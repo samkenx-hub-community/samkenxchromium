@@ -219,7 +219,9 @@ aura::Window* GetTopVisibleWindow() {
     // Floated windows can be tucked offscreen in tablet mode. Their target
     // visibility is true but the app list is fully visible under them.
     if (chromeos::wm::features::IsFloatWindowEnabled() &&
-        WindowState::Get(window)->IsFloated()) {
+        WindowState::Get(window)->IsFloated() &&
+        Shell::Get()->float_controller()->IsFloatedWindowTuckedForTablet(
+            window)) {
       continue;
     }
 
@@ -1219,13 +1221,6 @@ void AppListControllerImpl::InvokeSearchResultAction(
     client_->InvokeSearchResultAction(result_id, action);
 }
 
-void AppListControllerImpl::GetSearchResultContextMenuModel(
-    const std::string& result_id,
-    GetContextMenuModelCallback callback) {
-  if (client_)
-    client_->GetSearchResultContextMenuModel(result_id, std::move(callback));
-}
-
 void AppListControllerImpl::ViewShown(int64_t display_id) {
   UpdateAssistantVisibility();
 
@@ -1486,10 +1481,6 @@ int AppListControllerImpl::GetShelfSize() {
 
 bool AppListControllerImpl::IsInTabletMode() {
   return Shell::Get()->tablet_mode_controller()->InTabletMode();
-}
-
-AppListColorProviderImpl* AppListControllerImpl::GetColorProvider() {
-  return &color_provider_;
 }
 
 void AppListControllerImpl::RecordAppLaunched(

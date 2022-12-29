@@ -10,6 +10,7 @@
 #import "components/signin/internal/identity_manager/account_capabilities_constants.h"
 #import "components/strings/grit/components_strings.h"
 #import "ios/chrome/browser/flags/chrome_switches.h"
+#import "ios/chrome/browser/ntp/features.h"
 #import "ios/chrome/browser/prefs/pref_names.h"
 #import "ios/chrome/browser/signin/capabilities_types.h"
 #import "ios/chrome/browser/signin/fake_system_identity.h"
@@ -240,11 +241,6 @@ id<GREYMatcher> OmniboxWidthBetween(CGFloat width, CGFloat margin) {
   }
 #endif  // !TARGET_IPHONE_SIMULATOR
 
-  // TODO(crbug.com/1315304): Reenable.
-  if ([ChromeEarlGrey isNewOmniboxPopupEnabled]) {
-    EARL_GREY_TEST_DISABLED(@"Disabled for new popup");
-  }
-
   NSString* URL = @"app-settings://test/";
 
   // The URL needs to be typed to trigger the bug.
@@ -256,18 +252,11 @@ id<GREYMatcher> OmniboxWidthBetween(CGFloat width, CGFloat margin) {
       performAction:grey_typeText(URL)];
 
   // The first suggestion is a search, the second suggestion is the URL.
-  id<GREYMatcher> rowMatcher =
-      [ChromeEarlGrey isNewOmniboxPopupEnabled]
-          ? grey_allOf(
-                grey_ancestor(grey_accessibilityID(@"omnibox suggestion 0 1")),
-                chrome_test_util::OmniboxPopupRow(),
-                grey_accessibilityValue(URL), grey_sufficientlyVisible(), nil)
-          : grey_allOf(
-                grey_accessibilityID(@"omnibox suggestion 0 1"),
-                chrome_test_util::OmniboxPopupRow(),
-                grey_descendant(
-                    chrome_test_util::StaticTextWithAccessibilityLabel(URL)),
-                grey_sufficientlyVisible(), nil);
+  id<GREYMatcher> rowMatcher = grey_allOf(
+      grey_accessibilityID(@"omnibox suggestion 0 1"),
+      chrome_test_util::OmniboxPopupRow(),
+      grey_descendant(chrome_test_util::StaticTextWithAccessibilityLabel(URL)),
+      grey_sufficientlyVisible(), nil);
 
   [[EarlGrey selectElementWithMatcher:rowMatcher] performAction:grey_tap()];
 
@@ -635,12 +624,8 @@ id<GREYMatcher> OmniboxWidthBetween(CGFloat width, CGFloat margin) {
 }
 
 // Tests that tapping the fake omnibox focuses the real omnibox.
-- (void)testTapFakeOmnibox {
-  // TODO(crbug.com/1315304): Reenable.
-  if ([ChromeEarlGrey isNewOmniboxPopupEnabled]) {
-    EARL_GREY_TEST_DISABLED(@"Disabled for new popup");
-  }
-
+// TODO(crbug.com/1315304): Reenable.
+- (void)DISABLED_testTapFakeOmnibox {
   // Setup the server.
   self.testServer->RegisterRequestHandler(
       base::BindRepeating(&StandardResponse));
@@ -1191,6 +1176,8 @@ id<GREYMatcher> OmniboxWidthBetween(CGFloat width, CGFloat margin) {
   AppLaunchConfiguration config = [self appConfigurationForTestCase];
   config.relaunch_policy = ForceRelaunchByCleanShutdown;
   config.features_disabled.push_back(kTrendingQueriesModule);
+  // TODO(crbug.com/1403077): Reenable the discover feed sync promo feature
+  config.features_disabled.push_back(kEnableDiscoverFeedTopSyncPromo);
   [[AppLaunchManager sharedManager] ensureAppLaunchedWithConfiguration:config];
 
   [self

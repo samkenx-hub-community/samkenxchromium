@@ -144,6 +144,7 @@
 <translation id="2208919847696382164">Linux ಸಹಾಯದಿಂದ ಇನ್‌ಸ್ಟಾಲ್ ಮಾಡಿ</translation>
 <translation id="2225536596944493418">ನೀವು ಖಂಡಿತವಾಗಿಯೂ <ph name="NUMBER_OF_ITEMS" /> ಐಟಂಗಳನ್ನು ಅಳಿಸಲು ಬಯಸುವಿರಾ?</translation>
 <translation id="2230062665678605299">"<ph name="FOLDER_NAME" />" ಫೋಲ್ಡರ್ ಅನ್ನು ರಚಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. <ph name="ERROR_MESSAGE" /></translation>
+<translation id="2236732657580416950">ನಿಮ್ಮ Google Drive ಕ್ಯಾಷ್ ಅನ್ನು ತೆರವುಗೊಳಿಸಲಾಗಿದೆ.</translation>
 <translation id="2239068707900391003">ಕಾಫಿ ಕುಡಿಯುತ್ತಿರುವ ವ್ಯಕ್ತಿ</translation>
 <translation id="2251368349685848079">ಅನುಪಯುಕ್ತದಿಂದ ಮರುಸ್ಥಾಪಿಸಿ</translation>
 <translation id="2282155092769082568">ಸ್ವಯಂ ಕಾನ್ಫಿಗರೇಶನ್ URL:</translation>
@@ -678,6 +679,7 @@
 <translation id="6607272825297743757">ಫೈಲ್ ಮಾಹಿತಿ</translation>
 <translation id="6609332149380188670">Parallels Desktop ಮೂಲಕ <ph name="NUMBER_OF_ITEMS" /> ಫೋಲ್ಡರ್‌ಗಳನ್ನು ಹಂಚಿಕೊಳ್ಳಲಾಗಿದೆ</translation>
 <translation id="6629518321609546825">ಕನಿಷ್ಠ 4 ಸಂಖ್ಯೆಗಳನ್ನು ನಮೂದಿಸಿ</translation>
+<translation id="6639661343369899134"><ph name="SHARED_DRIVE_NAME" /> ಸಾಕಷ್ಟು ಸಂಗ್ರಹಣೆಯನ್ನು ಹೊಂದಿರದ ಕಾರಣ ಫೈಲ್‌ಗಳನ್ನು ಅಪ್‌ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಿಲ್ಲ.</translation>
 <translation id="6643016212128521049">ತೆರವುಗೊಳಿಸಿ</translation>
 <translation id="6650726141019353908">ಗುಲಾಬಿ ಬಣ್ಣದ ಚಿಟ್ಟೆ</translation>
 <translation id="6657585470893396449">ಪಾಸ್‌ವರ್ಡ್</translation>

@@ -517,6 +517,7 @@ Els testimonis d'estat privat milloren la privadesa al web i no poden utilitzar-
 <translation id="3830886834687455630">Actualitza Serveis de Google Play per comprovar les teves contrasenyes</translation>
 <translation id="3845098929839618392">Obre en una pestanya d'incògnit</translation>
 <translation id="3856096718352044181">Verifica que aquest és un proveïdor vàlid o torna-ho a provar més tard</translation>
+<translation id="3858127568696903256">Consulta aquí el contingut que segueixes</translation>
 <translation id="3858860766373142691">Nom</translation>
 <translation id="3861633093716975811">Vídeos populars</translation>
 <translation id="3874520961715512166">S'ha suprimit el lloc web</translation>
@@ -552,7 +553,6 @@ Els testimonis d'estat privat milloren la privadesa al web i no poden utilitzar-
 <translation id="4045764304651014138">Dades d'ús</translation>
 <translation id="405399507749852140">Si el preu baixa en qualsevol lloc web, rebràs una alerta</translation>
 <translation id="4056223980640387499">Sèpia</translation>
-<translation id="4060598801229743805">Hi ha opcions disponibles a prop de la part superior de la pantalla</translation>
 <translation id="4062305924942672200">Informació legal</translation>
 <translation id="4072805772816336153">Torna-ho a provar més tard</translation>
 <translation id="4084682180776658562">Adreça d'interès</translation>
@@ -642,7 +642,6 @@ Els testimonis d'estat privat milloren la privadesa al web i no poden utilitzar-
 <translation id="4554077758708533499">Connectat amb un cable USB</translation>
 <translation id="4558311620361989323">Dreceres per a pàgines web</translation>
 <translation id="4561730552726921821">S'ha registrat correctament</translation>
-<translation id="4561979708150884304">No hi ha connexió</translation>
 <translation id="4565377596337484307">Oculta la contrasenya</translation>
 <translation id="4572422548854449519">Inicia la sessió al compte gestionat</translation>
 <translation id="4576892426230499203">Prova una altra opció de verificació</translation>
@@ -667,7 +666,6 @@ Els testimonis d'estat privat milloren la privadesa al web i no poden utilitzar-
 <translation id="4699172675775169585">Imatges i fitxers desats a la memòria cau</translation>
 <translation id="4719927025381752090">Proposa traduir aquest idioma</translation>
 <translation id="4720023427747327413">Obre a <ph name="PRODUCT_NAME" /></translation>
-<translation id="4720982865791209136">Ajuda a millorar Chrome. <ph name="BEGIN_LINK" />Respon a l'enquesta<ph name="END_LINK" />.</translation>
 <translation id="47217992755561375">Consulta els llocs web que més visites</translation>
 <translation id="4732120983431207637">Anul·lador de piles</translation>
 <translation id="4736934858538408121">Targeta virtual</translation>
@@ -771,7 +769,6 @@ Per canviar aquesta opció, <ph name="BEGIN_LINK" />restableix la sincronitzaci�
 <translation id="5184329579814168207">Obre a Chrome</translation>
 <translation id="5191251636205085390">Obtén informació sobre les noves tecnologies per substituir les galetes de tercers i controla-les</translation>
 <translation id="5193988420012215838">S'ha copiat al porta-retalls</translation>
-<translation id="5199929503336119739">Perfil de treball</translation>
 <translation id="5204967432542742771">Escriviu la contrasenya</translation>
 <translation id="5206168361184759344">{FILE_COUNT,plural, =1{S'està baixant el fitxer…}other{S'estan baixant # fitxers…}}</translation>
 <translation id="5210286577605176222">Ves a la pestanya anterior</translation>
@@ -1345,14 +1342,12 @@ Per exemple, és possible que alguns llocs web responguin a aquesta sol·licitud
 <translation id="8221656072740924283">Continua</translation>
 <translation id="8223642481677794647">Menú de la targeta del tauler</translation>
 <translation id="8250920743982581267">Documents</translation>
-<translation id="825412236959742607">Com que aquesta pàgina fa servir massa memòria, Chrome n'ha suprimit contingut.</translation>
 <translation id="8255617931166444521">Els llocs web només poden fer servir les teves galetes per veure la teva activitat de navegació només en aquests mateixos llocs web</translation>
 <translation id="8259179246279078674">Com que les pàgines precarregades estan encriptades, Google no obtindrà informació del contingut de la pàgina precarregada. Els servidors de Google sabran quins llocs web es precarreguen de manera privada. Aquesta informació només s'utilitza per precarregar les pàgines i no es vincula amb cap altra informació del teu Compte de Google.</translation>
 <translation id="8260126382462817229">Prova d'iniciar la sessió de nou</translation>
 <translation id="8261506727792406068">Suprimeix</translation>
 <translation id="82619448491672958">Mostra les altres pestanyes</translation>
 <translation id="8266862848225348053">Ubicació de baixada</translation>
-<translation id="8274165955039650276">Mostra les baixades</translation>
 <translation id="8281886186245836920">Omet</translation>
 <translation id="8282297628636750033">Aplica el tema fosc als llocs web, sempre que sigui possible</translation>
 <translation id="829672787777123339">S'està connectant amb el dispositiu…</translation>
@@ -1516,7 +1511,6 @@ Per exemple, és possible que alguns llocs web responguin a aquesta sol·licitud
 <translation id="9108808586816295166">És possible que el DNS segur no estigui disponible en tot moment</translation>
 <translation id="9128984223251192329">La sol·licitud de Privacy Sandbox s'ha obert a mitja alçada</translation>
 <translation id="9133397713400217035">Explora sense connexió</translation>
-<translation id="9137013805542155359">Mostra l'original</translation>
 <translation id="9148126808321036104">Torna a iniciar la sessió</translation>
 <translation id="9158770349521403363">Comparteix només el contingut</translation>
 <translation id="9159716826369098114">Restaura el grup de <ph name="TAB_COUNT" /> pestanyes com un nou grup de pestanyes en segon pla.</translation>

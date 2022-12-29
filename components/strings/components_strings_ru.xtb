@@ -906,7 +906,7 @@
 <translation id="3268451620468152448">Вкладки</translation>
 <translation id="3270156322180235608">Авиапутешествия</translation>
 <translation id="3270847123878663523">&amp;Отменить изменение порядка</translation>
-<translation id="3271648667212143903">Сайт <ph name="ORIGIN" /> запрашивает подключение</translation>
+<translation id="3271648667212143903"><ph name="ORIGIN" /> запрашивает разрешение на подключение</translation>
 <translation id="3272091146646336650">Super B</translation>
 <translation id="3281350579597955952">{0,plural, =1{Администратор не рекомендует открывать этот файл в месте назначения "<ph name="DESTINATION_NAME" />".}one{Администратор не рекомендует открывать эти файлы в месте назначения "<ph name="DESTINATION_NAME" />".}few{Администратор не рекомендует открывать эти файлы в месте назначения "<ph name="DESTINATION_NAME" />".}many{Администратор не рекомендует открывать эти файлы в месте назначения "<ph name="DESTINATION_NAME" />".}other{Администратор не рекомендует открывать эти файлы в месте назначения "<ph name="DESTINATION_NAME" />".}}</translation>
 <translation id="3282085321714087552">Ваша организация (<ph name="ENROLLMENT_DOMAIN" />) отправила на следующие веб-сайты некоторые данные, такие как настройки и правила.</translation>
@@ -1014,6 +1014,7 @@
 <translation id="3532844647053365774">Сайт <ph name="HOST" /> запрашивает доступ к микрофону.</translation>
 <translation id="3533328374079021623">Почтовый ящик 5</translation>
 <translation id="3537165859691846083">Letter Plus</translation>
+<translation id="3542628208405253498">Изображение карты</translation>
 <translation id="3542768452570884558">Открыть ссылку в новом окне</translation>
 <translation id="3547746132308051926">20 x 24 дюйма</translation>
 <translation id="3550112004925580947">Индустрия гостеприимства</translation>
@@ -1104,6 +1105,7 @@
 <translation id="3745099705178523657">После подтверждения реквизиты карты из аккаунта Google будут переданы этому сайту.</translation>
 <translation id="3748148204939282805">Посещение сайта <ph name="BEGIN_BOLD" /><ph name="SITE" /><ph name="END_BOLD" /> может привести к установке вредоносного ПО или хищению личной информации (например, паролей, телефонных номеров и данных банковских карт). <ph name="BEGIN_LEARN_MORE_LINK" />Подробнее…<ph name="END_LEARN_MORE_LINK" /></translation>
 <translation id="3748912308089554501">Авиационная отрасль</translation>
+<translation id="3752543821772132562">Игнорируется, так как правило <ph name="POLICY_NAME" /> не настроено.</translation>
 <translation id="3754210790023674521">Выйти из режима "Картинка в картинке"</translation>
 <translation id="3759461132968374835">Нет записей о недавних сбоях. Сбои, которые произошли при отключенной функции записи сбоев, здесь не отображаются.</translation>
 <translation id="3760561303380396507">Использовать Windows Hello вместо CVC-кода?</translation>
@@ -1163,6 +1165,7 @@
 <translation id="3927932062596804919">Запретить</translation>
 <translation id="393316646445601645">Интернет и телекоммуникации</translation>
 <translation id="3939773374150895049">Использовать WebAuthn вместо CVC-кода?</translation>
+<translation id="3943857333388298514">Вставить</translation>
 <translation id="3946209740501886391">Всегда спрашивать на этом сайте</translation>
 <translation id="3947595700203588284">Разрешено отправлять запрос на подключение к MIDI-устройствам</translation>
 <translation id="3949571496842715403">Сервер не может подтвердить связь с доменом <ph name="DOMAIN" />. В его сертификате безопасности не указаны альтернативные варианты имен. Возможно, сервер настроен неправильно или кто-то пытается перехватить ваши данные.</translation>
@@ -2310,6 +2313,7 @@
 <translation id="6890531741535756070">Вы выбрали <ph name="DEVICE_LABEL" /> для подтверждения покупок на сайтах, пользующихся услугами поставщика <ph name="PROVIDER_ORIGIN" />. Поставщик мог сохранить информацию о вашем способе оплаты. У вас есть право <ph name="BEGIN_LINK" />запросить удаление этих данных<ph name="END_LINK" />.</translation>
 <translation id="6891596781022320156">Значение правила не поддерживается.</translation>
 <translation id="6895330447102777224">Ваша карта подтверждена</translation>
+<translation id="6896758677409633944">Копировать</translation>
 <translation id="6897140037006041989">User Agent</translation>
 <translation id="6898699227549475383">Организация (O)</translation>
 <translation id="6899000063526916106">Введите <ph name="NUMBER_OF_DIGITS" />-значный код</translation>
@@ -2677,6 +2681,7 @@
 <translation id="7716375162095500223">Проигнорирован или ещё не загружен</translation>
 <translation id="7716424297397655342">Не удалось загрузить сайт из кеша</translation>
 <translation id="7723047071702270851">Измените данные карты</translation>
+<translation id="7724603315864178912">Вырезать</translation>
 <translation id="7734285854693414638">Быстро создать форму в Google Формах</translation>
 <translation id="773466115871691567">Переводить страницы на этом языке: <ph name="SOURCE_LANGUAGE" /></translation>
 <translation id="7736959720849233795">Копировать адрес ссылки</translation>
@@ -2713,6 +2718,7 @@
 <translation id="7815407501681723534"><ph name="SEARCH_RESULTS" /> по запросу "<ph name="SEARCH_STRING" />" (<ph name="NUMBER_OF_RESULTS" />)</translation>
 <translation id="7822320754433038727">Охота и стрельба</translation>
 <translation id="782886543891417279">Возможно, вам нужно перейти на страницу входа сети Wi-Fi (<ph name="WIFI_NAME" />).</translation>
+<translation id="7840103971441592723">Запись экрана начата</translation>
 <translation id="7844689747373518809">{COUNT,plural, =0{Нет}=1{1 приложение (<ph name="EXAMPLE_APP_1" />)}=2{2 приложения (<ph name="EXAMPLE_APP_1" />, <ph name="EXAMPLE_APP_2" />)}one{# приложение (<ph name="EXAMPLE_APP_1" />, <ph name="EXAMPLE_APP_2" /> <ph name="AND_MORE" />)}few{# приложения (<ph name="EXAMPLE_APP_1" />, <ph name="EXAMPLE_APP_2" /> <ph name="AND_MORE" />)}many{# приложений (<ph name="EXAMPLE_APP_1" />, <ph name="EXAMPLE_APP_2" /> <ph name="AND_MORE" />)}other{# приложения (<ph name="EXAMPLE_APP_1" />, <ph name="EXAMPLE_APP_2" /> <ph name="AND_MORE" />)}}</translation>
 <translation id="7855695075675558090"><ph name="TOTAL_LABEL" /> <ph name="FORMATTED_TOTAL_AMOUNT" /> <ph name="CURRENCY_CODE" /></translation>
 <translation id="7862185352068345852">Закрыть сайт?</translation>
@@ -2742,6 +2748,7 @@
 <translation id="7942349550061667556">Красный</translation>
 <translation id="7943397946612013052">Скачивание остановлено</translation>
 <translation id="7943893128817522649">Разрешено отправлять запрос на автоматическое скачивание нескольких файлов</translation>
+<translation id="7946724693008564269">Обнаруженный язык</translation>
 <translation id="7947285636476623132">Проверьте год в сроке действия карты и повторите попытку</translation>
 <translation id="7947813448670013867"><ph name="SEE_CHROME_TIPS_FOCUSED_FRIENDLY_MATCH_TEXT" />. Чтобы узнать больше о функциях Chrome, нажмите Tab, а затем Ввод.</translation>
 <translation id="7950027195171824198">Задать параметры файлов cookie в настройках Chrome</translation>
@@ -2890,6 +2897,7 @@
 <translation id="8282947398454257691">доступ к уникальному идентификатору устройства</translation>
 <translation id="8284769179630993263">Задать параметры Безопасного просмотра и других функций в настройках Chrome</translation>
 <translation id="8286036467436129157">Войти</translation>
+<translation id="8286799286781881307">Приложения, одобренные администратором, могут получать доступ к информации со всех экранов, подключенных к вашему устройству. Такие сведения обрабатываются локально или загружаются на серверы вашей организации.</translation>
 <translation id="8288807391153049143">Показать сертификат</translation>
 <translation id="8289355894181816810">Уточните информацию у администратора сети.</translation>
 <translation id="8293206222192510085">Добавление закладки</translation>
@@ -2916,6 +2924,7 @@
 <translation id="8355270400102541638">Локальный идентификатор сбоя:</translation>
 <translation id="8363502534493474904">Отключите режим полета.</translation>
 <translation id="8364627913115013041">Не задано</translation>
+<translation id="836616551641291797">Узнайте больше о том, как осуществляется управление браузером</translation>
 <translation id="8368001212524806591">Отслеживание цен</translation>
 <translation id="8368027906805972958">Неизвестное или неподдерживаемое устройство (<ph name="DEVICE_ID" />)</translation>
 <translation id="8368476060205742148">Сервисы Google Play</translation>

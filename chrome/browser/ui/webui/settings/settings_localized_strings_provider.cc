@@ -127,7 +127,6 @@
 #endif
 
 #if BUILDFLAG(IS_WIN)
-#include "base/win/windows_version.h"
 #include "chrome/browser/safe_browsing/chrome_cleaner/srt_field_trial_win.h"
 #include "device/fido/win/webauthn_api.h"
 
@@ -263,8 +262,7 @@ void AddA11yStrings(content::WebUIDataSource* html_source) {
   html_source->AddLocalizedStrings(kLocalizedStrings);
 
 #if BUILDFLAG(IS_WIN)
-  html_source->AddBoolean("isWindows10OrNewer",
-                          base::win::GetVersion() >= base::win::Version::WIN10);
+  html_source->AddBoolean("isWindows10OrNewer", true);
 #endif
 
 #if !BUILDFLAG(IS_CHROMEOS_ASH)
@@ -2015,7 +2013,17 @@ void AddPrivacySandboxStrings(content::WebUIDataSource* html_source,
        IDS_SETTINGS_TOPICS_PAGE_CURRENT_TOPICS_DESCRIPTION_DISABLED},
       {"topicsPageCurrentTopicsDescriptionEmpty",
        IDS_SETTINGS_TOPICS_PAGE_CURRENT_TOPICS_DESCRIPTION_EMPTY},
+      {"topicsPageBlockTopic", IDS_SETTINGS_TOPICS_PAGE_BLOCK_TOPIC},
+      {"topicsPageBlockedTopicsHeading",
+       IDS_SETTINGS_TOPICS_PAGE_BLOCKED_TOPICS_HEADING},
+      {"topicsPageBlockedTopicsDescription",
+       IDS_SETTINGS_TOPICS_PAGE_BLOCKED_TOPICS_DESCRIPTION},
+      {"topicsPageBlockedTopicsDescriptionEmpty",
+       IDS_SETTINGS_TOPICS_PAGE_BLOCKED_TOPICS_DESCRIPTION_EMPTY},
+      {"topicsPageAllowTopic", IDS_SETTINGS_TOPICS_PAGE_ALLOW_TOPIC},
       {"fledgePageTitle", IDS_SETTINGS_FLEDGE_PAGE_TITLE},
+      {"fledgePageToggleLabel", IDS_SETTINGS_FLEDGE_PAGE_TOGGLE_LABEL},
+      {"fledgePageToggleSubLabel", IDS_SETTINGS_FLEDGE_PAGE_TOGGLE_SUB_LABEL},
       {"adMeasurementPageTitle", IDS_SETTINGS_AD_MEASUREMENT_PAGE_TITLE},
       {"adMeasurementPageToggleLabel",
        IDS_SETTINGS_AD_MEASUREMENT_PAGE_TOGGLE_LABEL},
@@ -2095,14 +2103,6 @@ void AddPrivacyGuideStrings(content::WebUIDataSource* html_source) {
        IDS_SETTINGS_PRIVACY_GUIDE_MSBB_PRIVACY_DESCRIPTION1},
       {"privacyGuideMsbbPrivacyDescription2",
        IDS_SETTINGS_PRIVACY_GUIDE_MSBB_PRIVACY_DESCRIPTION2},
-      {"privacyGuideClearOnExitCardHeader",
-       IDS_SETTINGS_PRIVACY_GUIDE_CLEAR_ON_EXIT_CARD_HEADER},
-      {"privacyGuideClearOnExitFeatureDescription1",
-       IDS_SETTINGS_PRIVACY_GUIDE_CLEAR_ON_EXIT_FEATURE_DESCRIPTION1},
-      {"privacyGuideClearOnExitFeatureDescription2",
-       IDS_SETTINGS_PRIVACY_GUIDE_CLEAR_ON_EXIT_FEATURE_DESCRIPTION2},
-      {"privacyGuideClearOnExitFeatureDescription3",
-       IDS_SETTINGS_PRIVACY_GUIDE_CLEAR_ON_EXIT_FEATURE_DESCRIPTION3},
       {"privacyGuideHistorySyncCardHeader",
        IDS_SETTINGS_PRIVACY_GUIDE_HISTORY_SYNC_CARD_HEADER},
       {"privacyGuideHistorySyncSettingLabel",
@@ -3090,12 +3090,16 @@ void AddSiteSettingsStrings(content::WebUIDataSource* html_source,
      IDS_SITE_SETTINGS_TYPE_BLUETOOTH_SCANNING},
     {"siteSettingsBluetoothScanningMidSentence",
      IDS_SITE_SETTINGS_TYPE_BLUETOOTH_SCANNING_MID_SENTENCE},
+    {"siteSettingsBluetoothScanningDescription",
+     IDS_SETTINGS_SITE_SETTINGS_BLUETOOTH_SCANNING_DESCRIPTION},
     {"siteSettingsBluetoothScanningAsk",
      IDS_SETTINGS_SITE_SETTINGS_BLUETOOTH_SCANNING_ASK},
-    {"siteSettingsBluetoothScanningAskRecommended",
-     IDS_SETTINGS_SITE_SETTINGS_BLUETOOTH_SCANNING_ASK_RECOMMENDED},
     {"siteSettingsBluetoothScanningBlock",
      IDS_SETTINGS_SITE_SETTINGS_BLUETOOTH_SCANNING_BLOCK},
+    {"siteSettingsBluetoothScanningAllowedExceptions",
+     IDS_SETTINGS_SITE_SETTINGS_BLUETOOTH_SCANNING_ALLOWED_EXCEPTIONS},
+    {"siteSettingsBluetoothScanningBlockedExceptions",
+     IDS_SETTINGS_SITE_SETTINGS_BLUETOOTH_SCANNING_BLOCKED_EXCEPTIONS},
     {"siteSettingsAr", IDS_SITE_SETTINGS_TYPE_AR},
     {"siteSettingsArMidSentence", IDS_SITE_SETTINGS_TYPE_AR_MID_SENTENCE},
     {"siteSettingsArAsk", IDS_SETTINGS_SITE_SETTINGS_AR_ASK},
@@ -3126,6 +3130,8 @@ void AddSiteSettingsStrings(content::WebUIDataSource* html_source,
      IDS_SITE_SETTINGS_TYPE_IDLE_DETECTION_MID_SENTENCE},
     {"siteSettingsIdleDetectionBlock",
      IDS_SETTINGS_SITE_SETTINGS_IDLE_DETECTION_BLOCK},
+    {"siteSettingsExtensionIdDescription",
+     IDS_SETTINGS_SITE_SETTINGS_EXTENSION_ID_DESCRIPTION},
   };
   html_source->AddLocalizedStrings(kLocalizedStrings);
 

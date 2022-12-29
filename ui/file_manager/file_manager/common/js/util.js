@@ -1133,15 +1133,6 @@ util.isMirrorSyncEnabled = () => {
 };
 
 /**
- * Returns true if filters in Recents view V2 is enabled.
- * @return {boolean}
- */
-util.isRecentsFilterV2Enabled = () => {
-  return loadTimeData.valueExists('FILTERS_IN_RECENTS_V2_ENABLED') &&
-      loadTimeData.getBoolean('FILTERS_IN_RECENTS_V2_ENABLED');
-};
-
-/**
  * Returns true if search v2 feature flag is enabled.
  * @return {boolean}
  */
@@ -1343,9 +1334,9 @@ util.isArcUsbStorageUIEnabled = () => {
 };
 
 /** @return {boolean} */
-util.isArcVirtioBlkForDataEnabled = () => {
-  return loadTimeData.valueExists('ARC_ENABLE_VIRTIO_BLK_FOR_DATA') &&
-      loadTimeData.getBoolean('ARC_ENABLE_VIRTIO_BLK_FOR_DATA');
+util.isArcVmEnabled = () => {
+  return loadTimeData.valueExists('ARC_VM_ENABLED') &&
+      loadTimeData.getBoolean('ARC_VM_ENABLED');
 };
 
 /** @return {boolean} */
@@ -1487,15 +1478,14 @@ util.getLocaleBasedWeekStart = () => {
 
 /**
  * Returns a boolean indicating whether the volume is a GuestOs volume. And
- * ANDROID_FILES type volume can also be a GuestOs volume if we are using
- * virtio-blk.
+ * ANDROID_FILES type volume can also be a GuestOs volume if ARCVM is enabled.
  * @param {VolumeManagerCommon.VolumeType} type
  * @return {boolean}
  */
 util.isGuestOs = type => {
   return type === VolumeManagerCommon.VolumeType.GUEST_OS ||
       (type === VolumeManagerCommon.VolumeType.ANDROID_FILES &&
-       util.isArcVirtioBlkForDataEnabled());
+       util.isArcVmEnabled());
 };
 
 /**

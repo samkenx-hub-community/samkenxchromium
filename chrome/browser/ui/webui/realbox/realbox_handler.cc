@@ -62,7 +62,7 @@
 #include "ui/base/webui/web_ui_util.h"
 #include "ui/base/window_open_disposition_utils.h"
 #include "ui/gfx/vector_icon_types.h"
-#include "ui/resources/grit/webui_generated_resources.h"
+#include "ui/resources/grit/webui_resources.h"
 
 namespace {
 
@@ -685,7 +685,8 @@ void RealboxHandler::OpenAutocompleteMatch(
           : std::u16string::npos,
       /*elapsed_time_since_last_change_to_default_match=*/
       elapsed_time_since_last_change_to_default_match,
-      /*result=*/autocomplete_controller_->result(), match.destination_url);
+      /*result=*/autocomplete_controller_->result(), match.destination_url,
+      /*is_incognito=*/profile_->IsOffTheRecord());
   autocomplete_controller_->AddProviderAndTriggeringLogs(&log);
 
   OmniboxEventGlobalTracker::GetInstance()->OnURLOpened(&log);
@@ -801,16 +802,22 @@ void RealboxHandler::ExecuteAction(uint8_t line,
 
 void RealboxHandler::OnResultChanged(AutocompleteController* controller,
                                      bool default_match_changed) {
-  // Ignore updates if the controller does not belong to the realbox.
-  if (!autocomplete_controller_ ||
-      autocomplete_controller_.get() != controller) {
-    return;
-  }
-
   if (metrics_reporter_ && !metrics_reporter_->HasLocalMark("ResultChanged")) {
     metrics_reporter_->Mark("ResultChanged");
   }
 
+  // Update the omnibox if the controller does not belong to the realbox.
+  if (controller != autocomplete_controller_.get()) {
+    if (base::FeatureList::IsEnabled(omnibox::kWebUIOmniboxPopup)) {
+      page_->OmniboxAutocompleteResultChanged(CreateAutocompleteResult(
+          controller->input().text(), controller->result(),
+          BookmarkModelFactory::GetForBrowserContext(profile_),
+          profile_->GetPrefs()));
+    }
+    return;
+  }
+
+  // Update the realbox only if the controller belongs to the realbox.
   page_->AutocompleteResultChanged(CreateAutocompleteResult(
       autocomplete_controller_->input().text(),
       autocomplete_controller_->result(),

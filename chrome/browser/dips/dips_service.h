@@ -31,7 +31,7 @@ class PersistentRepeatingTimer;
 class DIPSService : public KeyedService {
  public:
   using RecordBounceCallback = base::RepeatingCallback<
-      void(bool stateful, const GURL& url, base::Time time)>;
+      void(const GURL& url, base::Time time, bool stateful)>;
 
   ~DIPSService() override;
 
@@ -69,7 +69,7 @@ class DIPSService : public KeyedService {
                 DIPSRedirectChainInfoPtr chain,
                 size_t index,
                 const DIPSState url_state);
-  void RecordBounce(bool stateful, const GURL& url, base::Time time);
+  void RecordBounce(const GURL& url, base::Time time, bool stateful);
   static void HandleRedirect(const DIPSRedirectInfo& redirect,
                              const DIPSRedirectChainInfo& chain,
                              RecordBounceCallback callback);
@@ -77,6 +77,8 @@ class DIPSService : public KeyedService {
   scoped_refptr<base::SequencedTaskRunner> CreateTaskRunner();
   void InitializeStorageWithEngagedSites();
   void InitializeStorage(base::Time time, std::vector<std::string> sites);
+
+  void OnTimerFired();
 
   raw_ptr<content::BrowserContext> browser_context_;
   scoped_refptr<content_settings::CookieSettings> cookie_settings_;
@@ -86,7 +88,6 @@ class DIPSService : public KeyedService {
   // See base/time/time_delta_from_string.h for how that param should be given.
   std::unique_ptr<signin::PersistentRepeatingTimer> repeating_timer_;
   base::SequenceBound<DIPSStorage> storage_;
-
   base::WeakPtrFactory<DIPSService> weak_factory_{this};
 };
 

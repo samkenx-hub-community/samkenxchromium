@@ -252,6 +252,10 @@ class TtsEnvironmentAndroid;
 class TtsControllerDelegate;
 #endif
 
+#if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_FUCHSIA)
+class SmartCardDelegate;
+#endif
+
 // Embedder API (or SPI) for participating in browser logic, to be implemented
 // by the client of the content browser. See ChromeContentBrowserClient for the
 // principal implementation. The methods are assumed to be called on the UI
@@ -884,6 +888,13 @@ class CONTENT_EXPORT ContentBrowserClient {
                                       content::RenderFrameHost* rfh,
                                       const url::Origin& top_frame_origin,
                                       const url::Origin& accessing_origin);
+
+  // Allows the embedder to control if Shared Storage API `selectURL()` can
+  // happen in a given context.
+  virtual bool IsSharedStorageSelectURLAllowed(
+      content::BrowserContext* browser_context,
+      const url::Origin& top_frame_origin,
+      const url::Origin& accessing_origin);
 
   // Allows the embedder to control if Private Aggregation API operations can
   // happen in a given context.
@@ -1853,6 +1864,12 @@ class CONTENT_EXPORT ContentBrowserClient {
   // Allows the embedder to provide an implementation of the Local Font Access
   // API.
   virtual FontAccessDelegate* GetFontAccessDelegate();
+
+#if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_FUCHSIA)
+  // Allows the embedder to provide an implementation of the Web Smart Card API.
+  virtual SmartCardDelegate* GetSmartCardDelegate(
+      BrowserContext* browser_context);
+#endif
 
   // Attempt to open the Payment Handler window inside its corresponding
   // PaymentRequest UI surface. Returns true if the ContentBrowserClient

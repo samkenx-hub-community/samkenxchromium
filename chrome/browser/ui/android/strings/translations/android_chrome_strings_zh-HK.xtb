@@ -517,6 +517,7 @@ Private State Token 能夠改善網絡上的私隱，而且系統無法透過信
 <translation id="3830886834687455630">需要更新 Google Play 服務才能檢查密碼</translation>
 <translation id="3845098929839618392">在無痕式分頁中開啟</translation>
 <translation id="3856096718352044181">請驗證供應商的有效性，或稍後再試</translation>
+<translation id="3858127568696903256">這裡會顯示您追蹤的內容</translation>
 <translation id="3858860766373142691">名稱</translation>
 <translation id="3861633093716975811">熱門影片</translation>
 <translation id="3874520961715512166">已移除網站</translation>
@@ -552,7 +553,6 @@ Private State Token 能夠改善網絡上的私隱，而且系統無法透過信
 <translation id="4045764304651014138">使用情況資料</translation>
 <translation id="405399507749852140">如果產品在任何網站上降價，系統將通知您</translation>
 <translation id="4056223980640387499">棕褐色</translation>
-<translation id="4060598801229743805">選項位於螢幕頂部</translation>
 <translation id="4062305924942672200">法律資料</translation>
 <translation id="4072805772816336153">請稍後再試</translation>
 <translation id="4084682180776658562">書籤</translation>
@@ -642,7 +642,6 @@ Private State Token 能夠改善網絡上的私隱，而且系統無法透過信
 <translation id="4554077758708533499">已使用 USB 連接線連接</translation>
 <translation id="4558311620361989323">網頁快速鍵</translation>
 <translation id="4561730552726921821">註冊成功</translation>
-<translation id="4561979708150884304">沒有連線</translation>
 <translation id="4565377596337484307">隱藏密碼</translation>
 <translation id="4572422548854449519">登入受管理的帳戶</translation>
 <translation id="4576892426230499203">請改用其他驗證選項</translation>
@@ -667,7 +666,6 @@ Private State Token 能夠改善網絡上的私隱，而且系統無法透過信
 <translation id="4699172675775169585">快取圖片和檔案</translation>
 <translation id="4719927025381752090">提供翻譯</translation>
 <translation id="4720023427747327413">用 <ph name="PRODUCT_NAME" /> 開啟</translation>
-<translation id="4720982865791209136">協助改善 Chrome。<ph name="BEGIN_LINK" />請填寫我們的問卷調查<ph name="END_LINK" /></translation>
 <translation id="47217992755561375">查看熱門網站</translation>
 <translation id="4732120983431207637">Stack Unwinder</translation>
 <translation id="4736934858538408121">虛擬卡</translation>
@@ -771,7 +769,6 @@ Private State Token 能夠改善網絡上的私隱，而且系統無法透過信
 <translation id="5184329579814168207">在 Chrome 中開啟</translation>
 <translation id="5191251636205085390">瞭解及控制用於取代第三方 Cookie 的全新技術</translation>
 <translation id="5193988420012215838">已複製至剪貼簿</translation>
-<translation id="5199929503336119739">工作設定檔</translation>
 <translation id="5204967432542742771">輸入密碼</translation>
 <translation id="5206168361184759344">{FILE_COUNT,plural, =1{正在下載檔案…}other{正在下載 # 個檔案…}}</translation>
 <translation id="5210286577605176222">跳至上一個分頁</translation>
@@ -1345,14 +1342,12 @@ Private State Token 能夠改善網絡上的私隱，而且系統無法透過信
 <translation id="8221656072740924283">繼續</translation>
 <translation id="8223642481677794647">資訊提供卡選單</translation>
 <translation id="8250920743982581267">文件</translation>
-<translation id="825412236959742607">這個網頁使用過多記憶體，因此 Chrome 已移除部分內容。</translation>
 <translation id="8255617931166444521">網站只能使用 Cookie 查看您在該網站的瀏覽活動</translation>
 <translation id="8259179246279078674">由於預先載入的網頁已加密，Google 不會得知預先載入網頁內容的相關資料。Google 伺服器會知道哪些網站已透過私密方式預先載入。此資料只用於預先載入網頁，不會與您 Google 帳戶的其他資料連結。</translation>
 <translation id="8260126382462817229">請嘗試再次登入</translation>
 <translation id="8261506727792406068">刪除</translation>
 <translation id="82619448491672958">查看其他分頁</translation>
 <translation id="8266862848225348053">下載檔案儲存位置</translation>
-<translation id="8274165955039650276">查看已下載的內容</translation>
 <translation id="8281886186245836920">略過</translation>
 <translation id="8282297628636750033">在可用情況下，為網站套用深色主題背景</translation>
 <translation id="829672787777123339">正在連接您的裝置…</translation>
@@ -1516,7 +1511,6 @@ Private State Token 能夠改善網絡上的私隱，而且系統無法透過信
 <translation id="9108808586816295166">可能無法隨時使用安全 DNS</translation>
 <translation id="9128984223251192329">私隱沙箱提示宜家顯示喺畫面下半部</translation>
 <translation id="9133397713400217035">離線探索</translation>
-<translation id="9137013805542155359">顯示原文</translation>
 <translation id="9148126808321036104">重新登入</translation>
 <translation id="9158770349521403363">只分享內容</translation>
 <translation id="9159716826369098114">還原有 <ph name="TAB_COUNT" /> 個分頁嘅分頁群組做新嘅背景分頁群組。</translation>

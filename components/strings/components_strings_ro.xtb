@@ -1015,6 +1015,7 @@
 <translation id="3532844647053365774"><ph name="HOST" /> dorește să utilizeze microfonul</translation>
 <translation id="3533328374079021623">Căsuța de e-mail 5</translation>
 <translation id="3537165859691846083">Letter Plus</translation>
+<translation id="3542628208405253498">Imaginea cardului</translation>
 <translation id="3542768452570884558">Deschide linkul într-o fereastră nouă</translation>
 <translation id="3547746132308051926">20 x 24 in</translation>
 <translation id="3550112004925580947">Industria ospitalității</translation>
@@ -1105,6 +1106,7 @@
 <translation id="3745099705178523657">După ce confirmi, acest site va avea acces la detaliile cardului tău din Contul Google.</translation>
 <translation id="3748148204939282805">Atacatorii de pe <ph name="BEGIN_BOLD" /><ph name="SITE" /><ph name="END_BOLD" /> te pot înșela, determinându-te să faci ceva periculos, cum ar fi să instalezi software sau să îți dezvălui informațiile cu caracter personal (de exemplu, parole, numere de telefon sau date despre cardurile de credit). <ph name="BEGIN_LEARN_MORE_LINK" />Află mai multe<ph name="END_LEARN_MORE_LINK" /></translation>
 <translation id="3748912308089554501">Domeniul aviației</translation>
+<translation id="3752543821772132562">S-a ignorat deoarece <ph name="POLICY_NAME" /> nu este setat.</translation>
 <translation id="3754210790023674521">Ieși din modul picture-in-picture</translation>
 <translation id="3759461132968374835">Nu există blocări raportate recent. Blocările care au avut loc când raportarea blocărilor era dezactivată nu vor apărea aici.</translation>
 <translation id="3760561303380396507">Folosești Windows Hello în loc de CVC?</translation>
@@ -1164,6 +1166,7 @@
 <translation id="3927932062596804919">Refuză</translation>
 <translation id="393316646445601645">Internet și telecomunicații</translation>
 <translation id="3939773374150895049">Folosești WebAuthn în loc de CVC?</translation>
+<translation id="3943857333388298514">Inserează</translation>
 <translation id="3946209740501886391">Întreabă întotdeauna pe acest site</translation>
 <translation id="3947595700203588284">Poate solicita permisiunea de a se conecta la dispozitive MIDI</translation>
 <translation id="3949571496842715403">Acest server nu a putut dovedi că este <ph name="DOMAIN" />; în certificatul său de securitate nu este specificat câmpul Nume alternative subiect. Cauza poate fi o eroare de configurare sau interceptarea conexiunii de către un atacator.</translation>
@@ -2311,6 +2314,7 @@
 <translation id="6890531741535756070">Ai ales să confirmi cu <ph name="DEVICE_LABEL" /> pe site-urile care folosesc <ph name="PROVIDER_ORIGIN" />. Este posibil ca acest furnizor să fi stocat informații despre metoda de plată, pentru care poți <ph name="BEGIN_LINK" />trimite o solicitare de ștergere<ph name="END_LINK" />.</translation>
 <translation id="6891596781022320156">Nivelul politicii nu este acceptat.</translation>
 <translation id="6895330447102777224">Cardul tău este confirmat</translation>
+<translation id="6896758677409633944">Copiază</translation>
 <translation id="6897140037006041989">User Agent</translation>
 <translation id="6898699227549475383">Organizația (O)</translation>
 <translation id="6899000063526916106">Introdu codul de <ph name="NUMBER_OF_DIGITS" /> cifre</translation>
@@ -2678,6 +2682,7 @@ Detalii suplimentare:
 <translation id="7716375162095500223">Nu s-a încărcat sau a fost ignorat</translation>
 <translation id="7716424297397655342">Acest site nu poate fi încărcat din memoria cache</translation>
 <translation id="7723047071702270851">Editează cardul</translation>
+<translation id="7724603315864178912">Decupează</translation>
 <translation id="7734285854693414638">Creează rapid un formular în Formulare Google</translation>
 <translation id="773466115871691567">Tradu întotdeauna paginile în <ph name="SOURCE_LANGUAGE" /></translation>
 <translation id="7736959720849233795">Copiază adresa linkului</translation>
@@ -2714,6 +2719,7 @@ Detalii suplimentare:
 <translation id="7815407501681723534">S-au găsit <ph name="NUMBER_OF_RESULTS" /> <ph name="SEARCH_RESULTS" /> pentru „<ph name="SEARCH_STRING" />”</translation>
 <translation id="7822320754433038727">Vânătoare și tir</translation>
 <translation id="782886543891417279">Rețeaua Wi-Fi pe care o folosești (<ph name="WIFI_NAME" />) poate solicita accesarea paginii de conectare.</translation>
+<translation id="7840103971441592723">Captura de ecran a început</translation>
 <translation id="7844689747373518809">{COUNT,plural, =0{Niciuna}=1{O aplicație (<ph name="EXAMPLE_APP_1" />)}=2{Două aplicații (<ph name="EXAMPLE_APP_1" />, <ph name="EXAMPLE_APP_2" />)}few{# aplicații (<ph name="EXAMPLE_APP_1" />, <ph name="EXAMPLE_APP_2" />, <ph name="AND_MORE" />)}other{# de aplicații (<ph name="EXAMPLE_APP_1" />, <ph name="EXAMPLE_APP_2" />, <ph name="AND_MORE" />)}}</translation>
 <translation id="7855695075675558090"><ph name="TOTAL_LABEL" /> <ph name="FORMATTED_TOTAL_AMOUNT" /> <ph name="CURRENCY_CODE" /></translation>
 <translation id="7862185352068345852">Ieși de pe site?</translation>
@@ -2743,6 +2749,7 @@ Detalii suplimentare:
 <translation id="7942349550061667556">Roșu</translation>
 <translation id="7943397946612013052">Descărcare blocată</translation>
 <translation id="7943893128817522649">Poate solicita permisiunea de a descărca automat mai multe fișiere</translation>
+<translation id="7946724693008564269">Limba detectată</translation>
 <translation id="7947285636476623132">Verifică anul în care expiră și încearcă din nou</translation>
 <translation id="7947813448670013867"><ph name="SEE_CHROME_TIPS_FOCUSED_FRIENDLY_MATCH_TEXT" />, apasă pe Tab, apoi pe Enter pentru a afla despre funcțiile Chrome</translation>
 <translation id="7950027195171824198">Gestionează-ți preferințele privind cookie-urile din setările Chrome</translation>
@@ -2891,6 +2898,7 @@ Detalii suplimentare:
 <translation id="8282947398454257691">Află identificatorul unic de dispozitiv</translation>
 <translation id="8284769179630993263">Gestionează Navigarea sigură și alte opțiuni din setările Chrome</translation>
 <translation id="8286036467436129157">Conectați-vă</translation>
+<translation id="8286799286781881307">Aplicațiile autorizate de administratorul tău pot captura toate ecranele atașate dispozitivului. Aceste informații pot fi procesate local sau pot fi încărcate pe serverele organizației.</translation>
 <translation id="8288807391153049143">Afișează certificatul</translation>
 <translation id="8289355894181816810">Dacă nu știți sigur ce înseamnă aceasta, contactați administratorul de rețea.</translation>
 <translation id="8293206222192510085">Adăugați marcaj</translation>
@@ -2917,6 +2925,7 @@ Detalii suplimentare:
 <translation id="8355270400102541638">Contextul local al blocării:</translation>
 <translation id="8363502534493474904">să dezactivezi modul Avion;</translation>
 <translation id="8364627913115013041">Nesetată.</translation>
+<translation id="836616551641291797">Află mai multe despre gestionarea browserului</translation>
 <translation id="8368001212524806591">Urmărește prețul</translation>
 <translation id="8368027906805972958">Dispozitiv necunoscut sau neacceptat (<ph name="DEVICE_ID" />)</translation>
 <translation id="8368476060205742148">Servicii Google Play</translation>

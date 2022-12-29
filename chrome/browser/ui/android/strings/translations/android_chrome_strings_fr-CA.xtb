@@ -517,6 +517,7 @@ Les jetons de confiance valides améliorent la confidentialité sur le Web et ne
 <translation id="3830886834687455630">Mettez à jour les services Google Play pour vérifier vos mots de passe</translation>
 <translation id="3845098929839618392">Ouvrir dans onglet nav. privée</translation>
 <translation id="3856096718352044181">Veuillez vérifier qu'il s'agit d'un fournisseur valide ou réessayer plus tard</translation>
+<translation id="3858127568696903256">Voyez le contenu que vous suivez ici</translation>
 <translation id="3858860766373142691">Nom</translation>
 <translation id="3861633093716975811">Vidéos populaires</translation>
 <translation id="3874520961715512166">Site retiré</translation>
@@ -552,7 +553,6 @@ Les jetons de confiance valides améliorent la confidentialité sur le Web et ne
 <translation id="4045764304651014138">Données d'utilisation</translation>
 <translation id="405399507749852140">Obtenez des alertes si le prix est réduit sur un site</translation>
 <translation id="4056223980640387499">Sépia</translation>
-<translation id="4060598801229743805">Options disponibles vers le haut de l'écran</translation>
 <translation id="4062305924942672200">Mentions juridiques</translation>
 <translation id="4072805772816336153">Réessayez plus tard</translation>
 <translation id="4084682180776658562">Favoris</translation>
@@ -642,7 +642,6 @@ D'autres formes d'historique de navigation, telles que les recherches et l'activ
 <translation id="4554077758708533499">Connecté à l'aide d'un câble USB</translation>
 <translation id="4558311620361989323">Raccourcis relatifs à la page Web</translation>
 <translation id="4561730552726921821">Inscription réussie</translation>
-<translation id="4561979708150884304">Aucune connexion</translation>
 <translation id="4565377596337484307">Masquer le mot de passe</translation>
 <translation id="4572422548854449519">Connectez-vous à un compte géré</translation>
 <translation id="4576892426230499203">Essayez avec une autre option de vérification</translation>
@@ -667,7 +666,6 @@ D'autres formes d'historique de navigation, telles que les recherches et l'activ
 <translation id="4699172675775169585">Images et fichiers dans la mémoire cache</translation>
 <translation id="4719927025381752090">Proposer une traduction</translation>
 <translation id="4720023427747327413">Ouvrir dans <ph name="PRODUCT_NAME" /></translation>
-<translation id="4720982865791209136">Aidez-nous à améliorer Chrome. <ph name="BEGIN_LINK" />Répondez à notre sondage<ph name="END_LINK" /></translation>
 <translation id="47217992755561375">Afficher vos sites les plus fréquentés</translation>
 <translation id="4732120983431207637">Dérouleur de pile</translation>
 <translation id="4736934858538408121">Carte virtuelle</translation>
@@ -771,7 +769,6 @@ Pour modifier ce paramètre, <ph name="BEGIN_LINK" />réinitialisez la synchroni
 <translation id="5184329579814168207">Ouvrir dans Chrome</translation>
 <translation id="5191251636205085390">Découvrez les nouvelles technologies qui visent à remplacer les témoins tiers et apprenez à les utiliser.</translation>
 <translation id="5193988420012215838">Copié dans votre presse-papier</translation>
-<translation id="5199929503336119739">Profil professionnel</translation>
 <translation id="5204967432542742771">Entrez le mot de passe</translation>
 <translation id="5206168361184759344">{FILE_COUNT,plural, =1{Téléchargement du fichier en cours…}one{Téléchargement de # fichier en cours…}other{Téléchargement de # fichiers en cours…}}</translation>
 <translation id="5210286577605176222">Accéder à l'onglet précédent</translation>
@@ -1345,14 +1342,12 @@ Par exemple, certains sites Web peuvent répondre à cette demande en diffusant 
 <translation id="8221656072740924283">Continuer</translation>
 <translation id="8223642481677794647">Menu de la carte du flux</translation>
 <translation id="8250920743982581267">Documents</translation>
-<translation id="825412236959742607">Cette page utilise trop de mémoire, Chrome a donc supprimé certains contenus.</translation>
 <translation id="8255617931166444521">Les sites peuvent uniquement utiliser vos témoins pour connaître votre activité de navigation que sur leur propre site</translation>
 <translation id="8259179246279078674">Étant donné que les pages préchargées sont chiffrées, Google n'apprendra rien à propos du contenu des pages préchargées. Les serveurs de Google découvriront quels sites sont préchargés en privé. Cette information est uniquement utilisée pour précharger les pages et n'est pas associée à d'autres renseignements provenant de votre compte Google.</translation>
 <translation id="8260126382462817229">Essayez de vous reconnecter</translation>
 <translation id="8261506727792406068">Supprimer</translation>
 <translation id="82619448491672958">Afficher les autres onglets</translation>
 <translation id="8266862848225348053">Dossier de téléchargement</translation>
-<translation id="8274165955039650276">Afficher les téléchargements</translation>
 <translation id="8281886186245836920">Passer</translation>
 <translation id="8282297628636750033">Si possible, appliquer un thème sombre aux sites</translation>
 <translation id="829672787777123339">Connexion à votre appareil en cours…</translation>
@@ -1516,7 +1511,6 @@ Par exemple, certains sites Web peuvent répondre à cette demande en diffusant 
 <translation id="9108808586816295166">Le DNS sécurisé pourrait ne pas être accessible en tout temps</translation>
 <translation id="9128984223251192329">Invite du Bac à sable de confidentialité ouverte à mi-hauteur</translation>
 <translation id="9133397713400217035">Explorer hors ligne</translation>
-<translation id="9137013805542155359">Afficher l'original</translation>
 <translation id="9148126808321036104">Connectez-vous de nouveau</translation>
 <translation id="9158770349521403363">Partager le contenu uniquement</translation>
 <translation id="9159716826369098114">Restaurez le groupe d'onglets de <ph name="TAB_COUNT" /> onglets en tant que nouveau groupe d'onglets en arrière-plan.</translation>

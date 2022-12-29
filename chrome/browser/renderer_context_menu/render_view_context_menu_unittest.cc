@@ -45,6 +45,7 @@
 #include "components/autofill/core/common/autofill_features.h"
 #include "components/custom_handlers/protocol_handler_registry.h"
 #include "components/feed/feed_feature_list.h"
+#include "components/lens/buildflags.h"
 #include "components/lens/lens_features.h"
 #include "components/policy/core/common/policy_pref_names.h"
 #include "components/prefs/pref_registry_simple.h"
@@ -423,9 +424,9 @@ TEST_F(RenderViewContextMenuExtensionsTest,
                   &MenuManagerFactory::BuildServiceInstanceForTesting))));
 
   const Extension* extension1 = environment().MakeExtension(
-      base::DictionaryValue(), "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+      base::Value::Dict(), "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
   const Extension* extension2 = environment().MakeExtension(
-      base::DictionaryValue(), "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
+      base::Value::Dict(), "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
 
   // Create two items in two extensions with same title.
   ASSERT_TRUE(
@@ -1175,7 +1176,7 @@ TEST_F(RenderViewContextMenuPrefsTest, LensImageSearchDisabledFor3pDse) {
   EXPECT_FALSE(menu.IsItemPresent(IDC_CONTENT_CONTEXT_SEARCHLENSFORIMAGE));
 }
 
-#if BUILDFLAG(GOOGLE_CHROME_BRANDING)
+#if BUILDFLAG(ENABLE_LENS_DESKTOP_GOOGLE_BRANDED_FEATURES)
 // Verify that the Lens Region Search menu item is displayed when the feature
 // is enabled.
 TEST_F(RenderViewContextMenuPrefsTest, LensRegionSearch) {
@@ -1363,7 +1364,7 @@ TEST_F(RenderViewContextMenuPrefsTest,
   EXPECT_TRUE(menu.IsItemPresent(IDC_CONTENT_CONTEXT_LENS_REGION_SEARCH));
 }
 
-#endif
+#endif  // BUILDFLAG(ENABLE_LENS_DESKTOP_GOOGLE_BRANDED_FEATURES)
 
 // Test FormatUrlForClipboard behavior
 // -------------------------------------------

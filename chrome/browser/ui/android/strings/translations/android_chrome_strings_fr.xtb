@@ -517,6 +517,7 @@ Les jetons d'état privés améliorent la confidentialité sur le Web et ne peuv
 <translation id="3830886834687455630">Mettez à jour les services Google Play pour vérifier vos mots de passe</translation>
 <translation id="3845098929839618392">Ouvrir en navigation privée</translation>
 <translation id="3856096718352044181">Veuillez vérifier qu'il s'agit d'un fournisseur valide ou réessayer plus tard</translation>
+<translation id="3858127568696903256">Consultez ici les contenus que vous suivez</translation>
 <translation id="3858860766373142691">Nom</translation>
 <translation id="3861633093716975811">Vidéos populaires</translation>
 <translation id="3874520961715512166">Site supprimé</translation>
@@ -552,7 +553,6 @@ Les jetons d'état privés améliorent la confidentialité sur le Web et ne peuv
 <translation id="4045764304651014138">Données d'utilisation</translation>
 <translation id="405399507749852140">Recevez des alertes si le prix baisse sur un site</translation>
 <translation id="4056223980640387499">Sépia</translation>
-<translation id="4060598801229743805">Options disponibles à proximité du haut de l'écran</translation>
 <translation id="4062305924942672200">Informations légales</translation>
 <translation id="4072805772816336153">Réessayer plus tard</translation>
 <translation id="4084682180776658562">Favori</translation>
@@ -642,7 +642,6 @@ Votre compte Google conserve peut-être d'autres contenus d'historique de naviga
 <translation id="4554077758708533499">Connecté avec un câble USB</translation>
 <translation id="4558311620361989323">Raccourcis de pages Web</translation>
 <translation id="4561730552726921821">Enregistrement réussi</translation>
-<translation id="4561979708150884304">Aucune connexion</translation>
 <translation id="4565377596337484307">Masquer le mot de passe</translation>
 <translation id="4572422548854449519">Se connecter à un compte géré</translation>
 <translation id="4576892426230499203">Essayez une autre option de validation</translation>
@@ -667,7 +666,6 @@ Votre compte Google conserve peut-être d'autres contenus d'historique de naviga
 <translation id="4699172675775169585">Images et fichiers en cache</translation>
 <translation id="4719927025381752090">Proposer de traduire</translation>
 <translation id="4720023427747327413">Ouvrir dans <ph name="PRODUCT_NAME" /></translation>
-<translation id="4720982865791209136">Aidez-nous à améliorer Chrome. <ph name="BEGIN_LINK" />Répondez à notre enquête<ph name="END_LINK" /></translation>
 <translation id="47217992755561375">Retrouvez les meilleurs sites pour vous</translation>
 <translation id="4732120983431207637">Dérouleur de pile</translation>
 <translation id="4736934858538408121">Carte virtuelle</translation>
@@ -771,7 +769,6 @@ Pour modifier ce paramètre, <ph name="BEGIN_LINK" />réinitialisez la synchroni
 <translation id="5184329579814168207">Ouvrir dans Chrome</translation>
 <translation id="5191251636205085390">Découvrez et contrôlez les nouvelles technologies qui visent à remplacer les cookies tiers</translation>
 <translation id="5193988420012215838">Copié dans le presse-papiers</translation>
-<translation id="5199929503336119739">Profil professionnel</translation>
 <translation id="5204967432542742771">Mot de passe</translation>
 <translation id="5206168361184759344">{FILE_COUNT,plural, =1{Téléchargement du fichier…}one{Téléchargement de # fichier…}other{Téléchargement de # fichiers…}}</translation>
 <translation id="5210286577605176222">Accéder à l'onglet précédent</translation>
@@ -1345,14 +1342,12 @@ Par exemple, certains sites Web peuvent répondre à cette demande en diffusant 
 <translation id="8221656072740924283">Continuer</translation>
 <translation id="8223642481677794647">Menu de la carte de flux</translation>
 <translation id="8250920743982581267">Documents</translation>
-<translation id="825412236959742607">Cette page utilise trop de mémoire, Chrome a donc supprimé du contenu.</translation>
 <translation id="8255617931166444521">Les sites ne peuvent utiliser vos cookies que pour voir votre activité de navigation sur ces sites</translation>
 <translation id="8259179246279078674">Les pages préchargées étant chiffrées, Google n'analyse pas leur contenu. Les serveurs de Google voient quels sites sont préchargés en mode privé. Ces informations ne servent qu'à précharger les pages et ne sont liées à aucune autre information de votre compte Google.</translation>
 <translation id="8260126382462817229">Essayez de vous connecter de nouveau à votre compte.</translation>
 <translation id="8261506727792406068">Supprimer</translation>
 <translation id="82619448491672958">Voir les autres onglets</translation>
 <translation id="8266862848225348053">Emplacement de téléchargement</translation>
-<translation id="8274165955039650276">Voir les téléchargements</translation>
 <translation id="8281886186245836920">Passer</translation>
 <translation id="8282297628636750033">Appliquer thème sombre aux sites</translation>
 <translation id="829672787777123339">Connexion à votre appareil…</translation>
@@ -1516,7 +1511,6 @@ Par exemple, certains sites Web peuvent répondre à cette demande en diffusant 
 <translation id="9108808586816295166">Il est possible que le DNS sécurisé ne soit pas disponible à tout moment</translation>
 <translation id="9128984223251192329">Invite Privacy Sandbox ouverte à mi-hauteur</translation>
 <translation id="9133397713400217035">Consulter hors connexion</translation>
-<translation id="9137013805542155359">Afficher l'original</translation>
 <translation id="9148126808321036104">Nouvelle connexion</translation>
 <translation id="9158770349521403363">Partager uniquement le contenu</translation>
 <translation id="9159716826369098114">Restaurer le groupe d'onglets de <ph name="TAB_COUNT" /> onglets en tant que nouveau groupe d'onglets en arrière-plan.</translation>

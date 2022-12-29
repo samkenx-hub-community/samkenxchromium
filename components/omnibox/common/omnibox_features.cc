@@ -73,11 +73,10 @@ BASE_FEATURE(kDocumentProviderDedupingOptimization,
              "OmniboxDocumentProviderDedupingOptimization",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
-// Feature to tweak how the default suggestion is preserved. Feature params
-// control which tweaks specifically are enabled. Enabling this feature without
-// params is a no-op.
-BASE_FEATURE(kPreserveDefault,
-             "OmniboxPreserveDefault",
+// When enabled, uses the grouping framework (i.e.
+// autocomplete_grouper_sections.h) to limit and group (but not sort) matches.
+BASE_FEATURE(kGroupingFramework,
+             "OmniboxGroupingFramework",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Demotes the relevance scores when comparing suggestions based on the
@@ -94,6 +93,20 @@ BASE_FEATURE(kOmniboxRemoveExcessiveRecycledViewClearCalls,
              "OmniboxRemoveExcessiveRecycledViewClearCalls",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
+// Feature to tweak how the default suggestion is preserved. Feature params
+// control which tweaks specifically are enabled. Enabling this feature without
+// params is a no-op.
+BASE_FEATURE(kPreserveDefault,
+             "OmniboxPreserveDefault",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+// When disabled, when providers update their matches, the new set of matches
+// are sorted and culled, then merged with the old matches, then sorted and
+// culled again. When enabled, the first sort and cull is skipped.
+BASE_FEATURE(kSingleSortAndCullPass,
+             "OmniboxSingleSortAndCullPass",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 // Feature to enable memoizing URLs when replacing search terms in
 // `AutocompleteMatch::GURLToStrippedGURL()`.
 // TODO(manukh) Enabled by default on 10/20/22 m109. Clean up feature code
@@ -105,13 +118,6 @@ BASE_FEATURE(kStrippedGurlOptimization,
 // Feature to debounce `AutocompleteController::NotifyChanged()`.
 BASE_FEATURE(kUpdateResultDebounce,
              "OmniboxUpdateResultDebounce",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-
-// When disabled, when providers update their matches, the new set of matches
-// are sorted and culled, then merged with the old matches, then sorted and
-// culled again. When enabled, the first sort and cull is skipped.
-BASE_FEATURE(kSingleSortAndCullPass,
-             "OmniboxSingleSortAndCullPass",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Feature used to cap max zero suggestions shown according to the param
@@ -196,25 +202,21 @@ BASE_FEATURE(kKeepSecondaryZeroSuggest,
              "KeepSecondaryZeroSuggest",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-// Revamps how local search history is extracted and processed for generating
-// zero-prefix and prefix suggestions.
-BASE_FEATURE(kLocalHistorySuggestRevamp,
-             "LocalHistorySuggestRevamp",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
 // Enables local history zero-prefix suggestions in every context in which the
 // remote zero-prefix suggestions are enabled.
 BASE_FEATURE(kLocalHistoryZeroSuggestBeyondNTP,
              "LocalHistoryZeroSuggestBeyondNTP",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-// Used to adjust the age threshold since the last visit in order to consider a
-// normalized keyword search term as a zero-prefix suggestion. If disabled, the
-// default value of 90 days for Desktop and 60 days for Android and iOS is used.
-// If enabled, the age threshold is determined by this feature's companion
-// parameter, OmniboxFieldTrial::kOmniboxLocalZeroSuggestAgeThresholdParam.
-BASE_FEATURE(kOmniboxLocalZeroSuggestAgeThreshold,
-             "OmniboxLocalZeroSuggestAgeThreshold",
+// If enabled, SearchProvider uses `normalized_term` instead of `term` from the
+// `keyword_search_terms` table. `normalized_term` is the original search term
+// in lower case with extra whitespace characters collapsed. To ensure
+// suggestions from SearchProvider continue to get deduped with those from
+// ShortcutsProvider, AutocompleteMatch::GURLToStrippedGURL uses the normalized
+// term to build the destination URLs so they are identical despite case
+// mismatches in the terms.
+BASE_FEATURE(kNormalizeSearchSuggestions,
+             "NormalizeSearchSuggestions",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
 // Mainly used to enable sending INTERACTION_CLOBBER focus type for zero-prefix

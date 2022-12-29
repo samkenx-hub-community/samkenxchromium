@@ -252,23 +252,17 @@ extern const char kEnableCBDSignOutDescription[];
 extern const char kEnableDiscoverFeedDiscoFeedEndpointName[];
 extern const char kEnableDiscoverFeedDiscoFeedEndpointDescription[];
 
-// Title and description for the flag to show ghost cards when refreshing the
-// discover feed.
-extern const char kEnableDiscoverFeedGhostCardsName[];
-extern const char kEnableDiscoverFeedGhostCardsDescription[];
-
 // Title and description for the flag to remove the Feed from the NTP.
 extern const char kEnableFeedAblationName[];
 extern const char kEnableFeedAblationDescription[];
 
-// Title and description for the flag to test the FRE default browser promo
-// experiment.
-extern const char kEnableFREDefaultBrowserPromoScreenName[];
-extern const char kEnableFREDefaultBrowserPromoScreenDescription[];
-
 // Title and description for the flag to enable the Fullscreen API.
 extern const char kEnableFullscreenAPIName[];
 extern const char kEnableFullscreenAPIDescription[];
+
+// Title and description for the new bookmarks implementation.
+extern const char kEnableNewBookmarksImplementationName[];
+extern const char kEnableNewBookmarksImplementationDescription[];
 
 // Title and description for the flag to enable password grouping for the
 // Password Manager.
@@ -363,12 +357,6 @@ extern const char kHttpsOnlyModeDescription[];
 // Title and description for the flag to enable revamped Incognito NTP page.
 extern const char kIncognitoNtpRevampName[];
 extern const char kIncognitoNtpRevampDescription[];
-
-// Title and description for the flag that conditionally uploads clicks and view
-// actions in the feed (e.g., the user needs to view X cards).
-extern const char kInterestFeedV2ClickAndViewActionsConditionalUploadName[];
-extern const char
-    kInterestFeedV2ClickAndViewActionsConditionalUploadDescription[];
 
 // Title and description for the flag to enable feature_engagement::Tracker
 // demo mode.
@@ -539,11 +527,6 @@ extern const char kOmniboxFocusTriggersContextualWebZeroSuggestDescription[];
 extern const char kOmniboxFocusTriggersSRPZeroSuggestName[];
 extern const char kOmniboxFocusTriggersSRPZeroSuggestDescription[];
 
-// Title and description for the flag to enable paste button on clipboard
-// suggestion.
-extern const char kOmniboxPasteButtonName[];
-extern const char kOmniboxPasteButtonDescription[];
-
 // Title and description for local history zero-prefix suggestions beyond NTP.
 extern const char kOmniboxLocalHistoryZeroSuggestBeyondNTPName[];
 extern const char kOmniboxLocalHistoryZeroSuggestBeyondNTPDescription[];
@@ -568,11 +551,6 @@ extern const char kOmniboxZeroSuggestInMemoryCachingDescription[];
 // Title and description for omnibox on device tail suggest.
 extern const char kOmniboxOnDeviceTailSuggestionsName[];
 extern const char kOmniboxOnDeviceTailSuggestionsDescription[];
-
-// Title and description for the flag to enable ChromeActions (and optionally
-// SwiftUI omnibox popup implementation).
-extern const char kIOSOmniboxUpdatedPopupUIName[];
-extern const char kIOSOmniboxUpdatedPopupUIDescription[];
 
 // Title and description for the flag to enable Optimization Guide debug logs.
 extern const char kOptimizationGuideDebugLogsName[];
@@ -684,11 +662,6 @@ extern const char kSyncEnableHistoryDataTypeDescription[];
 // trusted vault passphrase promos.
 extern const char kSyncTrustedVaultPassphrasePromoName[];
 extern const char kSyncTrustedVaultPassphrasePromoDescription[];
-
-// Title and description for the flag to control if Chrome Sync should support
-// trusted vault passphrase type with improved recovery.
-extern const char kSyncTrustedVaultPassphraseRecoveryName[];
-extern const char kSyncTrustedVaultPassphraseRecoveryDescription[];
 
 // Title and description for the flag to enable Sync standalone invalidations.
 extern const char kSyncInvalidationsName[];

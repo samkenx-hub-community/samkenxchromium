@@ -116,7 +116,7 @@ scoped_refptr<Extension> CreateWebStoreExtension() {
               "icons",
               DictionaryBuilder().Set("16", "webstore_icon_16.png").BuildDict())
           .Set("web_accessible_resources",
-               ListBuilder().Append("webstore_icon_16.png").BuildList())
+               ListBuilder().Append("webstore_icon_16.png").Build())
           .BuildDict();
 
   base::FilePath path;
@@ -134,7 +134,7 @@ scoped_refptr<Extension> CreateWebStoreExtension() {
 scoped_refptr<const Extension> CreateTestResponseHeaderExtension() {
   return ExtensionBuilder("An extension with web-accessible resources")
       .SetManifestKey("web_accessible_resources",
-                      ListBuilder().Append("test.dat").BuildList())
+                      ListBuilder().Append("test.dat").Build())
       .SetPath(GetTestPath("response_headers"))
       .Build();
 }
@@ -778,9 +778,8 @@ TEST_F(ExtensionProtocolsTest, MimeTypesForKnownFiles) {
         "web_accessible_resources": ["*"]
       })";
   test_dir.WriteManifest(kManifest);
-  std::unique_ptr<base::DictionaryValue> manifest = base::DictionaryValue::From(
-      base::Value::ToUniquePtrValue(base::test::ParseJson(kManifest)));
-  ASSERT_TRUE(manifest);
+  base::Value::Dict manifest = base::test::ParseJsonDict(kManifest);
+  ASSERT_FALSE(manifest.empty());
 
   test_dir.WriteFile(FILE_PATH_LITERAL("json_file.json"), "{}");
   test_dir.WriteFile(FILE_PATH_LITERAL("js_file.js"), "function() {}");

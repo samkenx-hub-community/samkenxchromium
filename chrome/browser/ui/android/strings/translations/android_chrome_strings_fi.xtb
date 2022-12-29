@@ -517,6 +517,7 @@ Yksityiset tilamerkit parantavat yksityisyyttä verkossa, eikä sinua voi tunnis
 <translation id="3830886834687455630">Päivitä Google Play Palvelut, niin voit tarkistaa salasanasi</translation>
 <translation id="3845098929839618392">Avaa incognito-välilehdellä</translation>
 <translation id="3856096718352044181">Varmista, että tämä on kelvollinen palveluntarjoaja, tai yritä myöhemmin uudelleen</translation>
+<translation id="3858127568696903256">Täältä löydät seuraamasi sisällön</translation>
 <translation id="3858860766373142691">Nimi</translation>
 <translation id="3861633093716975811">Suositut videot</translation>
 <translation id="3874520961715512166">Sivusto poistettu</translation>
@@ -552,7 +553,6 @@ Yksityiset tilamerkit parantavat yksityisyyttä verkossa, eikä sinua voi tunnis
 <translation id="4045764304651014138">Käyttödata</translation>
 <translation id="405399507749852140">Voit saada ilmoituksen, jos hinta laskee jollakin sivustolla</translation>
 <translation id="4056223980640387499">Seepia</translation>
-<translation id="4060598801229743805">Toimintoja on käytettävissä näytön yläosassa.</translation>
 <translation id="4062305924942672200">Oikeudelliset tiedot</translation>
 <translation id="4072805772816336153">Yritä myöhemmin uudelleen</translation>
 <translation id="4084682180776658562">Kirjanmerkki</translation>
@@ -642,7 +642,6 @@ Google-tililläsi voi olla muita selaushistoriatietoja, kuten hakuja ja toiminta
 <translation id="4554077758708533499">Yhdistetty USB-johdolla</translation>
 <translation id="4558311620361989323">Verkkosivun pikanäppäimet</translation>
 <translation id="4561730552726921821">Rekisteröinti onnistui</translation>
-<translation id="4561979708150884304">Ei yhteyttä</translation>
 <translation id="4565377596337484307">Piilota salasana</translation>
 <translation id="4572422548854449519">Kirjaudu hallinnoidulle tilille</translation>
 <translation id="4576892426230499203">Kokeile toista vahvistustapaa</translation>
@@ -667,7 +666,6 @@ Google-tililläsi voi olla muita selaushistoriatietoja, kuten hakuja ja toiminta
 <translation id="4699172675775169585">Välimuistissa olevat kuvat ja tiedostot</translation>
 <translation id="4719927025381752090">Tarjoudu kääntämään</translation>
 <translation id="4720023427747327413">Avaa kohteessa <ph name="PRODUCT_NAME" /></translation>
-<translation id="4720982865791209136">Auta parantamaan Chromea. <ph name="BEGIN_LINK" />Vastaa kyselyyn.<ph name="END_LINK" /></translation>
 <translation id="47217992755561375">Katso suositut sivustosi</translation>
 <translation id="4732120983431207637">Pinon tyhjentäjä</translation>
 <translation id="4736934858538408121">Virtuaalinen kortti</translation>
@@ -771,7 +769,6 @@ Jos haluat muokata asetusta, <ph name="BEGIN_LINK" />nollaa synkronointi<ph name
 <translation id="5184329579814168207">Avaa Chromessa</translation>
 <translation id="5191251636205085390">Lue lisää uusista teknologioista, joilla on tarkoitus korvata kolmannen osapuolen evästeet, ja tee haluamasi valinnat</translation>
 <translation id="5193988420012215838">Kopioitu leikepöydälle</translation>
-<translation id="5199929503336119739">Työprofiili</translation>
 <translation id="5204967432542742771">Lisää salasana</translation>
 <translation id="5206168361184759344">{FILE_COUNT,plural, =1{Ladataan tiedostoa…}other{Ladataan # tiedostoa…}}</translation>
 <translation id="5210286577605176222">Siirry edelliselle välilehdelle</translation>
@@ -1345,14 +1342,12 @@ Jotkin verkkosivustot voivat vastata tähän pyyntöön esimerkiksi näyttämäl
 <translation id="8221656072740924283">Jatka</translation>
 <translation id="8223642481677794647">Fiidikottien valikko</translation>
 <translation id="8250920743982581267">Dokumentit</translation>
-<translation id="825412236959742607">Tämä sivu käyttää liikaa muistia, joten Chrome poisti osan sisällöstä.</translation>
 <translation id="8255617931166444521">Sivustot voivat nähdä selaustoimintaasi evästeiden kautta vain omalla sivustollaan</translation>
 <translation id="8259179246279078674">Google ei saa mitään tietoja esiladattujen sivujen sisällöstä, sillä nämä sivut ovat salattuja. Googlen palvelimet saavat tietää, mitkä sivustot on esiladattu yksityisesti. Tietoja käytetään vain sivujen esilataamiseen, eikä niitä linkitetä muihin Google-tilisi tietoihin.</translation>
 <translation id="8260126382462817229">Yritä kirjautua uudelleen sisään.</translation>
 <translation id="8261506727792406068">Poista</translation>
 <translation id="82619448491672958">Katso muut välilehdet</translation>
 <translation id="8266862848225348053">Lataussijainti</translation>
-<translation id="8274165955039650276">Näytä lataukset</translation>
 <translation id="8281886186245836920">Ohita</translation>
 <translation id="8282297628636750033">Käytä tummaa teemaa sivustoilla</translation>
 <translation id="829672787777123339">Muodostetaan yhteyttä laitteeseen…</translation>
@@ -1516,7 +1511,6 @@ Jotkin verkkosivustot voivat vastata tähän pyyntöön esimerkiksi näyttämäl
 <translation id="9108808586816295166">Suojattu DNS ei välttämättä ole koko ajan käytettävissä</translation>
 <translation id="9128984223251192329">Privacy Sandbox ‐kehote puoliksi avattuna</translation>
 <translation id="9133397713400217035">Tutki offline-tilassa</translation>
-<translation id="9137013805542155359">Näytä alkuperäinen</translation>
 <translation id="9148126808321036104">Kirjaudu sisään uudelleen</translation>
 <translation id="9158770349521403363">Jaa vain sisältö</translation>
 <translation id="9159716826369098114">Palauta <ph name="TAB_COUNT" /> välilehden välilehtiryhmä uutena taustavälilehtiryhmänä.</translation>

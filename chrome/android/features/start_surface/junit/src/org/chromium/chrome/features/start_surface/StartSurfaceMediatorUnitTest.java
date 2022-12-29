@@ -51,6 +51,7 @@ import static org.chromium.chrome.features.tasks.TasksSurfaceProperties.TASKS_SU
 import android.content.Context;
 import android.content.res.Resources;
 import android.view.View;
+import android.view.View.OnClickListener;
 
 import org.junit.After;
 import org.junit.Assert;
@@ -91,8 +92,6 @@ import org.chromium.chrome.browser.omnibox.OmniboxStub;
 import org.chromium.chrome.browser.omnibox.UrlFocusChangeListener;
 import org.chromium.chrome.browser.omnibox.voice.VoiceRecognitionHandler;
 import org.chromium.chrome.browser.preferences.ChromePreferenceKeys;
-import org.chromium.chrome.browser.preferences.PrefChangeRegistrar;
-import org.chromium.chrome.browser.preferences.PrefChangeRegistrarJni;
 import org.chromium.chrome.browser.preferences.SharedPreferencesManager;
 import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.chrome.browser.search_engines.TemplateUrlServiceFactory;
@@ -189,15 +188,15 @@ public class StartSurfaceMediatorUnitTest {
     @Mock
     private LogoView mLogoView;
     @Mock
-    LogoBridge.Natives mLogoBridgeJni;
-    @Mock
-    private PrefChangeRegistrar.Natives mPrefChangeRegistrarJni;
+    LogoBridge.Natives mLogoBridge;
     @Mock
     private Profile mProfile;
     @Mock
     private TemplateUrlService mTemplateUrlService;
     @Mock
     private ActivityLifecycleDispatcher mActivityLifecycleDispatcher;
+    @Mock
+    private OnClickListener mTabSwitcherClickHandler;
     @Captor
     private ArgumentCaptor<TabModelSelectorObserver> mTabModelSelectorObserverCaptor;
     @Captor
@@ -267,10 +266,8 @@ public class StartSurfaceMediatorUnitTest {
         doReturn(mFeedReliabilityLogger)
                 .when(mExploreSurfaceCoordinator)
                 .getFeedReliabilityLogger();
-
-        mJniMocker.mock(LogoBridgeJni.TEST_HOOKS, mLogoBridgeJni);
+        mJniMocker.mock(LogoBridgeJni.TEST_HOOKS, mLogoBridge);
         doReturn(mLogoView).when(mLogoContainerView).findViewById(R.id.search_provider_logo);
-        mJniMocker.mock(PrefChangeRegistrarJni.TEST_HOOKS, mPrefChangeRegistrarJni);
     }
 
     @After
@@ -1443,7 +1440,7 @@ public class StartSurfaceMediatorUnitTest {
         showHomepageAndVerify(mediator, StartSurfaceState.SHOWN_HOMEPAGE);
 
         verify(mLogoContainerView).setVisibility(View.VISIBLE);
-        verify(mLogoBridgeJni).getCurrentLogo(anyLong(), any(), any());
+        verify(mLogoBridge).getCurrentLogo(anyLong(), any(), any());
         Assert.assertTrue(mediator.isLogoVisible());
     }
 
@@ -1754,7 +1751,7 @@ public class StartSurfaceMediatorUnitTest {
                 mStartSurfaceSupplier, hadWarmStart, new DummyJankTracker(),
                 mInitializeMVTilesRunnable, mParentTabSupplier, mLogoContainerView,
                 mBackPressManager, null /* feedPlaceholderParentView */,
-                mActivityLifecycleDispatcher);
+                mActivityLifecycleDispatcher, mTabSwitcherClickHandler);
     }
 
     private void onControlsOffsetChanged(int topOffset, int topControlsMinHeightOffset) {

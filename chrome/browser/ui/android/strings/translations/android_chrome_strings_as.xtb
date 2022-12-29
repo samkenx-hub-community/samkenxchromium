@@ -517,6 +517,7 @@
 <translation id="3830886834687455630">আপোনাৰ পাছৱৰ্ডসমূহ পৰীক্ষা কৰিবলৈ Google Play সেৱাসমূহ আপডে’ট কৰক</translation>
 <translation id="3845098929839618392">ইনক’গনিট’ টেবত খোলক</translation>
 <translation id="3856096718352044181">অনুগ্ৰহ কৰি এইটো কোনো মান্য প্ৰদানকাৰীৰ বুলি সত্যাপন কৰক অথবা পাছত আকৌ চেষ্টা কৰক</translation>
+<translation id="3858127568696903256">আপুনি ফ’ল’ কৰা সমল ইয়াত চাওক</translation>
 <translation id="3858860766373142691">নাম</translation>
 <translation id="3861633093716975811">জনপ্ৰিয় ভিডিঅ’</translation>
 <translation id="3874520961715512166">ছাইট আঁতৰোৱা হৈছে</translation>
@@ -552,7 +553,6 @@
 <translation id="4045764304651014138">ব্যৱহাৰৰ ডেটা</translation>
 <translation id="405399507749852140">কোনো ছাইটত মূল্য কমিলে সতৰ্কবাৰ্তা পাওক</translation>
 <translation id="4056223980640387499">ছেপিয়া</translation>
-<translation id="4060598801229743805">স্ক্ৰীনৰ ওপৰৰ অংশত কাষত থকা বিকল্প</translation>
 <translation id="4062305924942672200">আইনী তথ্য</translation>
 <translation id="4072805772816336153">পাছত পুনৰ চেষ্টা কৰক</translation>
 <translation id="4084682180776658562">বুকমাৰ্ক কৰক</translation>
@@ -642,7 +642,6 @@
 <translation id="4554077758708533499">ইউএছবি কে’বলৰ জৰিয়তে সংযোগ কৰা হ’ল</translation>
 <translation id="4558311620361989323">ৱেবপৃষ্ঠাৰ শ্বৰ্টকাট</translation>
 <translation id="4561730552726921821">সফলভাৱে পঞ্জীয়ন কৰা হ’ল</translation>
-<translation id="4561979708150884304">ইণ্টাৰনেট নাই</translation>
 <translation id="4565377596337484307">পাছৱৰ্ড লুকুৱাওক</translation>
 <translation id="4572422548854449519">পৰিচালিত একাউণ্টত ছাইন ইন কৰক</translation>
 <translation id="4576892426230499203">সত্যাপনৰ অন্য এটা বিকল্প ব্যৱহাৰ কৰি চাওক</translation>
@@ -667,7 +666,6 @@
 <translation id="4699172675775169585">কেশ্ব প্ৰতিচ্ছবি আৰু ফাইল</translation>
 <translation id="4719927025381752090">অনুবাদ কৰাৰ প্ৰস্তাৱ দিয়ক</translation>
 <translation id="4720023427747327413"><ph name="PRODUCT_NAME" />ত খোলক</translation>
-<translation id="4720982865791209136">Chromeক উন্নত কৰাত সহায় কৰক। <ph name="BEGIN_LINK" />সমীক্ষাত ভাগ লওক<ph name="END_LINK" /></translation>
 <translation id="47217992755561375">আপোনাৰ শীৰ্ষ ছাইটসমূহ চাওক</translation>
 <translation id="4732120983431207637">ষ্টেক আনৱিণ্ডাৰ</translation>
 <translation id="4736934858538408121">ভাৰ্চুৱেল কাৰ্ড</translation>
@@ -771,7 +769,6 @@
 <translation id="5184329579814168207">Chromeত খোলক</translation>
 <translation id="5191251636205085390">তৃতীয় পক্ষৰ কুকিৰ স্থান ল'বলৈ বিচৰা নতুন প্ৰযুক্তিৰ বিষয়ে জানক আৰু সেইবোৰ নিয়ন্ত্ৰণ কৰক</translation>
 <translation id="5193988420012215838">আপোনাৰ ক্লিপব'ৰ্ডলৈ প্ৰতিলিপি কৰা হৈছে</translation>
-<translation id="5199929503336119739">কর্মস্থানৰ প্ৰ'ফাইল</translation>
 <translation id="5204967432542742771">পাছৱৰ্ড দিয়ক</translation>
 <translation id="5206168361184759344">{FILE_COUNT,plural, =1{ফাইল ডাউনল’ড কৰি থকা হৈছে…}one{# টা ফাইল ডাউনল’ড কৰি থকা হৈছে…}other{# টা ফাইল ডাউনল’ড কৰি থকা হৈছে…}}</translation>
 <translation id="5210286577605176222">পূর্বৱর্তী টেবলৈ যাওক</translation>
@@ -1345,14 +1342,12 @@
 <translation id="8221656072740924283">অব্যাহত ৰাখক</translation>
 <translation id="8223642481677794647">ফীড কাৰ্ড মেনু</translation>
 <translation id="8250920743982581267">নথিপত্রসমূহ</translation>
-<translation id="825412236959742607">এই পৃষ্ঠাটোৱে বহুত বেছি মেম’ৰি খৰচ কৰে, সেয়েহে Chromeএ কিছুমান সমল আঁতৰাই পেলাইছে৷</translation>
 <translation id="8255617931166444521">ছাইটসমূহে কেৱল নিজৰ ছাইটত আপোনাৰ ব্ৰাউজিঙৰ কাৰ্যকলাপ চাবলৈ কেৱল আপোনাৰ কুকিসমূহ ব্যৱহাৰ কৰিব পাৰে</translation>
 <translation id="8259179246279078674">আগতীয়াকৈ ল’ড হোৱা পৃষ্ঠাসমূহ যিহেতু এনক্ৰিপ্ট কৰা থাকে, আগতীয়াকৈ ল’ড হোৱা পৃষ্ঠাৰ সমলৰ বিষয়ে Googleএ একো নাজানিব। Googleৰ ছাৰ্ভাৰসমূহে কোনবোৰ ছাইট গোপনে আগতীয়াকৈ ল’ড কৰা হৈছে সেয়া জানিব। এই তথ্যখিনি কেৱল পৃষ্ঠাসমূহ আগতীয়াকৈ ল’ড কৰিবলৈহে ব্যৱহাৰ কৰা হয় আৰু সেয়া আপোনাৰ Google একাউণ্টৰ অন্য তথ্যৰ সৈতে লিংক কৰা নহয়।</translation>
 <translation id="8260126382462817229">আকৌ ছাইন ইন কৰিবলৈ চেষ্টা কৰক</translation>
 <translation id="8261506727792406068">মচক</translation>
 <translation id="82619448491672958">অন্য টেবসমূহ চাওক</translation>
 <translation id="8266862848225348053">ডাউনল’ডৰ অৱস্থান</translation>
-<translation id="8274165955039650276">ডাউনল’ড কৰাবোৰ চাওক</translation>
 <translation id="8281886186245836920">এৰি যাওক</translation>
 <translation id="8282297628636750033">সম্ভৱ হ’লে ছাইটত গাঢ় ৰঙৰ থীম প্ৰয়োগ কৰক</translation>
 <translation id="829672787777123339">আপোনাৰ ডিভাইচটোৰ সৈতে সংযোগ কৰি থকা হৈছে…</translation>
@@ -1516,7 +1511,6 @@
 <translation id="9108808586816295166">সকলো সময়তে সুৰক্ষিত DNS উপলব্ধ নহ'ব পাৰে</translation>
 <translation id="9128984223251192329">গোপনীয়তা বিষয়ক ছেণ্ডবক্সৰ প্ৰম্প্‌টটো অৰ্ধ উচ্চতাত খোলা হৈছে</translation>
 <translation id="9133397713400217035">অফলাইন অৱস্থাত অন্বেষণ কৰক</translation>
-<translation id="9137013805542155359">মূল সংস্কৰণ দেখুৱাওক</translation>
 <translation id="9148126808321036104">আকৌ ছাইন ইন কৰক</translation>
 <translation id="9158770349521403363">কেৱল সমল শ্বেয়াৰ কৰক</translation>
 <translation id="9159716826369098114"><ph name="TAB_COUNT" /> টা টেব থকা টেবৰ গোটক এটা নতুন নেপথ্যৰ টেবৰ গোট হিচাপে পুনৰুদ্ধাৰ কৰক।</translation>

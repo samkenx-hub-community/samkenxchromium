@@ -144,6 +144,7 @@
 <translation id="2208919847696382164">Installér med Linux</translation>
 <translation id="2225536596944493418">Er du sikker på at du vil slette <ph name="NUMBER_OF_ITEMS" /> elementer?</translation>
 <translation id="2230062665678605299">Kunne ikke opprette mappen «<ph name="FOLDER_NAME" />». <ph name="ERROR_MESSAGE" /></translation>
+<translation id="2236732657580416950">Google Disk-bufferen din er tømt.</translation>
 <translation id="2239068707900391003">Person med kaffe</translation>
 <translation id="2251368349685848079">Gjenopprett fra papirkurven</translation>
 <translation id="2282155092769082568">Nettadresse for automatisk konfigurering:</translation>
@@ -678,6 +679,7 @@
 <translation id="6607272825297743757">Filinformasjon</translation>
 <translation id="6609332149380188670"><ph name="NUMBER_OF_ITEMS" /> mapper er delt med Parallels Desktop</translation>
 <translation id="6629518321609546825">Skriv inn de fire siste tallene</translation>
+<translation id="6639661343369899134">Filene kan ikke lastes opp, ettersom det ikke er nok ledig plass på <ph name="SHARED_DRIVE_NAME" />.</translation>
 <translation id="6643016212128521049">Tøm</translation>
 <translation id="6650726141019353908">Rosa sommerfugl</translation>
 <translation id="6657585470893396449">Passord</translation>

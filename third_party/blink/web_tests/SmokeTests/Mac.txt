@@ -1460,7 +1460,7 @@ virtual/forced-high-contrast-colors/external/wpt/forced-colors-mode/forced-color
 virtual/forced-high-contrast-colors/external/wpt/forced-colors-mode/forced-colors-mode-19.html
 virtual/fractional-scroll-offsets/external/wpt/css/css-position/sticky/position-sticky-nested-left.html
 virtual/fsa-incognito/external/wpt/file-system-access/local_FileSystemFileHandle-move-manual.https.html
-virtual/fsa-incognito/external/wpt/file-system-access/sandboxed_FileSystemFileHandle-create-sync-access-handle.https.tentative.window.html
+virtual/fsa-incognito/external/wpt/fs/FileSystemFileHandle-create-sync-access-handle.https.tentative.window.html
 virtual/gpu-rasterization-disable-yuv/images/yuv-decode-eligible/webp-color-profile-lossy.html
 virtual/gpu-rasterization/images/2-comp.html
 virtual/gpu-rasterization/images/color-profile-animate.html
@@ -1612,7 +1612,6 @@ virtual/scalefactor200/fast/hidpi/static/validation-bubble-appearance-hidpi.html
 virtual/split-http-cache/external/wpt/signed-exchange/reporting/sxg-reporting-navigation-cert_fetch_error-downgraded.tentative.html
 virtual/split-http-cache/external/wpt/signed-exchange/reporting/sxg-reporting-prefetch-mi_error.tentative.html
 virtual/stable/media/stable/video-object-fit-stable.html
-virtual/storage-access-api/external/wpt/storage-access-api/storageAccess.testdriver.sub.html
 virtual/text-antialias/apply-start-width-after-skipped-text.html
 virtual/text-antialias/atomic-inline-before-ellipsis.html
 virtual/text-antialias/atsui-multiple-renderers.html

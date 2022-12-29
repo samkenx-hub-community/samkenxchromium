@@ -518,6 +518,7 @@ Med förtroendetoken förbättras integriteten på webben. De kan inte användas
 <translation id="3845098929839618392">Öppna i inkognitoflik
 </translation>
 <translation id="3856096718352044181">Verifiera att detta är en giltig leverantör eller försök igen senare</translation>
+<translation id="3858127568696903256">Här kan du se innehåll du följer</translation>
 <translation id="3858860766373142691">Namn</translation>
 <translation id="3861633093716975811">Populära videor</translation>
 <translation id="3874520961715512166">Webbplatsen har tagits bort</translation>
@@ -553,7 +554,6 @@ Med förtroendetoken förbättras integriteten på webben. De kan inte användas
 <translation id="4045764304651014138">Data om användning</translation>
 <translation id="405399507749852140">Få aviseringar när priset sjunker på en webbplats</translation>
 <translation id="4056223980640387499">Sepia</translation>
-<translation id="4060598801229743805">Alternativ finns högt upp på skärmen</translation>
 <translation id="4062305924942672200">Juridisk information</translation>
 <translation id="4072805772816336153">Försök igen senare</translation>
 <translation id="4084682180776658562">Infoga bokmärke</translation>
@@ -643,7 +643,6 @@ Det kan finnas andra former av webbhistorik i Google-kontot på <ph name="BEGIN_
 <translation id="4554077758708533499">Ansluten med USB-kabel</translation>
 <translation id="4558311620361989323">Kortkommandon på webbsidor</translation>
 <translation id="4561730552726921821">Registreringen lyckades</translation>
-<translation id="4561979708150884304">Ingen anslutning</translation>
 <translation id="4565377596337484307">Dölj lösenord</translation>
 <translation id="4572422548854449519">Logga in på hanterat konto</translation>
 <translation id="4576892426230499203">Försök med ett annat verifieringsalternativ</translation>
@@ -668,7 +667,6 @@ Det kan finnas andra former av webbhistorik i Google-kontot på <ph name="BEGIN_
 <translation id="4699172675775169585">Cachade bilder och filer</translation>
 <translation id="4719927025381752090">Erbjud översättning</translation>
 <translation id="4720023427747327413">Öppna i <ph name="PRODUCT_NAME" /></translation>
-<translation id="4720982865791209136">Hjälp till att förbättra Chrome. <ph name="BEGIN_LINK" />Fyll i enkäten<ph name="END_LINK" />.</translation>
 <translation id="47217992755561375">Se dina mest besökta webbplatser</translation>
 <translation id="4732120983431207637">Stack Unwinder</translation>
 <translation id="4736934858538408121">Virtuellt kort</translation>
@@ -772,7 +770,6 @@ Det kan finnas andra former av webbhistorik i Google-kontot på <ph name="BEGIN_
 <translation id="5184329579814168207">Öppna i Chrome</translation>
 <translation id="5191251636205085390">Läs mer om ny teknik som med tiden kan ersätta tredjepartscookies och hur du kan styra den</translation>
 <translation id="5193988420012215838">Kopierat till urklipp</translation>
-<translation id="5199929503336119739">Jobbprofil</translation>
 <translation id="5204967432542742771">Ange lösenord</translation>
 <translation id="5206168361184759344">{FILE_COUNT,plural, =1{Filen laddas ned …}other{# filer laddas ned …}}</translation>
 <translation id="5210286577605176222">Hoppa till föregående flik</translation>
@@ -1346,14 +1343,12 @@ Vissa webbplatser kan till exempel svara på begäran genom att visa annonser so
 <translation id="8221656072740924283">Fortsätt</translation>
 <translation id="8223642481677794647">Menyn med flödeskort</translation>
 <translation id="8250920743982581267">Dokument</translation>
-<translation id="825412236959742607">Den här sidan använder för mycket minne, så en del innehåll har tagits bort.</translation>
 <translation id="8255617931166444521">Webbplatser får endast se din webbaktivitet på den aktuella webbplatsen med hjälp av cookies</translation>
 <translation id="8259179246279078674">Eftersom förinlästa sidor är krypterade får Google ingen information om innehållet på dem. Googles servrar lär sig vilka webbplatser som läses in privat i förväg. Den här informationen används endast för att läsa in sidor i förväg och är inte länkar till andra uppgifter från ditt Google-konto.</translation>
 <translation id="8260126382462817229">Försök att logga in igen</translation>
 <translation id="8261506727792406068">Radera</translation>
 <translation id="82619448491672958">Se andra flikar</translation>
 <translation id="8266862848225348053">Nedladdningsplats</translation>
-<translation id="8274165955039650276">Visa nedladdningar</translation>
 <translation id="8281886186245836920">Hoppa över</translation>
 <translation id="8282297628636750033">Använd mörkt tema på webbplatser när det är möjligt</translation>
 <translation id="829672787777123339">Ansluter till enheten …</translation>
@@ -1517,7 +1512,6 @@ Vissa webbplatser kan till exempel svara på begäran genom att visa annonser so
 <translation id="9108808586816295166">Säker DNS kanske inte alltid är tillgänglig</translation>
 <translation id="9128984223251192329">Meddelandet för Privacy Sandbox har öppnats över halva skärmen</translation>
 <translation id="9133397713400217035">Utforska offline</translation>
-<translation id="9137013805542155359">Visa original</translation>
 <translation id="9148126808321036104">Logga in igen</translation>
 <translation id="9158770349521403363">Dela endast innehåll</translation>
 <translation id="9159716826369098114">Återställ flikgruppen med <ph name="TAB_COUNT" /> flikar som en ny flikgrupp i bakgrunden.</translation>

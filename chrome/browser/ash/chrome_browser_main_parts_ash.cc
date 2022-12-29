@@ -937,6 +937,7 @@ void ChromeBrowserMainPartsAsh::PreProfileInit() {
                      chromeos::version_loader::VERSION_FULL),
       base::BindOnce(&ChromeOSVersionCallback));
 
+  kiosk_app_manager_ = std::make_unique<KioskAppManager>();
   arc_kiosk_app_manager_ = std::make_unique<ArcKioskAppManager>();
   web_kiosk_app_manager_ = std::make_unique<WebKioskAppManager>();
 
@@ -1344,9 +1345,7 @@ void ChromeBrowserMainPartsAsh::PostBrowserStart() {
                  base::BindOnce(&AshUsbDetector::ConnectToDeviceManager,
                                 base::Unretained(ash_usb_detector_.get())));
 
-  if (features::IsFirmwareUpdaterAppEnabled()) {
-    fwupd_download_client_ = std::make_unique<FwupdDownloadClientImpl>();
-  }
+  fwupd_download_client_ = std::make_unique<FwupdDownloadClientImpl>();
 
   // The local_state pref may not be available at this stage of Chrome's
   // lifecycle, default to false for now. The actual state will be set in a
@@ -1530,7 +1529,7 @@ void ChromeBrowserMainPartsAsh::PostMainMessageLoopRun() {
   g_browser_process->platform_part()->ShutdownAutomaticRebootManager();
 
   // Clean up dependency on CrosSettings and stop pending data fetches.
-  KioskAppManager::Shutdown();
+  kiosk_app_manager_.reset();
 
   // Make sure that there is no pending URLRequests.
   if (pre_profile_init_called_)

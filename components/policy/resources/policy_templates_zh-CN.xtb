@@ -33,6 +33,7 @@
       目前支持的语言包括：af、bg、ca、cs、da、de、el、en-AU、en-CA、en-GB、en-US、es、es-419、es-AR、es-ES、es-MX、es-US、et、fa、fo、fr、he、hi、hr、hu、id、it、ko、lt、lv、nb、nl、pl、pt-BR、pt-PT、ro、ru、sh、sk、sl、sq、sr、sv、ta、tg、tr、uk、vi。</translation>
 <translation id="1019101089073227242">设置用户数据目录</translation>
 <translation id="1020006815010587263">已为用户停用回收站。</translation>
+<translation id="1021462144002396313"><ph name="PRIVACY_SANDBOX_NAME" /> 政策</translation>
 <translation id="1022361784792428773">应禁止用户安装的扩展程序的 ID（或者用“*”表示禁止安装所有扩展程序）</translation>
 <translation id="102492767056134033">设置屏幕键盘在登录屏幕上的默认状态</translation>
 <translation id="102658870205613876">弹出式窗口设置</translation>
@@ -159,6 +160,7 @@
       仅当 <ph name="CHROME_OS_RELEASE_CHANNEL_DELEGATED_POLICY_NAME" /> 设为 False 时，设置 <ph name="CHROME_OS_RELEASE_CHANNEL_POLICY_NAME" /> 才会产生影响。</translation>
 <translation id="1147732569915511430">相应头像图片的 SHA-256 哈希值。</translation>
 <translation id="1148415065145333943">停用高级电池充电模式</translation>
+<translation id="1150742937785306405">允许用户在其设备上开启或关闭 <ph name="PRIVACY_SANDBOX_NAME" /> 网站建议采用的广告设置。</translation>
 <translation id="1151353063931113432">在这些网站上允许图片</translation>
 <translation id="1151987132434751822">可对哪些身份验证方案采用政策凭据。可设为下列值之一：
             * basic
@@ -188,6 +190,7 @@
 <translation id="1160479894929412407">允许使用 QUIC 协议</translation>
 <translation id="1160939557934457296">禁止从安全浏览警告页面继续访问</translation>
 <translation id="1163080558183062209">禁用拒绝列表中的打印机类型</translation>
+<translation id="1163389598183927209">与 <ph name="PRIVACY_SANDBOX_NAME" /> 相关的一组政策。如需详细了解 <ph name="PRODUCT_NAME" /> 为弃用第三方 Cookie 而采取的措施，请参阅 <ph name="PRIVACY_SANDBOX_URL" />。</translation>
 <translation id="1165923723751466821">允许浏览器访客模式登录和个人资料登录</translation>
 <translation id="117059611145966538">外部打印服务器</translation>
 <translation id="117080706484659953">允许在 <ph name="MAC_OS_NAME" /> 上检测政策范围</translation>
@@ -508,11 +511,6 @@
       </translation>
 <translation id="1484190167468437592">停用单声道音频</translation>
 <translation id="1486021504508098388">报告背光信息</translation>
-<translation id="1486469502848499602">旨在更改手动创建的新票据的 <ph name="KRB5_CONFIG" /> 建议配置。
-
-      如果此政策已设置，系统会将政策值用作建议的配置并显示在身份验证对话框的“高级”部分中。
-
-      如果此政策未设置，系统会改为应用建议的 <ph name="PRODUCT_OS_NAME" /> 配置。请注意，它也会显示在身份验证对话框的“高级”部分中。</translation>
 <translation id="1487722536912664411">允许用户使用 <ph name="PRODUCT_NAME" /></translation>
 <translation id="1487916040416013623">通过设置此政策，您可以指定应允许哪些服务器进行集成身份验证。仅当收到由此许可名单中的代理服务器或服务器发出的身份验证请求时，<ph name="PRODUCT_NAME" /> 才会启用集成式身份验证机制。
 
@@ -573,6 +571,7 @@
 
       如果您未设置此政策，系统会对所有网站使用全局默认值（不自动授予访问权限）。</translation>
 <translation id="1530812829012954197">总是通过托管浏览器呈现以下网址格式</translation>
+<translation id="1542491165152947087">允许用户在其设备上开启或关闭 <ph name="PRIVACY_SANDBOX_NAME" /> 广告主题设置。</translation>
 <translation id="1552418937045050762">如果您启用了此设置，用户将能够选择启用“附近分享”功能，以便和附近的人互相发送文件。
 
       如果您停用了此设置，用户将无法选择启用“附近分享”功能。
@@ -587,6 +586,7 @@
 <translation id="1560279917909364275">以许可名单形式指定哪些记事应用可显示在 <ph name="PRODUCT_OS_NAME" /> 的锁定屏幕中</translation>
 <translation id="1561424797596341174">覆盖与远程访问主机的调试版本号相关的政策</translation>
 <translation id="1561967320164410511">用于个人认证的 U2F 和扩展程序</translation>
+<translation id="1562846754315919408">检测到 USB 设备时显示通知</translation>
 <translation id="1567718448549957373">如果此政策已启用或未设置，系统将会允许通过不安全的 HTTP 接收<ph name="BASIC_AUTH" />身份验证请求。
 
       如果此政策已停用，不安全的 HTTP 请求将无法使用<ph name="BASIC_AUTH" />身份验证方案，只有安全的 HTTPS 能使用该方案。
@@ -1240,6 +1240,12 @@
       如果此政策设为 true 或未设置，用户将能使用虚拟机管理 CLI。
       否则，所有虚拟机管理 CLI 会被停用并隐藏。
       </translation>
+<translation id="2194051055390000601">此政策用于控制是否可为您的用户停用 <ph name="PRIVACY_SANDBOX_NAME" /> 广告主题设置。
+
+如果此政策已停用，系统会为您的用户关闭广告主题设置。
+如果此政策已启用或未设置，您的用户将能够在其设备上开启或关闭 <ph name="PRIVACY_SANDBOX_NAME" /> 广告主题设置。
+
+如果您设置了此政策，则必须停用 <ph name="PRIVACY_SANDBOX_PROMPT_ENABLED_POLICY_NAME" /> 政策。</translation>
 <translation id="2195032660890227692">此政策已在 <ph name="PRODUCT_NAME" /> 中移除，并已由 <ph name="ARC_BR_POLICY_NAME" /> 取代。</translation>
 <translation id="2197625019569762163">如果此政策设为 true，登录屏幕上会默认显示数字键盘以用于输入密码。用户仍能切换到常规键盘。
 
@@ -1311,9 +1317,6 @@
       此政策会覆盖 <ph name="DEFAULT_SERIAL_GUARD_SETTING_POLICY_NAME" />、<ph name="SERIAL_ASK_FOR_URLS_POLICY_NAME" />、<ph name="SERIAL_BLOCKED_FOR_URLS_POLICY_NAME" /> 和用户的偏好设置。
 
       此政策仅会对通过 Web Serial API 访问 USB 设备这一操作产生影响。若要通过 WebUSB API 授权访问 USB 设备，请参见 <ph name="WEB_USB_ALLOW_DEVICES_FOR_URLS_POLICY_NAME" /> 政策。</translation>
-<translation id="2246011554082893079">控制该设备能否使用 <ph name="BOREALIS_NAME" />。
-
-      如果此政策设为 false，该设备的所有用户都将无法使用 <ph name="BOREALIS_NAME" />。否则（如果此政策未设置或设为 true），仅当未被任何其他政策或设置停用时，<ph name="BOREALIS_NAME" /> 才可用。</translation>
 <translation id="2246621891161157804">允许 Chrome 阻止导航到沙盒化 iframe 中的外部协议</translation>
 <translation id="224750967938323855">在登录期间不显示同步同意声明</translation>
 <translation id="2252400912879027343">不安全情境中的 WebSQL 在 M109 之前将一直可用，然后从 M110 起将不再可用。</translation>
@@ -1778,6 +1781,7 @@
       如需详细了解有效网站网址格式，请访问 https://cloud.google.com/docs/chrome-enterprise/policies/url-patterns。允许使用通配符 <ph name="WILDCARD_VALUE" />。此政策只能根据源进行匹配，所以网址格式中的任何路径都会被忽略。
 
       如果您未为某个网站设置此政策，系统便会将 <ph name="DEFAULT_LOCAL_FONTS_SETTING_POLICY_NAME" /> 中的政策（若已设置）应用于该网站，或者让该网站遵循浏览器的默认权限设置并允许用户按网站选择这项权限。</translation>
+<translation id="2727844239611930002">允许 <ph name="PRODUCT_NAME" /> 确定是否显示 <ph name="PRIVACY_SANDBOX_NAME" /> 提示。</translation>
 <translation id="2730200383593984228">允许独立用户使用 Android 应用</translation>
 <translation id="2730419309754848345">默认以图片形式打印 PDF 文件</translation>
 <translation id="2731299561202635374">此政策旨在控制实时的网址检查以识别不安全的网址。
@@ -2054,6 +2058,7 @@
       如果此政策设为 false，<ph name="BOREALIS_NAME" /> 会处于不可用状态。否则（如果此政策未设置或设为 true），仅当未被任何其他政策或设置停用时，<ph name="BOREALIS_NAME" /> 才可用。</translation>
 <translation id="2964373560810620158">阻止用户使用 <ph name="LACROS_NAME" /> 浏览器</translation>
 <translation id="2968177167006045252">允许网站使用 SharedArrayBuffers</translation>
+<translation id="2969489219271682844">检测到 USB 设备时不显示通知</translation>
 <translation id="2969568582351417848">不针对所列网域中的指定文件类型显示基于文件类型扩展名的下载警告</translation>
 <translation id="2969797921412053304">此政策用于配置哪些网址有权在登录屏幕上的 SAML 流程中对设备身份执行远程认证。
 
@@ -2065,6 +2070,7 @@
 
       要详细了解有效网址格式，请访问 https://cloud.google.com/docs/chrome-enterprise/policies/url-patterns。</translation>
 <translation id="2976429807269247880">旧版 <ph name="ATTRIBUTE_SAMESITE_NAME" /> Cookie 行为设置</translation>
+<translation id="2979696534869541158">强制使用旧实现</translation>
 <translation id="2985927503455169394">使用 Google 助理新手入门体验的默认模式</translation>
 <translation id="2987155890997901449">启用 ARC</translation>
 <translation id="2987227569419001736">控制对 Web Bluetooth API 的使用</translation>
@@ -2202,6 +2208,7 @@
 <translation id="3092059499596000593">在打印预览中将系统默认打印机设为默认选项</translation>
 <translation id="309416443108680956">此政策用于指定：当通过安全令牌（例如使用智能卡）验证身份的用户在会话过程中移除该令牌时，会发生什么情况。<ph name="SECURITY_TOKEN_SESSION_BEHAVIOR_IGNORE" />：不会发生任何情况。<ph name="SECURITY_TOKEN_SESSION_BEHAVIOR_LOCK" />：屏幕会被锁定，直到用户重新验证身份为止。<ph name="SECURITY_TOKEN_SESSION_BEHAVIOR_LOGOUT" />：会话会被结束，并且用户会被强制退出。如果此政策未设置，它将默认等同于已设为 <ph name="SECURITY_TOKEN_SESSION_BEHAVIOR_IGNORE" />。</translation>
 <translation id="3096595567015595053">已启用插件的列表</translation>
+<translation id="309885424548342662">启用 Microsoft® 云身份验证</translation>
 <translation id="3101035417394748390">可通过剪贴板同步功能在客户端和主机之间传输的数据的大小上限（以字节为单位）</translation>
 <translation id="3101501961102569744">选择如何指定代理服务器设置</translation>
 <translation id="3101709781009526431">日期和时间</translation>
@@ -2791,6 +2798,7 @@
 <translation id="3608206578291537084">启用加密报告管道</translation>
 <translation id="3608281460204780443">在 <ph name="PRODUCT_OS_NAME" /> 启动器和新标签页中显示 Chrome 应用商店的图标</translation>
 <translation id="3612809274815536412">窗口放置设置</translation>
+<translation id="3622463490728773174">允许使用新实现</translation>
 <translation id="3627678165642179114">启用或停用拼写检查网络服务</translation>
 <translation id="3628480121685794414">启用单面打印</translation>
 <translation id="3634125384445314047">允许通过 Phone Hub 访问手机上近期拍摄的照片和视频。</translation>
@@ -2881,6 +2889,7 @@
       如果您启用了此设置或未设置值，那么“自动填充”功能仍由用户控制。这样，用户就能配置要自动填充的个人资料，并能自行决定是否要启用/停用“自动填充”功能。</translation>
 <translation id="3733014427925403568">间隔时段的开始日期和结束日期分别是周几。</translation>
 <translation id="3736879847913515635">允许通过用户管理器添加用户</translation>
+<translation id="3744984310825999317">允许 <ph name="PEPPER_NAME" /> 使用新版解码器进行硬件加速视频解码。</translation>
 <translation id="3749259744154402564">不支持</translation>
 <translation id="3749511622128647337">禁止输出音频</translation>
 <translation id="3750220015372671395">禁止在这些网站上使用密钥生成功能</translation>
@@ -2946,6 +2955,7 @@
 
       如需详细了解<ph name="WEBXR_AR_SESSION_ENUM_VALUE" />会话，请查看 <ph name="WEBXR_AR_MODULE_API_NAME" />规范。</translation>
 <translation id="3788662722837364290">设备闲置时的电源管理设置</translation>
+<translation id="3788876528643861853">停用 Microsoft® 云身份验证</translation>
 <translation id="3790085888761753785">如果此设置处于启用状态，用户将能够使用 Smart Lock 登录他们的帐号。一般情况下 Smart Lock 只允许用户解锁屏幕，相较之下，这是限制性更低的设置。
 
       如果此设置处于停用状态，用户将不能使用 Smart Lock 登录功能。
@@ -3029,6 +3039,7 @@
 
       每个列表条目都包含一个字典，其“extension-id”字段必须包含扩展程序 ID，而其“update-url”字段必须包含更新网址。</translation>
 <translation id="3869180930654347954">对所有受影响客户停用 First-Party Sets 功能</translation>
+<translation id="3869566220234507038">始终加载 <ph name="LACROS_ROOTFS_NAME" /> <ph name="LACROS_NAME" /> 浏览器</translation>
 <translation id="3870035799352372700">禁止 Google 助理在互动过程中访问屏幕中的内容</translation>
 <translation id="3870059789954671543">在登录屏幕上启用“键盘焦点突出显示”无障碍功能。
 
@@ -3305,6 +3316,12 @@
       此政策提供的所有集合都必须是有效的 First-Party Set；如果无效，则会触发相应的错误。
 
       此政策仅适用于已加入 <ph name="MS_AD_NAME" /> 网域的 Windows 实例，或者已注册设备管理服务的 Windows 10 专业版或企业版实例，以及通过 MDM 进行管理或通过 MCX 加入网域的 macOS 实例。</translation>
+<translation id="4135805680586226327">此政策用于控制 PPAPI 插件中 Graphics3D API 的近期重构。
+
+迁移只会影响内部实现细节，应该不会改变任何行为。不过，如有任何 PPAPI 应用无法正常运行，可以使用此政策。
+
+如果此政策未设置或已启用，浏览器将决定使用哪种实现。
+如果此政策已停用，浏览器将使用旧实现，直到此政策失效为止。</translation>
 <translation id="4136603825567209889">启用关于用户标识信息的报告</translation>
 <translation id="4138655880188755661">时限</translation>
 <translation id="4140646780789794190">禁止向 PluginVm 共享诊断数据</translation>
@@ -3482,6 +3499,7 @@
 
           如果设为 false 或未设置，则内容提供方不会返回任何信息。</translation>
 <translation id="435395045087992163">当设备休眠或合盖时不锁定设备</translation>
+<translation id="4354792057099570728">为您的用户停用 <ph name="PRIVACY_SANDBOX_NAME" /> 广告衡量设置。</translation>
 <translation id="4357587374229381015">指定将用于在 SAML IdP 登录页面上自动填充用户名字段的网址参数名称。
 
       与用户的 <ph name="PRODUCT_OS_NAME" /> 个人资料关联的电子邮件地址将用作网址参数的值。因此，如果用户需要在 SAML IdP 页面上使用不同的电子邮件地址，此设置应被停用。
@@ -3572,6 +3590,7 @@
       尽管上述平台均支持此政策，但此政策启用的功能在其中的少数平台上可能无法使用。并非所有已弃用的网络平台功能都可重新启用。只有下面明确列出的功能才能在限定的时间（具体因功能而异）内重新发挥功效。字符串标记的常用格式为 [已弃用功能的名称]_EffectiveUntil[yyyymmdd]。要了解更改网络平台功能的意图，请访问 https://bit.ly/blinkintents。
       </translation>
 <translation id="4443711908766051441">允许玩恐龙复活节彩蛋游戏</translation>
+<translation id="4445728642576791607">允许用户在其设备上开启或关闭 <ph name="PRIVACY_SANDBOX_NAME" /> 广告衡量设置。</translation>
 <translation id="4447668084338250480">内网重定向行为</translation>
 <translation id="4449469846627734399">设定日间用电高峰转移配置</translation>
 <translation id="4449545651113180484">将屏幕顺时针旋转 270 度</translation>
@@ -3608,6 +3627,7 @@
 <translation id="4483649828988077221">停用自动更新功能</translation>
 <translation id="4484515651939984695">指定使用访问代码或二维码选择的投放设备会在 <ph name="PRODUCT_NAME" /> 菜单的投放设备列表中保留多长时间（以秒为单位）。</translation>
 <translation id="4485425108474077672">配置“打开新的标签页”页面网址</translation>
+<translation id="4491607814095953976">选择是否可以停用 <ph name="PRIVACY_SANDBOX_NAME" /> 广告衡量设置</translation>
 <translation id="4492287494009043413">停用截取屏幕截图功能</translation>
 <translation id="4494132853995232608">Wilco DTC</translation>
 <translation id="449423975179525290">配置与 <ph name="PLUGIN_VM_NAME" /> 相关的政策。</translation>
@@ -3797,6 +3817,7 @@
 <translation id="4660356908994631271">在“新标签页”页面上的搜索框中显示 Google 智能镜头按钮。</translation>
 <translation id="4661889655253181651">“内容设置”可用来指定对特定类型内容（例如 Cookie、图片或 JavaScript）的处理方式。</translation>
 <translation id="4663509616441994711">禁止合并用户级云政策。</translation>
+<translation id="4663588423815449593">强制 <ph name="PEPPER_NAME" /> 使用旧版视频解码器。</translation>
 <translation id="4665897631924472251">扩展程序管理设置</translation>
 <translation id="4666930704271463612">指定系统在寻找服务器打印机时，应查询符合哪种条件的打印服务器。
 
@@ -3905,6 +3926,21 @@
 
       如果您设置了此政策，用户便无法更改它。如果您不设置此政策，用户可以决定是否让工具栏自动隐藏。</translation>
 <translation id="4812309945046430049">键盘背光颜色：红色</translation>
+<translation id="4812410063101047442">此设置用于配置要使用哪个 <ph name="LACROS_NAME" /> 浏览器。
+
+如果此政策设为 <ph name="LACROS_SELECTION_USER_CHOICE_VALUE" />，用户可以决定加载哪个 <ph name="LACROS_NAME" /> 浏览器：来自 <ph name="LACROS_ROOTFS_NAME" /> 或 <ph name="LACROS_STATEFUL_NAME" /> 分区的二进制文件。
+如果用户未设置任何偏好设置，系统会选择具有最新版本的二进制文件。
+
+如果此政策设为 <ph name="LACROS_SELECTION_ROOTFS_VALUE" />，请始终加载 <ph name="LACROS_NAME" /> 浏览器的 <ph name="LACROS_ROOTFS_NAME" /> 二进制文件。
+
+如果此政策设为 <ph name="LACROS_SELECTION_STATEFUL_VALUE" />，请始终加载 <ph name="LACROS_NAME" /> 浏览器的 <ph name="LACROS_STATEFUL_NAME" /> 二进制文件。
+如果 <ph name="LACROS_STATEFUL_NAME" /> 浏览器版本低于 <ph name="PRODUCT_OS_NAME" /> 版本，使用此值可能会导致意外行为。这种情况不受支持，也无法保证能够正常运作。
+
+如果您未设置此政策，受企业管理的用户将使用默认值“<ph name="LACROS_SELECTION_ROOTFS_VALUE" />”，不受企业管理的用户将使用默认值“<ph name="LACROS_SELECTION_USER_CHOICE_VALUE" />”。
+
+请注意，如果在更改此政策的值后，<ph name="LACROS_NAME" /> 浏览器的版本低于当前版本，则可能会导致该浏览器的数据丢失。例如，如果此政策从 <ph name="LACROS_SELECTION_STATEFUL_VALUE" /> 更改为 <ph name="LACROS_SELECTION_ROOTFS_VALUE" />，并且前者已更新。或者，如果 <ph name="PRODUCT_OS_NAME" /> 是与 <ph name="LACROS_ROOTFS_NAME" /> <ph name="LACROS_NAME" /> 浏览器一起更新的，且 <ph name="LACROS_STATEFUL_NAME" /> 尚未更新。在此类情况下，无法保证正确迁移数据。
+
+为了安全起见，可以使用 <ph name="LACROS_SELECTION_USER_CHOICE_VALUE" /> 或 <ph name="LACROS_SELECTION_ROOTFS_VALUE" />，也可以从 <ph name="LACROS_SELECTION_ROOTFS_VALUE" /> 切换到 <ph name="LACROS_SELECTION_USER_CHOICE_VALUE" />。</translation>
 <translation id="4812714598405913256">为 DeviceMinimumVersion 政策配置自动更新期限已过消息</translation>
 <translation id="4815581264328351694">在系统任务栏菜单中显示无障碍选项</translation>
 <translation id="4816674326202173458">允许企业用户以主用户或次要用户的身份登录多个人资料会话（非受管理用户的默认行为）</translation>
@@ -4365,6 +4401,7 @@
 
       如果此政策未设置，用户无法在已注册的 <ph name="PRODUCT_OS_NAME" />上玩恐龙游戏，但可在其他环境下玩这款游戏。</translation>
 <translation id="5293285950307241933">清除所有本地用户数据</translation>
+<translation id="5293619885162445352">允许 <ph name="PEPPER_NAME" /> 使用新版视频解码器。</translation>
 <translation id="529457411593078576">在 CCT 首次运行期间启用《服务条款》</translation>
 <translation id="5297948043665200363">允许用户在帐号身份验证失效后继续保持登录状态</translation>
 <translation id="5298949392804966105">不针对受管理的帐号添加限制</translation>
@@ -4491,6 +4528,7 @@
       如果您设置了此政策，用户将无法更改或替换此政策。
 
       如果未设置此政策，则用户可以自行选择在登录屏幕上代表自己的头像图片。</translation>
+<translation id="5428716437928918274">Privacy Sandbox 设置控件</translation>
 <translation id="5431392643649571773">启用后，<ph name="PRODUCT_NAME" /> 功能会允许使用往返缓存。当离开某个网页时，系统可将此网页的现状（文档树、脚本等）保存到往返缓存中。如果浏览器返回到此网页，系统便可从往返缓存中恢复此网页并以缓存之前的网页状态显示它。
 
           该功能可能会导致某些未为这种缓存做好准备的网站出现问题。具体而言，某些网站需要在浏览器离开网页时收到系统传送的“<ph name="UNLOAD_HANDLER_NAME" />”事件。如果相应网页存储在往返缓存中，“<ph name="UNLOAD_HANDLER_NAME" />”事件将不会正常传送。
@@ -4637,6 +4675,15 @@
 <translation id="5563240289883266691">启用 Linux 应用使用情况报告</translation>
 <translation id="5565178130821694365">必须每两天（48 小时）输入一次密码</translation>
 <translation id="5566210228171064229">允许打印（无论是否有 PIN 码）</translation>
+<translation id="5569504149646180067">为由 Microsoft® Cloud Identity 提供方提供支持的帐号配置自动用户登录。
+
+如果您将此政策设为 1 (<ph name="POLICY_VALUE_ENABLED" />)，使用由 Microsoft® Cloud Identity 提供方（即 <ph name="MS_AAD_NAME" /> 或个人 Microsoft® 帐号身份提供方）提供支持的帐号登录计算机的用户或者向 <ph name="MS_WIN_NAME" /> 添加了工作或学校帐号的用户，可以使用该身份自动登录网站媒体资源。系统会针对每个身份验证事件将与用户的设备和帐号相关的信息传输到该用户的 Cloud Identity 提供方。
+
+如果您未设置此政策或将其设为 0 (<ph name="POLICY_VALUE_DISABLED" />)，系统会停用上述自动登录功能。
+
+此功能适用于 <ph name="WIN_NAME" /> 10 以上的系统。
+
+注意：此政策不适用于无痕模式或访客模式。</translation>
 <translation id="5572971233886879856">指定系统在寻找服务器打印机时，要查询符合哪种条件的打印服务器。此设置仅适用于 <ph name="DEVICE_EXTERNAL_PRINT_SERVERS_POLICY" /> 政策。
 
       如果您设置了此政策，用户将只能依照设备政策使用那些符合条件（ID 与此政策中所列的值匹配）的服务器打印机。
@@ -5291,6 +5338,12 @@
       请注意，我们曾宣布将在 <ph name="PRODUCT_NAME" /> 82 版中移除此政策，但已改为在 84 版中移除。</translation>
 <translation id="6276087670023098167">停用关于机器标识信息的报告</translation>
 <translation id="627672037430076089">禁止与这台计算机建立远程支持连接</translation>
+<translation id="6277043520666738324">此政策用于控制 <ph name="PEPPER_NAME" /> 插件能否使用新版解码器（而非旧版视频解码器）与硬件解码器通信。
+
+迁移只会影响内部实现细节，而不应改变任何行为。不过，如果任何 PPAPI 应用都无法正常运行，则可以使用此政策。
+
+如果此政策未设置或已启用，浏览器会决定使用哪种实现方案。
+如果此政策已停用，浏览器将会使用旧版实现方案，直至此政策到期。</translation>
 <translation id="6277314550042130537">在 HTTP 身份验证期间使用 KDC 政策审批结果</translation>
 <translation id="6278428485366576908">主题</translation>
 <translation id="6279722058145292462">通过设置此政策，您可以指定客户端对其机器帐号密码的更改频率（以天为单位）。密码是由客户端随机生成的，不会显示给用户。停用此政策或设置较多的天数可能会对安全性产生不利影响，因为这会让潜在攻击者有更多时间来找出并使用机器帐号密码。
@@ -5570,6 +5623,11 @@
       如果此政策未设置、设为“由用户决定”或设为“无”，用户便可使用 chrome://settings 页面中的常规控件来控制“自动检测时区”功能。</translation>
 <translation id="6532769014584932288">允许使用唤醒锁定</translation>
 <translation id="6533881418188970751">下载前询问用户要将文件保存到何处</translation>
+<translation id="653616551212414363">如果启用此设置，当 <ph name="PRODUCT_OS_NAME" /> 上插入 USB 设备时，系统会向用户显示通知。
+
+      如果停用此设置，系统将不会向用户显示任何关于插入的 USB 设备的通知。
+
+      如果此政策未设置，用户会在 USB 设备插入时收到通知。</translation>
 <translation id="6536600139108165863">设备关机后自动重新启动</translation>
 <translation id="6538653424603921690">始终为登录屏幕停用隐私保护屏幕</translation>
 <translation id="6539246272469751178">此政策对 Android 应用没有任何影响。Android 应用始终都会使用默认下载目录，并且无法访问由 <ph name="PRODUCT_OS_NAME" />下载到非默认下载目录中的任何文件。</translation>
@@ -5644,6 +5702,7 @@
 <translation id="6575944031719151455">通过设置此政策，您可以指定将在登录屏幕中显示的设备本地帐号的列表。标识符会将不同的设备本地帐号区分开。
 
       如果您不设置此政策或此政策是空列表，则不存在设备本地帐号。</translation>
+<translation id="6577760914164385949">允许自动登录 Microsoft® 云标识提供者</translation>
 <translation id="6580851705156412587">在设备休眠或合盖时锁定设备</translation>
 <translation id="6581048059229620221">如果停用此政策，将无法启动远程支持主机，也无法将该主机配置为接受传入连接。
 
@@ -5897,6 +5956,7 @@
 <translation id="6815483833848348029">如果此政策已启用或未设置，当设备离线时，如果系统已设置设备本地帐号以实现零延迟的自动登录，<ph name="PRODUCT_OS_NAME" />会显示网络配置提示。
 
       如果此政策已停用，系统则会显示错误消息。</translation>
+<translation id="6815628711329903153">允许为 PPAPI 插件中的 Graphics3D API 分配新型缓冲区。</translation>
 <translation id="6819838337315703072">如果 <ph name="LINUX_OS_NAME" /> 应用支持已开启，当此政策已启用时，系统会将有关 <ph name="LINUX_OS_NAME" /> 应用使用情况的信息发送回服务器。
 
       如果此政策已停用或未设置，系统便不会报告使用情况信息。</translation>
@@ -6003,7 +6063,6 @@
       如果此政策设为 false，<ph name="PRODUCT_NAME" /> 和 <ph name="LACROS_NAME" /> 将会禁止启用访客个人资料。
 
       请注意：如果此政策设为 true 或未配置，但 <ph name="LACROS_SECONDARY_PROFILES_ALLOWED_POLICY_NAME" /> 设为 false，<ph name="LACROS_NAME" /> 将会禁止启用访客个人资料。</translation>
-<translation id="6920640961852058581">更改 Kerberos 票据的默认配置</translation>
 <translation id="692096803256767290">将 OS 回滚到目标版本</translation>
 <translation id="6921544339867564740">允许设备在 Chrome 操作系统中运行虚拟机</translation>
 <translation id="6922884955650325312">禁止 <ph name="FLASH_PLUGIN_NAME" /> 插件运行</translation>
@@ -6113,6 +6172,7 @@
 <translation id="7002040773317582266">已为主帧网址启用实时检查功能。</translation>
 <translation id="7003746348783715221">“<ph name="PRODUCT_NAME" />”偏好设置</translation>
 <translation id="7007283257527015835">一个布尔值标记，用于表明是否应将该协议处理程序设为默认处理程序。</translation>
+<translation id="7007403084376547341">选择 <ph name="LACROS_NAME" /> 浏览器二进制文件</translation>
 <translation id="7008308728445338159">启用 DNS 拦截检查功能</translation>
 <translation id="7009043124653876961">禁止在用户输入内容时显示表情符号建议</translation>
 <translation id="7010006999849135962">针对远程访问主机启用无 PIN 码身份验证</translation>
@@ -6318,6 +6378,7 @@
 <translation id="7202925763179776247">允许下载限制</translation>
 <translation id="7207095846245296855">强制启用 Google 安全搜索功能</translation>
 <translation id="7211368186050418507">一律不自动检测时区</translation>
+<translation id="721617466745658461">允许用户选择 <ph name="LACROS_NAME" /> 浏览器二进制文件</translation>
 <translation id="7216442368414164495">允许用户启用安全浏览扩展报告功能</translation>
 <translation id="721970071627370558">停用设备电源状态报告功能</translation>
 <translation id="7221574724100909818">使用锁形图标表示安全连接</translation>
@@ -6516,6 +6577,7 @@
       </translation>
 <translation id="7459601923199346224">控制证书管理机制的用户和设备政策。</translation>
 <translation id="7459633275230216698">允许显示文件选择对话框</translation>
+<translation id="7462256705280836453">选择是否可以停用 <ph name="PRIVACY_SANDBOX_NAME" /> 网站建议采用的广告设置</translation>
 <translation id="7463055558720530430">允许用户记住 Kerberos 密码</translation>
 <translation id="7464058117970792805">启用打印预览</translation>
 <translation id="7464991223784276288">仅在当前会话中使用来自相符网址的 Cookie</translation>
@@ -6723,6 +6785,12 @@
       如果此政策已停用，那么只要用户执行了会触发文件选择对话框的操作（例如导入书签、上传文件、保存链接，等等），系统就会显示一条消息，并会假定用户已在文件选择对话框中点击了“取消”。</translation>
 <translation id="7638300388094655454">Google Cast</translation>
 <translation id="7638764766629234761">允许使用系统通知</translation>
+<translation id="7643151458117317518">此政策用于控制是否可为您的用户停用 <ph name="PRIVACY_SANDBOX_NAME" /> 广告衡量设置。
+
+如果此政策已停用，系统会为您的用户关闭广告衡量设置。
+如果此政策已启用或未设置，您的用户将能够在其设备上开启或关闭 <ph name="PRIVACY_SANDBOX_NAME" /> 广告衡量设置。
+
+如果您设置了此政策，则必须停用 <ph name="PRIVACY_SANDBOX_PROMPT_ENABLED_POLICY_NAME" /> 政策。</translation>
 <translation id="7643883929273267746">限制可在<ph name="PRODUCT_NAME" />中显示的帐号</translation>
 <translation id="7648664871086956188">此政策是一个通用开关，适用于在 DataLeakPreventionRulesList 政策中定义的所有规则。
       如果此政策设为 True，系统会开启关于数据泄露预防事件的实时报告。
@@ -7320,6 +7388,16 @@
 您无需手动配置这些设置！您可从 <ph name="POLICY_TEMPLATE_DOWNLOAD_URL" /> 下载适用于 Windows、Mac 和 Linux 的易用模板。
 
 虽然您仍可在已加入 <ph name="MS_AD_NAME" /> 网域的 Windows 实例上通过注册表配置政策，但我们建议您通过 GPO 在 Windows 上配置政策。</translation>
+<translation id="8261008508574620157">此政策用于控制您的用户是否会看到 <ph name="PRIVACY_SANDBOX_NAME" /> 提示。
+提示是一个旨在阻止用户执行相应操作的流程，用于将 <ph name="PRIVACY_SANDBOX_NAME" /> 设置告知您的用户。如需详细了解 Chrome 为弃用第三方 Cookie 而采取的措施，请参阅 <ph name="PRIVACY_SANDBOX_URL" />。
+
+如果此政策已停用，<ph name="PRODUCT_NAME" /> 将不会显示 <ph name="PRIVACY_SANDBOX_NAME" /> 提示。
+如果此政策已启用或未设置，<ph name="PRODUCT_NAME" /> 会确定是否可显示 <ph name="PRIVACY_SANDBOX_NAME" /> 提示，然后在可行的情况下显示这类提示。
+
+如果您设置了以下任何政策，则必须停用此政策：
+<ph name="PRIVACY_SANDBOX_AD_TOPICS_ENABLED_POLICY_NAME" />
+<ph name="PRIVACY_SANDBOX_SITE_ENABLED_ADS_ENABLED_POLICY_NAME" />
+<ph name="PRIVACY_SANDBOX_AD_MEASUREMENT_ENABLED_POLICY_NAME" /></translation>
 <translation id="8266778278542911985">如果此政策设为 3，系统会允许网站请求访问串行端口。如果此政策设为 2，系统会禁止访问串行端口。
 
       如果此政策未设置，系统会允许网站请求访问，但用户可以更改此设置。</translation>
@@ -7348,6 +7426,7 @@
       如果此政策未设置，系统会使用默认的调整因子。
 
       注意：调整因子不得小于 100%。</translation>
+<translation id="8284621384813278750">选择是否可以停用 <ph name="PRIVACY_SANDBOX_NAME" /> 广告主题设置</translation>
 <translation id="8285435910062771358">已启用全屏放大镜</translation>
 <translation id="828566872219880247">让您能够设置一系列网址格式，从而指定允许哪些网站使用密钥生成功能。如果此政策中的某个网址格式亦包含在“KeygenBlockedForUrls”中，系统将会应用“KeygenBlockedForUrls”政策而忽略此政策。
 
@@ -7533,6 +7612,7 @@
 
       注意：对于未加入 <ph name="MS_AD_NAME" /> 网域的 <ph name="MS_WIN_NAME" /> 实例，以及未通过 MDM 进行管理或未通过 MCX 加入网域的 <ph name="MAC_OS_NAME" /> 实例，强制安装仅限于 Chrome 应用商店中列出的应用和扩展程序。</translation>
 <translation id="8451988835943702790">使用“新标签页”作为主页</translation>
+<translation id="8453218444172088993">为您的用户停用 <ph name="PRIVACY_SANDBOX_NAME" /> 广告主题设置。</translation>
 <translation id="8455529558077979314">隐私保护屏设置</translation>
 <translation id="8461914792118322307">代理</translation>
 <translation id="8465065632133292531">在使用 POST 的即搜即得网址中所需的参数</translation>
@@ -7658,6 +7738,12 @@
       网址格式不能与 <ph name="WEB_HID_ASK_FOR_URLS_POLICY_NAME" /> 冲突。如果某个网址与这两项政策都相符，系统将不会优先应用任一项政策。
 
       如需详细了解有效的<ph name="URL_LABEL" />格式，请访问 https://cloud.google.com/docs/chrome-enterprise/policies/url-patterns。<ph name="WILDCARD_VALUE" /> 不是此政策可接受的值。</translation>
+<translation id="8554750769356971993">此政策用于控制是否可为您的用户停用 <ph name="PRIVACY_SANDBOX_NAME" /> 网站建议采用的广告设置。
+
+如果此政策已停用，系统将会为您的用户关闭网站建议采用的广告设置。
+如果此政策已启用或未设置，您的用户将能够在其设备上开启或关闭 <ph name="PRIVACY_SANDBOX_NAME" /> 网站建议采用的广告设置。
+
+如果您设置了此政策，则必须停用 <ph name="PRIVACY_SANDBOX_PROMPT_ENABLED_POLICY_NAME" /> 政策。</translation>
 <translation id="8559221882677768248">为登录屏幕停用随选朗读</translation>
 <translation id="8566842294717252664">在“打开新的标签页”页面和应用启动器中不显示网上应用店</translation>
 <translation id="8571314270766672278">版本降级过程中，回滚并重置设备，在这一过程中让设备保留已注册状态</translation>
@@ -7687,6 +7773,7 @@
           如果您未设置此政策，系统将使用默认时长。
 
           指定的政策值应以毫秒为单位。</translation>
+<translation id="859579553230883285">为您的用户停用 <ph name="PRIVACY_SANDBOX_NAME" /> 网站建议采用的广告设置。</translation>
 <translation id="8598786284856179541">启用关于版本信息的报告</translation>
 <translation id="859937827887158048">不允许点对点下载自动更新</translation>
 <translation id="8603454805657060638">通过设置此政策，管理员可以在将设备连接到基座时更改 MAC（媒体访问控制）地址。当某些型号的设备连接到基座时，系统会默认使用设备的指定基座 MAC 地址在以太网上标识相应设备。
@@ -7828,6 +7915,7 @@
 <translation id="8707790573162457301">在登录期间运行“自动清理磁盘”功能</translation>
 <translation id="8713535263782304771">停用安全浏览功能</translation>
 <translation id="8715885991031124968">允许显示从其他来源的子框架触发的 JavaScript 对话框。</translation>
+<translation id="8719374569086645837">始终加载 <ph name="LACROS_STATEFUL_NAME" /> <ph name="LACROS_NAME" /> 浏览器</translation>
 <translation id="8720547069538712402">允许用户启用或停用拼写检查</translation>
 <translation id="8726080977639508431">此政策用于控制 <ph name="PRODUCT_NAME" /> 如何解析“旧版浏览器支持”功能的 sitelist/greylist 政策。它会影响以下政策：<ph name="URL_LIST_POLICY_NAME" />、<ph name="URL_GREYLIST_POLICY_NAME" />、<ph name="USE_IE_SITELIST_POLICY_NAME" />、<ph name="EXTERNAL_SITELIST_POLICY_NAME" /> 和 <ph name="EXTERNAL_GREYLIST_POLICY_NAME" />。
 
@@ -7944,6 +8032,7 @@
       此政策旨在给予企业灵活度，让企业在使用会干扰网络服务沙盒的第三方软件的情况下仍可停用网络沙盒。</translation>
 <translation id="8840243776706727185">已停用 NewBaseUrlInheritanceBehavior 功能</translation>
 <translation id="8842208363354615697">允许启用纯 HTTPS 模式</translation>
+<translation id="8843331294082716286">不向用户显示 <ph name="PRIVACY_SANDBOX_NAME" /> 提示。</translation>
 <translation id="885147810817138322">向用户显示推荐的媒体内容</translation>
 <translation id="8852579753940989645">启用“渲染程序代码完整性”</translation>
 <translation id="8854571659927427063">如果此政策已启用，当首次运行浏览器时，系统将会从先前的默认浏览器导入书签。如果此政策已停用或未设置，当首次运行浏览器时，系统不会导入任何书签。
@@ -8063,6 +8152,7 @@
 <translation id="8955719471735800169">返回页首</translation>
 <translation id="8956312248048980644">默认允许使用以源为键的代理集群。</translation>
 <translation id="8970205333161758602">阻止显示 <ph name="PRODUCT_FRAME_NAME" />停止支持的提示</translation>
+<translation id="8973579598359969188">选择是否可向用户显示 <ph name="PRIVACY_SANDBOX_NAME" /> 提示</translation>
 <translation id="8974588819713914715">此政策已被弃用且不再受支持，请改用“<ph name="URL_ALLOWLIST_POLICY_NAME" />”政策。</translation>
 <translation id="8976248126101463034">允许针对远程访问主机进行 gnubby 身份验证</translation>
 <translation id="8976531594979650914">使用系统默认打印机作为默认选项</translation>
@@ -8252,6 +8342,7 @@
 <translation id="913195841488580904">阻止访问网址列表</translation>
 <translation id="9133526448421932754">键盘背光颜色：黄色</translation>
 <translation id="9135033364005346124">启用“<ph name="CLOUD_PRINT_NAME" />”代理</translation>
+<translation id="9135095804754272364">在检测到 USB 设备时显示通知</translation>
 <translation id="9136212796239682721">停用下载气泡界面</translation>
 <translation id="9136399279941091445">发布指定设备政策后的非工作时间的间隔</translation>
 <translation id="9142561920976791097">系统将使用针对已停用的表单控件分派事件的新行为。</translation>

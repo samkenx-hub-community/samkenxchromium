@@ -517,6 +517,7 @@ Ishonch tokenlari Internetdagi maxfiylikni oshiradi va shaxsiy maʼlumotlaringiz
 <translation id="3830886834687455630">Parollaringizni tekshirish uchun Google Play xizmatlarini yangilang</translation>
 <translation id="3845098929839618392">Inkognito rejimida ochish</translation>
 <translation id="3856096718352044181">Bu ishonchli xizmat ekanini tekshiring yoki keyinroq qayta urining</translation>
+<translation id="3858127568696903256">Siz obuna boʻlgan kontent</translation>
 <translation id="3858860766373142691">Ism</translation>
 <translation id="3861633093716975811">Mashhur videolar</translation>
 <translation id="3874520961715512166">Sayt olib tashlandi</translation>
@@ -552,7 +553,6 @@ Ishonch tokenlari Internetdagi maxfiylikni oshiradi va shaxsiy maʼlumotlaringiz
 <translation id="4045764304651014138">Foydalanish statistikasi</translation>
 <translation id="405399507749852140">Har qaysi saytda narxi tushganda xabar olish</translation>
 <translation id="4056223980640387499">Sepiya</translation>
-<translation id="4060598801229743805">Parametrlar ekranning yuqoriroq qismida joylashgan</translation>
 <translation id="4062305924942672200">Yuridik ma’lumot</translation>
 <translation id="4072805772816336153">Keyinroq qayta urining</translation>
 <translation id="4084682180776658562">Xatcho‘p</translation>
@@ -642,7 +642,6 @@ Google hisobingiz orqali amalga oshirgan qidiruvlaringiz, brauzer tarixi va bosh
 <translation id="4554077758708533499">USB kabel bilan ulangan</translation>
 <translation id="4558311620361989323">Veb-sahifalar bilan ishlash</translation>
 <translation id="4561730552726921821">Registratsiya qilindi</translation>
-<translation id="4561979708150884304">Internetga ulanmagansiz</translation>
 <translation id="4565377596337484307">Parolni berkitish</translation>
 <translation id="4572422548854449519">Tobe hisobga kirish</translation>
 <translation id="4576892426230499203">Boshqa tasdiqlash usulidan foydalaning</translation>
@@ -667,7 +666,6 @@ Google hisobingiz orqali amalga oshirgan qidiruvlaringiz, brauzer tarixi va bosh
 <translation id="4699172675775169585">Keshda saqlangan tavsirlar va boshqa fayllar</translation>
 <translation id="4719927025381752090">Tarjima qilishni taklif qilish</translation>
 <translation id="4720023427747327413"><ph name="PRODUCT_NAME" /> orqali ochish</translation>
-<translation id="4720982865791209136">Chrome brauzerini yaxshilashga yordam bering. <ph name="BEGIN_LINK" />So‘rovnomada qatnashing.<ph name="END_LINK" /></translation>
 <translation id="47217992755561375">Eng sara saytlaringiz</translation>
 <translation id="4732120983431207637">Stack Unwinder</translation>
 <translation id="4736934858538408121">Virtual karta</translation>
@@ -771,7 +769,6 @@ Bu sozlamani almashtirish uchun <ph name="BEGIN_LINK" />sinxronizatsiyani tiklan
 <translation id="5184329579814168207">Chrome brauzerida ochish</translation>
 <translation id="5191251636205085390">Tashqi cookie fayllar oʻrniga ishlatiladigan yangi texnologiyalarni oʻrganing va boshqaring</translation>
 <translation id="5193988420012215838">Vaqtinchalik xotiraga nusxalandi</translation>
-<translation id="5199929503336119739">Ish profili</translation>
 <translation id="5204967432542742771">Parolni kiriting</translation>
 <translation id="5206168361184759344">{FILE_COUNT,plural, =1{Fayl yuklab olinmoqda…}other{# ta fayl yuklab olinmoqda…}}</translation>
 <translation id="5210286577605176222">Avvalgi varaqqa o‘tish</translation>
@@ -1345,14 +1342,12 @@ Masalan, qaysi sahifalarga kirganligingizdan qat’i nazar, ba’zi saytlarda re
 <translation id="8221656072740924283">Davom etish</translation>
 <translation id="8223642481677794647">Quyi bildirgi menyu</translation>
 <translation id="8250920743982581267">Hujjatlar</translation>
-<translation id="825412236959742607">Bu sahifa juda ko‘p xotira ishlatishi sababli Chrome bu kontentni olib tashladi.</translation>
 <translation id="8255617931166444521">Saytlar cookie fayllarni faqatgina u saytni kezish vaqtingizda koʻradi</translation>
 <translation id="8259179246279078674">Oldindan yuklanadigan sahifalar shifrlanadi. Google bunday sahifalar tarkibi haqida hech narsani bila olmaydi. Google serverlari qaysi saytlar maxfiy tarzda oldindan yuklanganligini biladi. Bu maʼlumot faqat saytlarni oldindan yuklash uchun ishlatiladi va Google hisobingizdagi boshqa maʼlumotlarga ulanmaydi.</translation>
 <translation id="8260126382462817229">Qaytadan kirib ko‘ring</translation>
 <translation id="8261506727792406068">O‘chirish</translation>
 <translation id="82619448491672958">Boshqa varaqlar</translation>
 <translation id="8266862848225348053">Yuklanmalar jildi</translation>
-<translation id="8274165955039650276">Yuklanmalarni ochish</translation>
 <translation id="8281886186245836920">Tashlab ketish</translation>
 <translation id="8282297628636750033">Saytlarga tungi mavzuni tatbiq etish</translation>
 <translation id="829672787777123339">Qurilmangizga ulanmoqda…</translation>
@@ -1516,7 +1511,6 @@ Masalan, qaysi sahifalarga kirganligingizdan qat’i nazar, ba’zi saytlarda re
 <translation id="9108808586816295166">Xavfsiz DNS xizmati har doim ham ishlamasligi mumkin</translation>
 <translation id="9128984223251192329">Privacy Sandbox yarim hajmda ochildi.</translation>
 <translation id="9133397713400217035">Oflayn kontent</translation>
-<translation id="9137013805542155359">Asl tilda ko‘rsatish</translation>
 <translation id="9148126808321036104">Qaytadan kiring</translation>
 <translation id="9158770349521403363">Faqat kontentni ulashish</translation>
 <translation id="9159716826369098114">Varaqlar guruhini (<ph name="TAB_COUNT" />) yangi fondagi varaqlar guruhi sifatida tiklash.</translation>

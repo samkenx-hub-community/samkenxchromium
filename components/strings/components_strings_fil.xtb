@@ -1166,6 +1166,7 @@ Kung ayaw mo, iba-block ito ng iyong mga setting ng privacy. Papayagan nito ang 
 <translation id="3927932062596804919">Tanggihan</translation>
 <translation id="393316646445601645">Internet at telecom</translation>
 <translation id="3939773374150895049">Gamitin ang WebAuthn sa halip na CVC?</translation>
+<translation id="3943857333388298514">I-paste</translation>
 <translation id="3946209740501886391">Palaging hilingin sa site na ito</translation>
 <translation id="3947595700203588284">Puwedeng hilinging kumonekta sa mga MIDI device</translation>
 <translation id="3949571496842715403">Hindi mapatunayan ng server na ito na <ph name="DOMAIN" /> ito; hindi tinutukoy ng certificate ng seguridad nito ang Mga Alternatibong Pangalan ng Subject. Maaaring dahil ito sa isang maling configuration o sa isang umaatake na humahadlang sa iyong koneksyon.</translation>
@@ -2313,6 +2314,7 @@ Kung ayaw mo, iba-block ito ng iyong mga setting ng privacy. Papayagan nito ang 
 <translation id="6890531741535756070">Pinili mong mag-verify gamit ang <ph name="DEVICE_LABEL" /> sa mga website na gumagamit ng <ph name="PROVIDER_ORIGIN" />. Posibleng nag-store ang provider na ito ng impormasyon tungkol sa iyong paraan ng pagbabayad, na puwede mong <ph name="BEGIN_LINK" />hilinging i-delete<ph name="END_LINK" />.</translation>
 <translation id="6891596781022320156">Hindi sinusuportahan ang antas ng patakaran.</translation>
 <translation id="6895330447102777224">Nakumpirma na ang iyong card</translation>
+<translation id="6896758677409633944">Copy</translation>
 <translation id="6897140037006041989">User Agent</translation>
 <translation id="6898699227549475383">Samahan (O)</translation>
 <translation id="6899000063526916106">Ilagay ang <ph name="NUMBER_OF_DIGITS" /> (na) digit na code</translation>
@@ -2680,6 +2682,7 @@ Mga karagdagang detalye:
 <translation id="7716375162095500223">Hindi pa naa-upload, o binalewala</translation>
 <translation id="7716424297397655342">Hindi maaaring i-load ang site na ito mula sa cache</translation>
 <translation id="7723047071702270851">I-edit ang Card</translation>
+<translation id="7724603315864178912">I-cut</translation>
 <translation id="7734285854693414638">Gumawa ng bagong form sa Google Forms nang mabilis</translation>
 <translation id="773466115871691567">Palaging isalin ang mga page sa <ph name="SOURCE_LANGUAGE" /></translation>
 <translation id="7736959720849233795">Kopyahin ang Address ng Link</translation>
@@ -2716,6 +2719,7 @@ Mga karagdagang detalye:
 <translation id="7815407501681723534">Nakakita ng <ph name="NUMBER_OF_RESULTS" /> <ph name="SEARCH_RESULTS" /> para sa '<ph name="SEARCH_STRING" />'</translation>
 <translation id="7822320754433038727">Pangangaso at pamamaril</translation>
 <translation id="782886543891417279">Maaaring hilingin ng Wi-Fi na ginagamit mo (<ph name="WIFI_NAME" />) na bisitahin mo ang page nito sa pag-login.</translation>
+<translation id="7840103971441592723">Nagsimula na ang pag-screen capture</translation>
 <translation id="7844689747373518809">{COUNT,plural, =0{Wala}=1{1 app (<ph name="EXAMPLE_APP_1" />)}=2{2 app (<ph name="EXAMPLE_APP_1" />, <ph name="EXAMPLE_APP_2" />)}one{# (na) app (<ph name="EXAMPLE_APP_1" />, <ph name="EXAMPLE_APP_2" />, <ph name="AND_MORE" />)}other{# (na) app (<ph name="EXAMPLE_APP_1" />, <ph name="EXAMPLE_APP_2" />, <ph name="AND_MORE" />)}}</translation>
 <translation id="7855695075675558090"><ph name="TOTAL_LABEL" /> <ph name="CURRENCY_CODE" /> <ph name="FORMATTED_TOTAL_AMOUNT" /></translation>
 <translation id="7862185352068345852">Umalis sa site?</translation>
@@ -2745,6 +2749,7 @@ Mga karagdagang detalye:
 <translation id="7942349550061667556">Pula</translation>
 <translation id="7943397946612013052">Na-block na pag-download</translation>
 <translation id="7943893128817522649">Puwedeng hilinging awtomatikong mag-download ng maraming file</translation>
+<translation id="7946724693008564269">Na-detect na Wika</translation>
 <translation id="7947285636476623132">Tingnan ang iyong taon ng pag-expire at subukang muli</translation>
 <translation id="7947813448670013867"><ph name="SEE_CHROME_TIPS_FOCUSED_FRIENDLY_MATCH_TEXT" />, pindutin ang Tab at pagkatapos ay ang Enter para matuto pa tungkol sa mga feature ng Chrome</translation>
 <translation id="7950027195171824198">Pamahalaan ang iyong mga kagustuhan sa cookie sa mga setting ng Chrome</translation>
@@ -2893,6 +2898,7 @@ Mga karagdagang detalye:
 <translation id="8282947398454257691">Alamin ang natatanging identifier ng iyong device</translation>
 <translation id="8284769179630993263">Pamahalaan ang iyong Ligtas na Pag-browse at higit pa sa mga setting ng Chrome</translation>
 <translation id="8286036467436129157">Mag-sign In</translation>
+<translation id="8286799286781881307">Maka-capture ng mga application na awtorisado ng iyong administrator ang lahat ng screen na naka-attach sa device mo. Mapoproseso ang impormasyong ito nang lokal o maa-upload ito sa mga server ng iyong organisasyon.</translation>
 <translation id="8288807391153049143">Ipakita ang certificate</translation>
 <translation id="8289355894181816810">Makipag-ugnay sa administrator ng iyong network kung hindi ka sigurado kung ano ang ibig sabihin nito.</translation>
 <translation id="8293206222192510085">Magdagdag ng Bookmark</translation>

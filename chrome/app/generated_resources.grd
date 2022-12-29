@@ -2227,11 +2227,11 @@ are declared in tools/grit/grit_rule.gni.
       </message>
       <message name="IDS_DOWNLOAD_STATUS_PERCENT_COMPLETE_ACCESSIBLE_ALERT"
                desc="The title of a download notification: the current download status is in progress and time remaining is known. This message is for screen reader users.">
-               Downloading, <ph name="PERCENT_REMAINING">$1<ex>33</ex></ph>% remaining
+               Downloading <ph name="FILE_NAME">$1<ex>somedocument.pdf</ex></ph>, <ph name="PERCENT_REMAINING">$2<ex>33</ex></ph>% remaining
       </message>
       <message name="IDS_DOWNLOAD_STATUS_TIME_REMAINING_ACCESSIBLE_ALERT"
                desc="The title of a download notification: the current download status is in progress and time remaining is known. This message is for screen reader users.">
-               Downloading, <ph name="STATUS">$1<ex>42 mins left</ex></ph>
+               Downloading <ph name="FILE_NAME">$1<ex>somedocument.pdf</ex></ph>, <ph name="STATUS">$2<ex>42 mins left</ex></ph>
       </message>
       <message name="IDS_DOWNLOAD_FAILED_ACCESSIBLE_ALERT"
                desc="The title of a download notification: the current download status is failed. This message is for screen reader users.">
@@ -6065,6 +6065,20 @@ Keep your key file in a safe place. You will need it to create new versions of y
       <message name="IDS_PASSWORD_MANAGER_UPDATE_PASSWORD_SIGNED_IN_MESSAGE_DESCRIPTION" desc="The description of the Google Password Manager's update password message when the user is signed in.">
         In Google Password Manager for <ph name="ACCOUNT">$1<ex>user@gmail.com</ex></ph>
       </message>
+      <if expr="is_android">
+        <message name="IDS_PASSWORD_MANAGER_SAVE_UPDATE_PASSWORD_SIGNED_IN_MESSAGE_DESCRIPTION_V1" desc="The description of the Google Password Manager's save/update password prompt when the user is signed in.">
+          Google Password Manager <ph name="SEPARATOR">•</ph> <ph name="ACCOUNT">$1<ex>user@gmail.com</ex></ph>
+        </message>
+        <message name="IDS_PASSWORD_MANAGER_SAVE_PASSWORD_SIGNED_IN_MESSAGE_DESCRIPTION_V2" desc="The description of the Google Password Manager's save password prompt when the user is signed in.">
+          To your Google Account, for <ph name="ACCOUNT">$1<ex>user@gmail.com</ex></ph>
+        </message>
+        <message name="IDS_PASSWORD_MANAGER_UPDATE_PASSWORD_SIGNED_IN_MESSAGE_DESCRIPTION_V2" desc="The description of the Google Password Manager's save password prompt when the user is signed in.">
+          In your Google Account, for <ph name="ACCOUNT">$1<ex>user@gmail.com</ex></ph>
+        </message>
+        <message name="IDS_PASSWORD_MANAGER_SAVE_UPDATE_PASSWORD_SIGNED_OUT_MESSAGE_DESCRIPTION_V1" desc="The description of the Google Password Manager's save password prompt when the user is signed out and passwords are only stored locally.">
+          Only on this device
+        </message>
+      </if>
       <if expr="use_titlecase">
         <message name="IDS_PASSWORD_MANAGER_ACCOUNT_CHOOSER_SIGN_IN" desc="In Title Case: The title of the Sign in button in the account chooser when there is one account.">
           Sign In
@@ -6719,6 +6733,12 @@ Keep your key file in a safe place. You will need it to create new versions of y
       <message name="IDS_NTP_CUSTOMIZE_CHROME_COLORS_LABEL" desc="The label for the 'Chrome Colors' tile in the New Tab Page customize chrome side panel, which lists themes of colored classic chrome.">
         Chrome Colors
       </message>
+      <message name="IDS_NTP_CUSTOMIZE_CHROME_CHANGE_THEME_LABEL" desc="The label for the action button for changing Chrome theme in the New Tab Page customize chrome side panel.">
+        Change Theme
+      </message>
+      <message name="IDS_NTP_CUSTOMIZE_CHROME_RESET_TO_CLASSIC_CHROME_LABEL" desc="The label for the button for resetting theme back to classic chrome in the New Tab Page customize chrome side panel.">
+        Reset to Classic Chrome
+      </message>
       <message name="IDS_NTP_CUSTOMIZE_UPLOADED_IMAGE_LABEL" desc="The label for the 'Uploaded image' tile in the customization menu on the New Tab Page side panel.">
         Uploaded image
       </message>
@@ -6730,6 +6750,9 @@ Keep your key file in a safe place. You will need it to create new versions of y
       </message>
       <message name="IDS_NTP_CUSTOMIZE_HIDE_SHORTCUTS_DESC" desc="The description for the option to hide shortcuts in the customization menu on the New Tab Page">
         Don't show shortcuts on this page
+      </message>
+      <message name="IDS_NTP_CUSTOMIZE_SHOW_CARDS_LABEL" desc="The label for the option to show cards in the customization menu on the New Tab Page">
+        Show cards
       </message>
       <message name="IDS_NTP_CUSTOMIZE_SHOW_SHORTCUTS_LABEL" desc="The label for the option to show shortcuts in the customization menu on the New Tab Page">
         Show shortcuts
@@ -6772,6 +6795,9 @@ Keep your key file in a safe place. You will need it to create new versions of y
     </message>
       <message name="IDS_NTP_CUSTOMIZE_DEFAULT_LABEL" desc="The label for the Default theme in the customization menu on the New Tab Page">
         Default color
+      </message>
+      <message name="IDS_NTP_CUSTOMIZE_MAIN_COLOR_LABEL" desc="The label for the main color theme in the customization menu on the New Tab Page">
+        Color based on theme
       </message>
       <message name="IDS_NTP_COLORS_WARM_GREY" desc="A color option in the customization menu on the New Tab Page.">
         Warm grey
@@ -9493,10 +9519,6 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google 
         <message name="IDS_BROWSER_SHARING_SCREENSHOT_DIALOG_EDIT_BUTTON_LABEL"
             desc="Button text for the Screenshot dialog edit button.">
           Edit
-        </message>
-        <message name="IDS_BROWSER_SHARING_SCREENSHOT_DIALOG_SEARCH_IMAGE_BUTTON_LABEL"
-            desc="Button text for the Screenshot dialog search image button.">
-          Search with Google
         </message>
         <message name="IDS_BROWSER_SHARING_SCREENSHOT_DIALOG_SHARE_BUTTON_LABEL"
             desc="Button text for the Screenshot dialog share button.">
@@ -14166,154 +14188,113 @@ Please help our engineers fix this problem. Tell us what happened right before y
       Settings
     </message>
 
-    <!-- Privacy Sandbox Dialog M1 strings -->
-    <message name="IDS_PRIVACY_SANDBOX_DIALOG_M1_CONSENT_TITLE" translateable="false" desc="Title of privacy sandbox consent dialog">
-      Lorem ipsum Consent
-    </message>
-    <message name="IDS_PRIVACY_SANDBOX_DIALOG_M1_CONSENT_DESCRIPTION_1" translateable="false" desc="First part of description in privacy sandbox consent dialog">
-      Lorem ipsum dolor sit amet, consectetur adipiscing elit. Duis pretium pulvinar metus non mollis. Quisque placerat eget nisl sit amet facilisis.
-    </message>
-    <message name="IDS_PRIVACY_SANDBOX_DIALOG_M1_CONSENT_DESCRIPTION_2" translateable="false" desc="Second part of description in privacy sandbox consent dialog">
-      Nulla in tortor a ligula scelerisque laoreet. Sed sem velit, varius non purus vitae, imperdiet porttitor elit. Integer et libero id metus egestas consequat non a ipsum.
-    </message>
-    <message name="IDS_PRIVACY_SANDBOX_DIALOG_M1_CONSENT_DESCRIPTION_3" translateable="false" desc="Third part of description in privacy sandbox consent dialog">
-      Vestibulum pretium placerat justo vel suscipit. Quisque urna arcu, elementum ut venenatis ornare, consequat ac turpis.
-    </message>
-    <message name="IDS_PRIVACY_SANDBOX_DIALOG_M1_CONSENT_LEARN_MORE_EXPAND_LABEL" translateable="false" desc="Learn more expand label in privacy sandbox consent dialog">
-      Vestibulum orci risus, consectetur
-    </message>
-    <message name="IDS_PRIVACY_SANDBOX_DIALOG_M1_CONSENT_DESCRIPTION_4" translateable="false" desc="Forth part of description in privacy sandbox consent dialog">
-      Vestibulum pretium placerat justo vel suscipit. Quisque urna arcu, elementum ut venenatis ornare, consequat ac turpis.
-    </message>
-    <message name="IDS_PRIVACY_SANDBOX_DIALOG_M1_CONSENT_SAVING_LABEL" translateable="false" desc="Saving state label in privacy sandbox consent dialog">
-      Consectetur
-    </message>
-    <message name="IDS_PRIVACY_SANDBOX_DIALOG_M1_CONSENT_ACCEPT_BUTTON" translateable="false" desc="Accept button label in privacy sandbox consent dialog">
-      Quisque
-    </message>
-    <message name="IDS_PRIVACY_SANDBOX_DIALOG_M1_CONSENT_DECLINE_BUTTON" translateable="false" desc="Decline button label in privacy sandbox consent dialog">
-      Lorem
-    </message>
-    <message name="IDS_PRIVACY_SANDBOX_DIALOG_M1_CONSENT_LEARN_MORE_HEADING" translateable="false" desc="Learn more heading in privacy sandbox consent dialog">
-      Esed purus vestibulum velit convalli
-    </message>
-    <message name="IDS_PRIVACY_SANDBOX_DIALOG_M1_CONSENT_LEARN_MORE_BULLET_1" translateable="false" desc="Learn more bullet point 1 in privacy sandbox consent dialog">
-      <ph name="BEGIN_BOLD">&lt;b&gt;</ph>Nulla in tortor: <ph name="END_BOLD">&lt;/b&gt;</ph> a ligula scelerisque laoreet. Sed sem velit, varius non purus vitae, imperdiet porttitor elit.
-    </message>
-    <message name="IDS_PRIVACY_SANDBOX_DIALOG_M1_CONSENT_LEARN_MORE_BULLET_2" translateable="false" desc="Learn more bullet point 2 in privacy sandbox consent dialog">
-      <ph name="BEGIN_BOLD">&lt;b&gt;</ph>Consectetur adipiscing elit:<ph name="END_BOLD">&lt;/b&gt;</ph> Duis pretium pulvinar metus non mollis
-    </message>
-    <message name="IDS_PRIVACY_SANDBOX_DIALOG_M1_CONSENT_LEARN_MORE_BULLET_3" translateable="false" desc="Learn more bullet point 3 in privacy sandbox consent dialog">
-      <ph name="BEGIN_BOLD">&lt;b&gt;</ph>Sed purus vestibulum:<ph name="END_BOLD">&lt;/b&gt;</ph> velit convallis suscipit. Aenean aliquam ut velit eget dapibus. Vestibulum orci risus, consectetur non odio vulputate, mattis dignissim purus. Cras id tempor mi.
-    </message>
-    <message name="IDS_PRIVACY_SANDBOX_DIALOG_M1_CONSENT_LEARN_MORE_LINK" translateable="false" desc="Learn more link in privacy sandbox consent dialog">
-      Esed purus vestibulum velit convalli
-    </message>
-    <message name="IDS_PRIVACY_SANDBOX_DIALOG_M1_CONSENT_BANNER_IMAGE_A11Y_DESCRIPTION" translateable="false" desc="A11y description for the banner image in privacy sandbox consent dialog">
+    <!-- Privacy Sandbox Consent Dialog M1 strings -->
+    <message name="IDS_PRIVACY_SANDBOX_M1_CONSENT_BANNER_IMAGE_A11Y_DESCRIPTION" translateable="false" desc="A11y  description for the banner image in privacy sandbox consent dialog">
       Sed ullamcorper, ligula ac tempus venenatis
     </message>
 
-    <message name="IDS_PRIVACY_SANDBOX_DIALOG_M1_NOTICE_EEA_TITLE" translateable="false" desc="Title of privacy sandbox notice EEA dialog">
+    <!-- Privacy Sandbox Notice Dialog M1 strings -->
+    <message name="IDS_PRIVACY_SANDBOX_M1_NOTICE_EEA_TITLE" translateable="false" desc="Title of privacy sandbox notice EEA dialog">
       Lorem ipsum Notice EEA
     </message>
-    <message name="IDS_PRIVACY_SANDBOX_DIALOG_M1_NOTICE_EEA_DESCRIPTION_1" translateable="false" desc="First part of description in privacy sandbox notice EEA dialog">
+    <message name="IDS_PRIVACY_SANDBOX_M1_NOTICE_EEA_DESCRIPTION_1" translateable="false" desc="First part of description in privacy sandbox notice EEA dialog">
       Lorem ipsum dolor sit amet, consectetur adipiscing elit. Duis pretium pulvinar metus non mollis. Quisque placerat eget nisl sit amet facilisis.
     </message>
-    <message name="IDS_PRIVACY_SANDBOX_DIALOG_M1_NOTICE_EEA_BULLET_1" translateable="false" desc="First bullet point in the description in privacy sandbox notice EEA dialog">
+    <message name="IDS_PRIVACY_SANDBOX_M1_NOTICE_EEA_BULLET_1" translateable="false" desc="First bullet point in the description in privacy sandbox notice EEA dialog">
       Nulla in tortor: a ligula scelerisque laoreet. Sed sem velit, varius non purus vitae, imperdiet porttitor elit.
     </message>
-    <message name="IDS_PRIVACY_SANDBOX_DIALOG_M1_NOTICE_EEA_BULLET_2" translateable="false" desc="Second bullet point in the description in privacy sandbox notice EEA dialog">
+    <message name="IDS_PRIVACY_SANDBOX_M1_NOTICE_EEA_BULLET_2" translateable="false" desc="Second bullet point in the description in privacy sandbox notice EEA dialog">
       Sed purus vestibulum: velit convallis suscipit. Aenean aliquam ut velit eget dapibus. Vestibulum orci risus, consectetur non odio vulputate, mattis dignissim purus. Cras id tempor mi.
     </message>
-    <message name="IDS_PRIVACY_SANDBOX_DIALOG_M1_NOTICE_EEA_LEARN_MORE_EXPAND_LABEL" translateable="false" desc="Learn more expand label in privacy sandbox notice EEA dialog">
+    <message name="IDS_PRIVACY_SANDBOX_M1_NOTICE_EEA_LEARN_MORE_EXPAND_LABEL" translateable="false" desc="Learn more expand label in privacy sandbox notice EEA dialog">
       Vestibulum orci risus, consectetur
     </message>
-    <message name="IDS_PRIVACY_SANDBOX_DIALOG_M1_NOTICE_EEA_DESCRIPTION_2" translateable="false" desc="Second part of description in privacy sandbox notice EEA dialog">
+    <message name="IDS_PRIVACY_SANDBOX_M1_NOTICE_EEA_DESCRIPTION_2" translateable="false" desc="Second part of description in privacy sandbox notice EEA dialog">
       Consectetur adipiscing elit duis pretium pulvinar metus non mollis
     </message>
-    <message name="IDS_PRIVACY_SANDBOX_DIALOG_M1_NOTICE_EEA_ACK_BUTTON" translateable="false" desc="Acknowledge button label in privacy sandbox notice EEA dialog">
+    <message name="IDS_PRIVACY_SANDBOX_M1_NOTICE_EEA_ACK_BUTTON" translateable="false" desc="Acknowledge button label in privacy sandbox notice EEA dialog">
       Sed
     </message>
-    <message name="IDS_PRIVACY_SANDBOX_DIALOG_M1_NOTICE_EEA_SETTINGS_BUTTON" translateable="false" desc="Open settings button label in privacy sandbox notice EEA dialog">
+    <message name="IDS_PRIVACY_SANDBOX_M1_NOTICE_EEA_SETTINGS_BUTTON" translateable="false" desc="Open settings button label in privacy sandbox notice EEA dialog">
       Cras id
     </message>
-    <message name="IDS_PRIVACY_SANDBOX_DIALOG_M1_NOTICE_EEA_LEARN_MORE_HEADING_1" translateable="false" desc="Learn more first heading in privacy sandbox notice EEA dialog">
+    <message name="IDS_PRIVACY_SANDBOX_M1_NOTICE_EEA_LEARN_MORE_HEADING_1" translateable="false" desc="Learn more first heading in privacy sandbox notice EEA dialog">
       Esed purus vestibulum velit convalli
     </message>
-    <message name="IDS_PRIVACY_SANDBOX_DIALOG_M1_NOTICE_EEA_LEARN_MORE_DESCRIPTION" translateable="false" desc="Learn more description in privacy sandbox notice EEA dialog">
+    <message name="IDS_PRIVACY_SANDBOX_M1_NOTICE_EEA_LEARN_MORE_DESCRIPTION" translateable="false" desc="Learn more description in privacy sandbox notice EEA dialog">
       Nulla in tortor a ligula scelerisque laoreet. Sed sem velit, varius non purus vitae, imperdiet porttitor elit. Integer et libero id metus egestas consequat non a ipsum.
     </message>
-    <message name="IDS_PRIVACY_SANDBOX_DIALOG_M1_NOTICE_EEA_LEARN_MORE_HEADING_2" translateable="false" desc="Learn more second heading in privacy sandbox notice EEA dialog">
+    <message name="IDS_PRIVACY_SANDBOX_M1_NOTICE_EEA_LEARN_MORE_HEADING_2" translateable="false" desc="Learn more second heading in privacy sandbox notice EEA dialog">
       Proin sed purus vestibulum velit velit eget dapibus.
     </message>
-    <message name="IDS_PRIVACY_SANDBOX_DIALOG_M1_NOTICE_EEA_LEARN_MORE_BULLET_1" translateable="false" desc="Learn more bullet point 1 in privacy sandbox notice EEA dialog">
+    <message name="IDS_PRIVACY_SANDBOX_M1_NOTICE_EEA_LEARN_MORE_BULLET_1" translateable="false" desc="Learn more bullet point 1 in privacy sandbox notice EEA dialog">
       <ph name="BEGIN_BOLD">&lt;b&gt;</ph>Nulla in tortor:<ph name="END_BOLD">&lt;/b&gt;</ph> a ligula scelerisque laoreet. Sed sem velit, varius non purus vitae, imperdiet porttitor elit.
     </message>
-    <message name="IDS_PRIVACY_SANDBOX_DIALOG_M1_NOTICE_EEA_LEARN_MORE_BULLET_2" translateable="false" desc="Learn more bullet point 2 in privacy sandbox notice EEA dialog">
+    <message name="IDS_PRIVACY_SANDBOX_M1_NOTICE_EEA_LEARN_MORE_BULLET_2" translateable="false" desc="Learn more bullet point 2 in privacy sandbox notice EEA dialog">
       <ph name="BEGIN_BOLD">&lt;b&gt;</ph>Consectetur adipiscing elit:<ph name="END_BOLD">&lt;/b&gt;</ph> Duis pretium pulvinar metus non mollis
     </message>
-    <message name="IDS_PRIVACY_SANDBOX_DIALOG_M1_NOTICE_EEA_LEARN_MORE_BULLET_3" translateable="false" desc="Learn more bullet point 3 in privacy sandbox notice EEA dialog">
+    <message name="IDS_PRIVACY_SANDBOX_M1_NOTICE_EEA_LEARN_MORE_BULLET_3" translateable="false" desc="Learn more bullet point 3 in privacy sandbox notice EEA dialog">
       <ph name="BEGIN_BOLD">&lt;b&gt;</ph>Sed purus vestibulum:<ph name="END_BOLD">&lt;/b&gt;</ph> velit convallis suscipit. Aenean aliquam ut velit eget dapibus. Vestibulum orci risus, consectetur non odio vulputate, mattis dignissim purus. Cras id tempor mi.
     </message>
 
-    <message name="IDS_PRIVACY_SANDBOX_DIALOG_M1_NOTICE_ROW_TITLE" translateable="false" desc="Title of privacy sandbox notice ROW dialog">
+    <message name="IDS_PRIVACY_SANDBOX_M1_NOTICE_ROW_TITLE" translateable="false" desc="Title of privacy sandbox notice ROW dialog">
        Lorem ipsum Notice ROW
     </message>
-    <message name="IDS_PRIVACY_SANDBOX_DIALOG_M1_NOTICE_ROW_DESCRIPTION_1" translateable="false" desc="First part of description in privacy sandbox notice ROW dialog">
+    <message name="IDS_PRIVACY_SANDBOX_M1_NOTICE_ROW_DESCRIPTION_1" translateable="false" desc="First part of description in privacy sandbox notice ROW dialog">
        Lorem ipsum dolor sit amet, consectetur adipiscing elit. Duis pretium pulvinar metus non mollis.
     </message>
-    <message name="IDS_PRIVACY_SANDBOX_DIALOG_M1_NOTICE_ROW_DESCRIPTION_2" translateable="false" desc="Second part of description in privacy sandbox notice ROW dialog">
+    <message name="IDS_PRIVACY_SANDBOX_M1_NOTICE_ROW_DESCRIPTION_2" translateable="false" desc="Second part of description in privacy sandbox notice ROW dialog">
       Nulla in tortor a ligula scelerisque laoreet. Sed sem velit, varius non purus vitae, imperdiet porttitor elit. Integer et libero id metus egestas consequat non a ipsum. Quisque placerat eget nisl sit amet facilisis.
     </message>
-    <message name="IDS_PRIVACY_SANDBOX_DIALOG_M1_NOTICE_ROW_DESCRIPTION_3" translateable="false" desc="Third part of description in privacy sandbox notice ROW dialog">
+    <message name="IDS_PRIVACY_SANDBOX_M1_NOTICE_ROW_DESCRIPTION_3" translateable="false" desc="Third part of description in privacy sandbox notice ROW dialog">
       Vestibulum pretium placerat justo vel suscipit. Quisque urna arcu, elementum ut venenatis ornare, consequat ac turpis. Vestibulum orci risus, consectetur non odio vulputate, mattis dignissim purus. Cras id tempor mi.
     </message>
-    <message name="IDS_PRIVACY_SANDBOX_DIALOG_M1_NOTICE_ROW_DESCRIPTION_4" translateable="false" desc="Fourth part of description in privacy sandbox notice ROW dialog">
+    <message name="IDS_PRIVACY_SANDBOX_M1_NOTICE_ROW_DESCRIPTION_4" translateable="false" desc="Fourth part of description in privacy sandbox notice ROW dialog">
       Proin sed purus vestibulum velit convallis suscipit eget dapibus.
     </message>
-    <message name="IDS_PRIVACY_SANDBOX_DIALOG_M1_NOTICE_ROW_ACK_BUTTON" translateable="false" desc="Acknowledge button label in privacy sandbox notice EEA dialog">
+    <message name="IDS_PRIVACY_SANDBOX_M1_NOTICE_ROW_ACK_BUTTON" translateable="false" desc="Acknowledge button label in privacy sandbox notice EEA dialog">
       Sed
     </message>
-    <message name="IDS_PRIVACY_SANDBOX_DIALOG_M1_NOTICE_ROW_SETTINGS_BUTTON" translateable="false" desc="Open settings button label in privacy sandbox notice EEA dialog">
+    <message name="IDS_PRIVACY_SANDBOX_M1_NOTICE_ROW_SETTINGS_BUTTON" translateable="false" desc="Open settings button label in privacy sandbox notice EEA dialog">
       Cras id
     </message>
-    <message name="IDS_PRIVACY_SANDBOX_DIALOG_M1_NOTICE_ROW_LEARN_MORE_EXPAND_LABEL" translateable="false" desc="Learn more expand label in privacy sandbox notice ROW dialog">
+    <message name="IDS_PRIVACY_SANDBOX_M1_NOTICE_ROW_LEARN_MORE_EXPAND_LABEL" translateable="false" desc="Learn more expand label in privacy sandbox notice ROW dialog">
       Vestibulum orci risus consectetur
     </message>
-    <message name="IDS_PRIVACY_SANDBOX_DIALOG_M1_NOTICE_ROW_LEARN_MORE_HEADING_1" translateable="false" desc="Learn more first heading in privacy sandbox notice ROW dialog">
+    <message name="IDS_PRIVACY_SANDBOX_M1_NOTICE_ROW_LEARN_MORE_HEADING_1" translateable="false" desc="Learn more first heading in privacy sandbox notice ROW dialog">
       Esed purus vestibulum velit convalli
     </message>
-    <message name="IDS_PRIVACY_SANDBOX_DIALOG_M1_NOTICE_ROW_LEARN_MORE_DESCRIPTION_1" translateable="false" desc="First part of learn more description in privacy sandbox notice ROW dialog">
+    <message name="IDS_PRIVACY_SANDBOX_M1_NOTICE_ROW_LEARN_MORE_DESCRIPTION_1" translateable="false" desc="First part of learn more description in privacy sandbox notice ROW dialog">
       Etiam dictum sem et neque molestie lobortis. Morbi quam tellus, tincidunt eget dapibus ac, lobortis et lacus. Integer nec egestas elit. Nulla venenatis facilisis dui eget suscipit.
     </message>
-    <message name="IDS_PRIVACY_SANDBOX_DIALOG_M1_NOTICE_ROW_LEARN_MORE_HEADING_2" translateable="false" desc="Learn more second heading in privacy sandbox notice ROW dialog">
+    <message name="IDS_PRIVACY_SANDBOX_M1_NOTICE_ROW_LEARN_MORE_HEADING_2" translateable="false" desc="Learn more second heading in privacy sandbox notice ROW dialog">
       Class aptent taciti sociosqu ad
     </message>
-    <message name="IDS_PRIVACY_SANDBOX_DIALOG_M1_NOTICE_ROW_LEARN_MORE_DESCRIPTION_2" translateable="false" desc="Second part of learn more description in privacy sandbox notice ROW dialog">
+    <message name="IDS_PRIVACY_SANDBOX_M1_NOTICE_ROW_LEARN_MORE_DESCRIPTION_2" translateable="false" desc="Second part of learn more description in privacy sandbox notice ROW dialog">
       Vestibulum pretium placerat justo vel suscipit. Quisque urna arcu.
     </message>
-    <message name="IDS_PRIVACY_SANDBOX_DIALOG_M1_NOTICE_ROW_LEARN_MORE_BULLET_1" translateable="false" desc="Learn more bullet point 1 in privacy sandbox notice ROW dialog">
+    <message name="IDS_PRIVACY_SANDBOX_M1_NOTICE_ROW_LEARN_MORE_BULLET_1" translateable="false" desc="Learn more bullet point 1 in privacy sandbox notice ROW dialog">
       Sed elementum tellus condimentum quam vestibulum lacinia. Ut eu lobortis massa, venenatis sodales lacus. Nulla elementum magna et tortor efficitur, at volutpat metus varius.
     </message>
-    <message name="IDS_PRIVACY_SANDBOX_DIALOG_M1_NOTICE_ROW_LEARN_MORE_BULLET_2" translateable="false" desc="Learn more bullet point 2 in privacy sandbox notice ROW dialog">
+    <message name="IDS_PRIVACY_SANDBOX_M1_NOTICE_ROW_LEARN_MORE_BULLET_2" translateable="false" desc="Learn more bullet point 2 in privacy sandbox notice ROW dialog">
       Duis tempor nulla nisi, ac bibendum lorem tempus sit amet. Proin non blandit risus. Maecenas facilisis enim nec tristique tristique. Eelementum ut venenatis ornare, consequat ac turpis. Vestibulum orci risus, consectetur non odio vulputate, mattis dignissim purus. Cras id tempor mi.
     </message>
-    <message name="IDS_PRIVACY_SANDBOX_DIALOG_M1_NOTICE_ROW_LEARN_MORE_DESCRIPTION_3" translateable="false" desc="Third part of learn more description in privacy sandbox notice ROW dialog">
+    <message name="IDS_PRIVACY_SANDBOX_M1_NOTICE_ROW_LEARN_MORE_DESCRIPTION_3" translateable="false" desc="Third part of learn more description in privacy sandbox notice ROW dialog">
       Etiam hendrerit turpis nibh, ac maximus lectus placerat at. Vivamus ligula quam, posuere luctus felis eu, dictum egestas arcu. per conubia nostra, per inceptos himenaeos. Cras ut metus vel est molestie finibus nec ut orci.
     </message>
-    <message name="IDS_PRIVACY_SANDBOX_DIALOG_M1_NOTICE_ROW_LEARN_MORE_DESCRIPTION_4" translateable="false" desc="Fourth part of learn more description in privacy sandbox notice ROW dialog">
+    <message name="IDS_PRIVACY_SANDBOX_M1_NOTICE_ROW_LEARN_MORE_DESCRIPTION_4" translateable="false" desc="Fourth part of learn more description in privacy sandbox notice ROW dialog">
       Aliquam euismod scelerisque metus, in aliquet est vehicula ut. Curabitur sit amet ligula quis ante maximus gravida non id magna. Pellentesque interdum venenatis leo, at ultrices felis mollis nec. Integer vulputate velit eget mauris lacinia, ut ullamcorper mauris vehicula.
     </message>
-    <message name="IDS_PRIVACY_SANDBOX_DIALOG_M1_NOTICE_ROW_LEARN_MORE_HEADING_3" translateable="false" desc="Learn more third heading in privacy sandbox notice ROW dialog">
+    <message name="IDS_PRIVACY_SANDBOX_M1_NOTICE_ROW_LEARN_MORE_HEADING_3" translateable="false" desc="Learn more third heading in privacy sandbox notice ROW dialog">
       Orci varius natoque penatibus et
     </message>
-    <message name="IDS_PRIVACY_SANDBOX_DIALOG_M1_NOTICE_ROW_LEARN_MORE_DESCRIPTION_5" translateable="false" desc="Fifth part of description in privacy sandbox notice ROW dialog">
+    <message name="IDS_PRIVACY_SANDBOX_M1_NOTICE_ROW_LEARN_MORE_DESCRIPTION_5" translateable="false" desc="Fifth part of description in privacy sandbox notice ROW dialog">
       Suspendisse at dui pulvinar, rhoncus orci at, porttitor nibh. Curabitur lacinia nulla sem, eu euismod dolor vulputate quis. Duis mattis eros et arcu elementum tempor. Duis pharetra eleifend sagittis.
     </message>
-    <message name="IDS_PRIVACY_SANDBOX_DIALOG_M1_NOTICE_ROW_LEARN_MORE_DESCRIPTION_6" translateable="false" desc="Sixth part of description in privacy sandbox notice ROW dialog">
+    <message name="IDS_PRIVACY_SANDBOX_M1_NOTICE_ROW_LEARN_MORE_DESCRIPTION_6" translateable="false" desc="Sixth part of description in privacy sandbox notice ROW dialog">
       Cras sed lacus suscipit, efficitur erat nec, semper sapien. Fusce at nunc molestie, elementum augue at, auctor nunc. Sed dui nisi, consectetur sit amet urna vitae, facilisis scelerisque justo.
     </message>
-    <message name="IDS_PRIVACY_SANDBOX_DIALOG_M1_NOTICE_ROW_BANNER_IMAGE_A11Y_DESCRIPTION" translateable="false" desc="A11y description for the banner image in privacy sandbox notice ROW dialog">
+    <message name="IDS_PRIVACY_SANDBOX_M1_NOTICE_ROW_BANNER_IMAGE_A11Y_DESCRIPTION" translateable="false" desc="A11y description for the banner image in privacy sandbox notice ROW dialog">
       Ut venenatis magna nec lacus facilisis
     </message>
 

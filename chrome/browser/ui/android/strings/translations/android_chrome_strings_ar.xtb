@@ -518,6 +518,7 @@
 <translation id="3830886834687455630">‏يجب تحديث "خدمات Google Play" للتحقّق من كلمات المرور.</translation>
 <translation id="3845098929839618392">فتح في علامة تبويب تصفّح متخفي</translation>
 <translation id="3856096718352044181">يُرجى إثبات صلاحية مقدّم الخدمة أو المحاولة مجددًا.</translation>
+<translation id="3858127568696903256">اطّلِع هنا على المحتوى الذي تتابعه.</translation>
 <translation id="3858860766373142691">الاسم</translation>
 <translation id="3861633093716975811">الفيديوهات الرائجة</translation>
 <translation id="3874520961715512166">تمت إزالة الموقع الإلكتروني.</translation>
@@ -553,7 +554,6 @@
 <translation id="4045764304651014138">بيانات الاستخدام</translation>
 <translation id="405399507749852140">يمكنك الحصول على تنبيهات في حال انخفاض السعر على أي موقع إلكتروني</translation>
 <translation id="4056223980640387499">بني داكن</translation>
-<translation id="4060598801229743805">الخيارات متاحة بالقرب من أعلى الشاشة</translation>
 <translation id="4062305924942672200">المعلومات القانونية</translation>
 <translation id="4072805772816336153">يُرجى إعادة المحاولة لاحقًا.</translation>
 <translation id="4084682180776658562">إشارة</translation>
@@ -643,7 +643,6 @@
 <translation id="4554077758708533499">‏تم التوصيل باستخدام كابل USB.</translation>
 <translation id="4558311620361989323">اختصارات صفحة الويب</translation>
 <translation id="4561730552726921821">تم التسجيل بنجاح.</translation>
-<translation id="4561979708150884304">لا يتوفّر اتصال بالإنترنت</translation>
 <translation id="4565377596337484307">إخفاء كلمة المرور</translation>
 <translation id="4572422548854449519">تسجيل الدخول إلى الحساب المدار</translation>
 <translation id="4576892426230499203">تجربة خيار آخر لإثبات الهوية</translation>
@@ -668,7 +667,6 @@
 <translation id="4699172675775169585">الصور والملفات المخزنة مؤقتًا</translation>
 <translation id="4719927025381752090">عرض ترجمة</translation>
 <translation id="4720023427747327413">الفتح في <ph name="PRODUCT_NAME" /></translation>
-<translation id="4720982865791209136">‏المساعدة في تحسين Chrome. <ph name="BEGIN_LINK" />المشاركة في الاستطلاع<ph name="END_LINK" /></translation>
 <translation id="47217992755561375">الاطّلاع على أهم المواقع الإلكترونية</translation>
 <translation id="4732120983431207637">Stack Unwinder</translation>
 <translation id="4736934858538408121">البطاقة الافتراضية</translation>
@@ -772,7 +770,6 @@
 <translation id="5184329579814168207">‏فتح في Chrome</translation>
 <translation id="5191251636205085390">يمكنك التعرّف على تقنيات جديدة تهدف إلى استبدال ملفات تعريف الارتباط التابعة لجهات خارجية وكيفية التحكُّم في تلك التقنيات.</translation>
 <translation id="5193988420012215838">تم النسخ إلى الحافظة</translation>
-<translation id="5199929503336119739">الملف الشخصي للعمل</translation>
 <translation id="5204967432542742771">إدخال كلمة المرور</translation>
 <translation id="5206168361184759344">{FILE_COUNT,plural, =1{جارٍ تنزيل ملف واحد…}zero{جارٍ تنزيل # ملف…}two{جارٍ تنزيل ملفين…}few{جارٍ تنزيل # ملفات…}many{جارٍ تنزيل # ملفًا…}other{جارٍ تنزيل # ملف…}}</translation>
 <translation id="5210286577605176222">الانتقال السريع إلى علامة التبويب السابقة</translation>
@@ -1346,14 +1343,12 @@
 <translation id="8221656072740924283">متابعة</translation>
 <translation id="8223642481677794647">قائمة بطاقات الخلاصة</translation>
 <translation id="8250920743982581267">المستندات</translation>
-<translation id="825412236959742607">‏تستهلك هذه الصفحة مساحة كبيرة من الذاكرة، لذلك أزال Chrome بعض محتواها.</translation>
 <translation id="8255617931166444521">لا يمكن للمواقع الإلكترونية استخدام ملفات تعريف الارتباط إلا للاطّلاع على نشاط تصفّحك على تلك المواقع.</translation>
 <translation id="8259179246279078674">‏لن تطلِع Google على محتوى صفحات الويب التي يتم تحميلها مُسبقًا لأنّ هذه الصفحات يتم تشفيرها. ستتعرّف خوادم Google على المواقع الإلكترونية التي يتم تحميلها مُسبقًا بخصوصية. لا يتم استخدام هذه المعلومات إلّا لتحميل صفحات الويب مُسبقًا، ولا يتم ربطها بمعلومات أخرى من حسابك في Google.</translation>
 <translation id="8260126382462817229">محاولة تسجيل الدخول مرة أخرى</translation>
 <translation id="8261506727792406068">حذف</translation>
 <translation id="82619448491672958">الانتقال إلى علامات التبويب الأخرى</translation>
 <translation id="8266862848225348053">موقع التنزيل</translation>
-<translation id="8274165955039650276">الاطِّلاع على المحتوى الذي تم تنزيله</translation>
 <translation id="8281886186245836920">التخطّي</translation>
 <translation id="8282297628636750033">تطبيق "المظهر الداكن" على المواقع، إن أمكن ذلك</translation>
 <translation id="829672787777123339">جارٍ الاتصال بجهازك…</translation>
@@ -1447,7 +1442,7 @@
 <translation id="8725066075913043281">إعادة المحاولة</translation>
 <translation id="8746155870861185046">مشاركة النص المميّز</translation>
 <translation id="8748850008226585750">المحتوى مخفي</translation>
-<translation id="8756969031206844760">هل تريد تحديث كلمة المرور؟</translation>
+<translation id="8756969031206844760">هل تريد تعديل كلمة المرور؟</translation>
 <translation id="8766529642647037772">هل تريد إنشاء رابط مميّز يشبه هذا الرابط؟</translation>
 <translation id="8773160212632396039">جارٍ معالجة الطلب</translation>
 <translation id="8788265440806329501">يتم إغلاق سجلّ التنقُّل.</translation>
@@ -1517,7 +1512,6 @@
 <translation id="9108808586816295166">قد لا يكون نظام أسماء النطاقات الآمن متاحًا طوال الوقت.</translation>
 <translation id="9128984223251192329">تم فتح إشعار "مبادرة حماية الخصوصية" في نصف الشاشة.</translation>
 <translation id="9133397713400217035">الاطّلاع بلا اتصال بالإنترنت</translation>
-<translation id="9137013805542155359">إظهار الصفحة الأصلية</translation>
 <translation id="9148126808321036104">تسجيل الدخول مرة أخرى</translation>
 <translation id="9158770349521403363">مشاركة المحتوى فقط</translation>
 <translation id="9159716826369098114">استعادة مجموعة تضم <ph name="TAB_COUNT" /> علامة تبويب كمجموعة علامات تبويب جديدة في الخلفية</translation>

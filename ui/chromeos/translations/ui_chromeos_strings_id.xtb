@@ -144,6 +144,7 @@
 <translation id="2208919847696382164">Instal dengan Linux</translation>
 <translation id="2225536596944493418">Yakin ingin menghapus <ph name="NUMBER_OF_ITEMS" /> item?</translation>
 <translation id="2230062665678605299">Tidak dapat membuat folder "<ph name="FOLDER_NAME" />". <ph name="ERROR_MESSAGE" /></translation>
+<translation id="2236732657580416950">Cache Google Drive Anda telah dihapus.</translation>
 <translation id="2239068707900391003">Orang dengan kopi</translation>
 <translation id="2251368349685848079">Pulihkan dari sampah</translation>
 <translation id="2282155092769082568">URL konfigurasi otomatis:</translation>
@@ -678,6 +679,7 @@
 <translation id="6607272825297743757">Info file</translation>
 <translation id="6609332149380188670"><ph name="NUMBER_OF_ITEMS" /> folder dibagikan ke Parallels Desktop</translation>
 <translation id="6629518321609546825">Masukkan minimal 4 angka</translation>
+<translation id="6639661343369899134">File tidak dapat diupload karena <ph name="SHARED_DRIVE_NAME" /> tidak memiliki penyimpanan yang cukup.</translation>
 <translation id="6643016212128521049">Hapus</translation>
 <translation id="6650726141019353908">Kupu-kupu merah muda</translation>
 <translation id="6657585470893396449">Sandi</translation>
@@ -937,7 +939,7 @@
 <translation id="863903787380594467">PIN salah. Tersisa <ph name="RETRIES" /> upaya lagi.</translation>
 <translation id="8639391553632924850"><ph name="INPUT_LABEL" /> - Port</translation>
 <translation id="8656768832129462377">Jangan periksa</translation>
-<translation id="8688591111840995413">Sandi lemah</translation>
+<translation id="8688591111840995413">Sandi salah</translation>
 <translation id="8698464937041809063">Gambar Google</translation>
 <translation id="8698877009525468705">File ini bersifat rahasia dan tunduk pada pembatasan oleh kebijakan administrator.</translation>
 <translation id="8712637175834984815">Mengerti</translation>

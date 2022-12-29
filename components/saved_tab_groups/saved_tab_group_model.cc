@@ -234,6 +234,17 @@ void SavedTabGroupModel::AddTabToGroup(const base::GUID& group_id,
     observer.SavedTabGroupUpdatedLocally(group_id, tab_id);
 }
 
+void SavedTabGroupModel::UpdateTabInGroup(const base::GUID& group_id,
+                                          SavedTabGroupTab tab) {
+  absl::optional<int> group_index = GetIndexOf(group_id);
+  CHECK(group_index.has_value());
+  saved_tab_groups_[group_index.value()].UpdateTab(tab);
+
+  for (auto& observer : observers_) {
+    observer.SavedTabGroupUpdatedLocally(group_id);
+  }
+}
+
 void SavedTabGroupModel::RemoveTabFromGroup(const base::GUID& group_id,
                                             const base::GUID& tab_id) {
   if (!Contains(group_id))
@@ -242,16 +253,18 @@ void SavedTabGroupModel::RemoveTabFromGroup(const base::GUID& group_id,
   absl::optional<int> index = GetIndexOf(group_id);
   SavedTabGroup group = saved_tab_groups_[index.value()];
 
+  if (!group.ContainsTab(tab_id)) {
+    return;
+  }
+
   // Remove the group from the model if the last tab will be removed from it.
-  if (group.ContainsTab(tab_id) && group.saved_tabs().size() == 1) {
+  if (group.saved_tabs().size() == 1) {
     Remove(group_id);
     return;
   }
 
   saved_tab_groups_[index.value()].RemoveTab(tab_id);
 
-  // TODO(dljames): Update to use SavedTabGroupRemoveLocally and update the API
-  // to pass a group_id and an optional tab_id.
   for (auto& observer : observers_)
     observer.SavedTabGroupUpdatedLocally(group_id, tab_id);
 }

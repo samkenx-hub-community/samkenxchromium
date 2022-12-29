@@ -29,6 +29,11 @@
 #include "components/user_notes/user_notes_features.h"
 #include "ui/accessibility/accessibility_features.h"
 
+#if BUILDFLAG(ENABLE_EXTENSIONS)
+#include "chrome/browser/ui/views/side_panel/extensions/extension_side_panel_manager.h"
+#include "extensions/common/extension_features.h"
+#endif
+
 namespace {
 std::string GetHistogramNameForId(SidePanelEntry::Id id) {
   static constexpr auto id_to_histogram_name_map =
@@ -71,7 +76,8 @@ void SidePanelUtil::PopulateGlobalEntries(Browser* browser,
   if (base::FeatureList::IsEnabled(history_clusters::kSidePanelJourneys) &&
       history_clusters_service &&
       history_clusters_service->IsJourneysEnabled() &&
-      !browser->profile()->IsIncognitoProfile()) {
+      !browser->profile()->IsIncognitoProfile() &&
+      !browser->profile()->IsGuestSession()) {
     auto* history_clusters_side_panel_coordinator =
         HistoryClustersSidePanelCoordinator::GetOrCreateForBrowser(browser);
     if (browser->profile()->GetPrefs()->GetBoolean(
@@ -103,6 +109,14 @@ void SidePanelUtil::PopulateGlobalEntries(Browser* browser,
     WebViewSidePanelCoordinator::GetOrCreateForBrowser(browser)
         ->CreateAndRegisterEntry(global_registry);
   }
+
+#if BUILDFLAG(ENABLE_EXTENSIONS)
+  if (base::FeatureList::IsEnabled(
+          extensions_features::kExtensionSidePanelIntegration)) {
+    extensions::ExtensionSidePanelManager::GetOrCreateForBrowser(browser)
+        ->RegisterExtensionEntries(global_registry);
+  }
+#endif
 
   return;
 }

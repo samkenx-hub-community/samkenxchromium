@@ -144,6 +144,7 @@
 <translation id="2208919847696382164">Installer med Linux</translation>
 <translation id="2225536596944493418">Er du sikker på, at du vil slette <ph name="NUMBER_OF_ITEMS" /> elementer?</translation>
 <translation id="2230062665678605299">Mappen "<ph name="FOLDER_NAME" />" kunne ikke oprettes. <ph name="ERROR_MESSAGE" /></translation>
+<translation id="2236732657580416950">Din Google Drev-cache blev ryddet.</translation>
 <translation id="2239068707900391003">Person med kaffe</translation>
 <translation id="2251368349685848079">Gendan fra papirkurven</translation>
 <translation id="2282155092769082568">Webadresse til automatisk konfiguration:</translation>
@@ -678,6 +679,7 @@
 <translation id="6607272825297743757">Filoplysninger</translation>
 <translation id="6609332149380188670"><ph name="NUMBER_OF_ITEMS" /> mapper blev delt med Parallels Desktop</translation>
 <translation id="6629518321609546825">Angiv mindst fire tal</translation>
+<translation id="6639661343369899134">Du kan ikke uploade filer, fordi <ph name="SHARED_DRIVE_NAME" /> ikke har nok lagerplads.</translation>
 <translation id="6643016212128521049">Ryd</translation>
 <translation id="6650726141019353908">Lyserød sommerfugl</translation>
 <translation id="6657585470893396449">Adgangskode</translation>

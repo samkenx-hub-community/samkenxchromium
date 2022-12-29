@@ -517,6 +517,7 @@ Traustslyklar bæta persónuvernd á netinu og ekki er hægt að nota þá til a
 <translation id="3830886834687455630">Uppfærðu þjónustu Google Play til að athuga aðgangsorðin þín</translation>
 <translation id="3845098929839618392">Opna á huliðsflipa</translation>
 <translation id="3856096718352044181">Gakktu úr skugga um að þetta sé staðfest veita eða reyndu aftur síðar</translation>
+<translation id="3858127568696903256">Hér sérðu efni sem þú fylgist með</translation>
 <translation id="3858860766373142691">Heiti</translation>
 <translation id="3861633093716975811">Vinsæl myndskeið</translation>
 <translation id="3874520961715512166">Vefsvæði fjarlægt</translation>
@@ -552,7 +553,6 @@ Traustslyklar bæta persónuvernd á netinu og ekki er hægt að nota þá til a
 <translation id="4045764304651014138">Notkunargögn</translation>
 <translation id="405399507749852140">Fáðu tilkynningu ef verðlækkun verður á einhverju vefsvæði</translation>
 <translation id="4056223980640387499">Brúnn blær</translation>
-<translation id="4060598801229743805">Valkosti er að finna ofarlega á skjánum</translation>
 <translation id="4062305924942672200">Lagalegar upplýsingar</translation>
 <translation id="4072805772816336153">Reyndu aftur síðar</translation>
 <translation id="4084682180776658562">Bókamerki</translation>
@@ -642,7 +642,6 @@ Google reikningurinn þinn kann að vera með annars konar vefskoðunarferil, sv
 <translation id="4554077758708533499">Tengt með USB-snúru</translation>
 <translation id="4558311620361989323">Flýtilyklar vefsíðu</translation>
 <translation id="4561730552726921821">Skráning tókst</translation>
-<translation id="4561979708150884304">Engin tenging</translation>
 <translation id="4565377596337484307">Fela aðgangsorð</translation>
 <translation id="4572422548854449519">Innskráning á stýrðan reikning</translation>
 <translation id="4576892426230499203">Prófaðu aðra staðfestingaraðferð</translation>
@@ -667,7 +666,6 @@ Google reikningurinn þinn kann að vera með annars konar vefskoðunarferil, sv
 <translation id="4699172675775169585">Myndir og skrár í skyndiminni</translation>
 <translation id="4719927025381752090">Boð um þýðingu</translation>
 <translation id="4720023427747327413">Opna í <ph name="PRODUCT_NAME" /></translation>
-<translation id="4720982865791209136">Hjálpaðu til við að bæta Chrome. <ph name="BEGIN_LINK" />Svara könnun<ph name="END_LINK" /></translation>
 <translation id="47217992755561375">Sjá mest sóttu vefsvæðin</translation>
 <translation id="4732120983431207637">Afstöflun</translation>
 <translation id="4736934858538408121">Sýndarkort</translation>
@@ -771,7 +769,6 @@ Til að breyta þessari stillingu skaltu <ph name="BEGIN_LINK" />endurstilla sam
 <translation id="5184329579814168207">Opna í Chrome</translation>
 <translation id="5191251636205085390">Kynntu þér og hafðu umsjón með nýrri tækni sem er ætlað að koma í stað fótspora þriðja aðila</translation>
 <translation id="5193988420012215838">Afritað á klippiborðið</translation>
-<translation id="5199929503336119739">Vinnusnið</translation>
 <translation id="5204967432542742771">Sláðu inn aðgangsorð</translation>
 <translation id="5206168361184759344">{FILE_COUNT,plural, =1{Sækir skrá…}one{Sækir # skrá…}other{Sækir # skrár…}}</translation>
 <translation id="5210286577605176222">Stökkva í fyrri flipa</translation>
@@ -1345,14 +1342,12 @@ Sum vefsvæði kunna til dæmis að bregðast við beiðninni með því að bir
 <translation id="8221656072740924283">Áfram</translation>
 <translation id="8223642481677794647">Valmynd á straumspjaldi</translation>
 <translation id="8250920743982581267">Skjöl</translation>
-<translation id="825412236959742607">Chrome fjarlægði eitthvað efni því þessi síða notar of mikið minni.</translation>
 <translation id="8255617931166444521">Vefsvæði geta einungis notað fótspor frá þér til að sjá vafranotkun þína á umræddu vefsvæði</translation>
 <translation id="8259179246279078674">Vegna þess að forhlaðnar síður eru dulkóðaðar mun Google ekki fá upplýsingar um efni þeirra. Netþjónar Google fá upplýsingar um hvaða vefsvæðum er forhlaðið á lokaðan hátt. Þær upplýsingar eru eingöngu notaðar til að forhlaða síðum og þær eru ekki tengdar við aðrar upplýsingar á Google reikningnum þínum.</translation>
 <translation id="8260126382462817229">Reyndu að skrá þig inn aftur</translation>
 <translation id="8261506727792406068">Eyða</translation>
 <translation id="82619448491672958">Sjá aðra flipa</translation>
 <translation id="8266862848225348053">Niðurhalsmappa</translation>
-<translation id="8274165955039650276">Sjá niðurhal</translation>
 <translation id="8281886186245836920">Sleppa</translation>
 <translation id="8282297628636750033">Nota dökkt þema fyrir vefsvæði</translation>
 <translation id="829672787777123339">Tengist tækinu…</translation>
@@ -1516,7 +1511,6 @@ Sum vefsvæði kunna til dæmis að bregðast við beiðninni með því að bir
 <translation id="9108808586816295166">Ekki er víst að hægt sé að nota örugg DNS alltaf</translation>
 <translation id="9128984223251192329">Privacy Sandbox tilkynning opnuð í hálfri hæð</translation>
 <translation id="9133397713400217035">Skoða ónettengt</translation>
-<translation id="9137013805542155359">Sýna frumtexta</translation>
 <translation id="9148126808321036104">Skrá inn aftur</translation>
 <translation id="9158770349521403363">Aðeins deila efni</translation>
 <translation id="9159716826369098114">Endurheimta flipahóp með <ph name="TAB_COUNT" /> flipum sem nýjan flipahóp í bakgrunni.</translation>

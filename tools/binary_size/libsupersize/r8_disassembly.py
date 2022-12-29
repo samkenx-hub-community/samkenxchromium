@@ -299,6 +299,8 @@ def Parse(lines):
   total_methods = 0
   count_with_code = 0
   count_synthetics = 0
+  warning_quota_signature = 8
+  warning_quota_synthetic = 8
   anomalies = []
   for class_name, method_infos in _ExtractClassNameAndMethodInfos(lines):
     base_class_name = class_name.split('$$')[0]
@@ -313,7 +315,12 @@ def Parse(lines):
         return_type, extracted_class_name, method_name, param_types = (
             _ExtractMethodLegacy(method_str, signature))
       else:
-        assert signature in ('', method_str)
+        if signature not in ('', method_str):
+          if warning_quota_signature > 0:
+            warning_quota_signature -= 1
+            logging.warning('Found signature not matching "# Method":')
+            logging.warning('  %s', signature)
+            logging.warning('  %s', method_str)
         return_type, extracted_class_name, method_name, param_types = (
             _ExtractMethod(method_str, residual_str))
       if extracted_class_name != class_name:
@@ -325,7 +332,11 @@ def Parse(lines):
           # "true value" from |class_name| vs. "extracted value":
           # * org.chromium.base.FileUtils$$ExternalSyntheticLambda0 vs.
           #   org.chromium.base.FileUtils$$InternalSyntheticLambda$1${...}$0
-          assert 'Synthetic' in class_name
+          if 'Synthetic' not in class_name:
+            if warning_quota_synthetic > 0:
+              warning_quota_synthetic -= 1
+              logging.warning('Found "$$" in non-synthetic class: %s',
+                              class_name)
           count_synthetics += 1
         else:
           # Anomalies: Might be from class merging, but other oddities exist:

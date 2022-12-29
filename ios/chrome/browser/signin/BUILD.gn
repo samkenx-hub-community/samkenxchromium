@@ -141,7 +141,8 @@ source_set("fetcher") {
     "//components/signin/internal/identity_manager",
     "//components/signin/public/identity_manager",
     "//ios/chrome/browser/browser_state",
-    "//ios/public/provider/chrome/browser/signin:signin",
+    "//ios/public/provider/chrome/browser",
+    "//ios/public/provider/chrome/browser/signin",
     "//third_party/abseil-cpp:absl",
   ]
 }
@@ -230,6 +231,7 @@ source_set("fake_system_identity_manager") {
   public_deps =
       [ "//ios/public/provider/chrome/browser/signin:signin_resources_api" ]
   deps = [
+    ":capabilities_types",
     ":fake_account_details_view_controller",
     ":fake_system_identity",
     ":system_identity",

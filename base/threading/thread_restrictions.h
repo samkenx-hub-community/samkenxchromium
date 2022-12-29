@@ -160,6 +160,9 @@ class LoginEventRecorder;
 class StartupCustomizationDocument;
 class StartupUtils;
 bool CameraAppUIShouldEnableLocalOverride(const std::string&);
+namespace system {
+class StatisticsProviderImpl;
+}  // namespace system
 }  // namespace ash
 namespace audio {
 class OutputDevice;
@@ -196,7 +199,6 @@ class CrashUtil;
 namespace chromeos {
 class BlockingMethodCaller;
 namespace system {
-class StatisticsProviderImpl;
 bool IsCoreSchedulingAvailable();
 int NumberOfPhysicalCores();
 }  // namespace system
@@ -335,7 +337,6 @@ class LocalPrinterHandlerDefault;
 class PrintBackendServiceImpl;
 #endif
 class PrintBackendServiceManager;
-class PrintJobWorker;
 class PrinterQuery;
 }  // namespace printing
 namespace rlz_lib {
@@ -608,7 +609,7 @@ class BASE_EXPORT ScopedAllowBlocking {
   friend class printing::PrintBackendServiceImpl;
 #endif
   friend class printing::PrintBackendServiceManager;
-  friend class printing::PrintJobWorker;
+  friend class printing::PrinterQuery;
   friend class remote_cocoa::
       DroppedScreenShotCopierMac;  // https://crbug.com/1148078
   friend class ::WebEngineBrowserMainParts;
@@ -749,7 +750,7 @@ class BASE_EXPORT ScopedAllowBaseSyncPrimitives {
 
   // Usage that should be fixed:
   friend class ::NativeBackendKWallet;  // http://crbug.com/125331
-  friend class ::chromeos::system::
+  friend class ::ash::system::
       StatisticsProviderImpl;                      // http://crbug.com/125385
   friend class blink::VideoFrameResourceProvider;  // http://crbug.com/878070
   friend class value_store::LeveldbValueStore;     // http://crbug.com/1330845
@@ -838,7 +839,6 @@ class BASE_EXPORT ScopedAllowBaseSyncPrimitivesOutsideBlockingScope {
   friend class net::
       MultiThreadedProxyResolverScopedAllowJoinOnIO;  // http://crbug.com/69710
   friend class net::NetworkChangeNotifierMac;         // http://crbug.com/125097
-  friend class printing::PrinterQuery;                // http://crbug.com/66082
   friend class proxy_resolver::
       ScopedAllowThreadJoinForProxyResolverV8Tracing;  // http://crbug.com/69710
   friend class remoting::AutoThread;  // https://crbug.com/944316

@@ -7,6 +7,7 @@
 #import <memory>
 
 #import "base/bind.h"
+#import "base/ios/ios_util.h"
 #import "base/strings/strcat.h"
 #import "base/strings/stringprintf.h"
 #import "base/strings/sys_string_conversions.h"
@@ -250,6 +251,9 @@ void VerifyTheNotificationUI() {
   // can be turned on when the browser is restarted.
   [ChromeEarlGreyAppInterface commitPendingUserPrefsWrite];
 
+  GREYAssertTrue([ChromeEarlGreyAppInterface waitOnLoopbackPersistentFile],
+                 @"The Sync Loopback Server profile file wasn't saved.");
+
   // Restart the browser while keeping Sync ON by preserving the identity of the
   // managed account.
   AppLaunchConfiguration config = [self appConfigurationForTestCase];
@@ -272,6 +276,12 @@ void VerifyTheNotificationUI() {
 // Tests that the user policies are fetched when the user decides to "Continue"
 // in the notification dialog.
 - (void)testUserPolicyNotificationWithAcceptChoice {
+  // TODO(crbug.com/1386163): Flaky on iphone 14.5 simulators and 15.7 devices.
+  if (base::ios::IsRunningOnIOS14OrLater() &&
+      !base::ios::IsRunningOnIOS16OrLater()) {
+    EARL_GREY_TEST_DISABLED(@"Test disabled on iOS 14 and 15.");
+  }
+
   // Clear the prefs related to user policy to make sure that the notification
   // isn't skipped and that the fetch is started within the minimal schedule
   // interval.
@@ -290,6 +300,8 @@ void VerifyTheNotificationUI() {
   [SigninEarlGreyUI signinWithFakeIdentity:fakeManagedIdentity];
 
   [ChromeEarlGreyAppInterface commitPendingUserPrefsWrite];
+  GREYAssertTrue([ChromeEarlGreyAppInterface waitOnLoopbackPersistentFile],
+                 @"The Sync Loopback Server profile file wasn't saved.");
 
   // Restart the browser while keeping Sync ON by preserving the identity of the
   // managed account.

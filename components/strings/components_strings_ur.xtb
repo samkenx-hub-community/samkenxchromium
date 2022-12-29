@@ -1168,6 +1168,7 @@
 <translation id="3927932062596804919">مسترد کریں</translation>
 <translation id="393316646445601645">انٹرنیٹ اور ٹیلی کام</translation>
 <translation id="3939773374150895049">‏CVC کے بجائے WebAuthn کا استعمال کریں؟</translation>
+<translation id="3943857333388298514">پیسٹ کریں</translation>
 <translation id="3946209740501886391">اس سائٹ پر ہمیشہ پوچھیں</translation>
 <translation id="3947595700203588284">‏سائٹ MIDI آلات سے منسلک ہونے کیلئے پوچھ سکتی ہے</translation>
 <translation id="3949571496842715403">اس سرور سے یہ ثابت نہیں ہوتا کہ یہ <ph name="DOMAIN" /> ہے؛ اس کی سیکیورٹی سرٹیفکیٹ موضوع کے متبادل ناموں کی تعیین نہیں کرتی ہے۔ یہ غلط کنفیگریشن یا آپ کے کنکشن کو قطع کرنے والے کسی حملہ آور کی وجہ سے ہو سکتا ہے۔</translation>
@@ -2316,6 +2317,7 @@
 <translation id="6890531741535756070">آپ نے <ph name="DEVICE_LABEL" /> استعمال کرنے والی ویب سائٹس پر <ph name="PROVIDER_ORIGIN" /> سے تصدیق کرنے کا انتخاب کیا۔ ممکن ہے کہ اس فراہم کنندہ کے پاس آپ کی ادائیگی کے طریقہ کے بارے میں معلومات اسٹور کردہ ہے جن کو آپ <ph name="BEGIN_LINK" />حذف کرنے کی درخواست<ph name="END_LINK" /> کر سکتے ہیں۔</translation>
 <translation id="6891596781022320156">پالیسی کی سطح تعاون یافتہ نہیں ہے۔</translation>
 <translation id="6895330447102777224">آپ کے کارڈ کی توثیق ہو گئی ہے</translation>
+<translation id="6896758677409633944">کاپی کریں</translation>
 <translation id="6897140037006041989">صارف کا ایجنٹ</translation>
 <translation id="6898699227549475383">‏تنظیم (O)</translation>
 <translation id="6899000063526916106"><ph name="NUMBER_OF_DIGITS" /> ہندسے والا کوڈ درج کریں</translation>
@@ -2683,6 +2685,7 @@
 <translation id="7716375162095500223">ابھی اپلوڈ نہیں ہوا، یا نظرانداز کیا گیا</translation>
 <translation id="7716424297397655342">اس سائٹ کو کیش سے لوڈ نہیں کیا جا سکتا ہے</translation>
 <translation id="7723047071702270851">کارڈ میں ترمیم کریں</translation>
+<translation id="7724603315864178912">کٹ کریں</translation>
 <translation id="7734285854693414638">‏Google Forms میں تیزی سے ایک نیا فارم تخلیق کریں</translation>
 <translation id="773466115871691567">ہمیشہ <ph name="SOURCE_LANGUAGE" /> کے صفحات کا ترجمہ کریں</translation>
 <translation id="7736959720849233795">لنک کا پتہ کاپی کریں</translation>
@@ -2719,6 +2722,7 @@
 <translation id="7815407501681723534">'<ph name="SEARCH_STRING" />' کیلئے <ph name="NUMBER_OF_RESULTS" /> <ph name="SEARCH_RESULTS" /> ملے۔</translation>
 <translation id="7822320754433038727">شکار اور شوٹنگ</translation>
 <translation id="782886543891417279">‏آپ جو Wi-Fi استعمال کر رہے ہیں <ph name="WIFI_NAME" /> وہ آپ سے اپنا لاگ ان صفحہ ملاحظہ کرنے کا تقاضہ کر سکتا ہے۔</translation>
+<translation id="7840103971441592723">اسکرین کیپچر شروع ہو گئی ہے</translation>
 <translation id="7844689747373518809">{COUNT,plural, =0{کوئی نہیں}=1{1 ایپ (<ph name="EXAMPLE_APP_1" />)}=2{2 ایپس (<ph name="EXAMPLE_APP_1" />, <ph name="EXAMPLE_APP_2" />)}other{# ایپس (<ph name="EXAMPLE_APP_1" />، <ph name="EXAMPLE_APP_2" />، <ph name="AND_MORE" />)}}</translation>
 <translation id="7855695075675558090"><ph name="TOTAL_LABEL" /> <ph name="CURRENCY_CODE" /> <ph name="FORMATTED_TOTAL_AMOUNT" /></translation>
 <translation id="7862185352068345852">سائٹ چھوڑیں؟</translation>
@@ -2748,6 +2752,7 @@
 <translation id="7942349550061667556">سرخ</translation>
 <translation id="7943397946612013052">ڈاؤن لوڈ کرنا مسدود ہے</translation>
 <translation id="7943893128817522649">سائٹ خودکار طور پر متعدد فائلز ڈاؤن لوڈ کرنے کیلئے پوچھ سکتی ہے</translation>
+<translation id="7946724693008564269">شناخت کردہ زبان</translation>
 <translation id="7947285636476623132">اپنا اختتامی سال چیک کریں اور دوبارہ کوشش کریں</translation>
 <translation id="7947813448670013867">‏<ph name="SEE_CHROME_TIPS_FOCUSED_FRIENDLY_MATCH_TEXT" />، Chrome کی خصوصیات کے بارے میں جاننے کیلئے Tab، پھر Enter دبائیں</translation>
 <translation id="7950027195171824198">‏Chrome ترتیبات میں اپنی کوکی کی ترجیحات کا نظم کریں</translation>
@@ -2896,6 +2901,7 @@
 <translation id="8282947398454257691">اپنا منفرد آلہ کا شناخت کار جانیں</translation>
 <translation id="8284769179630993263">‏Chrome ترتیبات میں محفوظ براؤزنگ اور بہت کچھ کا نظم کریں</translation>
 <translation id="8286036467436129157">سائن ان کریں</translation>
+<translation id="8286799286781881307">آپ کے منتظم کے ذریعے منظور شدہ ایپلیکیشنز آپ کے آلے سے منسلک سبھی اسکرینز کیپچر کر سکتی ہیں۔ اس معلومات پر مقامی طور پر کارروائی کی جا سکتی ہے یا وہ آپ کی تنظیم کے سرورز پر اپ لوڈ ہو سکتی ہے۔</translation>
 <translation id="8288807391153049143">سرٹیفیکیٹ دکھائیں</translation>
 <translation id="8289355894181816810">اگر آپ کو اس کا مطلب یقینی طور پر معلوم نہیں ہے تو نیٹ ورک کے منتظم سے رابطہ کریں۔</translation>
 <translation id="8293206222192510085">بُک مارک شامل کریں</translation>

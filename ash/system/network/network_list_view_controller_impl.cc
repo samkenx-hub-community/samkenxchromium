@@ -392,7 +392,7 @@ size_t NetworkListViewControllerImpl::ShowConnectionWarningIfNetworkMonitored(
         ->GetNetworkList(NetworkType::kAll)
         ->ReorderChildView(connection_warning_, index++);
   } else if (connected_vpn_guid_.empty() && !using_proxy) {
-    RemoveAndResetViewIfExists(&connection_warning_);
+    HideConnectionWarning();
   }
 
   return index;
@@ -430,6 +430,13 @@ void NetworkListViewControllerImpl::MaybeShowConnectionWarningManagedIcon(
 void NetworkListViewControllerImpl::OnGetManagedPropertiesResult(
     const std::string& guid,
     ManagedPropertiesPtr properties) {
+  // Bail out early if no connection warning is being shown.
+  // This could happen if the connection warning is hidden while the async
+  // GetManagedProperties step is in progress.
+  if (!connection_warning_) {
+    return;
+  }
+
   // Check if the proxy is managed.
   const NetworkStateProperties* default_network = model()->default_network();
   if (default_network && default_network->guid == guid) {
@@ -818,6 +825,7 @@ size_t NetworkListViewControllerImpl::CreateItemViewsIfMissingAndReorder(
     network_view->UpdateViewForNetwork(network);
     network_detailed_network_view()->GetNetworkList(type)->ReorderChildView(
         network_view, index);
+    network_view->SetEnabled(!IsNetworkDisabled(network));
 
     // Only emit ethernet metric each time we show Ethernet section
     // for the first time. We use `has_reordered_a_network` to determine
@@ -872,6 +880,13 @@ void NetworkListViewControllerImpl::ShowConnectionWarning(
   connection_warning_ = network_detailed_network_view()
                             ->GetNetworkList(NetworkType::kAll)
                             ->AddChildView(std::move(connection_warning));
+}
+
+void NetworkListViewControllerImpl::HideConnectionWarning() {
+  // If `connection_warning_icon_` existed, it must be cleared first because
+  // `connection_warning_` owns it.
+  RemoveAndResetViewIfExists(&connection_warning_icon_);
+  RemoveAndResetViewIfExists(&connection_warning_);
 }
 
 void NetworkListViewControllerImpl::UpdateScanningBarAndTimer() {

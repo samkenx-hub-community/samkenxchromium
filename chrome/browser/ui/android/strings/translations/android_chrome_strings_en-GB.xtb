@@ -553,7 +553,6 @@ Private state tokens improve privacy on the web and can’t be used to find out 
 <translation id="4045764304651014138">Usage data</translation>
 <translation id="405399507749852140">Get alerts if the price drops on any site</translation>
 <translation id="4056223980640387499">Sepia</translation>
-<translation id="4060598801229743805">Options available near the top of the screen</translation>
 <translation id="4062305924942672200">Legal information</translation>
 <translation id="4072805772816336153">Try again later</translation>
 <translation id="4084682180776658562">Bookmark</translation>
@@ -643,7 +642,6 @@ Your Google Account may have other forms of browsing history such as searches an
 <translation id="4554077758708533499">Connected with USB cable</translation>
 <translation id="4558311620361989323">Web page shortcuts</translation>
 <translation id="4561730552726921821">Registration succeeded</translation>
-<translation id="4561979708150884304">No connection</translation>
 <translation id="4565377596337484307">Hide password</translation>
 <translation id="4572422548854449519">Sign in to managed account</translation>
 <translation id="4576892426230499203">Try another verification option</translation>
@@ -668,7 +666,6 @@ Your Google Account may have other forms of browsing history such as searches an
 <translation id="4699172675775169585">Cached images and files</translation>
 <translation id="4719927025381752090">Offer to translate</translation>
 <translation id="4720023427747327413">Open in <ph name="PRODUCT_NAME" /></translation>
-<translation id="4720982865791209136">Help improve Chrome. <ph name="BEGIN_LINK" />Take survey<ph name="END_LINK" /></translation>
 <translation id="47217992755561375">See your top sites</translation>
 <translation id="4732120983431207637">Stack unwinder</translation>
 <translation id="4736934858538408121">Virtual card</translation>
@@ -772,7 +769,6 @@ To change this setting, <ph name="BEGIN_LINK" />reset sync<ph name="END_LINK" />
 <translation id="5184329579814168207">Open in Chrome</translation>
 <translation id="5191251636205085390">Learn about and control new technologies that aim to replace third-party cookies</translation>
 <translation id="5193988420012215838">Copied to your clipboard</translation>
-<translation id="5199929503336119739">Work profile</translation>
 <translation id="5204967432542742771">Enter password</translation>
 <translation id="5206168361184759344">{FILE_COUNT,plural, =1{Downloading file…}other{Downloading # files…}}</translation>
 <translation id="5210286577605176222">Jump to the previous tab</translation>
@@ -1346,14 +1342,12 @@ For example, some websites may respond to this request by showing you ads that a
 <translation id="8221656072740924283">Continue</translation>
 <translation id="8223642481677794647">Feed card menu</translation>
 <translation id="8250920743982581267">Documents</translation>
-<translation id="825412236959742607">This page uses too much memory, so Chrome removed some content.</translation>
 <translation id="8255617931166444521">Sites can only use your cookies to see your browsing activity only on their own site</translation>
 <translation id="8259179246279078674">Because the preloaded pages are encrypted, Google will not learn anything about the preloaded page content. Google servers will learn which sites are privately preloaded. This information is only used to preload the pages and is not linked to other information from your Google Account.</translation>
 <translation id="8260126382462817229">Try signing in again</translation>
 <translation id="8261506727792406068">Delete</translation>
 <translation id="82619448491672958">See other tabs</translation>
 <translation id="8266862848225348053">Download location</translation>
-<translation id="8274165955039650276">See downloads</translation>
 <translation id="8281886186245836920">Skip</translation>
 <translation id="8282297628636750033">Apply Dark theme to sites, when possible</translation>
 <translation id="829672787777123339">Connecting to your device…</translation>
@@ -1517,7 +1511,6 @@ For example, some websites may respond to this request by showing you ads that a
 <translation id="9108808586816295166">Secure DNS may not be available all the time</translation>
 <translation id="9128984223251192329">Privacy Sandbox prompt opened at half height</translation>
 <translation id="9133397713400217035">Explore offline</translation>
-<translation id="9137013805542155359">Show original</translation>
 <translation id="9148126808321036104">Sign in again</translation>
 <translation id="9158770349521403363">Share content only</translation>
 <translation id="9159716826369098114">Restore tab group of <ph name="TAB_COUNT" /> tabs as a new background tab group.</translation>

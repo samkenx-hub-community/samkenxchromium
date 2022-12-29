@@ -323,8 +323,7 @@ const Extension* ExtensionContextMenuModelTest::AddExtensionWithHostPermission(
   if (action_key)
     manifest.Set(action_key, DictionaryBuilder().BuildDict());
   if (!host_permission.empty())
-    manifest.Set("permissions",
-                 ListBuilder().Append(host_permission).BuildList());
+    manifest.Set("permissions", ListBuilder().Append(host_permission).Build());
   scoped_refptr<const Extension> extension =
       ExtensionBuilder()
           .SetManifest(manifest.BuildDict())
@@ -456,13 +455,6 @@ void ExtensionContextMenuModelTest::TearDown() {
     while (!browser_->tab_strip_model()->empty())
       browser_->tab_strip_model()->DetachAndDeleteWebContentsAt(0);
   }
-
-#if BUILDFLAG(IS_CHROMEOS_ASH)
-  // The ash::KioskAppManager, if initialized, needs to be cleaned up.
-  // TODO(devlin): This should probably go somewhere more central, like
-  // ash::ScopedCrosSettingsTestHelper.
-  ash::KioskAppManager::Shutdown();
-#endif
 
   ExtensionServiceTestBase::TearDown();
 }

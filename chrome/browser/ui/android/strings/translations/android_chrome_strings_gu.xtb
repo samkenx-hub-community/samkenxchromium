@@ -517,6 +517,7 @@
 <translation id="3830886834687455630">તમારા પાસવર્ડ ચેક કરવા માટે Google Play સેવાઓ અપડેટ કરો</translation>
 <translation id="3845098929839618392">છૂપી ટૅબમાં ખોલો</translation>
 <translation id="3856096718352044181">કૃપા કરીને ચકાસણી કરો કે આ માન્ય પ્રદાતા છે અથવા પછીથી ફરી પ્રયાસ કરો</translation>
+<translation id="3858127568696903256">તમે ફૉલો કરો છો તે કન્ટેન્ટ અહીં જુઓ</translation>
 <translation id="3858860766373142691">નામ</translation>
 <translation id="3861633093716975811">લોકપ્રિય વીડિયો</translation>
 <translation id="3874520961715512166">સાઇટ કાઢી નાખી</translation>
@@ -552,7 +553,6 @@
 <translation id="4045764304651014138">વપરાશનો ડેટા</translation>
 <translation id="405399507749852140">જો કોઈપણ સાઇટ પર કિંમતમાં ઘટાડો થાય, તો અલર્ટ મેળવો</translation>
 <translation id="4056223980640387499">Sepia</translation>
-<translation id="4060598801229743805">સ્ક્રીનની ટોચ પર વિકલ્પો ઉપલબ્ધ છે</translation>
 <translation id="4062305924942672200">કાનુની માહિતી</translation>
 <translation id="4072805772816336153">થોડા સમય પછી ફરી પ્રયાસ કરો</translation>
 <translation id="4084682180776658562">બુકમાર્ક</translation>
@@ -642,7 +642,6 @@
 <translation id="4554077758708533499">USB કેબલ સાથે કનેક્ટ કરેલો છે</translation>
 <translation id="4558311620361989323">વેબ પેજના શૉર્ટકટ</translation>
 <translation id="4561730552726921821">નોંધણી કરવામાં સફળ રહ્યાં</translation>
-<translation id="4561979708150884304">કોઈ કનેક્શન નથી</translation>
 <translation id="4565377596337484307">પાસવર્ડ છુપાવો</translation>
 <translation id="4572422548854449519">મેનેજ એકાઉન્ટમાં સાઇન ઇન કરો</translation>
 <translation id="4576892426230499203">ચકાસણી માટે બીજો કોઈ વિકલ્પ અજમાવો</translation>
@@ -667,7 +666,6 @@
 <translation id="4699172675775169585">કૅશ કરેલી છબીઓ અને ફાઇલો</translation>
 <translation id="4719927025381752090">અનુવાદ કરવાનું ઑફર કરો</translation>
 <translation id="4720023427747327413"><ph name="PRODUCT_NAME" /> માં ખોલો</translation>
-<translation id="4720982865791209136">Chromeને બહેતર બનાવવામાં સહાય કરો. <ph name="BEGIN_LINK" />સર્વેક્ષણમાં ભાગ લો<ph name="END_LINK" /></translation>
 <translation id="47217992755561375">તમારા માટે શ્રેષ્ઠ હોય તેવી સાઇટ જુઓ</translation>
 <translation id="4732120983431207637">સ્ટૅક અનવાઇન્ડર</translation>
 <translation id="4736934858538408121">વર્ચ્યુઅલ કાર્ડ</translation>
@@ -771,7 +769,6 @@
 <translation id="5184329579814168207">Chrome માં ખોલો</translation>
 <translation id="5191251636205085390">ત્રીજા પક્ષની કુકીને બદલે વાપરવાના ઉદ્દેશ્યથી બનાવવામાં આવેલી નવી ટેક્નોલોજી વિશે જાણો અને તેમને નિયંત્રિત કરો</translation>
 <translation id="5193988420012215838">તમારા ક્લિપબોર્ડ પર કૉપિ કરવામાં આવી</translation>
-<translation id="5199929503336119739">ઑફિસની પ્રોફાઇલ</translation>
 <translation id="5204967432542742771">પાસવર્ડ દાખલ કરો</translation>
 <translation id="5206168361184759344">{FILE_COUNT,plural, =1{ફાઇલ ડાઉનલોડ કરી રહ્યાં છીએ…}one{# ફાઇલ ડાઉનલોડ કરી રહ્યાં છીએ…}other{# ફાઇલ ડાઉનલોડ કરી રહ્યાં છીએ…}}</translation>
 <translation id="5210286577605176222">પાછલી ટૅબ પર જાઓ</translation>
@@ -1345,14 +1342,12 @@
 <translation id="8221656072740924283">આગળ વધો</translation>
 <translation id="8223642481677794647">ફીડ કાર્ડ મેનૂ</translation>
 <translation id="8250920743982581267">દસ્તાવેજો</translation>
-<translation id="825412236959742607">આ પેજ મેમરીનો બહુ ઉપયોગ કરે છે, તેથી Chromeએ કેટલુંક કન્ટેન્ટ કાઢી નાખ્યું છે.</translation>
 <translation id="8255617931166444521">અલગ-અલગ સાઇટ તમારી બ્રાઉઝિંગ પ્રવૃત્તિ જોવા માટે માત્ર તેમની પોતાની સાઇટ પર જ તમારી કુકીનો ઉપયોગ કરી શકે છે</translation>
 <translation id="8259179246279078674">પહેલેથી લોડ કરેલા પેજ એન્ક્રિપ્ટેડ હોવાથી, પહેલેથી લોડ કરેલા પેજના કન્ટેન્ટ વિશે Googleને જાણ થશે નહીં. કઈ સાઇટ ખાનગી રીતે પહેલેથી લોડ કરવામાં આવી છે, તે Googleના સર્વરને જાણવા મળશે. આ માહિતીનો ઉપયોગ માત્ર પેજને પહેલેથી લોડ કરવા માટે થાય છે અને તમારા Google એકાઉન્ટમાંથી અન્ય માહિતી સાથે લિંક કરવામાં આવતી નથી.</translation>
 <translation id="8260126382462817229">ફરીથી સાઇન ઇન કરવાનો પ્રયાસ કરો</translation>
 <translation id="8261506727792406068">ડિલીટ કરો</translation>
 <translation id="82619448491672958">અન્ય ટૅબ જુઓ</translation>
 <translation id="8266862848225348053">સ્થાન ડાઉનલોડ કરો</translation>
-<translation id="8274165955039650276">ડાઉનલોડ જુઓ</translation>
 <translation id="8281886186245836920">છોડો</translation>
 <translation id="8282297628636750033">શક્ય હોય ત્યારે સાઇટ પર ઘેરી થીમ લાગુ કરો</translation>
 <translation id="829672787777123339">તમારા ડિવાઇસ સાથે કનેક્ટ કરી રહ્યાં છીએ…</translation>
@@ -1516,7 +1511,6 @@
 <translation id="9108808586816295166">સુરક્ષિત DNS હંમેશાં ઉપલબ્ધ ન હોઈ શકે</translation>
 <translation id="9128984223251192329">પ્રાઇવસી સૅન્ડબૉક્સનો સંકેત અડધી ઊંચાઈએ ખોલ્યો</translation>
 <translation id="9133397713400217035">ઑફલાઇનમાં શોધખોળ કરો</translation>
-<translation id="9137013805542155359">મૂળ બતાવો</translation>
 <translation id="9148126808321036104">ફરીથી સાઇન ઇન કરો </translation>
 <translation id="9158770349521403363">માત્ર કન્ટેન્ટ શેર કરો</translation>
 <translation id="9159716826369098114"><ph name="TAB_COUNT" /> ટૅબવાળા ટૅબના ગ્રૂપને નવા બૅકગ્રાઉન્ડ ટૅબના ગ્રૂપ તરીકે રિસ્ટોર કરો.</translation>

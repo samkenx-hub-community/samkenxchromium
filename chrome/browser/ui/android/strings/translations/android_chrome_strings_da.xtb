@@ -553,7 +553,6 @@ Private state tokens forbedrer beskyttelsen af personlige oplysninger på nettet
 <translation id="4045764304651014138">Brugsdata</translation>
 <translation id="405399507749852140">Få besked, hvis prisen falder på et website</translation>
 <translation id="4056223980640387499">Sepia</translation>
-<translation id="4060598801229743805">Du finder de tilgængelige valgmuligheder øverst på skærmen</translation>
 <translation id="4062305924942672200">Juridiske oplysninger</translation>
 <translation id="4072805772816336153">Prøv igen senere</translation>
 <translation id="4084682180776658562">Bogmærke</translation>
@@ -643,7 +642,6 @@ Din Google-konto kan have andre former for browserhistorik, f.eks. søgninger og
 <translation id="4554077758708533499">Tilsluttet via USB-kabel</translation>
 <translation id="4558311620361989323">Genveje på websider</translation>
 <translation id="4561730552726921821">Tilmeldingen blev fuldført</translation>
-<translation id="4561979708150884304">Der er ingen forbindelse</translation>
 <translation id="4565377596337484307">Skjul adgangskode</translation>
 <translation id="4572422548854449519">Log ind på managerstyret konto</translation>
 <translation id="4576892426230499203">Prøv en anden bekræftelsesmulighed</translation>
@@ -668,7 +666,6 @@ Din Google-konto kan have andre former for browserhistorik, f.eks. søgninger og
 <translation id="4699172675775169585">Billeder og filer, der er gemt i cache</translation>
 <translation id="4719927025381752090">Tilbyd at oversætte</translation>
 <translation id="4720023427747327413">Åbn i <ph name="PRODUCT_NAME" /></translation>
-<translation id="4720982865791209136">Vær med til at forbedre Chrome. <ph name="BEGIN_LINK" />Deltag i undersøgelsen<ph name="END_LINK" /></translation>
 <translation id="47217992755561375">Se dine mest anvendte websites</translation>
 <translation id="4732120983431207637">Stack Unwinder</translation>
 <translation id="4736934858538408121">Virtuelt kort</translation>
@@ -772,7 +769,6 @@ Hvis du vil ændre denne indstilling, skal du <ph name="BEGIN_LINK" />nulstille 
 <translation id="5184329579814168207">Åbn i Chrome</translation>
 <translation id="5191251636205085390">Få indblik i og styr nye teknologier, der har til formål at erstatte tredjepartscookies</translation>
 <translation id="5193988420012215838">Kopieret til din udklipsholder</translation>
-<translation id="5199929503336119739">Arbejdsprofil</translation>
 <translation id="5204967432542742771">Angiv adgangskode</translation>
 <translation id="5206168361184759344">{FILE_COUNT,plural, =1{Downloader fil…}one{Downloader # fil…}other{Downloader # filer…}}</translation>
 <translation id="5210286577605176222">Gå til den forrige fane</translation>
@@ -1346,14 +1342,12 @@ Nogle websites kan f.eks. reagere på denne anmodning ved at vise dig annoncer, 
 <translation id="8221656072740924283">Fortsæt</translation>
 <translation id="8223642481677794647">Feedkortmenu</translation>
 <translation id="8250920743982581267">Dokumenter</translation>
-<translation id="825412236959742607">Denne side anvender for meget hukommelse, så Chrome har fjernet noget indhold.</translation>
 <translation id="8255617931166444521">Websites kan kun bruge dine cookies til at se din browseraktivitet på deres eget website</translation>
 <translation id="8259179246279078674">Fordi de forudindlæste sider er krypterede, vil Google ikke få nogle oplysninger om det forudindlæste sideindhold. Googles servere vil få oplysninger om, hvilke websites der forudindlæses privat. Disse oplysninger bruges udelukkende til at forudindlæse siderne og knyttes ikke til andre oplysninger på din Google-konto.</translation>
 <translation id="8260126382462817229">Prøv at logge ind igen</translation>
 <translation id="8261506727792406068">Slet</translation>
 <translation id="82619448491672958">Se andre faner</translation>
 <translation id="8266862848225348053">Downloadplacering</translation>
-<translation id="8274165955039650276">Se downloads</translation>
 <translation id="8281886186245836920">Spring over</translation>
 <translation id="8282297628636750033">Anvend Mørkt tema på websites</translation>
 <translation id="829672787777123339">Opretter forbindelse til din enhed…</translation>
@@ -1517,7 +1511,6 @@ Nogle websites kan f.eks. reagere på denne anmodning ved at vise dig annoncer, 
 <translation id="9108808586816295166">Sikre DNS-servere er muligvis ikke altid tilgængelige</translation>
 <translation id="9128984223251192329">Privacy Sandbox-meddelelsen er åbnet i halv højde</translation>
 <translation id="9133397713400217035">Udforsk offline</translation>
-<translation id="9137013805542155359">Vis oprindelig</translation>
 <translation id="9148126808321036104">Log ind igen</translation>
 <translation id="9158770349521403363">Del kun indhold</translation>
 <translation id="9159716826369098114">Gendan fanegruppen med <ph name="TAB_COUNT" /> faner som en ny fanegruppe i baggrunden.</translation>

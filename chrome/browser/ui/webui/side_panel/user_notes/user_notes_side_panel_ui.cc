@@ -18,15 +18,14 @@
 
 UserNotesSidePanelUI::UserNotesSidePanelUI(content::WebUI* web_ui)
     : ui::MojoBubbleWebUIController(web_ui) {
-  content::WebUIDataSource* source =
-      content::WebUIDataSource::Create(chrome::kChromeUIUserNotesSidePanelHost);
+  content::WebUIDataSource* source = content::WebUIDataSource::CreateAndAdd(
+      web_ui->GetWebContents()->GetBrowserContext(),
+      chrome::kChromeUIUserNotesSidePanelHost);
 
   const int resource = IDR_SIDE_PANEL_USER_NOTES_USER_NOTES_HTML;
   webui::SetupWebUIDataSource(
       source, base::make_span(kSidePanelResources, kSidePanelResourcesSize),
       resource);
-  content::WebUIDataSource::Add(web_ui->GetWebContents()->GetBrowserContext(),
-                                source);
 }
 
 UserNotesSidePanelUI::~UserNotesSidePanelUI() = default;
@@ -34,7 +33,17 @@ UserNotesSidePanelUI::~UserNotesSidePanelUI() = default;
 WEB_UI_CONTROLLER_TYPE_IMPL(UserNotesSidePanelUI)
 
 void UserNotesSidePanelUI::BindInterface(
+    mojo::PendingReceiver<side_panel::mojom::UserNotesPageHandlerFactory>
+        receiver) {
+  page_factory_receiver_.reset();
+  page_factory_receiver_.Bind(std::move(receiver));
+}
+
+void UserNotesSidePanelUI::CreatePageHandler(
+    mojo::PendingRemote<side_panel::mojom::UserNotesPage> page,
     mojo::PendingReceiver<side_panel::mojom::UserNotesPageHandler> receiver) {
+  DCHECK(page);
+
   user_notes_page_handler_ = std::make_unique<UserNotesPageHandler>(
-      std::move(receiver), Profile::FromWebUI(web_ui()), this);
+      std::move(receiver), std::move(page), Profile::FromWebUI(web_ui()), this);
 }

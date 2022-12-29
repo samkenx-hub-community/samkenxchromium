@@ -101,7 +101,7 @@ base::TimeDelta GetArcSignInTimeout() {
   constexpr base::TimeDelta kArcSignInTimeout = base::Minutes(5);
   constexpr base::TimeDelta kArcVmSignInTimeoutForVM = base::Minutes(20);
 
-  if (chromeos::system::StatisticsProvider::GetInstance()->IsRunningOnVm() &&
+  if (ash::system::StatisticsProvider::GetInstance()->IsRunningOnVm() &&
       arc::IsArcVmEnabled()) {
     return kArcVmSignInTimeoutForVM;
   } else {
@@ -940,14 +940,12 @@ void ArcSessionManager::OnVmStarted(
   if (vm_signal.name() == kArcVmName) {
     vm_info_ = vm_signal.vm_info();
 
-    if (base::FeatureList::IsEnabled(kEnableVirtioBlkForData)) {
-      arcvm_mount_provider_id_ =
-          absl::optional<guest_os::GuestOsMountProviderRegistry::Id>(
-              guest_os::GuestOsService::GetForProfile(profile())
-                  ->MountProviderRegistry()
-                  ->Register(std::make_unique<ArcMountProvider>(
-                      profile(), vm_info_->cid())));
-    }
+    arcvm_mount_provider_id_ =
+        absl::optional<guest_os::GuestOsMountProviderRegistry::Id>(
+            guest_os::GuestOsService::GetForProfile(profile())
+                ->MountProviderRegistry()
+                ->Register(std::make_unique<ArcMountProvider>(
+                    profile(), vm_info_->cid())));
   }
 }
 

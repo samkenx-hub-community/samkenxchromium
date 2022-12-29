@@ -517,6 +517,7 @@
 <translation id="3830886834687455630">Թարմացրեք Google Play ծառայությունները՝ ձեր գաղտնաբառերը ստուգելու համար</translation>
 <translation id="3845098929839618392">Բացել ինկոգնիտո ներդիրում</translation>
 <translation id="3856096718352044181">Հաստատեք, որ սա վավեր մատակարար է կամ նորից փորձեք</translation>
+<translation id="3858127568696903256">Այստեղ դիտեք բովանդակությունը, որին հետևում եք</translation>
 <translation id="3858860766373142691">Անուն</translation>
 <translation id="3861633093716975811">Հաճախ դիտվող տեսանյութեր</translation>
 <translation id="3874520961715512166">Կայքը հեռացվեց</translation>
@@ -552,7 +553,6 @@
 <translation id="4045764304651014138">Օգտագործման տվյալներ</translation>
 <translation id="405399507749852140">Դուք ծանուցում կստանաք, երբ որևէ կայքում գնիջեցում լինի</translation>
 <translation id="4056223980640387499">Սեպիա</translation>
-<translation id="4060598801229743805">Ընտրանքները հասանելի են էկրանի վերին հատվածում</translation>
 <translation id="4062305924942672200">Իրավական տեղեկություններ</translation>
 <translation id="4072805772816336153">Փորձեք ավելի ուշ</translation>
 <translation id="4084682180776658562">Էջանիշ</translation>
@@ -642,7 +642,6 @@
 <translation id="4554077758708533499">Միացված է USB մալուխով</translation>
 <translation id="4558311620361989323">Վեբէջերի դյուրանցումներ</translation>
 <translation id="4561730552726921821">Գրանցումը կատարվեց</translation>
-<translation id="4561979708150884304">Կապ չկա</translation>
 <translation id="4565377596337484307">Թաքցնել գաղտնաբառը</translation>
 <translation id="4572422548854449519">Մուտք գործեք կառավարվող հաշիվ</translation>
 <translation id="4576892426230499203">Ընտրեք հաստատման այլ տարբերակ</translation>
@@ -667,7 +666,6 @@
 <translation id="4699172675775169585">Քեշավորված պատկերներ և ֆայլեր</translation>
 <translation id="4719927025381752090">Առաջարկել թարգմանել</translation>
 <translation id="4720023427747327413">Բացել <ph name="PRODUCT_NAME" />-ում</translation>
-<translation id="4720982865791209136">Օգնեք ավելի լավը դարձնել Chrome-ը: <ph name="BEGIN_LINK" />Մասնակցեք հարցմանը<ph name="END_LINK" /></translation>
 <translation id="47217992755561375">Դիտեք ձեր թոփ կայքերը</translation>
 <translation id="4732120983431207637">Stack Unwinder</translation>
 <translation id="4736934858538408121">Վիրտուալ քարտ</translation>
@@ -771,7 +769,6 @@
 <translation id="5184329579814168207">Բացել Chrome-ով</translation>
 <translation id="5191251636205085390">Իմացեք ավելին նոր տեխնոլոգիաների մասին, որոնք փոխարինելու են երրորդ կողմի քուքիներին։</translation>
 <translation id="5193988420012215838">Պատճենվեց սեղմատախտակին</translation>
-<translation id="5199929503336119739">Աշխատանքային պրոֆիլ</translation>
 <translation id="5204967432542742771">Մուտքագրեք գաղտնաբառը</translation>
 <translation id="5206168361184759344">{FILE_COUNT,plural, =1{Ֆայլը ներբեռնվում է…}one{Ներբեռնվում է # ֆայլ…}other{Ներբեռնվում է # ֆայլ…}}</translation>
 <translation id="5210286577605176222">Անցնել նախորդ ներդիր</translation>
@@ -1345,14 +1342,12 @@ Privacy Sandbox տեխնոլոգիան դեռևս մշակման փուլում 
 <translation id="8221656072740924283">Շարունակել</translation>
 <translation id="8223642481677794647">Լրահոսի քարտի ընտրացանկ</translation>
 <translation id="8250920743982581267">Փաստաթղթեր</translation>
-<translation id="825412236959742607">Այս էջը չափազանց շատ հիշողություն է օգտագործում, այդ պատճառով Chrome-ը որոշակի բովանդակություն հեռացրել է:</translation>
 <translation id="8255617931166444521">Կայքերը կարող են օգտագործել քուքիներ՝ միայն իրենց էջերում ձեր գործողությունները հետագծելու համար։</translation>
 <translation id="8259179246279078674">Քանի որ նախապես բեռնված էջերը գաղտնագրված են, Google-ը ոչինչ չի իմանա դրանց բովանդակության մասին։ Google-ի սերվերները տեղեկություններ կստանան, թե որ կայքերն են անանուն կերպով նախաբեռնվել։ Այս տեղեկություններն օգտագործվում են միայն կայքերի նախաբեռնման համար և կապված չեն ձեր Google հաշվի մյուս տվյալների հետ։</translation>
 <translation id="8260126382462817229">Փորձեք նորից մուտք գործել</translation>
 <translation id="8261506727792406068">Ջնջել</translation>
 <translation id="82619448491672958">Տեսնել մյուս ներդիրները</translation>
 <translation id="8266862848225348053">Ներբեռնումների պանակը</translation>
-<translation id="8274165955039650276">Դիտել ներբեռնումները</translation>
 <translation id="8281886186245836920">Բաց թողնել</translation>
 <translation id="8282297628636750033">Կայքերում հնարավորինս կիրառել մուգ թեման</translation>
 <translation id="829672787777123339">Միացում ձեր սարքին…</translation>
@@ -1516,7 +1511,6 @@ Privacy Sandbox տեխնոլոգիան դեռևս մշակման փուլում 
 <translation id="9108808586816295166">Ապահով DNS-ը կարող է ամբողջ ընթացքում հասանելի չլինել</translation>
 <translation id="9128984223251192329">Privacy Sandbox հարցումը բացված է կիսով չափ</translation>
 <translation id="9133397713400217035">Դիտել անցանց ռեժիմում</translation>
-<translation id="9137013805542155359">Ցույց տալ բնօրինակը</translation>
 <translation id="9148126808321036104">Նորից մուտք գործել</translation>
 <translation id="9158770349521403363">Կիսվել միայն բովանդակությամբ</translation>
 <translation id="9159716826369098114">Վերականգնել <ph name="TAB_COUNT" /> ներդիրից բաղկացած խումբը որպես ներդիրների նոր ֆոնային խումբ։</translation>

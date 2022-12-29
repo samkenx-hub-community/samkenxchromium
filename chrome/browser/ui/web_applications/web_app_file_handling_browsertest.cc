@@ -268,14 +268,6 @@ class WebAppFileHandlingBrowserTest : public WebAppFileHandlingTestBase {
 };
 
 IN_PROC_BROWSER_TEST_F(WebAppFileHandlingBrowserTest,
-                       LaunchConsumerIsNotTriggeredWithNoFiles) {
-  InstallFileHandlingPWA();
-  // The URL used is the normal start URL.
-  LaunchWithFiles(app_id(), GetSecureAppURL(), {});
-  VerifyPwaDidReceiveFileLaunchParams(false);
-}
-
-IN_PROC_BROWSER_TEST_F(WebAppFileHandlingBrowserTest,
                        PWAsCanReceiveFileLaunchParams) {
   InstallFileHandlingPWA();
   base::FilePath test_file_path = CreateTestFileWithExtension("txt");
@@ -658,7 +650,8 @@ IN_PROC_BROWSER_TEST_F(WebAppFileHandlingBrowserTest_FeatureSwitchesOn,
 }
 
 IN_PROC_BROWSER_TEST_F(WebAppFileHandlingBrowserTest_FeatureSwitchesOn,
-                       OsIntegrationIsAdded) {
+                       // TODO(crbug.com/1403367): Re-enable this test
+                       DISABLED_OsIntegrationIsAdded) {
   ASSERT_EQ(1u, registrar().GetAppIds().size());
   AppId app_id = registrar().GetAppIds()[0];
   EXPECT_TRUE(file_handler_manager().IsFileHandlingAPIAvailable(app_id));

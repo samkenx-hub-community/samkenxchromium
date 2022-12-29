@@ -35,6 +35,7 @@
 #import "ios/chrome/browser/main/browser.h"
 #import "ios/chrome/browser/ntp/features.h"
 #import "ios/chrome/browser/ntp/new_tab_page_tab_helper.h"
+#import "ios/chrome/browser/ntp/new_tab_page_tab_helper_delegate.h"
 #import "ios/chrome/browser/overscroll_actions/overscroll_actions_tab_helper.h"
 #import "ios/chrome/browser/prerender/preload_controller_delegate.h"
 #import "ios/chrome/browser/prerender/prerender_service.h"
@@ -56,7 +57,6 @@
 #import "ios/chrome/browser/ui/autofill/form_input_accessory/form_input_accessory_coordinator.h"
 #import "ios/chrome/browser/ui/autofill/manual_fill/manual_fill_password_coordinator.h"
 #import "ios/chrome/browser/ui/badges/badge_popup_menu_coordinator.h"
-#import "ios/chrome/browser/ui/bookmarks/bookmark_interaction_controller.h"
 #import "ios/chrome/browser/ui/browser_container/browser_container_coordinator.h"
 #import "ios/chrome/browser/ui/browser_container/browser_container_view_controller.h"
 #import "ios/chrome/browser/ui/browser_view/browser_coordinator+private.h"
@@ -110,6 +110,7 @@
 #import "ios/chrome/browser/ui/fullscreen/fullscreen_controller.h"
 #import "ios/chrome/browser/ui/incognito_reauth/incognito_reauth_mediator.h"
 #import "ios/chrome/browser/ui/incognito_reauth/incognito_reauth_scene_agent.h"
+#import "ios/chrome/browser/ui/legacy_bookmarks/legacy_bookmark_interaction_controller.h"
 #import "ios/chrome/browser/ui/lens/lens_coordinator.h"
 #import "ios/chrome/browser/ui/main/browser_interface_provider.h"
 #import "ios/chrome/browser/ui/main/default_browser_scene_agent.h"
@@ -141,6 +142,7 @@
 #import "ios/chrome/browser/ui/settings/password/password_settings/password_settings_coordinator_delegate.h"
 #import "ios/chrome/browser/ui/sharing/sharing_coordinator.h"
 #import "ios/chrome/browser/ui/side_swipe/side_swipe_controller.h"
+#import "ios/chrome/browser/ui/spotlight_debugger/spotlight_debugger_coordinator.h"
 #import "ios/chrome/browser/ui/tab_switcher/tab_strip/tab_strip_coordinator.h"
 #import "ios/chrome/browser/ui/tabs/tab_strip_legacy_coordinator.h"
 #import "ios/chrome/browser/ui/text_fragments/text_fragments_coordinator.h"
@@ -215,6 +217,7 @@ enum class ToolbarKind {
                                   FormInputAccessoryCoordinatorNavigator,
                                   NetExportTabHelperDelegate,
                                   NewTabPageCommands,
+                                  NewTabPageTabHelperDelegate,
                                   PageInfoCommands,
                                   PageInfoPresentation,
                                   PasswordBreachCommands,
@@ -403,6 +406,10 @@ enum class ToolbarKind {
 // The coordinator used for What's New feature.
 @property(nonatomic, strong) WhatsNewCoordinator* whatsNewCoordinator;
 
+// The coordinator used for Spotlight Debugger.
+@property(nonatomic, strong)
+    SpotlightDebuggerCoordinator* spotlightDebuggerCoordinator;
+
 @end
 
 @implementation BrowserCoordinator {
@@ -419,7 +426,6 @@ enum class ToolbarKind {
   PrerenderService* _prerenderService;
   BubblePresenter* _bubblePresenter;
   ToolbarAccessoryPresenter* _toolbarAccessoryPresenter;
-  NewTabPageCoordinator* _ntpCoordinator;
   LensCoordinator* _lensCoordinator;
   ToolbarCoordinatorAdaptor* _toolbarCoordinatorAdaptor;
   PrimaryToolbarCoordinator* _primaryToolbarCoordinator;
@@ -517,6 +523,14 @@ enum class ToolbarKind {
   // TODO(crbug.com/1272516): Update the WebUsageEnablerBrowserAgent as part of
   // setting active/inactive.
   self.viewController.active = active;
+
+  // Stop the NTP on web usage toggle. This happens when clearing browser
+  // data, and forces the NTP to be recreated the next time it is needed.
+  // TODO(crbug.com/906199): Move this to the NewTabPageTabHelper when
+  // WebStateObserver has a webUsage callback.
+  if (!active) {
+    [self stopNTP];
+  }
 }
 
 - (void)clearPresentedStateWithCompletion:(ProceduralBlock)completion
@@ -755,10 +769,10 @@ enum class ToolbarKind {
     }
   }
 
-  _ntpCoordinator =
+  _NTPCoordinator =
       [[NewTabPageCoordinator alloc] initWithBrowser:self.browser];
-  _ntpCoordinator.toolbarDelegate = _toolbarCoordinatorAdaptor;
-  _ntpCoordinator.bubblePresenter = _bubblePresenter;
+  _NTPCoordinator.toolbarDelegate = _toolbarCoordinatorAdaptor;
+  _NTPCoordinator.bubblePresenter = _bubblePresenter;
 
   _lensCoordinator = [[LensCoordinator alloc] initWithBrowser:self.browser];
 
@@ -778,7 +792,7 @@ enum class ToolbarKind {
   _viewControllerDependencies.popupMenuCoordinator = self.popupMenuCoordinator;
   _viewControllerDependencies.downloadManagerCoordinator =
       self.downloadManagerCoordinator;
-  _viewControllerDependencies.ntpCoordinator = _ntpCoordinator;
+  _viewControllerDependencies.ntpCoordinator = _NTPCoordinator;
   _viewControllerDependencies.lensCoordinator = _lensCoordinator;
   _viewControllerDependencies.primaryToolbarCoordinator =
       _primaryToolbarCoordinator;
@@ -822,7 +836,7 @@ enum class ToolbarKind {
   _primaryToolbarCoordinator.popupPresenterDelegate = self.viewController;
   [_primaryToolbarCoordinator start];
 
-  _ntpCoordinator.baseViewController = self.viewController;
+  _NTPCoordinator.baseViewController = self.viewController;
 
   [_dispatcher startDispatchingToTarget:self.viewController
                             forProtocol:@protocol(BrowserCommands)];
@@ -881,8 +895,8 @@ enum class ToolbarKind {
   [self.browserContainerCoordinator stop];
   self.browserContainerCoordinator = nil;
 
-  [_ntpCoordinator stop];
-  _ntpCoordinator = nil;
+  [_NTPCoordinator stop];
+  _NTPCoordinator = nil;
 
   _keyCommandsProvider = nil;
   _dispatcher = nil;
@@ -1152,7 +1166,7 @@ enum class ToolbarKind {
 
   self.tabEventsMediator = [[TabEventsMediator alloc]
       initWithWebStateList:self.browser->GetWebStateList()
-            ntpCoordinator:_ntpCoordinator];
+            ntpCoordinator:_NTPCoordinator];
 
   self.viewController.reauthHandler =
       HandlerForProtocol(self.dispatcher, IncognitoReauthCommands);
@@ -1390,7 +1404,7 @@ enum class ToolbarKind {
 
 - (void)focusFakebox {
   if ([self isNTPActiveForCurrentWebState]) {
-    [_ntpCoordinator focusFakebox];
+    [_NTPCoordinator focusFakebox];
   }
 }
 
@@ -1442,6 +1456,14 @@ enum class ToolbarKind {
 
 - (void)showWhatsNewIPH {
   [_bubblePresenter presentWhatsNewBottomToolbarBubble];
+}
+
+- (void)showSpotlightDebugger {
+  [self.spotlightDebuggerCoordinator stop];
+  self.spotlightDebuggerCoordinator = [[SpotlightDebuggerCoordinator alloc]
+      initWithBaseViewController:self.viewController
+                         browser:self.browser];
+  [self.spotlightDebuggerCoordinator start];
 }
 
 #pragma mark - DefaultPromoCommands
@@ -1506,15 +1528,8 @@ enum class ToolbarKind {
     self.findBarCoordinator = nil;
   }
 
-  findBarCoordinator =
-      [[FindBarCoordinator alloc] initWithBaseViewController:self.viewController
-                                                     browser:self.browser];
-  self.findBarCoordinator = findBarCoordinator;
-
-  findBarCoordinator.presenter = _toolbarAccessoryPresenter;
-  findBarCoordinator.delegate = self;
-  findBarCoordinator.presentationDelegate = self.viewController;
-  [findBarCoordinator start];
+  self.findBarCoordinator = [self newFindBarCoordinator];
+  [self.findBarCoordinator start];
 }
 
 - (void)closeFindInPage {
@@ -1527,6 +1542,7 @@ enum class ToolbarKind {
       findTabHelper->StopFinding();
     } else {
       [self.findBarCoordinator stop];
+      self.findBarCoordinator = nil;
     }
   }
 }
@@ -1536,13 +1552,16 @@ enum class ToolbarKind {
       self.browser->GetWebStateList()->GetActiveWebState();
   auto* findHelper = FindTabHelper::FromWebState(currentWebState);
   if (findHelper && findHelper->IsFindUIActive() &&
-      !self.findBarCoordinator.presenter.isPresenting) {
+      !_toolbarAccessoryPresenter.isPresenting) {
+    DCHECK(!self.findBarCoordinator);
+    self.findBarCoordinator = [self newFindBarCoordinator];
     [self.findBarCoordinator start];
   }
 }
 
 - (void)hideFindUI {
   [self.findBarCoordinator stop];
+  self.findBarCoordinator = nil;
 }
 
 - (void)defocusFindInPage {
@@ -1590,6 +1609,18 @@ enum class ToolbarKind {
   auto* helper = FindTabHelper::FromWebState(currentWebState);
   return (helper && helper->CurrentPageSupportsFindInPage() &&
           !helper->IsFindUIActive());
+}
+
+- (FindBarCoordinator*)newFindBarCoordinator {
+  FindBarCoordinator* findBarCoordinator =
+      [[FindBarCoordinator alloc] initWithBaseViewController:self.viewController
+                                                     browser:self.browser];
+
+  findBarCoordinator.presenter = _toolbarAccessoryPresenter;
+  findBarCoordinator.delegate = self;
+  findBarCoordinator.presentationDelegate = self.viewController;
+
+  return findBarCoordinator;
 }
 
 #pragma mark - PromosManagerCommands
@@ -1747,14 +1778,8 @@ enum class ToolbarKind {
     self.textZoomCoordinator = nil;
   }
 
-  textZoomCoordinator = [[TextZoomCoordinator alloc]
-      initWithBaseViewController:self.viewController
-                         browser:self.browser];
-  self.textZoomCoordinator = textZoomCoordinator;
-
-  textZoomCoordinator.presenter = _toolbarAccessoryPresenter;
-  textZoomCoordinator.delegate = self;
-  [textZoomCoordinator start];
+  self.textZoomCoordinator = [self newTextZoomCoordinator];
+  [self.textZoomCoordinator start];
 }
 
 - (void)closeTextZoom {
@@ -1768,6 +1793,7 @@ enum class ToolbarKind {
     }
   }
   [self.textZoomCoordinator stop];
+  self.textZoomCoordinator = nil;
 }
 
 - (void)showTextZoomUIIfActive {
@@ -1780,13 +1806,26 @@ enum class ToolbarKind {
   FontSizeTabHelper* fontSizeTabHelper =
       FontSizeTabHelper::FromWebState(currentWebState);
   if (fontSizeTabHelper && fontSizeTabHelper->IsTextZoomUIActive() &&
-      !self.textZoomCoordinator.presenter.isPresenting) {
+      !_toolbarAccessoryPresenter.isPresenting) {
+    DCHECK(!self.textZoomCoordinator);
+    self.textZoomCoordinator = [self newTextZoomCoordinator];
     [self.textZoomCoordinator start];
   }
 }
 
 - (void)hideTextZoomUI {
   [self.textZoomCoordinator stop];
+  self.textZoomCoordinator = nil;
+}
+
+- (TextZoomCoordinator*)newTextZoomCoordinator {
+  TextZoomCoordinator* textZoomCoordinator = [[TextZoomCoordinator alloc]
+      initWithBaseViewController:self.viewController
+                         browser:self.browser];
+  textZoomCoordinator.presenter = _toolbarAccessoryPresenter;
+  textZoomCoordinator.delegate = self;
+
+  return textZoomCoordinator;
 }
 
 #pragma mark - URLLoadingServiceDelegate
@@ -1821,6 +1860,7 @@ enum class ToolbarKind {
     didDetachWebState:(web::WebState*)webState
               atIndex:(int)index {
   [self uninstallDelegatesForWebState:webState];
+  [self stopNTPIfNeeded];
 }
 
 // TODO(crbug.com/906525) : Move out of BrowserCoordinator along with
@@ -1986,8 +2026,7 @@ enum class ToolbarKind {
   }
 
   if (NewTabPageTabHelper::FromWebState(webState)) {
-    NewTabPageTabHelper::FromWebState(webState)->SetDelegate(
-        self.viewController);
+    NewTabPageTabHelper::FromWebState(webState)->SetDelegate(self);
   }
 
   if (AnnotationsTabHelper::FromWebState(webState)) {
@@ -2435,7 +2474,7 @@ enum class ToolbarKind {
   DCHECK(webState);
 
   if (self.isNTPActiveForCurrentWebState) {
-    [_ntpCoordinator willUpdateSnapshot];
+    [_NTPCoordinator willUpdateSnapshot];
   }
   OverscrollActionsTabHelper::FromWebState(webState)->Clear();
 }
@@ -2444,7 +2483,7 @@ enum class ToolbarKind {
          baseViewForWebState:(web::WebState*)webState {
   NewTabPageTabHelper* NTPHelper = NewTabPageTabHelper::FromWebState(webState);
   if (NTPHelper && NTPHelper->IsActive())
-    return _ntpCoordinator.viewController.view;
+    return _NTPCoordinator.viewController.view;
   return webState->GetView();
 }
 
@@ -2468,11 +2507,11 @@ enum class ToolbarKind {
 }
 
 - (void)updateFollowingFeedHasUnseenContent:(BOOL)hasUnseenContent {
-  [_ntpCoordinator updateFollowingFeedHasUnseenContent:hasUnseenContent];
+  [_NTPCoordinator updateFollowingFeedHasUnseenContent:hasUnseenContent];
 }
 
 - (void)handleFeedModelDidEndUpdates:(FeedType)feedType {
-  [_ntpCoordinator handleFeedModelDidEndUpdates:feedType];
+  [_NTPCoordinator handleFeedModelDidEndUpdates:feedType];
 }
 
 - (void)scrollToNTPAfterPresentedStateCleared:(FeedType)feedType {
@@ -2509,7 +2548,7 @@ enum class ToolbarKind {
 }
 
 - (void)reloadNTPForWebState:(web::WebState*)webState {
-  [_ntpCoordinator reload];
+  [_NTPCoordinator reload];
 }
 
 #pragma mark - PageInfoPresentation
@@ -2538,6 +2577,60 @@ enum class ToolbarKind {
   [self.passwordSettingsCoordinator stop];
   self.passwordSettingsCoordinator.delegate = nil;
   self.passwordSettingsCoordinator = nil;
+}
+
+#pragma mark - NewTabPageTabHelperDelegate
+
+- (void)newTabPageHelperDidChangeVisibility:(NewTabPageTabHelper*)NTPHelper
+                                forWebState:(web::WebState*)webState {
+  DCHECK(self.browser);
+  web::WebState* currentWebState =
+      self.browser->GetWebStateList()->GetActiveWebState();
+
+  if (webState != currentWebState) {
+    // In the instance that a pageload starts while the WebState is not the
+    // active WebState anymore, do nothing.
+    return;
+  }
+  NewTabPageCoordinator* NTPCoordinator = self.NTPCoordinator;
+  DCHECK(NTPCoordinator);
+  if (NTPHelper->IsActive()) {
+    [NTPCoordinator ntpDidChangeVisibility:YES];
+    NTPCoordinator.webState = webState;
+    [NTPCoordinator selectFeedType:NTPHelper->GetNextNTPFeedType()];
+    NTPCoordinator.shouldScrollIntoFeed = NTPHelper->GetNextNTPScrolledToFeed();
+  } else {
+    [NTPCoordinator ntpDidChangeVisibility:NO];
+    // This set needs to come after ntpDidChangeVisibility: so that the previous
+    // state can be cleaned up (e.g. if moving away from the Start surface).
+    NTPCoordinator.webState = nullptr;
+    [self stopNTPIfNeeded];
+  }
+  if (self.isActive) {
+    [self.viewController displayCurrentTab];
+  }
+}
+
+#pragma mark - Private methods to support NewTabPageTabHelperDelegate
+
+// Checks if there are any WebStates showing an NTP at this time. If not, then
+// stops the NTP.
+- (void)stopNTPIfNeeded {
+  WebStateList* webStateList = self.browser->GetWebStateList();
+  for (int i = 0; i < webStateList->count(); i++) {
+    NewTabPageTabHelper* iterNtpHelper =
+        NewTabPageTabHelper::FromWebState(webStateList->GetWebStateAt(i));
+    if (iterNtpHelper->IsActive()) {
+      return;
+    }
+  }
+
+  // No active NTPs were found.
+  [self stopNTP];
+}
+
+- (void)stopNTP {
+  [self.NTPCoordinator stop];
 }
 
 @end

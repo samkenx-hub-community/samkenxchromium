@@ -48,6 +48,7 @@ Só pode ler os datos encriptados alguén que coñeza a túa frase de acceso. A 
 <translation id="1265739287306757398">Máis información</translation>
 <translation id="1272079795634619415">Deter</translation>
 <translation id="1275718070701477396">Seleccionado</translation>
+<translation id="1279024913354609713">Non permitir</translation>
 <translation id="1281818060020671000">Xestionar datos</translation>
 <translation id="1282311502488501110">Non iniciar sesión</translation>
 <translation id="1283524564873030414">Últimas 24 horas</translation>
@@ -148,6 +149,7 @@ Só pode ler os datos encriptados alguén que coñeza a túa frase de acceso. A 
 <translation id="2074131957428911366">Sempre podes escoller na <ph name="BEGIN_LINK" />configuración<ph name="END_LINK" /> o contido que queres sincronizar.</translation>
 <translation id="2079545284768500474">Desfacer</translation>
 <translation id="2080769225927880590">Inicia sesión cunha conta válida</translation>
+<translation id="2090878303988764231">Inicia sesión para xestionar o contido que ves</translation>
 <translation id="2103075008456228677">Abrir history.google.com</translation>
 <translation id="21133533946938348">Ancorar pestana</translation>
 <translation id="2116625576999540962"><ph name="NUMBER_OF_SELECTED_BOOKMARKS" /> elementos movidos</translation>
@@ -190,6 +192,7 @@ Tampouco poden utilizalas para ver a túa actividade de navegación en distintos
 <translation id="2421044535038393232">Seguir editando</translation>
 <translation id="2434405374328098816">Xa gardaches un contrasinal de <ph name="USERNAME" /> para <ph name="WEBSITE" /></translation>
 <translation id="2435457462613246316">Mostrar contrasinal</translation>
+<translation id="2451654228769116489">Fixar pestana</translation>
 <translation id="2461070143328828326">Configuración dos contrasinais</translation>
 <translation id="2469960372084740698">Queres desactivar a función Navegación segura?</translation>
 <translation id="2473876017985765807">Xa gardaches un contrasinal para <ph name="WEBSITE" /></translation>
@@ -507,6 +510,7 @@ Para cambiar esta opción de configuración, deberás <ph name="BEGIN_LINK" />re
 <translation id="481968316161811770">Cookies, datos do sitio</translation>
 <translation id="4824497107140370669">{count,plural, =0{{domain}}=1{{domain} e 1 máis}other{{domain} e {count} máis}}</translation>
 <translation id="4826218269716039351">Bloquear cookies de terceiros</translation>
+<translation id="4826588772550366629">cámara e micrófono</translation>
 <translation id="4826726074642088322">Compartir texto destacado</translation>
 <translation id="48274138579728272">Marcar como lido</translation>
 <translation id="4833686396768033263">As pestanas recentes non están dispoñibles</translation>
@@ -559,6 +563,7 @@ Para cambiar esta opción de configuración, deberás <ph name="BEGIN_LINK" />re
 <translation id="5190835502935405962">Barra de marcadores</translation>
 <translation id="519530786644929958">Erro na descarga. Non se pode volver tentar.</translation>
 <translation id="5197255632782567636">Internet</translation>
+<translation id="5211488077761630279">Queres permitir que "<ph name="SITE_NAME" />" utilice a túa <ph name="PERMISSION" />?</translation>
 <translation id="5219295696240154694">Axudar a mellorar a seguranza na Web para todos</translation>
 <translation id="5228579091201413441">Activar sincronización</translation>
 <translation id="5232485538978018676">Iniciar sesión cunha conta xestionada</translation>
@@ -672,6 +677,7 @@ Handoff tamén debe estar activado na sección Xeral da configuración e os teus
 <translation id="6059830886158432458">Controla as túas historias e a túa actividade aquí</translation>
 <translation id="6064824697233747382">A túa organización esixe que desactives a sincronización.</translation>
 <translation id="6066301408025741299">Toca para cancelar.</translation>
+<translation id="6071409777669089905">Deixar de fixar pestana</translation>
 <translation id="60829778314739003">Aceptar e continuar</translation>
 <translation id="6084848228346514841">Seleccionar pestanas</translation>
 <translation id="6103540626693881831">Encriptación no dispositivo</translation>
@@ -785,6 +791,7 @@ Co modo de incógnito activado, non poden utilizalas para ver a túa actividade 
 <translation id="6710079714193676716">Xestionado pola túa organización. É posible que algunhas funcións non estean dispoñibles. <ph name="BEGIN_LINK" />Máis información<ph name="END_LINK" /></translation>
 <translation id="6713747756340119864">Google Apps</translation>
 <translation id="6730682669179532099">Non se puideron exportar os contrasinais</translation>
+<translation id="6732087373923685049">cámara</translation>
 <translation id="6748108480210050150">De</translation>
 <translation id="6760509555861141183">Volver á pestana recente</translation>
 <translation id="6762812039470893796">Anular toda a selección</translation>
@@ -971,6 +978,7 @@ Tamén poden utilizalas para ver a túa actividade de navegación en varios siti
 <translation id="8197543752516192074">Traducir páxina</translation>
 <translation id="8205564605687841303">Cancelar</translation>
 <translation id="8206354486702514201">O administrador aplica esta configuración.</translation>
+<translation id="821809831108207540">Inicia sesión e activa a sincronización para personalizar Chrome e o teu feed de Discover.</translation>
 <translation id="8225985093977202398">Imaxes e ficheiros en caché</translation>
 <translation id="8237382152611443140">Abre os axustes de AutoFill Passwords (Autocompletar contrasinais)</translation>
 <translation id="8261506727792406068">Eliminar</translation>
@@ -1037,6 +1045,7 @@ Tamén poden utilizalas para ver a túa actividade de navegación en varios siti
 <translation id="8764015330924122850">Deixar de seguir: <ph name="DOMAIN_NAME" /></translation>
 <translation id="8775144690796719618">URL non válido</translation>
 <translation id="8787968206789828143">Busca na Web</translation>
+<translation id="8792626944327216835">micrófono</translation>
 <translation id="8803639129939845298">Seguro</translation>
 <translation id="8806823403540278281">A túa organización esixe que navegues de forma privada. As pestanas do modo de incógnito non se gardan.
 <ph name="BEGIN_LINK" />Máis información<ph name="END_LINK" /></translation>
@@ -1092,11 +1101,13 @@ Tamén poden utilizalas para ver a túa actividade de navegación en varios siti
 <translation id="9157836665414082580">Suprimir cadros de diálogos</translation>
 <translation id="9177438225260810839">Realiza buscas nas pestanas abertas</translation>
 <translation id="9188680907066685419">Pechar sesión na conta xestionada</translation>
+<translation id="9193147658040604536">Arrastrar a pestana ata aquí para fixala</translation>
 <translation id="9200875785104711666">Hai <ph name="TIME" /> d</translation>
 <translation id="9203116392574189331">Handoff</translation>
 <translation id="9219154867334666734">Realizar buscas nas pestanas…</translation>
 <translation id="9223358826628549784">Enviouse o informe de erros.</translation>
 <translation id="941747855997058526">Seleccionar contrasinal…</translation>
+<translation id="948048872540558976">Crear pestana nova</translation>
 <translation id="952704832371081537">Cancelar</translation>
 <translation id="953008885340860025">Pechouse sesión en Chrome</translation>
 <translation id="959066944189734975">Segues a <ph name="CHANNEL_NAME" /></translation>

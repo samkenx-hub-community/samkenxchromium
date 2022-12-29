@@ -181,7 +181,9 @@ SettingsUI::SettingsUI(content::WebUI* web_ui)
                         "Settings.LoadCompletedTime.MD") {
   Profile* profile = Profile::FromWebUI(web_ui);
   content::WebUIDataSource* html_source =
-      content::WebUIDataSource::Create(chrome::kChromeUISettingsHost);
+      content::WebUIDataSource::CreateAndAdd(
+          web_ui->GetWebContents()->GetBrowserContext(),
+          chrome::kChromeUISettingsHost);
   html_source->OverrideContentSecurityPolicy(
       network::mojom::CSPDirectiveName::WorkerSrc,
       "worker-src blob: chrome://resources 'self';");
@@ -339,10 +341,6 @@ SettingsUI::SettingsUI(content::WebUI* web_ui)
       !chrome::ShouldDisplayManagedUi(profile) && !profile->IsChild();
   html_source->AddBoolean("showPrivacyGuide", show_privacy_guide);
 
-  html_source->AddBoolean("privacyGuide2Enabled",
-                          show_privacy_guide && base::FeatureList::IsEnabled(
-                                                    features::kPrivacyGuide2));
-
   html_source->AddBoolean("esbSettingsImprovementsEnabled",
                           base::FeatureList::IsEnabled(
                               safe_browsing::kEsbIphBubbleAndCollapseSettings));
@@ -421,9 +419,6 @@ SettingsUI::SettingsUI(content::WebUI* web_ui)
   AddLocalizedStrings(html_source, profile, web_ui->GetWebContents());
 
   ManagedUIHandler::Initialize(web_ui, html_source);
-
-  content::WebUIDataSource::Add(web_ui->GetWebContents()->GetBrowserContext(),
-                                html_source);
 
   content::URLDataSource::Add(
       profile, std::make_unique<FaviconSource>(

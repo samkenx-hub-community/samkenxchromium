@@ -21,12 +21,13 @@ BASE_DECLARE_FEATURE(kOmniboxRemoveSuggestionsFromClipboard);
 // `SortAndCull()`.
 BASE_DECLARE_FEATURE(kAutocompleteStability);
 BASE_DECLARE_FEATURE(kDocumentProviderDedupingOptimization);
+BASE_DECLARE_FEATURE(kGroupingFramework);
 BASE_DECLARE_FEATURE(kOmniboxDemoteByType);
 BASE_DECLARE_FEATURE(kOmniboxRemoveExcessiveRecycledViewClearCalls);
 BASE_DECLARE_FEATURE(kPreserveDefault);
+BASE_DECLARE_FEATURE(kSingleSortAndCullPass);
 BASE_DECLARE_FEATURE(kStrippedGurlOptimization);
 BASE_DECLARE_FEATURE(kUpdateResultDebounce);
-BASE_DECLARE_FEATURE(kSingleSortAndCullPass);
 
 // Features below this line should be sorted alphabetically by their comments.
 
@@ -51,9 +52,8 @@ BASE_DECLARE_FEATURE(kClobberTriggersSRPZeroSuggest);
 BASE_DECLARE_FEATURE(kFocusTriggersContextualWebZeroSuggest);
 BASE_DECLARE_FEATURE(kFocusTriggersSRPZeroSuggest);
 BASE_DECLARE_FEATURE(kKeepSecondaryZeroSuggest);
-BASE_DECLARE_FEATURE(kLocalHistorySuggestRevamp);
 BASE_DECLARE_FEATURE(kLocalHistoryZeroSuggestBeyondNTP);
-BASE_DECLARE_FEATURE(kOmniboxLocalZeroSuggestAgeThreshold);
+BASE_DECLARE_FEATURE(kNormalizeSearchSuggestions);
 BASE_DECLARE_FEATURE(kOmniboxOnClobberFocusTypeOnContent);
 BASE_DECLARE_FEATURE(kZeroSuggestInMemoryCaching);
 BASE_DECLARE_FEATURE(kZeroSuggestOnNTPForSignedOutUsers);

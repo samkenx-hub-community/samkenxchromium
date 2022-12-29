@@ -511,8 +511,12 @@ class PaintOpHelper {
     return str.str();
   }
 
-  static std::string RecordToString(const sk_sp<const PaintRecord>& record) {
-    return record ? "<paint record>" : "(nil)";
+  static std::string RecordToString(const PaintRecord& record) {
+    return record.empty() ? "(empty)" : "<paint record>";
+  }
+
+  static std::string RecordToString(const absl::optional<PaintRecord>& record) {
+    return record ? RecordToString(*record) : "(nil)";
   }
 
   static std::string TextBlobToString(const sk_sp<SkTextBlob>& blob) {
@@ -614,7 +618,6 @@ class PaintOpHelper {
         << PaintOpHelper::PaintFilterToString(flags.getImageFilter());
     str << ", drawLooper="
         << PaintOpHelper::SkiaTypeToString(flags.getLooper());
-    str << ", isSimpleOpacity=" << flags.IsSimpleOpacity();
     str << ", supportsFoldingAlpha=" << flags.SupportsFoldingAlpha();
     str << ", isValid=" << flags.IsValid();
     str << ", hasDiscardableImages=" << flags.HasDiscardableImages();

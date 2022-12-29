@@ -1162,6 +1162,7 @@
 <translation id="3927932062596804919">Rədd edin</translation>
 <translation id="393316646445601645">İnternet və telekom</translation>
 <translation id="3939773374150895049">CVC əvəzinə WebAuthn istifadə edilsin?</translation>
+<translation id="3943857333388298514">Yapışdırın.</translation>
 <translation id="3946209740501886391">Həmişə bu saytda sual verin</translation>
 <translation id="3947595700203588284">Saytlar MIDI cihazlarına qoşulmaq üçün icazə istəyə bilər</translation>
 <translation id="3949571496842715403">Server bunun <ph name="DOMAIN" /> olduğunu sübut edə bilmir; onun təhlükəsizlik sertifikatı Subyektiv Alternativ Adı göstərmir. Buna yanlış konfiqurasiya və ya hücumçu tərəfindən bağlantının blok edilməsi səbəb ola bilər.</translation>
@@ -2309,6 +2310,7 @@
 <translation id="6890531741535756070"><ph name="PROVIDER_ORIGIN" /> istifadə edən saytlarda <ph name="DEVICE_LABEL" /> ilə doğrulamağı seçmisiniz. Bu provayder ödəniş metodunuz haqqında məlumat saxlamış ola bilər, bu məlumatın <ph name="BEGIN_LINK" />silinməsini tələb edə<ph name="END_LINK" /> bilərsiniz.</translation>
 <translation id="6891596781022320156">Qayda səviyyəsi dəstəklənmir.</translation>
 <translation id="6895330447102777224">Kartınız təsdiqləndi</translation>
+<translation id="6896758677409633944">Kopyalayın</translation>
 <translation id="6897140037006041989">İstifadəçi Agent</translation>
 <translation id="6898699227549475383">Təşkilat (T)</translation>
 <translation id="6899000063526916106"><ph name="NUMBER_OF_DIGITS" /> rəqəmli kodu daxil edin</translation>
@@ -2676,6 +2678,7 @@
 <translation id="7716375162095500223">Hələ yüklənməyib, ya da nəzərə alınmayıb</translation>
 <translation id="7716424297397655342">Sayt keşdən yüklənə bilmədi</translation>
 <translation id="7723047071702270851">Kartı redaktə edin</translation>
+<translation id="7724603315864178912">Kəsin</translation>
 <translation id="7734285854693414638">Google Forma'da cəld yeni forma yaradın</translation>
 <translation id="773466115871691567">Səhifələri həmişə <ph name="SOURCE_LANGUAGE" /> dilinə tərcümə edin</translation>
 <translation id="7736959720849233795">Keçid Ünvanını Kopyalayın</translation>
@@ -2712,6 +2715,7 @@
 <translation id="7815407501681723534">'<ph name="SEARCH_STRING" />' üçün <ph name="NUMBER_OF_RESULTS" /> <ph name="SEARCH_RESULTS" /> tapılmışdır</translation>
 <translation id="7822320754433038727">Ovçuluq və atıcılıq</translation>
 <translation id="782886543891417279">İstifadə etdiyiniz Wi-Fi (<ph name="WIFI_NAME" />) Sizdən login səhifəsinə daxil olmağınızı tələb edə bilər.</translation>
+<translation id="7840103971441592723">Ekranın çəkilməsi başladılıb</translation>
 <translation id="7844689747373518809">{COUNT,plural, =0{Heç bir tətbiq}=1{1 tətbiq (<ph name="EXAMPLE_APP_1" />)}=2{2 tətbiq (<ph name="EXAMPLE_APP_1" />, <ph name="EXAMPLE_APP_2" />)}other{# tətbiq (<ph name="EXAMPLE_APP_1" />, <ph name="EXAMPLE_APP_2" />, <ph name="AND_MORE" />)}}</translation>
 <translation id="7855695075675558090"><ph name="TOTAL_LABEL" /> <ph name="CURRENCY_CODE" /> <ph name="FORMATTED_TOTAL_AMOUNT" /></translation>
 <translation id="7862185352068345852">Saytdan çıxılsın?</translation>
@@ -2741,6 +2745,7 @@
 <translation id="7942349550061667556">Qırmızı</translation>
 <translation id="7943397946612013052">Endirmə bloklanıb</translation>
 <translation id="7943893128817522649">Saytlar çoxsaylı faylları avtomatik endirmək üçün icazə istəyə bilər</translation>
+<translation id="7946724693008564269">Aşkarlanmış Dil</translation>
 <translation id="7947285636476623132">Bitmə ilini yoxlayın və yenidən cəhd edin</translation>
 <translation id="7947813448670013867"><ph name="SEE_CHROME_TIPS_FOCUSED_FRIENDLY_MATCH_TEXT" />, Tab düyməsi, sonra Enter düyməsinə basaraq Chrome funksiyaları haqqında ətraflı məlumat əldə edin</translation>
 <translation id="7950027195171824198">Chrome ayarlarında kuki tərcihlərinizi idarə edin</translation>
@@ -2889,6 +2894,7 @@
 <translation id="8282947398454257691">Unikal cihaz identifikatorunuzu tanıyın</translation>
 <translation id="8284769179630993263">Chrome ayarlarında Təhlükəsiz Baxış və daha çoxunu idarə edin</translation>
 <translation id="8286036467436129157">Giriş</translation>
+<translation id="8286799286781881307">Administratorunuz tərəfindən icazə verilən tətbiqlər cihazınıza əlavə edilmiş bütün ekranları çəkə bilər. Bu məlumat lokal olaraq işlənə və ya təşkilatınızın serverlərinə yüklənə bilər.</translation>
 <translation id="8288807391153049143">Sertifikatı göstərin</translation>
 <translation id="8289355894181816810">Bunun mənasını bilmirsinizsə, şəbəkə administratorunuz ilə əlaqə saxlayın.</translation>
 <translation id="8293206222192510085">Əlfəcin əlavə edin</translation>

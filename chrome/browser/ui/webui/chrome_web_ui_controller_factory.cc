@@ -83,6 +83,7 @@
 #include "components/history_clusters/core/features.h"
 #include "components/history_clusters/history_clusters_internals/webui/history_clusters_internals_ui.h"
 #include "components/history_clusters/history_clusters_internals/webui/url_constants.h"
+#include "components/lens/buildflags.h"
 #include "components/nacl/common/buildflags.h"
 #include "components/optimization_guide/optimization_guide_internals/webui/url_constants.h"
 #include "components/password_manager/content/common/web_ui_constants.h"
@@ -403,7 +404,7 @@
 #include "chrome/browser/ui/webui/media_router/cast_feedback_ui.h"
 #endif
 
-#if !BUILDFLAG(IS_ANDROID) && BUILDFLAG(GOOGLE_CHROME_BRANDING)
+#if BUILDFLAG(ENABLE_LENS_DESKTOP_GOOGLE_BRANDED_FEATURES)
 #include "chrome/browser/ui/webui/lens/lens_ui.h"
 #endif
 
@@ -422,10 +423,9 @@ void SetUpWebUIDataSource(WebUI* web_ui,
                           const char* web_ui_host,
                           base::span<const webui::ResourcePath> resources,
                           int default_resource) {
-  auto source = base::WrapUnique(content::WebUIDataSource::Create(web_ui_host));
-  webui::SetupWebUIDataSource(source.get(), resources, default_resource);
-  content::WebUIDataSource::Add(web_ui->GetWebContents()->GetBrowserContext(),
-                                source.release());
+  content::WebUIDataSource* source = content::WebUIDataSource::CreateAndAdd(
+      web_ui->GetWebContents()->GetBrowserContext(), web_ui_host);
+  webui::SetupWebUIDataSource(source, resources, default_resource);
 }
 
 // A function for creating a new WebUI. The caller owns the return value, which
@@ -984,7 +984,7 @@ WebUIFactoryFunction GetWebUIFactoryFunction(WebUI* web_ui,
   if (url.host_piece() == ash::kChromeUIScanningAppHost)
     return &NewWebUI<ash::ScanningUI>;
   if ((ash::shimless_rma::HasLaunchRmaSwitchAndIsAllowed() ||
-       ash::features::IsShimlessRMAStandaloneAppEnabled()) &&
+       ash::features::IsShimlessRMAFlowEnabled()) &&
       url.host_piece() == ash::kChromeUIShimlessRMAHost) {
     return &NewWebUI<ash::ShimlessRMADialogUI>;
   }
@@ -1223,7 +1223,7 @@ WebUIFactoryFunction GetWebUIFactoryFunction(WebUI* web_ui,
     return &NewWebUI<PrivacySandboxDialogUI>;
 #endif  // !BUILDFLAG(IS_ANDROID)
 
-#if !BUILDFLAG(IS_ANDROID) && BUILDFLAG(GOOGLE_CHROME_BRANDING)
+#if BUILDFLAG(ENABLE_LENS_DESKTOP_GOOGLE_BRANDED_FEATURES)
   if (url.host_piece() == chrome::kChromeUILensHost) {
     return &NewWebUI<LensUI>;
   }

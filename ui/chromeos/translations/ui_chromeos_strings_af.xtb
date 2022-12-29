@@ -144,6 +144,7 @@
 <translation id="2208919847696382164">Installeer met Linux</translation>
 <translation id="2225536596944493418">Is jy seker jy wil <ph name="NUMBER_OF_ITEMS" /> items uitvee?</translation>
 <translation id="2230062665678605299">Kon nie vouer "<ph name="FOLDER_NAME" />" skep nie. <ph name="ERROR_MESSAGE" /></translation>
+<translation id="2236732657580416950">Jou Google Drive-kasgeheue is uitgevee.</translation>
 <translation id="2239068707900391003">Persoon met koffie</translation>
 <translation id="2251368349685848079">Laai uit asblik terug</translation>
 <translation id="2282155092769082568">Outo-opstelling-URL:</translation>
@@ -677,6 +678,7 @@
 <translation id="6607272825297743757">Lêerinligting</translation>
 <translation id="6609332149380188670"><ph name="NUMBER_OF_ITEMS" /> vouers is met Parallels Desktop gedeel</translation>
 <translation id="6629518321609546825">Voer minstens 4 syfers in</translation>
+<translation id="6639661343369899134">Lêers kan nie opgelaai word nie omdat <ph name="SHARED_DRIVE_NAME" /> nie genoeg bergingspasie het nie.</translation>
 <translation id="6643016212128521049">Vee uit</translation>
 <translation id="6650726141019353908">Pienk skoenlapper</translation>
 <translation id="6657585470893396449">Wagwoord</translation>

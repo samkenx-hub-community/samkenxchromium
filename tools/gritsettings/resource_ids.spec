@@ -160,6 +160,10 @@
     "includes": [1400],
     "structures": [1420],
   },
+  "<(SHARED_INTERMEDIATE_DIR)/chrome/browser/resources/chromeos/lock_screen_reauth/resources.grd": {
+    "META": {"sizes": {"includes": [30]}},
+    "includes": [1430],
+  },
   "<(SHARED_INTERMEDIATE_DIR)/chrome/browser/resources/chromeos/login/oobe_unconditional_resources.grd": {
     "META": {"sizes": {"includes": [350]}},
     "includes": [1440],
@@ -284,7 +288,7 @@
     "includes": [1925],
   },
   "<(SHARED_INTERMEDIATE_DIR)/chrome/browser/resources/side_panel/customize_chrome/resources.grd": {
-    "META": {"sizes": {"includes": [30],}},
+    "META": {"sizes": {"includes": [35],}},
     "includes": [1930],
   },
   "<(SHARED_INTERMEDIATE_DIR)/chrome/browser/resources/side_panel/side_panel_resources.grd": {
@@ -322,9 +326,6 @@
   "<(SHARED_INTERMEDIATE_DIR)/chrome/browser/resources/welcome/resources.grd": {
     "META": {"sizes": {"includes": [60]}},
     "includes": [2060],
-  },
-  "chrome/browser/supervised_user/supervised_user_unscaled_resources.grd": {
-    "includes": [2080],
   },
   "chrome/browser/test_dummy/internal/android/resources/resources.grd": {
     "includes": [2100],
@@ -446,6 +447,10 @@
   },
   "components/resources/dev_ui_components_resources.grd": {
     "includes": [2560],
+  },
+  "<(SHARED_INTERMEDIATE_DIR)/content/browser/resources/attribution_reporting/resources.grd": {
+    "META": {"sizes": {"includes": [20]}},
+    "includes": [2565],
   },
   "<(SHARED_INTERMEDIATE_DIR)/content/browser/resources/indexed_db/resources.grd": {
     "META": {"sizes": {"includes": [20]}},
@@ -958,6 +963,10 @@
     "messages": [4380],
   },
 
+  "headless/app/headless_command.grd": {
+    "includes": [4410],
+  },
+
   "mojo/public/js/mojo_bindings_resources.grd": {
     "includes": [4420],
   },
@@ -1036,11 +1045,7 @@
   "ui/webui/examples/resources/webui_examples_resources.grd": {
     "messages": [4850],
   },
-  "ui/webui/resources/webui_resources.grd": {
-    "includes": [4860],
-    "structures": [4880],
-  },
-  "<(SHARED_INTERMEDIATE_DIR)/ui/webui/resources/webui_generated_resources.grd": {
+  "<(SHARED_INTERMEDIATE_DIR)/ui/webui/resources/webui_resources.grd": {
     "META": {"sizes": {"includes": [900]}},
     "includes": [4900],
   },
@@ -1053,7 +1058,7 @@
   "<(DEVTOOLS_GRD_PATH).grd": {
     # In debug build, devtools frontend sources are not bundled and therefore
     # includes a lot of individual resources
-    "META": {"sizes": {"includes": [2000],}},
+    "META": {"sizes": {"includes": [2100],}},
     "includes": [4940],
   },
 

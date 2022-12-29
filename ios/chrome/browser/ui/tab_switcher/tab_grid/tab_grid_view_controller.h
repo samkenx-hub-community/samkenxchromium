@@ -24,15 +24,17 @@ class GURL;
 @protocol IncognitoReauthCommands;
 @protocol IncognitoReauthConsumer;
 @class LayoutGuideCenter;
+@protocol PinnedTabsCollectionConsumer;
+@protocol PinnedTabsCommands;
 @protocol PopupMenuCommands;
 @protocol RecentTabsConsumer;
 @class RecentTabsTableViewController;
 @protocol TabCollectionConsumer;
 @protocol TabCollectionDragDropHandler;
+@protocol TabContextMenuProvider;
 @class TabGridViewController;
 @protocol ThumbStripCommands;
 @protocol ViewControllerTraitCollectionObserver;
-@protocol GridContextMenuProvider;
 
 // Configurations for tab grid pages.
 enum class TabGridPageConfiguration {
@@ -119,10 +121,13 @@ enum class TabGridPageConfiguration {
     id<TabCollectionConsumer, IncognitoReauthConsumer>
         incognitoTabsConsumer;
 @property(nonatomic, readonly) id<RecentTabsConsumer> remoteTabsConsumer;
+@property(nonatomic, readonly) id<PinnedTabsCollectionConsumer>
+    pinnedTabsConsumer;
 
 // Delegates send updates from the UI layer to the model layer.
 @property(nonatomic, weak) id<GridCommands> regularTabsDelegate;
 @property(nonatomic, weak) id<GridCommands> incognitoTabsDelegate;
+@property(nonatomic, weak) id<PinnedTabsCommands> pinnedTabsDelegate;
 
 // Handles drag and drop interactions that require the model layer.
 @property(nonatomic, weak) id<TabCollectionDragDropHandler>
@@ -160,9 +165,9 @@ enum class TabGridPageConfiguration {
     RecentTabsTableViewController* remoteTabsViewController;
 
 // Provides the context menu for the tabs on the grid.
-@property(nonatomic, weak) id<GridContextMenuProvider>
+@property(nonatomic, weak) id<TabContextMenuProvider>
     regularTabsContextMenuProvider;
-@property(nonatomic, weak) id<GridContextMenuProvider>
+@property(nonatomic, weak) id<TabContextMenuProvider>
     incognitoTabsContextMenuProvider;
 
 // The layout guide center to use to refer to the bottom toolbar.

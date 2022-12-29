@@ -293,7 +293,7 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
-<histogram name="OOBE.GaiaLoginTime" units="ms" expires_after="2023-04-16">
+<histogram name="OOBE.GaiaLoginTime" units="ms" expires_after="2023-06-18">
   <owner>dkuzmin@google.com</owner>
   <owner>cros-oac@google.com</owner>
   <summary>
@@ -616,6 +616,18 @@ chromium-metrics-reviews@google.com.
   <token key="OOBEScreenName_ExitReason" variants="OOBEScreenName_ExitReason"/>
 </histogram>
 
+<histogram name="OOBE.StepShownStatus.Multidevice-setup-screen.Skipped"
+    enum="OobeMultideviceScreenSkippedReason" expires_after="2023-11-01">
+  <owner>bhartmire@google.com</owner>
+  <owner>chromeos-cross-device-eng@google.com</owner>
+  <summary>
+    The reason why the Multidevice setup screen is skipped in OOBE. Recorded
+    when determining that the screen should be skipped. This metric breaks down
+    the &quot;Not shown&quot; bucket of
+    &quot;OOBE.StepShownStatus.Multidevice-setup-screen&quot;.
+  </summary>
+</histogram>
+
 <histogram name="OOBE.StepShownStatus.{OOBELegacyScreenName}"
     enum="BooleanShown" expires_after="never">
 <!-- expires-never: Core metric for monitoring OOBE flow regressions. -->
@@ -630,7 +642,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="OOBE.SyncConsentScreen.Behavior" enum="SyncConsentBehavior"
-    expires_after="2023-04-24">
+    expires_after="2023-06-25">
   <owner>osamafathy@google.com</owner>
   <owner>cros-oac@google.com</owner>
   <summary>
@@ -683,7 +695,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="OOBE.SyncConsentScreen.SyncEnabled" enum="BooleanEnabled"
-    expires_after="2023-04-24">
+    expires_after="2023-06-25">
   <owner>osamafathy@google.com</owner>
   <owner>cros-oac@google.com</owner>
   <summary>
@@ -704,7 +716,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="OOBE.UpdateScreen.StageTime.Check" units="ms"
-    expires_after="2023-04-16">
+    expires_after="2023-06-18">
   <owner>dkuzmin@google.com</owner>
   <owner>cros-oac@google.com</owner>
   <summary>
@@ -786,7 +798,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="OOBE.WelcomeScreen.A11yUserActions"
-    enum="WelcomeScreenA11yUserAction" expires_after="2023-04-16">
+    enum="WelcomeScreenA11yUserAction" expires_after="2023-06-25">
   <owner>dkuzmin@google.com</owner>
   <owner>cros-oac@google.com</owner>
   <summary>

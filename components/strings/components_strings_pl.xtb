@@ -1015,6 +1015,7 @@ Uruchamianie aplikacji może potrwać dłużej niż zwykle.</translation>
 <translation id="3532844647053365774"><ph name="HOST" /> chce korzystać z mikrofonu</translation>
 <translation id="3533328374079021623">Zestaw tac odbiorczych 5</translation>
 <translation id="3537165859691846083">Letter Plus</translation>
+<translation id="3542628208405253498">Obraz na karcie</translation>
 <translation id="3542768452570884558">Otwórz link w nowym oknie</translation>
 <translation id="3547746132308051926">20 x 24 cale</translation>
 <translation id="3550112004925580947">Branża turystyczna</translation>
@@ -1105,6 +1106,7 @@ Uruchamianie aplikacji może potrwać dłużej niż zwykle.</translation>
 <translation id="3745099705178523657">Po potwierdzeniu dane karty z Twojego konta Google zostaną udostępnione tej stronie.</translation>
 <translation id="3748148204939282805">Osoby atakujące na stronie <ph name="BEGIN_BOLD" /><ph name="SITE" /><ph name="END_BOLD" /> mogą podstępem nakłonić Cię do wykonania czynności niebezpiecznych takich jak zainstalowanie oprogramowania czy ujawnienie danych osobowych (na przykład haseł, numerów telefonów lub danych kart kredytowych). <ph name="BEGIN_LEARN_MORE_LINK" />Więcej informacji<ph name="END_LEARN_MORE_LINK" /></translation>
 <translation id="3748912308089554501">Branża lotnicza</translation>
+<translation id="3752543821772132562">Ignorowana, bo zasada <ph name="POLICY_NAME" /> nie jest skonfigurowana.</translation>
 <translation id="3754210790023674521">Wyłącz tryb obrazu w obrazie</translation>
 <translation id="3759461132968374835">Brak ostatnio zgłoszonych awarii. Awarie, które nastąpiły wówczas, gdy funkcja zgłaszania awarii była wyłączona, nie są tutaj wymienione.</translation>
 <translation id="3760561303380396507">Używać Windows Hello zamiast kodu CVC?</translation>
@@ -1164,6 +1166,7 @@ Uruchamianie aplikacji może potrwać dłużej niż zwykle.</translation>
 <translation id="3927932062596804919">Odmawiaj</translation>
 <translation id="393316646445601645">Internet i telekomunikacja</translation>
 <translation id="3939773374150895049">Używać WebAuthn zamiast kodu CVC?</translation>
+<translation id="3943857333388298514">Wklej</translation>
 <translation id="3946209740501886391">Zawsze pytaj na tej stronie</translation>
 <translation id="3947595700203588284">Może prosić o zgodę na połączenie z urządzeniami MIDI</translation>
 <translation id="3949571496842715403">Serwer nie mógł udowodnić, że należy do <ph name="DOMAIN" />. Jego certyfikat bezpieczeństwa nie określa alternatywnych nazw podmiotu. Może to być spowodowane błędną konfiguracją lub przechwyceniem połączenia przez atakującego.</translation>
@@ -2311,6 +2314,7 @@ Uruchamianie aplikacji może potrwać dłużej niż zwykle.</translation>
 <translation id="6890531741535756070">W witrynach korzystających z <ph name="PROVIDER_ORIGIN" /> do potwierdzania tożsamości używasz <ph name="DEVICE_LABEL" />. Możliwe, że ten dostawca przechowuje dane Twojej formy płatności. Możesz <ph name="BEGIN_LINK" />poprosić o ich usunięcie<ph name="END_LINK" />.</translation>
 <translation id="6891596781022320156">Ten poziom zasad nie jest obsługiwany.</translation>
 <translation id="6895330447102777224">Karta została potwierdzona</translation>
+<translation id="6896758677409633944">Kopiuj</translation>
 <translation id="6897140037006041989">Klient</translation>
 <translation id="6898699227549475383">Organizacja (O)</translation>
 <translation id="6899000063526916106">Wpisz <ph name="NUMBER_OF_DIGITS" />-cyfrowy kod</translation>
@@ -2678,6 +2682,7 @@ Dodatkowe informacje:
 <translation id="7716375162095500223">Jeszcze nie przesłany lub zignorowany</translation>
 <translation id="7716424297397655342">Nie można załadować tej strony z pamięci podręcznej</translation>
 <translation id="7723047071702270851">Edytuj kartę</translation>
+<translation id="7724603315864178912">Wytnij</translation>
 <translation id="7734285854693414638">Szybko utwórz nowy formularz w Formularzach Google</translation>
 <translation id="773466115871691567">Zawsze tłumacz strony, których językiem jest <ph name="SOURCE_LANGUAGE" /></translation>
 <translation id="7736959720849233795">Kopiuj adres linku</translation>
@@ -2714,6 +2719,7 @@ Dodatkowe informacje:
 <translation id="7815407501681723534">Znalezione <ph name="SEARCH_RESULTS" /> dla zapytania „<ph name="SEARCH_STRING" />”: <ph name="NUMBER_OF_RESULTS" /></translation>
 <translation id="7822320754433038727">Łowiectwo i strzelectwo</translation>
 <translation id="782886543891417279">Sieć Wi-Fi (<ph name="WIFI_NAME" />), której używasz, może wymagać otwarcia strony logowania.</translation>
+<translation id="7840103971441592723">Rozpoczęto wykonywanie zrzutu ekranu</translation>
 <translation id="7844689747373518809">{COUNT,plural, =0{Brak}=1{Jedna aplikacja (<ph name="EXAMPLE_APP_1" />)}=2{Dwie aplikacje (<ph name="EXAMPLE_APP_1" /> i <ph name="EXAMPLE_APP_2" />)}few{# aplikacje (<ph name="EXAMPLE_APP_1" />, <ph name="EXAMPLE_APP_2" /> <ph name="AND_MORE" />)}many{# aplikacji (<ph name="EXAMPLE_APP_1" />, <ph name="EXAMPLE_APP_2" /> <ph name="AND_MORE" />)}other{# aplikacji (<ph name="EXAMPLE_APP_1" />, <ph name="EXAMPLE_APP_2" /> <ph name="AND_MORE" />)}}</translation>
 <translation id="7855695075675558090"><ph name="TOTAL_LABEL" />: <ph name="FORMATTED_TOTAL_AMOUNT" /> <ph name="CURRENCY_CODE" /></translation>
 <translation id="7862185352068345852">Opuścić stronę?</translation>
@@ -2743,6 +2749,7 @@ Dodatkowe informacje:
 <translation id="7942349550061667556">Czerwony</translation>
 <translation id="7943397946612013052">Pobieranie jest zablokowane</translation>
 <translation id="7943893128817522649">Może prosić o zgodę na automatyczne pobieranie wielu plików</translation>
+<translation id="7946724693008564269">Wykryty język</translation>
 <translation id="7947285636476623132">Sprawdź rok ważności i spróbuj ponownie</translation>
 <translation id="7947813448670013867"><ph name="SEE_CHROME_TIPS_FOCUSED_FRIENDLY_MATCH_TEXT" />; naciśnij Tab, a potem Enter, aby poznać funkcje Chrome</translation>
 <translation id="7950027195171824198">Zarządzaj opcjami plików cookie w ustawieniach Chrome</translation>
@@ -2891,6 +2898,7 @@ Dodatkowe informacje:
 <translation id="8282947398454257691">Odczytywanie unikalnego identyfikatora Twojego urządzenia</translation>
 <translation id="8284769179630993263">Zarządzaj Bezpiecznym przeglądaniem i innymi opcjami w ustawieniach Chrome</translation>
 <translation id="8286036467436129157">Zaloguj się</translation>
+<translation id="8286799286781881307">W przypadku aplikacji dopuszczonych przez administratora możliwe są zrzuty wszystkich ekranów podłączonych do urządzenia. Te informacje mogą być przetwarzane lokalnie lub przesyłane na serwery organizacji.</translation>
 <translation id="8288807391153049143">Pokaż certyfikat</translation>
 <translation id="8289355894181816810">Jeśli nie masz pewności, co to oznacza, skontaktuj się z administratorem sieci.</translation>
 <translation id="8293206222192510085">Dodaj zakładkę</translation>
@@ -2917,6 +2925,7 @@ Dodatkowe informacje:
 <translation id="8355270400102541638">Lokalny kontekst awarii:</translation>
 <translation id="8363502534493474904">Wyłącz tryb samolotowy</translation>
 <translation id="8364627913115013041">Nie ustawiono.</translation>
+<translation id="836616551641291797">Dowiedz się więcej o sposobie zarządzania przeglądarką</translation>
 <translation id="8368001212524806591">Monitorowanie cen</translation>
 <translation id="8368027906805972958">Nieznane lub nieobsługiwane urządzenie (<ph name="DEVICE_ID" />)</translation>
 <translation id="8368476060205742148">Usługi Google Play</translation>

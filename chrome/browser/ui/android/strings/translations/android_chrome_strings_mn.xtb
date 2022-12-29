@@ -553,7 +553,6 @@
 <translation id="4045764304651014138">Ашиглалтын өгөгдөл</translation>
 <translation id="405399507749852140">Аль нэг сайт дээр үнэ буурсан тохиолдолд сэрэмжлүүлэг аваарай</translation>
 <translation id="4056223980640387499">Сепиа</translation>
-<translation id="4060598801229743805">Сонголт дэлгэцийн дээд хэсэгт байна</translation>
 <translation id="4062305924942672200">Хууль, эрх зүйн мэдээлэл</translation>
 <translation id="4072805772816336153">Дараа дахин оролдоно уу</translation>
 <translation id="4084682180776658562">Хадгалах</translation>
@@ -643,7 +642,6 @@ Tаны Google бүртгэл <ph name="BEGIN_LINK" />history.google.com<ph name
 <translation id="4554077758708533499">USB кабелиар холбогдсон</translation>
 <translation id="4558311620361989323">Веб хуудaсны товчлол</translation>
 <translation id="4561730552726921821">Бүртгэл амжилттай</translation>
-<translation id="4561979708150884304">Холболт алга</translation>
 <translation id="4565377596337484307">Нууц үгийг нуух</translation>
 <translation id="4572422548854449519">Удирдсан бүртгэл рүү нэвтэрнэ үү</translation>
 <translation id="4576892426230499203">Баталгаажуулалтын өөр сонголтыг туршиж үзнэ үү</translation>
@@ -668,7 +666,6 @@ Tаны Google бүртгэл <ph name="BEGIN_LINK" />history.google.com<ph name
 <translation id="4699172675775169585">Кэшлсэн дүрс ба файл</translation>
 <translation id="4719927025381752090">Орчуулахыг санал болгох</translation>
 <translation id="4720023427747327413"><ph name="PRODUCT_NAME" />-д нээлттэй</translation>
-<translation id="4720982865791209136">Chrome-г сайжруулахад тусална уу. <ph name="BEGIN_LINK" />Судалгаанд оролцоно уу<ph name="END_LINK" /></translation>
 <translation id="47217992755561375">Шилдэг сайтуудаа харах</translation>
 <translation id="4732120983431207637">Stack Unwinder</translation>
 <translation id="4736934858538408121">Виртуал карт</translation>
@@ -771,7 +768,6 @@ Tаны Google бүртгэл <ph name="BEGIN_LINK" />history.google.com<ph name
 <translation id="5184329579814168207">Chrome-д нээх</translation>
 <translation id="5191251636205085390">Гуравдагч талын күүкиг орлох зорилготой шинэ технологийн талаар мэдэж авч мөн хянаарай</translation>
 <translation id="5193988420012215838">Түр санах ой руу хуулсан</translation>
-<translation id="5199929503336119739">Ажлын профайл</translation>
 <translation id="5204967432542742771">Нууц үгээ оруулна уу</translation>
 <translation id="5206168361184759344">{FILE_COUNT,plural, =1{Файл татаж байна…}other{# файл татаж байна…}}</translation>
 <translation id="5210286577605176222">Өмнөх табад очих</translation>
@@ -1345,14 +1341,12 @@ Privacy Sandbox-н туршилт нь идэвхтэй хөгжүүлэлтэд
 <translation id="8221656072740924283">Үргэлжлүүлэх</translation>
 <translation id="8223642481677794647">Сувгийн картын цэс</translation>
 <translation id="8250920743982581267">Документ</translation>
-<translation id="825412236959742607">Энэ хуудас хэт их санах ой ашиглаж байгаа тул Chrome зарим агуулгыг устгасан болно.</translation>
 <translation id="8255617931166444521">Сайтууд нь зөвхөн өөрийн сайт дээр таны хөтчийн үйл ажиллагааг харахын тулд күүкиг тань ашиглах боломжтой</translation>
 <translation id="8259179246279078674">Урьдчилан ачаалсан хуудаснууд шифрлэгдсэн тул Google урьдчилан ачаалсан хуудасны контентын талаар ямар нэг зүйл мэдэж авахгүй. Google-н серверүүд ямар сайтуудыг нууцлалтайгаар урьдчилан ачаалсан болохыг мэдэж авна. Энэ мэдээллийг зөвхөн хуудаснуудыг урьдчилан ачаалахад ашигладаг бөгөөд таны Google Бүртгэлийн бусад мэдээлэлтэй холбодоггүй.</translation>
 <translation id="8260126382462817229">Дахин нэвтрэхээр оролдоно уу.</translation>
 <translation id="8261506727792406068">Устгах</translation>
 <translation id="82619448491672958">Бусад табыг харах</translation>
 <translation id="8266862848225348053">Байршлыг татах</translation>
-<translation id="8274165955039650276">Татаж авсан файлыг харах</translation>
 <translation id="8281886186245836920">Алгасах</translation>
 <translation id="8282297628636750033">Боломжтой бол сайтуудад бараан загварыг ашиглах</translation>
 <translation id="829672787777123339">Таны төхөөрөмжид холбогдож байна…</translation>
@@ -1516,7 +1510,6 @@ Privacy Sandbox-н туршилт нь идэвхтэй хөгжүүлэлтэд
 <translation id="9108808586816295166">Аюулгүй DNS нь үргэлж боломжтой биш байж болзошгүй</translation>
 <translation id="9128984223251192329">Privacy Sandbox сануулгыг тал хэмжээгээр нээсэн</translation>
 <translation id="9133397713400217035">Офлайн горимд судлах</translation>
-<translation id="9137013805542155359">Эх хувийг харуулах</translation>
 <translation id="9148126808321036104">Дансандаа дахин нэвтрэх</translation>
 <translation id="9158770349521403363">Зөвхөн контент хуваалцана уу</translation>
 <translation id="9159716826369098114"><ph name="TAB_COUNT" /> табтай табын бүлгийг шинэ дэвсгэр табын бүлгээр сэргээнэ үү.</translation>

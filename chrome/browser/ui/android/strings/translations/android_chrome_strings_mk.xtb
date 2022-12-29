@@ -517,6 +517,7 @@
 <translation id="3830886834687455630">Ажурирајте ги услугите на Google Play за да ги проверите вашите лозинки</translation>
 <translation id="3845098929839618392">Отвори во картичка „Инкогнито“</translation>
 <translation id="3856096718352044181">Потврдете дека ова е вистински давател на услуги или обидете се повторно подоцна</translation>
+<translation id="3858127568696903256">Овде ќе ги најдете содржините што ги следите</translation>
 <translation id="3858860766373142691">Име</translation>
 <translation id="3861633093716975811">Популарни видеа</translation>
 <translation id="3874520961715512166">Сајтот е отстранет</translation>
@@ -552,7 +553,6 @@
 <translation id="4045764304651014138">Податоци за користењето</translation>
 <translation id="405399507749852140">Добивајте предупредувања ако цената се намали на кој било сајт</translation>
 <translation id="4056223980640387499">Sepia</translation>
-<translation id="4060598801229743805">Достапни се опции речиси на врвот на екранот</translation>
 <translation id="4062305924942672200">Правни информации</translation>
 <translation id="4072805772816336153">Обидете се повторно подоцна</translation>
 <translation id="4084682180776658562">Обележувач</translation>
@@ -642,7 +642,6 @@
 <translation id="4554077758708533499">Поврзано со USB-кабел</translation>
 <translation id="4558311620361989323">Кратенки на веб-страница</translation>
 <translation id="4561730552726921821">Успешна регистрација</translation>
-<translation id="4561979708150884304">Нема интернет-врска</translation>
 <translation id="4565377596337484307">Сокриј ја лозинката</translation>
 <translation id="4572422548854449519">Најавете се на управувана сметка</translation>
 <translation id="4576892426230499203">Обидете се со друга опција за потврда</translation>
@@ -667,7 +666,6 @@
 <translation id="4699172675775169585">Кеширани слики и датотеки</translation>
 <translation id="4719927025381752090">Понудувај превод</translation>
 <translation id="4720023427747327413">Отвори во <ph name="PRODUCT_NAME" /></translation>
-<translation id="4720982865791209136">Помогнете да се подобри Chrome. <ph name="BEGIN_LINK" />Учествувајте во анкетата<ph name="END_LINK" /></translation>
 <translation id="47217992755561375">Видете ги вашите најдобри сајтови</translation>
 <translation id="4732120983431207637">Модул за продолжување претходни задачи</translation>
 <translation id="4736934858538408121">Виртуелна картичка</translation>
@@ -771,7 +769,6 @@
 <translation id="5184329579814168207">Отвори во Chrome</translation>
 <translation id="5191251636205085390">Дознајте за новите технологии што имаат за цел да ги заменат колачињата на трети лица и контролирајте ги</translation>
 <translation id="5193988420012215838">Копирано во привремената меморија</translation>
-<translation id="5199929503336119739">Работен профил</translation>
 <translation id="5204967432542742771">Внеси лозинка</translation>
 <translation id="5206168361184759344">{FILE_COUNT,plural, =1{Се презема датотека…}one{Се преземаат # датотека…}other{Се преземаат # датотеки…}}</translation>
 <translation id="5210286577605176222">Скокнете на претходната картичка</translation>
@@ -1345,14 +1342,12 @@
 <translation id="8221656072740924283">Продолжи</translation>
 <translation id="8223642481677794647">Мени на картичката за активност</translation>
 <translation id="8250920743982581267">Документи</translation>
-<translation id="825412236959742607">Страницава користи премногу меморија, па Chrome отстрани некои содржини.</translation>
 <translation id="8255617931166444521">Сајтовите може да ги користат колачињата само за да ја гледаат вашата активност од прелистувањето на сопствениот сајт</translation>
 <translation id="8259179246279078674">Бидејќи однапред вчитаните страници се шифрирани, Google нема да дознае ништо за нивните содржини. Серверите на Google ќе знаат кои сајтови се приватно вчитани однапред. Податоциве се користат само за вчитување на страниците однапред и не се поврзани со други податоци од вашата сметка на Google.</translation>
 <translation id="8260126382462817229">Обидете се да се најавите повторно</translation>
 <translation id="8261506727792406068">Избриши</translation>
 <translation id="82619448491672958">Видете ги другите картички</translation>
 <translation id="8266862848225348053">Локација за преземањата</translation>
-<translation id="8274165955039650276">Видете ги преземањата</translation>
 <translation id="8281886186245836920">Прескокни</translation>
 <translation id="8282297628636750033">Ако е можно, примени темна тема на сајтовите</translation>
 <translation id="829672787777123339">Се поврзуваме со уредот…</translation>
@@ -1516,7 +1511,6 @@
 <translation id="9108808586816295166">Безбедниот DNS можеби не е достапен во секое време</translation>
 <translation id="9128984223251192329">Потсетникот за Privacy Sandbox е отворен на половина екран</translation>
 <translation id="9133397713400217035">Истражете офлајн</translation>
-<translation id="9137013805542155359">Покажи оригинална страница</translation>
 <translation id="9148126808321036104">Најави се повторно</translation>
 <translation id="9158770349521403363">Сподели само содржини</translation>
 <translation id="9159716826369098114">Врати ја групата картички од <ph name="TAB_COUNT" /> картички како нова заднинска група картички.</translation>

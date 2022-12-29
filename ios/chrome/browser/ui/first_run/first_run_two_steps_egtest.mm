@@ -7,13 +7,17 @@
 #import "base/strings/sys_string_conversions.h"
 #import "components/policy/core/common/policy_loader_ios_constants.h"
 #import "components/policy/policy_constants.h"
+#import "components/signin/internal/identity_manager/account_capabilities_constants.h"
 #import "components/signin/ios/browser/features.h"
+#import "ios/chrome/browser/metrics/metrics_app_interface.h"
 #import "ios/chrome/browser/policy/policy_earl_grey_utils.h"
 #import "ios/chrome/browser/policy/policy_util.h"
+#import "ios/chrome/browser/signin/capabilities_types.h"
 #import "ios/chrome/browser/signin/fake_system_identity.h"
 #import "ios/chrome/browser/ui/authentication/signin_earl_grey.h"
 #import "ios/chrome/browser/ui/authentication/signin_earl_grey_ui_test_util.h"
 #import "ios/chrome/browser/ui/authentication/signin_matchers.h"
+#import "ios/chrome/browser/ui/bookmarks/bookmark_earl_grey.h"
 #import "ios/chrome/browser/ui/first_run/field_trial_constants.h"
 #import "ios/chrome/browser/ui/first_run/first_run_app_interface.h"
 #import "ios/chrome/browser/ui/first_run/first_run_constants.h"
@@ -81,6 +85,18 @@ id<GREYMatcher> GetSyncSettings() {
                     grey_ancestor(disclaimer), nil);
 }
 
+// Dismiss default browser promo.
+void DismissDefaultBrowserPromo() {
+  id<GREYMatcher> buttonMatcher = grey_allOf(
+      grey_ancestor(grey_accessibilityID(
+          first_run::kFirstRunDefaultBrowserScreenAccessibilityIdentifier)),
+      grey_accessibilityLabel(l10n_util::GetNSString(
+          IDS_IOS_FIRST_RUN_DEFAULT_BROWSER_SCREEN_SECONDARY_ACTION)),
+      nil);
+  [[[EarlGrey selectElementWithMatcher:buttonMatcher]
+      assertWithMatcher:grey_notNil()] performAction:grey_tap()];
+}
+
 }  // namespace
 
 // Test first run stages
@@ -93,6 +109,25 @@ id<GREYMatcher> GetSyncSettings() {
 - (void)setUp {
   [[self class] testForStartup];
   [super setUp];
+
+  // Because this test suite changes the state of Sync passwords, wait
+  // until the engine is initialized before startup.
+  [ChromeEarlGrey
+      waitForSyncEngineInitialized:NO
+                       syncTimeout:syncher::kSyncUKMOperationsTimeout];
+}
+
+- (void)tearDown {
+  [SigninEarlGrey signOut];
+
+  // Tests that use `addBookmarkWithSyncPassphrase` must ensure that Sync
+  // data is cleared before tear down to reset the Sync password state.
+  [ChromeEarlGrey
+      waitForSyncEngineInitialized:NO
+                       syncTimeout:syncher::kSyncUKMOperationsTimeout];
+  [ChromeEarlGrey clearSyncServerData];
+
+  [super tearDown];
 }
 
 - (AppLaunchConfiguration)appConfigurationForTestCase {
@@ -112,8 +147,6 @@ id<GREYMatcher> GetSyncSettings() {
       std::string(signin::kNewMobileIdentityConsistencyFRE.name) +
       ".Test:" + std::string(kNewMobileIdentityConsistencyFREParam) + "/" +
       kNewMobileIdentityConsistencyFREParamTwoSteps);
-  // Disable default browser promo.
-  config.features_disabled.push_back(kEnableFREDefaultBrowserPromoScreen);
   // Show the First Run UI at startup.
   config.additional_args.push_back("-FirstRunForceEnabled");
   config.additional_args.push_back("true");
@@ -320,6 +353,10 @@ id<GREYMatcher> GetSyncSettings() {
                        kPromoStyleScrollViewAccessibilityIdentifier]
       performAction:grey_tap()];
   // Accept sync.
+  [[EarlGrey selectElementWithMatcher:
+                 grey_accessibilityID(
+                     first_run::kFirstRunSyncScreenAccessibilityIdentifier)]
+      assertWithMatcher:grey_notNil()];
   [[self
       elementInteractionWithGreyMatcher:PromoStylePrimaryActionButtonMatcher()
                    scrollViewIdentifier:
@@ -332,6 +369,7 @@ id<GREYMatcher> GetSyncSettings() {
   // Check signed in.
   [SigninEarlGrey verifySignedInWithFakeIdentity:fakeIdentity];
   // Check sync is on.
+  DismissDefaultBrowserPromo();
   [ChromeEarlGreyUI openSettingsMenu];
   [SigninEarlGrey verifySyncUIEnabled:YES];
 }
@@ -351,6 +389,10 @@ id<GREYMatcher> GetSyncSettings() {
                        kPromoStyleScrollViewAccessibilityIdentifier]
       performAction:grey_tap()];
   // Accept sync.
+  [[EarlGrey selectElementWithMatcher:
+                 grey_accessibilityID(
+                     first_run::kFirstRunSyncScreenAccessibilityIdentifier)]
+      assertWithMatcher:grey_notNil()];
   [[self
       elementInteractionWithGreyMatcher:PromoStylePrimaryActionButtonMatcher()
                    scrollViewIdentifier:
@@ -363,6 +405,7 @@ id<GREYMatcher> GetSyncSettings() {
   // Check signed in.
   [SigninEarlGrey verifySignedInWithFakeIdentity:fakeIdentity];
   // Check sync is on.
+  DismissDefaultBrowserPromo();
   [ChromeEarlGreyUI openSettingsMenu];
   [SigninEarlGrey verifySyncUIEnabled:YES];
 }
@@ -394,6 +437,7 @@ id<GREYMatcher> GetSyncSettings() {
   // Check signed in.
   [SigninEarlGrey verifySignedInWithFakeIdentity:fakeIdentity];
   // Check sync is off.
+  DismissDefaultBrowserPromo();
   [ChromeEarlGreyUI openSettingsMenu];
   [SigninEarlGrey verifySyncUIEnabled:NO];
 }
@@ -442,6 +486,10 @@ id<GREYMatcher> GetSyncSettings() {
   GREYAssertFalse([FirstRunAppInterface isSyncFirstSetupComplete],
                   @"Sync shouldn't start when discarding advanced settings.");
   // Accept sync.
+  [[EarlGrey selectElementWithMatcher:
+                 grey_accessibilityID(
+                     first_run::kFirstRunSyncScreenAccessibilityIdentifier)]
+      assertWithMatcher:grey_notNil()];
   [[self
       elementInteractionWithGreyMatcher:PromoStylePrimaryActionButtonMatcher()
                    scrollViewIdentifier:
@@ -454,6 +502,7 @@ id<GREYMatcher> GetSyncSettings() {
   // Check signed in.
   [SigninEarlGrey verifySignedInWithFakeIdentity:fakeIdentity];
   // Check sync is on.
+  DismissDefaultBrowserPromo();
   [ChromeEarlGreyUI openSettingsMenu];
   [ChromeEarlGreyUI
       tapSettingsMenuButton:chrome_test_util::ManageSyncSettingsButton()];
@@ -509,12 +558,17 @@ id<GREYMatcher> GetSyncSettings() {
                  chrome_test_util::AdvancedSyncSettingsDoneButtonMatcher()]
       performAction:grey_tap()];
   // Accept sync.
+  [[EarlGrey selectElementWithMatcher:
+                 grey_accessibilityID(
+                     first_run::kFirstRunSyncScreenAccessibilityIdentifier)]
+      assertWithMatcher:grey_notNil()];
   [[self
       elementInteractionWithGreyMatcher:PromoStylePrimaryActionButtonMatcher()
                    scrollViewIdentifier:
                        kPromoStyleScrollViewAccessibilityIdentifier]
       performAction:grey_tap()];
   // Check sync is on.
+  DismissDefaultBrowserPromo();
   [ChromeEarlGreyUI openSettingsMenu];
   [SigninEarlGrey verifySyncUIEnabled:YES];
 }
@@ -559,6 +613,10 @@ id<GREYMatcher> GetSyncSettings() {
                        kPromoStyleScrollViewAccessibilityIdentifier]
       performAction:grey_tap()];
   // Accept sync.
+  [[EarlGrey selectElementWithMatcher:
+                 grey_accessibilityID(
+                     first_run::kFirstRunSyncScreenAccessibilityIdentifier)]
+      assertWithMatcher:grey_notNil()];
   [[self
       elementInteractionWithGreyMatcher:PromoStylePrimaryActionButtonMatcher()
                    scrollViewIdentifier:
@@ -571,6 +629,7 @@ id<GREYMatcher> GetSyncSettings() {
   // Check signed in.
   [SigninEarlGrey verifySignedInWithFakeIdentity:fakeIdentity];
   // Check sync is on.
+  DismissDefaultBrowserPromo();
   [ChromeEarlGreyUI openSettingsMenu];
   [SigninEarlGrey verifySyncUIEnabled:YES];
   // Close settings.
@@ -607,6 +666,7 @@ id<GREYMatcher> GetSyncSettings() {
   // Check signed in.
   [SigninEarlGrey verifySignedInWithFakeIdentity:fakeIdentity];
   // Check sync is on.
+  DismissDefaultBrowserPromo();
   [ChromeEarlGreyUI openSettingsMenu];
   [SigninEarlGrey verifySyncUIEnabled:NO];
   // Close settings.
@@ -637,6 +697,7 @@ id<GREYMatcher> GetSyncSettings() {
   // Check signed in.
   [SigninEarlGrey verifySignedInWithFakeIdentity:fakeIdentity];
   // Check sync is on.
+  DismissDefaultBrowserPromo();
   [ChromeEarlGreyUI openSettingsMenu];
   [SigninEarlGrey verifySyncUIEnabled:NO];
 }
@@ -681,6 +742,10 @@ id<GREYMatcher> GetSyncSettings() {
                  chrome_test_util::AdvancedSyncSettingsDoneButtonMatcher()]
       performAction:grey_tap()];
   // Accept sync.
+  [[EarlGrey selectElementWithMatcher:
+                 grey_accessibilityID(
+                     first_run::kFirstRunSyncScreenAccessibilityIdentifier)]
+      assertWithMatcher:grey_notNil()];
   [[self
       elementInteractionWithGreyMatcher:PromoStylePrimaryActionButtonMatcher()
                    scrollViewIdentifier:
@@ -693,6 +758,7 @@ id<GREYMatcher> GetSyncSettings() {
   // Check signed in.
   [SigninEarlGrey verifySignedInWithFakeIdentity:fakeIdentity];
   // Check sync is on.
+  DismissDefaultBrowserPromo();
   [ChromeEarlGreyUI openSettingsMenu];
   [SigninEarlGrey verifySyncUIEnabled:YES];
 }
@@ -741,6 +807,10 @@ id<GREYMatcher> GetSyncSettings() {
                        kPromoStyleScrollViewAccessibilityIdentifier]
       performAction:grey_tap()];
   // Accept sync.
+  [[EarlGrey selectElementWithMatcher:
+                 grey_accessibilityID(
+                     first_run::kFirstRunSyncScreenAccessibilityIdentifier)]
+      assertWithMatcher:grey_notNil()];
   [[self
       elementInteractionWithGreyMatcher:PromoStylePrimaryActionButtonMatcher()
                    scrollViewIdentifier:
@@ -752,6 +822,62 @@ id<GREYMatcher> GetSyncSettings() {
       @"kMetricsReportingEnabled pref was unexpectedly true by default.");
   // Check signed in.
   [SigninEarlGrey verifySignedInWithFakeIdentity:fakeIdentity];
+}
+
+#pragma mark - Supervised User
+
+// Tests FRE with UMA default value and with sign-in for a supervised user.
+- (void)testWithUMACheckedAndSigninSupervised {
+  AppLaunchConfiguration configToSetSupervision =
+      self.appConfigurationForTestCase;
+  configToSetSupervision.features_enabled.push_back(
+      signin::kEnableUnicornAccountSupport);
+
+  // Relaunch the app to take the configuration into account.
+  [[AppLaunchManager sharedManager]
+      ensureAppLaunchedWithConfiguration:configToSetSupervision];
+
+  // Add a fake supervised identity to the device.
+  FakeSystemIdentity* fakeSupervisedIdentity =
+      [FakeSystemIdentity fakeIdentity1];
+  [SigninEarlGrey addFakeIdentity:fakeSupervisedIdentity];
+
+  ios::CapabilitiesDict* capabilities = @{
+    @(kIsSubjectToParentalControlsCapabilityName) :
+        @(static_cast<int>(SystemIdentityCapabilityResult::kTrue))
+  };
+  [SigninEarlGrey setCapabilities:capabilities
+                      forIdentity:fakeSupervisedIdentity];
+
+  // Verify 2 step FRE.
+  [self verifyEnterpriseWelcomeScreenIsDisplayedWithFRESigninIntent:
+            FRESigninIntentRegular];
+  // Accept sign-in.
+  [[self
+      elementInteractionWithGreyMatcher:PromoStylePrimaryActionButtonMatcher()
+                   scrollViewIdentifier:
+                       kPromoStyleScrollViewAccessibilityIdentifier]
+      performAction:grey_tap()];
+  // Accept sync.
+  [[EarlGrey selectElementWithMatcher:
+                 grey_accessibilityID(
+                     first_run::kFirstRunSyncScreenAccessibilityIdentifier)]
+      assertWithMatcher:grey_notNil()];
+  [[self
+      elementInteractionWithGreyMatcher:PromoStylePrimaryActionButtonMatcher()
+                   scrollViewIdentifier:
+                       kPromoStyleScrollViewAccessibilityIdentifier]
+      performAction:grey_tap()];
+  // Check that UMA is on.
+  GREYAssertTrue(
+      [FirstRunAppInterface isUMACollectionEnabled],
+      @"kMetricsReportingEnabled pref was unexpectedly false by default.");
+  // Check signed in.
+  [SigninEarlGrey verifySignedInWithFakeIdentity:fakeSupervisedIdentity];
+  // Check sync is on.
+  DismissDefaultBrowserPromo();
+  [ChromeEarlGreyUI openSettingsMenu];
+  [SigninEarlGrey verifySyncUIEnabled:YES];
 }
 
 #pragma mark - Helper

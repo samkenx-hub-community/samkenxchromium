@@ -553,7 +553,6 @@
 <translation id="4045764304651014138">ຂໍ້ມູນການນຳໃຊ້</translation>
 <translation id="405399507749852140">ຮັບການແຈ້ງເຕືອນຫາກມີການຫຼຸດລາຄາຢູ່ເວັບໄຊໃດກໍຕາມ</translation>
 <translation id="4056223980640387499">ສີນໍ້າຕານດໍາ</translation>
-<translation id="4060598801229743805">ຕົວເລືອກຕ່າງໆມີໃຫ້ນຳໃຊ້ຢູ່ໃກ້ສ່ວນເທິງຂອງໜ້າຈໍ</translation>
 <translation id="4062305924942672200">ຂໍ້​ມູນ​ທາງດ້ານ​ກົດ​ຫມາຍ</translation>
 <translation id="4072805772816336153">ລອງໃໝ່ໃນພາຍຫລັງ</translation>
 <translation id="4084682180776658562">ບຸກມາກຄ໌</translation>
@@ -643,7 +642,6 @@
 <translation id="4554077758708533499">ເຊື່ອມຕໍ່ກັບສາຍ USB</translation>
 <translation id="4558311620361989323">ທາງລັດໜ້າເວັບ</translation>
 <translation id="4561730552726921821">ລົງທະບຽນສຳເລັດແລ້ວ</translation>
-<translation id="4561979708150884304">ບໍ່ມີການເຊື່ອມຕໍ່</translation>
 <translation id="4565377596337484307">ເຊື່ອງລະຫັດຜ່ານ</translation>
 <translation id="4572422548854449519">ເຂົ້າສູ່ລະບົບບັນຊີທີ່ມີການຈັດການ</translation>
 <translation id="4576892426230499203">ກະລຸນາລອງໃຊ້ຕົວເລືອກການຢັ້ງຢືນອື່ນໆ</translation>
@@ -668,7 +666,6 @@
 <translation id="4699172675775169585">ຮູບ ແລະໄຟລ໌ທີ່ແຄຊ໌ແລ້ວ</translation>
 <translation id="4719927025381752090">ໃຫ້ການແປພາສາ</translation>
 <translation id="4720023427747327413">ເປີດ​ຢູ່​ໃນ <ph name="PRODUCT_NAME" /></translation>
-<translation id="4720982865791209136">ຊ່ວຍປັບປຸງ Chrome. <ph name="BEGIN_LINK" />ເຮັດການສຳຫຼວດ<ph name="END_LINK" /></translation>
 <translation id="47217992755561375">ເບິ່ງເວັບໄຊຍອດນິຍົມຂອງທ່ານ</translation>
 <translation id="4732120983431207637">ຕົວມາຍສະແຕັກ</translation>
 <translation id="4736934858538408121">ບັດສະເໝືອນ</translation>
@@ -772,7 +769,6 @@
 <translation id="5184329579814168207">ເປີດ​ຢູ່ໃນ Chrome</translation>
 <translation id="5191251636205085390">ສຶກສາກ່ຽວກັບ ແລະ ຄວບຄຸມເທັກໂນໂລຢີໃໝ່ທີ່ມີຈຸດປະສົງປ່ຽນແທນຄຸກກີ້ພາກສ່ວນທີສາມ</translation>
 <translation id="5193988420012215838">ອັດສຳເນົາໃສ່ຄລິບບອດຂອງທ່ານ</translation>
-<translation id="5199929503336119739">ໂປຣໄຟລ໌ບ່ອນເຮັດວຽກ</translation>
 <translation id="5204967432542742771">ໃສ່​ລະ​ຫັດ​ຜ່ານ</translation>
 <translation id="5206168361184759344">{FILE_COUNT,plural, =1{ກຳລັງດາວໂຫຼດໄຟລ໌…}other{ກຳລັງດາວໂຫຼດ # ໄຟລ໌…}}</translation>
 <translation id="5210286577605176222">ໂດດໄປຫາແຖບກ່ອນນີ້</translation>
@@ -1346,14 +1342,12 @@
 <translation id="8221656072740924283">ສືບຕໍ່</translation>
 <translation id="8223642481677794647">ເມນູບັດຟີດ</translation>
 <translation id="8250920743982581267">ເອກະສານ</translation>
-<translation id="825412236959742607">ໜ້ານີ້ໃຊ້ເງິນຫຼາຍເກີນໄປ, ສະນັ້ນ Chrome ໄດ້ລຶບບາງເນື້ອຫາອອກແລ້ວ.</translation>
 <translation id="8255617931166444521">ເວັບໄຊຕ່າງໆສາມາດໃຊ້ຄຸກກີ້ຂອງທ່ານເພື່ອເບິ່ງການເຄື່ອນໄຫວການທ່ອງເວັບຂອງທ່ານຢູ່ເວັບໄຊຂອງພວກມັນໄດ້ເທົ່ານັ້ນ</translation>
 <translation id="8259179246279078674">ເນື່ອງຈາກໜ້າທີ່ໂຫຼດກ່ອນລ່ວງໜ້ານັ້ນມີການເຂົ້າລະຫັດໄວ້, Google ຈະບໍ່ສຶກສາສິ່ງໃດກໍຕາມກ່ຽວກັບເນື້ອຫາຂອງໜ້າທີ່ໂຫຼດກ່ອນລ່ວງໜ້າ. ເຊີບເວີ Google ຈະສຶກສາວ່າເວັບໄຊໃດໂຫຼດກ່ອນລ່ວງໜ້າເປັນການສ່ວນຕົວ. ຂໍ້ມູນນີ້ແມ່ນຖືກໃຊ້ເພື່ອໂຫຼດໜ້າໄວ້ກ່ອນລ່ວງໜ້າເທົ່ານັ້ນ ແລະ ຈະບໍ່ລິ້ງໄປຫາຂໍ້ມູນອື່ນຈາກບັນຊີ Google ຂອງທ່ານ.</translation>
 <translation id="8260126382462817229">ລອງເຂົ້າສູ່ລະບົບອີກຄັ້ງ</translation>
 <translation id="8261506727792406068">ລຶບ</translation>
 <translation id="82619448491672958">ເບິ່ງແຖບອື່ນໆ</translation>
 <translation id="8266862848225348053">ບ່ອນບັນທຶກການດາວໂຫຼດ</translation>
-<translation id="8274165955039650276">ເບິ່ງການດາວໂຫຼດ</translation>
 <translation id="8281886186245836920">ຂ້າມ</translation>
 <translation id="8282297628636750033">ນຳໃຊ້ຮູບແບບສີສັນມືດໃສ່ເວັບໄຊ, ເມື່ອເປັນໄປໄດ້.</translation>
 <translation id="829672787777123339">ກຳລັງເຊື່ອມຕໍ່ກັບອຸປະກອນຂອງທ່ານ…</translation>
@@ -1517,7 +1511,6 @@
 <translation id="9108808586816295166">DNS ທີ່ປອດໄພອາດຈະບໍ່ສາມາດໃຊ້ໄດ້ຕະຫຼອດເວລາ</translation>
 <translation id="9128984223251192329">ເປີດກ່ອງຂໍ້ຄວາມ Privacy Sandbox ແບບເຄິ່ງຄວາມສູງແລ້ວ</translation>
 <translation id="9133397713400217035">ສຳຫຼວດອອບລາຍ</translation>
-<translation id="9137013805542155359">ສະແດງຕົ້ນສະບັບ</translation>
 <translation id="9148126808321036104">ລົງຊື່ເຂົ້າ​ໃຊ້ອີກ</translation>
 <translation id="9158770349521403363">ແບ່ງປັນເນື້ອຫາເທົ່ານັ້ນ</translation>
 <translation id="9159716826369098114">ກູ້ຄືນກຸ່ມແຖບຂອງ <ph name="TAB_COUNT" /> ແຖບເປັນກຸ່ມແຖບໃນພື້ນຫຼັງໃໝ່.</translation>

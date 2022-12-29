@@ -509,11 +509,6 @@ Wenn du diese Richtlinie deaktivierst, wird das Scrollen zu bestimmten Textfragm
       </translation>
 <translation id="1484190167468437592">Mono-Audio deaktivieren</translation>
 <translation id="1486021504508098388">Informationen zur Hintergrundbeleuchtung ausgeben</translation>
-<translation id="1486469502848499602">Ändert die vorgeschlagene <ph name="KRB5_CONFIG" />-Konfiguration für die neuen, manuell erstellten Tickets.
-
-      Wenn die Richtlinie konfiguriert ist, wird ihr Wert als die vorgeschlagene Konfiguration angewendet und im Authentifizierungsdialogfeld im Bereich „Erweitert“ angezeigt.
-
-      Wenn die Richtlinie nicht konfiguriert ist, wird stattdessen die empfohlene <ph name="PRODUCT_OS_NAME" />-Konfiguration angewendet. Sie wird auch im Authentifizierungsdialogfeld im Bereich „Erweitert“ angezeigt.</translation>
 <translation id="1487722536912664411">Nutzern erlauben, <ph name="PRODUCT_NAME" /> zu verwenden</translation>
 <translation id="1487916040416013623">Wenn diese Richtlinie konfiguriert ist, wird festgelegt, welche Server für die integrierte Authentifizierung zulässig sind. Die integrierte Authentifizierung wird nur dann aktiviert, wenn <ph name="PRODUCT_NAME" /> eine Authentifizierungsaufforderung von einem Proxy oder einem Server erhält, der sich in dieser Liste zulässiger Programme befindet.
 
@@ -588,6 +583,7 @@ Wenn du diese Richtlinie deaktivierst, wird das Scrollen zu bestimmten Textfragm
 <translation id="1560279917909364275">Auf dem <ph name="PRODUCT_OS_NAME" />-Sperrbildschirm zulässige Notizen-Apps auf die Zulassungsliste setzen</translation>
 <translation id="1561424797596341174">Überschreiben von Richtlinien für Fehlerbehebungs-Builds des Hosts für den Remotezugriff</translation>
 <translation id="1561967320164410511">U2F plus Erweiterungen zur individuellen Bestätigung</translation>
+<translation id="1562846754315919408">Benachrichtigen, wenn USB-Geräte erkannt werden</translation>
 <translation id="1567718448549957373">Wenn die Richtlinie aktiviert oder nicht konfiguriert ist, sind <ph name="BASIC_AUTH" />-Authentifizierungsherausforderungen zulässig, die über nicht sicheres HTTP empfangen wurden.
 
       Ist diese Richtlinie deaktiviert, dürfen nicht sichere HTTP-Anfragen das <ph name="BASIC_AUTH" />-Authentifizierungsschema nicht verwenden; nur HTTPS ist zulässig.
@@ -990,6 +986,7 @@ Diese Richtlinie hat keine Auswirkungen, wenn die Option zum Beibehalten von bes
 
       Wenn diese Richtlinie zusammen mit „<ph name="DOWNLOAD_RESTRICTIONS_POLICY_NAME" />“ aktiviert ist und gefährliche Dateitypen über „DownloadRestrictions“ blockiert werden, haben die Einstellungen von „DownloadRestrictions“ Priorität. Angenommen, Downloads von „exe“-Dateien von website1.com werden über diese Richtlinie zugelassen, „DownloadRestrictions“ ist aber so konfiguriert, dass schädliche Downloads und gefährliche Dateitypen blockiert werden. In diesem Fall werden Downloads von „exe“-Dateien für alle Domains blockiert. Werden gefährliche Dateitypen nicht über „DownloadRestrictions“ blockiert, werden keine erweiterungsbasierten Warnungen beim Herunterladen der in dieser Richtlinie festgelegten Dateitypen von den angegebenen Domains ausgegeben. Weitere Informationen zu „DownloadRestrictions“ findest du unter https://chromeenterprise.google/policies/?policy=DownloadRestrictions.</translation>
 <translation id="1954612656043024615">Die Funktion „Geteilte Zwischenablage“ aktivieren</translation>
+<translation id="1960059835237529462">Nutzern wird die Werbung für Bewertungen im App Store von <ph name="IOS_NAME" /> angezeigt</translation>
 <translation id="1960416154405676350"><ph name="GOOGLE_LENS_PRODUCT_NAME" />-Ausschnittsuche aktivieren.</translation>
 <translation id="1961091374249454164">Die Richtlinie wird nur auf verwaltete Gastsitzungen angewendet.
       Wenn die Richtlinie konfiguriert ist, wird eine Liste mit Erweiterungs-IDs angegeben, die von der Bereinigung der eingeschränkten verwalteten Gastsitzungen ausgenommen sind (siehe „<ph name="DEVICE_RESTRICTED_MANAGED_GUEST_SESSION_ENABLED_POLICY_NAME" />“).
@@ -1315,9 +1312,6 @@ Diese Richtlinie hat keine Auswirkungen, wenn die Option zum Beibehalten von bes
       Diese Richtlinie überschreibt <ph name="DEFAULT_SERIAL_GUARD_SETTING_POLICY_NAME" />, <ph name="SERIAL_ASK_FOR_URLS_POLICY_NAME" />, <ph name="SERIAL_BLOCKED_FOR_URLS_POLICY_NAME" /> und die Nutzereinstellungen.
 
       Sie wirkt sich nur auf den Zugriff auf USB-Geräte über die Web Serial API aus. Sieh dir für die Gewährung des Zugriffs auf USB-Geräte über die WebUSB API die Richtlinie <ph name="WEB_USB_ALLOW_DEVICES_FOR_URLS_POLICY_NAME" /> an.</translation>
-<translation id="2246011554082893079">Steuert die Verfügbarkeit von <ph name="BOREALIS_NAME" /> für dieses Gerät.
-
-      Wenn die Richtlinie auf „false“ gesetzt ist, steht <ph name="BOREALIS_NAME" /> Nutzern dieses Geräts nicht zur Verfügung. Wenn die Richtlinie nicht konfiguriert oder auf „true“ gesetzt ist, ist <ph name="BOREALIS_NAME" /> verfügbar, sofern die Richtlinie nicht durch eine andere Richtlinie oder Einstellung außer Kraft gesetzt wird.</translation>
 <translation id="2246621891161157804">Chrome erlauben, das Aufrufen externer Protokolle in einem Sandbox-iFrame zu blockieren</translation>
 <translation id="224750967938323855">Einwilligung zur Synchronisierung während der Anmeldung nicht anzeigen</translation>
 <translation id="2252400912879027343">WebSQL bleibt in nicht sicheren Kontexten bis M109 verfügbar und ist dann ab M110 nicht mehr verfügbar.</translation>
@@ -2080,6 +2074,7 @@ Wenn die Richtlinie nicht konfiguriert ist, kann <ph name="PRODUCT_OS_NAME" /> g
       Wenn die Richtlinie auf „false“ gesetzt ist, steht <ph name="BOREALIS_NAME" /> nicht zur Verfügung. Wenn die Richtlinie nicht konfiguriert oder auf „true“ gesetzt ist, ist <ph name="BOREALIS_NAME" /> verfügbar, sofern die Richtlinie nicht durch eine andere Richtlinie oder Einstellung außer Kraft gesetzt wird.</translation>
 <translation id="2964373560810620158">Verhindern, dass Nutzer den <ph name="LACROS_NAME" />-Browser verwenden</translation>
 <translation id="2968177167006045252">Websites die Nutzung von „SharedArrayBuffers“ erlauben</translation>
+<translation id="2969489219271682844">Nicht benachrichtigen, wenn USB-Geräte erkannt werden</translation>
 <translation id="2969568582351417848">Erweiterungsbasierte Warnungen beim Herunterladen bestimmter Dateitypen von bestimmten Domains deaktivieren</translation>
 <translation id="2969797921412053304">Mit dieser Richtlinie wird festgelegt, welche URLs während des SAML-Flows auf dem Anmeldebildschirm die Remote-Attestierung der Geräteidentität verwenden dürfen.
 
@@ -2091,6 +2086,7 @@ Wenn die Richtlinie nicht konfiguriert ist, kann <ph name="PRODUCT_OS_NAME" /> g
 
       Genaue Informationen zu gültigen URL-Mustern findest du unter https://cloud.google.com/docs/chrome-enterprise/policies/url-patterns.</translation>
 <translation id="2976429807269247880">Einstellungen für das Verhalten des alten „<ph name="ATTRIBUTE_SAMESITE_NAME" />“-Cookies</translation>
+<translation id="2979696534869541158">Alte Implementierung erzwingen</translation>
 <translation id="2985927503455169394">Standardmodus für das Einrichten von Assistant verwenden</translation>
 <translation id="2987155890997901449">ARC aktivieren</translation>
 <translation id="2987227569419001736">Verwendung der Web Bluetooth API steuern</translation>
@@ -2228,6 +2224,7 @@ Dieses Verhalten entspricht <ph name="POLICY_VALUE_PRIMARY_ACCOUNT_KEEP_EXISTING
 <translation id="3092059499596000593">Systemstandarddrucker als Standardeinstellung in der Druckvorschau verwenden</translation>
 <translation id="309416443108680956">Legt fest, was passiert, wenn ein Nutzer der sich über ein Sicherheitstoken (z. B. mit einer Smartcard) authentifiziert hat, dieses Token während einer Sitzung entfernt. <ph name="SECURITY_TOKEN_SESSION_BEHAVIOR_IGNORE" />: Es geschieht gar nichts. <ph name="SECURITY_TOKEN_SESSION_BEHAVIOR_LOCK" />: Der Bildschirm ist gesperrt, bis der Nutzer noch einmal eine Authentifizierung durchführt. <ph name="SECURITY_TOKEN_SESSION_BEHAVIOR_LOGOUT" />: Die Sitzung wird beendet und der Nutzer abgemeldet. Ist die Richtlinie nicht festgelegt, ist standardmäßig <ph name="SECURITY_TOKEN_SESSION_BEHAVIOR_IGNORE" /> ausgewählt.</translation>
 <translation id="3096595567015595053">Liste der aktivierten Plug-ins</translation>
+<translation id="309885424548342662">Microsoft®-Cloudauthentifizierung aktivieren</translation>
 <translation id="3101035417394748390">Die maximale Größe in Byte, die zwischen dem Client und dem Host über die Synchronisierung der Zwischenablage übertragen werden kann</translation>
 <translation id="3101501961102569744">Auswählen, wie Proxyserver-Einstellungen angegeben werden</translation>
 <translation id="3101709781009526431">Datum und Uhrzeit</translation>
@@ -2292,6 +2289,8 @@ Diese Richtlinie ist vorübergehend und wird zukünftig entfernt.</translation>
 
       Für diese Richtlinie sind zusätzliche Einrichtungen nötig. Weitere Informationen dazu findest du unter https://support.google.com/chrome/a?p=chrome_enterprise_connector_policies_setting.</translation>
 <translation id="3159375329008977062">Nutzer darf Crostini-Container über die Benutzeroberfläche exportieren/importieren</translation>
+<translation id="3163167792874598128">Wenn die Richtlinie nicht konfiguriert oder aktiviert ist, wird dem Nutzer die Werbung für App Store-Bewertungen maximal einmal pro Jahr angezeigt.
+Ist die Richtlinie deaktiviert, wird dem Nutzer die Werbung für App Store-Bewertungen nicht angezeigt.</translation>
 <translation id="3164531087779621747">Im PostScript-Modus drucken</translation>
 <translation id="3165468162820163252">Mit dieser Richtlinie wird festgelegt, ob der WebUI-Abschnitt des Anmeldebildschirms immer beim Start geladen wird oder erst kurz bevor er eingeblendet wird. Diese Richtlinie gilt für den Anmeldebildschirm.
 
@@ -2601,6 +2600,11 @@ Unter <ph name="MS_WIN_NAME" /> ist diese Funktion nur in Instanzen verfügbar, 
 <translation id="3412937883532015092">Wenn für die Richtlinie eine Zahl festgelegt ist, zeigt <ph name="PRODUCT_NAME" /> für genau diese Anzahl von Millisekunden eine Nachricht an und öffnet dann den alternativen Browser.
 
       Ist die Richtlinie nicht konfiguriert oder auf 0 gesetzt, wird eine bestimmte aufgerufene URL sofort in einem alternativen Browser geöffnet.</translation>
+<translation id="3413763534078822244">Diese Richtlinie wurde eingestellt. Bitte verwende stattdessen die Richtlinie „<ph name="USER_BOREALIS_ALLOWED_NAME" />“.
+
+      Steuert die Verfügbarkeit von <ph name="BOREALIS_NAME" /> für dieses Gerät.
+
+      Wenn die Richtlinie auf „false“ gesetzt ist, steht <ph name="BOREALIS_NAME" /> Nutzern dieses Geräts nicht zur Verfügung. Wenn die Richtlinie nicht konfiguriert oder auf „true“ gesetzt ist, ist <ph name="BOREALIS_NAME" /> verfügbar, sofern die Richtlinie nicht durch eine andere Richtlinie oder Einstellung außer Kraft gesetzt wird.</translation>
 <translation id="3415954062311826850">Diese Richtlinie wird in ARC nicht unterstützt.</translation>
 <translation id="34160070798637152">Legt die Netzwerkkonfiguration für das gesamte Gerät fest.</translation>
 <translation id="3417130629744653218">Websites erlauben, verfügbare Zahlungsmethoden abzufragen.</translation>
@@ -2827,6 +2831,7 @@ Jede Regel hat folgende Bestandteile:
 <translation id="3608206578291537084">Verschlüsselte Pipeline für die Berichterstellung aktivieren</translation>
 <translation id="3608281460204780443">Chrome Web Store-Symbol im <ph name="PRODUCT_OS_NAME" />-Launcher und auf der Seite „Neuer Tab“ anzeigen</translation>
 <translation id="3612809274815536412">Einstellungen für die Fensterpositionierung</translation>
+<translation id="3622463490728773174">Neue Implementierung zulassen</translation>
 <translation id="3627678165642179114">Webdienst für die Rechtschreibprüfung aktivieren oder deaktivieren</translation>
 <translation id="3628480121685794414">Simplexdruck aktivieren</translation>
 <translation id="3634125384445314047">Zulassen, dass Fotos und Videos, die kürzlich mit dem Smartphone aufgenommen wurden, über Phone Hub abgerufen werden können.</translation>
@@ -2917,6 +2922,7 @@ Wenn du diese Einstellung deaktivierst, können Nutzer die Autofill-Funktion nic
 Ist diese Einstellung aktiviert oder nicht konfiguriert, kann der Nutzer selbst entscheiden, ob er „Autofill“ nutzen möchte. Er kann dann entsprechende Profile konfigurieren und die Funktion nach eigenem Ermessen aktivieren und deaktivieren.</translation>
 <translation id="3733014427925403568">Wochentag des Intervalls.</translation>
 <translation id="3736879847913515635">"Person hinzufügen" im Nutzermanager aktivieren</translation>
+<translation id="3744984310825999317">Zulassen, dass <ph name="PEPPER_NAME" /> einen neuen Decoder für die hardwarebeschleunigte Videodecodierung verwendet.</translation>
 <translation id="3749259744154402564">Nicht unterstützt</translation>
 <translation id="3749511622128647337">Audioausgabe deaktivieren</translation>
 <translation id="3750220015372671395">Schlüsselgenerierung auf diesen Websites blockieren</translation>
@@ -2983,6 +2989,7 @@ Ist diese Einstellung aktiviert oder nicht konfiguriert, kann der Nutzer selbst 
 
       Weitere Informationen zu <ph name="WEBXR_AR_SESSION_ENUM_VALUE" />-Sitzungen findest du in den Spezifikationen zur <ph name="WEBXR_AR_MODULE_API_NAME" />.</translation>
 <translation id="3788662722837364290">Einstellungen für die Energieverwaltung bei Inaktivität des Nutzers</translation>
+<translation id="3788876528643861853">Microsoft®-Cloudauthentifizierung deaktivieren</translation>
 <translation id="3790085888761753785">Wenn diese Einstellung aktiviert ist, können Nutzer sich mit Smart Lock in ihren Konten anmelden. Du hast dann mehr Möglichkeiten als mit den üblichen Smart Lock-Einstellungen, mit denen sie lediglich ihre Bildschirme entsperren können.
 
 Wenn diese Einstellung deaktiviert ist, können Nutzer sich nicht mit Smart Lock anmelden.
@@ -3064,6 +3071,7 @@ Falls die Richtlinie nicht festgelegt wird, bleibt die Varianten-Seed-URL unver�
 
        Jeder Eintrag enthält ein Verzeichnis, in dem im Feld "extension-id" die Erweiterungs-ID und im Feld "update-url" die Aktualisierungs-URL angegeben werden müssen.</translation>
 <translation id="3869180930654347954">„First-Party-Sets“ für alle betroffenen Nutzer deaktivieren</translation>
+<translation id="3869566220234507038">Immer den <ph name="LACROS_ROOTFS_NAME" />-<ph name="LACROS_NAME" />-Browser laden</translation>
 <translation id="3870035799352372700">Nicht zulassen, dass Google Assistant bei Interaktionen auf den Bildschirmkontext zugreift</translation>
 <translation id="3870059789954671543">Hiermit wird die Bedienungshilfe "Objekt mit Tastaturfokus hervorheben" auf dem Anmeldebildschirm aktiviert.
 
@@ -3341,6 +3349,12 @@ Wird die Richtlinie auf „False“ gesetzt, verwendet <ph name="PRODUCT_NAME" /
       Alle in dieser Richtlinie angegebenen Sets müssen gültige First-Party-Sets sein. Andernfalls wird ein entsprechender Fehler ausgegeben.
 
       Diese Richtlinie steht nur bei Windows-Instanzen zur Verfügung, die Teil einer <ph name="MS_AD_NAME" />-Domain sind, oder bei Windows 10 Pro- oder Enterprise-Instanzen, die für die Geräteverwaltung angemeldet sind, außerdem bei macOS-Instanzen, die über die Mobilgeräteverwaltung verwaltet werden oder per MCX mit einer Domain verbunden sind.</translation>
+<translation id="4135805680586226327">Diese Richtlinie steuert die aktuelle Refaktorierung für Graphics3D-APIs im PPAPI-Plug-in.
+
+Die Migration wirkt sich nur auf Details der internen Implementierung aus und sollte das Verhalten nicht ändern. Diese Richtlinie kann jedoch verwendet werden, wenn PPAPI-Anwendungen nicht wie erwartet funktionieren.
+
+Wenn die Richtlinie nicht konfiguriert oder aktiviert ist, entscheidet der Browser, welche Implementierung verwendet wird.
+Wenn die Richtlinie deaktiviert ist, verwendet der Browser die alte Implementierung, bis die Richtlinie abgelaufen ist.</translation>
 <translation id="4136603825567209889">Erfassen personenbezogener Daten aktivieren</translation>
 <translation id="4138655880188755661">Zeitlimit</translation>
 <translation id="4140646780789794190">Weitergabe von Diagnosedaten an PluginVm deaktivieren</translation>
@@ -3554,6 +3568,7 @@ Wenn diese Richtlinie konfiguriert ist, erlaubt <ph name="PRODUCT_OS_NAME" /> es
       Genaue Informationen zu gültigen <ph name="URL_LABEL" />-Mustern findest du unter https://cloud.google.com/docs/chrome-enterprise/policies/url-patterns. <ph name="WILDCARD_VALUE" /> ist kein akzeptierter Wert für diese Richtlinie.</translation>
 <translation id="4389073105055031853">Nutzern erlauben, alle Zertifikate zu verwalten</translation>
 <translation id="4389091865841123886">Konfiguriert die Remote-Bestätigung mit TPM-Mechanismus</translation>
+<translation id="4389113579547582722">Werbung für App Store-Bewertungen zulassen</translation>
 <translation id="4394840953265135019">URL des komprimierten Objekts, das heruntergeladen werden soll. Objekte können mit gzip, bzip2, lzma oder zstd komprimiert werden. Dies wird nach dem Herunterladen automatisch erkannt. Sie dürfen nicht unkomprimiert sein, da das nicht automatisch erkannt werden kann.</translation>
 <translation id="439661169333921592">„Objekt mit Tastaturfokus hervorheben“ auf dem Anmeldebildschirm deaktivieren</translation>
 <translation id="4397045637922200204">Kontowiederherstellung deaktivieren</translation>
@@ -3832,6 +3847,7 @@ Diese Richtlinie wird voraussichtlich in Version 113 von <ph name="PRODUCT_NAME
 <translation id="4660356908994631271">Schaltfläche „Google Lens“ im Suchfeld auf der Seite „Neuer Tab“ anzeigen.</translation>
 <translation id="4661889655253181651">Unter "Inhaltseinstellungen" kannst du angeben, wie Inhalte bestimmter Typen (z. B. Cookies, Bilder oder JavaScript) verarbeitet werden.</translation>
 <translation id="4663509616441994711">Zusammenführung von Cloud-Richtlinien auf Nutzerebene deaktivieren.</translation>
+<translation id="4663588423815449593">Erzwingen, dass <ph name="PEPPER_NAME" /> den alten Videodecoder verwendet.</translation>
 <translation id="4665897631924472251">Verwaltungseinstellungen für Erweiterungen</translation>
 <translation id="4666930704271463612">Gibt die Untergruppe der Druckserver an, von denen Serverdrucker abgefragt werden.
 
@@ -3940,6 +3956,23 @@ Weitere Informationen zu gültigen <ph name="URL_LABEL" />-Mustern findest du un
 
       Wenn du diese Richtlinie konfigurierst, kann sie von Nutzern nicht geändert werden. Falls die Richtlinie nicht konfiguriert ist, können Nutzer selbst entscheiden, ob die Ablage automatisch ausgeblendet werden soll.</translation>
 <translation id="4812309945046430049">Tastaturbeleuchtungsfarbe „Rot“</translation>
+<translation id="4812410063101047442">Mit dieser Einstellung wird festgelegt, welcher <ph name="LACROS_NAME" />-Browser verwendet wird.
+
+Wenn die Richtlinie auf <ph name="LACROS_SELECTION_USER_CHOICE_VALUE" /> gesetzt ist, kann der Nutzer entscheiden, welcher <ph name="LACROS_NAME" />-Browser geladen wird: Binärprogramm der <ph name="LACROS_ROOTFS_NAME" />- oder der <ph name="LACROS_STATEFUL_NAME" />-Partition.
+Wenn der Nutzer keine Einstellung vorgenommen hat, wird das Binärprogramm mit der neuesten Version ausgewählt.
+
+Wenn die Richtlinie auf <ph name="LACROS_SELECTION_ROOTFS_VALUE" /> gesetzt ist, wird immer das<ph name="LACROS_ROOTFS_NAME" />-Binärprogramm des <ph name="LACROS_NAME" />-Browsers geladen.
+
+Wenn sie auf <ph name="LACROS_SELECTION_STATEFUL_VALUE" /> gesetzt ist, wird immer das <ph name="LACROS_STATEFUL_NAME" />-Binärprogramm des <ph name="LACROS_NAME" />-Browsers geladen.
+Dieser Wert kann zu unerwartetem Verhalten führen, wenn die <ph name="LACROS_STATEFUL_NAME" />-Browserversion älter als die <ph name="PRODUCT_OS_NAME" />-Version ist.
+Dieser Anwendungsfall wird nicht unterstützt und es kann nicht garantiert werden, dass er korrekt funktioniert.
+
+Wenn die Richtlinie nicht konfiguriert ist, ist die Standardeinstellung für von Unternehmen verwaltete Nutzer <ph name="LACROS_SELECTION_ROOTFS_VALUE" /> und für nicht verwaltete Nutzer <ph name="LACROS_SELECTION_USER_CHOICE_VALUE" />.
+
+Bitte beachte, dass das Ändern des Richtlinienwerts zu Datenverlusten im <ph name="LACROS_NAME" />-Browser führen kann, wenn zu einer Version gewechselt wird, die älter ist als die aktuelle – beispielsweise wenn der Richtlinienwert von <ph name="LACROS_SELECTION_STATEFUL_VALUE" /> zu <ph name="LACROS_SELECTION_ROOTFS_VALUE" /> geändert wird und die erstgenannte Version die aktuellere ist oder wenn <ph name="PRODUCT_OS_NAME" /> zusammen mit dem <ph name="LACROS_ROOTFS_NAME" />-<ph name="LACROS_NAME" />-Browser aktualisiert wurde und <ph name="LACROS_STATEFUL_NAME" /> noch nicht aktualisiert wurde.
+In solchen Fällen werden die Daten möglicherweise nicht korrekt migriert.
+
+Wenn man <ph name="LACROS_SELECTION_USER_CHOICE_VALUE" /> oder <ph name="LACROS_SELECTION_ROOTFS_VALUE" /> verwendet, ist man auf der sicheren Seite. Der Wechsel von <ph name="LACROS_SELECTION_ROOTFS_VALUE" /> zu <ph name="LACROS_SELECTION_USER_CHOICE_VALUE" /> ist ebenfalls sicher.</translation>
 <translation id="4812714598405913256">Meldung zum Ablaufdatum für die automatische Aktualisierung für die Richtlinie DeviceMinimumVersion konfigurieren</translation>
 <translation id="4815581264328351694">Optionen für Bedienungshilfen im Taskleistenmenü anzeigen</translation>
 <translation id="4816674326202173458">Unternehmensnutzer sowohl als primären als auch als sekundären Nutzer zulassen (Standardverhalten für nicht verwaltete Nutzer)</translation>
@@ -4400,6 +4433,7 @@ Wenn diese Richtlinie für ein Konto auf <ph name="POLICY_VALUE_PRIMARY_ACCOUNT_
 
       Wenn die Richtlinie nicht konfiguriert ist, können Nutzer das Dinosaurierspiel nicht auf registrierten <ph name="PRODUCT_OS_NAME" />-Geräten spielen, auf anderen aber schon.</translation>
 <translation id="5293285950307241933">Alle lokalen Nutzerdaten löschen</translation>
+<translation id="5293619885162445352">Erlauben, dass <ph name="PEPPER_NAME" /> den neuen Videodecoder verwendet.</translation>
 <translation id="529457411593078576">Nutzungsbedingungen während der ersten Ausführung für CCT aktivieren</translation>
 <translation id="5297948043665200363">Nutzer kann angemeldet bleiben, wenn sein Konto nicht mehr authentifiziert ist</translation>
 <translation id="5298949392804966105">Keine Einschränkungen für verwaltete Konten</translation>
@@ -4674,6 +4708,15 @@ Ist die Richtlinie deaktiviert oder nicht konfiguriert, wird anhand der Einstell
 <translation id="5563240289883266691">Nutzungsberichte für Linux-Apps aktivieren</translation>
 <translation id="5565178130821694365">Passworteingabe alle zwei Tage (48 Stunden) erforderlich</translation>
 <translation id="5566210228171064229">Drucken mit und ohne PIN zulassen</translation>
+<translation id="5569504149646180067">Mit dieser Richtlinie wird die automatische Nutzeranmeldung für Konten konfiguriert, die von einem Microsoft®-Cloudidentitätsanbieter bereitgestellt werden.
+
+Wenn diese Richtlinie auf 1 (<ph name="POLICY_VALUE_ENABLED" />) gesetzt ist, können Nutzer, die sich mit einem Konto in ihrem Computer anmelden, das von einem Microsoft®-Cloudidentitätsanbieter bereitgestellt wird (d. h. von <ph name="MS_AAD_NAME" /> oder dem Microsoft®-Identitätsanbieter für Kundenkonten), oder die ein Arbeitskonto oder das Konto einer Bildungseinrichtung zu <ph name="MS_WIN_NAME" /> hinzugefügt haben, mit dieser Identität automatisch in Web-Properties angemeldet werden. Informationen zu Gerät und Konto des Nutzers werden bei jedem Authentifizierungsereignis an den Cloudidentitätsanbieter des Nutzers gesendet.
+
+Wenn die Richtlinie auf 0 (<ph name="POLICY_VALUE_DISABLED" />) gesetzt oder nicht konfiguriert ist, wird die automatische Anmeldung, wie oben beschrieben, deaktiviert.
+
+Diese Funktion ist unter <ph name="WIN_NAME" /> 10 und höher verfügbar.
+
+Hinweis: Diese Richtlinie gilt nicht für den Inkognito- oder Gastmodus.</translation>
 <translation id="5572971233886879856">Gibt die Untergruppe der Druckserver an, von denen Serverdrucker abgefragt werden. Das gilt nur für die Richtlinie "<ph name="DEVICE_EXTERNAL_PRINT_SERVERS_POLICY" />".
 
       Wenn diese Richtlinie verwendet wird, stehen dem Nutzer gemäß den Geräterichtlinien nur die Serverdrucker zur Verfügung, deren IDs mit den Werten in der Richtlinie übereinstimmen.
@@ -5330,6 +5373,12 @@ Wenn der Wert für <ph name="CHROMEOS_VERSION_PROPERTY_NAME" /> bei keinem Eintr
       Hinweis: Diese Richtlinie sollte ursprünglich planmäßig in <ph name="PRODUCT_NAME" />-Version 82 entfernt werden, wurde aber erst in Version 84 entfernt.</translation>
 <translation id="6276087670023098167">Erfassen gerätebezogener Daten deaktivieren</translation>
 <translation id="627672037430076089">Verbindungen zu diesem Computer per Remote-Unterstützung verhindern</translation>
+<translation id="6277043520666738324">Mit dieser Richtlinie wird festgelegt, ob <ph name="PEPPER_NAME" />-Plug-ins den neuen Videodecoder statt des alten Decoders verwenden können, um mit Hardwaredecodern zu kommunizieren.
+
+Die Migration wirkt sich nur auf Details der internen Implementierung aus und sollte das Verhalten nicht ändern. Diese Richtlinie kann jedoch verwendet werden, wenn PPAPI-Anwendungen nicht wie erwartet funktionieren.
+
+Wenn die Richtlinie nicht konfiguriert oder aktiviert ist, entscheidet der Browser, welche Implementierung zum Einsatz kommt.
+Wenn die Richtlinie deaktiviert ist, verwendet der Browser die alte Implementierung, bis diese Richtlinie abläuft.</translation>
 <translation id="6277314550042130537">Genehmigung der KDC-Richtlinie bei der HTTP-Authentifizierung berücksichtigen</translation>
 <translation id="6278428485366576908">Design</translation>
 <translation id="6279722058145292462">Wenn die Richtlinie konfiguriert ist, wird in Tagen angegeben, wie häufig ein Client das Computerpasswort ändert. Das Passwort wird vom Client zufällig generiert und ist für den Nutzer nicht sichtbar. Eine Deaktivierung dieser Richtlinie oder die Auswahl einer hohen Anzahl von Tagen kann sich negativ auf die Sicherheit auswirken, da potenzielle Angreifer so mehr Zeit haben, das Computerpasswort herauszufinden und missbräuchlich zu verwenden.
@@ -5609,6 +5658,11 @@ Wenn der Wert für <ph name="CHROMEOS_VERSION_PROPERTY_NAME" /> bei keinem Eintr
       Ist diese Richtlinie nicht konfiguriert oder auf "None" oder "Let users decide" gesetzt, können Nutzer die automatische Zeitzonenerkennung über die normalen Steuerelemente unter chrome://settings verwalten.</translation>
 <translation id="6532769014584932288">Wakelocks zulassen</translation>
 <translation id="6533881418188970751">Nutzer vor dem Download nach dem Speicherort für die Datei fragen</translation>
+<translation id="653616551212414363">Wenn diese Einstellung aktiviert ist, wird dem Nutzer eine Benachrichtigung angezeigt, wenn ein USB-Gerät an <ph name="PRODUCT_OS_NAME" /> angeschlossen wird.
+
+      Ist diese Einstellung deaktiviert, werden dem Nutzer keine Benachrichtigungen zu angeschlossenen USB-Geräten angezeigt.
+
+      Ist diese Richtlinie nicht konfiguriert, erhalten Nutzer Benachrichtigungen zu angeschlossenen USB-Geräten.</translation>
 <translation id="6536600139108165863">Automatischer Neustart nach Herunterfahren des Geräts</translation>
 <translation id="6538653424603921690">Privatsphärefunktion auf dem Anmeldebildschirm immer deaktivieren</translation>
 <translation id="6539246272469751178">Diese Richtlinie hat keine Auswirkung auf Android-Apps. Android-Apps verwenden immer das Standardverzeichnis für Downloads und haben keinen Zugriff auf Dateien, die von <ph name="PRODUCT_OS_NAME" /> in ein anderes Verzeichnis als das Standardverzeichnis für Downloads heruntergeladen werden.</translation>
@@ -5683,6 +5737,7 @@ Wenn der Wert für <ph name="CHROMEOS_VERSION_PROPERTY_NAME" /> bei keinem Eintr
 <translation id="6575944031719151455">Wenn die Richtlinie konfiguriert ist, wird die Liste der lokalen Gerätekonten angegeben, die auf der Anmeldeseite angezeigt werden sollen. Durch Kennungen werden die verschiedenen lokalen Gerätekonten auseinandergehalten.
 
       Wenn die Richtlinie nicht konfiguriert oder eine leere Liste festgelegt ist, gibt es keine lokalen Gerätekonten.</translation>
+<translation id="6577760914164385949">Automatische Anmeldung bei Microsoft®-Cloudidentitätsanbietern zulassen</translation>
 <translation id="6580851705156412587">Gerät sperren, wenn es in den Ruhemodus versetzt oder zugeklappt wird</translation>
 <translation id="6581048059229620221">Wenn diese Richtlinie deaktiviert ist, kann der Host für die Remote-Unterstützung keine eingehenden Verbindungen annehmen.
 
@@ -5935,6 +5990,7 @@ Wird die Richtlinie deaktiviert, wird das Symbol für den Zugriff auf experiment
 <translation id="6815483833848348029">Wenn die Richtlinie aktiviert oder nicht konfiguriert und ein lokales Gerätekonto für die automatische Anmeldung ohne Verzögerung bei einem Gerät im Offlinemodus konfiguriert ist, zeigt <ph name="PRODUCT_OS_NAME" /> eine Eingabeaufforderung zur Netzwerkkonfiguration an.
 
       Wenn die Richtlinie deaktiviert ist, wird stattdessen eine Fehlermeldung angezeigt,</translation>
+<translation id="6815628711329903153">Moderne Zwischenspeicherzuweisung für Graphics3D-APIs im PPAPI-Plug-in zulassen.</translation>
 <translation id="6819838337315703072">Wenn der Support für die <ph name="LINUX_OS_NAME" />-App und die Richtlinie aktiviert sind, werden Informationen zur Nutzung von <ph name="LINUX_OS_NAME" />-Apps an den Server zurückgesendet.
 
       Ist diese Richtlinie deaktiviert oder nicht konfiguriert, werden keine Informationen zur App-Nutzung gesendet.</translation>
@@ -6042,7 +6098,6 @@ Wenn die Richtlinie deaktiviert oder nicht konfiguriert ist, gilt das Standardve
       Ist die Richtlinie auf „falsch“ gesetzt, sind keine Gastanmeldungen in <ph name="PRODUCT_NAME" /> und <ph name="LACROS_NAME" /> möglich.
 
       Hinweis: Ist die Richtlinie nicht konfiguriert oder auf „wahr“ gesetzt, „<ph name="LACROS_SECONDARY_PROFILES_ALLOWED_POLICY_NAME" />“ aber auf „falsch“, sind in <ph name="LACROS_NAME" /> keine Gastanmeldungen möglich.</translation>
-<translation id="6920640961852058581">Standardkonfiguration für Kerberos-Tickets ändern</translation>
 <translation id="692096803256767290">Rollback des Betriebssystems auf die Zielversion durchführen</translation>
 <translation id="6921544339867564740">Geräten die Ausführung von virtuellen Maschinen unter Chrome OS erlauben</translation>
 <translation id="6922884955650325312">Das Plug-in "<ph name="FLASH_PLUGIN_NAME" />" blockieren</translation>
@@ -6150,6 +6205,7 @@ Wenn die Richtlinie deaktiviert oder nicht konfiguriert ist, gilt das Standardve
 <translation id="7002040773317582266">Die Echtzeitüberprüfung für Mainframe-URLs ist aktiviert.</translation>
 <translation id="7003746348783715221">Einstellungen für <ph name="PRODUCT_NAME" /></translation>
 <translation id="7007283257527015835">Boolescher Parameter, der angibt, ob der Protokoll-Handler als Standard festgelegt ist.</translation>
+<translation id="7007403084376547341"><ph name="LACROS_NAME" />-Browser-Binärprogramm auswählen</translation>
 <translation id="7008308728445338159">DNS-Abfangprüfungen aktiviert</translation>
 <translation id="7009043124653876961">Emoji-Vorschläge beim Tippen deaktivieren</translation>
 <translation id="7010006999849135962">Authentifizierung ohne PIN für den Host für den Remote-Zugriff aktivieren</translation>
@@ -6355,6 +6411,7 @@ Wenn die Richtlinie <ph name="SAFE_BROWSING_PROTECTION_LEVEL_POLICY_NAME" /> kon
 <translation id="7202925763179776247">Download-Einschränkungen zulassen</translation>
 <translation id="7207095846245296855">Google SafeSearch erzwingen</translation>
 <translation id="7211368186050418507">Zeitzone nie automatisch erkennen</translation>
+<translation id="721617466745658461">Nutzern erlauben, das <ph name="LACROS_NAME" />-Binärprogramm des Browsers auszuwählen</translation>
 <translation id="7216442368414164495">Ermöglicht Nutzern die Aktivierung erweiterter Berichterstellung bei Verwendung von Safe Browsing</translation>
 <translation id="721970071627370558">Melden des Energiestatus auf Geräten deaktivieren</translation>
 <translation id="7221574724100909818">Schloss-Symbol für sichere Verbindungen verwenden</translation>
@@ -7888,6 +7945,7 @@ Die Richtlinie ist eine Zuordnung von Konfigurations-IDs zu VM-Konfigurationen. 
 <translation id="8707790573162457301">Automatische Datenträgerbereinigung während der Anmeldung ausführen</translation>
 <translation id="8713535263782304771">Safe Browsing deaktivieren</translation>
 <translation id="8715885991031124968">JavaScript-Dialogfelder zulassen, die von einem anderen Quell-Subframe ausgelöst wurden</translation>
+<translation id="8719374569086645837">Immer den <ph name="LACROS_STATEFUL_NAME" />-<ph name="LACROS_NAME" />-Browser laden</translation>
 <translation id="8720547069538712402">Zulassen, dass Nutzer die Rechtschreibprüfung aktivieren oder deaktivieren</translation>
 <translation id="8726080977639508431">Diese Richtlinie legt fest, wie <ph name="PRODUCT_NAME" /> Richtlinien zu Websitelisten/Greylists für die Funktion zur Unterstützung älterer Browser interpretiert. Die folgenden Richtlinien sind betroffen: <ph name="URL_LIST_POLICY_NAME" />, <ph name="URL_GREYLIST_POLICY_NAME" />, <ph name="USE_IE_SITELIST_POLICY_NAME" />, <ph name="EXTERNAL_SITELIST_POLICY_NAME" /> und <ph name="EXTERNAL_GREYLIST_POLICY_NAME" />.
 
@@ -8315,6 +8373,7 @@ Wenn diese Richtlinie nicht konfiguriert ist, wird genau wie bei den anderen Chr
 <translation id="913195841488580904">Zugriff auf aufgelistete URLs blockieren</translation>
 <translation id="9133526448421932754">Tastaturbeleuchtungsfarbe „Gelb“</translation>
 <translation id="9135033364005346124"><ph name="CLOUD_PRINT_NAME" />-Proxy aktivieren</translation>
+<translation id="9135095804754272364">Benachrichtigen, wenn ein USB-Gerät erkannt wird</translation>
 <translation id="9136212796239682721">Benutzeroberfläche für Download-Infofeld deaktivieren</translation>
 <translation id="9136399279941091445">Intervalle für Abwesenheitszeiten, wenn die angegebenen Geräterichtlinien veröffentlicht werden</translation>
 <translation id="9142561920976791097">Bei deaktivierten Formularsteuerelementen wird die neue Ereignisweiterleitung verwendet.</translation>
@@ -8350,6 +8409,7 @@ Wenn diese Richtlinie nicht konfiguriert ist, wird genau wie bei den anderen Chr
 
       Diese Richtlinie ist eine vorübergehende Maßnahme. Sie wird aus künftigen Versionen von <ph name="PRODUCT_NAME" /> entfernt. Nachdem sie entfernt wurde, kann <ph name="PRODUCT_NAME" /> zusätzliche DNS-Typen immer abfragen.</translation>
 <translation id="9167719789236691545">Synchronisierung zwischen Drive und der App "Dateien" von <ph name="PRODUCT_OS_NAME" /> deaktivieren</translation>
+<translation id="9172911925443428317">Werbung für App Store-Bewertungen nicht zulassen</translation>
 <translation id="9180108183162961002">Browseranmeldungen durch Gäste zulassen</translation>
 <translation id="9185963199234034321">Hohen Kontrast auf dem Anmeldebildschirm aktivieren und dem Nutzer erlauben, die Funktion vorübergehend zu deaktivieren</translation>
 <translation id="9187743794267626640">Bereitstellen von externem Speicher deaktivieren</translation>

@@ -48,6 +48,7 @@
 #include "chrome/test/base/testing_profile.h"
 #include "components/prefs/pref_service.h"
 #include "components/webapps/browser/install_result_code.h"
+#include "components/webapps/browser/installable/installable_logging.h"
 #include "components/webapps/browser/installable/installable_metrics.h"
 #include "components/webapps/browser/uninstall_result_code.h"
 #include "content/public/test/test_utils.h"
@@ -370,8 +371,8 @@ class ExternallyManagedAppInstallTaskTest
       data_retriever_->SetRendererWebAppInstallInfo(
           std::make_unique<WebAppInstallInfo>());
 
-    data_retriever_->SetManifest(std::move(manifest),
-                                 /*is_installable=*/true);
+    data_retriever_->SetManifest(
+        std::move(manifest), webapps::InstallableStatusCode::NO_ERROR_DETECTED);
 
     data_retriever_->SetIcons(IconsMap{});
 
@@ -379,8 +380,8 @@ class ExternallyManagedAppInstallTaskTest
         options.install_url, webapps::InstallResultCode::kSuccessNewInstall);
 
     auto task = std::make_unique<ExternallyManagedAppInstallTask>(
-        profile(), url_loader_.get(), registrar_, ui_manager_,
-        install_finalizer_, command_scheduler_, std::move(options));
+        profile(), url_loader_.get(), ui_manager_, install_finalizer_,
+        command_scheduler_, std::move(options));
     task->SetDataRetrieverFactoryForTesting(
         GetFactoryForRetriever(std::move(data_retriever)));
     return task;
@@ -886,7 +887,7 @@ TEST_P(ExternallyManagedAppInstallTaskTest, InstallURLLoadFailed) {
         GURL(), UserDisplayMode::kStandalone,
         ExternalInstallSource::kInternalDefault);
     ExternallyManagedAppInstallTask install_task(
-        profile(), &url_loader(), registrar(), ui_manager(), finalizer(),
+        profile(), &url_loader(), ui_manager(), finalizer(),
         command_scheduler(), install_options);
     url_loader().SetPrepareForLoadResultLoaded();
     url_loader().SetNextLoadUrlResult(GURL(), result_pair.loader_result);
@@ -908,8 +909,8 @@ TEST_P(ExternallyManagedAppInstallTaskTest, InstallFailedWebContentsDestroyed) {
       GURL(), UserDisplayMode::kStandalone,
       ExternalInstallSource::kInternalDefault);
   ExternallyManagedAppInstallTask install_task(
-      profile(), &url_loader(), registrar(), ui_manager(), finalizer(),
-      command_scheduler(), install_options);
+      profile(), &url_loader(), ui_manager(), finalizer(), command_scheduler(),
+      install_options);
   url_loader().SetPrepareForLoadResultLoaded();
   url_loader().SetNextLoadUrlResult(
       GURL(), WebAppUrlLoader::Result::kFailedWebContentsDestroyed);
@@ -936,7 +937,7 @@ TEST_P(ExternallyManagedAppInstallTaskTest, InstallWithWebAppInfoSucceeds) {
   });
 
   ExternallyManagedAppInstallTask task(profile(), /*url_loader=*/nullptr,
-                                       registrar(), ui_manager(), finalizer(),
+                                       ui_manager(), finalizer(),
                                        command_scheduler(), std::move(options));
 
   finalizer()->SetNextFinalizeInstallResult(
@@ -983,7 +984,7 @@ TEST_P(ExternallyManagedAppInstallTaskTest, InstallWithWebAppInfoFails) {
   });
 
   ExternallyManagedAppInstallTask task(profile(), /*url_loader=*/nullptr,
-                                       registrar(), ui_manager(), finalizer(),
+                                       ui_manager(), finalizer(),
                                        command_scheduler(), std::move(options));
 
   finalizer()->SetNextFinalizeInstallResult(

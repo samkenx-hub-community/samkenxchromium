@@ -599,10 +599,10 @@ void ConversionContext<Result>::StartEffect(
       cc::PaintFlags flags;
       flags.setBlendMode(effect.BlendMode());
       flags.setAlpha(alpha);
-      save_layer_id = push<cc::SaveLayerOp>(nullptr, &flags);
+      save_layer_id = push<cc::SaveLayerOp>(flags);
     } else {
-      save_layer_id = push<cc::SaveLayerAlphaOp>(
-          nullptr, static_cast<float>(alpha / 255.0f));
+      save_layer_id =
+          push<cc::SaveLayerAlphaOp>(static_cast<float>(alpha / 255.0f));
     }
   } else {
     // Handle filter effect.
@@ -612,7 +612,7 @@ void ConversionContext<Result>::StartEffect(
     cc::PaintFlags filter_flags;
     filter_flags.setImageFilter(cc::RenderSurfaceFilters::BuildImageFilter(
         effect.Filter().AsCcFilterOperations(), empty));
-    save_layer_id = push<cc::SaveLayerOp>(nullptr, &filter_flags);
+    save_layer_id = push<cc::SaveLayerOp>(filter_flags);
   }
   result_.EndPaintOfPairedBegin();
 
@@ -776,7 +776,7 @@ void ConversionContext<Result>::Convert(const PaintChunkSubset& chunks) {
     bool switched_to_chunk_state = false;
 
     for (const auto& item : it.DisplayItems()) {
-      sk_sp<const PaintRecord> record;
+      PaintRecord record;
       if (auto* scrollbar = DynamicTo<ScrollbarDisplayItem>(item))
         record = scrollbar->Paint();
       else if (auto* drawing = DynamicTo<DrawingDisplayItem>(item))
@@ -789,7 +789,7 @@ void ConversionContext<Result>::Convert(const PaintChunkSubset& chunks) {
       // might be for a mask with empty content which should make the masked
       // content fully invisible. We need to "draw" this record to ensure that
       // the effect has correct visual rect.
-      if ((!record || record->size() == 0) &&
+      if (record.empty() &&
           &chunk_state.Effect() == &EffectPaintPropertyNode::Root()) {
         continue;
       }
@@ -800,8 +800,9 @@ void ConversionContext<Result>::Convert(const PaintChunkSubset& chunks) {
       }
 
       result_.StartPaint();
-      if (record && record->size() != 0)
+      if (!record.empty()) {
         push<cc::DrawRecordOp>(std::move(record));
+      }
       result_.EndPaintOfUnpaired(
           chunk_to_layer_mapper_.MapVisualRect(item.VisualRect()));
     }
@@ -835,27 +836,27 @@ void PaintChunksToCcLayer::ConvertInto(
     recorder.beginRecording();
     // Create a complete cloned list for under-invalidation checking. We can't
     // use cc_list because it is not finalized yet.
-    sk_sp<PaintOpBufferExt> buffer = sk_make_sp<PaintOpBufferExt>();
-    ConversionContext(layer_state, layer_offset, *buffer).Convert(chunks);
-    recorder.getRecordingCanvas()->drawPicture(std::move(buffer));
+    PaintOpBufferExt buffer;
+    ConversionContext(layer_state, layer_offset, buffer).Convert(chunks);
+    recorder.getRecordingCanvas()->drawPicture(buffer.ReleaseAsRecord());
     params.tracking.CheckUnderInvalidations(params.debug_name,
                                             recorder.finishRecordingAsPicture(),
                                             params.interest_rect);
-    if (auto record = params.tracking.UnderInvalidationRecord()) {
+    auto under_invalidation_record = params.tracking.UnderInvalidationRecord();
+    if (!under_invalidation_record.empty()) {
       cc_list.StartPaint();
-      cc_list.push<cc::DrawRecordOp>(std::move(record));
+      cc_list.push<cc::DrawRecordOp>(std::move(under_invalidation_record));
       cc_list.EndPaintOfUnpaired(params.interest_rect);
     }
   }
 }
 
-sk_sp<PaintRecord> PaintChunksToCcLayer::Convert(
-    const PaintChunkSubset& chunks,
-    const PropertyTreeState& layer_state,
-    const gfx::Vector2dF& layer_offset) {
-  sk_sp<PaintOpBufferExt> buffer = sk_make_sp<PaintOpBufferExt>();
-  ConversionContext(layer_state, layer_offset, *buffer).Convert(chunks);
-  return buffer;
+PaintRecord PaintChunksToCcLayer::Convert(const PaintChunkSubset& chunks,
+                                          const PropertyTreeState& layer_state,
+                                          const gfx::Vector2dF& layer_offset) {
+  PaintOpBufferExt buffer;
+  ConversionContext(layer_state, layer_offset, buffer).Convert(chunks);
+  return buffer.ReleaseAsRecord();
 }
 
 static void UpdateTouchActionRegion(

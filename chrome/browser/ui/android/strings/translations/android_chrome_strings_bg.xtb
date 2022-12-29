@@ -517,6 +517,7 @@
 <translation id="3830886834687455630">Актуализирайте услугите за Google Play, за да проверите паролите си</translation>
 <translation id="3845098929839618392">Отваряне в раздел „инкогнито“</translation>
 <translation id="3856096718352044181">Моля, проверете дали този доставчик е валиден или опитайте отново по-късно</translation>
+<translation id="3858127568696903256">Тук ще виждате съдържанието, което следите</translation>
 <translation id="3858860766373142691">Име</translation>
 <translation id="3861633093716975811">Популярни видеоклипове</translation>
 <translation id="3874520961715512166">Сайтът бе премахнат</translation>
@@ -552,7 +553,6 @@
 <translation id="4045764304651014138">Данни за употребата</translation>
 <translation id="405399507749852140">Получаване на сигнали при понижение на цената в който и да е сайт</translation>
 <translation id="4056223980640387499">Сепия</translation>
-<translation id="4060598801229743805">Опциите са в горната част на екрана</translation>
 <translation id="4062305924942672200">Правна информация</translation>
 <translation id="4072805772816336153">Опитайте отново по-късно</translation>
 <translation id="4084682180776658562">Отметка</translation>
@@ -642,7 +642,6 @@
 <translation id="4554077758708533499">Установена е връзка с USB кабел</translation>
 <translation id="4558311620361989323">Комбинации за уеб страници</translation>
 <translation id="4561730552726921821">Регистрацията бе успешна</translation>
-<translation id="4561979708150884304">Няма връзка</translation>
 <translation id="4565377596337484307">Скриване на паролата</translation>
 <translation id="4572422548854449519">Вход в управляван профил</translation>
 <translation id="4576892426230499203">Опитайте с друга опция за потвърждаване</translation>
@@ -667,7 +666,6 @@
 <translation id="4699172675775169585">Кеширани изображения и файлове</translation>
 <translation id="4719927025381752090">Предложения за превод</translation>
 <translation id="4720023427747327413">Отваряне в <ph name="PRODUCT_NAME" /></translation>
-<translation id="4720982865791209136">Помогнете за подобряването на Chrome. <ph name="BEGIN_LINK" />Участвайте в анкетата<ph name="END_LINK" /></translation>
 <translation id="47217992755561375">Преглед на водещите сайтове за вас</translation>
 <translation id="4732120983431207637">Stack Unwinder</translation>
 <translation id="4736934858538408121">Виртуална карта</translation>
@@ -771,7 +769,6 @@
 <translation id="5184329579814168207">Отваряне в Chrome</translation>
 <translation id="5191251636205085390">Научете повече за новите технологии, които имат за цел да заменят „бисквитките“ на трети страни, и как да ги контролирате</translation>
 <translation id="5193988420012215838">Копирано в буферната памет</translation>
-<translation id="5199929503336119739">Служебен потребителски профил</translation>
 <translation id="5204967432542742771">Въведете парола</translation>
 <translation id="5206168361184759344">{FILE_COUNT,plural, =1{Изтегля се файл…}other{Изтеглят се # файла…}}</translation>
 <translation id="5210286577605176222">Преминаване към предишния раздел</translation>
@@ -1345,14 +1342,12 @@
 <translation id="8221656072740924283">Напред</translation>
 <translation id="8223642481677794647">Меню на картата за емисията</translation>
 <translation id="8250920743982581267">Документи</translation>
-<translation id="825412236959742607">Тази страница използва твърде много памет, така че Chrome премахна част от съдържанието.</translation>
 <translation id="8255617931166444521">Сайтовете могат да използват „бисквитките“ ви, за да следят активността ви при сърфиране само в собствените си уеб страници</translation>
 <translation id="8259179246279078674">Тъй като заредените предварително страници са шифровани, Google няма да получава информация за съдържанието им. Сървърите ни обаче ще научават за кои сайтове е извършено частно предварително зареждане. Тази информация се използва само за предварителното зареждане на страниците и не се свързва с други данни от профила ви в Google.</translation>
 <translation id="8260126382462817229">Опитайте да влезете отново</translation>
 <translation id="8261506727792406068">Изтриване</translation>
 <translation id="82619448491672958">Преглед на другите раздели</translation>
 <translation id="8266862848225348053">Местоположение за изтеглянията</translation>
-<translation id="8274165955039650276">Преглед на изтеглянията</translation>
 <translation id="8281886186245836920">Пропускане</translation>
 <translation id="8282297628636750033">Тъмна тема за сайтовете при възможност</translation>
 <translation id="829672787777123339">Установява се връзка с устройството ви…</translation>
@@ -1516,7 +1511,6 @@
 <translation id="9108808586816295166">Сигурният DNS може да не е налице по всяко време</translation>
 <translation id="9128984223251192329">Подканата за Privacy Sandbox е отворена на половината височина</translation>
 <translation id="9133397713400217035">Разглеждане в офлайн режим</translation>
-<translation id="9137013805542155359">Показване на оригинала</translation>
 <translation id="9148126808321036104">Влезте отново</translation>
 <translation id="9158770349521403363">Споделяне само на съдържанието</translation>
 <translation id="9159716826369098114">Възстановяване на група раздели от <ph name="TAB_COUNT" /> раздела като нова група на заден план.</translation>

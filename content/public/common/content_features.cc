@@ -405,6 +405,17 @@ BASE_FEATURE(kFedCmUserInfo,
              "FedCmUserInfo",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
+// Enables usage of the FedCM API with the Selective Disclosure API at the same
+// time.
+BASE_FEATURE(kFedCmSelectiveDisclosure,
+             "FedCmSelectiveDisclosure",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+// Enables usage of the FedCM API with the login hint parameter.
+BASE_FEATURE(kFedCmLoginHint,
+             "FedCmLoginHint",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 // Field trial boolean parameter which indicates whether IdpSigninStatus API is
 // used in FedCM API.
 const char kFedCmIdpSigninStatusFieldTrialParamName[] = "IdpSigninStatus";
@@ -578,14 +589,7 @@ BASE_FEATURE(kJavaScriptExperimentalSharedMemory,
 BASE_FEATURE(kLazyFrameLoading,
              "LazyFrameLoading",
              base::FEATURE_ENABLED_BY_DEFAULT);
-BASE_FEATURE(kLazyFrameVisibleLoadTimeMetrics,
-             "LazyFrameVisibleLoadTimeMetrics",
-#if BUILDFLAG(IS_ANDROID)
-             base::FEATURE_ENABLED_BY_DEFAULT
-#else
-             base::FEATURE_DISABLED_BY_DEFAULT
-#endif
-);
+
 BASE_FEATURE(kLazyImageLoading,
              "LazyImageLoading",
              base::FEATURE_ENABLED_BY_DEFAULT);
@@ -624,6 +628,16 @@ BASE_FEATURE(kLogJsConsoleMessages,
 BASE_FEATURE(kLowerV8MemoryLimitForNonMainRenderers,
              "LowerV8MemoryLimitForNonMainRenderers",
              base::FEATURE_DISABLED_BY_DEFAULT);
+
+// Uses ThreadType::kCompositing for the main thread
+BASE_FEATURE(kMainThreadCompositingPriority,
+             "MainThreadCompositingPriority",
+#if BUILDFLAG(IS_MAC)
+             base::FEATURE_ENABLED_BY_DEFAULT
+#else
+             base::FEATURE_DISABLED_BY_DEFAULT
+#endif
+);
 
 // The MBI mode controls whether or not communication over the
 // AgentSchedulingGroup is ordered with respect to the render-process-global
@@ -1392,9 +1406,6 @@ BASE_FEATURE(kWebUsb, "WebUSB", base::FEATURE_ENABLED_BY_DEFAULT);
 
 // Controls whether the WebXR Device API is enabled.
 BASE_FEATURE(kWebXr, "WebXR", base::FEATURE_ENABLED_BY_DEFAULT);
-
-// Enables access to AR features via the WebXR API.
-BASE_FEATURE(kWebXrArModule, "WebXRARModule", base::FEATURE_ENABLED_BY_DEFAULT);
 
 #if BUILDFLAG(IS_ANDROID)
 // Allows the experimental approach of proactively generating an accessibility

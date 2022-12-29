@@ -137,6 +137,8 @@
 #include "chrome/browser/ssl/https_defaulted_callbacks.h"
 #include "chrome/browser/ssl/https_only_mode_navigation_throttle.h"
 #include "chrome/browser/ssl/https_only_mode_upgrade_interceptor.h"
+#include "chrome/browser/ssl/https_upgrades_interceptor.h"
+#include "chrome/browser/ssl/https_upgrades_navigation_throttle.h"
 #include "chrome/browser/ssl/sct_reporting_service.h"
 #include "chrome/browser/ssl/ssl_client_auth_metrics.h"
 #include "chrome/browser/ssl/ssl_client_certificate_selector.h"
@@ -212,6 +214,7 @@
 #include "components/keep_alive_registry/keep_alive_types.h"
 #include "components/keep_alive_registry/scoped_keep_alive.h"
 #include "components/language/core/browser/pref_names.h"
+#include "components/lens/buildflags.h"
 #include "components/live_caption/caption_util.h"
 #include "components/media_router/browser/presentation/presentation_service_delegate_impl.h"
 #include "components/media_router/browser/presentation/receiver_presentation_service_delegate_impl.h"
@@ -528,7 +531,7 @@
 #include "chrome/browser/ui/views/chrome_browser_main_extra_parts_views.h"
 #endif
 
-#if defined(TOOLKIT_VIEWS) && BUILDFLAG(GOOGLE_CHROME_BRANDING)
+#if BUILDFLAG(ENABLE_LENS_DESKTOP_GOOGLE_BRANDED_FEATURES)
 #include "chrome/browser/ui/lens/lens_side_panel_navigation_helper.h"
 #include "components/lens/lens_features.h"
 #endif
@@ -3335,6 +3338,18 @@ bool ChromeContentBrowserClient::IsSharedStorageAllowed(
   return allowed;
 }
 
+bool ChromeContentBrowserClient::IsSharedStorageSelectURLAllowed(
+    content::BrowserContext* browser_context,
+    const url::Origin& top_frame_origin,
+    const url::Origin& accessing_origin) {
+  Profile* profile = Profile::FromBrowserContext(browser_context);
+  auto* privacy_sandbox_settings =
+      PrivacySandboxSettingsFactory::GetForProfile(profile);
+  DCHECK(privacy_sandbox_settings);
+  return privacy_sandbox_settings->IsSharedStorageSelectURLAllowed(
+      top_frame_origin, accessing_origin);
+}
+
 bool ChromeContentBrowserClient::IsPrivateAggregationAllowed(
     content::BrowserContext* browser_context,
     const url::Origin& top_frame_origin,
@@ -5040,10 +5055,7 @@ ChromeContentBrowserClient::CreateThrottlesForNavigation(
   }
 #endif
 
-// Only include Lens on Chrome branded Desktop clients. TOOLKIT_VIEWS is used
-// for rendering UI on Windows, Mac, Linux, and ChromeOS. Therefore, if
-// TOOLKIT_VIEWS is defined, we are on one of those platforms.
-#if defined(TOOLKIT_VIEWS) && BUILDFLAG(GOOGLE_CHROME_BRANDING)
+#if BUILDFLAG(ENABLE_LENS_DESKTOP_GOOGLE_BRANDED_FEATURES)
   if (lens::features::IsLensSidePanelEnabled()) {
     MaybeAddThrottle(
         lens::LensSidePanelNavigationHelper::MaybeCreateThrottleFor(handle),
@@ -5059,11 +5071,19 @@ ChromeContentBrowserClient::CreateThrottlesForNavigation(
 #endif
 
   if (profile && profile->GetPrefs()) {
-    MaybeAddThrottle(
-        HttpsOnlyModeNavigationThrottle::MaybeCreateThrottleFor(
-            handle, std::make_unique<ChromeSecurityBlockingPageFactory>(),
-            profile->GetPrefs()),
-        &throttles);
+    if (base::FeatureList::IsEnabled(features::kHttpsFirstModeV2)) {
+      MaybeAddThrottle(
+          HttpsUpgradesNavigationThrottle::MaybeCreateThrottleFor(
+              handle, std::make_unique<ChromeSecurityBlockingPageFactory>(),
+              profile->GetPrefs()),
+          &throttles);
+    } else {
+      MaybeAddThrottle(
+          HttpsOnlyModeNavigationThrottle::MaybeCreateThrottleFor(
+              handle, std::make_unique<ChromeSecurityBlockingPageFactory>(),
+              profile->GetPrefs()),
+          &throttles);
+    }
   }
 
   MaybeAddThrottle(MaybeCreateNavigationAblationThrottle(handle), &throttles);
@@ -5362,7 +5382,6 @@ ChromeContentBrowserClient::CreateURLLoaderThrottles(
 
 #if BUILDFLAG(IS_ANDROID)
   std::string client_data_header;
-  bool is_tab_large_enough = false;
   bool is_custom_tab = false;
   if (frame_tree_node_id != content::RenderFrameHost::kNoFrameTreeNodeId) {
     auto* web_contents = WebContents::FromFrameTreeNodeId(frame_tree_node_id);
@@ -5380,7 +5399,6 @@ ChromeContentBrowserClient::CreateURLLoaderThrottles(
                     web_contents->GetDelegate())
               : nullptr;
       if (delegate) {
-        is_tab_large_enough = delegate->IsTabLargeEnoughForDesktopSite();
         is_custom_tab = delegate->IsCustomTab();
       }
     }
@@ -5393,7 +5411,7 @@ ChromeContentBrowserClient::CreateURLLoaderThrottles(
       profile->GetPrefs()->GetString(prefs::kAllowedDomainsForApps)};
   result.push_back(std::make_unique<GoogleURLLoaderThrottle>(
 #if BUILDFLAG(IS_ANDROID)
-      client_data_header, is_tab_large_enough,
+      client_data_header,
 #endif
       std::move(dynamic_params)));
 
@@ -5892,7 +5910,10 @@ ChromeContentBrowserClient::WillCreateURLLoaderRequestInterceptors(
   interceptors.push_back(
       std::make_unique<SearchPrefetchURLLoaderInterceptor>(frame_tree_node_id));
 
-  if (base::FeatureList::IsEnabled(features::kHttpsOnlyMode)) {
+  if (base::FeatureList::IsEnabled(features::kHttpsFirstModeV2)) {
+    interceptors.push_back(
+        std::make_unique<HttpsUpgradesInterceptor>(frame_tree_node_id));
+  } else {
     interceptors.push_back(
         std::make_unique<HttpsOnlyModeUpgradeInterceptor>(frame_tree_node_id));
   }

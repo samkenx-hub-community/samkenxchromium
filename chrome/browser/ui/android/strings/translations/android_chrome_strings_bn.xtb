@@ -555,7 +555,6 @@
 <translation id="4045764304651014138">ব্যবহারের ডেটা</translation>
 <translation id="405399507749852140">কোনও সাইটে দাম কমলে সেই বিষয়ে বিজ্ঞপ্তি পান</translation>
 <translation id="4056223980640387499">সেপিয়া</translation>
-<translation id="4060598801229743805">স্ক্রীনের প্রায় উপরের দিকে বিকল্পগুলি উপলব্ধ</translation>
 <translation id="4062305924942672200">আইনী তথ্য</translation>
 <translation id="4072805772816336153">পরে আবার চেষ্টা করুন</translation>
 <translation id="4084682180776658562">বুকমার্ক</translation>
@@ -645,7 +644,6 @@
 <translation id="4554077758708533499">ইউএসবি কেবেলের সাথে কানেক্ট করা হয়েছে</translation>
 <translation id="4558311620361989323">ওয়েবপৃষ্ঠার শর্টকাটগুলি</translation>
 <translation id="4561730552726921821">রেজিস্ট্রেশন হয়ে গেছে</translation>
-<translation id="4561979708150884304">কোনও কানেকশন নেই</translation>
 <translation id="4565377596337484307">পাসওয়ার্ড লুকান</translation>
 <translation id="4572422548854449519">ম্যানেজ করা অ্যাকাউন্টে সাইন-ইন করুন</translation>
 <translation id="4576892426230499203">যাচাইকরণের অন্য একটি বিকল্প ব্যবহার করে দেখুন</translation>
@@ -670,7 +668,6 @@
 <translation id="4699172675775169585">ক্যাশে করা ছবি এবং ফাইলগুলি</translation>
 <translation id="4719927025381752090">অনুবাদ করুন</translation>
 <translation id="4720023427747327413"><ph name="PRODUCT_NAME" /> এ খুলুন</translation>
-<translation id="4720982865791209136">Chrome উন্নত করতে সাহায্য করুন। <ph name="BEGIN_LINK" />সমীক্ষায় অংশ নিন।<ph name="END_LINK" /></translation>
 <translation id="47217992755561375">আপনার জন্য বেছে নেওয়া সেরা সাইট দেখুন</translation>
 <translation id="4732120983431207637">স্ট্যাক আনউইন্ডার</translation>
 <translation id="4736934858538408121">ভার্চুয়াল কার্ড</translation>
@@ -774,7 +771,6 @@
 <translation id="5184329579814168207">Chrome এ খুলুন</translation>
 <translation id="5191251636205085390">থার্ড-পার্টি কুকি সরানোর নতুন প্রযুক্তি ও তা নিয়ন্ত্রণ সংক্রান্ত তথ্যগুলি জানুন</translation>
 <translation id="5193988420012215838">আপনার ক্লিপবোর্ডে কপি করা হয়েছে</translation>
-<translation id="5199929503336119739">কর্মস্থলের প্রোফাইল</translation>
 <translation id="5204967432542742771">পাসওয়ার্ড প্রবেশ করান</translation>
 <translation id="5206168361184759344">{FILE_COUNT,plural, =1{ফাইল ডাউনলোড হচ্ছে…}one{#টি ফাইল ডাউনলোড হচ্ছে…}other{#টি ফাইল ডাউনলোড হচ্ছে…}}</translation>
 <translation id="5210286577605176222">পূর্ববর্তী ট্যাবে চলে যান</translation>
@@ -1348,14 +1344,12 @@
 <translation id="8221656072740924283">চালিয়ে যান</translation>
 <translation id="8223642481677794647">ফিড কার্ডের মেনু</translation>
 <translation id="8250920743982581267">দস্তাবেজগুলি</translation>
-<translation id="825412236959742607">এই পৃষ্ঠাটি খুব বেশি মেমরি ব্যবহার করছে তাই Chrome কিছু কন্টেন্ট সরিয়ে দিয়েছে।</translation>
 <translation id="8255617931166444521">সাইট শুধুমাত্র আপনার কুকি ব্যবহার করতে পারে, যাতে তার সাইটে আপনার ব্রাউজিং অ্যাক্টিভিটি দেখা যায়</translation>
 <translation id="8259179246279078674">প্রিলোড করা পৃষ্ঠা এনক্রিপ্ট করা থাকে বলে সেটির কন্টেন্ট Google জানতে পারে না। কোন সাইট ব্যক্তিগতভাবে প্রিলোড করা হয়েছে সেটি Google সার্ভার জানতে পারে। এই তথ্য শুধু পৃষ্ঠা প্রিলোড করার জন্য ব্যবহার করা হয় এবং আপনার Google অ্যাকাউন্টের অন্য তথ্যের সাথে যুক্ত থাকে না।</translation>
 <translation id="8260126382462817229">আবার সাইন ইন করার চেষ্টা করুন</translation>
 <translation id="8261506727792406068">মুছুন</translation>
 <translation id="82619448491672958">অন্যান্য ট্যাব দেখুন</translation>
 <translation id="8266862848225348053">যেখানে ডাউনলোড হবে</translation>
-<translation id="8274165955039650276">ডাউনলোড দেখুন</translation>
 <translation id="8281886186245836920">ছেড়ে যান</translation>
 <translation id="8282297628636750033">সম্ভব হলে সাইটে ডার্ক থিম রাখুন</translation>
 <translation id="829672787777123339">আপনার ডিভাইসে কানেক্ট করা হচ্ছে…</translation>
@@ -1519,7 +1513,6 @@
 <translation id="9108808586816295166">নিরাপদ ডিএনএস সবসময় উপলভ্য নাও থাকতে পারে</translation>
 <translation id="9128984223251192329">প্রাইভেসি স্যান্ডবক্স প্রম্পট অর্ধেক স্ক্রিন জুড়ে খুলেছে</translation>
 <translation id="9133397713400217035">অফলাইন কন্টেন্ট দেখুন</translation>
-<translation id="9137013805542155359">প্রকৃত রূপ দেখান</translation>
 <translation id="9148126808321036104">আবার সাইন-ইন করুন</translation>
 <translation id="9158770349521403363">শুধুমাত্র কন্টেন্ট শেয়ার করুন</translation>
 <translation id="9159716826369098114">নতুন ব্যাকগ্রাউন্ড ট্যাব গ্রুপ হিসেবে <ph name="TAB_COUNT" />টি ট্যাবের ট্যাব গ্রুপ ফিরিয়ে আনুন।</translation>

@@ -144,6 +144,7 @@
 <translation id="2208919847696382164">Linux ব্যবহার করে ইনস্টল করুন</translation>
 <translation id="2225536596944493418">আপনি কি <ph name="NUMBER_OF_ITEMS" />টি আইটেম মুছে ফেলার ব্যাপারে নিশ্চিত?</translation>
 <translation id="2230062665678605299">"<ph name="FOLDER_NAME" /> " ফোল্ডার তৈরী করতে ব্যর্থ৷<ph name="ERROR_MESSAGE" /></translation>
+<translation id="2236732657580416950">আপনার Google Drive ক্যাশে খালি করা হয়েছে।</translation>
 <translation id="2239068707900391003">কফি কাপ ধরে আছে এমন ব্যক্তির ছবি</translation>
 <translation id="2251368349685848079">ট্র্যাশ থেকে ফিরিয়ে আনুন</translation>
 <translation id="2282155092769082568">স্বতঃকনফিগারেশান URL:</translation>
@@ -677,6 +678,7 @@
 <translation id="6607272825297743757">ফাইলের তথ্য</translation>
 <translation id="6609332149380188670">Parallels Desktop-এর সাথে <ph name="NUMBER_OF_ITEMS" /> ফোল্ডার শেয়ার করা হয়েছে</translation>
 <translation id="6629518321609546825">কমপক্ষে ৪টি সংখ্যা লিখুন</translation>
+<translation id="6639661343369899134"><ph name="SHARED_DRIVE_NAME" />-এ পর্যাপ্ত স্টোরেজ না থাকার জন্য ফাইল আপলোড করা যাচ্ছে না।</translation>
 <translation id="6643016212128521049">সাফ করুন</translation>
 <translation id="6650726141019353908">গোলাপি প্রজাপতি</translation>
 <translation id="6657585470893396449">পাসওয়ার্ড</translation>

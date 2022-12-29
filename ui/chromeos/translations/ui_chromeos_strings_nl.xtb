@@ -144,6 +144,7 @@
 <translation id="2208919847696382164">Installeren met Linux</translation>
 <translation id="2225536596944493418">Weet je zeker dat je <ph name="NUMBER_OF_ITEMS" /> items wilt verwijderen?</translation>
 <translation id="2230062665678605299">Kan map '<ph name="FOLDER_NAME" />' niet maken. <ph name="ERROR_MESSAGE" /></translation>
+<translation id="2236732657580416950">Je Google Drive-cachegeheugen is gewist.</translation>
 <translation id="2239068707900391003">Persoon met koffie</translation>
 <translation id="2251368349685848079">Herstellen uit prullenbak</translation>
 <translation id="2282155092769082568">URL voor autoconfiguratie</translation>
@@ -679,6 +680,7 @@
 <translation id="6607272825297743757">Bestandsinformatie</translation>
 <translation id="6609332149380188670"><ph name="NUMBER_OF_ITEMS" /> mappen gedeeld met Parallels Desktop</translation>
 <translation id="6629518321609546825">Geef minimaal 4 cijfers op</translation>
+<translation id="6639661343369899134">Je kunt geen bestanden uploaden omdat <ph name="SHARED_DRIVE_NAME" /> niet genoeg opslagruimte heeft.</translation>
 <translation id="6643016212128521049">Wissen</translation>
 <translation id="6650726141019353908">Roze vlinder</translation>
 <translation id="6657585470893396449">Wachtwoord</translation>

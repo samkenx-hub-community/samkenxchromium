@@ -16,14 +16,6 @@ BASE_FEATURE(kEnablePopoutOmniboxIpad,
              "EnablePopoutOmniboxIpad",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-BASE_FEATURE(kOmniboxPasteButton,
-             "OmniboxPasteButton",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-
-const char kOmniboxPasteButtonParameterName[] = "PasteButtonVariant";
-const char kOmniboxPasteButtonParameterBlueIconCapsule[] = "SuggestionIcon";
-const char kOmniboxPasteButtonParameterBlueFullCapsule[] = "SuggestionTextIcon";
-
 BASE_FEATURE(kOmniboxKeyboardPasteButton,
              "OmniboxKeyboardPasteButton",
              base::FEATURE_DISABLED_BY_DEFAULT);
@@ -31,22 +23,6 @@ BASE_FEATURE(kOmniboxKeyboardPasteButton,
 BASE_FEATURE(kOmniboxCarouselDynamicSpacing,
              "OmniboxCarouselDynamicSpacing",
              base::FEATURE_ENABLED_BY_DEFAULT);
-
-bool IsOmniboxActionsEnabled() {
-  return base::FeatureList::IsEnabled(kIOSOmniboxUpdatedPopupUI);
-}
-
-bool IsOmniboxActionsVisualTreatment1() {
-  return base::FeatureList::IsEnabled(kIOSOmniboxUpdatedPopupUI);
-}
-
-bool IsOmniboxActionsVisualTreatment2() {
-  return false;
-}
-
-bool IsSwiftUIPopupEnabled() {
-  return false;
-}
 
 bool IsIpadPopoutOmniboxEnabled() {
   return base::FeatureList::IsEnabled(kEnablePopoutOmniboxIpad) &&

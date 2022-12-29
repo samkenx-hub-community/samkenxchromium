@@ -1015,6 +1015,7 @@ Dit sal andersins deur jou privaatheidinstellings geblokkeer word. Dit sal die i
 <translation id="3532844647053365774"><ph name="HOST" /> wil jou mikrofoon gebruik</translation>
 <translation id="3533328374079021623">Posbus 5</translation>
 <translation id="3537165859691846083">Brief Plus</translation>
+<translation id="3542628208405253498">Kaartprent</translation>
 <translation id="3542768452570884558">Maak skakel in nuwe venster oop</translation>
 <translation id="3547746132308051926">20x24 dm.</translation>
 <translation id="3550112004925580947">Gasvryheidsbedryf</translation>
@@ -1105,6 +1106,7 @@ Dit sal andersins deur jou privaatheidinstellings geblokkeer word. Dit sal die i
 <translation id="3745099705178523657">Nadat jy bevestig het, sal kaartbesonderhede vanaf jou Google-rekening met hierdie werf gedeel word.</translation>
 <translation id="3748148204939282805">Aanvallers op <ph name="BEGIN_BOLD" /><ph name="SITE" /><ph name="END_BOLD" /> kan jou dalk mislei om iets gevaarlik te doen, soos om sagteware te installeer of jou persoonlike inligting bekend te maak (byvoorbeeld: wagwoorde, foonnommers of kredietkaartinligting). <ph name="BEGIN_LEARN_MORE_LINK" />Kom meer te wete<ph name="END_LEARN_MORE_LINK" /></translation>
 <translation id="3748912308089554501">Lugvaartbedryf</translation>
+<translation id="3752543821772132562">Geïgnoreer omdat <ph name="POLICY_NAME" /> nie gestel is nie.</translation>
 <translation id="3754210790023674521">Verlaat prent-in-prent</translation>
 <translation id="3759461132968374835">Jy het geen omvalle wat onlangs aangemeld is nie. Omvalle wat plaasgevind het toe omvalverslaggewing gedeaktiveer is, sal nie hier verskyn nie.</translation>
 <translation id="3760561303380396507">Gebruik Windows Hello pleks van CVC?</translation>
@@ -1164,6 +1166,7 @@ Dit sal andersins deur jou privaatheidinstellings geblokkeer word. Dit sal die i
 <translation id="3927932062596804919">Weier</translation>
 <translation id="393316646445601645">Internet en telekommunikasie</translation>
 <translation id="3939773374150895049">Gebruik WebAuthn pleks van CVC?</translation>
+<translation id="3943857333388298514">Plak</translation>
 <translation id="3946209740501886391">Vra altyd op hierdie werf</translation>
 <translation id="3947595700203588284">Kan vra om aan MIDI-toestelle te koppel</translation>
 <translation id="3949571496842715403">Hierdie bediener kon nie bewys dat dit <ph name="DOMAIN" /> is nie; sy sekuriteitsertifikaat spesifiseer nie Onderwerp Alternatiewe Name nie. Dit kan veroorsaak word deur 'n wanopstelling of 'n aanvaller wat jou verbinding onderskep.</translation>
@@ -2311,6 +2314,7 @@ Dit sal andersins deur jou privaatheidinstellings geblokkeer word. Dit sal die i
 <translation id="6890531741535756070">Jy het gekies om met <ph name="DEVICE_LABEL" /> te verifieer op webwerwe wat <ph name="PROVIDER_ORIGIN" /> gebruik. Hierdie verskaffer het dalk inligting oor betaalmetode geberg, wat jy kan <ph name="BEGIN_LINK" />vra dat dit uitgevee word<ph name="END_LINK" />.</translation>
 <translation id="6891596781022320156">Beleidvlak word nie gesteun nie.</translation>
 <translation id="6895330447102777224">Jou kaart is bevestig</translation>
+<translation id="6896758677409633944">Kopieer</translation>
 <translation id="6897140037006041989">Gebruikeragent</translation>
 <translation id="6898699227549475383">Organisasie (O)</translation>
 <translation id="6899000063526916106">Voer <ph name="NUMBER_OF_DIGITS" />-syferkode in</translation>
@@ -2678,6 +2682,7 @@ om uit te vind hoe om die sagteware permanent van jou rekenaar te verwyder&lt;/o
 <translation id="7716375162095500223">Nog nie opgelaai nie, of geïgnoreer</translation>
 <translation id="7716424297397655342">Hierdie werf kan nie uit die kas gelaai word nie</translation>
 <translation id="7723047071702270851">Wysig kaart</translation>
+<translation id="7724603315864178912">Knip</translation>
 <translation id="7734285854693414638">Skep vinnig 'n nuwe vorm in Google Vorms</translation>
 <translation id="773466115871691567">Vertaal altyd bladsye in <ph name="SOURCE_LANGUAGE" /></translation>
 <translation id="7736959720849233795">Kopieer skakeladres</translation>
@@ -2714,6 +2719,7 @@ om uit te vind hoe om die sagteware permanent van jou rekenaar te verwyder&lt;/o
 <translation id="7815407501681723534">Het <ph name="NUMBER_OF_RESULTS" /> <ph name="SEARCH_RESULTS" /> vir "<ph name="SEARCH_STRING" />" gevind</translation>
 <translation id="7822320754433038727">Jag en skiet</translation>
 <translation id="782886543891417279">Die Wi-Fi wat jy gebruik (<ph name="WIFI_NAME" />), kan vereis dat jy sy aanmeldbladsy besoek.</translation>
+<translation id="7840103971441592723">Skermskoot het begin</translation>
 <translation id="7844689747373518809">{COUNT,plural, =0{Geen}=1{1 program (<ph name="EXAMPLE_APP_1" />)}=2{2 programme (<ph name="EXAMPLE_APP_1" />, <ph name="EXAMPLE_APP_2" />)}other{# programme (<ph name="EXAMPLE_APP_1" />, <ph name="EXAMPLE_APP_2" />, <ph name="AND_MORE" />)}}</translation>
 <translation id="7855695075675558090"><ph name="TOTAL_LABEL" /> <ph name="CURRENCY_CODE" /> <ph name="FORMATTED_TOTAL_AMOUNT" /></translation>
 <translation id="7862185352068345852">Verlaat werf?</translation>
@@ -2743,6 +2749,7 @@ om uit te vind hoe om die sagteware permanent van jou rekenaar te verwyder&lt;/o
 <translation id="7942349550061667556">Rooi</translation>
 <translation id="7943397946612013052">Aflaai is geblokkeer</translation>
 <translation id="7943893128817522649">Kan vra om outomaties veelvuldige lêers af te laai</translation>
+<translation id="7946724693008564269">Bespeurde taal</translation>
 <translation id="7947285636476623132">Gaan jou vervaljaar na en probeer weer</translation>
 <translation id="7947813448670013867"><ph name="SEE_CHROME_TIPS_FOCUSED_FRIENDLY_MATCH_TEXT" />, druk Tab en dan Enter om meer oor Chrome-kenmerke uit te vind</translation>
 <translation id="7950027195171824198">Bestuur jou webkoekievoorkeure in Chrome-instellings</translation>
@@ -2891,6 +2898,7 @@ om uit te vind hoe om die sagteware permanent van jou rekenaar te verwyder&lt;/o
 <translation id="8282947398454257691">Jou unieke toestelidentifiseerder ken</translation>
 <translation id="8284769179630993263">Bestuur jou Veiligblaai en meer in Chrome-instellings</translation>
 <translation id="8286036467436129157">Meld aan</translation>
+<translation id="8286799286781881307">Apps wat deur jou admin gemagtig is, kan alle skerms vasvang wat aan jou toestel gekoppel is. Hierdie inligting kan plaaslik verwerk word, of kan na jou organisasie se bedieners toe opgelaai word.</translation>
 <translation id="8288807391153049143">Wys sertifikaat</translation>
 <translation id="8289355894181816810">Kontak jou netwerkadministrateur as jy nie seker is wat dit beteken nie.</translation>
 <translation id="8293206222192510085">Voeg boekmerk by</translation>
@@ -2917,6 +2925,7 @@ om uit te vind hoe om die sagteware permanent van jou rekenaar te verwyder&lt;/o
 <translation id="8355270400102541638">Konteks van plaaslike omval:</translation>
 <translation id="8363502534493474904">Vliegtuigmodus afskakel</translation>
 <translation id="8364627913115013041">Nie gestel nie.</translation>
+<translation id="836616551641291797">Kom meer te wete oor hoe jou blaaier bestuur word</translation>
 <translation id="8368001212524806591">Spoor prys na</translation>
 <translation id="8368027906805972958">Onbekende of ongesteunde toestel (<ph name="DEVICE_ID" />)</translation>
 <translation id="8368476060205742148">Google Play Dienste</translation>

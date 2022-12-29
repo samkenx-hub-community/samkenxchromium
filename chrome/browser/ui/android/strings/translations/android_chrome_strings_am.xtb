@@ -517,6 +517,7 @@
 <translation id="3830886834687455630">የእርስዎን የይለፍ ቃላት ለመፈተሽ የGoogle Play አገልግሎቶችን ያዘምኑ</translation>
 <translation id="3845098929839618392">ማንነትን በማያሳውቅ ትር ክፈት</translation>
 <translation id="3856096718352044181">ይህ ልክ የሆነ አገልግሎት አቅራቢ መሆኑን እባክዎ ያረጋግጡ ወይም ቆይተው እንደገና ይሞክሩ</translation>
+<translation id="3858127568696903256">እርስዎ የሚከተሉትን ይዘት እዚህ ይመልከቱ</translation>
 <translation id="3858860766373142691">ስም</translation>
 <translation id="3861633093716975811">ታዋቂ ቪዲዮዎች</translation>
 <translation id="3874520961715512166">ጣቢያ ተወግዷል</translation>
@@ -552,7 +553,6 @@
 <translation id="4045764304651014138">የአጠቃቀም ውሂብ</translation>
 <translation id="405399507749852140">በማንኛውም ጣቢያ ላይ ዋጋው ቢቀንስ ማንቂያዎችን ያግኙ</translation>
 <translation id="4056223980640387499">ቀይ ቡናማ</translation>
-<translation id="4060598801229743805">አማራጮች ከማያ ገጹ ግርጌ አጠገብ ይገኛሉ</translation>
 <translation id="4062305924942672200">የህግ መረጃ</translation>
 <translation id="4072805772816336153">ቆይተው እንደገና ይሞክሩ</translation>
 <translation id="4084682180776658562">ዕልባት</translation>
@@ -642,7 +642,6 @@
 <translation id="4554077758708533499">በዩኤስቢ ገመድ ተገናኝቷል</translation>
 <translation id="4558311620361989323">የድረ-ገጽ አቋራጮች</translation>
 <translation id="4561730552726921821">ምዝገባው ተሳክቷል</translation>
-<translation id="4561979708150884304">ግንኙነት የለም</translation>
 <translation id="4565377596337484307">የይለፍ ቃል ደብቅ</translation>
 <translation id="4572422548854449519">ወደ የሚተዳደር መለያ ይግቡ</translation>
 <translation id="4576892426230499203">ሌላ የማረጋገጫ አማራጭ ይሞክሩ</translation>
@@ -667,7 +666,6 @@
 <translation id="4699172675775169585">የተሸጎጡ ምስሎች እና ፋይሎች</translation>
 <translation id="4719927025381752090">ለመተርጎም ጥያቄ አቅርብ</translation>
 <translation id="4720023427747327413">በ<ph name="PRODUCT_NAME" /> ውስጥ ክፈት</translation>
-<translation id="4720982865791209136">Chrome እንዲሻሻል ያግዙ። <ph name="BEGIN_LINK" />የዳሰሳ ጥናት ይወሰዱ<ph name="END_LINK" /></translation>
 <translation id="47217992755561375">ከፍተኛዎቹ ጣቢያዎችዎን ይመልከቱ</translation>
 <translation id="4732120983431207637">ድርድር ወደ ኋላ ማጠንጠኛ</translation>
 <translation id="4736934858538408121">ምናባዊ ካርድ</translation>
@@ -771,7 +769,6 @@
 <translation id="5184329579814168207">በChrome ውስጥ ክፈት</translation>
 <translation id="5191251636205085390">የሶስተኛ ወገን ኩኪዎችን ለመተካት ዓላማ ያላቸውን አዳዲስ ቴክኖሎጂዎችን ይረዱ እና ይቆጣጠሩ</translation>
 <translation id="5193988420012215838">ወደ የእርስዎ ቅንጥብ ሰሌዳ ላይ ተቀድቷል</translation>
-<translation id="5199929503336119739">የሥራ መገለጫ</translation>
 <translation id="5204967432542742771">የይለፍ ቃል ያስገቡ</translation>
 <translation id="5206168361184759344">{FILE_COUNT,plural, =1{ፋይልን በማውረድ ላይ…}one{# ፋይሎችን በማውረድ ላይ…}other{# ፋይሎችን በማውረድ ላይ…}}</translation>
 <translation id="5210286577605176222">ወደ ቀዳሚው ትር ዝለል</translation>
@@ -1345,14 +1342,12 @@
 <translation id="8221656072740924283">ቀጥል</translation>
 <translation id="8223642481677794647">የምግብ ካርድ ምናሌ</translation>
 <translation id="8250920743982581267">ሰነዶች</translation>
-<translation id="825412236959742607">ይህ ገጽ በጣም ብዙ ማህደረ ትውስታን ይጠቀማል፣ ስለዚህ Chrome አንዳንድ ይዘትን አስወግዷል።</translation>
 <translation id="8255617931166444521">ጣቢያዎች የአሰሳ እንቅስቃሴዎን በራሳቸው ጣቢያ ላይ ብቻ ለማየት የእርስዎን ኩኪዎች ብቻ ሊጠቀሙ ይችላሉ።</translation>
 <translation id="8259179246279078674">ቅድሚያ የሚጫኑ ገጾች የተመሠጠሩ ስለሆኑ Google ቅድሚያ ስለተጫነው የገጽ ይዘት ምንም ነገር አያውቅም። የGoogle አገልጋዮች የትኛዎቹ ጣቢያዎች በግል ቅድሚያ እንደሚጫኑ ይማራል። ይህ መረጃ ገጾቹን ቅድሚያ ለመጫን ብቻ ነው ስራ ላይ የሚውለው፣ እና ከGoogle መለያዎ ከመጣ ሌላ መረጃ ጋር አይገናኝም።</translation>
 <translation id="8260126382462817229">እንደገና ለመግባት ይሞክሩ</translation>
 <translation id="8261506727792406068">ሰርዝ</translation>
 <translation id="82619448491672958">ሌሎች ትሮችን ይመልከቱ</translation>
 <translation id="8266862848225348053">የሚወርድበት ቦታ</translation>
-<translation id="8274165955039650276">ውርዶችን ይመልከቱ</translation>
 <translation id="8281886186245836920">ዝለል</translation>
 <translation id="8282297628636750033">በሚቻልበት ጊዜ ጠቆር ያለ ገጽታን ጣቢያዎች ላይ ተግብር</translation>
 <translation id="829672787777123339">ከእርስዎ መሣሪያ ጋር በመገናኘት ላይ…</translation>
@@ -1516,7 +1511,6 @@
 <translation id="9108808586816295166">ደህንነቱ የተጠበቀ ዲኤንኤስ ሁልጊዜ ሊገኝ የሚችል ላይሆን ይችላል</translation>
 <translation id="9128984223251192329">የግላዊነት Sandbox ጥያቄ በግማሽ ቁመት ተከፍቷል</translation>
 <translation id="9133397713400217035">ከመስመር ውጭ ያስሱ</translation>
-<translation id="9137013805542155359">የመጀመሪያውን አሳይ</translation>
 <translation id="9148126808321036104">እንደገና ይግቡ</translation>
 <translation id="9158770349521403363">ይዘትን ብቻ ያጋሩ</translation>
 <translation id="9159716826369098114">የ<ph name="TAB_COUNT" /> ትሮችን የትር ቡድን እንደ አዲስ የዳራ ትር ቡድን ወደነበረበት መልስ።</translation>

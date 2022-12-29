@@ -553,7 +553,6 @@ Os tokens de estado particular melhoram a privacidade na Web e não podem ser us
 <translation id="4045764304651014138">Dados de uso</translation>
 <translation id="405399507749852140">Receba alertas se houver uma redução no preço em algum site</translation>
 <translation id="4056223980640387499">Sépia</translation>
-<translation id="4060598801229743805">Opções disponíveis perto da parte superior da tela</translation>
 <translation id="4062305924942672200">Informações legais</translation>
 <translation id="4072805772816336153">Tente novamente mais tarde</translation>
 <translation id="4084682180776658562">Favorito</translation>
@@ -644,7 +643,6 @@ Os tokens de estado particular melhoram a privacidade na Web e não podem ser us
 <translation id="4554077758708533499">Conectado com um cabo USB</translation>
 <translation id="4558311620361989323">Atalhos de páginas da Web</translation>
 <translation id="4561730552726921821">Registro concluído</translation>
-<translation id="4561979708150884304">Sem conexão</translation>
 <translation id="4565377596337484307">Ocultar senha</translation>
 <translation id="4572422548854449519">Fazer login em conta gerenciada</translation>
 <translation id="4576892426230499203">Tente outra opção de verificação</translation>
@@ -669,7 +667,6 @@ Os tokens de estado particular melhoram a privacidade na Web e não podem ser us
 <translation id="4699172675775169585">Imagens e arquivos armazenados em cache</translation>
 <translation id="4719927025381752090">Oferecer para traduzir</translation>
 <translation id="4720023427747327413">Abrir no <ph name="PRODUCT_NAME" /></translation>
-<translation id="4720982865791209136">Ajude a melhorar o Chrome. <ph name="BEGIN_LINK" />Responda à pesquisa.<ph name="END_LINK" /></translation>
 <translation id="47217992755561375">Veja seus principais sites</translation>
 <translation id="4732120983431207637">Recuperador de pilha</translation>
 <translation id="4736934858538408121">Cartão virtual</translation>
@@ -773,7 +770,6 @@ Para alterar essa configuração, <ph name="BEGIN_LINK" />redefina a sincroniza�
 <translation id="5184329579814168207">Abrir no Google Chrome</translation>
 <translation id="5191251636205085390">Descubra e controle novas tecnologias para substituir cookies de terceiros</translation>
 <translation id="5193988420012215838">Copiado para a área de transferência</translation>
-<translation id="5199929503336119739">Perfil de trabalho</translation>
 <translation id="5204967432542742771">Insira a senha</translation>
 <translation id="5206168361184759344">{FILE_COUNT,plural, =1{Fazendo o download do arquivo…}one{Fazendo o download de # arquivo…}other{Fazendo o download de # arquivos…}}</translation>
 <translation id="5210286577605176222">Ir para a guia anterior</translation>
@@ -1347,14 +1343,12 @@ Por exemplo, alguns sites podem responder a esse pedido mostrando anúncios que 
 <translation id="8221656072740924283">Continuar</translation>
 <translation id="8223642481677794647">Menu do card do feed</translation>
 <translation id="8250920743982581267">Documentos</translation>
-<translation id="825412236959742607">Como esta página usa muita memória, o Chrome removeu parte do conteúdo.</translation>
 <translation id="8255617931166444521">Os sites só podem usar os cookies para ver sua atividade de navegação na própria página.</translation>
 <translation id="8259179246279078674">Como as páginas pré-carregadas são criptografadas, o Google não sabe nada sobre o conteúdo delas. Os servidores do Google saberão quais sites foram pré-carregados de forma anônima. Essa informação é usada somente para pré-carregar as páginas, e não está vinculada a outras informações da sua Conta do Google.</translation>
 <translation id="8260126382462817229">Tente fazer login novamente</translation>
 <translation id="8261506727792406068">Excluir</translation>
 <translation id="82619448491672958">Ver outras guias</translation>
 <translation id="8266862848225348053">Local de download</translation>
-<translation id="8274165955039650276">Ver downloads</translation>
 <translation id="8281886186245836920">Pular</translation>
 <translation id="8282297628636750033">Aplicar o tema escuro para sites</translation>
 <translation id="829672787777123339">Conectando ao seu dispositivo…</translation>
@@ -1518,7 +1512,6 @@ Por exemplo, alguns sites podem responder a esse pedido mostrando anúncios que 
 <translation id="9108808586816295166">DNS seguro pode não estar disponível o tempo todo</translation>
 <translation id="9128984223251192329">Solicitação do Sandbox de privacidade aberta na metade da altura</translation>
 <translation id="9133397713400217035">Navegar off-line</translation>
-<translation id="9137013805542155359">Mostrar original</translation>
 <translation id="9148126808321036104">Faça login novamente</translation>
 <translation id="9158770349521403363">Compartilhar apenas o conteúdo</translation>
 <translation id="9159716826369098114">Restaurar grupo de <ph name="TAB_COUNT" /> guias como um novo grupo de guias em segundo plano.</translation>

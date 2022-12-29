@@ -48,6 +48,7 @@ Solo las personas que tengan tu frase de contraseña podrán leer tus datos cifr
 <translation id="1265739287306757398">Más información</translation>
 <translation id="1272079795634619415">Detener</translation>
 <translation id="1275718070701477396">Seleccionado</translation>
+<translation id="1279024913354609713">No permitir</translation>
 <translation id="1281818060020671000">Gestionar datos</translation>
 <translation id="1282311502488501110">No iniciar sesión</translation>
 <translation id="1283524564873030414">Últimas 24 horas</translation>
@@ -148,6 +149,7 @@ Solo las personas que tengan tu frase de contraseña podrán leer tus datos cifr
 <translation id="2074131957428911366">Siempre puedes seleccionar qué contenido quieres sincronizar en los <ph name="BEGIN_LINK" />ajustes<ph name="END_LINK" />.</translation>
 <translation id="2079545284768500474">Deshacer</translation>
 <translation id="2080769225927880590">Inicia sesión con una cuenta válida</translation>
+<translation id="2090878303988764231">Inicia sesión para gestionar el contenido que ves</translation>
 <translation id="2103075008456228677">Abrir history.google.com</translation>
 <translation id="21133533946938348">Fijar pestaña</translation>
 <translation id="2116625576999540962"><ph name="NUMBER_OF_SELECTED_BOOKMARKS" /> elementos eliminados</translation>
@@ -508,6 +510,7 @@ Para cambiar esta opción, <ph name="BEGIN_LINK" />restablece la sincronización
 <translation id="481968316161811770">Cookies y datos de sitios</translation>
 <translation id="4824497107140370669">{count,plural, =0{{domain}}=1{{domain} y 1 más}other{{domain} y {count} más}}</translation>
 <translation id="4826218269716039351">Bloquear cookies de terceros</translation>
+<translation id="4826588772550366629">cámara y micrófono</translation>
 <translation id="4826726074642088322">Compartir resaltado</translation>
 <translation id="48274138579728272">Marcar como leído</translation>
 <translation id="4833686396768033263">Las pestañas recientes no están disponibles</translation>
@@ -560,6 +563,7 @@ Para cambiar esta opción, <ph name="BEGIN_LINK" />restablece la sincronización
 <translation id="5190835502935405962">Barra de marcadores</translation>
 <translation id="519530786644929958">La descarga ha fallado y no se puede reintentar.</translation>
 <translation id="5197255632782567636">Internet</translation>
+<translation id="5211488077761630279">¿Permitir que <ph name="SITE_NAME" /> use tu <ph name="PERMISSION" />?</translation>
 <translation id="5219295696240154694">Ayudar a mejorar la seguridad de todos los usuarios en la Web</translation>
 <translation id="5228579091201413441">Habilitar sincronización</translation>
 <translation id="5232485538978018676">Iniciar sesión con una cuenta gestionada</translation>
@@ -787,6 +791,7 @@ Mientras estás en modo Incógnito, los sitios no pueden usar tus cookies para v
 <translation id="6710079714193676716">Gestionado por tu organización. Es posible que algunas funciones no estén disponibles. <ph name="BEGIN_LINK" />Más información<ph name="END_LINK" /></translation>
 <translation id="6713747756340119864">Aplicaciones de Google</translation>
 <translation id="6730682669179532099">No se pueden exportar las contraseñas</translation>
+<translation id="6732087373923685049">cámara</translation>
 <translation id="6748108480210050150">De</translation>
 <translation id="6760509555861141183">Volver a la pestaña reciente</translation>
 <translation id="6762812039470893796">Desmarcar todo</translation>
@@ -973,6 +978,7 @@ Los sitios pueden usar cookies para ver tu actividad de navegación en otros sit
 <translation id="8197543752516192074">Traducir página</translation>
 <translation id="8205564605687841303">Cancelar</translation>
 <translation id="8206354486702514201">El administrador aplica esta opción.</translation>
+<translation id="821809831108207540">Para personalizar tu feed de Discover y Chrome, inicia sesión y activa la sincronización.</translation>
 <translation id="8225985093977202398">Archivos e imágenes en caché</translation>
 <translation id="8237382152611443140">Abre los ajustes de Autorrellenar contraseñas</translation>
 <translation id="8261506727792406068">Eliminar</translation>
@@ -1039,6 +1045,7 @@ Los sitios pueden usar cookies para ver tu actividad de navegación en otros sit
 <translation id="8764015330924122850">Dejar de seguir a <ph name="DOMAIN_NAME" /></translation>
 <translation id="8775144690796719618">La URL no es válida</translation>
 <translation id="8787968206789828143">Buscar en Web</translation>
+<translation id="8792626944327216835">micrófono</translation>
 <translation id="8803639129939845298">Es seguro</translation>
 <translation id="8806823403540278281">Tu organización requiere que navegues de forma privada. En el modo Incógnito, las pestañas no se guardan.
 <ph name="BEGIN_LINK" />Más información<ph name="END_LINK" /></translation>
@@ -1094,6 +1101,7 @@ Los sitios pueden usar cookies para ver tu actividad de navegación en otros sit
 <translation id="9157836665414082580">Quitar cuadros de diálogo</translation>
 <translation id="9177438225260810839">Buscar en las pestañas abiertas</translation>
 <translation id="9188680907066685419">Cierra sesión en la cuenta gestionada</translation>
+<translation id="9193147658040604536">Arrastra aquí para fijar la pestaña</translation>
 <translation id="9200875785104711666">Hace <ph name="TIME" /> d</translation>
 <translation id="9203116392574189331">Handoff</translation>
 <translation id="9219154867334666734">Buscar pestañas…</translation>

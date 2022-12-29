@@ -24,7 +24,8 @@ namespace ash::cfm {
 
 namespace {
 
-// TODO(https://crbug.com/1164001): remove after the migration to namespace ash.
+// TODO(https://crbug.com/1403174): Remove when namespace of mojoms for CfM are
+// migarted to ash.
 namespace mojom = ::chromeos::cfm::mojom;
 
 constexpr char kRootPartition[] = "/";
@@ -246,8 +247,8 @@ void DeviceInfoService::GetMachineStatisticsInfo(
   auto stat_info = mojom::MachineStatisticsInfo::New();
 
   if (const absl::optional<base::StringPiece> hwid =
-          chromeos::system::StatisticsProvider::GetInstance()
-              ->GetMachineStatistic(chromeos::system::kHardwareClassKey)) {
+          system::StatisticsProvider::GetInstance()->GetMachineStatistic(
+              system::kHardwareClassKey)) {
     stat_info->hwid = std::string(hwid.value());
   }
 
@@ -279,10 +280,9 @@ void DeviceInfoService::ScheduleOnMachineStatisticsLoaded() {
 
   on_machine_statistics_loaded_ = false;
 
-  chromeos::system::StatisticsProvider::GetInstance()
-      ->ScheduleOnMachineStatisticsLoaded(
-          base::BindOnce(&DeviceInfoService::SetOnMachineStatisticsLoaded,
-                         weak_ptr_factory_.GetWeakPtr(), true));
+  system::StatisticsProvider::GetInstance()->ScheduleOnMachineStatisticsLoaded(
+      base::BindOnce(&DeviceInfoService::SetOnMachineStatisticsLoaded,
+                     weak_ptr_factory_.GetWeakPtr(), true));
 }
 
 void DeviceInfoService::SetOnMachineStatisticsLoaded(bool loaded) {

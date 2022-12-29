@@ -517,6 +517,7 @@ Os tokens de estado privado melloran a privacidade na Web e non se poden usar pa
 <translation id="3830886834687455630">Actualiza os servizos de Google Play para comprobar os contrasinais</translation>
 <translation id="3845098929839618392">Abrir en pestana de incógnito</translation>
 <translation id="3856096718352044181">Verifica que se trate dun fornecedor válido ou téntao de novo máis tarde.</translation>
+<translation id="3858127568696903256">Consulta aquí o contido que segues</translation>
 <translation id="3858860766373142691">Nome</translation>
 <translation id="3861633093716975811">Vídeos populares</translation>
 <translation id="3874520961715512166">Quitouse o sitio</translation>
@@ -552,7 +553,6 @@ Os tokens de estado privado melloran a privacidade na Web e non se poden usar pa
 <translation id="4045764304651014138">Datos de uso</translation>
 <translation id="405399507749852140">Recibe alertas se baixa o prezo en calquera sitio</translation>
 <translation id="4056223980640387499">Sepia</translation>
-<translation id="4060598801229743805">Opcións dispoñibles preto da parte superior da pantalla</translation>
 <translation id="4062305924942672200">Información legal</translation>
 <translation id="4072805772816336153">Téntao de novo máis tarde</translation>
 <translation id="4084682180776658562">Marcador</translation>
@@ -642,7 +642,6 @@ Os tokens de estado privado melloran a privacidade na Web e non se poden usar pa
 <translation id="4554077758708533499">Teléfono conectado mediante un cable USB</translation>
 <translation id="4558311620361989323">Atallos da páxina web</translation>
 <translation id="4561730552726921821">Realizouse o rexistro</translation>
-<translation id="4561979708150884304">Sen conexión</translation>
 <translation id="4565377596337484307">Ocultar contrasinal</translation>
 <translation id="4572422548854449519">Inicia sesión nunha conta xestionada</translation>
 <translation id="4576892426230499203">Proba con outra opción de verificación</translation>
@@ -667,7 +666,6 @@ Os tokens de estado privado melloran a privacidade na Web e non se poden usar pa
 <translation id="4699172675775169585">Imaxes e ficheiros almacenados na memoria caché</translation>
 <translation id="4719927025381752090">Ofrecer a tradución</translation>
 <translation id="4720023427747327413">Abrir en <ph name="PRODUCT_NAME" /></translation>
-<translation id="4720982865791209136">Axuda a mellorar Chrome. <ph name="BEGIN_LINK" />Responder enquisa<ph name="END_LINK" /></translation>
 <translation id="47217992755561375">Ver os teus sitios favoritos</translation>
 <translation id="4732120983431207637">Recuperador de pillas</translation>
 <translation id="4736934858538408121">Tarxeta virtual</translation>
@@ -771,7 +769,6 @@ Para cambiar esta opción de configuración, deberás <ph name="BEGIN_LINK" />re
 <translation id="5184329579814168207">Abrir en Chrome</translation>
 <translation id="5191251636205085390">Obtén información sobre novas tecnoloxías desenvolvidas co obxectivo de substituír as cookies de terceiros e aprende a manexalas</translation>
 <translation id="5193988420012215838">Copiouse no teu portapapeis</translation>
-<translation id="5199929503336119739">Perfil de traballo</translation>
 <translation id="5204967432542742771">Introduce o contrasinal</translation>
 <translation id="5206168361184759344">{FILE_COUNT,plural, =1{Descargando ficheiro…}other{Descargando # ficheiros…}}</translation>
 <translation id="5210286577605176222">Saltar á pestana anterior</translation>
@@ -1345,14 +1342,12 @@ Por exemplo, algúns sitios web poden responder a esta solicitude mostrándoche 
 <translation id="8221656072740924283">Continuar</translation>
 <translation id="8223642481677794647">Menú da tarxeta do feed</translation>
 <translation id="8250920743982581267">Documentos</translation>
-<translation id="825412236959742607">Esta páxina utiliza demasiada memoria, polo que Chrome quitou parte do seu contido.</translation>
 <translation id="8255617931166444521">Os distintos sitios só poden utilizar as túas cookies para consultar a actividade de navegación que levaches a cabo no seu propio sitio</translation>
 <translation id="8259179246279078674">Como as páxinas precargadas están encriptadas, Google non recibirá información sobre o seu contido. Os nosos servidores saberán que sitios se precargan de forma privada. Esta información só se utilizará para precargar as páxinas e non se vinculará a outros datos da túa Conta de Google.</translation>
 <translation id="8260126382462817229">Proba a volver iniciar sesión</translation>
 <translation id="8261506727792406068">Eliminar</translation>
 <translation id="82619448491672958">Ver outras pestanas</translation>
 <translation id="8266862848225348053">Localización das descargas</translation>
-<translation id="8274165955039650276">Ver descargas</translation>
 <translation id="8281886186245836920">Omitir</translation>
 <translation id="8282297628636750033">Aplicar tema escuro aos sitios cando sexa posible</translation>
 <translation id="829672787777123339">Conectando co teu dispositivo…</translation>
@@ -1516,7 +1511,6 @@ Por exemplo, algúns sitios web poden responder a esta solicitude mostrándoche 
 <translation id="9108808586816295166">O DNS seguro pode non estar dispoñible continuamente</translation>
 <translation id="9128984223251192329">A solicitude de Privacy Sandbox abriuse a media pantalla</translation>
 <translation id="9133397713400217035">Explorar sen conexión</translation>
-<translation id="9137013805542155359">Mostrar orixinal</translation>
 <translation id="9148126808321036104">Iniciar sesión de novo</translation>
 <translation id="9158770349521403363">Compartir só contido</translation>
 <translation id="9159716826369098114">Restablecer grupo de <ph name="TAB_COUNT" /> pestanas como un novo grupo de pestanas en segundo plano.</translation>

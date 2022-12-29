@@ -42,6 +42,7 @@
 #include "chrome/browser/ui/webui/media/media_history_ui.h"
 #include "chrome/browser/ui/webui/omnibox/omnibox.mojom.h"
 #include "chrome/browser/ui/webui/omnibox/omnibox_ui.h"
+#include "chrome/browser/ui/webui/omnibox_popup/omnibox_popup_ui.h"
 #include "chrome/browser/ui/webui/segmentation_internals/segmentation_internals_ui.h"
 #include "chrome/browser/ui/webui/usb_internals/usb_internals.mojom.h"
 #include "chrome/browser/ui/webui/usb_internals/usb_internals_ui.h"
@@ -915,6 +916,7 @@ void PopulateChromeWebUIFrameBinders(
 #endif
 #if BUILDFLAG(IS_CHROMEOS_ASH)
       ash::personalization_app::PersonalizationAppUI,
+      ash::settings::OSSettingsUI,
 #endif
       NewTabPageUI>(map);
 
@@ -946,7 +948,7 @@ void PopulateChromeWebUIFrameBinders(
       map);
 
   RegisterWebUIControllerInterfaceBinder<omnibox::mojom::PageHandler,
-                                         NewTabPageUI>(map);
+                                         NewTabPageUI, OmniboxPopupUI>(map);
 
   RegisterWebUIControllerInterfaceBinder<
       customize_themes::mojom::CustomizeThemesHandlerFactory, NewTabPageUI
@@ -965,7 +967,11 @@ void PopulateChromeWebUIFrameBinders(
       map);
 #endif  // !defined(OFFICIAL_BUILD)
 
-  if (IsCartModuleEnabled()) {
+  if (IsCartModuleEnabled() && customize_chrome::IsSidePanelEnabled()) {
+    RegisterWebUIControllerInterfaceBinder<chrome_cart::mojom::CartHandler,
+                                           NewTabPageUI, CustomizeChromeUI>(
+        map);
+  } else if (IsCartModuleEnabled()) {
     RegisterWebUIControllerInterfaceBinder<chrome_cart::mojom::CartHandler,
                                            NewTabPageUI>(map);
   }
@@ -1015,7 +1021,8 @@ void PopulateChromeWebUIFrameBinders(
 
   if (user_notes::IsUserNotesEnabled()) {
     RegisterWebUIControllerInterfaceBinder<
-        side_panel::mojom::UserNotesPageHandler, UserNotesSidePanelUI>(map);
+        side_panel::mojom::UserNotesPageHandlerFactory, UserNotesSidePanelUI>(
+        map);
   }
 
   if (features::IsReadAnythingEnabled()) {
@@ -1032,11 +1039,12 @@ void PopulateChromeWebUIFrameBinders(
                                          TabSearchUI>(map);
   if (base::FeatureList::IsEnabled(features::kTabSearchUseMetricsReporter)) {
     RegisterWebUIControllerInterfaceBinder<
-        metrics_reporter::mojom::PageMetricsHost, TabSearchUI, NewTabPageUI>(
-        map);
+        metrics_reporter::mojom::PageMetricsHost, TabSearchUI, NewTabPageUI,
+        OmniboxPopupUI>(map);
   } else {
     RegisterWebUIControllerInterfaceBinder<
-        metrics_reporter::mojom::PageMetricsHost, NewTabPageUI>(map);
+        metrics_reporter::mojom::PageMetricsHost, NewTabPageUI, OmniboxPopupUI>(
+        map);
   }
 
   RegisterWebUIControllerInterfaceBinder<
@@ -1184,11 +1192,9 @@ void PopulateChromeWebUIFrameBinders(
       ash::diagnostics::mojom::InputDataProvider, ash::DiagnosticsDialogUI>(
       map);
 
-  if (ash::features::IsNetworkingInDiagnosticsAppEnabled()) {
-    RegisterWebUIControllerInterfaceBinder<
-        ash::diagnostics::mojom::NetworkHealthProvider,
-        ash::DiagnosticsDialogUI>(map);
-  }
+  RegisterWebUIControllerInterfaceBinder<
+      ash::diagnostics::mojom::NetworkHealthProvider, ash::DiagnosticsDialogUI>(
+      map);
 
   RegisterWebUIControllerInterfaceBinder<
       ash::diagnostics::mojom::SystemDataProvider, ash::DiagnosticsDialogUI>(
@@ -1276,11 +1282,9 @@ void PopulateChromeWebUIFrameBinders(
   RegisterWebUIControllerInterfaceBinder<audio::mojom::PageHandlerFactory,
                                          ash::AudioUI>(map);
 
-  if (ash::features::IsFirmwareUpdaterAppEnabled()) {
-    RegisterWebUIControllerInterfaceBinder<
-        ash::firmware_update::mojom::UpdateProvider, ash::FirmwareUpdateAppUI>(
-        map);
-  }
+  RegisterWebUIControllerInterfaceBinder<
+      ash::firmware_update::mojom::UpdateProvider, ash::FirmwareUpdateAppUI>(
+      map);
 
   if (ash::features::IsDriveFsMirroringEnabled()) {
     RegisterWebUIControllerInterfaceBinder<

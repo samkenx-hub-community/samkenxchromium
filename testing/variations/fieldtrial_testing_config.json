@@ -233,6 +233,21 @@
             ]
         }
     ],
+    "AndroidMessagesPWAInstall": [
+        {
+            "platforms": [
+                "android"
+            ],
+            "experiments": [
+                {
+                    "name": "Enabled",
+                    "enable_features": [
+                        "InstallableAmbientBadgeMessage"
+                    ]
+                }
+            ]
+        }
+    ],
     "AndroidMessagesSaveCard": [
         {
             "platforms": [
@@ -1596,6 +1611,21 @@
             ]
         }
     ],
+    "AvatarsCloudMigration": [
+        {
+            "platforms": [
+                "chromeos"
+            ],
+            "experiments": [
+                {
+                    "name": "Enabled",
+                    "enable_features": [
+                        "AvatarsCloudMigration"
+                    ]
+                }
+            ]
+        }
+    ],
     "AvoidRasterDuringElasticOverscroll": [
         {
             "platforms": [
@@ -2684,21 +2714,6 @@
                     },
                     "enable_features": [
                         "ChromeWideEchoCancellation"
-                    ]
-                }
-            ]
-        }
-    ],
-    "ClankAppFlowsLoggingStudy": [
-        {
-            "platforms": [
-                "android"
-            ],
-            "experiments": [
-                {
-                    "name": "Enabled",
-                    "enable_features": [
-                        "FeedReliabilityLogging"
                     ]
                 }
             ]
@@ -5482,6 +5497,21 @@
             ]
         }
     ],
+    "IOSEnableFullscreenAPI": [
+        {
+            "platforms": [
+                "ios"
+            ],
+            "experiments": [
+                {
+                    "name": "Enabled",
+                    "enable_features": [
+                        "EnableFullscreenAPI"
+                    ]
+                }
+            ]
+        }
+    ],
     "IOSExpKitAppleCalendar": [
         {
             "platforms": [
@@ -6131,6 +6161,7 @@
             "platforms": [
                 "android",
                 "android_weblayer",
+                "android_webview",
                 "chromeos",
                 "chromeos_lacros",
                 "linux",
@@ -6643,6 +6674,29 @@
             ]
         }
     ],
+    "MainThreadCompositingPriority": [
+        {
+            "platforms": [
+                "android",
+                "android_weblayer",
+                "android_webview",
+                "chromeos",
+                "chromeos_lacros",
+                "fuchsia",
+                "linux",
+                "mac",
+                "windows"
+            ],
+            "experiments": [
+                {
+                    "name": "Enabled",
+                    "enable_features": [
+                        "MainThreadCompositingPriority"
+                    ]
+                }
+            ]
+        }
+    ],
     "MaxUnthrottledTimeoutNestingLevel": [
         {
             "platforms": [
@@ -7029,29 +7083,6 @@
             ]
         }
     ],
-    "NoCentralWebCacheLimitControl": [
-        {
-            "platforms": [
-                "android",
-                "android_weblayer",
-                "android_webview",
-                "chromeos",
-                "chromeos_lacros",
-                "fuchsia",
-                "linux",
-                "mac",
-                "windows"
-            ],
-            "experiments": [
-                {
-                    "name": "Enabled",
-                    "enable_features": [
-                        "NoCentralWebCacheLimitControl"
-                    ]
-                }
-            ]
-        }
-    ],
     "NoWorkerThreadReclaim": [
         {
             "platforms": [
@@ -7432,33 +7463,6 @@
                         "OmniboxFocusTriggersContextualWebZeroSuggest",
                         "OmniboxFocusTriggersSRPZeroSuggest",
                         "OmniboxMostVisitedTiles"
-                    ]
-                }
-            ]
-        }
-    ],
-    "OmniboxPedalsActionsIOS": [
-        {
-            "platforms": [
-                "ios"
-            ],
-            "experiments": [
-                {
-                    "name": "Enabled_Variation1_V2",
-                    "params": {
-                        "PopupUIVariant": "variant-one-UIKit"
-                    },
-                    "enable_features": [
-                        "IOSOmniboxUpdatedPopupUI"
-                    ]
-                },
-                {
-                    "name": "Enabled_Variation2_V2",
-                    "params": {
-                        "PopupUIVariant": "variant-two-UIKit"
-                    },
-                    "enable_features": [
-                        "IOSOmniboxUpdatedPopupUI"
                     ]
                 }
             ]
@@ -8868,7 +8872,7 @@
             ]
         }
     ],
-    "PrivacyHub": [
+    "PrivacyHubBetaStudy": [
         {
             "platforms": [
                 "chromeos",
@@ -8876,7 +8880,13 @@
             ],
             "experiments": [
                 {
-                    "name": "PrivacyHubDogfoodStudy",
+                    "name": "Enabled_20230101",
+                    "enable_features": [
+                        "CrosPrivacyHubV0"
+                    ]
+                },
+                {
+                    "name": "Enabled_20230101_Dogfood",
                     "enable_features": [
                         "CrosPrivacyHubV0"
                     ]

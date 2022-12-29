@@ -12,11 +12,13 @@ import androidx.annotation.Nullable;
 import androidx.preference.Preference;
 import androidx.preference.PreferenceCategory;
 
+import org.chromium.base.metrics.RecordUserAction;
 import org.chromium.chrome.browser.privacy_sandbox.FledgePreference;
 import org.chromium.chrome.browser.privacy_sandbox.PrivacySandboxBridge;
 import org.chromium.chrome.browser.privacy_sandbox.PrivacySandboxSettingsBaseFragment;
 import org.chromium.chrome.browser.privacy_sandbox.R;
 import org.chromium.chrome.browser.profiles.Profile;
+import org.chromium.chrome.browser.ui.messages.snackbar.Snackbar;
 import org.chromium.components.browser_ui.settings.SettingsUtils;
 import org.chromium.components.favicon.LargeIconBridge;
 
@@ -72,6 +74,10 @@ public class FledgeBlockedSitesFragmentV4
                     ((FledgePreference) preference).getSite(), true);
             mBlockedSitesCategory.removePreference(preference);
             updateBlockedSitesDescription();
+
+            showSnackbar(R.string.privacy_sandbox_add_site_snackbar, null, Snackbar.TYPE_ACTION,
+                    Snackbar.UMA_PRIVACY_SANDBOX_ADD_SITE);
+            RecordUserAction.record("Settings.PrivacySandbox.Fledge.SiteAdded");
             return true;
         }
 

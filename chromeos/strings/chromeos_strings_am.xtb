@@ -116,6 +116,7 @@
 <translation id="1908234395526491708">የ UDP ጥያቄ አለመሳካቶች</translation>
 <translation id="1947737735496445907">ታትሟል</translation>
 <translation id="1951012854035635156">ረዳት</translation>
+<translation id="1962550982027027473">ነባሪ ኤፒኤን ያስፈልጋል</translation>
 <translation id="1977994649430373166">የGoogle መገለጫ ፎቶ</translation>
 <translation id="1979103255016296513">የይለፍ ቃል ለውጥ ማድረጊያ ጊዜው አልፏል</translation>
 <translation id="1999615961760456652">ተያዥ መግቢያ</translation>
@@ -186,6 +187,7 @@
 <translation id="2570743873672969996">የ<ph name="TEST_NAME" /> ሙከራን በማሄድ ላይ...</translation>
 <translation id="2584559707064218956">ለማዋቀር ወደ ቅንብሮች ይሂዱ</translation>
 <translation id="2597774443162333062">ፋይሎች ስህተታቸው እንዲታረም ወደ Google ይላካሉ</translation>
+<translation id="2599691907981599502">{NUMBER_OF_PAGES,plural, =1{ቅኝት ተጠናቅቋል። 1 ገጽ ተቃኝቷል}one{ቅኝት ተጠናቅቋል። {NUMBER_OF_PAGES} ገጾች ተቃኝተዋል}other{ቅኝት ተጠናቅቋል። {NUMBER_OF_PAGES} ገጾች ተቃኝተዋል}}</translation>
 <translation id="2619761439309613843">ዕለታዊ ዕድሳት</translation>
 <translation id="2620436844016719705">ስርዓት</translation>
 <translation id="2638662041295312666">መግቢያ ምስል</translation>
@@ -392,6 +394,7 @@
 <translation id="4793710386569335688">ለበለጠ እገዛ ወደ <ph name="BEGIN_LINK" />የእገዛ ማዕከል<ph name="END_LINK" /> ይሂዱ።</translation>
 <translation id="4793756956024303490">የእመቃ ስልተ-ቀመር</translation>
 <translation id="4794140124556169553">የሲፒዩ ሙከራን ማካሄድ በሥርዓትዎ አፈጻጸም ላይ ተጽዕኖ ሊኖረው ይችላል</translation>
+<translation id="4798078634453489142">አዲስ ኤፒኤን ለማከል አንድ ኤፒኤን ያክሉ</translation>
 <translation id="4800589996161293643">የChromebook ማህበረሰብ</translation>
 <translation id="4803391892369051319">IPv4</translation>
 <translation id="4808449224298348341">የተሰረዘ የሕትመት ሥራ <ph name="DOCUMENT_TITLE" /></translation>
@@ -633,6 +636,7 @@
 <translation id="6791471867139427246">የቁልፍ ሰሌዳ ብርሃን ቀለም</translation>
 <translation id="680983167891198932">ቁልፍ</translation>
 <translation id="6816797338148849397">ከሚገኘው የእርስዎ ምርጫ ጋር የተገናኘ መረጃ ለመድረስ የላይ ቀስት ቁልፍን ይጠቀሙ።</translation>
+<translation id="6838167112108853532">ይህን ኤፒኤን ማሰናከል ወይም ማስወገድ አልተቻለም። የነቁ የተያያዙ ኤፒኤኖች መሰናከላቸውን እና መወገዳቸውን ያረጋግጡ።</translation>
 <translation id="6853312040151791195">የኃይል ማለቂያ ፍጥነት</translation>
 <translation id="6889786074662672253">ዳግም በሚነሳበት ጊዜ ይህን ውጫዊ መሣሪያ ይንቀሉ ወይም ኮምፒውተርዎን አይዝጉት። ይህን መስኮት መቀነስ ይችላሉ። ይህ ጥቂት ደቂቃዎች ሊወስድ ይችላል እና በዚህ ጊዜ የእርስዎ ውጫዊ መሣሪያ ላይሰራ ይችላል።</translation>
 <translation id="6905724422583748843">ወደ <ph name="PAGE_NAME" /> ተመለስ</translation>
@@ -722,6 +726,7 @@
 <translation id="7769672763586021400">የሞዴል መታወቂያ</translation>
 <translation id="7778717409420828014">የእርስዎ ግብረመልስ የChromebook ተሞክሮን እንድናሻሽል ያግዘናል እና በቡድናችን የሚገመገም ይሆናል። ብዙ ቁጥር ባላቸው ሪፖርቶች ምክንያት መልስ መላክ አንችልም።</translation>
 <translation id="7784116172884276937">ምንም የዲኤንኤስ አገልጋዮች አልተዋቀሩም</translation>
+<translation id="7791543448312431591">ያክሉ</translation>
 <translation id="779591286616261875">አዲስ ሪፖርት ላክ</translation>
 <translation id="7799817062559422778">የብርሃን ሁነታ</translation>
 <translation id="780301667611848630">አይ፣ አመሰግናለሁ</translation>

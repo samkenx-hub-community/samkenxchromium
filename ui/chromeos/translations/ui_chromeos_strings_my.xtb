@@ -144,6 +144,7 @@
 <translation id="2208919847696382164">Linux ဖြင့် ထည့်သွင်းရန်</translation>
 <translation id="2225536596944493418">အကြောင်းအရာ <ph name="NUMBER_OF_ITEMS" />ခုကို ဖျက်လိုသည်မှာ သေချာသလား။</translation>
 <translation id="2230062665678605299">ဖိုလ်ဒါ  "<ph name="FOLDER_NAME" />"ကို ဖန်တီး မရခဲ့ပါ။ <ph name="ERROR_MESSAGE" /></translation>
+<translation id="2236732657580416950">Your Google Drive cache was cleared.</translation>
 <translation id="2239068707900391003">ကော်ဖီသောက်နေသူ</translation>
 <translation id="2251368349685848079">အမှိုက်ပုံးမှ ပြန်ယူရန်</translation>
 <translation id="2282155092769082568">အလိုအလျောက် စီစဉ်သတ်မှတ်ခြင်း URL −</translation>
@@ -677,6 +678,7 @@
 <translation id="6607272825297743757">ဖိုင်အချက်အလက်</translation>
 <translation id="6609332149380188670">ဖိုင်တွဲ <ph name="NUMBER_OF_ITEMS" /> ခုကို Parallels Desktop အား မျှဝေထားသည်</translation>
 <translation id="6629518321609546825">အနည်းဆုံး ဂဏန်း ၄ လုံး ထည့်ပါ</translation>
+<translation id="6639661343369899134"><ph name="SHARED_DRIVE_NAME" /> တွင် သိုလှောင်ခန်းမလုံလောက်သဖြင့် ဖိုင်များကို အပ်လုဒ်လုပ်၍မရပါ။</translation>
 <translation id="6643016212128521049">ရှင်းရန်</translation>
 <translation id="6650726141019353908">ပန်းရောင်လိပ်ပြာ</translation>
 <translation id="6657585470893396449">စကားဝှက်</translation>

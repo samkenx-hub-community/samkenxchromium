@@ -5,6 +5,7 @@
 #include "chrome/browser/ui/webui/omnibox_popup/omnibox_popup_ui.h"
 
 #include "chrome/browser/profiles/profile.h"
+#include "chrome/browser/ui/webui/realbox/realbox_handler.h"
 #include "chrome/browser/ui/webui/webui_util.h"
 #include "chrome/common/webui_url_constants.h"
 #include "chrome/grit/omnibox_popup_resources.h"
@@ -13,18 +14,28 @@
 
 OmniboxPopupUI::OmniboxPopupUI(content::WebUI* web_ui)
     : ui::MojoWebUIController(web_ui, /*enable_chrome_send=*/true) {
-  content::WebUIDataSource* source =
-      content::WebUIDataSource::Create(chrome::kChromeUIOmniboxPopupHost);
+  content::WebUIDataSource* source = content::WebUIDataSource::CreateAndAdd(
+      Profile::FromWebUI(web_ui), chrome::kChromeUIOmniboxPopupHost);
 
   webui::SetupWebUIDataSource(
       source,
       base::make_span(kOmniboxPopupResources, kOmniboxPopupResourcesSize),
       IDR_OMNIBOX_POPUP_OMNIBOX_POPUP_HTML);
   webui::EnableTrustedTypesCSP(source);
-
-  content::WebUIDataSource::Add(Profile::FromWebUI(web_ui), source);
 }
 
 OmniboxPopupUI::~OmniboxPopupUI() = default;
 
 WEB_UI_CONTROLLER_TYPE_IMPL(OmniboxPopupUI)
+
+void OmniboxPopupUI::BindInterface(
+    mojo::PendingReceiver<omnibox::mojom::PageHandler> pending_page_handler) {
+  popup_handler_ = std::make_unique<RealboxHandler>(
+      std::move(pending_page_handler), Profile::FromWebUI(web_ui()),
+      web_ui()->GetWebContents(), &metrics_reporter_);
+}
+
+void OmniboxPopupUI::BindInterface(
+    mojo::PendingReceiver<metrics_reporter::mojom::PageMetricsHost> receiver) {
+  metrics_reporter_.BindInterface(std::move(receiver));
+}

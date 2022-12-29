@@ -17,7 +17,7 @@ using ValueState =
 
 class PrefHashStoreImplTest : public testing::Test {
  public:
-  PrefHashStoreImplTest() : contents_(pref_store_contents_.GetDict()) {}
+  PrefHashStoreImplTest() : contents_(pref_store_contents_) {}
 
   PrefHashStoreImplTest(const PrefHashStoreImplTest&) = delete;
   PrefHashStoreImplTest& operator=(const PrefHashStoreImplTest&) = delete;
@@ -26,7 +26,7 @@ class PrefHashStoreImplTest : public testing::Test {
   HashStoreContents* GetHashStoreContents() { return &contents_; }
 
  private:
-  base::DictionaryValue pref_store_contents_;
+  base::Value::Dict pref_store_contents_;
   // Must be declared after |pref_store_contents_| as it needs to be outlived
   // by it.
   DictionaryHashStoreContents contents_;
@@ -109,14 +109,16 @@ TEST_F(PrefHashStoreImplTest, AtomicHashStoreAndCheck) {
     EXPECT_EQ(ValueState::UNCHANGED, transaction->CheckValue("path1", NULL));
     EXPECT_EQ(ValueState::CHANGED, transaction->CheckValue("path1", &string_2));
 
-    base::DictionaryValue dict;
-    dict.SetString("a", "foo");
-    dict.SetString("d", "bad");
-    dict.SetString("b", "bar");
-    dict.SetString("c", "baz");
+    base::Value dict_val(base::Value::Type::DICT);
+    base::Value::Dict& dict = dict_val.GetDict();
+    dict.Set("a", "foo");
+    dict.Set("d", "bad");
+    dict.Set("b", "bar");
+    dict.Set("c", "baz");
 
-    transaction->StoreHash("path1", &dict);
-    EXPECT_EQ(ValueState::UNCHANGED, transaction->CheckValue("path1", &dict));
+    transaction->StoreHash("path1", &dict_val);
+    EXPECT_EQ(ValueState::UNCHANGED,
+              transaction->CheckValue("path1", &dict_val));
   }
 
   ASSERT_FALSE(GetHashStoreContents()->GetSuperMac().empty());

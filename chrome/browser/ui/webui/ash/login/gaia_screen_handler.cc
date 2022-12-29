@@ -140,6 +140,10 @@ GaiaScreenHandler::GaiaScreenMode GetGaiaScreenMode(const std::string& email) {
         user_manager::UserManager::Get()->FindUser(known_user.GetAccountId(
             email, std::string() /* id */, AccountType::UNKNOWN));
 
+    // TODO(b/259675128): we shouldn't rely on `user->using_saml()` when
+    // deciding which IdP page to show because this flag can be outdated. Admin
+    // could have changed the IdP to GAIA since last authentication and we
+    // wouldn't know about it.
     if (user && user->using_saml())
       return GaiaScreenHandler::GAIA_SCREEN_MODE_SAML_REDIRECT;
   }
@@ -868,6 +872,9 @@ void GaiaScreenHandler::SubmitLoginFormForTest() {
 }
 
 void GaiaScreenHandler::Show() {
+  // Start network observation.
+  signin_screen_handler_->StartNetworkObservation();
+
   base::Value::Dict data;
   if (LoginDisplayHost::default_host())
     data.Set("hasUserPods", LoginDisplayHost::default_host()->HasUserPods());
@@ -876,6 +883,7 @@ void GaiaScreenHandler::Show() {
 }
 
 void GaiaScreenHandler::Hide() {
+  signin_screen_handler_->StopNetworkObservation();
   hidden_ = true;
 }
 

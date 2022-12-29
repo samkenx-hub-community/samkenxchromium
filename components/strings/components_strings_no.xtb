@@ -1108,7 +1108,7 @@ I motsatt fall blir dette blokkert av personverninnstillingene. Dette gjør at i
 <translation id="3748912308089554501">Flybransjen</translation>
 <translation id="3752543821772132562">Ignorert fordi <ph name="POLICY_NAME" /> ikke er angitt.</translation>
 <translation id="3754210790023674521">Avslutt bilde-i-bilde</translation>
-<translation id="3759461132968374835">Du har ingen nylig rapportert programstopp. Programstopp som inntraff når rapportering om programstopp var deaktivert, blir ikke vist her.</translation>
+<translation id="3759461132968374835">Du har ingen nylig rapporterte krasj. Krasj som inntraff når rapportering om krasj var deaktivert, blir ikke vist her.</translation>
 <translation id="3760561303380396507">Vil du bruke Windows Hello i stedet for CVC?</translation>
 <translation id="3761153679507778975">Musikk- og dansespill</translation>
 <translation id="3761171036307311438">Navn som er oppført på kortet:</translation>
@@ -1166,6 +1166,7 @@ I motsatt fall blir dette blokkert av personverninnstillingene. Dette gjør at i
 <translation id="3927932062596804919">Ikke tillat</translation>
 <translation id="393316646445601645">Internett og telekommunikasjon</translation>
 <translation id="3939773374150895049">Vil du bruke WebAuthn i stedet for CVC?</translation>
+<translation id="3943857333388298514">Lim inn</translation>
 <translation id="3946209740501886391">Spør alltid på dette nettstedet</translation>
 <translation id="3947595700203588284">Kan be om å få koble til MIDI-enheter</translation>
 <translation id="3949571496842715403">Denne tjeneren kunne ikke bevise at den er <ph name="DOMAIN" />. Det er ikke angitt noen alternative emnenavn i tjenerens sikkerhetssertifikat. Dette kan være forårsaket av en feilkonfigurering eller en angriper som avskjærer tilkoblingen din.</translation>
@@ -1727,7 +1728,7 @@ I motsatt fall blir dette blokkert av personverninnstillingene. Dette gjør at i
 <translation id="5306593769196050043">Begge arkene</translation>
 <translation id="5307166000025436103">OK</translation>
 <translation id="5308380583665731573">Koble til</translation>
-<translation id="5308689395849655368">Rapportering av programstopp er deaktivert.</translation>
+<translation id="5308689395849655368">Rapportering av krasj er deaktivert.</translation>
 <translation id="5310178588836736698">Terrengkjøretøy</translation>
 <translation id="5314967030527622926">Heftemaker</translation>
 <translation id="5316812925700871227">Rotér mot klokken</translation>
@@ -2313,6 +2314,7 @@ I motsatt fall blir dette blokkert av personverninnstillingene. Dette gjør at i
 <translation id="6890531741535756070">Du har valgt å verifisere med <ph name="DEVICE_LABEL" /> på nettsteder som bruker <ph name="PROVIDER_ORIGIN" />. Denne leverandøren kan ha lagret informasjon om betalingsmåten din, som du kan <ph name="BEGIN_LINK" />be om å få slettet<ph name="END_LINK" />.</translation>
 <translation id="6891596781022320156">Innstillingsnivået støttes ikke.</translation>
 <translation id="6895330447102777224">Kortet ditt er bekreftet</translation>
+<translation id="6896758677409633944">Kopiér</translation>
 <translation id="6897140037006041989">Brukeragent</translation>
 <translation id="6898699227549475383">Organisasjon (O)</translation>
 <translation id="6899000063526916106">Skriv inn den <ph name="NUMBER_OF_DIGITS" />-sifrede koden</translation>
@@ -2679,6 +2681,7 @@ I motsatt fall blir dette blokkert av personverninnstillingene. Dette gjør at i
 <translation id="7716375162095500223">Ignorert eller ikke lastet opp ennå</translation>
 <translation id="7716424297397655342">Dette nettstedet kan ikke lastes inn fra bufferen</translation>
 <translation id="7723047071702270851">Endre kortet</translation>
+<translation id="7724603315864178912">Klipp ut</translation>
 <translation id="7734285854693414638">Opprett et nytt skjema i Google Skjemaer raskt</translation>
 <translation id="773466115871691567">Oversett alltid sider på <ph name="SOURCE_LANGUAGE" /></translation>
 <translation id="7736959720849233795">Kopier linkadressen</translation>
@@ -2715,6 +2718,7 @@ I motsatt fall blir dette blokkert av personverninnstillingene. Dette gjør at i
 <translation id="7815407501681723534">Fant <ph name="NUMBER_OF_RESULTS" /> <ph name="SEARCH_RESULTS" /> for «<ph name="SEARCH_STRING" />»</translation>
 <translation id="7822320754433038727">Jakt og skyting</translation>
 <translation id="782886543891417279">Det kan hende at Wifi-nettverket du bruker (<ph name="WIFI_NAME" />), krever at du besøker en påloggingsside.</translation>
+<translation id="7840103971441592723">Et skjermopptak er startet</translation>
 <translation id="7844689747373518809">{COUNT,plural, =0{Ingen}=1{1 app (<ph name="EXAMPLE_APP_1" />)}=2{2 apper (<ph name="EXAMPLE_APP_1" /> og <ph name="EXAMPLE_APP_2" />)}other{# apper (<ph name="EXAMPLE_APP_1" />, <ph name="EXAMPLE_APP_2" /> <ph name="AND_MORE" />)}}</translation>
 <translation id="7855695075675558090"><ph name="TOTAL_LABEL" /> <ph name="CURRENCY_CODE" /> <ph name="FORMATTED_TOTAL_AMOUNT" /></translation>
 <translation id="7862185352068345852">Vil du forlate nettstedet?</translation>
@@ -2744,6 +2748,7 @@ I motsatt fall blir dette blokkert av personverninnstillingene. Dette gjør at i
 <translation id="7942349550061667556">Rød</translation>
 <translation id="7943397946612013052">Blokkert nedlasting</translation>
 <translation id="7943893128817522649">Kan be om å få laste ned flere filer automatisk</translation>
+<translation id="7946724693008564269">gjenkjent språk</translation>
 <translation id="7947285636476623132">Kontroller utløpsdatoen, og prøv igjen</translation>
 <translation id="7947813448670013867"><ph name="SEE_CHROME_TIPS_FOCUSED_FRIENDLY_MATCH_TEXT" /> – trykk på Tab og deretter på Enter for å lære om Chrome-funksjoner</translation>
 <translation id="7950027195171824198">Administrer preferansene dine for informasjonskapsler i Chrome-innstillingene</translation>
@@ -2892,6 +2897,7 @@ I motsatt fall blir dette blokkert av personverninnstillingene. Dette gjør at i
 <translation id="8282947398454257691">få kjennskap til den unike enhetsidentifikatoren</translation>
 <translation id="8284769179630993263">Administrer Safe Browsing med mer i Chrome-innstillingene</translation>
 <translation id="8286036467436129157">Logg på</translation>
+<translation id="8286799286781881307">Apper som er autorisert av administratoren din, kan ta opp alle skjermene som er tilknyttet enheten din. Denne informasjonen kan behandles lokalt eller lastes opp til organisasjonens tjenere.</translation>
 <translation id="8288807391153049143">Vis sertifikat</translation>
 <translation id="8289355894181816810">Kontakt nettverksadministratoren hvis du ikke er sikker på hva dette betyr.</translation>
 <translation id="8293206222192510085">Legg til bokmerke</translation>

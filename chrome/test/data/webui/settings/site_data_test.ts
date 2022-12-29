@@ -8,11 +8,15 @@ import {ContentSetting, ContentSettingsTypes, SettingsSiteDataElement, SiteSetti
 import {CrSettingsPrefs, SettingsPrefsElement} from 'chrome://settings/settings.js';
 import {assertEquals, assertFalse, assertTrue} from 'chrome://webui-test/chai_assert.js';
 import {isChildVisible} from 'chrome://webui-test/test_util.js';
+import {flushTasks} from 'chrome://webui-test/polymer_test_util.js';
 
 import {TestSiteSettingsPrefsBrowserProxy} from './test_site_settings_prefs_browser_proxy.js';
 import {createContentSettingTypeToValuePair, createRawSiteException, createSiteSettingsPrefs} from './test_util.js';
 
 // clang-format on
+
+// Name of the cookie default content setting pref.
+const PREF_NAME = 'generated.cookie_default_content_setting';
 
 suite('SiteDataTest', function() {
   let page: SettingsSiteDataElement;
@@ -39,11 +43,44 @@ suite('SiteDataTest', function() {
     page.remove();
   });
 
+  test('DefaultSettingChangesUpdatePref', function() {
+    // Default is 'allow'.
+    assertEquals(page.getPref(PREF_NAME + '.value'), ContentSetting.ALLOW);
+
+    page.$.defaultSessionOnly.click();
+    assertEquals(
+        page.getPref(PREF_NAME + '.value'), ContentSetting.SESSION_ONLY);
+
+    page.$.defaultBlock.click();
+    assertEquals(page.getPref(PREF_NAME + '.value'), ContentSetting.BLOCK);
+
+    page.$.defaultAllow.click();
+    assertEquals(page.getPref(PREF_NAME + '.value'), ContentSetting.ALLOW);
+  });
+
+  test('PrefChangesUpdateDefaultSetting', function() {
+    // Default is 'allow'.
+    assertEquals(page.$.defaultGroup.selected, ContentSetting.ALLOW);
+
+    page.set('prefs.' + PREF_NAME + '.value', ContentSetting.SESSION_ONLY);
+    flush();
+    assertEquals(page.$.defaultGroup.selected, ContentSetting.SESSION_ONLY);
+
+    page.set('prefs.' + PREF_NAME + '.value', ContentSetting.BLOCK);
+    flush();
+    assertEquals(page.$.defaultGroup.selected, ContentSetting.BLOCK);
+
+    page.set('prefs.' + PREF_NAME + '.value', ContentSetting.ALLOW);
+    flush();
+    assertEquals(page.$.defaultGroup.selected, ContentSetting.ALLOW);
+  });
+
   test('ExceptionListsReadOnly', function() {
     // Check all exception lists are read only when the preference
     // reports as managed.
-    page.set('prefs.generated.cookie_default_content_setting', {
+    page.set('prefs.' + PREF_NAME, {
       value: ContentSetting.ALLOW,
+      type: chrome.settingsPrivate.PrefType.STRING,
       enforcement: chrome.settingsPrivate.Enforcement.ENFORCED,
     });
     let exceptionLists = page.shadowRoot!.querySelectorAll('site-list');
@@ -54,8 +91,9 @@ suite('SiteDataTest', function() {
 
     // Return preference to unmanaged state and check all exception lists
     // are no longer read only.
-    page.set('prefs.generated.cookie_default_content_setting', {
+    page.set('prefs.' + PREF_NAME, {
       value: ContentSetting.ALLOW,
+      type: chrome.settingsPrivate.PrefType.STRING,
     });
     exceptionLists = page.shadowRoot!.querySelectorAll('site-list');
     assertEquals(exceptionLists.length, 3);
@@ -65,6 +103,11 @@ suite('SiteDataTest', function() {
   });
 
   test('ExceptionsSearch', async function() {
+    while (siteSettingsBrowserProxy.getCallCount('getExceptionList') < 3) {
+      await flushTasks();
+    }
+    siteSettingsBrowserProxy.resetResolver('getExceptionList');
+
     const exceptionPrefs = createSiteSettingsPrefs([], [
       createContentSettingTypeToValuePair(
           ContentSettingsTypes.COOKIES,
@@ -84,7 +127,9 @@ suite('SiteDataTest', function() {
     ]);
     page.searchTerm = 'foo';
     siteSettingsBrowserProxy.setPrefs(exceptionPrefs);
-    await siteSettingsBrowserProxy.whenCalled('getExceptionList');
+    while (siteSettingsBrowserProxy.getCallCount('getExceptionList') < 3) {
+      await flushTasks();
+    }
     flush();
 
     const exceptionLists = page.shadowRoot!.querySelectorAll('site-list');

@@ -506,14 +506,14 @@ bool SVGImage::ApplyShaderInternal(const DrawInfo& draw_info,
                                    const SkMatrix& local_matrix) {
   if (draw_info.ContainerSize().IsEmpty())
     return false;
-  sk_sp<PaintRecord> record = PaintRecordForCurrentFrame(draw_info);
+  absl::optional<PaintRecord> record = PaintRecordForCurrentFrame(draw_info);
   if (!record)
     return false;
 
   const SkRect bounds =
       SkRect::MakeSize(gfx::SizeFToSkSize(draw_info.ContainerSize()));
   flags.setShader(PaintShader::MakePaintRecord(
-      std::move(record), bounds, SkTileMode::kClamp, SkTileMode::kClamp,
+      std::move(*record), bounds, SkTileMode::kClamp, SkTileMode::kClamp,
       &local_matrix));
 
   // Animation is normally refreshed in Draw() impls, which we don't reach when
@@ -553,10 +553,11 @@ void SVGImage::Draw(cc::PaintCanvas* canvas,
   DrawInternal(draw_info, canvas, flags, dst_rect, src_rect);
 }
 
-sk_sp<PaintRecord> SVGImage::PaintRecordForCurrentFrame(
+absl::optional<PaintRecord> SVGImage::PaintRecordForCurrentFrame(
     const DrawInfo& draw_info) {
-  if (!page_)
-    return nullptr;
+  if (!page_) {
+    return absl::nullopt;
+  }
   // Temporarily disable the image observer to prevent ChangeInRect() calls due
   // re-laying out the image.
   ImageObserverDisabler disable_image_observer(this);
@@ -602,7 +603,7 @@ void SVGImage::DrawInternal(const DrawInfo& draw_info,
                             const cc::PaintFlags& flags,
                             const gfx::RectF& dst_rect,
                             const gfx::RectF& unzoomed_src_rect) {
-  sk_sp<PaintRecord> record = PaintRecordForCurrentFrame(draw_info);
+  absl::optional<PaintRecord> record = PaintRecordForCurrentFrame(draw_info);
   if (!record)
     return;
 
@@ -610,7 +611,7 @@ void SVGImage::DrawInternal(const DrawInfo& draw_info,
     PaintCanvasAutoRestore ar(canvas, false);
     if (DrawNeedsLayer(flags)) {
       SkRect layer_rect = gfx::RectFToSkRect(dst_rect);
-      canvas->saveLayer(&layer_rect, &flags);
+      canvas->saveLayer(layer_rect, flags);
     }
     // We can only draw the entire frame, clipped to the rect we want. So
     // compute where the top left of the image would be if we were drawing
@@ -619,7 +620,7 @@ void SVGImage::DrawInternal(const DrawInfo& draw_info,
     canvas->clipRect(gfx::RectToSkRect(gfx::ToEnclosingRect(dst_rect)));
     canvas->concat(SkM44::RectToRect(gfx::RectFToSkRect(unzoomed_src_rect),
                                      gfx::RectFToSkRect(dst_rect)));
-    canvas->drawPicture(std::move(record));
+    canvas->drawPicture(std::move(*record));
     canvas->restore();
   }
 

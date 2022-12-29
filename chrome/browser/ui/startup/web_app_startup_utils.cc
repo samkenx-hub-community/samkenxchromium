@@ -37,10 +37,12 @@
 #include "chrome/browser/ui/startup/startup_browser_creator.h"
 #include "chrome/browser/ui/startup/startup_browser_creator_impl.h"
 #include "chrome/browser/ui/startup/startup_types.h"
+#include "chrome/browser/ui/web_applications/web_app_launch_manager.h"
 #include "chrome/browser/web_applications/os_integration/os_integration_manager.h"
 #include "chrome/browser/web_applications/os_integration/web_app_file_handler_manager.h"
 #include "chrome/browser/web_applications/web_app.h"
 #include "chrome/browser/web_applications/web_app_command_scheduler.h"
+#include "chrome/browser/web_applications/web_app_constants.h"
 #include "chrome/browser/web_applications/web_app_id.h"
 #include "chrome/browser/web_applications/web_app_provider.h"
 #include "chrome/browser/web_applications/web_app_registrar.h"
@@ -306,8 +308,11 @@ class StartupWebAppCreator
     if (remember_user_choice) {
       WebAppProvider* provider = WebAppProvider::GetForWebApps(profile_);
       if (!protocol_url_.is_empty()) {
+        ApiApprovalState approval_state = allowed
+                                              ? ApiApprovalState::kAllowed
+                                              : ApiApprovalState::kDisallowed;
         provider->scheduler().UpdateProtocolHandlerUserApproval(
-            app_id_, protocol_url_.scheme(), allowed,
+            app_id_, protocol_url_.scheme(), approval_state,
             std::move(persist_callback));
       } else {
         DCHECK(!file_launch_infos_.empty());

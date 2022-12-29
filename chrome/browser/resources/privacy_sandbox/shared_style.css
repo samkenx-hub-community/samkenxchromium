@@ -45,8 +45,7 @@
 }
 
 .section {
-  margin: 0 90px;
-  padding: 8px 0;
+  margin: 8px 90px;
 }
 
 privacy-sandbox-dialog-learn-more {
@@ -56,11 +55,14 @@ privacy-sandbox-dialog-learn-more {
 
 .buttons-container {
   align-items: center;
+  box-sizing: border-box;
   display: flex;
   height: var(--privacy-sandbox-dialog-buttons-row-height);
   justify-content: end;
+  padding-bottom: 16px;
   padding-inline-end:
       var(--cr-dialog-button-container-padding-horizontal, 16px);
+  padding-top: 16px;
   width: 100%;
 }
 
@@ -68,14 +70,13 @@ privacy-sandbox-dialog-learn-more {
   margin-inline-start: 8px;
 }
 
-/* TODO(crbug.com/1378703): If content area isn't scrollable, center the
- * content */
 .content-area {
   border-color: transparent;
   border-style: solid;
   border-width: 1px 0;
   line-height: 20px;
   overflow-y: overlay;
+  scroll-behavior: smooth;
 }
 
 :host(.fill-content),
@@ -93,7 +94,6 @@ privacy-sandbox-dialog-learn-more {
 :host(.fill-content) .buttons-container,
 .fill-content .buttons-container {
   bottom: 0;
-  box-sizing: border-box;
   position: fixed;
   right: 0;
 }
@@ -121,16 +121,32 @@ li:not(:last-child) {
 }
 
 /* Privacy sandbox banner */
-/* TODO(crbug.com/1378703): Add dark theme styles or use a proper constant */
 .banner {
-  background-color: var(--google-grey-50);
+  height: 160px;
   margin: 16px 0;
   text-align: center;
 }
 
-.banner img {
-  content: url(images/privacy_sandbox_new_banner.svg);
-  height: 184px;
+/* Topics banner image */
+img.topics-banner {
+  content: url(images/topics_banner.svg);
+}
+
+@media (prefers-color-scheme: dark) {
+  img.topics-banner {
+    content: url(images/topics_banner_dark.svg);
+  }
+}
+
+/* Fledge banner image */
+img.fledge-banner {
+  content: url(images/fledge_banner.svg);
+}
+
+@media (prefers-color-scheme: dark) {
+  img.fledge-banner {
+    content: url(images/fledge_banner_dark.svg);
+  }
 }
 
 /* Chrome logo image */
@@ -138,4 +154,26 @@ img.logo {
   content: url(images/chrome_logo.svg);
   height: 40px;
   margin-bottom: 10px;
+}
+
+#showMoreOverlay {
+  align-items: center;
+  background: linear-gradient(0deg, var(--md-background-color), transparent);
+  bottom: 0;
+  display: flex;
+  height: var(--privacy-sandbox-dialog-buttons-row-height);
+  justify-content: center;
+  position: fixed;
+  width: 100%;
+}
+
+.more-content-available.content-area {
+  bottom: 0 !important;
+}
+.more-content-available .buttons-container {
+  position: static !important;
+}
+
+#moreButton {
+  border-radius: 100px;
 }

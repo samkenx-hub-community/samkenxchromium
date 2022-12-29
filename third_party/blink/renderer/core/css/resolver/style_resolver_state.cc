@@ -77,14 +77,17 @@ StyleResolverState::StyleResolverState(
   if (UsesHighlightPseudoInheritance()) {
     DCHECK(originating_element_style_);
   } else {
-    if (!parent_style_)
+    if (!parent_style_) {
       parent_style_ = element_context_.ParentStyle();
-    if (!layout_parent_style_)
+    }
+    if (!layout_parent_style_) {
       layout_parent_style_ = element_context_.LayoutParentStyle();
+    }
   }
 
-  if (!layout_parent_style_)
+  if (!layout_parent_style_) {
     layout_parent_style_ = parent_style_;
+  }
 
   DCHECK(document.IsActive());
 }
@@ -125,10 +128,17 @@ void StyleResolverState::UpdateLengthConversionData() {
 
 CSSToLengthConversionData StyleResolverState::UnzoomedLengthConversionData(
     const ComputedStyle* font_style) {
+  DCHECK(font_style);
+  const ComputedStyle* root_font_style = RootElementStyle();
   float em = font_style->SpecifiedFontSize();
-  float rem = RootElementStyle() ? RootElementStyle()->SpecifiedFontSize() : 1;
+  float rem = root_font_style ? root_font_style->SpecifiedFontSize() : 1.0f;
+  const Font* root_font =
+      root_font_style ? &root_font_style->GetFont() : &font_style->GetFont();
+  float root_zoom = root_font_style ? root_font_style->EffectiveZoom()
+                                    : font_style->EffectiveZoom();
   CSSToLengthConversionData::FontSizes font_sizes(
-      em, rem, &font_style->GetFont(), font_style->EffectiveZoom());
+      em, rem, &font_style->GetFont(), root_font, font_style->EffectiveZoom(),
+      root_zoom);
   CSSToLengthConversionData::LineHeightSize line_height_size(
       ParentStyle() ? *ParentStyle() : *Style());
   CSSToLengthConversionData::ViewportSize viewport_size(
@@ -190,16 +200,19 @@ void StyleResolverState::SetZoom(float f) {
 
   StyleBuilder().SetZoom(f);
 
-  if (f != 1.f)
+  if (f != 1.f) {
     GetDocument().CountUse(WebFeature::kCascadedCSSZoomNotEqualToOne);
+  }
 
-  if (StyleBuilder().SetEffectiveZoom(parent_effective_zoom * f))
+  if (StyleBuilder().SetEffectiveZoom(parent_effective_zoom * f)) {
     font_builder_.DidChangeEffectiveZoom();
+  }
 }
 
 void StyleResolverState::SetEffectiveZoom(float f) {
-  if (StyleBuilder().SetEffectiveZoom(f))
+  if (StyleBuilder().SetEffectiveZoom(f)) {
     font_builder_.DidChangeEffectiveZoom();
+  }
 }
 
 void StyleResolverState::SetWritingMode(WritingMode new_writing_mode) {
@@ -223,8 +236,9 @@ CSSParserMode StyleResolverState::GetParserMode() const {
 }
 
 Element* StyleResolverState::GetAnimatingElement() const {
-  if (element_type_ == ElementType::kElement)
+  if (element_type_ == ElementType::kElement) {
     return &GetElement();
+  }
   DCHECK_EQ(ElementType::kPseudoElement, element_type_);
   return pseudo_element_;
 }
@@ -237,8 +251,9 @@ PseudoElement* StyleResolverState::GetPseudoElement() const {
 const CSSValue& StyleResolverState::ResolveLightDarkPair(
     const CSSValue& value) {
   if (const auto* pair = DynamicTo<CSSLightDarkValuePair>(value)) {
-    if (StyleBuilder().UsedColorScheme() == mojom::blink::ColorScheme::kLight)
+    if (StyleBuilder().UsedColorScheme() == mojom::blink::ColorScheme::kLight) {
       return pair->First();
+    }
     return pair->Second();
   }
   return value;

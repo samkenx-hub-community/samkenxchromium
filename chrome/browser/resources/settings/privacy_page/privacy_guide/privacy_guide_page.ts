@@ -12,7 +12,6 @@ import 'chrome://resources/cr_elements/cr_shared_style.css.js';
 import '../../prefs/prefs.js';
 import '../../settings_shared.css.js';
 import 'chrome://resources/cr_elements/cr_view_manager/cr_view_manager.js';
-import './privacy_guide_clear_on_exit_fragment.js';
 import './privacy_guide_completion_fragment.js';
 import './privacy_guide_cookies_fragment.js';
 import './privacy_guide_history_sync_fragment.js';
@@ -22,9 +21,9 @@ import './privacy_guide_welcome_fragment.js';
 import './step_indicator.js';
 
 import {CrViewManagerElement} from 'chrome://resources/cr_elements/cr_view_manager/cr_view_manager.js';
-import {assert} from 'chrome://resources/js/assert_ts.js';
 import {I18nMixin, I18nMixinInterface} from 'chrome://resources/cr_elements/i18n_mixin.js';
 import {WebUiListenerMixin, WebUiListenerMixinInterface} from 'chrome://resources/cr_elements/web_ui_listener_mixin.js';
+import {assert} from 'chrome://resources/js/assert_ts.js';
 import {afterNextRender, PolymerElement} from 'chrome://resources/polymer/v3_0/polymer/polymer_bundled.min.js';
 
 import {HatsBrowserProxyImpl, TrustSafetyInteraction} from '../../hats_browser_proxy.js';
@@ -123,12 +122,6 @@ export class SettingsPrivacyGuidePageElement extends PrivacyGuideBase {
         type: Boolean,
         value: false,
       },
-
-      isPrivacyGuideV2: {
-        reflectToAttribute: true,
-        type: Boolean,
-        value: false,
-      },
     };
   }
 
@@ -150,7 +143,6 @@ export class SettingsPrivacyGuidePageElement extends PrivacyGuideBase {
   // The privacy guide flag is only enabled when the user was not managed at
   // the time settings were loaded, so this is default false.
   private isManaged_: boolean = false;
-  private isPrivacyGuideV2: boolean = false;
   private translateMultiplier_: number;
   private metricsBrowserProxy_: MetricsBrowserProxy =
       MetricsBrowserProxyImpl.getInstance();
@@ -219,7 +211,7 @@ export class SettingsPrivacyGuidePageElement extends PrivacyGuideBase {
       [
         PrivacyGuideStep.MSBB,
         {
-          nextStep: PrivacyGuideStep.CLEAR_ON_EXIT,
+          nextStep: PrivacyGuideStep.HISTORY_SYNC,
           previousStep: PrivacyGuideStep.WELCOME,
           onForwardNavigation: () => {
             this.metricsBrowserProxy_.recordPrivacyGuideNextNavigationHistogram(
@@ -235,19 +227,10 @@ export class SettingsPrivacyGuidePageElement extends PrivacyGuideBase {
         },
       ],
       [
-        PrivacyGuideStep.CLEAR_ON_EXIT,
-        {
-          nextStep: PrivacyGuideStep.HISTORY_SYNC,
-          previousStep: PrivacyGuideStep.MSBB,
-          // TODO(crbug/1215630): Enable the CoE step when it's ready.
-          isAvailable: () => false,
-        },
-      ],
-      [
         PrivacyGuideStep.HISTORY_SYNC,
         {
           nextStep: PrivacyGuideStep.SAFE_BROWSING,
-          previousStep: PrivacyGuideStep.CLEAR_ON_EXIT,
+          previousStep: PrivacyGuideStep.MSBB,
           onForwardNavigation: () => {
             this.metricsBrowserProxy_.recordPrivacyGuideNextNavigationHistogram(
                 PrivacyGuideInteractions.HISTORY_SYNC_NEXT_BUTTON);
@@ -364,10 +347,10 @@ export class SettingsPrivacyGuidePageElement extends PrivacyGuideBase {
     }
 
     if (Object.values(PrivacyGuideStep).includes(step)) {
-      this.navigateToCard_(step, false, true, true);
+      this.navigateToCard_(step, false, true);
     } else {
       // If no step has been specified, then navigate to the welcome step.
-      this.navigateToCard_(PrivacyGuideStep.WELCOME, false, true, false);
+      this.navigateToCard_(PrivacyGuideStep.WELCOME, false, true);
     }
   }
 
@@ -382,7 +365,7 @@ export class SettingsPrivacyGuidePageElement extends PrivacyGuideBase {
       components.onForwardNavigation();
     }
     if (components.nextStep) {
-      this.navigateToCard_(components.nextStep, false, false, true);
+      this.navigateToCard_(components.nextStep, false, false);
     }
   }
 
@@ -397,13 +380,13 @@ export class SettingsPrivacyGuidePageElement extends PrivacyGuideBase {
       components.onBackwardNavigation();
     }
     if (components.previousStep) {
-      this.navigateToCard_(components.previousStep, true, false, true);
+      this.navigateToCard_(components.previousStep, true, false);
     }
   }
 
   private navigateToCard_(
       step: PrivacyGuideStep, isBackwardNavigation: boolean,
-      isFirstNavigation: boolean, playAnimation: boolean) {
+      isFirstNavigation: boolean) {
     assert(step !== this.privacyGuideStep_);
     this.privacyGuideStep_ = step;
 
@@ -425,13 +408,7 @@ export class SettingsPrivacyGuidePageElement extends PrivacyGuideBase {
         this.navigateForward_();
       }
     } else {
-      if (this.animationsEnabled_ && playAnimation && !this.isPrivacyGuideV2) {
-        this.$.viewManager.switchView(
-            this.privacyGuideStep_,
-            animateFromLeftToRight ? 'slide-in-fade-in-ltr' :
-                                     'slide-in-fade-in-rtl',
-            'no-animation');
-      } else if (this.animationsEnabled_ && this.isPrivacyGuideV2) {
+      if (this.animationsEnabled_) {
         this.$.viewManager.switchView(
             this.privacyGuideStep_, 'no-animation', 'fade-out');
       } else {
@@ -531,10 +508,6 @@ export class SettingsPrivacyGuidePageElement extends PrivacyGuideBase {
         isLtr ? this.navigateForward_() : this.navigateBackward_();
         break;
     }
-  }
-
-  private showBackground_(): boolean {
-    return this.isPrivacyGuideV2 && this.showAnySettingFragment_();
   }
 }
 

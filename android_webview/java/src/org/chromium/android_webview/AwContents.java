@@ -137,9 +137,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.WeakHashMap;
 import java.util.concurrent.Callable;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -303,8 +300,7 @@ public class AwContents implements SmartClipProvider {
          * Requests a callback on the native DrawGL method (see getAwDrawGLFunction).
          *
          * If called from within onDraw, |canvas| should be non-null and must be hardware
-         * accelerated. |releasedCallback| should be null if |canvas| is null, or if
-         * supportsDrawGLFunctorReleasedCallback returns false.
+         * accelerated. |releasedCallback| should be null if |canvas| is null.
          *
          * @return false indicates the GL draw request was not accepted, and the caller
          *         should fallback to the SW path.
@@ -318,15 +314,6 @@ public class AwContents implements SmartClipProvider {
          * will not return until functor has returned.
          */
         boolean requestInvokeGL(View containerView, boolean waitForCompletion);
-
-        /**
-         * Test whether the Android framework supports notifying when a functor is free
-         * to be destroyed via the callback mechanism provided to the functor factory.
-         *
-         * @return true if destruction needs to wait on a framework callback, or false
-         *         if it can occur immediately.
-         */
-        boolean supportsDrawGLFunctorReleasedCallback();
 
         /**
          * Detaches the GLFunctor from the view tree.
@@ -681,39 +668,6 @@ public class AwContents implements SmartClipProvider {
                         new AwContentsClient.AwWebResourceError());
             }
             return webResourceResponseInfo;
-        }
-
-        @Override
-        public boolean shouldBlockRequest(String url) {
-            if (!AwFeatureList.isEnabled(AwFeatures.WEBVIEW_RESTRICT_THIRD_PARTY_CONTENT)) {
-                return false;
-            }
-            // TODO(1376958): Implement a URLLoaderThrottle to not block the IO thread before
-            // enabling the feature.
-
-            CountDownLatch countDownLatch = new CountDownLatch(1);
-            AtomicBoolean verified = new AtomicBoolean(false);
-
-            // Verifications are scheduled when WebView is initialized, so when this is called, the
-            // verification is likely finished here.
-            if (AwOriginVerificationScheduler.getInstance().getOriginVerifier().checkForSavedResult(
-                        url)) {
-                return false;
-            }
-
-            AwThreadUtils.postToUiThreadLooper(() -> {
-                AwOriginVerificationScheduler.getInstance().verify(
-                        url, mBrowserContext, (result) -> {
-                            verified.set(result);
-                            countDownLatch.countDown();
-                        });
-            });
-            try {
-                countDownLatch.await(10, TimeUnit.SECONDS);
-            } catch (InterruptedException e) {
-                // Returning the default value as no successful verification was performed.
-            }
-            return !verified.get();
         }
     }
 
@@ -4054,8 +4008,7 @@ public class AwContents implements SmartClipProvider {
 
             // Workaround for bug in libhwui on N that does not swap if inserting functor is the
             // only operation in a canvas. See crbug.com/704212.
-            if (Build.VERSION.SDK_INT == Build.VERSION_CODES.N
-                    || Build.VERSION.SDK_INT == Build.VERSION_CODES.N_MR1) {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
                 if (mPaintForNWorkaround == null) {
                     mPaintForNWorkaround = new Paint();
                     // Note a completely transparent color will get optimized out. So draw almost

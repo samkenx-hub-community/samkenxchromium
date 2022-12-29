@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <memory>
 #include <vector>
 
 #include "ash/accelerators/keyboard_code_util.h"
@@ -16,19 +17,28 @@
 #include "ash/capture_mode/capture_mode_settings_view.h"
 #include "ash/capture_mode/capture_mode_test_util.h"
 #include "ash/capture_mode/capture_mode_types.h"
+#include "ash/capture_mode/capture_mode_util.h"
 #include "ash/capture_mode/key_combo_view.h"
 #include "ash/capture_mode/pointer_highlight_layer.h"
 #include "ash/capture_mode/video_recording_watcher.h"
 #include "ash/constants/ash_features.h"
+#include "ash/display/window_tree_host_manager.h"
+#include "ash/resources/vector_icons/vector_icons.h"
+#include "ash/shell.h"
 #include "ash/style/icon_button.h"
 #include "ash/test/ash_test_base.h"
-#include "base/run_loop.h"
 #include "base/test/scoped_feature_list.h"
+#include "base/timer/timer.h"
+#include "ui/aura/window_tree_host.h"
+#include "ui/base/ime/fake_text_input_client.h"
 #include "ui/compositor/scoped_animation_duration_scale_mode.h"
 #include "ui/events/event_constants.h"
 #include "ui/events/keycodes/keyboard_codes_posix.h"
+#include "ui/events/pointer_details.h"
 #include "ui/gfx/geometry/point.h"
+#include "ui/gfx/geometry/point_f.h"
 #include "ui/gfx/geometry/rect.h"
+#include "ui/gfx/geometry/vector2d.h"
 #include "ui/views/controls/button/toggle_button.h"
 #include "ui/views/controls/image_view.h"
 #include "ui/wm/core/coordinate_conversion.h"
@@ -66,6 +76,10 @@ class CaptureModeDemoToolsTest : public AshTestBase {
     scoped_feature_list_.InitAndEnableFeature(features::kCaptureModeDemoTools);
     AshTestBase::SetUp();
     window_ = CreateTestWindow(gfx::Rect(20, 30, 601, 300));
+
+    // Focus on non-input-text field at beginning.
+    fake_text_input_client_ =
+        std::make_unique<ui::FakeTextInputClient>(ui::TEXT_INPUT_TYPE_NONE);
   }
 
   void TearDown() override {
@@ -104,9 +118,77 @@ class CaptureModeDemoToolsTest : public AshTestBase {
     run_loop.Run();
   }
 
+  // Fires the key combo viewer timer and verifies the existence of the widget
+  // after the timer expires.
+  void FireHideTimerAndVerifyWidget() {
+    auto* demo_tools_controller = GetCaptureModeDemoToolsController();
+    DCHECK(demo_tools_controller);
+    CaptureModeDemoToolsTestApi capture_mode_demo_tools_test_api(
+        demo_tools_controller);
+    auto* hide_timer = capture_mode_demo_tools_test_api.GetKeyComboHideTimer();
+    EXPECT_TRUE(hide_timer->IsRunning());
+    EXPECT_EQ(hide_timer->GetCurrentDelay(),
+              capture_mode::kDelayToHideKeyComboDuration);
+    KeyComboView* key_combo_view =
+        capture_mode_demo_tools_test_api.GetKeyComboView();
+    ViewVisibilityChangeWaiter waiter(key_combo_view);
+    hide_timer->FireNow();
+    waiter.Wait();
+    EXPECT_FALSE(capture_mode_demo_tools_test_api.GetDemoToolsWidget());
+    EXPECT_FALSE(capture_mode_demo_tools_test_api.GetKeyComboView());
+  }
+
+  void EnableTextInputFocus(ui::TextInputType input_type) {
+    fake_text_input_client_->set_text_input_type(input_type);
+    Shell::Get()
+        ->window_tree_host_manager()
+        ->input_method()
+        ->SetFocusedTextInputClient(fake_text_input_client_.get());
+  }
+
+  void DisableTextInputFocus() {
+    fake_text_input_client_->set_text_input_type(ui::TEXT_INPUT_TYPE_NONE);
+    Shell::Get()
+        ->window_tree_host_manager()
+        ->input_method()
+        ->SetFocusedTextInputClient(nullptr);
+  }
+
+  void DragTouchAndVerifyHighlight(const ui::PointerId& touch_id,
+                                   const gfx::Point& touch_point,
+                                   const gfx::Vector2d& drag_offset) {
+    auto* event_generator = GetEventGenerator();
+    event_generator->PressTouchId(touch_id, touch_point);
+    CaptureModeDemoToolsTestApi demo_tools_test_api(
+        GetCaptureModeDemoToolsController());
+    const auto& touch_highlight_map =
+        demo_tools_test_api.GetTouchIdToHighlightLayerMap();
+    const auto iter =
+        touch_highlight_map.find(static_cast<ui::PointerId>(touch_id));
+    ASSERT_TRUE(iter != touch_highlight_map.end());
+    const auto* touch_highlight = iter->second.get();
+    auto original_touch_highlight_bounds = touch_highlight->layer()->bounds();
+    auto* recording_watcher =
+        CaptureModeController::Get()->video_recording_watcher_for_testing();
+    wm::ConvertRectToScreen(recording_watcher->window_being_recorded(),
+                            &original_touch_highlight_bounds);
+    event_generator->MoveTouchBy(drag_offset.x(), drag_offset.y());
+    gfx::PointF updated_event_location{
+        event_generator->current_screen_location()};
+    const auto expected_touch_highlight_layer_bounds =
+        capture_mode_util::CalculateHighlightLayerBounds(
+            updated_event_location, capture_mode::kHighlightLayerRadius);
+    auto actual_touch_highlight_layer_bounds = original_touch_highlight_bounds;
+    actual_touch_highlight_layer_bounds.Offset(drag_offset.x(),
+                                               drag_offset.y());
+    EXPECT_EQ(expected_touch_highlight_layer_bounds,
+              actual_touch_highlight_layer_bounds);
+  }
+
  private:
   base::test::ScopedFeatureList scoped_feature_list_;
   std::unique_ptr<aura::Window> window_;
+  std::unique_ptr<ui::FakeTextInputClient> fake_text_input_client_;
 };
 
 // Tests that the key event is considered to generate the `demo_tools_widget_`
@@ -135,40 +217,34 @@ TEST_F(CaptureModeDemoToolsTest, ConsiderKeyEvent) {
   // Press the 'A' key and the event will not be considered to generate a
   // corresponding key widget.
   event_generator->PressKey(ui::VKEY_A, ui::EF_NONE);
-  CaptureModeDemoToolsTestApi capture_mode_demo_tools_test_api(
-      demo_tools_controller);
-  EXPECT_FALSE(capture_mode_demo_tools_test_api.GetDemoToolsWidget());
+  CaptureModeDemoToolsTestApi demo_tools_test_api(demo_tools_controller);
+  EXPECT_FALSE(demo_tools_test_api.GetDemoToolsWidget());
   event_generator->ReleaseKey(ui::VKEY_A, ui::EF_NONE);
-  EXPECT_EQ(capture_mode_demo_tools_test_api.GetCurrentModifiersFlags(), 0);
-  EXPECT_EQ(capture_mode_demo_tools_test_api.GetLastNonModifierKey(),
-            ui::VKEY_UNKNOWN);
+  EXPECT_EQ(demo_tools_test_api.GetCurrentModifiersFlags(), 0);
+  EXPECT_EQ(demo_tools_test_api.GetLastNonModifierKey(), ui::VKEY_UNKNOWN);
 
   // Press 'Ctrl' + 'A' and the key event will be considered to generate a
   // corresponding key widget.
   event_generator->PressKey(ui::VKEY_A, ui::EF_NONE);
   event_generator->PressKey(ui::VKEY_CONTROL, ui::EF_NONE);
-  EXPECT_TRUE(capture_mode_demo_tools_test_api.GetDemoToolsWidget());
-  EXPECT_EQ(capture_mode_demo_tools_test_api.GetCurrentModifiersFlags(),
+  EXPECT_TRUE(demo_tools_test_api.GetDemoToolsWidget());
+  EXPECT_EQ(demo_tools_test_api.GetCurrentModifiersFlags(),
             ui::EF_CONTROL_DOWN);
-  EXPECT_EQ(capture_mode_demo_tools_test_api.GetLastNonModifierKey(),
-            ui::VKEY_A);
+  EXPECT_EQ(demo_tools_test_api.GetLastNonModifierKey(), ui::VKEY_A);
 
   event_generator->ReleaseKey(ui::VKEY_A, ui::EF_NONE);
-  base::OneShotTimer* hide_timer =
-      capture_mode_demo_tools_test_api.GetKeyComboHideTimer();
+  base::OneShotTimer* hide_timer = demo_tools_test_api.GetKeyComboHideTimer();
   EXPECT_TRUE(hide_timer->IsRunning());
   hide_timer->FireNow();
   event_generator->ReleaseKey(ui::VKEY_CONTROL, ui::EF_NONE);
-  EXPECT_FALSE(capture_mode_demo_tools_test_api.GetDemoToolsWidget());
-  EXPECT_EQ(capture_mode_demo_tools_test_api.GetCurrentModifiersFlags(), 0);
-  EXPECT_EQ(capture_mode_demo_tools_test_api.GetLastNonModifierKey(),
-            ui::VKEY_UNKNOWN);
+  EXPECT_FALSE(demo_tools_test_api.GetDemoToolsWidget());
+  EXPECT_EQ(demo_tools_test_api.GetCurrentModifiersFlags(), 0);
+  EXPECT_EQ(demo_tools_test_api.GetLastNonModifierKey(), ui::VKEY_UNKNOWN);
 
   event_generator->PressKey(ui::VKEY_TAB, ui::EF_NONE);
-  EXPECT_TRUE(capture_mode_demo_tools_test_api.GetDemoToolsWidget());
-  EXPECT_EQ(capture_mode_demo_tools_test_api.GetCurrentModifiersFlags(), 0);
-  EXPECT_EQ(capture_mode_demo_tools_test_api.GetLastNonModifierKey(),
-            ui::VKEY_TAB);
+  EXPECT_TRUE(demo_tools_test_api.GetDemoToolsWidget());
+  EXPECT_EQ(demo_tools_test_api.GetCurrentModifiersFlags(), 0);
+  EXPECT_EQ(demo_tools_test_api.GetLastNonModifierKey(), ui::VKEY_TAB);
 }
 
 // Tests that the capture mode demo tools feature will be enabled if the
@@ -198,9 +274,8 @@ TEST_F(CaptureModeDemoToolsTest, EntryPointTest) {
   CaptureModeDemoToolsController* demo_tools_controller =
       GetCaptureModeDemoToolsController();
   EXPECT_TRUE(demo_tools_controller);
-  CaptureModeDemoToolsTestApi capture_mode_demo_tools_test_api(
-      demo_tools_controller);
-  EXPECT_TRUE(capture_mode_demo_tools_test_api.GetDemoToolsWidget());
+  CaptureModeDemoToolsTestApi demo_tools_test_api(demo_tools_controller);
+  EXPECT_TRUE(demo_tools_test_api.GetDemoToolsWidget());
   controller->EndVideoRecording(EndRecordingReason::kStopRecordingButton);
   WaitForCaptureFileToBeSaved();
   EXPECT_FALSE(controller->IsActive());
@@ -233,35 +308,33 @@ TEST_F(CaptureModeDemoToolsTest, KeyComboWidgetTest) {
   controller->EnableDemoTools(true);
   StartVideoRecordingImmediately();
   EXPECT_TRUE(controller->is_recording_in_progress());
-  auto* event_generator = GetEventGenerator();
-  event_generator->PressKey(ui::VKEY_CONTROL, ui::EF_NONE);
-  event_generator->PressKey(ui::VKEY_C, ui::EF_NONE);
   CaptureModeDemoToolsController* demo_tools_controller =
       GetCaptureModeDemoToolsController();
   EXPECT_TRUE(demo_tools_controller);
-  CaptureModeDemoToolsTestApi capture_mode_demo_tools_test_api(
-      demo_tools_controller);
-  EXPECT_TRUE(capture_mode_demo_tools_test_api.GetDemoToolsWidget());
-  EXPECT_TRUE(capture_mode_demo_tools_test_api.GetKeyComboView());
+  CaptureModeDemoToolsTestApi demo_tools_test_api(demo_tools_controller);
+
+  auto* event_generator = GetEventGenerator();
+  event_generator->PressKey(ui::VKEY_CONTROL, ui::EF_NONE);
+  event_generator->PressKey(ui::VKEY_C, ui::EF_NONE);
+  EXPECT_TRUE(demo_tools_test_api.GetDemoToolsWidget());
+  EXPECT_TRUE(demo_tools_test_api.GetKeyComboView());
   std::vector<ui::KeyboardCode> expected_modifier_key_vector = {
       ui::VKEY_CONTROL};
-  EXPECT_EQ(capture_mode_demo_tools_test_api.GetShownModifiersKeyCodes(),
+  EXPECT_EQ(demo_tools_test_api.GetShownModifiersKeyCodes(),
             expected_modifier_key_vector);
-  EXPECT_EQ(capture_mode_demo_tools_test_api.GetShownNonModifierKeyCode(),
-            ui::VKEY_C);
+  EXPECT_EQ(demo_tools_test_api.GetShownNonModifierKeyCode(), ui::VKEY_C);
 
   // Press the key 'Shift' at last, but it will still show before the 'C' key.
   event_generator->PressKey(ui::VKEY_SHIFT, ui::EF_NONE);
   expected_modifier_key_vector = {ui::VKEY_CONTROL, ui::VKEY_SHIFT};
-  EXPECT_TRUE(capture_mode_demo_tools_test_api.GetShownModifiersKeyCodes() ==
+  EXPECT_TRUE(demo_tools_test_api.GetShownModifiersKeyCodes() ==
               expected_modifier_key_vector);
-  EXPECT_EQ(capture_mode_demo_tools_test_api.GetShownNonModifierKeyCode(),
-            ui::VKEY_C);
+  EXPECT_EQ(demo_tools_test_api.GetShownNonModifierKeyCode(), ui::VKEY_C);
 
   // Release the modifier keys, and the key combo view will not be displayed.
   event_generator->ReleaseKey(ui::VKEY_SHIFT, ui::EF_NONE);
   event_generator->ReleaseKey(ui::VKEY_CONTROL, ui::EF_NONE);
-  EXPECT_FALSE(capture_mode_demo_tools_test_api.GetDemoToolsWidget());
+  EXPECT_FALSE(demo_tools_test_api.GetDemoToolsWidget());
 }
 
 // Tests the hide timer behaviors for the key combo view:
@@ -281,43 +354,26 @@ TEST_F(CaptureModeDemoToolsTest, DemoToolsHideTimerTest) {
   CaptureModeDemoToolsController* demo_tools_controller =
       GetCaptureModeDemoToolsController();
   EXPECT_TRUE(demo_tools_controller);
-  CaptureModeDemoToolsTestApi capture_mode_demo_tools_test_api(
-      demo_tools_controller);
+  CaptureModeDemoToolsTestApi demo_tools_test_api(demo_tools_controller);
 
   // Press the 'Ctrl' + 'A' and verify the shown key widgets.
   auto* event_generator = GetEventGenerator();
   event_generator->PressKey(ui::VKEY_CONTROL, ui::EF_NONE);
   event_generator->PressKey(ui::VKEY_A, ui::EF_NONE);
-  EXPECT_TRUE(capture_mode_demo_tools_test_api.GetDemoToolsWidget());
-  KeyComboView* key_combo_view =
-      capture_mode_demo_tools_test_api.GetKeyComboView();
+  EXPECT_TRUE(demo_tools_test_api.GetDemoToolsWidget());
+  KeyComboView* key_combo_view = demo_tools_test_api.GetKeyComboView();
   EXPECT_TRUE(key_combo_view);
   std::vector<ui::KeyboardCode> expected_modifier_key_vector = {
       ui::VKEY_CONTROL};
-  EXPECT_EQ(capture_mode_demo_tools_test_api.GetShownModifiersKeyCodes(),
+  EXPECT_EQ(demo_tools_test_api.GetShownModifiersKeyCodes(),
             expected_modifier_key_vector);
-  EXPECT_EQ(capture_mode_demo_tools_test_api.GetShownNonModifierKeyCode(),
-            ui::VKEY_A);
+  EXPECT_EQ(demo_tools_test_api.GetShownNonModifierKeyCode(), ui::VKEY_A);
 
   // Release the non-modifier key and the hide timer will be triggered, the key
   // combo view will hide when the timer expires.
   event_generator->ReleaseKey(ui::VKEY_A, ui::EF_NONE);
-  base::OneShotTimer* hide_timer =
-      capture_mode_demo_tools_test_api.GetKeyComboHideTimer();
-  EXPECT_TRUE(hide_timer->IsRunning());
-  EXPECT_EQ(hide_timer->GetCurrentDelay(),
-            capture_mode::kDelayToHideKeyComboDuration);
 
-  auto fire_hide_timer_and_verify_widget = [&]() {
-    key_combo_view = capture_mode_demo_tools_test_api.GetKeyComboView();
-    ViewVisibilityChangeWaiter waiter(key_combo_view);
-    hide_timer->FireNow();
-    waiter.Wait();
-    EXPECT_FALSE(capture_mode_demo_tools_test_api.GetDemoToolsWidget());
-    EXPECT_FALSE(capture_mode_demo_tools_test_api.GetKeyComboView());
-  };
-
-  fire_hide_timer_and_verify_widget();
+  FireHideTimerAndVerifyWidget();
 
   // Press 'Ctrl' + 'Shift' + 'A', then release 'A', the timer will be
   // triggered. Press 'B' and the timer will stop and the key combo view will be
@@ -325,18 +381,17 @@ TEST_F(CaptureModeDemoToolsTest, DemoToolsHideTimerTest) {
   event_generator->PressKey(ui::VKEY_CONTROL, ui::EF_NONE);
   event_generator->PressKey(ui::VKEY_SHIFT, ui::EF_NONE);
   event_generator->PressKey(ui::VKEY_A, ui::EF_NONE);
-  EXPECT_TRUE(capture_mode_demo_tools_test_api.GetDemoToolsWidget());
+  EXPECT_TRUE(demo_tools_test_api.GetDemoToolsWidget());
   expected_modifier_key_vector = {ui::VKEY_CONTROL, ui::VKEY_SHIFT};
-  EXPECT_EQ(capture_mode_demo_tools_test_api.GetShownModifiersKeyCodes(),
+  EXPECT_EQ(demo_tools_test_api.GetShownModifiersKeyCodes(),
             expected_modifier_key_vector);
-  EXPECT_EQ(capture_mode_demo_tools_test_api.GetShownNonModifierKeyCode(),
-            ui::VKEY_A);
+  EXPECT_EQ(demo_tools_test_api.GetShownNonModifierKeyCode(), ui::VKEY_A);
   event_generator->ReleaseKey(ui::VKEY_A, ui::EF_NONE);
+  base::OneShotTimer* hide_timer = demo_tools_test_api.GetKeyComboHideTimer();
   EXPECT_TRUE(hide_timer->IsRunning());
   event_generator->PressKey(ui::VKEY_B, ui::EF_NONE);
   EXPECT_FALSE(hide_timer->IsRunning());
-  EXPECT_EQ(capture_mode_demo_tools_test_api.GetShownNonModifierKeyCode(),
-            ui::VKEY_B);
+  EXPECT_EQ(demo_tools_test_api.GetShownNonModifierKeyCode(), ui::VKEY_B);
 
   // Release 'B', the timer will be triggered. Release 'Ctrl' will not hide
   // the 'Ctrl' key combo view on display immediately. Similarly for releasing
@@ -349,26 +404,23 @@ TEST_F(CaptureModeDemoToolsTest, DemoToolsHideTimerTest) {
   event_generator->ReleaseKey(ui::VKEY_CONTROL, ui::EF_NONE);
   EXPECT_TRUE(hide_timer->IsRunning());
   expected_modifier_key_vector = {ui::VKEY_CONTROL, ui::VKEY_SHIFT};
-  EXPECT_EQ(capture_mode_demo_tools_test_api.GetShownModifiersKeyCodes(),
+  EXPECT_EQ(demo_tools_test_api.GetShownModifiersKeyCodes(),
             expected_modifier_key_vector);
-  EXPECT_EQ(capture_mode_demo_tools_test_api.GetShownNonModifierKeyCode(),
-            ui::VKEY_B);
+  EXPECT_EQ(demo_tools_test_api.GetShownNonModifierKeyCode(), ui::VKEY_B);
 
   event_generator->ReleaseKey(ui::VKEY_SHIFT, ui::EF_NONE);
   EXPECT_TRUE(hide_timer->IsRunning());
 
   // The contents of the widget remains the same before the timer expires.
-  EXPECT_EQ(capture_mode_demo_tools_test_api.GetShownModifiersKeyCodes(),
+  EXPECT_EQ(demo_tools_test_api.GetShownModifiersKeyCodes(),
             expected_modifier_key_vector);
-  EXPECT_EQ(capture_mode_demo_tools_test_api.GetShownNonModifierKeyCode(),
-            ui::VKEY_B);
+  EXPECT_EQ(demo_tools_test_api.GetShownNonModifierKeyCode(), ui::VKEY_B);
 
   // The state the controller has been updated.
-  EXPECT_EQ(capture_mode_demo_tools_test_api.GetCurrentModifiersFlags(), 0);
-  EXPECT_EQ(capture_mode_demo_tools_test_api.GetLastNonModifierKey(),
-            ui::VKEY_UNKNOWN);
+  EXPECT_EQ(demo_tools_test_api.GetCurrentModifiersFlags(), 0);
+  EXPECT_EQ(demo_tools_test_api.GetLastNonModifierKey(), ui::VKEY_UNKNOWN);
 
-  fire_hide_timer_and_verify_widget();
+  FireHideTimerAndVerifyWidget();
 }
 
 // Tests that all the non-modifier keys with the icon are displayed
@@ -395,6 +447,52 @@ TEST_F(CaptureModeDemoToolsTest, AllIconKeysTest) {
               std::string(image_model.GetVectorIcon().vector_icon()->name));
     event_generator->ReleaseKey(key_code, ui::EF_NONE);
   }
+}
+
+// Tests that the key combo viewer widget will not show if the password input
+// field is currently focused and will display in a normal way when the focus is
+// detached.
+TEST_F(CaptureModeDemoToolsTest, DoNotShowKeyComboViewerInInputField) {
+  EnableTextInputFocus(ui::TEXT_INPUT_TYPE_PASSWORD);
+  CaptureModeController* controller = StartCaptureSession(
+      CaptureModeSource::kFullscreen, CaptureModeType::kVideo);
+  controller->EnableDemoTools(true);
+  StartVideoRecordingImmediately();
+  EXPECT_TRUE(controller->is_recording_in_progress());
+  CaptureModeDemoToolsController* demo_tools_controller =
+      GetCaptureModeDemoToolsController();
+  CaptureModeDemoToolsTestApi demo_tools_test_api(demo_tools_controller);
+  auto* event_generator = GetEventGenerator();
+
+  // With the password input text focus enabled before the video recording, the
+  // key combo viewer will not display when pressing 'Ctrl' and 'T'.
+  event_generator->PressKey(ui::VKEY_CONTROL, ui::EF_NONE);
+  event_generator->PressKey(ui::VKEY_T, ui::EF_NONE);
+  EXPECT_FALSE(demo_tools_test_api.GetDemoToolsWidget());
+  EXPECT_FALSE(demo_tools_test_api.GetKeyComboView());
+  event_generator->ReleaseKey(ui::VKEY_T, ui::EF_NONE);
+  event_generator->ReleaseKey(ui::VKEY_CONTROL, ui::EF_NONE);
+
+  // Disable the input text focus, the key combo viewer will show when
+  // pressing 'Ctrl' and 'T' in a non-input-text field.
+  DisableTextInputFocus();
+  event_generator->PressKey(ui::VKEY_CONTROL, ui::EF_NONE);
+  event_generator->PressKey(ui::VKEY_T, ui::EF_NONE);
+  EXPECT_TRUE(demo_tools_test_api.GetDemoToolsWidget());
+  EXPECT_TRUE(demo_tools_test_api.GetKeyComboView());
+  event_generator->ReleaseKey(ui::VKEY_T, ui::EF_NONE);
+  FireHideTimerAndVerifyWidget();
+  event_generator->ReleaseKey(ui::VKEY_CONTROL, ui::EF_NONE);
+
+  // Enable the password text input focus during the recording, the key combo
+  // viewer will not display when pressing 'Ctrl' and 'T'.
+  EnableTextInputFocus(ui::TEXT_INPUT_TYPE_PASSWORD);
+  event_generator->PressKey(ui::VKEY_CONTROL, ui::EF_NONE);
+  event_generator->PressKey(ui::VKEY_T, ui::EF_NONE);
+  EXPECT_FALSE(demo_tools_test_api.GetDemoToolsWidget());
+  EXPECT_FALSE(demo_tools_test_api.GetKeyComboView());
+  event_generator->ReleaseKey(ui::VKEY_T, ui::EF_NONE);
+  event_generator->ReleaseKey(ui::VKEY_CONTROL, ui::EF_NONE);
 }
 
 class CaptureModeDemoToolsTestWithAllSources
@@ -433,6 +531,26 @@ class CaptureModeDemoToolsTestWithAllSources
                             &confined_bounds_in_screen);
     return confined_bounds_in_screen;
   }
+
+  // Verifies that the `demo_tools_widget` is positioned in the middle
+  // horizontally within the confined bounds and that the distance between the
+  // bottom of the widget and the bottom of the confined bounds is always equal
+  // to `capture_mode::kKeyWidgetDistanceFromBottom`.
+  void VerifyKeyComboWidgetPosition() {
+    CaptureModeDemoToolsTestApi demo_tools_test_api(
+        GetCaptureModeDemoToolsController());
+    auto* demo_tools_widget = demo_tools_test_api.GetDemoToolsWidget();
+    ASSERT_TRUE(demo_tools_widget);
+    auto confined_bounds_in_screen =
+        GetDemoToolsConfinedBoundsInScreenCoordinates();
+    const gfx::Rect demo_tools_widget_bounds =
+        demo_tools_widget->GetWindowBoundsInScreen();
+    EXPECT_NEAR(confined_bounds_in_screen.CenterPoint().x(),
+                demo_tools_widget_bounds.CenterPoint().x(), /*abs_error=*/1);
+    EXPECT_EQ(
+        confined_bounds_in_screen.bottom() - demo_tools_widget_bounds.bottom(),
+        capture_mode::kKeyWidgetDistanceFromBottom);
+  }
 };
 
 // Tests that the key combo viewer widget should be centered within its confined
@@ -443,32 +561,12 @@ TEST_P(CaptureModeDemoToolsTestWithAllSources,
   auto* demo_tools_controller = GetCaptureModeDemoToolsController();
   EXPECT_TRUE(demo_tools_controller);
 
-  gfx::Rect confined_bounds_in_screen =
-      GetDemoToolsConfinedBoundsInScreenCoordinates();
-
-  // Verifies that the `demo_tools_widget` is positioned in the middle
-  // horizontally within the confined bounds.
-  auto verify_demo_tools_been_centered = [&]() {
-    CaptureModeDemoToolsTestApi capture_mode_demo_tools_test_api(
-        demo_tools_controller);
-    auto* demo_tools_widget =
-        capture_mode_demo_tools_test_api.GetDemoToolsWidget();
-    ASSERT_TRUE(demo_tools_widget);
-    const gfx::Rect demo_tools_widget_bounds =
-        demo_tools_widget->GetWindowBoundsInScreen();
-    EXPECT_TRUE(abs(confined_bounds_in_screen.CenterPoint().x() -
-                    demo_tools_widget_bounds.CenterPoint().x()) <= 1);
-  };
-
   auto* event_generator = GetEventGenerator();
-  event_generator->PressKey(ui::VKEY_CONTROL, ui::EF_NONE);
-  verify_demo_tools_been_centered();
-
-  event_generator->PressKey(ui::VKEY_SHIFT, ui::EF_NONE);
-  verify_demo_tools_been_centered();
-
-  event_generator->PressKey(ui::VKEY_A, ui::EF_NONE);
-  verify_demo_tools_been_centered();
+  const auto kKeyCodes = {ui::VKEY_CONTROL, ui::VKEY_SHIFT, ui::VKEY_A};
+  for (const auto key_code : kKeyCodes) {
+    event_generator->PressKey(key_code, ui::EF_NONE);
+    VerifyKeyComboWidgetPosition();
+  }
 
   controller->EndVideoRecording(EndRecordingReason::kStopRecordingButton);
   WaitForCaptureFileToBeSaved();
@@ -483,6 +581,7 @@ TEST_P(CaptureModeDemoToolsTestWithAllSources, MouseHighlightTest) {
   StartDemoToolsEnabledVideoRecordingWithParam();
   auto* demo_tools_controller = GetCaptureModeDemoToolsController();
   EXPECT_TRUE(demo_tools_controller);
+  CaptureModeDemoToolsTestApi demo_tools_test_api(demo_tools_controller);
 
   gfx::Rect confined_bounds_in_screen =
       GetDemoToolsConfinedBoundsInScreenCoordinates();
@@ -490,13 +589,12 @@ TEST_P(CaptureModeDemoToolsTestWithAllSources, MouseHighlightTest) {
   event_generator->MoveMouseTo(confined_bounds_in_screen.CenterPoint());
   event_generator->PressLeftButton();
   event_generator->ReleaseLeftButton();
-  EXPECT_FALSE(
-      demo_tools_controller->mouse_highlight_layers_for_testing().empty());
-  EXPECT_EQ(demo_tools_controller->mouse_highlight_layers_for_testing().size(),
-            1u);
+  const MouseHighlightLayers& highlight_layers =
+      demo_tools_test_api.GetMouseHighlightLayers();
+  EXPECT_FALSE(highlight_layers.empty());
+  EXPECT_EQ(highlight_layers.size(), 1u);
   WaitForMouseHighlightAnimationCompleted();
-  EXPECT_TRUE(
-      demo_tools_controller->mouse_highlight_layers_for_testing().empty());
+  EXPECT_TRUE(highlight_layers.empty());
 }
 
 // Tests that multiple mouse highlight layers will be visible on consecutive
@@ -513,12 +611,13 @@ TEST_P(CaptureModeDemoToolsTestWithAllSources,
   auto* window_being_recorded = recording_watcher->window_being_recorded();
   auto* demo_tools_controller = GetCaptureModeDemoToolsController();
   EXPECT_TRUE(demo_tools_controller);
+  CaptureModeDemoToolsTestApi demo_tools_test_api =
+      CaptureModeDemoToolsTestApi(demo_tools_controller);
 
   gfx::Rect inner_rect = GetDemoToolsConfinedBoundsInScreenCoordinates();
   inner_rect.Inset(5);
 
-  auto& layers_vector =
-      demo_tools_controller->mouse_highlight_layers_for_testing();
+  const auto& layers_vector = demo_tools_test_api.GetMouseHighlightLayers();
   auto* event_generator = GetEventGenerator();
 
   for (auto point : {inner_rect.CenterPoint(), inner_rect.origin(),
@@ -537,6 +636,110 @@ TEST_P(CaptureModeDemoToolsTestWithAllSources,
   }
 
   EXPECT_EQ(layers_vector.size(), 3u);
+}
+
+// Tests that the key combo viewer is positioned correctly on device
+// scale factor change.
+TEST_P(CaptureModeDemoToolsTestWithAllSources, DeviceScaleFactorTest) {
+  StartDemoToolsEnabledVideoRecordingWithParam();
+  auto* demo_tools_controller = GetCaptureModeDemoToolsController();
+  EXPECT_TRUE(demo_tools_controller);
+
+  auto* event_generator = GetEventGenerator();
+  event_generator->PressKey(ui::VKEY_CONTROL, ui::EF_NONE);
+  event_generator->PressKey(ui::VKEY_SHIFT, ui::EF_NONE);
+  event_generator->PressKey(ui::VKEY_A, ui::EF_NONE);
+
+  const float kDeviceScaleFactors[] = {0.5f, 1.2f, 2.5f};
+  for (const float dsf : kDeviceScaleFactors) {
+    SetDeviceScaleFactor(dsf);
+    EXPECT_EQ(dsf, window()->GetHost()->device_scale_factor());
+    VerifyKeyComboWidgetPosition();
+  }
+}
+
+// Tests that the touch highlight layer will be created on touch
+// down and removed on touch up. It also tests that the bounds of the touch
+// highlight layer will be updated correctly on the touch drag event.
+TEST_P(CaptureModeDemoToolsTestWithAllSources, TouchHighlightTest) {
+  StartDemoToolsEnabledVideoRecordingWithParam();
+  auto* demo_tools_controller = GetCaptureModeDemoToolsController();
+  EXPECT_TRUE(demo_tools_controller);
+  CaptureModeDemoToolsTestApi demo_tools_test_api(demo_tools_controller);
+
+  const gfx::Rect confined_bounds_in_screen =
+      GetDemoToolsConfinedBoundsInScreenCoordinates();
+  auto* event_generator = GetEventGenerator();
+
+  const auto& touch_highlight_map =
+      demo_tools_test_api.GetTouchIdToHighlightLayerMap();
+
+  const auto center_point = confined_bounds_in_screen.CenterPoint();
+  event_generator->PressTouchId(0, center_point);
+  EXPECT_FALSE(touch_highlight_map.empty());
+  event_generator->ReleaseTouchId(0);
+  EXPECT_TRUE(touch_highlight_map.empty());
+
+  const gfx::Vector2d drag_offset =
+      gfx::Vector2d(confined_bounds_in_screen.width() / 4,
+                    confined_bounds_in_screen.height() / 4);
+  DragTouchAndVerifyHighlight(/*touch_id=*/0, /*touch_point=*/center_point,
+                              drag_offset);
+}
+
+// Tests the behaviors when multiple touches are performed.
+// 1. The corresponding touch highlight will be generated on touch down;
+// 2. The number of touch highlights kept in the demo tools controller is the
+// same as the number of touch down events;
+// 3. The bounds of the touch highlights will be updated correctly when dragging
+// multiple touch events simultaneously;
+// 4. The corresponding touch highlight will be removed on touch up. The
+// number of touch highlights kept in the demo tools controller will become zero
+// when all touches are released or cancelled.
+TEST_P(CaptureModeDemoToolsTestWithAllSources, MutiTouchHighlightTest) {
+  StartDemoToolsEnabledVideoRecordingWithParam();
+  auto* demo_tools_controller = GetCaptureModeDemoToolsController();
+  EXPECT_TRUE(demo_tools_controller);
+  CaptureModeDemoToolsTestApi demo_tools_test_api(demo_tools_controller);
+
+  const auto& touch_highlight_map =
+      demo_tools_test_api.GetTouchIdToHighlightLayerMap();
+  EXPECT_TRUE(touch_highlight_map.empty());
+
+  gfx::Rect inner_rect = GetDemoToolsConfinedBoundsInScreenCoordinates();
+  inner_rect.Inset(20);
+
+  struct {
+    int touch_id;
+    gfx::Point touch_point;
+    gfx::Vector2d drag_offset;
+  } kTestCases[] = {
+      {/*touch_id=*/1, inner_rect.CenterPoint(), gfx::Vector2d(15, 25)},
+      {/*touch_id=*/0, inner_rect.origin(), gfx::Vector2d(10, -20)},
+      {/*touch_id=*/2, inner_rect.bottom_right(), gfx::Vector2d(-30, -20)}};
+
+  // Iterate through the kTestCases and perform the touch down. The
+  // corresponding touch highlight will be generated. Drag these touch events
+  // and check if the bounds of the corresponding touch highlight are updated
+  // correctly.
+  for (const auto& test_case : kTestCases) {
+    DragTouchAndVerifyHighlight(test_case.touch_id, test_case.touch_point,
+                                test_case.drag_offset);
+  }
+
+  EXPECT_EQ(touch_highlight_map.size(), 3u);
+
+  // Release the touch event one by one and the corresponding touch highlight
+  // layer will be removed. The number of highlight layers kept in the demo
+  // tools controller will become zero when all touches are released or
+  // cancelled.
+  for (const auto& test_case : kTestCases) {
+    GetEventGenerator()->ReleaseTouchId(test_case.touch_id);
+    EXPECT_FALSE(touch_highlight_map.contains(
+        static_cast<ui::PointerId>(test_case.touch_id)));
+  }
+
+  EXPECT_TRUE(touch_highlight_map.empty());
 }
 
 INSTANTIATE_TEST_SUITE_P(All,

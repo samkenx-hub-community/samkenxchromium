@@ -46,8 +46,9 @@ ReadingListUI::ReadingListUI(content::WebUI* web_ui)
       webui_load_timer_(web_ui->GetWebContents(),
                         "ReadingList.WebUI.LoadDocumentTime",
                         "ReadingList.WebUI.LoadCompletedTime") {
-  content::WebUIDataSource* source =
-      content::WebUIDataSource::Create(chrome::kChromeUIReadLaterHost);
+  Profile* const profile = Profile::FromWebUI(web_ui);
+  content::WebUIDataSource* source = content::WebUIDataSource::CreateAndAdd(
+      profile, chrome::kChromeUIReadLaterHost);
   static constexpr webui::LocalizedString kLocalizedStrings[] = {
       {"addCurrentTab", IDS_READ_LATER_ADD_CURRENT_TAB},
       {"bookmarksTabTitle", IDS_BOOKMARK_MANAGER_TITLE},
@@ -89,6 +90,7 @@ ReadingListUI::ReadingListUI(content::WebUI* web_ui)
       {"editBookmarkListA11yLabel",
        IDS_BOOKMARKS_EDIT_BOOKMARK_LIST_A11Y_LABEL},
       {"cancelA11yLabel", IDS_CANCEL},
+      {"bookmarkNameA11yLabel", IDS_BOOKMARK_AX_EDITOR_NAME_LABEL},
       {"emptyTitle", IDS_BOOKMARKS_EMPTY_STATE_TITLE},
       {"emptyBody", IDS_BOOKMARKS_EMPTY_STATE_BODY},
       {"emptyTitleGuest", IDS_BOOKMARKS_EMPTY_STATE_TITLE_GUEST},
@@ -97,13 +99,15 @@ ReadingListUI::ReadingListUI(content::WebUI* web_ui)
       {"clearSearch", IDS_BOOKMARK_MANAGER_CLEAR_SEARCH},
       {"selectedBookmarkCount", IDS_BOOKMARK_MANAGER_ITEMS_SELECTED},
       {"menuOpenNewTab", IDS_BOOKMARK_MANAGER_MENU_OPEN_IN_NEW_TAB},
+      {"menuOpenNewWindow", IDS_BOOKMARK_MANAGER_MENU_OPEN_IN_NEW_WINDOW},
+      {"menuOpenIncognito", IDS_BOOKMARK_MANAGER_MENU_OPEN_INCOGNITO},
+      {"newFolderTitle", IDS_BOOKMARK_EDITOR_NEW_FOLDER_NAME},
   };
   for (const auto& str : kLocalizedStrings)
     webui::AddLocalizedString(source, str.name, str.id);
 
   source->AddBoolean("useRipples", views::PlatformStyle::kUseRipples);
 
-  Profile* const profile = Profile::FromWebUI(web_ui);
   PrefService* prefs = profile->GetPrefs();
   source->AddBoolean(
       "bookmarksDragAndDropEnabled",
@@ -127,6 +131,7 @@ ReadingListUI::ReadingListUI(content::WebUI* web_ui)
                      base::FeatureList::IsEnabled(features::kUnifiedSidePanel));
 
   source->AddBoolean("guestMode", profile->IsGuestSession());
+  source->AddBoolean("incognitoMode", profile->IsIncognitoProfile());
 
   source->AddBoolean(
       "showPowerBookmarks",
@@ -149,8 +154,6 @@ ReadingListUI::ReadingListUI(content::WebUI* web_ui)
   webui::SetupWebUIDataSource(
       source, base::make_span(kSidePanelResources, kSidePanelResourcesSize),
       resource);
-  content::WebUIDataSource::Add(web_ui->GetWebContents()->GetBrowserContext(),
-                                source);
   content::URLDataSource::Add(profile,
                               std::make_unique<SanitizedImageSource>(profile));
 }

@@ -144,6 +144,7 @@
 <translation id="2208919847696382164">透過 Linux 執行安裝程序</translation>
 <translation id="2225536596944493418">你確定要刪除 <ph name="NUMBER_OF_ITEMS" /> 個項目嗎？</translation>
 <translation id="2230062665678605299">無法建立資料夾「<ph name="FOLDER_NAME" />」。<ph name="ERROR_MESSAGE" /></translation>
+<translation id="2236732657580416950">Google 雲端硬碟快取已清除。</translation>
 <translation id="2239068707900391003">喝咖啡的人</translation>
 <translation id="2251368349685848079">從垃圾桶還原</translation>
 <translation id="2282155092769082568">自動設定網址：</translation>
@@ -678,6 +679,7 @@
 <translation id="6607272825297743757">檔案資訊</translation>
 <translation id="6609332149380188670">已與 Parallels Desktop 共用 <ph name="NUMBER_OF_ITEMS" /> 個資料夾</translation>
 <translation id="6629518321609546825">請輸入至少 4 位數</translation>
+<translation id="6639661343369899134">「<ph name="SHARED_DRIVE_NAME" />」的儲存空間不足，因此無法上傳檔案。</translation>
 <translation id="6643016212128521049">清除</translation>
 <translation id="6650726141019353908">粉紅蝴蝶</translation>
 <translation id="6657585470893396449">密碼</translation>

@@ -25,11 +25,13 @@
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_piece.h"
 #include "base/strings/string_util.h"
+#include "base/strings/stringprintf.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/time/time.h"
 #include "components/autofill/core/browser/autofill_type.h"
 #include "components/autofill/core/browser/data_model/autofill_metadata.h"
 #include "components/autofill/core/browser/data_model/autofill_offer_data.h"
+#include "components/autofill/core/browser/data_model/autofill_wallet_usage_data.h"
 #include "components/autofill/core/browser/data_model/credit_card.h"
 #include "components/autofill/core/browser/data_model/credit_card_cloud_token_data.h"
 #include "components/autofill/core/browser/data_model/iban.h"
@@ -55,6 +57,7 @@
 #include "sql/transaction.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "url/gurl.h"
+#include "url/origin.h"
 
 namespace autofill {
 
@@ -2173,7 +2176,7 @@ bool AutofillTable::AddServerCardMetadata(
   InsertBuilder(db_, s, kServerCardMetadataTable,
                 {kUseCount, kUseDate, kBillingAddressId, kId});
   s.BindInt64(0, card_metadata.use_count);
-  s.BindInt64(1, card_metadata.use_date.ToInternalValue());
+  s.BindTime(1, card_metadata.use_date);
   s.BindString(2, card_metadata.billing_address_id);
   s.BindString(3, card_metadata.id);
   s.Run();
@@ -2191,7 +2194,7 @@ bool AutofillTable::UpdateServerCardMetadata(const CreditCard& credit_card) {
   InsertBuilder(db_, s, kServerCardMetadataTable,
                 {kUseCount, kUseDate, kBillingAddressId, kId});
   s.BindInt64(0, credit_card.use_count());
-  s.BindInt64(1, credit_card.use_date().ToInternalValue());
+  s.BindTime(1, credit_card.use_date());
   s.BindString(2, credit_card.billing_address_id());
   s.BindString(3, credit_card.server_id());
   s.Run();
@@ -2208,7 +2211,7 @@ bool AutofillTable::UpdateServerCardMetadata(
   InsertBuilder(db_, s, kServerCardMetadataTable,
                 {kUseCount, kUseDate, kBillingAddressId, kId});
   s.BindInt64(0, card_metadata.use_count);
-  s.BindInt64(1, card_metadata.use_date.ToInternalValue());
+  s.BindTime(1, card_metadata.use_date);
   s.BindString(2, card_metadata.billing_address_id);
   s.BindString(3, card_metadata.id);
   s.Run();
@@ -2584,6 +2587,63 @@ bool AutofillTable::GetAutofillOffers(
               display_strings, promo_code));
       autofill_offer_data->emplace_back(std::move(data));
     }
+  }
+
+  return s.Succeeded();
+}
+void AutofillTable::SetVirtualCardUsageData(
+    const std::vector<VirtualCardUsageData>& virtual_card_usage_data) {
+  sql::Transaction transaction(db_);
+  if (!transaction.Begin()) {
+    return;
+  }
+
+  // Delete old table.
+  Delete(db_, kVirtualCardUsageDataTable);
+
+  // Insert new values.
+  sql::Statement insert_data;
+  InsertBuilder(db_, insert_data, kVirtualCardUsageDataTable,
+                {kId, kInstrumentId, kMerchantDomain, kLastFour});
+
+  for (const VirtualCardUsageData& data : virtual_card_usage_data) {
+    // usage_data_id should be consistent with the sync server logic.
+    std::string usage_data_id = base::JoinString(
+        {"VirtualCardUsageData",
+         base::NumberToString(data.instrument_id.value()),
+         data.merchant_app_package, data.merchant_origin.Serialize()},
+        "|");
+    insert_data.BindString(0, usage_data_id);
+    insert_data.BindInt64(1, data.instrument_id.value());
+    insert_data.BindString(2, data.merchant_origin.Serialize());
+    insert_data.BindString(3, data.virtual_card_last_four);
+    insert_data.Run();
+    insert_data.Reset(true);
+  }
+  transaction.Commit();
+}
+
+bool AutofillTable::GetVirtualCardUsageData(
+    std::vector<std::unique_ptr<VirtualCardUsageData>>*
+        virtual_card_usage_data) {
+  virtual_card_usage_data->clear();
+
+  sql::Statement s;
+  SelectBuilder(db_, s, kVirtualCardUsageDataTable,
+                {kId, kInstrumentId, kMerchantDomain, kLastFour});
+
+  while (s.Step()) {
+    int index = 1;  // UsageDataId is unused.
+    int64_t instrument_id = s.ColumnInt64(index++);
+    std::string merchant_domain = s.ColumnString(index++);
+    std::string last_four = s.ColumnString(index++);
+
+    auto data = std::make_unique<VirtualCardUsageData>();
+    data->instrument_id = VirtualCardUsageData::InstrumentId(instrument_id);
+    data->virtual_card_last_four = last_four;
+    data->merchant_origin = url::Origin::Create(GURL(merchant_domain));
+
+    virtual_card_usage_data->push_back(std::move(data));
   }
 
   return s.Succeeded();
@@ -3157,9 +3217,7 @@ bool AutofillTable::MigrateToVersion98RemoveStatusColumnMaskedCreditCards() {
 }
 
 bool AutofillTable::MigrateToVersion99RemoveAutofillProfilesTrashTable() {
-  sql::Transaction transaction(db_);
-  return transaction.Begin() && DropTable(db_, "autofill_profiles_trash") &&
-         transaction.Commit();
+  return DropTable(db_, "autofill_profiles_trash");
 }
 
 bool AutofillTable::MigrateToVersion100RemoveProfileValidityBitfieldColumn() {
@@ -3199,21 +3257,15 @@ bool AutofillTable::MigrateToVersion100RemoveProfileValidityBitfieldColumn() {
 }
 
 bool AutofillTable::MigrateToVersion101RemoveCreditCardArtImageTable() {
-  sql::Transaction transaction(db_);
-  return transaction.Begin() &&
-         db_->Execute("DROP TABLE IF EXISTS credit_card_art_images") &&
-         transaction.Commit();
+  return db_->Execute("DROP TABLE IF EXISTS credit_card_art_images");
 }
 
 bool AutofillTable::MigrateToVersion102AddAutofillBirthdatesTable() {
-  sql::Transaction transaction(db_);
-  return transaction.Begin() &&
-         CreateTable(db_, kAutofillProfileBirthdatesTable,
+  return CreateTable(db_, kAutofillProfileBirthdatesTable,
                      {{kGuid, "VARCHAR"},
                       {kDay, "INTEGER DEFAULT 0"},
                       {kMonth, "INTEGER DEFAULT 0"},
-                      {kYear, "INTEGER DEFAULT 0"}}) &&
-         transaction.Commit();
+                      {kYear, "INTEGER DEFAULT 0"}});
 }
 
 bool AutofillTable::MigrateToVersion104AddProductDescriptionColumn() {
@@ -3234,15 +3286,12 @@ bool AutofillTable::MigrateToVersion104AddProductDescriptionColumn() {
 }
 
 bool AutofillTable::MigrateToVersion105AddAutofillIBANTable() {
-  sql::Transaction transaction(db_);
-  return transaction.Begin() &&
-         CreateTable(db_, kIBANsTable,
+  return CreateTable(db_, kIBANsTable,
                      {{kGuid, "VARCHAR"},
                       {kUseCount, "INTEGER NOT NULL DEFAULT 0"},
                       {kUseDate, "INTEGER NOT NULL DEFAULT 0"},
                       {kValue, "VARCHAR"},
-                      {kNickname, "VARCHAR"}}) &&
-         transaction.Commit();
+                      {kNickname, "VARCHAR"}});
 }
 
 bool AutofillTable::MigrateToVersion106RecreateAutofillIBANTable() {
@@ -3277,21 +3326,10 @@ bool AutofillTable::MigrateToVersion107AddContactInfoTables() {
 }
 
 bool AutofillTable::MigrateToVersion108AddCardIssuerIdColumn() {
-  sql::Transaction transaction(db_);
-
-  if (!transaction.Begin())
-    return false;
-
-  if (!db_->DoesTableExist(kMaskedCreditCardsTable))
-    return false;
-
   // Add card_issuer_id to masked_credit_cards.
-  if (!AddColumnIfNotExists(db_, kMaskedCreditCardsTable, kCardIssuerId,
-                            "VARCHAR")) {
-    return false;
-  }
-
-  return transaction.Commit();
+  return db_->DoesTableExist(kMaskedCreditCardsTable) &&
+         AddColumnIfNotExists(db_, kMaskedCreditCardsTable, kCardIssuerId,
+                              "VARCHAR");
 }
 
 bool AutofillTable::MigrateToVersion109AddVirtualCardUsageDataTable() {

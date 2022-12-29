@@ -8,12 +8,14 @@
 #include "ash/constants/ash_switches.h"
 #include "ash/public/cpp/keyboard/keyboard_switches.h"
 #include "base/files/file_path.h"
+#include "base/functional/bind.h"
 #include "base/run_loop.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/test/metrics/histogram_tester.h"
 #include "base/threading/thread_restrictions.h"
 #include "chrome/browser/ash/file_manager/copy_or_move_io_task_scanning_impl.h"
 #include "chrome/browser/ash/file_manager/file_manager_browsertest_base.h"
+#include "chrome/browser/ash/file_manager/path_util.h"
 #include "chrome/browser/ash/policy/dlp/dlp_files_controller.h"
 #include "chrome/browser/chromeos/policy/dlp/dlp_rules_manager.h"
 #include "chrome/browser/chromeos/policy/dlp/dlp_rules_manager_factory.h"
@@ -30,6 +32,7 @@
 #include "chrome/common/chrome_features.h"
 #include "chrome/common/pref_names.h"
 #include "chromeos/dbus/dlp/dlp_client.h"
+#include "chromeos/dbus/dlp/dlp_service.pb.h"
 #include "components/policy/core/common/cloud/mock_cloud_policy_client.h"
 #include "components/prefs/pref_service.h"
 #include "components/session_manager/core/session_manager.h"
@@ -137,11 +140,6 @@ struct TestCase {
     return *this;
   }
 
-  TestCase& EnableFiltersInRecentsV2() {
-    options.enable_filters_in_recents_v2 = true;
-    return *this;
-  }
-
   TestCase& EnableTrash() {
     options.enable_trash = true;
     return *this;
@@ -157,8 +155,8 @@ struct TestCase {
     return *this;
   }
 
-  TestCase& EnableVirtioBlkForData() {
-    options.enable_virtio_blk_for_data = true;
+  TestCase& EnableArcVm() {
+    options.enable_arc_vm = true;
     return *this;
   }
 
@@ -224,9 +222,6 @@ struct TestCase {
 
     if (options.enable_trash)
       full_name += "_Trash";
-
-    if (options.enable_filters_in_recents_v2)
-      full_name += "_FiltersInRecentsV2";
 
     if (options.enable_mirrorsync)
       full_name += "_MirrorSync";
@@ -311,6 +306,12 @@ IN_PROC_BROWSER_TEST_P(ExtendedFilesAppBrowserTest, Test) {
   StartTest();
 }
 
+// DLP source URLs
+constexpr char kBlockedSourceUrl[] = "https://blocked.com";
+constexpr char kWarnSourceUrl[] = "https://warned.com";
+constexpr char kNotSetSourceUrl[] = "https://not-set.com";
+constexpr char kNotBlockedSourceUrl[] = "https://allowed.com";
+
 // A version of FilesAppBrowserTest that supports DLP files restrictions.
 class DlpFilesAppBrowserTest : public FilesAppBrowserTest {
  public:
@@ -345,14 +346,72 @@ class DlpFilesAppBrowserTest : public FilesAppBrowserTest {
                             base::Unretained(this)));
   }
 
+  absl::optional<ino64_t> GetInodeValue(const base::FilePath& path) {
+    struct stat file_stats;
+    if (stat(path.value().c_str(), &file_stats) != 0) {
+      return absl::nullopt;
+    }
+    return file_stats.st_ino;
+  }
+
   // TODO(b/261163959): Optimize DLP messages.
   bool HandleDlpCommands(const std::string& name,
                          const base::Value::Dict& value,
                          std::string* output) override {
+    if (name == "setGetFilesSourcesMock") {
+      base::FilePath result =
+          file_manager::util::GetDownloadsFolderForProfile(profile());
+      const base::Value::List* file_names = value.FindList("fileNames");
+      auto* source_urls = value.FindList("sourceUrls");
+      EXPECT_TRUE(file_names);
+      EXPECT_TRUE(source_urls);
+      EXPECT_EQ(file_names->size(), source_urls->size());
+
+      ::dlp::GetFilesSourcesResponse response;
+      for (unsigned long i = 0; i < file_names->size(); i++) {
+        auto* metadata = response.add_files_metadata();
+        auto inode = GetInodeValue(result.Append((*file_names)[i].GetString()));
+        EXPECT_TRUE(inode.has_value());
+        metadata->set_inode(inode.value());
+        metadata->set_source_url((*source_urls)[i].GetString());
+      }
+
+      chromeos::DlpClient::Get()->GetTestInterface()->SetGetFilesSourceMock(
+          base::BindRepeating(&DlpFilesAppBrowserTest::GetFilesSourcesMock,
+                              base::Unretained(this), response));
+      return true;
+    }
+    if (name == "setBlockedFilesTransfer") {
+      base::FilePath result =
+          file_manager::util::GetDownloadsFolderForProfile(profile());
+      auto* file_names = value.FindList("fileNames");
+      EXPECT_TRUE(file_names);
+      ::dlp::CheckFilesTransferResponse check_files_transfer_response;
+      for (const auto& file_name : *file_names) {
+        check_files_transfer_response.add_files_paths(
+            result.Append(file_name.GetString()).value());
+      }
+      chromeos::DlpClient::Get()->GetTestInterface()->SetIsAlive(true);
+      chromeos::DlpClient::Get()
+          ->GetTestInterface()
+          ->SetCheckFilesTransferResponse(check_files_transfer_response);
+      return true;
+    }
     if (name == "setIsRestrictedDestinationRestriction") {
-      EXPECT_CALL(*mock_rules_manager_, IsRestrictedDestination)
+      EXPECT_CALL(
+          *mock_rules_manager_,
+          IsRestrictedDestination(GURL(kBlockedSourceUrl), testing::_,
+                                  policy::DlpRulesManager::Restriction::kFiles,
+                                  testing::_, testing::_))
           .WillRepeatedly(
-              ::testing::Return(policy::DlpRulesManager::Level::kBlock));
+              testing::Return(policy::DlpRulesManager::Level::kBlock));
+      EXPECT_CALL(
+          *mock_rules_manager_,
+          IsRestrictedDestination(GURL(kNotBlockedSourceUrl), testing::_,
+                                  policy::DlpRulesManager::Restriction::kFiles,
+                                  testing::_, testing::_))
+          .WillRepeatedly(
+              ::testing::Return(policy::DlpRulesManager::Level::kAllow));
       return true;
     }
     if (name == "setBlockedArc") {
@@ -371,13 +430,42 @@ class DlpFilesAppBrowserTest : public FilesAppBrowserTest {
           .WillOnce(testing::Return(components));
       return true;
     }
+    if (name == "setBlockedPluginVM") {
+      policy::DlpRulesManager::AggregatedComponents components;
+      components[policy::DlpRulesManager::Level::kBlock].insert(
+          policy::DlpRulesManager::Component::kPluginVm);
+      EXPECT_CALL(*mock_rules_manager_, GetAggregatedComponents)
+          .WillOnce(testing::Return(components));
+      return true;
+    }
     if (name == "setIsRestrictedByAnyRuleRestrictions") {
-      EXPECT_CALL(*mock_rules_manager_, IsRestrictedByAnyRule)
-          .WillOnce(::testing::Return(policy::DlpRulesManager::Level::kWarn))
-          .WillOnce(::testing::Return(policy::DlpRulesManager::Level::kAllow))
-          .WillOnce(::testing::Return(policy::DlpRulesManager::Level::kNotSet))
+      EXPECT_CALL(*mock_rules_manager_,
+                  IsRestrictedByAnyRule(
+                      GURL(kNotBlockedSourceUrl),
+                      policy::DlpRulesManager::Restriction::kFiles, testing::_))
           .WillRepeatedly(
-              ::testing::Return(policy::DlpRulesManager::Level::kBlock));
+              testing::Return(policy::DlpRulesManager::Level::kAllow));
+
+      EXPECT_CALL(*mock_rules_manager_,
+                  IsRestrictedByAnyRule(
+                      GURL(kBlockedSourceUrl),
+                      policy::DlpRulesManager::Restriction::kFiles, testing::_))
+          .WillRepeatedly(
+              testing::Return(policy::DlpRulesManager::Level::kBlock));
+
+      EXPECT_CALL(*mock_rules_manager_,
+                  IsRestrictedByAnyRule(
+                      GURL(kNotSetSourceUrl),
+                      policy::DlpRulesManager::Restriction::kFiles, testing::_))
+          .WillRepeatedly(
+              testing::Return(policy::DlpRulesManager::Level::kNotSet));
+
+      EXPECT_CALL(*mock_rules_manager_,
+                  IsRestrictedByAnyRule(
+                      GURL(kWarnSourceUrl),
+                      policy::DlpRulesManager::Restriction::kFiles, testing::_))
+          .WillRepeatedly(
+              testing::Return(policy::DlpRulesManager::Level::kWarn));
       return true;
     }
     if (name == "setIsRestrictedByAnyRuleBlocked") {
@@ -389,6 +477,15 @@ class DlpFilesAppBrowserTest : public FilesAppBrowserTest {
     return false;
   }
 
+  // Invokes `callback` with the previously constructed `response`. Note that the
+  // result doesn't depend on the value of `request`.
+  void GetFilesSourcesMock(
+      const dlp::GetFilesSourcesResponse response,
+      const dlp::GetFilesSourcesRequest request,
+      chromeos::DlpClient::GetFilesSourcesCallback callback) {
+    std::move(callback).Run(response);
+  }
+
   // MockDlpRulesManager is owned by KeyedService and is guaranteed to outlive
   // this class.
   policy::MockDlpRulesManager* mock_rules_manager_ = nullptr;
@@ -397,8 +494,6 @@ class DlpFilesAppBrowserTest : public FilesAppBrowserTest {
 };
 
 IN_PROC_BROWSER_TEST_P(DlpFilesAppBrowserTest, Test) {
-  chromeos::DlpClient::Get()->GetTestInterface()->SetFakeSource("example1.com");
-
   ASSERT_TRUE(policy::DlpRulesManagerFactory::GetForPrimaryProfile());
   ON_CALL(*mock_rules_manager_, IsRestricted)
       .WillByDefault(::testing::Return(policy::DlpRulesManager::Level::kAllow));
@@ -992,7 +1087,7 @@ WRAPPED_INSTANTIATE_TEST_SUITE_P(
             .EnableGenericDocumentsProvider(),
         TestCase("checkContextMenuFocus"),
         TestCase("checkContextMenusForInputElements"),
-        TestCase("checkDeleteDisabledInRecents"),
+        TestCase("checkDeleteEnabledInRecents"),
         TestCase("checkGoToFileLocationEnabledInRecents"),
         TestCase("checkGoToFileLocationDisabledInMultipleSelection"),
         TestCase("checkDefaultTask"),
@@ -1062,7 +1157,7 @@ WRAPPED_INSTANTIATE_TEST_SUITE_P(
         TestCase("openQuickViewDrive"),
         TestCase("openQuickViewSmbfs"),
         TestCase("openQuickViewAndroid"),
-        TestCase("openQuickViewAndroidGuestOs").EnableVirtioBlkForData(),
+        TestCase("openQuickViewAndroidGuestOs").EnableArcVm(),
         TestCase("openQuickViewDocumentsProvider")
             .EnableGenericDocumentsProvider(),
         TestCase("openQuickViewCrostini"),
@@ -1302,9 +1397,10 @@ WRAPPED_INSTANTIATE_TEST_SUITE_P(
         TestCase("dlpShowManagedIcon").EnableDlp(),
         TestCase("dlpContextMenuRestrictionDetails").EnableDlp(),
         TestCase("saveAsDlpRestrictedDirectory").EnableDlp(),
-        TestCase("saveAsDlpRestrictedMountableDirectory").EnableDlp(),
+        TestCase("saveAsDlpRestrictedCrostini").EnableDlp(),
         TestCase("saveAsNonDlpRestricted").EnableDlp(),
         TestCase("saveAsDlpRestrictedRedirectsToMyFiles").EnableDlp(),
+        TestCase("saveAsDlpRestrictedVm").EnableDlp(),
         TestCase("openDlpRestrictedFile").EnableDlp()));
 
 #define FILE_TRANSFER_TEST_CASE(name) \
@@ -1636,19 +1732,14 @@ WRAPPED_INSTANTIATE_TEST_SUITE_P(
     FilesAppBrowserTest,
     ::testing::Values(
         TestCase("recentsA11yMessages"),
-        TestCase("recentsAllowCutForDownloads").EnableFiltersInRecentsV2(),
-        TestCase("recentsAllowCutForDrive").EnableFiltersInRecentsV2(),
-        TestCase("recentsAllowCutForPlayFiles")
-            .EnableArc()
-            .EnableFiltersInRecentsV2(),
-        TestCase("recentsAllowDeletion").EnableArc().EnableFiltersInRecentsV2(),
-        TestCase("recentsAllowMultipleFilesDeletion")
-            .EnableArc()
-            .EnableFiltersInRecentsV2(),
-        TestCase("recentsAllowRename").EnableArc().EnableFiltersInRecentsV2(),
-        TestCase("recentsEmptyFolderMessage").EnableFiltersInRecentsV2(),
-        TestCase("recentsEmptyFolderMessageAfterDeletion")
-            .EnableFiltersInRecentsV2(),
+        TestCase("recentsAllowCutForDownloads"),
+        TestCase("recentsAllowCutForDrive"),
+        TestCase("recentsAllowCutForPlayFiles").EnableArc(),
+        TestCase("recentsAllowDeletion").EnableArc(),
+        TestCase("recentsAllowMultipleFilesDeletion").EnableArc(),
+        TestCase("recentsAllowRename").EnableArc(),
+        TestCase("recentsEmptyFolderMessage"),
+        TestCase("recentsEmptyFolderMessageAfterDeletion"),
         TestCase("recentsDownloads"),
         TestCase("recentsDrive"),
         TestCase("recentsCrostiniNotMounted"),
@@ -1658,26 +1749,19 @@ WRAPPED_INSTANTIATE_TEST_SUITE_P(
         TestCase("recentsDownloadsAndDriveWithOverlap"),
         TestCase("recentsFilterResetToAll"),
         TestCase("recentsNested"),
-        TestCase("recentsNoRenameForPlayFiles")
-            .EnableArc()
-            .EnableFiltersInRecentsV2(),
+        TestCase("recentsNoRenameForPlayFiles").EnableArc(),
         TestCase("recentsPlayFiles").EnableArc(),
-        TestCase("recentsReadOnlyHidden").EnableFiltersInRecentsV2(),
-        TestCase("recentsRespectSearchWhenSwitchingFilter")
-            .EnableFiltersInRecentsV2(),
-        TestCase("recentsRespondToTimezoneChangeForGridView")
-            .EnableFiltersInRecentsV2(),
-        TestCase("recentsRespondToTimezoneChangeForListView")
-            .EnableFiltersInRecentsV2(),
-        TestCase("recentsTimePeriodHeadings").EnableFiltersInRecentsV2(),
+        TestCase("recentsReadOnlyHidden"),
+        TestCase("recentsRespectSearchWhenSwitchingFilter"),
+        TestCase("recentsRespondToTimezoneChangeForGridView"),
+        TestCase("recentsRespondToTimezoneChangeForListView"),
+        TestCase("recentsTimePeriodHeadings"),
         TestCase("recentAudioDownloads"),
         TestCase("recentAudioDownloadsAndDrive"),
         TestCase("recentAudioDownloadsAndDriveAndPlayFiles").EnableArc(),
-        TestCase("recentDocumentsDownloads").EnableFiltersInRecentsV2(),
-        TestCase("recentDocumentsDownloadsAndDrive").EnableFiltersInRecentsV2(),
-        TestCase("recentDocumentsDownloadsAndDriveAndPlayFiles")
-            .EnableArc()
-            .EnableFiltersInRecentsV2(),
+        TestCase("recentDocumentsDownloads"),
+        TestCase("recentDocumentsDownloadsAndDrive"),
+        TestCase("recentDocumentsDownloadsAndDriveAndPlayFiles").EnableArc(),
         TestCase("recentImagesDownloads"),
         TestCase("recentImagesDownloadsAndDrive"),
         TestCase("recentImagesDownloadsAndDriveAndPlayFiles").EnableArc(),
@@ -1770,6 +1854,7 @@ WRAPPED_INSTANTIATE_TEST_SUITE_P(
         TestCase("trashEmptyTrash").EnableTrash(),
         TestCase("trashEmptyTrashShortcut").EnableTrash(),
         TestCase("trashDeleteFromTrash").EnableTrash(),
+        TestCase("trashDeleteFromTrashOriginallyFromMyFiles").EnableTrash(),
         TestCase("trashNoTasksInTrashRoot").EnableTrash(),
         TestCase("trashDoubleClickOnFileInTrashRootShowsDialog").EnableTrash(),
         TestCase("trashDragDropRootAcceptsEntries").EnableTrash(),
@@ -1795,7 +1880,9 @@ WRAPPED_INSTANTIATE_TEST_SUITE_P(
             "trashPressingEnterOnFileInTrashRootShowsDialogWithRestoreButton")
             .EnableTrash(),
         TestCase("trashCantRenameFilesInTrashRoot").EnableTrash(),
-        TestCase("trashNudgeShownOnFirstTrashOperation").EnableTrash()));
+        TestCase("trashNudgeShownOnFirstTrashOperation").EnableTrash(),
+        TestCase("trashStaleTrashInfoFilesAreRemovedAfterOneHour")
+            .EnableTrash()));
 
 WRAPPED_INSTANTIATE_TEST_SUITE_P(
     AndroidPhotos, /* android_photos.js */
@@ -1826,10 +1913,9 @@ WRAPPED_INSTANTIATE_TEST_SUITE_P(
 WRAPPED_INSTANTIATE_TEST_SUITE_P(
     GuestOs, /* guest_os.js */
     FilesAppBrowserTest,
-    ::testing::Values(
-        TestCase("fakesListed"),
-        TestCase("listUpdatedWhenGuestsChanged"),
-        TestCase("mountGuestSuccess"),
-        TestCase("mountAndroidVolumeSuccess").EnableVirtioBlkForData()));
+    ::testing::Values(TestCase("fakesListed"),
+                      TestCase("listUpdatedWhenGuestsChanged"),
+                      TestCase("mountGuestSuccess"),
+                      TestCase("mountAndroidVolumeSuccess").EnableArcVm()));
 
 }  // namespace file_manager

@@ -5,7 +5,7 @@
 // clang-format off
 import {loadTimeData} from 'chrome://resources/js/load_time_data.js';
 import {flush} from 'chrome://resources/polymer/v3_0/polymer/polymer_bundled.min.js';
-import {ContentSetting, SettingsCollapseRadioButtonElement, ContentSettingsTypes,CookiePrimarySetting, SettingsCookiesPageElement, SiteSettingsPrefsBrowserProxyImpl, CookieControlsMode} from 'chrome://settings/lazy_load.js';
+import {CookieControlsMode, ContentSetting, SettingsCollapseRadioButtonElement, ContentSettingsTypes,CookiePrimarySetting, SettingsCookiesPageElement, SITE_EXCEPTION_WILDCARD, SiteSettingsPrefsBrowserProxyImpl} from 'chrome://settings/lazy_load.js';
 import {CrLinkRowElement, CrSettingsPrefs, MetricsBrowserProxyImpl, PrivacyElementInteractions, Router, routes, SettingsPrefsElement, SettingsToggleButtonElement} from 'chrome://settings/settings.js';
 import {assertEquals, assertFalse, assertTrue} from 'chrome://webui-test/chai_assert.js';
 import {isChildVisible} from 'chrome://webui-test/test_util.js';
@@ -66,10 +66,11 @@ suite('CrSettingsCookiesPageTest', function() {
   test('ElementVisibility', async function() {
     // TODO(): Remove assertFalse checks after the feature is launched.
     await flushTasks();
+    assertTrue(isChildVisible(page, '#explanationText'));
     assertTrue(isChildVisible(page, '#exceptionHeader'));
     assertTrue(isChildVisible(page, '#allowExceptionsList'));
-    assertTrue(isChildVisible(page, '#sessionOnlyExceptionsList'));
-    assertTrue(isChildVisible(page, '#blockExceptionsList'));
+    assertFalse(isChildVisible(page, '#sessionOnlyExceptionsList'));
+    assertFalse(isChildVisible(page, '#blockExceptionsList'));
 
     assertFalse(isChildVisible(page, '#clearOnExit'));
 
@@ -108,22 +109,16 @@ suite('CrSettingsCookiesPageTest', function() {
         CookieControlsMode.OFF);
   });
 
-  test('CookieSettingExceptions_Search', async function() {
-    // TODO(crbug.com/1378703): Update after changes to site lists.
+  test('ExceptionsSearch', async function() {
+    await siteSettingsBrowserProxy.whenCalled('getExceptionList');
+    siteSettingsBrowserProxy.resetResolver('getExceptionList');
+
     const exceptionPrefs = createSiteSettingsPrefs([], [
       createContentSettingTypeToValuePair(
           ContentSettingsTypes.COOKIES,
           [
-            createRawSiteException('http://foo-block.com', {
-              embeddingOrigin: '',
-              setting: ContentSetting.BLOCK,
-            }),
-            createRawSiteException('http://foo-allow.com', {
-              embeddingOrigin: '',
-            }),
-            createRawSiteException('http://foo-session.com', {
-              embeddingOrigin: '',
-              setting: ContentSetting.SESSION_ONLY,
+            createRawSiteException(SITE_EXCEPTION_WILDCARD, {
+              embeddingOrigin: 'foo-allow.com',
             }),
           ]),
     ]);
@@ -132,45 +127,42 @@ suite('CrSettingsCookiesPageTest', function() {
     await siteSettingsBrowserProxy.whenCalled('getExceptionList');
     flush();
 
-    const exceptionLists = page.shadowRoot!.querySelectorAll('site-list');
-    assertEquals(exceptionLists.length, 3);
-
-    for (const list of exceptionLists) {
-      assertTrue(isChildVisible(list, 'site-list-entry'));
-    }
+    const exceptionList = page.shadowRoot!.querySelector('site-list');
+    assertTrue(!!exceptionList);
+    assertTrue(isChildVisible(exceptionList, 'site-list-entry'));
 
     page.searchTerm = 'unrelated.com';
     flush();
 
-    for (const list of exceptionLists) {
-      assertFalse(isChildVisible(list, 'site-list-entry'));
-    }
+    assertFalse(isChildVisible(exceptionList, 'site-list-entry'));
   });
 
-  test('ExceptionLists_ReadOnly', function() {
-    // TODO(crbug.com/1378703): Update after changes to site lists.
-    // Check all exception lists are read only when the preference
-    // reports as managed.
+  test('ExceptionListReadOnly', function() {
+    // Check that the exception list is read only when the preference reports as
+    // managed.
     page.set('prefs.generated.cookie_default_content_setting', {
       value: ContentSetting.ALLOW,
       enforcement: chrome.settingsPrivate.Enforcement.ENFORCED,
     });
-    let exceptionLists = page.shadowRoot!.querySelectorAll('site-list');
-    assertEquals(exceptionLists.length, 3);
-    for (const list of exceptionLists) {
-      assertTrue(!!list.readOnlyList);
-    }
+    const exceptionList1 = page.shadowRoot!.querySelector('site-list');
+    assertTrue(!!exceptionList1);
+    assertTrue(!!exceptionList1.readOnlyList);
 
-    // Return preference to unmanaged state and check all exception lists
-    // are no longer read only.
+    // Return preference to unmanaged state and check that the exception list
+    // is no longer read only.
     page.set('prefs.generated.cookie_default_content_setting', {
       value: ContentSetting.ALLOW,
     });
-    exceptionLists = page.shadowRoot!.querySelectorAll('site-list');
-    assertEquals(exceptionLists.length, 3);
-    for (const list of exceptionLists) {
-      assertFalse(!!list.readOnlyList);
-    }
+    const exceptionList2 = page.shadowRoot!.querySelector('site-list');
+    assertTrue(!!exceptionList2);
+    assertFalse(!!exceptionList2.readOnlyList);
+  });
+
+  test('ExceptionListHasCorrectCookieExceptionType', function() {
+    const exceptionList = page.shadowRoot!.querySelector('site-list');
+    assertTrue(!!exceptionList);
+    assertEquals(
+        'third-party', exceptionList.getAttribute('cookies-exception-type'));
   });
 
   test('privacySandboxToast', async function() {
@@ -322,7 +314,7 @@ suite('CrSettingsCookiesPageTest_FirstPartySetsUIEnabled', function() {
 });
 
 // TODO(crbug.com/1378703): Remove after crbug/1378703 launched.
-suite('PrivacySandboxSettings4Disabled', function() {
+suite('CrSettingsCookiesPageTest_PrivacySandboxSettings4Disabled', function() {
   let siteSettingsBrowserProxy: TestSiteSettingsPrefsBrowserProxy;
   let testMetricsBrowserProxy: TestMetricsBrowserProxy;
   let page: SettingsCookiesPageElement;
@@ -381,6 +373,7 @@ suite('PrivacySandboxSettings4Disabled', function() {
 
   test('ElementVisibility', async function() {
     await flushTasks();
+    assertFalse(isChildVisible(page, '#explanationText'));
     assertTrue(isChildVisible(page, '#exceptionHeader'));
     assertTrue(isChildVisible(page, '#clearOnExit'));
     assertTrue(isChildVisible(page, '#doNotTrack'));
@@ -436,6 +429,11 @@ suite('PrivacySandboxSettings4Disabled', function() {
   });
 
   test('CookieSettingExceptions_Search', async function() {
+    while (siteSettingsBrowserProxy.getCallCount('getExceptionList') < 3) {
+      await flushTasks();
+    }
+    siteSettingsBrowserProxy.resetResolver('getExceptionList');
+
     const exceptionPrefs = createSiteSettingsPrefs([], [
       createContentSettingTypeToValuePair(
           ContentSettingsTypes.COOKIES,
@@ -455,7 +453,9 @@ suite('PrivacySandboxSettings4Disabled', function() {
     ]);
     page.searchTerm = 'foo';
     siteSettingsBrowserProxy.setPrefs(exceptionPrefs);
-    await siteSettingsBrowserProxy.whenCalled('getExceptionList');
+    while (siteSettingsBrowserProxy.getCallCount('getExceptionList') < 3) {
+      await flushTasks();
+    }
     flush();
 
     const exceptionLists = page.shadowRoot!.querySelectorAll('site-list');

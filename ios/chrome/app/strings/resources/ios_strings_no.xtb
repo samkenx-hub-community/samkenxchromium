@@ -4,6 +4,7 @@
 <translation id="1005230401424685968">ÅÅÅÅ</translation>
 <translation id="1013952917065545813">Du kan komme tilbake hit for å gjenåpne faner du nylig har lukket</translation>
 <translation id="1016495303386450659">Elementet er oppdatert</translation>
+<translation id="1035980983510608210">Hvis du lukker alle faner, blir også festede faner lukket.</translation>
 <translation id="1044891598689252897">Nettsteder kommer til å fungere som normalt</translation>
 <translation id="1049743911850919806">Inkognito</translation>
 <translation id="105093091697134113">Disse kontoene bruker passord som har vært avdekket i databrudd hos tredjeparter eller skrevet inn på villedende nettsteder. Endre disse passordene umiddelbart for å beskytte kontoene dine.</translation>
@@ -48,6 +49,7 @@ Bare personer som har passordfrasen din, kan lese de krypterte dataene. Passordf
 <translation id="1265739287306757398">Finn ut hvordan</translation>
 <translation id="1272079795634619415">Stopp</translation>
 <translation id="1275718070701477396">Valgt</translation>
+<translation id="1279024913354609713">Ikke tillat</translation>
 <translation id="1281818060020671000">Administrer data</translation>
 <translation id="1282311502488501110">Ikke logg på</translation>
 <translation id="1283524564873030414">Siste døgn</translation>
@@ -148,6 +150,7 @@ Bare personer som har passordfrasen din, kan lese de krypterte dataene. Passordf
 <translation id="2074131957428911366">Du kan når som helst velge hva du vil synkronisere, i <ph name="BEGIN_LINK" />innstillingene<ph name="END_LINK" />.</translation>
 <translation id="2079545284768500474">Angre</translation>
 <translation id="2080769225927880590">Logg på med en gyldig konto</translation>
+<translation id="2090878303988764231">Logg på for å administrere innholdet du ser</translation>
 <translation id="2103075008456228677">Åpne history.google.com</translation>
 <translation id="21133533946938348">Fest fanen</translation>
 <translation id="2116625576999540962"><ph name="NUMBER_OF_SELECTED_BOOKMARKS" /> elementer er flyttet</translation>
@@ -206,6 +209,7 @@ Nettsteder kan ikke bruke informasjonskapsler til å se nettleseraktiviteten din
 <translation id="2578571896248130439">Send nettside</translation>
 <translation id="2584132361465095047">Legg til en konto …</translation>
 <translation id="2600682495497606169">Slett informasjonskapsler for nettstedet</translation>
+<translation id="2609008503159898744">Vil du lukke alle faner?</translation>
 <translation id="2625189173221582860">Passordet er kopiert</translation>
 <translation id="2626236249646841566">Kontroller tilkoblingen din, og prøv å logge på igjen.</translation>
 <translation id="2637313651144986786">Søk i faner…</translation>
@@ -297,6 +301,7 @@ Se eventuelt instruksjonene fra den aktuelle søkemotoren om hvordan du sletter 
 <translation id="3174662312949010067">Du kan også bruke lagrede passord på de andre enhetene dine.</translation>
 <translation id="3175081911749765310">Nettjenester</translation>
 <translation id="3178650076442119961">Aktiv i dag</translation>
+<translation id="3181261441371833039">Lukk bare vanlige faner</translation>
 <translation id="3181825792072797598">Slå på synkronisering</translation>
 <translation id="3181954750937456830">Safe Browsing (beskytter deg og enheten din mot farlige nettsteder)</translation>
 <translation id="3184767182050912705">Lås opp med <ph name="BIOMETRIC_AUTHENITCATION_TYPE" /></translation>
@@ -508,6 +513,7 @@ For å endre denne innstillingen, <ph name="BEGIN_LINK" />tilbakestill synkronis
 <translation id="481968316161811770">Informasjonskapsler og nettstedsdata</translation>
 <translation id="4824497107140370669">{count,plural, =0{{domain}}=1{{domain} og 1 til}other{{domain} og {count} til}}</translation>
 <translation id="4826218269716039351">Blokkér fra tredjeparter</translation>
+<translation id="4826588772550366629">kamera og mikrofon</translation>
 <translation id="4826726074642088322">Del markert tekst</translation>
 <translation id="48274138579728272">Merk som lest</translation>
 <translation id="4833686396768033263">Nylige faner er utilgjengelige</translation>
@@ -560,6 +566,7 @@ For å endre denne innstillingen, <ph name="BEGIN_LINK" />tilbakestill synkronis
 <translation id="5190835502935405962">Bokmerkerad</translation>
 <translation id="519530786644929958">Nedlastingen mislyktes. Det er ikke mulig å prøve på nytt.</translation>
 <translation id="5197255632782567636">Internett</translation>
+<translation id="5211488077761630279">Vil du tillate at «<ph name="SITE_NAME" />» bruker <ph name="PERMISSION" />?</translation>
 <translation id="5219295696240154694">Bidra til å gjøre nettet sikrere for alle</translation>
 <translation id="5228579091201413441">Slå på synkronisering</translation>
 <translation id="5232485538978018676">Logg på med administrert konto</translation>
@@ -787,6 +794,7 @@ Når du er i Inkognito, kan ikke nettsteder bruke informasjonskapsler til å se 
 <translation id="6710079714193676716">Administreres av organisasjonen din. Noen funksjoner er kanskje ikke tilgjengelige. <ph name="BEGIN_LINK" />Finn ut mer<ph name="END_LINK" /></translation>
 <translation id="6713747756340119864">Google Apps</translation>
 <translation id="6730682669179532099">Kan ikke eksportere passordene</translation>
+<translation id="6732087373923685049">kamera</translation>
 <translation id="6748108480210050150">Fra</translation>
 <translation id="6760509555861141183">Gå tilbake til nylig fane</translation>
 <translation id="6762812039470893796">Velg bort alle</translation>
@@ -973,6 +981,7 @@ Nettsteder kan bruke informasjonskapsler til å se nettleseraktiviteten din på 
 <translation id="8197543752516192074">Oversett siden</translation>
 <translation id="8205564605687841303">Avbryt</translation>
 <translation id="8206354486702514201">Denne innstillingen håndheves av administratoren din.</translation>
+<translation id="821809831108207540">For å gi Discover-feeden og Chrome et personlig preg, logg på og slå på synkronisering.</translation>
 <translation id="8225985093977202398">Bufrede bilder og filer</translation>
 <translation id="8237382152611443140">Åpne innstillinger for autofylling av passord</translation>
 <translation id="8261506727792406068">Slett</translation>
@@ -1039,6 +1048,7 @@ Nettsteder kan bruke informasjonskapsler til å se nettleseraktiviteten din på 
 <translation id="8764015330924122850">Slutt å følge <ph name="DOMAIN_NAME" /></translation>
 <translation id="8775144690796719618">Ugyldig nettadresse</translation>
 <translation id="8787968206789828143">Søk på nettet</translation>
+<translation id="8792626944327216835">mikrofon</translation>
 <translation id="8803639129939845298">Sikker</translation>
 <translation id="8806823403540278281">Organisasjonen din krever at du surfer privat. Faner lagres ikke i inkognitomodus.
 <ph name="BEGIN_LINK" />Finn ut mer<ph name="END_LINK" /></translation>
@@ -1094,6 +1104,7 @@ Nettsteder kan bruke informasjonskapsler til å se nettleseraktiviteten din på 
 <translation id="9157836665414082580">Ignorer dialogbokser</translation>
 <translation id="9177438225260810839">Søk i åpne faner</translation>
 <translation id="9188680907066685419">Logg av administrert konto</translation>
+<translation id="9193147658040604536">Dra hit for å feste fanen</translation>
 <translation id="9200875785104711666">for <ph name="TIME" /> d siden</translation>
 <translation id="9203116392574189331">Handoff</translation>
 <translation id="9219154867334666734">Søk etter faner…</translation>

@@ -48,14 +48,17 @@ absl::optional<double> FindSizeForContainerAxis(PhysicalAxes requested_axis,
                                                 Element* context_element) {
   Element* container = ContainerQueryEvaluator::FindContainer(
       context_element, ContainerSelector(requested_axis));
-  if (!container)
+  if (!container) {
     return absl::nullopt;
+  }
   auto* evaluator = container->GetContainerQueryEvaluator();
-  if (!evaluator)
+  if (!evaluator) {
     return absl::nullopt;
+  }
   evaluator->SetReferencedByUnit();
-  if (requested_axis == kPhysicalAxisHorizontal)
+  if (requested_axis == kPhysicalAxisHorizontal) {
     return evaluator->Width();
+  }
   DCHECK_EQ(requested_axis, kPhysicalAxisVertical);
   return evaluator->Height();
 }
@@ -66,26 +69,63 @@ CSSToLengthConversionData::FontSizes::FontSizes(float em,
                                                 float rem,
                                                 const Font* font,
                                                 float font_zoom)
-    : em_(em), rem_(rem), font_(font), font_zoom_(font_zoom) {
+    : em_(em),
+      rem_(rem),
+      font_(font),
+      root_font_(font),
+      font_zoom_(font_zoom),
+      root_font_zoom_(font_zoom) {
   DCHECK(font_);
+}
+
+CSSToLengthConversionData::FontSizes::FontSizes(float em,
+                                                float rem,
+                                                const Font* font,
+                                                const Font* root_font,
+                                                float font_zoom,
+                                                float root_font_zoom)
+    : em_(em),
+      rem_(rem),
+      font_(font),
+      root_font_(root_font),
+      font_zoom_(font_zoom),
+      root_font_zoom_(root_font_zoom) {
+  DCHECK(font_);
+  DCHECK(root_font_);
 }
 
 CSSToLengthConversionData::FontSizes::FontSizes(const ComputedStyle* style,
                                                 const ComputedStyle* root_style)
-    : FontSizes(style->SpecifiedFontSize(),
-                root_style ? root_style->SpecifiedFontSize() : 1.0f,
-                &style->GetFont(),
-                style->EffectiveZoom()) {}
+    : FontSizes(
+          style->SpecifiedFontSize(),
+          root_style ? root_style->SpecifiedFontSize() : 1.0f,
+          &style->GetFont(),
+          root_style ? &root_style->GetFont() : &style->GetFont(),
+          style->EffectiveZoom(),
+          root_style ? root_style->EffectiveZoom() : style->EffectiveZoom()) {}
 
 float CSSToLengthConversionData::FontSizes::Ex(float zoom) const {
   DCHECK(font_);
   const SimpleFontData* font_data = font_->PrimaryFont();
   DCHECK(font_data);
-  if (!font_data || !font_data->GetFontMetrics().HasXHeight())
+  if (!font_data || !font_data->GetFontMetrics().HasXHeight()) {
     return em_ / 2.0f;
+  }
   // Font-metrics-based units are pre-zoomed with a factor of `font_zoom_`,
   // we need to unzoom using that factor before applying the target zoom.
   return font_data->GetFontMetrics().XHeight() / font_zoom_ * zoom;
+}
+
+float CSSToLengthConversionData::FontSizes::Rex(float zoom) const {
+  DCHECK(root_font_);
+  const SimpleFontData* font_data = root_font_->PrimaryFont();
+  DCHECK(font_data);
+  if (!font_data || !font_data->GetFontMetrics().HasXHeight()) {
+    return rem_ / 2.0f;
+  }
+  // Font-metrics-based units are pre-zoomed with a factor of `root_font_zoom_`,
+  // we need to unzoom using that factor before applying the target zoom.
+  return font_data->GetFontMetrics().XHeight() / root_font_zoom_ * zoom;
 }
 
 float CSSToLengthConversionData::FontSizes::Ch(float zoom) const {
@@ -103,8 +143,9 @@ float CSSToLengthConversionData::FontSizes::Ic(float zoom) const {
   DCHECK(font_data);
   absl::optional<float> full_width =
       font_data->GetFontMetrics().IdeographicFullWidth();
-  if (!full_width.has_value())
+  if (!full_width.has_value()) {
     return Em(zoom);
+  }
   // Font-metrics-based units are pre-zoomed with a factor of `font_zoom_`,
   // we need to unzoom using that factor before applying the target zoom.
   return full_width.value() / font_zoom_ * zoom;
@@ -181,8 +222,9 @@ absl::optional<double> CSSToLengthConversionData::ContainerSizes::Height()
 void CSSToLengthConversionData::ContainerSizes::CacheSizeIfNeeded(
     PhysicalAxes requested_axis,
     absl::optional<double>& cache) const {
-  if ((cached_physical_axes_ & requested_axis) == requested_axis)
+  if ((cached_physical_axes_ & requested_axis) == requested_axis) {
     return;
+  }
   cached_physical_axes_ |= requested_axis;
   cache = FindSizeForContainerAxis(requested_axis, context_element_);
 }
@@ -227,13 +269,25 @@ float CSSToLengthConversionData::EmFontSize(float zoom) const {
 }
 
 float CSSToLengthConversionData::RemFontSize(float zoom) const {
-  SetFlag(Flag::kRem);
+  SetFlag(Flag::kRootFontRelative);
   return font_sizes_.Rem(zoom);
 }
 
 float CSSToLengthConversionData::ExFontSize(float zoom) const {
   SetFlag(Flag::kGlyphRelative);
   return font_sizes_.Ex(zoom);
+}
+
+float CSSToLengthConversionData::RexFontSize(float zoom) const {
+  // Need to mark the current element's ComputedStyle as having glyph relative
+  // styles, even if it is not relative to the current element's font because
+  // the invalidation that happens when a web font finishes loading for the root
+  // element does not necessarily cause a style difference for the root element,
+  // hence will not cause an invalidation of root font relative dependent
+  // styles. See also Node::MarkSubtreeNeedsStyleRecalcForFontUpdates().
+  SetFlag(Flag::kGlyphRelative);
+  SetFlag(Flag::kRootFontRelative);
+  return font_sizes_.Rex(zoom);
 }
 
 float CSSToLengthConversionData::ChFontSize(float zoom) const {

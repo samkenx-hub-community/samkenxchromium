@@ -517,6 +517,7 @@ Indicativele de stare private îmbunătățesc confidențialitatea pe web și nu
 <translation id="3830886834687455630">Actualizează serviciile Google Play pentru a verifica parolele</translation>
 <translation id="3845098929839618392">Deschide într-o filă incognito</translation>
 <translation id="3856096718352044181">Confirmă dacă acesta este un furnizor valid sau încearcă din nou mai târziu</translation>
+<translation id="3858127568696903256">Vezi aici conținutul pe care îl urmărești</translation>
 <translation id="3858860766373142691">Nume</translation>
 <translation id="3861633093716975811">Videoclipuri populare</translation>
 <translation id="3874520961715512166">Site eliminat</translation>
@@ -552,7 +553,6 @@ Indicativele de stare private îmbunătățesc confidențialitatea pe web și nu
 <translation id="4045764304651014138">Date de utilizare</translation>
 <translation id="405399507749852140">Primește alerte dacă prețul scade pe orice site</translation>
 <translation id="4056223980640387499">Sepia</translation>
-<translation id="4060598801229743805">Opțiunile sunt disponibile în partea de sus a ecranului</translation>
 <translation id="4062305924942672200">Informații juridice</translation>
 <translation id="4072805772816336153">Încearcă din nou mai târziu</translation>
 <translation id="4084682180776658562">Marcaj</translation>
@@ -642,7 +642,6 @@ Contul Google poate să ofere alte forme ale istoricului de navigare, cum ar fi 
 <translation id="4554077758708533499">Conectat cu un cablu USB</translation>
 <translation id="4558311620361989323">Comenzi rapide pentru pagini web</translation>
 <translation id="4561730552726921821">S-a realizat înregistrarea</translation>
-<translation id="4561979708150884304">Nicio conexiune</translation>
 <translation id="4565377596337484307">Ascunde parola</translation>
 <translation id="4572422548854449519">Conectează-te la contul gestionat</translation>
 <translation id="4576892426230499203">Încearcă altă opțiune de confirmare</translation>
@@ -667,7 +666,6 @@ Contul Google poate să ofere alte forme ale istoricului de navigare, cum ar fi 
 <translation id="4699172675775169585">Imaginile și fișierele memorate în cache</translation>
 <translation id="4719927025381752090">Oferă traducerea</translation>
 <translation id="4720023427747327413">Deschide în <ph name="PRODUCT_NAME" /></translation>
-<translation id="4720982865791209136">Contribuie la îmbunătățirea browserului Chrome. <ph name="BEGIN_LINK" />Participă la sondaj.<ph name="END_LINK" /></translation>
 <translation id="47217992755561375">Vezi principalele site-uri</translation>
 <translation id="4732120983431207637">Instrument de derulare a stivei</translation>
 <translation id="4736934858538408121">Card virtual</translation>
@@ -771,7 +769,6 @@ Pentru a modifica această setare, <ph name="BEGIN_LINK" />resetează sincroniza
 <translation id="5184329579814168207">Deschide în Chrome</translation>
 <translation id="5191251636205085390">Află despre și folosește tehnologii noi, destinate să înlocuiască cookie-urile terță parte</translation>
 <translation id="5193988420012215838">Copiat în clipboard</translation>
-<translation id="5199929503336119739">Profilul de serviciu</translation>
 <translation id="5204967432542742771">Introdu parola</translation>
 <translation id="5206168361184759344">{FILE_COUNT,plural, =1{Fișierul se descarcă…}few{Se descarcă # fișiere…}other{Se descarcă # de fișiere…}}</translation>
 <translation id="5210286577605176222">Accesează fila anterioară</translation>
@@ -1345,14 +1342,12 @@ De exemplu, unele site-uri pot răspunde la această solicitare afișând anunț
 <translation id="8221656072740924283">Continuă</translation>
 <translation id="8223642481677794647">Meniul cardului din feed</translation>
 <translation id="8250920743982581267">Documente</translation>
-<translation id="825412236959742607">Această pagină folosește prea multă memorie, prin urmare Chrome a eliminat o parte din conținut.</translation>
 <translation id="8255617931166444521">Site-urile pot folosi cookie-uri numai pentru a-ți vedea activitatea de navigare pe site-ul respectiv</translation>
 <translation id="8259179246279078674">Întrucât paginile preîncărcate sunt criptate, Google nu va afla nimic despre conținutul paginii preîncărcate. Serverele Google vor afla ce site-uri sunt preîncărcate în mod privat. Aceste informații sunt folosite numai la preîncărcarea paginilor și nu sunt conectate cu alte informații din Contul Google.</translation>
 <translation id="8260126382462817229">Încearcă să te conectezi din nou</translation>
 <translation id="8261506727792406068">Șterge</translation>
 <translation id="82619448491672958">Vezi alte file</translation>
 <translation id="8266862848225348053">Locația de descărcare</translation>
-<translation id="8274165955039650276">Vezi descărcările</translation>
 <translation id="8281886186245836920">Omite</translation>
 <translation id="8282297628636750033">Aplică tema întunecată pe site-uri dacă e posibil</translation>
 <translation id="829672787777123339">Se conectează la dispozitiv…</translation>
@@ -1516,7 +1511,6 @@ De exemplu, unele site-uri pot răspunde la această solicitare afișând anunț
 <translation id="9108808586816295166">Este posibil să nu fie disponibil oricând un DNS securizat</translation>
 <translation id="9128984223251192329">Solicitarea Privacy Sandbox s-a deschis la jumătate din înălțime</translation>
 <translation id="9133397713400217035">Explorează offline</translation>
-<translation id="9137013805542155359">Afișează originalul</translation>
 <translation id="9148126808321036104">Conectează-te din nou</translation>
 <translation id="9158770349521403363">Trimite numai conținutul</translation>
 <translation id="9159716826369098114">Restabilește grupul de <ph name="TAB_COUNT" /> file ca pe un nou grup de file din fundal.</translation>

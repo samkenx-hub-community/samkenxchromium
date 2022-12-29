@@ -144,6 +144,7 @@
 <translation id="2208919847696382164">Instalar com o Linux</translation>
 <translation id="2225536596944493418">Tem certeza de que quer excluir <ph name="NUMBER_OF_ITEMS" /> itens?</translation>
 <translation id="2230062665678605299">Não é possível criar a pasta "<ph name="FOLDER_NAME" />". <ph name="ERROR_MESSAGE" /></translation>
+<translation id="2236732657580416950">Seu cache do Google Drive foi limpo.</translation>
 <translation id="2239068707900391003">Pessoa com café</translation>
 <translation id="2251368349685848079">Restaurar da lixeira</translation>
 <translation id="2282155092769082568">URL de configuração automática</translation>
@@ -678,6 +679,7 @@
 <translation id="6607272825297743757">Informações do arquivo</translation>
 <translation id="6609332149380188670"><ph name="NUMBER_OF_ITEMS" /> pastas compartilhadas com o Parallels Desktop</translation>
 <translation id="6629518321609546825">Digite pelo menos quatro números</translation>
+<translation id="6639661343369899134">Não é possível fazer upload dos arquivos porque o drive <ph name="SHARED_DRIVE_NAME" /> não tem espaço de armazenamento suficiente.</translation>
 <translation id="6643016212128521049">Limpar</translation>
 <translation id="6650726141019353908">Borboleta rosa</translation>
 <translation id="6657585470893396449">Senha</translation>

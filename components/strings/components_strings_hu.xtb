@@ -1013,6 +1013,7 @@ Ezt egyéb esetben letiltják az Ön adatvédelmi beállításai. Az engedélyez
 <translation id="3532844647053365774">A(z) <ph name="HOST" /> használni szeretné a mikrofont</translation>
 <translation id="3533328374079021623">5. postaláda</translation>
 <translation id="3537165859691846083">„Letter Plus” méret</translation>
+<translation id="3542628208405253498">Kártyakép</translation>
 <translation id="3542768452570884558">Link megnyitása új ablakban</translation>
 <translation id="3547746132308051926">20 × 24 hüvelyk</translation>
 <translation id="3550112004925580947">Vendéglátóipar</translation>
@@ -1103,6 +1104,7 @@ Ezt egyéb esetben letiltják az Ön adatvédelmi beállításai. Az engedélyez
 <translation id="3745099705178523657">A megerősítést követően a böngésző megosztja az Ön Google-fiókjából származó kártyaadatokat ezzel a webhellyel.</translation>
 <translation id="3748148204939282805">A támadók a(z) <ph name="BEGIN_BOLD" /><ph name="SITE" /><ph name="END_BOLD" /> webhelyen megpróbálhatják csellel rávenni Önt például arra, hogy veszélyes szoftvert telepítsen, vagy felfedje személyes adatait (jelszavakat, telefonszámokat, bankkártyaadatokat stb). <ph name="BEGIN_LEARN_MORE_LINK" />További információ<ph name="END_LEARN_MORE_LINK" />.</translation>
 <translation id="3748912308089554501">Repülőipar</translation>
+<translation id="3752543821772132562">Figyelmen kívül hagyva, mert a következő házirend nincs beállítva: <ph name="POLICY_NAME" />.</translation>
 <translation id="3754210790023674521">Kilépés a kép a képben módból</translation>
 <translation id="3759461132968374835">Nincs a közelmúltban bejelentett rendszerösszeomlás. A kikapcsolt jelentésküldés során történt összeomlások nem jelennek meg itt.</translation>
 <translation id="3760561303380396507">A Windows Hello szolgáltatást szeretné használni a CVC helyett?</translation>
@@ -1162,6 +1164,7 @@ Ezt egyéb esetben letiltják az Ön adatvédelmi beállításai. Az engedélyez
 <translation id="3927932062596804919">Megtagadás</translation>
 <translation id="393316646445601645">Internet és telekommunikáció</translation>
 <translation id="3939773374150895049">A WebAuthn szolgáltatást szeretné használni a CVC helyett?</translation>
+<translation id="3943857333388298514">Beillesztés</translation>
 <translation id="3946209740501886391">Mindig kérdezze meg ezen a webhelyen</translation>
 <translation id="3947595700203588284">Engedélyt kérhet a MIDI-eszközökhöz való csatlakozásra</translation>
 <translation id="3949571496842715403">A szerver nem tudta bizonyítani, hogy valóban a(z) <ph name="DOMAIN" /> domainbe tartozik; biztonsági tanúsítványában nincs meghatározva a „Subject Alternative Names” mező. Ezt okozhatja konfigurációs hiba, vagy az, hogy egy támadó eltérítette az Ön kapcsolatát.</translation>
@@ -2309,6 +2312,7 @@ Ezt egyéb esetben letiltják az Ön adatvédelmi beállításai. Az engedélyez
 <translation id="6890531741535756070">Úgy döntött, hogy <ph name="DEVICE_LABEL" /> a használatával igazolja magát a következőt használó webhelyeken: <ph name="PROVIDER_ORIGIN" />. Ez a szolgáltató eltárolhatott információkat az Ön fizetési módjáról. Ön <ph name="BEGIN_LINK" />kérelmezheti az adatok törlését<ph name="END_LINK" />.</translation>
 <translation id="6891596781022320156">Ezt a házirendszintet a rendszer nem támogatja.</translation>
 <translation id="6895330447102777224">Kártyáját ellenőriztük</translation>
+<translation id="6896758677409633944">Másolás</translation>
 <translation id="6897140037006041989">User agent</translation>
 <translation id="6898699227549475383">Szervezet (O)</translation>
 <translation id="6899000063526916106">Adja meg a kapott, <ph name="NUMBER_OF_DIGITS" /> számjegyből álló kódot</translation>
@@ -2676,6 +2680,7 @@ További részletek:
 <translation id="7716375162095500223">Még nincs feltöltve, vagy ki lett hagyva</translation>
 <translation id="7716424297397655342">A webhely nem tölthető be a gyorsítótárból</translation>
 <translation id="7723047071702270851">Kártya szerkesztése</translation>
+<translation id="7724603315864178912">Kivágás</translation>
 <translation id="7734285854693414638">Új űrlap gyors létrehozása a Google Űrlapok szolgáltatással</translation>
 <translation id="773466115871691567">Mindig fordítsa le a(z) <ph name="SOURCE_LANGUAGE" /> nyelvű oldalakat</translation>
 <translation id="7736959720849233795">Link címének másolása</translation>
@@ -2712,6 +2717,7 @@ További részletek:
 <translation id="7815407501681723534"><ph name="NUMBER_OF_RESULTS" /> <ph name="SEARCH_RESULTS" /> található a(z) „<ph name="SEARCH_STRING" />” kifejezésre</translation>
 <translation id="7822320754433038727">Vadászat és lövészet</translation>
 <translation id="782886543891417279">Az Ön által használt Wi-Fi-hálózat (<ph name="WIFI_NAME" />) megkövetelheti a bejelentkezést a bejelentkezési oldalán.</translation>
+<translation id="7840103971441592723">A képernyőfelvétel elindult</translation>
 <translation id="7844689747373518809">{COUNT,plural, =0{Nincs}=1{1 alkalmazás (<ph name="EXAMPLE_APP_1" />)}=2{2 alkalmazás (<ph name="EXAMPLE_APP_1" />, <ph name="EXAMPLE_APP_2" />)}other{# alkalmazás (<ph name="EXAMPLE_APP_1" />, <ph name="EXAMPLE_APP_2" /> <ph name="AND_MORE" />)}}</translation>
 <translation id="7855695075675558090"><ph name="TOTAL_LABEL" />: <ph name="FORMATTED_TOTAL_AMOUNT" /> <ph name="CURRENCY_CODE" /></translation>
 <translation id="7862185352068345852">Elhagyja a webhelyet?</translation>
@@ -2741,6 +2747,7 @@ További részletek:
 <translation id="7942349550061667556">Piros</translation>
 <translation id="7943397946612013052">Letiltott letöltés</translation>
 <translation id="7943893128817522649">Engedélyt kérhet arra, hogy több fájlt is letöltsön automatikusan</translation>
+<translation id="7946724693008564269">Észlelt nyelv</translation>
 <translation id="7947285636476623132">Ellenőrizze a lejárati évet, majd próbálja újra</translation>
 <translation id="7947813448670013867"><ph name="SEE_CHROME_TIPS_FOCUSED_FRIENDLY_MATCH_TEXT" />, tartsa lenyomva a Tab billentyűt, majd nyomja meg az Enter billentyűt a Chrome funkcióival kapcsolatos további információkért</translation>
 <translation id="7950027195171824198">Cookie-beállítások kezelése a Chrome-beállítások között</translation>
@@ -2889,6 +2896,7 @@ További részletek:
 <translation id="8282947398454257691">Az egyedi eszközazonosító megtekintése</translation>
 <translation id="8284769179630993263">A Biztonságos böngészés és más funkciók kezelése a Chrome-beállítások között</translation>
 <translation id="8286036467436129157">Bejelentkezés</translation>
+<translation id="8286799286781881307">A rendszergazda által engedélyezett alkalmazások az eszközhöz csatlakoztatott összes képernyőről képesek felvételt készíteni. Ezek az információk feldolgozhatók helyben, vagy fel lehet tölteni őket a szervezet szervereire.</translation>
 <translation id="8288807391153049143">Tanúsítvány megjelenítése</translation>
 <translation id="8289355894181816810">Forduljon a hálózati rendszergazdához, ha nem tudja, hogy ez mit jelent.</translation>
 <translation id="8293206222192510085">Könyvjelző hozzáadása</translation>
@@ -2915,6 +2923,7 @@ További részletek:
 <translation id="8355270400102541638">Összeomlás helyi kontextusa:</translation>
 <translation id="8363502534493474904">Repülős üzemmód kikapcsolása</translation>
 <translation id="8364627913115013041">Nincs beállítva.</translation>
+<translation id="836616551641291797">További információ a felügyelt böngészőkről</translation>
 <translation id="8368001212524806591">Ár nyomon követése</translation>
 <translation id="8368027906805972958">Ismeretlen vagy nem támogatott eszköz (<ph name="DEVICE_ID" />)</translation>
 <translation id="8368476060205742148">Google Play-szolgáltatások</translation>

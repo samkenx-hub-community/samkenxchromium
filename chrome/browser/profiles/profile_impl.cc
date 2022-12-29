@@ -657,7 +657,6 @@ void ProfileImpl::LoadPrefsForNormalStartup(bool async_prefs) {
         policy::PolicyNamespace(policy::POLICY_DOMAIN_CHROME, std::string()));
     crosapi::browser_util::CacheLacrosAvailability(map);
     crosapi::browser_util::CacheLacrosDataBackwardMigrationMode(map);
-    crosapi::browser_util::CacheLacrosSelection(map);
   }
 #endif
 }
@@ -827,6 +826,8 @@ void ProfileImpl::DoFinalInit(CreateMode create_mode) {
     if (shutting_down)
       return;
   }
+
+  NotifyProfileInitializationComplete();
 
   SharingServiceFactory::GetForBrowserContext(this);
 
@@ -1184,7 +1185,6 @@ void ProfileImpl::OnPrefsLoaded(CreateMode create_mode, bool success) {
           policy::PolicyNamespace(policy::POLICY_DOMAIN_CHROME, std::string()));
       crosapi::browser_util::CacheLacrosAvailability(map);
       crosapi::browser_util::CacheLacrosDataBackwardMigrationMode(map);
-      crosapi::browser_util::CacheLacrosSelection(map);
     }
 
     ash::UserSessionManager::GetInstance()->RespectLocalePreferenceWrapper(

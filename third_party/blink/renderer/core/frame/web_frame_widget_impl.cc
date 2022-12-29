@@ -2136,6 +2136,11 @@ void WebFrameWidgetImpl::Resize(const gfx::Size& new_size) {
 }
 
 void WebFrameWidgetImpl::OnCommitRequested() {
+  // This can be called during shutdown, in which case local_root_ will be
+  // nullptr.
+  if (!LocalRootImpl() || !LocalRootImpl()->GetFrame()) {
+    return;
+  }
   if (auto* view = LocalRootImpl()->GetFrame()->View())
     view->OnCommitRequested();
 }
@@ -2377,13 +2382,15 @@ void WebFrameWidgetImpl::RecordEndOfFrameMetrics(
     cc::ActiveFrameSequenceTrackers trackers) {
   if (!LocalRootImpl())
     return;
-
+  Document* document = LocalRootImpl()->GetFrame()->GetDocument();
+  DCHECK(document);
   LocalRootImpl()
       ->GetFrame()
       ->View()
       ->GetUkmAggregator()
       ->RecordEndOfFrameMetrics(frame_begin_time, base::TimeTicks::Now(),
-                                trackers);
+                                trackers, document->UkmSourceID(),
+                                document->UkmRecorder());
 }
 
 void WebFrameWidgetImpl::WillHandleGestureEvent(const WebGestureEvent& event,
@@ -2563,9 +2570,12 @@ WebInputEventResult WebFrameWidgetImpl::HandleInputEvent(
     return WebInputEventResult::kHandledSuppressed;
   }
 
-  // Don't handle events once we've started shutting down.
-  if (!GetPage())
+  // Don't handle events once we've started shutting down or when the page is in
+  // bfcache.
+  if (!GetPage() ||
+      GetPage()->GetPageLifecycleState()->is_in_back_forward_cache) {
     return WebInputEventResult::kNotHandled;
+  }
 
   if (WebDevToolsAgentImpl* devtools = LocalRootImpl()->DevToolsAgentImpl()) {
     auto result = devtools->HandleInputEvent(input_event);

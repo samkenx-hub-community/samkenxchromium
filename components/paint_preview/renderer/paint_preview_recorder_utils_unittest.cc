@@ -41,7 +41,7 @@ namespace paint_preview {
 
 namespace {
 
-sk_sp<cc::PaintRecord> AddLink(const std::string& link, const SkRect& rect) {
+cc::PaintRecord AddLink(const std::string& link, const SkRect& rect) {
   cc::PaintRecorder link_recorder;
   cc::PaintCanvas* link_canvas = link_recorder.beginRecording();
   link_canvas->Annotate(cc::PaintCanvas::AnnotationType::URL, rect,
@@ -124,8 +124,8 @@ TEST(PaintPreviewRecorderUtilsTest, TestParseLinks) {
   outer_canvas->drawPicture(AddLink(link_4, rect_4));
   outer_canvas->restore();
 
-  outer_canvas->saveLayer(&rect_1, nullptr);
-  outer_canvas->saveLayerAlpha(&rect_1, 8);
+  outer_canvas->saveLayer(rect_1, cc::PaintFlags());
+  outer_canvas->saveLayerAlpha(8);
   outer_canvas->restoreToCount(1);
   auto record = outer_recorder.finishRecordingAsPicture();
 

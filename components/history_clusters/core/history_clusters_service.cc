@@ -25,6 +25,8 @@
 #include "components/history_clusters/core/config.h"
 #include "components/history_clusters/core/file_clustering_backend.h"
 #include "components/history_clusters/core/history_clusters_debug_jsons.h"
+#include "components/history_clusters/core/history_clusters_service_task_get_most_recent_clusters_for_ui.h"
+#include "components/history_clusters/core/history_clusters_service_task_update_clusters.h"
 #include "components/history_clusters/core/history_clusters_types.h"
 #include "components/history_clusters/core/history_clusters_util.h"
 #include "components/history_clusters/core/on_device_clustering_backend.h"
@@ -156,7 +158,7 @@ void HistoryClustersService::CompleteVisitContextAnnotationsIfReady(
   }
 }
 
-std::unique_ptr<HistoryClustersServiceTaskGetMostRecentClusters>
+std::unique_ptr<HistoryClustersServiceTask>
 HistoryClustersService::QueryClusters(
     ClusteringRequestSource clustering_request_source,
     base::Time begin_time,
@@ -177,6 +179,16 @@ HistoryClustersService::QueryClusters(
   }
 
   DCHECK(history_service_);
+  if (GetConfig().persist_clusters_in_history_db &&
+      GetConfig().use_navigation_context_clusters &&
+      source ==
+          HistoryClustersServiceTaskGetMostRecentClusters::Source::kWebUi &&
+      !recluster) {
+    return std::make_unique<
+        HistoryClustersServiceTaskGetMostRecentClustersForUI>(
+        weak_ptr_factory_.GetWeakPtr(), backend_.get(), history_service_,
+        begin_time, continuation_params, std::move(callback));
+  }
   return std::make_unique<HistoryClustersServiceTaskGetMostRecentClusters>(
       weak_ptr_factory_.GetWeakPtr(), incomplete_visit_context_annotations_,
       backend_.get(), history_service_, clustering_request_source, begin_time,

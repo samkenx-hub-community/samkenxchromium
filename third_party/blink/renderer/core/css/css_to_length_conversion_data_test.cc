@@ -95,6 +95,7 @@ TEST_F(CSSToLengthConversionDataTest, Normal) {
   EXPECT_FLOAT_EQ(16.0f, Convert(data, "1ex"));
   EXPECT_FLOAT_EQ(20.0f, Convert(data, "1ch"));
   EXPECT_FLOAT_EQ(10.0f, Convert(data, "1rem"));
+  EXPECT_FLOAT_EQ(8.0f, Convert(data, "1rex"));
   EXPECT_FLOAT_EQ(36.0f, Convert(data, "calc(1em + 1ex)"));
   EXPECT_FLOAT_EQ(10.0f, Convert(data, "1lh"));
 }
@@ -106,6 +107,7 @@ TEST_F(CSSToLengthConversionDataTest, Zoomed) {
   EXPECT_FLOAT_EQ(32.0f, Convert(data, "1ex"));
   EXPECT_FLOAT_EQ(40.0f, Convert(data, "1ch"));
   EXPECT_FLOAT_EQ(20.0f, Convert(data, "1rem"));
+  EXPECT_FLOAT_EQ(16.0f, Convert(data, "1rex"));
   EXPECT_FLOAT_EQ(72.0f, Convert(data, "calc(1em + 1ex)"));
   EXPECT_FLOAT_EQ(20.0f, Convert(data, "1lh"));
 }
@@ -117,6 +119,7 @@ TEST_F(CSSToLengthConversionDataTest, AdjustedZoom) {
   EXPECT_FLOAT_EQ(32.0f, Convert(data, "1ex"));
   EXPECT_FLOAT_EQ(40.0f, Convert(data, "1ch"));
   EXPECT_FLOAT_EQ(20.0f, Convert(data, "1rem"));
+  EXPECT_FLOAT_EQ(16.0f, Convert(data, "1rex"));
   EXPECT_FLOAT_EQ(72.0f, Convert(data, "calc(1em + 1ex)"));
   EXPECT_FLOAT_EQ(20.0f, Convert(data, "1lh"));
 }
@@ -130,6 +133,7 @@ TEST_F(CSSToLengthConversionDataTest, DifferentZoom) {
   EXPECT_FLOAT_EQ(32.0f, Convert(data, "1ex"));
   EXPECT_FLOAT_EQ(40.0f, Convert(data, "1ch"));
   EXPECT_FLOAT_EQ(20.0f, Convert(data, "1rem"));
+  EXPECT_FLOAT_EQ(16.0f, Convert(data, "1rex"));
   EXPECT_FLOAT_EQ(72.0f, Convert(data, "calc(1em + 1ex)"));
   EXPECT_FLOAT_EQ(20.0f, Convert(data, "1lh"));
 }
@@ -141,6 +145,7 @@ TEST_F(CSSToLengthConversionDataTest, Unzoomed) {
   EXPECT_FLOAT_EQ(16.0f, Convert(data, "1ex"));
   EXPECT_FLOAT_EQ(20.0f, Convert(data, "1ch"));
   EXPECT_FLOAT_EQ(10.0f, Convert(data, "1rem"));
+  EXPECT_FLOAT_EQ(8.0f, Convert(data, "1rex"));
   EXPECT_FLOAT_EQ(36.0f, Convert(data, "calc(1em + 1ex)"));
   EXPECT_FLOAT_EQ(10.0f, Convert(data, "1lh"));
 }
@@ -168,8 +173,9 @@ TEST_F(CSSToLengthConversionDataTest, Flags) {
   using Flags = CSSToLengthConversionData::Flags;
 
   Flags em = static_cast<Flags>(Flag::kEm);
-  Flags rem = static_cast<Flags>(Flag::kRem);
+  Flags rem = static_cast<Flags>(Flag::kRootFontRelative);
   Flags glyph = static_cast<Flags>(Flag::kGlyphRelative);
+  Flags rex = rem | glyph;
   Flags lh = static_cast<Flags>(Flag::kLineHeightRelative);
   Flags sv = static_cast<Flags>(Flag::kStaticViewport);
   Flags dv = static_cast<Flags>(Flag::kDynamicViewport);
@@ -180,6 +186,7 @@ TEST_F(CSSToLengthConversionDataTest, Flags) {
   EXPECT_EQ(em, ConversionFlags("1em"));
 
   EXPECT_EQ(rem, ConversionFlags("1rem"));
+  EXPECT_EQ(rex, ConversionFlags("1rex"));
 
   EXPECT_EQ(glyph, ConversionFlags("1ex"));
   EXPECT_EQ(glyph, ConversionFlags("1ch"));

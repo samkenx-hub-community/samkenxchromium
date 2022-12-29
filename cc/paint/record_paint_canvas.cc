@@ -21,12 +21,12 @@ namespace cc {
 RecordPaintCanvas::RecordPaintCanvas() = default;
 RecordPaintCanvas::~RecordPaintCanvas() = default;
 
-sk_sp<PaintRecord> RecordPaintCanvas::ReleaseAsRecord() {
+PaintRecord RecordPaintCanvas::ReleaseAsRecord() {
   // Some users expect that their saves are automatically closed for them.
   // Maybe we could remove this assumption and just have callers do it.
   restoreToCount(1);
   needs_flush_ = false;
-  return buffer_.MoveRetainingBufferIfPossible();
+  return buffer_.ReleaseAsRecord();
 }
 
 template <typename T, typename... Args>
@@ -72,24 +72,23 @@ int RecordPaintCanvas::save() {
   return save_count_++;
 }
 
-int RecordPaintCanvas::saveLayer(const SkRect* bounds,
-                                 const PaintFlags* flags) {
-  if (flags && flags->IsSimpleOpacity()) {
-    // TODO(enne): maybe more callers should know this and call
-    // saveLayerAlpha instead of needing to check here.
-    uint8_t alpha = SkColorGetA(flags->getColor());
-    return saveLayerAlpha(bounds, alpha);
-  }
-  return saveLayerInternal(bounds, flags);
+int RecordPaintCanvas::saveLayer(const PaintFlags& flags) {
+  push<SaveLayerOp>(flags);
+  return save_count_++;
 }
 
-int RecordPaintCanvas::saveLayerInternal(const SkRect* bounds,
-                                         const PaintFlags* flags) {
+int RecordPaintCanvas::saveLayer(const SkRect& bounds,
+                                 const PaintFlags& flags) {
   push<SaveLayerOp>(bounds, flags);
   return save_count_++;
 }
 
-int RecordPaintCanvas::saveLayerAlpha(const SkRect* bounds, uint8_t alpha) {
+int RecordPaintCanvas::saveLayerAlpha(uint8_t alpha) {
+  push<SaveLayerAlphaOp>(static_cast<float>(alpha / 255.0f));
+  return save_count_++;
+}
+
+int RecordPaintCanvas::saveLayerAlpha(const SkRect& bounds, uint8_t alpha) {
   push<SaveLayerAlphaOp>(bounds, static_cast<float>(alpha / 255.0f));
   return save_count_++;
 }
@@ -329,7 +328,7 @@ void RecordPaintCanvas::drawTextBlob(sk_sp<SkTextBlob> blob,
   push<DrawTextBlobOp>(std::move(blob), x, y, node_id, flags);
 }
 
-void RecordPaintCanvas::drawPicture(sk_sp<const PaintRecord> record) {
+void RecordPaintCanvas::drawPicture(PaintRecord record) {
   // TODO(enne): If this is small, maybe flatten it?
   push<DrawRecordOp>(record);
 }
@@ -358,26 +357,27 @@ int InspectableRecordPaintCanvas::save() {
   return CheckSaveCount(RecordPaintCanvas::save(), canvas_.save());
 }
 
-int InspectableRecordPaintCanvas::saveLayerInternal(const SkRect* bounds,
-                                                    const PaintFlags* flags) {
-  int canvas_prev_save_count;
-  // TODO(enne): it appears that image filters affect matrices and color
-  // matrices affect transparent flags on SkCanvas layers, but it's not clear
-  // whether those are actually needed and we could just skip ToSkPaint here.
-  if (flags) {
-    SkPaint paint = flags->ToSkPaint();
-    canvas_prev_save_count = canvas_.saveLayer(bounds, &paint);
-  } else {
-    canvas_prev_save_count = canvas_.saveLayer(bounds, nullptr);
-  }
-  return CheckSaveCount(RecordPaintCanvas::saveLayerInternal(bounds, flags),
-                        canvas_prev_save_count);
+int InspectableRecordPaintCanvas::saveLayer(const PaintFlags& flags) {
+  SkPaint paint = flags.ToSkPaint();
+  return CheckSaveCount(RecordPaintCanvas::saveLayer(flags),
+                        canvas_.saveLayer(nullptr, &paint));
 }
 
-int InspectableRecordPaintCanvas::saveLayerAlpha(const SkRect* bounds,
+int InspectableRecordPaintCanvas::saveLayer(const SkRect& bounds,
+                                            const PaintFlags& flags) {
+  SkPaint paint = flags.ToSkPaint();
+  return CheckSaveCount(RecordPaintCanvas::saveLayer(bounds, flags),
+                        canvas_.saveLayer(&bounds, &paint));
+}
+int InspectableRecordPaintCanvas::saveLayerAlpha(uint8_t alpha) {
+  return CheckSaveCount(RecordPaintCanvas::saveLayerAlpha(alpha),
+                        canvas_.saveLayerAlpha(nullptr, alpha));
+}
+
+int InspectableRecordPaintCanvas::saveLayerAlpha(const SkRect& bounds,
                                                  uint8_t alpha) {
   return CheckSaveCount(RecordPaintCanvas::saveLayerAlpha(bounds, alpha),
-                        canvas_.saveLayerAlpha(bounds, alpha));
+                        canvas_.saveLayerAlpha(&bounds, alpha));
 }
 
 void InspectableRecordPaintCanvas::restore() {

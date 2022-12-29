@@ -1166,6 +1166,7 @@ This will otherwise be blocked by your privacy settings. This will allow the con
 <translation id="3927932062596804919">Deny</translation>
 <translation id="393316646445601645">Internet and telecom</translation>
 <translation id="3939773374150895049">Use WebAuthn instead of CVC?</translation>
+<translation id="3943857333388298514">Paste</translation>
 <translation id="3946209740501886391">Always ask on this site</translation>
 <translation id="3947595700203588284">Can ask to connect to MIDI devices</translation>
 <translation id="3949571496842715403">This server could not prove that it is <ph name="DOMAIN" />; its security certificate does not specify Subject Alternative Names. This may be caused by a misconfiguration or an attacker intercepting your connection.</translation>
@@ -2313,6 +2314,7 @@ This will otherwise be blocked by your privacy settings. This will allow the con
 <translation id="6890531741535756070">You chose to verify with <ph name="DEVICE_LABEL" /> on websites that use <ph name="PROVIDER_ORIGIN" />. This provider may have stored information about your payment method, which you can <ph name="BEGIN_LINK" />request to have deleted<ph name="END_LINK" />.</translation>
 <translation id="6891596781022320156">Policy level is not supported.</translation>
 <translation id="6895330447102777224">Your card is confirmed</translation>
+<translation id="6896758677409633944">Copy</translation>
 <translation id="6897140037006041989">User agent</translation>
 <translation id="6898699227549475383">Organisation (O)</translation>
 <translation id="6899000063526916106">Enter <ph name="NUMBER_OF_DIGITS" />-digit code</translation>
@@ -2680,6 +2682,7 @@ Additional details:
 <translation id="7716375162095500223">Not yet uploaded, or ignored</translation>
 <translation id="7716424297397655342">This site can’t be loaded from the cache</translation>
 <translation id="7723047071702270851">Edit Card</translation>
+<translation id="7724603315864178912">Cut</translation>
 <translation id="7734285854693414638">Create a new form in Google Forms quickly</translation>
 <translation id="773466115871691567">Always translate pages in <ph name="SOURCE_LANGUAGE" /></translation>
 <translation id="7736959720849233795">Copy link address</translation>
@@ -2716,6 +2719,7 @@ Additional details:
 <translation id="7815407501681723534">Found <ph name="NUMBER_OF_RESULTS" /> <ph name="SEARCH_RESULTS" /> for '<ph name="SEARCH_STRING" />'</translation>
 <translation id="7822320754433038727">Hunting and shooting</translation>
 <translation id="782886543891417279">The Wi-Fi that you are using (<ph name="WIFI_NAME" />) may require you to visit its login page.</translation>
+<translation id="7840103971441592723">Screen capture has started</translation>
 <translation id="7844689747373518809">{COUNT,plural, =0{None}=1{1 app (<ph name="EXAMPLE_APP_1" />)}=2{2 apps (<ph name="EXAMPLE_APP_1" />, <ph name="EXAMPLE_APP_2" />)}other{# apps (<ph name="EXAMPLE_APP_1" />, <ph name="EXAMPLE_APP_2" /> <ph name="AND_MORE" />)}}</translation>
 <translation id="7855695075675558090"><ph name="TOTAL_LABEL" /> <ph name="CURRENCY_CODE" /> <ph name="FORMATTED_TOTAL_AMOUNT" /></translation>
 <translation id="7862185352068345852">Leave site?</translation>
@@ -2745,6 +2749,7 @@ Additional details:
 <translation id="7942349550061667556">Red</translation>
 <translation id="7943397946612013052">Blocked download</translation>
 <translation id="7943893128817522649">Can ask to automatically download multiple files</translation>
+<translation id="7946724693008564269">Detected language</translation>
 <translation id="7947285636476623132">Check your expiry year and try again</translation>
 <translation id="7947813448670013867"><ph name="SEE_CHROME_TIPS_FOCUSED_FRIENDLY_MATCH_TEXT" />: press Tab then Enter to learn about Chrome features</translation>
 <translation id="7950027195171824198">Manage your cookie preferences in Chrome settings</translation>
@@ -2893,6 +2898,7 @@ Additional details:
 <translation id="8282947398454257691">Know your unique device identifier</translation>
 <translation id="8284769179630993263">Manage your Safe Browsing and more in Chrome settings</translation>
 <translation id="8286036467436129157">Sign In</translation>
+<translation id="8286799286781881307">Applications authorised by your administrator can capture all screens attached to your device. This information can be processed locally or uploaded to your organisation’s servers.</translation>
 <translation id="8288807391153049143">Show certificate</translation>
 <translation id="8289355894181816810">Contact your network administrator if you're not sure what this means.</translation>
 <translation id="8293206222192510085">Add Bookmark</translation>

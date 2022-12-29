@@ -152,6 +152,9 @@ const char kArcStartMode[] = "arc-start-mode";
 // Sets ARC Terms Of Service hostname url for testing.
 const char kArcTosHostForTests[] = "arc-tos-host-for-tests";
 
+// Sets Privacy Policy hostname url for testing.
+const char kPrivacyPolicyHostForTests[] = "privacy-policy-host-for-tests";
+
 // Sets the mode of operation for ureadahead during ARCVM boot. If this switch
 // is not set, ARCVM ureadahead will check for the presence and age of pack
 // file and reads ahead files to page cache for improved boot performance.
@@ -577,9 +580,6 @@ const char kForceShowCursor[] = "force-show-cursor";
 // Force the "release track" UI to show in the system tray. Simulates the system
 // being on a non-stable release channel with feedback enabled.
 const char kForceShowReleaseTrack[] = "force-show-release-track";
-
-// Force system compositor mode when set.
-const char kForceSystemCompositorMode[] = "force-system-compositor-mode";
 
 // If set, tablet-like power button behavior (i.e. tapping the button turns the
 // screen off) is used even if the device is in laptop mode.

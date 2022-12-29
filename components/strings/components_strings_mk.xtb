@@ -1015,6 +1015,7 @@
 <translation id="3532844647053365774"><ph name="HOST" /> сака да го користи вашиот микрофон</translation>
 <translation id="3533328374079021623">Поштенско сандаче 5</translation>
 <translation id="3537165859691846083">Писмо плус</translation>
+<translation id="3542628208405253498">Слика на картичка</translation>
 <translation id="3542768452570884558">Отвори го линкот во нов прозорец</translation>
 <translation id="3547746132308051926">20 x 24 инчи</translation>
 <translation id="3550112004925580947">Угостителска индустрија</translation>
@@ -1105,6 +1106,7 @@
 <translation id="3745099705178523657">Откако ќе потврдите, деталите за картичката од вашата сметка на Google ќе се споделат со сајтов.</translation>
 <translation id="3748148204939282805">Напаѓачите на <ph name="BEGIN_BOLD" /><ph name="SITE" /><ph name="END_BOLD" /> може да ве измамат да направите нешто опасно, како што е инсталирање софтвер или откривање лични информации (на пример, лозинки, телефонски броеви или кредитни картички). <ph name="BEGIN_LEARN_MORE_LINK" />Дознајте повеќе<ph name="END_LEARN_MORE_LINK" /></translation>
 <translation id="3748912308089554501">Авијациска индустрија</translation>
+<translation id="3752543821772132562">Се игнорира бидејќи не е поставено <ph name="POLICY_NAME" />.</translation>
 <translation id="3754210790023674521">Излези од „Слика во слика“</translation>
 <translation id="3759461132968374835">Немате неодамна пријавени падови. Падовите што настанале кога било исклучено пријавувањето падови нема да се појават тука.</translation>
 <translation id="3760561303380396507">Да се користи Windows Hello наместо CVC?</translation>
@@ -1164,6 +1166,7 @@
 <translation id="3927932062596804919">Одбиј</translation>
 <translation id="393316646445601645">Интернет и телекомуникации</translation>
 <translation id="3939773374150895049">Да се користи WebAuthn наместо CVC?</translation>
+<translation id="3943857333388298514">Залепи</translation>
 <translation id="3946209740501886391">Прашувај секогаш на овој сајт</translation>
 <translation id="3947595700203588284">Може да прашува за да се поврзува со MIDI-уреди</translation>
 <translation id="3949571496842715403">Серверот не може да докаже дека е <ph name="DOMAIN" />; неговиот безбедносен сертификат не наведува алтернативни имиња на предметот. Тоа може да се должи на погрешна конфигурација или на напаѓач што го пресретнува поврзувањето.</translation>
@@ -2311,6 +2314,7 @@
 <translation id="6890531741535756070">Избравте да потврдите со <ph name="DEVICE_LABEL" /> на веб-сајтови што користат <ph name="PROVIDER_ORIGIN" />. Давателов на услуги можеби ги зачувал податоците за вашиот начин на плаќање и можете <ph name="BEGIN_LINK" />да побарате да ги избрише<ph name="END_LINK" />.</translation>
 <translation id="6891596781022320156">Нивото на политика не е поддржано.</translation>
 <translation id="6895330447102777224">Вашата картичка е потврдена</translation>
+<translation id="6896758677409633944">Копирај</translation>
 <translation id="6897140037006041989">Кориснички агент</translation>
 <translation id="6898699227549475383">Организација (O)</translation>
 <translation id="6899000063526916106">Внесете го <ph name="NUMBER_OF_DIGITS" />-цифрениот код</translation>
@@ -2678,6 +2682,7 @@
 <translation id="7716375162095500223">Сѐ уште не е прикачен или е игнориран</translation>
 <translation id="7716424297397655342">Сајтот не може да се вчита од кешот</translation>
 <translation id="7723047071702270851">Изменете ја картичката</translation>
+<translation id="7724603315864178912">Исечи</translation>
 <translation id="7734285854693414638">Набрзина создајте нов формулар во Google Forms</translation>
 <translation id="773466115871691567">Секогаш преведувај ги страниците на <ph name="SOURCE_LANGUAGE" /></translation>
 <translation id="7736959720849233795">Копирај ја адресата на линкот</translation>
@@ -2714,6 +2719,7 @@
 <translation id="7815407501681723534">Пронајдени се <ph name="NUMBER_OF_RESULTS" /> <ph name="SEARCH_RESULTS" /> за „<ph name="SEARCH_STRING" />“</translation>
 <translation id="7822320754433038727">Ловење и пукање</translation>
 <translation id="782886543891417279">Wi-Fi што го користите (<ph name="WIFI_NAME" />) може да бара да ја посетите страницата за најавување.</translation>
+<translation id="7840103971441592723">Започна снимање на екранот</translation>
 <translation id="7844689747373518809">{COUNT,plural, =0{Ништо}=1{1 апликација (<ph name="EXAMPLE_APP_1" />)}=2{2 апликации (<ph name="EXAMPLE_APP_1" />, <ph name="EXAMPLE_APP_2" />)}one{# апликација (<ph name="EXAMPLE_APP_1" />, <ph name="EXAMPLE_APP_2" />, <ph name="AND_MORE" />)}other{# апликации (<ph name="EXAMPLE_APP_1" />, <ph name="EXAMPLE_APP_2" />, <ph name="AND_MORE" />)}}</translation>
 <translation id="7855695075675558090"><ph name="TOTAL_LABEL" /> <ph name="FORMATTED_TOTAL_AMOUNT" /> <ph name="CURRENCY_CODE" /></translation>
 <translation id="7862185352068345852">Да се напушти ли сајтот?</translation>
@@ -2743,6 +2749,7 @@
 <translation id="7942349550061667556">Црвена</translation>
 <translation id="7943397946612013052">Блокирано преземање</translation>
 <translation id="7943893128817522649">Може да прашува за да презема повеќе датотеки автоматски</translation>
+<translation id="7946724693008564269">Откриен јазик</translation>
 <translation id="7947285636476623132">Проверете ја годината на истекување и обидете се повторно</translation>
 <translation id="7947813448670013867"><ph name="SEE_CHROME_TIPS_FOCUSED_FRIENDLY_MATCH_TEXT" />, притиснете го копчето Tab, а потоа копчето Enter за да дознаете за функциите на Chrome</translation>
 <translation id="7950027195171824198">Управувајте со поставките за колачиња во поставките на Chrome</translation>
@@ -2891,6 +2898,7 @@
 <translation id="8282947398454257691">Знајте го својот уникатен идентификатор на уредот</translation>
 <translation id="8284769179630993263">Управувајте со безбедното прелистување и друго во поставките за Chrome</translation>
 <translation id="8286036467436129157">Најави се</translation>
+<translation id="8286799286781881307">Апликации овластени од администраторот може да ги снимаат сите екрани приложени на вашиот уред. Информацииве може да се обработат локално или да се прикачат на серверите на вашата организација.</translation>
 <translation id="8288807391153049143">Прикажи сертификат</translation>
 <translation id="8289355894181816810">Контактирајте со мрежниот администратор ако не сте сигурни што значи ова.</translation>
 <translation id="8293206222192510085">Додај обележувач</translation>
@@ -2917,6 +2925,7 @@
 <translation id="8355270400102541638">Контекст на локален пад:</translation>
 <translation id="8363502534493474904">Да го исклучите авионскиот режим</translation>
 <translation id="8364627913115013041">Не е поставено.</translation>
+<translation id="836616551641291797">Дознајте повеќе за тоа како се управува со вашиот прелистувач</translation>
 <translation id="8368001212524806591">Следи ја цената</translation>
 <translation id="8368027906805972958">Непознат или неподдржан уред (<ph name="DEVICE_ID" />)</translation>
 <translation id="8368476060205742148">Услуги на Google Play</translation>

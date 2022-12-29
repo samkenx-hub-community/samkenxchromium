@@ -517,6 +517,7 @@ Privaatstatustoken verbeter privaatheid op die web en kan nie gebruik word om ui
 <translation id="3830886834687455630">Dateer Google Play Dienste op om jou wagwoorde na te gaan</translation>
 <translation id="3845098929839618392">Maak in Incognito-oortjie oop</translation>
 <translation id="3856096718352044181">Bevestig dat dit 'n geldige verskaffer is of probeer later weer</translation>
+<translation id="3858127568696903256">Sien inhoud wat jy volg hier</translation>
 <translation id="3858860766373142691">Naam</translation>
 <translation id="3861633093716975811">Gewilde video's</translation>
 <translation id="3874520961715512166">Werf is verwyder</translation>
@@ -552,7 +553,6 @@ Privaatstatustoken verbeter privaatheid op die web en kan nie gebruik word om ui
 <translation id="4045764304651014138">Gebruiksdata</translation>
 <translation id="405399507749852140">Kry kennisgewings as die prys op enige werf daal</translation>
 <translation id="4056223980640387499">Sepia</translation>
-<translation id="4060598801229743805">Opsies is naby die bokant van die skerm beskikbaar</translation>
 <translation id="4062305924942672200">Regsinligting</translation>
 <translation id="4072805772816336153">Probeer later weer</translation>
 <translation id="4084682180776658562">Boekmerk</translation>
@@ -642,7 +642,6 @@ Jou Google-rekening het dalk ander vorme van blaaigeskiedenis, soos soektogte en
 <translation id="4554077758708533499">Gekoppel met USB-kabel</translation>
 <translation id="4558311620361989323">Webbladkortpaaie</translation>
 <translation id="4561730552726921821">Suksesvol geregistreer</translation>
-<translation id="4561979708150884304">Geen verbinding nie</translation>
 <translation id="4565377596337484307">Versteek wagwoord</translation>
 <translation id="4572422548854449519">Meld by 'n bestuurde rekening aan</translation>
 <translation id="4576892426230499203">Probeer 'n ander verifikasie-opsie</translation>
@@ -667,7 +666,6 @@ Jou Google-rekening het dalk ander vorme van blaaigeskiedenis, soos soektogte en
 <translation id="4699172675775169585">Gekaste prente en lêers</translation>
 <translation id="4719927025381752090">Aanbieding om te vertaal</translation>
 <translation id="4720023427747327413">Maak in <ph name="PRODUCT_NAME" /> oop</translation>
-<translation id="4720982865791209136">Help om Chrome te verbeter. <ph name="BEGIN_LINK" />Neem aan die opname deel<ph name="END_LINK" /></translation>
 <translation id="47217992755561375">Sien jou topwerwe</translation>
 <translation id="4732120983431207637">Stapellosdraaier</translation>
 <translation id="4736934858538408121">Virtuele kaart</translation>
@@ -771,7 +769,6 @@ Jou Google-rekening het dalk ander vorme van blaaigeskiedenis, soos soektogte en
 <translation id="5184329579814168207">Maak in Chrome oop</translation>
 <translation id="5191251636205085390">Vind meer uit oor en beheer nuwe tegnologieë wat beoog om derdepartywebkoekies te vervang</translation>
 <translation id="5193988420012215838">Gekopieer na jou knipbord</translation>
-<translation id="5199929503336119739">Werkprofiel</translation>
 <translation id="5204967432542742771">Voer wagwoord in</translation>
 <translation id="5206168361184759344">{FILE_COUNT,plural, =1{Laai tans lêer af …}other{Laai tans # lêers af …}}</translation>
 <translation id="5210286577605176222">Spring na die vorige oortjie</translation>
@@ -1345,14 +1342,12 @@ Byvoorbeeld, sommige webwerwe kan op hierdie versoek reageer deur vir jou advert
 <translation id="8221656072740924283">Gaan voort</translation>
 <translation id="8223642481677794647">Stroomkaartkieslys</translation>
 <translation id="8250920743982581267">Dokumente</translation>
-<translation id="825412236959742607">Hierdie bladsy gebruik te veel berging en daarom het Chrome van die inhoud verwyder.</translation>
 <translation id="8255617931166444521">Werwe kan jou webkoekies net gebruik om jou blaai-aktiwiteit op hul eie werf te sien</translation>
 <translation id="8259179246279078674">Google sal niks oor die voorafgelaaide bladsy se inhoud te wete kom nie omdat die voorafgelaaide bladsye geënkripteer word. Google-bedieners sal leer watter werwe privaat vooraf gelaai word. Hierdie inligting word slegs gebruik om die bladsye vooraf te laai en word nie aan ander inligting in jou Google-rekening gekoppel nie.</translation>
 <translation id="8260126382462817229">Probeer weer om aan te meld</translation>
 <translation id="8261506727792406068">Vee uit</translation>
 <translation id="82619448491672958">Sien ander oortjies</translation>
 <translation id="8266862848225348053">Laai ligging af</translation>
-<translation id="8274165955039650276">Sien aflaaie</translation>
 <translation id="8281886186245836920">Slaan oor</translation>
 <translation id="8282297628636750033">Pas donkertema op werwe toe, as jy kan</translation>
 <translation id="829672787777123339">Koppel tans aan jou toestel …</translation>
@@ -1516,7 +1511,6 @@ Byvoorbeeld, sommige webwerwe kan op hierdie versoek reageer deur vir jou advert
 <translation id="9108808586816295166">Veilige DNS is dalk nie die hele tyd beskikbaar nie</translation>
 <translation id="9128984223251192329">Privacy Sandbox-porboodskap is teen halwe hoogte oopgemaak</translation>
 <translation id="9133397713400217035">Verken vanlyn</translation>
-<translation id="9137013805542155359">Wys oorspronklike</translation>
 <translation id="9148126808321036104">Meld weer aan …</translation>
 <translation id="9158770349521403363">Deel net inhoud</translation>
 <translation id="9159716826369098114">Stel oortjiegroep van <ph name="TAB_COUNT" /> oortjies terug as ’n nuwe agtergrondoortjiegroep.</translation>

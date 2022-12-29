@@ -553,7 +553,6 @@ Med private tilstandstokener får du bedre personvern på nettet, og de kan ikke
 <translation id="4045764304651014138">Bruksdata</translation>
 <translation id="405399507749852140">Få varsler hvis prisen settes ned på noe nettsted</translation>
 <translation id="4056223980640387499">Sepia</translation>
-<translation id="4060598801229743805">Du finner alternativene oppe på skjermen</translation>
 <translation id="4062305924942672200">Juridisk informasjon</translation>
 <translation id="4072805772816336153">Prøv på nytt senere</translation>
 <translation id="4084682180776658562">Legg til bokmerke</translation>
@@ -643,7 +642,6 @@ Google-kontoen din kan ha andre former for nettleserlogger, for eksempel søk og
 <translation id="4554077758708533499">Tilkoblet med USB-kabel</translation>
 <translation id="4558311620361989323">Hurtigtaster for nettsider</translation>
 <translation id="4561730552726921821">Registreringen var vellykket</translation>
-<translation id="4561979708150884304">Ingen tilkobling</translation>
 <translation id="4565377596337484307">Skjul passord</translation>
 <translation id="4572422548854449519">Logg på en administrert konto</translation>
 <translation id="4576892426230499203">Prøv et annet bekreftelsesalternativ</translation>
@@ -668,7 +666,6 @@ Google-kontoen din kan ha andre former for nettleserlogger, for eksempel søk og
 <translation id="4699172675775169585">Bufrede bilder og filer</translation>
 <translation id="4719927025381752090">Tilby å oversette</translation>
 <translation id="4720023427747327413">Åpne i <ph name="PRODUCT_NAME" /></translation>
-<translation id="4720982865791209136">Hjelp til med å forbedre Chrome. <ph name="BEGIN_LINK" />Delta i undersøkelsen<ph name="END_LINK" /></translation>
 <translation id="47217992755561375">Se toppnettstedene dine</translation>
 <translation id="4732120983431207637">Stack Unwinder</translation>
 <translation id="4736934858538408121">Virtuelt kort</translation>
@@ -772,7 +769,6 @@ For å endre denne innstillingen, <ph name="BEGIN_LINK" />tilbakestill synkronis
 <translation id="5184329579814168207">Åpne i Chrome</translation>
 <translation id="5191251636205085390">Finn ut om og kontroller nye teknologier som tar sikte på å erstatte tredjeparts informasjonskapsler</translation>
 <translation id="5193988420012215838">Kopiert til utklippstavlen</translation>
-<translation id="5199929503336119739">Jobbprofil</translation>
 <translation id="5204967432542742771">Skriv inn passordet</translation>
 <translation id="5206168361184759344">{FILE_COUNT,plural, =1{Laster ned filen …}other{Laster ned # filer …}}</translation>
 <translation id="5210286577605176222">Gå til den forrige fanen</translation>
@@ -1346,14 +1342,12 @@ Noen nettsteder kan for eksempel svare på denne forespørselen ved å vise deg 
 <translation id="8221656072740924283">Fortsett</translation>
 <translation id="8223642481677794647">Feedkortmeny</translation>
 <translation id="8250920743982581267">Dokumenter</translation>
-<translation id="825412236959742607">Denne siden bruker for mye minne, så Chrome har fjernet noe av innholdet.</translation>
 <translation id="8255617931166444521">Nettsteder kan bare bruke informasjonskapslene dine til å se surfeaktiviteten din på sitt eget nettsted</translation>
 <translation id="8259179246279078674">Siden de forhåndslastede sidene er krypterte, får ikke Google vite noe om det forhåndslastede sideinnholdet. Googles tjenere får vite hvilke nettsteder som forhåndslastes privat. Denne informasjonen brukes bare til å forhåndslaste sidene og blir ikke knyttet til annen informasjon i Google-kontoen din.</translation>
 <translation id="8260126382462817229">Prøv å logge på igjen</translation>
 <translation id="8261506727792406068">Slett</translation>
 <translation id="82619448491672958">Se andre faner</translation>
 <translation id="8266862848225348053">Nedlastingssted</translation>
-<translation id="8274165955039650276">Se nedlastinger</translation>
 <translation id="8281886186245836920">Hopp over</translation>
 <translation id="8282297628636750033">Bruk mørkt tema på nettsteder når mulig</translation>
 <translation id="829672787777123339">Kobler til enheten din …</translation>
@@ -1517,7 +1511,6 @@ Noen nettsteder kan for eksempel svare på denne forespørselen ved å vise deg 
 <translation id="9108808586816295166">Sikker DNS er kanskje ikke tilgjengelig hele tiden</translation>
 <translation id="9128984223251192329">Privacy Sandbox-forespørselen er åpnet i halv høyde</translation>
 <translation id="9133397713400217035">Utforsk uten nett</translation>
-<translation id="9137013805542155359">Vis original</translation>
 <translation id="9148126808321036104">Logg på igjen</translation>
 <translation id="9158770349521403363">Del kun innhold</translation>
 <translation id="9159716826369098114">Gjenopprett fanegruppen med <ph name="TAB_COUNT" /> faner som en ny bakgrunnsfanegruppe.</translation>

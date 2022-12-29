@@ -34,6 +34,7 @@ import static org.chromium.chrome.features.tasks.TasksSurfaceProperties.TOP_TOOL
 import android.content.Context;
 import android.content.res.Resources;
 import android.view.View;
+import android.view.View.OnClickListener;
 import android.view.ViewGroup;
 
 import androidx.annotation.Nullable;
@@ -54,7 +55,6 @@ import org.chromium.base.supplier.Supplier;
 import org.chromium.chrome.R;
 import org.chromium.chrome.browser.back_press.BackPressManager;
 import org.chromium.chrome.browser.browser_controls.BrowserControlsStateProvider;
-import org.chromium.chrome.browser.feed.FeedFeatures;
 import org.chromium.chrome.browser.feed.FeedReliabilityLogger;
 import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.lens.LensEntryPoint;
@@ -67,9 +67,7 @@ import org.chromium.chrome.browser.omnibox.OmniboxStub;
 import org.chromium.chrome.browser.omnibox.UrlFocusChangeListener;
 import org.chromium.chrome.browser.preferences.ChromePreferenceKeys;
 import org.chromium.chrome.browser.preferences.Pref;
-import org.chromium.chrome.browser.preferences.PrefChangeRegistrar;
 import org.chromium.chrome.browser.preferences.SharedPreferencesManager;
-import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.browser.tab.TabLaunchType;
 import org.chromium.chrome.browser.tab.TabSelectionType;
@@ -87,7 +85,6 @@ import org.chromium.chrome.features.start_surface.StartSurface.TabSwitcherViewOb
 import org.chromium.components.browser_ui.widget.gesture.BackPressHandler;
 import org.chromium.components.embedder_support.util.UrlUtilities;
 import org.chromium.components.prefs.PrefService;
-import org.chromium.components.user_prefs.UserPrefs;
 import org.chromium.content_public.browser.LoadUrlParams;
 import org.chromium.ui.modelutil.PropertyModel;
 import org.chromium.ui.util.ColorUtils;
@@ -208,6 +205,7 @@ class StartSurfaceMediator implements TabSwitcher.TabSwitcherViewObserver, View.
     // The timestamp at which the Start Surface was last shown to the user.
     private long mLastShownTimeMs = LAST_SHOW_TIME_NOT_SET;
     private boolean mIsStartSurfaceRefactorEnabled;
+    private OnClickListener mTabSwitcherClickHandler;
 
     StartSurfaceMediator(Controller controller, ViewGroup tabSwitcherContainer,
             TabModelSelector tabModelSelector, @Nullable PropertyModel propertyModel,
@@ -219,7 +217,8 @@ class StartSurfaceMediator implements TabSwitcher.TabSwitcherViewObserver, View.
             JankTracker jankTracker, Runnable initializeMVTilesRunnable,
             Supplier<Tab> parentTabSupplier, View logoContainerView,
             BackPressManager backPressManager, ViewGroup feedPlaceholderParentView,
-            ActivityLifecycleDispatcher activityLifecycleDispatcher) {
+            ActivityLifecycleDispatcher activityLifecycleDispatcher,
+            OnClickListener tabSwitcherClickHandler) {
         mController = controller;
         mTabSwitcherContainer = tabSwitcherContainer;
         mTabModelSelector = tabModelSelector;
@@ -246,6 +245,7 @@ class StartSurfaceMediator implements TabSwitcher.TabSwitcherViewObserver, View.
         mIsFeedGoneImprovementEnabled =
                 ReturnToChromeUtil.shouldImproveStartWhenFeedIsDisabled(context);
         mIsStartSurfaceRefactorEnabled = ReturnToChromeUtil.isStartSurfaceRefactorEnabled(context);
+        mTabSwitcherClickHandler = tabSwitcherClickHandler;
 
         if (mPropertyModel != null) {
             assert mIsStartSurfaceEnabled;
@@ -468,20 +468,6 @@ class StartSurfaceMediator implements TabSwitcher.TabSwitcherViewObserver, View.
                     if (mLogoCoordinator != null) mLogoCoordinator.initWithNative();
                 }
             }
-
-            // If feed is disabled from user toggling off the header, Start surface will be set not
-            // scrollable, so we reset the scroll position to make it visible in the entire screen
-            // again.
-            PrefChangeRegistrar prefChangeRegistrar = new PrefChangeRegistrar();
-            prefChangeRegistrar.addObserver(Pref.ARTICLES_LIST_VISIBLE, () -> {
-                boolean isFeedVisible = FeedFeatures.isFeedEnabled()
-                        && UserPrefs.get(Profile.getLastUsedRegularProfile())
-                                   .getBoolean(Pref.ARTICLES_LIST_VISIBLE);
-                if (!isFeedVisible) {
-                    mPropertyModel.set(RESET_TASK_SURFACE_HEADER_SCROLL_POSITION, true);
-                    maybeDestroyFeedPlaceholder();
-                }
-            });
         }
 
         mFeedVisibilityPrefOnStartUp = prefService.getBoolean(Pref.ARTICLES_LIST_VISIBLE);
@@ -1023,14 +1009,18 @@ class StartSurfaceMediator implements TabSwitcher.TabSwitcherViewObserver, View.
     public void onClick(View v) {
         assert isHomepageShown();
 
-        if (mSecondaryTasksSurfacePropertyModel == null) {
-            TabSwitcher.Controller controller = mSecondaryTasksSurfaceInitializer.initialize();
-            assert mSecondaryTasksSurfacePropertyModel != null;
-            setSecondaryTasksSurfaceController(controller);
-        }
+        if (mIsStartSurfaceRefactorEnabled) {
+            mTabSwitcherClickHandler.onClick(v);
+        } else {
+            if (mSecondaryTasksSurfacePropertyModel == null) {
+                TabSwitcher.Controller controller = mSecondaryTasksSurfaceInitializer.initialize();
+                assert mSecondaryTasksSurfacePropertyModel != null;
+                setSecondaryTasksSurfaceController(controller);
+            }
 
+            setStartSurfaceState(StartSurfaceState.SHOWN_TABSWITCHER);
+        }
         RecordUserAction.record("StartSurface.SinglePane.MoreTabs");
-        setStartSurfaceState(StartSurfaceState.SHOWN_TABSWITCHER);
     }
 
     // StartSurface.OnTabSelectingListener
@@ -1060,10 +1050,6 @@ class StartSurfaceMediator implements TabSwitcher.TabSwitcherViewObserver, View.
         return mIsStartSurfaceEnabled && ChromeFeatureList.sInstantStart.isEnabled()
                 && ReturnToChromeUtil.getFeedArticlesVisibility() && !mHadWarmStart
                 && !mHasFeedPlaceholderShown;
-    }
-
-    boolean hasFeedPlaceholderShown() {
-        return mHasFeedPlaceholderShown;
     }
 
     void setSecondaryTasksSurfaceController(

@@ -7,6 +7,8 @@
 #include "base/callback.h"
 #include "base/files/file_path.h"
 #include "base/metrics/histogram_functions.h"
+#include "base/time/time.h"
+#include "chrome/app/chrome_command_ids.h"
 #include "chrome/app/vector_icons/vector_icons.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/download/bubble/download_bubble_controller.h"
@@ -21,9 +23,11 @@
 #include "chrome/browser/ui/views/chrome_layout_provider.h"
 #include "chrome/browser/ui/views/download/bubble/download_bubble_row_list_view.h"
 #include "chrome/browser/ui/views/download/download_shelf_context_menu_view.h"
+#include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/grit/generated_resources.h"
 #include "components/download/public/common/download_item.h"
 #include "components/vector_icons/vector_icons.h"
+#include "ui/base/clipboard/scoped_clipboard_writer.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/l10n/time_format.h"
 #include "ui/base/metadata/metadata_header_macros.h"
@@ -178,13 +182,16 @@ void DownloadBubbleRowView::AddedToWidget() {
   auto* focus_manager = GetFocusManager();
   if (focus_manager) {
     focus_manager->AddFocusChangeListener(this);
+    RegisterAccelerators(focus_manager);
   }
 }
 
 void DownloadBubbleRowView::RemovedFromWidget() {
   auto* focus_manager = GetFocusManager();
-  if (focus_manager)
+  if (focus_manager) {
     focus_manager->RemoveFocusChangeListener(this);
+    UnregisterAccelerators(focus_manager);
+  }
 }
 
 void DownloadBubbleRowView::OnThemeChanged() {
@@ -201,7 +208,8 @@ void DownloadBubbleRowView::OnDeviceScaleFactorChanged(
 }
 
 void DownloadBubbleRowView::SetIconFromImageModel(bool use_over_last_override,
-                                                  ui::ImageModel icon) {
+                                                  base::Time load_start_time,
+                                                  const ui::ImageModel& icon) {
   if (last_overriden_icon_ && !use_over_last_override)
     return;
   if (icon.IsEmpty()) {
@@ -209,11 +217,14 @@ void DownloadBubbleRowView::SetIconFromImageModel(bool use_over_last_override,
   } else {
     icon_->SetImage(icon);
   }
+  base::UmaHistogramTimes("Download.Bubble.LoadAndSetIconLatency",
+                          base::Time::Now() - load_start_time);
 }
 
 void DownloadBubbleRowView::SetIconFromImage(bool use_over_last_override,
+                                             base::Time load_start_time,
                                              gfx::Image icon) {
-  SetIconFromImageModel(use_over_last_override,
+  SetIconFromImageModel(use_over_last_override, load_start_time,
                         ui::ImageModel::FromImage(icon));
 }
 
@@ -222,12 +233,14 @@ void DownloadBubbleRowView::LoadIcon() {
   if (!GetWidget())
     return;
 
+  base::Time load_start_time = base::Time::Now();
+
   if (ui_info_.icon_model_override) {
     if (last_overriden_icon_ == ui_info_.icon_model_override)
       return;
     last_overriden_icon_ = ui_info_.icon_model_override;
     SetIconFromImageModel(
-        /*use_over_last_override=*/true,
+        /*use_over_last_override=*/true, load_start_time,
         ui::ImageModel::FromVectorIcon(*ui_info_.icon_model_override,
                                        ui_info_.secondary_color,
                                        GetLayoutConstant(DOWNLOAD_ICON_SIZE)));
@@ -239,7 +252,7 @@ void DownloadBubbleRowView::LoadIcon() {
       return;
     last_overriden_icon_ = &kIncognitoIcon;
     SetIconFromImageModel(
-        /*use_over_last_override=*/true,
+        /*use_over_last_override=*/true, load_start_time,
         ui::ImageModel::FromVectorIcon(kIncognitoIcon, ui::kColorIcon,
                                        GetLayoutConstant(DOWNLOAD_ICON_SIZE)));
     return;
@@ -255,7 +268,8 @@ void DownloadBubbleRowView::LoadIcon() {
     if (already_set_default_icon_)
       return;
     already_set_default_icon_ = true;
-    SetIconFromImageModel(/*use_over_last_override=*/true, GetDefaultIcon());
+    SetIconFromImageModel(/*use_over_last_override=*/true, load_start_time,
+                          GetDefaultIcon());
     return;
   }
 
@@ -264,13 +278,15 @@ void DownloadBubbleRowView::LoadIcon() {
       im->LookupIconFromFilepath(file_path, IconLoader::SMALL, current_scale_);
 
   if (file_icon_image) {
-    SetIconFromImage(/*use_over_last_override=*/true, *file_icon_image);
+    SetIconFromImage(/*use_over_last_override=*/true, load_start_time,
+                     *file_icon_image);
   } else {
-    im->LoadIcon(file_path, IconLoader::SMALL, current_scale_,
-                 base::BindOnce(&DownloadBubbleRowView::SetIconFromImage,
-                                weak_factory_.GetWeakPtr(),
-                                /*use_over_last_override=*/false),
-                 &cancelable_task_tracker_);
+    im->LoadIcon(
+        file_path, IconLoader::SMALL, current_scale_,
+        base::BindOnce(&DownloadBubbleRowView::SetIconFromImage,
+                       weak_factory_.GetWeakPtr(),
+                       /*use_over_last_override=*/false, load_start_time),
+        &cancelable_task_tracker_);
   }
 }
 
@@ -907,6 +923,66 @@ void DownloadBubbleRowView::ShowContextMenuForViewImpl(
 void DownloadBubbleRowView::AnnounceInProgressAlert() {
   GetViewAccessibility().AnnounceText(
       model_->GetInProgressAccessibleAlertText());
+}
+
+bool DownloadBubbleRowView::AcceleratorPressed(
+    const ui::Accelerator& accelerator) {
+  if (model_->GetState() != download::DownloadItem::COMPLETE) {
+    return false;
+  }
+
+  // The only accelerator we registered is for copy, so we know that's what
+  // `accelerator` contains. If DCHECKs are enabled, we can confirm that.
+#if DCHECK_IS_ON()
+  BrowserView* browser_view = BrowserView::GetBrowserViewForBrowser(browser_);
+  ui::Accelerator registered_accelerator;
+  if (browser_view &&
+      browser_view->GetAccelerator(IDC_COPY, &registered_accelerator)) {
+    DCHECK(accelerator == registered_accelerator);
+  }
+#endif
+
+  ui::ScopedClipboardWriter scw(ui::ClipboardBuffer::kCopyPaste);
+  std::string uri_list = ui::FileInfosToURIList({ui::FileInfo(
+      model_->GetTargetFilePath(), model_->GetFileNameToReportUser())});
+  scw.WriteFilenames(uri_list);
+  return true;
+}
+
+bool DownloadBubbleRowView::CanHandleAccelerators() const {
+  bool focused = Contains(GetFocusManager()->GetFocusedView());
+  return focused;
+}
+
+void DownloadBubbleRowView::RegisterAccelerators(
+    views::FocusManager* focus_manager) {
+  BrowserView* browser_view = BrowserView::GetBrowserViewForBrowser(browser_);
+  if (!browser_view) {
+    return;
+  }
+
+  ui::Accelerator accelerator;
+  if (!browser_view->GetAccelerator(IDC_COPY, &accelerator)) {
+    return;
+  }
+
+  focus_manager->RegisterAccelerator(
+      accelerator, ui::AcceleratorManager::kNormalPriority, this);
+}
+
+void DownloadBubbleRowView::UnregisterAccelerators(
+    views::FocusManager* focus_manager) {
+  BrowserView* browser_view = BrowserView::GetBrowserViewForBrowser(browser_);
+  if (!browser_view) {
+    return;
+  }
+
+  ui::Accelerator accelerator;
+  if (!browser_view->GetAccelerator(IDC_COPY, &accelerator)) {
+    return;
+  }
+
+  focus_manager->UnregisterAccelerator(accelerator, this);
 }
 
 BEGIN_METADATA(DownloadBubbleRowView, views::View)

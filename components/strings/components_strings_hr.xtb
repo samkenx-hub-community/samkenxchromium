@@ -1165,6 +1165,7 @@ To će u suprotnom biti onemogućeno na temelju vaših postavki privatnosti. To 
 <translation id="3927932062596804919">Odbij</translation>
 <translation id="393316646445601645">Internet i telekomunikacije</translation>
 <translation id="3939773374150895049">Želite li koristiti WebAuthn umjesto CVC-a?</translation>
+<translation id="3943857333388298514">Zalijepi</translation>
 <translation id="3946209740501886391">Uvijek pitaj na ovoj web-lokaciji</translation>
 <translation id="3947595700203588284">Može tražiti dopuštenje za povezivanje s MIDI uređajima</translation>
 <translation id="3949571496842715403">Poslužitelj nije mogao dokazati da je <ph name="DOMAIN" />; njegov sigurnosni certifikat ne navodi alternativne nazive predmeta. To može biti uzrokovano pogrešnom konfiguracijom ili napadom na vašu vezu.</translation>
@@ -2312,6 +2313,7 @@ To će u suprotnom biti onemogućeno na temelju vaših postavki privatnosti. To 
 <translation id="6890531741535756070">Odabrali ste potvrdu putem značajke <ph name="DEVICE_LABEL" /> na web-lokacijama koje upotrebljavaju <ph name="PROVIDER_ORIGIN" />. Taj je davatelj usluga možda pohranio podatke o vašem načinu plaćanja za koje možete <ph name="BEGIN_LINK" />zatražiti brisanje<ph name="END_LINK" />.</translation>
 <translation id="6891596781022320156">Razina pravila nije podržana.</translation>
 <translation id="6895330447102777224">Kartica je potvrđena</translation>
+<translation id="6896758677409633944">Kopiraj</translation>
 <translation id="6897140037006041989">Korisnički agent</translation>
 <translation id="6898699227549475383">Organizacija (O)</translation>
 <translation id="6899000063526916106">Unesite <ph name="NUMBER_OF_DIGITS" />-znamenkasti kôd</translation>
@@ -2679,6 +2681,7 @@ Dodatne pojedinosti:
 <translation id="7716375162095500223">Još nije preneseno ili je zanemareno</translation>
 <translation id="7716424297397655342">Web-lokacija se ne može učitati iz predmemorije</translation>
 <translation id="7723047071702270851">Uredite karticu</translation>
+<translation id="7724603315864178912">Izreži</translation>
 <translation id="7734285854693414638">Brzo izradite novi obrazac u Google obrascima</translation>
 <translation id="773466115871691567">Uvijek prevodi <ph name="SOURCE_LANGUAGE" /></translation>
 <translation id="7736959720849233795">Kopiraj adresu veze</translation>
@@ -2715,6 +2718,7 @@ Dodatne pojedinosti:
 <translation id="7815407501681723534">Pronađeno <ph name="NUMBER_OF_RESULTS" /> <ph name="SEARCH_RESULTS" /> za "<ph name="SEARCH_STRING" />"</translation>
 <translation id="7822320754433038727">Lov</translation>
 <translation id="782886543891417279">Za Wi-Fi koji upotrebljavate (<ph name="WIFI_NAME" />) možda ćete morati posjetiti stranicu za prijavu.</translation>
+<translation id="7840103971441592723">Snimanje zaslona je počelo</translation>
 <translation id="7844689747373518809">{COUNT,plural, =0{Ništa}=1{1 aplikacija (<ph name="EXAMPLE_APP_1" />)}=2{2 aplikacije (<ph name="EXAMPLE_APP_1" />, <ph name="EXAMPLE_APP_2" />)}one{# aplikacija (<ph name="EXAMPLE_APP_1" />, <ph name="EXAMPLE_APP_2" />, <ph name="AND_MORE" />)}few{# aplikacije (<ph name="EXAMPLE_APP_1" />, <ph name="EXAMPLE_APP_2" />, <ph name="AND_MORE" />)}other{# aplikacija (<ph name="EXAMPLE_APP_1" />, <ph name="EXAMPLE_APP_2" />, <ph name="AND_MORE" />)}}</translation>
 <translation id="7855695075675558090"><ph name="TOTAL_LABEL" /> <ph name="CURRENCY_CODE" /> <ph name="FORMATTED_TOTAL_AMOUNT" /></translation>
 <translation id="7862185352068345852">Želite li napustiti web-lokaciju?</translation>
@@ -2744,6 +2748,7 @@ Dodatne pojedinosti:
 <translation id="7942349550061667556">Crvena</translation>
 <translation id="7943397946612013052">Blokirano preuzimanje</translation>
 <translation id="7943893128817522649">Može tražiti dopuštenje za automatsko preuzimanje više datoteka</translation>
+<translation id="7946724693008564269">Otkriveni jezik</translation>
 <translation id="7947285636476623132">Provjerite godinu isteka, pa pokušajte ponovo</translation>
 <translation id="7947813448670013867"><ph name="SEE_CHROME_TIPS_FOCUSED_FRIENDLY_MATCH_TEXT" />, pritisnite Tab, a zatim Enter da biste saznali više o Chromeovim značajkama</translation>
 <translation id="7950027195171824198">Preferencijama za kolačiće možete upravljati u postavkama Chromea</translation>
@@ -2892,6 +2897,7 @@ Dodatne pojedinosti:
 <translation id="8282947398454257691">znati vaš jedinstveni identifikator uređaja</translation>
 <translation id="8284769179630993263">Sigurnim pregledavanjem i drugim značajkama možete upravljati u postavkama Chromea</translation>
 <translation id="8286036467436129157">Prijava</translation>
+<translation id="8286799286781881307">Aplikacije koje je odobrio administrator mogu snimiti sve zaslone priključene na vaš uređaj. Te se informacije mogu obrađivati lokalno ili prenijeti na poslužitelje vaše organizacije.</translation>
 <translation id="8288807391153049143">Prikaz certifikata</translation>
 <translation id="8289355894181816810">Obratite se svojem mrežnom administratoru ako niste sigurni što to znači.</translation>
 <translation id="8293206222192510085">Dodaj oznaku</translation>

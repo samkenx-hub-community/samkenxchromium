@@ -8,6 +8,8 @@
 #include "base/functional/callback_forward.h"
 #include "base/memory/weak_ptr.h"
 #include "base/timer/timer.h"
+#include "ui/base/ime/input_method_observer.h"
+#include "ui/base/ime/text_input_client.h"
 #include "ui/events/keycodes/keyboard_codes_posix.h"
 #include "ui/views/widget/unique_widget_ptr.h"
 
@@ -24,12 +26,15 @@ class VideoRecordingWatcher;
 using MouseHighlightLayers =
     std::vector<std::unique_ptr<PointerHighlightLayer>>;
 
+using TouchHighlightLayersMap =
+    base::flat_map<ui::PointerId, std::unique_ptr<PointerHighlightLayer>>;
+
 // Observes and decides whether to show a helper widget representing the
 // currently pressed key combination or not. The key combination will be used to
 // construct or modify the `KeyComboViewer`. The
 // `CaptureModeDemoToolsController` will only be available during video
 // recording and has to be explicitly enabled by the user.
-class CaptureModeDemoToolsController {
+class CaptureModeDemoToolsController : public ui::InputMethodObserver {
  public:
   explicit CaptureModeDemoToolsController(
       VideoRecordingWatcher* video_recording_watcher);
@@ -37,7 +42,7 @@ class CaptureModeDemoToolsController {
       delete;
   CaptureModeDemoToolsController& operator=(
       const CaptureModeDemoToolsController&) = delete;
-  ~CaptureModeDemoToolsController();
+  ~CaptureModeDemoToolsController() override;
 
   // Decides whether to show a helper widget for the `event` or not.
   void OnKeyEvent(ui::KeyEvent* event);
@@ -46,9 +51,20 @@ class CaptureModeDemoToolsController {
   // grow-and-fade-out animation on it.
   void PerformMousePressAnimation(const gfx::PointF& event_location_in_window);
 
-  const MouseHighlightLayers& mouse_highlight_layers_for_testing() const {
-    return mouse_highlight_layers_;
-  }
+  // Refreshes the bounds of the key combo viewer.
+  void RefreshBounds();
+
+  // Decides whether to show the highlight for the touch event or not.
+  void OnTouchEvent(ui::EventType event_type,
+                    ui::PointerId pointer_id,
+                    const gfx::PointF& event_location_in_window);
+
+  // ui::InputMethodObserver:
+  void OnFocus() override {}
+  void OnBlur() override {}
+  void OnCaretBoundsChanged(const ui::TextInputClient* client) override {}
+  void OnTextInputStateChanged(const ui::TextInputClient* client) override;
+  void OnInputMethodDestroyed(const ui::InputMethod* input_method) override {}
 
  private:
   friend class CaptureModeDemoToolsTestApi;
@@ -65,10 +81,28 @@ class CaptureModeDemoToolsController {
   // Resets the `demo_tools_widget_` when the `hide_timer_` expires.
   void AnimateToResetTheWidget();
 
+  void UpdateTextInputType(const ui::TextInputClient* client);
+
   // Called when the mouse highlight animation ends to remove the corresponding
   // pointer highlight from the `mouse_highlight_layers_`.
   void OnMouseHighlightAnimationEnded(
       PointerHighlightLayer* pointer_highlight_layer_ptr);
+
+  // Creates a new highlight layer each time it gets called and performs the
+  // grow animation on it.
+  void OnTouchDown(const ui::PointerId& pointer_id,
+                   const gfx::PointF& event_location_in_window);
+
+  // Performs the grow-and-fade-out animation on an existing highlight layer
+  // that corresponds to the given `pointer_id`.
+  void OnTouchUp(const ui::PointerId& pointer_id,
+                 const gfx::PointF& event_location_in_window);
+
+  // Sets the bounds of the touch highlight layer that corresponds to the
+  // `pointer_id` based on the `event_location_in_window` of the touch event
+  // when it gets called on touch dragged.
+  void OnTouchDragged(const ui::PointerId& pointer_id,
+                      const gfx::PointF& event_location_in_window);
 
   VideoRecordingWatcher* const video_recording_watcher_;
   views::UniqueWidgetPtr demo_tools_widget_;
@@ -80,12 +114,20 @@ class CaptureModeDemoToolsController {
   // The most recently pressed non-modifier key.
   ui::KeyboardCode last_non_modifier_key_ = ui::VKEY_UNKNOWN;
 
+  // True if the cursor and focus is currently in a password text input
+  // field, false otherwise.
+  bool in_password_text_input_ = false;
+
   // Starts on key up of the last non-modifier key and the `key_combo_view_`
   // will disappear when it expires.
   base::OneShotTimer hide_timer_;
 
   // Contains all the mouse highlight layers that are being animated.
   MouseHighlightLayers mouse_highlight_layers_;
+
+  // Maps the PointerHighlightLayer of the touch event by the pointer id as the
+  // key.
+  TouchHighlightLayersMap touch_pointer_id_to_highlight_layer_map_;
 
   // If set, it will be called when the mouse highlight animation is completed.
   base::OnceClosure on_mouse_highlight_animation_ended_callback_for_test_;

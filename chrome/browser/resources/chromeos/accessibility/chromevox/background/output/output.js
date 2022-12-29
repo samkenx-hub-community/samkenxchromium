@@ -11,7 +11,6 @@ import {constants} from '../../../common/constants.js';
 import {Cursor, CURSOR_NODE_INDEX} from '../../../common/cursors/cursor.js';
 import {CursorRange} from '../../../common/cursors/range.js';
 import {LocalStorage} from '../../../common/local_storage.js';
-import {AutomationTreeWalker} from '../../../common/tree_walker.js';
 import {Earcon} from '../../common/abstract_earcons.js';
 import {NavBraille} from '../../common/braille/nav_braille.js';
 import {EventSourceType} from '../../common/event_source_type.js';
@@ -672,99 +671,6 @@ export class Output {
   }
 
   /** @override */
-  formatNode_(data, token, tree, options) {
-    const buff = data.outputBuffer;
-    const node = data.node;
-    const formatLog = data.outputFormatLogger;
-    let prevNode = data.opt_prevNode;
-
-    if (!tree.firstChild) {
-      return;
-    }
-
-    const relationName = tree.firstChild.value;
-    if (relationName === 'tableCellColumnHeaders') {
-      // Skip output when previous position falls on the same column.
-      while (prevNode && !AutomationPredicate.cellLike(prevNode)) {
-        prevNode = prevNode.parent;
-      }
-      if (prevNode &&
-          prevNode.tableCellColumnIndex === node.tableCellColumnIndex) {
-        return;
-      }
-
-      const headers = node.tableCellColumnHeaders;
-      if (headers) {
-        for (let i = 0; i < headers.length; i++) {
-          const header = headers[i].name;
-          if (header) {
-            this.append_(buff, header, options);
-            formatLog.writeTokenWithValue(token, header);
-          }
-        }
-      }
-    } else if (relationName === 'tableCellRowHeaders') {
-      const headers = node.tableCellRowHeaders;
-      if (headers) {
-        for (let i = 0; i < headers.length; i++) {
-          const header = headers[i].name;
-          if (header) {
-            this.append_(buff, header, options);
-            formatLog.writeTokenWithValue(token, header);
-          }
-        }
-      }
-    } else if (node[relationName]) {
-      const related = node[relationName];
-      this.node_(
-          related, related, outputTypes.OutputCustomEvent.NAVIGATE, buff,
-          formatLog);
-    }
-  }
-
-  /** @override */
-  formatTextContent_(data, token, options) {
-    const buff = data.outputBuffer;
-    const node = data.node;
-    const formatLog = data.outputFormatLogger;
-
-    if (node.name && token === 'nameOrTextContent') {
-      formatLog.writeToken(token);
-      this.format_({
-        node,
-        outputFormat: '$name',
-        outputBuffer: buff,
-        outputFormatLogger: formatLog,
-      });
-      return;
-    }
-
-    if (!node.firstChild) {
-      return;
-    }
-
-    const root = node;
-    const walker = new AutomationTreeWalker(node, Dir.FORWARD, {
-      visit: AutomationPredicate.leafOrStaticText,
-      leaf: n => {
-        // The root might be a leaf itself, but we still want to descend
-        // into it.
-        return n !== root && AutomationPredicate.leafOrStaticText(n);
-      },
-      root: r => r === root,
-    });
-    const outputStrings = [];
-    while (walker.next().node) {
-      if (walker.node.name) {
-        outputStrings.push(walker.node.name.trim());
-      }
-    }
-    const finalOutput = outputStrings.join(' ');
-    this.append_(buff, finalOutput, options);
-    formatLog.writeTokenWithValue(token, finalOutput);
-  }
-
-  /** @override */
   formatAsFieldAccessor_(data, token, options) {
     const buff = data.outputBuffer;
     const node = data.node;
@@ -1045,7 +951,7 @@ export class Output {
             node, prevNode, type, buff, formatLog,
             {preferStart: preferStartOrEndAncestry});
       }
-      this.node_(node, prevNode, type, buff, formatLog);
+      this.formatNode(node, prevNode, type, buff, formatLog);
       if (addContextAfter) {
         this.ancestry_(
             node, prevNode, type, buff, formatLog,
@@ -1310,9 +1216,9 @@ export class Output {
    * @param {!outputTypes.OutputEventType} type
    * @param {!Array<Spannable>} buff
    * @param {!OutputFormatLogger} formatLog
-   * @private
+   * @override
    */
-  node_(node, prevNode, type, buff, formatLog) {
+  formatNode(node, prevNode, type, buff, formatLog) {
     const originalBuff = buff;
 
     if (this.formatOptions_.braille) {

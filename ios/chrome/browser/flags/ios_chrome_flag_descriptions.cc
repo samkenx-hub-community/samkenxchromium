@@ -270,17 +270,6 @@ const char kEnableDiscoverFeedDiscoFeedEndpointName[] =
 const char kEnableDiscoverFeedDiscoFeedEndpointDescription[] =
     "Enable using the discofeed endpoint for the discover feed.";
 
-const char kEnableDiscoverFeedGhostCardsName[] =
-    "Enable discover feed ghost cards";
-const char kEnableDiscoverFeedGhostCardsDescription[] =
-    "Show ghost cards when refreshing the discover feed.";
-
-const char kEnableFREDefaultBrowserPromoScreenName[] =
-    "Enable FRE default browser screen";
-const char kEnableFREDefaultBrowserPromoScreenDescription[] =
-    "Display the FRE default browser screen and other default browser promo "
-    "depending on experiment.";
-
 const char kEnableFeedAblationName[] = "Enables Feed Ablation";
 const char kEnableFeedAblationDescription[] =
     "If Enabled the Feed will be removed from the NTP";
@@ -300,6 +289,11 @@ const char kEnableFeedCardMenuSignInPromoDescription[] =
 const char kEnableFullscreenAPIName[] = "Enable Fullscreen API";
 const char kEnableFullscreenAPIDescription[] =
     "Enable the Fullscreen API for web content (iOS 16.0+).";
+
+const char kEnableNewBookmarksImplementationName[] =
+    "Enable New Bookmarks Implementation";
+const char kEnableNewBookmarksImplementationDescription[] =
+    "Enable the new bookmarks implementation with coordinators";
 
 const char kPasswordsGroupingName[] =
     "Enable password grouping for the Password Manager";
@@ -410,12 +404,6 @@ const char kHttpsOnlyModeDescription[] = "Enables the HTTPS-Only Mode setting";
 const char kIncognitoNtpRevampName[] = "Revamped Incognito New Tab Page";
 const char kIncognitoNtpRevampDescription[] =
     "When enabled, Incognito new tab page will have an updated UI.";
-
-const char kInterestFeedV2ClickAndViewActionsConditionalUploadName[] =
-    "New Content Suggestions taps/views conditional upload";
-const char kInterestFeedV2ClickAndViewActionsConditionalUploadDescription[] =
-    "Only enable the upload of taps/views after satisfying conditions (e.g., "
-    "user views X cards)";
 
 const char kInProductHelpDemoModeName[] = "In-Product Help Demo Mode";
 const char kInProductHelpDemoModeDescription[] =
@@ -598,11 +586,6 @@ const char kOmniboxFocusTriggersSRPZeroSuggestDescription[] =
     "on-focus suggestions for the contextual web to be enabled. Will only work "
     "if user is signed-in and syncing.";
 
-const char kOmniboxPasteButtonName[] = "Omnibox paste to search button";
-const char kOmniboxPasteButtonDescription[] =
-    "Add a paste button when showing clipboard suggestions in the omnibox. iOS "
-    "16 and above.";
-
 const char kOmniboxLocalHistoryZeroSuggestBeyondNTPName[] =
     "Allow local history zero-prefix suggestions beyond NTP";
 const char kOmniboxLocalHistoryZeroSuggestBeyondNTPDescription[] =
@@ -637,10 +620,6 @@ const char kOmniboxOnDeviceTailSuggestionsName[] =
 const char kOmniboxOnDeviceTailSuggestionsDescription[] =
     "Google tail non personalized search suggestions provided by a compact on "
     "device model.";
-
-const char kIOSOmniboxUpdatedPopupUIName[] = "Popup refresh";
-const char kIOSOmniboxUpdatedPopupUIDescription[] =
-    "Enable the new Popup implementation with Actions";
 
 const char kOptimizationGuideDebugLogsName[] =
     "Enable optimization guide debug logs";
@@ -762,13 +741,6 @@ const char kSyncTrustedVaultPassphrasePromoName[] =
 const char kSyncTrustedVaultPassphrasePromoDescription[] =
     "Enables promos for an experimental sync passphrase type, referred to as "
     "trusted vault.";
-
-const char kSyncTrustedVaultPassphraseRecoveryName[] =
-    "Enable sync trusted vault passphrase with improved recovery.";
-const char kSyncTrustedVaultPassphraseRecoveryDescription[] =
-    "Enables support for an experimental sync passphrase type, referred to as "
-    "trusted vault, including logic and APIs for improved account recovery "
-    "flows.";
 
 const char kSyncInvalidationsName[] = "Use Sync standalone invalidations";
 const char kSyncInvalidationsDescription[] =

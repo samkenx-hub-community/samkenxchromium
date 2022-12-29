@@ -125,7 +125,6 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &features::kPwaUpdateDialogForIcon,
     &features::kPwaUpdateDialogForName,
     &features::kQuietNotificationPrompts,
-    &features::kRequestDesktopSiteForTablets,
     &features::kToolbarUseHardwareBitmapDraw,
     &features::kWebNfc,
     &features::kIncognitoDownloadsWarning,
@@ -138,24 +137,18 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &feature_engagement::kUseClientConfigIPH,
     &feature_guide::features::kFeatureNotificationGuide,
     &feature_guide::features::kSkipCheckForLowEngagedUsers,
-    &feed::kClientGoodVisits,
     &feed::kFeedBackToTop,
-    &feed::kFeedClearImageMemoryCache,
     &feed::kFeedHeaderStickToTop,
     &feed::kFeedImageMemoryCacheSizePercentage,
-    &feed::kFeedInteractiveRefresh,
     &feed::kFeedLoadingPlaceholder,
     &feed::kFeedNoViewCache,
     &feed::kFeedPerformanceStudy,
-    &feed::kFeedReplaceAll,
     &feed::kFeedShowSignInCommand,
     &feed::kInterestFeedContentSuggestions,
-    &feed::kInterestFeedV1ClicksAndViewsConditionalUpload,
     &feed::kInterestFeedV2,
     &feed::kInterestFeedV2Autoplay,
     &feed::kInterestFeedV2Hearts,
     &feed::kShareCrowButton,
-    &feed::kReliabilityLogging,
     &feed::kWebFeed,
     &feed::kWebFeedAwareness,
     &feed::kWebFeedOnboarding,
@@ -199,9 +192,6 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &kCCTRemoveRemoteViewIds,
     &kCCTReportParallelRequestStatus,
     &kCCTResizable90MaximumHeight,
-    &kCCTResizableAllowResizeByUserGesture,
-    &kCCTResizableAlwaysShowNavBarButtons,
-    &kCCTResizableForFirstParties,
     &kCCTResizableForThirdParties,
     &kCCTResizableSideSheet,
     &kCCTRetainingStateInMemory,
@@ -231,14 +221,12 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &kContextualSearchSuppressShortView,
     &kContextualSearchThinWebViewImplementation,
     &kDeferKeepScreenOnDuringGesture,
-    &kDirectActions,
     &kExperimentsForAgsa,
     &kExploreSites,
     &kFocusOmniboxInIncognitoTabIntents,
     &kFoldableJankFix,
     &kGridTabSwitcherForTablets,
     &kHideNonDisplayableAccountEmail,
-    &kImmersiveUiMode,
     &kIncognitoReauthenticationForAndroid,
     &kIncognitoScreenshot,
     &kInfobarScrollOptimization,
@@ -247,7 +235,6 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &kIsVoiceSearchEnabledCache,
     &kLensCameraAssistedSearch,
     &kLensOnQuickActionSearchWidget,
-    &kNewWindowAppMenu,
     &kNotificationPermissionVariant,
     &kPageAnnotationsService,
     &kBookmarksImprovedSaveFlow,
@@ -291,7 +278,6 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &kDiscoverFeedMultiColumn,
     &kTabStripRedesign,
     &kTabGridLayoutAndroid,
-    &kTabReparenting,
     &kTabSelectionEditorV2,
     &kTabStripImprovements,
     &kTabSwitcherOnReturn,
@@ -336,7 +322,6 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &media_router::kCafMRPDeferredDiscovery,
     &messages::kMessagesForAndroidInfrastructure,
     &messages::kMessagesForAndroidSaveCard,
-    &offline_pages::kOfflineIndicatorFeature,
     &offline_pages::kOfflinePagesCTFeature,  // See crbug.com/620421.
     &offline_pages::kOfflinePagesDescriptiveFailStatusFeature,
     &offline_pages::kOfflinePagesDescriptivePendingStatusFeature,
@@ -386,7 +371,6 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &switches::kForceDisableExtendedSyncPromos,
     &switches::kTangibleSync,
     &syncer::kSyncEnableHistoryDataType,
-    &syncer::kSyncTrustedVaultPassphraseRecovery,
     &syncer::kSyncAndroidLimitNTPPromoImpressions,
     &syncer::kSyncAndroidPromosWithAlternativeTitle,
     &syncer::kSyncAndroidPromosWithIllustration,
@@ -573,18 +557,6 @@ BASE_FEATURE(kCCTResizable90MaximumHeight,
              "CCTResizable90MaximumHeight",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-BASE_FEATURE(kCCTResizableAllowResizeByUserGesture,
-             "CCTResizableAllowResizeByUserGesture",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
-BASE_FEATURE(kCCTResizableAlwaysShowNavBarButtons,
-             "CCTResizableAlwaysShowNavBarButtons",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
-BASE_FEATURE(kCCTResizableForFirstParties,
-             "CCTResizableForFirstParties",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
 BASE_FEATURE(kCCTResizableForThirdParties,
              "CCTResizableForThirdParties",
              base::FEATURE_ENABLED_BY_DEFAULT);
@@ -701,8 +673,6 @@ BASE_FEATURE(kDeferKeepScreenOnDuringGesture,
              "DeferKeepScreenOnDuringGesture",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-BASE_FEATURE(kDirectActions, "DirectActions", base::FEATURE_ENABLED_BY_DEFAULT);
-
 BASE_FEATURE(kDownloadAutoResumptionThrottling,
              "DownloadAutoResumptionThrottling",
              base::FEATURE_ENABLED_BY_DEFAULT);
@@ -729,10 +699,6 @@ BASE_FEATURE(kHideNonDisplayableAccountEmail,
              "HideNonDisplayableAccountEmail",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-BASE_FEATURE(kImmersiveUiMode,
-             "ImmersiveUiMode",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-
 BASE_FEATURE(kIncognitoReauthenticationForAndroid,
              "IncognitoReauthenticationForAndroid",
              base::FEATURE_DISABLED_BY_DEFAULT);
@@ -749,10 +715,6 @@ BASE_FEATURE(kInstantStart, "InstantStart", base::FEATURE_DISABLED_BY_DEFAULT);
 
 BASE_FEATURE(kIsVoiceSearchEnabledCache,
              "IsVoiceSearchEnabledCache",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
-BASE_FEATURE(kNewWindowAppMenu,
-             "NewWindowAppMenu",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
 BASE_FEATURE(kNotificationPermissionVariant,
@@ -913,10 +875,6 @@ BASE_FEATURE(kTabGroupsForTablets,
 
 BASE_FEATURE(kTabGridLayoutAndroid,
              "TabGridLayoutAndroid",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
-BASE_FEATURE(kTabReparenting,
-             "TabReparenting",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
 BASE_FEATURE(kTabSelectionEditorV2,

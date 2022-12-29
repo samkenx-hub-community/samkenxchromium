@@ -3265,7 +3265,7 @@
       }
     ]
   },
-  "KerberosDefaultConfiguration": {
+  "KerberosUseCustomPrefilledConfig": {
     "os": [
       "chromeos_ash"
     ],
@@ -3273,18 +3273,45 @@
       {
         "policies": {},
         "prefs": {
-          "kerberos.default_configuration": {
-            "default_value": "[libdefaults]\n  default_tgs_enctypes = aes256-cts-hmac-sha1-96 aes128-cts-hmac-sha1-96\n  default_tkt_enctypes = aes256-cts-hmac-sha1-96 aes128-cts-hmac-sha1-96\n  permitted_enctypes = aes256-cts-hmac-sha1-96 aes128-cts-hmac-sha1-96\n  forwardable = true\n",
+          "kerberos.use_custom_prefilled_config": {
+            "default_value": false,
             "location": "local_state"
           }
         }
       },
       {
         "policies": {
-          "KerberosDefaultConfiguration": "custom-config"
+          "KerberosUseCustomPrefilledConfig": true
         },
         "prefs": {
-          "kerberos.default_configuration": {
+          "kerberos.use_custom_prefilled_config": {
+            "value": true,
+            "location": "local_state"
+          }
+        }
+      }
+    ]
+  },
+  "KerberosCustomPrefilledConfig": {
+    "os": [
+      "chromeos_ash"
+    ],
+    "policy_pref_mapping_tests": [
+      {
+        "policies": {},
+        "prefs": {
+          "kerberos.custom_prefilled_config": {
+            "default_value": "",
+            "location": "local_state"
+          }
+        }
+      },
+      {
+        "policies": {
+          "KerberosCustomPrefilledConfig": "custom-config"
+        },
+        "prefs": {
+          "kerberos.custom_prefilled_config": {
             "value": "custom-config",
             "location": "local_state"
           }
@@ -15901,7 +15928,7 @@
     ]
   },
   "DeviceBorealisAllowed": {
-    "reason_for_missing_test": "Maps into CrosSettings"
+    "reason_for_missing_test": "Policy was removed"
   },
   "DeviceAllowedBluetoothServices": {
     "reason_for_missing_test": "Maps into CrosSettings"
@@ -21098,6 +21125,7 @@
   },
   "HindiInscriptLayoutEnabled": {
     "os": ["chromeos_ash"],
+    "note": "A user policy. Replaced by DeviceHindiInscriptLayoutEnabled (device policy) and to be deprecated",
     "policy_pref_mapping_tests": [
       {
         "policies": {},
@@ -21458,6 +21486,226 @@
           "policy.ppapi_shared_images_swap_chain_allowed": {
             "location": "local_state",
             "value": false
+          }
+        }
+      }
+    ]
+  },
+  "PrivacySandboxPromptEnabled": {
+    "os": [
+      "win",
+      "linux",
+      "mac",
+      "chromeos_ash",
+      "chromeos_lacros",
+      "fuchsia",
+      "android"
+    ],
+    "policy_pref_mapping_tests": [
+      {
+        "policies": {
+          "PrivacySandboxPromptEnabled": false
+        },
+        "prefs": {
+          "privacy_sandbox.m1.prompt_suppressed": {
+            "location": "user_profile",
+            "value": 5,
+            "note": "The value of 5 corresponds to PrivacySandboxService::PromptSuppressedReason::kPolicy"
+          }
+        }
+      },
+      {
+        "policies": {
+          "PrivacySandboxPromptEnabled": true
+        },
+        "prefs": {
+          "privacy_sandbox.m1.prompt_suppressed": {
+            "default_value": 0,
+             "note": "The value of 0 corresponds to PrivacySandboxService::PromptSuppressedReason::kNone"
+          }
+        }
+      }
+    ]
+  },
+  "PrivacySandboxAdTopicsEnabled": {
+    "os": [
+      "win",
+      "linux",
+      "mac",
+      "chromeos_ash",
+      "chromeos_lacros",
+      "fuchsia",
+      "android"
+    ],
+    "policy_pref_mapping_tests": [
+      {
+        "policies": {
+          "PrivacySandboxAdTopicsEnabled": false,
+          "PrivacySandboxPromptEnabled": false
+        },
+        "prefs": {
+          "privacy_sandbox.m1.prompt_suppressed": {
+            "value": 5,
+            "location": "user_profile",
+             "note": "The value of 5 corresponds to PrivacySandboxService::PromptSuppressedReason::kPolicy"
+          },
+          "privacy_sandbox.m1.topics_enabled": {
+            "value": false,
+            "location": "user_profile"
+          }
+        }
+      },
+      {
+        "policies": {
+          "PrivacySandboxAdTopicsEnabled": true,
+          "PrivacySandboxPromptEnabled": false
+        },
+        "prefs": {
+          "privacy_sandbox.m1.prompt_suppressed": {
+            "value": 5,
+            "location": "user_profile",
+            "note": "The value of 5 corresponds to PrivacySandboxService::PromptSuppressedReason::kPolicy"
+          },
+          "privacy_sandbox.m1.topics_enabled": {
+            "default_value": false,
+            "location": "user_profile",
+            "note": "True values are not applied to the prefs."
+          }
+        }
+      }
+    ]
+  },
+  "PrivacySandboxSiteEnabledAdsEnabled": {
+    "os": [
+      "win",
+      "linux",
+      "mac",
+      "chromeos_ash",
+      "chromeos_lacros",
+      "fuchsia",
+      "android"
+    ],
+    "policy_pref_mapping_tests": [
+      {
+        "policies": {
+          "PrivacySandboxSiteEnabledAdsEnabled": false,
+          "PrivacySandboxPromptEnabled": false
+        },
+        "prefs": {
+          "privacy_sandbox.m1.prompt_suppressed": {
+            "value": 5,
+            "location": "user_profile",
+            "note": "The value of 5 corresponds to PrivacySandboxService::PromptSuppressedReason::kPolicy"
+          },
+          "privacy_sandbox.m1.fledge_enabled": {
+            "value": false,
+            "location": "user_profile"
+          }
+        }
+      },
+      {
+        "policies": {
+          "PrivacySandboxSiteEnabledAdsEnabled": true,
+          "PrivacySandboxPromptEnabled": false
+        },
+        "prefs": {
+          "privacy_sandbox.m1.prompt_suppressed": {
+            "value": 5,
+            "location": "user_profile",
+            "note": "The value of 5 corresponds to PrivacySandboxService::PromptSuppressedReason::kPolicy"
+          },
+          "privacy_sandbox.m1.fledge_enabled": {
+            "default_value": false,
+            "location": "user_profile",
+            "note": "True values are not applied to the prefs."
+          }
+        }
+      }
+    ]
+  },
+  "PrivacySandboxAdMeasurementEnabled": {
+    "os": [
+      "win",
+      "linux",
+      "mac",
+      "chromeos_ash",
+      "chromeos_lacros",
+      "fuchsia",
+      "android"
+    ],
+    "policy_pref_mapping_tests": [
+      {
+        "policies": {
+          "PrivacySandboxAdMeasurementEnabled": false,
+          "PrivacySandboxPromptEnabled": false
+        },
+        "prefs": {
+          "privacy_sandbox.m1.prompt_suppressed": {
+            "value": 5,
+            "location": "user_profile",
+            "note": "The value of 5 corresponds to PrivacySandboxService::PromptSuppressedReason::kPolicy"
+          },
+          "privacy_sandbox.m1.ad_measurement_enabled": {
+            "value": false,
+            "location": "user_profile"
+          }
+        }
+      },
+      {
+        "policies": {
+          "PrivacySandboxAdMeasurementEnabled": true,
+          "PrivacySandboxPromptEnabled": false
+        },
+        "prefs": {
+          "privacy_sandbox.m1.prompt_suppressed": {
+            "value": 5,
+            "location": "user_profile",
+            "note": "The value of 5 corresponds to PrivacySandboxService::PromptSuppressedReason::kPolicy"
+          },
+          "privacy_sandbox.m1.ad_measurement_enabled": {
+            "default_value": false,
+            "location": "user_profile",
+            "note": "True values are not applied to the prefs."
+          }
+        }
+      }
+    ]
+  },
+  "AppStoreRatingEnabled" : {
+    "reason_for_missing_test": "Maps into an iOS-specific pref"
+  },
+  "DeviceHindiInscriptLayoutEnabled": {
+    "os": ["chromeos_ash"],
+    "note": "A device policy replacing HindiInscriptLayoutEnabled (a user policy)",
+    "policy_pref_mapping_tests": [
+      {
+        "policies": {},
+        "prefs": {
+          "settings.input.device_hindi_inscript_layout_enabled": {
+            "location": "local_state",
+            "default_value": false
+          }
+        }
+      },
+      {
+        "policies": {
+          "DeviceHindiInscriptLayoutEnabled": false
+        },
+        "prefs": {
+          "settings.input.device_hindi_inscript_layout_enabled": {
+            "location": "local_state",
+            "value": false
+          }
+        }
+      },
+      {
+        "policies": {
+          "DeviceHindiInscriptLayoutEnabled": true
+        },
+        "prefs": {
+          "settings.input.device_hindi_inscript_layout_enabled": {
+            "location": "local_state",
+            "value": true
           }
         }
       }

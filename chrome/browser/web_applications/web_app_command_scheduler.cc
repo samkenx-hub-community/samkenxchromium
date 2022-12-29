@@ -19,6 +19,7 @@
 #include "chrome/browser/web_applications/commands/externally_managed_install_command.h"
 #include "chrome/browser/web_applications/commands/fetch_installability_for_chrome_management.h"
 #include "chrome/browser/web_applications/commands/fetch_manifest_and_install_command.h"
+#include "chrome/browser/web_applications/commands/install_app_locally_command.h"
 #include "chrome/browser/web_applications/commands/install_from_info_command.h"
 #include "chrome/browser/web_applications/commands/install_from_sync_command.h"
 #include "chrome/browser/web_applications/commands/manifest_update_data_fetch_command.h"
@@ -37,6 +38,7 @@
 #include "chrome/browser/web_applications/locks/shared_web_contents_lock.h"
 #include "chrome/browser/web_applications/locks/shared_web_contents_with_app_lock.h"
 #include "chrome/browser/web_applications/web_app_command_manager.h"
+#include "chrome/browser/web_applications/web_app_constants.h"
 #include "chrome/browser/web_applications/web_app_data_retriever.h"
 #include "chrome/browser/web_applications/web_app_provider.h"
 #include "chrome/browser/web_applications/web_app_sync_bridge.h"
@@ -328,7 +330,7 @@ void WebAppCommandScheduler::SyncRunOnOsLoginMode(const AppId& app_id,
 void WebAppCommandScheduler::UpdateProtocolHandlerUserApproval(
     const AppId& app_id,
     const std::string& protocol_scheme,
-    bool allowed,
+    ApiApprovalState approval_state,
     base::OnceClosure callback) {
   if (IsShuttingDown()) {
     base::SequencedTaskRunnerHandle::Get()->PostTask(FROM_HERE,
@@ -338,7 +340,7 @@ void WebAppCommandScheduler::UpdateProtocolHandlerUserApproval(
 
   provider_->command_manager().ScheduleCommand(
       std::make_unique<UpdateProtocolHandlerApprovalCommand>(
-          app_id, protocol_scheme, allowed, std::move(callback)));
+          app_id, protocol_scheme, approval_state, std::move(callback)));
 }
 
 void WebAppCommandScheduler::ClearWebAppBrowsingData(
@@ -439,6 +441,18 @@ void WebAppCommandScheduler::SynchronizeOsIntegration(
   provider_->command_manager().ScheduleCommand(
       std::make_unique<OsIntegrationSynchronizeCommand>(
           app_id, std::move(synchronize_callback)));
+}
+
+void WebAppCommandScheduler::InstallAppLocally(const AppId& app_id,
+                                               base::OnceClosure callback) {
+  if (IsShuttingDown()) {
+    base::SequencedTaskRunnerHandle::Get()->PostTask(FROM_HERE,
+                                                     std::move(callback));
+    return;
+  }
+
+  provider_->command_manager().ScheduleCommand(
+      std::make_unique<InstallAppLocallyCommand>(app_id, std::move(callback)));
 }
 
 void WebAppCommandScheduler::LaunchApp(apps::AppLaunchParams params,

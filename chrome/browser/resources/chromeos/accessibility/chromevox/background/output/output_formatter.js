@@ -11,6 +11,7 @@ import {constants} from '../../../common/constants.js';
 import {Cursor, CURSOR_NODE_INDEX} from '../../../common/cursors/cursor.js';
 import {CursorRange} from '../../../common/cursors/range.js';
 import {LocalStorage} from '../../../common/local_storage.js';
+import {AutomationTreeWalker} from '../../../common/tree_walker.js';
 import {Msgs} from '../../common/msgs.js';
 
 import {OutputFormatParserObserver} from './output_format_parser.js';
@@ -99,9 +100,9 @@ export class OutputFormatter {
     } else if (token === 'cellIndexText') {
       this.formatCellIndexText_(this.params_, token, options);
     } else if (token === 'node') {
-      this.output_.formatNode_(this.params_, token, tree, options);
+      this.formatNode_(this.params_, token, tree, options);
     } else if (token === 'nameOrTextContent' || token === 'textContent') {
-      this.output_.formatTextContent_(this.params_, token, options);
+      this.formatTextContent_(this.params_, token, options);
     } else if (this.params_.node[token] !== undefined) {
       this.output_.formatAsFieldAccessor_(this.params_, token, options);
     } else if (outputTypes.OUTPUT_STATE_INFO[token]) {
@@ -507,6 +508,63 @@ export class OutputFormatter {
   /**
    * @param {!outputTypes.OutputFormattingData} data
    * @param {string} token
+   * @param {!OutputFormatTree} tree
+   * @param {!{annotation: Array<*>, isUnique: (boolean|undefined)}} options
+   * @private
+   */
+  formatNode_(data, token, tree, options) {
+    const buff = data.outputBuffer;
+    const node = data.node;
+    const formatLog = data.outputFormatLogger;
+    let prevNode = data.opt_prevNode;
+
+    if (!tree.firstChild) {
+      return;
+    }
+
+    const relationName = tree.firstChild.value;
+    if (relationName === 'tableCellColumnHeaders') {
+      // Skip output when previous position falls on the same column.
+      while (prevNode && !AutomationPredicate.cellLike(prevNode)) {
+        prevNode = prevNode.parent;
+      }
+      if (prevNode &&
+          prevNode.tableCellColumnIndex === node.tableCellColumnIndex) {
+        return;
+      }
+
+      const headers = node.tableCellColumnHeaders;
+      if (headers) {
+        for (let i = 0; i < headers.length; i++) {
+          const header = headers[i].name;
+          if (header) {
+            this.output_.append_(buff, header, options);
+            formatLog.writeTokenWithValue(token, header);
+          }
+        }
+      }
+    } else if (relationName === 'tableCellRowHeaders') {
+      const headers = node.tableCellRowHeaders;
+      if (headers) {
+        for (let i = 0; i < headers.length; i++) {
+          const header = headers[i].name;
+          if (header) {
+            this.output_.append_(buff, header, options);
+            formatLog.writeTokenWithValue(token, header);
+          }
+        }
+      }
+    } else if (node[relationName]) {
+      const related = node[relationName];
+      this.output_.formatNode(
+          related, related, outputTypes.OutputCustomEvent.NAVIGATE, buff,
+          formatLog);
+    }
+  }
+
+  /**
+   * @param {!outputTypes.OutputFormattingData} data
+   * @param {string} token
    * @private
    */
   formatPressed_(data, token) {
@@ -624,6 +682,53 @@ export class OutputFormatter {
     options.annotation.push(token);
     this.output_.append_(buff, value, options);
     formatLog.writeTokenWithValue(token, value);
+  }
+
+  /**
+   * @param {!outputTypes.OutputFormattingData} data
+   * @param {string} token
+   * @param {!{annotation: Array<*>, isUnique: (boolean|undefined)}} options
+   * @private
+   */
+  formatTextContent_(data, token, options) {
+    const buff = data.outputBuffer;
+    const node = data.node;
+    const formatLog = data.outputFormatLogger;
+
+    if (node.name && token === 'nameOrTextContent') {
+      formatLog.writeToken(token);
+      this.output_.format_({
+        node,
+        outputFormat: '$name',
+        outputBuffer: buff,
+        outputFormatLogger: formatLog,
+      });
+      return;
+    }
+
+    if (!node.firstChild) {
+      return;
+    }
+
+    const root = node;
+    const walker = new AutomationTreeWalker(node, Dir.FORWARD, {
+      visit: AutomationPredicate.leafOrStaticText,
+      leaf: n => {
+        // The root might be a leaf itself, but we still want to descend
+        // into it.
+        return n !== root && AutomationPredicate.leafOrStaticText(n);
+      },
+      root: r => r === root,
+    });
+    const outputStrings = [];
+    while (walker.next().node) {
+      if (walker.node.name) {
+        outputStrings.push(walker.node.name.trim());
+      }
+    }
+    const finalOutput = outputStrings.join(' ');
+    this.output_.append_(buff, finalOutput, options);
+    formatLog.writeTokenWithValue(token, finalOutput);
   }
 
   /**

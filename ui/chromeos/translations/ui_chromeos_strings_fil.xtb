@@ -144,6 +144,7 @@
 <translation id="2208919847696382164">I-install gamit ang Linux</translation>
 <translation id="2225536596944493418">Sigurado ka bang gusto mong i-delete ang <ph name="NUMBER_OF_ITEMS" /> (na) item?</translation>
 <translation id="2230062665678605299">Hindi malikha ang folder na "<ph name="FOLDER_NAME" />". <ph name="ERROR_MESSAGE" /></translation>
+<translation id="2236732657580416950">Your Google Drive cache was cleared.</translation>
 <translation id="2239068707900391003">Taong may kape</translation>
 <translation id="2251368349685848079">I-restore mula sa trash</translation>
 <translation id="2282155092769082568">Autoconfiguration URL:</translation>
@@ -678,6 +679,7 @@
 <translation id="6607272825297743757">Impormasyon ng file</translation>
 <translation id="6609332149380188670"><ph name="NUMBER_OF_ITEMS" /> (na) folder ang ibinahagi sa Parallels Desktop</translation>
 <translation id="6629518321609546825">Maglagay ng kahit 4 na numero lang</translation>
+<translation id="6639661343369899134">Hindi ma-upload ang mga file dahil walang sapat na storage ang <ph name="SHARED_DRIVE_NAME" />.</translation>
 <translation id="6643016212128521049">I-clear</translation>
 <translation id="6650726141019353908">Pink na paru-paro</translation>
 <translation id="6657585470893396449">Password</translation>

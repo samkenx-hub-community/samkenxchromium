@@ -1166,6 +1166,7 @@ De lo contrario, lo impedirá tu configuración de privacidad. Permitirá que el
 <translation id="3927932062596804919">Denegar</translation>
 <translation id="393316646445601645">Internet y telecomunicaciones</translation>
 <translation id="3939773374150895049">¿Usar WebAuthn en lugar de CVC?</translation>
+<translation id="3943857333388298514">Pegar</translation>
 <translation id="3946209740501886391">Preguntar siempre en este sitio web</translation>
 <translation id="3947595700203588284">Puede solicitar permiso para conectarse a dispositivos MIDI</translation>
 <translation id="3949571496842715403">Este servidor no ha podido demostrar que es <ph name="DOMAIN" />; su certificado de seguridad no especifica nombres alternativos del sujeto. Este problema puede deberse a una configuración incorrecta o a que un atacante ha interceptado la conexión.</translation>
@@ -2313,6 +2314,7 @@ De lo contrario, lo impedirá tu configuración de privacidad. Permitirá que el
 <translation id="6890531741535756070">Has elegido realizar la verificación con <ph name="DEVICE_LABEL" /> en sitios web que usan <ph name="PROVIDER_ORIGIN" />. Es posible que este proveedor haya almacenado información sobre tu método de pago. Puedes <ph name="BEGIN_LINK" />solicitar que se eliminen esos datos<ph name="END_LINK" />.</translation>
 <translation id="6891596781022320156">No se admite el nivel de la política.</translation>
 <translation id="6895330447102777224">Tu tarjeta se ha confirmado</translation>
+<translation id="6896758677409633944">Copiar</translation>
 <translation id="6897140037006041989">User-agent</translation>
 <translation id="6898699227549475383">Organización (O)</translation>
 <translation id="6899000063526916106">Introduce el código de <ph name="NUMBER_OF_DIGITS" /> dígitos</translation>
@@ -2680,6 +2682,7 @@ Más información:
 <translation id="7716375162095500223">Aún no se ha subido o se ha ignorado</translation>
 <translation id="7716424297397655342">No se puede cargar este sitio web desde la caché</translation>
 <translation id="7723047071702270851">Edita la tarjeta</translation>
+<translation id="7724603315864178912">Cortar</translation>
 <translation id="7734285854693414638">Crea un nuevo Formulario de Google rápidamente</translation>
 <translation id="773466115871691567">Traducir siempre las páginas en <ph name="SOURCE_LANGUAGE" /></translation>
 <translation id="7736959720849233795">Copiar dirección de enlace</translation>
@@ -2716,6 +2719,7 @@ Más información:
 <translation id="7815407501681723534">Se han encontrado <ph name="NUMBER_OF_RESULTS" /> <ph name="SEARCH_RESULTS" /> de <ph name="SEARCH_STRING" /></translation>
 <translation id="7822320754433038727">Caza y tiro</translation>
 <translation id="782886543891417279">La red Wi-Fi que estás utilizando (<ph name="WIFI_NAME" />) puede requerir que accedas a su página de inicio de sesión.</translation>
+<translation id="7840103971441592723">Captura de pantalla iniciada</translation>
 <translation id="7844689747373518809">{COUNT,plural, =0{Ninguna}=1{1 aplicación (<ph name="EXAMPLE_APP_1" />)}=2{2 aplicaciones (<ph name="EXAMPLE_APP_1" /> y <ph name="EXAMPLE_APP_2" />)}other{# aplicaciones (<ph name="EXAMPLE_APP_1" />, <ph name="EXAMPLE_APP_2" /> <ph name="AND_MORE" />)}}</translation>
 <translation id="7855695075675558090"><ph name="TOTAL_LABEL" /> <ph name="FORMATTED_TOTAL_AMOUNT" /> <ph name="CURRENCY_CODE" /></translation>
 <translation id="7862185352068345852">¿Quieres salir del sitio web?</translation>
@@ -2745,6 +2749,7 @@ Más información:
 <translation id="7942349550061667556">Rojo</translation>
 <translation id="7943397946612013052">Descarga bloqueada</translation>
 <translation id="7943893128817522649">Puede solicitar permiso para descargar varios archivos automáticamente</translation>
+<translation id="7946724693008564269">Idioma detectado</translation>
 <translation id="7947285636476623132">Consulta el año de vencimiento y vuelve a intentarlo</translation>
 <translation id="7947813448670013867"><ph name="SEE_CHROME_TIPS_FOCUSED_FRIENDLY_MATCH_TEXT" />, pulsa Tabulador y luego Intro para ver información sobre las funciones de Chrome</translation>
 <translation id="7950027195171824198">Gestiona tus preferencias de cookies en la configuración de Chrome</translation>
@@ -2893,6 +2898,7 @@ Más información:
 <translation id="8282947398454257691">Conocer tu identificador de dispositivo único</translation>
 <translation id="8284769179630993263">Gestiona Navegación segura y más en la configuración de Chrome</translation>
 <translation id="8286036467436129157">Iniciar sesión</translation>
+<translation id="8286799286781881307">Las aplicaciones autorizadas por tu administrador pueden hacer capturas de todas las pantallas que estén conectadas físicamente a tu dispositivo. Esta información puede procesarse de forma local o subirse a los servidores de tu organización.</translation>
 <translation id="8288807391153049143">Mostrar certificado</translation>
 <translation id="8289355894181816810">Si tienes alguna duda, ponte en contacto con el administrador de red.</translation>
 <translation id="8293206222192510085">Añadir marcador</translation>

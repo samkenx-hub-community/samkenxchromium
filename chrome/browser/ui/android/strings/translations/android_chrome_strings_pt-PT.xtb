@@ -496,7 +496,7 @@ Os símbolos de estado privado melhoram a privacidade na Web e não podem ser us
 <translation id="371230970611282515">Prevê e envia-lhe avisos sobre eventos perigosos antes da sua ocorrência.</translation>
 <translation id="3714981814255182093">Abrir a barra Localizar</translation>
 <translation id="3716182511346448902">Esta página utiliza demasiada memória, pelo que o Chrome a colocou em pausa.</translation>
-<translation id="3721119614952978349">O utilizador e a Google</translation>
+<translation id="3721119614952978349">Eu e a Google</translation>
 <translation id="3737319253362202215">Definições de tradução</translation>
 <translation id="3737402728074743863">Para utilizar este dispositivo como uma chave de segurança, defina um bloqueio de ecrã</translation>
 <translation id="3738139272394829648">Tocar para pesquisar</translation>
@@ -553,7 +553,6 @@ Os símbolos de estado privado melhoram a privacidade na Web e não podem ser us
 <translation id="4045764304651014138">Dados de utilização</translation>
 <translation id="405399507749852140">Obtenha alertas se o preço descer em qualquer site</translation>
 <translation id="4056223980640387499">Sépia</translation>
-<translation id="4060598801229743805">Opções disponíveis junto à parte superior do ecrã</translation>
 <translation id="4062305924942672200">Informações legais</translation>
 <translation id="4072805772816336153">Tente mais tarde.</translation>
 <translation id="4084682180776658562">Marcar</translation>
@@ -643,7 +642,6 @@ A sua Conta Google pode ter outras formas do histórico de navegação, como pes
 <translation id="4554077758708533499">Ligado com cabo USB</translation>
 <translation id="4558311620361989323">Atalhos da página Web</translation>
 <translation id="4561730552726921821">Registo efetuado com êxito</translation>
-<translation id="4561979708150884304">Sem ligação</translation>
 <translation id="4565377596337484307">Ocultar palavra-passe</translation>
 <translation id="4572422548854449519">Iniciar sessão na conta gerida</translation>
 <translation id="4576892426230499203">Experimente outra opção de validação</translation>
@@ -668,7 +666,6 @@ A sua Conta Google pode ter outras formas do histórico de navegação, como pes
 <translation id="4699172675775169585">Imagens e ficheiros em cache</translation>
 <translation id="4719927025381752090">Propor tradução</translation>
 <translation id="4720023427747327413">Abrir no <ph name="PRODUCT_NAME" /></translation>
-<translation id="4720982865791209136">Ajude a melhorar o Chrome. <ph name="BEGIN_LINK" />Responder ao inquérito<ph name="END_LINK" /></translation>
 <translation id="47217992755561375">Veja os seus sites principais.</translation>
 <translation id="4732120983431207637">Desempilhador de pilhas</translation>
 <translation id="4736934858538408121">Cartão virtual</translation>
@@ -772,7 +769,6 @@ Para alterar esta definição, <ph name="BEGIN_LINK" />reponha a sincronização
 <translation id="5184329579814168207">Abrir no Chrome</translation>
 <translation id="5191251636205085390">Saiba mais e controle novas tecnologias que visam substituir cookies de terceiros.</translation>
 <translation id="5193988420012215838">Copiado para a área de transferência.</translation>
-<translation id="5199929503336119739">Perfil de trabalho</translation>
 <translation id="5204967432542742771">Introduzir palavra-passe</translation>
 <translation id="5206168361184759344">{FILE_COUNT,plural, =1{A transferir o ficheiro…}other{A transferir # ficheiros…}}</translation>
 <translation id="5210286577605176222">Ir para o separador anterior</translation>
@@ -1346,14 +1342,12 @@ Por exemplo, alguns Sites podem responder a este pedido ao mostrar-lhe anúncios
 <translation id="8221656072740924283">Continuar</translation>
 <translation id="8223642481677794647">Menu do cartão do feed</translation>
 <translation id="8250920743982581267">Docs</translation>
-<translation id="825412236959742607">Esta página utiliza demasiada memória, pelo que o Chrome removeu algum conteúdo.</translation>
 <translation id="8255617931166444521">Os sites apenas podem utilizar os seus cookies para ver a sua atividade de navegação no respetivo site</translation>
 <translation id="8259179246279078674">Uma vez que as páginas pré-carregadas são encriptadas, a Google não irá aprender nada sobre o conteúdo das páginas pré-carregadas. Os servidores da Google saberão que sites são pré-carregados de forma privada. Esta informação só é utilizada para pré-carregar as páginas e não está associada a outras informações da sua Conta Google.</translation>
 <translation id="8260126382462817229">Experimente iniciar sessão novamente</translation>
 <translation id="8261506727792406068">Eliminar</translation>
 <translation id="82619448491672958">Ver outros separadores</translation>
 <translation id="8266862848225348053">Localização da transferência</translation>
-<translation id="8274165955039650276">Ver transferências</translation>
 <translation id="8281886186245836920">Ignorar</translation>
 <translation id="8282297628636750033">Aplique o tema escuro aos sites</translation>
 <translation id="829672787777123339">A ligar ao seu dispositivo…</translation>
@@ -1517,7 +1511,6 @@ Por exemplo, alguns Sites podem responder a este pedido ao mostrar-lhe anúncios
 <translation id="9108808586816295166">O DNS seguro pode não estar sempre disponível.</translation>
 <translation id="9128984223251192329">Pedido do Privacy Sandbox aberto a meia altura</translation>
 <translation id="9133397713400217035">Explorar offline</translation>
-<translation id="9137013805542155359">Mostrar original</translation>
 <translation id="9148126808321036104">Iniciar sessão novamente</translation>
 <translation id="9158770349521403363">Apenas partilhar conteúdo</translation>
 <translation id="9159716826369098114">Restaure o grupo de <ph name="TAB_COUNT" /> separadores como um novo grupo de separadores em segundo plano.</translation>

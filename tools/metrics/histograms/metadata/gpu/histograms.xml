@@ -271,16 +271,6 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
-<histogram name="GPU.AcceleratedSurfaceRefreshRate" units="hz"
-    expires_after="M97">
-  <owner>vmiura@chromium.org</owner>
-  <owner>graphics-dev@chromium.org</owner>
-  <summary>
-    Refresh rate of the display in Hz. This is recorded every time we present a
-    frame.
-  </summary>
-</histogram>
-
 <histogram name="GPU.ANGLE.Buffer11CPUMemoryMB" units="MB"
     expires_after="2020-05-10">
   <owner>cwallez@chromium.org</owner>
@@ -351,7 +341,7 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
-<histogram name="GPU.AppHelpIsLoaded" enum="Boolean" expires_after="2023-04-23">
+<histogram name="GPU.AppHelpIsLoaded" enum="Boolean" expires_after="2023-06-25">
   <owner>zmo@chromium.org</owner>
   <owner>spvw@chromium.org</owner>
   <owner>chrome-catan@google.com</owner>
@@ -415,7 +405,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="GPU.ContextLost" enum="ContextLostReason"
-    expires_after="2023-04-23">
+    expires_after="2023-06-25">
   <owner>sievers@chromium.org</owner>
   <summary>
     The reason a GPU command buffer context of a given type was lost.
@@ -435,7 +425,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="GPU.D3D11FeatureLevel" enum="D3D11FeatureLevel"
-    expires_after="2023-04-16">
+    expires_after="2023-06-18">
   <owner>zmo@chromium.org</owner>
   <owner>graphics-dev@chromium.org</owner>
   <summary>
@@ -445,7 +435,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="GPU.D3D12FeatureLevel" enum="D3D12FeatureLevel"
-    expires_after="2023-04-16">
+    expires_after="2023-06-18">
   <owner>magchen@chromium.org</owner>
   <owner>zmo@chromium.org</owner>
   <summary>
@@ -455,7 +445,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="GPU.D3D12HighestShaderModel2" enum="D3DShaderModel"
-    expires_after="2023-04-16">
+    expires_after="2023-06-18">
   <owner>magchen@chromium.org</owner>
   <owner>zmo@chromium.org</owner>
   <owner>amaiorano@google.com</owner>
@@ -675,7 +665,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="GPU.EGLDisplayType" enum="EGLDisplayType"
-    expires_after="2023-04-23">
+    expires_after="2023-06-25">
   <owner>zmo@chromium.org</owner>
   <owner>graphics-dev@chromium.org</owner>
   <summary>The display type used to ask for an EGLDisplay.</summary>
@@ -801,7 +791,7 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
-<histogram name="GPU.GpuCount" units="gpus" expires_after="2023-04-16">
+<histogram name="GPU.GpuCount" units="gpus" expires_after="2023-06-18">
   <owner>zmo@chromium.org</owner>
   <owner>graphics-dev@chromium.org</owner>
   <summary>
@@ -905,7 +895,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="GPU.HasDiscreteGpu" enum="HasDiscreteGpu"
-    expires_after="2023-04-24">
+    expires_after="2023-06-25">
   <owner>zmo@chromium.org</owner>
   <owner>graphics-dev@chromium.org</owner>
   <summary>
@@ -928,7 +918,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="GPU.IntelGpuGeneration" enum="IntelGpuGeneration"
-    expires_after="2023-04-23">
+    expires_after="2023-06-25">
   <owner>zmo@chromium.org</owner>
   <owner>graphics-dev@chromium.org</owner>
   <summary>
@@ -938,7 +928,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="GPU.IntelGpuSeriesType" enum="IntelGpuSeriesType"
-    expires_after="2023-04-23">
+    expires_after="2023-06-25">
   <owner>sunnyps@chromium.org</owner>
   <owner>zmo@chromium.org</owner>
   <summary>
@@ -948,7 +938,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="GPU.IOSurface.CATransactionTimeUs" units="microseconds"
-    expires_after="2023-04-16">
+    expires_after="2023-06-18">
   <owner>magchen@chromium.org</owner>
   <owner>ccameron@chromium.org</owner>
   <summary>
@@ -983,7 +973,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Gpu.Mac.BackpressureUs" units="microseconds"
-    expires_after="2023-04-16">
+    expires_after="2023-06-18">
   <owner>magchen@chromium.org</owner>
   <owner>ccameron@chromium.org</owner>
   <summary>
@@ -1003,7 +993,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Gpu.Metal.ReadWriteTextureSupport"
-    enum="MetalReadWriteTextureSupportTier" expires_after="2023-04-16">
+    enum="MetalReadWriteTextureSupportTier" expires_after="2023-06-18">
   <owner>cwallez@chromium.org</owner>
   <owner>graphics-dev@chromium.org</owner>
   <summary>
@@ -1105,7 +1095,7 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
-<histogram name="GPU.Output.HDR" enum="Boolean" expires_after="2023-04-24">
+<histogram name="GPU.Output.HDR" enum="Boolean" expires_after="2023-06-25">
   <owner>hubbe@chromium.org</owner>
   <owner>cassew@chromium.org</owner>
   <owner>media-dev@chromium.org</owner>
@@ -1117,7 +1107,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Gpu.OutputSurface.ScheduleOverlaysUs" units="microseconds"
-    expires_after="2023-04-16">
+    expires_after="2023-06-18">
   <owner>magchen@chromium.org</owner>
   <owner>ccameron@chromium.org</owner>
   <summary>
@@ -1225,7 +1215,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="GPU.ReportOnlyModeStatusAtHang" enum="BooleanEnabled"
-    expires_after="2023-04-23">
+    expires_after="2023-06-25">
   <owner>spvw@chromium.org</owner>
   <owner>chrome-catan@google.com</owner>
   <summary>

@@ -73,16 +73,22 @@ int SkiaPaintCanvas::save() {
   return canvas_->save();
 }
 
-int SkiaPaintCanvas::saveLayer(const SkRect* bounds, const PaintFlags* flags) {
-  if (!flags)
-    return canvas_->saveLayer(bounds, nullptr);
-
-  SkPaint paint = flags->ToSkPaint();
-  return canvas_->saveLayer(bounds, &paint);
+int SkiaPaintCanvas::saveLayer(const PaintFlags& flags) {
+  SkPaint paint = flags.ToSkPaint();
+  return canvas_->saveLayer(nullptr, &paint);
 }
 
-int SkiaPaintCanvas::saveLayerAlpha(const SkRect* bounds, uint8_t alpha) {
-  return canvas_->saveLayerAlpha(bounds, alpha);
+int SkiaPaintCanvas::saveLayer(const SkRect& bounds, const PaintFlags& flags) {
+  SkPaint paint = flags.ToSkPaint();
+  return canvas_->saveLayer(&bounds, &paint);
+}
+
+int SkiaPaintCanvas::saveLayerAlpha(uint8_t alpha) {
+  return canvas_->saveLayerAlpha(nullptr, alpha);
+}
+
+int SkiaPaintCanvas::saveLayerAlpha(const SkRect& bounds, uint8_t alpha) {
+  return canvas_->saveLayerAlpha(&bounds, alpha);
 }
 
 void SkiaPaintCanvas::restore() {
@@ -361,7 +367,7 @@ void SkiaPaintCanvas::drawTextBlob(sk_sp<SkTextBlob> blob,
     SkPDF::SetNodeId(canvas_, 0);
 }
 
-void SkiaPaintCanvas::drawPicture(sk_sp<const PaintRecord> record) {
+void SkiaPaintCanvas::drawPicture(PaintRecord record) {
   drawPicture(record, PlaybackParams::CustomDataRasterCallback());
 }
 
@@ -396,7 +402,7 @@ void SkiaPaintCanvas::setNodeId(int node_id) {
 }
 
 void SkiaPaintCanvas::drawPicture(
-    sk_sp<const PaintRecord> record,
+    PaintRecord record,
     PlaybackParams::CustomDataRasterCallback custom_raster_callback) {
   auto did_draw_op_cb =
       context_flushes_.enable
@@ -405,7 +411,7 @@ void SkiaPaintCanvas::drawPicture(
           : PlaybackParams::DidDrawOpCallback();
   PlaybackParams params(image_provider_, canvas_->getLocalToDevice(),
                         custom_raster_callback, did_draw_op_cb);
-  record->Playback(canvas_, params);
+  record.Playback(canvas_, params);
 }
 
 void SkiaPaintCanvas::FlushAfterDrawIfNeeded() {

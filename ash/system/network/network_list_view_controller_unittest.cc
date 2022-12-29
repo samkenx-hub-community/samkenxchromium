@@ -427,6 +427,17 @@ class NetworkListViewControllerTest : public AshTestBase,
     }
   }
 
+  bool GetNetworkListItemIsEnabled(NetworkType type, size_t index) {
+    EXPECT_STREQ(network_list(type)->children().at(index)->GetClassName(),
+                 kNetworkListNetworkItemView);
+
+    NetworkListNetworkItemView* network =
+        static_cast<NetworkListNetworkItemView*>(
+            network_list(type)->children().at(index));
+
+    return network->GetEnabled();
+  }
+
   void SetBluetoothAdapterState(BluetoothSystemState system_state) {
     bluetooth_config_test_helper()
         ->fake_adapter_state_controller()
@@ -1156,6 +1167,46 @@ TEST_P(NetworkListViewControllerTest, ConnectionWarningManagedIconProxy) {
   EXPECT_THAT(GetConnectionWarning(), IsNull());
 }
 
+// Disconnect and re-connect a network that shows a warning.
+// Regression test for b/263803248.
+TEST_P(NetworkListViewControllerTest, ConnectionWarningDisconnectReconnect) {
+  EXPECT_THAT(GetConnectionWarning(), IsNull());
+
+  cros_network()->AddManagedProperties(
+      kWifiName, CreateManagedPropertiesWithProxy(/*is_managed=*/true));
+  auto network = CrosNetworkConfigTestHelper::CreateStandaloneNetworkProperties(
+      kWifiName, NetworkType::kWiFi, ConnectionStateType::kConnected);
+  network->proxy_mode = chromeos::network_config::mojom::ProxyMode::kAutoDetect;
+  cros_network()->AddNetworkAndDevice(std::move(network));
+
+  ASSERT_THAT(GetConnectionWarning(), NotNull());
+  ASSERT_THAT(GetConnectionLabelView(), NotNull());
+  EXPECT_EQ(
+      l10n_util::GetStringUTF16(IDS_ASH_STATUS_TRAY_NETWORK_MANAGED_WARNING),
+      GetConnectionLabelView()->GetText());
+
+  {
+    views::ImageView* icon = GetConnectionWarningIcon();
+    ASSERT_THAT(icon, NotNull());
+    EXPECT_TRUE(IsManagedIcon(icon));
+  }
+
+  // Disconnect the network and check that no warning is shown.
+  cros_network()->SetNetworkState(kWifiName,
+                                  ConnectionStateType::kNotConnected);
+  EXPECT_THAT(GetConnectionWarning(), IsNull());
+
+  // Reconnect the network. This should not crash (regression test for
+  // b/263803248). Afterwards, the warning should be shown again.
+  cros_network()->SetNetworkState(kWifiName, ConnectionStateType::kOnline);
+  ASSERT_THAT(GetConnectionWarning(), NotNull());
+  {
+    views::ImageView* icon = GetConnectionWarningIcon();
+    ASSERT_THAT(icon, NotNull());
+    EXPECT_TRUE(IsManagedIcon(icon));
+  }
+}
+
 TEST_P(NetworkListViewControllerTest,
        ConnectionWarningDnsTemplateUriWithIdentifier) {
   EXPECT_THAT(GetConnectionWarning(), IsNull());
@@ -1254,6 +1305,50 @@ TEST_P(NetworkListViewControllerTest, NetworkScanning) {
             cros_network()->GetScanCount(NetworkType::kWiFi));
   EXPECT_EQ(initial_tether_count + 1,
             cros_network()->GetScanCount(NetworkType::kTether));
+}
+
+TEST_P(NetworkListViewControllerTest, NetworkItemIsEnabled) {
+  auto properties =
+      chromeos::network_config::mojom::DeviceStateProperties::New();
+  properties->type = NetworkType::kCellular;
+  properties->device_state = DeviceStateType::kEnabled;
+  properties->sim_infos = CellularSIMInfos(kCellularTestIccid, kTestBaseEid);
+
+  cros_network()->SetDeviceProperties(properties.Clone());
+  ASSERT_THAT(GetMobileSubHeader(), NotNull());
+  EXPECT_TRUE(GetAddEsimButton()->GetEnabled());
+
+  cros_network()->AddNetworkAndDevice(
+      CrosNetworkConfigTestHelper::CreateStandaloneNetworkProperties(
+          kCellularName, NetworkType::kCellular,
+          ConnectionStateType::kConnected));
+
+  if (IsQsRevampEnabled()) {
+    CheckNetworkListItem(NetworkType::kCellular, /*index=*/0u, kCellularName);
+    EXPECT_TRUE(GetNetworkListItemIsEnabled(NetworkType::kCellular, 0u));
+  } else {
+    CheckNetworkListItem(NetworkType::kCellular, /*index=*/1u, kCellularName);
+    EXPECT_TRUE(GetNetworkListItemIsEnabled(NetworkType::kCellular, 1u));
+  }
+
+  // Inhibit cellular device.
+  properties->inhibit_reason = InhibitReason::kResettingEuiccMemory;
+  cros_network()->SetDeviceProperties(properties.Clone());
+
+  if (IsQsRevampEnabled()) {
+    EXPECT_FALSE(GetNetworkListItemIsEnabled(NetworkType::kCellular, 0u));
+  } else {
+    EXPECT_FALSE(GetNetworkListItemIsEnabled(NetworkType::kCellular, 1u));
+  }
+
+  // Uninhibit the device.
+  properties->inhibit_reason = InhibitReason::kNotInhibited;
+  cros_network()->SetDeviceProperties(properties.Clone());
+  if (IsQsRevampEnabled()) {
+    EXPECT_TRUE(GetNetworkListItemIsEnabled(NetworkType::kCellular, 0u));
+  } else {
+    EXPECT_TRUE(GetNetworkListItemIsEnabled(NetworkType::kCellular, 1u));
+  }
 }
 
 }  // namespace ash

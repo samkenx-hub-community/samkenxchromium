@@ -41,7 +41,8 @@ public class OriginVerificationScheduler {
         mPendingOrigins = pendingOrigins;
     }
 
-    public Set<Origin> getPendingOrigins() {
+    @VisibleForTesting
+    public Set<Origin> getPendingOriginsForTesting() {
         return mPendingOrigins;
     }
 
@@ -53,12 +54,9 @@ public class OriginVerificationScheduler {
 
     public void verify(
             String url, BrowserContextHandle browserContextHandle, Callback<Boolean> callback) {
-        verify(Origin.create(url), browserContextHandle, callback);
-    }
-
-    public void verify(
-            Origin origin, BrowserContextHandle browserContextHandle, Callback<Boolean> callback) {
         ThreadUtils.assertOnUiThread();
+
+        Origin origin = Origin.create(url);
         if (origin == null) {
             callback.onResult(false);
             return;
@@ -78,20 +76,5 @@ public class OriginVerificationScheduler {
             return;
         }
         callback.onResult(mOriginVerifier.wasPreviouslyVerified(origin));
-    }
-
-    public void scheduleAllPendingVerifications(
-            BrowserContextHandle browserContextHandle, @Nullable Callback<Boolean> callback) {
-        ThreadUtils.assertOnUiThread();
-        if (callback == null) {
-            callback = (res) -> {};
-        }
-        for (Origin origin : getPendingOrigins()) {
-            verify(origin, browserContextHandle, callback);
-        }
-    }
-
-    public OriginVerifier getOriginVerifier() {
-        return mOriginVerifier;
     }
 }

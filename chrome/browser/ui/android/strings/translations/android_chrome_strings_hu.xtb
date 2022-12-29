@@ -517,6 +517,7 @@ A privát állapottokenek nagyobb fokú adatvédelmet biztosítanak az internete
 <translation id="3830886834687455630">Jelszavai ellenőrzéséhez frissítse a Google Play-szolgáltatásokat</translation>
 <translation id="3845098929839618392">Megnyitás inkognitó lapon</translation>
 <translation id="3856096718352044181">Ellenőrizze a szolgáltató érvényességét, vagy próbálkozzon újra.</translation>
+<translation id="3858127568696903256">Az Ön által követett tartalmakat tekintheti meg itt</translation>
 <translation id="3858860766373142691">Név</translation>
 <translation id="3861633093716975811">Népszerű videók</translation>
 <translation id="3874520961715512166">Webhely eltávolítva</translation>
@@ -552,7 +553,6 @@ A privát állapottokenek nagyobb fokú adatvédelmet biztosítanak az internete
 <translation id="4045764304651014138">Használati adatok</translation>
 <translation id="405399507749852140">Értesítést kaphat, ha valamelyik webhelyen csökken az ár</translation>
 <translation id="4056223980640387499">Szépia</translation>
-<translation id="4060598801229743805">A lehetőségek a képernyő tetején találhatók</translation>
 <translation id="4062305924942672200">Jogi információk</translation>
 <translation id="4072805772816336153">Próbálja újra később</translation>
 <translation id="4084682180776658562">Könyvjelző</translation>
@@ -642,7 +642,6 @@ Előfordulhat, hogy Google-fiókjában (a <ph name="BEGIN_LINK" />myactivity.goo
 <translation id="4554077758708533499">Csatlakoztatva USB-kábellel</translation>
 <translation id="4558311620361989323">Weboldalakkal kapcsolatos billentyűparancsok</translation>
 <translation id="4561730552726921821">Sikeres regisztráció</translation>
-<translation id="4561979708150884304">Nincs kapcsolat</translation>
 <translation id="4565377596337484307">Jelszó elrejtése</translation>
 <translation id="4572422548854449519">Bejelentkezés a kezelt fiókba</translation>
 <translation id="4576892426230499203">Próbálkozzon másik ellenőrzési módszerrel</translation>
@@ -667,7 +666,6 @@ Előfordulhat, hogy Google-fiókjában (a <ph name="BEGIN_LINK" />myactivity.goo
 <translation id="4699172675775169585">A gyorsítótárban szereplő képek és fájlok</translation>
 <translation id="4719927025381752090">Fordítás felajánlása</translation>
 <translation id="4720023427747327413">Megnyitás itt: <ph name="PRODUCT_NAME" /></translation>
-<translation id="4720982865791209136">Segítsen a Chrome fejlesztésében. <ph name="BEGIN_LINK" />Töltse ki ezt a felmérést.<ph name="END_LINK" /></translation>
 <translation id="47217992755561375">A leginkább kedvelt webhelyei megtekintése</translation>
 <translation id="4732120983431207637">Stack Unwinder</translation>
 <translation id="4736934858538408121">Virtuális kártya</translation>
@@ -771,7 +769,6 @@ A beállítás módosításához <ph name="BEGIN_LINK" />állítsa vissza a szin
 <translation id="5184329579814168207">Megnyitás Chrome-ban</translation>
 <translation id="5191251636205085390">További információ a harmadik felektől származó cookie-k leváltását célzó új technológiákról és a kezelésükről</translation>
 <translation id="5193988420012215838">Vágólapra másolva</translation>
-<translation id="5199929503336119739">Munkaprofil</translation>
 <translation id="5204967432542742771">Írja be a jelszót</translation>
 <translation id="5206168361184759344">{FILE_COUNT,plural, =1{Fájl letöltése…}other{# fájl letöltése…}}</translation>
 <translation id="5210286577605176222">Ugrás az előző lapra</translation>
@@ -1345,14 +1342,12 @@ Egyes webhelyek például válaszolhatnak rá úgy, hogy olyan hirdetéseket jel
 <translation id="8221656072740924283">Tovább</translation>
 <translation id="8223642481677794647">A hírcsatornakártya menüje</translation>
 <translation id="8250920743982581267">Dokumentumok</translation>
-<translation id="825412236959742607">Ez az oldal túl sok memóriát használ, ezért a Chrome eltávolított egyes tartalmakat.</translation>
 <translation id="8255617931166444521">A webhelyek használhatnak cookie-kat arra, hogy megfigyeljék az Ön, csak a saját webhelyükön végzett böngészési tevékenységeit</translation>
 <translation id="8259179246279078674">Mivel az előre betöltött oldalak titkosítottak, a Google semmilyen információt nem tud meg az előre betöltött oldal tartalmával kapcsolatban. A Google-szerverek csak annyit tudnak majd meg, hogy mely webhelyek töltődnek be előre privát módon. Ez az információ csak az oldalak előtöltésére szolgálnak, és a rendszer nem kapcsolja össze őket az Ön Google-fiókjából származó egyéb információkkal.</translation>
 <translation id="8260126382462817229">Próbáljon meg újra bejelentkezni</translation>
 <translation id="8261506727792406068">Törlés</translation>
 <translation id="82619448491672958">További lapok megtekintése</translation>
 <translation id="8266862848225348053">Letöltés helye</translation>
-<translation id="8274165955039650276">Letöltések megtekintése</translation>
 <translation id="8281886186245836920">Kihagyás</translation>
 <translation id="8282297628636750033">Sötét téma a webhelyeken, ha lehet</translation>
 <translation id="829672787777123339">Csatlakozás az eszközhöz…</translation>
@@ -1516,7 +1511,6 @@ Egyes webhelyek például válaszolhatnak rá úgy, hogy olyan hirdetéseket jel
 <translation id="9108808586816295166">Előfordulhat, hogy a biztonságos DNS nem mindig áll rendelkezésre</translation>
 <translation id="9128984223251192329">A Privacy Sandbox üzenete félmagasságban megnyitva</translation>
 <translation id="9133397713400217035">Offline felfedezés</translation>
-<translation id="9137013805542155359">Eredeti megjelenítése</translation>
 <translation id="9148126808321036104">Jelentkezzen be újra</translation>
 <translation id="9158770349521403363">Csak tartalom megosztása</translation>
 <translation id="9159716826369098114"><ph name="TAB_COUNT" /> lapból álló lapcsoport visszaállítása új háttérbeli lapcsoportként.</translation>

@@ -12,11 +12,13 @@ import androidx.annotation.Nullable;
 import androidx.preference.Preference;
 import androidx.preference.PreferenceCategory;
 
+import org.chromium.base.metrics.RecordUserAction;
 import org.chromium.chrome.browser.privacy_sandbox.PrivacySandboxBridge;
 import org.chromium.chrome.browser.privacy_sandbox.PrivacySandboxSettingsBaseFragment;
 import org.chromium.chrome.browser.privacy_sandbox.R;
 import org.chromium.chrome.browser.privacy_sandbox.Topic;
 import org.chromium.chrome.browser.privacy_sandbox.TopicPreference;
+import org.chromium.chrome.browser.ui.messages.snackbar.Snackbar;
 import org.chromium.components.browser_ui.settings.SettingsUtils;
 
 import java.util.List;
@@ -60,6 +62,10 @@ public class TopicsBlockedFragmentV4
             PrivacySandboxBridge.setTopicAllowed(((TopicPreference) preference).getTopic(), true);
             mBlockedTopicsCategory.removePreference(preference);
             updateBlockedTopicsDescription();
+
+            showSnackbar(R.string.privacy_sandbox_add_interest_snackbar, null, Snackbar.TYPE_ACTION,
+                    Snackbar.UMA_PRIVACY_SANDBOX_ADD_INTEREST);
+            RecordUserAction.record("Settings.PrivacySandbox.Topics.TopicAdded");
             return true;
         }
         return false;

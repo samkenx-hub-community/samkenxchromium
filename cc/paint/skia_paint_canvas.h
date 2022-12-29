@@ -54,12 +54,7 @@ class CC_PAINT_EXPORT SkiaPaintCanvas final : public PaintCanvas {
   explicit SkiaPaintCanvas(const SkBitmap& bitmap,
                            ImageProvider* image_provider = nullptr);
   explicit SkiaPaintCanvas(const SkBitmap& bitmap, const SkSurfaceProps& props);
-  // If |target_color_space| is non-nullptr, then this will wrap |canvas| in a
-  // SkColorSpaceXformCanvas.
-  SkiaPaintCanvas(SkCanvas* canvas,
-                  sk_sp<SkColorSpace> target_color_space,
-                  ImageProvider* image_provider = nullptr,
-                  ContextFlushes context_flushes = ContextFlushes());
+
   SkiaPaintCanvas(const SkiaPaintCanvas&) = delete;
   ~SkiaPaintCanvas() override;
 
@@ -76,8 +71,10 @@ class CC_PAINT_EXPORT SkiaPaintCanvas final : public PaintCanvas {
   void flush() override;
 
   int save() override;
-  int saveLayer(const SkRect* bounds, const PaintFlags* flags) override;
-  int saveLayerAlpha(const SkRect* bounds, uint8_t alpha) override;
+  int saveLayer(const PaintFlags& flags) override;
+  int saveLayer(const SkRect& bounds, const PaintFlags& flags) override;
+  int saveLayerAlpha(uint8_t alpha) override;
+  int saveLayerAlpha(const SkRect& bounds, uint8_t alpha) override;
 
   void restore() override;
   int getSaveCount() const override;
@@ -149,7 +146,7 @@ class CC_PAINT_EXPORT SkiaPaintCanvas final : public PaintCanvas {
                     NodeId node_id,
                     const PaintFlags& flags) override;
 
-  void drawPicture(sk_sp<const PaintRecord> record) override;
+  void drawPicture(PaintRecord record) override;
 
   bool isClipEmpty() const override;
   SkM44 getLocalToDevice() const override;
@@ -173,7 +170,7 @@ class CC_PAINT_EXPORT SkiaPaintCanvas final : public PaintCanvas {
   // Same as the above drawPicture() except using the given custom data
   // raster callback.
   void drawPicture(
-      sk_sp<const PaintRecord> record,
+      PaintRecord record,
       PlaybackParams::CustomDataRasterCallback custom_raster_callback);
 
  private:
