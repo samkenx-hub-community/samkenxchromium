@@ -383,6 +383,12 @@ TEST_F('CrSettingsSiteListTest', 'SiteList', function() {
   runMochaSuite('SiteList');
 });
 
+// TODO(crbug.com/929455, crbug.com/1064002): Flaky test. When it is fixed,
+// merge SiteListDisabled back into SiteList.
+TEST_F('CrSettingsSiteListTest', 'DISABLED_SiteListDisabled', function() {
+  runMochaSuite('DISABLED_SiteList');
+});
+
 // TODO(crbug.com/929455): When the bug is fixed, merge
 // SiteListEmbargoedOrigin into SiteList.
 TEST_F('CrSettingsSiteListTest', 'SiteListEmbargoedOrigin', function() {
@@ -1038,13 +1044,11 @@ function registerTest(testName, module, caseName) {
 // and flake on some bots. Each test suite can instead be run as an individual
 // test fixture, allowing more time to complete.
 [[
-  'SecurityPage',
-  'security_page_test.js',
+  'SecurityPage', 'security_page_test.js',
   [
     'SecurityPage',
     'SecurityPage_FlagsDisabled',
-    'SecurityPage_SafeBrowsing',
-  ],
+  ]
 ],
  [
    'AllSites',
@@ -1054,17 +1058,27 @@ function registerTest(testName, module, caseName) {
      'AllSites_DisableFirstPartySets',
    ],
  ],
+
 ].forEach(test => registerTestSuites(...test));
+
+// TODO(crbug.com/1403969): SecurityPage_SafeBrowsing suite is flaky on Mac.
+GEN('#if !BUILDFLAG(IS_MAC)');
+registerTestSuites(
+    'SecurityPage', 'security_page_test.js', ['SecurityPage_SafeBrowsing']);
+GEN('#endif');
 
 function registerTestSuites(testName, module, suites) {
   const className = `CrSettings${testName}Test`;
-  this[className] = class extends CrSettingsBrowserTest {
-    /** @override */
-    get browsePreload() {
-      return `chrome://settings/test_loader.html?module=settings/${module}`;
-    }
-  };
-
+  // The classname may have already been registered, such as if some suites only
+  // run on some platforms.
+  if (!this[className]) {
+    this[className] = class extends CrSettingsBrowserTest {
+      /** @override */
+      get browsePreload() {
+        return `chrome://settings/test_loader.html?module=settings/${module}`;
+      }
+    };
+  }
   suites.forEach((suite) => {
     TEST_F(className, suite, () => runMochaSuite(suite));
   })

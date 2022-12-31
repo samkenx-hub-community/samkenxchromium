@@ -10,6 +10,7 @@
 #include "base/time/time.h"
 #include "base/timer/timer.h"
 #include "base/trace_event/trace_event.h"
+#include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/webui/ash/emoji/emoji_ui.h"
 #include "ui/base/clipboard/scoped_clipboard_writer.h"
 #include "ui/base/ime/ash/ime_bridge.h"
@@ -76,7 +77,7 @@ class EmojiObserver : public ui::InputMethodObserver {
       // Can't use this->ime_ either as it may not be active, want to ensure
       // that we get the active IME.
       ui::InputMethod* input_method =
-          ui::IMEBridge::Get()->GetInputContextHandler()->GetInputMethod();
+          IMEBridge::Get()->GetInputContextHandler()->GetInputMethod();
 
       if (!input_method) {
         return;
@@ -163,6 +164,12 @@ void EmojiPageHandler::GetFeatureList(GetFeatureListCallback callback) {
   std::move(callback).Run(enabled_features);
 }
 
+void EmojiPageHandler::GetCategories(GetCategoriesCallback callback) {
+  content::WebUI* web_ui = webui_controller_->web_ui();
+  Profile* profile = Profile::FromWebUI(web_ui);
+  gif_tenor_api_fetcher_.FetchCategories(std::move(callback), profile);
+}
+
 void EmojiPageHandler::InsertEmoji(const std::string& emoji_to_insert,
                                    bool is_variant,
                                    int16_t search_length) {
@@ -173,7 +180,7 @@ void EmojiPageHandler::InsertEmoji(const std::string& emoji_to_insert,
   // e.g. JS has mutated the web page while emoji picker was open, so check
   // that a valid input client is available as part of inserting the emoji.
   ui::InputMethod* input_method =
-      ui::IMEBridge::Get()->GetInputContextHandler()->GetInputMethod();
+      IMEBridge::Get()->GetInputContextHandler()->GetInputMethod();
   if (!input_method) {
     DLOG(WARNING) << "no input_method found";
     CopyEmojiToClipboard(emoji_to_insert);

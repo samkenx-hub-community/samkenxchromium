@@ -160,6 +160,7 @@ suite('PrivacySandboxTopicsSubpageTests', function() {
     await flushTasks();
     assertTrue(isVisible(page.$.topicsToggle));
     assertFalse(page.$.topicsToggle.checked);
+    assertFalse(page.$.topicsToggle.controlDisabled());
     assertEquals(
         loadTimeData.getString('topicsPageToggleSubLabel'),
         page.$.topicsToggle.subLabel);
@@ -171,6 +172,7 @@ suite('PrivacySandboxTopicsSubpageTests', function() {
     await flushTasks();
     assertTrue(isVisible(page.$.topicsToggle));
     assertTrue(page.$.topicsToggle.checked);
+    assertFalse(page.$.topicsToggle.controlDisabled());
     assertEquals(
         loadTimeData.getString('topicsPageToggleSubLabel'),
         page.$.topicsToggle.subLabel);
@@ -187,6 +189,7 @@ suite('PrivacySandboxTopicsSubpageTests', function() {
     await flushTasks();
     assertTrue(isVisible(page.$.topicsToggle));
     assertTrue(page.$.topicsToggle.checked);
+    assertFalse(page.$.topicsToggle.controlDisabled());
     assertEquals(
         loadTimeData.getString('topicsPageToggleSubLabel'),
         page.$.topicsToggle.subLabel);
@@ -200,6 +203,7 @@ suite('PrivacySandboxTopicsSubpageTests', function() {
     await flushTasks();
     assertTrue(isVisible(page.$.topicsToggle));
     assertFalse(page.$.topicsToggle.checked);
+    assertFalse(page.$.topicsToggle.controlDisabled());
     assertEquals(
         loadTimeData.getString('topicsPageToggleSubLabel'),
         page.$.topicsToggle.subLabel);
@@ -345,10 +349,24 @@ suite('PrivacySandboxTopicsSubpageTests', function() {
         loadTimeData.getString('topicsPageBlockedTopicsDescriptionEmpty'),
         blockedTopicsDescription.innerText);
   });
+
+  test('topicsManaged', async function() {
+    page.set('prefs.privacy_sandbox.m1.topics_enabled', {
+      ...page.get('prefs.privacy_sandbox.m1.topics_enabled'),
+      value: false,
+      controlledBy: chrome.settingsPrivate.ControlledBy.USER_POLICY,
+      enforcement: chrome.settingsPrivate.Enforcement.ENFORCED,
+    });
+    await flushTasks();
+    assertFalse(page.$.topicsToggle.checked);
+    assertTrue(page.$.topicsToggle.controlDisabled());
+    assertFalse(isChildVisible(page, '#currentTopicsSection'));
+  });
 });
 
 suite('PrivacySandboxFledgeSubpageTests', function() {
   let page: SettingsPrivacySandboxFledgeSubpageElement;
+  let testPrivacySandboxBrowserProxy: TestPrivacySandboxBrowserProxy;
   let settingsPrefs: SettingsPrefsElement;
 
   suiteSetup(function() {
@@ -359,12 +377,16 @@ suite('PrivacySandboxFledgeSubpageTests', function() {
     return CrSettingsPrefs.initialized;
   });
 
-  setup(function() {
+  setup(async function() {
+    testPrivacySandboxBrowserProxy = new TestPrivacySandboxBrowserProxy();
+    PrivacySandboxBrowserProxyImpl.setInstance(testPrivacySandboxBrowserProxy);
+
     document.body.innerHTML = window.trustedTypes!.emptyHTML;
     document.body.appendChild(settingsPrefs);
     page = document.createElement('settings-privacy-sandbox-fledge-subpage');
     page.prefs = settingsPrefs.prefs!;
     document.body.appendChild(page);
+    await testPrivacySandboxBrowserProxy.whenCalled('getFledgeState');
     return flushTasks();
   });
 
@@ -380,6 +402,9 @@ suite('PrivacySandboxFledgeSubpageTests', function() {
     assertEquals(
         loadTimeData.getString('fledgePageToggleSubLabel'),
         page.$.fledgeToggle.subLabel);
+    assertFalse(isChildVisible(page, '#currentSitesDescription'));
+    assertFalse(isChildVisible(page, '#currentSitesDescriptionEmpty'));
+    assertTrue(isChildVisible(page, '#currentSitesDescriptionDisabled'));
 
     page.$.fledgeToggle.click();
     await flushTasks();
@@ -389,6 +414,11 @@ suite('PrivacySandboxFledgeSubpageTests', function() {
         loadTimeData.getString('fledgePageToggleSubLabel'),
         page.$.fledgeToggle.subLabel);
     assertTrue(!!page.getPref('privacy_sandbox.m1.fledge_enabled.value'));
+    assertTrue(isChildVisible(page, '#currentSitesDescription'));
+    // TODO(crbug.com/1378703): Add test for `#currentSitesDescriptionEmpty`
+    // when `getFledgeState()` returns an empty list.
+    assertFalse(isChildVisible(page, '#currentSitesDescriptionEmpty'));
+    assertFalse(isChildVisible(page, '#currentSitesDescriptionDisabled'));
   });
 
   test('disableFledgeToggle', async function() {
@@ -399,6 +429,11 @@ suite('PrivacySandboxFledgeSubpageTests', function() {
     assertEquals(
         loadTimeData.getString('fledgePageToggleSubLabel'),
         page.$.fledgeToggle.subLabel);
+    assertTrue(isChildVisible(page, '#currentSitesDescription'));
+    // TODO(crbug.com/1378703): Add test for `#currentSitesDescriptionEmpty`
+    // when `getFledgeState()` returns an empty list.
+    assertFalse(isChildVisible(page, '#currentSitesDescriptionEmpty'));
+    assertFalse(isChildVisible(page, '#currentSitesDescriptionDisabled'));
 
     page.$.fledgeToggle.click();
     await flushTasks();
@@ -408,6 +443,9 @@ suite('PrivacySandboxFledgeSubpageTests', function() {
         loadTimeData.getString('fledgePageToggleSubLabel'),
         page.$.fledgeToggle.subLabel);
     assertFalse(!!page.getPref('privacy_sandbox.m1.fledge_enabled.value'));
+    assertFalse(isChildVisible(page, '#currentSitesDescription'));
+    assertFalse(isChildVisible(page, '#currentSitesDescriptionEmpty'));
+    assertTrue(isChildVisible(page, '#currentSitesDescriptionDisabled'));
   });
 });
 

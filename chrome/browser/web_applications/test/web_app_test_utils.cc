@@ -329,8 +329,10 @@ std::string GetExternalPrefMigrationTestName(
 std::string GetOsIntegrationSubManagersTestName(
     const ::testing::TestParamInfo<OsIntegrationSubManagersState>& info) {
   switch (info.param) {
-    case OsIntegrationSubManagersState::kEnabled:
-      return "OSIntegrationSubManagers_Enabled";
+    case OsIntegrationSubManagersState::kSaveStateToDB:
+      return "OSIntegrationSubManagers_SaveStateToDB";
+    case OsIntegrationSubManagersState::kSaveStateAndExecute:
+      return "OSIntegrationSubManagers_SaveStateAndExecute";
     case OsIntegrationSubManagersState::kDisabled:
       return "OSIntegrationSubManagers_Disabled";
   }
@@ -643,6 +645,8 @@ std::unique_ptr<WebApp> CreateRandomWebApp(const GURL& base_url,
   app->SetAlwaysShowToolbarInFullscreen(random.next_bool());
 
   if (random.next_bool()) {
+    // TODO(crbug.com/1403844): Fill this up randomly to use in
+    // WebAppDatabaseTests.
     proto::WebAppOsIntegrationState state;
     app->SetCurrentOsIntegrationStates(state);
   }

@@ -13,6 +13,8 @@
 # Tests that fail in legacy but pass in NG
 
 # ====== New tests from wpt-importer added here ======
+crbug.com/626703 external/wpt/css/css-text/bidi/bidi-tab-001.html [ Failure ]
+crbug.com/626703 virtual/plz-dedicated-worker/external/wpt/resource-timing/response-status-code.html [ Timeout ]
 crbug.com/626703 virtual/force-renderer-accessibility/external/wpt/accessibility/crashtests/bdo-table-cell.html [ Crash ]
 crbug.com/626703 external/wpt/url/a-element.html?include=mailto [ Crash Failure ]
 crbug.com/626703 external/wpt/url/url-setters-a-area.window.html?exclude=(file|javascript|mailto) [ Crash Failure ]
@@ -1025,7 +1027,7 @@ crbug.com/591099 external/wpt/css/css-text/line-breaking/line-breaking-ic-003.ht
 ### external/wpt/css/css-text/overflow-wrap/
 crbug.com/1019695 external/wpt/css/css-text/overflow-wrap/overflow-wrap-shaping-001.html [ Failure ]
 crbug.com/1019695 external/wpt/css/css-text/overflow-wrap/overflow-wrap-shaping-002.html [ Failure ]
-crbug.com/1020749 external/wpt/css/css-text/overflow-wrap/overflow-wrap-anywhere-inline-004.html [ Failure ]
+crbug.com/1020749 external/wpt/css/css-text/overflow-wrap/overflow-wrap-anywhere-inline-004.tentative.html [ Failure ]
 crbug.com/1205334 external/wpt/css/css-text/overflow-wrap/overflow-wrap-min-content-size-009.html [ Failure ]
 
 ### external/wpt/css/css-text/shaping/
