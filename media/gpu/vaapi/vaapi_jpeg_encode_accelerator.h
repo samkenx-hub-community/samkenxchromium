@@ -83,22 +83,11 @@ class MEDIA_GPU_EXPORT VaapiJpegEncodeAccelerator
   // |encoder_task_runner_|.
   class Encoder;
 
-  void InitializeOnEncoderTaskRunner(InitCB init_cb);
-
-  void InitializeOnTaskRunner(
-      chromeos_camera::JpegEncodeAccelerator::Client* client,
-      InitCB init_cb);
-
-  void CleanUpOnEncoderThread();
-
   // Notifies the client that an error has occurred and encoding cannot
   // continue.
   void NotifyError(int32_t task_id, Status status);
 
   void VideoFrameReady(int32_t task_id, size_t encoded_picture_size);
-
-  // ChildThread's task runner.
-  scoped_refptr<base::SingleThreadTaskRunner> task_runner_;
 
   // GPU IO task runner.
   scoped_refptr<base::SingleThreadTaskRunner> io_task_runner_;

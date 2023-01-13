@@ -7,8 +7,8 @@
 #include <memory>
 #include <utility>
 
-#include "base/bind.h"
 #include "base/feature_list.h"
+#include "base/functional/bind.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/values.h"
 #include "chrome/browser/profiles/profile.h"
@@ -511,7 +511,7 @@ void FetchManifestAndInstallCommand::OnInstallFinalizedMaybeReparentTab(
       app_lock_->install_finalizer().CanReparentTab(app_id, !error);
 
   if (can_reparent_tab &&
-      (web_app_info_->user_display_mode != UserDisplayMode::kBrowser)) {
+      (web_app_info_->user_display_mode != mojom::UserDisplayMode::kBrowser)) {
     app_lock_->install_finalizer().ReparentTab(app_id, !error,
                                                web_contents_.get());
   }

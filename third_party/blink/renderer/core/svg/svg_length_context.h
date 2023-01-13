@@ -74,6 +74,8 @@ class CORE_EXPORT SVGLengthContext {
                                    const Length& y_length,
                                    const ComputedStyle&) const;
 
+  Length ConvertToLength(const SVGLength&) const;
+
   float ConvertValueToUserUnits(float,
                                 SVGLengthMode,
                                 CSSPrimitiveValue::UnitType from_unit) const;
@@ -90,21 +92,13 @@ class CORE_EXPORT SVGLengthContext {
                               const ComputedStyle&,
                               float dimension);
 
-  bool DetermineViewport(gfx::SizeF&) const;
+  gfx::SizeF ResolveViewport() const;
   float ResolveValue(const CSSPrimitiveValue&, SVGLengthMode) const;
 
  private:
+  float ViewportDimension(SVGLengthMode) const;
   float ValueForLength(const Length&, float zoom, SVGLengthMode) const;
   static float ValueForLength(const Length&, float zoom, float dimension);
-
-  float ConvertValueFromUserUnitsToCHS(float value) const;
-  float ConvertValueFromCHSToUserUnits(float value) const;
-
-  float ConvertValueFromUserUnitsToICS(float value) const;
-  float ConvertValueFromICSToUserUnits(float value) const;
-
-  float ConvertValueFromUserUnitsToLHS(float value) const;
-  float ConvertValueFromLHSToUserUnits(float value) const;
 
   const SVGElement* context_;
 };

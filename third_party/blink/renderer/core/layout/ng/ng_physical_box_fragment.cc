@@ -104,9 +104,10 @@ NGContainingBlock<PhysicalOffset> PhysicalContainingBlock(
           builder->Style().GetWritingDirection(), outer_size, inner_size),
       RelativeInsetToPhysical(containing_block.RelativeOffset(),
                               builder->Style().GetWritingDirection()),
-      containing_block.Fragment(), containing_block.IsInsideColumnSpanner(),
-      containing_block.RequiresContentBeforeBreaking(),
-      containing_block.IsFragmentedInsideClippedContainer());
+      containing_block.Fragment(),
+      containing_block.ClippedContainerBlockOffset(),
+      containing_block.IsInsideColumnSpanner(),
+      containing_block.RequiresContentBeforeBreaking());
 }
 
 NGContainingBlock<PhysicalOffset> PhysicalContainingBlock(
@@ -1320,6 +1321,11 @@ void NGPhysicalBoxFragment::AddSelfOutlineRects(
       *info = LayoutObject::OutlineInfo::GetFromStyle(Style());
   }
 
+  if (ShouldIncludeBlockVisualOverflow(outline_type) &&
+      IsA<HTMLAnchorElement>(GetNode())) {
+    outline_type = NGOutlineType::kIncludeBlockVisualOverflowForAnchor;
+  }
+
   AddOutlineRects(additional_offset, outline_type,
                   /* container_relative */ false, outline_rects);
 }
@@ -1358,7 +1364,7 @@ void NGPhysicalBoxFragment::AddOutlineRects(
     }
   }
 
-  if (outline_type == NGOutlineType::kIncludeBlockVisualOverflow &&
+  if (ShouldIncludeBlockVisualOverflow(outline_type) &&
       !HasNonVisibleOverflow() && !HasControlClip(*this)) {
     // Tricky code ahead: we pass a 0,0 additional_offset to
     // AddOutlineRectsForNormalChildren, and add it in after the call.
@@ -1375,8 +1381,13 @@ void NGPhysicalBoxFragment::AddOutlineRects(
            base::make_span(*outline_rects).subspan(size_before))
         rect.offset += additional_offset;
     }
-    for (const auto& child : PostLayoutChildren()) {
-      if (child->IsOutOfFlowPositioned()) {
+
+    if (ShouldIncludeBlockVisualOverflowForAnchorOnly(outline_type)) {
+      for (const auto& child : PostLayoutChildren()) {
+        if (!child->IsOutOfFlowPositioned()) {
+          continue;
+        }
+
         AddOutlineRectsForDescendant(
             child, outline_rects, additional_offset, outline_type,
             To<LayoutBoxModelObject>(GetLayoutObject()));
@@ -1448,11 +1459,37 @@ void NGPhysicalBoxFragment::AddOutlineRectsForInlineBox(
   // Adjust the rectangles using |additional_offset| and |container_relative|.
   if (!container_relative)
     additional_offset -= this_offset_in_container;
-  if (additional_offset.IsZero())
-    return;
-  for (PhysicalRect& rect :
-       base::make_span(rects->begin() + initial_rects_size, rects->end()))
-    rect.offset += additional_offset;
+  if (!additional_offset.IsZero()) {
+    for (PhysicalRect& rect :
+         base::make_span(rects->begin() + initial_rects_size, rects->end())) {
+      rect.offset += additional_offset;
+    }
+  }
+
+  if (ShouldIncludeBlockVisualOverflowForAnchorOnly(outline_type) &&
+      !HasNonVisibleOverflow() && !HasControlClip(*this)) {
+    if (container->IsAnonymousBlock()) {
+      const auto* container_box = DynamicTo<LayoutBox>(
+          container->GetLayoutObject()->NonAnonymousAncestor());
+      if (!container_box)
+        return;
+      // TODO(crbug.com/1380673): Just picking the first fragment isn't right.
+      container = container_box->GetPhysicalFragment(0);
+      DCHECK(container);
+    }
+
+    for (const auto& child : container->PostLayoutChildren()) {
+      if (!child->IsOutOfFlowPositioned() ||
+          child->GetLayoutObject()->ContainerForAbsolutePosition() !=
+              layout_object) {
+        continue;
+      }
+
+      AddOutlineRectsForDescendant(child, rects, additional_offset,
+                                   outline_type,
+                                   To<LayoutBoxModelObject>(layout_object));
+    }
+  }
 }
 
 PositionWithAffinity NGPhysicalBoxFragment::PositionForPoint(

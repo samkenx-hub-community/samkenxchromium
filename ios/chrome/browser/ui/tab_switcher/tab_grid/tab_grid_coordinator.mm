@@ -21,8 +21,8 @@
 #import "ios/chrome/browser/prefs/pref_names.h"
 #import "ios/chrome/browser/search_engines/template_url_service_factory.h"
 #import "ios/chrome/browser/sessions/ios_chrome_tab_restore_service_factory.h"
-#import "ios/chrome/browser/ui/activity_services/activity_params.h"
 #import "ios/chrome/browser/ui/alert_coordinator/action_sheet_coordinator.h"
+#import "ios/chrome/browser/ui/bookmarks/bookmark_interaction_controller.h"
 #import "ios/chrome/browser/ui/bookmarks/editor/bookmarks_editor_coordinator.h"
 #import "ios/chrome/browser/ui/commands/application_commands.h"
 #import "ios/chrome/browser/ui/commands/bookmarks_commands.h"
@@ -40,7 +40,6 @@
 #import "ios/chrome/browser/ui/history/public/history_presentation_delegate.h"
 #import "ios/chrome/browser/ui/incognito_reauth/incognito_reauth_mediator.h"
 #import "ios/chrome/browser/ui/incognito_reauth/incognito_reauth_scene_agent.h"
-#import "ios/chrome/browser/ui/legacy_bookmarks/legacy_bookmark_interaction_controller.h"
 #import "ios/chrome/browser/ui/main/bvc_container_view_controller.h"
 #import "ios/chrome/browser/ui/main/default_browser_scene_agent.h"
 #import "ios/chrome/browser/ui/main/layout_guide_util.h"
@@ -51,18 +50,19 @@
 #import "ios/chrome/browser/ui/recent_tabs/recent_tabs_presentation_delegate.h"
 #import "ios/chrome/browser/ui/recent_tabs/recent_tabs_table_view_controller.h"
 #import "ios/chrome/browser/ui/recent_tabs/synced_sessions.h"
+#import "ios/chrome/browser/ui/sharing/activity_services/activity_params.h"
 #import "ios/chrome/browser/ui/sharing/sharing_coordinator.h"
 #import "ios/chrome/browser/ui/snackbar/snackbar_coordinator.h"
 #import "ios/chrome/browser/ui/tab_switcher/tab_grid/grid/grid_commands.h"
 #import "ios/chrome/browser/ui/tab_switcher/tab_grid/pinned_tabs/features.h"
 #import "ios/chrome/browser/ui/tab_switcher/tab_grid/pinned_tabs/pinned_tabs_mediator.h"
-#import "ios/chrome/browser/ui/tab_switcher/tab_grid/tab_context_menu_helper.h"
+#import "ios/chrome/browser/ui/tab_switcher/tab_grid/tab_context_menu/tab_context_menu_helper.h"
+#import "ios/chrome/browser/ui/tab_switcher/tab_grid/tab_context_menu/tab_item.h"
 #import "ios/chrome/browser/ui/tab_switcher/tab_grid/tab_grid_coordinator+private.h"
 #import "ios/chrome/browser/ui/tab_switcher/tab_grid/tab_grid_coordinator_delegate.h"
 #import "ios/chrome/browser/ui/tab_switcher/tab_grid/tab_grid_mediator.h"
 #import "ios/chrome/browser/ui/tab_switcher/tab_grid/tab_grid_paging.h"
 #import "ios/chrome/browser/ui/tab_switcher/tab_grid/tab_grid_view_controller.h"
-#import "ios/chrome/browser/ui/tab_switcher/tab_grid/tab_item.h"
 #import "ios/chrome/browser/ui/tab_switcher/tab_grid/transitions/tab_grid_transition_handler.h"
 #import "ios/chrome/browser/ui/thumb_strip/thumb_strip_coordinator.h"
 #import "ios/chrome/browser/ui/thumb_strip/thumb_strip_feature.h"
@@ -666,13 +666,20 @@
       initWithConsumer:baseViewController.incognitoTabsConsumer];
   self.incognitoTabsMediator.browser = _incognitoBrowser;
   self.incognitoTabsMediator.delegate = self;
+
   baseViewController.regularTabsDelegate = self.regularTabsMediator;
   baseViewController.incognitoTabsDelegate = self.incognitoTabsMediator;
+
   baseViewController.regularTabsDragDropHandler = self.regularTabsMediator;
   baseViewController.incognitoTabsDragDropHandler = self.incognitoTabsMediator;
+  if (IsPinnedTabsEnabled()) {
+    baseViewController.pinnedTabsDragDropHandler = self.pinnedTabsMediator;
+  }
+
   baseViewController.regularTabsImageDataSource = self.regularTabsMediator;
   baseViewController.priceCardDataSource = self.priceCardMediator;
   baseViewController.incognitoTabsImageDataSource = self.incognitoTabsMediator;
+
   baseViewController.regularTabsShareableItemsProvider =
       self.regularTabsMediator;
   baseViewController.incognitoTabsShareableItemsProvider =
@@ -691,13 +698,11 @@
 
   self.regularTabContextMenuHelper =
       [[TabContextMenuHelper alloc] initWithBrowser:self.regularBrowser
-                                  actionsDataSource:self.regularTabsMediator
                              tabContextMenuDelegate:self];
   self.baseViewController.regularTabsContextMenuProvider =
       self.regularTabContextMenuHelper;
   self.incognitoTabContextMenuHelper =
       [[TabContextMenuHelper alloc] initWithBrowser:self.incognitoBrowser
-                                  actionsDataSource:self.incognitoTabsMediator
                              tabContextMenuDelegate:self];
   self.baseViewController.incognitoTabsContextMenuProvider =
       self.incognitoTabContextMenuHelper;
@@ -947,13 +952,13 @@
       addItemWithTitle:l10n_util::GetNSString(
                            IDS_IOS_TAB_GRID_CLOSE_NON_PINNED_TABS_ONLY)
                 action:^{
-                  [weakTabGridMediator closeNonPinnedItems];
+                  [weakTabGridMediator saveAndCloseNonPinnedItems];
                 }
                  style:UIAlertActionStyleDefault];
   [self.actionSheetCoordinator
       addItemWithTitle:l10n_util::GetNSString(IDS_IOS_TAB_GRID_CLOSE_ALL_TABS)
                 action:^{
-                  [weakTabGridMediator closeAllItems];
+                  [weakTabGridMediator saveAndCloseAllItems];
                 }
                  style:UIAlertActionStyleDestructive];
 
@@ -1159,20 +1164,25 @@
   }
 }
 
-- (void)pinTabWithIdentifier:(NSString*)identifier incognito:(BOOL)incognito {
-  if (incognito) {
-    [self.incognitoTabsMediator pinItemWithID:identifier];
-  } else {
-    [self.regularTabsMediator pinItemWithID:identifier];
-  }
+- (void)pinTabWithIdentifier:(NSString*)identifier {
+  [self.regularTabsMediator setPinState:YES forItemWithIdentifier:identifier];
 }
 
-- (void)closeTabWithIdentifier:(NSString*)identifier incognito:(BOOL)incognito {
+- (void)closeTabWithIdentifier:(NSString*)identifier
+                     incognito:(BOOL)incognito
+                        pinned:(BOOL)pinned {
   if (incognito) {
     [self.incognitoTabsMediator closeItemWithID:identifier];
-  } else {
-    [self.regularTabsMediator closeItemWithID:identifier];
+    return;
   }
+
+  if (pinned) {
+    DCHECK(IsPinnedTabsEnabled());
+    [self.pinnedTabsMediator closeItemWithID:identifier];
+    return;
+  }
+
+  [self.regularTabsMediator closeItemWithID:identifier];
 }
 
 - (void)selectTabs {
@@ -1246,20 +1256,17 @@
 #pragma mark - SnackbarCoordinatorDelegate
 
 - (CGFloat)bottomOffsetForCurrentlyPresentedView {
-  UILayoutGuide* bottomToolbarGuide = nil;
+  NSString* bottomToolbarGuideName;
   if ([self.bvcContainer currentBVC]) {
     // Use the BVC bottom bar as the offset as it is currently presented.
-    bottomToolbarGuide =
-        [NamedGuide guideWithName:kSecondaryToolbarGuide
-                             view:self.bvcContainer.currentBVC.view];
+    bottomToolbarGuideName = kSecondaryToolbarGuide;
   } else {
     // The tab grid is being show so use tab grid bottom bar.
-    bottomToolbarGuide = [LayoutGuideCenterForBrowser(self.browser)
-        makeLayoutGuideNamed:kTabGridBottomToolbarGuide];
-    [self.baseViewController.view addLayoutGuide:bottomToolbarGuide];
+    bottomToolbarGuideName = kTabGridBottomToolbarGuide;
   }
-
-  return CGRectGetHeight(bottomToolbarGuide.layoutFrame);
+  UIView* bottomToolbar = [LayoutGuideCenterForBrowser(self.browser)
+      referencedViewUnderName:bottomToolbarGuideName];
+  return CGRectGetHeight(bottomToolbar.bounds);
 }
 
 @end

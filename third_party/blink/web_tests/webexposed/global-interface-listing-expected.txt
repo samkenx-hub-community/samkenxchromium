@@ -10,6 +10,7 @@ interface AbortController
     method constructor
 interface AbortSignal : EventTarget
     static method abort
+    static method any
     static method timeout
     attribute @@toStringTag
     getter aborted
@@ -546,11 +547,6 @@ interface BeforeInstallPromptEvent : Event
     getter userChoice
     method constructor
     method prompt
-interface BeforeToggleEvent : Event
-    attribute @@toStringTag
-    getter currentState
-    getter newState
-    method constructor
 interface BeforeUnloadEvent : Event
     attribute @@toStringTag
     getter returnValue
@@ -1851,6 +1847,7 @@ interface Document : Node
     getter linkColor
     getter links
     getter onabort
+    getter onaftertoggle
     getter onanimationend
     getter onanimationiteration
     getter onanimationstart
@@ -2067,6 +2064,7 @@ interface Document : Node
     setter fullscreenEnabled
     setter linkColor
     setter onabort
+    setter onaftertoggle
     setter onanimationend
     setter onanimationiteration
     setter onanimationstart
@@ -3189,9 +3187,9 @@ interface HTMLButtonElement : HTMLElement
     getter formTarget
     getter labels
     getter name
-    getter popoverHideTarget
-    getter popoverShowTarget
-    getter popoverToggleTarget
+    getter popoverHideTargetElement
+    getter popoverShowTargetElement
+    getter popoverToggleTargetElement
     getter type
     getter validationMessage
     getter validity
@@ -3208,9 +3206,9 @@ interface HTMLButtonElement : HTMLElement
     setter formNoValidate
     setter formTarget
     setter name
-    setter popoverHideTarget
-    setter popoverShowTarget
-    setter popoverToggleTarget
+    setter popoverHideTargetElement
+    setter popoverShowTargetElement
+    setter popoverToggleTargetElement
     setter type
     setter value
 interface HTMLCanvasElement : HTMLElement
@@ -3301,6 +3299,7 @@ interface HTMLElement : Element
     getter offsetTop
     getter offsetWidth
     getter onabort
+    getter onaftertoggle
     getter onanimationend
     getter onanimationiteration
     getter onanimationstart
@@ -3437,6 +3436,7 @@ interface HTMLElement : Element
     setter lang
     setter nonce
     setter onabort
+    setter onaftertoggle
     setter onanimationend
     setter onanimationiteration
     setter onanimationstart
@@ -3858,9 +3858,9 @@ interface HTMLInputElement : HTMLElement
     getter name
     getter pattern
     getter placeholder
-    getter popoverHideTarget
-    getter popoverShowTarget
-    getter popoverToggleTarget
+    getter popoverHideTargetElement
+    getter popoverShowTargetElement
+    getter popoverToggleTargetElement
     getter readOnly
     getter required
     getter selectionDirection
@@ -3916,9 +3916,9 @@ interface HTMLInputElement : HTMLElement
     setter name
     setter pattern
     setter placeholder
-    setter popoverHideTarget
-    setter popoverShowTarget
-    setter popoverToggleTarget
+    setter popoverHideTargetElement
+    setter popoverShowTargetElement
+    setter popoverToggleTargetElement
     setter readOnly
     setter required
     setter selectionDirection
@@ -5285,6 +5285,7 @@ interface MathMLElement : Element
     getter focusgroup
     getter nonce
     getter onabort
+    getter onaftertoggle
     getter onanimationend
     getter onanimationiteration
     getter onanimationstart
@@ -5398,6 +5399,7 @@ interface MathMLElement : Element
     setter focusgroup
     setter nonce
     setter onabort
+    setter onaftertoggle
     setter onanimationend
     setter onanimationiteration
     setter onanimationstart
@@ -5956,25 +5958,6 @@ interface NamedNodeMap
     method removeNamedItemNS
     method setNamedItem
     method setNamedItemNS
-interface NativeIOFile
-    attribute @@toStringTag
-    method close
-    method constructor
-    method flush
-    method getLength
-    method read
-    method setLength
-    method write
-interface NativeIOFileManager
-    attribute @@toStringTag
-    method constructor
-    method delete
-    method getAll
-    method getRemainingCapacity
-    method open
-    method releaseCapacity
-    method rename
-    method requestCapacity
 interface NavigateEvent : Event
     attribute @@toStringTag
     getter canIntercept
@@ -6825,6 +6808,11 @@ interface PopStateEvent : Event
     attribute @@toStringTag
     getter state
     method constructor
+interface PopoverToggleEvent : Event
+    attribute @@toStringTag
+    getter currentState
+    getter newState
+    method constructor
 interface Presentation
     attribute @@toStringTag
     getter defaultRequest
@@ -7571,6 +7559,7 @@ interface SVGElement : Element
     getter focusgroup
     getter nonce
     getter onabort
+    getter onaftertoggle
     getter onanimationend
     getter onanimationiteration
     getter onanimationstart
@@ -7686,6 +7675,7 @@ interface SVGElement : Element
     setter focusgroup
     setter nonce
     setter onabort
+    setter onaftertoggle
     setter onanimationend
     setter onanimationiteration
     setter onanimationstart
@@ -11505,6 +11495,7 @@ interface XRSession : EventTarget
     getter depthDataFormat
     getter depthUsage
     getter domOverlayState
+    getter enabledFeatures
     getter environmentBlendMode
     getter inputSources
     getter interactionMode
@@ -11913,6 +11904,7 @@ namespace CSS
     getter offscreenBuffering
     getter onabort
     getter onafterprint
+    getter onaftertoggle
     getter onanimationend
     getter onanimationiteration
     getter onanimationstart
@@ -12060,7 +12052,6 @@ namespace CSS
     getter speechSynthesis
     getter status
     getter statusbar
-    getter storageFoundation
     getter styleMedia
     getter toolbar
     getter top
@@ -12137,6 +12128,7 @@ namespace CSS
     setter offscreenBuffering
     setter onabort
     setter onafterprint
+    setter onaftertoggle
     setter onanimationend
     setter onanimationiteration
     setter onanimationstart

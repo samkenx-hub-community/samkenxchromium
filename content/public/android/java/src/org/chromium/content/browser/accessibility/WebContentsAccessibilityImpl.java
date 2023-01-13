@@ -153,8 +153,12 @@ public class WebContentsAccessibilityImpl extends AccessibilityNodeProviderCompa
             "ACTION_ARGUMENT_HTML_ELEMENT_STRING_VALUES";
     public static final String EXTRAS_KEY_TARGET_URL = "AccessibilityNodeInfo.targetUrl";
     public static final String EXTRAS_KEY_UNCLIPPED_TOP = "AccessibilityNodeInfo.unclippedTop";
+    public static final String EXTRAS_KEY_UNCLIPPED_LEFT = "AccessibilityNodeInfo.unclippedLeft";
     public static final String EXTRAS_KEY_UNCLIPPED_BOTTOM =
             "AccessibilityNodeInfo.unclippedBottom";
+    public static final String EXTRAS_KEY_UNCLIPPED_WIDTH = "AccessibilityNodeInfo.unclippedWidth";
+    public static final String EXTRAS_KEY_UNCLIPPED_HEIGHT =
+            "AccessibilityNodeInfo.unclippedHeight";
     public static final String EXTRAS_KEY_URL = "url";
 
     // Constants defined for requests to add data to AccessibilityNodeInfo Bundle extras.
@@ -818,7 +822,8 @@ public class WebContentsAccessibilityImpl extends AccessibilityNodeProviderCompa
     // BrowserAccessibilityStateListener
 
     @Override
-    public void onBrowserAccessibilityStateChanged(boolean newScreenReaderEnabledState) {
+    public void onAccessibilityStateChanged(AccessibilityState.State oldAccessibilityState,
+            AccessibilityState.State newAccessibilityState) {
         refreshNativeState();
 
         // TODO(mschillaci,jacklynch): Move into {refreshNativeState} or similar method once

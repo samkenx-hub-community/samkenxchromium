@@ -6,8 +6,8 @@
 
 #include <utility>
 
-#include "base/bind.h"
 #include "base/containers/adapters.h"
+#include "base/functional/bind.h"
 #include "base/metrics/histogram_macros.h"
 #include "base/trace_event/trace_event.h"
 #include "chrome/browser/predictors/resource_prefetch_predictor.h"
@@ -132,17 +132,17 @@ void PreconnectManager::StartPreresolveHost(
 }
 
 void PreconnectManager::StartPreresolveHosts(
-    const std::vector<std::string>& hostnames,
+    const std::vector<GURL>& urls,
     const net::NetworkAnonymizationKey& network_anonymization_key) {
   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
   if (!IsEnabled())
     return;
   // Push jobs in front of the queue due to higher priority.
-  for (const std::string& hostname : base::Reversed(hostnames)) {
-    PreresolveJobId job_id = preresolve_jobs_.Add(
-        std::make_unique<PreresolveJob>(GURL("http://" + hostname), 0,
-                                        kAllowCredentialsOnPreconnectByDefault,
-                                        network_anonymization_key, nullptr));
+  for (const GURL& url : base::Reversed(urls)) {
+    PreresolveJobId job_id =
+        preresolve_jobs_.Add(std::make_unique<PreresolveJob>(
+            url, 0, kAllowCredentialsOnPreconnectByDefault,
+            network_anonymization_key, nullptr));
     queued_jobs_.push_front(job_id);
   }
 

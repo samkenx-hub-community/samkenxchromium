@@ -6,7 +6,6 @@
 
 #include "base/base_paths.h"
 #include "base/files/file_path.h"
-#include "base/files/file_util.h"
 #include "base/path_service.h"
 #include "chrome/updater/constants.h"
 #include "chrome/updater/updater_branding.h"
@@ -61,10 +60,9 @@ absl::optional<base::FilePath> GetBaseInstallDirectory(UpdaterScope scope) {
 
 absl::optional<base::FilePath> GetUpdateServiceLauncherPath(
     UpdaterScope scope) {
-  // TODO(crbug.com/1400679): This is not correct, since this is always the
-  // executable associated with kUpdaterVersion, but a different version may be
-  // active.
-  return GetUpdaterExecutablePath(scope);
+  absl::optional<base::FilePath> path = GetBaseInstallDirectory(scope);
+  return path ? absl::optional<base::FilePath>(path->AppendASCII(kLauncherName))
+              : absl::nullopt;
 }
 
 }  // namespace updater

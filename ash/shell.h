@@ -101,6 +101,7 @@ class AshDBusServices;
 class AshFocusRules;
 class AshTouchTransformController;
 class AssistantControllerImpl;
+class AudioEffectsController;
 class AutoclickController;
 class AutozoomControllerImpl;
 class BackGestureEventHandler;
@@ -163,12 +164,12 @@ class TabletModeController;
 class MediaControllerImpl;
 class MessageCenterAshImpl;
 class MessageCenterController;
+class MicrophonePrivacySwitchController;
 class MouseCursorEventFilter;
 class MruWindowTracker;
 class MultiDeviceNotificationPresenter;
 class MultitaskMenuNudgeController;
 class NearbyShareControllerImpl;
-class DesksTemplatesDelegate;
 class NearbyShareDelegate;
 class NightLightControllerImpl;
 class OcclusionTrackerPauser;
@@ -195,6 +196,7 @@ class RefreshRateThrottleController;
 class ResizeShadowController;
 class ResolutionNotificationController;
 class RootWindowController;
+class SavedDeskDelegate;
 class ScreenLayoutObserver;
 class ScreenOrientationController;
 class ScreenPinningController;
@@ -210,6 +212,7 @@ struct ShellInitParams;
 class ShellObserver;
 class ShutdownControllerImpl;
 class SmsObserver;
+class SnapGroupController;
 class SnoopingProtectionController;
 class StickyKeysController;
 class SystemGestureEventFilter;
@@ -393,6 +396,9 @@ class ASH_EXPORT Shell : public SessionObserver,
   AssistantControllerImpl* assistant_controller() {
     return assistant_controller_.get();
   }
+  AudioEffectsController* audio_effects_controller() {
+    return audio_effects_controller_.get();
+  }
   AutoclickController* autoclick_controller() {
     return autoclick_controller_.get();
   }
@@ -425,8 +431,8 @@ class ASH_EXPORT Shell : public SessionObserver,
   PersistentDesksBarController* persistent_desks_bar_controller() {
     return persistent_desks_bar_controller_.get();
   }
-  DesksTemplatesDelegate* desks_templates_delegate() {
-    return desks_templates_delegate_.get();
+  SavedDeskDelegate* saved_desk_delegate() {
+    return saved_desk_delegate_.get();
   }
   DetachableBaseHandler* detachable_base_handler() {
     return detachable_base_handler_.get();
@@ -623,6 +629,9 @@ class ASH_EXPORT Shell : public SessionObserver,
   }
   SessionControllerImpl* session_controller() {
     return session_controller_.get();
+  }
+  SnapGroupController* snap_group_controller() {
+    return snap_group_controller_.get();
   }
   FeatureDiscoveryDurationReporterImpl* feature_discover_reporter() {
     return feature_discover_reporter_.get();
@@ -859,6 +868,7 @@ class ASH_EXPORT Shell : public SessionObserver,
   scoped_refptr<dbus::Bus> dbus_bus_;
   std::unique_ptr<AshDBusServices> ash_dbus_services_;
   std::unique_ptr<AssistantControllerImpl> assistant_controller_;
+  std::unique_ptr<AudioEffectsController> audio_effects_controller_;
   std::unique_ptr<AutozoomControllerImpl> autozoom_controller_;
   std::unique_ptr<BacklightsForcedOffSetter> backlights_forced_off_setter_;
   std::unique_ptr<BrightnessControlDelegate> brightness_control_delegate_;
@@ -869,7 +879,7 @@ class ASH_EXPORT Shell : public SessionObserver,
       security_curtain_controller_;
   std::unique_ptr<DarkLightModeControllerImpl> dark_light_mode_controller_;
   std::unique_ptr<DesksController> desks_controller_;
-  std::unique_ptr<DesksTemplatesDelegate> desks_templates_delegate_;
+  std::unique_ptr<SavedDeskDelegate> saved_desk_delegate_;
   std::unique_ptr<DetachableBaseHandler> detachable_base_handler_;
   std::unique_ptr<DetachableBaseNotificationController>
       detachable_base_notification_controller_;
@@ -887,6 +897,7 @@ class ASH_EXPORT Shell : public SessionObserver,
   std::unique_ptr<GlanceablesController> glanceables_controller_;
   std::unique_ptr<HoldingSpaceController> holding_space_controller_;
   std::unique_ptr<PowerPrefs> power_prefs_;
+  std::unique_ptr<SnapGroupController> snap_group_controller_;
   std::unique_ptr<SnoopingProtectionController> snooping_protection_controller_;
   std::unique_ptr<HumanPresenceOrientationController>
       human_presence_orientation_controller_;
@@ -907,6 +918,8 @@ class ASH_EXPORT Shell : public SessionObserver,
   std::unique_ptr<MessageCenterAshImpl> message_center_ash_impl_;
   std::unique_ptr<MediaControllerImpl> media_controller_;
   std::unique_ptr<MediaNotificationProviderImpl> media_notification_provider_;
+  std::unique_ptr<MicrophonePrivacySwitchController>
+      microphone_privacy_switch_controller_;
   std::unique_ptr<MruWindowTracker> mru_window_tracker_;
   std::unique_ptr<MultiDeviceNotificationPresenter>
       multidevice_notification_presenter_;

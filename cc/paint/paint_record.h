@@ -30,11 +30,9 @@ class CC_PAINT_EXPORT PaintRecord {
   PaintRecord(const PaintRecord&);
   PaintRecord& operator=(const PaintRecord&);
 
-  bool operator==(const PaintRecord& other) const {
-    return buffer_ == other.buffer_ ||
-           (buffer_ && other.buffer_ && *buffer_ == *other.buffer_);
+  bool EqualsForTesting(const PaintRecord& other) const {
+    return buffer_->EqualsForTesting(*other.buffer_);
   }
-  bool operator!=(const PaintRecord& other) const { return !(*this == other); }
 
   const PaintOpBuffer& buffer() const { return *buffer_; }
 
@@ -59,11 +57,6 @@ class CC_PAINT_EXPORT PaintRecord {
     return buffer_->has_effects_preventing_lcd_text_for_save_layer_alpha();
   }
   const PaintOp& GetFirstOp() const { return buffer_->GetFirstOp(); }
-
-  template <typename T>
-  const T* GetOpAtForTesting(size_t index) const {
-    return buffer_->GetOpAtForTesting<T>(index);
-  }
 
   // Given the |bounds| of a PaintOpBuffer that would be transformed by |ctm|
   // when rendered, compute the bounds needed to raster the buffer at a fixed

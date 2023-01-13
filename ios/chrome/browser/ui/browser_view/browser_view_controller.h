@@ -15,11 +15,11 @@
 #import "ios/chrome/browser/ui/find_bar/find_bar_coordinator.h"
 #import "ios/chrome/browser/ui/incognito_reauth/incognito_reauth_consumer.h"
 #import "ios/chrome/browser/ui/ntp/logo_animation_controller.h"
+#import "ios/chrome/browser/ui/omnibox/omnibox_focus_delegate.h"
 #import "ios/chrome/browser/ui/omnibox/popup/omnibox_popup_presenter.h"
 #import "ios/chrome/browser/ui/page_info/requirements/page_info_presentation.h"
 #import "ios/chrome/browser/ui/settings/sync/utils/sync_presenter.h"
 #import "ios/chrome/browser/ui/thumb_strip/thumb_strip_supporting.h"
-#import "ios/chrome/browser/ui/toolbar/toolbar_coordinator_delegate.h"
 #import "ios/chrome/browser/web/web_navigation_ntp_delegate.h"
 #import "ios/chrome/browser/web/web_state_container_view_provider.h"
 
@@ -31,9 +31,6 @@ class Browser;
 @protocol CRWResponderInputView;
 @class DefaultBrowserPromoNonModalScheduler;
 @protocol DefaultPromoNonModalPresentationDelegate;
-// TODO(crbug.com/1331229): Remove all use of the download manager coordinator
-// from BVC
-@class DownloadManagerCoordinator;
 class FullscreenController;
 @protocol HelpCommands;
 @class KeyCommandsProvider;
@@ -55,14 +52,11 @@ class PrerenderService;
 @protocol IncognitoReauthCommands;
 
 // TODO(crbug.com/1328039): Remove all use of the prerender service from BVC
-// TODO(crbug.com/1331229): Remove all use of the download manager coordinator
-// from BVC
 typedef struct {
   PrerenderService* prerenderService;
   BubblePresenter* bubblePresenter;
   ToolbarAccessoryPresenter* toolbarAccessoryPresenter;
   PopupMenuCoordinator* popupMenuCoordinator;
-  DownloadManagerCoordinator* downloadManagerCoordinator;
   NewTabPageCoordinator* ntpCoordinator;
   LensCoordinator* lensCoordinator;
   PrimaryToolbarCoordinator* primaryToolbarCoordinator;
@@ -84,9 +78,9 @@ typedef struct {
     : UIViewController <FindBarPresentationDelegate,
                         IncognitoReauthConsumer,
                         LogoAnimationControllerOwnerOwner,
+                        OmniboxFocusDelegate,
                         OmniboxPopupPresenterDelegate,
                         ThumbStripSupporting,
-                        ToolbarCoordinatorDelegate,
                         WebStateContainerViewProvider,
                         BrowserCommands>
 

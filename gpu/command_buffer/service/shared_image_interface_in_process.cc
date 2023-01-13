@@ -4,7 +4,7 @@
 
 #include "gpu/command_buffer/service/shared_image_interface_in_process.h"
 
-#include "base/bind.h"
+#include "base/functional/bind.h"
 #include "base/memory/raw_ptr.h"
 #include "base/synchronization/waitable_event.h"
 #include "build/build_config.h"
@@ -20,7 +20,6 @@
 #include "gpu/config/gpu_driver_bug_workarounds.h"
 #include "gpu/config/gpu_feature_info.h"
 #include "gpu/config/gpu_preferences.h"
-#include "gpu/ipc/common/gpu_client_ids.h"
 #include "ui/gl/gl_context.h"
 
 namespace gpu {
@@ -315,11 +314,9 @@ Mailbox SharedImageInterfaceInProcess::CreateSharedImage(
 
   auto mailbox = Mailbox::GenerateForSharedImage();
   gfx::GpuMemoryBufferHandle handle = gpu_memory_buffer->CloneHandle();
-  bool requires_sync_token = handle.type == gfx::IO_SURFACE_BUFFER;
-  SyncToken sync_token;
   {
     base::AutoLock lock(lock_);
-    sync_token = MakeSyncToken(next_fence_sync_release_++);
+    SyncToken sync_token = MakeSyncToken(next_fence_sync_release_++);
     // Note: we enqueue the task under the lock to guarantee monotonicity of
     // the release ids as seen by the service. Unretained is safe because
     // InProcessCommandBuffer synchronizes with the GPU thread at destruction
@@ -332,11 +329,7 @@ Mailbox SharedImageInterfaceInProcess::CreateSharedImage(
             color_space, surface_origin, alpha_type, usage, sync_token),
         {});
   }
-  if (requires_sync_token) {
-    sync_token.SetVerifyFlush();
-    gpu_memory_buffer_manager->SetDestructionSyncToken(gpu_memory_buffer,
-                                                       sync_token);
-  }
+
   return mailbox;
 }
 
@@ -360,8 +353,8 @@ void SharedImageInterfaceInProcess::CreateGMBSharedImageOnGpuThread(
 
   DCHECK(shared_image_factory_);
   if (!shared_image_factory_->CreateSharedImage(
-          mailbox, kDisplayCompositorClientId, std::move(handle), format, plane,
-          size, color_space, surface_origin, alpha_type, usage)) {
+          mailbox, std::move(handle), format, plane, size, color_space,
+          surface_origin, alpha_type, usage)) {
     context_state_->MarkContextLost();
     return;
   }

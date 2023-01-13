@@ -8,13 +8,13 @@
 #include <memory>
 #include <utility>
 
-#include "base/callback_helpers.h"
 #include "base/check_op.h"
 #include "base/command_line.h"
 #include "base/containers/adapters.h"
 #include "base/containers/contains.h"
 #include "base/debug/dump_without_crashing.h"
 #include "base/feature_list.h"
+#include "base/functional/callback_helpers.h"
 #include "base/i18n/rtl.h"
 #include "base/logging.h"
 #include "base/notreached.h"
@@ -1899,6 +1899,20 @@ ViewAccessibility& View::GetViewAccessibility() const {
   if (!view_accessibility_)
     view_accessibility_ = ViewAccessibility::Create(const_cast<View*>(this));
   return *view_accessibility_;
+}
+
+void View::SetAccessibleName(const std::u16string& name) {
+  if (name == accessible_name_) {
+    return;
+  }
+  accessible_name_ = name;
+  OnPropertyChanged(&accessible_name_, kPropertyEffectsNone);
+  NotifyAccessibilityEvent(ax::mojom::Event::kTextChanged, true);
+  OnAccessibleNameChanged(name);
+}
+
+const std::u16string& View::GetAccessibleName() const {
+  return accessible_name_;
 }
 
 bool View::HandleAccessibleAction(const ui::AXActionData& action_data) {

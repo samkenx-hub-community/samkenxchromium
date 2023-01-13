@@ -70,7 +70,8 @@ ci.builder(
     ),
     # Higher build timeout since dbg ASAN builds can take a while on a clobber
     # build.
-    execution_timeout = 5 * time.hour,
+    # TODO(crbug.com/1395760): Check why the compile takes longer time.
+    execution_timeout = 8 * time.hour,
 )
 
 ci.thin_tester(
@@ -1218,35 +1219,6 @@ ci.thin_tester(
     cq_mirrors_console_view = "mirrors",
 )
 
-# TODO(crbug/1182468) Remove android coverage bots after coverage is
-# running on CQ.
-ci.builder(
-    name = "android-pie-arm64-coverage-experimental-rel",
-    builder_spec = builder_config.builder_spec(
-        gclient_config = builder_config.gclient_config(
-            config = "chromium",
-            apply_configs = [
-                "android",
-                "use_clang_coverage",
-            ],
-        ),
-        chromium_config = builder_config.chromium_config(
-            config = "android",
-            apply_configs = ["mb"],
-            build_config = builder_config.build_config.RELEASE,
-            target_bits = 64,
-            target_platform = builder_config.target_platform.ANDROID,
-        ),
-        android_config = builder_config.android_config(config = "main_builder"),
-        build_gs_bucket = "chromium-android-archive",
-    ),
-    sheriff_rotations = args.ignore_default(None),
-    console_view_entry = consoles.console_view_entry(
-        category = "builder_tester|arm64",
-        short_name = "p-cov",
-    ),
-)
-
 ci.builder(
     name = "android-pie-arm64-rel",
     branch_selector = branches.STANDARD_MILESTONE,
@@ -1376,4 +1348,7 @@ ci.builder(
         short_name = "12",
     ),
     execution_timeout = 4 * time.hour,
+
+    # TODO(crbug.com/1366956): remove this after confirm py3 works on this builder.
+    omit_python2 = True,
 )

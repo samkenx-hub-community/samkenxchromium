@@ -11,12 +11,12 @@
 #include <vector>
 
 #include "ash/constants/ash_features.h"
-#include "base/bind.h"
-#include "base/callback_helpers.h"
 #include "base/containers/adapters.h"
 #include "base/files/file_enumerator.h"
 #include "base/files/file_path.h"
 #include "base/files/file_util.h"
+#include "base/functional/bind.h"
+#include "base/functional/callback_helpers.h"
 #include "base/hash/md5.h"
 #include "base/logging.h"
 #include "base/metrics/histogram_macros.h"
@@ -45,6 +45,7 @@
 #include "chrome/common/pref_names.h"
 #include "chromeos/ash/components/drivefs/drivefs_bootstrap.h"
 #include "chromeos/ash/components/drivefs/drivefs_pin_manager.h"
+#include "chromeos/ash/components/drivefs/sync_status_tracker.h"
 #include "chromeos/ash/components/network/network_handler.h"
 #include "chromeos/ash/components/network/network_state.h"
 #include "chromeos/ash/components/network/network_state_handler.h"
@@ -445,10 +446,6 @@ class DriveIntegrationService::PreferenceWatcher
 
   void UpdateBulkPinningState() {
     DCHECK(integration_service_);
-    if (!ash::features::IsDriveFsBulkPinningEnabled()) {
-      return;
-    }
-
     drivefs::pinning::DriveFsPinManager* const pin_manager =
         integration_service_->GetDriveFsPinManager();
     if (!pin_manager) {
@@ -457,9 +454,7 @@ class DriveIntegrationService::PreferenceWatcher
 
     const bool enabled =
         pref_service_->GetBoolean(prefs::kDriveFsBulkPinningEnabled);
-    integration_service_->GetDriveFsPinManager()->SetBulkPinningEnabled(
-        enabled);
-
+    integration_service_->GetDriveFsHost()->SetAlwaysEnableDocsOffline(enabled);
     if (enabled) {
       VLOG(1) << "Starting bulk pinning";
       pin_manager->Start(base::DoNothing());
@@ -866,11 +861,7 @@ drivefs::DriveFsHost* DriveIntegrationService::GetDriveFsHost() const {
 }
 
 drivefs::pinning::DriveFsPinManager*
-DriveIntegrationService::GetDriveFsPinManager() {
-  if (!ash::features::IsDriveFsBulkPinningEnabled()) {
-    return nullptr;
-  }
-
+DriveIntegrationService::GetDriveFsPinManager() const {
   return pin_manager_.get();
 }
 
@@ -1016,10 +1007,11 @@ void DriveIntegrationService::RemoveDriveMountPoint() {
   }
   GetDriveFsHost()->Unmount();
 
-  if (ash::features::IsDriveFsBulkPinningEnabled() && pin_manager_) {
+  if (pin_manager_) {
     pin_manager_->Stop();
     GetDriveFsHost()->RemoveObserver(pin_manager_.get());
     pin_manager_.reset();
+    GetDriveFsHost()->SetAlwaysEnableDocsOffline(false);
   }
 }
 
@@ -1099,7 +1091,6 @@ void DriveIntegrationService::OnMounted(const base::FilePath& mount_path) {
 
   if (ash::features::IsDriveFsBulkPinningEnabled()) {
     pin_manager_ = std::make_unique<drivefs::pinning::DriveFsPinManager>(
-        profile_->GetPrefs()->GetBoolean(prefs::kDriveFsBulkPinningEnabled),
         profile_->GetPath(), GetDriveFsInterface());
     GetDriveFsHost()->AddObserver(pin_manager_.get());
   }
@@ -1496,9 +1487,9 @@ void DriveIntegrationService::GetSyncingPaths(
   }
 }
 
-drivefs::SyncStatusAndProgress DriveIntegrationService::GetSyncStatusForPath(
+drivefs::SyncState DriveIntegrationService::GetSyncStateForPath(
     const base::FilePath& drive_path) {
-  return GetDriveFsHost()->GetSyncStatusForPath(drive_path);
+  return GetDriveFsHost()->GetSyncStateForPath(drive_path);
 }
 
 void DriveIntegrationService::PollHostedFilePinStates() {

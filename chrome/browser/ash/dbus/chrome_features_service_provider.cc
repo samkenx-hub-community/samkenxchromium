@@ -12,8 +12,8 @@
 #include "ash/components/arc/arc_features.h"
 #include "ash/constants/ash_features.h"
 #include "ash/constants/ash_pref_names.h"
-#include "base/bind.h"
 #include "base/feature_list.h"
+#include "base/functional/bind.h"
 #include "base/metrics/field_trial.h"
 #include "base/ranges/algorithm.h"
 #include "chrome/browser/ash/crostini/crostini_features.h"
@@ -417,11 +417,13 @@ void ChromeFeaturesServiceProvider::IsPeripheralDataAccessEnabled(
                peripheral_data_access_enabled);
 }
 
+// TODO(b/265091596): Remove
 void ChromeFeaturesServiceProvider::IsDnsProxyEnabled(
     dbus::MethodCall* method_call,
     dbus::ExportedObject::ResponseSender response_sender) {
-  SendResponse(method_call, std::move(response_sender),
-               base::FeatureList::IsEnabled(features::kEnableDnsProxy));
+  // dnsproxy is always enabled now, so always return true; this method will be
+  // removed in a follow-up patch once CrOS is no longer dependent on it.
+  SendResponse(method_call, std::move(response_sender), true);
 }
 
 }  // namespace ash

@@ -13,10 +13,10 @@
 #include <utility>
 #include <vector>
 
-#include "base/callback_helpers.h"
 #include "base/containers/span.h"
 #include "base/files/file_path.h"
 #include "base/files/scoped_temp_dir.h"
+#include "base/functional/callback_helpers.h"
 #include "base/hash/hash.h"
 #include "base/process/process_iterator.h"
 #include "base/scoped_generic.h"
@@ -201,6 +201,12 @@ std::wstring GetRegistryKeyClientsUpdater();
 // Returns the registry path for the Updater app id under the |ClientState|
 // subkey. The path does not include the registry root hive prefix.
 std::wstring GetRegistryKeyClientStateUpdater();
+
+// Set `name` in `root`\`key` to `value`.
+bool SetRegistryKey(HKEY root,
+                    const std::wstring& key,
+                    const std::wstring& name,
+                    const std::wstring& value);
 
 // Returns a value in the [0, 100] range or -1 if the progress could not
 // be computed.

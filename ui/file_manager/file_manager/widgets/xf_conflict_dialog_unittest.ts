@@ -26,6 +26,35 @@ function getConflictDialogElement(): XfConflictDialog {
 }
 
 /*
+ * Tests that the <dialog> element has the focus when the dialog opens. Child
+ * UI elements should not be focused by design.
+ */
+export async function testDialogShowFocus(done: () => void) {
+  const element = getConflictDialogElement();
+
+  // Check: the dialog should not be open.
+  const dialog = element.getDialogElement();
+  assertFalse(dialog.open);
+
+  const randomTrueFalse = () => {  // Returns random Boolean.
+    return Math.random() < 0.5;
+  };
+
+  // Open the conflict dialog for 'file-name' with random optional params.
+  element.show('file-name', randomTrueFalse(), randomTrueFalse());
+  await waitUntil(() => dialog.open);
+
+  // Check: the dialog should be visible.
+  assertNotEquals('none', window.getComputedStyle(dialog).display);
+  assertFalse(dialog.hidden);
+
+  // Check: the <dialog> must have the focus, never its child UI elements.
+  await waitUntil(() => element.shadowRoot!.activeElement === dialog);
+
+  done();
+}
+
+/*
  * Tests that the dialog opens with no 'Apply to all' checkbox shown.
  */
 export async function testDialogShow(done: () => void) {
@@ -42,7 +71,7 @@ export async function testDialogShow(done: () => void) {
   // Check: the dialog message should contain 'file.txt'.
   const message = element.getMessageElement();
   assertNotEquals('none', window.getComputedStyle(message).display);
-  assertTrue(message.innerText.includes('file.txt'));
+  assertTrue(message.innerText.includes('A file named "file.txt"'));
   assertFalse(message.hidden);
 
   // Check: the 'Apply to all' checkbox should not be shown.
@@ -50,10 +79,6 @@ export async function testDialogShow(done: () => void) {
   assertEquals('none', window.getComputedStyle(checkbox).display);
   assertFalse(checkbox.checked);
   assertTrue(checkbox.hidden);
-
-  // Check: the dialog should have the focus.
-  assertNotEquals('none', window.getComputedStyle(dialog).display);
-  await waitUntil(() => element.shadowRoot!.activeElement === dialog);
 
   done();
 }
@@ -76,7 +101,7 @@ export async function testDialogShowCheckbox(done: () => void) {
   // Check: the dialog message should contain 'image.jpg'.
   const message = element.getMessageElement();
   assertNotEquals('none', window.getComputedStyle(message).display);
-  assertTrue(message.innerText.includes('image.jpg'));
+  assertTrue(message.innerText.includes('A file named "image.jpg"'));
   assertFalse(message.hidden);
 
   // Check: the 'Apply to all' checkbox should be shown.
@@ -86,9 +111,38 @@ export async function testDialogShowCheckbox(done: () => void) {
   assertFalse(checkbox.checked);
   assertFalse(checkbox.hidden);
 
-  // Check: the dialog should have the focus.
-  assertNotEquals('none', window.getComputedStyle(dialog).display);
-  await waitUntil(() => element.shadowRoot!.activeElement === dialog);
+  done();
+}
+
+/*
+ * Tests that the dialog can open with the directory (aka a folder) message
+ * text shown.
+ */
+export async function testDialogShowDirectoryMessageText(done: () => void) {
+  const element = getConflictDialogElement();
+
+  // Check: the dialog should not be open.
+  const dialog = element.getDialogElement();
+  assertFalse(dialog.open);
+
+  // Open the conflict dialog for a given file name, with no checkbox, and
+  // (test-case) message text indicating that the file type is a folder.
+  const isDirectory = true;
+  const withCheckbox = false;
+  element.show('Downloads', withCheckbox, isDirectory);
+  await waitUntil(() => dialog.open);
+
+  // Check: the dialog message should contain 'Downloads'.
+  const message = element.getMessageElement();
+  assertNotEquals('none', window.getComputedStyle(message).display);
+  assertTrue(message.innerText.includes('A folder named "Downloads"'));
+  assertFalse(message.hidden);
+
+  // Check: the 'Apply to all' checkbox should not be shown.
+  const checkbox = element.getCheckboxElement();
+  assertEquals('none', window.getComputedStyle(checkbox).display);
+  assertFalse(checkbox.checked);
+  assertTrue(checkbox.hidden);
 
   done();
 }

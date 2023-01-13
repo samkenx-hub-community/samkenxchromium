@@ -10,9 +10,9 @@
 #include <utility>
 #include <vector>
 
-#include "base/callback.h"
 #include "base/containers/circular_deque.h"
 #include "base/containers/contains.h"
+#include "base/functional/callback.h"
 #include "base/hash/hash.h"
 #include "base/lazy_instance.h"
 #include "base/no_destructor.h"
@@ -113,14 +113,13 @@ bool RenderFrameProxyHost::IsFrameTokenInUse(
 }
 
 RenderFrameProxyHost::RenderFrameProxyHost(
-    SiteInstance* site_instance,
+    SiteInstanceImpl* site_instance,
     scoped_refptr<RenderViewHostImpl> render_view_host,
     FrameTreeNode* frame_tree_node,
     const blink::RemoteFrameToken& frame_token)
     : routing_id_(site_instance->GetProcess()->GetNextRoutingID()),
       site_instance_(site_instance),
-      site_instance_group_(
-          static_cast<SiteInstanceImpl*>(site_instance)->group()),
+      site_instance_group_(site_instance->group()),
       process_(site_instance->GetProcess()),
       frame_tree_node_(frame_tree_node),
       render_frame_proxy_created_(false),
@@ -436,8 +435,7 @@ void RenderFrameProxyHost::ChildProcessGone() {
 void RenderFrameProxyHost::DidFocusFrame() {
   TRACE_EVENT("navigation", "RenderFrameProxyHost::DidFocusFrame",
               ChromeTrackEvent::kFrameTreeNodeInfo, *frame_tree_node_,
-              ChromeTrackEvent::kSiteInstance,
-              *static_cast<SiteInstanceImpl*>(GetSiteInstance()));
+              ChromeTrackEvent::kSiteInstance, *GetSiteInstance());
   // If a fenced frame has requested focus something wrong has gone on. We do
   // not support programmatic focus between the embedder and embeddee because
   // that could be a side channel.
@@ -630,13 +628,22 @@ void RenderFrameProxyHost::UpdateTargetURL(
 }
 
 void RenderFrameProxyHost::RouteCloseEvent() {
+  // The renderer already ensures that this can only be called on an outermost
+  // main frame - see DOMWindow::Close().  Terminate the renderer if this is
+  // not the case.
+  RenderFrameHostImpl* rfh = frame_tree_node_->current_frame_host();
+  if (!rfh->IsOutermostMainFrame()) {
+    bad_message::ReceivedBadMessage(
+        GetProcess(), bad_message::RFPH_WINDOW_CLOSE_ON_NON_OUTERMOST_FRAME);
+    return;
+  }
+
   // Tell the active RenderFrameHost to run unload handlers and close, as long
   // as the request came from a RenderFrameHost in the same BrowsingInstance.
   // We receive this from a WebViewImpl when it receives a request to close
   // the window containing the active RenderFrameHost.
-  RenderFrameHostImpl* rfh = frame_tree_node_->current_frame_host();
   if (GetSiteInstance()->IsRelatedSiteInstance(rfh->GetSiteInstance())) {
-    rfh->render_view_host()->ClosePage();
+    rfh->ClosePage();
   }
 }
 
@@ -830,11 +837,9 @@ void RenderFrameProxyHost::WriteIntoTrace(
   proto->set_is_render_frame_proxy_live(is_render_frame_proxy_live());
   auto* site_instance = GetSiteInstance();
   if (site_instance) {
-    proto->set_rvh_map_id(
-        frame_tree_node_->frame_tree()
-            .GetRenderViewHostMapId(
-                static_cast<SiteInstanceImpl*>(site_instance)->group())
-            .value());
+    proto->set_rvh_map_id(frame_tree_node_->frame_tree()
+                              .GetRenderViewHostMapId(site_instance->group())
+                              .value());
     proto->set_site_instance_id(site_instance->GetId().value());
   }
 }

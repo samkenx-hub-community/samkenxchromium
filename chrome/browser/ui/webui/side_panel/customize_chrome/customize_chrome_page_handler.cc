@@ -28,6 +28,8 @@
 #include "components/prefs/pref_service.h"
 #include "components/prefs/scoped_user_pref_update.h"
 #include "content/public/browser/web_contents.h"
+#include "extensions/browser/extension_registry.h"
+#include "extensions/common/extension.h"
 #include "mojo/public/cpp/bindings/pending_remote.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/color/color_provider.h"
@@ -203,8 +205,24 @@ void CustomizeChromePageHandler::UpdateTheme() {
   } else {
     theme->colors_managed_by_policy = false;
   }
+  if (theme_service_->UsingExtensionTheme()) {
+    const extensions::Extension* theme_extension =
+        extensions::ExtensionRegistry::Get(profile_)
+            ->enabled_extensions()
+            .GetByID(theme_service_->GetThemeID());
+    if (theme_extension) {
+      auto third_party_theme_info =
+          side_panel::mojom::ThirdPartyThemeInfo::New();
+      third_party_theme_info->id = theme_extension->id();
+      third_party_theme_info->name = theme_extension->name();
+      theme->third_party_theme_info = std::move(third_party_theme_info);
+    }
+  }
   theme->color_picker_icon_color =
       web_contents_->GetColorProvider().GetColor(kColorNewTabPageText);
+  if (custom_background.has_value()) {
+    theme->daily_refresh_collection_id = custom_background->collection_id;
+  }
   auto* native_theme = ui::NativeTheme::GetInstanceForNativeUi();
   CHECK(native_theme);
   theme->system_dark_mode = native_theme->ShouldUseDarkColors();
@@ -267,9 +285,29 @@ void CustomizeChromePageHandler::SetBackgroundImage(
       /* collection_id= */ "");
 }
 
+void CustomizeChromePageHandler::SetDailyRefreshCollectionId(
+    const std::string& collection_id) {
+  // Populating the |collection_id| turns on refresh daily which overrides the
+  // the selected image.
+  ntp_custom_background_service_->SetCustomBackgroundInfo(
+      /* image_url */ GURL(), /* thumbnail_url */ GURL(),
+      /* attribution_line_1= */ "", /* attribution_line_2= */ "",
+      /* action_url= */ GURL(), collection_id);
+}
+
 void CustomizeChromePageHandler::OpenChromeWebStore() {
   NavigateParams navigate_params(
       profile_, GURL("https://chrome.google.com/webstore?category=theme"),
+      ui::PAGE_TRANSITION_LINK);
+  navigate_params.window_action = NavigateParams::WindowAction::SHOW_WINDOW;
+  navigate_params.disposition = WindowOpenDisposition::NEW_FOREGROUND_TAB;
+  Navigate(&navigate_params);
+}
+
+void CustomizeChromePageHandler::OpenThirdPartyThemePage(
+    const std::string& theme_id) {
+  NavigateParams navigate_params(
+      profile_, GURL("https://chrome.google.com/webstore/detail/" + theme_id),
       ui::PAGE_TRANSITION_LINK);
   navigate_params.window_action = NavigateParams::WindowAction::SHOW_WINDOW;
   navigate_params.disposition = WindowOpenDisposition::NEW_FOREGROUND_TAB;

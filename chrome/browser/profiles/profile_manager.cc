@@ -14,15 +14,15 @@
 #include <string>
 #include <utility>
 
-#include "base/bind.h"
-#include "base/callback.h"
-#include "base/callback_helpers.h"
 #include "base/command_line.h"
 #include "base/containers/contains.h"
 #include "base/feature_list.h"
 #include "base/files/file_enumerator.h"
 #include "base/files/file_path.h"
 #include "base/files/file_util.h"
+#include "base/functional/bind.h"
+#include "base/functional/callback.h"
+#include "base/functional/callback_helpers.h"
 #include "base/json/values_util.h"
 #include "base/metrics/histogram_functions.h"
 #include "base/metrics/histogram_macros.h"
@@ -43,7 +43,6 @@
 #include "chrome/browser/browsing_data/chrome_browsing_data_lifetime_manager.h"
 #include "chrome/browser/browsing_data/chrome_browsing_data_lifetime_manager_factory.h"
 #include "chrome/browser/buildflags.h"
-#include "chrome/browser/chrome_notification_types.h"
 #include "chrome/browser/extensions/chrome_content_browser_client_extensions_part.h"
 #include "chrome/browser/lifetime/application_lifetime.h"
 #include "chrome/browser/navigation_predictor/navigation_predictor_keyed_service_factory.h"
@@ -89,7 +88,6 @@
 #include "components/sync/base/stop_source.h"
 #include "content/public/browser/browser_task_traits.h"
 #include "content/public/browser/browser_thread.h"
-#include "content/public/browser/notification_service.h"
 #include "content/public/browser/storage_partition.h"
 #include "content/public/common/content_switches.h"
 #include "extensions/buildflags/buildflags.h"
@@ -1350,10 +1348,6 @@ void ProfileManager::DoFinalInit(ProfileInfo* profile_info,
   for (auto& observer : observers_)
     observer.OnProfileAdded(profile);
 
-  content::NotificationService::current()->Notify(
-      chrome::NOTIFICATION_PROFILE_ADDED, content::Source<Profile>(profile),
-      content::NotificationService::NoDetails());
-
   // At this point, the user policy service and the child account service
   // had enough time to initialize and should have updated the user signout
   // flag attached to the profile.
@@ -1874,10 +1868,11 @@ void ProfileManager::AddProfileToStorage(Profile* profile) {
           !entry->CanBeManaged()) {
         content::GetUIThreadTaskRunner({})->PostTask(
             FROM_HERE,
-            base::BindOnce(
-                &ClearPrimaryAccountForProfile, profile->GetWeakPtr(),
-                signin_metrics::AUTHENTICATION_FAILED_WITH_FORCE_SIGNIN,
-                signin_metrics::SignoutDelete::kIgnoreMetric));
+            base::BindOnce(&ClearPrimaryAccountForProfile,
+                           profile->GetWeakPtr(),
+                           signin_metrics::ProfileSignout::
+                               kAuthenticationFailedWithForceSignin,
+                           signin_metrics::SignoutDelete::kIgnoreMetric));
       }
 #endif
       return;

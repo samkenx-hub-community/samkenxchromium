@@ -11,11 +11,11 @@
 #include <utility>
 
 #include "ash/constants/ash_features.h"
-#include "base/bind.h"
-#include "base/callback.h"
-#include "base/callback_helpers.h"
 #include "base/check.h"
 #include "base/containers/contains.h"
+#include "base/functional/bind.h"
+#include "base/functional/callback.h"
+#include "base/functional/callback_helpers.h"
 #include "base/json/json_reader.h"
 #include "base/logging.h"
 #include "base/metrics/histogram_functions.h"
@@ -97,6 +97,7 @@ const char* const kKnownSettings[] = {
     kDevicePrintersAccessMode,
     kDevicePrintersBlocklist,
     kDevicePrintersAllowlist,
+    kDevicePrintingClientNameTemplate,
     kDevicePowerwashAllowed,
     kDeviceQuirksDownloadEnabled,
     kDeviceRebootOnUserSignout,
@@ -1095,6 +1096,15 @@ void DecodeGenericPolicies(const em::ChromeDeviceSettingsProto& policy,
       list.Append(id);
     new_values_cache->SetValue(kDevicePrintersAllowlist,
                                base::Value(std::move(list)));
+  }
+
+  if (policy.has_device_printing_client_name_template()) {
+    const em::StringPolicyProto& container(
+        policy.device_printing_client_name_template());
+    if (container.has_value() && !container.value().empty()) {
+      new_values_cache->SetString(kDevicePrintingClientNameTemplate,
+                                  container.value());
+    }
   }
 
   if (policy.has_device_reboot_on_user_signout()) {

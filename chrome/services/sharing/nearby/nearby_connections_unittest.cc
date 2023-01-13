@@ -11,10 +11,10 @@
 #include <utility>
 
 #include "ash/public/cpp/network_config_service.h"
-#include "base/bind.h"
-#include "base/callback.h"
-#include "base/callback_helpers.h"
 #include "base/files/file_util.h"
+#include "base/functional/bind.h"
+#include "base/functional/callback.h"
+#include "base/functional/callback_helpers.h"
 #include "base/memory/ptr_util.h"
 #include "base/run_loop.h"
 #include "base/strings/string_number_conversions.h"
@@ -38,7 +38,6 @@
 #include "testing/gtest/include/gtest/gtest.h"
 #include "third_party/nearby/src/connections/implementation/mock_service_controller_router.h"
 
-namespace location {
 namespace nearby {
 namespace connections {
 
@@ -208,7 +207,7 @@ class NearbyConnectionsTest : public testing::Test {
 
     nearby_connections_ = std::make_unique<NearbyConnections>(
         remote_.BindNewPipeAndPassReceiver(),
-        location::nearby::api::LogMessage::Severity::kInfo,
+        nearby::api::LogMessage::Severity::kInfo,
         base::BindOnce(&NearbyConnectionsTest::OnDisconnect,
                        base::Unretained(this)));
     nearby_connections_->SetServiceControllerRouterForTesting(
@@ -1321,4 +1320,3 @@ TEST_F(NearbyConnectionsTest, ReceiveStreamPayload) {
 
 }  // namespace connections
 }  // namespace nearby
-}  // namespace location

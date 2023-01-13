@@ -7,9 +7,9 @@
 
 #include <memory>
 
-#include "base/callback_forward.h"
 #include "base/containers/flat_map.h"
 #include "base/files/file_path.h"
+#include "base/functional/callback_forward.h"
 #include "base/gtest_prod_util.h"
 #include "base/memory/weak_ptr.h"
 #include "base/sequence_checker.h"
@@ -20,6 +20,7 @@
 #include "chrome/browser/web_applications/isolated_web_apps/signed_web_bundle_reader.h"
 #include "components/keyed_service/core/keyed_service.h"
 #include "components/web_package/mojom/web_bundle_parser.mojom-forward.h"
+#include "components/web_package/signed_web_bundles/signed_web_bundle_integrity_block.h"
 #include "components/web_package/signed_web_bundles/signed_web_bundle_signature_verifier.h"
 #include "services/network/public/cpp/resource_request.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
@@ -172,7 +173,7 @@ class IsolatedWebAppReaderRegistry : public KeyedService {
   void OnIntegrityBlockRead(
       const base::FilePath& web_bundle_path,
       const web_package::SignedWebBundleId& web_bundle_id,
-      const std::vector<web_package::Ed25519PublicKey>& public_key_stack,
+      const web_package::SignedWebBundleIntegrityBlock integrity_block,
       base::OnceCallback<
           void(SignedWebBundleReader::SignatureVerificationAction)> callback);
 

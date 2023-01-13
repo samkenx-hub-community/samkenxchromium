@@ -8,9 +8,9 @@
 #include <limits>
 
 #include "base/barrier_closure.h"
-#include "base/bind.h"
-#include "base/callback_helpers.h"
 #include "base/compiler_specific.h"
+#include "base/functional/bind.h"
+#include "base/functional/callback_helpers.h"
 #include "base/logging.h"
 #include "base/memory/ptr_util.h"
 #include "base/memory/raw_ptr.h"
@@ -356,6 +356,14 @@ libyuv::FilterMode ToLibyuvFilterMode(
     case PaintCanvasVideoRenderer::kFilterBilinear:
       return libyuv::kFilterBilinear;
   }
+}
+
+size_t NumConvertVideoFrameToRGBPixelsTasks(const VideoFrame* video_frame) {
+  constexpr size_t kTaskBytes = 1024 * 1024;  // 1 MiB
+  const size_t frame_size = VideoFrame::AllocationSize(
+      video_frame->format(), video_frame->visible_rect().size());
+  const size_t n_tasks = std::max<size_t>(1, frame_size / kTaskBytes);
+  return std::min<size_t>(n_tasks, base::SysInfo::NumberOfProcessors());
 }
 
 void ConvertVideoFrameToRGBPixelsTask(const VideoFrame* video_frame,
@@ -732,23 +740,23 @@ class VideoImageGenerator : public cc::PaintImageGenerator {
 
   sk_sp<SkData> GetEncodedData() const override { return nullptr; }
 
-  bool GetPixels(const SkImageInfo& info,
-                 void* pixels,
-                 size_t row_bytes,
+  bool GetPixels(SkPixmap dst_pixmap,
                  size_t frame_index,
                  cc::PaintImage::GeneratorClientId client_id,
                  uint32_t lazy_pixel_ref) override {
     DCHECK_EQ(frame_index, 0u);
 
     // If skia couldn't do the YUV conversion on GPU, we will on CPU.
-    PaintCanvasVideoRenderer::ConvertVideoFrameToRGBPixels(frame_.get(), pixels,
-                                                           row_bytes);
+    PaintCanvasVideoRenderer::ConvertVideoFrameToRGBPixels(
+        frame_.get(), dst_pixmap.writable_addr(), dst_pixmap.rowBytes());
 
     if (!SkColorSpace::Equals(GetSkImageInfo().colorSpace(),
-                              info.colorSpace())) {
-      SkPixmap src(GetSkImageInfo(), pixels, row_bytes);
-      if (!src.readPixels(info, pixels, row_bytes))
+                              dst_pixmap.colorSpace())) {
+      SkPixmap src(GetSkImageInfo(), dst_pixmap.writable_addr(),
+                   dst_pixmap.rowBytes());
+      if (!src.readPixels(dst_pixmap)) {
         return false;
+      }
     }
     return true;
   }
@@ -1335,7 +1343,8 @@ void PaintCanvasVideoRenderer::ConvertVideoFrameToRGBPixels(
     void* rgb_pixels,
     size_t row_bytes,
     bool premultiply_alpha,
-    FilterMode filter) {
+    FilterMode filter,
+    bool disable_threading) {
   if (!video_frame->IsMappable()) {
     NOTREACHED() << "Cannot extract pixels from non-CPU frame formats.";
     return;
@@ -1374,13 +1383,8 @@ void PaintCanvasVideoRenderer::ConvertVideoFrameToRGBPixels(
       break;
   }
 
-  constexpr size_t kTaskBytes = 1024 * 1024;  // 1 MiB
-  const size_t n_tasks = std::min<size_t>(
-      std::max<size_t>(
-          1, VideoFrame::AllocationSize(video_frame->format(),
-                                        video_frame->visible_rect().size()) /
-                 kTaskBytes),
-      base::SysInfo::NumberOfProcessors());
+  const size_t n_tasks =
+      disable_threading ? 1 : NumConvertVideoFrameToRGBPixelsTasks(video_frame);
   base::WaitableEvent event;
   base::RepeatingClosure barrier = base::BarrierClosure(
       n_tasks,

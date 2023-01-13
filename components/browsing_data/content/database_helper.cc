@@ -8,11 +8,11 @@
 #include <utility>
 #include <vector>
 
-#include "base/bind.h"
-#include "base/callback.h"
-#include "base/callback_helpers.h"
 #include "base/files/file_path.h"
 #include "base/files/file_util.h"
+#include "base/functional/bind.h"
+#include "base/functional/callback.h"
+#include "base/functional/callback_helpers.h"
 #include "base/location.h"
 #include "base/strings/utf_string_conversions.h"
 #include "components/browsing_data/content/browsing_data_helper.h"
@@ -111,8 +111,7 @@ void CannedDatabaseHelper::StartFetching(FetchCallback callback) {
     result.emplace_back(blink::StorageKey(origin), 0, base::Time());
   }
 
-  content::GetUIThreadTaskRunner({})->PostTask(
-      FROM_HERE, base::BindOnce(std::move(callback), result));
+  std::move(callback).Run(result);
 }
 
 void CannedDatabaseHelper::DeleteDatabase(const url::Origin& origin) {

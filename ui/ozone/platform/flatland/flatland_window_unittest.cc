@@ -32,6 +32,7 @@ using ::scenic::FakeView;
 using ::scenic::FakeViewport;
 using ::testing::_;
 using ::testing::AllOf;
+using ::testing::Contains;
 using ::testing::Field;
 using ::testing::IsEmpty;
 using ::testing::Matcher;
@@ -47,9 +48,13 @@ Matcher<FakeGraph> IsWindowGraph(
     const fuchsia::ui::composition::ParentViewportWatcherPtr&
         parent_viewport_watcher,
     const fuchsia::ui::views::ViewportCreationToken& viewport_creation_token,
-    std::vector<Matcher<FakeTransformPtr>> child_transform_matchers) {
-  auto view_token_koid = base::GetRelatedKoid(viewport_creation_token.value);
-  auto watcher_koid = base::GetRelatedKoid(parent_viewport_watcher.channel());
+    Matcher<std::vector<FakeTransformPtr>> children_transform_matcher) {
+  absl::optional<zx_koid_t> view_token_koid =
+      base::GetRelatedKoid(viewport_creation_token.value);
+  EXPECT_TRUE(view_token_koid.has_value());
+  absl::optional<zx_koid_t> watcher_koid =
+      base::GetRelatedKoid(parent_viewport_watcher.channel());
+  EXPECT_TRUE(watcher_koid.has_value());
 
   return AllOf(
       Field("root_transform", &FakeGraph::root_transform,
@@ -60,7 +65,7 @@ Matcher<FakeGraph> IsWindowGraph(
                           Field("opacity", &FakeTransform::opacity,
                                 FakeTransform::kDefaultOpacity),
                           Field("children", &FakeTransform::children,
-                                ElementsAreArray(child_transform_matchers))))),
+                                children_transform_matcher)))),
       Field("view", &FakeGraph::view,
             Optional(AllOf(
                 Field("view_token", &FakeView::view_token, view_token_koid),
@@ -98,6 +103,16 @@ Matcher<FakeTransformPtr> IsViewport(
                       viewport_koid)))))));
 }
 
+Matcher<FakeTransformPtr> IsHitShield() {
+  return Pointee(AllOf(
+      // Must not clip the hit region.
+      Field("clip_bounds", &FakeTransform::clip_bounds,
+            testing::Eq(std::nullopt)),
+      // Hit region must be "infinite".
+      Field("hit_regions", &FakeTransform::hit_regions,
+            testing::Contains(scenic::kInfiniteHitRegion))));
+}
+
 }  // namespace
 
 class FlatlandWindowTest : public ::testing::Test {
@@ -107,15 +122,20 @@ class FlatlandWindowTest : public ::testing::Test {
                                  fake_flatland_.GetFlatlandRequestHandler()) {}
   ~FlatlandWindowTest() override = default;
 
-  FlatlandWindow* CreateFlatlandWindow(
-      PlatformWindowDelegate* delegate,
-      fuchsia::ui::views::ViewCreationToken view_creation_token) {
+  void CreateWindow() {
+    EXPECT_FALSE(flatland_window_);
+
+    auto token_pair = scenic::ViewCreationTokenPair::New();
+    viewport_token_ = std::move(token_pair.viewport_token);
+
+    EXPECT_CALL(window_delegate_, OnAcceleratedWidgetAvailable(_))
+        .WillOnce(SaveArg<0>(&window_widget_));
+
     PlatformWindowInitProperties properties;
     properties.view_ref_pair = scenic::ViewRefPair::New();
-    properties.view_creation_token = std::move(view_creation_token);
+    properties.view_creation_token = std::move(token_pair.view_token);
     flatland_window_ = std::make_unique<FlatlandWindow>(
-        &window_manager_, delegate, std::move(properties));
-    return flatland_window_.get();
+        &window_manager_, &window_delegate_, std::move(properties));
   }
 
   void SetLayoutInfo(uint32_t width,
@@ -127,6 +147,10 @@ class FlatlandWindowTest : public ::testing::Test {
     layout_info.set_device_pixel_ratio({dpr, dpr});
     layout_info.set_inset(inset);
     flatland_window_->OnGetLayout(std::move(layout_info));
+  }
+
+  void SetWindowStatus(fuchsia::ui::composition::ParentViewportStatus status) {
+    flatland_window_->OnGetStatus(status);
   }
 
   void SetViewRefFocusedHandle(
@@ -161,64 +185,53 @@ class FlatlandWindowTest : public ::testing::Test {
       base::test::SingleThreadTaskEnvironment::MainThreadType::IO};
   scenic::FakeFlatland fake_flatland_;
 
- private:
   base::TestComponentContextForProcess test_context_;
   // Injects binding for responding to Flatland protocol connection requests.
   const base::ScopedServicePublisher<fuchsia::ui::composition::Flatland>
       fake_flatland_publisher_;
 
   FlatlandWindowManager window_manager_;
+
+  MockPlatformWindowDelegate window_delegate_;
   std::unique_ptr<FlatlandWindow> flatland_window_;
+
+  gfx::AcceleratedWidget window_widget_ = gfx::kNullAcceleratedWidget;
+
+  fuchsia::ui::views::ViewportCreationToken viewport_token_;
 };
 
 TEST_F(FlatlandWindowTest, Initialization) {
-  MockPlatformWindowDelegate delegate;
-  gfx::AcceleratedWidget window_widget;
-  EXPECT_CALL(delegate, OnAcceleratedWidgetAvailable(_))
-      .WillOnce(SaveArg<0>(&window_widget));
-
-  auto token_pair = scenic::ViewCreationTokenPair::New();
-  CreateFlatlandWindow(&delegate, std::move(token_pair.view_token));
-  ASSERT_NE(window_widget, gfx::kNullAcceleratedWidget);
+  CreateWindow();
+  ASSERT_NE(window_widget_, gfx::kNullAcceleratedWidget);
 
   // Check that there are no crashes after flushing tasks.
   task_environment_.RunUntilIdle();
 }
 
 TEST_F(FlatlandWindowTest, PresentsOnShow) {
-  MockPlatformWindowDelegate delegate;
-  gfx::AcceleratedWidget window_widget;
-  EXPECT_CALL(delegate, OnAcceleratedWidgetAvailable(_))
-      .WillOnce(SaveArg<0>(&window_widget));
   size_t presents_called = 0u;
   fake_flatland_.SetPresentHandler(
       [&presents_called](auto) { ++presents_called; });
 
-  auto token_pair = scenic::ViewCreationTokenPair::New();
-  FlatlandWindow* flatland_window =
-      CreateFlatlandWindow(&delegate, std::move(token_pair.view_token));
-  ASSERT_NE(window_widget, gfx::kNullAcceleratedWidget);
+  CreateWindow();
+  ASSERT_NE(window_widget_, gfx::kNullAcceleratedWidget);
 
   task_environment_.RunUntilIdle();
   EXPECT_EQ(0u, presents_called);
 
-  flatland_window->Show(/*inactive=*/false);
+  flatland_window_->Show(/*inactive=*/false);
   EXPECT_EQ(0u, presents_called);
   task_environment_.RunUntilIdle();
   EXPECT_EQ(1u, presents_called);
   EXPECT_THAT(
       fake_flatland_.graph(),
-      IsWindowGraph(parent_viewport_watcher(), token_pair.viewport_token, {}));
+      IsWindowGraph(parent_viewport_watcher(), viewport_token_, IsEmpty()));
 }
 
 // Tests that FlatlandWindow processes and delegates focus signal.
 TEST_F(FlatlandWindowTest, ProcessesFocusedSignal) {
-  MockPlatformWindowDelegate delegate;
-  EXPECT_CALL(delegate, OnAcceleratedWidgetAvailable(_));
-  auto token_pair = scenic::ViewCreationTokenPair::New();
-  FlatlandWindow* flatland_window =
-      CreateFlatlandWindow(&delegate, std::move(token_pair.view_token));
-  flatland_window->Show(/*inactive=*/false);
+  CreateWindow();
+  flatland_window_->Show(/*inactive=*/false);
   task_environment_.RunUntilIdle();
 
   scenic::FakeViewRefFocused fake_view_ref_focused;
@@ -232,7 +245,7 @@ TEST_F(FlatlandWindowTest, ProcessesFocusedSignal) {
 
   // Send focused=true signal.
   bool focus_delegated = false;
-  EXPECT_CALL(delegate, OnActivationChanged(_))
+  EXPECT_CALL(window_delegate_, OnActivationChanged(_))
       .WillRepeatedly(SaveArg<0>(&focus_delegated));
   fake_view_ref_focused.ScheduleCallback(true);
   task_environment_.RunUntilIdle();
@@ -247,11 +260,8 @@ TEST_F(FlatlandWindowTest, ProcessesFocusedSignal) {
 }
 
 TEST_F(FlatlandWindowTest, AppliesDevicePixelRatio) {
-  MockPlatformWindowDelegate delegate;
-  EXPECT_CALL(delegate, OnAcceleratedWidgetAvailable(_));
-  auto token_pair = scenic::ViewCreationTokenPair::New();
-  CreateFlatlandWindow(&delegate, std::move(token_pair.view_token));
-  EXPECT_CALL(delegate, OnBoundsChanged(_)).Times(1);
+  CreateWindow();
+  EXPECT_CALL(window_delegate_, OnBoundsChanged(_)).Times(1);
   SetLayoutInfo(100, 100, 1.f);
 
   scenic::FakeTouchSource fake_touch_source;
@@ -264,7 +274,7 @@ TEST_F(FlatlandWindowTest, AppliesDevicePixelRatio) {
   const float kLocationX = 9.f;
   const float kLocationY = 10.f;
   bool event_received = false;
-  EXPECT_CALL(delegate, DispatchEvent(_))
+  EXPECT_CALL(window_delegate_, DispatchEvent(_))
       .WillOnce([&event_received, kLocationX, kLocationY](ui::Event* event) {
         EXPECT_EQ(event->AsTouchEvent()->location_f().x(), kLocationX);
         EXPECT_EQ(event->AsTouchEvent()->location_f().y(), kLocationY);
@@ -283,13 +293,13 @@ TEST_F(FlatlandWindowTest, AppliesDevicePixelRatio) {
 
   // Update device pixel ratio.
   const float kDPR = 2.f;
-  EXPECT_CALL(delegate, OnBoundsChanged(_)).Times(1);
+  EXPECT_CALL(window_delegate_, OnBoundsChanged(_)).Times(1);
   SetLayoutInfo(100, 100, kDPR);
 
   // Send the same touch event and expect coordinates to be scaled from
   // TouchEvent.
   event_received = false;
-  EXPECT_CALL(delegate, DispatchEvent(_))
+  EXPECT_CALL(window_delegate_, DispatchEvent(_))
       .WillOnce([&event_received, kLocationX, kLocationY,
                  kDPR](ui::Event* event) {
         EXPECT_EQ(event->AsTouchEvent()->location_f().x(), kLocationX * kDPR);
@@ -309,36 +319,30 @@ TEST_F(FlatlandWindowTest, AppliesDevicePixelRatio) {
 }
 
 TEST_F(FlatlandWindowTest, WaitsForNonZeroSizeToAttachSurfaceContent) {
-  MockPlatformWindowDelegate delegate;
-  EXPECT_CALL(delegate, OnAcceleratedWidgetAvailable(_));
   size_t presents_called = 0u;
   fake_flatland_.SetPresentHandler(
       [&presents_called](auto) { ++presents_called; });
 
-  auto token_pair = scenic::ViewCreationTokenPair::New();
-  FlatlandWindow* flatland_window =
-      CreateFlatlandWindow(&delegate, std::move(token_pair.view_token));
+  CreateWindow();
 
   // FlatlandWindow should start watching callbacks in ctor.
   task_environment_.RunUntilIdle();
 
-  // Create a ViewportCreationToken.
-  fuchsia::ui::views::ViewportCreationToken parent_token;
-  fuchsia::ui::views::ViewCreationToken child_token;
-  auto status = zx::channel::create(0, &parent_token.value, &child_token.value);
-  ASSERT_EQ(ZX_OK, status);
-
   // Try attaching the content. It should only be a closure.
-  flatland_window->AttachSurfaceContent(std::move(parent_token));
+  auto token_pair = scenic::ViewCreationTokenPair::New();
+  flatland_window_->AttachSurfaceContent(std::move(token_pair.viewport_token));
   EXPECT_TRUE(HasPendingAttachSurfaceContentClosure());
 
   // Setting layout info should trigger the closure and delegate calls.
-  EXPECT_CALL(delegate, OnWindowStateChanged(_, _)).Times(1);
-  EXPECT_CALL(delegate, OnBoundsChanged(_)).Times(1);
+  EXPECT_CALL(window_delegate_, OnWindowStateChanged(_, _)).Times(1);
+  EXPECT_CALL(window_delegate_, OnBoundsChanged(_)).Times(1);
 
   const uint32_t kWidth = 200;
   const uint32_t kHeight = 100;
   const fuchsia::math::SizeU expected_size = {kWidth, kHeight};
+
+  SetWindowStatus(
+      fuchsia::ui::composition::ParentViewportStatus::CONNECTED_TO_DISPLAY);
   SetLayoutInfo(kWidth, kHeight, 1.f);
   EXPECT_FALSE(HasPendingAttachSurfaceContentClosure());
 
@@ -348,17 +352,105 @@ TEST_F(FlatlandWindowTest, WaitsForNonZeroSizeToAttachSurfaceContent) {
   EXPECT_EQ(1u, presents_called);
 
   // Show to attach the scene graph.
-  flatland_window->Show(/*inactive=*/false);
+  flatland_window_->Show(/*inactive=*/false);
   fuchsia::ui::composition::OnNextFrameBeginValues on_next_frame_begin_values;
   on_next_frame_begin_values.set_additional_present_credits(1);
   fake_flatland_.FireOnNextFrameBeginEvent(
       std::move(on_next_frame_begin_values));
+
+  // Spin the loop to process Present().
   task_environment_.RunUntilIdle();
   EXPECT_EQ(2u, presents_called);
+  EXPECT_THAT(fake_flatland_.graph(),
+              IsWindowGraph(
+                  parent_viewport_watcher(), viewport_token_,
+                  Contains(IsViewport(token_pair.view_token, expected_size))));
+}
+
+// Verify that surface is cleared when the window is disconnected from the
+// display.
+TEST_F(FlatlandWindowTest, ResetSurfaceOnDisconnect) {
+  CreateWindow();
+
+  EXPECT_CALL(window_delegate_, OnBoundsChanged(_));
+  SetLayoutInfo(100, 100, 1.f);
+  task_environment_.RunUntilIdle();
+
+  // Try attaching the content. It should only be a closure.
+  auto token_pair = scenic::ViewCreationTokenPair::New();
+  flatland_window_->AttachSurfaceContent(std::move(token_pair.viewport_token));
+
+  // Show to attach the scene graph.
+  flatland_window_->Show(/*inactive=*/false);
+  fuchsia::ui::composition::OnNextFrameBeginValues on_next_frame_begin_values;
+  on_next_frame_begin_values.set_additional_present_credits(1);
+  fake_flatland_.FireOnNextFrameBeginEvent(
+      std::move(on_next_frame_begin_values));
+
+  // Spin the loop to process Present().
+  task_environment_.RunUntilIdle();
+
+  // surface view should be attached once the window is shown.
+  EXPECT_THAT(fake_flatland_.graph(),
+              IsWindowGraph(parent_viewport_watcher(), viewport_token_, _));
+
+  // Remove the window from the screen and verify that it simulates destruction
+  // of AcceleratedWidget, which is necessary to ensure that WindowSurface is
+  // re-initialized.
+  testing::Mock::VerifyAndClearExpectations(&window_delegate_);
+  EXPECT_CALL(window_delegate_, OnAcceleratedWidgetDestroyed());
+  EXPECT_CALL(window_delegate_, OnAcceleratedWidgetAvailable(window_widget_));
+
+  SetWindowStatus(fuchsia::ui::composition::ParentViewportStatus::
+                      DISCONNECTED_FROM_DISPLAY);
+
+  on_next_frame_begin_values.set_additional_present_credits(1);
+  fake_flatland_.FireOnNextFrameBeginEvent(
+      std::move(on_next_frame_begin_values));
+
+  // Spin the loop to process Present().
+  task_environment_.RunUntilIdle();
+
+  // Verify that the surface view is cleared.
   EXPECT_THAT(
       fake_flatland_.graph(),
-      IsWindowGraph(parent_viewport_watcher(), token_pair.viewport_token,
-                    {IsViewport(child_token, expected_size)}));
+      IsWindowGraph(parent_viewport_watcher(), viewport_token_, IsEmpty()));
+}
+
+// Verify that when surface is attached, a hit region accompanies the surface.
+TEST_F(FlatlandWindowTest, SurfaceHasHitTestHitShield) {
+  CreateWindow();
+
+  EXPECT_CALL(window_delegate_, OnBoundsChanged(_));
+  const uint32_t kWidth = 200;
+  const uint32_t kHeight = 100;
+  const fuchsia::math::SizeU expected_size = {kWidth, kHeight};
+  SetLayoutInfo(kWidth, kHeight, 1.f);
+
+  // Spin the loop to propagate layout.
+  task_environment_.RunUntilIdle();
+
+  auto token_pair = scenic::ViewCreationTokenPair::New();
+  flatland_window_->AttachSurfaceContent(std::move(token_pair.viewport_token));
+
+  // Show() the window, to trigger creation of the scene graph, including
+  // surface and hit shield.
+  flatland_window_->Show(/*inactive=*/false);
+  fuchsia::ui::composition::OnNextFrameBeginValues on_next_frame_begin_values;
+  on_next_frame_begin_values.set_additional_present_credits(1);
+  fake_flatland_.FireOnNextFrameBeginEvent(
+      std::move(on_next_frame_begin_values));
+
+  // Spin the loop to process Present().
+  task_environment_.RunUntilIdle();
+
+  // Surface should be accompanied by input shield, in that order.
+  EXPECT_THAT(fake_flatland_.graph(),
+              Field("root_transform", &FakeGraph::root_transform,
+                    Pointee(Field("children", &FakeTransform::children,
+                                  ElementsAre(IsViewport(token_pair.view_token,
+                                                         expected_size),
+                                              IsHitShield())))));
 }
 
 class ParameterizedViewInsetTest : public FlatlandWindowTest,
@@ -370,11 +462,8 @@ INSTANTIATE_TEST_SUITE_P(ViewInsetTest,
 
 // Tests whether view insets are properly set in |FlatlandWindow|.
 TEST_P(ParameterizedViewInsetTest, ViewInsetsTest) {
-  MockPlatformWindowDelegate delegate;
-  EXPECT_CALL(delegate, OnAcceleratedWidgetAvailable(_));
-  auto token_pair = scenic::ViewCreationTokenPair::New();
-  CreateFlatlandWindow(&delegate, std::move(token_pair.view_token));
-  EXPECT_CALL(delegate, OnBoundsChanged(_)).Times(1);
+  CreateWindow();
+  EXPECT_CALL(window_delegate_, OnBoundsChanged(_)).Times(1);
   SetLayoutInfo(100, 100, 1.f);
 
   const fuchsia::math::Inset inset = {1, 1, 1, 1};
@@ -382,7 +471,8 @@ TEST_P(ParameterizedViewInsetTest, ViewInsetsTest) {
 
   // Setting LayoutInfo should trigger a change in the bounds.
   PlatformWindowDelegate::BoundsChange bounds(false);
-  EXPECT_CALL(delegate, OnBoundsChanged(_)).WillOnce(SaveArg<0>(&bounds));
+  EXPECT_CALL(window_delegate_, OnBoundsChanged(_))
+      .WillOnce(SaveArg<0>(&bounds));
   SetLayoutInfo(100, 100, dpr, inset);
 
   EXPECT_EQ(bounds.system_ui_overlap.top(), dpr * inset.top);

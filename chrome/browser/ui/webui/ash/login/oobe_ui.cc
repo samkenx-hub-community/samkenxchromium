@@ -10,15 +10,16 @@
 #include <string>
 #include <utility>
 
+#include "ash/components/arc/arc_features.h"
 #include "ash/constants/ash_features.h"
 #include "ash/constants/ash_switches.h"
 #include "ash/public/cpp/esim_manager.h"
 #include "ash/public/cpp/network_config_service.h"
 #include "ash/public/cpp/resources/grit/ash_public_unscaled_resources.h"
 #include "ash/shell.h"
-#include "base/bind.h"
 #include "base/command_line.h"
 #include "base/containers/contains.h"
+#include "base/functional/bind.h"
 #include "base/logging.h"
 #include "base/notreached.h"
 #include "base/system/sys_info.h"
@@ -44,6 +45,7 @@
 #include "chrome/browser/ui/webui/ash/login/app_downloading_screen_handler.h"
 #include "chrome/browser/ui/webui/ash/login/app_launch_splash_screen_handler.h"
 #include "chrome/browser/ui/webui/ash/login/arc_terms_of_service_screen_handler.h"
+#include "chrome/browser/ui/webui/ash/login/arc_vm_data_migration_screen_handler.h"
 #include "chrome/browser/ui/webui/ash/login/assistant_optin_flow_screen_handler.h"
 #include "chrome/browser/ui/webui/ash/login/auto_enrollment_check_screen_handler.h"
 #include "chrome/browser/ui/webui/ash/login/base_screen_handler.h"
@@ -162,17 +164,13 @@ constexpr char kArcOverlayCSSPath[] = "arc_support/overlay.css";
 constexpr char kArcPlaystoreCSSPath[] = "arc_support/playstore.css";
 constexpr char kArcPlaystoreJSPath[] = "arc_support/playstore.js";
 constexpr char kArcPlaystoreLogoPath[] = "arc_support/icon/playstore.svg";
-constexpr char kArcSupervisionIconPath[] = "supervision_icon.png";
-constexpr char kDebuggerMJSPath[] = "debug/debug.m.js";
-constexpr char kKeyboardUtilsJSPath[] = "keyboard_utils.js";
-constexpr char kKeyboardUtilsForInjectionModulePath[] =
-    "components/keyboard_utils_for_injection.m.js";
+constexpr char kDebuggerMJSPath[] = "debug/debug.js";
 
 constexpr char kProductLogoPath[] = "product-logo.png";
-constexpr char kTestAPIJsMPath[] = "test_api/test_api.m.js";
+constexpr char kTestAPIJsMPath[] = "test_api/test_api.js";
 
 // Components
-constexpr char kOobeCustomVarsCssJsM[] =
+constexpr char kOobeCustomVarsCssJs[] =
     "components/oobe_vars/oobe_custom_vars.css.js";
 
 #if BUILDFLAG(GOOGLE_CHROME_BRANDING)
@@ -185,9 +183,6 @@ constexpr char kArcAppDownloadingVideoPath[] = "res/arc_app_dowsnloading.mp4";
 
 // Adds various product logo resources.
 void AddProductLogoResources(content::WebUIDataSource* source) {
-  // Required for Assistant OOBE.
-  source->AddResourcePath(kArcSupervisionIconPath, IDR_SUPERVISION_ICON_PNG);
-
 #if BUILDFLAG(GOOGLE_CHROME_BRANDING)
   source->AddResourcePath(kLogo24PX1XSvgPath, IDR_PRODUCT_LOGO_24PX_1X);
   source->AddResourcePath(kLogo24PX2XSvgPath, IDR_PRODUCT_LOGO_24PX_2X);
@@ -231,10 +226,6 @@ void AddAssistantScreensResources(content::WebUIDataSource* source) {
 }
 
 void AddMultiDeviceSetupResources(content::WebUIDataSource* source) {
-  source->AddResourcePath("multidevice_setup_light.json",
-                          IDR_MULTIDEVICE_SETUP_ANIMATION_LIGHT);
-  source->AddResourcePath("multidevice_setup_dark.json",
-                          IDR_MULTIDEVICE_SETUP_ANIMATION_DARK);
   source->OverrideContentSecurityPolicy(
       network::mojom::CSPDirectiveName::WorkerSrc,
       "worker-src blob: chrome://resources 'self';");
@@ -242,29 +233,25 @@ void AddMultiDeviceSetupResources(content::WebUIDataSource* source) {
 
 void AddDebuggerResources(content::WebUIDataSource* source) {
   base::CommandLine* command_line = base::CommandLine::ForCurrentProcess();
-  bool enable_debugger = command_line->HasSwitch(switches::kShowOobeDevOverlay);
+  const bool enabled = command_line->HasSwitch(switches::kShowOobeDevOverlay);
   // Enable for ChromeOS-on-linux for developers and test images.
-  if (enable_debugger && base::SysInfo::IsRunningOnChromeOS()) {
+  if (enabled && base::SysInfo::IsRunningOnChromeOS()) {
     LOG(WARNING) << "OOBE Debug overlay can only be used on test images";
     base::SysInfo::CrashIfChromeOSNonTestImage();
   }
 
-  if (enable_debugger) {
-    source->AddResourcePath(kDebuggerMJSPath, IDR_OOBE_DEBUGGER_M_JS);
-  } else {
-    // Serve empty files under all resource paths.
-    source->AddResourcePath(kDebuggerMJSPath, IDR_OOBE_DEBUGGER_STUB_JS);
-  }
+  source->AddResourcePath(kDebuggerMJSPath, enabled ?
+                                            IDR_OOBE_DEBUGGER_JS :
+                                            IDR_OOBE_DEBUGGER_STUB_JS);
 }
 
 void AddTestAPIResources(content::WebUIDataSource* source) {
   base::CommandLine* command_line = base::CommandLine::ForCurrentProcess();
-  bool enable_test_api = command_line->HasSwitch(switches::kEnableOobeTestAPI);
-  if (enable_test_api) {
-    source->AddResourcePath(kTestAPIJsMPath, IDR_OOBE_TEST_API_M_JS);
-  } else {
-    source->AddResourcePath(kTestAPIJsMPath, IDR_OOBE_TEST_API_STUB_M_JS);
-  }
+  const bool enabled = command_line->HasSwitch(switches::kEnableOobeTestAPI);
+
+  source->AddResourcePath(kTestAPIJsMPath, enabled ?
+                                           IDR_OOBE_TEST_API_JS :
+                                           IDR_OOBE_TEST_API_STUB_JS);
 }
 
 // Creates a WebUIDataSource for chrome://oobe
@@ -289,6 +276,9 @@ void CreateAndAddOobeUIDataSource(Profile* profile,
   source->AddBoolean("isOobeFlow", is_oobe_flow);
   source->AddBoolean("isOobeJelly", features::IsOobeJellyEnabled());
   source->AddBoolean("isChoobeEnabled", features::IsOobeChoobeEnabled());
+  source->AddBoolean(
+      "isArcVmDataMigrationEnabled",
+      base::FeatureList::IsEnabled(arc::kEnableArcVmDataMigration));
 
   // Configure shared resources
   AddProductLogoResources(source);
@@ -302,9 +292,6 @@ void CreateAndAddOobeUIDataSource(Profile* profile,
   AddDebuggerResources(source);
   AddTestAPIResources(source);
 
-  source->AddResourcePath(kKeyboardUtilsJSPath, IDR_KEYBOARD_UTILS_JS);
-  source->AddResourcePath(kKeyboardUtilsForInjectionModulePath,
-                          IDR_KEYBOARD_UTILS_FOR_INJECTION_M_JS);
   source->OverrideContentSecurityPolicy(
       network::mojom::CSPDirectiveName::ObjectSrc, "object-src chrome:;");
   source->DisableTrustedTypesCSP();
@@ -401,6 +388,10 @@ void OobeUI::ConfigureOobeDisplay() {
   AddScreenHandler(std::make_unique<SyncConsentScreenHandler>());
 
   AddScreenHandler(std::make_unique<ArcTermsOfServiceScreenHandler>());
+
+  if (base::FeatureList::IsEnabled(arc::kEnableArcVmDataMigration)) {
+    AddScreenHandler(std::make_unique<ArcVmDataMigrationScreenHandler>());
+  }
 
   AddScreenHandler(std::make_unique<RecommendAppsScreenHandler>());
 
@@ -617,11 +608,11 @@ void OobeUI::AddOobeComponents(content::WebUIDataSource* source) {
 
   if (policy::EnrollmentRequisitionManager::IsRemoraRequisition()) {
     source->AddResourcePath(
-        kOobeCustomVarsCssJsM,
-        IDR_OOBE_COMPONENTS_OOBE_CUSTOM_VARS_REMORA_CSS_M_JS);
+        kOobeCustomVarsCssJs,
+        IDR_OOBE_COMPONENTS_OOBE_CUSTOM_VARS_REMORA_CSS_JS);
   } else {
-    source->AddResourcePath(kOobeCustomVarsCssJsM,
-                            IDR_OOBE_COMPONENTS_OOBE_CUSTOM_VARS_CSS_M_JS);
+    source->AddResourcePath(kOobeCustomVarsCssJs,
+                            IDR_OOBE_COMPONENTS_OOBE_CUSTOM_VARS_CSS_JS);
   }
 
   source->AddResourcePath("spinner.json", IDR_LOGIN_SPINNER_ANIMATION);

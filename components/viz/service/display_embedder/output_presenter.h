@@ -8,7 +8,7 @@
 #include <memory>
 #include <vector>
 
-#include "base/callback_helpers.h"
+#include "base/functional/callback_helpers.h"
 #include "build/build_config.h"
 #include "components/viz/service/display/output_surface.h"
 #include "components/viz/service/display/overlay_processor_interface.h"
@@ -145,6 +145,11 @@ class VIZ_SERVICE_EXPORT OutputPresenter {
       const OverlayPlaneCandidate& overlay_plane_candidate,
       ScopedOverlayAccess* access,
       std::unique_ptr<gfx::GpuFence> acquire_fence) = 0;
+
+  virtual bool SupportsGpuVSync() const;
+  virtual void SetGpuVSyncEnabled(bool enabled) {}
+  virtual void SetVSyncDisplayID(int64_t display_id) {}
+
 #if BUILDFLAG(IS_MAC)
   virtual void SetCALayerErrorCode(gfx::CALayerResult ca_layer_error_code) {}
 #endif

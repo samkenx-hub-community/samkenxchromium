@@ -26,7 +26,8 @@ import {DomRepeatEvent, mixinBehaviors, PolymerElement} from 'chrome://resources
 
 import {Setting} from '../../mojom-webui/setting.mojom-webui.js';
 import {assertExists} from '../assert_extras.js';
-import {DeepLinkingBehavior, DeepLinkingBehaviorInterface} from '../deep_linking_behavior.js';
+import {Constructor} from '../common/types.js';
+import {DeepLinkingMixin, DeepLinkingMixinInterface} from '../deep_linking_mixin.js';
 import {recordSettingChange} from '../metrics_recorder.js';
 import {routes} from '../os_route.js';
 import {RouteObserverMixin, RouteObserverMixinInterface} from '../route_observer_mixin.js';
@@ -43,16 +44,13 @@ interface SettingsInternetKnownNetworksPageElement {
 const SettingsInternetKnownNetworksPageElementBase =
     mixinBehaviors(
         [
-          DeepLinkingBehavior,
           NetworkListenerBehavior,
           CrPolicyNetworkBehaviorMojo,
         ],
-        RouteObserverMixin(I18nMixin(PolymerElement))) as {
-      new (): PolymerElement & I18nMixinInterface &
-          RouteObserverMixinInterface & DeepLinkingBehaviorInterface &
-          NetworkListenerBehaviorInterface &
-          CrPolicyNetworkBehaviorMojoInterface,
-    };
+        DeepLinkingMixin(RouteObserverMixin(I18nMixin(PolymerElement)))) as
+    Constructor<PolymerElement&I18nMixinInterface&RouteObserverMixinInterface&
+                DeepLinkingMixinInterface&NetworkListenerBehaviorInterface&
+                CrPolicyNetworkBehaviorMojoInterface>;
 
 class SettingsInternetKnownNetworksPageElement extends
     SettingsInternetKnownNetworksPageElementBase {
@@ -105,11 +103,11 @@ class SettingsInternetKnownNetworksPageElement extends
       },
 
       /**
-       * Used by DeepLinkingBehavior to focus this page's deep links.
+       * Used by DeepLinkingMixin to focus this page's deep links.
        */
       supportedSettingIds: {
         type: Object,
-        value: () => new Set([
+        value: () => new Set<Setting>([
           Setting.kPreferWifiNetwork,
           Setting.kForgetWifiNetwork,
         ]),

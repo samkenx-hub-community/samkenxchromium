@@ -351,33 +351,6 @@
           }
         ]
       }, {
-        "name": "getCompositionBounds",
-        "type": "function",
-        "description": "Gets the composition bounds",
-        "parameters": [
-          {
-            "type": "function",
-            "name": "callback",
-            "description": "Callback which is called to provide the result",
-            "parameters": [
-              {
-                "name": "boundsList",
-                "type": "array",
-                "description": "List of bounds information.",
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "x": {"type": "integer"},
-                    "y": {"type": "integer"},
-                    "w": {"type": "integer"},
-                    "h": {"type": "integer"}
-                  }
-                }
-              }
-            ]
-          }
-        ]
-      }, {
         "name": "getSurroundingText",
         "type": "function",
         "description": "Gets the surrounding text of the current selection. WARNING: This could return a stale cache that doesn't reflect reality, due to async between IMF and TextInputClient.",
@@ -630,36 +603,6 @@
             "name": "newInputMethodId",
             "type": "string",
             "description": "New input method which is being used."
-          }
-        ]
-      }, {
-        "name": "onCompositionBoundsChanged",
-        "type": "function",
-        "description": "Fired when the composition bounds or cursor bounds are changed.",
-        "parameters": [
-          {
-            "name": "firstBounds",
-            "type": "object",
-            "description": "The bounds information for the first character in composition.",
-            "properties": {
-              "x": {"type": "integer"},
-              "y": {"type": "integer"},
-              "w": {"type": "integer"},
-              "h": {"type": "integer"}
-            }
-          }, {
-            "name": "boundsList",
-            "type": "array",
-            "description": "List of bounds information.",
-            "items": {
-              "type": "object",
-              "properties": {
-                "x": {"type": "integer"},
-                "y": {"type": "integer"},
-                "w": {"type": "integer"},
-                "h": {"type": "integer"}
-              }
-            }
           }
         ]
       }, {

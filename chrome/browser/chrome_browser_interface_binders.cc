@@ -34,7 +34,6 @@
 #include "chrome/browser/ui/ui_features.h"
 #include "chrome/browser/ui/web_applications/draggable_region_host_impl.h"
 #include "chrome/browser/ui/web_applications/sub_apps_service_impl.h"
-#include "chrome/browser/ui/webui/bluetooth_internals/bluetooth_internals.mojom.h"
 #include "chrome/browser/ui/webui/browsing_topics/browsing_topics_internals_ui.h"
 #include "chrome/browser/ui/webui/engagement/site_engagement_ui.h"
 #include "chrome/browser/ui/webui/internals/internals_ui.h"
@@ -156,6 +155,8 @@
 #include "chrome/browser/ui/webui/feed/feed_ui.h"
 #include "chrome/browser/ui/webui/image_editor/image_editor.mojom.h"
 #include "chrome/browser/ui/webui/image_editor/image_editor_untrusted_ui.h"
+#include "chrome/browser/ui/webui/web_app_internals/web_app_internals.mojom.h"
+#include "chrome/browser/ui/webui/web_app_internals/web_app_internals_ui.h"
 #include "components/omnibox/browser/omnibox.mojom.h"
 #if !defined(OFFICIAL_BUILD)
 #include "chrome/browser/ui/webui/new_tab_page/foo/foo.mojom.h"  // nogncheck crbug.com/1125897
@@ -303,7 +304,7 @@
 #include "chromeos/ash/services/hotspot_config/public/mojom/cros_hotspot_config.mojom.h"
 #include "chromeos/ash/services/multidevice_setup/multidevice_setup_service.h"
 #include "chromeos/ash/services/multidevice_setup/public/mojom/multidevice_setup.mojom.h"
-#include "chromeos/components/print_management/mojom/printing_manager.mojom.h"
+#include "chromeos/components/print_management/mojom/printing_manager.mojom.h"  // nogncheck
 #include "chromeos/services/network_config/public/mojom/cros_network_config.mojom.h"  // nogncheck
 #include "chromeos/services/network_health/public/mojom/network_diagnostics.mojom.h"  // nogncheck
 #include "chromeos/services/network_health/public/mojom/network_health.mojom.h"  // nogncheck
@@ -317,6 +318,7 @@
 #include "chrome/browser/apps/digital_goods/digital_goods_lacros.h"
 #include "chromeos/lacros/lacros_service.h"
 #else
+#include "chrome/browser/ui/webui/bluetooth_internals/bluetooth_internals.mojom.h"  // nogncheck
 #include "chrome/browser/ui/webui/bluetooth_internals/bluetooth_internals_ui.h"  // nogncheck
 #endif  // BUILDFLAG(IS_CHROMEOS_LACROS)
 
@@ -422,6 +424,17 @@ void BindCommerceHintObserver(
         "Unexpected the message from subframe or fenced frame.");
     return;
   }
+
+// Check if features require CommerceHint are enabled.
+#if !BUILDFLAG(IS_ANDROID)
+  if (!IsCartModuleEnabled()) {
+    return;
+  }
+#else
+  if (!base::FeatureList::IsEnabled(commerce::kCommerceHintAndroid)) {
+    return;
+  }
+#endif
 
 // On Android, commerce hint observer is enabled for all users with the feature
 // enabled since the observer is only used for collecting metrics for now, and
@@ -689,18 +702,8 @@ void PopulateChromeFrameBinders(
   map->Add<image_annotation::mojom::Annotator>(
       base::BindRepeating(&BindImageAnnotator));
 
-  // We should not request this mojo interface's binding for the subframes in
-  // the renderer.
-#if !BUILDFLAG(IS_ANDROID)
-  if (IsCartModuleEnabled() &&
-#else
-  if (base::FeatureList::IsEnabled(commerce::kCommerceHintAndroid) &&
-#endif
-      !render_frame_host->GetParent() &&
-      !render_frame_host->IsFencedFrameRoot()) {
-    map->Add<cart::mojom::CommerceHintObserver>(
-        base::BindRepeating(&BindCommerceHintObserver));
-  }
+  map->Add<cart::mojom::CommerceHintObserver>(
+      base::BindRepeating(&BindCommerceHintObserver));
 
   map->Add<blink::mojom::AnchorElementMetricsHost>(
       base::BindRepeating(&NavigationPredictor::Create));
@@ -932,8 +935,7 @@ void PopulateChromeWebUIFrameBinders(
           render_frame_host->GetProcess()->GetBrowserContext());
   if (history_clusters_service &&
       history_clusters_service->IsJourneysEnabled()) {
-    if (base::FeatureList::IsEnabled(history_clusters::kSidePanelJourneys) &&
-        base::FeatureList::IsEnabled(features::kUnifiedSidePanel)) {
+    if (base::FeatureList::IsEnabled(history_clusters::kSidePanelJourneys)) {
       RegisterWebUIControllerInterfaceBinder<
           history_clusters::mojom::PageHandler, HistoryUI,
           HistoryClustersSidePanelUI>(map);
@@ -998,20 +1000,12 @@ void PopulateChromeWebUIFrameBinders(
 
   RegisterWebUIControllerInterfaceBinder<
       reading_list::mojom::PageHandlerFactory, ReadingListUI>(map);
-
-  if (base::FeatureList::IsEnabled(features::kUnifiedSidePanel)) {
-    RegisterWebUIControllerInterfaceBinder<
-        side_panel::mojom::BookmarksPageHandlerFactory, BookmarksSidePanelUI>(
-        map);
-    RegisterWebUIControllerInterfaceBinder<
-        shopping_list::mojom::ShoppingListHandlerFactory, BookmarksSidePanelUI>(
-        map);
-  } else {
-    RegisterWebUIControllerInterfaceBinder<
-        side_panel::mojom::BookmarksPageHandlerFactory, ReadingListUI>(map);
-    RegisterWebUIControllerInterfaceBinder<
-        shopping_list::mojom::ShoppingListHandlerFactory, ReadingListUI>(map);
-  }
+  RegisterWebUIControllerInterfaceBinder<
+      side_panel::mojom::BookmarksPageHandlerFactory, BookmarksSidePanelUI>(
+      map);
+  RegisterWebUIControllerInterfaceBinder<
+      shopping_list::mojom::ShoppingListHandlerFactory, BookmarksSidePanelUI>(
+      map);
 
   if (customize_chrome::IsSidePanelEnabled()) {
     RegisterWebUIControllerInterfaceBinder<
@@ -1026,13 +1020,8 @@ void PopulateChromeWebUIFrameBinders(
   }
 
   if (features::IsReadAnythingEnabled()) {
-    if (base::FeatureList::IsEnabled(features::kUnifiedSidePanel)) {
-      RegisterWebUIControllerInterfaceBinder<
-          read_anything::mojom::PageHandlerFactory, ReadAnythingUI>(map);
-    } else {
-      RegisterWebUIControllerInterfaceBinder<
-          read_anything::mojom::PageHandlerFactory, ReadingListUI>(map);
-    }
+    RegisterWebUIControllerInterfaceBinder<
+        read_anything::mojom::PageHandlerFactory, ReadAnythingUI>(map);
   }
 
   RegisterWebUIControllerInterfaceBinder<tab_search::mojom::PageHandlerFactory,
@@ -1355,6 +1344,11 @@ void PopulateChromeWebUIFrameBinders(
     RegisterWebUIControllerInterfaceBinder<
         ::app_home::mojom::PageHandlerFactory, webapps::AppHomeUI>(map);
   }
+#endif
+
+#if !BUILDFLAG(IS_ANDROID)
+  RegisterWebUIControllerInterfaceBinder<::mojom::WebAppInternalsHandler,
+                                         WebAppInternalsUI>(map);
 #endif
 }
 

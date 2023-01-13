@@ -10,11 +10,6 @@
 
 namespace feature_engagement {
 
-// A feature for enabling automatic snooze mode for In-Product Help (IPH). When
-// this flag is enabled, we don't show snooze button/UI on the IPH, but on
-// dismiss we will implicitly snooze it until the snooze limit count is reached.
-BASE_DECLARE_FEATURE(kEnableAutomaticSnooze);
-
 // A feature for enabling a demonstration mode for In-Product Help (IPH).
 BASE_DECLARE_FEATURE(kIPHDemoMode);
 
@@ -179,10 +174,12 @@ BASE_DECLARE_FEATURE(kIPHReadingListMessagesFeature);
 BASE_DECLARE_FEATURE(kIPHBadgedTranslateManualTriggerFeature);
 BASE_DECLARE_FEATURE(kIPHDiscoverFeedHeaderFeature);
 BASE_DECLARE_FEATURE(kIPHDefaultSiteViewFeature);
-BASE_DECLARE_FEATURE(kIPHPasswordSuggestionsFeature);
 BASE_DECLARE_FEATURE(kIPHFollowWhileBrowsingFeature);
 BASE_DECLARE_FEATURE(kIPHOverflowMenuTipFeature);
 BASE_DECLARE_FEATURE(kIPHPriceNotificationsWhileBrowsingFeature);
+BASE_DECLARE_FEATURE(kIPHiOSDefaultBrowserBadgeEligibilityFeature);
+BASE_DECLARE_FEATURE(kIPHiOSDefaultBrowserOverflowMenuBadgeFeature);
+BASE_DECLARE_FEATURE(kIPHiOSDefaultBrowserSettingsBadgeFeature);
 #endif  // BUILDFLAG(IS_IOS)
 
 #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_APPLE) || BUILDFLAG(IS_LINUX) || \
@@ -191,6 +188,10 @@ BASE_DECLARE_FEATURE(kIPHAutofillVirtualCardSuggestionFeature);
 #endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_APPLE) || BUILDFLAG(IS_LINUX) ||
         // BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_ANDROID) ||
         // BUILDFLAG(IS_FUCHSIA)
+
+#if BUILDFLAG(IS_CHROMEOS_ASH)
+BASE_DECLARE_FEATURE(kIPHGoogleOneOfferNotificationFeature);
+#endif
 
 }  // namespace feature_engagement
 

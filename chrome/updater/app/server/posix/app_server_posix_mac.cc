@@ -4,17 +4,12 @@
 
 #import "chrome/updater/app/server/posix/app_server_posix.h"
 
-#include "base/callback.h"
-#include "chrome/updater/constants.h"
+#include "base/functional/callback.h"
+#include "base/memory/scoped_refptr.h"
 #include "chrome/updater/mac/setup/keystone.h"
-#include "chrome/updater/posix/setup.h"
 #include "chrome/updater/registration_data.h"
 
 namespace updater {
-
-bool AppServerPosix::SwapInNewVersion() {
-  return PromoteCandidate(updater_scope()) == kErrorOk;
-}
 
 bool AppServerPosix::MigrateLegacyUpdaters(
     base::RepeatingCallback<void(const RegistrationRequest&)>
@@ -23,6 +18,10 @@ bool AppServerPosix::MigrateLegacyUpdaters(
   MigrateKeystoneTickets(updater_scope(), register_callback);
 
   return true;
+}
+
+scoped_refptr<App> MakeAppServer() {
+  return base::MakeRefCounted<AppServerPosix>();
 }
 
 }  // namespace updater

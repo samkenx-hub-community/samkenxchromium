@@ -6,9 +6,9 @@
 
 #include <string>
 
-#include "base/bind.h"
 #include "base/files/file_path.h"
 #include "base/files/file_util.h"
+#include "base/functional/bind.h"
 #include "base/observer_list.h"
 #include "base/task/thread_pool.h"
 #include "base/time/clock.h"
@@ -192,6 +192,12 @@ void NtpCustomBackgroundService::OnNextCollectionImageAvailable() {
   std::string resume_token = background_service_->next_image_resume_token();
   int64_t timestamp = (clock_->Now() + base::Days(1)).ToTimeT();
 
+  if (base::FeatureList::IsEnabled(
+          ntp_features::kCustomizeChromeColorExtraction)) {
+    FetchCustomBackgroundAndExtractBackgroundColor(image.image_url,
+                                                   image.thumbnail_image_url);
+  }
+
   base::Value::Dict background_info = GetBackgroundInfoAsDict(
       image.image_url, attribution1, attribution2, image.attribution_action_url,
       image.collection_id, resume_token, timestamp);
@@ -255,6 +261,10 @@ void NtpCustomBackgroundService::FetchCustomBackgroundAndExtractBackgroundColor(
                 email: "chrome-desktop-ntp@google.com"
               }
             }
+            user_data {
+              type: NONE
+            }
+            last_reviewed: "2023-01-09"
           }
           policy {
             cookies_allowed: NO

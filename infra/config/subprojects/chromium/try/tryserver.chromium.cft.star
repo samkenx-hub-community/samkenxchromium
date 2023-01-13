@@ -9,6 +9,7 @@ load("//lib/consoles.star", "consoles")
 
 try_.defaults.set(
     builder_group = "tryserver.chromium.cft",
+    cores = 8,
     executable = try_.DEFAULT_EXECUTABLE,
     builderless = True,
     pool = try_.DEFAULT_POOL,
@@ -45,4 +46,5 @@ try_.builder(
         "ci/win-rel-cft",
     ],
     os = os.WINDOWS_DEFAULT,
+    execution_timeout = 6 * time.hour,
 )

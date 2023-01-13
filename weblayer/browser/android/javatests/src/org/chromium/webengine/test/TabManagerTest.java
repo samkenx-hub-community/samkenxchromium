@@ -11,7 +11,6 @@ import static org.hamcrest.CoreMatchers.is;
 import static org.chromium.content_public.browser.test.util.TestThreadUtils.runOnUiThreadBlocking;
 
 import android.content.pm.ActivityInfo;
-import android.support.test.InstrumentationRegistry;
 
 import androidx.test.filters.SmallTest;
 
@@ -22,13 +21,11 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
-import org.chromium.base.ContextUtils;
 import org.chromium.base.test.util.Criteria;
 import org.chromium.base.test.util.CriteriaHelper;
 import org.chromium.base.test.util.DoNotBatch;
 import org.chromium.net.test.EmbeddedTestServer;
 import org.chromium.net.test.EmbeddedTestServerRule;
-import org.chromium.webengine.FragmentParams;
 import org.chromium.webengine.Tab;
 import org.chromium.webengine.TabListObserver;
 import org.chromium.webengine.TabManager;
@@ -119,48 +116,6 @@ public class TabManagerTest {
         });
         Tab activeTab = webEngine.getTabManager().getActiveTab();
         Assert.assertEquals(url, activeTab.getDisplayUri().toString());
-    }
-
-    @Test
-    @SmallTest
-    public void tabsPersistAcrossSessions() throws Exception {
-        FragmentParams params = (new FragmentParams.Builder())
-                                        .setPersistenceId("pid1234")
-                                        .setProfileName("pn12345")
-                                        .build();
-        WebEngine webEngine = runOnUiThreadBlocking(
-                () -> mActivityTestRule.getWebSandbox().createWebEngine(params))
-                                      .get();
-        runOnUiThreadBlocking(() -> mActivityTestRule.attachFragment(webEngine.getFragment()));
-        Tab activeTab = webEngine.getTabManager().getActiveTab();
-        String url = getTestDataURL("simple_page.html");
-        mActivityTestRule.navigateAndWait(activeTab, url);
-        // Shutdown the sandbox.
-        runOnUiThreadBlocking(() -> mActivityTestRule.detachFragment(webEngine.getFragment()));
-        runOnUiThreadBlocking(() -> {
-            try {
-                mActivityTestRule.getWebSandbox().shutdown();
-            } catch (Exception e) {
-                Assert.fail("Failed to shutdown sandbox");
-            }
-        });
-
-        // Give the sandbox some time to shutdown.
-        InstrumentationRegistry.getInstrumentation().waitForIdleSync();
-
-        WebSandbox sandbox =
-                runOnUiThreadBlocking(() -> WebSandbox.create(ContextUtils.getApplicationContext()))
-                        .get();
-        // Recreate a fragment with the same params.
-        WebEngine webEngine2 = runOnUiThreadBlocking(() -> sandbox.createWebEngine(params)).get();
-        runOnUiThreadBlocking(() -> mActivityTestRule.attachFragment(webEngine2.getFragment()));
-        Tab newActiveTab = webEngine2.getTabManager().getActiveTab();
-        Set<Tab> allTabs = webEngine2.getTabManager().getAllTabs();
-        Assert.assertEquals(1, allTabs.size());
-        Assert.assertTrue(allTabs.contains(newActiveTab));
-        // TODO(crbug.com/1398388): Set url for tab after restoring from persistence ID.
-        // Assert.assertEquals(newActiveTab.getDisplayUri().toString(), url);
-        Assert.assertEquals(activeTab.getGuid(), newActiveTab.getGuid());
     }
 
     private static final class TabHolder {

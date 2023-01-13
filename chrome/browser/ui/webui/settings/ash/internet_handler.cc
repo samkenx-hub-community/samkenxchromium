@@ -11,7 +11,7 @@
 #include "ash/components/arc/session/arc_bridge_service.h"
 #include "ash/components/arc/session/arc_service_manager.h"
 #include "ash/constants/ash_pref_names.h"
-#include "base/bind.h"
+#include "base/functional/bind.h"
 #include "base/values.h"
 #include "chrome/browser/apps/app_service/app_service_proxy.h"
 #include "chrome/browser/apps/app_service/app_service_proxy_factory.h"
@@ -39,7 +39,7 @@ namespace {
 const char kAddThirdPartyVpnMessage[] = "addThirdPartyVpn";
 const char kConfigureThirdPartyVpnMessage[] = "configureThirdPartyVpn";
 const char kShowCarrierAccountDetail[] = "showCarrierAccountDetail";
-const char kShowCellularSetupUI[] = "showCellularSetupUI";
+const char kShowCellularSetupUI[] = "showCellularSetupUi";
 const char kShowPortalSignin[] = "showPortalSignin";
 const char kRequestGmsCoreNotificationsDisabledDeviceNames[] =
     "requestGmsCoreNotificationsDisabledDeviceNames";

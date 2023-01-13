@@ -11,14 +11,14 @@
 #include <vector>
 
 #include "base/barrier_closure.h"
-#include "base/bind.h"
-#include "base/callback.h"
-#include "base/callback_helpers.h"
 #include "base/containers/contains.h"
 #include "base/containers/flat_map.h"
 #include "base/containers/queue.h"
 #include "base/files/file_path.h"
 #include "base/files/scoped_temp_dir.h"
+#include "base/functional/bind.h"
+#include "base/functional/callback.h"
+#include "base/functional/callback_helpers.h"
 #include "base/logging.h"
 #include "base/ranges/algorithm.h"
 #include "base/run_loop.h"
@@ -236,7 +236,9 @@ void UpdateServiceImpl::FetchPolicies(base::OnceCallback<void(int)> callback) {
   VLOG(1) << __func__;
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
 
-  config_->GetPolicyService()->FetchPolicies(std::move(callback));
+  config_->GetPolicyService()->FetchPolicies(
+      std::move(callback),
+      /*is_system_install_scenario*/ IsSystemInstall());
 }
 
 void UpdateServiceImpl::RegisterApp(const RegistrationRequest& request,
@@ -306,15 +308,16 @@ void UpdateServiceImpl::RunPeriodicTasks(base::OnceClosure callback) {
                                          GetUpdaterScope(), persisted_data_)));
 
   new_tasks.push_back(base::BindOnce(
-      [](scoped_refptr<UpdateServiceImpl> update_service_impl,
-         base::OnceClosure callback) {
-        update_service_impl->FetchPolicies(base::BindOnce(
-            [](base::OnceClosure callback, int /* ignore_result */) {
-              std::move(callback).Run();
-            },
-            std::move(callback)));
+      [](scoped_refptr<Configurator> config, base::OnceClosure callback) {
+        config->GetPolicyService()->FetchPolicies(
+            base::BindOnce(
+                [](base::OnceClosure callback, int /* ignore_result */) {
+                  std::move(callback).Run();
+                },
+                std::move(callback)),
+            /*is_system_install_scenario*/ false);
       },
-      base::WrapRefCounted(this)));
+      config_));
   new_tasks.push_back(base::BindOnce(
       &CheckForUpdatesTask::Run,
       base::MakeRefCounted<CheckForUpdatesTask>(
@@ -530,7 +533,8 @@ void UpdateServiceImpl::RunInstaller(const std::string& app_id,
                        : base::FilePath());
 
   // Create a thread runner that:
-  //   1) has SequencedTaskRunnerHandle set, to run `state_update` callback.
+  //   1) has SequencedTaskRunner::CurrentDefaultHandle set, to run
+  //      `state_update` callback.
   //   2) may block, since `RunApplicationInstaller` blocks.
   //   3) has `base::WithBaseSyncPrimitives()`, since `RunApplicationInstaller`
   //      waits on process.

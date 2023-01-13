@@ -12,10 +12,10 @@
 #include <utility>
 #include <vector>
 
-#include "base/callback.h"
-#include "base/callback_helpers.h"
 #include "base/check.h"
 #include "base/check_op.h"
+#include "base/functional/callback.h"
+#include "base/functional/callback_helpers.h"
 #include "base/ranges/algorithm.h"
 #include "base/run_loop.h"
 #include "base/strings/string_number_conversions.h"
@@ -226,8 +226,9 @@ ConfigurableStorageDelegate::GetOfflineReportDelayConfig() const {
 void ConfigurableStorageDelegate::ShuffleReports(
     std::vector<AttributionReport>& reports) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-  if (reverse_reports_on_shuffle_)
+  if (reverse_reports_on_shuffle_) {
     base::ranges::reverse(reports);
+  }
 }
 
 AttributionStorageDelegate::RandomizedResponse
@@ -362,29 +363,33 @@ AttributionDataHostManager* MockAttributionManager::GetDataHostManager() {
 }
 
 void MockAttributionManager::NotifySourcesChanged() {
-  for (auto& observer : observers_)
+  for (auto& observer : observers_) {
     observer.OnSourcesChanged();
+  }
 }
 
 void MockAttributionManager::NotifyReportsChanged(
     AttributionReport::Type report_type) {
-  for (auto& observer : observers_)
+  for (auto& observer : observers_) {
     observer.OnReportsChanged(report_type);
+  }
 }
 
 void MockAttributionManager::NotifySourceHandled(
     const StorableSource& source,
     StorableSource::Result result,
     absl::optional<uint64_t> cleared_debug_key) {
-  for (auto& observer : observers_)
+  for (auto& observer : observers_) {
     observer.OnSourceHandled(source, cleared_debug_key, result);
+  }
 }
 
 void MockAttributionManager::NotifyReportSent(const AttributionReport& report,
                                               bool is_debug_report,
                                               const SendResult& info) {
-  for (auto& observer : observers_)
+  for (auto& observer : observers_) {
     observer.OnReportSent(report, is_debug_report, info);
+  }
 }
 
 void MockAttributionManager::NotifySourceRegistrationFailure(
@@ -403,16 +408,18 @@ void MockAttributionManager::NotifyTriggerHandled(
     const AttributionTrigger& trigger,
     const CreateReportResult& result,
     absl::optional<uint64_t> cleared_debug_key) {
-  for (auto& observer : observers_)
+  for (auto& observer : observers_) {
     observer.OnTriggerHandled(trigger, cleared_debug_key, result);
+  }
 }
 
 void MockAttributionManager::NotifyDebugReportSent(
     const AttributionDebugReport& report,
     const int status,
     const base::Time time) {
-  for (auto& observer : observers_)
+  for (auto& observer : observers_) {
     observer.OnDebugReportSent(report, status, time);
+  }
 }
 
 void MockAttributionManager::SetDataHostManager(
@@ -429,8 +436,9 @@ SourceObserver::~SourceObserver() = default;
 void SourceObserver::OnDidFinishNavigation(
     NavigationHandle* navigation_handle) {
   if (!navigation_handle->GetImpression()) {
-    if (waiting_for_null_impression_)
+    if (waiting_for_null_impression_) {
       impression_loop_.Quit();
+    }
     return;
   }
 
@@ -446,8 +454,9 @@ void SourceObserver::OnDidFinishNavigation(
 // Waits for |expected_num_impressions_| navigations with impressions, and
 // returns the last impression.
 const blink::Impression& SourceObserver::Wait() {
-  if (num_impressions_ >= expected_num_impressions_)
+  if (num_impressions_ >= expected_num_impressions_) {
     return *last_impression_;
+  }
   impression_loop_.Run();
   return last_impression();
 }
@@ -876,7 +885,7 @@ bool operator==(const AttributionInfo& a, const AttributionInfo& b) {
 bool operator==(const AttributionStorageDelegate::FakeReport& a,
                 const AttributionStorageDelegate::FakeReport& b) {
   const auto tie = [](const AttributionStorageDelegate::FakeReport& r) {
-    return std::make_tuple(r.trigger_data, r.report_time);
+    return std::make_tuple(r.trigger_data, r.trigger_time, r.report_time);
   };
   return tie(a) == tie(b);
 }
@@ -884,7 +893,7 @@ bool operator==(const AttributionStorageDelegate::FakeReport& a,
 bool operator<(const AttributionStorageDelegate::FakeReport& a,
                const AttributionStorageDelegate::FakeReport& b) {
   const auto tie = [](const AttributionStorageDelegate::FakeReport& r) {
-    return std::make_tuple(r.trigger_data, r.report_time);
+    return std::make_tuple(r.trigger_data, r.trigger_time, r.report_time);
   };
   return tie(a) < tie(b);
 }
@@ -1151,6 +1160,7 @@ std::ostream& operator<<(std::ostream& out,
 std::ostream& operator<<(std::ostream& out,
                          const AttributionStorageDelegate::FakeReport& r) {
   return out << "{trigger_data=" << r.trigger_data
+             << ",trigger_time=" << r.trigger_time
              << ",report_time=" << r.report_time << "}";
 }
 

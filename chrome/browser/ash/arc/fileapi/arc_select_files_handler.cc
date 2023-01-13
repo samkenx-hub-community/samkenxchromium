@@ -7,7 +7,7 @@
 #include <utility>
 
 #include "ash/components/arc/arc_util.h"
-#include "base/bind.h"
+#include "base/functional/bind.h"
 #include "base/json/string_escape.h"
 #include "base/logging.h"
 #include "base/strings/stringprintf.h"
@@ -98,9 +98,10 @@ void OnGetElementsScriptResults(
     base::Value value) {
   mojom::FileSelectorElementsPtr result = mojom::FileSelectorElements::New();
   if (value.is_dict()) {
-    ConvertToElementVector(value.FindKey("dirNames"),
+    ConvertToElementVector(value.GetDict().Find("dirNames"),
                            &result->directory_elements);
-    ConvertToElementVector(value.FindKey("fileNames"), &result->file_elements);
+    ConvertToElementVector(value.GetDict().Find("fileNames"),
+                           &result->file_elements);
     // TODO(niwa): Fill result->search_query.
   }
   std::move(callback).Run(std::move(result));

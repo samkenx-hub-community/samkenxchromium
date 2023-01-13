@@ -17,12 +17,12 @@
 #include "ash/constants/ash_features.h"
 #include "ash/constants/ash_switches.h"
 #include "base/base_paths.h"
-#include "base/bind.h"
-#include "base/callback_helpers.h"
 #include "base/command_line.h"
 #include "base/containers/contains.h"
 #include "base/debug/dump_without_crashing.h"
 #include "base/feature_list.h"
+#include "base/functional/bind.h"
+#include "base/functional/callback_helpers.h"
 #include "base/location.h"
 #include "base/logging.h"
 #include "base/memory/ptr_util.h"
@@ -1686,20 +1686,11 @@ void UserSessionManager::FinalizePrepareProfile(Profile* profile) {
       always_on_vpn_manager_ =
           std::make_unique<arc::AlwaysOnVpnManager>(profile->GetPrefs());
 
-      // SecureDnsManager is only needed if DNS-over-HTTPS is enabled for the
-      // dns-proxy service.
-      if (base::FeatureList::IsEnabled(::features::kDnsProxyEnableDOH)) {
-        secure_dns_manager_ = std::make_unique<SecureDnsManager>(
-            g_browser_process->local_state());
-      }
+      secure_dns_manager_ =
+          std::make_unique<SecureDnsManager>(g_browser_process->local_state());
     }
 
     UpdateEasyUnlockKeys(user_context_);
-    if (!features::IsUseAuthFactorsEnabled()) {
-      // Migration to cryptohome uses legacy AddKey-based cryptohome methods.
-      quick_unlock::PinBackend::GetInstance()->MigrateToCryptohome(
-          profile, std::make_unique<UserContext>(user_context_));
-    }
 
     // Save sync password hash and salt to profile prefs if they are available.
     // These will be used to detect Gaia password reuses.

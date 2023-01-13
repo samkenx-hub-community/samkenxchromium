@@ -1,9 +1,7 @@
 // Copyright 2014 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-GEN_INCLUDE([
-  '//chrome/browser/resources/chromeos/accessibility/chromevox/testing/chromevox_next_e2e_test_base.js',
-]);
+GEN_INCLUDE(['../../testing/chromevox_e2e_test_base.js']);
 
 /**
  * Gets the braille output and asserts that it matches expected values.
@@ -94,14 +92,13 @@ function checkOutput_(expectedText, expectedSpans, actualText, actualSpans) {
 /**
  * Test fixture for output.js.
  */
-ChromeVoxOutputE2ETest = class extends ChromeVoxNextE2ETest {
+ChromeVoxOutputE2ETest = class extends ChromeVoxE2ETest {
   /** @override */
   async setUpDeferred() {
     await super.setUpDeferred();
 
     // Alphabetical based on file path.
-    await importModule(
-        'EventSourceState', '/chromevox/background/event_source.js');
+    await importModule('EventSource', '/chromevox/background/event_source.js');
     await importModule('FocusBounds', '/chromevox/background/focus_bounds.js');
     await importModule('Output', '/chromevox/background/output/output.js');
     await importModule(
@@ -124,7 +121,8 @@ ChromeVoxOutputE2ETest = class extends ChromeVoxNextE2ETest {
 
     await importModule('LocalStorage', '/common/local_storage.js');
 
-    window.Dir = AutomationUtil.Dir;
+    globalThis.Dir = AutomationUtil.Dir;
+    globalThis.RoleType = chrome.automation.RoleType;
     this.forceContextualLastOutput();
   }
 };
@@ -1404,7 +1402,7 @@ AX_TEST_F(
 
       // Force a few properties to be set so that hints are triggered.
       Object.defineProperty(button, 'clickable', {get: () => true});
-      EventSourceState.set(EventSourceType.TOUCH_GESTURE);
+      EventSource.set(EventSourceType.TOUCH_GESTURE);
 
       o = new Output().withSpeech(range, null, 'navigate');
       assertEqualsJSON(

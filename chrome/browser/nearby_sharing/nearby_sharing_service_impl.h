@@ -12,10 +12,10 @@
 #include <vector>
 
 #include "ash/public/cpp/session/session_observer.h"
-#include "base/callback_helpers.h"
 #include "base/cancelable_callback.h"
 #include "base/containers/flat_map.h"
 #include "base/containers/flat_set.h"
+#include "base/functional/callback_helpers.h"
 #include "base/memory/ptr_util.h"
 #include "base/memory/weak_ptr.h"
 #include "base/sequence_checker.h"
@@ -268,13 +268,11 @@ class NearbySharingServiceImpl
   void OnUniquePathFetched(
       int64_t attachment_id,
       int64_t payload_id,
-      base::OnceCallback<void(location::nearby::connections::mojom::Status)>
-          callback,
+      base::OnceCallback<void(nearby::connections::mojom::Status)> callback,
       base::FilePath path);
-  void OnPayloadPathRegistered(
-      base::ScopedClosureRunner closure_runner,
-      bool* aggregated_success,
-      location::nearby::connections::mojom::Status status);
+  void OnPayloadPathRegistered(base::ScopedClosureRunner closure_runner,
+                               bool* aggregated_success,
+                               nearby::connections::mojom::Status status);
   void OnPayloadPathsRegistered(const ShareTarget& share_target,
                                 std::unique_ptr<bool> aggregated_success,
                                 StatusCodesCallback status_codes_callback);
@@ -293,8 +291,8 @@ class NearbySharingServiceImpl
   void OnOpenFiles(ShareTarget share_target,
                    base::OnceCallback<void(ShareTarget, bool)> callback,
                    std::vector<NearbyFileHandler::FileInfo> files);
-  std::vector<location::nearby::connections::mojom::PayloadPtr>
-  CreateTextPayloads(const std::vector<TextAttachment>& attachments);
+  std::vector<nearby::connections::mojom::PayloadPtr> CreateTextPayloads(
+      const std::vector<TextAttachment>& attachments);
 
   void WriteResponse(
       NearbyConnection& connection,

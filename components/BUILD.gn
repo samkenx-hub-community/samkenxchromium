@@ -23,7 +23,6 @@ import("//tools/grit/repack.gni")
 if (is_android) {
   import("//build/config/android/rules.gni")
   import("//build/config/compiler/compiler.gni")
-  import("//tools/v8_context_snapshot/v8_context_snapshot.gni")
 }
 
 if (is_ios) {
@@ -159,7 +158,6 @@ test("components_unittests") {
     "//components/grpc_support/test:unit_tests",
     "//components/heap_profiling/in_process:unit_tests",
     "//components/history/core/browser:unit_tests",
-    "//components/history/core/common:unit_tests",
     "//components/history/metrics:unit_tests",
     "//components/image_fetcher/core:unit_tests",
     "//components/keyed_service/core:unit_tests",
@@ -205,7 +203,6 @@ test("components_unittests") {
     "//components/reporting/metrics:unit_tests",
     "//components/reporting/storage:unit_tests",
     "//components/reporting/util:unit_tests",
-    "//components/reputation/core:unit_tests",
     "//components/safe_browsing/core/browser:safe_browsing_metrics_collector_unittest",
     "//components/safe_search_api:unit_tests",
     "//components/saved_tab_groups:unit_tests",
@@ -245,6 +242,7 @@ test("components_unittests") {
     "//components/translate/core/language_detection:unit_tests",
     "//components/ukm:unit_tests",
     "//components/undo:unit_tests",
+    "//components/unexportable_keys:unit_tests",
     "//components/unified_consent:unit_tests",
     "//components/upload_list:unit_tests",
     "//components/url_formatter:unit_tests",
@@ -482,6 +480,8 @@ test("components_unittests") {
     deps += [
       "//base:base_java_unittest_support",
       "//components/android_autofill/browser:unit_tests",
+      "//components/browser_ui/accessibility/android:unit_tests",
+      "//components/browser_ui/site_settings/android:unit_tests",
       "//components/browser_ui/sms/android:unit_tests",
       "//components/cdm/browser:unit_tests",
       "//components/component_updater/android:embedded_component_loader_java",
@@ -519,17 +519,13 @@ test("components_unittests") {
       "//components/webapps/browser/android:unit_tests",
       "//content/public/android:content_java",
       "//content/public/browser",
+      "//gin:v8_snapshot_assets",
       "//net",
       "//services/data_decoder/public/cpp/android:safe_json_java",
       "//ui/android:ui_java",
       "//ui/base",
       "//ui/gfx",
     ]
-    if (use_v8_context_snapshot) {
-      deps += [ "//tools/v8_context_snapshot:v8_context_snapshot_assets" ]
-    } else {
-      deps += [ "//v8:v8_external_startup_data_assets" ]
-    }
 
     if (enable_chrome_android_internal) {
       data_deps += [ "//clank/build/bot/filters:components_unittests_filters" ]
@@ -742,13 +738,9 @@ if (is_android) {
     deps = [
       ":components_tests_pak",
       "//content/shell:pak",
+      "//gin:v8_snapshot_assets",
       "//third_party/icu:icu_assets",
     ]
-    if (use_v8_context_snapshot) {
-      deps += [ "//tools/v8_context_snapshot:v8_context_snapshot_assets" ]
-    } else {
-      deps += [ "//v8:v8_external_startup_data_assets" ]
-    }
   }
 
   android_library("components_browsertests_java") {
@@ -1038,12 +1030,10 @@ if (!is_ios) {
     ]
 
     if (is_android) {
-      deps += [ "//ui/android:ui_java" ]
-      if (use_v8_context_snapshot) {
-        deps += [ "//tools/v8_context_snapshot:v8_context_snapshot_assets" ]
-      } else {
-        deps += [ "//v8:v8_external_startup_data_assets" ]
-      }
+      deps += [
+        "//gin:v8_snapshot_assets",
+        "//ui/android:ui_java",
+      ]
     }
 
     if (!is_android) {

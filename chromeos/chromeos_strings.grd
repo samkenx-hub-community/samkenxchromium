@@ -1871,6 +1871,15 @@ Try tapping the mic to ask me anything.
         <message name="IDS_ONC_TETHER_CARRIER_UNKNOWN" desc="Settings > Internet > Text displayed in the settings UI in place of a cellular provider when the actual name of the provider is unknown. In this context, the cellular provider refers to the carrier which provides mobile data service to another device which can start a tether hotspot to provide a data connection to the current device.">
           Unknown carrier
         </message>
+        <message name="IDS_ONC_HOTSPOT_WIFI_SECURITY_WPA2" desc="In settings > Network > Hotspot > Configure, a string specifying hotspot Wi-Fi security type = WPA2.">
+          WPA2
+        </message>
+        <message name="IDS_ONC_HOTSPOT_WIFI_SECURITY_WPA3" desc="In settings > Network > Hotspot > Configure, a string specifying hotspot Wi-Fi security type = WPA3.">
+          WPA3
+        </message>
+        <message name="IDS_ONC_HOTSPOT_WIFI_SECURITY_WPA2WPA3" desc="In settings > Network > Hotspot > Configure, a string specifying hotspot Wi-Fi security type = WPA2+WPA3.">
+          WPA2WPA3
+        </message>
 
         <!-- Network Health display strings -->
         <message name="IDS_NETWORK_HEALTH_STATE" desc="Label for the current state of a networking device.">
@@ -3687,6 +3696,12 @@ Try tapping the mic to ask me anything.
         <message name="IDS_SHORTCUT_CUSTOMIZATION_CONFIRM_RESET_SHORTCUTS_BUTTON" desc="Button label for action that confirms resetting all shortcuts to their default values" translateable="false">
           Reset
         </message>
+        <message name="IDS_SHORTCUT_CUSTOMIZATION_LOCKED_SHORTCUT_STATUS_MESSAGE" desc="The status message that displays when user clicks button to override a locked accelerator" translateable="false">
+          Shortcut is used by <ph name="CONFLICT_ACCEL_NAME">$1<ex>BRIGHTNESS_UP</ex></ph>. Press a new shortcut to replace.
+        </message>
+        <message name="IDS_SHORTCUT_CUSTOMIZATION_SHORTCUT_WITH_CONFILICT_STATUS_MESSAGE" desc="The status message that displays when user clicks button to override an accelerator" translateable="false">
+          Shortcut is used by <ph name="CONFLICT_ACCEL_NAME">$1<ex>BRIGHTNESS_UP</ex></ph>. Press a new shortcut or press the same one again to use it for this action instead.
+        </message>
         <message name="IDS_SHORTCUT_CUSTOMIZATION_CATEGORY_TABS_AND_WINDOWS" desc="Category named 'Tabs and Windows' shown on the navigation sidebar" translateable="false">Tabs &#38; Windows</message>
         <message name="IDS_SHORTCUT_CUSTOMIZATION_CATEGORY_PAGE_AND_WEB_BROWSER" desc="Category named 'Page and Web Browser' shown on the navigation sidebar" translateable="false">Page &#38; Web Browser</message>
         <message name="IDS_SHORTCUT_CUSTOMIZATION_CATEGORY_SYSTEM_AND_DISPLAY_SETTINGS" desc="Category named 'System and Display Settings' shown on the navigation sidebar" translateable="false">System &#38; Display Settings</message>
@@ -3702,6 +3717,84 @@ Try tapping the mic to ask me anything.
         <message name="IDS_SHORTCUT_CUSTOMIZATION_KEY_ESCAPE" desc="Lowercase name of the keyboard key 'Escape', abbreviated if possible" translateable="false">esc</message>
         <message name="IDS_SHORTCUT_CUSTOMIZATION_KEY_RETURN" desc="Lowercase name of the keyboard key 'Enter'" translateable="false">enter</message>
         <message name="IDS_SHORTCUT_CUSTOMIZATION_KEY_BACKSPACE" desc="Lowercase name of the keyboard key 'Backspace'" translateable="false">backspace</message>
+        <message name="IDS_SHORTCUT_CUSTOMIZATION_ICON_LABEL_ARROW_DOWN" desc="The text read aloud by the screen reader describing the keyboard icon 'arrow down'." translateable="false">
+          arrow down
+        </message>
+        <message name="IDS_SHORTCUT_CUSTOMIZATION_ICON_LABEL_ARROW_LEFT" desc="The text read aloud by the screen reader describing the keyboard icon 'arrow left'." translateable="false">
+          arrow left
+        </message>
+        <message name="IDS_SHORTCUT_CUSTOMIZATION_ICON_LABEL_ARROW_RIGHT" desc="The text read aloud by the screen reader describing the keyboard icon 'arrow right'." translateable="false">
+          arrow right
+        </message>
+        <message name="IDS_SHORTCUT_CUSTOMIZATION_ICON_LABEL_ARROW_UP" desc="The text read aloud by the screen reader describing the keyboard icon 'arrow up'." translateable="false">
+          arrow up
+        </message>
+        <message name="IDS_SHORTCUT_CUSTOMIZATION_ICON_LABEL_AUDIO_VOLUME_DOWN" desc="The text read aloud by the screen reader describing the keyboard icon 'volume down'." translateable="false">
+          volume down
+        </message>
+        <message name="IDS_SHORTCUT_CUSTOMIZATION_ICON_LABEL_AUDIO_VOLUME_MUTE" desc="The text read aloud by the screen reader describing the keyboard icon 'volume mute'." translateable="false">
+          volume mute
+        </message>
+        <message name="IDS_SHORTCUT_CUSTOMIZATION_ICON_LABEL_AUDIO_VOLUME_UP" desc="The text read aloud by the screen reader describing the keyboard icon 'volume up'." translateable="false">
+          volume up
+        </message>
+        <message name="IDS_SHORTCUT_CUSTOMIZATION_ICON_LABEL_BRIGHTNESS_DOWN" desc="The text read aloud by the screen reader describing the keyboard icon 'brightness down'." translateable="false">
+          brightness down
+        </message>
+        <message name="IDS_SHORTCUT_CUSTOMIZATION_ICON_LABEL_BRIGHTNESS_UP" desc="The text read aloud by the screen reader describing the keyboard icon 'brightness up'." translateable="false">
+          brightness up
+        </message>
+        <message name="IDS_SHORTCUT_CUSTOMIZATION_ICON_LABEL_BROWSER_BACK" desc="The text read aloud by the screen reader describing the keyboard icon 'back'." translateable="false">
+          back
+        </message>
+        <message name="IDS_SHORTCUT_CUSTOMIZATION_ICON_LABEL_BROWSER_FORWARD" desc="The text read aloud by the screen reader describing the keyboard icon 'forward'." translateable="false">
+          forward
+        </message>
+        <message name="IDS_SHORTCUT_CUSTOMIZATION_ICON_LABEL_BROWSER_REFRESH" desc="The text read aloud by the screen reader describing the keyboard icon 'refresh'." translateable="false">
+          refresh
+        </message>
+        <message name="IDS_SHORTCUT_CUSTOMIZATION_ICON_LABEL_KEYBOARD_BACKLIGHT_TOGGLE" desc="The text read aloud by the screen reader describing the keyboard icon 'toggle keyboard backlight'." translateable="false">
+          toggle keyboard backlight
+        </message>
+        <message name="IDS_SHORTCUT_CUSTOMIZATION_ICON_LABEL_KEYBOARD_BRIGHTNESS_UP" desc="The text read aloud by the screen reader describing the keyboard icon 'keyboard brightness up'." translateable="false">
+          keyboard brightness up
+        </message>
+        <message name="IDS_SHORTCUT_CUSTOMIZATION_ICON_LABEL_KEYBOARD_BRIGHTNESS_DOWN" desc="The text read aloud by the screen reader describing the keyboard icon 'keyboard brightness down'." translateable="false">
+          keyboard brightness down
+        </message>
+        <message name="IDS_SHORTCUT_CUSTOMIZATION_ICON_LABEL_LAUNCH_APPLICATION1" desc="The text read aloud by the screen reader describing the keyboard icon 'overview'." translateable="false">
+          overview
+        </message>
+        <message name="IDS_SHORTCUT_CUSTOMIZATION_ICON_LABEL_LAUNCH_ASSISTANT" desc="The text read aloud by the screen reader describing the keyboard icon 'assistant'." translateable="false">
+          assistant
+        </message>
+        <message name="IDS_SHORTCUT_CUSTOMIZATION_ICON_LABEL_MEDIA_PLAY_PAUSE" desc="The text read aloud by the screen reader describing the keyboard icon 'play pause'." translateable="false">
+          play pause
+        </message>
+        <message name="IDS_SHORTCUT_CUSTOMIZATION_ICON_LABEL_MEDIA_TRACK_NEXT" desc="The text read aloud by the screen reader describing the keyboard icon 'next track'." translateable="false">
+          next track
+        </message>
+        <message name="IDS_SHORTCUT_CUSTOMIZATION_ICON_LABEL_MEDIA_TRACK_PREVIOUS" desc="The text read aloud by the screen reader describing the keyboard icon 'previous track'." translateable="false">
+          previous track
+        </message>
+        <message name="IDS_SHORTCUT_CUSTOMIZATION_ICON_LABEL_MICROPHONE_MUTE_TOGGLE" desc="The text read aloud by the screen reader describing the keyboard icon 'toggle microphone mute'." translateable="false">
+          toggle microphone mute
+        </message>
+        <message name="IDS_SHORTCUT_CUSTOMIZATION_ICON_LABEL_OPEN_LAUNCHER" desc="The text read aloud by the screen reader describing the keyboard icon 'launcher'." translateable="false">
+          launcher
+        </message>
+        <message name="IDS_SHORTCUT_CUSTOMIZATION_ICON_LABEL_POWER" desc="The text read aloud by the screen reader describing the keyboard icon 'power'." translateable="false">
+          power
+        </message>
+        <message name="IDS_SHORTCUT_CUSTOMIZATION_ICON_LABEL_PRINT_SCREEN" desc="The text read aloud by the screen reader describing the keyboard icon 'screenshot'." translateable="false">
+          screenshot
+        </message>
+        <message name="IDS_SHORTCUT_CUSTOMIZATION_ICON_LABEL_PRIVACY_SCREEN_TOGGLE" desc="The text read aloud by the screen reader describing the keyboard icon 'toggle privacy screen'." translateable="false">
+          toggle privacy screen
+        </message>
+        <message name="IDS_SHORTCUT_CUSTOMIZATION_ICON_LABEL_ZOOM_TOGGLE" desc="The text read aloud by the screen reader describing the keyboard icon 'full screen'." translateable="false">
+          full screen
+        </message>
         <!-- End of Shortcut Customization -->
 
         <!-- APN -->

@@ -19,8 +19,8 @@ import subprocess
 import sys
 import urllib3
 
-from build import CheckoutLLVM, GetCommitDescription, LLVM_DIR
-from update import CHROMIUM_DIR
+from build import CheckoutLLVM, GetCommitDescription, LLVM_DIR, RunCommand
+from update import CHROMIUM_DIR, DownloadAndUnpack
 
 # Path constants.
 THIS_DIR = os.path.dirname(__file__)
@@ -28,6 +28,7 @@ CHROMIUM_DIR = os.path.abspath(os.path.join(THIS_DIR, '..', '..', '..'))
 CLANG_UPDATE_PY_PATH = os.path.join(THIS_DIR, 'update.py')
 RUST_UPDATE_PY_PATH = os.path.join(THIS_DIR, '..', '..', 'rust',
                                    'update_rust.py')
+BUILD_RUST_PY_PATH = os.path.join(THIS_DIR, '..', '..', 'rust', 'build_rust.py')
 DEPS_PATH = os.path.join(CHROMIUM_DIR, 'DEPS')
 
 # URL prefix for LLVM git diff ranges.
@@ -36,7 +37,14 @@ GOB_LLVM_URL = 'https://chromium.googlesource.com/external/github.com/llvm/llvm-
 # Constants for finding HEAD.
 CLANG_URL = 'https://api.github.com/repos/llvm/llvm-project/git/refs/heads/main'
 CLANG_REGEX = b'"sha":"([^"]+)"'
+
+# Constants for finding and downloading the latest Rust sources.
+RUST_SRC_PATH = 'third_party/rust_src/src'
 RUST_CIPD_PATH = 'chromium/third_party/rust_src'
+# This is the URL where we can download packages found in CIPD.
+# The complete format is:
+# https://chrome-infra-packages.appspot.com/dl/path../+/version
+RUST_CIPD_DOWNLOAD_URL = f'https://chrome-infra-packages.appspot.com/dl'
 RUST_INSTANCES_REGEX = bytes('([0-9A-Za-z-_]+) │ .*? latest\W*\n', 'utf-8')
 RUST_CIPD_VERSION_REGEX = '([0-9]+)@([0-9]{4})-([0-9]{2})-([0-9]{2})'
 RUST_CIPD_DESCRIBE_REGEX = f'version:({RUST_CIPD_VERSION_REGEX})'.encode(
@@ -197,6 +205,18 @@ def GetLatestRustVersion(sub_revision: int):
   return RustVersion.from_cipd_date(m.group(1).decode('utf-8'), sub_revision)
 
 
+def FetchRust(rust_version):
+  print(f'Removing {RUST_SRC_PATH}.')
+  shutil.rmtree(RUST_SRC_PATH)
+
+  print(f'Fetching Rust {rust_version} into {RUST_SRC_PATH}')
+  version_str = rust_version.string_with_dashes(with_tag=True)
+  DownloadAndUnpack(
+      f'{RUST_CIPD_DOWNLOAD_URL}/{RUST_CIPD_PATH}/+/version:{version_str}',
+      RUST_SRC_PATH,
+      is_known_zip=True)
+
+
 def PatchClangRevision(new_version: ClangVersion) -> ClangVersion:
   with open(CLANG_UPDATE_PY_PATH) as f:
     content = f.read()
@@ -277,6 +297,46 @@ def PatchRustRevision(new_version: RustVersion) -> RustVersion:
   return old_version
 
 
+def PatchRustStage0():
+  verify_stage0 = subprocess.run([BUILD_RUST_PY_PATH, '--verify-stage0-hash'],
+                                 capture_output=True,
+                                 text=True)
+  if verify_stage0.returncode == 0:
+    return
+
+  # TODO(crbug.com/1405814): We're printing a warning that the hash has
+  # changed, but we could require a verification step of some sort here. We
+  # should do the same for both Rust and Clang if we do so.
+  print(verify_stage0.stdout)
+  lines = verify_stage0.stdout.splitlines()
+  m = re.match('Actual hash: +([0-9a-z]+)', lines[2])
+  new_stage0_hash = m.group(1)
+
+  with open(RUST_UPDATE_PY_PATH) as f:
+    content = f.read()
+
+  STAGE0_HASH = '\'([0-9a-z]+)\''
+  content = re.sub(f'STAGE0_JSON_SHA256 = {STAGE0_HASH}',
+                   f'STAGE0_JSON_SHA256 = \'{new_stage0_hash}\'',
+                   content,
+                   count=1)
+  with open(RUST_UPDATE_PY_PATH, 'w') as f:
+    f.write(content)
+
+
+def PatchRustRemoveFallback():
+  with open(RUST_UPDATE_PY_PATH) as f:
+    content = f.read()
+
+  CLANG_HASH = '([0-9a-z-]+)'
+  content = re.sub(f'FALLBACK_CLANG_VERSION = \'{CLANG_HASH}\'',
+                   f'FALLBACK_CLANG_VERSION = \'\'',
+                   content,
+                   count=1)
+  with open(RUST_UPDATE_PY_PATH, 'w') as f:
+    f.write(content)
+
+
 def Git(*args, no_run: bool):
   """Runs a git command, or just prints it out if `no_run` is True."""
   if no_run:
@@ -350,6 +410,8 @@ def main():
   else:
     rust_version = GetLatestRustVersion(args.rust_sub_revision)
 
+  FetchRust(rust_version)
+
   print((f'Making a patch for Clang {clang_version} and Rust {rust_version}'))
 
   branch_name = f'clang-{clang_version}_rust-{rust_version}'
@@ -361,8 +423,10 @@ def main():
           or rust_version != old_rust_version), (
               'Change the sub-revision of Clang or Rust if there is '
               'no major version change.')
-
   # TODO: Turn the nightly dates into git hashes?
+  PatchRustStage0()
+  # TODO: Do this when we block Clang updates without a matching Rust compiler.
+  # PatchRustRemoveFallback()
 
   clang_change = f'{old_clang_version} : {clang_version}'
   clang_change_log = (

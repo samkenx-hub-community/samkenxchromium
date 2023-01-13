@@ -9,8 +9,6 @@
 #include <vector>
 
 #include "base/auto_reset.h"
-#include "base/bind.h"
-#include "base/callback_helpers.h"
 #include "base/command_line.h"
 #include "base/containers/contains.h"
 #include "base/containers/cxx20_erase.h"
@@ -18,6 +16,8 @@
 #include "base/debug/dump_without_crashing.h"
 #include "base/feature_list.h"
 #include "base/files/file_path.h"
+#include "base/functional/bind.h"
+#include "base/functional/callback_helpers.h"
 #include "base/memory/ptr_util.h"
 #include "base/metrics/field_trial_params.h"
 #include "base/metrics/histogram_functions.h"
@@ -96,6 +96,7 @@
 #include "content/public/browser/browser_context.h"
 #include "content/public/browser/browser_task_traits.h"
 #include "content/public/browser/browser_thread.h"
+#include "content/public/browser/child_process_host.h"
 #include "content/public/browser/client_hints_controller_delegate.h"
 #include "content/public/browser/commit_deferring_condition.h"
 #include "content/public/browser/content_browser_client.h"
@@ -109,7 +110,6 @@
 #include "content/public/browser/site_isolation_policy.h"
 #include "content/public/browser/storage_partition.h"
 #include "content/public/browser/weak_document_ptr.h"
-#include "content/public/common/child_process_host.h"
 #include "content/public/common/content_client.h"
 #include "content/public/common/content_features.h"
 #include "content/public/common/content_switches.h"
@@ -958,7 +958,7 @@ bool IsDocumentToCommitAnonymous(FrameTreeNode* frame,
   // credentialless.
   bool parent_is_credentialless =
       parent_document && parent_document->IsCredentialless();
-  return parent_is_credentialless || frame->credentialless();
+  return parent_is_credentialless || frame->Credentialless();
 }
 
 // Returns the "loading" URL in the renderer. This tries to replicate
@@ -1302,7 +1302,7 @@ std::unique_ptr<NavigationRequest> NavigationRequest::CreateRendererInitiated(
           /*navigation_delivery_type=*/
           network::mojom::NavigationDeliveryType::kDefault,
           /*view_transition_state=*/absl::nullopt,
-          /*soft_navigation_heuristic_task_id=*/absl::nullopt,
+          /*soft_navigation_heuristics_task_id=*/absl::nullopt,
           /*modified_runtime_features=*/
           base::flat_map<::blink::mojom::RuntimeFeatureState, bool>(),
           /*fenced_frame_properties=*/absl::nullopt,
@@ -1445,7 +1445,7 @@ NavigationRequest::CreateForSynchronousRendererCommit(
           /*navigation_delivery_type=*/
           network::mojom::NavigationDeliveryType::kDefault,
           /*view_transition_state=*/absl::nullopt,
-          /*soft_navigation_heuristic_task_id=*/absl::nullopt,
+          /*soft_navigation_heuristics_task_id=*/absl::nullopt,
           /*modified_runtime_features=*/
           base::flat_map<::blink::mojom::RuntimeFeatureState, bool>(),
           /*fenced_frame_properties=*/absl::nullopt,
@@ -1959,6 +1959,23 @@ NavigationRequest::~NavigationRequest() {
   TRACE_EVENT_NESTABLE_ASYNC_END0("navigation", "", navigation_id_);
   TRACE_EVENT_NESTABLE_ASYNC_END0("navigation", "NavigationRequest",
                                   navigation_id_);
+
+  // In theory, this only needs to run when deleting a NavigationRequest with an
+  // associated RenderFrameHost that is:
+  //
+  // - the speculative RenderFrameHost
+  // - and that speculative RenderFrameHost was previously in the pending commit
+  //   state.
+  //
+  // In practice, it is safer to just always run this; trying to resume a
+  // NavigationRequest's attempt to commit "too soon" will just re-queue the
+  // request, whereas accidentally forgetting to resume it sometimes will lead
+  // to a navigation just silently not working.
+  if (base::FeatureList::IsEnabled(kQueueNavigationsWhileWaitingForCommit) &&
+      frame_tree_node_->navigation_request()) {
+    frame_tree_node_->navigation_request()->ResumeCommitIfNeeded();
+  }
+
   if (loading_mem_tracker_)
     loading_mem_tracker_->Cancel();
   ResetExpectedProcess();
@@ -2729,7 +2746,7 @@ void NavigationRequest::ResetForCrossDocumentRestart() {
   navigation_handle_timing_ = NavigationHandleTiming();
 
   policy_container_builder_->ResetForCrossDocumentRestart();
-  commit_params_->soft_navigation_heuristic_task_id = absl::nullopt;
+  commit_params_->soft_navigation_heuristics_task_id = absl::nullopt;
 }
 
 void NavigationRequest::ResetStateForSiteInstanceChange() {
@@ -5117,11 +5134,16 @@ void NavigationRequest::CommitNavigation() {
   // A navigation request should only commit once the response has been
   // processed.
   DCHECK_GE(state_, WILL_PROCESS_RESPONSE);
+#if DCHECK_IS_ON()
   // In NavigationControllerImpl::NavigateToExistingPendingEntry we're verifying
   // that the task ID is only passed along if the initiator RFH is the same as
   // the navigated RFH.
-  DCHECK((IsSameDocument() && IsInOutermostMainFrame()) ||
-         !commit_params_->soft_navigation_heuristic_task_id);
+  if (commit_params_->soft_navigation_heuristics_task_id) {
+    DCHECK(IsSameDocument());
+    DCHECK(IsInMainFrame());
+    DCHECK(!frame_tree_node()->IsFencedFrameRoot());
+  }
+#endif
 
   if (!CoopCoepSanityCheck())
     return;
@@ -6530,6 +6552,15 @@ void NavigationRequest::DidCommitNavigation(
     // Notify the service worker navigation handle that the navigation finished
     // committing.
     service_worker_handle_->OnEndNavigationCommit();
+  }
+
+  // TODO(https://crbug.com/1399499): consider using NavigationOrDocumentHandle
+  // instead once we can get a WeakDocumentPtr from NavigationOrDocumentHandle.
+  if (topics_url_loader_service_bind_context_) {
+    DCHECK(!IsSameDocument());
+
+    topics_url_loader_service_bind_context_->OnDidCommitNavigation(
+        GetRenderFrameHost()->GetWeakDocumentPtr());
   }
 }
 
@@ -8020,6 +8051,11 @@ void NavigationRequest::RecordAddressSpaceFeature() {
   ContentBrowserClient* client = GetContentClient()->browser();
   client->LogWebFeatureForCurrentPage(initiator_render_frame_host,
                                       *optional_feature);
+  client->LogWebFeatureForCurrentPage(
+      initiator_render_frame_host,
+      IsInOutermostMainFrame()
+          ? blink::mojom::WebFeature::kPrivateNetworkAccessFetchedTopFrame
+          : blink::mojom::WebFeature::kPrivateNetworkAccessFetchedSubFrame);
 }
 
 void NavigationRequest::ComputePoliciesToCommit() {
@@ -8572,6 +8608,17 @@ void NavigationRequest::ComputeDownloadPolicy() {
   // [AdFrameNoGesture]
   // [AdFrame]
   // [Interstitial]
+}
+
+void NavigationRequest::ResumeCommitIfNeeded() {
+  DCHECK(base::FeatureList::IsEnabled(kQueueNavigationsWhileWaitingForCommit));
+  // TODO(crbug.com/1220337): Add some metrics for how often:
+  // - this is run
+  // - how often it ends up having to simply re-queue itself
+  if (resume_commit_closure_) {
+    base::SequencedTaskRunner::GetCurrentDefault()->PostNonNestableTask(
+        FROM_HERE, std::move(resume_commit_closure_));
+  }
 }
 
 }  // namespace content

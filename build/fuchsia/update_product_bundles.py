@@ -26,6 +26,7 @@ _PRODUCT_BUNDLES = [
     'workstation_eng.chromebook-x64',
     'workstation_eng.chromebook-x64-dfv2',
     'workstation_eng.qemu-x64',
+    'workstation_eng.x64',
 ]
 
 # TODO(crbug/1361089): Remove when the old scripts have been deprecated.
@@ -243,7 +244,7 @@ def get_current_signature(ffx_runner):
   """
   product_bundles = get_product_bundles(ffx_runner)
   if not product_bundles:
-    logging.warning('No product bundles - signature will default to None')
+    logging.info('No product bundles - signature will default to None')
     return None
   product_bundle_urls = get_product_bundle_urls(ffx_runner)
 

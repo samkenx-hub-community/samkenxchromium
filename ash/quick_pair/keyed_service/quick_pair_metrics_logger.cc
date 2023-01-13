@@ -4,13 +4,17 @@
 
 #include "ash/quick_pair/keyed_service/quick_pair_metrics_logger.h"
 
+#include "ash/constants/ash_pref_names.h"
 #include "ash/quick_pair/common/device.h"
 #include "ash/quick_pair/common/fast_pair/fast_pair_feature_usage_metrics_logger.h"
 #include "ash/quick_pair/common/fast_pair/fast_pair_metrics.h"
 #include "ash/quick_pair/common/logging.h"
 #include "ash/quick_pair/repository/fast_pair/device_metadata.h"
 #include "ash/quick_pair/repository/fast_pair_repository.h"
+#include "ash/session/session_controller_impl.h"
+#include "ash/shell.h"
 #include "base/containers/contains.h"
+#include "components/prefs/pref_service.h"
 #include "device/bluetooth/bluetooth_adapter_factory.h"
 
 namespace ash {
@@ -39,7 +43,7 @@ void GetDeviceMetadataAndLogEngagementFunnelWithMetadata(
     scoped_refptr<Device> device,
     FastPairEngagementFlowEvent event) {
   FastPairRepository::Get()->GetDeviceMetadata(
-      device->metadata_id,
+      device->metadata_id(),
       base::BindOnce(&AttemptToRecordEngagementFunnelFlowWithMetadata, device,
                      event));
 }
@@ -64,10 +68,14 @@ void GetDeviceMetadataAndLogRetroactiveEngagementFunnelWithMetadata(
     scoped_refptr<Device> device,
     FastPairRetroactiveEngagementFlowEvent event) {
   FastPairRepository::Get()->GetDeviceMetadata(
-      device->metadata_id,
+      device->metadata_id(),
       base::BindOnce(
           &AttemptToRecordRetroactiveEngagementFunnelFlowWithMetadata, device,
           event));
+}
+
+PrefService* GetLastActiveUserPrefService() {
+  return Shell::Get()->session_controller()->GetLastActiveUserPrefService();
 }
 
 }  // namespace
@@ -160,8 +168,8 @@ void QuickPairMetricsLogger::OnPairFailure(scoped_refptr<Device> device,
 void QuickPairMetricsLogger::OnDiscoveryAction(scoped_refptr<Device> device,
                                                DiscoveryAction action) {
   switch (action) {
-    case DiscoveryAction::kPairToDevice:
-      switch (device->protocol) {
+    case DiscoveryAction::kPairToDevice: {
+      switch (device->protocol()) {
         case Protocol::kFastPairSubsequent:
           RecordSubsequentSuccessFunnelFlow(
               FastPairSubsequentSuccessFunnelEvent::kNotificationsClicked);
@@ -185,12 +193,18 @@ void QuickPairMetricsLogger::OnDiscoveryAction(scoped_refptr<Device> device,
         break;
       }
 
+      PrefService* pref = GetLastActiveUserPrefService();
+      if (pref->FindPreference(ash::prefs::kUserPairedWithFastPair)) {
+        pref->SetBoolean(ash::prefs::kUserPairedWithFastPair, true);
+      }
+
       AttemptRecordingFastPairEngagementFlow(
           *device, FastPairEngagementFlowEvent::kDiscoveryUiConnectPressed);
       GetDeviceMetadataAndLogEngagementFunnelWithMetadata(
           device, FastPairEngagementFlowEvent::kDiscoveryUiConnectPressed);
       device_pairing_start_timestamps_[device] = base::TimeTicks::Now();
       break;
+    }
     case DiscoveryAction::kLearnMore:
       // We need to record whether or not the Discovery UI for this
       // device has had the Learn More button pressed because since the
@@ -296,7 +310,7 @@ void QuickPairMetricsLogger::OnPairingStart(scoped_refptr<Device> device) {
   RecordFastPairInitializePairingProcessEvent(
       *device, FastPairInitializePairingProcessEvent::kInitializationStarted);
 
-  switch (device->protocol) {
+  switch (device->protocol()) {
     case Protocol::kFastPairSubsequent:
       RecordSubsequentSuccessFunnelFlow(
           FastPairSubsequentSuccessFunnelEvent::kInitializationStarted);
@@ -316,7 +330,7 @@ void QuickPairMetricsLogger::OnHandshakeComplete(scoped_refptr<Device> device) {
   RecordFastPairInitializePairingProcessEvent(
       *device, FastPairInitializePairingProcessEvent::kInitializationComplete);
 
-  switch (device->protocol) {
+  switch (device->protocol()) {
     case Protocol::kFastPairSubsequent:
       RecordSubsequentSuccessFunnelFlow(
           FastPairSubsequentSuccessFunnelEvent::kPairingStarted);
@@ -333,7 +347,7 @@ void QuickPairMetricsLogger::OnHandshakeComplete(scoped_refptr<Device> device) {
 }
 
 void QuickPairMetricsLogger::OnPairingComplete(scoped_refptr<Device> device) {
-  switch (device->protocol) {
+  switch (device->protocol()) {
     case Protocol::kFastPairSubsequent:
       RecordSubsequentSuccessFunnelFlow(
           FastPairSubsequentSuccessFunnelEvent::kProcessComplete);
@@ -365,7 +379,7 @@ void QuickPairMetricsLogger::OnAssociateAccountAction(
     scoped_refptr<Device> device,
     AssociateAccountAction action) {
   switch (action) {
-    case AssociateAccountAction::kAssoicateAccount:
+    case AssociateAccountAction::kAssoicateAccount: {
       if (base::Contains(associate_account_learn_more_devices_, device)) {
         AttemptRecordingFastPairRetroactiveEngagementFlow(
             *device, FastPairRetroactiveEngagementFlowEvent::
@@ -377,6 +391,11 @@ void QuickPairMetricsLogger::OnAssociateAccountAction(
         break;
       }
 
+      PrefService* pref = GetLastActiveUserPrefService();
+      if (pref->FindPreference(ash::prefs::kUserPairedWithFastPair)) {
+        pref->SetBoolean(ash::prefs::kUserPairedWithFastPair, true);
+      }
+
       AttemptRecordingFastPairRetroactiveEngagementFlow(
           *device,
           FastPairRetroactiveEngagementFlowEvent::kAssociateAccountSavePressed);
@@ -386,6 +405,7 @@ void QuickPairMetricsLogger::OnAssociateAccountAction(
       RecordRetroactiveSuccessFunnelFlow(
           FastPairRetroactiveSuccessFunnelEvent::kSaveRequested);
       break;
+    }
     case AssociateAccountAction::kLearnMore:
       // We need to record whether or not the Associate Account UI for this
       // device has had the Learn More button pressed because since the
@@ -468,7 +488,7 @@ void QuickPairMetricsLogger::OnAssociateAccountAction(
 void QuickPairMetricsLogger::OnAccountKeyWrite(
     scoped_refptr<Device> device,
     absl::optional<AccountKeyFailure> error) {
-  switch (device->protocol) {
+  switch (device->protocol()) {
     case Protocol::kFastPairSubsequent:
       // TODO(b/259443372): Record this case once we implement account key
       // writing in all scenarios,

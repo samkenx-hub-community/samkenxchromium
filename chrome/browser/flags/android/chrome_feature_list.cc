@@ -103,7 +103,6 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &commerce::kCommerceMerchantViewer,
     &commerce::kCommercePriceTracking,
     &commerce::kShoppingList,
-    &commerce::kShoppingListEnableDesyncResolution,
     &commerce::kShoppingPDPMetrics,
     &content_settings::kDarkenWebsitesCheckboxInThemesSetting,
     &download::features::kDownloadAutoResumptionNative,
@@ -130,7 +129,6 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &features::kIncognitoDownloadsWarning,
     &features::kIncognitoNtpRevamp,
     &feature_engagement::kEnableIPH,
-    &feature_engagement::kEnableAutomaticSnooze,
     &feature_engagement::kIPHNewTabPageHomeButtonFeature,
     &feature_engagement::kIPHSnooze,
     &feature_engagement::kIPHTabSwitcherButtonFeature,
@@ -163,15 +161,17 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &kAllowNewIncognitoTabIntents,
     &kAndroidScrollOptimizations,
     &kAndroidSearchEngineChoiceNotification,
+    &kAndroidImprovedBookmarks,
+    &kAnimatedImageDragShadow,
     &kAssistantConsentSimplifiedText,
     &kAssistantConsentV2,
     &kAssistantIntentExperimentId,
-    &kAssistantIntentPageUrl,
     &kAssistantIntentTranslateInfo,
     &kAssistantNonPersonalizedVoiceSearch,
     &kAppMenuMobileSiteOption,
     &kAppToWebAttribution,
     &kBackgroundThreadPool,
+    &kBaselineGM3SurfaceColors,
     &kCastDeviceFilter,
     &kClearOmniboxFocusAfterNavigation,
     &kCloseTabSuggestions,
@@ -215,7 +215,6 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &kContextMenuSearchAndShopWithGoogleLens,
     &kContextMenuTranslateWithGoogleLens,
     &kContextMenuPopupForAllScreenSizes,
-    &kContextualSearchDebug,
     &kContextualSearchDelayedIntelligence,
     &kContextualSearchDisableOnlineDetection,
     &kContextualSearchForceCaption,
@@ -261,6 +260,7 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &kRequestDesktopSiteOptInControlSynthetic,
     &kRequestDesktopSiteOptInSynthetic,
     &kRequestDesktopSiteDefaultsDowngrade,
+    &kRequestDesktopSitePerSiteIph,
     &kSafeModeForCachedFlags,
     &kShowScrollableMVTOnNTPAndroid,
     &kFeedPositionAndroid,
@@ -281,7 +281,6 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &kTabGridLayoutAndroid,
     &kTabSelectionEditorV2,
     &kTabStripImprovements,
-    &kTabSwitcherOnReturn,
     &kTabToGTSAnimation,
     &kTestDefaultDisabled,
     &kTestDefaultEnabled,
@@ -359,6 +358,7 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &segmentation_platform::features::kContextualPageActions,
     &segmentation_platform::features::kContextualPageActionPriceTracking,
     &segmentation_platform::features::kContextualPageActionReaderMode,
+    &segmentation_platform::features::kContextualPageActionShareModel,
     &send_tab_to_self::kSendTabToSelfSigninPromo,
     &send_tab_to_self::kSendTabToSelfV2,
     &share::kCormorant,
@@ -373,10 +373,6 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &switches::kTangibleSync,
     &syncer::kSyncEnableHistoryDataType,
     &syncer::kSyncAndroidLimitNTPPromoImpressions,
-    &syncer::kSyncAndroidPromosWithAlternativeTitle,
-    &syncer::kSyncAndroidPromosWithIllustration,
-    &syncer::kSyncAndroidPromosWithSingleButton,
-    &syncer::kSyncAndroidPromosWithTitle,
     &subresource_filter::kSafeBrowsingSubresourceFilter,
     &video_tutorials::features::kVideoTutorials,
     &webapps::features::kInstallableAmbientBadgeInfoBar,
@@ -439,6 +435,14 @@ BASE_FEATURE(kAndroidSearchEngineChoiceNotification,
              "AndroidSearchEngineChoiceNotification",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
+BASE_FEATURE(kAndroidImprovedBookmarks,
+             "AndroidImprovedBookmarks",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+BASE_FEATURE(kAnimatedImageDragShadow,
+             "AnimatedImageDragShadow",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 BASE_FEATURE(kAssistantConsentSimplifiedText,
              "AssistantConsentSimplifiedText",
              base::FEATURE_DISABLED_BY_DEFAULT);
@@ -449,10 +453,6 @@ BASE_FEATURE(kAssistantConsentV2,
 
 BASE_FEATURE(kAssistantIntentExperimentId,
              "AssistantIntentExperimentId",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-
-BASE_FEATURE(kAssistantIntentPageUrl,
-             "AssistantIntentPageUrl",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 BASE_FEATURE(kAssistantIntentTranslateInfo,
@@ -473,6 +473,10 @@ BASE_FEATURE(kAppToWebAttribution,
 
 BASE_FEATURE(kBackgroundThreadPool,
              "BackgroundThreadPool",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+BASE_FEATURE(kBaselineGM3SurfaceColors,
+             "BaselineGM3SurfaceColors",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 BASE_FEATURE(kConditionalTabStripAndroid,
@@ -584,7 +588,7 @@ BASE_FEATURE(kCCTToolbarCustomizations,
 
 BASE_FEATURE(kDiscardOccludedBitmaps,
              "DiscardOccludedBitmaps",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 BASE_FEATURE(kDontAutoHideBrowserControls,
              "DontAutoHideBrowserControls",
@@ -826,6 +830,10 @@ BASE_FEATURE(kRequestDesktopSiteDefaultsDowngrade,
              "RequestDesktopSiteDefaultsDowngrade",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
+BASE_FEATURE(kRequestDesktopSitePerSiteIph,
+             "RequestDesktopSitePerSiteIph",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 BASE_FEATURE(kSafeModeForCachedFlags,
              "SafeModeForCachedFlags",
              base::FEATURE_DISABLED_BY_DEFAULT);
@@ -844,7 +852,7 @@ BASE_FEATURE(kSpecialUserDecision,
 
 BASE_FEATURE(kSplitCompositorTask,
              "SplitCompositorTask",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 BASE_FEATURE(kStoreHoursAndroid,
              "StoreHoursAndroid",
@@ -897,10 +905,6 @@ BASE_FEATURE(kDiscoverFeedMultiColumn,
 BASE_FEATURE(kTabStripRedesign,
              "TabStripRedesign",
              base::FEATURE_DISABLED_BY_DEFAULT);
-
-BASE_FEATURE(kTabSwitcherOnReturn,
-             "TabSwitcherOnReturn",
-             base::FEATURE_ENABLED_BY_DEFAULT);
 
 BASE_FEATURE(kTabToGTSAnimation,
              "TabToGTSAnimation",

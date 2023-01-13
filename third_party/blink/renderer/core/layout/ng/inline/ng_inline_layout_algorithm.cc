@@ -118,7 +118,7 @@ NGInlineBoxState* NGInlineLayoutAlgorithm::HandleCloseTag(
 void NGInlineLayoutAlgorithm::PrepareBoxStates(
     const NGLineInfo& line_info,
     const NGInlineBreakToken* break_token) {
-#if DCHECK_IS_ON()
+#if EXPENSIVE_DCHECKS_ARE_ON()
   is_box_states_from_context_ = false;
 #endif
 
@@ -136,7 +136,7 @@ void NGInlineLayoutAlgorithm::PrepareBoxStates(
     box_states_ =
         context_->BoxStatesIfValidForItemIndex(items, break_token->ItemIndex());
     if (box_states_) {
-#if DCHECK_IS_ON()
+#if EXPENSIVE_DCHECKS_ARE_ON()
       is_box_states_from_context_ = true;
 #endif
       return;
@@ -191,7 +191,7 @@ void NGInlineLayoutAlgorithm::RebuildBoxStates(
   context_->ReleaseTempLogicalLineItems(line_box);
 }
 
-#if DCHECK_IS_ON()
+#if EXPENSIVE_DCHECKS_ARE_ON()
 void NGInlineLayoutAlgorithm::CheckBoxStates(
     const NGLineInfo& line_info,
     const NGInlineBreakToken* break_token) const {
@@ -226,7 +226,7 @@ void NGInlineLayoutAlgorithm::CreateLine(
   box_states_->SetIsEmptyLine(line_info->IsEmptyLine());
   NGInlineBoxState* box = box_states_->OnBeginPlaceItems(
       Node(), line_style, baseline_type_, quirks_mode_, line_box);
-#if DCHECK_IS_ON()
+#if EXPENSIVE_DCHECKS_ARE_ON()
   if (is_box_states_from_context_)
     CheckBoxStates(*line_info, BreakToken());
 #endif
@@ -1207,17 +1207,16 @@ const NGLayoutResult* NGInlineLayoutAlgorithm::Layout() {
     is_pushed_by_floats = true;
   }
 
-  // For initial letter, we should clear previous block's initial letter[1]
+  // For initial letter, we should clear previous block's initial letter[1][2]
   // if:
   //   - new formatting context
   //   - starts with an initial letter
   //   - `clear` in start direction of initial letter containing block.
   //
   // [1] https://drafts.csswg.org/css-inline/#short-para-initial-letter
-  // TODO(crbug.com/1402001): `LogicalLineItems()` is unused, and thus is always
-  // empty. Replace it with the correct condition, then remove
-  // `LogicalLineItems()`.
-  if (context_->LogicalLineItems()->IsEmpty()) {
+  // [2]
+  // https://wpt.live/css/css-inline/initial-letter/initial-letter-short-para-initial-letter-clears.html
+  if (!context_->ItemsBuilder()->Size()) {
     const EClear clear_type =
         UNLIKELY(Node().HasInitialLetterBox())
             ? EClear::kBoth

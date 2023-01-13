@@ -11,6 +11,7 @@
 #include "mojo/public/cpp/bindings/remote.h"
 #include "net/base/completion_once_callback.h"
 #include "net/base/network_delegate_impl.h"
+#include "net/cookies/cookie_setting_override.h"
 #include "net/first_party_sets/first_party_set_metadata.h"
 #include "net/first_party_sets/first_party_sets_cache_filter.h"
 #include "services/network/cookie_settings.h"
@@ -19,7 +20,6 @@
 
 namespace net {
 class SchemefulSite;
-class SiteForCookies;
 }  // namespace net
 
 namespace network {
@@ -79,9 +79,7 @@ class COMPONENT_EXPORT(NETWORK_SERVICE) NetworkServiceNetworkDelegate
                       const net::CanonicalCookie& cookie,
                       net::CookieOptions* options) override;
   net::NetworkDelegate::PrivacySetting OnForcePrivacyMode(
-      const GURL& url,
-      const net::SiteForCookies& site_for_cookies,
-      const absl::optional<url::Origin>& top_frame_origin) const override;
+      const net::URLRequest& request) const override;
   bool OnCancelURLRequestWithPolicyViolatingReferrerHeader(
       const net::URLRequest& request,
       const GURL& target_url,

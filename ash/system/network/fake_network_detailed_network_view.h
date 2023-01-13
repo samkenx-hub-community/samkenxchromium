@@ -48,12 +48,15 @@ class ASH_EXPORT FakeNetworkDetailedNetworkView
   NetworkListNetworkItemView* AddNetworkListItem(
       chromeos::network_config::mojom::NetworkType type) override;
   NetworkListWifiHeaderView* AddWifiSectionHeader() override;
+  HoverHighlightView* AddJoinNetworkEntry() override;
   NetworkListMobileHeaderView* AddMobileSectionHeader() override;
   void UpdateScanningBarVisibility(bool visible) override;
+  void ReorderFirstListView(size_t index) override {}
   void ReorderNetworkTopContainer(size_t index) override {}
   void ReorderNetworkListView(size_t index) override {}
   void ReorderMobileTopContainer(size_t index) override {}
   void ReorderMobileListView(size_t index) override {}
+  void MaybeRemoveFirstListView() override {}
 
   // ViewClickListener:
   void OnViewClicked(views::View* view) override;

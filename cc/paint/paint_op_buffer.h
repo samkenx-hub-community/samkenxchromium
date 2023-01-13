@@ -10,9 +10,9 @@
 #include <utility>
 #include <vector>
 
-#include "base/callback.h"
 #include "base/check_op.h"
 #include "base/debug/alias.h"
+#include "base/functional/callback.h"
 #include "base/memory/aligned_memory.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/raw_ptr_exclusion.h"
@@ -238,10 +238,7 @@ class CC_PAINT_EXPORT PaintOpBuffer : public SkRefCnt {
   // retains the original data buffer for future use.
   PaintRecord ReleaseAsRecord();
 
-  bool operator==(const PaintOpBuffer& other) const;
-  bool operator!=(const PaintOpBuffer& other) const {
-    return !(*this == other);
-  }
+  bool EqualsForTesting(const PaintOpBuffer& other) const;
 
   const PaintOp& GetFirstOp() const {
     DCHECK(!empty());
@@ -272,6 +269,7 @@ class CC_PAINT_EXPORT PaintOpBuffer : public SkRefCnt {
     static_assert(!std::is_same<T, PaintOp>::value,
                   "AnalyzeAddedOp needs a subtype of PaintOp");
     DCHECK(is_mutable());
+    DCHECK(op->IsValid());
 
     if (num_slow_paths_up_to_min_for_MSAA_ < kMinNumberOfSlowPathsForMSAA) {
       num_slow_paths_up_to_min_for_MSAA_ += op->CountSlowPathsFromFlags();
@@ -293,12 +291,6 @@ class CC_PAINT_EXPORT PaintOpBuffer : public SkRefCnt {
     has_effects_preventing_lcd_text_for_save_layer_alpha_ |=
         op->HasEffectsPreventingLCDTextForSaveLayerAlpha();
   }
-
-  template <typename T>
-  const T* GetOpAtForTesting(size_t index) const {
-    return static_cast<const T*>(GetOpAtForTesting(index, T::kType));
-  }
-  const PaintOp* GetOpAtForTesting(size_t index, PaintOpType type) const;
 
   size_t GetOpOffsetForTracing(const PaintOp& op) const {
     DCHECK_GE(reinterpret_cast<const char*>(&op), data_.get());

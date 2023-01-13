@@ -25,7 +25,6 @@
 #include "ash/shell.h"
 #include "ash/strings/grit/ash_strings.h"
 #include "ash/style/ash_color_id.h"
-#include "ash/style/ash_color_provider.h"
 #include "ash/style/icon_button.h"
 #include "ash/system/eche/eche_icon_loading_indicator_view.h"
 #include "ash/system/phonehub/phone_hub_tray.h"
@@ -38,8 +37,8 @@
 #include "ash/webui/eche_app_ui/mojom/eche_app.mojom.h"
 #include "ash/wm/tablet_mode/tablet_mode_controller.h"
 #include "ash/wm/window_state.h"
-#include "base/bind.h"
-#include "base/callback_forward.h"
+#include "base/functional/bind.h"
+#include "base/functional/callback_forward.h"
 #include "base/metrics/histogram_functions.h"
 #include "base/time/default_tick_clock.h"
 #include "base/time/time.h"
@@ -159,12 +158,10 @@ std::unique_ptr<views::Button> CreateButton(
     views::Button::PressedCallback callback,
     const gfx::VectorIcon& icon,
     int message_id) {
-  SkColor color = AshColorProvider::Get()->GetContentLayerColor(
-      AshColorProvider::ContentLayerType::kIconColorPrimary);
-  SkColor disabled_color = SkColorSetA(color, gfx::kDisabledControlAlpha);
   auto button = views::CreateVectorImageButton(std::move(callback));
-  views::SetImageFromVectorIconWithColor(button.get(), icon, color,
-                                         disabled_color);
+  views::SetImageFromVectorIconWithColorId(button.get(), icon,
+                                           kColorAshIconColorPrimary,
+                                           kColorAshButtonIconDisabledColor);
   button->SetTooltipText(l10n_util::GetStringUTF16(message_id));
   button->SizeToPreferredSize();
 
@@ -231,10 +228,8 @@ EcheTray::EcheTray(Shelf* shelf)
   // Note: `ScreenLayoutObserver` starts observing at its constructor.
   observed_session_.Observe(Shell::Get()->session_controller());
   icon_->SetTooltipText(GetAccessibleNameForTray());
-  icon_->SetImage(CreateVectorIcon(
-      kPhoneHubPhoneIcon,
-      AshColorProvider::Get()->GetContentLayerColor(
-          AshColorProvider::ContentLayerType::kIconColorPrimary)));
+  icon_->SetImage(ui::ImageModel::FromVectorIcon(kPhoneHubPhoneIcon,
+                                                 kColorAshIconColorPrimary));
   shelf_observation_.Observe(shelf);
   tablet_mode_observation_.Observe(Shell::Get()->tablet_mode_controller());
   shell_observer_.Observe(Shell::Get());
@@ -347,6 +342,11 @@ void EcheTray::OnAnyBubbleVisibilityChanged(views::Widget* bubble_widget,
 
 bool EcheTray::CacheBubbleViewForHide() const {
   return true;
+}
+
+void EcheTray::OnThemeChanged() {
+  TrayBackgroundView::OnThemeChanged();
+  RefreshHeaderView();
 }
 
 std::u16string EcheTray::GetAccessibleNameForBubble() {
@@ -527,25 +527,25 @@ void EcheTray::InitBubble(const std::u16string& phone_name) {
   init_params.translucent = true;
   init_params.reroute_event_handler = false;
   init_params.corner_radius = kTrayItemCornerRadius;
+  phone_name_ = phone_name;
 
   auto bubble_view = std::make_unique<TrayBubbleView>(init_params);
   bubble_view->SetCanActivate(true);
   bubble_view->SetBorder(views::CreateEmptyBorder(kBubblePadding));
 
-  auto* header_view =
-      bubble_view->AddChildView(CreateBubbleHeaderView(phone_name));
+  header_view_ = bubble_view->AddChildView(CreateBubbleHeaderView(phone_name));
 
   // We need the header be always visible with the same size.
   static_cast<views::BoxLayout*>(bubble_view->GetLayoutManager())
-      ->SetFlexForView(header_view, 0, true);
+      ->SetFlexForView(header_view_, 0, true);
   static_cast<views::BoxLayout*>(bubble_view->GetLayoutManager())
       ->set_inside_border_insets(kBubblePadding);
 
   // In dark light mode, we switch TrayBubbleView to use a textured layer
   // instead of solid color layer, so no need to create an extra layer here.
   if (!features::IsDarkLightModeEnabled()) {
-    header_view->SetPaintToLayer();
-    header_view->layer()->SetFillsBoundsOpaquely(false);
+    header_view_->SetPaintToLayer();
+    header_view_->layer()->SetFillsBoundsOpaquely(false);
   }
 
   AshWebView::InitParams params;
@@ -716,6 +716,22 @@ EcheIconLoadingIndicatorView* EcheTray::GetLoadingIndicator() {
   if (!phone_hub_tray)
     return nullptr;
   return phone_hub_tray->eche_loading_indicator();
+}
+
+void EcheTray::RefreshHeaderView() {
+  if (!header_view_ || !bubble_) {
+    return;
+  }
+
+  auto* bubble_view = bubble_->GetBubbleView();
+  bubble_view->RemoveChildView(header_view_);
+  header_view_ = bubble_view->AddChildViewAt(
+      CreateBubbleHeaderView(phone_name_), /* index= */ 0);
+
+  static_cast<views::BoxLayout*>(bubble_view->GetLayoutManager())
+      ->SetFlexForView(header_view_, 0, true);
+  static_cast<views::BoxLayout*>(bubble_view->GetLayoutManager())
+      ->set_inside_border_insets(kBubblePadding);
 }
 
 void EcheTray::UpdateEcheSizeAndBubbleBounds() {

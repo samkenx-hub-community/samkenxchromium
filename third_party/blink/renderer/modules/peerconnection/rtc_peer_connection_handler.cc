@@ -14,8 +14,8 @@
 #include <utility>
 #include <vector>
 
-#include "base/bind.h"
 #include "base/containers/contains.h"
+#include "base/functional/bind.h"
 #include "base/location.h"
 #include "base/logging.h"
 #include "base/memory/scoped_refptr.h"
@@ -23,6 +23,8 @@
 #include "base/metrics/histogram_macros.h"
 #include "base/numerics/safe_conversions.h"
 #include "base/synchronization/waitable_event.h"
+#include "base/task/sequenced_task_runner.h"
+#include "base/task/single_thread_task_runner.h"
 #include "base/threading/thread_checker.h"
 #include "base/trace_event/trace_event.h"
 #include "build/chromecast_buildflags.h"
@@ -338,10 +340,8 @@ class StatsResponse : public webrtc::StatsObserver {
     class MemberIterator : public RTCLegacyStatsMemberIterator {
      public:
       MemberIterator(
-          const std::vector<StatsReport::Values::value_type>::const_iterator&
-              it,
-          const std::vector<StatsReport::Values::value_type>::const_iterator&
-              end)
+          Vector<StatsReport::Values::value_type>::const_iterator it,
+          Vector<StatsReport::Values::value_type>::const_iterator end)
           : it_(it), end_(end) {}
 
       // RTCLegacyStatsMemberIterator
@@ -374,16 +374,17 @@ class StatsResponse : public webrtc::StatsObserver {
       }
 
      private:
-      std::vector<StatsReport::Values::value_type>::const_iterator it_;
-      std::vector<StatsReport::Values::value_type>::const_iterator end_;
+      Vector<StatsReport::Values::value_type>::const_iterator it_;
+      Vector<StatsReport::Values::value_type>::const_iterator end_;
     };
 
     explicit Report(const StatsReport* report)
         : id_(report->id()->ToString()),
           type_(report->type()),
           type_name_(report->TypeToString()),
-          timestamp_(report->timestamp()),
-          values_(report->values().begin(), report->values().end()) {}
+          timestamp_(report->timestamp()) {
+      values_.AppendRange(report->values().begin(), report->values().end());
+    }
 
     ~Report() override {
       // Since the values vector holds pointers to const objects that are bound
@@ -396,7 +397,7 @@ class StatsResponse : public webrtc::StatsObserver {
     String GetType() const override { return String::FromUTF8(type_name_); }
     double Timestamp() const override { return timestamp_; }
     RTCLegacyStatsMemberIterator* Iterator() const override {
-      return new MemberIterator(values_.cbegin(), values_.cend());
+      return new MemberIterator(values_.begin(), values_.end());
     }
 
     bool HasValues() const { return values_.size() > 0; }
@@ -407,7 +408,7 @@ class StatsResponse : public webrtc::StatsObserver {
     const StatsReport::StatsType type_;
     const std::string type_name_;
     const double timestamp_;
-    const std::vector<StatsReport::Values::value_type> values_;
+    Vector<StatsReport::Values::value_type> values_;
   };
 
   static void DeleteReports(std::vector<Report*>* reports) {
@@ -506,7 +507,7 @@ std::set<RTCPeerConnectionHandler*>* GetPeerConnectionHandlers() {
 
 // Counts the number of senders that have |stream_id| as an associated stream.
 size_t GetLocalStreamUsageCount(
-    const std::vector<std::unique_ptr<blink::RTCRtpSenderImpl>>& rtp_senders,
+    const Vector<std::unique_ptr<blink::RTCRtpSenderImpl>>& rtp_senders,
     const std::string stream_id) {
   size_t usage_count = 0;
   for (const auto& sender : rtp_senders) {
@@ -706,6 +707,8 @@ class RTCPeerConnectionHandler::WebRtcSetDescriptionObserverImpl
     if (handler_) {
       handler_->OnModifySctpTransport(std::move(states.sctp_transport_state));
     }
+    // Since OnSessionDescriptionsUpdated can fire events, it may cause
+    // garbage collection. Ensure that handler_ is still valid.
     if (handler_) {
       handler_->OnModifyTransceivers(
           states.signaling_state, std::move(states.transceiver_states),
@@ -927,6 +930,10 @@ class RTCPeerConnectionHandler::Observer
           std::move(current_local_description),
           std::move(pending_remote_description),
           std::move(current_remote_description));
+    }
+    // Since OnSessionDescriptionsUpdated can fire events, it may cause
+    // garbage collection. Ensure that handler_ is still valid.
+    if (handler_) {
       handler_->OnIceCandidate(sdp, sdp_mid, sdp_mline_index, component,
                                address_family);
     }
@@ -1057,6 +1064,8 @@ bool RTCPeerConnectionHandler::Initialize(
   CHECK(!initialize_called_);
   initialize_called_ = true;
 
+  // Prevent garbage collection of client_ during processing.
+  auto* client_on_stack = client_;
   peer_connection_tracker_ = PeerConnectionTracker::From(*frame);
 
   configuration_ = server_configuration;
@@ -1098,8 +1107,8 @@ bool RTCPeerConnectionHandler::Initialize(
     peer_connection_tracker_->RegisterPeerConnection(this, configuration_,
                                                      frame_);
   }
-
-  return true;
+  // Gratuitous usage of client_on_stack to prevent compiler errors.
+  return !!client_on_stack;
 }
 
 bool RTCPeerConnectionHandler::InitializeForTest(
@@ -1801,7 +1810,7 @@ webrtc::RTCErrorOr<std::unique_ptr<RTCRtpTransceiverPlatform>>
 RTCPeerConnectionHandler::RemoveTrack(blink::RTCRtpSenderPlatform* web_sender) {
   DCHECK(task_runner_->RunsTasksInCurrentSequence());
   TRACE_EVENT0("webrtc", "RTCPeerConnectionHandler::RemoveTrack");
-  auto it = FindSender(web_sender->Id());
+  auto* it = FindSender(web_sender->Id());
   if (it == rtp_senders_.end())
     return webrtc::RTCError(webrtc::RTCErrorType::INVALID_PARAMETER);
   const auto& sender = *it;
@@ -2061,9 +2070,11 @@ void RTCPeerConnectionHandler::OnSessionDescriptionsUpdated(
         pending_remote_description,
     std::unique_ptr<webrtc::SessionDescriptionInterface>
         current_remote_description) {
+  // Prevent garbage collection of client_ during processing.
+  auto* client_on_stack = client_;
   if (!client_ || is_closed_)
     return;
-  client_->DidChangeSessionDescriptions(
+  client_on_stack->DidChangeSessionDescriptions(
       pending_local_description
           ? CreateWebKitSessionDescription(pending_local_description.get())
           : nullptr,
@@ -2181,7 +2192,7 @@ void RTCPeerConnectionHandler::OnModifyTransceivers(
     uintptr_t transceiver_id = blink::RTCRtpTransceiverImpl::GetId(
         transceiver_states[i].webrtc_transceiver().get());
     ids[i] = transceiver_id;
-    auto it = FindTransceiver(transceiver_id);
+    auto* it = FindTransceiver(transceiver_id);
     bool transceiver_is_new = (it == rtp_transceivers_.end());
     bool transceiver_was_modified = false;
     if (!transceiver_is_new) {
@@ -2254,8 +2265,12 @@ void RTCPeerConnectionHandler::OnIceCandidate(const String& sdp,
                                               int sdp_mline_index,
                                               int component,
                                               int address_family) {
+  // In order to ensure that the RTCPeerConnection is not garbage collected
+  // from under the function, we keep a pointer to it on the stack.
+  auto* client_on_stack = client_;
   DCHECK(task_runner_->RunsTasksInCurrentSequence());
   TRACE_EVENT0("webrtc", "RTCPeerConnectionHandler::OnIceCandidateImpl");
+  // This line can cause garbage collection.
   auto* platform_candidate = MakeGarbageCollected<RTCIceCandidatePlatform>(
       sdp, sdp_mid, sdp_mline_index);
   if (peer_connection_tracker_) {
@@ -2264,7 +2279,7 @@ void RTCPeerConnectionHandler::OnIceCandidate(const String& sdp,
   }
 
   if (!is_closed_)
-    client_->DidGenerateICECandidate(platform_candidate);
+    client_on_stack->DidGenerateICECandidate(platform_candidate);
 }
 
 void RTCPeerConnectionHandler::OnIceCandidateError(
@@ -2276,7 +2291,6 @@ void RTCPeerConnectionHandler::OnIceCandidateError(
     const String& error_text) {
   DCHECK(task_runner_->RunsTasksInCurrentSequence());
   TRACE_EVENT0("webrtc", "RTCPeerConnectionHandler::OnIceCandidateError");
-
   if (peer_connection_tracker_) {
     peer_connection_tracker_->TrackIceCandidateError(
         this, address, port, host_candidate, url, error_code, error_text);
@@ -2323,27 +2337,27 @@ void RTCPeerConnectionHandler::ReportFirstSessionDescriptions(
   // video or not.
 }
 
-std::vector<std::unique_ptr<blink::RTCRtpSenderImpl>>::iterator
+Vector<std::unique_ptr<blink::RTCRtpSenderImpl>>::iterator
 RTCPeerConnectionHandler::FindSender(uintptr_t id) {
-  for (auto it = rtp_senders_.begin(); it != rtp_senders_.end(); ++it) {
+  for (auto* it = rtp_senders_.begin(); it != rtp_senders_.end(); ++it) {
     if ((*it)->Id() == id)
       return it;
   }
   return rtp_senders_.end();
 }
 
-std::vector<std::unique_ptr<blink::RTCRtpReceiverImpl>>::iterator
+Vector<std::unique_ptr<blink::RTCRtpReceiverImpl>>::iterator
 RTCPeerConnectionHandler::FindReceiver(uintptr_t id) {
-  for (auto it = rtp_receivers_.begin(); it != rtp_receivers_.end(); ++it) {
+  for (auto* it = rtp_receivers_.begin(); it != rtp_receivers_.end(); ++it) {
     if ((*it)->Id() == id)
       return it;
   }
   return rtp_receivers_.end();
 }
 
-std::vector<std::unique_ptr<blink::RTCRtpTransceiverImpl>>::iterator
+Vector<std::unique_ptr<blink::RTCRtpTransceiverImpl>>::iterator
 RTCPeerConnectionHandler::FindTransceiver(uintptr_t id) {
-  for (auto it = rtp_transceivers_.begin(); it != rtp_transceivers_.end();
+  for (auto* it = rtp_transceivers_.begin(); it != rtp_transceivers_.end();
        ++it) {
     if ((*it)->Id() == id)
       return it;
@@ -2351,9 +2365,9 @@ RTCPeerConnectionHandler::FindTransceiver(uintptr_t id) {
   return rtp_transceivers_.end();
 }
 
-size_t RTCPeerConnectionHandler::GetTransceiverIndex(
+wtf_size_t RTCPeerConnectionHandler::GetTransceiverIndex(
     const RTCRtpTransceiverPlatform& platform_transceiver) {
-  for (size_t i = 0; i < rtp_transceivers_.size(); ++i) {
+  for (wtf_size_t i = 0; i < rtp_transceivers_.size(); ++i) {
     if (platform_transceiver.Id() == rtp_transceivers_[i]->Id())
       return i;
   }
@@ -2373,7 +2387,7 @@ RTCPeerConnectionHandler::CreateOrUpdateTransceiver(
   auto webrtc_receiver = transceiver_state.receiver_state()->webrtc_receiver();
 
   std::unique_ptr<blink::RTCRtpTransceiverImpl> transceiver;
-  auto it = FindTransceiver(
+  auto* it = FindTransceiver(
       blink::RTCRtpTransceiverImpl::GetId(webrtc_transceiver.get()));
   if (it == rtp_transceivers_.end()) {
     // Create a new transceiver, including a sender and a receiver.

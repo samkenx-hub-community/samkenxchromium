@@ -408,7 +408,7 @@
 <translation id="4847902821209177679"><ph name="TOPIC_SOURCE" /> <ph name="TOPIC_SOURCE_DESC" /> বাছনি কৰা হৈছে, <ph name="TOPIC_SOURCE" />ৰ এলবামসমূহ বাছনি কৰিবলৈ এণ্টাৰ টিপক</translation>
 <translation id="484790837831576105">(Android) DNS ৰিজ’লিউশ্বন</translation>
 <translation id="4848429997038228357">চলি আছে</translation>
-<translation id="4854586501323951986">বিল্ট-ইন টাচ্চস্ক্ৰীন</translation>
+<translation id="4854586501323951986">বিল্ট-ইন টাচ্‌স্ক্ৰীন</translation>
 <translation id="4861758251032006121">{ATTEMPTS_LEFT,plural, =1{<ph name="ERROR_MESSAGE" /> {0} টা প্ৰয়াস বাকী আছে}one{<ph name="ERROR_MESSAGE" /> {0} টা প্ৰয়াস বাকী আছে}other{<ph name="ERROR_MESSAGE" /> {0} টা প্ৰয়াস বাকী আছে}}</translation>
 <translation id="4873827928179867585">বিশ্বাসযোগ্যতা প্ৰমাণীকৰণৰ এলগ’ৰিডম</translation>
 <translation id="4880328057631981605">এক্সেছ পইণ্টৰ নাম</translation>
@@ -583,7 +583,7 @@
 <translation id="6348738456043757611">ব্যৱহাৰকাৰীৰ নাম আৰু পাছৱৰ্ড</translation>
 <translation id="6359706544163531585">পাতল ৰঙৰ থীম অক্ষম কৰক</translation>
 <translation id="636850387210749493">এন্টাৰপ্ৰাইজৰ পঞ্জীয়ন</translation>
-<translation id="6379086450106841622">টাচ্চস্ক্ৰীন</translation>
+<translation id="6379086450106841622">টাচ্‌স্ক্ৰীন</translation>
 <translation id="6381741036071372448">আপোনাৰ কীব’ৰ্ডখন পৰীক্ষা কৰক</translation>
 <translation id="6388847657025262518">স্কেনাৰৰ নথিৰ ফীডাৰটো জাম লাগিছে। ফীডাৰটো পৰীক্ষা কৰি পুনৰ চেষ্টা কৰক।</translation>
 <translation id="6394634179843537518">ফাইল যোগ দিয়ক</translation>
@@ -703,12 +703,12 @@
 <translation id="7502658306369382406">IPv6 ঠিকনা</translation>
 <translation id="7515998400212163428">Android</translation>
 <translation id="7535791657097741517">পাতল ৰঙৰ থীম অন কৰক</translation>
-<translation id="7550715992156305117">ডায়গন’ষ্টিক ৰুটিন</translation>
+<translation id="7550715992156305117">ডায়েগন’ষ্টিক ৰুটিন</translation>
 <translation id="7551123448725492271">ডিভাইচটো এটা অডিঅ’ ডিভাইচ।</translation>
 <translation id="7559239713112547082">স্ক্ৰীনশ্বট পূৰ্বদৰ্শন কৰক</translation>
 <translation id="7561454561030345039">এই কাৰ্যটো আপোনাৰ প্ৰশাসকে পৰিচালনা কৰে</translation>
 <translation id="7569444139234840525"><ph name="QUERY_TEXT" /> · /<ph name="PHONETICS" />/</translation>
-<translation id="7570674786725311828">ইউএছবি টাচ্চস্ক্ৰীন</translation>
+<translation id="7570674786725311828">ইউএছবি টাচ্‌স্ক্ৰীন</translation>
 <translation id="7595982850646262331"><ph name="TIME_VALUE" /> বাকী</translation>
 <translation id="7620771111601174153">সহায় কেন্দ্ৰত অধিক জানক</translation>
 <translation id="763165478673169849">অন্তিমবাৰ ৰিছেট কৰাৰ সময়</translation>
@@ -734,7 +734,7 @@
 <translation id="7819857487979277519">PSK (WPA বা RSN)</translation>
 <translation id="7841134249932030522">গাঢ় ম’ড সক্ষম কৰক</translation>
 <translation id="7846634333498149051">কীব'ৰ্ড</translation>
-<translation id="7856267634822906833">ব্লুটুথ টাচ্চস্ক্ৰীন</translation>
+<translation id="7856267634822906833">ব্লুটুথ টাচ্‌স্ক্ৰীন</translation>
 <translation id="7869143217755017858">গাঢ় ম’ড অক্ষম কৰক</translation>
 <translation id="7881066108824108340">DNS</translation>
 <translation id="7882358943899516840">প্ৰদানকাৰীৰ ধৰণ</translation>

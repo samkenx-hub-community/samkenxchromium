@@ -14,14 +14,13 @@
 #include <memory>
 
 #include "base/atomic_sequence_num.h"
-#include "base/bind.h"
 #include "base/containers/contains.h"
 #include "base/containers/span.h"
 #include "base/cxx17_backports.h"
+#include "base/functional/bind.h"
 #include "base/logging.h"
 #include "base/mac/mac_logging.h"
 #include "base/mac/mac_util.h"
-#include "base/mac/sdk_forward_declarations.h"
 #include "base/memory/ptr_util.h"
 #include "base/memory/scoped_policy.h"
 #include "base/metrics/histogram_macros.h"
@@ -2235,9 +2234,9 @@ bool VTVideoDecodeAccelerator::SendFrame(const Frame& frame) {
 
       gpu::Mailbox mailbox = gpu::Mailbox::GenerateForSharedImage();
       bool success = shared_image_stub->CreateSharedImage(
-          mailbox, /*client_id=*/0, std::move(handle), buffer_format_,
-          planes[plane], frame_size, color_space, kTopLeft_GrSurfaceOrigin,
-          kOpaque_SkAlphaType, shared_image_usage);
+          mailbox, std::move(handle), buffer_format_, planes[plane], frame_size,
+          color_space, kTopLeft_GrSurfaceOrigin, kOpaque_SkAlphaType,
+          shared_image_usage);
       if (!success) {
         DLOG(ERROR) << "Failed to create shared image";
         NotifyError(PLATFORM_FAILURE, SFT_PLATFORM_ERROR);

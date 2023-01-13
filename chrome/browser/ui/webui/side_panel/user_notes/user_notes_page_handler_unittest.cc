@@ -21,11 +21,13 @@ class TestUserNotesPageHandler : public UserNotesPageHandler {
  public:
   explicit TestUserNotesPageHandler(
       mojo::PendingRemote<side_panel::mojom::UserNotesPage> page,
-      Profile* profile)
+      Profile* profile,
+      Browser* browser)
       : UserNotesPageHandler(
             mojo::PendingReceiver<side_panel::mojom::UserNotesPageHandler>(),
             std::move(page),
             profile,
+            browser,
             nullptr) {}
 };
 
@@ -54,23 +56,7 @@ class UserNotesPageHandlerTest : public BrowserWithTestWindowTest {
     features_.InitAndEnableFeature(power_bookmarks::kPowerBookmarkBackend);
     BrowserWithTestWindowTest::SetUp();
     handler_ = std::make_unique<TestUserNotesPageHandler>(
-        page_.BindAndGetRemote(), profile());
-
-    GURL url1(u"https://url1");
-    GURL url2(u"https://url2");
-    GURL url3(u"https://url3");
-
-    std::vector<Note> notes;
-    notes.push_back({url1, "note1"});
-    notes.push_back({url2, "note2"});
-    notes.push_back({url3, "note3"});
-    notes.push_back({url1, "note4"});
-
-    side_panel::mojom::UserNotesPageHandlerAsyncWaiter waiter(handler());
-    for (auto& note : notes) {
-      handler_->SetCurrentTabUrlForTesting(note.url);
-      ASSERT_TRUE(waiter.NewNoteFinished(note.text));
-    }
+        page_.BindAndGetRemote(), profile(), browser());
   }
 
   void TearDown() override {
@@ -89,31 +75,37 @@ class UserNotesPageHandlerTest : public BrowserWithTestWindowTest {
 };
 
 TEST_F(UserNotesPageHandlerTest, GetNotes) {
-  EXPECT_CALL(page_, NotesChanged()).Times(1);
   side_panel::mojom::UserNotesPageHandlerAsyncWaiter waiter(handler());
   handler()->SetCurrentTabUrlForTesting(GURL(u"https://url1"));
+  ASSERT_TRUE(waiter.NewNoteFinished("note1"));
+  ASSERT_TRUE(waiter.NewNoteFinished("note11"));
   auto notes = waiter.GetNotesForCurrentTab();
   ASSERT_EQ(2u, notes.size());
 
   handler()->SetCurrentTabUrlForTesting(GURL(u"https://url2"));
+  ASSERT_TRUE(waiter.NewNoteFinished("note2"));
   auto notes2 = waiter.GetNotesForCurrentTab();
   ASSERT_EQ(1u, notes2.size());
   ASSERT_EQ("note2", notes2[0]->text);
 }
 
 TEST_F(UserNotesPageHandlerTest, GetNoteOverviews) {
-  EXPECT_CALL(page_, NotesChanged()).Times(1);
   side_panel::mojom::UserNotesPageHandlerAsyncWaiter waiter(handler());
   handler()->SetCurrentTabUrlForTesting(GURL(u"https://url1"));
+  ASSERT_TRUE(waiter.NewNoteFinished("note1"));
+  handler()->SetCurrentTabUrlForTesting(GURL(u"https://url2"));
+  ASSERT_TRUE(waiter.NewNoteFinished("note2"));
+  handler()->SetCurrentTabUrlForTesting(GURL(u"https://url3"));
+  ASSERT_TRUE(waiter.NewNoteFinished("note3"));
   auto note_overviews = waiter.GetNoteOverviews("");
   ASSERT_EQ(3u, note_overviews.size());
 }
 
 TEST_F(UserNotesPageHandlerTest, CreateAndDeleteNote) {
-  EXPECT_CALL(page_, NotesChanged()).Times(3);
+  EXPECT_CALL(page_, NotesChanged()).Times(2);
   side_panel::mojom::UserNotesPageHandlerAsyncWaiter waiter(handler());
-  handler()->SetCurrentTabUrlForTesting(GURL(u"https://url5"));
-  ASSERT_TRUE(waiter.NewNoteFinished("note5"));
+  handler()->SetCurrentTabUrlForTesting(GURL(u"https://url1"));
+  ASSERT_TRUE(waiter.NewNoteFinished("note1"));
 
   auto notes = waiter.GetNotesForCurrentTab();
   ASSERT_EQ(1u, notes.size());
@@ -125,33 +117,67 @@ TEST_F(UserNotesPageHandlerTest, CreateAndDeleteNote) {
   ASSERT_EQ(0u, notes2.size());
 }
 
-TEST_F(UserNotesPageHandlerTest, UpdateNote) {
-  EXPECT_CALL(page_, NotesChanged()).Times(3);
+TEST_F(UserNotesPageHandlerTest, ShouldNotCreateNoteWithEmptyURL) {
   side_panel::mojom::UserNotesPageHandlerAsyncWaiter waiter(handler());
-  handler()->SetCurrentTabUrlForTesting(GURL(u"https://url5"));
-  ASSERT_TRUE(waiter.NewNoteFinished("note5"));
+  handler()->SetCurrentTabUrlForTesting(GURL::EmptyGURL());
+  ASSERT_FALSE(waiter.NewNoteFinished("note5"));
+
+  auto notes = waiter.GetNotesForCurrentTab();
+  ASSERT_EQ(0u, notes.size());
+}
+
+TEST_F(UserNotesPageHandlerTest, UpdateNote) {
+  EXPECT_CALL(page_, NotesChanged()).Times(2);
+  side_panel::mojom::UserNotesPageHandlerAsyncWaiter waiter(handler());
+  handler()->SetCurrentTabUrlForTesting(GURL(u"https://url1"));
+  ASSERT_TRUE(waiter.NewNoteFinished("note1"));
 
   auto notes = waiter.GetNotesForCurrentTab();
   ASSERT_EQ(1u, notes.size());
-  ASSERT_EQ("note5", notes[0]->text);
+  ASSERT_EQ("note1", notes[0]->text);
   std::string guid = notes[0]->guid;
 
-  ASSERT_TRUE(waiter.UpdateNote(guid, "note6"));
+  ASSERT_TRUE(waiter.UpdateNote(guid, "note2"));
 
   auto notes2 = waiter.GetNotesForCurrentTab();
   ASSERT_EQ(1u, notes.size());
   ASSERT_EQ(guid, notes2[0]->guid);
-  ASSERT_EQ("note6", notes2[0]->text);
+  ASSERT_EQ("note2", notes2[0]->text);
 }
 
 TEST_F(UserNotesPageHandlerTest, DeleteNotesForUrl) {
-  EXPECT_CALL(page_, NotesChanged()).Times(2);
+  EXPECT_CALL(page_, NotesChanged()).Times(3);
   side_panel::mojom::UserNotesPageHandlerAsyncWaiter waiter(handler());
+  handler()->SetCurrentTabUrlForTesting(GURL(u"https://url1"));
+  ASSERT_TRUE(waiter.NewNoteFinished("note1"));
+  ASSERT_TRUE(waiter.NewNoteFinished("note2"));
   ASSERT_TRUE(waiter.DeleteNotesForUrl(GURL(u"https://url1")));
 
-  handler()->SetCurrentTabUrlForTesting(GURL(u"https://url1"));
   auto notes = waiter.GetNotesForCurrentTab();
   ASSERT_EQ(0u, notes.size());
+}
+
+TEST_F(UserNotesPageHandlerTest, CurrentTabUrlChangedWithTabStripModelChanged) {
+  AddTab(browser(), GURL(u"https://newurl1"));
+  ASSERT_EQ(GURL(u"https://newurl1"), handler()->GetCurrentTabUrlForTesting());
+  AddTab(browser(), GURL(u"https://newurl2"));
+  ASSERT_EQ(GURL(u"https://newurl2"), handler()->GetCurrentTabUrlForTesting());
+  browser()->tab_strip_model()->SelectNextTab();
+  ASSERT_EQ(GURL(u"https://newurl1"), handler()->GetCurrentTabUrlForTesting());
+  browser()->tab_strip_model()->CloseWebContentsAt(1,
+                                                   TabCloseTypes::CLOSE_NONE);
+  ASSERT_EQ(GURL(u"https://newurl2"), handler()->GetCurrentTabUrlForTesting());
+}
+
+TEST_F(UserNotesPageHandlerTest, CurrentTabUrlChangedWithNavigation) {
+  AddTab(browser(), GURL(u"https://newurl1"));
+  ASSERT_EQ(GURL(u"https://newurl1"), handler()->GetCurrentTabUrlForTesting());
+  NavigateAndCommitActiveTab(GURL(u"https://newurl2"));
+  ASSERT_EQ(GURL(u"https://newurl2"), handler()->GetCurrentTabUrlForTesting());
+  AddTab(browser(), GURL(u"https://newurl3"));
+  ASSERT_EQ(GURL(u"https://newurl3"), handler()->GetCurrentTabUrlForTesting());
+  NavigateAndCommitActiveTab(GURL(u"https://newurl4"));
+  ASSERT_EQ(GURL(u"https://newurl4"), handler()->GetCurrentTabUrlForTesting());
 }
 
 }  // namespace

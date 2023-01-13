@@ -16,6 +16,7 @@
 #include "gpu/command_buffer/service/shared_image/shared_image_format_utils.h"
 #include "gpu/config/gpu_preferences.h"
 #include "ui/gl/gl_gl_api_implementation.h"
+#include "ui/gl/gl_implementation.h"
 #include "ui/gl/progress_reporter.h"
 
 namespace gpu {
@@ -78,7 +79,6 @@ GLTextureImageBackingFactory::CreateSharedImage(
 std::unique_ptr<SharedImageBacking>
 GLTextureImageBackingFactory::CreateSharedImage(
     const Mailbox& mailbox,
-    int client_id,
     gfx::GpuMemoryBufferHandle handle,
     gfx::BufferFormat buffer_format,
     gfx::BufferPlane plane,
@@ -130,6 +130,17 @@ bool GLTextureImageBackingFactory::IsSupported(
       SHARED_IMAGE_USAGE_VIDEO_DECODE | SHARED_IMAGE_USAGE_SCANOUT;
   if (usage & kInvalidUsages) {
     return false;
+  }
+
+  if (gl::GetGLImplementation() == gl::kGLImplementationEGLANGLE &&
+      gl::GetANGLEImplementation() == gl::ANGLEImplementation::kMetal) {
+    constexpr uint32_t kMetalInvalidUsages =
+        SHARED_IMAGE_USAGE_DISPLAY_READ | SHARED_IMAGE_USAGE_SCANOUT |
+        SHARED_IMAGE_USAGE_VIDEO_DECODE | SHARED_IMAGE_USAGE_GLES2 |
+        SHARED_IMAGE_USAGE_GLES2_FRAMEBUFFER_HINT | SHARED_IMAGE_USAGE_WEBGPU;
+    if (usage & kMetalInvalidUsages) {
+      return false;
+    }
   }
 
   // Doesn't support contexts other than GL for OOPR Canvas
@@ -190,7 +201,8 @@ GLTextureImageBackingFactory::CreateSharedImageInternal(
   if (format_info.supports_storage) {
     {
       gl::ScopedProgressReporter scoped_progress_reporter(progress_reporter_);
-      api->glTexStorage2DEXTFn(target, 1, format_info.storage_internal_format,
+      api->glTexStorage2DEXTFn(target, 1,
+                               format_info.adjusted_storage_internal_format,
                                size.width(), size.height());
     }
 

@@ -126,15 +126,16 @@ class BrowserThemePack;
 class ChromeNSSCryptoModuleDelegate;
 class DesktopNotificationBalloon;
 class FirefoxProfileLock;
+class GaiaConfig;
 class KeyStorageLinux;
 class NativeBackendKWallet;
 class NativeDesktopMediaList;
 class Profile;
 class ProfileImpl;
-class StartupTabProviderImpl;
-class GaiaConfig;
-class WebEngineBrowserMainParts;
 class ScopedAllowBlockingForProfile;
+class StartupTabProviderImpl;
+class WebEngineBrowserMainParts;
+class WebEngineContentBrowserClient;
 
 namespace base {
 class File;
@@ -293,10 +294,10 @@ class WebViewBrowserState;
 namespace leveldb::port {
 class ScopedAllowWait;
 }  // namespace leveldb::port
-namespace location::nearby::chrome {
+namespace nearby::chrome {
 class ScheduledExecutor;
 class SubmittableExecutor;
-}  // namespace location::nearby::chrome
+}  // namespace nearby::chrome
 namespace media {
 class AudioInputDevice;
 class AudioOutputDevice;
@@ -409,6 +410,10 @@ class FuchsiaPerfettoProducerConnector;
 
 namespace ui {
 class WindowResizeHelperMac;
+}
+
+namespace updater {
+class SystemctlLauncherScopedAllowBaseSyncPrimitives;
 }
 
 namespace viz {
@@ -613,6 +618,7 @@ class BASE_EXPORT ScopedAllowBlocking {
   friend class remote_cocoa::
       DroppedScreenShotCopierMac;  // https://crbug.com/1148078
   friend class ::WebEngineBrowserMainParts;
+  friend class ::WebEngineContentBrowserClient;
   friend class remote_cocoa::SelectFileDialogBridge;
   friend class remoting::ScopedBypassIOThreadRestrictions;  // crbug.com/1144161
   friend class ui::DrmDisplayHostManager;
@@ -731,8 +737,8 @@ class BASE_EXPORT ScopedAllowBaseSyncPrimitives {
   friend class history_report::HistoryReportJniBridge;
   friend class internal::TaskTracker;
   friend class leveldb::port::ScopedAllowWait;
-  friend class location::nearby::chrome::ScheduledExecutor;
-  friend class location::nearby::chrome::SubmittableExecutor;
+  friend class nearby::chrome::ScheduledExecutor;
+  friend class nearby::chrome::SubmittableExecutor;
   friend class media::AudioOutputDevice;
   friend class media::BlockingUrlProtocol;
   friend class media::MojoVideoEncodeAccelerator;
@@ -744,6 +750,7 @@ class BASE_EXPORT ScopedAllowBaseSyncPrimitives {
   friend class storage::ObfuscatedFileUtil;
   friend class syncer::HttpBridge;
   friend class syncer::GetLocalChangesRequest;
+  friend class updater::SystemctlLauncherScopedAllowBaseSyncPrimitives;
   friend class viz::ClientGpuMemoryBufferManager;
   friend class webrtc::DesktopConfigurationMonitor;
   friend class ::tracing::FuchsiaPerfettoProducerConnector;

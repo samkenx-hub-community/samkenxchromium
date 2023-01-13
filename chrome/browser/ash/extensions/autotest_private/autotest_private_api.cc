@@ -43,15 +43,17 @@
 #include "ash/public/cpp/style/dark_light_mode_controller.h"
 #include "ash/public/cpp/tablet_mode.h"
 #include "ash/public/cpp/window_properties.h"
+#include "ash/root_window_controller.h"
 #include "ash/rotator/screen_rotation_animator.h"
 #include "ash/shell.h"
+#include "ash/wallpaper/wallpaper_widget_controller.h"
 #include "ash/wm/overview/overview_controller.h"
 #include "ash/wm/wm_event.h"
 #include "base/base64.h"
-#include "base/bind.h"
 #include "base/command_line.h"
 #include "base/compiler_specific.h"
 #include "base/feature_list.h"
+#include "base/functional/bind.h"
 #include "base/i18n/base_i18n_switches.h"
 #include "base/json/json_reader.h"
 #include "base/json/values_util.h"
@@ -401,9 +403,7 @@ api::autotest_private::AppType GetAppType(apps::AppType type) {
     case apps::AppType::kStandaloneBrowserExtension:
       return api::autotest_private::AppType::APP_TYPE_NONE;
     case apps::AppType::kStandaloneBrowserChromeApp:
-      // TODO(https://crbug.com/1225848): Figure out appropriate behavior for
-      // Lacros-hosted chrome-apps.
-      return api::autotest_private::AppType::APP_TYPE_NONE;
+      return api::autotest_private::AppType::APP_TYPE_EXTENSION;
   }
   NOTREACHED();
   return api::autotest_private::AppType::APP_TYPE_NONE;
@@ -1030,6 +1030,9 @@ std::string CompositorFrameSinkTypeToString(
   }
 }
 
+// Update when `startThroughputTrackerDataCollection` is called.
+base::TimeTicks g_last_start_throughput_data_collection_tick;
+
 }  // namespace
 
 class WindowStateChangeObserver : public aura::WindowObserver {
@@ -1382,6 +1385,11 @@ ExtensionFunction::ResponseAction AutotestPrivateLoginStatusFunction::Run() {
     result.Set("isLoggedIn", user_manager->IsUserLoggedIn());
     result.Set("isOwner", user_manager->IsCurrentUserOwner());
     result.Set("isScreenLocked", is_screen_locked);
+    result.Set("isLockscreenWallpaperAnimating",
+               is_screen_locked && ash::Shell::Get()
+                                       ->GetPrimaryRootWindowController()
+                                       ->wallpaper_widget_controller()
+                                       ->IsAnimating());
     result.Set("isReadyForPassword",
                ash::LoginScreen::Get()->IsReadyForPassword());
     if (user_manager->IsUserLoggedIn()) {
@@ -5916,6 +5924,7 @@ AutotestPrivateStartThroughputTrackerDataCollectionFunction::
 
 ExtensionFunction::ResponseAction
 AutotestPrivateStartThroughputTrackerDataCollectionFunction::Run() {
+  g_last_start_throughput_data_collection_tick = base::TimeTicks::Now();
   ash::metrics_util::StartDataCollection();
   return RespondNow(NoArguments());
 }
@@ -5938,9 +5947,15 @@ AutotestPrivateStopThroughputTrackerDataCollectionFunction::Run() {
   result_data.reserve(collected_data.size());
   for (const auto& data : collected_data) {
     api::autotest_private::ThroughputTrackerAnimationData animation_data;
-    animation_data.frames_expected = data.frames_expected;
-    animation_data.frames_produced = data.frames_produced;
-    animation_data.jank_count = data.jank_count;
+    animation_data.start_offset_ms =
+        (data.start_tick - g_last_start_throughput_data_collection_tick)
+            .InMilliseconds();
+    animation_data.stop_offset_ms =
+        (data.stop_tick - g_last_start_throughput_data_collection_tick)
+            .InMilliseconds();
+    animation_data.frames_expected = data.smoothness_data.frames_expected;
+    animation_data.frames_produced = data.smoothness_data.frames_produced;
+    animation_data.jank_count = data.smoothness_data.jank_count;
     result_data.emplace_back(std::move(animation_data));
   }
   return RespondNow(
@@ -5965,9 +5980,15 @@ AutotestPrivateGetThroughputTrackerDataFunction::Run() {
   result_data.reserve(collected_data.size());
   for (const auto& data : collected_data) {
     api::autotest_private::ThroughputTrackerAnimationData animation_data;
-    animation_data.frames_expected = data.frames_expected;
-    animation_data.frames_produced = data.frames_produced;
-    animation_data.jank_count = data.jank_count;
+    animation_data.start_offset_ms =
+        (data.start_tick - g_last_start_throughput_data_collection_tick)
+            .InMilliseconds();
+    animation_data.stop_offset_ms =
+        (data.stop_tick - g_last_start_throughput_data_collection_tick)
+            .InMilliseconds();
+    animation_data.frames_expected = data.smoothness_data.frames_expected;
+    animation_data.frames_produced = data.smoothness_data.frames_produced;
+    animation_data.jank_count = data.smoothness_data.jank_count;
     result_data.emplace_back(std::move(animation_data));
   }
   return RespondNow(ArgumentList(
@@ -6374,6 +6395,11 @@ AutotestPrivateStopFrameCountingFunction::Run() {
 
 void AutotestPrivateStopFrameCountingFunction::OnDataReceived(
     viz::mojom::FrameCountingDataPtr data_ptr) {
+  if (!data_ptr || data_ptr->per_sink_data.empty()) {
+    Respond(Error("No frame counting data"));
+    return;
+  }
+
   std::vector<api::autotest_private::FrameCountingPerSinkData> result;
   for (const auto& per_sink_data : data_ptr->per_sink_data) {
     api::autotest_private::FrameCountingPerSinkData result_per_sink_data;

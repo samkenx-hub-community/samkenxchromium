@@ -20,9 +20,9 @@ BASE_FEATURE(kOmniboxKeyboardPasteButton,
              "OmniboxKeyboardPasteButton",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-BASE_FEATURE(kOmniboxCarouselDynamicSpacing,
-             "OmniboxCarouselDynamicSpacing",
-             base::FEATURE_ENABLED_BY_DEFAULT);
+BASE_FEATURE(kOmniboxMultilineSearchSuggest,
+             "OmniboxMultilineSearchSuggest",
+             base::FEATURE_DISABLED_BY_DEFAULT);
 
 bool IsIpadPopoutOmniboxEnabled() {
   return base::FeatureList::IsEnabled(kEnablePopoutOmniboxIpad) &&

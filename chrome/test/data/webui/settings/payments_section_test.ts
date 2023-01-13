@@ -3,11 +3,9 @@
 // found in the LICENSE file.
 
 // clang-format off
-import {CrButtonElement} from 'chrome://resources/cr_elements/cr_button/cr_button.js';
-import {loadTimeData} from 'chrome://resources/js/load_time_data.js';
 import {flush} from 'chrome://resources/polymer/v3_0/polymer/polymer_bundled.min.js';
 import {PaymentsManagerImpl, SettingsCreditCardEditDialogElement, SettingsPaymentsSectionElement, SettingsVirtualCardUnenrollDialogElement} from 'chrome://settings/lazy_load.js';
-import {MetricsBrowserProxyImpl, PrivacyElementInteractions, SettingsToggleButtonElement} from 'chrome://settings/settings.js';
+import {CrButtonElement, loadTimeData, MetricsBrowserProxyImpl, PrivacyElementInteractions, SettingsToggleButtonElement} from 'chrome://settings/settings.js';
 import {assertEquals, assertFalse, assertNotEquals, assertTrue} from 'chrome://webui-test/chai_assert.js';
 import {eventToPromise, whenAttributeIs} from 'chrome://webui-test/test_util.js';
 import {flushTasks} from 'chrome://webui-test/polymer_test_util.js';
@@ -44,8 +42,10 @@ suite('PaymentsSection', function() {
     document.body.innerHTML = window.trustedTypes!.emptyHTML;
     loadTimeData.overrideValues({
       migrationEnabled: true,
+      removeCardExpirationAndTypeTitles: true,
       virtualCardEnrollmentEnabled: true,
       virtualCardMetadataEnabled: true,
+      showIbansSettings: true,
     });
   });
 
@@ -158,25 +158,46 @@ suite('PaymentsSection', function() {
     assertTrue(!!creditCardList);
     assertEquals(0, getLocalAndServerCreditCardListItems().length);
 
-    assertFalse(
-        creditCardList.shadowRoot!
-            .querySelector<HTMLElement>('#noPaymentMethodsLabel')!.hidden);
-    assertTrue(creditCardList.shadowRoot!
-                   .querySelector<HTMLElement>('#creditCardsHeading')!.hidden);
+    const noPaymentMethodsLabel =
+        creditCardList.shadowRoot!.querySelector<HTMLElement>(
+            '#noPaymentMethodsLabel');
+    assertTrue(!!noPaymentMethodsLabel);
+    assertFalse(noPaymentMethodsLabel.hidden);
+
+    const creditCardsHeading =
+        creditCardList.shadowRoot!.querySelector<HTMLElement>(
+            '#creditCardsHeading');
+    assertTrue(!!creditCardsHeading);
+    assertTrue(creditCardsHeading.hidden);
+
     assertFalse(section.$.autofillCreditCardToggle.disabled);
-    assertFalse(section.$.addCreditCard.disabled);
+
+    const addPaymentMethodsButton =
+        section.shadowRoot!.querySelector<CrButtonElement>(
+            '#addPaymentMethods');
+    assertTrue(!!addPaymentMethodsButton);
+    assertFalse(addPaymentMethodsButton.disabled);
   });
 
   test('verifyCreditCardsDisabled', async function() {
+    loadTimeData.overrideValues({
+      showIbansSettings: false,
+    });
     const section = await createPaymentsSection(
         /*creditCards=*/[], /*upiIds=*/[],
         {credit_card_enabled: {value: false}});
 
     assertFalse(section.$.autofillCreditCardToggle.disabled);
-    assertTrue(section.$.addCreditCard.hidden);
+    const addCreditCardButton =
+        section.shadowRoot!.querySelector<CrButtonElement>('#addCreditCard');
+    assertTrue(!!addCreditCardButton);
+    assertTrue(addCreditCardButton.hidden);
   });
 
   test('verifyCreditCardCount', async function() {
+    loadTimeData.overrideValues({
+      removeCardExpirationAndTypeTitles: true,
+    });
     const creditCards = [
       createCreditCardEntry(),
       createCreditCardEntry(),
@@ -193,13 +214,25 @@ suite('PaymentsSection', function() {
     assertEquals(
         creditCards.length, getLocalAndServerCreditCardListItems().length);
 
-    assertTrue(
-        creditCardList.shadowRoot!
-            .querySelector<HTMLElement>('#noPaymentMethodsLabel')!.hidden);
-    assertFalse(creditCardList.shadowRoot!
-                    .querySelector<HTMLElement>('#creditCardsHeading')!.hidden);
+    const noPaymentMethodsLabel =
+        creditCardList.shadowRoot!.querySelector<HTMLElement>(
+            '#noPaymentMethodsLabel');
+    assertTrue(!!noPaymentMethodsLabel);
+    assertTrue(noPaymentMethodsLabel.hidden);
+
+    const creditCardsHeading =
+        creditCardList.shadowRoot!.querySelector<HTMLElement>(
+            '#creditCardsHeading');
+    assertTrue(!!creditCardsHeading);
+    assertTrue(creditCardsHeading.hidden);
+
     assertFalse(section.$.autofillCreditCardToggle.disabled);
-    assertFalse(section.$.addCreditCard.disabled);
+
+    const addPaymentMethodsButton =
+        section.shadowRoot!.querySelector<CrButtonElement>(
+            '#addPaymentMethods');
+    assertTrue(!!addPaymentMethodsButton);
+    assertFalse(addPaymentMethodsButton.disabled);
   });
 
   test('verifyCreditCardFields', async function() {
@@ -291,6 +324,47 @@ suite('PaymentsSection', function() {
     assertTrue(!!outlinkButton);
   });
 
+  test('verifyPaymentSummarySublabelIsHidden', async function() {
+    loadTimeData.overrideValues({
+      removeCardExpirationAndTypeTitles: false,
+      virtualCardMetadataEnabled: false,
+    });
+    const creditCard = createCreditCardEntry();
+    creditCard.metadata!.isLocal = false;
+    creditCard.metadata!.isVirtualCardEnrollmentEligible = false;
+    creditCard.metadata!.isVirtualCardEnrolled = false;
+    const section = await createPaymentsSection(
+        [creditCard], /*upiIds=*/[], /*prefValues=*/ {});
+
+    const creditCardList = section.$.paymentsList;
+    assertTrue(!!creditCardList);
+    assertEquals(1, getLocalAndServerCreditCardListItems().length);
+    assertTrue(getCardRowShadowRoot(section.$.paymentsList)
+                   .querySelector<HTMLElement>('#summarySublabel')!.hidden);
+  });
+
+  test('verifyCreditCardSummarySublabelWithExpirationDate', async function() {
+    loadTimeData.overrideValues({
+      removeCardExpirationAndTypeTitles: true,
+      virtualCardMetadataEnabled: false,
+    });
+    const creditCard = createCreditCardEntry();
+
+    const section = await createPaymentsSection(
+        [creditCard], /*upiIds=*/[], /*prefValues=*/ {});
+
+    const creditCardList = section.$.paymentsList;
+    assertTrue(!!creditCardList);
+    assertEquals(1, getLocalAndServerCreditCardListItems().length);
+    assertFalse(getCardRowShadowRoot(section.$.paymentsList)
+                    .querySelector<HTMLElement>('#summarySublabel')!.hidden);
+    assertEquals(
+        creditCard.expirationMonth + '/' + creditCard.expirationYear,
+        getCardRowShadowRoot(section.$.paymentsList)
+            .querySelector<HTMLElement>(
+                '#summarySublabel')!.textContent!.trim());
+  });
+
   test(
       'verifyCreditCardRowButtonIsDropdownWhenVirtualCardEnrollEligible',
       async function() {
@@ -325,6 +399,9 @@ suite('PaymentsSection', function() {
 
   test(
       'verifyCreditCardSummarySublabelWhenSublabelIsInvalid', async function() {
+        loadTimeData.overrideValues({
+          removeCardExpirationAndTypeTitles: false,
+        });
         const creditCard = createCreditCardEntry();
         creditCard.metadata!.isLocal = false;
         creditCard.metadata!.isVirtualCardEnrollmentEligible = false;
@@ -343,6 +420,9 @@ suite('PaymentsSection', function() {
   test(
       'verifyCreditCardSummarySublabelWhenVirtualCardAvailable',
       async function() {
+        loadTimeData.overrideValues({
+          removeCardExpirationAndTypeTitles: false,
+        });
         const creditCard = createCreditCardEntry();
         creditCard.metadata!.isLocal = false;
         creditCard.metadata!.isVirtualCardEnrollmentEligible = true;
@@ -366,6 +446,9 @@ suite('PaymentsSection', function() {
   test(
       'verifyCreditCardSummarySublabelWhenVirtualCardTurnedOn',
       async function() {
+        loadTimeData.overrideValues({
+          removeCardExpirationAndTypeTitles: false,
+        });
         const creditCard = createCreditCardEntry();
         creditCard.metadata!.isLocal = false;
         creditCard.metadata!.isVirtualCardEnrollmentEligible = false;
@@ -381,6 +464,34 @@ suite('PaymentsSection', function() {
                 .querySelector<HTMLElement>('#summarySublabel')!.hidden);
         assertEquals(
             'Virtual card turned on',
+            getCardRowShadowRoot(section.$.paymentsList)
+                .querySelector<HTMLElement>(
+                    '#summarySublabel')!.textContent!.trim());
+      });
+
+  test(
+      'verifyCreditCardSummarySublabelExpirationAndVirtualCardAvailable',
+      async function() {
+        loadTimeData.overrideValues({
+          removeCardExpirationAndTypeTitles: true,
+        });
+        const creditCard = createCreditCardEntry();
+        creditCard.metadata!.isLocal = false;
+        creditCard.metadata!.isVirtualCardEnrollmentEligible = false;
+        creditCard.metadata!.isVirtualCardEnrolled = true;
+        const section = await createPaymentsSection(
+            [creditCard], /*upiIds=*/[], /*prefValues=*/ {});
+
+        const creditCardList = section.$.paymentsList;
+        assertTrue(!!creditCardList);
+        assertEquals(1, getLocalAndServerCreditCardListItems().length);
+        assertFalse(
+            getCardRowShadowRoot(section.$.paymentsList)
+                .querySelector<HTMLElement>('#summarySublabel')!.hidden);
+        assertEquals(
+            creditCard.expirationMonth + '/' + creditCard.expirationYear +
+                '\u00a0|\u00a0' +
+                'Virtual card turned on',
             getCardRowShadowRoot(section.$.paymentsList)
                 .querySelector<HTMLElement>(
                     '#summarySublabel')!.textContent!.trim());
@@ -1093,6 +1204,60 @@ suite('PaymentsSection', function() {
 
     // Wait for dialogs to open before finishing test.
     return whenAttributeIs(dialog.$.dialog, 'open', '');
+  });
+
+  test(
+      'verifyNoAddPaymentMethodsButtonIfPaymentPrefDisabled', async function() {
+        const section = await createPaymentsSection(
+            /*creditCards=*/[], /*upiIds=*/[],
+            {credit_card_enabled: {value: false}});
+
+        const addPaymentMethodsButton =
+            section.shadowRoot!.querySelector<CrButtonElement>(
+                '#addPaymentMethods');
+        assertTrue(!!addPaymentMethodsButton);
+        assertTrue(addPaymentMethodsButton.hidden);
+      });
+
+  test('verifyIbanSettingsDisabled', async function() {
+    loadTimeData.overrideValues({
+      showIbansSettings: false,
+    });
+    const section = await createPaymentsSection(
+        /*creditCards=*/[], /*upiIds=*/[],
+        {credit_card_enabled: {value: true}});
+    const addPaymentMethodsButton =
+        section.shadowRoot!.querySelector<CrButtonElement>(
+            '#addPaymentMethods');
+    assertFalse(!!addPaymentMethodsButton);
+
+    const addCreditCardButton =
+        section.shadowRoot!.querySelector<CrButtonElement>('#addCreditCard');
+    assertTrue(!!addCreditCardButton);
+    assertFalse(addCreditCardButton.hidden);
+  });
+
+  test('verifyAddCardOrIbanPaymentMenu', async function() {
+    const section = await createPaymentsSection(
+        /*creditCards=*/[], /*upiIds=*/[],
+        {credit_card_enabled: {value: true}});
+    const addPaymentMethodsButton =
+        section.shadowRoot!.querySelector<CrButtonElement>(
+            '#addPaymentMethods');
+    assertTrue(!!addPaymentMethodsButton);
+    addPaymentMethodsButton.click();
+    flush();
+
+    // "Add" menu should have 2 options.
+    const addCreditCardButton =
+        section.shadowRoot!.querySelector<CrButtonElement>('#addCreditCard');
+    assertTrue(!!addCreditCardButton);
+    assertFalse(addCreditCardButton.hidden);
+
+    const addIbanButton =
+        section.shadowRoot!.querySelector<CrButtonElement>('#addIban');
+    assertTrue(!!addIbanButton);
+    assertFalse(addIbanButton.hidden);
   });
 
 });

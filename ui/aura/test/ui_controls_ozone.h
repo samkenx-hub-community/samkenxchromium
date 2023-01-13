@@ -5,11 +5,10 @@
 #ifndef UI_AURA_TEST_UI_CONTROLS_OZONE_H_
 #define UI_AURA_TEST_UI_CONTROLS_OZONE_H_
 
-#include "base/bind.h"
+#include "base/functional/bind.h"
 #include "base/logging.h"
 #include "base/memory/raw_ptr.h"
 #include "base/task/single_thread_task_runner.h"
-#include "base/threading/thread_task_runner_handle.h"
 #include "build/chromeos_buildflags.h"
 #include "ui/aura/env.h"
 #include "ui/aura/test/aura_test_utils.h"

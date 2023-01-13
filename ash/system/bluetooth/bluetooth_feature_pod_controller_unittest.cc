@@ -10,6 +10,8 @@
 
 #include "ash/constants/ash_features.h"
 #include "ash/constants/quick_settings_catalogs.h"
+#include "ash/public/cpp/fake_hats_bluetooth_revamp_trigger_impl.h"
+#include "ash/public/cpp/hats_bluetooth_revamp_trigger.h"
 #include "ash/resources/vector_icons/vector_icons.h"
 #include "ash/strings/grit/ash_strings.h"
 #include "ash/system/unified/detailed_view_controller.h"
@@ -63,11 +65,9 @@ class BluetoothFeaturePodControllerTest
  public:
   BluetoothFeaturePodControllerTest() {
     if (IsQsRevampEnabled()) {
-      feature_list_.InitWithFeatures(
-          {features::kQsRevamp, features::kQsRevampWip}, {});
+      feature_list_.InitAndEnableFeature(features::kQsRevamp);
     } else {
-      feature_list_.InitWithFeatures(
-          {}, {features::kQsRevamp, features::kQsRevampWip});
+      feature_list_.InitAndDisableFeature(features::kQsRevamp);
     }
   }
 
@@ -78,6 +78,8 @@ class BluetoothFeaturePodControllerTest
     AshTestBase::SetUp();
 
     GetPrimaryUnifiedSystemTray()->ShowBubble();
+
+    fake_trigger_impl_ = std::make_unique<FakeHatsBluetoothRevampTriggerImpl>();
 
     bluetooth_pod_controller_ =
         std::make_unique<BluetoothFeaturePodController>(tray_controller());
@@ -268,6 +270,10 @@ class BluetoothFeaturePodControllerTest
     return GetPrimaryUnifiedSystemTray()->bubble()->unified_view();
   }
 
+  size_t GetTryToShowSurveyCount() {
+    return fake_trigger_impl_->try_to_show_survey_count();
+  }
+
  protected:
   std::unique_ptr<FeaturePodButton> feature_pod_button_;
   std::unique_ptr<FeatureTile> feature_tile_;
@@ -277,6 +283,7 @@ class BluetoothFeaturePodControllerTest
     return ash_test_helper()->bluetooth_config_test_helper();
   }
 
+  std::unique_ptr<FakeHatsBluetoothRevampTriggerImpl> fake_trigger_impl_;
   std::unique_ptr<BluetoothFeaturePodController> bluetooth_pod_controller_;
   base::test::ScopedFeatureList feature_list_;
 };
@@ -305,11 +312,15 @@ TEST_P(BluetoothFeaturePodControllerTest,
 }
 
 TEST_P(BluetoothFeaturePodControllerTest, PressingIconOrLabelChangesBluetooth) {
+  EXPECT_EQ(0u, GetTryToShowSurveyCount());
   EXPECT_TRUE(IsButtonToggled());
   PressIcon();
   EXPECT_FALSE(IsButtonToggled());
+  EXPECT_EQ(1u, GetTryToShowSurveyCount());
+
   PressLabel();
   EXPECT_TRUE(IsButtonToggled());
+  EXPECT_EQ(2u, GetTryToShowSurveyCount());
 }
 
 TEST_P(BluetoothFeaturePodControllerTest, HasCorrectMetadataWhenOff) {
@@ -577,6 +588,21 @@ TEST_P(BluetoothFeaturePodControllerTest, LabelUMATracking) {
   histogram_tester->ExpectBucketCount(GetDiveInHistogramName(),
                                       QsFeatureCatalogName::kBluetooth,
                                       /*expected_count=*/1);
+}
+
+TEST_P(BluetoothFeaturePodControllerTest, VisibilityOnConstruction) {
+  BluetoothFeaturePodController controller(tray_controller());
+  if (IsQsRevampEnabled()) {
+    // Create a feature tile but don't spin the message loop.
+    auto tile = controller.CreateTile();
+    // System state defaults to "enabled" so the tile is visible.
+    EXPECT_TRUE(tile->GetVisible());
+  } else {
+    // Create a feature pod button but don't spin the message loop.
+    auto button = base::WrapUnique(controller.CreateButton());
+    // System state defaults to "unavailable" so the button is invisible.
+    EXPECT_FALSE(button->GetVisible());
+  }
 }
 
 }  // namespace ash

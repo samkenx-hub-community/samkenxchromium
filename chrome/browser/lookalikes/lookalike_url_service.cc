@@ -6,8 +6,8 @@
 
 #include <utility>
 
-#include "base/bind.h"
-#include "base/callback.h"
+#include "base/functional/bind.h"
+#include "base/functional/callback.h"
 #include "base/memory/scoped_refptr.h"
 #include "base/memory/singleton.h"
 #include "base/metrics/field_trial_params.h"
@@ -26,6 +26,8 @@
 #include "components/url_formatter/url_formatter.h"
 #include "net/base/registry_controlled_domains/registry_controlled_domain.h"
 #include "net/base/url_util.h"
+
+using lookalikes::DomainInfo;
 
 namespace {
 
@@ -88,7 +90,7 @@ std::vector<DomainInfo> UpdateEngagedSitesOnWorkerThread(
             detail.total_score, blink::mojom::EngagementLevel::MEDIUM)) {
       continue;
     }
-    const DomainInfo domain_info = GetDomainInfo(detail.origin);
+    const DomainInfo domain_info = lookalikes::GetDomainInfo(detail.origin);
     if (domain_info.domain_and_registry.empty()) {
       continue;
     }

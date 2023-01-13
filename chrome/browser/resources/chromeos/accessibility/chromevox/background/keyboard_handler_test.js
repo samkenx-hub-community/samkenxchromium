@@ -3,17 +3,19 @@
 // found in the LICENSE file.
 
 // Include test fixture.
-GEN_INCLUDE(['../testing/chromevox_next_e2e_test_base.js']);
+GEN_INCLUDE(['../testing/chromevox_e2e_test_base.js']);
 
 /**
  * Test fixture for ChromeVox KeyboardHandler.
  */
-ChromeVoxBackgroundKeyboardHandlerTest = class extends ChromeVoxNextE2ETest {
+ChromeVoxBackgroundKeyboardHandlerTest = class extends ChromeVoxE2ETest {
   /** @override */
   async setUpDeferred() {
     await super.setUpDeferred();
 
     // Alphabetical based on file path.
+    await importModule(
+        'ChromeVoxRange', '/chromevox/background/chromevox_range.js');
     await importModule(
         'ChromeVoxState', '/chromevox/background/chromevox_state.js');
     await importModule(
@@ -40,7 +42,7 @@ AX_TEST_F(
 
       // A Search keydown does not get eaten when there's no range and there
       // was no previous range. TalkBack is handled elsewhere.
-      ChromeVoxState.instance.setCurrentRange(null);
+      ChromeVoxRange.set(null);
       ChromeVoxState.instance.previousRange_ = null;
       const searchDown2 = {};
       searchDown2.metaKey = true;

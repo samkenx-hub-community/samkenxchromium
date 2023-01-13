@@ -28,7 +28,7 @@
 #import "ios/chrome/browser/download/pass_kit_tab_helper.h"
 #import "ios/chrome/browser/feature_engagement/tracker_factory.h"
 #import "ios/chrome/browser/feature_engagement/tracker_util.h"
-#import "ios/chrome/browser/find_in_page/find_tab_helper.h"
+#import "ios/chrome/browser/find_in_page/java_script_find_tab_helper.h"
 #import "ios/chrome/browser/follow/follow_browser_agent.h"
 #import "ios/chrome/browser/follow/follow_tab_helper.h"
 #import "ios/chrome/browser/follow/followed_web_site.h"
@@ -48,8 +48,6 @@
 #import "ios/chrome/browser/sync/sync_error_browser_agent.h"
 #import "ios/chrome/browser/tabs/tab_title_util.h"
 #import "ios/chrome/browser/translate/chrome_ios_translate_client.h"
-#import "ios/chrome/browser/ui/activity_services/activity_params.h"
-#import "ios/chrome/browser/ui/activity_services/requirements/activity_service_positioner.h"
 #import "ios/chrome/browser/ui/alert_coordinator/repost_form_coordinator.h"
 #import "ios/chrome/browser/ui/app_store_rating/features.h"
 #import "ios/chrome/browser/ui/authentication/enterprise/enterprise_prompt/enterprise_prompt_coordinator.h"
@@ -57,6 +55,7 @@
 #import "ios/chrome/browser/ui/autofill/form_input_accessory/form_input_accessory_coordinator.h"
 #import "ios/chrome/browser/ui/autofill/manual_fill/manual_fill_password_coordinator.h"
 #import "ios/chrome/browser/ui/badges/badge_popup_menu_coordinator.h"
+#import "ios/chrome/browser/ui/bookmarks/bookmark_interaction_controller.h"
 #import "ios/chrome/browser/ui/browser_container/browser_container_coordinator.h"
 #import "ios/chrome/browser/ui/browser_container/browser_container_view_controller.h"
 #import "ios/chrome/browser/ui/browser_view/browser_coordinator+private.h"
@@ -110,7 +109,6 @@
 #import "ios/chrome/browser/ui/fullscreen/fullscreen_controller.h"
 #import "ios/chrome/browser/ui/incognito_reauth/incognito_reauth_mediator.h"
 #import "ios/chrome/browser/ui/incognito_reauth/incognito_reauth_scene_agent.h"
-#import "ios/chrome/browser/ui/legacy_bookmarks/legacy_bookmark_interaction_controller.h"
 #import "ios/chrome/browser/ui/lens/lens_coordinator.h"
 #import "ios/chrome/browser/ui/main/browser_interface_provider.h"
 #import "ios/chrome/browser/ui/main/default_browser_scene_agent.h"
@@ -130,7 +128,6 @@
 #import "ios/chrome/browser/ui/price_notifications/price_notifications_view_coordinator.h"
 #import "ios/chrome/browser/ui/print/print_controller.h"
 #import "ios/chrome/browser/ui/promos_manager/promos_manager_coordinator.h"
-#import "ios/chrome/browser/ui/qr_generator/qr_generator_coordinator.h"
 #import "ios/chrome/browser/ui/qr_scanner/qr_scanner_legacy_coordinator.h"
 #import "ios/chrome/browser/ui/reading_list/reading_list_coordinator.h"
 #import "ios/chrome/browser/ui/recent_tabs/recent_tabs_coordinator.h"
@@ -140,6 +137,8 @@
 #import "ios/chrome/browser/ui/settings/autofill/autofill_add_credit_card_coordinator.h"
 #import "ios/chrome/browser/ui/settings/password/password_settings/password_settings_coordinator.h"
 #import "ios/chrome/browser/ui/settings/password/password_settings/password_settings_coordinator_delegate.h"
+#import "ios/chrome/browser/ui/sharing/activity_services/activity_params.h"
+#import "ios/chrome/browser/ui/sharing/activity_services/requirements/activity_service_positioner.h"
 #import "ios/chrome/browser/ui/sharing/sharing_coordinator.h"
 #import "ios/chrome/browser/ui/side_swipe/side_swipe_controller.h"
 #import "ios/chrome/browser/ui/spotlight_debugger/spotlight_debugger_coordinator.h"
@@ -790,8 +789,6 @@ enum class ToolbarKind {
   _viewControllerDependencies.toolbarAccessoryPresenter =
       _toolbarAccessoryPresenter;
   _viewControllerDependencies.popupMenuCoordinator = self.popupMenuCoordinator;
-  _viewControllerDependencies.downloadManagerCoordinator =
-      self.downloadManagerCoordinator;
   _viewControllerDependencies.ntpCoordinator = _NTPCoordinator;
   _viewControllerDependencies.lensCoordinator = _lensCoordinator;
   _viewControllerDependencies.primaryToolbarCoordinator =
@@ -848,7 +845,6 @@ enum class ToolbarKind {
   _viewControllerDependencies.bubblePresenter = nil;
   _viewControllerDependencies.toolbarAccessoryPresenter = nil;
   _viewControllerDependencies.popupMenuCoordinator = nil;
-  _viewControllerDependencies.downloadManagerCoordinator = nil;
   _viewControllerDependencies.ntpCoordinator = nil;
   _viewControllerDependencies.lensCoordinator = nil;
   _viewControllerDependencies.primaryToolbarCoordinator = nil;
@@ -1537,9 +1533,10 @@ enum class ToolbarKind {
       self.browser->GetWebStateList()->GetActiveWebState();
 
   if (currentWebState) {
-    FindTabHelper* findTabHelper = FindTabHelper::FromWebState(currentWebState);
-    if (findTabHelper->IsFindUIActive()) {
-      findTabHelper->StopFinding();
+    JavaScriptFindTabHelper* helper =
+        JavaScriptFindTabHelper::FromWebState(currentWebState);
+    if (helper->IsFindUIActive()) {
+      helper->StopFinding();
     } else {
       [self.findBarCoordinator stop];
       self.findBarCoordinator = nil;
@@ -1550,7 +1547,7 @@ enum class ToolbarKind {
 - (void)showFindUIIfActive {
   web::WebState* currentWebState =
       self.browser->GetWebStateList()->GetActiveWebState();
-  auto* findHelper = FindTabHelper::FromWebState(currentWebState);
+  auto* findHelper = JavaScriptFindTabHelper::FromWebState(currentWebState);
   if (findHelper && findHelper->IsFindUIActive() &&
       !_toolbarAccessoryPresenter.isPresenting) {
     DCHECK(!self.findBarCoordinator);
@@ -1572,7 +1569,8 @@ enum class ToolbarKind {
   web::WebState* currentWebState =
       self.browser->GetWebStateList()->GetActiveWebState();
   DCHECK(currentWebState);
-  FindTabHelper* helper = FindTabHelper::FromWebState(currentWebState);
+  JavaScriptFindTabHelper* helper =
+      JavaScriptFindTabHelper::FromWebState(currentWebState);
   helper->StartFinding([self.findBarCoordinator.findBarController searchTerm]);
 
   if (!self.browser->GetBrowserState()->IsOffTheRecord())
@@ -1584,8 +1582,8 @@ enum class ToolbarKind {
       self.browser->GetWebStateList()->GetActiveWebState();
   DCHECK(currentWebState);
   // TODO(crbug.com/603524): Reshow find bar if necessary.
-  FindTabHelper::FromWebState(currentWebState)
-      ->ContinueFinding(FindTabHelper::FORWARD);
+  JavaScriptFindTabHelper::FromWebState(currentWebState)
+      ->ContinueFinding(JavaScriptFindTabHelper::FORWARD);
 }
 
 - (void)findPreviousStringInPage {
@@ -1593,8 +1591,8 @@ enum class ToolbarKind {
       self.browser->GetWebStateList()->GetActiveWebState();
   DCHECK(currentWebState);
   // TODO(crbug.com/603524): Reshow find bar if necessary.
-  FindTabHelper::FromWebState(currentWebState)
-      ->ContinueFinding(FindTabHelper::REVERSE);
+  JavaScriptFindTabHelper::FromWebState(currentWebState)
+      ->ContinueFinding(JavaScriptFindTabHelper::REVERSE);
 }
 
 #pragma mark - FindInPageCommands Helpers
@@ -1606,7 +1604,7 @@ enum class ToolbarKind {
     return NO;
   }
 
-  auto* helper = FindTabHelper::FromWebState(currentWebState);
+  auto* helper = JavaScriptFindTabHelper::FromWebState(currentWebState);
   return (helper && helper->CurrentPageSupportsFindInPage() &&
           !helper->IsFindUIActive());
 }
@@ -1837,7 +1835,7 @@ enum class ToolbarKind {
                                    completion:completion];
 }
 
-// TODO(crbug.com/906525) : Move WebStateListObserving out of
+// TODO(crbug.com/1403956) : Move WebStateListObserving out of
 // BrowserCoordinator.
 #pragma mark - WebStateListObserving
 
@@ -1863,7 +1861,7 @@ enum class ToolbarKind {
   [self stopNTPIfNeeded];
 }
 
-// TODO(crbug.com/906525) : Move out of BrowserCoordinator along with
+// TODO(crbug.com/1403956) : Move out of BrowserCoordinator along with
 // WebStateListObserving.
 #pragma mark - Private WebState management methods
 
@@ -2002,22 +2000,32 @@ enum class ToolbarKind {
   DCHECK(!_prerenderService ||
          !_prerenderService->IsWebStatePrerendered(webState));
 
+  // TODO(crbug.com/1403957): Move AutofillTabHelper logic inside
+  // TabLifecycleMediator.
   if (AutofillTabHelper::FromWebState(webState)) {
     AutofillTabHelper::FromWebState(webState)->SetBaseViewController(
         self.viewController);
   }
 
+  // TODO(crbug.com/1403959): Move PrintTabHelper logic inside
+  // TabLifecycleMediator.
   if (PrintTabHelper::FromWebState(webState)) {
     PrintTabHelper::FromWebState(webState)->set_printer(self.printController);
   }
 
+  // TODO(crbug.com/1403960): Move RepostFormTabHelper logic inside
+  // TabLifecycleMediator.
   RepostFormTabHelper::FromWebState(webState)->SetDelegate(self);
 
+  // TODO(crbug.com/1403962): Move FollowTabHelper logic inside
+  // TabLifecycleMediator.
   FollowTabHelper* followTabHelper = FollowTabHelper::FromWebState(webState);
   if (followTabHelper) {
     followTabHelper->set_follow_iph_presenter(self.followIPHCoordinator);
   }
 
+  // TODO(crbug.com/1403963): Move CaptivePortalTabHelper logic inside
+  // TabLifecycleMediator.
   if (CaptivePortalTabHelper::FromWebState(webState)) {
     TabInsertionBrowserAgent* insertionAgent =
         TabInsertionBrowserAgent::FromBrowser(self.browser);
@@ -2025,15 +2033,21 @@ enum class ToolbarKind {
         insertionAgent);
   }
 
+  // TODO(crbug.com/1403964): Move NewTabPageTabHelper logic inside
+  // TabLifecycleMediator.
   if (NewTabPageTabHelper::FromWebState(webState)) {
     NewTabPageTabHelper::FromWebState(webState)->SetDelegate(self);
   }
 
+  // TODO(crbug.com/1403967): Move AnnotationsTabHelper logic inside
+  // TabLifecycleMediator.
   if (AnnotationsTabHelper::FromWebState(webState)) {
     AnnotationsTabHelper::FromWebState(webState)->SetBaseViewController(
         self.viewController);
   }
 
+  // TODO(crbug.com/1403968): Move PriceNotificationsTabHelper logic inside
+  // TabLifecycleMediator.
   PriceNotificationsTabHelper* priceNotificationsTabHelper =
       PriceNotificationsTabHelper::FromWebState(webState);
   if (priceNotificationsTabHelper) {
@@ -2049,34 +2063,50 @@ enum class ToolbarKind {
     return;
   }
 
+  // TODO(crbug.com/1403957): Move AutofillTabHelper logic inside
+  // TabLifecycleMediator.
   if (AutofillTabHelper::FromWebState(webState)) {
     AutofillTabHelper::FromWebState(webState)->SetBaseViewController(nil);
   }
 
+  // TODO(crbug.com/1403959): Move PrintTabHelper logic inside
+  // TabLifecycleMediator.
   if (PrintTabHelper::FromWebState(webState)) {
     PrintTabHelper::FromWebState(webState)->set_printer(nil);
   }
 
+  // TODO(crbug.com/1403960): Move RepostFormTabHelper logic inside
+  // TabLifecycleMediator.
   RepostFormTabHelper::FromWebState(webState)->SetDelegate(nil);
 
+  // TODO(crbug.com/1403962): Move FollowTabHelper logic inside
+  // TabLifecycleMediator.
   FollowTabHelper* followTabHelper = FollowTabHelper::FromWebState(webState);
   if (followTabHelper) {
     followTabHelper->set_follow_iph_presenter(nil);
   }
 
+  // TODO(crbug.com/1403963): Move CaptivePortalTabHelper logic inside
+  // TabLifecycleMediator.
   if (CaptivePortalTabHelper::FromWebState(webState)) {
     CaptivePortalTabHelper::FromWebState(webState)->SetTabInsertionBrowserAgent(
         nil);
   }
 
+  // TODO(crbug.com/1403964): Move NewTabPageTabHelper logic inside
+  // TabLifecycleMediator.
   if (NewTabPageTabHelper::FromWebState(webState)) {
     NewTabPageTabHelper::FromWebState(webState)->SetDelegate(nil);
   }
 
+  // TODO(crbug.com/1403967): Move AnnotationsTabHelper logic inside
+  // TabLifecycleMediator.
   if (AnnotationsTabHelper::FromWebState(webState)) {
     AnnotationsTabHelper::FromWebState(webState)->SetBaseViewController(nil);
   }
 
+  // TODO(crbug.com/1403968): Move PriceNotificationsTabHelper logic inside
+  // TabLifecycleMediator.
   PriceNotificationsTabHelper* priceNotificationsTabHelper =
       PriceNotificationsTabHelper::FromWebState(webState);
   if (priceNotificationsTabHelper) {

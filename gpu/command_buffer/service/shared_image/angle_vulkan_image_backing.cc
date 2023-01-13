@@ -170,16 +170,15 @@ AngleVulkanImageBacking::AngleVulkanImageBacking(
     GrSurfaceOrigin surface_origin,
     SkAlphaType alpha_type,
     uint32_t usage)
-    : ClearTrackingSharedImageBacking(
-          mailbox,
-          format,
-          size,
-          color_space,
-          surface_origin,
-          alpha_type,
-          usage,
-          viz::ResourceSizes::UncheckedSizeInBytes<size_t>(size, format),
-          false /* is_thread_safe */),
+    : ClearTrackingSharedImageBacking(mailbox,
+                                      format,
+                                      size,
+                                      color_space,
+                                      surface_origin,
+                                      alpha_type,
+                                      usage,
+                                      format.EstimatedSizeInBytes(size),
+                                      false /* is_thread_safe */),
       context_state_(context_state) {}
 
 AngleVulkanImageBacking::~AngleVulkanImageBacking() {
@@ -288,11 +287,15 @@ SharedImageBackingType AngleVulkanImageBacking::GetType() const {
   return SharedImageBackingType::kAngleVulkan;
 }
 
-bool AngleVulkanImageBacking::UploadFromMemory(const SkPixmap& pixmap) {
+bool AngleVulkanImageBacking::UploadFromMemory(
+    const std::vector<SkPixmap>& pixmaps) {
+  DCHECK_EQ(pixmaps.size(), 1u);
+
   PrepareBackendTexture();
   DCHECK(backend_texture_.isValid());
 
-  bool result = gr_context()->updateBackendTexture(backend_texture_, pixmap);
+  bool result =
+      gr_context()->updateBackendTexture(backend_texture_, pixmaps[0]);
   DCHECK(result);
   SyncImageLayoutFromBackendTexture();
   return result;
@@ -306,11 +309,14 @@ std::unique_ptr<GLTexturePassthroughImageRepresentation>
 AngleVulkanImageBacking::ProduceGLTexturePassthrough(
     SharedImageManager* manager,
     MemoryTypeTracker* tracker) {
-  if (!passthrough_texture_ && !InitializePassthroughTexture())
+  if (!passthrough_texture_ && !InitializePassthroughTexture()) {
     return nullptr;
+  }
 
+  std::vector<scoped_refptr<gles2::TexturePassthrough>> gl_textures = {
+      passthrough_texture_};
   return std::make_unique<GLTexturePassthroughGLCommonRepresentation>(
-      manager, this, this, tracker, passthrough_texture_);
+      manager, this, this, tracker, std::move(gl_textures));
 }
 
 std::unique_ptr<SkiaImageRepresentation> AngleVulkanImageBacking::ProduceSkia(
@@ -408,9 +414,6 @@ void AngleVulkanImageBacking::GLTextureImageRepresentationEndAccess(
   is_gl_write_in_process_ = false;
   ReleaseTextureANGLE();
 }
-
-void AngleVulkanImageBacking::GLTextureImageRepresentationRelease(
-    bool have_context) {}
 
 void AngleVulkanImageBacking::AcquireTextureANGLE() {
   gl::GLApi* api = gl::g_current_gl_context;
@@ -556,7 +559,7 @@ void AngleVulkanImageBacking::WritePixels(
     const base::span<const uint8_t>& pixel_data,
     size_t stride) {
   SkPixmap pixmap(AsSkImageInfo(), pixel_data.data(), stride);
-  UploadFromMemory(pixmap);
+  UploadFromMemory({pixmap});
 }
 
 }  // namespace gpu

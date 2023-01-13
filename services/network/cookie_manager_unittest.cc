@@ -7,11 +7,12 @@
 #include <algorithm>
 #include <vector>
 
-#include "base/bind.h"
 #include "base/files/scoped_temp_dir.h"
+#include "base/functional/bind.h"
 #include "base/memory/raw_ptr.h"
 #include "base/run_loop.h"
 #include "base/strings/strcat.h"
+#include "base/task/sequenced_task_runner.h"
 #include "base/task/thread_pool.h"
 #include "base/task/thread_pool/thread_pool_instance.h"
 #include "base/test/bind.h"
@@ -2786,6 +2787,7 @@ TEST_F(FlushableCookieManagerTest, DeletionFilterToInfo) {
   EXPECT_TRUE(delete_info.domains_and_ips_to_delete.empty());
   EXPECT_TRUE(delete_info.domains_and_ips_to_ignore.empty());
   EXPECT_FALSE(delete_info.value_for_testing.has_value());
+  EXPECT_TRUE(delete_info.cookie_partition_key_collection.ContainsAllKeys());
 
   // Then test all with non-default values.
   const double kTestStartEpoch = 1000;

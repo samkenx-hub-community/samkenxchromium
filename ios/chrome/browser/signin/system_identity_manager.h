@@ -11,7 +11,7 @@
 #include <set>
 #include <string>
 
-#include "base/callback.h"
+#include "base/functional/callback.h"
 #include "base/observer_list.h"
 #include "base/sequence_checker.h"
 #include "base/time/time.h"
@@ -106,6 +106,9 @@ class SystemIdentityManager {
   // Adds/removes observers.
   void AddObserver(SystemIdentityManagerObserver* observer);
   void RemoveObserver(SystemIdentityManagerObserver* observer);
+
+  // Returns whether signin is supported by the provider.
+  virtual bool IsSigninSupported() = 0;
 
   // Handles open URL authentication callback. Should be called within
   // `-[UISceneDelegate application:openURLContexts:]` context. Returns

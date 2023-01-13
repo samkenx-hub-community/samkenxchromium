@@ -2,6 +2,7 @@
 <!DOCTYPE translationbundle>
 <translationbundle lang="zh-HK">
 <translation id="1006017844123154345">在線上開啟</translation>
+<translation id="1036348656032585052">停用</translation>
 <translation id="1044891598689252897">網站將正常運作</translation>
 <translation id="1124090076051167250">此操作會清除 <ph name="DATASIZE" /> 主畫面上各個網站或應用程式儲存的資料和 Cookie。</translation>
 <translation id="1178581264944972037">暫停</translation>
@@ -12,7 +13,6 @@
 <translation id="1289742167380433257">Google 已優化此網頁的圖片，以節省數據用量。</translation>
 <translation id="129382876167171263">網站儲存的檔案會在這裡顯示</translation>
 <translation id="1317194122196776028">清除此網站的記錄資料</translation>
-<translation id="1364532808393826295"><ph name="APP_NAME" /> - <ph name="NOTIFICATION_MESSAGE" /></translation>
 <translation id="1369915414381695676">已新增網站 <ph name="SITE_NAME" /></translation>
 <translation id="1383876407941801731">搜尋</translation>
 <translation id="1384959399684842514">已暫停下載</translation>
@@ -49,14 +49,14 @@
 <translation id="2030769033451695672">輕按即可返回 <ph name="URL_OF_THE_CURRENT_TAB" /></translation>
 <translation id="2079545284768500474">復原</translation>
 <translation id="2091887806945687916">音效</translation>
-<translation id="2107397443965016585">網站播放受保護內容前先詢問您 (建議)</translation>
 <translation id="2148716181193084225">今天</translation>
 <translation id="216989819110952009">即使有綠色眼鏡保護眼睛，這座奇妙之城的璀璨光輝一開始還是讓桃樂絲和朋友看得眼都花了</translation>
 <translation id="2182457891543959921">在允許網站建立您身處環境的 3D 地圖或追蹤攝錄機位置前先詢問您 (建議)</translation>
 <translation id="2212565012507486665">允許 Cookie</translation>
 <translation id="2228071138934252756">如要讓 <ph name="APP_NAME" /> 存取您的相機，請一併在 <ph name="BEGIN_LINK" />Android 設定<ph name="END_LINK" />中開啟相機。</translation>
+<translation id="2235344399760031203">已封鎖第三方 Cookie</translation>
 <translation id="2238944249568001759">根據最近開啟的分頁提供搜尋建議</translation>
-<translation id="2241634353105152135">只有這一次</translation>
+<translation id="2241634353105152135">只此一次</translation>
 <translation id="2253414712144136228">移除<ph name="NAME_OF_LIST_ITEM" /></translation>
 <translation id="2289270750774289114">在網站要探索附近的藍牙裝置時詢問您 (建議)</translation>
 <translation id="2315043854645842844">作業系統不支援由客戶端選取憑證。</translation>
@@ -135,6 +135,7 @@
 <translation id="3744111561329211289">背景同步處理</translation>
 <translation id="3763247130972274048">輕按影片的左或右面兩下即可略過 10 秒</translation>
 <translation id="3797520601150691162">不要為特定網站套用深色主題背景</translation>
+<translation id="3803367742635802571">您瀏覽的網站可能無法正常運作</translation>
 <translation id="3804247818991980532"><ph name="TYPE_1" />。<ph name="TYPE_2" />。</translation>
 <translation id="381841723434055211">電話號碼</translation>
 <translation id="3826050100957962900">第三方登入</translation>
@@ -163,10 +164,10 @@
 <translation id="4336434711095810371">清除所有資料</translation>
 <translation id="4338831206024587507"><ph name="DOMAIN" /> 下的所有網站</translation>
 <translation id="4402755511846832236">禁止網站取得此裝置的使用狀態</translation>
+<translation id="4412992751769744546">允許第三方 Cookie</translation>
 <translation id="4428065317363009941">廣告個人化</translation>
 <translation id="4434045419905280838">彈出式視窗和重新導向</translation>
 <translation id="4440642537584213025">展開「<ph name="TARGET_DESCRIPTION" />」</translation>
-<translation id="445467742685312942">允許網站播放受保護的內容</translation>
 <translation id="4468959413250150279">將特定網站設為靜音。</translation>
 <translation id="4475912480633855319">{COOKIES,plural, =1{# 個 Cookie}other{# 個 Cookie}}</translation>
 <translation id="4479647676395637221">允許網站使用相機前先詢問您 (建議)</translation>
@@ -174,6 +175,7 @@
 <translation id="4534723447064627427">如要讓 <ph name="APP_NAME" /> 存取您的麥克風，請一併在 <ph name="BEGIN_LINK" />Android 設定<ph name="END_LINK" />中開啟麥克風。</translation>
 <translation id="4566417217121906555">將麥克風設定為靜音</translation>
 <translation id="4570913071927164677">詳細資料</translation>
+<translation id="4598549027014564149">在無痕模式下，網站無法使用 Cookie 瞭解您的跨網站瀏覽活動 (即使是相關網站)，因此無法根據瀏覽活動提供個人化廣告等服務。部分網站的功能可能會無法正常運作。</translation>
 <translation id="4645575059429386691">由您的家長管理</translation>
 <translation id="4670064810192446073">虛擬實境</translation>
 <translation id="4751476147751820511">動態或光線感應器</translation>
@@ -192,7 +194,7 @@
 <translation id="5039804452771397117">允許</translation>
 <translation id="5048398596102334565">允許網站存取動作感應器 (建議)</translation>
 <translation id="5050380848339752099">此網站即將退出無痕模式並與外部應用程式分享資料。</translation>
-<translation id="5063480226653192405">用量</translation>
+<translation id="5063480226653192405">使用狀況</translation>
 <translation id="5091013926750941408">流動網站</translation>
 <translation id="509133520954049755">要求桌面電腦檢視模式</translation>
 <translation id="5100237604440890931">已收合 - 點擊即可展開。</translation>
@@ -220,6 +222,7 @@
 <translation id="5505264765875738116">網站將無法要求向您傳送通知</translation>
 <translation id="5516455585884385570">開通知設定</translation>
 <translation id="5527111080432883924">允許網站讀取剪貼簿的文字和圖片前詢問您 (建議)</translation>
+<translation id="5545693483061321551">網站不能使用 Cookie 查看您在其他網站的瀏覽活動，例如放送個人化廣告。部分網站的功能可能會無法正常運作。</translation>
 <translation id="5553374991681107062">最新</translation>
 <translation id="5556459405103347317">重新載入</translation>
 <translation id="5596627076506792578">更多選項</translation>
@@ -230,6 +233,7 @@
 <translation id="5690795753582697420">相機已在 Android 設定中關閉</translation>
 <translation id="5706552988683188916">此操作會刪除 <ph name="WEBSITE" /> 的 Cookie 和其他網站資料</translation>
 <translation id="5719847187258001597">此操作會清除主畫面上 <ph name="ORIGIN" /> 或其應用程式儲存的所有資料和 Cookie。</translation>
+<translation id="5723967018671998714">已封鎖無痕模式中的第三方 Cookie</translation>
 <translation id="5771720122942595109">已封鎖「<ph name="PERMISSION_1" />」</translation>
 <translation id="5804241973901381774">權限</translation>
 <translation id="5860033963881614850">關閉</translation>
@@ -281,7 +285,7 @@
 <translation id="6689172468748959065">個人檔案相片</translation>
 <translation id="6697925417670533197">正在下載的項目</translation>
 <translation id="6722828510648505498">封鎖來自身分服務的登入提示。</translation>
-<translation id="6746124502594467657">下移</translation>
+<translation id="6746124502594467657">向下移</translation>
 <translation id="6749077623962119521">要重設權限嗎？</translation>
 <translation id="6766622839693428701">向下掃就可以閂咗佢。</translation>
 <translation id="6790428901817661496">播放</translation>
@@ -301,6 +305,7 @@
 <translation id="7141896414559753902">禁止網站顯示彈出式視窗和重新導向 (建議)</translation>
 <translation id="7176368934862295254"><ph name="KILOBYTES" /> KB</translation>
 <translation id="7180611975245234373">重新整理</translation>
+<translation id="7188508872042490670">裝置上的網站資料</translation>
 <translation id="7203150201908454328">已展開</translation>
 <translation id="723171743924126238">選取圖片</translation>
 <translation id="7243308994586599757">您可在畫面底部附近找到選項</translation>
@@ -360,7 +365,6 @@
 <translation id="8284326494547611709">字幕</translation>
 <translation id="8300705686683892304">由應用程式管理</translation>
 <translation id="8324158725704657629">不要再詢問</translation>
-<translation id="834785183489258869">在無痕模式中，網站不能使用 Cookie 查看您在各網站的瀏覽活動，例如放送個人化廣告。部分網站的功能可能會無法正常運作。</translation>
 <translation id="8372893542064058268">允許特定網站執行背景同步功能。</translation>
 <translation id="8376384591331888629">包括在此網站上的第三方 Cookie</translation>
 <translation id="83792324527827022">有網站正在使用您的相機和麥克風</translation>
@@ -376,11 +380,12 @@
 <translation id="8487700953926739672">可離線使用</translation>
 <translation id="848952951823693243">一律要求流動網站</translation>
 <translation id="8499083585497694743">將麥克風取消靜音</translation>
+<translation id="8514955299594277296">不允許網站在裝置上儲存資料 (不建議)</translation>
 <translation id="851751545965956758">禁止網站連接裝置</translation>
 <translation id="8525306231823319788">全螢幕</translation>
 <translation id="8564613706851221529">{COUNT,plural, =1{已允許 <ph name="FPS_MEMBERS_COUNT" /> 個 <ph name="FPS_OWNER" /> 網站使用 Cookie}other{已允許 <ph name="FPS_MEMBERS_COUNT" /> 個 <ph name="FPS_OWNER" /> 網站使用 Cookie}}</translation>
 <translation id="857943718398505171">允許 (建議)</translation>
-<translation id="8609465669617005112">上移</translation>
+<translation id="8609465669617005112">向上移</translation>
 <translation id="8676374126336081632">清除輸入</translation>
 <translation id="868929229000858085">搜尋您的聯絡人</translation>
 <translation id="8702612070107455751">所有離線資料將會被清除</translation>

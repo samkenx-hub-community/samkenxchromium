@@ -9,6 +9,7 @@
 #include "ash/constants/ash_features.h"
 #include "ash/constants/quick_settings_catalogs.h"
 #include "ash/public/cpp/bluetooth_config_service.h"
+#include "ash/public/cpp/hats_bluetooth_revamp_trigger.h"
 #include "ash/resources/vector_icons/vector_icons.h"
 #include "ash/strings/grit/ash_strings.h"
 #include "ash/system/unified/feature_pod_button.h"
@@ -24,6 +25,7 @@
 #include "ui/base/l10n/l10n_util.h"
 
 namespace ash {
+namespace {
 
 using bluetooth_config::GetPairedDeviceName;
 using bluetooth_config::mojom::BluetoothModificationState;
@@ -31,9 +33,22 @@ using bluetooth_config::mojom::BluetoothSystemPropertiesPtr;
 using bluetooth_config::mojom::BluetoothSystemState;
 using bluetooth_config::mojom::DeviceConnectionState;
 
+BluetoothSystemState GetInitialSystemState() {
+  if (features::IsQsRevampEnabled()) {
+    // Ensure the feature tile is visible while waiting for the async mojo query
+    // in the constructor. This simplifies the initial QS layout.
+    return BluetoothSystemState::kEnabled;
+  } else {
+    return BluetoothSystemState::kUnavailable;
+  }
+}
+
+}  // namespace
+
 BluetoothFeaturePodController::BluetoothFeaturePodController(
     UnifiedSystemTrayController* tray_controller)
-    : tray_controller_(tray_controller) {
+    : system_state_(GetInitialSystemState()),
+      tray_controller_(tray_controller) {
   GetBluetoothConfigService(
       remote_cros_bluetooth_config_.BindNewPipeAndPassReceiver());
   remote_cros_bluetooth_config_->ObserveSystemProperties(
@@ -81,6 +96,10 @@ void BluetoothFeaturePodController::OnIconPressed() {
   const bool is_toggled = IsButtonToggled();
   remote_cros_bluetooth_config_->SetBluetoothEnabledState(!is_toggled);
 
+  if (auto* hats_bluetooth_revamp_trigger = HatsBluetoothRevampTrigger::Get()) {
+    hats_bluetooth_revamp_trigger->TryToShowSurvey();
+  }
+
   if (is_toggled) {
     TrackToggleUMA(/*target_toggle_state=*/false);
     return;
@@ -98,6 +117,10 @@ void BluetoothFeaturePodController::OnLabelPressed() {
   TrackDiveInUMA();
   if (!IsButtonToggled()) {
     remote_cros_bluetooth_config_->SetBluetoothEnabledState(true);
+  }
+
+  if (auto* hats_bluetooth_revamp_trigger = HatsBluetoothRevampTrigger::Get()) {
+    hats_bluetooth_revamp_trigger->TryToShowSurvey();
   }
   tray_controller_->ShowBluetoothDetailedView();
 }

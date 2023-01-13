@@ -7,6 +7,7 @@
 
 #include "base/memory/raw_ptr.h"
 #include "build/chromeos_buildflags.h"
+#include "ui/base/dragdrop/mojom/drag_drop_types.mojom-shared.h"
 #include "ui/gfx/geometry/insets.h"
 #include "ui/gfx/geometry/vector2d.h"
 #include "ui/ozone/platform/wayland/host/wayland_window.h"
@@ -139,7 +140,9 @@ class WaylandToplevelWindow : public WaylandWindow,
   void EndMoveLoop() override;
 
   // WaylandExtension:
-  void StartWindowDraggingSessionIfNeeded(bool allow_system_drag) override;
+  void StartWindowDraggingSessionIfNeeded(
+      ui::mojom::DragEventSource event_source,
+      bool allow_system_drag) override;
 #if BUILDFLAG(IS_CHROMEOS_LACROS)
   void SetImmersiveFullscreenStatus(bool status) override;
 #endif
@@ -251,8 +254,10 @@ class WaylandToplevelWindow : public WaylandWindow,
   // Contains the previous state of the window.
   PlatformWindowState previous_state_ = PlatformWindowState::kUnknown;
 
+#if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS_LACROS)
   // Contains the current state of the tiled edges.
   WindowTiledEdges tiled_state_;
+#endif
 
   bool is_active_ = false;
 

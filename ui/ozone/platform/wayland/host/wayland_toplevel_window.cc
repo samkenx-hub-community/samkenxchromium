@@ -232,7 +232,19 @@ void WaylandToplevelWindow::Maximize() {
 }
 
 void WaylandToplevelWindow::Minimize() {
-  SetWindowState(PlatformWindowState::kMinimized);
+  // Do not allow to minimize the window if it has never been configured. That
+  // is, if the browser is minimized (there are at least two windows) and the
+  // session is restored after crash or logout, which forced the browser to
+  // close, the session will only restore one window, while all the other
+  // windows will be set to minimized. That means windows will be never ack
+  // configured and they will stay forever minimized as a Wayland compositor
+  // will not activate those windows (upon user interaction) because the before
+  // mentioned initial configure/ack_configure messaging hasn't happened.
+  if (IsSurfaceConfigured()) {
+    SetWindowState(PlatformWindowState::kMinimized);
+  } else {
+    SetWindowState(PlatformWindowState::kNormal);
+  }
 }
 
 void WaylandToplevelWindow::Restore() {
@@ -440,6 +452,7 @@ void WaylandToplevelWindow::HandleAuraToplevelConfigure(
   const bool did_active_change = is_active_ != window_states.is_activated;
   is_active_ = window_states.is_activated;
 
+#if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS_LACROS)
   // The tiled state affects the window geometry, so apply it here.
   if (window_states.tiled_edges != tiled_state_) {
     // This configure changes the decoration insets.  We should adjust the
@@ -447,6 +460,7 @@ void WaylandToplevelWindow::HandleAuraToplevelConfigure(
     tiled_state_ = window_states.tiled_edges;
     delegate()->OnWindowTiledStateChanged(window_states.tiled_edges);
   }
+#endif  // IS_LINUX || IS_CHROMEOS_LACROS
 
   // Rather than call SetBounds here for every configure event, just save the
   // most recent bounds, and have WaylandConnection call ApplyPendingBounds
@@ -750,14 +764,17 @@ void WaylandToplevelWindow::EndMoveLoop() {
 }
 
 void WaylandToplevelWindow::StartWindowDraggingSessionIfNeeded(
+    ui::mojom::DragEventSource event_source,
     bool allow_system_drag) {
   DCHECK(connection()->window_drag_controller());
-  // If extended drag is not available, WaylandDataDragManager is used instead
-  // of WaylandWindowDragManager.
-  if (!allow_system_drag ||
-      connection()->window_drag_controller()->IsExtendedDragAvailable()) {
-    connection()->window_drag_controller()->StartDragSession();
+  // If extended drag is not available and |allow_system_drag| is set, this is
+  // no-op and WaylandDataDragController is assumed to be used instead. i.e:
+  // Fallback to a simpler window drag UX based on regular system drag-and-drop.
+  if (!connection()->window_drag_controller()->IsExtendedDragAvailable() &&
+      allow_system_drag) {
+    return;
   }
+  connection()->window_drag_controller()->StartDragSession(this, event_source);
 }
 
 #if BUILDFLAG(IS_CHROMEOS_LACROS)
@@ -765,7 +782,7 @@ void WaylandToplevelWindow::SetImmersiveFullscreenStatus(bool status) {
   if (shell_toplevel_ && shell_toplevel_->SupportsTopLevelImmersiveStatus()) {
     shell_toplevel_->SetUseImmersiveMode(status);
   } else if (IsSupportedOnAuraSurface(
-          ZAURA_SURFACE_SET_FULLSCREEN_MODE_SINCE_VERSION)) {
+                 ZAURA_SURFACE_SET_FULLSCREEN_MODE_SINCE_VERSION)) {
     auto mode = status ? ZAURA_SURFACE_FULLSCREEN_MODE_IMMERSIVE
                        : ZAURA_SURFACE_FULLSCREEN_MODE_PLAIN;
     zaura_surface_set_fullscreen_mode(aura_surface(), mode);

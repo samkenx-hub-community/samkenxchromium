@@ -9,15 +9,29 @@
 
 #import "ios/chrome/browser/ui/tab_switcher/tab_collection_consumer.h"
 
+@class PinnedTabsViewController;
 @protocol GridImageDataSource;
+@protocol TabCollectionDragDropHandler;
 @protocol TabContextMenuProvider;
 
 // Protocol used to relay relevant user interactions from the
 // PinnedTabsViewController.
 @protocol PinnedTabsViewControllerDelegate
 
-// Tells the delegate that the item with `itemID` was selected.
-- (void)didSelectItemWithID:(NSString*)itemID;
+// Tells the delegate that the item with `itemID` in `pinnedTabsViewController`
+// was selected.
+- (void)pinnedTabsViewController:
+            (PinnedTabsViewController*)pinnedTabsViewController
+             didSelectItemWithID:(NSString*)itemID;
+
+// Tells the delegate that the the number of items in `pinnedTabsViewController`
+// changed to `count`.
+- (void)pinnedTabsViewController:
+            (PinnedTabsViewController*)pinnedTabsViewController
+              didChangeItemCount:(NSUInteger)count;
+
+// Tells the delegate that the `pinnedTabsViewController` is hidden.
+- (void)pinnedTabsViewControllerDidHide;
 
 @end
 
@@ -33,6 +47,9 @@
 
 // Provides context menus.
 @property(nonatomic, weak) id<TabContextMenuProvider> menuProvider;
+
+// Handles drag and drop interactions that involved the model layer.
+@property(nonatomic, weak) id<TabCollectionDragDropHandler> dragDropHandler;
 
 // Updates the view when starting or ending a drag action.
 - (void)dragSessionEnabled:(BOOL)enabled;

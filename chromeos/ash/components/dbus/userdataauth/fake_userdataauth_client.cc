@@ -181,6 +181,7 @@ absl::optional<cryptohome::KeyData> FakeAuthFactorToKeyData(
             data.set_label(std::move(label));
             data.add_challenge_response_key()->set_public_key_spki_der(
                 smart_card.public_key_spki_der);
+            // TODO (b/241259026): populate algorithms.
             return data;
           },
           [&](const KioskFactor& kiosk) {
@@ -229,8 +230,7 @@ absl::optional<user_data_auth::AuthFactor> FakeAuthFactorToAuthFactor(
           [&](const SmartCardFactor& smart_card) {
             user_data_auth::AuthFactor result;
             result.set_label(std::move(label));
-            result.set_type(
-                user_data_auth::AUTH_FACTOR_TYPE_CRYPTOHOME_RECOVERY);
+            result.set_type(user_data_auth::AUTH_FACTOR_TYPE_SMART_CARD);
             result.mutable_smart_card_metadata()->set_public_key_spki_der(
                 smart_card.public_key_spki_der);
             return result;
@@ -299,8 +299,8 @@ std::pair<std::string, FakeAuthFactor> AuthFactorWithInputToFakeAuthFactor(
     case user_data_auth::AUTH_FACTOR_TYPE_CRYPTOHOME_RECOVERY:
       return {label, RecoveryFactor{}};
     case user_data_auth::AUTH_FACTOR_TYPE_SMART_CARD: {
-      std::string t = factor.smart_card_metadata().public_key_spki_der();
-      return {label, SmartCardFactor{.public_key_spki_der = t}};
+      std::string key = factor.smart_card_metadata().public_key_spki_der();
+      return {label, SmartCardFactor{.public_key_spki_der = key}};
     }
     default:
       NOTREACHED();
@@ -957,8 +957,7 @@ void FakeUserDataAuthClient::StartAuthSession(
   // fixed, we explicitly add keys here.
   if (user_exists) {
     if (is_kiosk) {
-      // See kCryptohomePublicMountLabel.
-      std::string kiosk_label = "publicmount";
+      std::string kiosk_label = kCryptohomePublicMountLabel;
       cryptohome::KeyData kiosk_key;
       kiosk_key.set_label(kiosk_label);
       kiosk_key.set_type(cryptohome::KeyData::KEY_TYPE_KIOSK);
@@ -1039,87 +1038,6 @@ void FakeUserDataAuthClient::ListAuthFactors(
     }
     reply.add_supported_auth_factors(
         user_data_auth::AUTH_FACTOR_TYPE_CRYPTOHOME_RECOVERY);
-  }
-}
-
-void FakeUserDataAuthClient::AuthenticateAuthSession(
-    const ::user_data_auth::AuthenticateAuthSessionRequest& request,
-    AuthenticateAuthSessionCallback callback) {
-  last_authenticate_auth_session_request_ = request;
-  ::user_data_auth::AuthenticateAuthSessionReply reply;
-  ReplyOnReturn auto_reply(&reply, std::move(callback));
-
-  if (auto error = TakeOperationError(Operation::kAuthenticateAuthSession);
-      error != CryptohomeErrorCode::CRYPTOHOME_ERROR_NOT_SET) {
-    reply.set_error(error);
-    return;
-  }
-
-  const std::string auth_session_id = request.auth_session_id();
-
-  const auto it = auth_sessions_.find(auth_session_id);
-  if (it == auth_sessions_.end()) {
-    reply.set_error(CryptohomeErrorCode::CRYPTOHOME_INVALID_AUTH_SESSION_TOKEN);
-    return;
-  }
-  AuthSessionData& auth_session = it->second;
-
-  const cryptohome::Key& key = request.authorization().key();
-  switch (AuthenticateViaAuthFactors(auth_session.account,
-                                     /*factor_label=*/key.data().label(),
-                                     /*secret=*/key.secret(),
-                                     /*wildcard_allowed=*/false)) {
-    case AuthResult::kAuthSuccess:
-      // Proceed to marking the auth session authenticated.
-      break;
-    case AuthResult::kUserNotFound:
-      reply.set_error(CryptohomeErrorCode::CRYPTOHOME_ERROR_ACCOUNT_NOT_FOUND);
-      return;
-    case AuthResult::kFactorNotFound:
-      reply.set_error(CryptohomeErrorCode::CRYPTOHOME_ERROR_KEY_NOT_FOUND);
-      return;
-    case AuthResult::kAuthFailed:
-      reply.set_error(
-          CryptohomeErrorCode::CRYPTOHOME_ERROR_AUTHORIZATION_KEY_FAILED);
-      return;
-  }
-
-  auth_session.authenticated = true;
-  reply.set_authenticated(true);
-}
-
-void FakeUserDataAuthClient::AddCredentials(
-    const ::user_data_auth::AddCredentialsRequest& request,
-    AddCredentialsCallback callback) {
-  last_add_credentials_request_ = request;
-  ::user_data_auth::AddCredentialsReply reply;
-  ReplyOnReturn auto_reply(&reply, std::move(callback));
-
-  const std::string auth_session_id = request.auth_session_id();
-
-  const auto it = auth_sessions_.find(auth_session_id);
-  if (it == auth_sessions_.end()) {
-    reply.set_error(CryptohomeErrorCode::CRYPTOHOME_INVALID_AUTH_SESSION_TOKEN);
-  }
-}
-
-void FakeUserDataAuthClient::UpdateCredential(
-    const ::user_data_auth::UpdateCredentialRequest& request,
-    UpdateCredentialCallback callback) {
-  ::user_data_auth::UpdateCredentialReply reply;
-  ReplyOnReturn auto_reply(&reply, std::move(callback));
-
-  const std::string auth_session_id = request.auth_session_id();
-
-  const auto it = auth_sessions_.find(auth_session_id);
-  if (it == auth_sessions_.end()) {
-    reply.set_error(CryptohomeErrorCode::CRYPTOHOME_INVALID_AUTH_SESSION_TOKEN);
-    return;
-  }
-  if (!it->second.authenticated) {
-    reply.set_error(
-        CryptohomeErrorCode::CRYPTOHOME_ERROR_UNAUTHENTICATED_AUTH_SESSION);
-    return;
   }
 }
 

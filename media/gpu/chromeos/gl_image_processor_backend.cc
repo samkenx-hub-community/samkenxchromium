@@ -4,10 +4,11 @@
 
 #include "media/gpu/chromeos/gl_image_processor_backend.h"
 
-#include "base/callback_forward.h"
+#include "base/functional/callback_forward.h"
 #include "base/metrics/histogram_macros.h"
 #include "base/stl_util.h"
 #include "base/synchronization/waitable_event.h"
+#include "base/task/sequenced_task_runner.h"
 #include "base/trace_event/trace_event.h"
 #include "media/base/format_utils.h"
 #include "media/base/video_frame.h"

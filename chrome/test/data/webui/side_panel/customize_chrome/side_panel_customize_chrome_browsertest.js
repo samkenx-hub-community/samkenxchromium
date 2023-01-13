@@ -26,6 +26,15 @@ class SidePanelCustomizeChromeBrowserTest extends PolymerTest {
   };
 }
 
+var SidePanelCustomizeChromeButtonLabelTest =
+    class extends SidePanelCustomizeChromeBrowserTest {
+  /** @override */
+  get browsePreload() {
+    return 'chrome://customize-chrome-side-panel.top-chrome/test_loader.html' +
+        '?module=side_panel_customize_chrome/button_label_test.js';
+  }
+};
+
 var SidePanelCustomizeChromeCardsTest =
     class extends SidePanelCustomizeChromeBrowserTest {
   /** @override */
@@ -98,6 +107,15 @@ var SidePanelCustomizeChromeColorsTest =
   }
 };
 
+var SidePanelCustomizeChromeHoverButtonTest =
+    class extends SidePanelCustomizeChromeBrowserTest {
+  /** @override */
+  get browsePreload() {
+    return 'chrome://customize-chrome-side-panel.top-chrome/test_loader.html' +
+        '?module=side_panel_customize_chrome/hover_button_test.js';
+  }
+};
+
 var SidePanelCustomizeChromeThemesTest =
     class extends SidePanelCustomizeChromeBrowserTest {
   /** @override */
@@ -115,6 +133,10 @@ var SidePanelCustomizeChromeThemeSnapshotTest =
         '?module=side_panel_customize_chrome/theme_snapshot_test.js';
   }
 };
+
+TEST_F('SidePanelCustomizeChromeButtonLabelTest', 'All', function() {
+  mocha.run();
+});
 
 TEST_F('SidePanelCustomizeChromeCardsTest', 'All', function() {
   mocha.run();
@@ -145,6 +167,11 @@ TEST_F('SidePanelCustomizeChromeColorTest', 'All', function() {
 });
 
 TEST_F('SidePanelCustomizeChromeColorsTest', 'All', function() {
+  mocha.run();
+});
+
+
+TEST_F('SidePanelCustomizeChromeHoverButtonTest', 'All', function() {
   mocha.run();
 });
 

@@ -9,9 +9,9 @@
 #include <string>
 #include <vector>
 
-#include "base/callback.h"
-#include "base/callback_forward.h"
 #include "base/debug/crash_logging.h"
+#include "base/functional/callback.h"
+#include "base/functional/callback_forward.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/ref_counted.h"
 #include "base/memory/safe_ref.h"
@@ -20,6 +20,7 @@
 #include "base/time/time.h"
 #include "base/timer/timer.h"
 #include "build/build_config.h"
+#include "content/browser/browsing_topics/browsing_topics_url_loader_service.h"
 #include "content/browser/fenced_frame/fenced_frame_url_mapping.h"
 #include "content/browser/loader/navigation_url_loader_delegate.h"
 #include "content/browser/navigation_subresource_loader_params.h"
@@ -1022,6 +1023,12 @@ class CONTENT_EXPORT NavigationRequest
   // Empties this instance's vector.
   std::vector<blink::mojom::WebFeature> TakeWebFeaturesToLog();
 
+  void set_topics_url_loader_service_bind_context(
+      base::WeakPtr<BrowsingTopicsURLLoaderService::BindContext> bind_context) {
+    DCHECK(!topics_url_loader_service_bind_context_);
+    topics_url_loader_service_bind_context_ = bind_context;
+  }
+
   // Helper for logging crash keys related to a NavigationRequest (e.g.
   // "navigation_request_url", "navigation_request_initiator", and
   // "navigation_request_is_same_document").  The crash keys will be logged if a
@@ -1702,6 +1709,10 @@ class CONTENT_EXPORT NavigationRequest
     return common_params_->download_policy;
   }
 
+  // Called on FrameTreeNode's NavigationRequest (if any) when another
+  // NavigationRequest associated with the same FrameTreeNode is destroyed.
+  void ResumeCommitIfNeeded();
+
   // Never null. The pointee node owns this navigation request instance.
   FrameTreeNode* const frame_tree_node_;
 
@@ -2273,6 +2284,14 @@ class CONTENT_EXPORT NavigationRequest
   // reset.
   bool force_new_browsing_instance_ = false;
 
+  // A WeakPtr for the BindContext associated with topics loader factory for the
+  // committing document. This will be set in `CommitNavigation()`, and can
+  // become null if the corresponding factory is destroyed. Upon
+  // `DidCommitNavigation()`, `topics_url_loader_service_bind_context_` will
+  // be notified with the committed document.
+  base::WeakPtr<BrowsingTopicsURLLoaderService::BindContext>
+      topics_url_loader_service_bind_context_;
+
   scoped_refptr<NavigationOrDocumentHandle> navigation_or_document_handle_;
 
   // Exposes getters and setters for Blink Runtime-Enabled Features to the
@@ -2301,6 +2320,23 @@ class CONTENT_EXPORT NavigationRequest
   // Whether a Cookie header added to this request should not be overwritten by
   // the network service.
   bool allow_cookies_from_browser_ = false;
+
+  // If the browser has asked the renderer to commit the navigation in a
+  // speculative RenderFrameHost, but the renderer has not yet responded, a
+  // subsequent navigation request will be suspended if it also reaches the
+  // ready to commit state. A suspended navigation should populate this field
+  // with a closure that resumes committing the navigation when run.
+  //
+  // 1. The closure should always be bound with a `WeakPtr` receiver. To avoid
+  //    weird reentrancy bugs, it will be run as a non-nested posted task, which
+  //    means the original NavigationRequest could already be deleted by the
+  //    time the closure runs.
+  // 2. The closure may run spuriously, i.e. it may be invoked even if a
+  //    speculative RenderFrameHost is still in the pending commit state and
+  //    still preventing any other navigations from committing. If this happens,
+  //    the closure should re-queue itself. For more background, please see the
+  //    comments in the implementation of `ResumeCommitIfNeeded()`.
+  base::OnceClosure resume_commit_closure_;
 
   base::WeakPtrFactory<NavigationRequest> weak_factory_{this};
 };

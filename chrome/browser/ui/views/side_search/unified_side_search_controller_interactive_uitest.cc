@@ -43,9 +43,7 @@ class SideSearchV2Test : public SideSearchBrowserTest {
  public:
   void SetUp() override {
     scoped_feature_list_.InitWithFeatures(
-        {features::kSideSearch, features::kSideSearchDSESupport,
-         features::kSearchWebInSidePanel},
-        {});
+        {features::kSideSearch, features::kSearchWebInSidePanel}, {});
     SideSearchBrowserTest::SetUp();
   }
 
@@ -887,11 +885,15 @@ class SideSearchAutoTriggeringBrowserTest
 
     feature_list_.InitAndEnableFeaturesWithParameters({
         {features::kSideSearch, {}},
-        {features::kSideSearchDSESupport, {}},
         {features::kSideSearchAutoTriggering, params},
         {feature_engagement::kIPHSideSearchAutoTriggeringFeature,
          GetFeatureEngagementParams()},
     });
+  }
+
+  void SetUp() override {
+    set_open_about_blank_on_browser_launch(true);
+    SideSearchFeatureEngagementTest::SetUp();
   }
 
   void SetUpOnMainThread() override {
@@ -929,17 +931,8 @@ class SideSearchAutoTriggeringBrowserTest
   feature_engagement::test::ScopedIphFeatureList feature_list_;
 };
 
-// TODO(crbug.com/1368921): Flaky on lacros.
-#if BUILDFLAG(IS_CHROMEOS_LACROS)
-#define MAYBE_SidePanelAutoTriggersAfterReturningToAPreviousSRP \
-  DISABLED_SidePanelAutoTriggersAfterReturningToAPreviousSRP
-#else
-#define MAYBE_SidePanelAutoTriggersAfterReturningToAPreviousSRP \
-  SidePanelAutoTriggersAfterReturningToAPreviousSRP
-#endif
-IN_PROC_BROWSER_TEST_F(
-    SideSearchAutoTriggeringBrowserTest,
-    MAYBE_SidePanelAutoTriggersAfterReturningToAPreviousSRP) {
+IN_PROC_BROWSER_TEST_F(SideSearchAutoTriggeringBrowserTest,
+                       SidePanelAutoTriggersAfterReturningToAPreviousSRP) {
   DEFINE_LOCAL_ELEMENT_IDENTIFIER_VALUE(kPrimaryTabId);
   DEFINE_LOCAL_ELEMENT_IDENTIFIER_VALUE(kSidePanelWebContentsId);
 
@@ -1022,7 +1015,6 @@ class SideSearchPageActionLabelTriggerBrowserTest
   SideSearchPageActionLabelTriggerBrowserTest() {
     feature_list_.InitAndEnableFeaturesWithParameters({
         {features::kSideSearch, {}},
-        {features::kSideSearchDSESupport, {}},
         {feature_engagement::kIPHSideSearchPageActionLabelFeature,
          GetFeatureEngagementParams()},
     });

@@ -6,7 +6,7 @@
 
 #include <utility>
 
-#include "base/callback.h"
+#include "base/functional/callback.h"
 #include "base/notreached.h"
 #include "device/fido/ctap_make_credential_request.h"
 #include "device/fido/fido_constants.h"
@@ -183,6 +183,12 @@ void FidoAuthenticator::ReadLargeBlob(
     const std::vector<LargeBlobKey>& large_blob_keys,
     const absl::optional<pin::TokenResponse> pin_uv_auth_token,
     LargeBlobReadCallback callback) {
+  NOTREACHED();
+}
+
+void FidoAuthenticator::GarbageCollectLargeBlob(
+    const pin::TokenResponse& pin_uv_auth_token,
+    base::OnceCallback<void(CtapDeviceResponseCode)> callback) {
   NOTREACHED();
 }
 

@@ -11,11 +11,11 @@
 
 #include "base/barrier_closure.h"
 #include "base/base64.h"
-#include "base/bind.h"
 #include "base/command_line.h"
 #include "base/containers/contains.h"
 #include "base/containers/queue.h"
 #include "base/feature_list.h"
+#include "base/functional/bind.h"
 #include "base/i18n/i18n_constants.h"
 #include "base/i18n/icu_string_conversions.h"
 #include "base/process/process_handle.h"
@@ -2158,6 +2158,7 @@ void NetworkHandler::NavigationRequestWillBeSent(
     request->SetUrlFragment(url_fragment);
 
   if (common_params.post_data) {
+    request->SetHasPostData(true);
     std::string post_data;
     auto data_entries =
         std::make_unique<protocol::Array<protocol::Network::PostDataEntry>>();
@@ -2166,7 +2167,6 @@ void NetworkHandler::NavigationRequestWillBeSent(
         request->SetPostData(post_data);
       if (data_entries->size())
         request->SetPostDataEntries(std::move(data_entries));
-      request->SetHasPostData(true);
     }
   }
   // TODO(caseq): report potentially blockable types

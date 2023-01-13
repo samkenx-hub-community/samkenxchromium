@@ -11,7 +11,7 @@
 #include <utility>
 #include <vector>
 
-#include "base/callback.h"
+#include "base/functional/callback.h"
 #include "base/memory/weak_ptr.h"
 #include "chrome/browser/nearby_sharing/public/cpp/nearby_connections_manager.h"
 #include "chromeos/ash/services/nearby/public/mojom/nearby_connections.mojom.h"
@@ -22,7 +22,7 @@ class NearbyConnection;
 // Fake NearbyConnectionsManager for testing.
 class FakeNearbyConnectionsManager
     : public NearbyConnectionsManager,
-      public location::nearby::connections::mojom::EndpointDiscoveryListener {
+      public nearby::connections::mojom::EndpointDiscoveryListener {
  public:
   FakeNearbyConnectionsManager();
   ~FakeNearbyConnectionsManager() override;
@@ -68,8 +68,7 @@ class FakeNearbyConnectionsManager
   // mojom::EndpointDiscoveryListener:
   void OnEndpointFound(
       const std::string& endpoint_id,
-      location::nearby::connections::mojom::DiscoveredEndpointInfoPtr info)
-      override;
+      nearby::connections::mojom::DiscoveredEndpointInfoPtr info) override;
   void OnEndpointLost(const std::string& endpoint_id) override;
 
   // Testing methods

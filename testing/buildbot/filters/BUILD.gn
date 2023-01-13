@@ -219,7 +219,6 @@ source_set("services_unittests_filters") {
   testonly = true
 
   data = [
-    "//testing/buildbot/filters/android.pie_tot.services_unittests.filter",
     "//testing/buildbot/filters/fuchsia.services_unittests.filter",
     "//testing/buildbot/filters/fuchsia.lsan.services_unittests.filter",
   ]
@@ -248,7 +247,10 @@ source_set("extensions_unittests_filters") {
 source_set("gin_unittests_filters") {
   testonly = true
 
-  data = [ "//testing/buildbot/filters/fuchsia.lsan.gin_unittests.filter" ]
+  data = [
+    "//testing/buildbot/filters/android.pie_arm64.gin_unittests_coverage.filter",
+    "//testing/buildbot/filters/fuchsia.lsan.gin_unittests.filter",
+  ]
 }
 
 source_set("skia_unittests_filters") {
@@ -285,8 +287,11 @@ source_set("interactive_ui_tests_filters") {
   data = [
     "//testing/buildbot/filters/linux-lacros.interactive_ui_tests.filter",
     "//testing/buildbot/filters/linux-lacros.interactive_ui_tests.skew.filter",
+    "//testing/buildbot/filters/linux.linux-rel-cft.interactive_ui_tests.filter",
+    "//testing/buildbot/filters/mac.mac-rel-cft.interactive_ui_tests.filter",
     "//testing/buildbot/filters/ozone-linux.interactive_ui_tests_wayland.filter",
     "//testing/buildbot/filters/pixel_tests.filter",
+    "//testing/buildbot/filters/win.win-rel-cft.interactive_ui_tests.filter",
   ]
 }
 
@@ -361,7 +366,7 @@ source_set("webview_cts_tests_filters") {
 
   data = [
     "//testing/buildbot/filters/android.emulator.webview_cts_tests.filter",
-    "//testing/buildbot/filters/android.emulator.webview_cts_tests_coverage.filter",
+    "//testing/buildbot/filters/android.webview_cts_tests_coverage.filter",
   ]
 }
 

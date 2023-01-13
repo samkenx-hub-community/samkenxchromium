@@ -131,17 +131,19 @@ scoped_refptr<GLImageNativePixmap> GLImageNativePixmap::Create(
     gfx::BufferFormat format,
     scoped_refptr<gfx::NativePixmap> pixmap) {
   return CreateForPlane(size, format, gfx::BufferPlane::DEFAULT,
-                        std::move(pixmap));
+                        std::move(pixmap), gfx::ColorSpace());
 }
 
 scoped_refptr<GLImageNativePixmap> GLImageNativePixmap::CreateForPlane(
     const gfx::Size& size,
     gfx::BufferFormat format,
     gfx::BufferPlane plane,
-    scoped_refptr<gfx::NativePixmap> pixmap) {
+    scoped_refptr<gfx::NativePixmap> pixmap,
+    const gfx::ColorSpace& color_space) {
   auto image =
       base::WrapRefCounted(new GLImageNativePixmap(size, format, plane));
-  if (!image->Initialize(std::move(pixmap))) {
+
+  if (!image->InitializeFromNativePixmap(std::move(pixmap), color_space)) {
     return nullptr;
   }
   return image;
@@ -162,15 +164,29 @@ scoped_refptr<GLImageNativePixmap> GLImageNativePixmap::CreateFromTexture(
 GLImageNativePixmap::GLImageNativePixmap(const gfx::Size& size,
                                          gfx::BufferFormat format,
                                          gfx::BufferPlane plane)
-    : GLImageEGL(size),
+    : egl_image_(EGL_NO_IMAGE_KHR),
+      size_(size),
       format_(format),
       plane_(plane),
       has_image_dma_buf_export_(gl::GLSurfaceEGL::GetGLDisplayEGL()
                                     ->ext->b_EGL_MESA_image_dma_buf_export) {}
 
-GLImageNativePixmap::~GLImageNativePixmap() {}
+GLImageNativePixmap::~GLImageNativePixmap() {
+  DCHECK_CALLED_ON_VALID_THREAD(thread_checker_);
+  if (egl_image_ == EGL_NO_IMAGE_KHR) {
+    return;
+  }
 
-bool GLImageNativePixmap::Initialize(scoped_refptr<gfx::NativePixmap> pixmap) {
+  const EGLBoolean result = eglDestroyImageKHR(
+      GLSurfaceEGL::GetGLDisplayEGL()->GetDisplay(), egl_image_);
+  if (result == EGL_FALSE) {
+    DLOG(ERROR) << "Error destroying EGLImage: " << ui::GetLastEGLErrorString();
+  }
+}
+
+bool GLImageNativePixmap::InitializeFromNativePixmap(
+    scoped_refptr<gfx::NativePixmap> pixmap,
+    const gfx::ColorSpace& color_space) {
   DCHECK(!pixmap_);
   if (GLInternalFormat(format_) == GL_NONE) {
     LOG(ERROR) << "Unsupported format: " << gfx::BufferFormatToString(format_);
@@ -210,7 +226,7 @@ bool GLImageNativePixmap::Initialize(scoped_refptr<gfx::NativePixmap> pixmap) {
     // promoted to overlays). We'll need to revisit this once we plumb the
     // color space and range to DRM/KMS.
     attrs.push_back(EGL_YUV_COLOR_SPACE_HINT_EXT);
-    switch (color_space_.GetMatrixID()) {
+    switch (color_space.GetMatrixID()) {
       case gfx::ColorSpace::MatrixID::BT2020_NCL:
         attrs.push_back(EGL_ITU_REC2020_EXT);
         break;
@@ -219,7 +235,7 @@ bool GLImageNativePixmap::Initialize(scoped_refptr<gfx::NativePixmap> pixmap) {
     }
 
     attrs.push_back(EGL_SAMPLE_RANGE_HINT_EXT);
-    switch (color_space_.GetRangeID()) {
+    switch (color_space.GetRangeID()) {
       case gfx::ColorSpace::RangeID::FULL:
         attrs.push_back(EGL_YUV_FULL_RANGE_EXT);
         break;
@@ -271,9 +287,8 @@ bool GLImageNativePixmap::Initialize(scoped_refptr<gfx::NativePixmap> pixmap) {
     attrs.push_back(EGL_NONE);
   }
 
-  if (!GLImageEGL::Initialize(EGL_NO_CONTEXT, EGL_LINUX_DMA_BUF_EXT,
-                              static_cast<EGLClientBuffer>(nullptr),
-                              &attrs[0])) {
+  if (!Initialize(EGL_NO_CONTEXT, EGL_LINUX_DMA_BUF_EXT,
+                  static_cast<EGLClientBuffer>(nullptr), &attrs[0])) {
     return false;
   }
 
@@ -297,21 +312,35 @@ bool GLImageNativePixmap::InitializeFromTexture(uint32_t texture_id) {
       reinterpret_cast<EGLContext>(current_context->GetHandle());
   DCHECK_NE(context_handle, EGL_NO_CONTEXT);
 
-  if (!GLImageEGL::Initialize(context_handle, EGL_GL_TEXTURE_2D_KHR,
-                              reinterpret_cast<EGLClientBuffer>(texture_id),
-                              nullptr)) {
+  if (!Initialize(context_handle, EGL_GL_TEXTURE_2D_KHR,
+                  reinterpret_cast<EGLClientBuffer>(texture_id), nullptr)) {
     return false;
   }
   return true;
 }
 
+bool GLImageNativePixmap::Initialize(EGLContext context,
+                                     EGLenum target,
+                                     EGLClientBuffer buffer,
+                                     const EGLint* attrs) {
+  DCHECK_CALLED_ON_VALID_THREAD(thread_checker_);
+  DCHECK_EQ(EGL_NO_IMAGE_KHR, egl_image_);
+  egl_image_ = eglCreateImageKHR(GLSurfaceEGL::GetGLDisplayEGL()->GetDisplay(),
+                                 context, target, buffer, attrs);
+  const bool success = egl_image_ != EGL_NO_IMAGE_KHR;
+  if (!success) {
+    LOG(ERROR) << "Error creating EGLImage: " << ui::GetLastEGLErrorString();
+  }
+  return success;
+}
+
 gfx::NativePixmapHandle GLImageNativePixmap::ExportHandle() {
   DCHECK(!pixmap_);
-  DCHECK(thread_checker_.CalledOnValidThread());
+  DCHECK_CALLED_ON_VALID_THREAD(thread_checker_);
 
-  // Must use GLImageEGL::Initialize.
+  // Must use Initialize.
   if (egl_image_ == EGL_NO_IMAGE_KHR) {
-    LOG(ERROR) << "GLImageEGL is not initialized";
+    LOG(ERROR) << "GLImageNativePixmap is not initialized";
     return gfx::NativePixmapHandle();
   }
 
@@ -386,6 +415,21 @@ gfx::NativePixmapHandle GLImageNativePixmap::ExportHandle() {
 
   return handle;
 #endif  // BUILDFLAG(IS_FUCHSIA)
+}
+
+gfx::Size GLImageNativePixmap::GetSize() {
+  return size_;
+}
+
+void* GLImageNativePixmap::GetEGLImage() const {
+  return egl_image_;
+}
+
+bool GLImageNativePixmap::BindTexImage(unsigned target) {
+  DCHECK_CALLED_ON_VALID_THREAD(thread_checker_);
+
+  glEGLImageTargetTexture2DOES(target, egl_image_);
+  return true;
 }
 
 unsigned GLImageNativePixmap::GetInternalFormat() {

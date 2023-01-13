@@ -13,8 +13,8 @@
 #include <utility>
 #include <vector>
 
-#include "base/bind.h"
 #include "base/check.h"
+#include "base/functional/bind.h"
 #include "base/i18n/char_iterator.h"
 #include "base/strings/string_util.h"
 #include "base/strings/utf_string_conversions.h"
@@ -271,7 +271,6 @@ void InputMethodAsh::OnCaretBoundsChanged(const TextInputClient* client) {
 
   TextInputMethod* engine = GetEngine();
   if (engine) {
-    engine->SetCompositionBounds(GetCompositionBounds(client));
     engine->SetCaretBounds(client->GetCaretBounds());
   }
 
@@ -284,16 +283,18 @@ void InputMethodAsh::OnCaretBoundsChanged(const TextInputClient* client) {
 
   const gfx::Rect caret_rect = client->GetCaretBounds();
 
-  gfx::Rect composition_head;
+  gfx::Rect composition_bounds;
   if (client->HasCompositionText())
-    client->GetCompositionCharacterBounds(0, &composition_head);
+    client->GetCompositionCharacterBounds(0, &composition_bounds);
 
   // Pepper doesn't support composition bounds, so fall back to caret bounds to
   // avoid a bad user experience (the IME window moved to upper left corner).
-  if (composition_head.IsEmpty())
-    composition_head = caret_rect;
+  if (composition_bounds.IsEmpty()) {
+    composition_bounds = caret_rect;
+  }
   if (candidate_window)
-    candidate_window->SetCursorBounds(caret_rect, composition_head);
+    candidate_window->SetCursorAndCompositionBounds(caret_rect,
+                                                    composition_bounds);
 
   if (assistive_window) {
     Bounds bounds;
@@ -384,8 +385,7 @@ void InputMethodAsh::OnWillChangeFocusedClient(TextInputClient* focused_before,
   ConfirmComposition(/* reset_engine */ true);
 
   // Remove any autocorrect range in the unfocused TextInputClient.
-  gfx::Range text_range;
-  if (focused_before && focused_before->GetTextRange(&text_range)) {
+  if (focused_before) {
     focused_before->SetAutocorrectRange(gfx::Range());
   }
 
@@ -1066,23 +1066,6 @@ ukm::SourceId InputMethodAsh::GetClientSourceForMetrics() {
 
 ui::InputMethod* InputMethodAsh::GetInputMethod() {
   return this;
-}
-
-std::vector<gfx::Rect> InputMethodAsh::GetCompositionBounds(
-    const TextInputClient* client) {
-  std::vector<gfx::Rect> bounds;
-  if (client->HasCompositionText()) {
-    uint32_t i = 0;
-    gfx::Rect rect;
-    while (client->GetCompositionCharacterBounds(i++, &rect))
-      bounds.push_back(rect);
-  } else {
-    // For case of no composition at present, use caret bounds which is required
-    // by the IME extension for certain features (e.g. physical keyboard
-    // auto-correct).
-    bounds.push_back(client->GetCaretBounds());
-  }
-  return bounds;
 }
 
 bool InputMethodAsh::SendFakeProcessKeyEvent(bool pressed) const {

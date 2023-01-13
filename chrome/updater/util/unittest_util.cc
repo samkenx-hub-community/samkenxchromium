@@ -18,13 +18,17 @@
 #include "base/process/launch.h"
 #include "base/process/process_iterator.h"
 #include "base/strings/strcat.h"
+#include "base/strings/string_number_conversions.h"
 #include "base/strings/string_util.h"
 #include "base/strings/stringprintf.h"
+#include "base/strings/utf_string_conversions.h"
+#include "base/synchronization/waitable_event.h"
 #include "base/threading/platform_thread.h"
 #include "base/time/time.h"
 #include "chrome/updater/constants.h"
 #include "chrome/updater/policy/manager.h"
 #include "chrome/updater/policy/service.h"
+#include "chrome/updater/test_scope.h"
 #include "chrome/updater/updater_scope.h"
 #include "chrome/updater/util/util.h"
 #include "testing/gtest/include/gtest/gtest.h"
@@ -33,6 +37,8 @@
 #if BUILDFLAG(IS_WIN)
 #include <shlobj.h>
 
+#include "base/strings/string_number_conversions_win.h"
+#include "base/win/scoped_handle.h"
 #include "base/win/windows_version.h"
 #include "chrome/test/base/process_inspector_win.h"
 #include "chrome/updater/util/win_util.h"
@@ -127,7 +133,30 @@ bool WaitForProcessesToExit(const base::FilePath::StringType& executable_name,
 
 bool KillProcesses(const base::FilePath::StringType& executable_name,
                    int exit_code) {
-  return base::KillProcesses(executable_name, exit_code, nullptr);
+  bool result = true;
+  for (const base::ProcessEntry& entry :
+       base::NamedProcessIterator(executable_name, nullptr).Snapshot()) {
+    base::Process process = base::Process::Open(entry.pid());
+    if (!process.IsValid()) {
+      PLOG(ERROR) << "Process invalid for PID: " << executable_name << ": "
+                  << entry.pid();
+      result = false;
+      continue;
+    }
+
+    const bool process_terminated = process.Terminate(exit_code, true);
+
+#if BUILDFLAG(IS_WIN)
+    PLOG_IF(ERROR, !process_terminated &&
+                       !::TerminateProcess(process.Handle(),
+                                           static_cast<UINT>(exit_code)))
+        << "::TerminateProcess failed: " << executable_name << ": "
+        << entry.pid();
+#endif  // BUILDFLAG(IS_WIN)
+
+    result &= process_terminated;
+  }
+  return result;
 }
 
 scoped_refptr<PolicyService> CreateTestPolicyService() {
@@ -347,44 +376,48 @@ void StopProcmonLogging(const base::FilePath& pml_file) {
     LOG(ERROR) << __func__ << ": failed to backup pml file";
 }
 
+const base::ProcessIterator::ProcessEntries FindProcesses(
+    const base::FilePath::StringType& executable_name) {
+  return base::NamedProcessIterator(executable_name, nullptr).Snapshot();
+}
+
 base::FilePath::StringType PrintProcesses(
     const base::FilePath::StringType& executable_name) {
-  class ExeNameProcessFilter : public base::ProcessFilter {
-   public:
-    explicit ExeNameProcessFilter(
-        const base::FilePath::StringType& executable_name)
-        : executable_name_(executable_name) {}
-
-    bool Includes(const base::ProcessEntry& entry) const override {
-      return base::EqualsCaseInsensitiveASCII(entry.exe_file(),
-                                              executable_name_);
-    }
-
-   private:
-    const base::FilePath::StringType executable_name_;
-  };
-
-  base::FilePath::StringType message(FILE_PATH_LITERAL("Found processes:"));
-  const base::FilePath::StringType demarcation(72, FILE_PATH_LITERAL('='));
+  base::FilePath::StringType message(L"Found processes:\n");
+  base::FilePath::StringType demarcation(72, L'=');
+  demarcation += L'\n';
   message += demarcation;
 
-  ExeNameProcessFilter exe_name_filter(executable_name);
-  base::ProcessIterator process_iterator(&exe_name_filter);
-  const base::ProcessIterator::ProcessEntries& process_entries =
-      process_iterator.Snapshot();
-  for (const base::ProcessEntry& entry : process_entries) {
+  for (const base::ProcessEntry& entry : FindProcesses(executable_name)) {
     message += base::StrCat(
-        {entry.exe_file(), FILE_PATH_LITERAL(", cmdline="),
+        {entry.exe_file(), L", pid=", base::NumberToWString(entry.pid()),
+         L", creation time=",
+         [](base::ProcessId pid) {
+           const base::Process process = base::Process::Open(pid);
+           return process.IsValid() ? base::ASCIIToWide(base::TimeFormatHTTP(
+                                          process.CreationTime()))
+                                    : L"n/a";
+         }(entry.pid()),
+         L", cmdline=",
          [](base::ProcessId pid) {
            std::unique_ptr<ProcessInspector> process_inspector =
                ProcessInspector::Create(base::Process::OpenWithAccess(
                    pid, PROCESS_ALL_ACCESS | PROCESS_VM_READ));
            return process_inspector ? process_inspector->command_line()
-                                    : FILE_PATH_LITERAL("n/a");
-         }(entry.pid())});
+                                    : L"n/a";
+         }(entry.pid()),
+         L"\n"});
   }
 
   return message + demarcation;
+}
+
+EventHolder CreateWaitableEventForTest() {
+  NamedObjectAttributes attr = GetNamedObjectAttributes(
+      base::NumberToWString(::GetCurrentProcessId()).c_str(), GetTestScope());
+  return {base::WaitableEvent(base::win::ScopedHandle(
+              ::CreateEvent(&attr.sa, FALSE, FALSE, attr.name.c_str()))),
+          attr.name};
 }
 
 #endif  // BUILDFLAG(IS_WIN)

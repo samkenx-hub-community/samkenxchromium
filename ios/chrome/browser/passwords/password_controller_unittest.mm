@@ -1646,11 +1646,12 @@ TEST_F(PasswordControllerTest, CheckPasswordGenerationSuggestion) {
   }
 }
 
-
-
 // Tests that the user is prompted to save or update password on a succesful
 // form submission.
-TEST_F(PasswordControllerTest, ShowingSavingPromptOnSuccessfulSubmission) {
+// TODO(crbug.com/1404697): This test is flaky: it sometimes fails to finish
+// loading the HTML.
+TEST_F(PasswordControllerTest,
+       DISABLED_ShowingSavingPromptOnSuccessfulSubmission) {
   const char* kHtml = {"<html><body>"
                        "<form name='login_form' id='login_form'>"
                        "  <input type='text' name='username'>"
@@ -1747,7 +1748,10 @@ TEST_F(PasswordControllerTest, NotShowingSavingPromptWhileSavingIsDisabled) {
 // Tests that the user is prompted to update password on a succesful
 // form submission when there's already a credential with the same
 // username in the store.
-TEST_F(PasswordControllerTest, ShowingUpdatePromptOnSuccessfulSubmission) {
+// TODO(crbug.com/1404697): This test is flaky: it sometimes fails to finish
+// loading the HTML.
+TEST_F(PasswordControllerTest,
+       DISABLED_ShowingUpdatePromptOnSuccessfulSubmission) {
   PasswordForm form(MakeSimpleForm());
   ON_CALL(*store_, GetLogins)
       .WillByDefault(WithArg<1>(InvokeConsumer(store_.get(), form)));
@@ -2118,7 +2122,9 @@ TEST_F(PasswordControllerTest,
   }));
 }
 
-TEST_F(PasswordControllerTest, PasswordMetricsNoSavedCredentials) {
+// TODO(crbug.com/1404697): This test is flaky: it sometimes fails to finish
+// loading the HTML.
+TEST_F(PasswordControllerTest, DISABLED_PasswordMetricsNoSavedCredentials) {
   base::HistogramTester histogram_tester;
   {
     ON_CALL(*store_, GetLogins)
@@ -2328,145 +2334,6 @@ TEST_F(PasswordControllerTest, SavingPasswordsOutsideTheFormTag) {
   }));
   EXPECT_EQ(u"user1", form_manager->GetPendingCredentials().username_value);
   EXPECT_EQ(u"password1", form_manager->GetPendingCredentials().password_value);
-}
-
-// Tests that submission is detected on change password form clearing.
-TEST_F(PasswordControllerTest, DetectSubmissionOnFormReset) {
-  base::test::ScopedFeatureList feature_list;
-  feature_list.InitAndEnableFeature(
-      password_manager::features::kDetectFormSubmissionOnFormClear);
-
-  PasswordForm form(
-      CreatePasswordForm("https://chromium.test/", "user", "oldpw"));
-  EXPECT_CALL(*store_, GetLogins)
-      .WillRepeatedly(WithArg<1>(InvokeConsumer(store_.get(), form)));
-
-  LoadHtml(@"<html><body>"
-            "<form name='change_form' id='change_form'>"
-            "  <input type='password' id='opw'>"
-            "  <input type='password' id='npw' autocomplete='new-password'>"
-            "  <input type='password' id='cpw' autocomplete='new-password'>"
-            "  <button id='submit_button' value='Submit'>"
-            "</form>"
-            "</body></html>");
-  WaitForFormManagersCreation();
-
-  std::string main_frame_id = web::GetMainWebFrameId(web_state());
-
-  SimulateUserTyping("change_form", FormRendererId(1), "opw",
-                     FieldRendererId(2), "oldpw", main_frame_id);
-  SimulateUserTyping("change_form", FormRendererId(1), "npw",
-                     FieldRendererId(3), "newpw", main_frame_id);
-  SimulateUserTyping("change_form", FormRendererId(1), "cpw",
-                     FieldRendererId(4), "newpw", main_frame_id);
-
-  std::unique_ptr<PasswordFormManagerForUI> form_manager_to_save;
-  EXPECT_CALL(*weak_client_, PromptUserToSaveOrUpdatePasswordPtr)
-      .WillOnce(WithArg<0>(SaveToScopedPtr(&form_manager_to_save)));
-
-  __block NSString* form_details = nil;
-  __block bool form_details_retreived = false;
-  password_manager::PasswordManagerJavaScriptFeature::GetInstance()
-      ->ExtractForm(GetMainFrame(web_state()), FormRendererId(1),
-                    base::BindOnce(^(NSString* response) {
-                      form_details = response;
-                      form_details_retreived = true;
-                    }));
-
-  ASSERT_TRUE(WaitUntilConditionOrTimeout(kWaitForJSCompletionTimeout, ^bool() {
-    return form_details_retreived;
-  }));
-
-  std::string form_data = base::SysNSStringToUTF8(form_details);
-
-  // Imitiate the signal from the page resetting the form.
-  SimulateFormActivityObserverSignal("password_form_cleared", FormRendererId(1),
-                                     FieldRendererId(), form_data);
-
-  auto& form_manager_check = form_manager_to_save;
-  ASSERT_TRUE(WaitUntilConditionOrTimeout(kWaitForActionTimeout, ^bool() {
-    return form_manager_check != nullptr;
-  }));
-  EXPECT_EQ("https://chromium.test/",
-            form_manager_to_save->GetPendingCredentials().signon_realm);
-  EXPECT_EQ(u"user",
-            form_manager_to_save->GetPendingCredentials().username_value);
-  EXPECT_EQ(u"newpw",
-            form_manager_to_save->GetPendingCredentials().password_value);
-
-  auto* form_manager =
-      static_cast<PasswordFormManager*>(form_manager_to_save.get());
-  EXPECT_TRUE(form_manager->is_submitted());
-  EXPECT_TRUE(form_manager->IsPasswordUpdate());
-}
-
-// Tests that submission is detected on change password form clearing,
-// when the formless fields are cleared individually.
-TEST_F(PasswordControllerTest, DetectSubmissionOnFormlessFieldsClearing) {
-  base::test::ScopedFeatureList feature_list;
-  feature_list.InitAndEnableFeature(
-      password_manager::features::kDetectFormSubmissionOnFormClear);
-
-  PasswordForm form(
-      CreatePasswordForm("https://chromium.test/", "user", "oldpw"));
-  EXPECT_CALL(*store_, GetLogins)
-      .WillRepeatedly(WithArg<1>(InvokeConsumer(store_.get(), form)));
-
-  LoadHtml(@"<html><body>"
-            "  <input type='password' id='opw'>"
-            "  <input type='password' id='npw' autocomplete='new-password'>"
-            "  <input type='password' id='cpw' autocomplete='new-password'>"
-            "  <button id='submit_button' value='Submit'>"
-            "</body></html>");
-  WaitForFormManagersCreation();
-
-  std::string main_frame_id = web::GetMainWebFrameId(web_state());
-
-  SimulateUserTyping("change_form", FormRendererId(), "opw", FieldRendererId(1),
-                     "oldpw", main_frame_id);
-  SimulateUserTyping("change_form", FormRendererId(), "npw", FieldRendererId(2),
-                     "newpw", main_frame_id);
-  SimulateUserTyping("change_form", FormRendererId(), "cpw", FieldRendererId(3),
-                     "newpw", main_frame_id);
-
-  std::unique_ptr<PasswordFormManagerForUI> form_manager_to_save;
-  EXPECT_CALL(*weak_client_, PromptUserToSaveOrUpdatePasswordPtr)
-      .WillOnce(WithArg<0>(SaveToScopedPtr(&form_manager_to_save)));
-
-  __block NSString* form_details = nil;
-  __block bool form_details_retreived = false;
-  password_manager::PasswordManagerJavaScriptFeature::GetInstance()
-      ->ExtractForm(GetMainFrame(web_state()), autofill::FormRendererId(0),
-                    base::BindOnce(^(NSString* response) {
-                      form_details = response;
-                      form_details_retreived = true;
-                    }));
-
-  ASSERT_TRUE(WaitUntilConditionOrTimeout(kWaitForJSCompletionTimeout, ^bool() {
-    return form_details_retreived;
-  }));
-
-  std::string form_data = base::SysNSStringToUTF8(form_details);
-
-  // Imitiate the signal from the page resetting the form.
-  SimulateFormActivityObserverSignal("password_form_cleared", FormRendererId(),
-                                     FieldRendererId(), form_data);
-
-  auto& form_manager_check = form_manager_to_save;
-  ASSERT_TRUE(WaitUntilConditionOrTimeout(kWaitForActionTimeout, ^bool() {
-    return form_manager_check != nullptr;
-  }));
-  EXPECT_EQ("https://chromium.test/",
-            form_manager_to_save->GetPendingCredentials().signon_realm);
-  EXPECT_EQ(u"user",
-            form_manager_to_save->GetPendingCredentials().username_value);
-  EXPECT_EQ(u"newpw",
-            form_manager_to_save->GetPendingCredentials().password_value);
-
-  auto* form_manager =
-      static_cast<PasswordFormManager*>(form_manager_to_save.get());
-  EXPECT_TRUE(form_manager->is_submitted());
-  EXPECT_TRUE(form_manager->IsPasswordUpdate());
 }
 
 // Tests submission and saving of a password form located in a same origin

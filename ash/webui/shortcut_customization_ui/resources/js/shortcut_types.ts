@@ -28,6 +28,8 @@ export enum Modifier {
 }
 
 export type TextAcceleratorPart = AcceleratorInfoTypes.TextAcceleratorPart;
+export type TextAcceleratorPartType =
+    AcceleratorInfoTypes.TextAcceleratorPartType;
 export const TextAcceleratorPartType =
     AcceleratorInfoTypes.TextAcceleratorPartType;
 
@@ -96,8 +98,7 @@ export type StandardAcceleratorInfo =
 export type TextAcceleratorInfo =
     Omit<AcceleratorInfoTypes.AcceleratorInfo, 'layoutProperties'>&{
       layoutProperties: {
-        textAccelerator:
-            {textAccelerator: AcceleratorInfoTypes.TextAcceleratorPart[]},
+        textAccelerator: {parts: AcceleratorInfoTypes.TextAcceleratorPart[]},
       },
     };
 

@@ -488,9 +488,9 @@ TEST(RawRef, GreaterThanOrEqual) {
 // `raw_ref` evaluate to nothing. Therefore, death tests relying on
 // these CHECKs firing are disabled in their absence.
 
-#if BUILDFLAG(ENABLE_BACKUP_REF_PTR_SUPPORT) ||                         \
-    BUILDFLAG(USE_ASAN_BACKUP_REF_PTR) ||                               \
-    defined(PA_ENABLE_MTE_CHECKED_PTR_SUPPORT_WITH_64_BITS_POINTERS) || \
+#if BUILDFLAG(ENABLE_BACKUP_REF_PTR_SUPPORT) ||                        \
+    BUILDFLAG(USE_ASAN_BACKUP_REF_PTR) ||                              \
+    PA_CONFIG(ENABLE_MTE_CHECKED_PTR_SUPPORT_WITH_64_BITS_POINTERS) || \
     BUILDFLAG(PA_DCHECK_IS_ON)
 
 TEST(RawRefDeathTest, CopyConstructAfterMove) {
@@ -733,7 +733,7 @@ TEST(RawRefDeathTest, GreaterThanOrEqualAfterMove) {
 
 #endif  // BUILDFLAG(ENABLE_BACKUP_REF_PTR_SUPPORT) ||
         // BUILDFLAG(USE_ASAN_BACKUP_REF_PTR) ||
-        // defined(PA_ENABLE_MTE_CHECKED_PTR_SUPPORT_WITH_64_BITS_POINTERS) ||
+        // PA_CONFIG(ENABLE_MTE_CHECKED_PTR_SUPPORT_WITH_64_BITS_POINTERS) ||
         // BUILDFLAG(PA_DCHECK_IS_ON)
 
 TEST(RawRef, CTAD) {
@@ -747,11 +747,12 @@ TEST(RawRefPtr, CTADWithConst) {
   struct S {
     const raw_ref<const std::string> r;
   };
-  // Deduces as raw_ref<std::string>, for which the constructor call is valid making a mutable
-  // reference, and then converts to raw_ref<const std::string>.
+  // Deduces as `raw_ref<std::string>`, for which the constructor call is valid
+  // making a mutable reference, and then converts to
+  // `raw_ref<const std::string>`.
   S s1 = {.r = raw_ref(str)};
-  // Deduces as raw_ref<const std::string>, for which the constructor call is valid from a const
-  // ref.
+  // Deduces as raw_ref<const std::string>, for which the constructor call is
+  // valid from a const ref.
   S s2 = {.r = raw_ref(static_cast<const std::string&>(str))};
   EXPECT_EQ(&*s1.r, &str);
   EXPECT_EQ(&*s2.r, &str);

@@ -10,8 +10,11 @@
 // Delegate for the ContentSuggestionsHeaderViewController.
 @protocol ContentSuggestionsHeaderViewControllerDelegate
 
-// Returns whether the scrollview is scrolled to the omnibox.
-- (BOOL)isScrolledToMinimumHeight;
+// Whether the scrollview is scrolled to the omnibox.
+@property(nonatomic, assign, readonly) BOOL scrolledToMinimumHeight;
+
+// Indicates to the receiver to update its state to focus the omnibox.
+- (void)focusFakebox;
 
 @end
 

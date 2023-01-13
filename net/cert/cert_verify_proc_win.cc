@@ -8,7 +8,7 @@
 #include <memory>
 #include <string>
 
-#include "base/bind.h"
+#include "base/functional/bind.h"
 #include "base/memory/free_deleter.h"
 #include "base/metrics/histogram_macros.h"
 #include "base/no_destructor.h"
@@ -17,7 +17,6 @@
 #include "base/synchronization/lock.h"
 #include "base/task/thread_pool.h"
 #include "base/threading/thread_local.h"
-#include "base/threading/thread_task_runner_handle.h"
 #include "base/win/registry.h"
 #include "base/win/windows_version.h"
 #include "crypto/capi_util.h"

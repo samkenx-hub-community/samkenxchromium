@@ -84,7 +84,9 @@ class GPU_GLES2_EXPORT TexturePassthrough final
   gl::GLImage* GetLevelImage(GLenum target, GLint level) const;
 #endif
 
+#if BUILDFLAG(IS_ANDROID)
   void BindToServiceId(GLuint service_id);
+#endif
 
 #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC)
   // Return true if and only if the decoder should BindTexImage / CopyTexImage
@@ -109,7 +111,6 @@ class GPU_GLES2_EXPORT TexturePassthrough final
                              gl::GLImage* image,
                              GLuint service_id);
 #endif
-  void UpdateStreamTextureServiceId(GLenum target, GLint level);
 
   friend class base::RefCounted<TexturePassthrough>;
 

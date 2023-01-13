@@ -15,15 +15,16 @@
 #include <utility>
 #include <vector>
 
-#include "base/callback.h"
 #include "base/cancelable_callback.h"
 #include "base/containers/flat_set.h"
 #include "base/containers/lru_cache.h"
 #include "base/files/file_path.h"
+#include "base/functional/callback.h"
 #include "base/gtest_prod_util.h"
 #include "base/memory/memory_pressure_listener.h"
 #include "base/observer_list.h"
 #include "base/task/cancelable_task_tracker.h"
+#include "base/task/sequenced_task_runner.h"
 #include "base/task/single_thread_task_runner.h"
 #include "base/time/time.h"
 #include "build/build_config.h"
@@ -521,6 +522,8 @@ class HistoryBackend : public base::RefCountedThreadSafe<HistoryBackend>,
   void AddVisitsToCluster(int64_t cluster_id,
                           const std::vector<ClusterVisit>& visits);
 
+  void UpdateClusterTriggerability(const std::vector<Cluster>& clusters);
+
   std::vector<Cluster> GetMostRecentClusters(
       base::Time inclusive_min_time,
       base::Time exclusive_max_time,
@@ -628,7 +631,9 @@ class HistoryBackend : public base::RefCountedThreadSafe<HistoryBackend>,
   // Even though the process is async, only visits that already exist at the
   // time this is called will be deleted. Visits added afterwards will *not* be
   // deleted.
-  bool DeleteAllForeignVisits() override;
+  // This method also resets the `is_known_to_sync` bit for all visits, local
+  // and foreign.
+  void DeleteAllForeignVisitsAndResetIsKnownToSync() override;
 
   bool RemoveVisits(const VisitVector& visits);
 
@@ -809,6 +814,9 @@ class HistoryBackend : public base::RefCountedThreadSafe<HistoryBackend>,
 
   // Updates the visit_duration information in visits table.
   void UpdateVisitDuration(VisitID visit_id, const base::Time end_ts);
+
+  // Flags this visit's `is_known_to_sync` true.
+  void MarkVisitAsKnownToSync(VisitID visit_id) override;
 
   // Returns whether `url` is on an untyped intranet host.
   bool IsUntypedIntranetHost(const GURL& url);

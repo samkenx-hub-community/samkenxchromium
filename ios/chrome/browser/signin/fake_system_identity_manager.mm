@@ -4,7 +4,7 @@
 
 #import "ios/chrome/browser/signin/fake_system_identity_manager.h"
 
-#import "base/bind.h"
+#import "base/functional/bind.h"
 #import "base/run_loop.h"
 #import "base/strings/sys_string_conversions.h"
 #import "base/task/sequenced_task_runner.h"
@@ -144,6 +144,11 @@ FakeSystemIdentityManager::CreateRefreshAccessTokenFailure(
   details.error = [[FakeRefreshAccessTokenError alloc]
       initWithCallback:std::move(callback)];
   return details.error;
+}
+
+bool FakeSystemIdentityManager::IsSigninSupported() {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  return true;
 }
 
 bool FakeSystemIdentityManager::HandleSessionOpenURLContexts(

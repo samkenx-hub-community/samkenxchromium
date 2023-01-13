@@ -6,8 +6,8 @@
 #import <string>
 
 #import "base/base_paths.h"
-#import "base/bind.h"
 #import "base/files/file_path.h"
+#import "base/functional/bind.h"
 #import "base/ios/ios_util.h"
 #import "base/ios/ns_error_util.h"
 #import "base/mac/foundation_util.h"
@@ -17,6 +17,7 @@
 #import "base/strings/sys_string_conversions.h"
 #import "base/strings/utf_string_conversions.h"
 #import "base/task/sequenced_task_runner.h"
+#import "base/task/single_thread_task_runner.h"
 #import "base/test/gmock_callback_support.h"
 #import "base/test/ios/wait_util.h"
 #import "ios/net/protocol_handler_util.h"

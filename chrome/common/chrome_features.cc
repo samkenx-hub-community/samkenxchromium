@@ -44,6 +44,12 @@ BASE_FEATURE(kAppDeduplicationService,
 #endif  // BUILDFLAG(IS_CHROMEOS_ASH)
 
 #if BUILDFLAG(IS_CHROMEOS_ASH)
+BASE_FEATURE(kAppDeduplicationServiceFondue,
+             "AppDeduplicationServiceFondue",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+#endif  // BUILDFLAG(IS_CHROMEOS_ASH)
+
+#if BUILDFLAG(IS_CHROMEOS_ASH)
 BASE_FEATURE(kAppPreloadService,
              "AppPreloadService",
              base::FEATURE_DISABLED_BY_DEFAULT);
@@ -161,11 +167,6 @@ BASE_FEATURE(kCrostiniArcSideload,
              "CrostiniArcSideload",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
-// Enables custom UI for forcibly closing unresponsive windows.
-BASE_FEATURE(kCrostiniForceClose,
-             "CrostiniForceClose",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
 // Enables distributed model for TPM1.2, i.e., using tpm_managerd and
 // attestationd.
 BASE_FEATURE(kCryptohomeDistributedModel,
@@ -251,12 +252,7 @@ const base::FeatureParam<OsIntegrationSubManagersStage>
 // offline if no custom page is provided by developer.
 BASE_FEATURE(kPWAsDefaultOfflinePage,
              "PWAsDefaultOfflinePage",
-#if BUILDFLAG(IS_ANDROID)
-             base::FEATURE_ENABLED_BY_DEFAULT
-#else
-             base::FEATURE_DISABLED_BY_DEFAULT
-#endif
-);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // API that allows PWAs manually minimizing, maximizing and restoring windows.
 BASE_FEATURE(kDesktopPWAsAdditionalWindowingControls,
@@ -407,12 +403,6 @@ BASE_FEATURE(kExtensionDeferredIndividualSettings,
              "ExtensionDeferredIndividualSettings",
              base::FEATURE_ENABLED_BY_DEFAULT);
 #endif
-
-// Controls whether the user justification text field is visible on the
-// extension request dialog.
-BASE_FEATURE(kExtensionWorkflowJustification,
-             "ExtensionWorkflowJustification",
-             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // If enabled, this feature's |kExternalInstallDefaultButtonKey| field trial
 // parameter value controls which |ExternalInstallBubbleAlert| button is the

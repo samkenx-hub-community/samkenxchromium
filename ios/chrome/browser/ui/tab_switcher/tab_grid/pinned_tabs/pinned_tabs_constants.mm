@@ -22,6 +22,7 @@ const CGFloat kPinnedViewTopPadding = 24.0f;
 const NSTimeInterval kPinnedViewFadeInTime = 0.2;
 const NSTimeInterval kPinnedViewDragAnimationTime = 0.2;
 const NSTimeInterval kPinnedViewMoveAnimationTime = 0.1;
+const NSTimeInterval kPinnedViewInsetAnimationTime = 0.2;
 
 // Pinned cell identifier.
 NSString* const kPinnedCellIdentifier = @"PinnedCellIdentifier";
@@ -41,6 +42,10 @@ const CGFloat kPinnedCellFaviconContainerWidth = 24.0f;
 const CGFloat kPinnedCellFaviconBorderWidth = 1.5f;
 const CGFloat kPinnedCellFaviconContainerCornerRadius = 9.0f;
 const CGFloat kPinnedCellFaviconCornerRadius = 7.0f;
+const CGFloat kPinnedCellSelectionRingGapWidth = 2.0f;
+const CGFloat kPinnedCellSelectionRingTintWidth = 3.0f;
+const CGFloat kPinnedCellSelectionRingPadding =
+    kPinnedCellSelectionRingTintWidth + kPinnedCellSelectionRingGapWidth;
 
 // Pinned cell collection view layout constraints.
 const CGFloat kPinnedCellVerticalLayoutInsets = 16.0f;

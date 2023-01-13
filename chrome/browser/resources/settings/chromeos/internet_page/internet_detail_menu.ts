@@ -23,7 +23,8 @@ import {afterNextRender, mixinBehaviors, PolymerElement} from 'chrome://resource
 
 import {Setting} from '../../mojom-webui/setting.mojom-webui.js';
 import {castExists} from '../assert_extras.js';
-import {DeepLinkingBehavior, DeepLinkingBehaviorInterface} from '../deep_linking_behavior.js';
+import {Constructor} from '../common/types.js';
+import {DeepLinkingMixin, DeepLinkingMixinInterface} from '../deep_linking_mixin.js';
 import {routes} from '../os_route.js';
 import {RouteObserverMixin, RouteObserverMixinInterface} from '../route_observer_mixin.js';
 import {Route, Router} from '../router.js';
@@ -38,11 +39,10 @@ interface SettingsInternetDetailMenuElement {
 
 const SettingsInternetDetailMenuElementBase =
     mixinBehaviors(
-        [ESimManagerListenerBehavior, DeepLinkingBehavior],
-        RouteObserverMixin(PolymerElement)) as {
-      new (): PolymerElement & RouteObserverMixinInterface &
-          ESimManagerListenerBehaviorInterface & DeepLinkingBehaviorInterface,
-    };
+        [ESimManagerListenerBehavior],
+        DeepLinkingMixin(RouteObserverMixin(PolymerElement))) as
+    Constructor<PolymerElement&RouteObserverMixinInterface&
+                DeepLinkingMixinInterface&ESimManagerListenerBehaviorInterface>;
 
 class SettingsInternetDetailMenuElement extends
     SettingsInternetDetailMenuElementBase {
@@ -82,11 +82,11 @@ class SettingsInternetDetailMenuElement extends
       },
 
       /**
-       * Used by DeepLinkingBehavior to focus this page's deep links.
+       * Used by DeepLinkingMixin to focus this page's deep links.
        */
       supportedSettingIds: {
         type: Object,
-        value: () => new Set([
+        value: () => new Set<Setting>([
           Setting.kCellularRenameESimNetwork,
           Setting.kCellularRemoveESimNetwork,
         ]),
@@ -100,7 +100,7 @@ class SettingsInternetDetailMenuElement extends
   private guid_: string;
 
   /**
-   * Overridden from DeepLinkingBehavior.
+   * Overridden from DeepLinkingMixin.
    */
   override beforeDeepLinkAttempt(settingId: Setting): boolean {
     afterNextRender(this, () => {

@@ -4,8 +4,8 @@
 
 #include "content/browser/webid/federated_auth_request_impl.h"
 
-#include "base/callback.h"
 #include "base/command_line.h"
+#include "base/functional/callback.h"
 #include "base/rand_util.h"
 #include "base/ranges/algorithm.h"
 #include "base/strings/escape.h"
@@ -111,6 +111,9 @@ std::string GetConsoleErrorMessage(FederatedAuthRequestResult status) {
     case FederatedAuthRequestResult::kErrorFetchingWellKnownInvalidResponse: {
       return "Provider's FedCM well-known file is invalid.";
     }
+    case FederatedAuthRequestResult::kErrorFetchingWellKnownListEmpty: {
+      return "Provider's FedCM well-known file has no config URLs.";
+    }
     case FederatedAuthRequestResult::kErrorConfigNotInWellKnown: {
       return "Provider's FedCM config file not listed in its well-known file.";
     }
@@ -149,6 +152,9 @@ std::string GetConsoleErrorMessage(FederatedAuthRequestResult status) {
       return "Provider's accounts list is invalid. Should have received an "
              "\"accounts\" list, where each account must have at least \"id\", "
              "\"name\", and \"email\".";
+    }
+    case FederatedAuthRequestResult::kErrorFetchingAccountsListEmpty: {
+      return "Provider's accounts list is empty.";
     }
     case FederatedAuthRequestResult::kErrorFetchingIdTokenHttpNotFound: {
       return "The provider's id token endpoint cannot be found.";
@@ -195,6 +201,7 @@ RequestTokenStatus FederatedAuthRequestResultToRequestTokenStatus(
     case FederatedAuthRequestResult::kErrorFetchingWellKnownHttpNotFound:
     case FederatedAuthRequestResult::kErrorFetchingWellKnownNoResponse:
     case FederatedAuthRequestResult::kErrorFetchingWellKnownInvalidResponse:
+    case FederatedAuthRequestResult::kErrorFetchingWellKnownListEmpty:
     case FederatedAuthRequestResult::kErrorConfigNotInWellKnown:
     case FederatedAuthRequestResult::kErrorWellKnownTooBig:
     case FederatedAuthRequestResult::kErrorFetchingConfigHttpNotFound:
@@ -207,6 +214,7 @@ RequestTokenStatus FederatedAuthRequestResultToRequestTokenStatus(
     case FederatedAuthRequestResult::kErrorFetchingAccountsHttpNotFound:
     case FederatedAuthRequestResult::kErrorFetchingAccountsNoResponse:
     case FederatedAuthRequestResult::kErrorFetchingAccountsInvalidResponse:
+    case FederatedAuthRequestResult::kErrorFetchingAccountsListEmpty:
     case FederatedAuthRequestResult::kErrorFetchingIdTokenHttpNotFound:
     case FederatedAuthRequestResult::kErrorFetchingIdTokenNoResponse:
     case FederatedAuthRequestResult::kErrorFetchingIdTokenInvalidResponse:
@@ -228,7 +236,8 @@ FederatedAuthRequestResultToMetricsEndpointErrorCode(
     case FederatedAuthRequestResult::kErrorCanceled: {
       return IdpNetworkRequestManager::MetricsEndpointErrorCode::kRpFailure;
     }
-    case FederatedAuthRequestResult::kErrorFetchingAccountsInvalidResponse: {
+    case FederatedAuthRequestResult::kErrorFetchingAccountsInvalidResponse:
+    case FederatedAuthRequestResult::kErrorFetchingAccountsListEmpty: {
       return IdpNetworkRequestManager::MetricsEndpointErrorCode::
           kAccountsEndpointInvalidResponse;
     }
@@ -258,6 +267,7 @@ FederatedAuthRequestResultToMetricsEndpointErrorCode(
     case FederatedAuthRequestResult::kErrorWellKnownTooBig: {
       return IdpNetworkRequestManager::MetricsEndpointErrorCode::kManifestError;
     }
+    case FederatedAuthRequestResult::kErrorFetchingWellKnownListEmpty:
     case FederatedAuthRequestResult::kErrorFetchingWellKnownInvalidResponse:
     case FederatedAuthRequestResult::kErrorFetchingConfigInvalidResponse:
     case FederatedAuthRequestResult::
@@ -339,8 +349,11 @@ void FilterAccountsWithLoginHint(
 
 FederatedAuthRequestImpl::IdentityProviderGetInfo::IdentityProviderGetInfo(
     blink::mojom::IdentityProviderConfig provider,
-    bool prefer_auto_signin)
-    : provider(std::move(provider)), prefer_auto_signin(prefer_auto_signin) {}
+    bool prefer_auto_signin,
+    blink::mojom::RpContext rp_context)
+    : provider(std::move(provider)),
+      prefer_auto_signin(prefer_auto_signin),
+      rp_context(rp_context) {}
 
 FederatedAuthRequestImpl::IdentityProviderGetInfo::~IdentityProviderGetInfo() =
     default;
@@ -351,11 +364,13 @@ FederatedAuthRequestImpl::IdentityProviderInfo::IdentityProviderInfo(
     blink::mojom::IdentityProviderConfig provider,
     IdpNetworkRequestManager::Endpoints endpoints,
     IdentityProviderMetadata metadata,
-    bool prefer_auto_signin)
+    bool prefer_auto_signin,
+    blink::mojom::RpContext rp_context)
     : provider(std::move(provider)),
       endpoints(std::move(endpoints)),
       metadata(std::move(metadata)),
-      prefer_auto_signin(prefer_auto_signin) {}
+      prefer_auto_signin(prefer_auto_signin),
+      rp_context(rp_context) {}
 
 FederatedAuthRequestImpl::IdentityProviderInfo::~IdentityProviderInfo() =
     default;
@@ -548,10 +563,15 @@ void FederatedAuthRequestImpl::RequestToken(
   for (auto& idp_get_params_ptr : idp_get_params_ptrs) {
     for (auto& idp_ptr : idp_get_params_ptr->providers) {
       idp_order_.push_back(idp_ptr->config_url);
-      get_infos.emplace(idp_ptr->config_url,
-                        IdentityProviderGetInfo(
-                            *idp_ptr, idp_get_params_ptr->prefer_auto_sign_in &&
-                                          IsFedCmAutoSigninEnabled()));
+      blink::mojom::RpContext rp_context =
+          IsFedCmRpContextEnabled() ? idp_get_params_ptr->context
+                                    : blink::mojom::RpContext::kSignIn;
+      get_infos.emplace(
+          idp_ptr->config_url,
+          IdentityProviderGetInfo(*idp_ptr,
+                                  idp_get_params_ptr->prefer_auto_sign_in &&
+                                      IsFedCmAutoSigninEnabled(),
+                                  rp_context));
     }
   }
 
@@ -680,7 +700,8 @@ void FederatedAuthRequestImpl::OnAllConfigAndWellKnownFetched(
             std::move(fetch_result.endpoints),
             fetch_result.metadata ? std::move(*fetch_result.metadata)
                                   : IdentityProviderMetadata(),
-            get_info_it->second.prefer_auto_signin);
+            get_info_it->second.prefer_auto_signin,
+            get_info_it->second.rp_context);
 
     if (fetch_result.error) {
       const FederatedProviderFetcher::FetchError& fetch_error =
@@ -743,7 +764,8 @@ void FederatedAuthRequestImpl::OnFetchDataForIdpSucceeded(
   idp_info->data = IdentityProviderData(
       idp_for_display, accounts, idp_info->metadata,
       ClientMetadata{GURL(client_metadata.terms_of_service_url),
-                     GURL(client_metadata.privacy_policy_url)});
+                     GURL(client_metadata.privacy_policy_url)},
+      idp_info->rp_context);
   idp_infos_[idp_config_url] = std::move(idp_info);
 
   pending_idps_.erase(idp_config_url);
@@ -929,6 +951,14 @@ void FederatedAuthRequestImpl::OnAccountsResponseReceived(
           std::move(idp_info),
           FederatedAuthRequestResult::kErrorFetchingAccountsInvalidResponse,
           TokenStatus::kAccountsInvalidResponse);
+      return;
+    }
+    case IdpNetworkRequestManager::ParseStatus::kEmptyListError: {
+      MaybeAddResponseCodeToConsole(kAccountsUrl, status.response_code);
+      HandleAccountsFetchFailure(
+          std::move(idp_info),
+          FederatedAuthRequestResult::kErrorFetchingAccountsListEmpty,
+          TokenStatus::kAccountsListEmpty);
       return;
     }
     case IdpNetworkRequestManager::ParseStatus::kSuccess: {
@@ -1165,6 +1195,10 @@ void FederatedAuthRequestImpl::CompleteTokenRequest(
           FederatedAuthRequestResult::kErrorFetchingIdTokenInvalidResponse,
           TokenStatus::kIdTokenInvalidResponse,
           /*should_delay_callback=*/true);
+      return;
+    }
+    case IdpNetworkRequestManager::ParseStatus::kEmptyListError: {
+      NOTREACHED() << "kEmptyListError is undefined for CompleteTokenRequest";
       return;
     }
     case IdpNetworkRequestManager::ParseStatus::kSuccess: {

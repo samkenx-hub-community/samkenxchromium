@@ -26,6 +26,7 @@ import("//build/config/c++/c++.gni")
 import("//build/config/chromecast_build.gni")
 import("//build/config/chromeos/ui_mode.gni")
 import("//build/config/compiler/compiler.gni")
+import("//build/config/cronet/config.gni")
 import("//build/config/dcheck_always_on.gni")
 import("//build/config/ios/config.gni")
 import("//build/config/logging.gni")
@@ -436,6 +437,8 @@ component("base") {
     "memory/raw_ptr.h",
     "memory/raw_ptr_asan_bound_arg_tracker.cc",
     "memory/raw_ptr_asan_bound_arg_tracker.h",
+    "memory/raw_ptr_asan_hooks.cc",
+    "memory/raw_ptr_asan_hooks.h",
     "memory/raw_ptr_asan_service.cc",
     "memory/raw_ptr_asan_service.h",
     "memory/raw_ptr_exclusion.h",
@@ -906,8 +909,6 @@ component("base") {
     "threading/sequence_local_storage_map.h",
     "threading/sequence_local_storage_slot.cc",
     "threading/sequence_local_storage_slot.h",
-    "threading/sequenced_task_runner_handle.cc",
-    "threading/sequenced_task_runner_handle.h",
     "threading/simple_thread.cc",
     "threading/simple_thread.h",
     "threading/thread.cc",
@@ -926,8 +927,6 @@ component("base") {
     "threading/thread_local_storage.h",
     "threading/thread_restrictions.cc",
     "threading/thread_restrictions.h",
-    "threading/thread_task_runner_handle.cc",
-    "threading/thread_task_runner_handle.h",
     "threading/threading_features.h",
     "threading/watchdog.cc",
     "threading/watchdog.h",
@@ -1320,8 +1319,6 @@ component("base") {
       "mac/scoped_objc_class_swizzler.mm",
       "mac/scoped_sending_event.h",
       "mac/scoped_sending_event.mm",
-      "mac/sdk_forward_declarations.h",
-      "mac/sdk_forward_declarations.mm",
       "message_loop/message_pump_mac.h",
       "message_loop/message_pump_mac.mm",
       "native_library_mac.mm",
@@ -2423,7 +2420,6 @@ component("base") {
       "trace_event/optional_trace_event.h",
       "trace_event/process_memory_dump.cc",
       "trace_event/process_memory_dump.h",
-      "trace_event/task_execution_macros.h",
       "trace_event/trace_arguments.cc",
       "trace_event/trace_arguments.h",
       "trace_event/trace_buffer.cc",
@@ -3206,6 +3202,7 @@ test("base_unittests") {
     "memory/memory_pressure_listener_unittest.cc",
     "memory/platform_shared_memory_region_unittest.cc",
     "memory/ptr_util_unittest.cc",
+    "memory/raw_ptr_asan_unittest.cc",
     "memory/raw_ptr_unittest.cc",
     "memory/raw_ref_unittest.cc",
     "memory/ref_counted_memory_unittest.cc",
@@ -3407,7 +3404,6 @@ test("base_unittests") {
     "threading/sequence_bound_unittest.cc",
     "threading/sequence_local_storage_map_unittest.cc",
     "threading/sequence_local_storage_slot_unittest.cc",
-    "threading/sequenced_task_runner_handle_unittest.cc",
     "threading/simple_thread_unittest.cc",
     "threading/thread_checker_unittest.cc",
     "threading/thread_collision_warner_unittest.cc",
@@ -3415,7 +3411,6 @@ test("base_unittests") {
     "threading/thread_local_storage_unittest.cc",
     "threading/thread_local_unittest.cc",
     "threading/thread_restrictions_unittest.cc",
-    "threading/thread_task_runner_handle_unittest.cc",
     "threading/thread_unittest.cc",
     "threading/watchdog_unittest.cc",
     "time/pr_time_unittest.cc",
@@ -4086,6 +4081,7 @@ if (is_android || is_robolectric) {
       "android/java/src/org/chromium/base/MemoryPressureListener.java",
       "android/java/src/org/chromium/base/PathService.java",
       "android/java/src/org/chromium/base/PathUtils.java",
+      "android/java/src/org/chromium/base/PiiElider.java",
       "android/java/src/org/chromium/base/PowerMonitor.java",
       "android/java/src/org/chromium/base/RadioUtils.java",
       "android/java/src/org/chromium/base/SysUtils.java",
@@ -4154,10 +4150,39 @@ if (is_android) {
     template = "android/java/src/org/chromium/base/BaseSwitches.java.tmpl"
   }
 
+  android_library("process_launcher_java") {
+    srcjar_deps = [ ":process_launcher_aidl" ]
+    deps = [
+      ":base_java",
+      ":jni_java",
+      "//build/android:build_java",
+      "//third_party/android_deps:com_google_code_findbugs_jsr305_java",
+      "//third_party/androidx:androidx_annotation_annotation_experimental_java",
+      "//third_party/androidx:androidx_annotation_annotation_java",
+      "//third_party/androidx:androidx_collection_collection_java",
+      "//third_party/androidx:androidx_core_core_java",
+    ]
+    sources = [
+      "android/java/src/org/chromium/base/process_launcher/BindService.java",
+      "android/java/src/org/chromium/base/process_launcher/ChildConnectionAllocator.java",
+      "android/java/src/org/chromium/base/process_launcher/ChildProcessConnection.java",
+      "android/java/src/org/chromium/base/process_launcher/ChildProcessConstants.java",
+      "android/java/src/org/chromium/base/process_launcher/ChildProcessLauncher.java",
+      "android/java/src/org/chromium/base/process_launcher/ChildProcessService.java",
+      "android/java/src/org/chromium/base/process_launcher/ChildProcessServiceDelegate.java",
+      "android/java/src/org/chromium/base/process_launcher/ChildServiceConnection.java",
+      "android/java/src/org/chromium/base/process_launcher/ChildServiceConnectionDelegate.java",
+      "android/java/src/org/chromium/base/process_launcher/ChildServiceConnectionFactory.java",
+      "android/java/src/org/chromium/base/process_launcher/ChildServiceConnectionImpl.java",
+      "android/java/src/org/chromium/base/process_launcher/FileDescriptorInfo.java",
+    ]
+
+    annotation_processor_deps = [ "//base/android/jni_generator:jni_processor" ]
+  }
+
   android_library("base_java") {
     srcjar_deps = [
       ":base_android_java_enums_srcjar",
-      ":base_java_aidl",
       ":java_features_srcjar",
       ":java_switches_srcjar",
     ]
@@ -4170,7 +4195,6 @@ if (is_android) {
       "//third_party/androidx:androidx_annotation_annotation_java",
       "//third_party/androidx:androidx_collection_collection_java",
       "//third_party/androidx:androidx_core_core_java",
-      "//third_party/androidx:androidx_multidex_multidex_java",
     ]
 
     sources = [
@@ -4200,7 +4224,6 @@ if (is_android) {
       "android/java/src/org/chromium/base/Flag.java",
       "android/java/src/org/chromium/base/ImportantFileWriterAndroid.java",
       "android/java/src/org/chromium/base/IntStringCallback.java",
-      "android/java/src/org/chromium/base/IntentUtils.java",
       "android/java/src/org/chromium/base/JNIUtils.java",
       "android/java/src/org/chromium/base/JavaExceptionReporter.java",
       "android/java/src/org/chromium/base/JavaHandlerThread.java",
@@ -4219,6 +4242,7 @@ if (is_android) {
       "android/java/src/org/chromium/base/PowerMonitorForQ.java",
       "android/java/src/org/chromium/base/Promise.java",
       "android/java/src/org/chromium/base/RadioUtils.java",
+      "android/java/src/org/chromium/base/RequiredCallback.java",
       "android/java/src/org/chromium/base/StreamUtil.java",
       "android/java/src/org/chromium/base/StrictModeContext.java",
       "android/java/src/org/chromium/base/SysUtils.java",
@@ -4278,19 +4302,6 @@ if (is_android) {
       "android/java/src/org/chromium/base/metrics/TimingMetric.java",
       "android/java/src/org/chromium/base/metrics/UmaRecorder.java",
       "android/java/src/org/chromium/base/metrics/UmaRecorderHolder.java",
-      "android/java/src/org/chromium/base/multidex/ChromiumMultiDexInstaller.java",
-      "android/java/src/org/chromium/base/process_launcher/BindService.java",
-      "android/java/src/org/chromium/base/process_launcher/ChildConnectionAllocator.java",
-      "android/java/src/org/chromium/base/process_launcher/ChildProcessConnection.java",
-      "android/java/src/org/chromium/base/process_launcher/ChildProcessConstants.java",
-      "android/java/src/org/chromium/base/process_launcher/ChildProcessLauncher.java",
-      "android/java/src/org/chromium/base/process_launcher/ChildProcessService.java",
-      "android/java/src/org/chromium/base/process_launcher/ChildProcessServiceDelegate.java",
-      "android/java/src/org/chromium/base/process_launcher/ChildServiceConnection.java",
-      "android/java/src/org/chromium/base/process_launcher/ChildServiceConnectionDelegate.java",
-      "android/java/src/org/chromium/base/process_launcher/ChildServiceConnectionFactory.java",
-      "android/java/src/org/chromium/base/process_launcher/ChildServiceConnectionImpl.java",
-      "android/java/src/org/chromium/base/process_launcher/FileDescriptorInfo.java",
       "android/java/src/org/chromium/base/supplier/DestroyableObservableSupplier.java",
       "android/java/src/org/chromium/base/supplier/ObservableSupplier.java",
       "android/java/src/org/chromium/base/supplier/ObservableSupplierImpl.java",
@@ -4318,6 +4329,10 @@ if (is_android) {
       "android/java/src/org/chromium/base/task/TaskTraitsExtensionDescriptor.java",
     ]
 
+    if (!is_cronet_build) {
+      sources += [ "android/java/src/org/chromium/base/IntentUtils.java" ]
+    }
+
     annotation_processor_deps = [ "//base/android/jni_generator:jni_processor" ]
 
     resources_package = "org.chromium.base"
@@ -4329,7 +4344,7 @@ if (is_android) {
     ]
   }
 
-  android_aidl("base_java_aidl") {
+  android_aidl("process_launcher_aidl") {
     import_include = [ "android/java/src" ]
     sources = [
       "android/java/src/org/chromium/base/process_launcher/IChildProcessService.aidl",
@@ -4426,6 +4441,7 @@ if (is_android) {
       "//third_party/android_support_test_runner:runner_java",
       "//third_party/androidx:androidx_annotation_annotation_java",
       "//third_party/androidx:androidx_core_core_java",
+      "//third_party/androidx:androidx_multidex_multidex_java",
       "//third_party/androidx:androidx_test_uiautomator_uiautomator_java",
       "//third_party/hamcrest:hamcrest_java",
       "//third_party/junit",
@@ -4434,6 +4450,7 @@ if (is_android) {
     public_deps = [ ":base_java_url_utils_for_test" ]
 
     sources = [
+      "test/android/java/src/org/chromium/base/multidex/ChromiumMultiDexInstaller.java",
       "test/android/javatests/src/org/chromium/base/FakeTimeTestRule.java",
       "test/android/javatests/src/org/chromium/base/test/BaseActivityTestRule.java",
       "test/android/javatests/src/org/chromium/base/test/BaseChromiumAndroidJUnitRunner.java",
@@ -4452,6 +4469,7 @@ if (is_android) {
       "test/android/javatests/src/org/chromium/base/test/TestTraceEvent.java",
       "test/android/javatests/src/org/chromium/base/test/UiThreadStatement.java",
       "test/android/javatests/src/org/chromium/base/test/UiThreadTest.java",
+      "test/android/javatests/src/org/chromium/base/test/UnitTestLifetimeAssertRule.java",
       "test/android/javatests/src/org/chromium/base/test/UnitTestNoBrowserProcessHook.java",
       "test/android/javatests/src/org/chromium/base/test/metrics/HistogramTestRule.java",
       "test/android/javatests/src/org/chromium/base/test/params/BaseJUnit4RunnerDelegate.java",
@@ -4521,7 +4539,7 @@ if (is_android) {
   android_library("base_java_process_launcher_test_support") {
     testonly = true
 
-    deps = [ ":base_java" ]
+    public_deps = [ ":process_launcher_java" ]
 
     sources = [ "test/android/javatests/src/org/chromium/base/process_launcher/TestChildProcessConnection.java" ]
   }

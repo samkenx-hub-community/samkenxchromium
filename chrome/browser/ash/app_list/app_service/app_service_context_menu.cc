@@ -8,9 +8,9 @@
 #include "ash/public/cpp/app_list/app_list_types.h"
 #include "ash/public/cpp/app_menu_constants.h"
 #include "ash/public/cpp/new_window_delegate.h"
-#include "base/bind.h"
-#include "base/callback.h"
-#include "base/callback_helpers.h"
+#include "base/functional/bind.h"
+#include "base/functional/callback.h"
+#include "base/functional/callback_helpers.h"
 #include "chrome/browser/apps/app_service/app_service_proxy.h"
 #include "chrome/browser/apps/app_service/app_service_proxy_factory.h"
 #include "chrome/browser/apps/app_service/menu_util.h"
@@ -244,8 +244,8 @@ void AppServiceContextMenu::ExecuteCommand(int command_id, int event_flags) {
     }
     case ash::SHUTDOWN_GUEST_OS:
       if (app_id() == guest_os::kTerminalSystemAppId) {
-        crostini::CrostiniManager::GetForProfile(profile())->StopVm(
-            crostini::kCrostiniDefaultVmName, base::DoNothing());
+        crostini::CrostiniManager::GetForProfile(profile())->StopRunningVms(
+            base::DoNothing());
       } else if (app_id() == plugin_vm::kPluginVmShelfAppId) {
         plugin_vm::PluginVmManagerFactory::GetForProfile(profile())
             ->StopPluginVm(plugin_vm::kPluginVmName, /*force=*/false);

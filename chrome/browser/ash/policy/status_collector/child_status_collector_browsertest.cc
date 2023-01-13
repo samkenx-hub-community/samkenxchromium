@@ -10,9 +10,9 @@
 #include <utility>
 #include <vector>
 
-#include "base/bind.h"
-#include "base/callback.h"
 #include "base/environment.h"
+#include "base/functional/bind.h"
+#include "base/functional/callback.h"
 #include "base/memory/ptr_util.h"
 #include "base/run_loop.h"
 #include "base/strings/utf_string_conversions.h"
@@ -776,7 +776,7 @@ TEST_F(ChildStatusCollectorTest, ReportingAppActivityNoReport) {
     ash::app_time::AppTimeLimitsPolicyBuilder builder;
     builder.SetAppActivityReportingEnabled(/* enabled */ false);
     testing_profile()->GetPrefs()->SetDict(prefs::kPerAppTimeLimitsPolicy,
-                                           builder.value().GetDict().Clone());
+                                           builder.value().Clone());
   }
 
   SimulateAppActivity(app1, app1_interval);

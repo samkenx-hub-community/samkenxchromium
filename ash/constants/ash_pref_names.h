@@ -369,6 +369,7 @@ COMPONENT_EXPORT(ASH_CONSTANTS)
 extern const char kRecentDailyGooglePhotosWallpapers[];
 COMPONENT_EXPORT(ASH_CONSTANTS) extern const char kWallpaperColors[];
 COMPONENT_EXPORT(ASH_CONSTANTS) extern const char kWallpaperMeanColors[];
+COMPONENT_EXPORT(ASH_CONSTANTS) extern const char kWallpaperCelebiColors[];
 COMPONENT_EXPORT(ASH_CONSTANTS) extern const char kSyncableWallpaperInfo[];
 
 COMPONENT_EXPORT(ASH_CONSTANTS)
@@ -472,6 +473,9 @@ extern const char kLacrosProxyControllingExtension[];
 
 COMPONENT_EXPORT(ASH_CONSTANTS)
 extern const char kFastPairEnabled[];
+
+COMPONENT_EXPORT(ASH_CONSTANTS)
+extern const char kUserPairedWithFastPair[];
 
 COMPONENT_EXPORT(ASH_CONSTANTS) extern const char kDeskTemplatesEnabled[];
 COMPONENT_EXPORT(ASH_CONSTANTS) extern const char kPreconfiguredDeskTemplates[];

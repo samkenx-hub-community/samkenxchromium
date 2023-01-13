@@ -10,8 +10,8 @@
 #include <utility>
 #include <vector>
 
-#include "base/bind.h"
-#include "base/callback.h"
+#include "base/functional/bind.h"
+#include "base/functional/callback.h"
 #include "base/memory/raw_ptr.h"
 #include "base/run_loop.h"
 #include "base/strings/string_number_conversions.h"
@@ -526,8 +526,8 @@ class ClientTagBasedModelTypeProcessorTest : public ::testing::Test {
   std::unique_ptr<TestModelTypeSyncBridge> bridge_;
   sync_pb::ModelTypeState model_type_state_;
 
-  // This sets SequencedTaskRunnerHandle on the current thread, which the type
-  // processor will pick up as the sync task runner.
+  // This sets SequencedTaskRunner::CurrentDefaultHandle on the current thread,
+  // which the type processor will pick up as the sync task runner.
   base::test::SingleThreadTaskEnvironment task_environment_;
 
   // This run loop is used to wait for OnReadyToConnect is called.
@@ -2941,6 +2941,45 @@ TEST_F(ClientTagBasedModelTypeProcessorTest, ShouldResetOnInvalidDataTypeId) {
 }
 
 TEST_F(ClientTagBasedModelTypeProcessorTest,
+       ShouldResetForEntityMetadataWithoutInitialSyncDone) {
+  base::HistogramTester histogram_tester;
+
+  const syncer::ClientTagHash kClientTagHash =
+      ClientTagHash::FromUnhashed(AUTOFILL, "tag");
+  sync_pb::EntityMetadata entity_metadata1;
+  entity_metadata1.set_client_tag_hash(kClientTagHash.value());
+  entity_metadata1.set_creation_time(0);
+  sync_pb::EntityMetadata entity_metadata2;
+  entity_metadata2.set_client_tag_hash(kClientTagHash.value());
+  entity_metadata2.set_creation_time(0);
+  sync_pb::EntityMetadata entity_metadata3;
+  entity_metadata3.set_client_tag_hash(kClientTagHash.value());
+  entity_metadata3.set_creation_time(0);
+
+  db()->PutMetadata(kKey1, std::move(entity_metadata1));
+  db()->PutMetadata(kKey2, std::move(entity_metadata2));
+  db()->PutMetadata(kKey3, std::move(entity_metadata3));
+
+  InitializeToMetadataLoaded(/*initial_sync_done=*/false);
+  OnSyncStarting();
+
+  // Since initial_sync_done was false, metadata should have been cleared.
+  EXPECT_EQ(0U, db()->metadata_count());
+  EXPECT_EQ(0U, ProcessorEntityCount());
+  EXPECT_FALSE(type_processor()->IsTrackingMetadata());
+  // Initial update.
+  worker()->UpdateFromServer();
+  EXPECT_TRUE(type_processor()->IsTrackingMetadata());
+
+  // There were three entities with the same client-tag-hash which indicates
+  // that two of them were metadata oprhans.
+  histogram_tester.ExpectBucketCount(
+      "Sync.ModelTypeEntityMetadataWithoutInitialSync",
+      /*sample=*/ModelTypeHistogramValue(GetModelType()),
+      /*expected_count=*/1);
+}
+
+TEST_F(ClientTagBasedModelTypeProcessorTest,
        ShouldResetForDuplicateClientTagHash) {
   base::HistogramTester histogram_tester;
 
@@ -2974,8 +3013,8 @@ TEST_F(ClientTagBasedModelTypeProcessorTest,
   // that two of them were metadata oprhans.
   histogram_tester.ExpectBucketCount(
       "Sync.ModelTypeOrphanMetadata.ModelReadyToSync",
-      /*bucket=*/ModelTypeHistogramValue(GetModelType()),
-      /*count=*/2);
+      /*sample=*/ModelTypeHistogramValue(GetModelType()),
+      /*expected_count=*/2);
 }
 
 // The param indicates whether the password notes feature is enabled.

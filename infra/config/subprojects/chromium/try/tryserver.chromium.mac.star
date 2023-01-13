@@ -5,7 +5,7 @@
 
 load("//lib/branches.star", "branches")
 load("//lib/builder_config.star", "builder_config")
-load("//lib/builders.star", "cpu", "goma", "os", "xcode")
+load("//lib/builders.star", "cpu", "goma", "os", "reclient", "xcode")
 load("//lib/try.star", "try_")
 load("//lib/consoles.star", "consoles")
 
@@ -18,9 +18,11 @@ try_.defaults.set(
     pool = try_.DEFAULT_POOL,
     service_account = try_.DEFAULT_SERVICE_ACCOUNT,
     compilator_goma_jobs = goma.jobs.J150,
+    compilator_reclient_jobs = reclient.jobs.HIGH_JOBS_FOR_CQ,
     execution_timeout = try_.DEFAULT_EXECUTION_TIMEOUT,
     goma_backend = goma.backend.RBE_PROD,
     orchestrator_cores = 2,
+    reclient_instance = reclient.instance.DEFAULT_UNTRUSTED,
 )
 
 def ios_builder(*, name, **kwargs):
@@ -159,6 +161,7 @@ try_.builder(
     ],
     builderless = True,
     check_for_flakiness = True,
+    goma_backend = None,
 )
 
 try_.orchestrator_builder(
@@ -218,6 +221,7 @@ try_.builder(
         "ci/Mac11 Tests",
     ],
     builderless = False,
+    goma_backend = None,
 )
 
 try_.builder(
@@ -241,7 +245,8 @@ try_.builder(
         "ci/Mac ASan 64 Builder",
         "ci/Mac ASan 64 Tests (1)",
     ],
-    goma_jobs = goma.jobs.J150,
+    goma_backend = None,
+    reclient_jobs = reclient.jobs.HIGH_JOBS_FOR_CQ,
 )
 
 try_.builder(
@@ -295,11 +300,17 @@ try_.builder(
     goma_backend = None,  # Does not use Goma.
 )
 
+try_.builder(
+    name = "mac-code-coverage",
+    mirrors = ["ci/mac-code-coverage"],
+)
+
 ios_builder(
     name = "ios-asan",
     mirrors = [
         "ci/ios-asan",
     ],
+    goma_backend = None,
 )
 
 ios_builder(
@@ -429,6 +440,7 @@ ios_builder(
 ios_builder(
     name = "ios15-beta-simulator",
     mirrors = ["ci/ios15-beta-simulator"],
+    goma_backend = None,
 )
 
 ios_builder(
@@ -450,8 +462,14 @@ ios_builder(
     mirrors = [
         "ci/ios16-sdk-simulator",
     ],
+    goma_backend = None,
     os = os.MAC_DEFAULT,
     xcode = xcode.x14betabots,
+)
+
+ios_builder(
+    name = "ios-simulator-code-coverage",
+    mirrors = ["ci/ios-simulator-code-coverage"],
 )
 
 try_.gpu.optional_tests_builder(

@@ -8,11 +8,11 @@
 #include <utility>
 
 #include "base/base64.h"
-#include "base/bind.h"
-#include "base/callback.h"
 #include "base/command_line.h"
 #include "base/containers/contains.h"
 #include "base/feature_list.h"
+#include "base/functional/bind.h"
+#include "base/functional/callback.h"
 #include "base/location.h"
 #include "base/memory/raw_ptr.h"
 #include "base/strings/string_piece.h"
@@ -447,9 +447,11 @@ absl::optional<bool> ChromeWebAuthenticationDelegate::
 
 content::WebAuthenticationRequestProxy*
 ChromeWebAuthenticationDelegate::MaybeGetRequestProxy(
-    content::BrowserContext* browser_context) {
-  return extensions::WebAuthenticationProxyServiceFactory::GetForBrowserContext(
-      browser_context);
+    content::BrowserContext* browser_context,
+    const url::Origin& caller_origin) {
+  auto* service = extensions::WebAuthenticationProxyService::GetIfProxyAttached(
+      Profile::FromBrowserContext(browser_context));
+  return service && service->IsActive(caller_origin) ? service : nullptr;
 }
 
 #endif  // !IS_ANDROID
@@ -553,8 +555,9 @@ void ChromeAuthenticatorRequestDelegate::SetRelyingPartyId(
 
 bool ChromeAuthenticatorRequestDelegate::DoesBlockRequestOnFailure(
     InterestingFailureReason reason) {
-  if (!IsWebAuthnUIEnabled())
+  if (!IsWebAuthnUIEnabled()) {
     return false;
+  }
 
   switch (reason) {
     case InterestingFailureReason::kTimeout:
@@ -936,16 +939,18 @@ bool ChromeAuthenticatorRequestDelegate::EmbedderControlsAuthenticatorDispatch(
 
 void ChromeAuthenticatorRequestDelegate::FidoAuthenticatorAdded(
     const device::FidoAuthenticator& authenticator) {
-  if (!IsWebAuthnUIEnabled())
+  if (!IsWebAuthnUIEnabled()) {
     return;
+  }
 
   dialog_model_->AddAuthenticator(authenticator);
 }
 
 void ChromeAuthenticatorRequestDelegate::FidoAuthenticatorRemoved(
     base::StringPiece authenticator_id) {
-  if (!IsWebAuthnUIEnabled())
+  if (!IsWebAuthnUIEnabled()) {
     return;
+  }
 
   dialog_model_->RemoveAuthenticator(authenticator_id);
 }

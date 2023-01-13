@@ -30,17 +30,6 @@ BASE_FEATURE(kBiometricTouchToFill,
              "BiometricTouchToFill",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-// Enables submission detection for forms dynamically cleared but not removed
-// from the page.
-BASE_FEATURE(kDetectFormSubmissionOnFormClear,
-             "DetectFormSubmissionOnFormClear",
-#if BUILDFLAG(IS_IOS)
-             base::FEATURE_DISABLED_BY_DEFAULT
-#else
-             base::FEATURE_ENABLED_BY_DEFAULT
-#endif
-);
-
 // Enables the overwriting of prefilled username fields if the server predicted
 // the field to contain a placeholder value.
 BASE_FEATURE(kEnableOverwritingPlaceholderUsernames,
@@ -95,12 +84,6 @@ BASE_FEATURE(kInferConfirmationPasswordField,
              "InferConfirmationPasswordField",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
-// Feature flag that updates icons, strings, and views for Google Password
-// Manager.
-BASE_FEATURE(kIOSEnablePasswordManagerBrandingUpdate,
-             "IOSEnablePasswordManagerBrandingUpdate",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
 #if BUILDFLAG(IS_IOS)
 // Removes the list of passwords from the Settings UI and adds a separate
 // Password Manager view.
@@ -111,6 +94,12 @@ BASE_FEATURE(kIOSPasswordUISplit,
 // Enables password saving and filling in cross-origin iframes on IOS.
 BASE_FEATURE(kIOSPasswordManagerCrossOriginIframeSupport,
              "IOSPasswordManagerCrossOriginIframeSupport",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+// Enables displaying and managing compromised, weak and reused credentials in
+// the Password Manager.
+BASE_FEATURE(kIOSPasswordCheckup,
+             "IOSPasswordCheckup",
              base::FEATURE_DISABLED_BY_DEFAULT);
 #endif  // IS_IOS
 

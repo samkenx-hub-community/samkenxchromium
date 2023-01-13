@@ -11,11 +11,11 @@
 #include <memory>
 #include <string>
 
-#include "base/bind.h"
-#include "base/callback_helpers.h"
 #include "base/check.h"
 #include "base/files/file_util.h"
 #include "base/files/scoped_temp_dir.h"
+#include "base/functional/bind.h"
+#include "base/functional/callback_helpers.h"
 #include "base/memory/raw_ptr.h"
 #include "base/run_loop.h"
 #include "base/test/metrics/histogram_tester.h"
@@ -259,8 +259,8 @@ TEST_F(AttributionStorageSqlTest,
     // [rate_limit_reporting_origin_idx], [rate_limit_time_idx],
     // [rate_limit_impression_id_idx], [aggregate_source_id_idx],
     // [aggregate_trigger_time_idx], [aggregate_report_time_idx],
-    // [contribution_aggregation_id_idx] and the meta table index.
-    EXPECT_EQ(15u, sql::test::CountSQLIndices(&raw_db));
+    // and the meta table index.
+    EXPECT_EQ(14u, sql::test::CountSQLIndices(&raw_db));
   }
 }
 

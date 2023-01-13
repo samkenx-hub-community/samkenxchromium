@@ -9,7 +9,7 @@
 #include <memory>
 #include <string>
 
-#include "base/callback_forward.h"
+#include "base/functional/callback_forward.h"
 #include "base/memory/scoped_refptr.h"
 #include "content/browser/attribution_reporting/attribution_report_sender.h"
 #include "content/common/content_export.h"
@@ -66,7 +66,7 @@ class CONTENT_EXPORT AttributionReportNetworkSender
                   UrlLoaderCallback callback);
 
   // Called when headers are available for a sent report.
-  void OnReportSent(AttributionReport report,
+  void OnReportSent(const AttributionReport&,
                     bool is_debug_report,
                     ReportSentCallback sent_callback,
                     UrlLoaderList::iterator it,

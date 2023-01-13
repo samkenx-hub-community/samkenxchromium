@@ -71,7 +71,7 @@ class SiteSettingsHandler
                         size_t start,
                         size_t count) override;
   void TreeNodeChanged(ui::TreeModel* model, ui::TreeModelNode* node) override;
-  void TreeModelEndBatch(CookiesTreeModel* model) override;
+  void TreeModelEndBatchDeprecated(CookiesTreeModel* model) override;
 
   // content_settings::Observer:
   void OnContentSettingChanged(const ContentSettingsPattern& primary_pattern,
@@ -90,14 +90,18 @@ class SiteSettingsHandler
   void OnZoomLevelChanged(const content::HostZoomMap::ZoomLevelChange& change);
 
  private:
-  friend class SiteSettingsHandlerBaseTest;
   friend class SiteSettingsHandlerChooserExceptionTest;
   friend class SiteSettingsHandlerInfobarTest;
+  friend class SiteSettingsHandlerTest;
   // TODO(crbug.com/1373962): Remove this friend class when
   // Persistent Permissions is launched.
   friend class PersistentPermissionsSiteSettingsHandlerTest;
   FRIEND_TEST_ALL_PREFIXES(PersistentPermissionsSiteSettingsHandlerTest,
                            HandleGetFileSystemGrants);
+  FRIEND_TEST_ALL_PREFIXES(SiteSettingsHandlerChooserExceptionTest,
+                           HandleGetChooserExceptionListForUsb);
+  FRIEND_TEST_ALL_PREFIXES(SiteSettingsHandlerChooserExceptionTest,
+                           HandleResetChooserExceptionForSiteForUsb);
   FRIEND_TEST_ALL_PREFIXES(SiteSettingsHandlerInfobarTest,
                            SettingPermissionsTriggersInfobar);
   FRIEND_TEST_ALL_PREFIXES(SiteSettingsHandlerTest,

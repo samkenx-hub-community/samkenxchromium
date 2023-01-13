@@ -208,6 +208,10 @@ Response PermissionDescriptorToPermissionType(
     *permission_type = PermissionType::WAKE_LOCK_SYSTEM;
   } else if (name == "nfc") {
     *permission_type = PermissionType::NFC;
+  } else if (name == "window-management" &&
+             base::FeatureList::IsEnabled(
+                 blink::features::kWindowManagementPermissionAlias)) {
+    *permission_type = PermissionType::WINDOW_MANAGEMENT;
   } else if (name == "window-placement") {
     *permission_type = PermissionType::WINDOW_MANAGEMENT;
   } else if (name == "local-fonts") {
@@ -216,6 +220,8 @@ Response PermissionDescriptorToPermissionType(
     *permission_type = PermissionType::DISPLAY_CAPTURE;
   } else if (name == "storage-access") {
     *permission_type = PermissionType::STORAGE_ACCESS_GRANT;
+  } else if (name == "top-level-storage-access") {
+    *permission_type = PermissionType::TOP_LEVEL_STORAGE_ACCESS;
   } else {
     return Response::InvalidParams("Invalid PermissionDescriptor name: " +
                                    name);
@@ -283,6 +289,9 @@ Response FromProtocolPermissionType(
     *out_type = PermissionType::DISPLAY_CAPTURE;
   } else if (type == protocol::Browser::PermissionTypeEnum::StorageAccess) {
     *out_type = PermissionType::STORAGE_ACCESS_GRANT;
+  } else if (type ==
+             protocol::Browser::PermissionTypeEnum::TopLevelStorageAccess) {
+    *out_type = PermissionType::TOP_LEVEL_STORAGE_ACCESS;
   } else {
     return Response::InvalidParams("Unknown permission type: " + type);
   }

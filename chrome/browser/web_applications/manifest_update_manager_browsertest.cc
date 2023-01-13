@@ -13,12 +13,12 @@
 #include <utility>
 #include <vector>
 
-#include "base/bind.h"
 #include "base/check.h"
 #include "base/check_op.h"
 #include "base/containers/contains.h"
 #include "base/containers/flat_tree.h"
 #include "base/feature_list.h"
+#include "base/functional/bind.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/raw_ref.h"
 #include "base/notreached.h"
@@ -27,6 +27,7 @@
 #include "base/run_loop.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_util.h"
+#include "base/task/single_thread_task_runner.h"
 #include "base/test/bind.h"
 #include "base/test/metrics/histogram_tester.h"
 #include "base/test/scoped_feature_list.h"
@@ -43,6 +44,7 @@
 #include "chrome/browser/ui/web_applications/test/web_app_browsertest_util.h"
 #include "chrome/browser/web_applications/external_install_options.h"
 #include "chrome/browser/web_applications/externally_managed_app_manager.h"
+#include "chrome/browser/web_applications/mojom/user_display_mode.mojom.h"
 #include "chrome/browser/web_applications/os_integration/os_integration_manager.h"
 #include "chrome/browser/web_applications/os_integration/web_app_shortcut.h"
 #include "chrome/browser/web_applications/test/web_app_icon_test_utils.h"
@@ -50,7 +52,6 @@
 #include "chrome/browser/web_applications/test/web_app_sync_test_utils.h"
 #include "chrome/browser/web_applications/test/web_app_test_observers.h"
 #include "chrome/browser/web_applications/test/web_app_test_utils.h"
-#include "chrome/browser/web_applications/user_display_mode.h"
 #include "chrome/browser/web_applications/web_app.h"
 #include "chrome/browser/web_applications/web_app_callback_app_identity.h"
 #include "chrome/browser/web_applications/web_app_command_scheduler.h"
@@ -457,11 +458,34 @@ class ManifestUpdateManagerBrowserTest : public InProcessBrowserTest {
     return app_id;
   }
 
+  AppId InstallOemWebApp() {
+    const GURL app_url = GetAppURL();
+    EXPECT_TRUE(ui_test_utils::NavigateToURL(browser(), app_url));
+
+    AppId app_id;
+    base::RunLoop run_loop;
+    GetProvider().scheduler().FetchManifestAndInstall(
+        webapps::WebappInstallSource::PRELOADED_OEM,
+        browser()->tab_strip_model()->GetActiveWebContents()->GetWeakPtr(),
+        /*bypass_service_worker_check=*/false,
+        base::BindOnce(test::TestAcceptDialogCallback),
+        base::BindLambdaForTesting(
+            [&](const AppId& new_app_id, webapps::InstallResultCode code) {
+              EXPECT_EQ(code, webapps::InstallResultCode::kSuccessNewInstall);
+              app_id = new_app_id;
+              run_loop.Quit();
+            }),
+        /*use_fallback=*/true);
+
+    run_loop.Run();
+    return app_id;
+  }
+
   AppId InstallDefaultApp() {
     const GURL app_url = GetAppURL();
     base::RunLoop run_loop;
     ExternalInstallOptions install_options(
-        app_url, UserDisplayMode::kStandalone,
+        app_url, mojom::UserDisplayMode::kStandalone,
         ExternalInstallSource::kInternalDefault);
     install_options.add_to_applications_menu = false;
     install_options.add_to_desktop = false;
@@ -488,7 +512,7 @@ class ManifestUpdateManagerBrowserTest : public InProcessBrowserTest {
     const GURL app_url = GetAppURL();
     base::RunLoop run_loop;
     ExternalInstallOptions install_options(
-        app_url, UserDisplayMode::kStandalone,
+        app_url, mojom::UserDisplayMode::kStandalone,
         ExternalInstallSource::kExternalPolicy);
     install_options.add_to_applications_menu = false;
     install_options.add_to_desktop = false;
@@ -514,8 +538,9 @@ class ManifestUpdateManagerBrowserTest : public InProcessBrowserTest {
   AppId InstallKioskApp() {
     const GURL app_url = GetAppURL();
     base::RunLoop run_loop;
-    ExternalInstallOptions install_options(
-        app_url, UserDisplayMode::kStandalone, ExternalInstallSource::kKiosk);
+    ExternalInstallOptions install_options(app_url,
+                                           mojom::UserDisplayMode::kStandalone,
+                                           ExternalInstallSource::kKiosk);
     install_options.install_placeholder = true;
     GetProvider().externally_managed_app_manager().Install(
         std::move(install_options),
@@ -544,7 +569,8 @@ class ManifestUpdateManagerBrowserTest : public InProcessBrowserTest {
       synced_specifics_data->SetStartUrl(start_url);
 
       synced_specifics_data->AddSource(WebAppManagement::kSync);
-      synced_specifics_data->SetUserDisplayMode(UserDisplayMode::kBrowser);
+      synced_specifics_data->SetUserDisplayMode(
+          mojom::UserDisplayMode::kBrowser);
       synced_specifics_data->SetName("Name From Sync");
 
       WebApp::SyncFallbackData sync_fallback_data;
@@ -1688,7 +1714,7 @@ IN_PROC_BROWSER_TEST_F(ManifestUpdateManagerBrowserTest,
   OverrideManifest(kManifestTemplate, {"standalone", kInstallableIconList});
   AppId app_id = InstallWebApp();
   GetProvider().sync_bridge_unsafe().SetAppUserDisplayMode(
-      app_id, UserDisplayMode::kStandalone, /*is_user_action=*/false);
+      app_id, mojom::UserDisplayMode::kStandalone, /*is_user_action=*/false);
 
   OverrideManifest(kManifestTemplate, {"browser", kInstallableIconList});
   EXPECT_EQ(GetResultAfterPageLoad(GetAppURL()),
@@ -1701,7 +1727,7 @@ IN_PROC_BROWSER_TEST_F(ManifestUpdateManagerBrowserTest,
   // We don't touch the user's launch preference even if the app display mode
   // changes. Instead the effective display mode changes.
   EXPECT_EQ(GetProvider().registrar_unsafe().GetAppUserDisplayMode(app_id),
-            UserDisplayMode::kStandalone);
+            mojom::UserDisplayMode::kStandalone);
   EXPECT_EQ(GetProvider().registrar_unsafe().GetAppEffectiveDisplayMode(app_id),
             DisplayMode::kMinimalUi);
 }
@@ -1988,8 +2014,9 @@ IN_PROC_BROWSER_TEST_F(ManifestUpdateManagerBrowserTest,
                                       ManifestUpdateResult::kAppUpdated, 0);
 }
 
+// TODO(https://crbug.com/1401216): Flakes on multiple platforms.
 IN_PROC_BROWSER_TEST_P(ManifestUpdateManagerBrowserTest_UpdateDialog,
-                       CheckUpdateOfGeneratedIcons_SyncFailure) {
+                       DISABLED_CheckUpdateOfGeneratedIcons_SyncFailure) {
   // The first "name" character is used to generate icons. Make it like a space
   // to probe the background color at the center. Spaces are trimmed by the
   // parser.
@@ -2296,8 +2323,6 @@ class ManifestUpdateManagerBrowserTestWithFileHandling
   ManifestUpdateManagerBrowserTestWithFileHandling() = default;
 
  private:
-  base::test::ScopedFeatureList feature_list_{
-      blink::features::kFileHandlingAPI};
 };
 
 IN_PROC_BROWSER_TEST_F(ManifestUpdateManagerBrowserTestWithFileHandling,
@@ -2942,6 +2967,52 @@ IN_PROC_BROWSER_TEST_F(ManifestUpdateManagerBrowserTest,
                       SK_ColorBLUE);
           }));
   run_loop.Run();
+}
+
+// TODO(crbug.com/1402886) Currently disabled due to bug in the code.
+IN_PROC_BROWSER_TEST_F(ManifestUpdateManagerBrowserTest,
+                       DISABLED_CheckIconChangeForOemInstallation) {
+  constexpr char kNewName[] = "New app name";
+  constexpr char kManifest[] = R"(
+    {
+      "name": "$1",
+      "start_url": ".",
+      "scope": "/",
+      "display": "standalone",
+      "icons": [
+        {
+          "src": "/web_apps/basic-192.png?ignore",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    }
+  )";
+  OverrideManifest(kManifest, {kNewName, kInstallableIconList});
+  AppId app_id = InstallOemWebApp();
+
+  // Replace the contents of basic-192.png with blue-192.png without changing
+  // the URL.
+  content::URLLoaderInterceptor url_interceptor(base::BindLambdaForTesting(
+      [this](content::URLLoaderInterceptor::RequestParams* params)
+          -> bool /*intercepted*/ {
+        if (params->url_request.url ==
+            http_server_.GetURL("/web_apps/basic-192.png?ignore")) {
+          content::URLLoaderInterceptor::WriteResponse(
+              "chrome/test/data/web_apps/blue-192.png", params->client.get());
+          return true;
+        }
+        return false;
+      }));
+
+  EXPECT_EQ(GetResultAfterPageLoad(GetAppURL()),
+            ManifestUpdateResult::kAppUpdated);
+  EXPECT_EQ(kNewName, GetProvider().registrar_unsafe().GetAppShortName(app_id));
+  histogram_tester_.ExpectBucketCount(kUpdateHistogramName,
+                                      ManifestUpdateResult::kAppUpdated, 1);
+
+  // Check that the installed icon is now blue.
+  EXPECT_EQ(ReadAppIconPixel(app_id, /*size=*/192), SK_ColorBLUE);
 }
 
 IN_PROC_BROWSER_TEST_P(ManifestUpdateManagerBrowserTest_UpdateDialog,

@@ -8,8 +8,8 @@
 #include <string>
 #include <utility>
 
-#include "base/bind.h"
 #include "base/command_line.h"
+#include "base/functional/bind.h"
 #include "base/metrics/field_trial_params.h"
 #include "base/metrics/histogram_macros.h"
 #include "base/strings/string_util.h"
@@ -254,6 +254,7 @@ content::WebUIDataSource* CreateAndAddExtensionsSource(Profile* profile,
     {"missingOrUninstalledExtension", IDS_MISSING_OR_UNINSTALLED_EXTENSION},
     {"noActivities", IDS_EXTENSIONS_NO_ACTIVITIES},
     {"noErrorsToShow", IDS_EXTENSIONS_ERROR_NO_ERRORS_CODE_MESSAGE},
+    {"opensInNewTab", IDS_EXTENSIONS_OPENS_IN_NEW_TAB},
     {"removeSitesDialogTitle", IDS_EXTENSIONS_REMOVE_SITES_DIALOG_TITLE},
     {"runtimeHostsDialogInputError",
      IDS_EXTENSIONS_RUNTIME_HOSTS_DIALOG_INPUT_ERROR},

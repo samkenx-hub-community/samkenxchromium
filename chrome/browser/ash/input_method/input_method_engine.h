@@ -208,11 +208,6 @@ class InputMethodEngine : virtual public TextInputMethod,
   // Resolves all the pending key event callbacks as not handled.
   void CancelPendingKeyEvents();
 
-  // Get the composition bounds.
-  const std::vector<gfx::Rect>& composition_bounds() const {
-    return composition_bounds_;
-  }
-
   int GetContextIdForTesting() const { return context_id_; }
 
   PrefChangeRegistrar* GetPrefChangeRegistrarForTesting() const {
@@ -232,7 +227,6 @@ class InputMethodEngine : virtual public TextInputMethod,
                           uint32_t cursor_pos,
                           uint32_t anchor_pos,
                           uint32_t offset_pos) override;
-  void SetCompositionBounds(const std::vector<gfx::Rect>& bounds) override;
   void SetCaretBounds(const gfx::Rect& caret_bounds) override;
   void PropertyActivate(const std::string& property_name) override;
   void CandidateClicked(uint32_t index) override;
@@ -375,10 +369,6 @@ class InputMethodEngine : virtual public TextInputMethod,
   ui::CompositionText composition_;
 
   bool composition_changed_;
-
-  // The composition bounds returned by inputMethodPrivate.getCompositionBounds
-  // API.
-  std::vector<gfx::Rect> composition_bounds_;
 
   // The text to be committed from calling input.ime.commitText API.
   std::u16string text_;

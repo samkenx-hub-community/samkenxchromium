@@ -4,7 +4,9 @@
 
 #include "chrome/chrome_cleaner/engines/common/registry_util.h"
 
+#include <ntstatus.h>
 #include <windows.h>
+
 #include <algorithm>
 #include <memory>
 #include <sstream>
@@ -171,13 +173,13 @@ class SandboxChildProcess : public chrome_cleaner::ChildProcess {
 
 std::wstring HandlePath(HANDLE handle) {
   std::wstring full_path;
-  // The size parameter of GetFinalPathNameByHandle does NOT include the null
+  // The size parameter of GetFinalPathNameByHandle includes the null
   // terminator.
   DWORD result = ::GetFinalPathNameByHandleW(
-      handle, base::WriteInto(&full_path, MAX_PATH), MAX_PATH - 1, 0);
+      handle, base::WriteInto(&full_path, MAX_PATH + 1), MAX_PATH + 1, 0);
   if (result > MAX_PATH) {
-    result = ::GetFinalPathNameByHandle(
-        handle, base::WriteInto(&full_path, result), result - 1, 0);
+    result = ::GetFinalPathNameByHandleW(
+        handle, base::WriteInto(&full_path, result), result, 0);
   }
   if (!result) {
     PLOG(ERROR) << "Could not get full path for handle " << handle;

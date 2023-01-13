@@ -112,8 +112,7 @@ bool IsSidePanelWebContents(content::WebContents* web_contents) {
 }
 
 bool IsDSESupportEnabled(const Profile* profile) {
-  return base::FeatureList::IsEnabled(features::kSideSearchDSESupport) &&
-         IsSideSearchEnabled(profile);
+  return IsSideSearchEnabled(profile);
 }
 
 bool IsEnabledForBrowser(const Browser* browser) {
@@ -131,15 +130,8 @@ bool IsSearchWebInSidePanelSupported(const Browser* browser) {
   return IsEnabledForBrowser(browser) &&
          IsDSESupportEnabled(browser->profile()) &&
          default_provider->IsSideSearchSupported() &&
-         base::FeatureList::IsEnabled(features::kSearchWebInSidePanel) &&
-         base::FeatureList::IsEnabled(features::kUnifiedSidePanel);
+         base::FeatureList::IsEnabled(features::kSearchWebInSidePanel);
 }
-
-bool ShouldUseUnifiedSidePanel() {
-  return base::FeatureList::IsEnabled(features::kSideSearchDSESupport) &&
-         base::FeatureList::IsEnabled(features::kUnifiedSidePanel);
-}
-
 }  // namespace side_search
 
 bool IsSideSearchEnabled(const Profile* profile) {

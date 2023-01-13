@@ -133,18 +133,6 @@ std::unique_ptr<Value> Value::ToUniquePtrValue(Value val) {
   return std::make_unique<Value>(std::move(val));
 }
 
-// static
-const DictionaryValue& Value::AsDictionaryValue(const Value& val) {
-  CHECK(val.is_dict());
-  return static_cast<const DictionaryValue&>(val);
-}
-
-// static
-const ListValue& Value::AsListValue(const Value& val) {
-  CHECK(val.is_list());
-  return static_cast<const ListValue&>(val);
-}
-
 Value::Value() noexcept = default;
 
 Value::Value(Value&&) noexcept = default;
@@ -983,6 +971,14 @@ size_t Value::List::EraseValue(const Value& value) {
   return Erase(storage_, value);
 }
 
+size_t Value::List::EstimateMemoryUsage() const {
+#if BUILDFLAG(ENABLE_BASE_TRACING)
+  return base::trace_event::EstimateMemoryUsage(storage_);
+#else   // BUILDFLAG(ENABLE_BASE_TRACING)
+  return 0;
+#endif  // BUILDFLAG(ENABLE_BASE_TRACING)
+}
+
 std::string Value::List::DebugString() const {
   return DebugStringImpl(*this);
 }
@@ -1400,7 +1396,7 @@ size_t Value::EstimateMemoryUsage() const {
     case Type::DICTIONARY:
       return base::trace_event::EstimateMemoryUsage(dict());
     case Type::LIST:
-      return base::trace_event::EstimateMemoryUsage(list());
+      return GetList().EstimateMemoryUsage();
 #endif  // BUILDFLAG(ENABLE_BASE_TRACING)
     default:
       return 0;
@@ -1435,241 +1431,6 @@ void Value::WriteIntoTrace(perfetto::TracedValue context) const {
   });
 }
 #endif  // BUILDFLAG(ENABLE_BASE_TRACING)
-
-///////////////////// DictAdapterForMigration ////////////////////
-
-DictAdapterForMigration::DictAdapterForMigration(
-    const Value::Dict& dict) noexcept
-    : dict_(dict) {}
-
-DictAdapterForMigration::DictAdapterForMigration(
-    const DictionaryValue& dict) noexcept
-    : dict_(dict.GetDict()) {}
-
-bool DictAdapterForMigration::empty() const {
-  return dict_->empty();
-}
-
-size_t DictAdapterForMigration::size() const {
-  return dict_->size();
-}
-
-DictAdapterForMigration::const_iterator DictAdapterForMigration::begin() const {
-  return dict_->begin();
-}
-
-DictAdapterForMigration::const_iterator DictAdapterForMigration::cbegin()
-    const {
-  return dict_->cbegin();
-}
-
-DictAdapterForMigration::const_iterator DictAdapterForMigration::end() const {
-  return dict_->end();
-}
-
-DictAdapterForMigration::const_iterator DictAdapterForMigration::cend() const {
-  return dict_->cend();
-}
-
-bool DictAdapterForMigration::contains(base::StringPiece key) const {
-  return dict_->contains(key);
-}
-
-Value::Dict DictAdapterForMigration::Clone() const {
-  return dict_->Clone();
-}
-
-const Value* DictAdapterForMigration::Find(StringPiece key) const {
-  return dict_->Find(key);
-}
-
-absl::optional<bool> DictAdapterForMigration::FindBool(StringPiece key) const {
-  return dict_->FindBool(key);
-}
-
-absl::optional<int> DictAdapterForMigration::FindInt(StringPiece key) const {
-  return dict_->FindInt(key);
-}
-
-absl::optional<double> DictAdapterForMigration::FindDouble(
-    StringPiece key) const {
-  return dict_->FindDouble(key);
-}
-const std::string* DictAdapterForMigration::FindString(StringPiece key) const {
-  return dict_->FindString(key);
-}
-
-const Value::BlobStorage* DictAdapterForMigration::FindBlob(
-    StringPiece key) const {
-  return dict_->FindBlob(key);
-}
-
-const Value::Dict* DictAdapterForMigration::FindDict(StringPiece key) const {
-  return dict_->FindDict(key);
-}
-
-const Value::List* DictAdapterForMigration::FindList(StringPiece key) const {
-  return dict_->FindList(key);
-}
-
-const Value* DictAdapterForMigration::FindByDottedPath(StringPiece path) const {
-  return dict_->FindByDottedPath(path);
-}
-
-absl::optional<bool> DictAdapterForMigration::FindBoolByDottedPath(
-    StringPiece path) const {
-  return dict_->FindBoolByDottedPath(path);
-}
-
-absl::optional<int> DictAdapterForMigration::FindIntByDottedPath(
-    StringPiece path) const {
-  return dict_->FindIntByDottedPath(path);
-}
-
-absl::optional<double> DictAdapterForMigration::FindDoubleByDottedPath(
-    StringPiece path) const {
-  return dict_->FindDoubleByDottedPath(path);
-}
-
-const std::string* DictAdapterForMigration::FindStringByDottedPath(
-    StringPiece path) const {
-  return dict_->FindStringByDottedPath(path);
-}
-
-const Value::BlobStorage* DictAdapterForMigration::FindBlobByDottedPath(
-    StringPiece path) const {
-  return dict_->FindBlobByDottedPath(path);
-}
-
-const Value::Dict* DictAdapterForMigration::FindDictByDottedPath(
-    StringPiece path) const {
-  return dict_->FindDictByDottedPath(path);
-}
-
-const Value::List* DictAdapterForMigration::FindListByDottedPath(
-    StringPiece path) const {
-  return dict_->FindListByDottedPath(path);
-}
-
-std::string DictAdapterForMigration::DebugString() const {
-  return dict_->DebugString();
-}
-
-#if BUILDFLAG(ENABLE_BASE_TRACING)
-void DictAdapterForMigration::WriteIntoTrace(
-    perfetto::TracedValue context) const {
-  return dict_->WriteIntoTrace(std::move(context));
-}
-#endif  // BUILDFLAG(ENABLE_BASE_TRACING)
-
-const Value::Dict& DictAdapterForMigration::dict_for_test() const {
-  return *dict_;
-}
-
-///////////////////// DictionaryValue ////////////////////
-
-// static
-std::unique_ptr<DictionaryValue> DictionaryValue::From(
-    std::unique_ptr<Value> value) {
-  if (!value || !value->is_dict()) {
-    return nullptr;
-  }
-
-  DictionaryValue* out = static_cast<DictionaryValue*>(value.release());
-  return WrapUnique(out);
-}
-
-DictionaryValue::DictionaryValue() : Value(Type::DICTIONARY) {}
-
-Value* DictionaryValue::Set(StringPiece path, std::unique_ptr<Value> in_value) {
-  DCHECK(IsStringUTF8AllowingNoncharacters(path));
-  DCHECK(in_value);
-
-  // IMPORTANT NOTE: Do not replace with GetDict.SetByDottedPath() yet, because
-  // the latter fails when over-writing a non-dict intermediate node, while this
-  // method just replaces it with one. This difference makes some tests actually
-  // fail (http://crbug.com/949461).
-  StringPiece current_path(path);
-  Value* current_dictionary = this;
-  for (size_t delimiter_position = current_path.find('.');
-       delimiter_position != StringPiece::npos;
-       delimiter_position = current_path.find('.')) {
-    // Assume that we're indexing into a dictionary.
-    StringPiece key = current_path.substr(0, delimiter_position);
-    Value* child_dictionary =
-        current_dictionary->FindKeyOfType(key, Type::DICTIONARY);
-    if (!child_dictionary) {
-      child_dictionary =
-          current_dictionary->SetKey(key, Value(Type::DICTIONARY));
-    }
-
-    current_dictionary = child_dictionary;
-    current_path = current_path.substr(delimiter_position + 1);
-  }
-
-  // NOTE: We can't use |insert_or_assign| here, as only |try_emplace| does
-  // an explicit conversion from StringPiece to std::string if necessary.
-  auto result = static_cast<DictionaryValue*>(current_dictionary)
-                    ->dict()
-                    .try_emplace(current_path, std::move(in_value));
-  if (!result.second) {
-    // in_value is guaranteed to be still intact at this point.
-    result.first->second = std::move(in_value);
-  }
-  return result.first->second.get();
-}
-
-Value* DictionaryValue::SetBoolean(StringPiece path, bool in_value) {
-  return Set(path, std::make_unique<Value>(in_value));
-}
-
-Value* DictionaryValue::SetString(StringPiece path, StringPiece in_value) {
-  return Set(path, std::make_unique<Value>(in_value));
-}
-
-Value* DictionaryValue::SetString(StringPiece path,
-                                  const std::u16string& in_value) {
-  return Set(path, std::make_unique<Value>(in_value));
-}
-
-bool DictionaryValue::GetDictionary(StringPiece path,
-                                    const DictionaryValue** out_value) const {
-  const Value* value = GetDict().FindByDottedPath(path);
-  if (!value || !value->is_dict()) {
-    return false;
-  }
-
-  if (out_value)
-    *out_value = static_cast<const DictionaryValue*>(value);
-
-  return true;
-}
-
-bool DictionaryValue::GetDictionary(StringPiece path,
-                                    DictionaryValue** out_value) {
-  return std::as_const(*this).GetDictionary(
-      path, const_cast<const DictionaryValue**>(out_value));
-}
-
-///////////////////// ListValue ////////////////////
-
-// static
-std::unique_ptr<ListValue> ListValue::From(std::unique_ptr<Value> value) {
-  if (value && value->is_list())
-    return WrapUnique(static_cast<ListValue*>(value.release()));
-
-  return nullptr;
-}
-
-ListValue::ListValue() : Value(Type::LIST) {}
-
-void ListValue::Append(base::Value::Dict in_dict) {
-  list().emplace_back(std::move(in_dict));
-}
-
-void ListValue::Append(base::Value::List in_list) {
-  list().emplace_back(std::move(in_list));
-}
 
 ValueView::ValueView(const Value& value)
     : data_view_(

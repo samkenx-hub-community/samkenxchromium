@@ -117,6 +117,9 @@ chromium-metrics-reviews@google.com.
 
 <histogram name="Extensions.ActionSetIconFailureType"
     enum="ExtensionActionSetIconFailureType" expires_after="M88">
+  <obsolete>
+    Code removed 2022/12.
+  </obsolete>
   <owner>rdevlin.cronin@chromium.org</owner>
   <owner>extensions-core@chromium.org</owner>
   <summary>
@@ -136,7 +139,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Extensions.ActiveScriptController.PermittedExtensions"
-    units="Extension Count" expires_after="2023-04-30">
+    units="Extension Count" expires_after="2023-07-02">
   <owner>rdevlin.cronin@chromium.org</owner>
   <owner>extensions-core@chromium.org</owner>
   <summary>
@@ -145,12 +148,12 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
-<histogram name="Extensions.ApiTabUpdateJavascript" enum="Boolean"
-    expires_after="M78">
+<histogram name="Extensions.AlarmManager.AlarmsLoadedCount" units="alarms"
+    expires_after="2023-12-01">
   <owner>dbertoni@chromium.org</owner>
+  <owner>extensions-core@chromium.org</owner>
   <summary>
-    Reports whether a tab was updated to a javascript:-scheme URL from the
-    extensions tabs.update API. Reported once per call to tabs.update().
+    The number of alarms loaded from storage when an extension is loaded.
   </summary>
 </histogram>
 
@@ -229,7 +232,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Extensions.BackgroundHostCreatedForExtension"
-    enum="BackgroundHostCreatedForExtensionValues" expires_after="2023-05-07">
+    enum="BackgroundHostCreatedForExtensionValues" expires_after="2023-07-09">
   <owner>fdoray@chromium.org</owner>
   <owner>catan-team@chromium.org</owner>
   <summary>
@@ -335,7 +338,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Extensions.BookmarkAppLaunchSource" enum="AppLaunchSource"
-    expires_after="2023-05-07">
+    expires_after="2023-07-09">
   <owner>phillis@chromium.org</owner>
   <owner>benwells@chromium.org</owner>
   <owner>dominickn@chromium.org</owner>
@@ -532,6 +535,20 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
+<histogram name="Extensions.CreateWindowHeight" units="pixels"
+    expires_after="2023-03-31">
+  <owner>emiliapaz@chromium.org</owner>
+  <owner>extensions-core@chromium.org</owner>
+  <summary>Height of the window created via chrome.windows.create.</summary>
+</histogram>
+
+<histogram name="Extensions.CreateWindowWidth" units="pixels"
+    expires_after="2023-03-31">
+  <owner>emiliapaz@chromium.org</owner>
+  <owner>extensions-core@chromium.org</owner>
+  <summary>Width of the window created via chrome.windows.create.</summary>
+</histogram>
+
 <histogram name="Extensions.Database.Database.Restore"
     enum="LevelDBDatabaseCorruptionRestoreValue" expires_after="M85">
   <owner>cmumford@chromium.org</owner>
@@ -711,7 +728,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Extensions.DeclarativeNetRequest.RequestHeaderChanged"
-    enum="WebRequest.RequestHeader" expires_after="2023-01-22">
+    enum="WebRequest.RequestHeader" expires_after="2023-12-22">
   <owner>rdevlin.cronin@chromium.org</owner>
   <owner>kelvinjiang@chromium.org</owner>
   <owner>src/extensions/OWNERS</owner>
@@ -723,7 +740,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Extensions.DeclarativeNetRequest.RequestHeaderRemoved"
-    enum="WebRequest.RequestHeader" expires_after="2023-02-12">
+    enum="WebRequest.RequestHeader" expires_after="2023-12-12">
   <owner>rdevlin.cronin@chromium.org</owner>
   <owner>kelvinjiang@chromium.org</owner>
   <owner>src/extensions/OWNERS</owner>
@@ -735,7 +752,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Extensions.DeclarativeNetRequest.ResponseHeaderAdded"
-    enum="WebRequest.ResponseHeader" expires_after="2023-01-22">
+    enum="WebRequest.ResponseHeader" expires_after="2023-12-22">
   <owner>rdevlin.cronin@chromium.org</owner>
   <owner>kelvinjiang@chromium.org</owner>
   <owner>src/extensions/OWNERS</owner>
@@ -747,7 +764,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Extensions.DeclarativeNetRequest.ResponseHeaderChanged"
-    enum="WebRequest.ResponseHeader" expires_after="2023-01-22">
+    enum="WebRequest.ResponseHeader" expires_after="2023-12-22">
   <owner>rdevlin.cronin@chromium.org</owner>
   <owner>kelvinjiang@chromium.org</owner>
   <owner>src/extensions/OWNERS</owner>
@@ -759,7 +776,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Extensions.DeclarativeNetRequest.ResponseHeaderRemoved"
-    enum="WebRequest.ResponseHeader" expires_after="2023-01-22">
+    enum="WebRequest.ResponseHeader" expires_after="2023-12-22">
   <owner>rdevlin.cronin@chromium.org</owner>
   <owner>kelvinjiang@chromium.org</owner>
   <owner>src/extensions/OWNERS</owner>
@@ -829,7 +846,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Extensions.DevTools.UserIsInDeveloperMode"
-    enum="InDeveloperMode" expires_after="2023-04-30">
+    enum="InDeveloperMode" expires_after="2023-07-02">
   <owner>ghazale@chromium.org</owner>
   <owner>extensions-core@chromium.org</owner>
   <summary>
@@ -1280,6 +1297,9 @@ chromium-metrics-reviews@google.com.
 
 <histogram name="Extensions.FeatureProviderStaticInitTime" units="ms"
     expires_after="M90">
+  <obsolete>
+    Code removed 2022/12.
+  </obsolete>
   <owner>rdevlin.cronin@chromium.org</owner>
   <owner>extensions-core@chromium.org</owner>
   <summary>
@@ -1880,7 +1900,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Extensions.Functions.SucceededTotalExecutionTime" units="ms"
-    expires_after="2023-04-30">
+    expires_after="2023-07-02">
   <owner>rdevlin.cronin@chromium.org</owner>
   <owner>extensions-core@chromium.org</owner>
   <summary>
@@ -1893,7 +1913,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Extensions.Functions.SynchronousExecutionTime" units="ms"
-    expires_after="2023-04-30">
+    expires_after="2023-07-02">
   <owner>rdevlin.cronin@chromium.org</owner>
   <owner>extensions-core@chromium.org</owner>
   <summary>
@@ -2101,6 +2121,9 @@ chromium-metrics-reviews@google.com.
 
 <histogram name="Extensions.InitPrefGetExtensionsTime" units="ms"
     expires_after="M90">
+  <obsolete>
+    Code removed 2022/12.
+  </obsolete>
   <owner>rdevlin.cronin@chromium.org</owner>
   <owner>extensions-core@chromium.org</owner>
   <summary>
@@ -2453,7 +2476,7 @@ chromium-metrics-reviews@google.com.
   <summary>The number of platform apps loaded at profile open.</summary>
 </histogram>
 
-<histogram name="Extensions.LoadTheme" units="units" expires_after="2023-05-07">
+<histogram name="Extensions.LoadTheme" units="units" expires_after="2023-07-09">
   <owner>rdevlin.cronin@chromium.org</owner>
   <owner>extensions-core@chromium.org</owner>
   <summary>The number of themes loaded at profile open.</summary>

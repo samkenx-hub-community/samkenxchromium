@@ -44,10 +44,11 @@ import {ConnectionStateType, NetworkType} from 'chrome://resources/mojo/chromeos
 import {afterNextRender, mixinBehaviors, PolymerElement} from 'chrome://resources/polymer/v3_0/polymer/polymer_bundled.min.js';
 
 import {Setting} from '../../mojom-webui/setting.mojom-webui.js';
-import {Route} from '../router.js';
-import {DeepLinkingBehavior, DeepLinkingBehaviorInterface} from '../deep_linking_behavior.js';
+import {Constructor} from '../common/types.js';
+import {DeepLinkingMixin, DeepLinkingMixinInterface} from '../deep_linking_mixin.js';
 import {routes} from '../os_route.js';
-import {RouteObserverBehavior, RouteObserverBehaviorInterface} from '../route_observer_behavior.js';
+import {RouteObserverMixin, RouteObserverMixinInterface} from '../route_observer_mixin.js';
+import {Route} from '../router.js';
 
 import {PrinterListEntry, PrinterType} from './cups_printer_types.js';
 import {getTemplate} from './cups_printers.html.js';
@@ -58,15 +59,13 @@ import {SettingsCupsAddPrinterDialogElement} from './cups_settings_add_printer_d
 const SettingsCupsPrintersElementBase =
     mixinBehaviors(
         [
-          DeepLinkingBehavior,
           NetworkListenerBehavior,
-          RouteObserverBehavior,
         ],
-        WebUiListenerMixin(PolymerElement)) as {
-      new (): PolymerElement & DeepLinkingBehaviorInterface &
-          NetworkListenerBehaviorInterface & RouteObserverBehaviorInterface &
-          WebUiListenerMixinInterface,
-    };
+        DeepLinkingMixin(
+            RouteObserverMixin(WebUiListenerMixin(PolymerElement)))) as
+    Constructor<PolymerElement&WebUiListenerMixinInterface&
+                RouteObserverMixinInterface&DeepLinkingMixinInterface&
+                NetworkListenerBehaviorInterface>;
 
 interface SettingsCupsPrintersElement {
   $: {
@@ -171,11 +170,11 @@ class SettingsCupsPrintersElement extends SettingsCupsPrintersElementBase {
       },
 
       /**
-       * Used by DeepLinkingBehavior to focus this page's deep links.
+       * Used by DeepLinkingMixin to focus this page's deep links.
        */
       supportedSettingIds: {
         type: Object,
-        value: () => new Set([
+        value: () => new Set<Setting>([
           Setting.kAddPrinter,
           Setting.kSavedPrinters,
         ]),
@@ -258,7 +257,7 @@ class SettingsCupsPrintersElement extends SettingsCupsPrintersElementBase {
   }
 
   /**
-   * Overridden from DeepLinkingBehavior.
+   * Overridden from DeepLinkingMixin.
    */
   override beforeDeepLinkAttempt(settingId: Setting): boolean {
     if (settingId !== Setting.kSavedPrinters) {

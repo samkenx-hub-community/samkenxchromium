@@ -10,6 +10,7 @@
 #include "base/memory/ref_counted.h"
 #include "components/content_settings/core/browser/cookie_settings.h"
 #include "net/base/network_delegate_impl.h"
+#include "net/cookies/cookie_setting_override.h"
 #include "net/first_party_sets/first_party_set_metadata.h"
 
 class PrefService;
@@ -62,9 +63,7 @@ class IOSChromeNetworkDelegate : public net::NetworkDelegateImpl {
                       const net::CanonicalCookie& cookie,
                       net::CookieOptions* options) override;
   net::NetworkDelegate::PrivacySetting OnForcePrivacyMode(
-      const GURL& url,
-      const net::SiteForCookies& site_for_cookies,
-      const absl::optional<url::Origin>& top_frame_origin) const override;
+      const net::URLRequest& request) const override;
   bool OnCancelURLRequestWithPolicyViolatingReferrerHeader(
       const net::URLRequest& request,
       const GURL& target_url,

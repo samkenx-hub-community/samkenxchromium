@@ -182,6 +182,12 @@ const base::FeatureParam<int> kChromeRootStoreSysImpl{&kChromeRootStoreUsed,
 #endif /* BUILDFLAG(IS_MAC) */
 #endif /* BUILDFLAG(CHROME_ROOT_STORE_SUPPORTED) */
 
+#if BUILDFLAG(IS_MAC)
+BASE_FEATURE(kTrustStoreTrustedLeafSupport,
+             "TrustStoreTrustedLeafSupport",
+             base::FEATURE_ENABLED_BY_DEFAULT);
+#endif
+
 BASE_FEATURE(kTurnOffStreamingMediaCachingOnBattery,
              "TurnOffStreamingMediaCachingOnBattery",
              base::FEATURE_DISABLED_BY_DEFAULT);
@@ -369,5 +375,10 @@ BASE_FEATURE(kPlatformKeyProbeSHA256,
              "PlatformKeyProbeSHA256",
              base::FEATURE_ENABLED_BY_DEFAULT);
 #endif
+
+// Enable support for HTTP extensible priorities (RFC 9218)
+BASE_FEATURE(kPriorityIncremental,
+             "PriorityIncremental",
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 }  // namespace net::features

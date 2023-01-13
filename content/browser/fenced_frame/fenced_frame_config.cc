@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 #include "content/browser/fenced_frame/fenced_frame_config.h"
-#include "base/callback.h"
+#include "base/functional/callback.h"
 #include "base/guid.h"
 #include "base/strings/strcat.h"
 #include "base/strings/string_util.h"
@@ -90,13 +90,10 @@ FencedFrameConfig::FencedFrameConfig(
                                       shared_storage_budget_metadata,
                                       VisibilityToEmbedder::kOpaque,
                                       VisibilityToContent::kOpaque),
-      // TODO(crbug.com/1381158): Give the reporting metadata
-      // `VisibilityToContent::kOpaque` once it is no longer needed in the
-      // renderer.
       reporting_metadata_(absl::in_place,
                           reporting_metadata,
                           VisibilityToEmbedder::kOpaque,
-                          VisibilityToContent::kTransparent) {}
+                          VisibilityToContent::kOpaque) {}
 
 FencedFrameConfig::FencedFrameConfig(const FencedFrameConfig&) = default;
 FencedFrameConfig::FencedFrameConfig(FencedFrameConfig&&) = default;

@@ -29,8 +29,8 @@
 #include <memory>
 
 #include "base/auto_reset.h"
-#include "base/callback_forward.h"
 #include "base/dcheck_is_on.h"
+#include "base/functional/callback_forward.h"
 #include "base/functional/function_ref.h"
 #include "base/gtest_prod_util.h"
 #include "base/time/time.h"
@@ -572,7 +572,7 @@ class CORE_EXPORT LocalFrameView final
 
   // Get the PaintRecord based on the cached paint artifact generated during
   // the last paint in lifecycle update.
-  cc::PaintRecord GetPaintRecord() const;
+  cc::PaintRecord GetPaintRecord(const gfx::Rect* cull_rect = nullptr) const;
 
   void Show() override;
   void Hide() override;

@@ -7,6 +7,7 @@
 
 #include "base/memory/raw_ptr.h"
 #include "base/observer_list.h"
+#include "base/scoped_multi_source_observation.h"
 #include "base/time/time.h"
 #include "chrome/browser/ui/tabs/tab_strip_model_observer.h"
 #include "chrome/browser/ui/views/side_panel/side_panel_entry.h"
@@ -17,6 +18,7 @@
 #include "extensions/common/extension_id.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
 
+class Browser;
 class BrowserView;
 class SidePanelComboboxModel;
 
@@ -45,6 +47,8 @@ class SidePanelCoordinator final : public SidePanelRegistryObserver,
   SidePanelCoordinator& operator=(const SidePanelCoordinator&) = delete;
   ~SidePanelCoordinator() override;
 
+  static SidePanelRegistry* GetGlobalSidePanelRegistry(Browser* browser);
+
   void Show(absl::optional<SidePanelEntry::Id> entry_id = absl::nullopt,
             absl::optional<SidePanelUtil::SidePanelOpenTrigger> open_trigger =
                 absl::nullopt);
@@ -57,8 +61,6 @@ class SidePanelCoordinator final : public SidePanelRegistryObserver,
   // Opens the current side panel contents in a new tab. This is called by the
   // header button, when it's visible.
   void OpenInNewTab();
-
-  SidePanelRegistry* GetGlobalSidePanelRegistry();
 
   // Prevent content swapping delays from happening for testing.
   // This should be called before the side panel is first shown.
@@ -141,7 +143,8 @@ class SidePanelCoordinator final : public SidePanelRegistryObserver,
 
   // SidePanelRegistryObserver:
   void OnEntryRegistered(SidePanelEntry* entry) override;
-  void OnEntryWillDeregister(SidePanelEntry* entry) override;
+  void OnEntryWillDeregister(SidePanelRegistry* registry,
+                             SidePanelEntry* entry) override;
   void OnEntryIconUpdated(SidePanelEntry* entry) override;
 
   // TabStripModelObserver:
@@ -184,8 +187,9 @@ class SidePanelCoordinator final : public SidePanelRegistryObserver,
 
   base::ObserverList<SidePanelViewStateObserver> view_state_observers_;
 
-  // TODO(pbos): Add awareness of tab registries here. This probably needs to
-  // know the tab registry it's currently monitoring.
+  base::ScopedMultiSourceObservation<SidePanelRegistry,
+                                     SidePanelRegistryObserver>
+      registry_observations_{this};
 };
 
 #endif  // CHROME_BROWSER_UI_VIEWS_SIDE_PANEL_SIDE_PANEL_COORDINATOR_H_

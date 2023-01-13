@@ -11,6 +11,7 @@
 #include "base/feature_list.h"
 #include "base/gtest_prod_util.h"
 #include "base/memory/scoped_refptr.h"
+#include "base/task/single_thread_task_runner.h"
 #include "base/time/time.h"
 #include "base/trace_event/memory_dump_provider.h"
 #include "third_party/blink/renderer/platform/bindings/parkable_string.h"
@@ -48,6 +49,11 @@ class PLATFORM_EXPORT ParkableStringManagerDumpProvider
 // Manages all the ParkableStrings, and parks eligible strings after the
 // renderer has been backgrounded.
 // Main Thread only.
+// When a `ParkableString` is unparked on a background thread, a task is posted
+// to the main thread to update the entries in the manager. Hence, it is
+// possible to temporarily have an unparked `ParkableString` inaccessible
+// through `unparked_strings_`. This can cause aging of the string to be
+// delayed or a variation on the sizes recorded in 'ComputeStatistics()`.
 class PLATFORM_EXPORT ParkableStringManager {
   USING_FAST_MALLOC(ParkableStringManager);
 
@@ -90,6 +96,9 @@ class PLATFORM_EXPORT ParkableStringManager {
                                  ParkableStringImpl*,
                                  SecureDigestHash>;
 
+  bool IsOnParkedMapForTesting(ParkableStringImpl* string);
+  bool IsOnDiskMapForTesting(ParkableStringImpl* string);
+
  private:
   friend class ParkableString;
   friend class ParkableStringImpl;
@@ -97,12 +106,25 @@ class PLATFORM_EXPORT ParkableStringManager {
   scoped_refptr<ParkableStringImpl> Add(
       scoped_refptr<StringImpl>&&,
       std::unique_ptr<ParkableStringImpl::SecureDigest> digest);
-  void Remove(ParkableStringImpl*);
+
+  void RemoveOnMainThread(MayBeDangling<ParkableStringImpl> string);
+  // If on a background thread, posts a `RemoveOnMainThread` task to the Main
+  // thread. Calls `RemoveOnMainThread` otherwise.
+  void Remove(ParkableStringImpl* string);
 
   void OnParked(ParkableStringImpl*);
   void OnWrittenToDisk(ParkableStringImpl*);
-  void OnReadFromDisk(ParkableStringImpl*);
-  void OnUnparked(ParkableStringImpl*);
+  void OnUnparked(ParkableStringImpl*, bool);
+
+  // If on a background thread, posts a `CompleteUnparkOnMainThread` task to
+  // the Main thread. Calls `CompleteUnparkOnMainThread` otherwise.
+  void CompleteUnpark(ParkableStringImpl* string,
+                      base::TimeDelta elapsed,
+                      base::TimeDelta disk_elapsed);
+
+  void CompleteUnparkOnMainThread(ParkableStringImpl* string,
+                                  base::TimeDelta elapsed,
+                                  base::TimeDelta disk_elapsed);
 
   void ParkAll(ParkableStringImpl::ParkingMode mode);
   void RecordStatisticsAfter5Minutes() const;
@@ -145,6 +167,7 @@ class PLATFORM_EXPORT ParkableStringManager {
     return task_runner_;
   }
 
+  void AssertRemoved(ParkableStringImpl* string);
   void ResetForTesting();
   ParkableStringManager();
 

@@ -11,9 +11,9 @@
 #include <string>
 #include <vector>
 
-#include "base/callback.h"
 #include "base/component_export.h"
 #include "base/containers/flat_map.h"
+#include "base/functional/callback.h"
 #include "chromeos/ash/components/dbus/audio/audio_node.h"
 #include "chromeos/ash/components/dbus/audio/volume_state.h"
 #include "chromeos/dbus/common/dbus_method_call_status.h"
@@ -52,6 +52,9 @@ class COMPONENT_EXPORT(DBUS_AUDIO) CrasAudioClient {
 
     // Called when output node's volume changed.
     virtual void OutputNodeVolumeChanged(uint64_t node_id, int volume);
+
+    // Called when input node's gain changed.
+    virtual void InputNodeGainChanged(uint64_t node_id, int volume);
 
     // Called when hotword is triggered.
     virtual void HotwordTriggered(uint64_t tv_sec, uint64_t tv_nsec);

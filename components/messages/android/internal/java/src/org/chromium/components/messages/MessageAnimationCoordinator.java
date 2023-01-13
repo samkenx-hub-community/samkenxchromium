@@ -159,7 +159,12 @@ public class MessageAnimationCoordinator implements SwipeAnimationHandler {
     public void updateWithStacking(
             @NonNull List<MessageState> candidates, boolean isSuspended, Runnable onFinished) {
         // Wait until the current animation is done, unless we need to hide them immediately.
-        if (!isSuspended && mAnimatorSet.isStarted()) {
+        if (mAnimatorSet.isStarted()) {
+            if (isSuspended) {
+                // crbug.com/1405389: Force animation to end in order to trigger callbacks.
+                mAnimatorSet.end();
+                onFinished.run();
+            }
             return;
         }
         var currentFront = mCurrentDisplayedMessages.get(0); // Currently front.
@@ -260,10 +265,14 @@ public class MessageAnimationCoordinator implements SwipeAnimationHandler {
         if (currentFront == null) {
             // No message is being displayed now: trigger #onStartShowing.
             mCurrentDisplayedMessages = new ArrayList<>(candidates);
+            // Use ref because when startShowing is finished, other animation might have been
+            // triggered such that those two member variables have been mutated.
+            var frontAnimator = mFrontAnimator;
+            var backAnimator = mBackAnimator;
             mMessageQueueDelegate.onStartShowing(() -> {
                 if (candidates.get(0) == mCurrentDisplayedMessages.get(0)
                         && candidates.get(1) == mCurrentDisplayedMessages.get(1)) {
-                    triggerStackingAnimation(candidates, onFinished, mFrontAnimator, mBackAnimator);
+                    triggerStackingAnimation(candidates, onFinished, frontAnimator, backAnimator);
                 }
             });
         } else if (nextFront == null) {
@@ -368,5 +377,9 @@ public class MessageAnimationCoordinator implements SwipeAnimationHandler {
             super.onEnd(animator);
             mOnFinished.run();
         }
+    }
+
+    AnimatorSet getAnimatorSetForTesting() {
+        return mAnimatorSet;
     }
 }

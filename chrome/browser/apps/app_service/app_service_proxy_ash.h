@@ -9,9 +9,9 @@
 #include <memory>
 #include <string>
 
-#include "base/callback.h"
 #include "base/containers/flat_map.h"
 #include "base/containers/unique_ptr_adapters.h"
+#include "base/functional/callback.h"
 #include "base/memory/weak_ptr.h"
 #include "base/scoped_observation.h"
 #include "chrome/browser/apps/app_service/app_icon/app_icon_reader.h"
@@ -28,8 +28,6 @@
 #include "components/services/app_service/public/cpp/icon_types.h"
 #include "components/services/app_service/public/cpp/instance_registry.h"
 #include "components/services/app_service/public/cpp/preferred_app.h"
-#include "components/services/app_service/public/mojom/app_service.mojom.h"
-#include "components/services/app_service/public/mojom/types.mojom.h"
 #include "ui/gfx/native_widget_types.h"
 
 // Avoid including this header file directly or referring directly to
@@ -90,9 +88,6 @@ class AppServiceProxyAsh : public AppServiceProxyBase,
                  gfx::NativeWindow parent_window) override;
   void OnApps(std::vector<AppPtr> deltas,
               AppType app_type,
-              bool should_notify_initialized) override;
-  void OnApps(std::vector<apps::mojom::AppPtr> deltas,
-              apps::mojom::AppType app_type,
               bool should_notify_initialized) override;
 
   // Pauses apps. |pause_data|'s key is the app_id. |pause_data|'s PauseData
@@ -266,12 +261,20 @@ class AppServiceProxyAsh : public AppServiceProxyBase,
                   IconValuePtr iv);
 
   // Invoked after writing icon image files to the local disk.
-  void OnIconInstalled(const std::string& app_id,
+  void OnIconInstalled(AppType app_type,
+                       const std::string& app_id,
                        int32_t size_in_dip,
                        IconEffects icon_effects,
                        IconType icon_type,
                        LoadIconCallback callback,
                        bool install_success);
+
+  // Returns an instance of `IntentLaunchInfo` created based on `intent`,
+  // `filter`, and `update`.
+  IntentLaunchInfo CreateIntentLaunchInfo(
+      const apps::IntentPtr& intent,
+      const apps::IntentFilterPtr& filter,
+      const apps::AppUpdate& update) override;
 
   SubscriberCrosapi* crosapi_subscriber_ = nullptr;
 

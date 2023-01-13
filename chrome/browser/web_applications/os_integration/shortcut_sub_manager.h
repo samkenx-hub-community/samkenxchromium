@@ -12,6 +12,7 @@
 #include "base/functional/callback_forward.h"
 #include "base/memory/raw_ref.h"
 #include "base/memory/weak_ptr.h"
+#include "base/time/time.h"
 #include "chrome/browser/web_applications/os_integration/os_integration_sub_manager.h"
 #include "chrome/browser/web_applications/proto/web_app_os_integration_state.pb.h"
 #include "chrome/browser/web_applications/web_app_id.h"
@@ -53,7 +54,9 @@ class ShortcutSubManager : public OsIntegrationSubManager {
                       const std::u16string& old_app_title,
                       base::OnceClosure on_complete,
                       std::unique_ptr<ShortcutInfo> shortcut_info);
-
+  void OnShortcutsDeleted(const AppId& app_id,
+                          base::OnceClosure final_callback,
+                          bool success);
   void StoreIconDataFromDisk(proto::ShortcutDescription* shortcut,
                              base::flat_map<SquareSizePx, base::Time> time_map);
 

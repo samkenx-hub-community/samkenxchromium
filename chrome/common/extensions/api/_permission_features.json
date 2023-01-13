@@ -355,8 +355,7 @@
     "extension_types": ["extension", "legacy_packaged_app", "platform_app"],
     "platforms": ["chromeos"],
     "allowlist": [
-      "74E2D32A61B08D29521A8C4E360F581DE78F5CA5",  // Image loader
-      "A948368FC53BE437A55FEB414106E207925482F5"   // Files app
+      "74E2D32A61B08D29521A8C4E360F581DE78F5CA5"  // Image loader
     ]
   },
   "fileSystemProvider": [{
@@ -839,6 +838,14 @@
     "extension_types": ["extension"],
     "min_manifest_version": 3
   },
+  "smartCardProviderPrivate": {
+    "channel": "dev",
+    "platforms": ["chromeos", "lacros"],
+    "extension_types": ["extension", "platform_app"],
+    "allowlist": [
+      "EC3DE21E048B67319893889529354DFBFA96FD23"   // Smart Card Connector
+    ]
+  },
   "speechRecognitionPrivate": {
     "channel": "stable",
     "extension_types": ["extension"],
@@ -848,6 +855,24 @@
       "371AC6869D2138CE58123741E69F67469206909F" // AccessibilityCommon extension. https://crbug.com/1220107
     ]
   },
+  // For now, systemLog API is private to avoid 3rd party logs being sent to
+  // Google in feedback reports. More info: http://crbug.com/1264234
+  "systemLog": [{
+    "channel": "stable",
+    "dependencies": ["behavior:imprivata_extension"],
+    "extension_types": ["extension", "login_screen_extension"],
+    "location": "policy",
+    "platforms": ["chromeos", "lacros"]
+  }, {
+    "channel": "stable",
+    "extension_types": ["extension", "login_screen_extension", "platform_app"],
+    "platforms": ["chromeos", "lacros"],
+    "allowlist": [
+      "EC3DE21E048B67319893889529354DFBFA96FD23", // Smart Card Connector
+      "6B748A5C005F21B7CBCF4170C2F883E435DEB511", // CSSI Smart Card Middleware
+      "075FF17D52ED6E3C2E5EC4D99F188E7A25AF47EA"  // Beta CSSI Smart Card Middleware
+    ]
+  }],
   "systemPrivate": {
     "channel": "stable",
     "extension_types": ["extension", "legacy_packaged_app", "platform_app"],

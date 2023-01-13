@@ -408,6 +408,12 @@ public final class TabImpl extends ITab.Stub {
         return mId;
     }
 
+    @Override
+    public String getUri() {
+        StrictModeWorkaround.apply();
+        return mWebContents.getVisibleUrl().getSpec();
+    }
+
     /**
      * Called when this TabImpl is attached to the BrowserViewController.
      */
@@ -711,7 +717,7 @@ public final class TabImpl extends ITab.Stub {
         WebLayerOriginVerificationScheduler originVerifier =
                 WebLayerOriginVerificationScheduler.getInstance();
         String url = mWebContents.getVisibleUrl().getSpec();
-        originVerifier.verify(url, mProfile, (verified) -> {
+        originVerifier.verify(url, (verified) -> {
             // Make sure the page hasn't changed since we started verification.
             if (!url.equals(mWebContents.getVisibleUrl().getSpec())) {
                 return;
@@ -809,7 +815,8 @@ public final class TabImpl extends ITab.Stub {
             return true;
         }
 
-        SelectionPopupController popup = SelectionPopupController.fromWebContents(mWebContents);
+        SelectionPopupController popup =
+                SelectionPopupController.fromWebContentsNoCreate(mWebContents);
         if (popup != null && popup.isSelectActionBarShowing()) {
             popup.clearSelection();
             return true;

@@ -12,11 +12,11 @@
 #include <string>
 #include <utility>
 
-#include "base/bind.h"
-#include "base/callback.h"
 #include "base/containers/contains.h"
 #include "base/containers/cxx20_erase.h"
 #include "base/feature_list.h"
+#include "base/functional/bind.h"
+#include "base/functional/callback.h"
 #include "base/guid.h"
 #include "base/i18n/case_conversion.h"
 #include "base/i18n/timezone.h"
@@ -2304,7 +2304,11 @@ void PersonalDataManager::OnCreditCardSaved(bool is_local_card) {}
 void PersonalDataManager::ConvertWalletAddressesAndUpdateWalletCards() {
   // If the full Sync feature isn't enabled, then do NOT convert any Wallet
   // addresses to local ones.
-  if (!IsSyncFeatureEnabled()) {
+  // When syncing of account profiles is enabled, converting wallet addresses
+  // is unnecessary, since they are available through the ContactInfoSyncBridge.
+  if (!IsSyncFeatureEnabled() ||
+      base::FeatureList::IsEnabled(
+          features::kAutofillAccountProfilesUnionView)) {
     // PDM expects that each call to
     // ConvertWalletAddressesAndUpdateWalletCards() is followed by a
     // AutofillAddressConversionCompleted() notification, simulate the

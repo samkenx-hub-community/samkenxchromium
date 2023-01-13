@@ -1,8 +1,8 @@
 // Copyright 2021 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-import {PageHandlerFactory, PageHandlerRemote} from './emoji_picker.mojom-webui.js';
-import {GifSubcategoryData} from './types.js';
+import {PageHandlerFactory, PageHandlerRemote, TenorGifResponse} from './emoji_picker.mojom-webui.js';
+import {EmojiVariants, GifSubcategoryData, VisualContent} from './types.js';
 
 /** @interface */
 export interface EmojiPickerApiProxy {
@@ -14,15 +14,16 @@ export interface EmojiPickerApiProxy {
 
   getFeatureList(): Promise<{featureList: number[]}>;
 
-  getCategories(): Promise<{categories: GifSubcategoryData[]}>;
-}
+  getCategories(): Promise<{gifCategories: GifSubcategoryData[]}>;
 
-// https://developers.google.com/tenor/guides/response-objects-and-errors#category-object
-declare interface CategoryObject {
-  searchterm: string;  // the search term that corresponds to the category
-  path: string;        // the search url to request
-  image: string;       // a url to the category's example GIF
-  name: string;        // category name
+  getFeaturedGifs(pos?: string): Promise<{featuredGifs: TenorGifResponse}>;
+
+  searchGifs(query: string, pos?: string):
+      Promise<{searchGifs: TenorGifResponse}>;
+
+  getGifsByIds(ids: string[]): Promise<{selectedGifs: VisualContent[]}>;
+
+  convertTenorGifsToEmoji(gifs: TenorGifResponse): EmojiVariants[];
 }
 
 export class EmojiPickerApiProxyImpl implements EmojiPickerApiProxy {
@@ -53,12 +54,46 @@ export class EmojiPickerApiProxyImpl implements EmojiPickerApiProxy {
   }
 
   /** @override */
-  async getCategories(): Promise<{categories: GifSubcategoryData[]}> {
-    const {categories} = await this.handler.getCategories();
+  async getCategories(): Promise<{gifCategories: GifSubcategoryData[]}> {
+    const {gifCategories} = await this.handler.getCategories();
     return {
-      categories: JSON.parse(categories)
-                      .tags.map((tag: CategoryObject) => ({name: tag.name})),
+      gifCategories: gifCategories.map((category) => ({name: category})),
     };
+  }
+
+  /** @override */
+  getFeaturedGifs(pos?: string): Promise<{featuredGifs: TenorGifResponse}> {
+    return this.handler.getFeaturedGifs(pos || null);
+  }
+
+  /** @override */
+  searchGifs(query: string, pos?: string):
+      Promise<{searchGifs: TenorGifResponse}> {
+    return this.handler.searchGifs(query, pos || null);
+  }
+
+  /** @override */
+  getGifsByIds(ids: string[]): Promise<{selectedGifs: VisualContent[]}> {
+    return this.handler.getGifsByIds(ids);
+  }
+
+  convertTenorGifsToEmoji(gifs: TenorGifResponse): EmojiVariants[] {
+    return gifs.results.map(({
+                              id,
+                              url,
+                              previewSize,
+                              contentDescription,
+                            }) => ({
+                              base: {
+                                visualContent: {
+                                  id,
+                                  url,
+                                  previewSize,
+                                },
+                                name: contentDescription,
+                              },
+                              alternates: [],
+                            }));
   }
 
   static getInstance(): EmojiPickerApiProxy {
@@ -66,5 +101,9 @@ export class EmojiPickerApiProxyImpl implements EmojiPickerApiProxy {
       EmojiPickerApiProxyImpl.instance = new EmojiPickerApiProxyImpl();
     }
     return EmojiPickerApiProxyImpl.instance;
+  }
+
+  static setInstance(instance: EmojiPickerApiProxy): void {
+    EmojiPickerApiProxyImpl.instance = instance;
   }
 }

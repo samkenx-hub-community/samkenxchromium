@@ -410,19 +410,14 @@ void ServiceWorkerRegistry::StoreRegistration(
     data->used_features.push_back(feature);
   data->ancestor_frame_type = registration->ancestor_frame_type();
 
-  // The ServiceWorkerVersion's COEP might be null if it is stored before
-  // loading the main script. This happens in many unittests.
-  if (version->cross_origin_embedder_policy()) {
-    data->cross_origin_embedder_policy =
-        *version->cross_origin_embedder_policy();
-  }
+  // The ServiceWorkerVersion's policy container host might be null if it is
+  // stored before loading the main script. This happens in many unittests.
   data->policy_container_policies =
-      blink::mojom::PolicyContainerPolicies::New();
-  if (version->policy_container_host()) {
-    data->policy_container_policies = version->policy_container_host()
-                                          ->policies()
-                                          .ToMojoPolicyContainerPolicies();
-  }
+      version->policy_container_host()
+          ? version->policy_container_host()
+                ->policies()
+                .ToMojoPolicyContainerPolicies()
+          : blink::mojom::PolicyContainerPolicies::New();
 
   ResourceList resources;
   version->script_cache_map()->GetResources(&resources);
@@ -916,8 +911,6 @@ ServiceWorkerRegistry::GetOrCreateRegistration(
     std::set<blink::mojom::WebFeature> used_features(data.used_features.begin(),
                                                      data.used_features.end());
     version->set_used_features(std::move(used_features));
-    version->set_cross_origin_embedder_policy(
-        data.cross_origin_embedder_policy);
     // policy_container_host could be null for registration restored from old DB
     if (data.policy_container_policies) {
       version->set_policy_container_host(

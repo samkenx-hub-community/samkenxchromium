@@ -310,6 +310,10 @@ const base::FeatureParam<int>
     kSharedStorageMaxAllowedFencedFrameDepthForSelectURL = {
         &kSharedStorageAPI,
         "SharedStorageMaxAllowedFencedFrameDepthForSelectURL", 1};
+const base::FeatureParam<int>
+    kSharedStorageMaxAllowedSelectURLCallsPerOriginPerPageLoad = {
+        &kSharedStorageAPI,
+        "SharedStorageMaxAllowedSelectURLCallsPerOriginPerPageLoad", 3};
 
 BASE_FEATURE(kSameSiteCrossOriginForSpeculationRulesPrerender,
              "SameSiteCrossOriginForSpeculationRulesPrerender",
@@ -1019,6 +1023,14 @@ const base::FeatureParam<int> kBrowsingTopicsConfigVersion{&kBrowsingTopics,
 const base::FeatureParam<int> kBrowsingTopicsTaxonomyVersion{
     &kBrowsingTopics, "taxonomy_version", 1};
 
+// Enables the deprecatedBrowsingTopics XHR attribute. For this feature to take
+// effect, the main Topics feature has to be enabled first (i.e.
+// `kBrowsingTopics` is enabled, and, either a valid Origin Trial token exists
+// or `kPrivacySandboxAdsAPIsOverride` is enabled.)
+BASE_FEATURE(kBrowsingTopicsXHR,
+             "BrowsingTopicsXHR",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 // If enabled, the check for whether the IP address is publicly routable will be
 // bypassed when determining the eligibility for a page to be included in topics
 // calculation. This is useful for developers to test in local environment.
@@ -1242,19 +1254,19 @@ BASE_FEATURE(kUACHOverrideBlank,
 #if BUILDFLAG(IS_WIN)
 BASE_FEATURE(kPrewarmDefaultFontFamilies,
              "PrewarmDefaultFontFamilies",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 const base::FeatureParam<bool> kPrewarmStandard = {&kPrewarmDefaultFontFamilies,
-                                                   "prewarm_standard", true};
+                                                   "prewarm_standard", false};
 const base::FeatureParam<bool> kPrewarmFixed = {&kPrewarmDefaultFontFamilies,
-                                                "prewarm_fixed", true};
+                                                "prewarm_fixed", false};
 const base::FeatureParam<bool> kPrewarmSerif = {&kPrewarmDefaultFontFamilies,
                                                 "prewarm_serif", true};
 const base::FeatureParam<bool> kPrewarmSansSerif = {
     &kPrewarmDefaultFontFamilies, "prewarm_sans_serif", true};
 const base::FeatureParam<bool> kPrewarmCursive = {&kPrewarmDefaultFontFamilies,
-                                                  "prewarm_cursive", true};
+                                                  "prewarm_cursive", false};
 const base::FeatureParam<bool> kPrewarmFantasy = {&kPrewarmDefaultFontFamilies,
-                                                  "prewarm_fantasy", true};
+                                                  "prewarm_fantasy", false};
 #endif
 
 // Enable `save-data` client hint.
@@ -1264,11 +1276,18 @@ BASE_FEATURE(kClientHintsSaveData,
 
 BASE_FEATURE(kEstablishGpuChannelAsync,
              "EstablishGpuChannelAsync",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+#if BUILDFLAG(IS_ANDROID)
+             base::FEATURE_ENABLED_BY_DEFAULT
+#else
+             // TODO(crbug.com/1278147): Experiment with this more on desktop to
+             // see if it can help.
+             base::FEATURE_DISABLED_BY_DEFAULT
+#endif
+);
 
 BASE_FEATURE(kDecodeScriptSourceOffThread,
              "DecodeScriptSourceOffThread",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 BASE_FEATURE(kDelayAsyncScriptExecution,
              "DelayAsyncScriptExecution",
@@ -1415,7 +1434,12 @@ const base::FeatureParam<bool> kPendingBeaconAPIForcesSendingOnNavigation = {
 #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_ANDROID)
 BASE_FEATURE(kPrefetchFontLookupTables,
              "PrefetchFontLookupTables",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+#if BUILDFLAG(IS_WIN)
+             base::FEATURE_DISABLED_BY_DEFAULT
+#else
+             base::FEATURE_ENABLED_BY_DEFAULT
+#endif
+);
 #endif
 
 BASE_FEATURE(kPrecompileInlineScripts,
@@ -1475,7 +1499,7 @@ BASE_FEATURE(kDisableArrayBufferSizeLimitsForTesting,
 
 BASE_FEATURE(kTimedHTMLParserBudget,
              "TimedHTMLParserBudget",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 BASE_FEATURE(kClipboardUnsanitizedContent,
              "ClipboardUnsanitizedContent",
@@ -1671,9 +1695,17 @@ BASE_FEATURE(kAllowPageWithIDBConnectionInBFCache,
              "AllowPageWithIDBConnectionInBFCache",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
+BASE_FEATURE(kAllowPageWithIDBTransactionInBFCache,
+             "AllowPageWithIDBTransactionInBFCache",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 BASE_FEATURE(kUseBlinkSchedulerTaskRunnerWithCustomDeleter,
              "UseBlinkSchedulerTaskRunnerWithCustomDeleter",
              base::FEATURE_ENABLED_BY_DEFAULT);
+
+BASE_FEATURE(kExtendScriptResourceLifetime,
+             "ExtendScriptResourceLifetime",
+             base::FEATURE_DISABLED_BY_DEFAULT);
 
 }  // namespace features
 }  // namespace blink

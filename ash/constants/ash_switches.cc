@@ -112,7 +112,15 @@ const char kArcDisableTtsCache[] = "arc-disable-tts-cache";
 // Flag that disables ureadahead completely, including host and guest parts.
 // To enable only guest ureadahead, please use --arcvm-ureadahead-mode=readahead
 // in combination with this switch (see |kArcVmUreadaheadMode|).
+// TODO(b/264585671): Refactore this and |kArcHostUreadaheadGeneration| to
+// mode enum.
 const char kArcDisableUreadahead[] = "arc-disable-ureadahead";
+
+// Flag that indicates host ureadahead generation session. Note, it is still
+// valid even in case of kArcDisableUreadahead is set.
+// TODO(b/264585671): Refactore this and |kArcDisableUreadahead| to
+// mode enum.
+const char kArcHostUreadaheadGeneration[] = "arc-host-ureadahead-generation";
 
 // Flag that forces the OptIn ui to be shown. Used in tests.
 const char kArcForceShowOptInUi[] = "arc-force-show-optin-ui";
@@ -927,10 +935,6 @@ const char kWaitForInitialPolicyFetchForTest[] =
 // attempt to load from /tmp/resource_overrides/help_app/untrusted/js/main.js.
 const char kWebUiDataSourcePathForTesting[] =
     "web-ui-data-source-path-for-testing";
-
-// Used to determine if and how on-device handwriting recognition is supported
-// (e.g. via rootfs or downloadable content).
-const char kOndeviceHandwritingSwitch[] = "ondevice_handwriting";
 
 // Enable the getAccessToken autotest API which creates access tokens using
 // the internal OAuth client ID.

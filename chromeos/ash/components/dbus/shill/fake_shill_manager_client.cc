@@ -9,10 +9,10 @@
 #include <memory>
 #include <vector>
 
-#include "base/bind.h"
-#include "base/callback_helpers.h"
 #include "base/command_line.h"
 #include "base/containers/contains.h"
+#include "base/functional/bind.h"
+#include "base/functional/callback_helpers.h"
 #include "base/location.h"
 #include "base/logging.h"
 #include "base/strings/string_number_conversions.h"
@@ -829,9 +829,10 @@ void FakeShillManagerClient::SetNetworkThrottlingStatus(
 }
 
 bool FakeShillManagerClient::GetFastTransitionStatus() {
-  base::Value* fast_transition_status = stub_properties_.FindKey(
-      base::StringPiece(shill::kWifiGlobalFTEnabledProperty));
-  return fast_transition_status && fast_transition_status->GetBool();
+  absl::optional<bool> fast_transition_status =
+      stub_properties_.GetDict().FindBool(
+          base::StringPiece(shill::kWifiGlobalFTEnabledProperty));
+  return fast_transition_status && fast_transition_status.value();
 }
 
 void FakeShillManagerClient::SetSimulateConfigurationResult(
@@ -1196,7 +1197,7 @@ void FakeShillManagerClient::CallNotifyObserversPropertyChanged(
 void FakeShillManagerClient::NotifyObserversPropertyChanged(
     const std::string& property) {
   VLOG(1) << "NotifyObserversPropertyChanged: " << property;
-  base::Value* value = stub_properties_.FindKey(property);
+  base::Value* value = stub_properties_.GetDict().Find(property);
   if (!value) {
     LOG(ERROR) << "Notify for unknown property: " << property;
     return;

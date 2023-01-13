@@ -10,8 +10,8 @@
 #include <memory>
 #include <utility>
 
-#include "base/bind.h"
-#include "base/callback_helpers.h"
+#include "base/functional/bind.h"
+#include "base/functional/callback_helpers.h"
 #include "base/memory/memory_pressure_listener.h"
 #include "base/memory/ptr_util.h"
 #include "base/ranges/algorithm.h"
@@ -17569,8 +17569,9 @@ TEST_F(CommitToPendingTreeLayerTreeHostImplTest, CommitWithDirtyPaintWorklets) {
   // Finally, 'paint' the content. This should unlock tile preparation and
   // update the PictureLayerImpl's map.
   std::move(painter->TakeDoneCallback()).Run(std::move(painted_job_map));
-  EXPECT_EQ(*root->GetPaintWorkletRecordMap().find(input)->second.second,
-            record);
+  EXPECT_TRUE(root->GetPaintWorkletRecordMap()
+                  .find(input)
+                  ->second.second->EqualsForTesting(record));
   EXPECT_TRUE(did_prepare_tiles_);
 }
 
@@ -17667,8 +17668,9 @@ TEST_F(ForceActivateAfterPaintWorkletPaintLayerTreeHostImplTest,
   // updated, but since the tree was force activated there should be no tile
   // preparation.
   std::move(painter->TakeDoneCallback()).Run(std::move(painted_job_map));
-  EXPECT_EQ(root->GetPaintWorkletRecordMap().find(input)->second.second,
-            record);
+  EXPECT_TRUE(root->GetPaintWorkletRecordMap()
+                  .find(input)
+                  ->second.second->EqualsForTesting(record));
   EXPECT_FALSE(did_prepare_tiles_);
 }
 

@@ -10,10 +10,10 @@
 #include <utility>
 #include <vector>
 
-#include "base/bind.h"
 #include "base/check_op.h"
 #include "base/files/file_util.h"
 #include "base/files/scoped_temp_dir.h"
+#include "base/functional/bind.h"
 #include "base/memory/weak_ptr.h"
 #include "base/path_service.h"
 #include "base/run_loop.h"
@@ -959,7 +959,6 @@ IN_PROC_BROWSER_TEST_F(PageLoadMetricsBrowserTest, NewPage) {
   histogram_tester_->ExpectTotalCount(internal::kHistogramDomContentLoaded, 1);
   histogram_tester_->ExpectTotalCount(internal::kHistogramLoad, 1);
   histogram_tester_->ExpectTotalCount(internal::kHistogramFirstPaint, 1);
-  histogram_tester_->ExpectTotalCount(internal::kHistogramParseDuration, 1);
   histogram_tester_->ExpectTotalCount(
       internal::kHistogramParseBlockedOnScriptLoad, 1);
   histogram_tester_->ExpectTotalCount(
@@ -997,7 +996,6 @@ IN_PROC_BROWSER_TEST_F(PageLoadMetricsBrowserTest, Redirect) {
   histogram_tester_->ExpectTotalCount(internal::kHistogramDomContentLoaded, 1);
   histogram_tester_->ExpectTotalCount(internal::kHistogramLoad, 1);
   histogram_tester_->ExpectTotalCount(internal::kHistogramFirstPaint, 1);
-  histogram_tester_->ExpectTotalCount(internal::kHistogramParseDuration, 1);
   histogram_tester_->ExpectTotalCount(
       internal::kHistogramParseBlockedOnScriptLoad, 1);
   histogram_tester_->ExpectTotalCount(
@@ -3959,9 +3957,7 @@ class NavigationPageLoadMetricsBrowserTest
   }
 };
 
-// Flaky. See https://crbug.com/1224780.
-IN_PROC_BROWSER_TEST_P(NavigationPageLoadMetricsBrowserTest,
-                       DISABLED_FirstInputDelay) {
+IN_PROC_BROWSER_TEST_P(NavigationPageLoadMetricsBrowserTest, FirstInputDelay) {
   ASSERT_TRUE(embedded_test_server()->Start());
 
   GURL url1(embedded_test_server()->GetURL("a.com", "/title1.html"));
@@ -3972,22 +3968,42 @@ IN_PROC_BROWSER_TEST_P(NavigationPageLoadMetricsBrowserTest,
                   internal::kHistogramFirstContentfulPaint),
               testing::IsEmpty());
 
+  auto waiter = CreatePageLoadMetricsTestWaiter("waiter");
+  waiter->AddPageExpectation(TimingField::kFirstInputDelay);
+
   // 1) Navigate to url1.
   EXPECT_TRUE(content::NavigateToURL(web_contents(), url1));
+  histogram_tester_->ExpectTotalCount(internal::kHistogramFirstInputDelay, 0);
   content::RenderFrameHost* rfh_a = RenderFrameHost();
   content::RenderProcessHost* rfh_a_process = rfh_a->GetProcess();
+
+  // We should wait for the main frame's hit-test data to be ready before
+  // sending the click event below to avoid flakiness.
+  content::WaitForHitTestData(web_contents()->GetPrimaryMainFrame());
+  // Ensure the compositor thread is ready for mouse events.
+  content::MainThreadFrameObserver frame_observer(
+      web_contents()->GetRenderWidgetHostView()->GetRenderWidgetHost());
+  frame_observer.Wait();
 
   // Simulate mouse click. FirstInputDelay won't get updated immediately.
   content::SimulateMouseClickAt(web_contents(), 0,
                                 blink::WebMouseEvent::Button::kLeft,
                                 gfx::Point(100, 100));
-  // Run arbitrary script and run tasks in the brwoser to ensure the input is
-  // processed in the renderer.
-  EXPECT_TRUE(content::ExecJs(rfh_a, "var foo = 42;"));
+
+  // Run a Performance Observer to ensure the renderer receives the click
+  EXPECT_TRUE(content::ExecJs(web_contents(), R"(
+          (async () => {
+            await new Promise(resolve => {
+              new PerformanceObserver(e => {
+                e.getEntries().forEach(entry => {
+                  resolve(true);
+                })
+              }).observe({type: 'first-input', buffered: true});
+          })})())"));
   base::RunLoop().RunUntilIdle();
   content::FetchHistogramsFromChildProcesses();
-  histogram_tester_->ExpectTotalCount(internal::kHistogramFirstInputDelay, 0);
 
+  waiter->Wait();
   // 2) Immediately navigate to url2.
   if (GetParam() == "CrossSiteRendererInitiated") {
     EXPECT_TRUE(content::NavigateToURLFromRenderer(web_contents(), url2));

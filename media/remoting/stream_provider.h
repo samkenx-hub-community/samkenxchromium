@@ -5,8 +5,8 @@
 #ifndef MEDIA_REMOTING_STREAM_PROVIDER_H_
 #define MEDIA_REMOTING_STREAM_PROVIDER_H_
 
-#include "base/callback_forward.h"
 #include "base/containers/circular_deque.h"
+#include "base/functional/callback_forward.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/scoped_refptr.h"
 #include "base/memory/weak_ptr.h"
@@ -103,7 +103,7 @@ class StreamProvider final : public Demuxer {
         const scoped_refptr<base::SequencedTaskRunner>& media_task_runner);
 
     // DemuxerStream implementation.
-    void Read(ReadCB read_cb) override;
+    void Read(uint32_t count, ReadCB read_cb) override;
     AudioDecoderConfig audio_decoder_config() override;
     VideoDecoderConfig video_decoder_config() override;
     DemuxerStream::Type type() const override;

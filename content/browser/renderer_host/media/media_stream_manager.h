@@ -33,11 +33,12 @@
 #include <utility>
 #include <vector>
 
-#include "base/callback.h"
+#include "base/functional/callback.h"
 #include "base/gtest_prod_util.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/ref_counted.h"
 #include "base/task/current_thread.h"
+#include "base/task/sequenced_task_runner.h"
 #include "base/task/single_thread_task_runner.h"
 #include "base/threading/thread.h"
 #include "base/time/time.h"
@@ -456,6 +457,8 @@ class CONTENT_EXPORT MediaStreamManager
 
   // Contains common data needed to keep track of requests.
   class DeviceRequest;
+  // Contains common data between GenerateStreams and GetOpenDevice requests
+  class CreateDeviceRequest;
   // Contains data specific for GenerateStreams requests
   class GenerateStreamsRequest;
   // Contains data specific for GetOpenDevice requests
@@ -490,7 +493,7 @@ class CONTENT_EXPORT MediaStreamManager
   void StopMediaStreamFromBrowser(const std::string& label);
   void ChangeMediaStreamSourceFromBrowser(const std::string& label,
                                           const DesktopMediaID& media_id);
-  void RequestStateChangeFromBrowser(
+  void OnRequestStateChangeFromBrowser(
       const std::string& label,
       const DesktopMediaID& media_id,
       blink::mojom::MediaStreamStateChange new_state);
@@ -515,6 +518,8 @@ class CONTENT_EXPORT MediaStreamManager
       blink::mojom::MediaStreamType stream_type) const;
   void StartEnumeration(DeviceRequest* request, const std::string& label);
   std::string AddRequest(std::unique_ptr<DeviceRequest> request);
+  DeviceRequests::const_iterator FindRequestIterator(
+      const std::string& label) const;
   DeviceRequest* FindRequest(const std::string& label) const;
   // Clones an existing device identified by |existing_device_session_id| and
   // returns it. If no such device is found, it returns absl::nullopt.

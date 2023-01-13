@@ -8,7 +8,7 @@
 #include <vector>
 
 #include "base/component_export.h"
-#include "components/services/app_service/public/mojom/types.mojom.h"
+#include "base/functional/callback.h"
 #include "ui/gfx/image/image_skia.h"
 
 namespace apps {
@@ -101,6 +101,18 @@ struct COMPONENT_EXPORT(ICON_TYPES) IconValue {
   // is from a maskable icon.
   bool is_maskable_icon = false;
 
+  // PNG-encoded bytes for the foreground icon data. Only available for the
+  // adaptive icon, e.g. some ARC app icons, when `icon_type` is kUncompressed.
+  // This field should be set by GetCompressedIconData only for
+  // publishers to get the raw icon data.
+  std::vector<uint8_t> foreground_icon_png_data;
+
+  // PNG-encoded bytes for the background icon data. Only available for the
+  // adaptive icon, e.g. some ARC app icons, when `icon_type` is kUncompressed.
+  // This field should be set by GetCompressedIconData only for
+  // publishers to get the raw icon data.
+  std::vector<uint8_t> background_icon_png_data;
+
   // Specifies whether the icon provided is a placeholder. That field should
   // only be true if the corresponding `LoadIcon` call had
   // `allow_placeholder_icon` set to true, which states whether the caller will
@@ -110,21 +122,6 @@ struct COMPONENT_EXPORT(ICON_TYPES) IconValue {
 
 using IconValuePtr = std::unique_ptr<IconValue>;
 using LoadIconCallback = base::OnceCallback<void(IconValuePtr)>;
-
-// TODO(crbug.com/1253250): Remove these functions after migrating to non-mojo
-// AppService.
-COMPONENT_EXPORT(ICON_TYPES)
-apps::mojom::IconKeyPtr ConvertIconKeyToMojomIconKey(const IconKey& icon_key);
-
-COMPONENT_EXPORT(ICON_TYPES)
-std::unique_ptr<IconKey> ConvertMojomIconKeyToIconKey(
-    const apps::mojom::IconKeyPtr& mojom_icon_key);
-
-COMPONENT_EXPORT(ICON_TYPES)
-apps::mojom::IconType ConvertIconTypeToMojomIconType(IconType icon_type);
-
-COMPONENT_EXPORT(ICON_TYPES)
-IconType ConvertMojomIconTypeToIconType(apps::mojom::IconType mojom_icon_type);
 
 }  // namespace apps
 

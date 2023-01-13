@@ -7,15 +7,16 @@
 #include <memory>
 #include <utility>
 
-#include "base/bind.h"
 #include "base/command_line.h"
 #include "base/feature_list.h"
 #include "base/files/file_path.h"
+#include "base/functional/bind.h"
 #include "base/logging.h"
 #include "base/metrics/field_trial_params.h"
 #include "base/metrics/histogram_functions.h"
 #include "base/metrics/user_metrics.h"
 #include "base/no_destructor.h"
+#include "base/task/sequenced_task_runner.h"
 #include "base/task/single_thread_task_runner.h"
 #include "build/build_config.h"
 #include "components/feature_engagement/internal/availability_model_impl.h"
@@ -37,6 +38,8 @@
 #include "components/feature_engagement/internal/system_time_provider.h"
 #include "components/feature_engagement/public/feature_constants.h"
 #include "components/feature_engagement/public/feature_list.h"
+#include "components/feature_engagement/public/group_constants.h"
+#include "components/feature_engagement/public/group_list.h"
 #include "components/leveldb_proto/public/proto_database_provider.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
 
@@ -111,7 +114,7 @@ Tracker* Tracker::Create(
       std::make_unique<PersistentEventStore>(std::move(event_db));
 
   auto configuration = std::make_unique<ChromeVariationsConfiguration>();
-  configuration->ParseFeatureConfigs(GetAllFeatures());
+  configuration->ParseConfigs(GetAllFeatures(), GetAllGroups());
 
   auto event_storage_validator =
       std::make_unique<FeatureConfigEventStorageValidator>();
@@ -190,7 +193,7 @@ TrackerImpl::TriggerDetails TrackerImpl::ShouldTriggerHelpUIWithSnooze(
 
   FeatureConfig feature_config = configuration_->GetFeatureConfig(feature);
   ConditionValidator::Result result = condition_validator_->MeetsConditions(
-      feature, feature_config, *event_model_, *availability_model_,
+      feature, feature_config, {}, *event_model_, *availability_model_,
       *display_lock_controller_, configuration_.get(),
       time_provider_->GetCurrentDay());
   if (result.NoErrors()) {
@@ -238,7 +241,7 @@ bool TrackerImpl::WouldTriggerHelpUI(const base::Feature& feature) const {
 
   FeatureConfig feature_config = configuration_->GetFeatureConfig(feature);
   ConditionValidator::Result result = condition_validator_->MeetsConditions(
-      feature, feature_config, *event_model_, *availability_model_,
+      feature, feature_config, {}, *event_model_, *availability_model_,
       *display_lock_controller_, configuration_.get(),
       time_provider_->GetCurrentDay());
   DVLOG(2) << "Would trigger result for " << feature.name
@@ -272,7 +275,7 @@ Tracker::TriggerState TrackerImpl::GetTriggerState(
   }
 
   ConditionValidator::Result result = condition_validator_->MeetsConditions(
-      feature, configuration_->GetFeatureConfig(feature), *event_model_,
+      feature, configuration_->GetFeatureConfig(feature), {}, *event_model_,
       *availability_model_, *display_lock_controller_, configuration_.get(),
       time_provider_->GetCurrentDay());
 

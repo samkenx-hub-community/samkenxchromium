@@ -492,9 +492,8 @@ void NewEmptyWindow(Profile* profile, bool should_trigger_session_restore) {
       off_the_record = false;
     }
   } else if (profile->IsGuestSession() ||
-             (browser_defaults::kAlwaysOpenIncognitoWindow &&
-              IncognitoModePrefs::ShouldLaunchIncognito(
-                  *base::CommandLine::ForCurrentProcess(), prefs))) {
+             IncognitoModePrefs::ShouldOpenSubsequentBrowsersInIncognito(
+                 *base::CommandLine::ForCurrentProcess(), prefs)) {
     off_the_record = true;
   }
 
@@ -560,12 +559,24 @@ bool CanGoBack(const Browser* browser) {
       .CanGoBack();
 }
 
+bool CanGoBack(content::WebContents* web_contents) {
+  return web_contents->GetController().CanGoBack();
+}
+
 void GoBack(Browser* browser, WindowOpenDisposition disposition) {
   base::RecordAction(UserMetricsAction("Back"));
 
   if (CanGoBack(browser)) {
     WebContents* new_tab = GetTabAndRevertIfNecessary(browser, disposition);
     new_tab->GetController().GoBack();
+  }
+}
+
+void GoBack(content::WebContents* web_contents) {
+  base::RecordAction(UserMetricsAction("Back"));
+
+  if (CanGoBack(web_contents)) {
+    web_contents->GetController().GoBack();
   }
 }
 
@@ -576,12 +587,23 @@ bool CanGoForward(const Browser* browser) {
       .CanGoForward();
 }
 
+bool CanGoForward(content::WebContents* web_contents) {
+  return web_contents->GetController().CanGoForward();
+}
+
 void GoForward(Browser* browser, WindowOpenDisposition disposition) {
   base::RecordAction(UserMetricsAction("Forward"));
   if (CanGoForward(browser)) {
     GetTabAndRevertIfNecessary(browser, disposition)
         ->GetController()
         .GoForward();
+  }
+}
+
+void GoForward(content::WebContents* web_contents) {
+  base::RecordAction(UserMetricsAction("Forward"));
+  if (CanGoForward(web_contents)) {
+    web_contents->GetController().GoForward();
   }
 }
 

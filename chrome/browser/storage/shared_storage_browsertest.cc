@@ -10,6 +10,7 @@
 #include "base/containers/contains.h"
 #include "base/run_loop.h"
 #include "base/strings/strcat.h"
+#include "base/task/single_thread_task_runner.h"
 #include "base/test/bind.h"
 #include "base/test/metrics/histogram_tester.h"
 #include "base/test/scoped_feature_list.h"
@@ -2133,7 +2134,9 @@ IN_PROC_BROWSER_TEST_F(SharedStorageChromeBrowserTest, WorkletTiming) {
   histogram_tester_.ExpectUniqueSample(kWorkletNumPerPageHistogram, 1, 1);
 }
 
-IN_PROC_BROWSER_TEST_F(SharedStorageChromeBrowserTest, WorkletNumPerPage_Two) {
+// Flaky: https://crbug.com/1406845
+IN_PROC_BROWSER_TEST_F(SharedStorageChromeBrowserTest,
+                       DISABLED_WorkletNumPerPage_Two) {
   EXPECT_TRUE(content::NavigateToURL(
       GetActiveWebContents(),
       https_server()->GetURL(kSimpleTestHost, kSimplePagePath)));
@@ -2171,8 +2174,9 @@ IN_PROC_BROWSER_TEST_F(SharedStorageChromeBrowserTest, WorkletNumPerPage_Two) {
             histogram_tester_.GetAllSamples(kTimingWorkletSetHistogram).size());
 }
 
+// Flaky: https://crbug.com/1406845
 IN_PROC_BROWSER_TEST_F(SharedStorageChromeBrowserTest,
-                       WorkletNumPerPage_Three) {
+                       DISABLED_WorkletNumPerPage_Three) {
   EXPECT_TRUE(content::NavigateToURL(
       GetActiveWebContents(),
       https_server()->GetURL(kSimpleTestHost, kSimplePagePath)));

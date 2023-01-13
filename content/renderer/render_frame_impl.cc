@@ -11,8 +11,6 @@
 #include <vector>
 
 #include "base/auto_reset.h"
-#include "base/bind.h"
-#include "base/callback_helpers.h"
 #include "base/command_line.h"
 #include "base/containers/flat_map.h"
 #include "base/debug/alias.h"
@@ -21,6 +19,8 @@
 #include "base/debug/dump_without_crashing.h"
 #include "base/feature_list.h"
 #include "base/files/file.h"
+#include "base/functional/bind.h"
+#include "base/functional/callback_helpers.h"
 #include "base/guid.h"
 #include "base/json/json_reader.h"
 #include "base/json/json_writer.h"
@@ -40,8 +40,8 @@
 #include "base/strings/string_split.h"
 #include "base/strings/string_util.h"
 #include "base/strings/utf_string_conversions.h"
+#include "base/task/single_thread_task_runner.h"
 #include "base/task/thread_pool.h"
-#include "base/threading/thread_task_runner_handle.h"
 #include "base/time/time.h"
 #include "base/trace_event/base_tracing.h"
 #include "base/trace_event/trace_event.h"
@@ -1059,12 +1059,8 @@ void FillMiscNavigationParams(
         navigation_params->ad_auction_components->push_back(blink::WebURL(urn));
       }
     }
-
-    if (commit_params.fenced_frame_properties->reporting_metadata()) {
-      navigation_params->fenced_frame_reporting =
-          commit_params.fenced_frame_properties->reporting_metadata()
-              ->potentially_opaque_value;
-    }
+    navigation_params->has_fenced_frame_reporting =
+        commit_params.fenced_frame_properties->reporting_metadata().has_value();
   }
 
   navigation_params->ancestor_or_self_has_cspee =
@@ -1546,8 +1542,9 @@ RenderFrameImpl* RenderFrameImpl::CreateMainFrame(
     // `params->subresource_loader_factories`.
     render_frame->loader_factories_ = render_frame->CreateLoaderFactoryBundle(
         std::move(params->subresource_loader_factories),
-        absl::nullopt /* subresource_overrides */,
-        mojo::NullRemote() /* prefetch_loader_factory */);
+        /*subresource_overrides=*/absl::nullopt,
+        /*prefetch_loader_factory=*/mojo::NullRemote(),
+        /*topics_loader_factory=*/mojo::NullRemote());
   }
 
   return render_frame;
@@ -2570,6 +2567,7 @@ void RenderFrameImpl::CommitNavigation(
     blink::mojom::ServiceWorkerContainerInfoForClientPtr container_info,
     mojo::PendingRemote<network::mojom::URLLoaderFactory>
         prefetch_loader_factory,
+    mojo::PendingRemote<network::mojom::URLLoaderFactory> topics_loader_factory,
     const blink::DocumentToken& document_token,
     const base::UnguessableToken& devtools_navigation_token,
     const absl::optional<blink::ParsedPermissionsPolicy>& permissions_policy,
@@ -2630,9 +2628,9 @@ void RenderFrameImpl::CommitNavigation(
       common_params.Clone(), commit_params.Clone(),
       std::move(subresource_loader_factories), std::move(subresource_overrides),
       std::move(controller_service_worker_info), std::move(container_info),
-      std::move(prefetch_loader_factory), std::move(code_cache_host),
-      std::move(cookie_manager_info), std::move(storage_info),
-      std::move(document_state));
+      std::move(prefetch_loader_factory), std::move(topics_loader_factory),
+      std::move(code_cache_host), std::move(cookie_manager_info),
+      std::move(storage_info), std::move(document_state));
 
   // Handle a navigation that has a non-empty `data_url_as_string`, or perform
   // a "loadDataWithBaseURL" navigation, which is different from a normal data:
@@ -2749,6 +2747,7 @@ void RenderFrameImpl::CommitNavigationWithParams(
     blink::mojom::ServiceWorkerContainerInfoForClientPtr container_info,
     mojo::PendingRemote<network::mojom::URLLoaderFactory>
         prefetch_loader_factory,
+    mojo::PendingRemote<network::mojom::URLLoaderFactory> topics_loader_factory,
     mojo::PendingRemote<blink::mojom::CodeCacheHost> code_cache_host,
     mojom::CookieManagerInfoPtr cookie_manager_info,
     mojom::StorageInfoPtr storage_info,
@@ -2763,7 +2762,8 @@ void RenderFrameImpl::CommitNavigationWithParams(
   scoped_refptr<blink::ChildURLLoaderFactoryBundle> new_loader_factories =
       CreateLoaderFactoryBundle(std::move(subresource_loader_factories),
                                 std::move(subresource_overrides),
-                                std::move(prefetch_loader_factory));
+                                std::move(prefetch_loader_factory),
+                                std::move(topics_loader_factory));
 
   DCHECK(new_loader_factories);
   DCHECK(new_loader_factories->HasBoundDefaultFactory());
@@ -2895,7 +2895,8 @@ void RenderFrameImpl::CommitFailedNavigation(
       CreateLoaderFactoryBundle(
           std::move(subresource_loader_factories),
           absl::nullopt /* subresource_overrides */,
-          mojo::NullRemote() /* prefetch_loader_factory */);
+          mojo::NullRemote() /* prefetch_loader_factory */,
+          mojo::NullRemote() /* topics_loader_factory */);
   DCHECK(new_loader_factories->HasBoundDefaultFactory());
 
   // Send the provisional load failure.
@@ -3087,8 +3088,8 @@ void RenderFrameImpl::CommitSameDocumentNavigation(
     bool started_with_transient_activation = common_params->has_user_gesture;
     bool is_browser_initiated = commit_params->is_browser_initiated;
     absl::optional<blink::scheduler::TaskAttributionId>
-        soft_navigation_heuristic_task_id =
-            commit_params->soft_navigation_heuristic_task_id;
+        soft_navigation_heuristics_task_id =
+            commit_params->soft_navigation_heuristics_task_id;
 
     WebSecurityOrigin initiator_origin;
     if (common_params->initiator_origin)
@@ -3109,7 +3110,7 @@ void RenderFrameImpl::CommitSameDocumentNavigation(
     commit_status = frame_->CommitSameDocumentNavigation(
         url, load_type, item_for_history_navigation, is_client_redirect,
         started_with_transient_activation, initiator_origin,
-        is_browser_initiated, soft_navigation_heuristic_task_id);
+        is_browser_initiated, soft_navigation_heuristics_task_id);
 
     // The load of the URL can result in this frame being removed. Use a
     // WeakPtr as an easy way to detect whether this has occured. If so, this
@@ -3249,11 +3250,14 @@ blink::WebMediaPlayer* RenderFrameImpl::CreateMediaPlayer(
     WebMediaPlayerEncryptedMediaClient* encrypted_client,
     WebContentDecryptionModule* initial_cdm,
     const blink::WebString& sink_id,
-    const cc::LayerTreeSettings& settings,
+    const cc::LayerTreeSettings* settings,
     scoped_refptr<base::TaskRunner> compositor_worker_task_runner) {
+  // `settings` should be non-null since the WebView created for
+  // RenderFrameImpl always composites.
+  DCHECK(settings);
   return media_factory_.CreateMediaPlayer(
       source, client, inspector_context, encrypted_client, initial_cdm, sink_id,
-      GetLocalRootWebFrameWidget()->GetFrameSinkId(), settings,
+      GetLocalRootWebFrameWidget()->GetFrameSinkId(), *settings,
       agent_scheduling_group_.agent_group_scheduler().CompositorTaskRunner(),
       std::move(compositor_worker_task_runner));
 }
@@ -4223,9 +4227,10 @@ void RenderFrameImpl::WillSendRequestInternal(
     }
   }
 
-  if (!request.GetURLRequestExtraData())
+  if (!request.GetURLRequestExtraData()) {
     request.SetURLRequestExtraData(
         base::MakeRefCounted<blink::WebURLRequestExtraData>());
+  }
   auto* url_request_extra_data = static_cast<blink::WebURLRequestExtraData*>(
       request.GetURLRequestExtraData().get());
   url_request_extra_data->set_custom_user_agent(custom_user_agent);
@@ -5516,7 +5521,9 @@ RenderFrameImpl::CreateLoaderFactoryBundle(
     absl::optional<std::vector<blink::mojom::TransferrableURLLoaderPtr>>
         subresource_overrides,
     mojo::PendingRemote<network::mojom::URLLoaderFactory>
-        prefetch_loader_factory) {
+        prefetch_loader_factory,
+    mojo::PendingRemote<network::mojom::URLLoaderFactory>
+        topics_loader_factory) {
   DCHECK(info);
   // We don't check `DCHECK(info->pending_default_factory())`, because it will
   // be missing for speculative frames (and in other cases where no subresource
@@ -5537,6 +5544,9 @@ RenderFrameImpl::CreateLoaderFactoryBundle(
   if (prefetch_loader_factory) {
     loader_factories->SetPrefetchLoaderFactory(
         std::move(prefetch_loader_factory));
+  }
+  if (topics_loader_factory) {
+    loader_factories->SetTopicsLoaderFactory(std::move(topics_loader_factory));
   }
 
   return loader_factories;
@@ -5699,11 +5709,8 @@ void RenderFrameImpl::BeginNavigationInternal(
   bool for_outermost_main_frame = frame_->IsOutermostMainFrame();
   WillSendRequestInternal(info->url_request, for_outermost_main_frame,
                           transition_type, ForRedirect(false));
-
-  if (!info->url_request.GetURLRequestExtraData()) {
-    info->url_request.SetURLRequestExtraData(
-        base::MakeRefCounted<blink::WebURLRequestExtraData>());
-  }
+  // The extra data was created in WillSendRequestInternal if it didn't exist.
+  DCHECK(info->url_request.GetURLRequestExtraData());
 
   // TODO(clamy): Same-document navigations should not be sent back to the
   // browser.
@@ -6009,8 +6016,9 @@ void RenderFrameImpl::LoadHTMLStringForTesting(const std::string& html,
   pending_loader_factories_ = CreateLoaderFactoryBundle(
       blink::ChildPendingURLLoaderFactoryBundle::CreateFromDefaultFactoryImpl(
           network::NotImplementedURLLoaderFactory::Create()),
-      absl::nullopt,  // |subresource_overrides|
-      {});            // prefetch_loader_factory
+      /*subresource_overrides=*/absl::nullopt,
+      /*prefetch_loader_factory=*/{},
+      /*topics_loader_factory=*/{});
 
   auto navigation_params = std::make_unique<WebNavigationParams>();
   navigation_params->url = base_url;

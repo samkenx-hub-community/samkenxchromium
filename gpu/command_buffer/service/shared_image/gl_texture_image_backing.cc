@@ -19,7 +19,6 @@
 #include "gpu/command_buffer/common/shared_image_usage.h"
 #include "gpu/command_buffer/service/context_state.h"
 #include "gpu/command_buffer/service/gles2_cmd_decoder.h"
-#include "gpu/command_buffer/service/image_factory.h"
 #include "gpu/command_buffer/service/service_utils.h"
 #include "gpu/command_buffer/service/shared_context_state.h"
 #include "gpu/command_buffer/service/shared_image/gl_repack_utils.h"
@@ -143,16 +142,15 @@ GLTextureImageBacking::GLTextureImageBacking(const Mailbox& mailbox,
                                              SkAlphaType alpha_type,
                                              uint32_t usage,
                                              bool is_passthrough)
-    : ClearTrackingSharedImageBacking(
-          mailbox,
-          format,
-          size,
-          color_space,
-          surface_origin,
-          alpha_type,
-          usage,
-          viz::ResourceSizes::UncheckedSizeInBytes<size_t>(size, format),
-          false /* is_thread_safe */),
+    : ClearTrackingSharedImageBacking(mailbox,
+                                      format,
+                                      size,
+                                      color_space,
+                                      surface_origin,
+                                      alpha_type,
+                                      usage,
+                                      format.EstimatedSizeInBytes(size),
+                                      false /* is_thread_safe */),
       is_passthrough_(is_passthrough) {}
 
 GLTextureImageBacking::~GLTextureImageBacking() {
@@ -168,10 +166,6 @@ GLTextureImageBacking::~GLTextureImageBacking() {
       texture_ = nullptr;
     }
   }
-}
-
-GLenum GLTextureImageBacking::GetGLTarget() const {
-  return texture_ ? texture_->target() : passthrough_texture_->target();
 }
 
 GLuint GLTextureImageBacking::GetGLServiceId() const {
@@ -204,7 +198,11 @@ void GLTextureImageBacking::SetClearedRect(const gfx::Rect& cleared_rect) {
 
 void GLTextureImageBacking::Update(std::unique_ptr<gfx::GpuFence> in_fence) {}
 
-bool GLTextureImageBacking::UploadFromMemory(const SkPixmap& pixmap) {
+bool GLTextureImageBacking::UploadFromMemory(
+    const std::vector<SkPixmap>& pixmaps) {
+  DCHECK_EQ(pixmaps.size(), 1u);
+  auto& pixmap = pixmaps[0];
+
   DCHECK(SupportsPixelUploadWithFormat(format()));
   DCHECK(gl::GLContext::GetCurrent());
 
@@ -367,16 +365,19 @@ std::unique_ptr<GLTextureImageRepresentation>
 GLTextureImageBacking::ProduceGLTexture(SharedImageManager* manager,
                                         MemoryTypeTracker* tracker) {
   DCHECK(texture_);
+  std::vector<raw_ptr<gles2::Texture>> gl_textures = {texture_};
   return std::make_unique<GLTextureGLCommonRepresentation>(
-      manager, this, nullptr, tracker, texture_);
+      manager, this, nullptr, tracker, std::move(gl_textures));
 }
 
 std::unique_ptr<GLTexturePassthroughImageRepresentation>
 GLTextureImageBacking::ProduceGLTexturePassthrough(SharedImageManager* manager,
                                                    MemoryTypeTracker* tracker) {
   DCHECK(passthrough_texture_);
+  std::vector<scoped_refptr<gles2::TexturePassthrough>> gl_textures = {
+      passthrough_texture_};
   return std::make_unique<GLTexturePassthroughGLCommonRepresentation>(
-      manager, this, nullptr, tracker, passthrough_texture_);
+      manager, this, nullptr, tracker, std::move(gl_textures));
 }
 
 std::unique_ptr<DawnImageRepresentation> GLTextureImageBacking::ProduceDawn(
@@ -387,19 +388,35 @@ std::unique_ptr<DawnImageRepresentation> GLTextureImageBacking::ProduceDawn(
     std::vector<WGPUTextureFormat> view_formats) {
 #if BUILDFLAG(USE_DAWN) && BUILDFLAG(DAWN_ENABLE_BACKEND_OPENGLES)
   if (backend_type == WGPUBackendType_OpenGLES) {
-    if (!image_egl_) {
-      CreateEGLImage();
+    // GLImageNativePixmap is only compiled on below os.
+#if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_OZONE)
+    if (!gl_image_native_pixmap_) {
+      SharedContextState* shared_context_state =
+          factory()->GetSharedContextState();
+      ui::ScopedMakeCurrent smc(shared_context_state->context(),
+                                shared_context_state->surface());
+      gl_image_native_pixmap_ = gl::GLImageNativePixmap::CreateFromTexture(
+          size(), ToBufferFormat(format()), GetGLServiceId());
+      if (!gl_image_native_pixmap_) {
+        DLOG(ERROR) << "Unable to create a GLImage";
+        return nullptr;
+      }
     }
-    std::unique_ptr<GLTextureImageRepresentationBase> texture;
+    std::unique_ptr<GLTextureImageRepresentationBase> gl_representation;
     if (IsPassthrough()) {
-      texture = ProduceGLTexturePassthrough(manager, tracker);
+      gl_representation = ProduceGLTexturePassthrough(manager, tracker);
     } else {
-      texture = ProduceGLTexture(manager, tracker);
+      gl_representation = ProduceGLTexture(manager, tracker);
     }
     return std::make_unique<DawnEGLImageRepresentation>(
-        std::move(texture), manager, this, tracker, device);
+        std::move(gl_representation), gl_image_native_pixmap_->GetEGLImage(),
+        manager, this, tracker, device);
+#else
+    DLOG(ERROR) << "Dawn representation not supported";
+    return nullptr;
+#endif  // BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_OZONE)
   }
-#endif
+#endif  // BUILDFLAG(USE_DAWN) && BUILDFLAG(DAWN_ENABLE_BACKEND_OPENGLES)
 
   if (!factory()) {
     DLOG(ERROR) << "No SharedImageFactory to create a dawn representation.";
@@ -416,21 +433,18 @@ std::unique_ptr<SkiaImageRepresentation> GLTextureImageBacking::ProduceSkia(
     MemoryTypeTracker* tracker,
     scoped_refptr<SharedContextState> context_state) {
   if (!cached_promise_texture_) {
-    bool angle_rgbx_internal_format = context_state->feature_info()
-                                          ->feature_flags()
-                                          .angle_rgbx_internal_format;
-    GLenum gl_texture_storage_format = TextureStorageFormat(
-        format(), angle_rgbx_internal_format, /*plane_index=*/0);
     GrBackendTexture backend_texture;
-    GetGrBackendTexture(context_state->feature_info(), GetGLTarget(), size(),
-                        GetGLServiceId(), gl_texture_storage_format,
-                        context_state->gr_context()->threadSafeProxy(),
-                        &backend_texture);
+    GetGrBackendTexture(
+        context_state->feature_info(), format_desc_.target, size(),
+        GetGLServiceId(), format_desc_.storage_internal_format,
+        context_state->gr_context()->threadSafeProxy(), &backend_texture);
     cached_promise_texture_ = SkPromiseImageTexture::Make(backend_texture);
   }
+  std::vector<sk_sp<SkPromiseImageTexture>> promise_textures = {
+      cached_promise_texture_};
   return std::make_unique<SkiaGLCommonRepresentation>(
-      manager, this, nullptr, std::move(context_state), cached_promise_texture_,
-      tracker);
+      manager, this, nullptr, std::move(context_state),
+      std::move(promise_textures), tracker);
 }
 
 void GLTextureImageBacking::InitializeGLTexture(
@@ -462,23 +476,6 @@ void GLTextureImageBacking::InitializeGLTexture(
                            is_cleared ? gfx::Rect(size()) : gfx::Rect());
     texture_->SetImmutable(true, format_info.supports_storage);
   }
-}
-
-void GLTextureImageBacking::CreateEGLImage() {
-#if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_OZONE)
-  SharedContextState* shared_context_state = factory()->GetSharedContextState();
-  ui::ScopedMakeCurrent smc(shared_context_state->context(),
-                            shared_context_state->surface());
-  image_egl_ = gl::GLImageNativePixmap::CreateFromTexture(
-      size(), ToBufferFormat(format()), GetGLServiceId());
-  if (passthrough_texture_) {
-    passthrough_texture_->SetLevelImage(passthrough_texture_->target(), 0,
-                                        image_egl_.get());
-  } else if (texture_) {
-    texture_->SetLevelImage(texture_->target(), 0, image_egl_.get(),
-                            gles2::Texture::ImageState::BOUND);
-  }
-#endif
 }
 
 void GLTextureImageBacking::SetCompatibilitySwizzle(

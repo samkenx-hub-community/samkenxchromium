@@ -608,7 +608,7 @@
 <translation id="5957366693331451795">Chromebox-ak</translation>
 <translation id="5982621672636444458">Ordenatzeko aukerak</translation>
 <translation id="6007237601604674381">Ezin izan da eraman. <ph name="ERROR_MESSAGE" /></translation>
-<translation id="6011074160056912900">Ethernet sarea</translation>
+<translation id="6011074160056912900">Ethernet-sarea</translation>
 <translation id="60357267506638014">QWERTY txekiarra</translation>
 <translation id="603895874132768835">Ezingo duzu erabili sarea beste PIN bat konfiguratzen duzun arte</translation>
 <translation id="6040143037577758943">Itxi</translation>
@@ -678,7 +678,6 @@
 <translation id="6607272825297743757">Fitxategiari buruzko informazioa</translation>
 <translation id="6609332149380188670"><ph name="NUMBER_OF_ITEMS" /> karpeta partekatu dira Parallels Desktop aplikazioarekin</translation>
 <translation id="6629518321609546825">Idatzi lau zenbaki gutxienez</translation>
-<translation id="6639661343369899134">Ezin dira kargatu fitxategiak, <ph name="SHARED_DRIVE_NAME" /> unitate partekatuko biltegian ez dagoelako behar adina toki.</translation>
 <translation id="6643016212128521049">Garbitu</translation>
 <translation id="6650726141019353908">Tximeleta arrosa</translation>
 <translation id="6657585470893396449">Pasahitza</translation>

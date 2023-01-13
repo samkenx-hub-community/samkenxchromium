@@ -8,9 +8,9 @@
 #include <memory>
 #include <vector>
 
-#include "base/callback_forward.h"
 #include "base/containers/flat_map.h"
 #include "base/files/file_path.h"
+#include "base/functional/callback_forward.h"
 #include "base/memory/weak_ptr.h"
 #include "chrome/browser/chromeos/policy/dlp/dlp_rules_manager.h"
 #include "chromeos/dbus/dlp/dlp_service.pb.h"
@@ -209,6 +209,11 @@ class DlpFilesController {
   void CheckIfLaunchAllowed(const apps::AppUpdate& app_update,
                             apps::IntentPtr intent,
                             CheckIfLaunchAllowedCallback result_callback);
+
+  // Returns true if `app_update` is blocked from opening any of the
+  // files in `intent`.
+  virtual bool IsLaunchBlocked(const apps::AppUpdate& app_update,
+                               const apps::IntentPtr& intent);
 
   // Returns a sublist of |transferred_files| which aren't allowed to be
   // transferred to either |destination_url| or |destination_component| in

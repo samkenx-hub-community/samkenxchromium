@@ -115,7 +115,8 @@ public final class TopicsFragmentV4Test {
 
     private void startTopicsSettings() {
         mSettingsActivityTestRule.startSettingsActivity();
-        onViewWaiting(withText(R.string.settings_topics_page_title));
+        onViewWaiting(allOf(withText(R.string.settings_topics_page_title),
+                withParent(withId(R.id.action_bar))));
     }
 
     private Matcher<View> getTopicsToggleMatcher() {
@@ -125,7 +126,7 @@ public final class TopicsFragmentV4Test {
     }
 
     private View getTopicsRootView() {
-        return getRootViewSanitized(R.string.settings_topics_page_title);
+        return getRootViewSanitized(R.string.settings_topics_page_toggle_sub_label);
     }
 
     private View getBlockedTopicsRootView() {
@@ -388,7 +389,7 @@ public final class TopicsFragmentV4Test {
 
         // Go back to the main Topics fragment
         pressBack();
-        onViewWaiting(withText(R.string.settings_topics_page_title));
+        onViewWaiting(withText(R.string.settings_topics_page_toggle_sub_label));
 
         // Verify that the Topics are unblocked
         onView(withText(TOPIC_NAME_1)).check(matches(isDisplayed()));
@@ -422,13 +423,29 @@ public final class TopicsFragmentV4Test {
 
     @Test
     @SmallTest
+    public void testLearnMoreLink() {
+        startTopicsSettings();
+        // Open the Topics learn more activity
+        onView(withText(containsString("Learn more"))).perform(clickOnClickableSpan(0));
+        onViewWaiting(withText(R.string.settings_topics_page_learn_more_heading))
+                .check(matches(isDisplayed()));
+        // Close the additional activity by navigating back.
+        pressBack();
+        // Verify that metrics are sent
+        assertThat(mUserActionTester.getActions(),
+                hasItems("Settings.PrivacySandbox.Topics.LearnMoreClicked"));
+    }
+
+    @Test
+    @SmallTest
     public void testFooterFledgeLink() throws IOException {
         setTopicsPrefEnabled(true);
         mFakePrivacySandboxBridge.setCurrentTopTopics(TOPIC_NAME_1, TOPIC_NAME_2);
         startTopicsSettings();
         // Open a Fledge settings activity.
-        onView(withText(containsString("fledge settings"))).perform(clickOnClickableSpan(0));
-        onView(withText(R.string.settings_fledge_page_title)).check(matches(isDisplayed()));
+        onView(withText(containsString("Site-suggested ads"))).perform(clickOnClickableSpan(0));
+        onViewWaiting(withText(R.string.settings_fledge_page_toggle_sub_label))
+                .check(matches(isDisplayed()));
         // Close the additional activity by navigating back.
         pressBack();
     }
@@ -441,7 +458,8 @@ public final class TopicsFragmentV4Test {
         startTopicsSettings();
         // Open a CookieSettings activity.
         onView(withText(containsString("cookie settings"))).perform(clickOnClickableSpan(1));
-        onView(withText(R.string.third_party_cookies_page_title)).check(matches(isDisplayed()));
+        onViewWaiting(withText(R.string.third_party_cookies_page_title))
+                .check(matches(isDisplayed()));
         // Close the additional activity by navigating back.
         pressBack();
     }

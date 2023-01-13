@@ -44,6 +44,7 @@ public class FledgeFragmentV4 extends PrivacySandboxSettingsBaseFragment
     static final int MAX_DISPLAYED_SITES = 15;
 
     private static final String FLEDGE_TOGGLE_PREFERENCE = "fledge_toggle";
+    private static final String HEADING_PREFERENCE = "fledge_heading";
     private static final String CURRENT_SITES_PREFERENCE = "current_fledge_sites";
     private static final String EMPTY_FLEDGE_PREFERENCE = "fledge_empty";
     private static final String DISABLED_FLEDGE_PREFERENCE = "fledge_disabled";
@@ -51,12 +52,14 @@ public class FledgeFragmentV4 extends PrivacySandboxSettingsBaseFragment
     private static final String FOOTER_PREFERENCE = "fledge_page_footer";
 
     private ChromeSwitchPreference mFledgeTogglePreference;
+    private PreferenceCategoryWithClickableSummary mHeadingPreference;
     private PreferenceCategory mCurrentSitesCategory;
     private TextMessagePreference mEmptyFledgePreference;
     private TextMessagePreference mDisabledFledgePreference;
     private ChromeBasePreference mAllSitesPreference;
     private LargeIconBridge mLargeIconBridge;
     private ClickableSpansTextMessagePreference mFooterPreference;
+    private boolean mMoreThanMaxSitesToDisplay;
 
     static boolean isFledgePrefEnabled() {
         PrefService prefService = UserPrefs.get(Profile.getLastUsedRegularProfile());
@@ -80,6 +83,7 @@ public class FledgeFragmentV4 extends PrivacySandboxSettingsBaseFragment
         SettingsUtils.addPreferencesFromResource(this, R.xml.fledge_preference_v4);
 
         mFledgeTogglePreference = findPreference(FLEDGE_TOGGLE_PREFERENCE);
+        mHeadingPreference = findPreference(HEADING_PREFERENCE);
         mCurrentSitesCategory = findPreference(CURRENT_SITES_PREFERENCE);
         mEmptyFledgePreference = findPreference(EMPTY_FLEDGE_PREFERENCE);
         mDisabledFledgePreference = findPreference(DISABLED_FLEDGE_PREFERENCE);
@@ -89,8 +93,9 @@ public class FledgeFragmentV4 extends PrivacySandboxSettingsBaseFragment
         mFledgeTogglePreference.setChecked(isFledgePrefEnabled());
         mFledgeTogglePreference.setOnPreferenceChangeListener(this);
         mFledgeTogglePreference.setManagedPreferenceDelegate(createManagedPreferenceDelegate());
+        mMoreThanMaxSitesToDisplay = false;
 
-        mCurrentSitesCategory.setSummary(SpanApplier.applySpans(
+        mHeadingPreference.setSummary(SpanApplier.applySpans(
                 getResources().getString(R.string.settings_fledge_page_current_sites_description),
                 new SpanApplier.SpanInfo("<link>", "</link>",
                         new NoUnderlineClickableSpan(getContext(), this::onLearnMoreClicked))));
@@ -105,6 +110,7 @@ public class FledgeFragmentV4 extends PrivacySandboxSettingsBaseFragment
     }
 
     private void onLearnMoreClicked(View view) {
+        RecordUserAction.record("Settings.PrivacySandbox.Fledge.LearnMoreClicked");
         launchSettingsActivity(FledgeLearnMoreFragment.class);
     }
 
@@ -177,6 +183,8 @@ public class FledgeFragmentV4 extends PrivacySandboxSettingsBaseFragment
         }
 
         mCurrentSitesCategory.removeAll();
+        mMoreThanMaxSitesToDisplay = currentSites.size() > MAX_DISPLAYED_SITES;
+
         int nrDisplayedSites = Math.min(currentSites.size(), MAX_DISPLAYED_SITES);
         for (int i = 0; i < nrDisplayedSites; i++) {
             String site = currentSites.get(i);
@@ -184,11 +192,13 @@ public class FledgeFragmentV4 extends PrivacySandboxSettingsBaseFragment
                     new FledgePreference(getContext(), site, mLargeIconBridge);
             preference.setImage(R.drawable.btn_close,
                     getResources().getString(
-                            R.string.privacy_sandbox_remove_site_button_description, site));
+                            R.string.settings_fledge_page_block_site_a11y_label, site));
             preference.setDividerAllowedAbove(false);
             preference.setOnPreferenceClickListener(this);
             mCurrentSitesCategory.addPreference(preference);
         }
+
+        updatePreferenceVisibility();
     }
 
     private void updatePreferenceVisibility() {
@@ -203,7 +213,9 @@ public class FledgeFragmentV4 extends PrivacySandboxSettingsBaseFragment
 
         // Visible when Fledge is enabled and the current sites list is not empty.
         mCurrentSitesCategory.setVisible(fledgeEnabled && !sitesEmpty);
-        mAllSitesPreference.setVisible(fledgeEnabled && !sitesEmpty);
+
+        // Visible when Fledge is enabled and has more than MAX_DISPLAYED_SITES allowed sites.
+        mAllSitesPreference.setVisible(fledgeEnabled && mMoreThanMaxSitesToDisplay);
     }
 
     private ChromeManagedPreferenceDelegate createManagedPreferenceDelegate() {

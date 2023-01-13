@@ -4,7 +4,7 @@
 
 #include "remoting/codec/webrtc_video_encoder_av1.h"
 
-#include "base/callback.h"
+#include "base/functional/callback.h"
 #include "base/logging.h"
 #include "base/notreached.h"
 #include "base/system/sys_info.h"
@@ -92,6 +92,24 @@ bool WebrtcVideoEncoderAV1::InitializeCodec(const webrtc::DesktopSize& size) {
   if (config_.g_threads > 1) {
     error = aom_codec_control(codec.get(), AV1E_SET_ROW_MT, 1);
     DCHECK_EQ(error, AOM_CODEC_OK) << "Failed to set AV1E_SET_ROW_MT";
+
+    // Use a smaller superblock size when allocating > 16 threads.
+    if (config_.g_threads > 16) {
+      // The default value for AV1E_SET_SUPERBLOCK_SIZE is
+      // AOM_SUPERBLOCK_SIZE_DYNAMIC which uses 64x64 blocks for resolutions of
+      // 720px or lower and 128x128 for resolutions above that. When testing
+      // with display resolutions higher than 3840x2160 (4K), we found that
+      // increasing the number of threads from 16 to 32 increased performance
+      // for VP9 but performance decreased with AV1. The codec team investigated
+      // and suggested adjusting the superblock size down to 64x64 to increase
+      // the amount of parallelism.  This solution increased performance for 5K
+      // displays and put it around the level of what we see for a 4K display.
+      // See https://crbug.com/aomedia/3363 for more info.
+      error = aom_codec_control(codec.get(), AV1E_SET_SUPERBLOCK_SIZE,
+                                AOM_SUPERBLOCK_SIZE_64X64);
+      DCHECK_EQ(error, AOM_CODEC_OK)
+          << "Failed to set AV1E_SET_SUPERBLOCK_SIZE";
+    }
   }
 
   // The param used to set the tile columns and tile rows is in log2 so 0 is ok.
@@ -325,8 +343,9 @@ void WebrtcVideoEncoderAV1::UpdateConfig(const FrameParams& params) {
     changed = true;
   }
 
-  if (!changed)
+  if (!changed) {
     return;
+  }
 
   // Update encoder context.
   if (aom_codec_enc_config_set(codec_.get(), &config_)) {
@@ -373,11 +392,13 @@ void WebrtcVideoEncoderAV1::Encode(std::unique_ptr<webrtc::DesktopFrame> frame,
 
   aom_active_map_t act_map;
   if (use_active_map_) {
-    if (params.clear_active_map)
+    if (params.clear_active_map) {
       active_map_.Clear();
+    }
 
-    if (params.key_frame)
+    if (params.key_frame) {
       updated_region.SetRect(webrtc::DesktopRect::MakeSize(frame_size));
+    }
 
     active_map_.Update(updated_region);
 
@@ -434,8 +455,9 @@ void WebrtcVideoEncoderAV1::Encode(std::unique_ptr<webrtc::DesktopFrame> frame,
   while (!got_data) {
     const aom_codec_cx_pkt_t* aom_packet =
         aom_codec_get_cx_data(codec_.get(), &iter);
-    if (!aom_packet)
+    if (!aom_packet) {
       continue;
+    }
 
     switch (aom_packet->kind) {
       case AOM_CODEC_CX_FRAME_PKT: {

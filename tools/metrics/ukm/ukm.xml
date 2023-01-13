@@ -149,6 +149,33 @@ be describing additional metrics about the same event.
   </metric>
 </event>
 
+<event name="Accessibility.PageZoom">
+  <owner>aldietz@google.com</owner>
+  <owner>mschillaci@google.com</owner>
+  <owner>chrome-a11y-core@google.com</owner>
+  <summary>
+    Tracks usage of Page Zoom on Chrome for Android. Recorded each time the
+    slider is dismissed if the user changed the zoom level on this page before
+    dismissal.
+  </summary>
+  <metric name="SliderZoomValue">
+    <summary>
+      For users who changed the individual zoom level on this page, tracks what
+      zoom level has been set on the page at slider dismissal. There may be
+      multiple instances where the slider is opened on the same page, so there
+      may be multiple values logged per page. The value will be an integer
+      between 25 and 500, inclusive, bucketed in intervals of 5.
+    </summary>
+    <aggregation>
+      <history>
+        <statistics>
+          <quantiles type="std-percentiles"/>
+        </statistics>
+      </history>
+    </aggregation>
+  </metric>
+</event>
+
 <event name="Accessibility.Renderer">
   <owner>aleventhal@chromium.org</owner>
   <owner>nektar@chromium.org</owner>
@@ -5302,6 +5329,9 @@ be describing additional metrics about the same event.
     </aggregation>
   </metric>
   <metric name="UrlContent" enum="URLContent">
+    <obsolete>
+      Deprecated as of 01/2023.
+    </obsolete>
     <summary>
       The url content, e.g. full url, scope.
     </summary>
@@ -17998,6 +18028,18 @@ be describing additional metrics about the same event.
       metric, we measure the latency of user interactions by
       Responsiveness.UserInteraction.MaxEventDuration.
     </summary>
+    <aggregation>
+      <history>
+        <index fields="profile.country"/>
+        <index fields="profile.country,profile.system_ram"/>
+        <index fields="profile.is_dominant_version"/>
+        <index fields="profile.is_latest_version"/>
+        <index fields="profile.system_ram"/>
+        <statistics>
+          <quantiles type="std-percentiles"/>
+        </statistics>
+      </history>
+    </aggregation>
   </metric>
   <metric name="InteractiveTiming.WorstUserInteractionLatency.MaxEventDuration">
     <summary>
@@ -18024,6 +18066,18 @@ be describing additional metrics about the same event.
       resource has a 'Cache-control: no-store' response header. Recorded only
       for main frame request.
     </summary>
+  </metric>
+  <metric name="PageEndReason" enum="PageEndReason">
+    <summary>
+      The |page_load_metrics::PageEndReason| for the prerender's activation.
+    </summary>
+    <aggregation>
+      <history>
+        <statistics>
+          <enumeration/>
+        </statistics>
+      </history>
+    </aggregation>
   </metric>
   <metric name="Timing.ActivationToFirstContentfulPaint">
     <summary>

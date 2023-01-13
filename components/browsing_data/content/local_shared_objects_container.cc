@@ -53,8 +53,7 @@ LocalSharedObjectsContainer::LocalSharedObjectsContainer(
       databases_(base::MakeRefCounted<CannedDatabaseHelper>(browser_context)),
       file_systems_(base::MakeRefCounted<CannedFileSystemHelper>(
           browser_context->GetDefaultStoragePartition()->GetFileSystemContext(),
-          additional_file_system_types,
-          browser_context->GetDefaultStoragePartition()->GetNativeIOContext())),
+          additional_file_system_types)),
       indexed_dbs_(base::MakeRefCounted<CannedIndexedDBHelper>(
           browser_context->GetDefaultStoragePartition())),
       local_storages_(base::MakeRefCounted<CannedLocalStorageHelper>(
@@ -162,8 +161,10 @@ LocalSharedObjectsContainer::GetObjectCountPerOriginMap() const {
   for (const auto& info : shared_workers()->GetSharedWorkerInfo())
     origins[info.storage_key.origin()]++;
 
-  for (const auto& origin : cache_storages()->GetOrigins())
-    origins[origin]++;
+  for (const auto& storage_key : cache_storages()->GetStorageKeys()) {
+    // TODO(https://crbug.com/1199077): Use the real StorageKey once migrated.
+    origins[storage_key.origin()]++;
+  }
 
   for (const auto& origin : file_systems()->GetOrigins())
     origins[origin]++;

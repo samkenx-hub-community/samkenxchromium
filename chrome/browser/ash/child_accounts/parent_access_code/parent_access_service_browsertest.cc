@@ -8,7 +8,7 @@
 #include <utility>
 
 #include "ash/public/cpp/child_accounts/parent_access_controller.h"
-#include "base/bind.h"
+#include "base/functional/bind.h"
 #include "base/json/json_writer.h"
 #include "chrome/browser/ash/child_accounts/parent_access_code/config_source.h"
 #include "chrome/browser/ash/child_accounts/parent_access_code/parent_access_service.h"
@@ -42,7 +42,7 @@ base::Value PolicyFromConfigs(
   base::Value::Dict dict;
   dict.Set(kFutureConfigDictKey, future_config.ToDictionary());
   dict.Set(kCurrentConfigDictKey, current_config.ToDictionary());
-  base::Value old_configs_value(base::Value::Type::LIST);
+  base::Value::List old_configs_value;
   for (const auto& config : old_configs)
     old_configs_value.Append(config.ToDictionary());
   dict.Set(kOldConfigsDictKey, std::move(old_configs_value));

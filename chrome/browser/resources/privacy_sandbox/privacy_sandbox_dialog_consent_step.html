@@ -20,7 +20,6 @@
   <privacy-sandbox-dialog-learn-more class="learn-more-section"
       expanded="{{expanded_}}"
       title="$i18n{m1ConsentLearnMoreExpandLabel}">
-    <div><b>$i18n{m1ConsentLearnMoreHeading}</b></div>
       <ul class="cr-secondary-text">
         <li>$i18nRaw{m1ConsentLearnMoreBullet1}</li>
         <li>$i18nRaw{m1ConsentLearnMoreBullet2}</li>
@@ -41,7 +40,7 @@
   </div>
 </div>
 <div id="showMoreOverlay" hidden="[[wasScrolledToBottom]]">
-  <cr-button id="moreButton" on-click="onMoreClicked"
+  <cr-button id="moreButton" on-click="onConsentMoreClicked"
       class="action-button" aria-hidden="true" tabindex="-1">
     $i18n{m1DialogMoreButton}
     <iron-icon icon="cr:expand-more"></iron-icon>

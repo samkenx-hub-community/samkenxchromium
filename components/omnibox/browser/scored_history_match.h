@@ -20,8 +20,6 @@
 #include "components/omnibox/browser/omnibox_field_trial.h"
 #include "omnibox_event.pb.h"
 
-class ScoredHistoryMatchTest;
-
 // An HistoryMatch that has a score as well as metrics defining where in the
 // history item's URL and/or page title matches have occurred.
 struct ScoredHistoryMatch : public history::HistoryMatch {
@@ -95,7 +93,12 @@ struct ScoredHistoryMatch : public history::HistoryMatch {
 
   // An interim score taking into consideration location and completeness
   // of the match.
-  int raw_score;
+  int raw_score = 0;
+
+  // `kDomainSuggestions` may boost the score. These record the original and
+  // boosted scores for logging.
+  int raw_score_before_domain_boosting = 0;
+  int raw_score_after_domain_boosting = 0;
 
   // Both these TermMatches contain the set of matches that are considered
   // important.  At this time, that means they exclude mid-word matches
@@ -115,14 +118,7 @@ struct ScoredHistoryMatch : public history::HistoryMatch {
   metrics::OmniboxEventProto::Suggestion::ScoringSignals scoring_signals;
 
  private:
-  friend class ScoredHistoryMatchTest;
-  FRIEND_TEST_ALL_PREFIXES(ScoredHistoryMatchTest, GetDocumentSpecificityScore);
-  FRIEND_TEST_ALL_PREFIXES(ScoredHistoryMatchTest, GetFinalRelevancyScore);
-  FRIEND_TEST_ALL_PREFIXES(ScoredHistoryMatchTest, GetFrequency);
-  FRIEND_TEST_ALL_PREFIXES(ScoredHistoryMatchTest, GetHQPBucketsFromString);
-  FRIEND_TEST_ALL_PREFIXES(ScoredHistoryMatchTest, ScoringBookmarks);
-  FRIEND_TEST_ALL_PREFIXES(ScoredHistoryMatchTest, ScoringScheme);
-  FRIEND_TEST_ALL_PREFIXES(ScoredHistoryMatchTest, ScoringTLD);
+  friend class ScoredHistoryMatchPublic;
 
   // Initialize ScoredHistoryMatch statics. Must be called before any other
   // method of ScoredHistoryMatch and before creating any instances.
@@ -178,6 +174,13 @@ struct ScoredHistoryMatch : public history::HistoryMatch {
   // malformed |buckets_str|.
   static ScoreMaxRelevances GetHQPBucketsFromString(
       const std::string& buckets_str);
+
+  // Returns a score based on last visit time intended for suggestions from
+  // highly visited domains. This is an alternative to
+  // `GetFinalRelevancyScore()`; suggestions from highly visited domains will
+  // use the max of the 2 while other suggestions will use just
+  // `GetFinalRelevancyScore()`.
+  int GetDomainRelevancyScore(base::Time now) const;
 
   // If true, assign raw scores to be max(whatever it normally would be, a
   // score that's similar to the score HistoryURL provider would assign).

@@ -14,13 +14,11 @@ BASE_DECLARE_FEATURE(kEnableSuggestionsScrollingOnIPad);
 // Feature flag to make omnibox popup a floating rounded rect.
 BASE_DECLARE_FEATURE(kEnablePopoutOmniboxIpad);
 
-// Feature flag to enable dynamic tile spacing in MVCarousel. Increases the
-// spacing between the tiles to always show half a tile, indicating a scrollable
-// list.
-BASE_DECLARE_FEATURE(kOmniboxCarouselDynamicSpacing);
-
 // Feature flag to enable paste button on the omnibox keyboard accessories.
 BASE_DECLARE_FEATURE(kOmniboxKeyboardPasteButton);
+
+// Feature flag to enable multiple lines for search suggestions in omnibox.
+BASE_DECLARE_FEATURE(kOmniboxMultilineSearchSuggest);
 
 // Returns if kEnablePopoutOmniboxIpad feature is enabled.
 bool IsIpadPopoutOmniboxEnabled();

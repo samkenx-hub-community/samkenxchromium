@@ -4,14 +4,16 @@
 
 #include "chrome/updater/policy/win/group_policy_manager.h"
 
-#include <memory>
 #include <string>
 
+#include "base/memory/ref_counted.h"
+#include "base/memory/scoped_refptr.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/test/test_reg_util_win.h"
 #include "base/time/time.h"
 #include "base/win/registry.h"
 #include "base/win/win_util.h"
+#include "chrome/updater/test_scope.h"
 #include "chrome/updater/util/win_util.h"
 #include "chrome/updater/win/win_constants.h"
 #include "testing/gtest/include/gtest/gtest.h"
@@ -48,8 +50,8 @@ void GroupPolicyManagerTests::DeletePolicyKey() {
 }
 
 TEST_F(GroupPolicyManagerTests, NoPolicySet) {
-  std::unique_ptr<PolicyManagerInterface> policy_manager =
-      std::make_unique<GroupPolicyManager>();
+  scoped_refptr<PolicyManagerInterface> policy_manager =
+      base::MakeRefCounted<GroupPolicyManager>(IsSystemInstall(GetTestScope()));
   EXPECT_FALSE(policy_manager->HasActiveDevicePolicies());
 
   EXPECT_EQ(policy_manager->source(), "GroupPolicy");
@@ -118,8 +120,8 @@ TEST_F(GroupPolicyManagerTests, PolicyRead) {
   EXPECT_EQ(ERROR_SUCCESS,
             key.WriteValue(L"RollbackToTargetVersion" TEST_APP_ID, 1));
 
-  std::unique_ptr<PolicyManagerInterface> policy_manager =
-      std::make_unique<GroupPolicyManager>();
+  scoped_refptr<PolicyManagerInterface> policy_manager =
+      base::MakeRefCounted<GroupPolicyManager>(IsSystemInstall(GetTestScope()));
   EXPECT_EQ(policy_manager->HasActiveDevicePolicies(),
             base::win::IsEnrolledToDomain());
 
@@ -190,8 +192,8 @@ TEST_F(GroupPolicyManagerTests, WrongPolicyValueType) {
   EXPECT_EQ(ERROR_SUCCESS,
             key.WriteValue(L"RollbackToTargetVersion" TEST_APP_ID, L"1"));
 
-  std::unique_ptr<PolicyManagerInterface> policy_manager =
-      std::make_unique<GroupPolicyManager>();
+  scoped_refptr<PolicyManagerInterface> policy_manager =
+      base::MakeRefCounted<GroupPolicyManager>(IsSystemInstall(GetTestScope()));
 
   EXPECT_EQ(policy_manager->GetLastCheckPeriod(), absl::nullopt);
   EXPECT_EQ(policy_manager->GetUpdatesSuppressedTimes(), absl::nullopt);

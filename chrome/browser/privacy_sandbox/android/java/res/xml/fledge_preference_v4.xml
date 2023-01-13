@@ -13,23 +13,22 @@ found in the LICENSE file.
         android:summary="@string/settings_fledge_page_toggle_sub_label" />
 
     <org.chromium.chrome.browser.privacy_sandbox.v4.PreferenceCategoryWithClickableSummary
-        android:key="current_fledge_sites"
+        android:key="fledge_heading"
         android:title="@string/settings_fledge_page_current_sites_heading"
         android:summary="@string/settings_fledge_page_current_sites_description"
-        app:allowDividerAbove="false"
-        app:allowDividerBelow="false" />
+        app:allowDividerAbove="true" />
+
+    <PreferenceCategory
+        android:key="current_fledge_sites"
+        android:layout="@layout/preference_category_no_title_or_padding" />
 
     <org.chromium.components.browser_ui.settings.TextMessagePreference
         android:key="fledge_disabled"
-        android:layout="@layout/centered_image_preference"
-        android:summary="@string/settings_fledge_page_current_sites_description_disabled"
-        android:icon="@drawable/ic_motion_photos_off_24dp" />
+        android:summary="@string/settings_fledge_page_current_sites_description_disabled" />
 
     <org.chromium.components.browser_ui.settings.TextMessagePreference
         android:key="fledge_empty"
-        android:layout="@layout/centered_image_preference"
-        android:summary="@string/settings_fledge_page_current_sites_description_empty"
-        android:icon="@drawable/ic_hourglass_empty_24dp" />
+        android:summary="@string/settings_fledge_page_current_sites_description_empty" />
 
     <org.chromium.components.browser_ui.settings.ChromeBasePreference
         android:key="fledge_all_sites"

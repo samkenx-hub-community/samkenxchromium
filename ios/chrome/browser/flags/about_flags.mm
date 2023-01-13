@@ -12,10 +12,10 @@
 #import <stdint.h>
 
 #import "base/base_switches.h"
-#import "base/bind.h"
-#import "base/callback_helpers.h"
 #import "base/check_op.h"
 #import "base/debug/debugging_buildflags.h"
+#import "base/functional/bind.h"
+#import "base/functional/callback_helpers.h"
 #import "base/mac/foundation_util.h"
 #import "base/no_destructor.h"
 #import "base/strings/stringprintf.h"
@@ -67,6 +67,7 @@
 #import "ios/chrome/browser/browsing_data/browsing_data_features.h"
 #import "ios/chrome/browser/crash_report/features.h"
 #import "ios/chrome/browser/credential_provider_promo/features.h"
+#import "ios/chrome/browser/find_in_page/features.h"
 #import "ios/chrome/browser/flags/chrome_switches.h"
 #import "ios/chrome/browser/flags/ios_chrome_flag_descriptions.h"
 #import "ios/chrome/browser/flags/system_flags.h"
@@ -80,7 +81,6 @@
 #import "ios/chrome/browser/text_selection/text_selection_util.h"
 #import "ios/chrome/browser/ui/app_store_rating/features.h"
 #import "ios/chrome/browser/ui/autofill/features.h"
-#import "ios/chrome/browser/ui/bubble/bubble_features.h"
 #import "ios/chrome/browser/ui/content_suggestions/content_suggestions_feature.h"
 #import "ios/chrome/browser/ui/default_promo/default_browser_utils.h"
 #import "ios/chrome/browser/ui/download/features.h"
@@ -459,25 +459,6 @@ const FeatureEntry::FeatureVariation
         {"new FRE with 2 steps", kNewMICEFREWithTwoSteps,
          std::size(kNewMICEFREWithTwoSteps), nullptr}};
 
-const FeatureEntry::FeatureParam kBubbleRichIPHTargetHighlight[] = {
-    {kBubbleRichIPHParameterName, kBubbleRichIPHParameterTargetHighlight}};
-const FeatureEntry::FeatureParam kBubbleRichIPHExplicitDismissal[] = {
-    {kBubbleRichIPHParameterName, kBubbleRichIPHParameterExplicitDismissal}};
-const FeatureEntry::FeatureParam kBubbleRichIPHRich[] = {
-    {kBubbleRichIPHParameterName, kBubbleRichIPHParameterRich}};
-const FeatureEntry::FeatureParam kBubbleRichIPHRichWithSnooze[] = {
-    {kBubbleRichIPHParameterName, kBubbleRichIPHParameterRichWithSnooze}};
-const FeatureEntry::FeatureVariation kBubbleRichIPHVariations[] = {
-    {"Target Highlight", kBubbleRichIPHTargetHighlight,
-     std::size(kBubbleRichIPHTargetHighlight), nullptr},
-    {"Explicit dismissal", kBubbleRichIPHExplicitDismissal,
-     std::size(kBubbleRichIPHExplicitDismissal), nullptr},
-    {"Dismissal and rich content", kBubbleRichIPHRich,
-     std::size(kBubbleRichIPHRich), nullptr},
-    {"Dismissal, rich content, and snooze", kBubbleRichIPHRichWithSnooze,
-     std::size(kBubbleRichIPHRichWithSnooze), nullptr},
-};
-
 const FeatureEntry::FeatureParam kDmTokenDeletionParam[] = {{"forced", "true"}};
 const FeatureEntry::FeatureVariation kDmTokenDeletionVariation[] = {
     {"(Forced)", kDmTokenDeletionParam, std::size(kDmTokenDeletionParam),
@@ -552,6 +533,12 @@ const FeatureEntry::FeatureVariation kFollowingFeedDefaultSortTypeVariations[] =
       std::size(kFollowingFeedSortTypeGroupedByPublisher), nullptr},
      {"Sort by Latest", kFollowingFeedSortTypeSortByLatest,
       std::size(kFollowingFeedSortTypeSortByLatest), nullptr}};
+
+const FeatureEntry::FeatureParam kNativeFindInPageWithChromeFindBar[] = {
+    {kNativeFindInPageParameterName, kNativeFindInPageWithChromeFindBarParam}};
+const FeatureEntry::FeatureVariation kNativeFindInPageVariations[] = {
+    {"With Chrome Find Bar", kNativeFindInPageWithChromeFindBar,
+     std::size(kNativeFindInPageWithChromeFindBar), nullptr}};
 
 // To add a new entry, add to the end of kFeatureEntries. There are four
 // distinct types of entries:
@@ -857,12 +844,6 @@ const flags_ui::FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kSynthesizedRestoreSessionName,
      flag_descriptions::kSynthesizedRestoreSessionDescription, flags_ui::kOsIos,
      FEATURE_VALUE_TYPE(web::features::kSynthesizedRestoreSession)},
-    {"enable-password-manager-branding-update",
-     flag_descriptions::kIOSEnablePasswordManagerBrandingUpdateName,
-     flag_descriptions::kIOSEnablePasswordManagerBrandingUpdateDescription,
-     flags_ui::kOsIos,
-     FEATURE_VALUE_TYPE(
-         password_manager::features::kIOSEnablePasswordManagerBrandingUpdate)},
     {"ios-media-permissions-control",
      flag_descriptions::kMediaPermissionsControlName,
      flag_descriptions::kMediaPermissionsControlDescription, flags_ui::kOsIos,
@@ -875,11 +856,6 @@ const flags_ui::FeatureEntry kFeatureEntries[] = {
     {"use-sf-symbols", flag_descriptions::kUseSFSymbolsName,
      flag_descriptions::kUseSFSymbolsDescription, flags_ui::kOsIos,
      FEATURE_VALUE_TYPE(kUseSFSymbols)},
-    {"enable-unicorn-account-support",
-     flag_descriptions::kEnableUnicornAccountSupportName,
-     flag_descriptions::kEnableUnicornAccountSupportDescription,
-     flags_ui::kOsIos,
-     FEATURE_VALUE_TYPE(signin::kEnableUnicornAccountSupport)},
     {"ios-webpage-intent-annotations",
      flag_descriptions::kEnableWebPageAnnotationsName,
      flag_descriptions::kEnableWebPageAnnotationsDescription, flags_ui::kOsIos,
@@ -904,11 +880,6 @@ const flags_ui::FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kSendTabToSelfSigninPromoName,
      flag_descriptions::kSendTabToSelfSigninPromoDescription, flags_ui::kOsIos,
      FEATURE_VALUE_TYPE(send_tab_to_self::kSendTabToSelfSigninPromo)},
-    {"bubble-rich-iph", flag_descriptions::kBubbleRichIPHName,
-     flag_descriptions::kBubbleRichIPHDescription, flags_ui::kOsIos,
-     FEATURE_WITH_PARAMS_VALUE_TYPE(kBubbleRichIPH,
-                                    kBubbleRichIPHVariations,
-                                    "BubbleRichIPH")},
     {"autofill-enforce-delays-in-strike-database",
      flag_descriptions::kAutofillEnforceDelaysInStrikeDatabaseName,
      flag_descriptions::kAutofillEnforceDelaysInStrikeDatabaseDescription,
@@ -1005,6 +976,11 @@ const flags_ui::FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kSmartSortingNewOverflowMenuName,
      flag_descriptions::kSmartSortingNewOverflowMenuDescription,
      flags_ui::kOsIos, FEATURE_VALUE_TYPE(kSmartSortingNewOverflowMenu)},
+    {"smart-sorting-price-tracking-destination",
+     flag_descriptions::kSmartSortingPriceTrackingDestinationName,
+     flag_descriptions::kSmartSortingPriceTrackingDestinationDescription,
+     flags_ui::kOsIos,
+     FEATURE_VALUE_TYPE(kSmartSortingPriceTrackingDestination)},
     {"new-overflow-menu-share-chrome-action",
      flag_descriptions::kNewOverflowMenuShareChromeActionName,
      flag_descriptions::kNewOverflowMenuShareChromeActionDescription,
@@ -1014,6 +990,12 @@ const flags_ui::FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kAutofillEnableRankingFormulaDescription,
      flags_ui::kOsIos,
      FEATURE_VALUE_TYPE(autofill::features::kAutofillEnableRankingFormula)},
+    {"autofill-enable-ranking-formula-address-profiles",
+     flag_descriptions::kAutofillEnableRankingFormulaAddressProfilesName,
+     flag_descriptions::kAutofillEnableRankingFormulaAddressProfilesDescription,
+     flags_ui::kOsIos,
+     FEATURE_VALUE_TYPE(
+         autofill::features::kAutofillEnableRankingFormulaAddressProfiles)},
     {"enable-feed-ablation", flag_descriptions::kEnableFeedAblationName,
      flag_descriptions::kEnableFeedAblationDescription, flags_ui::kOsIos,
      FEATURE_VALUE_TYPE(kEnableFeedAblation)},
@@ -1147,9 +1129,6 @@ const flags_ui::FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kOmniboxKeyboardPasteButtonDescription,
      flags_ui::kOsIos, FEATURE_VALUE_TYPE(kOmniboxKeyboardPasteButton)},
 #endif  // BUILDFLAG(IOS_BACKGROUND_MODE_ENABLED)
-    {"enable-cbd-sign-out", flag_descriptions::kEnableCBDSignOutName,
-     flag_descriptions::kEnableCBDSignOutDescription, flags_ui::kOsIos,
-     FEATURE_VALUE_TYPE(switches::kEnableCbdSignOut)},
     {"enable-open-in-download", flag_descriptions::kEnableOpenInDownloadName,
      flag_descriptions::kEnableOpenInDownloadDescription, flags_ui::kOsIos,
      FEATURE_WITH_PARAMS_VALUE_TYPE(kEnableOpenInDownload,
@@ -1215,10 +1194,6 @@ const flags_ui::FeatureEntry kFeatureEntries[] = {
      FEATURE_WITH_PARAMS_VALUE_TYPE(kEnableFollowingFeedDefaultSortType,
                                     kFollowingFeedDefaultSortTypeVariations,
                                     "EnableFollowingFeedDefaultSortType")},
-    {"omnibox-carousel-dynamic-spacing",
-     flag_descriptions::kOmniboxCarouselDynamicSpacingName,
-     flag_descriptions::kOmniboxCarouselDynamicSpacingDescription,
-     flags_ui::kOsIos, FEATURE_VALUE_TYPE(kOmniboxCarouselDynamicSpacing)},
     {"use-sf-symbols-omnibox", flag_descriptions::kUseSFSymbolsInOmniboxName,
      flag_descriptions::kUseSFSymbolsInOmniboxDescription, flags_ui::kOsIos,
      FEATURE_VALUE_TYPE(kUseSFSymbolsInOmnibox)},
@@ -1261,6 +1236,27 @@ const flags_ui::FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kEnableNewBookmarksImplementationName,
      flag_descriptions::kEnableNewBookmarksImplementationDescription,
      flags_ui::kOsIos, FEATURE_VALUE_TYPE(kEnableNewBookmarksImplementation)},
+    {"omnibox-multiline-search-suggest",
+     flag_descriptions::kOmniboxMultilineSearchSuggestName,
+     flag_descriptions::kOmniboxMultilineSearchSuggestDescription,
+     flags_ui::kOsIos, FEATURE_VALUE_TYPE(kOmniboxMultilineSearchSuggest)},
+    {"autofill-suggest-server-card-instead-of-local-card",
+     flag_descriptions::kAutofillSuggestServerCardInsteadOfLocalCardName,
+     flag_descriptions::kAutofillSuggestServerCardInsteadOfLocalCardDescription,
+     flags_ui::kOsIos,
+     FEATURE_VALUE_TYPE(
+         autofill::features::kAutofillSuggestServerCardInsteadOfLocalCard)},
+    {"native-find-in-page", flag_descriptions::kNativeFindInPageName,
+     flag_descriptions::kNativeFindInPageDescription, flags_ui::kOsIos,
+     FEATURE_WITH_PARAMS_VALUE_TYPE(kNativeFindInPage,
+                                    kNativeFindInPageVariations,
+                                    "NativeFindInPage")},
+    {"intents-on-email", flag_descriptions::kEmailName,
+     flag_descriptions::kEmailDescription, flags_ui::kOsIos,
+     FEATURE_VALUE_TYPE(kEnableEmails)},
+    {"ios-password-checkup", flag_descriptions::kIOSPasswordCheckupName,
+     flag_descriptions::kIOSPasswordCheckupDescription, flags_ui::kOsIos,
+     FEATURE_VALUE_TYPE(password_manager::features::kIOSPasswordCheckup)},
 };
 
 bool SkipConditionalFeatureEntry(const flags_ui::FeatureEntry& entry) {
@@ -1315,6 +1311,8 @@ NSMutableDictionary* CreateExperimentalTestingPolicies() {
       base::SysUTF8ToNSString(policy::key::kSafeBrowsingProtectionLevel) : @2,
 
       base::SysUTF8ToNSString(policy::key::kSearchSuggestEnabled) : @YES,
+
+      base::SysUTF8ToNSString(policy::key::kAppStoreRatingEnabled) : @NO,
     }];
   }
 

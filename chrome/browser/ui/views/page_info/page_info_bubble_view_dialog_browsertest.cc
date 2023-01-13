@@ -408,6 +408,8 @@ IN_PROC_BROWSER_TEST_F(PageInfoBubbleViewDialogBrowserTest,
 // set. All permissions will show regardless of its factory default value.
 IN_PROC_BROWSER_TEST_F(PageInfoBubbleViewDialogBrowserTest,
                        InvokeUi_AllowAllPermissions) {
+  // Last updated in crrev.com/c/4150491.
+  set_baseline("4150491");
   ShowAndVerifyUi();
 }
 
@@ -415,6 +417,8 @@ IN_PROC_BROWSER_TEST_F(PageInfoBubbleViewDialogBrowserTest,
 // set. All permissions will show regardless of its factory default value.
 IN_PROC_BROWSER_TEST_F(PageInfoBubbleViewDialogBrowserTest,
                        InvokeUi_BlockAllPermissions) {
+  // Last updated in crrev.com/c/4150491.
+  set_baseline("4150491");
   ShowAndVerifyUi();
 }
 
@@ -875,6 +879,7 @@ class PageInfoBubbleViewIsolatedWebAppBrowserTest : public DialogBrowserTest {
     std::u16string app_name = u"Google IWA";
     bubble_view->presenter_for_testing()->SetIsolatedWebAppNameForTesting(
         app_name);
+    bubble_view->presenter_for_testing()->UpdateSecurityState();
     // For Isolated Web Apps, normal site name gets overridden by app name.
     ASSERT_EQ(
         bubble_view->presenter_for_testing()->GetSiteNameOrAppNameToDisplay(),
@@ -890,8 +895,11 @@ class PageInfoBubbleViewIsolatedWebAppBrowserTest : public DialogBrowserTest {
   net::EmbeddedTestServer https_server_{net::EmbeddedTestServer::TYPE_HTTPS};
 };
 
+// Test renamed, as currently Skia Gold doesn't support resetting test
+// expectation for tests run on windows.
+// crbug.com/1403038
 IN_PROC_BROWSER_TEST_F(
     PageInfoBubbleViewIsolatedWebAppBrowserTest,
-    InvokeUi_AppNameIsDisplayedInsteadOfOriginForIsolatedWebApps) {
+    InvokeUi_AppNameIsDisplayedInsteadOfOriginForIsolatedWebApps_REV1) {
   ShowAndVerifyUi();
 }

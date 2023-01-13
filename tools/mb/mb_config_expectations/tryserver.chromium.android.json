@@ -100,6 +100,7 @@
   "android-arm64-rel": {
     "gn_args": {
       "android_static_analysis": "off",
+      "coverage_instrumentation_input_file": "//.code-coverage/files_to_instrument.txt",
       "dcheck_always_on": true,
       "debuggable_apks": false,
       "fail_on_android_expectations": true,
@@ -113,12 +114,14 @@
       "system_webview_package_name": "com.google.android.apps.chrome",
       "target_cpu": "arm64",
       "target_os": "android",
+      "use_clang_coverage": true,
       "use_remoteexec": true
     }
   },
   "android-arm64-rel-inverse-fyi": {
     "gn_args": {
       "android_static_analysis": "off",
+      "coverage_instrumentation_input_file": "//.code-coverage/files_to_instrument.txt",
       "dcheck_always_on": true,
       "debuggable_apks": false,
       "fail_on_android_expectations": true,
@@ -132,6 +135,7 @@
       "system_webview_package_name": "com.google.android.apps.chrome",
       "target_cpu": "arm64",
       "target_os": "android",
+      "use_clang_coverage": true,
       "use_goma": true
     }
   },
@@ -199,6 +203,45 @@
       "use_goma": true
     }
   },
+  "android-code-coverage": {
+    "gn_args": {
+      "android_static_analysis": "off",
+      "dcheck_always_on": false,
+      "debuggable_apks": false,
+      "enable_resource_allowlist_generation": true,
+      "ffmpeg_branding": "Chrome",
+      "is_component_build": false,
+      "is_debug": false,
+      "is_java_debug": true,
+      "proprietary_codecs": true,
+      "symbol_level": 1,
+      "system_webview_package_name": "com.google.android.webview",
+      "target_cpu": "arm64",
+      "target_os": "android",
+      "use_jacoco_coverage": true,
+      "use_remoteexec": true,
+      "use_static_angle": true
+    }
+  },
+  "android-code-coverage-native": {
+    "gn_args": {
+      "android_static_analysis": "off",
+      "dcheck_always_on": false,
+      "debuggable_apks": false,
+      "enable_resource_allowlist_generation": true,
+      "ffmpeg_branding": "Chrome",
+      "is_component_build": false,
+      "is_debug": false,
+      "is_java_debug": true,
+      "proprietary_codecs": true,
+      "system_webview_package_name": "com.google.android.webview",
+      "target_cpu": "arm64",
+      "target_os": "android",
+      "use_clang_coverage": true,
+      "use_remoteexec": true,
+      "use_static_angle": true
+    }
+  },
   "android-cronet-arm-dbg": {
     "gn_args": {
       "arm_use_neon": false,
@@ -212,6 +255,7 @@
       "ffmpeg_branding": "Chrome",
       "include_transport_security_state_preload_list": false,
       "is_component_build": false,
+      "is_cronet_build": true,
       "is_debug": true,
       "is_java_debug": false,
       "media_use_ffmpeg": false,
@@ -239,6 +283,7 @@
       "ffmpeg_branding": "Chrome",
       "include_transport_security_state_preload_list": false,
       "is_component_build": false,
+      "is_cronet_build": true,
       "is_debug": true,
       "media_use_ffmpeg": false,
       "proprietary_codecs": true,
@@ -266,6 +311,7 @@
       "ffmpeg_branding": "Chrome",
       "include_transport_security_state_preload_list": false,
       "is_component_build": false,
+      "is_cronet_build": true,
       "is_debug": false,
       "is_official_build": true,
       "media_use_ffmpeg": false,
@@ -298,6 +344,7 @@
       "is_asan": true,
       "is_clang": true,
       "is_component_build": false,
+      "is_cronet_build": true,
       "is_debug": false,
       "media_use_ffmpeg": false,
       "proprietary_codecs": true,
@@ -327,6 +374,7 @@
       "ffmpeg_branding": "Chrome",
       "include_transport_security_state_preload_list": false,
       "is_component_build": false,
+      "is_cronet_build": true,
       "is_debug": false,
       "is_official_build": true,
       "media_use_ffmpeg": false,
@@ -356,6 +404,7 @@
       "ffmpeg_branding": "Chrome",
       "include_transport_security_state_preload_list": false,
       "is_component_build": false,
+      "is_cronet_build": true,
       "is_debug": false,
       "is_official_build": true,
       "media_use_ffmpeg": false,
@@ -384,6 +433,7 @@
       "ffmpeg_branding": "Chrome",
       "include_transport_security_state_preload_list": false,
       "is_component_build": false,
+      "is_cronet_build": true,
       "is_debug": true,
       "media_use_ffmpeg": false,
       "proprietary_codecs": true,
@@ -410,6 +460,7 @@
       "ffmpeg_branding": "Chrome",
       "include_transport_security_state_preload_list": false,
       "is_component_build": false,
+      "is_cronet_build": true,
       "is_debug": true,
       "media_use_ffmpeg": false,
       "proprietary_codecs": true,
@@ -436,6 +487,7 @@
       "ffmpeg_branding": "Chrome",
       "include_transport_security_state_preload_list": false,
       "is_component_build": false,
+      "is_cronet_build": true,
       "is_debug": true,
       "media_use_ffmpeg": false,
       "proprietary_codecs": true,
@@ -462,6 +514,7 @@
       "ffmpeg_branding": "Chrome",
       "include_transport_security_state_preload_list": false,
       "is_component_build": false,
+      "is_cronet_build": true,
       "is_debug": true,
       "media_use_ffmpeg": false,
       "proprietary_codecs": true,
@@ -488,6 +541,7 @@
       "ffmpeg_branding": "Chrome",
       "include_transport_security_state_preload_list": false,
       "is_component_build": false,
+      "is_cronet_build": true,
       "is_debug": true,
       "media_use_ffmpeg": false,
       "proprietary_codecs": true,
@@ -515,6 +569,7 @@
       "ffmpeg_branding": "Chrome",
       "include_transport_security_state_preload_list": false,
       "is_component_build": false,
+      "is_cronet_build": true,
       "is_debug": false,
       "is_official_build": true,
       "media_use_ffmpeg": false,
@@ -544,6 +599,7 @@
       "ffmpeg_branding": "Chrome",
       "include_transport_security_state_preload_list": false,
       "is_component_build": false,
+      "is_cronet_build": true,
       "is_debug": false,
       "is_official_build": true,
       "media_use_ffmpeg": false,
@@ -686,43 +742,6 @@
       "target_os": "android",
       "use_goma": true,
       "use_perfetto_client_library": true
-    }
-  },
-  "android-pie-arm64-coverage-experimental-rel": {
-    "gn_args": {
-      "coverage_instrumentation_input_file": "//.code-coverage/files_to_instrument.txt",
-      "dcheck_always_on": true,
-      "debuggable_apks": false,
-      "fail_on_android_expectations": true,
-      "ffmpeg_branding": "Chrome",
-      "is_component_build": false,
-      "is_debug": false,
-      "proprietary_codecs": true,
-      "strip_debug_info": true,
-      "symbol_level": 0,
-      "system_webview_package_name": "com.google.android.apps.chrome",
-      "target_cpu": "arm64",
-      "target_os": "android",
-      "use_clang_coverage": true,
-      "use_remoteexec": true
-    }
-  },
-  "android-pie-arm64-coverage-rel": {
-    "gn_args": {
-      "coverage_instrumentation_input_file": "//.code-coverage/files_to_instrument.txt",
-      "dcheck_always_on": true,
-      "debuggable_apks": false,
-      "ffmpeg_branding": "Chrome",
-      "is_component_build": false,
-      "is_debug": false,
-      "proprietary_codecs": true,
-      "strip_debug_info": true,
-      "symbol_level": 0,
-      "system_webview_package_name": "com.google.android.apps.chrome",
-      "target_cpu": "arm64",
-      "target_os": "android",
-      "use_clang_coverage": true,
-      "use_remoteexec": true
     }
   },
   "android-pie-arm64-dbg": {
@@ -1032,6 +1051,7 @@
       "ffmpeg_branding": "Chrome",
       "include_transport_security_state_preload_list": false,
       "is_component_build": false,
+      "is_cronet_build": true,
       "is_debug": false,
       "media_use_ffmpeg": false,
       "proprietary_codecs": true,

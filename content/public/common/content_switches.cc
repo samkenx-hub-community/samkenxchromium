@@ -333,10 +333,6 @@ const char kEnableExperimentalCookieFeatures[] =
 const char kEnableExperimentalWebAssemblyFeatures[] =
     "enable-experimental-webassembly-features";
 
-// Enables experimental WebAssembly stack switching.
-const char kEnableExperimentalWebAssemblyStackSwitching[] =
-    "enable-experimental-webassembly-stack-switching";
-
 // Enables Web Platform features that are in development.
 const char kEnableExperimentalWebPlatformFeatures[] =
     "enable-experimental-web-platform-features";
@@ -469,6 +465,11 @@ const char kFileSystemSyncAccessHandleAsyncInterfaceEnabled[] =
 // in file URLs. The format is "/alias=/replacement", which would turn
 // file:///alias/some/path.html into file:///replacement/some/path.html.
 const char kFileUrlPathAlias[] = "file-url-path-alias";
+
+// Force-enables the PPB_VideoDecoder(Dev) API, overriding the value from any
+// ongoing Finch experiment.
+const char kForceEnablePepperVideoDecoderDevAPI[] =
+    "force-enable-pepper-video-decoder-dev-api";
 
 // This forces pages to be loaded as presentation receivers.  Useful for testing
 // behavior specific to presentation receivers.

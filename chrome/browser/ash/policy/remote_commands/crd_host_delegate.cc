@@ -6,8 +6,8 @@
 
 #include <string>
 
-#include "base/bind.h"
-#include "base/callback_forward.h"
+#include "base/functional/bind.h"
+#include "base/functional/callback_forward.h"
 #include "base/memory/weak_ptr.h"
 #include "chrome/browser/ash/policy/remote_commands/crd_logging.h"
 #include "chrome/browser/ash/policy/remote_commands/crd_remote_command_utils.h"
@@ -133,6 +133,10 @@ class CrdHostDelegate::CrdHostSession
     // Note the oauth token must be prefixed with 'oauth2:', or it will be
     // rejected by the CRD host.
     result->oauth_access_token = "oauth2:" + parameters_.oauth_token;
+
+    // TODO(joedow): Set the |authorized_helper| field once it is provided by
+    // the admin console and available in |parameters_|.
+
     return result;
   }
 

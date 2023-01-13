@@ -182,14 +182,6 @@ BASE_FEATURE(kWebSocketReassembleShortMessages,
 // https://tools.ietf.org/html/draft-davidben-http-client-hint-reliability-02#section-4.3
 BASE_FEATURE(kAcceptCHFrame, "AcceptCHFrame", base::FEATURE_ENABLED_BY_DEFAULT);
 
-BASE_FEATURE(kSCTAuditingRetryReports,
-             "SCTAuditingRetryReports",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
-BASE_FEATURE(kSCTAuditingPersistReports,
-             "SCTAuditingPersistReports",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
 namespace {
 // The default Mojo ring buffer size, used to send the content body.
 static constexpr uint32_t kDefaultDataPipeAllocationSize = 512 * 1024;
@@ -306,6 +298,16 @@ BASE_FEATURE(kPrivateNetworkAccessPreflightShortTimeout,
 BASE_FEATURE(kPreconnectInNetworkService,
              "PreconnectInNetworkService",
              base::FEATURE_DISABLED_BY_DEFAULT);
+
+// When prefetching a DNS record ensures that the scheme and port are taken
+// into account so that the cache (which is keyed by scheme and port) works
+// for subsequent queries.
+BASE_FEATURE(kPrefetchDNSWithURL,
+             "PrefetchDNSWithURL",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+constexpr base::FeatureParam<bool> kPrefetchDNSWithURLAllAnchorElements{
+    &kPrefetchDNSWithURL, "prefetch_dns_all_anchor_elements", true};
 
 // Preconnect to a new origin right when a redirect starts.
 BASE_FEATURE(kPreconnectOnRedirect,

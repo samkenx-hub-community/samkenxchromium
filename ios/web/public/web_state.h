@@ -15,8 +15,8 @@
 #include <utility>
 #include <vector>
 
-#include "base/callback_forward.h"
 #include "base/callback_list.h"
+#include "base/functional/callback_forward.h"
 #include "base/memory/weak_ptr.h"
 #include "base/strings/string_piece.h"
 #include "base/supports_user_data.h"
@@ -354,6 +354,9 @@ class WebState : public base::SupportsUserData {
 
   // Whether this instance is in the process of being destroyed.
   virtual bool IsBeingDestroyed() const = 0;
+
+  // Whether this instance's web page is in fullscreen mode.
+  virtual bool IsWebPageInFullscreenMode() const = 0;
 
   // Gets/Sets the favicon for the current page displayed by this WebState.
   virtual const FaviconStatus& GetFaviconStatus() const = 0;

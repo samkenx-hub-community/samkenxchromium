@@ -10,9 +10,9 @@
 #include <vector>
 
 #include "base/base_export.h"
-#include "base/callback.h"
 #include "base/containers/stack.h"
 #include "base/dcheck_is_on.h"
+#include "base/functional/callback.h"
 #include "base/gtest_prod_util.h"
 #include "base/location.h"
 #include "base/memory/raw_ptr.h"
@@ -326,8 +326,8 @@ class BASE_EXPORT RunLoop {
   // not be accessed from any other sequence than the thread it was constructed
   // on. Exception: RunLoop can be safely accessed from one other sequence (or
   // single parallel task) during Run() -- e.g. to Quit() without having to
-  // plumb ThreatTaskRunnerHandle::Get() throughout a test to repost QuitClosure
-  // to origin thread.
+  // plumb SingleThreadTaskRunner::GetCurrentDefault() throughout a test to
+  // repost QuitClosure to origin thread.
   SEQUENCE_CHECKER(sequence_checker_);
 
   const scoped_refptr<SingleThreadTaskRunner> origin_task_runner_;

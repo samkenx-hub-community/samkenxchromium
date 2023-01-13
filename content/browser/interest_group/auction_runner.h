@@ -10,7 +10,7 @@
 #include <string>
 #include <vector>
 
-#include "base/callback.h"
+#include "base/functional/callback.h"
 #include "base/memory/raw_ptr.h"
 #include "content/browser/interest_group/auction_worklet_manager.h"
 #include "content/browser/interest_group/interest_group_auction.h"
@@ -185,7 +185,7 @@ class CONTENT_EXPORT AuctionRunner : public blink::mojom::AbortableAdAuction {
       RunAuctionCallback callback);
 
   // Tells `auction_` to start the loading interest groups phase.
-  void StartAuctionIfReady();
+  void StartAuction();
 
   // Invoked asynchronously by `auction_` once all interest groups have loaded.
   // Fails the auction if `success` is false. Otherwise, starts the bidding and
@@ -233,6 +233,9 @@ class CONTENT_EXPORT AuctionRunner : public blink::mojom::AbortableAdAuction {
   std::unique_ptr<blink::AuctionConfig> owned_auction_config_;
 
   RunAuctionCallback callback_;
+
+  // Number of fields in `owned_auction_config_` that are promises; decremented
+  // as they get resolved.
   int promise_fields_in_auction_config_;
 
   InterestGroupAuction auction_;

@@ -137,6 +137,10 @@ BASE_FEATURE(kAmbientSubpageUIChange,
 
 BASE_FEATURE(kApnRevamp, "ApnRevamp", base::FEATURE_DISABLED_BY_DEFAULT);
 
+BASE_FEATURE(kAppCollectionFolderRefresh,
+             "AppCollectionFolderRefresh",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 // Controls whether to enable ARC ADB sideloading support.
 BASE_FEATURE(kArcAdbSideloadingFeature,
              "ArcAdbSideloading",
@@ -261,7 +265,7 @@ BASE_FEATURE(kAutocorrectParamsTuning,
 // Enables using a toggle for enabling autocorrect on ChromeOS.
 BASE_FEATURE(kAutocorrectToggle,
              "AutocorrectToggle",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // Enables using a toggle for enabling autocorrect on ChromeOS.
 BASE_FEATURE(kAutocorrectByDefault,
@@ -277,7 +281,7 @@ BASE_FEATURE(kAutozoomNudgeSessionReset,
 // Enables loading avatar images from the cloud on ChromeOS.
 BASE_FEATURE(kAvatarsCloudMigration,
              "AvatarsCloudMigration",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // Enables the persistent desks bar at the top of the screen in clamshell mode
 // when there are more than one desk.
@@ -365,12 +369,6 @@ BASE_FEATURE(kCalendarJelly,
 // Enables to allow low storage warning feature in the camera app.
 BASE_FEATURE(kCameraAppLowStorageWarning,
              "CameraAppLowStorageWarning",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-
-// Enables to show multi-page UI when for document scanning feature in the
-// camera app.
-BASE_FEATURE(kCameraAppMultiPageDocScan,
-             "CameraAppMultiPageDocScan",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
 // Controls whether the camera privacy switch toasts and notification should be
@@ -575,7 +573,7 @@ BASE_FEATURE(kCryptohomeRecoverySetup,
 
 BASE_FEATURE(kDarkLightModeKMeansColor,
              "DarkLightModeKMeansColor",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // Enables or disables Sync for desk templates on ChromeOS.
 BASE_FEATURE(kDeskTemplateSync,
@@ -941,6 +939,10 @@ BASE_FEATURE(kFederatedServiceScheduleTasks,
              "FederatedServiceScheduleTasks",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
+BASE_FEATURE(kFederatedTimezoneCodePhh,
+             "FederatedTimezoneCodePhh",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 // Enables experimental UI features in Files app.
 BASE_FEATURE(kFilesAppExperimental,
              "FilesAppExperimental",
@@ -1168,7 +1170,7 @@ BASE_FEATURE(kSnoopingProtection,
 // response time).
 BASE_FEATURE(kStartAssistantAudioDecoderOnDemand,
              "StartAssistantAudioDecoderOnDemand",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // Enable or disable a new header bar for the ChromeOS virtual keyboard.
 BASE_FEATURE(kVirtualKeyboardNewHeader,
@@ -1451,6 +1453,11 @@ BASE_FEATURE(kNotificationExperimentalShortTimeouts,
              "NotificationExperimentalShortTimeouts",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
+// Enables dragging the image from a notification by mouse or gesture.
+BASE_FEATURE(kNotificationImageDrag,
+             "NotificationImageDrag",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 // Enables notification scroll bar in UnifiedSystemTray.
 BASE_FEATURE(kNotificationScrollBar,
              "NotificationScrollBar",
@@ -1480,6 +1487,12 @@ BASE_FEATURE(kOnDeviceSpeechRecognition,
 // If enabled, CHOBOE Screen will be shown during the new user onboarding flow.
 BASE_FEATURE(kOobeChoobe, "OobeChoobe", base::FEATURE_DISABLED_BY_DEFAULT);
 
+// If enabled, TouchPadScreen will be shown in CHOOBE.
+// enabling this without enabling OobeChoobe flag will have no effect
+BASE_FEATURE(kOobeTouchpadScroll,
+             "OobeTouchpadScrollDirection",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 // If enabled, EULA and ARC Terms of Service screens are skipped and merged
 // into Consolidated Consent Screen.
 BASE_FEATURE(kOobeConsolidatedConsent,
@@ -1491,7 +1504,7 @@ BASE_FEATURE(kOobeConsolidatedConsent,
 // https://crbug.com/1299099.
 BASE_FEATURE(kOobeHidDetectionRevamp,
              "OobeHidDetectionRevamp",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // Enables OOBE Jelly features.
 BASE_FEATURE(kOobeJelly, "OobeJelly", base::FEATURE_DISABLED_BY_DEFAULT);
@@ -1581,6 +1594,12 @@ BASE_FEATURE(kPhoneHubCallNotification,
 BASE_FEATURE(kPhoneHubMonochromeNotificationIcons,
              "PhoneHubMonochromeNotificationIcons",
              base::FEATURE_ENABLED_BY_DEFAULT);
+
+// Determine whether system nudge will be shown on user eligible for Phone Hub
+// instead of multidevice notification.
+BASE_FEATURE(kPhoneHubNudge,
+             "PhoneHubNudge",
+             base::FEATURE_DISABLED_BY_DEFAULT);
 
 BASE_FEATURE(kPhoneHubPingOnBubbleOpen,
              "PhoneHubPingOnBubbleOpen",
@@ -1707,13 +1726,8 @@ BASE_FEATURE(kProjectorUseApiKeyForTranslation,
              "ProjectorUseApiKeyForTranslation",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
-// Enable or disable quick settings revamped view. This flag only works when the
-// `QsRevampWip` flag is enabled.
+// Enable or disable quick settings revamped view.
 BASE_FEATURE(kQsRevamp, "QsRevamp", base::FEATURE_DISABLED_BY_DEFAULT);
-
-// Enable or disable quick settings revamped wip view.
-// TODO(b/257541368): remove this flag once the wip view is finished.
-BASE_FEATURE(kQsRevampWip, "QsRevampWip", base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Controls whether the Projector Viewer supports the user experience for
 // secondary account.
@@ -2195,11 +2209,16 @@ BASE_FEATURE(kPerUserMetrics,
              "PerUserMetricsConsent",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
-// Allows Files App to find and execute tasks using App Service for Arc and
-// Guest OS apps.
-BASE_FEATURE(kArcAndGuestOsFileTasksUseAppService,
-             "ArcAndGuestOsFileTasksUseAppService",
+// Allows Files App to find and execute tasks using App Service for ARC apps.
+BASE_FEATURE(kArcFileTasksUseAppService,
+             "ArcFileTasksUseAppService",
              base::FEATURE_DISABLED_BY_DEFAULT);
+
+// Allows Files App to find and execute tasks using App Service for Guest OS
+// apps.
+BASE_FEATURE(kGuestOsFileTasksUseAppService,
+             "GuestOsFileTasksUseAppService",
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -2288,6 +2307,10 @@ bool IsApnRevampEnabled() {
 
 bool IsAppNotificationsPageEnabled() {
   return base::FeatureList::IsEnabled(kOsSettingsAppNotificationsPage);
+}
+
+bool IsAppCollectionFolderRefreshEnabled() {
+  return base::FeatureList::IsEnabled(kAppCollectionFolderRefresh);
 }
 
 bool IsArcFuseBoxFileSharingEnabled() {
@@ -2804,6 +2827,10 @@ bool IsNotificationExperimentalShortTimeoutsEnabled() {
   return base::FeatureList::IsEnabled(kNotificationExperimentalShortTimeouts);
 }
 
+bool IsNotificationImageDragEnabled() {
+  return base::FeatureList::IsEnabled(kNotificationImageDrag);
+}
+
 bool IsNotificationScrollBarEnabled() {
   return base::FeatureList::IsEnabled(kNotificationScrollBar);
 }
@@ -2860,6 +2887,10 @@ bool IsOobeThemeSelectionEnabled() {
   return base::FeatureList::IsEnabled(kEnableOobeThemeSelection);
 }
 
+bool IsOobeTouchpadScrollEnabled() {
+  return base::FeatureList::IsEnabled(kOobeTouchpadScroll);
+}
+
 bool IsOsSettingsAppBadgingToggleEnabled() {
   return base::FeatureList::IsEnabled(kOsSettingsAppBadgingToggle);
 }
@@ -2886,6 +2917,10 @@ bool IsPhoneHubCameraRollEnabled() {
 
 bool IsPhoneHubMonochromeNotificationIconsEnabled() {
   return base::FeatureList::IsEnabled(kPhoneHubMonochromeNotificationIcons);
+}
+
+bool IsPhoneHubNudgeEnabled() {
+  return base::FeatureList::IsEnabled(kPhoneHubNudge);
 }
 
 bool IsPhoneHubFeatureSetupErrorHandlingEnabled() {
@@ -2983,8 +3018,7 @@ bool IsProjectorUseApiKeyForTranslationEnabled() {
 }
 
 bool IsQsRevampEnabled() {
-  return base::FeatureList::IsEnabled(kQsRevamp) &&
-         base::FeatureList::IsEnabled(kQsRevampWip);
+  return base::FeatureList::IsEnabled(kQsRevamp);
 }
 
 bool IsProjectorViewerUseSecondaryAccountEnabled() {
@@ -3107,10 +3141,6 @@ bool IsUploadOfficeToCloudEnabled() {
   return base::FeatureList::IsEnabled(kUploadOfficeToCloud);
 }
 
-bool IsUseAuthFactorsEnabled() {
-  return base::FeatureList::IsEnabled(kUseAuthFactors);
-}
-
 bool IsUseAuthsessionForWebAuthNEnabled() {
   return base::FeatureList::IsEnabled(kUseAuthsessionForWebAuthN);
 }
@@ -3175,8 +3205,12 @@ bool IsWmModeEnabled() {
   return base::FeatureList::IsEnabled(kWmMode);
 }
 
-bool ShouldArcAndGuestOsFileTasksUseAppService() {
-  return base::FeatureList::IsEnabled(kArcAndGuestOsFileTasksUseAppService);
+bool ShouldArcFileTasksUseAppService() {
+  return base::FeatureList::IsEnabled(kArcFileTasksUseAppService);
+}
+
+bool ShouldGuestOsFileTasksUseAppService() {
+  return base::FeatureList::IsEnabled(kGuestOsFileTasksUseAppService);
 }
 
 bool ShouldShowPlayStoreInDemoMode() {

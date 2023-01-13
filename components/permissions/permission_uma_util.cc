@@ -13,6 +13,7 @@
 #include "base/time/time.h"
 #include "build/build_config.h"
 #include "build/chromeos_buildflags.h"
+#include "components/content_settings/core/common/content_settings_types.h"
 #include "components/permissions/permission_actions_history.h"
 #include "components/permissions/permission_decision_auto_blocker.h"
 #include "components/permissions/permission_request.h"
@@ -110,6 +111,8 @@ RequestTypeForUma GetUmaValueForRequestType(RequestType request_type) {
     case RequestType::kWindowManagement:
       return RequestTypeForUma::PERMISSION_WINDOW_MANAGEMENT;
 #endif
+    case RequestType::kTopLevelStorageAccess:
+      return RequestTypeForUma::PERMISSION_TOP_LEVEL_STORAGE_ACCESS;
   }
 }
 
@@ -151,10 +154,12 @@ std::string GetPermissionRequestString(RequestTypeForUma type) {
       return "AR";
     case RequestTypeForUma::PERMISSION_STORAGE_ACCESS:
       return "StorageAccess";
+    case RequestTypeForUma::PERMISSION_TOP_LEVEL_STORAGE_ACCESS:
+      return "TopLevelStorageAccess";
     case RequestTypeForUma::PERMISSION_CAMERA_PAN_TILT_ZOOM:
       return "CameraPanTiltZoom";
     case RequestTypeForUma::PERMISSION_WINDOW_MANAGEMENT:
-      return "WindowPlacement";
+      return "WindowManagement";
     case RequestTypeForUma::PERMISSION_LOCAL_FONTS:
       return "LocalFonts";
     case RequestTypeForUma::PERMISSION_IDLE_DETECTION:
@@ -591,7 +596,6 @@ void PermissionUmaUtil::PermissionPromptResolved(
       NOTREACHED();
       break;
   }
-
   std::string action_string = GetPermissionActionString(permission_action);
   RecordEngagementMetric(requests, web_contents, action_string);
 
@@ -937,6 +941,10 @@ void PermissionUmaUtil::RecordPermissionAction(
     case ContentSettingsType::STORAGE_ACCESS:
       base::UmaHistogramEnumeration("Permissions.Action.StorageAccess", action,
                                     PermissionAction::NUM);
+      break;
+    case ContentSettingsType::TOP_LEVEL_STORAGE_ACCESS:
+      base::UmaHistogramEnumeration("Permissions.Action.TopLevelStorageAccess",
+                                    action, PermissionAction::NUM);
       break;
     case ContentSettingsType::CAMERA_PAN_TILT_ZOOM:
       base::UmaHistogramEnumeration("Permissions.Action.CameraPanTiltZoom",

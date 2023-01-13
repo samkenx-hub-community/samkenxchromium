@@ -48,10 +48,33 @@ export class PrivacySandboxInterestItemElement extends
   }
 
   private getButtonLabel_(): string {
-    // TODO(crbug.com/1378703): Return Fledge string ids for this.interest.site.
-    return this.i18n(
-        this.interest.removed ? 'topicsPageAllowTopic' :
-                                'topicsPageBlockTopic');
+    if (this.interest.topic !== undefined) {
+      assert(!this.interest.site);
+      return this.i18n(
+          this.interest.removed ? 'topicsPageAllowTopic' :
+                                  'topicsPageBlockTopic');
+    } else {
+      assert(!this.interest.topic);
+      return this.i18n(
+          this.interest.removed ? 'fledgePageAllowSite' :
+                                  'fledgePageBlockSite');
+    }
+  }
+
+  private getButtonAriaLabel_(): string {
+    if (this.interest.topic !== undefined) {
+      assert(!this.interest.site);
+      return this.i18n(
+          this.interest.removed ? 'topicsPageAllowTopicA11yLabel' :
+                                  'topicsPageBlockTopicA11yLabel',
+          this.interest.topic.displayString!);
+    } else {
+      assert(!this.interest.topic);
+      return this.i18n(
+          this.interest.removed ? 'fledgePageAllowSiteA11yLabel' :
+                                  'fledgePageBlockSiteA11yLabel',
+          this.interest.site!);
+    }
   }
 
   private onInterestChanged_(e: Event) {

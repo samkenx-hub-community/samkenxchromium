@@ -41,32 +41,9 @@
 
 namespace blink {
 
-static inline float DimensionForLengthMode(SVGLengthMode mode,
-                                           const gfx::SizeF& viewport_size) {
-  switch (mode) {
-    case SVGLengthMode::kWidth:
-      return viewport_size.width();
-    case SVGLengthMode::kHeight:
-      return viewport_size.height();
-    case SVGLengthMode::kOther:
-      // Returns the normalized diagonal length of the viewport, as defined in
-      // https://www.w3.org/TR/SVG2/coords.html#Units.
-      return ClampTo<float>(std::sqrt(
-          gfx::Vector2dF(viewport_size.width(), viewport_size.height())
-              .LengthSquared() /
-          2));
-  }
-  NOTREACHED();
-  return 0;
-}
+namespace {
 
-static float ConvertValueFromPercentageToUserUnits(const SVGLength& value,
-                                                   float viewport_dimension) {
-  return CSSPrimitiveValue::ClampToCSSLengthRange(
-      value.ScaleByPercentage(viewport_dimension));
-}
-
-static const ComputedStyle* ComputedStyleForLengthResolving(
+const ComputedStyle* ComputedStyleForLengthResolving(
     const SVGElement* context) {
   if (!context) {
     return nullptr;
@@ -85,7 +62,7 @@ static const ComputedStyle* ComputedStyleForLengthResolving(
   return nullptr;
 }
 
-static const ComputedStyle* RootElementStyle(const Node* context) {
+const ComputedStyle* RootElementStyle(const Node* context) {
   if (!context) {
     return nullptr;
   }
@@ -102,8 +79,55 @@ static const ComputedStyle* RootElementStyle(const Node* context) {
   return style;
 }
 
-static float ConvertValueFromUserUnitsToEMS(const ComputedStyle* style,
-                                            float value) {
+class CSSToLengthConversionDataContext {
+  STACK_ALLOCATED();
+
+ public:
+  explicit CSSToLengthConversionDataContext(const SVGElement* context)
+      : context_(context),
+        style_(ComputedStyleForLengthResolving(context)),
+        root_style_(RootElementStyle(context)) {}
+
+  bool HasStyle() const { return style_; }
+
+  CSSToLengthConversionData MakeConversionData() const {
+    DCHECK(context_);
+    DCHECK(HasStyle());
+    return CSSToLengthConversionData(style_, style_, root_style_,
+                                     context_->GetDocument().GetLayoutView(),
+                                     CSSToLengthConversionData::ContainerSizes(
+                                         context_->ParentOrShadowHostElement()),
+                                     1.0f, ignored_flags_);
+  }
+
+ private:
+  const SVGElement* context_ = nullptr;
+  const ComputedStyle* style_ = nullptr;
+  const ComputedStyle* root_style_ = nullptr;
+  mutable CSSToLengthConversionData::Flags ignored_flags_ = 0;
+};
+
+float ObjectBoundingBoxUnitToUserUnits(const Length& length,
+                                       float ref_dimension) {
+  // For "plain" percentages we resolve against the real reference dimension
+  // and scale with the unit dimension to avoid losing precision for common
+  // cases. In essence because of the difference between:
+  //
+  //   v * percentage / 100
+  //
+  // and:
+  //
+  //   v * (percentage / 100)
+  //
+  // for certain, common, values of v and percentage.
+  float unit_dimension = 1;
+  if (length.IsPercent()) {
+    std::swap(unit_dimension, ref_dimension);
+  }
+  return FloatValueForLength(length, unit_dimension, nullptr) * ref_dimension;
+}
+
+float ConvertValueFromUserUnitsToEMS(const ComputedStyle* style, float value) {
   if (!style) {
     return 0;
   }
@@ -114,16 +138,14 @@ static float ConvertValueFromUserUnitsToEMS(const ComputedStyle* style,
   return value / font_size;
 }
 
-static float ConvertValueFromEMSToUserUnits(const ComputedStyle* style,
-                                            float value) {
+float ConvertValueFromEMSToUserUnits(const ComputedStyle* style, float value) {
   if (!style) {
     return 0;
   }
   return value * style->SpecifiedFontSize();
 }
 
-static float ConvertValueFromUserUnitsToEXS(const ComputedStyle* style,
-                                            float value) {
+float ConvertValueFromUserUnitsToEXS(const ComputedStyle* style, float value) {
   if (!style) {
     return 0;
   }
@@ -142,8 +164,7 @@ static float ConvertValueFromUserUnitsToEXS(const ComputedStyle* style,
   return value / x_height;
 }
 
-static float ConvertValueFromEXSToUserUnits(const ComputedStyle* style,
-                                            float value) {
+float ConvertValueFromEXSToUserUnits(const ComputedStyle* style, float value) {
   if (!style) {
     return 0;
   }
@@ -158,20 +179,90 @@ static float ConvertValueFromEXSToUserUnits(const ComputedStyle* style,
          ceilf(font_data->GetFontMetrics().XHeight() / style->EffectiveZoom());
 }
 
-static inline float ViewportLengthPercent(const float width_or_height) {
+float ConvertValueFromUserUnitsToCHS(const ComputedStyle* style, float value) {
+  if (!style) {
+    return 0;
+  }
+  const SimpleFontData* font_data = style->GetFont().PrimaryFont();
+  if (!font_data) {
+    return 0;
+  }
+  float zero_width =
+      font_data->GetFontMetrics().ZeroWidth() / style->EffectiveZoom();
+  if (!zero_width) {
+    return 0;
+  }
+  return value / zero_width;
+}
+
+float ConvertValueFromCHSToUserUnits(const ComputedStyle* style, float value) {
+  if (!style) {
+    return 0;
+  }
+  const SimpleFontData* font_data = style->GetFont().PrimaryFont();
+  if (!font_data) {
+    return 0;
+  }
+  return value * font_data->GetFontMetrics().ZeroWidth() /
+         style->EffectiveZoom();
+}
+
+float ConvertValueFromUserUnitsToICS(const ComputedStyle* style, float value) {
+  if (!style) {
+    return 0;
+  }
+  const SimpleFontData* font_data = style->GetFont().PrimaryFont();
+  if (!font_data) {
+    return 0;
+  }
+  float ideographic_full_width =
+      font_data->GetFontMetrics().IdeographicFullWidth().value_or(
+          style->ComputedFontSize()) /
+      style->EffectiveZoom();
+  if (!ideographic_full_width) {
+    return 0;
+  }
+  return value / ideographic_full_width;
+}
+
+float ConvertValueFromICSToUserUnits(const ComputedStyle* style, float value) {
+  if (!style) {
+    return 0;
+  }
+  const SimpleFontData* font_data = style->GetFont().PrimaryFont();
+  if (!font_data) {
+    return 0;
+  }
+  return value *
+         font_data->GetFontMetrics().IdeographicFullWidth().value_or(
+             style->ComputedFontSize()) /
+         style->EffectiveZoom();
+}
+
+float ConvertValueFromUserUnitsToLHS(const ComputedStyle* style, float value) {
+  return value / AdjustForAbsoluteZoom::AdjustFloat(style->ComputedLineHeight(),
+                                                    *style);
+}
+
+float ConvertValueFromLHSToUserUnits(const ComputedStyle* style, float value) {
+  return value * AdjustForAbsoluteZoom::AdjustFloat(style->ComputedLineHeight(),
+                                                    *style);
+}
+
+inline float ViewportLengthPercent(const float width_or_height) {
   return width_or_height / 100;
 }
 
-static inline float ViewportMinPercent(const gfx::SizeF& viewport_size) {
+inline float ViewportMinPercent(const gfx::SizeF& viewport_size) {
   return std::min(viewport_size.width(), viewport_size.height()) / 100;
 }
 
-static inline float ViewportMaxPercent(const gfx::SizeF& viewport_size) {
+inline float ViewportMaxPercent(const gfx::SizeF& viewport_size) {
   return std::max(viewport_size.width(), viewport_size.height()) / 100;
 }
 
-static inline float DimensionForViewportUnit(const SVGElement* context,
-                                             CSSPrimitiveValue::UnitType unit) {
+inline float DimensionForViewportUnit(const SVGElement* context,
+                                      CSSPrimitiveValue::UnitType unit) {
   if (!context) {
     return 0;
   }
@@ -211,6 +302,8 @@ static inline float DimensionForViewportUnit(const SVGElement* context,
   return 0;
 }
 
+}  // namespace
+
 SVGLengthContext::SVGLengthContext(const SVGElement* context)
     : context_(context) {}
 
@@ -222,19 +315,46 @@ gfx::RectF SVGLengthContext::ResolveRectangle(const SVGElement* context,
                                               const SVGLength& width,
                                               const SVGLength& height) {
   DCHECK_NE(SVGUnitTypes::kSvgUnitTypeUnknown, type);
-  if (type != SVGUnitTypes::kSvgUnitTypeUserspaceonuse) {
-    return gfx::RectF(
-        ConvertValueFromPercentageToUserUnits(x, viewport.width()) +
-            viewport.x(),
-        ConvertValueFromPercentageToUserUnits(y, viewport.height()) +
-            viewport.y(),
-        ConvertValueFromPercentageToUserUnits(width, viewport.width()),
-        ConvertValueFromPercentageToUserUnits(height, viewport.height()));
+  CSSToLengthConversionDataContext conversion_context(context);
+  if (!conversion_context.HasStyle()) {
+    return gfx::RectF(0, 0, 0, 0);
   }
+  const CSSToLengthConversionData conversion_data =
+      conversion_context.MakeConversionData();
+  // Convert SVGLengths to Lengths (preserves percentages).
+  const LengthPoint point(
+      x.AsCSSPrimitiveValue().ConvertToLength(conversion_data),
+      y.AsCSSPrimitiveValue().ConvertToLength(conversion_data));
+  const LengthSize size(
+      width.AsCSSPrimitiveValue().ConvertToLength(conversion_data),
+      height.AsCSSPrimitiveValue().ConvertToLength(conversion_data));
 
-  SVGLengthContext length_context(context);
-  return gfx::RectF(x.Value(length_context), y.Value(length_context),
-                    width.Value(length_context), height.Value(length_context));
+  gfx::RectF resolved_rect;
+  // If the requested unit is 'objectBoundingBox' then the resolved user units
+  // are actually normalized (in bounding box units), so transform them to the
+  // actual user space.
+  if (type == SVGUnitTypes::kSvgUnitTypeObjectboundingbox) {
+    // Resolve the Lengths to user units.
+    resolved_rect = gfx::RectF(
+        ObjectBoundingBoxUnitToUserUnits(point.X(), viewport.width()),
+        ObjectBoundingBoxUnitToUserUnits(point.Y(), viewport.height()),
+        ObjectBoundingBoxUnitToUserUnits(size.Width(), viewport.width()),
+        ObjectBoundingBoxUnitToUserUnits(size.Height(), viewport.height()));
+    resolved_rect += viewport.OffsetFromOrigin();
+  } else {
+    DCHECK_EQ(type, SVGUnitTypes::kSvgUnitTypeUserspaceonuse);
+    // Determine the viewport to use for resolving the Lengths to user units.
+    gfx::SizeF viewport_size_for_resolve;
+    if (size.Width().IsPercentOrCalc() || size.Height().IsPercentOrCalc() ||
+        point.X().IsPercentOrCalc() || point.Y().IsPercentOrCalc()) {
+      viewport_size_for_resolve = SVGLengthContext(context).ResolveViewport();
+    }
+    // Resolve the Lengths to user units.
+    resolved_rect =
+        gfx::RectF(PointForLengthPoint(point, viewport_size_for_resolve),
+                   SizeForLengthSize(size, viewport_size_for_resolve));
+  }
+  return resolved_rect;
 }
 
 gfx::PointF SVGLengthContext::ResolvePoint(const SVGElement* context,
@@ -258,7 +378,7 @@ gfx::Vector2dF SVGLengthContext::ResolveLengthPair(
     const ComputedStyle& style) const {
   gfx::SizeF viewport_size;
   if (x_length.IsPercentOrCalc() || y_length.IsPercentOrCalc()) {
-    DetermineViewport(viewport_size);
+    viewport_size = ResolveViewport();
     // If either |x_length| or |y_length| is 'auto', set that viewport dimension
     // to zero so that the corresponding Length resolves to zero. This matches
     // the behavior of ValueForLength() below.
@@ -287,6 +407,26 @@ float SVGLengthContext::ResolveLength(const SVGElement* context,
   return x.ScaleByPercentage(1);
 }
 
+float SVGLengthContext::ResolveValue(const CSSPrimitiveValue& primitive_value,
+                                     SVGLengthMode mode) const {
+  CSSToLengthConversionDataContext conversion_context(context_);
+  if (!conversion_context.HasStyle()) {
+    return 0;
+  }
+  const Length& length =
+      primitive_value.ConvertToLength(conversion_context.MakeConversionData());
+  return ValueForLength(length, 1.0f, mode);
+}
+
+Length SVGLengthContext::ConvertToLength(const SVGLength& length) const {
+  CSSToLengthConversionDataContext conversion_context(context_);
+  if (!conversion_context.HasStyle()) {
+    return Length::Fixed(0);
+  }
+  return length.AsCSSPrimitiveValue().ConvertToLength(
+      conversion_context.MakeConversionData());
+}
+
 float SVGLengthContext::ValueForLength(const UnzoomedLength& unzoomed_length,
                                        SVGLengthMode mode) const {
   return ValueForLength(unzoomed_length.length(), 1, mode);
@@ -301,13 +441,9 @@ float SVGLengthContext::ValueForLength(const Length& length,
 float SVGLengthContext::ValueForLength(const Length& length,
                                        float zoom,
                                        SVGLengthMode mode) const {
-  float dimension = 0;
-  if (length.IsPercentOrCalc()) {
-    gfx::SizeF viewport_size;
-    DetermineViewport(viewport_size);
-    // The viewport will be unaffected by zoom.
-    dimension = DimensionForLengthMode(mode, viewport_size);
-  }
+  // The viewport will be unaffected by zoom.
+  const float dimension =
+      length.IsPercentOrCalc() ? ViewportDimension(mode) : 0;
   return ValueForLength(length, zoom, dimension);
 }
 
@@ -340,14 +476,9 @@ float SVGLengthContext::ConvertValueToUserUnits(
     case CSSPrimitiveValue::UnitType::kUserUnits:
       user_units = value;
       break;
-    case CSSPrimitiveValue::UnitType::kPercentage: {
-      gfx::SizeF viewport_size;
-      if (!DetermineViewport(viewport_size)) {
-        return 0;
-      }
-      user_units = value * DimensionForLengthMode(mode, viewport_size) / 100;
+    case CSSPrimitiveValue::UnitType::kPercentage:
+      user_units = value * ViewportDimension(mode) / 100;
       break;
-    }
     case CSSPrimitiveValue::UnitType::kEms:
       user_units = ConvertValueFromEMSToUserUnits(
           ComputedStyleForLengthResolving(context_), value);
@@ -383,13 +514,28 @@ float SVGLengthContext::ConvertValueToUserUnits(
           ConvertValueFromEXSToUserUnits(RootElementStyle(context_), value);
       break;
     case CSSPrimitiveValue::UnitType::kChs:
-      user_units = ConvertValueFromCHSToUserUnits(value);
+      user_units = ConvertValueFromCHSToUserUnits(
+          ComputedStyleForLengthResolving(context_), value);
+      break;
+    case CSSPrimitiveValue::UnitType::kRchs:
+      user_units =
+          ConvertValueFromCHSToUserUnits(RootElementStyle(context_), value);
       break;
     case CSSPrimitiveValue::UnitType::kIcs:
-      user_units = ConvertValueFromICSToUserUnits(value);
+      user_units = ConvertValueFromICSToUserUnits(
+          ComputedStyleForLengthResolving(context_), value);
+      break;
+    case CSSPrimitiveValue::UnitType::kRics:
+      user_units =
+          ConvertValueFromICSToUserUnits(RootElementStyle(context_), value);
       break;
     case CSSPrimitiveValue::UnitType::kLhs:
-      user_units = ConvertValueFromLHSToUserUnits(value);
+      user_units = ConvertValueFromLHSToUserUnits(
+          ComputedStyleForLengthResolving(context_), value);
+      break;
+    case CSSPrimitiveValue::UnitType::kRlhs:
+      user_units =
+          ConvertValueFromLHSToUserUnits(RootElementStyle(context_), value);
       break;
     case CSSPrimitiveValue::UnitType::kViewportWidth:
     case CSSPrimitiveValue::UnitType::kViewportHeight:
@@ -427,11 +573,7 @@ float SVGLengthContext::ConvertValueFromUserUnits(
     case CSSPrimitiveValue::UnitType::kUserUnits:
       return value;
     case CSSPrimitiveValue::UnitType::kPercentage: {
-      gfx::SizeF viewport_size;
-      if (!DetermineViewport(viewport_size)) {
-        return 0;
-      }
-      float dimension = DimensionForLengthMode(mode, viewport_size);
+      const float dimension = ViewportDimension(mode);
       if (!dimension) {
         return 0;
       }
@@ -450,11 +592,20 @@ float SVGLengthContext::ConvertValueFromUserUnits(
     case CSSPrimitiveValue::UnitType::kRexs:
       return ConvertValueFromUserUnitsToEXS(RootElementStyle(context_), value);
     case CSSPrimitiveValue::UnitType::kChs:
-      return ConvertValueFromUserUnitsToCHS(value);
+      return ConvertValueFromUserUnitsToCHS(
+          ComputedStyleForLengthResolving(context_), value);
+    case CSSPrimitiveValue::UnitType::kRchs:
+      return ConvertValueFromUserUnitsToCHS(RootElementStyle(context_), value);
     case CSSPrimitiveValue::UnitType::kIcs:
-      return ConvertValueFromUserUnitsToICS(value);
+      return ConvertValueFromUserUnitsToICS(
+          ComputedStyleForLengthResolving(context_), value);
+    case CSSPrimitiveValue::UnitType::kRics:
+      return ConvertValueFromUserUnitsToICS(RootElementStyle(context_), value);
     case CSSPrimitiveValue::UnitType::kLhs:
-      return ConvertValueFromUserUnitsToLHS(value);
+      return ConvertValueFromUserUnitsToLHS(
+          ComputedStyleForLengthResolving(context_), value);
+    case CSSPrimitiveValue::UnitType::kRlhs:
+      return ConvertValueFromUserUnitsToLHS(RootElementStyle(context_), value);
     case CSSPrimitiveValue::UnitType::kCentimeters:
       return value / kCssPixelsPerCentimeter;
     case CSSPrimitiveValue::UnitType::kMillimeters:
@@ -488,128 +639,44 @@ float SVGLengthContext::ConvertValueFromUserUnits(
   return 0;
 }
 
-float SVGLengthContext::ConvertValueFromUserUnitsToCHS(float value) const {
-  const ComputedStyle* style = ComputedStyleForLengthResolving(context_);
-  if (!style) {
-    return 0;
-  }
-  const SimpleFontData* font_data = style->GetFont().PrimaryFont();
-  if (!font_data) {
-    return 0;
-  }
-  float zero_width =
-      font_data->GetFontMetrics().ZeroWidth() / style->EffectiveZoom();
-  if (!zero_width) {
-    return 0;
-  }
-  return value / zero_width;
-}
-
-float SVGLengthContext::ConvertValueFromCHSToUserUnits(float value) const {
-  const ComputedStyle* style = ComputedStyleForLengthResolving(context_);
-  if (!style) {
-    return 0;
-  }
-  const SimpleFontData* font_data = style->GetFont().PrimaryFont();
-  if (!font_data) {
-    return 0;
-  }
-  return value * font_data->GetFontMetrics().ZeroWidth() /
-         style->EffectiveZoom();
-}
-
-float SVGLengthContext::ConvertValueFromUserUnitsToICS(float value) const {
-  const ComputedStyle* style = ComputedStyleForLengthResolving(context_);
-  if (!style) {
-    return 0;
-  }
-  const SimpleFontData* font_data = style->GetFont().PrimaryFont();
-  if (!font_data) {
-    return 0;
-  }
-  float ideographic_full_width =
-      font_data->GetFontMetrics().IdeographicFullWidth().value_or(
-          style->ComputedFontSize()) /
-      style->EffectiveZoom();
-  if (!ideographic_full_width) {
-    return 0;
-  }
-  return value / ideographic_full_width;
-}
-
-float SVGLengthContext::ConvertValueFromICSToUserUnits(float value) const {
-  const ComputedStyle* style = ComputedStyleForLengthResolving(context_);
-  if (!style) {
-    return 0;
-  }
-  const SimpleFontData* font_data = style->GetFont().PrimaryFont();
-  if (!font_data) {
-    return 0;
-  }
-  return value *
-         font_data->GetFontMetrics().IdeographicFullWidth().value_or(
-             style->ComputedFontSize()) /
-         style->EffectiveZoom();
-}
-
-float SVGLengthContext::ConvertValueFromUserUnitsToLHS(float value) const {
-  const ComputedStyle* style = ComputedStyleForLengthResolving(context_);
-  return value / AdjustForAbsoluteZoom::AdjustFloat(style->ComputedLineHeight(),
-                                                    *style);
-}
-
-float SVGLengthContext::ConvertValueFromLHSToUserUnits(float value) const {
-  const ComputedStyle* style = ComputedStyleForLengthResolving(context_);
-  return value * AdjustForAbsoluteZoom::AdjustFloat(style->ComputedLineHeight(),
-                                                    *style);
-}
-
-bool SVGLengthContext::DetermineViewport(gfx::SizeF& viewport_size) const {
+gfx::SizeF SVGLengthContext::ResolveViewport() const {
   if (!context_) {
-    return false;
+    return gfx::SizeF();
   }
-
   // Root <svg> element lengths are resolved against the top level viewport.
   if (context_->IsOutermostSVGSVGElement()) {
-    viewport_size = To<SVGSVGElement>(context_)->CurrentViewportSize();
-    return true;
+    return To<SVGSVGElement>(context_)->CurrentViewportSize();
   }
-
   // Take size from nearest viewport element.
   SVGElement* viewport_element = context_->viewportElement();
   const auto* svg = DynamicTo<SVGSVGElement>(viewport_element);
   if (!svg) {
-    return false;
+    return gfx::SizeF();
   }
-
-  viewport_size = svg->CurrentViewBoxRect().size();
+  gfx::SizeF viewport_size = svg->CurrentViewBoxRect().size();
   if (viewport_size.IsEmpty()) {
     viewport_size = svg->CurrentViewportSize();
   }
-
-  return true;
+  return viewport_size;
 }
 
-float SVGLengthContext::ResolveValue(const CSSPrimitiveValue& primitive_value,
-                                     SVGLengthMode mode) const {
-  const ComputedStyle* style = ComputedStyleForLengthResolving(context_);
-  if (!style) {
-    return 0;
+float SVGLengthContext::ViewportDimension(SVGLengthMode mode) const {
+  gfx::SizeF viewport_size = ResolveViewport();
+  switch (mode) {
+    case SVGLengthMode::kWidth:
+      return viewport_size.width();
+    case SVGLengthMode::kHeight:
+      return viewport_size.height();
+    case SVGLengthMode::kOther:
+      // Returns the normalized diagonal length of the viewport, as defined in
+      // https://www.w3.org/TR/SVG2/coords.html#Units.
+      return ClampTo<float>(std::sqrt(
+          gfx::Vector2dF(viewport_size.width(), viewport_size.height())
+              .LengthSquared() /
+          2));
   }
-
-  const ComputedStyle* root_style = RootElementStyle(context_);
-  if (!root_style) {
-    return 0;
-  }
-
-  DCHECK(context_);
-  CSSToLengthConversionData::Flags ignored_flags = 0;
-  CSSToLengthConversionData conversion_data = CSSToLengthConversionData(
-      style, style, root_style, context_->GetDocument().GetLayoutView(),
-      CSSToLengthConversionData::ContainerSizes(
-          context_->ParentOrShadowHostElement()),
-      1.0f, ignored_flags);
-  Length length = primitive_value.ConvertToLength(conversion_data);
-  return ValueForLength(length, 1.0f, mode);
+  NOTREACHED();
+  return 0;
 }
+
 }  // namespace blink

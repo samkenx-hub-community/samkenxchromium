@@ -7,8 +7,8 @@
 #include <string>
 #include <utility>
 
-#include "base/bind.h"
 #include "base/check.h"
+#include "base/functional/bind.h"
 #include "base/metrics/histogram_functions.h"
 #include "base/values.h"
 #include "content/browser/attribution_reporting/attribution_debug_report.h"
@@ -145,7 +145,7 @@ void AttributionReportNetworkSender::SendReport(GURL url,
 }
 
 void AttributionReportNetworkSender::OnReportSent(
-    AttributionReport report,
+    const AttributionReport& report,
     bool is_debug_report,
     ReportSentCallback sent_callback,
     UrlLoaderList::iterator it,
@@ -159,10 +159,9 @@ void AttributionReportNetworkSender::OnReportSent(
 
   int response_code = headers ? headers->response_code() : -1;
   bool external_ok = response_code >= 200 && response_code <= 299;
-  Status status =
-      internal_ok && external_ok
-          ? Status::kOk
-          : !internal_ok ? Status::kInternalError : Status::kExternalError;
+  Status status = internal_ok && external_ok ? Status::kOk
+                  : !internal_ok             ? Status::kInternalError
+                                             : Status::kExternalError;
 
   const char* status_metric;
   const char* http_response_or_net_error_code_metric;
@@ -229,9 +228,8 @@ void AttributionReportNetworkSender::OnReportSent(
                           : SendResult::Status::kFailure);
 
   std::move(sent_callback)
-      .Run(std::move(report),
-           SendResult(report_status, net_error,
-                      headers ? headers->response_code() : 0));
+      .Run(report, SendResult(report_status, net_error,
+                              headers ? headers->response_code() : 0));
 }
 
 void AttributionReportNetworkSender::OnDebugReportSent(

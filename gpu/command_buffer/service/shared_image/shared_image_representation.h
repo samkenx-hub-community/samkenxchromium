@@ -9,7 +9,7 @@
 #include <dawn/webgpu.h>
 #include <memory>
 
-#include "base/callback_helpers.h"
+#include "base/functional/callback_helpers.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/scoped_refptr.h"
 #include "base/types/pass_key.h"
@@ -108,6 +108,9 @@ class GPU_GLES2_EXPORT SharedImageRepresentation {
     has_context_ = false;
     backing_->OnContextLost();
   }
+
+  // Returns the number of image planes expected based on the backing format.
+  size_t NumPlanesExpected() const;
 
  protected:
   SharedImageManager* manager() const { return manager_; }

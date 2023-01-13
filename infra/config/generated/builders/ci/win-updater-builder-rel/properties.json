@@ -57,7 +57,7 @@
           {
             "builder_id": {
               "bucket": "ci",
-              "builder": "win11-updater-tester-rel",
+              "builder": "win10-updater-tester-rel-uac",
               "project": "chromium"
             },
             "builder_spec": {
@@ -85,7 +85,7 @@
           {
             "builder_id": {
               "bucket": "ci",
-              "builder": "win7-updater-tester-rel",
+              "builder": "win11-updater-tester-rel",
               "project": "chromium"
             },
             "builder_spec": {
@@ -127,12 +127,12 @@
         },
         {
           "bucket": "ci",
-          "builder": "win11-updater-tester-rel",
+          "builder": "win10-updater-tester-rel-uac",
           "project": "chromium"
         },
         {
           "bucket": "ci",
-          "builder": "win7-updater-tester-rel",
+          "builder": "win11-updater-tester-rel",
           "project": "chromium"
         }
       ],

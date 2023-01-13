@@ -8,9 +8,10 @@
 #include <string>
 #include <utility>
 
-#include "base/bind.h"
+#include "base/containers/contains.h"
 #include "base/containers/flat_map.h"
 #include "base/containers/flat_set.h"
+#include "base/functional/bind.h"
 #include "base/logging.h"
 #include "base/memory/scoped_refptr.h"
 #include "base/metrics/histogram_functions.h"
@@ -26,6 +27,7 @@
 #include "content/public/browser/service_process_host.h"
 #include "mojo/public/cpp/bindings/remote.h"
 #include "printing/backend/print_backend.h"
+#include "printing/buildflags/buildflags.h"
 #include "printing/printing_features.h"
 
 #if BUILDFLAG(IS_WIN)
@@ -36,6 +38,10 @@
 #include "printing/backend/win_helper.h"
 #include "printing/printed_page_win.h"
 #include "ui/views/win/hwnd_util.h"
+#endif
+
+#if BUILDFLAG(ENABLE_OOP_BASIC_PRINT_DIALOG)
+#include "base/notreached.h"
 #endif
 
 namespace printing {
@@ -54,22 +60,16 @@ constexpr char kEmptyPrinterName[] = "";
 
 PrintBackendServiceManager* g_print_backend_service_manager_singleton = nullptr;
 
-size_t GetClientsCountForRemoteId(
-    const PrintBackendServiceManager::PrintClientsMap& clients,
-    const PrintBackendServiceManager::RemoteId& remote_id) {
-  auto iter = clients.find(remote_id);
-  if (iter != clients.end()) {
-    DCHECK(!iter->second.empty());
-    return iter->second.size();
-  }
-  return 0;
-}
-
-#if BUILDFLAG(IS_WIN)
+#if BUILDFLAG(ENABLE_OOP_BASIC_PRINT_DIALOG)
 // TODO(crbug.com/809738):  Update for other platforms as they are made able
 // to support modal dialogs from OOP.
 uint32_t NativeViewToUint(gfx::NativeView view) {
+#if BUILDFLAG(IS_WIN)
   return base::win::HandleToUint32(views::HWNDForNativeView(view));
+#else
+  NOTREACHED();
+  return 0;
+#endif
 }
 #endif
 
@@ -271,7 +271,7 @@ void PrintBackendServiceManager::UseDefaultSettings(
                      base::Unretained(this), std::move(context)));
 }
 
-#if BUILDFLAG(IS_WIN)
+#if BUILDFLAG(ENABLE_OOP_BASIC_PRINT_DIALOG)
 void PrintBackendServiceManager::AskUserForSettings(
     const std::string& printer_name,
     gfx::NativeView parent_view,
@@ -295,7 +295,7 @@ void PrintBackendServiceManager::AskUserForSettings(
       base::BindOnce(&PrintBackendServiceManager::OnDidAskUserForSettings,
                      base::Unretained(this), std::move(context)));
 }
-#endif  // BUILDFLAG(IS_WIN)
+#endif  // BUILDFLAG(ENABLE_OOP_BASIC_PRINT_DIALOG)
 
 void PrintBackendServiceManager::UpdatePrintSettings(
     const std::string& printer_name,
@@ -555,13 +555,7 @@ absl::optional<uint32_t> PrintBackendServiceManager::RegisterClient(
   // System print is a special case because it can display a system dialog and
   // is window modal.  In this scenario we do not want the print backend to
   // self-terminate even if the user is idle for a long period of time.
-  auto iter = sandboxed_remotes_bundles_.find(remote_id);
-  if (iter == sandboxed_remotes_bundles_.end()) {
-    // Service not already available, so launch it now so that it will be
-    // ready by the time the client gets to point of invoking a Mojo call.
-    bool is_sandboxed;
-    GetService(printer_name, client_type, &is_sandboxed);
-  } else {
+  if (base::Contains(sandboxed_remotes_bundles_, remote_id)) {
     // Service already existed, possibly was recently marked for being reset
     // with a short timeout or is already in use for other client types.
     // Determine if any adjustment to the timeout is actually necessary.
@@ -569,6 +563,11 @@ absl::optional<uint32_t> PrintBackendServiceManager::RegisterClient(
         DetermineIdleTimeoutUpdateOnRegisteredClient(client_type, remote_id);
     if (new_timeout.has_value())
       UpdateServiceIdleTimeoutByRemoteId(remote_id, new_timeout.value());
+  } else {
+    // Service not already available, so launch it now so that it will be
+    // ready by the time the client gets to point of invoking a Mojo call.
+    bool is_sandboxed;
+    GetService(printer_name, client_type, &is_sandboxed);
   }
 
   return client_id;
@@ -748,6 +747,21 @@ constexpr base::TimeDelta PrintBackendServiceManager::GetClientTypeIdleTimeout(
   }
 }
 
+bool PrintBackendServiceManager::HasPrintDocumentClientForRemoteId(
+    const RemoteId& remote_id) const {
+  return GetPrintDocumentClientsCountForRemoteId(remote_id) > 0;
+}
+
+size_t PrintBackendServiceManager::GetPrintDocumentClientsCountForRemoteId(
+    const RemoteId& remote_id) const {
+  auto iter = print_document_clients_.find(remote_id);
+  if (iter != print_document_clients_.end()) {
+    DCHECK(!iter->second.empty());
+    return iter->second.size();
+  }
+  return 0;
+}
+
 absl::optional<base::TimeDelta>
 PrintBackendServiceManager::DetermineIdleTimeoutUpdateOnRegisteredClient(
     ClientType registered_client_type,
@@ -759,7 +773,7 @@ PrintBackendServiceManager::DetermineIdleTimeoutUpdateOnRegisteredClient(
       // Other query types have longer timeouts, so no need to update if
       // any of them have clients.
       if (!query_with_ui_clients_.empty() ||
-          GetClientsCountForRemoteId(print_document_clients_, remote_id) > 0) {
+          HasPrintDocumentClientForRemoteId(remote_id)) {
         return absl::nullopt;
       }
 
@@ -782,13 +796,13 @@ PrintBackendServiceManager::DetermineIdleTimeoutUpdateOnRegisteredClient(
 
       // This is the longest timeout.  No need to update if there is a similarly
       // long timeout due to a printing client.
-      if (GetClientsCountForRemoteId(print_document_clients_, remote_id) > 0)
+      if (HasPrintDocumentClientForRemoteId(remote_id)) {
         return absl::nullopt;
+      }
       break;
 
     case ClientType::kPrintDocument:
-      size_t clients_count =
-          GetClientsCountForRemoteId(print_document_clients_, remote_id);
+      size_t clients_count = GetPrintDocumentClientsCountForRemoteId(remote_id);
       DCHECK_GT(clients_count, 0u);
 
       // No need to update if there were other printing clients for same remote
@@ -815,7 +829,7 @@ PrintBackendServiceManager::DetermineIdleTimeoutUpdateOnUnregisteredClient(
       // Other query types have longer timeouts, so no need to update if
       // any of them have clients.
       if (!query_with_ui_clients_.empty() ||
-          GetClientsCountForRemoteId(print_document_clients_, remote_id) > 0) {
+          HasPrintDocumentClientForRemoteId(remote_id)) {
         return absl::nullopt;
       }
 
@@ -839,8 +853,9 @@ PrintBackendServiceManager::DetermineIdleTimeoutUpdateOnUnregisteredClient(
 
       // This is the longest timeout, so no need to update if there is a
       // printing client for this `remote_id`.
-      if (GetClientsCountForRemoteId(print_document_clients_, remote_id) > 0)
+      if (HasPrintDocumentClientForRemoteId(remote_id)) {
         return absl::nullopt;
+      }
 
       // New timeout depends upon existence of other queries.
       return query_clients_.empty() ? kNoClientsRegisteredResetOnIdleTimeout
@@ -849,8 +864,9 @@ PrintBackendServiceManager::DetermineIdleTimeoutUpdateOnUnregisteredClient(
     case ClientType::kPrintDocument:
       // No need to update if there were other printing clients for same remote
       // ID.
-      if (GetClientsCountForRemoteId(print_document_clients_, remote_id) > 0)
+      if (HasPrintDocumentClientForRemoteId(remote_id)) {
         return absl::nullopt;
+      }
 
       // This is the longest timeout, so no need to update if there is still a
       // query with UI.
@@ -943,7 +959,7 @@ void PrintBackendServiceManager::OnRemoteDisconnected(
   RunSavedCallbacksStructResult(
       GetRemoteSavedUseDefaultSettingsCallbacks(sandboxed), remote_id,
       mojom::PrintSettingsResult::NewResultCode(mojom::ResultCode::kFailed));
-#if BUILDFLAG(IS_WIN)
+#if BUILDFLAG(ENABLE_OOP_BASIC_PRINT_DIALOG)
   RunSavedCallbacksStructResult(
       GetRemoteSavedAskUserForSettingsCallbacks(sandboxed), remote_id,
       mojom::PrintSettingsResult::NewResultCode(mojom::ResultCode::kFailed));
@@ -1002,7 +1018,7 @@ PrintBackendServiceManager::GetRemoteSavedUseDefaultSettingsCallbacks(
                    : unsandboxed_saved_use_default_settings_callbacks_;
 }
 
-#if BUILDFLAG(IS_WIN)
+#if BUILDFLAG(ENABLE_OOP_BASIC_PRINT_DIALOG)
 PrintBackendServiceManager::RemoteSavedAskUserForSettingsCallbacks&
 PrintBackendServiceManager::GetRemoteSavedAskUserForSettingsCallbacks(
     bool sandboxed) {
@@ -1140,7 +1156,7 @@ void PrintBackendServiceManager::OnDidUseDefaultSettings(
       context.remote_id, context.saved_callback_id, std::move(settings));
 }
 
-#if BUILDFLAG(IS_WIN)
+#if BUILDFLAG(ENABLE_OOP_BASIC_PRINT_DIALOG)
 void PrintBackendServiceManager::OnDidAskUserForSettings(
     const CallbackContext& context,
     mojom::PrintSettingsResultPtr settings) {
@@ -1149,7 +1165,7 @@ void PrintBackendServiceManager::OnDidAskUserForSettings(
       GetRemoteSavedAskUserForSettingsCallbacks(context.is_sandboxed),
       context.remote_id, context.saved_callback_id, std::move(settings));
 }
-#endif  // BUILDFLAG(IS_WIN)
+#endif  // BUILDFLAG(ENABLE_OOP_BASIC_PRINT_DIALOG)
 
 void PrintBackendServiceManager::OnDidUpdatePrintSettings(
     const CallbackContext& context,

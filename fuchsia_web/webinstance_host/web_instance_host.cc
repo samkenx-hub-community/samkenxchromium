@@ -198,13 +198,13 @@ InstanceBuilder::~InstanceBuilder() {
 void InstanceBuilder::AppendOffersForServices(
     const std::vector<std::string>& services) {
   for (const auto& service_name : services) {
-    dynamic_offers_.push_back(fcdecl::Offer::WithProtocol(
-        std::move(fcdecl::OfferProtocol()
-                      .set_source(fcdecl::Ref::WithParent({}))
-                      .set_source_name(service_name)
-                      .set_target_name(service_name)
-                      .set_dependency_type(fcdecl::DependencyType::STRONG)
-                      .set_availability(fcdecl::Availability::REQUIRED))));
+    dynamic_offers_.push_back(fcdecl::Offer::WithProtocol(std::move(
+        fcdecl::OfferProtocol()
+            .set_source(fcdecl::Ref::WithParent({}))
+            .set_source_name(service_name)
+            .set_target_name(service_name)
+            .set_dependency_type(fcdecl::DependencyType::STRONG)
+            .set_availability(fcdecl::Availability::SAME_AS_TARGET))));
   }
 }
 
@@ -349,6 +349,24 @@ void InstanceBuilder::ServeDirectory(
                     .set_availability(fcdecl::Availability::REQUIRED))));
 }
 
+void HandleCdmDataDirectoryParam(InstanceBuilder& builder,
+                                 fuchsia::web::CreateContextParams& params) {
+  if (!params.has_cdm_data_directory()) {
+    return;
+  }
+
+  static constexpr char kCdmDataPath[] = "/cdm_data";
+
+  builder.args().AppendSwitchNative(switches::kCdmDataDirectory, kCdmDataPath);
+  builder.ServeCdmDataDirectory(
+      std::move(*params.mutable_cdm_data_directory()));
+  if (params.has_cdm_data_quota_bytes()) {
+    builder.args().AppendSwitchNative(
+        switches::kCdmDataQuotaBytes,
+        base::NumberToString(params.cdm_data_quota_bytes()));
+  }
+}
+
 void HandleDataDirectoryParam(InstanceBuilder& builder,
                               fuchsia::web::CreateContextParams& params) {
   if (!params.has_data_directory()) {
@@ -429,6 +447,8 @@ zx_status_t WebInstanceHost::CreateInstanceForContextWithCopiedArgs(
     builder->AppendOffersForServices(services);
   }
 
+  HandleCdmDataDirectoryParam(*builder, params);
+
   HandleDataDirectoryParam(*builder, params);
 
   if (!HandleContentDirectoriesParam(*builder, params)) {
@@ -503,16 +523,18 @@ void WebInstanceHost::OnComponentBinderClosed(const base::GUID& id,
                                               zx_status_t status) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
 
-  // Drop the hold on the instance's Binder.
-  auto count = instances_.erase(id);
-  DCHECK_EQ(count, 1UL);
-
   // Destroy the child instance.
   const std::string name(InstanceNameFromId(id));
   DestroyChild(*realm_, name);
 
   // Drop the directory subtree for the child instance.
   DestroyChildDirectory(GetWebInstancesCollectionDir(), name);
+
+  // Drop the hold on the instance's Binder. Note: destroying the InterfacePtr
+  // here also deletes the lambda into which `id` was bound, so `id` must not
+  // be touched after this next statement.
+  auto count = instances_.erase(id);
+  DCHECK_EQ(count, 1UL);
 
   if (instances_.empty()) {
     Uninitialize();

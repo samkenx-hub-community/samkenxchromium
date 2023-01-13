@@ -826,6 +826,9 @@ const char kWallpaperColors[] = "ash.wallpaper.prominent_colors";
 // A dictionary pref that maps wallpaper file paths to their k mean colors.
 const char kWallpaperMeanColors[] = "ash.wallpaper.k_mean_colors";
 
+// A dictionary pref that maps wallpaper file paths to their celebi colors.
+const char kWallpaperCelebiColors[] = "ash.wallpaper.celebi_colors";
+
 // Boolean pref indicating whether a user has enabled the bluetooth adapter.
 const char kUserBluetoothAdapterEnabled[] =
     "ash.user.bluetooth.adapter_enabled";
@@ -1044,6 +1047,10 @@ const char kLacrosProxyControllingExtension[] =
 
 // A boolean pref which is true if Fast Pair is enabled.
 const char kFastPairEnabled[] = "ash.fast_pair.enabled";
+
+// Boolean pref indicating a user entered Bluetooth pairing flow from a fast
+// pair entry point.
+const char kUserPairedWithFastPair[] = "ash.user.paired_with_fast_pair";
 
 // A boolean pref that controls whether the user is allowed to use the Desk
 // Templates feature - including creating Desks templates and using predefined

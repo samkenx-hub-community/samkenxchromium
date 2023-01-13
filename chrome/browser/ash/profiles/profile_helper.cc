@@ -11,9 +11,9 @@
 
 #include "ash/constants/ash_switches.h"
 #include "base/barrier_closure.h"
-#include "base/bind.h"
-#include "base/callback.h"
 #include "base/command_line.h"
+#include "base/functional/bind.h"
+#include "base/functional/callback.h"
 #include "base/ranges/algorithm.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_piece.h"
@@ -60,19 +60,6 @@ class ProfileHelperImpl : public ProfileHelper {
       std::unique_ptr<BrowserContextHelper::Delegate> delegate);
   ~ProfileHelperImpl() override;
 
-  // Returns the path that corresponds to the passed profile.
-  base::FilePath GetProfileDir(base::StringPiece profile);
-
-  // Returns true if the signin profile has been initialized.
-  bool IsSigninProfileInitialized();
-
-  // Returns OffTheRecord profile for use during signing phase.
-  Profile* GetSigninProfile();
-
-  // Returns OffTheRecord profile for use during online authentication on the
-  // lock screen.
-  Profile* GetLockScreenProfile();
-
   // ProfileHelper overrides
   base::FilePath GetActiveUserProfileDir() override;
   void Initialize() override;
@@ -109,17 +96,6 @@ class ProfileHelperImpl : public ProfileHelper {
 
   std::unique_ptr<FileFlusher> profile_flusher_;
 };
-
-namespace {
-// Convenient utility to obtain ProfileHelperImpl.
-// Currently ProfileHelper interface is implemented by only ProfileHelperImpl,
-// so safe to cast.
-// TODO(crbug.com/1325210): Remove this after ProfileHelper is moved out from
-// chrome/browser.
-ProfileHelperImpl* GetImpl() {
-  return static_cast<ProfileHelperImpl*>(ProfileHelper::Get());
-}
-}  // namespace
 
 ////////////////////////////////////////////////////////////////////////////////
 // ProfileHelper, public
@@ -158,7 +134,8 @@ base::FilePath ProfileHelper::GetSigninProfileDir() {
 
 // static
 Profile* ProfileHelper::GetSigninProfile() {
-  return GetImpl()->GetSigninProfile();
+  return Profile::FromBrowserContext(
+      BrowserContextHelper::Get()->DeprecatedGetOrCreateSigninBrowserContext());
 }
 
 // static
@@ -181,7 +158,7 @@ bool ProfileHelper::IsSigninProfile(const Profile* profile) {
 
 // static
 bool ProfileHelper::IsSigninProfileInitialized() {
-  return GetImpl()->IsSigninProfileInitialized();
+  return BrowserContextHelper::Get()->GetSigninBrowserContext();
 }
 
 // static
@@ -201,7 +178,8 @@ base::FilePath ProfileHelper::GetLockScreenProfileDir() {
 
 // static
 Profile* ProfileHelper::GetLockScreenProfile() {
-  return GetImpl()->GetLockScreenProfile();
+  return Profile::FromBrowserContext(
+      BrowserContextHelper::Get()->GetLockScreenBrowserContext());
 }
 
 // static
@@ -285,38 +263,6 @@ ProfileHelperImpl::ProfileHelperImpl(
 
 ProfileHelperImpl::~ProfileHelperImpl() = default;
 
-base::FilePath ProfileHelperImpl::GetProfileDir(base::StringPiece profile) {
-  const base::FilePath* user_data_dir =
-      browser_context_helper_->delegate()->GetUserDataDir();
-  if (!user_data_dir)
-    return base::FilePath();
-  return user_data_dir->AppendASCII(profile);
-}
-
-bool ProfileHelperImpl::IsSigninProfileInitialized() {
-  return browser_context_helper_->delegate()->GetBrowserContextByPath(
-      GetSigninProfileDir());
-}
-
-Profile* ProfileHelperImpl::GetSigninProfile() {
-  Profile* profile = Profile::FromBrowserContext(
-      browser_context_helper_->delegate()->DeprecatedGetBrowserContext(
-          GetSigninProfileDir()));
-  if (!profile)
-    return nullptr;
-  return profile->GetPrimaryOTRProfile(/*create_if_needed=*/true);
-}
-
-Profile* ProfileHelperImpl::GetLockScreenProfile() {
-  ProfileManager* profile_manager = g_browser_process->profile_manager();
-  DCHECK(profile_manager);
-  Profile* profile =
-      profile_manager->GetProfileByPath(GetLockScreenProfileDir());
-  if (!profile)
-    return nullptr;
-  return profile->GetPrimaryOTRProfile(/*create_if_needed=*/true);
-}
-
 base::FilePath ProfileHelperImpl::GetActiveUserProfileDir() {
   return ProfileHelper::GetUserProfileDir(active_user_id_hash_);
 }
@@ -326,40 +272,30 @@ void ProfileHelperImpl::Initialize() {
 }
 
 Profile* ProfileHelperImpl::GetProfileByAccountId(const AccountId& account_id) {
-  const user_manager::User* user =
-      user_manager::UserManager::Get()->FindUser(account_id);
-
-  if (!user) {
-    LOG(WARNING) << "Unable to retrieve user for account_id.";
-    return nullptr;
+  // TODO(crbug.com/1325210): Remove test injection from here.
+  if (!user_to_profile_for_testing_.empty()) {
+    const auto* user = user_manager::UserManager::Get()->FindUser(account_id);
+    auto it = user_to_profile_for_testing_.find(user);
+    if (it != user_to_profile_for_testing_.end()) {
+      return it->second;
+    }
   }
 
-  return GetProfileByUser(user);
+  return Profile::FromBrowserContext(
+      browser_context_helper_->GetBrowserContextByAccountId(account_id));
 }
 
 Profile* ProfileHelperImpl::GetProfileByUser(const user_manager::User* user) {
-  // This map is non-empty only in tests.
+  // TODO(crbug.com/1325210): Remove test injection from here.
   if (!user_to_profile_for_testing_.empty()) {
-    std::map<const user_manager::User*, Profile*>::const_iterator it =
-        user_to_profile_for_testing_.find(user);
-    if (it != user_to_profile_for_testing_.end())
+    auto it = user_to_profile_for_testing_.find(user);
+    if (it != user_to_profile_for_testing_.end()) {
       return it->second;
+    }
   }
 
-  if (!user->is_profile_created())
-    return nullptr;
-
-  Profile* profile = Profile::FromBrowserContext(
-      browser_context_helper_->delegate()->GetBrowserContextByPath(
-          browser_context_helper_->GetBrowserContextPathByUserIdHash(
-              user->username_hash())));
-
-  // GetActiveUserProfile() or GetProfileByUserIdHash() returns a new instance
-  // of ProfileImpl(), but actually its off-the-record profile should be used.
-  if (user_manager::UserManager::Get()->IsLoggedInAsGuest())
-    profile = profile->GetPrimaryOTRProfile(/*create_if_needed=*/true);
-
-  return profile;
+  return Profile::FromBrowserContext(
+      browser_context_helper_->GetBrowserContextByUser(user));
 }
 
 const user_manager::User* ProfileHelperImpl::GetUserByProfile(
@@ -443,6 +379,7 @@ void ProfileHelperImpl::SetProfileToUserMappingForTesting(
 void ProfileHelperImpl::SetUserToProfileMappingForTesting(
     const user_manager::User* user,
     Profile* profile) {
+  DCHECK(user);
   user_to_profile_for_testing_[user] = profile;
 }
 

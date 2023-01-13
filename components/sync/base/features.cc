@@ -12,6 +12,10 @@ BASE_FEATURE(kCacheBaseEntitySpecificsInMetadata,
              "CacheBaseEntitySpecificsInMetadata",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
+BASE_FEATURE(kDeferredSyncStartupCustomDelay,
+             "DeferredSyncStartupCustomDelay",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 BASE_FEATURE(kIgnoreSyncEncryptionKeysLongMissing,
              "IgnoreSyncEncryptionKeysLongMissing",
              base::FEATURE_DISABLED_BY_DEFAULT);
@@ -28,18 +32,6 @@ BASE_FEATURE(kSyncAllowWalletDataInTransportModeWithCustomPassphrase,
 BASE_FEATURE(kSyncAndroidLimitNTPPromoImpressions,
              "SyncAndroidLimitNTPPromoImpressions",
              base::FEATURE_DISABLED_BY_DEFAULT);
-BASE_FEATURE(kSyncAndroidPromosWithAlternativeTitle,
-             "SyncAndroidPromosWithAlternativeTitle",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-BASE_FEATURE(kSyncAndroidPromosWithIllustration,
-             "SyncAndroidPromosWithIllustration",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-BASE_FEATURE(kSyncAndroidPromosWithSingleButton,
-             "SyncAndroidPromosWithSingleButton",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-BASE_FEATURE(kSyncAndroidPromosWithTitle,
-             "SyncAndroidPromosWithTitle",
-             base::FEATURE_ENABLED_BY_DEFAULT);
 #endif  // BUILDFLAG(IS_ANDROID)
 
 BASE_FEATURE(kSyncAutofillWalletUsageData,
@@ -57,10 +49,6 @@ BASE_FEATURE(kSyncResetPollIntervalOnStart,
 BASE_FEATURE(kSyncSegmentationDataType,
              "SyncSegmentationDataType",
              base::FEATURE_DISABLED_BY_DEFAULT);
-
-BASE_FEATURE(kSyncSendInterestedDataTypes,
-             "SyncSendInterestedDataTypes",
-             base::FEATURE_ENABLED_BY_DEFAULT);
 
 #if BUILDFLAG(IS_CHROMEOS)
 BASE_FEATURE(kSyncSettingsShowLacrosSideBySideWarning,
@@ -143,5 +131,9 @@ BASE_FEATURE(kSyncIgnoreAccountWithoutRefreshToken,
 BASE_FEATURE(kSyncDoNotPropagateBrowserShutdownToDataTypes,
              "SyncDoNotPropagateBrowserShutdownToDataTypes",
              base::FEATURE_ENABLED_BY_DEFAULT);
+
+BASE_FEATURE(kSyncAllowClearingMetadataWhenDataTypeIsStopped,
+             "SyncAllowClearingMetadataWhenDataTypeIsStopped",
+             base::FEATURE_DISABLED_BY_DEFAULT);
 
 }  // namespace syncer

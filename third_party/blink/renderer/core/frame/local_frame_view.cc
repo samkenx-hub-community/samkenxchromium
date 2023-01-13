@@ -31,8 +31,8 @@
 #include <utility>
 
 #include "base/auto_reset.h"
-#include "base/callback.h"
 #include "base/feature_list.h"
+#include "base/functional/callback.h"
 #include "base/functional/function_ref.h"
 #include "base/memory/ptr_util.h"
 #include "base/metrics/field_trial_params.h"
@@ -4105,12 +4105,12 @@ void LocalFrameView::PaintForTest(const CullRect& cull_rect) {
       .UpdateForTesting(CullRect::Infinite());
 }
 
-PaintRecord LocalFrameView::GetPaintRecord() const {
+PaintRecord LocalFrameView::GetPaintRecord(const gfx::Rect* cull_rect) const {
   DCHECK_EQ(DocumentLifecycle::kPaintClean, Lifecycle().GetState());
   DCHECK(frame_->IsLocalRoot());
   DCHECK(paint_controller_);
   return paint_controller_->GetPaintArtifact().GetPaintRecord(
-      PropertyTreeState::Root());
+      PropertyTreeState::Root(), cull_rect);
 }
 
 gfx::Rect LocalFrameView::ConvertToRootFrame(

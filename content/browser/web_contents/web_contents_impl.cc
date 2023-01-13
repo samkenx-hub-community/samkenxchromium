@@ -15,7 +15,6 @@
 #include "base/allocator/partition_alloc_features.h"
 #include "base/allocator/partition_allocator/partition_alloc_buildflags.h"
 #include "base/allocator/partition_allocator/starscan/pcscan.h"
-#include "base/bind.h"
 #include "base/check_op.h"
 #include "base/command_line.h"
 #include "base/containers/contains.h"
@@ -23,6 +22,7 @@
 #include "base/containers/flat_set.h"
 #include "base/feature_list.h"
 #include "base/files/file_path.h"
+#include "base/functional/bind.h"
 #include "base/lazy_instance.h"
 #include "base/location.h"
 #include "base/logging.h"
@@ -97,7 +97,7 @@
 #include "content/browser/renderer_host/render_widget_host_view_child_frame.h"
 #include "content/browser/renderer_host/text_input_manager.h"
 #include "content/browser/renderer_host/visible_time_request_trigger.h"
-#include "content/browser/screen_enumeration/screen_change_monitor.h"
+#include "content/browser/screen_details/screen_change_monitor.h"
 #include "content/browser/screen_orientation/screen_orientation_provider.h"
 #include "content/browser/shared_storage/shared_storage_budget_charger.h"
 #include "content/browser/site_instance_impl.h"
@@ -920,10 +920,10 @@ class WebContentsOfBrowserContext : public base::SupportsUserData::Data {
                                 ->GetCreatorLocation()
                                 .ToString();
       SCOPED_CRASH_KEY_STRING256("shutdown", "web_contents/creator", creator);
-
       NOTREACHED()
           << "BrowserContext is getting destroyed without first closing all "
-             "WebContents (for more info see https://crbug.com/1376879#c44)";
+          << "WebContents (for more info see https://crbug.com/1376879#c44); "
+          << "creator = " << creator;
       base::debug::DumpWithoutCrashing();
     }
   }
@@ -1040,7 +1040,7 @@ WebContentsImpl::WebContentsImpl(BrowserContext* browser_context)
     SharedStorageBudgetCharger::CreateForWebContents(this);
   }
 
-#if BUILDFLAG(USE_PARTITION_ALLOC_AS_MALLOC) && defined(PA_ALLOW_PCSCAN)
+#if BUILDFLAG(USE_PARTITION_ALLOC_AS_MALLOC) && PA_CONFIG(ALLOW_PCSCAN)
   // TODO(1231679): Remove or move to another place after finishing the PCScan
   // experiment.
   if (partition_alloc::internal::PCScan::IsInitialized()) {
@@ -1429,7 +1429,7 @@ bool WebContentsImpl::IsPrerenderedFrame(int frame_tree_node_id) {
                ->lifecycle_state() ==
            RenderFrameHostImpl::LifecycleStateImpl::kPrerendering;
   }
-  return frame_tree_node->frame_tree().type() == FrameTree::Type::kPrerender;
+  return frame_tree_node->GetFrameType() == FrameType::kPrerenderMainFrame;
 }
 
 RenderFrameHostImpl* WebContentsImpl::UnsafeFindFrameByFrameTreeNodeId(
@@ -1622,7 +1622,7 @@ void WebContentsImpl::CancelActiveAndPendingDialogs() {
 
 void WebContentsImpl::ClosePage() {
   OPTIONAL_TRACE_EVENT0("content", "WebContentsImpl::ClosePage");
-  GetRenderViewHost()->ClosePage();
+  GetPrimaryMainFrame()->ClosePage();
 }
 
 RenderWidgetHostView* WebContentsImpl::GetRenderWidgetHostView() {
@@ -2065,10 +2065,8 @@ bool WebContentsImpl::WasDiscarded() {
 }
 
 void WebContentsImpl::SetWasDiscarded(bool was_discarded) {
-  // TODO(https://crbug.com/1264031): With MPArch a WebContents might have
-  // multiple FrameTrees. Should we propagate the was_discarded to all other
-  // FrameTrees? It seems that was_discarded could be a WebContentsImpl
-  // property.
+  // It's set based on a tab and the setting value is started from a primary
+  // tree and propagated to all children nodes including a fenced frame node.
   GetPrimaryFrameTree().root()->set_was_discarded();
 }
 
@@ -2456,11 +2454,12 @@ bool WebContentsImpl::NeedToFireBeforeUnloadOrUnloadEvents() {
   if (!notify_disconnection_)
     return false;
 
-  // Don't fire if the main frame's RenderViewHost indicates that beforeunload
-  // and unload have already executed (e.g., after receiving a ClosePage ACK)
-  // or should be ignored.
-  if (GetRenderViewHost()->SuddenTerminationAllowed())
+  // Don't fire if the main frame indicates that beforeunload and unload have
+  // already executed (e.g., after receiving a ClosePage ACK) or should be
+  // ignored.
+  if (GetPrimaryMainFrame()->IsPageReadyToBeClosed()) {
     return false;
+  }
 
   // Check whether any frame in the frame tree needs to run beforeunload or
   // unload-time event handlers.
@@ -3142,12 +3141,12 @@ void WebContentsImpl::Init(const WebContents::CreateParams& params,
   if (!params.last_active_time.is_null())
     last_active_time_ = params.last_active_time;
 
-  scoped_refptr<SiteInstance> site_instance = params.site_instance;
+  scoped_refptr<SiteInstanceImpl> site_instance =
+      static_cast<SiteInstanceImpl*>(params.site_instance.get());
   if (!site_instance)
-    site_instance = SiteInstance::Create(params.browser_context);
+    site_instance = SiteInstanceImpl::Create(params.browser_context);
   if (params.desired_renderer_state == CreateParams::kNoRendererProcess) {
-    static_cast<SiteInstanceImpl*>(site_instance.get())
-        ->PreventAssociationWithSpareProcess();
+    site_instance->PreventAssociationWithSpareProcess();
   }
 
   // Iniitalize the primary FrameTree.
@@ -3203,9 +3202,8 @@ void WebContentsImpl::Init(const WebContents::CreateParams& params,
   if (params.desired_renderer_state ==
       CreateParams::kInitializeAndWarmupRendererProcess) {
     if (!GetRenderManager()->current_frame_host()->IsRenderFrameLive()) {
-      GetRenderManager()->InitRenderView(
-          static_cast<SiteInstanceImpl*>(site_instance.get())->group(),
-          GetRenderViewHost(), nullptr);
+      GetRenderManager()->InitRenderView(site_instance->group(),
+                                         GetRenderViewHost(), nullptr);
     }
   }
 
@@ -4009,10 +4007,7 @@ FrameTree* WebContentsImpl::CreateNewWindow(
     return nullptr;
 
   int render_process_id = opener->GetProcess()->GetID();
-
-  auto* source_site_instance =
-      static_cast<SiteInstanceImpl*>(opener->GetSiteInstance());
-
+  SiteInstanceImpl* source_site_instance = opener->GetSiteInstance();
   const auto& partition_config =
       source_site_instance->GetStoragePartitionConfig();
 
@@ -5294,11 +5289,6 @@ const std::string& WebContentsImpl::GetContentsMimeType() {
 
 blink::RendererPreferences* WebContentsImpl::GetMutableRendererPrefs() {
   return &renderer_preferences_;
-}
-
-void WebContentsImpl::Close() {
-  OPTIONAL_TRACE_EVENT0("content", "WebContentsImpl::Close");
-  Close(GetRenderViewHost());
 }
 
 void WebContentsImpl::DragSourceEndedAt(float client_x,
@@ -7505,9 +7495,9 @@ void WebContentsImpl::ClearTargetURL() {
     delegate_->UpdateTargetURL(this, GURL());
 }
 
-void WebContentsImpl::Close(RenderViewHost* rvh) {
-  OPTIONAL_TRACE_EVENT1("content", "WebContentsImpl::Close", "render_view_host",
-                        rvh);
+void WebContentsImpl::Close() {
+  OPTIONAL_TRACE_EVENT1("content", "WebContentsImpl::Close",
+                        "render_frame_host", GetPrimaryMainFrame());
 #if BUILDFLAG(IS_MAC)
   // The UI may be in an event-tracking loop, such as between the
   // mouse-down and mouse-up in text selection or a button click.
@@ -7520,9 +7510,9 @@ void WebContentsImpl::Close(RenderViewHost* rvh) {
     return;
 #endif
 
-  // Ignore this if it comes from a RenderViewHost that we aren't showing.
-  if (delegate_ && rvh == GetRenderViewHost())
+  if (delegate_) {
     delegate_->CloseContents(this);
+  }
 }
 
 void WebContentsImpl::SetWindowRect(const gfx::Rect& new_bounds) {
@@ -7796,11 +7786,6 @@ void WebContentsImpl::DocumentOnLoadCompleted(
 
   observers_.NotifyObservers(
       &WebContentsObserver::DocumentOnLoadCompletedInPrimaryMainFrame);
-
-  // TODO(avi): Remove. http://crbug.com/170921
-  NotificationService::current()->Notify(NOTIFICATION_LOAD_COMPLETED_MAIN_FRAME,
-                                         Source<WebContents>(this),
-                                         NotificationService::NoDetails());
 }
 
 void WebContentsImpl::UpdateTitle(RenderFrameHostImpl* render_frame_host,
@@ -9584,7 +9569,7 @@ std::unique_ptr<PrerenderHandle> WebContentsImpl::StartPrerendering(
   PrerenderAttributes attributes(
       prerendering_url, trigger_type, embedder_histogram_suffix,
       content::Referrer(), /*initiator_origin=*/absl::nullopt, prerendering_url,
-      content::ChildProcessHost::kInvalidUniqueID,
+      content::ChildProcessHost::kInvalidUniqueID, GetWeakPtr(),
       /*initiator_frame_token=*/absl::nullopt,
       /*initiator_frame_tree_node_id=*/RenderFrameHost::kNoFrameTreeNodeId,
       ukm::kInvalidSourceId, page_transition, url_match_predicate);

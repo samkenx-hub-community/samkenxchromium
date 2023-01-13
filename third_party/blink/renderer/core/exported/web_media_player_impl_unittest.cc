@@ -9,9 +9,9 @@
 #include <memory>
 #include <string>
 
-#include "base/bind.h"
-#include "base/callback_helpers.h"
 #include "base/command_line.h"
+#include "base/functional/bind.h"
+#include "base/functional/callback_helpers.h"
 #include "base/memory/ref_counted.h"
 #include "base/memory/scoped_refptr.h"
 #include "base/memory/weak_ptr.h"
@@ -809,7 +809,7 @@ class WebMediaPlayerImplTest
 
     // Verify we made it through pipeline startup.
     EXPECT_TRUE(wmpi_->demuxer_manager_->HasDataSource());
-    EXPECT_TRUE(wmpi_->demuxer_);
+    EXPECT_TRUE(wmpi_->demuxer_manager_->HasDemuxer());
 
     if (ready_state > WebMediaPlayer::kReadyStateHaveCurrentData)
       EXPECT_FALSE(wmpi_->seeking_);

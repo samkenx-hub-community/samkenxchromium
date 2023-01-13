@@ -387,8 +387,9 @@ const RemoteSecurityContext* RemoteFrame::GetSecurityContext() const {
 }
 
 bool RemoteFrame::ShouldClose() {
-  // TODO(nasko): Implement running the beforeunload handler in the actual
-  // LocalFrame running in a different process and getting back a real result.
+  // TODO(crbug.com/1407078): Implement running the beforeunload handler in the
+  // actual LocalFrame running in a different process and getting back a real
+  // result.
   return true;
 }
 
@@ -420,9 +421,14 @@ void RemoteFrame::AddResourceTimingFromChild(
   HTMLFrameOwnerElement* owner_element = To<HTMLFrameOwnerElement>(Owner());
   DCHECK(owner_element);
 
+  if (!owner_element->HasPendingFallbackTimingInfo()) {
+    return;
+  }
+
   DOMWindowPerformance::performance(*owner_element->GetDocument().domWindow())
       ->AddResourceTiming(std::move(timing), owner_element->localName(),
                           owner_element->GetDocument().GetExecutionContext());
+  owner_element->DidReportResourceTiming();
 }
 
 void RemoteFrame::DidStartLoading() {

@@ -6,8 +6,8 @@
 
 #include <memory>
 
-#include "base/bind.h"
-#include "base/callback.h"
+#include "base/functional/bind.h"
+#include "base/functional/callback.h"
 #include "base/task/sequenced_task_runner.h"
 #include "components/prefs/pref_service.h"
 #include "components/signin/public/base/signin_metrics.h"
@@ -125,7 +125,7 @@ void SigninManager::UpdateUnconsentedPrimaryAccount() {
     DCHECK(!identity_manager_->HasPrimaryAccount(signin::ConsentLevel::kSync));
 #endif
     identity_manager_->GetPrimaryAccountMutator()->ClearPrimaryAccount(
-        signin_metrics::USER_DELETED_ACCOUNT_COOKIES,
+        signin_metrics::ProfileSignout::kUserDeletedAccountCookies,
         signin_metrics::SignoutDelete::kIgnoreMetric);
   }
 }

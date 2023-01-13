@@ -313,18 +313,23 @@ bool CSSParser::ParseColor(Color& color, const String& string, bool strict) {
     return true;
   }
 
-  const CSSValue* value = CSSParserFastPaths::ParseColor(
-      string, strict ? kHTMLStandardMode : kHTMLQuirksMode);
-  // TODO(timloh): Why is this always strict mode?
-  if (!value) {
-    // NOTE(ikilpatrick): We will always parse color value in the insecure
-    // context mode. If a function/unit/etc will require a secure context check
-    // in the future, plumbing will need to be added.
-    value = ParseSingleValue(
-        CSSPropertyID::kColor, string,
-        StrictCSSParserContext(SecureContextMode::kInsecureContext));
+  switch (CSSParserFastPaths::ParseColor(
+      string, strict ? kHTMLStandardMode : kHTMLQuirksMode, color)) {
+    case ParseColorResult::kFailure:
+      break;
+    case ParseColorResult::kKeyword:
+      return false;
+    case ParseColorResult::kColor:
+      return true;
   }
 
+  // TODO(timloh): Why is this always strict mode?
+  // NOTE(ikilpatrick): We will always parse color value in the insecure
+  // context mode. If a function/unit/etc will require a secure context check
+  // in the future, plumbing will need to be added.
+  const CSSValue* value = ParseSingleValue(
+      CSSPropertyID::kColor, string,
+      StrictCSSParserContext(SecureContextMode::kInsecureContext));
   auto* color_value = DynamicTo<cssvalue::CSSColor>(value);
   if (!color_value) {
     return false;
@@ -367,8 +372,12 @@ CSSPrimitiveValue* CSSParser::ParseLengthPercentage(
   CSSTokenizer tokenizer(string);
   const auto tokens = tokenizer.TokenizeToEOF();
   CSSParserTokenRange range(tokens);
-  return css_parsing_utils::ConsumeLengthOrPercent(
+  // Trim whitespace from the string. It's only necessary to consume leading
+  // whitespaces, since ConsumeLengthOrPercent always consumes trailing ones.
+  range.ConsumeWhitespace();
+  CSSPrimitiveValue* parsed_value = css_parsing_utils::ConsumeLengthOrPercent(
       range, *context, CSSPrimitiveValue::ValueRange::kAll);
+  return range.AtEnd() ? parsed_value : nullptr;
 }
 
 MutableCSSPropertyValueSet* CSSParser::ParseFont(

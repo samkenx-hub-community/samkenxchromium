@@ -8,6 +8,7 @@
 #include <memory>
 
 #include "ash/accessibility/accessibility_controller_impl.h"
+#include "ash/constants/app_types.h"
 #include "ash/constants/ash_features.h"
 #include "ash/display/screen_orientation_controller.h"
 #include "ash/keyboard/ui/keyboard_ui_controller.h"
@@ -43,15 +44,16 @@
 #include "ash/wm/window_transient_descendant_iterator.h"
 #include "ash/wm/window_util.h"
 #include "base/auto_reset.h"
-#include "base/bind.h"
 #include "base/containers/contains.h"
 #include "base/containers/flat_set.h"
 #include "base/cxx17_backports.h"
+#include "base/functional/bind.h"
 #include "base/metrics/histogram_macros.h"
 #include "base/metrics/user_metrics.h"
 #include "base/ranges/algorithm.h"
 #include "base/system/sys_info.h"
 #include "chromeos/ui/base/window_properties.h"
+#include "chromeos/ui/frame/caption_buttons/snap_controller.h"
 #include "chromeos/ui/wm/features.h"
 #include "components/app_restore/desk_template_read_handler.h"
 #include "components/app_restore/window_properties.h"
@@ -230,6 +232,16 @@ void UpdateSnappedBounds(aura::Window* window) {
   window_state->UpdateSnapRatio();
   const bool in_tablet = Shell::Get()->tablet_mode_controller()->InTabletMode();
   if (in_tablet) {
+    // TODO(b/264962634): Remove this workaround. Probably, we can rewrite
+    // `TabletModeWindowState::UpdateWindowPosition` to include this logic.
+    if (window->GetProperty(aura::client::kAppType) ==
+        static_cast<int>(AppType::ARC_APP)) {
+      const SetBoundsWMEvent event(
+          TabletModeWindowState::GetBoundsInTabletMode(window_state),
+          /*animate=*/true);
+      window_state->OnWMEvent(&event);
+      return;
+    }
     TabletModeWindowState::UpdateWindowPosition(
         window_state, WindowState::BoundsChangeAnimationType::kAnimate);
   } else {
@@ -1049,13 +1061,19 @@ void SplitViewController::SwapWindows() {
   // the opposite position. If there is no window, i.e. Overview is open,
   // `UpdateStateAndNotifyObservers()` will update the bounds themselves.
   if (IsSnapped(primary_window_)) {
-    const WMEvent primary_window_event(WM_EVENT_SNAP_PRIMARY);
-    WindowState::Get(primary_window_)->OnWMEvent(&primary_window_event);
+    auto* window_state = WindowState::Get(primary_window_);
+    const WMEvent primary_window_event(
+        WM_EVENT_SNAP_PRIMARY,
+        window_state->snap_ratio().value_or(kDefaultSnapRatio));
+    window_state->OnWMEvent(&primary_window_event);
   }
   secondary_window_ = new_right_window;
   if (IsSnapped(secondary_window_)) {
-    const WMEvent secondary_window_event(WM_EVENT_SNAP_SECONDARY);
-    WindowState::Get(secondary_window_)->OnWMEvent(&secondary_window_event);
+    auto* window_state = WindowState::Get(secondary_window_);
+    const WMEvent secondary_window_event(
+        WM_EVENT_SNAP_SECONDARY,
+        window_state->snap_ratio().value_or(kDefaultSnapRatio));
+    window_state->OnWMEvent(&secondary_window_event);
   }
 
   // Update |default_snap_position_| if necessary.

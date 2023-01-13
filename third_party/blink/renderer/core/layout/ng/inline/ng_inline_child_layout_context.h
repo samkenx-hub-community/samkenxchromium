@@ -31,11 +31,6 @@ class CORE_EXPORT NGInlineChildLayoutContext {
 
   NGFragmentItemsBuilder* ItemsBuilder() { return &items_builder_; }
 
-  // Returns an instance of |NGLogicalLineItems|. This is reused when laying out
-  // the next line.
-  // TODO(crbug.com/1402001): Deprecated, remove once all usages are gone.
-  NGLogicalLineItems* LogicalLineItems() { return &logical_line_items_; }
-
   // Acquire/release temporary |NGLogicalLineItems|, used for a short period of
   // time, but needed multiple times in a context.
   NGLogicalLineItems& AcquireTempLogicalLineItems();
@@ -71,8 +66,6 @@ class CORE_EXPORT NGInlineChildLayoutContext {
   NGBoxFragmentBuilder* container_builder_ = nullptr;
   NGFragmentItemsBuilder items_builder_;
 
-  NGLogicalLineItems& logical_line_items_ =
-      *MakeGarbageCollected<NGLogicalLineItems>();
   NGLogicalLineItems* temp_logical_line_items_ = nullptr;
 
   absl::optional<NGInlineLayoutStateStack> box_states_;

@@ -131,6 +131,10 @@ BLINK_COMMON_EXPORT extern const base::FeatureParam<base::TimeDelta>
 // main frame has fenced frame depth 1, etc).
 BLINK_COMMON_EXPORT extern const base::FeatureParam<int>
     kSharedStorageMaxAllowedFencedFrameDepthForSelectURL;
+// Maximum number of times per origin per pageload that
+// `sharedStorage.selectURL()` is allowed to be invoked.
+BLINK_COMMON_EXPORT extern const base::FeatureParam<int>
+    kSharedStorageMaxAllowedSelectURLCallsPerOriginPerPageLoad;
 
 // Enables the multiple prerendering in a sequential way:
 // https://crbug.com/1355151
@@ -440,6 +444,8 @@ BLINK_COMMON_EXPORT extern const base::FeatureParam<int>
     kBrowsingTopicsTaxonomyVersion;
 BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(
     kBrowsingTopicsBypassIPIsPubliclyRoutableCheck);
+
+BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kBrowsingTopicsXHR);
 
 // Uses page viewport instead of frame viewport in the Largest Contentful Paint
 // heuristic where images occupying the full viewport are ignored.
@@ -959,14 +965,23 @@ BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(
 // enabled.
 BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kSpeculationRulesPrefetchFuture);
 
-// Feature for allowing page with open IDB connection to be stored in
-// back/forward cache.
+// TODO(leimy crbug.com/1378823): Merge the following two together into a
+// multi-level feature. Feature for allowing page with open IDB connection to be
+// stored in back/forward cache.
 BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kAllowPageWithIDBConnectionInBFCache);
+
+// Feature for allowing page with open IDB transaction to be stored in
+// back/forward cache.
+BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kAllowPageWithIDBTransactionInBFCache);
 
 // Kill switch for using a custom task runner in the blink scheduler that makes
 // DeleteSoon/ReleaseSoon less prone to memory leaks.
 BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(
     kUseBlinkSchedulerTaskRunnerWithCustomDeleter);
+
+// Extend ScriptResource's lifetime to match its payload's lifetime.
+// See https://crbug.com/1393246.
+BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kExtendScriptResourceLifetime);
 
 }  // namespace features
 }  // namespace blink

@@ -10,7 +10,6 @@
 #include <string>
 #include <utility>
 
-#include "base/bind.h"
 #include "base/command_line.h"
 #include "base/files/file_enumerator.h"
 #include "base/files/file_path.h"
@@ -19,6 +18,7 @@
 #include "base/fuchsia/filtered_service_directory.h"
 #include "base/fuchsia/fuchsia_logging.h"
 #include "base/fuchsia/process_context.h"
+#include "base/functional/bind.h"
 #include "base/logging.h"
 #include "base/process/process.h"
 #include "base/strings/strcat.h"
@@ -30,7 +30,7 @@
 #include "fuchsia_web/runners/cast/cast_streaming.h"
 #include "fuchsia_web/runners/cast/pending_cast_component.h"
 #include "fuchsia_web/runners/common/web_content_runner.h"
-#include "fuchsia_web/webinstance_host/web_instance_host.h"
+#include "fuchsia_web/webinstance_host/web_instance_host_v1.h"
 #include "url/gurl.h"
 
 namespace {
@@ -203,7 +203,7 @@ void SetCdmParamsForMainContext(fuchsia::web::CreateContextParams* params) {
 
 }  // namespace
 
-CastRunner::CastRunner(WebInstanceHost& web_instance_host, Options options)
+CastRunner::CastRunner(WebInstanceHostV1& web_instance_host, Options options)
     : web_instance_host_(web_instance_host),
       is_headless_(options.headless),
       disable_codegen_(options.disable_codegen),
@@ -211,7 +211,7 @@ CastRunner::CastRunner(WebInstanceHost& web_instance_host, Options options)
           base::ComponentContextForProcess()->svc())),
       main_context_(std::make_unique<WebContentRunner>(
           base::BindRepeating(
-              &WebInstanceHost::CreateInstanceForContextWithCopiedArgs,
+              &WebInstanceHostV1::CreateInstanceForContextWithCopiedArgs,
               base::Unretained(&web_instance_host_.get())),
           base::BindRepeating(&CastRunner::GetMainWebInstanceConfig,
                               base::Unretained(this)))),
@@ -509,7 +509,7 @@ WebContentRunner* CastRunner::CreateIsolatedRunner(
   // Create an isolated context which will own the CastComponent.
   auto context = std::make_unique<WebContentRunner>(
       base::BindRepeating(
-          &WebInstanceHost::CreateInstanceForContextWithCopiedArgs,
+          &WebInstanceHostV1::CreateInstanceForContextWithCopiedArgs,
           base::Unretained(&web_instance_host_.get())),
       std::move(config));
   context->SetOnEmptyCallback(

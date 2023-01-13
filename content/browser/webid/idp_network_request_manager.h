@@ -9,7 +9,7 @@
 #include <string>
 #include <vector>
 
-#include "base/callback.h"
+#include "base/functional/callback.h"
 #include "content/common/content_export.h"
 #include "content/public/browser/identity_request_account.h"
 #include "content/public/browser/identity_request_dialog_controller.h"
@@ -68,6 +68,10 @@ class CONTENT_EXPORT IdpNetworkRequestManager {
     kHttpNotFoundError,
     kNoResponseError,
     kInvalidResponseError,
+    // ParseStatus::kEmptyListError only applies to well known and account list
+    // responses. It is used to classify a successful response where the list in
+    // the response is empty.
+    kEmptyListError,
   };
   struct FetchStatus {
     ParseStatus parse_status;

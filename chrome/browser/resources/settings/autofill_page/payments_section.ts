@@ -21,11 +21,12 @@ import './passwords_shared.css.js';
 import './payments_list.js';
 import './virtual_card_unenroll_dialog.js';
 
-import {CrActionMenuElement} from 'chrome://resources/cr_elements/cr_action_menu/cr_action_menu.js';
+import {AnchorAlignment, CrActionMenuElement} from 'chrome://resources/cr_elements/cr_action_menu/cr_action_menu.js';
 import {CrButtonElement} from 'chrome://resources/cr_elements/cr_button/cr_button.js';
+import {CrLazyRenderElement} from 'chrome://resources/cr_elements/cr_lazy_render/cr_lazy_render.js';
+import {I18nMixin} from 'chrome://resources/cr_elements/i18n_mixin.js';
 import {assert} from 'chrome://resources/js/assert_ts.js';
 import {focusWithoutInk} from 'chrome://resources/js/focus_without_ink.js';
-import {I18nMixin} from 'chrome://resources/cr_elements/i18n_mixin.js';
 import {PolymerElement} from 'chrome://resources/polymer/v3_0/polymer/polymer_bundled.min.js';
 
 import {SettingsToggleButtonElement} from '../controls/settings_toggle_button.js';
@@ -50,7 +51,6 @@ declare global {
 
 export interface SettingsPaymentsSectionElement {
   $: {
-    addCreditCard: CrButtonElement,
     autofillCreditCardToggle: SettingsToggleButtonElement,
     canMakePaymentToggle: SettingsToggleButtonElement,
     creditCardSharedMenu: CrActionMenuElement,
@@ -108,6 +108,17 @@ export class SettingsPaymentsSectionElement extends
       },
 
       /**
+       * Whether IBAN is supported in Settings page.
+       */
+      showIbanSettingsEnabled_: {
+        type: Boolean,
+        value() {
+          return loadTimeData.getBoolean('showIbansSettings');
+        },
+        readOnly: true,
+      },
+
+      /**
        * The model for any credit card related action menus or dialogs.
        */
       activeCreditCard_: Object,
@@ -128,6 +139,18 @@ export class SettingsPaymentsSectionElement extends
       },
 
       /**
+       * Whether the removal of Expiration and Type titles on settings page is
+       * enabled.
+       */
+      removeCardExpirationAndTypeTitlesEnabled_: {
+        type: Boolean,
+        value() {
+          return loadTimeData.getBoolean('removeCardExpirationAndTypeTitles');
+        },
+        readOnly: true,
+      },
+
+      /**
        * Whether virtual card enroll management on settings page is enabled.
        */
       virtualCardEnrollmentEnabled_: {
@@ -137,19 +160,33 @@ export class SettingsPaymentsSectionElement extends
         },
         readOnly: true,
       },
+
+      /**
+       * Whether virtual card metadata on settings page is enabled.
+       */
+      virtualCardMetadataEnabled_: {
+        type: Boolean,
+        value() {
+          return loadTimeData.getBoolean('virtualCardMetadataEnabled');
+        },
+        readOnly: true,
+      },
     };
   }
 
   prefs: {[key: string]: any};
   creditCards: chrome.autofillPrivate.CreditCardEntry[];
   upiIds: string[];
+  private showIbanSettingsEnabled_: boolean;
   private userIsFidoVerifiable_: boolean;
   private activeCreditCard_: chrome.autofillPrivate.CreditCardEntry|null;
   private showCreditCardDialog_: boolean;
   private showVirtualCardUnenrollDialog_: boolean;
   private migratableCreditCardsInfo_: string;
   private migrationEnabled_: boolean;
+  private removeCardExpirationAndTypeTitlesEnabled_: boolean;
   private virtualCardEnrollmentEnabled_: boolean;
+  private virtualCardMetadataEnabled_: boolean;
   private activeDialogAnchor_: HTMLElement|null;
   private paymentsManager_: PaymentsManagerProxy =
       PaymentsManagerImpl.getInstance();
@@ -229,6 +266,41 @@ export class SettingsPaymentsSectionElement extends
   }
 
   /**
+   * Calculate the class style for `paymentsList` based on flags.
+   */
+  private computeCssClass_(): string {
+    return this.removeCardExpirationAndTypeTitlesEnabled_ &&
+            this.virtualCardMetadataEnabled_ ?
+        'payment-list-margin-start' :
+        '';
+  }
+
+  /**
+   * Returns true if IBAN should be shown from settings page.
+   * TODO(crbug.com/1352606): Add additional check (starter country-list, or
+   * the saved-pref-boolean on if the user has submitted an IBAN form).
+   */
+  private shouldShowIbanSettings_(): boolean {
+    return this.showIbanSettingsEnabled_;
+  }
+
+  /**
+   * Opens the dropdown menu to add a credit/debit card or IBAN.
+   */
+  private onAddPaymentMethodClick_(e: Event) {
+    const target = e.currentTarget as HTMLElement;
+    const menu = this.shadowRoot!
+                     .querySelector<CrLazyRenderElement<CrActionMenuElement>>(
+                         '#paymentMethodsActionMenu')!.get();
+    assert(menu);
+    menu.showAt(target, {
+      anchorAlignmentX: AnchorAlignment.BEFORE_END,
+      anchorAlignmentY: AnchorAlignment.AFTER_END,
+      noOffset: true,
+    });
+  }
+
+  /**
    * Opens the credit card action menu.
    */
   private onCreditCardDotsMenuClick_(e: DotsCardMenuiClickEvent) {
@@ -251,7 +323,16 @@ export class SettingsPaymentsSectionElement extends
       expirationYear: date.getFullYear().toString(),
     };
     this.showCreditCardDialog_ = true;
-    this.activeDialogAnchor_ = this.$.addCreditCard;
+    this.activeDialogAnchor_ = this.shadowRoot!.querySelector<CrButtonElement>(
+        this.showIbanSettingsEnabled_ ? '#addPaymentMethods' :
+                                        '#addCreditCard');
+    if (this.showIbanSettingsEnabled_) {
+      const menu = this.shadowRoot!
+                       .querySelector<CrLazyRenderElement<CrActionMenuElement>>(
+                           '#paymentMethodsActionMenu')!.get();
+      assert(menu);
+      menu.close();
+    }
   }
 
   private onCreditCardDialogClose_() {

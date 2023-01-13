@@ -12,6 +12,7 @@
 #include "base/test/test_future.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/web_applications/os_integration/os_integration_manager.h"
+#include "chrome/browser/web_applications/os_integration/os_integration_test_override.h"
 #include "chrome/browser/web_applications/policy/web_app_policy_manager.h"
 #include "chrome/browser/web_applications/proto/web_app_os_integration_state.pb.h"
 #include "chrome/browser/web_applications/test/fake_web_app_provider.h"
@@ -46,8 +47,8 @@ class RunOnOsLoginSubManagerTest
     WebAppTest::SetUp();
     {
       base::ScopedAllowBlockingForTesting allow_blocking;
-      shortcut_override_ =
-          ShortcutOverrideForTesting::OverrideForTesting(base::GetHomeDir());
+      test_override_ =
+          OsIntegrationTestOverride::OverrideForTesting(base::GetHomeDir());
     }
     if (GetParam() == OsIntegrationSubManagersState::kSaveStateToDB) {
       scoped_feature_list_.InitAndEnableFeatureWithParameters(
@@ -86,7 +87,7 @@ class RunOnOsLoginSubManagerTest
       // Blocking required due to file operations in the shortcut override
       // destructor.
       base::ScopedAllowBlockingForTesting allow_blocking;
-      shortcut_override_.reset();
+      test_override_.reset();
     }
     WebAppTest::TearDown();
   }
@@ -96,7 +97,7 @@ class RunOnOsLoginSubManagerTest
         std::make_unique<WebAppInstallInfo>();
     info->start_url = kWebAppUrl;
     info->title = u"Test App";
-    info->user_display_mode = web_app::UserDisplayMode::kStandalone;
+    info->user_display_mode = web_app::mojom::UserDisplayMode::kStandalone;
     base::test::TestFuture<const AppId&, webapps::InstallResultCode> result;
     // InstallFromInfoWithParams is used instead of InstallFromInfo, because
     // InstallFromInfo doesn't register OS integration.
@@ -129,8 +130,8 @@ class RunOnOsLoginSubManagerTest
  private:
   raw_ptr<FakeWebAppProvider> provider_;
   base::test::ScopedFeatureList scoped_feature_list_;
-  std::unique_ptr<ShortcutOverrideForTesting::BlockingRegistration>
-      shortcut_override_;
+  std::unique_ptr<OsIntegrationTestOverride::BlockingRegistration>
+      test_override_;
 };
 
 TEST_P(RunOnOsLoginSubManagerTest, VerifyRunOnOsLoginSetProperlyOnInstall) {

@@ -21,9 +21,9 @@ import {Feature} from './emoji_picker.mojom-webui.js';
 import {EmojiPickerApiProxy, EmojiPickerApiProxyImpl} from './emoji_picker_api_proxy.js';
 import {EmojiSearch} from './emoji_search.js';
 import * as events from './events.js';
-import {CATEGORY_METADATA, CATEGORY_TABS, EMOJI_GROUP_TABS, GIF_CATEGORY_METADATA, gifCategoryTabs, SUBCATEGORY_TABS, TABS_CATEGORY_START_INDEX} from './metadata_extension.js';
+import {CATEGORY_METADATA, CATEGORY_TABS, EMOJI_GROUP_TABS, GIF_CATEGORY_METADATA, gifCategoryTabs, SUBCATEGORY_TABS, TABS_CATEGORY_START_INDEX, TABS_CATEGORY_START_INDEX_GIF_SUPPORT} from './metadata_extension.js';
 import {RecentlyUsedStore} from './store.js';
-import {CategoryEnum, EmojiGroupData, EmojiGroupElement, EmojiVariants, GifSubcategoryData, SubcategoryData} from './types.js';
+import {CategoryEnum, Emoji, EmojiGroupData, EmojiGroupElement, EmojiVariants, GifSubcategoryData, SubcategoryData, VisualContent} from './types.js';
 
 export class EmojiPicker extends PolymerElement {
   static get is() {
@@ -43,6 +43,7 @@ export class EmojiPicker extends PolymerElement {
         ],
         [CategoryEnum.EMOTICON]: ['/emoticon_ordering.json'],
         [CategoryEnum.SYMBOL]: ['/symbol_ordering.json'],
+        // GIFs are not preloaded hence the empty data url.
         [CategoryEnum.GIF]: [''],
       },
     };
@@ -52,6 +53,7 @@ export class EmojiPicker extends PolymerElement {
     return {
       category: {type: String, value: 'emoji', observer: 'onCategoryChanged'},
       emojiGroupTabs: {type: Array},
+      dummyTab: {type: Object, value: () => ({})},
       categoriesData: {type: Array, value: () => ([])},
       categoriesGroupElements: {type: Array, value: () => ([])},
       categoriesHistory: {type: Object, value: () => ({})},
@@ -66,10 +68,12 @@ export class EmojiPicker extends PolymerElement {
       searchExtensionEnabled: {type: Boolean, value: false},
       incognito: {type: Boolean, value: true},
       gifSupport: {type: Boolean, value: false},
+      gifDataInitialised: {type: Boolean, value: false},
     };
   }
   private category: CategoryEnum;
   private emojiGroupTabs: SubcategoryData[];
+  private dummyTab: SubcategoryData;
   private allCategoryTabs: SubcategoryData[];
   categoriesData: EmojiGroupData;
   categoriesGroupElements: EmojiGroupElement[];
@@ -89,6 +93,7 @@ export class EmojiPicker extends PolymerElement {
   private autoScrollingToGroup: boolean;
   private highlightBarMoving: boolean;
   private groupTabsMoving: boolean;
+  private gifDataInitialised: boolean;
 
   constructor() {
     super();
@@ -113,12 +118,20 @@ export class EmojiPicker extends PolymerElement {
         (ev: events.GroupButtonClickEvent) =>
             this.selectGroup(ev.detail.group));
     this.addEventListener(
-        events.EMOJI_BUTTON_CLICK,
-        (ev: events.EmojiButtonClickEvent) => this.onEmojiButtonClick(ev));
+        events.EMOJI_TEXT_BUTTON_CLICK,
+        (ev: events.EmojiTextButtonClickEvent) =>
+            this.onEmojiTextButtonClick(ev));
+    this.addEventListener(
+        events.EMOJI_IMG_BUTTON_CLICK,
+        (ev: events.EmojiImgButtonClickEvent) =>
+            this.onEmojiImgButtonClick(ev));
     this.addEventListener(
         events.EMOJI_CLEAR_RECENTS_CLICK,
         (ev: events.EmojiClearRecentClickEvent) => this.clearRecentEmoji(ev));
     // variant popup related handlers
+    this.addEventListener(
+        events.EMOJI_VARIANTS_SHOWN,
+        (ev: events.EmojiVariantsShownEvent) => this.onShowEmojiVariants(ev));
     this.addEventListener('click', () => this.hideDialogs());
     this.addEventListener(
         events.CATEGORY_BUTTON_CLICK,
@@ -223,7 +236,7 @@ export class EmojiPicker extends PolymerElement {
         await Promise
             .all(
                 [
-                  this.fetchOrderingData<EmojiGroupData>(firstResult.url),
+                  this.fetchOrderingData(firstResult.url),
                   this.apiProxy.getFeatureList().then(
                       (response: {featureList: number[]}) =>
                           this.setActiveFeatures(response.featureList)),
@@ -238,18 +251,6 @@ export class EmojiPicker extends PolymerElement {
       '--emoji-size': constants.EMOJI_ICON_SIZE_PX,
       '--emoji-spacing': constants.EMOJI_SPACING_PX,
     });
-
-    if (this.gifSupport) {
-      const dataUrl = EmojiPicker.configs().dataUrls.gif[0];
-      const categories: GifSubcategoryData[] = dataUrl ?
-          (await this.fetchOrderingData<GifSubcategoryData[]>(dataUrl)) :
-          (await this.apiProxy.getCategories()).categories;
-      const categoryTabs = {
-        ...CATEGORY_TABS,
-        gif: categories,
-      };
-      this.allCategoryTabs = gifCategoryTabs(categoryTabs);
-    }
 
     // Update UI and relevant features based on the initial data.
     this.updateCategoryData(
@@ -297,6 +298,40 @@ export class EmojiPicker extends PolymerElement {
                   );
         },
     );
+
+    if (this.gifSupport) {
+      const categoriesFetchPromise =
+          prevFetchPromise.then(() => this.apiProxy.getCategories());
+
+      const categoriesRenderPromise =
+          Promise.all([prevRenderPromise, categoriesFetchPromise])
+              .then((values) => {
+                const {gifCategories} = values[1];
+                const categoryTabs = {
+                  ...CATEGORY_TABS,
+                  gif: this.setGifGroupsPagination(
+                      [{name: constants.TRENDING}, ...gifCategories]),
+                };
+                this.allCategoryTabs = gifCategoryTabs(categoryTabs);
+              });
+
+      const featuredGifFetchPromise =
+          categoriesFetchPromise.then(() => this.apiProxy.getFeaturedGifs());
+
+      Promise.all([categoriesRenderPromise, featuredGifFetchPromise])
+          .then((values) => {
+            const {featuredGifs} = values[1];
+            const trendingGifs = [{
+              group: constants.TRENDING,
+              category: CategoryEnum.GIF,
+              emoji: this.apiProxy.convertTenorGifsToEmoji(featuredGifs),
+            }];
+
+            this.gifDataInitialised = true;
+
+            this.updateCategoryData(trendingGifs, CategoryEnum.GIF);
+          });
+    }
   }
 
   setActiveFeatures(featureList: Feature[]) {
@@ -305,7 +340,7 @@ export class EmojiPicker extends PolymerElement {
     this.gifSupport = featureList.includes(Feature.EMOJI_PICKER_GIF_SUPPORT);
   }
 
-  fetchOrderingData<T>(url: string): Promise<T> {
+  fetchOrderingData(url: string): Promise<EmojiGroupData> {
     return new Promise((resolve) => {
       const xhr = new XMLHttpRequest();
       xhr.onloadend = () => resolve(JSON.parse(xhr.responseText));
@@ -340,7 +375,10 @@ export class EmojiPicker extends PolymerElement {
 
     // Create recently used emoji group for the category as its first
     // group element.
-    const startIndex = TABS_CATEGORY_START_INDEX.get(category);
+    const startIndexes = this.gifSupport ?
+        TABS_CATEGORY_START_INDEX_GIF_SUPPORT :
+        TABS_CATEGORY_START_INDEX;
+    const startIndex = startIndexes.get(category);
     if (startIndex === this.categoriesGroupElements.length) {
       const historyGroupElement = this.createEmojiGroupElement(
           this.getHistoryEmojis(category), {}, true, startIndex);
@@ -422,16 +460,21 @@ export class EmojiPicker extends PolymerElement {
     this.highlightBarMoving = false;
   }
 
-  private onEmojiButtonClick(ev: events.EmojiButtonClickEvent) {
+  private onEmojiTextButtonClick(ev: events.EmojiTextButtonClickEvent) {
     const category = ev.detail.category;
     this.insertText(category, ev.detail);
+  }
+
+  private onEmojiImgButtonClick(ev: events.EmojiImgButtonClickEvent) {
+    const category = ev.detail.category;
+    this.insertVisualContent(category, ev.detail);
   }
 
   async insertText(category: CategoryEnum, item: {
     emoji: string,
     isVariant: boolean,
     baseEmoji: string,
-    allVariants?: string[], name: string, text: string,
+    allVariants?: Emoji[], name: string, text: string,
   }) {
     const {text, isVariant, baseEmoji, allVariants, name} = item;
     const message = this.getMessage();
@@ -439,7 +482,7 @@ export class EmojiPicker extends PolymerElement {
       message.textContent = text + ' inserted.';
     }
 
-    this.insertHistoryItem(category, {
+    this.insertHistoryTextItem(category, {
       selectedEmoji: text,
       baseEmoji: baseEmoji,
       alternates: allVariants || [],
@@ -453,6 +496,17 @@ export class EmojiPicker extends PolymerElement {
 
     // TODO(b/217276960): change to a more generic name
     this.apiProxy.insertEmoji(text, isVariant, searchLength);
+  }
+
+  insertVisualContent(category: CategoryEnum, item: {
+    name: string,
+    visualContent: VisualContent,
+  }) {
+    this.insertHistoryVisualContentItem(category, item);
+
+    // TODO(b/264825662): Actually insert GIF to input field.
+    // Currently the Emoji Picker stays open and users need to
+    // close and re-open the Emoji Picker to see recently used GIFs.
   }
 
   clearRecentEmoji(event: events.EmojiClearRecentClickEvent) {
@@ -716,17 +770,28 @@ export class EmojiPicker extends PolymerElement {
    * Gets recently used emojis for a category. It gets the history items
    * and convert them to emojis.
    */
-  getHistoryEmojis(category: CategoryEnum) {
+  getHistoryEmojis(category: CategoryEnum): EmojiVariants[] {
     if (this.incognito) {
       return [];
     }
 
     return this.categoriesHistory[category]?.data?.history?.map(
                emoji => ({
-                 base: {string: emoji.base, name: emoji.name, keywords: []},
-                 alternates: emoji.alternates.map(alternate => {
-                   return {string: alternate, name: emoji.name, keywords: []};
-                 }),
+                 base: {
+                   string: emoji.base.string,
+                   name: emoji.base.name,
+                   visualContent: emoji.base.visualContent,
+                   keywords: [],
+                 },
+                 alternates: emoji.alternates.map(
+                     (alternate: Emoji):
+                         Emoji => {
+                           return {
+                             string: alternate.string,
+                             name: alternate.name,
+                             keywords: [...(alternate.keywords ?? [])],
+                           };
+                         }),
                })) ??
         [];
   }
@@ -740,7 +805,10 @@ export class EmojiPicker extends PolymerElement {
       category: CategoryEnum, historyUpdated = true,
       _preferenceUpdated = true) {
     // History item is assumed to be the first item of each category.
-    const historyIndex = TABS_CATEGORY_START_INDEX.get(category);
+    const historyIndexes = this.gifSupport ?
+        TABS_CATEGORY_START_INDEX_GIF_SUPPORT :
+        TABS_CATEGORY_START_INDEX;
+    const historyIndex = historyIndexes.get(category);
 
     // If history group is already added, then update it.
     if (historyUpdated && (historyIndex !== undefined) &&
@@ -777,10 +845,10 @@ export class EmojiPicker extends PolymerElement {
    * incognito state.
    *
    */
-  insertHistoryItem(category: CategoryEnum, item: {
+  insertHistoryTextItem(category: CategoryEnum, item: {
     selectedEmoji: string,
     baseEmoji: string,
-    alternates: string[],
+    alternates: Emoji[],
     name: string,
   }) {
     if (this.incognito) {
@@ -790,13 +858,35 @@ export class EmojiPicker extends PolymerElement {
     const {selectedEmoji, baseEmoji, alternates, name} = item;
 
     this.categoriesHistory[category]?.bumpItem(
-        {base: selectedEmoji, alternates: alternates, name: name});
+        category,
+        {base: {string: selectedEmoji, name: name}, alternates: alternates});
 
     const preferenceUpdated =
         this.categoriesHistory[category]?.savePreferredVariant(
             baseEmoji, selectedEmoji);
 
     this.categoryHistoryUpdated(category, true, preferenceUpdated);
+  }
+
+  /**
+   * Inserts a new item to the history of a visual content category. It will do
+   * nothing during incognito state.
+   */
+  insertHistoryVisualContentItem(category: CategoryEnum, item: {
+    visualContent: VisualContent,
+    name: string,
+  }) {
+    if (this.incognito) {
+      return;
+    }
+
+    const {name, visualContent} = item;
+
+    this.categoriesHistory[category]?.bumpItem(
+        category,
+        {base: {visualContent: visualContent, name: name}, alternates: []});
+
+    this.categoryHistoryUpdated(category, true, undefined);
   }
 
   /**
@@ -851,6 +941,7 @@ export class EmojiPicker extends PolymerElement {
       'preferences': preferences,
       'isHistory': isHistory,
     };
+
     return (
         Object.assign({}, baseDetails, this.allCategoryTabs[subcategoryIndex]));
   }
@@ -864,6 +955,66 @@ export class EmojiPicker extends PolymerElement {
                             // ! is safe as categories history must contain
                             // entries for all categories.
                             this.categoriesHistory[category]!.data.preference;
+  }
+
+  onShowEmojiVariants(ev: events.EmojiVariantsShownEvent) {
+    // Hide the currently shown emoji variants if the new one belongs
+    // to a different emoji group.
+    if (this.activeVariant && ev.detail.owner !== this.activeVariant) {
+      this.hideEmojiVariants();
+    }
+
+    this.activeVariant = ev.detail.owner as EmojiGroupComponent;
+
+    // Updates the UI if a variant is shown.
+    if (ev.detail.variants) {
+      const message = this.getMessage();
+      if (message) {
+        message.textContent = ev.detail.baseEmoji + ' variants shown.';
+      }
+      this.positionEmojiVariants(ev.detail.variants);
+    }
+  }
+
+  positionEmojiVariants(variants: HTMLElement) {
+    // TODO(crbug.com/1174311): currently positions horizontally within page.
+    // ideal UI would be overflowing the bounds of the page.
+    // also need to account for vertical positioning.
+
+    // compute width required for the variant popup as: SIZE * columns + 10.
+    // SIZE is emoji width in pixels. number of columns is determined by width
+    // of variantRows, then one column each for the base emoji and skin tone
+    // indicators if present. 10 pixels are added for padding and the shadow.
+
+    // Reset any existing left margin before calculating a new position.
+    variants.style.marginLeft = '0';
+
+    // get size of emoji picker
+    const pickerRect = this.getBoundingClientRect();
+
+    // determine how much overflows the right edge of the window.
+    const rect = variants.getBoundingClientRect();
+    const overflowWidth = rect.x + rect.width - pickerRect.width;
+    // shift left by overflowWidth rounded up to next multiple of EMOJI_SIZE.
+    const shift = constants.EMOJI_ICON_SIZE *
+        Math.ceil(overflowWidth / constants.EMOJI_ICON_SIZE);
+    // negative value means we are already within bounds, so no shift needed.
+    variants.style.marginLeft = `-${Math.max(shift, 0)}px`;
+    // Now, examine vertical scrolling and scroll if needed. Not quire sure why
+    // we need listcontainer.offsetTop, but it makes things work.
+    const groups = this.$['groups'] as HTMLElement | null;
+    const scrollTop = groups?.scrollTop ?? 0;
+    const variantTop = variants?.offsetTop ?? 0;
+    const variantBottom = variantTop + variants.offsetHeight;
+    const listTop =
+        (this.$['list-container'] as HTMLElement | null)?.offsetTop ?? 0;
+    if (variantBottom > scrollTop + (groups?.offsetHeight ?? 0) + listTop) {
+      groups?.scrollTo({
+        top: variantBottom - (groups?.offsetHeight ?? 0) - listTop,
+        left: 0,
+        behavior: 'smooth',
+      });
+    }
   }
 
   /**
@@ -884,6 +1035,13 @@ export class EmojiPicker extends PolymerElement {
   }
 
   onCategoryButtonClick(newCategory: CategoryEnum) {
+    // TODO(b/264485361): Change the below if statement so that some sort of
+    // indication that GIFs are still loading appears on the Emoji Picker
+    // instead of not allowing the user to change to the GIF section
+    if (newCategory === CategoryEnum.GIF && !this.gifDataInitialised) {
+      return;
+    }
+
     this.set('category', newCategory);
     this.set('pagination', 1);
     if (this.getSearchContainer()?.searchNotEmpty()) {
@@ -929,6 +1087,58 @@ export class EmojiPicker extends PolymerElement {
   }
 
   /**
+   * Dynamically calculate the pagination for the GIF category groups tabs to
+   * determine the number of tabs that can fit in each page. Existing
+   * emoji/emoticon/symbol tabs pagination is hardcoded since the tabs remain
+   * consistent, but GIF tabs change after every API call.
+   */
+  private setGifGroupsPagination(gifGroupTabs: GifSubcategoryData[]):
+      GifSubcategoryData[] {
+    const gifCategoriesGroupData = gifGroupTabs;
+
+    // Max tabs bar width accounts for the chevron clicks and/or history button
+    const maxTabsWidth = constants.EMOJI_PICKER_WIDTH -
+        2 * constants.EMOJI_PICKER_SIDE_PADDING - 2 * constants.EMOJI_ICON_SIZE;
+
+    let totalTabsWidth = 0;
+    let pagination = 1;
+
+    for (const tabData of gifCategoriesGroupData) {
+      // Calculate maximum number of tabs that can fit within the tabs bar width
+      // to set pagination
+      const tabWidth = this.getTabElementWidth(tabData.name);
+      if (totalTabsWidth + tabWidth > maxTabsWidth) {
+        pagination += 1;
+        totalTabsWidth = 0;
+      }
+      totalTabsWidth += tabWidth;
+      tabData.pagination = pagination;
+    }
+
+    return gifCategoriesGroupData;
+  }
+
+  /**
+   * Calculate the width of the specific tab element before it
+   * is rendered by customising the dummy element with the tab name
+   * and finding width.
+   */
+  private getTabElementWidth(tabName: string): number {
+    this.dummyTab = {
+      name: tabName,
+      groupId: '-1',
+      active: false,
+      disabled: false,
+      category: CategoryEnum.GIF,
+    };
+
+    const dummyTab = this.getDummy();
+    const dummyTabWidth = dummyTab ? dummyTab.clientWidth : 0;
+
+    return dummyTabWidth;
+  }
+
+  /**
    * Returns true if the page is not the first.
    */
   private isNotFirstPage(pageNumber: number) {
@@ -970,6 +1180,10 @@ export class EmojiPicker extends PolymerElement {
 
   private getTabs() {
     return this.$['tabs'] as HTMLElement | null;
+  }
+
+  private getDummy() {
+    return this.$['dummyTab'] as HTMLElement | null;
   }
 
   private getSearchContainer() {

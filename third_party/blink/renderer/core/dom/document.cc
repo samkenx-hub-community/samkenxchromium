@@ -39,6 +39,7 @@
 #include "base/metrics/histogram_functions.h"
 #include "base/notreached.h"
 #include "base/ranges/algorithm.h"
+#include "base/task/single_thread_task_runner.h"
 #include "base/time/time.h"
 #include "cc/animation/animation_host.h"
 #include "cc/animation/animation_timeline.h"
@@ -3983,16 +3984,8 @@ void Document::DispatchUnloadEvents(UnloadEventTimingInfo* unload_timing_info) {
   // |dispatched_pagehide_persisted| above, if we enable same-site
   // ProactivelySwapBrowsingInstance but not BackForwardCache.
   if (window && !GetPage()->DispatchedPagehideAndStillHidden()) {
-    const base::TimeTicks pagehide_event_start = base::TimeTicks::Now();
     window->DispatchEvent(
         *PageTransitionEvent::Create(event_type_names::kPagehide, false), this);
-    const base::TimeTicks pagehide_event_end = base::TimeTicks::Now();
-    DEFINE_STATIC_LOCAL(
-        CustomCountHistogram, pagehide_histogram,
-        ("DocumentEventTiming.PageHideDuration", kTimeBasedHistogramMinSample,
-         kTimeBasedHistogramMaxSample, kTimeBasedHistogramBucketCount));
-    pagehide_histogram.CountMicroseconds(pagehide_event_end -
-                                         pagehide_event_start);
   }
   if (!dom_window_)
     return;
@@ -4004,18 +3997,7 @@ void Document::DispatchUnloadEvents(UnloadEventTimingInfo* unload_timing_info) {
   if (page_visible) {
     // Dispatch visibilitychange event, but don't bother doing
     // other notifications as we're about to be unloaded.
-    const base::TimeTicks pagevisibility_hidden_event_start =
-        base::TimeTicks::Now();
     DispatchEvent(*Event::CreateBubble(event_type_names::kVisibilitychange));
-    const base::TimeTicks pagevisibility_hidden_event_end =
-        base::TimeTicks::Now();
-    DEFINE_STATIC_LOCAL(
-        CustomCountHistogram, pagevisibility_histogram,
-        ("DocumentEventTiming.PageVibilityHiddenDuration",
-         kTimeBasedHistogramMinSample, kTimeBasedHistogramMaxSample,
-         kTimeBasedHistogramBucketCount));
-    pagevisibility_histogram.CountMicroseconds(
-        pagevisibility_hidden_event_end - pagevisibility_hidden_event_start);
     DispatchEvent(
         *Event::CreateBubble(event_type_names::kWebkitvisibilitychange));
   }
@@ -4032,12 +4014,6 @@ void Document::DispatchUnloadEvents(UnloadEventTimingInfo* unload_timing_info) {
 
   if (unload_timing_info) {
     // Record unload event timing when navigating cross-document.
-    DEFINE_STATIC_LOCAL(
-        CustomCountHistogram, unload_histogram,
-        ("DocumentEventTiming.UnloadDuration", kTimeBasedHistogramMinSample,
-         kTimeBasedHistogramMaxSample, kTimeBasedHistogramBucketCount));
-    unload_histogram.CountMicroseconds(unload_event_end - unload_event_start);
-
     auto& timing = unload_timing_info->unload_timing.emplace();
     timing.can_request =
         unload_timing_info->new_document_origin->CanRequest(Url());
@@ -4048,16 +4024,9 @@ void Document::DispatchUnloadEvents(UnloadEventTimingInfo* unload_timing_info) {
 }
 
 void Document::DispatchFreezeEvent() {
-  const base::TimeTicks freeze_event_start = base::TimeTicks::Now();
   SetFreezingInProgress(true);
   DispatchEvent(*Event::Create(event_type_names::kFreeze));
   SetFreezingInProgress(false);
-  const base::TimeTicks freeze_event_end = base::TimeTicks::Now();
-  DEFINE_STATIC_LOCAL(
-      CustomCountHistogram, freeze_histogram,
-      ("DocumentEventTiming.FreezeDuration", kTimeBasedHistogramMinSample,
-       kTimeBasedHistogramMaxSample, kTimeBasedHistogramBucketCount));
-  freeze_histogram.CountMicroseconds(freeze_event_end - freeze_event_start);
   UseCounter::Count(*this, WebFeature::kPageLifeCycleFreeze);
 }
 
@@ -6206,13 +6175,13 @@ ScriptPromise Document::requestStorageAccessForOrigin(
   }
 
   auto descriptor = mojom::blink::PermissionDescriptor::New();
-  descriptor->name = mojom::blink::PermissionName::STORAGE_ACCESS;
-  auto storage_access_extension =
-      mojom::blink::StorageAccessPermissionDescriptor::New();
-  storage_access_extension->siteOverride = supplied_origin;
+  descriptor->name = mojom::blink::PermissionName::TOP_LEVEL_STORAGE_ACCESS;
+  auto top_level_storage_access_extension =
+      mojom::blink::TopLevelStorageAccessPermissionDescriptor::New();
+  top_level_storage_access_extension->requestedOrigin = supplied_origin;
   descriptor->extension =
-      mojom::blink::PermissionDescriptorExtension::NewStorageAccess(
-          std::move(storage_access_extension));
+      mojom::blink::PermissionDescriptorExtension::NewTopLevelStorageAccess(
+          std::move(top_level_storage_access_extension));
 
   GetPermissionService(ExecutionContext::From(script_state))
       ->RequestPermission(
@@ -6401,13 +6370,6 @@ ScriptPromise Document::requestStorageAccess(ScriptState* script_state) {
 
 FragmentDirective& Document::fragmentDirective() const {
   return *fragment_directive_;
-}
-
-ScriptPromise Document::hasTrustToken(ScriptState* script_state,
-                                      const String& issuer,
-                                      ExceptionState& exception_state) {
-  return hasPrivateToken(script_state, issuer, "private-state-token",
-                         exception_state);
 }
 
 ScriptPromise Document::hasPrivateToken(ScriptState* script_state,

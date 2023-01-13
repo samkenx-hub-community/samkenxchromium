@@ -113,9 +113,9 @@ absl::optional<Referrer> GetReferrer(SpeculationRule* rule,
 
   // TODO(mcnee): Speculation rules initially shipped with a bug where a policy
   // of "no-referrer" would be assumed and the referrer policy restriction was
-  // not enforced. We emulate that behaviour here as sites don't currently have
-  // a means of specifying a suitable policy. Once
-  // SpeculationRulesReferrerPolicyKey ships, this workaround should be removed.
+  // not enforced. We emulate that behaviour here as sites did not have a means
+  // of specifying a suitable policy. SpeculationRulesReferrerPolicyKey shipped
+  // in M111. This workaround should be removed when the flag is removed.
   // See https://crbug.com/1398772.
   if (!RuntimeEnabledFeatures::SpeculationRulesReferrerPolicyKeyEnabled(
           execution_context) &&
@@ -346,10 +346,11 @@ void DocumentSpeculationRules::UpdateSpeculationCandidates() {
             rule->requires_anonymous_client_ip_when_cross_origin(),
             rule->target_browsing_context_name_hint().value_or(
                 mojom::blink::SpeculationTargetHint::kNoHint),
-            mojom::blink::SpeculationEagerness::
-                kEager));  // The default Eagerness value for |"source": "list"|
-                           // rules is |kEager|. More info can be found here:
-                           // https://docs.google.com/document/d/1nKOUX6R9seR5e7nyR16mj0lp3C1z7Qox-_KUt4C9E2U
+            // The default Eagerness value for |"source": "list"| rules is
+            // |kEager|. More info can be found here:
+            // https://github.com/WICG/nav-speculation/blob/main/triggers.md#eagerness
+            rule->eagerness().value_or(
+                mojom::blink::SpeculationEagerness::kEager)));
       }
     }
   };
@@ -436,11 +437,11 @@ void DocumentSpeculationRules::AddLinkBasedSpeculationCandidates(
                     rule->requires_anonymous_client_ip_when_cross_origin(),
                     rule->target_browsing_context_name_hint().value_or(
                         mojom::blink::SpeculationTargetHint::kNoHint),
-                    mojom::blink::SpeculationEagerness::
-                        kDefault);  // The default Eagerness value for
-                                    // |"source": "document"| rules is
-                                    // |kDefault|. More info can be found here:
-                                    // https://docs.google.com/document/d/1nKOUX6R9seR5e7nyR16mj0lp3C1z7Qox-_KUt4C9E2U
+                    // The default Eagerness value for |"source": "document"|
+                    // rules is |kConservative|. More info can be found here:
+                    // https://github.com/WICG/nav-speculation/blob/main/triggers.md#eagerness
+                    rule->eagerness().value_or(
+                        mojom::blink::SpeculationEagerness::kConservative));
             link_candidates.push_back(std::move(candidate));
           }
         };

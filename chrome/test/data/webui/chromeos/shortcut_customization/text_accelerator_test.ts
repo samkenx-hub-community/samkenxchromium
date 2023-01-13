@@ -5,20 +5,42 @@
 import 'chrome://shortcut-customization/js/text_accelerator.js';
 import 'chrome://webui-test/mojo_webui_test_support.js';
 
-import {flush} from 'chrome://resources/polymer/v3_0/polymer/polymer_bundled.min.js';
+import {IronIconElement} from 'chrome://resources/polymer/v3_0/iron-icon/iron-icon.js';
+import {InputKeyElement, KeyInputState} from 'chrome://shortcut-customization/js/input_key.js';
+import {mojoString16ToString, stringToMojoString16} from 'chrome://shortcut-customization/js/mojo_utils.js';
+import {TextAcceleratorPart, TextAcceleratorPartType} from 'chrome://shortcut-customization/js/shortcut_types.js';
 import {TextAcceleratorElement} from 'chrome://shortcut-customization/js/text_accelerator.js';
-import {assertEquals, assertTrue} from 'chrome://webui-test/chai_assert.js';
+import {assertEquals} from 'chrome://webui-test/chai_assert.js';
+import {flushTasks} from 'chrome://webui-test/polymer_test_util.js';
 
-
-export function initTextAcceleratorElement(): TextAcceleratorElement {
-  const element = document.createElement('text-accelerator');
-  document.body.appendChild(element);
-  flush();
-  return element;
+function createTextAcceleratorPart(
+    text: string, type: TextAcceleratorPartType): TextAcceleratorPart {
+  return {text: stringToMojoString16(text), type};
 }
 
-suite('acceleratorRowTest', function() {
+suite('textAcceleratorTest', function() {
   let textAccelElement: TextAcceleratorElement|null = null;
+
+  function getTextWrapperEl(): HTMLElement {
+    return textAccelElement!.shadowRoot!.querySelector('#text-wrapper') as
+        HTMLElement;
+  }
+
+  function getAllInputKeys(): NodeListOf<InputKeyElement> {
+    return getTextWrapperEl().querySelectorAll('input-key');
+  }
+
+  function getAllPlainTextParts(): NodeListOf<HTMLSpanElement> {
+    return getTextWrapperEl().querySelectorAll('span');
+  }
+
+  function getAllDelimiterParts(): NodeListOf<IronIconElement> {
+    return getTextWrapperEl().querySelectorAll('#delimiter-icon');
+  }
+
+  setup(() => {
+    document.body.innerHTML = window.trustedTypes!.emptyHTML;
+  });
 
   teardown(() => {
     if (textAccelElement) {
@@ -27,29 +49,78 @@ suite('acceleratorRowTest', function() {
     textAccelElement = null;
   });
 
-  test('BasicTextDisplay', async () => {
-    textAccelElement = initTextAcceleratorElement();
-    const expectedText = 'string test';
-    textAccelElement.text = expectedText;
-    flush();
+  function initTextAcceleratorElement(parts: TextAcceleratorPart[] = []):
+      Promise<void> {
+    textAccelElement = document.createElement('text-accelerator');
+    textAccelElement.parts = parts;
+    document.body.appendChild(textAccelElement);
+    return flushTasks();
+  }
 
-    const textWrapper = textAccelElement!.shadowRoot!.querySelector(
-                            '#text-wrapper') as HTMLDivElement;
-    assertTrue(!!textWrapper);
-    assertEquals(expectedText, textWrapper.innerText);
+
+  test('TextAcceleratorPartsSingleModifier', async () => {
+    const ctrlKey =
+        createTextAcceleratorPart('ctrl', TextAcceleratorPartType.kModifier);
+    await initTextAcceleratorElement([ctrlKey]);
+    assertEquals(1, getTextWrapperEl().children.length);
+    assertEquals(1, textAccelElement!.parts.length);
+    const inputKey = getAllInputKeys()[0];
+    assertEquals(inputKey!.key, mojoString16ToString(ctrlKey.text));
+    assertEquals(inputKey!.keyState, KeyInputState.MODIFIER_SELECTED);
   });
 
-  test('HtmlTextDisplay', async () => {
-    textAccelElement = initTextAcceleratorElement();
-    const expectedText = 'html test';
-    const expectedHtml = `<div>${expectedText}</div>`;
-    textAccelElement.text = expectedHtml;
-    flush();
+  test('TextAcceleratorPartsSingleKey', async () => {
+    const bKey = createTextAcceleratorPart('b', TextAcceleratorPartType.kKey);
+    await initTextAcceleratorElement([bKey]);
+    assertEquals(1, getTextWrapperEl().children.length);
+    assertEquals(1, textAccelElement!.parts.length);
+    const inputKey = getAllInputKeys()[0];
+    assertEquals(inputKey!.key, mojoString16ToString(bKey.text));
+    assertEquals(inputKey!.keyState, KeyInputState.ALPHANUMERIC_SELECTED);
+  });
 
-    const textWrapper = textAccelElement!.shadowRoot!.querySelector(
-                            '#text-wrapper') as HTMLDivElement;
-    assertTrue(!!textWrapper);
-    assertEquals(expectedText, textWrapper.innerText);
-    assertEquals(expectedHtml, textWrapper.innerHTML);
+  test('TextAcceleratorPartsPlainText', async () => {
+    const plainText = createTextAcceleratorPart(
+        'Some text', TextAcceleratorPartType.kPlainText);
+    await initTextAcceleratorElement([plainText]);
+    assertEquals(1, getTextWrapperEl().children.length);
+    const part = getAllPlainTextParts()[0];
+    assertEquals(1, textAccelElement!.parts.length);
+    assertEquals(part!.innerText, mojoString16ToString(plainText.text));
+  });
+
+  test('TextAcceleratorPartsDelimiter', async () => {
+    const delimiter =
+        createTextAcceleratorPart('+', TextAcceleratorPartType.kDelimiter);
+    await initTextAcceleratorElement([delimiter]);
+    assertEquals(1, getTextWrapperEl().children.length);
+    const delimiterPart = getAllDelimiterParts()[0];
+    assertEquals(1, textAccelElement!.parts.length);
+    assertEquals(delimiterPart!.icon, 'shortcut-customization-keys:plus');
+  });
+
+  test('TextAcceleratorPartsAll', async () => {
+    const ctrlKey =
+        createTextAcceleratorPart('ctrl', TextAcceleratorPartType.kModifier);
+    const bKey = createTextAcceleratorPart('b', TextAcceleratorPartType.kKey);
+    const plainText = createTextAcceleratorPart(
+        'Some text', TextAcceleratorPartType.kPlainText);
+    const delimiter =
+        createTextAcceleratorPart('+', TextAcceleratorPartType.kDelimiter);
+    await initTextAcceleratorElement([ctrlKey, bKey, plainText, delimiter]);
+    assertEquals(4, getTextWrapperEl().children.length);
+    assertEquals(4, textAccelElement!.parts.length);
+
+    const [ctrlInputKey, bInputKey] = getAllInputKeys();
+    assertEquals(ctrlInputKey!.key, mojoString16ToString(ctrlKey.text));
+    assertEquals(ctrlInputKey!.keyState, KeyInputState.MODIFIER_SELECTED);
+
+    assertEquals(bInputKey!.key, mojoString16ToString(bKey.text));
+    assertEquals(bInputKey!.keyState, KeyInputState.ALPHANUMERIC_SELECTED);
+    const part = getAllPlainTextParts()[0];
+    assertEquals(part!.innerText, mojoString16ToString(plainText.text));
+
+    const delimiterPart = getAllDelimiterParts()[0];
+    assertEquals(delimiterPart!.icon, 'shortcut-customization-keys:plus');
   });
 });

@@ -34,6 +34,7 @@ buildflag_header("buildflags") {
     "USE_DAWN=$use_dawn",
     "USE_STATIC_ANGLE=$use_static_angle",
     "USE_OPENGL_APITRACE=$enable_opengl_apitrace",
+    "ENABLE_VALIDATING_COMMAND_DECODER=$enable_validating_command_decoder",
   ]
 }
 
@@ -216,13 +217,6 @@ component("gl") {
       "shared_gl_fence_egl.h",
     ]
 
-    if (!is_android) {
-      sources += [
-        "gl_image_egl.cc",
-        "gl_image_egl.h",
-      ]
-    }
-
     if (enable_vulkan) {
       sources += [
         "gl_angle_util_vulkan.cc",
@@ -257,7 +251,10 @@ component("gl") {
         "gl_fence_android_native_fence_sync.h",
       ]
 
-      deps += [ "//third_party/libsync" ]
+      deps += [
+        "//components/crash/core/common",
+        "//third_party/libsync",
+      ]
     }
   }
 
@@ -499,7 +496,6 @@ static_library("test_support") {
       "test/gl_image_bind_test_template.h",
       "test/gl_image_test_template.cc",
       "test/gl_image_test_template.h",
-      "test/gl_image_zero_initialize_test_template.h",
     ]
   }
 

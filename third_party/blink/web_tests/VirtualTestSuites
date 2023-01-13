@@ -51,7 +51,8 @@
   {
     "prefix": "gpu",
     "platforms": ["Linux", "Mac", "Win", "Fuchsia"],
-    "bases": ["fast/canvas"],
+    "bases": [ "fast/canvas",
+               "external/wpt/mediacapture-record/MediaRecorder-canvas-media-source.https.html" ],
     "args": ["--enable-accelerated-2d-canvas"],
     "expires": "Jul 1, 2023"
   },
@@ -635,11 +636,19 @@
     "bases": [
       "external/wpt/html/browsers/origin/origin-keyed-agent-clusters",
       "external/wpt/html/infrastructure/urls/terminology-0",
-      "external/wpt/navigation-api/navigate-event/cross-window"
+      "external/wpt/navigation-api/navigate-event/cross-window",
+      "http/tests/security/cross-frame-access-callback-explicit-domain-ALLOW.html",
+      "http/tests/security/cross-frame-access-callback-explicit-domain-DENY.html",
+      "http/tests/security/cross-frame-access-child-explicit-domain.html",
+      "http/tests/security/cross-frame-access-parent-explicit-domain.html",
+      "http/tests/security/cross-frame-access-port-explicit-domain.html",
+      "http/tests/security/cross-frame-access-protocol-explicit-domain.html",
+      "http/tests/security/canvas-remote-read-remote-image-document-domain.html"
     ],
     "exclusive_tests": ["external/wpt/html/browsers/origin/origin-keyed-agent-clusters"],
     "args": ["--disable-auto-wpt-origin-isolation",
-             "--reset-browsing-instance-between-tests"],
+             "--reset-browsing-instance-between-tests",
+             "--disable-features=OriginAgentClusterDefaultEnable"],
     "expires": "Jul 1, 2023"
   },
   {
@@ -711,6 +720,13 @@
     "exclusive_tests": "ALL",
     "args": ["--enable-blink-features=MeasureMemory,ForceEagerMeasureMemory"],
     "expires": "Jul 1, 2023"
+  },
+  {
+    "prefix": "payment-request-csp-violation",
+    "platforms": ["Linux"],
+    "bases": ["http/tests/inspector-protocol/issues/payment-request-csp-violation-issue.js"],
+    "args": ["--enable-blink-features=IgnoreCSPInWebPaymentAPI"],
+    "expires": "May 30, 2023"
   },
   {
     "prefix": "payment-request-mandatory-total",
@@ -1014,7 +1030,8 @@
   {
     "prefix": "oopr-canvas2d",
     "platforms": ["Linux", "Mac", "Win"],
-    "bases": [ "fast/canvas" ],
+    "bases": [ "fast/canvas",
+               "external/wpt/mediacapture-record/MediaRecorder-canvas-media-source.https.html" ],
     "args": [ "--enable-features=CanvasOopRasterization",
               "--enable-accelerated-2d-canvas",
               "--enable-gpu-rasterization" ],
@@ -1069,7 +1086,6 @@
       "external/wpt/speculation-rules/prerender/csp-script-src-inline-speculation-rules.tentative.html"
     ],
     "args": [
-      "--enable-blink-features=SpeculationRulesReferrerPolicyKey",
       "--enable-features=SameSiteCrossOriginForSpeculationRulesPrerender,Prerender2ContentSecurityPolicyExtensions"
     ],
     "expires": "Jul 1, 2023"
@@ -1414,14 +1430,6 @@
     ],
     "expires": "Jul 1, 2023"
   },
-  {
-    "prefix": "document-pip",
-    "platforms": ["Linux", "Mac", "Win"],
-    "bases": [],
-    "args": ["--enable-features=DocumentPictureInPictureAPI",
-             "--enable-blink-features=DocumentPictureInPictureAPI"],
-    "expires": "Jul 1, 2023"
-  },
 
   "Tests URL processing in IDNA 2008 Transitional Mode. Explicitly disables ",
   "the Non-Transitional Mode feature flag to do so.",
@@ -1433,17 +1441,14 @@
     "expires": "Jul 1, 2023"
   },
 
-  "Tests in the virtual/origin-agent-cluster-default suite. These tests",
-  "require isolation behaviour as in the actual browser and are therefore",
-  "incompatible with auto-wpt-origin-isolation. Thus they are only run in",
-  "their virtual test suite.",
   {
-    "prefix": "origin-agent-cluster-default",
+    "prefix": "origin-agent-cluster-default-warning",
     "platforms": ["Linux", "Mac", "Win"],
-    "bases": [ "wpt_internal/origin-agent-cluster-default" ],
+    "bases": [ "wpt_internal/origin-agent-cluster-default-warning" ],
     "exclusive_tests": "ALL",
     "args": [
       "--enable-features=OriginAgentClusterDefaultWarning",
+      "--disable-features=OriginAgentClusterDefaultEnable",
       "--disable-auto-wpt-origin-isolation"
     ],
     "expires": "Jul 1, 2023"
@@ -1536,7 +1541,7 @@
     ],
     "exclusive_tests": "ALL",
     "args": [
-      "--enable-blink-features=SpeculationRulesPrefetchProxy,SpeculationRulesFetchFromHeader,SpeculationRulesReferrerPolicyKey,SpeculationRulesDocumentRules,NoVarySearchPrefetch",
+      "--enable-blink-features=SpeculationRulesPrefetchProxy,SpeculationRulesFetchFromHeader,SpeculationRulesDocumentRules,NoVarySearchPrefetch",
       "--enable-features=SpeculationRulesPrefetchProxy,PrefetchUseContentRefactor",
       "--bypass-prefetch-proxy-for-host=not-web-platform.test"
     ],
@@ -1666,13 +1671,6 @@
     "expires": "Jul 1, 2023"
   },
   {
-    "prefix": "devtools-tab-target",
-    "platforms": ["Linux", "Mac", "Win"],
-    "bases": ["http/tests/devtools/extensions", "http/tests/devtools/tracing", "http/tests/devtools/coverage"],
-    "args": ["--content-shell-devtools-tab-target"],
-    "expires": "Jul 1, 2023"
-  },
-  {
     "prefix": "split-user-media-queues",
     "platforms": ["Linux", "Mac", "Win"],
     "bases": [
@@ -1701,6 +1699,31 @@
       "external/wpt/html/infrastructure/safe-passing-of-structured-data/cross-origin-transfer-resizable-arraybuffer.html"
     ],
     "args": ["--js-flags=--harmony-rab-gsab"],
+    "expires": "Jul 1, 2023"
+  },
+
+  "This individual test must be run separately from others, because it makes a",
+  "huge memory allocation that often causes OOM if other tests have run in the",
+  "same content_shell harness. For this reason this virtual test suite must",
+  "never expire. Virtual test suites require command line args so pick one",
+  "which is effectively a no-op.",
+  {
+    "prefix": "webgl-oversized-printing",
+    "platforms": ["Linux", "Mac", "Win", "Fuchsia"],
+    "bases": [
+      "printing/webgl-oversized-printing.html"
+    ],
+    "args": ["--enable-webgl-developer-extensions"],
+    "expires": "never"
+  },
+  {
+    "prefix": "extend-script-resource-lifetime",
+    "platforms": ["Linux", "Mac", "Win"],
+    "bases": [
+      "http/tests/cache/script-keepalive.html"
+    ],
+    "exclusive_tests": "ALL",
+    "args": ["--enable-features=ExtendScriptResourceLifetime"],
     "expires": "Jul 1, 2023"
   }
 ]

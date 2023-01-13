@@ -4,13 +4,14 @@
 
 #import "ios/chrome/browser/follow/follow_tab_helper.h"
 
-#import "base/callback.h"
+#import "base/functional/callback.h"
 #import "base/memory/ptr_util.h"
 #import "base/strings/string_util.h"
 #import "base/strings/sys_string_conversions.h"
 #import "base/strings/utf_string_conversions.h"
 #import "base/task/cancelable_task_tracker.h"
 #import "base/task/sequenced_task_runner.h"
+#import "base/task/single_thread_task_runner.h"
 #import "base/time/time.h"
 #import "components/feature_engagement/public/feature_constants.h"
 #import "components/feature_engagement/public/tracker.h"

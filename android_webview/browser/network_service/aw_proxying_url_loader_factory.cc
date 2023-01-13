@@ -23,8 +23,8 @@
 #include "android_webview/common/url_constants.h"
 #include "base/android/build_info.h"
 #include "base/barrier_closure.h"
-#include "base/bind.h"
 #include "base/feature_list.h"
+#include "base/functional/bind.h"
 #include "base/memory/scoped_refptr.h"
 #include "base/metrics/histogram_functions.h"
 #include "base/notreached.h"
@@ -403,6 +403,13 @@ void InterceptedRequest::Restart() {
       // intentionally override if referrer header already exists
       request_.headers.SetHeader(net::HttpRequestHeaders::kReferer,
                                  request_.referrer.spec());
+    }
+
+    if (io_thread_client->ShouldBlockRequest(AwWebResourceRequest(request_))) {
+      // TODO(swestphal): Show alternative UI to inform the user about blocked
+      // third party web content.
+      SendErrorAndCompleteImmediately(net::ERR_ACCESS_DENIED);
+      return;
     }
 
     base::RepeatingClosure arg_ready_closure;

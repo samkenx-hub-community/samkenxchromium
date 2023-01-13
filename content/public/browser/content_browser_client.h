@@ -13,9 +13,9 @@
 #include <string>
 #include <vector>
 
-#include "base/callback_forward.h"
 #include "base/containers/flat_map.h"
 #include "base/containers/flat_set.h"
+#include "base/functional/callback_forward.h"
 #include "base/memory/scoped_refptr.h"
 #include "base/strings/string_piece_forward.h"
 #include "base/time/time.h"
@@ -398,11 +398,14 @@ class CONTENT_EXPORT ContentBrowserClient {
   virtual bool ShouldLockProcessToSite(BrowserContext* browser_context,
                                        const GURL& effective_url);
 
-  // Returns a boolean indicating whether the WebUI |scheme| requires its
-  // process to be locked to the WebUI origin.
-  // Note: This method can be called from multiple threads. It is not safe to
-  // assume it runs only on the UI thread.
-  virtual bool DoesWebUISchemeRequireProcessLock(base::StringPiece scheme);
+  // Returns a boolean indicating whether the WebUI |url| requires its process
+  // to be locked to the WebUI origin. Note: This method can be called from
+  // multiple threads. It is not safe to assume it runs only on the UI thread.
+  //
+  // TODO(crbug.com/566091): Remove this exception once most visited tiles can
+  // load in OOPIFs on the NTP.  Ideally, all WebUI urls should load in locked
+  // processes.
+  virtual bool DoesWebUIUrlRequireProcessLock(const GURL& url);
 
   // Returns true if everything embedded inside a document with given scheme
   // should be treated as first-party content. |scheme| will be in canonical
@@ -521,9 +524,8 @@ class CONTENT_EXPORT ContentBrowserClient {
 
   // Temporary hack to determine whether to skip OOPIFs on the new tab page.
   // TODO(creis): Remove when https://crbug.com/566091 is fixed.
-  virtual bool ShouldStayInParentProcessForNTP(
-      const GURL& url,
-      SiteInstance* parent_site_instance);
+  virtual bool ShouldStayInParentProcessForNTP(const GURL& url,
+                                               const GURL& parent_site_url);
 
   // Returns whether a new view for a given |site_url| can be launched in a
   // given |process_host|.
@@ -2375,6 +2377,16 @@ class CONTENT_EXPORT ContentBrowserClient {
   // Called when optionally blockable insecure content is displayed on a secure
   // page (resulting in mixed content).
   virtual void OnDisplayInsecureContent(WebContents* web_contents) {}
+
+#if BUILDFLAG(IS_MAC)
+  // Gets the path for an embedder-specific helper child process. The
+  // |child_flags| is a value greater than
+  // ChildProcessHost::CHILD_EMBEDDER_FIRST. The |helpers_path| is the location
+  // of the known //content Mac helpers in the framework bundle.
+  virtual base::FilePath GetChildProcessPath(
+      int child_flags,
+      const base::FilePath& helpers_path);
+#endif  // BUILDFLAG(IS_MAC)
 };
 
 }  // namespace content

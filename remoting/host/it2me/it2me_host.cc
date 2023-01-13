@@ -9,14 +9,15 @@
 #include <string>
 #include <utility>
 
-#include "base/bind.h"
-#include "base/callback_helpers.h"
+#include "base/functional/bind.h"
+#include "base/functional/callback_helpers.h"
 #include "base/strings/string_util.h"
 #include "base/task/single_thread_task_runner.h"
 #include "base/time/time.h"
 #include "build/chromeos_buildflags.h"
 #include "components/policy/policy_constants.h"
 #include "components/webrtc/thread_wrapper.h"
+#include "google_apis/gaia/gaia_auth_util.h"
 #include "remoting/base/auto_thread_task_runner.h"
 #include "remoting/base/logging.h"
 #include "remoting/base/oauth_token_getter.h"
@@ -41,6 +42,10 @@
 #include "remoting/signaling/log_to_server.h"
 #include "remoting/signaling/signaling_id_util.h"
 #include "services/network/public/cpp/shared_url_loader_factory.h"
+
+#if defined(REMOTING_USE_WAYLAND) || defined(REMOTING_USE_X11)
+#include "remoting/host/linux/wayland_utils.h"
+#endif  // defined(REMOTING_USE_WAYLAND) || defined(REMOTING_USE_X11)
 
 #if defined(REMOTING_USE_WAYLAND)
 #include "remoting/host/linux/wayland_manager.h"
@@ -122,6 +127,10 @@ void It2MeHost::set_is_enterprise_session(bool is_enterprise_session) {
 #endif
 }
 
+void It2MeHost::set_authorized_helper(const std::string& authorized_helper) {
+  authorized_helper_ = authorized_helper;
+}
+
 void It2MeHost::Connect(
     std::unique_ptr<ChromotingHostContext> host_context,
     base::Value::Dict policies,
@@ -139,7 +148,9 @@ void It2MeHost::Connect(
   OnPolicyUpdate(std::move(policies));
 
 #if defined(REMOTING_USE_WAYLAND)
-  WaylandManager::Get()->Init(host_context_->ui_task_runner());
+  if (IsRunningWayland()) {
+    WaylandManager::Get()->Init(host_context_->ui_task_runner());
+  }
 #endif  // defined(REMOTING_USE_WAYLAND)
 
   desktop_environment_factory_ =
@@ -223,7 +234,7 @@ void It2MeHost::ConnectOnNetworkThread(
   // Request registration of the host for support.
   register_request_ = std::move(connection_context->register_request);
   register_request_->StartRequest(
-      signal_strategy_.get(), host_key_pair_,
+      signal_strategy_.get(), host_key_pair_, authorized_helper_,
       base::BindOnce(&It2MeHost::OnReceivedSupportID, base::Unretained(this)));
 
   HOST_LOG << "NAT traversal enabled: " << nat_traversal_enabled_;
@@ -276,7 +287,9 @@ void It2MeHost::ConnectOnNetworkThread(
   // Set up the desktop environment options.
   DesktopEnvironmentOptions options(DesktopEnvironmentOptions::CreateDefault());
 #if defined(REMOTING_USE_WAYLAND)
-  options.desktop_capture_options()->set_prefer_cursor_embedded(true);
+  if (IsRunningWayland()) {
+    options.desktop_capture_options()->set_prefer_cursor_embedded(true);
+  }
 #endif
   options.set_enable_user_interface(enable_dialogs_);
   options.set_enable_notifications(enable_notifications_);
@@ -692,6 +705,17 @@ void It2MeHost::ValidateConnectionDetails(
       DisconnectOnNetworkThread();
       return;
     }
+  }
+
+  if (!authorized_helper_.empty() &&
+      !gaia::AreEmailsSame(authorized_helper_, client_username)) {
+    LOG(ERROR) << "Rejecting connection request from (" << client_username
+               << ") as it does not match the authorized_helper ("
+               << authorized_helper_ << ")";
+    std::move(result_callback)
+        .Run(ValidationResult::ERROR_UNAUTHORIZED_ACCOUNT);
+    DisconnectOnNetworkThread();
+    return;
   }
 
   // If we receive valid connection details multiple times, then we don't know

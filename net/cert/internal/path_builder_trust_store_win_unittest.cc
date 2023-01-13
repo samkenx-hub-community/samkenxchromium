@@ -7,8 +7,8 @@
 #include <algorithm>
 
 #include "base/base_paths.h"
-#include "base/callback_forward.h"
 #include "base/files/file_util.h"
+#include "base/functional/callback_forward.h"
 #include "base/path_service.h"
 #include "base/test/bind.h"
 #include "build/build_config.h"
@@ -162,7 +162,7 @@ class TrustStoreThatStoresUserData : public TrustStore {
   void SyncGetIssuersOf(const ParsedCertificate* cert,
                         ParsedCertificateList* issuers) override {}
   CertificateTrust GetTrust(const ParsedCertificate* cert,
-                            base::SupportsUserData* debug_data) const override {
+                            base::SupportsUserData* debug_data) override {
     debug_data->SetUserData(kKey, std::make_unique<Data>(1234));
     return CertificateTrust::ForUnspecified();
   }

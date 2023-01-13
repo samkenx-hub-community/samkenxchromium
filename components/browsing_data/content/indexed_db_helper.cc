@@ -8,7 +8,7 @@
 #include <utility>
 #include <vector>
 
-#include "base/bind.h"
+#include "base/functional/bind.h"
 #include "base/location.h"
 #include "base/memory/scoped_refptr.h"
 #include "base/time/time.h"
@@ -102,8 +102,7 @@ void CannedIndexedDBHelper::StartFetching(FetchCallback callback) {
     result.emplace_back(storage_key, 0, base::Time());
   }
 
-  content::GetUIThreadTaskRunner({})->PostTask(
-      FROM_HERE, base::BindOnce(std::move(callback), result));
+  std::move(callback).Run(result);
 }
 
 void CannedIndexedDBHelper::DeleteIndexedDB(

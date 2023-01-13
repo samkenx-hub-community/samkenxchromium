@@ -8,8 +8,8 @@
 #include <memory>
 #include <vector>
 
-#include "components/power_bookmarks/core/powers/power.h"
-#include "components/power_bookmarks/core/powers/power_overview.h"
+#include "components/power_bookmarks/common/power.h"
+#include "components/power_bookmarks/common/power_overview.h"
 #include "components/power_bookmarks/storage/power_bookmark_sync_bridge.h"
 #include "url/gurl.h"
 
@@ -42,6 +42,10 @@ class PowerBookmarkDatabase : public PowerBookmarkSyncBridge::Delegate {
   // Returns a vector of Powers for the given `search_params`.
   virtual std::vector<std::unique_ptr<Power>> GetPowersForSearchParams(
       const SearchParams& search_params) = 0;
+
+  // Returns a vector of PowerOverviews for the given `search_params`.
+  virtual std::vector<std::unique_ptr<PowerOverview>>
+  GetPowerOverviewsForSearchParams(const SearchParams& search_params) = 0;
 
   // Create the given `power` in the database. If it already exists, then it
   // will be updated. Returns whether the operation was successful.

@@ -10,8 +10,8 @@
 #include <string>
 #include <vector>
 
-#include "base/callback.h"
 #include "base/feature_list.h"
+#include "base/functional/callback.h"
 #include "base/gtest_prod_util.h"
 #include "base/memory/singleton.h"
 #include "base/memory/weak_ptr.h"
@@ -178,7 +178,7 @@ class DriveIntegrationService : public KeyedService,
   drivefs::DriveFsHost* GetDriveFsHost() const;
 
   // Returns the `DriveFsPinManager` iff DriveFS is mounted.
-  drivefs::pinning::DriveFsPinManager* GetDriveFsPinManager();
+  drivefs::pinning::DriveFsPinManager* GetDriveFsPinManager() const;
 
   // Returns the mojo interface to the DriveFs daemon if it is enabled and
   // connected.
@@ -270,8 +270,7 @@ class DriveIntegrationService : public KeyedService,
   void GetSyncingPaths(
       drivefs::mojom::DriveFs::GetSyncingPathsCallback callback);
 
-  drivefs::SyncStatusAndProgress GetSyncStatusForPath(
-      const base::FilePath& drive_path);
+  drivefs::SyncState GetSyncStateForPath(const base::FilePath& drive_path);
 
   // Tells DriveFS to update its cached pin states of hosted files (once).
   void PollHostedFilePinStates();

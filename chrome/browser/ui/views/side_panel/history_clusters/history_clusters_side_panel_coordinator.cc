@@ -4,7 +4,7 @@
 
 #include "chrome/browser/ui/views/side_panel/history_clusters/history_clusters_side_panel_coordinator.h"
 
-#include "base/callback.h"
+#include "base/functional/callback.h"
 #include "base/strings/escape.h"
 #include "base/strings/stringprintf.h"
 #include "chrome/app/vector_icons/vector_icons.h"
@@ -112,9 +112,8 @@ HistoryClustersSidePanelCoordinator::CreateHistoryClustersWebView() {
 
 void HistoryClustersSidePanelCoordinator::OnHistoryClustersPreferenceChanged() {
   auto* browser = &GetBrowser();
-  auto* global_registry = BrowserView::GetBrowserViewForBrowser(browser)
-                              ->side_panel_coordinator()
-                              ->GetGlobalSidePanelRegistry();
+  auto* global_registry =
+      SidePanelCoordinator::GetGlobalSidePanelRegistry(browser);
   if (browser->profile()->GetPrefs()->GetBoolean(
           history_clusters::prefs::kVisible)) {
     if (IsSupported(browser->profile())) {

@@ -6,8 +6,8 @@
 
 #include <string>
 
-#include "base/bind.h"
 #include "base/feature_list.h"
+#include "base/functional/bind.h"
 #include "base/memory/raw_ptr.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/test/scoped_feature_list.h"
@@ -119,8 +119,9 @@ class AccountSelectionBubbleViewTest : public ChromeViewsTestBase {
         exclude_title ? absl::nullopt
                       : absl::make_optional<std::u16string>(kIdpETLDPlusOne);
     dialog_ = new AccountSelectionBubbleView(
-        kRpETLDPlusOne, title, anchor_widget_->GetContentsView(),
-        shared_url_loader_factory(), /*observer=*/nullptr);
+        kRpETLDPlusOne, title, blink::mojom::RpContext::kSignIn,
+        anchor_widget_->GetContentsView(), shared_url_loader_factory(),
+        /*observer=*/nullptr);
     views::BubbleDialogDelegateView::CreateBubble(dialog_)->Show();
   }
 

@@ -7,10 +7,9 @@
 #import <Foundation/Foundation.h>
 #import <stdint.h>
 
-#import "base/bind.h"
-#import "base/callback.h"
+#import "base/functional/bind.h"
+#import "base/functional/callback.h"
 #import "base/strings/sys_string_conversions.h"
-#import "base/threading/sequenced_task_runner_handle.h"
 #import "ios/web/common/crw_content_view.h"
 #import "ios/web/js_messaging/web_frames_manager_impl.h"
 #import "ios/web/public/js_messaging/web_frame.h"
@@ -307,6 +306,10 @@ bool FakeWebState::IsEvicted() const {
 }
 
 bool FakeWebState::IsBeingDestroyed() const {
+  return false;
+}
+
+bool FakeWebState::IsWebPageInFullscreenMode() const {
   return false;
 }
 

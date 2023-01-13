@@ -119,7 +119,6 @@
 #include "components/omnibox/browser/omnibox_prefs.h"
 #include "components/omnibox/browser/zero_suggest_provider.h"
 #include "components/optimization_guide/core/optimization_guide_prefs.h"
-#include "components/origin_trials/browser/prefservice_persistence_provider.h"
 #include "components/password_manager/core/browser/password_manager.h"
 #include "components/payments/core/payment_prefs.h"
 #include "components/performance_manager/public/user_tuning/prefs.h"
@@ -322,6 +321,7 @@
 #include "chrome/browser/ash/arc/policy/arc_policy_bridge.h"
 #include "chrome/browser/ash/arc/session/arc_session_manager.h"
 #include "chrome/browser/ash/bluetooth/debug_logs_manager.h"
+#include "chrome/browser/ash/bluetooth/hats_bluetooth_revamp_trigger_impl.h"
 #include "chrome/browser/ash/borealis/borealis_prefs.h"
 #include "chrome/browser/ash/bruschetta/bruschetta_pref_names.h"
 #include "chrome/browser/ash/cert_provisioning/cert_provisioning_common.h"
@@ -724,6 +724,9 @@ const char kLoadCryptoTokenExtension[] =
     "extensions.load_cryptotoken_extension";
 #endif
 
+// Deprecated 10/2022.
+const char kOriginTrialPrefKey[] = "origin_trials.persistent_trials";
+
 #if BUILDFLAG(IS_CHROMEOS_ASH)
 // Deprecated 07/2022.
 // The name of a boolean pref that determines whether we can show the folder
@@ -809,6 +812,10 @@ const char kAutofillAssistantTriggerScriptsIsFirstTimeUser[] =
 const char kAutofillWalletImportStorageCheckboxState[] =
     "autofill.wallet_import_storage_checkbox_state";
 
+// Deprecated 01/2023
+const char kSendDownloadToCloudPref[] =
+    "enterprise_connectors.send_download_to_cloud";
+
 // Register local state used only for migration (clearing or moving to a new
 // key).
 void RegisterLocalStatePrefsForMigration(PrefRegistrySimple* registry) {
@@ -877,6 +884,9 @@ void RegisterLocalStatePrefsForMigration(PrefRegistrySimple* registry) {
 
   // Deprecated 11/2022.
   registry->RegisterDictionaryPref(kLocalConsentsDictionary);
+
+  // Deprecated 01/2023
+  registry->RegisterListPref(kSendDownloadToCloudPref);
 }
 
 // Register prefs used only for migration (clearing or moving to a new key).
@@ -1065,6 +1075,9 @@ void RegisterProfilePrefsForMigration(
   registry->RegisterBooleanPref(kSuggestedContentInfoDismissedInLauncher,
                                 false);
 #endif  // BUILDFLAG(IS_CHROMEOS_ASH)
+  // Deprecated 10/2022.
+  registry->RegisterDictionaryPref(kOriginTrialPrefKey,
+                                   PrefRegistry::LOSSY_PREF);
 
   // Deprecated 11/2022.
   registry->RegisterBooleanPref(kAutofillAssistantEnabled, true);
@@ -1367,7 +1380,6 @@ void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry,
   NotifierStateTracker::RegisterProfilePrefs(registry);
   ntp_tiles::MostVisitedSites::RegisterProfilePrefs(registry);
   optimization_guide::prefs::RegisterProfilePrefs(registry);
-  origin_trials::PrefServicePersistenceProvider::RegisterProfilePrefs(registry);
   password_manager::PasswordManager::RegisterProfilePrefs(registry);
   payments::RegisterProfilePrefs(registry);
   performance_manager::user_tuning::prefs::RegisterProfilePrefs(registry);
@@ -1558,6 +1570,7 @@ void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry,
   ash::bluetooth::DebugLogsManager::RegisterPrefs(registry);
   ash::bluetooth_config::BluetoothPowerControllerImpl::RegisterProfilePrefs(
       registry);
+  ash::HatsBluetoothRevampTriggerImpl::RegisterProfilePrefs(registry);
   ash::ClientAppMetadataProviderService::RegisterProfilePrefs(registry);
   ash::CupsPrintersManager::RegisterProfilePrefs(registry);
   ash::device_sync::RegisterProfilePrefs(registry);
@@ -1824,6 +1837,9 @@ void MigrateObsoleteLocalStatePrefs(PrefService* local_state) {
   // Added 11/2022.
   local_state->ClearPref(kLocalConsentsDictionary);
 
+  // Added 01/2023
+  local_state->ClearPref(kSendDownloadToCloudPref);
+
   // Please don't delete the following line. It is used by PRESUBMIT.py.
   // END_MIGRATE_OBSOLETE_LOCAL_STATE_PREFS
 
@@ -2083,7 +2099,7 @@ void MigrateObsoleteProfilePrefs(Profile* profile) {
 #if BUILDFLAG(IS_ANDROID)
   feed::MigrateObsoleteProfilePrefsOct_2022(profile_prefs);
 #endif  // BUILDFLAG(IS_ANDROID)
-  profile_prefs->ClearPref(origin_trials::kOriginTrialPrefKey);
+  profile_prefs->ClearPref(kOriginTrialPrefKey);
 
   // Once this migration is complete, the tracked preference
   // `kGoogleServicesLastAccountIdDeprecated` can be removed.

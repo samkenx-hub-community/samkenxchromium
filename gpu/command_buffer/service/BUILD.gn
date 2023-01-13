@@ -46,8 +46,6 @@ target(link_target_type, "service_sources") {
     "decoder_client.h",
     "gpu_switches.cc",
     "gpu_switches.h",
-    "image_factory.cc",
-    "image_factory.h",
     "mailbox_manager.h",
     "memory_tracking.cc",
     "memory_tracking.h",
@@ -267,6 +265,8 @@ target(link_target_type, "gles2_sources") {
     "shared_image/shared_memory_image_backing_factory.h",
     "shared_image/skia_gl_image_representation.cc",
     "shared_image/skia_gl_image_representation.h",
+    "shared_image/wrapped_sk_image_backing.cc",
+    "shared_image/wrapped_sk_image_backing.h",
     "shared_image/wrapped_sk_image_backing_factory.cc",
     "shared_image/wrapped_sk_image_backing_factory.h",
     "shared_image_interface_in_process.cc",
@@ -390,8 +390,6 @@ target(link_target_type, "gles2_sources") {
 
   if (use_ozone) {
     sources += [
-      "image_factory_native_pixmap.cc",
-      "image_factory_native_pixmap.h",
       "shared_image/gl_ozone_image_representation.cc",
       "shared_image/gl_ozone_image_representation.h",
       "shared_image/ozone_image_backing.cc",

@@ -153,7 +153,7 @@ chromium-metrics-reviews@google.com.
 
 <histogram name="Enterprise.AutoEnrollmentControllerTimeout"
     enum="EnterpriseAutoEnrollmentControllerTimeoutReport"
-    expires_after="2023-05-07">
+    expires_after="2023-07-09">
   <owner>vsavu@google.com</owner>
   <owner>igorcov@chromium.org</owner>
   <summary>
@@ -444,7 +444,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Enterprise.CloudReportingBasicRequestSize" units="KB"
-    expires_after="2023-04-30">
+    expires_after="2023-07-02">
   <owner>zmin@chromium.org</owner>
   <owner>pastarmovj@chromium.org</owner>
   <summary>
@@ -475,7 +475,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Enterprise.CloudReportingResponse"
-    enum="EnterpriseCloudReportingResponse" expires_after="2023-04-30">
+    enum="EnterpriseCloudReportingResponse" expires_after="2023-07-02">
   <owner>zmin@chromium.org</owner>
   <owner>pastarmovj@chromium.org</owner>
   <summary>
@@ -544,7 +544,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Enterprise.DevicePolicyRefresh3"
-    enum="EnterprisePolicyRefresh" expires_after="2023-04-30">
+    enum="EnterprisePolicyRefresh" expires_after="2023-07-02">
   <owner>asumaneev@google.com</owner>
   <owner>managed-platforms@google.com</owner>
   <summary>
@@ -592,14 +592,14 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Enterprise.DeviceRemoteCommand.Crd.Result"
-    enum="EnterpriseCrdSessionResultCode" expires_after="2023-01-01">
+    enum="EnterpriseCrdSessionResultCode" expires_after="2023-06-01">
   <owner>macinashutosh@google.com</owner>
   <owner>chromeos-commercial-crd@google.com</owner>
   <summary>Reports success/failure when a session is attempted.</summary>
 </histogram>
 
 <histogram name="Enterprise.DeviceRemoteCommand.Crd.SessionType"
-    enum="EnterpriseCrdUserType" expires_after="2023-01-01">
+    enum="EnterpriseCrdUserType" expires_after="2023-06-01">
   <owner>macinashutosh@google.com</owner>
   <owner>chromeos-commercial-crd@google.com</owner>
   <summary>
@@ -640,7 +640,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Enterprise.DeviceRemoteCommand.Received"
-    enum="RemoteCommandReceivedStatus" expires_after="2023-04-30">
+    enum="RemoteCommandReceivedStatus" expires_after="2023-07-02">
   <owner>asumaneev@google.com</owner>
   <owner>managed-platforms@google.com</owner>
   <summary>
@@ -1630,10 +1630,10 @@ chromium-metrics-reviews@google.com.
   <owner>igorcov@chromium.org</owner>
   <owner>chromeos-commercial-remote-management@google.com</owner>
   <summary>
-    Whether loading of device policy from file on an enterprise-enrolled
-    (checked against install_attributes.pb) Chrome OS device yields an
-    enterprise policy with a DM token. Filled once during session startup, after
-    first successful device policy read.
+    Whether loading of device policies from file on an enterprise-enrolled
+    (checked against install_attributes.pb) Chrome OS device yields a PolicyData
+    message with a DMToken. Filled once during session startup, after first
+    successful device policy read.
   </summary>
 </histogram>
 
@@ -1664,7 +1664,7 @@ chromium-metrics-reviews@google.com.
 <histogram
     name="Enterprise.EnrollmentAttestationBased.EnrollmentCertificateStatus.InitialAttempt"
     enum="EnrollmentAttestationBasedCertificateStatus"
-    expires_after="2023-04-30">
+    expires_after="2023-07-02">
   <owner>asumaneev@google.com</owner>
   <owner>chromeos-commercial-remote-management@google.com</owner>
   <summary>
@@ -1694,7 +1694,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Enterprise.EnrollmentForced" enum="EnterpriseEnrollmentType"
-    expires_after="2023-04-01">
+    expires_after="2023-07-09">
   <owner>dkuzmin@google.com</owner>
   <owner>cros-oac@google.com</owner>
   <summary>
@@ -1993,7 +1993,7 @@ chromium-metrics-reviews@google.com.
 
 <histogram
     name="Enterprise.FCMInvalidationService.PolicyInvalidationsRegistrationResult"
-    enum="BooleanSuccess" expires_after="2023-04-30">
+    enum="BooleanSuccess" expires_after="2023-07-02">
   <owner>asumaneev@google.com</owner>
   <owner>managed-platforms@google.com</owner>
   <summary>
@@ -2006,7 +2006,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Enterprise.FCMInvalidationService.PolicyRefresh2"
-    enum="EnterprisePolicyRefresh" expires_after="2023-05-07">
+    enum="EnterprisePolicyRefresh" expires_after="2023-07-09">
   <owner>asumaneev@google.com</owner>
   <owner>managed-platforms@google.com</owner>
   <summary>
@@ -2015,53 +2015,6 @@ chromium-metrics-reviews@google.com.
     changed, and whether the policy was invalidated at the time of the refresh.
     Subset of &quot;Enterprise.PolicyRefresh2&quot;. Gets recorded only when
     FCMInvalidationService is used as InvalidationService.
-  </summary>
-</histogram>
-
-<histogram name="Enterprise.FileSystem.DownloadsRouting"
-    enum="EnterpriseFileSystemDownloadsRoutingDestination"
-    expires_after="2023-01-30">
-  <owner>alicego@google.com</owner>
-  <owner>rogerta@google.com</owner>
-  <owner>xanth@google.com</owner>
-  <summary>
-    The intended routing destination of each downloaded item when the Enterprise
-    Filesystem connector is enabled. Each file is either not routed to any cloud
-    provider, or routed to Box. Gets recorded every time a file is downloaded
-    with the filesystem connector enabled, whether or not the file is eventually
-    uploaded to the cloud.
-  </summary>
-</histogram>
-
-<histogram name="Enterprise.FileSystem.DownloadsRouting.Box"
-    enum="EnterpriseFileSystemDownloadsRoutingStatus"
-    expires_after="2023-01-30">
-  <owner>alicego@google.com</owner>
-  <owner>rogerta@google.com</owner>
-  <owner>xanth@google.com</owner>
-  <summary>
-    The final result of a file routed to Box by the filesystem connector. The
-    file routing may a) succeed b) be canceled by the user c) fail due to a Box
-    error d) fail due to a browser error, e) fail due to a file error OR f) fail
-    due to a network error. Gets recorded every time a file is downloaded with
-    the filesystem connector enabled, whether or not the file is eventually
-    uploaded to the cloud.
-  </summary>
-</histogram>
-
-<histogram name="Enterprise.FileSystem.Uniquifier"
-    enum="EnterpriseFilesystemUploadAttemptCount" expires_after="2023-01-30">
-  <owner>alicego@google.com</owner>
-  <owner>mad@google.com</owner>
-  <owner>rogerta@google.com</owner>
-  <owner>xanth@google.com</owner>
-  <summary>
-    The number of alternate filenames tried to avoid a filename collision when
-    uploading to the cloud storage provider. If there is a collision filenames
-    of the form &quot;filename (%d).ext&quot; are used for
-    &quot;filename.ext&quot;, and after 10 retries we fallback to a timestamp
-    based name &quot;filename - YYYY-MM-ddTHHMMss.SSS UTC+HHmm.ext&quot;, and
-    abandon if that fails.
   </summary>
 </histogram>
 
@@ -2234,7 +2187,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Enterprise.OnBulkDataEntry.DataSize" units="bytes"
-    expires_after="2023-05-07">
+    expires_after="2023-07-09">
   <owner>domfc@chromium.org</owner>
   <owner>webprotect-team@google.com</owner>
   <summary>
@@ -2287,7 +2240,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Enterprise.Policies" enum="EnterprisePolicies"
-    expires_after="2023-05-07">
+    expires_after="2023-07-09">
   <owner>mnissler@chromium.org</owner>
   <summary>
     A set of enterprise policy rules that are in use. This is recorded every 24
@@ -2333,7 +2286,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Enterprise.PolicyInvalidations"
-    enum="EnterprisePolicyInvalidations" expires_after="2023-04-30">
+    enum="EnterprisePolicyInvalidations" expires_after="2023-07-02">
   <owner>asumaneev@google.com</owner>
   <owner>managed-platforms@google.com</owner>
   <summary>
@@ -2345,7 +2298,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Enterprise.PolicyInvalidationsRegistrationResult"
-    enum="BooleanSuccess" expires_after="2023-05-07">
+    enum="BooleanSuccess" expires_after="2023-07-09">
   <owner>asumaneev@google.com</owner>
   <owner>managed-platforms@google.com</owner>
   <summary>
@@ -2442,7 +2395,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Enterprise.ProfileSeparation.DasherPolicyFetch.HttpResponse"
-    enum="HttpResponseCode" expires_after="2023-05-01">
+    enum="HttpResponseCode" expires_after="2023-07-02">
   <owner>ydago@chromium.org</owner>
   <owner>zmin@chromium.org</owner>
   <summary>
@@ -2632,7 +2585,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Enterprise.UserPolicyChromeOS.ChildUser.OAuthTokenError"
-    enum="GoogleServiceAuthError" expires_after="2023-05-07">
+    enum="GoogleServiceAuthError" expires_after="2023-07-09">
   <owner>agawronska@chromium.org</owner>
   <owner>michaelpg@chromium.org</owner>
   <summary>Failure reason for OAuth token fetch for child user.</summary>
@@ -2762,7 +2715,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Enterprise.VPDCacheReadResult" enum="VPDCacheReadResult"
-    expires_after="2023-05-07">
+    expires_after="2023-07-09">
   <owner>vsavu@google.com</owner>
   <owner>igorcov@chromium.org</owner>
   <summary>The result of Chrome reading the VPD cache on Chrome OS.</summary>
@@ -2868,7 +2821,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="EnterpriseCheck.IsFullyManaged2" enum="IsFullyManagedBoolean"
-    expires_after="2023-04-30">
+    expires_after="2023-07-02">
   <owner>twellington@google.com</owner>
   <owner>tedchcoc@chromium.org</owner>
   <summary>
@@ -2987,6 +2940,16 @@ chromium-metrics-reviews@google.com.
   <summary>
     Whether we could obtain the address of the NetGetJoinInformation function.
     This check is performed once at start-up on Windows.
+  </summary>
+</histogram>
+
+<histogram name="EnterpriseCheck.OSType" enum="OsSuite"
+    expires_after="2024-01-10">
+  <owner>ydago@chromium.org</owner>
+  <owner>pastarmovj@chromium.org</owner>
+  <summary>
+    The rough Windows suite we are running on. This check is performed once at
+    start-up on Windows. The histogram was removed in 108 and reinstated in 111.
   </summary>
 </histogram>
 

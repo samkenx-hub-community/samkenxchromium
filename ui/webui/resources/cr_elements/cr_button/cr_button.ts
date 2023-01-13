@@ -12,12 +12,18 @@ import '//resources/polymer/v3_0/paper-styles/color.js';
 import '../cr_hidden_style.css.js';
 import '../cr_shared_vars.css.js';
 
+import {FocusOutlineManager} from '//resources/js/focus_outline_manager.js';
 import {PaperRippleBehavior} from '//resources/polymer/v3_0/paper-behaviors/paper-ripple-behavior.js';
 import {mixinBehaviors, PolymerElement} from '//resources/polymer/v3_0/polymer/polymer_bundled.min.js';
 
-import {FocusOutlineManager} from '../../js/focus_outline_manager.js';
-
 import {getTemplate} from './cr_button.html.js';
+
+export interface CrButtonElement {
+  $: {
+    prefixIcon: HTMLSlotElement,
+    suffixIcon: HTMLSlotElement,
+  };
+}
 
 const CrButtonElementBase =
     mixinBehaviors([PaperRippleBehavior], PolymerElement) as {
@@ -58,12 +64,26 @@ export class CrButtonElement extends CrButtonElementBase {
         type: Boolean,
         value: false,
       },
+
+      hasPrefixIcon_: {
+        type: Boolean,
+        reflectToAttribute: true,
+        value: false,
+      },
+
+      hasSuffixIcon_: {
+        type: Boolean,
+        reflectToAttribute: true,
+        value: false,
+      },
     };
   }
 
   disabled: boolean;
   customTabIndex: number;
   circleRipple: boolean;
+  private hasPrefixIcon_: boolean;
+  private hasSuffixIcon_: boolean;
 
   /**
    * It is possible to activate a tab when the space key is pressed down. When
@@ -150,6 +170,14 @@ export class CrButtonElement extends CrButtonElementBase {
     if (this.disabled) {
       e.stopImmediatePropagation();
     }
+  }
+
+  private onPrefixIconSlotChanged_() {
+    this.hasPrefixIcon_ = this.$.prefixIcon.assignedElements().length > 0;
+  }
+
+  private onSuffixIconSlotChanged_() {
+    this.hasSuffixIcon_ = this.$.suffixIcon.assignedElements().length > 0;
   }
 
   private onKeyDown_(e: KeyboardEvent) {

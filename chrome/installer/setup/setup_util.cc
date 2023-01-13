@@ -21,7 +21,6 @@
 #include <vector>
 
 #include "base/base64.h"
-#include "base/bind.h"
 #include "base/check.h"
 #include "base/command_line.h"
 #include "base/cpu.h"
@@ -29,6 +28,7 @@
 #include "base/files/file_enumerator.h"
 #include "base/files/file_path.h"
 #include "base/files/file_util.h"
+#include "base/functional/bind.h"
 #include "base/logging.h"
 #include "base/metrics/histogram_functions.h"
 #include "base/metrics/histogram_macros.h"
@@ -97,7 +97,7 @@ void RemoveLegacyIExecuteCommandKey(const InstallerState& installer_state) {
 // for this mode of install was dropped from ToT in December 2016. Remove any
 // stray bits in the registry leftover from such installs.
 void RemoveBinariesVersionKey(const InstallerState& installer_state) {
-#if !BUILDFLAG(GOOGLE_CHROME_FOR_TESTING_BRANDING)
+#if !BUILDFLAG(USE_INTERNAL_CHROME_FOR_TESTING_ICONS)
 #if BUILDFLAG(GOOGLE_CHROME_BRANDING)
   std::wstring path(install_static::GetClientsKeyPath(
       L"{4DC8B4CA-1BDA-483e-B5FA-D3C12E15B62D}"));
@@ -107,7 +107,7 @@ void RemoveBinariesVersionKey(const InstallerState& installer_state) {
 #endif
   installer::DeleteRegistryKey(installer_state.root_key(), path,
                                KEY_WOW64_32KEY);
-#endif  // !BUILDFLAG(GOOGLE_CHROME_FOR_TESTING_BRANDING)
+#endif  // !BUILDFLAG(USE_INTERNAL_CHROME_FOR_TESTING_ICONS)
 }
 
 void RemoveAppLauncherVersionKey(const InstallerState& installer_state) {

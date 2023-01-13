@@ -4,9 +4,9 @@
 
 #include "chrome/browser/ui/views/frame/browser_non_client_frame_view_mac.h"
 
-#include "base/bind.h"
 #include "base/command_line.h"
 #include "base/containers/fixed_flat_map.h"
+#include "base/functional/bind.h"
 #include "base/metrics/histogram_macros.h"
 #include "base/numerics/safe_conversions.h"
 #include "chrome/browser/themes/theme_properties.h"
@@ -88,8 +88,8 @@ BrowserNonClientFrameViewMac::BrowserNonClientFrameViewMac(
 
   if (browser_view->GetIsWebAppType()) {
     if (browser_view->browser()->app_controller()) {
-      set_web_app_frame_toolbar(AddChildView(
-          std::make_unique<WebAppFrameToolbarView>(frame, browser_view)));
+      set_web_app_frame_toolbar(
+          AddChildView(std::make_unique<WebAppFrameToolbarView>(browser_view)));
 
       if (browser_view->IsWindowControlsOverlayEnabled()) {
         caption_button_placeholder_container_ =

@@ -13,9 +13,9 @@
 #include <utility>
 #include <vector>
 
-#include "base/bind.h"
 #include "base/command_line.h"
 #include "base/files/file_path.h"
+#include "base/functional/bind.h"
 #include "base/hash/hash.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/scoped_refptr.h"
@@ -217,34 +217,6 @@ class RenderFrameHostCreatedObserver : public WebContentsObserver {
 
  private:
   bool created_;
-};
-
-// This WebContents observer keep track of its RVH change.
-class RenderViewHostChangedObserver : public WebContentsObserver {
- public:
-  explicit RenderViewHostChangedObserver(WebContents* web_contents)
-      : WebContentsObserver(web_contents), host_changed_(false) {}
-
-  RenderViewHostChangedObserver(const RenderViewHostChangedObserver&) = delete;
-  RenderViewHostChangedObserver& operator=(
-      const RenderViewHostChangedObserver&) = delete;
-
-  // WebContentsObserver.
-  void RenderViewHostChanged(RenderViewHost* old_host,
-                             RenderViewHost* new_host) override {
-    host_changed_ = true;
-  }
-
-  bool DidHostChange() {
-    bool host_changed = host_changed_;
-    Reset();
-    return host_changed;
-  }
-
-  void Reset() { host_changed_ = false; }
-
- private:
-  bool host_changed_;
 };
 
 // This observer is used to check whether IPC messages are being filtered for
@@ -906,11 +878,11 @@ TEST_P(RenderFrameHostManagerTest, Init) {
 TEST_P(RenderFrameHostManagerTest, Navigate) {
   std::unique_ptr<TestWebContents> web_contents(TestWebContents::Create(
       browser_context(), SiteInstance::Create(browser_context())));
-  RenderViewHostChangedObserver change_observer(web_contents.get());
 
   RenderFrameHostManager* manager =
       web_contents->GetPrimaryFrameTree().root()->render_manager();
   RenderFrameHostImpl* host = nullptr;
+  RenderViewHost* initial_render_view_host = nullptr;
 
   // 1) The first navigation. --------------------------
   const GURL kUrl1("http://www.google.com/");
@@ -948,6 +920,8 @@ TEST_P(RenderFrameHostManagerTest, Navigate) {
       true /* is_renderer_init */, nullptr /* blob_url_loader_factory */,
       false /* is_initial_entry */);
   host = NavigateToEntry(manager, &entry2);
+  initial_render_view_host = host->GetRenderViewHost();
+  EXPECT_TRUE(initial_render_view_host);
 
   // The RenderFrameHost created in Init will be reused.
   EXPECT_TRUE(host == manager->current_frame_host());
@@ -978,18 +952,15 @@ TEST_P(RenderFrameHostManagerTest, Navigate) {
   EXPECT_TRUE(GetPendingFrameHost(manager));
   ASSERT_EQ(host, GetPendingFrameHost(manager));
 
-  change_observer.Reset();
-
   // Commit.
   DidNavigateFrame(manager, GetPendingFrameHost(manager));
   EXPECT_TRUE(host == manager->current_frame_host());
   ASSERT_TRUE(host);
   EXPECT_TRUE(host->GetSiteInstance()->HasSite());
+  EXPECT_NE(initial_render_view_host, host->GetRenderViewHost());
+
   // Check the pending RenderFrameHost has been committed.
   EXPECT_FALSE(GetPendingFrameHost(manager));
-
-  // We should observe RVH changed event.
-  EXPECT_TRUE(change_observer.DidHostChange());
 
   ASSERT_TRUE(manager->GetRenderWidgetHostView()->GetBackgroundColor());
   EXPECT_EQ(SK_ColorRED,
@@ -1618,7 +1589,6 @@ TEST_P(RenderFrameHostManagerTest, NavigateWithEarlyClose) {
   BeforeUnloadFiredWebContentsDelegate delegate;
   std::unique_ptr<TestWebContents> web_contents(
       TestWebContents::Create(browser_context(), instance));
-  RenderViewHostChangedObserver change_observer(web_contents.get());
   web_contents->SetDelegate(&delegate);
 
   RenderFrameHostManager* manager =
@@ -1637,9 +1607,6 @@ TEST_P(RenderFrameHostManagerTest, NavigateWithEarlyClose) {
   // The RenderFrameHost created in Init will be reused.
   EXPECT_EQ(host, manager->current_frame_host());
   EXPECT_FALSE(GetPendingFrameHost(manager));
-
-  // We should observe RVH changed event.
-  EXPECT_TRUE(change_observer.DidHostChange());
 
   // Commit.
   DidNavigateFrame(manager, host);
@@ -1690,8 +1657,9 @@ TEST_P(RenderFrameHostManagerTest, CloseWithPendingWhileUnresponsive) {
   TestRenderFrameHost* rfh1 = contents()->GetPrimaryMainFrame();
 
   // Start to close the tab, but assume it's unresponsive.
-  rfh1->render_view_host()->ClosePage();
-  EXPECT_TRUE(rfh1->render_view_host()->is_waiting_for_page_close_completion());
+  rfh1->ClosePage();
+  EXPECT_EQ(rfh1->page_close_state_,
+            RenderFrameHostImpl::PageCloseState::kRunningUnloadHandlers);
 
   // Start a navigation to a new site.
   controller().LoadURL(kUrl2, Referrer(), ui::PAGE_TRANSITION_LINK,
@@ -1700,7 +1668,7 @@ TEST_P(RenderFrameHostManagerTest, CloseWithPendingWhileUnresponsive) {
   EXPECT_TRUE(contents()->CrossProcessNavigationPending());
 
   // Simulate the unresponsiveness timer.  The tab should close.
-  rfh1->render_view_host()->ClosePageTimeout();
+  rfh1->ClosePageTimeout();
   EXPECT_TRUE(close_delegate.is_closed());
 }
 

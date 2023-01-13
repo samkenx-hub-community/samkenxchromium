@@ -5,7 +5,7 @@
 #import <memory>
 #import <vector>
 
-#import "base/bind.h"
+#import "base/functional/bind.h"
 #import "base/ios/ios_util.h"
 #import "base/mac/foundation_util.h"
 #import "base/strings/sys_string_conversions.h"
@@ -82,25 +82,19 @@ std::unique_ptr<net::test_server::HttpResponse> StandardResponse(
 
 + (void)setUpHelper {
   [self closeAllTabs];
-
-  [NewTabPageAppInterface setUpService];
 }
 
 + (void)tearDown {
   [self closeAllTabs];
-
-  [NewTabPageAppInterface resetService];
 
   [super tearDown];
 }
 
 - (void)setUp {
   [super setUp];
-  [NewTabPageAppInterface makeSuggestionsAvailable];
 }
 
 - (void)tearDown {
-  [NewTabPageAppInterface disableSuggestions];
   [ChromeEarlGrey clearBrowsingHistory];
   [super tearDown];
 }

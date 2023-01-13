@@ -7,8 +7,8 @@
 #include <utility>
 
 #include "base/base64.h"
-#include "base/bind.h"
 #include "base/feature_list.h"
+#include "base/functional/bind.h"
 #include "base/json/json_string_value_serializer.h"
 #include "base/location.h"
 #include "base/logging.h"
@@ -758,6 +758,14 @@ NigoriKeyBag NigoriSyncBridgeImpl::BuildDecryptionKeyBagForRemoteKeybag()
       // successful decryption of |pending_keys|.
       decryption_key_bag.AddKeyFromProto(keystore_decryptor_key);
     }
+  }
+
+  if (state_.passphrase_type == NigoriSpecifics::KEYSTORE_PASSPHRASE) {
+    // Allow decryption using keystore keys directly: while using
+    // |keystore_decryptor_token| should be sufficient, this supports future
+    // case when |keystore_decryptor_token| is not passed.
+    decryption_key_bag.AddAllUnknownKeysFrom(
+        state_.keystore_keys_cryptographer->GetKeystoreKeybag());
   }
 
   if (state_.cryptographer->CanEncrypt()) {

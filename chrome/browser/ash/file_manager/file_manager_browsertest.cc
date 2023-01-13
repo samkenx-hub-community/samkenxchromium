@@ -11,6 +11,7 @@
 #include "base/functional/bind.h"
 #include "base/run_loop.h"
 #include "base/strings/utf_string_conversions.h"
+#include "base/task/single_thread_task_runner.h"
 #include "base/test/metrics/histogram_tester.h"
 #include "base/threading/thread_restrictions.h"
 #include "chrome/browser/ash/file_manager/copy_or_move_io_task_scanning_impl.h"
@@ -1213,8 +1214,9 @@ WRAPPED_INSTANTIATE_TEST_SUITE_P(
         TestCase("directoryTreeExpandFolder"),
         TestCase(
             "directoryTreeExpandFolderWithHiddenFileAndShowHiddenFilesOff"),
-        TestCase(
-            "directoryTreeExpandFolderWithHiddenFileAndShowHiddenFilesOn")));
+        TestCase("directoryTreeExpandFolderWithHiddenFileAndShowHiddenFilesOn"),
+        TestCase("directoryTreeExpandFolderOnNonDelayExpansionVolume"),
+        TestCase("directoryTreeExpandFolderOnDelayExpansionVolume")));
 
 WRAPPED_INSTANTIATE_TEST_SUITE_P(
     DirectoryTreeContextMenu, /* directory_tree_context_menu.js */
@@ -1401,7 +1403,8 @@ WRAPPED_INSTANTIATE_TEST_SUITE_P(
         TestCase("saveAsNonDlpRestricted").EnableDlp(),
         TestCase("saveAsDlpRestrictedRedirectsToMyFiles").EnableDlp(),
         TestCase("saveAsDlpRestrictedVm").EnableDlp(),
-        TestCase("openDlpRestrictedFile").EnableDlp()));
+        TestCase("openDlpRestrictedFile").EnableDlp(),
+        TestCase("openFolderDlpRestricted").EnableDlp()));
 
 #define FILE_TRANSFER_TEST_CASE(name) \
   TestCase(name).EnableFileTransferConnector()
@@ -1782,17 +1785,25 @@ WRAPPED_INSTANTIATE_TEST_SUITE_P(
 WRAPPED_INSTANTIATE_TEST_SUITE_P(
     Search, /* search.js */
     FilesAppBrowserTest,
-    ::testing::Values(TestCase("searchDownloadsWithResults"),
-                      TestCase("searchDownloadsWithNoResults"),
-                      TestCase("searchDownloadsClearSearchKeyDown"),
-                      TestCase("searchDownloadsClearSearch"),
-                      TestCase("searchHidingViaTab"),
-                      TestCase("searchHidingTextEntryField"),
-                      TestCase("searchButtonToggles"),
-                      TestCase("searchOptions").EnableSearchV2()
-                      // TODO(b/189173190): Enable
-                      // TestCase("searchQueryLaunchParam")
-                      ));
+    ::testing::Values(
+        TestCase("searchDownloadsWithResults"),
+        TestCase("searchDownloadsWithResults").EnableSearchV2(),
+        TestCase("searchDownloadsWithNoResults"),
+        TestCase("searchDownloadsWithNoResults").EnableSearchV2(),
+        TestCase("searchDownloadsClearSearchKeyDown"),
+        TestCase("searchDownloadsClearSearchKeyDown").EnableSearchV2(),
+        TestCase("searchDownloadsClearSearch"),
+        TestCase("searchDownloadsClearSearch").EnableSearchV2(),
+        TestCase("searchHidingViaTab"),
+        TestCase("searchHidingViaTab").EnableSearchV2(),
+        TestCase("searchHidingTextEntryField"),
+        TestCase("searchHidingTextEntryField").EnableSearchV2(),
+        TestCase("searchButtonToggles"),
+        TestCase("searchButtonToggles").EnableSearchV2(),
+        TestCase("searchOptions").EnableSearchV2()
+        // TODO(b/189173190): Enable
+        // TestCase("searchQueryLaunchParam")
+        ));
 
 WRAPPED_INSTANTIATE_TEST_SUITE_P(
     Metrics, /* metrics.js */

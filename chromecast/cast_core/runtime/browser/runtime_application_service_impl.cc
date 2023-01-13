@@ -7,6 +7,7 @@
 #include <string>
 
 #include "base/task/bind_post_task.h"
+#include "base/task/sequenced_task_runner.h"
 #include "chromecast/browser/cast_web_service.h"
 #include "chromecast/browser/cast_web_view.h"
 #include "chromecast/cast_core/grpc/grpc_status_or.h"
@@ -299,10 +300,10 @@ CastWebView::Scoped RuntimeApplicationServiceImpl::CreateCastWebView() {
   params->renderer_type = mojom::RendererType::MOJO_RENDERER;
   params->handle_inner_contents = true;
   params->session_id = runtime_application_->GetCastSessionId();
-  params->is_remote_control_mode = IsRemoteControlMode();
-  params->activity_id = params->is_remote_control_mode
-                            ? params->session_id
-                            : runtime_application_->GetAppId();
+  params->should_request_audio_focus = !IsRemoteControlMode();
+  params->activity_id = params->should_request_audio_focus
+                            ? runtime_application_->GetAppId()
+                            : params->session_id;
   params->enabled_for_dev = IsEnabledForDev();
   params->enable_url_rewrite_rules = false;
   return web_service_->CreateWebViewInternal(std::move(params));

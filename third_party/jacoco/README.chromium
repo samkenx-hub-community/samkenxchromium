@@ -10,5 +10,4 @@ Description:
 JaCoCo is a Java code coverage tool.
 
 Local Modifications:
-* Added BUILD.gn
-* Added jacoco-agent.properties.jar
+* Added jacoco-agent.properties for use on Android.

@@ -11,7 +11,7 @@
 #include <memory>
 #include <utility>
 
-#include "base/bind.h"
+#include "base/functional/bind.h"
 #include "base/ranges/algorithm.h"
 #include "base/task/thread_pool.h"
 #include "base/trace_event/trace_event.h"
@@ -180,8 +180,7 @@ void GbmSurfacelessWayland::Present(SwapCompletionCallback completion_callback,
     return;
   }
 
-  if ((!no_gl_flush_for_tests_ && !buffer_manager_->supports_acquire_fence()) ||
-      requires_gl_flush_on_swap_buffers_) {
+  if (!no_gl_flush_for_tests_ && !buffer_manager_->supports_acquire_fence()) {
     glFlush();
   }
 
@@ -322,10 +321,6 @@ void GbmSurfacelessWayland::FenceRetired(PendingFrame* frame) {
 
 void GbmSurfacelessWayland::SetNoGLFlushForTests() {
   no_gl_flush_for_tests_ = true;
-}
-
-void GbmSurfacelessWayland::SetForceGlFlushOnSwapBuffers() {
-  requires_gl_flush_on_swap_buffers_ = true;
 }
 
 void GbmSurfacelessWayland::OnSubmission(uint32_t frame_id,

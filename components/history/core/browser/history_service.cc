@@ -19,16 +19,17 @@
 
 #include <functional>
 
-#include "base/callback.h"
-#include "base/callback_helpers.h"
 #include "base/command_line.h"
 #include "base/compiler_specific.h"
+#include "base/functional/callback.h"
+#include "base/functional/callback_helpers.h"
 #include "base/location.h"
 #include "base/logging.h"
 #include "base/memory/ref_counted.h"
 #include "base/metrics/histogram_macros.h"
 #include "base/observer_list.h"
 #include "base/sequence_checker.h"
+#include "base/task/sequenced_task_runner.h"
 #include "base/task/single_thread_task_runner.h"
 #include "base/task/thread_pool.h"
 #include "base/time/time.h"
@@ -322,6 +323,19 @@ base::CancelableTaskTracker::TaskId HistoryService::AddVisitsToCluster(
       backend_task_runner_.get(), FROM_HERE,
       base::BindOnce(&HistoryBackend::AddVisitsToCluster, history_backend_,
                      cluster_id, visits));
+}
+
+base::CancelableTaskTracker::TaskId HistoryService::UpdateClusterTriggerability(
+    const std::vector<history::Cluster>& clusters,
+    base::OnceClosure callback,
+    base::CancelableTaskTracker* tracker) {
+  DCHECK(backend_task_runner_) << "History service being called after cleanup";
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  return tracker->PostTaskAndReply(
+      backend_task_runner_.get(), FROM_HERE,
+      base::BindOnce(&HistoryBackend::UpdateClusterTriggerability,
+                     history_backend_, clusters),
+      std::move(callback));
 }
 
 base::CancelableTaskTracker::TaskId HistoryService::GetMostRecentClusters(

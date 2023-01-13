@@ -117,7 +117,8 @@ public final class FledgeFragmentV4Test {
 
     private void startFledgeSettings() {
         mSettingsActivityTestRule.startSettingsActivity();
-        ViewUtils.onViewWaiting(withText(R.string.settings_fledge_page_title));
+        ViewUtils.onViewWaiting(allOf(withText(R.string.settings_fledge_page_title),
+                withParent(withId(R.id.action_bar))));
     }
 
     private Matcher<View> getFledgeToggleMatcher() {
@@ -127,7 +128,7 @@ public final class FledgeFragmentV4Test {
     }
 
     private View getFledgeRootView() {
-        return getRootViewSanitized(R.string.settings_fledge_page_title);
+        return getRootViewSanitized(R.string.settings_fledge_page_toggle_sub_label);
     }
 
     private View getAllSitesPageRootView() {
@@ -194,8 +195,11 @@ public final class FledgeFragmentV4Test {
     @Feature({"RenderTest"})
     public void testRenderAllSitesPage() throws IOException {
         setFledgePrefEnabled(true);
-        mFakePrivacySandboxBridge.setCurrentFledgeSites(SITE_NAME_1, SITE_NAME_2);
+        for (int i = 0; i < FledgeFragmentV4.MAX_DISPLAYED_SITES + 1; i++) {
+            mFakePrivacySandboxBridge.setFledgeJoiningAllowed(generateSiteFromNr(i), true);
+        }
         startFledgeSettings();
+        scrollToSetting(withText(R.string.settings_fledge_page_see_all_sites_label));
         onView(withText(R.string.settings_fledge_page_see_all_sites_label)).perform(click());
         mRenderTestRule.render(getAllSitesPageRootView(), "fledge_all_sites_page");
     }
@@ -279,10 +283,6 @@ public final class FledgeFragmentV4Test {
         // Click on the toggle.
         onView(getFledgeToggleMatcher()).perform(click());
 
-        // Check that the all sites pref is displayed
-        onViewWaiting(withText(R.string.settings_fledge_page_see_all_sites_label))
-                .check(matches(isDisplayed()));
-
         // Check that the sites list is displayed when Fledge is enabled.
         onView(withText(SITE_NAME_1)).check(matches(isDisplayed()));
         onView(withText(SITE_NAME_2)).check(matches(isDisplayed()));
@@ -316,6 +316,10 @@ public final class FledgeFragmentV4Test {
         mFakePrivacySandboxBridge.setCurrentFledgeSites(SITE_NAME_1, SITE_NAME_2);
         startFledgeSettings();
 
+        // Check that the all sites pref is not displayed
+        onView(withText(R.string.settings_fledge_page_see_all_sites_label)).check(doesNotExist());
+
+        // Check that the sites are displayed.
         onView(withText(SITE_NAME_1)).check(matches(isDisplayed()));
         onView(withText(SITE_NAME_2)).check(matches(isDisplayed()));
     }
@@ -415,7 +419,7 @@ public final class FledgeFragmentV4Test {
 
         // Go back to the main Fledge fragment.
         pressBack();
-        onViewWaiting(withText(R.string.settings_fledge_page_title));
+        onViewWaiting(withText(R.string.settings_fledge_page_toggle_sub_label));
 
         // Verify that the sites are unblocked.
         onView(withText(SITE_NAME_1)).check(matches(isDisplayed()));
@@ -481,12 +485,27 @@ public final class FledgeFragmentV4Test {
 
     @Test
     @SmallTest
+    public void testLearnMoreLink() {
+        startFledgeSettings();
+        // Open the Fledge learn more activity
+        onView(withText(containsString("Learn more"))).perform(clickOnClickableSpan(0));
+        onViewWaiting(withText(R.string.settings_fledge_page_learn_more_heading))
+                .check(matches(isDisplayed()));
+        // Close the additional activity
+        pressBack();
+        assertThat(mUserActionTester.getActions(),
+                hasItems("Settings.PrivacySandbox.Fledge.LearnMoreClicked"));
+    }
+
+    @Test
+    @SmallTest
     public void testFooterTopicsLink() throws IOException {
         setFledgePrefEnabled(true);
         startFledgeSettings();
         // Open a Topics settings activity.
-        onView(withText(containsString("topics settings"))).perform(clickOnClickableSpan(0));
-        onView(withText(R.string.settings_topics_page_title)).check(matches(isDisplayed()));
+        onView(withText(containsString("Ad topics"))).perform(clickOnClickableSpan(0));
+        onViewWaiting(withText(R.string.settings_topics_page_toggle_sub_label))
+                .check(matches(isDisplayed()));
         // Close the additional activity by navigating back.
         pressBack();
     }
@@ -498,7 +517,8 @@ public final class FledgeFragmentV4Test {
         startFledgeSettings();
         // Open a CookieSettings activity.
         onView(withText(containsString("cookie settings"))).perform(clickOnClickableSpan(1));
-        onView(withText(R.string.third_party_cookies_page_title)).check(matches(isDisplayed()));
+        onViewWaiting(withText(R.string.third_party_cookies_page_title))
+                .check(matches(isDisplayed()));
         // Close the additional activity by navigating back.
         pressBack();
     }

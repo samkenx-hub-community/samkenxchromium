@@ -5,11 +5,12 @@
 #include "chrome/browser/ui/views/side_panel/side_panel_coordinator.h"
 #include <memory>
 
-#include "base/bind.h"
-#include "base/callback.h"
-#include "base/callback_forward.h"
+#include "base/functional/bind.h"
+#include "base/functional/callback.h"
+#include "base/functional/callback_forward.h"
 #include "chrome/browser/feature_engagement/tracker_factory.h"
 #include "chrome/browser/themes/theme_properties.h"
+#include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_element_identifiers.h"
 #include "chrome/browser/ui/color/chrome_color_id.h"
 #include "chrome/browser/ui/views/chrome_layout_provider.h"
@@ -165,20 +166,27 @@ SidePanelCoordinator::SidePanelCoordinator(BrowserView* browser_view)
   combobox_model_ = std::make_unique<SidePanelComboboxModel>();
 
   auto global_registry = std::make_unique<SidePanelRegistry>();
-  global_registry->AddObserver(this);
   global_registry_ = global_registry.get();
+  registry_observations_.AddObservation(global_registry_);
   browser_view->browser()->SetUserData(kGlobalSidePanelRegistryKey,
                                        std::move(global_registry));
 
   browser_view_->browser()->tab_strip_model()->AddObserver(this);
 
   SidePanelUtil::PopulateGlobalEntries(browser_view->browser(),
-                                       GetGlobalSidePanelRegistry());
+                                       global_registry_);
 }
 
 SidePanelCoordinator::~SidePanelCoordinator() {
   browser_view_->browser()->tab_strip_model()->RemoveObserver(this);
   view_state_observers_.Clear();
+}
+
+// static
+SidePanelRegistry* SidePanelCoordinator::GetGlobalSidePanelRegistry(
+    Browser* browser) {
+  return static_cast<SidePanelRegistry*>(
+      browser->GetUserData(kGlobalSidePanelRegistryKey));
 }
 
 void SidePanelCoordinator::Show(
@@ -327,11 +335,6 @@ void SidePanelCoordinator::OpenInNewTab() {
                                 /*is_renderer_initiated=*/false);
   browser_view_->browser()->OpenURL(params);
   Close();
-}
-
-SidePanelRegistry* SidePanelCoordinator::GetGlobalSidePanelRegistry() {
-  return static_cast<SidePanelRegistry*>(
-      browser_view_->browser()->GetUserData(kGlobalSidePanelRegistryKey));
 }
 
 void SidePanelCoordinator::SetNoDelaysForTesting() {
@@ -599,9 +602,29 @@ void SidePanelCoordinator::OnEntryRegistered(SidePanelEntry* entry) {
   }
 }
 
-void SidePanelCoordinator::OnEntryWillDeregister(SidePanelEntry* entry) {
+void SidePanelCoordinator::OnEntryWillDeregister(SidePanelRegistry* registry,
+                                                 SidePanelEntry* entry) {
   absl::optional<SidePanelEntry::Key> selected_key = GetSelectedKey();
-  combobox_model_->RemoveItem(entry->key());
+  if (entry->key().id() == SidePanelEntry::Id::kExtension) {
+    // Remove the extension entry from the combobox if one of these conditions
+    // are met:
+    //  - The entry will be deregistered from the global registry and there's no
+    //    entry for the extension in the active contextual registry.
+    //  - The entry will be deregistered from a contextual registry and there's
+    //    no entry for the extension in the global registry.
+    bool remove_if_global =
+        registry == global_registry_ &&
+        (!GetActiveContextualRegistry() ||
+         !GetActiveContextualRegistry()->GetEntryForKey(entry->key()));
+    bool remove_if_contextual = registry != global_registry_ &&
+                                !global_registry_->GetEntryForKey(entry->key());
+    if (remove_if_global || remove_if_contextual) {
+      combobox_model_->RemoveItem(entry->key());
+    }
+  } else {
+    combobox_model_->RemoveItem(entry->key());
+  }
+
   if (GetContentView()) {
     header_combobox_->SetSelectedIndex(combobox_model_->GetIndexForKey(
         GetLastActiveEntryKey().value_or(SidePanelEntry::Key(kDefaultEntry))));
@@ -645,15 +668,25 @@ void SidePanelCoordinator::OnTabStripModelChanged(
   auto* old_contextual_registry =
       SidePanelRegistry::Get(selection.old_contents);
   if (old_contextual_registry) {
-    old_contextual_registry->RemoveObserver(this);
-    combobox_model_->RemoveItems(old_contextual_registry->entries());
+    registry_observations_.RemoveObservation(old_contextual_registry);
+    std::vector<SidePanelEntry::Key> contextual_keys_to_remove;
+
+    // Only remove the previous tab's contextual entries from the combobox if
+    // they are not in the global registry.
+    for (auto const& entry : old_contextual_registry->entries()) {
+      if (!global_registry_->GetEntryForKey(entry->key())) {
+        contextual_keys_to_remove.push_back(entry->key());
+      }
+    }
+
+    combobox_model_->RemoveItems(contextual_keys_to_remove);
   }
 
   // Add the current tab's contextual registry and update the combobox.
   auto* new_contextual_registry =
       SidePanelRegistry::Get(selection.new_contents);
   if (new_contextual_registry) {
-    new_contextual_registry->AddObserver(this);
+    registry_observations_.AddObservation(new_contextual_registry);
     combobox_model_->AddItems(new_contextual_registry->entries());
   }
 

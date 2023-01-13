@@ -13,12 +13,16 @@
 #include <wrl.h>
 #include <wrl/client.h>
 
+#include <algorithm>
+#include <memory>
+#include <string>
 #include <utility>
+#include <vector>
 
-#include "base/bind.h"
 #include "base/command_line.h"
 #include "base/containers/contains.h"
 #include "base/feature_list.h"
+#include "base/functional/bind.h"
 #include "base/metrics/histogram_macros.h"
 #include "base/no_destructor.h"
 #include "base/ranges/algorithm.h"
@@ -280,12 +284,6 @@ DevicesInfo::const_iterator FindNonDirectShowDeviceInfoByNameAndModel(
 }
 
 bool IsEnclosureLocationSupported() {
-  // DeviceInformation class is only available in Win10 onwards (v10.0.10240.0).
-  if (base::win::GetVersion() < base::win::Version::WIN10) {
-    DVLOG(1) << "DeviceInformation not supported before Windows 10";
-    return false;
-  }
-
   if (!(base::win::ResolveCoreWinRTDelayload() &&
         ScopedHString::ResolveCoreWinRTStringDelayload())) {
     DLOG(ERROR) << "Failed loading functions from combase.dll";

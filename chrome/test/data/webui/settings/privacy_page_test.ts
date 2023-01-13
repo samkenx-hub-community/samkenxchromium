@@ -6,7 +6,7 @@
 import {webUIListenerCallback} from 'chrome://resources/js/cr.js';
 import {loadTimeData} from 'chrome://resources/js/load_time_data.js';
 import {flush, PolymerElement} from 'chrome://resources/polymer/v3_0/polymer/polymer_bundled.min.js';
-import {ClearBrowsingDataBrowserProxyImpl, ContentSettingsTypes, SiteSettingsPrefsBrowserProxyImpl} from 'chrome://settings/lazy_load.js';
+import {ClearBrowsingDataBrowserProxyImpl, ContentSettingsTypes, CookieControlsMode, SiteSettingsPrefsBrowserProxyImpl} from 'chrome://settings/lazy_load.js';
 import {CrLinkRowElement, CrSettingsPrefs, HatsBrowserProxyImpl, MetricsBrowserProxyImpl, PrivacyGuideInteractions, PrivacyPageBrowserProxyImpl, Route, Router, routes, SettingsPrefsElement, SettingsPrivacyPageElement, StatusAction, SyncStatus, TrustSafetyInteraction} from 'chrome://settings/settings.js';
 import {assertEquals, assertFalse, assertTrue} from 'chrome://webui-test/chai_assert.js';
 import {isChildVisible, isVisible} from 'chrome://webui-test/test_util.js';
@@ -67,8 +67,6 @@ suite('PrivacyPage', function() {
   let siteSettingsBrowserProxy: TestSiteSettingsPrefsBrowserProxy;
   let metricsBrowserProxy: TestMetricsBrowserProxy;
 
-  const testLabels: string[] = ['test label 1', 'test label 2'];
-
   suiteSetup(function() {
     loadTimeData.overrideValues({
       isPrivacySandboxRestricted: true,
@@ -86,7 +84,6 @@ suite('PrivacyPage', function() {
     PrivacyPageBrowserProxyImpl.setInstance(testBrowserProxy);
     siteSettingsBrowserProxy = new TestSiteSettingsPrefsBrowserProxy();
     SiteSettingsPrefsBrowserProxyImpl.setInstance(siteSettingsBrowserProxy);
-    siteSettingsBrowserProxy.setCookieSettingDescription(testLabels[0]!);
     metricsBrowserProxy = new TestMetricsBrowserProxy();
     MetricsBrowserProxyImpl.setInstance(metricsBrowserProxy);
 
@@ -113,13 +110,46 @@ suite('PrivacyPage', function() {
     assertTrue(!!dialog);
   });
 
-  test('CookiesLinkRowSublabel', async function() {
-    await siteSettingsBrowserProxy.whenCalled('getCookieSettingDescription');
-    flush();
-    assertEquals(page.$.cookiesLinkRow.subLabel, testLabels[0]);
+  // TODO(crbug.com/1378703): Remove the test once PrivacySandboxSettings4
+  // has been rolled out.
+  test('cookiesLinkRowLabel', function() {
+    assertTrue(Boolean(page.shadowRoot!.querySelector<HTMLElement>(
+        '#thirdPartyCookiesLinkRow')));
+    assertFalse(Boolean(
+        page.shadowRoot!.querySelector<HTMLElement>('#cookiesLinkRow')));
+    assertEquals(
+        page.i18n('thirdPartyCookiesLinkRowLabel'),
+        page.shadowRoot!
+            .querySelector<CrLinkRowElement>(
+                '#thirdPartyCookiesLinkRow')!.label);
+  });
 
-    webUIListenerCallback('cookieSettingDescriptionChanged', testLabels[1]);
-    assertEquals(page.$.cookiesLinkRow.subLabel, testLabels[1]);
+  test('cookiesLinkRowSublabel', async function() {
+    page.set(
+        'prefs.profile.cookie_controls_mode.value', CookieControlsMode.OFF);
+    assertEquals(
+        page.i18n('thirdPartyCookiesLinkRowSublabelEnabled'),
+        page.shadowRoot!
+            .querySelector<CrLinkRowElement>(
+                '#thirdPartyCookiesLinkRow')!.subLabel);
+
+    page.set(
+        'prefs.profile.cookie_controls_mode.value',
+        CookieControlsMode.INCOGNITO_ONLY);
+    assertEquals(
+        page.i18n('thirdPartyCookiesLinkRowSublabelDisabledIncognito'),
+        page.shadowRoot!
+            .querySelector<CrLinkRowElement>(
+                '#thirdPartyCookiesLinkRow')!.subLabel);
+
+    page.set(
+        'prefs.profile.cookie_controls_mode.value',
+        CookieControlsMode.BLOCK_THIRD_PARTY);
+    assertEquals(
+        page.i18n('thirdPartyCookiesLinkRowSublabelDisabled'),
+        page.shadowRoot!
+            .querySelector<CrLinkRowElement>(
+                '#thirdPartyCookiesLinkRow')!.subLabel);
   });
 
   test('ContentSettingsVisibility', async function() {
@@ -170,6 +200,9 @@ suite(`PrivacySandbox4Disabled`, function() {
   let page: SettingsPrivacyPageElement;
   let settingsPrefs: SettingsPrefsElement;
   let metricsBrowserProxy: TestMetricsBrowserProxy;
+  let siteSettingsBrowserProxy: TestSiteSettingsPrefsBrowserProxy;
+
+  const testLabels: string[] = ['test label 1', 'test label 2'];
 
   suiteSetup(function() {
     loadTimeData.overrideValues({
@@ -182,6 +215,9 @@ suite(`PrivacySandbox4Disabled`, function() {
   });
 
   setup(function() {
+    siteSettingsBrowserProxy = new TestSiteSettingsPrefsBrowserProxy();
+    SiteSettingsPrefsBrowserProxyImpl.setInstance(siteSettingsBrowserProxy);
+    siteSettingsBrowserProxy.setCookieSettingDescription(testLabels[0]!);
     metricsBrowserProxy = new TestMetricsBrowserProxy();
     MetricsBrowserProxyImpl.setInstance(metricsBrowserProxy);
     document.body.innerHTML = window.trustedTypes!.emptyHTML;
@@ -191,8 +227,43 @@ suite(`PrivacySandbox4Disabled`, function() {
     return flushTasks();
   });
 
+  test('cookiesLinkRowLabel', function() {
+    assertTrue(Boolean(
+        page.shadowRoot!.querySelector<HTMLElement>('#cookiesLinkRow')));
+    assertFalse(Boolean(page.shadowRoot!.querySelector<HTMLElement>(
+        '#thirdPartyCookiesLinkRow')));
+    assertEquals(
+        page.i18n('cookiePageTitle'),
+        page.shadowRoot!.querySelector<CrLinkRowElement>(
+                            '#cookiesLinkRow')!.label);
+  });
+
+  test('cookiesLinkRowSublabel', async function() {
+    await siteSettingsBrowserProxy.whenCalled('getCookieSettingDescription');
+    flush();
+    assertEquals(
+        testLabels[0],
+        page.shadowRoot!.querySelector<CrLinkRowElement>(
+                            '#cookiesLinkRow')!.subLabel);
+
+    webUIListenerCallback('cookieSettingDescriptionChanged', testLabels[1]);
+    assertEquals(
+        testLabels[1],
+        page.shadowRoot!.querySelector<CrLinkRowElement>(
+                            '#cookiesLinkRow')!.subLabel);
+  });
+
   test('privacySandboxRestricted', function() {
     assertTrue(isChildVisible(page, '#privacySandboxLinkRow'));
+  });
+
+  test('privacySandboxRowLabel', function() {
+    const privacySandboxLinkRow =
+        page.shadowRoot!.querySelector<CrLinkRowElement>(
+            '#privacySandboxLinkRow')!;
+    assertEquals(
+        loadTimeData.getString('privacySandboxTitle'),
+        privacySandboxLinkRow.label);
   });
 
   test('privacySandboxRowSublabel', async function() {
@@ -234,7 +305,8 @@ suite(`PrivacySandbox4Disabled`, function() {
 
   test('cookiesSubpageAttributes', async function() {
     // The subpage is only in the DOM if the corresponding route is open.
-    page.$.cookiesLinkRow.click();
+    page.shadowRoot!.querySelector<CrLinkRowElement>(
+                        '#cookiesLinkRow')!.click();
     await flushTasks();
 
     const cookiesSubpage =
@@ -275,6 +347,15 @@ suite(`PrivacySandbox4Enabled`, function() {
 
   test('privacySandboxRestricted', function() {
     assertTrue(isChildVisible(page, '#privacySandboxLinkRow'));
+  });
+
+  test('privacySandboxRowLabel', function() {
+    const privacySandboxLinkRow =
+        page.shadowRoot!.querySelector<CrLinkRowElement>(
+            '#privacySandboxLinkRow')!;
+    assertEquals(
+        loadTimeData.getString('adPrivacyLinkRowLabel'),
+        privacySandboxLinkRow.label);
   });
 
   test('privacySandboxRowSublabel', async function() {
@@ -322,18 +403,19 @@ suite(`PrivacySandbox4Enabled`, function() {
 
   test('cookiesSubpageAttributes', async function() {
     // The subpage is only in the DOM if the corresponding route is open.
-    page.$.cookiesLinkRow.click();
+    page.shadowRoot!
+        .querySelector<CrLinkRowElement>('#thirdPartyCookiesLinkRow')!.click();
     await flushTasks();
 
     const cookiesSubpage =
         page.shadowRoot!.querySelector<PolymerElement>('#cookies');
     assertTrue(!!cookiesSubpage);
     assertEquals(
-        page.i18n('privacyPageTitle'),
+        page.i18n('thirdPartyCookiesPageTitle'),
         cookiesSubpage.getAttribute('page-title'));
     const associatedControl = cookiesSubpage.get('associatedControl');
     assertTrue(!!associatedControl);
-    assertEquals('cookiesLinkRow', associatedControl.id);
+    assertEquals('thirdPartyCookiesLinkRow', associatedControl.id);
   });
 });
 
@@ -555,7 +637,8 @@ suite('HappinessTrackingSurveys', function() {
   });
 
   test('CookiesTrigger', async function() {
-    page.$.cookiesLinkRow.click();
+    page.shadowRoot!.querySelector<HTMLElement>(
+                        '#thirdPartyCookiesLinkRow')!.click();
     const interaction =
         await testHatsBrowserProxy.whenCalled('trustSafetyInteractionOccurred');
     assertEquals(TrustSafetyInteraction.USED_PRIVACY_CARD, interaction);

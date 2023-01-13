@@ -25,6 +25,7 @@
 #include "chrome/browser/net/cert_verifier_configuration.h"
 #include "chrome/browser/obsolete_system/obsolete_system.h"
 #include "chrome/browser/performance_manager/public/user_tuning/user_performance_tuning_manager.h"
+#include "chrome/browser/preloading/preloading_features.h"
 #include "chrome/browser/privacy_sandbox/privacy_sandbox_service.h"
 #include "chrome/browser/privacy_sandbox/privacy_sandbox_service_factory.h"
 #include "chrome/browser/profiles/profile.h"
@@ -71,6 +72,7 @@
 #include "components/prefs/pref_service.h"
 #include "components/privacy_sandbox/privacy_sandbox_features.h"
 #include "components/safe_browsing/core/common/safe_browsing_prefs.h"
+#include "components/services/screen_ai/buildflags/buildflags.h"
 #include "components/signin/public/base/signin_buildflags.h"
 #include "components/strings/grit/components_chromium_strings.h"
 #include "components/strings/grit/components_strings.h"
@@ -91,6 +93,7 @@
 #include "net/net_buildflags.h"
 #include "services/device/public/cpp/device_features.h"
 #include "third_party/blink/public/common/features_generated.h"
+#include "ui/accessibility/accessibility_features.h"
 #include "ui/accessibility/accessibility_switches.h"
 #include "ui/base/accelerators/accelerator.h"
 #include "ui/base/l10n/l10n_util.h"
@@ -115,7 +118,6 @@
 #include "ui/chromeos/devicetype_utils.h"
 #else  // !BUILDFLAG(IS_CHROMEOS_ASH)
 #include "chrome/browser/ui/webui/settings/system_handler.h"
-#include "ui/accessibility/accessibility_features.h"
 #endif
 
 #if BUILDFLAG(IS_CHROMEOS)
@@ -180,6 +182,7 @@ void AddCommonStrings(content::WebUIDataSource* html_source, Profile* profile) {
     {"moreActions", IDS_SETTINGS_MORE_ACTIONS},
     {"noThanks", IDS_NO_THANKS},
     {"ok", IDS_OK},
+    {"opensInNewTab", IDS_SETTINGS_OPENS_IN_NEW_TAB},
 #if !BUILDFLAG(IS_CHROMEOS_ASH)
     {"relaunchConfirmationDialogTitle", IDS_RELAUNCH_CONFIRMATION_DIALOG_TITLE},
 #endif
@@ -247,6 +250,8 @@ void AddA11yStrings(content::WebUIDataSource* html_source) {
     {"accessibleImageLabelsTitle", IDS_SETTINGS_ACCESSIBLE_IMAGE_LABELS_TITLE},
     {"accessibleImageLabelsSubtitle",
      IDS_SETTINGS_ACCESSIBLE_IMAGE_LABELS_SUBTITLE},
+    {"pdfOcrTitle", IDS_SETTINGS_PDF_OCR_TITLE},
+    {"pdfOcrSubtitle", IDS_SETTINGS_PDF_OCR_SUBTITLE},
     {"settingsSliderRoleDescription",
      IDS_SETTINGS_SLIDER_MIN_MAX_ARIA_ROLE_DESCRIPTION},
     {"caretBrowsingTitle", IDS_SETTINGS_ENABLE_CARET_BROWSING_TITLE},
@@ -269,6 +274,10 @@ void AddA11yStrings(content::WebUIDataSource* html_source) {
   html_source->AddBoolean(
       "showFocusHighlightOption",
       base::FeatureList::IsEnabled(features::kAccessibilityFocusHighlight));
+#endif
+#if BUILDFLAG(ENABLE_SCREEN_AI_SERVICE)
+  html_source->AddBoolean("pdfOcrEnabled",
+                          base::FeatureList::IsEnabled(features::kPdfOcr));
 #endif
 
   AddCaptionSubpageStrings(html_source);
@@ -405,9 +414,7 @@ void AddAppearanceStrings(content::WebUIDataSource* html_source,
                          zoom::GetPresetZoomFactorsAsJSON());
   html_source->AddBoolean("showReaderModeOption",
                           dom_distiller::OfferReaderModeInSettings());
-  html_source->AddBoolean(
-      "showSidePanelOptions",
-      base::FeatureList::IsEnabled(features::kUnifiedSidePanel));
+  html_source->AddBoolean("showSidePanelOptions", true);
 
 // TODO(crbug.com/1052397): Revisit the macro expression once build flag switch
 // of lacros-chrome is complete.
@@ -461,8 +468,6 @@ void AddClearBrowsingDataStrings(content::WebUIDataSource* html_source,
     {"passwordsDeletionDialogTitle",
      IDS_CLEAR_BROWSING_DATA_PASSWORDS_NOTICE_TITLE},
     {"passwordsDeletionDialogOK", IDS_CLEAR_BROWSING_DATA_PASSWORDS_NOTICE_OK},
-    {"installedAppsConfirm", IDS_SETTINGS_CLEAR_INSTALLED_APPS_DATA_CONFIRM},
-    {"installedAppsTitle", IDS_SETTINGS_CLEAR_INSTALLED_APPS_DATA_TITLE},
     {"notificationWarning", IDS_SETTINGS_NOTIFICATION_WARNING},
   };
 
@@ -511,40 +516,12 @@ void AddDownloadsStrings(content::WebUIDataSource* html_source) {
   static constexpr webui::LocalizedString kLocalizedStrings[] = {
       {"downloadsPageTitle", IDS_SETTINGS_DOWNLOADS},
       {"downloadLocation", IDS_SETTINGS_DOWNLOAD_LOCATION},
-      {"downloadLocalLocation", IDS_SETTINGS_DOWNLOAD_LOCAL_LOCATION},
-      {"downloadConnectionAccountTitle",
-       IDS_SETTINGS_DOWNLOAD_CONNECTION_ACCOUNT_TITLE},
-      {"downloadConnectionLearnMore",
-       IDS_SETTINGS_DOWNLOAD_CONNECTION_LEARN_MORE},
       {"changeDownloadLocation", IDS_SETTINGS_CHANGE_DOWNLOAD_LOCATION},
       {"promptForDownload", IDS_SETTINGS_PROMPT_FOR_DOWNLOAD},
       {"openFileTypesAutomatically",
        IDS_SETTINGS_OPEN_FILE_TYPES_AUTOMATICALLY},
   };
   html_source->AddLocalizedStrings(kLocalizedStrings);
-  const std::u16string kBox =
-      l10n_util::GetStringUTF16(IDS_FILE_SYSTEM_CONNECTOR_BOX);
-  html_source->AddString(
-      "downloadsConnectionTitle",
-      l10n_util::GetStringFUTF16(IDS_SETTINGS_DOWNLOAD_CONNECTION_TITLE, kBox));
-  html_source->AddString(
-      "downloadsConnectionUnlinkedMessage",
-      l10n_util::GetStringFUTF16(
-          IDS_SETTINGS_DOWNLOAD_CONNECTION_UNLINKED_MESSAGE, kBox));
-  html_source->AddString(
-      "downloadsConnectionLinkButton",
-      l10n_util::GetStringFUTF16(
-          IDS_SETTINGS_DOWNLOAD_CONNECTION_SIGN_IN_BUTTON, kBox));
-  html_source->AddString(
-      "downloadsConnectionLinkedMessage",
-      l10n_util::GetStringFUTF16(
-          IDS_SETTINGS_DOWNLOAD_CONNECTION_LINKED_MESSAGE, kBox));
-  html_source->AddString("downloadsConnectionUnlinkButton",
-                         l10n_util::GetStringUTF16(
-                             IDS_SETTINGS_DOWNLOAD_CONNECTION_SIGN_OUT_BUTTON));
-  html_source->AddString("downloadConnectionLinkedFolder",
-                         l10n_util::GetStringFUTF16(
-                             IDS_SETTINGS_DOWNLOAD_WEB_DRIVE_LOCATION, kBox));
 }
 
 #if BUILDFLAG(IS_WIN) && BUILDFLAG(GOOGLE_CHROME_BRANDING)
@@ -834,7 +811,11 @@ void AddLanguagesStrings(content::WebUIDataSource* html_source,
     {"offerToEnableTranslateSublabel",
      IDS_SETTINGS_LANGUAGES_OFFER_TO_ENABLE_TRANSLATE_SUBLABEL},
     {"noLanguagesAdded", IDS_SETTINGS_LANGUAGES_NO_LANGUAGES_ADDED},
-    {"removeLanguageAriaLabel", IDS_SETTINGS_LANGUAGES_REMOVE_ARIA_LABEL},
+    {"addLanguageAriaLabel", IDS_SETTINGS_LANGUAGES_ADD_ARIA_LABEL},
+    {"removeAutomaticLanguageAriaLabel",
+     IDS_SETTINGS_LANGUAGES_REMOVE_AUTOMATIC_ARIA_LABEL},
+    {"removeNeverLanguageAriaLabel",
+     IDS_SETTINGS_LANGUAGES_REMOVE_NEVER_ARIA_LABEL},
     {"translatePageTitle", IDS_SETTINGS_TRANSLATE_PAGE_TITLE},
     {"targetLanguageLabel", IDS_SETTINGS_TARGET_TRANSLATE_LABEL},
     {"automaticallyTranslateLanguages",
@@ -1039,6 +1020,9 @@ void AddAutofillStrings(content::WebUIDataSource* html_source,
     {"creditCardExpired", IDS_SETTINGS_CREDIT_CARD_EXPIRED},
     {"editCreditCardTitle", IDS_SETTINGS_EDIT_CREDIT_CARD_TITLE},
     {"addCreditCardTitle", IDS_SETTINGS_ADD_CREDIT_CARD_TITLE},
+    {"addPaymentMethodCreditOrDebitCard",
+     IDS_SETTINGS_ADD_PAYMENT_METHOD_CREDIT_OR_DEBIT_CARD},
+    {"addPaymentMethodIban", IDS_SETTINGS_ADD_PAYMENT_METHOD_IBAN},
     {"migrateCreditCardsLabel", IDS_SETTINGS_MIGRATABLE_CARDS_LABEL},
     {"migratableCardsInfoSingle", IDS_SETTINGS_SINGLE_MIGRATABLE_CARD_INFO},
     {"migratableCardsInfoMultiple",
@@ -1351,6 +1335,11 @@ void AddAutofillStrings(content::WebUIDataSource* html_source,
                             SyncServiceFactory::GetForProfile(profile),
                             /*is_test_mode=*/false,
                             /*log_manager=*/nullptr));
+
+  html_source->AddBoolean("showIbansSettings",
+                          base::FeatureList::IsEnabled(
+                              autofill::features::kAutofillFillIbanFields));
+
   html_source->AddBoolean(
       "fidoAuthenticationAvailableForAutofill",
       IsFidoAuthenticationAvailable(personal_data, web_contents));
@@ -1360,6 +1349,11 @@ void AddAutofillStrings(content::WebUIDataSource* html_source,
       "undoDescription",
       l10n_util::GetStringFUTF16(IDS_UNDO_DESCRIPTION,
                                  undo_accelerator.GetShortcutText()));
+
+  html_source->AddBoolean(
+      "removeCardExpirationAndTypeTitles",
+      base::FeatureList::IsEnabled(
+          autofill::features::kAutofillRemoveCardExpirationAndTypeTitles));
 
   html_source->AddBoolean("showUpiIdSettings",
                           base::FeatureList::IsEnabled(
@@ -1661,10 +1655,7 @@ void AddPeopleStrings(content::WebUIDataSource* html_source, Profile* profile) {
 }
 
 bool ShouldLinkSecureDnsOsSettings() {
-#if BUILDFLAG(IS_CHROMEOS_ASH)
-  return base::FeatureList::IsEnabled(ash::features::kEnableDnsProxy) &&
-         base::FeatureList::IsEnabled(::features::kDnsProxyEnableDOH);
-#elif BUILDFLAG(IS_CHROMEOS_LACROS)
+#if BUILDFLAG(IS_CHROMEOS)
   return true;
 #else
   return false;
@@ -1774,6 +1765,32 @@ void AddPrivacyStrings(content::WebUIDataSource* html_source,
      IDS_SETTINGS_NETWORK_PREDICTION_ENABLED_DESC},
     {"networkPredictionEnabledDescCookiesPage",
      IDS_SETTINGS_NETWORK_PREDICTION_ENABLED_DESC_COOKIES_PAGE},
+    {"preloadingPageTitle", IDS_SETTINGS_PRELOAD_PAGES_TITLE},
+    {"preloadingPageSummary", IDS_SETTINGS_PRELOAD_PAGES_SUMMARY},
+    {"preloadingPageNoPreloadingTitle",
+     IDS_SETTINGS_PRELOAD_PAGES_NO_PRELOADING_TITLE},
+    {"preloadingPageNoPreloadingSummary",
+     IDS_SETTINGS_PRELOAD_PAGES_NO_PRELOADING_SUMMARY},
+    {"preloadingPageStandardPreloadingTitle",
+     IDS_SETTINGS_PRELOAD_PAGES_STANDARD_PRELOADING_TITLE},
+    {"preloadingPageStandardPreloadingSummary",
+     IDS_SETTINGS_PRELOAD_PAGES_STANDARD_PRELOADING_SUMMARY},
+    {"preloadingPageStandardPreloadingWhenOnBulletOne",
+     IDS_SETTINGS_PRELOAD_PAGES_STANDARD_PRELOADING_WHEN_ON_BULLET_ONE},
+    {"preloadingPageStandardPreloadingWhenOnBulletTwo",
+     IDS_SETTINGS_PRELOAD_PAGES_STANDARD_PRELOADING_WHEN_ON_BULLET_TWO},
+    {"preloadingPageExtendedPreloadingTitle",
+     IDS_SETTINGS_PRELOAD_PAGES_EXTENDED_PRELOADING_TITLE},
+    {"preloadingPageExtendedPreloadingSummary",
+     IDS_SETTINGS_PRELOAD_PAGES_EXTENDED_PRELOADING_SUMMARY},
+    {"preloadingPageExtendedPreloadingWhenOnBulletOne",
+     IDS_SETTINGS_PRELOAD_PAGES_EXTENDED_PRELOADING_WHEN_ON_BULLET_ONE},
+    {"preloadingPageExtendedPreloadingWhenOnBulletTwo",
+     IDS_SETTINGS_PRELOAD_PAGES_EXTENDED_PRELOADING_WHEN_ON_BULLET_TWO},
+    {"preloadingPageExtendedPreloadingThingsToConsiderBulletTwo",
+     IDS_SETTINGS_PRELOAD_PAGES_EXTENDED_PRELOADING_THINGS_TO_CONSIDER_BULLET_TWO},
+    {"preloadingPageThingsToConsiderBulletOne",
+     IDS_SETTINGS_PRELOAD_PAGES_THINGS_TO_CONSIDER_BULLET_ONE},
 #if BUILDFLAG(IS_CHROMEOS)
     {"openChromeOSSecureDnsSettingsLabel",
      IDS_SETTINGS_SECURE_DNS_OPEN_CHROME_OS_SETTINGS_LABEL},
@@ -1792,6 +1809,9 @@ void AddPrivacyStrings(content::WebUIDataSource* html_source,
   html_source->AddString("cookiesSettingsHelpCenterURL",
                          chrome::kCookiesSettingsHelpCenterURL);
 
+  html_source->AddString("firstPartySetsLearnMoreURL",
+                         chrome::kFirstPartySetsLearnMoreURL);
+
   html_source->AddString("safeBrowsingHelpCenterURL",
                          chrome::kSafeBrowsingHelpCenterURL);
 
@@ -1806,9 +1826,6 @@ void AddPrivacyStrings(content::WebUIDataSource* html_source,
   html_source->AddString(
       "exceptionsLearnMoreURL",
       base::ASCIIToUTF16(chrome::kContentSettingsExceptionsLearnMoreURL));
-  html_source->AddBoolean(
-      "installedAppsInCbd",
-      base::FeatureList::IsEnabled(features::kInstalledAppsInCbd));
   html_source->AddBoolean(
       "driveSuggestAvailable",
       base::FeatureList::IsEnabled(omnibox::kDocumentProvider));
@@ -1851,6 +1868,10 @@ void AddPrivacyStrings(content::WebUIDataSource* html_source,
       advanced_protection_url, "utm_campaign", "ChromeSettings");
   html_source->AddString("advancedProtectionURL",
                          advanced_protection_url.spec());
+
+  html_source->AddBoolean("showPreloadingSubPage",
+                          base::FeatureList::IsEnabled(
+                              features::kPreloadingDesktopSettingsSubPage));
 
   AddPersonalizationOptionsStrings(html_source);
   AddSecureDnsStrings(html_source);
@@ -1999,8 +2020,8 @@ void AddPrivacySandboxStrings(content::WebUIDataSource* html_source,
        IDS_SETTINGS_TOPICS_PAGE_CURRENT_TOPICS_HEADING},
       {"topicsPageCurrentTopicsDescription",
        IDS_SETTINGS_TOPICS_PAGE_CURRENT_TOPICS_DESCRIPTION},
-      {"topicsPageCurrentTopicsDescriptionLearnMore",
-       IDS_SETTINGS_TOPICS_PAGE_CURRENT_TOPICS_DESCRIPTION_LEARN_MORE},
+      {"topicsPageCurrentTopicsDescriptionLearnMoreLink",
+       IDS_SETTINGS_TOPICS_PAGE_CURRENT_TOPICS_DESCRIPTION_LEARN_MORE_LINK},
       {"topicsPageLearnMoreHeading",
        IDS_SETTINGS_TOPICS_PAGE_LEARN_MORE_HEADING},
       {"topicsPageLearnMoreBullet1",
@@ -2014,6 +2035,8 @@ void AddPrivacySandboxStrings(content::WebUIDataSource* html_source,
       {"topicsPageCurrentTopicsDescriptionEmpty",
        IDS_SETTINGS_TOPICS_PAGE_CURRENT_TOPICS_DESCRIPTION_EMPTY},
       {"topicsPageBlockTopic", IDS_SETTINGS_TOPICS_PAGE_BLOCK_TOPIC},
+      {"topicsPageBlockTopicA11yLabel",
+       IDS_SETTINGS_TOPICS_PAGE_BLOCK_TOPIC_A11Y_LABEL},
       {"topicsPageBlockedTopicsHeading",
        IDS_SETTINGS_TOPICS_PAGE_BLOCKED_TOPICS_HEADING},
       {"topicsPageBlockedTopicsDescription",
@@ -2021,7 +2044,10 @@ void AddPrivacySandboxStrings(content::WebUIDataSource* html_source,
       {"topicsPageBlockedTopicsDescriptionEmpty",
        IDS_SETTINGS_TOPICS_PAGE_BLOCKED_TOPICS_DESCRIPTION_EMPTY},
       {"topicsPageAllowTopic", IDS_SETTINGS_TOPICS_PAGE_ALLOW_TOPIC},
-      {"topicsPageFooter", IDS_SETTINGS_TOPICS_PAGE_FOOTER},
+      {"topicsPageAllowTopicA11yLabel",
+       IDS_SETTINGS_TOPICS_PAGE_ALLOW_TOPIC_A11Y_LABEL},
+      {"topicsPageCurrentTopicsDescriptionLearnMoreA11yLabel",
+       IDS_SETTINGS_TOPICS_PAGE_CURRENT_TOPICS_DESCRIPTION_LEARN_MORE_A11Y_LABEL},
       {"fledgePageTitle", IDS_SETTINGS_FLEDGE_PAGE_TITLE},
       {"fledgePageToggleLabel", IDS_SETTINGS_FLEDGE_PAGE_TOGGLE_LABEL},
       {"fledgePageToggleSubLabel", IDS_SETTINGS_FLEDGE_PAGE_TOGGLE_SUB_LABEL},
@@ -2035,6 +2061,30 @@ void AddPrivacySandboxStrings(content::WebUIDataSource* html_source,
        IDS_SETTINGS_FLEDGE_PAGE_CURRENT_SITES_DESCRIPTION_DISABLED},
       {"fledgePageCurrentSitesDescriptionEmpty",
        IDS_SETTINGS_FLEDGE_PAGE_CURRENT_SITES_DESCRIPTION_EMPTY},
+      {"fledgePageSeeAllSitesLabel",
+       IDS_SETTINGS_FLEDGE_PAGE_SEE_ALL_SITES_LABEL},
+      {"fledgePageBlockSite", IDS_SETTINGS_FLEDGE_PAGE_BLOCK_SITE},
+      {"fledgePageBlockSiteA11yLabel",
+       IDS_SETTINGS_FLEDGE_PAGE_BLOCK_SITE_A11Y_LABEL},
+      {"fledgePageBlockedSitesHeading",
+       IDS_SETTINGS_FLEDGE_PAGE_BLOCKED_SITES_HEADING},
+      {"fledgePageBlockedSitesDescription",
+       IDS_SETTINGS_FLEDGE_PAGE_BLOCKED_SITES_DESCRIPTION},
+      {"fledgePageBlockedSitesDescriptionEmpty",
+       IDS_SETTINGS_FLEDGE_PAGE_BLOCKED_SITES_DESCRIPTION_EMPTY},
+      {"fledgePageAllowSite", IDS_SETTINGS_FLEDGE_PAGE_ALLOW_SITE},
+      {"fledgePageAllowSiteA11yLabel",
+       IDS_SETTINGS_FLEDGE_PAGE_ALLOW_SITE_A11Y_LABEL},
+      {"fledgePageLearnMoreHeading",
+       IDS_SETTINGS_FLEDGE_PAGE_LEARN_MORE_HEADING},
+      {"fledgePageLearnMoreBullet1",
+       IDS_SETTINGS_FLEDGE_PAGE_LEARN_MORE_BULLET_1},
+      {"fledgePageLearnMoreBullet2",
+       IDS_SETTINGS_FLEDGE_PAGE_LEARN_MORE_BULLET_2},
+      {"fledgePageLearnMoreBullet3",
+       IDS_SETTINGS_FLEDGE_PAGE_LEARN_MORE_BULLET_3},
+      {"fledgePageCurrentSitesDescriptionLearnMoreA11yLabel",
+       IDS_SETTINGS_FLEDGE_PAGE_CURRENT_SITES_DESCRIPTION_LEARN_MORE_A11Y_LABEL},
       {"adMeasurementPageTitle", IDS_SETTINGS_AD_MEASUREMENT_PAGE_TITLE},
       {"adMeasurementPageToggleLabel",
        IDS_SETTINGS_AD_MEASUREMENT_PAGE_TOGGLE_LABEL},
@@ -2048,8 +2098,14 @@ void AddPrivacySandboxStrings(content::WebUIDataSource* html_source,
        IDS_SETTINGS_AD_MEASUREMENT_PAGE_ENABLED_BULLET_1},
       {"adMeasurementPageEnabledBullet2",
        IDS_SETTINGS_AD_MEASUREMENT_PAGE_ENABLED_BULLET_2},
+      {"adMeasurementPageEnabledBullet3",
+       IDS_SETTINGS_AD_MEASUREMENT_PAGE_ENABLED_BULLET_3},
       {"adMeasurementPageConsiderBullet1",
        IDS_SETTINGS_AD_MEASUREMENT_PAGE_CONSIDER_BULLET_1},
+      {"adMeasurementPageConsiderBullet2",
+       IDS_SETTINGS_AD_MEASUREMENT_PAGE_CONSIDER_BULLET_2},
+      {"adMeasurementPageConsiderBullet3",
+       IDS_SETTINGS_AD_MEASUREMENT_PAGE_CONSIDER_BULLET_3},
 
   };
   html_source->AddLocalizedStrings(kLocalizedStrings);
@@ -2059,6 +2115,20 @@ void AddPrivacySandboxStrings(content::WebUIDataSource* html_source,
       l10n_util::GetStringFUTF16(
           IDS_SETTINGS_PRIVACY_SANDBOX_AD_MEASUREMENT_DIALOG_CONTROL_MEASUREMENT,
           base::ASCIIToUTF16(chrome::kChromeUIHistoryURL)));
+  // Topics and fledge both link to the cookies setting page and cross-link
+  // each other in the footers.
+  html_source->AddString(
+      "topicsPageFooter",
+      l10n_util::GetStringFUTF16(
+          IDS_SETTINGS_TOPICS_PAGE_FOOTER,
+          base::ASCIIToUTF16(chrome::kChromeUIPrivacySandboxFledgeURL),
+          base::ASCIIToUTF16(chrome::kChromeUICookieSettingsURL)));
+  html_source->AddString(
+      "fledgePageFooter",
+      l10n_util::GetStringFUTF16(
+          IDS_SETTINGS_FLEDGE_PAGE_FOOTER,
+          base::ASCIIToUTF16(chrome::kChromeUIPrivacySandboxTopicsURL),
+          base::ASCIIToUTF16(chrome::kChromeUICookieSettingsURL)));
   html_source->AddBoolean(
       "firstPartySetsUIEnabled",
       base::FeatureList::IsEnabled(
@@ -2416,6 +2486,52 @@ void AddSiteSettingsStrings(content::WebUIDataSource* html_source,
      IDS_SETTINGS_SITE_SETTINGS_RECENT_ACTIVITY},
     {"siteSettingsCategoryCamera", IDS_SITE_SETTINGS_TYPE_CAMERA},
     {"siteSettingsCameraLabel", IDS_SITE_SETTINGS_TYPE_CAMERA},
+    {"thirdPartyCookiesPageTitle", IDS_SETTINGS_THIRD_PARTY_COOKIES_PAGE_TITLE},
+    {"thirdPartyCookiesLinkRowLabel",
+     IDS_SETTINGS_THIRD_PARTY_COOKIES_LINK_ROW_LABEL},
+    {"thirdPartyCookiesLinkRowSublabelEnabled",
+     IDS_SETTINGS_THIRD_PARTY_COOKIES_LINK_ROW_SUB_LABEL_ENABLED},
+    {"thirdPartyCookiesLinkRowSublabelDisabledIncognito",
+     IDS_SETTINGS_THIRD_PARTY_COOKIES_LINK_ROW_SUB_LABEL_DISABLED_INCOGNITO},
+    {"thirdPartyCookiesLinkRowSublabelDisabled",
+     IDS_SETTINGS_THIRD_PARTY_COOKIES_LINK_ROW_SUB_LABEL_DISABLED},
+    {"thirdPartyCookiesPageAllowRadioLabel",
+     IDS_SETTINGS_THIRD_PARTY_COOKIES_PAGE_ALLOW_RADIO_LABEL},
+    {"thirdPartyCookiesPageAllowExpandA11yLabel",
+     IDS_SETTINGS_THIRD_PARTY_COOKIES_PAGE_ALLOW_EXPAND_A11Y_LABEL},
+    {"thirdPartyCookiesPageAllowBulOne",
+     IDS_SETTINGS_THIRD_PARTY_COOKIES_PAGE_ALLOW_BULLET_1},
+    {"thirdPartyCookiesPageAllowBulTwo",
+     IDS_SETTINGS_THIRD_PARTY_COOKIES_PAGE_ALLOW_BULLET_2},
+    {"thirdPartyCookiesPageBlockIncognitoRadioLabel",
+     IDS_SETTINGS_THIRD_PARTY_COOKIES_PAGE_BLOCK_INCOGNITO_RADIO_LABEL},
+    {"thirdPartyCookiesPageBlockIncognitoExpandA11yLabel",
+     IDS_SETTINGS_THIRD_PARTY_COOKIES_PAGE_BLOCK_INCOGNITO_EXPAND_A11Y_LABEL},
+    {"thirdPartyCookiesPageBlockIncognitoBulOne",
+     IDS_SETTINGS_THIRD_PARTY_COOKIES_PAGE_BLOCK_INCOGNITO_BULLET_1},
+    {"thirdPartyCookiesPageBlockIncognitoBulTwo",
+     IDS_SETTINGS_THIRD_PARTY_COOKIES_PAGE_BLOCK_INCOGNITO_BULLET_2},
+    {"thirdPartyCookiesPageBlockRadioLabel",
+     IDS_SETTINGS_THIRD_PARTY_COOKIES_PAGE_BLOCK_RADIO_LABEL},
+    {"thirdPartyCookiesPageBlockExpandA11yLabel",
+     IDS_SETTINGS_THIRD_PARTY_COOKIES_PAGE_BLOCK_EXPAND_A11Y_LABEL},
+    {"thirdPartyCookiesPageBlockBulOne",
+     IDS_SETTINGS_THIRD_PARTY_COOKIES_PAGE_BLOCK_BULLET_1},
+    {"thirdPartyCookiesPageBlockBulTwo",
+     IDS_SETTINGS_THIRD_PARTY_COOKIES_PAGE_BLOCK_BULLET_2},
+
+    {"thirdPartyCookiesPageDescription",
+     IDS_SETTINGS_THIRD_PARTY_COOKIES_PAGE_DESCRIPTION},
+    {"thirdPartyCookiesPageDefaultBehaviorHeading",
+     IDS_SETTINGS_THIRD_PARTY_COOKIES_PAGE_DEFAULT_BEHAVIOR_HEADING},
+    {"thirdPartyCookiesPageDefaultBehaviorDescription",
+     IDS_SETTINGS_THIRD_PARTY_COOKIES_PAGE_DEFAULT_BEHAVIOR_DESCRIPTION},
+    {"thirdPartyCookiesPageCustomizedBehaviorHeading",
+     IDS_SETTINGS_THIRD_PARTY_COOKIES_PAGE_CUSTOMIZED_BEHAVIOR_HEADING},
+    {"thirdPartyCookiesPageCustomizedBehaviorDescription",
+     IDS_SETTINGS_THIRD_PARTY_COOKIES_PAGE_CUSTOMIZED_BEHAVIOR_DESCRIPTION},
+    {"thirdPartyCookiesPageAllowExceptionsSubHeading",
+     IDS_SETTINGS_THIRD_PARTY_COOKIES_PAGE_ALLOW_EXCEPTIONS_SUB_HEADING},
     {"cookiePageTitle", IDS_SETTINGS_COOKIES_PAGE},
     {"cookiePageGeneralControls", IDS_SETTINGS_COOKIES_CONTROLS},
     {"cookiePageAllowAll", IDS_SETTINGS_COOKIES_ALLOW_ALL},
@@ -2431,6 +2547,8 @@ void AddSiteSettingsStrings(content::WebUIDataSource* html_source,
      IDS_SETTINGS_COOKIES_BLOCK_THIRD_PARTY_INCOGNITO_BULLET_ONE},
     {"cookiePageBlockThirdIncognitoBulTwo",
      IDS_SETTINGS_COOKIES_BLOCK_THIRD_PARTY_INCOGNITO_BULLET_TWO},
+    {"cookiePageBlockThirdIncognitoBulTwoFps",
+     IDS_SETTINGS_COOKIES_BLOCK_THIRD_PARTY_INCOGNITO_BULLET_TWO_FPS},
     {"cookiePageBlockThird", IDS_SETTINGS_COOKIES_BLOCK_THIRD_PARTY},
     {"cookiePageBlockThirdExpandA11yLabel",
      IDS_SETTINGS_COOKIES_BLOCK_THIRD_PARTY_EXPAND_A11Y_LABEL},
@@ -3143,6 +3261,12 @@ void AddSiteSettingsStrings(content::WebUIDataSource* html_source,
      IDS_SETTINGS_SITE_SETTINGS_IDLE_DETECTION_BLOCK},
     {"siteSettingsExtensionIdDescription",
      IDS_SETTINGS_SITE_SETTINGS_EXTENSION_ID_DESCRIPTION},
+    {"siteSettingsSiteDataAllowedSubLabel",
+     IDS_SETTINGS_SITE_SETTINGS_PAGE_SITE_DATA_ALLOWED_SUB_LABEL},
+    {"siteSettingsSiteDataBlockedSubLabel",
+     IDS_SETTINGS_SITE_SETTINGS_PAGE_SITE_DATA_BLOCKED_SUB_LABEL},
+    {"siteSettingsSiteDataClearOnExitSubLabel",
+     IDS_SETTINGS_SITE_SETTINGS_PAGE_SITE_DATA_CLEAR_ON_EXIT_SUB_LABEL},
   };
   html_source->AddLocalizedStrings(kLocalizedStrings);
 
@@ -3199,6 +3323,49 @@ void AddSiteSettingsStrings(content::WebUIDataSource* html_source,
 
   // The exception placeholder should not be translated. See crbug.com/1095878.
   html_source->AddString("addSiteExceptionPlaceholder", "[*.]example.com");
+}
+
+void AddSiteDataPageStrings(content::WebUIDataSource* html_source,
+                            Profile* profile) {
+  static constexpr webui::LocalizedString kLocalizedStrings[] = {
+      {"siteDataPageTitle", IDS_SETTINGS_SITE_DATA_PAGE_TITLE},
+      {"siteDataPageDescription", IDS_SETTINGS_SITE_DATA_PAGE_DESCRIPTION},
+      {"siteDataPageDefaultBehavior",
+       IDS_SETTINGS_SITE_DATA_PAGE_DEFAULT_BEHAVIOR_HEADING},
+      {"siteDataPagedefaultBehaviorDescription",
+       IDS_SETTINGS_SITE_DATA_PAGE_DEFAULT_BEHAVIOR_DESCRIPTION},
+      {"siteDataPageAllowRadioLabel",
+       IDS_SETTINGS_SITE_DATA_PAGE_ALLOW_RADIO_LABEL},
+      {"siteDataPageAllowRadioSubLabel",
+       IDS_SETTINGS_SITE_DATA_PAGE_ALLOW_RADIO_SUB_LABEL},
+      {"siteDataPageClearOnExitRadioLabel",
+       IDS_SETTINGS_SITE_DATA_PAGE_CLEAR_ON_EXIT_RADIO_LABEL},
+      {"siteDataPageClearOnExitRadioSubLabel",
+       IDS_SETTINGS_SITE_DATA_PAGE_CLEAR_ON_EXIT_RADIO_SUBLABEL},
+      {"siteDataPageBlockRadioLabel",
+       IDS_SETTINGS_SITE_DATA_PAGE_BLOCK_RADIO_LABEL},
+      {"siteDataPageBlockRadioSublabel",
+       IDS_SETTINGS_SITE_DATA_PAGE_BLOCK_RADIO_SUB_LABEL},
+      {"siteDataPageCustomizedBehaviorHeading",
+       IDS_SETTINGS_SITE_DATA_PAGE_CUSTOMIZED_BEHAVIOR_HEADING},
+      {"siteDataPageCustomizedBehaviorDescription",
+       IDS_SETTINGS_SITE_DATA_PAGE_CUSTOMIZED_BEHAVIOR_DESCRIPTION},
+      {"siteDataPageAllowExceptionsSubHeading",
+       IDS_SETTINGS_SITE_DATA_PAGE_ALLOW_EXCEPTIONS_SUB_HEADING},
+      {"siteDataPageClearOnExitExceptionsSubHeading",
+       IDS_SETTINGS_SITE_DATA_PAGE_CLEAR_ON_EXIT_EXCEPTIONS_SUB_HEADING},
+      {"siteDataPageBlockExceptionsSubHeading",
+       IDS_SETTINGS_SITE_DATA_PAGE_BLOCK_EXCEPTIONS_SUB_HEADING},
+      {"siteDataPageBlockConfirmDialogTitle",
+       IDS_SETTINGS_SITE_DATA_PAGE_BLOCK_CONFIRM_DIALOG_TITLE},
+      {"siteDataPageBlockConfirmDialogDescription",
+       IDS_SETTINGS_SITE_DATA_PAGE_BLOCK_CONFIRM_DIALOG_DESCRIPTION},
+      {"siteDataPageBlockConfirmDialogConfirmButton",
+       IDS_SETTINGS_SITE_DATA_PAGE_BLOCK_CONFIRM_DIALOG_CONFIRM_BUTTON},
+      {"siteDataPageBlockConfirmDialogCancelButton",
+       IDS_SETTINGS_SITE_DATA_PAGE_BLOCK_CONFIRM_DIALOG_CANCEL_BUTTON},
+  };
+  html_source->AddLocalizedStrings(kLocalizedStrings);
 }
 
 #if !BUILDFLAG(IS_CHROMEOS_ASH)
@@ -3421,6 +3588,7 @@ void AddLocalizedStrings(content::WebUIDataSource* html_source,
   AddSearchInSettingsStrings(html_source);
   AddSearchStrings(html_source);
   AddSiteSettingsStrings(html_source, profile);
+  AddSiteDataPageStrings(html_source, profile);
 
 #if !BUILDFLAG(IS_CHROMEOS)
   AddDefaultBrowserStrings(html_source);

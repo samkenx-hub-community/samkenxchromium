@@ -24,7 +24,6 @@ import("//third_party/closure_compiler/compile_js.gni")
 import("//tools/grit/grit_rule.gni")
 import("//tools/grit/preprocess_if_expr.gni")
 import("//tools/typescript/ts_library.gni")
-import("//tools/v8_context_snapshot/v8_context_snapshot.gni")
 import("//v8/gni/v8.gni")
 
 if (is_android) {
@@ -47,8 +46,6 @@ static_library("test_support") {
     "../browser/accessibility/test_browser_accessibility_delegate.h",
     "../browser/aggregation_service/aggregation_service_test_utils.cc",
     "../browser/aggregation_service/aggregation_service_test_utils.h",
-    "../browser/attribution_reporting/attribution_insecure_random_generator.cc",
-    "../browser/attribution_reporting/attribution_insecure_random_generator.h",
     "../browser/attribution_reporting/attribution_interop_parser.cc",
     "../browser/attribution_reporting/attribution_interop_parser.h",
     "../browser/attribution_reporting/attribution_parser_test_utils.cc",
@@ -95,8 +92,8 @@ static_library("test_support") {
     "../browser/renderer_host/input/mock_input_router.h",
     "../browser/renderer_host/mock_render_widget_host.cc",
     "../browser/renderer_host/mock_render_widget_host.h",
-    "../browser/screen_enumeration/screen_details_test_utils.cc",
-    "../browser/screen_enumeration/screen_details_test_utils.h",
+    "../browser/screen_details/screen_details_test_utils.cc",
+    "../browser/screen_details/screen_details_test_utils.h",
     "../browser/service_worker/embedded_worker_test_helper.cc",
     "../browser/service_worker/embedded_worker_test_helper.h",
     "../browser/service_worker/fake_embedded_worker_instance_client.cc",
@@ -773,6 +770,7 @@ if (is_fuchsia) {
       ":fuchsia_telemetry_test_data",
       ":telemetry_gpu_integration_test_data",
       "//base:base_perftests",
+      "//chrome/test:sync_performance_tests",
       "//testing:run_perf_test",
       "//tools/perf/:perf",
     ]
@@ -1338,7 +1336,6 @@ test("content_browsertests") {
     "../browser/media/webaudio/audio_context_manager_browsertest.cc",
     "../browser/message_port_provider_browsertest.cc",
     "../browser/mojo_sandbox_browsertest.cc",
-    "../browser/native_io/native_io_manager_browsertest.cc",
     "../browser/navigation_browsertest.cc",
     "../browser/navigation_mhtml_browsertest.cc",
     "../browser/net_info_browsertest.cc",
@@ -1431,7 +1428,7 @@ test("content_browsertests") {
     "../browser/renderer_host/sec_fetch_browsertest.cc",
     "../browser/renderer_host/unassigned_site_instance_browsertest.cc",
     "../browser/resource_loading_browsertest.cc",
-    "../browser/screen_enumeration/screen_details_browsertest.cc",
+    "../browser/screen_details/screen_details_browsertest.cc",
     "../browser/screen_orientation/screen_orientation_browsertest.cc",
     "../browser/security_exploit_browsertest.cc",
     "../browser/service_process_host_browsertest.cc",
@@ -2135,7 +2132,6 @@ test("content_unittests") {
     "../browser/attribution_reporting/attribution_data_host_manager_impl_unittest.cc",
     "../browser/attribution_reporting/attribution_debug_report_unittest.cc",
     "../browser/attribution_reporting/attribution_host_unittest.cc",
-    "../browser/attribution_reporting/attribution_insecure_random_generator_unittest.cc",
     "../browser/attribution_reporting/attribution_interop_parser_unittest.cc",
     "../browser/attribution_reporting/attribution_interop_unittest.cc",
     "../browser/attribution_reporting/attribution_manager_impl_unittest.cc",
@@ -2318,7 +2314,6 @@ test("content_unittests") {
     "../browser/metrics/histograms_monitor_unittest.cc",
     "../browser/mojo_binder_policy_applier_unittest.cc",
     "../browser/mojo_binder_policy_map_impl_unittest.cc",
-    "../browser/native_io/native_io_manager_unittest.cc",
     "../browser/network/cross_origin_embedder_policy_reporter_unittest.cc",
     "../browser/network/cross_origin_opener_policy_reporter_unittest.cc",
     "../browser/network/network_quality_observer_impl_unittest.cc",
@@ -2529,10 +2524,13 @@ test("content_unittests") {
     "../browser/web_package/web_bundle_url_loader_factory_unittest.cc",
     "../browser/web_package/web_bundle_utils_unittest.cc",
     "../browser/webid/federated_auth_request_impl_logout_unittest.cc",
+    "../browser/webid/federated_auth_request_impl_multiple_frames_unittest.cc",
     "../browser/webid/federated_auth_request_impl_unittest.cc",
     "../browser/webid/idp_network_request_manager_unittest.cc",
     "../browser/webid/test/delegated_idp_network_request_manager.cc",
     "../browser/webid/test/delegated_idp_network_request_manager.h",
+    "../browser/webid/test/federated_auth_request_request_token_callback_helper.cc",
+    "../browser/webid/test/federated_auth_request_request_token_callback_helper.h",
     "../browser/webid/test/mock_api_permission_delegate.cc",
     "../browser/webid/test/mock_api_permission_delegate.h",
     "../browser/webid/test/mock_identity_request_dialog_controller.cc",
@@ -2576,6 +2574,7 @@ test("content_unittests") {
     "../common/input/event_with_latency_info_unittest.cc",
     "../common/input/gesture_event_stream_validator_unittest.cc",
     "../common/input/touch_event_stream_validator_unittest.cc",
+    "../common/pseudonymization_salt_unittest.cc",
     "../common/url_utils_unittest.cc",
     "../common/user_agent_unittest.cc",
     "../common/webid/identity_url_loader_throttle_unittest.cc",
@@ -2589,6 +2588,7 @@ test("content_unittests") {
     "../renderer/accessibility/ax_image_stopwords_unittest.cc",
     "../renderer/content_security_policy_util_unittest.cc",
     "../renderer/media/batching_media_log_unittest.cc",
+    "../renderer/media/gpu/gpu_video_accelerator_factories_impl_unittest.cc",
     "../renderer/media/inspector_media_event_handler_unittest.cc",
     "../renderer/media/renderer_webaudiodevice_impl_unittest.cc",
     "../renderer/render_thread_impl_unittest.cc",
@@ -2758,6 +2758,7 @@ test("content_unittests") {
     "//gin",
     "//gpu",
     "//gpu:test_support",
+    "//gpu/ipc/common:test_support",
     "//gpu/ipc/host",
     "//gpu/ipc/service",
     "//ipc:test_support",
@@ -2789,6 +2790,7 @@ test("content_unittests") {
     "//services/video_capture/public/cpp:mocks",
     "//services/video_capture/public/mojom",
     "//services/video_capture/public/mojom:constants",
+    "//services/viz/public/cpp/gpu",
     "//skia",
     "//sql",
     "//sql:test_support",
@@ -2843,6 +2845,12 @@ test("content_unittests") {
     "//testing/buildbot/filters:content_unittests_filters",
     "//third_party/mesa_headers",
   ]
+
+  # Platforms where sqlite_dev_shell is defined.
+  if (is_win || is_mac || is_linux || is_chromeos) {
+    sources += [ "../browser/attribution_reporting/attribution_storage_sql_query_plans_unittest.cc" ]
+    deps += [ "../browser/attribution_reporting:sqlite_test_utils" ]
+  }
 
   if (is_chromeos_lacros) {
     deps += [
@@ -2940,7 +2948,6 @@ test("content_unittests") {
       "../browser/renderer_host/direct_manipulation_test_helper_win.cc",
       "../browser/renderer_host/direct_manipulation_test_helper_win.h",
       "../browser/renderer_host/direct_manipulation_win_unittest.cc",
-      "../browser/renderer_host/dwrite_font_lookup_table_builder_win_unittest.cc",
       "../browser/renderer_host/dwrite_font_proxy_impl_win_unittest.cc",
       "../browser/screenlock_monitor/screenlock_monitor_device_source_win_unittest.cc",
       "../child/dwrite_font_proxy/dwrite_font_proxy_win_unittest.cc",
@@ -2965,7 +2972,6 @@ test("content_unittests") {
   if (is_mac) {
     deps += [
       "//sandbox/mac:seatbelt",
-      "//third_party/mozilla",
       "//third_party/ocmock",
       "//ui/accelerated_widget_mac",
       "//ui/base/mojom",
@@ -3022,6 +3028,7 @@ test("content_unittests") {
       "//build/config/freetype",
       "//components/download/internal/common:internal_java",
       "//content/public/android:content_java",
+      "//gin:v8_snapshot_assets",
       "//gpu/command_buffer/service:android_texture_owner_test_support",
       "//services/data_decoder/public/cpp/android:safe_json_java",
       "//third_party/blink/public/common",
@@ -3029,18 +3036,11 @@ test("content_unittests") {
       "//ui/android:android",
     ]
 
-    if (use_v8_context_snapshot) {
-      deps += [ "//tools/v8_context_snapshot:v8_context_snapshot_assets" ]
-    } else {
-      deps += [ "//v8:v8_external_startup_data_assets" ]
-    }
-
     defines += [ "APPCACHE_USE_SIMPLE_CACHE" ]
   } else {
     # Non-Android.
     sources += [
       "../browser/devtools/protocol/webauthn_handler_unittest.cc",
-      "../browser/direct_sockets/direct_sockets_udp_unittest.cc",
       "../browser/direct_sockets/direct_sockets_unittest.cc",
       "../browser/host_zoom_map_impl_unittest.cc",
       "../browser/serial/serial_unittest.cc",

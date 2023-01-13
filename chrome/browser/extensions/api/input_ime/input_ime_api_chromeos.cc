@@ -53,8 +53,6 @@ namespace SetAssistiveWindowProperties =
 namespace SetAssistiveWindowButtonHighlighted =
     extensions::api::input_ime::SetAssistiveWindowButtonHighlighted;
 namespace ClearComposition = extensions::api::input_ime::ClearComposition;
-namespace OnCompositionBoundsChanged =
-    extensions::api::input_method_private::OnCompositionBoundsChanged;
 namespace OnScreenProjectionChanged =
     extensions::api::input_method_private::OnScreenProjectionChanged;
 namespace FinishComposingText =
@@ -408,37 +406,6 @@ class ImeObserverChromeOS
     DispatchEventToExtension(extensions::events::INPUT_IME_ON_DEACTIVATED,
                              input_ime::OnDeactivated::kEventName,
                              std::move(args));
-  }
-
-  void OnCompositionBoundsChanged(
-      const std::vector<gfx::Rect>& bounds) override {
-    if (bounds.empty() || extension_id_.empty() ||
-        !HasListener(OnCompositionBoundsChanged::kEventName)) {
-      return;
-    }
-
-    // Note: this is a private API event.
-    base::Value::List bounds_list;
-    bounds_list.reserve(bounds.size());
-    for (const auto& bound : bounds) {
-      base::Value::Dict bounds_value;
-      bounds_value.Set("x", bound.x());
-      bounds_value.Set("y", bound.y());
-      bounds_value.Set("w", bound.width());
-      bounds_value.Set("h", bound.height());
-      bounds_list.Append(std::move(bounds_value));
-    }
-
-    base::Value::List args;
-
-    // The old extension code uses the first parameter to get the bounds of the
-    // first composition character, so for backward compatibility, add it here.
-    args.Append(bounds_list[0].Clone());
-    args.Append(std::move(bounds_list));
-
-    DispatchEventToExtension(
-        extensions::events::INPUT_METHOD_PRIVATE_ON_COMPOSITION_BOUNDS_CHANGED,
-        OnCompositionBoundsChanged::kEventName, std::move(args));
   }
 
   void OnCaretBoundsChanged(const gfx::Rect& caret_bounds) override {
@@ -1321,27 +1288,6 @@ InputMethodPrivateFinishComposingTextFunction::Run() {
   return RespondNow(
       error.empty() ? NoArguments()
                     : Error(InformativeError(error, static_function_name())));
-}
-
-ExtensionFunction::ResponseAction
-InputMethodPrivateGetCompositionBoundsFunction::Run() {
-  std::string error;
-  InputMethodEngine* engine = GetEngineIfActive(
-      Profile::FromBrowserContext(browser_context()), extension_id(), &error);
-  if (!engine)
-    return RespondNow(Error(InformativeError(error, static_function_name())));
-
-  base::Value::List bounds_list;
-  for (const auto& bounds : engine->composition_bounds()) {
-    base::Value::Dict bounds_value;
-    bounds_value.Set("x", bounds.x());
-    bounds_value.Set("y", bounds.y());
-    bounds_value.Set("w", bounds.width());
-    bounds_value.Set("h", bounds.height());
-    bounds_list.Append(std::move(bounds_value));
-  }
-
-  return RespondNow(WithArguments(std::move(bounds_list)));
 }
 
 void InputImeAPI::OnExtensionLoaded(content::BrowserContext* browser_context,

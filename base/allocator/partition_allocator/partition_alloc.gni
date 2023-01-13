@@ -92,6 +92,10 @@ declare_args() {
   use_asan_unowned_ptr = false
 }
 
+# Use the version of raw_ptr<T> that allows the embedder to implement custom
+# logic.
+use_hookable_raw_ptr = use_asan_backup_ref_ptr
+
 declare_args() {
   # - put_ref_count_in_previous_slot: place the ref-count at the end of the
   #   previous slot (or in metadata if a slot starts on the page boundary), as
@@ -145,6 +149,7 @@ if (!use_partition_alloc) {
   enable_mte_checked_ptr_support = false
   use_asan_backup_ref_ptr = false
   use_asan_unowned_ptr = false
+  use_hookable_raw_ptr = false
   put_ref_count_in_previous_slot = false
   enable_backup_ref_ptr_slow_checks = false
   enable_dangling_raw_ptr_checks = false
@@ -195,6 +200,16 @@ assert(
 assert(!enable_backup_ref_ptr_support || !use_asan_unowned_ptr,
        "Both BackupRefPtr and AsanUnownedPtr can't be enabled at the same time")
 
+# HookableRawPtrImpl and BackupRefPtr are mutually exclusive variants of raw_ptr.
+assert(
+    !use_hookable_raw_ptr || !enable_backup_ref_ptr_support,
+    "Both HookableRawPtrImpl and BackupRefPtr can't be enabled at the same time")
+
+# HookableRawPtrImpl and AsanUnownedPtr are mutually exclusive variants of raw_ptr.
+assert(
+    !use_hookable_raw_ptr || !use_asan_unowned_ptr,
+    "Both HookableRawPtrImpl and AsanUnownedPtr can't be enabled at the same time")
+
 assert(!use_asan_backup_ref_ptr || is_asan,
        "AsanBackupRefPtr requires AddressSanitizer")
 
@@ -206,6 +221,9 @@ assert(!use_asan_unowned_ptr || is_asan,
 # rest of `raw_ptr` to keep it together.
 assert(build_with_chromium || !use_asan_backup_ref_ptr,
        "AsanBackupRefPtr is not supported outside Chromium")
+
+assert(!use_asan_backup_ref_ptr || use_hookable_raw_ptr,
+       "AsanBackupRefPtr requires HookableRawPtrImpl")
 
 declare_args() {
   enable_pkeys = is_linux && target_cpu == "x64"

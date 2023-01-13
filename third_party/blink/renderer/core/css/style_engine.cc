@@ -62,6 +62,7 @@
 #include "third_party/blink/renderer/core/css/shadow_tree_style_sheet_collection.h"
 #include "third_party/blink/renderer/core/css/style_change_reason.h"
 #include "third_party/blink/renderer/core/css/style_environment_variables.h"
+#include "third_party/blink/renderer/core/css/style_rule_font_feature_values.h"
 #include "third_party/blink/renderer/core/css/style_sheet_contents.h"
 #include "third_party/blink/renderer/core/css/vision_deficiency.h"
 #include "third_party/blink/renderer/core/display_lock/display_lock_utilities.h"
@@ -1159,6 +1160,23 @@ inline Element* SelfOrPreviousSibling(Node* node) {
 
 }  // namespace
 
+void PossiblyScheduleNthPseudoInvalidations(Node& node) {
+  if (!node.IsElementNode()) {
+    return;
+  }
+  ContainerNode* parent = node.parentNode();
+  if (parent == nullptr) {
+    return;
+  }
+
+  if ((parent->ChildrenAffectedByForwardPositionalRules() &&
+       node.nextSibling()) ||
+      (parent->ChildrenAffectedByBackwardPositionalRules() &&
+       node.previousSibling())) {
+    node.GetDocument().GetStyleEngine().ScheduleNthPseudoInvalidations(*parent);
+  }
+}
+
 void StyleEngine::InvalidateElementAffectedByHas(
     Element& element,
     bool for_element_affected_by_pseudo_in_has) {
@@ -1176,6 +1194,8 @@ void StyleEngine::InvalidateElementAffectedByHas(
         StyleChangeType::kLocalStyleChange,
         StyleChangeReasonForTracing::Create(
             blink::style_change_reason::kStyleInvalidator));
+
+    PossiblyScheduleNthPseudoInvalidations(element);
   }
 
   if (element.AffectedByNonSubjectHas()) {
@@ -1352,8 +1372,7 @@ void StyleEngine::ClassChangedForElement(
 
   const RuleFeatureSet& features = GetRuleFeatureSet();
 
-  if (RuntimeEnabledFeatures::CSSPseudoHasEnabled() &&
-      features.NeedsHasInvalidationForClassChange() &&
+  if (features.NeedsHasInvalidationForClassChange() &&
       PossiblyAffectingHasState(element)) {
     unsigned changed_size = changed_classes.size();
     for (unsigned i = 0; i < changed_size; ++i) {
@@ -1398,7 +1417,6 @@ void StyleEngine::ClassChangedForElement(const SpaceSplitString& old_classes,
 
   bool needs_schedule_invalidation = !IsSubtreeAndSiblingsStyleDirty(element);
   bool possibly_affecting_has_state =
-      RuntimeEnabledFeatures::CSSPseudoHasEnabled() &&
       features.NeedsHasInvalidationForClassChange() &&
       PossiblyAffectingHasState(element);
   if (!needs_schedule_invalidation && !possibly_affecting_has_state) {
@@ -1497,8 +1515,7 @@ void StyleEngine::AttributeChangedForElement(
 
   const RuleFeatureSet& features = GetRuleFeatureSet();
 
-  if (RuntimeEnabledFeatures::CSSPseudoHasEnabled() &&
-      features.NeedsHasInvalidationForAttributeChange() &&
+  if (features.NeedsHasInvalidationForAttributeChange() &&
       PossiblyAffectingHasState(element)) {
     if (features.NeedsHasInvalidationForAttribute(attribute_name)) {
       InvalidateChangedElementAffectedByLogicalCombinationsInHas(
@@ -1536,8 +1553,7 @@ void StyleEngine::IdChangedForElement(const AtomicString& old_id,
 
   const RuleFeatureSet& features = GetRuleFeatureSet();
 
-  if (RuntimeEnabledFeatures::CSSPseudoHasEnabled() &&
-      features.NeedsHasInvalidationForIdChange() &&
+  if (features.NeedsHasInvalidationForIdChange() &&
       PossiblyAffectingHasState(element)) {
     if ((!old_id.empty() && features.NeedsHasInvalidationForId(old_id)) ||
         (!new_id.empty() && features.NeedsHasInvalidationForId(new_id))) {
@@ -1581,7 +1597,6 @@ void StyleEngine::PseudoStateChangedForElement(
   const RuleFeatureSet& features = GetRuleFeatureSet();
 
   if (invalidate_ancestors_or_siblings &&
-      RuntimeEnabledFeatures::CSSPseudoHasEnabled() &&
       features.NeedsHasInvalidationForPseudoStateChange() &&
       PossiblyAffectingHasState(element)) {
     if (features.NeedsHasInvalidationForPseudoClass(pseudo_type)) {
@@ -1819,7 +1834,7 @@ void StyleEngine::ScheduleInvalidationsForHasPseudoAffectedByInsertion(
     Element* parent,
     Node* node_before_change,
     Element& inserted_element) {
-  if (!RuntimeEnabledFeatures::CSSPseudoHasEnabled() || !parent) {
+  if (!parent) {
     return;
   }
 
@@ -1901,7 +1916,7 @@ void StyleEngine::ScheduleInvalidationsForHasPseudoAffectedByRemoval(
     Element* parent,
     Node* node_before_change,
     Element& removed_element) {
-  if (!RuntimeEnabledFeatures::CSSPseudoHasEnabled() || !parent) {
+  if (!parent) {
     return;
   }
 
@@ -1955,10 +1970,6 @@ void StyleEngine::ScheduleInvalidationsForHasPseudoAffectedByRemoval(
 
 void StyleEngine::ScheduleInvalidationsForHasPseudoWhenAllChildrenRemoved(
     Element& parent) {
-  if (!RuntimeEnabledFeatures::CSSPseudoHasEnabled()) {
-    return;
-  }
-
   if (ShouldSkipInvalidationFor(parent)) {
     return;
   }
@@ -2463,11 +2474,8 @@ void StyleEngine::ApplyUserRuleSetChanges(
       MarkFontsNeedUpdate();
     }
 
-    if (changed_rule_flags & kFontFeatureValuesRules) {
-      font_feature_values_storage_map_.clear();
-      AddFontFeatureValuesRulesFromSheets(new_style_sheets);
-      MarkFontsNeedUpdate();
-    }
+    // TODO(https://crbug.com/1402199): kFontFeatureValuesRules changes not
+    // handled in user sheets.
 
     // We just cleared all the rules, which includes any author rules. They
     // must be forcibly re-added.
@@ -2593,16 +2601,8 @@ void StyleEngine::ApplyRuleSetChanges(
     }
   }
 
-  if ((changed_rule_flags & kFontFeatureValuesRules) ||
-      rebuild_at_font_palette_values_map) {
-    // TODO(https://crbug.com/1382722): Support @font-feature-values in shadow
-    // trees and support scoping correctly.
-    if (tree_scope.RootNode().IsDocumentNode()) {
-      font_feature_values_storage_map_.clear();
-      AddFontFeatureValuesRulesFromSheets(active_user_style_sheets_);
-      AddFontFeatureValuesRulesFromSheets(new_style_sheets);
-    }
-  }
+  // The kFontFeatureValuesRules case is handled in
+  // tree_scope.EnsureScopedStyleResolver().AppendActiveStyleSheets below.
 
   if (tree_scope.RootNode().IsDocumentNode()) {
     bool has_rebuilt_font_face_cache = false;
@@ -2702,7 +2702,12 @@ bool StyleEngine::UpdateRootFontRelativeUnits(
       !old_root_style ||
       (UsesGlyphRelativeUnits() &&
        old_root_style->GetFont() != new_root_style->GetFont());
-  bool root_font_changed = rem_changed || root_font_glyphs_changed;
+  bool root_line_height_changed =
+      !old_root_style ||
+      (UsesLineHeightUnits() &&
+       old_root_style->LineHeight() != new_root_style->LineHeight());
+  bool root_font_changed =
+      rem_changed || root_font_glyphs_changed || root_line_height_changed;
   if (root_font_changed) {
     // Resolved root font relative units are stored in the matched properties
     // cache so we need to make sure to invalidate the cache if the
@@ -2811,15 +2816,6 @@ void StyleEngine::AddFontPaletteValuesRulesFromSheets(
   }
 }
 
-void StyleEngine::AddFontFeatureValuesRulesFromSheets(
-    const ActiveStyleSheetVector& sheets) {
-  for (const ActiveStyleSheet& active_sheet : sheets) {
-    if (RuleSet* rule_set = active_sheet.second) {
-      AddFontFeatureValuesRules(*rule_set);
-    }
-  }
-}
-
 bool StyleEngine::AddUserFontFaceRules(const RuleSet& rule_set) {
   if (!font_selector_) {
     return false;
@@ -2880,20 +2876,6 @@ void StyleEngine::AddFontPaletteValuesRules(const RuleSet& rule_set) {
   }
 }
 
-void StyleEngine::AddFontFeatureValuesRules(const RuleSet& rule_set) {
-  const HeapVector<Member<StyleRuleFontFeatureValues>>
-      font_feature_values_rules = rule_set.FontFeatureValuesRules();
-  for (auto& rule : font_feature_values_rules) {
-    for (auto& font_family : rule->GetFamilies()) {
-      auto add_result = font_feature_values_storage_map_.insert(
-          String(font_family).FoldCase(), rule->Storage());
-      if (!add_result.is_new_entry) {
-        add_result.stored_value->value.FuseUpdate(rule->Storage());
-      }
-    }
-  }
-}
-
 void StyleEngine::AddPropertyRules(AtRuleCascadeMap& cascade_map,
                                    const RuleSet& rule_set,
                                    bool is_user_style) {
@@ -2949,21 +2931,6 @@ StyleRuleFontPaletteValues* StyleEngine::FontPaletteValuesForNameAndFamily(
   }
 
   return it->value.Get();
-}
-
-const FontFeatureValuesStorage* StyleEngine::FontFeatureValuesForFamily(
-    AtomicString font_family) {
-  if (font_feature_values_storage_map_.empty() || font_family.empty()) {
-    return nullptr;
-  }
-
-  auto it =
-      font_feature_values_storage_map_.find(String(font_family).FoldCase());
-  if (it == font_feature_values_storage_map_.end()) {
-    return nullptr;
-  }
-
-  return &(it->value);
 }
 
 DocumentStyleEnvironmentVariables& StyleEngine::EnsureEnvironmentVariables() {

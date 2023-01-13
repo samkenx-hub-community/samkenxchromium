@@ -8,16 +8,21 @@ import './icons.html.js';
 import './power_bookmark_chip.js';
 import './power_bookmarks_context_menu.js';
 import './power_bookmark_row.js';
+import '//bookmarks-side-panel.top-chrome/shared/sp_empty_state.js';
+import '//bookmarks-side-panel.top-chrome/shared/sp_footer.js';
 import '//resources/cr_elements/cr_action_menu/cr_action_menu.js';
 import '//resources/cr_elements/cr_button/cr_button.js';
 import '//resources/cr_elements/cr_icon_button/cr_icon_button.js';
 import '//resources/cr_elements/cr_lazy_render/cr_lazy_render.js';
+import '//resources/cr_elements/cr_toast/cr_toast.js';
 import '//resources/cr_elements/cr_toolbar/cr_toolbar_search_field.js';
+import '//resources/cr_elements/cr_toolbar/cr_toolbar_selection_overlay.js';
 import '//resources/cr_elements/icons.html.js';
 
 import {getInstance as getAnnouncerInstance} from '//resources/cr_elements/cr_a11y_announcer/cr_a11y_announcer.js';
 import {CrActionMenuElement} from '//resources/cr_elements/cr_action_menu/cr_action_menu.js';
 import {CrLazyRenderElement} from '//resources/cr_elements/cr_lazy_render/cr_lazy_render.js';
+import {CrToastElement} from '//resources/cr_elements/cr_toast/cr_toast.js';
 import {loadTimeData} from '//resources/js/load_time_data.js';
 import {PluralStringProxyImpl} from '//resources/js/plural_string_proxy.js';
 import {listenOnce} from '//resources/js/util_ts.js';
@@ -25,10 +30,10 @@ import {DomRepeatEvent, PolymerElement} from '//resources/polymer/v3_0/polymer/p
 
 import {ActionSource} from './bookmarks.mojom-webui.js';
 import {BookmarksApiProxy, BookmarksApiProxyImpl} from './bookmarks_api_proxy.js';
-import {BookmarkProductInfo} from './commerce/shopping_list.mojom-webui.js';
 import {ShoppingListApiProxy, ShoppingListApiProxyImpl} from './commerce/shopping_list_api_proxy.js';
 import {PowerBookmarksContextMenuElement} from './power_bookmarks_context_menu.js';
 import {getTemplate} from './power_bookmarks_list.html.js';
+import {BookmarkProductInfo} from './shopping_list.mojom-webui.js';
 
 function getBookmarkName(bookmark: chrome.bookmarks.BookmarkTreeNode): string {
   return bookmark.title || bookmark.url || '';
@@ -43,6 +48,7 @@ interface Label {
 export interface PowerBookmarksListElement {
   $: {
     contextMenu: CrLazyRenderElement<PowerBookmarksContextMenuElement>,
+    deletionToast: CrLazyRenderElement<CrToastElement>,
     powerBookmarksContainer: HTMLElement,
     sortMenu: CrActionMenuElement,
   };
@@ -132,6 +138,11 @@ export class PowerBookmarksListElement extends PolymerElement {
         type: String,
         value: '',
       },
+
+      deletionDescription_: {
+        type: String,
+        value: '',
+      },
     };
   }
 
@@ -166,6 +177,7 @@ export class PowerBookmarksListElement extends PolymerElement {
   private guestMode_: boolean;
   private renamingParentId_: string;
   private renamingId_: string;
+  private deletionDescription_: string;
 
   override connectedCallback() {
     super.connectedCallback();
@@ -631,6 +643,10 @@ export class PowerBookmarksListElement extends PolymerElement {
     }
   }
 
+  private setRenamingId_(event: CustomEvent<{id: string}>) {
+    this.renamingId_ = event.detail.id;
+  }
+
   private onRename_(
       event: CustomEvent<
           {bookmark: chrome.bookmarks.BookmarkTreeNode, value: string}>) {
@@ -684,12 +700,10 @@ export class PowerBookmarksListElement extends PolymerElement {
     event.stopPropagation();
     if (event.detail.event.button === 0) {
       this.$.contextMenu.get().showAt(
-          event.detail.event, event.detail.bookmark,
-          this.activeFolderPath_.length);
+          event.detail.event, [event.detail.bookmark]);
     } else {
       this.$.contextMenu.get().showAtPosition(
-          event.detail.event, event.detail.bookmark,
-          this.activeFolderPath_.length);
+          event.detail.event, [event.detail.bookmark]);
     }
   }
 
@@ -730,9 +744,37 @@ export class PowerBookmarksListElement extends PolymerElement {
     this.bookmarksApi_
         .deleteBookmarks(this.selectedBookmarks_.map(bookmark => bookmark.id))
         .then(() => {
+          this.showDeletionToastWithCount_(this.selectedBookmarks_.length);
           this.selectedBookmarks_ = [];
           this.editing_ = false;
         });
+  }
+
+  private onContextMenuDeleteClicked_(event: MouseEvent) {
+    event.preventDefault();
+    event.stopPropagation();
+    // Context menu delete is expected to only be called on a single bookmark.
+    this.showDeletionToastWithCount_(1);
+  }
+
+  private showDeletionToastWithCount_(deletionCount: number) {
+    PluralStringProxyImpl.getInstance()
+        .getPluralString('bookmarkDeletionCount', deletionCount)
+        .then(pluralString => {
+          this.deletionDescription_ = pluralString;
+          this.$.deletionToast.get().show();
+        });
+  }
+
+  private onUndoClicked_() {
+    this.bookmarksApi_.undo();
+    this.$.deletionToast.get().hide();
+  }
+
+  private onEditMenuClicked_(event: MouseEvent) {
+    event.preventDefault();
+    event.stopPropagation();
+    this.$.contextMenu.get().showAt(event, this.selectedBookmarks_.slice());
   }
 
   private onSortTypeClicked_(event: DomRepeatEvent<string>) {
@@ -827,6 +869,10 @@ export class PowerBookmarksListElement extends PolymerElement {
     this.showPriceTracking_ = true;
     chrome.metricsPrivate.recordUserAction(
         'Commerce.PriceTracking.SidePanel.TrackedProductsShown');
+  }
+
+  private shouldPinFooter_(): boolean {
+    return this.shownBookmarks_.length > 0;
   }
 }
 

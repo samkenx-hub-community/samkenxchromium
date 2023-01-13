@@ -4,34 +4,37 @@
 
 #include "chrome/browser/apps/app_preload_service/preload_app_definition.h"
 
+#include "base/strings/string_util.h"
+#include "chrome/browser/apps/app_service/package_id.h"
 #include "url/gurl.h"
 
 namespace apps {
+
+PreloadAppDefinition::PreloadAppDefinition(
+    proto::AppProvisioningListAppsResponse_App app_proto)
+    : app_proto_(app_proto),
+      package_id_(PackageId::FromString(app_proto_.package_id())) {}
+
+PreloadAppDefinition::PreloadAppDefinition(const PreloadAppDefinition&) =
+    default;
+PreloadAppDefinition& PreloadAppDefinition::operator=(
+    const PreloadAppDefinition&) = default;
+PreloadAppDefinition::~PreloadAppDefinition() = default;
 
 std::string PreloadAppDefinition::GetName() const {
   return app_proto_.name();
 }
 
 AppType PreloadAppDefinition::GetPlatform() const {
-  switch (app_proto_.platform()) {
-    case proto::AppProvisioningListAppsResponse::PLATFORM_UNKNOWN:
-      return AppType::kUnknown;
-    case proto::AppProvisioningListAppsResponse::PLATFORM_WEB:
-      return AppType::kWeb;
-    case proto::AppProvisioningListAppsResponse::PLATFORM_ANDROID:
-      return AppType::kArc;
+  if (package_id_.has_value()) {
+    return package_id_->app_type();
   }
+  return AppType::kUnknown;
 }
 
 bool PreloadAppDefinition::IsOemApp() const {
   return app_proto_.install_reason() ==
          proto::AppProvisioningListAppsResponse::INSTALL_REASON_OEM;
-}
-
-std::string PreloadAppDefinition::GetWebAppManifestId() const {
-  DCHECK_EQ(GetPlatform(), AppType::kWeb);
-
-  return app_proto_.web_extras().manifest_id();
 }
 
 GURL PreloadAppDefinition::GetWebAppManifestUrl() const {
@@ -46,6 +49,13 @@ GURL PreloadAppDefinition::GetWebAppOriginalManifestUrl() const {
   return GURL(app_proto_.web_extras().original_manifest_url());
 }
 
+GURL PreloadAppDefinition::GetWebAppManifestId() const {
+  DCHECK_EQ(GetPlatform(), AppType::kWeb);
+  DCHECK(package_id_.has_value());
+
+  return GURL(package_id_->identifier());
+}
+
 std::ostream& operator<<(std::ostream& os, const PreloadAppDefinition& app) {
   os << std::boolalpha;
   os << "- Name: " << app.GetName() << std::endl;
@@ -54,10 +64,10 @@ std::ostream& operator<<(std::ostream& os, const PreloadAppDefinition& app) {
 
   if (app.GetPlatform() == AppType::kWeb) {
     os << "- Web Extras:" << std::endl;
-    os << "  - Manifest ID: " << app.GetWebAppManifestId() << std::endl;
     os << "  - Manifest URL: " << app.GetWebAppManifestUrl() << std::endl;
     os << "  - Original Manifest URL: " << app.GetWebAppOriginalManifestUrl()
        << std::endl;
+    os << "  - Manifest ID: " << app.GetWebAppManifestId() << std::endl;
   }
 
   os << std::noboolalpha;

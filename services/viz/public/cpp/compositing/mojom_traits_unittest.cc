@@ -4,7 +4,7 @@
 
 #include <utility>
 
-#include "base/bind.h"
+#include "base/functional/bind.h"
 #include "base/run_loop.h"
 #include "base/test/gtest_util.h"
 #include "base/test/task_environment.h"
@@ -164,7 +164,8 @@ void ExpectEqual(const cc::FilterOperation& input,
     case cc::FilterOperation::REFERENCE: {
       ASSERT_EQ(!!input.image_filter(), !!output.image_filter());
       if (input.image_filter()) {
-        EXPECT_EQ(*input.image_filter(), *output.image_filter());
+        EXPECT_TRUE(
+            input.image_filter()->EqualsForTesting(*output.image_filter()));
       }
       break;
     }

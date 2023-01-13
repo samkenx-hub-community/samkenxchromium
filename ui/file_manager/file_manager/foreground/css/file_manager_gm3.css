@@ -181,7 +181,7 @@ html[dir='rtl'] #directory-tree .tree-row > .file-row {
 }
 
 #directory-tree .tree-item:not([disabled])
-  .tree-row[active] > .file-row > .item-icon {
+  .tree-row[active] > .file-row > .item-icon:not([style*='background-image']) {
   background-color: var(--cros-icon-color-selection);
 }
 
@@ -1067,6 +1067,9 @@ html.focus-outline-visible .dialog-footer select:focus {
   display: flex;
   flex-direction: row;
   overflow: hidden;
+  padding-bottom: 4px;
+  padding-inline: 8px 48px;
+  padding-top: 4px;
 }
 
 body.check-select .breadcrumbs {

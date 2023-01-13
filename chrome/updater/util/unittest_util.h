@@ -9,6 +9,8 @@
 
 #include "base/files/file_path.h"
 #include "base/memory/scoped_refptr.h"
+#include "base/process/process_iterator.h"
+#include "base/synchronization/waitable_event.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
 
 namespace base {
@@ -85,10 +87,23 @@ base::FilePath StartProcmonLogging();
 // procmon PML file returned from `StartProcmonLogging`.
 void StopProcmonLogging(const base::FilePath& pml_file);
 
+// Returns a list of processes matching `executable_name`.
+const base::ProcessIterator::ProcessEntries FindProcesses(
+    const base::FilePath::StringType& executable_name);
+
 // Returns a log string of processes matching `executable_name`.
 base::FilePath::StringType PrintProcesses(
     const base::FilePath::StringType& executable_name);
 #endif
+
+struct EventHolder {
+  base::WaitableEvent event;
+  std::wstring name;
+};
+
+// Creates a waitable event with default attributes for the current process,
+// test, and test scope.
+EventHolder CreateWaitableEventForTest();
 
 }  // namespace updater::test
 

@@ -86,6 +86,12 @@ protocol::Audits::GenericIssueErrorType GenericIssueErrorTypeToProtocol(
           CrossOriginPortalPostMessageError;
     case mojom::blink::GenericIssueErrorType::kFormLabelForNameError:
       return protocol::Audits::GenericIssueErrorTypeEnum::FormLabelForNameError;
+    case mojom::blink::GenericIssueErrorType::kFormDuplicateIdForInputError:
+      return protocol::Audits::GenericIssueErrorTypeEnum::
+          FormDuplicateIdForInputError;
+    case mojom::blink::GenericIssueErrorType::kFormInputWithNoLabelError:
+      return protocol::Audits::GenericIssueErrorTypeEnum::
+          FormInputWithNoLabelError;
   }
 }
 

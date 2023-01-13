@@ -10,12 +10,13 @@
 #import "base/mac/foundation_util.h"
 #import "base/notreached.h"
 #import "base/numerics/safe_conversions.h"
+#import "ios/chrome/browser/ui/tab_switcher/tab_collection_drag_drop_handler.h"
 #import "ios/chrome/browser/ui/tab_switcher/tab_grid/grid/grid_image_data_source.h"
 #import "ios/chrome/browser/ui/tab_switcher/tab_grid/pinned_tabs/features.h"
 #import "ios/chrome/browser/ui/tab_switcher/tab_grid/pinned_tabs/pinned_cell.h"
 #import "ios/chrome/browser/ui/tab_switcher/tab_grid/pinned_tabs/pinned_tabs_constants.h"
 #import "ios/chrome/browser/ui/tab_switcher/tab_grid/pinned_tabs/pinned_tabs_layout.h"
-#import "ios/chrome/browser/ui/tab_switcher/tab_grid/tab_context_menu_provider.h"
+#import "ios/chrome/browser/ui/tab_switcher/tab_grid/tab_context_menu/tab_context_menu_provider.h"
 #import "ios/chrome/browser/ui/tab_switcher/tab_switcher_item.h"
 #import "ios/chrome/common/ui/colors/semantic_color_names.h"
 #import "ios/chrome/grit/ios_strings.h"
@@ -29,6 +30,12 @@ namespace {
 
 // The number of sections for the pinned collection view.
 NSInteger kNumberOfSectionsInPinnedCollection = 1;
+
+// Leading/trailing inset of the collection view content.
+const CGFloat kCollectionViewHorizontalInset = 11.0f;
+
+// Pinned cell identifier.
+NSString* const kCellIdentifier = @"PinnedCellIdentifier";
 
 // Creates an NSIndexPath with `index` in section 0.
 NSIndexPath* CreateIndexPath(NSInteger index) {
@@ -92,6 +99,11 @@ NSIndexPath* CreateIndexPath(NSInteger index) {
   [self configureEmptyCollectionViewLabel];
 }
 
+- (void)viewWillAppear:(BOOL)animated {
+  [super viewWillAppear:animated];
+  [self contentWillAppearAnimated:animated];
+}
+
 #pragma mark - Public
 
 - (void)dragSessionEnabled:(BOOL)enabled {
@@ -152,6 +164,8 @@ NSIndexPath* CreateIndexPath(NSInteger index) {
 
   [self updateEmptyCollectionViewLabelVisibility];
 
+  [self.delegate pinnedTabsViewController:self didChangeItemCount:items.count];
+
   [self.collectionView reloadData];
   [self.collectionView
       selectItemAtIndexPath:CreateIndexPath(self.selectedIndex)
@@ -165,30 +179,18 @@ NSIndexPath* CreateIndexPath(NSInteger index) {
   // Consistency check: `item`'s ID is not in `_items`.
   DCHECK([self indexOfItemWithID:item.identifier] == NSNotFound);
 
-  ProceduralBlock modelUpdates = ^{
-    [self->_items insertObject:item atIndex:index];
-    self->_selectedItemID = selectedItemID;
-  };
-
-  ProceduralBlock collectionViewUpdates = ^{
-    [self.collectionView insertItemsAtIndexPaths:@[ CreateIndexPath(index) ]];
-    [self updateEmptyCollectionViewLabelVisibility];
-  };
+  NSString* previousItemID = _selectedItemID;
 
   __weak __typeof(self) weakSelf = self;
-  NSString* previousItemID = _selectedItemID;
-  ProceduralBlock collectionViewUpdatesCompletion = ^{
-    [weakSelf updateCollectionViewAfterItemInsertionWithPreviousItemID:
-                  previousItemID];
-  };
-
   [self.collectionView
       performBatchUpdates:^{
-        modelUpdates();
-        collectionViewUpdates();
+        [weakSelf performBatchUpdateForInsertingItem:item
+                                             atIndex:index
+                                      selectedItemID:selectedItemID];
       }
       completion:^(BOOL completed) {
-        collectionViewUpdatesCompletion();
+        [weakSelf
+            handleItemInsertionCompletionWithPreviousItemID:previousItemID];
       }];
 }
 
@@ -199,28 +201,14 @@ NSIndexPath* CreateIndexPath(NSInteger index) {
     return;
   }
 
-  ProceduralBlock modelUpdates = ^{
-    [self->_items removeObjectAtIndex:index];
-    self->_selectedItemID = selectedItemID;
-  };
-
-  ProceduralBlock collectionViewUpdates = ^{
-    [self.collectionView deleteItemsAtIndexPaths:@[ CreateIndexPath(index) ]];
-    [self updateEmptyCollectionViewLabelVisibility];
-  };
-
   __weak __typeof(self) weakSelf = self;
-  ProceduralBlock collectionViewUpdatesCompletion = ^{
-    [weakSelf updateCollectionViewAfterItemDeletion];
-  };
-
   [self.collectionView
       performBatchUpdates:^{
-        modelUpdates();
-        collectionViewUpdates();
+        [weakSelf performBatchUpdateForRemovingItemAtIndex:index
+                                            selectedItemID:selectedItemID];
       }
       completion:^(BOOL completed) {
-        collectionViewUpdatesCompletion();
+        [weakSelf handleItemRemovalCompletion];
       }];
 }
 
@@ -255,7 +243,8 @@ NSIndexPath* CreateIndexPath(NSInteger index) {
 
 - (void)moveItemWithID:(NSString*)itemID toIndex:(NSUInteger)toIndex {
   NSUInteger fromIndex = [self indexOfItemWithID:itemID];
-  if (fromIndex == toIndex || fromIndex == NSNotFound) {
+  if (fromIndex == toIndex || toIndex == NSNotFound ||
+      fromIndex == NSNotFound) {
     return;
   }
 
@@ -359,15 +348,17 @@ NSIndexPath* CreateIndexPath(NSInteger index) {
 
 - (void)collectionView:(UICollectionView*)collectionView
      dragSessionDidEnd:(id<UIDragSession>)session {
+  [self.dragDropHandler dragSessionDidEnd];
   [self dragSessionEnabled:NO];
 }
 
 - (NSArray<UIDragItem*>*)collectionView:(UICollectionView*)collectionView
            itemsForBeginningDragSession:(id<UIDragSession>)session
                             atIndexPath:(NSIndexPath*)indexPath {
-  // TODO(crbug.com/1382015): Implement this.
-  return @[ [[UIDragItem alloc]
-      initWithItemProvider:[[NSItemProvider alloc] initWithObject:@""]] ];
+  TabSwitcherItem* item = _items[indexPath.item];
+  UIDragItem* dragItem =
+      [self.dragDropHandler dragItemForItemWithID:item.identifier];
+  return [NSArray arrayWithObjects:dragItem, nil];
 }
 
 - (NSArray<UIDragItem*>*)collectionView:(UICollectionView*)collectionView
@@ -399,12 +390,21 @@ NSIndexPath* CreateIndexPath(NSInteger index) {
   self.collectionView.backgroundView.hidden = NO;
 }
 
+- (void)collectionView:(UICollectionView*)collectionView
+     dropSessionDidEnd:(id<UIDropSession>)session {
+  // Reset the background if the drop cames from another app.
+  self.collectionView.backgroundColor = _backgroundColor;
+  self.collectionView.backgroundView.hidden = NO;
+}
+
 - (UICollectionViewDropProposal*)
               collectionView:(UICollectionView*)collectionView
         dropSessionDidUpdate:(id<UIDropSession>)session
     withDestinationIndexPath:(NSIndexPath*)destinationIndexPath {
+  UIDropOperation dropOperation =
+      [self.dragDropHandler dropOperationForDropSession:session];
   return [[UICollectionViewDropProposal alloc]
-      initWithDropOperation:UIDropOperationMove
+      initWithDropOperation:dropOperation
                      intent:
                          UICollectionViewDropIntentInsertAtDestinationIndexPath];
 }
@@ -412,7 +412,48 @@ NSIndexPath* CreateIndexPath(NSInteger index) {
 - (void)collectionView:(UICollectionView*)collectionView
     performDropWithCoordinator:
         (id<UICollectionViewDropCoordinator>)coordinator {
-  // TODO(crbug.com/1382015): Implement this.
+  NSArray<id<UICollectionViewDropItem>>* items = coordinator.items;
+  for (id<UICollectionViewDropItem> item in items) {
+    // Append to the end of the collection, unless drop index is specified.
+    // The sourceIndexPath is nil if the drop item is not from the same
+    // collection view. Set the destinationIndex to reflect the addition of an
+    // item.
+    NSUInteger destinationIndex =
+        item.sourceIndexPath ? _items.count - 1 : _items.count;
+    if (coordinator.destinationIndexPath) {
+      destinationIndex =
+          base::checked_cast<NSUInteger>(coordinator.destinationIndexPath.item);
+    }
+
+    NSIndexPath* dropIndexPath = CreateIndexPath(destinationIndex);
+    // Drop synchronously if local object is available.
+    if (item.dragItem.localObject) {
+      [coordinator dropItem:item.dragItem toItemAtIndexPath:dropIndexPath];
+      // The sourceIndexPath is non-nil if the drop item is from this same
+      // collection view.
+      [self.dragDropHandler dropItem:item.dragItem
+                             toIndex:destinationIndex
+                  fromSameCollection:(item.sourceIndexPath != nil)];
+    } else {
+      // Drop asynchronously if local object is not available.
+      UICollectionViewDropPlaceholder* placeholder =
+          [[UICollectionViewDropPlaceholder alloc]
+              initWithInsertionIndexPath:dropIndexPath
+                         reuseIdentifier:kCellIdentifier];
+      placeholder.previewParametersProvider =
+          ^UIDragPreviewParameters*(UICollectionViewCell* placeholderCell) {
+        PinnedCell* pinnedCell =
+            base::mac::ObjCCastStrict<PinnedCell>(placeholderCell);
+        return pinnedCell.dragPreviewParameters;
+      };
+
+      id<UICollectionViewDropPlaceholderContext> context =
+          [coordinator dropItem:item.dragItem toPlaceholder:placeholder];
+      [self.dragDropHandler dropItemFromProvider:item.dragItem.itemProvider
+                                         toIndex:destinationIndex
+                              placeholderContext:context];
+    }
+  }
 }
 
 - (BOOL)collectionView:(UICollectionView*)collectionView
@@ -428,6 +469,56 @@ NSIndexPath* CreateIndexPath(NSInteger index) {
 
 #pragma mark - Private
 
+// Performs (in batch) all the actions needed to insert an `item` at the
+// specified `index` into the collection view and updates its appearance.
+// `selectedItemID` is saved to an instance variable.
+- (void)performBatchUpdateForInsertingItem:(TabSwitcherItem*)item
+                                   atIndex:(NSUInteger)index
+                            selectedItemID:(NSString*)selectedItemID {
+  [_items insertObject:item atIndex:index];
+  _selectedItemID = selectedItemID;
+  [self.delegate pinnedTabsViewController:self didChangeItemCount:_items.count];
+
+  [self.collectionView insertItemsAtIndexPaths:@[ CreateIndexPath(index) ]];
+  [self updateEmptyCollectionViewLabelVisibility];
+}
+
+// Performs (in batch) all the actions needed to remove an item at the
+// specified `index` from the collection view and updates its appearance.
+// `selectedItemID` is saved to an instance variable.
+- (void)performBatchUpdateForRemovingItemAtIndex:(NSUInteger)index
+                                  selectedItemID:(NSString*)selectedItemID {
+  [_items removeObjectAtIndex:index];
+  _selectedItemID = selectedItemID;
+  [self.delegate pinnedTabsViewController:self didChangeItemCount:_items.count];
+
+  [self.collectionView deleteItemsAtIndexPaths:@[ CreateIndexPath(index) ]];
+  [self updateEmptyCollectionViewLabelVisibility];
+}
+
+// Handles the completion of item insertion into the collection view.
+- (void)handleItemInsertionCompletionWithPreviousItemID:
+    (NSString*)previousItemID {
+  [self
+      updateCollectionViewAfterItemInsertionWithPreviousItemID:previousItemID];
+  [self.delegate pinnedTabsViewController:self didChangeItemCount:_items.count];
+}
+
+// Handles the completion of item removal into the collection view.
+- (void)handleItemRemovalCompletion {
+  [self updateCollectionViewAfterItemDeletion];
+  [self.delegate pinnedTabsViewController:self didChangeItemCount:_items.count];
+}
+
+// Notifies the ViewController that its content is being displayed.
+- (void)contentWillAppearAnimated:(BOOL)animated {
+  [self.collectionView reloadData];
+  [self updateEmptyCollectionViewLabelVisibility];
+
+  // Update the delegate, in case it wasn't set when `items` was populated.
+  [self.delegate pinnedTabsViewController:self didChangeItemCount:_items.count];
+}
+
 // Configures the collectionView.
 - (void)configureCollectionView {
   self.overrideUserInterfaceStyle = UIUserInterfaceStyleDark;
@@ -441,6 +532,9 @@ NSIndexPath* CreateIndexPath(NSInteger index) {
   collectionView.dragDelegate = self;
   collectionView.dropDelegate = self;
   collectionView.dragInteractionEnabled = YES;
+  collectionView.showsHorizontalScrollIndicator = NO;
+  collectionView.contentInset = UIEdgeInsetsMake(
+      0, kCollectionViewHorizontalInset, 0, kCollectionViewHorizontalInset);
 
   self.view = collectionView;
 
@@ -526,6 +620,7 @@ NSIndexPath* CreateIndexPath(NSInteger index) {
   _visible = visible;
   if (!visible) {
     self.view.hidden = YES;
+    [self.delegate pinnedTabsViewControllerDidHide];
   }
 }
 
@@ -594,7 +689,7 @@ NSIndexPath* CreateIndexPath(NSInteger index) {
   DCHECK_LT(index, _items.count);
 
   NSString* itemID = _items[index].identifier;
-  [self.delegate didSelectItemWithID:itemID];
+  [self.delegate pinnedTabsViewController:self didSelectItemWithID:itemID];
 }
 
 @end

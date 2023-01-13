@@ -8,9 +8,9 @@
 #include <memory>
 #include <ostream>
 
-#include "base/callback_helpers.h"
 #include "base/check.h"
 #include "base/debug/stack_trace.h"
+#include "base/functional/callback_helpers.h"
 #include "base/lazy_instance.h"
 #include "base/location.h"
 #include "base/logging.h"
@@ -344,10 +344,12 @@ class TaskEnvironment::MockTimeDomain : public sequence_manager::TimeDomain {
  private:
   SEQUENCE_CHECKER(sequence_checker_);
 
-  raw_ptr<internal::ThreadPoolImpl> thread_pool_ = nullptr;
-  raw_ptr<const TestTaskTracker> thread_pool_task_tracker_ = nullptr;
+  raw_ptr<internal::ThreadPoolImpl, DanglingUntriaged> thread_pool_ = nullptr;
+  raw_ptr<const TestTaskTracker, DanglingUntriaged> thread_pool_task_tracker_ =
+      nullptr;
 
-  const raw_ptr<sequence_manager::internal::SequenceManagerImpl>
+  const raw_ptr<sequence_manager::internal::SequenceManagerImpl,
+                DanglingUntriaged>
       sequence_manager_;
 
   // Protects |now_ticks_|
@@ -420,7 +422,8 @@ TaskEnvironment::TaskEnvironment(
       sequence_manager_->SetTimeDomain(mock_time_domain_.get());
     simple_task_executor_ = std::make_unique<SimpleTaskExecutor>(task_runner_);
     CHECK(base::SingleThreadTaskRunner::HasCurrentDefault())
-        << "ThreadTaskRunnerHandle should've been set now.";
+        << "SingleThreadTaskRunner::CurrentDefaultHandle should've been set "
+           "now.";
     CompleteInitialization();
   }
 

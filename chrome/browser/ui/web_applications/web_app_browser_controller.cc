@@ -4,9 +4,9 @@
 
 #include "chrome/browser/ui/web_applications/web_app_browser_controller.h"
 
-#include "base/callback_helpers.h"
 #include "base/containers/flat_set.h"
 #include "base/functional/callback.h"
+#include "base/functional/callback_helpers.h"
 #include "base/memory/raw_ptr.h"
 #include "base/strings/strcat.h"
 #include "base/strings/string_util.h"
@@ -161,7 +161,7 @@ void WebAppBrowserController::ToggleWindowControlsOverlayEnabled(
 
   provider_->scheduler().ScheduleCallbackWithLock<AppLock>(
       "WebAppBrowserController::ToggleWindowControlsOverlayEnabled",
-      std::make_unique<AppLockDescription, base::flat_set<AppId>>({app_id()}),
+      std::make_unique<AppLockDescription>(app_id()),
       base::BindOnce(
           [](base::OnceClosure on_complete, const AppId& app_id,
              AppLock& lock) {
@@ -220,7 +220,7 @@ bool WebAppBrowserController::AlwaysShowToolbarInFullscreen() const {
 void WebAppBrowserController::ToggleAlwaysShowToolbarInFullscreen() {
   provider_->scheduler().ScheduleCallbackWithLock<AppLock>(
       "WebAppBrowserController::ToggleAlwaysShowToolbarInFullscreen",
-      std::make_unique<AppLockDescription, base::flat_set<AppId>>({app_id()}),
+      std::make_unique<AppLockDescription>(app_id()),
       base::BindOnce(
           [](const AppId& app_id, AppLock& lock) {
             lock.sync_bridge().SetAlwaysShowToolbarInFullscreen(

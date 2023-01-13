@@ -1,11 +1,21 @@
 <style>
+  .spacing {
+    margin-inline-end: 8px;
+  }
+
   #text-wrapper {
     align-items: center;
     display: flex;
     flex-direction: row;
   }
+
+  iron-icon {
+    --iron-icon-width: 16px;
+  }
 </style>
 
 <div class="container">
-  <div id="text-wrapper" inner-h-t-m-l="[[text]]"></div>
+  <!-- This element's innerHTML is dynamically set based on its text
+  accelerator parts. -->
+  <div id="text-wrapper"></div>
 </div>

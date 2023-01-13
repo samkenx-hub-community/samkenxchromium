@@ -11,9 +11,9 @@
 #include <memory>
 #include <vector>
 
-#include "base/bind.h"
-#include "base/callback_helpers.h"
 #include "base/command_line.h"
+#include "base/functional/bind.h"
+#include "base/functional/callback_helpers.h"
 #include "base/memory/raw_ptr.h"
 #include "base/process/process_handle.h"
 #include "base/strings/escape.h"
@@ -2301,6 +2301,57 @@ IN_PROC_BROWSER_TEST_F(AccessibilityWinBrowserTest,
   EXPECT_LT(0, y);
   EXPECT_LT(1, width);
   EXPECT_LT(1, height);
+}
+
+IN_PROC_BROWSER_TEST_F(AccessibilityWinBrowserTest,
+                       TestBasicMSAAAccessibilityModeChange) {
+  LoadInitialAccessibilityTreeFromHtml(R"HTML(
+      <p>Hello world.</p>
+      )HTML");
+  // Get the accessibility object for the window tree host.
+  aura::Window* window = shell()->window();
+  CHECK(window);
+  aura::WindowTreeHost* window_tree_host = window->GetHost();
+  CHECK(window_tree_host);
+  HWND hwnd = window_tree_host->GetAcceleratedWidget();
+  CHECK(hwnd);
+  Microsoft::WRL::ComPtr<IAccessible> browser_accessible;
+  HRESULT hr = AccessibleObjectFromWindow(hwnd, OBJID_WINDOW,
+                                          IID_PPV_ARGS(&browser_accessible));
+  ASSERT_EQ(S_OK, hr);
+
+  // Ensure that we can find accessibility nodes in web contents.
+  bool found = false;
+  FindNodeInAccessibilityTree(browser_accessible.Get(), ROLE_SYSTEM_STATICTEXT,
+                              L"Hello world.", 0, &found);
+  EXPECT_TRUE(found);
+
+  // Remove all accessibility modes.
+  content::BrowserAccessibilityStateImpl::GetInstance()
+      ->RemoveAccessibilityModeFlags(ui::kAXModeComplete);
+
+  // Ensure accessibility is not enabled before we begin the test.
+  EXPECT_TRUE(content::BrowserAccessibilityStateImpl::GetInstance()
+                  ->GetAccessibilityMode()
+                  .is_mode_off());
+
+  // Search for the document, we should be able to find it.
+  found = false;
+  FindNodeInAccessibilityTree(browser_accessible.Get(), ROLE_SYSTEM_DOCUMENT,
+                              L"", 0, &found);
+  EXPECT_TRUE(found);
+
+  // The act of searching for the document should enable kNativeAPIs
+  EXPECT_EQ(ui::AXMode(ui::AXMode::kNativeAPIs),
+            content::BrowserAccessibilityStateImpl::GetInstance()
+                ->GetAccessibilityMode());
+
+  // Even with kNativeAPIs, we still shouldn't be able to find the node in web
+  // contents.
+  found = false;
+  FindNodeInAccessibilityTree(browser_accessible.Get(), ROLE_SYSTEM_STATICTEXT,
+                              L"Hello world.", 0, &found);
+  EXPECT_FALSE(found);
 }
 
 IN_PROC_BROWSER_TEST_F(AccessibilityWinBrowserTest, TestScrollToPoint) {

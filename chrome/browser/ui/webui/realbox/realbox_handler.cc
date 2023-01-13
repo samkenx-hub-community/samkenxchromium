@@ -6,8 +6,8 @@
 
 #include "base/base64.h"
 #include "base/base64url.h"
-#include "base/bind.h"
 #include "base/containers/contains.h"
+#include "base/functional/bind.h"
 #include "base/metrics/histogram_macros.h"
 #include "base/metrics/user_metrics.h"
 #include "base/metrics/user_metrics_action.h"
@@ -534,7 +534,7 @@ RealboxHandler::RealboxHandler(
       metrics_reporter_(metrics_reporter),
       page_handler_(this, std::move(pending_page_handler)) {
   controller_emitter_observation_.Observe(
-      OmniboxControllerEmitter::GetForBrowserContext(profile_));
+      AutocompleteControllerEmitter::GetForBrowserContext(profile_));
 }
 
 RealboxHandler::~RealboxHandler() = default;
@@ -551,8 +551,8 @@ void RealboxHandler::QueryAutocomplete(const std::u16string& input,
         std::make_unique<ChromeAutocompleteProviderClient>(profile_),
         AutocompleteClassifier::DefaultOmniboxProviders());
 
-    OmniboxControllerEmitter* emitter =
-        OmniboxControllerEmitter::GetForBrowserContext(profile_);
+    AutocompleteControllerEmitter* emitter =
+        AutocompleteControllerEmitter::GetForBrowserContext(profile_);
     if (emitter) {
       autocomplete_controller_->AddObserver(emitter);
     }

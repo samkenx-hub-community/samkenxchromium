@@ -8,9 +8,9 @@
 #error "This file requires ARC support."
 #endif
 
-#import "base/bind.h"
 #import "base/check.h"
 #import "base/compiler_specific.h"
+#import "base/functional/bind.h"
 #import "base/metrics/histogram_macros.h"
 #import "base/strings/sys_string_conversions.h"
 #import "base/time/time.h"
@@ -752,6 +752,10 @@ bool WebStateImpl::RealizedWebState::IsEvicted() const {
   return ![web_controller_ isViewAlive];
 }
 
+bool WebStateImpl::RealizedWebState::IsWebPageInFullscreenMode() const {
+  return [web_controller_ isWebPageInFullscreenMode];
+}
+
 const FaviconStatus& WebStateImpl::RealizedWebState::GetFaviconStatus() const {
   static const FaviconStatus missing_favicon_status;
   NavigationItem* item = navigation_manager_->GetLastCommittedItem();
@@ -934,8 +938,8 @@ void WebStateImpl::RealizedWebState::RequestPermissionsWithDecisionHandler(
     PermissionDecisionHandler web_view_decision_handler) {
   bool delegate_can_handle_decision = false;
   if (delegate_) {
-    WebStateDelegate::WebStatePermissionDecisionHandler
-        web_state_decision_handler = ^(BOOL allowed) {
+    WebStatePermissionDecisionHandler web_state_decision_handler =
+        ^(BOOL allowed) {
           allowed ? web_view_decision_handler(WKPermissionDecisionGrant)
                   : web_view_decision_handler(WKPermissionDecisionDeny);
         };

@@ -31,9 +31,9 @@
 #include "ash/wm/overview/overview_session.h"
 #include "ash/wm/overview/overview_test_util.h"
 #include "ash/wm/window_state.h"
-#include "base/bind.h"
-#include "base/callback_helpers.h"
 #include "base/containers/contains.h"
+#include "base/functional/bind.h"
+#include "base/functional/callback_helpers.h"
 #include "base/guid.h"
 #include "base/json/json_writer.h"
 #include "base/run_loop.h"
@@ -61,7 +61,6 @@
 #include "chrome/browser/profiles/keep_alive/profile_keep_alive_types.h"
 #include "chrome/browser/profiles/keep_alive/scoped_profile_keep_alive.h"
 #include "chrome/browser/profiles/profile.h"
-#include "chrome/browser/ui/ash/desks/chrome_desks_templates_delegate.h"
 #include "chrome/browser/ui/ash/desks/chrome_desks_util.h"
 #include "chrome/browser/ui/ash/desks/desks_client.h"
 #include "chrome/browser/ui/ash/desks/desks_templates_app_launch_handler.h"
@@ -74,8 +73,8 @@
 #include "chrome/browser/ui/tabs/tab_group.h"
 #include "chrome/browser/ui/tabs/tab_group_model.h"
 #include "chrome/browser/ui/web_applications/test/web_app_browsertest_util.h"
+#include "chrome/browser/web_applications/mojom/user_display_mode.mojom.h"
 #include "chrome/browser/web_applications/test/web_app_install_test_utils.h"
-#include "chrome/browser/web_applications/user_display_mode.h"
 #include "chrome/browser/web_applications/web_app_provider.h"
 #include "chrome/test/base/chromeos/ash_browser_test_starter.h"
 #include "chrome/test/base/in_process_browser_test.h"
@@ -527,7 +526,8 @@ class DesksClientTest : public extensions::PlatformAppBrowserTest {
     web_app_info->start_url = start_url;
     web_app_info->scope = start_url.GetWithoutFilename();
     if (!launch_in_browser)
-      web_app_info->user_display_mode = web_app::UserDisplayMode::kStandalone;
+      web_app_info->user_display_mode =
+          web_app::mojom::UserDisplayMode::kStandalone;
     web_app_info->title = u"A Web App";
     const web_app::AppId app_id =
         web_app::test::InstallWebApp(profile(), std::move(web_app_info));
@@ -1349,6 +1349,43 @@ IN_PROC_BROWSER_TEST_F(DesksClientTest, LaunchTemplateWithPWA) {
       new_pwa_browser->window()->GetNativeWindow();
   EXPECT_NE(new_browser_window, pwa_window);
   EXPECT_EQ(pwa_bounds, new_browser_window->bounds());
+  const std::string* new_app_name =
+      new_browser_window->GetProperty(app_restore::kBrowserAppNameKey);
+  ASSERT_TRUE(new_app_name);
+  EXPECT_EQ(*app_name, *new_app_name);
+}
+
+// Tests that PWAs with out of scope urls are saved and launched correctly.
+// Regression test for b/248645623.
+IN_PROC_BROWSER_TEST_F(DesksClientTest, LaunchTemplateWithOutOfScopeURL) {
+  ASSERT_TRUE(DesksClient::Get());
+
+  Browser* pwa_browser =
+      InstallAndLaunchPWA(GURL(kYoutubeUrl), /*launch_in_browser=*/false);
+  ASSERT_TRUE(pwa_browser->is_type_app());
+  aura::Window* pwa_window = pwa_browser->window()->GetNativeWindow();
+  const std::string* app_name =
+      pwa_window->GetProperty(app_restore::kBrowserAppNameKey);
+  ASSERT_TRUE(app_name);
+
+  const GURL out_of_scope_url(kExampleUrl1);
+  ASSERT_TRUE(ui_test_utils::NavigateToURL(pwa_browser, out_of_scope_url));
+  // Verify that the PWA has navigated to the out of scope url.
+  const std::vector<GURL> urls = GetURLsForBrowserWindow(pwa_browser);
+  ASSERT_THAT(urls, ElementsAre(out_of_scope_url));
+
+  // Set the template and launch it.
+  SetAndLaunchTemplate(
+      CaptureActiveDeskAndSaveTemplate(ash::DeskTemplateType::kTemplate));
+
+  // Verify that the PWA was launched correctly, and that the out of scope url
+  // was successfully opened in the PWA (and not in a normal browser window).
+  Browser* new_pwa_browser = FindLaunchedBrowserByURLs(urls);
+  ASSERT_TRUE(new_pwa_browser);
+  ASSERT_TRUE(new_pwa_browser->is_type_app());
+  aura::Window* new_browser_window =
+      new_pwa_browser->window()->GetNativeWindow();
+  EXPECT_NE(new_browser_window, pwa_window);
   const std::string* new_app_name =
       new_browser_window->GetProperty(app_restore::kBrowserAppNameKey);
   ASSERT_TRUE(new_app_name);
@@ -2464,7 +2501,7 @@ IN_PROC_BROWSER_TEST_F(DesksClientTest, LaunchTemplateAndCleanUpDesk) {
   // Record number of windows being closed per source.
   // NOTE: The template contains an existing browser with 1 tab created by
   // `BrowserMain()`.
-  histogram_tester.ExpectUniqueSample("Ash.Desks.NumberOfWindowsClosed.Api", 2,
+  histogram_tester.ExpectUniqueSample("Ash.Desks.NumberOfWindowsClosed2.Api", 2,
                                       1);
   EXPECT_EQ(1u, desks_controller->desks().size());
 }

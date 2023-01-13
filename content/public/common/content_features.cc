@@ -311,11 +311,6 @@ BASE_FEATURE(kEarlyEstablishGpuChannel,
              "EarlyEstablishGpuChannel",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-// Enable Early Hints subresource preloads for navigation.
-BASE_FEATURE(kEarlyHintsPreloadForNavigation,
-             "EarlyHintsPreloadForNavigation",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
 // Requires documents embedded via <iframe>, etc, to explicitly opt-into the
 // embedding: https://github.com/mikewest/embedding-requires-opt-in.
 BASE_FEATURE(kEmbeddingRequiresOptIn,
@@ -332,6 +327,13 @@ BASE_FEATURE(kEnableCanvas2DLayers,
 BASE_FEATURE(kEnableMachineLearningModelLoaderWebPlatformApi,
              "EnableMachineLearningModelLoaderWebPlatformApi",
              base::FEATURE_DISABLED_BY_DEFAULT);
+
+// Enables support for the PPB_VideoDecoder(Dev) API. If this feature is
+// false (and the command-line override is not set in the renderer), the API
+// will appear as unsupported if asked for by a plugin.
+BASE_FEATURE(kSupportPepperVideoDecoderDevAPI,
+             "kSupportPepperVideoDecoderDevAPI",
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // Enables service workers on chrome-untrusted:// urls.
 BASE_FEATURE(kEnableServiceWorkersForChromeUntrusted,
@@ -398,6 +400,11 @@ BASE_FEATURE(kFedCmMetricsEndpoint,
 // time.
 BASE_FEATURE(kFedCmMultipleIdentityProviders,
              "FedCmMultipleIdentityProviders",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+// Enables usage of the FedCM Relying Party Context API.
+BASE_FEATURE(kFedCmRpContext,
+             "FedCmRpContext",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Enables usage of the FedCM API with the User Info API at the same time.
@@ -545,12 +552,6 @@ BASE_FEATURE(kInstalledApp, "InstalledApp", base::FEATURE_ENABLED_BY_DEFAULT);
 BASE_FEATURE(kInstalledAppProvider,
              "InstalledAppProvider",
              base::FEATURE_ENABLED_BY_DEFAULT);
-
-// Show warning about clearing data from installed apps in the clear browsing
-// data flow. The warning will be shown in a second dialog.
-BASE_FEATURE(kInstalledAppsInCbd,
-             "InstalledAppsInCbd",
-             base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Enable support for isolated web apps. This will guard features like serving
 // isolated web apps via the isolated-app:// scheme, and other advanced isolated
@@ -1024,6 +1025,13 @@ BASE_FEATURE(kSecurePaymentConfirmationDebug,
              "SecurePaymentConfirmationDebug",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
+// Remove the 'rp' field from the output SPC
+// CollectedClientAdditionalPaymentData dictionary. See
+// https://crbug.com/1356224 .
+BASE_FEATURE(kSecurePaymentConfirmationRemoveRpField,
+             "SecurePaymentConfirmationRemoveRpField",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 // Make sendBeacon throw for a Blob with a non simple type.
 BASE_FEATURE(kSendBeaconThrowForBlobWithNonSimpleType,
              "SendBeaconThrowForBlobWithNonSimpleType",
@@ -1035,11 +1043,6 @@ BASE_FEATURE(kSendBeaconThrowForBlobWithNonSimpleType,
 BASE_FEATURE(kServiceWorkerPaymentApps,
              "ServiceWorkerPaymentApps",
              base::FEATURE_ENABLED_BY_DEFAULT);
-
-// Enable connect-src CSP directive for the Web Payment API.
-BASE_FEATURE(kWebPaymentAPICSP,
-             "WebPaymentAPICSP",
-             base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Use this feature to experiment terminating a service worker when it doesn't
 // control any clients: https://crbug.com/1043845.
@@ -1274,25 +1277,10 @@ BASE_FEATURE(kWebAssemblyBaseline,
              "WebAssemblyBaseline",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
-// Enable memory protection for code JITed for WebAssembly.
-BASE_FEATURE(kWebAssemblyCodeProtection,
-             "WebAssemblyCodeProtection",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-
-#if (BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS)) && defined(ARCH_CPU_X86_64)
-// Use memory protection keys in userspace (PKU) (if available) to protect code
-// JITed for WebAssembly. Fall back to traditional memory protection if
-// WebAssemblyCodeProtection is also enabled.
-BASE_FEATURE(kWebAssemblyCodeProtectionPku,
-             "WebAssemblyCodeProtectionPku",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-#endif  // (BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS)) &&
-        // defined(ARCH_CPU_X86_64)
-
-// Enable WebAssembly stack switching.
+// Enable WebAssembly JSPI.
 #if defined(ARCH_CPU_X86_64) || defined(ARCH_CPU_ARM64)
-BASE_FEATURE(kEnableExperimentalWebAssemblyStackSwitching,
-             "WebAssemblyExperimentalStackSwitching",
+BASE_FEATURE(kEnableExperimentalWebAssemblyJSPI,
+             "WebAssemblyExperimentalJSPI",
              base::FEATURE_DISABLED_BY_DEFAULT);
 #endif  // defined(ARCH_CPU_X86_64) || defined(ARCH_CPU_ARM64)
 
@@ -1334,11 +1322,6 @@ BASE_FEATURE(kWebAssemblyTrapHandler,
              base::FEATURE_DISABLED_BY_DEFAULT
 #endif
 );
-
-// Controls whether WebAuthn conditional UI requests are supported.
-BASE_FEATURE(kWebAuthConditionalUI,
-             "WebAuthenticationConditionalUI",
-             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // Controls whether WebAuthn get requests for discoverable credentials use the
 // Touch To Fill bottom sheet on Android.
@@ -1442,7 +1425,7 @@ BASE_FEATURE(kBindingManagerConnectionLimit,
 // use a not perceptible binding for background renderers on Android Q+.
 BASE_FEATURE(kBindingManagerUseNotPerceptibleBinding,
              "BindingManagerUseNotPerceptibleBinding",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // Reduce the priority of GPU process when in background so it is more likely
 // to be killed first if the OS needs more memory.
@@ -1489,11 +1472,6 @@ BASE_FEATURE(kWarmUpNetworkProcess,
 // https://w3c.github.io/web-nfc/
 BASE_FEATURE(kWebNfc, "WebNFC", base::FEATURE_ENABLED_BY_DEFAULT);
 
-// Throttle begin frame if Android WebView isn't getting draws.
-BASE_FEATURE(kWebViewThrottleBackgroundBeginFrame,
-             "WebViewThrottleBackgroundBeginFrame",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-
 #endif  // BUILDFLAG(IS_ANDROID)
 
 #if BUILDFLAG(IS_MAC)
@@ -1506,6 +1484,11 @@ BASE_FEATURE(kDeviceMonitorMac,
 BASE_FEATURE(kIOSurfaceCapturer,
              "IOSurfaceCapturer",
              base::FEATURE_ENABLED_BY_DEFAULT);
+
+// Enables backgrounding hidden renderers on Mac.
+BASE_FEATURE(kMacAllowBackgroundingRenderProcesses,
+             "MacAllowBackgroundingRenderProcesses",
+             base::FEATURE_DISABLED_BY_DEFAULT);
 
 BASE_FEATURE(kMacSyscallSandbox,
              "MacSyscallSandbox",
@@ -1546,8 +1529,9 @@ bool ShouldEnableVideoCaptureService() {
 }
 
 VideoCaptureServiceConfiguration GetVideoCaptureServiceConfiguration() {
-  if (!ShouldEnableVideoCaptureService())
+  if (!ShouldEnableVideoCaptureService()) {
     return VideoCaptureServiceConfiguration::kDisabled;
+  }
 
 // On ChromeOS the service must run in the browser process, because parts of the
 // code depend on global objects that are only available in the Browser process.
@@ -1556,8 +1540,9 @@ VideoCaptureServiceConfiguration GetVideoCaptureServiceConfiguration() {
   return VideoCaptureServiceConfiguration::kEnabledForBrowserProcess;
 #else
 #if BUILDFLAG(IS_WIN)
-  if (base::win::GetVersion() <= base::win::Version::WIN7)
+  if (base::win::GetVersion() <= base::win::Version::WIN7) {
     return VideoCaptureServiceConfiguration::kEnabledForBrowserProcess;
+  }
 #endif
   return base::FeatureList::IsEnabled(
              features::kRunVideoCaptureServiceInBrowserProcess)

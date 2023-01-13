@@ -11,6 +11,7 @@
 #include "base/time/time.h"
 #include "chrome/updater/app/server/posix/update_service_internal_stub.h"
 #include "chrome/updater/app/server/posix/update_service_stub.h"
+#include "chrome/updater/constants.h"
 #include "chrome/updater/posix/setup.h"
 
 namespace updater {
@@ -76,8 +77,8 @@ void AppServerPosix::ActiveDuty(scoped_refptr<UpdateService> update_service) {
       base::BindRepeating(&AppServerPosix::TaskCompleted, this));
 }
 
-scoped_refptr<App> MakeAppServer() {
-  return base::MakeRefCounted<AppServerPosix>();
+bool AppServerPosix::SwapInNewVersion() {
+  return PromoteCandidate(updater_scope()) == kErrorOk;
 }
 
 }  // namespace updater

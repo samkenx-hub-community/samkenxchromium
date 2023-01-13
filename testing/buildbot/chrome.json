@@ -17,6 +17,9 @@
     ],
     "gtest_tests": [
       {
+        "args": [
+          "--tast-retries=1"
+        ],
         "merge": {
           "args": [],
           "script": "//testing/merge_scripts/standard_gtest_merge.py"
@@ -77,6 +80,7 @@
     "gtest_tests": [
       {
         "args": [
+          "--tast-retries=1",
           "--magic-vm-cache=magic_cros_vm_cache",
           "--strip-chrome"
         ],
@@ -322,6 +326,7 @@
       },
       {
         "args": [
+          "--tast-retries=1",
           "--magic-vm-cache=magic_cros_vm_cache"
         ],
         "merge": {
@@ -1326,6 +1331,9 @@
         }
       },
       {
+        "args": [
+          "--tast-retries=1"
+        ],
         "merge": {
           "args": [],
           "script": "//testing/merge_scripts/standard_gtest_merge.py"
@@ -1416,6 +1424,9 @@
         }
       },
       {
+        "args": [
+          "--tast-retries=1"
+        ],
         "merge": {
           "args": [],
           "script": "//testing/merge_scripts/standard_gtest_merge.py"
@@ -1479,92 +1490,6 @@
   "chromeos-jacuzzi-chrome": {
     "additional_compile_targets": [
       "chromiumos_preflight"
-    ],
-    "gtest_tests": [
-      {
-        "args": [
-          "--test-launcher-filter-file=../../testing/buildbot/filters/chromeos.base_unittests.filter"
-        ],
-        "merge": {
-          "args": [],
-          "script": "//testing/merge_scripts/standard_gtest_merge.py"
-        },
-        "swarming": {
-          "can_use_on_swarming_builders": true,
-          "dimension_sets": [
-            {
-              "device_type": "jacuzzi",
-              "os": "ChromeOS",
-              "pool": "chrome.tests"
-            }
-          ],
-          "service_account": "chrome-tester@chops-service-accounts.iam.gserviceaccount.com"
-        },
-        "test": "base_unittests",
-        "test_id_prefix": "ninja://base:base_unittests/",
-        "trigger_script": {
-          "script": "//testing/trigger_scripts/chromeos_device_trigger.py"
-        }
-      },
-      {
-        "experiment_percentage": 100,
-        "merge": {
-          "args": [],
-          "script": "//testing/merge_scripts/standard_gtest_merge.py"
-        },
-        "resultdb": {
-          "enable": true,
-          "has_native_resultdb_integration": true
-        },
-        "swarming": {
-          "can_use_on_swarming_builders": true,
-          "dimension_sets": [
-            {
-              "device_type": "jacuzzi",
-              "os": "ChromeOS",
-              "pool": "chrome.tests"
-            }
-          ],
-          "idempotent": false,
-          "io_timeout": 3600,
-          "service_account": "chrome-tester@chops-service-accounts.iam.gserviceaccount.com",
-          "shards": 10
-        },
-        "test": "chrome_all_tast_tests",
-        "test_id_prefix": "ninja://chromeos:chrome_all_tast_tests/",
-        "trigger_script": {
-          "script": "//testing/trigger_scripts/chromeos_device_trigger.py"
-        }
-      },
-      {
-        "args": [
-          "--strip-chrome"
-        ],
-        "merge": {
-          "script": "//tools/perf/process_perf_results.py"
-        },
-        "resultdb": {
-          "enable": true,
-          "has_native_resultdb_integration": true
-        },
-        "swarming": {
-          "can_use_on_swarming_builders": true,
-          "dimension_sets": [
-            {
-              "device_type": "jacuzzi",
-              "os": "ChromeOS",
-              "pool": "chrome.tests"
-            }
-          ],
-          "idempotent": false,
-          "service_account": "chrome-tester@chops-service-accounts.iam.gserviceaccount.com"
-        },
-        "test": "disk_usage_tast_test",
-        "test_id_prefix": "ninja://chromeos:disk_usage_tast_test/",
-        "trigger_script": {
-          "script": "//testing/trigger_scripts/chromeos_device_trigger.py"
-        }
-      }
     ]
   },
   "chromeos-kevin-chrome": {
@@ -1598,6 +1523,9 @@
         }
       },
       {
+        "args": [
+          "--tast-retries=1"
+        ],
         "merge": {
           "args": [],
           "script": "//testing/merge_scripts/standard_gtest_merge.py"
@@ -1697,8 +1625,7 @@
   "chromeos-octopus-chrome": {
     "additional_compile_targets": [
       "chromiumos_preflight"
-    ],
-    "gtest_tests": []
+    ]
   },
   "chromeos-reven-chrome": {
     "additional_compile_targets": [
@@ -1707,6 +1634,7 @@
     "gtest_tests": [
       {
         "args": [
+          "--tast-retries=1",
           "--magic-vm-cache=magic_cros_reven_vm_cache"
         ],
         "merge": {
@@ -1926,7 +1854,7 @@
       {
         "args": [],
         "cros_board": "dedede",
-        "cros_img": "dedede-release/R110-15274.0.0",
+        "cros_img": "dedede-release/R111-15310.0.0",
         "name": "lacros_all_tast_tests DEDEDE_RELEASE_LKGM",
         "resultdb": {
           "enable": true,
@@ -1942,7 +1870,7 @@
       {
         "args": [],
         "cros_board": "dedede",
-        "cros_img": "dedede-release/R110-15263.0.0",
+        "cros_img": "dedede-release/R110-15278.21.0",
         "name": "lacros_all_tast_tests DEDEDE_RELEASE_DEV",
         "resultdb": {
           "enable": true,
@@ -1958,7 +1886,7 @@
       {
         "args": [],
         "cros_board": "dedede",
-        "cros_img": "dedede-release/R109-15236.35.0",
+        "cros_img": "dedede-release/R110-15278.29.0",
         "name": "lacros_all_tast_tests DEDEDE_RELEASE_BETA",
         "resultdb": {
           "enable": true,
@@ -1974,7 +1902,7 @@
       {
         "args": [],
         "cros_board": "dedede",
-        "cros_img": "dedede-release/R108-15183.59.0",
+        "cros_img": "dedede-release/R108-15183.69.0",
         "name": "lacros_all_tast_tests DEDEDE_RELEASE_STABLE",
         "resultdb": {
           "enable": true,
@@ -1990,7 +1918,7 @@
       {
         "args": [],
         "cros_board": "eve",
-        "cros_img": "eve-release/R110-15274.0.0",
+        "cros_img": "eve-release/R111-15310.0.0",
         "name": "lacros_all_tast_tests EVE_RELEASE_LKGM",
         "resultdb": {
           "enable": true,
@@ -2006,7 +1934,7 @@
       {
         "args": [],
         "cros_board": "eve",
-        "cros_img": "eve-release/R110-15263.0.0",
+        "cros_img": "eve-release/R110-15278.21.0",
         "name": "lacros_all_tast_tests EVE_RELEASE_DEV",
         "resultdb": {
           "enable": true,
@@ -2038,7 +1966,7 @@
       {
         "args": [],
         "cros_board": "eve",
-        "cros_img": "eve-release/R108-15183.69.0",
+        "cros_img": "eve-release/R108-15183.78.0",
         "name": "lacros_all_tast_tests EVE_RELEASE_STABLE",
         "resultdb": {
           "enable": true,
@@ -2133,7 +2061,7 @@
       {
         "args": [],
         "cros_board": "jacuzzi",
-        "cros_img": "jacuzzi-release/R110-15274.0.0",
+        "cros_img": "jacuzzi-release/R111-15310.0.0",
         "name": "lacros_all_tast_tests JACUZZI_RELEASE_LKGM",
         "resultdb": {
           "enable": true,
@@ -2149,7 +2077,7 @@
       {
         "args": [],
         "cros_board": "jacuzzi",
-        "cros_img": "jacuzzi-release/R110-15269.0.0",
+        "cros_img": "jacuzzi-release/R110-15278.21.0",
         "name": "lacros_all_tast_tests JACUZZI_RELEASE_DEV",
         "resultdb": {
           "enable": true,
@@ -2165,7 +2093,7 @@
       {
         "args": [],
         "cros_board": "jacuzzi",
-        "cros_img": "jacuzzi-release/R109-15236.35.0",
+        "cros_img": "jacuzzi-release/R110-15278.29.0",
         "name": "lacros_all_tast_tests JACUZZI_RELEASE_BETA",
         "resultdb": {
           "enable": true,
@@ -2181,7 +2109,7 @@
       {
         "args": [],
         "cros_board": "jacuzzi",
-        "cros_img": "jacuzzi-release/R108-15183.69.0",
+        "cros_img": "jacuzzi-release/R108-15183.78.0",
         "name": "lacros_all_tast_tests JACUZZI_RELEASE_STABLE",
         "resultdb": {
           "enable": true,
@@ -2238,7 +2166,7 @@
       {
         "args": [],
         "cros_board": "herobrine",
-        "cros_img": "herobrine-release/R110-15274.0.0",
+        "cros_img": "herobrine-release/R111-15310.0.0",
         "name": "lacros_fyi_tast_tests HEROBRINE_RELEASE_LKGM",
         "resultdb": {
           "enable": true,

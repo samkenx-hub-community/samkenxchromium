@@ -4,8 +4,8 @@
 
 #include "services/metrics/public/cpp/ukm_recorder.h"
 
-#include "base/bind.h"
 #include "base/feature_list.h"
+#include "base/functional/bind.h"
 #include "build/build_config.h"
 #include "services/metrics/public/cpp/delegating_ukm_recorder.h"
 #include "services/metrics/public/cpp/ukm_entry_builder.h"
@@ -57,14 +57,6 @@ ukm::SourceId UkmRecorder::GetSourceIdForDesktopWebAppStartUrl(
 }
 
 // static
-ukm::SourceId UkmRecorder::GetSourceIdForWebsiteUrl(
-    base::PassKey<apps::WebsiteMetrics>,
-    const GURL& start_url) {
-  return UkmRecorder::GetSourceIdFromScopeImpl(
-      start_url, SourceIdType::DESKTOP_WEB_APP_ID);
-}
-
-// static
 ukm::SourceId UkmRecorder::GetSourceIdForWebIdentityFromScope(
     base::PassKey<content::FedCmMetrics>,
     const GURL& provider_url) {
@@ -78,6 +70,14 @@ ukm::SourceId UkmRecorder::GetSourceIdForRedirectUrl(
     const GURL& redirect_url) {
   return UkmRecorder::GetSourceIdFromScopeImpl(redirect_url,
                                                SourceIdType::REDIRECT_ID);
+}
+
+// static
+ukm::SourceId UkmRecorder::GetSourceIdForChromeOSWebsiteURL(
+    base::PassKey<apps::WebsiteMetrics>,
+    const GURL& redirect_url) {
+  return UkmRecorder::GetSourceIdFromScopeImpl(
+      redirect_url, SourceIdType::CHROMEOS_WEBSITE_ID);
 }
 
 void UkmRecorder::RecordOtherURL(ukm::SourceIdObj source_id, const GURL& url) {

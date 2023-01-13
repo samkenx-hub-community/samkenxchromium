@@ -411,6 +411,12 @@ BASE_FEATURE(kOmniboxMostVisitedTilesAddRecycledViewPool,
              "OmniboxMostVisitedTilesAddRecycledViewPool",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
+// If enabled, adds a grey square background to search icons, and makes answer
+// icon square instead of round.
+BASE_FEATURE(kSquareSuggestIcons,
+             "OmniboxSquareIcons",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 // If enabled, forces omnibox suggestion rows to be uniformly sized.
 BASE_FEATURE(kUniformRowHeight,
              "OmniboxUniformRowHeight",
@@ -451,6 +457,7 @@ BASE_FEATURE(kUpdatedConnectionSecurityIndicators,
 BASE_FEATURE(kDefaultTypedNavigationsToHttps,
              "OmniboxDefaultTypedNavigationsToHttps",
              enabled_by_default_desktop_android);
+
 // Parameter name used to look up the delay before falling back to the HTTP URL
 // while trying an HTTPS URL. The parameter is treated as a TimeDelta, so the
 // unit must be included in the value as well (e.g. 3s for 3 seconds).
@@ -474,6 +481,14 @@ BASE_FEATURE(kReportSearchboxStats,
 // If enabled, logs Omnibox URL scoring signals to OmniboxEventProto in UMA.
 BASE_FEATURE(kLogUrlScoringSignals,
              "LogUrlScoringSignals",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+// If enabled, runs the ML scoring model to assign relevance scores to URL
+// suggestions. This enables the autocomplete system related changes to support
+// ML scoring and moves scoring out of the autocomplete providers into
+// autocomplete controller.
+BASE_FEATURE(kMlRelevanceScoring,
+             "MlRelevanceScoring",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 }  // namespace omnibox

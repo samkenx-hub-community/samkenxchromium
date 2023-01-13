@@ -9,8 +9,10 @@
 #include "ash/display/screen_orientation_controller_test_api.h"
 #include "ash/shell.h"
 #include "ash/test/ash_test_base.h"
+#include "ash/wm/splitview/split_view_constants.h"
 #include "ash/wm/splitview/split_view_divider.h"
 #include "ash/wm/tablet_mode/tablet_mode_controller_test_api.h"
+#include "ash/wm/tablet_mode/tablet_mode_multitask_cue.h"
 #include "ash/wm/tablet_mode/tablet_mode_multitask_menu.h"
 #include "ash/wm/tablet_mode/tablet_mode_window_manager.h"
 #include "base/command_line.h"
@@ -127,6 +129,25 @@ class TabletModeMultitaskMenuEventHandlerTest : public AshTestBase {
     GenerateScroll(/*x=*/window.bounds().CenterPoint().x(),
                    /*start_y=*/window.bounds().y() + 8,
                    /*end_y=*/window.bounds().y() + kMenuDragPoint);
+  }
+
+  void PressPartialPrimary(const aura::Window& window) {
+    ShowMultitaskMenu(window);
+    GetEventGenerator()->GestureTapAt(GetMultitaskMenuView(GetMultitaskMenu())
+                                          ->partial_button_for_testing()
+                                          ->GetBoundsInScreen()
+                                          .left_center());
+  }
+
+  void PressPartialSecondary(const aura::Window& window) {
+    ShowMultitaskMenu(window);
+    gfx::Rect partial_bounds(GetMultitaskMenuView(GetMultitaskMenu())
+                                 ->partial_button_for_testing()
+                                 ->GetBoundsInScreen());
+    gfx::Point secondary_center(
+        gfx::Point(partial_bounds.x() + partial_bounds.width() * 0.67f,
+                   partial_bounds.y() + partial_bounds.y() * 0.5f));
+    GetEventGenerator()->GestureTapAt(secondary_center);
   }
 
   TabletModeMultitaskMenuEventHandler* GetMultitaskMenuEventHandler() {
@@ -482,11 +503,7 @@ TEST_F(TabletModeMultitaskMenuEventHandlerTest, PartialButtonFunctionality) {
   base::HistogramTester histogram_tester;
 
   // Test that primary button snaps to 0.67f screen ratio.
-  ShowMultitaskMenu(*window);
-  GetEventGenerator()->GestureTapAt(GetMultitaskMenuView(GetMultitaskMenu())
-                                        ->partial_button_for_testing()
-                                        ->GetBoundsInScreen()
-                                        .left_center());
+  PressPartialPrimary(*window);
   ASSERT_EQ(chromeos::WindowStateType::kPrimarySnapped,
             WindowState::Get(window.get())->GetStateType());
   const gfx::Rect work_area_bounds =
@@ -504,14 +521,7 @@ TEST_F(TabletModeMultitaskMenuEventHandlerTest, PartialButtonFunctionality) {
       chromeos::MultitaskMenuActionType::kPartialSplitButton, 1);
 
   // Test that secondary button snaps to 0.33f screen ratio.
-  ShowMultitaskMenu(*window);
-  gfx::Rect partial_bounds(GetMultitaskMenuView(GetMultitaskMenu())
-                               ->partial_button_for_testing()
-                               ->GetBoundsInScreen());
-  gfx::Point secondary_center(
-      gfx::Point(partial_bounds.x() + partial_bounds.width() * 0.67f,
-                 partial_bounds.y() + partial_bounds.y() * 0.5f));
-  GetEventGenerator()->GestureTapAt(secondary_center);
+  PressPartialSecondary(*window);
   ASSERT_EQ(chromeos::WindowStateType::kSecondarySnapped,
             WindowState::Get(window.get())->GetStateType());
   ASSERT_NEAR(work_area_bounds.width() * 0.33f, window->bounds().width(),
@@ -520,6 +530,35 @@ TEST_F(TabletModeMultitaskMenuEventHandlerTest, PartialButtonFunctionality) {
   histogram_tester.ExpectBucketCount(
       chromeos::GetActionTypeHistogramName(),
       chromeos::MultitaskMenuActionType::kPartialSplitButton, 2);
+}
+
+// Tests that the menu bounds are adjusted if the window is narrower than the
+// menu for two partial split windows.
+TEST_F(TabletModeMultitaskMenuEventHandlerTest, AdjustedMenuBounds) {
+  auto window1 = CreateTestWindow();
+  PressPartialPrimary(*window1);
+  auto window2 = CreateTestWindow();
+  PressPartialSecondary(*window2);
+
+  auto* split_view_controller =
+      SplitViewController::Get(Shell::GetPrimaryRootWindow());
+  ASSERT_TRUE(split_view_controller->IsWindowInSplitView(window1.get()));
+  ASSERT_TRUE(split_view_controller->IsWindowInSplitView(window2.get()));
+
+  // Test that the menu fits on the 1/3 window on the right.
+  const gfx::Rect work_area =
+      display::Screen::GetScreen()->GetPrimaryDisplay().work_area();
+  ASSERT_NEAR(work_area.width() * 0.33f, window2->bounds().width(),
+              kSplitviewDividerShortSideLength);
+  ShowMultitaskMenu(*window2);
+  EXPECT_EQ(work_area.right(),
+            GetMultitaskMenu()->widget()->GetWindowBoundsInScreen().right());
+
+  // Swap windows so the 1/3 window is on the left. Test that the menu fits.
+  split_view_controller->SwapWindows();
+  ShowMultitaskMenu(*window2);
+  EXPECT_EQ(work_area.x(),
+            GetMultitaskMenu()->widget()->GetWindowBoundsInScreen().x());
 }
 
 // Tests that tap outside the menu will close the menu.
@@ -560,6 +599,26 @@ TEST_F(TabletModeMultitaskMenuEventHandlerTest, HiddenButtons) {
   EXPECT_FALSE(multitask_menu_view->partial_button_for_testing());
   EXPECT_TRUE(multitask_menu_view->full_button_for_testing());
   EXPECT_FALSE(multitask_menu_view->float_button_for_testing());
+}
+
+// Tests that showing the menu will dismiss the visual cue (drag bar).
+TEST_F(TabletModeMultitaskMenuEventHandlerTest, DismissCueOnShowMenu) {
+  auto window = CreateAppWindow();
+
+  auto* multitask_cue = TabletModeControllerTestApi()
+                            .tablet_mode_window_manager()
+                            ->tablet_mode_multitask_cue();
+  ASSERT_TRUE(multitask_cue);
+  EXPECT_TRUE(multitask_cue->cue_layer_for_testing());
+
+  ShowMultitaskMenu(*window);
+  ASSERT_TRUE(GetMultitaskMenu());
+
+  multitask_cue = TabletModeControllerTestApi()
+                      .tablet_mode_window_manager()
+                      ->tablet_mode_multitask_cue();
+  ASSERT_TRUE(multitask_cue);
+  EXPECT_FALSE(multitask_cue->cue_layer_for_testing());
 }
 
 }  // namespace ash

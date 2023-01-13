@@ -9,11 +9,11 @@
 #include <string>
 #include <utility>
 
-#include "base/callback.h"
-#include "base/callback_helpers.h"
 #include "base/check.h"
 #include "base/containers/flat_set.h"
 #include "base/functional/bind.h"
+#include "base/functional/callback.h"
+#include "base/functional/callback_helpers.h"
 #include "base/memory/ptr_util.h"
 #include "base/sequence_checker.h"
 #include "base/strings/strcat.h"
@@ -75,8 +75,8 @@ InstallIsolatedWebAppCommand::InstallIsolatedWebAppCommand(
                                            InstallIsolatedWebAppCommandError>)>
         callback)
     : WebAppCommandTemplate<AppLock>("InstallIsolatedWebAppCommand"),
-      lock_description_(std::make_unique<AppLockDescription>(
-          base::flat_set<AppId>{isolation_info.app_id()})),
+      lock_description_(
+          std::make_unique<AppLockDescription>(isolation_info.app_id())),
       isolation_info_(isolation_info),
       isolation_data_(isolation_data),
       web_contents_(std::move(web_contents)),

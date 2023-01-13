@@ -22,12 +22,6 @@ bool GLImageEGLStream::BindTexImage(unsigned target) {
   return true;
 }
 
-bool GLImageEGLStream::CopyTexSubImage(unsigned target,
-                                       const gfx::Point& offset,
-                                       const gfx::Rect& rect) {
-  return false;
-}
-
 unsigned GLImageEGLStream::GetInternalFormat() {
   return GL_RGBA;
 }
@@ -47,8 +41,6 @@ gl::GLImage::Type GLImageEGLStream::GetType() const {
 void GLImageEGLStream::OnMemoryDump(base::trace_event::ProcessMemoryDump* pmd,
                                     uint64_t process_tracing_id,
                                     const std::string& dump_name) {}
-
-void GLImageEGLStream::ReleaseTexImage(unsigned target) {}
 
 void GLImageEGLStream::SetTexture(
     const Microsoft::WRL::ComPtr<ID3D11Texture2D>& texture,

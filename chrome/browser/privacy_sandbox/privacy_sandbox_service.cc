@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <iterator>
+#include <numeric>
 
 #include "base/feature_list.h"
 #include "base/i18n/time_formatting.h"
@@ -89,6 +90,88 @@ bool IsRegularProfile(profile_metrics::BrowserProfileType profile_type) {
 #endif
 }
 
+// Returns the text contents of the Topics Consent dialog.
+std::string GetTopicsConfirmationText() {
+  std::vector<int> string_ids = {
+      IDS_PRIVACY_SANDBOX_M1_CONSENT_TITLE,
+      IDS_PRIVACY_SANDBOX_M1_CONSENT_DESCRIPTION_1,
+      IDS_PRIVACY_SANDBOX_M1_CONSENT_DESCRIPTION_2,
+      IDS_PRIVACY_SANDBOX_M1_CONSENT_DESCRIPTION_3,
+      IDS_PRIVACY_SANDBOX_M1_CONSENT_DESCRIPTION_4,
+      IDS_PRIVACY_SANDBOX_M1_CONSENT_LEARN_MORE_EXPAND_LABEL,
+      IDS_PRIVACY_SANDBOX_M1_CONSENT_LEARN_MORE_BULLET_1,
+      IDS_PRIVACY_SANDBOX_M1_CONSENT_LEARN_MORE_BULLET_2,
+      IDS_PRIVACY_SANDBOX_M1_CONSENT_LEARN_MORE_BULLET_3,
+      IDS_PRIVACY_SANDBOX_M1_CONSENT_LEARN_MORE_LINK};
+
+  return std::accumulate(
+      string_ids.begin(), string_ids.end(), std::string(),
+      [](const std::string& previous_result, int next_id) {
+        auto next_string = l10n_util::GetStringUTF8(next_id);
+        // Remove bold tags present in some strings.
+        base::ReplaceSubstringsAfterOffset(&next_string, 0, "<b>", "");
+        base::ReplaceSubstringsAfterOffset(&next_string, 0, "</b>", "");
+        return previous_result + (!previous_result.empty() ? " " : "") +
+               next_string;
+      }
+
+  );
+}
+
+// Returns the text contents of the Topics settings page.
+std::string GetTopicsSettingsText(bool did_consent,
+                                  bool has_current_topics,
+                                  bool has_blocked_topics) {
+  // `did_consent` refers to the _updated_ state, and so the previous state,
+  // e.g. when the user clicked the toggle, will be the opposite.
+  auto topics_prev_enabled = !did_consent;
+
+  // A user should only have current topics while topics is enabled. Old topics
+  // will not appear when the user enables, as they will have been cleared when
+  // topics was previously disabled, or never generated at all.
+  DCHECK(topics_prev_enabled || !has_current_topics);
+
+  int blocked_topics_description =
+      has_blocked_topics
+          ? IDS_SETTINGS_TOPICS_PAGE_BLOCKED_TOPICS_DESCRIPTION
+          : IDS_SETTINGS_TOPICS_PAGE_BLOCKED_TOPICS_DESCRIPTION_EMPTY;
+
+  std::vector<int> string_ids = {
+      IDS_SETTINGS_TOPICS_PAGE_TITLE,
+      IDS_SETTINGS_TOPICS_PAGE_TOGGLE_LABEL,
+      IDS_SETTINGS_TOPICS_PAGE_TOGGLE_SUB_LABEL,
+      IDS_SETTINGS_TOPICS_PAGE_CURRENT_TOPICS_HEADING,
+      IDS_SETTINGS_TOPICS_PAGE_CURRENT_TOPICS_DESCRIPTION_CANONICAL,
+      IDS_SETTINGS_TOPICS_PAGE_LEARN_MORE_HEADING,
+      IDS_SETTINGS_TOPICS_PAGE_LEARN_MORE_BULLET_1,
+      IDS_SETTINGS_TOPICS_PAGE_LEARN_MORE_BULLET_2,
+      IDS_SETTINGS_TOPICS_PAGE_LEARN_MORE_BULLET_3,
+      IDS_SETTINGS_TOPICS_PAGE_BLOCKED_TOPICS_HEADING,
+      blocked_topics_description,
+      IDS_SETTINGS_TOPICS_PAGE_FOOTER_CANONICAL};
+
+  // Additional strings are displayed if there were no current topics, either
+  // because they were empty, or because Topics was disabled. These will have
+  // appeared after the current topics description.
+  if (!topics_prev_enabled) {
+    string_ids.insert(
+        string_ids.begin() + 5,
+        IDS_SETTINGS_TOPICS_PAGE_CURRENT_TOPICS_DESCRIPTION_DISABLED);
+  } else if (!has_current_topics) {
+    string_ids.insert(
+        string_ids.begin() + 5,
+        IDS_SETTINGS_TOPICS_PAGE_CURRENT_TOPICS_DESCRIPTION_EMPTY);
+  }
+
+  return std::accumulate(string_ids.begin(), string_ids.end(), std::string(),
+                         [](const std::string& previous_result, int next_id) {
+                           auto next_string = l10n_util::GetStringUTF8(next_id);
+                           return previous_result +
+                                  (!previous_result.empty() ? " " : "") +
+                                  next_string;
+                         });
+}
+
 }  // namespace
 
 PrivacySandboxService::PrivacySandboxService() = default;
@@ -127,6 +210,19 @@ PrivacySandboxService::PrivacySandboxService(
       base::BindRepeating(&PrivacySandboxService::OnPrivacySandboxV2PrefChanged,
                           base::Unretained(this)));
 
+  user_prefs_registrar_.Add(
+      prefs::kPrivacySandboxM1TopicsEnabled,
+      base::BindRepeating(&PrivacySandboxService::OnTopicsPrefChanged,
+                          base::Unretained(this)));
+  user_prefs_registrar_.Add(
+      prefs::kPrivacySandboxM1FledgeEnabled,
+      base::BindRepeating(&PrivacySandboxService::OnFledgePrefChanged,
+                          base::Unretained(this)));
+  user_prefs_registrar_.Add(
+      prefs::kPrivacySandboxM1AdMeasurementEnabled,
+      base::BindRepeating(&PrivacySandboxService::OnAdMeasurementPrefChanged,
+                          base::Unretained(this)));
+
   // If the Sandbox is currently restricted, disable the V2 preference. The user
   // must manually enable the sandbox if they stop being restricted.
   if (IsPrivacySandboxRestricted())
@@ -154,85 +250,21 @@ PrivacySandboxService::GetRequiredPromptType() {
 void PrivacySandboxService::PromptActionOccurred(
     PrivacySandboxService::PromptAction action) {
   InformSentimentService(action);
-  switch (action) {
-    case (PromptAction::kNoticeShown): {
-      // TODO(crbug.com/1378703): Handle new prompt types.
-      if (PromptType::kNotice == GetRequiredPromptType()) {
-        // The new Privacy Sandbox pref can be enabled when the notice has been
-        // shown. Note that a notice will not have been shown if the user
-        // disabled the old Privacy Sandbox pref.
-        pref_service_->SetBoolean(prefs::kPrivacySandboxApisEnabledV2, true);
-        pref_service_->SetBoolean(prefs::kPrivacySandboxNoticeDisplayed, true);
-      }
-      base::RecordAction(
-          base::UserMetricsAction("Settings.PrivacySandbox.Notice.Shown"));
-      break;
-    }
-    case (PromptAction::kNoticeOpenSettings): {
-      base::RecordAction(base::UserMetricsAction(
-          "Settings.PrivacySandbox.Notice.OpenedSettings"));
-      break;
-    }
-    case (PromptAction::kNoticeAcknowledge): {
-      base::RecordAction(base::UserMetricsAction(
-          "Settings.PrivacySandbox.Notice.Acknowledged"));
-      break;
-    }
-    case (PromptAction::kNoticeDismiss): {
-      base::RecordAction(
-          base::UserMetricsAction("Settings.PrivacySandbox.Notice.Dismissed"));
-      break;
-    }
-    case (PromptAction::kNoticeClosedNoInteraction): {
-      base::RecordAction(base::UserMetricsAction(
-          "Settings.PrivacySandbox.Notice.ClosedNoInteraction"));
-      break;
-    }
-    case (PromptAction::kConsentShown): {
-      base::RecordAction(
-          base::UserMetricsAction("Settings.PrivacySandbox.Consent.Shown"));
-      break;
-    }
-    case (PromptAction::kConsentAccepted): {
-      pref_service_->SetBoolean(prefs::kPrivacySandboxApisEnabledV2, true);
-      pref_service_->SetBoolean(prefs::kPrivacySandboxConsentDecisionMade,
-                                true);
-      base::RecordAction(
-          base::UserMetricsAction("Settings.PrivacySandbox.Consent.Accepted"));
-      break;
-    }
-    case (PromptAction::kConsentDeclined): {
-      pref_service_->SetBoolean(prefs::kPrivacySandboxApisEnabledV2, false);
-      pref_service_->SetBoolean(prefs::kPrivacySandboxConsentDecisionMade,
-                                true);
-      base::RecordAction(
-          base::UserMetricsAction("Settings.PrivacySandbox.Consent.Declined"));
-      break;
-    }
-    case (PromptAction::kConsentMoreInfoOpened): {
-      base::RecordAction(base::UserMetricsAction(
-          "Settings.PrivacySandbox.Consent.LearnMoreExpanded"));
-      break;
-    }
-    case (PromptAction::kConsentClosedNoDecision): {
-      base::RecordAction(base::UserMetricsAction(
-          "Settings.PrivacySandbox.Consent.ClosedNoInteraction"));
-      break;
-    }
-    case (PromptAction::kNoticeLearnMore): {
-      base::RecordAction(
-          base::UserMetricsAction("Settings.PrivacySandbox.Notice.LearnMore"));
-      break;
-    }
-    case (PromptAction::kNoticeMoreInfoOpened): {
-      base::RecordAction(base::UserMetricsAction(
-          "Settings.PrivacySandbox.Notice.LearnMoreExpanded"));
-      break;
-    }
-    // TODO(crbug.com/1378703): Clean up PromptAction and remove
-    // *LearnMoreClosed or add use actions metrics for those prompt actions.
-    default:
-      break;
+  RecordPromptActionMetrics(action);
+
+  if (PromptAction::kNoticeShown == action &&
+      PromptType::kNotice == GetRequiredPromptType()) {
+    // The Privacy Sandbox pref can be enabled when the notice has been
+    // shown. Note that a notice will not have been shown if the user
+    // disabled the old Privacy Sandbox pref.
+    pref_service_->SetBoolean(prefs::kPrivacySandboxApisEnabledV2, true);
+    pref_service_->SetBoolean(prefs::kPrivacySandboxNoticeDisplayed, true);
+  } else if (PromptAction::kConsentAccepted == action) {
+    pref_service_->SetBoolean(prefs::kPrivacySandboxApisEnabledV2, true);
+    pref_service_->SetBoolean(prefs::kPrivacySandboxConsentDecisionMade, true);
+  } else if (PromptAction::kConsentDeclined == action) {
+    pref_service_->SetBoolean(prefs::kPrivacySandboxApisEnabledV2, false);
+    pref_service_->SetBoolean(prefs::kPrivacySandboxConsentDecisionMade, true);
   }
 }
 
@@ -334,8 +366,8 @@ void PrivacySandboxService::GetFledgeJoiningEtldPlusOneForDisplay(
     return;
   }
 
-  interest_group_manager_->GetAllInterestGroupJoiningOrigins(base::BindOnce(
-      &PrivacySandboxService::ConvertFledgeJoiningTopFramesForDisplay,
+  interest_group_manager_->GetAllInterestGroupDataKeys(base::BindOnce(
+      &PrivacySandboxService::ConvertInterestGroupDataKeysForDisplay,
       weak_factory_.GetWeakPtr(), std::move(callback)));
 }
 
@@ -546,11 +578,16 @@ void PrivacySandboxService::LogPrivacySandboxState() {
   }
 }
 
-void PrivacySandboxService::ConvertFledgeJoiningTopFramesForDisplay(
+void PrivacySandboxService::ConvertInterestGroupDataKeysForDisplay(
     base::OnceCallback<void(std::vector<std::string>)> callback,
-    std::vector<url::Origin> top_frames) {
+    std::vector<content::InterestGroupManager::InterestGroupDataKey>
+        data_keys) {
   std::set<std::string> display_entries;
-  for (const auto& origin : top_frames) {
+  for (const auto& data_key : data_keys) {
+    // When displaying interest group information in settings, the joining
+    // origin is the relevant origin.
+    const auto& origin = data_key.joining_origin;
+
     // Prefer to display the associated eTLD+1, if there is one.
     auto etld_plus_one = net::registry_controlled_domains::GetDomainAndRegistry(
         origin, net::registry_controlled_domains::INCLUDE_PRIVATE_REGISTRIES);
@@ -578,8 +615,10 @@ void PrivacySandboxService::ConvertFledgeJoiningTopFramesForDisplay(
 
 std::vector<privacy_sandbox::CanonicalTopic>
 PrivacySandboxService::GetCurrentTopTopics() const {
-  if (privacy_sandbox::kPrivacySandboxSettings3ShowSampleDataForTesting.Get())
+  if (privacy_sandbox::kPrivacySandboxSettings3ShowSampleDataForTesting.Get() ||
+      privacy_sandbox::kPrivacySandboxSettings4ShowSampleDataForTesting.Get()) {
     return {fake_current_topics_.begin(), fake_current_topics_.end()};
+  }
 
   if (!browsing_topics_service_)
     return {};
@@ -596,8 +635,10 @@ PrivacySandboxService::GetCurrentTopTopics() const {
 
 std::vector<privacy_sandbox::CanonicalTopic>
 PrivacySandboxService::GetBlockedTopics() const {
-  if (privacy_sandbox::kPrivacySandboxSettings3ShowSampleDataForTesting.Get())
+  if (privacy_sandbox::kPrivacySandboxSettings3ShowSampleDataForTesting.Get() ||
+      privacy_sandbox::kPrivacySandboxSettings4ShowSampleDataForTesting.Get()) {
     return {fake_blocked_topics_.begin(), fake_blocked_topics_.end()};
+  }
 
   const base::Value::List& pref_value =
       pref_service_->GetList(prefs::kPrivacySandboxBlockedTopics);
@@ -617,7 +658,8 @@ PrivacySandboxService::GetBlockedTopics() const {
 void PrivacySandboxService::SetTopicAllowed(
     privacy_sandbox::CanonicalTopic topic,
     bool allowed) {
-  if (privacy_sandbox::kPrivacySandboxSettings3ShowSampleDataForTesting.Get()) {
+  if (privacy_sandbox::kPrivacySandboxSettings3ShowSampleDataForTesting.Get() ||
+      privacy_sandbox::kPrivacySandboxSettings4ShowSampleDataForTesting.Get()) {
     if (allowed) {
       fake_current_topics_.insert(topic);
       fake_blocked_topics_.erase(topic);
@@ -712,6 +754,43 @@ bool PrivacySandboxService::IsPartOfManagedFirstPartySet(
   }
 
   return first_party_sets_policy_service_->IsSiteInManagedSet(site);
+}
+
+void PrivacySandboxService::TopicsConfirmationDecisionMade(
+    bool confirmed) const {
+  RecordUpdatedTopicsConsent(
+      privacy_sandbox::TopicsConsentUpdateSource::kConfirmation, confirmed);
+}
+
+void PrivacySandboxService::TopicsToggleChanged(bool new_value) const {
+  RecordUpdatedTopicsConsent(
+      privacy_sandbox::TopicsConsentUpdateSource::kSettings, new_value);
+}
+
+void PrivacySandboxService::TopicsConsentRequired() const {
+  // TODO(crbug.com/1332513): Implement + Test.
+  NOTIMPLEMENTED();
+}
+
+bool PrivacySandboxService::TopicsHasActiveConsent() const {
+  return pref_service_->GetBoolean(prefs::kPrivacySandboxTopicsConsentGiven);
+}
+
+privacy_sandbox::TopicsConsentUpdateSource
+PrivacySandboxService::TopicsConsentLastUpdateSource() const {
+  return static_cast<privacy_sandbox::TopicsConsentUpdateSource>(
+      pref_service_->GetInteger(
+          prefs::kPrivacySandboxTopicsConsentLastUpdateReason));
+}
+
+base::Time PrivacySandboxService::TopicsConsentLastUpdateTime() const {
+  return pref_service_->GetTime(
+      prefs::kPrivacySandboxTopicsConsentLastUpdateTime);
+}
+
+std::string PrivacySandboxService::TopicsConsentLastUpdateText() const {
+  return pref_service_->GetString(
+      prefs::kPrivacySandboxTopicsConsentTextAtLastUpdate);
 }
 
 /*static*/ PrivacySandboxService::PromptType
@@ -931,6 +1010,40 @@ void PrivacySandboxService::MaybeInitializeFirstPartySetsPref() {
       prefs::kPrivacySandboxFirstPartySetsDataAccessAllowedInitialized, true);
 }
 
+void PrivacySandboxService::RecordUpdatedTopicsConsent(
+    privacy_sandbox::TopicsConsentUpdateSource source,
+    bool did_consent) const {
+  std::string consent_text;
+  switch (source) {
+    case (privacy_sandbox::TopicsConsentUpdateSource::kDefaultValue): {
+      NOTREACHED();
+      break;
+    }
+    case (privacy_sandbox::TopicsConsentUpdateSource::kConfirmation): {
+      consent_text = GetTopicsConfirmationText();
+      break;
+    }
+    case (privacy_sandbox::TopicsConsentUpdateSource::kSettings): {
+      int current_topics_count = GetCurrentTopTopics().size();
+      int blocked_topics_count = GetBlockedTopics().size();
+      consent_text = GetTopicsSettingsText(
+          did_consent, current_topics_count > 0, blocked_topics_count > 0);
+      break;
+    }
+    default:
+      NOTREACHED();
+  }
+
+  pref_service_->SetBoolean(prefs::kPrivacySandboxTopicsConsentGiven,
+                            did_consent);
+  pref_service_->SetTime(prefs::kPrivacySandboxTopicsConsentLastUpdateTime,
+                         base::Time::Now());
+  pref_service_->SetInteger(prefs::kPrivacySandboxTopicsConsentLastUpdateReason,
+                            static_cast<int>(source));
+  pref_service_->SetString(prefs::kPrivacySandboxTopicsConsentTextAtLastUpdate,
+                           consent_text);
+}
+
 void PrivacySandboxService::InformSentimentService(
     PrivacySandboxService::PromptAction action) {
 #if !BUILDFLAG(IS_ANDROID)
@@ -968,4 +1081,137 @@ void PrivacySandboxService::InformSentimentService(
 
   sentiment_service_->InteractedWithPrivacySandbox3(area);
 #endif
+}
+
+void PrivacySandboxService::RecordPromptActionMetrics(
+    PrivacySandboxService::PromptAction action) {
+  switch (action) {
+    case (PromptAction::kNoticeShown): {
+      base::RecordAction(
+          base::UserMetricsAction("Settings.PrivacySandbox.Notice.Shown"));
+      break;
+    }
+    case (PromptAction::kNoticeOpenSettings): {
+      base::RecordAction(base::UserMetricsAction(
+          "Settings.PrivacySandbox.Notice.OpenedSettings"));
+      break;
+    }
+    case (PromptAction::kNoticeAcknowledge): {
+      base::RecordAction(base::UserMetricsAction(
+          "Settings.PrivacySandbox.Notice.Acknowledged"));
+      break;
+    }
+    case (PromptAction::kNoticeDismiss): {
+      base::RecordAction(
+          base::UserMetricsAction("Settings.PrivacySandbox.Notice.Dismissed"));
+      break;
+    }
+    case (PromptAction::kNoticeClosedNoInteraction): {
+      base::RecordAction(base::UserMetricsAction(
+          "Settings.PrivacySandbox.Notice.ClosedNoInteraction"));
+      break;
+    }
+    case (PromptAction::kConsentShown): {
+      base::RecordAction(
+          base::UserMetricsAction("Settings.PrivacySandbox.Consent.Shown"));
+      break;
+    }
+    case (PromptAction::kConsentAccepted): {
+      base::RecordAction(
+          base::UserMetricsAction("Settings.PrivacySandbox.Consent.Accepted"));
+      break;
+    }
+    case (PromptAction::kConsentDeclined): {
+      base::RecordAction(
+          base::UserMetricsAction("Settings.PrivacySandbox.Consent.Declined"));
+      break;
+    }
+    case (PromptAction::kConsentMoreInfoOpened): {
+      base::RecordAction(base::UserMetricsAction(
+          "Settings.PrivacySandbox.Consent.LearnMoreExpanded"));
+      break;
+    }
+    case (PromptAction::kConsentMoreInfoClosed): {
+      base::RecordAction(base::UserMetricsAction(
+          "Settings.PrivacySandbox.Consent.LearnMoreClosed"));
+      break;
+    }
+    case (PromptAction::kConsentClosedNoDecision): {
+      base::RecordAction(base::UserMetricsAction(
+          "Settings.PrivacySandbox.Consent.ClosedNoInteraction"));
+      break;
+    }
+    case (PromptAction::kNoticeLearnMore): {
+      base::RecordAction(
+          base::UserMetricsAction("Settings.PrivacySandbox.Notice.LearnMore"));
+      break;
+    }
+    case (PromptAction::kNoticeMoreInfoOpened): {
+      base::RecordAction(base::UserMetricsAction(
+          "Settings.PrivacySandbox.Notice.LearnMoreExpanded"));
+      break;
+    }
+    case (PromptAction::kNoticeMoreInfoClosed): {
+      base::RecordAction(base::UserMetricsAction(
+          "Settings.PrivacySandbox.Notice.LearnMoreClosed"));
+      break;
+    }
+    case (PromptAction::kConsentMoreButtonClicked): {
+      base::RecordAction(base::UserMetricsAction(
+          "Settings.PrivacySandbox.Consent.MoreButtonClicked"));
+      break;
+    }
+    case (PromptAction::kNoticeMoreButtonClicked): {
+      base::RecordAction(base::UserMetricsAction(
+          "Settings.PrivacySandbox.Notice.MoreButtonClicked"));
+      break;
+    }
+  }
+}
+
+void PrivacySandboxService::OnTopicsPrefChanged() {
+  // If the user has disabled the preference, any related data stored should be
+  // cleared.
+  if (pref_service_->GetBoolean(prefs::kPrivacySandboxM1TopicsEnabled)) {
+    return;
+  }
+
+  if (browsing_topics_service_) {
+    browsing_topics_service_->ClearAllTopicsData();
+  }
+}
+
+void PrivacySandboxService::OnFledgePrefChanged() {
+  // If the user has disabled the preference, any related data stored should be
+  // cleared.
+  if (pref_service_->GetBoolean(prefs::kPrivacySandboxM1FledgeEnabled)) {
+    return;
+  }
+
+  if (browsing_data_remover_) {
+    browsing_data_remover_->Remove(
+        base::Time::Min(), base::Time::Max(),
+        content::BrowsingDataRemover::DATA_TYPE_INTEREST_GROUPS |
+            content::BrowsingDataRemover::DATA_TYPE_SHARED_STORAGE |
+            content::BrowsingDataRemover::DATA_TYPE_INTEREST_GROUPS_INTERNAL,
+        content::BrowsingDataRemover::ORIGIN_TYPE_UNPROTECTED_WEB);
+  }
+}
+
+void PrivacySandboxService::OnAdMeasurementPrefChanged() {
+  // If the user has disabled the preference, any related data stored should be
+  // cleared.
+  if (pref_service_->GetBoolean(prefs::kPrivacySandboxM1AdMeasurementEnabled)) {
+    return;
+  }
+
+  if (browsing_data_remover_) {
+    browsing_data_remover_->Remove(
+        base::Time::Min(), base::Time::Max(),
+        content::BrowsingDataRemover::DATA_TYPE_ATTRIBUTION_REPORTING |
+            content::BrowsingDataRemover::DATA_TYPE_AGGREGATION_SERVICE |
+            content::BrowsingDataRemover::
+                DATA_TYPE_PRIVATE_AGGREGATION_INTERNAL,
+        content::BrowsingDataRemover::ORIGIN_TYPE_UNPROTECTED_WEB);
+  }
 }

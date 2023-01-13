@@ -7,7 +7,7 @@
 
 #import <Foundation/Foundation.h>
 
-#include "base/callback.h"
+#include "base/functional/callback.h"
 #include "base/location.h"
 #include "base/memory/weak_ptr.h"
 #include "base/observer_list.h"
@@ -77,6 +77,7 @@ class FakeSystemIdentityManager final : public SystemIdentityManager {
       HandleMDMNotificationCallback callback);
 
   // SystemIdentityManager implementation.
+  bool IsSigninSupported() final;
   bool HandleSessionOpenURLContexts(
       UIScene* scene,
       NSSet<UIOpenURLContext*>* url_contexts) final;

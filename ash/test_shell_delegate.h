@@ -9,7 +9,7 @@
 #include <string>
 
 #include "ash/shell_delegate.h"
-#include "base/callback.h"
+#include "base/functional/callback.h"
 #include "chromeos/ash/services/multidevice_setup/public/mojom/multidevice_setup.mojom.h"
 #include "mojo/public/cpp/bindings/pending_receiver.h"
 #include "url/gurl.h"
@@ -45,8 +45,7 @@ class TestShellDelegate : public ShellDelegate {
       BackGestureContextualNudgeController* controller) override;
   std::unique_ptr<NearbyShareDelegate> CreateNearbyShareDelegate(
       NearbyShareController* controller) const override;
-  std::unique_ptr<DesksTemplatesDelegate> CreateDesksTemplatesDelegate()
-      const override;
+  std::unique_ptr<SavedDeskDelegate> CreateSavedDeskDelegate() const override;
   std::unique_ptr<SystemSoundsDelegate> CreateSystemSoundsDelegate()
       const override;
   scoped_refptr<network::SharedURLLoaderFactory>

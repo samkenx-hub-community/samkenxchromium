@@ -56,11 +56,18 @@ enum class UserMediaRequestType { kUserMedia, kDisplayMedia, kDisplayMediaSet };
 enum class UserMediaRequestResult {
   kOk = 0,
   kTimedOut = 1,
-  kUnknownError = 2,
+  kSecurityError = 2,
   kInvalidConstraints = 3,
   kOverConstrainedError = 4,
   kContextDestroyed = 5,
-  kMaxValue = kContextDestroyed
+  kNotAllowedError = 6,
+  kNotFoundError = 7,
+  kAbortError = 8,
+  kNotReadableError = 9,
+  kNotSupportedError = 10,
+  kInsecureContext = 11,
+  kInvalidStateError = 12,
+  kMaxValue = kInvalidStateError
 };
 
 class MODULES_EXPORT UserMediaRequest final

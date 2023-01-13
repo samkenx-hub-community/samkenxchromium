@@ -9,10 +9,10 @@
 #include <set>
 #include <string>
 
-#include "base/bind.h"
-#include "base/callback.h"
 #include "base/containers/flat_map.h"
 #include "base/containers/flat_set.h"
+#include "base/functional/bind.h"
+#include "base/functional/callback.h"
 #include "base/metrics/field_trial_params.h"
 #include "base/metrics/histogram_functions.h"
 #include "base/observer_list.h"
@@ -28,6 +28,7 @@
 #include "components/password_manager/core/browser/ui/saved_passwords_presenter.h"
 
 #if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
+#include "components/password_manager/core/browser/ui/reuse_check_utility.h"
 #include "components/password_manager/core/browser/ui/weak_check_utility.h"
 #endif
 
@@ -64,6 +65,16 @@ InsecureCredentialsManager::InsecureCredentialsManager(
 InsecureCredentialsManager::~InsecureCredentialsManager() = default;
 
 #if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
+void InsecureCredentialsManager::StartReuseCheck(
+    base::OnceClosure on_check_done) {
+  base::ThreadPool::PostTaskAndReplyWithResult(
+      FROM_HERE, {base::MayBlock(), base::TaskPriority::USER_VISIBLE},
+      base::BindOnce(&BulkReuseCheck, presenter_->GetSavedPasswords()),
+      base::BindOnce(&InsecureCredentialsManager::OnReuseCheckDone,
+                     weak_ptr_factory_.GetWeakPtr(), base::ElapsedTimer())
+          .Then(std::move(on_check_done)));
+}
+
 void InsecureCredentialsManager::StartWeakCheck(
     base::OnceClosure on_check_done) {
   base::ThreadPool::PostTaskAndReplyWithResult(
@@ -140,6 +151,12 @@ InsecureCredentialsManager::GetInsecureCredentialEntries() const {
            password_manager::InsecurityMetadata(
                base::Time(), password_manager::IsMuted(false))});
     }
+    if (reused_passwords_.contains(credential.password)) {
+      credential.password_issues.insert(
+          {password_manager::InsecureType::kReused,
+           password_manager::InsecurityMetadata(
+               base::Time(), password_manager::IsMuted(false))});
+    }
   }
   base::EraseIf(credentials, [](const auto& credential) {
     return credential.password_issues.empty();
@@ -154,6 +171,13 @@ void InsecureCredentialsManager::AddObserver(Observer* observer) {
 
 void InsecureCredentialsManager::RemoveObserver(Observer* observer) {
   observers_.RemoveObserver(observer);
+}
+
+void InsecureCredentialsManager::OnReuseCheckDone(
+    base::ElapsedTimer timer_since_reuse_check_start,
+    base::flat_set<std::u16string> reused_passwords) {
+  reused_passwords_ = std::move(reused_passwords);
+  NotifyInsecureCredentialsChanged();
 }
 
 void InsecureCredentialsManager::OnWeakCheckDone(

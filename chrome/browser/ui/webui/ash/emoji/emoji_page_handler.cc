@@ -12,6 +12,7 @@
 #include "base/trace_event/trace_event.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/webui/ash/emoji/emoji_ui.h"
+#include "content/public/browser/storage_partition.h"
 #include "ui/base/clipboard/scoped_clipboard_writer.h"
 #include "ui/base/ime/ash/ime_bridge.h"
 #include "ui/base/ime/input_method_observer.h"
@@ -129,7 +130,11 @@ EmojiPageHandler::EmojiPageHandler(
     : receiver_(this, std::move(receiver)),
       webui_controller_(webui_controller),
       incognito_mode_(incognito_mode),
-      no_text_field_(no_text_field) {}
+      no_text_field_(no_text_field) {
+  Profile* profile = Profile::FromWebUI(web_ui);
+  url_loader_factory_ = profile->GetDefaultStoragePartition()
+                            ->GetURLLoaderFactoryForBrowserProcess();
+}
 
 EmojiPageHandler::~EmojiPageHandler() {}
 
@@ -165,9 +170,27 @@ void EmojiPageHandler::GetFeatureList(GetFeatureListCallback callback) {
 }
 
 void EmojiPageHandler::GetCategories(GetCategoriesCallback callback) {
-  content::WebUI* web_ui = webui_controller_->web_ui();
-  Profile* profile = Profile::FromWebUI(web_ui);
-  gif_tenor_api_fetcher_.FetchCategories(std::move(callback), profile);
+  gif_tenor_api_fetcher_.FetchCategories(std::move(callback),
+                                         url_loader_factory_);
+}
+
+void EmojiPageHandler::GetFeaturedGifs(const absl::optional<std::string>& pos,
+                                       GetFeaturedGifsCallback callback) {
+  gif_tenor_api_fetcher_.FetchFeaturedGifs(std::move(callback),
+                                           url_loader_factory_, pos);
+}
+
+void EmojiPageHandler::SearchGifs(const std::string& query,
+                                  const absl::optional<std::string>& pos,
+                                  SearchGifsCallback callback) {
+  gif_tenor_api_fetcher_.FetchGifSearch(std::move(callback),
+                                        url_loader_factory_, query, pos);
+}
+
+void EmojiPageHandler::GetGifsByIds(const std::vector<std::string>& ids,
+                                    GetGifsByIdsCallback callback) {
+  gif_tenor_api_fetcher_.FetchGifsByIds(std::move(callback),
+                                        url_loader_factory_, ids);
 }
 
 void EmojiPageHandler::InsertEmoji(const std::string& emoji_to_insert,

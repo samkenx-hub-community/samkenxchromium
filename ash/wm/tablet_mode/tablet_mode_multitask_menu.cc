@@ -6,6 +6,7 @@
 
 #include "ash/public/cpp/shell_window_ids.h"
 #include "ash/public/cpp/window_properties.h"
+#include "ash/screen_util.h"
 #include "ash/style/ash_color_id.h"
 #include "ash/style/system_shadow.h"
 #include "ash/wm/splitview/split_view_controller.h"
@@ -153,13 +154,20 @@ TabletModeMultitaskMenu::TabletModeMultitaskMenu(
   // Set the widget on the top center of the window.
   const gfx::Size menu_size(menu_view_->GetPreferredSize());
   const gfx::Rect window_bounds(window_->GetBoundsInScreen());
-  gfx::Rect widget_bounds(window_bounds);
+
   // The invisible widget needs to be big enough to include both the menu and
-  // shadow otherwise it would mask parts out.
-  widget_bounds.ClampToCenteredSize(
-      gfx::Size(menu_size.width() + kShadowOutset * 2,
-                menu_size.height() + kShadowOutset * 2));
-  widget_bounds.set_y(window_bounds.y());
+  // shadow otherwise it would mask parts out. Explicitly set the widget size
+  // since `window` may be narrower than the menu and clamp to its bounds.
+  const int widget_width = menu_size.width() + kShadowOutset * 2;
+  gfx::Rect widget_bounds = gfx::Rect(
+      window_bounds.CenterPoint().x() - widget_width / 2, window_bounds.y(),
+      widget_width, menu_size.height() + kShadowOutset * 2);
+  const gfx::Rect work_area =
+      screen_util::GetDisplayWorkAreaBoundsInParent(window);
+  if (!work_area.Contains(widget_bounds)) {
+    widget_bounds.AdjustToFit(work_area);
+  }
+
   widget_->SetBounds(widget_bounds);
   widget_->Show();
 
@@ -214,33 +222,29 @@ void TabletModeMultitaskMenu::AnimateFadeOut() {
       .SetOpacity(view_layer, 0.0f, gfx::Tween::LINEAR);
 }
 
-void TabletModeMultitaskMenu::BeginDrag(float initial_y, bool show) {
-  // Drag up can start from anywhere in the menu; simply save `initial_y` to
-  // update drag relative to it.
-  initial_y_ = initial_y;
-  if (show) {
+void TabletModeMultitaskMenu::BeginDrag(float initial_y, bool down) {
+  if (down) {
     // If we are dragging down, the menu hasn't been created yet, so match the
-    // bottom of the menu with `initial_y`.
-    const float transform_y = initial_y - menu_view_->bounds().bottom();
+    // bottom of the menu with `initial_y` and save it as `initial_y_`.
+    const float translation_y = initial_y - menu_view_->bounds().bottom();
+    initial_y_ = menu_view_->bounds().bottom();
     menu_view_->layer()->SetTransform(
-        gfx::Transform::MakeTranslation(0, transform_y));
+        gfx::Transform::MakeTranslation(0, translation_y));
+  } else {
+    // Drag up can start from anywhere in the menu; simply save `initial_y` to
+    // update drag relative to it.
+    initial_y_ = initial_y;
   }
 }
 
-void TabletModeMultitaskMenu::UpdateDrag(float current_y, bool show) {
-  float transform_y;
-  if (show) {
-    // Continue to match the menu bottom with `current_y`.
-    transform_y = current_y - menu_view_->bounds().bottom();
-    // Stop translating the menu if the drag moves out of bounds.
-    if (transform_y >= 0.f) {
-      return;
-    }
-  } else {
-    transform_y = current_y - initial_y_;
+void TabletModeMultitaskMenu::UpdateDrag(float current_y, bool down) {
+  const float translation_y = current_y - initial_y_;
+  // Stop translating the menu if the drag moves out of bounds.
+  if (down && translation_y >= 0.f) {
+    return;
   }
   menu_view_->layer()->SetTransform(
-      gfx::Transform::MakeTranslation(0, transform_y));
+      gfx::Transform::MakeTranslation(0, translation_y));
 }
 
 void TabletModeMultitaskMenu::EndDrag() {
@@ -291,10 +295,9 @@ void TabletModeMultitaskMenu::OnDisplayMetricsChanged(
                           .id()) {
     return;
   }
-  // TODO(shidi): Will do the rotate transition on a separate cl. Close the
-  // menu at rotation for now.
-  if (changed_metrics & display::DisplayObserver::DISPLAY_METRIC_ROTATION)
-    event_handler_->ResetMultitaskMenu();
+  if (changed_metrics) {
+    AnimateFadeOut();
+  }
 }
 
 chromeos::MultitaskMenuView*

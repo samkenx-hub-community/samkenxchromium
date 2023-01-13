@@ -10,12 +10,12 @@
 #include <map>
 #include <string>
 
-#include "base/bind.h"
-#include "base/callback_helpers.h"
 #include "base/check.h"
 #include "base/command_line.h"
 #include "base/containers/contains.h"
 #include "base/debug/dump_without_crashing.h"
+#include "base/functional/bind.h"
+#include "base/functional/callback_helpers.h"
 #include "base/guid.h"
 #include "base/location.h"
 #include "base/memory/ref_counted.h"
@@ -172,7 +172,7 @@ void DidShowPaymentHandlerWindow(
     int render_frame_id) {
   if (success) {
     service_worker_client_utils::DidNavigate(
-        context, url.DeprecatedGetOriginAsURL(), key,
+        context, url, key,
         base::BindOnce(&OnOpenWindowFinished, std::move(callback)),
         GlobalRenderFrameHostId(render_process_id, render_frame_id));
   } else {
@@ -1839,33 +1839,33 @@ void ServiceWorkerVersion::CountFeature(blink::mojom::WebFeature feature) {
   }
 }
 
-void ServiceWorkerVersion::set_cross_origin_embedder_policy(
-    network::CrossOriginEmbedderPolicy cross_origin_embedder_policy) {
-  // Once it is set, the CrossOriginEmbedderPolicy is immutable.
-  DCHECK(!client_security_state_ ||
-         client_security_state_->cross_origin_embedder_policy.value ==
-             network::mojom::CrossOriginEmbedderPolicyValue::kNone ||
-         client_security_state_->cross_origin_embedder_policy ==
-             cross_origin_embedder_policy);
-  if (!client_security_state_) {
-    client_security_state_ = network::mojom::ClientSecurityState::New();
-  }
-  client_security_state_->cross_origin_embedder_policy =
-      std::move(cross_origin_embedder_policy);
-}
-
 network::mojom::CrossOriginEmbedderPolicyValue
 ServiceWorkerVersion::cross_origin_embedder_policy_value() const {
-  return client_security_state_
-             ? client_security_state_->cross_origin_embedder_policy.value
+  return policy_container_host_
+             ? policy_container_host_->cross_origin_embedder_policy().value
              : network::mojom::CrossOriginEmbedderPolicyValue::kNone;
 }
 
 const network::CrossOriginEmbedderPolicy*
 ServiceWorkerVersion::cross_origin_embedder_policy() const {
-  return client_security_state_
-             ? &client_security_state_->cross_origin_embedder_policy
+  return policy_container_host_
+             ? &policy_container_host_->cross_origin_embedder_policy()
              : nullptr;
+}
+
+const network::mojom::ClientSecurityStatePtr
+ServiceWorkerVersion::BuildClientSecurityState() const {
+  if (!policy_container_host_) {
+    return nullptr;
+  }
+
+  const PolicyContainerPolicies& policies = policy_container_host_->policies();
+  return network::mojom::ClientSecurityState::New(
+      policies.cross_origin_embedder_policy, policies.is_web_secure_context,
+      policies.ip_address_space,
+      DerivePrivateNetworkRequestPolicy(policies.ip_address_space,
+                                        policies.is_web_secure_context,
+                                        PrivateNetworkRequestContext::kWorker));
 }
 
 // static
@@ -2580,11 +2580,9 @@ void ServiceWorkerVersion::PrepareForUpdate(
     std::map<GURL, ServiceWorkerUpdateChecker::ComparedScriptInfo>
         compared_script_info_map,
     const GURL& updated_script_url,
-    scoped_refptr<PolicyContainerHost> policy_container_host,
-    network::CrossOriginEmbedderPolicy cross_origin_embedder_policy) {
+    scoped_refptr<PolicyContainerHost> policy_container_host) {
   compared_script_info_map_ = std::move(compared_script_info_map);
   updated_script_url_ = updated_script_url;
-  set_cross_origin_embedder_policy(cross_origin_embedder_policy);
   if (!GetContentClient()
            ->browser()
            ->ShouldServiceWorkerInheritPolicyContainerFromCreator(

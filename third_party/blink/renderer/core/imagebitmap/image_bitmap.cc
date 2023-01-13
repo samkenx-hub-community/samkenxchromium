@@ -9,6 +9,7 @@
 #include "base/memory/scoped_refptr.h"
 #include "base/numerics/checked_math.h"
 #include "base/numerics/clamped_math.h"
+#include "base/task/sequenced_task_runner.h"
 #include "base/task/single_thread_task_runner.h"
 #include "gpu/command_buffer/client/shared_image_interface.h"
 #include "gpu/config/gpu_feature_info.h"
@@ -52,6 +53,7 @@
 namespace blink {
 
 constexpr const char* kImageOrientationFlipY = "flipY";
+constexpr const char* kImageOrientationFromImage = "from-image";
 constexpr const char* kImageBitmapOptionNone = "none";
 constexpr const char* kImageBitmapOptionDefault = "default";
 constexpr const char* kImageBitmapOptionPremultiply = "premultiply";
@@ -69,7 +71,8 @@ ImageBitmap::ParsedOptions ParseOptions(const ImageBitmapOptions* options,
     parsed_options.flip_y = true;
   } else {
     parsed_options.flip_y = false;
-    DCHECK(options->imageOrientation() == kImageBitmapOptionNone);
+    DCHECK(options->imageOrientation() == kImageBitmapOptionNone ||
+           options->imageOrientation() == kImageOrientationFromImage);
   }
 
   if (options->premultiplyAlpha() == kImageBitmapOptionNone) {

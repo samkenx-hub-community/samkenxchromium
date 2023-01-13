@@ -8,9 +8,9 @@
 #include <sstream>
 #include <utility>
 
-#include "base/callback.h"
 #include "base/containers/contains.h"
 #include "base/containers/flat_map.h"
+#include "base/functional/callback.h"
 #include "base/ranges/algorithm.h"
 #include "base/values.h"
 #include "chrome/browser/web_applications/commands/web_app_command.h"
@@ -274,7 +274,7 @@ void SubAppInstallCommand::OnGetWebAppInstallInfo(
     install_info->start_url = install_url;
     install_info->install_url = install_url;
   }
-  install_info->user_display_mode = UserDisplayMode::kStandalone;
+  install_info->user_display_mode = mojom::UserDisplayMode::kStandalone;
 
   data_retriever_->CheckInstallabilityAndRetrieveManifest(
       &lock_->shared_web_contents(), /*bypass_service_worker_check=*/false,
@@ -366,7 +366,7 @@ void SubAppInstallCommand::OnDialogCompleted(
     return;
   }
 
-  web_app_info->user_display_mode = UserDisplayMode::kStandalone;
+  web_app_info->user_display_mode = mojom::UserDisplayMode::kStandalone;
 
   lock_->install_finalizer().FinalizeInstall(
       *web_app_info, GetFinalizerOptionsForSubApps(parent_app_id_),

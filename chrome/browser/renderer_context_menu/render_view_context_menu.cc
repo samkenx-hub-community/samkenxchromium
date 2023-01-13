@@ -12,11 +12,11 @@
 #include <utility>
 
 #include "ash/components/arc/arc_features.h"
-#include "base/bind.h"
-#include "base/callback.h"
 #include "base/command_line.h"
 #include "base/containers/contains.h"
 #include "base/feature_list.h"
+#include "base/functional/bind.h"
+#include "base/functional/callback.h"
 #include "base/logging.h"
 #include "base/metrics/field_trial.h"
 #include "base/metrics/histogram_functions.h"
@@ -96,7 +96,7 @@
 #include "chrome/browser/ui/ui_features.h"
 #include "chrome/browser/ui/web_applications/app_browser_controller.h"
 #include "chrome/browser/ui/webui/history/foreign_session_handler.h"
-#include "chrome/browser/web_applications/user_display_mode.h"
+#include "chrome/browser/web_applications/mojom/user_display_mode.mojom.h"
 #include "chrome/browser/web_applications/web_app_helpers.h"
 #include "chrome/browser/web_applications/web_app_icon_manager.h"
 #include "chrome/browser/web_applications/web_app_provider.h"
@@ -1023,8 +1023,7 @@ void RenderViewContextMenu::InitMenu() {
     AppendLinkToTextItems();
   }
 
-  if (user_notes::IsUserNotesEnabled() &&
-      base::FeatureList::IsEnabled(features::kUnifiedSidePanel)) {
+  if (user_notes::IsUserNotesEnabled()) {
     AppendUserNotesItems();
   }
 
@@ -1651,7 +1650,7 @@ void RenderViewContextMenu::AppendOpenInWebAppLinkItems() {
 
   // Only applies to apps that open in an app window.
   if (provider->registrar_unsafe().GetAppUserDisplayMode(*link_app_id) ==
-      web_app::UserDisplayMode::kBrowser) {
+      web_app::mojom::UserDisplayMode::kBrowser) {
     return;
   }
 
@@ -2512,7 +2511,7 @@ bool RenderViewContextMenu::IsCommandIdEnabled(int id) const {
              service->IsAvailable<crosapi::mojom::ClipboardHistory>();
     }
 #else
-      NOTREACHED();
+      NOTREACHED() << "Unhandled id: " << id;
       return false;
 #endif
 
@@ -2521,7 +2520,7 @@ bool RenderViewContextMenu::IsCommandIdEnabled(int id) const {
       return !GetProfile()->IsOffTheRecord();
 
     default:
-      NOTREACHED();
+      NOTREACHED() << "Unhandled id: " << id;
       return false;
   }
 }
@@ -2951,7 +2950,7 @@ void RenderViewContextMenu::ExecuteCommand(int id, int event_flags) {
       }
 #endif
 #else
-      NOTREACHED();
+      NOTREACHED() << "Unhandled id: " << id;
 #endif
       break;
     }
@@ -2965,7 +2964,7 @@ void RenderViewContextMenu::ExecuteCommand(int id, int event_flags) {
       break;
 
     default:
-      NOTREACHED();
+      NOTREACHED() << "Unhandled id: " << id;
       break;
   }
 }
@@ -3310,7 +3309,6 @@ bool RenderViewContextMenu::IsRegionSearchEnabled() const {
 
 bool RenderViewContextMenu::IsAddANoteEnabled() const {
   DCHECK(user_notes::IsUserNotesEnabled());
-  DCHECK(base::FeatureList::IsEnabled(features::kUnifiedSidePanel));
 
   RenderFrameHost* render_frame_host = GetRenderFrameHost();
   if (!render_frame_host)
@@ -3608,9 +3606,7 @@ void RenderViewContextMenu::ExecSearchLensForImage() {
     return;
   core_tab_helper->SearchWithLens(
       render_frame_host, params().src_url,
-      lens::EntryPoint::CHROME_SEARCH_WITH_GOOGLE_LENS_CONTEXT_MENU_ITEM,
-      /* is_side_panel_enabled_for_feature= */
-      lens::features::IsLensSidePanelEnabled());
+      lens::EntryPoint::CHROME_SEARCH_WITH_GOOGLE_LENS_CONTEXT_MENU_ITEM);
 }
 
 void RenderViewContextMenu::ExecAddANote() {

@@ -11,13 +11,13 @@
 
 #include "base/barrier_closure.h"
 #include "base/base64.h"
-#include "base/bind.h"
 #include "base/build_time.h"
-#include "base/callback_helpers.h"
 #include "base/command_line.h"
 #include "base/containers/unique_ptr_adapters.h"
 #include "base/dcheck_is_on.h"
 #include "base/feature_list.h"
+#include "base/functional/bind.h"
+#include "base/functional/callback_helpers.h"
 #include "base/logging.h"
 #include "base/memory/ptr_util.h"
 #include "base/memory/ref_counted.h"
@@ -531,12 +531,10 @@ NetworkContext::NetworkContext(
     SetCTPolicy(std::move(params_->ct_policy));
 
   base::FilePath sct_auditing_path;
-  if (base::FeatureList::IsEnabled(features::kSCTAuditingPersistReports)) {
-    GetFullDataFilePath(params_->file_paths,
-                        &network::mojom::NetworkContextFilePaths::
-                            sct_auditing_pending_reports_file_name,
-                        sct_auditing_path);
-  }
+  GetFullDataFilePath(params_->file_paths,
+                      &network::mojom::NetworkContextFilePaths::
+                          sct_auditing_pending_reports_file_name,
+                      sct_auditing_path);
   sct_auditing_handler_ =
       std::make_unique<SCTAuditingHandler>(this, sct_auditing_path);
   sct_auditing_handler()->SetMode(params_->sct_auditing_mode);
@@ -1466,6 +1464,19 @@ void NetworkContext::CreateUDPSocket(
     mojo::PendingReceiver<mojom::UDPSocket> receiver,
     mojo::PendingRemote<mojom::UDPSocketListener> listener) {
   socket_factory_->CreateUDPSocket(std::move(receiver), std::move(listener));
+}
+
+void NetworkContext::CreateRestrictedUDPSocket(
+    const net::IPEndPoint& addr,
+    mojom::RestrictedUDPSocketMode mode,
+    const net::MutableNetworkTrafficAnnotationTag& traffic_annotation,
+    mojom::UDPSocketOptionsPtr options,
+    mojo::PendingReceiver<mojom::RestrictedUDPSocket> receiver,
+    mojo::PendingRemote<mojom::UDPSocketListener> listener,
+    CreateRestrictedUDPSocketCallback callback) {
+  socket_factory_->CreateRestrictedUDPSocket(
+      addr, mode, traffic_annotation, std::move(options), std::move(receiver),
+      std::move(listener), std::move(callback));
 }
 
 void NetworkContext::CreateTCPServerSocket(

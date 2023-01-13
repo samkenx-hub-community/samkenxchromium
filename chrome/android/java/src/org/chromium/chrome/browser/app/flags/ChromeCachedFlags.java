@@ -26,7 +26,6 @@ import org.chromium.chrome.browser.page_annotations.PageAnnotationsServiceConfig
 import org.chromium.chrome.browser.tab.state.FilePersistedTabDataStorage;
 import org.chromium.chrome.browser.tabmodel.TabPersistentStore;
 import org.chromium.chrome.browser.tasks.ConditionalTabStripUtils;
-import org.chromium.chrome.browser.tasks.ReturnToChromeUtil;
 import org.chromium.chrome.browser.tasks.tab_management.TabUiFeatureUtilities;
 import org.chromium.chrome.features.start_surface.StartSurfaceConfiguration;
 
@@ -75,6 +74,7 @@ public class ChromeCachedFlags {
             {
                 add(ChromeFeatureList.sAppMenuMobileSiteOption);
                 add(ChromeFeatureList.sBackGestureRefactorAndroid);
+                add(ChromeFeatureList.sBaselineGm3SurfaceColors);
                 add(ChromeFeatureList.sCctAutoTranslate);
                 add(ChromeFeatureList.sCctBrandTransparency);
                 add(ChromeFeatureList.sCctFeatureUsage);
@@ -100,6 +100,7 @@ public class ChromeCachedFlags {
                 add(ChromeFeatureList.sFeedLoadingPlaceholder);
                 add(ChromeFeatureList.sFoldableJankFix);
                 add(ChromeFeatureList.sGridTabSwitcherForTablets);
+                add(ChromeFeatureList.sHideNonDisplayableAccountEmail);
                 add(ChromeFeatureList.sIncognitoReauthenticationForAndroid);
                 add(ChromeFeatureList.sInstanceSwitcher);
                 add(ChromeFeatureList.sInstantStart);
@@ -155,7 +156,6 @@ public class ChromeCachedFlags {
                         add(OmniboxFeatures.MODERNIZE_VISUAL_UPDATE_ACTIVE_COLOR_ON_OMNIBOX);
                         add(OmniboxFeatures.MODERNIZE_VISUAL_UPDATE_SMALL_BOTTOM_MARGIN);
                         add(PageAnnotationsServiceConfig.PAGE_ANNOTATIONS_BASE_URL);
-                        add(ReturnToChromeUtil.TAB_SWITCHER_ON_RETURN_MS);
                         add(CustomTabIntentDataProvider.AUTO_TRANSLATE_ALLOW_ALL_FIRST_PARTIES);
                         add(CustomTabIntentDataProvider.AUTO_TRANSLATE_PACKAGE_NAME_ALLOWLIST);
                         add(CustomTabIntentDataProvider.THIRD_PARTIES_DEFAULT_POLICY);

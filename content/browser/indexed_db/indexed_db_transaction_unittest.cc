@@ -7,14 +7,15 @@
 #include <stdint.h>
 #include <memory>
 
-#include "base/bind.h"
-#include "base/callback_helpers.h"
 #include "base/check.h"
 #include "base/debug/stack_trace.h"
 #include "base/files/scoped_temp_dir.h"
+#include "base/functional/bind.h"
+#include "base/functional/callback_helpers.h"
 #include "base/memory/scoped_refptr.h"
 #include "base/run_loop.h"
 #include "base/task/sequenced_task_runner.h"
+#include "base/task/single_thread_task_runner.h"
 #include "base/test/bind.h"
 #include "base/test/task_environment.h"
 #include "base/time/default_clock.h"
@@ -639,6 +640,45 @@ TEST_F(IndexedDBTransactionTest, PostedStartTaskRunAfterAbort) {
   // It's not safe to check the state of the transaction at this point since it
   // is freed when the IndexedDBDatabase::RunTasks call happens via the posted
   // RunTasksForDatabase task.
+}
+
+TEST_F(IndexedDBTransactionTest, IsTransactionBlockingOthers) {
+  const int64_t id = 0;
+  const int64_t object_store_id = 1ll;
+  const std::set<int64_t> scope = {object_store_id};
+  std::unique_ptr<IndexedDBConnection> connection = CreateConnection();
+  IndexedDBTransaction* transaction = connection->CreateTransaction(
+      id, scope, blink::mojom::IDBTransactionMode::ReadWrite,
+      new IndexedDBFakeBackingStore::FakeTransaction(leveldb::Status::OK()));
+  db_->RegisterAndScheduleTransaction(transaction);
+
+  // Register a transaction with ReadWrite mode to object store 1.
+  // The transaction should be started and it's not blocking any others.
+  ASSERT_EQ(transaction->state(), IndexedDBTransaction::STARTED);
+  ASSERT_FALSE(db_->IsTransactionBlockingOthers(transaction));
+
+  const int64_t id2 = 1;
+  IndexedDBTransaction* transaction2 = connection->CreateTransaction(
+      id2, scope, blink::mojom::IDBTransactionMode::ReadWrite,
+      new IndexedDBFakeBackingStore::FakeTransaction(leveldb::Status::OK()));
+  db_->RegisterAndScheduleTransaction(transaction2);
+
+  // Register another transaction with ReadWrite mode to the same object store.
+  // The transaction should be blocked in `CREATED` state and the previous
+  // transaction is now blocking others.
+  ASSERT_EQ(transaction2->state(), IndexedDBTransaction::CREATED);
+  ASSERT_TRUE(db_->IsTransactionBlockingOthers(transaction));
+
+  RunPostedTasks();
+
+  transaction2->Abort(
+      IndexedDBDatabaseError(blink::mojom::IDBException::kUnknownError));
+
+  // Abort the blocked transaction, and the previous transaction should not be
+  // blocking others anymore.
+  ASSERT_EQ(transaction2->state(), IndexedDBTransaction::FINISHED);
+  RunPostedTasks();
+  ASSERT_FALSE(db_->IsTransactionBlockingOthers(transaction));
 }
 
 }  // namespace indexed_db_transaction_unittest

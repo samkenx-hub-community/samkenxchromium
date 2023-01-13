@@ -64,10 +64,12 @@
 #include "third_party/skia/include/core/SkSamplingOptions.h"
 #include "third_party/skia/include/core/SkSwizzle.h"
 #include "third_party/skia/include/core/SkYUVAInfo.h"
+#include "third_party/skia/include/gpu/GpuTypes.h"
 #include "third_party/skia/include/gpu/GrTypes.h"
 #include "ui/gfx/color_space.h"
 #include "ui/gfx/geometry/skia_conversions.h"
 #include "ui/gfx/gpu_fence_handle.h"
+#include "ui/gl/gl_features.h"
 #include "ui/gl/gl_fence.h"
 #include "ui/gl/gl_surface.h"
 #include "ui/gl/presenter.h"
@@ -414,7 +416,7 @@ void SkiaOutputSurfaceImplOnGpu::DrawOverdraw(
   DCHECK(overdraw_ddl);
 
   sk_sp<SkSurface> overdraw_surface = SkSurface::MakeRenderTarget(
-      gr_context(), overdraw_ddl->characterization(), SkBudgeted::kNo);
+      gr_context(), overdraw_ddl->characterization(), skgpu::Budgeted::kNo);
   overdraw_surface->draw(overdraw_ddl);
   destroy_after_swap_.push_back(std::move(overdraw_ddl));
 
@@ -1651,6 +1653,10 @@ void SkiaOutputSurfaceImplOnGpu::SetGpuVSyncEnabled(bool enabled) {
   output_device_->SetGpuVSyncEnabled(enabled);
 }
 
+void SkiaOutputSurfaceImplOnGpu::SetVSyncDisplayID(int64_t display_id) {
+  output_device_->SetVSyncDisplayID(display_id);
+}
+
 void SkiaOutputSurfaceImplOnGpu::SetFrameRate(float frame_rate) {
   if (gl_surface_)
     gl_surface_->SetFrameRate(frame_rate);
@@ -1735,6 +1741,12 @@ bool SkiaOutputSurfaceImplOnGpu::InitializeForGL() {
         return false;
       }
     }
+
+#if BUILDFLAG(IS_MAC)
+    if (features::UseGpuVsync()) {
+      presenter_->SetVSyncDisplayID(renderer_settings_.display_id);
+    }
+#endif
 
     if (MakeCurrent(/*need_framebuffer=*/true)) {
       if (presenter_) {

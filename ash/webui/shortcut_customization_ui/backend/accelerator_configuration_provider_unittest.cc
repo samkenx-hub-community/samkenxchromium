@@ -10,7 +10,6 @@
 #include <variant>
 #include <vector>
 
-#include "ash/accelerators/accelerator_layout_table.h"
 #include "ash/accelerators/ash_accelerator_configuration.h"
 #include "ash/constants/ash_pref_names.h"
 #include "ash/public/cpp/accelerator_configuration.h"
@@ -22,9 +21,10 @@
 #include "ash/session/session_controller_impl.h"
 #include "ash/shell.h"
 #include "ash/test/ash_test_base.h"
+#include "ash/webui/shortcut_customization_ui/backend/accelerator_layout_table.h"
 #include "ash/webui/shortcut_customization_ui/mojom/shortcut_customization.mojom.h"
-#include "base/bind.h"
-#include "base/callback_forward.h"
+#include "base/functional/bind.h"
+#include "base/functional/callback_forward.h"
 #include "base/memory/raw_ptr.h"
 #include "base/run_loop.h"
 #include "base/test/bind.h"
@@ -38,6 +38,7 @@
 #include "ui/base/ime/ash/mock_input_method_manager.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/resource/resource_bundle.h"
+#include "ui/chromeos/events/keyboard_capability.h"
 #include "ui/events/devices/device_data_manager_test_api.h"
 #include "ui/events/devices/input_device.h"
 #include "ui/events/event_constants.h"
@@ -83,27 +84,8 @@ class FakeAcceleratorsUpdatedObserver
   int num_times_notified_ = 0;
 };
 
-void SetTopRowKeysAsFunctionKeysEnabled(bool enabled) {
-  PrefService* prefs =
-      Shell::Get()->session_controller()->GetLastActiveUserPrefService();
-  prefs->SetBoolean(prefs::kSendFunctionKeys, enabled);
-  prefs->CommitPendingWrite();
-}
-
-bool TopRowKeysAreFunctionKeys() {
-  const PrefService* pref_service =
-      Shell::Get()->session_controller()->GetLastActiveUserPrefService();
-  if (!pref_service) {
-    return false;
-  }
-  return pref_service->GetBoolean(prefs::kSendFunctionKeys);
-}
-
-bool CompareAccelerators(const ash::AcceleratorData& expected_data,
-                         const mojom::AcceleratorInfoPtr& actual_info) {
-  ui::Accelerator expected_accelerator(expected_data.keycode,
-                                       expected_data.modifiers);
-
+bool AreAcceleratorsEqual(const ui::Accelerator& expected_accelerator,
+                          const mojom::AcceleratorInfoPtr& actual_info) {
   const bool accelerator_equals =
       expected_accelerator ==
       actual_info->layout_properties->get_standard_accelerator()->accelerator;
@@ -111,6 +93,18 @@ bool CompareAccelerators(const ash::AcceleratorData& expected_data,
       shortcut_ui::GetKeyDisplay(expected_accelerator.key_code()) ==
       actual_info->layout_properties->get_standard_accelerator()->key_display;
   return accelerator_equals && key_display_equals;
+}
+
+bool CompareAccelerators(const ash::AcceleratorData& expected_data,
+                         const mojom::AcceleratorInfoPtr& actual_info) {
+  ui::Accelerator expected_accelerator(expected_data.keycode,
+                                       expected_data.modifiers);
+  return AreAcceleratorsEqual(expected_accelerator, actual_info);
+}
+
+bool CompareAccelerators(const ui::Accelerator& expected_accelerator,
+                         const mojom::AcceleratorInfoPtr& actual_info) {
+  return AreAcceleratorsEqual(expected_accelerator, actual_info);
 }
 
 void CompareInputDevices(const ui::InputDevice& expected,
@@ -168,10 +162,22 @@ void ValidateAcceleratorLayouts(
   }
 }
 
-void ValidateTextAccelerator(const TextAcceleratorPart& lhs,
-                             const mojom::TextAcceleratorPartPtr& rhs) {
+void ValidateTextAccelerators(const TextAcceleratorPart& lhs,
+                              const mojom::TextAcceleratorPartPtr& rhs) {
   EXPECT_EQ(lhs.text, rhs->text);
   EXPECT_EQ(lhs.type, rhs->type);
+}
+
+std::vector<mojom::TextAcceleratorPartPtr> RemovePlainTextParts(
+    const std::vector<mojom::TextAcceleratorPartPtr>& parts) {
+  std::vector<mojom::TextAcceleratorPartPtr> res;
+  for (const auto& part : parts) {
+    if (part->type == mojom::TextAcceleratorPartType::kPlainText) {
+      continue;
+    }
+    res.push_back(mojo::Clone(part));
+  }
+  return res;
 }
 
 }  // namespace
@@ -218,13 +224,15 @@ class AcceleratorConfigurationProviderTest : public AshTestBase {
     AshTestBase::SetUp();
 
     provider_ = std::make_unique<AcceleratorConfigurationProvider>();
+    non_configurable_actions_map_ =
+        provider_->GetNonConfigurableAcceleratorsForTesting();
     base::RunLoop().RunUntilIdle();
   }
 
   void TearDown() override {
-    AshTestBase::TearDown();
     // `provider_` has a dependency on `input_method_manager_`.
     provider_.reset();
+    AshTestBase::TearDown();
     input_method::InputMethodManager::Shutdown();
     input_method_manager_ = nullptr;
   }
@@ -239,7 +247,33 @@ class AcceleratorConfigurationProviderTest : public AshTestBase {
     base::RunLoop().RunUntilIdle();
   }
 
+  const std::vector<ui::Accelerator>& GetAcceleratorsForAction(int action_id) {
+    return non_configurable_actions_map_
+        .find(static_cast<ash::NonConfigurableActions>(action_id))
+        ->second.accelerators.value();
+  }
+
+  const std::vector<TextAcceleratorPart>& GetReplacementsForAction(
+      int action_id) {
+    return non_configurable_actions_map_
+        .find(static_cast<ash::NonConfigurableActions>(action_id))
+        ->second.replacements.value();
+  }
+
+  bool TextAccelContainsReplacements(int action_id) {
+    return non_configurable_actions_map_
+        .find(static_cast<ash::NonConfigurableActions>(action_id))
+        ->second.replacements.has_value();
+  }
+
+  int GetMessageIdForTextAccel(int action_id) {
+    return non_configurable_actions_map_
+        .find(static_cast<ash::NonConfigurableActions>(action_id))
+        ->second.message_id.value();
+  }
+
   std::unique_ptr<AcceleratorConfigurationProvider> provider_;
+  NonConfigurableActionsMap non_configurable_actions_map_;
   base::test::ScopedFeatureList scoped_feature_list_;
   // Test global singleton. Delete is handled by InputMethodManager::Shutdown().
   base::raw_ptr<TestInputMethodManager> input_method_manager_;
@@ -372,7 +406,7 @@ TEST_F(AcceleratorConfigurationProviderTest, TopRowKeyAcceleratorRemapped) {
   EXPECT_EQ(0, observer.num_times_notified());
 
   // Top row keys are not function keys by default.
-  EXPECT_FALSE(TopRowKeysAreFunctionKeys());
+  EXPECT_FALSE(Shell::Get()->keyboard_capability()->TopRowKeysAreFKeys());
 
   const AcceleratorData test_data[] = {
       {/*trigger_on_press=*/true, ui::VKEY_TAB, ui::EF_ALT_DOWN,
@@ -405,9 +439,13 @@ TEST_F(AcceleratorConfigurationProviderTest, TopRowKeyAcceleratorRemapped) {
   ExpectMojomAcceleratorsEqual(mojom::AcceleratorSource::kAsh, test_data,
                                observer.config());
 
-  // Enable TopRowKeysAsFunctionKeys
-  SetTopRowKeysAsFunctionKeysEnabled(true);
-  EXPECT_TRUE(TopRowKeysAreFunctionKeys());
+  // Enable TopRowKeysAreFKeys.
+  Shell::Get()->session_controller()->GetActivePrefService()->SetBoolean(
+      prefs::kSendFunctionKeys, true);
+  base::RunLoop().RunUntilIdle();
+
+  EXPECT_TRUE(Shell::Get()->keyboard_capability()->TopRowKeysAreFKeys());
+  EXPECT_EQ(2, observer.num_times_notified());
 
   // Initialize the same test_data again, but with
   // TopRowKeysAsFunctionKeysEnabled.
@@ -426,17 +464,17 @@ TEST_F(AcceleratorConfigurationProviderTest, TopRowKeyAcceleratorRemapped) {
       // search + esc -> search + esc
       {/*trigger_on_press=*/true, ui::VKEY_ESCAPE, ui::EF_COMMAND_DOWN,
        SHOW_TASK_MANAGER},
-      // shift + zoom -> shift + search + F4
-      {/*trigger_on_press=*/true, ui::VKEY_F4,
+      // shift + zoom -> shift + search + F3
+      {/*trigger_on_press=*/true, ui::VKEY_F3,
        ui::EF_SHIFT_DOWN | ui::EF_COMMAND_DOWN, TOGGLE_FULLSCREEN},
-      // zoom -> search + F4
-      {/*trigger_on_press=*/true, ui::VKEY_F4, ui::EF_COMMAND_DOWN,
+      // zoom -> search + F3
+      {/*trigger_on_press=*/true, ui::VKEY_F3, ui::EF_COMMAND_DOWN,
        TOGGLE_FULLSCREEN},
-      // brightness_up -> search + F7
-      {/*trigger_on_press=*/true, ui::VKEY_F7, ui::EF_COMMAND_DOWN,
+      // brightness_up -> search + F6
+      {/*trigger_on_press=*/true, ui::VKEY_F6, ui::EF_COMMAND_DOWN,
        BRIGHTNESS_UP},
-      // alt + brightness_up -> alt + search + F7
-      {/*trigger_on_press=*/true, ui::VKEY_F7,
+      // alt + brightness_up -> alt + search + F6
+      {/*trigger_on_press=*/true, ui::VKEY_F6,
        ui::EF_ALT_DOWN | ui::EF_COMMAND_DOWN, KEYBOARD_BRIGHTNESS_UP},
       // When [search] is part of the original accelerator, no remapping is
       // done.
@@ -448,7 +486,7 @@ TEST_F(AcceleratorConfigurationProviderTest, TopRowKeyAcceleratorRemapped) {
        TOGGLE_FULLSCREEN},
   };
 
-  EXPECT_EQ(2, observer.num_times_notified());
+  EXPECT_EQ(3, observer.num_times_notified());
   // Verify observer received the top-row-remapped accelerators.
   ExpectMojomAcceleratorsEqual(mojom::AcceleratorSource::kAsh,
                                expected_test_data, observer.config());
@@ -578,10 +616,57 @@ TEST_F(AcceleratorConfigurationProviderTest, TestGetKeyDisplay) {
   EXPECT_EQ(u"space", GetKeyDisplay(ui::VKEY_SPACE));
 }
 
+TEST_F(AcceleratorConfigurationProviderTest, NonConfigurableActions) {
+  FakeAcceleratorsUpdatedObserver observer;
+  SetUpObserver(&observer);
+  base::RunLoop().RunUntilIdle();
+  // Reinitialize the non-configurable accelerators to trigger the observer.
+  provider_->InitializeNonConfigurableAccelerators(
+      non_configurable_actions_map_);
+  base::RunLoop().RunUntilIdle();
+  auto config = observer.config();
+  for (const auto& [id, accel_infos] :
+       config[mojom::AcceleratorSource::kAmbient]) {
+    for (const auto& info : accel_infos) {
+      if (info->layout_properties->is_standard_accelerator()) {
+        bool found_match = false;
+        for (const auto& expected_data : GetAcceleratorsForAction(id)) {
+          found_match = CompareAccelerators(expected_data, mojo::Clone(info));
+          if (found_match) {
+            break;
+          }
+        }
+        // Matching Accelerator was found.
+        EXPECT_TRUE(found_match);
+      } else {
+        const auto& text_accel =
+            info->layout_properties->get_text_accelerator()->parts;
+        if (!TextAccelContainsReplacements(id)) {
+          // Ambient accelerators that contain no replacements e.g., Drag the
+          // link to the tab's address bar
+          EXPECT_EQ(text_accel[0]->text,
+                    l10n_util::GetStringUTF16(GetMessageIdForTextAccel(id)));
+          continue;
+        }
+        // We're only concerned with validating the replacements
+        // (keys/modifiers). Validating the plain text parts is handled by the
+        // paramaterized tests below.
+        const auto& text_accel_parts = RemovePlainTextParts(text_accel);
+        const auto& replacement_parts = GetReplacementsForAction(id);
+        for (size_t i = 0; i < replacement_parts.size(); i++) {
+          ValidateTextAccelerators(replacement_parts[i], text_accel_parts[i]);
+        }
+      }
+    }
+  }
+}
+
 using FlagsKeyboardCodesVariant =
-    std::variant<ui::EventFlags, ui::KeyboardCode>;
-using FlagsKeyboardCodeStringVariant =
-    std::variant<ui::EventFlags, ui::KeyboardCode, std::u16string>;
+    std::variant<ui::EventFlags, ui::KeyboardCode, TextAcceleratorDelimiter>;
+using FlagsKeyboardCodeStringVariant = std::variant<ui::EventFlags,
+                                                    ui::KeyboardCode,
+                                                    std::u16string,
+                                                    TextAcceleratorDelimiter>;
 
 class TextAcceleratorParsingTest
     : public AcceleratorConfigurationProviderTest,
@@ -599,8 +684,10 @@ class TextAcceleratorParsingTest
     for (const auto& r : replacements_parts) {
       if (std::holds_alternative<ui::KeyboardCode>(r)) {
         replacements_.emplace_back(std::get<ui::KeyboardCode>(r));
-      } else {
+      } else if (std::holds_alternative<ui::EventFlags>(r)) {
         replacements_.emplace_back(std::get<ui::EventFlags>(r));
+      } else {
+        replacements_.emplace_back(std::get<TextAcceleratorDelimiter>(r));
       }
     }
 
@@ -609,8 +696,10 @@ class TextAcceleratorParsingTest
         expected_parts_.emplace_back(std::get<std::u16string>(v));
       } else if (std::holds_alternative<ui::KeyboardCode>(v)) {
         expected_parts_.emplace_back(std::get<ui::KeyboardCode>(v));
-      } else {
+      } else if (std::holds_alternative<ui::EventFlags>(v)) {
         expected_parts_.emplace_back(std::get<ui::EventFlags>(v));
+      } else {
+        expected_parts_.emplace_back(std::get<TextAcceleratorDelimiter>(v));
       }
     }
   }
@@ -633,10 +722,11 @@ INSTANTIATE_TEST_SUITE_P(
                                std::vector<FlagsKeyboardCodesVariant>,
                                std::vector<FlagsKeyboardCodeStringVariant>>>{
             {
-                u"$1 + $2 through $3",
-                {ui::EF_CONTROL_DOWN, ui::VKEY_1, ui::VKEY_8},
-                {ui::EF_CONTROL_DOWN, u" + ", ui::VKEY_1, u" through ",
-                 ui::VKEY_8},
+                u"$1 $2 $3 through $4",
+                {ui::EF_CONTROL_DOWN, TextAcceleratorDelimiter::kPlusSign,
+                 ui::VKEY_1, ui::VKEY_8},
+                {ui::EF_CONTROL_DOWN, u" ", TextAcceleratorDelimiter::kPlusSign,
+                 u" ", ui::VKEY_1, u" through ", ui::VKEY_8},
             },
             {
                 u"Press $1 and $2",
@@ -684,6 +774,21 @@ INSTANTIATE_TEST_SUITE_P(
                 {u" ", ui::VKEY_B},
             },
             {
+                u"$1",
+                {TextAcceleratorDelimiter::kPlusSign},
+                {TextAcceleratorDelimiter::kPlusSign},
+            },
+            {
+                u"$1 ",
+                {TextAcceleratorDelimiter::kPlusSign},
+                {TextAcceleratorDelimiter::kPlusSign, u" "},
+            },
+            {
+                u" $1",
+                {TextAcceleratorDelimiter::kPlusSign},
+                {u" ", TextAcceleratorDelimiter::kPlusSign},
+            },
+            {
                 u"Drag the link to a blank area on the tab strip",
                 {},
                 {u"Drag the link to a blank area on the tab strip"},
@@ -698,11 +803,11 @@ TEST_P(TextAcceleratorParsingTest, TextAcceleratorParsing) {
   auto& bundle = ui::ResourceBundle::GetSharedInstance();
   int FAKE_RESOURCE_ID = 1;
   bundle.OverrideLocaleStringResource(FAKE_RESOURCE_ID, replacement_string_);
-  const auto parts = provider_->CreateTextAcceleratorProperties(
+  const auto text_accelerator = provider_->CreateTextAcceleratorProperties(
       {FAKE_RESOURCE_ID, replacements_});
-  EXPECT_EQ(expected_parts_.size(), parts->text_accelerator.size());
+  EXPECT_EQ(expected_parts_.size(), text_accelerator->parts.size());
   for (size_t i = 0; i < expected_parts_.size(); i++) {
-    ValidateTextAccelerator(expected_parts_[i], parts->text_accelerator[i]);
+    ValidateTextAccelerators(expected_parts_[i], text_accelerator->parts[i]);
   }
 }
 

@@ -217,6 +217,12 @@ class WebLayer {
         return WebLayerClientVersionConstants.PRODUCT_VERSION;
     }
 
+    @NonNull
+    static String getProviderPackageName(@NonNull Context context) {
+        ThreadCheck.ensureOnUiThread();
+        return getWebLayerLoader(context).getProviderPackageName();
+    }
+
     /**
      * Encapsulates the state of WebLayer loading and initialization.
      */
@@ -281,6 +287,14 @@ class WebLayer {
             mAvailable = available;
             mMajorVersion = majorVersion;
             mVersion = version;
+        }
+
+        public String getProviderPackageName() {
+            try {
+                return getOrCreateRemoteContext(mContext).getPackageName();
+            } catch (Exception e) {
+                throw new APICallException(e);
+            }
         }
 
         public boolean isAvailable() {
@@ -582,15 +596,11 @@ class WebLayer {
         sAppContext = appContext;
         if (implPackageName != null) {
             sRemoteContext = createRemoteContextFromPackageName(appContext, implPackageName);
-        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+        } else {
             Method getContext =
                     webViewFactoryClass.getDeclaredMethod("getWebViewContextAndSetProvider");
             getContext.setAccessible(true);
             sRemoteContext = (Context) getContext.invoke(null);
-        } else {
-            implPackageName =
-                    (String) webViewFactoryClass.getMethod("getWebViewPackageName").invoke(null);
-            sRemoteContext = createRemoteContextFromPackageName(appContext, implPackageName);
         }
         sContextCreationTime = SystemClock.elapsedRealtime() - start;
         return sRemoteContext;

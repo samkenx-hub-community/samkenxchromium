@@ -7,8 +7,8 @@
 #include <string>
 #include <utility>
 
-#include "base/bind.h"
-#include "base/callback_helpers.h"
+#include "base/functional/bind.h"
+#include "base/functional/callback_helpers.h"
 #include "base/metrics/histogram_functions.h"
 #include "chrome/browser/ash/crostini/crostini_disk.h"
 #include "chrome/browser/ash/crostini/crostini_features.h"
@@ -701,10 +701,8 @@ void CrostiniHandler::OnContainerShutdown(
 void CrostiniHandler::HandleShutdownCrostini(const base::Value::List& args) {
   CHECK_EQ(0U, args.size());
 
-  const std::string vm_name = "termina";
-
-  crostini::CrostiniManager::GetForProfile(profile_)->StopVm(std::move(vm_name),
-                                                             base::DoNothing());
+  crostini::CrostiniManager::GetForProfile(profile_)->StopRunningVms(
+      base::DoNothing());
 }
 
 void CrostiniHandler::HandleCreateContainer(const base::Value::List& args) {
