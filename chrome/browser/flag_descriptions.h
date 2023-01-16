@@ -557,12 +557,6 @@ extern const char kDevicePostureDescription[];
 extern const char kIsolatedAppOriginsName[];
 extern const char kIsolatedAppOriginsDescription[];
 
-extern const char kEnableMigrateDefaultChromeAppToWebAppsGSuiteName[];
-extern const char kEnableMigrateDefaultChromeAppToWebAppsGSuiteDescription[];
-
-extern const char kEnableMigrateDefaultChromeAppToWebAppsNonGSuiteName[];
-extern const char kEnableMigrateDefaultChromeAppToWebAppsNonGSuiteDescription[];
-
 extern const char kEnablePreinstalledWebAppDuplicationFixerName[];
 extern const char kEnablePreinstalledWebAppDuplicationFixerDescription[];
 
@@ -3093,6 +3087,9 @@ extern const char kFileTransferEnterpriseConnectorDescription[];
 extern const char kFilesAppExperimentalName[];
 extern const char kFilesAppExperimentalDescription[];
 
+extern const char kFilesConflictDialogName[];
+extern const char kFilesConflictDialogDescription[];
+
 extern const char kFilesExtractArchiveName[];
 extern const char kFilesExtractArchiveDescription[];
 
@@ -3395,9 +3392,6 @@ extern const char kSystemJapanesePhysicalTypingDescription[];
 extern const char kQuickSettingsNetworkRevampName[];
 extern const char kQuickSettingsNetworkRevampDescription[];
 
-extern const char kCaptivePortalUI2022Name[];
-extern const char kCaptivePortalUI2022Description[];
-
 extern const char kCaptivePortalErrorPageName[];
 extern const char kCaptivePortalErrorPageDescription[];
 
@@ -3436,9 +3430,6 @@ extern const char kUploadOfficeToCloudDescription[];
 
 extern const char kUseFakeDeviceForMediaStreamName[];
 extern const char kUseFakeDeviceForMediaStreamDescription[];
-
-extern const char kUseMultipleOverlaysName[];
-extern const char kUseMultipleOverlaysDescription[];
 
 extern const char kUXStudy1Name[];
 extern const char kUXStudy1Description[];
@@ -3605,8 +3596,6 @@ extern const char kChromeOSDirectVideoDecoderDescription[];
 extern const char kChromeOSHWVBREncodingName[];
 extern const char kChromeOSHWVBREncodingDescription[];
 #if defined(ARCH_CPU_ARM_FAMILY)
-extern const char kPreferLibYuvImageProcessorName[];
-extern const char kPreferLibYuvImageProcessorDescription[];
 extern const char kPreferGLImageProcessorName[];
 extern const char kPreferGLImageProcessorDescription[];
 #endif  // defined(ARCH_CPU_ARM_FAMILY

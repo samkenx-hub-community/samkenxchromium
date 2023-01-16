@@ -492,12 +492,6 @@ BASE_FEATURE(kBruschettaAlphaMigrate,
              "BruschettaAlphaMigrate",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-// Enables the Captive Portal UI 2022 changes, which includes updates to
-// notifications, network details page, quick settings, and portal signin UI.
-BASE_FEATURE(kCaptivePortalUI2022,
-             "CaptivePortalUI2022",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
 // Enables the Captive Portal Error Page changes, which shows a suggestion in
 // the Chrome error page on ChromeOS when behind a captive portal.
 BASE_FEATURE(kCaptivePortalErrorPage,
@@ -946,6 +940,11 @@ BASE_FEATURE(kFederatedTimezoneCodePhh,
 // Enables experimental UI features in Files app.
 BASE_FEATURE(kFilesAppExperimental,
              "FilesAppExperimental",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+// Enables the files transfer conflict dialog in Files app.
+BASE_FEATURE(kFilesConflictDialog,
+             "FilesConflictDialog",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Enable inline sync status in Files app.
@@ -2375,10 +2374,6 @@ bool IsCalendarJellyEnabled() {
   return base::FeatureList::IsEnabled(kCalendarJelly);
 }
 
-bool IsCaptivePortalUI2022Enabled() {
-  return base::FeatureList::IsEnabled(kCaptivePortalUI2022);
-}
-
 bool IsCaptivePortalErrorPageEnabled() {
   return base::FeatureList::IsEnabled(kCaptivePortalErrorPage);
 }
@@ -2583,6 +2578,10 @@ bool IsFileManagerFuseBoxDebugEnabled() {
 
 bool IsFileManagerSearchV2Enabled() {
   return base::FeatureList::IsEnabled(kFilesSearchV2);
+}
+
+bool IsFilesConflictDialogEnabled() {
+  return base::FeatureList::IsEnabled(kFilesConflictDialog);
 }
 
 bool IsFloatingWorkspaceEnabled() {

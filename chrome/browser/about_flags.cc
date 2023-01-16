@@ -2841,26 +2841,6 @@ const FeatureEntry::FeatureVariation kVCBackgroundBlurVariations[] = {
 
 #endif  // BUILDFLAG(IS_CHROMEOS_ASH)
 
-#if BUILDFLAG(IS_CHROMEOS_ASH)
-const FeatureEntry::FeatureParam kMaxOverlays1 = {features::kMaxOverlaysParam,
-                                                  "1"};
-const FeatureEntry::FeatureParam kMaxOverlays2 = {features::kMaxOverlaysParam,
-                                                  "2"};
-const FeatureEntry::FeatureParam kMaxOverlays3 = {features::kMaxOverlaysParam,
-                                                  "3"};
-const FeatureEntry::FeatureParam kMaxOverlays4 = {features::kMaxOverlaysParam,
-                                                  "4"};
-const FeatureEntry::FeatureParam kMaxOverlays5 = {features::kMaxOverlaysParam,
-                                                  "5"};
-const FeatureEntry::FeatureParam kMaxOverlays6 = {features::kMaxOverlaysParam,
-                                                  "6"};
-
-const FeatureEntry::FeatureVariation kUseMultipleOverlaysVariations[] = {
-    {"1", &kMaxOverlays1, 1, nullptr}, {"2", &kMaxOverlays2, 1, nullptr},
-    {"3", &kMaxOverlays3, 1, nullptr}, {"4", &kMaxOverlays4, 1, nullptr},
-    {"5", &kMaxOverlays5, 1, nullptr}, {"6", &kMaxOverlays6, 1, nullptr}};
-#endif  // BUILDFLAG(IS_CHROMEOS_ASH)
-
 #if BUILDFLAG(IS_ANDROID)
 const FeatureEntry::FeatureParam kGridTabSwitcherForTabletsPolished[] = {
     {"enable_launch_polish", "true"}};
@@ -3620,9 +3600,6 @@ const FeatureEntry kFeatureEntries[] = {
     {"calendar-view-debug-mode", flag_descriptions::kCalendarModelDebugModeName,
      flag_descriptions::kCalendarModelDebugModeDescription, kOsCrOS,
      FEATURE_VALUE_TYPE(ash::features::kCalendarModelDebugMode)},
-    {"captive-portal-ui-2022", flag_descriptions::kCaptivePortalUI2022Name,
-     flag_descriptions::kCaptivePortalUI2022Description, kOsCrOS,
-     FEATURE_VALUE_TYPE(ash::features::kCaptivePortalUI2022)},
     {"captive-portal-error-page",
      flag_descriptions::kCaptivePortalErrorPageName,
      flag_descriptions::kCaptivePortalErrorPageDescription, kOsCrOS,
@@ -4368,18 +4345,6 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kAllowAllSitesToInitiateMirroringDescription,
      kOsDesktop,
      FEATURE_VALUE_TYPE(media_router::kAllowAllSitesToInitiateMirroring)},
-    {"enable-migrate-default-chrome-app-to-web-apps-gsuite",
-     flag_descriptions::kEnableMigrateDefaultChromeAppToWebAppsGSuiteName,
-     flag_descriptions::
-         kEnableMigrateDefaultChromeAppToWebAppsGSuiteDescription,
-     kOsDesktop,
-     FEATURE_VALUE_TYPE(web_app::kMigrateDefaultChromeAppToWebAppsGSuite)},
-    {"enable-migrate-default-chrome-app-to-web-apps-non-gsuite",
-     flag_descriptions::kEnableMigrateDefaultChromeAppToWebAppsNonGSuiteName,
-     flag_descriptions::
-         kEnableMigrateDefaultChromeAppToWebAppsNonGSuiteDescription,
-     kOsDesktop,
-     FEATURE_VALUE_TYPE(web_app::kMigrateDefaultChromeAppToWebAppsNonGSuite)},
     {"enable-preinstalled-web-app-duplication-fixer",
      flag_descriptions::kEnablePreinstalledWebAppDuplicationFixerName,
      flag_descriptions::kEnablePreinstalledWebAppDuplicationFixerDescription,
@@ -5065,6 +5030,9 @@ const FeatureEntry kFeatureEntries[] = {
     {"files-app-experimental", flag_descriptions::kFilesAppExperimentalName,
      flag_descriptions::kFilesAppExperimentalDescription, kOsCrOS,
      FEATURE_VALUE_TYPE(ash::features::kFilesAppExperimental)},
+    {"files-conflict-dialog", flag_descriptions::kFilesConflictDialogName,
+     flag_descriptions::kFilesConflictDialogDescription, kOsCrOS,
+     FEATURE_VALUE_TYPE(ash::features::kFilesConflictDialog)},
     {"files-inline-sync-status", flag_descriptions::kFilesInlineSyncStatusName,
      flag_descriptions::kFilesInlineSyncStatusDescription, kOsCrOS,
      FEATURE_VALUE_TYPE(ash::features::kFilesInlineSyncStatus)},
@@ -6543,11 +6511,6 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kChromeOSHWVBREncodingDescription, kOsCrOS | kOsLacros,
      FEATURE_VALUE_TYPE(media::kChromeOSHWVBREncoding)},
 #if defined(ARCH_CPU_ARM_FAMILY)
-    {"prefer-libyuv-image-processor",
-     flag_descriptions::kPreferLibYuvImageProcessorName,
-     flag_descriptions::kPreferLibYuvImageProcessorDescription,
-     kOsCrOS | kOsLacros,
-     FEATURE_VALUE_TYPE(media::kPreferLibYuvImageProcessor)},
     {"prefer-gl-image-processor",
      flag_descriptions::kPreferGLImageProcessorName,
      flag_descriptions::kPreferGLImageProcessorDescription, kOsCrOS | kOsLacros,
@@ -8516,14 +8479,6 @@ const FeatureEntry kFeatureEntries[] = {
     {"vc-portrait-relighting", flag_descriptions::kVCPortraitRelightingName,
      flag_descriptions::kVCPortraitRelightingDescription, kOsCrOS,
      FEATURE_VALUE_TYPE(ash::features::kVCPortraitRelighting)},
-#endif
-
-#if BUILDFLAG(IS_CHROMEOS_ASH)
-    {"use-multiple-overlays", flag_descriptions::kUseMultipleOverlaysName,
-     flag_descriptions::kUseMultipleOverlaysDescription, kOsCrOS,
-     FEATURE_WITH_PARAMS_VALUE_TYPE(features::kUseMultipleOverlays,
-                                    kUseMultipleOverlaysVariations,
-                                    "UseMultipleOverlays")},
 #endif
 
 #if BUILDFLAG(IS_CHROMEOS)

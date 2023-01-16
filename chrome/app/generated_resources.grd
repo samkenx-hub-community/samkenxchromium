@@ -6239,23 +6239,6 @@ Keep your key file in a safe place. You will need it to create new versions of y
         Choose sites to clear
       </message>
 
-      <!-- Experimental Lacros Infobar-->
-      <message name="IDS_EXPERIMENTAL_LACROS_WARNING_MESSAGE" desc="Message shown when user launches Lacros, an experimental feature.">
-        Experimental (alpha-quality) browser! Some features missing or incomplete. Report issues with: Help > "Report an issue...".
-      </message>
-
-      <message name="IDS_EXPERIMENTAL_LACROS_WARNING_MESSAGE_PRIMARY" desc="Addendum which is sometimes added to the initial warning message.">
-        The standard browser can be found by typing "Chrome" into Launcher.
-      </message>
-
-      <message name="IDS_EXPERIMENTAL_LACROS_WARNING_MESSAGE_MANAGED" desc="Addendum which is sometimes added to the initial warning message.">
-        For more information, contact your administrator.
-      </message>
-
-      <message name="IDS_EXPERIMENTAL_LACROS_WARNING_LEARN_MORE" desc="A section of text that the user can click on to learn more about Lacros.">
-        Learn More
-      </message>
-
       <!-- Bad Flags Infobar-->
       <message name="IDS_BAD_FLAGS_WARNING_MESSAGE" desc="Message shown when an unsupported command-line flag is used. [Keep it short so it fits in the infobar.]">
         You are using an unsupported command-line flag: <ph name="BAD_FLAG">$1<ex>--no-sandbox</ex></ph>. Stability and security will suffer.
@@ -11712,10 +11695,7 @@ Please help our engineers fix this problem. Tell us what happened right before y
         <message name="IDS_MIC_TURNED_OFF_IN_MACOS" desc="Title for the media status bubble that is used when a site requests microphone access, but microphone is blocked on an OS level in macOS.">
           Microphone is turned off in Mac System Preferences
         </message>
-        <message name="IDS_OPEN_PREFERENCES_LINK" desc="Title for the button that takes the user to the Security and Privacy settings in macOS, in order for the user to be able to modify the ability to access camera and microphone for Chrome. System Preferences was renamed to System Settings in macOS 13 so this string shouldn't be used past macOS 12.">
-          Open Preferences
-        </message>
-        <message name="IDS_OPEN_SETTINGS_LINK" desc="Title for the button that takes the user to System Settings in macOS >= 13. The translation for this string should match the translation of the System Settings app title in the macOS target locale. You can find this by selecting the locale from https://support.apple.com/guide/mac-help/mh15217/mac/localeselector. The title of the next page after that includes the desired translation. Note that, for size reasons, the English string omits 'System' and the same contraction may be suitable in other languages.">
+        <message name="IDS_OPEN_SETTINGS_LINK" desc="Title for the button that takes the user to the Security and Privacy settings in macOS, in order for the user to be able to modify the ability to access camera and microphone for Chrome. The translation for this string should match the translation of the System Settings app title in the macOS target locale. You can find this by selecting the locale from https://support.apple.com/guide/mac-help/mh15217/mac/localeselector. The title of the next page after that includes the desired translation. Note that, for size reasons, the English string omits 'System' and the same contraction may be suitable in other languages.">
           Open Settings
         </message>
         <message name="IDS_CAMERA" desc="Description text for the camera.">
@@ -14190,16 +14170,6 @@ Please help our engineers fix this problem. Tell us what happened right before y
     </message>
     <message name="IDS_PRIVACY_SANDBOX_DIALOG_NOTICE_OPEN_SETTINGS_BUTTON" desc="The user can choose “Settings” to visit chrome://settings/privacySandbox. If they do, they’ll find the toggle on for Sandbox trials, which include everything they’ve read above. They can leave trials on or turn them off on this page. Choosing “Settings”, the user will navigate away from this page and won’t be able to return here.">
       Settings
-    </message>
-
-    <!-- Privacy Sandbox Consent Dialog M1 strings -->
-    <message name="IDS_PRIVACY_SANDBOX_M1_CONSENT_BANNER_IMAGE_A11Y_DESCRIPTION" translateable="false" desc="A11y  description for the banner image in privacy sandbox consent dialog">
-      Sed ullamcorper, ligula ac tempus venenatis
-    </message>
-
-    <!-- Privacy Sandbox Notice Dialog M1 strings -->
-    <message name="IDS_PRIVACY_SANDBOX_M1_NOTICE_ROW_BANNER_IMAGE_A11Y_DESCRIPTION" translateable="false" desc="A11y description for the banner image in privacy sandbox notice ROW dialog">
-      Ut venenatis magna nec lacus facilisis
     </message>
 
     <!-- Battery Saver Toolbar strings  -->

@@ -336,6 +336,75 @@ They are used for the ChromeOS.CertProvisioning.* histograms to distinguish
   </summary>
 </histogram>
 
+<histogram name="ChromeOS.Camera.Effects.SelectedEffect"
+    enum="CameraEffectType" expires_after="2024-01-01">
+  <owner>jmpollock@chromium.org</owner>
+  <owner>chromeos-camera-eng@google.com</owner>
+  <summary>
+    Records a user enabling a camera effect. Emitted at most once per camera
+    effect chosen when the camera session is closed.
+  </summary>
+</histogram>
+
+<histogram
+    name="ChromeOS.Camera.Effects.{EffectType}.{StreamType}.AvgProcessedFrameInterval"
+    units="microseconds" expires_after="2024-01-01">
+  <owner>jmpollock@chromium.org</owner>
+  <owner>chromeos-camera-eng@google.com</owner>
+  <summary>
+    Records average wall time interval between successfully processed frames
+    within the EffectsStreamManipulator for the different effect + stream type
+    combinations.
+
+    This metric is reported on ChromeOS devices with an effect applied that does
+    not encounter an error during processing. It is emitted at the close of each
+    camera session.
+  </summary>
+  <token key="EffectType">
+    <variant name="Blur"
+        summary="Average processed frame rate of the Blur effect"/>
+    <variant name="BlurAndRelight"
+        summary="Average processed frame rate of the Blur + Relight effect"/>
+    <variant name="Relight"
+        summary="Average processed frame rate of the Relight effect"/>
+  </token>
+  <token key="StreamType">
+    <variant name="BLOB" summary="Processing time for BLOB (JPEG) streams"/>
+    <variant name="YUV" summary="Processing time for YUV streams"/>
+  </token>
+</histogram>
+
+<histogram
+    name="ChromeOS.Camera.Effects.{EffectType}.{StreamType}.AvgProcessingLatency"
+    units="microseconds" expires_after="2024-01-01">
+  <owner>jmpollock@chromium.org</owner>
+  <owner>chromeos-camera-eng@google.com</owner>
+  <summary>
+    Records the wall time taken to execute the EffectsStreamManipulator
+    ProcessCaptureResult method for the different effect + stream type
+    combinations. Calculated as the average processing time / latency over the
+    camera session.
+
+    This metric is reported on ChromeOS devices with an effect applied that does
+    not encounter an error during processing. It is emitted at the close of each
+    camera session.
+  </summary>
+  <token key="EffectType">
+    <variant name="Blur"
+        summary="EffectsStreamManipulator processing time of the Blur effect"/>
+    <variant name="BlurAndRelight"
+        summary="EffectsStreamManipulator processing time of the Blur +
+                 Relight effect"/>
+    <variant name="Relight"
+        summary="EffectsStreamManipulator processing time of the Relight
+                 effect"/>
+  </token>
+  <token key="StreamType">
+    <variant name="BLOB" summary="Processing time for BLOB (JPEG) streams"/>
+    <variant name="YUV" summary="Processing time for YUV streams"/>
+  </token>
+</histogram>
+
 <histogram name="ChromeOS.Camera.ErrorType" enum="ChromeOSCameraErrorType"
     expires_after="2023-10-01">
   <owner>wtlee@chromium.org</owner>
@@ -590,29 +659,34 @@ They are used for the ChromeOS.CertProvisioning.* histograms to distinguish
 </histogram>
 
 <histogram
-    name="ChromeOS.CertProvisioning.KeypairGenerationTime.{CertProvisioningScope}"
+    name="ChromeOS.CertProvisioning.KeypairGenerationTime{CertProvisioningProtocolVersion}.{CertProvisioningScope}"
     units="ms" expires_after="2024-02-01">
   <owner>miersh@google.com</owner>
   <owner>pmarko@chromium.org</owner>
   <summary>
-    The amount of time it took the certificate provisioning worker with scope
-    {CertProvisioningScope} to generate one key pair. Emitted after the
-    generation is complete.
+    The amount of time it took the {CertProvisioningProtocolVersion} certificate
+    provisioning worker with scope {CertProvisioningScope} to generate one key
+    pair. Emitted after the generation is complete.
   </summary>
   <token key="CertProvisioningScope" variants="AllCertProvisioningScopes"/>
+  <token key="CertProvisioningProtocolVersion"
+      variants="AllCertProvisioningProtocolVersions"/>
 </histogram>
 
-<histogram name="ChromeOS.CertProvisioning.Result.{CertProvisioningScope}"
+<histogram
+    name="ChromeOS.CertProvisioning.Result{CertProvisioningProtocolVersion}.{CertProvisioningScope}"
     enum="CertProvisioningWorkerState" expires_after="2024-02-01">
   <owner>miersh@google.com</owner>
   <owner>pmarko@chromium.org</owner>
   <summary>
     For final states (see the list in cert_provisioning::IsFinalState): number
-    of times the certificate provisioning worker with scope
-    {CertProvisioningScope} finished on every state. For other states: number of
-    times the worker failed on every state.
+    of times the {CertProvisioningProtocolVersion} certificate provisioning
+    worker with scope {CertProvisioningScope} finished on every state. For other
+    states: number of times the worker failed on every state.
   </summary>
   <token key="CertProvisioningScope" variants="AllCertProvisioningScopes"/>
+  <token key="CertProvisioningProtocolVersion"
+      variants="AllCertProvisioningProtocolVersions"/>
 </histogram>
 
 <histogram name="ChromeOS.CertProvisioning.VaTime.{CertProvisioningScope}"
@@ -1119,6 +1193,7 @@ They are used for the ChromeOS.CertProvisioning.* histograms to distinguish
   <token key="Survey">
     <variant name="General"/>
     <variant name="Performance"/>
+    <variant name="PrivacyHubBaseline"/>
     <variant name="Stability"/>
   </token>
 </histogram>

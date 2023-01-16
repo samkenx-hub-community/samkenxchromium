@@ -973,18 +973,6 @@ const char kDesktopPWAsDetailedInstallDialogDescription[] =
     "Enable PWAs with screenshots to show a detailed install dialog during "
     "installation";
 
-const char kEnableMigrateDefaultChromeAppToWebAppsGSuiteName[] =
-    "Migrate default G Suite Chrome apps to web apps";
-const char kEnableMigrateDefaultChromeAppToWebAppsGSuiteDescription[] =
-    "Enable the migration of default installed G Suite Chrome apps over to "
-    "their corresponding web apps.";
-
-const char kEnableMigrateDefaultChromeAppToWebAppsNonGSuiteName[] =
-    "Migrate default non-G Suite Chrome apps to web apps";
-const char kEnableMigrateDefaultChromeAppToWebAppsNonGSuiteDescription[] =
-    "Enable the migration of default installed non-G Suite Chrome apps over to "
-    "their corresponding web apps.";
-
 const char kEnablePreinstalledWebAppDuplicationFixerName[] =
     "Enable the app deduplication fix for migrated preinstalled web apps";
 const char kEnablePreinstalledWebAppDuplicationFixerDescription[] =
@@ -5397,6 +5385,11 @@ const char kFilesAppExperimentalDescription[] =
     "Enable experimental UI features for Files app. Experimental features are "
     "expected to be non functional to end users.";
 
+const char kFilesConflictDialogName[] = "Files app conflict dialog";
+const char kFilesConflictDialogDescription[] =
+    "When enabled, the conflict dialog will be shown during file transfers "
+    "if a file entry in the transfer exists at the destination.";
+
 const char kFilesExtractArchiveName[] = "Extract archive in Files app";
 const char kFilesExtractArchiveDescription[] =
     "Enable the simplified archive extraction feature in Files app";
@@ -5900,13 +5893,6 @@ const char kQuickSettingsNetworkRevampDescription[] =
     "Enables the Quick Settings Network revamp, which updates Network Quick "
     "Settings UI and related infrastructure. See https://crbug.com/1169479.";
 
-const char kCaptivePortalUI2022Name[] =
-    "Enables the Captive Portal UI 2022 changes.";
-const char kCaptivePortalUI2022Description[] =
-    "Enables the Captive Portal UI 2022 changes, which includes updates to "
-    "notifications, network details page, quick settings, and portal signin "
-    "UI.";
-
 const char kCaptivePortalErrorPageName[] =
     "Enables Captive Portal error page suggestions.";
 const char kCaptivePortalErrorPageDescription[] =
@@ -5963,11 +5949,6 @@ const char kUseFakeDeviceForMediaStreamDescription[] =
     "Forces Chrome to use a fake video capture device (a rolling pacman with a "
     "timestamp) instead of the system audio/video devices, for debugging "
     "purposes.";
-
-const char kUseMultipleOverlaysName[] = "Use Multiple Overlays";
-const char kUseMultipleOverlaysDescription[] =
-    "Specifies the maximum number of quads that Chrome will attempt to promote"
-    " to overlays.";
 
 const char kUXStudy1Name[] = "UX Study 1";
 const char kUXStudy1Description[] = "Opt into a group for UX Study";
@@ -6260,10 +6241,6 @@ const char kChromeOSHWVBREncodingDescription[] =
     "video is recorded in VBR encoding in MediaRecoder API automatically and "
     "WebCodecs API if configured so.";
 #if defined(ARCH_CPU_ARM_FAMILY)
-const char kPreferLibYuvImageProcessorName[] = "Prefer libYUV image processor";
-const char kPreferLibYuvImageProcessorDescription[] =
-    "Prefers the libYUV image processor for format conversion of video frames "
-    "over the hardware implementation";
 const char kPreferGLImageProcessorName[] = "Prefer GL image processor";
 const char kPreferGLImageProcessorDescription[] =
     "Prefers the GL image processor for format conversion of video frames over"

@@ -639,9 +639,19 @@ TEST_F('CrSettingsPrivacySandboxPageTest', 'TopicsSubpageTests', function() {
   runMochaSuite('PrivacySandboxTopicsSubpageTests');
 });
 
+TEST_F(
+    'CrSettingsPrivacySandboxPageTest', 'TopicsSubpageEmptyTests', function() {
+      runMochaSuite('PrivacySandboxTopicsSubpageEmptyTests');
+    });
+
 TEST_F('CrSettingsPrivacySandboxPageTest', 'FledgeSubpageTests', function() {
   runMochaSuite('PrivacySandboxFledgeSubpageTests');
 });
+
+TEST_F(
+    'CrSettingsPrivacySandboxPageTest', 'FledgeSubpageEmptyTests', function() {
+      runMochaSuite('PrivacySandboxFledgeSubpageEmptyTests');
+    });
 
 TEST_F(
     'CrSettingsPrivacySandboxPageTest', 'FledgeSubpageSeeAllSitesTests',

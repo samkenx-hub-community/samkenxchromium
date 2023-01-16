@@ -473,6 +473,21 @@
             ]
         }
     ],
+    "AppKMDecouplingCoverage": [
+        {
+            "platforms": [
+                "chromeos"
+            ],
+            "experiments": [
+                {
+                    "name": "AppKMDecoupling",
+                    "enable_features": [
+                        "AppMetricsOnlyRelyOnAppSync"
+                    ]
+                }
+            ]
+        }
+    ],
     "AppListLaunchRecorder": [
         {
             "platforms": [
@@ -7834,6 +7849,26 @@
             ]
         }
     ],
+    "OptimizationGuideInstallWideModelStore": [
+        {
+            "platforms": [
+                "android",
+                "chromeos",
+                "chromeos_lacros",
+                "linux",
+                "mac",
+                "windows"
+            ],
+            "experiments": [
+                {
+                    "name": "Enabled",
+                    "enable_features": [
+                        "OptimizationGuideInstallWideModelStore"
+                    ]
+                }
+            ]
+        }
+    ],
     "OptimizeNetworkBuffers": [
         {
             "platforms": [
@@ -9954,6 +9989,26 @@
                     "enable_features": [
                         "NotificationInteractionHistory",
                         "SafetyCheckNotificationPermissions"
+                    ]
+                }
+            ]
+        }
+    ],
+    "SafetyCheckUnusedSitePermissions": [
+        {
+            "platforms": [
+                "chromeos",
+                "chromeos_lacros",
+                "fuchsia",
+                "linux",
+                "mac",
+                "windows"
+            ],
+            "experiments": [
+                {
+                    "name": "Enabled",
+                    "enable_features": [
+                        "SafetyCheckUnusedSitePermissions"
                     ]
                 }
             ]

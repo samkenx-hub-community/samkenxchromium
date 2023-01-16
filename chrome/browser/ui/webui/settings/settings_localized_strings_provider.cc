@@ -320,14 +320,6 @@ void AddAboutStrings(content::WebUIDataSource* html_source, Profile* profile) {
 
   std::u16string browser_version = VersionUI::GetAnnotatedVersionStringForUi();
 
-#if BUILDFLAG(IS_CHROMEOS_LACROS)
-  // Lacros is in development so we don't worry about l10n for now. This message
-  // will not be shown for the full release.
-  browser_version += u". ";
-  browser_version +=
-      l10n_util::GetStringUTF16(IDS_EXPERIMENTAL_LACROS_WARNING_MESSAGE);
-#endif
-
   html_source->AddString("aboutBrowserVersion", browser_version);
   html_source->AddString(
       "aboutProductCopyright",
@@ -1023,6 +1015,10 @@ void AddAutofillStrings(content::WebUIDataSource* html_source,
     {"addPaymentMethodCreditOrDebitCard",
      IDS_SETTINGS_ADD_PAYMENT_METHOD_CREDIT_OR_DEBIT_CARD},
     {"addPaymentMethodIban", IDS_SETTINGS_ADD_PAYMENT_METHOD_IBAN},
+    {"ibanSavedToThisDeviceOnly", IDS_SETTINGS_IBAN_SAVED_TO_THIS_DEVICE_ONLY},
+    {"addIbanTitle", IDS_SETTINGS_ADD_IBAN_TITLE},
+    {"editIbanTitle", IDS_SETTINGS_EDIT_IBAN_TITLE},
+    {"ibanNickname", IDS_IBAN_NICKNAME},
     {"migrateCreditCardsLabel", IDS_SETTINGS_MIGRATABLE_CARDS_LABEL},
     {"migratableCardsInfoSingle", IDS_SETTINGS_SINGLE_MIGRATABLE_CARD_INFO},
     {"migratableCardsInfoMultiple",
@@ -2022,6 +2018,8 @@ void AddPrivacySandboxStrings(content::WebUIDataSource* html_source,
        IDS_SETTINGS_TOPICS_PAGE_CURRENT_TOPICS_DESCRIPTION},
       {"topicsPageCurrentTopicsDescriptionLearnMoreLink",
        IDS_SETTINGS_TOPICS_PAGE_CURRENT_TOPICS_DESCRIPTION_LEARN_MORE_LINK},
+      {"topicsPageCurrentTopicsRegionA11yDescription",
+       IDS_SETTINGS_TOPICS_PAGE_CURRENT_TOPICS_REGION_A11Y_DESCRIPTION},
       {"topicsPageLearnMoreHeading",
        IDS_SETTINGS_TOPICS_PAGE_LEARN_MORE_HEADING},
       {"topicsPageLearnMoreBullet1",
@@ -2043,6 +2041,8 @@ void AddPrivacySandboxStrings(content::WebUIDataSource* html_source,
        IDS_SETTINGS_TOPICS_PAGE_BLOCKED_TOPICS_DESCRIPTION},
       {"topicsPageBlockedTopicsDescriptionEmpty",
        IDS_SETTINGS_TOPICS_PAGE_BLOCKED_TOPICS_DESCRIPTION_EMPTY},
+      {"topicsPageBlockedTopicsRegionA11yDescription",
+       IDS_SETTINGS_TOPICS_PAGE_BLOCKED_TOPICS_REGION_A11Y_DESCRIPTION},
       {"topicsPageAllowTopic", IDS_SETTINGS_TOPICS_PAGE_ALLOW_TOPIC},
       {"topicsPageAllowTopicA11yLabel",
        IDS_SETTINGS_TOPICS_PAGE_ALLOW_TOPIC_A11Y_LABEL},
@@ -2061,6 +2061,8 @@ void AddPrivacySandboxStrings(content::WebUIDataSource* html_source,
        IDS_SETTINGS_FLEDGE_PAGE_CURRENT_SITES_DESCRIPTION_DISABLED},
       {"fledgePageCurrentSitesDescriptionEmpty",
        IDS_SETTINGS_FLEDGE_PAGE_CURRENT_SITES_DESCRIPTION_EMPTY},
+      {"fledgePageCurrentSitesRegionA11yDescription",
+       IDS_SETTINGS_FLEDGE_PAGE_CURRENT_SITES_REGION_A11Y_DESCRIPTION},
       {"fledgePageSeeAllSitesLabel",
        IDS_SETTINGS_FLEDGE_PAGE_SEE_ALL_SITES_LABEL},
       {"fledgePageBlockSite", IDS_SETTINGS_FLEDGE_PAGE_BLOCK_SITE},
@@ -2072,6 +2074,8 @@ void AddPrivacySandboxStrings(content::WebUIDataSource* html_source,
        IDS_SETTINGS_FLEDGE_PAGE_BLOCKED_SITES_DESCRIPTION},
       {"fledgePageBlockedSitesDescriptionEmpty",
        IDS_SETTINGS_FLEDGE_PAGE_BLOCKED_SITES_DESCRIPTION_EMPTY},
+      {"fledgePageBlockedSitesRegionA11yDescription",
+       IDS_SETTINGS_FLEDGE_PAGE_BLOCKED_SITES_REGION_A11Y_DESCRIPTION},
       {"fledgePageAllowSite", IDS_SETTINGS_FLEDGE_PAGE_ALLOW_SITE},
       {"fledgePageAllowSiteA11yLabel",
        IDS_SETTINGS_FLEDGE_PAGE_ALLOW_SITE_A11Y_LABEL},

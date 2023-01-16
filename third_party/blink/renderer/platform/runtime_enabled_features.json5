@@ -791,7 +791,7 @@
     },
     {
       name: "CSSNewRootFontUnits",
-      status: "experimental",
+      status: "stable",
     },
     {
       name: "CSSObjectViewBox",
@@ -2383,6 +2383,11 @@
       name: "RtcAudioJitterBufferMaxPackets",
       origin_trial_feature_name: "RtcAudioJitterBufferMaxPackets",
       status: "experimental",
+    },
+    {
+      name: "RTCEncodedVideoFrameAdditionalMetadata",
+      status: "experimental",
+      base_feature: "RTCEncodedVideoFrameAdditionalMetadata",
     },
     {
       name: "RTCEncodedVideoFrameClone",
