@@ -227,8 +227,7 @@ std::vector<CreditCard*> AutofillSuggestionGenerator::GetOrderedCardsToSuggest(
       autofill_client->GetPersonalDataManager();
   DCHECK(personal_data);
   std::vector<CreditCard*> cards_to_suggest =
-      personal_data->GetCreditCardsToSuggest(
-          autofill_client->AreServerCardsSupported());
+      personal_data->GetCreditCardsToSuggest();
 
   // If a card has available card linked offers on the last committed url, rank
   // it to the top.
@@ -254,7 +253,7 @@ std::vector<CreditCard*> AutofillSuggestionGenerator::GetOrderedCardsToSuggest(
 
 // static
 std::vector<Suggestion> AutofillSuggestionGenerator::GetSuggestionsForIBANs(
-    const std::vector<IBAN*>& ibans) {
+    const std::vector<const IBAN*>& ibans) {
   std::vector<Suggestion> suggestions;
   for (const IBAN* iban : ibans) {
     Suggestion& suggestion = suggestions.emplace_back(iban->value());

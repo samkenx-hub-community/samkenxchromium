@@ -123,7 +123,7 @@ BASE_FEATURE(kTLS13KeyUpdate,
 
 BASE_FEATURE(kPermuteTLSExtensions,
              "PermuteTLSExtensions",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 BASE_FEATURE(kPostQuantumCECPQ2,
              "PostQuantumCECPQ2",
@@ -182,7 +182,7 @@ const base::FeatureParam<int> kChromeRootStoreSysImpl{&kChromeRootStoreUsed,
 #endif /* BUILDFLAG(IS_MAC) */
 #endif /* BUILDFLAG(CHROME_ROOT_STORE_SUPPORTED) */
 
-#if BUILDFLAG(IS_MAC)
+#if BUILDFLAG(IS_MAC) || BUILDFLAG(USE_NSS_CERTS) || BUILDFLAG(IS_WIN)
 BASE_FEATURE(kTrustStoreTrustedLeafSupport,
              "TrustStoreTrustedLeafSupport",
              base::FEATURE_ENABLED_BY_DEFAULT);
@@ -282,40 +282,6 @@ BASE_FEATURE(kOptimisticBlockfileWrite,
              "OptimisticBlockfileWrite",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-// Read as much of the net::URLRequest as there is space in the Mojo data pipe.
-BASE_FEATURE(kOptimizeNetworkBuffers,
-             "OptimizeNetworkBuffers2",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
-const base::FeatureParam<int> kOptimizeNetworkBuffersBytesReadLimit{
-    &kOptimizeNetworkBuffers, "bytes_read_limit", 64 * 1024};
-
-// If InputStream.available() returns less than this,
-// kOptimizeNetworkBuffersMinInputStreamReadSize will be used instead.
-const base::FeatureParam<int>
-    kOptimizeNetworkBuffersMinInputStreamAvailableValueToIgnore{
-        &kOptimizeNetworkBuffers, "min_input_stream_available_value_to_ignore",
-        16};
-
-// The smallest amount we'll try to read at a time if InputStream.available()
-// returned less than
-// kOptimizeNetworkBuffersMinInputStreamAvailableValueToIgnore.
-const base::FeatureParam<int> kOptimizeNetworkBuffersMinInputStreamReadSize{
-    &kOptimizeNetworkBuffers, "min_input_stream_read_size", 1024};
-
-const base::FeatureParam<int>
-    kOptimizeNetworkBuffersMaxInputStreamBytesToReadWhenAvailableUnknown{
-        &kOptimizeNetworkBuffers, "max_input_stream_bytes_available_unknown",
-        2 * 1024};
-
-const base::FeatureParam<int>
-    kOptimizeNetworkBuffersFilterSourceStreamBufferSize{
-        &kOptimizeNetworkBuffers, "filter_source_stream_buffer_size",
-        32 * 1024};
-
-const base::FeatureParam<bool> kOptimizeNetworkBuffersInputStreamCheckAvailable{
-    &kOptimizeNetworkBuffers, "input_stream_check_available", true};
-
 BASE_FEATURE(kStorageAccessAPI,
              "StorageAccessAPI",
              base::FEATURE_DISABLED_BY_DEFAULT);
@@ -340,9 +306,11 @@ BASE_FEATURE(kThirdPartyStoragePartitioning,
 // Whether to use the new code paths needed to support partitioning Blob URLs.
 // This exists as a kill-switch in case an issue is identified with the Blob
 // URL implementation that causes breakage.
+// TODO(https://crbug.com/1407944): Kill-switch activated - investigate cause of
+// increased renderer hangs.
 BASE_FEATURE(kSupportPartitionedBlobUrl,
              "SupportPartitionedBlobUrl",
-             base::FEATURE_ENABLED_BY_DEFAULT);
+             base::FEATURE_DISABLED_BY_DEFAULT);
 
 BASE_FEATURE(kAlpsParsing, "AlpsParsing", base::FEATURE_ENABLED_BY_DEFAULT);
 
@@ -380,5 +348,11 @@ BASE_FEATURE(kPlatformKeyProbeSHA256,
 BASE_FEATURE(kPriorityIncremental,
              "PriorityIncremental",
              base::FEATURE_ENABLED_BY_DEFAULT);
+
+// Prefetch to follow normal semantics instead of 5-minute rule
+// https://crbug.com/1345207
+BASE_FEATURE(kPrefetchFollowsNormalCacheSemantics,
+             "PrefetchFollowsNormalCacheSemantics",
+             base::FEATURE_DISABLED_BY_DEFAULT);
 
 }  // namespace net::features

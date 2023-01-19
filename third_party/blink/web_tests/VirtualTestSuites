@@ -967,7 +967,6 @@
       "wpt_internal/storage/quota/partitioned-webkitTemporaryStorage-usage-details.tentative.sub.html",
       "wpt_internal/storage/quota/partitioned-webkitPersistentStorage-quota-usage-details.tentative.sub.html",
       "wpt_internal/storage/quota/partitioned-webkitStorageInfo-temporary-quota-usage-details.tentative.sub.html",
-      "wpt_internal/storage/quota/partitioned-webkitStorageInfo-persistent-quota-usage-details.tentative.sub.html",
       "external/wpt/FileAPI/BlobURL/cross-partition.tentative.https.html",
       "external/wpt/storage/partitioned-estimate-usage-details-caches.tentative.https.sub.html",
       "external/wpt/storage/partitioned-estimate-usage-details-indexeddb.tentative.https.sub.html",
@@ -1344,6 +1343,18 @@
     "expires": "Jul 1, 2023"
   },
   {
+    "prefix": "shared-storage-fenced-frame-mparch-selecturl-limit",
+    "platforms": ["Linux", "Mac", "Win"],
+    "bases": [
+      "wpt_internal/shared_storage_selecturl_limit/"
+    ],
+    "exclusive_tests": [
+      "wpt_internal/shared_storage_selecturl_limit/"
+    ],
+    "args": ["--enable-features=SharedStorageAPI,FencedFrames:implementation_type/mparch,PrivacySandboxAdsAPIsOverride,SharedStorageSelectURLLimit"],
+    "expires": "Jul 1, 2023"
+  },
+  {
     "prefix": "task-tracking",
     "platforms": ["Linux", "Mac", "Win"],
     "bases": ["wpt_internal/task-tracking"],
@@ -1541,7 +1552,7 @@
     ],
     "exclusive_tests": "ALL",
     "args": [
-      "--enable-blink-features=SpeculationRulesPrefetchProxy,SpeculationRulesFetchFromHeader,SpeculationRulesDocumentRules,NoVarySearchPrefetch",
+      "--enable-blink-features=SpeculationRulesPrefetchProxy,SpeculationRulesFetchFromHeader,SpeculationRulesDocumentRules,NoVarySearchPrefetch,SpeculationRulesEagerness",
       "--enable-features=SpeculationRulesPrefetchProxy,PrefetchUseContentRefactor",
       "--bypass-prefetch-proxy-for-host=not-web-platform.test"
     ],
@@ -1684,13 +1695,9 @@
     "platforms": ["Linux", "Mac", "Win"],
     "bases": [
       "external/wpt/html/infrastructure/safe-passing-of-structured-data/cross-origin-transfer-resizable-arraybuffer.html",
-      "external/wpt/html/infrastructure/safe-passing-of-structured-data/messagechannel.any.html",
-      "external/wpt/html/infrastructure/safe-passing-of-structured-data/messagechannel.any.serviceworker.html",
-      "external/wpt/html/infrastructure/safe-passing-of-structured-data/messagechannel.any.sharedworker.html",
-      "external/wpt/html/infrastructure/safe-passing-of-structured-data/messagechannel.any.worker.html",
+      "external/wpt/html/infrastructure/safe-passing-of-structured-data/messagechannel.any.js",
       "external/wpt/html/infrastructure/safe-passing-of-structured-data/window-postmessage.window.html",
-      "external/wpt/html/webappapis/structured-clone/structured-clone.any.html",
-      "external/wpt/html/webappapis/structured-clone/structured-clone.any.worker.html",
+      "external/wpt/html/webappapis/structured-clone/structured-clone.any.js",
       "external/wpt/webidl/ecmascript-binding/allow-resizable.html",
       "external/wpt/workers/semantics/structured-clone/dedicated.html",
       "external/wpt/workers/semantics/structured-clone/shared.html"

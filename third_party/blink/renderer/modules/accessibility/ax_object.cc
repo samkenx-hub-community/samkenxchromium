@@ -253,8 +253,7 @@ constexpr wtf_size_t kNumRoles =
 
 using ARIARoleMap = HashMap<String,
                             ax::mojom::blink::Role,
-                            CaseFoldingHash,
-                            HashTraits<String>,
+                            CaseFoldingHashTraits<String>,
                             RoleHashTraits>;
 
 struct RoleEntry {

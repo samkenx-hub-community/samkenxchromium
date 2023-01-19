@@ -237,9 +237,6 @@ public class WebContentsAccessibilityImpl extends AccessibilityNodeProviderCompa
     // return an AccessibilityNodeProvider or process touch exploration events.
     private boolean mIsObscuredByAnotherView;
 
-    // Accessibility touch exploration state.
-    private boolean mTouchExplorationEnabled;
-
     // This array maps a given virtualViewId to an |AccessibilityNodeInfoCompat| for that view. We
     // use this to update a node quickly rather than building from one scratch each time.
     private SparseArray<AccessibilityNodeInfoCompat> mNodeInfoCache = new SparseArray<>();
@@ -615,6 +612,12 @@ public class WebContentsAccessibilityImpl extends AccessibilityNodeProviderCompa
         }
     }
 
+    private void unInitialize() {
+        if (mNativeObj != 0) {
+            WebContentsAccessibilityImplJni.get().unInitialize(mNativeObj);
+        }
+    }
+
     /**
      * Refresh a11y state with that of {@link AccessibilityManager}.
      */
@@ -861,18 +864,11 @@ public class WebContentsAccessibilityImpl extends AccessibilityNodeProviderCompa
     }
 
     @Override
-    public boolean isTouchExplorationEnabled() {
-        return mTouchExplorationEnabled;
-    }
-
-    @Override
     public void setState(boolean state) {
         if (!state) {
             mNativeAccessibilityAllowed = false;
-            mTouchExplorationEnabled = false;
         } else {
             mNativeAccessibilityAllowed = true;
-            mTouchExplorationEnabled = mAccessibilityManager.isTouchExplorationEnabled();
         }
     }
 
@@ -1450,6 +1446,12 @@ public class WebContentsAccessibilityImpl extends AccessibilityNodeProviderCompa
                     mNativeObj, mAccessibilityFocusId)) {
             mAutofillPopupView.requestFocus();
         }
+
+        // Android has a bug that can lead to the a11y focus not being rendered: b/264356970
+        // The reason is that this event alone is not enough to rerender, this line works it
+        // around by adding the rerender trigger via the underlying view.
+        // TODO(b/264356970): Remove when all supported platforms have this bug fixed.
+        mView.invalidate();
 
         sendAccessibilityEvent(
                 mAccessibilityFocusId, AccessibilityEvent.TYPE_VIEW_ACCESSIBILITY_FOCUSED);
@@ -2334,5 +2336,6 @@ public class WebContentsAccessibilityImpl extends AccessibilityNodeProviderCompa
                 long nativeWebContentsAccessibilityAndroid, float x, float y);
         boolean getImageData(long nativeWebContentsAccessibilityAndroid,
                 AccessibilityNodeInfoCompat info, int id, boolean hasSentPreviousRequest);
+        void unInitialize(long nativeWebContentsAccessibilityAndroid);
     }
 }

@@ -206,14 +206,15 @@ export class SettingsCookiesPageElement extends SettingsCookiesPageElementBase {
     }
   }
 
-  private getThirdPartyCookiesPageBlockThirdIncognitoBulTwoLabel_(): string {
+  private getThirdPartyCookiesPageBlockThirdPartyIncognitoBulTwoLabel_():
+      string {
     return this.i18n(
         this.enableFirstPartySetsUI_ ?
             'cookiePageBlockThirdIncognitoBulTwoFps' :
             'thirdPartyCookiesPageBlockIncognitoBulTwo');
   }
 
-  private getCookiePageBlockThirdIncognitoBulTwoLabel_(): string {
+  private getCookiesPageBlockThirdPartyIncognitoBulTwoLabel_(): string {
     return this.i18n(
         this.enableFirstPartySetsUI_ ?
             'cookiePageBlockThirdIncognitoBulTwoFps' :
@@ -278,9 +279,18 @@ export class SettingsCookiesPageElement extends SettingsCookiesPageElementBase {
     // is launched and element isn't in dom-if anymore.
     const primarySettingGroup: SettingsRadioGroupElement =
         this.shadowRoot!.querySelector('#primarySettingGroup')!;
-
     const selection = Number(primarySettingGroup.selected);
-    // TODO(crbug.com/1378703): Record metrics based on the selection.
+    if (selection === CookieControlsMode.OFF) {
+      this.metricsBrowserProxy_.recordSettingsPageHistogram(
+          PrivacyElementInteractions.THIRD_PARTY_COOKIES_ALLOW);
+    } else if (selection === CookieControlsMode.INCOGNITO_ONLY) {
+      this.metricsBrowserProxy_.recordSettingsPageHistogram(
+          PrivacyElementInteractions.THIRD_PARTY_COOKIES_BLOCK_IN_INCOGNITO);
+    } else {
+      assert(selection === CookieControlsMode.BLOCK_THIRD_PARTY);
+      this.metricsBrowserProxy_.recordSettingsPageHistogram(
+          PrivacyElementInteractions.THIRD_PARTY_COOKIES_BLOCK);
+    }
 
     // If this change resulted in the user now blocking 3P cookies where they
     // previously were not, and any of privacy sandbox APIs are enabled,

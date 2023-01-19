@@ -18,6 +18,7 @@
 #include "chrome/browser/apps/app_service/metrics/app_platform_metrics.h"
 #include "chrome/browser/apps/app_service/metrics/app_platform_metrics_service.h"
 #include "chrome/browser/apps/app_service/metrics/app_service_metrics.h"
+#include "chrome/browser/apps/app_service/promise_apps/promise_apps.h"
 #include "chrome/browser/apps/app_service/publishers/app_publisher.h"
 #include "chrome/browser/apps/app_service/uninstall_dialog.h"
 #include "chrome/browser/ash/app_restore/full_restore_service.h"
@@ -43,6 +44,7 @@
 #include "components/services/app_service/public/cpp/preferred_apps_list.h"
 #include "components/services/app_service/public/cpp/types_util.h"
 #include "components/user_manager/user.h"
+#include "components/user_manager/user_manager.h"
 #include "extensions/grit/extensions_browser_resources.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
 
@@ -197,11 +199,12 @@ void AppServiceProxyAsh::OnApps(std::vector<AppPtr> deltas,
                                 AppType app_type,
                                 bool should_notify_initialized) {
   if (base::FeatureList::IsEnabled(kUnifiedAppServiceIconLoading)) {
-    // Delete app icon folders for uninstalled apps.
+    // Delete app icon folders for uninstalled apps or the icon updated app.
     std::vector<std::string> app_ids;
     for (const auto& delta : deltas) {
-      if (delta->readiness != Readiness::kUnknown &&
-          !apps_util::IsInstalled(delta->readiness)) {
+      if ((delta->readiness != Readiness::kUnknown &&
+           !apps_util::IsInstalled(delta->readiness)) ||
+          (delta->icon_key.has_value() && delta->icon_key->raw_icon_updated)) {
         // If there's already a deletion in progress, skip the deletion request.
         if (base::Contains(pending_read_icon_requests_, delta->app_id)) {
           continue;
@@ -368,6 +371,12 @@ void AppServiceProxyAsh::ReadIconsForTesting(AppType app_type,
                                              LoadIconCallback callback) {
   ReadIcons(app_type, app_id, size_in_dip, icon_key.Clone(), icon_type,
             std::move(callback));
+}
+apps::PromiseAppRegistryCache& AppServiceProxyAsh::PromiseAppRegistryCache() {
+  return promise_app_registry_cache_;
+}
+void AppServiceProxyAsh::AddPromiseApp(PromiseAppPtr app) {
+  promise_app_registry_cache_.AddPromiseApp(std::move(app));
 }
 
 void AppServiceProxyAsh::Shutdown() {

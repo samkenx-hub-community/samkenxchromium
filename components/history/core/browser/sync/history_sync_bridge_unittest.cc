@@ -455,8 +455,10 @@ TEST_F(HistorySyncBridgeTest, AppliesRemoteChanges) {
   EXPECT_EQ(backend()->GetURLs()[0].url(), local_url);
   EXPECT_EQ(backend()->GetURLs()[1].url(), remote_url);
   EXPECT_EQ(backend()->GetVisits()[0].url_id, backend()->GetURLs()[0].id());
+  EXPECT_FALSE(backend()->GetVisits()[0].is_known_to_sync);
   EXPECT_EQ(backend()->GetVisits()[1].url_id, backend()->GetURLs()[1].id());
   EXPECT_EQ(backend()->GetVisits()[1].originator_cache_guid, remote_cache_guid);
+  EXPECT_TRUE(backend()->GetVisits()[1].is_known_to_sync);
 }
 
 TEST_F(HistorySyncBridgeTest, MergesRemoteChanges) {
@@ -691,6 +693,12 @@ TEST_F(HistorySyncBridgeTest, UploadsNewLocalVisit) {
       ui::PAGE_TRANSITION_TYPED));
   EXPECT_FALSE(history.page_transition().forward_back());
   EXPECT_TRUE(history.page_transition().from_address_bar());
+
+  // Re-fetch the visit from the backend and verify we've marked it as
+  // `is_known_to_sync`.
+  VisitRow visit_from_backend;
+  ASSERT_TRUE(backend()->GetVisitByID(visit_row.visit_id, &visit_from_backend));
+  EXPECT_TRUE(visit_from_backend.is_known_to_sync);
 }
 
 TEST_F(HistorySyncBridgeTest, DoesNotUploadPreexistingData) {
@@ -732,6 +740,17 @@ TEST_F(HistorySyncBridgeTest, DoesNotUploadUnsyncableURLs) {
 
   // The data should *not* have been uploaded to Sync.
   EXPECT_TRUE(processor()->GetEntities().empty());
+
+  // Re-fetch these visits from the backend and verify we've NOT marked them as
+  // `is_known_to_sync`.
+  VisitRow visit_from_backend_1;
+  ASSERT_TRUE(
+      backend()->GetVisitByID(visit_row1.visit_id, &visit_from_backend_1));
+  EXPECT_FALSE(visit_from_backend_1.is_known_to_sync);
+  VisitRow visit_from_backend_2;
+  ASSERT_TRUE(
+      backend()->GetVisitByID(visit_row2.visit_id, &visit_from_backend_2));
+  EXPECT_FALSE(visit_from_backend_2.is_known_to_sync);
 }
 
 TEST_F(HistorySyncBridgeTest, DoesNotUploadWhileSyncIsPaused) {

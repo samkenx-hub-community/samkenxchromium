@@ -32,6 +32,7 @@
 #include "chrome/browser/profiles/profile_shortcut_manager.h"
 #include "chrome/browser/signin/account_consistency_mode_manager.h"
 #include "chrome/browser/signin/account_consistency_mode_manager_factory.h"
+#include "chrome/browser/signin/signin_features.h"
 #include "chrome/browser/sync/sync_service_factory.h"
 #include "chrome/browser/ui/passwords/ui_utils.h"
 #include "chrome/browser/ui/ui_features.h"
@@ -1444,8 +1445,10 @@ void AddSignOutDialogStrings(content::WebUIDataSource* html_source,
   html_source->AddString(
       "syncDisconnectManagedProfileExplanation",
       l10n_util::GetStringFUTF8(
-          IDS_SETTINGS_SYNC_DISCONNECT_MANAGED_PROFILE_EXPLANATION, u"$1",
-          base::ASCIIToUTF16(sync_dashboard_url)));
+          base::FeatureList::IsEnabled(kDisallowManagedProfileSignout)
+              ? IDS_SETTINGS_TURN_OFF_SYNC_MANAGED_PROFILE_EXPLANATION
+              : IDS_SETTINGS_SYNC_DISCONNECT_MANAGED_PROFILE_EXPLANATION,
+          u"$1", base::ASCIIToUTF16(sync_dashboard_url)));
 #endif
 }
 
@@ -2114,6 +2117,11 @@ void AddPrivacySandboxStrings(content::WebUIDataSource* html_source,
   };
   html_source->AddLocalizedStrings(kLocalizedStrings);
 
+  html_source->AddString("adPrivacyLearnMoreURL",
+                         google_util::AppendGoogleLocaleParam(
+                             GURL(chrome::kAdPrivacyLearnMoreURL),
+                             g_browser_process->GetApplicationLocale())
+                             .spec());
   html_source->AddString(
       "privacySandboxAdMeasurementDialogControlMeasurement",
       l10n_util::GetStringFUTF16(

@@ -2830,6 +2830,11 @@ const char kHardwareSecureDecryptionDisabledTimes[] =
 // This setting resides in local state.
 const char kKioskMetrics[] = "kiosk-metrics";
 
+// A boolean pref which determines whether kiosk troubleshooting tools are
+// enabled.
+const char kKioskTroubleshootingToolsEnabled[] =
+    "kiosk_troubleshooting_tools_enabled";
+
 // A boolean pref which determines whether a Web Kiosk can open more than one
 // browser window.
 const char kNewWindowsInKioskAllowed[] = "new_windows_in_kiosk_allowed";
@@ -3325,8 +3330,10 @@ const char kTabStatsDailySample[] = "tab_stats.last_daily_sample";
 // Discards/Reloads since last daily report.
 const char kTabStatsDiscardsExternal[] = "tab_stats.discards_external";
 const char kTabStatsDiscardsUrgent[] = "tab_stats.discards_urgent";
+const char kTabStatsDiscardsProactive[] = "tab_stats.discards_proactive";
 const char kTabStatsReloadsExternal[] = "tab_stats.reloads_external";
 const char kTabStatsReloadsUrgent[] = "tab_stats.reloads_urgent";
+const char kTabStatsReloadsProactive[] = "tab_stats.reloads_proactive";
 
 // A list of origins (URLs) to treat as "secure origins" for debugging purposes.
 const char kUnsafelyTreatInsecureOriginAsSecure[] =

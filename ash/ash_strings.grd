@@ -1487,6 +1487,9 @@ Style notes:
       <message name="IDS_ASH_VIDEO_CONFERENCE_BUBBLE_PORTRAIT_RELIGHT_NAME" desc="Text for name of the portrait relight effect in the VC bubble.">
         Portrait Relighting
       </message>
+      <message name="IDS_ASH_VIDEO_CONFERENCE_TOAST_SPEAK_ON_MUTE_DETECTED" desc="A toast message that we show when user tries to speak while muted on system-level.">
+        Are you speaking? You are on mute. Learn more
+      </message>
 
       <!-- Phone Hub tray-->
       <message name="IDS_ASH_PHONE_HUB_TRAY_ACCESSIBLE_NAME" desc="The accessible name of the Phone Hub tray bubble for screen readers.">
@@ -4552,6 +4555,10 @@ Connect your device to power.
 
       <message name="IDS_ASH_CALENDAR_UP_NEXT_SCROLL_RIGHT_BUTTON" desc="The accessible/tooltip description of the calendar up next scroll right button.">
         Scroll right
+      </message>
+
+      <message name="IDS_ASH_CALENDAR_UP_NEXT_TODAYS_EVENTS_BUTTON" desc="The accessible/tooltip description of the calendar up next today's events button.">
+        See all events for today
       </message>
 
       <message name="IDS_ASH_STATUS_TRAY_PROGRESS_BAR_ACCESSIBLE_NAME" desc="The accessible name for the progress bar shown in the status tray.">

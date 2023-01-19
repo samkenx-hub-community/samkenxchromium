@@ -184,7 +184,9 @@ class GetNonRecentExpectationContentUnittest(unittest.TestCase):
 5f03bc04975c04 (Some R. Author    {today_date} 00:00:00 +0000  4)
 5f03bc04975c04 (Some R. Author    {today_date} 00:00:00 +0000  5)crbug.com/1234 [ tag1 ] testname [ Failure ]
 98637cd80f8c15 (Some R. Author    {yesterday_date} 00:00:00 +0000  6)[ tag2 ] testname [ Failure ] # Comment
-3fcadac9d861d0 (Some R. Author    {older_date} 00:00:00 +0000  7)[ tag1 ] othertest [ Failure ]"""
+3fcadac9d861d0 (Some R. Author    {older_date} 00:00:00 +0000  7)[ tag1 ] othertest [ Failure ]
+5f03bc04975c04 (Some R. Author    {today_date} 00:00:00 +0000  8)crbug.com/2345 testname [ Failure ]
+3fcadac9d861d0 (Some R. Author    {older_date} 00:00:00 +0000  9)crbug.com/3456 othertest [ Failure ]"""
     # pylint: enable=line-too-long
     blame_output = blame_output.format(today_date=today_str,
                                        yesterday_date=yesterday_str,
@@ -196,7 +198,8 @@ class GetNonRecentExpectationContentUnittest(unittest.TestCase):
 # tags: [ tag2 ]
 # results: [ Failure ]
 
-[ tag1 ] othertest [ Failure ]"""
+[ tag1 ] othertest [ Failure ]
+crbug.com/3456 othertest [ Failure ]"""
     self.assertEqual(self.instance._GetNonRecentExpectationContent('', 1),
                      expected_content)
 
@@ -1101,183 +1104,6 @@ class FilterToMostSpecificTypTagsUnittest(fake_filesystem_unittest.TestCase):
     self.assertEqual(filtered_tags, set(['win10', 'nvidia', 'release']))
 
 
-class ModifySemiStaleExpectationsUnittest(fake_filesystem_unittest.TestCase):
-  def setUp(self) -> None:
-    self.setUpPyfakefs()
-    self.instance = uu.CreateGenericExpectations()
-
-    self._input_patcher = mock.patch.object(expectations,
-                                            '_WaitForUserInputOnModification')
-    self._input_mock = self._input_patcher.start()
-    self.addCleanup(self._input_patcher.stop)
-
-    with tempfile.NamedTemporaryFile(delete=False, mode='w') as f:
-      f.write(FAKE_EXPECTATION_FILE_CONTENTS)
-      self.filename = f.name
-    with tempfile.NamedTemporaryFile(delete=False, mode='w') as f:
-      f.write(SECONDARY_FAKE_EXPECTATION_FILE_CONTENTS)
-      self.secondary_filename = f.name
-
-  def testEmptyExpectationMap(self) -> None:
-    """Tests that an empty expectation map results in a no-op."""
-    modified_urls = self.instance.ModifySemiStaleExpectations(
-        data_types.TestExpectationMap())
-    self.assertEqual(modified_urls, set())
-    self._input_mock.assert_not_called()
-    with open(self.filename) as f:
-      self.assertEqual(f.read(), FAKE_EXPECTATION_FILE_CONTENTS)
-
-  def testRemoveExpectation(self) -> None:
-    """Tests that specifying to remove an expectation does so."""
-    self._input_mock.return_value = 'r'
-    # yapf: disable
-    test_expectation_map = data_types.TestExpectationMap({
-        self.filename:
-        data_types.ExpectationBuilderMap({
-            data_types.Expectation(
-                'foo/test', ['win'], 'Failure', 'crbug.com/1234'):
-            data_types.BuilderStepMap(),
-        }),
-        self.secondary_filename:
-        data_types.ExpectationBuilderMap({
-            data_types.Expectation(
-                'foo/test', ['mac'], 'Failure', 'crbug.com/4567'):
-            data_types.BuilderStepMap(),
-        }),
-    })
-    # yapf: enable
-    modified_urls = self.instance.ModifySemiStaleExpectations(
-        test_expectation_map)
-    self.assertEqual(modified_urls, set(['crbug.com/1234', 'crbug.com/4567']))
-    expected_file_contents = """\
-# tags: [ win linux ]
-# results: [ Failure RetryOnFailure Skip Pass ]
-crbug.com/5678 crbug.com/6789 [ win ] foo/another/test [ RetryOnFailure ]
-
-[ linux ] foo/test [ Failure ]
-
-crbug.com/2345 [ linux ] bar/* [ RetryOnFailure ]
-crbug.com/3456 [ linux ] some/bad/test [ Skip ]
-crbug.com/4567 [ linux ] some/good/test [ Pass ]
-"""
-    with open(self.filename) as f:
-      self.assertEqual(f.read(), expected_file_contents)
-    expected_file_contents = """\
-# tags: [ mac ]
-# results: [ Failure ]
-
-"""
-    with open(self.secondary_filename) as f:
-      self.assertEqual(f.read(), expected_file_contents)
-
-  def testModifyExpectation(self) -> None:
-    """Tests that specifying to modify an expectation does not remove it."""
-    self._input_mock.return_value = 'm'
-    # yapf: disable
-    test_expectation_map = data_types.TestExpectationMap({
-        self.filename:
-        data_types.ExpectationBuilderMap({
-            data_types.Expectation(
-                'foo/test', ['win'], 'Failure', 'crbug.com/1234'):
-            data_types.BuilderStepMap(),
-        }),
-        self.secondary_filename:
-        data_types.ExpectationBuilderMap({
-            data_types.Expectation(
-                'foo/test', ['mac'], 'Failure', 'crbug.com/4567',
-            ): data_types.BuilderStepMap()
-        }),
-    })
-    # yapf: enable
-    modified_urls = self.instance.ModifySemiStaleExpectations(
-        test_expectation_map)
-    self.assertEqual(modified_urls, set(['crbug.com/1234', 'crbug.com/4567']))
-    with open(self.filename) as f:
-      self.assertEqual(f.read(), FAKE_EXPECTATION_FILE_CONTENTS)
-    with open(self.secondary_filename) as f:
-      self.assertEqual(f.read(), SECONDARY_FAKE_EXPECTATION_FILE_CONTENTS)
-
-  def testModifyExpectationMultipleBugs(self) -> None:
-    """Tests that modifying an expectation with multiple bugs works properly."""
-    self._input_mock.return_value = 'm'
-    # yapf: disable
-    test_expectation_map = data_types.TestExpectationMap({
-        self.filename:
-        data_types.ExpectationBuilderMap({
-            data_types.Expectation(
-                'foo/another/test', ['win'], 'RetryOnFailure',
-                'crbug.com/5678 crbug.com/6789'):
-            data_types.BuilderStepMap(),
-        }),
-    })
-    # yapf: enable
-    modified_urls = self.instance.ModifySemiStaleExpectations(
-        test_expectation_map)
-    self.assertEqual(modified_urls, set(['crbug.com/5678', 'crbug.com/6789']))
-    with open(self.filename) as f:
-      self.assertEqual(f.read(), FAKE_EXPECTATION_FILE_CONTENTS)
-    with open(self.secondary_filename) as f:
-      self.assertEqual(f.read(), SECONDARY_FAKE_EXPECTATION_FILE_CONTENTS)
-
-  def testIgnoreExpectation(self) -> None:
-    """Tests that specifying to ignore an expectation does nothing."""
-    self._input_mock.return_value = 'i'
-    # yapf: disable
-    test_expectation_map = data_types.TestExpectationMap({
-        self.filename:
-        data_types.ExpectationBuilderMap({
-            data_types.Expectation(
-                'foo/test', ['win'], 'Failure', 'crbug.com/1234'):
-            data_types.BuilderStepMap(),
-        }),
-        self.secondary_filename:
-        data_types.ExpectationBuilderMap({
-            data_types.Expectation(
-                'foo/test', ['mac'], 'Failure', 'crbug.com/4567',
-            ): data_types.BuilderStepMap()
-        }),
-    })
-    # yapf: enable
-    modified_urls = self.instance.ModifySemiStaleExpectations(
-        test_expectation_map)
-    self.assertEqual(modified_urls, set())
-    with open(self.filename) as f:
-      self.assertEqual(f.read(), FAKE_EXPECTATION_FILE_CONTENTS)
-    with open(self.secondary_filename) as f:
-      self.assertEqual(f.read(), SECONDARY_FAKE_EXPECTATION_FILE_CONTENTS)
-
-  def testParserErrorCorrection(self) -> None:
-    """Tests that parser errors are caught and users can fix them."""
-
-    def TypoSideEffect() -> str:
-      with open(self.filename, 'w') as outfile:
-        outfile.write(FAKE_EXPECTATION_FILE_CONTENTS_WITH_TYPO)
-      return 'm'
-
-    def CorrectionSideEffect() -> None:
-      with open(self.filename, 'w') as outfile:
-        outfile.write(FAKE_EXPECTATION_FILE_CONTENTS)
-
-    self._input_mock.side_effect = TypoSideEffect
-    with mock.patch.object(expectations,
-                           '_WaitForAnyUserInput') as any_input_mock:
-      any_input_mock.side_effect = CorrectionSideEffect
-      # yapf: disable
-      test_expectation_map = data_types.TestExpectationMap({
-          self.filename:
-          data_types.ExpectationBuilderMap({
-              data_types.Expectation(
-                  'foo/test', ['win'], 'Failure', 'crbug.com/1234'):
-              data_types.BuilderStepMap(),
-          }),
-      })
-      # yapf: enable
-      self.instance.ModifySemiStaleExpectations(test_expectation_map)
-      any_input_mock.assert_called_once()
-      with open(self.filename) as infile:
-        self.assertEqual(infile.read(), FAKE_EXPECTATION_FILE_CONTENTS)
-
-
 class NarrowSemiStaleExpectationScopeUnittest(fake_filesystem_unittest.TestCase
                                               ):
   def setUp(self) -> None:
@@ -2028,6 +1854,136 @@ crbug.com/2345 [ mac ] bar/test [ Failure ]
     with open(self.filename) as infile:
       self.assertEqual(infile.read(), expected_contents)
     self.assertEqual(urls, set(['crbug.com/1234']))
+
+  def testNoOverlapsInNarrowedExpectations(self):
+    """Tests that scope narrowing does not produce overlapping tag sets."""
+    original_contents = """\
+# tags: [ Linux
+#         Mac Mac10.15 Mac11 Mac11-arm64 Mac12 Mac12-arm64
+#         Win Win10.20h2 Win11 ]
+# tags: [ Release Debug ]
+# results: [ Failure ]
+
+crbug.com/874695 foo/test [ Failure ]
+"""
+    with open(self.filename, 'w') as outfile:
+      outfile.write(original_contents)
+
+    linux_debug_stats = data_types.BuildStats()
+    linux_debug_stats.AddPassedBuild(frozenset(['debug', 'linux']))
+    linux_release_stats = data_types.BuildStats()
+    linux_release_stats.AddFailedBuild('1', frozenset(['linux', 'release']))
+    mac10_release_stats = data_types.BuildStats()
+    mac10_release_stats.AddFailedBuild(
+        '1', frozenset(['mac', 'mac10.15', 'release']))
+    mac11_arm_release_stats = data_types.BuildStats()
+    mac11_arm_release_stats.AddFailedBuild(
+        '1', frozenset(['mac', 'mac11-arm64', 'release']))
+    mac11_release_stats = data_types.BuildStats()
+    mac11_release_stats.AddFailedBuild('1',
+                                       frozenset(['mac', 'mac11', 'release']))
+    mac12_arm_release_stats = data_types.BuildStats()
+    mac12_arm_release_stats.AddFailedBuild(
+        '1', frozenset(['mac', 'mac12-arm64', 'release']))
+    mac12_debug_stats = data_types.BuildStats()
+    mac12_debug_stats.AddFailedBuild('1', frozenset(['debug', 'mac', 'mac12']))
+    mac12_release_stats = data_types.BuildStats()
+    mac12_release_stats.AddFailedBuild('1',
+                                       frozenset(['mac', 'mac12', 'release']))
+    win10_release_stats = data_types.BuildStats()
+    win10_release_stats.AddFailedBuild(
+        '1', frozenset(['release', 'win', 'win10.20h2']))
+    win11_release_stats = data_types.BuildStats()
+    win11_release_stats.AddFailedBuild('1',
+                                       frozenset(['release', 'win', 'win11']))
+    # yapf: disable
+    test_expectation_map = data_types.TestExpectationMap({
+        self.filename:
+        data_types.ExpectationBuilderMap({
+            data_types.Expectation(
+                'foo/test',
+                [], 'Failure', 'crbug.com/874695'):
+            data_types.BuilderStepMap({
+                'Linux Tests (dbg)(1)':
+                data_types.StepBuildStatsMap({
+                    'blink_web_tests': linux_debug_stats,
+                }),
+                'Mac10.15 Tests':
+                data_types.StepBuildStatsMap({
+                    'blink_web_tests': mac10_release_stats,
+                }),
+                'mac11-arm64-rel-tests':
+                data_types.StepBuildStatsMap({
+                    'blink_web_tests': mac11_arm_release_stats,
+                }),
+                'Mac11 Tests':
+                data_types.StepBuildStatsMap({
+                    'blink_web_tests': mac11_release_stats,
+                }),
+                'mac12-arm64-rel-tests':
+                data_types.StepBuildStatsMap({
+                    'blink_web_tests': mac12_arm_release_stats,
+                }),
+                'Mac12 Tests (dbg)':
+                data_types.StepBuildStatsMap({
+                    'blink_web_tests': mac12_debug_stats,
+                }),
+                'Mac12 Tests':
+                data_types.StepBuildStatsMap({
+                    'blink_web_tests': mac12_release_stats,
+                }),
+                'Linux Tests':
+                data_types.StepBuildStatsMap({
+                    'blink_web_tests': linux_release_stats,
+                }),
+                'WebKit Win10':
+                data_types.StepBuildStatsMap({
+                    'blink_web_tests': win10_release_stats,
+                }),
+                'Win11 Tests x64':
+                data_types.StepBuildStatsMap({
+                    'blink_web_tests': win11_release_stats,
+                }),
+            }),
+        }),
+    })
+    # yapf: enable
+    urls = self.instance.NarrowSemiStaleExpectationScope(test_expectation_map)
+    # Python sets are not stable between different processes due to random hash
+    # seeds that are on by default. Since there are two valid ways to simplify
+    # the tags we provided, this means that the test is flaky if we only check
+    # for one due to the non-deterministic order the tags are processed, so
+    # instead, accept either valid output.
+    #
+    # Random hash seeds can be disabled by setting PYTHONHASHSEED, but that
+    # requires that we either ensure that this test is always run with that set
+    # (difficult/error-prone), or we manually set the seed and recreate the
+    # process (hacky). Simply accepting either valid value instead of trying to
+    # force a certain order seems like the better approach.
+    expected_contents1 = """\
+# tags: [ Linux
+#         Mac Mac10.15 Mac11 Mac11-arm64 Mac12 Mac12-arm64
+#         Win Win10.20h2 Win11 ]
+# tags: [ Release Debug ]
+# results: [ Failure ]
+
+crbug.com/874695 [ debug mac12 ] foo/test [ Failure ]
+crbug.com/874695 [ release ] foo/test [ Failure ]
+"""
+    expected_contents2 = """\
+# tags: [ Linux
+#         Mac Mac10.15 Mac11 Mac11-arm64 Mac12 Mac12-arm64
+#         Win Win10.20h2 Win11 ]
+# tags: [ Release Debug ]
+# results: [ Failure ]
+
+crbug.com/874695 [ linux release ] foo/test [ Failure ]
+crbug.com/874695 [ mac ] foo/test [ Failure ]
+crbug.com/874695 [ release win ] foo/test [ Failure ]
+"""
+    with open(self.filename) as infile:
+      self.assertIn(infile.read(), (expected_contents1, expected_contents2))
+    self.assertEqual(urls, set(['crbug.com/874695']))
 
   def testInlineDisableAnnotation(self) -> None:
     """Tests that narrowing is skipped if inline annotations are present."""

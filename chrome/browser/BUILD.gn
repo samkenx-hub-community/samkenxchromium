@@ -660,8 +660,6 @@ static_library("browser") {
     "lookalikes/lookalike_url_service.h",
     "lookalikes/lookalike_url_tab_storage.cc",
     "lookalikes/lookalike_url_tab_storage.h",
-    "lookalikes/safety_tip_service.cc",
-    "lookalikes/safety_tip_service.h",
     "lookalikes/safety_tip_ui.h",
     "lookalikes/safety_tip_ui_helper.cc",
     "lookalikes/safety_tip_ui_helper.h",
@@ -1658,6 +1656,10 @@ static_library("browser") {
     "signin/chrome_signin_proxying_url_loader_factory.h",
     "signin/chrome_signin_url_loader_throttle.cc",
     "signin/chrome_signin_url_loader_throttle.h",
+    "signin/google_accounts_private_api_host.cc",
+    "signin/google_accounts_private_api_host.h",
+    "signin/google_accounts_private_api_util.cc",
+    "signin/google_accounts_private_api_util.h",
     "signin/header_modification_delegate.h",
     "signin/header_modification_delegate_impl.cc",
     "signin/header_modification_delegate_impl.h",
@@ -3284,8 +3286,6 @@ static_library("browser") {
       "//chrome/browser/commerce/merchant_viewer:merchant_signal_db",
       "//chrome/browser/commerce/merchant_viewer:merchant_viewer_data_manager",
       "//chrome/browser/commerce/merchant_viewer/android:jni_headers",
-      "//chrome/browser/commerce/subscriptions:commerce_subscription_db",
-      "//chrome/browser/commerce/subscriptions/android:jni_headers",
       "//chrome/browser/consent_auditor/android:jni_headers",
       "//chrome/browser/content_creation/notes/internal/android:jni_headers",
       "//chrome/browser/creator/android:jni_headers",
@@ -3328,7 +3328,6 @@ static_library("browser") {
       "//chrome/browser/touch_to_fill/payments/android:public",
       "//chrome/browser/ui:adaptive_toolbar_enums_java",
       "//chrome/browser/ui/android/layouts:android",
-      "//chrome/browser/ui/webui/explore_sites_internals:mojo_bindings",
       "//chrome/browser/ui/webui/feed_internals:mojo_bindings",
       "//chrome/browser/usb/android:jni_headers",
       "//chrome/browser/video_tutorials/internal",
@@ -3903,6 +3902,8 @@ static_library("browser") {
       "new_tab_page/modules/drive/drive_service_factory.h",
       "new_tab_page/modules/feed/feed_handler.cc",
       "new_tab_page/modules/feed/feed_handler.h",
+      "new_tab_page/modules/modules_switches.cc",
+      "new_tab_page/modules/modules_switches.h",
       "new_tab_page/modules/new_tab_page_modules.cc",
       "new_tab_page/modules/new_tab_page_modules.h",
       "new_tab_page/modules/photos/photos_handler.cc",
@@ -4192,6 +4193,8 @@ static_library("browser") {
       "support_tool/data_collector_utils.h",
       "support_tool/policy_data_collector.cc",
       "support_tool/policy_data_collector.h",
+      "support_tool/screenshot_data_collector.cc",
+      "support_tool/screenshot_data_collector.h",
       "support_tool/support_packet_metadata.cc",
       "support_tool/support_packet_metadata.h",
       "support_tool/support_tool_handler.cc",
@@ -4401,6 +4404,7 @@ static_library("browser") {
       "//components/app_constants",
       "//components/commerce/core:cart_db_content_proto",
       "//components/commerce/core:coupon_db_content_proto",
+      "//components/commerce/core:proto",
       "//components/commerce/core:public",
       "//components/commerce/core/mojom:mojo_bindings",
       "//components/constrained_window",
@@ -5060,7 +5064,6 @@ static_library("browser") {
       "//chrome/browser/ui/webui/ash/parent_access:mojo_bindings",
       "//chrome/browser/ui/webui/ash/vm:mojo_bindings",
       "//chrome/browser/ui/webui/nearby_share:mojom",
-      "//chrome/browser/ui/webui/nearby_share/public/mojom",
       "//chrome/browser/ui/webui/settings/ash/os_apps_page/mojom",
       "//chrome/browser/ui/webui/settings/ash/search:mojo_bindings",
       "//chrome/services/sharing/public/cpp",
@@ -5119,6 +5122,9 @@ static_library("browser") {
       "//chromeos/ash/services/nearby/public/cpp",
       "//chromeos/ash/services/nearby/public/cpp:tcp_server_socket_port",
       "//chromeos/ash/services/nearby/public/mojom",
+      "//chromeos/ash/services/nearby/public/mojom:nearby_share_settings",
+      "//chromeos/ash/services/network_config",
+      "//chromeos/ash/services/network_config:in_process_instance",
       "//chromeos/ash/services/network_health/public/cpp",
       "//chromeos/ash/services/secure_channel/public/mojom",
       "//chromeos/components/onc",
@@ -5129,8 +5135,6 @@ static_library("browser") {
       "//chromeos/crosapi/mojom",
       "//chromeos/dbus/tpm_manager",
       "//chromeos/dbus/tpm_manager:tpm_manager_proto",
-      "//chromeos/services/network_config",
-      "//chromeos/services/network_config:in_process_instance",
       "//chromeos/services/network_config/public/mojom",
       "//chromeos/services/network_health/public/mojom",
       "//chromeos/strings",
@@ -6036,15 +6040,6 @@ static_library("browser") {
     ]
   }
 
-  if (is_mac) {
-    sources += [
-      "enterprise/connectors/device_trust/browser/mac_device_trust_connector_service.cc",
-      "enterprise/connectors/device_trust/browser/mac_device_trust_connector_service.h",
-    ]
-
-    deps += [ "//chrome/browser/enterprise/connectors/device_trust/key_management/core/mac" ]
-  }
-
   if (is_linux || is_win || is_mac || is_android) {
     sources += [
       "enterprise/idle/action.cc",
@@ -6119,7 +6114,10 @@ static_library("browser") {
     }
 
     if (is_mac) {
-      deps += [ "//components/device_signals/core/browser/mac" ]
+      deps += [
+        "//chrome/browser/enterprise/connectors/device_trust/key_management/core/mac",
+        "//components/device_signals/core/browser/mac",
+      ]
     }
   }
 
@@ -7469,8 +7467,6 @@ static_library("browser") {
     }
 
     sources += [
-      "component_updater/vr_assets_component_installer.cc",
-      "component_updater/vr_assets_component_installer.h",
       "vr/chrome_xr_integration_client.cc",
       "vr/chrome_xr_integration_client.h",
     ]
@@ -7706,10 +7702,7 @@ grit("resources") {
   }
 
   if (is_android) {
-    deps += [
-      "//chrome/browser/resources/offline_pages:build_ts",
-      "//chrome/browser/ui/webui/explore_sites_internals:mojo_bindings_js",
-    ]
+    deps += [ "//chrome/browser/resources/offline_pages:build_ts" ]
   }
   if (!is_android) {
     deps += [

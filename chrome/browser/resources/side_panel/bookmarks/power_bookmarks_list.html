@@ -1,16 +1,11 @@
 <style include="cr-icons cr-hidden-style">
   :host {
     --back-button-size: 14px;
-    --border-color: var(--google-grey-300);
-    --disabled-text-color: var(--google-grey-600);
     --edit-footer-background: var(--google-grey-50);
-    --label-selected-color: var(--google-blue-50);
   }
 
   @media (prefers-color-scheme: dark) {
     :host {
-      --border-color: var(--google-grey-700);
-      --disabled-text-color: var(--google-grey-500);
       --edit-footer-background: var(--google-grey-900-white-4-percent);
     }
   }
@@ -41,20 +36,6 @@
     visibility: hidden;
   }
 
-  .back-button {
-    align-items: center;
-    background-color: transparent;
-    border: none;
-    color: var(--cr-secondary-text-color);
-    display: flex;
-    font-size: 11px;
-    font-weight: 700;
-    gap: 4px;
-    height: var(--back-button-size);
-    padding: 0;
-    text-transform: uppercase;
-  }
-
   .bookmarks {
     height: inherit;
     overflow-y: auto;
@@ -74,21 +55,8 @@
     margin-top: 66px;
   }
 
-  .heading-row {
-    align-items: center;
-    display: flex;
-    justify-content: space-between;
-    margin: 14px;
-  }
-
-  .icon-arrow-back {
-    -webkit-mask-image: var(--cr-icon-image);
-    -webkit-mask-position: center;
-    -webkit-mask-repeat: no-repeat;
-    -webkit-mask-size: var(--back-button-size);
-    background-color: var(--cr-primary-text-color);
-    height: var(--back-button-size);
-    width: var(--back-button-size);
+  sp-heading {
+    margin: 8px 14px;
   }
 
   .icon-button-row {
@@ -99,62 +67,11 @@
     gap: 8px;
   }
 
-  .label {
-    align-items: center;
-    background-color: transparent;
-    border: 1px solid var(--border-color);
-    border-radius: 4px;
-    color: var(--cr-secondary-text-color);
-    display: flex;
-    flex-direction: row;
-    font-size: var(--mwb-secondary-text-font-size);
-    gap: 4px;
-    padding: 6px;
-  }
-
-  .label[disabled] {
-    opacity: var(--cr-disabled-opacity);
-  }
-
-  .label[selected] {
-    background-color: var(--label-selected-color);
-    border-color: var(--label-selected-color);
-  }
-
-  .label:hover:not([disabled]) {
-    background-color: var(--google-grey-100);
-  }
-
   .label-row {
     display: flex;
     flex-direction: row;
     gap: 4px;
     margin: 0 14px;
-  }
-
-  .price-discounted {
-    color: var(--price-tracking-discount-color);
-    font-weight: 500;
-  }
-
-  .price-original {
-    color: var(--price-tracking-original-color);
-    text-decoration: line-through;
-  }
-
-  .sort-menu-button {
-    --hover-bg-color: var(--cr-hover-background-color);
-    --ripple-opacity: 0;
-    border: none;
-    color: var(--cr-secondary-text-color);
-    gap: 4px;
-    height: fit-content;
-    padding: 0;
-  }
-
-  .sort-menu-button:active {
-    background-color: var(--cr-active-background-color);
-    box-shadow: none;
   }
 
   cr-toolbar-selection-overlay {
@@ -186,38 +103,41 @@
   </cr-toolbar-search-field>
   <div class="label-row" hidden="[[guestMode_]]">
     <template is="dom-repeat" items="[[labels_]]">
-      <button class="label" selected$="[[item.active]]" disabled="[[editing_]]"
-          on-click="onLabelClicked_" aria-pressed="[[item.active]]">
-        <iron-icon class="label-icon"
-            icon="[[getLabelIcon_(item, item.active)]]"></iron-icon>
+      <sp-filter-chip
+          selected="[[item.active]]"
+          disabled="[[editing_]]"
+          on-click="onLabelClicked_">
+        <iron-icon icon="[[getLabelIcon_(item, item.active)]]"></iron-icon>
         [[item.label]]
-      </button>
+      </sp-filter-chip>
     </template>
   </div>
-  <div class="heading-row" hidden="[[guestMode_]]">
-    <button class="back-button" on-click="onBackClicked_"
-        disabled="[[disableBackButton_(activeFolderPath_.*, editing_)]]">
-      <div class="icon-arrow-back" hidden="[[!activeFolderPath_.length]]">
-      </div>
-      [[getFolderLabel_(activeFolderPath_.*)]]
-    </button>
-    <div class="icon-button-row">
-      <cr-button class="sort-menu-button" aria-label="$i18n{sortMenuA11yLabel}"
-          on-click="onShowSortMenuClicked_">
-        [[getSortLabel_(activeSortIndex_)]]
-        <iron-icon icon="bookmarks:filter-list"></iron-icon>
-      </cr-button>
-      <cr-icon-button iron-icon="bookmarks:create-new-folder"
-          disabled="[[editing_]]"
-          aria-label="$i18n{createNewFolderA11yLabel}"
-          on-click="onAddNewFolderClicked_"></cr-icon-button>
-      <cr-icon-button class="icon-edit" disabled="[[!shownBookmarks_.length]]"
-          aria-label="$i18n{editBookmarkListA11yLabel}"
-          aria-pressed="[[editing_]]"
-          aria-disabled="[[!shownBookmarks_.length]]"
-          on-click="onBulkEditClicked_"></cr-icon-button>
-    </div>
-  </div>
+  <sp-heading hidden$="[[guestMode_]]"
+      back-button-label="Test test test"
+      on-back-button-click="onBackClicked_"
+      hide-back-button="[[!activeFolderPath_.length]]"
+      disable-back-button="[[disableBackButton_(
+          activeFolderPath_.*, editing_)]]">
+    <h1 slot="heading">[[getFolderLabel_(activeFolderPath_.*)]]</h1>
+
+    <cr-button slot="buttons" class="sort-menu-button"
+        aria-label="$i18n{sortMenuA11yLabel}"
+        on-click="onShowSortMenuClicked_">
+      [[getSortLabel_(activeSortIndex_)]]
+      <iron-icon icon="bookmarks:filter-list"></iron-icon>
+    </cr-button>
+    <cr-icon-button slot="buttons" iron-icon="bookmarks:create-new-folder"
+        disabled="[[editing_]]"
+        aria-label="$i18n{createNewFolderA11yLabel}"
+        on-click="onAddNewFolderClicked_"></cr-icon-button>
+    <cr-icon-button slot="buttons" class="icon-edit"
+        disabled="[[!shownBookmarks_.length]]"
+        aria-label="$i18n{editBookmarkListA11yLabel}"
+        aria-pressed="[[editing_]]"
+        aria-disabled="[[!shownBookmarks_.length]]"
+        on-click="onBulkEditClicked_"></cr-icon-button>
+  </sp-heading>
+
   <div id="bookmarks" class="bookmarks" hidden="[[!shownBookmarks_.length]]"
       role="[[getBookmarksListRole_(editing_)]]"
       aria-multiselectable="[[editing_]]">
@@ -237,17 +157,17 @@
             on-trailing-icon-clicked="onShowContextMenuClicked_"
             on-checkbox-change="onRowSelectedChange_"
             on-input-change="onRename_">
-          <div slot="chips">
+          <div slot="badges">
             <template is="dom-if"
                 if="[[isPriceTracked_(item, showPriceTracking_)]]" restamp>
-              <sp-label updated="[[showDiscountedPrice_(item)]]">
+              <sp-list-item-badge updated="[[showDiscountedPrice_(item)]]">
                 <iron-icon icon="bookmarks:price-tracking"></iron-icon>
                 <div>[[getCurrentPrice_(item)]]</div>
-                <div slot="previous-label"
+                <div slot="previous-badge"
                     hidden$="[[!showDiscountedPrice_(item)]]">
                   [[getPreviousPrice_(item)]]
                 </div>
-              </sp-label>
+              </sp-list-item-badge>
             </template>
           </div>
         </power-bookmark-row>

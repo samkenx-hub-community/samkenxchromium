@@ -46,7 +46,7 @@ class AttributionSqlQueryPlanTest : public testing::Test {
       std::string query,
       absl::optional<SqlFullScanReason> reason = absl::nullopt) {
     auto plan = explainer_->GetPlan(std::move(query), reason);
-    EXPECT_TRUE(plan.has_value());
+    EXPECT_TRUE(plan.has_value()) << plan.error();
     return *plan;
   }
 
@@ -110,6 +110,87 @@ TEST_F(AttributionSqlQueryPlanTest, kScanCandidateDataAggregatable) {
 TEST_F(AttributionSqlQueryPlanTest, kDeleteAggregationsSql) {
   EXPECT_THAT(GetPlan(attribution_queries::kDeleteAggregationsSql),
               UsesCoveringIndex("aggregate_source_id_idx"));
+}
+
+TEST_F(AttributionSqlQueryPlanTest, kGetContributionsSql) {
+  EXPECT_THAT(GetPlan(attribution_queries::kGetContributionsSql),
+              UsesPrimaryKey());
+}
+
+TEST_F(AttributionSqlQueryPlanTest, kCountEventLevelReportsSql) {
+  EXPECT_THAT(GetPlan(attribution_queries::kCountEventLevelReportsSql),
+              AllOf(UsesCoveringIndex(
+                        "sources_by_active_destination_site_reporting_origin",
+                        {"event_level_active"}),
+                    UsesCoveringIndex("event_level_reports_by_source_id")));
+}
+
+TEST_F(AttributionSqlQueryPlanTest, kCountAggregatableReportsSql) {
+  EXPECT_THAT(GetPlan(attribution_queries::kCountAggregatableReportsSql),
+              AllOf(UsesCoveringIndex(
+                        "sources_by_active_destination_site_reporting_origin",
+                        {"event_level_active"}),
+                    UsesCoveringIndex("aggregate_source_id_idx")));
+}
+
+TEST_F(AttributionSqlQueryPlanTest, kNextEventLevelReportTimeSql) {
+  EXPECT_THAT(GetPlan(attribution_queries::kNextEventLevelReportTimeSql),
+              UsesCoveringIndex("event_level_reports_by_report_time"));
+}
+
+TEST_F(AttributionSqlQueryPlanTest, kNextAggregatableReportTimeSql) {
+  EXPECT_THAT(GetPlan(attribution_queries::kNextAggregatableReportTimeSql),
+              UsesCoveringIndex("aggregate_report_time_idx"));
+}
+
+TEST_F(AttributionSqlQueryPlanTest, kSetEventLevelReportTimeSql) {
+  EXPECT_THAT(GetPlan(attribution_queries::kSetEventLevelReportTimeSql),
+              UsesIndex("event_level_reports_by_report_time"));
+}
+
+TEST_F(AttributionSqlQueryPlanTest, kSetAggregatableReportTimeSql) {
+  EXPECT_THAT(GetPlan(attribution_queries::kSetAggregatableReportTimeSql),
+              UsesIndex("aggregate_report_time_idx"));
+}
+
+TEST_F(AttributionSqlQueryPlanTest, kReadSourceToAttributeSql) {
+  EXPECT_THAT(GetPlan(attribution_queries::kReadSourceToAttributeSql),
+              UsesPrimaryKey());
+}
+
+TEST_F(AttributionSqlQueryPlanTest, kGetActiveSourcesSql) {
+  EXPECT_THAT(GetPlan(attribution_queries::kGetActiveSourcesSql),
+              UsesIndex("sources_by_expiry_time"));
+}
+
+TEST_F(AttributionSqlQueryPlanTest, kGetEventLevelReportsSql) {
+  EXPECT_THAT(GetPlan(attribution_queries::kGetEventLevelReportsSql),
+              UsesIndex("event_level_reports_by_report_time"));
+}
+
+TEST_F(AttributionSqlQueryPlanTest, kGetEventLevelReportSql) {
+  EXPECT_THAT(GetPlan(attribution_queries::kGetEventLevelReportSql),
+              UsesPrimaryKey());
+}
+
+TEST_F(AttributionSqlQueryPlanTest, kGetAggregatableReportsSql) {
+  EXPECT_THAT(GetPlan(attribution_queries::kGetAggregatableReportsSql),
+              UsesIndex("aggregate_report_time_idx"));
+}
+
+TEST_F(AttributionSqlQueryPlanTest, kGetAggregatableReportSql) {
+  EXPECT_THAT(GetPlan(attribution_queries::kGetAggregatableReportSql),
+              UsesPrimaryKey());
+}
+
+TEST_F(AttributionSqlQueryPlanTest, kUpdateFailedEventLevelReportSql) {
+  EXPECT_THAT(GetPlan(attribution_queries::kUpdateFailedEventLevelReportSql),
+              UsesPrimaryKey());
+}
+
+TEST_F(AttributionSqlQueryPlanTest, kUpdateFailedAggregatableReportSql) {
+  EXPECT_THAT(GetPlan(attribution_queries::kUpdateFailedAggregatableReportSql),
+              UsesPrimaryKey());
 }
 
 }  // namespace

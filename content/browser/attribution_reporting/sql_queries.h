@@ -74,6 +74,152 @@ inline constexpr const char kDeleteAggregationsSql[] =
     "WHERE source_id=? "
     "RETURNING aggregation_id";
 
+inline constexpr const char kGetContributionsSql[] =
+    "SELECT key_high_bits,key_low_bits,value "
+    "FROM aggregatable_contributions "
+    "WHERE aggregation_id=?";
+
+// We need to hint to the query planner that/ `event_level_active` and
+// `aggregatable_active` are booleans, so include them in the conditional.
+#define ATTRIBUTION_COUNT_REPORTS_SQL(table) \
+  "SELECT COUNT(*)FROM " table               \
+  " R "                                      \
+  "JOIN sources I "                          \
+  "ON I.source_id=R.source_id "              \
+  "WHERE I.destination_site=? "              \
+  "AND(event_level_active BETWEEN 0 AND 1)"  \
+  "AND(aggregatable_active BETWEEN 0 AND 1)"
+
+inline constexpr const char kCountEventLevelReportsSql[] =
+    ATTRIBUTION_COUNT_REPORTS_SQL("event_level_reports");
+
+inline constexpr const char kCountAggregatableReportsSql[] =
+    ATTRIBUTION_COUNT_REPORTS_SQL("aggregatable_report_metadata");
+
+#undef ATTRIBUTION_COUNT_REPORTS_SQL
+
+#define ATTRIBUTION_NEXT_REPORT_TIME_SQL(table) \
+  "SELECT MIN(report_time)FROM " table " WHERE report_time>?"
+
+inline constexpr char kNextEventLevelReportTimeSql[] =
+    ATTRIBUTION_NEXT_REPORT_TIME_SQL("event_level_reports");
+
+inline constexpr char kNextAggregatableReportTimeSql[] =
+    ATTRIBUTION_NEXT_REPORT_TIME_SQL("aggregatable_report_metadata");
+
+#undef ATTRIBUTION_NEXT_REPORT_TIME_SQL
+
+// Set the report time for all reports that should have been sent before now
+// to now + a random number of microseconds between `min_delay` and
+// `max_delay`, both inclusive. We use RANDOM, instead of a method on the
+// delegate, to avoid having to pull all reports into memory and update them
+// one by one. We use ABS because RANDOM may return a negative integer. We add
+// 1 to the difference between `max_delay` and `min_delay` to ensure that the
+// range of generated values is inclusive. If `max_delay == min_delay`, we
+// take the remainder modulo 1, which is always 0.
+#define ATTRIBUTION_SET_REPORT_TIME_SQL(table) \
+  "UPDATE " table                              \
+  " SET report_time=?+ABS(RANDOM()%?)"         \
+  "WHERE report_time<?"
+
+inline constexpr const char kSetEventLevelReportTimeSql[] =
+    ATTRIBUTION_SET_REPORT_TIME_SQL("event_level_reports");
+
+inline constexpr const char kSetAggregatableReportTimeSql[] =
+    ATTRIBUTION_SET_REPORT_TIME_SQL("aggregatable_report_metadata");
+
+#undef ATTRIBUTION_SET_REPORT_TIME_SQL
+
+// clang-format off
+
+#define ATTRIBUTION_SOURCE_COLUMNS_SQL(prefix) \
+  prefix "source_id,"                          \
+  prefix "source_event_id,"                    \
+  prefix "source_origin,"                      \
+  prefix "destination_origin,"                 \
+  prefix "reporting_origin,"                   \
+  prefix "source_time,"                        \
+  prefix "expiry_time,"                        \
+  prefix "event_report_window_time,"           \
+  prefix "aggregatable_report_window_time,"    \
+  prefix "source_type,"                        \
+  prefix "attribution_logic,"                  \
+  prefix "priority,"                           \
+  prefix "debug_key,"                          \
+  prefix "num_attributions,"                   \
+  prefix "aggregatable_budget_consumed,"       \
+  prefix "aggregatable_source,"                \
+  prefix "filter_data,"                        \
+  prefix "event_level_active,"                 \
+  prefix "aggregatable_active"
+
+inline constexpr const char kReadSourceToAttributeSql[] =
+    "SELECT " ATTRIBUTION_SOURCE_COLUMNS_SQL("")
+    " FROM sources "
+    "WHERE source_id=?";
+
+inline constexpr const char kGetActiveSourcesSql[] =
+      "SELECT " ATTRIBUTION_SOURCE_COLUMNS_SQL("")
+      " FROM sources "
+      "WHERE(event_level_active=1 OR aggregatable_active=1)AND "
+      "expiry_time>? LIMIT ?";
+
+#define ATTRIBUTION_SELECT_EVENT_LEVEL_REPORT_AND_SOURCE_COLUMNS_SQL    \
+  "SELECT "                                                             \
+  ATTRIBUTION_SOURCE_COLUMNS_SQL("I.")                                  \
+  ",C.trigger_data,C.trigger_time,C.report_time,C.report_id,"           \
+  "C.priority,C.failed_send_attempts,C.external_report_id,C.debug_key " \
+  "FROM event_level_reports C "                                         \
+  "JOIN sources I ON C.source_id=I.source_id "
+
+inline constexpr const char kGetEventLevelReportsSql[] =
+    ATTRIBUTION_SELECT_EVENT_LEVEL_REPORT_AND_SOURCE_COLUMNS_SQL
+    "WHERE C.report_time<=? LIMIT ?";
+
+inline constexpr const char kGetEventLevelReportSql[] =
+    ATTRIBUTION_SELECT_EVENT_LEVEL_REPORT_AND_SOURCE_COLUMNS_SQL
+    "WHERE C.report_id=?";
+
+#undef ATTRIBUTION_SELECT_EVENT_LEVEL_REPORT_AND_SOURCE_COLUMNS_SQL
+
+#define ATTRIBUTION_SELECT_AGGREGATABLE_REPORT_AND_SOURCE_COLUMNS_SQL  \
+  "SELECT "                                                            \
+  ATTRIBUTION_SOURCE_COLUMNS_SQL("I.")                                 \
+  ",A.aggregation_id,A.trigger_time,A.report_time,A.debug_key,"        \
+  "A.external_report_id,A.failed_send_attempts,A.initial_report_time," \
+  "A.aggregation_coordinator "                                         \
+  "FROM aggregatable_report_metadata A "                               \
+  "JOIN sources I ON A.source_id=I.source_id "
+
+inline constexpr const char kGetAggregatableReportsSql[] =
+    ATTRIBUTION_SELECT_AGGREGATABLE_REPORT_AND_SOURCE_COLUMNS_SQL
+    "WHERE A.report_time<=? LIMIT ?";
+
+inline constexpr const char kGetAggregatableReportSql[] =
+    ATTRIBUTION_SELECT_AGGREGATABLE_REPORT_AND_SOURCE_COLUMNS_SQL
+    "WHERE A.aggregation_id=?";
+
+#undef ATTRIBUTION_SELECT_AGGREGATABLE_REPORT_AND_SOURCE_COLUMNS_SQL
+
+#undef ATTRIBUTION_SOURCE_COLUMNS_SQL
+
+#define ATTRIBUTION_UPDATE_FAILED_REPORT_SQL(table, column) \
+  "UPDATE " table                                           \
+  " SET report_time=?,"                                     \
+  "failed_send_attempts=failed_send_attempts+1 "            \
+  "WHERE " column "=?"
+
+inline constexpr const char kUpdateFailedEventLevelReportSql[] =
+    ATTRIBUTION_UPDATE_FAILED_REPORT_SQL("event_level_reports", "report_id");
+
+inline constexpr const char kUpdateFailedAggregatableReportSql[] =
+    ATTRIBUTION_UPDATE_FAILED_REPORT_SQL("aggregatable_report_metadata",
+                                         "aggregation_id");
+
+#undef ATTRIBUTION_UPDATE_FAILED_REPORT_SQL
+
+// clang-format on
+
 }  // namespace content::attribution_queries
 
 #endif  // CONTENT_BROWSER_ATTRIBUTION_REPORTING_SQL_QUERIES_H_

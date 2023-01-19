@@ -185,7 +185,7 @@ export class Output {
   withSpeech(range, prevRange, type) {
     this.formatOptions_ = {speech: true, braille: false, auralStyle: false};
     this.formattedAncestors_ = new WeakSet();
-    this.render_(
+    this.render(
         range, prevRange, type, this.speechBuffer_, this.speechFormatLog_);
     return this;
   }
@@ -200,7 +200,7 @@ export class Output {
   withRichSpeech(range, prevRange, type) {
     this.formatOptions_ = {speech: true, braille: false, auralStyle: true};
     this.formattedAncestors_ = new WeakSet();
-    this.render_(
+    this.render(
         range, prevRange, type, this.speechBuffer_, this.speechFormatLog_);
     return this;
   }
@@ -231,7 +231,7 @@ export class Output {
       prevRange = CursorRange.fromNode(range.start.node.parent);
       range = new CursorRange(Cursor.fromNode(start), Cursor.fromNode(end));
     }
-    this.render_(
+    this.render(
         range, prevRange, type, this.brailleBuffer_, this.brailleFormatLog_);
     return this;
   }
@@ -246,7 +246,7 @@ export class Output {
   withLocation(range, prevRange, type) {
     this.formatOptions_ = {speech: false, braille: false, auralStyle: false};
     this.formattedAncestors_ = new WeakSet();
-    this.render_(
+    this.render(
         range, prevRange, type, [] /*unused output*/,
         new OutputFormatLogger('', LogType.SPEECH_RULE) /*unused log*/);
     return this;
@@ -393,7 +393,7 @@ export class Output {
 
     this.formatOptions_ = {speech: true, braille: false, auralStyle: false};
     this.formattedAncestors_ = new WeakSet();
-    this.format_({
+    OutputFormatter.format(this, {
       node,
       outputFormat: formatStr,
       outputBuffer: this.speechBuffer_,
@@ -416,7 +416,7 @@ export class Output {
 
     this.formatOptions_ = {speech: false, braille: true, auralStyle: false};
     this.formattedAncestors_ = new WeakSet();
-    this.format_({
+    OutputFormatter.format(this, {
       node,
       outputFormat: formatStr,
       outputBuffer: this.brailleBuffer_,
@@ -580,7 +580,7 @@ export class Output {
   }
 
   /** @override */
-  render_(range, prevRange, type, buff, formatLog, optionalArgs = {}) {
+  render(range, prevRange, type, buff, formatLog, optionalArgs = {}) {
     if (prevRange && !prevRange.isValid()) {
       prevRange = null;
     }
@@ -615,12 +615,6 @@ export class Output {
     this.hint_(
         range, AutomationUtil.getUniqueAncestors(prevParent, range.start.node),
         type, buff, formatLog);
-  }
-
-  /** @override */
-  format_(params) {
-    const formatter = new OutputFormatter(this, params);
-    new OutputFormatParser(formatter).parse(params.outputFormat);
   }
 
   /**
@@ -857,10 +851,6 @@ export class Output {
   ancestryHelper_(args) {
     let {node, prevNode, buff, formatLog, type, ancestors, formatName} = args;
 
-    const rule = new AncestryOutputRule(type);
-    // First, look up the event type's format block.
-    const eventBlock = OutputRule.RULES[rule.event];
-
     const excludeRoles =
         args.exclude ? new Set(args.exclude.map(node => node.role)) : new Set();
 
@@ -876,22 +866,16 @@ export class Output {
         continue;
       }
 
-      // Reset the rule to DEFAULT so we don't unintentionally use a value from
-      // the last iteration.
-      rule.role = CustomRole.DEFAULT;
-      rule.populateRole(formatNode.role, roleInfo.inherits, formatName);
-      rule.populateNavigation(formatName);
+      const rule = new AncestryOutputRule(
+          type, formatNode.role, roleInfo.inherits, formatName);
+      // First, look up the event type's format block.
+      const eventBlock = OutputRule.RULES[rule.event];
 
+      rule.populateOutput(this.formatOptions_.braille);
       if (eventBlock[rule.role][formatName]) {
-        rule.output = eventBlock[rule.role][formatName].speak ?
-            outputTypes.OutputFormatType.SPEAK :
-            undefined;
         if (this.formatOptions_.braille) {
           buff = [];
           formatLog.bufferClear();
-          if (eventBlock[rule.role][formatName].braille) {
-            rule.output = outputTypes.OutputFormatType.BRAILLE;
-          }
         }
 
         excludeRoles.add(formatNode.role);
@@ -900,7 +884,7 @@ export class Output {
             eventBlock[rule.role][formatName][rule.output] :
             eventBlock[rule.role][formatName];
         this.formattedAncestors_.add(formatNode);
-        this.format_({
+        OutputFormatter.format(this, {
           node: formatNode,
           outputFormat: enterFormat,
           outputBuffer: buff,
@@ -948,7 +932,7 @@ export class Output {
       }
     }
     formatLog.writeRule(rule.specifier);
-    this.format_({
+    OutputFormatter.format(this, {
       node,
       outputFormat: eventBlock[rule.role][rule.output],
       outputBuffer: buff,
@@ -1025,7 +1009,7 @@ export class Output {
       this.ancestry_(
           node, prevNode, type, buff, formatLog, {preferStart: true});
     }
-    const earcon = this.findEarcon_(node, prevNode);
+    const earcon = this.findEarcon(node, prevNode);
     if (earcon) {
       options.annotation.push(earcon);
     }
@@ -1041,7 +1025,7 @@ export class Output {
     }
 
     if (LocalStorage.get('languageSwitching')) {
-      this.assignLocaleAndAppend_(text, node, buff, options);
+      this.assignLocaleAndAppend(text, node, buff, options);
     } else {
       this.append(buff, text, options);
     }
@@ -1114,7 +1098,7 @@ export class Output {
         formatLog.write('hint_: ' + msg.text + '\n');
       } else if (msg.outputFormat) {
         formatLog.write('hint_: ...');
-        this.format_({
+        OutputFormatter.format(this, {
           node,
           outputFormat: msg.outputFormat,
           outputBuffer: buff,
@@ -1319,10 +1303,7 @@ export class Output {
     return ret;
   }
 
-  /**
-   * Only to be used by output classes.
-   * @override
-   */
+  /** @override */
   append(buff, value, opt_options) {
     opt_options = opt_options || {isUnique: false, annotation: []};
 
@@ -1436,7 +1417,7 @@ export class Output {
   }
 
   /** @override */
-  findEarcon_(node, opt_prevNode) {
+  findEarcon(node, opt_prevNode) {
     if (node === opt_prevNode) {
       return null;
     }
@@ -1493,7 +1474,7 @@ export class Output {
   }
 
   /** @override */
-  assignLocaleAndAppend_(text, contextNode, buff, options) {
+  assignLocaleAndAppend(text, contextNode, buff, options) {
     const data =
         LocaleOutputHelper.instance.computeTextAndLocale(text, contextNode);
     const speechProps = new outputTypes.OutputSpeechProperties();

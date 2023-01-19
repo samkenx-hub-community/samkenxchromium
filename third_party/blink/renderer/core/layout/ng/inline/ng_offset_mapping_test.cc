@@ -11,8 +11,8 @@
 #include "third_party/blink/renderer/core/layout/layout_text_fragment.h"
 #include "third_party/blink/renderer/core/layout/ng/inline/ng_inline_node.h"
 #include "third_party/blink/renderer/core/layout/ng/layout_ng_block_flow.h"
-#include "third_party/blink/renderer/core/layout/ng/ng_layout_test.h"
 #include "third_party/blink/renderer/core/style/computed_style.h"
+#include "third_party/blink/renderer/core/testing/core_unit_test_helper.h"
 #include "third_party/blink/renderer/platform/wtf/allocator/allocator.h"
 
 namespace blink {
@@ -89,7 +89,7 @@ void PrintTo(const base::span<const NGOffsetMappingUnit>& range,
   PrintTo(ToVector(range), ostream);
 }
 
-class NGOffsetMappingTest : public NGLayoutTest {
+class NGOffsetMappingTest : public RenderingTest {
  protected:
   static const auto kCollapsed = NGOffsetMappingUnitType::kCollapsed;
   static const auto kIdentity = NGOffsetMappingUnitType::kIdentity;
@@ -1521,11 +1521,6 @@ TEST_F(NGOffsetMappingGetterTest, Get) {
   auto* layout_block_flow =
       To<LayoutBlockFlow>(GetLayoutObjectByElementId("container"));
   DCHECK(layout_block_flow->ChildrenInline());
-
-  // For the purpose of this test, ensure this is laid out by each layout
-  // engine.
-  DCHECK_EQ(layout_block_flow->IsLayoutNGObject(),
-            RuntimeEnabledFeatures::LayoutNGEnabled());
 
   const NGOffsetMapping* mapping =
       NGInlineNode::GetOffsetMapping(layout_block_flow);

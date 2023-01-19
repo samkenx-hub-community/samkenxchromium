@@ -103,9 +103,6 @@ class WallpaperControllerClientImpl
   void SetGooglePhotosWallpaper(
       const ash::GooglePhotosWallpaperParams& params,
       ash::WallpaperController::SetWallpaperCallback callback);
-  void SetOnlineWallpaperIfExists(
-      const ash::OnlineWallpaperParams& params,
-      ash::WallpaperController::SetWallpaperCallback callback);
   void SetCustomizedDefaultWallpaperPaths(
       const base::FilePath& customized_default_small_path,
       const base::FilePath& customized_default_large_path);
@@ -125,8 +122,6 @@ class WallpaperControllerClientImpl
   void RemoveAlwaysOnTopWallpaper();
   void RemoveUserWallpaper(const AccountId& account_id);
   void RemovePolicyWallpaper(const AccountId& account_id);
-  void GetOfflineWallpaperList(
-      ash::WallpaperController::GetOfflineWallpaperListCallback callback);
   void SetAnimationDuration(const base::TimeDelta& animation_duration);
   void OpenWallpaperPickerIfAllowed();
   void MinimizeInactiveWindows(const std::string& user_id_hash);

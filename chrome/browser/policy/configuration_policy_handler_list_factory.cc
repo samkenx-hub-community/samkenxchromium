@@ -839,9 +839,6 @@ const PolicyToPreferenceMapEntry kSimplePolicyMap[] = {
   { key::kPaymentMethodQueryEnabled,
     payments::kCanMakePaymentEnabled,
     base::Value::Type::BOOLEAN },
-  { key::kFileSystemSyncAccessHandleAsyncInterfaceEnabled,
-    storage::kFileSystemSyncAccessHandleAsyncInterfaceEnabled,
-    base::Value::Type::BOOLEAN },
 
 #if !BUILDFLAG(IS_CHROMEOS)
   { key::kMetricsReportingEnabled,
@@ -1673,6 +1670,9 @@ const PolicyToPreferenceMapEntry kSimplePolicyMap[] = {
   { key::kNewWindowsInKioskAllowed,
     prefs::kNewWindowsInKioskAllowed,
     base::Value::Type::BOOLEAN },
+  { key::kKioskTroubleshootingToolsEnabled,
+    prefs::kKioskTroubleshootingToolsEnabled,
+    base::Value::Type::BOOLEAN },
 #endif // BUILDFLAG(IS_CHROMEOS)
 
 #if BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_LINUX)
@@ -1828,6 +1828,9 @@ const PolicyToPreferenceMapEntry kSimplePolicyMap[] = {
     base::Value::Type::BOOLEAN },
   { key::kPPAPISharedImagesSwapChainAllowed,
     policy::policy_prefs::kPPAPISharedImagesSwapChainAllowed,
+    base::Value::Type::BOOLEAN },
+  { key::kForceEnablePepperVideoDecoderDevAPI,
+    policy::policy_prefs::kForceEnablePepperVideoDecoderDevAPI,
     base::Value::Type::BOOLEAN },
 #endif // BUILDFLAG(ENABLE_PPAPI)
 };

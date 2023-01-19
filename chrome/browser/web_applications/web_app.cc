@@ -114,7 +114,69 @@ base::Value OsStatesDebugValue(
         current_states.uninstall_registration().registered_with_os());
   }
 
+  if (current_states.has_shortcut_menus()) {
+    for (const auto& shortcut_menu :
+         current_states.shortcut_menus().shortcut_menu_info()) {
+      base::Value::Dict icon_data_any_dict;
+      base::Value::Dict icon_data_maskable_dict;
+      base::Value::Dict icon_data_monochrome_dict;
+      for (const auto& icon_data_any : shortcut_menu.icon_data_any()) {
+        icon_data_any_dict.Set(
+            base::NumberToString(icon_data_any.icon_size()),
+            syncer::GetTimeDebugString(
+                syncer::ProtoTimeToTime(icon_data_any.timestamp())));
+      }
+      for (const auto& icon_data_maskable : shortcut_menu.icon_data_any()) {
+        icon_data_maskable_dict.Set(
+            base::NumberToString(icon_data_maskable.icon_size()),
+            syncer::GetTimeDebugString(
+                syncer::ProtoTimeToTime(icon_data_maskable.timestamp())));
+      }
+      for (const auto& icon_data_monochrome : shortcut_menu.icon_data_any()) {
+        icon_data_monochrome_dict.Set(
+            base::NumberToString(icon_data_monochrome.icon_size()),
+            syncer::GetTimeDebugString(
+                syncer::ProtoTimeToTime(icon_data_monochrome.timestamp())));
+      }
+      base::Value::Dict shortcut_menu_dict;
+      shortcut_menu_dict.Set("app_title", shortcut_menu.app_title());
+      shortcut_menu_dict.Set("app_launch_url", shortcut_menu.app_launch_url());
+      shortcut_menu_dict.Set("icon_data_any",
+                             base::Value(std::move(icon_data_any_dict)));
+      shortcut_menu_dict.Set("icon_data_maskable",
+                             base::Value(std::move(icon_data_maskable_dict)));
+      shortcut_menu_dict.Set("icon_data_monochrome",
+                             base::Value(std::move(icon_data_monochrome_dict)));
+      debug_dict.Set("shortcut_menus",
+                     base::Value(std::move(shortcut_menu_dict)));
+    }
+  }
+
   return base::Value(std::move(debug_dict));
+}
+
+base::Value ImageResourceDebugValue(
+    const blink::Manifest::ImageResource& icon) {
+  const char* const kPurposeStrings[] = {"Any", "Monochrome", "Maskable"};
+
+  base::Value root(base::Value::Type::DICT);
+  root.SetStringKey("src", icon.src.spec());
+  root.SetStringKey("type", icon.type);
+
+  base::Value sizes_json(base::Value::Type::LIST);
+  for (const auto& size : icon.sizes) {
+    std::string size_formatted = base::NumberToString(size.width()) + "x" +
+                                 base::NumberToString(size.height());
+    sizes_json.Append(base::Value(size_formatted));
+  }
+  root.SetKey("sizes", std::move(sizes_json));
+
+  base::Value purpose_json(base::Value::Type::LIST);
+  for (const auto& purpose : icon.purpose) {
+    purpose_json.Append(kPurposeStrings[static_cast<int>(purpose)]);
+  }
+  root.SetKey("purpose", std::move(purpose_json));
+  return root;
 }
 
 }  // namespace
@@ -918,8 +980,18 @@ base::Value WebApp::AsDebugValue() const {
           "home_tab", base::StreamableToString(absl::get<TabStrip::Visibility>(
                           tab_strip_.value().home_tab)));
     } else {
-      tab_strip_json.Set("home_tab", base::Value::Dict());
-      // TODO(crbug.com/897314): Add debug info for home tab icons.
+      base::Value::Dict home_tab_json;
+      base::Value icons_json(base::Value::Type::LIST);
+      absl::optional<std::vector<blink::Manifest::ImageResource>> icons =
+          absl::get<blink::Manifest::HomeTabParams>(tab_strip_.value().home_tab)
+              .icons;
+
+      for (auto& icon : *icons) {
+        icons_json.Append(ImageResourceDebugValue(icon));
+      }
+
+      home_tab_json.Set("icons", std::move(icons_json));
+      tab_strip_json.Set("home_tab", std::move(home_tab_json));
     }
     root.Set("tab_strip", std::move(tab_strip_json));
   } else {

@@ -942,6 +942,9 @@
           'cronet_test_instrumentation_apk',
           'chrome_nocompile_tests',
         ],
+        'args': [
+          '--use-persistent-shell',
+        ],
         'os_type': 'android',
         'test_suites': {
           'gtest_tests': 'android_nougat_emulator_gtests',
@@ -1262,7 +1265,7 @@
         }
       },
 
-      # Mirrors Mac Builder and Mac 12 Tests, except that we don't run
+      # Mirrors Mac Builder and Mac12 Tests, except that we don't run
       # 'mac_signing_tests' (it is removed in test_suite_exceptions.pyl),
       # which doesn't exist in the CfT config.
       'mac-rel-cft': {
@@ -1281,10 +1284,11 @@
         'test_suites': {
           'gtest_tests': 'chromium_mac_gtests_no_nacl',
           'isolated_scripts': 'chromium_mac_rel_isolated_scripts',
+          'scripts': 'chromium_mac_scripts',
         },
       },
 
-      # Mirrors Win x64 Builder and Win10 Tests x64.
+      # Mirrors "Win x64 Builder" and "Win10 Tests x64".
       'win-rel-cft': {
         'mixins': [
           'x86-64',
@@ -2979,7 +2983,7 @@
           'walleye',
         ],
         'test_suites': {
-          'gtest_tests': 'android_pie_coverage_gtests',
+          'gtest_tests': 'android_pie_coverage_instrumentation_tests',
           'junit_tests': 'chromium_junit_tests_no_swarming',
         },
         'os_type': 'android',
@@ -3306,6 +3310,15 @@
         },
         'os_type': 'chromeos'
       },
+      'lacros-arm-generic-rel-skylab-fyi': {
+        'additional_compile_targets': [
+          'chrome',
+        ],
+        'test_suites': {
+          'skylab_tests': 'lacros_arm_generic_rel_skylab_fyi',
+        },
+        'os_type': 'chromeos',
+      },
       'lacros-arm64-generic-rel-skylab-fyi': {
         'additional_compile_targets': [
           'chrome',
@@ -3527,6 +3540,15 @@
           'isolated_scripts': 'wpt_web_tests_content_shell_multiple_flags',
         },
       },
+      'linux-wpt-content-shell-leak-detection': {
+        'mixins': [
+          'has_native_resultdb_integration',
+          'linux-bionic',
+        ],
+        'test_suites': {
+          'isolated_scripts': 'wpt_web_tests_enable_leak_detection',
+        },
+      },
       'linux-wpt-fyi-rel': {
         'mixins': [
           'has_native_resultdb_integration',
@@ -3665,7 +3687,7 @@
       },
       'win-fieldtrial-rel': {
         'mixins': [
-            'win10-20h2',
+            'win10',
             'finch-chromium-swarming-pool',
         ],
         'test_suites': {
@@ -3699,7 +3721,7 @@
       'win10-rel-no-external-ip': {
         'mixins': [
           'x86-64',
-          'win10-20h2',
+          'win10',
           'isolate_profile_data',
         ],
         'swarming': {

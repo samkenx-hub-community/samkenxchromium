@@ -24,7 +24,6 @@
 #include "ash/shell_observer.h"
 #include "ash/wallpaper/online_wallpaper_variant_info_fetcher.h"
 #include "ash/wallpaper/wallpaper_utils/wallpaper_calculated_colors.h"
-#include "ash/wallpaper/wallpaper_utils/wallpaper_color_calculator_observer.h"
 #include "ash/wallpaper/wallpaper_utils/wallpaper_resizer_observer.h"
 #include "ash/webui/personalization_app/mojom/personalization_app.mojom-forward.h"
 #include "ash/wm/overview/overview_observer.h"
@@ -79,7 +78,6 @@ class ASH_EXPORT WallpaperControllerImpl
       public WindowTreeHostManager::Observer,
       public ShellObserver,
       public WallpaperResizerObserver,
-      public WallpaperColorCalculatorObserver,
       public SessionObserver,
       public TabletModeObserver,
       public OverviewObserver,
@@ -87,11 +85,6 @@ class ASH_EXPORT WallpaperControllerImpl
       public ui::NativeThemeObserver,
       public ColorModeObserver {
  public:
-  enum WallpaperResolution {
-    WALLPAPER_RESOLUTION_LARGE,
-    WALLPAPER_RESOLUTION_SMALL
-  };
-
   // Directory names of custom wallpapers.
   static const char kSmallWallpaperSubDir[];
   static const char kLargeWallpaperSubDir[];
@@ -252,8 +245,6 @@ class ASH_EXPORT WallpaperControllerImpl
                                  const gfx::ImageSkia& image) override;
   void SetOnlineWallpaper(const OnlineWallpaperParams& params,
                           SetWallpaperCallback callback) override;
-  void SetOnlineWallpaperIfExists(const OnlineWallpaperParams& params,
-                                  SetWallpaperCallback callback) override;
   void SetGooglePhotosWallpaper(const GooglePhotosWallpaperParams& params,
                                 SetWallpaperCallback callback) override;
   void SetGooglePhotosDailyRefreshAlbumId(const AccountId& account_id,
@@ -297,8 +288,6 @@ class ASH_EXPORT WallpaperControllerImpl
   void RemoveAlwaysOnTopWallpaper() override;
   void RemoveUserWallpaper(const AccountId& account_id) override;
   void RemovePolicyWallpaper(const AccountId& account_id) override;
-  void GetOfflineWallpaperList(
-      GetOfflineWallpaperListCallback callback) override;
   void SetAnimationDuration(base::TimeDelta animation_duration) override;
   void OpenWallpaperPickerIfAllowed() override;
   void MinimizeInactiveWindows(const std::string& user_id_hash) override;
@@ -330,9 +319,6 @@ class ASH_EXPORT WallpaperControllerImpl
 
   // WallpaperResizerObserver:
   void OnWallpaperResized() override;
-
-  // WallpaperColorCalculatorObserver:
-  void OnColorCalculationComplete() override;
 
   // SessionObserver:
   void OnSessionStateChanged(session_manager::SessionState state) override;
@@ -465,7 +451,7 @@ class ASH_EXPORT WallpaperControllerImpl
                                const base::Time& date);
 
   // Used as the callback of checking `WallpaperType::kOnline` wallpaper
-  // existence in `SetOnlineWallpaperIfExists`. Initiates reading and decoding
+  // existence in `SetOnlineWallpaper`. Initiates reading and decoding
   // the wallpaper if `file_path` is not empty.
   void SetOnlineWallpaperFromPath(SetWallpaperCallback callback,
                                   const OnlineWallpaperParams& params,
@@ -639,6 +625,9 @@ class ASH_EXPORT WallpaperControllerImpl
   // logged in, feature isn't enabled).
   // If an existing calculation is in progress it is destroyed.
   void CalculateWallpaperColors();
+
+  // Callback to handle the completed color computation.
+  void OnColorCalculationComplete(const WallpaperCalculatedColors& colors);
 
   // Returns false when the color extraction algorithm shouldn't be run based on
   // system state (e.g. wallpaper image, SessionState, etc.).

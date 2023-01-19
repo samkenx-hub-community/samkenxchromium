@@ -384,7 +384,7 @@ void HTMLVideoElement::PaintCurrentFrame(cc::PaintCanvas* canvas,
   if (flags) {
     media_flags = *flags;
   } else {
-    media_flags.setAlpha(0xFF);
+    media_flags.setAlphaf(1.0f);
     media_flags.setFilterQuality(cc::PaintFlags::FilterQuality::kLow);
     media_flags.setBlendMode(SkBlendMode::kSrc);
   }
@@ -601,7 +601,7 @@ ScriptPromise HTMLVideoElement::CreateImageBitmap(
 
   return ImageBitmapSource::FulfillImageBitmap(
       script_state, MakeGarbageCollected<ImageBitmap>(this, crop_rect, options),
-      exception_state);
+      options, exception_state);
 }
 
 void HTMLVideoElement::MediaRemotingStarted(

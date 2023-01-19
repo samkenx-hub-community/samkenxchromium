@@ -184,6 +184,8 @@ TEST_F(TabInteractionRecorderAndroidTest, HadFormInteraction) {
   auto* helper = TabInteractionRecorderAndroid::FromWebContents(contents.get());
 
   EXPECT_FALSE(helper->has_form_interactions());
+  EXPECT_EQ(nullptr, FormInteractionData::GetForCurrentDocument(
+                   contents->GetPrimaryMainFrame()));
   OnTextFieldDidChangeForAutofillManager(autofill_manager());
   EXPECT_TRUE(helper->has_form_interactions());
   EXPECT_TRUE(FormInteractionData::GetForCurrentDocument(
@@ -248,6 +250,8 @@ TEST_F(TabInteractionRecorderAndroidTest, ResetInteractions) {
 
   // Simulate touch, text input, and navigation events.
   helper->DidGetUserInteraction(blink::WebTouchEvent());
+  EXPECT_EQ(nullptr, FormInteractionData::GetForCurrentDocument(
+                   contents->GetPrimaryMainFrame()));
   OnTextFieldDidChangeForAutofillManager(autofill_manager());
   EXPECT_TRUE(FormInteractionData::GetForCurrentDocument(
                   contents->GetPrimaryMainFrame())

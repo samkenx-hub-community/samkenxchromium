@@ -111,11 +111,11 @@ void Canvas::Save() {
 }
 
 void Canvas::SaveLayerAlpha(uint8_t alpha) {
-  canvas_->saveLayerAlpha(alpha);
+  canvas_->saveLayerAlphaf(alpha / 255.0f);
 }
 
 void Canvas::SaveLayerAlpha(uint8_t alpha, const Rect& layer_bounds) {
-  canvas_->saveLayerAlpha(RectToSkRect(layer_bounds), alpha);
+  canvas_->saveLayerAlphaf(RectToSkRect(layer_bounds), alpha / 255.0f);
 }
 
 void Canvas::SaveLayerWithFlags(const cc::PaintFlags& flags) {
@@ -300,7 +300,7 @@ void Canvas::DrawImageInt(const ImageSkia& image, int x, int y) {
 
 void Canvas::DrawImageInt(const ImageSkia& image, int x, int y, uint8_t a) {
   cc::PaintFlags flags;
-  flags.setAlpha(a);
+  flags.setAlphaf(a / 255.0f);
   DrawImageInt(image, x, y, flags);
 }
 

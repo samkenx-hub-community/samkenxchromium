@@ -127,8 +127,6 @@
 #if BUILDFLAG(IS_ANDROID)
 #include "chrome/browser/android/dom_distiller/distiller_ui_handle_android.h"
 #include "chrome/browser/offline_pages/android/offline_page_auto_fetcher.h"
-#include "chrome/browser/ui/webui/explore_sites_internals/explore_sites_internals.mojom.h"
-#include "chrome/browser/ui/webui/explore_sites_internals/explore_sites_internals_ui.h"
 #include "chrome/browser/ui/webui/feed_internals/feed_internals.mojom.h"
 #include "chrome/browser/ui/webui/feed_internals/feed_internals_ui.h"
 #include "chrome/common/offline_page_auto_fetcher.mojom.h"
@@ -290,7 +288,6 @@
 #include "chrome/browser/ui/webui/ash/vm/vm_ui.h"
 #include "chrome/browser/ui/webui/nearby_share/nearby_share.mojom.h"
 #include "chrome/browser/ui/webui/nearby_share/nearby_share_dialog_ui.h"
-#include "chrome/browser/ui/webui/nearby_share/public/mojom/nearby_share_settings.mojom.h"  // nogncheck crbug.com/1125897
 #include "chrome/browser/ui/webui/settings/ash/os_apps_page/mojom/app_notification_handler.mojom.h"
 #include "chrome/browser/ui/webui/settings/ash/os_settings_ui.h"
 #include "chrome/browser/ui/webui/settings/ash/search/search.mojom.h"
@@ -304,6 +301,7 @@
 #include "chromeos/ash/services/hotspot_config/public/mojom/cros_hotspot_config.mojom.h"
 #include "chromeos/ash/services/multidevice_setup/multidevice_setup_service.h"
 #include "chromeos/ash/services/multidevice_setup/public/mojom/multidevice_setup.mojom.h"
+#include "chromeos/ash/services/nearby/public/mojom/nearby_share_settings.mojom.h"  // nogncheck crbug.com/1125897
 #include "chromeos/components/print_management/mojom/printing_manager.mojom.h"  // nogncheck
 #include "chromeos/services/network_config/public/mojom/cros_network_config.mojom.h"  // nogncheck
 #include "chromeos/services/network_health/public/mojom/network_diagnostics.mojom.h"  // nogncheck
@@ -900,11 +898,7 @@ void PopulateChromeWebUIFrameBinders(
       app_management::mojom::PageHandlerFactory, WebAppSettingsUI>(map);
 #endif
 
-#if BUILDFLAG(IS_ANDROID)
-  RegisterWebUIControllerInterfaceBinder<
-      explore_sites_internals::mojom::PageHandler,
-      explore_sites::ExploreSitesInternalsUI>(map);
-#else
+#if !BUILDFLAG(IS_ANDROID)
   RegisterWebUIControllerInterfaceBinder<downloads::mojom::PageHandlerFactory,
                                          DownloadsUI>(map);
 

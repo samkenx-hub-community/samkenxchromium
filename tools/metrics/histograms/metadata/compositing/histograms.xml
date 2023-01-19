@@ -86,6 +86,18 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
+<histogram name="Compositing.BufferQueue.TimeUntilBuffersRecreatedMs"
+    units="ms" expires_after="2023-09-30">
+  <owner>khaslett@chromium.org</owner>
+  <owner>petermcneeley@chromium.org</owner>
+  <summary>
+    The time since a BufferQueue's buffers were destroyed until they were
+    recreated. If this time is commonly very small, that is a problem. Recorded
+    when the buffer recreates buffers that were previously destroyed. For a
+    single BufferQueue this should be once per frame at worst.
+  </summary>
+</histogram>
+
 <histogram name="Compositing.ColorGamut" enum="ColorGamut"
     expires_after="2022-02-06">
   <owner>cblume@chromium.org</owner>
@@ -572,7 +584,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Compositing.Renderer.CommitHung" units="boolean"
-    expires_after="2023-05-14">
+    expires_after="2023-07-16">
   <owner>skobes@chromium.org</owner>
   <owner>input-dev@chromium.org</owner>
   <summary>
@@ -636,7 +648,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Compositing.Renderer.LCDTextDisallowedReasonLayers"
-    enum="LCDTextDisallowedReason" expires_after="2023-04-16">
+    enum="LCDTextDisallowedReason" expires_after="2023-07-16">
   <owner>wangxianzhu@chromium.org</owner>
   <owner>paint-dev@chromium.org</owner>
   <summary>

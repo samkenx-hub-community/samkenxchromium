@@ -230,6 +230,7 @@ public final class TopicsFragmentV4Test {
         startTopicsSettings();
         onView(getTopicsToggleMatcher()).perform(click());
 
+        assertTrue(mFakePrivacySandboxBridge.getLastTopicsToggleValue());
         assertTrue(isTopicsPrefEnabled());
         onViewWaiting(withText(R.string.settings_topics_page_current_topics_description_empty))
                 .check(matches(isDisplayed()));
@@ -253,6 +254,7 @@ public final class TopicsFragmentV4Test {
 
         // Click on the toggle.
         onView(getTopicsToggleMatcher()).perform(click());
+        assertTrue(mFakePrivacySandboxBridge.getLastTopicsToggleValue());
 
         // Check that the Topics list is displayed when Topics are enabled.
         onViewWaiting(withText(TOPIC_NAME_1)).check(matches(isDisplayed()));
@@ -269,6 +271,7 @@ public final class TopicsFragmentV4Test {
         setTopicsPrefEnabled(true);
         startTopicsSettings();
         onView(getTopicsToggleMatcher()).perform(click());
+        assertFalse(mFakePrivacySandboxBridge.getLastTopicsToggleValue());
 
         assertFalse(isTopicsPrefEnabled());
         onViewWaiting(withText(R.string.settings_topics_page_current_topics_description_disabled))
@@ -333,13 +336,13 @@ public final class TopicsFragmentV4Test {
         // Remove the first Topic from the list.
         clickImageButtonNextToText(TOPIC_NAME_1);
         onView(withText(TOPIC_NAME_1)).check(doesNotExist());
-        onView(withText(R.string.privacy_sandbox_remove_interest_snackbar))
+        onView(withText(R.string.settings_topics_page_block_topic_snackbar))
                 .check(matches(isDisplayed()));
 
         // Remove the second Topic from the list.
         clickImageButtonNextToText(TOPIC_NAME_2);
         onView(withText(TOPIC_NAME_2)).check(doesNotExist());
-        onView(withText(R.string.privacy_sandbox_remove_interest_snackbar))
+        onView(withText(R.string.settings_topics_page_block_topic_snackbar))
                 .check(matches(isDisplayed()));
 
         // Check that the empty state UI is displayed when the Topic list is empty.
@@ -374,13 +377,13 @@ public final class TopicsFragmentV4Test {
         // Unblock the first Topic
         clickImageButtonNextToText(TOPIC_NAME_1);
         onView(withText(TOPIC_NAME_1)).check(doesNotExist());
-        onView(withText(R.string.privacy_sandbox_add_interest_snackbar))
+        onView(withText(R.string.settings_topics_page_add_topic_snackbar))
                 .check(matches(isDisplayed()));
 
         // Unblock the second Topic
         clickImageButtonNextToText(TOPIC_NAME_2);
         onView(withText(TOPIC_NAME_2)).check(doesNotExist());
-        onView(withText(R.string.privacy_sandbox_add_interest_snackbar))
+        onView(withText(R.string.settings_topics_page_add_topic_snackbar))
                 .check(matches(isDisplayed()));
 
         // Check that the empty state UI is displayed when the Topic list is empty.
@@ -415,6 +418,7 @@ public final class TopicsFragmentV4Test {
         assertFalse(isTopicsPrefEnabled());
         onView(getTopicsToggleMatcher()).check(matches(not(isChecked())));
         onView(getTopicsToggleMatcher()).perform(click());
+        assertFalse(mFakePrivacySandboxBridge.getLastTopicsToggleValue());
 
         // Check that the state of the pref and the toggle did not change.
         assertFalse(isTopicsPrefEnabled());

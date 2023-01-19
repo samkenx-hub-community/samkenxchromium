@@ -33,7 +33,7 @@
 #include "chromeos/ash/services/bluetooth_config/fake_adapter_state_controller.h"
 #include "chromeos/ash/services/bluetooth_config/public/mojom/cros_bluetooth_config.mojom.h"
 #include "chromeos/ash/services/bluetooth_config/scoped_bluetooth_config_test_helper.h"
-#include "chromeos/services/network_config/public/cpp/cros_network_config_test_helper.h"
+#include "chromeos/ash/services/network_config/public/cpp/cros_network_config_test_helper.h"
 #include "chromeos/services/network_config/public/cpp/cros_network_config_util.h"
 #include "chromeos/services/network_config/public/cpp/fake_cros_network_config.h"
 #include "chromeos/services/network_config/public/mojom/cros_network_config.mojom.h"
@@ -71,11 +71,8 @@ using ::chromeos::network_config::mojom::PolicySource;
 using ::chromeos::network_config::mojom::SIMInfoPtr;
 using ::chromeos::network_config::mojom::VpnProviderPtr;
 using network_config::CrosNetworkConfigTestHelper;
-
-using ::testing::_;
 using ::testing::IsNull;
 using ::testing::NotNull;
-using ::testing::Return;
 
 const std::string kCellularName = "cellular";
 const std::string kCellularName2 = "cellular_2";
@@ -99,24 +96,6 @@ constexpr char kNetworkListNetworkItemView[] = "NetworkListNetworkItemView";
 
 // Delay used to simulate running process when setting device technology state.
 constexpr base::TimeDelta kInteractiveDelay = base::Milliseconds(3000);
-
-bool IsManagedIcon(views::ImageView* icon) {
-  const gfx::ImageSkia managed_icon = gfx::CreateVectorIcon(
-      kSystemTrayManagedIcon,
-      AshColorProvider::Get()->GetContentLayerColor(
-          AshColorProvider::ContentLayerType::kIconColorPrimary));
-  return gfx::BitmapsAreEqual(*icon->GetImage().bitmap(),
-                              *managed_icon.bitmap());
-}
-
-bool IsSystemIcon(views::ImageView* icon) {
-  const gfx::ImageSkia system_icon = gfx::CreateVectorIcon(
-      kSystemMenuInfoIcon,
-      AshColorProvider::Get()->GetContentLayerColor(
-          AshColorProvider::ContentLayerType::kIconColorPrimary));
-  return gfx::BitmapsAreEqual(*icon->GetImage().bitmap(),
-                              *system_icon.bitmap());
-}
 
 std::vector<ash::SIMInfoPtr> CellularSIMInfos(const std::string& iccid,
                                               const std::string& eid) {
@@ -471,6 +450,36 @@ class NetworkListViewControllerTest : public AshTestBase,
     return static_cast<NetworkDetailedNetworkView*>(
                network_detailed_network_view_)
         ->GetNetworkList(type);
+  }
+
+  bool IsManagedIcon(views::ImageView* icon) {
+    if (icon->GetID() !=
+        static_cast<int>(NetworkListViewControllerImpl::
+                             NetworkListViewControllerViewChildId::
+                                 kConnectionWarningManagedIcon)) {
+      return false;
+    }
+    const gfx::ImageSkia managed_icon = gfx::CreateVectorIcon(
+        kSystemTrayManagedIcon,
+        AshColorProvider::Get()->GetContentLayerColor(
+            AshColorProvider::ContentLayerType::kIconColorPrimary));
+    return gfx::BitmapsAreEqual(*icon->GetImage().bitmap(),
+                                *managed_icon.bitmap());
+  }
+
+  bool IsSystemIcon(views::ImageView* icon) {
+    if (icon->GetID() !=
+        static_cast<int>(NetworkListViewControllerImpl::
+                             NetworkListViewControllerViewChildId::
+                                 kConnectionWarningSystemIcon)) {
+      return false;
+    }
+    const gfx::ImageSkia system_icon = gfx::CreateVectorIcon(
+        kSystemMenuInfoIcon,
+        AshColorProvider::Get()->GetContentLayerColor(
+            AshColorProvider::ContentLayerType::kIconColorPrimary));
+    return gfx::BitmapsAreEqual(*icon->GetImage().bitmap(),
+                                *system_icon.bitmap());
   }
 
   FakeCrosNetworkConfig* cros_network() { return cros_network_.get(); }

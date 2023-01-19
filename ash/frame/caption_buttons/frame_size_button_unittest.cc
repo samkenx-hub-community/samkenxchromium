@@ -804,7 +804,7 @@ TEST_F(MultitaskMenuTest, TestMultitaskMenuPartialSplit) {
   ShowMultitaskMenu();
   generator->MoveMouseTo(multitask_menu()
                              ->multitask_menu_view_for_testing()
-                             ->partial_button_for_testing()
+                             ->partial_button()
                              ->GetBoundsInScreen()
                              .left_center());
   generator->ClickLeftButton();
@@ -822,7 +822,7 @@ TEST_F(MultitaskMenuTest, TestMultitaskMenuPartialSplit) {
   ShowMultitaskMenu();
   gfx::Rect partial_bounds(multitask_menu()
                                ->multitask_menu_view_for_testing()
-                               ->partial_button_for_testing()
+                               ->partial_button()
                                ->GetBoundsInScreen());
   gfx::Point secondary_center(
       gfx::Point(partial_bounds.x() + partial_bounds.width() * 0.67f,
@@ -904,9 +904,16 @@ TEST_F(MultitaskMenuTest, EntryTypeHistogram) {
       chromeos::GetEntryTypeHistogramName(),
       MultitaskMenuEntryType::kFrameSizeButtonLongPress, 1);
 
+  // Check that the accelerator increments the correct bucket.
+  // Create an active window for the toggle menu to work.
+  auto window = CreateTestWindow();
+  PressAndReleaseKey(ui::VKEY_Z, ui::EF_COMMAND_DOWN);
+  histogram_tester.ExpectBucketCount(chromeos::GetEntryTypeHistogramName(),
+                                     MultitaskMenuEntryType::kAccel, 1);
+
   // Check total counts for each histogram to ensure calls aren't counted in
   // multiple buckets.
-  histogram_tester.ExpectTotalCount(chromeos::GetEntryTypeHistogramName(), 2);
+  histogram_tester.ExpectTotalCount(chromeos::GetEntryTypeHistogramName(), 3);
 }
 
 }  // namespace ash

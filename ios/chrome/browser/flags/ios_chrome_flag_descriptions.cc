@@ -514,10 +514,6 @@ const char kNativeFindInPageDescription[] =
     "is replaced with a native implementation which also enables searching "
     "text in PDF files. Available for iOS 16 or later.";
 
-const char kNewMobileIdentityConsistencyFREName[] = "New MICE FRE";
-const char kNewMobileIdentityConsistencyFREDescription[] =
-    "New Mobile Identity Consistency FRE";
-
 const char kNewOverflowMenuName[] = "New Overflow Menu";
 const char kNewOverflowMenuDescription[] = "Enables the new overflow menu";
 
@@ -659,10 +655,15 @@ const char kPasswordReuseDetectionDescription[] =
     "Displays warning when user types or pastes a saved password into a "
     "phishing website.";
 
+const char kPromosManagerUsesFETName[] = "Promos Manager using FET";
+const char kPromosManagerUsesFETDescription[] =
+    "Migrates the Promos Manager to use the Feature Engagement Tracker as its "
+    "impression tracking system";
+
 const char kIPHPriceNotificationsWhileBrowsingName[] =
     "Price Tracking IPH Display";
 const char kIPHPriceNotificationsWhileBrowsingDescription[] =
-    "Always displays the Price Tracking IPH when the user navigates to a "
+    "Displays the Price Tracking IPH when the user navigates to a "
     "product "
     "webpage that supports price tracking.";
 

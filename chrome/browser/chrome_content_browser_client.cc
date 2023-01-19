@@ -1552,6 +1552,8 @@ void ChromeContentBrowserClient::RegisterLocalStatePrefs(
       policy::policy_prefs::kUseMojoVideoDecoderForPepperAllowed, true);
   registry->RegisterBooleanPref(
       policy::policy_prefs::kPPAPISharedImagesSwapChainAllowed, true);
+  registry->RegisterBooleanPref(
+      policy::policy_prefs::kForceEnablePepperVideoDecoderDevAPI, false);
 }
 
 // static
@@ -2346,7 +2348,7 @@ void ChromeContentBrowserClient::SiteInstanceGotProcess(
     InstantService* instant_service =
         InstantServiceFactory::GetForProfile(profile);
     if (instant_service)
-      instant_service->AddInstantProcess(site_instance->GetProcess()->GetID());
+      instant_service->AddInstantProcess(site_instance->GetProcess());
   }
 #endif
 
@@ -2707,14 +2709,6 @@ void ChromeContentBrowserClient::AppendExtraCommandLineSwitches(
             blink::switches::kPrefixedStorageInfoEnabled);
       }
 
-      // Enabled async interface for FileSystemSyncAccessHandle if enabled by
-      // enterprise policy.
-      if (prefs->GetBoolean(
-              storage::kFileSystemSyncAccessHandleAsyncInterfaceEnabled)) {
-        command_line->AppendSwitch(
-            switches::kFileSystemSyncAccessHandleAsyncInterfaceEnabled);
-      }
-
 #if !BUILDFLAG(IS_ANDROID)
       InstantService* instant_service =
           InstantServiceFactory::GetForProfile(profile);
@@ -2971,6 +2965,11 @@ void ChromeContentBrowserClient::AppendExtraCommandLineSwitches(
             policy::policy_prefs::kPPAPISharedImagesSwapChainAllowed)) {
       command_line->AppendSwitch(
           ::switches::kDisablePPAPISharedImagesSwapChain);
+    }
+    if (local_state->GetBoolean(
+            policy::policy_prefs::kForceEnablePepperVideoDecoderDevAPI)) {
+      command_line->AppendSwitch(
+          ::switches::kForceEnablePepperVideoDecoderDevAPI);
     }
   }
 }

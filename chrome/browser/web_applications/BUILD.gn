@@ -119,6 +119,8 @@ source_set("web_applications") {
     "os_integration/protocol_handling_sub_manager.h",
     "os_integration/run_on_os_login_sub_manager.cc",
     "os_integration/run_on_os_login_sub_manager.h",
+    "os_integration/shortcut_menu_handling_sub_manager.cc",
+    "os_integration/shortcut_menu_handling_sub_manager.h",
     "os_integration/shortcut_sub_manager.cc",
     "os_integration/shortcut_sub_manager.h",
     "os_integration/uninstallation_via_os_settings_sub_manager.cc",
@@ -375,7 +377,6 @@ source_set("web_applications") {
     "//components/services/app_service/public/cpp:protocol_handling",
     "//components/services/app_service/public/cpp:run_on_os_login",
     "//components/services/app_service/public/cpp:types",
-    "//components/services/app_service/public/mojom",
     "//components/site_engagement/content",
     "//components/site_engagement/core/mojom:mojo_bindings",
     "//components/sync",
@@ -386,6 +387,7 @@ source_set("web_applications") {
     "//components/webapps/common:mojo_bindings",
     "//components/webapps/services/web_app_origin_association:lib",
     "//components/webapps/services/web_app_origin_association:service",
+    "//content/browser/background_fetch:background_fetch_proto",
     "//content/public/browser",
     "//mojo/core/embedder",
     "//mojo/core/embedder:features",
@@ -603,6 +605,7 @@ source_set("web_applications_unit_tests") {
     "os_integration/os_integration_manager_unittest.cc",
     "os_integration/protocol_handling_sub_manager_unittest.cc",
     "os_integration/run_on_os_login_sub_manager_unittest.cc",
+    "os_integration/shortcut_menu_handling_sub_manager_unittest.cc",
     "os_integration/uninstallation_via_os_settings_sub_manager_unittest.cc",
     "os_integration/web_app_file_handler_manager_unittest.cc",
     "os_integration/web_app_protocol_handler_manager_unittest.cc",
@@ -770,6 +773,7 @@ source_set("web_applications_browser_tests") {
     "isolated_web_apps/isolated_web_app_url_loader_factory_browsertest.cc",
     "manifest_update_manager_browsertest.cc",
     "os_integration/shortcut_sub_manager_browsertest.cc",
+    "policy/web_app_policy_manager_browsertest.cc",
     "preinstalled_web_app_manager_browsertest.cc",
     "preinstalled_web_apps_browsertest.cc",
     "user_uninstalled_preinstalled_web_app_prefs_browsertest.cc",
@@ -785,10 +789,6 @@ source_set("web_applications_browser_tests") {
     sources += [
       "os_integration/web_app_file_handler_registration_linux_browsertest.cc",
     ]
-  }
-
-  if (is_chromeos) {
-    sources += [ "policy/web_app_policy_manager_browsertest.cc" ]
   }
 
   if (is_chromeos_ash) {

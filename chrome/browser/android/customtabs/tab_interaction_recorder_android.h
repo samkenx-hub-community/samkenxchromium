@@ -43,7 +43,7 @@ class AutofillObserverImpl : public autofill::AutofillManager::Observer {
   void OnFormInteraction();
   void Invalidate();
 
-  content::GlobalRenderFrameHostId global_id_;
+  const content::GlobalRenderFrameHostId global_id_;
   raw_ptr<autofill::AutofillManager, DanglingUntriaged> autofill_manager_;
   OnFormInteractionCallback form_interaction_callback_;
 };

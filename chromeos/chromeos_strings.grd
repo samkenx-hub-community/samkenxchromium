@@ -2356,6 +2356,12 @@ Try tapping the mic to ask me anything.
         <message name="IDS_PERSONALIZATION_APP_SCREENSAVER_LABEL" desc="Label for the Screen saver page in Personalization app.">
           Screen saver
         </message>
+        <message name="IDS_PERSONALIZATION_APP_SCREENSAVER_PREVIEW_BUTTON" desc="Label for the button to preview screen saver.">
+          Preview
+        </message>
+        <message name="IDS_PERSONALIZATION_APP_SCREENSAVER_PREVIEW_DOWNLOADING" desc="Label for the button while screen saver preview is loading.">
+          Downloading image
+        </message>
         <message name="IDS_PERSONALIZATION_APP_AMBIENT_MODE_PAGE_DESCRIPTION" desc="Description for the ambient mode settings page.">
           When your screen is idle, show photos, time, weather, and media info.
         </message>
@@ -3534,6 +3540,12 @@ Try tapping the mic to ask me anything.
         </message>
         <message name="IDS_FEEDBACK_TOOL_HELP_CONTENT_OFFLINE_ALT_TEXT" desc="The alt text for the illustration shown when the suggested help content is unavailable because the user is offline.">
           Device is offline
+        </message>
+        <message name="IDS_FEEDBACK_TOOL_HELP_CONTENT_NOT_AVAILABLE_MESSAGE" desc="The text shown when the suggested help content is unavailable because the search service is down or the search server is blocked.">
+          Help content isn't available.
+        </message>
+        <message name="IDS_FEEDBACK_TOOL_HELP_CONTENT_NOT_AVAILABLE_ALT_TEXT" desc="The alt text for the illustration shown when the suggested help content is unavailable because the search service is down or the search server is blocked.">
+          Help content isn't available
         </message>
         <message name="IDS_FEEDBACK_TOOL_HELP_CONTENT_LABEL_TOOLTIP" desc="The tooltip text shown next to the suggested help content label.">
           Suggestions are based on your description

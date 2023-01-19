@@ -839,6 +839,11 @@ COMPONENT_EXPORT(CHROME_FEATURES)
 extern const base::FeatureParam<SearchSuggestionPrerenderImplementationType>
     kSearchSuggestionPrerenderImplementationTypeParam;
 
+// This is used to enable an experiment for modifying confidence cutoff of
+// prerender and preconnect for autocomplete action predictor.
+COMPONENT_EXPORT(CHROME_FEATURES)
+BASE_DECLARE_FEATURE(kAutocompleteActionPredictorConfidenceCutoff);
+
 COMPONENT_EXPORT(CHROME_FEATURES)
 BASE_DECLARE_FEATURE(kOmniboxTriggerForNoStatePrefetch);
 
@@ -853,6 +858,11 @@ BASE_DECLARE_FEATURE(kSupportsRtcWakeOver24Hours);
 // completely.
 COMPONENT_EXPORT(CHROME_FEATURES)
 BASE_DECLARE_FEATURE(kUseWebAppDBInsteadOfExternalPrefs);
+
+// When enabled, use authentication through a browser tab, instead of
+// an app window.
+COMPONENT_EXPORT(CHROME_FEATURES)
+BASE_DECLARE_FEATURE(kWebAuthFlowInBrowserTab);
 
 bool PrefServiceEnabled();
 

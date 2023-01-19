@@ -1454,6 +1454,10 @@ const char kFedCmName[] = "FedCM";
 const char kFedCmDescription[] =
     "Enables JavaScript API to intermediate federated identity requests.";
 
+const char kFedCmAutoSigninName[] = "FedCmAutoSignin";
+const char kFedCmAutoSigninDescription[] =
+    "Enables auto sign-in in the FedCM API. Requires FedCM to be enabled.";
+
 const char kFedCmIframeSupportName[] = "FedCM with iframe support";
 const char kFedCmIframeSupportDescription[] =
     "Enables the 'identity-credentials-get' Permissions-Policy for the FedCM "
@@ -1539,9 +1543,21 @@ const char kGlobalMediaControlsForCastName[] = "Global Media Controls for Cast";
 const char kGlobalMediaControlsForCastDescription[] =
     "Shows Cast sessions in the Global Media Controls UI.";
 
+const char kMediaRemotingWithoutFullscreenName[] =
+    "Media Remoting without videos in fullscreen mode";
+const char kMediaRemotingWithoutFullscreenDescription[] =
+    "Starts Media Remoting from Global Media Controls without making the "
+    "videos fullscreen.";
+
+#if BUILDFLAG(IS_CHROMEOS)
+const char kGlobalMediaControlsCrOSUpdatedUIName[] =
+    "Global Media Controls CrOS updated UI";
+const char kGlobalMediaControlsCrOSUpdatedUIDescription[] =
+    "Show updated UI for Global Media Controls in CrOS.";
+#endif
+
 const char kGlobalMediaControlsModernUIName[] =
     "Global Media Controls Modern UI";
-
 const char kGlobalMediaControlsModernUIDescription[] =
     "Use a redesigned version of the Global Media Controls UI. Requires "
     "#global-media-controls to also be enabled.";
@@ -1635,10 +1651,6 @@ const char kHardwareMediaKeyHandling[] = "Hardware Media Key Handling";
 const char kHardwareMediaKeyHandlingDescription[] =
     "Enables using media keys to control the active media session. This "
     "requires MediaSessionService to be enabled too";
-
-const char kHatsUseNewHistogramsName[] = "New ChromeOS HaTS Histograms";
-const char kHatsUseNewHistogramsDescription[] =
-    "Enables the ability for surveys to emit new, more inclusive histograms";
 
 const char kHeavyAdPrivacyMitigationsName[] = "Heavy ad privacy mitigations";
 const char kHeavyAdPrivacyMitigationsDescription[] =
@@ -1833,10 +1845,6 @@ const char kJourneysShowAllClustersName[] =
     "History Journeys Show All Clusters";
 const char kJourneysShowAllClustersDescription[] =
     "Enables all Journeys clusters to be shown on prominent UI surfaces";
-
-const char kJourneysVisitDedupingName[] = "History Journeys Visit Deduping";
-const char kJourneysVisitDedupingDescription[] =
-    "Enables variations for how visits are deduped";
 
 const char kJourneysIncludeSyncedVisitsName[] =
     "History Journeys Include SyncedVisits";
@@ -2783,6 +2791,11 @@ const char kSmoothScrollingName[] = "Smooth Scrolling";
 const char kSmoothScrollingDescription[] =
     "Animate smoothly when scrolling page content.";
 
+const char kSpeakOnMuteName[] = "Enable Speak On Mute Detection";
+const char kSpeakOnMuteDescription[] =
+    "Enable the speak-on-mute detector in CRAS. Reboot is required to let the "
+    "flag take effect";
+
 const char kSplitCacheByNetworkIsolationKeyName[] = "HTTP Cache Partitioning";
 const char kSplitCacheByNetworkIsolationKeyDescription[] =
     "Partitions the HTTP Cache by (top-level site, current-frame site) to "
@@ -2823,11 +2836,6 @@ const char kSupportToolScreenshotDescription[] =
 const char kSuppressToolbarCapturesName[] = "Suppress Toolbar Captures";
 const char kSuppressToolbarCapturesDescription[] =
     "Suppress Toolbar Captures except when certain properties change.";
-
-const char kSyncAccessHandleAllSyncSurfaceName[] =
-    "Sync Access Handle All Sync Surface";
-const char kSyncAccessHandleAllSyncSurfaceDescription[] =
-    "Enables all-sync surface for SyncAccessHandle in File System Access API.";
 
 const char kSyncAutofillWalletUsageDataName[] =
     "Sync Autofill Wallet Usage Data";
@@ -3227,10 +3235,6 @@ const char kAppStoreBillingDebugDescription[] =
     "requested using the Payment Request API. This flag removes the "
     "restriction that the TWA has to be installed from the app-store.";
 
-const char kWebAuthnNewDesktopUIName[] = "Web Authentication new desktop UI";
-const char kWebAuthnNewDesktopUIDescription[] =
-    "Enable updated UI dialog for WebAuthn requests.";
-
 const char kWebrtcHideLocalIpsWithMdnsName[] =
     "Anonymize local IPs exposed by WebRTC.";
 const char kWebrtcHideLocalIpsWithMdnsDecription[] =
@@ -3333,12 +3337,6 @@ const char kDrawPredictedPointsName[] = "Draw predicted delegated ink points";
 const char kSanitizerApiName[] = "Sanitizer API";
 const char kSanitizerApiDescription[] =
     "Enable the Sanitizer API. See: https://github.com/WICG/sanitizer-api";
-
-const char kSanitizerApiv0Name[] = "Sanitizer API, Initial version";
-const char kSanitizerApiv0Description[] =
-    "Enable the initial version of the Sanitizer API. This includes the "
-    "Element.setHTML method, but not any sanitization methods on the "
-    "Sanitizer instances. See also the #sanitizer-api flag.";
 
 const char kUsePassthroughCommandDecoderName[] =
     "Use passthrough command decoder";
@@ -3465,6 +3463,12 @@ const char kAppMenuMobileSiteOptionName[] =
 const char kAppMenuMobileSiteOptionDescription[] =
     "When enabled, app menu should show 'Mobile site' when showing desktop "
     "site, instead of showing 'Desktop Site' with checkbox";
+
+const char kBackGestureRefactorActivityAndroidName[] =
+    "Back Gesture Refactor (Secondary Activities)";
+const char kBackGestureRefactorActivityAndroidDescription[] =
+    "Enable Back Gesture Refactor for Secondary Activities to support in-app "
+    "activity-to-activity predictive back gestures";
 
 const char kBackGestureRefactorAndroidName[] = "Back Gesture Refactor";
 const char kBackGestureRefactorAndroidDescription[] =
@@ -5025,6 +5029,11 @@ const char kFastPairDescription[] =
     "Enables Google Fast Pair service which uses BLE to discover supported "
     "nearby Bluetooth devices and surfaces a notification for quick pairing.";
 
+const char kFastPairHandshakeRefactorName[] =
+    "Enable Fast Pair Handshake Refactor";
+const char kFastPairHandshakeRefactorDescription[] =
+    "Enables refactored handshake logic for Google Fast Pair service.";
+
 const char kFastPairLowPowerName[] = "Enable Fast Pair Low Power mode";
 const char kFastPairLowPowerDescription[] =
     "Enables Fast Pair Low Power mode, which doesn't scan for devices "
@@ -5068,11 +5077,6 @@ const char kQuickSettingsPWANotificationsDescription[] =
     "permissions in the quick settings menu. Website notification permissions "
     "settings will be migrated to the lacros - chrome browser.";
 
-const char kDriveFsBidirectionalNativeMessagingName[] =
-    "Enable bidirectional native messaging for DriveFS";
-const char kDriveFsBidirectionalNativeMessagingDescription[] =
-    "Enable enhanced native messaging host to communicate with DriveFS.";
-
 const char kDriveFsChromeNetworkingName[] =
     "Enable the DriveFS / Chrome Network Service bridge";
 const char kDriveFsChromeNetworkingDescription[] =
@@ -5109,6 +5113,11 @@ const char kEnableCrOSActionRecorderDescription[] =
     "When enabled, each app launching, file opening, setting change, and url "
     "visiting will be logged locally into an encrypted file. Should not be "
     "enabled. Be aware that hash option only provides a thin layer of privacy.";
+
+const char kDisableDnsProxyName[] = "Disable DNS proxy service for ChromeOS";
+const char kDisableDnsProxyDescription[] =
+    "Turns off DNS proxying and SecureDNS for ChromeOS (only). Does not impact "
+    "Chrome browser.";
 
 const char kEnableDnsProxyName[] = "Enable DNS proxy service";
 const char kEnableDnsProxyDescription[] =
@@ -5294,6 +5303,11 @@ const char kEcheLauncherDescription[] =
 const char kEcheLauncherListViewName[] = "Enable Eche launcher list view";
 const char kEcheLauncherListViewDescription[] =
     "Convert Eche launcher from grid view to list view";
+
+const char kEcheLauncherIconsInMoreAppsButtonName[] =
+    "Enable app icons in the Eche launcher more apps button";
+const char kEcheLauncherIconsInMoreAppsButtonDescription[] =
+    "Show app icons in the Eche launcher more apps button";
 
 const char kEcheSWADebugModeName[] = "Enable Eche Debug Mode";
 const char kEcheSWADebugModeDescription[] =
@@ -6211,6 +6225,11 @@ const char kSyncChromeOSExplicitPassphraseSharingName[] =
     "Sync passphrase sharing";
 const char kSyncChromeOSExplicitPassphraseSharingDescription[] =
     "Allows sharing custom sync passphrase between OS and Browser on ChromeOS";
+
+const char kChromeOSSyncedSessionSharingName[] =
+    "Synced session sharing on ChromeOS";
+const char kChromeOSSyncedSessionSharingDescription[] =
+    "Allows sharing synced sessions between OS and Browser on ChromeOS";
 
 const char kTouchTextEditingRedesignName[] = "Touch Text Editing Redesign";
 const char kTouchTextEditingRedesignDescription[] =

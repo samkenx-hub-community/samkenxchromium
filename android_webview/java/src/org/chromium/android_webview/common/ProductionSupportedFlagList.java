@@ -101,11 +101,8 @@ public final class ProductionSupportedFlagList {
                     "Disable sending HTTP/2 SETTINGS parameters with reserved identifiers."),
             Flag.commandLine(VariationsSwitches.ENABLE_FINCH_SEED_DELTA_COMPRESSION,
                     "Enables delta-compression when requesting a new seed from the server."),
-            Flag.commandLine(AwSwitches.WEBVIEW_MP_ARCH_FENCED_FRAMES,
-                    "Enables MPArch-based fenced frames. Also implies SharedStorageAPI, "
-                            + "and PrivacySandboxAdsAPIsOverride"),
-            Flag.commandLine(AwSwitches.WEBVIEW_SHADOW_DOM_FENCED_FRAMES,
-                    "Enables ShadowDOM-based fenced frames. Also implies SharedStorageAPI, "
+            Flag.commandLine(AwSwitches.WEBVIEW_FENCED_FRAMES,
+                    "Enables fenced frames. Also implies SharedStorageAPI, "
                             + "and PrivacySandboxAdsAPIsOverride"),
             Flag.commandLine(AwSwitches.WEBVIEW_DISABLE_APP_RECOVERY,
                     "Disables WebView from checking for app recovery mitigations."),
@@ -216,7 +213,6 @@ public final class ProductionSupportedFlagList {
             Flag.baseFeature(AwFeatures.WEBVIEW_USE_METRICS_UPLOAD_SERVICE,
                     "Upload UMA metrics logs through MetricsUploadService not via GMS-core"
                             + " directly."),
-            Flag.baseFeature("OptimizeNetworkBuffers2"),
             Flag.baseFeature(BlinkFeatures.SET_TIMEOUT_WITHOUT_CLAMP,
                     "Enables faster setTimeout(,0) by removing the 1 ms clamping."),
             Flag.baseFeature(BlinkFeatures.PAINT_HOLDING_CROSS_ORIGIN,
@@ -272,8 +268,6 @@ public final class ProductionSupportedFlagList {
             Flag.baseFeature(BlinkFeatures.EARLY_EXIT_ON_NOOP_CLASS_OR_STYLE_CHANGE,
                     "Early exit when the style or class attribute of a DOM element is set to the"
                             + " same value as before."),
-            Flag.baseFeature(BlinkFeatures.INVALIDATION_SET_CLASS_BLOOM_FILTER,
-                    "If enabled, style invalidation will use a Bloom filter."),
             Flag.baseFeature(BlinkFeatures.THREADED_PRELOAD_SCANNER,
                     "If enabled, the HTMLPreloadScanner will run on a worker thread."),
             Flag.baseFeature(BlinkFeatures.TIMED_HTML_PARSER_BUDGET,

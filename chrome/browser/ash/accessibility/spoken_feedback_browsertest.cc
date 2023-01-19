@@ -41,7 +41,6 @@
 #include "chrome/browser/ash/login/test/login_manager_mixin.h"
 #include "chrome/browser/ash/login/test/oobe_base_test.h"
 #include "chrome/browser/ash/login/wizard_controller.h"
-#include "chrome/browser/ash/profiles/profile_helper.h"
 #include "chrome/browser/profiles/profile_manager.h"
 #include "chrome/browser/ui/ash/shelf/app_shortcut_shelf_item_controller.h"
 #include "chrome/browser/ui/ash/shelf/chrome_shelf_controller.h"
@@ -53,6 +52,7 @@
 #include "chrome/common/extensions/extension_constants.h"
 #include "chrome/test/base/interactive_test_utils.h"
 #include "chrome/test/base/ui_test_utils.h"
+#include "chromeos/ash/components/browser_context_helper/browser_context_types.h"
 #include "components/services/app_service/public/cpp/app_types.h"
 #include "components/user_manager/user_names.h"
 #include "content/public/browser/browser_task_traits.h"
@@ -370,9 +370,7 @@ class NotificationCenterSpokenFeedbackTest : public LoggedInSpokenFeedbackTest {
 
 // Tests that clicking the notification center tray does not crash when spoken
 // feedback is enabled.
-// TODO(crbug.com/1407232): Fix flaky timeouts and re-enable.
-IN_PROC_BROWSER_TEST_F(NotificationCenterSpokenFeedbackTest,
-                       DISABLED_OpenBubble) {
+IN_PROC_BROWSER_TEST_F(NotificationCenterSpokenFeedbackTest, OpenBubble) {
   // Enable spoken feedback and add a notification to ensure the tray is
   // visible.
   EnableChromeVox();
@@ -380,9 +378,11 @@ IN_PROC_BROWSER_TEST_F(NotificationCenterSpokenFeedbackTest,
   ASSERT_TRUE(test_api()->IsTrayShown());
 
   // Click on the tray and verify the bubble shows up.
-  test_api()->ToggleBubble();
-  EXPECT_TRUE(test_api()->GetWidget()->IsActive());
-  EXPECT_TRUE(test_api()->IsBubbleShown());
+  sm_.Call([this]() {
+    test_api()->ToggleBubble();
+    EXPECT_TRUE(test_api()->GetWidget()->IsActive());
+    EXPECT_TRUE(test_api()->IsBubbleShown());
+  });
   sm_.ExpectSpeech("Notification Center");
 
   sm_.Replay();
@@ -2063,8 +2063,7 @@ IN_PROC_BROWSER_TEST_P(SigninToUserProfileSwitchTest, DISABLED_LoginAsNewUser) {
   sm_.ExpectSpeechPattern("*");
 
   sm_.Call([this]() {
-    ASSERT_EQ(AccessibilityManager::Get()->profile(),
-              ProfileHelper::GetSigninProfile());
+    ASSERT_TRUE(IsSigninBrowserContext(AccessibilityManager::Get()->profile()));
     login_manager_.LoginAsNewRegularUser();
   });
 

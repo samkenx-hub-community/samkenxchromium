@@ -4,6 +4,7 @@
 
 #include "chrome/browser/privacy_sandbox/privacy_sandbox_service.h"
 
+#include "base/feature_list.h"
 #include "base/memory/raw_ptr.h"
 #include "base/test/bind.h"
 #include "base/test/gtest_util.h"
@@ -3274,6 +3275,223 @@ TEST_F(PrivacySandboxServiceM1Test, TopicsConsentConfirmation_Declined) {
           {kTopicsConsentStringIdentifiers,
            GetTopicsConfirmationStringIdentifiers()},
       });
+}
+
+TEST_F(PrivacySandboxServiceM1Test,
+       RecordPrivacySandbox4StartupMetrics_PromptSuppressed) {
+  base::HistogramTester histogram_tester;
+  const std::string privacy_sandbox_prompt_startup_histogram =
+      "Settings.PrivacySandbox.PromptStartupState";
+
+  prefs()->SetInteger(
+      prefs::kPrivacySandboxM1PromptSuppressed,
+      static_cast<int>(
+          PrivacySandboxService::PromptSuppressedReason::kRestricted));
+  privacy_sandbox_service()->RecordPrivacySandbox4StartupMetrics();
+  histogram_tester.ExpectBucketCount(
+      privacy_sandbox_prompt_startup_histogram,
+      static_cast<int>(PrivacySandboxService::PromptStartupState::
+                           kPromptNotShownDueToPrivacySandboxRestricted),
+      /*expected_count=*/1);
+
+  prefs()->SetInteger(
+      prefs::kPrivacySandboxM1PromptSuppressed,
+      static_cast<int>(PrivacySandboxService::PromptSuppressedReason::
+                           kThirdPartyCookiesBlocked));
+  privacy_sandbox_service()->RecordPrivacySandbox4StartupMetrics();
+  histogram_tester.ExpectBucketCount(
+      privacy_sandbox_prompt_startup_histogram,
+      static_cast<int>(PrivacySandboxService::PromptStartupState::
+                           kPromptNotShownDueTo3PCBlocked),
+      /*expected_count=*/1);
+
+  prefs()->SetInteger(
+      prefs::kPrivacySandboxM1PromptSuppressed,
+      static_cast<int>(PrivacySandboxService::PromptSuppressedReason::
+                           kTrialsConsentDeclined));
+  privacy_sandbox_service()->RecordPrivacySandbox4StartupMetrics();
+  histogram_tester.ExpectBucketCount(
+      privacy_sandbox_prompt_startup_histogram,
+      static_cast<int>(PrivacySandboxService::PromptStartupState::
+                           kPromptNotShownDueToTrialConsentDeclined),
+      /*expected_count=*/1);
+
+  prefs()->SetInteger(
+      prefs::kPrivacySandboxM1PromptSuppressed,
+      static_cast<int>(PrivacySandboxService::PromptSuppressedReason::
+                           kTrialsDisabledAfterNotice));
+  privacy_sandbox_service()->RecordPrivacySandbox4StartupMetrics();
+  histogram_tester.ExpectBucketCount(
+      privacy_sandbox_prompt_startup_histogram,
+      static_cast<int>(PrivacySandboxService::PromptStartupState::
+                           kPromptNotShownDueToTrialsDisabledAfterNoticeShown),
+      /*expected_count=*/1);
+
+  prefs()->SetInteger(
+      prefs::kPrivacySandboxM1PromptSuppressed,
+      static_cast<int>(PrivacySandboxService::PromptSuppressedReason::kPolicy));
+  privacy_sandbox_service()->RecordPrivacySandbox4StartupMetrics();
+  histogram_tester.ExpectBucketCount(
+      privacy_sandbox_prompt_startup_histogram,
+      static_cast<int>(PrivacySandboxService::PromptStartupState::
+                           kPromptNotShownDueToManagedState),
+      /*expected_count=*/1);
+}
+
+TEST_F(PrivacySandboxServiceM1Test,
+       RecordPrivacySandbox4StartupMetrics_PromptNotSuppressed_EEA) {
+  base::HistogramTester histogram_tester;
+  const std::string privacy_sandbox_prompt_startup_histogram =
+      "Settings.PrivacySandbox.PromptStartupState";
+
+  // Ensure prompt not suppressed.
+  prefs()->SetInteger(
+      prefs::kPrivacySandboxM1PromptSuppressed,
+      static_cast<int>(PrivacySandboxService::PromptSuppressedReason::kNone));
+
+  base::test::ScopedFeatureList feature_list_consent_required;
+  std::map<std::string, std::string> consent_required_feature_param = {
+      {std::string(
+           privacy_sandbox::kPrivacySandboxSettings4ConsentRequiredName),
+       "true"},
+      {std::string(privacy_sandbox::kPrivacySandboxSettings4NoticeRequiredName),
+       "false"}};
+  feature_list_consent_required.InitAndEnableFeatureWithParameters(
+      privacy_sandbox::kPrivacySandboxSettings4,
+      consent_required_feature_param);
+  // Not consented
+  prefs()->SetBoolean(prefs::kPrivacySandboxM1ConsentDecisionMade, false);
+
+  privacy_sandbox_service()->RecordPrivacySandbox4StartupMetrics();
+  histogram_tester.ExpectBucketCount(
+      privacy_sandbox_prompt_startup_histogram,
+      static_cast<int>(
+          PrivacySandboxService::PromptStartupState::kEEAConsentPromptWaiting),
+      /*expected_count=*/1);
+
+  // Consent decision made and notice acknowledged.
+  prefs()->SetBoolean(prefs::kPrivacySandboxM1ConsentDecisionMade, true);
+  prefs()->SetBoolean(prefs::kPrivacySandboxM1EEANoticeAcknowledged, true);
+
+  // With topics enabled.
+  prefs()->SetBoolean(prefs::kPrivacySandboxM1TopicsEnabled, true);
+  privacy_sandbox_service()->RecordPrivacySandbox4StartupMetrics();
+  histogram_tester.ExpectBucketCount(
+      privacy_sandbox_prompt_startup_histogram,
+      static_cast<int>(PrivacySandboxService::PromptStartupState::
+                           kEEAFlowCompletedWithTopicsAccepted),
+      /*expected_count=*/1);
+
+  // With topics disabled.
+  prefs()->SetBoolean(prefs::kPrivacySandboxM1TopicsEnabled, false);
+  privacy_sandbox_service()->RecordPrivacySandbox4StartupMetrics();
+  histogram_tester.ExpectBucketCount(
+      privacy_sandbox_prompt_startup_histogram,
+      static_cast<int>(PrivacySandboxService::PromptStartupState::
+                           kEEAFlowCompletedWithTopicsDeclined),
+      /*expected_count=*/1);
+
+  // Consent decision made but notice was not acknowledged.
+  prefs()->SetBoolean(prefs::kPrivacySandboxM1EEANoticeAcknowledged, false);
+  privacy_sandbox_service()->RecordPrivacySandbox4StartupMetrics();
+  histogram_tester.ExpectBucketCount(
+      privacy_sandbox_prompt_startup_histogram,
+      static_cast<int>(
+          PrivacySandboxService::PromptStartupState::kEEANoticePromptWaiting),
+      /*expected_count=*/1);
+}
+
+TEST_F(PrivacySandboxServiceM1Test,
+       RecordPrivacySandbox4StartupMetrics_PromptNotSuppressed_ROW) {
+  base::HistogramTester histogram_tester;
+  const std::string privacy_sandbox_prompt_startup_histogram =
+      "Settings.PrivacySandbox.PromptStartupState";
+
+  // Ensure prompt not suppressed.
+  prefs()->SetInteger(
+      prefs::kPrivacySandboxM1PromptSuppressed,
+      static_cast<int>(PrivacySandboxService::PromptSuppressedReason::kNone));
+
+  base::test::ScopedFeatureList feature_list_notice_required;
+  std::map<std::string, std::string> notice_required_feature_param = {
+      {std::string(
+           privacy_sandbox::kPrivacySandboxSettings4ConsentRequiredName),
+       "false"},
+      {std::string(privacy_sandbox::kPrivacySandboxSettings4NoticeRequiredName),
+       "true"}};
+  feature_list_notice_required.InitAndEnableFeatureWithParameters(
+      privacy_sandbox::kPrivacySandboxSettings4, notice_required_feature_param);
+
+  // Notice flow not completed.
+  prefs()->SetBoolean(prefs::kPrivacySandboxM1RowNoticeAcknowledged, false);
+  privacy_sandbox_service()->RecordPrivacySandbox4StartupMetrics();
+  histogram_tester.ExpectBucketCount(
+      privacy_sandbox_prompt_startup_histogram,
+      static_cast<int>(
+          PrivacySandboxService::PromptStartupState::kROWNoticePromptWaiting),
+      /*expected_count=*/1);
+
+  // Notice flow completed.
+  prefs()->SetBoolean(prefs::kPrivacySandboxM1RowNoticeAcknowledged, true);
+  privacy_sandbox_service()->RecordPrivacySandbox4StartupMetrics();
+  histogram_tester.ExpectBucketCount(
+      privacy_sandbox_prompt_startup_histogram,
+      static_cast<int>(
+          PrivacySandboxService::PromptStartupState::kROWNoticeFlowCompleted),
+      /*expected_count=*/1);
+}
+
+TEST_F(PrivacySandboxServiceM1Test, RecordPrivacySandbox4StartupMetrics_APIs) {
+  // Each test for the APIs are scoped below to ensure we start with a clean
+  // HistogramTester as each call to `RecordPrivacySandbox4StartupMetrics` emits
+  // histograms for all APIs.
+
+  // Topics
+  {
+    base::HistogramTester histogram_tester;
+    prefs()->SetBoolean(prefs::kPrivacySandboxM1TopicsEnabled, true);
+    privacy_sandbox_service()->RecordPrivacySandbox4StartupMetrics();
+    histogram_tester.ExpectBucketCount("Settings.PrivacySandbox.Topics.Enabled",
+                                       static_cast<int>(true),
+                                       /*expected_count=*/1);
+
+    prefs()->SetBoolean(prefs::kPrivacySandboxM1TopicsEnabled, false);
+    privacy_sandbox_service()->RecordPrivacySandbox4StartupMetrics();
+    histogram_tester.ExpectBucketCount("Settings.PrivacySandbox.Topics.Enabled",
+                                       static_cast<int>(false),
+                                       /*expected_count=*/1);
+  }
+
+  // Fledge
+  {
+    base::HistogramTester histogram_tester;
+    prefs()->SetBoolean(prefs::kPrivacySandboxM1FledgeEnabled, true);
+    privacy_sandbox_service()->RecordPrivacySandbox4StartupMetrics();
+    histogram_tester.ExpectBucketCount("Settings.PrivacySandbox.Fledge.Enabled",
+                                       static_cast<int>(true),
+                                       /*expected_count=*/1);
+    prefs()->SetBoolean(prefs::kPrivacySandboxM1FledgeEnabled, false);
+    privacy_sandbox_service()->RecordPrivacySandbox4StartupMetrics();
+    histogram_tester.ExpectBucketCount("Settings.PrivacySandbox.Fledge.Enabled",
+                                       static_cast<int>(false),
+                                       /*expected_count=*/1);
+  }
+
+  // Ad measurement
+  {
+    base::HistogramTester histogram_tester;
+    prefs()->SetBoolean(prefs::kPrivacySandboxM1AdMeasurementEnabled, true);
+    privacy_sandbox_service()->RecordPrivacySandbox4StartupMetrics();
+    histogram_tester.ExpectBucketCount(
+        "Settings.PrivacySandbox.AdMeasurement.Enabled", static_cast<int>(true),
+        /*expected_count=*/1);
+    prefs()->SetBoolean(prefs::kPrivacySandboxM1AdMeasurementEnabled, false);
+    privacy_sandbox_service()->RecordPrivacySandbox4StartupMetrics();
+    histogram_tester.ExpectBucketCount(
+        "Settings.PrivacySandbox.AdMeasurement.Enabled",
+        static_cast<int>(false),
+        /*expected_count=*/1);
+  }
 }
 
 class PrivacySandboxServiceM1PromptTest : public PrivacySandboxServiceM1Test {

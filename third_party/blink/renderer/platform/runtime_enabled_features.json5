@@ -657,7 +657,11 @@
     },
     {
       name: "CSSColorTypedOM",
-      status:  "experimental",
+      status: "experimental",
+    },
+    {
+      name: "CSSDisplayAnimation",
+      status: "test"
     },
     {
       // Include custom properties in CSSComputedStyleDeclaration::item/length.
@@ -694,7 +698,6 @@
     },
     {
       name: "CSSGridTemplatePropertyInterpolation",
-      depends_on: ["LayoutNGGridFragmentation"],
       status: "stable",
     },
     {
@@ -879,7 +882,7 @@
       //
       // https://drafts.csswg.org/selectors-4/#the-nth-child-pseudo
       name: "CSSSelectorNthChildComplexSelector",
-      status: "experimental"
+      status: "stable"
     },
     {
       // Support for CSS ::spelling-error, ::grammar-error, and the
@@ -902,6 +905,13 @@
     {
       name: "CSSToggles",
       status: "experimental",
+    },
+    {
+      // Support for tree-scoped [1] timeline names (e.g. produced by
+      // scroll-timeline).
+      //
+      // [1] https://drafts.csswg.org/css-scoping-1/#shadow-names
+      name: "CSSTreeScopedTimelines",
     },
     {
       // Explainer: https://github.com/DevSDK/css-trigonometric-functions
@@ -1222,6 +1232,11 @@
       status: "stable",
     },
     {
+      name: "FedCmAutoSignin",
+      depends_on: ["FedCm"],
+      public: true,
+    },
+    {
       // This only exists so we can use RuntimeEnabled in the IDL file
       // when either implied_by flag is enabled.
       name: "FedCmIdentityProviderInterface",
@@ -1339,12 +1354,6 @@
       // OPFS File System Access API.
       name: "FileSystemAccessOriginPrivate",
       status: "stable",
-    },
-    {
-      // Whether to re-enable async interface for FileSystemSyncAccessHandle
-      // This is used by enterprise policy during migration.
-      name: "FileSystemSyncAccessHandleAsyncInterfaceOverride",
-      public: true,
     },
     {
       name: "FirstPartySets",
@@ -1504,6 +1513,7 @@
     },
     {
       name: "HighlightInheritance",
+      status: "experimental",
     },
     {
       name: "HighlightOverlayPainting",
@@ -1580,6 +1590,12 @@
       name: "InfiniteCullRect",
     },
     {
+      // If enabled, setting innerHTML will use a special fast-path parser.
+      name: "InnerHTMLParserFastpath",
+      base_feature: "InnerHTMLParserFastpath",
+      status: "experimental",
+    },
+    {
       name: "InputMultipleFieldsUI",
       // No plan to support complex UI for date/time INPUT types on Android.
       status: {"Android": "test", "default": "stable"},
@@ -1625,37 +1641,21 @@
       base_feature: "LayoutNG",
     },
     {
-      name: "LayoutNGBlockFragmentation",
-      status: "stable",
-    },
-    {
-      name: "LayoutNGBlockInInline",
-      depends_on: ["LayoutNG"],
-      status: "stable",
-    },
-    {
       // A kill-switch for a fix of crbug.com/1366268.
       name: "LayoutNGDelayScrollOffsetClamping",
       base_feature: "LayoutNGDelayScrollOffsetClamping",
       status: "stable",
     },
     {
-      // Block fragmentation support in the flex layout algorithm.
-      // https://drafts.csswg.org/css-flexbox-1/#pagination
-      name: "LayoutNGFlexFragmentation",
-      depends_on: ["LayoutNG", "LayoutNGBlockFragmentation"],
+      // crbug.com/1353190
+      name: "LayoutNGNoCopyBack",
+      depends_on: ["LayoutMediaNGContainer", "LayoutNGReplacedNoBoxSetters"],
       status: "stable",
-    },
-    {
-      // Block fragmentation support in the grid layout algorithm.
-      // https://drafts.csswg.org/css-grid-1/#pagination
-      name: "LayoutNGGridFragmentation",
-      depends_on: ["LayoutNG","LayoutNGBlockFragmentation"],
-      status: "stable",
+      base_feature: "LayoutNGNoCopyBack",
     },
     {
       name: "LayoutNGPrinting",
-      depends_on: ["LayoutNG","LayoutNGBlockFragmentation"],
+      depends_on: ["LayoutNG"],
       status: "stable",
       base_feature: "LayoutNGPrinting",
     },
@@ -1672,13 +1672,6 @@
       name: "LayoutNGSubgrid",
       depends_on: ["LayoutNG"],
       status: "test"
-    },
-    {
-      // Block fragmentation support in the table layout algorithm.
-      // https://drafts.csswg.org/css-tables-3/#fragmentation
-      name: "LayoutNGTableFragmentation",
-      depends_on: ["LayoutNG","LayoutNGBlockFragmentation"],
-      status: "stable",
     },
     {
       // Merge UpdateAfterLayout() calls for LayoutReplaced into one in
@@ -1896,10 +1889,6 @@
         "ChromeOS_Lacros": "stable",
         "default": "experimental",
       },
-    },
-    {
-      name: "NeverSlowMode",
-      public: true,
     },
     {
       name: "NewFlexboxSizing",
@@ -2367,6 +2356,10 @@
       status: "experimental",
     },
     {
+      name: "ResourceTimingInterimResponseTimes",
+      status: "test"
+    },
+    {
       name: "ResourceTimingResponseStatus",
       status: "stable",
     },
@@ -2430,6 +2423,7 @@
     {
       name: "RTCSvcScalabilityMode",
       status: "experimental",
+      base_feature: "RTCSvcScalabilityMode",
     },
     {
       name: "SanitizerAPI",
@@ -2908,6 +2902,14 @@
       status: "experimental",
     },
     {
+      // Allow unbalanced columns (no implicit breaks), even if the block-size
+      // of the multicol container isn't constrained, rather than forcing column
+      // balancing in such cases. See crbug.com/1156312
+      name: "UnconstrainedColumnFillAuto",
+      status: "stable",
+      base_feature: "UnconstrainedColumnFillAuto",
+    },
+    {
       name: "UnexposedTaskIds",
     },
     // This is a reverse OT used for a phased deprecation, on desktop
@@ -3105,6 +3107,11 @@
       origin_trial_os: ["win", "mac", "linux", "chromeos"],
       status: "stable",
     },
+    {
+      name: "WebAssemblyGC",
+      origin_trial_feature_name: "WebAssemblyGC",
+      status: "experimental",
+    },
     // WebAuth is disabled on Android versions prior to N (7.0) due to lack of
     // supporting APIs, see runtime_features.cc.
     {
@@ -3132,6 +3139,11 @@
     },
     {
       name: "WebAuthenticationLargeBlobExtension",
+      status: "experimental",
+    },
+    // https://w3c.github.io/webauthn/#prf-extension
+    {
+      name: "WebAuthenticationPRF",
       status: "experimental",
     },
     {

@@ -81,6 +81,8 @@
 #include "chromeos/ash/services/assistant/public/cpp/assistant_prefs.h"
 #include "chromeos/components/quick_answers/public/cpp/quick_answers_prefs.h"
 #include "components/account_manager_core/pref_names.h"
+#include "components/user_manager/user.h"
+#include "components/user_manager/user_manager.h"
 #include "ui/chromeos/events/pref_names.h"
 #endif
 
@@ -390,6 +392,12 @@ const PrefsUtil::TypedPrefMap& PrefsUtil::GetAllowlistedKeys() {
   (*s_allowlist)[ash::prefs::kLastUsedImeShortcutReminderDismissed] =
       settings_api::PrefType::PREF_TYPE_BOOLEAN;
   (*s_allowlist)[ash::prefs::kNextImeShortcutReminderDismissed] =
+      settings_api::PrefType::PREF_TYPE_BOOLEAN;
+#endif
+
+  // Files page.
+#if BUILDFLAG(IS_CHROMEOS_ASH)
+  (*s_allowlist)[::prefs::kOfficeFilesAlwaysMove] =
       settings_api::PrefType::PREF_TYPE_BOOLEAN;
 #endif
 

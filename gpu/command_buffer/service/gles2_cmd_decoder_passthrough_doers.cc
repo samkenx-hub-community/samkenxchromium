@@ -4910,8 +4910,7 @@ error::Error
 GLES2DecoderPassthroughImpl::DoBeginSharedImageAccessDirectCHROMIUM(
     GLuint client_id,
     GLenum mode) {
-  if (mode != GL_SHARED_IMAGE_ACCESS_MODE_OVERLAY_CHROMIUM &&
-      mode != GL_SHARED_IMAGE_ACCESS_MODE_READWRITE_CHROMIUM &&
+  if (mode != GL_SHARED_IMAGE_ACCESS_MODE_READWRITE_CHROMIUM &&
       mode != GL_SHARED_IMAGE_ACCESS_MODE_READ_CHROMIUM) {
     InsertError(GL_INVALID_ENUM, "unrecognized access mode");
     return error::kNoError;
@@ -4948,6 +4947,24 @@ error::Error GLES2DecoderPassthroughImpl::DoEndSharedImageAccessDirectCHROMIUM(
     return error::kNoError;
   }
   found->second.EndAccess();
+  return error::kNoError;
+}
+
+error::Error GLES2DecoderPassthroughImpl::DoConvertRGBAToYUVAMailboxesINTERNAL(
+    GLenum yuv_color_space,
+    GLenum plane_config,
+    GLenum subsampling,
+    const volatile GLbyte* mailboxes_in) {
+  NOTIMPLEMENTED_LOG_ONCE();
+  return error::kNoError;
+}
+
+error::Error GLES2DecoderPassthroughImpl::DoConvertYUVAMailboxesToRGBINTERNAL(
+    GLenum yuv_color_space,
+    GLenum plane_config,
+    GLenum subsampling,
+    const volatile GLbyte* mailboxes_in) {
+  NOTIMPLEMENTED_LOG_ONCE();
   return error::kNoError;
 }
 

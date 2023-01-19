@@ -426,7 +426,11 @@ void AXNodeObject::AlterSliderOrSpinButtonValue(bool increase) {
       ->PostDelayedTask(
           FROM_HERE,
           WTF::BindOnce(
-              [](Node* node, KeyboardEvent* evt) { node->DispatchEvent(*evt); },
+              [](Node* node, KeyboardEvent* evt) {
+                if (node) {
+                  node->DispatchEvent(*evt);
+                }
+              },
               WrapWeakPersistent(GetNode()), WrapPersistent(keyup)),
           base::Milliseconds(100));
 }
@@ -3519,9 +3523,6 @@ static bool ShouldInsertSpaceBetweenObjectsIfNeeded(
   // using a space.
   if (previous->IsControl() || next->IsControl())
     return true;
-
-  if (!RuntimeEnabledFeatures::LayoutNGBlockInInlineEnabled())
-    return false;
 
   // When |previous| and |next| are in same inline formatting context, we
   // may have block-in-inline between |previous| and |next|.

@@ -531,9 +531,9 @@ class ToRenderFrameHost {
   ToRenderFrameHost(T* frame_convertible_value)
       : render_frame_host_(ConvertToRenderFrameHost(frame_convertible_value)) {}
 
-  template <typename T, typename RawPtrType>
+  template <typename T, typename Traits>
   // NOLINTNEXTLINE(google-explicit-constructor)
-  ToRenderFrameHost(const raw_ptr<T, RawPtrType>& frame_convertible_value)
+  ToRenderFrameHost(const raw_ptr<T, Traits>& frame_convertible_value)
       : ToRenderFrameHost(frame_convertible_value.get()) {}
 
   // Extract the underlying frame.
@@ -1717,7 +1717,7 @@ class TestNavigationManager : public WebContentsObserver {
   // Waits until the navigation has been finished. Will automatically resume
   // navigations paused before this point. Returns false if the waiting was
   // terminated before reaching DidStartNavigation (e.g. timeout).
-  bool WaitForNavigationFinished();
+  [[nodiscard]] bool WaitForNavigationFinished();
 
   // Resume the navigation.
   // * Called after |WaitForRequestStart|, it causes the request to be sent.

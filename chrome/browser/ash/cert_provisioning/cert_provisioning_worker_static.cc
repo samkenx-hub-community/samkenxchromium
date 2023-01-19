@@ -498,7 +498,8 @@ void CertProvisioningWorkerStatic::OnBuildVaChallengeResponseDone(
     const attestation::TpmChallengeKeyResult& challenge_result) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
 
-  RecordVerifiedAccessTime(cert_scope_, base::TimeTicks::Now() - start_time);
+  RecordVerifiedAccessTime(cert_profile_.protocol_version, cert_scope_,
+                           base::TimeTicks::Now() - start_time);
 
   if (!challenge_result.IsSuccess()) {
     failure_message_ = ConstructFailureMessage(challenge_result);
@@ -602,7 +603,8 @@ void CertProvisioningWorkerStatic::OnSignCsrDone(
     chromeos::platform_keys::Status status) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
 
-  RecordCsrSignTime(cert_scope_, base::TimeTicks::Now() - start_time);
+  RecordDataSignTime(cert_profile_.protocol_version, cert_scope_,
+                     base::TimeTicks::Now() - start_time);
 
   if (status != chromeos::platform_keys::Status::kSuccess) {
     failure_message_ =

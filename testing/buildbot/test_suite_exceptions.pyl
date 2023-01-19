@@ -506,6 +506,16 @@
           'hard_timeout': 2400,
         },
       },
+      'win-rel-cft': {
+        'args': [
+          '--target',
+          'Release_x64',
+        ],
+        'swarming': {
+          "shards": 12,
+          "inverse_quickrun_shards": 24,
+        },
+      },
       'win10-rel-no-external-ip': {
         'args': [
           '--target',
@@ -809,6 +819,16 @@
           'hard_timeout': 2400,
         },
       },
+      'win-rel-cft': {
+        'args': [
+          '--target',
+          'Release_x64',
+        ],
+        'swarming': {
+          "shards": 18,
+          "inverse_quickrun_shards": 36,
+        },
+      },
       'win10-rel-no-external-ip': {
         'args': [
           '--target',
@@ -832,7 +852,7 @@
           '--target',
           'Release_x64',
         ],
-      }
+      },
     },
   },
   'browser_tests': {
@@ -1091,6 +1111,9 @@
         'args': [
           '--test-launcher-filter-file=../../testing/buildbot/filters/mac.mac-rel-cft.browser_tests.filter',
         ],
+        'swarming': {
+          'shards': 20,  # crbug.com/1361887
+        },
       },
       'win-asan': {
         # These are very slow on the ASAN trybot for some reason.
@@ -1106,8 +1129,15 @@
       },
       'win-rel-cft': {
         'args': [
+          # crbug.com/868082
+          '--disable-features=WebRTC-H264WithOpenH264FFmpeg',
           '--test-launcher-filter-file=../../testing/buildbot/filters/win.win-rel-cft.browser_tests.filter',
         ],
+        'swarming': {
+          # This is for slow test execution that often becomes a critical path of
+          # swarming jobs. crbug.com/868114
+          'shards': 15,
+        }
       },
       'win10-rel-no-external-ip': {
         # crbug.com/868082
@@ -1470,6 +1500,10 @@
         # TODO(crbug.com/1369158): Fix & re-enable.
         'isolate_profile_data': False,
       },
+      'win-rel-cft': {
+        # TODO(crbug.com/1369158): Fix & re-enable.
+        'isolate_profile_data': False,
+      },
     },
     'remove_from': [
       # Timeout happens sometimes (crbug.com/951799).
@@ -1558,6 +1592,11 @@
         # With a single shard seems to hit time limit.
         'swarming': {
           'shards': 2,
+        },
+      },
+      'win-rel-cft': {
+        'swarming': {
+          'inverse_quickrun_shards': 2,
         },
       },
     },
@@ -1800,6 +1839,15 @@
               'cores': '8|12',
             }
           ],
+        },
+      },
+      'win-rel-cft': {
+        # crbug.com/868082
+        'args': [
+          '--disable-features=WebRTC-H264WithOpenH264FFmpeg',
+        ],
+        'swarming': {
+          'quickrun_shards': 18,
         },
       },
       'win10-rel-no-external-ip': {
@@ -2520,6 +2568,9 @@
         'args': [
           '--test-launcher-filter-file=../../testing/buildbot/filters/win.win-rel-cft.interactive_ui_tests.filter',
         ],
+        'swarming': {
+          'shards': 9,
+        },
       },
     },
   },
@@ -3010,6 +3061,7 @@
     # need to update this field.
     'remove_from': [
       'Win11 Tests x64',
+      'win-rel-cft',
     ],
   },
   'pixel_skia_gold_passthrough_test': {
@@ -3308,6 +3360,11 @@
           '--coverage-continuous-mode=1',
         ],
       },
+      'win-rel-cft': {
+        'swarming': {
+          'shards': 3,
+        },
+      },
     },
   },
   'system_webview_wpt': {
@@ -3416,6 +3473,7 @@
       'Win10 Tests x64 (dbg)',
       'Win11 Tests x64',
       'win10-rel-no-external-ip',
+      'win-rel-cft',
     ],
   },
   'telemetry_unittests': {
@@ -3437,6 +3495,7 @@
       'Win10 Tests x64',
       'Win11 Tests x64',
       'win10-rel-no-external-ip',
+      'win-rel-cft',
 
       # TODO(https://crbug.com/1267161): Re-enable when platform is supported.
       'mac11-arm64-rel-tests',
@@ -3641,12 +3700,6 @@
   'vr_common_unittests': {
     'remove_from': [
       'android-pie-x86-rel',
-    ],
-  },
-  'vr_pixeltests': {
-    'remove_from': [
-      'android-pie-x86-rel',
-      'VR Linux',
     ],
   },
   'vulkan_pixel_skia_gold_test': {

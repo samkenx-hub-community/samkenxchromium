@@ -901,7 +901,6 @@ if (current_toolchain == default_toolchain) {
       "//chrome/browser/android/vr/vrcore_install_helper.h",
       "//chrome/browser/vr/text_edit_action.h",
       "//chrome/browser/vr/ui_test_input.h",
-      "//chrome/browser/vr/ui_unsupported_mode.h",
     ]
   }
 
@@ -1436,6 +1435,7 @@ if (current_toolchain == default_toolchain) {
       "//components/browser_ui/styles/android:java",
       "//components/browser_ui/util/android:java",
       "//components/browser_ui/widget/android:java",
+      "//components/commerce/core/android:core_java",
       "//components/crash/android:java",
       "//components/embedder_support/android:context_menu_java",
       "//components/embedder_support/android:util_java",
@@ -1510,8 +1510,11 @@ if (current_toolchain == default_toolchain) {
       "$google_play_services_package:google_play_services_gcm_java",
       "$google_play_services_package:google_play_services_iid_java",
       "$google_play_services_package:google_play_services_tasks_java",
+      "//base:base_java",
       "//base:base_java_test_support",
+      "//base:jni_java",
       "//base/test:test_support_java",
+      "//build/android:build_java",
       "//cc:cc_java",
       "//chrome/android:chrome_java",
       "//chrome/android/features/keyboard_accessory/public:public_java",
@@ -1826,8 +1829,6 @@ if (current_toolchain == default_toolchain) {
 
     deps += feed_test_deps
 
-    deps += commerce_subscriptions_java_test_deps
-
     if (enable_printing) {
       deps += [ "//printing:printing_java" ]
     }
@@ -1966,17 +1967,14 @@ if (current_toolchain == default_toolchain) {
           "javatests/src/org/chromium/chrome/browser/vr/WebXrVrTabTest.java",
           "javatests/src/org/chromium/chrome/browser/vr/WebXrVrTestFramework.java",
           "javatests/src/org/chromium/chrome/browser/vr/WebXrVrTransitionTest.java",
-          "javatests/src/org/chromium/chrome/browser/vr/mock/MockBrowserKeyboardInterface.java",
           "javatests/src/org/chromium/chrome/browser/vr/mock/MockVrCoreVersionChecker.java",
           "javatests/src/org/chromium/chrome/browser/vr/mock/MockVrDaydreamApi.java",
           "javatests/src/org/chromium/chrome/browser/vr/rules/ChromeTabbedActivityVrTestRule.java",
           "javatests/src/org/chromium/chrome/browser/vr/rules/CustomTabActivityVrTestRule.java",
-          "javatests/src/org/chromium/chrome/browser/vr/rules/VrActivityRestrictionRule.java",
           "javatests/src/org/chromium/chrome/browser/vr/rules/VrModuleNotInstalled.java",
           "javatests/src/org/chromium/chrome/browser/vr/rules/VrTestRule.java",
           "javatests/src/org/chromium/chrome/browser/vr/rules/WebappActivityVrTestRule.java",
           "javatests/src/org/chromium/chrome/browser/vr/util/NativeUiUtils.java",
-          "javatests/src/org/chromium/chrome/browser/vr/util/RenderTestUtils.java",
           "javatests/src/org/chromium/chrome/browser/vr/util/VrMessageUtils.java",
           "javatests/src/org/chromium/chrome/browser/vr/util/VrShellDelegateUtils.java",
           "javatests/src/org/chromium/chrome/browser/vr/util/VrTestRuleUtils.java",
@@ -2888,8 +2886,9 @@ if (current_toolchain == default_toolchain) {
 
     # Can be used to install compressed apks on system images.
     system_image_stub_apk("trichrome_library_system_stub_apk") {
-      package_name = chrome_public_manifest_package
+      package_name = trichrome_library_package
       stub_output = "$root_out_dir/apks/TrichromeLibrary-Stub.apk"
+      static_library_name = trichrome_library_package
     }
   }
 
@@ -4029,10 +4028,6 @@ generate_jni("chrome_jni_headers") {
   if (enable_offline_pages_harness) {
     sources += [ "java/src/org/chromium/chrome/browser/offlinepages/evaluation/OfflinePageEvaluationBridge.java" ]
   }
-
-  if (enable_vr) {
-    sources += [ "java/src/org/chromium/chrome/browser/component_updater/VrAssetsComponentInstaller.java" ]
-  }
 }
 
 source_set("chrome_test_util_jni") {
@@ -4064,7 +4059,6 @@ group("jni_headers") {
     "//chrome/browser/battery/android:jni_headers",
     "//chrome/browser/commerce/merchant_viewer/android:jni_headers",
     "//chrome/browser/commerce/price_tracking/android:jni_headers",
-    "//chrome/browser/commerce/subscriptions/android:jni_headers",
     "//chrome/browser/contextmenu:jni_headers",
     "//chrome/browser/download/android:jni_headers",
     "//chrome/browser/enterprise/util:jni_headers",

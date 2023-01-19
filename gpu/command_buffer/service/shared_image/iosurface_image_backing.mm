@@ -169,9 +169,7 @@ bool GLTextureIOSurfaceRepresentation::BeginAccess(GLenum mode) {
   DCHECK(mode_ == 0);
   mode_ = mode;
   bool readonly = mode_ != GL_SHARED_IMAGE_ACCESS_MODE_READWRITE_CHROMIUM;
-  if (mode != GL_SHARED_IMAGE_ACCESS_MODE_OVERLAY_CHROMIUM)
-    return egl_state_->BeginAccess(readonly);
-  return true;
+  return egl_state_->BeginAccess(readonly);
 }
 
 void GLTextureIOSurfaceRepresentation::EndAccess() {
@@ -965,7 +963,7 @@ bool IOSurfaceImageBacking::IOSurfaceBackingEGLStateBeginAccess(
       gfx::BufferFormat buffer_format;
       if (format().is_single_plane()) {
         plane = io_surface_plane_;
-        buffer_format = viz::BufferFormat(format().resource_format());
+        buffer_format = ToBufferFormat(format());
       } else {
         // For multiplanar formats (without external sampler) get planar buffer
         // format.

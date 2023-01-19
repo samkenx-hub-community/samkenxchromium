@@ -334,6 +334,8 @@ void OpenOrMoveFiles(Profile* profile,
 void GetEntriesFromFilePathsAndMimeTypes(
     const std::vector<base::FilePath>& file_paths,
     EntriesCallback entries_callback,
+    std::unique_ptr<extensions::app_file_handler_util::MimeTypeCollector>
+        mime_collector,
     std::unique_ptr<std::vector<std::string>> mime_types) {
   std::vector<extensions::EntryInfo> entries;
   DCHECK_EQ(file_paths.size(), mime_types->size());
@@ -372,11 +374,13 @@ void FindTasksForDialog(Profile* profile,
 
   // Get the mime types of the files and then pass them to the callback to
   // get the entries.
-  extensions::app_file_handler_util::MimeTypeCollector* mime_collector =
-      new extensions::app_file_handler_util::MimeTypeCollector(profile);
-  mime_collector->CollectForLocalPaths(
-      local_paths, base::BindOnce(&GetEntriesFromFilePathsAndMimeTypes,
-                                  local_paths, std::move(entries_callback)));
+  std::unique_ptr<extensions::app_file_handler_util::MimeTypeCollector>
+      mime_collector = std::make_unique<
+          extensions::app_file_handler_util::MimeTypeCollector>(profile);
+  mime_collector.get()->CollectForLocalPaths(
+      local_paths,
+      base::BindOnce(&GetEntriesFromFilePathsAndMimeTypes, local_paths,
+                     std::move(entries_callback), std::move(mime_collector)));
 }
 
 // static

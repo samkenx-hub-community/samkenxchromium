@@ -1242,6 +1242,16 @@ class GLES2DecoderImpl : public GLES2Decoder,
   void DoBeginSharedImageAccessDirectCHROMIUM(GLuint client_id, GLenum mode);
   void DoEndSharedImageAccessDirectCHROMIUM(GLuint client_id);
 
+  void DoConvertRGBAToYUVAMailboxesINTERNAL(
+      GLenum yuv_color_space,
+      GLenum plane_config,
+      GLenum subsampling,
+      const volatile GLbyte* mailboxes_in);
+  void DoConvertYUVAMailboxesToRGBINTERNAL(GLenum yuv_color_space,
+                                           GLenum plane_config,
+                                           GLenum subsampling,
+                                           const volatile GLbyte* mailboxes_in);
+
 #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC)
   void AttachImageToTextureWithDecoderBinding(uint32_t client_texture_id,
                                               uint32_t texture_target,
@@ -3218,15 +3228,13 @@ bool BackTexture::AllocateNativeGpuMemoryBuffer(const gfx::Size& size,
       decoder_->CreateAnonymousImage(size, buffer_format, &is_cleared);
   if (!image)
     return false;
-  DCHECK_EQ(format, image->GetDataFormat());
   if (!image->BindTexImage(Target()))
     return false;
 
   image_ = image;
   decoder_->texture_manager()->SetLevelInfo(
-      texture_ref_.get(), Target(), 0, image_->GetInternalFormat(),
-      size.width(), size.height(), 1, 0, image->GetDataFormat(),
-      image->GetDataType(), gfx::Rect(size));
+      texture_ref_.get(), Target(), 0, format, size.width(), size.height(), 1,
+      0, format, GL_UNSIGNED_BYTE, gfx::Rect(size));
   decoder_->texture_manager()->SetLevelImage(texture_ref_.get(), Target(), 0,
                                              image_.get(), Texture::BOUND);
 
@@ -3825,7 +3833,9 @@ gpu::ContextResult GLES2DecoderImpl::Initialize(
       // like glClear.
       // TODO(piman): allow empty framebuffers, similar to
       // EGL_KHR_surfaceless_context / GL_OES_surfaceless_context.
-      initial_size = gfx::Size(1, 1);
+      // Use 64x64 instead of 1x1 to handle minimum framebuffer size
+      // requirement on some platforms: b/265847440.
+      initial_size = gfx::Size(64, 64);
     }
 
     state_.viewport_width = initial_size.width();
@@ -18487,6 +18497,22 @@ void GLES2DecoderImpl::DoEndSharedImageAccessDirectCHROMIUM(GLuint client_id) {
   }
 
   texture_ref->EndAccessSharedImage();
+}
+
+void GLES2DecoderImpl::DoConvertRGBAToYUVAMailboxesINTERNAL(
+    GLenum yuv_color_space,
+    GLenum plane_config,
+    GLenum subsampling,
+    const volatile GLbyte* mailboxes_in) {
+  NOTIMPLEMENTED_LOG_ONCE();
+}
+
+void GLES2DecoderImpl::DoConvertYUVAMailboxesToRGBINTERNAL(
+    GLenum yuv_color_space,
+    GLenum plane_config,
+    GLenum subsampling,
+    const volatile GLbyte* mailboxes_in) {
+  NOTIMPLEMENTED_LOG_ONCE();
 }
 
 void GLES2DecoderImpl::DoInsertEventMarkerEXT(

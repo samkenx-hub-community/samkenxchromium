@@ -534,6 +534,9 @@ void TabHelpers::AttachTabHelpers(WebContents* web_contents) {
 
 #if BUILDFLAG(IS_CHROMEOS)
   policy::DlpContentTabHelper::MaybeCreateForWebContents(web_contents);
+#endif
+
+#if BUILDFLAG(ENABLE_EXTENSIONS)
   webapps::PreRedirectionURLObserver::CreateForWebContents(web_contents);
 #endif
 
@@ -548,7 +551,18 @@ void TabHelpers::AttachTabHelpers(WebContents* web_contents) {
     BUILDFLAG(IS_CHROMEOS)
   if (base::FeatureList::IsEnabled(
           features::kHappinessTrackingSurveysForDesktopDemo) ||
-      base::FeatureList::IsEnabled(features::kTrustSafetySentimentSurvey)) {
+      base::FeatureList::IsEnabled(features::kTrustSafetySentimentSurvey) ||
+      base::FeatureList::IsEnabled(performance_manager::features::
+                                       kPerformanceControlsPerformanceSurvey) ||
+      base::FeatureList::IsEnabled(
+          performance_manager::features::
+              kPerformanceControlsBatteryPerformanceSurvey) ||
+      base::FeatureList::IsEnabled(
+          performance_manager::features::
+              kPerformanceControlsHighEfficiencyOptOutSurvey) ||
+      base::FeatureList::IsEnabled(
+          performance_manager::features::
+              kPerformanceControlsBatterySaverOptOutSurvey)) {
     HatsHelper::CreateForWebContents(web_contents);
   }
   SharedHighlightingPromo::CreateForWebContents(web_contents);

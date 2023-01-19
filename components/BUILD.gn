@@ -413,6 +413,7 @@ test("components_unittests") {
       "//components/safe_browsing/content/browser/triggers:unit_tests",
       "//components/safe_browsing/content/browser/web_ui:unit_tests",
       "//components/safe_browsing/core/browser:token_fetcher_unit_tests",
+      "//components/safe_browsing/core/browser/hashprefix_realtime:unit_tests",
       "//components/safe_browsing/core/browser/realtime:unit_tests",
       "//components/safe_browsing/core/browser/tailored_security_service:unit_tests",
       "//components/safe_browsing/core/browser/utils:unit_tests",
@@ -581,6 +582,7 @@ test("components_unittests") {
       "//components/metrics/structured/mojom:unit_tests",
       "//components/ownership:unit_tests",
       "//components/user_manager:unit_tests",
+      "//components/variations/cros:unit_tests",
     ]
   }
 

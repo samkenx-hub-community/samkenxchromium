@@ -185,9 +185,8 @@ std::vector<uint8_t> ConstructMakeCredentialResponse(
                         std::move(attestation_statement)));
   make_credential_response.enterprise_attestation_returned =
       enterprise_attestation_requested;
-  if (large_blob_key) {
-    make_credential_response.large_blob_key = *large_blob_key;
-  }
+  make_credential_response.has_associated_large_blob_key =
+      large_blob_key.has_value();
   make_credential_response.device_public_key_signature =
       std::move(dpk_signature);
   return AsCTAPStyleCBORBytes(make_credential_response);
@@ -1555,6 +1554,13 @@ absl::optional<CtapDeviceResponseCode> VirtualCtap2Device::OnGetAssertion(
   absl::optional<std::array<uint8_t, 32>> hmac_salt2;
 
   if (request.hmac_secret) {
+    if (!config_.hmac_secret_support) {
+      // Should not have been sent. Authenticators will normally ignore unknown
+      // extensions but Chromium should not make this mistake.
+      DLOG(ERROR)
+          << "Rejecting getAssertion due to unexpected hmac_secret extension";
+      return CtapDeviceResponseCode::kCtap2ErrUnsupportedExtension;
+    }
     if (!mutable_state()->ecdh_key) {
       // Platform did not fetch the authenticator ECDH key first.
       NOTREACHED();

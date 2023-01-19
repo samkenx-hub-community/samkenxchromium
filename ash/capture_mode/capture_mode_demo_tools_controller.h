@@ -29,9 +29,9 @@ using MouseHighlightLayers =
 using TouchHighlightLayersMap =
     base::flat_map<ui::PointerId, std::unique_ptr<PointerHighlightLayer>>;
 
-// Observes and decides whether to show a helper widget representing the
-// currently pressed key combination or not. The key combination will be used to
-// construct or modify the `KeyComboViewer`. The
+// Observes and decides whether to show clicks (or taps) highlights and a helper
+// widget that represents the currently pressed key combination or not. The key
+// combination will be used to construct or modify the `KeyComboViewer`. The
 // `CaptureModeDemoToolsController` will only be available during video
 // recording and has to be explicitly enabled by the user.
 class CaptureModeDemoToolsController : public ui::InputMethodObserver {
@@ -118,9 +118,9 @@ class CaptureModeDemoToolsController : public ui::InputMethodObserver {
   // The most recently pressed non-modifier key.
   ui::KeyboardCode last_non_modifier_key_ = ui::VKEY_UNKNOWN;
 
-  // True if the cursor and focus is currently in a password text input
+  // True if the cursor and focus is currently in a text input
   // field, false otherwise.
-  bool in_password_text_input_ = false;
+  bool in_text_input_ = false;
 
   // Used to hold on `RefreshKeyComboViewer`. The key combo widget will be
   // scheduled to hide after `capture_mode::kRefreshKeyComboWidgetLongDelay`

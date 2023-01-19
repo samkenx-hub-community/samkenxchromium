@@ -370,7 +370,7 @@ BASE_FEATURE(kClipboardSuggestionContentHidden,
 // given country/culture
 BASE_FEATURE(kSuggestionAnswersColorReverse,
              "SuggestionAnswersColorReverse",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // If enabled, frequently visited sites are presented in form of a single row
 // with a carousel of tiles, instead of one URL per row.
@@ -456,7 +456,7 @@ BASE_FEATURE(kUpdatedConnectionSecurityIndicators,
 // necessary.
 BASE_FEATURE(kDefaultTypedNavigationsToHttps,
              "OmniboxDefaultTypedNavigationsToHttps",
-             enabled_by_default_desktop_android);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // Parameter name used to look up the delay before falling back to the HTTP URL
 // while trying an HTTPS URL. The parameter is treated as a TimeDelta, so the

@@ -147,6 +147,10 @@ void AddStrings(content::WebUIDataSource* source) {
 
       // Ambient mode related string.
       {"screensaverLabel", IDS_PERSONALIZATION_APP_SCREENSAVER_LABEL},
+      {"screenSaverPreviewButton",
+       IDS_PERSONALIZATION_APP_SCREENSAVER_PREVIEW_BUTTON},
+      {"screenSaverPreviewDownloading",
+       IDS_PERSONALIZATION_APP_SCREENSAVER_PREVIEW_DOWNLOADING},
       {"ambientModePageDescription",
        IDS_PERSONALIZATION_APP_AMBIENT_MODE_PAGE_DESCRIPTION},
       {"ambientModeOn", IDS_PERSONALIZATION_APP_AMBIENT_MODE_ON},
@@ -358,6 +362,9 @@ void PersonalizationAppUI::AddBooleans(content::WebUIDataSource* source) {
 
   source->AddBoolean("isGooglePhotosIntegrationEnabled",
                      wallpaper_provider_->IsEligibleForGooglePhotos());
+
+  source->AddBoolean("isGooglePhotosSharedAlbumsEnabled",
+                     features::IsWallpaperGooglePhotosSharedAlbumsEnabled());
 
   source->AddBoolean("isDarkLightModeEnabled",
                      features::IsDarkLightModeEnabled());

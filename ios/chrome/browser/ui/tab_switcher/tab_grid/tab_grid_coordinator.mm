@@ -659,7 +659,8 @@
     self.pinnedTabsMediator = [[PinnedTabsMediator alloc]
         initWithConsumer:baseViewController.pinnedTabsConsumer];
     self.pinnedTabsMediator.browser = _regularBrowser;
-    self.baseViewController.pinnedTabsDelegate = self.pinnedTabsMediator;
+    baseViewController.pinnedTabsDelegate = self.pinnedTabsMediator;
+    baseViewController.pinnedTabsImageDataSource = self.pinnedTabsMediator;
   }
 
   self.incognitoTabsMediator = [[TabGridMediator alloc]
@@ -1166,6 +1167,10 @@
 
 - (void)pinTabWithIdentifier:(NSString*)identifier {
   [self.regularTabsMediator setPinState:YES forItemWithIdentifier:identifier];
+}
+
+- (void)unpinTabWithIdentifier:(NSString*)identifier {
+  [self.pinnedTabsMediator setPinState:NO forItemWithIdentifier:identifier];
 }
 
 - (void)closeTabWithIdentifier:(NSString*)identifier

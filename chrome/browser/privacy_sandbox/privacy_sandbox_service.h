@@ -286,7 +286,8 @@ class PrivacySandboxService : public KeyedService {
   // so that the current topics consent information can be updated.
   // TODO (crbug.com/1378703): Determine whether changes to the preference,
   // such as by policy or extensions, should also call here.
-  void TopicsToggleChanged(bool new_value) const;
+  // Virtual for mocking in tests.
+  virtual void TopicsToggleChanged(bool new_value) const;
 
   // Whether the current profile requires consent for Topics to operate.
   void TopicsConsentRequired() const;
@@ -356,6 +357,17 @@ class PrivacySandboxService : public KeyedService {
                            FirstPartySetsEnabledMetric);
   FRIEND_TEST_ALL_PREFIXES(PrivacySandboxServiceTest,
                            FirstPartySetsDisabledMetric);
+  FRIEND_TEST_ALL_PREFIXES(
+      PrivacySandboxServiceM1Test,
+      RecordPrivacySandbox4StartupMetrics_PromptSuppressed);
+  FRIEND_TEST_ALL_PREFIXES(
+      PrivacySandboxServiceM1Test,
+      RecordPrivacySandbox4StartupMetrics_PromptNotSuppressed_EEA);
+  FRIEND_TEST_ALL_PREFIXES(
+      PrivacySandboxServiceM1Test,
+      RecordPrivacySandbox4StartupMetrics_PromptNotSuppressed_ROW);
+  FRIEND_TEST_ALL_PREFIXES(PrivacySandboxServiceM1Test,
+                           RecordPrivacySandbox4StartupMetrics_APIs);
 
   // Should be used only for tests when mocking the service.
   PrivacySandboxService();
@@ -426,6 +438,27 @@ class PrivacySandboxService : public KeyedService {
     kMaxValue = kNoPromptRequiredDisabled,
   };
 
+  // Contains the possible states of the prompt start up states for m1.
+  // Must be kept in sync with SettingsPrivacySandboxPromptStartupState in
+  // histograms/enums.xml
+  enum class PromptStartupState {
+    kEEAConsentPromptWaiting = 0,
+    kEEANoticePromptWaiting = 1,
+    kROWNoticePromptWaiting = 2,
+    kEEAFlowCompletedWithTopicsAccepted = 3,
+    kEEAFlowCompletedWithTopicsDeclined = 4,
+    kROWNoticeFlowCompleted = 5,
+    kPromptNotShownDueToPrivacySandboxRestricted = 6,
+    kPromptNotShownDueTo3PCBlocked = 7,
+    kPromptNotShownDueToTrialConsentDeclined = 8,
+    kPromptNotShownDueToTrialsDisabledAfterNoticeShown = 9,
+    kPromptNotShownDueToManagedState = 10,
+
+    // Add values above this line with a corresponding label in
+    // tools/metrics/histograms/enums.xml
+    kMaxValue = kPromptNotShownDueToManagedState,
+  };
+
   // Helper function to log first party sets state.
   void RecordFirstPartySetsStateHistogram(FirstPartySetsState state);
 
@@ -440,6 +473,10 @@ class PrivacySandboxService : public KeyedService {
   // Logs the state of privacy sandbox 3 in regards to prompts. Called once per
   // profile startup.
   void RecordPrivacySandbox3StartupMetrics();
+
+  // Logs the state of privacy sandbox 4 in regards to prompts. Called once per
+  // profile startup.
+  void RecordPrivacySandbox4StartupMetrics();
 
   // Converts the provided list of |top_frames| into eTLD+1s for display, and
   // provides those to |callback|.

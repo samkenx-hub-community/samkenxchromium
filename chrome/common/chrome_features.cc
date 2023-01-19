@@ -958,7 +958,7 @@ BASE_FEATURE(kRemoveSupervisedUsersOnStartup,
 // Enables notification permission module in Safety Check.
 BASE_FEATURE(kSafetyCheckNotificationPermissions,
              "SafetyCheckNotificationPermissions",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 const base::FeatureParam<int>
     kSafetyCheckNotificationPermissionsMinEnagementLimit{
@@ -1428,6 +1428,10 @@ const base::FeatureParam<SearchSuggestionPrerenderImplementationType>
         SearchSuggestionPrerenderImplementationType::kIgnorePrefetch,
         &search_suggestion_implementation_types};
 
+BASE_FEATURE(kAutocompleteActionPredictorConfidenceCutoff,
+             "AutocompleteActionPredictorConfidenceCutoff",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 // Enables omnibox trigger no state prefetch. Only one of
 // kOmniboxTriggerForPrerender2 or kOmniboxTriggerForNoStatePrefetch can be
 // enabled in the experiment. If both are enabled, only
@@ -1449,5 +1453,9 @@ BASE_FEATURE(kSupportsRtcWakeOver24Hours,
 BASE_FEATURE(kUseWebAppDBInsteadOfExternalPrefs,
              "UseWebAppDBInsteadOfExternalPrefs",
              base::FEATURE_ENABLED_BY_DEFAULT);
+
+BASE_FEATURE(kWebAuthFlowInBrowserTab,
+             "WebAuthFlowInBrowserTab",
+             base::FeatureState::FEATURE_DISABLED_BY_DEFAULT);
 
 }  // namespace features

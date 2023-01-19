@@ -6678,6 +6678,7 @@ interface PerformanceResourceTiming : PerformanceEntry
     getter domainLookupStart
     getter encodedBodySize
     getter fetchStart
+    getter firstInterimResponseStart
     getter initiatorType
     getter nextHopProtocol
     getter redirectEnd
@@ -7016,6 +7017,7 @@ interface RTCEncodedVideoFrame
     method clone
     method constructor
     method getMetadata
+    method setMetadata
     method toString
     setter data
 interface RTCError : DOMException

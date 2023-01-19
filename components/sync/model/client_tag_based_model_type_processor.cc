@@ -392,7 +392,7 @@ void ClientTagBasedModelTypeProcessor::Put(
   // |data->specifics| is about to be committed, and therefore represents the
   // imminent server-side state in most cases.
   sync_pb::EntitySpecifics trimmed_specifics =
-      bridge_->TrimRemoteSpecificsForCaching(data->specifics);
+      bridge_->TrimAllSupportedFieldsFromRemoteSpecifics(data->specifics);
 
   ProcessorEntity* entity =
       entity_tracker_->GetEntityForStorageKey(storage_key);
@@ -656,9 +656,13 @@ void ClientTagBasedModelTypeProcessor::OnCommitCompleted(
     ProcessorEntity* entity =
         entity_tracker_->GetEntityForTagHash(data.client_tag_hash);
     if (entity == nullptr) {
-      NOTREACHED() << "Received commit response for missing item."
-                   << " type: " << ModelTypeToDebugString(type_)
-                   << " client_tag_hash: " << data.client_tag_hash;
+      // This can happen (rarely) if the entity got untracked while a Commit was
+      // ongoing, or if the server sent a bogus response (unlikely).
+      DLOG(ERROR) << "Received commit response for missing item."
+                  << " type: " << ModelTypeToDebugString(type_)
+                  << " client_tag_hash: " << data.client_tag_hash;
+      base::UmaHistogramEnumeration("Sync.CommitResponseForUnknownEntity",
+                                    ModelTypeHistogramValue(type_));
       continue;
     }
 
@@ -934,7 +938,8 @@ ClientTagBasedModelTypeProcessor::OnFullUpdateReceived(
 #endif  // DCHECK_IS_ON()
     ProcessorEntity* entity = entity_tracker_->AddRemote(
         storage_key, update,
-        bridge_->TrimRemoteSpecificsForCaching(update.entity.specifics));
+        bridge_->TrimAllSupportedFieldsFromRemoteSpecifics(
+            update.entity.specifics));
     entity_data.push_back(
         EntityChange::CreateAdd(storage_key, std::move(update.entity)));
     if (!storage_key.empty())
