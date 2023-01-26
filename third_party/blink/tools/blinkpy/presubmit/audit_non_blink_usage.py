@@ -92,6 +92,7 @@ _CONFIG = [
             'base::Nanoseconds',
             'base::OptionalFromPtr',
             'base::OptionalToPtr',
+            'base::Overloaded',
             'base::PassKey',
             'base::PlatformThread',
             'base::PlatformThreadId',
@@ -1145,7 +1146,7 @@ _CONFIG = [
         # The modules listed above need access to the following GL drawing and
         # display-related types.
         'allowed': [
-            'base::LRUCache',
+            'base::flat_map',
             'gl::GpuPreference',
             'gpu::SHARED_IMAGE_USAGE_.+',
             'gpu::gles2::GLES2Interface',
@@ -1718,7 +1719,7 @@ _CONFIG = [
     },
     {
         'paths': [
-            'third_party/blink/renderer/platform/graphics/view_transition_shared_element_id.h'
+            'third_party/blink/renderer/platform/graphics/view_transition_element_id.h'
         ],
         'allowed': ['cc::ViewTransitionElementId'],
     },

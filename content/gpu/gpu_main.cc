@@ -405,12 +405,6 @@ int GpuMain(MainFunctionParams parameters) {
 namespace {
 
 #if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS)
-bool IsAsahiGpu(const gpu::GPUInfo::GPUDevice& device) {
-  // Asahi's vendor ID is a stub value (0xffffffff), so match the vendor name
-  // instead.
-  return device.vendor_string.find("Asahi") != std::string::npos;
-}
-
 bool StartSandboxLinux(gpu::GpuWatchdogThread* watchdog_thread,
                        const gpu::GPUInfo* gpu_info,
                        const gpu::GpuPreferences& gpu_prefs) {
@@ -436,8 +430,6 @@ bool StartSandboxLinux(gpu::GpuWatchdogThread* watchdog_thread,
         angle::IsVirtIO(gpu_info->active_gpu().vendor_id);
     sandbox_options.use_nvidia_specific_policies =
         angle::IsNVIDIA(gpu_info->active_gpu().vendor_id);
-    sandbox_options.use_asahi_specific_policies =
-        IsAsahiGpu(gpu_info->active_gpu());
     for (const auto& gpu : gpu_info->secondary_gpus) {
       if (angle::IsAMD(gpu.vendor_id))
         sandbox_options.use_amd_specific_policies = true;
@@ -445,8 +437,6 @@ bool StartSandboxLinux(gpu::GpuWatchdogThread* watchdog_thread,
         sandbox_options.use_intel_specific_policies = true;
       else if (angle::IsNVIDIA(gpu.vendor_id))
         sandbox_options.use_nvidia_specific_policies = true;
-      else if (IsAsahiGpu(gpu))
-        sandbox_options.use_asahi_specific_policies = true;
     }
   }
   sandbox_options.accelerated_video_decode_enabled =
@@ -454,18 +444,18 @@ bool StartSandboxLinux(gpu::GpuWatchdogThread* watchdog_thread,
   sandbox_options.accelerated_video_encode_enabled =
       !gpu_prefs.disable_accelerated_video_encode;
 
-#if BUILDFLAG(IS_CHROMEOS) && BUILDFLAG(USE_VAAPI)
-  // Increase the FD limit by 512 on VA-API Chrome OS devices in order to
-  // avoid running out of FDs in cases where many decoders are running
-  // concurrently. See b/215553848.
+#if BUILDFLAG(IS_CHROMEOS)
+  // Increase the FD limit by 512 on Chrome OS devices in order to avoid running
+  // running out of FDs in cases where many decoders are running concurrently.
+  // See b/215553848 and b/265885078.
   // TODO(b/195769334): revisit the need for this once out-of-process video
   // decoding has been fully implemented.
   const auto current_max_fds =
       base::saturated_cast<unsigned int>(base::GetMaxFds());
   constexpr unsigned int kMaxFDsDelta = 1u << 9;
   const auto new_max_fds =
-      static_cast<int>(base::ClampAdd(current_max_fds, kMaxFDsDelta));
-  base::IncreaseFdLimitTo(base::checked_cast<unsigned int>(new_max_fds));
+      static_cast<unsigned int>(base::ClampAdd(current_max_fds, kMaxFDsDelta));
+  base::IncreaseFdLimitTo(new_max_fds);
 #endif
 
   bool res = sandbox::policy::SandboxLinux::GetInstance()->InitializeSandbox(

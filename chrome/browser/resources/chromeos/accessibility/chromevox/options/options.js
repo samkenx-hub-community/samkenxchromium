@@ -11,6 +11,7 @@ import {BackgroundBridge} from '../common/background_bridge.js';
 import {BrailleTable} from '../common/braille/braille_table.js';
 import {Msgs} from '../common/msgs.js';
 import {PanelCommand, PanelCommandType} from '../common/panel_command.js';
+import {SettingsManager} from '../common/settings_manager.js';
 import {PunctuationEchoes, TtsSettings} from '../common/tts_types.js';
 
 import {BluetoothBrailleDisplayUI} from './bluetooth_braille_display_ui.js';
@@ -32,6 +33,7 @@ export class OptionsPage {
    */
   static async init() {
     await LocalStorage.init();
+    await SettingsManager.init();
     OptionsPage.populateVoicesSelect();
     BrailleTable.getAll(function(tables) {
       /** @type {!Array<BrailleTable.Table>} */
@@ -386,11 +388,11 @@ export class OptionsPage {
   /**
    * Set the html element for a preference to match the given value.
    * @param {Element} element The HTML control.
-   * @param {string} value The new value.
+   * @param {*} value The new value.
    */
   static setValue(element, value) {
     if (element.tagName === 'INPUT' && element.type === 'checkbox') {
-      element.checked = (value === 'true');
+      element.checked = value;
     } else if (element.tagName === 'INPUT' && element.type === 'radio') {
       element.checked = (String(element.value) === value);
     } else {

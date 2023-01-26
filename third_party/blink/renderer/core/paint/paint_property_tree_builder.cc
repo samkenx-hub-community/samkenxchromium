@@ -67,7 +67,7 @@
 #include "third_party/blink/renderer/platform/graphics/compositing/paint_artifact_compositor.h"
 #include "third_party/blink/renderer/platform/graphics/paint/effect_paint_property_node.h"
 #include "third_party/blink/renderer/platform/graphics/skia/skia_utils.h"
-#include "third_party/blink/renderer/platform/graphics/view_transition_shared_element_id.h"
+#include "third_party/blink/renderer/platform/graphics/view_transition_element_id.h"
 #include "third_party/blink/renderer/platform/wtf/casting.h"
 #include "ui/gfx/geometry/outsets_f.h"
 #include "ui/gfx/geometry/transform.h"
@@ -271,7 +271,7 @@ class FragmentPaintPropertyTreeBuilder {
   ALWAYS_INLINE void UpdateTransformForSVGChild(CompositingReasons);
   ALWAYS_INLINE bool NeedsEffect() const;
   ALWAYS_INLINE bool EffectCanUseCurrentClipAsOutputClip() const;
-  ALWAYS_INLINE void UpdateSharedElementTransitionEffect();
+  ALWAYS_INLINE void UpdateViewTransitionEffect();
   ALWAYS_INLINE void UpdateEffect();
   ALWAYS_INLINE void UpdateFilter();
   ALWAYS_INLINE void UpdateFragmentClip();
@@ -1153,8 +1153,7 @@ void FragmentPaintPropertyTreeBuilder::UpdateIndividualTransform(
         state.rendering_context_id = context_.rendering_context_id;
         if (handling_transform_property && style.Preserves3D() &&
             !state.rendering_context_id) {
-          state.rendering_context_id =
-              PtrHash<const LayoutObject>::GetHash(&object_);
+          state.rendering_context_id = WTF::GetHash(&object_);
         }
 
         // TODO(crbug.com/1185254): Make this work correctly for block
@@ -1385,8 +1384,17 @@ static bool NeedsEffectIgnoringClipPath(
 
   // A mask needs an effect node on the current LayoutObject to define the scope
   // of masked contents to be the current LayoutObject and its descendants.
-  if (object.StyleRef().HasMask())
+  if (style.HasMask()) {
     return true;
+  }
+
+  // The view-transition-name property when set creates a backdrop filter root.
+  // We do this by ensuring that this object needs an effect node.
+  // This is not required for the root element since its snapshot comes from the
+  // root stacking context which is already a backdrop filter root.
+  if (style.ViewTransitionName() && !object.IsDocumentElement()) {
+    return true;
+  }
 
   return false;
 }
@@ -1638,10 +1646,10 @@ void FragmentPaintPropertyTreeBuilder::UpdateEffect() {
   }
 }
 
-void FragmentPaintPropertyTreeBuilder::UpdateSharedElementTransitionEffect() {
+void FragmentPaintPropertyTreeBuilder::UpdateViewTransitionEffect() {
   if (NeedsPaintPropertyUpdate()) {
     if (full_context_.direct_compositing_reasons &
-        CompositingReason::kViewTransitionSharedElement) {
+        CompositingReason::kViewTransitionElement) {
       auto* transition =
           ViewTransitionUtils::GetActiveTransition(object_.GetDocument());
       DCHECK(transition);
@@ -2899,20 +2907,21 @@ void FragmentPaintPropertyTreeBuilder::UpdatePaintOffset() {
   // up and left to be at the origin "as-if all viewport-insetting UI were
   // hidden". This is done so that the transition container is stable across
   // navigations where the state of such UI can change (e.g. URL bar hidden ->
-  // shown). Offset painting of all other content so that it paints at the
-  // fixed viewport origin rather than behind the UI. Non-root transitions
-  // paint at their layer's origin and the layer is positioned with this offset
-  // included.
+  // shown). Offset painting of all other content so that it appears at its
+  // original location on the screen. Non-root transitions paint at their
+  // layer's origin and the layer is positioned with this offset included.
   Document& document = object_.GetDocument();
   ViewTransition* transition =
       ViewTransitionUtils::GetActiveTransition(document);
   PseudoElement* view_transition_pseudo =
       ViewTransitionUtils::GetRootPseudo(document);
+
   // We may have a transition but not yet have setup the pseudo element tree.
   // This can happen in view-transition-on-navigation where a transition is
   // created waiting for rendering to unblock but pre-paint can still be
   // triggered in this state.
   DCHECK(!view_transition_pseudo || transition);
+
   if (view_transition_pseudo && transition->IsRootTransitioning()) {
     DCHECK(document.documentElement());
     DCHECK(view_transition_pseudo->GetLayoutObject());
@@ -2923,8 +2932,12 @@ void FragmentPaintPropertyTreeBuilder::UpdatePaintOffset() {
     bool is_view_transition_pseudo =
         object_.GetNode() == view_transition_pseudo;
     if (is_child_of_root && !is_view_transition_pseudo) {
+      // Frame scrollbars belong to the frame so page content (children of the
+      // LayoutView) already has a paint offset from any left-side vertical
+      // scrollbar. Thus, offset by snapshot-root-to-frame (rather than to
+      // fixed-viewport) so we don't apply the scrollbar offset a second time.
       PhysicalOffset offset =
-          PhysicalOffset(transition->GetRootSnapshotPaintOffset());
+          -PhysicalOffset(transition->GetFrameToSnapshotRootOffset());
       context_.current.paint_offset += offset;
       context_.absolute_position.paint_offset += offset;
       context_.fixed_position.paint_offset += offset;
@@ -3121,7 +3134,7 @@ void FragmentPaintPropertyTreeBuilder::UpdateForSelf() {
       UpdateOffset();
       UpdateTransform();
     }
-    UpdateSharedElementTransitionEffect();
+    UpdateViewTransitionEffect();
     UpdateClipPathClip();
     UpdateEffect();
     UpdateCssClip();

@@ -429,7 +429,7 @@ public class TabListMediatorUnitTest {
         mMediator = new TabListMediator(mActivity, mModel, TabListMode.GRID, mTabModelSelector,
                 getTabThumbnailCallback(), mTitleProvider, mTabListFaviconProvider, false, null,
                 mGridCardOnClickListenerProvider, null, null, getClass().getSimpleName(),
-                UiType.CLOSABLE);
+                UiType.CLOSABLE, null);
         mMediator.registerOrientationListener(mGridLayoutManager);
         TrackerFactory.setTrackerForTests(mTracker);
 
@@ -620,7 +620,7 @@ public class TabListMediatorUnitTest {
         assertThat(mModel.size(), equalTo(2));
 
         mTabModelObserverCaptor.getValue().didAddTab(
-                newTab, TabLaunchType.FROM_CHROME_UI, TabCreationState.LIVE_IN_FOREGROUND);
+                newTab, TabLaunchType.FROM_CHROME_UI, TabCreationState.LIVE_IN_FOREGROUND, false);
 
         assertThat(mModel.size(), equalTo(3));
         assertThat(mModel.get(2).model.get(TabProperties.TAB_ID), equalTo(TAB3_ID));
@@ -897,7 +897,7 @@ public class TabListMediatorUnitTest {
         assertThat(mModel.size(), equalTo(2));
 
         mTabModelObserverCaptor.getValue().didAddTab(
-                newTab, TabLaunchType.FROM_RESTORE, TabCreationState.LIVE_IN_FOREGROUND);
+                newTab, TabLaunchType.FROM_RESTORE, TabCreationState.LIVE_IN_FOREGROUND, false);
 
         // When tab restoring stage is not yet finished, this tab info should not be added to
         // property model.
@@ -925,7 +925,7 @@ public class TabListMediatorUnitTest {
         assertThat(mModel.size(), equalTo(2));
 
         mTabModelObserverCaptor.getValue().didAddTab(
-                newTab, TabLaunchType.FROM_RESTORE, TabCreationState.LIVE_IN_FOREGROUND);
+                newTab, TabLaunchType.FROM_RESTORE, TabCreationState.LIVE_IN_FOREGROUND, false);
 
         TabListMediator.TabActionListener actionListenerAfterUpdate =
                 mModel.get(1).model.get(TabProperties.TAB_SELECTED_LISTENER);
@@ -952,11 +952,11 @@ public class TabListMediatorUnitTest {
         mModel.clear();
 
         mMediatorTabModelObserver.didAddTab(
-                mTab2, TabLaunchType.FROM_RESTORE, TabCreationState.LIVE_IN_FOREGROUND);
+                mTab2, TabLaunchType.FROM_RESTORE, TabCreationState.LIVE_IN_FOREGROUND, false);
         assertThat(mModel.size(), equalTo(0));
 
         mMediatorTabModelObserver.didAddTab(
-                mTab1, TabLaunchType.FROM_RESTORE, TabCreationState.LIVE_IN_FOREGROUND);
+                mTab1, TabLaunchType.FROM_RESTORE, TabCreationState.LIVE_IN_FOREGROUND, false);
         assertThat(mModel.size(), equalTo(1));
     }
 
@@ -975,7 +975,7 @@ public class TabListMediatorUnitTest {
         assertThat(mModel.size(), equalTo(2));
 
         mTabModelObserverCaptor.getValue().didAddTab(
-                newTab, TabLaunchType.FROM_CHROME_UI, TabCreationState.LIVE_IN_FOREGROUND);
+                newTab, TabLaunchType.FROM_CHROME_UI, TabCreationState.LIVE_IN_FOREGROUND, false);
 
         assertThat(mModel.size(), equalTo(3));
         assertThat(mModel.get(2).model.get(TabProperties.TAB_ID), equalTo(TAB3_ID));
@@ -997,7 +997,7 @@ public class TabListMediatorUnitTest {
         assertThat(mModel.size(), equalTo(2));
 
         mTabModelObserverCaptor.getValue().didAddTab(
-                newTab, TabLaunchType.FROM_CHROME_UI, TabCreationState.LIVE_IN_FOREGROUND);
+                newTab, TabLaunchType.FROM_CHROME_UI, TabCreationState.LIVE_IN_FOREGROUND, false);
 
         assertThat(mModel.size(), equalTo(2));
     }
@@ -1017,7 +1017,7 @@ public class TabListMediatorUnitTest {
         assertThat(mModel.size(), equalTo(2));
 
         mTabModelObserverCaptor.getValue().didAddTab(
-                newTab, TabLaunchType.FROM_CHROME_UI, TabCreationState.LIVE_IN_FOREGROUND);
+                newTab, TabLaunchType.FROM_CHROME_UI, TabCreationState.LIVE_IN_FOREGROUND, false);
 
         assertThat(mModel.size(), equalTo(3));
         assertThat(mModel.get(1).model.get(TabProperties.TAB_ID), equalTo(TAB3_ID));
@@ -1037,7 +1037,7 @@ public class TabListMediatorUnitTest {
         assertThat(mModel.size(), equalTo(2));
 
         mTabModelObserverCaptor.getValue().didAddTab(
-                newTab, TabLaunchType.FROM_CHROME_UI, TabCreationState.LIVE_IN_FOREGROUND);
+                newTab, TabLaunchType.FROM_CHROME_UI, TabCreationState.LIVE_IN_FOREGROUND, false);
 
         assertThat(mModel.size(), equalTo(3));
         assertThat(mModel.get(2).model.get(TabProperties.TAB_ID), equalTo(TAB3_ID));
@@ -1057,7 +1057,7 @@ public class TabListMediatorUnitTest {
         assertThat(mModel.size(), equalTo(2));
 
         mTabModelObserverCaptor.getValue().didAddTab(
-                newTab, TabLaunchType.FROM_CHROME_UI, TabCreationState.LIVE_IN_FOREGROUND);
+                newTab, TabLaunchType.FROM_CHROME_UI, TabCreationState.LIVE_IN_FOREGROUND, false);
 
         assertThat(mModel.size(), equalTo(3));
         assertThat(mModel.get(1).model.get(TabProperties.TAB_ID), equalTo(TAB3_ID));
@@ -1075,7 +1075,7 @@ public class TabListMediatorUnitTest {
         assertThat(mModel.size(), equalTo(2));
 
         mTabModelObserverCaptor.getValue().didAddTab(
-                newTab, TabLaunchType.FROM_CHROME_UI, TabCreationState.LIVE_IN_FOREGROUND);
+                newTab, TabLaunchType.FROM_CHROME_UI, TabCreationState.LIVE_IN_FOREGROUND, false);
 
         assertThat(mModel.size(), equalTo(2));
     }
@@ -1091,7 +1091,7 @@ public class TabListMediatorUnitTest {
         // Try to do a redundant addition by adding the PropertyModel of an existing tab to the
         // TabListModel.
         mTabModelObserverCaptor.getValue().didAddTab(
-                mTab1, TabLaunchType.FROM_CHROME_UI, TabCreationState.LIVE_IN_FOREGROUND);
+                mTab1, TabLaunchType.FROM_CHROME_UI, TabCreationState.LIVE_IN_FOREGROUND, false);
 
         assertThat(mModel.size(), equalTo(2));
     }
@@ -1118,7 +1118,7 @@ public class TabListMediatorUnitTest {
         mMediator = new TabListMediator(mActivity, mModel, TabListMode.GRID, mTabModelSelector,
                 getTabThumbnailCallback(), mTitleProvider, mTabListFaviconProvider, true, null,
                 mGridCardOnClickListenerProvider, null, null, getClass().getSimpleName(),
-                UiType.CLOSABLE);
+                UiType.CLOSABLE, null);
         mMediator.initWithNative(mProfile);
         // mTabModelObserverCaptor captures on every initWithNative calls. There is one
         // initWithNative call in the setup already.
@@ -3015,7 +3015,7 @@ public class TabListMediatorUnitTest {
         setPriceTrackingEnabledForTesting(true);
         mMediator = new TabListMediator(mActivity, mModel, TabListMode.GRID, mTabModelSelector,
                 getTabThumbnailCallback(), mTitleProvider, mTabListFaviconProvider, true, null,
-                null, null, null, getClass().getSimpleName(), TabProperties.UiType.CLOSABLE);
+                null, null, null, getClass().getSimpleName(), TabProperties.UiType.CLOSABLE, null);
         mMediator.registerOrientationListener(mGridLayoutManager);
         mMediator.initWithNative(mProfile);
         initAndAssertAllProperties();
@@ -3032,7 +3032,7 @@ public class TabListMediatorUnitTest {
         setPriceTrackingEnabledForTesting(true);
         mMediator = new TabListMediator(mActivity, mModel, TabListMode.GRID, mTabModelSelector,
                 getTabThumbnailCallback(), mTitleProvider, mTabListFaviconProvider, true, null,
-                null, null, null, getClass().getSimpleName(), TabProperties.UiType.CLOSABLE);
+                null, null, null, getClass().getSimpleName(), TabProperties.UiType.CLOSABLE, null);
         mMediator.registerOrientationListener(mGridLayoutManager);
         mMediator.initWithNative(mProfile);
         initWithThreeTabs();
@@ -3349,9 +3349,11 @@ public class TabListMediatorUnitTest {
         when(mSelectionDelegate.isItemSelected(TAB3_ID)).thenReturn(false);
         when(mTabModelSelector.isTabStateInitialized()).thenReturn(true);
         mMediator = new TabListMediator(mActivity, mModel, TabListMode.GRID, mTabModelSelector,
-                getTabThumbnailCallback(), mTitleProvider, mTabListFaviconProvider, true, () -> {
-                    return mSelectionDelegate;
-                }, null, null, null, getClass().getSimpleName(), TabProperties.UiType.SELECTABLE);
+                getTabThumbnailCallback(), mTitleProvider, mTabListFaviconProvider, true,
+                ()
+                        -> { return mSelectionDelegate; },
+                null, null, null, getClass().getSimpleName(), TabProperties.UiType.SELECTABLE,
+                null);
         mMediator.registerOrientationListener(mGridLayoutManager);
         mMediator.initWithNative(mProfile);
         initAndAssertAllProperties();
@@ -3382,9 +3384,11 @@ public class TabListMediatorUnitTest {
         when(mSelectionDelegate.isItemSelected(TAB3_ID)).thenReturn(false);
         when(mTabModelSelector.isTabStateInitialized()).thenReturn(true);
         mMediator = new TabListMediator(mActivity, mModel, TabListMode.GRID, mTabModelSelector,
-                getTabThumbnailCallback(), mTitleProvider, mTabListFaviconProvider, true, () -> {
-                    return mSelectionDelegate;
-                }, null, null, null, getClass().getSimpleName(), TabProperties.UiType.SELECTABLE);
+                getTabThumbnailCallback(), mTitleProvider, mTabListFaviconProvider, true,
+                ()
+                        -> { return mSelectionDelegate; },
+                null, null, null, getClass().getSimpleName(), TabProperties.UiType.SELECTABLE,
+                null);
         mMediator.registerOrientationListener(mGridLayoutManager);
         mMediator.initWithNative(mProfile);
         initAndAssertAllProperties();
@@ -3415,9 +3419,11 @@ public class TabListMediatorUnitTest {
         when(mSelectionDelegate.isItemSelected(TAB3_ID)).thenReturn(false);
         when(mTabModelSelector.isTabStateInitialized()).thenReturn(true);
         mMediator = new TabListMediator(mActivity, mModel, TabListMode.GRID, mTabModelSelector,
-                getTabThumbnailCallback(), mTitleProvider, mTabListFaviconProvider, true, () -> {
-                    return mSelectionDelegate;
-                }, null, null, null, getClass().getSimpleName(), TabProperties.UiType.SELECTABLE);
+                getTabThumbnailCallback(), mTitleProvider, mTabListFaviconProvider, true,
+                ()
+                        -> { return mSelectionDelegate; },
+                null, null, null, getClass().getSimpleName(), TabProperties.UiType.SELECTABLE,
+                null);
         mMediator.registerOrientationListener(mGridLayoutManager);
         mMediator.initWithNative(mProfile);
         initAndAssertAllProperties();
@@ -3612,7 +3618,8 @@ public class TabListMediatorUnitTest {
 
         mMediator = new TabListMediator(mActivity, mModel, mode, mTabModelSelector,
                 getTabThumbnailCallback(), mTitleProvider, mTabListFaviconProvider,
-                actionOnRelatedTabs, null, null, handler, null, getClass().getSimpleName(), uiType);
+                actionOnRelatedTabs, null, null, handler, null, getClass().getSimpleName(), uiType,
+                null);
         mMediator.registerOrientationListener(mGridLayoutManager);
 
         // TabGroupModelFilterObserver is registered when native is ready.

@@ -66,6 +66,7 @@
 #include "components/content_settings/core/browser/insecure_private_network_policy_handler.h"
 #include "components/content_settings/core/common/pref_names.h"
 #include "components/custom_handlers/pref_names.h"
+#include "components/domain_reliability/domain_reliability_prefs.h"
 #include "components/embedder_support/pref_names.h"
 #include "components/enterprise/browser/reporting/cloud_profile_reporting_policy_handler.h"
 #include "components/enterprise/browser/reporting/cloud_reporting_frequency_policy_handler.h"
@@ -237,6 +238,9 @@ const PolicyToPreferenceMapEntry kSimplePolicyMap[] = {
     base::Value::Type::INTEGER },
   { key::kDisableSafeBrowsingProceedAnyway,
     prefs::kSafeBrowsingProceedAnywayDisabled,
+    base::Value::Type::BOOLEAN },
+  { key::kDomainReliabilityAllowed,
+    domain_reliability::prefs::kDomainReliabilityAllowedByPolicy,
     base::Value::Type::BOOLEAN },
   { key::kEditBookmarksEnabled,
     bookmarks::prefs::kEditBookmarksEnabled,
@@ -420,9 +424,6 @@ const PolicyToPreferenceMapEntry kSimplePolicyMap[] = {
     base::Value::Type::INTEGER },
   { key::kDefaultWebHidGuardSetting,
     prefs::kManagedDefaultWebHidGuardSetting,
-    base::Value::Type::INTEGER },
-  { key::kDefaultWindowPlacementSetting,
-    prefs::kManagedDefaultWindowPlacementSetting,
     base::Value::Type::INTEGER },
   { key::kDisable3DAPIs,
     prefs::kDisable3DAPIs,
@@ -687,12 +688,6 @@ const PolicyToPreferenceMapEntry kSimplePolicyMap[] = {
     base::Value::Type::LIST },
   { key::kWindowCaptureAllowedByOrigins,
     prefs::kWindowCaptureAllowedByOrigins,
-    base::Value::Type::LIST },
-  { key::kWindowPlacementAllowedForUrls,
-    prefs::kManagedWindowPlacementAllowedForUrls,
-    base::Value::Type::LIST },
-  { key::kWindowPlacementBlockedForUrls,
-    prefs::kManagedWindowPlacementBlockedForUrls,
     base::Value::Type::LIST },
 #endif // BUILDFLAG(IS_ANDROID)
   { key::kAlternateErrorPagesEnabled,
@@ -1798,7 +1793,7 @@ const PolicyToPreferenceMapEntry kSimplePolicyMap[] = {
   { key::kTabDiscardingExceptions,
     performance_manager::user_tuning::prefs::kManagedTabDiscardingExceptions,
     base::Value::Type::LIST },
-#endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS_ASH
+#endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS_ASH)
   { key::kStrictMimetypeCheckForWorkerScriptsEnabled,
     prefs::kStrictMimetypeCheckForWorkerScriptsEnabled,
     base::Value::Type::BOOLEAN},
@@ -1833,6 +1828,11 @@ const PolicyToPreferenceMapEntry kSimplePolicyMap[] = {
     policy::policy_prefs::kForceEnablePepperVideoDecoderDevAPI,
     base::Value::Type::BOOLEAN },
 #endif // BUILDFLAG(ENABLE_PPAPI)
+#if BUILDFLAG(IS_ANDROID) || BUILDFLAG(IS_LINUX)
+  { key::kOutOfProcessSystemDnsResolutionEnabled,
+    prefs::kOutOfProcessSystemDnsResolutionEnabled,
+    base::Value::Type::BOOLEAN },
+#endif  // BUILDFLAG(IS_ANDROID) || BUILDFLAG(IS_LINUX)
 };
 // clang-format on
 
@@ -1914,7 +1914,7 @@ std::unique_ptr<ConfigurationPolicyHandlerList> BuildHandlerList(
 #if BUILDFLAG(IS_ANDROID)
   handlers->AddHandler(
       std::make_unique<ContextualSearchPolicyHandlerAndroid>());
-#else
+#else  // !BUILDFLAG(IS_ANDROID)
   handlers->AddHandler(std::make_unique<BrowsingHistoryPolicyHandler>());
   handlers->AddHandler(std::make_unique<BrowsingDataLifetimePolicyHandler>(
       key::kClearBrowsingDataOnExitList,
@@ -2059,7 +2059,37 @@ std::unique_ptr<ConfigurationPolicyHandlerList> BuildHandlerList(
   handlers->AddHandler(std::make_unique<WebHidDevicePolicyHandler>(
       key::kWebHidAllowDevicesWithHidUsagesForUrls,
       prefs::kManagedWebHidAllowDevicesWithHidUsagesForUrls, chrome_schema));
-#endif
+
+  // WindowPlacement policies to be deprecated and replaced by WindowManagement.
+  // crbug.com/1328581
+  handlers->AddHandler(std::make_unique<SimpleDeprecatingPolicyHandler>(
+      std::make_unique<SimplePolicyHandler>(
+          key::kDefaultWindowPlacementSetting,
+          prefs::kManagedDefaultWindowManagementSetting,
+          base::Value::Type::INTEGER),
+      std::make_unique<SimplePolicyHandler>(
+          key::kDefaultWindowManagementSetting,
+          prefs::kManagedDefaultWindowManagementSetting,
+          base::Value::Type::INTEGER)));
+  handlers->AddHandler(std::make_unique<SimpleDeprecatingPolicyHandler>(
+      std::make_unique<SimplePolicyHandler>(
+          key::kWindowPlacementAllowedForUrls,
+          prefs::kManagedWindowManagementAllowedForUrls,
+          base::Value::Type::LIST),
+      std::make_unique<SimplePolicyHandler>(
+          key::kWindowManagementAllowedForUrls,
+          prefs::kManagedWindowManagementAllowedForUrls,
+          base::Value::Type::LIST)));
+  handlers->AddHandler(std::make_unique<SimpleDeprecatingPolicyHandler>(
+      std::make_unique<SimplePolicyHandler>(
+          key::kWindowPlacementBlockedForUrls,
+          prefs::kManagedWindowManagementBlockedForUrls,
+          base::Value::Type::LIST),
+      std::make_unique<SimplePolicyHandler>(
+          key::kWindowManagementBlockedForUrls,
+          prefs::kManagedWindowManagementBlockedForUrls,
+          base::Value::Type::LIST)));
+#endif  // BUILDFLAG(IS_ANDROID)
 
 #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) || \
     BUILDFLAG(IS_ANDROID)

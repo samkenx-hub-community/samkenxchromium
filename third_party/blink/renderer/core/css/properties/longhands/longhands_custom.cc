@@ -194,6 +194,39 @@ const CSSValue* AnchorScroll::CSSValueFromComputedStyleInternal(
       style.AnchorScroll()->GetName().GetName());
 }
 
+const CSSValue* AnimationComposition::ParseSingleValue(
+    CSSParserTokenRange& range,
+    const CSSParserContext& context,
+    const CSSParserLocalContext&) const {
+  DCHECK(RuntimeEnabledFeatures::CSSAnimationCompositionEnabled());
+  return css_parsing_utils::ConsumeCommaSeparatedList(
+      css_parsing_utils::ConsumeIdent<CSSValueID::kReplace, CSSValueID::kAdd,
+                                      CSSValueID::kAccumulate>,
+      range);
+}
+
+const CSSValue* AnimationComposition::CSSValueFromComputedStyleInternal(
+    const ComputedStyle& style,
+    const LayoutObject*,
+    bool allow_visited_style) const {
+  DCHECK(RuntimeEnabledFeatures::CSSAnimationCompositionEnabled());
+  if (!style.Animations()) {
+    return InitialValue();
+  }
+  CSSValueList* list = CSSValueList::CreateCommaSeparated();
+  const auto& composition_list = style.Animations()->CompositionList();
+  for (const auto& composition : composition_list) {
+    list->Append(*CSSIdentifierValue::Create(composition));
+  }
+  return list;
+}
+
+const CSSValue* AnimationComposition::InitialValue() const {
+  CSSValueList* list = CSSValueList::CreateCommaSeparated();
+  list->Append(*CSSIdentifierValue::Create(CSSValueID::kReplace));
+  return list;
+}
+
 const CSSValue* AnimationDelay::ParseSingleValue(
     CSSParserTokenRange& range,
     const CSSParserContext& context,
@@ -421,8 +454,8 @@ const CSSValue* AnimationRangeStart::CSSValueFromComputedStyleInternal(
     const ComputedStyle& style,
     const LayoutObject*,
     bool allow_visited_style) const {
-  return ComputedStyleUtils::ValueForAnimationRangeStartList(
-      style.Animations());
+  return ComputedStyleUtils::ValueForAnimationRangeStartList(style.Animations(),
+                                                             style);
 }
 
 const CSSValue* AnimationRangeEnd::ParseSingleValue(
@@ -438,7 +471,8 @@ const CSSValue* AnimationRangeEnd::CSSValueFromComputedStyleInternal(
     const ComputedStyle& style,
     const LayoutObject*,
     bool allow_visited_style) const {
-  return ComputedStyleUtils::ValueForAnimationRangeEndList(style.Animations());
+  return ComputedStyleUtils::ValueForAnimationRangeEndList(style.Animations(),
+                                                           style);
 }
 
 const CSSValue* AnimationTimeline::ParseSingleValue(
@@ -4818,24 +4852,20 @@ const CSSValue* ListStyleType::CSSValueFromComputedStyleInternal(
   if (!style.ListStyleType()) {
     return CSSIdentifierValue::Create(CSSValueID::kNone);
   }
-  if (style.ListStyleType()->IsString()) {
+  const ListStyleTypeData& list_style_type = *style.ListStyleType();
+  if (list_style_type.IsString()) {
     return MakeGarbageCollected<CSSStringValue>(
-        style.ListStyleType()->GetStringValue());
+        list_style_type.GetStringValue());
   }
   // TODO(crbug.com/687225): Return a scoped CSSValue?
   return MakeGarbageCollected<CSSCustomIdentValue>(
-      style.ListStyleType()->GetCounterStyleName());
+      list_style_type.GetCounterStyleName());
 }
 
 void ListStyleType::ApplyValue(StyleResolverState& state,
                                const CSSValue& value) const {
-  NOTREACHED();
-}
-
-void ListStyleType::ApplyValue(StyleResolverState& state,
-                               const ScopedCSSValue& scoped_value) const {
+  DCHECK(value.IsScopedValue());
   ComputedStyleBuilder& builder = state.StyleBuilder();
-  const CSSValue& value = scoped_value.GetCSSValue();
   if (const auto* identifier_value = DynamicTo<CSSIdentifierValue>(value)) {
     DCHECK_EQ(CSSValueID::kNone, identifier_value->GetValueID());
     builder.SetListStyleType(nullptr);
@@ -4851,7 +4881,7 @@ void ListStyleType::ApplyValue(StyleResolverState& state,
   DCHECK(value.IsCustomIdentValue());
   const auto& custom_ident_value = To<CSSCustomIdentValue>(value);
   builder.SetListStyleType(ListStyleTypeData::CreateCounterStyle(
-      custom_ident_value.Value(), scoped_value.GetTreeScope()));
+      custom_ident_value.Value(), custom_ident_value.GetTreeScope()));
 }
 
 bool MarginBlockEnd::IsLayoutDependent(const ComputedStyle* style,
@@ -6890,37 +6920,60 @@ const CSSValue* ScrollTimelineAxis::ParseSingleValue(
     CSSParserTokenRange& range,
     const CSSParserContext& context,
     const CSSParserLocalContext&) const {
-  return css_parsing_utils::ConsumeSingleTimelineAxis(range);
+  using css_parsing_utils::ConsumeCommaSeparatedList;
+  using css_parsing_utils::ConsumeSingleTimelineAxis;
+  return ConsumeCommaSeparatedList(ConsumeSingleTimelineAxis, range);
 }
 
 const CSSValue* ScrollTimelineAxis::CSSValueFromComputedStyleInternal(
     const ComputedStyle& style,
     const LayoutObject*,
     bool allow_visited_style) const {
-  return CSSIdentifierValue::Create(style.ScrollTimelineAxis());
+  const Vector<TimelineAxis>& vector = style.ScrollTimelineAxis();
+  if (vector.empty()) {
+    return InitialValue();
+  }
+  CSSValueList* list = CSSValueList::CreateCommaSeparated();
+  for (TimelineAxis axis : vector) {
+    list->Append(*CSSIdentifierValue::Create(axis));
+  }
+  return list;
 }
 
 const CSSValue* ScrollTimelineAxis::InitialValue() const {
-  return CSSIdentifierValue::Create(CSSValueID::kBlock);
+  CSSValueList* list = CSSValueList::CreateCommaSeparated();
+  list->Append(*CSSIdentifierValue::Create(CSSValueID::kBlock));
+  return list;
 }
 
 const CSSValue* ScrollTimelineName::ParseSingleValue(
     CSSParserTokenRange& range,
     const CSSParserContext& context,
     const CSSParserLocalContext&) const {
-  return css_parsing_utils::ConsumeSingleTimelineName(range, context);
+  using css_parsing_utils::ConsumeCommaSeparatedList;
+  using css_parsing_utils::ConsumeSingleTimelineName;
+  return ConsumeCommaSeparatedList(ConsumeSingleTimelineName, range, context);
 }
 
 const CSSValue* ScrollTimelineName::CSSValueFromComputedStyleInternal(
     const ComputedStyle& style,
     const LayoutObject* layout_object,
     bool allow_visited_style) const {
-  return ComputedStyleUtils::ValueForCustomIdentOrNone(
-      style.ScrollTimelineName().Get());
+  if (!style.ScrollTimelineName()) {
+    return InitialValue();
+  }
+  CSSValueList* list = CSSValueList::CreateCommaSeparated();
+  for (const Member<const ScopedCSSName>& name :
+       style.ScrollTimelineName()->GetNames()) {
+    list->Append(*ComputedStyleUtils::ValueForCustomIdentOrNone(name.Get()));
+  }
+  return list;
 }
 
 const CSSValue* ScrollTimelineName::InitialValue() const {
-  return CSSIdentifierValue::Create(CSSValueID::kNone);
+  CSSValueList* list = CSSValueList::CreateCommaSeparated();
+  list->Append(*CSSIdentifierValue::Create(CSSValueID::kNone));
+  return list;
 }
 
 const CSSValue* ShapeImageThreshold::ParseSingleValue(

@@ -137,10 +137,8 @@
  */
 #define SK_PDF_USE_HARFBUZZ_SUBSET
 
-#if !defined(SK_API)
 // Handle exporting using base/component_export.h
 #define SK_API COMPONENT_EXPORT(SKIA)
-#endif
 
 // Chromium does not use these fonts.  This define causes type1 fonts to be
 // converted to type3 when producing PDFs, and reduces build size.
@@ -197,6 +195,8 @@ SK_API void SkDebugf_FileLine(const char* file,
 #endif
 
 #endif
+
+#define SK_TRIVIAL_ABI [[clang::trivial_abi]]
 
 // These flags are no longer defined in Skia, but we have them (temporarily)
 // until we update our call-sites (typically these are for API changes).

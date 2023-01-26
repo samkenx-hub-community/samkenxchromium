@@ -27,10 +27,6 @@ const char kAllowLoopbackInPeerConnection[] =
 // This is used in blimp to emulate android fonts on linux.
 const char kAndroidFontsPath[]          = "android-fonts-path";
 
-// Indicates that the ash web browser is disabled (i.e. lacros the only
-// browser).
-const char kAshWebBrowserDisabled[] = "ash-web-browser-disabled";
-
 // Causes the Attribution Report API to run without delays or noise.
 const char kAttributionReportingDebugMode[] =
     "attribution-reporting-debug-mode";
@@ -1036,10 +1032,6 @@ const char kDeviceScaleFactor[]     = "device-scale-factor";
 
 // Disable the Legacy Window which corresponds to the size of the WebContents.
 const char kDisableLegacyIntermediateWindow[] = "disable-legacy-window";
-
-// Enables H264 HW decode acceleration for WebRtc on Win 7.
-const char kEnableWin7WebRtcHWH264Decoding[] =
-    "enable-win7-webrtc-hw-h264-decoding";
 
 // DirectWrite FontCache is shared by browser to renderers using shared memory.
 // This switch allows us to pass the shared memory handle to the renderer.

@@ -142,7 +142,6 @@
 #include "chrome/browser/ui/views/side_panel/side_panel.h"
 #include "chrome/browser/ui/views/side_panel/side_panel_coordinator.h"
 #include "chrome/browser/ui/views/side_panel/side_panel_registry.h"
-#include "chrome/browser/ui/views/side_search/side_search_browser_controller.h"
 #include "chrome/browser/ui/views/status_bubble_views.h"
 #include "chrome/browser/ui/views/sync/one_click_signin_dialog_view.h"
 #include "chrome/browser/ui/views/tab_contents/chrome_web_contents_view_focus_helper.h"
@@ -159,6 +158,7 @@
 #include "chrome/browser/ui/views/translate/translate_bubble_controller.h"
 #include "chrome/browser/ui/views/translate/translate_bubble_view.h"
 #include "chrome/browser/ui/views/update_recommended_message_box.h"
+#include "chrome/browser/ui/views/upgrade_notification_controller.h"
 #include "chrome/browser/ui/views/user_education/browser_feature_promo_controller.h"
 #include "chrome/browser/ui/views/user_education/browser_user_education_service.h"
 #include "chrome/browser/ui/views/web_apps/frame_toolbar/web_app_frame_toolbar_view.h"
@@ -172,6 +172,7 @@
 #include "chrome/grit/chromium_strings.h"
 #include "chrome/grit/generated_resources.h"
 #include "chrome/grit/theme_resources.h"
+#include "chromeos/ui/wm/features.h"
 #include "components/autofill/core/common/autofill_payments_features.h"
 #include "components/feature_engagement/public/event_constants.h"
 #include "components/feature_engagement/public/feature_constants.h"
@@ -254,7 +255,9 @@
 #include "ui/views/window/dialog_delegate.h"
 
 #if BUILDFLAG(IS_CHROMEOS)
+#include "chrome/browser/ui/views/frame/browser_non_client_frame_view_chromeos.h"
 #include "chrome/browser/ui/views/frame/top_controls_slide_controller_chromeos.h"
+#include "chromeos/ui/frame/caption_buttons/frame_size_button.h"
 #include "chromeos/ui/wm/desks/desks_helper.h"
 #endif
 
@@ -751,13 +754,6 @@ class BrowserView::SidePanelVisibilityController : public views::ViewObserver {
       : side_search_panel_(side_search_panel) {
     if (rhs_panel)
       global_panels_.push_back({rhs_panel, absl::nullopt});
-
-    // Observing the side search panel is only necessary when enabling the
-    // improved clobbering functionality.
-    if (side_search_panel_ &&
-        base::FeatureList::IsEnabled(features::kSidePanelImprovedClobbering)) {
-      side_search_panel_observation_.Observe(side_search_panel_);
-    }
   }
   ~SidePanelVisibilityController() override = default;
 
@@ -953,6 +949,8 @@ BrowserView::BrowserView(std::unique_ptr<Browser> browser)
   // Create do-nothing view for the sake of controlling the z-order of the find
   // bar widget.
   find_bar_host_view_ = AddChildView(std::make_unique<View>());
+
+  UpgradeNotificationController::CreateForBrowser(browser_.get());
 
 #if BUILDFLAG(IS_WIN)
   // Create a custom JumpList and add it to an observer of TabRestoreService
@@ -1433,10 +1431,6 @@ void BrowserView::UpdateTitleBar() {
     frame_->UpdateWindowIcon();
 }
 
-void BrowserView::UpdateFrameColor() {
-  frame_->GetFrameView()->UpdateFrameColor();
-}
-
 void BrowserView::BookmarkBarStateChanged(
     BookmarkBar::AnimateChangeType change_type) {
   if (bookmark_bar_view_.get()) {
@@ -1582,16 +1576,6 @@ void BrowserView::OnActiveTabChanged(content::WebContents* old_contents,
   if (app_banner_manager)
     ObserveAppBannerManager(app_banner_manager);
 
-  // Update the side panel before performing a layout on the BrowserView so that
-  // the layout takes into account the presence (or absence) of the side panel.
-  // This avoids unnecessary resize events propagating to the WebContents if it
-  // was added first and the layout was adjusted to accommodate the side panel
-  // later on.
-  if (side_search_controller_) {
-    side_search_controller_->UpdateSidePanelForContents(new_contents,
-                                                        old_contents);
-  }
-
   UpdateUIForContents(new_contents);
   RevealTabStripIfNeeded();
 
@@ -1678,17 +1662,6 @@ void BrowserView::OnTabDetached(content::WebContents* contents,
   infobar_container_->ChangeInfoBarManager(nullptr);
   app_banner_manager_observation_.Reset();
   UpdateDevToolsForContents(nullptr, true);
-
-  // We must ensure that we propagate an update to the side search controller
-  // so that it removes the now detached tab WebContents from the side panel's
-  // WebView. This is necessary as BrowserView::OnActiveTabChanged() will fire
-  // for the destination window before the source window is destroyed during a
-  // tab dragging operation which could lead to the dragged WebContents being
-  // added to the destination panel's WebView before it is removed from the
-  // source panel's WebView. Failing to so so can lead to visual artifacts
-  // (see crbug.com/1306793).
-  if (side_search_controller_)
-    side_search_controller_->UpdateSidePanelForContents(contents, nullptr);
 }
 
 void BrowserView::OnTabRestored(int command_id) {
@@ -2093,17 +2066,24 @@ void BrowserView::UpdateWindowControlsOverlayEnabled() {
                  browser()->app_controller() &&
                  browser()->app_controller()->IsWindowControlsOverlayEnabled();
 
-  if (enabled == window_controls_overlay_enabled_)
+  if (enabled == window_controls_overlay_enabled_) {
     return;
+  }
 
   window_controls_overlay_enabled_ = enabled;
 
   // Clear the title-bar-area rect when window controls overlay is disabled.
-  if (!window_controls_overlay_enabled_)
+  if (!window_controls_overlay_enabled_) {
     GetActiveWebContents()->UpdateWindowControlsOverlay(gfx::Rect());
+  }
 
-  if (frame_ && frame_->GetFrameView())
+  if (web_app_frame_toolbar()) {
+    web_app_frame_toolbar()->OnWindowControlsOverlayEnabledChanged();
+  }
+
+  if (frame_ && frame_->GetFrameView()) {
     frame_->GetFrameView()->WindowControlsOverlayEnabledChanged();
+  }
 
   const std::u16string& state_change_text =
       IsWindowControlsOverlayEnabled()
@@ -2134,22 +2114,25 @@ void BrowserView::UpdateWindowControlsOverlayToggleVisible() {
     should_show = false;
 
 #if BUILDFLAG(IS_MAC)
-  // On macOS, when in fullscreen mode, window controls (the menu bar, tile bar,
-  // and toolbar) are attached to a separate NSView that slides down from the
-  // top of the screen, independent of, and overlapping the WebContents. Disable
-  // WCO when in fullscreen, because this space is inaccessible to WebContents.
-  // https://crbug.com/915110.
-  if (frame_ && IsFullscreen())
+  // On macOS, when in fullscreen mode, window controls (the menu bar, title
+  // bar, and toolbar) are attached to a separate NSView that slides down from
+  // the top of the screen, independent of, and overlapping the WebContents.
+  // Disable WCO when in fullscreen, because this space is inaccessible to
+  // WebContents. https://crbug.com/915110.
+  if (frame_ && IsFullscreen()) {
     should_show = false;
+  }
 #endif
 
   if (should_show == should_show_window_controls_overlay_toggle_)
     return;
 
+  DCHECK(AppUsesWindowControlsOverlay());
   should_show_window_controls_overlay_toggle_ = should_show;
 
-  if (frame_ && frame_->GetFrameView())
-    frame_->GetFrameView()->SetWindowControlsOverlayToggleVisible(should_show);
+  if (web_app_frame_toolbar()) {
+    web_app_frame_toolbar()->SetWindowControlsOverlayToggleVisible(should_show);
+  }
 }
 
 void BrowserView::UpdateBorderlessModeEnabled() {
@@ -2190,8 +2173,8 @@ void BrowserView::UpdateBorderlessModeEnabled() {
     return;
   borderless_mode_enabled_ = borderless_mode_enabled;
 
-  if (frame_ && frame_->GetFrameView()) {
-    frame_->GetFrameView()->UpdateBorderlessModeEnabled();
+  if (web_app_frame_toolbar()) {
+    web_app_frame_toolbar()->UpdateBorderlessModeEnabled();
   }
 }
 
@@ -2616,6 +2599,20 @@ BrowserView::ShowSendTabToSelfPromoBubble(content::WebContents* web_contents,
 views::Button* BrowserView::GetSharingHubIconButton() {
   return toolbar_button_provider()->GetPageActionIconView(
       PageActionIconType::kSharingHub);
+}
+
+void BrowserView::ToggleMultitaskMenu() const {
+  DCHECK(chromeos::wm::features::IsFloatWindowEnabled());
+  auto* frame_view =
+      static_cast<BrowserNonClientFrameViewChromeOS*>(frame_->GetFrameView());
+  if (!frame_view) {
+    return;
+  }
+  auto* size_button = static_cast<chromeos::FrameSizeButton*>(
+      frame_view->caption_button_container()->size_button());
+  if (size_button && size_button->GetVisible()) {
+    size_button->ToggleMultitaskMenu();
+  }
 }
 #else
 sharing_hub::SharingHubBubbleView* BrowserView::ShowSharingHubBubble(
@@ -3606,37 +3603,9 @@ bool BrowserView::CloseOpenRightAlignedSidePanel(bool exclude_side_search) {
     return false;
   }
 
-  // Ensure all side panels are closed. Close contextual panels first.
-
-  // Hide side search panel if it's right aligned.
-  if (!exclude_side_search && side_search_controller_) {
-    side_search_controller_->CloseSidePanel();
-  }
-
   toolbar()->side_panel_button()->HideSidePanel();
 
   return true;
-}
-
-void BrowserView::MaybeClobberAllSideSearchSidePanels() {
-  if (!base::FeatureList::IsEnabled(
-          features::kClobberAllSideSearchSidePanels)) {
-    return;
-  }
-
-  if (side_search_controller_) {
-    side_search_controller_->ClobberAllInCurrentBrowser();
-  }
-}
-
-void BrowserView::RightAlignedSidePanelWasClosed() {
-  // For the improved side panel clobbering experience we must close all side
-  // panels for the window when the user explicitly closes a participating side
-  // panel.
-  if (base::FeatureList::IsEnabled(features::kSidePanelImprovedClobbering)) {
-    CloseOpenRightAlignedSidePanel();
-    MaybeClobberAllSideSearchSidePanels();
-  }
 }
 
 void BrowserView::RevealTabStripIfNeeded() {
@@ -4530,6 +4499,12 @@ void BrowserView::ShowIncognitoHistoryDisclaimerDialog() {
                  kHistoryDisclaimerBubble);
 }
 
+void BrowserView::UpdateWebAppStatusIconsVisiblity() {
+  if (web_app_frame_toolbar()) {
+    web_app_frame_toolbar()->UpdateStatusIconsVisibility();
+  }
+}
+
 ExclusiveAccessContext* BrowserView::GetExclusiveAccessContext() {
   return this;
 }
@@ -4790,6 +4765,28 @@ void BrowserView::OnImmersiveModeControllerDestroyed() {
 // BrowserView, webapps::AppBannerManager::Observer implementation:
 void BrowserView::OnInstallableWebAppStatusUpdated() {
   UpdatePageActionIcon(PageActionIconType::kPwaInstall);
+}
+
+WebAppFrameToolbarView* BrowserView::web_app_frame_toolbar() {
+  if (frame_ && frame_->GetFrameView()) {
+    return frame_->GetFrameView()->web_app_frame_toolbar(
+        base::PassKey<BrowserView>());
+  }
+  return nullptr;
+}
+
+const WebAppFrameToolbarView* BrowserView::web_app_frame_toolbar() const {
+  if (frame_ && frame_->GetFrameView()) {
+    return frame_->GetFrameView()->web_app_frame_toolbar(
+        base::PassKey<BrowserView>());
+  }
+  return nullptr;
+}
+
+void BrowserView::PaintAsActiveChanged() {
+  if (web_app_frame_toolbar()) {
+    web_app_frame_toolbar()->SetPaintAsActive(frame_->ShouldPaintAsActive());
+  }
 }
 
 BEGIN_METADATA(BrowserView, views::ClientView)

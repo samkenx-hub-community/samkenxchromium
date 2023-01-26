@@ -10,6 +10,7 @@
 #include "base/command_line.h"
 #include "build/build_config.h"
 #include "ui/gl/gl_context.h"
+#include "ui/gl/gl_features.h"
 #include "ui/gl/gl_implementation.h"
 #include "ui/gl/gl_switches.h"
 #include "ui/gl/init/gl_factory.h"
@@ -126,9 +127,22 @@ GLDisplay* GLSurfaceTestSupport::InitializeOneOffWithStubBindings() {
   params.single_process = true;
   ui::OzonePlatform::InitializeForGPU(params);
 #endif
-
   return InitializeOneOffImplementation(
       GLImplementationParts(kGLImplementationStubGL), false);
+}
+
+// static
+GLDisplay* GLSurfaceTestSupport::InitializeOneOffWithNullAngleBindings() {
+#if BUILDFLAG(IS_OZONE)
+  ui::OzonePlatform::InitParams params;
+  params.single_process = true;
+  ui::OzonePlatform::InitializeForGPU(params);
+#endif
+  auto* display = InitializeOneOffImplementation(
+      GLImplementationParts(gl::ANGLEImplementation::kNull), false);
+
+  DCHECK_EQ(gl::GetANGLEImplementation(), gl::ANGLEImplementation::kNull);
+  return display;
 }
 
 // static

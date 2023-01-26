@@ -54,17 +54,14 @@ suite('ReadAnythingAppTest', () => {
     chrome.readAnything.setThemeForTesting('Serif', 18.0, 0, 0, 1, 0);
     assertFontName('serif');
 
-    chrome.readAnything.setThemeForTesting('Avenir', 18.0, 0, 0, 1, 0);
-    assertFontName('avenir');
-
-    chrome.readAnything.setThemeForTesting('Comic Neue', 18.0, 0, 0, 1, 0);
-    assertFontName('"Comic Neue"');
+    chrome.readAnything.setThemeForTesting('Arial', 18.0, 0, 0, 1, 0);
+    assertFontName('Arial');
 
     chrome.readAnything.setThemeForTesting('Comic Sans MS', 18.0, 0, 0, 1, 0);
     assertFontName('"Comic Sans MS"');
 
-    chrome.readAnything.setThemeForTesting('Poppins', 18.0, 0, 0, 1, 0);
-    assertFontName('poppins');
+    chrome.readAnything.setThemeForTesting('Times New Roman', 18.0, 0, 0, 1, 0);
+    assertFontName('"Times New Roman"');
   });
 
   test('updateTheme fontSize', () => {
@@ -836,6 +833,114 @@ suite('ReadAnythingAppTest', () => {
     chrome.readAnything.setContentForTesting(axTree, [2, 4]);
     const expected = '<div><p dir="auto">This should be auto</p>' +
         '<p dir="auto">This should be also be auto</p></div>';
+    assertContainerInnerHTML(expected);
+  });
+
+  test('updateContent textStyle overline', () => {
+    // root htmlTag='#document' id=1
+    // ++paragraph htmlTag='p' id=2
+    // ++++staticText name='This should be overlined.' textStyle='overline' id=3
+    // ++++staticText name='Regular text.' id=4
+    // ++++staticText name='This is overlined and bolded.' textStyle='overline
+    // underline'id=5
+    const axTree = {
+      rootId: 1,
+      nodes: [
+        {
+          id: 1,
+          role: 'rootWebArea',
+          htmlTag: '#document',
+          childIds: [2],
+        },
+        {
+          id: 2,
+          role: 'paragraph',
+          htmlTag: 'p',
+          childIds: [3, 4, 5],
+        },
+        {
+          id: 3,
+          role: 'staticText',
+          textStyle: 'overline',
+          name: 'This should be overlined.',
+        },
+        {
+          id: 4,
+          role: 'staticText',
+          name: 'Regular text.',
+        },
+        {
+          id: 5,
+          role: 'staticText',
+          textStyle: 'overline underline',
+          name: 'This is overlined and bolded.',
+        },
+      ],
+    };
+    chrome.readAnything.setContentForTesting(axTree, [2]);
+    const expected = '<div><p><span style="text-decoration: overline;">This ' +
+        'should be overlined.</span>Regular text.<b style="text-decoration: ' +
+        'overline;">This is overlined and bolded.</b></p></div>';
+    assertContainerInnerHTML(expected);
+  });
+
+  test('updateContent textStyle bold', () => {
+    // root htmlTag='#document' id=1
+    // ++paragraph htmlTag='p' id=2
+    // ++++staticText name='Regular text.' id=3
+    // ++++staticText name='This should be bolded.' textStyle='underline' id=4
+    // ++paragraph htmlTag='p' id=5
+    // ++++staticText name='Bolded text.' textStyle='italic' id=6
+    // ++++staticText name='Bolded text.' textStyle='bold' id=7
+    const axTree = {
+      rootId: 1,
+      nodes: [
+        {
+          id: 1,
+          role: 'rootWebArea',
+          htmlTag: '#document',
+          childIds: [2, 5],
+        },
+        {
+          id: 2,
+          role: 'paragraph',
+          htmlTag: 'p',
+          childIds: [3, 4],
+        },
+        {
+          id: 3,
+          role: 'staticText',
+          name: 'Regular text.',
+        },
+        {
+          id: 4,
+          role: 'staticText',
+          textStyle: 'underline',
+          name: 'This should be bolded.',
+        },
+        {
+          id: 5,
+          role: 'paragraph',
+          htmlTag: 'p',
+          childIds: [6, 7],
+        },
+        {
+          id: 6,
+          role: 'staticText',
+          textStyle: 'italic',
+          name: 'Bolded text.',
+        },
+        {
+          id: 7,
+          role: 'staticText',
+          textStyle: 'bold',
+          name: 'Bolded text.',
+        },
+      ],
+    };
+    chrome.readAnything.setContentForTesting(axTree, [2, 5]);
+    const expected = '<div><p>Regular text.<b>This should be bolded.</b></p>' +
+        '<p><b>Bolded text.</b><b>Bolded text.</b></p></div>';
     assertContainerInnerHTML(expected);
   });
 

@@ -52,13 +52,11 @@ class AutofillDriverIOS : public AutofillDriver {
                                                     web::WebFrame* web_frame);
 
   // AutofillDriver:
-  bool IsIncognito() const override;
   bool IsInActiveFrame() const override;
   bool IsInAnyMainFrame() const override;
   bool IsPrerendering() const override;
   bool CanShowAutofillUi() const override;
   ui::AXTreeID GetAxTreeId() const override;
-  scoped_refptr<network::SharedURLLoaderFactory> GetURLLoaderFactory() override;
   bool RendererIsAvailable() override;
   std::vector<FieldGlobalId> FillOrPreviewForm(
       mojom::RendererFormDataAction action,
@@ -76,6 +74,8 @@ class AutofillDriverIOS : public AutofillDriver {
       const std::u16string& value) override;
   void SendFieldsEligibleForManualFillingToRenderer(
       const std::vector<FieldGlobalId>& fields) override;
+  void SetShouldSuppressKeyboard(bool suppress) override;
+  void TriggerReparseInAllFrames() override;
 
   AutofillClient* client() { return client_; }
 

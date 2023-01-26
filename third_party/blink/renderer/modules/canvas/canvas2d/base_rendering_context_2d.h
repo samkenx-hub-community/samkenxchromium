@@ -5,6 +5,8 @@
 #ifndef THIRD_PARTY_BLINK_RENDERER_MODULES_CANVAS_CANVAS2D_BASE_RENDERING_CONTEXT_2D_H_
 #define THIRD_PARTY_BLINK_RENDERER_MODULES_CANVAS_CANVAS2D_BASE_RENDERING_CONTEXT_2D_H_
 
+#include <memory>
+
 #include "base/functional/bind.h"
 #include "base/notreached.h"
 #include "base/task/single_thread_task_runner.h"
@@ -14,6 +16,7 @@
 #include "third_party/blink/renderer/core/geometry/dom_matrix.h"
 #include "third_party/blink/renderer/core/html/canvas/canvas_rendering_context.h"
 #include "third_party/blink/renderer/core/html/canvas/image_data.h"
+#include "third_party/blink/renderer/modules/canvas/canvas2d/canvas_color_cache.h"
 #include "third_party/blink/renderer/modules/canvas/canvas2d/canvas_gradient.h"
 #include "third_party/blink/renderer/modules/canvas/canvas2d/canvas_image_source_util.h"
 #include "third_party/blink/renderer/modules/canvas/canvas2d/canvas_path.h"
@@ -27,6 +30,7 @@
 
 namespace blink {
 
+class CanvasColorCache;
 class CanvasImageSource;
 class Color;
 class Image;
@@ -261,7 +265,10 @@ class MODULES_EXPORT BaseRenderingContext2D : public CanvasPath {
   virtual Color GetCurrentColor() const = 0;
 
   virtual cc::PaintCanvas* GetOrCreatePaintCanvas() = 0;
-  virtual cc::PaintCanvas* GetPaintCanvas() const = 0;
+  const cc::PaintCanvas* GetPaintCanvas() const {
+    return const_cast<BaseRenderingContext2D*>(this)->GetPaintCanvas();
+  }
+  virtual cc::PaintCanvas* GetPaintCanvas() = 0;
   virtual cc::PaintCanvas* GetPaintCanvasForDraw(
       const SkIRect& dirty_rect,
       CanvasPerformanceMonitor::DrawType) = 0;
@@ -492,8 +499,6 @@ class MODULES_EXPORT BaseRenderingContext2D : public CanvasPath {
   static const char kOptimizeSpeedRendering[];
   static const char kOptimizeLegibilityRendering[];
   static const char kGeometricPrecisionRendering[];
-  // Canvas is device independent
-  static const double kCDeviceScaleFactor;
   virtual void DisableAcceleration() {}
 
   virtual bool IsPaint2D() const { return false; }
@@ -501,6 +506,13 @@ class MODULES_EXPORT BaseRenderingContext2D : public CanvasPath {
   virtual void WillOverwriteCanvas() = 0;
 
   void SetColorScheme(mojom::blink::ColorScheme color_scheme) {
+    if (color_scheme == color_scheme_) {
+      return;
+    }
+
+    if (color_cache_) {
+      color_cache_->Clear();
+    }
     color_scheme_ = color_scheme;
   }
 
@@ -509,6 +521,11 @@ class MODULES_EXPORT BaseRenderingContext2D : public CanvasPath {
       CanvasRenderingContext::kNotLostContext};
 
  private:
+  // Returns the color from `v8_style`. This may return a cached value as well
+  // as updating the cache (if possible).
+  bool ExtractColorFromV8ValueAndUpdateCache(const V8CanvasStyle& v8_style,
+                                             Color& color);
+
   // Pops from the top of the state stack, inverts transform, restores the
   // PaintCanvas, and validates the state stack. Helper for Restore and
   // EndLayer.
@@ -655,14 +672,15 @@ class MODULES_EXPORT BaseRenderingContext2D : public CanvasPath {
       const V8CanvasStyle& v8_style,
       CanvasOps op);
 
-  // Parses the string as a color. If successful, sets `color` appropriately
-  // and returns true.
-  bool ParseColorOrCurrentColor(const String& color_string, Color& color) const;
+  // Parses the string as a color and returns the result of parsing.
+  ColorParseResult ParseColorOrCurrentColor(const String& color_string,
+                                            Color& color) const;
 
   bool origin_tainted_by_content_;
   UsePaintCache path2d_use_paint_cache_;
   int num_readbacks_performed_ = 0;
   unsigned read_count_ = 0;
+  std::unique_ptr<CanvasColorCache> color_cache_;
   mojom::blink::ColorScheme color_scheme_ = mojom::blink::ColorScheme::kLight;
 };
 

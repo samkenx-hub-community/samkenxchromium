@@ -15,9 +15,9 @@
 #import "ios/web/favicon/favicon_java_script_feature.h"
 #import "ios/web/find_in_page/find_in_page_java_script_feature.h"
 #import "ios/web/js_features/context_menu/context_menu_java_script_feature.h"
+#import "ios/web/js_features/error_page/error_page_java_script_feature.h"
 #import "ios/web/js_features/scroll_helper/scroll_helper_java_script_feature.h"
 #import "ios/web/js_features/window_error/window_error_java_script_feature.h"
-#import "ios/web/js_messaging/script_command_java_script_feature.h"
 #import "ios/web/js_messaging/web_frames_manager_java_script_feature.h"
 #import "ios/web/navigation/navigation_java_script_feature.h"
 #import "ios/web/navigation/session_restore_java_script_feature.h"
@@ -127,13 +127,13 @@ std::vector<JavaScriptFeature*> GetBuiltInJavaScriptFeatures(
     BrowserState* browser_state) {
   std::vector<JavaScriptFeature*> features = {
       ContextMenuJavaScriptFeature::FromBrowserState(browser_state),
+      ErrorPageJavaScriptFeature::GetInstance(),
       FindInPageJavaScriptFeature::GetInstance(),
       GetFaviconJavaScriptFeature(),
       GetScrollHelperJavaScriptFeature(),
       GetShareWorkaroundJavaScriptFeature(),
       GetWindowErrorJavaScriptFeature(),
       NavigationJavaScriptFeature::GetInstance(),
-      ScriptCommandJavaScriptFeature::GetInstance(),
       SessionRestoreJavaScriptFeature::FromBrowserState(browser_state),
       TextFragmentsJavaScriptFeature::GetInstance(),
       WebFramesManagerJavaScriptFeature::FromBrowserState(browser_state),

@@ -14,6 +14,7 @@
 #include "base/check_is_test.h"
 #include "base/task/single_thread_task_runner.h"
 #include "base/time/time.h"
+#include "chrome/browser/ash/floating_workspace/floating_workspace_metrics_util.h"
 #include "chrome/browser/ash/floating_workspace/floating_workspace_service_factory.h"
 #include "chrome/browser/ash/floating_workspace/floating_workspace_util.h"
 #include "chrome/browser/ash/login/session/user_session_manager.h"
@@ -30,12 +31,6 @@
 #include "components/sync_sessions/synced_session.h"
 
 namespace ash {
-
-// Max time floating workspace service can wait after user login.
-// After that even a more recent foreign session change is detected
-// restore will not take place.
-constexpr base::TimeDelta kMaxTimeAvaliableForRestoreAfterLogin =
-    base::Seconds(3);
 
 // Static
 FloatingWorkspaceService* FloatingWorkspaceService::GetForProfile(
@@ -59,6 +54,8 @@ FloatingWorkspaceService::~FloatingWorkspaceService() {
 void FloatingWorkspaceService::Init() {
   is_testing_ = false;
   if (floating_workspace_util::IsFloatingWorkspaceV1Enabled()) {
+    floating_workspace_metrics_util::
+        RecordFloatingWorkspaceV1InitializedHistogram();
     InitForV1();
     return;
   }
@@ -106,7 +103,9 @@ void FloatingWorkspaceService::
   if (!should_run_restore_)
     return;
   if (base::TimeTicks::Now() >
-      initialization_timestamp_ + kMaxTimeAvaliableForRestoreAfterLogin) {
+      initialization_timestamp_ +
+          ash::features::kFloatingWorkspaceMaxTimeAvaliableForRestoreAfterLogin
+              .Get()) {
     // No need to restore any remote session 3 seconds (TBD) after login.
     should_run_restore_ = false;
     return;
@@ -126,7 +125,8 @@ void FloatingWorkspaceService::
         base::BindOnce(
             &FloatingWorkspaceService::TryRestoreMostRecentlyUsedSession,
             weak_pointer_factory_.GetWeakPtr()),
-        kMaxTimeAvaliableForRestoreAfterLogin);
+        ash::features::kFloatingWorkspaceMaxTimeAvaliableForRestoreAfterLogin
+            .Get());
     should_run_restore_ = false;
     return;
   }
@@ -160,6 +160,16 @@ void FloatingWorkspaceService::TryRestoreMostRecentlyUsedSession() {
 
 void FloatingWorkspaceService::OnDeskModelDestroying() {
   desk_sync_service_->GetDeskModel()->RemoveObserver(this);
+}
+
+void FloatingWorkspaceService::EntriesAddedOrUpdatedRemotely(
+    const std::vector<const DeskTemplate*>& new_entries) {
+  for (const DeskTemplate* desk_template : new_entries) {
+    if (desk_template &&
+        desk_template->type() == DeskTemplateType::kFloatingWorkspace) {
+      RestoreFloatingWorkspaceTemplate(desk_template);
+    }
+  }
 }
 
 void FloatingWorkspaceService::InitForV1() {
@@ -206,6 +216,10 @@ void FloatingWorkspaceService::RestoreForeignSessionWindows(
                                                 &session_windows)) {
     SessionRestore::RestoreForeignSessionWindows(
         profile_, session_windows.begin(), session_windows.end());
+    floating_workspace_metrics_util::
+        RecordFloatingWorkspaceV1RestoredSessionType(
+            floating_workspace_metrics_util::RestoredBrowserSessionType::
+                kRemote);
   }
 }
 
@@ -213,6 +227,8 @@ void FloatingWorkspaceService::RestoreLocalSessionWindows() {
   // Restore local session based on user settings in
   // chrome://settings/onStartup.
   UserSessionManager::GetInstance()->LaunchBrowser(profile_);
+  floating_workspace_metrics_util::RecordFloatingWorkspaceV1RestoredSessionType(
+      floating_workspace_metrics_util::RestoredBrowserSessionType::kLocal);
 }
 
 sync_sessions::OpenTabsUIDelegate*
@@ -222,50 +238,21 @@ FloatingWorkspaceService::GetOpenTabsUIDelegate() {
 }
 
 void FloatingWorkspaceService::StartCaptureAndUploadActiveDesk() {
-  timer_.Start(FROM_HERE, kPeriodicJobIntervalInSeconds, this,
-               &FloatingWorkspaceService::CaptureAndUploadActiveDesk);
+  timer_.Start(
+      FROM_HERE,
+      ash::features::kFloatingWorkspaceV2PeriodicJobIntervalInSeconds.Get(),
+      this, &FloatingWorkspaceService::CaptureAndUploadActiveDesk);
 }
 
 void FloatingWorkspaceService::StopCaptureAndUploadActiveDesk() {
   timer_.Stop();
 }
 
-// TODO(b/258692868): Add a method in DesksClient to capture but not save
-// current desk for floating workspace; we can attach our own callback with the
-// prev/current comparison method to see if a upload/save is necessary.
 void FloatingWorkspaceService::CaptureAndUploadActiveDesk() {
   DesksClient::Get()->CaptureActiveDeskAndSaveTemplate(
       base::BindOnce(&FloatingWorkspaceService::OnTemplateCaptured,
                      weak_pointer_factory_.GetWeakPtr()),
       DeskTemplateType::kFloatingWorkspace);
-}
-
-void FloatingWorkspaceService::OnTemplateCaptured(
-    absl::optional<DesksClient::DeskActionError> error,
-    std::unique_ptr<DeskTemplate> desk_template) {
-  // Desk capture was not successful, nothing to upload.
-  if (!desk_template)
-    return;
-
-  // If successfully captured desk, remove old entry and record new uuid.
-  if (!FloatingWorkspaceService::IsCurrentDeskSameAsPrevious(
-          desk_template.get())) {
-    // Upload and save the template.
-    desk_sync_service_->GetDeskModel()->AddOrUpdateEntry(
-        std::move(desk_template),
-        base::BindOnce(&FloatingWorkspaceService::OnTemplateUploaded,
-                       weak_pointer_factory_.GetWeakPtr()));
-  }
-}
-
-void FloatingWorkspaceService::EntriesAddedOrUpdatedRemotely(
-    const std::vector<const DeskTemplate*>& new_entries) {
-  for (const DeskTemplate* desk_template : new_entries) {
-    if (desk_template &&
-        desk_template->type() == DeskTemplateType::kFloatingWorkspace) {
-      RestoreFloatingWorkspaceTemplate(desk_template);
-    }
-  }
 }
 
 void FloatingWorkspaceService::RestoreFloatingWorkspaceTemplate(
@@ -275,10 +262,12 @@ void FloatingWorkspaceService::RestoreFloatingWorkspaceTemplate(
     return;
   }
 
-  // Check if template has been downloaded after 3 seconds.
+  // Check if template has been downloaded after 15 seconds (TBD).
   if (base::TimeTicks::Now() >
-      initialization_timestamp_ + kMaxTimeAvaliableForRestoreAfterLogin) {
-    // No need to restore any remote session 3 seconds (TBD) after login.
+      initialization_timestamp_ +
+          ash::features::
+              kFloatingWorkspaceV2MaxTimeAvaliableForRestoreAfterLogin.Get()) {
+    // No need to restore any remote session 15 seconds (TBD) after login.
     should_run_restore_ = false;
     return;
   }
@@ -290,17 +279,6 @@ void FloatingWorkspaceService::RestoreFloatingWorkspaceTemplate(
       desk_template->template_name());
 }
 
-void FloatingWorkspaceService::OnTemplateLaunched(
-    absl::optional<DesksClient::DeskActionError> error,
-    const base::GUID& desk_uuid) {
-  // Disable future floating workspace restore.
-  should_run_restore_ = false;
-}
-
-// TODO(b/256874545): Implement comparison where all apps/ browsers are checked.
-// As of right now, a return of false indicates that both templates
-// are different, thus periodic checks will happen every 30 seconds
-// regardless of if no changes exist.
 bool FloatingWorkspaceService::IsCurrentDeskSameAsPrevious(
     DeskTemplate* current_desk_template) const {
   if (!previously_captured_desk_template_) {
@@ -343,6 +321,32 @@ bool FloatingWorkspaceService::IsCurrentDeskSameAsPrevious(
     }
   }
   return true;
+}
+
+void FloatingWorkspaceService::OnTemplateLaunched(
+    absl::optional<DesksClient::DeskActionError> error,
+    const base::GUID& desk_uuid) {
+  // Disable future floating workspace restore.
+  should_run_restore_ = false;
+}
+
+void FloatingWorkspaceService::OnTemplateCaptured(
+    absl::optional<DesksClient::DeskActionError> error,
+    std::unique_ptr<DeskTemplate> desk_template) {
+  // Desk capture was not successful, nothing to upload.
+  if (!desk_template) {
+    return;
+  }
+
+  // If successfully captured desk, remove old entry and record new uuid.
+  if (!FloatingWorkspaceService::IsCurrentDeskSameAsPrevious(
+          desk_template.get())) {
+    // Upload and save the template.
+    desk_sync_service_->GetDeskModel()->AddOrUpdateEntry(
+        std::move(desk_template),
+        base::BindOnce(&FloatingWorkspaceService::OnTemplateUploaded,
+                       weak_pointer_factory_.GetWeakPtr()));
+  }
 }
 
 void FloatingWorkspaceService::OnTemplateUploaded(

@@ -1658,7 +1658,6 @@ CSSValue* ComputedStyleUtils::ValueForGridTrackList(
     const LayoutObject* layout_object,
     const ComputedStyle& style) {
   const bool is_for_columns = direction == kForColumns;
-  const bool is_layout_ng = RuntimeEnabledFeatures::LayoutNGEnabled();
   const ComputedGridTrackList& computed_grid_track_list =
       is_for_columns ? style.GridTemplateColumns() : style.GridTemplateRows();
   const Vector<GridTrackSize, 1>& legacy_track_sizes =
@@ -1671,9 +1670,7 @@ CSSValue* ComputedStyleUtils::ValueForGridTrackList(
 
   // Handle the 'none' case.
   bool is_track_list_empty =
-      is_layout_ng
-          ? !computed_grid_track_list.TrackList().RepeaterCount()
-          : (legacy_track_sizes.empty() && auto_repeat_track_sizes.empty());
+      !computed_grid_track_list.TrackList().RepeaterCount();
   if (is_layout_grid && is_track_list_empty) {
     // For grids we should consider every listed track, whether implicitly or
     // explicitly created. Empty grids have a sole grid line per axis.
@@ -1756,13 +1753,6 @@ CSSValue* ComputedStyleUtils::ValueForGridTrackList(
   };
 
   if (auto_repeat_track_sizes.empty()) {
-    if (!is_layout_ng) {
-      // If it's legacy grid or there's no repeat(), just add all the line names
-      // and track sizes.
-      PopulateGridTrackList(list, collector, legacy_track_sizes, getTrackSize);
-      return list;
-    }
-
     // TODO(ansollan): Add support for track lists with auto and integer
     // repeaters.
     wtf_size_t track_index = 0;
@@ -2001,15 +1991,13 @@ CSSValue* ComputedStyleUtils::ValueForWillChange(
 
 namespace {
 
-template <class U>
-using ItemFunc = CSSValue*(U);
-
-template <typename T, typename U>
+template <typename T, typename Func, typename... Args>
 CSSValue* CreateAnimationValueList(const Vector<T>& values,
-                                   ItemFunc<U>* item_func) {
+                                   Func item_func,
+                                   Args&&... args) {
   CSSValueList* list = CSSValueList::CreateCommaSeparated();
   for (const T& value : values) {
-    list->Append(*item_func(value));
+    list->Append(*item_func(value, std::forward<Args>(args)...));
   }
   return list;
 }
@@ -2151,42 +2139,43 @@ CSSValue* ComputedStyleUtils::ValueForAnimationPlayStateList(
 }
 
 CSSValue* ComputedStyleUtils::ValueForAnimationRangeStart(
-    const absl::optional<Timing::TimelineOffset>& offset) {
+    const absl::optional<Timing::TimelineOffset>& offset,
+    const ComputedStyle& style) {
   if (!offset.has_value()) {
     return MakeGarbageCollected<CSSIdentifierValue>(CSSValueID::kAuto);
   }
-  // TODO(crbug.com/1407923): Support <length-percentage>.
   CSSValueList* list = CSSValueList::CreateSpaceSeparated();
   list->Append(*MakeGarbageCollected<CSSIdentifierValue>(offset->name));
-  list->Append(*CSSNumericLiteralValue::Create(
-      offset->relative_offset * 100.0,
-      CSSPrimitiveValue::UnitType::kPercentage));
+  list->Append(*ZoomAdjustedPixelValueForLength(offset->offset, style));
   return list;
 }
 
 CSSValue* ComputedStyleUtils::ValueForAnimationRangeStartList(
-    const CSSTimingData* timing_data) {
+    const CSSTimingData* timing_data,
+    const ComputedStyle& style) {
   return CreateAnimationValueList(
       timing_data
           ? timing_data->RangeStartList()
           : Vector<absl::optional<
                 Timing::TimelineOffset>>{CSSTimingData::InitialRangeStart()},
-      &ValueForAnimationRangeStart);
+      &ValueForAnimationRangeStart, style);
 }
 
 CSSValue* ComputedStyleUtils::ValueForAnimationRangeEnd(
-    const absl::optional<Timing::TimelineOffset>& offset) {
-  return ValueForAnimationRangeStart(offset);
+    const absl::optional<Timing::TimelineOffset>& offset,
+    const ComputedStyle& style) {
+  return ValueForAnimationRangeStart(offset, style);
 }
 
 CSSValue* ComputedStyleUtils::ValueForAnimationRangeEndList(
-    const CSSTimingData* timing_data) {
+    const CSSTimingData* timing_data,
+    const ComputedStyle& style) {
   return CreateAnimationValueList(
       timing_data
           ? timing_data->RangeEndList()
           : Vector<absl::optional<
                 Timing::TimelineOffset>>{CSSTimingData::InitialRangeEnd()},
-      &ValueForAnimationRangeEnd);
+      &ValueForAnimationRangeEnd, style);
 }
 
 CSSValue* ComputedStyleUtils::ValueForAnimationTimingFunction(
@@ -2304,7 +2293,7 @@ CSSValue* ComputedStyleUtils::ValueForAnimationTimelineList(
       &ValueForAnimationTimeline);
 }
 
-CSSValue* ComputedStyleUtils::SingleValueForViewTimelineShorthand(
+CSSValue* ComputedStyleUtils::SingleValueForTimelineShorthand(
     const ScopedCSSName* name,
     TimelineAxis axis) {
   CSSValueList* list = CSSValueList::CreateSpaceSeparated();
@@ -3473,37 +3462,6 @@ CSSValueList* ComputedStyleUtils::ValuesForContainerShorthand(
   if (!(IsA<CSSIdentifierValue>(type) &&
         To<CSSIdentifierValue>(*type).GetValueID() == CSSValueID::kNormal)) {
     list->Append(*type);
-  }
-
-  return list;
-}
-
-CSSValueList* ComputedStyleUtils::ValuesForScrollTimelineShorthand(
-    const ComputedStyle& style,
-    const LayoutObject* layout_object,
-    bool allow_visited_style) {
-  CHECK_EQ(scrollTimelineShorthand().length(), 2u);
-  CHECK_EQ(scrollTimelineShorthand().properties()[0],
-           &GetCSSPropertyScrollTimelineName());
-  CHECK_EQ(scrollTimelineShorthand().properties()[1],
-           &GetCSSPropertyScrollTimelineAxis());
-
-  CSSValueList* list = CSSValueList::CreateSpaceSeparated();
-
-  const CSSValue* name =
-      GetCSSPropertyScrollTimelineName().CSSValueFromComputedStyle(
-          style, layout_object, allow_visited_style);
-  const CSSValue* axis =
-      GetCSSPropertyScrollTimelineAxis().CSSValueFromComputedStyle(
-          style, layout_object, allow_visited_style);
-
-  DCHECK(name);
-  DCHECK(axis);
-
-  list->Append(*name);
-
-  if (To<CSSIdentifierValue>(*axis).GetValueID() != CSSValueID::kBlock) {
-    list->Append(*axis);
   }
 
   return list;

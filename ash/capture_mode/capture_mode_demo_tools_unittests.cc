@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "ash/accelerators/keyboard_code_util.h"
+#include "ash/accessibility/magnifier/docked_magnifier_controller.h"
 #include "ash/capture_mode/capture_mode_bar_view.h"
 #include "ash/capture_mode/capture_mode_constants.h"
 #include "ash/capture_mode/capture_mode_controller.h"
@@ -16,7 +17,6 @@
 #include "ash/capture_mode/capture_mode_session.h"
 #include "ash/capture_mode/capture_mode_session_test_api.h"
 #include "ash/capture_mode/capture_mode_settings_test_api.h"
-#include "ash/capture_mode/capture_mode_settings_view.h"
 #include "ash/capture_mode/capture_mode_test_util.h"
 #include "ash/capture_mode/capture_mode_types.h"
 #include "ash/capture_mode/capture_mode_util.h"
@@ -29,6 +29,7 @@
 #include "ash/shell.h"
 #include "ash/style/icon_button.h"
 #include "ash/test/ash_test_base.h"
+#include "ash/wm/splitview/split_view_controller.h"
 #include "base/test/metrics/histogram_tester.h"
 #include "base/test/scoped_feature_list.h"
 #include "base/timer/timer.h"
@@ -94,6 +95,35 @@ class CaptureModeDemoToolsTest : public AshTestBase {
 
   aura::Window* window() const { return window_.get(); }
 
+  gfx::Rect GetConfinedBoundsInScreenCoordinates() {
+    auto* recording_watcher =
+        CaptureModeController::Get()->video_recording_watcher_for_testing();
+    gfx::Rect confined_bounds_in_screen =
+        recording_watcher->GetCaptureSurfaceConfineBounds();
+    wm::ConvertRectToScreen(recording_watcher->window_being_recorded(),
+                            &confined_bounds_in_screen);
+    return confined_bounds_in_screen;
+  }
+
+  // Verifies that the `key_combo_widget` is positioned in the middle
+  // horizontally within the confined bounds and that the distance between the
+  // bottom of the widget and the bottom of the confined bounds is always equal
+  // to `capture_mode::kKeyWidgetDistanceFromBottom`.
+  void VerifyKeyComboWidgetPosition() {
+    CaptureModeDemoToolsTestApi demo_tools_test_api(
+        GetCaptureModeDemoToolsController());
+    auto* key_combo_widget = demo_tools_test_api.GetKeyComboWidget();
+    ASSERT_TRUE(key_combo_widget);
+    auto confined_bounds_in_screen = GetConfinedBoundsInScreenCoordinates();
+    const gfx::Rect key_combo_widget_bounds =
+        key_combo_widget->GetWindowBoundsInScreen();
+    EXPECT_NEAR(confined_bounds_in_screen.CenterPoint().x(),
+                key_combo_widget_bounds.CenterPoint().x(), /*abs_error=*/1);
+    EXPECT_EQ(
+        confined_bounds_in_screen.bottom() - key_combo_widget_bounds.bottom(),
+        capture_mode::kKeyWidgetDistanceFromBottom);
+  }
+
   IconButton* GetSettingsButton() const {
     return GetCaptureModeBarView()->settings_button();
   }
@@ -143,7 +173,7 @@ class CaptureModeDemoToolsTest : public AshTestBase {
 
     if (should_hide_view) {
       waiter.Wait();
-      EXPECT_FALSE(capture_mode_demo_tools_test_api.GetDemoToolsWidget());
+      EXPECT_FALSE(capture_mode_demo_tools_test_api.GetKeyComboWidget());
       EXPECT_FALSE(capture_mode_demo_tools_test_api.GetKeyComboView());
     }
   }
@@ -201,7 +231,7 @@ class CaptureModeDemoToolsTest : public AshTestBase {
   std::unique_ptr<ui::FakeTextInputClient> fake_text_input_client_;
 };
 
-// Tests that the key event is considered to generate the `demo_tools_widget_`
+// Tests that the key event is considered to generate the `key_combo_widget_`
 // or ignored otherwise in a correct way.
 TEST_F(CaptureModeDemoToolsTest, ConsiderKeyEvent) {
   CaptureModeController* controller = StartCaptureSession(
@@ -228,7 +258,7 @@ TEST_F(CaptureModeDemoToolsTest, ConsiderKeyEvent) {
   // corresponding key widget.
   event_generator->PressKey(ui::VKEY_A, ui::EF_NONE);
   CaptureModeDemoToolsTestApi demo_tools_test_api(demo_tools_controller);
-  EXPECT_FALSE(demo_tools_test_api.GetDemoToolsWidget());
+  EXPECT_FALSE(demo_tools_test_api.GetKeyComboWidget());
   event_generator->ReleaseKey(ui::VKEY_A, ui::EF_NONE);
   EXPECT_EQ(demo_tools_test_api.GetCurrentModifiersFlags(), 0);
   EXPECT_EQ(demo_tools_test_api.GetLastNonModifierKey(), ui::VKEY_UNKNOWN);
@@ -237,7 +267,7 @@ TEST_F(CaptureModeDemoToolsTest, ConsiderKeyEvent) {
   // corresponding key widget.
   event_generator->PressKey(ui::VKEY_A, ui::EF_NONE);
   event_generator->PressKey(ui::VKEY_CONTROL, ui::EF_NONE);
-  EXPECT_TRUE(demo_tools_test_api.GetDemoToolsWidget());
+  EXPECT_TRUE(demo_tools_test_api.GetKeyComboWidget());
   EXPECT_EQ(demo_tools_test_api.GetCurrentModifiersFlags(),
             ui::EF_CONTROL_DOWN);
   EXPECT_EQ(demo_tools_test_api.GetLastNonModifierKey(), ui::VKEY_A);
@@ -246,12 +276,12 @@ TEST_F(CaptureModeDemoToolsTest, ConsiderKeyEvent) {
   base::OneShotTimer* timer = demo_tools_test_api.GetRefreshKeyComboTimer();
   EXPECT_TRUE(timer->IsRunning());
   timer->FireNow();
-  EXPECT_FALSE(demo_tools_test_api.GetDemoToolsWidget());
+  EXPECT_FALSE(demo_tools_test_api.GetKeyComboWidget());
   EXPECT_EQ(demo_tools_test_api.GetCurrentModifiersFlags(), 0);
   event_generator->ReleaseKey(ui::VKEY_A, ui::EF_NONE);
 
   event_generator->PressKey(ui::VKEY_TAB, ui::EF_NONE);
-  EXPECT_TRUE(demo_tools_test_api.GetDemoToolsWidget());
+  EXPECT_TRUE(demo_tools_test_api.GetKeyComboWidget());
   EXPECT_EQ(demo_tools_test_api.GetCurrentModifiersFlags(), 0);
   EXPECT_EQ(demo_tools_test_api.GetLastNonModifierKey(), ui::VKEY_TAB);
 }
@@ -284,7 +314,7 @@ TEST_F(CaptureModeDemoToolsTest, EntryPointTest) {
       GetCaptureModeDemoToolsController();
   EXPECT_TRUE(demo_tools_controller);
   CaptureModeDemoToolsTestApi demo_tools_test_api(demo_tools_controller);
-  EXPECT_TRUE(demo_tools_test_api.GetDemoToolsWidget());
+  EXPECT_TRUE(demo_tools_test_api.GetKeyComboWidget());
   controller->EndVideoRecording(EndRecordingReason::kStopRecordingButton);
   WaitForCaptureFileToBeSaved();
   EXPECT_FALSE(controller->IsActive());
@@ -325,7 +355,7 @@ TEST_F(CaptureModeDemoToolsTest, KeyComboWidgetTest) {
   auto* event_generator = GetEventGenerator();
   event_generator->PressKey(ui::VKEY_CONTROL, ui::EF_NONE);
   event_generator->PressKey(ui::VKEY_C, ui::EF_NONE);
-  EXPECT_TRUE(demo_tools_test_api.GetDemoToolsWidget());
+  EXPECT_TRUE(demo_tools_test_api.GetKeyComboWidget());
   EXPECT_TRUE(demo_tools_test_api.GetKeyComboView());
   std::vector<ui::KeyboardCode> expected_modifier_key_vector = {
       ui::VKEY_CONTROL};
@@ -345,7 +375,7 @@ TEST_F(CaptureModeDemoToolsTest, KeyComboWidgetTest) {
   event_generator->ReleaseKey(ui::VKEY_SHIFT, ui::EF_NONE);
   event_generator->ReleaseKey(ui::VKEY_CONTROL, ui::EF_NONE);
   FireTimerAndVerifyWidget(/*should_hide_view=*/true);
-  EXPECT_FALSE(demo_tools_test_api.GetDemoToolsWidget());
+  EXPECT_FALSE(demo_tools_test_api.GetKeyComboWidget());
 }
 
 // Tests the timer behaviors for the key combo view:
@@ -376,7 +406,7 @@ TEST_F(CaptureModeDemoToolsTest, DemoToolsTimerTest) {
   auto* event_generator = GetEventGenerator();
   event_generator->PressKey(ui::VKEY_CONTROL, ui::EF_NONE);
   event_generator->PressKey(ui::VKEY_A, ui::EF_NONE);
-  EXPECT_TRUE(demo_tools_test_api.GetDemoToolsWidget());
+  EXPECT_TRUE(demo_tools_test_api.GetKeyComboWidget());
   KeyComboView* key_combo_view = demo_tools_test_api.GetKeyComboView();
   EXPECT_TRUE(key_combo_view);
   std::vector<ui::KeyboardCode> expected_modifier_key_vector = {
@@ -417,7 +447,7 @@ TEST_F(CaptureModeDemoToolsTest, DemoToolsTimerTest) {
   event_generator->PressKey(ui::VKEY_CONTROL, ui::EF_NONE);
   event_generator->PressKey(ui::VKEY_SHIFT, ui::EF_NONE);
   event_generator->PressKey(ui::VKEY_A, ui::EF_NONE);
-  EXPECT_TRUE(demo_tools_test_api.GetDemoToolsWidget());
+  EXPECT_TRUE(demo_tools_test_api.GetKeyComboWidget());
   expected_modifier_key_vector = {ui::VKEY_CONTROL, ui::VKEY_SHIFT};
   EXPECT_EQ(demo_tools_test_api.GetShownModifiersKeyCodes(),
             expected_modifier_key_vector);
@@ -517,7 +547,7 @@ TEST_F(CaptureModeDemoToolsTest, DoNotShowKeyComboViewerInInputField) {
     // key combo viewer will not display when pressing 'Ctrl' and 'T'.
     event_generator->PressKey(ui::VKEY_CONTROL, ui::EF_NONE);
     event_generator->PressKey(ui::VKEY_T, ui::EF_NONE);
-    EXPECT_FALSE(demo_tools_test_api.GetDemoToolsWidget());
+    EXPECT_FALSE(demo_tools_test_api.GetKeyComboWidget());
     EXPECT_FALSE(demo_tools_test_api.GetKeyComboView());
     event_generator->ReleaseKey(ui::VKEY_T, ui::EF_NONE);
     event_generator->ReleaseKey(ui::VKEY_CONTROL, ui::EF_NONE);
@@ -527,7 +557,7 @@ TEST_F(CaptureModeDemoToolsTest, DoNotShowKeyComboViewerInInputField) {
     DisableTextInputFocus();
     event_generator->PressKey(ui::VKEY_CONTROL, ui::EF_NONE);
     event_generator->PressKey(ui::VKEY_T, ui::EF_NONE);
-    EXPECT_TRUE(demo_tools_test_api.GetDemoToolsWidget());
+    EXPECT_TRUE(demo_tools_test_api.GetKeyComboWidget());
     EXPECT_TRUE(demo_tools_test_api.GetKeyComboView());
     event_generator->ReleaseKey(ui::VKEY_T, ui::EF_NONE);
     event_generator->ReleaseKey(ui::VKEY_CONTROL, ui::EF_NONE);
@@ -538,7 +568,7 @@ TEST_F(CaptureModeDemoToolsTest, DoNotShowKeyComboViewerInInputField) {
     EnableTextInputFocus(input_type);
     event_generator->PressKey(ui::VKEY_CONTROL, ui::EF_NONE);
     event_generator->PressKey(ui::VKEY_T, ui::EF_NONE);
-    EXPECT_FALSE(demo_tools_test_api.GetDemoToolsWidget());
+    EXPECT_FALSE(demo_tools_test_api.GetKeyComboWidget());
     EXPECT_FALSE(demo_tools_test_api.GetKeyComboView());
     event_generator->ReleaseKey(ui::VKEY_T, ui::EF_NONE);
     event_generator->ReleaseKey(ui::VKEY_CONTROL, ui::EF_NONE);
@@ -649,6 +679,89 @@ TEST_F(CaptureModeDemoToolsTest,
   FireTimerAndVerifyWidget(/*should_hide_view=*/true);
 }
 
+// Tests that if the width of the confined bounds is smaller than that of the
+// preferred size of the key combo widget, the key combo widget will be shifted
+// to the left. But the right edge of the key combo widget will always be to the
+// left of the right edge of the capture surface confined bounds.
+TEST_F(CaptureModeDemoToolsTest,
+       ConfinedBoundsSizeSmallerThanPreferredSizeTest) {
+  auto* controller = CaptureModeController::Get();
+  const gfx::Rect capture_region(100, 200, 200, 50);
+  controller->SetUserCaptureRegion(capture_region, /*by_user=*/true);
+  StartCaptureSession(CaptureModeSource::kRegion, CaptureModeType::kVideo);
+  controller->EnableDemoTools(true);
+  StartVideoRecordingImmediately();
+
+  auto* event_generator = GetEventGenerator();
+  event_generator->PressKey(ui::VKEY_CONTROL, ui::EF_NONE);
+  event_generator->PressKey(ui::VKEY_SHIFT, ui::EF_NONE);
+  event_generator->PressKey(ui::VKEY_C, ui::EF_NONE);
+
+  auto* demo_tools_controller = GetCaptureModeDemoToolsController();
+  DCHECK(demo_tools_controller);
+  CaptureModeDemoToolsTestApi demo_tools_test_api(demo_tools_controller);
+  KeyComboView* key_combo_view = demo_tools_test_api.GetKeyComboView();
+  EXPECT_TRUE(key_combo_view);
+  const auto confine_bounds = controller->GetCaptureSurfaceConfineBounds();
+  EXPECT_LT(confine_bounds.width(),
+            key_combo_view->GetBoundsInScreen().width());
+  EXPECT_GT(confine_bounds.right(),
+            key_combo_view->GetBoundsInScreen().right());
+}
+
+// Tests that the key combo widget will be re-posisioned correctly on capture
+// window bounds change.
+TEST_F(CaptureModeDemoToolsTest, CaptureBoundsChangeTest) {
+  UpdateDisplay("800x700");
+  const auto window = CreateTestWindow(gfx::Rect(100, 150, 300, 500));
+  auto* split_view_controller =
+      SplitViewController::Get(Shell::GetPrimaryRootWindow());
+  EXPECT_EQ(split_view_controller->state(),
+            SplitViewController::State::kNoSnap);
+
+  auto* capture_mode_controller =
+      StartCaptureSession(CaptureModeSource::kWindow, CaptureModeType::kVideo);
+  auto* event_generator = GetEventGenerator();
+  event_generator->MoveMouseToCenterOf(window.get());
+
+  capture_mode_controller->EnableDemoTools(true);
+  StartVideoRecordingImmediately();
+  EXPECT_TRUE(capture_mode_controller->is_recording_in_progress());
+  auto* demo_tools_controller = GetCaptureModeDemoToolsController();
+  DCHECK(demo_tools_controller);
+
+  event_generator->PressKey(ui::VKEY_CONTROL, ui::EF_NONE);
+  event_generator->PressKey(ui::VKEY_C, ui::EF_NONE);
+  VerifyKeyComboWidgetPosition();
+
+  // Snap the `window` which will result in window bounds change and the key
+  // combo widget will still be centered horizontally.
+  split_view_controller->SnapWindow(
+      window.get(), SplitViewController::SnapPosition::kPrimary);
+  EXPECT_EQ(split_view_controller->primary_window(), window.get());
+  VerifyKeyComboWidgetPosition();
+}
+
+// Tests that there is no crash when work area changed after starting a video
+// recording with demo tools enabled. Docked mananifier is used as an example to
+// trigger the work area change.
+TEST_F(CaptureModeDemoToolsTest, WorkAreaChangeTest) {
+  CaptureModeController* controller = StartCaptureSession(
+      CaptureModeSource::kFullscreen, CaptureModeType::kVideo);
+  controller->EnableDemoTools(true);
+  StartVideoRecordingImmediately();
+  EXPECT_TRUE(controller->is_recording_in_progress());
+  CaptureModeDemoToolsController* demo_tools_controller =
+      GetCaptureModeDemoToolsController();
+  EXPECT_TRUE(demo_tools_controller);
+  CaptureModeDemoToolsTestApi demo_tools_test_api(demo_tools_controller);
+
+  auto* docked_magnifier_controller =
+      Shell::Get()->docked_magnifier_controller();
+  docked_magnifier_controller->SetEnabled(/*enabled=*/true);
+  controller->EndVideoRecording(EndRecordingReason::kStopRecordingButton);
+}
+
 // Tests that the metrics that record if a recording starts with demo tools
 // feature enabled are recorded correctly in a capture session both in clamshell
 // and tablet mode.
@@ -717,36 +830,6 @@ class CaptureModeDemoToolsTestWithAllSources
     EXPECT_TRUE(controller->is_recording_in_progress());
     return controller;
   }
-
-  gfx::Rect GetDemoToolsConfinedBoundsInScreenCoordinates() {
-    auto* recording_watcher =
-        CaptureModeController::Get()->video_recording_watcher_for_testing();
-    gfx::Rect confined_bounds_in_screen =
-        recording_watcher->GetCaptureSurfaceConfineBounds();
-    wm::ConvertRectToScreen(recording_watcher->window_being_recorded(),
-                            &confined_bounds_in_screen);
-    return confined_bounds_in_screen;
-  }
-
-  // Verifies that the `demo_tools_widget` is positioned in the middle
-  // horizontally within the confined bounds and that the distance between the
-  // bottom of the widget and the bottom of the confined bounds is always equal
-  // to `capture_mode::kKeyWidgetDistanceFromBottom`.
-  void VerifyKeyComboWidgetPosition() {
-    CaptureModeDemoToolsTestApi demo_tools_test_api(
-        GetCaptureModeDemoToolsController());
-    auto* demo_tools_widget = demo_tools_test_api.GetDemoToolsWidget();
-    ASSERT_TRUE(demo_tools_widget);
-    auto confined_bounds_in_screen =
-        GetDemoToolsConfinedBoundsInScreenCoordinates();
-    const gfx::Rect demo_tools_widget_bounds =
-        demo_tools_widget->GetWindowBoundsInScreen();
-    EXPECT_NEAR(confined_bounds_in_screen.CenterPoint().x(),
-                demo_tools_widget_bounds.CenterPoint().x(), /*abs_error=*/1);
-    EXPECT_EQ(
-        confined_bounds_in_screen.bottom() - demo_tools_widget_bounds.bottom(),
-        capture_mode::kKeyWidgetDistanceFromBottom);
-  }
 };
 
 // Tests that the key combo viewer widget should be centered within its confined
@@ -779,8 +862,7 @@ TEST_P(CaptureModeDemoToolsTestWithAllSources, MouseHighlightTest) {
   EXPECT_TRUE(demo_tools_controller);
   CaptureModeDemoToolsTestApi demo_tools_test_api(demo_tools_controller);
 
-  gfx::Rect confined_bounds_in_screen =
-      GetDemoToolsConfinedBoundsInScreenCoordinates();
+  gfx::Rect confined_bounds_in_screen = GetConfinedBoundsInScreenCoordinates();
   auto* event_generator = GetEventGenerator();
   event_generator->MoveMouseTo(confined_bounds_in_screen.CenterPoint());
   event_generator->PressLeftButton();
@@ -810,7 +892,7 @@ TEST_P(CaptureModeDemoToolsTestWithAllSources,
   CaptureModeDemoToolsTestApi demo_tools_test_api =
       CaptureModeDemoToolsTestApi(demo_tools_controller);
 
-  gfx::Rect inner_rect = GetDemoToolsConfinedBoundsInScreenCoordinates();
+  gfx::Rect inner_rect = GetConfinedBoundsInScreenCoordinates();
   inner_rect.Inset(5);
 
   const auto& layers_vector = demo_tools_test_api.GetMouseHighlightLayers();
@@ -864,7 +946,7 @@ TEST_P(CaptureModeDemoToolsTestWithAllSources, TouchHighlightTest) {
   CaptureModeDemoToolsTestApi demo_tools_test_api(demo_tools_controller);
 
   const gfx::Rect confined_bounds_in_screen =
-      GetDemoToolsConfinedBoundsInScreenCoordinates();
+      GetConfinedBoundsInScreenCoordinates();
   auto* event_generator = GetEventGenerator();
 
   const auto& touch_highlight_map =
@@ -902,7 +984,7 @@ TEST_P(CaptureModeDemoToolsTestWithAllSources, MutiTouchHighlightTest) {
       demo_tools_test_api.GetTouchIdToHighlightLayerMap();
   EXPECT_TRUE(touch_highlight_map.empty());
 
-  gfx::Rect inner_rect = GetDemoToolsConfinedBoundsInScreenCoordinates();
+  gfx::Rect inner_rect = GetConfinedBoundsInScreenCoordinates();
   inner_rect.Inset(20);
 
   struct {

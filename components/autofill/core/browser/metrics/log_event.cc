@@ -79,4 +79,24 @@ bool AreCollapsible(const HeuristicPredictionFieldLogEvent& event1,
              event2.rank_in_field_signature_group;
 }
 
+bool AreCollapsible(const AutocompleteAttributeFieldLogEvent& event1,
+                    const AutocompleteAttributeFieldLogEvent& event2) {
+  return event1.html_type == event2.html_type &&
+         event1.html_mode == event2.html_mode &&
+         event1.rank_in_field_signature_group ==
+             event2.rank_in_field_signature_group;
+}
+
+bool AreCollapsible(const ServerPredictionFieldLogEvent& event1,
+                    const ServerPredictionFieldLogEvent& event2) {
+  return event1.server_type1 == event2.server_type1 &&
+         event1.prediction_source1 == event2.prediction_source1 &&
+         event1.server_type2 == event2.server_type2 &&
+         event1.prediction_source2 == event2.prediction_source2 &&
+         event1.server_type_prediction_is_override ==
+             event2.server_type_prediction_is_override &&
+         event1.rank_in_field_signature_group ==
+             event2.rank_in_field_signature_group;
+}
+
 }  // namespace autofill

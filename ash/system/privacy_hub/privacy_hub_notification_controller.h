@@ -44,6 +44,10 @@ class ASH_EXPORT PrivacyHubNotificationController {
   // should be removed from the notification center and popups.
   void RemoveSensorDisabledNotification(Sensor sensor);
 
+  // Called by any sensor system when a notification for `sensor` should be
+  // updated, for example, when an application stops accessing `sensor`.
+  void UpdateSensorDisabledNotification(Sensor sensor);
+
   static constexpr const char kCombinedNotificationId[] =
       "ash.system.privacy_hub.enable_microphone_and_camera";
 
@@ -51,8 +55,9 @@ class ASH_EXPORT PrivacyHubNotificationController {
   // a notification.
   static void OpenPrivacyHubSettingsPage();
 
-  // Open the support page for Privacy Hub.
-  static void OpenSupportUrl();
+  // Open the support page for Privacy Hub and logs the interaction together
+  // with what `sensor` was in use by the user.
+  static void OpenSupportUrl(Sensor sensor);
 
  private:
   // Show all notifications that are currently active and combine them if

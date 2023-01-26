@@ -46,7 +46,7 @@ struct ColorMixTest {
   absl::optional<Color::HueInterpolationMethod> hue_method;
   Color color_left;
   Color color_right;
-  float percentage_left;
+  float percentage_right;
   float alpha_multiplier;
   Color color_expected;
 };
@@ -66,9 +66,8 @@ TEST(BlinkColor, ColorMixSameColorSpace) {
        /*percentage =*/0.5f, /*alpha_multiplier=*/1.0f,
        CreateSRGBColor(0.5f, 0.5f, 0.0f, 1.0f)},
       {Color::ColorInterpolationSpace::kSRGB, absl::nullopt,
-       Color::FromColorSpace(Color::ColorSpace::kRec2020,
-                                0.7919771358198009f, 0.23097568481079767f,
-                                0.07376147493817597f, 1.0f),
+       Color::FromColorSpace(Color::ColorSpace::kRec2020, 0.7919771358198009f,
+                             0.23097568481079767f, 0.07376147493817597f, 1.0f),
        Color::FromColorSpace(Color::ColorSpace::kLab, 87.81853633115202f,
                              -79.27108223854806f, 80.99459785152247f, 1.0f),
        /*percentage =*/0.5f, /*alpha_multiplier=*/1.0f,
@@ -76,19 +75,19 @@ TEST(BlinkColor, ColorMixSameColorSpace) {
       {Color::ColorInterpolationSpace::kSRGB, absl::nullopt,
        CreateSRGBColor(1.0f, 0.0f, 0.0f, 1.0f),
        CreateSRGBColor(0.0f, 1.0f, 0.0f, 1.0f),
-       /*percentage =*/0.75f, /*alpha_multiplier=*/0.5f,
+       /*percentage =*/0.25f, /*alpha_multiplier=*/0.5f,
        CreateSRGBColor(0.75f, 0.25f, 0.0f, 0.5f)},
       // Value obtained form the spec https://www.w3.org/TR/css-color-5/.
       {Color::ColorInterpolationSpace::kSRGB, absl::nullopt,
        CreateSRGBColor(1.0f, 0.0f, 0.0f, 0.7f),
        CreateSRGBColor(0.0f, 1.0f, 0.0f, 0.2f),
-       /*percentage =*/0.25f, /*alpha_multiplier=*/1.0f,
+       /*percentage =*/0.75f, /*alpha_multiplier=*/1.0f,
        CreateSRGBColor(0.53846f, 0.46154f, 0.0f, 0.325f)}};
   for (auto& color_mix_test : color_mix_tests) {
     Color result = Color::FromColorMix(
         color_mix_test.mix_space, color_mix_test.hue_method,
         color_mix_test.color_left, color_mix_test.color_right,
-        color_mix_test.percentage_left, color_mix_test.alpha_multiplier);
+        color_mix_test.percentage_right, color_mix_test.alpha_multiplier);
     EXPECT_EQ(
         result.GetColorSpace(),
         Color::ColorInterpolationSpaceToColorSpace(color_mix_test.mix_space));
@@ -183,24 +182,43 @@ TEST(BlinkColor, ColorInterpolation) {
   // Tests extracted from the CSS Color 4 spec.
   // https://csswg.sesse.net/css-color-4/#interpolation-alpha
   ColorsTest colors_test[] = {
-      {Color::FromColorSpace(Color::ColorSpace::kSRGB, 0.24f, 0.12f, 0.98f,
-                                0.4f),
+      {Color::FromColorSpace(Color::ColorSpace::kSRGB, absl::nullopt, 0.12f,
+                             0.98f, 1.0f),
        Color::FromColorSpace(Color::ColorSpace::kSRGB, 0.62f, 0.26f, 0.64f,
-                                0.6f),
+                             1.0f),
        Color::ColorInterpolationSpace::kSRGB, absl::nullopt, 0.5f,
-       Color::FromColorSpace(Color::ColorSpace::kSRGB, 0.468f, 0.204f,
-                                0.776f, 0.5f)},
+       Color::FromColorSpace(Color::ColorSpace::kSRGB, 0.62f, 0.19f, 0.81f,
+                             1.0f)},
+      {Color::FromColorSpace(Color::ColorSpace::kSRGB, 0.5f, absl::nullopt,
+                             1.0f, 1.0f),
+       Color::FromColorSpace(Color::ColorSpace::kSRGB, 1.0f, 0.5f, 0.0f, 1.0f),
+       Color::ColorInterpolationSpace::kSRGB, absl::nullopt, 0.5f,
+       Color::FromColorSpace(Color::ColorSpace::kSRGB, 0.75f, 0.5f, 0.5f,
+                             1.0f)},
+      {Color::FromColorSpace(Color::ColorSpace::kSRGB, .5f, 0.0f, 0.0f,
+                             absl::nullopt),
+       Color::FromColorSpace(Color::ColorSpace::kSRGB, 1.f, 0.5f, 1.0f, 1.0f),
+       Color::ColorInterpolationSpace::kSRGB, absl::nullopt, 0.5f,
+       Color::FromColorSpace(Color::ColorSpace::kSRGB, 0.75f, 0.25f, 0.5f,
+                             1.0f)},
+      {Color::FromColorSpace(Color::ColorSpace::kSRGB, 0.24f, 0.12f, 0.98f,
+                             0.4f),
+       Color::FromColorSpace(Color::ColorSpace::kSRGB, 0.62f, 0.26f, 0.64f,
+                             0.6f),
+       Color::ColorInterpolationSpace::kSRGB, absl::nullopt, 0.5f,
+       Color::FromColorSpace(Color::ColorSpace::kSRGB, 0.468f, 0.204f, 0.776f,
+                             0.5f)},
       {Color::FromColorSpace(Color::ColorSpace::kSRGB, 0.76f, 0.62f, 0.03f,
-                                0.4f),
-       Color::FromColorSpace(Color::ColorSpace::kDisplayP3, 0.84f, 0.19f,
-                                0.72f, 0.6f),
+                             0.4f),
+       Color::FromColorSpace(Color::ColorSpace::kDisplayP3, 0.84f, 0.19f, 0.72f,
+                             0.6f),
        Color::ColorInterpolationSpace::kLab, absl::nullopt, 0.5f,
        Color::FromColorSpace(Color::ColorSpace::kLab, 58.873f, 51.552f, 7.108f,
                              0.5f)},
       {Color::FromColorSpace(Color::ColorSpace::kSRGB, 0.76f, 0.62f, 0.03f,
-                                0.4f),
-       Color::FromColorSpace(Color::ColorSpace::kDisplayP3, 0.84f, 0.19f,
-                                0.72f, 0.6f),
+                             0.4f),
+       Color::FromColorSpace(Color::ColorSpace::kDisplayP3, 0.84f, 0.19f, 0.72f,
+                             0.6f),
        Color::ColorInterpolationSpace::kLch,
        Color::HueInterpolationMethod::kShorter, 0.5f,
        // There is an issue with the spec where the hue is un-premultiplied even
@@ -212,10 +230,114 @@ TEST(BlinkColor, ColorInterpolation) {
     Color result = Color::InterpolateColors(
         color_test.space, color_test.hue_method, color_test.color1,
         color_test.color2, color_test.percentage);
-    EXPECT_NEAR(result.param0_, color_test.expected.param0_, 0.01f);
-    EXPECT_NEAR(result.param1_, color_test.expected.param1_, 0.01f);
-    EXPECT_NEAR(result.param2_, color_test.expected.param2_, 0.01f);
-    EXPECT_NEAR(result.alpha_, color_test.expected.alpha_, 0.01f);
+    EXPECT_NEAR(result.param0_, color_test.expected.param0_, 0.01f)
+        << "Mixing \n"
+        << color_test.color1.param0_is_none_ << ' ' << color_test.color1.param0_
+        << " " << color_test.color1.param1_is_none_ << ' '
+        << color_test.color1.param1_ << " " << color_test.color1.param2_is_none_
+        << ' ' << color_test.color1.param2_ << " "
+        << color_test.color1.alpha_is_none_ << ' ' << color_test.color1.alpha_
+        << " and \n"
+        << color_test.color2.param0_is_none_ << ' ' << color_test.color2.param0_
+        << " " << color_test.color2.param1_is_none_ << ' '
+        << color_test.color2.param1_ << " " << color_test.color2.param2_is_none_
+        << ' ' << color_test.color2.param2_ << " "
+        << color_test.color2.alpha_is_none_ << ' ' << color_test.color2.alpha_
+        << " produced\n"
+        << result.param0_is_none_ << ' ' << result.param0_ << " "
+        << result.param1_is_none_ << ' ' << result.param1_ << " "
+        << result.param2_is_none_ << ' ' << result.param2_ << " "
+        << result.alpha_is_none_ << ' ' << result.alpha_
+        << " and it was expecting \n"
+        << color_test.expected.param0_is_none_ << ' '
+        << color_test.expected.param0_ << " "
+        << color_test.expected.param1_is_none_ << ' '
+        << color_test.expected.param1_ << " "
+        << color_test.expected.param2_is_none_ << ' '
+        << color_test.expected.param2_ << " "
+        << color_test.expected.alpha_is_none_ << ' '
+        << color_test.expected.alpha_;
+    EXPECT_NEAR(result.param1_, color_test.expected.param1_, 0.01f)
+        << "Mixing \n"
+        << color_test.color1.param0_is_none_ << ' ' << color_test.color1.param0_
+        << " " << color_test.color1.param1_is_none_ << ' '
+        << color_test.color1.param1_ << " " << color_test.color1.param2_is_none_
+        << ' ' << color_test.color1.param2_ << " "
+        << color_test.color1.alpha_is_none_ << ' ' << color_test.color1.alpha_
+        << " \n"
+        << color_test.color2.param0_is_none_ << ' ' << color_test.color2.param0_
+        << " " << color_test.color2.param1_is_none_ << ' '
+        << color_test.color2.param1_ << " " << color_test.color2.param2_is_none_
+        << ' ' << color_test.color2.param2_ << " "
+        << color_test.color2.alpha_is_none_ << ' ' << color_test.color2.alpha_
+        << " produced \n"
+        << result.param0_is_none_ << ' ' << result.param0_ << " "
+        << result.param1_is_none_ << ' ' << result.param1_ << " "
+        << result.param2_is_none_ << ' ' << result.param2_ << " "
+        << result.alpha_is_none_ << ' ' << result.alpha_
+        << " and it was expecting \n"
+        << color_test.expected.param0_is_none_ << ' '
+        << color_test.expected.param0_ << " "
+        << color_test.expected.param1_is_none_ << ' '
+        << color_test.expected.param1_ << " "
+        << color_test.expected.param2_is_none_ << ' '
+        << color_test.expected.param2_ << " "
+        << color_test.expected.alpha_is_none_ << ' '
+        << color_test.expected.alpha_;
+    EXPECT_NEAR(result.param2_, color_test.expected.param2_, 0.01f)
+        << "Mixing \n"
+        << color_test.color1.param0_is_none_ << ' ' << color_test.color1.param0_
+        << " " << color_test.color1.param1_is_none_ << ' '
+        << color_test.color1.param1_ << " " << color_test.color1.param2_is_none_
+        << ' ' << color_test.color1.param2_ << " "
+        << color_test.color1.alpha_is_none_ << ' ' << color_test.color1.alpha_
+        << " \n"
+        << color_test.color2.param0_is_none_ << ' ' << color_test.color2.param0_
+        << " " << color_test.color2.param1_is_none_ << ' '
+        << color_test.color2.param1_ << " " << color_test.color2.param2_is_none_
+        << ' ' << color_test.color2.param2_ << " "
+        << color_test.color2.alpha_is_none_ << ' ' << color_test.color2.alpha_
+        << " produced \n"
+        << result.param0_is_none_ << ' ' << result.param0_ << " "
+        << result.param1_is_none_ << ' ' << result.param1_ << " "
+        << result.param2_is_none_ << ' ' << result.param2_ << " "
+        << result.alpha_is_none_ << ' ' << result.alpha_
+        << " and it was expecting \n"
+        << color_test.expected.param0_is_none_ << ' '
+        << color_test.expected.param0_ << " "
+        << color_test.expected.param1_is_none_ << ' '
+        << color_test.expected.param1_ << " "
+        << color_test.expected.param2_is_none_ << ' '
+        << color_test.expected.param2_ << " "
+        << color_test.expected.alpha_is_none_ << ' '
+        << color_test.expected.alpha_;
+    EXPECT_NEAR(result.alpha_, color_test.expected.alpha_, 0.01f)
+        << "Mixing \n"
+        << color_test.color1.param0_is_none_ << ' ' << color_test.color1.param0_
+        << " " << color_test.color1.param1_is_none_ << ' '
+        << color_test.color1.param1_ << " " << color_test.color1.param2_is_none_
+        << ' ' << color_test.color1.param2_ << " "
+        << color_test.color1.alpha_is_none_ << ' ' << color_test.color1.alpha_
+        << " \n"
+        << color_test.color2.param0_is_none_ << ' ' << color_test.color2.param0_
+        << " " << color_test.color2.param1_is_none_ << ' '
+        << color_test.color2.param1_ << " " << color_test.color2.param2_is_none_
+        << ' ' << color_test.color2.param2_ << " "
+        << color_test.color2.alpha_is_none_ << ' ' << color_test.color2.alpha_
+        << " produced \n"
+        << result.param0_is_none_ << ' ' << result.param0_ << " "
+        << result.param1_is_none_ << ' ' << result.param1_ << " "
+        << result.param2_is_none_ << ' ' << result.param2_ << " "
+        << result.alpha_is_none_ << ' ' << result.alpha_
+        << " and it was expecting \n"
+        << color_test.expected.param0_is_none_ << ' '
+        << color_test.expected.param0_ << " "
+        << color_test.expected.param1_is_none_ << ' '
+        << color_test.expected.param1_ << " "
+        << color_test.expected.param2_is_none_ << ' '
+        << color_test.expected.param2_ << " "
+        << color_test.expected.alpha_is_none_ << ' '
+        << color_test.expected.alpha_;
   }
 }
 

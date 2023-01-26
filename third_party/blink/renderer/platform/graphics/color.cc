@@ -143,7 +143,6 @@ constexpr int AlphaChannel(RGBA32 color) {
 float AngleToUnitCircleDegrees(float angle) {
   return fmod(fmod(angle, 360.f) + 360.f, 360.f);
 }
-
 }  // namespace
 
 // The color parameters will use 16 bytes (for 4 floats). Ensure that the
@@ -249,7 +248,6 @@ float Color::HueInterpolation(float value1,
   DCHECK(value1 >= 0.0f && value1 < 360.0f) << value1;
   DCHECK(value2 >= 0.0f && value2 < 360.0f) << value2;
   DCHECK(percentage >= 0.0f && percentage <= 1.0f);
-  percentage = 1.0f - percentage;
   // Adapt values of angles if needed, depending on the hue_method.
   switch (hue_method) {
     case Color::HueInterpolationMethod::kShorter: {
@@ -283,7 +281,63 @@ float Color::HueInterpolation(float value1,
       DCHECK(-360.0f < value2 - value1 && value2 - value1 <= 0.f);
       break;
   }
-  return AngleToUnitCircleDegrees(blink::Blend(value2, value1, percentage));
+  return AngleToUnitCircleDegrees(blink::Blend(value1, value2, percentage));
+}
+
+namespace {}  // namespace
+
+void Color::CarryForwardAnalogousMissingComponents(
+    Color color,
+    Color::ColorSpace prev_color_space) {
+  auto HasRGBOrXYZComponents = [](Color::ColorSpace color_space) {
+    return color_space == Color::ColorSpace::kSRGB ||
+           color_space == Color::ColorSpace::kSRGBLinear ||
+           color_space == Color::ColorSpace::kDisplayP3 ||
+           color_space == Color::ColorSpace::kA98RGB ||
+           color_space == Color::ColorSpace::kProPhotoRGB ||
+           color_space == Color::ColorSpace::kRec2020 ||
+           color_space == Color::ColorSpace::kXYZD50 ||
+           color_space == Color::ColorSpace::kXYZD65 ||
+           color_space == Color::ColorSpace::kRGBLegacy;
+  };
+
+  auto IsLightnessFirstComponent = [](Color::ColorSpace color_space) {
+    return color_space == Color::ColorSpace::kLab ||
+           color_space == Color::ColorSpace::kOklab ||
+           color_space == Color::ColorSpace::kLch ||
+           color_space == Color::ColorSpace::kOklch;
+  };
+
+  const auto cur_color_space = color.GetColorSpace();
+  if (cur_color_space == prev_color_space) {
+    return;
+  }
+  if (HasRGBOrXYZComponents(cur_color_space) &&
+      HasRGBOrXYZComponents(prev_color_space)) {
+    return;
+  }
+  if (IsLightnessFirstComponent(cur_color_space) &&
+      IsLightnessFirstComponent(prev_color_space)) {
+    color.param1_is_none_ = false;
+    color.param2_is_none_ = false;
+    return;
+  }
+  if (IsLightnessFirstComponent(prev_color_space) &&
+      cur_color_space == ColorSpace::kHSL) {
+    color.param2_is_none_ = color.param0_is_none_;
+    color.param0_is_none_ = false;
+    if (prev_color_space != ColorSpace::kLch &&
+        prev_color_space != ColorSpace::kOklch) {
+      DCHECK(prev_color_space == ColorSpace::kLab ||
+             prev_color_space == ColorSpace::kOklab);
+      color.param1_is_none_ = false;
+    }
+    return;
+  }
+  // There are no analogous missing components.
+  color.param0_is_none_ = false;
+  color.param1_is_none_ = false;
+  color.param2_is_none_ = false;
 }
 
 // static
@@ -325,8 +379,21 @@ Color Color::InterpolateColors(
   // hwb colorspaces.
   DCHECK(percentage >= 0.0f && percentage <= 1.0f);
 
+  const auto color1_prev_color_space = color1.GetColorSpace();
   color1.ConvertToColorInterpolationSpace(interpolation_space);
+  const auto color2_prev_color_space = color2.GetColorSpace();
   color2.ConvertToColorInterpolationSpace(interpolation_space);
+
+  CarryForwardAnalogousMissingComponents(color1, color1_prev_color_space);
+  CarryForwardAnalogousMissingComponents(color2, color2_prev_color_space);
+
+  if (color1.alpha_is_none_ && !color2.alpha_is_none_) {
+    color1.alpha_ = color2.alpha_;
+    color1.alpha_is_none_ = false;
+  } else if (color2.alpha_is_none_ && !color1.alpha_is_none_) {
+    color2.alpha_ = color1.alpha_;
+    color2.alpha_is_none_ = false;
+  }
 
   absl::optional<float> alpha1 = color1.PremultiplyColor();
   absl::optional<float> alpha2 = color2.PremultiplyColor();
@@ -353,15 +420,21 @@ Color Color::InterpolateColors(
                                     color2.param0_, color2.param0_is_none_)
       : (interpolation_space == ColorInterpolationSpace::kHSL ||
          interpolation_space == ColorInterpolationSpace::kHWB)
-          ? HueInterpolation(color2.param0_, color1.param0_, percentage,
-                             hue_method.value())
-          : blink::Blend(color2.param0_, color1.param0_, percentage);
+          // TODO(aaronhk): Historically we store hue in the range [0, 6] for
+          // hsl and hwb. This is so that primary and secondary colors are
+          // integers. With the addition of lch and oklch, this makes less
+          // sense. We should transform these to degrees [0, 360] which is
+          // what HueInterpolation() relies on.
+          ? HueInterpolation(color1.param0_ * 60.f, color2.param0_ * 60.f,
+                             percentage, hue_method.value()) /
+                60.f
+          : blink::Blend(color1.param0_, color2.param0_, percentage);
 
   absl::optional<float> param1 =
       (color1.param1_is_none_ || color2.param1_is_none_)
           ? HandleNoneInterpolation(color1.param1_, color1.param1_is_none_,
                                     color2.param1_, color2.param1_is_none_)
-          : blink::Blend(color2.param1_, color1.param1_, percentage);
+          : blink::Blend(color1.param1_, color2.param1_, percentage);
 
   absl::optional<float> param2 =
       (color1.param2_is_none_ || color2.param2_is_none_)
@@ -369,15 +442,17 @@ Color Color::InterpolateColors(
                                     color2.param2_, color2.param2_is_none_)
       : (interpolation_space == ColorInterpolationSpace::kLch ||
          interpolation_space == ColorInterpolationSpace::kOklch)
-          ? HueInterpolation(color2.param2_, color1.param2_, percentage,
+          ? HueInterpolation(color1.param2_, color2.param2_, percentage,
                              hue_method.value())
-          : blink::Blend(color2.param2_, color1.param2_, percentage);
+          : blink::Blend(color1.param2_, color2.param2_, percentage);
 
+  if (color1.alpha_is_none_ || color2.alpha_is_none_) {
+    DCHECK_EQ(color1.alpha_is_none_, color2.alpha_is_none_);
+  }
   absl::optional<float> alpha =
       (color1.alpha_is_none_ && color2.alpha_is_none_)
-          ? HandleNoneInterpolation(alpha1.value(), color1.alpha_is_none_,
-                                    alpha2.value(), color2.alpha_is_none_)
-          : blink::Blend(alpha2.value(), alpha1.value(), percentage);
+          ? absl::optional<float>(absl::nullopt)
+          : blink::Blend(alpha1.value(), alpha2.value(), percentage);
 
   Color result;
   ColorSpace result_color_space =

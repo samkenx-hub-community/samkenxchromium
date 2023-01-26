@@ -60,7 +60,10 @@ class OmniboxPrerenderBrowserTest : public PlatformBrowserTest {
   OmniboxPrerenderBrowserTest()
       : prerender_helper_(base::BindRepeating(
             &OmniboxPrerenderBrowserTest::GetActiveWebContents,
-            base::Unretained(this))) {}
+            base::Unretained(this))) {
+    scoped_feature_list_.InitAndEnableFeature(
+        features::kOmniboxTriggerForPrerender2);
+  }
 
   void SetUp() override {
     prerender_helper_.SetUp(embedded_test_server());
@@ -74,8 +77,7 @@ class OmniboxPrerenderBrowserTest : public PlatformBrowserTest {
     test_ukm_recorder_ = std::make_unique<ukm::TestAutoSetUkmRecorder>();
     ukm_entry_builder_ =
         std::make_unique<content::test::PreloadingAttemptUkmEntryBuilder>(
-            ToPreloadingPredictor(
-                ChromePreloadingPredictor::kOmniboxDirectURLInput));
+            chrome_preloading_predictor::kOmniboxDirectURLInput);
     test_timer_ = std::make_unique<base::ScopedMockElapsedTimersForTest>();
     ASSERT_TRUE(embedded_test_server()->Start());
   }
@@ -119,6 +121,7 @@ class OmniboxPrerenderBrowserTest : public PlatformBrowserTest {
   std::unique_ptr<ukm::TestAutoSetUkmRecorder> test_ukm_recorder_;
   std::unique_ptr<content::test::PreloadingAttemptUkmEntryBuilder>
       ukm_entry_builder_;
+  base::test::ScopedFeatureList scoped_feature_list_;
   std::unique_ptr<base::ScopedMockElapsedTimersForTest> test_timer_;
 };
 

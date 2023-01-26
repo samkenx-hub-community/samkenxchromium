@@ -9,7 +9,7 @@ import {SACommands} from './commands.js';
 import {Navigator} from './navigator.js';
 import {KeyboardRootNode} from './nodes/keyboard_node.js';
 import {PreferenceManager} from './preference_manager.js';
-import {SAConstants} from './switch_access_constants.js';
+import {ErrorType, Mode} from './switch_access_constants.js';
 
 const AutomationNode = chrome.automation.AutomationNode;
 const EventType = chrome.automation.EventType;
@@ -28,7 +28,7 @@ export class SwitchAccess {
     const desktop = await AsyncUtil.getDesktop();
     const currentFocus = await AsyncUtil.getFocus();
 
-    SwitchAccess.waitForFocus_(desktop, currentFocus);
+    await SwitchAccess.waitForFocus_(desktop, currentFocus);
   }
 
   /**
@@ -36,32 +36,36 @@ export class SwitchAccess {
    * @param {AutomationNode} currentFocus
    * @private
    */
-  static waitForFocus_(desktop, currentFocus) {
-    // Focus is available. Finish init without waiting for further events.
-    // Disallow web view nodes, which indicate a root web area is still
-    // loading and pending focus.
-    if (currentFocus && currentFocus.role !== RoleType.WEB_VIEW) {
-      SwitchAccess.finishInit_(desktop);
-      return;
-    }
-
-    // Wait for the focus to be sent. If |currentFocus| was undefined, this is
-    // guaranteed. Otherwise, also set a timed callback to ensure we do
-    // eventually init.
-    let callbackId = 0;
-    const listener = maybeEvent => {
-      if (maybeEvent && maybeEvent.target.role === RoleType.WEB_VIEW) {
+  static async waitForFocus_(desktop, currentFocus) {
+    return new Promise(resolve => {
+      // Focus is available. Finish init without waiting for further events.
+      // Disallow web view nodes, which indicate a root web area is still
+      // loading and pending focus.
+      if (currentFocus && currentFocus.role !== RoleType.WEB_VIEW) {
+        SwitchAccess.finishInit_(desktop);
+        resolve();
         return;
       }
 
-      desktop.removeEventListener(EventType.FOCUS, listener, false);
-      clearTimeout(callbackId);
+      // Wait for the focus to be sent. If |currentFocus| was undefined, this is
+      // guaranteed. Otherwise, also set a timed callback to ensure we do
+      // eventually init.
+      let callbackId = 0;
+      const listener = maybeEvent => {
+        if (maybeEvent && maybeEvent.target.role === RoleType.WEB_VIEW) {
+          return;
+        }
 
-      SwitchAccess.finishInit_(desktop);
-    };
+        desktop.removeEventListener(EventType.FOCUS, listener, false);
+        clearTimeout(callbackId);
 
-    desktop.addEventListener(EventType.FOCUS, listener, false);
-    callbackId = setTimeout(listener, 5000);
+        SwitchAccess.finishInit_(desktop);
+        resolve();
+      };
+
+      desktop.addEventListener(EventType.FOCUS, listener, false);
+      callbackId = setTimeout(listener, 5000);
+    });
   }
 
   /** @private */
@@ -77,8 +81,8 @@ export class SwitchAccess {
           this.enableImprovedTextInput_ = result;
         });
 
-    /* @private {!SAConstants.Mode} */
-    this.mode_ = SAConstants.Mode.ITEM_SCAN;
+    /* @private {!Mode} */
+    this.mode_ = Mode.ITEM_SCAN;
   }
 
   /**
@@ -90,12 +94,12 @@ export class SwitchAccess {
     return SwitchAccess.instance.enableImprovedTextInput_;
   }
 
-  /** @return {!SAConstants.Mode} */
+  /** @return {!Mode} */
   get mode() {
     return this.mode_;
   }
 
-  /** @param {!SAConstants.Mode} newMode */
+  /** @param {!Mode} newMode */
   set mode(newMode) {
     this.mode_ = newMode;
   }
@@ -141,7 +145,7 @@ export class SwitchAccess {
 
   /**
    * Creates and records the specified error.
-   * @param {SAConstants.ErrorType} errorType
+   * @param {ErrorType} errorType
    * @param {string} errorString
    * @param {boolean} shouldRecover
    * @return {!Error}
@@ -150,7 +154,7 @@ export class SwitchAccess {
     if (shouldRecover) {
       setTimeout(Navigator.byItem.moveToValidNode.bind(Navigator.byItem), 0);
     }
-    const errorTypeCountForUMA = Object.keys(SAConstants.ErrorType).length;
+    const errorTypeCountForUMA = Object.keys(ErrorType).length;
     chrome.metricsPrivate.recordEnumerationValue(
         'Accessibility.CrosSwitchAccess.Error',
         /** @type {number} */ (errorType), errorTypeCountForUMA);

@@ -11,6 +11,7 @@ all
 anchorName
 anchorScroll
 animation
+animationComposition
 animationDelay
 animationDelayEnd
 animationDelayStart
@@ -467,6 +468,7 @@ viewTimeline
 viewTimelineAxis
 viewTimelineInset
 viewTimelineName
+viewTransitionName
 visibility
 webkitAlignContent
 webkitAlignItems

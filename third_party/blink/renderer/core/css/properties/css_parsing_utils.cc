@@ -1404,6 +1404,14 @@ CSSStringValue* ConsumeString(CSSParserTokenRange& range) {
       range.ConsumeIncludingWhitespace().Value().ToString());
 }
 
+StringView ConsumeStringAsStringView(CSSParserTokenRange& range) {
+  if (range.Peek().GetType() != CSSParserTokenType::kStringToken) {
+    return StringView();
+  }
+
+  return range.ConsumeIncludingWhitespace().Value();
+}
+
 StringView ConsumeUrlAsStringView(CSSParserTokenRange& range,
                                   const CSSParserContext& context) {
   StringView url;
@@ -1437,6 +1445,15 @@ StringView ConsumeUrlAsStringView(CSSParserTokenRange& range,
   }
 
   return url;
+}
+
+StringView ConsumeUrlOrStringAsStringView(CSSParserTokenRange& range,
+                                          const CSSParserContext& context) {
+  if (range.Peek().GetType() == CSSParserTokenType::kStringToken) {
+    return ConsumeStringAsStringView(range);
+  }
+
+  return ConsumeUrlAsStringView(range, context);
 }
 
 cssvalue::CSSURIValue* ConsumeUrl(CSSParserTokenRange& range,
@@ -1932,6 +1949,10 @@ static CSSValue* ConsumeColorMixFunction(CSSParserTokenRange& range,
   // If both values are literally zero (and not calc()) reject at parse time
   if (p1 && p2 && p1->IsNumericLiteralValue() && p1->GetDoubleValue() == 0.0f &&
       p2->IsNumericLiteralValue() && p2->GetDoubleValue() == 0.0) {
+    return nullptr;
+  }
+
+  if (!args.AtEnd()) {
     return nullptr;
   }
 
@@ -3307,7 +3328,10 @@ static CSSValue* ConsumeImageSet(CSSParserTokenRange& range,
   auto* image_set = MakeGarbageCollected<CSSImageSetValue>();
   do {
     AtomicString url_value =
-        ConsumeUrlAsStringView(args, context).ToAtomicString();
+        (RuntimeEnabledFeatures::CSSImageSetEnabled()
+             ? ConsumeUrlOrStringAsStringView(args, context)
+             : ConsumeUrlAsStringView(args, context))
+            .ToAtomicString();
     if (url_value.IsNull()) {
       return nullptr;
     }
@@ -4068,7 +4092,6 @@ CSSValue* ConsumeTimelineRangeName(CSSParserTokenRange& range) {
                       CSSValueID::kEnter, CSSValueID::kExit>(range);
 }
 
-// TODO(crbug.com/1407923): Support <length-percentage>.
 CSSValue* ConsumeTimelineRangeNameAndPercent(CSSParserTokenRange& range,
                                              const CSSParserContext& context) {
   CSSValueList* list = CSSValueList::CreateSpaceSeparated();
@@ -4098,7 +4121,19 @@ CSSValue* ConsumeAnimationRange(CSSParserTokenRange& range,
   if (CSSValue* ident = ConsumeIdent<CSSValueID::kAuto>(range)) {
     return ident;
   }
-  return ConsumeTimelineRangeNameAndPercent(range, context);
+  CSSValueList* list = CSSValueList::CreateSpaceSeparated();
+  CSSValue* range_name = ConsumeTimelineRangeName(range);
+  if (!range_name) {
+    return nullptr;
+  }
+  list->Append(*range_name);
+  CSSValue* percentage = ConsumeLengthOrPercent(
+      range, context, CSSPrimitiveValue::ValueRange::kAll);
+  if (!percentage) {
+    return nullptr;
+  }
+  list->Append(*percentage);
+  return list;
 }
 
 bool ConsumeAnimationShorthand(

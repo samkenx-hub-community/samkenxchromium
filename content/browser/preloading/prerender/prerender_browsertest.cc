@@ -49,7 +49,6 @@
 #include "content/browser/renderer_host/navigation_type.h"
 #include "content/browser/renderer_host/render_frame_host_impl.h"
 #include "content/browser/renderer_host/render_process_host_impl.h"
-#include "content/browser/renderer_host/render_view_host_impl.h"
 #include "content/browser/storage_partition_impl.h"
 #include "content/browser/web_contents/web_contents_impl.h"
 #include "content/common/content_navigation_policy.h"
@@ -63,8 +62,6 @@
 #include "content/public/browser/notification_types.h"
 #include "content/public/browser/render_frame_host.h"
 #include "content/public/browser/render_process_host.h"
-#include "content/public/common/content_client.h"
-#include "content/public/common/content_features.h"
 #include "content/public/common/content_switches.h"
 #include "content/public/test/back_forward_cache_util.h"
 #include "content/public/test/background_color_change_waiter.h"
@@ -224,12 +221,10 @@ class PrerenderBrowserTest : public ContentBrowserTest,
     host_resolver()->AddRule("*", "127.0.0.1");
     attempt_ukm_entry_builder_ =
         std::make_unique<test::PreloadingAttemptUkmEntryBuilder>(
-            ToPreloadingPredictor(
-                ContentPreloadingPredictor::kSpeculationRules));
+            content_preloading_predictor::kSpeculationRules);
     prediction_ukm_entry_builder_ =
         std::make_unique<test::PreloadingPredictionUkmEntryBuilder>(
-            ToPreloadingPredictor(
-                ContentPreloadingPredictor::kSpeculationRules));
+            content_preloading_predictor::kSpeculationRules);
     ssl_server_.AddDefaultHandlers(GetTestDataFilePath());
     ssl_server_.SetSSLConfig(
         net::test_server::EmbeddedTestServer::CERT_TEST_NAMES);
@@ -6186,46 +6181,6 @@ IN_PROC_BROWSER_TEST_F(PrerenderBrowserTest,
   EXPECT_TRUE(activation_observer.was_activated());
 }
 
-class ScopedDataSaverTestContentBrowserClient
-    : public TestContentBrowserClient {
- public:
-  ScopedDataSaverTestContentBrowserClient()
-      : old_client(SetBrowserClientForTesting(this)) {}
-  ~ScopedDataSaverTestContentBrowserClient() override {
-    SetBrowserClientForTesting(old_client);
-  }
-
-  // ContentBrowserClient overrides:
-  bool IsDataSaverEnabled(BrowserContext* context) override { return true; }
-
-  void OverrideWebkitPrefs(WebContents* web_contents,
-                           blink::web_pref::WebPreferences* prefs) override {
-    prefs->data_saver_enabled = true;
-  }
-
- private:
-  raw_ptr<ContentBrowserClient> old_client;
-};
-
-// Tests that prerender doesn't run when Data Saver mode is enabled.
-IN_PROC_BROWSER_TEST_F(PrerenderBrowserTest, DataSaver) {
-  const GURL kInitialUrl = GetUrl("/empty.html");
-  const GURL kPrerenderingUrl = GetUrl("/empty.html?prerender");
-
-  // Enable data saver.
-  ScopedDataSaverTestContentBrowserClient scoped_content_browser_client;
-  shell()->web_contents()->OnWebPreferencesChanged();
-
-  test::PrerenderHostRegistryObserver observer(*web_contents_impl());
-  ASSERT_TRUE(NavigateToURL(shell(), kInitialUrl));
-  AddPrerenderAsync(kPrerenderingUrl);
-  observer.WaitForTrigger(kPrerenderingUrl);
-
-  // Prerendering should fail.
-  ExpectFinalStatusForSpeculationRule(PrerenderFinalStatus::kDataSaverEnabled);
-  EXPECT_FALSE(HasHostForUrl(kPrerenderingUrl));
-}
-
 // Tests that loading=lazy doesn't prevent image load in a prerendered page.
 IN_PROC_BROWSER_TEST_F(PrerenderBrowserTest, LazyLoading) {
   const GURL kInitialUrl = GetUrl("/empty.html");
@@ -6670,10 +6625,6 @@ class PrerenderWithBackForwardCacheBrowserTest
       public testing::WithParamInterface<BackForwardCacheType> {
  public:
   PrerenderWithBackForwardCacheBrowserTest() {
-    // Set up the common params for the BFCache.
-    base::FieldTrialParams feature_params;
-    feature_params["TimeToLiveInBackForwardCacheInSeconds"] = "3600";
-
     // Allow the BFCache for all devices regardless of their memory.
     std::vector<base::test::FeatureRef> disabled_features{
         features::kBackForwardCacheMemoryControls};
@@ -6684,7 +6635,10 @@ class PrerenderWithBackForwardCacheBrowserTest
         break;
       case BackForwardCacheType::kEnabled:
         feature_list_.InitWithFeaturesAndParameters(
-            {{features::kBackForwardCache, feature_params}}, disabled_features);
+            {{features::kBackForwardCache, {{}}},
+             {features::kBackForwardCacheTimeToLiveControl,
+              {{"time_to_live_seconds", "3600"}}}},
+            disabled_features);
         break;
     }
   }
@@ -8599,8 +8553,16 @@ IN_PROC_BROWSER_TEST_F(PrerenderBrowserTest,
                   ->has_received_user_gesture_before_nav());
 }
 
+// TODO(https://crbug.com/1408911): This test is flaky on Mac bots.
+#if BUILDFLAG(IS_MAC)
+#define MAYBE_CancelPrerenderWhenIsOverridingUserAgentDiffers \
+  DISABLED_CancelPrerenderWhenIsOverridingUserAgentDiffers
+#else
+#define MAYBE_CancelPrerenderWhenIsOverridingUserAgentDiffers \
+  CancelPrerenderWhenIsOverridingUserAgentDiffers
+#endif
 IN_PROC_BROWSER_TEST_F(PrerenderBrowserTest,
-                       CancelPrerenderWhenIsOverridingUserAgentDiffers) {
+                       MAYBE_CancelPrerenderWhenIsOverridingUserAgentDiffers) {
   const std::string user_agent_override = "foo";
 
   // Navigate to an initial page.

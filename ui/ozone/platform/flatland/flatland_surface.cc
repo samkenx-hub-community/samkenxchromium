@@ -11,6 +11,7 @@
 #include "base/check_op.h"
 #include "base/fuchsia/fuchsia_logging.h"
 #include "base/fuchsia/process_context.h"
+#include "base/functional/bind.h"
 #include "base/trace_event/trace_event.h"
 #include "ui/gfx/geometry/rect_conversions.h"
 #include "ui/gfx/geometry/rect_f.h"
@@ -34,8 +35,9 @@ std::vector<zx::event> GpuFenceHandlesToZxEvents(
     std::vector<gfx::GpuFenceHandle> handles) {
   std::vector<zx::event> events;
   events.reserve(handles.size());
-  for (auto& handle : handles)
+  for (auto& handle : handles) {
     events.push_back(std::move(handle.owned_event));
+  }
   return events;
 }
 
@@ -140,7 +142,9 @@ fuchsia::ui::composition::ContentId CreateImage(
 FlatlandSurface::FlatlandSurface(
     FlatlandSurfaceFactory* flatland_surface_factory,
     gfx::AcceleratedWidget window)
-    : flatland_("Chromium FlatlandSurface"),
+    : flatland_("Chromium FlatlandSurface",
+                base::BindOnce(&FlatlandSurface::OnFlatlandError,
+                               base::Unretained(this))),
       flatland_surface_factory_(flatland_surface_factory),
       window_(window) {
   // Create Flatland Allocator connection.
@@ -205,8 +209,9 @@ void FlatlandSurface::Present(
     const auto overlay_plane_transform =
         overlay.overlay_plane_data.plane_transform;
 
-    if (overlay.gpu_fence)
+    if (overlay.gpu_fence) {
       acquire_fences.push_back(overlay.gpu_fence->GetGpuFenceHandle().Clone());
+    }
     child_transforms_[overlay.overlay_plane_data.z_order] = transform_id;
 
     const auto rounded_bounds =
@@ -222,15 +227,14 @@ void FlatlandSurface::Present(
         image_id,
         GfxSizeToFuchsiaSize(rounded_bounds.size(), overlay_plane_transform));
 
-    gfx::RectF crop_rect = overlay.overlay_plane_data.crop_rect;
-    crop_rect.Scale(rounded_bounds.width(), rounded_bounds.height());
-    const auto rounded_crop_rect = gfx::ToRoundedRect(crop_rect);
-    fuchsia::math::Rect clip_rect = {
-        rounded_crop_rect.x(), rounded_crop_rect.y(), rounded_crop_rect.width(),
-        rounded_crop_rect.height()};
-    flatland_.flatland()->SetClipBoundary(
-        transform_id,
-        std::make_unique<fuchsia::math::Rect>(std::move(clip_rect)));
+    // `crop_rect` is in normalized coordinates, but Flatland expects it to be
+    // given in image coordinates.
+    gfx::RectF sample_region = overlay.overlay_plane_data.crop_rect;
+    const gfx::Size& buffer_size = overlay.pixmap->GetBufferSize();
+    sample_region.Scale(buffer_size.width(), buffer_size.height());
+    flatland_.flatland()->SetImageSampleRegion(
+        image_id, {sample_region.x(), sample_region.y(), sample_region.width(),
+                   sample_region.height()});
     flatland_.flatland()->SetImageBlendingFunction(
         image_id, overlay.overlay_plane_data.enable_blend
                       ? fuchsia::ui::composition::BlendMode::SRC_OVER
@@ -341,8 +345,9 @@ void FlatlandSurface::RemovePixmapResources(FlatlandPixmapId ids) {
   auto iter = pixmap_ids_to_flatland_ids_.find(ids);
   DCHECK(iter != pixmap_ids_to_flatland_ids_.end());
   flatland_.flatland()->ReleaseImage(iter->second.image_id);
-  if (iter->second.transform_id.value)
+  if (iter->second.transform_id.value) {
     flatland_.flatland()->ReleaseTransform(iter->second.transform_id);
+  }
   pixmap_ids_to_flatland_ids_.erase(iter);
 }
 
@@ -428,6 +433,15 @@ void FlatlandSurface::ClearScene() {
     flatland_.flatland()->RemoveChild(root_transform_id_, child.second);
   }
   child_transforms_.clear();
+}
+
+void FlatlandSurface::OnFlatlandError(
+    fuchsia::ui::composition::FlatlandError error) {
+  DCHECK_CALLED_ON_VALID_THREAD(thread_checker_);
+
+  LOG(ERROR) << "Flatland error: " << static_cast<int>(error);
+  base::LogFidlErrorAndExitProcess(FROM_HERE,
+                                   "fuchsia::ui::composition::Flatland");
 }
 
 FlatlandSurface::PresentedFrame::PresentedFrame(

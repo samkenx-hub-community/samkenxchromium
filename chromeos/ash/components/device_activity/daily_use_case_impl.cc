@@ -31,7 +31,8 @@ DailyUseCaseImpl::DailyUseCaseImpl(
 
 DailyUseCaseImpl::~DailyUseCaseImpl() = default;
 
-FresnelImportDataRequest DailyUseCaseImpl::GenerateImportRequestBody() {
+absl::optional<FresnelImportDataRequest>
+DailyUseCaseImpl::GenerateImportRequestBody() {
   // Generate Fresnel PSM import request body.
   FresnelImportDataRequest import_request;
 
@@ -64,4 +65,18 @@ bool DailyUseCaseImpl::IsEnabledCheckMembership() {
   return base::FeatureList::IsEnabled(
       features::kDeviceActiveClientDailyCheckMembership);
 }
+
+private_computing::ActiveStatus DailyUseCaseImpl::GenerateActiveStatus() {
+  private_computing::ActiveStatus status;
+
+  status.set_use_case(
+      private_computing::PrivateComputingUseCase::CROS_FRESNEL_DAILY);
+
+  std::string last_ping_pt_date =
+      FormatPTDateString(GetLastKnownPingTimestamp());
+  status.set_last_ping_date(last_ping_pt_date);
+
+  return status;
+}
+
 }  // namespace ash::device_activity

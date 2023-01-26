@@ -11,12 +11,14 @@
 #include "chrome/browser/ui/layout_constants.h"
 #include "chrome/browser/ui/views/accessibility/non_accessible_image_view.h"
 #include "chrome/browser/ui/views/chrome_layout_provider.h"
-#include "chrome/browser/ui/views/controls/hover_button.h"
+#include "chrome/browser/ui/views/controls/rich_hover_button.h"
 #include "chrome/browser/ui/views/download/bubble/download_bubble_row_list_view.h"
 #include "chrome/grit/generated_resources.h"
 #include "components/vector_icons/vector_icons.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
+#include "ui/base/models/image_model.h"
+#include "ui/color/color_id.h"
 #include "ui/color/color_provider.h"
 #include "ui/gfx/paint_vector_icon.h"
 #include "ui/resources/grit/ui_resources.h"
@@ -75,11 +77,18 @@ void DownloadDialogView::AddHeader() {
 }
 
 void DownloadDialogView::AddFooter() {
-  auto* footer = AddChildView(std::make_unique<HoverButton>(
-      base::BindRepeating(&DownloadDialogView::ShowAllDownloads,
-                          base::Unretained(this)),
-      l10n_util::GetStringUTF16(IDS_DOWNLOAD_BUBBLE_FOOTER_LINK)));
-  footer->SetBorder(views::CreateEmptyBorder(GetLayoutInsets(DOWNLOAD_ROW)));
+  AddChildView(
+      std::make_unique<RichHoverButton>(
+          base::BindRepeating(&DownloadDialogView::ShowAllDownloads,
+                              base::Unretained(this)),
+          /*main_image_icon=*/ui::ImageModel(),
+          l10n_util::GetStringUTF16(IDS_DOWNLOAD_BUBBLE_FOOTER_LINK),
+          /*secondary_text=*/std::u16string(),
+          l10n_util::GetStringUTF16(IDS_DOWNLOAD_BUBBLE_FOOTER_TOOLTIP),
+          /*subtitle_text=*/std::u16string(),
+          ui::ImageModel::FromVectorIcon(vector_icons::kLaunchIcon,
+                                         ui::kColorIconSecondary)))
+      ->SetBorder(views::CreateEmptyBorder(GetLayoutInsets(DOWNLOAD_ROW)));
 }
 
 DownloadDialogView::DownloadDialogView(

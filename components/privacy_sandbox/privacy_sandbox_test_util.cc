@@ -236,6 +236,39 @@ void ApplyTestState(
           base::Value(GetItemValue<int>(value)));
       return;
     }
+    case (StateKey::kM1PromptDisabledByPolicy): {
+      SCOPED_TRACE("State Setup: M1 prompt disabled by policy");
+      testing_pref_service->SetManagedPref(
+          prefs::kPrivacySandboxM1PromptSuppressed,
+          base::Value(GetItemValue<int>(value)));
+      EXPECT_TRUE(testing_pref_service->IsManagedPreference(
+          prefs::kPrivacySandboxM1PromptSuppressed));
+      return;
+    }
+    case (StateKey::kM1TopicsDisabledByPolicy): {
+      SCOPED_TRACE("State Setup: M1 topics disabled by policy");
+      testing_pref_service->SetManagedPref(
+          prefs::kPrivacySandboxM1TopicsEnabled, base::Value(false));
+      EXPECT_TRUE(testing_pref_service->IsManagedPreference(
+          prefs::kPrivacySandboxM1TopicsEnabled));
+      return;
+    }
+    case (StateKey::kM1FledgeDisabledByPolicy): {
+      SCOPED_TRACE("State Setup: M1 fledge disabled by policy");
+      testing_pref_service->SetManagedPref(
+          prefs::kPrivacySandboxM1FledgeEnabled, base::Value(false));
+      EXPECT_TRUE(testing_pref_service->IsManagedPreference(
+          prefs::kPrivacySandboxM1FledgeEnabled));
+      return;
+    }
+    case (StateKey::kM1AdMesaurementDisabledByPolicy): {
+      SCOPED_TRACE("State Setup: M1 ad measurement disabled by policy");
+      testing_pref_service->SetManagedPref(
+          prefs::kPrivacySandboxM1AdMeasurementEnabled, base::Value(false));
+      EXPECT_TRUE(testing_pref_service->IsManagedPreference(
+          prefs::kPrivacySandboxM1AdMeasurementEnabled));
+      return;
+    }
     default:
       NOTREACHED();
   }
@@ -250,9 +283,9 @@ void ProvideInput(const std::pair<InputKey, TestCaseItemValue>& input,
           GetItemValue<bool>(input_value));
       return;
     }
-    case (InputKey::kTopicsConfirmationDecisionConfirmed): {
-      privacy_sandbox_service->TopicsConfirmationDecisionMade(
-          GetItemValue<bool>(input_value));
+    case (InputKey::kPromptAction): {
+      privacy_sandbox_service->PromptActionOccurred(
+          GetItemValue<int>(input_value));
       return;
     }
     default: {
@@ -556,6 +589,48 @@ void CheckOutput(
       EXPECT_EQ(prompt_suppressed_reason,
                 testing_pref_service->GetInteger(
                     prefs::kPrivacySandboxM1PromptSuppressed));
+      return;
+    }
+    case (OutputKey::kM1ConsentDecisionMade): {
+      SCOPED_TRACE("Check Output: M1 consent decision made");
+      bool expected = GetItemValue<bool>(output_value);
+      EXPECT_EQ(expected, testing_pref_service->GetBoolean(
+                              prefs::kPrivacySandboxM1ConsentDecisionMade));
+      return;
+    }
+    case (OutputKey::kM1EEANoticeAcknowledged): {
+      SCOPED_TRACE("Check Output: M1 eea notice acknowledged");
+      bool expected = GetItemValue<bool>(output_value);
+      EXPECT_EQ(expected, testing_pref_service->GetBoolean(
+                              prefs::kPrivacySandboxM1EEANoticeAcknowledged));
+      return;
+    }
+    case (OutputKey::kM1RowNoticeAcknowledged): {
+      SCOPED_TRACE("Check Output: M1 row notice acknowledged");
+      bool expected = GetItemValue<bool>(output_value);
+      EXPECT_EQ(expected, testing_pref_service->GetBoolean(
+                              prefs::kPrivacySandboxM1RowNoticeAcknowledged));
+      return;
+    }
+    case (OutputKey::kM1TopicsEnabled): {
+      SCOPED_TRACE("Check Output: M1 topics enabled");
+      bool expected = GetItemValue<bool>(output_value);
+      EXPECT_EQ(expected, testing_pref_service->GetBoolean(
+                              prefs::kPrivacySandboxM1TopicsEnabled));
+      return;
+    }
+    case (OutputKey::kM1FledgeEnabled): {
+      SCOPED_TRACE("Check Output: M1 fledge enabled");
+      bool expected = GetItemValue<bool>(output_value);
+      EXPECT_EQ(expected, testing_pref_service->GetBoolean(
+                              prefs::kPrivacySandboxM1FledgeEnabled));
+      return;
+    }
+    case (OutputKey::kM1AdMeasurementEnabled): {
+      SCOPED_TRACE("Check Output: M1 ad measurement enabled");
+      bool expected = GetItemValue<bool>(output_value);
+      EXPECT_EQ(expected, testing_pref_service->GetBoolean(
+                              prefs::kPrivacySandboxM1AdMeasurementEnabled));
       return;
     }
   }

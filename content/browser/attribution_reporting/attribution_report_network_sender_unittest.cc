@@ -64,6 +64,9 @@ const char kDebugAggregatableReportUrl[] =
     "https://report.test/.well-known/attribution-reporting/debug/"
     "report-aggregate-attribution";
 
+const char kVerboseDebugReportMetricName[] =
+    "Conversions.VerboseDebugReport.HttpResponseOrNetErrorCode";
+
 AttributionReport DefaultEventLevelReport() {
   return ReportBuilder(
              AttributionInfoBuilder(SourceBuilder(base::Time()).BuildStored())
@@ -655,9 +658,42 @@ TEST_F(AttributionReportNetworkSenderTest,
   const network::ResourceRequest* pending_request;
   EXPECT_TRUE(test_url_loader_factory_.IsPending(kAggregatableReportUrl,
                                                  &pending_request));
+  EXPECT_FALSE(pending_request->headers.HasHeader(
+      "Sec-Attribution-Reporting-Private-State-Token"));
   EXPECT_EQ(kExpectedReportBody, network::GetUploadData(*pending_request));
   EXPECT_TRUE(test_url_loader_factory_.SimulateResponseForPendingRequest(
       kAggregatableReportUrl, ""));
+}
+
+TEST_F(AttributionReportNetworkSenderTest,
+       ReportAttestationHeaderSetCorrectly) {
+  const struct {
+    bool is_debug_report;
+    const char* url;
+  } kTestCases[] = {
+      {true, kDebugAggregatableReportUrl},
+      {false, kAggregatableReportUrl},
+  };
+
+  for (const auto& test_case : kTestCases) {
+    AttributionReport report =
+        ReportBuilder(
+            AttributionInfoBuilder(SourceBuilder().BuildStored()).Build())
+            .SetAttestationToken("attestation-token")
+            .BuildAggregatableAttribution();
+
+    network_sender_->SendReport(report, test_case.is_debug_report,
+                                base::DoNothing());
+
+    const network::ResourceRequest* pending_request;
+    EXPECT_TRUE(
+        test_url_loader_factory_.IsPending(test_case.url, &pending_request));
+
+    std::string added_header;
+    pending_request->headers.GetHeader(
+        "Sec-Attribution-Reporting-Private-State-Token", &added_header);
+    EXPECT_EQ(added_header, "attestation-token");
+  }
 }
 
 TEST_F(AttributionReportNetworkSenderTest,
@@ -968,6 +1004,8 @@ TEST_F(AttributionReportNetworkSenderTest,
 
 TEST_F(AttributionReportNetworkSenderTest,
        ErrorReportSent_ReportBodySetCorrectly) {
+  base::HistogramTester histograms;
+
   static constexpr char kExpectedReportBody[] =
       R"([{)"
       R"("body":{)"
@@ -1002,10 +1040,15 @@ TEST_F(AttributionReportNetworkSenderTest,
   EXPECT_EQ(kExpectedReportBody, network::GetUploadData(*pending_request));
   EXPECT_TRUE(test_url_loader_factory_.SimulateResponseForPendingRequest(
       kErrorReportUrl, ""));
+
+  histograms.ExpectUniqueSample(kVerboseDebugReportMetricName,
+                                net::HttpStatusCode::HTTP_OK, 1);
 }
 
 TEST_F(AttributionReportNetworkSenderTest,
        ErrorReportSent_CallbackInvokedWithNetworkError) {
+  base::HistogramTester histograms;
+
   static constexpr char kErrorReportUrl[] =
       "https://report.test/.well-known/attribution-reporting/debug/verbose";
 
@@ -1032,6 +1075,9 @@ TEST_F(AttributionReportNetworkSenderTest,
       GURL(kErrorReportUrl),
       network::URLLoaderCompletionStatus(net::ERR_CONNECTION_ABORTED),
       network::mojom::URLResponseHead::New(), "");
+
+  histograms.ExpectUniqueSample(kVerboseDebugReportMetricName,
+                                net::ERR_CONNECTION_ABORTED, 1);
 }
 
 }  // namespace content

@@ -2170,6 +2170,21 @@ be describing additional metrics about the same event.
       are from |autofill::ServerFieldType|.
     </summary>
   </metric>
+  <metric name="HtmlFieldMode" enum="AutocompleteHtmlFieldMode">
+    <summary>
+      The mode according to the autocomplete attribute of a field. Only set if a
+      field has a valid autocomplete attribute. Currently this is used to
+      specify if the field is part of the billing or shipping address. See
+      autofill::mojom::HtmlFieldMode.
+    </summary>
+  </metric>
+  <metric name="HtmlFieldType" enum="AutocompleteHtmlFieldType">
+    <summary>
+      The field type specified in the autocomplete attribute of the field. Only
+      set if a field has a valid autocomplete attribute. See
+      autofill::mojom::HtmlFieldType.
+    </summary>
+  </metric>
   <metric name="IsFocusable" enum="Boolean">
     <summary>
       Whether the field is focusable to the user. This is an approximation of
@@ -2181,6 +2196,40 @@ be describing additional metrics about the same event.
       If multiple fields have the same signature, this indicates the position
       within this set of fields. This allows us to understand problems related
       to duplicated field signatures.
+    </summary>
+  </metric>
+  <metric name="ServerPredictionSource1" enum="AutofillServerPredictionSource">
+    <summary>
+      The major source of predictions from the Autofill crowdsourced server, see
+      AutofillQueryResponse::FormSuggestion::FieldSuggestion::FieldPrediction::Source.
+    </summary>
+  </metric>
+  <metric name="ServerPredictionSource2" enum="AutofillServerPredictionSource">
+    <summary>
+      The additional source of predictions from the Autofill crowdsourced server
+      if there is an additional prediction, see
+      AutofillQueryResponse::FormSuggestion::FieldSuggestion::FieldPrediction::Source.
+    </summary>
+  </metric>
+  <metric name="ServerType1" enum="AutofillServerFieldType">
+    <summary>
+      The type of the field predicted from the Autofill crowdsourced server from
+      majority voting (and some more complex stuff). The types are from
+      |autofill::ServerFieldType|.
+    </summary>
+  </metric>
+  <metric name="ServerType2" enum="AutofillServerFieldType">
+    <summary>
+      The additional type of the field predicted from the Autofill crowdsourced
+      server if there is an additional prediction. The types are from
+      |autofill::ServerFieldType|.
+    </summary>
+  </metric>
+  <metric name="ServerTypeIsOverride" enum="Boolean">
+    <summary>
+      This is an annotation for server predicted field types which indicates
+      that a manual override defines the server type. This allows us to assess
+      the impact of server overrides and detect possible problems with it.
     </summary>
   </metric>
   <metric name="SuggestionWasAccepted" enum="Boolean">
@@ -5735,6 +5784,112 @@ be describing additional metrics about the same event.
       The count of the largest burst of click inputs for a page load. Only
       recorded if it meets a minimum threshold to be considered a burst.
     </summary>
+  </metric>
+</event>
+
+<event name="ClientHints.AcceptCHFrameUsage">
+  <owner>arichiv@chromium.org</owner>
+  <owner>victortan@chromium.org</owner>
+  <summary>
+    Record when a Client Hint is requested in an ACCEPT_CH TLS Frame.
+  </summary>
+  <metric name="Type" enum="WebClientHintsType">
+    <summary>
+      Records an enum representing the specific Client Hint type that was
+      requested.
+    </summary>
+    <aggregation>
+      <history>
+        <statistics>
+          <enumeration/>
+        </statistics>
+      </history>
+    </aggregation>
+  </metric>
+</event>
+
+<event name="ClientHints.AcceptCHHeaderUsage">
+  <owner>arichiv@chromium.org</owner>
+  <owner>victortan@chromium.org</owner>
+  <summary>
+    Record when a Client Hint is requested in a Accept-CH HTTP Response Header.
+  </summary>
+  <metric name="Type" enum="WebClientHintsType">
+    <summary>
+      Records an enum representing the specific Client Hint type that was
+      requested.
+    </summary>
+    <aggregation>
+      <history>
+        <statistics>
+          <enumeration/>
+        </statistics>
+      </history>
+    </aggregation>
+  </metric>
+</event>
+
+<event name="ClientHints.AcceptCHMetaUsage">
+  <owner>arichiv@chromium.org</owner>
+  <owner>victortan@chromium.org</owner>
+  <summary>
+    Record when a Client Hint is requested in a Accept-CH HTML Meta Tag.
+  </summary>
+  <metric name="Type" enum="WebClientHintsType">
+    <summary>
+      Records an enum representing the specific Client Hint type that was
+      requested.
+    </summary>
+    <aggregation>
+      <history>
+        <statistics>
+          <enumeration/>
+        </statistics>
+      </history>
+    </aggregation>
+  </metric>
+</event>
+
+<event name="ClientHints.CriticalCHHeaderUsage">
+  <owner>arichiv@chromium.org</owner>
+  <owner>victortan@chromium.org</owner>
+  <summary>
+    Record when a Client Hint is requested in a Critical-CH HTTP Response
+    Header.
+  </summary>
+  <metric name="Type" enum="WebClientHintsType">
+    <summary>
+      Records an enum representing the specific Client Hint type that was
+      requested.
+    </summary>
+    <aggregation>
+      <history>
+        <statistics>
+          <enumeration/>
+        </statistics>
+      </history>
+    </aggregation>
+  </metric>
+</event>
+
+<event name="ClientHints.DelegateCHMetaUsage">
+  <owner>arichiv@chromium.org</owner>
+  <owner>victortan@chromium.org</owner>
+  <summary>
+    Record when a Client Hint is requested in a Delegate-CH HTML Meta Tag.
+  </summary>
+  <metric name="Type" enum="WebClientHintsType">
+    <summary>
+      Records an enum representing the specific Client Hint type that was
+      requested.
+    </summary>
+    <aggregation>
+      <history>
+        <statistics>
+          <enumeration/>
+        </statistics>
+      </history>
+    </aggregation>
   </metric>
 </event>
 

@@ -481,6 +481,18 @@ chromium-metrics-reviews@google.com.
   </token>
 </histogram>
 
+<histogram name="Sync.EntitySizeOnCommit.{SyncModelType}" units="bytes"
+    expires_after="2023-11-30">
+  <owner>ankushkush@google.com</owner>
+  <owner>treib@chromium.org</owner>
+  <component>Services&gt;Sync</component>
+  <summary>
+    Size of individual sync entities in bytes. Recorded right before an entity
+    is committed to the server.
+  </summary>
+  <token key="SyncModelType" variants="SyncModelType"/>
+</histogram>
+
 <histogram name="Sync.FCMInstanceIdTokenRetrievalStatus"
     enum="InstanceIDResult" expires_after="2023-06-18">
   <owner>rushans@google.com</owner>
@@ -747,7 +759,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Sync.ModelTypeConfigurationTime.{StorageType}{SyncModelType}"
-    units="ms" expires_after="2023-03-06">
+    units="ms" expires_after="2024-03-06">
   <owner>rushans@google.com</owner>
   <owner>mastiz@chromium.org</owner>
   <component>Services&gt;Sync</component>
@@ -957,6 +969,8 @@ chromium-metrics-reviews@google.com.
     <variant name="DecryptionPendingForTooLong"
         summary="Decryption keys were missing for so long that the update was
                  ignored."/>
+    <variant name="DroppedByBridge"
+        summary="The bridge classified the data as bad/invalid."/>
     <variant name="FailedToDecrypt"
         summary="Decryption is not successful (maybe the data is corrupt)."/>
     <variant name="InconsistentClientTag"
@@ -1506,7 +1520,7 @@ chromium-metrics-reviews@google.com.
 
 <histogram name="Sync.TrustedVaultHintDegradedRecoverabilityChangedReason2"
     enum="TrustedVaultHintDegradedRecoverabilityChangedReason"
-    expires_after="2023-04-09">
+    expires_after="2023-07-23">
   <owner>mmrashad@google.com</owner>
   <owner>mmoskvitin@google.com</owner>
   <component>Services&gt;Sync</component>

@@ -160,7 +160,7 @@
     "check_for_flakiness": true
   },
   "$build/goma": {
-    "jobs": 300,
+    "jobs": 150,
     "rpc_extra_params": "?prod",
     "server_host": "goma.chromium.org"
   },

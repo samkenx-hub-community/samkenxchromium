@@ -187,7 +187,7 @@ inline constexpr const char kGetEventLevelReportSql[] =
   ATTRIBUTION_SOURCE_COLUMNS_SQL("I.")                                 \
   ",A.aggregation_id,A.trigger_time,A.report_time,A.debug_key,"        \
   "A.external_report_id,A.failed_send_attempts,A.initial_report_time," \
-  "A.aggregation_coordinator "                                         \
+  "A.aggregation_coordinator,A.attestation_token "                     \
   "FROM aggregatable_report_metadata A "                               \
   "JOIN sources I ON A.source_id=I.source_id "
 
@@ -219,6 +219,44 @@ inline constexpr const char kUpdateFailedAggregatableReportSql[] =
 #undef ATTRIBUTION_UPDATE_FAILED_REPORT_SQL
 
 // clang-format on
+
+inline constexpr const char kRateLimitAttributionAllowedSql[] =
+    "SELECT COUNT(*)FROM rate_limits "
+    "WHERE scope=1 "
+    "AND destination_site=? "
+    "AND source_site=? "
+    "AND reporting_origin=? "
+    "AND time>?";
+
+inline constexpr const char kRateLimitSourceAllowedSql[] =
+    "SELECT destination_site FROM rate_limits "
+    "WHERE scope=0 "
+    "AND source_site=? "
+    "AND reporting_origin=? "
+    "AND expiry_time>?";
+
+inline constexpr const char kRateLimitSelectReportingOriginsSql[] =
+    "SELECT reporting_origin FROM rate_limits "
+    "WHERE scope=? "
+    "AND source_site=? "
+    "AND destination_site=? "
+    "AND time>?";
+
+inline constexpr const char kDeleteRateLimitRangeSql[] =
+    "DELETE FROM rate_limits "
+    "WHERE time BETWEEN ? AND ?";
+
+inline constexpr const char kSelectRateLimitsForDeletionSql[] =
+    "SELECT id,source_origin,destination_origin,reporting_origin "
+    "FROM rate_limits "
+    "WHERE time BETWEEN ? AND ?";
+
+inline constexpr const char kDeleteExpiredRateLimitsSql[] =
+    "DELETE FROM rate_limits "
+    "WHERE time<=? AND(scope=1 OR expiry_time<=?)";
+
+inline constexpr const char kDeleteRateLimitsBySourceIdSql[] =
+    "DELETE FROM rate_limits WHERE source_id=?";
 
 }  // namespace content::attribution_queries
 

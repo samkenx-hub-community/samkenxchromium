@@ -152,8 +152,6 @@ source_set("common") {
     "pseudonymization_salt.h",
     "set_process_title.cc",
     "set_process_title.h",
-    "shared_file_util.cc",
-    "shared_file_util.h",
     "skia_utils.cc",
     "skia_utils.h",
     "thread_pool_util.cc",
@@ -274,6 +272,13 @@ source_set("common") {
     "//content/public/common:interfaces",
   ]
 
+  if (is_posix) {
+    sources += [
+      "shared_file_util.cc",
+      "shared_file_util.h",
+    ]
+  }
+
   if (is_android) {
     sources += [
       "android/cpu_time_metrics.cc",
@@ -304,7 +309,6 @@ source_set("common") {
 
   if (is_mac) {
     sources += [
-      "cursors/webcursor_mac.mm",
       "font_list_mac.mm",
       "mac/attributed_string_type_converters.h",
       "mac/attributed_string_type_converters.mm",
@@ -358,7 +362,7 @@ source_set("common") {
     ]
   }
 
-  if (use_zygote_handle) {
+  if (use_zygote) {
     sources += [
       "zygote/zygote_handle_impl_linux.h",
       "zygote/zygote_handle_linux.cc",

@@ -16,6 +16,7 @@
 #include "third_party/blink/renderer/platform/wtf/conditional_destructor.h"
 #include "third_party/blink/renderer/platform/wtf/hash_table.h"
 #include "third_party/blink/renderer/platform/wtf/hash_traits.h"
+#include "third_party/blink/renderer/platform/wtf/key_value_pair.h"
 #include "third_party/blink/renderer/platform/wtf/sanitizers.h"
 #include "v8/include/cppgc/custom-space.h"
 #include "v8/include/cppgc/explicit-management.h"
@@ -236,7 +237,7 @@ struct TraceHashTableBackingInCollectionTrait {
         sizeof(Value);
     for (size_t i = 0; i < length; ++i) {
       internal::ConcurrentBucket<Value> concurrent_bucket(
-          array[i], Extractor::ExtractSafe);
+          array[i], Extractor::ExtractKeyToMemory);
       if (!WTF::IsHashTraitsEmptyOrDeletedValue<typename Table::KeyTraitsType>(
               *concurrent_bucket.key())) {
         blink::TraceCollectionIfEnabled<

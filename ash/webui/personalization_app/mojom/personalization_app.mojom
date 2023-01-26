@@ -7,6 +7,7 @@ module ash.personalization_app.mojom;
 import "mojo/public/mojom/base/big_buffer.mojom";
 import "mojo/public/mojom/base/file_path.mojom";
 import "mojo/public/mojom/base/string16.mojom";
+import "mojo/public/mojom/base/time.mojom";
 import "skia/public/mojom/skcolor.mojom";
 import "url/mojom/url.mojom";
 
@@ -96,6 +97,12 @@ struct GooglePhotosAlbum {
 
     // URL to the bytes of the album's displayed cover photo.
     url.mojom.Url preview;
+
+    // Latest modification timestamp used to sort albums.
+    mojo_base.mojom.Time timestamp;
+
+    // Whether the album is a shared album.
+    bool is_shared;
 };
 
 // Represents the server-provided response to a Google Photos albums request.

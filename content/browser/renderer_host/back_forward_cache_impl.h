@@ -64,18 +64,11 @@ BASE_FEATURE(kCacheControlNoStoreEnterBackForwardCache,
              "CacheControlNoStoreEnterBackForwardCache",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-// Enables controlling the time to live for pages in the backforward cache.
-// The time to live is defined by the param 'time_to_live_seconds'; if this
-// param is not specified then this feature is ignored and the default is used.
-BASE_FEATURE(kBackForwardCacheTimeToLiveControl,
-             "BackForwardCacheTimeToLiveControl",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-
-// Allows overriding the sizes of back/forward cache.
-// Sizes set via this feature's parameters take precedence over others.
-BASE_FEATURE(kBackForwardCacheSize,
-             "BackForwardCacheSize",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+CONTENT_EXPORT BASE_DECLARE_FEATURE(kBackForwardCacheSize);
+CONTENT_EXPORT extern const base::FeatureParam<int>
+    kBackForwardCacheSizeCacheSize;
+CONTENT_EXPORT extern const base::FeatureParam<int>
+    kBackForwardCacheSizeForegroundCacheSize;
 
 // Combines a flattened list and a tree of the reasons why each document cannot
 // enter the back/forward cache (might be empty if it can). The tree saves the
@@ -121,12 +114,11 @@ struct CONTENT_EXPORT BackForwardCacheCanStoreDocumentResultWithTree {
 //       evicts the outermost frame after
 //       `kDefaultTimeToLiveInBackForwardCacheInSeconds` seconds.
 // 2. In `performance_manager::policies::BFCachePolicy`:
-//    A. (To Launch) [Desktop-only] On moderate memory pressure, the number of
-//       entries in a visible tab's cache is pruned to
+//    A. [Desktop-only] On moderate memory pressure, the number of entries in a
+//       visible tab's cache is pruned to
 //       `ForegroundCacheSizeOnModeratePressure()`. The number in a non-visible
 //       tab is pruned to `BackgroundCacheSizeOnModeratePressure()`.
-//    B. (To Launch) [Desktop-only] On critical memory pressure, the cache is
-//       cleared.
+//    B. [Desktop-only] On critical memory pressure, the cache is cleared.
 class CONTENT_EXPORT BackForwardCacheImpl
     : public BackForwardCache,
       public RenderProcessHostInternalObserver,

@@ -916,9 +916,20 @@ ClientTagBasedModelTypeProcessor::OnFullUpdateReceived(
       continue;
     }
 
+    if (!bridge_->IsEntityDataValid(update.entity)) {
+      SyncRecordModelTypeUpdateDropReason(UpdateDropReason::kDroppedByBridge,
+                                          type_);
+      DLOG(WARNING) << "Received entity with invalid update for "
+                    << ModelTypeToDebugString(type_);
+      continue;
+    }
+
     std::string storage_key;
     if (bridge_->SupportsGetStorageKey()) {
       storage_key = bridge_->GetStorageKey(update.entity);
+      // TODO(crbug.com/1057947): Make this a DCHECK as storage keys should not
+      // be empty after IsEntityDataValid() has been implemented by all
+      // bridges.
       if (storage_key.empty()) {
         SyncRecordModelTypeUpdateDropReason(
             UpdateDropReason::kCannotGenerateStorageKey, type_);
@@ -944,6 +955,12 @@ ClientTagBasedModelTypeProcessor::OnFullUpdateReceived(
         EntityChange::CreateAdd(storage_key, std::move(update.entity)));
     if (!storage_key.empty())
       metadata_changes->UpdateMetadata(storage_key, entity->metadata());
+  }
+
+  // If there is already an error (this can happen if one of the metadata
+  // writes failed), don't even send the data to the bridge.
+  if (model_error_) {
+    return model_error_;
   }
 
   // Let the bridge handle associating and merging the data.

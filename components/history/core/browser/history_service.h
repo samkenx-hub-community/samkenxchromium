@@ -592,7 +592,7 @@ class HistoryService : public KeyedService {
   using ClusterIdCallback = base::OnceCallback<void(int64_t)>;
 
   // Adds a cluster with no visits and invokes `callback` with the ID of the
-  // new cluster.
+  // new cluster. It is expected for this to only be called for local visits.
   // Virtual for testing.
   virtual base::CancelableTaskTracker::TaskId ReserveNextClusterId(
       base::OnceCallback<void(int64_t)> callback,
@@ -608,6 +608,12 @@ class HistoryService : public KeyedService {
   // Updates the triggerability attributes for `clusters`.
   base::CancelableTaskTracker::TaskId UpdateClusterTriggerability(
       const std::vector<history::Cluster>& clusters,
+      base::OnceClosure callback,
+      base::CancelableTaskTracker* tracker);
+
+  // Sets scores of cluster visits to 0 to hide them from the webUI.
+  base::CancelableTaskTracker::TaskId HideVisits(
+      const std::vector<VisitID>& visit_ids,
       base::OnceClosure callback,
       base::CancelableTaskTracker* tracker);
 

@@ -91,7 +91,8 @@ suite('CategoriesTest', () => {
   test('clicking classic chrome sets theme', async () => {
     await setInitialSettings(0);
     categoriesElement.$.classicChromeTile.click();
-    assertEquals(1, handler.getCallCount('setClassicChromeDefaultTheme'));
+    assertEquals(1, handler.getCallCount('removeBackgroundImage'));
+    assertEquals(1, handler.getCallCount('setDefaultColor'));
   });
 
   test('clicking upload image creates dialog and sends event', async () => {
@@ -113,5 +114,13 @@ suite('CategoriesTest', () => {
 
     categoriesElement.$.chromeWebStoreTile.click();
     assertEquals(1, handler.getCallCount('openChromeWebStore'));
+  });
+
+  test('clicking chrome colors sends event', async () => {
+    const eventPromise =
+        eventToPromise('chrome-colors-select', categoriesElement);
+    categoriesElement.$.chromeColorsTile.click();
+    const event = await eventPromise;
+    assertTrue(!!event);
   });
 });

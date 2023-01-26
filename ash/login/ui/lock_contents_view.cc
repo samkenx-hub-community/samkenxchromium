@@ -47,6 +47,7 @@
 #include "ash/shelf/shelf_widget.h"
 #include "ash/shell.h"
 #include "ash/strings/grit/ash_strings.h"
+#include "ash/style/ash_color_id.h"
 #include "ash/style/ash_color_provider.h"
 #include "ash/system/model/enterprise_domain_model.h"
 #include "ash/system/model/system_tray_model.h"
@@ -338,15 +339,21 @@ class UserAddingScreenIndicator : public views::View {
 
     info_icon_ = AddChildView(std::make_unique<views::ImageView>());
     info_icon_->SetPreferredSize(gfx::Size(kInfoIconSizeDp, kInfoIconSizeDp));
+    info_icon_->SetImage(ui::ImageModel::FromVectorIcon(
+        views::kInfoIcon, kColorAshIconColorPrimary));
 
     std::u16string message =
         l10n_util::GetStringUTF16(IDS_ASH_LOGIN_USER_ADDING_BANNER);
-    label_ = AddChildView(login_views_utils::CreateBubbleLabel(message, this));
+    label_ =
+        AddChildView(login_views_utils::CreateThemedBubbleLabel(message, this));
     label_->SetText(message);
 
     SetPaintToLayer();
     layer()->SetBackgroundBlur(ColorProvider::kBackgroundBlurSigma);
     layer()->SetFillsBoundsOpaquely(false);
+
+    SetBackground(views::CreateThemedRoundedRectBackground(
+        kColorAshShieldAndBase80, kBubbleBorderRadius));
   }
 
   UserAddingScreenIndicator(const UserAddingScreenIndicator&) = delete;
@@ -358,23 +365,6 @@ class UserAddingScreenIndicator : public views::View {
   gfx::Size CalculatePreferredSize() const override {
     return gfx::Size(kUserAddingScreenIndicatorWidth,
                      GetHeightForWidth(kUserAddingScreenIndicatorWidth));
-  }
-
-  // views::View:
-  void OnThemeChanged() override {
-    views::View::OnThemeChanged();
-    info_icon_->SetImage(gfx::CreateVectorIcon(
-        views::kInfoIcon,
-        AshColorProvider::Get()->GetContentLayerColor(
-            AshColorProvider::ContentLayerType::kIconColorPrimary)));
-
-    label_->SetEnabledColor(AshColorProvider::Get()->GetContentLayerColor(
-        AshColorProvider::ContentLayerType::kTextColorPrimary));
-
-    SkColor background_color = AshColorProvider::Get()->GetBaseLayerColor(
-        AshColorProvider::BaseLayerType::kTransparent80);
-    SetBackground(views::CreateRoundedRectBackground(background_color,
-                                                     kBubbleBorderRadius));
   }
 
  private:
@@ -2392,7 +2382,7 @@ void LockContentsView::ShowAuthErrorMessage() {
   // Show gaia signin if this is login and the user has failed too many times.
   // Do not show on secondary login screen – even though it has type kLogin – as
   // there is no OOBE there.
-  if (!ash::features::IsCryptohomeRecoveryFlowUIEnabled()) {
+  if (!ash::features::IsCryptohomeRecoveryFlowEnabled()) {
     // Pin login attempt does not trigger Gaia dialog. Pin auth method will be
     // disabled after 5 failed attempts.
     int pin_unlock_attempt = pin_unlock_attempt_by_user_[account_id];
@@ -2454,7 +2444,7 @@ void LockContentsView::ShowAuthErrorMessage() {
   container->AddChildView(std::move(label));
   container->AddChildView(std::move(learn_more_button));
 
-  if (ash::features::IsCryptohomeRecoveryFlowUIEnabled()) {
+  if (ash::features::IsCryptohomeRecoveryFlowEnabled()) {
     // The forgot password flow is only accessible from the login screen but
     // not from the lock screen.
     if (screen_type_ == LockScreen::ScreenType::kLogin &&
@@ -2582,12 +2572,9 @@ void LockContentsView::ForgotPasswordButtonPressed() {
 
   const AccountId account_id =
       big_view->auth_user()->current_user().basic_user_info.account_id;
-  // TODO(b/240283185): check whether recovery key is configured.
-  if (ash::features::IsCryptohomeRecoveryFlowEnabled()) {
-    user_manager::KnownUser(Shell::Get()->local_state())
-        .UpdateReauthReason(account_id,
-                            static_cast<int>(ReauthReason::kForgotPassword));
-  }
+  user_manager::KnownUser(Shell::Get()->local_state())
+      .UpdateReauthReason(account_id,
+                          static_cast<int>(ReauthReason::kForgotPassword));
   RecordAndResetPasswordAttempts(
       AuthMetricsRecorder::AuthenticationOutcome::kRecovery, account_id);
   Shell::Get()->login_screen_controller()->ShowGaiaSignin(account_id);

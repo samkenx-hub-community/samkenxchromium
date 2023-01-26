@@ -22,8 +22,7 @@
 #import "ios/chrome/browser/search_engines/template_url_service_factory.h"
 #import "ios/chrome/browser/sessions/ios_chrome_tab_restore_service_factory.h"
 #import "ios/chrome/browser/ui/alert_coordinator/action_sheet_coordinator.h"
-#import "ios/chrome/browser/ui/bookmarks/bookmark_interaction_controller.h"
-#import "ios/chrome/browser/ui/bookmarks/editor/bookmarks_editor_coordinator.h"
+#import "ios/chrome/browser/ui/bookmarks/bookmarks_coordinator.h"
 #import "ios/chrome/browser/ui/commands/application_commands.h"
 #import "ios/chrome/browser/ui/commands/bookmarks_commands.h"
 #import "ios/chrome/browser/ui/commands/browser_commands.h"
@@ -81,8 +80,7 @@
 #error "This file requires ARC support."
 #endif
 
-@interface TabGridCoordinator () <BookmarksEditorCoordinatorDelegate,
-                                  RecentTabsPresentationDelegate,
+@interface TabGridCoordinator () <RecentTabsPresentationDelegate,
                                   HistoryPresentationDelegate,
                                   SceneStateObserver,
                                   SnackbarCoordinatorDelegate,
@@ -95,12 +93,9 @@
   // ivar.
   Browser* _incognitoBrowser;
 
-  // The controller that shows the bookmarking UI after the user taps the Add
+  // The coordinator that shows the bookmarking UI after the user taps the Add
   // to Bookmarks button.
-  BookmarkInteractionController* _bookmarkInteractionController;
-  // Coordinator to edit a bookmark. Used only if
-  // kEnableNewBookmarksImplementation enabled.
-  BookmarksEditorCoordinator* _bookmarksEditorCoordinator;
+  BookmarksCoordinator* _bookmarksCoordinator;
 }
 
 @property(nonatomic, assign, readonly) Browser* regularBrowser;
@@ -235,7 +230,7 @@
     [self.incognitoSnackbarCoordinator start];
 
     [incognitoBrowser->GetCommandDispatcher()
-        startDispatchingToTarget:[self bookmarkInteractionController]
+        startDispatchingToTarget:[self bookmarksCoordinator]
                      forProtocol:@protocol(BookmarksCommands)];
   }
 
@@ -282,8 +277,8 @@
 
   [self dismissPopovers];
 
-  if (_bookmarkInteractionController) {
-    [_bookmarkInteractionController dismissBookmarkModalControllerAnimated:YES];
+  if (_bookmarksCoordinator) {
+    [_bookmarksCoordinator dismissBookmarkModalControllerAnimated:YES];
   }
   // History may be presented on top of the tab grid.
   if (self.historyCoordinator) {
@@ -516,14 +511,14 @@
 
 #pragma mark - Private
 
-// Lazily creates the bookmark interaction controller.
-- (BookmarkInteractionController*)bookmarkInteractionController {
-  if (!_bookmarkInteractionController) {
-    _bookmarkInteractionController = [[BookmarkInteractionController alloc]
-        initWithBrowser:self.regularBrowser];
-    _bookmarkInteractionController.parentController = self.baseViewController;
+// Lazily creates the bookmarks coordinator.
+- (BookmarksCoordinator*)bookmarksCoordinator {
+  if (!_bookmarksCoordinator) {
+    _bookmarksCoordinator =
+        [[BookmarksCoordinator alloc] initWithBrowser:self.regularBrowser];
+    _bookmarksCoordinator.baseViewController = self.baseViewController;
   }
-  return _bookmarkInteractionController;
+  return _bookmarksCoordinator;
 }
 
 #pragma mark - Private (Thumb Strip)
@@ -758,10 +753,10 @@
   [self.incognitoSnackbarCoordinator start];
 
   [_regularBrowser->GetCommandDispatcher()
-      startDispatchingToTarget:[self bookmarkInteractionController]
+      startDispatchingToTarget:[self bookmarksCoordinator]
                    forProtocol:@protocol(BookmarksCommands)];
   [_incognitoBrowser->GetCommandDispatcher()
-      startDispatchingToTarget:[self bookmarkInteractionController]
+      startDispatchingToTarget:[self bookmarksCoordinator]
                    forProtocol:@protocol(BookmarksCommands)];
 
   SceneState* sceneState =
@@ -789,8 +784,6 @@
   self.recentTabsContextMenuHelper = nil;
   self.regularTabContextMenuHelper = nil;
   self.incognitoTabContextMenuHelper = nil;
-  [_bookmarksEditorCoordinator stop];
-  _bookmarksEditorCoordinator = nil;
   [self.sharingCoordinator stop];
   self.sharingCoordinator = nil;
   [self.dispatcher stopDispatchingForProtocol:@protocol(ApplicationCommands)];
@@ -815,15 +808,6 @@
   self.snackbarCoordinator = nil;
   [self.incognitoSnackbarCoordinator stop];
   self.incognitoSnackbarCoordinator = nil;
-}
-
-#pragma mark - BookmarksEditorCoordinatorDelegate
-
-- (void)bookmarksEditorCoordinatorShouldStop:
-    (BookmarksEditorCoordinator*)coordinator {
-  DCHECK(_bookmarksEditorCoordinator);
-  [_bookmarksEditorCoordinator stop];
-  _bookmarksEditorCoordinator = nil;
 }
 
 #pragma mark - TabPresentationDelegate
@@ -1148,21 +1132,12 @@
   if (currentlyBookmarked) {
     [self editBookmarkWithURL:URL];
   } else {
-    [self.bookmarkInteractionController bookmarkURL:URL title:title];
+    [self.bookmarksCoordinator bookmarkURL:URL title:title];
   }
 }
 
 - (void)editBookmarkWithURL:(const GURL&)URL {
-  if (base::FeatureList::IsEnabled(kEnableNewBookmarksImplementation)) {
-    _bookmarksEditorCoordinator = [[BookmarksEditorCoordinator alloc]
-        initWithBaseViewController:self.baseViewController
-                           browser:self.browser
-                               URL:URL];
-    _bookmarksEditorCoordinator.delegate = self;
-    [_bookmarksEditorCoordinator start];
-  } else {
-    [self.bookmarkInteractionController presentBookmarkEditorForURL:URL];
-  }
+  [self.bookmarksCoordinator presentBookmarkEditorForURL:URL];
 }
 
 - (void)pinTabWithIdentifier:(NSString*)identifier {

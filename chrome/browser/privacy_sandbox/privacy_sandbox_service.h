@@ -114,7 +114,10 @@ class PrivacySandboxService : public KeyedService {
     kTrialsDisabledAfterNotice = 4,
     // A policy is suppressing any prompt
     kPolicy = 5,
-    kMaxValue = kPolicy,
+    // User migrated from EEA to ROW, and had already previously finished the
+    // EEA consent flow.
+    kEEAFlowCompletedBeforeRowMigration = 6,
+    kMaxValue = kEEAFlowCompletedBeforeRowMigration,
   };
 
   PrivacySandboxService(
@@ -276,12 +279,6 @@ class PrivacySandboxService : public KeyedService {
   virtual bool IsPartOfManagedFirstPartySet(
       const net::SchemefulSite& site) const;
 
-  // Informs the service that a user made a decision during the confirmation
-  // moment, so that the current topics consent information can be updated.
-  // TODO (crbug.com/1378703): Determine if this should just rely on the already
-  // reported prompt actions, and be made protected, or be called separately.
-  void TopicsConfirmationDecisionMade(bool confirmed) const;
-
   // Inform the service that the user changed the Topics toggle in settings,
   // so that the current topics consent information can be updated.
   // TODO (crbug.com/1378703): Determine whether changes to the preference,
@@ -290,7 +287,7 @@ class PrivacySandboxService : public KeyedService {
   virtual void TopicsToggleChanged(bool new_value) const;
 
   // Whether the current profile requires consent for Topics to operate.
-  void TopicsConsentRequired() const;
+  bool TopicsConsentRequired() const;
 
   // Whether there is an active consent for Topics currently recorded.
   bool TopicsHasActiveConsent() const;
@@ -359,7 +356,10 @@ class PrivacySandboxService : public KeyedService {
                            FirstPartySetsDisabledMetric);
   FRIEND_TEST_ALL_PREFIXES(
       PrivacySandboxServiceM1Test,
-      RecordPrivacySandbox4StartupMetrics_PromptSuppressed);
+      RecordPrivacySandbox4StartupMetrics_PromptSuppressed_Explicitly);
+  FRIEND_TEST_ALL_PREFIXES(
+      PrivacySandboxServiceM1Test,
+      RecordPrivacySandbox4StartupMetrics_PromptSuppressed_Implicitly);
   FRIEND_TEST_ALL_PREFIXES(
       PrivacySandboxServiceM1Test,
       RecordPrivacySandbox4StartupMetrics_PromptNotSuppressed_EEA);
@@ -550,6 +550,14 @@ class PrivacySandboxService : public KeyedService {
   // determined by |action|. Only a subset of actions has a corresponding area.
   void InformSentimentService(PrivacySandboxService::PromptAction action);
 
+  // Equivalent of PrivacySandboxService::InformSentimentService, but for
+  // PrivacySandboxSettings4.
+  void InformSentimentServiceM1(PrivacySandboxService::PromptAction action);
+
+  // Implementation of PrivacySandboxService::PromptActionOccurred, but for
+  // PrivacySandboxSettings4.
+  virtual void PromptActionOccurredM1(PromptAction action);
+
   // Record user action metrics based on the |action|.
   void RecordPromptActionMetrics(PrivacySandboxService::PromptAction action);
 
@@ -561,6 +569,10 @@ class PrivacySandboxService : public KeyedService {
 
   // Called when the Ad measurement preference is changed.
   void OnAdMeasurementPrefChanged();
+
+  // Returns true if _any_ of the k-API prefs are disabled via policy or
+  // the prompt was suppressed via policy.
+  static bool IsM1PrivacySandboxEffectivelyManaged(PrefService* pref_service);
 
   bool force_chrome_build_for_tests_ = false;
 

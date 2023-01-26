@@ -442,9 +442,9 @@ DownloadBubbleRowView::DownloadBubbleRowView(
   // Empty cell under icon_
   AddChildView(std::make_unique<views::FlexLayoutView>());
 
+  // The content of the label will be populated in the `UpdateRow` function.
   secondary_label_ = AddChildView(std::make_unique<views::Label>(
-      model_->GetStatusText(), views::style::CONTEXT_LABEL,
-      views::style::STYLE_SECONDARY));
+      u"", views::style::CONTEXT_LABEL, views::style::STYLE_SECONDARY));
   secondary_label_->SetHorizontalAlignment(gfx::ALIGN_LEFT);
   // The 2 columns being removed are icon, and padding.
   secondary_label_->SetProperty(views::kTableColAndRowSpanKey,
@@ -597,6 +597,7 @@ void DownloadBubbleRowView::Layout() {
                                quick_actions_size.width() - insets.right(),
                            insets.top()),
                 quick_actions_size));
+  inkdrop_container_->SetBoundsRect(GetLocalBounds());
 }
 
 void DownloadBubbleRowView::OnMainButtonPressed() {
@@ -675,7 +676,8 @@ void DownloadBubbleRowView::UpdateProgressBar() {
 
 void DownloadBubbleRowView::UpdateLabels() {
   primary_label_->SetText(model_->GetFileNameToReportUser().LossyDisplayName());
-  secondary_label_->SetText(model_->GetStatusText());
+  secondary_label_->SetText(model_->GetStatusTextForLabel(
+      secondary_label_->font_list(), secondary_label_->width()));
 
   if (ui_info_.has_subpage) {
     transparent_button_->SetAccessibleName(l10n_util::GetStringFUTF16(

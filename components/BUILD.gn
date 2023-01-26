@@ -377,6 +377,7 @@ test("components_unittests") {
       "//components/media_router/browser:unit_tests",
       "//components/media_router/common:unit_tests",
       "//components/media_router/common/providers/cast/channel:unit_tests",
+      "//components/mirroring:mirroring_tests",
       "//components/navigation_interception:unit_tests",
       "//components/network_hints/renderer:unit_tests",
       "//components/no_state_prefetch/browser:unit_tests",
@@ -557,6 +558,7 @@ test("components_unittests") {
 
   if (!is_android) {
     deps += [
+      "//components/commerce/core:account_checker_unittests",
       "//components/commerce/core:commerce_heuristics_data_unittests",
       "//components/commerce/core:feature_list_unittests",
       "//components/commerce/core:heuristics_provider_unittests",
@@ -578,6 +580,7 @@ test("components_unittests") {
       "//components/arc:unit_tests",
       "//components/desks_storage:unit_tests",
       "//components/guest_os:unit_tests",
+      "//components/live_caption:unit_tests",
       "//components/metrics/structured:unit_tests",
       "//components/metrics/structured/mojom:unit_tests",
       "//components/ownership:unit_tests",
@@ -641,6 +644,7 @@ test("components_unittests") {
     deps += [
       "//components/safe_browsing/content/renderer:throttles_unittest",
       "//components/safe_browsing/core/browser:ping_manager_unittest",
+      "//components/safe_browsing/core/browser:safe_browsing_lookup_mechanism_experimenter_unittest",
       "//components/safe_browsing/core/browser:safe_browsing_url_checker_unittest",
       "//components/safe_browsing/core/browser:user_population_unittest",
       "//components/safe_browsing/core/browser:verdict_cache_manager_unittest",
@@ -1058,6 +1062,7 @@ if (is_android) {
       "//components/browser_ui/client_certificate/android:junit",
       "//components/browser_ui/media/android:junit",
       "//components/browser_ui/photo_picker/android:junit",
+      "//components/browser_ui/settings/android:junit",
       "//components/browser_ui/util/android:junit",
       "//components/browser_ui/webshare/android:junit",
       "//components/browser_ui/widget/android:junit",

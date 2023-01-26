@@ -111,6 +111,24 @@ class PLATFORM_EXPORT Color {
            color_space == ColorSpace::kXYZD65;
   }
 
+  static bool HasRGBOrXYZComponents(ColorSpace color_space) {
+    return color_space == ColorSpace::kSRGB ||
+           color_space == ColorSpace::kSRGBLinear ||
+           color_space == ColorSpace::kDisplayP3 ||
+           color_space == ColorSpace::kA98RGB ||
+           color_space == ColorSpace::kProPhotoRGB ||
+           color_space == ColorSpace::kRec2020 ||
+           color_space == ColorSpace::kXYZD50 ||
+           color_space == ColorSpace::kXYZD65 ||
+           color_space == ColorSpace::kRGBLegacy;
+  }
+
+  static bool IsLightnessFirstComponent(ColorSpace color_space) {
+    return color_space == ColorSpace::kLab ||
+           color_space == ColorSpace::kOklab ||
+           color_space == ColorSpace::kLch || color_space == ColorSpace::kOklch;
+  }
+
   // The default constructor creates a transparent color.
   constexpr Color()
       : param0_is_none_(0),
@@ -378,6 +396,13 @@ class PLATFORM_EXPORT Color {
                                 float percentage,
                                 HueInterpolationMethod hue_method);
 
+  // According the Spec https://www.w3.org/TR/css-color-4/#interpolation-missing
+  // we have to do a special treatment of when to carry forward the 'noneness'
+  // of a component, given if it's an 'analog component'.
+  static void CarryForwardAnalogousMissingComponents(
+      Color color,
+      ColorSpace prev_color_space);
+
   ColorSpace color_space_ = ColorSpace::kRGBLegacy;
 
   // Whether or not color parameters were specified as none (this only affects
@@ -401,17 +426,5 @@ PLATFORM_EXPORT Color ColorFromPremultipliedARGB(RGBA32);
 PLATFORM_EXPORT RGBA32 PremultipliedARGBFromColor(const Color&);
 
 }  // namespace blink
-
-namespace WTF {
-template <>
-struct DefaultHash<blink::Color> {
-  STATIC_ONLY(DefaultHash);
-  static unsigned GetHash(const blink::Color& key) { return key.GetHash(); }
-  static bool Equal(const blink::Color& a, const blink::Color& b) {
-    return a == b;
-  }
-  static const bool safe_to_compare_to_empty_or_deleted = true;
-};
-}  // namespace WTF
 
 #endif  // THIRD_PARTY_BLINK_RENDERER_PLATFORM_GRAPHICS_COLOR_H_

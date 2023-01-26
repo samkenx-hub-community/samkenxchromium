@@ -111,7 +111,6 @@
     }
   },
   "$build/goma": {
-    "jobs": 150,
     "rpc_extra_params": "?prod",
     "server_host": "goma.chromium.org"
   },

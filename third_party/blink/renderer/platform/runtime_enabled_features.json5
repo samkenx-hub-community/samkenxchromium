@@ -122,7 +122,7 @@
     //
     // The default value of the base::Feature instance is:
     //  base::FEATURE_ENABLED_BY_DEFAULT if 'status' field is 'stable", and
-    //  base::FEATURE_DISABLED_BY_DEFAULT otheriwse.
+    //  base::FEATURE_DISABLED_BY_DEFAULT otherwise.
     // It can be overridden by 'base_feature_status' field.
     //
     // If the flag should be associated with a feature not in blink::features,
@@ -283,6 +283,13 @@
     },
     {
       name: "AllowContentInitiatedDataUrlNavigations",
+    },
+    {
+      // TODO(crbug.com/1393662): Remove this flag once Android supports
+      // creating discoverable credentials with the 'payment' extension.
+      name: "AllowDiscoverableCredentialsForSecurePaymentConfirmation",
+      base_feature: "AllowDiscoverableCredentialsForSecurePaymentConfirmation",
+      status: {"Android": "", "default": "stable"},
     },
     {
       name: "AndroidDownloadableFontsMatching",
@@ -614,6 +621,10 @@
       status: "experimental",
     },
     {
+      name: "CSSAnimationComposition",
+      status: "experimental"
+    },
+    {
       // Whether <image> values are allowed as counter style <symbol>
       name: "CSSAtRuleCounterStyleImageSymbols",
     },
@@ -630,7 +641,8 @@
     },
     {
       name: "CSSBaselineSource",
-      status: "experimental",
+      status: "stable",
+      base_feature: "CSSBaselineSource",
     },
     {
       // Support CSS Values Level 4 calc simplification and serialization
@@ -649,7 +661,8 @@
       // Support for CSS Color Module Level 4
       // https://www.w3.org/TR/css-color-4/
       name: "CSSColor4",
-      status:  "experimental",
+      status:  "stable",
+      base_feature: "CSSColor4",
     },
     {
       name: "CSSColorContrast",
@@ -732,7 +745,6 @@
     {
         // http://crbug.com/1276900
         name: "CSSInitialLetter",
-        depends_on: ["LayoutNG"],
         status: "stable",
         base_feature: "CSSInitialLetter",
     },
@@ -965,7 +977,6 @@
     {
       // crbug.com/1259085
       name: "DeferredShaping",
-      depends_on: ["LayoutNG"],
       status: "test",
       base_feature: "DeferredShaping",
     },
@@ -1066,8 +1077,8 @@
     // trial it isn't possible to set a `depends_on`.
     {
       name: "DisableThirdPartySessionStoragePartitioningAfterGeneralPartitioning",
+      origin_trial_feature_name: "DisableThirdPartySessionStoragePartitioningAfterGeneralPartitioning",
       status: "experimental",
-      browser_process_read_write_access: true,
     },
     // This feature will represent the deprecation trial that allows first
     // parties to temporarily use unpartitioned storage in embeds loaded
@@ -1104,6 +1115,8 @@
     },
     {
       name: "DocumentPictureInPictureAPI",
+      origin_trial_feature_name: "DocumentPictureInPictureAPI",
+      origin_trial_os: ["win", "mac", "linux", "chromeos"],
       status: {
         "Android": "",
         "ChromeOS_Lacros": "",
@@ -1162,6 +1175,10 @@
       name: "EventPath",
       public: true,
       base_feature: "EventPath",
+    },
+    {
+      name: "EventTimingInteractionCount",
+      status: "experimental",
     },
     {
       name: "ExperimentalContentSecurityPolicyFeatures",
@@ -1285,6 +1302,7 @@
       name: "FedCmUserInfo",
       depends_on: ["FedCm"],
       public: true,
+      status: "test",
     },
     {
       name: "FencedFrames",
@@ -1431,7 +1449,6 @@
     },
     {
       name: "FormattedText",
-      depends_on: ["LayoutNG"],
       status: "experimental",
     },
     {
@@ -1630,17 +1647,6 @@
       base_feature: "LayoutMediaNGContainer",
     },
     {
-      // LayoutNG has been enabled in M76, but we still keep this flag for
-      // testing. See web_tests/FlagExpectations/disable-layout-ng for more
-      // details about running web tests with LayoutNG disabled. This flag also
-      // provides a convenient way for testing legacy layout code path in blink
-      // unit tests.
-      name: "LayoutNG",
-      implied_by: ["BidiCaretAffinity"],
-      status: "stable",
-      base_feature: "LayoutNG",
-    },
-    {
       // A kill-switch for a fix of crbug.com/1366268.
       name: "LayoutNGDelayScrollOffsetClamping",
       base_feature: "LayoutNGDelayScrollOffsetClamping",
@@ -1650,12 +1656,11 @@
       // crbug.com/1353190
       name: "LayoutNGNoCopyBack",
       depends_on: ["LayoutMediaNGContainer", "LayoutNGReplacedNoBoxSetters"],
-      status: "stable",
+      status: "test",
       base_feature: "LayoutNGNoCopyBack",
     },
     {
       name: "LayoutNGPrinting",
-      depends_on: ["LayoutNG"],
       status: "stable",
       base_feature: "LayoutNGPrinting",
     },
@@ -1670,7 +1675,6 @@
     },
     {
       name: "LayoutNGSubgrid",
-      depends_on: ["LayoutNG"],
       status: "test"
     },
     {
@@ -1738,7 +1742,6 @@
     {
       name: "MathMLCore",
       status: "stable",
-      depends_on: ["LayoutNG"],
       base_feature: "MathMLCore",
     },
     {
@@ -2090,7 +2093,6 @@
     {
       name: "PaymentInstruments",
       depends_on: ["PaymentApp"],
-      status: "stable",
     },
     {
       name: "PaymentMethodChangeEvent",
@@ -2422,7 +2424,7 @@
     // Spec: https://w3c.github.io/webrtc-svc/
     {
       name: "RTCSvcScalabilityMode",
-      status: "experimental",
+      status: "stable",
       base_feature: "RTCSvcScalabilityMode",
     },
     {
@@ -2728,7 +2730,7 @@
     },
     {
       name: "StreamingDeclarativeShadowDOM",
-      status: "experimental",
+      status: "stable",
       base_feature: "StreamingDeclarativeShadowDOM",
     },
     {
@@ -3012,6 +3014,7 @@
       // View transitions.
       // See https://www.w3.org/TR/css-view-transitions-1/
       name: "ViewTransition",
+      status: "stable",
       base_feature: "ViewTransition",
       implied_by: ["ViewTransitionOnNavigation"],
     },
@@ -3321,6 +3324,12 @@
       base_feature: "WebXREnabledFeatures",
     },
     {
+      name: "WebXRFrontFacing",
+      depends_on: ["WebXR"],
+      public: true,
+      status: "experimental",
+    },
+    {
       name: "WebXRHandInput",
       depends_on: ["WebXR"],
       public: true,
@@ -3367,7 +3376,7 @@
     // permission. See crbug.com/1328581
     {
       name: "WindowManagementPermissionAlias",
-      status: "experimental",
+      status: "stable",
       base_feature: "WindowManagementPermissionAlias",
     },
     // Allows sites to request fullscreen when the set of screens change.

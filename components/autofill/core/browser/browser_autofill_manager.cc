@@ -862,6 +862,7 @@ void BrowserAutofillManager::OnFormSubmittedImpl(const FormData& form,
   if (IsAutofillCreditCardEnabled()) {
     credit_card_form_event_logger_->OnFormSubmitted(sync_state_,
                                                     *submitted_form);
+    touch_to_fill_delegate_->LogMetricsAfterSubmission(*submitted_form);
   }
 }
 
@@ -1512,7 +1513,7 @@ void BrowserAutofillManager::DidShowSuggestions(bool has_autofill_suggestions,
   if (logger) {
     logger->OnDidShowSuggestions(*form_structure, *autofill_field,
                                  form_structure->form_parsed_timestamp(),
-                                 sync_state_, driver()->IsIncognito());
+                                 sync_state_, client()->IsOffTheRecord());
   }
 
   if (autofill_field->Type().group() == FieldTypeGroup::kCreditCard &&
@@ -1865,7 +1866,7 @@ const FormData& BrowserAutofillManager::last_query_form() const {
 }
 
 bool BrowserAutofillManager::ShouldUploadForm(const FormStructure& form) {
-  return IsAutofillEnabled() && !driver()->IsIncognito() &&
+  return IsAutofillEnabled() && !client()->IsOffTheRecord() &&
          form.ShouldBeUploaded();
 }
 
@@ -1971,7 +1972,7 @@ void BrowserAutofillManager::UploadVotesAndLogQuality(
   download_manager()->StartUploadRequest(
       *submitted_form, was_autofilled, non_empty_types,
       /*login_form_signature=*/std::string(), observed_submission,
-      client()->GetPrefs());
+      client()->GetPrefs(), GetWeakPtr());
 }
 
 const gfx::Image& BrowserAutofillManager::GetCardImage(
@@ -3339,9 +3340,22 @@ void BrowserAutofillManager::OnSeePromoCodeOfferDetailsSelected(
   OnSingleFieldSuggestionSelected(value, frontend_id);
 }
 
-void BrowserAutofillManager::SetSuggestionOriginMetricState(
-    AutofillSuggestionMethod state) {
-  autofill_suggestion_method_ = state;
+void BrowserAutofillManager::SetAutofillSuggestionMethod(
+    AutofillSuggestionMethod method) {
+  autofill_suggestion_method_ = method;
+  credit_card_form_event_logger_->set_autofill_suggestion_method(method);
+}
+
+void BrowserAutofillManager::SetShouldSuppressKeyboard(bool suppress) {
+  driver()->SetShouldSuppressKeyboard(suppress);
+}
+
+bool BrowserAutofillManager::CanShowAutofillUi() const {
+  return driver()->CanShowAutofillUi();
+}
+
+void BrowserAutofillManager::TriggerReparseInAllFrames() {
+  driver()->TriggerReparseInAllFrames();
 }
 
 void BrowserAutofillManager::ProcessFieldLogEventsInForm(

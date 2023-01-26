@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//base/allocator/partition_allocator/partition_alloc.gni")
 import("//build/buildflag_header.gni")
 import("//build/config/chromeos/ui_mode.gni")
 import("//build/config/chromeos/ui_mode.gni")
@@ -259,7 +260,6 @@ source_set("browser") {
     "//ui/base:buildflags",
     "//ui/base:data_exchange",
     "//ui/base/clipboard",
-    "//ui/base/cursor",
     "//ui/base/cursor/mojom:cursor_type",
     "//ui/base/dragdrop:types",
     "//ui/base/dragdrop/mojom",
@@ -301,6 +301,7 @@ source_set("browser") {
     "//third_party/blink/public/mojom:embedded_frame_sink_mojo_bindings",
     "//third_party/blink/public/mojom:mojom_broadcastchannel_bindings",
     "//third_party/leveldatabase",
+    "//ui/base/cursor",
     "//ui/base/dragdrop/mojom:mojom_headers",
   ]
 
@@ -717,8 +718,6 @@ source_set("browser") {
     "code_cache/simple_lru_cache.h",
     "compositor/surface_utils.cc",
     "compositor/surface_utils.h",
-    "compute_pressure/pressure_service_impl.cc",
-    "compute_pressure/pressure_service_impl.h",
     "contacts/contacts_manager_impl.cc",
     "contacts/contacts_manager_impl.h",
     "contacts/contacts_provider.h",
@@ -900,6 +899,8 @@ source_set("browser") {
     "fenced_frame/fenced_frame.h",
     "fenced_frame/fenced_frame_config.cc",
     "fenced_frame/fenced_frame_config.h",
+    "fenced_frame/fenced_frame_reporter.cc",
+    "fenced_frame/fenced_frame_reporter.h",
     "fenced_frame/fenced_frame_url_mapping.cc",
     "fenced_frame/fenced_frame_url_mapping.h",
     "field_trial_recorder.cc",
@@ -1129,6 +1130,8 @@ source_set("browser") {
     "interest_group/interest_group_k_anonymity_manager.h",
     "interest_group/interest_group_manager_impl.cc",
     "interest_group/interest_group_manager_impl.h",
+    "interest_group/interest_group_pa_report_util.cc",
+    "interest_group/interest_group_pa_report_util.h",
     "interest_group/interest_group_permissions_cache.cc",
     "interest_group/interest_group_permissions_cache.h",
     "interest_group/interest_group_permissions_checker.cc",
@@ -1185,6 +1188,8 @@ source_set("browser") {
     "loader/prefetch_url_loader.h",
     "loader/prefetch_url_loader_service.cc",
     "loader/prefetch_url_loader_service.h",
+    "loader/resource_timing_utils.cc",
+    "loader/resource_timing_utils.h",
     "loader/shared_cors_origin_access_list_impl.cc",
     "loader/shared_cors_origin_access_list_impl.h",
     "loader/url_loader_throttles.cc",
@@ -1455,7 +1460,6 @@ source_set("browser") {
     "preloading/prefetch/proxy_lookup_client_impl.h",
     "preloading/prefetcher.cc",
     "preloading/prefetcher.h",
-    "preloading/preloading.cc",
     "preloading/preloading.h",
     "preloading/preloading_attempt_impl.cc",
     "preloading/preloading_attempt_impl.h",
@@ -2067,8 +2071,6 @@ source_set("browser") {
     "ssl/ssl_manager.h",
     "ssl_private_key_impl.cc",
     "ssl_private_key_impl.h",
-    "starscan_load_observer.cc",
-    "starscan_load_observer.h",
     "startup_data_impl.cc",
     "startup_data_impl.h",
     "startup_helper.cc",
@@ -2149,8 +2151,6 @@ source_set("browser") {
     "web_package/prefetched_signed_exchange_cache_adapter.h",
     "web_package/prefetched_signed_exchange_cache_entry.cc",
     "web_package/prefetched_signed_exchange_cache_entry.h",
-    "web_package/save_as_web_bundle_job.cc",
-    "web_package/save_as_web_bundle_job.h",
     "web_package/signed_exchange_cert_fetcher.cc",
     "web_package/signed_exchange_cert_fetcher.h",
     "web_package/signed_exchange_cert_fetcher_factory.cc",
@@ -2235,6 +2235,8 @@ source_set("browser") {
     "webid/federated_auth_request_impl.h",
     "webid/federated_auth_request_page_data.cc",
     "webid/federated_auth_request_page_data.h",
+    "webid/federated_auth_user_info_request.cc",
+    "webid/federated_auth_user_info_request.h",
     "webid/federated_provider_fetcher.cc",
     "webid/federated_provider_fetcher.h",
     "webid/flags.cc",
@@ -2306,6 +2308,13 @@ source_set("browser") {
     "worker_host/worker_script_loader_factory.cc",
     "worker_host/worker_script_loader_factory.h",
   ]
+
+  if (use_starscan) {
+    sources += [
+      "starscan_load_observer.cc",
+      "starscan_load_observer.h",
+    ]
+  }
 
   if (!is_android && !is_fuchsia) {
     sources += [

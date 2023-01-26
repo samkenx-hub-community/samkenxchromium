@@ -162,8 +162,8 @@ void BackForwardCacheBrowserTest::SetUpCommandLine(
   base::CommandLine::ForCurrentProcess()->AppendSwitch(
       switches::kEnableExperimentalWebPlatformFeatures);
   // TODO(sreejakshetty): Initialize ScopedFeatureLists from test constructor.
-  EnableFeatureAndSetParams(features::kBackForwardCache,
-                            "TimeToLiveInBackForwardCacheInSeconds", "3600");
+  EnableFeatureAndSetParams(features::kBackForwardCacheTimeToLiveControl,
+                            "time_to_live_seconds", "3600");
   // Entry to the cache can be slow during testing and cause flakiness.
   DisableFeature(features::kBackForwardCacheEntryTimeout);
   EnableFeatureAndSetParams(features::kBackForwardCache,
@@ -192,6 +192,10 @@ void BackForwardCacheBrowserTest::SetUpCommandLine(
 #endif
     // Allow BackForwardCache for all devices regardless of their memory.
     DisableFeature(features::kBackForwardCacheMemoryControls);
+    // Disables BackForwardCache cache size overwritten by
+    // `content::kBackForwardCacheSize`, as many browser tests here assume
+    // specific or smaller cache size (e.g. 1) rather than 6.
+    DisableFeature(kBackForwardCacheSize);
 
     SetupFeaturesAndParameters();
 

@@ -39,7 +39,7 @@ TwentyEightDayActiveUseCaseImpl::TwentyEightDayActiveUseCaseImpl(
 
 TwentyEightDayActiveUseCaseImpl::~TwentyEightDayActiveUseCaseImpl() = default;
 
-FresnelImportDataRequest
+absl::optional<FresnelImportDataRequest>
 TwentyEightDayActiveUseCaseImpl::GenerateImportRequestBody() {
   // Generate Fresnel PSM import request body.
   FresnelImportDataRequest import_request;
@@ -75,6 +75,20 @@ bool TwentyEightDayActiveUseCaseImpl::IsEnabledCheckIn() {
 bool TwentyEightDayActiveUseCaseImpl::IsEnabledCheckMembership() {
   return base::FeatureList::IsEnabled(
       features::kDeviceActiveClient28DayActiveCheckMembership);
+}
+
+private_computing::ActiveStatus
+TwentyEightDayActiveUseCaseImpl::GenerateActiveStatus() {
+  private_computing::ActiveStatus status;
+
+  status.set_use_case(
+      private_computing::PrivateComputingUseCase::CROS_FRESNEL_28DAY_ACTIVE);
+
+  std::string last_ping_pt_date =
+      FormatPTDateString(GetLastKnownPingTimestamp());
+  status.set_last_ping_date(last_ping_pt_date);
+
+  return status;
 }
 
 bool TwentyEightDayActiveUseCaseImpl::SavePsmIdToDateMap(base::Time cur_ts) {

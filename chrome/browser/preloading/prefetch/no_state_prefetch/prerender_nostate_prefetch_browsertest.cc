@@ -305,11 +305,10 @@ class NoStatePrefetchBrowserTest
     test_ukm_recorder_ = std::make_unique<ukm::TestAutoSetUkmRecorder>();
     omnibox_attempt_entry_builder_ =
         std::make_unique<content::test::PreloadingAttemptUkmEntryBuilder>(
-            ToPreloadingPredictor(
-                ChromePreloadingPredictor::kOmniboxDirectURLInput));
+            chrome_preloading_predictor::kOmniboxDirectURLInput);
     link_rel_attempt_entry_builder_ =
         std::make_unique<content::test::PreloadingAttemptUkmEntryBuilder>(
-            content::PreloadingPredictor::kLinkRel);
+            content::preloading_predictor::kLinkRel);
     test_timer_ = std::make_unique<base::ScopedMockElapsedTimersForTest>();
     host_resolver()->AddRule("*", "127.0.0.1");
   }
@@ -1778,11 +1777,12 @@ class NoStatePrefetchOmniboxBrowserTest : public NoStatePrefetchBrowserTest {
 
  protected:
   void SetUp() override {
-    // kOmniboxTriggerForNoStatePrefetch or kOmniboxTriggerForPrerender2 can be
-    // enabled in the experiment. Explicitly enable and disable these flags.
-    feature_list_.InitWithFeatures(
-        {features::kOmniboxTriggerForNoStatePrefetch},
-        {features::kOmniboxTriggerForPrerender2});
+    // kOmniboxTriggerForPrerender2 or kOmniboxTriggerForNoStatePrefetch can be
+    // enabled in the experiment. Explicitly disable
+    // kOmniboxTriggerForPrerender2 as fieldtrial tests run with a config to
+    // enable it by default.
+    feature_list_.InitWithFeatures({},
+                                   {features::kOmniboxTriggerForPrerender2});
 
     NoStatePrefetchBrowserTest::SetUp();
   }

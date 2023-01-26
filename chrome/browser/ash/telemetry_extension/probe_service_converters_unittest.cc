@@ -14,6 +14,7 @@
 #include "chromeos/services/network_health/public/mojom/network_health_types.mojom.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
+#include "third_party/abseil-cpp/absl/types/optional.h"
 
 namespace ash::converters {
 
@@ -136,7 +137,9 @@ TEST(ProbeServiceConverters, AudioNodeInputInfoPtr) {
 
   EXPECT_EQ(ConvertAudioInputNodePtr(std::move(input_node)),
             crosapi::mojom::ProbeAudioInputNodeInfo::New(
-                kId, kName, kDeviceName, kActive, kInputNodeGain));
+                crosapi::mojom::UInt64Value::New(kId), kName, kDeviceName,
+                crosapi::mojom::BoolValue::New(kActive),
+                crosapi::mojom::UInt8Value::New(kInputNodeGain)));
 
   EXPECT_EQ(ConvertAudioInputNodePtr(nullptr),
             crosapi::mojom::ProbeAudioInputNodeInfoPtr());
@@ -157,7 +160,9 @@ TEST(ProbeServiceConverters, AudioNodeOutputInfoPtr) {
   output_node->node_volume = kNodeVolume;
   EXPECT_EQ(ConvertAudioOutputNodePtr(std::move(output_node)),
             crosapi::mojom::ProbeAudioOutputNodeInfo::New(
-                kId, kName, kDeviceName, kActive, kNodeVolume));
+                crosapi::mojom::UInt64Value::New(kId), kName, kDeviceName,
+                crosapi::mojom::BoolValue::New(kActive),
+                crosapi::mojom::UInt8Value::New(kNodeVolume)));
 
   EXPECT_EQ(ConvertAudioOutputNodePtr(nullptr),
             crosapi::mojom::ProbeAudioOutputNodeInfoPtr());
@@ -210,26 +215,31 @@ TEST(ProbeServiceConverters, AudioInfoPtr) {
   std::vector<crosapi::mojom::ProbeAudioInputNodeInfoPtr>
       expected_input_node_info;
   auto expected_input = crosapi::mojom::ProbeAudioInputNodeInfo::New();
-  expected_input->id = kIdInput;
+  expected_input->id = crosapi::mojom::UInt64Value::New(kIdInput);
   expected_input->name = kNameInput;
   expected_input->device_name = kDeviceNameInput;
-  expected_input->active = kActiveInput;
-  expected_input->node_gain = kInputNodeGainInput;
+  expected_input->active = crosapi::mojom::BoolValue::New(kActiveInput);
+  expected_input->node_gain =
+      crosapi::mojom::UInt8Value::New(kInputNodeGainInput);
   expected_input_node_info.push_back(std::move(expected_input));
 
   std::vector<crosapi::mojom::ProbeAudioOutputNodeInfoPtr>
       expected_output_node_info;
   auto expected_output = crosapi::mojom::ProbeAudioOutputNodeInfo::New();
-  expected_output->id = kIdOutput;
+  expected_output->id = crosapi::mojom::UInt64Value::New(kIdOutput);
   expected_output->name = kNameOutput;
   expected_output->device_name = kDeviceNameOutput;
-  expected_output->active = kActiveOutput;
-  expected_output->node_volume = kNodeVolumeOutput;
+  expected_output->active = crosapi::mojom::BoolValue::New(kActiveOutput);
+  expected_output->node_volume =
+      crosapi::mojom::UInt8Value::New(kNodeVolumeOutput);
   expected_output_node_info.push_back(std::move(expected_output));
 
   EXPECT_EQ(ConvertProbePtr(std::move(input)),
             crosapi::mojom::ProbeAudioInfo::New(
-                kOutputMute, kInputMute, kUnderruns, kSevereUnderruns,
+                crosapi::mojom::BoolValue::New(kOutputMute),
+                crosapi::mojom::BoolValue::New(kInputMute),
+                crosapi::mojom::UInt32Value::New(kUnderruns),
+                crosapi::mojom::UInt32Value::New(kSevereUnderruns),
                 std::move(expected_output_node_info),
                 std::move(expected_input_node_info)));
 }
@@ -246,6 +256,248 @@ TEST(ProbeServiceConverters, AudioResultPtrError) {
       ConvertProbePtr(cros_healthd::mojom::AudioResult::NewError(nullptr));
   ASSERT_TRUE(output);
   EXPECT_TRUE(output->is_error());
+}
+
+TEST(ProbeServiceConverters, ProbeUsbVersion) {
+  EXPECT_EQ(Convert(cros_healthd::mojom::UsbVersion::kUnmappedEnumField),
+            crosapi::mojom::ProbeUsbVersion::kUnknown);
+
+  EXPECT_EQ(Convert(cros_healthd::mojom::UsbVersion::kUnknown),
+            crosapi::mojom::ProbeUsbVersion::kUnknown);
+
+  EXPECT_EQ(Convert(cros_healthd::mojom::UsbVersion::kUsb1),
+            crosapi::mojom::ProbeUsbVersion::kUsb1);
+
+  EXPECT_EQ(Convert(cros_healthd::mojom::UsbVersion::kUsb2),
+            crosapi::mojom::ProbeUsbVersion::kUsb2);
+
+  EXPECT_EQ(Convert(cros_healthd::mojom::UsbVersion::kUsb3),
+            crosapi::mojom::ProbeUsbVersion::kUsb3);
+}
+
+TEST(ProbeServiceConverters, ProbeUsbSpecSpeed) {
+  EXPECT_EQ(Convert(cros_healthd::mojom::UsbSpecSpeed::kUnmappedEnumField),
+            crosapi::mojom::ProbeUsbSpecSpeed::kUnknown);
+
+  EXPECT_EQ(Convert(cros_healthd::mojom::UsbSpecSpeed::kUnknown),
+            crosapi::mojom::ProbeUsbSpecSpeed::kUnknown);
+
+  EXPECT_EQ(Convert(cros_healthd::mojom::UsbSpecSpeed::k1_5Mbps),
+            crosapi::mojom::ProbeUsbSpecSpeed::k1_5Mbps);
+
+  EXPECT_EQ(Convert(cros_healthd::mojom::UsbSpecSpeed::k12Mbps),
+            crosapi::mojom::ProbeUsbSpecSpeed::k12Mbps);
+
+  EXPECT_EQ(Convert(cros_healthd::mojom::UsbSpecSpeed::kDeprecateSpeed),
+            crosapi::mojom::ProbeUsbSpecSpeed::kUnknown);
+
+  EXPECT_EQ(Convert(cros_healthd::mojom::UsbSpecSpeed::k480Mbps),
+            crosapi::mojom::ProbeUsbSpecSpeed::k480Mbps);
+
+  EXPECT_EQ(Convert(cros_healthd::mojom::UsbSpecSpeed::k5Gbps),
+            crosapi::mojom::ProbeUsbSpecSpeed::k5Gbps);
+
+  EXPECT_EQ(Convert(cros_healthd::mojom::UsbSpecSpeed::k10Gbps),
+            crosapi::mojom::ProbeUsbSpecSpeed::k10Gbps);
+
+  EXPECT_EQ(Convert(cros_healthd::mojom::UsbSpecSpeed::k20Gbps),
+            crosapi::mojom::ProbeUsbSpecSpeed::k20Gbps);
+}
+
+TEST(ProbeServiceConverters, ProbeFwupdVersionFormat) {
+  EXPECT_EQ(
+      Convert(cros_healthd::mojom::FwupdVersionFormat::kUnmappedEnumField),
+      crosapi::mojom::ProbeFwupdVersionFormat::kUnknown);
+
+  EXPECT_EQ(Convert(cros_healthd::mojom::FwupdVersionFormat::kUnknown),
+            crosapi::mojom::ProbeFwupdVersionFormat::kUnknown);
+
+  EXPECT_EQ(Convert(cros_healthd::mojom::FwupdVersionFormat::kPlain),
+            crosapi::mojom::ProbeFwupdVersionFormat::kPlain);
+
+  EXPECT_EQ(Convert(cros_healthd::mojom::FwupdVersionFormat::kNumber),
+            crosapi::mojom::ProbeFwupdVersionFormat::kNumber);
+
+  EXPECT_EQ(Convert(cros_healthd::mojom::FwupdVersionFormat::kPair),
+            crosapi::mojom::ProbeFwupdVersionFormat::kPair);
+
+  EXPECT_EQ(Convert(cros_healthd::mojom::FwupdVersionFormat::kTriplet),
+            crosapi::mojom::ProbeFwupdVersionFormat::kTriplet);
+
+  EXPECT_EQ(Convert(cros_healthd::mojom::FwupdVersionFormat::kBcd),
+            crosapi::mojom::ProbeFwupdVersionFormat::kBcd);
+
+  EXPECT_EQ(Convert(cros_healthd::mojom::FwupdVersionFormat::kIntelMe),
+            crosapi::mojom::ProbeFwupdVersionFormat::kIntelMe);
+
+  EXPECT_EQ(Convert(cros_healthd::mojom::FwupdVersionFormat::kIntelMe2),
+            crosapi::mojom::ProbeFwupdVersionFormat::kIntelMe2);
+
+  EXPECT_EQ(Convert(cros_healthd::mojom::FwupdVersionFormat::kSurfaceLegacy),
+            crosapi::mojom::ProbeFwupdVersionFormat::kSurfaceLegacy);
+
+  EXPECT_EQ(Convert(cros_healthd::mojom::FwupdVersionFormat::kSurface),
+            crosapi::mojom::ProbeFwupdVersionFormat::kSurface);
+
+  EXPECT_EQ(Convert(cros_healthd::mojom::FwupdVersionFormat::kDellBios),
+            crosapi::mojom::ProbeFwupdVersionFormat::kDellBios);
+
+  EXPECT_EQ(Convert(cros_healthd::mojom::FwupdVersionFormat::kHex),
+            crosapi::mojom::ProbeFwupdVersionFormat::kHex);
+}
+
+TEST(ProbeServiceConverters, ProbeFwupdFirmwareVersionInfoPtr) {
+  constexpr char kVersion[] = "MyVersion";
+
+  auto input = cros_healthd::mojom::FwupdFirmwareVersionInfo::New(
+      kVersion, cros_healthd::mojom::FwupdVersionFormat::kHex);
+
+  EXPECT_EQ(ConvertProbePtr(std::move(input)),
+            crosapi::mojom::ProbeFwupdFirmwareVersionInfo::New(
+                kVersion, crosapi::mojom::ProbeFwupdVersionFormat::kHex));
+}
+
+TEST(ProbeServiceConverters, ProbeUsbBusInterfaceInfoPtr) {
+  constexpr uint8_t kInterfaceNumber = 42;
+  constexpr uint8_t kClassId = 41;
+  constexpr uint8_t kSubclassId = 43;
+  constexpr uint8_t kProtocolId = 43;
+  constexpr char kDriver[] = "MyDriver";
+
+  EXPECT_EQ(ConvertProbePtr(cros_healthd::mojom::UsbBusInterfaceInfo::New(
+                kInterfaceNumber, kClassId, kSubclassId, kProtocolId, kDriver)),
+            crosapi::mojom::ProbeUsbBusInterfaceInfo::New(
+                crosapi::mojom::UInt8Value::New(kInterfaceNumber),
+                crosapi::mojom::UInt8Value::New(kClassId),
+                crosapi::mojom::UInt8Value::New(kSubclassId),
+                crosapi::mojom::UInt8Value::New(kProtocolId), kDriver));
+}
+
+TEST(ProbeServiceConverters, ProbeUsbBusInfoPtr) {
+  constexpr uint8_t kInterfaceNumberInterface = 42;
+  constexpr uint8_t kClassIdInterface = 41;
+  constexpr uint8_t kSubclassIdInterface = 45;
+  constexpr uint8_t kProtocolIdInterface = 43;
+  constexpr char kDriverInterface[] = "MyDriver";
+
+  std::vector<cros_healthd::mojom::UsbBusInterfaceInfoPtr> interfaces;
+  interfaces.push_back(cros_healthd::mojom::UsbBusInterfaceInfo::New(
+      kInterfaceNumberInterface, kClassIdInterface, kSubclassIdInterface,
+      kProtocolIdInterface, kDriverInterface));
+
+  constexpr uint8_t kClassId = 41;
+  constexpr uint8_t kSubclassId = 45;
+  constexpr uint8_t kProtocolId = 43;
+  constexpr uint16_t kVendor = 42;
+  constexpr uint16_t kProductId = 44;
+
+  constexpr char kVersion[] = "MyVersion";
+
+  auto fwupd_version = cros_healthd::mojom::FwupdFirmwareVersionInfo::New(
+      kVersion, cros_healthd::mojom::FwupdVersionFormat::kPair);
+
+  auto input = cros_healthd::mojom::UsbBusInfo::New();
+  input->class_id = kClassId;
+  input->subclass_id = kSubclassId;
+  input->protocol_id = kProtocolId;
+  input->vendor_id = kVendor;
+  input->product_id = kProductId;
+  input->interfaces = std::move(interfaces);
+  input->fwupd_firmware_version_info = std::move(fwupd_version);
+  input->version = cros_healthd::mojom::UsbVersion::kUsb3;
+  input->spec_speed = cros_healthd::mojom::UsbSpecSpeed::k20Gbps;
+
+  std::vector<crosapi::mojom::ProbeUsbBusInterfaceInfoPtr> expected_interfaces;
+  expected_interfaces.push_back(crosapi::mojom::ProbeUsbBusInterfaceInfo::New(
+      crosapi::mojom::UInt8Value::New(kInterfaceNumberInterface),
+      crosapi::mojom::UInt8Value::New(kClassIdInterface),
+      crosapi::mojom::UInt8Value::New(kSubclassIdInterface),
+      crosapi::mojom::UInt8Value::New(kProtocolIdInterface), kDriverInterface));
+
+  auto expected_fwupd_version =
+      crosapi::mojom::ProbeFwupdFirmwareVersionInfo::New(
+          kVersion, crosapi::mojom::ProbeFwupdVersionFormat::kPair);
+
+  EXPECT_EQ(
+      ConvertProbePtr(std::move(input)),
+      crosapi::mojom::ProbeUsbBusInfo::New(
+          crosapi::mojom::UInt8Value::New(kClassId),
+          crosapi::mojom::UInt8Value::New(kSubclassId),
+          crosapi::mojom::UInt8Value::New(kProtocolId),
+          crosapi::mojom::UInt16Value::New(kVendor),
+          crosapi::mojom::UInt16Value::New(kProductId),
+          std::move(expected_interfaces), std::move(expected_fwupd_version),
+          crosapi::mojom::ProbeUsbVersion::kUsb3,
+          crosapi::mojom::ProbeUsbSpecSpeed::k20Gbps));
+}
+
+TEST(ProbeServiceConverters, ProbeBusInfoPtr) {
+  constexpr uint8_t kInterfaceNumberInterface = 42;
+  constexpr uint8_t kClassIdInterface = 41;
+  constexpr uint8_t kSubclassIdInterface = 43;
+  constexpr uint8_t kProtocolIdInterface = 43;
+  constexpr char kDriverInterface[] = "MyDriver";
+
+  std::vector<cros_healthd::mojom::UsbBusInterfaceInfoPtr> interfaces;
+  interfaces.push_back(cros_healthd::mojom::UsbBusInterfaceInfo::New(
+      kInterfaceNumberInterface, kClassIdInterface, kSubclassIdInterface,
+      kProtocolIdInterface, kDriverInterface));
+
+  constexpr char kVersion[] = "MyVersion";
+
+  auto fwupd_version = cros_healthd::mojom::FwupdFirmwareVersionInfo::New(
+      kVersion, cros_healthd::mojom::FwupdVersionFormat::kPair);
+
+  constexpr uint8_t kClassId = 41;
+  constexpr uint8_t kSubclassId = 45;
+  constexpr uint8_t kProtocolId = 43;
+  constexpr uint16_t kVendor = 42;
+  constexpr uint16_t kProductId = 44;
+
+  auto usb_bus_info = cros_healthd::mojom::UsbBusInfo::New();
+  usb_bus_info->class_id = kClassId;
+  usb_bus_info->subclass_id = kSubclassId;
+  usb_bus_info->protocol_id = kProtocolId;
+  usb_bus_info->vendor_id = kVendor;
+  usb_bus_info->product_id = kProductId;
+  usb_bus_info->interfaces = std::move(interfaces);
+  usb_bus_info->fwupd_firmware_version_info = std::move(fwupd_version);
+  usb_bus_info->version = cros_healthd::mojom::UsbVersion::kUsb3;
+  usb_bus_info->spec_speed = cros_healthd::mojom::UsbSpecSpeed::k20Gbps;
+
+  auto bus_info =
+      cros_healthd::mojom::BusInfo::NewUsbBusInfo(std::move(usb_bus_info));
+
+  std::vector<crosapi::mojom::ProbeUsbBusInterfaceInfoPtr> expected_interfaces;
+  expected_interfaces.push_back(crosapi::mojom::ProbeUsbBusInterfaceInfo::New(
+      crosapi::mojom::UInt8Value::New(kInterfaceNumberInterface),
+      crosapi::mojom::UInt8Value::New(kClassIdInterface),
+      crosapi::mojom::UInt8Value::New(kSubclassIdInterface),
+      crosapi::mojom::UInt8Value::New(kProtocolIdInterface), kDriverInterface));
+
+  auto expected_fwupd_version =
+      crosapi::mojom::ProbeFwupdFirmwareVersionInfo::New(
+          kVersion, crosapi::mojom::ProbeFwupdVersionFormat::kPair);
+
+  auto expected_usb_bus_info = crosapi::mojom::ProbeUsbBusInfo::New(
+      crosapi::mojom::UInt8Value::New(kClassId),
+      crosapi::mojom::UInt8Value::New(kSubclassId),
+      crosapi::mojom::UInt8Value::New(kProtocolId),
+      crosapi::mojom::UInt16Value::New(kVendor),
+      crosapi::mojom::UInt16Value::New(kProductId),
+      std::move(expected_interfaces), std::move(expected_fwupd_version),
+      crosapi::mojom::ProbeUsbVersion::kUsb3,
+      crosapi::mojom::ProbeUsbSpecSpeed::k20Gbps);
+
+  auto expected_bus_info = crosapi::mojom::ProbeBusInfo::NewUsbBusInfo(
+      std::move(expected_usb_bus_info));
+
+  EXPECT_EQ(ConvertProbePtr(bus_info->Clone()), expected_bus_info);
+
+  auto device_input = cros_healthd::mojom::BusDevice::New();
+  device_input->bus_info = std::move(bus_info);
+
+  EXPECT_EQ(ConvertProbePtr(std::move(device_input)), expected_bus_info);
 }
 
 TEST(ProbeServiceConverters, BatteryInfoPtr) {
@@ -984,19 +1236,22 @@ TEST(ProbeServiceConverters, SystemInfoPtr) {
   constexpr char kBuildNumber[] = "13544";
   constexpr char kPatchNumber[] = "59.0";
   constexpr char kReleaseChannel[] = "stable-channel";
+  constexpr char kMarketingName[] = "Test Marketing Name";
 
   auto os_version = cros_healthd::mojom::OsVersion::New(
       kReleaseMilestone, kBuildNumber, kPatchNumber, kReleaseChannel);
   auto input = cros_healthd::mojom::OsInfo::New();
   input->oem_name = kOemName;
   input->os_version = std::move(os_version);
+  input->marketing_name = kMarketingName;
 
   EXPECT_EQ(
       ConvertProbePtr(std::move(input)),
       crosapi::mojom::ProbeSystemInfo::New(crosapi::mojom::ProbeOsInfo::New(
           kOemName,
           crosapi::mojom::ProbeOsVersion::New(kReleaseMilestone, kBuildNumber,
-                                              kPatchNumber, kReleaseChannel))));
+                                              kPatchNumber, kReleaseChannel),
+          kMarketingName)));
 }
 
 TEST(ProbeServiceConverters, OsVersionPtr) {
@@ -1170,6 +1425,8 @@ TEST(ProbeServiceConverters, TelemetryInfoPtrWithNotNullFields) {
         cros_healthd::mojom::TpmInfo::New());
     input->audio_result = cros_healthd::mojom::AudioResult::NewAudioInfo(
         cros_healthd::mojom::AudioInfo::New());
+    input->bus_result = cros_healthd::mojom::BusResult::NewBusDevices(
+        std::vector<cros_healthd::mojom::BusDevicePtr>());
   }
 
   EXPECT_EQ(
@@ -1217,7 +1474,14 @@ TEST(ProbeServiceConverters, TelemetryInfoPtrWithNotNullFields) {
           crosapi::mojom::ProbeTpmResult::NewTpmInfo(
               crosapi::mojom::ProbeTpmInfo::New()),
           crosapi::mojom::ProbeAudioResult::NewAudioInfo(
-              crosapi::mojom::ProbeAudioInfo::New())));
+              crosapi::mojom::ProbeAudioInfo::New(
+                  crosapi::mojom::BoolValue::New(false),
+                  crosapi::mojom::BoolValue::New(false),
+                  crosapi::mojom::UInt32Value::New(0),
+                  crosapi::mojom::UInt32Value::New(0), absl::nullopt,
+                  absl::nullopt)),
+          crosapi::mojom::ProbeBusResult::NewBusDevicesInfo(
+              std::vector<crosapi::mojom::ProbeBusInfoPtr>())));
 }
 
 TEST(ProbeServiceConverters, TelemetryInfoPtrWithNullFields) {
@@ -1236,7 +1500,8 @@ TEST(ProbeServiceConverters, TelemetryInfoPtrWithNullFields) {
                 crosapi::mojom::ProbeSystemResultPtr(nullptr),
                 crosapi::mojom::ProbeNetworkResultPtr(nullptr),
                 crosapi::mojom::ProbeTpmResultPtr(nullptr),
-                crosapi::mojom::ProbeAudioResultPtr(nullptr)));
+                crosapi::mojom::ProbeAudioResultPtr(nullptr),
+                crosapi::mojom::ProbeBusResultPtr(nullptr)));
 }
 
 }  // namespace ash::converters

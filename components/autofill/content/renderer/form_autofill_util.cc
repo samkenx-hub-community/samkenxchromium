@@ -71,6 +71,7 @@ using blink::WebOptionElement;
 using blink::WebSelectElement;
 using blink::WebString;
 using blink::WebVector;
+using blink::mojom::GenericIssueErrorType;
 
 namespace autofill {
 
@@ -1434,13 +1435,14 @@ void MatchLabelsAndFields(
     field_data->label_source = FormFieldData::LabelSource::kFor;
     base::UmaHistogramEnumeration(kAssignedLabelSourceHistogram, label_source);
 
-    if (label_source == AssignedLabelSource::kName) {
+    if (label_source == AssignedLabelSource::kName &&
+        base::FeatureList::IsEnabled(features::kAutofillEnableDevtoolsIssues)) {
       // Add a DevTools issue informing the developer that the `label`'s for-
       // attribute is pointing to the name of a field, even though the ID should
       // be used.
       // TODO(crbug.com/1339277): Use `root` once the feature is launched.
       label.GetDocument().GetFrame()->AddGenericIssue(
-          blink::mojom::GenericIssueErrorType::kFormLabelForNameError,
+          GenericIssueErrorType::kFormLabelForNameError,
           label.GetDevToolsNodeId());
     }
   }
@@ -1462,7 +1464,7 @@ void MaybeEmitDuplicateIdForInputIssue(
     if (IsAutofillableElement(element) &&
         id_count[element.GetIdAttribute()] > 1) {
       element.GetDocument().GetFrame()->AddGenericIssue(
-          blink::mojom::GenericIssueErrorType::kFormDuplicateIdForInputError,
+          GenericIssueErrorType::kFormDuplicateIdForInputError,
           element.GetDevToolsNodeId());
     }
   }
@@ -1489,8 +1491,20 @@ void MaybeEmitInputWithNoLabelIssue(
     const WebFormControlElement& control_element =
         control_elements[element_index];
     control_element.GetDocument().GetFrame()->AddGenericIssue(
-        blink::mojom::GenericIssueErrorType::kFormInputWithNoLabelError,
+        GenericIssueErrorType::kFormInputWithNoLabelError,
         control_element.GetDevToolsNodeId());
+  }
+}
+
+void MaybeEmitInputWithEmptyIdAndNameIssue(
+    const WebFormControlElement& element) {
+  static base::NoDestructor<WebString> kName("name");
+
+  if (element.GetAttribute(*kName).IsEmpty() &&
+      element.GetIdAttribute().IsEmpty()) {
+    element.GetDocument().GetFrame()->AddGenericIssue(
+        GenericIssueErrorType::kFormEmptyIdAndNameAttributesForInputError,
+        element.GetDevToolsNodeId());
   }
 }
 
@@ -1524,7 +1538,9 @@ bool FormOrFieldsetsToFormData(
   DCHECK(!optional_field || form_control_element);
   DCHECK(!form_element || fieldsets.empty());
 
-  MaybeEmitDuplicateIdForInputIssue(control_elements);
+  if (base::FeatureList::IsEnabled(features::kAutofillEnableDevtoolsIssues)) {
+    MaybeEmitDuplicateIdForInputIssue(control_elements);
+  }
 
   // Extracts fields from |control_elements| into `form->fields` and sets
   // `form->child_frames[i].predecessor` to the field index of the last field
@@ -1561,6 +1577,10 @@ bool FormOrFieldsetsToFormData(
         form->unique_renderer_id, control_element, field_data_manager,
         extract_mask, &form->fields.back(), &shadow_fields.back());
     fields_extracted[i] = true;
+
+    if (base::FeatureList::IsEnabled(features::kAutofillEnableDevtoolsIssues)) {
+      MaybeEmitInputWithEmptyIdAndNameIssue(control_element);
+    }
 
     if (base::FeatureList::IsEnabled(features::kAutofillAcrossIframes)) {
       const blink::WebFormElement& ancestor_hint =
@@ -1620,7 +1640,9 @@ bool FormOrFieldsetsToFormData(
     }
   }
 
-  MaybeEmitInputWithNoLabelIssue(control_elements, form, fields_extracted);
+  if (base::FeatureList::IsEnabled(features::kAutofillEnableDevtoolsIssues)) {
+    MaybeEmitInputWithNoLabelIssue(control_elements, form, fields_extracted);
+  }
 
   // Infers field labels from other tags or <labels> without for="...".
   bool found_field = false;
@@ -1752,6 +1774,21 @@ std::string GetAutocompleteAttribute(const WebElement& element) {
     return "x-max-data-length-exceeded";
   }
   return autocomplete_attribute;
+}
+
+bool HasAutocompleteAttribute(const WebElement& element) {
+  static base::NoDestructor<WebString> kAutocomplete("autocomplete");
+  return element.HasAttribute(*kAutocomplete);
+}
+
+void ValidateAutocompleteAttributeForElement(const WebElement& element) {
+  std::string autocomplete_attribute = GetAutocompleteAttribute(element);
+  if (HasAutocompleteAttribute(element) && autocomplete_attribute.empty()) {
+    element.GetDocument().GetFrame()->AddGenericIssue(
+        blink::mojom::GenericIssueErrorType::
+            kFormAutocompleteAttributeEmptyError,
+        element.GetDevToolsNodeId());
+  }
 }
 
 void FindFormElementUpShadowRoots(const WebElement& element,
@@ -2082,6 +2119,11 @@ void WebFormControlElementToFormField(
   field->max_length =
       IsTextInput(input_element) ? input_element.MaxLength() : 0;
   field->autocomplete_attribute = GetAutocompleteAttribute(element);
+
+  if (base::FeatureList::IsEnabled(features::kAutofillEnableDevtoolsIssues)) {
+    ValidateAutocompleteAttributeForElement(element);
+  }
+
   field->parsed_autocomplete = ParseAutocompleteAttribute(
       field->autocomplete_attribute, field->max_length);
   if (base::EqualsCaseInsensitiveASCII(element.GetAttribute(*kRole).Utf16(),
@@ -2126,6 +2168,7 @@ void WebFormControlElementToFormField(
       field->name = field->name_attribute.empty() ? field->id_attribute
                                                   : field->name_attribute;
     }
+    ValidateAutocompleteAttributeForElement(element);
     if (field->autocomplete_attribute.empty()) {
       field->autocomplete_attribute = GetAutocompleteAttribute(host);
       field->parsed_autocomplete = ParseAutocompleteAttribute(

@@ -86,7 +86,7 @@
 #include "ui/gfx/text_elider.h"
 #include "ui/views/accessibility/view_accessibility.h"
 #include "ui/views/animation/ink_drop.h"
-#include "ui/views/animation/ink_drop_host_view.h"
+#include "ui/views/animation/ink_drop_host.h"
 #include "ui/views/background.h"
 #include "ui/views/border.h"
 #include "ui/views/controls/button/image_button.h"
@@ -1081,17 +1081,8 @@ std::pair<std::u16string, int> DownloadItemView::GetStatusTextAndStyle() const {
   if (type == DangerType::DOWNLOAD_DANGER_TYPE_DEEP_SCANNED_OPENED_DANGEROUS)
     return {l10n_util::GetStringUTF16(kDangerous), STYLE_RED};
 
-  const GURL url = model_->GetOriginalURL().DeprecatedGetOriginAsURL();
   const std::u16string text =
-      (!model_->ShouldPromoteOrigin() || url.is_empty())
-          ? model_->GetStatusText()
-#if BUILDFLAG(IS_ANDROID)
-          // url_formatter::ElideUrl() doesn't exist on Android.
-          : std::u16string();
-#else
-          : url_formatter::ElideUrl(url, status_label_->font_list(),
-                                    kTextWidth);
-#endif
+      model_->GetStatusTextForLabel(status_label_->font_list(), kTextWidth);
   return {text, views::style::STYLE_PRIMARY};
 }
 

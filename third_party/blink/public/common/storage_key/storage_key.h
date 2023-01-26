@@ -43,11 +43,20 @@ namespace blink {
 // `a.com` frame can be controlled by `b.com`, and is thus considered
 // third-party. The ancestor chain bit tracks this status.
 //
+// TODO(https://crbug.com/1410254): Use kCrossSite for this case.
 // Storage keys can also optionally have a nonce. Keys with different nonces are
 // considered distinct, and distinct from a key with no nonce. This is used to
 // implement iframe credentialless and other forms of storage partitioning.
 // Keys with a nonce disregard the top level site and ancestor chain bit. For
 // consistency we set them to the origin's site and `kSameSite` respectively.
+//
+// TODO(https://crbug.com/1410254): Use kCrossSite for this case.
+// Storage keys might have an opaque top level site (for example, if an
+// iframe is embedded in a data url). These storage keys always have a
+// `kSameSite` ancestor chain bit as it provides no additional distinctiveness.
+//
+// Storage keys might have a top level site and origin that don't match. These
+// storage keys always have a `kCrossSite` ancestor chain bit.
 //
 // For more details on the overall design, see
 // https://docs.google.com/document/d/1xd6MXcUhfnZqIe5dt2CTyCn6gEZ7nOezAEWS0W9hwbQ/edit.
@@ -74,7 +83,11 @@ class BLINK_COMMON_EXPORT StorageKey {
       const url::Origin& origin,
       const base::UnguessableToken& nonce);
 
-  // Callers may specify an optional nonce by passing nullptr.
+  // Callers may specify an optional `nonce` by passing nullptr.
+  // If the `nonce` isn't null, `top_level_site` must be the same as `origin`
+  // and `ancestor_chain_bit` must be kSameSite. If `top_level_site` is opaque,
+  // `ancestor_chain_bit` must be `kSameSite`, otherwise if `top_level_site`
+  // doesn't match `origin` `ancestor_chain_bit` must be `kCrossSite`.
   static StorageKey CreateWithOptionalNonce(
       const url::Origin& origin,
       const net::SchemefulSite& top_level_site,
@@ -141,12 +154,12 @@ class BLINK_COMMON_EXPORT StorageKey {
   static bool IsThirdPartyStoragePartitioningEnabled();
 
   // Serializes the `StorageKey` into a string.
-  // Do not call if `this` is opaque.
+  // Do not call if `origin_` is opaque.
   std::string Serialize() const;
 
   // Serializes into a string in the format used for localStorage (without
   // trailing slashes). Prefer Serialize() for uses other than localStorage. Do
-  // not call if `this` is opaque.
+  // not call if `origin_` is opaque.
   std::string SerializeForLocalStorage() const;
 
   // `IsThirdPartyContext` returns true if the StorageKey is for a context that
@@ -237,23 +250,16 @@ class BLINK_COMMON_EXPORT StorageKey {
     kNonceHigh = 1,
     kNonceLow = 2,
     kAncestorChainBit = 3,
-    kMaxValue = kAncestorChainBit,
+    kTopLevelSiteOpaqueNonceHigh = 4,
+    kTopLevelSiteOpaqueNonceLow = 5,
+    kTopLevelSiteOpaquePrecursor = 6,
+    kMaxValue = kTopLevelSiteOpaquePrecursor,
   };
 
   StorageKey(const url::Origin& origin,
              const net::SchemefulSite& top_level_site,
              const base::UnguessableToken* nonce,
-             blink::mojom::AncestorChainBit ancestor_chain_bit)
-      : origin_(origin),
-        top_level_site_(IsThirdPartyStoragePartitioningEnabled()
-                            ? top_level_site
-                            : net::SchemefulSite(origin)),
-        top_level_site_if_third_party_enabled_(top_level_site),
-        nonce_(nonce ? absl::make_optional(*nonce) : absl::nullopt),
-        ancestor_chain_bit_(IsThirdPartyStoragePartitioningEnabled()
-                                ? ancestor_chain_bit
-                                : blink::mojom::AncestorChainBit::kSameSite),
-        ancestor_chain_bit_if_third_party_enabled_(ancestor_chain_bit) {}
+             blink::mojom::AncestorChainBit ancestor_chain_bit);
 
   // Converts the attribute type into the separator + uint8_t byte
   // serialization. E.x.: kTopLevelSite becomes "^0"

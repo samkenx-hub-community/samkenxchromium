@@ -117,6 +117,26 @@ export class XfConflictDialog extends HTMLElement {
     this.action_ = '';
     this.checked_();
     this.dialog_.showModal();
+    this.setFocus_();
+  }
+
+  /**
+   * The conflict dialog has no title. Remove the <cr-dialog> title child that
+   * would focus, remove its <dialog> aria-labelledby and aria-describedby, so
+   * ARIA announces the #message (that is the initial focus) once.
+   *
+   * Per https://w3c.github.io/aria-practices/#dialog_roles_states_props, adds
+   * aria-modal='true' meaning all content outside the <dialog> is inert.
+   */
+  private setFocus_() {
+    this.dialog_.shadowRoot!.querySelector('#title')?.remove();
+
+    const element = this.getHtmlDialogElement();
+    element.setAttribute('aria-modal', 'true');
+    element.removeAttribute('aria-labelledby');
+    element.removeAttribute('aria-describedby');
+
+    this.getMessageElement().focus();
   }
 
   /**
@@ -124,6 +144,13 @@ export class XfConflictDialog extends HTMLElement {
    */
   getDialogElement(): CrDialogElement {
     return this.shadowRoot!.querySelector('#conflict-dialog')!;
+  }
+
+  /**
+   * Returns 'dialog' <dialog> element.
+   */
+  getHtmlDialogElement(): HTMLDialogElement {
+    return this.dialog_.getNative()!;
   }
 
   /**
@@ -154,6 +181,7 @@ export class XfConflictDialog extends HTMLElement {
       this.getReplaceButton().innerText = str('CONFLICT_DIALOG_REPLACE');
     }
 
+    this.getCheckboxElement().focus();
     this.toggleAttribute('checked', checked);
   }
 

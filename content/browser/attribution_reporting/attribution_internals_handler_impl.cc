@@ -14,12 +14,14 @@
 #include "base/command_line.h"
 #include "base/containers/flat_map.h"
 #include "base/containers/flat_set.h"
+#include "base/functional/bind.h"
 #include "base/functional/callback.h"
 #include "base/functional/callback_helpers.h"
 #include "base/functional/overloaded.h"
 #include "base/notreached.h"
 #include "base/ranges/algorithm.h"
 #include "base/time/time.h"
+#include "components/aggregation_service/parsing_utils.h"
 #include "components/attribution_reporting/aggregation_keys.h"
 #include "components/attribution_reporting/parsing_utils.h"
 #include "components/attribution_reporting/source_registration_error.mojom.h"
@@ -168,9 +170,18 @@ attribution_internals::mojom::WebUIReportPtr WebUIReport(
                           contribution.key()),
                       contribution.value());
                 });
+
+            ai_mojom::AttestationTokenPtr attestation_token =
+                aggregatable_data.attestation_token
+                    ? ai_mojom::AttestationToken::New(
+                          *aggregatable_data.attestation_token)
+                    : nullptr;
+
             return ai_mojom::WebUIReportData::NewAggregatableAttributionData(
                 ai_mojom::WebUIReportAggregatableAttributionData::New(
-                    std::move(contributions)));
+                    std::move(contributions), std::move(attestation_token),
+                    aggregation_service::SerializeAggregationCoordinator(
+                        aggregatable_data.aggregation_coordinator)));
           },
       },
       report.data());
@@ -202,7 +213,11 @@ void ForwardReportsToWebUI(
 AttributionInternalsHandlerImpl::AttributionInternalsHandlerImpl(
     WebUI* web_ui,
     mojo::PendingReceiver<attribution_internals::mojom::Handler> receiver)
-    : web_ui_(web_ui), receiver_(this, std::move(receiver)) {}
+    : web_ui_(web_ui), receiver_(this, std::move(receiver)) {
+  observers_.set_disconnect_handler(base::BindRepeating(
+      &AttributionInternalsHandlerImpl::OnObserverDisconnected,
+      base::Unretained(this)));
+}
 
 AttributionInternalsHandlerImpl::~AttributionInternalsHandlerImpl() = default;
 
@@ -374,10 +389,6 @@ void AttributionInternalsHandlerImpl::OnDebugReportSent(
     const AttributionDebugReport& report,
     int status,
     base::Time time) {
-  if (observers_.empty()) {
-    return;
-  }
-
   auto web_report = WebUIDebugReport::New();
   web_report->url = report.ReportURL();
   web_report->time = time.ToJsTime();
@@ -456,6 +467,8 @@ WebUITriggerStatus GetWebUITriggerStatus(EventLevelStatus status) {
       return WebUITriggerStatus::kExcessiveEventLevelReports;
     case EventLevelStatus::kReportWindowPassed:
       return WebUITriggerStatus::kReportWindowPassed;
+    case EventLevelStatus::kNotRegistered:
+      return WebUITriggerStatus::kNotRegistered;
   }
 }
 
@@ -514,6 +527,7 @@ void AttributionInternalsHandlerImpl::OnTriggerHandled(
       GetWebUITriggerStatus(result.event_level_status());
   web_ui_trigger->aggregatable_status =
       GetWebUITriggerStatus(result.aggregatable_status());
+  web_ui_trigger->attestation = trigger.attestation();
 
   for (auto& observer : observers_) {
     observer->OnTriggerHandled(web_ui_trigger.Clone());
@@ -536,6 +550,13 @@ void AttributionInternalsHandlerImpl::OnTriggerHandled(
     for (auto& observer : observers_) {
       observer->OnReportDropped(web_ui_report.Clone());
     }
+  }
+}
+
+void AttributionInternalsHandlerImpl::OnObserverDisconnected(
+    mojo::RemoteSetElementId) {
+  if (observers_.empty()) {
+    manager_observation_.Reset();
   }
 }
 

@@ -28,13 +28,13 @@ suite('AppearanceTest', () => {
                 mock, new CustomizeChromePageCallbackRouter()));
     callbackRouterRemote = CustomizeChromeApiProxy.getInstance()
                                .callbackRouter.$.bindNewPipeAndPassRemote();
-    // Set result for getChromeColors for the mock handler. Otherwise, it
-    // crashes since colors is a child of appearance and needs a Promise
-    // from getChromeColors.
-    handler.setResultFor('getChromeColors', Promise.resolve([]));
+    // Set result for getOverviewChromeColors for the mock handler. Otherwise,
+    // it crashes since colors is a child of appearance and needs a Promise from
+    // getOverviewChromeColors.
+    handler.setResultFor('getOverviewChromeColors', Promise.resolve({}));
     appearanceElement = document.createElement('customize-chrome-appearance');
     document.body.appendChild(appearanceElement);
-    await handler.whenCalled('getChromeColors');
+    await handler.whenCalled('getOverviewChromeColors');
   });
 
   test('appearance edit button creates event', async () => {
@@ -71,7 +71,8 @@ suite('AppearanceTest', () => {
     await callbackRouterRemote.$.flushForTesting();
 
     appearanceElement.$.setClassicChromeButton.click();
-    assertEquals(1, handler.getCallCount('setClassicChromeDefaultTheme'));
+    assertEquals(1, handler.getCallCount('removeBackgroundImage'));
+    assertEquals(1, handler.getCallCount('setDefaultColor'));
   });
 
   test('1P view shows when 3P theme info not set', async () => {

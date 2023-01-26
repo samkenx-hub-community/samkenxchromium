@@ -638,7 +638,7 @@ void RenderFrameHostManager::CommitPendingIfNecessary(
                   std::move(stored_page_to_restore_), clear_proxies_on_commit);
 
     if (base::FeatureList::IsEnabled(
-            kAvoidUnnecessaryNavigationCancellations)) {
+            features::kAvoidUnnecessaryNavigationCancellations)) {
       // When kAvoidUnnecessaryNavigationCancellations is enabled, if there are
       // other navigation requests that are ongoing, set their "associated
       // RenderFrameHost type" NONE, as the old type may no longer be accurate:
@@ -1043,10 +1043,17 @@ void RenderFrameHostManager::RestorePage(
   // in the long run. For now, and to avoid complex edge cases, we simply reuse
   // it to preserve the understood logic in CommitPending.
 
-  // There should be no speculative RFH at this point. With BackForwardCache, it
+  // When the kAvoidUnnecessaryNavigationCancellations flag is disabled, there
+  // should be no speculative RFH at this point. With BackForwardCache, it
   // should have never been created, and with prerender activation, it should
   // have been cleared out earlier.
-  DCHECK(!speculative_render_frame_host_);
+  // TODO(https://crbug.com/1220337): Ensure we aren't deleting a pending commit
+  // RFH.
+  DCHECK(base::FeatureList::IsEnabled(
+             features::kAvoidUnnecessaryNavigationCancellations) ||
+         !speculative_render_frame_host_);
+  SCOPED_CRASH_KEY_BOOL("Bug1407526", "spec_rfh_exists",
+                        !!speculative_render_frame_host_);
   speculative_render_frame_host_ = stored_page->TakeRenderFrameHost();
   // Now |stored_page| is destroyed and thus does not monitor cookie changes any
   // more. This is okay as eviction would not happen from this point.
@@ -1115,7 +1122,7 @@ void RenderFrameHostManager::DidCreateNavigationRequest(
     // calling that method for navigations which will be forced into the current
     // document.
     if (base::FeatureList::IsEnabled(
-            kAvoidUnnecessaryNavigationCancellations)) {
+            features::kAvoidUnnecessaryNavigationCancellations)) {
       // When kAvoidUnnecessaryNavigationCancellations is enabled, only delete
       // the speculative RFH if it is unused. In particular, this means that a
       // speculative RFH with a pending-commit navigation won't be deleted
@@ -1311,7 +1318,7 @@ RenderFrameHostManager::GetFrameHostForNavigation(
     request->SetAssociatedRFHType(
         NavigationRequest::AssociatedRenderFrameHostType::CURRENT);
     if (base::FeatureList::IsEnabled(
-            kAvoidUnnecessaryNavigationCancellations)) {
+            features::kAvoidUnnecessaryNavigationCancellations)) {
       // When kAvoidUnnecessaryNavigationCancellations is enabled, only delete
       // the speculative RFH if it is unused.
       DiscardSpeculativeRFHIfUnused(NavigationDiscardReason::kNewNavigation);
@@ -4157,7 +4164,7 @@ std::unique_ptr<RenderFrameHostImpl> RenderFrameHostManager::SetRenderFrameHost(
   // Note that this is a no-op for pending commit RenderFrameHosts (which start
   // with owner pointing to the FrameTreeNode owning them) and prerendering
   // activations (where RenderFrameHost's owner has been updated in
-  // PrerenderPageHolder::Activate), but is necessary for RFHs restored from
+  // PrerenderHost::Activate), but is necessary for RFHs restored from
   // back/forward cache.
   if (render_frame_host_)
     render_frame_host_->SetRenderFrameHostOwner(frame_tree_node_);

@@ -155,9 +155,11 @@ class CORE_EXPORT ComputedStyleUtils {
   static CSSValue* ValueForAnimationIterationCount(double iteration_count);
   static CSSValue* ValueForAnimationPlayState(EAnimPlayState);
   static CSSValue* ValueForAnimationRangeStart(
-      const absl::optional<Timing::TimelineOffset>&);
+      const absl::optional<Timing::TimelineOffset>&,
+      const ComputedStyle&);
   static CSSValue* ValueForAnimationRangeEnd(
-      const absl::optional<Timing::TimelineOffset>&);
+      const absl::optional<Timing::TimelineOffset>&,
+      const ComputedStyle&);
   static CSSValue* ValueForAnimationTimingFunction(
       const scoped_refptr<TimingFunction>&);
   static CSSValue* ValueForAnimationTimeline(const StyleTimeline&);
@@ -169,14 +171,15 @@ class CORE_EXPORT ComputedStyleUtils {
   static CSSValue* ValueForAnimationFillModeList(const CSSAnimationData*);
   static CSSValue* ValueForAnimationIterationCountList(const CSSAnimationData*);
   static CSSValue* ValueForAnimationPlayStateList(const CSSAnimationData*);
-  static CSSValue* ValueForAnimationRangeStartList(const CSSTimingData*);
-  static CSSValue* ValueForAnimationRangeEndList(const CSSTimingData*);
+  static CSSValue* ValueForAnimationRangeStartList(const CSSTimingData*,
+                                                   const ComputedStyle&);
+  static CSSValue* ValueForAnimationRangeEndList(const CSSTimingData*,
+                                                 const ComputedStyle&);
   static CSSValue* ValueForAnimationTimingFunctionList(const CSSTimingData*);
   static CSSValue* ValueForAnimationTimelineList(const CSSAnimationData*);
 
-  static CSSValue* SingleValueForViewTimelineShorthand(
-      const ScopedCSSName* name,
-      TimelineAxis);
+  static CSSValue* SingleValueForTimelineShorthand(const ScopedCSSName* name,
+                                                   TimelineAxis);
   static CSSValueList* ValuesForBorderRadiusCorner(const LengthSize&,
                                                    const ComputedStyle&);
   static CSSValue* ValueForBorderRadiusCorner(const LengthSize&,
@@ -287,10 +290,6 @@ class CORE_EXPORT ComputedStyleUtils {
   static CSSValueList* ValuesForContainerShorthand(const ComputedStyle&,
                                                    const LayoutObject*,
                                                    bool allow_visited_style);
-  static CSSValueList* ValuesForScrollTimelineShorthand(
-      const ComputedStyle&,
-      const LayoutObject*,
-      bool allow_visited_style);
   static CSSValue* ScrollCustomizationFlagsToCSSValue(
       scroll_customization::ScrollDirection);
   static CSSValue* ValueForGapLength(const absl::optional<Length>&,

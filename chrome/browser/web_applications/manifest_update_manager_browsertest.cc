@@ -31,6 +31,7 @@
 #include "base/test/bind.h"
 #include "base/test/metrics/histogram_tester.h"
 #include "base/test/scoped_feature_list.h"
+#include "base/test/test_future.h"
 #include "base/time/time.h"
 #include "build/build_config.h"
 #include "build/buildflag.h"
@@ -42,6 +43,7 @@
 #include "chrome/browser/ui/browser_list.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/web_applications/test/web_app_browsertest_util.h"
+#include "chrome/browser/ui/web_applications/web_app_browser_controller.h"
 #include "chrome/browser/web_applications/external_install_options.h"
 #include "chrome/browser/web_applications/externally_managed_app_manager.h"
 #include "chrome/browser/web_applications/mojom/user_display_mode.mojom.h"
@@ -76,7 +78,6 @@
 #include "components/services/app_service/public/cpp/icon_info.h"
 #include "components/services/app_service/public/cpp/protocol_handler_info.h"
 #include "components/services/app_service/public/cpp/share_target.h"
-#include "components/services/app_service/public/cpp/url_handler_info.h"
 #include "components/webapps/browser/install_result_code.h"
 #include "components/webapps/browser/installable/installable_metrics.h"
 #include "components/webapps/browser/uninstall_result_code.h"
@@ -108,12 +109,6 @@
 
 #if BUILDFLAG(IS_MAC)
 #include "base/mac/mac_util.h"
-#endif
-
-#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
-#include "base/command_line.h"
-#include "chrome/browser/web_applications/os_integration/url_handler_manager_impl.h"
-#include "chrome/browser/web_applications/test/fake_web_app_origin_association_manager.h"
 #endif
 
 #if BUILDFLAG(IS_CHROMEOS_ASH)
@@ -878,19 +873,6 @@ IN_PROC_BROWSER_TEST_F(ManifestUpdateManagerBrowserTest,
   EXPECT_EQ(GetProvider().registrar_unsafe().GetAppShortName(app_id),
             "Different app name");
 }
-
-class ManifestUpdateManagerAppIdentityBrowserTest
-    : public ManifestUpdateManagerBrowserTest {
- public:
-  ManifestUpdateManagerAppIdentityBrowserTest() {
-    scoped_feature_list_.InitWithFeatures(
-        {features::kPwaUpdateDialogForIcon, features::kPwaUpdateDialogForName},
-        {});
-  }
-
- private:
-  base::test::ScopedFeatureList scoped_feature_list_;
-};
 
 IN_PROC_BROWSER_TEST_F(ManifestUpdateManagerBrowserTest,
                        CheckIgnoresStartUrlChange) {
@@ -3381,240 +3363,6 @@ IN_PROC_BROWSER_TEST_F(ManifestUpdateManagerIconUpdatingBrowserTest,
   EXPECT_EQ(ReadAppIconPixel(app_id, /*size=*/192), SK_ColorBLACK);
 }
 
-class ManifestUpdateManagerBrowserTest_UrlHandlers
-    : public ManifestUpdateManagerBrowserTest {
- public:
-#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
-  void SetUpUrlHandlerManager() {
-    auto url_handler_manager =
-        std::make_unique<UrlHandlerManagerImpl>(browser()->profile());
-
-    // Set up web app origin association manager and expected data.
-    auto association_manager =
-        std::make_unique<FakeWebAppOriginAssociationManager>();
-    url::Origin foo_origin = url::Origin::Create(GURL("https://foo.com"));
-    url::Origin bar_origin = url::Origin::Create(GURL("https://bar.com"));
-    std::map<apps::UrlHandlerInfo, apps::UrlHandlerInfo> data = {
-        {apps::UrlHandlerInfo(foo_origin),
-         apps::UrlHandlerInfo(foo_origin, false, /*paths*/ {},
-                              /*exclude_paths*/ {"/exclude"})},
-        {apps::UrlHandlerInfo(bar_origin),
-         apps::UrlHandlerInfo(bar_origin, false, /*paths*/ {},
-                              /*exclude_paths*/ {"/exclude"})},
-    };
-    association_manager->SetData(std::move(data));
-
-    url_handler_manager->SetAssociationManagerForTesting(
-        std::move(association_manager));
-    url_handler_manager->SetSubsystems(&(GetProvider().registrar_unsafe()));
-    GetProvider().os_integration_manager().set_url_handler_manager(
-        std::move(url_handler_manager));
-  }
-#endif
-
-  base::test::ScopedFeatureList scoped_feature_list_{
-      blink::features::kWebAppEnableUrlHandlers};
-};
-
-IN_PROC_BROWSER_TEST_F(ManifestUpdateManagerBrowserTest_UrlHandlers,
-                       UpdateWithDifferentUrlHandlers) {
-  constexpr char kManifestTemplate[] = R"(
-    {
-      "name": "Test app name",
-      "start_url": ".",
-      "scope": "/",
-      "display": "standalone",
-      "icons": $1,
-      "url_handlers": [$2]
-    }
-  )";
-
-  OverrideManifest(kManifestTemplate, {
-                                          kInstallableIconList,
-                                          R"({"origin": "https://foo.com"})",
-                                      });
-  AppId app_id = InstallWebApp();
-  ASSERT_EQ(1u,
-            GetProvider().registrar_unsafe().GetAppUrlHandlers(app_id).size());
-
-  OverrideManifest(
-      kManifestTemplate,
-      {kInstallableIconList,
-       R"({"origin": "https://foo.com"}, {"origin": "https://bar.com"})"});
-  EXPECT_EQ(GetResultAfterPageLoad(GetAppURL()),
-            ManifestUpdateResult::kAppUpdated);
-
-  apps::UrlHandlers url_handlers =
-      GetProvider().registrar_unsafe().GetAppUrlHandlers(app_id);
-  ASSERT_EQ(2u, url_handlers.size());
-  EXPECT_TRUE(base::Contains(
-      url_handlers,
-      apps::UrlHandlerInfo(url::Origin::Create(GURL("https://foo.com")))));
-  EXPECT_TRUE(base::Contains(
-      url_handlers,
-      apps::UrlHandlerInfo(url::Origin::Create(GURL("https://bar.com")))));
-}
-
-IN_PROC_BROWSER_TEST_F(ManifestUpdateManagerBrowserTest_UrlHandlers,
-                       UpdateFromNoUrlHandlersToHaveUrlHandlers) {
-  constexpr char kManifestTemplate[] = R"(
-    {
-      "name": "Test app name",
-      "start_url": ".",
-      "scope": "/",
-      "display": "standalone",
-      "icons": $1
-      $2
-    }
-  )";
-
-  OverrideManifest(kManifestTemplate, {
-                                          kInstallableIconList,
-                                          R"()",
-                                      });
-  AppId app_id = InstallWebApp();
-  ASSERT_EQ(0u,
-            GetProvider().registrar_unsafe().GetAppUrlHandlers(app_id).size());
-
-  OverrideManifest(kManifestTemplate,
-                   {kInstallableIconList,
-                    R"(,"url_handlers": [{"origin": "https://foo.com"}])"});
-  EXPECT_EQ(GetResultAfterPageLoad(GetAppURL()),
-            ManifestUpdateResult::kAppUpdated);
-
-  apps::UrlHandlers url_handlers =
-      GetProvider().registrar_unsafe().GetAppUrlHandlers(app_id);
-  ASSERT_EQ(1u, url_handlers.size());
-  EXPECT_TRUE(base::Contains(
-      url_handlers,
-      apps::UrlHandlerInfo(url::Origin::Create(GURL("https://foo.com")))));
-}
-
-IN_PROC_BROWSER_TEST_F(ManifestUpdateManagerBrowserTest_UrlHandlers,
-                       UpdateFromUrlHandlersToNoUrlHandlers) {
-  constexpr char kManifestTemplate[] = R"(
-    {
-      "name": "Test app name",
-      "start_url": ".",
-      "scope": "/",
-      "display": "standalone",
-      "icons": $1
-      $2
-    }
-  )";
-
-  OverrideManifest(kManifestTemplate,
-                   {
-                       kInstallableIconList,
-                       R"(,"url_handlers": [{"origin": "https://foo.com"}])",
-                   });
-  AppId app_id = InstallWebApp();
-  apps::UrlHandlers url_handlers =
-      GetProvider().registrar_unsafe().GetAppUrlHandlers(app_id);
-  ASSERT_EQ(1u, url_handlers.size());
-  EXPECT_TRUE(base::Contains(
-      url_handlers,
-      apps::UrlHandlerInfo(url::Origin::Create(GURL("https://foo.com")))));
-
-  OverrideManifest(kManifestTemplate, {kInstallableIconList, R"()"});
-  EXPECT_EQ(GetResultAfterPageLoad(GetAppURL()),
-            ManifestUpdateResult::kAppUpdated);
-
-  url_handlers = GetProvider().registrar_unsafe().GetAppUrlHandlers(app_id);
-  ASSERT_EQ(0u, url_handlers.size());
-}
-
-#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
-class ManifestUpdateBrowserTestUrlHandlerSynchronize
-    : public ManifestUpdateManagerBrowserTest_UrlHandlers,
-      public ::testing::WithParamInterface<OsIntegrationSubManagersState> {
- public:
-  ManifestUpdateBrowserTestUrlHandlerSynchronize() {
-    if (GetParam() == OsIntegrationSubManagersState::kSaveStateToDB) {
-      scoped_feature_list_.InitWithFeaturesAndParameters(
-          {{features::kOsIntegrationSubManagers, {{"stage", "write_config"}}}},
-          /*disabled_features=*/{});
-    } else {
-      scoped_feature_list_.InitWithFeatures(
-          {}, {features::kOsIntegrationSubManagers});
-    }
-  }
-
-  ~ManifestUpdateBrowserTestUrlHandlerSynchronize() override = default;
-
- private:
-  base::test::ScopedFeatureList scoped_feature_list_;
-};
-
-IN_PROC_BROWSER_TEST_P(ManifestUpdateBrowserTestUrlHandlerSynchronize,
-                       NoHandlersChangeUpdateAssociations) {
-  constexpr char kManifestTemplate[] = R"(
-    {
-      "name": "Test app name",
-      "start_url": ".",
-      "scope": "/",
-      "display": "standalone",
-      "icons": $1,
-      "url_handlers": [
-        {
-          "origin": "https://foo.com"
-        },
-        {
-          "origin": "https://bar.com"
-        }
-      ]
-    }
-  )";
-
-  OverrideManifest(kManifestTemplate, {kInstallableIconList});
-  AppId app_id = InstallWebApp();
-  apps::UrlHandlers url_handlers =
-      GetProvider().registrar_unsafe().GetAppUrlHandlers(app_id);
-  ASSERT_EQ(2u, url_handlers.size());
-  EXPECT_TRUE(base::Contains(
-      url_handlers,
-      apps::UrlHandlerInfo(url::Origin::Create(GURL("https://foo.com")))));
-  EXPECT_TRUE(base::Contains(
-      url_handlers,
-      apps::UrlHandlerInfo(url::Origin::Create(GURL("https://bar.com")))));
-
-  // Prepare for association fetching at manifest update.
-  SetUpUrlHandlerManager();
-  OverrideManifest(kManifestTemplate, {kInstallableIconList});
-  EXPECT_EQ(GetResultAfterPageLoad(GetAppURL()),
-            ManifestUpdateResult::kAppAssociationsUpdated);
-
-  // Verify url handlers are saved to prefs.
-  base::CommandLine cmd = base::CommandLine(base::CommandLine::NO_PROGRAM);
-  cmd.AppendArg("https://foo.com/ok");
-  std::vector<UrlHandlerLaunchParams> matches =
-      UrlHandlerManagerImpl::GetUrlHandlerMatches(cmd);
-  ASSERT_EQ(matches.size(), 1u);
-  // Check exclude paths came through.
-  cmd = base::CommandLine(base::CommandLine::NO_PROGRAM);
-  cmd.AppendArg("https://foo.com/exclude");
-  matches = UrlHandlerManagerImpl::GetUrlHandlerMatches(cmd);
-  ASSERT_EQ(matches.size(), 0u);
-
-  cmd = base::CommandLine(base::CommandLine::NO_PROGRAM);
-  cmd.AppendArg("https://bar.com/ok");
-  matches = UrlHandlerManagerImpl::GetUrlHandlerMatches(cmd);
-  ASSERT_EQ(matches.size(), 1u);
-  // Check exclude paths came through.
-  cmd = base::CommandLine(base::CommandLine::NO_PROGRAM);
-  cmd.AppendArg("https://bar.com/exclude");
-  matches = UrlHandlerManagerImpl::GetUrlHandlerMatches(cmd);
-  ASSERT_EQ(matches.size(), 0u);
-}
-
-INSTANTIATE_TEST_SUITE_P(
-    All,
-    ManifestUpdateBrowserTestUrlHandlerSynchronize,
-    ::testing::Values(OsIntegrationSubManagersState::kSaveStateToDB,
-                      OsIntegrationSubManagersState::kDisabled),
-    test::GetOsIntegrationSubManagersTestName);
-#endif
-
 IN_PROC_BROWSER_TEST_F(ManifestUpdateManagerBrowserTest,
                        CheckFindsAddedProtocolHandler) {
   constexpr char kManifestTemplate[] = R"(
@@ -4332,6 +4080,23 @@ IN_PROC_BROWSER_TEST_F(ManifestUpdateManagerBrowserTest_ManifestId,
                   .has_value());
 }
 
+class ManifestUpdateManagerAppIdentityBrowserTest
+    : public ManifestUpdateManagerBrowserTest {
+ public:
+  ManifestUpdateManagerAppIdentityBrowserTest() {
+    scoped_feature_list_.InitWithFeatures(
+        {features::kPwaUpdateDialogForIcon, features::kPwaUpdateDialogForName},
+        // These tests also cover update during shutdown which is reliably
+        // triggered by having the web app window being the last browser window
+        // to close when manifest updating is awaiting all web app windows to
+        // close. Disable immediate updating to get the delayed update behavior.
+        {features::kWebAppManifestImmediateUpdating});
+  }
+
+ private:
+  base::test::ScopedFeatureList scoped_feature_list_;
+};
+
 // This test exercises the upgrade path for App Identity manifest updates with
 // the update pending while Chrome is in the process of shutting down.
 IN_PROC_BROWSER_TEST_F(ManifestUpdateManagerAppIdentityBrowserTest,
@@ -4512,6 +4277,106 @@ IN_PROC_BROWSER_TEST_F(ManifestUpdateManagerAppIdentityBrowserTest,
           }));
 
   run_loop.Run();
+}
+
+class ManifestUpdateManagerImmediateUpdateBrowserTest
+    : public ManifestUpdateManagerBrowserTest {
+ public:
+  ManifestUpdateManagerImmediateUpdateBrowserTest() = default;
+
+  SkColor GetMiddlePixel(gfx::Image image) {
+    SkBitmap bitmap = image.AsBitmap();
+    return bitmap.getColor(bitmap.width() / 2, bitmap.height() / 2);
+  }
+
+ private:
+  base::test::ScopedFeatureList scoped_feature_list_{
+      features::kWebAppManifestImmediateUpdating};
+};
+
+// Test whether web app windows update their UI immediately after a manifest
+// update gets applied.
+IN_PROC_BROWSER_TEST_F(ManifestUpdateManagerImmediateUpdateBrowserTest,
+                       WebAppWindowsUpdatedImmediately) {
+  constexpr char kManifestTemplate[] = R"(
+    {
+      "name": "$1",
+      "start_url": "manifest_test_page.html",
+      "scope": "/",
+      "display": "$2",
+      "icons": [{
+        "src": "$3",
+        "sizes": "256x256",
+        "type": "image/png"
+      }],
+      "theme_color": "$4"
+    }
+  )";
+
+  // Install default web app (so user confirmations aren't required for updating
+  // its identity).
+  OverrideManifest(kManifestTemplate,
+                   {"Old name", "standalone", "256x256-red.png", "red"});
+  AppId app_id = InstallDefaultApp();
+  GURL app_url = GetAppURL();
+  Browser* app_browser = nullptr;
+
+  // Launch app window and wait for the page to load, the app icon to load and
+  // the manifest update check to complete.
+  {
+    base::RunLoop icon_load;
+    WebAppBrowserController::SetIconLoadCallbackForTesting(
+        icon_load.QuitClosure());
+    UpdateCheckResultAwaiter result_awaiter(app_url);
+
+    app_browser = LaunchWebAppBrowserAndWait(browser()->profile(), app_id);
+
+    icon_load.Run();
+    EXPECT_EQ(std::move(result_awaiter).AwaitNextResult(),
+              ManifestUpdateResult::kAppUpToDate);
+  }
+
+  // Update manifest UI elements.
+  OverrideManifest(kManifestTemplate,
+                   {"New name", "minimal-ui", "256x256-green.png", "lime"});
+
+  // Set up awaiters.
+  base::RunLoop app_window_update;
+  WebAppBrowserController::SetManifestUpdateAppliedCallbackForTesting(
+      app_window_update.QuitClosure());
+  base::RunLoop second_icon_load;
+  WebAppBrowserController::SetIconLoadCallbackForTesting(
+      second_icon_load.QuitClosure());
+  UpdateCheckResultAwaiter result_awaiter(app_url);
+
+  // Reload page to invoke a manifest update check.
+  GetProvider().manifest_update_manager().ResetManifestThrottleForTesting(
+      app_id);
+  chrome::Reload(app_browser, WindowOpenDisposition::CURRENT_TAB);
+
+  // Check update takes effect on web app database.
+  EXPECT_EQ(std::move(result_awaiter).AwaitNextResult(),
+            ManifestUpdateResult::kAppUpdated);
+  histogram_tester_.ExpectBucketCount(kUpdateHistogramName,
+                                      ManifestUpdateResult::kAppUpdated, 1);
+  const WebApp* web_app = GetProvider().registrar_unsafe().GetAppById(app_id);
+  ASSERT_TRUE(web_app);
+  EXPECT_EQ(web_app->untranslated_name(), "New name");
+  EXPECT_EQ(web_app->display_mode(), DisplayMode::kMinimalUi);
+  EXPECT_EQ(web_app->theme_color(), SK_ColorGREEN);
+
+  // Check update takes effect on live web app window.
+  app_window_update.Run();
+  AppBrowserController* app_controller = app_browser->app_controller();
+  EXPECT_EQ(app_controller->GetTitle(), u"New name - Web app banner test page");
+  EXPECT_EQ(app_controller->GetThemeColor(), SK_ColorGREEN);
+
+  // Force the app icon to load again and check that it's the new one.
+  app_controller->GetWindowIcon();
+  second_icon_load.Run();
+  // Read the middle of the icon since on Chrome OS it gets circlified.
+  EXPECT_EQ(GetMiddlePixel(app_controller->GetWindowIcon().GetImage()),
+            SK_ColorGREEN);
 }
 
 enum AppIdTestParam {

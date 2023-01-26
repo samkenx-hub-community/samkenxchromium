@@ -223,10 +223,6 @@ void WaylandSurface::UnsetRootWindow() {
   root_window_ = nullptr;
 }
 
-void WaylandSurface::SetRootWindow(WaylandWindow* window) {
-  root_window_ = window;
-}
-
 void WaylandSurface::set_acquire_fence(gfx::GpuFenceHandle acquire_fence) {
   // WaylandBufferManagerGPU knows if the synchronization is not available and
   // must disallow clients to use explicit synchronization.
@@ -727,14 +723,16 @@ void WaylandSurface::ForceImmediateStateApplication() {
   apply_state_immediately_ = true;
 }
 
-void WaylandSurface::InhibitKeyboardShortcuts() {
-  if (auto* keyboard_shortcuts_inhibit_manager =
-          connection_->keyboard_shortcuts_inhibit_manager_v1()) {
+void WaylandSurface::SetKeyboardShortcutsInhibition(bool enabled) {
+  if (!enabled) {
+    keyboard_shortcuts_inhibitor_.reset();
+    return;
+  }
+  if (auto* manager = connection_->keyboard_shortcuts_inhibit_manager_v1()) {
     keyboard_shortcuts_inhibitor_ =
         wl::Object<zwp_keyboard_shortcuts_inhibitor_v1>(
             zwp_keyboard_shortcuts_inhibit_manager_v1_inhibit_shortcuts(
-                keyboard_shortcuts_inhibit_manager, surface_.get(),
-                connection_->seat()->wl_object()));
+                manager, surface_.get(), connection_->seat()->wl_object()));
   }
 }
 

@@ -65,6 +65,9 @@
 #define IDC_MAXIMIZE_WINDOW             34047
 #define IDC_ALL_WINDOWS_FRONT           34048
 #define IDC_NAME_WINDOW                 34049
+#if BUILDFLAG(IS_CHROMEOS)
+#define IDC_TOGGLE_MULTITASK_MENU       34050
+#endif
 
 // TODO(crbug.com/1052397): Revisit the macro expression once build flag switch of lacros-chrome is complete.
 #if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS_LACROS)
@@ -473,6 +476,8 @@
 #define IDC_DEBUG_PRINT_VIEW_TREE_DETAILS 52512
 // Please leave a gap here for new debug commands.
 
+// Autofill feedback.
+#define IDC_CONTENT_CONTEXT_AUTOFILL_FEEDBACK 52990
 // Autofill context menu commands
 #define IDC_CONTENT_CONTEXT_AUTOFILL_CUSTOM_FIRST 53000
 #define IDC_CONTENT_CONTEXT_AUTOFILL_CUSTOM_LAST 53250

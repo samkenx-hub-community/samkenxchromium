@@ -5,6 +5,8 @@
 #import "ios/chrome/browser/ui/omnibox/popup/omnibox_popup_row_cell.h"
 
 #import "base/check.h"
+#import "base/i18n/rtl.h"
+#import "base/strings/sys_string_conversions.h"
 #import "components/omnibox/common/omnibox_features.h"
 #import "ios/chrome/browser/ui/elements/extended_touch_target_button.h"
 #import "ios/chrome/browser/ui/elements/fade_truncating_label.h"
@@ -308,12 +310,12 @@ NSString* const kOmniboxPopupRowSwitchTabAccessibilityIdentifier =
   DCHECK(self.imageLayoutGuide);
   DCHECK(self.textLayoutGuide);
 
-  // The text stack view should extend to the end of the omnibox, except if
-  // there is a trailing button. Make this constraint non-required so that it is
-  // ignored in that conflicting case.
-  NSLayoutConstraint* constraint = [self.textStackView.trailingAnchor
-      constraintEqualToAnchor:self.textLayoutGuide.trailingAnchor];
-  constraint.priority = UILayoutPriorityDefaultHigh;
+  // The text should extend to the cell's trailing edge when there is no
+  // trailing button.
+  NSLayoutConstraint* stackViewToCellTrailing =
+      [self.textStackView.trailingAnchor
+          constraintEqualToAnchor:self.contentView.trailingAnchor];
+  stackViewToCellTrailing.priority = UILayoutPriorityDefaultHigh;
 
   // These constraints need to be removed when freezing the position of these
   // views. See -freezeLayoutGuidePositions for the reason why.
@@ -326,7 +328,7 @@ NSString* const kOmniboxPopupRowSwitchTabAccessibilityIdentifier =
         constraintEqualToAnchor:self.imageLayoutGuide.widthAnchor],
     [self.textStackView.leadingAnchor
         constraintEqualToAnchor:self.textLayoutGuide.leadingAnchor],
-    constraint,
+    stackViewToCellTrailing,
   ];
 
   [NSLayoutConstraint
@@ -401,6 +403,9 @@ NSString* const kOmniboxPopupRowSwitchTabAccessibilityIdentifier =
 
   // Clear text.
   self.textTruncatingLabel.attributedText = nil;
+  self.textTruncatingLabel.truncateMode = FadeTruncatingTail;
+  self.textTruncatingLabel.semanticContentAttribute =
+      UISemanticContentAttributeUnspecified;
   self.detailTruncatingLabel.attributedText = nil;
   self.detailAnswerLabel.attributedText = nil;
 
@@ -454,8 +459,14 @@ NSString* const kOmniboxPopupRowSwitchTabAccessibilityIdentifier =
           : suggestion.text;
   if (base::FeatureList::IsEnabled(kOmniboxMultilineSearchSuggest) &&
       suggestion.isMatchTypeSearch) {
-    self.textTruncatingLabel.lineBreakMode = NSLineBreakByWordWrapping;
     self.textTruncatingLabel.numberOfLines = kSearchSuggestNumberOfLines;
+    base::i18n::TextDirection textDirection = base::i18n::GetStringDirection(
+        base::SysNSStringToUTF16(self.textTruncatingLabel.text));
+    if (textDirection == base::i18n::RIGHT_TO_LEFT) {
+      self.textTruncatingLabel.semanticContentAttribute =
+          UISemanticContentAttributeForceRightToLeft;
+      self.textTruncatingLabel.truncateMode = FadeTruncatingHead;
+    }
   } else {
     // Default values for FadeTruncatingLabel.
     self.textTruncatingLabel.lineBreakMode = NSLineBreakByClipping;

@@ -793,6 +793,16 @@ class FederatedAuthRequestImplTest : public RenderViewHostImplTestHarness {
     return dialog_controller_state_.did_show_idp_signin_status_mismatch_dialog;
   }
 
+  int CountNumLoginStateIsSignin() {
+    int num_sign_in_login_state = 0;
+    for (const auto& account : displayed_accounts()) {
+      if (account.login_state == LoginState::kSignIn) {
+        ++num_sign_in_login_state;
+      }
+    }
+    return num_sign_in_login_state;
+  }
+
   bool DidFetchAnyEndpoint() {
     for (auto& [endpoint, num] : test_network_request_manager_->num_fetched_) {
       if (num > 0) {
@@ -1248,7 +1258,10 @@ TEST_F(FederatedAuthRequestImplTest,
   EXPECT_TRUE(DidFetch(FetchedEndpoint::TOKEN));
 }
 
-TEST_F(FederatedAuthRequestImplTest, AutoSignInForReturningUser) {
+// Test that auto sign-in with a single account where the account is a returning
+// user sets the sign-in mode to auto.
+TEST_F(FederatedAuthRequestImplTest,
+       AutoSigninForSingleReturningUserSingleAccount) {
   base::test::ScopedFeatureList list;
   list.InitAndEnableFeature(features::kFedCmAutoSignin);
 
@@ -1271,7 +1284,49 @@ TEST_F(FederatedAuthRequestImplTest, AutoSignInForReturningUser) {
   EXPECT_EQ(dialog_controller_state_.sign_in_mode, SignInMode::kAuto);
 }
 
-TEST_F(FederatedAuthRequestImplTest, AutoSignInForFirstTimeUser) {
+// Test that auto sign-in with multiple accounts and a single returning user
+// sets the sign-in mode to auto.
+TEST_F(FederatedAuthRequestImplTest,
+       AutoSigninForSingleReturningUserMultipleAccounts) {
+  base::test::ScopedFeatureList list;
+  list.InitAndEnableFeature(features::kFedCmAutoSignin);
+
+  RequestParameters request_parameters = kDefaultRequestParameters;
+  request_parameters.prefer_auto_sign_in = true;
+
+  MockConfiguration configuration = kConfigurationValid;
+  configuration.idp_info[kProviderUrlFull].accounts = kMultipleAccounts;
+  RunAuthTest(request_parameters, kExpectationSuccess, configuration);
+
+  ASSERT_EQ(displayed_accounts().size(), 3u);
+  EXPECT_EQ(CountNumLoginStateIsSignin(), 1);
+  EXPECT_EQ(dialog_controller_state_.sign_in_mode, SignInMode::kAuto);
+}
+
+// Test that auto sign-in with multiple accounts and multiple returning users
+// sets the sign-in mode to explicit.
+TEST_F(FederatedAuthRequestImplTest,
+       AutoSigninForMultipleReturningUsersMultipleAccounts) {
+  base::test::ScopedFeatureList list;
+  list.InitAndEnableFeature(features::kFedCmAutoSignin);
+
+  RequestParameters request_parameters = kDefaultRequestParameters;
+  request_parameters.prefer_auto_sign_in = true;
+
+  AccountList multiple_accounts = kMultipleAccounts;
+  multiple_accounts[0].login_state = LoginState::kSignIn;
+  MockConfiguration configuration = kConfigurationValid;
+  configuration.idp_info[kProviderUrlFull].accounts = multiple_accounts;
+  RunAuthTest(request_parameters, kExpectationSuccess, configuration);
+
+  ASSERT_EQ(displayed_accounts().size(), 3u);
+  EXPECT_EQ(CountNumLoginStateIsSignin(), 2);
+  EXPECT_EQ(dialog_controller_state_.sign_in_mode, SignInMode::kExplicit);
+}
+
+// Test that auto sign-in for a first time user sets the sign-in mode to
+// explicit.
+TEST_F(FederatedAuthRequestImplTest, AutoSigninForFirstTimeUser) {
   base::test::ScopedFeatureList list;
   list.InitAndEnableFeature(features::kFedCmAutoSignin);
 
@@ -1281,32 +1336,6 @@ TEST_F(FederatedAuthRequestImplTest, AutoSignInForFirstTimeUser) {
 
   ASSERT_EQ(displayed_accounts().size(), 1u);
   EXPECT_EQ(displayed_accounts()[0].login_state, LoginState::kSignUp);
-  EXPECT_EQ(dialog_controller_state_.sign_in_mode, SignInMode::kExplicit);
-}
-
-TEST_F(FederatedAuthRequestImplTest, AutoSignInWithScreenReader) {
-  base::test::ScopedFeatureList list;
-  list.InitAndEnableFeature(features::kFedCmAutoSignin);
-
-  content::BrowserAccessibilityState::GetInstance()->AddAccessibilityModeFlags(
-      ui::AXMode::kScreenReader);
-
-  // Pretend the sharing permission has been granted for this account.
-  EXPECT_CALL(
-      *mock_permission_delegate_,
-      HasSharingPermission(OriginFromString(kRpUrl), OriginFromString(kRpUrl),
-                           OriginFromString(kProviderUrlFull), kAccountId))
-      .WillOnce(Return(true));
-
-  for (const auto& idp_info : kConfigurationValid.idp_info) {
-    ASSERT_EQ(idp_info.second.accounts.size(), 1u);
-  }
-  RequestParameters request_parameters = kDefaultRequestParameters;
-  request_parameters.prefer_auto_sign_in = true;
-  RunAuthTest(request_parameters, kExpectationSuccess, kConfigurationValid);
-
-  ASSERT_EQ(displayed_accounts().size(), 1u);
-  EXPECT_EQ(displayed_accounts()[0].login_state, LoginState::kSignIn);
   EXPECT_EQ(dialog_controller_state_.sign_in_mode, SignInMode::kExplicit);
 }
 

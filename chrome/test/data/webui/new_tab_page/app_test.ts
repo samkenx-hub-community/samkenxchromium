@@ -5,18 +5,18 @@
 import 'chrome://webui-test/mojo_webui_test_support.js';
 
 import {counterfactualLoad, LensUploadDialogElement, Module, ModuleDescriptor, ModuleRegistry} from 'chrome://new-tab-page/lazy_load.js';
-import {$$, AppElement, BackgroundManager, BrowserCommandProxy, CustomizeDialogPage, NewTabPageProxy, NtpElement, VoiceAction, WindowProxy} from 'chrome://new-tab-page/new_tab_page.js';
-import {PageCallbackRouter, PageHandlerRemote, PageRemote} from 'chrome://new-tab-page/new_tab_page.mojom-webui.js';
+import {$$, AppElement, BackgroundManager, BrowserCommandProxy, CustomizeDialogPage, NewTabPageProxy, NtpCustomizeChromeEntryPoint, NtpElement, VoiceAction, WindowProxy} from 'chrome://new-tab-page/new_tab_page.js';
+import {CustomizeChromeSection, PageCallbackRouter, PageHandlerRemote, PageRemote} from 'chrome://new-tab-page/new_tab_page.mojom-webui.js';
 import {Command, CommandHandlerRemote} from 'chrome://resources/js/browser_command/browser_command.mojom-webui.js';
 import {loadTimeData} from 'chrome://resources/js/load_time_data.js';
 import {isMac} from 'chrome://resources/js/platform.js';
 import {PromiseResolver} from 'chrome://resources/js/promise_resolver.js';
 import {assertDeepEquals, assertEquals, assertFalse, assertTrue} from 'chrome://webui-test/chai_assert.js';
+import {fakeMetricsPrivate, MetricsTracker} from 'chrome://webui-test/metrics_test_support.js';
 import {flushTasks} from 'chrome://webui-test/polymer_test_util.js';
 import {TestBrowserProxy} from 'chrome://webui-test/test_browser_proxy.js';
 import {eventToPromise} from 'chrome://webui-test/test_util.js';
 
-import {fakeMetricsPrivate, MetricsTracker} from './../metrics_test_support.js';
 import {assertNotStyle, assertStyle, createBackgroundImage, createTheme, installMock} from './test_support.js';
 
 suite('NewTabPageAppTest', () => {
@@ -646,17 +646,36 @@ suite('NewTabPageAppTest', () => {
       $$<HTMLElement>(app, '#customizeButton')!.click();
 
       // Assert.
-      assertTrue(handler.getArgs('setCustomizeChromeSidePanelVisible')[0]);
+      assertDeepEquals(
+          [true, CustomizeChromeSection.kUnspecified],
+          handler.getArgs('setCustomizeChromeSidePanelVisible')[0]);
+      assertEquals(
+          1,
+          metrics.count(
+              'NewTabPage.CustomizeChromeOpened',
+              NtpCustomizeChromeEntryPoint.CUSTOMIZE_BUTTON));
     });
 
     test('clicking customize button hides side panel', async () => {
       // Act.
       callbackRouterRemote.setCustomizeChromeSidePanelVisibility(true);
+      assertEquals(
+          0,
+          metrics.count(
+              'NewTabPage.CustomizeChromeOpened',
+              NtpCustomizeChromeEntryPoint.CUSTOMIZE_BUTTON));
       await callbackRouterRemote.$.flushForTesting();
       $$<HTMLElement>(app, '#customizeButton')!.click();
 
       // Assert.
-      assertFalse(handler.getArgs('setCustomizeChromeSidePanelVisible')[0]);
+      assertDeepEquals(
+          [false, CustomizeChromeSection.kUnspecified],
+          handler.getArgs('setCustomizeChromeSidePanelVisible')[0]);
+      assertEquals(
+          0,
+          metrics.count(
+              'NewTabPage.CustomizeChromeOpened',
+              NtpCustomizeChromeEntryPoint.CUSTOMIZE_BUTTON));
     });
 
     suite('modules', () => {
@@ -671,7 +690,14 @@ suite('NewTabPageAppTest', () => {
         $$(app, 'ntp-modules')!.dispatchEvent(new Event('customize-module'));
 
         // Assert.
-        assertTrue(handler.getArgs('setCustomizeChromeSidePanelVisible')[0]);
+        assertDeepEquals(
+            [true, CustomizeChromeSection.kModules],
+            handler.getArgs('setCustomizeChromeSidePanelVisible')[0]);
+        assertEquals(
+            1,
+            metrics.count(
+                'NewTabPage.CustomizeChromeOpened',
+                NtpCustomizeChromeEntryPoint.MODULE));
       });
     });
 
@@ -684,7 +710,14 @@ suite('NewTabPageAppTest', () => {
 
       test('URL opens side panel', () => {
         // Assert.
-        assertTrue(handler.getArgs('setCustomizeChromeSidePanelVisible')[0]);
+        assertDeepEquals(
+            [true, CustomizeChromeSection.kAppearance],
+            handler.getArgs('setCustomizeChromeSidePanelVisible')[0]);
+        assertEquals(
+            1,
+            metrics.count(
+                'NewTabPage.CustomizeChromeOpened',
+                NtpCustomizeChromeEntryPoint.URL));
       });
     });
   });

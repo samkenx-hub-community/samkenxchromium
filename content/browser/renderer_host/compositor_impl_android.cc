@@ -19,6 +19,7 @@
 #include "base/command_line.h"
 #include "base/containers/contains.h"
 #include "base/functional/bind.h"
+#include "base/functional/callback_helpers.h"
 #include "base/lazy_instance.h"
 #include "base/logging.h"
 #include "base/memory/raw_ptr.h"
@@ -86,8 +87,6 @@
 namespace content {
 
 namespace {
-
-static const char* kBrowser = "Browser";
 
 // NOINLINE to make sure crashes use this for magic signature.
 NOINLINE void FatalSurfaceFailure() {
@@ -743,8 +742,9 @@ std::unique_ptr<ui::CompositorLock> CompositorImpl::GetCompositorLock(
   if (!host_) {
     return nullptr;
   }
-  return lock_manager_.GetCompositorLock(/*client=*/nullptr, timeout,
-                                         host_->DeferMainFrameUpdate());
+  return lock_manager_.GetCompositorLock(
+      /*client=*/nullptr, timeout,
+      base::DoNothingWithBoundArgs(host_->DeferMainFrameUpdate()));
 }
 
 void CompositorImpl::PostRequestPresentationTimeForNextFrame(
@@ -953,7 +953,6 @@ void CompositorImpl::InitializeVizLayerTreeFrameSink(
       BrowserGpuChannelHostFactory::instance()->GetGpuMemoryBufferManager();
   params.pipes.compositor_frame_sink_associated_remote = std::move(sink_remote);
   params.pipes.client_receiver = std::move(client_receiver);
-  params.client_name = kBrowser;
   auto layer_tree_frame_sink =
       std::make_unique<cc::mojo_embedder::AsyncLayerTreeFrameSink>(
           std::move(context_provider), nullptr, &params);

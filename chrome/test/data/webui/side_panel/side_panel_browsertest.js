@@ -29,6 +29,17 @@ TEST_F('SidePanelBookmarksListTest', 'All', function() {
   mocha.run();
 });
 
+var SidePanelPowerBookmarksEditDialogTest = class extends SidePanelBrowserTest {
+  /** @override */
+  get browsePreload() {
+    return 'chrome://bookmarks-side-panel.top-chrome/test_loader.html?module=side_panel/bookmarks/power_bookmarks_edit_dialog_test.js';
+  }
+};
+
+TEST_F('SidePanelPowerBookmarksEditDialogTest', 'All', function() {
+  mocha.run();
+});
+
 var SidePanelPowerBookmarksListTest = class extends SidePanelBrowserTest {
   /** @override */
   get browsePreload() {
@@ -37,6 +48,17 @@ var SidePanelPowerBookmarksListTest = class extends SidePanelBrowserTest {
 };
 
 TEST_F('SidePanelPowerBookmarksListTest', 'All', function() {
+  mocha.run();
+});
+
+var SidePanelPowerBookmarksServiceTest = class extends SidePanelBrowserTest {
+  /** @override */
+  get browsePreload() {
+    return 'chrome://bookmarks-side-panel.top-chrome/test_loader.html?module=side_panel/bookmarks/power_bookmarks_service_test.js';
+  }
+};
+
+TEST_F('SidePanelPowerBookmarksServiceTest', 'All', function() {
   mocha.run();
 });
 

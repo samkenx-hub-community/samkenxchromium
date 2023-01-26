@@ -12,7 +12,7 @@
 #include "third_party/blink/renderer/bindings/core/v8/active_script_wrappable.h"
 #include "third_party/blink/renderer/bindings/core/v8/script_promise.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_media_track_capabilities.h"
-#include "third_party/blink/renderer/bindings/modules/v8/v8_media_track_constraint_set.h"
+#include "third_party/blink/renderer/bindings/modules/v8/v8_media_track_constraints.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_media_track_settings.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_photo_settings.h"
 #include "third_party/blink/renderer/core/dom/events/event_target.h"
@@ -68,19 +68,12 @@ class MODULES_EXPORT ImageCapture final
 
   ScriptPromise getPhotoCapabilities(ScriptState*);
   ScriptPromise getPhotoSettings(ScriptState*);
-
-  ScriptPromise setOptions(ScriptState*,
-                           const PhotoSettings*,
-                           bool trigger_take_photo = false);
-
   ScriptPromise takePhoto(ScriptState*, const PhotoSettings*);
-
   ScriptPromise grabFrame(ScriptState*);
 
   void GetMediaTrackCapabilities(MediaTrackCapabilities*) const;
-  void SetMediaTrackConstraints(
-      ScriptPromiseResolver*,
-      const HeapVector<Member<MediaTrackConstraintSet>>&);
+  void SetMediaTrackConstraints(ScriptPromiseResolver*,
+                                const MediaTrackConstraints* constraints);
   const MediaTrackConstraintSet* GetMediaTrackConstraints() const;
   void ClearMediaTrackConstraints();
   void GetMediaTrackSettings(MediaTrackSettings*) const;
@@ -124,7 +117,7 @@ class MODULES_EXPORT ImageCapture final
   // Update local track settings and capabilities and call
   // |initialized_callback| to indicate settings and capabilities have been
   // retrieved.
-  void UpdateMediaTrackCapabilities(
+  void UpdateMediaTrackSettingsAndCapabilities(
       base::OnceClosure initialized_callback,
       media::mojom::blink::PhotoStatePtr photo_state);
 
@@ -136,6 +129,8 @@ class MODULES_EXPORT ImageCapture final
 
   // Returns true if page is visible. Otherwise returns false.
   bool IsPageVisible();
+
+  const String& SourceId() const;
 
   Member<MediaStreamTrack> stream_track_;
   std::unique_ptr<ImageCaptureFrameGrabber> frame_grabber_;

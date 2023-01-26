@@ -17,6 +17,7 @@
 class GURL;
 
 namespace net {
+class HttpRequestHeaders;
 class HttpResponseHeaders;
 }  // namespace net
 
@@ -63,6 +64,7 @@ class CONTENT_EXPORT AttributionReportNetworkSender
 
   void SendReport(GURL url,
                   const std::string& body,
+                  net::HttpRequestHeaders headers,
                   UrlLoaderCallback callback);
 
   // Called when headers are available for a sent report.
@@ -72,10 +74,11 @@ class CONTENT_EXPORT AttributionReportNetworkSender
                     UrlLoaderList::iterator it,
                     scoped_refptr<net::HttpResponseHeaders> headers);
 
-  // Called when headers are available for a sent debug report.
-  void OnDebugReportSent(base::OnceCallback<void(int status)> callback,
-                         UrlLoaderList::iterator it,
-                         scoped_refptr<net::HttpResponseHeaders> headers);
+  // Called when headers are available for a sent verbose debug report.
+  void OnVerboseDebugReportSent(
+      base::OnceCallback<void(int status)> callback,
+      UrlLoaderList::iterator it,
+      scoped_refptr<net::HttpResponseHeaders> headers);
 
   // Reports that are actively being sent.
   UrlLoaderList loaders_in_progress_;

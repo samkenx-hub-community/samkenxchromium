@@ -1760,7 +1760,12 @@ bool SkiaOutputSurfaceImplOnGpu::InitializeForGL() {
             shared_gpu_deps_->memory_tracker(),
             GetDidSwapBuffersCompleteCallback());
 #else   // !BUILDFLAG(IS_WIN)
-        NOTIMPLEMENTED();
+        DCHECK(presenter_->SupportsDCLayers());
+        output_device_ = std::make_unique<SkiaOutputDeviceDCompPresenter>(
+            shared_image_factory_.get(),
+            shared_image_representation_factory_.get(), context_state_.get(),
+            presenter_, feature_info_, shared_gpu_deps_->memory_tracker(),
+            GetDidSwapBuffersCompleteCallback());
 #endif  // BUILDFLAG(IS_WIN)
       } else {
         if (dependency_->NeedsSupportForExternalStencil()) {
@@ -1772,7 +1777,6 @@ bool SkiaOutputSurfaceImplOnGpu::InitializeForGL() {
 #if BUILDFLAG(IS_WIN)
           if (gl_surface_->SupportsDCLayers()) {
             output_device_ = std::make_unique<SkiaOutputDeviceDCompGLSurface>(
-                dependency_->GetMailboxManager(),
                 shared_image_representation_factory_.get(),
                 context_state_.get(), gl_surface_, feature_info_,
                 shared_gpu_deps_->memory_tracker(),
@@ -1922,8 +1926,8 @@ bool SkiaOutputSurfaceImplOnGpu::InitializeForDawn() {
 #elif BUILDFLAG(IS_WIN)
     std::unique_ptr<SkiaOutputDeviceDawn> output_device =
         std::make_unique<SkiaOutputDeviceDawn>(
-            dawn_context_provider_, dependency_->GetSurfaceHandle(),
-            gfx::SurfaceOrigin::kTopLeft, shared_gpu_deps_->memory_tracker(),
+            dawn_context_provider_, gfx::SurfaceOrigin::kTopLeft,
+            shared_gpu_deps_->memory_tracker(),
             GetDidSwapBuffersCompleteCallback());
     const gpu::SurfaceHandle child_window_handle =
         output_device->GetChildSurfaceHandle();

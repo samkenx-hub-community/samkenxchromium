@@ -63,6 +63,7 @@
 #include "content/browser/download/data_url_blob_reader.h"
 #include "content/browser/feature_observer.h"
 #include "content/browser/fenced_frame/fenced_frame.h"
+#include "content/browser/fenced_frame/fenced_frame_reporter.h"
 #include "content/browser/fenced_frame/fenced_frame_url_mapping.h"
 #include "content/browser/file_system/file_system_manager_impl.h"
 #include "content/browser/file_system/file_system_url_loader_factory.h"
@@ -313,11 +314,6 @@ BASE_FEATURE(kEvictOnAXEvents,
 #endif
 );
 
-// Feature to ignore OpenURL from inactive RFH.
-BASE_FEATURE(kIgnoreOpenURLFromInactiveRFH,
-             "IgnoreOpenURLFromInactiveRFH",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
 }  // namespace features
 
 namespace content {
@@ -387,53 +383,6 @@ class RenderFrameHostOrProxy {
 };
 
 namespace {
-
-constexpr net::NetworkTrafficAnnotationTag kReportingBeaconNetworkTag =
-    net::DefineNetworkTrafficAnnotation("fenced_frame_reporting_beacon",
-                                        R"(
-        semantics {
-          sender: "Fenced frame reportEvent API"
-          description:
-            "This request sends out reporting beacon data in an HTTP POST "
-            "request. This is initiated by window.fence.reportEvent API."
-          trigger:
-            "When there are events such as impressions, user interactions and "
-            "clicks, fenced frames can invoke window.fence.reportEvent API. It "
-            "tells the browser to send a beacon with event data to a URL "
-            "registered by the worklet in registerAdBeacon. Please see "
-            "https://github.com/WICG/turtledove/blob/main/Fenced_Frames_Ads_Reporting.md#reportevent"
-          data:
-            "Event data given by fenced frame reportEvent API. Please see "
-            "https://github.com/WICG/turtledove/blob/main/Fenced_Frames_Ads_Reporting.md#parameters"
-          destination: OTHER
-          destination_other: "The reporting destination given by FLEDGE's "
-                             "registerAdBeacon API or selectURL's inputs."
-        }
-        policy {
-          cookies_allowed: NO
-          setting: "To use reportEvent API, users need to enable selectURL, "
-          "FLEDGE and FencedFrames features by enabling the Privacy Sandbox "
-          "Ads APIs experiment flag at "
-          "chrome://flags/#privacy-sandbox-ads-apis "
-          policy_exception_justification: "This beacon is sent by fenced frame "
-          "calling window.fence.reportEvent when there are events like user "
-          "interactions."
-        }
-      )");
-
-base::StringPiece ReportingDestinationAsString(
-    const blink::FencedFrame::ReportingDestination& destination) {
-  switch (destination) {
-    case blink::FencedFrame::ReportingDestination::kBuyer:
-      return "Buyer";
-    case blink::FencedFrame::ReportingDestination::kSeller:
-      return "Seller";
-    case blink::FencedFrame::ReportingDestination::kComponentSeller:
-      return "ComponentSeller";
-    case blink::FencedFrame::ReportingDestination::kSharedStorageSelectUrl:
-      return "SharedStorageSelectUrl";
-  }
-}
 
 // Maximum amount of time to wait for beforeunload/unload handlers to be
 // processed by the renderer process.
@@ -1661,6 +1610,8 @@ RenderFrameHostImpl::RenderFrameHostImpl(
 }
 
 RenderFrameHostImpl::~RenderFrameHostImpl() {
+  SCOPED_CRASH_KEY_STRING256("Bug1407526", "lifecycle",
+                             LifecycleStateImplToString(lifecycle_state()));
   TRACE_EVENT("navigation", "~RenderFrameHostImpl()",
               ChromeTrackEvent::kRenderFrameHost, this);
   // See https://crbug.com/1276535
@@ -1706,10 +1657,15 @@ RenderFrameHostImpl::~RenderFrameHostImpl() {
   g_token_frame_map.Get().erase(frame_token_);
 
   auto* process = GetProcess();
+  SCOPED_CRASH_KEY_BOOL("Bug1407526", "si_exists", !!site_instance_);
+  SCOPED_CRASH_KEY_BOOL("Bug1407526", "sig_exists", !!site_instance_->group());
+  SCOPED_CRASH_KEY_BOOL("Bug1407526", "process_exists", !!process);
   site_instance_->group()->RemoveObserver(this);
   process->UnregisterRenderFrameHost(GetGlobalId());
 
   const bool was_created = is_render_frame_created();
+  SCOPED_CRASH_KEY_BOOL("Bug1407526", "was_created", !!was_created);
+  SCOPED_CRASH_KEY_BOOL("Bug1407526", "delegate_exists", !!delegate_);
   render_frame_state_ = RenderFrameState::kDeleted;
   if (was_created)
     delegate_->RenderFrameDeleted(this);
@@ -2322,6 +2278,10 @@ const GURL& RenderFrameHostImpl::GetLastCommittedURL() const {
 
 const url::Origin& RenderFrameHostImpl::GetLastCommittedOrigin() const {
   return last_committed_origin_;
+}
+
+const GURL& RenderFrameHostImpl::GetInheritedBaseUrl() const {
+  return inherited_base_url_;
 }
 
 const net::NetworkIsolationKey& RenderFrameHostImpl::GetNetworkIsolationKey() {
@@ -3132,8 +3092,7 @@ void RenderFrameHostImpl::RenderProcessGone(
   // reset.
   RenderFrameDeleted();
   SetLastCommittedUrl(GURL());
-  set_base_url_from_renderer(GURL());
-  set_inherited_base_url(GURL());
+  SetInheritedBaseUrl(GURL());
   renderer_url_info_ = RendererURLInfo();
   web_bundle_handle_.reset();
 
@@ -3892,6 +3851,12 @@ void RenderFrameHostImpl::SetLastCommittedOrigin(const url::Origin& origin) {
   last_committed_origin_ = origin;
 }
 
+void RenderFrameHostImpl::SetInheritedBaseUrl(const GURL& inherited_base_url) {
+  if (blink::features::IsNewBaseUrlInheritanceBehaviorEnabled()) {
+    inherited_base_url_ = inherited_base_url;
+  }
+}
+
 void RenderFrameHostImpl::SetLastCommittedOriginForTesting(
     const url::Origin& origin) {
   SetLastCommittedOrigin(origin);
@@ -4043,6 +4008,15 @@ absl::optional<base::UnguessableToken> RenderFrameHostImpl::ComputeNonce(
 blink::StorageKey RenderFrameHostImpl::CalculateStorageKey(
     const url::Origin& new_rfh_origin,
     const base::UnguessableToken* nonce) {
+  // If the nonce is set the `top_level_site` must be the same as
+  // `new_rfh_origin` and the `ancestor_chain_bit` must be kSameSite.
+  // TODO(https://crbug.com/1410254): Cleanup this logic.
+  if (nonce) {
+    return blink::StorageKey::CreateWithOptionalNonce(
+        new_rfh_origin, net::SchemefulSite(new_rfh_origin), nonce,
+        blink::mojom::AncestorChainBit::kSameSite);
+  }
+
   std::vector<RenderFrameHostImpl*> ancestor_chain;
   RenderFrameHostImpl* current = this;
   while (current) {
@@ -4079,20 +4053,25 @@ blink::StorageKey RenderFrameHostImpl::CalculateStorageKey(
   if (ignore_top_level_extension) {
     ancestor_chain.pop_back();
   }
+  net::SchemefulSite top_level_site(origin(ancestor_chain.back()));
 
-  // Compute the AncestorChainBit. It represents whether every ancestors are all
-  // same-site or not.
-  auto site_for_cookies = net::SiteForCookies::FromOrigin(new_rfh_origin);
+  // Compute the AncestorChainBit. It represents whether every ancestors are
+  // all same-site or not. If `top_level_site` is opaque the bit must be
+  // kSameSite as this is the default value (which won't be serialized).
   blink::mojom::AncestorChainBit ancestor_chain_bit =
       blink::mojom::AncestorChainBit::kSameSite;
-  for (auto* ancestor : ancestor_chain) {
-    if (!site_for_cookies.IsFirstParty(origin(ancestor).GetURL()))
-      ancestor_chain_bit = blink::mojom::AncestorChainBit::kCrossSite;
+  if (!top_level_site.opaque()) {
+    for (auto* ancestor : ancestor_chain) {
+      if (top_level_site != net::SchemefulSite(origin(ancestor))) {
+        ancestor_chain_bit = blink::mojom::AncestorChainBit::kCrossSite;
+        break;
+      }
+    }
   }
 
+  // TODO(https://crbug.com/1410254): Cleanup this logic.
   return blink::StorageKey::CreateWithOptionalNonce(
-      new_rfh_origin, net::SchemefulSite(origin(ancestor_chain.back())), nonce,
-      ancestor_chain_bit);
+      new_rfh_origin, top_level_site, nullptr, ancestor_chain_bit);
 }
 
 void RenderFrameHostImpl::SetOriginDependentStateOfNewFrame(
@@ -7344,12 +7323,7 @@ void RenderFrameHostImpl::OpenURL(blink::mojom::OpenURLParamsPtr params) {
   // Also, see a similar check in RenderFrameHostImpl::BeginNavigation at
   // https://source.chromium.org/chromium/chromium/src/+/main:content/browser/renderer_host/render_frame_host_impl.cc;l=7761-7769;drc=6dc39d60fea45c003424272efdb4c366119a9d7f
   if (!owner) {
-    if (base::FeatureList::IsEnabled(features::kIgnoreOpenURLFromInactiveRFH)) {
-      return;
-    } else {
-      // TODO(mshin): Remove after 2023/Jan/21.
-      owner = frame_tree_node_;
-    }
+    return;
   }
   owner->GetCurrentNavigator().RequestOpenURL(
       this, validated_url, base::OptionalToPtr(params->initiator_frame_token),
@@ -7692,14 +7666,10 @@ void RenderFrameHostImpl::SendFencedFrameReportingBeacon(
   const absl::optional<FencedFrameProperties>& fenced_frame_properties =
       frame_tree_node_->GetFencedFrameProperties();
   if (!fenced_frame_properties.has_value() ||
-      !fenced_frame_properties->reporting_metadata_.has_value() ||
-      fenced_frame_properties->reporting_metadata_->GetValueIgnoringVisibility()
-          .metadata.empty()) {
-    // No associated reporting metadata or empty reporting metadata associated
-    // with the fenced frame.
-    // For no associated reporting metadata case, it should have been captured
+      !fenced_frame_properties->fenced_frame_reporter_) {
+    // No associated fenced frame reporter. This should have been captured
     // in the renderer process at `Fence::reportEvent`.
-    // Both cases imply there is an inconsistency between the browser and the
+    // This implies there is an inconsistency between the browser and the
     // renderer.
     mojo::ReportBadMessage(
         "This frame had reporting metadata registered in its renderer process "
@@ -7708,73 +7678,24 @@ void RenderFrameHostImpl::SendFencedFrameReportingBeacon(
     return;
   }
 
-  const blink::FencedFrame::FencedFrameReporting& fenced_frame_reporting =
-      fenced_frame_properties->reporting_metadata_
-          ->GetValueIgnoringVisibility();
-
-  // Check metadata registration for given destination.
-  const auto metadata_iter = fenced_frame_reporting.metadata.find(destination);
-  if (metadata_iter == fenced_frame_reporting.metadata.end()) {
-    AddMessageToConsole(
-        blink::mojom::ConsoleMessageLevel::kError,
-        base::StrCat(
-            {"This frame did not register reporting metadata for destination '",
-             ReportingDestinationAsString(destination), "'."}));
+  if (destination ==
+          blink::FencedFrame::ReportingDestination::kSharedStorageSelectUrl &&
+      !GetOutermostMainFrame()
+           ->GetPage()
+           .CheckAndMaybeDebitReportEventForSelectURLBudget(*this)) {
+    AddMessageToConsole(blink::mojom::ConsoleMessageLevel::kError,
+                        "The call to fence.reportEvent was blocked due to "
+                        "insufficient budget.");
     return;
   }
 
-  // Check reporting url registration for given destination and event type.
-  const auto url_iter = metadata_iter->second.find(event_type);
-  if (url_iter == metadata_iter->second.end()) {
-    AddMessageToConsole(
-        blink::mojom::ConsoleMessageLevel::kError,
-        base::StrCat(
-            {"This frame did not register reporting url for destination '",
-             ReportingDestinationAsString(destination), "' and event_type '",
-             event_type, "'."}));
-    return;
+  std::string error_message;
+  if (!fenced_frame_properties->fenced_frame_reporter_->SendReport(
+          event_type, event_data, destination,
+          /*request_initiator=*/GetLastCommittedOrigin(), error_message)) {
+    AddMessageToConsole(blink::mojom::ConsoleMessageLevel::kError,
+                        error_message);
   }
-
-  // Validate the reporting url.
-  GURL url = url_iter->second;
-  if (!url.is_valid() || !url.SchemeIsHTTPOrHTTPS()) {
-    AddMessageToConsole(
-        blink::mojom::ConsoleMessageLevel::kError,
-        base::StrCat(
-            {"This frame registered invalid reporting url for destination '",
-             ReportingDestinationAsString(destination), "' and event_type '",
-             event_type, "'."}));
-    return;
-  }
-
-  // Construct the resource request.
-  auto request = std::make_unique<network::ResourceRequest>();
-
-  request->url = url;
-  request->mode = network::mojom::RequestMode::kCors;
-  request->request_initiator = GetLastCommittedOrigin();
-  request->credentials_mode = network::mojom::CredentialsMode::kOmit;
-  request->method = net::HttpRequestHeaders::kPostMethod;
-  request->headers.SetHeader(net::HttpRequestHeaders::kContentType,
-                             "text/plain;charset=UTF-8");
-  request->trusted_params = network::ResourceRequest::TrustedParams();
-  request->trusted_params->isolation_info =
-      net::IsolationInfo::CreateTransient();
-
-  // Obtain the `SimpleURLLoader` instance.
-  std::unique_ptr<network::SimpleURLLoader> simple_url_loader =
-      network::SimpleURLLoader::Create(std::move(request),
-                                       kReportingBeaconNetworkTag);
-  simple_url_loader->AttachStringForUpload(event_data);
-
-  network::SimpleURLLoader* simple_url_loader_ptr = simple_url_loader.get();
-  auto* shared_url_loader_factory =
-      GetStoragePartition()->GetURLLoaderFactoryForBrowserProcess().get();
-
-  // Send out the reporting beacon.
-  simple_url_loader_ptr->DownloadHeadersOnly(
-      shared_url_loader_factory,
-      base::DoNothingWithBoundArgs(std::move(simple_url_loader)));
 }
 
 void RenderFrameHostImpl::CreatePortal(
@@ -8039,43 +7960,6 @@ void RenderFrameHostImpl::DidChangeSrcDoc(
     return;
 
   child->SetSrcdocValue(srcdoc_value);
-}
-
-void RenderFrameHostImpl::DidChangeBaseURL(const GURL& base_url) {
-  if (!blink::features::IsNewBaseUrlInheritanceBehaviorEnabled())
-    return;
-
-  // TODO(https://crbug.com/1356658,1366593): consider restricting base URL in
-  // web renderers to non-chrome:// URLs.
-  set_base_url_from_renderer(base_url);
-}
-
-const GURL& RenderFrameHostImpl::GetBaseUrl() const {
-  if (!blink::features::IsNewBaseUrlInheritanceBehaviorEnabled()) {
-    NOTREACHED() << __func__
-                 << " should only be invoked when the feature"
-                    " NewBaseUrlInheritanceBehavior is enabled.";
-    return GURL::EmptyGURL();
-  }
-
-  if (!base_url_from_renderer_.is_empty())
-    return base_url_from_renderer_;
-
-  // If `base_url_from_renderer_` is not set, then the document uses either the
-  // inherited or default (i.e. last committed URL) value for base URL.
-  if (!snapshotted_base_url_from_parent_.is_empty()) {
-    // TODO(wjmaclean): update this DCHECK when we start sending base urls for
-    // about:blank as well.
-    DCHECK(GetLastCommittedURL().IsAboutSrcdoc());
-    return snapshotted_base_url_from_parent_;
-  }
-
-  // If no other base URL is specified or inherited, the last committed URL is
-  // used. Note that srcdoc cases should always inherit.
-  // TODO(wjmaclean): update this DCHECK when we start sending base urls for
-  // about:blank as well.
-  DCHECK(!GetLastCommittedURL().IsAboutSrcdoc());
-  return GetLastCommittedURL();
 }
 
 void RenderFrameHostImpl::ReceivedDelegatedCapability(
@@ -8877,19 +8761,36 @@ void RenderFrameHostImpl::StartPendingDeletionOnSubtree(
   DCHECK(IsPendingDeletion());
 
   if (pending_deletion_reason == PendingDeletionReason::kFrameDetach ||
-      !base::FeatureList::IsEnabled(kAvoidUnnecessaryNavigationCancellations)) {
-    // Reset navigations only when entering "pending deletion" state due to
-    // frame detach if the kStopCancellingNavigationsOnCommitAndNewNavigation
-    // flag is enabled, or for all pending deletion cases otherwise.
-    GetFrameTreeNodeForUnload()->ResetAllNavigationsForFrameDetach();
+      !base::FeatureList::IsEnabled(
+          features::kAvoidUnnecessaryNavigationCancellations)) {
+    // Reset all navigations happening in the FrameTreeNode only when entering
+    // "pending deletion" state due to frame detach if the
+    // kStopCancellingNavigationsOnCommitAndNewNavigation flag is enabled, or
+    // for all pending deletion cases otherwise.
+    NavigationDiscardReason reason = NavigationDiscardReason::kWillRemoveFrame;
+    GetFrameTreeNodeForUnload()->CancelNavigation();
+    GetFrameTreeNodeForUnload()
+        ->GetRenderFrameHostManager()
+        .DiscardSpeculativeRFH(reason);
+    ResetOwnedNavigationRequests(reason);
   } else {
-    CHECK(
-        pending_deletion_reason == PendingDeletionReason::kSwappedOut ||
-        base::FeatureList::IsEnabled(kAvoidUnnecessaryNavigationCancellations));
+    CHECK(pending_deletion_reason == PendingDeletionReason::kSwappedOut ||
+          base::FeatureList::IsEnabled(
+              features::kAvoidUnnecessaryNavigationCancellations));
     // The pending deletion state is caused by swapping out the RFH. Reset only
     // the navigations that are owned by or will be using the swapped out RFH,
     // and also reset all navigations happening in the descendant frames.
-    ResetNavigationsUsingSwappedOutRFHAndAllNavigationsInSubtree();
+    ResetNavigationsUsingSwappedOutRFH();
+  }
+
+  // For the child frames, we should delete all ongoing navigations
+  // unconditionally, because the child frames will be deleted when this RFH
+  // gets unloaded. Note that we are going through the RFH's children instead of
+  // the FrameTreeNode's children, as the FTN might already have children that
+  // isn't shared with the detached/swapped out RFH, e.g. in case of prerender
+  // activation.
+  for (auto& subframe : children_) {
+    subframe->ResetAllNavigationsForFrameDetach();
   }
 
   for (std::unique_ptr<FrameTreeNode>& child_frame : children_) {
@@ -8973,10 +8874,9 @@ void RenderFrameHostImpl::PendingDeletionCheckCompletedOnSubtree() {
   }
 }
 
-void RenderFrameHostImpl::
-    ResetNavigationsUsingSwappedOutRFHAndAllNavigationsInSubtree() {
+void RenderFrameHostImpl::ResetNavigationsUsingSwappedOutRFH() {
   // Only delete the navigation owned by the swapped out RFH or those that
-  // intend to use the current RFH.
+  // intend to use the swapped out RFH.
   ResetOwnedNavigationRequests(
       NavigationDiscardReason::kRenderFrameHostDestruction);
   const NavigationRequest* navigation_request =
@@ -8992,13 +8892,6 @@ void RenderFrameHostImpl::
     // deletion RFH.
     frame_tree_node_->ResetNavigationRequest(
         NavigationDiscardReason::kRenderFrameHostDestruction);
-  }
-
-  // For the child frames, we should delete all ongoing navigations,
-  // unconditionally, because the child frames will be deleted when this RFH
-  // gets unloaded.
-  for (auto& subframe : children_) {
-    subframe->ResetAllNavigationsForFrameDetach();
   }
 }
 
@@ -12142,15 +12035,15 @@ void RenderFrameHostImpl::DidCommitNewDocument(
   DCHECK(!navigation_request->IsSameDocument());
   DCHECK(!navigation_request->IsPageActivation());
 
-  // On every cross-document navigation, reset the the base url as sent from the
-  // renderer.
-  set_base_url_from_renderer(GURL());
-  // Remember any snapshot of the inherited base URL, in case subframes need it.
-  // This is currently only used for srcdoc frames when the
-  // IsolateSandboxedIframes feature is enabled.
-  DCHECK(navigation_request->inherited_base_url().is_empty() ||
-         navigation_request->GetURL().IsAboutSrcdoc());
-  set_inherited_base_url(navigation_request->inherited_base_url());
+  const GURL& request_url = navigation_request->common_params().url;
+  if (request_url.IsAboutBlank() || request_url.IsAboutSrcdoc()) {
+    const absl::optional<::GURL>& initiator_base_url =
+        navigation_request->common_params().initiator_base_url;
+    SetInheritedBaseUrl(initiator_base_url ? initiator_base_url.value()
+                                           : GURL::EmptyGURL());
+  } else {
+    SetInheritedBaseUrl(GURL::EmptyGURL());
+  }
 
   // The nonce to use in credentialless iframe is a page scoped attribute. So it
   // needs to change every time the top-level document change.

@@ -446,11 +446,6 @@ BASE_FEATURE(kCryptauthAttestationSyncing,
              "CryptauthAttestationSyncing",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-// If enabled, replaces the `DeskMiniView` legacy desk close button and behavior
-// with a button to close desk and windows and a button to combine desks (the
-// legacy behavior).
-BASE_FEATURE(kDesksCloseAll, "DesksCloseAll", base::FEATURE_ENABLED_BY_DEFAULT);
-
 // Enables contextual nudges for gesture education.
 BASE_FEATURE(kContextualNudges,
              "ContextualNudges",
@@ -544,18 +539,13 @@ BASE_FEATURE(kCryptAuthV2Enrollment,
              "CryptAuthV2Enrollment",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
-// Enables the Cryptohome recovery feature, which allows users to recover access
-// to their profile and Cryptohome after performing an online authentication.
-BASE_FEATURE(kCryptohomeRecoveryFlow,
-             "CryptohomeRecoveryFlow",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-
-// Enables the UI for the cryptohome recovery feature:
-// - New UI for Gaia password changed screen.
+// Enables the cryptohome recovery feature:
+// - Enable recovery via the recovery service.
+// - New UI for Cryptohome recovery and Gaia password changed screen.
 // - Adds a "forgot password" button to the error bubble that opens when the
 //   user fails to enter their correct password.
-BASE_FEATURE(kCryptohomeRecoveryFlowUI,
-             "CryptohomeRecoveryFlowUI",
+BASE_FEATURE(kCryptohomeRecoveryFlow,
+             "CryptohomeRecoveryFlow",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Enables the UI to enable or disable cryptohome recovery in the settings
@@ -696,7 +686,7 @@ BASE_FEATURE(kEcheSWADisableStunServer,
 // network information to provide more context on connection errors.
 BASE_FEATURE(kEcheSWACheckAndroidNetworkInfo,
              "EcheSWACheckAndroidNetworkInfo",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // If enabled, allows the creation of up to 16 desks (default is 8).
 BASE_FEATURE(kEnable16Desks,
@@ -708,13 +698,6 @@ BASE_FEATURE(kEnable16Desks,
 // may have choppier app list animations while in this mode. crbug.com/765292.
 BASE_FEATURE(kEnableBackgroundBlur,
              "EnableBackgroundBlur",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
-// Enables the DNS proxy service providing support split and secure DNS
-// for ChromeOS.
-// TODO(b/265091596): Remove.
-BASE_FEATURE(kEnableDnsProxy,
-             "EnableDnsProxy",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
 // Enables external keyboard testers in the diagnostics app.
@@ -821,6 +804,11 @@ BASE_FEATURE(kEnforceAshExtensionKeeplist,
              "EnforceAshExtensionKeeplist",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
+// Enables access to the chrome://enterprise-reporting WebUI.
+BASE_FEATURE(kEnterpriseReportingUI,
+             "EnterpriseReportingUI",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 // Enables Device End Of Lifetime warning notifications.
 BASE_FEATURE(kEolWarningNotifications,
              "EolWarningNotifications",
@@ -881,7 +869,7 @@ BASE_FEATURE(kFastPair, "FastPair", base::FEATURE_DISABLED_BY_DEFAULT);
 // Enables using new Handshake retry logic for Fast Pair.
 BASE_FEATURE(kFastPairHandshakeRefactor,
              "FastPairHandshakeRefactor",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // The amount of minutes we should wait before allowing notifications for a
 // recently lost device.
@@ -982,15 +970,40 @@ BASE_FEATURE(kFloatingWorkspace,
              "FloatingWorkspace",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
+// Maximum delay to wait for restoring Floating Workspace after login.
+constexpr base::FeatureParam<base::TimeDelta>
+    kFloatingWorkspaceMaxTimeAvaliableForRestoreAfterLogin{
+        &kFloatingWorkspace, "MaxTimeAvailableForRestoreAfterLogin",
+        base::Seconds(3)};
+
 // Enables or disables Floating Workspace V2 feature on ChromeOS
 BASE_FEATURE(kFloatingWorkspaceV2,
              "FloatingWorkspaceV2",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
+// Maximum delay to wait for restoring Floating Workspace V2 after login.
+constexpr base::FeatureParam<base::TimeDelta>
+    kFloatingWorkspaceV2MaxTimeAvaliableForRestoreAfterLogin{
+        &kFloatingWorkspaceV2, "MaxTimeAvailableForRestoreAfterLoginV2",
+        base::Seconds(15)};
+
+// Time interval to capture current desk as desk template and upload template to
+// server.
+constexpr base::FeatureParam<base::TimeDelta>
+    kFloatingWorkspaceV2PeriodicJobIntervalInSeconds{
+        &kFloatingWorkspaceV2, "PeriodicJobIntervalInSeconds",
+        base::Seconds(30)};
+
 // If enabled, makes the Projector app use server side speech
 // recognition instead of on-device speech recognition.
 BASE_FEATURE(kForceEnableServerSideSpeechRecognitionForDev,
              "ForceEnableServerSideSpeechRecognitionForDev",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+// Enables Drive to forcibly resync office files. Operations such as copy,
+// move, ZIP on MS Office files call on the Drive to resync the files.
+BASE_FEATURE(kForceReSyncDrive,
+             "ForceReSyncDrive",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Controls whether to allow keeping full screen mode after unlock.
@@ -1045,6 +1058,11 @@ BASE_FEATURE(kGesturePropertiesDBusService,
 // Enables the ability to record the screen into an animated GIF image from the
 // native screen capture tool.
 BASE_FEATURE(kGifRecording, "GifRecording", base::FEATURE_DISABLED_BY_DEFAULT);
+
+// Enables a Files banner about Google One offer.
+BASE_FEATURE(kGoogleOneOfferFilesBanner,
+             "GoogleOneOfferFilesBanner",
+             base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Enables editing with handwriting gestures within the virtual keyboard.
 BASE_FEATURE(kHandwritingGestureEditing,
@@ -1376,23 +1394,6 @@ BASE_FEATURE(kMacAddressRandomization,
              "MacAddressRandomization",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-// Enables the custom color picker and recent colors UI in the media app.
-BASE_FEATURE(kMediaAppCustomColors,
-             "MediaAppCustomColors",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
-// Within the ChromeOS media app, reveals the button to edit the current image
-// in Photos.
-BASE_FEATURE(kMediaAppPhotosIntegrationImage,
-             "MediaAppPhotosIntegrationImage",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
-// Within the ChromeOS media app, reveals the button to edit the current video
-// in Photos.
-BASE_FEATURE(kMediaAppPhotosIntegrationVideo,
-             "MediaAppPhotosIntegrationVideo",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
 // Enables notification of when a microphone-using app is launched while the
 // microphone is muted.
 BASE_FEATURE(kMicMuteNotifications,
@@ -1436,6 +1437,11 @@ BASE_FEATURE(kEcheLauncherListView,
 // Switch the "More Apps" button in eche launcher to show small app icons
 BASE_FEATURE(kEcheLauncherIconsInMoreAppsButton,
              "EcheLauncherIconsInMoreAppsButton",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+// Enables multi-zone rgb keyboard customization.
+BASE_FEATURE(kMultiZoneRgbKeyboard,
+             "MultiZoneRgbKeyboard",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Enables support for multilingual assistive typing on ChromeOS.
@@ -1533,6 +1539,10 @@ BASE_FEATURE(kOobeQuickStart,
 BASE_FEATURE(kOobeRemoveShutdownButton,
              "OobeRemoveShutdownButton",
              base::FEATURE_ENABLED_BY_DEFAULT);
+
+BASE_FEATURE(kOnlyShowNewShortcutsApp,
+             "OnlyShowNewShortcutsApp",
+             base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Enables or disables the feedback tool new UX on ChromeOS.
 // This tool under development will be rolled out via Finch.
@@ -1683,6 +1693,12 @@ BASE_FEATURE(kProjectorExcludeTranscript,
              "ProjectorExcludeTranscript",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
+// Controls whether to fold short gap between transcript into the previous
+// transcript.
+BASE_FEATURE(kProjectorFoldShortGapIntoPreviousTranscript,
+             "ProjectorFoldShortGapIntoPreviousTranscript",
+             base::FEATURE_ENABLED_BY_DEFAULT);
+
 // Controls whether Projector's tutorial videos are displayed.
 BASE_FEATURE(kProjectorTutorialVideoView,
              "ProjectorTutorialVideoView",
@@ -1760,26 +1776,15 @@ BASE_FEATURE(kPromiseIcons, "PromiseIcons", base::FEATURE_DISABLED_BY_DEFAULT);
 // Controls whether the quick dim prototype is enabled.
 BASE_FEATURE(kQuickDim, "QuickDim", base::FEATURE_ENABLED_BY_DEFAULT);
 
-// Controls whether the vc background blur is enabled.
-BASE_FEATURE(kVCBackgroundBlur,
-             "VCBackgroundBlur",
+// Controls whether the video conference feature is enabled.
+BASE_FEATURE(kVideoConference,
+             "VideoConference",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Controls whether the vc background replace is enabled.
-BASE_FEATURE(kVCBackgroundReplace,
+BASE_FEATURE(kVcBackgroundReplace,
              "VCBackgroundReplace",
              base::FEATURE_DISABLED_BY_DEFAULT);
-
-// Controls whether the vc portrait relighting is enabled.
-BASE_FEATURE(kVCPortraitRelighting,
-             "VCPortraitRelighting",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-
-// Enables or disables the Quick Settings Network revamp, which updates Network
-// Quick Settings UI and related infrastructure. See https://crbug.com/1169479.
-BASE_FEATURE(kQuickSettingsNetworkRevamp,
-             "QuickSettingsNetworkRevamp",
-             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // Enables or disables fingerprint quick unlock.
 BASE_FEATURE(kQuickUnlockFingerprint,
@@ -1950,6 +1955,13 @@ BASE_FEATURE(kSmartLockUIRevamp,
 // Controls whether the snap group feature is enabled or not.
 BASE_FEATURE(kSnapGroup, "SnapGroup", base::FEATURE_DISABLED_BY_DEFAULT);
 
+// Controls whether to create the snap group automatically when two windows are
+// snapped if true. Otherwise, the user has to explicitly lock the two windows
+// when both are snapped via cliking on the lock button when hovering the mouse
+// over the shared edge of the two snapped windows.
+constexpr base::FeatureParam<bool> kAutomaticallyLockGroup{
+    &kSnapGroup, "AutomaticLockGroup", true};
+
 // Controls whether the speak-on-mute detection feature is enabled or not.
 BASE_FEATURE(kSpeakOnMuteEnabled,
              "SpeakOnMuteEnabled",
@@ -2094,9 +2106,6 @@ BASE_FEATURE(kUserActivityPrediction,
              "UserActivityPrediction",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
-// Enable or disable the ChromeOS video conferencing controls UI.
-BASE_FEATURE(kVcControlsUi, "VcControlsUi", base::FEATURE_DISABLED_BY_DEFAULT);
-
 // Enable or disable the fake effects for ChromeOS video conferencing controls
 // UI. Only meaningful in the emulator.
 BASE_FEATURE(kVcControlsUiFakeEffects,
@@ -2207,6 +2216,18 @@ BASE_FEATURE(kDeviceActiveClient28DayActiveCheckMembership,
 BASE_FEATURE(kDeviceActiveClientDailyCheckMembership,
              "DeviceActiveClientDailyCheckMembership",
              base::FEATURE_ENABLED_BY_DEFAULT);
+
+// Enables or disables PSM CheckIn for the churn cohort device active pings
+// on ChromeOS.
+BASE_FEATURE(kDeviceActiveClientChurnCohortCheckIn,
+             "DeviceActiveClientChurnCohortCheckIn",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+// Enables or disables PSM CheckMembership for the churn cohort device active
+// pings on ChromeOS.
+BASE_FEATURE(kDeviceActiveClientChurnCohortCheckMembership,
+             "DeviceActiveClientChurnCohortCheckMembership",
+             base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Enables or disables forced reboots when DeviceScheduledReboot policy is set.
 BASE_FEATURE(kDeviceForceScheduledReboot,
@@ -2423,7 +2444,9 @@ bool IsCryptauthAttestationSyncingEnabled() {
 }
 
 bool IsDesksCloseAllEnabled() {
-  return base::FeatureList::IsEnabled(kDesksCloseAll);
+  // TODO(b/263166880): Remove this function and all code paths where this is
+  // false.
+  return true;
 }
 
 bool IsDnsOverHttpsWithIdentifiersReuseOldPolicyEnabled() {
@@ -2465,10 +2488,6 @@ bool IsCrosPrivacyHubV1Enabled() {
 
 bool IsCryptohomeRecoveryFlowEnabled() {
   return base::FeatureList::IsEnabled(kCryptohomeRecoveryFlow);
-}
-
-bool IsCryptohomeRecoveryFlowUIEnabled() {
-  return base::FeatureList::IsEnabled(kCryptohomeRecoveryFlowUI);
 }
 
 bool IsCryptohomeRecoverySetupEnabled() {
@@ -2623,6 +2642,10 @@ bool ShouldForceEnableServerSideSpeechRecognitionForDev() {
 #else
   return false;
 #endif  // BUILDFLAG(GOOGLE_CHROME_BRANDING);
+}
+
+bool IsForceReSyncDriveEnabled() {
+  return base::FeatureList::IsEnabled(kForceReSyncDrive);
 }
 
 bool IsFullscreenAfterUnlockAllowed() {
@@ -2824,9 +2847,17 @@ bool IsMinimumChromeVersionEnabled() {
   return base::FeatureList::IsEnabled(kMinimumChromeVersion);
 }
 
+bool IsMultiZoneRgbKeyboardEnabled() {
+  return base::FeatureList::IsEnabled(kMultiZoneRgbKeyboard);
+}
+
 bool IsEcheLauncherEnabled() {
   return base::FeatureList::IsEnabled(kEcheLauncher) &&
          base::FeatureList::IsEnabled(kEcheSWA);
+}
+
+bool IsEcheLauncherIconsInMoreAppsButtonEnabled() {
+  return base::FeatureList::IsEnabled(kEcheLauncherIconsInMoreAppsButton);
 }
 
 bool IsEcheLauncherListViewEnabled() {
@@ -3052,12 +3083,13 @@ bool IsProjectorAccountSwitchNotificationEnabled() {
   return base::FeatureList::IsEnabled(kProjectorAccountSwitchNotification);
 }
 
-bool IsQuickDimEnabled() {
-  return base::FeatureList::IsEnabled(kQuickDim) && switches::HasHps();
+bool IsProjectorFoldShortGapIntoPreviousTranscriptEnabled() {
+  return base::FeatureList::IsEnabled(
+      kProjectorFoldShortGapIntoPreviousTranscript);
 }
 
-bool IsQuickSettingsNetworkRevampEnabled() {
-  return base::FeatureList::IsEnabled(kQuickSettingsNetworkRevamp);
+bool IsQuickDimEnabled() {
+  return base::FeatureList::IsEnabled(kQuickDim) && switches::HasHps();
 }
 
 bool IsPerDeskZOrderEnabled() {
@@ -3180,20 +3212,13 @@ bool IsUseStorkSmdsServerAddressEnabled() {
   return base::FeatureList::IsEnabled(kUseStorkSmdsServerAddress);
 }
 
-bool IsVCBackgroundBlurEnabled() {
-  return base::FeatureList::IsEnabled(kVCBackgroundBlur);
+bool IsVideoConferenceEnabled() {
+  return base::FeatureList::IsEnabled(kVideoConference);
 }
 
-bool IsVCBackgroundReplaceEnabled() {
-  return base::FeatureList::IsEnabled(kVCBackgroundReplace);
-}
-
-bool IsVCPortraitRelightingEnabled() {
-  return base::FeatureList::IsEnabled(kVCPortraitRelighting);
-}
-
-bool IsVcControlsUiEnabled() {
-  return base::FeatureList::IsEnabled(kVcControlsUi);
+bool IsVcBackgroundReplaceEnabled() {
+  return base::FeatureList::IsEnabled(kVcBackgroundReplace) &&
+         IsVideoConferenceEnabled();
 }
 
 bool IsVcControlsUiFakeEffectsEnabled() {
@@ -3238,6 +3263,10 @@ bool ShouldArcFileTasksUseAppService() {
 
 bool ShouldGuestOsFileTasksUseAppService() {
   return base::FeatureList::IsEnabled(kGuestOsFileTasksUseAppService);
+}
+
+bool ShouldOnlyShowNewShortcutApp() {
+  return base::FeatureList::IsEnabled(kOnlyShowNewShortcutsApp);
 }
 
 bool ShouldShowPlayStoreInDemoMode() {

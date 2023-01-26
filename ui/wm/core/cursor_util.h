@@ -25,7 +25,7 @@ namespace wm {
 
 COMPONENT_EXPORT(UI_WM)
 absl::optional<ui::CursorData> GetCursorData(
-    ui::mojom::CursorType id,
+    ui::mojom::CursorType type,
     ui::CursorSize size,
     float scale,
     display::Display::Rotation rotation);
@@ -38,6 +38,16 @@ void ScaleAndRotateCursorBitmapAndHotpoint(float scale,
                                            display::Display::Rotation rotation,
                                            SkBitmap* bitmap_in_out,
                                            gfx::Point* hotpoint_in_out);
+
+// Returns data about the cursor `type`. The IDR will be placed in `resource_id`
+// and the hotspot in `point`. Returns false if resource data for `type` isn't
+// available.
+COMPONENT_EXPORT(UI_WM)
+bool GetCursorDataFor(ui::CursorSize cursor_size,
+                      ui::mojom::CursorType type,
+                      float scale_factor,
+                      int* resource_id,
+                      gfx::Point* point);
 
 }  // namespace wm
 

@@ -33,6 +33,7 @@
 #include "third_party/blink/renderer/core/view_transition/view_transition_content_element.h"
 #include "third_party/blink/renderer/core/view_transition/view_transition_pseudo_element_base.h"
 #include "third_party/blink/renderer/core/view_transition/view_transition_style_builder.h"
+#include "third_party/blink/renderer/core/view_transition/view_transition_supplement.h"
 #include "third_party/blink/renderer/core/view_transition/view_transition_utils.h"
 #include "third_party/blink/renderer/platform/data_resource_helper.h"
 #include "third_party/blink/renderer/platform/geometry/layout_size.h"
@@ -133,8 +134,8 @@ class ViewTransitionStyleTracker::ImageWrapperPseudoElement
         snapshot_id = it->value->old_snapshot_id;
       } else {
         // If we're being called with a name that isn't an old_root name and
-        // it's not an element shared element, it must mean we have it as a new
-        // root name.
+        // it's not a transition element, it must mean we have it as a new root
+        // name.
         DCHECK(style_tracker_->new_root_data_);
         DCHECK(style_tracker_->new_root_data_->names.Contains(
             view_transition_name()));
@@ -151,7 +152,7 @@ class ViewTransitionStyleTracker::ImageWrapperPseudoElement
         snapshot_id = it->value->new_snapshot_id;
       } else {
         // If we're being called with a name that isn't a new_root name and it's
-        // not an element shared element, it must mean we have it as an old root
+        // not a transition element, it must mean we have it as an old root
         // name.
         DCHECK(style_tracker_->old_root_data_);
         DCHECK(style_tracker_->old_root_data_->names.Contains(
@@ -186,6 +187,7 @@ ViewTransitionStyleTracker::ViewTransitionStyleTracker(
 
       // TODO(khushalsagar): We should keep track of the snapshot viewport rect
       // size to handle changes in its bounds.
+      // https://crbug.com/1404957.
       continue;
     }
 
@@ -223,13 +225,14 @@ void ViewTransitionStyleTracker::AddConsoleError(
   document_->AddConsoleMessage(console_message);
 }
 
-void ViewTransitionStyleTracker::AddSharedElement(Element* element,
-                                                  const AtomicString& name) {
+void ViewTransitionStyleTracker::AddTransitionElement(
+    Element* element,
+    const AtomicString& name) {
   DCHECK(element);
 
   // Insert an empty hash set for the element if it doesn't exist, or get it if
   // it does.
-  auto& value = pending_shared_element_names_
+  auto& value = pending_transition_element_names_
                     .insert(element, HashSet<std::pair<AtomicString, int>>())
                     .stored_value->value;
   // Find the existing name if one is there. If it is there, do nothing.
@@ -243,11 +246,13 @@ void ViewTransitionStyleTracker::AddSharedElement(Element* element,
 
 bool ViewTransitionStyleTracker::MatchForOnlyChild(
     PseudoId pseudo_id,
-    AtomicString view_transition_name) const {
-  DCHECK(view_transition_name);
-
+    const AtomicString& view_transition_name) const {
   switch (pseudo_id) {
+    case kPseudoIdViewTransition:
+      DCHECK(!view_transition_name);
+      return false;
     case kPseudoIdViewTransitionGroup: {
+      DCHECK(view_transition_name);
       const bool has_root = old_root_data_ || new_root_data_;
       if (has_root) {
         return element_data_map_.empty();
@@ -257,8 +262,10 @@ bool ViewTransitionStyleTracker::MatchForOnlyChild(
       }
     }
     case kPseudoIdViewTransitionImagePair:
+      DCHECK(view_transition_name);
       return true;
     case kPseudoIdViewTransitionOld: {
+      DCHECK(view_transition_name);
       if (new_root_data_ &&
           new_root_data_->names.Contains(view_transition_name)) {
         return false;
@@ -275,6 +282,7 @@ bool ViewTransitionStyleTracker::MatchForOnlyChild(
       return !element_data->new_snapshot_id.IsValid();
     }
     case kPseudoIdViewTransitionNew: {
+      DCHECK(view_transition_name);
       if (old_root_data_ &&
           old_root_data_->names.Contains(view_transition_name)) {
         return false;
@@ -297,7 +305,7 @@ bool ViewTransitionStyleTracker::MatchForOnlyChild(
   return false;
 }
 
-void ViewTransitionStyleTracker::AddSharedElementsFromCSS() {
+void ViewTransitionStyleTracker::AddTransitionElementsFromCSS() {
   DCHECK(document_ && document_->View());
 
   // We need our paint layers, and z-order lists which is done during
@@ -305,13 +313,13 @@ void ViewTransitionStyleTracker::AddSharedElementsFromCSS() {
   DCHECK_GE(document_->Lifecycle().GetState(),
             DocumentLifecycle::kCompositingInputsClean);
 
-  AddSharedElementsFromCSSRecursive(
+  AddTransitionElementsFromCSSRecursive(
       document_->GetLayoutView()->PaintingLayer());
 }
 
-void ViewTransitionStyleTracker::AddSharedElementsFromCSSRecursive(
+void ViewTransitionStyleTracker::AddTransitionElementsFromCSSRecursive(
     PaintLayer* root) {
-  // We want to call AddSharedElements in the order in which
+  // We want to call AddTransitionElements in the order in which
   // PaintLayerPaintOrderIterator would cause us to paint the elements.
   // Specifically, parents are added before their children, and lower z-index
   // children are added before higher z-index children. Given that, what we
@@ -319,17 +327,17 @@ void ViewTransitionStyleTracker::AddSharedElementsFromCSSRecursive(
   // PaintLayerPaintOrderIterator which will return values in the correct
   // z-index order.
   //
-  // Note that the order of calls to AddSharedElement determines the DOM order
-  // of pseudo-elements constructed to represent the shared elements, which by
-  // default will also represent the paint order of the pseudo-elements (unless
-  // changed by something like z-index on the pseudo-elements).
+  // Note that the order of calls to AddTransitionElement determines the DOM
+  // order of pseudo-elements constructed to represent the transition elements,
+  // which by default will also represent the paint order of the pseudo-elements
+  // (unless changed by something like z-index on the pseudo-elements).
   auto& root_object = root->GetLayoutObject();
   auto& root_style = root_object.StyleRef();
   if (root_style.ViewTransitionName()) {
     DCHECK(root_object.GetNode());
     DCHECK(root_object.GetNode()->IsElementNode());
-    AddSharedElement(DynamicTo<Element>(root_object.GetNode()),
-                     root_style.ViewTransitionName());
+    AddTransitionElement(DynamicTo<Element>(root_object.GetNode()),
+                         root_style.ViewTransitionName());
   }
 
   if (root_object.ChildPaintBlockedByDisplayLock())
@@ -337,7 +345,7 @@ void ViewTransitionStyleTracker::AddSharedElementsFromCSSRecursive(
 
   PaintLayerPaintOrderIterator child_iterator(root, kAllChildren);
   while (auto* child = child_iterator.Next()) {
-    AddSharedElementsFromCSSRecursive(child);
+    AddTransitionElementsFromCSSRecursive(child);
   }
 }
 
@@ -378,7 +386,7 @@ bool ViewTransitionStyleTracker::FlattenAndVerifyElements(
   VectorOf<FlatData> flat_list;
 
   // Flatten it.
-  for (auto& [element, names] : pending_shared_element_names_) {
+  for (auto& [element, names] : pending_transition_element_names_) {
     DCHECK(element->GetLayoutObject());
 
     const bool is_root = element->IsDocumentElement();
@@ -430,7 +438,7 @@ bool ViewTransitionStyleTracker::FlattenAndVerifyElements(
 bool ViewTransitionStyleTracker::Capture() {
   DCHECK_EQ(state_, State::kIdle);
 
-  // Flatten `pending_shared_element_names_` into a vector of names and
+  // Flatten `pending_transition_element_names_` into a vector of names and
   // elements. This process also verifies that the name-element combinations are
   // valid.
   VectorOf<AtomicString> transition_names;
@@ -488,7 +496,10 @@ bool ViewTransitionStyleTracker::Capture() {
   InvalidateStyle();
 
   set_element_sequence_id_ = 0;
-  pending_shared_element_names_.clear();
+  pending_transition_element_names_.clear();
+
+  DCHECK(!snapshot_root_size_at_capture_.has_value());
+  snapshot_root_size_at_capture_ = GetSnapshotRootSize();
 
   return true;
 }
@@ -504,8 +515,8 @@ void ViewTransitionStyleTracker::CaptureResolved() {
 
   // Since the elements will be unset, we need to invalidate their style first.
   // TODO(vmpstr): We don't have to invalidate the pseudo styles at this point,
-  // just the shared elements. We can split InvalidateStyle() into two functions
-  // as an optimization.
+  // just the transition elements. We can split InvalidateStyle() into two
+  // functions as an optimization.
   InvalidateStyle();
 
   for (auto& entry : element_data_map_) {
@@ -517,7 +528,7 @@ void ViewTransitionStyleTracker::CaptureResolved() {
 }
 
 VectorOf<Element> ViewTransitionStyleTracker::GetTransitioningElements() const {
-  // In stable states, we don't have shared elements.
+  // In stable states, we don't have transitioning elements.
   if (state_ == State::kIdle || state_ == State::kCaptured)
     return {};
 
@@ -532,7 +543,7 @@ VectorOf<Element> ViewTransitionStyleTracker::GetTransitioningElements() const {
 bool ViewTransitionStyleTracker::Start() {
   DCHECK_EQ(state_, State::kCaptured);
 
-  // Flatten `pending_shared_element_names_` into a vector of names and
+  // Flatten `pending_transition_element_names_` into a vector of names and
   // elements. This process also verifies that the name-element combinations are
   // valid.
   VectorOf<AtomicString> transition_names;
@@ -592,8 +603,8 @@ bool ViewTransitionStyleTracker::Start() {
   if (!found_new_names && new_root_data_) {
     DCHECK(old_root_data_);
     for (const auto& new_name : new_root_data_->names) {
-      // If the new root name is not also an old root name and it isn't a shared
-      // element name, then we have a new name.
+      // If the new root name is not also an old root name and it isn't a
+      // transition element name, then we have a new name.
       if (!old_root_data_->names.Contains(new_name) &&
           !element_data_map_.Contains(new_name)) {
         found_new_names = true;
@@ -643,7 +654,7 @@ bool ViewTransitionStyleTracker::Start() {
   InvalidateStyle();
 
   if (auto* page = document_->GetPage())
-    page->Animator().SetHasSharedElementTransition(true);
+    page->Animator().SetHasViewTransition(true);
   return true;
 }
 
@@ -661,18 +672,18 @@ void ViewTransitionStyleTracker::EndTransition() {
   InvalidateHitTestingCache();
 
   // We need a style invalidation to remove the pseudo element tree. This needs
-  // to be done before we clear the data, since we need to invalidate the shared
-  // elements stored in `element_data_map_`.
+  // to be done before we clear the data, since we need to invalidate the
+  // transition elements stored in `element_data_map_`.
   InvalidateStyle();
 
   element_data_map_.clear();
-  pending_shared_element_names_.clear();
+  pending_transition_element_names_.clear();
   set_element_sequence_id_ = 0;
   old_root_data_.reset();
   new_root_data_.reset();
   document_->GetStyleEngine().SetViewTransitionNames({});
   if (auto* page = document_->GetPage())
-    page->Animator().SetHasSharedElementTransition(false);
+    page->Animator().SetHasViewTransition(false);
 }
 
 void ViewTransitionStyleTracker::UpdateElementIndicesAndSnapshotId(
@@ -733,7 +744,7 @@ PseudoElement* ViewTransitionStyleTracker::CreatePseudoElement(
       viz::ViewTransitionElementResourceId snapshot_id;
       if (old_root_data_ &&
           old_root_data_->names.Contains(view_transition_name)) {
-        size = LayoutSize(GetSnapshotViewportRect().size());
+        size = LayoutSize(GetSnapshotRootSize());
         snapshot_id = old_root_data_->snapshot_id;
       } else {
         DCHECK(view_transition_name);
@@ -765,7 +776,7 @@ PseudoElement* ViewTransitionStyleTracker::CreatePseudoElement(
       viz::ViewTransitionElementResourceId snapshot_id;
       if (new_root_data_ &&
           new_root_data_->names.Contains(view_transition_name)) {
-        size = LayoutSize(GetSnapshotViewportRect().size());
+        size = LayoutSize(GetSnapshotRootSize());
         snapshot_id = new_root_data_->snapshot_id;
       } else {
         DCHECK(view_transition_name);
@@ -804,6 +815,10 @@ bool ViewTransitionStyleTracker::RunPostPrePaintSteps() {
     needs_style_invalidation = true;
   }
 
+  if (SnapshotRootDidChangeSize()) {
+    return false;
+  }
+
   for (auto& entry : element_data_map_) {
     auto& element_data = entry.value;
     if (!element_data->target_element)
@@ -833,8 +848,7 @@ bool ViewTransitionStyleTracker::RunPostPrePaintSteps() {
       snapshot_matrix.PostTranslate(-viewport.VerticalScrollbarWidth(), 0);
     }
 
-    gfx::Vector2d snapshot_to_fixed_offset =
-        -GetSnapshotViewportRect().OffsetFromOrigin();
+    gfx::Vector2d snapshot_to_fixed_offset = -GetFixedToSnapshotRootOffset();
     snapshot_matrix.PostTranslate(snapshot_to_fixed_offset.x(),
                                   snapshot_to_fixed_offset.y());
 
@@ -950,7 +964,7 @@ PaintPropertyChangeType ViewTransitionStyleTracker::UpdateEffect(
       element_data->effect_node =
           EffectPaintPropertyNode::Create(current_effect, std::move(state));
 #if DCHECK_IS_ON()
-      element_data->effect_node->SetDebugName("SharedElementTransition");
+      element_data->effect_node->SetDebugName("ViewTransition");
 #endif
       return PaintPropertyChangeType::kNodeAddedOrRemoved;
     }
@@ -968,7 +982,7 @@ PaintPropertyChangeType ViewTransitionStyleTracker::UpdateRootEffect(
     root_effect_node_ =
         EffectPaintPropertyNode::Create(current_effect, std::move(state));
 #if DCHECK_IS_ON()
-    root_effect_node_->SetDebugName("SharedElementTransition");
+    root_effect_node_->SetDebugName("ViewTransition");
 #endif
     return PaintPropertyChangeType::kNodeAddedOrRemoved;
   }
@@ -993,8 +1007,8 @@ EffectPaintPropertyNode* ViewTransitionStyleTracker::GetRootEffect() const {
   return root_effect_node_.get();
 }
 
-bool ViewTransitionStyleTracker::IsSharedElement(Node* node) const {
-  // In stable states, we don't have shared elements.
+bool ViewTransitionStyleTracker::IsTransitionElement(Node* node) const {
+  // In stable states, we don't have transition elements.
   if (state_ == State::kIdle || state_ == State::kCaptured)
     return false;
 
@@ -1089,7 +1103,7 @@ gfx::Outsets GetFixedToSnapshotViewportOutsets(Document& document) {
 }
 }  // namespace
 
-gfx::Rect ViewTransitionStyleTracker::GetSnapshotViewportRect() const {
+gfx::Rect ViewTransitionStyleTracker::GetSnapshotRootInFixedViewport() const {
   DCHECK(document_->GetLayoutView());
   DCHECK(document_->View());
   DCHECK(document_->GetFrame());
@@ -1106,7 +1120,15 @@ gfx::Rect ViewTransitionStyleTracker::GetSnapshotViewportRect() const {
   return snapshot_viewport_rect;
 }
 
-gfx::Vector2d ViewTransitionStyleTracker::GetRootSnapshotPaintOffset() const {
+gfx::Size ViewTransitionStyleTracker::GetSnapshotRootSize() const {
+  return GetSnapshotRootInFixedViewport().size();
+}
+
+gfx::Vector2d ViewTransitionStyleTracker::GetFixedToSnapshotRootOffset() const {
+  return GetSnapshotRootInFixedViewport().OffsetFromOrigin();
+}
+
+gfx::Vector2d ViewTransitionStyleTracker::GetFrameToSnapshotRootOffset() const {
   DCHECK(document_->GetLayoutView());
   DCHECK(document_->View());
 
@@ -1114,14 +1136,15 @@ gfx::Vector2d ViewTransitionStyleTracker::GetRootSnapshotPaintOffset() const {
   int left = outsets.left();
   int top = outsets.top();
 
-  // Paint already applies an offset for a left-side vertical scrollbar so
-  // don't offset by it here again.
+  // Left-side vertical scrollbars are placed within the frame but offset the
+  // fixed viewport so remove its width from the fixed-to-snapshot offset to
+  // get the frame-to-snapshot offset.
   if (document_->GetLayoutView()
           ->ShouldPlaceBlockDirectionScrollbarOnLogicalLeft()) {
     left -= document_->View()->LayoutViewport()->VerticalScrollbarWidth();
   }
 
-  return gfx::Vector2d(left, top);
+  return gfx::Vector2d(-left, -top);
 }
 
 ViewTransitionState ViewTransitionStyleTracker::GetViewTransitionState() const {
@@ -1158,8 +1181,7 @@ ViewTransitionState ViewTransitionStyleTracker::GetViewTransitionState() const {
     auto& element = transition_state.elements.emplace_back();
     // TODO(khushalsagar): What about non utf8 strings?
     element.tag_name = old_root_data_->names[0].Utf8();
-    element.border_box_size_in_css_space =
-        gfx::SizeF(GetSnapshotViewportRect().size());
+    element.border_box_size_in_css_space = gfx::SizeF(GetSnapshotRootSize());
     element.snapshot_id = old_root_data_->snapshot_id;
     element.paint_order = 0;
     element.is_root = true;
@@ -1198,14 +1220,14 @@ void ViewTransitionStyleTracker::InvalidateStyle() {
     if (!object)
       continue;
 
-    // We propagate the shared element id on an effect node for the object. This
-    // means that we should update the paint properties to update the shared
-    // element id.
+    // We propagate the view transition element id on an effect node for the
+    // object. This means that we should update the paint properties to update
+    // the view transition element id.
     object->SetNeedsPaintPropertyUpdate();
   }
 
   document_->GetDisplayLockDocumentState()
-      .NotifySharedElementPseudoTreeChanged();
+      .NotifyViewTransitionPseudoTreeChanged();
 }
 
 HashSet<AtomicString> ViewTransitionStyleTracker::AllRootTags() const {
@@ -1247,36 +1269,22 @@ const String& ViewTransitionStyleTracker::UAStyleSheet() {
   // 2. A name is an old root only (exit animation for root). The style is set
   // up in the AllrootTags loop and fades out through AnimationUAStyles.
   //
-  // 3. A name is an old root and a new shared element. The AllRootTags loop
+  // 3. A name is an old root and a new transition element. The AllRootTags loop
   // skips this name. The element map loop updates the container for the new
-  // shared element size and transform. The animation code of that loop adds an
-  // animation from old root size and identity matrix.
+  // transition element size and transform. The animation code of that loop adds
+  // an animation from old root size and identity matrix.
   //
   // 4. A name is a new root only (entry animation for root). Its only visited
   // in AllRootTags and its a default fade-in.
   //
-  // 5. A name is a new root and old shared element. We visit it in AllRootTags
-  // to set up the destination state. We skip setting its styles in the
-  // `element_data_map_` loop since latest value comes from AllRootTags. We do
-  // set the animation in that loop since we need the "from" state.
+  // 5. A name is a new root and old transition element. We visit it in
+  // AllRootTags to set up the destination state. We skip setting its styles in
+  // the `element_data_map_` loop since latest value comes from AllRootTags. We
+  // do set the animation in that loop since we need the "from" state.
   //
-  // 6. A name is a new and old shared element (or maybe exit/enter for shared
-  // element only -- no roots involved. Everything is done in the
+  // 6. A name is a new and old transition element (or maybe exit/enter for
+  // transition element only -- no roots involved. Everything is done in the
   // `element_data_map_` loop.
-
-  // Size and position the root container behind any viewport insetting widgets
-  // (such as the URL bar) so that it's stable across a transition. This rect
-  // is called the "snapshot viewport".  Since this is applied in style,
-  // convert from physical pixels to CSS pixels.
-  gfx::RectF snapshot_viewport_css_pixels = gfx::ScaleRect(
-      gfx::RectF(GetSnapshotViewportRect()), 1.f / device_pixel_ratio_);
-
-  // If adjusted, the root is always translated up and left underneath any UI
-  // so the direction must always be negative.
-  DCHECK_LE(snapshot_viewport_css_pixels.x(), 0.f);
-  DCHECK_LE(snapshot_viewport_css_pixels.y(), 0.f);
-
-  builder.AddRootStyles(snapshot_viewport_css_pixels);
 
   for (auto& root_name : AllRootTags()) {
     // This is case 3 above.
@@ -1327,7 +1335,7 @@ const String& ViewTransitionStyleTracker::UAStyleSheet() {
                                  element_data->container_properties.back(),
                                  element_data->container_writing_mode);
 
-      // Incoming inset also only makes sense if the name is a new shared
+      // Incoming inset also only makes sense if the name is a new transition
       // element (not a new root).
       const bool has_new_image = element_data->new_snapshot_id.IsValid();
       absl::optional<String> incoming_inset =
@@ -1345,8 +1353,8 @@ const String& ViewTransitionStyleTracker::UAStyleSheet() {
       }
     }
 
-    // Outgoing inset only makes sense if the name is an old shared element (not
-    // an old root).
+    // Outgoing inset only makes sense if the name is an old transition element
+    // (not an old root).
     const bool has_old_image = element_data->old_snapshot_id.IsValid();
     if (has_old_image && !name_is_old_root) {
       absl::optional<String> outgoing_inset = ComputeInsetDifference(
@@ -1375,7 +1383,7 @@ const String& ViewTransitionStyleTracker::UAStyleSheet() {
         builder.AddAnimationAndBlending(
             view_transition_name, element_data->cached_container_properties);
       } else if (element_data->new_snapshot_id.IsValid() && name_is_old_root) {
-        auto layout_view_size = LayoutSize(GetSnapshotViewportRect().size());
+        auto layout_view_size = LayoutSize(GetSnapshotRootSize());
         // Note that we want the size in css space, which means we need to undo
         // the effective zoom.
         layout_view_size.Scale(
@@ -1398,7 +1406,7 @@ bool ViewTransitionStyleTracker::HasLiveNewContent() const {
 void ViewTransitionStyleTracker::Trace(Visitor* visitor) const {
   visitor->Trace(document_);
   visitor->Trace(element_data_map_);
-  visitor->Trace(pending_shared_element_names_);
+  visitor->Trace(pending_transition_element_names_);
 }
 
 void ViewTransitionStyleTracker::InvalidateHitTestingCache() {
@@ -1417,7 +1425,7 @@ void ViewTransitionStyleTracker::ElementData::Trace(Visitor* visitor) const {
 }
 
 // TODO(vmpstr): We need to write tests for the following:
-// * A local transform on the shared element.
+// * A local transform on the transition element.
 // * A transform on an ancestor which changes its screen space transform.
 LayoutSize ViewTransitionStyleTracker::ElementData::GetIntrinsicSize(
     bool use_cached_data) {
@@ -1444,7 +1452,7 @@ void ViewTransitionStyleTracker::ElementData::CacheGeometryState() {
 PhysicalRect ViewTransitionStyleTracker::ComputeVisualOverflowRect(
     LayoutBoxModelObject& box,
     LayoutBoxModelObject* ancestor) {
-  if (ancestor && IsSharedElement(box.GetNode())) {
+  if (ancestor && IsTransitionElement(box.GetNode())) {
     return {};
   }
 
@@ -1498,6 +1506,27 @@ PhysicalRect ViewTransitionStyleTracker::ComputeVisualOverflowRect(
     result.Unite(box.PhysicalVisualOverflowRectIncludingFilters());
   }
   return result;
+}
+
+bool ViewTransitionStyleTracker::SnapshotRootDidChangeSize() const {
+  if (!snapshot_root_size_at_capture_.has_value()) {
+    return false;
+  }
+
+  gfx::Size current_size = GetSnapshotRootSize();
+
+  // Allow 1px of diff since the snapshot root can be adjusted by
+  // viewport-resizing UI (e.g. the virtual keyboard insets the viewport but
+  // then outsets the viewport rect to get the snapshot root). These
+  // adjustments can be off by a pixel due to different pixel snapping.
+  if (std::abs(snapshot_root_size_at_capture_->width() -
+               current_size.width()) <= 1 &&
+      std::abs(snapshot_root_size_at_capture_->height() -
+               current_size.height()) <= 1) {
+    return false;
+  }
+
+  return true;
 }
 
 }  // namespace blink

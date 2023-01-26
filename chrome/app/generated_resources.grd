@@ -805,6 +805,9 @@ are declared in tools/grit/grit_rule.gni.
           <message name="IDS_CONTENT_CONTEXT_OPEN_WITH_APP" desc="The label for an item in the content area context menu for opening a link with an app.">
             Open with <ph name="APP">$1<ex>Hangouts</ex></ph>
           </message>
+          <message name="IDS_CONTENT_CONTEXT_AUTOFILL_FEEDBACK" desc="The name of the Autofill Feedback command in the content area context menu">
+           Provide Autofill feedback
+          </message>
         </if>
         <if expr="use_titlecase">
           <message name="IDS_CONTENT_CONTEXT_BACK" desc="In Title Case: The name of the Back command in the content area context menu">
@@ -1070,6 +1073,9 @@ are declared in tools/grit/grit_rule.gni.
           </message>
           <message name="IDS_CONTENT_CONTEXT_GENERATEPASSWORD" desc="In Title Case: The name of the Generate Password command in the content area context menu">
             Suggest Password...
+          </message>
+          <message name="IDS_CONTENT_CONTEXT_AUTOFILL_FEEDBACK" desc="The name of the Autofill Feedback command in the content area context menu">
+           Provide Autofill Feedback
           </message>
         </if>
 
@@ -2220,6 +2226,14 @@ are declared in tools/grit/grit_rule.gni.
       <message name="IDS_DOWNLOAD_TOAST_CLEARED_ALL" desc="Toast message for clearing all download entries">
         Cleared all
       </message>
+      <message name="IDS_DOWNLOAD_DEEP_SCAN"
+               desc="In the download view, the 'Scan' button when prompt for deep scan">
+        Scan
+      </message>
+      <message name="IDS_DOWNLOAD_BYPASS_DEEP_SCAN"
+               desc="In the download view, the 'Open' button when prompt for deep scan">
+        Open
+      </message>
 
 
       <!-- Download Alerts for Accessibility -->
@@ -2551,6 +2565,10 @@ are declared in tools/grit/grit_rule.gni.
       <message name="IDS_DOWNLOAD_BUBBLE_FOOTER_LINK"
                desc="Footer link in the Download Bubble">
         Show all downloads
+      </message>
+      <message name="IDS_DOWNLOAD_BUBBLE_FOOTER_TOOLTIP"
+               desc="Tooltip label for the button to open all downloads">
+        Show all downloads in a new tab
       </message>
       <message name="IDS_DOWNLOAD_BUBBLE_DOWNLOAD_STATUS_MESSAGE_WITH_SEPARATOR"
                desc="The download status and message are separated by a symbol, in this case bullet •, with a white space before it and a white space after it. If the bullet • resembles another symbol in the language, please translate the bullet • as a symbol (A) that is not easily mistaken for a number or letter in the language and (B) that is typically used to separate elements.">
@@ -4012,13 +4030,22 @@ are declared in tools/grit/grit_rule.gni.
       </message>
 
       <!-- Tab casting infobar -->
-      <message name="IDS_TAB_CASTING_INFOBAR_CASTING_CURRENT_TAB_LABEL" desc="Text displayed on an infobar when current tab is being casted.">
+      <message name="IDS_TAB_CASTING_INFOBAR_CASTING_CURRENT_TAB_LABEL" desc="Text displayed on an infobar when current tab is being cast. The placeholder text (DEVICE_NAME) represents the name of the cast receiver.">
+       Casting this tab to <ph name="DEVICE_NAME">$1<ex>Living Room TV</ex></ph>
+      </message>
+      <message name="IDS_TAB_CASTING_INFOBAR_CASTING_CURRENT_TAB_NO_DEVICE_NAME_LABEL" desc="Text displayed on an infobar when current tab is being cast.">
        Casting this tab
       </message>
-      <message name="IDS_TAB_CASTING_INFOBAR_CASTING_ANOTHER_UNTITLED_TAB_LABEL" desc="Text displayed on an infobar when another (non-current) untitled tab is being casted.">
+      <message name="IDS_TAB_CASTING_INFOBAR_CASTING_ANOTHER_UNTITLED_TAB_LABEL" desc="Text displayed on an infobar when another (non-current) untitled tab is being cast. The placeholder text (DEVICE_NAME) represents the name of the cast receiver.">
+       Casting a tab to <ph name="DEVICE_NAME">$1<ex>Living Room TV</ex></ph>
+      </message>
+      <message name="IDS_TAB_CASTING_INFOBAR_CASTING_ANOTHER_UNTITLED_TAB_NO_DEVICE_NAME_LABEL" desc="Text displayed on an infobar when another (non-current) untitled tab is being cast.">
        Casting a tab
       </message>
-      <message name="IDS_TAB_CASTING_INFOBAR_CASTING_ANOTHER_TAB_LABEL" desc="Text displayed on an infobar when another (non-current) tab is being shacastedred.">
+      <message name="IDS_TAB_CASTING_INFOBAR_CASTING_ANOTHER_TAB_LABEL" desc="Text displayed on an infobar when another (non-current) tab is being cast. The placeholder text (DEVICE_NAME) represents the name of the cast receiver.">
+       Casting <ph name="TAB_NAME">$1<ex>youtube.com</ex></ph> to <ph name="DEVICE_NAME">$2<ex>Living Room TV</ex></ph>
+      </message>
+      <message name="IDS_TAB_CASTING_INFOBAR_CASTING_ANOTHER_TAB_NO_DEVICE_NAME_LABEL" desc="Text displayed on an infobar when another (non-current) tab is being cast.">
        Casting <ph name="TAB_NAME">$1<ex>youtube.com</ex></ph>
       </message>
       <message name="IDS_TAB_CASTING_INFOBAR_CAST_BUTTON" desc="Text displayed on the button to cast current tab.">
@@ -5206,6 +5233,9 @@ are declared in tools/grit/grit_rule.gni.
           <message name="IDS_MANAGE_EXTENSIONS" desc="The text of the button in the extensions toolbar menu used to open the chrome://extensions page and manage all extensions (sentence case).">
             Manage extensions
           </message>
+          <message name="IDS_VIEW_WEB_PERMISSIONS" desc="The text for the button in the extension context menu used to open the chrome://settings/content/siteDetails?site=xxx page and view the site details for a specific extension (sentence case).">
+            View web permissions
+          </message>
           <message name="IDS_EXTENSION_ACTION_INSPECT_POPUP" desc="The text for the right-click menu of page and browser actions which shows the popup and opens the developer tools (sentence case).">
             Inspect popup
           </message>
@@ -5288,6 +5318,9 @@ are declared in tools/grit/grit_rule.gni.
           </message>
           <message name="IDS_MANAGE_EXTENSIONS" desc="The text for the button in the extensions toolbar menu used to open the chrome://extensions page and manage all extensions (title case).">
             Manage Extensions
+          </message>
+          <message name="IDS_VIEW_WEB_PERMISSIONS" desc="The text for the button in the extension context menu used to open the chrome://settings/content/siteDetails?site=xxx page and view the site details for a specific extension (title case).">
+            View Web Permissions
           </message>
           <message name="IDS_EXTENSION_ACTION_INSPECT_POPUP" desc="The text for the right-click menu of page and browser actions which shows the popup and opens the developer tools (title case).">
             Inspect Popup
@@ -5856,6 +5889,44 @@ Keep your key file in a safe place. You will need it to create new versions of y
         Title bar is now showing
       </message>
 
+     <!-- App Home WebUI strings. -->
+      <message name="IDS_APP_HOME_TITLE" desc="Title of the new App Home page">
+        Apps
+      </message>
+
+      <message name="IDS_APP_HOME_OPEN_IN_WINDOW" desc="Label of menu entry for toggling an app to open in window from App Home context menu">
+        Open in window
+      </message>
+
+      <message name="IDS_ACCNAME_APP_HOME_OPEN_IN_WINDOW_CHECKBOX" desc="Accessibility label for the Open in window checkbox for App Home">
+        Enable opening app in window
+      </message>
+
+      <message name="IDS_APP_HOME_LAUNCH_AT_STARTUP" desc="Label of menu entry for toggling an app to run on startup from App Home context menu">
+        Launch at startup
+      </message>
+
+      <message name="IDS_ACCNAME_APP_HOME_LAUNCH_AT_STARTUP_CHECKBOX" desc="Accessibility label for the Launch at startup checkbox for App Home">
+        Enable launching app at startup
+      </message>
+
+      <message name="IDS_APP_HOME_CREATE_SHORTCUT" desc="Menu entry label for creating a shortcut for an app from context menu on App Home">
+        Create shortcut
+      </message>
+
+      <message name="IDS_APP_HOME_INSTALL_LOCALLY" desc="Menu entry label for installing the app on this device from context menu on App Home">
+        Install on this device
+      </message>
+
+      <message name="IDS_APP_HOME_UNINSTALL_APP" desc="Menu entry label for uninstalling an app from context menu on App Home">
+        Uninstall
+      </message>
+
+      <message name="IDS_APP_HOME_APP_SETTINGS" desc="Menu entry label for navigation to App Settings page for an app from context menu on App Home">
+        App settings
+      </message>
+      <!-- End App Home WebUI strings. -->
+
       <message name="IDS_WEB_APP_SETTINGS_TITLE" desc="Title of web app settings page">
         App Settings
       </message>
@@ -6084,10 +6155,10 @@ Keep your key file in a safe place. You will need it to create new versions of y
           Google Password Manager <ph name="SEPARATOR">•</ph> <ph name="ACCOUNT">$1<ex>user@gmail.com</ex></ph>
         </message>
         <message name="IDS_PASSWORD_MANAGER_SAVE_PASSWORD_SIGNED_IN_MESSAGE_DESCRIPTION_V2" desc="The description of the Google Password Manager's save password prompt when the user is signed in.">
-          To your Google Account, for <ph name="ACCOUNT">$1<ex>user@gmail.com</ex></ph>
+          To your Google Account, <ph name="ACCOUNT">$1<ex>user@gmail.com</ex></ph>
         </message>
         <message name="IDS_PASSWORD_MANAGER_UPDATE_PASSWORD_SIGNED_IN_MESSAGE_DESCRIPTION_V2" desc="The description of the Google Password Manager's save password prompt when the user is signed in.">
-          In your Google Account, for <ph name="ACCOUNT">$1<ex>user@gmail.com</ex></ph>
+          In your Google Account, <ph name="ACCOUNT">$1<ex>user@gmail.com</ex></ph>
         </message>
         <message name="IDS_PASSWORD_MANAGER_SAVE_UPDATE_PASSWORD_SIGNED_OUT_MESSAGE_DESCRIPTION_V1" desc="The description of the Google Password Manager's save password prompt when the user is signed out and passwords are only stored locally.">
           Only on this device
@@ -7345,8 +7416,23 @@ Keep your key file in a safe place. You will need it to create new versions of y
       <message name="IDS_BOOKMARK_FOLDER_CHILD_COUNT" desc="Text description for the number of children of a bookmark folder">
         {NUM_BOOKMARKS, plural, =1 {1 bookmark} other {# bookmarks}}
       </message>
+      <message name="IDS_BOOKMARKS_EDIT_MOVE_TO_ANOTHER_FOLDER" desc="Tooltip for the button in the bookmarks side panel bulk edit mode that allows the user to move the selected bookmarks to a different folder.">
+        Move to another folder
+      </message>
       <message name="IDS_BOOKMARKS_EDIT_MORE" desc="Tooltip for the menu button in the bookmarks side panel bulk edit mode that shows more actions the user can take on selected bookmarks.">
         More
+      </message>
+      <message name="IDS_BOOKMARKS_EDIT_MOVE_TO" desc="Title for the bookmarks side panel edit dialog when there are multiple selected bookmarks">
+        Move to…
+      </message>
+      <message name="IDS_BOOKMARKS_EDIT_NEW_FOLDER" desc="Label for the button to add a new folder in the bookmarks side panel edit dialog">
+        New Folder
+      </message>
+      <message name="IDS_BOOKMARKS_EDIT_CANCEL" desc="Label for the button to close the bookmarks side panel edit dialog">
+        Cancel
+      </message>
+      <message name="IDS_BOOKMARKS_EDIT_SAVE" desc="Label for the button to save changes from the bookmarks side panel edit dialog">
+        Save
       </message>
       <message name="IDS_BOOKMARK_DELETION_COUNT" desc="Text description for the number of deleted bookmarks">
         {NUM_BOOKMARKS, plural, =1 {1 bookmark deleted} other {# bookmarks deleted}}
@@ -7362,6 +7448,9 @@ Keep your key file in a safe place. You will need it to create new versions of y
       </message>
       <message name="IDS_BOOKMARKS_RENAME" desc="Label for the rename bookmarks menu option">
         Rename
+      </message>
+      <message name="IDS_BOOKMARKS_URL_FOLDER_DESCRIPTION" desc="Description for a bookmark that includes its URL and parent folder">
+        <ph name="URL">$1<ex>www.google.com</ex></ph> - <ph name="FOLDER">$2<ex>Bookmarks Bar</ex></ph>
       </message>
 
       <!-- Read Anything strings -->
@@ -10333,9 +10422,16 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google 
       <message name="IDS_SYNC_CONFIRMATION_SETTINGS_INFO" desc="Information about customizing Sync settings in the sync confirmation dialog when Unity is enabled">
         You can always choose what to sync in settings.
       </message>
-      <message name="IDS_SYNC_CONFIRMATION_CONFIRM_BUTTON_LABEL" desc="Label of the confirmation button in the sync confirmation dialog of the tab modal signin flow">
-        Yes, I'm in
-      </message>
+      <if expr="not use_titlecase">
+        <message name="IDS_SYNC_CONFIRMATION_CONFIRM_BUTTON_LABEL" desc="Label of the confirmation button in the sync confirmation dialog of the tab modal signin flow">
+          Yes, I'm in
+        </message>
+      </if>
+      <if expr="use_titlecase">
+        <message name="IDS_SYNC_CONFIRMATION_CONFIRM_BUTTON_LABEL" desc="In Title Case: Label of the confirmation button in the sync confirmation dialog of the tab modal signin flow">
+          Yes, I'm In
+        </message>
+      </if>
       <message name="IDS_SYNC_CONFIRMATION_SETTINGS_BUTTON_LABEL" desc="Label of the button in the sync confirmation dialog of the tab modal signin flow to open settings">
         Settings
       </message>
@@ -10359,6 +10455,11 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google 
       <message name="IDS_SYNC_CONFIRMATION_TANGIBLE_SYNC_INFO_TITLE" desc="This string appears as a subheading on a screen, and it asks users if they want to turn on sync. This string explains to users that they can back up their Chrome data and use it on all their computers, phones, and other devices; a user's Chrome data includes their bookmarks, passwords, history, settings, and more. If there is no natural translation for the word 'stuff' in your language, the word can be translated as 'data' or similar. Maintain the level of formality that your language generally uses in the Chrome app. The tone should be informative and inviting.">
         Back up your stuff and use it on any device
       </message>
+      <if expr="chromeos_lacros">
+        <message name="IDS_SYNC_CONFIRMATION_TANGIBLE_SYNC_INFO_TITLE_LACROS" desc="This string appears as a subheading on a screen, and it asks users if they want to turn on sync. This string explains to users that they can back up their Chrome browser data and use it on all their computers, phones, and other devices; a user's Chrome data includes their bookmarks, passwords, history, settings, and more. If there is no natural translation for the word 'stuff' in your language, the word can be translated as 'data' or similar. Maintain the level of formality that your language generally uses in the Chrome app. The tone should be informative and inviting. Please keep translations consistent with TC 7137558043921529662 (Windows, Mac, Linux) and TC 3833960754549650885 (iOS).">
+          Back up your browser stuff and use it on any device
+        </message>
+      </if>
       <message name="IDS_SYNC_CONFIRMATION_TANGIBLE_SYNC_INFO_TITLE_SIGNIN_INTERCEPT_V2" desc="This string appears as a subheading on a pop-up dialog, and it asks users if they want to turn on sync. This string explains to users that they can back up their Chrome data and use it on all their computers, phones, and other devices; a user's Chrome data includes their bookmarks, passwords, history, settings, and more. If there is no natural translation for the word 'stuff' in your language, the word can be translated as 'data' or similar. Maintain the level of formality that your language generally uses in the Chrome app. The tone should be informative and inviting.">
         Turn on sync to back up your stuff and use it on any device
       </message>
@@ -10598,9 +10699,6 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google 
       </message>
       <message name="IDS_SAVE_PAGE_DESC_COMPLETE" desc="In the Save Page dialog, the description of saving both the HTML and all shown resources.">
         Webpage, Complete
-      </message>
-      <message name="IDS_SAVE_PAGE_DESC_WEB_BUNDLE_FILE" desc="In the Save Page dialog, the description of saving both the HTML and all shown resources into a single Web Bundle file.">
-        Webpage, Single File (Web Bundle)
       </message>
 
       <!-- General app failure messages -->
@@ -13988,6 +14086,9 @@ Please help our engineers fix this problem. Tell us what happened right before y
     </message>
     <message name="IDS_VERIFY_SHEET_TITLE" desc="Header shown to the user while signing in happens.">
       Verifying…
+    </message>
+    <message name="IDS_VERIFY_SHEET_TITLE_AUTO_SIGNIN" desc="Header for auto sign-in sheet. Sheet is shown to notify the user that they are signing in to a website using an account from an identity provider." translateable="false">
+      Signing in to <ph name="SITE_ETLD_PLUS_ONE">$1<ex>rp.example</ex></ph> with <ph name="IDENTITY_PROVIDER_ETLD_PLUS_ONE">$2<ex>idp.example</ex></ph>
     </message>
 
     <!-- Input overlay strings -->

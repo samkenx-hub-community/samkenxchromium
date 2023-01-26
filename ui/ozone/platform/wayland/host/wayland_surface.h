@@ -84,7 +84,6 @@ class WaylandSurface {
   // the underlying wl_surface must be kept alive with no root window associated
   // (e.g: window/tab dragging sessions).
   void UnsetRootWindow();
-  void SetRootWindow(WaylandWindow* window);
 
   // Attaches the given wl_buffer to the underlying wl_surface at (0, 0).
   // Returns true if wl_surface.attach will be called in ApplyPendingStates().
@@ -216,9 +215,10 @@ class WaylandSurface {
   // effect immediately.
   void ForceImmediateStateApplication();
 
-  // Requests to wayland compositor to send key events even if it matches
-  // with the compositor's accelerator keys.
-  void InhibitKeyboardShortcuts();
+  // Asks the Wayland compositor to enable or disable the keyboard shortcuts
+  // inhibition for this surface. i.e: to receive key events even if they match
+  // compositor accelerators, e.g: Alt+Tab, etc.
+  void SetKeyboardShortcutsInhibition(bool enabled);
 
  private:
   FRIEND_TEST_ALL_PREFIXES(WaylandWindowTest,

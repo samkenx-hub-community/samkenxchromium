@@ -129,9 +129,7 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &features::kWebNfc,
     &features::kIncognitoDownloadsWarning,
     &features::kIncognitoNtpRevamp,
-    &feature_engagement::kEnableIPH,
     &feature_engagement::kIPHNewTabPageHomeButtonFeature,
-    &feature_engagement::kIPHSnooze,
     &feature_engagement::kIPHTabSwitcherButtonFeature,
     &feature_engagement::kUseClientConfigIPH,
     &feature_guide::features::kFeatureNotificationGuide,
@@ -196,6 +194,7 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &kCCTResizable90MaximumHeight,
     &kCCTResizableForThirdParties,
     &kCCTResizableSideSheet,
+    &kCCTResizableSideSheetForThirdParties,
     &kCCTRetainingStateInMemory,
     &kCCTResourcePrefetch,
     &kCCTToolbarCustomizations,
@@ -208,7 +207,6 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &kChromeSharingHubLaunchAdjacent,
     &kChromeSurveyNextAndroid,
     &kCommandLineOnNonRooted,
-    &kConditionalTabStripAndroid,
     &kContextMenuEnableLensShoppingAllowlist,
     &kContextMenuGoogleLensChip,
     &kContextMenuSearchWithGoogleLens,
@@ -237,6 +235,7 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &kLensCameraAssistedSearch,
     &kLensOnQuickActionSearchWidget,
     &kNotificationPermissionVariant,
+    &kNotificationPermissionBottomSheet,
     &kPageAnnotationsService,
     &kBookmarksImprovedSaveFlow,
     &kBookmarksRefresh,
@@ -250,6 +249,7 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &kProbabilisticCryptidRenderer,
     &kReachedCodeProfiler,
     &kReaderModeInCCT,
+    &kRecordSuppressionMetrics,
     &kReengagementNotification,
     &kRelatedSearches,
     &kRelatedSearchesInBar,
@@ -287,7 +287,6 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &kTestDefaultDisabled,
     &kTestDefaultEnabled,
     &kToolbarMicIphAndroid,
-    &kToolbarPhoneOptimizations,
     &kToolbarScrollAblationAndroid,
     &kTrustedWebActivityPostMessage,
     &kTrustedWebActivityQualityEnforcement,
@@ -339,6 +338,7 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &page_info::kPageInfoAboutThisSiteEn,
     &page_info::kPageInfoAboutThisSiteMoreInfo,
     &page_info::kPageInfoAboutThisSiteNonEn,
+    &page_info::kPageInfoAboutThisSiteImprovedBottomSheet,
     &password_manager::features::kBiometricTouchToFill,
     &password_manager::features::kEnablePasswordsAccountStorage,
     &password_manager::features::kLeakDetectionUnauthenticated,
@@ -378,6 +378,7 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &video_tutorials::features::kVideoTutorials,
     &webapps::features::kInstallableAmbientBadgeInfoBar,
     &webapps::features::kInstallableAmbientBadgeMessage,
+    &webapps::features::kWebApkInstallFailureNotification,
     &webapps::features::kWebApkUniqueId,
 };
 
@@ -480,10 +481,6 @@ BASE_FEATURE(kBaselineGM3SurfaceColors,
              "BaselineGM3SurfaceColors",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-BASE_FEATURE(kConditionalTabStripAndroid,
-             "ConditionalTabStripAndroid",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-
 // Used in downstream code.
 BASE_FEATURE(kCastDeviceFilter,
              "CastDeviceFilter",
@@ -573,6 +570,10 @@ BASE_FEATURE(kCCTResizableForThirdParties,
 
 BASE_FEATURE(kCCTResizableSideSheet,
              "CCTResizableSideSheet",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+BASE_FEATURE(kCCTResizableSideSheetForThirdParties,
+             "CCTResizableSideSheetForThirdParties",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 BASE_FEATURE(kCCTResourcePrefetch,
@@ -731,6 +732,10 @@ BASE_FEATURE(kNotificationPermissionVariant,
              "NotificationPermissionVariant",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
+BASE_FEATURE(kNotificationPermissionBottomSheet,
+             "NotificationPermissionBottomSheet",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 BASE_FEATURE(kInstanceSwitcher,
              "InstanceSwitcher",
              base::FEATURE_ENABLED_BY_DEFAULT);
@@ -785,6 +790,10 @@ BASE_FEATURE(kReachedCodeProfiler,
 
 BASE_FEATURE(kReaderModeInCCT,
              "ReaderModeInCCT",
+             base::FEATURE_ENABLED_BY_DEFAULT);
+
+BASE_FEATURE(kRecordSuppressionMetrics,
+             "RecordSuppressionMetrics",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
 BASE_FEATURE(kReengagementNotification,
@@ -926,10 +935,6 @@ BASE_FEATURE(kTestDefaultEnabled,
 BASE_FEATURE(kToolbarMicIphAndroid,
              "ToolbarMicIphAndroid",
              base::FEATURE_DISABLED_BY_DEFAULT);
-
-BASE_FEATURE(kToolbarPhoneOptimizations,
-             "ToolbarPhoneOptimizations",
-             base::FEATURE_ENABLED_BY_DEFAULT);
 
 BASE_FEATURE(kToolbarScrollAblationAndroid,
              "ToolbarScrollAblationAndroid",

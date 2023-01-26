@@ -315,8 +315,6 @@ public final class ProductionSupportedFlagList {
                     "Switches skia to use DMSAA instead of MSAA for tile raster"),
             Flag.baseFeature(
                     CcFeatures.AVOID_RASTER_DURING_ELASTIC_OVERSCROLL, "No effect on webview"),
-            Flag.baseFeature(BlinkFeatures.DOCUMENT_EVENT_NODE_PATH_CACHING,
-                    "Enables a performance optimization that caches event paths."),
             Flag.baseFeature(BlinkFeatures.WEB_RTC_METRONOME,
                     "Inject a metronome into webrtc to allow task coalescing, "
                             + " including synchronized decoding."),
@@ -352,6 +350,14 @@ public final class ProductionSupportedFlagList {
                             + " in a background thread or on the main thread."),
             Flag.baseFeature(ContentFeatures.MAIN_THREAD_COMPOSITING_PRIORITY,
                     "When enabled runs the main thread at compositing priority."),
+            Flag.baseFeature(AwFeatures.WEBVIEW_UMA_UPLOAD_QUALITY_OF_SERVICE_SET_TO_DEFAULT,
+                    "If enabled, the frequency to upload UMA is increased."),
+            Flag.baseFeature(ContentFeatures.AVOID_UNNECESSARY_NAVIGATION_CANCELLATIONS,
+                    "If enabled, avoids unnecessary navigation cancellations."),
+            Flag.baseFeature("CanvasColorCache"),
+            Flag.baseFeature(AwFeatures.WEBVIEW_RESTRICT_SENSITIVE_CONTENT,
+                    "Controls whether access to sensitive web content should be restricted."),
+            Flag.baseFeature("NavigationRequestPreconnect"),
             // Add new commandline switches and features above. The final entry should have a
             // trailing comma for cleaner diffs.
     };

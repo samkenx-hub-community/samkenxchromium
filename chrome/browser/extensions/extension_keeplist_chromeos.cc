@@ -327,10 +327,10 @@ BuildStandaloneBrowserAppServiceBlockListInitParam() {
   auto app_service_block_list =
       crosapi::mojom::StandaloneBrowserAppServiceBlockList::New();
   for (const auto& id : ExtensionAppsAppServiceBlocklistInStandaloneBrowser()) {
-    app_service_block_list->extension_apps.emplace_back(std::string(id));
+    app_service_block_list->extension_apps.emplace_back(id);
   }
   for (const auto& id : ExtensionsAppServiceBlocklistInStandaloneBrowser()) {
-    app_service_block_list->extensions.emplace_back(std::string(id));
+    app_service_block_list->extensions.emplace_back(id);
   }
 
   return app_service_block_list;
@@ -401,44 +401,44 @@ bool ExtensionAppRunsInOS(const std::string& app_id) {
          base::Contains(GetExtensionAppsRunInOSOnly(), app_id);
 }
 
-bool ExtensionAppRunsInOSOnly(const std::string& app_id) {
+bool ExtensionAppRunsInOSOnly(base::StringPiece app_id) {
   return base::Contains(GetExtensionAppsRunInOSOnly(), app_id);
 }
 
-bool ExtensionRunsInOSOnly(const std::string& extension_id) {
+bool ExtensionRunsInOSOnly(base::StringPiece extension_id) {
   return base::Contains(GetExtensionsRunInOSOnly(), extension_id);
 }
 
 #if BUILDFLAG(IS_CHROMEOS_LACROS)
 bool IsAppServiceBlocklistCrosapiSupported() {
-  const auto& block_list = chromeos::BrowserParamsProxy::Get()
+  const auto* block_list = chromeos::BrowserParamsProxy::Get()
                          ->StandaloneBrowserAppServiceBlockList();
-  return !block_list.is_null();
+  return block_list != nullptr;
 }
 
 bool ExtensionAppBlockListedForAppServiceInStandaloneBrowser(
-    const std::string& app_id) {
-  const auto& block_list = chromeos::BrowserParamsProxy::Get()
+    base::StringPiece app_id) {
+  const auto* block_list = chromeos::BrowserParamsProxy::Get()
                          ->StandaloneBrowserAppServiceBlockList();
-  DCHECK(!block_list.is_null());
+  DCHECK(block_list);
   return base::Contains(block_list->extension_apps, app_id);
 }
 
 bool ExtensionBlockListedForAppServiceInStandaloneBrowser(
-    const std::string& extension_id) {
-  const auto& block_list = chromeos::BrowserParamsProxy::Get()
+    base::StringPiece extension_id) {
+  const auto* block_list = chromeos::BrowserParamsProxy::Get()
                          ->StandaloneBrowserAppServiceBlockList();
-  DCHECK(!block_list.is_null());
+  DCHECK(block_list);
   return base::Contains(block_list->extensions, extension_id);
 }
 #endif
 
 #if BUILDFLAG(IS_CHROMEOS_ASH)
-bool ExtensionAppBlockListedForAppServiceInOS(const std::string& app_id) {
+bool ExtensionAppBlockListedForAppServiceInOS(base::StringPiece app_id) {
   return base::Contains(ExtensionAppsAppServiceBlocklistInOS(), app_id);
 }
 
-bool ExtensionBlockListedForAppServiceInOS(const std::string& extension_id) {
+bool ExtensionBlockListedForAppServiceInOS(base::StringPiece extension_id) {
   return base::Contains(ExtensionsAppServiceBlocklistInOS(), extension_id);
 }
 #endif

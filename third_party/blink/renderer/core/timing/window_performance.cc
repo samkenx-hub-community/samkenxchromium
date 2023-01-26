@@ -421,7 +421,6 @@ void WindowPerformance::RegisterEventTiming(const Event& event,
       MonotonicTimeToDOMHighResTimeStamp(processing_start),
       MonotonicTimeToDOMHighResTimeStamp(processing_end), event.cancelable(),
       event.target() ? event.target()->ToNode() : nullptr,
-      PerformanceEntry::GetNavigationId(GetExecutionContext()),
       DomWindow());  // TODO(haoliuk): Add WPT for Event Timing.
                      // See crbug.com/1320878.
   absl::optional<int> key_code;
@@ -587,7 +586,7 @@ void WindowPerformance::NotifyAndAddEventTimingBuffer(
     base::TimeTicks unsafe_start_time =
         GetTimeOriginInternal() + base::Milliseconds(entry->startTime());
     base::TimeTicks unsafe_end_time = entry->unsafePresentationTimestamp();
-    unsigned hash = WTF::StringHash::GetHash(entry->name());
+    unsigned hash = WTF::GetHash(entry->name());
     WTF::AddFloatToHash(hash, entry->startTime());
     TRACE_EVENT_NESTABLE_ASYNC_BEGIN_WITH_TIMESTAMP1(
         "devtools.timeline", "EventTiming", hash, unsafe_start_time, "data",
@@ -631,7 +630,7 @@ void WindowPerformance::AddElementTiming(const AtomicString& name,
       name, url, rect, MonotonicTimeToDOMHighResTimeStamp(start_time),
       MonotonicTimeToDOMHighResTimeStamp(load_time), identifier,
       intrinsic_size.width(), intrinsic_size.height(), id, element,
-      PerformanceEntry::GetNavigationId(GetExecutionContext()), DomWindow());
+      DomWindow());
   TRACE_EVENT2("loading", "PerformanceElementTiming", "data",
                entry->ToTracedValue(), "frame",
                ToTraceValue(DomWindow()->GetFrame()));
@@ -670,7 +669,6 @@ void WindowPerformance::AddVisibilityStateEntry(bool is_visible,
   VisibilityStateEntry* entry = MakeGarbageCollected<VisibilityStateEntry>(
       PageHiddenStateString(!is_visible),
       MonotonicTimeToDOMHighResTimeStamp(timestamp),
-      PerformanceEntry::GetNavigationId(GetExecutionContext()),
       DomWindow());  // Todo(haoliuk): Add WPT for
                      // VisibilityStateEntry. See
                      // crbug.com/1320878.
@@ -688,8 +686,7 @@ void WindowPerformance::AddSoftNavigationEntry(const AtomicString& name,
     return;
   }
   SoftNavigationEntry* entry = MakeGarbageCollected<SoftNavigationEntry>(
-      name, MonotonicTimeToDOMHighResTimeStamp(timestamp),
-      PerformanceEntry::GetNavigationId(GetExecutionContext()), DomWindow());
+      name, MonotonicTimeToDOMHighResTimeStamp(timestamp), DomWindow());
 
   if (HasObserverFor(PerformanceEntry::kSoftNavigation)) {
     UseCounter::Count(GetExecutionContext(),
@@ -715,6 +712,10 @@ EventCounts* WindowPerformance::eventCounts() {
   return event_counts_;
 }
 
+uint64_t WindowPerformance::interactionCount() const {
+  return responsiveness_metrics_->GetInteractionCount();
+}
+
 void WindowPerformance::OnLargestContentfulPaintUpdated(
     base::TimeTicks start_time,
     base::TimeTicks render_time,
@@ -733,8 +734,7 @@ void WindowPerformance::OnLargestContentfulPaintUpdated(
   // TODO(yoav): Should we modify start to represent the animated frame?
   auto* entry = MakeGarbageCollected<LargestContentfulPaint>(
       start_timestamp, render_timestamp, paint_size, load_timestamp,
-      first_animated_frame_timestamp, id, url, element,
-      PerformanceEntry::GetNavigationId(GetExecutionContext()), DomWindow());
+      first_animated_frame_timestamp, id, url, element, DomWindow());
   if (HasObserverFor(PerformanceEntry::kLargestContentfulPaint))
     NotifyObserversOfEntry(*entry);
   AddLargestContentfulPaint(entry);

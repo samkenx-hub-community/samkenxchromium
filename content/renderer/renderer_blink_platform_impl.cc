@@ -120,10 +120,6 @@
 #include "base/file_descriptor_posix.h"
 #endif
 
-#if BUILDFLAG(IS_WIN)
-#include "base/win/windows_version.h"
-#endif
-
 using blink::Platform;
 using blink::WebAudioDevice;
 using blink::WebAudioLatencyHint;
@@ -147,7 +143,7 @@ media::AudioParameters GetAudioHardwareParams() {
 
   return blink::AudioDeviceFactory::GetInstance()
       ->GetOutputDeviceInfo(render_frame->GetWebFrame()->GetLocalFrameToken(),
-                            media::AudioSinkParameters())
+                            std::string())
       .output_params();
 }
 
@@ -628,22 +624,6 @@ void RendererBlinkPlatformImpl::GetWebRTCRendererPreferences(
   *allow_mdns_obfuscation = true;
 }
 
-bool RendererBlinkPlatformImpl::IsWebRtcHWH264DecodingEnabled(
-    webrtc::VideoCodecType video_codec_type) {
-#if BUILDFLAG(IS_WIN)
-  // Do not use hardware decoding for H.264 on Win7, due to high latency.
-  // See https://crbug.com/webrtc/5717.
-  if (!base::CommandLine::ForCurrentProcess()->HasSwitch(
-          switches::kEnableWin7WebRtcHWH264Decoding) &&
-      video_codec_type == webrtc::kVideoCodecH264 &&
-      base::win::GetVersion() == base::win::Version::WIN7) {
-    DVLOG(1) << "H.264 HW decoding is not supported on Win7";
-    return false;
-  }
-#endif  // BUILDFLAG(IS_WIN)
-  return true;
-}
-
 bool RendererBlinkPlatformImpl::IsWebRtcHWEncodingEnabled() {
   return !base::CommandLine::ForCurrentProcess()->HasSwitch(
       switches::kDisableWebRtcHWEncoding);
@@ -1073,5 +1053,14 @@ RendererBlinkPlatformImpl::VideoFrameCompositorTaskRunner() {
   }
   return compositor_task_runner;
 }
+
+#if BUILDFLAG(IS_ANDROID)
+void RendererBlinkPlatformImpl::SetPrivateMemoryFootprint(
+    uint64_t private_memory_footprint_bytes) {
+  auto* render_thread = RenderThreadImpl::current();
+  CHECK(render_thread);
+  render_thread->SetPrivateMemoryFootprint(private_memory_footprint_bytes);
+}
+#endif
 
 }  // namespace content

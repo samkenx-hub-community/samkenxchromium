@@ -732,6 +732,22 @@
 
     // Animation Priority properties
     {
+      name: "animation-composition",
+      property_methods: ["ParseSingleValue", "CSSValueFromComputedStyleInternal", "InitialValue"],
+      keywords: ["replace", "add", "accumulate"],
+      style_builder_template: "animation",
+      style_builder_template_args: {
+        attribute: "Composition",
+      },
+      typedom_types: ["Keyword"],
+      separator: ",",
+      include_paths: ["third_party/blink/renderer/core/animation/effect_model.h"],
+      default_value: "EffectModel::kCompositeReplace",
+      type_name: "EffectModel::CompositeOperation",
+      valid_for_marker: true,
+      runtime_flag: "CSSAnimationComposition"
+    },
+    {
       name: "animation-delay",
       property_methods: ["ParseSingleValue", "CSSValueFromComputedStyleInternal", "InitialValue"],
       style_builder_template: "animation",
@@ -1066,7 +1082,6 @@
       valid_for_first_line: true,
       valid_for_cue: true,
       valid_for_marker: true,
-      tree_scoped_value: true,
       valid_for_formatted_text: true,
       valid_for_formatted_text_run: true,
     },
@@ -2277,7 +2292,6 @@
       },
       supports_incremental_style: true,
       valid_for_position_fallback: true,
-      tree_scoped_value: true,
     },
     {
       name: "box-shadow",
@@ -2992,7 +3006,6 @@
       supports_incremental_style: true,
       valid_for_formatted_text: true,
       valid_for_position_fallback: true,
-      tree_scoped_value: true,
     },
     {
       name: "hyphenate-limit-chars",
@@ -3116,7 +3129,6 @@
       },
       supports_incremental_style: true,
       valid_for_position_fallback: true,
-      tree_scoped_value: true,
     },
     {
       name: "letter-spacing",
@@ -3205,7 +3217,6 @@
         "decimal", "none"
       ],
       style_builder_custom_functions: ["value"],
-      tree_scoped_value: true,
     },
     {
       name: "margin-bottom",
@@ -3385,7 +3396,6 @@
       },
       supports_incremental_style: true,
       valid_for_position_fallback: true,
-      tree_scoped_value: true,
     },
     {
       name: "max-width",
@@ -3403,7 +3413,6 @@
       },
       supports_incremental_style: true,
       valid_for_position_fallback: true,
-      tree_scoped_value: true,
     },
     {
       name: "min-height",
@@ -3420,7 +3429,6 @@
       },
       supports_incremental_style: true,
       valid_for_position_fallback: true,
-      tree_scoped_value: true,
     },
     {
       name: "min-width",
@@ -3437,7 +3445,6 @@
       },
       supports_incremental_style: true,
       valid_for_position_fallback: true,
-      tree_scoped_value: true,
     },
     {
       name: "mix-blend-mode",
@@ -4040,7 +4047,6 @@
       },
       supports_incremental_style: true,
       valid_for_position_fallback: true,
-      tree_scoped_value: true,
     },
     {
       name: "r",
@@ -4376,12 +4382,11 @@
       name: "scroll-timeline-axis",
       property_methods: ["ParseSingleValue", "CSSValueFromComputedStyleInternal", "InitialValue"],
       field_group: "*->timeline",
-      field_template: "primitive",
-      field_size: 2,
-      type_name: "TimelineAxis",
-      default_value: "TimelineAxis::kBlock",
-      keywords: ["block", "inline", "vertical", "horizontal"],
-      typedom_types: ["Keyword"],
+      field_template: "external",
+      default_value: "Vector<TimelineAxis>()",
+      type_name: "Vector<TimelineAxis>",
+      converter: "ConvertViewTimelineAxis",
+      separator: ",",
       runtime_flag: "CSSScrollTimeline",
     },
     {
@@ -4389,11 +4394,12 @@
       property_methods: ["ParseSingleValue", "CSSValueFromComputedStyleInternal", "InitialValue"],
       field_group: "*->timeline",
       field_template: "external",
-      type_name: "ScopedCSSName",
-      wrapper_pointer_name: "Persistent",
       default_value: "nullptr",
+      type_name: "ScopedCSSNameList",
+      wrapper_pointer_name: "Persistent",
       tree_scoped_value: true,
-      converter: "ConvertNoneOrCustomIdent",
+      converter: "ConvertViewTimelineName",
+      separator: ",",
       runtime_flag: "CSSScrollTimeline",
     },
     {
@@ -4962,7 +4968,6 @@
       },
       supports_incremental_style: true,
       valid_for_position_fallback: true,
-      tree_scoped_value: true,
     },
     {
       name: "touch-action",
@@ -5886,7 +5891,6 @@
       supports_incremental_style: true,
       valid_for_formatted_text: true,
       valid_for_position_fallback: true,
-      tree_scoped_value: true,
     },
     {
       name: "will-change",

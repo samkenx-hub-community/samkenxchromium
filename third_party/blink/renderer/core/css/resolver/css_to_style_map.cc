@@ -30,6 +30,7 @@
 #include "third_party/blink/renderer/core/css/resolver/css_to_style_map.h"
 
 #include "third_party/blink/renderer/core/animation/css/css_animation_data.h"
+#include "third_party/blink/renderer/core/animation/effect_model.h"
 #include "third_party/blink/renderer/core/css/css_border_image_slice_value.h"
 #include "third_party/blink/renderer/core/css/css_custom_ident_value.h"
 #include "third_party/blink/renderer/core/css/css_identifier_value.h"
@@ -479,6 +480,7 @@ EAnimPlayState CSSToStyleMap::MapAnimationPlayState(StyleResolverState& state,
 namespace {
 
 absl::optional<Timing::TimelineOffset> MapAnimationRange(
+    StyleResolverState& state,
     const CSSValue& value) {
   if (auto* ident = DynamicTo<CSSIdentifierValue>(value);
       ident && ident->GetValueID() == CSSValueID::kAuto) {
@@ -487,11 +489,9 @@ absl::optional<Timing::TimelineOffset> MapAnimationRange(
   const auto& list = To<CSSValueList>(value);
   DCHECK_EQ(list.length(), 2u);
   const auto& range_name = To<CSSIdentifierValue>(list.Item(0));
-  const auto& percentage = To<CSSPrimitiveValue>(list.Item(1));
-  DCHECK(percentage.IsPercentage());
   return Timing::TimelineOffset(
       range_name.ConvertTo<Timing::TimelineNamedRange>(),
-      percentage.GetValue<double>() / 100.0);
+      StyleBuilderConverter::ConvertLength(state, list.Item(1)));
 }
 
 }  // namespace
@@ -499,13 +499,27 @@ absl::optional<Timing::TimelineOffset> MapAnimationRange(
 absl::optional<Timing::TimelineOffset> CSSToStyleMap::MapAnimationRangeStart(
     StyleResolverState& state,
     const CSSValue& value) {
-  return MapAnimationRange(value);
+  return MapAnimationRange(state, value);
 }
 
 absl::optional<Timing::TimelineOffset> CSSToStyleMap::MapAnimationRangeEnd(
     StyleResolverState& state,
     const CSSValue& value) {
-  return MapAnimationRange(value);
+  return MapAnimationRange(state, value);
+}
+
+EffectModel::CompositeOperation CSSToStyleMap::MapAnimationComposition(
+    StyleResolverState& state,
+    const CSSValue& value) {
+  switch (To<CSSIdentifierValue>(value).GetValueID()) {
+    case CSSValueID::kAdd:
+      return EffectModel::kCompositeAdd;
+    case CSSValueID::kAccumulate:
+      return EffectModel::kCompositeAccumulate;
+    case CSSValueID::kReplace:
+    default:
+      return EffectModel::kCompositeReplace;
+  }
 }
 
 CSSTransitionData::TransitionProperty CSSToStyleMap::MapAnimationProperty(

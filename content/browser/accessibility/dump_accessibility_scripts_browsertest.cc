@@ -46,6 +46,8 @@ constexpr const char kMacParameterizedAttributes[]{
 constexpr const char kIAccessible[]{"win/ia2/iaccessible"};
 constexpr const char kIAccessible2[]{"win/ia2/iaccessible2"};
 constexpr const char kIAccessibleTable[]{"win/ia2/iaccessibletable"};
+constexpr const char kIAccessibleTextSelectionContainer[]{
+    "win/ia2/iaccessibletextselectioncontainer"};
 
 #endif
 
@@ -510,6 +512,11 @@ IN_PROC_BROWSER_TEST_P(DumpAccessibilityScriptTest,
   RunTypedTest<kMacMethods>("accessibility-column-header-ui-elements.html");
 }
 
+IN_PROC_BROWSER_TEST_P(DumpAccessibilityScriptTest,
+                       AccessibilityCustomContent) {
+  RunTypedTest<kMacMethods>("accessibility-custom-content.html");
+}
+
 IN_PROC_BROWSER_TEST_P(DumpAccessibilityScriptTest, AccessibilityIsIgnored) {
   RunTypedTest<kMacMethods>("accessibility-is-ignored.html");
 }
@@ -605,6 +612,14 @@ IN_PROC_BROWSER_TEST_P(DumpAccessibilityScriptTest, IAccessible2Role) {
 IN_PROC_BROWSER_TEST_P(DumpAccessibilityScriptTest,
                        IAccessibleTableSelectedColumns) {
   RunTypedTest<kIAccessibleTable>(L"iaccessibletable-selected-columns.html");
+}
+
+// IAccessibleTextSelectionContainer
+
+IN_PROC_BROWSER_TEST_P(DumpAccessibilityScriptTest,
+                       IAccessibleTextSelectionContainerSelections) {
+  RunTypedTest<kIAccessibleTextSelectionContainer>(
+      L"iaccessibletextselectioncontainer-selections.html");
 }
 
 #endif

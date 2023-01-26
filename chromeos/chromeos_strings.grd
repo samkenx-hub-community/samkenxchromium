@@ -322,11 +322,6 @@
       </message>
 
       <if expr="chromeos_ash">
-        <message name="IDS_ASSISTANT_SCREEN_CONTEXT_QUERY_FALLBACK_TEXT" desc="Message shown in Assistant UI when a query for content related to the screen context returns no results.">
-          I can't find anything on your screen I can help with.
-Try tapping the mic to ask me anything.
-        </message>
-
         <!-- The following strings are located here for accessibility from both //ash and //chrome -->
         <message name="IDS_ENABLE_BLUETOOTH" desc="The message to display in the network list when Tether is enabled but Bluetooth is disabled.">
           Turn on Bluetooth to discover nearby devices
@@ -2234,6 +2229,9 @@ Try tapping the mic to ask me anything.
         <message name="IDS_PERSONALIZATION_APP_GOOGLE_PHOTOS_TRY_AGAIN" desc="Message for the try again button shown when something goes wrong in the Google Photos page in the wallpaper app.">
           Try again
         </message>
+        <message name="IDS_PERSONALIZATION_APP_GOOGLE_PHOTOS_ALBUM_SHARED" desc="Secondary text for Google Photos shared albums in the wallpaper app.">
+          Shared
+        </message>
         <message name="IDS_PERSONALIZATION_APP_GOOGLE_PHOTOS_ALBUMS_TAB" desc="Label for the Albums tab in the Google Photos page in the wallpaper app.">
           Albums
         </message>
@@ -3721,9 +3719,11 @@ Try tapping the mic to ask me anything.
         <message name="IDS_SHORTCUT_CUSTOMIZATION_CATEGORY_ACCESSIBILITY" desc="Category named 'Accessibility' shown on the navigation sidebar" translateable="false">Accessibility</message>
         <message name="IDS_SHORTCUT_CUSTOMIZATION_CATEGORY_DEBUG" desc="Category named 'Debug' shown on the navigation sidebar" translateable="false">Debug</message>
         <message name="IDS_SHORTCUT_CUSTOMIZATION_CATEGORY_DEVELOPER" desc="Category named 'Developer' shown on the navigation sidebar" translateable="false">Developer</message>
+        <message name="IDS_SHORTCUT_CUSTOMIZATION_CATEGORY_EVENT_REWRITER" desc="Category named 'Special Keys' shown on the navigation sidebar" translateable="false">Special Keys</message>
         <message name="IDS_SHORTCUT_CUSTOMIZATION_SUBCATEGORY_GENERAL" desc="Subcategory named 'General' shown within main shortcuts section" translateable="false">General</message>
         <message name="IDS_SHORTCUT_CUSTOMIZATION_SUBCATEGORY_SYSTEM_APPS" desc="Subcategory named 'System Apps' shown within main shortcuts section" translateable="false">System Apps</message>
         <message name="IDS_SHORTCUT_CUSTOMIZATION_SUBCATEGORY_SYSTEM_CONTROLS" desc="Subcategory named 'System Controls' shown within main shortcuts section" translateable="false">System Controls</message>
+        <message name="IDS_SHORTCUT_CUSTOMIZATION_SUBCATEGORY_SIX_PACK" desc="Subcategory named 'Six Pack' shown within main shortcuts section" translateable="false">Six Pack</message>
         <message name="IDS_SHORTCUT_CUSTOMIZATION_KEY_SPACE" desc="Lowercase name of the keyboard key 'Space'" translateable="false">space</message>
         <message name="IDS_SHORTCUT_CUSTOMIZATION_KEY_TAB" desc="Lowercase name of the keyboard key 'Tab'" translateable="false">tab</message>
         <message name="IDS_SHORTCUT_CUSTOMIZATION_KEY_ESCAPE" desc="Lowercase name of the keyboard key 'Escape', abbreviated if possible" translateable="false">esc</message>

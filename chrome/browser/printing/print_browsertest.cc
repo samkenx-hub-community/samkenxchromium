@@ -13,6 +13,7 @@
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
 #include "base/memory/raw_ptr.h"
+#include "base/memory/raw_ptr_exclusion.h"
 #include "base/path_service.h"
 #include "base/ranges/algorithm.h"
 #include "base/run_loop.h"
@@ -47,6 +48,7 @@
 #include "components/printing/browser/print_manager_utils.h"
 #include "components/printing/common/print.mojom-test-utils.h"
 #include "components/printing/common/print.mojom.h"
+#include "components/web_modal/web_contents_modal_dialog_manager.h"
 #include "content/public/browser/browser_message_filter.h"
 #include "content/public/browser/browser_task_traits.h"
 #include "content/public/browser/browser_thread.h"
@@ -118,8 +120,7 @@ using OnDidAskUserForSettingsCallback =
     base::RepeatingCallback<void(mojom::ResultCode result)>;
 #endif
 using OnDidStartPrintingCallback =
-    base::RepeatingCallback<void(mojom::ResultCode result,
-                                 PrintJob* print_job)>;
+    base::RepeatingCallback<void(mojom::ResultCode result)>;
 #if BUILDFLAG(IS_WIN)
 using OnDidRenderPrintedPageCallback =
     base::RepeatingCallback<void(uint32_t page_number,
@@ -322,22 +323,33 @@ class PrintPreviewObserver : PrintPreviewUI::TestDelegate {
     PrintPreviewUI::SetDelegateForTesting(nullptr);
   }
 
-  void WaitUntilPreviewIsReady() {
-    if (rendered_page_count_ >= expected_rendered_page_count_)
-      return;
+  // Tests that use PrintPreviewObserver must call
+  // WaitUntilPreviewIsReady*() exactly once.
+  [[nodiscard]] content::WebContents*
+  WaitUntilPreviewIsReadyAndReturnPreviewDialog() {
+    if (rendered_page_count_ < expected_rendered_page_count_) {
+      base::RunLoop run_loop;
+      base::AutoReset<base::RunLoop*> auto_reset(&run_loop_, &run_loop);
+      run_loop.Run();
 
-    base::RunLoop run_loop;
-    base::AutoReset<base::RunLoop*> auto_reset(&run_loop_, &run_loop);
-    run_loop.Run();
-
-    if (queue_.has_value()) {
-      std::string message;
-      EXPECT_TRUE(queue_->WaitForMessage(&message));
-      EXPECT_EQ("\"success\"", message);
+      if (queue_.has_value()) {
+        std::string message;
+        EXPECT_TRUE(queue_->WaitForMessage(&message));
+        EXPECT_EQ("\"success\"", message);
+      }
     }
+
+    // Grab and reset `preview_dialog_` to avoid potential dangling pointers.
+    content::WebContents* dialog = preview_dialog_;
+    preview_dialog_ = nullptr;
+    return dialog;
   }
 
-  content::WebContents* GetPrintPreviewDialog() { return preview_dialog_; }
+  // Wrapper for WaitUntilPreviewIsReadyAndReturnPreviewDialog() provided for
+  // convenience for callers that do not need the returned result.
+  void WaitUntilPreviewIsReady() {
+    std::ignore = WaitUntilPreviewIsReadyAndReturnPreviewDialog();
+  }
 
   uint32_t rendered_page_count() const { return rendered_page_count_; }
 
@@ -386,8 +398,10 @@ class PrintPreviewObserver : PrintPreviewUI::TestDelegate {
   uint32_t rendered_page_count_ = 0;
 
   const bool wait_for_loaded_;
-  raw_ptr<content::WebContents, DanglingUntriaged> preview_dialog_ = nullptr;
-  base::RunLoop* run_loop_ = nullptr;
+  raw_ptr<content::WebContents> preview_dialog_ = nullptr;
+  // This field is not a raw_ptr<> because it was filtered by the rewriter for:
+  // #addr-of
+  RAW_PTR_EXCLUSION base::RunLoop* run_loop_ = nullptr;
 };
 
 class TestPrintRenderFrame
@@ -458,8 +472,8 @@ class TestPrintRenderFrame
   }
 
  private:
-  raw_ptr<content::RenderFrameHost, DanglingUntriaged> frame_host_;
-  raw_ptr<content::WebContents, DanglingUntriaged> web_contents_;
+  raw_ptr<content::RenderFrameHost> frame_host_;
+  raw_ptr<content::WebContents> web_contents_;
   const int document_cookie_;
   scoped_refptr<base::SequencedTaskRunner> task_runner_;
   base::RepeatingClosure msg_callback_;
@@ -514,6 +528,62 @@ class KillPrintRenderFrame
  private:
   const raw_ptr<content::RenderProcessHost> rph_;
   mojo::AssociatedReceiver<mojom::PrintRenderFrame> receiver_{this};
+};
+
+class PrintPreviewDoneObserver
+    : public mojom::PrintRenderFrameInterceptorForTesting {
+ public:
+  PrintPreviewDoneObserver(content::RenderFrameHost* render_frame_host,
+                           mojom::PrintRenderFrame* print_render_frame)
+      : render_frame_host_(render_frame_host),
+        print_render_frame_(print_render_frame) {
+    OverrideBinderForTesting();
+  }
+  ~PrintPreviewDoneObserver() override {
+    render_frame_host_->GetRemoteAssociatedInterfaces()
+        ->OverrideBinderForTesting(mojom::PrintRenderFrame::Name_,
+                                   base::NullCallback());
+  }
+
+  void WaitForPrintPreviewDialogClosed() { run_loop_.Run(); }
+
+  // mojom::PrintRenderFrameInterceptorForTesting:
+  mojom::PrintRenderFrame* GetForwardingInterface() override {
+    return print_render_frame_;
+  }
+  void OnPrintPreviewDialogClosed() override {
+    GetForwardingInterface()->OnPrintPreviewDialogClosed();
+    run_loop_.Quit();
+  }
+
+ private:
+  void OverrideBinderForTesting() {
+    // Safe to use base::Unretained() below because:
+    // 1) Normally, Bind() will unregister the override after it gets called.
+    // 2) If Bind() does not get called, the dtor will unregister the override.
+    render_frame_host_->GetRemoteAssociatedInterfaces()
+        ->OverrideBinderForTesting(
+            mojom::PrintRenderFrame::Name_,
+            base::BindRepeating(&PrintPreviewDoneObserver::Bind,
+                                base::Unretained(this)));
+  }
+
+  void Bind(mojo::ScopedInterfaceEndpointHandle handle) {
+    receiver_.Bind(mojo::PendingAssociatedReceiver<mojom::PrintRenderFrame>(
+        std::move(handle)));
+
+    // After the initial binding, reset the binder override. Otherwise,
+    // PrintPreviewDoneObserver will also try to bind the remote passed by
+    // SetPrintPreviewUI(), which will fail since `receiver_` is already bound.
+    render_frame_host_->GetRemoteAssociatedInterfaces()
+        ->OverrideBinderForTesting(mojom::PrintRenderFrame::Name_,
+                                   base::NullCallback());
+  }
+
+  raw_ptr<content::RenderFrameHost> const render_frame_host_;
+  raw_ptr<mojom::PrintRenderFrame> const print_render_frame_;
+  mojo::AssociatedReceiver<mojom::PrintRenderFrame> receiver_{this};
+  base::RunLoop run_loop_;
 };
 
 }  // namespace
@@ -578,7 +648,9 @@ class TestPrintViewManager : public PrintViewManager {
   }
 
  protected:
-  base::RunLoop* run_loop_ = nullptr;
+  // This field is not a raw_ptr<> because it was filtered by the rewriter for:
+  // #addr-of
+  RAW_PTR_EXCLUSION base::RunLoop* run_loop_ = nullptr;
 
  private:
   void PrintPreviewAllowedForTesting() override {
@@ -879,6 +951,9 @@ class PrintBrowserTest : public InProcessBrowserTest {
   }
 
   void TearDownOnMainThread() override {
+    // Remove map of objects pointing to //content objects before they go away.
+    frame_content_.clear();
+
     SetShowPrintErrorDialogForTest(base::NullCallback());
     InProcessBrowserTest::TearDownOnMainThread();
   }
@@ -1080,11 +1155,12 @@ class BackForwardCachePrintBrowserTest : public PrintBrowserTest {
 
   void SetUpCommandLine(base::CommandLine* command_line) override {
     scoped_feature_list_.InitWithFeaturesAndParameters(
-        {{::features::kBackForwardCache,
+        {{::features::kBackForwardCache, {{}}},
+         {::features::kBackForwardCacheTimeToLiveControl,
           // Set a very long TTL before expiration (longer than the test
           // timeout) so tests that are expecting deletion don't pass when
           // they shouldn't.
-          {{"TimeToLiveInBackForwardCacheInSeconds", "3600"}}}},
+          {{"time_to_live_seconds", "3600"}}}},
         // Allow BackForwardCache for all devices regardless of their memory.
         {::features::kBackForwardCacheMemoryControls});
 
@@ -1993,10 +2069,8 @@ IN_PROC_BROWSER_TEST_F(PrintBrowserTest,
   StartPrint(browser()->tab_strip_model()->GetActiveWebContents(),
              /*print_renderer=*/mojo::NullAssociatedRemote(),
              /*print_preview_disabled=*/false, /*has_selection=*/false);
-  print_preview_observer.WaitUntilPreviewIsReady();
-
   content::WebContents* preview_dialog =
-      print_preview_observer.GetPrintPreviewDialog();
+      print_preview_observer.WaitUntilPreviewIsReadyAndReturnPreviewDialog();
   ASSERT_TRUE(preview_dialog);
 
   // The script will ensure we return the id of <zoom-out-button> when
@@ -2044,6 +2118,39 @@ IN_PROC_BROWSER_TEST_F(PrintBrowserTest, WindowDotPrint) {
   content::ExecuteScriptAsync(web_contents->GetPrimaryMainFrame(),
                               "window.print();");
   print_preview_observer.WaitUntilPreviewIsReady();
+}
+
+IN_PROC_BROWSER_TEST_F(PrintBrowserTest,
+                       WindowDotPrintTriggersBeforeAfterEvents) {
+  // Load test page and check the initial state.
+  const GURL kUrl(
+      embedded_test_server()->GetURL("/printing/on_before_after_events.html"));
+  ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), kUrl));
+  content::WebContents* web_contents =
+      browser()->tab_strip_model()->GetActiveWebContents();
+  content::RenderFrameHost* rfh = web_contents->GetPrimaryMainFrame();
+  EXPECT_EQ(false, content::EvalJs(rfh, "firedBeforePrint"));
+  EXPECT_EQ(false, content::EvalJs(rfh, "firedAfterPrint"));
+
+  // Set up the PrintPreviewDoneObserver early, as it needs to intercept Mojo
+  // IPCs before they start.
+  PrintPreviewDoneObserver done_observer(rfh, GetPrintRenderFrame(rfh).get());
+
+  // Load Print Preview and make sure the beforeprint event fired.
+  PrintPreviewObserver print_preview_observer(/*wait_for_loaded=*/false);
+  content::ExecuteScriptAsync(rfh, "window.print();");
+  print_preview_observer.WaitUntilPreviewIsReady();
+  EXPECT_EQ(true, content::EvalJs(rfh, "firedBeforePrint"));
+  EXPECT_EQ(false, content::EvalJs(rfh, "firedAfterPrint"));
+
+  // Close the Print Preview dialog and make sure the afterprint event fired.
+  auto* web_contents_modal_dialog_manager =
+      web_modal::WebContentsModalDialogManager::FromWebContents(web_contents);
+  ASSERT_TRUE(web_contents_modal_dialog_manager);
+  web_contents_modal_dialog_manager->CloseAllDialogs();
+  done_observer.WaitForPrintPreviewDialogClosed();
+  EXPECT_EQ(true, content::EvalJs(rfh, "firedBeforePrint"));
+  EXPECT_EQ(true, content::EvalJs(rfh, "firedAfterPrint"));
 }
 
 class PrintPrerenderBrowserTest : public PrintBrowserTest {
@@ -2317,7 +2424,7 @@ class TestPrintJobWorkerOop : public PrintJobWorkerOop {
     DVLOG(1) << "Observed: start printing of document";
     callbacks_->error_check_callback.Run(result);
     PrintJobWorkerOop::OnDidStartPrinting(result);
-    callbacks_->did_start_printing_callback.Run(result, print_job());
+    callbacks_->did_start_printing_callback.Run(result);
   }
 
 #if BUILDFLAG(IS_WIN)
@@ -2546,13 +2653,11 @@ class SystemAccessProcessPrintBrowserTestBase
                /*print_renderer=*/mojo::NullAssociatedRemote(),
                /*print_preview_disabled=*/false,
                /*has_selection=*/false);
-    print_preview_observer.WaitUntilPreviewIsReady();
+    content::WebContents* preview_dialog =
+        print_preview_observer.WaitUntilPreviewIsReadyAndReturnPreviewDialog();
+    ASSERT_TRUE(preview_dialog);
 
     set_rendered_page_count(print_preview_observer.rendered_page_count());
-
-    content::WebContents* preview_dialog =
-        print_preview_observer.GetPrintPreviewDialog();
-    ASSERT_TRUE(preview_dialog);
 
     // Print Preview is completely ready, can now initiate printing.
     // This script locates and clicks the Print button.
@@ -2574,13 +2679,11 @@ class SystemAccessProcessPrintBrowserTestBase
                /*print_renderer=*/mojo::NullAssociatedRemote(),
                /*print_preview_disabled=*/false,
                /*has_selection=*/false);
-    print_preview_observer.WaitUntilPreviewIsReady();
+    content::WebContents* preview_dialog =
+        print_preview_observer.WaitUntilPreviewIsReadyAndReturnPreviewDialog();
+    ASSERT_TRUE(preview_dialog);
 
     set_rendered_page_count(print_preview_observer.rendered_page_count());
-
-    content::WebContents* preview_dialog =
-        print_preview_observer.GetPrintPreviewDialog();
-    ASSERT_TRUE(preview_dialog);
 
     // Print Preview is completely ready, can now initiate printing.
     // This script locates and clicks the "Print using system dialog",
@@ -2760,9 +2863,8 @@ class SystemAccessProcessPrintBrowserTestBase
   }
 #endif
 
-  void OnDidStartPrinting(mojom::ResultCode result, PrintJob* print_job) {
+  void OnDidStartPrinting(mojom::ResultCode result) {
     start_printing_result_ = result;
-    print_job_ = print_job;
     CheckForQuit();
   }
 
@@ -2824,7 +2926,6 @@ class SystemAccessProcessPrintBrowserTestBase
   mojo::Remote<mojom::PrintBackendService> test_remote_;
   std::unique_ptr<PrintBackendServiceTestImpl> print_backend_service_;
 #endif  // BUILDFLAG(ENABLE_OOP_PRINTING)
-  raw_ptr<PrintJob, DanglingUntriaged> print_job_ = nullptr;
   bool reset_errors_after_check_ = true;
   int did_print_document_count_ = 0;
   mojom::ResultCode use_default_settings_result_ = mojom::ResultCode::kFailed;
@@ -3679,7 +3780,7 @@ IN_PROC_BROWSER_TEST_P(SystemAccessProcessServicePrintBrowserTest,
       TestPrintViewManager::CreateForWebContents(web_contents);
 
   // Pretend that a window has started a system print.
-  absl::optional<uint32_t> client_id =
+  absl::optional<PrintBackendServiceManager::ClientId> client_id =
       PrintBackendServiceManager::GetInstance().RegisterQueryWithUiClient();
   ASSERT_TRUE(client_id.has_value());
 

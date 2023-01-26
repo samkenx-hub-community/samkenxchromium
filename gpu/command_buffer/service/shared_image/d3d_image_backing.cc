@@ -613,9 +613,9 @@ std::unique_ptr<DawnImageRepresentation> D3DImageBacking::ProduceDawn(
     std::unique_ptr<GLTextureImageRepresentationBase> gl_representation =
         ProduceGLTexturePassthrough(manager, tracker);
     gpu::TextureBase* texture = gl_representation->GetTextureBase();
-    const gl::GLImage* image =
+    const auto* image = gl::GLImage::ToGLImageD3D(
         static_cast<gles2::TexturePassthrough*>(texture)->GetLevelImage(
-            texture->target(), 0u);
+            texture->target(), 0u));
     DCHECK(image);
     return std::make_unique<DawnEGLImageRepresentation>(
         std::move(gl_representation), image->GetEGLImage(), manager, this,
@@ -1003,13 +1003,8 @@ std::unique_ptr<OverlayImageRepresentation> D3DImageBacking::ProduceOverlay(
     SharedImageManager* manager,
     MemoryTypeTracker* tracker) {
   TRACE_EVENT0("gpu", "D3DImageBacking::ProduceOverlay");
-  D3D11_TEXTURE2D_DESC desc;
-  d3d11_texture_->GetDesc(&desc);
-  if (swap_chain_ || desc.Format == DXGI_FORMAT_NV12) {
-    return std::make_unique<OverlayD3DImageRepresentation>(manager, this,
-                                                           tracker);
-  }
-  return nullptr;
+  return std::make_unique<OverlayD3DImageRepresentation>(manager, this,
+                                                         tracker);
 }
 
 absl::optional<gl::DCLayerOverlayImage>
@@ -1017,8 +1012,13 @@ D3DImageBacking::GetDCLayerOverlayImage() {
   if (swap_chain_) {
     return absl::make_optional<gl::DCLayerOverlayImage>(size(), swap_chain_);
   }
-  return absl::make_optional<gl::DCLayerOverlayImage>(size(), d3d11_texture_,
-                                                      array_slice_);
+  // Set only if access isn't synchronized using the shared handle state.
+  Microsoft::WRL::ComPtr<IDXGIKeyedMutex> keyed_mutex;
+  if (!dxgi_shared_handle_state_) {
+    d3d11_texture_.As(&keyed_mutex);
+  }
+  return absl::make_optional<gl::DCLayerOverlayImage>(
+      size(), d3d11_texture_, array_slice_, std::move(keyed_mutex));
 }
 
 }  // namespace gpu

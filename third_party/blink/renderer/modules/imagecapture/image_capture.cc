@@ -290,11 +290,11 @@ ScriptPromise ImageCapture::getPhotoSettings(ScriptState* script_state) {
                                   WrapPersistent(this)));
 }
 
-ScriptPromise ImageCapture::setOptions(ScriptState* script_state,
-                                       const PhotoSettings* photo_settings,
-                                       bool trigger_take_photo /* = false */) {
+ScriptPromise ImageCapture::takePhoto(ScriptState* script_state,
+                                      const PhotoSettings* photo_settings) {
   TRACE_EVENT_INSTANT0(TRACE_DISABLED_BY_DEFAULT("video_and_image_capture"),
-                       "ImageCapture::setOptions", TRACE_EVENT_SCOPE_PROCESS);
+                       "ImageCapture::takePhoto", TRACE_EVENT_SCOPE_PROCESS);
+
   auto* resolver = MakeGarbageCollected<ScriptPromiseResolver>(script_state);
   ScriptPromise promise = resolver->Promise();
 
@@ -368,20 +368,10 @@ ScriptPromise ImageCapture::setOptions(ScriptState* script_state,
   }
 
   service_->SetOptions(
-      stream_track_->Component()->Source()->Id(), std::move(settings),
+      SourceId(), std::move(settings),
       WTF::BindOnce(&ImageCapture::OnMojoSetOptions, WrapPersistent(this),
-                    WrapPersistent(resolver), trigger_take_photo));
+                    WrapPersistent(resolver), /*trigger_take_photo=*/true));
   return promise;
-}
-
-ScriptPromise ImageCapture::takePhoto(ScriptState* script_state,
-                                      const PhotoSettings* photo_settings) {
-  TRACE_EVENT_INSTANT0(TRACE_DISABLED_BY_DEFAULT("video_and_image_capture"),
-                       "ImageCapture::takePhoto (with settings)",
-                       TRACE_EVENT_SCOPE_PROCESS);
-
-  return setOptions(script_state, photo_settings,
-                    true /* trigger_take_photo */);
 }
 
 ScriptPromise ImageCapture::grabFrame(ScriptState* script_state) {
@@ -426,7 +416,18 @@ void ImageCapture::GetMediaTrackCapabilities(
 // inside the method, https://crbug.com/708723.
 void ImageCapture::SetMediaTrackConstraints(
     ScriptPromiseResolver* resolver,
-    const HeapVector<Member<MediaTrackConstraintSet>>& constraints_vector) {
+    const MediaTrackConstraints* all_constraints) {
+  DCHECK(all_constraints);
+  if (!all_constraints->hasAdvanced() || all_constraints->advanced().empty()) {
+    // TODO(crbug.com/1408091): This is not spec compliant.
+    // If there are no advanced constraints (but only required and optional
+    // constraints), the required and optional constraints should be applied.
+    ClearMediaTrackConstraints();
+    resolver->Resolve();
+    return;
+  }
+
+  const auto& constraints_vector = all_constraints->advanced();
   DCHECK_GT(constraints_vector.size(), 0u);
   // TODO(mcasas): add support more than one single advanced constraint.
   const MediaTrackConstraintSet* constraints = constraints_vector[0];
@@ -783,15 +784,16 @@ void ImageCapture::SetMediaTrackConstraints(
   service_requests_.insert(resolver);
 
   service_->SetOptions(
-      stream_track_->Component()->Source()->Id(), std::move(settings),
+      SourceId(), std::move(settings),
       WTF::BindOnce(&ImageCapture::OnMojoSetOptions, WrapPersistent(this),
-                    WrapPersistent(resolver), false /* trigger_take_photo */));
+                    WrapPersistent(resolver), /*trigger_take_photo=*/false));
 }
 
 void ImageCapture::SetPanTiltZoomSettingsFromTrack(
     base::OnceClosure initialized_callback,
     media::mojom::blink::PhotoStatePtr photo_state) {
-  UpdateMediaTrackCapabilities(base::DoNothing(), std::move(photo_state));
+  UpdateMediaTrackSettingsAndCapabilities(base::DoNothing(),
+                                          std::move(photo_state));
 
   auto* video_track = MediaStreamVideoTrack::From(stream_track_->Component());
   DCHECK(video_track);
@@ -841,7 +843,7 @@ void ImageCapture::SetPanTiltZoomSettingsFromTrack(
   }
 
   service_->SetOptions(
-      stream_track_->Component()->Source()->Id(), std::move(settings),
+      SourceId(), std::move(settings),
       WTF::BindOnce(&ImageCapture::OnSetPanTiltZoomSettingsFromTrack,
                     WrapPersistent(this), std::move(initialized_callback)));
 }
@@ -850,8 +852,8 @@ void ImageCapture::OnSetPanTiltZoomSettingsFromTrack(
     base::OnceClosure done_callback,
     bool result) {
   service_->GetPhotoState(
-      stream_track_->Component()->Source()->Id(),
-      WTF::BindOnce(&ImageCapture::UpdateMediaTrackCapabilities,
+      SourceId(),
+      WTF::BindOnce(&ImageCapture::UpdateMediaTrackSettingsAndCapabilities,
                     WrapPersistent(this), std::move(done_callback)));
 }
 
@@ -907,7 +909,7 @@ ImageCapture::ImageCapture(ExecutionContext* context,
   // Launch a retrieval of the current photo state, which arrive asynchronously
   // to avoid blocking the main UI thread.
   service_->GetPhotoState(
-      stream_track_->Component()->Source()->Id(),
+      SourceId(),
       WTF::BindOnce(&ImageCapture::SetPanTiltZoomSettingsFromTrack,
                     WrapPersistent(this), std::move(initialized_callback)));
 
@@ -952,15 +954,11 @@ ScriptPromise ImageCapture::GetMojoPhotoState(
   }
   service_requests_.insert(resolver);
 
-  // m_streamTrack->component()->source()->id() is the renderer "name" of the
-  // camera;
-  // TODO(mcasas) consider sending the security origin as well:
-  // scriptState->getExecutionContext()->getSecurityOrigin()->toString()
   service_->GetPhotoState(
-      stream_track_->Component()->Source()->Id(),
+      SourceId(),
       WTF::BindOnce(&ImageCapture::OnMojoGetPhotoState, WrapPersistent(this),
                     WrapPersistent(resolver), std::move(resolver_cb),
-                    false /* trigger_take_photo */));
+                    /*trigger_take_photo=*/false));
   return promise;
 }
 
@@ -1010,11 +1008,12 @@ void ImageCapture::OnMojoGetPhotoState(
     photo_capabilities_->setFillLightMode(fill_light_mode);
 
   // Update the local track photo_state cache.
-  UpdateMediaTrackCapabilities(base::DoNothing(), std::move(photo_state));
+  UpdateMediaTrackSettingsAndCapabilities(base::DoNothing(),
+                                          std::move(photo_state));
 
   if (trigger_take_photo) {
     service_->TakePhoto(
-        stream_track_->Component()->Source()->Id(),
+        SourceId(),
         WTF::BindOnce(&ImageCapture::OnMojoTakePhoto, WrapPersistent(this),
                       WrapPersistent(resolver)));
     return;
@@ -1044,10 +1043,9 @@ void ImageCapture::OnMojoSetOptions(ScriptPromiseResolver* resolver,
 
   // Retrieve the current device status after setting the options.
   service_->GetPhotoState(
-      stream_track_->Component()->Source()->Id(),
-      WTF::BindOnce(&ImageCapture::OnMojoGetPhotoState, WrapPersistent(this),
-                    WrapPersistent(resolver), std::move(resolver_cb),
-                    trigger_take_photo));
+      SourceId(), WTF::BindOnce(&ImageCapture::OnMojoGetPhotoState,
+                                WrapPersistent(this), WrapPersistent(resolver),
+                                std::move(resolver_cb), trigger_take_photo));
 }
 
 void ImageCapture::OnMojoTakePhoto(ScriptPromiseResolver* resolver,
@@ -1068,7 +1066,7 @@ void ImageCapture::OnMojoTakePhoto(ScriptPromiseResolver* resolver,
   service_requests_.erase(resolver);
 }
 
-void ImageCapture::UpdateMediaTrackCapabilities(
+void ImageCapture::UpdateMediaTrackSettingsAndCapabilities(
     base::OnceClosure initialized_callback,
     media::mojom::blink::PhotoStatePtr photo_state) {
   if (!photo_state) {
@@ -1230,6 +1228,10 @@ void ImageCapture::ResolveWithPhotoCapabilities(
 
 bool ImageCapture::IsPageVisible() {
   return DomWindow() ? DomWindow()->document()->IsPageVisible() : false;
+}
+
+const String& ImageCapture::SourceId() const {
+  return stream_track_->Component()->Source()->Id();
 }
 
 ImageCapture* ImageCapture::Clone() const {

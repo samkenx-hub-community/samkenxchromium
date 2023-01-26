@@ -10,7 +10,10 @@
 
 #include "base/component_export.h"
 #include "base/time/time.h"
+#include "chromeos/ash/components/dbus/private_computing/private_computing_service.pb.h"
+#include "chromeos/ash/components/device_activity/churn_active_status.h"
 #include "chromeos/ash/components/device_activity/fresnel_service.pb.h"
+#include "third_party/abseil-cpp/absl/types/optional.h"
 #include "third_party/private_membership/src/private_membership_rlwe_client.h"
 
 class PrefService;
@@ -70,13 +73,17 @@ class COMPONENT_EXPORT(CHROMEOS_ASH_COMPONENTS_DEVICE_ACTIVITY)
   //
   // Important: Each new dimension added to metadata will need to be approved by
   // privacy.
-  virtual FresnelImportDataRequest GenerateImportRequestBody() = 0;
+  virtual absl::optional<FresnelImportDataRequest>
+  GenerateImportRequestBody() = 0;
 
   // Whether current device active use case check-in is enabled or not.
   virtual bool IsEnabledCheckIn() = 0;
 
   // Whether current device active use case check membership is enabled or not.
   virtual bool IsEnabledCheckMembership() = 0;
+
+  // Generate status storing the last ping pacific date.
+  virtual private_computing::ActiveStatus GenerateActiveStatus() = 0;
 
   // Method used to reset the non constant saved state of the device active use
   // case. The state should be cleared after reporting device actives.
@@ -188,6 +195,14 @@ class COMPONENT_EXPORT(CHROMEOS_ASH_COMPONENTS_DEVICE_ACTIVITY)
   // Retrieve the ChromeOS device market segment.
   MarketSegment GetMarketSegment() const;
 
+  // Once the client has initiated churn_active_status object, then pass
+  // the reference to the churn use cases to get the churn active status.
+  void SetChurnActiveStatus(ChurnActiveStatus* churn_active_status);
+
+  // Uses the churn_active_status to get the device churn active status
+  // metadata.
+  ChurnActiveStatus* GetChurnActiveStatus();
+
   // Retrieve |psm_device_active_secret_|.
   const std::string& GetPsmDeviceActiveSecret() const;
 
@@ -246,6 +261,10 @@ class COMPONENT_EXPORT(CHROMEOS_ASH_COMPONENTS_DEVICE_ACTIVITY)
   // Client Generates protos used in request body of Oprf and Query requests.
   std::unique_ptr<private_membership::rlwe::PrivateMembershipRlweClient>
       psm_rlwe_client_;
+
+  // The churn_active_status is used for Churn Cohort and Observation use
+  // cases to calculate the churn active status metadata.
+  ChurnActiveStatus* churn_active_status_ = nullptr;
 };
 
 }  // namespace device_activity

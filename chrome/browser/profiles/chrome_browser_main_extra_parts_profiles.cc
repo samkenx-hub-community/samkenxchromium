@@ -252,6 +252,7 @@
 #endif
 
 #if BUILDFLAG(BUILD_WITH_TFLITE_LIB)
+#include "chrome/browser/autocomplete/autocomplete_scoring_model_service_factory.h"
 #include "chrome/browser/permissions/prediction_model_handler_provider_factory.h"
 #endif
 
@@ -327,6 +328,9 @@ void ChromeBrowserMainExtraPartsProfiles::
   apps::SupportedLinksInfoBarPrefsServiceFactory::GetInstance();
 #endif
   AutocompleteClassifierFactory::GetInstance();
+#if BUILDFLAG(BUILD_WITH_TFLITE_LIB)
+  AutocompleteScoringModelServiceFactory::GetInstance();
+#endif
   autofill::AutofillImageFetcherFactory::GetInstance();
   autofill::PersonalDataManagerFactory::GetInstance();
   autofill::AutofillOfferManagerFactory::GetInstance();
@@ -417,7 +421,9 @@ void ChromeBrowserMainExtraPartsProfiles::
     LastTabStandingTrackerFactory::GetInstance();
   }
 #if !BUILDFLAG(IS_ANDROID)
+#if !BUILDFLAG(IS_CHROMEOS_LACROS)
   captions::LiveCaptionControllerFactory::GetInstance();
+#endif
   if (base::FeatureList::IsEnabled(media::kLiveTranslate))
     captions::LiveTranslateControllerFactory::GetInstance();
 #endif

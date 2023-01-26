@@ -1013,6 +1013,12 @@ RasterDecoderImpl::RasterDecoderImpl(
 }
 
 RasterDecoderImpl::~RasterDecoderImpl() {
+  // Client can call BeginRasterChromium and then channel can be closed and
+  // decoder destroyed. Finish raster first.
+  if (sk_surface_ || scoped_shared_image_raster_write_) {
+    DoEndRasterCHROMIUM();
+  }
+
   shared_context_state_->RemoveContextLostObserver(this);
 }
 
@@ -1230,6 +1236,7 @@ Capabilities RasterDecoderImpl::GetCapabilities() {
   caps.shared_image_swap_chain = D3DImageBackingFactory::IsSwapChainSupported();
 #endif  // BUILDFLAG(IS_WIN)
   caps.disable_legacy_mailbox = disable_legacy_mailbox_;
+  caps.supports_yuv_rgb_conversion = true;
   return caps;
 }
 
@@ -2487,19 +2494,18 @@ void RasterDecoderImpl::DoReadbackARGBImagePixelsINTERNAL(
 
   auto sk_image =
       source_scoped_access->CreateSkImage(shared_context_state_->gr_context());
-  if (!sk_image) {
+  if (sk_image) {
+    bool success =
+        sk_image->readPixels(dst_info, pixel_address, row_bytes, src_x, src_y);
+    if (!success) {
+      LOCAL_SET_GL_ERROR(GL_INVALID_OPERATION, "glReadbackImagePixels",
+                         "Failed to read pixels from SkImage");
+    } else {
+      *result = 1;
+    }
+  } else {
     LOCAL_SET_GL_ERROR(GL_INVALID_OPERATION, "glReadbackImagePixels",
                        "Couldn't create SkImage for reading.");
-    return;
-  }
-
-  bool success =
-      sk_image->readPixels(dst_info, pixel_address, row_bytes, src_x, src_y);
-  if (!success) {
-    LOCAL_SET_GL_ERROR(GL_INVALID_OPERATION, "glReadbackImagePixels",
-                       "Failed to read pixels from SkImage");
-  } else {
-    *result = 1;
   }
 
   if (auto end_state = source_scoped_access->TakeEndState()) {
@@ -2748,9 +2754,14 @@ void RasterDecoderImpl::DoConvertYUVAMailboxesToRGBINTERNAL(
     GLenum subsampling,
     const volatile GLbyte* bytes_in) {
   CopySharedImageHelper helper(&shared_image_representation_factory_,
-                               shared_context_state_.get(), error_state_.get());
-  helper.ConvertYUVAMailboxesToRGB(planes_yuv_color_space, plane_config,
-                                   subsampling, bytes_in);
+                               shared_context_state_.get());
+  auto result = helper.ConvertYUVAMailboxesToRGB(
+      planes_yuv_color_space, plane_config, subsampling, bytes_in);
+  if (!result.has_value()) {
+    LOCAL_SET_GL_ERROR(result.error().gl_error,
+                       result.error().function_name.c_str(),
+                       result.error().msg.c_str());
+  }
 }
 
 void RasterDecoderImpl::DoConvertRGBAToYUVAMailboxesINTERNAL(
@@ -2759,9 +2770,14 @@ void RasterDecoderImpl::DoConvertRGBAToYUVAMailboxesINTERNAL(
     GLenum subsampling,
     const volatile GLbyte* mailboxes_in) {
   CopySharedImageHelper helper(&shared_image_representation_factory_,
-                               shared_context_state_.get(), error_state_.get());
-  helper.ConvertRGBAToYUVAMailboxes(yuv_color_space, plane_config, subsampling,
-                                    mailboxes_in);
+                               shared_context_state_.get());
+  auto result = helper.ConvertRGBAToYUVAMailboxes(yuv_color_space, plane_config,
+                                                  subsampling, mailboxes_in);
+  if (!result.has_value()) {
+    LOCAL_SET_GL_ERROR(result.error().gl_error,
+                       result.error().function_name.c_str(),
+                       result.error().msg.c_str());
+  }
 }
 
 void RasterDecoderImpl::DoLoseContextCHROMIUM(GLenum current, GLenum other) {

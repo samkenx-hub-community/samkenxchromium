@@ -365,31 +365,7 @@ DeviceActivityClient::GetSaveStatusRequest() {
   private_computing::SaveStatusRequest request;
 
   for (auto* use_case : GetUseCases()) {
-    private_computing::ActiveStatus status;
-
-    // TODO: Before submission, check handling a last known ts that is
-    // unset / unix::epoch.
-    std::string last_ping_pt_date =
-        use_case->FormatPTDateString(use_case->GetLastKnownPingTimestamp());
-
-    psm_rlwe::RlweUseCase psm_use_case = use_case->GetPsmUseCase();
-    switch (psm_use_case) {
-      case psm_rlwe::RlweUseCase::CROS_FRESNEL_DAILY:
-        status.set_use_case(
-            private_computing::PrivateComputingUseCase::CROS_FRESNEL_DAILY);
-        status.set_last_ping_date(last_ping_pt_date);
-        break;
-      case psm_rlwe::RlweUseCase::CROS_FRESNEL_28DAY_ACTIVE:
-        status.set_use_case(private_computing::PrivateComputingUseCase::
-                                CROS_FRESNEL_28DAY_ACTIVE);
-        status.set_last_ping_date(last_ping_pt_date);
-        break;
-      default:
-        VLOG(1) << "Use case is not supported yet. "
-                << psm_rlwe::RlweUseCase_Name(use_case->GetPsmUseCase());
-        break;
-    }
-
+    private_computing::ActiveStatus status = use_case->GenerateActiveStatus();
     if (status.has_use_case()) {
       *request.add_active_status() = status;
     }
@@ -480,6 +456,11 @@ void DeviceActivityClient::OnGetLastPingDatesStatusFetched(
           device_active_use_case_ptr =
               GetUseCasePtr(psm_rlwe::RlweUseCase::CROS_FRESNEL_28DAY_ACTIVE);
           break;
+        case private_computing::PrivateComputingUseCase::
+            CROS_FRESNEL_CHURN_MONTHLY_COHORT:
+          device_active_use_case_ptr = GetUseCasePtr(
+              psm_rlwe::RlweUseCase::CROS_FRESNEL_CHURN_MONTHLY_COHORT);
+          break;
         default:
           LOG(ERROR) << "PSM use case is not supported yet.";
           continue;
@@ -493,14 +474,24 @@ void DeviceActivityClient::OnGetLastPingDatesStatusFetched(
       }
 
       if (!device_active_use_case_ptr->IsLastKnownPingTimestampSet()) {
-        RecordPreservedFileState(
-            DeviceActivityClient::PreservedFileState::kReadOkLocalStateEmpty);
+        if (use_case ==
+            private_computing::PrivateComputingUseCase::CROS_FRESNEL_DAILY) {
+          // Only record the successfully read from preserved file for daily use
+          // case.
+          RecordPreservedFileState(
+              DeviceActivityClient::PreservedFileState::kReadOkLocalStateEmpty);
+        }
         VLOG(1) << "Updating local pref timestamp value with file timestamp = "
                 << last_ping_time;
         device_active_use_case_ptr->SetLastKnownPingTimestamp(last_ping_time);
       } else {
-        RecordPreservedFileState(
-            DeviceActivityClient::PreservedFileState::kReadOkLocalStateSet);
+        if (use_case ==
+            private_computing::PrivateComputingUseCase::CROS_FRESNEL_DAILY) {
+          // Only record the successfully read from preserved file for daily use
+          // case.
+          RecordPreservedFileState(
+              DeviceActivityClient::PreservedFileState::kReadOkLocalStateSet);
+        }
         VLOG(1) << "Preserved File was read successfully but local state is "
                    "already set. "
                 << "Device was most likely restarted and not powerwashed, so "
@@ -530,6 +521,16 @@ void DeviceActivityClient::OnGetLastPingDatesStatusFetched(
   // Always trigger step to check for network status changing after reading the
   // preserved file.
   DefaultNetworkChanged(network_state_handler_->DefaultNetwork());
+}
+
+ChurnActiveStatus* DeviceActivityClient::GetChurnActiveStatus() {
+  DCHECK(churn_active_status_);
+  return churn_active_status_.get();
+}
+
+void DeviceActivityClient::SetChurnActiveStatus(int value) {
+  DCHECK(!churn_active_status_);
+  churn_active_status_ = std::make_unique<ChurnActiveStatus>(value);
 }
 
 void DeviceActivityClient::ReportingTriggeredByTimer() {
@@ -1050,11 +1051,16 @@ void DeviceActivityClient::TransitionToCheckIn(
   RecordStateCountMetric(state_);
 
   // Generate Fresnel PSM import request body.
-  FresnelImportDataRequest import_request =
+  absl::optional<FresnelImportDataRequest> import_request =
       current_use_case->GenerateImportRequestBody();
 
+  if (!import_request.has_value()) {
+    TransitionToIdle(current_use_case);
+    return;
+  }
+
   std::string request_body;
-  import_request.SerializeToString(&request_body);
+  import_request.value().SerializeToString(&request_body);
 
   auto resource_request = GenerateResourceRequest(
       net::HttpRequestHeaders::kPostMethod, GetFresnelURL(), api_key_);

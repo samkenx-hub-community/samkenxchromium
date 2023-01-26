@@ -1873,13 +1873,9 @@ void NavigationControllerImpl::CreateInitialEntry() {
   params->referrer = blink::mojom::Referrer::New();
 
   // Create and insert the initial NavigationEntry.
-  // TODO(https://crbug.com/1356658): in the follow-on CL enabling srcdoc base
-  // urls, change `temporary_initiator_base_url` to the inherited base_url
-  // stored on RFHI at the same time that GetLastCommittedOrigin() is set.
-  absl::optional<GURL> temporary_initiator_base_url;
   auto new_entry = std::make_unique<NavigationEntryImpl>(
       rfh->GetSiteInstance(), params->url, Referrer(*params->referrer),
-      rfh->GetLastCommittedOrigin(), temporary_initiator_base_url,
+      rfh->GetLastCommittedOrigin(), rfh->GetInheritedBaseUrl(),
       std::u16string() /* title */, ui::PAGE_TRANSITION_TYPED,
       false /* renderer_initiated */, nullptr /* blob_url_loader_factory */,
       true /* is_initial_entry */);
@@ -3807,9 +3803,10 @@ NavigationControllerImpl::CreateNavigationRequestFromLoadParams(
   blink::mojom::CommitNavigationParamsPtr commit_params =
       blink::mojom::CommitNavigationParams::New(
           absl::nullopt,
-          // The correct storage key will be computed before committing the
-          // navigation.
-          blink::StorageKey(), override_user_agent, params.redirect_chain,
+          // The correct storage key and session storage key will be computed
+          // before committing the navigation.
+          blink::StorageKey(), blink::StorageKey(), override_user_agent,
+          params.redirect_chain,
           std::vector<network::mojom::URLResponseHeadPtr>(),
           std::vector<net::RedirectInfo>(), params.post_content_type,
           common_params->url, common_params->method,
@@ -3845,7 +3842,6 @@ NavigationControllerImpl::CreateNavigationRequestFromLoadParams(
           /*early_hints_preloaded_resources=*/std::vector<GURL>(),
           // This timestamp will be populated when the commit IPC is sent.
           /*commit_sent=*/base::TimeTicks(), /*srcdoc_value=*/std::string(),
-          /*fallback_srcdoc_baseurl_value=*/GURL(),
           /*should_load_data_url=*/false,
           /*ancestor_or_self_has_cspee=*/node->AncestorOrSelfHasCSPEE(),
           /*reduced_accept_language=*/std::string(),

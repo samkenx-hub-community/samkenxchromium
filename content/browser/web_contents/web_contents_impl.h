@@ -486,10 +486,6 @@ class CONTENT_EXPORT WebContentsImpl : public WebContents,
   void GenerateMHTMLWithResult(
       const MHTMLGenerationParams& params,
       MHTMLGenerationResult::GenerateMHTMLCallback callback) override;
-  void GenerateWebBundle(
-      const base::FilePath& file_path,
-      base::OnceCallback<void(uint64_t, data_decoder::mojom::WebBundlerError)>
-          callback) override;
   const std::string& GetContentsMimeType() override;
   blink::RendererPreferences* GetMutableRendererPrefs() override;
   void Close() override;
@@ -554,6 +550,8 @@ class CONTENT_EXPORT WebContentsImpl : public WebContents,
   void UpdateWindowControlsOverlay(const gfx::Rect& bounding_rect) override;
 #if BUILDFLAG(IS_ANDROID)
   base::android::ScopedJavaLocalRef<jobject> GetJavaWebContents() override;
+  base::android::ScopedJavaLocalRef<jthrowable> GetJavaCreatorLocation()
+      override;
   WebContentsAndroid* GetWebContentsAndroid();
   void ClearWebContentsAndroid();
   void ActivateNearestFindResult(float x, float y) override;
@@ -580,12 +578,6 @@ class CONTENT_EXPORT WebContentsImpl : public WebContents,
   void NotifyPreferencesChanged() override;
   void SetWebPreferences(const blink::web_pref::WebPreferences& prefs) override;
   void OnWebPreferencesChanged() override;
-
-  void DisablePrerender2() override;
-  void ResetPrerender2Disabled() override;
-  // Resets the bit to explicitly disable Prerender2 for this WebContents. Note
-  // that this may not equate to the feature being enabled.
-  bool IsPrerender2Disabled();
 
   void AboutToBeDiscarded(WebContents* new_contents) override;
 
@@ -2336,8 +2328,13 @@ class CONTENT_EXPORT WebContentsImpl : public WebContents,
   // TODO(1231679): Remove/reevaluate after the PCScan experiment is finished.
   std::unique_ptr<StarScanLoadObserver> star_scan_load_observer_;
 
-  // Stores WebContents::CreateParams::creator_location_.
+  // Stores WebContents::CreateParams::creator_location.
   base::Location creator_location_;
+
+#if BUILDFLAG(IS_ANDROID)
+  // Stores WebContents::CreateParams::java_creator_location.
+  base::android::ScopedJavaGlobalRef<jthrowable> java_creator_location_;
+#endif  // BUILDFLAG(IS_ANDROID)
 
   // The initial aspect ratio (only used for WebContents associated with a
   // PictureInPicture window). This value is either the parameter given in
@@ -2359,8 +2356,6 @@ class CONTENT_EXPORT WebContentsImpl : public WebContents,
   // either DevTools is opened and consults this value or when a non-prerendered
   // navigation commits in the primary main frame.
   bool last_navigation_was_prerender_activation_for_devtools_ = false;
-
-  bool prerender2_disabled_ = false;
 
   base::WeakPtrFactory<WebContentsImpl> loading_weak_factory_{this};
   base::WeakPtrFactory<WebContentsImpl> weak_factory_{this};

@@ -55,7 +55,6 @@
 #include "ash/display/display_shutdown_observer.h"
 #include "ash/display/event_transformation_handler.h"
 #include "ash/display/mouse_cursor_event_filter.h"
-#include "ash/display/persistent_window_controller.h"
 #include "ash/display/privacy_screen_controller.h"
 #include "ash/display/projecting_observer.h"
 #include "ash/display/refresh_rate_throttle_controller.h"
@@ -74,7 +73,6 @@
 #include "ash/frame_throttler/frame_throttling_controller.h"
 #include "ash/glanceables/glanceables_controller.h"
 #include "ash/glanceables/glanceables_delegate.h"
-#include "ash/highlighter/highlighter_controller.h"
 #include "ash/host/ash_window_tree_host_init_params.h"
 #include "ash/hud_display/hud_display.h"
 #include "ash/ime/ime_controller_impl.h"
@@ -131,6 +129,9 @@
 #include "ash/system/geolocation/geolocation_controller.h"
 #include "ash/system/human_presence/human_presence_orientation_controller.h"
 #include "ash/system/human_presence/snooping_protection_controller.h"
+#include "ash/system/input_device_settings/input_device_settings_controller_impl.h"
+#include "ash/system/input_device_settings/input_device_tracker.h"
+#include "ash/system/input_device_settings/keyboard_modifier_metrics_recorder.h"
 #include "ash/system/keyboard_brightness/keyboard_backlight_color_controller.h"
 #include "ash/system/keyboard_brightness/keyboard_brightness_controller.h"
 #include "ash/system/keyboard_brightness_control_delegate.h"
@@ -180,6 +181,8 @@
 #include "ash/wm/immersive_context_ash.h"
 #include "ash/wm/lock_state_controller.h"
 #include "ash/wm/mru_window_tracker.h"
+#include "ash/wm/multi_display/multi_display_metrics_controller.h"
+#include "ash/wm/multi_display/persistent_window_controller.h"
 #include "ash/wm/multitask_menu_nudge_controller.h"
 #include "ash/wm/native_cursor_manager_ash.h"
 #include "ash/wm/overlay_event_filter.h"
@@ -736,6 +739,9 @@ Shell::~Shell() {
   wm_mode_controller_.reset();
 
   event_rewriter_controller_.reset();
+  keyboard_modifier_metrics_recorder_.reset();
+  input_device_tracker_.reset();
+  input_device_settings_controller_.reset();
 
   screen_orientation_controller_.reset();
   screen_layout_observer_.reset();
@@ -856,6 +862,9 @@ Shell::~Shell() {
   system_tray_model_.reset();
   system_sounds_delegate_.reset();
 
+  // MultiDisplayMetricsController has a dependency on `mru_window_tracker_`.
+  multi_display_metrics_controller_.reset();
+
   // MruWindowTracker must be destroyed after all windows have been deleted to
   // avoid a possible crash when Shell is destroyed from a non-normal shutdown
   // path. (crbug.com/485438).
@@ -886,7 +895,6 @@ Shell::~Shell() {
   modality_filter_.reset();
 
   touch_transformer_controller_.reset();
-  highlighter_controller_.reset();
   key_accessibility_enabler_.reset();
 
   display_speaker_controller_.reset();
@@ -1233,6 +1241,14 @@ void Shell::Init(
   window_modality_controller_ =
       std::make_unique<::wm::WindowModalityController>(this, env);
 
+  // The `InputDeviceSettingsController` is a dependency of the
+  // `EventRewriterController`, `InputDeviceTracker` and
+  // `KeyboardModifierMetricsRecorder` so it must be initialized first.
+  input_device_settings_controller_ =
+      std::make_unique<InputDeviceSettingsControllerImpl>();
+  input_device_tracker_ = std::make_unique<InputDeviceTracker>();
+  keyboard_modifier_metrics_recorder_ =
+      std::make_unique<KeyboardModifierMetricsRecorder>();
   event_rewriter_controller_ = std::make_unique<EventRewriterControllerImpl>();
 
   env_filter_ = std::make_unique<::wm::CompoundEventFilter>();
@@ -1297,7 +1313,7 @@ void Shell::Init(
     camera_effects_controller_ = std::make_unique<CameraEffectsController>();
   }
 
-  if (features::IsVcControlsUiEnabled()) {
+  if (features::IsVideoConferenceEnabled()) {
     audio_effects_controller_ = std::make_unique<AudioEffectsController>();
   }
 
@@ -1386,7 +1402,6 @@ void Shell::Init(
   laser_pointer_controller_ = std::make_unique<LaserPointerController>();
   partial_magnifier_controller_ =
       std::make_unique<PartialMagnifierController>();
-  highlighter_controller_ = std::make_unique<HighlighterController>();
   if (::features::IsTouchTextEditingRedesignEnabled()) {
     touch_selection_magnifier_runner_ash_ =
         std::make_unique<TouchSelectionMagnifierRunnerAsh>();
@@ -1396,6 +1411,10 @@ void Shell::Init(
       std::make_unique<FullscreenMagnifierController>();
   mru_window_tracker_ = std::make_unique<MruWindowTracker>();
   assistant_controller_ = std::make_unique<AssistantControllerImpl>();
+
+  // MultiDisplayMetricsController has a dependency on `mru_window_tracker_`.
+  multi_display_metrics_controller_ =
+      std::make_unique<MultiDisplayMetricsController>();
 
   // |assistant_controller_| is put before |ambient_controller_| as it will be
   // used by the latter.

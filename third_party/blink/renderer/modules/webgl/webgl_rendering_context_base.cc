@@ -1232,6 +1232,7 @@ void WebGLRenderingContextBase::InitializeNewContext() {
   framebuffer_binding_ = nullptr;
   renderbuffer_binding_ = nullptr;
   depth_mask_ = true;
+  depth_enabled_ = false;
   stencil_enabled_ = false;
   stencil_mask_ = 0xFFFFFFFF;
   stencil_mask_back_ = 0xFFFFFFFF;
@@ -2828,7 +2829,12 @@ void WebGLRenderingContextBase::disable(GLenum cap) {
     return;
   if (cap == GL_STENCIL_TEST) {
     stencil_enabled_ = false;
-    ApplyStencilTest();
+    ApplyDepthAndStencilTest();
+    return;
+  }
+  if (cap == GL_DEPTH_TEST) {
+    depth_enabled_ = false;
+    ApplyDepthAndStencilTest();
     return;
   }
   if (cap == GL_SCISSOR_TEST)
@@ -2983,7 +2989,12 @@ void WebGLRenderingContextBase::enable(GLenum cap) {
     return;
   if (cap == GL_STENCIL_TEST) {
     stencil_enabled_ = true;
-    ApplyStencilTest();
+    ApplyDepthAndStencilTest();
+    return;
+  }
+  if (cap == GL_DEPTH_TEST) {
+    depth_enabled_ = true;
+    ApplyDepthAndStencilTest();
     return;
   }
   if (cap == GL_SCISSOR_TEST)
@@ -3055,7 +3066,7 @@ void WebGLRenderingContextBase::framebufferRenderbuffer(
   }
   framebuffer_binding->SetAttachmentForBoundFramebuffer(target, attachment,
                                                         buffer);
-  ApplyStencilTest();
+  ApplyDepthAndStencilTest();
 }
 
 void WebGLRenderingContextBase::framebufferTexture2D(GLenum target,
@@ -3087,7 +3098,7 @@ void WebGLRenderingContextBase::framebufferTexture2D(GLenum target,
   }
   framebuffer_binding->SetAttachmentForBoundFramebuffer(
       target, attachment, textarget, texture, level, 0, 0);
-  ApplyStencilTest();
+  ApplyDepthAndStencilTest();
 }
 
 void WebGLRenderingContextBase::frontFace(GLenum mode) {
@@ -3351,19 +3362,20 @@ ScriptValue WebGLRenderingContextBase::getFramebufferAttachmentParameter(
     GLenum target,
     GLenum attachment,
     GLenum pname) {
+  const char kFunctionName[] = "getFramebufferAttachmentParameter";
   if (isContextLost() ||
-      !ValidateFramebufferFuncParameters("getFramebufferAttachmentParameter",
-                                         target, attachment))
+      !ValidateFramebufferFuncParameters(kFunctionName, target, attachment)) {
     return ScriptValue::CreateNull(script_state->GetIsolate());
+  }
 
   if (!framebuffer_binding_ || !framebuffer_binding_->Object()) {
-    SynthesizeGLError(GL_INVALID_OPERATION, "getFramebufferAttachmentParameter",
+    SynthesizeGLError(GL_INVALID_OPERATION, kFunctionName,
                       "no framebuffer bound");
     return ScriptValue::CreateNull(script_state->GetIsolate());
   }
 
   if (framebuffer_binding_ && framebuffer_binding_->Opaque()) {
-    SynthesizeGLError(GL_INVALID_OPERATION, "getFramebufferAttachmentParameter",
+    SynthesizeGLError(GL_INVALID_OPERATION, kFunctionName,
                       "cannot query parameters of an opaque framebuffer");
     return ScriptValue::CreateNull(script_state->GetIsolate());
   }
@@ -3375,62 +3387,60 @@ ScriptValue WebGLRenderingContextBase::getFramebufferAttachmentParameter(
       return WebGLAny(script_state, GL_NONE);
     // OpenGL ES 2.0 specifies INVALID_ENUM in this case, while desktop GL
     // specifies INVALID_OPERATION.
-    SynthesizeGLError(GL_INVALID_ENUM, "getFramebufferAttachmentParameter",
-                      "invalid parameter name");
+    SynthesizeGLError(GL_INVALID_ENUM, kFunctionName, "invalid parameter name");
     return ScriptValue::CreateNull(script_state->GetIsolate());
   }
 
   DCHECK(attachment_object->IsTexture() || attachment_object->IsRenderbuffer());
-  if (attachment_object->IsTexture()) {
-    switch (pname) {
-      case GL_FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE:
+  switch (pname) {
+    case GL_FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE:
+      if (attachment_object->IsTexture()) {
         return WebGLAny(script_state, GL_TEXTURE);
-      case GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME:
-        return WebGLAny(script_state, attachment_object);
-      case GL_FRAMEBUFFER_ATTACHMENT_TEXTURE_LEVEL:
-      case GL_FRAMEBUFFER_ATTACHMENT_TEXTURE_CUBE_MAP_FACE: {
+      }
+      return WebGLAny(script_state, GL_RENDERBUFFER);
+    case GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME:
+      return WebGLAny(script_state, attachment_object);
+    case GL_FRAMEBUFFER_ATTACHMENT_TEXTURE_LEVEL:
+    case GL_FRAMEBUFFER_ATTACHMENT_TEXTURE_CUBE_MAP_FACE:
+      if (attachment_object->IsTexture()) {
         GLint value = 0;
         ContextGL()->GetFramebufferAttachmentParameteriv(target, attachment,
                                                          pname, &value);
         return WebGLAny(script_state, value);
       }
-      case GL_FRAMEBUFFER_ATTACHMENT_COLOR_ENCODING_EXT:
-        if (ExtensionEnabled(kEXTsRGBName)) {
-          GLint value = 0;
-          ContextGL()->GetFramebufferAttachmentParameteriv(target, attachment,
-                                                           pname, &value);
-          return WebGLAny(script_state, static_cast<unsigned>(value));
+      break;
+    case GL_FRAMEBUFFER_ATTACHMENT_COLOR_ENCODING_EXT:
+      if (ExtensionEnabled(kEXTsRGBName)) {
+        GLint value = 0;
+        ContextGL()->GetFramebufferAttachmentParameteriv(target, attachment,
+                                                         pname, &value);
+        return WebGLAny(script_state, static_cast<unsigned>(value));
+      }
+      SynthesizeGLError(GL_INVALID_ENUM, kFunctionName,
+                        "invalid parameter name, EXT_sRGB not enabled");
+      return ScriptValue::CreateNull(script_state->GetIsolate());
+    case GL_FRAMEBUFFER_ATTACHMENT_COMPONENT_TYPE_EXT:
+      if (ExtensionEnabled(kEXTColorBufferHalfFloatName) ||
+          ExtensionEnabled(kWebGLColorBufferFloatName)) {
+        if (attachment == GL_DEPTH_STENCIL_ATTACHMENT) {
+          SynthesizeGLError(
+              GL_INVALID_OPERATION, kFunctionName,
+              "component type cannot be queried for DEPTH_STENCIL_ATTACHMENT");
+          return ScriptValue::CreateNull(script_state->GetIsolate());
         }
-        SynthesizeGLError(GL_INVALID_ENUM, "getFramebufferAttachmentParameter",
-                          "invalid parameter name for renderbuffer attachment");
-        return ScriptValue::CreateNull(script_state->GetIsolate());
-      default:
-        SynthesizeGLError(GL_INVALID_ENUM, "getFramebufferAttachmentParameter",
-                          "invalid parameter name for texture attachment");
-        return ScriptValue::CreateNull(script_state->GetIsolate());
-    }
-  } else {
-    switch (pname) {
-      case GL_FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE:
-        return WebGLAny(script_state, GL_RENDERBUFFER);
-      case GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME:
-        return WebGLAny(script_state, attachment_object);
-      case GL_FRAMEBUFFER_ATTACHMENT_COLOR_ENCODING_EXT:
-        if (ExtensionEnabled(kEXTsRGBName)) {
-          GLint value = 0;
-          ContextGL()->GetFramebufferAttachmentParameteriv(target, attachment,
-                                                           pname, &value);
-          return WebGLAny(script_state, value);
-        }
-        SynthesizeGLError(GL_INVALID_ENUM, "getFramebufferAttachmentParameter",
-                          "invalid parameter name for renderbuffer attachment");
-        return ScriptValue::CreateNull(script_state->GetIsolate());
-      default:
-        SynthesizeGLError(GL_INVALID_ENUM, "getFramebufferAttachmentParameter",
-                          "invalid parameter name for renderbuffer attachment");
-        return ScriptValue::CreateNull(script_state->GetIsolate());
-    }
+        GLint value = 0;
+        ContextGL()->GetFramebufferAttachmentParameteriv(target, attachment,
+                                                         pname, &value);
+        return WebGLAny(script_state, static_cast<unsigned>(value));
+      }
+      SynthesizeGLError(
+          GL_INVALID_ENUM, kFunctionName,
+          "invalid parameter name, EXT_color_buffer_half_float or "
+          "WEBGL_color_buffer_float not enabled");
+      return ScriptValue::CreateNull(script_state->GetIsolate());
   }
+  SynthesizeGLError(GL_INVALID_ENUM, kFunctionName, "invalid parameter name");
+  return ScriptValue::CreateNull(script_state->GetIsolate());
 }
 
 namespace {
@@ -3588,7 +3598,7 @@ ScriptValue WebGLRenderingContextBase::getParameter(ScriptState* script_state,
     case GL_DEPTH_RANGE:
       return GetWebGLFloatArrayParameter(script_state, pname);
     case GL_DEPTH_TEST:
-      return GetBooleanParameter(script_state, pname);
+      return WebGLAny(script_state, depth_enabled_);
     case GL_DEPTH_WRITEMASK:
       return GetBooleanParameter(script_state, pname);
     case GL_DITHER:
@@ -4515,8 +4525,12 @@ bool WebGLRenderingContextBase::isContextLost() const {
 GLboolean WebGLRenderingContextBase::isEnabled(GLenum cap) {
   if (isContextLost() || !ValidateCapability("isEnabled", cap))
     return 0;
-  if (cap == GL_STENCIL_TEST)
+  if (cap == GL_DEPTH_TEST) {
+    return depth_enabled_;
+  }
+  if (cap == GL_STENCIL_TEST) {
     return stencil_enabled_;
+  }
   return ContextGL()->IsEnabled(cap);
 }
 
@@ -4968,7 +4982,7 @@ void WebGLRenderingContextBase::renderbufferStorage(GLenum target,
     return;
   RenderbufferStorageImpl(target, 0, internalformat, width, height,
                           function_name);
-  ApplyStencilTest();
+  ApplyDepthAndStencilTest();
 }
 
 void WebGLRenderingContextBase::sampleCoverage(GLfloat value,
@@ -8759,15 +8773,20 @@ void WebGLRenderingContextBase::EmitGLWarning(const char* function_name,
   NotifyWebGLWarning();
 }
 
-void WebGLRenderingContextBase::ApplyStencilTest() {
+void WebGLRenderingContextBase::ApplyDepthAndStencilTest() {
   bool have_stencil_buffer = false;
+  bool have_depth_buffer = false;
 
   if (framebuffer_binding_) {
+    have_depth_buffer = framebuffer_binding_->HasDepthBuffer();
     have_stencil_buffer = framebuffer_binding_->HasStencilBuffer();
   } else {
+    have_depth_buffer = !isContextLost() && CreationAttributes().depth &&
+                        GetDrawingBuffer()->HasDepthBuffer();
     have_stencil_buffer = !isContextLost() && CreationAttributes().stencil &&
                           GetDrawingBuffer()->HasStencilBuffer();
   }
+  EnableOrDisable(GL_DEPTH_TEST, depth_enabled_ && have_depth_buffer);
   EnableOrDisable(GL_STENCIL_TEST, stencil_enabled_ && have_stencil_buffer);
 }
 
@@ -8825,7 +8844,7 @@ void WebGLRenderingContextBase::SetFramebuffer(GLenum target,
 
   if (target == GL_FRAMEBUFFER || target == GL_DRAW_FRAMEBUFFER) {
     framebuffer_binding_ = buffer;
-    ApplyStencilTest();
+    ApplyDepthAndStencilTest();
   }
   if (!buffer) {
     // Instead of binding fb 0, bind the drawing buffer.

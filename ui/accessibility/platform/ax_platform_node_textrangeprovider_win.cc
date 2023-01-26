@@ -468,9 +468,6 @@ HRESULT AXPlatformNodeTextRangeProviderWin::FindText(
     BOOL backwards,
     BOOL ignore_case,
     ITextRangeProvider** result) {
-  WIN_ACCESSIBILITY_API_HISTOGRAM(UMA_API_TEXTRANGE_FINDTEXT);
-  WIN_ACCESSIBILITY_API_PERF_HISTOGRAM(UMA_API_TEXTRANGE_FINDTEXT);
-  UIA_VALIDATE_TEXTRANGEPROVIDER_CALL_1_IN_1_OUT(string, result);
   // On Windows, there's a dichotomy in the definition of a text offset in a
   // text position between different APIs:
   //   - on UIA, a text offset translates to the offset in the text itself
@@ -493,6 +490,17 @@ HRESULT AXPlatformNodeTextRangeProviderWin::FindText(
   // value of the global variable to what is really expected on UIA.
   ScopedAXEmbeddedObjectBehaviorSetter ax_embedded_object_behavior(
       AXEmbeddedObjectBehavior::kSuppressCharacter);
+
+  WIN_ACCESSIBILITY_API_HISTOGRAM(UMA_API_TEXTRANGE_FINDTEXT);
+  WIN_ACCESSIBILITY_API_PERF_HISTOGRAM(UMA_API_TEXTRANGE_FINDTEXT);
+  // The following has to be called after setting the
+  // ax_embedded_object_behavior. This is because it can modify `this`'s `start`
+  // and `end`, and it will do so assuming
+  // `AXEmbeddedObjectBehavior::kExposeCharacter` if we do not set it to
+  // `kSuppressCharacter' above. This would lead to incorrect behavior where the
+  // `text_range` length = 1, since that is the length of the embedded object
+  // character.
+  UIA_VALIDATE_TEXTRANGEPROVIDER_CALL_1_IN_1_OUT(string, result);
 
   std::u16string search_string = base::WideToUTF16(string);
   if (search_string.length() <= 0)
@@ -1647,16 +1655,16 @@ void AXPlatformNodeTextRangeProviderWin::TextRangeEndpoints::SetStart(
   // TODO(bebeaudr): We can't use IsNullPosition() here because of
   // https://crbug.com/1152939. Once this is fixed, we can go back to
   // IsNullPosition().
-  if (did_tree_change && start_->kind() != AXPositionKind::NULL_POSITION &&
+  if (did_tree_change && start_->GetTree() &&
       start_->tree_id() != end_->tree_id()) {
-    RemoveObserver(start_->tree_id());
+    start_->GetTree()->RemoveObserver(this);
   }
 
   start_ = std::move(new_start);
 
   if (did_tree_change && !start_->IsNullPosition() &&
       start_->tree_id() != end_->tree_id()) {
-    AddObserver(start_->tree_id());
+    start_->GetTree()->AddObserver(this);
   }
 }
 
@@ -1666,31 +1674,17 @@ void AXPlatformNodeTextRangeProviderWin::TextRangeEndpoints::SetEnd(
   // TODO(bebeaudr): We can't use IsNullPosition() here because of
   // https://crbug.com/1152939. Once this is fixed, we can go back to
   // IsNullPosition().
-  if (did_tree_change && end_->kind() != AXPositionKind::NULL_POSITION &&
+  if (did_tree_change && end_->GetTree() &&
       end_->tree_id() != start_->tree_id()) {
-    RemoveObserver(end_->tree_id());
+    end_->GetTree()->RemoveObserver(this);
   }
 
   end_ = std::move(new_end);
 
   if (did_tree_change && !end_->IsNullPosition() &&
       start_->tree_id() != end_->tree_id()) {
-    AddObserver(end_->tree_id());
+    end_->GetTree()->AddObserver(this);
   }
-}
-
-void AXPlatformNodeTextRangeProviderWin::TextRangeEndpoints::AddObserver(
-    const AXTreeID tree_id) {
-  AXTreeManager* ax_tree_manager = AXTreeManager::FromID(tree_id);
-  DCHECK(ax_tree_manager);
-  ax_tree_manager->ax_tree()->AddObserver(this);
-}
-
-void AXPlatformNodeTextRangeProviderWin::TextRangeEndpoints::RemoveObserver(
-    const AXTreeID tree_id) {
-  AXTreeManager* ax_tree_manager = AXTreeManager::FromID(tree_id);
-  if (ax_tree_manager)
-    ax_tree_manager->ax_tree()->RemoveObserver(this);
 }
 
 // Ensures that our endpoints are located on non-deleted nodes (step 1, case A
@@ -1826,7 +1820,11 @@ void AXPlatformNodeTextRangeProviderWin::TextRangeEndpoints::
     OnTreeManagerWillBeRemoved(AXTreeID previous_tree_id) {
   if (start_->tree_id() == previous_tree_id ||
       end_->tree_id() == previous_tree_id) {
-    RemoveObserver(previous_tree_id);
+    AXTreeManager* ax_tree_manager = AXTreeManager::FromID(previous_tree_id);
+    if (ax_tree_manager) {
+      DCHECK(ax_tree_manager->ax_tree());
+      ax_tree_manager->ax_tree()->RemoveObserver(this);
+    }
   }
 }
 

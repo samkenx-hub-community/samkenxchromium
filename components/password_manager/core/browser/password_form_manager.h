@@ -84,10 +84,6 @@ class PasswordFormManager : public PasswordFormManagerForUI,
   // for success detection.
   bool IsEqualToSubmittedForm(const autofill::FormData& form) const;
 
-  // Clears potentially submitted or pending form. Used to forget the state when
-  // Autofill Assistant has handled a submission.
-  void ResetState();
-
   // If |submitted_form| is managed by *this (i.e. DoesManage returns true for
   // |submitted_form| and |driver|) then saves |submitted_form| to
   // |submitted_form_| field, sets |is_submitted| = true and returns true.
@@ -189,7 +185,6 @@ class PasswordFormManager : public PasswordFormManagerForUI,
   void SetGenerationElement(autofill::FieldRendererId generation_element);
   bool HasLikelyChangePasswordFormSubmitted() const;
   bool IsPasswordUpdate() const;
-  bool IsSamePassword() const;
   base::WeakPtr<PasswordManagerDriver> GetDriver() const;
   const PasswordForm* GetSubmittedForm() const;
 

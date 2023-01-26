@@ -25,6 +25,7 @@
 #include "third_party/blink/public/web/blink.h"
 #include "third_party/blink/public/web/web_local_frame.h"
 #include "third_party/blink/public/web/web_script_source.h"
+#include "ui/accessibility/ax_enum_util.h"
 #include "ui/accessibility/ax_node.h"
 #include "ui/accessibility/ax_selection.h"
 #include "ui/accessibility/ax_serializable_tree.h"
@@ -124,6 +125,27 @@ void SetAXNodeDataTextDirection(v8::Isolate* isolate,
                                 direction);
 }
 
+void SetAXNodeDataTextStyle(v8::Isolate* isolate,
+                            gin::Dictionary* v8_dict,
+                            ui::AXNodeData* ax_node_data) {
+  v8::Local<v8::Value> v8_text_style;
+  v8_dict->Get("textStyle", &v8_text_style);
+  std::string text_style;
+  gin::ConvertFromV8(isolate, v8_text_style, &text_style);
+  if (text_style.find("underline") != std::string::npos) {
+    ax_node_data->AddTextStyle(ax::mojom::TextStyle::kUnderline);
+  }
+  if (text_style.find("overline") != std::string::npos) {
+    ax_node_data->AddTextStyle(ax::mojom::TextStyle::kOverline);
+  }
+  if (text_style.find("italic") != std::string::npos) {
+    ax_node_data->AddTextStyle(ax::mojom::TextStyle::kItalic);
+  }
+  if (text_style.find("bold") != std::string::npos) {
+    ax_node_data->AddTextStyle(ax::mojom::TextStyle::kBold);
+  }
+}
+
 void SetAXNodeDataUrl(v8::Isolate* isolate,
                       gin::Dictionary* v8_dict,
                       ui::AXNodeData* ax_node_data) {
@@ -216,6 +238,7 @@ ui::AXTreeUpdate GetSnapshotFromV8SnapshotLite(
     SetAXNodeDataHtmlTag(isolate, &v8_node_dict, &ax_node_data);
     SetAXNodeDataLanguage(isolate, &v8_node_dict, &ax_node_data);
     SetAXNodeDataTextDirection(isolate, &v8_node_dict, &ax_node_data);
+    SetAXNodeDataTextStyle(isolate, &v8_node_dict, &ax_node_data);
     SetAXNodeDataUrl(isolate, &v8_node_dict, &ax_node_data);
     snapshot.nodes.push_back(ax_node_data);
   }
@@ -297,8 +320,10 @@ void ReadAnythingAppController::AccessibilityEventReceived(
   // so it’s critical that updates are not unserialized until drawing is
   // complete.
   if (tree_id == active_tree_id_ && distillation_in_progress_) {
-    DCHECK(pending_updates_.empty() ||
-           tree_id == pending_updates_.back().tree_data.tree_id);
+#if DCHECK_IS_ON()
+    DCHECK(pending_updates_.empty() || tree_id == pending_updates_bundle_id_);
+    pending_updates_bundle_id_ = tree_id;
+#endif
     pending_updates_.insert(pending_updates_.end(),
                             std::make_move_iterator(updates.begin()),
                             std::make_move_iterator(updates.end()));
@@ -342,7 +367,14 @@ void ReadAnythingAppController::OnActiveAXTreeIDChanged(
   // Unserialize all pending updates on the formerly active AXTree.
   // TODO(crbug.com/1266555): If distillation is in progress, cancel the
   // distillation request.
+#if DCHECK_IS_ON()
+  DCHECK(pending_updates_.empty() ||
+         pending_updates_bundle_id_ == previous_active_tree_id);
+#endif
   UnserializeUpdates(std::move(pending_updates_), previous_active_tree_id);
+#if DCHECK_IS_ON()
+  pending_updates_bundle_id_ = ui::AXTreeIDUnknown();
+#endif
   // When the UI first constructs, this function may be called before tree_id
   // has been added to trees_ in AccessibilityEventReceived. In that case, do
   // not distill.
@@ -379,6 +411,8 @@ void ReadAnythingAppController::OnAtomicUpdateFinished(
     ui::AXTree* tree,
     bool root_changed,
     const std::vector<Change>& changes) {
+  // TODO(crbug.com/1266555): This method may be called when child trees finish
+  // updating. We should re-distill if tree is a child of the active tree.
   if (active_tree_id_ == ui::AXTreeIDUnknown() ||
       tree->GetAXTreeID() != active_tree_id_) {
     return;
@@ -424,6 +458,7 @@ void ReadAnythingAppController::Distill() {
 }
 
 void ReadAnythingAppController::OnAXTreeDistilled(
+    const ui::AXTreeID& tree_id,
     const std::vector<ui::AXNodeID>& content_node_ids) {
   // Reset state.
   display_node_ids_.clear();
@@ -434,12 +469,18 @@ void ReadAnythingAppController::OnAXTreeDistilled(
   content_node_ids_ = content_node_ids;
   distillation_in_progress_ = false;
 
-  // This callback could be called after the AXTree was destroyed. In that case,
-  // return early.
-  if (active_tree_id_ == ui::AXTreeIDUnknown()) {
+  // Return early if any of the following scenarios occurred while waiting for
+  // distillation to complete:
+  // 1. tree_id != active_tree_id_: The active tree was changed.
+  // 2. active_tree_id_ == ui::AXTreeIDUnknown(): The active tree was change to
+  //    an unknown tree id.
+  // 3. !base::Contains(trees_, tree_id): The distilled tree was destroyed.
+  // 4. tree_id == ui::AXTreeIDUnknown(): The distiller sent back an unknown
+  //    tree id which occurs when there was an error.
+  if (tree_id != active_tree_id_ || active_tree_id_ == ui::AXTreeIDUnknown() ||
+      !base::Contains(trees_, tree_id) || tree_id == ui::AXTreeIDUnknown()) {
     return;
   }
-  DCHECK(base::Contains(trees_, active_tree_id_));
   ui::AXSelection selection = trees_[active_tree_id_]->GetUnignoredSelection();
   has_selection_ = selection.anchor_object_id != ui::kInvalidAXNodeID &&
                    selection.focus_object_id != ui::kInvalidAXNodeID;
@@ -459,7 +500,14 @@ void ReadAnythingAppController::OnAXTreeDistilled(
   Draw();
   // Once drawing is complete, unserialize all of the pending updates on the
   // active tree and send out a new distillation request.
+#if DCHECK_IS_ON()
+  DCHECK(pending_updates_.empty() ||
+         pending_updates_bundle_id_ == active_tree_id_);
+#endif
   UnserializeUpdates(std::move(pending_updates_), active_tree_id_);
+#if DCHECK_IS_ON()
+  pending_updates_bundle_id_ = ui::AXTreeIDUnknown();
+#endif
 }
 
 void ReadAnythingAppController::Draw() {
@@ -604,6 +652,8 @@ gin::ObjectTemplateBuilder ReadAnythingAppController::GetObjectTemplateBuilder(
       .SetMethod("getLanguage", &ReadAnythingAppController::GetLanguage)
       .SetMethod("getTextContent", &ReadAnythingAppController::GetTextContent)
       .SetMethod("getUrl", &ReadAnythingAppController::GetUrl)
+      .SetMethod("shouldBold", &ReadAnythingAppController::ShouldBold)
+      .SetMethod("isOverline", &ReadAnythingAppController::IsOverline)
       .SetMethod("onConnected", &ReadAnythingAppController::OnConnected)
       .SetMethod("onLinkClicked", &ReadAnythingAppController::OnLinkClicked)
       .SetMethod("setContentForTesting",
@@ -660,7 +710,11 @@ std::string ReadAnythingAppController::GetHtmlTag(
     ui::AXNodeID ax_node_id) const {
   ui::AXNode* ax_node = GetAXNode(ax_node_id);
   DCHECK(ax_node);
-  return ax_node->GetStringAttribute(ax::mojom::StringAttribute::kHtmlTag);
+
+  // Replace mark element with bold element for readability
+  std::string html_tag =
+      ax_node->GetStringAttribute(ax::mojom::StringAttribute::kHtmlTag);
+  return html_tag == ui::ToString(ax::mojom::Role::kMark) ? "b" : html_tag;
 }
 
 std::string ReadAnythingAppController::GetLanguage(
@@ -718,6 +772,21 @@ std::string ReadAnythingAppController::GetUrl(ui::AXNodeID ax_node_id) const {
   return ax_node->GetStringAttribute(ax::mojom::StringAttribute::kUrl);
 }
 
+bool ReadAnythingAppController::ShouldBold(ui::AXNodeID ax_node_id) const {
+  ui::AXNode* ax_node = GetAXNode(ax_node_id);
+  DCHECK(ax_node);
+  bool isBold = ax_node->HasTextStyle(ax::mojom::TextStyle::kBold);
+  bool isItalic = ax_node->HasTextStyle(ax::mojom::TextStyle::kItalic);
+  bool isUnderline = ax_node->HasTextStyle(ax::mojom::TextStyle::kUnderline);
+  return isBold || isItalic || isUnderline;
+}
+
+bool ReadAnythingAppController::IsOverline(ui::AXNodeID ax_node_id) const {
+  ui::AXNode* ax_node = GetAXNode(ax_node_id);
+  DCHECK(ax_node);
+  return ax_node->HasTextStyle(ax::mojom::TextStyle::kOverline);
+}
+
 void ReadAnythingAppController::OnConnected() {
   mojo::PendingReceiver<read_anything::mojom::PageHandlerFactory>
       page_handler_factory_receiver =
@@ -764,7 +833,7 @@ void ReadAnythingAppController::SetContentForTesting(
       GetSnapshotFromV8SnapshotLite(isolate, v8_snapshot_lite);
   AccessibilityEventReceived(snapshot.tree_data.tree_id, {snapshot}, {});
   OnActiveAXTreeIDChanged(snapshot.tree_data.tree_id);
-  OnAXTreeDistilled(content_node_ids);
+  OnAXTreeDistilled(snapshot.tree_data.tree_id, content_node_ids);
 }
 
 AXTreeDistiller* ReadAnythingAppController::SetDistillerForTesting(

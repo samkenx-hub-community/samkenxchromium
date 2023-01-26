@@ -274,7 +274,6 @@ void OpaqueBrowserFrameView::WindowControlsOverlayEnabledChanged() {
   UpdateCaptionButtonToolTipsForWindowControlsOverlay();
 #endif
 
-  web_app_frame_toolbar()->OnWindowControlsOverlayEnabledChanged();
   layout_->SetWindowControlsOverlayEnabled(enabled, this);
   InvalidateLayout();
 }
@@ -284,11 +283,6 @@ gfx::Size OpaqueBrowserFrameView::GetMinimumSize() const {
 }
 
 void OpaqueBrowserFrameView::PaintAsActiveChanged() {
-  UpdateCaptionButtonPlaceholderContainerBackground();
-  BrowserNonClientFrameView::PaintAsActiveChanged();
-}
-
-void OpaqueBrowserFrameView::UpdateFrameColor() {
   UpdateCaptionButtonPlaceholderContainerBackground();
   BrowserNonClientFrameView::PaintAsActiveChanged();
 }

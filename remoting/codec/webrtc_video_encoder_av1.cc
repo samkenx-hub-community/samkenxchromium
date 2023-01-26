@@ -4,6 +4,7 @@
 
 #include "remoting/codec/webrtc_video_encoder_av1.h"
 
+#include "base/cxx17_backports.h"
 #include "base/functional/callback.h"
 #include "base/logging.h"
 #include "base/notreached.h"
@@ -35,11 +36,16 @@ void DestroyAomCodecContext(aom_codec_ctx_t* codec_ctx) {
 // TODO(joedow): Perform some additional testing to see if this needs tweaking.
 constexpr int kAv1MinimumTargetBitrateKbpsPerMegapixel = 2500;
 
+// A value of 9 provides higher-quality and decent performance based on
+// experimentation.
+constexpr int kAv1DefaultEncoderSpeed = 9;
+
 }  // namespace
 
 WebrtcVideoEncoderAV1::WebrtcVideoEncoderAV1()
     : codec_(nullptr, DestroyAomCodecContext),
       image_(nullptr, aom_img_free),
+      av1_encoder_speed_(kAv1DefaultEncoderSpeed),
       bitrate_filter_(kAv1MinimumTargetBitrateKbpsPerMegapixel) {
   ConfigureCodecParams();
 }
@@ -50,6 +56,14 @@ void WebrtcVideoEncoderAV1::SetLosslessColor(bool want_lossless) {
     lossless_color_ = want_lossless;
     codec_.reset();
   }
+}
+
+void WebrtcVideoEncoderAV1::SetEncoderSpeed(int encoder_speed) {
+  // Clamp values are based on the lowest and highest values available when
+  // realtime encoding with AV1.  This allows for client-driven experimentation,
+  // however in practice, a value of 9 or 10 should be chosen as that will give
+  // the best performance.
+  av1_encoder_speed_ = base::clamp<int>(encoder_speed, 7, 10);
 }
 
 bool WebrtcVideoEncoderAV1::InitializeCodec(const webrtc::DesktopSize& size) {
@@ -83,7 +97,7 @@ bool WebrtcVideoEncoderAV1::InitializeCodec(const webrtc::DesktopSize& size) {
     active_map_.Initialize(size);
   }
 
-  error = aom_codec_control(codec.get(), AOME_SET_CPUUSED, 10);
+  error = aom_codec_control(codec.get(), AOME_SET_CPUUSED, av1_encoder_speed_);
   DCHECK_EQ(error, AOM_CODEC_OK) << "Failed to set AOME_SET_CPUUSED";
 
   error = aom_codec_control(codec.get(), AV1E_SET_AQ_MODE, 3);
@@ -303,7 +317,7 @@ void WebrtcVideoEncoderAV1::ConfigureCodecParams() {
   config_.g_lag_in_frames = 0;
   config_.g_error_resilient = 0;
   config_.g_timebase.num = 1;
-  config_.g_timebase.den = base::Time::kMicrosecondsPerSecond;
+  config_.g_timebase.den = base::Time::kMillisecondsPerSecond;
 
   config_.kf_mode = AOM_KF_DISABLED;
 
@@ -416,12 +430,12 @@ void WebrtcVideoEncoderAV1::Encode(std::unique_ptr<webrtc::DesktopFrame> frame,
     }
   }
 
-  auto duration_us = params.duration.InMicroseconds();
-  DCHECK_GT(duration_us, 0);
+  auto duration_ms = params.duration.InMilliseconds();
+  DCHECK_GT(duration_ms, 0);
   aom_codec_err_t ret = aom_codec_encode(
-      codec_.get(), image_.get(), artificial_timestamp_us_, duration_us,
+      codec_.get(), image_.get(), artificial_timestamp_ms_, duration_ms,
       (params.key_frame) ? AOM_EFLAG_FORCE_KF : 0);
-  artificial_timestamp_us_ += duration_us;
+  artificial_timestamp_ms_ += duration_ms;
   if (ret != AOM_CODEC_OK) {
     const char* error_detail = aom_codec_error_detail(codec_.get());
     LOG(ERROR) << "Encoding error: " << aom_codec_err_to_string(ret) << "\n  "

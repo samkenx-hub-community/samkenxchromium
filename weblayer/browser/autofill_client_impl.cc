@@ -9,8 +9,10 @@
 #include "build/build_config.h"
 #include "components/autofill/core/browser/data_model/autofill_profile.h"
 #include "components/autofill/core/browser/ui/suggestion.h"
+#include "content/public/browser/browser_context.h"
 #include "content/public/browser/navigation_entry.h"
 #include "content/public/browser/ssl_status.h"
+#include "content/public/browser/storage_partition.h"
 #include "content/public/browser/web_contents.h"
 #include "services/metrics/public/cpp/ukm_recorder.h"
 #include "weblayer/browser/translate_client_impl.h"
@@ -18,6 +20,18 @@
 namespace weblayer {
 
 AutofillClientImpl::~AutofillClientImpl() = default;
+
+bool AutofillClientImpl::IsOffTheRecord() {
+  return web_contents()->GetBrowserContext()->IsOffTheRecord();
+}
+
+scoped_refptr<network::SharedURLLoaderFactory>
+AutofillClientImpl::GetURLLoaderFactory() {
+  return web_contents()
+      ->GetBrowserContext()
+      ->GetDefaultStoragePartition()
+      ->GetURLLoaderFactoryForBrowserProcess();
+}
 
 autofill::PersonalDataManager* AutofillClientImpl::GetPersonalDataManager() {
   NOTREACHED();

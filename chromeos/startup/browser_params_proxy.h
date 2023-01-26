@@ -129,7 +129,7 @@ class COMPONENT_EXPORT(CHROMEOS_STARTUP) BrowserParamsProxy {
 
   bool VcControlsUiEnabled() const;
 
-  const crosapi::mojom::StandaloneBrowserAppServiceBlockListPtr&
+  const crosapi::mojom::StandaloneBrowserAppServiceBlockList*
   StandaloneBrowserAppServiceBlockList() const;
 
  private:

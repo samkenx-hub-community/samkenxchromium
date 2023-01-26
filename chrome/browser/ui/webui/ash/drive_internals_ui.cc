@@ -69,7 +69,7 @@ namespace {
 
 using content::BrowserThread;
 using drive::DriveIntegrationService;
-using drivefs::pinning::DriveFsPinManager;
+using drivefs::pinning::PinManager;
 
 constexpr char kKey[] = "key";
 constexpr char kValue[] = "value";
@@ -248,12 +248,13 @@ void ZipLogs(Profile* profile,
 
 // Class to handle messages from chrome://drive-internals.
 class DriveInternalsWebUIHandler : public content::WebUIMessageHandler,
-                                   public DriveFsPinManager::Observer {
+                                   public PinManager::Observer {
  public:
   ~DriveInternalsWebUIHandler() override {
-    VLOG_IF(1, pin_manager_)
-        << "DriveInternalsWebUIHandler dropped before DriveFsPinManager";
-    OnDrop();
+    if (pin_manager_) {
+      VLOG(1) << "DriveInternalsWebUIHandler dropped before PinManager";
+      pin_manager_->RemoveObserver(this);
+    }
   }
 
   DriveInternalsWebUIHandler() = default;
@@ -384,17 +385,12 @@ class DriveInternalsWebUIHandler : public content::WebUIMessageHandler,
     UpdateDriveRelatedPreferencesSection();
     UpdateGCacheContentsSection();
     UpdatePathConfigurationsSection();
-
     UpdateConnectionStatusSection();
     UpdateAboutResourceSection();
-
     UpdateDeltaUpdateStatusSection();
     UpdateCacheContentsSection();
-
     UpdateInFlightOperationsSection();
-
     UpdateDriveDebugSection();
-
     UpdateMirrorSyncSection();
     UpdateBulkPinningSection();
 
@@ -606,10 +602,13 @@ class DriveInternalsWebUIHandler : public content::WebUIMessageHandler,
 
   void UpdateBulkPinningSection() {
     DriveIntegrationService* const service = GetIntegrationService();
-    DCHECK(service);
+    if (!service) {
+      return;
+    }
 
-    OnDrop();
-    DCHECK(!pin_manager_);
+    if (pin_manager_) {
+      pin_manager_->RemoveObserver(this);
+    }
 
     pin_manager_ = service->GetPinManager();
     if (!pin_manager_) {
@@ -629,22 +628,22 @@ class DriveInternalsWebUIHandler : public content::WebUIMessageHandler,
 
   void OnDrop() override {
     if (pin_manager_) {
-      pin_manager_->RemoveObserver(this);
+      VLOG(1) << "PinManager dropped before DriveInternalsWebUIHandler";
       pin_manager_ = nullptr;
     }
   }
 
-  void OnProgress(const drivefs::pinning::SetupProgress& progress) override {
+  void OnProgress(const drivefs::pinning::Progress& progress) override {
     using drivefs::pinning::HumanReadableSize;
 
     base::Value::Dict d;
     d.Set("stage", ToString(progress.stage));
-    d.Set("availableDiskSpace",
-          ToString(HumanReadableSize(progress.free_space)));
-    d.Set("requiredDiskSpace",
-          ToString(HumanReadableSize(progress.total_bytes)));
-    d.Set("pinnedDiskSpace",
-          ToString(HumanReadableSize(progress.transferred_bytes)));
+    d.Set("free_space", ToString(HumanReadableSize(progress.free_space)));
+    d.Set("bytes_to_pin", ToString(HumanReadableSize(progress.bytes_to_pin)));
+    d.Set("pinned_bytes", ToString(HumanReadableSize(progress.pinned_bytes)));
+    d.Set("files_to_pin", ToString(progress.files_to_pin));
+    d.Set("pinned_files", ToString(progress.pinned_files));
+    d.Set("failed_files", ToString(progress.failed_files));
     MaybeCallJavascript("onBulkPinningProgress", base::Value(std::move(d)));
   }
 
@@ -848,6 +847,7 @@ class DriveInternalsWebUIHandler : public content::WebUIMessageHandler,
 
     const bool enabled = args[0].GetBool();
     GetPrefs()->SetBoolean(drive::prefs::kDriveFsBulkPinningEnabled, enabled);
+    UpdateBulkPinningSection();
   }
 
   // Called when the "Startup Arguments" field on the page is submitted.
@@ -971,7 +971,7 @@ class DriveInternalsWebUIHandler : public content::WebUIMessageHandler,
   }
 
   // DriveFS bulk-pinning manager.
-  base::raw_ptr<DriveFsPinManager> pin_manager_ = nullptr;
+  base::raw_ptr<PinManager> pin_manager_ = nullptr;
 
   // The last event sent to the JavaScript side.
   int last_sent_event_id_ = -1;

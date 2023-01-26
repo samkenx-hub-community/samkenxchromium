@@ -39,6 +39,7 @@ backgroundRepeatY
 backgroundSize
 basePalette
 baselineShift
+baselineSource
 blockSize
 border
 borderBlock
@@ -435,6 +436,7 @@ unicodeRange
 userSelect
 vectorEffect
 verticalAlign
+viewTransitionName
 visibility
 webkitAlignContent
 webkitAlignItems

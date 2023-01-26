@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include "components/autofill/core/browser/metrics/autofill_metrics.h"
+#include "base/check.h"
 
 #include <stddef.h>
 
@@ -746,80 +747,119 @@ TEST_P(AutofillPerfectFillingMetricsTest,
       BucketsAre(test_case.credit_card_buckets));
 }
 
-struct SuggestionOriginPerfectFillingTestCase {
-  std::string description;
+struct TouchToFillForCreditCardsTestCase {
   std::vector<Field> fields;
-  bool expected_metric_value;
+  std::vector<bool> fields_is_autofilled_values;
+  bool is_all_autofilled;
+  bool is_all_accepted;
 };
 
-class SuggestionOriginPerfectFillingMetricsTest
+class TouchToFillForCreditCardsTest
     : public AutofillMetricsTest,
-      public ::testing::WithParamInterface<
-          SuggestionOriginPerfectFillingTestCase> {
+      public ::testing::WithParamInterface<TouchToFillForCreditCardsTestCase> {
  public:
-  std::vector<test::FieldDescription> GetFields(std::vector<Field> fields) {
-    std::vector<test::FieldDescription> fields_to_return;
+  std::vector<FormFieldData> GetFields(std::vector<Field> fields) {
+    std::vector<FormFieldData> fields_to_return;
+    fields_to_return.reserve(fields.size());
     for (const auto& field : fields) {
-      test::FieldDescription f;
-      if (field.value) {
-        f.value = field.value;
-      } else if (field.field_type == CREDIT_CARD_NAME_FULL) {
-        f.value = u"Elvis Aaron Presley";
+      if (field.field_type == CREDIT_CARD_NAME_FULL) {
+        fields_to_return.push_back(
+            CreateField("Name on card", "cardName", "", "text"));
       } else if (field.field_type == CREDIT_CARD_NUMBER) {
-        f.value = u"01230123012399";
+        fields_to_return.push_back(
+            CreateField("Credit card number", "cardNumber", "", "text"));
+      } else if (field.field_type == CREDIT_CARD_EXP_MONTH) {
+        fields_to_return.push_back(
+            CreateField("Expiration date", "cc_exp", "", "text"));
+      } else if (field.field_type == CREDIT_CARD_VERIFICATION_CODE) {
+        fields_to_return.push_back(CreateField("CVC", "CVC", "", "text"));
       } else {
         NOTREACHED();
       }
-      f.role = field.field_type;
-      f.is_autofilled = field.is_autofilled;
-      fields_to_return.push_back(f);
     }
     return fields_to_return;
   }
+
+  void SetFieldsAutofilledValues(FormData& form,
+                                 std::vector<bool>& fields_is_autofilled_values,
+                                 std::vector<Field>& server_field_types) {
+    DCHECK(form.fields.size() == fields_is_autofilled_values.size());
+    DCHECK(form.fields.size() == server_field_types.size());
+    for (size_t i = 0; i < fields_is_autofilled_values.size(); i++) {
+      form.fields[i].is_autofilled = fields_is_autofilled_values[i];
+      CreditCard testCard = test::GetCreditCard();
+      form.fields[i].value =
+          server_field_types[i].field_type != CREDIT_CARD_VERIFICATION_CODE
+              ? testCard.GetRawInfo(server_field_types[i].field_type)
+              : u"123";
+    }
+  }
 };
 
-TEST_P(SuggestionOriginPerfectFillingMetricsTest,
-       PerfectFilling_TouchToFill_CreditCards) {
-  SuggestionOriginPerfectFillingTestCase test_case = GetParam();
-  std::vector<Field> fields{{CREDIT_CARD_NAME_FULL}, {CREDIT_CARD_NUMBER}};
-  FormData form =
-      test::GetFormData({.description_for_logging = test_case.description,
-                         .fields = GetFields(test_case.fields),
-                         .unique_renderer_id = test::MakeFormRendererId(),
-                         .main_frame_origin = url::Origin::Create(
-                             autofill_client_->form_origin())});
+TEST_P(TouchToFillForCreditCardsTest,
+       AllAutofilledAndAccepted_TouchToFill_CreditCards) {
+  RecreateCreditCards(true, false, false, false);
+  TouchToFillForCreditCardsTestCase test_case = GetParam();
+  FormData form = CreateForm(GetFields(test_case.fields));
 
-  std::vector<ServerFieldType> field_types;
-  for (const auto& f : test_case.fields) {
-    field_types.push_back(f.field_type);
-  }
-
-  autofill_manager().AddSeenForm(form, field_types);
+  SeeForm(form);
+  autofill_manager().OnAskForValuesToFillTest(form, form.fields[0], {},
+                                              AutoselectFirstSuggestion(false),
+                                              FormElementWasClicked(true));
 
   base::HistogramTester histogram_tester;
-  autofill_manager().SetSuggestionOriginMetricState(
-      AutofillSuggestionMethod::KTouchToFillCreditCard);
+  // Simulate user selection in the payments bottom sheet
+  touch_to_fill_delgate_->SuggestionSelected(kTestLocalCardId);
+  // Simulate that fields were autofilled
+  SetFieldsAutofilledValues(form, test_case.fields_is_autofilled_values,
+                            test_case.fields);
+  // Simulate user made change to autofilled field
+  if (!test_case.is_all_accepted) {
+    SimulateUserChangedTextField(form, form.fields[0]);
+  }
+
   SubmitForm(form);
+  ResetDriverToCommitMetrics();
   EXPECT_EQ(histogram_tester.GetBucketCount(
                 "Autofill.TouchToFill.CreditCard.PerfectFilling",
-                test_case.expected_metric_value),
+                test_case.is_all_autofilled && test_case.is_all_accepted),
+            1);
+  EXPECT_EQ(histogram_tester.GetBucketCount(
+                "Autofill.FillingCorrectnessByMethod.CreditCard.TouchToFill",
+                test_case.is_all_accepted),
             1);
 }
 
 INSTANTIATE_TEST_SUITE_P(
     AutofillMetricsTest,
-    SuggestionOriginPerfectFillingMetricsTest,
+    TouchToFillForCreditCardsTest,
     testing::Values(
-        // Test that we log the perfect filling metric correctly for an address
-        // form in which every field is autofilled.
-        SuggestionOriginPerfectFillingTestCase{
-            "PerfectFillingForCreditCardForm_AutofilledFromTTF",
-            {{CREDIT_CARD_NAME_FULL}, {CREDIT_CARD_NUMBER}},
-            true},
-        SuggestionOriginPerfectFillingTestCase{
-            "PerfectFillingForCreditCardForm_NotAllAutofilledFromTTF",
-            {{CREDIT_CARD_NAME_FULL}, {CREDIT_CARD_NUMBER, false}},
-            false}));
+        // All autofilled and nothing edited manually
+        TouchToFillForCreditCardsTestCase{
+            {{CREDIT_CARD_NAME_FULL},
+             {CREDIT_CARD_NUMBER},
+             {CREDIT_CARD_EXP_MONTH}},
+            /*fields_is_autofilled_values=*/{true, true, true},
+            /*is_all_autofilled=*/true,
+            /*is_all_accepted=*/true},
+        // Not all autofilled and nothing edited manually
+        TouchToFillForCreditCardsTestCase{
+            {{CREDIT_CARD_NAME_FULL},
+             {CREDIT_CARD_NUMBER},
+             {CREDIT_CARD_EXP_MONTH},
+             {CREDIT_CARD_VERIFICATION_CODE}},
+            /*fields_is_autofilled_values=*/{true, true, true, false},
+            /*is_all_autofilled=*/false,
+            /*is_all_accepted=*/true},
+        // Not all autofilled and something edited manually
+        TouchToFillForCreditCardsTestCase{
+            {{CREDIT_CARD_NAME_FULL},
+             {CREDIT_CARD_NUMBER},
+             {CREDIT_CARD_EXP_MONTH},
+             {CREDIT_CARD_VERIFICATION_CODE}},
+            /*fields_is_autofilled_values=*/{true, true, true, false},
+            /*is_all_autofilled=*/false,
+            /*is_all_accepted=*/false}));
 
 // Test the emission of collisions between NUMERIC_QUANTITY and server
 // predictions as well as the potential false positives.
@@ -10588,46 +10628,89 @@ TEST_F(AutofillMetricsFromLogEventsTest, AutofillFieldInfoMetrics_FieldType) {
           ->emplace(form_structure_ptr->global_id(), std::move(form_structure))
           .second);
 
+  AutofillQueryResponse response;
+  auto* form_suggestion = response.add_form_suggestions();
+  // The server type of each field predicted from autofill crowdsourced server.
+  std::vector<ServerFieldType> server_types{
+      // Server response will match with autocomplete.
+      NAME_LAST,
+      // Server response will NOT match with autocomplete.
+      NAME_FIRST,
+      // No autocomplete, server predicts a type from majority voting.
+      NAME_MIDDLE,
+      // Server response will have no data.
+      NO_SERVER_DATA};
+  // Set suggestions from server for the form.
+  for (size_t i = 0; i < server_types.size(); ++i) {
+    AddFieldPredictionToForm(form.fields[i], server_types[i], form_suggestion);
+  }
+
+  std::string response_string = SerializeAndEncode(response);
+  autofill_manager().OnLoadedServerPredictionsForTest(
+      response_string, test::GetEncodedSignatures(*form_structure_ptr));
+
   SubmitForm(form);
   // Record Autofill.FieldInfo UKM event at autofill manager reset.
   autofill_manager().Reset();
 
   auto entries =
       test_ukm_recorder_->GetEntriesByName(UkmFieldInfoType::kEntryName);
-  // The local heuristic prediction does not predict the type for the fourth
-  // field.
-  ASSERT_EQ(3u, entries.size());
-  std::vector<ServerFieldType> heuristic_types{NAME_LAST, NAME_FIRST,
-                                               ADDRESS_HOME_LINE1};
+  ASSERT_EQ(4u, entries.size());
+  // The heuristic type of each field. The local heuristic prediction does not
+  // predict the type for the fourth field.
+  std::vector<ServerFieldType> heuristic_types{
+      NAME_LAST, NAME_FIRST, ADDRESS_HOME_LINE1, UNKNOWN_TYPE};
+  // Field types as per the autocomplete attribute in the input.
+  std::vector<HtmlFieldType> html_field_types{
+      HtmlFieldType::kFamilyName, HtmlFieldType::kAdditionalName,
+      HtmlFieldType::kUnrecognized, HtmlFieldType::kPostalCode};
 
   for (size_t i = 0; i < entries.size(); ++i) {
     SCOPED_TRACE(testing::Message() << i);
     using UFIT = UkmFieldInfoType;
     const auto* const entry = entries[i];
-
+    FieldPrediction::Source prediction_source =
+        server_types[i] != NO_SERVER_DATA
+            ? FieldPrediction::SOURCE_AUTOFILL_DEFAULT
+            : FieldPrediction::SOURCE_UNSPECIFIED;
     std::map<std::string, int64_t> expected = {
-      {UFIT::kFormSessionIdentifierName,
-       AutofillMetrics::FormGlobalIdToHash64Bit(form.global_id())},
-      {UFIT::kFieldSessionIdentifierName,
-       AutofillMetrics::FieldGlobalIdToHash64Bit(form.fields[i].global_id())},
-      {UFIT::kFieldSignatureName,
-       Collapse(CalculateFieldSignatureForField(form.fields[i])).value()},
-      {UFIT::kHeuristicTypeName, heuristic_types[i]},
-      {UFIT::kHeuristicTypeLegacyName, heuristic_types[i]},
-#if BUILDFLAG(USE_INTERNAL_AUTOFILL_PATTERNS)
-      {UFIT::kHeuristicTypeDefaultName, heuristic_types[i]},
-      {UFIT::kHeuristicTypeExperimentalName, heuristic_types[i]},
-      {UFIT::kHeuristicTypeNextGenName, heuristic_types[i]},
-#else
-      {UFIT::kHeuristicTypeDefaultName, UNKNOWN_TYPE},
-      {UFIT::kHeuristicTypeExperimentalName, UNKNOWN_TYPE},
-      {UFIT::kHeuristicTypeNextGenName, UNKNOWN_TYPE},
-#endif
-      {UFIT::kIsFocusableName, true},
-      {UFIT::kRankInFieldSignatureGroupName, 1},
-      {UFIT::kWasFocusedName, false},
+        {UFIT::kFormSessionIdentifierName,
+         AutofillMetrics::FormGlobalIdToHash64Bit(form.global_id())},
+        {UFIT::kFieldSessionIdentifierName,
+         AutofillMetrics::FieldGlobalIdToHash64Bit(form.fields[i].global_id())},
+        {UFIT::kFieldSignatureName,
+         Collapse(CalculateFieldSignatureForField(form.fields[i])).value()},
+        {UFIT::kServerType1Name, server_types[i]},
+        {UFIT::kServerPredictionSource1Name, prediction_source},
+        {UFIT::kServerType2Name, NO_SERVER_DATA},
+        {UFIT::kServerPredictionSource2Name,
+         FieldPrediction::SOURCE_UNSPECIFIED},
+        {UFIT::kServerTypeIsOverrideName, false},
+        {UFIT::kIsFocusableName, true},
+        {UFIT::kRankInFieldSignatureGroupName, 1},
+        {UFIT::kWasFocusedName, false},
     };
-
+    if (heuristic_types[i] != UNKNOWN_TYPE) {
+      expected.merge(std::map<std::string, int64_t>({
+          {UFIT::kHeuristicTypeName, heuristic_types[i]},
+          {UFIT::kHeuristicTypeLegacyName, heuristic_types[i]},
+#if BUILDFLAG(USE_INTERNAL_AUTOFILL_PATTERNS)
+          {UFIT::kHeuristicTypeDefaultName, heuristic_types[i]},
+          {UFIT::kHeuristicTypeExperimentalName, heuristic_types[i]},
+          {UFIT::kHeuristicTypeNextGenName, heuristic_types[i]},
+#else
+          {UFIT::kHeuristicTypeDefaultName, UNKNOWN_TYPE},
+          {UFIT::kHeuristicTypeExperimentalName, UNKNOWN_TYPE},
+          {UFIT::kHeuristicTypeNextGenName, UNKNOWN_TYPE},
+#endif
+      }));
+    }
+    if (html_field_types[i] != HtmlFieldType::kUnrecognized) {
+      expected.merge(std::map<std::string, int64_t>({
+          {UFIT::kHtmlFieldTypeName, static_cast<int>(html_field_types[i])},
+          {UFIT::kHtmlFieldModeName, static_cast<int>(HtmlFieldMode::kNone)},
+      }));
+    }
     EXPECT_EQ(expected.size(), entry->metrics.size());
     for (const auto& [metric, value] : expected) {
       test_ukm_recorder_->ExpectEntryMetric(entry, metric, value);

@@ -105,8 +105,8 @@ BASE_FEATURE(kWebViewRecordAppDataDirectorySize,
 
 // Flag to restrict main frame Web Content to verified web content. Verification
 // happens via Digital Asset Links.
-BASE_FEATURE(kWebViewRestrictThirdPartyContent,
-             "WebViewRestrictThirdPartyContent",
+BASE_FEATURE(kWebViewRestrictSensitiveContent,
+             "WebViewRestrictSensitiveContent",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Disallows window.{alert, prompt, confirm} if triggered inside a subframe that
@@ -154,6 +154,12 @@ BASE_FEATURE(kWebViewXRequestedWithHeaderManifestAllowList,
 BASE_FEATURE(kWebViewImageDrag,
              "WebViewImageDrag",
              base::FEATURE_ENABLED_BY_DEFAULT);
+
+// This enables uploading UMA data with a higher frequency.
+// This Feature is checked and used in downstream internal code.
+BASE_FEATURE(kWebViewUmaUploadQualityOfServiceSetToDefault,
+             "WebViewUmaUploadQualityOfServiceSetToDefault",
+             base::FEATURE_DISABLED_BY_DEFAULT);
 
 }  // namespace features
 }  // namespace android_webview

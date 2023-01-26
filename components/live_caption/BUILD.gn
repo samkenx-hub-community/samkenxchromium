@@ -8,10 +8,10 @@ if (!is_android) {
   static_library("live_caption") {
     sources = [
       "caption_bubble_context.h",
+      "caption_bubble_context_remote.cc",
+      "caption_bubble_context_remote.h",
       "caption_bubble_controller.h",
       "caption_bubble_session_observer.h",
-      "live_caption_controller.cc",
-      "live_caption_controller.h",
     ]
 
     deps = [
@@ -26,6 +26,7 @@ if (!is_android) {
       "//components/sync_preferences",
       "//media",
       "//media/mojo/mojom",
+      "//mojo/public/cpp/bindings",
       "//ui/native_theme",
     ]
 
@@ -50,6 +51,20 @@ if (!is_android) {
         "//ui/views",
       ]
     }  # toolkit_views
+
+    if (is_chromeos_ash) {
+      sources += [
+        "live_caption_ui_remote_driver.cc",
+        "live_caption_ui_remote_driver.h",
+      ]
+    }  # is_chromeos_ash
+
+    if (!is_chromeos_lacros) {
+      sources += [
+        "live_caption_controller.cc",
+        "live_caption_controller.h",
+      ]
+    }
   }
 
   static_library("live_translate") {
@@ -77,6 +92,23 @@ if (!is_android) {
       "//services/network/public/cpp",
       "//services/network/public/mojom",
       "//ui/native_theme",
+    ]
+  }
+
+  source_set("unit_tests") {
+    testonly = true
+
+    sources = [ "caption_bubble_context_remote_unittest.cc" ]
+
+    deps = [
+      ":live_caption",
+      "//base",
+      "//base/test:test_support",
+      "//media/mojo/mojom:speech_recognition",
+      "//mojo/public/cpp/bindings:bindings",
+      "//testing/gmock",
+      "//testing/gtest",
+      "//ui/gfx/geometry:geometry",
     ]
   }
 }  # !is_android

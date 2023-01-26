@@ -4,11 +4,13 @@
 
 #include "components/safe_browsing/core/browser/hash_realtime_mechanism.h"
 
+#include "base/metrics/histogram_functions.h"
 #include "base/task/sequenced_task_runner.h"
 #include "components/safe_browsing/core/browser/db/database_manager.h"
 #include "components/safe_browsing/core/browser/db/util.h"
 #include "components/safe_browsing/core/browser/db/v4_protocol_manager_util.h"
 #include "components/safe_browsing/core/browser/safe_browsing_lookup_mechanism.h"
+#include "components/safe_browsing/core/common/utils.h"
 
 namespace safe_browsing {
 
@@ -30,6 +32,14 @@ HashRealTimeMechanism::~HashRealTimeMechanism() {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
 }
 
+// static
+bool HashRealTimeMechanism::CanCheckUrl(
+    const GURL& url,
+    network::mojom::RequestDestination request_destination) {
+  return request_destination == network::mojom::RequestDestination::kDocument &&
+         CanGetReputationOfUrl(url);
+}
+
 SafeBrowsingLookupMechanism::StartCheckResult
 HashRealTimeMechanism::StartCheckInternal() {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
@@ -40,7 +50,10 @@ HashRealTimeMechanism::StartCheckInternal() {
   }
 
   bool has_allowlist_match =
-      database_manager_->CheckUrlForHighConfidenceAllowlist(url_);
+      database_manager_->CheckUrlForHighConfidenceAllowlist(url_, "HPRT");
+  base::UmaHistogramEnumeration(
+      "SafeBrowsing.HPRT.LocalMatch.Result",
+      has_allowlist_match ? AsyncMatch::MATCH : AsyncMatch::NO_MATCH);
   base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
       FROM_HERE,
       base::BindOnce(
@@ -78,6 +91,8 @@ void HashRealTimeMechanism::StartLookupOnUIThread(
     scoped_refptr<base::SequencedTaskRunner> io_task_runner) {
   bool is_lookup_service_available =
       lookup_service_on_ui && !lookup_service_on_ui->IsInBackoffMode();
+  base::UmaHistogramBoolean("SafeBrowsing.HPRT.IsLookupServiceAvailable",
+                            is_lookup_service_available);
   if (!is_lookup_service_available) {
     io_task_runner->PostTask(
         FROM_HERE, base::BindOnce(&HashRealTimeMechanism::PerformHashBasedCheck,

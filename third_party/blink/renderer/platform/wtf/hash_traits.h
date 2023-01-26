@@ -30,7 +30,6 @@
 #include <utility>
 
 #include "third_party/blink/renderer/platform/wtf/allocator/allocator.h"
-#include "third_party/blink/renderer/platform/wtf/atomic_operations.h"
 #include "third_party/blink/renderer/platform/wtf/forward.h"
 #include "third_party/blink/renderer/platform/wtf/hash_functions.h"
 #include "third_party/blink/renderer/platform/wtf/hash_table_deleted_value_type.h"
@@ -39,22 +38,47 @@
 
 namespace WTF {
 
+// A hash traits type is required for a type when the type is used as the key
+// or value of a HashTable-based classes. See documentation in
+// GenericHashTraitsBase for the HashTraits API.
+//
+// A hash traits type can be defined as
+// - a specialization of the HashTraits template, which will be automatically
+//   used, or
+// - a standalone hash traits type, which should be passed as the *Traits
+//   template parameters of HashTable-based classes.
+// The former is preferred if the hash traits defines the default hash behavior
+// of the type. The latter is suitable when a type has multiple hash behaviors,
+// e.g. CaseFoldingHashTraits defines an alternative hash behavior of strings.
+//
+// This file contains definitions of hash traits for integral types,
+// floating-point types, enums, raw and smart pointers, std::pair, etc.
+// These types can be used as hash key or value directly.
+//
+// This file also contains hash traits types that can be used as the base class
+// of hash traits of other types.
+//
+// A simple hash traits type for a key type can be like:
+//   template <>
+//   HashTraits<KeyType> : GenericHashTraits<KeyType> {
+//     static unsigned GetHash(const KeyType& key) { ...; }
+//     static KeyType EmptyValue() { ...; }
+//     static KeyType DeletedValue() { ...; }
+//   };
+//
+// A hash traits type for a value type can be even simpler. See documentation
+// in GenericHashTraitsBase for which functions/flags are for key types only
+// (i.e. not needed for a value type).
+//
 template <typename T>
 struct HashTraits;
 
 namespace internal {
 
-template <typename T, bool = IsTraceable<T>::value>
-struct ClearMemoryAtomicallyIfNeeded {
-  static void Clear(T* slot) { memset(static_cast<void*>(slot), 0, sizeof(T)); }
-};
-template <typename T>
-struct ClearMemoryAtomicallyIfNeeded<T, true> {
-  static void Clear(T* slot) { AtomicMemzero<sizeof(T), alignof(T)>(slot); }
-};
-
 template <typename T>
 struct GenericHashTraitsBase {
+  STATIC_ONLY(GenericHashTraitsBase);
+
   using TraitType = T;
 
   // Type for functions that do not take ownership, such as contains.
@@ -77,9 +101,11 @@ struct GenericHashTraitsBase {
   static const T& Peek(const T& value) { return value; }
 
   // Computes the hash code.
+  // This is for key types only.
   static unsigned GetHash(const T&) = delete;
 
   // Whether two values are equal. By default, operator== is used.
+  // This is for key types only.
   static bool Equal(const T& a, const T& b) { return a == b; }
 
   // When this is true, the hash table can optimize lookup operations by
@@ -91,6 +117,7 @@ struct GenericHashTraitsBase {
   // is an empty or a deleted value. When T is a pointer type, Equal(a, b) can
   // dereference a and b safely without checking if a or b is nullptr or an
   // invalid pointer that represents the deleted value.
+  // This is for key types only.
   static constexpr bool kSafeToCompareToEmptyOrDeleted = true;
 
   // Defines the empty value which is used to fill unused slots in the hash
@@ -121,19 +148,25 @@ struct GenericHashTraitsBase {
   // and ConstructDeletedValue() when the deleted value can be represented with
   // a value that can be safely and trivially compared/assigned to another
   // value.
+  // This is for key types only.
+  // NOTE: The destructor of the returned value *may not* be called, so the
+  // value should not own any dynamically allocated resources.
   static T DeletedValue() = delete;
 
   // Checks if a given value is a deleted value. If this is defined, the hash
   // table will call this function (through IsHashTraitsDeletedValue()) to check
   // if a slot is deleted. Otherwise `v == DeletedValue()` will be used.
+  // This is for key typess only.
   static bool IsDeletedValue(const T& v) = delete;
 
   // Constructs a deleted value in-place in the given memory space.
-  // |zero_value| is true if the memory has been filled with zero.
   // This must be defined if IsDeletedValue() is defined, and will be called
   // through ConstructHashTraitsDeletedValue(). Otherwise
   // `slot = DeletedValue()` will be used.
-  static void ConstructDeletedValue(T& slot, bool zero_value) = delete;
+  // This is for key types only.
+  // NOTE: The destructor of the constructed value *will not* be called, so the
+  // value should not own any dynamically allocated resources.
+  static void ConstructDeletedValue(T& slot) = delete;
 
   // The starting table size. Can be overridden when we know beforehand that a
   // hash table will have at least N entries.
@@ -175,7 +208,7 @@ struct GenericHashTraitsBase {
 template <typename T, auto empty_value, auto deleted_value>
 struct IntOrEnumHashTraits : internal::GenericHashTraitsBase<T> {
   static_assert(std::is_integral_v<T> || std::is_enum_v<T>);
-  static unsigned GetHash(T key) { return IntHash<T>::GetHash(key); }
+  static unsigned GetHash(T key) { return WTF::HashInt(key); }
   static constexpr bool kEmptyValueIsZero =
       static_cast<int64_t>(empty_value) == 0;
   static constexpr T EmptyValue() { return static_cast<T>(empty_value); }
@@ -218,6 +251,8 @@ struct GenericHashTraits<T, std::enable_if_t<std::is_enum_v<T>>>
 template <typename T>
 struct GenericHashTraits<T, std::enable_if_t<std::is_floating_point_v<T>>>
     : internal::GenericHashTraitsBase<T> {
+  static unsigned GetHash(T key) { return HashFloat(key); }
+  static bool Equal(T a, T b) { return FloatEqualForHash(a, b); }
   static constexpr T EmptyValue() { return std::numeric_limits<T>::infinity(); }
   static constexpr T DeletedValue() {
     return -std::numeric_limits<T>::infinity();
@@ -242,6 +277,7 @@ struct AlreadyHashedWithZeroKeyTraits : IntWithZeroKeyHashTraits<unsigned> {
 
 template <typename P>
 struct GenericHashTraits<P*> : internal::GenericHashTraitsBase<P*> {
+  static unsigned GetHash(P* key) { return HashPointer(key); }
   static constexpr bool kEmptyValueIsZero = true;
   static constexpr P* DeletedValue() { return reinterpret_cast<P*>(-1); }
 };
@@ -252,6 +288,17 @@ struct GenericHashTraits<scoped_refptr<P>>
   static_assert(sizeof(void*) == sizeof(scoped_refptr<P>),
                 "Unexpected RefPtr size."
                 " RefPtr needs to be single pointer to support deleted value.");
+
+  static unsigned GetHash(P* key) { return HashPointer(key); }
+  static unsigned GetHash(const scoped_refptr<P>& key) {
+    return GetHash(key.get());
+  }
+
+  static bool Equal(const scoped_refptr<P>& a, const scoped_refptr<P>& b) {
+    return a == b;
+  }
+  static bool Equal(P* a, const scoped_refptr<P>& b) { return a == b; }
+  static bool Equal(const scoped_refptr<P>& a, P* b) { return a == b; }
 
   class RefPtrValuePeeker {
     DISALLOW_NEW();
@@ -275,7 +322,7 @@ struct GenericHashTraits<scoped_refptr<P>>
            reinterpret_cast<const void*>(-1);
   }
 
-  static void ConstructDeletedValue(scoped_refptr<P>& slot, bool zero_value) {
+  static void ConstructDeletedValue(scoped_refptr<P>& slot) {
     *reinterpret_cast<void**>(&slot) = reinterpret_cast<void*>(-1);
   }
 
@@ -301,6 +348,21 @@ struct GenericHashTraits<scoped_refptr<P>>
 template <typename T>
 struct GenericHashTraits<std::unique_ptr<T>>
     : internal::GenericHashTraitsBase<std::unique_ptr<T>> {
+  static unsigned GetHash(T* key) { return HashPointer(key); }
+  static unsigned GetHash(const std::unique_ptr<T>& key) {
+    return GetHash(key.get());
+  }
+
+  static bool Equal(const std::unique_ptr<T>& a, const std::unique_ptr<T>& b) {
+    return a == b;
+  }
+  static bool Equal(const std::unique_ptr<T>& a, const T* b) {
+    return a.get() == b;
+  }
+  static bool Equal(const T* a, const std::unique_ptr<T>& b) {
+    return a == b.get();
+  }
+
   static constexpr bool kEmptyValueIsZero = true;
   static bool IsEmptyValue(const std::unique_ptr<T>& value) { return !value; }
 
@@ -315,7 +377,7 @@ struct GenericHashTraits<std::unique_ptr<T>>
     return value.get();
   }
 
-  static void ConstructDeletedValue(std::unique_ptr<T>& slot, bool) {
+  static void ConstructDeletedValue(std::unique_ptr<T>& slot) {
     // Dirty trick: implant an invalid pointer to unique_ptr. Destructor isn't
     // called for deleted buckets, so this is okay.
     new (NotNullTag::kNotNull, &slot)
@@ -356,7 +418,7 @@ struct SimpleClassHashTraits : GenericHashTraits<T> {
   struct NeedsToForbidGCOnMove {
     static constexpr bool value = false;
   };
-  static void ConstructDeletedValue(T& slot, bool) {
+  static void ConstructDeletedValue(T& slot) {
     new (NotNullTag::kNotNull, &slot) T(kHashTableDeletedValue);
   }
   static bool IsDeletedValue(const T& value) {
@@ -364,13 +426,9 @@ struct SimpleClassHashTraits : GenericHashTraits<T> {
   }
 };
 
+// Defined in string_hash.h.
 template <>
-struct HashTraits<String> : SimpleClassHashTraits<String> {
-  // Defined in string_hash.h.
-  static bool IsEmptyValue(const String&);
-  static bool IsDeletedValue(const String& value);
-  static void ConstructDeletedValue(String& slot, bool zero_value);
-};
+struct HashTraits<String>;
 
 namespace internal {
 
@@ -401,7 +459,7 @@ struct HashTraitsDeletedValueHelper {
     return value == Traits::DeletedValue();
   }
   template <typename T>
-  static void ConstructDeletedValue(T& slot, bool) {
+  static void ConstructDeletedValue(T& slot) {
     slot = Traits::DeletedValue();
   }
 };
@@ -419,8 +477,8 @@ struct HashTraitsDeletedValueHelper<
   // Traits must also define ConstructDeletedValue() if it defines
   // IsDeletedValue().
   template <typename T>
-  static void ConstructDeletedValue(T& slot, bool zero_value) {
-    Traits::ConstructDeletedValue(slot, zero_value);
+  static void ConstructDeletedValue(T& slot) {
+    Traits::ConstructDeletedValue(slot);
   }
 };
 
@@ -443,9 +501,8 @@ inline bool IsHashTraitsDeletedValue(const T& value) {
 // This function selects either the DeletedValue() function or the
 // ConstructDeletedValue() function to construct a deleted value.
 template <typename Traits, typename T>
-inline void ConstructHashTraitsDeletedValue(T& slot, bool zero_value) {
-  internal::HashTraitsDeletedValueHelper<Traits>::ConstructDeletedValue(
-      slot, zero_value);
+inline void ConstructHashTraitsDeletedValue(T& slot) {
+  internal::HashTraitsDeletedValueHelper<Traits>::ConstructDeletedValue(slot);
 }
 
 template <typename Traits, typename T>
@@ -454,24 +511,67 @@ inline bool IsHashTraitsEmptyOrDeletedValue(const T& value) {
          IsHashTraitsDeletedValue<Traits, T>(value);
 }
 
-namespace internal {
-
-template <template <typename, typename> typename T,
-          typename FirstTraits,
-          typename SecondTraits,
-          auto first_field,
-          auto second_field>
-struct PairHashTraitsBase
-    : GenericHashTraits<T<typename FirstTraits::TraitType,
-                          typename SecondTraits::TraitType>> {
-  using TraitType =
-      T<typename FirstTraits::TraitType, typename SecondTraits::TraitType>;
-
-  static unsigned GetHash(const TraitType& p) {
-    return HashInts(FirstTraits::GetHash(p.first),
-                    SecondTraits::GetHash(p.second));
+// A HashTraits type for T to delegate all HashTraits API to a field.
+template <typename T,
+          auto field,
+          typename FieldTraits = HashTraits<
+              std::remove_reference_t<decltype(std::declval<T>().*field)>>>
+struct OneFieldHashTraits : GenericHashTraits<T> {
+  using TraitType = T;
+  static unsigned GetHash(const T& p) { return FieldTraits::GetHash(p.*field); }
+  static bool Equal(const T& a, const T& b) {
+    return FieldTraits::Equal(a.*field, b.*field);
   }
-  static bool Equal(const TraitType& a, const TraitType& b) {
+  static constexpr bool kSafeToCompareToEmptyOrDeleted =
+      FieldTraits::kSafeToCompareToEmptyOrDeleted;
+
+  static constexpr bool kEmptyValueIsZero = FieldTraits::kEmptyValueIsZero;
+  static T EmptyValue() { return T(FieldTraits::EmptyValue()); }
+
+  static bool IsEmptyValue(const T& value) {
+    return IsHashTraitsEmptyValue<FieldTraits>(value.*field);
+  }
+
+  static void ConstructDeletedValue(T& slot) {
+    ConstructHashTraitsDeletedValue<FieldTraits>(slot.*field);
+  }
+  static bool IsDeletedValue(const T& value) {
+    return IsHashTraitsDeletedValue<FieldTraits>(value.*field);
+  }
+
+  static constexpr unsigned kMinimumTableSize = FieldTraits::kMinimumTableSize;
+
+  template <typename U = void>
+  struct IsTraceableInCollection {
+    static const bool value = IsTraceableInCollectionTrait<FieldTraits>::value;
+  };
+
+  template <typename U = void>
+  struct NeedsToForbidGCOnMove {
+    static const bool value =
+        FieldTraits::template NeedsToForbidGCOnMove<>::value;
+  };
+
+  static constexpr bool kCanTraceConcurrently =
+      FieldTraits::kCanTraceConcurrently;
+};
+
+// A HashTraits type for T to delegate all HashTraits API to two fields.
+template <
+    typename T,
+    auto first_field,
+    auto second_field,
+    typename FirstTraits = HashTraits<
+        std::remove_reference_t<decltype(std::declval<T>().*first_field)>>,
+    typename SecondTraits = HashTraits<
+        std::remove_reference_t<decltype(std::declval<T>().*second_field)>>>
+struct TwoFieldsHashTraits : OneFieldHashTraits<T, first_field, FirstTraits> {
+  using TraitType = T;
+  static unsigned GetHash(const T& p) {
+    return HashInts(FirstTraits::GetHash(p.*first_field),
+                    SecondTraits::GetHash(p.*second_field));
+  }
+  static bool Equal(const T& a, const T& b) {
     return FirstTraits::Equal(a.*first_field, b.*first_field) &&
            SecondTraits::Equal(a.*second_field, b.*second_field);
   }
@@ -481,34 +581,17 @@ struct PairHashTraitsBase
 
   static constexpr bool kEmptyValueIsZero =
       FirstTraits::kEmptyValueIsZero && SecondTraits::kEmptyValueIsZero;
-  static TraitType EmptyValue() {
-    return TraitType(FirstTraits::EmptyValue(), SecondTraits::EmptyValue());
+  static T EmptyValue() {
+    return T(FirstTraits::EmptyValue(), SecondTraits::EmptyValue());
   }
 
-  static bool IsEmptyValue(const TraitType& value) {
+  static bool IsEmptyValue(const T& value) {
     return IsHashTraitsEmptyValue<FirstTraits>(value.*first_field) &&
            IsHashTraitsEmptyValue<SecondTraits>(value.*second_field);
   }
 
-  static constexpr unsigned kMinimumTableSize = FirstTraits::kMinimumTableSize;
-
-  static void ConstructDeletedValue(TraitType& slot, bool zero_value) {
-    ConstructHashTraitsDeletedValue<FirstTraits>(slot.*first_field, zero_value);
-    // For GC collections the memory for the backing is zeroed when it is
-    // allocated, and the constructors may take advantage of that,
-    // especially if a GC occurs during insertion of an entry into the
-    // table. This slot is being marked deleted, but If the slot is reused
-    // at a later point, the same assumptions around memory zeroing must
-    // hold as they did at the initial allocation.  Therefore we zero the
-    // value part of the slot here for GC collections.
-    if (zero_value) {
-      internal::ClearMemoryAtomicallyIfNeeded<
-          typename SecondTraits::TraitType>::Clear(&(slot.*second_field));
-    }
-  }
-  static bool IsDeletedValue(const TraitType& value) {
-    return IsHashTraitsDeletedValue<FirstTraits>(value.*first_field);
-  }
+  // ConstructDeletedValue(), IsDeletedValue(), kMinimumTableSize delegate to
+  // the first field, inherited from OneFieldHashTraits.
 
   template <typename U = void>
   struct IsTraceableInCollection {
@@ -533,17 +616,15 @@ struct PairHashTraitsBase
        !IsTraceable<typename SecondTraits::TraitType>::value);
 };
 
-}  // namespace internal
-
 template <typename FirstTraitsArg,
           typename SecondTraitsArg,
           typename P = std::pair<typename FirstTraitsArg::TraitType,
                                  typename SecondTraitsArg::TraitType>>
-struct PairHashTraits : internal::PairHashTraitsBase<std::pair,
-                                                     FirstTraitsArg,
-                                                     SecondTraitsArg,
-                                                     &P::first,
-                                                     &P::second> {
+struct PairHashTraits : TwoFieldsHashTraits<P,
+                                            &P::first,
+                                            &P::second,
+                                            FirstTraitsArg,
+                                            SecondTraitsArg> {
   using TraitType = P;
   using FirstTraits = FirstTraitsArg;
   using SecondTraits = SecondTraitsArg;
@@ -553,82 +634,13 @@ template <typename First, typename Second>
 struct HashTraits<std::pair<First, Second>>
     : public PairHashTraits<HashTraits<First>, HashTraits<Second>> {};
 
-template <typename KeyTypeArg, typename ValueTypeArg>
-struct KeyValuePair {
-  typedef KeyTypeArg KeyType;
-
-  template <typename IncomingKeyType, typename IncomingValueType>
-  KeyValuePair(IncomingKeyType&& key, IncomingValueType&& value)
-      : key(std::forward<IncomingKeyType>(key)),
-        value(std::forward<IncomingValueType>(value)) {}
-
-  template <typename OtherKeyType, typename OtherValueType>
-  KeyValuePair(KeyValuePair<OtherKeyType, OtherValueType>&& other)
-      : key(std::move(other.key)), value(std::move(other.value)) {}
-
-  KeyTypeArg key;
-  ValueTypeArg value;
-};
-
-template <typename K, typename V>
-struct IsWeak<KeyValuePair<K, V>>
-    : std::integral_constant<bool, IsWeak<K>::value || IsWeak<V>::value> {};
-
-template <typename KeyTraitsArg,
-          typename ValueTraitsArg,
-          typename P = KeyValuePair<typename KeyTraitsArg::TraitType,
-                                    typename ValueTraitsArg::TraitType>>
-struct KeyValuePairHashTraits : internal::PairHashTraitsBase<KeyValuePair,
-                                                             KeyTraitsArg,
-                                                             ValueTraitsArg,
-                                                             &P::key,
-                                                             &P::value> {
-  using TraitType = P;
-  using KeyTraits = KeyTraitsArg;
-  using ValueTraits = ValueTraitsArg;
-};
-
-template <typename Key, typename Value>
-struct HashTraits<KeyValuePair<Key, Value>>
-    : public KeyValuePairHashTraits<HashTraits<Key>, HashTraits<Value>> {};
-
-// Temporary adapters during combining HashFunctions and HashTraits.
-template <typename HashFunctions, typename KeyTraits, typename Enable = void>
-struct CombinedHashTraits : HashFunctions, KeyTraits {
-  using HashFunctions::Equal;
-  using HashFunctions::GetHash;
-  // Note the name change.
-  static constexpr bool kSafeToCompareToEmptyOrDeleted =
-      HashFunctions::safe_to_compare_to_empty_or_deleted;
-};
-// If HashFunctions is not explicitly defined, we assume KeyTraits is already a
-// full hash traits type.
-template <typename HashFunctions, typename KeyTraits>
-struct CombinedHashTraits<HashFunctions,
-                          KeyTraits,
-                          std::void_t<typename HashFunctions::Undefined>>
-    : KeyTraits {};
-template <typename Key, typename Enable = void>
-struct DefaultHashAndTraits
-    : CombinedHashTraits<DefaultHash<Key>, HashTraits<Key>> {};
-// Use HashFunctions + HashTraits<Key> if the second argument (i.e. the third
-// argument of HashMap) is a legacy hash functions type.
-template <typename Key, typename HashFunctions, typename Enable = void>
-struct HashTraitsAdapter : CombinedHashTraits<HashFunctions, HashTraits<Key>> {
-};
-// Use KeyTraits if it's already a full hash traits type.
-template <typename Key, typename KeyTraits>
-struct HashTraitsAdapter<Key,
-                         KeyTraits,
-                         std::void_t<typename KeyTraits::TraitType>>
-    : KeyTraits {};
+// Shortcut of HashTraits<T>::GetHash(), which can deduct T automatically.
+template <typename T>
+unsigned GetHash(const T& key) {
+  return HashTraits<T>::GetHash(key);
+}
 
 }  // namespace WTF
-
-// Temporary hash traits adapters.
-using WTF::CombinedHashTraits;
-using WTF::DefaultHashAndTraits;
-using WTF::HashTraitsAdapter;
 
 using WTF::AlreadyHashedTraits;
 using WTF::AlreadyHashedWithZeroKeyTraits;
@@ -637,7 +649,9 @@ using WTF::GenericHashTraits;
 using WTF::HashTraits;
 using WTF::IntHashTraits;
 using WTF::IntWithZeroKeyHashTraits;
+using WTF::OneFieldHashTraits;
 using WTF::PairHashTraits;
 using WTF::SimpleClassHashTraits;
+using WTF::TwoFieldsHashTraits;
 
 #endif  // THIRD_PARTY_BLINK_RENDERER_PLATFORM_WTF_HASH_TRAITS_H_

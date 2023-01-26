@@ -21,6 +21,11 @@ const char kAppStoreRatingDescription[] =
     "When enabled, App Store Rating promo will be presented to eligible "
     "users.";
 
+const char kAutofillAccountProfilesUnionViewName[] =
+    "Enable compatibility with GAS";
+const char kAutofillAccountProfilesUnionViewDescription[] =
+    "When enabled, the GAS profiles would start up showing in settings";
+
 const char kAutofillBrandingIOSName[] = "Autofill Branding on iOS";
 const char kAutofillBrandingIOSDescription[] =
     "Adds the Chrome logo in the form input suggestions bar. Full color by "
@@ -236,6 +241,11 @@ const char kDetectMainThreadFreezeDescription[] =
     "A crash report will be uploaded if the main thread is frozen more than "
     "the time specified by this flag.";
 
+const char kEnableAccessibilityIdentifierToOmniboxLeadingImageName[] =
+    "Enable accessibility identifier leading image";
+const char kEnableAccessibilityIdentifierToOmniboxLeadingImageDescription[] =
+    "Enable accessibility identifier to Omnibox leading image";
+
 const char kEnableDiscoverFeedTopSyncPromoName[] =
     "Enable the sync promo on top of the feed.";
 const char kEnableDiscoverFeedTopSyncPromoDescription[] =
@@ -281,6 +291,11 @@ const char kEnableDiscoverFeedDiscoFeedEndpointName[] =
 const char kEnableDiscoverFeedDiscoFeedEndpointDescription[] =
     "Enable using the discofeed endpoint for the discover feed.";
 
+const char kHideMVTAndShortcutsForNewUsersName[] =
+    "Enable hiding the Most Visited Tiles and Shortcuts";
+const char kHideMVTAndShortcutsForNewUsersDescription[] =
+    "Enable hiding the Most Visited Tiles and Shortcuts for new users";
+
 const char kEnableFeedAblationName[] = "Enables Feed Ablation";
 const char kEnableFeedAblationDescription[] =
     "If Enabled the Feed will be removed from the NTP";
@@ -300,11 +315,6 @@ const char kEnableFeedCardMenuSignInPromoDescription[] =
 const char kEnableFullscreenAPIName[] = "Enable Fullscreen API";
 const char kEnableFullscreenAPIDescription[] =
     "Enable the Fullscreen API for web content (iOS 16.0+).";
-
-const char kEnableNewBookmarksImplementationName[] =
-    "Enable New Bookmarks Implementation";
-const char kEnableNewBookmarksImplementationDescription[] =
-    "Enable the new bookmarks implementation with coordinators";
 
 const char kPasswordsGroupingName[] =
     "Enable password grouping for the Password Manager";
@@ -604,6 +614,18 @@ const char kOmniboxOnFocusSuggestionsDescription[] =
     "before the user has typed any input. This provides overrides for the "
     "default suggestion locations.";
 
+const char kOmniboxReportAssistedQueryStatsName[] =
+    "Omnibox Assisted Query Stats param";
+const char kOmniboxReportAssistedQueryStatsDescription[] =
+    "Enables reporting the Assisted Query Stats param in search destination "
+    "URLs originated from the Omnibox.";
+
+const char kOmniboxReportSearchboxStatsName[] =
+    "Omnibox Searchbox Stats proto param";
+const char kOmniboxReportSearchboxStatsDescription[] =
+    "Enables reporting the serialized Searchbox Stats proto param in search "
+    "destination URLs originated from the Omnibox.";
+
 const char kOmniboxUIMaxAutocompleteMatchesName[] =
     "Omnibox UI Max Autocomplete Matches";
 const char kOmniboxUIMaxAutocompleteMatchesDescription[] =
@@ -839,6 +861,12 @@ const char kEnableLensInNTPDescription[] =
     "menu when Google is the selected search engine, accessible from the"
     "new tab page.";
 
+const char kEnableLensContextMenuAltTextName[] =
+    "Enable alternate text for Google Lens in Context Menu";
+const char kEnableLensContextMenuAltTextDescription[] =
+    "When enabled, use the alternate text for the search image with Google "
+    "Lens context menu string.";
+
 const char kEnableLensInOmniboxCopiedImageName[] =
     "Enable Google Lens in the Omnibox for Copied Images";
 const char kEnableLensInOmniboxCopiedImageDescription[] =
@@ -849,6 +877,15 @@ const char kEnableLensInOmniboxCopiedImageDescription[] =
 const char kTabGridRecencySortName[] = "Change TabGrid sorting";
 const char kTabGridRecencySortDescription[] =
     "When enabled, the tabs in the Tab Grid are sorted differently.";
+
+const char kTabStripContextMenuName[] = "Tab Strip Context Menu";
+const char kTabStripContextMenuDescription[] =
+    "Add context menu to tab strip items.";
+
+const char kTabInactivityThresholdName[] = "Change Tab inactivity threshold";
+const char kTabInactivityThresholdDescription[] =
+    "When enabled, the tabs older than the threshold are considered inactive "
+    "and set aside in the Inactive Tabs section of the TabGrid.";
 
 const char kUseLoadSimulatedRequestForOfflinePageName[] =
     "Use loadSimulatedRequest:responseHTMLString: when displaying offline "

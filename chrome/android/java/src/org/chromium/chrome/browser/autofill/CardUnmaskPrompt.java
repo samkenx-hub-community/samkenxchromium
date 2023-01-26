@@ -42,6 +42,7 @@ import org.chromium.ui.modaldialog.DialogDismissalCause;
 import org.chromium.ui.modaldialog.ModalDialogManager;
 import org.chromium.ui.modaldialog.ModalDialogProperties;
 import org.chromium.ui.modelutil.PropertyModel;
+import org.chromium.ui.widget.ChromeImageView;
 
 import java.util.Calendar;
 
@@ -146,7 +147,8 @@ public class CardUnmaskPrompt
     }
 
     public CardUnmaskPrompt(Context context, CardUnmaskPromptDelegate delegate, String title,
-            String instructions, String confirmButtonLabel, int cvcDrawableId,
+            String instructions, int cardIconId, String cardName, String cardLastFourDigits,
+            String cardExpiration, String confirmButtonLabel, int cvcDrawableId,
             int googlePayDrawableId, boolean isVirtualCard, boolean shouldRequestExpirationDate,
             boolean shouldOfferWebauthn, boolean defaultUseScreenlockChecked,
             long successMessageDurationMilliseconds) {
@@ -158,6 +160,16 @@ public class CardUnmaskPrompt
         if (ChromeFeatureList.isEnabled(
                     ChromeFeatureList.AUTOFILL_TOUCH_TO_FILL_FOR_CREDIT_CARDS_ANDROID)) {
             mMainView = inflater.inflate(R.layout.autofill_card_unmask_prompt_new, null);
+
+            // Populate card details.
+            if (cardIconId != 0) {
+                ChromeImageView cardIconView =
+                        (ChromeImageView) mMainView.findViewById(R.id.card_icon);
+                cardIconView.setImageDrawable(context.getDrawable(cardIconId));
+            }
+            ((TextView) mMainView.findViewById(R.id.card_name)).setText(cardName);
+            ((TextView) mMainView.findViewById(R.id.card_last_four)).setText(cardLastFourDigits);
+            ((TextView) mMainView.findViewById(R.id.card_expiration)).setText(cardExpiration);
         } else {
             mMainView = inflater.inflate(R.layout.autofill_card_unmask_prompt, null);
         }

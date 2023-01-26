@@ -16,6 +16,9 @@
 #include "ash/public/cpp/session/session_observer.h"
 #include "ash/public/cpp/shelf_types.h"
 #include "ash/public/cpp/system_sounds_delegate.h"
+#include "ash/system/input_device_settings/input_device_settings_controller_impl.h"
+#include "ash/system/input_device_settings/input_device_tracker.h"
+#include "ash/system/input_device_settings/keyboard_modifier_metrics_recorder.h"
 #include "ash/wm/system_modal_container_event_filter_delegate.h"
 #include "base/gtest_prod_util.h"
 #include "base/memory/weak_ptr.h"
@@ -143,7 +146,6 @@ class FullscreenMagnifierController;
 class GeolocationController;
 class GlanceablesController;
 class ColorEnhancementController;
-class HighlighterController;
 class HoldingSpaceController;
 class HumanPresenceOrientationController;
 class ImeControllerImpl;
@@ -168,6 +170,7 @@ class MicrophonePrivacySwitchController;
 class MouseCursorEventFilter;
 class MruWindowTracker;
 class MultiDeviceNotificationPresenter;
+class MultiDisplayMetricsController;
 class MultitaskMenuNudgeController;
 class NearbyShareControllerImpl;
 class NearbyShareDelegate;
@@ -476,6 +479,10 @@ class ASH_EXPORT Shell : public SessionObserver,
   EventRewriterControllerImpl* event_rewriter_controller() {
     return event_rewriter_controller_.get();
   }
+  InputDeviceSettingsControllerImpl* input_device_settings_controller() {
+    return input_device_settings_controller_.get();
+  }
+
   EventClientImpl* event_client() { return event_client_.get(); }
   EventTransformationHandler* event_transformation_handler() {
     return event_transformation_handler_.get();
@@ -502,9 +509,6 @@ class ASH_EXPORT Shell : public SessionObserver,
   }
   GlanceablesController* glanceables_controller() {
     return glanceables_controller_.get();
-  }
-  HighlighterController* highlighter_controller() {
-    return highlighter_controller_.get();
   }
   ColorEnhancementController* color_enhancement_controller() {
     return color_enhancement_controller_.get();
@@ -533,6 +537,9 @@ class ASH_EXPORT Shell : public SessionObserver,
   }
   KeyboardControllerImpl* keyboard_controller() {
     return keyboard_controller_.get();
+  }
+  KeyboardModifierMetricsRecorder* keyboard_modifier_metrics_recorder() {
+    return keyboard_modifier_metrics_recorder_.get();
   }
   LaserPointerController* laser_pointer_controller() {
     return laser_pointer_controller_.get();
@@ -563,6 +570,9 @@ class ASH_EXPORT Shell : public SessionObserver,
     return mouse_cursor_filter_.get();
   }
   MruWindowTracker* mru_window_tracker() { return mru_window_tracker_.get(); }
+  MultiDisplayMetricsController* multi_display_metrics_controller() {
+    return multi_display_metrics_controller_.get();
+  }
   MultitaskMenuNudgeController* multitask_menu_nudge_controller() {
     return multitask_menu_nudge_controller_.get();
   }
@@ -850,7 +860,12 @@ class ASH_EXPORT Shell : public SessionObserver,
   std::unique_ptr<::wm::CompoundEventFilter> env_filter_;
 
   std::unique_ptr<EventRewriterControllerImpl> event_rewriter_controller_;
+  std::unique_ptr<InputDeviceSettingsControllerImpl>
+      input_device_settings_controller_;
 
+  std::unique_ptr<InputDeviceTracker> input_device_tracker_;
+  std::unique_ptr<KeyboardModifierMetricsRecorder>
+      keyboard_modifier_metrics_recorder_;
   std::unique_ptr<UserMetricsRecorder> user_metrics_recorder_;
   std::unique_ptr<WindowPositioner> window_positioner_;
 
@@ -921,6 +936,8 @@ class ASH_EXPORT Shell : public SessionObserver,
   std::unique_ptr<MicrophonePrivacySwitchController>
       microphone_privacy_switch_controller_;
   std::unique_ptr<MruWindowTracker> mru_window_tracker_;
+  std::unique_ptr<MultiDisplayMetricsController>
+      multi_display_metrics_controller_;
   std::unique_ptr<MultiDeviceNotificationPresenter>
       multidevice_notification_presenter_;
   std::unique_ptr<MultitaskMenuNudgeController>
@@ -1058,7 +1075,6 @@ class ASH_EXPORT Shell : public SessionObserver,
   std::unique_ptr<ui::EventHandler> speech_feedback_handler_;
   std::unique_ptr<LaserPointerController> laser_pointer_controller_;
   std::unique_ptr<PartialMagnifierController> partial_magnifier_controller_;
-  std::unique_ptr<HighlighterController> highlighter_controller_;
 
   std::unique_ptr<DockedMagnifierController> docked_magnifier_controller_;
 

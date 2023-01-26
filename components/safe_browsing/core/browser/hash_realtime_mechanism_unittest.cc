@@ -7,6 +7,7 @@
 #include "base/containers/contains.h"
 #include "base/functional/bind.h"
 #include "base/task/sequenced_task_runner.h"
+#include "base/test/metrics/histogram_tester.h"
 #include "base/test/mock_callback.h"
 #include "base/test/task_environment.h"
 #include "components/safe_browsing/core/browser/db/test_database_manager.h"
@@ -28,7 +29,10 @@ namespace {
 class MockHashRealTimeService : public HashRealTimeService {
  public:
   MockHashRealTimeService()
-      : HashRealTimeService(/*url_loader_factory=*/nullptr) {}
+      : HashRealTimeService(
+            /*url_loader_factory=*/nullptr,
+            /*cache_manager=*/nullptr,
+            /*get_is_enhanced_protection_enabled=*/base::NullCallback()) {}
   base::WeakPtr<MockHashRealTimeService> GetWeakPtr() {
     return weak_factory_.GetWeakPtr();
   }
@@ -120,7 +124,9 @@ class MockSafeBrowsingDatabaseManager : public TestSafeBrowsingDatabaseManager {
   // Returns the allowlist match result previously set by
   // |SetAllowlistResultForUrl|. It crashes if the allowlist match result for
   // the |gurl| is not set in advance.
-  bool CheckUrlForHighConfidenceAllowlist(const GURL& gurl) override {
+  bool CheckUrlForHighConfidenceAllowlist(
+      const GURL& gurl,
+      const std::string& metric_variation) override {
     std::string url = gurl.spec();
     DCHECK(base::Contains(urls_allowlist_match_, url));
     return urls_allowlist_match_[url];
@@ -201,16 +207,73 @@ class HashRealTimeMechanismTest : public PlatformTest {
         hash_rt_service_->GetWeakPtr());
   }
 
+  void CheckHashRealTimeMetrics(
+      absl::optional<bool> expected_local_match_result,
+      absl::optional<bool> expected_is_service_available) {
+    if (!expected_local_match_result.has_value()) {
+      histogram_tester_->ExpectTotalCount(
+          /*name=*/"SafeBrowsing.HPRT.LocalMatch.Result", /*expected_count=*/0);
+    } else {
+      histogram_tester_->ExpectUniqueSample(
+          /*name=*/"SafeBrowsing.HPRT.LocalMatch.Result",
+          /*sample=*/expected_local_match_result.value() ? AsyncMatch::MATCH
+                                                         : AsyncMatch::NO_MATCH,
+          /*expected_bucket_count=*/1);
+    }
+    if (!expected_is_service_available.has_value()) {
+      histogram_tester_->ExpectTotalCount(
+          /*name=*/"SafeBrowsing.HPRT.IsLookupServiceAvailable",
+          /*expected_count=*/0);
+    } else {
+      histogram_tester_->ExpectUniqueSample(
+          /*name=*/"SafeBrowsing.HPRT.IsLookupServiceAvailable",
+          /*sample=*/expected_is_service_available.value(),
+          /*expected_bucket_count=*/1);
+    }
+  }
+
  protected:
   base::test::TaskEnvironment task_environment_;
   scoped_refptr<MockSafeBrowsingDatabaseManager> database_manager_;
   std::unique_ptr<MockHashRealTimeService> hash_rt_service_;
+  std::unique_ptr<base::HistogramTester> histogram_tester_ =
+      std::make_unique<base::HistogramTester>();
 };
 
 MATCHER_P2(Matches, url, threat_type, "") {
   return arg->url.spec() == url.spec() && arg->threat_type == threat_type &&
          !arg->is_from_url_real_time_check &&
          arg->url_real_time_lookup_response == nullptr;
+}
+
+TEST_F(HashRealTimeMechanismTest, CanCheckUrl_HashRealTime) {
+  auto can_check_url =
+      [](std::string url,
+         network::mojom::RequestDestination request_destination =
+             network::mojom::RequestDestination::kDocument) {
+        EXPECT_TRUE(GURL(url).is_valid());
+        return HashRealTimeMechanism::CanCheckUrl(GURL(url),
+                                                  request_destination);
+      };
+  // Yes: HTTPS and main-frame URL.
+  EXPECT_TRUE(can_check_url("https://example.test/path"));
+  // Yes: HTTP and main-frame URL.
+  EXPECT_TRUE(can_check_url("http://example.test/path"));
+  // No: It's not a mainframe URL.
+  EXPECT_FALSE(can_check_url("https://example.test/path",
+                             network::mojom::RequestDestination::kFrame));
+  // No: The URL scheme is not HTTP/HTTPS.
+  EXPECT_FALSE(can_check_url("ftp://example.test/path"));
+  // No: It's localhost.
+  EXPECT_FALSE(can_check_url("http://localhost/path"));
+  // No: The host is an IP address, but is not publicly routable.
+  EXPECT_FALSE(can_check_url("http://0.0.0.0"));
+  // Yes: The host is an IP address and is publicly routable.
+  EXPECT_TRUE(can_check_url("http://1.0.0.0"));
+  // No: Hostname does not have at least 1 dot.
+  EXPECT_FALSE(can_check_url("https://example/path"));
+  // No: Hostname does not have at least 3 characters.
+  EXPECT_FALSE(can_check_url("https://e./path"));
 }
 
 TEST_F(HashRealTimeMechanismTest, CheckUrl_HashRealTime_CantCheckDb) {
@@ -224,6 +287,8 @@ TEST_F(HashRealTimeMechanismTest, CheckUrl_HashRealTime_CantCheckDb) {
   EXPECT_EQ(result.is_safe_synchronously, true);
 
   task_environment_.RunUntilIdle();
+  CheckHashRealTimeMetrics(/*expected_local_match_result=*/absl::nullopt,
+                           /*expected_is_service_available=*/absl::nullopt);
 }
 
 TEST_F(HashRealTimeMechanismTest, CheckUrl_HashRealTime_AllowlistMatchSafe) {
@@ -240,6 +305,8 @@ TEST_F(HashRealTimeMechanismTest, CheckUrl_HashRealTime_AllowlistMatchSafe) {
 
   EXPECT_CALL(callback, Run(Matches(url, SB_THREAT_TYPE_SAFE))).Times(1);
   task_environment_.RunUntilIdle();
+  CheckHashRealTimeMetrics(/*expected_local_match_result=*/true,
+                           /*expected_is_service_available=*/absl::nullopt);
 }
 
 TEST_F(HashRealTimeMechanismTest, CheckUrl_HashRealTime_AllowlistMatchUnsafe) {
@@ -257,6 +324,8 @@ TEST_F(HashRealTimeMechanismTest, CheckUrl_HashRealTime_AllowlistMatchUnsafe) {
   EXPECT_CALL(callback, Run(Matches(url, SB_THREAT_TYPE_URL_PHISHING)))
       .Times(1);
   task_environment_.RunUntilIdle();
+  CheckHashRealTimeMetrics(/*expected_local_match_result=*/true,
+                           /*expected_is_service_available=*/absl::nullopt);
 }
 
 TEST_F(HashRealTimeMechanismTest, CheckUrl_HashRealTime_SafeLookup) {
@@ -273,6 +342,8 @@ TEST_F(HashRealTimeMechanismTest, CheckUrl_HashRealTime_SafeLookup) {
 
   EXPECT_CALL(callback, Run(Matches(url, SB_THREAT_TYPE_SAFE))).Times(1);
   task_environment_.RunUntilIdle();
+  CheckHashRealTimeMetrics(/*expected_local_match_result=*/false,
+                           /*expected_is_service_available=*/true);
 }
 
 TEST_F(HashRealTimeMechanismTest, CheckUrl_HashRealTime_UnsafeLookup) {
@@ -290,6 +361,8 @@ TEST_F(HashRealTimeMechanismTest, CheckUrl_HashRealTime_UnsafeLookup) {
   EXPECT_CALL(callback, Run(Matches(url, SB_THREAT_TYPE_URL_PHISHING)))
       .Times(1);
   task_environment_.RunUntilIdle();
+  CheckHashRealTimeMetrics(/*expected_local_match_result=*/false,
+                           /*expected_is_service_available=*/true);
 }
 
 TEST_F(HashRealTimeMechanismTest, CheckUrl_HashRealTime_BackoffMode) {
@@ -308,6 +381,8 @@ TEST_F(HashRealTimeMechanismTest, CheckUrl_HashRealTime_BackoffMode) {
   EXPECT_CALL(callback, Run(Matches(url, SB_THREAT_TYPE_URL_PHISHING)))
       .Times(1);
   task_environment_.RunUntilIdle();
+  CheckHashRealTimeMetrics(/*expected_local_match_result=*/false,
+                           /*expected_is_service_available=*/false);
 }
 
 TEST_F(HashRealTimeMechanismTest, CheckUrl_HashRealTime_UnsuccessfulLookup) {
@@ -327,6 +402,8 @@ TEST_F(HashRealTimeMechanismTest, CheckUrl_HashRealTime_UnsuccessfulLookup) {
   EXPECT_CALL(callback, Run(Matches(url, SB_THREAT_TYPE_URL_PHISHING)))
       .Times(1);
   task_environment_.RunUntilIdle();
+  CheckHashRealTimeMetrics(/*expected_local_match_result=*/false,
+                           /*expected_is_service_available=*/true);
 }
 
 }  // namespace safe_browsing

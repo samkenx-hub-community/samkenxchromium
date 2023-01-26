@@ -80,8 +80,17 @@ class PowerBookmarkBackend : public PowerBookmarkSyncBridge::Delegate {
   std::vector<std::unique_ptr<Power>> GetPowersForGUIDs(
       const std::vector<std::string>& guids) override;
   std::unique_ptr<Power> GetPowerForGUID(const std::string& guid) override;
+  bool CreateOrMergePowerFromSync(const Power& power) override;
+  bool DeletePowerFromSync(const std::string& guid) override;
+  syncer::SyncMetadataStore* GetSyncMetadataDatabase() override;
+  std::unique_ptr<Transaction> BeginTransaction() override;
+  void NotifyPowersChanged() override;
 
  private:
+  // Commit the change. If success then notify the observer, otherwise report
+  // error to sync.
+  bool CommitAndNotify(Transaction& transaction);
+
   const base::FilePath database_dir_;
 
   std::unique_ptr<PowerBookmarkDatabase> db_
@@ -95,7 +104,7 @@ class PowerBookmarkBackend : public PowerBookmarkSyncBridge::Delegate {
 
   // Observer that serves the frontend of power bookmarks.
   // Needs to be called on the frontend task runner.
-  raw_ptr<PowerBookmarkObserver> service_observer_;
+  raw_ptr<PowerBookmarkObserver, DanglingUntriaged> service_observer_;
 
   SEQUENCE_CHECKER(sequence_checker_);
 };

@@ -2105,6 +2105,7 @@ static_library("browser") {
     "//components/dom_distiller/content/browser",
     "//components/dom_distiller/content/common/mojom",
     "//components/domain_reliability",
+    "//components/domain_reliability:prefs",
     "//components/download/content/factory",
     "//components/download/content/public",
     "//components/download/database",
@@ -2262,6 +2263,7 @@ static_library("browser") {
     "//components/safe_browsing/core/browser:safe_browsing_metrics_collector",
     "//components/safe_browsing/core/browser:verdict_cache_manager",
     "//components/safe_browsing/core/browser/db:database_manager",
+    "//components/safe_browsing/core/browser/hashprefix_realtime:hash_realtime_service",
     "//components/safe_browsing/core/browser/password_protection:password_protection_metrics_util",
     "//components/safe_browsing/core/browser/realtime:policy_engine",
     "//components/safe_browsing/core/browser/realtime:url_lookup_service",
@@ -3326,7 +3328,6 @@ static_library("browser") {
       "//chrome/browser/sync/android:jni_headers",
       "//chrome/browser/tab:jni_headers",
       "//chrome/browser/touch_to_fill/payments/android:public",
-      "//chrome/browser/ui:adaptive_toolbar_enums_java",
       "//chrome/browser/ui/android/layouts:android",
       "//chrome/browser/ui/webui/feed_internals:mojo_bindings",
       "//chrome/browser/usb/android:jni_headers",
@@ -3484,12 +3485,6 @@ static_library("browser") {
       "accessibility/caption_bubble_context_browser.h",
       "accessibility/invert_bubble_prefs.cc",
       "accessibility/invert_bubble_prefs.h",
-      "accessibility/live_caption_controller_factory.cc",
-      "accessibility/live_caption_controller_factory.h",
-      "accessibility/live_caption_speech_recognition_host.cc",
-      "accessibility/live_caption_speech_recognition_host.h",
-      "accessibility/live_caption_unavailability_notifier.cc",
-      "accessibility/live_caption_unavailability_notifier.h",
       "accessibility/live_translate_controller_factory.cc",
       "accessibility/live_translate_controller_factory.h",
       "apps/intent_helper/apps_navigation_throttle.cc",
@@ -4544,6 +4539,23 @@ static_library("browser") {
         "//chrome/browser/enterprise/connectors/device_trust/key_management/browser",
       ]
     }
+
+    if (!is_chromeos_lacros) {
+      sources += [
+        "accessibility/live_caption_controller_factory.cc",
+        "accessibility/live_caption_controller_factory.h",
+        "accessibility/live_caption_speech_recognition_host.cc",
+        "accessibility/live_caption_speech_recognition_host.h",
+      ]
+    }
+
+    if (is_win) {
+      sources += [
+        "accessibility/live_caption_unavailability_notifier.cc",
+        "accessibility/live_caption_unavailability_notifier.h",
+      ]
+    }
+
     if (enable_extensions) {
       deps += [
         "//extensions/browser",
@@ -4603,6 +4615,8 @@ static_library("browser") {
   if (is_chromeos_ash) {
     assert(enable_system_notifications)
     sources += [
+      "apps/app_deduplication_service/app_deduplication_cache.cc",
+      "apps/app_deduplication_service/app_deduplication_cache.h",
       "apps/app_deduplication_service/app_deduplication_mapper.cc",
       "apps/app_deduplication_service/app_deduplication_mapper.h",
       "apps/app_deduplication_service/app_deduplication_server_connector.cc",
@@ -5239,6 +5253,8 @@ static_library("browser") {
   if (is_chromeos_lacros) {
     assert(enable_system_notifications)
     sources += [
+      "accessibility/live_caption_surface.cc",
+      "accessibility/live_caption_surface.h",
       "apps/digital_goods/digital_goods_factory_stub.cc",
       "apps/digital_goods/digital_goods_factory_stub.h",
       "apps/digital_goods/digital_goods_lacros.cc",
@@ -5349,6 +5365,7 @@ static_library("browser") {
       "lacros/screen_orientation_delegate_lacros.h",
       "lacros/standalone_browser_test_controller.cc",
       "lacros/standalone_browser_test_controller.h",
+      "lacros/sync/crosapi_session_sync_notifier.h",
       "lacros/sync/sync_crosapi_manager_lacros.cc",
       "lacros/sync/sync_crosapi_manager_lacros.h",
       "lacros/sync/sync_explicit_passphrase_client_lacros.cc",
@@ -7484,6 +7501,10 @@ static_library("browser") {
           "//device/vr/android/arcore",
         ]
       }
+
+      if (enable_cardboard) {
+        deps += [ "//device/vr/android/cardboard:vr_cardboard" ]
+      }
     } else {
       deps += [ "//device/vr/public/mojom:isolated_xr_service" ]
     }
@@ -7553,6 +7574,8 @@ static_library("browser") {
 
   if (build_with_tflite_lib) {
     sources += [
+      "autocomplete/autocomplete_scoring_model_service_factory.cc",
+      "autocomplete/autocomplete_scoring_model_service_factory.h",
       "permissions/prediction_model_handler_provider_factory.cc",
       "permissions/prediction_model_handler_provider_factory.h",
     ]
@@ -7683,8 +7706,6 @@ grit("resources") {
 
   deps = [
     ":chrome_internal_resources_gen",
-    "//device/bluetooth/public/mojom:deprecated_experimental_interfaces_js",
-    "//device/bluetooth/public/mojom:mojom_js",
     "//url/mojom:url_mojom_gurl_js",
     "//url/mojom:url_mojom_origin_js",
   ]
@@ -7702,7 +7723,10 @@ grit("resources") {
   }
 
   if (is_android) {
-    deps += [ "//chrome/browser/resources/offline_pages:build_ts" ]
+    deps += [
+      "//chrome/browser/resources/offline_pages:build_ts",
+      "//chrome/browser/resources/video_tutorials:build_ts",
+    ]
   }
   if (!is_android) {
     deps += [
@@ -7735,7 +7759,6 @@ grit("resources") {
       "//chrome/browser/ui/webui/ash/crostini_upgrader:mojo_bindings_js",
       "//chrome/browser/ui/webui/ash/parent_access:mojo_bindings_js",
       "//chrome/browser/ui/webui/ash/vm:mojo_bindings_js__generator",
-      "//chrome/browser/ui/webui/settings/ash:mojom_js",
     ]
   }
 
@@ -7994,60 +8017,6 @@ static_library("test_support") {
 
   if (is_chromeos_ash) {
     sources += [
-      "ash/accessibility/caret_bounds_changed_waiter.cc",
-      "ash/accessibility/caret_bounds_changed_waiter.h",
-      "ash/accessibility/html_test_utils.cc",
-      "ash/accessibility/html_test_utils.h",
-      "ash/accessibility/service/fake_accessibility_service.cc",
-      "ash/accessibility/service/fake_accessibility_service.h",
-      "ash/app_list/test/chrome_app_list_test_support.cc",
-      "ash/app_list/test/chrome_app_list_test_support.h",
-      "ash/app_list/test/test_app_list_controller.cc",
-      "ash/app_list/test/test_app_list_controller.h",
-      "ash/app_list/test/test_app_list_controller_delegate.cc",
-      "ash/app_list/test/test_app_list_controller_delegate.h",
-      "ash/app_mode/fake_cws.cc",
-      "ash/app_mode/fake_cws.h",
-      "ash/arc/extensions/fake_arc_support.cc",
-      "ash/arc/extensions/fake_arc_support.h",
-      "ash/file_manager/fake_disk_mount_manager.cc",
-      "ash/file_manager/fake_disk_mount_manager.h",
-      "ash/input_method/mock_candidate_window_controller.cc",
-      "ash/input_method/mock_candidate_window_controller.h",
-      "ash/input_method/mock_input_method_engine.cc",
-      "ash/input_method/mock_input_method_engine.h",
-      "ash/input_method/mock_input_method_manager_impl.cc",
-      "ash/input_method/mock_input_method_manager_impl.h",
-      "ash/login/screens/mock_device_disabled_screen_view.cc",
-      "ash/login/screens/mock_device_disabled_screen_view.h",
-      "ash/login/session/user_session_manager_test_api.cc",
-      "ash/login/session/user_session_manager_test_api.h",
-      "ash/login/test/oobe_configuration_waiter.cc",
-      "ash/login/test/oobe_configuration_waiter.h",
-      "ash/login/ui/fake_login_display_host.cc",
-      "ash/login/ui/fake_login_display_host.h",
-      "ash/login/ui/mock_login_display.cc",
-      "ash/login/ui/mock_login_display.h",
-      "ash/login/ui/mock_login_display_host.cc",
-      "ash/login/ui/mock_login_display_host.h",
-      "ash/login/ui/mock_signin_ui.cc",
-      "ash/login/ui/mock_signin_ui.h",
-      "ash/login/users/avatar/mock_user_image_manager.cc",
-      "ash/login/users/avatar/mock_user_image_manager.h",
-      "ash/login/users/fake_supervised_user_manager.cc",
-      "ash/login/users/fake_supervised_user_manager.h",
-      "ash/login/users/mock_user_manager.cc",
-      "ash/login/users/mock_user_manager.h",
-      "ash/net/network_portal_detector_test_utils.cc",
-      "ash/net/network_portal_detector_test_utils.h",
-      "ash/policy/arc/fake_android_management_client.cc",
-      "ash/policy/arc/fake_android_management_client.h",
-      "ash/policy/core/device_policy_builder.cc",
-      "ash/policy/core/device_policy_builder.h",
-      "ash/policy/core/fake_device_cloud_policy_manager.cc",
-      "ash/policy/core/fake_device_cloud_policy_manager.h",
-      "ash/policy/external_data/cloud_external_data_manager_base_test_util.cc",
-      "ash/policy/external_data/cloud_external_data_manager_base_test_util.h",
       "net/fake_nss_service.cc",
       "net/fake_nss_service.h",
       "sharesheet/sharesheet_test_util.cc",

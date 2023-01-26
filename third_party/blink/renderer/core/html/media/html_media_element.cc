@@ -647,7 +647,8 @@ void HTMLMediaElement::DidMoveToNewDocument(Document& old_document) {
 
 bool HTMLMediaElement::ShouldReusePlayer(Document& old_document,
                                          Document& new_document) const {
-  if (!RuntimeEnabledFeatures::DocumentPictureInPictureAPIEnabled()) {
+  if (!RuntimeEnabledFeatures::DocumentPictureInPictureAPIEnabled(
+          GetExecutionContext())) {
     return false;
   }
 
@@ -800,7 +801,7 @@ void HTMLMediaElement::FinishParsingChildren() {
     ScheduleTextTrackResourceLoad();
 }
 
-bool HTMLMediaElement::LayoutObjectIsNeeded(const ComputedStyle& style) const {
+bool HTMLMediaElement::LayoutObjectIsNeeded(const DisplayStyle& style) const {
   return ShouldShowControls() && HTMLElement::LayoutObjectIsNeeded(style);
 }
 

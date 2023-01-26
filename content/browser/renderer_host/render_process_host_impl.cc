@@ -3495,7 +3495,6 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
 #endif
 #if BUILDFLAG(IS_WIN)
     switches::kDisableHighResTimer,
-    switches::kEnableWin7WebRtcHWH264Decoding,
     switches::kTrySupportedChannelLayouts,
     switches::kRaiseTimerFrequency,
 #endif
@@ -4888,6 +4887,13 @@ void RenderProcessHostImpl::SuddenTerminationChanged(bool enabled) {
 void RenderProcessHostImpl::RecordUserMetricsAction(const std::string& action) {
   base::RecordComputedAction(action);
 }
+
+#if BUILDFLAG(IS_ANDROID)
+void RenderProcessHostImpl::SetPrivateMemoryFootprint(
+    uint64_t private_memory_footprint_bytes) {
+  private_memory_footprint_bytes_ = private_memory_footprint_bytes;
+}
+#endif
 
 void RenderProcessHostImpl::UpdateProcessPriorityInputs() {
   int32_t new_visible_widgets_count = 0;

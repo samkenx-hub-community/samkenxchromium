@@ -150,7 +150,13 @@ try_.compilator_builder(
     os = os.MAC_DEFAULT,
     main_list_view = "try",
     check_for_flakiness = True,
-    goma_jobs = goma.jobs.J300,
+)
+
+try_.builder(
+    name = "mac10.15-wpt-content-shell-fyi-rel",
+    mirrors = [
+        "ci/mac10.15-wpt-content-shell-fyi-rel",
+    ],
 )
 
 try_.builder(
@@ -162,6 +168,13 @@ try_.builder(
     builderless = True,
     check_for_flakiness = True,
     goma_backend = None,
+)
+
+try_.builder(
+    name = "mac11-wpt-content-shell-fyi-rel",
+    mirrors = [
+        "ci/mac11-wpt-content-shell-fyi-rel",
+    ],
 )
 
 try_.orchestrator_builder(
@@ -185,6 +198,20 @@ try_.compilator_builder(
     check_for_flakiness = True,
     # TODO (crbug.com/1245171): Revert when root issue is fixed
     grace_period = 4 * time.minute,
+)
+
+try_.builder(
+    name = "mac12-arm64-wpt-content-shell-fyi-rel",
+    mirrors = [
+        "ci/mac12-arm64-wpt-content-shell-fyi-rel",
+    ],
+)
+
+try_.builder(
+    name = "mac12-wpt-content-shell-fyi-rel",
+    mirrors = [
+        "ci/mac12-wpt-content-shell-fyi-rel",
+    ],
 )
 
 # NOTE: the following trybots aren't sensitive to Mac version on which
@@ -261,7 +288,6 @@ try_.builder(
     ),
     os = os.MAC_DEFAULT,
     main_list_view = "try",
-    goma_jobs = goma.jobs.J150,
     tryjob = try_.job(),
 )
 
@@ -319,6 +345,8 @@ ios_builder(
     mirrors = [
         "ci/ios-catalyst",
     ],
+    goma_backend = None,
+    reclient_jobs = reclient.jobs.LOW_JOBS_FOR_CQ,
 )
 
 ios_builder(
@@ -326,6 +354,8 @@ ios_builder(
     mirrors = [
         "ci/ios-device",
     ],
+    goma_backend = None,
+    reclient_jobs = reclient.jobs.LOW_JOBS_FOR_CQ,
 )
 
 ios_builder(
@@ -346,6 +376,8 @@ ios_builder(
     mirrors = ["ci/ios-m1-simulator-cronet"],
     os = os.MAC_DEFAULT,
     cpu = cpu.ARM64,
+    goma_backend = None,
+    reclient_jobs = reclient.jobs.LOW_JOBS_FOR_CQ,
 )
 
 try_.orchestrator_builder(
@@ -378,6 +410,7 @@ try_.compilator_builder(
     xcode = xcode.x14main,
     main_list_view = "try",
     check_for_flakiness = True,
+    goma_backend = None,
 )
 
 ios_builder(
@@ -396,6 +429,8 @@ ios_builder(
             cq.location_filter(exclude = True, path_regexp = "components/cronet/android/.+"),
         ],
     ),
+    goma_backend = None,
+    reclient_jobs = reclient.jobs.HIGH_JOBS_FOR_CQ,
 )
 
 ios_builder(
@@ -436,6 +471,8 @@ ios_builder(
             "third_party/crashpad/crashpad/.+",
         ],
     ),
+    goma_backend = None,
+    reclient_jobs = reclient.jobs.LOW_JOBS_FOR_CQ,
 )
 
 ios_builder(
@@ -448,6 +485,7 @@ ios_builder(
     name = "ios15-sdk-simulator",
     mirrors = ["ci/ios15-sdk-simulator"],
     os = os.MAC_12,
+    goma_backend = None,
 )
 
 ios_builder(
@@ -456,6 +494,8 @@ ios_builder(
         "ci/ios16-beta-simulator",
     ],
     os = os.MAC_DEFAULT,
+    goma_backend = None,
+    reclient_jobs = reclient.jobs.LOW_JOBS_FOR_CQ,
 )
 
 ios_builder(

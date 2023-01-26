@@ -6,7 +6,9 @@
 
 #include "base/test/gtest_util.h"
 #include "content/browser/fenced_frame/fenced_frame_config.h"
+#include "content/browser/fenced_frame/fenced_frame_reporter.h"
 #include "mojo/public/cpp/test_support/test_utils.h"
+#include "services/network/public/cpp/weak_wrapper_shared_url_loader_factory.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "third_party/blink/public/common/fenced_frame/redacted_fenced_frame_config.h"
 #include "third_party/blink/public/common/fenced_frame/redacted_fenced_frame_config_mojom_traits.h"
@@ -305,6 +307,42 @@ TEST(FencedFrameConfigMojomTraitsTest, ConfigMojomTraitsInternalUrnTest) {
   }
 }
 
+TEST(FencedFrameConfigMojomTraitsTest, ConfigMojomTraitsModeTest) {
+  std::vector<blink::FencedFrame::DeprecatedFencedFrameMode> modes = {
+      blink::FencedFrame::DeprecatedFencedFrameMode::kDefault,
+      blink::FencedFrame::DeprecatedFencedFrameMode::kOpaqueAds,
+  };
+  std::vector<FencedFrameEntity> entities = {
+      FencedFrameEntity::kEmbedder,
+      FencedFrameEntity::kContent,
+  };
+  GURL test_url("test_url");
+  GURL test_urn = GenerateUrnUuid();
+  for (blink::FencedFrame::DeprecatedFencedFrameMode& mode : modes) {
+    FencedFrameConfig browser_config(test_urn, test_url);
+    browser_config.mode_ = mode;
+    FencedFrameProperties browser_properties(browser_config);
+    for (FencedFrameEntity& entity : entities) {
+      RedactedFencedFrameConfig input_config = browser_config.RedactFor(entity);
+      ASSERT_TRUE(browser_config.mode_ == input_config.mode());
+
+      RedactedFencedFrameConfig output_config;
+      mojo::test::SerializeAndDeserialize<blink::mojom::FencedFrameConfig>(
+          input_config, output_config);
+      ASSERT_TRUE(input_config.mode() == output_config.mode());
+
+      RedactedFencedFrameProperties input_properties =
+          browser_properties.RedactFor(entity);
+      ASSERT_TRUE(browser_properties.mode_ == input_properties.mode());
+
+      RedactedFencedFrameProperties output_properties;
+      mojo::test::SerializeAndDeserialize<blink::mojom::FencedFrameProperties>(
+          input_properties, output_properties);
+      ASSERT_TRUE(input_properties.mode() == output_properties.mode());
+    }
+  }
+}
+
 TEST(FencedFrameConfigMojomTraitsTest, ConfigMojomTraitsNullInternalUrnTest) {
   FencedFrameConfig browser_config;
   RedactedFencedFrameConfig input_config =
@@ -429,10 +467,13 @@ TEST(FencedFrameConfigMojomTraitsTest, ConfigMojomTraitsTest) {
   // Test `shared_storage_budget_metadata`.
   {
     SharedStorageBudgetMetadata test_shared_storage_budget_metadata = {
-        url::Origin::Create(test_url), 0.5};
+        url::Origin::Create(test_url), 0.5, /*top_navigated=*/true,
+        /*report_event_called=*/false};
     auto eq_fn = [](const SharedStorageBudgetMetadata& a,
                     const SharedStorageBudgetMetadata& b) {
-      return a.origin == b.origin && a.budget_to_charge == b.budget_to_charge;
+      return a.origin == b.origin && a.budget_to_charge == b.budget_to_charge &&
+             a.top_navigated == b.top_navigated &&
+             a.report_event_called == b.report_event_called;
     };
     TestProperty(&FencedFrameConfig::shared_storage_budget_metadata_,
                  &RedactedFencedFrameConfig::shared_storage_budget_metadata_,
@@ -442,7 +483,9 @@ TEST(FencedFrameConfigMojomTraitsTest, ConfigMojomTraitsTest) {
         [](const raw_ptr<const SharedStorageBudgetMetadata>& a,
            const SharedStorageBudgetMetadata& b) {
           return a->origin == b.origin &&
-                 a->budget_to_charge == b.budget_to_charge;
+                 a->budget_to_charge == b.budget_to_charge &&
+                 a->top_navigated == b.top_navigated &&
+                 a->report_event_called == b.report_event_called;
         };
     TestProperty(
         &FencedFrameProperties::shared_storage_budget_metadata_,
@@ -451,23 +494,30 @@ TEST(FencedFrameConfigMojomTraitsTest, ConfigMojomTraitsTest) {
             &test_shared_storage_budget_metadata),
         pointer_value_eq_fn, eq_fn);
   }
+}
 
-  // Test `reporting_metadata`.
-  {
-    auto test_reporting_metadata = blink::FencedFrame::FencedFrameReporting();
-    test_reporting_metadata
-        .metadata[blink::FencedFrame::ReportingDestination::kBuyer]["test"] =
-        test_url;
-    auto eq_fn = [](const ReportingMetadata& a, const ReportingMetadata& b) {
-      return a.metadata == b.metadata;
-    };
-    TestProperty(&FencedFrameConfig::reporting_metadata_,
-                 &RedactedFencedFrameConfig::reporting_metadata_,
-                 test_reporting_metadata, eq_fn, eq_fn);
-    TestProperty(&FencedFrameProperties::reporting_metadata_,
-                 &RedactedFencedFrameProperties::reporting_metadata_,
-                 test_reporting_metadata, eq_fn, eq_fn);
-  }
+// Test `has_fenced_frame_reporting`, which only appears in
+// FencedFrameProperties, and does not use the redacted mechanism used by other
+// fields.
+TEST(FencedFrameConfigMojomTraitsTest, PropertiesHasFencedFrameReportingTest) {
+  FencedFrameProperties properties;
+  RedactedFencedFrameProperties input_properties =
+      properties.RedactFor(FencedFrameEntity::kEmbedder);
+  EXPECT_FALSE(input_properties.has_fenced_frame_reporting());
+  RedactedFencedFrameProperties output_properties;
+  mojo::test::SerializeAndDeserialize<blink::mojom::FencedFrameProperties>(
+      input_properties, output_properties);
+  EXPECT_FALSE(output_properties.has_fenced_frame_reporting());
+
+  // Create a reporting service with a dummy SharedURLLoaderFactory.
+  properties.fenced_frame_reporter_ = FencedFrameReporter::CreateForFledge(
+      base::MakeRefCounted<network::WeakWrapperSharedURLLoaderFactory>(
+          nullptr));
+  input_properties = properties.RedactFor(FencedFrameEntity::kEmbedder);
+  EXPECT_TRUE(input_properties.has_fenced_frame_reporting());
+  mojo::test::SerializeAndDeserialize<blink::mojom::FencedFrameProperties>(
+      input_properties, output_properties);
+  EXPECT_TRUE(output_properties.has_fenced_frame_reporting());
 }
 
 }  // namespace content

@@ -1654,6 +1654,26 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
+<histogram name="Autofill.FillingCorrectnessByMethod.{FormType}.{Method}"
+    enum="BooleanAutofillFillingCorrectness" expires_after="2023-06-01">
+  <owner>atsvirhckova@google.com</owner>
+  <owner>izuzic@google.com</owner>
+  <owner>chrome-autofill-team@google.com</owner>
+  <summary>
+    Tracks whether or not the user has edited at least one of the autofilled
+    fields before submitting the form. This metric is tracked whenever the value
+    to autofill the {FormType} is provided by the {Method}. The metric is
+    recorded on form submission.
+  </summary>
+  <token key="FormType">
+    <variant name="Address" summary="Address form"/>
+    <variant name="CreditCard" summary="Credit card form"/>
+  </token>
+  <token key="Method">
+    <variant name="TouchToFill" summary="Bottom sheet"/>
+  </token>
+</histogram>
+
 <histogram name="Autofill.FindFormControlElementByUniqueRendererIdDuration"
     units="microseconds" expires_after="2022-10-30">
   <obsolete>
@@ -2960,9 +2980,9 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Autofill.PopupHidingReason" enum="AutofillPopupHidingReason"
-    expires_after="2023-03-05">
-  <owner>mamir@google.com</owner>
+    expires_after="2023-09-05">
   <owner>koerber@google.com</owner>
+  <owner>mamir@chromium.org</owner>
   <summary>
     This tracks the reasons for which the Autofill popup disappers or cannot be
     displayed. Recorded everytime an Autofill popup disappears or cannot be
@@ -3010,19 +3030,6 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
-<histogram name="Autofill.ProfileImport.NewProfileEditedComplementedCountry"
-    enum="AutofillSettingsVisibleTypes" expires_after="2023-01-15">
-  <owner>fleimgruber@google.com</owner>
-  <owner>chrome-autofill-team@google.com</owner>
-  <summary>
-    Logs that the country field was edited in a new profile save prompt that was
-    shown to the user when a new address profile is observed in a form
-    submission. The edited country was complemented based on the predicted
-    country on import. This metric is emitted once the user-provided import
-    decision is final.
-  </summary>
-</histogram>
-
 <histogram name="Autofill.ProfileImport.NewProfileEditedType"
     enum="AutofillSettingsVisibleTypes" expires_after="2023-06-04">
   <owner>koerber@google.com</owner>
@@ -3045,20 +3052,6 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
-<histogram
-    name="Autofill.ProfileImport.NewProfileWithComplementedCountryDecision"
-    enum="AutofillProfileImportDecision" expires_after="2023-07-02">
-  <owner>fleimgruber@google.com</owner>
-  <owner>chrome-autofill-team@google.com</owner>
-  <summary>
-    Logs the user's decision for storing a new address profile observed in a
-    form submission, which had it's country complemented based on the predicted
-    country on import. This metric is emitted at the end of an import process
-    once the user-provided import decision is final. It is collected in addition
-    to Autofill.ProfileImport.NewProfileDecision.
-  </summary>
-</histogram>
-
 <histogram name="Autofill.ProfileImport.NewProfileWithIgnoredCountryDecision"
     enum="AutofillProfileImportDecision" expires_after="2023-06-04">
   <owner>fleimgruber@google.com</owner>
@@ -3070,21 +3063,6 @@ chromium-metrics-reviews@google.com.
     import process once the user-provided import decision is final. It is
     collected in addition to Autofill.ProfileImport.NewProfileDecision and only
     if kAutofillIgnoreInvalidCountryOnImport is enabled.
-  </summary>
-</histogram>
-
-<histogram
-    name="Autofill.ProfileImport.NewProfileWithRemovedPhoneNumberDecision"
-    enum="AutofillProfileImportDecision" expires_after="2023-06-18">
-  <owner>fleimgruber@google.com</owner>
-  <owner>chrome-autofill-team@google.com</owner>
-  <summary>
-    Logs the user's decision for storing a new address profile observed in a
-    form submission. The profile was only considered an import candidate, after
-    an invalid phone number was removed. This metric is emitted at the end of an
-    import process once the user-provided import decision is final. It is
-    collected in addition to Autofill.ProfileImport.NewProfileDecision and only
-    if kAutofillRemoveInvalidPhoneNumberOnImport is enabled.
   </summary>
 </histogram>
 
@@ -3117,21 +3095,6 @@ chromium-metrics-reviews@google.com.
     The type of an import of an address that is observed in a form submission
     when the form does not satisfy profile import requirements. This metric is
     emitted once the import decision is final.
-  </summary>
-</histogram>
-
-<histogram
-    name="Autofill.ProfileImport.SilentUpdatesWithRemovedPhoneNumberProfileImportType"
-    enum="AutofillSilentUpdatesProfileImportType" expires_after="2023-07-02">
-  <owner>fleimgruber@google.com</owner>
-  <owner>chrome-autofill-team@google.com</owner>
-  <summary>
-    The type of an import of an address that is observed in a form submission
-    when the form does not satisfy profile import requirements. It was only
-    considered for a silent update after an invalid phone number was removed.
-    This metric is emitted once the import decision is final. It is collected in
-    addition to Autofill.ProfileImport.SilentUpdatesProfileImportType and only
-    if kAutofillRemoveInvalidPhoneNumberOnImport is enabled.
   </summary>
 </histogram>
 
@@ -3187,19 +3150,6 @@ chromium-metrics-reviews@google.com.
     similar profile was observed in a form submission. This metric is emitted at
     the end of an import process once the user-provided import decision is
     final.
-  </summary>
-</histogram>
-
-<histogram name="Autofill.ProfileImport.UpdateProfileEditedComplementedCountry"
-    enum="AutofillSettingsVisibleTypes" expires_after="2023-01-15">
-  <owner>fleimgruber@google.com</owner>
-  <owner>chrome-autofill-team@google.com</owner>
-  <summary>
-    Logs that the country field was edited in a a profile update prompt that was
-    shown to the user when a profile similar to an already existing profile was
-    observed in a form submission. The edited country was complemented based on
-    the predicted country on import. This metric is emitted once the
-    user-provided import decision is final.
   </summary>
 </histogram>
 
@@ -3269,21 +3219,6 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram
-    name="Autofill.ProfileImport.UpdateProfileWithComplementedCountryDecision"
-    enum="AutofillProfileImportDecision" expires_after="2023-02-26">
-  <owner>fleimgruber@google.com</owner>
-  <owner>chrome-autofill-team@google.com</owner>
-  <summary>
-    Logs the user's decision for editing an already existing address after a
-    similar profile was observed in a form submission. The new profile had it's
-    country complemented based on the predicted country on import. This metric
-    is emitted at the end of an import process once the user-provided import
-    decision is final. It is collected in addition to
-    Autofill.ProfileImport.UpdateProfileDecision.
-  </summary>
-</histogram>
-
-<histogram
     name="Autofill.ProfileImport.UpdateProfileWithIgnoredCountryDecision"
     enum="AutofillProfileImportDecision" expires_after="2023-06-04">
   <owner>fleimgruber@google.com</owner>
@@ -3296,22 +3231,6 @@ chromium-metrics-reviews@google.com.
     import decision is final. It is collected in addition to
     Autofill.ProfileImport.UpdateProfileDecision and only if
     kAutofillIgnoreInvalidCountryOnImport is enabled.
-  </summary>
-</histogram>
-
-<histogram
-    name="Autofill.ProfileImport.UpdateProfileWithRemovedPhoneNumberDecision"
-    enum="AutofillProfileImportDecision" expires_after="2023-07-09">
-  <owner>fleimgruber@google.com</owner>
-  <owner>chrome-autofill-team@google.com</owner>
-  <summary>
-    Logs the user's decision for editing an already existing address after a
-    similar profile was observed in a form submission. The profile was only
-    considered an import candidate, after an invalid phone number was removed.
-    This metric is emitted at the end of an import process once the user-
-    provided import decision is final. It is collected in addition to
-    Autofill.ProfileImport.UpdateProfileDecision and only if
-    kAutofillRemoveInvalidPhoneNumberOnImport is enabled.
   </summary>
 </histogram>
 
@@ -4034,6 +3953,24 @@ chromium-metrics-reviews@google.com.
   </token>
 </histogram>
 
+<histogram
+    name="Autofill.TouchToFill.CreditCard.AutofillUsedAfterTouchToFillDismissal"
+    enum="Boolean" expires_after="2023-06-01">
+  <owner>atsvirhckova@google.com</owner>
+  <owner>izuzic@google.com</owner>
+  <owner>chrome-autofill-team@google.com</owner>
+  <summary>
+    Records whether a user has still used autofill after dismissing the payments
+    bottom sheet. There is a fallback to still allow the user to autofill the
+    form after dismissing the bottom sheet, that is to use the keyboard
+    accessory suggestion. This metric is recorded when submitting the form: true
+    - if there is at least one autofilled field in the submitted form and the
+    payments bottom sheet was shown and dismissed by user, false - otherwise.
+    The metrics is recorded only if the payments bottom sheet was displayed for
+    the form submitted.
+  </summary>
+</histogram>
+
 <histogram name="Autofill.TouchToFill.CreditCard.NumberOfCardsShown"
     units="cards" expires_after="2023-06-01">
   <owner>atsvirhckova@google.com</owner>
@@ -4141,7 +4078,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Autofill.UnmaskPrompt.GetRealPanDuration" units="ms"
-    expires_after="2023-07-16">
+    expires_after="2023-07-23">
   <owner>jsaul@google.com</owner>
   <owner>siyua@chromium.org</owner>
   <summary>

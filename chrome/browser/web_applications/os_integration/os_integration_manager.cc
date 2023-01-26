@@ -24,12 +24,14 @@
 #include "build/build_config.h"
 #include "build/chromeos_buildflags.h"
 #include "chrome/browser/profiles/profile.h"
+#include "chrome/browser/web_applications/os_integration/file_handling_sub_manager.h"
 #include "chrome/browser/web_applications/os_integration/os_integration_sub_manager.h"
 #include "chrome/browser/web_applications/os_integration/protocol_handling_sub_manager.h"
 #include "chrome/browser/web_applications/os_integration/run_on_os_login_sub_manager.h"
 #include "chrome/browser/web_applications/os_integration/shortcut_menu_handling_sub_manager.h"
 #include "chrome/browser/web_applications/os_integration/shortcut_sub_manager.h"
 #include "chrome/browser/web_applications/os_integration/uninstallation_via_os_settings_sub_manager.h"
+#include "chrome/browser/web_applications/os_integration/url_handling_sub_manager.h"
 #include "chrome/browser/web_applications/os_integration/web_app_shortcut.h"
 #include "chrome/browser/web_applications/os_integration/web_app_uninstallation_via_os_settings_registration.h"
 #include "chrome/browser/web_applications/proto/web_app_os_integration_state.pb.h"
@@ -184,8 +186,12 @@ void OsIntegrationManager::SetSubsystems(WebAppSyncBridge* sync_bridge,
 
   auto shortcut_sub_manager = std::make_unique<ShortcutSubManager>(
       *profile_, *icon_manager, *registrar);
+  auto file_handling_sub_manager =
+      std::make_unique<FileHandlingSubManager>(*registrar);
   auto protocol_handling_sub_manager =
       std::make_unique<ProtocolHandlingSubManager>(profile_, *registrar);
+  auto url_handling_sub_manager =
+      std::make_unique<UrlHandlingSubManager>(*registrar);
   auto shortcut_menu_handling_sub_manager =
       std::make_unique<ShortcutMenuHandlingSubManager>(*icon_manager,
                                                        *registrar);
@@ -194,7 +200,9 @@ void OsIntegrationManager::SetSubsystems(WebAppSyncBridge* sync_bridge,
   auto uninstallation_via_os_settings_sub_manager =
       std::make_unique<UninstallationViaOsSettingsSubManager>(*registrar);
   sub_managers_.push_back(std::move(shortcut_sub_manager));
+  sub_managers_.push_back(std::move(file_handling_sub_manager));
   sub_managers_.push_back(std::move(protocol_handling_sub_manager));
+  sub_managers_.push_back(std::move(url_handling_sub_manager));
   sub_managers_.push_back(std::move(shortcut_menu_handling_sub_manager));
   sub_managers_.push_back(std::move(run_on_os_login_sub_manager));
   sub_managers_.push_back(

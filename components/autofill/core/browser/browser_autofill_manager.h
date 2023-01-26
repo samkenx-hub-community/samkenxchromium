@@ -151,8 +151,6 @@ class BrowserAutofillManager : public AutofillManager,
 #endif
 
   // Called from our external delegate so they cannot be private.
-  // FillCreditCardForm() is also called by Autofill Assistant through
-  // ContentAutofillDriver::FillFormForAssistant().
   // TODO(crbug.com/1330108): Clean up the API.
   virtual void FillOrPreviewForm(mojom::RendererFormDataAction action,
                                  const FormData& form,
@@ -175,8 +173,6 @@ class BrowserAutofillManager : public AutofillManager,
                                            const FormFieldData& field,
                                            const CreditCard* credit_card);
 
-  // Called only from Autofill Assistant through
-  // ContentAutofillDriver::FillFormForAssistant().
   // TODO(crbug.com/1330108): Clean up the API.
   void FillProfileFormImpl(const FormData& form,
                            const FormFieldData& field,
@@ -317,7 +313,16 @@ class BrowserAutofillManager : public AutofillManager,
 
   // Sets where the accepted autofill suggestion came from: touch to fill,
   // keyboard accessory, etc.
-  virtual void SetSuggestionOriginMetricState(AutofillSuggestionMethod state);
+  virtual void SetAutofillSuggestionMethod(AutofillSuggestionMethod state);
+
+  // Forwards call to the same-named `AutofillDriver` function.
+  virtual void SetShouldSuppressKeyboard(bool suppress);
+
+  // Forwards call to the same-named `AutofillDriver` function.
+  virtual bool CanShowAutofillUi() const;
+
+  // Forwards call to the same-named `AutofillDriver` function.
+  virtual void TriggerReparseInAllFrames();
 
   void SetExternalDelegateForTest(
       std::unique_ptr<AutofillExternalDelegate> external_delegate) {

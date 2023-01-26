@@ -35,7 +35,6 @@
 #include "content/public/browser/save_page_type.h"
 #include "content/public/browser/visibility.h"
 #include "content/public/common/stop_find_action.h"
-#include "services/data_decoder/public/mojom/web_bundler.mojom.h"
 #include "services/network/public/mojom/web_sandbox_flags.mojom-shared.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
 #include "third_party/blink/public/mojom/favicon/favicon_url.mojom-forward.h"
@@ -257,6 +256,13 @@ class WebContents : public PageNavigator,
     // mostly for debugging (e.g. to help attribute specific scenarios or
     // invariant violations to a particular flavor of WebContents).
     base::Location creator_location;
+
+#if BUILDFLAG(IS_ANDROID)
+    // Same as `creator_location`, for WebContents created via Java. This
+    // java.lang.Throwable contains the entire
+    // WebContentsCreator.createWebContents() stack trace.
+    base::android::ScopedJavaGlobalRef<jthrowable> java_creator_location;
+#endif  // BUILDFLAG(IS_ANDROID)
 
     // Enables contents to hold wake locks, for example, to keep the screen on
     // while playing video.
@@ -1016,13 +1022,6 @@ class WebContents : public PageNavigator,
       const MHTMLGenerationParams& params,
       MHTMLGenerationResult::GenerateMHTMLCallback callback) = 0;
 
-  // Generates a Web Bundle representation of the current page.
-  virtual void GenerateWebBundle(
-      const base::FilePath& file_path,
-      base::OnceCallback<void(uint64_t /* file_size */,
-                              data_decoder::mojom::WebBundlerError)>
-          callback) = 0;
-
   // Returns the contents MIME type after a navigation.
   virtual const std::string& GetContentsMimeType() = 0;
 
@@ -1282,6 +1281,10 @@ class WebContents : public PageNavigator,
       const base::android::JavaRef<jobject>& jweb_contents_android);
   virtual base::android::ScopedJavaLocalRef<jobject> GetJavaWebContents() = 0;
 
+  // Returns the value from CreateParams::java_creator_location.
+  virtual base::android::ScopedJavaLocalRef<jthrowable>
+  GetJavaCreatorLocation() = 0;
+
   // Selects and zooms to the find result nearest to the point (x,y) defined in
   // find-in-page coordinates.
   virtual void ActivateNearestFindResult(float x, float y) = 0;
@@ -1389,14 +1392,6 @@ class WebContents : public PageNavigator,
       PreloadingAttempt* preloading_attempt,
       absl::optional<base::RepeatingCallback<bool(const GURL&)>>
           url_match_predicate = absl::nullopt) = 0;
-
-  // Disables Prerender2 for this WebContents.
-  // See
-  // https://docs.google.com/document/d/1P2VKCLpmnNm_cRAjUeE-bqLL0bslL_zKqiNeCzNom_w/
-  virtual void DisablePrerender2() = 0;
-  // Set Prerender2 disabled = false, but this does not imply Prerender2 is
-  // enabled.
-  virtual void ResetPrerender2Disabled() = 0;
 
  private:
   // This interface should only be implemented inside content.

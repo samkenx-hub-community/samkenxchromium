@@ -79,6 +79,8 @@ class HelpBubbleView : public views::BubbleDialogDelegateView {
   views::LabelButton* GetDefaultButtonForTesting() const;
   views::LabelButton* GetNonDefaultButtonForTesting(int index) const;
 
+  void SetForceAnchorRect(gfx::Rect force_anchor_rect);
+
  protected:
   // BubbleDialogDelegateView:
   bool OnMousePressed(const ui::MouseEvent& event) override;
@@ -91,6 +93,7 @@ class HelpBubbleView : public views::BubbleDialogDelegateView {
  private:
   FRIEND_TEST_ALL_PREFIXES(HelpBubbleViewTimeoutTest,
                            RespectsProvidedTimeoutAfterActivate);
+  friend class HelpBubbleViewsTest;
 
   void MaybeStartAutoCloseTimer();
 
@@ -98,10 +101,8 @@ class HelpBubbleView : public views::BubbleDialogDelegateView {
 
   const base::raw_ptr<const HelpBubbleDelegate> delegate_;
 
-  // Forces the anchor rect to the specified rectangle (in screen coordinates).
-  // If an artificial anchor rect is used, we assume the exact target cannot be
-  // localized, and a visible arrow is not shown.
-  absl::optional<gfx::Rect> force_anchor_rect_;
+  // If set, overrides the anchor bounds within the anchor view.
+  absl::optional<gfx::Rect> local_anchor_bounds_;
 
   base::raw_ptr<views::ImageView> icon_view_ = nullptr;
   std::vector<views::Label*> labels_;

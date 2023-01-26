@@ -90,6 +90,10 @@ void HideFloatedWindow(aura::Window* floated_window) {
 // Shows the given floated window.
 void ShowFloatedWindow(aura::Window* floated_window) {
   DCHECK(floated_window);
+  if (floated_window->IsVisible()) {
+    return;
+  }
+
   ScopedAnimationDisabler disabler(floated_window);
   floated_window->Show();
 }
@@ -282,6 +286,13 @@ gfx::Rect FloatController::GetPreferredFloatWindowClamshellBounds(
                 std::max(static_cast<int>(work_area.height() * 0.7),
                          minimum_size.height()));
 
+  // If user has already adjusted the window to be a size smaller than the
+  // calculated preferred size, use user size instead.
+  if (window->bounds().height() <= preferred_bounds.height() &&
+      window->bounds().width() <= preferred_bounds.width()) {
+    preferred_bounds = window->bounds();
+  }
+
   const int padding_dp = chromeos::wm::kFloatedWindowPaddingDp;
   const int preferred_width =
       std::min(preferred_bounds.width(), work_area.width() - 2 * padding_dp);
@@ -403,7 +414,7 @@ void FloatController::OnDragCompletedForTablet(
           ->GetDisplayNearestWindow(floated_window->GetRootWindow())
           .bounds());
 
-  // Check which corner to magnetize to based on which quadrent of the display
+  // Check which corner to magnetize to based on which quadrant of the display
   // the mouse/touch was released. If it somehow falls outside, then magnetize
   // to the previous location.
   gfx::RectF display_bounds_left, display_bounds_right;

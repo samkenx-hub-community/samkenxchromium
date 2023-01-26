@@ -40,6 +40,7 @@
 #include "chrome/browser/ui/autofill/payments/card_unmask_otp_input_dialog_controller_impl.h"
 #include "chrome/browser/ui/autofill/payments/create_card_unmask_prompt_view.h"
 #include "chrome/browser/ui/autofill/payments/credit_card_scanner_controller.h"
+#include "chrome/browser/ui/autofill/payments/save_iban_bubble_controller_impl.h"
 #include "chrome/browser/ui/autofill/payments/virtual_card_enroll_bubble_controller_impl.h"
 #include "chrome/browser/ui/autofill/risk_util.h"
 #include "chrome/browser/ui/autofill/save_update_address_profile_bubble_controller_impl.h"
@@ -60,6 +61,7 @@
 #include "components/autofill/core/browser/payments/credit_card_otp_authenticator.h"
 #include "components/autofill/core/browser/payments/payments_client.h"
 #include "components/autofill/core/browser/ui/payments/bubble_show_options.h"
+#include "components/autofill/core/browser/ui/payments/card_unmask_prompt_controller_impl.h"
 #include "components/autofill/core/browser/ui/payments/card_unmask_prompt_view.h"
 #include "components/autofill/core/browser/ui/popup_item_ids.h"
 #include "components/autofill/core/common/autofill_features.h"
@@ -89,6 +91,7 @@
 #include "content/public/browser/navigation_entry.h"
 #include "content/public/browser/render_frame_host.h"
 #include "content/public/browser/ssl_status.h"
+#include "content/public/browser/storage_partition.h"
 #include "services/network/public/cpp/shared_url_loader_factory.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
 #include "ui/gfx/geometry/rect.h"
@@ -145,6 +148,18 @@ ChromeAutofillClient::~ChromeAutofillClient() {
 
 version_info::Channel ChromeAutofillClient::GetChannel() const {
   return chrome::GetChannel();
+}
+
+bool ChromeAutofillClient::IsOffTheRecord() {
+  return web_contents()->GetBrowserContext()->IsOffTheRecord();
+}
+
+scoped_refptr<network::SharedURLLoaderFactory>
+ChromeAutofillClient::GetURLLoaderFactory() {
+  return web_contents()
+      ->GetBrowserContext()
+      ->GetDefaultStoragePartition()
+      ->GetURLLoaderFactoryForBrowserProcess();
 }
 
 PersonalDataManager* ChromeAutofillClient::GetPersonalDataManager() {
@@ -366,9 +381,9 @@ void ChromeAutofillClient::ShowUnmaskPrompt(
     const CreditCard& card,
     const CardUnmaskPromptOptions& card_unmask_prompt_options,
         base::WeakPtr<CardUnmaskDelegate> delegate) {
-  unmask_controller_.ShowPrompt(
+  unmask_controller_->ShowPrompt(
       base::BindOnce(&CreateCardUnmaskPromptView,
-                     base::Unretained(&unmask_controller_),
+                     base::Unretained(unmask_controller_.get()),
                      base::Unretained(web_contents())),
       card, card_unmask_prompt_options, delegate);
 }
@@ -376,7 +391,7 @@ void ChromeAutofillClient::ShowUnmaskPrompt(
 // TODO(crbug.com/1220990): Refactor this for both CVC and Biometrics flows.
 void ChromeAutofillClient::OnUnmaskVerificationResult(
     PaymentsRpcResult result) {
-  unmask_controller_.OnVerificationResult(result);
+  unmask_controller_->OnVerificationResult(result);
 #if BUILDFLAG(IS_ANDROID)
   // For VCN-related errors, on Android we show a new error dialog instead of
   // updating the CVC unmask prompt with the error message.
@@ -510,9 +525,10 @@ void ChromeAutofillClient::ConfirmSaveIBANLocally(
     const IBAN& iban,
     bool should_show_prompt,
     LocalSaveIBANPromptCallback callback) {
-  NOTIMPLEMENTED();
-  // TODO(crbug.com/1349109): Implement SaveIBANBubbleController to show
-  // prompt bubble for local save.
+  // Do lazy initialization of SaveIbanBubbleControllerImpl.
+  SaveIbanBubbleControllerImpl::CreateForWebContents(web_contents());
+  SaveIbanBubbleControllerImpl::FromWebContents(web_contents())
+      ->OfferLocalSave(iban, should_show_prompt, std::move(callback));
 }
 
 void ChromeAutofillClient::ShowWebauthnOfferDialog(
@@ -598,11 +614,8 @@ void ChromeAutofillClient::ConfirmSaveCreditCardLocally(
   DCHECK(options.show_prompt);
   infobars::ContentInfoBarManager::FromWebContents(web_contents())
       ->AddInfoBar(CreateSaveCardInfoBarMobile(
-          std::make_unique<AutofillSaveCardInfoBarDelegateMobile>(
-              /*upload=*/false, options, card, LegalMessageLines(),
-              AutofillClient::UploadSaveCardPromptCallback(),
-              /*local_save_card_callback=*/std::move(callback),
-              AccountInfo())));
+          AutofillSaveCardInfoBarDelegateMobile::CreateForLocalSave(
+              options, card, std::move(callback))));
 #else
   // Do lazy initialization of SaveCardBubbleControllerImpl.
   SaveCardBubbleControllerImpl::CreateForWebContents(web_contents());
@@ -626,10 +639,9 @@ void ChromeAutofillClient::ConfirmSaveCreditCardToCloud(
       identity_manager->GetPrimaryAccountInfo(signin::ConsentLevel::kSignin));
   infobars::ContentInfoBarManager::FromWebContents(web_contents())
       ->AddInfoBar(CreateSaveCardInfoBarMobile(
-          std::make_unique<AutofillSaveCardInfoBarDelegateMobile>(
-              /*upload=*/true, options, card, legal_message_lines,
-              /*upload_save_card_callback=*/std::move(callback),
-              AutofillClient::LocalSaveCardPromptCallback(), account_info)));
+          AutofillSaveCardInfoBarDelegateMobile::CreateForUploadSave(
+              options, card, std::move(callback), legal_message_lines,
+              account_info)));
 #else
   // Do lazy initialization of SaveCardBubbleControllerImpl.
   SaveCardBubbleControllerImpl::CreateForWebContents(web_contents());
@@ -1094,19 +1106,19 @@ ChromeAutofillClient::ChromeAutofillClient(content::WebContents* web_contents)
           payments_client_.get(),
           GetPersonalDataManager(),
           GetPersonalDataManager()->app_locale())),
-      unmask_controller_(
-          user_prefs::UserPrefs::Get(web_contents->GetBrowserContext())),
+      log_manager_(
+          // TODO(crbug.com/928595): Replace the closure with a callback to the
+          // renderer that indicates if log messages should be sent from the
+          // renderer.
+          LogManager::Create(AutofillLogRouterFactory::GetForBrowserContext(
+                                 web_contents->GetBrowserContext()),
+                             base::NullCallback())),
+      unmask_controller_(std::make_unique<CardUnmaskPromptControllerImpl>(
+          user_prefs::UserPrefs::Get(web_contents->GetBrowserContext()))),
       autofill_error_dialog_controller_(web_contents),
       autofill_progress_dialog_controller_(
           std::make_unique<AutofillProgressDialogControllerImpl>(
               web_contents)) {
-  // TODO(crbug.com/928595): Replace the closure with a callback to the
-  // renderer that indicates if log messages should be sent from the
-  // renderer.
-  log_manager_ =
-      LogManager::Create(AutofillLogRouterFactory::GetForBrowserContext(
-                             web_contents->GetBrowserContext()),
-                         base::NullCallback());
   // Initialize StrikeDatabase so its cache will be loaded and ready to use
   // when requested by other Autofill classes.
   GetStrikeDatabase();

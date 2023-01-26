@@ -109,7 +109,7 @@ bool SetAsDefaultClientForScheme(const std::string& scheme) {
     return false;
   }
 
-  if (GetDefaultWebClientSetPermission() != SET_DEFAULT_UNATTENDED) {
+  if (GetDefaultSchemeClientSetPermission() != SET_DEFAULT_UNATTENDED) {
     return false;
   }
 
@@ -144,16 +144,6 @@ bool SetAsDefaultClientForScheme(const std::string& scheme) {
         base::mac::NSToCFCast(scheme_ns), base::mac::NSToCFCast(identifier));
     return return_code == noErr;
   }
-}
-
-DefaultWebClientSetPermission
-GetPlatformSpecificDefaultWebClientSetPermission() {
-  // This should be `SET_DEFAULT_INTERACTIVE`, but that changes how
-  // `DefaultBrowserWorker` and `DefaultSchemeClientWorker` work.
-  // TODO(https://crbug.com/1393452): Migrate all callers to the new API,
-  // migrate all the Mac code to integrate with it, and change this to return
-  // the correct value.
-  return SET_DEFAULT_UNATTENDED;
 }
 
 std::u16string GetApplicationNameForScheme(const GURL& url) {
@@ -277,5 +267,19 @@ DefaultWebClientState IsDefaultClientForScheme(const std::string& scheme) {
   return [default_browser isEqualToString:my_identifier] ? IS_DEFAULT
                                                          : NOT_DEFAULT;
 }
+
+namespace internal {
+
+DefaultWebClientSetPermission GetPlatformSpecificDefaultWebClientSetPermission(
+    WebClientSetMethod method) {
+  // This should be `SET_DEFAULT_INTERACTIVE`, but that changes how
+  // `DefaultBrowserWorker` and `DefaultSchemeClientWorker` work.
+  // TODO(https://crbug.com/1393452): Migrate all callers to the new API,
+  // migrate all the Mac code to integrate with it, and change this to return
+  // the correct value.
+  return SET_DEFAULT_UNATTENDED;
+}
+
+}  // namespace internal
 
 }  // namespace shell_integration

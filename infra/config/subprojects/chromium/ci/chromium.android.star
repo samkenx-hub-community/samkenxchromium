@@ -19,9 +19,6 @@ ci.defaults.set(
     sheriff_rotations = sheriff_rotations.ANDROID,
     service_account = ci.DEFAULT_SERVICE_ACCOUNT,
     execution_timeout = ci.DEFAULT_EXECUTION_TIMEOUT,
-
-    # TODO(crbug.com/1362440): remove this.
-    omit_python2 = False,
     reclient_instance = reclient.instance.DEFAULT_TRUSTED,
     reclient_jobs = reclient.jobs.HIGH_JOBS_FOR_CI,
 )
@@ -477,6 +474,9 @@ ci.builder(
     ),
     execution_timeout = 7 * time.hour,
     notifies = ["Deterministic Android"],
+
+    # TODO(crbug.com/1362440): remove this.
+    omit_python2 = False,
 )
 
 ci.builder(
@@ -492,6 +492,9 @@ ci.builder(
     execution_timeout = 6 * time.hour,
     notifies = ["Deterministic Android"],
     reclient_jobs = reclient.jobs.DEFAULT,
+
+    # TODO(crbug.com/1362440): remove this.
+    omit_python2 = False,
 )
 
 ci.thin_tester(
@@ -694,6 +697,9 @@ ci.builder(
         short_name = "size",
     ),
     reclient_jobs = reclient.jobs.DEFAULT,
+
+    # TODO(crbug.com/1362440): remove this.
+    omit_python2 = False,
 )
 
 ci.builder(
@@ -861,6 +867,9 @@ ci.builder(
     ),
     notifies = ["cronet"],
     reclient_jobs = reclient.jobs.DEFAULT,
+
+    # TODO(crbug.com/1362440): remove this.
+    omit_python2 = False,
 )
 
 ci.builder(
@@ -1348,7 +1357,40 @@ ci.builder(
         short_name = "12",
     ),
     execution_timeout = 4 * time.hour,
+)
 
-    # TODO(crbug.com/1366956): remove this after confirm py3 works on this builder.
-    omit_python2 = True,
+ci.builder(
+    name = "android-13-x64-rel",
+    # TODO(crbug.com/1405331): Enable on branches once stable
+    #branch_selector = branches.STANDARD_MILESTONE,
+    builder_spec = builder_config.builder_spec(
+        gclient_config = builder_config.gclient_config(
+            config = "chromium",
+            apply_configs = [
+                "android",
+            ],
+        ),
+        chromium_config = builder_config.chromium_config(
+            config = "android",
+            apply_configs = [
+                "mb",
+            ],
+            build_config = builder_config.build_config.RELEASE,
+            target_bits = 64,
+            target_platform = builder_config.target_platform.ANDROID,
+        ),
+        android_config = builder_config.android_config(
+            config = "x64_builder",
+        ),
+        build_gs_bucket = "chromium-android-archive",
+    ),
+    # TODO(crbug.com/1405331): Enable sheriff once tests are stable
+    sheriff_rotations = args.ignore_default(None),
+    # TODO(crbug.com/1405331): Enable tree_closing once compile are stable
+    #tree_closing = True,
+    console_view_entry = consoles.console_view_entry(
+        category = "builder_tester|x64",
+        short_name = "13",
+    ),
+    execution_timeout = 4 * time.hour,
 )

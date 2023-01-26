@@ -697,18 +697,18 @@ suite('SettingsDevicePage', function() {
       const sectionHeader =
           audioPage.shadowRoot.querySelector('#audioInputTitle');
       assertTrue(isVisible(sectionHeader));
-      assertEquals('Input', sectionHeader.textContent);
+      assertEquals('Input', sectionHeader.textContent.trim());
       const deviceSubsectionHeader =
           audioPage.shadowRoot.querySelector('#audioInputDeviceLabel');
       assertTrue(isVisible(deviceSubsectionHeader));
-      assertEquals('Device', deviceSubsectionHeader.textContent);
+      assertEquals('Device', deviceSubsectionHeader.textContent.trim());
       const deviceSubsectionDropdown =
           audioPage.shadowRoot.querySelector('#audioInputDeviceDropdown');
       assertTrue(isVisible(deviceSubsectionDropdown));
       const inputGainSubsectionHeader =
           audioPage.shadowRoot.querySelector('#audioInputGainLabel');
       assertTrue(isVisible(inputGainSubsectionHeader), 'audioInputGainLabel');
-      assertEquals('Volume', inputGainSubsectionHeader.textContent);
+      assertEquals('Volume', inputGainSubsectionHeader.textContent.trim());
       const inputVolumeButton =
           audioPage.shadowRoot.querySelector('#audioInputGainMuteButton');
       assertTrue(isVisible(inputVolumeButton), 'audioInputGainMuteButton');
@@ -720,7 +720,8 @@ suite('SettingsDevicePage', function() {
               '#audioInputNoiseCancellationLabel');
       assertTrue(isVisible(noiseCancellationSubsectionHeader));
       assertEquals(
-          'Noise Cancellation', noiseCancellationSubsectionHeader.textContent);
+          'Noise Cancellation',
+          noiseCancellationSubsectionHeader.textContent.trim());
       const noiseCancellationToggle = audioPage.shadowRoot.querySelector(
           '#audioInputNoiseCancellationToggle');
       assertTrue(isVisible(noiseCancellationToggle));
@@ -893,6 +894,25 @@ suite('SettingsDevicePage', function() {
       outputDevices: [],
 
       /** @type {!Array<!AudioDevice>} */
+      inputDevices: [
+        fakeCrosAudioConfig.fakeInternalMicActive,
+      ],
+    };
+
+    /** @type {!AudioSystemProperties} */
+    const emptyInputDevicesFakeAudioSystemProperties = {
+      outputVolumePercent: 75,
+
+      /** @type {!MuteState} */
+      outputMuteState: crosAudioConfigMojomWebui.MuteState.kNotMuted,
+
+      /** @type {!Array<!AudioDevice>} */
+      outputDevices: [
+        fakeCrosAudioConfig.fakeSpeakerActive,
+        fakeCrosAudioConfig.fakeMicJackInactive,
+      ],
+
+      /** @type {!Array<!AudioDevice>} */
       inputDevices: [],
     };
 
@@ -997,6 +1017,8 @@ suite('SettingsDevicePage', function() {
     test('simulate setting output volume slider mojo test', async function() {
       const sliderSelector = '#outputVolumeSlider';
       const outputSlider = audioPage.shadowRoot.querySelector(sliderSelector);
+      const outputMuteButton =
+          audioPage.shadowRoot.querySelector('#audioOutputMuteButton');
 
       // Test clicking to min volume case.
       const minOutputVolumePercent = 0;
@@ -1005,6 +1027,7 @@ suite('SettingsDevicePage', function() {
           minOutputVolumePercent,
           audioPage.audioSystemProperties_.outputVolumePercent,
       );
+      assertEquals('settings20:volume-zero', outputMuteButton.ironIcon);
 
       // Test clicking to max volume case.
       const maxOutputVolumePercent = 100;
@@ -1013,14 +1036,17 @@ suite('SettingsDevicePage', function() {
           maxOutputVolumePercent,
           audioPage.audioSystemProperties_.outputVolumePercent,
       );
+      assertEquals('settings20:volume-up', outputMuteButton.ironIcon);
 
       // Test clicking to non-boundary volume case.
       const nonBoundaryOutputVolumePercent = 50;
-      await simulateSliderClicked(sliderSelector, 50);
+      await simulateSliderClicked(
+          sliderSelector, nonBoundaryOutputVolumePercent);
       assertEquals(
           nonBoundaryOutputVolumePercent,
           audioPage.audioSystemProperties_.outputVolumePercent,
       );
+      assertEquals('settings20:volume-up', outputMuteButton.ironIcon);
 
       // Ensure value clamps to min.
       outputSlider.value = -1;
@@ -1030,8 +1056,9 @@ suite('SettingsDevicePage', function() {
       assertEquals(
           minOutputVolumePercent,
           audioPage.audioSystemProperties_.outputVolumePercent);
+      assertEquals('settings20:volume-zero', outputMuteButton.ironIcon);
 
-      // Ensure value clamps to min.
+      // Ensure value clamps to max.
       outputSlider.value = 101;
       outputSlider.dispatchEvent(new CustomEvent('cr-slider-value-changed'));
       await flushTasks();
@@ -1039,6 +1066,16 @@ suite('SettingsDevicePage', function() {
       assertEquals(
           maxOutputVolumePercent,
           audioPage.audioSystemProperties_.outputVolumePercent);
+      assertEquals('settings20:volume-up', outputMuteButton.ironIcon);
+
+      // Test clicking to a small icon volume case.
+      const smallIconOutputVolumePercent = 10;
+      await simulateSliderClicked(sliderSelector, smallIconOutputVolumePercent);
+      assertEquals(
+          smallIconOutputVolumePercent,
+          audioPage.audioSystemProperties_.outputVolumePercent,
+      );
+      assertEquals('settings20:volume-down', outputMuteButton.ironIcon);
     });
 
     test('output mute state changes slider disabled state', async function() {
@@ -1085,6 +1122,12 @@ suite('SettingsDevicePage', function() {
       assertEquals(
           emptyOutputDevicesFakeAudioSystemProperties.outputDevices.length,
           outputDeviceDropdown.length);
+
+      // If the output devices are empty, the output section should be hidden.
+      const outputDeviceSection = audioPage.shadowRoot.querySelector('#output');
+      assertFalse(isVisible(outputDeviceSection));
+      const inputDeviceSection = audioPage.shadowRoot.querySelector('#input');
+      assertTrue(isVisible(inputDeviceSection));
 
       // Test active speaker case.
       crosAudioConfig.setAudioSystemProperties(
@@ -1140,6 +1183,21 @@ suite('SettingsDevicePage', function() {
           fakeCrosAudioConfig.defaultFakeAudioSystemProperties.inputDevices
               .length,
           inputDeviceDropdown.length);
+
+      // Test empty input devices case.
+      crosAudioConfig.setAudioSystemProperties(
+          emptyInputDevicesFakeAudioSystemProperties);
+      await flushTasks();
+      assertTrue(!inputDeviceDropdown.value);
+      assertEquals(
+          emptyInputDevicesFakeAudioSystemProperties.inputDevices.length,
+          inputDeviceDropdown.length);
+
+      // If the input devices are empty, the input section should be hidden.
+      const inputDeviceSection = audioPage.shadowRoot.querySelector('#input');
+      assertFalse(isVisible(inputDeviceSection));
+      const outputDeviceSection = audioPage.shadowRoot.querySelector('#output');
+      assertTrue(isVisible(outputDeviceSection));
     });
 
     test('simulate setting active input device', async function() {
@@ -1185,6 +1243,7 @@ suite('SettingsDevicePage', function() {
           crosAudioConfigMojomWebui.MuteState.kMutedByUser,
           audioPage.audioSystemProperties_.outputMuteState);
       assertTrue(audioPage.isOutputMuted_);
+      assertEquals('settings20:volume-up-off', outputMuteButton.ironIcon);
 
       outputMuteButton.click();
       await flushTasks();
@@ -1200,11 +1259,13 @@ suite('SettingsDevicePage', function() {
           audioPage.shadowRoot.querySelector('#audioInputGainMuteButton');
 
       assertFalse(audioPage.getIsInputMutedForTest());
+      assertEquals('cr:mic', inputMuteButton.ironIcon);
 
       inputMuteButton.click();
       await flushTasks();
 
       assertTrue(audioPage.getIsInputMutedForTest());
+      assertEquals('settings:mic-off', inputMuteButton.ironIcon);
     });
 
     test('simulate setting input gain slider', async function() {

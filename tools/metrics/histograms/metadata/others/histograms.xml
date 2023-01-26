@@ -161,28 +161,6 @@ chromium-metrics-reviews@google.com.
   <variant name="WorkerProcess" summary=""/>
 </variants>
 
-<variants name="UrlParamFilterClassificationRole">
-  <variant name=".Destination"
-      summary="parameters classified as having the destination role">
-    <obsolete>
-      Obsolete and no longer written as of m109.
-    </obsolete>
-  </variant>
-  <variant name=".Invalid"
-      summary="parameters with an unknown role, likely indicating a
-               compatibility issue">
-    <obsolete>
-      Obsolete and no longer written as of m109.
-    </obsolete>
-  </variant>
-  <variant name=".Source"
-      summary="parameters classified as having the source role">
-    <obsolete>
-      Obsolete and no longer written as of m109.
-    </obsolete>
-  </variant>
-</variants>
-
 <variants name="VoiceIntentTargetVariant">
   <variant name="Assistant" summary="Assistant voice transcription."/>
   <variant name="System" summary="System voice transcription."/>
@@ -212,7 +190,7 @@ chromium-metrics-reviews@google.com.
 </variants>
 
 <histogram name="AccessCodeCast.Discovery.AddSinkResult.New"
-    enum="AccessCodeCastAddSinkResult" expires_after="2023-05-14">
+    enum="AccessCodeCastAddSinkResult" expires_after="2023-07-23">
   <owner>bzielinski@google.com</owner>
   <owner>cros-edu-eng@google.com</owner>
   <summary>
@@ -235,7 +213,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="AccessCodeCast.Discovery.CastModeOnSuccess"
-    enum="AccessCodeCastCastMode" expires_after="2023-05-14">
+    enum="AccessCodeCastCastMode" expires_after="2023-07-23">
   <owner>bzielinski@google.com</owner>
   <owner>cros-edu-eng@google.com</owner>
   <summary>
@@ -279,7 +257,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="AccessCodeCast.Ui.AccessCodeInputTime" units="ms"
-    expires_after="2023-05-14">
+    expires_after="2023-07-23">
   <owner>bzielinski@google.com</owner>
   <owner>cros-edu-eng@google.com</owner>
   <summary>
@@ -291,7 +269,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="AccessCodeCast.Ui.AccessCodeNotFoundCount" units="instances"
-    expires_after="2023-03-12">
+    expires_after="2023-07-23">
   <owner>bzielinski@google.com</owner>
   <owner>cros-edu-eng@google.com</owner>
   <summary>
@@ -303,7 +281,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="AccessCodeCast.Ui.CastAttemptLength" units="ms"
-    expires_after="2023-05-14">
+    expires_after="2023-07-23">
   <owner>bzielinski@google.com</owner>
   <owner>cros-edu-eng@google.com</owner>
   <summary>
@@ -315,7 +293,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="AccessCodeCast.Ui.DialogCloseReason"
-    enum="AccessCodeCastDialogCloseReason" expires_after="2023-05-14">
+    enum="AccessCodeCastDialogCloseReason" expires_after="2023-07-23">
   <owner>bzielinski@google.com</owner>
   <owner>cros-edu-eng@google.com</owner>
   <summary>
@@ -325,7 +303,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="AccessCodeCast.Ui.DialogLoadTime" units="ms"
-    expires_after="2023-05-14">
+    expires_after="2023-07-23">
   <owner>bzielinski@google.com</owner>
   <owner>cros-edu-eng@google.com</owner>
   <summary>
@@ -336,7 +314,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="AccessCodeCast.Ui.DialogOpenLocation"
-    enum="AccessCodeCastDialogOpenLocation" expires_after="2023-05-14">
+    enum="AccessCodeCastDialogOpenLocation" expires_after="2023-07-23">
   <owner>bzielinski@google.com</owner>
   <owner>cros-edu-eng@google.com</owner>
   <summary>
@@ -2911,14 +2889,23 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
-<histogram name="ClientHints.FetchLatency" units="ms"
+<histogram name="ClientHints.FetchLatency{OperationType}" units="ms"
     expires_after="2023-06-25">
   <owner>miketaylr@chromium.org</owner>
   <owner>potassium-katabolism@google.com</owner>
   <summary>
     The latency (in milliseconds) to fetch the client hints for a given origin
-    from the Accept-CH cache.
+    from the Accept-CH cache for {OperationType}.
   </summary>
+  <token key="OperationType">
+    <variant name="_OriginTrialCheck"
+        summary="checking origin trial client hints"/>
+    <variant name="_PrefRead" summary="PrefService read"/>
+    <variant name="_PrerenderHost" summary="prerender host"/>
+    <variant name="_Total"
+        summary="all subcategories operations: PrefRead, PrerenderHost, and
+                 OriginTrialCheck"/>
+  </token>
 </histogram>
 
 <histogram name="ClientHints.PersistDuration" units="ms"
@@ -3636,7 +3623,7 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
-<histogram name="Conversions.CreateReportStatus6"
+<histogram name="Conversions.CreateReportStatus7"
     enum="ConversionStorageCreateReportStatus" expires_after="M117">
   <owner>apaseltiner@chromium.org</owner>
   <owner>johnidel@chromium.org</owner>
@@ -4148,6 +4135,18 @@ chromium-metrics-reviews@google.com.
     source, top-level trigger, event-level and aggregatable trigger data.
     Recorded once for each filter in the filter data when parsed from the
     attributionsrc response.
+  </summary>
+</histogram>
+
+<histogram name="Conversions.VerboseDebugReport.HttpResponseOrNetErrorCode"
+    enum="CombinedHttpResponseAndNetErrorCode" expires_after="M117">
+  <owner>linnan@chromium.org</owner>
+  <owner>johnidel@chromium.org</owner>
+  <owner>measurement-api-dev+metrics@google.com</owner>
+  <summary>
+    Error info for sending a verbose debug report, recorded for each sent
+    verbose debug report. The net error code is recorded if the HTTP response
+    code is unavailable.
   </summary>
 </histogram>
 
@@ -6245,8 +6244,8 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
-<histogram name="FirstPartySets.Initialization.ClearSiteDataOutcomeType"
-    enum="FirstPartySetsClearSiteDataOutcomeType" expires_after="2023-08-20">
+<histogram name="FirstPartySets.Initialization.ClearSiteDataOutcome"
+    enum="BooleanSuccess" expires_after="M115">
   <owner>shuuran@google.com</owner>
   <owner>kaustubhag@google.com</owner>
   <summary>
@@ -6976,13 +6975,13 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
-<histogram name="Hyphenation.Open" units="ms" expires_after="2023-02-12">
+<histogram name="Hyphenation.Open" units="ms" expires_after="2023-08-12">
   <owner>kojii@chromium.org</owner>
   <owner>layout-dev@chromium.org</owner>
   <summary>The time it takes to open a hyphenation dictionary.</summary>
 </histogram>
 
-<histogram name="Hyphenation.Open.File" units="ms" expires_after="2023-02-12">
+<histogram name="Hyphenation.Open.File" units="ms" expires_after="2023-08-12">
   <owner>kojii@chromium.org</owner>
   <owner>layout-dev@chromium.org</owner>
   <summary>The time it takes to open a hyphenation dictionary file.</summary>
@@ -9112,6 +9111,32 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
+<histogram name="OriginTrials.PersistentOriginTrial.PartitionSetSize"
+    units="sites" expires_after="2023-10-01">
+  <owner>pbirk@chromium.org</owner>
+  <owner>src/components/origin_trials/OWNERS</owner>
+  <summary>
+    Reports the number of partitions a persistent origin trial token has been
+    stored against. The purpose of the metric is to uncover memory footprint
+    issues from storing site partitions, and to help decide if an eviction
+    strategy needs to be put in place. This metric is recorded once for every
+    stored origin trial token on browser startup.
+  </summary>
+</histogram>
+
+<histogram
+    name="OriginTrials.PersistentOriginTrial.TokenHasFirstPartyPartition"
+    enum="Boolean" expires_after="2023-10-01">
+  <owner>pbirk@chromium.org</owner>
+  <owner>src/components/origin_trials/OWNERS</owner>
+  <summary>
+    Records whether a stored partition token has its own origins eTLD+1 as one
+    of the partitions. This is being recorded to determine if space can be saved
+    by making the first-party partition a special case. This metric is recorded
+    on browser startup when the persisted tokens are loaded from the database.
+  </summary>
+</histogram>
+
 <histogram name="OriginTrials.ValidationResult" enum="OriginTrialTokenStatus"
     expires_after="2021-10-10">
   <owner>chasej@chromium.org</owner>
@@ -10075,18 +10100,6 @@ chromium-metrics-reviews@google.com.
   <owner>csharp@chromium.org</owner>
   <summary>
     Enumeration of errors that happened when reading Preferences files.
-  </summary>
-</histogram>
-
-<histogram name="Preloading.AnchorElementPreloader.PreloadingTriggered"
-    enum="AnchorElementPreloaderType" expires_after="2023-06-04">
-  <owner>jacobstanley@google.com</owner>
-  <owner>spelchat@chromium.org</owner>
-  <owner>curranmax@chromium.org</owner>
-  <owner>chrome-brapp-loading@google.com</owner>
-  <summary>
-    Logged once for each preconnection request sent to the browser. Associated
-    with the Source ID of the page triggering the preconnection.
   </summary>
 </histogram>
 
@@ -15367,7 +15380,7 @@ regressions. -->
 </histogram>
 
 <histogram name="WhatsNew.LoadResponseCode"
-    enum="CombinedHttpResponseAndNetErrorCode" expires_after="2023-01-15">
+    enum="CombinedHttpResponseAndNetErrorCode" expires_after="2023-06-18">
   <owner>rbpotter@chromium.org</owner>
   <owner>mahmadi@chromium.org</owner>
   <summary>

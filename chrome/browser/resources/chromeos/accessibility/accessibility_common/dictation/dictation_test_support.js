@@ -61,7 +61,7 @@ class DictationTestSupport {
   }
 
   /** Waits for the SandboxedPumpkinTagger to initialize. */
-  async WaitForPumpkinTaggerReady() {
+  async waitForPumpkinTaggerReady() {
     const strategy = this.dictation_.speechParser_.pumpkinParseStrategy_;
     const isReady = () => {
       return strategy.pumpkinTaggerReady_;
@@ -124,6 +124,45 @@ class DictationTestSupport {
       editableNode.addEventListener(
           chrome.automation.EventType.VALUE_IN_TEXT_FIELD_CHANGED,
           onEditableValueChanged);
+    });
+
+    this.notifyCcTests_();
+  }
+
+  /**
+   * @param {number} selStart
+   * @param {number} selEnd
+   */
+  async setSelection(selStart, selEnd) {
+    await this.dictation_.inputController_.setSelection_(selStart, selEnd);
+    this.notifyCcTests_();
+  }
+
+  /**
+   * @param {number} selStart
+   * @param {number} selEnd
+   */
+  async waitForSelection(selStart, selEnd) {
+    const inputController = this.dictation_.inputController_;
+    const goalTest = () => {
+      const data = inputController.getEditableNodeData();
+      return data && data.selStart === selStart && data.selEnd === selEnd;
+    };
+
+    if (goalTest()) {
+      this.notifyCcTests_();
+      return;
+    }
+
+    await new Promise(resolve => {
+      const onSelectionChanged = () => {
+        if (goalTest()) {
+          inputController.onSelectionChangedForTesting_ = null;
+          resolve();
+        }
+      };
+
+      inputController.onSelectionChangedForTesting_ = onSelectionChanged;
     });
 
     this.notifyCcTests_();

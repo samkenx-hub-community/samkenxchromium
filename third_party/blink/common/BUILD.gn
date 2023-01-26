@@ -156,6 +156,7 @@ source_set("common") {
     "fetch/fetch_api_request_body_mojom_traits.cc",
     "frame/frame_ad_evidence.cc",
     "frame/frame_ad_evidence_mojom_traits.cc",
+    "frame/frame_owner_element_type_mojom_traits.cc",
     "frame/frame_policy.cc",
     "frame/frame_policy_mojom_traits.cc",
     "frame/frame_visual_properties.cc",
@@ -493,5 +494,6 @@ if (use_libfuzzer) {
       "//third_party/blink/public/common:storage_key_proto_converter",
       "//third_party/libprotobuf-mutator",
     ]
+    seed_corpus = "//third_party/blink/common/storage_key/storage_key_corpus"
   }
 }

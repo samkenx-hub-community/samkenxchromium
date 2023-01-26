@@ -2508,6 +2508,11 @@ void AutofillMetrics::FormInteractionsUkmLogger::
   // TODO(crbug.com/1325851): Add a metric in |FieldInfo| UKM event to indicate
   // whether the user had any data available for the respective field type.
 
+  // If multiple fields have the same signature, this indicates the position
+  // within this set of fields. This allows us to understand problems related
+  // to duplicated field signatures.
+  size_t rank_in_field_signature_group = 0;
+
   // Field types from local heuristics prediction.
   // The field type from the active local heuristic pattern.
   ServerFieldType heuristic_type = UNKNOWN_TYPE;
@@ -2524,15 +2529,30 @@ void AutofillMetrics::FormInteractionsUkmLogger::
   // only for non-user-visible metrics, one step before experimental.
   ServerFieldType heuristic_next_gen_type = UNKNOWN_TYPE;
 
-  // If multiple fields have the same signature, this indicates the position
-  // within this set of fields. This allows us to understand problems related
-  // to duplicated field signatures.
-  size_t rank_in_field_signature_group = 0;
+  // Field types from Autocomplete attribute.
+  // Information of the HTML autocomplete attribute, see
+  // components/autofill/core/common/mojom/autofill_types.mojom.
+  HtmlFieldMode html_mode = HtmlFieldMode::kNone;
+  HtmlFieldType html_type = HtmlFieldType::kUnrecognized;
+
+  // The field type predicted by the Autofill crowdsourced server from
+  // majority voting.
+  ServerFieldType server_type1 = NO_SERVER_DATA;
+  FieldPrediction::Source prediction_source1 =
+      FieldPrediction::SOURCE_UNSPECIFIED;
+  ServerFieldType server_type2 = NO_SERVER_DATA;
+  FieldPrediction::Source prediction_source2 =
+      FieldPrediction::SOURCE_UNSPECIFIED;
+  // This is an annotation for server predicted field types which indicates
+  // that a manual override defines the server type.
+  bool server_type_is_override = false;
 
   bool had_heuristic_type = false;
+  bool had_html_type = false;
+  bool had_server_type = false;
 
   for (const auto& log_event : field_log_events) {
-    static_assert(absl::variant_size<AutofillField::FieldLogEventType>() == 6,
+    static_assert(absl::variant_size<AutofillField::FieldLogEventType>() == 8,
                   "When adding new variants check that this function does not "
                   "need to be updated.");
     if (auto* event =
@@ -2596,6 +2616,24 @@ void AutofillMetrics::FormInteractionsUkmLogger::
       rank_in_field_signature_group = event->rank_in_field_signature_group;
       had_heuristic_type = true;
     }
+
+    if (auto* event =
+            absl::get_if<AutocompleteAttributeFieldLogEvent>(&log_event)) {
+      html_type = event->html_type;
+      html_mode = event->html_mode;
+      rank_in_field_signature_group = event->rank_in_field_signature_group;
+      had_html_type = true;
+    }
+
+    if (auto* event = absl::get_if<ServerPredictionFieldLogEvent>(&log_event)) {
+      server_type1 = event->server_type1;
+      prediction_source1 = event->prediction_source1;
+      server_type2 = event->server_type2;
+      prediction_source2 = event->prediction_source2;
+      server_type_is_override = event->server_type_prediction_is_override;
+      rank_in_field_signature_group = event->rank_in_field_signature_group;
+      had_server_type = true;
+    }
   }
 
   if (had_value_after_filling != OptionalBoolean::kUndefined ||
@@ -2651,8 +2689,24 @@ void AutofillMetrics::FormInteractionsUkmLogger::
         .SetHeuristicTypeLegacy(heuristic_legacy_type)
         .SetHeuristicTypeDefault(heuristic_default_type)
         .SetHeuristicTypeExperimental(heuristic_experimental_type)
-        .SetHeuristicTypeNextGen(heuristic_next_gen_type)
-        .SetRankInFieldSignatureGroup(rank_in_field_signature_group);
+        .SetHeuristicTypeNextGen(heuristic_next_gen_type);
+  }
+
+  if (had_html_type) {
+    builder.SetHtmlFieldType(static_cast<int>(html_type))
+        .SetHtmlFieldMode(static_cast<int>(html_mode));
+  }
+
+  if (had_server_type) {
+    builder.SetServerType1(server_type1)
+        .SetServerPredictionSource1(prediction_source1)
+        .SetServerType2(server_type2)
+        .SetServerPredictionSource2(prediction_source2)
+        .SetServerTypeIsOverride(server_type_is_override);
+  }
+
+  if (rank_in_field_signature_group) {
+    builder.SetRankInFieldSignatureGroup(rank_in_field_signature_group);
   }
 
   builder.Record(ukm_recorder_);
@@ -2958,25 +3012,10 @@ void AutofillMetrics::LogSilentUpdatesProfileImportType(
       "Autofill.ProfileImport.SilentUpdatesProfileImportType", import_type);
 }
 
-void AutofillMetrics::LogSilentUpdatesWithRemovedPhoneNumberProfileImportType(
-    AutofillProfileImportType import_type) {
-  base::UmaHistogramEnumeration(
-      "Autofill.ProfileImport."
-      "SilentUpdatesWithRemovedPhoneNumberProfileImportType",
-      import_type);
-}
-
 void AutofillMetrics::LogNewProfileImportDecision(
     AutofillClient::SaveAddressProfileOfferUserDecision decision) {
   base::UmaHistogramEnumeration("Autofill.ProfileImport.NewProfileDecision",
                                 decision);
-}
-
-void AutofillMetrics::LogNewProfileWithComplementedCountryImportDecision(
-    AutofillClient::SaveAddressProfileOfferUserDecision decision) {
-  base::UmaHistogramEnumeration(
-      "Autofill.ProfileImport.NewProfileWithComplementedCountryDecision",
-      decision);
 }
 
 void AutofillMetrics::LogNewProfileWithIgnoredCountryImportDecision(
@@ -2985,23 +3024,10 @@ void AutofillMetrics::LogNewProfileWithIgnoredCountryImportDecision(
       "Autofill.ProfileImport.NewProfileWithIgnoredCountryDecision", decision);
 }
 
-void AutofillMetrics::LogNewProfileWithRemovedPhoneNumberImportDecision(
-    AutofillClient::SaveAddressProfileOfferUserDecision decision) {
-  base::UmaHistogramEnumeration(
-      "Autofill.ProfileImport.NewProfileWithRemovedPhoneNumberDecision",
-      decision);
-}
-
 void AutofillMetrics::LogNewProfileEditedType(ServerFieldType edited_type) {
   base::UmaHistogramEnumeration(
       "Autofill.ProfileImport.NewProfileEditedType",
       ConvertSettingsVisibleFieldTypeForMetrics(edited_type));
-}
-
-void AutofillMetrics::LogNewProfileEditedComplementedCountry() {
-  base::UmaHistogramEnumeration(
-      "Autofill.ProfileImport.NewProfileEditedComplementedCountry",
-      AutofillMetrics::SettingsVisibleFieldTypeForMetrics::kCountry);
 }
 
 void AutofillMetrics::LogNewProfileNumberOfEditedFields(
@@ -3017,24 +3043,10 @@ void AutofillMetrics::LogProfileUpdateImportDecision(
                                 decision);
 }
 
-void AutofillMetrics::LogProfileUpdateWithComplementedCountryImportDecision(
-    AutofillClient::SaveAddressProfileOfferUserDecision decision) {
-  base::UmaHistogramEnumeration(
-      "Autofill.ProfileImport.UpdateProfileWithComplementedCountryDecision",
-      decision);
-}
-
 void AutofillMetrics::LogProfileUpdateWithIgnoredCountryImportDecision(
     AutofillClient::SaveAddressProfileOfferUserDecision decision) {
   base::UmaHistogramEnumeration(
       "Autofill.ProfileImport.UpdateProfileWithIgnoredCountryDecision",
-      decision);
-}
-
-void AutofillMetrics::LogProfileUpdateWithRemovedPhoneNumberImportDecision(
-    AutofillClient::SaveAddressProfileOfferUserDecision decision) {
-  base::UmaHistogramEnumeration(
-      "Autofill.ProfileImport.UpdateProfileWithRemovedPhoneNumberDecision",
       decision);
 }
 
@@ -3057,12 +3069,6 @@ void AutofillMetrics::LogProfileUpdateEditedType(ServerFieldType edited_type) {
   base::UmaHistogramEnumeration(
       "Autofill.ProfileImport.UpdateProfileEditedType",
       ConvertSettingsVisibleFieldTypeForMetrics(edited_type));
-}
-
-void AutofillMetrics::LogProfileUpdateEditedComplementedCountry() {
-  base::UmaHistogramEnumeration(
-      "Autofill.ProfileImport.UpdateProfileEditedComplementedCountry",
-      AutofillMetrics::SettingsVisibleFieldTypeForMetrics::kCountry);
 }
 
 void AutofillMetrics::LogUpdateProfileNumberOfEditedFields(

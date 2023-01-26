@@ -129,7 +129,7 @@ class StyleBuilderConverter {
   static T ConvertFlags(StyleResolverState&, const CSSValue&);
   static FontDescription::FamilyDescription ConvertFontFamily(
       StyleResolverState&,
-      const ScopedCSSValue&);
+      const CSSValue&);
   static scoped_refptr<FontFeatureSettings> ConvertFontFeatureSettings(
       StyleResolverState&,
       const CSSValue&);
@@ -193,20 +193,14 @@ class StyleBuilderConverter {
   static absl::optional<Length> ConvertGapLength(const StyleResolverState&,
                                                  const CSSValue&);
   static Length ConvertLength(const StyleResolverState&, const CSSValue&);
-  static Length ConvertLength(const StyleResolverState&, const ScopedCSSValue&);
   static UnzoomedLength ConvertUnzoomedLength(StyleResolverState&,
                                               const CSSValue&);
   static float ConvertZoom(const StyleResolverState&, const CSSValue&);
   static TimelineInset ConvertSingleTimelineInset(StyleResolverState&,
                                                   const CSSValue&);
   static Length ConvertLengthOrAuto(const StyleResolverState&, const CSSValue&);
-  static Length ConvertLengthOrAuto(const StyleResolverState&,
-                                    const ScopedCSSValue&);
   static Length ConvertLengthSizing(StyleResolverState&, const CSSValue&);
-  static Length ConvertLengthSizing(StyleResolverState&, const ScopedCSSValue&);
   static Length ConvertLengthMaxSizing(StyleResolverState&, const CSSValue&);
-  static Length ConvertLengthMaxSizing(StyleResolverState&,
-                                       const ScopedCSSValue&);
   static TabSize ConvertLengthOrTabSpaces(StyleResolverState&, const CSSValue&);
   static Length ConvertLineHeight(StyleResolverState&, const CSSValue&);
   static float ConvertNumberOrPercentage(StyleResolverState&, const CSSValue&);

@@ -267,9 +267,14 @@ PrivacySandboxService::GetRequiredPromptType() {
 
 void PrivacySandboxService::PromptActionOccurred(
     PrivacySandboxService::PromptAction action) {
-  InformSentimentService(action);
   RecordPromptActionMetrics(action);
 
+  if (base::FeatureList::IsEnabled(privacy_sandbox::kPrivacySandboxSettings4)) {
+    PromptActionOccurredM1(action);
+    return;
+  }
+
+  InformSentimentService(action);
   if (PromptAction::kNoticeShown == action &&
       PromptType::kNotice == GetRequiredPromptType()) {
     // The Privacy Sandbox pref can be enabled when the notice has been
@@ -283,6 +288,43 @@ void PrivacySandboxService::PromptActionOccurred(
   } else if (PromptAction::kConsentDeclined == action) {
     pref_service_->SetBoolean(prefs::kPrivacySandboxApisEnabledV2, false);
     pref_service_->SetBoolean(prefs::kPrivacySandboxConsentDecisionMade, true);
+  }
+}
+
+void PrivacySandboxService::PromptActionOccurredM1(
+    PrivacySandboxService::PromptAction action) {
+  DCHECK(
+      base::FeatureList::IsEnabled(privacy_sandbox::kPrivacySandboxSettings4));
+
+  InformSentimentServiceM1(action);
+  if (PromptAction::kNoticeAcknowledge == action ||
+      PromptAction::kNoticeOpenSettings == action) {
+    if (privacy_sandbox::kPrivacySandboxSettings4ConsentRequired.Get()) {
+      pref_service_->SetBoolean(prefs::kPrivacySandboxM1EEANoticeAcknowledged,
+                                true);
+    } else {
+      DCHECK(privacy_sandbox::kPrivacySandboxSettings4NoticeRequired.Get());
+      pref_service_->SetBoolean(prefs::kPrivacySandboxM1RowNoticeAcknowledged,
+                                true);
+      pref_service_->SetBoolean(prefs::kPrivacySandboxM1TopicsEnabled, true);
+    }
+    pref_service_->SetBoolean(prefs::kPrivacySandboxM1FledgeEnabled, true);
+    pref_service_->SetBoolean(prefs::kPrivacySandboxM1AdMeasurementEnabled,
+                              true);
+  } else if (PromptAction::kConsentAccepted == action) {
+    DCHECK(privacy_sandbox::kPrivacySandboxSettings4ConsentRequired.Get());
+    pref_service_->SetBoolean(prefs::kPrivacySandboxM1ConsentDecisionMade,
+                              true);
+    pref_service_->SetBoolean(prefs::kPrivacySandboxM1TopicsEnabled, true);
+    RecordUpdatedTopicsConsent(
+        privacy_sandbox::TopicsConsentUpdateSource::kConfirmation, true);
+  } else if (PromptAction::kConsentDeclined == action) {
+    DCHECK(privacy_sandbox::kPrivacySandboxSettings4ConsentRequired.Get());
+    pref_service_->SetBoolean(prefs::kPrivacySandboxM1ConsentDecisionMade,
+                              true);
+    pref_service_->SetBoolean(prefs::kPrivacySandboxM1TopicsEnabled, false);
+    RecordUpdatedTopicsConsent(
+        privacy_sandbox::TopicsConsentUpdateSource::kConfirmation, false);
   }
 }
 
@@ -584,9 +626,26 @@ void PrivacySandboxService::RecordPrivacySandbox4StartupMetrics() {
           PromptStartupState::kPromptNotShownDueToManagedState);
       return;
     }
+
+    case PromptSuppressedReason::kEEAFlowCompletedBeforeRowMigration: {
+      base::UmaHistogramEnumeration(
+          privacy_sandbox_prompt_startup_histogram,
+          topics_enabled
+              ? PromptStartupState::kEEAFlowCompletedWithTopicsAccepted
+              : PromptStartupState::kEEAFlowCompletedWithTopicsDeclined);
+      return;
+    }
   }
 
-  // Prompt was not suppressed at this point.
+  // Prompt was not suppressed explicitly at this point.
+
+  // Check if prompt was suppressed implicitly.
+  if (IsM1PrivacySandboxEffectivelyManaged(pref_service_)) {
+    base::UmaHistogramEnumeration(
+        privacy_sandbox_prompt_startup_histogram,
+        PromptStartupState::kPromptNotShownDueToManagedState);
+    return;
+  }
 
   // EEA
   if (privacy_sandbox::kPrivacySandboxSettings4ConsentRequired.Get()) {
@@ -759,7 +818,9 @@ void PrivacySandboxService::ConvertInterestGroupDataKeysForDisplay(
 std::vector<privacy_sandbox::CanonicalTopic>
 PrivacySandboxService::GetCurrentTopTopics() const {
   if (privacy_sandbox::kPrivacySandboxSettings3ShowSampleDataForTesting.Get() ||
-      privacy_sandbox::kPrivacySandboxSettings4ShowSampleDataForTesting.Get()) {
+      (pref_service_->GetBoolean(prefs::kPrivacySandboxM1TopicsEnabled) &&
+       privacy_sandbox::kPrivacySandboxSettings4ShowSampleDataForTesting
+           .Get())) {
     return {fake_current_topics_.begin(), fake_current_topics_.end()};
   }
 
@@ -904,20 +965,13 @@ bool PrivacySandboxService::IsPartOfManagedFirstPartySet(
   return first_party_sets_policy_service_->IsSiteInManagedSet(site);
 }
 
-void PrivacySandboxService::TopicsConfirmationDecisionMade(
-    bool confirmed) const {
-  RecordUpdatedTopicsConsent(
-      privacy_sandbox::TopicsConsentUpdateSource::kConfirmation, confirmed);
-}
-
 void PrivacySandboxService::TopicsToggleChanged(bool new_value) const {
   RecordUpdatedTopicsConsent(
       privacy_sandbox::TopicsConsentUpdateSource::kSettings, new_value);
 }
 
-void PrivacySandboxService::TopicsConsentRequired() const {
-  // TODO(crbug.com/1332513): Implement + Test.
-  NOTIMPLEMENTED();
+bool PrivacySandboxService::TopicsConsentRequired() const {
+  return privacy_sandbox::kPrivacySandboxSettings4ConsentRequired.Get();
 }
 
 bool PrivacySandboxService::TopicsHasActiveConsent() const {
@@ -1194,6 +1248,12 @@ PrivacySandboxService::GetRequiredPromptTypeInternalM1(
     return PromptType::kNone;
   }
 
+  // If an Admin controls any of the K-APIs or suppresses the prompt explicitly
+  // then don't show the prompt.
+  if (IsM1PrivacySandboxEffectivelyManaged(pref_service)) {
+    return PromptType::kNone;
+  }
+
   if (pref_service->GetBoolean(prefs::kPrivacySandboxConsentDecisionMade) ||
       pref_service->GetBoolean(prefs::kPrivacySandboxNoticeDisplayed)) {
     // If during the trials a previous consent decision was made, or the notice
@@ -1247,6 +1307,20 @@ PrivacySandboxService::GetRequiredPromptTypeInternalM1(
   }
 
   DCHECK(privacy_sandbox::kPrivacySandboxSettings4NoticeRequired.Get());
+
+  // If a user that migrated from EEA to ROW has already completed the EEA
+  // consent and notice flow, set the suppression reason as such and do not show
+  // a prompt.
+  if (pref_service->GetBoolean(prefs::kPrivacySandboxM1ConsentDecisionMade) &&
+      (pref_service->GetBoolean(
+          prefs::kPrivacySandboxM1EEANoticeAcknowledged))) {
+    pref_service->SetInteger(
+        prefs::kPrivacySandboxM1PromptSuppressed,
+        static_cast<int>(
+            PromptSuppressedReason::kEEAFlowCompletedBeforeRowMigration));
+    return PromptType::kNone;
+  }
+
   // If the notice has already been acknowledged, do not show a prompt.
   // Else, show the row notice prompt.
   if (pref_service->GetBoolean(prefs::kPrivacySandboxM1RowNoticeAcknowledged)) {
@@ -1355,6 +1429,38 @@ void PrivacySandboxService::InformSentimentService(
   }
 
   sentiment_service_->InteractedWithPrivacySandbox3(area);
+#endif
+}
+
+void PrivacySandboxService::InformSentimentServiceM1(
+    PrivacySandboxService::PromptAction action) {
+#if !BUILDFLAG(IS_ANDROID)
+  if (!sentiment_service_) {
+    return;
+  }
+
+  TrustSafetySentimentService::FeatureArea area;
+  switch (action) {
+    case PromptAction::kNoticeOpenSettings:
+      area = TrustSafetySentimentService::FeatureArea::
+          kPrivacySandbox4NoticeSettings;
+      break;
+    case PromptAction::kNoticeAcknowledge:
+      area = TrustSafetySentimentService::FeatureArea::kPrivacySandbox4NoticeOk;
+      break;
+    case PromptAction::kConsentAccepted:
+      area = TrustSafetySentimentService::FeatureArea::
+          kPrivacySandbox4ConsentAccept;
+      break;
+    case PromptAction::kConsentDeclined:
+      area = TrustSafetySentimentService::FeatureArea::
+          kPrivacySandbox4ConsentDecline;
+      break;
+    default:
+      return;
+  }
+
+  sentiment_service_->InteractedWithPrivacySandbox4(area);
 #endif
 }
 
@@ -1489,4 +1595,23 @@ void PrivacySandboxService::OnAdMeasurementPrefChanged() {
                 DATA_TYPE_PRIVATE_AGGREGATION_INTERNAL,
         content::BrowsingDataRemover::ORIGIN_TYPE_UNPROTECTED_WEB);
   }
+}
+
+// static
+bool PrivacySandboxService::IsM1PrivacySandboxEffectivelyManaged(
+    PrefService* pref_service) {
+  bool is_prompt_suppressed_by_policy =
+      pref_service->IsManagedPreference(
+          prefs::kPrivacySandboxM1PromptSuppressed) &&
+      static_cast<int>(
+          PrivacySandboxService::PromptSuppressedReason::kPolicy) ==
+          pref_service->GetInteger(prefs::kPrivacySandboxM1PromptSuppressed);
+
+  return is_prompt_suppressed_by_policy ||
+         pref_service->IsManagedPreference(
+             prefs::kPrivacySandboxM1TopicsEnabled) ||
+         pref_service->IsManagedPreference(
+             prefs::kPrivacySandboxM1FledgeEnabled) ||
+         pref_service->IsManagedPreference(
+             prefs::kPrivacySandboxM1AdMeasurementEnabled);
 }

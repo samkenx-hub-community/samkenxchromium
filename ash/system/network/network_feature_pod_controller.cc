@@ -158,7 +158,6 @@ bool SetNetworkTypeEnabled(bool enabled) {
 NetworkFeaturePodController::NetworkFeaturePodController(
     UnifiedSystemTrayController* tray_controller)
     : tray_controller_(tray_controller) {
-  DCHECK(ash::features::IsQuickSettingsNetworkRevampEnabled());
   Shell::Get()->system_tray_model()->network_state_model()->AddObserver(this);
 }
 
@@ -184,7 +183,8 @@ FeaturePodButton* NetworkFeaturePodController::CreateButton() {
   return button.release();
 }
 
-std::unique_ptr<FeatureTile> NetworkFeaturePodController::CreateTile() {
+std::unique_ptr<FeatureTile> NetworkFeaturePodController::CreateTile(
+    bool compact) {
   DCHECK(features::IsQsRevampEnabled());
   auto tile = std::make_unique<FeatureTile>(
       base::BindRepeating(&FeaturePodControllerBase::OnIconPressed,

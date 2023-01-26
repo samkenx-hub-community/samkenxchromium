@@ -62,14 +62,14 @@ bool ExtensionAppRunsInOS(const std::string& app_id);
 // used to support Chrome OS features such as text to speech or vox, or they are
 // not compatible with Lacros yet. When this method is invoked in Lacros, it may
 // not know about OS-specific extension apps that are compiled into ash.
-bool ExtensionAppRunsInOSOnly(const std::string& app_id);
+bool ExtensionAppRunsInOSOnly(base::StringPiece app_id);
 
 // Returns true if the extension is kept to run in Ash ONLY. A small list of
 // 1st party extensions will continue to run in Ash either since they are
 // used to support Chrome OS features such as text to speech or vox, or they are
 // not compatible with Lacros yet. When this method is invoked in Lacros, it may
 // not know about OS-specific extensions that are compiled into ash.
-bool ExtensionRunsInOSOnly(const std::string& extension_id);
+bool ExtensionRunsInOSOnly(base::StringPiece extension_id);
 
 #if BUILDFLAG(IS_CHROMEOS_LACROS)
 bool IsAppServiceBlocklistCrosapiSupported();
@@ -77,22 +77,22 @@ bool IsAppServiceBlocklistCrosapiSupported();
 // Returns true if the app is on app service block list in Lacros, i.e.,
 // the app can't be published in app service by Lacros.
 bool ExtensionAppBlockListedForAppServiceInStandaloneBrowser(
-    const std::string& app_id);
+    base::StringPiece app_id);
 
 // Returns true if the extension is on app service block list in Lacros, i.e.,
 // the extension can't be published in app service by Lacros.
 bool ExtensionBlockListedForAppServiceInStandaloneBrowser(
-    const std::string& extension_id);
+    base::StringPiece extension_id);
 #endif
 
 #if BUILDFLAG(IS_CHROMEOS_ASH)
 // Returns true if the app is on app service block list in Ash, i.e.,
 // the app can't be published in app service by Ash.
-bool ExtensionAppBlockListedForAppServiceInOS(const std::string& app_id);
+bool ExtensionAppBlockListedForAppServiceInOS(base::StringPiece app_id);
 
 // Returns true if the extension is on app service block list in Ash, i.e.,
 // the extension can't be published in app service by Ash.
-bool ExtensionBlockListedForAppServiceInOS(const std::string& extension_id);
+bool ExtensionBlockListedForAppServiceInOS(base::StringPiece extension_id);
 #endif
 
 size_t ExtensionsRunInOSAndStandaloneBrowserAllowlistSizeForTest();

@@ -13,7 +13,7 @@
 #import "components/strings/grit/components_strings.h"
 #import "ios/chrome/browser/bookmarks/bookmark_model_factory.h"
 #import "ios/chrome/browser/browser_state/chrome_browser_state.h"
-#import "ios/chrome/browser/find_in_page/java_script_find_tab_helper.h"
+#import "ios/chrome/browser/find_in_page/abstract_find_tab_helper.h"
 #import "ios/chrome/browser/main/browser.h"
 #import "ios/chrome/browser/sessions/ios_chrome_tab_restore_service_factory.h"
 #import "ios/chrome/browser/tabs/tab_title_util.h"
@@ -169,6 +169,16 @@ using base::UserMetricsAction;
 }
 
 - (BOOL)canPerformAction:(SEL)action withSender:(id)sender {
+  // BVC prevents KeyCommandsProvider from providing key commands when it has
+  // `presentedViewController` set. But there is an interval between presenting
+  // a view controller and having `presentedViewController` set. In that window,
+  // KeyCommandsProvider can register key commands while it shouldn't.
+  // To prevent actions from executing, check again if there is a
+  // `presentedViewController`.
+  if (_viewController.presentedViewController) {
+    return NO;
+  }
+
   if (sel_isEqual(action, @selector(keyCommand_back))) {
     BOOL canPerformBack =
         self.tabsCount > 0 && self.navigationAgent->CanGoBack();
@@ -542,8 +552,7 @@ using base::UserMetricsAction;
     return NO;
   }
 
-  JavaScriptFindTabHelper* helper =
-      JavaScriptFindTabHelper::FromWebState(currentWebState);
+  auto* helper = GetConcreteFindTabHelperFromWebState(currentWebState);
   return (helper && helper->CurrentPageSupportsFindInPage());
 }
 
@@ -554,8 +563,7 @@ using base::UserMetricsAction;
     return NO;
   }
 
-  JavaScriptFindTabHelper* helper =
-      JavaScriptFindTabHelper::FromWebState(currentWebState);
+  auto* helper = GetConcreteFindTabHelperFromWebState(currentWebState);
   return (helper && helper->IsFindUIActive());
 }
 

@@ -15,7 +15,6 @@ import org.chromium.chrome.browser.flags.BooleanCachedFieldTrialParameter;
 import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.flags.DoubleCachedFieldTrialParameter;
 import org.chromium.chrome.browser.flags.IntCachedFieldTrialParameter;
-import org.chromium.chrome.browser.tasks.ConditionalTabStripUtils;
 import org.chromium.chrome.browser.tasks.ReturnToChromeUtil;
 import org.chromium.ui.base.DeviceFormFactor;
 
@@ -109,6 +108,14 @@ public class TabUiFeatureUtilities {
     public static final BooleanCachedFieldTrialParameter ENABLE_TAB_SELECTION_EDITOR_V2_SHARE =
             new BooleanCachedFieldTrialParameter(ChromeFeatureList.TAB_SELECTION_EDITOR_V2,
                     TAB_SELECTION_EDITOR_V2_SHARE_PARAM, false);
+    // Field trial parameter for controlling longpress entry into TabSelectionEditorV2 from
+    // TabGridDialog and TabSwitcher.
+    private static final String TAB_SELECTION_EDITOR_V2_LONGPRESS_ENTRY_PARAM =
+            "enable_longpress_entrypoint";
+    public static final BooleanCachedFieldTrialParameter
+            ENABLE_TAB_SELECTION_EDITOR_V2_LONGPRESS_ENTRY =
+                    new BooleanCachedFieldTrialParameter(ChromeFeatureList.TAB_SELECTION_EDITOR_V2,
+                            TAB_SELECTION_EDITOR_V2_LONGPRESS_ENTRY_PARAM, false);
 
     // Field trial parameter for controlling bookmark tabs in TabSelectionEditorV2.
     private static final String TAB_SELECTION_EDITOR_V2_BOOKMARKS_PARAM = "enable_bookmarks";
@@ -252,16 +259,6 @@ public class TabUiFeatureUtilities {
     public static boolean isTabSelectionEditorV2Enabled(Context context) {
         return isTabGroupsAndroidEnabled(context)
                 && ChromeFeatureList.sTabSelectionEditorV2.isEnabled();
-    }
-
-    /**
-     * @return Whether the conditional tab strip feature is enabled and available for use.
-     */
-    public static boolean isConditionalTabStripEnabled() {
-        // TODO(crbug.com/1222946): Deprecate this feature.
-        return ChromeFeatureList.sConditionalTabStripAndroid.isEnabled()
-                && isTabManagementModuleSupported()
-                && !ConditionalTabStripUtils.getOptOutIndicator();
     }
 
     /**

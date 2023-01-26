@@ -88,8 +88,13 @@ class ReadAnythingAppControllerTest : public ChromeRenderViewTest {
 
   void AccessibilityEventReceived(
       const std::vector<ui::AXTreeUpdate>& updates) {
-    controller_->AccessibilityEventReceived(updates[0].tree_data.tree_id,
-                                            updates, {});
+    AccessibilityEventReceived(updates[0].tree_data.tree_id, updates);
+  }
+
+  void AccessibilityEventReceived(
+      const ui::AXTreeID& tree_id,
+      const std::vector<ui::AXTreeUpdate>& updates) {
+    controller_->AccessibilityEventReceived(tree_id, updates, {});
   }
 
   void OnActiveAXTreeIDChanged(const ui::AXTreeID& tree_id) {
@@ -97,7 +102,12 @@ class ReadAnythingAppControllerTest : public ChromeRenderViewTest {
   }
 
   void OnAXTreeDistilled(const std::vector<ui::AXNodeID>& content_node_ids) {
-    controller_->OnAXTreeDistilled(content_node_ids);
+    OnAXTreeDistilled(tree_id_, content_node_ids);
+  }
+
+  void OnAXTreeDistilled(const ui::AXTreeID& tree_id,
+                         const std::vector<ui::AXNodeID>& content_node_ids) {
+    controller_->OnAXTreeDistilled(tree_id, content_node_ids);
   }
 
   void OnAXTreeDestroyed(const ui::AXTreeID& tree_id) {
@@ -136,6 +146,14 @@ class ReadAnythingAppControllerTest : public ChromeRenderViewTest {
 
   std::string GetUrl(ui::AXNodeID ax_node_id) {
     return controller_->GetUrl(ax_node_id);
+  }
+
+  bool ShouldBold(ui::AXNodeID ax_node_id) {
+    return controller_->ShouldBold(ax_node_id);
+  }
+
+  bool IsOverline(ui::AXNodeID ax_node_id) {
+    return controller_->IsOverline(ax_node_id);
   }
 
   size_t GetNumTrees() { return controller_->trees_.size(); }
@@ -419,6 +437,37 @@ TEST_F(ReadAnythingAppControllerTest, GetUrl) {
   EXPECT_EQ(url, GetUrl(2));
   EXPECT_EQ(invalid_url, GetUrl(3));
   EXPECT_EQ(missing_url, GetUrl(4));
+}
+
+TEST_F(ReadAnythingAppControllerTest, ShouldBold) {
+  ui::AXTreeUpdate update;
+  SetUpdateTreeID(&update);
+  update.nodes.resize(3);
+  update.nodes[0].id = 2;
+  update.nodes[1].id = 3;
+  update.nodes[2].id = 4;
+  update.nodes[0].AddTextStyle(ax::mojom::TextStyle::kOverline);
+  update.nodes[1].AddTextStyle(ax::mojom::TextStyle::kUnderline);
+  update.nodes[2].AddTextStyle(ax::mojom::TextStyle::kItalic);
+  AccessibilityEventReceived({update});
+  OnAXTreeDistilled({});
+  EXPECT_EQ(false, ShouldBold(2));
+  EXPECT_EQ(true, ShouldBold(3));
+  EXPECT_EQ(true, ShouldBold(4));
+}
+
+TEST_F(ReadAnythingAppControllerTest, IsOverline) {
+  ui::AXTreeUpdate update;
+  SetUpdateTreeID(&update);
+  update.nodes.resize(2);
+  update.nodes[0].id = 2;
+  update.nodes[1].id = 3;
+  update.nodes[0].AddTextStyle(ax::mojom::TextStyle::kOverline);
+  update.nodes[1].AddTextStyle(ax::mojom::TextStyle::kUnderline);
+  AccessibilityEventReceived({update});
+  OnAXTreeDistilled({});
+  EXPECT_EQ(true, IsOverline(2));
+  EXPECT_EQ(false, IsOverline(3));
 }
 
 TEST_F(ReadAnythingAppControllerTest, DisplayNodeIdsContains_Selection) {
@@ -791,4 +840,74 @@ TEST_F(ReadAnythingAppControllerTest,
   EXPECT_CALL(*distiller_, Distill).Times(1);
   OnActiveAXTreeIDChanged(tree_id_);
   EXPECT_EQ("567", GetTextContent(1));
+}
+
+TEST_F(ReadAnythingAppControllerTest,
+       OnAXTreeDistilledCalledWithInactiveTreeId) {
+  OnActiveAXTreeIDChanged(ui::AXTreeID::CreateNewAXTreeID());
+  // Should not crash.
+  OnAXTreeDistilled({});
+}
+
+TEST_F(ReadAnythingAppControllerTest,
+       OnAXTreeDistilledCalledWithDestroyedTreeId) {
+  OnAXTreeDestroyed(tree_id_);
+  // Should not crash.
+  OnAXTreeDistilled({});
+}
+
+TEST_F(ReadAnythingAppControllerTest,
+       OnAXTreeDistilledCalledWithUnknownActiveTreeId) {
+  OnActiveAXTreeIDChanged(ui::AXTreeIDUnknown());
+  // Should not crash.
+  OnAXTreeDistilled({});
+}
+
+TEST_F(ReadAnythingAppControllerTest,
+       OnAXTreeDistilledCalledWithUnknownTreeId) {
+  // Should not crash.
+  OnAXTreeDistilled(ui::AXTreeIDUnknown(), {});
+}
+
+TEST_F(ReadAnythingAppControllerTest,
+       ChangeActiveTreeWithPendingUpdates_UnknownID) {
+  EXPECT_EQ(0u, GetNumPendingUpdates());
+
+  // Create a couple of updates which add additional nodes to the tree.
+  std::vector<ui::AXTreeUpdate> updates;
+  std::vector<int> child_ids = {2, 3, 4};
+  for (int i = 0; i < 2; i++) {
+    int id = i + 5;
+    child_ids.push_back(id);
+
+    ui::AXTreeUpdate update;
+    SetUpdateTreeID(&update);
+    update.root_id = 1;
+    update.nodes.resize(2);
+    update.nodes[0].id = 1;
+    update.nodes[0].child_ids = child_ids;
+    update.nodes[1].id = id;
+    update.nodes[1].role = ax::mojom::Role::kStaticText;
+    update.nodes[1].SetName(base::NumberToString(id));
+    update.nodes[1].SetNameFrom(ax::mojom::NameFrom::kContents);
+    updates.push_back(update);
+  }
+
+  // Create an update which has no tree id.
+  ui::AXTreeUpdate update;
+  update.nodes.resize(1);
+  update.nodes[0].id = 1;
+  update.nodes[0].role = ax::mojom::Role::kGenericContainer;
+  updates.push_back(update);
+
+  // Add the three updates.
+  EXPECT_CALL(*distiller_, Distill).Times(1);
+  AccessibilityEventReceived({updates[0]});
+  EXPECT_EQ(0u, GetNumPendingUpdates());
+  AccessibilityEventReceived(tree_id_, {updates[1], updates[2]});
+  EXPECT_EQ(2u, GetNumPendingUpdates());
+
+  // Switch to a new active tree. Should not crash.
+  EXPECT_CALL(*distiller_, Distill).Times(0);
+  OnActiveAXTreeIDChanged(ui::AXTreeIDUnknown());
 }

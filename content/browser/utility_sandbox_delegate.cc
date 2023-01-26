@@ -14,7 +14,7 @@
 #include "printing/buildflags/buildflags.h"
 #include "sandbox/policy/mojom/sandbox.mojom.h"
 
-#if BUILDFLAG(USE_ZYGOTE_HANDLE)
+#if BUILDFLAG(USE_ZYGOTE)
 #include "content/common/zygote/zygote_handle_impl_linux.h"
 #include "sandbox/policy/sandbox_type.h"
 #endif
@@ -89,7 +89,7 @@ UtilitySandboxedProcessLauncherDelegate::
 }
 
 UtilitySandboxedProcessLauncherDelegate::
-    ~UtilitySandboxedProcessLauncherDelegate() {}
+    ~UtilitySandboxedProcessLauncherDelegate() = default;
 
 sandbox::mojom::Sandbox
 UtilitySandboxedProcessLauncherDelegate::GetSandboxType() {
@@ -102,8 +102,12 @@ base::EnvironmentMap UtilitySandboxedProcessLauncherDelegate::GetEnvironment() {
 }
 #endif  // BUILDFLAG(IS_POSIX)
 
-#if BUILDFLAG(USE_ZYGOTE_HANDLE)
+#if BUILDFLAG(USE_ZYGOTE)
 ZygoteCommunication* UtilitySandboxedProcessLauncherDelegate::GetZygote() {
+  if (zygote_.has_value()) {
+    return zygote_.value();
+  }
+
   // If the sandbox has been disabled for a given type, don't use a zygote.
   if (sandbox::policy::IsUnsandboxedSandboxType(sandbox_type_))
     return nullptr;
@@ -139,6 +143,11 @@ ZygoteCommunication* UtilitySandboxedProcessLauncherDelegate::GetZygote() {
   // All other types use the pre-sandboxed zygote.
   return GetGenericZygote();
 }
-#endif  // BUILDFLAG(USE_ZYGOTE_HANDLE)
+
+void UtilitySandboxedProcessLauncherDelegate::SetZygote(
+    ZygoteCommunication* handle) {
+  zygote_ = handle;
+}
+#endif  // BUILDFLAG(USE_ZYGOTE)
 
 }  // namespace content

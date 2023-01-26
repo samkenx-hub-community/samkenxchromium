@@ -525,10 +525,17 @@ void FillNavigationParamsRequest(
   }
 
   if (common_params.url.IsAboutSrcdoc()) {
-    // Pass on the `fallback_srcdoc_baseurl` sent from the frame host. This will
+    // Pass on the `initiator_base_url`sent via the common_params. This will be
     // picked up in DocumentLoader.
-    navigation_params->fallback_srcdoc_base_url =
-        commit_params.fallback_srcdoc_baseurl;
+    if (blink::features::IsNewBaseUrlInheritanceBehaviorEnabled()) {
+      // It's possible for initiator_base_url to be empty if this is an error
+      // srcdoc page. See
+      // NavigationRequestBrowserTest.OriginForSrcdocErrorPageInSubframe.
+      navigation_params->fallback_srcdoc_base_url =
+          common_params.initiator_base_url
+              ? WebURL(common_params.initiator_base_url.value())
+              : WebURL();
+    }
   }
 }
 
@@ -989,6 +996,8 @@ void FillMiscNavigationParams(
         commit_params.origin_to_commit.value();
   }
   navigation_params->storage_key = std::move(commit_params.storage_key);
+  navigation_params->session_storage_key =
+      std::move(commit_params.session_storage_key);
   navigation_params->frame_policy = commit_params.frame_policy;
 
   if (common_params.navigation_type == blink::mojom::NavigationType::RESTORE) {
@@ -1060,7 +1069,7 @@ void FillMiscNavigationParams(
       }
     }
     navigation_params->has_fenced_frame_reporting =
-        commit_params.fenced_frame_properties->reporting_metadata().has_value();
+        commit_params.fenced_frame_properties->has_fenced_frame_reporting();
   }
 
   navigation_params->ancestor_or_self_has_cspee =
@@ -2871,6 +2880,10 @@ void RenderFrameImpl::CommitFailedNavigation(
   DCHECK(!NavigationTypeUtils::IsSameDocument(common_params->navigation_type));
   // `origin_to_commit` must be set on failed navigations.
   CHECK(commit_params->origin_to_commit);
+
+  // The browser process should not send us an initiator_base_url in a failed
+  // navigation.
+  DCHECK(!common_params->initiator_base_url);
 
   AssertNavigationCommits assert_navigation_commits(
       this, kMayReplaceInitialEmptyDocument);
@@ -5712,9 +5725,6 @@ void RenderFrameImpl::BeginNavigationInternal(
   // The extra data was created in WillSendRequestInternal if it didn't exist.
   DCHECK(info->url_request.GetURLRequestExtraData());
 
-  // TODO(clamy): Same-document navigations should not be sent back to the
-  // browser.
-  // TODO(clamy): Data urls should not be sent back to the browser either.
   // These values are assumed on the browser side for navigations. These checks
   // ensure the renderer has the correct values.
   DCHECK_EQ(network::mojom::RequestMode::kNavigate,
@@ -5753,12 +5763,13 @@ void RenderFrameImpl::BeginNavigationInternal(
       CloneBlobURLToken(info->blob_url_token));
 
   int load_flags = info->url_request.GetLoadFlagsForWebUrlRequest();
-  absl::optional<base::Value::Dict> initiator;
+  absl::optional<base::Value::Dict> devtools_initiator;
   if (!info->devtools_initiator_info.IsNull()) {
-    absl::optional<base::Value> initiator_value =
+    absl::optional<base::Value> devtools_initiator_value =
         base::JSONReader::Read(info->devtools_initiator_info.Utf8());
-    if (initiator_value && initiator_value->is_dict())
-      initiator = std::move(*initiator_value).TakeDict();
+    if (devtools_initiator_value && devtools_initiator_value->is_dict()) {
+      devtools_initiator = std::move(*devtools_initiator_value).TakeDict();
+    }
   }
 
   absl::optional<network::ResourceRequest::WebBundleTokenParams>
@@ -5785,7 +5796,7 @@ void RenderFrameImpl::BeginNavigationInternal(
           blink::GetMixedContentContextTypeForWebURLRequest(info->url_request),
           is_form_submission, was_initiated_by_link_click, searchable_form_url,
           searchable_form_encoding, client_side_redirect_url,
-          std::move(initiator),
+          std::move(devtools_initiator),
           info->url_request.TrustTokenParams()
               ? info->url_request.TrustTokenParams()->Clone()
               : nullptr,
@@ -5956,10 +5967,8 @@ void RenderFrameImpl::CheckIfAudioSinkExistsAndIsAuthorized(
   std::move(
       blink::ConvertToOutputDeviceStatusCB(std::move(completion_callback)))
       .Run(blink::AudioDeviceFactory::GetInstance()
-               ->GetOutputDeviceInfo(
-                   GetWebFrame()->GetLocalFrameToken(),
-                   media::AudioSinkParameters(base::UnguessableToken(),
-                                              sink_id.Utf8()))
+               ->GetOutputDeviceInfo(GetWebFrame()->GetLocalFrameToken(),
+                                     sink_id.Utf8())
                .device_status());
 }
 

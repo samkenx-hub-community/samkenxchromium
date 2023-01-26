@@ -265,10 +265,10 @@ struct BLINK_EXPORT WebNavigationParams {
   WebURL pre_redirect_url_for_failed_navigations;
 
   // If `url` is about:srcdoc, this is the default base URL to use for the new
-  // document. It corresponds to the parent's base URL snapshotted when the
+  // document. It corresponds to the initiator's base URL snapshotted when the
   // navigation started.
-  // Note: this value is only used when the IsolateSandboxedIframes feature is
-  // enabled in the embedder.
+  // Note: this value is only used when the NewBaseUrlInheritanceBehavior
+  // feature is enabled in the embedder.
   // TODO(wjmaclean): Revisit the naming here when we expand to sending base
   // URLs for about:blank.
   WebURL fallback_srcdoc_base_url;
@@ -349,6 +349,15 @@ struct BLINK_EXPORT WebNavigationParams {
   // `storage_key`. The final storage key is computed by the document loader
   // taking into account the origin computed by the renderer.
   StorageKey storage_key;
+
+  // The storage key here is the one the browser process believes the renderer
+  // should use when binding session storage. This may differ from `storage_key`
+  // as a deprecation trial can prevent the partitioning of session storage.
+  // The document loader should verify this storage key is (1) the same as
+  // `storage_key` or (2) a first-party storage key at `storage_key.origin`.
+  //
+  // TODO(crbug.com/1407150): Remove this when deprecation trial is complete.
+  StorageKey session_storage_key;
 
   blink::DocumentToken document_token;
   // The devtools token for this navigation. See DocumentLoader

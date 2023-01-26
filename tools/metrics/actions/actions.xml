@@ -8975,6 +8975,30 @@ should be able to be added at any place in this file.
   </description>
 </action>
 
+<action name="FileBrowser.GoogleOneOffer.Dismiss">
+  <owner>yawano@google.com</owner>
+  <owner>src/ui/file_manager/OWNERS</owner>
+  <description>
+    Google One offer files banner gets dismissed by the user.
+  </description>
+</action>
+
+<action name="FileBrowser.GoogleOneOffer.GetPerk">
+  <owner>yawano@google.com</owner>
+  <owner>src/ui/file_manager/OWNERS</owner>
+  <description>
+    Get perk button of Google One offer files banner gets activated.
+  </description>
+</action>
+
+<action name="FileBrowser.GoogleOneOffer.Shown">
+  <owner>yawano@google.com</owner>
+  <owner>src/ui/file_manager/OWNERS</owner>
+  <description>
+    Google One offer files banner gets shown on Files app.
+  </description>
+</action>
+
 <action name="FileBrowser.PhotoEditor.Edit">
   <obsolete>Removed in M92.</obsolete>
   <owner>simmonsjosh@google.com</owner>
@@ -28706,6 +28730,14 @@ should be able to be added at any place in this file.
   <description>User clicks the extensions row in safety check.</description>
 </action>
 
+<action name="Settings.SafetyCheck.ReviewUnusedSitePermissions">
+  <owner>sideyilmaz@chromium.org</owner>
+  <owner>msramek@chromium.org</owner>
+  <description>
+    User clicks the button in the unused site permissions row in safety check.
+  </description>
+</action>
+
 <action name="Settings.SafetyCheck.Start">
   <owner>rainhard@chromium.org</owner>
   <owner>andzaytsev@google.com</owner>
@@ -34239,12 +34271,14 @@ should be able to be added at any place in this file.
 </action>
 
 <action name="TabStrip">
+  <obsolete>The feature was deprecated and code deleted.</obsolete>
   <owner>yusufo@chromium.org</owner>
   <owner>wychen@chromium.org</owner>
   <description>User actions about conditional tab strip.</description>
 </action>
 
 <action name="TabStrip.SessionVisibility">
+  <obsolete>The feature was deprecated and code deleted.</obsolete>
   <owner>yusufo@chromium.org</owner>
   <owner>wychen@chromium.org</owner>
   <description>
@@ -36495,6 +36529,12 @@ should be able to be added at any place in this file.
       label="Users opened TabSelectionEditorV2 from the Tab Dialog."/>
   <suffix name="OpenFromGrid"
       label="Users opened TabSelectionEditorV2 from the Tab Switcher."/>
+  <suffix name="OpenLongPressInDialog"
+      label="Users enacted a longpress action from the Tab Dialog to enter
+             TabSelectionEditorV2."/>
+  <suffix name="OpenLongPressInGrid"
+      label="Users enacted a longpress action from the Tab Switcher to enter
+             TabSelectionEditorV2."/>
   <suffix name="SelectAll"
       label="Users tapped on the select all button in TabSelectionEditorV2."/>
   <suffix name="SharedTabAsTextList"

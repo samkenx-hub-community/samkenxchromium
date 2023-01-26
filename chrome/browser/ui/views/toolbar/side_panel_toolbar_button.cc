@@ -9,6 +9,7 @@
 #include "build/branding_buildflags.h"
 #include "build/build_config.h"
 #include "chrome/app/vector_icons/vector_icons.h"
+#include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_element_identifiers.h"
 #include "chrome/browser/ui/ui_features.h"
@@ -57,8 +58,6 @@ void SidePanelToolbarButton::ButtonPressed() {
     return;
   }
 
-  browser_view->MaybeClobberAllSideSearchSidePanels();
-
   if (!side_panel_webview_) {
     // Using base::Unretained(this) is safe here because the side panel (and the
     // web view as its child) will be destroyed before the toolbar which will
@@ -79,7 +78,6 @@ void SidePanelToolbarButton::HideSidePanel() {
     browser_view->unified_side_panel()->RemoveChildViewT(
         side_panel_webview_.get());
     side_panel_webview_ = nullptr;
-    browser_view->RightAlignedSidePanelWasClosed();
   }
 }
 

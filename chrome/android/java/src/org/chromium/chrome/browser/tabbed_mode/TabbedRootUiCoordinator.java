@@ -66,6 +66,8 @@ import org.chromium.chrome.browser.multiwindow.MultiInstanceIphController;
 import org.chromium.chrome.browser.multiwindow.MultiWindowUtils;
 import org.chromium.chrome.browser.night_mode.WebContentsDarkModeMessageController;
 import org.chromium.chrome.browser.notifications.permissions.NotificationPermissionController;
+import org.chromium.chrome.browser.notifications.permissions.NotificationPermissionController.RationaleDelegate;
+import org.chromium.chrome.browser.notifications.permissions.NotificationPermissionRationaleBottomSheet;
 import org.chromium.chrome.browser.notifications.permissions.NotificationPermissionRationaleDialogController;
 import org.chromium.chrome.browser.ntp.NewTabPageLaunchOrigin;
 import org.chromium.chrome.browser.ntp.NewTabPageUtils;
@@ -111,7 +113,6 @@ import org.chromium.chrome.browser.ui.tablet.emptybackground.EmptyBackgroundView
 import org.chromium.chrome.browser.webapps.AddToHomescreenIPHController;
 import org.chromium.chrome.browser.webapps.AddToHomescreenMostVisitedTileClickObserver;
 import org.chromium.chrome.features.start_surface.StartSurface;
-import org.chromium.chrome.features.start_surface.StartSurfaceState;
 import org.chromium.chrome.features.start_surface.StartSurfaceUserData;
 import org.chromium.components.browser_ui.bottomsheet.EmptyBottomSheetObserver;
 import org.chromium.components.browser_ui.util.ComposedBrowserControlsVisibilityDelegate;
@@ -517,8 +518,7 @@ public class TabbedRootUiCoordinator extends RootUiCoordinator {
         }
 
         if (!DeviceFormFactor.isNonMultiDisplayContextOnTablet(mActivity)
-                && (TabUiFeatureUtilities.isTabGroupsAndroidEnabled(mActivity)
-                        || TabUiFeatureUtilities.isConditionalTabStripEnabled())) {
+                && TabUiFeatureUtilities.isTabGroupsAndroidEnabled(mActivity)) {
             getToolbarManager().enableBottomControls();
         }
 
@@ -604,9 +604,7 @@ public class TabbedRootUiCoordinator extends RootUiCoordinator {
     }
 
     private boolean isShowingStartSurfaceHomepage() {
-        return mStartSurfaceSupplier.get() != null
-                && mStartSurfaceSupplier.get().getStartSurfaceState()
-                == StartSurfaceState.SHOWN_HOMEPAGE;
+        return mStartSurfaceSupplier.get() != null && mStartSurfaceSupplier.get().isHomepageShown();
     }
 
     // Protected class methods
@@ -680,11 +678,22 @@ public class TabbedRootUiCoordinator extends RootUiCoordinator {
         }
 
         if (!didTriggerPromo) {
-            mNotificationPermissionController = new NotificationPermissionController(mWindowAndroid,
-                    new NotificationPermissionRationaleDialogController(
-                            mActivity, mModalDialogManagerSupplier.get()));
+            RationaleDelegate rationaleUIDelegate;
+
+            if (NotificationPermissionController.shouldUseBottomSheetRationaleUi()) {
+                rationaleUIDelegate = new NotificationPermissionRationaleBottomSheet(
+                        mActivity, getBottomSheetController());
+            } else {
+                rationaleUIDelegate = new NotificationPermissionRationaleDialogController(
+                        mActivity, mModalDialogManagerSupplier.get());
+            }
+
+            mNotificationPermissionController =
+                    new NotificationPermissionController(mWindowAndroid, rationaleUIDelegate);
+
             NotificationPermissionController.attach(
                     mWindowAndroid, mNotificationPermissionController);
+
             didTriggerPromo = mNotificationPermissionController.requestPermissionIfNeeded(
                     false /* contextual */);
         }

@@ -46,7 +46,6 @@ mojom("mojom_platform") {
     "clipboard/clipboard.mojom",
     "close_watcher/close_listener.mojom",
     "commit_result/commit_result.mojom",
-    "compute_pressure/pressure_service.mojom",
     "content_index/content_index.mojom",
     "context_menu/context_menu.mojom",
     "conversions/attribution_data_host.mojom",
@@ -258,7 +257,6 @@ mojom("mojom_platform") {
     "//components/schema_org/common:mojom",
     "//components/services/filesystem/public/mojom",
     "//mojo/public/mojom/base",
-    "//services/data_decoder/public/mojom:mojom_resource_snapshot_for_web_bundle",
     "//services/device/public/mojom",
     "//services/network/public/mojom",
     "//services/network/public/mojom:mojom_ip_address",
@@ -509,6 +507,15 @@ mojom("mojom_platform") {
     {
       types = [
         {
+          mojom = "blink.mojom.FrameOwnerElementType"
+          cpp = "::blink::FrameOwnerElementType"
+        },
+      ]
+      traits_headers = [ "//third_party/blink/public/common/frame/frame_owner_element_type_mojom_traits.h" ]
+    },
+    {
+      types = [
+        {
           mojom = "blink.mojom.SHA256HashValue"
           cpp = "::net::SHA256HashValue"
         },
@@ -550,6 +557,10 @@ mojom("mojom_platform") {
         {
           mojom = "blink.mojom.FencedFrameReporting"
           cpp = "::blink::FencedFrame::FencedFrameReporting"
+        },
+        {
+          mojom = "blink.mojom.DeprecatedFencedFrameMode"
+          cpp = "::blink::FencedFrame::DeprecatedFencedFrameMode"
         },
         {
           mojom = "blink.mojom.PotentiallyOpaqueURL"
@@ -884,6 +895,9 @@ mojom("mojom_platform") {
   blink_cpp_typemaps = [
     {
       types = [
+        # TODO(dcheng): The structs for the variant subtypes should be
+        # registered here as well, but it becomes tricky, because one of the C++
+        # types is defined outside dragging code.
         {
           mojom = "blink.mojom.DragData"
           cpp = "::blink::WebDragData"
@@ -1208,7 +1222,6 @@ mojom("mojom_core") {
   if (is_android) {
     # Direct deps (instead of transitive deps) are necessary for java targets.
     public_deps += [
-      "//services/data_decoder/public/mojom:mojom_resource_snapshot_for_web_bundle",
       "//services/network/public/mojom:cookies_mojom",
       "//services/network/public/mojom:url_loader_base",
       "//third_party/blink/public/mojom/tokens",

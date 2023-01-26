@@ -39,6 +39,17 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
+<histogram name="History.Backend.TransactionBeginError"
+    enum="SqliteLoggedResultCode" expires_after="2023-10-01">
+  <owner>tommycli@chromium.org</owner>
+  <owner>asully@chromium.org</owner>
+  <component>UI&gt;Browser&gt;History</component>
+  <summary>
+    The exact database error encountered when beginning a transaction, if it
+    failed.
+  </summary>
+</histogram>
+
 <histogram name="History.Backend.TransactionBeginSuccess" enum="BooleanSuccess"
     expires_after="2023-10-01">
   <owner>tommycli@chromium.org</owner>
@@ -47,6 +58,17 @@ chromium-metrics-reviews@google.com.
   <summary>
     Recorded after attempting to begin a singleton transaction within
     HistoryBackend. Records whether it was successfully begun or not.
+  </summary>
+</histogram>
+
+<histogram name="History.Backend.TransactionCommitError"
+    enum="SqliteLoggedResultCode" expires_after="2023-10-01">
+  <owner>tommycli@chromium.org</owner>
+  <owner>asully@chromium.org</owner>
+  <component>UI&gt;Browser&gt;History</component>
+  <summary>
+    The exact database error encountered when committing a transaction, if it
+    failed.
   </summary>
 </histogram>
 
@@ -740,6 +762,50 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
+<histogram
+    name="History.Clusters.Backend.ContentClustering.NumClustersAfterMerge"
+    units="counts" expires_after="2023-06-04">
+  <owner>sophiechang@chromium.org</owner>
+  <owner>chrome-journeys@google.com</owner>
+  <component>UI&gt;Browser&gt;Journeys</component>
+  <summary>
+    Records the number of clusters after merging similar clusters based on
+    content. Logged when clusters have been calculated based on any request to
+    cluster visits, which could be triggered from several things, including
+    loading the journeys UI, putting a query in the journeys page, etc...
+  </summary>
+</histogram>
+
+<histogram
+    name="History.Clusters.Backend.ContentClustering.NumClustersBeforeMerge"
+    units="counts" expires_after="2023-06-04">
+  <owner>sophiechang@chromium.org</owner>
+  <owner>chrome-journeys@google.com</owner>
+  <component>UI&gt;Browser&gt;Journeys</component>
+  <summary>
+    Records the number of clusters before merging similar clusters based on
+    content. Logged when clusters have been calculated based on any request to
+    cluster visits, which could be triggered from several things, including
+    loading the journeys UI, putting a query in the journeys page, etc...
+  </summary>
+</histogram>
+
+<histogram
+    name="History.Clusters.Backend.ContentClustering.PairwiseMergeNumIterations"
+    units="counts" expires_after="2023-06-04">
+  <owner>sophiechang@chromium.org</owner>
+  <owner>chrome-journeys@google.com</owner>
+  <component>UI&gt;Browser&gt;Journeys</component>
+  <summary>
+    Records the number of iterations it took for a batch of clusters to converge
+    during a pairwise merge of similar clusters based on content, up to a
+    Finch-configured maximum. Logged when clusters have been calculated based on
+    any request to cluster visits, which could be triggered from several things,
+    including loading the journeys UI, putting a query in the journeys page,
+    etc...
+  </summary>
+</histogram>
+
 <histogram name="History.Clusters.Backend.ContextClusterer.ThreadTime"
     units="ms" expires_after="2023-06-04">
   <owner>sophiechang@chromium.org</owner>
@@ -832,7 +898,10 @@ chromium-metrics-reviews@google.com.
 
     On startup and every 1 hour afterwards, these context clusters have their
     triggability calculated. Context clusters older than 2 hours are not updated
-    are not re-updated after the initial triggability is calculated.
+    are not re-updated after the initial triggability is calculated. However, if
+    there are unclustered visits (due to visits from before the user had context
+    clustering enabled or synced visits without a cluster ID), they will also be
+    context clustered with their triggerability calculated as well.
 
     When a user visits the Journeys WebUI, persisted clusters (both those with
     and without triggerability calculated) are fetched. Clusters are then
@@ -1155,6 +1224,40 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram
+    name="History.Clusters.Backend.UpdateClusterTriggerability.HadUnclusteredVisitsToCluster"
+    enum="Boolean" expires_after="2023-10-01">
+  <owner>sophiechang@chromium.org</owner>
+  <owner>chrome-journeys@google.com</owner>
+  <component>UI&gt;Browser&gt;Journeys</component>
+  <summary>
+    On navigation, context clusters are created, grown, and persisted.
+
+    On startup and every 1 hour afterwards, these context clusters have their
+    triggability calculated. Context clusters older than 2 hours are not updated
+    are not re-updated after the initial triggability is calculated. However, if
+    there are unclustered visits (due to visits from before the user had context
+    clustering enabled or synced visits without a cluster ID), they will also be
+    context clustered with their triggerability calculated as well.
+
+    When a user visits the Journeys WebUI, persisted clusters (both those with
+    and without triggerability calculated) are fetched. Clusters are then
+    augmented with appropriate metadata needed for displaying on the Journeys
+    WebUI (e.g. ranking, deduping, labeling).
+
+    When the keyword cache used to match omnibox inputs and show journey chips
+    or suggestions in the omnibox needs updating, context clusters (both those
+    with and without triggerability calculated) are fetched.
+
+    This histogram records whether there were unclustered visits left to cluster
+    in the first run of this task. When this trends to all false, this
+    additional step can get deleted.
+
+    Recorded for every batch of visits clustered; can be recorded more than once
+    every hour.
+  </summary>
+</histogram>
+
+<histogram
     name="History.Clusters.Backend.UpdateClusterTriggerability.{Segment}"
     units="ms" expires_after="2023-10-01">
   <owner>manukh@chromium.org</owner>
@@ -1165,7 +1268,10 @@ chromium-metrics-reviews@google.com.
 
     On startup and every 1 hour afterwards, these context clusters have their
     triggability calculated. Context clusters older than 2 hours are not updated
-    are not re-updated after the initial triggability is calculated.
+    are not re-updated after the initial triggability is calculated. However, if
+    there are unclustered visits (due to visits from before the user had context
+    clustering enabled or synced visits without a cluster ID), they will also be
+    context clustered with their triggerability calculated as well.
 
     When a user visits the Journeys WebUI, persisted clusters (both those with
     and without triggerability calculated) are fetched. Clusters are then
@@ -1188,12 +1294,22 @@ chromium-metrics-reviews@google.com.
   <token key="Segment">
     <variant name="ComputeClusterTriggerabilityLatency"
         summary="receiving cluster triggerability metadata from the model"/>
+    <variant name="ComputeContextClustersLatency"
+        summary="receiving context clusters from unclustered visits from the
+                 model"/>
+    <variant name="GetAnnotatedVisitsToClusterLatency"
+        summary="receiving persisted unclustered visits to compute context
+                 clusters for for"/>
     <variant name="GetMostRecentPersistedClustersLatency"
         summary="receiving persisted clusters to compute cluster
                  triggerability metadata for"/>
     <variant name="PersistClusterTriggerabilityLatency"
         summary="receiving acknowledgement for completion of persisting the
                  cluster triggerability metadata to the history DB"/>
+    <variant name="PersistContextClustersLatency"
+        summary="receiving acknowledgement for completion of persisting the
+                 context clusters formed from unclustered visits to the
+                 history DB"/>
   </token>
 </histogram>
 
@@ -1468,6 +1584,7 @@ chromium-metrics-reviews@google.com.
   <token key="VisitAction">
     <variant name="Clicked" summary="clicks"/>
     <variant name="Deleted" summary="deletes"/>
+    <variant name="Hidden" summary="hides"/>
   </token>
   <token key="VisitType">
     <variant name="" summary="visit"/>

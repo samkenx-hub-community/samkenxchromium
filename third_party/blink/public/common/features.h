@@ -140,6 +140,17 @@ BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kSharedStorageSelectURLLimit);
 BLINK_COMMON_EXPORT extern const base::FeatureParam<int>
     kSharedStorageMaxAllowedSelectURLCallsPerOriginPerPageLoad;
 
+// If enabled, limits the maximum bits of entropy per pageload that
+// `fence.reportEvent()` is allowed to leak when called with
+// `FencedFrame::ReportingDestination::kSharedStorageSelectUrl`.
+BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kSharedStorageReportEventLimit);
+// Maximum number of bits of entropy per pageload that are allowed to leak via
+// calls to `fence.reportEvent()` with
+// `FencedFrame::ReportingDestination::kSharedStorageSelectUrl`, if
+// `kSharedStorageReportEventLimit` is enabled.
+BLINK_COMMON_EXPORT extern const base::FeatureParam<int>
+    kSharedStorageReportEventBitBudgetPerPageLoad;
+
 // Enables the multiple prerendering in a sequential way:
 // https://crbug.com/1355151
 BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kPrerender2SequentialPrerendering);
@@ -269,11 +280,15 @@ BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kWebviewAccelerateSmallCanvases);
 
 BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kCanvasFreeMemoryWhenHidden);
 
+BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kCreateImageBitmapOrientationNone);
+
 BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kDiscardCodeCacheAfterFirstUse);
 
 BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kCacheCodeOnIdle);
 BLINK_COMMON_EXPORT extern const base::FeatureParam<int>
     kCacheCodeOnIdleDelayParam;
+BLINK_COMMON_EXPORT extern const base::FeatureParam<bool>
+    kCacheCodeOnIdleDelayServiceWorkerOnlyParam;
 
 BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(
     kAlignFontDisplayAutoTimeoutWithLCPGoal);
@@ -817,14 +832,6 @@ BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kFastPathPaintPropertyUpdates);
 
 // If enabled, reads and decodes navigation body data off the main thread.
 BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kThreadedBodyLoader);
-
-// If enabled, will cache for each node's EventPath::NodePath in document.
-BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kDocumentEventNodePathCaching);
-
-// Parameter for tuning max entries allowed in EventNodePathCache, which will be
-// used to do LRU eviction in document.
-BLINK_COMMON_EXPORT extern const base::FeatureParam<int>
-    kDocumentMaxEventNodePathCachedEntries;
 
 // Whether first-party to third-party different-bucket same-origin post messages
 // are blocked.

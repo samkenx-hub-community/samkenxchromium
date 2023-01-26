@@ -113,6 +113,7 @@ class TabListMediator {
     // screen.
     private boolean mVisible;
     private boolean mShownIPH;
+    private Tab mTabToAddDelayed;
 
     /**
      * An interface to get the thumbnails to be shown inside the tab grid cards.
@@ -369,7 +370,7 @@ class TabListMediator {
 
             mNextTabId = tabId;
 
-            if (!mActionsOnAllRelatedTabs || TabUiFeatureUtilities.isConditionalTabStripEnabled()) {
+            if (!mActionsOnAllRelatedTabs) {
                 Tab currentTab = mTabModelSelector.getCurrentTab();
                 Tab newlySelectedTab =
                         TabModelUtils.getTabById(mTabModelSelector.getCurrentModel(), tabId);
@@ -413,12 +414,6 @@ class TabListMediator {
                                         .indexOf(toTab);
 
             RecordUserAction.record("MobileTabSwitched." + mComponentName);
-            if (TabUiFeatureUtilities.isConditionalTabStripEnabled()) {
-                assert fromFilterIndex != toFilterIndex;
-                RecordHistogram.recordSparseHistogram("Tabs.TabOffsetOfSwitch." + mComponentName,
-                        fromFilterIndex - toFilterIndex);
-                return;
-            }
 
             if (fromFilterIndex != toFilterIndex) return;
 
@@ -562,7 +557,9 @@ class TabListMediator {
             @Nullable GridCardOnClickListenerProvider gridCardOnClickListenerProvider,
             @Nullable TabGridDialogHandler dialogHandler,
             @Nullable PriceWelcomeMessageController priceWelcomeMessageController,
-            String componentName, @UiType int uiType) {
+            String componentName, @UiType int uiType,
+            @Nullable TabGridItemTouchHelperCallback
+                    .OnLongPressTabItemEventListener onLongPressTabItemEventListener) {
         mContext = context;
         mTabModelSelector = tabModelSelector;
         mThumbnailProvider = thumbnailProvider;
@@ -585,15 +582,6 @@ class TabListMediator {
                 if (tab.getId() == lastId) return;
 
                 int oldIndex = mModel.indexFromId(lastId);
-                mLastSelectedTabListModelIndex = oldIndex;
-                if (oldIndex != TabModel.INVALID_TAB_INDEX) {
-                    mModel.get(oldIndex).model.set(TabProperties.IS_SELECTED, false);
-                    if (mActionsOnAllRelatedTabs && mThumbnailProvider != null && mVisible) {
-                        mModel.get(oldIndex).model.set(TabProperties.THUMBNAIL_FETCHER,
-                                new ThumbnailFetcher(mThumbnailProvider, lastId, true, false));
-                    }
-                }
-
                 int newIndex = mModel.indexFromId(tab.getId());
                 if (newIndex == TabModel.INVALID_TAB_INDEX && mActionsOnAllRelatedTabs
                         && type == TabSelectionType.FROM_UNDO) {
@@ -602,23 +590,19 @@ class TabListMediator {
                     // the related ids are present in model.
                     newIndex = getIndexForTabWithRelatedTabs(tab);
                 }
-                if (newIndex == TabModel.INVALID_TAB_INDEX) return;
-                mModel.get(newIndex).model.set(TabProperties.IS_SELECTED, true);
-                if (mThumbnailProvider != null && mVisible) {
-                    mModel.get(newIndex).model.set(TabProperties.THUMBNAIL_FETCHER,
-                            new ThumbnailFetcher(mThumbnailProvider, tab.getId(), true, false));
+
+                mLastSelectedTabListModelIndex = oldIndex;
+                if (mTabToAddDelayed != null && mTabToAddDelayed == tab) {
+                    // If tab is being added later, it will be selected later.
+                    return;
                 }
+                selectTab(oldIndex, newIndex);
             }
 
             @Override
             public void tabClosureUndone(Tab tab) {
                 onTabAdded(tab, !mActionsOnAllRelatedTabs);
-                if (TabUiFeatureUtilities.isConditionalTabStripEnabled()) {
-                    mTabModelSelector.getCurrentModel().setIndex(
-                            TabModelUtils.getTabIndexById(
-                                    mTabModelSelector.getCurrentModel(), tab.getId()),
-                            TabSelectionType.FROM_USER, false);
-                }
+
                 if (sTabClosedFromMapTabClosedFromMap.containsKey(tab.getId())) {
                     @TabClosedFrom
                     int from = sTabClosedFromMapTabClosedFromMap.get(tab.getId());
@@ -660,9 +644,16 @@ class TabListMediator {
             }
 
             @Override
-            public void didAddTab(
-                    Tab tab, @TabLaunchType int type, @TabCreationState int creationState) {
+            public void didAddTab(Tab tab, @TabLaunchType int type,
+                    @TabCreationState int creationState, boolean markedForSelection) {
                 if (!mTabModelSelector.isTabStateInitialized()) return;
+                // Check if we need to delay tab addition to model.
+                boolean delayAdd =
+                        (type == TabLaunchType.FROM_TAB_SWITCHER_UI) && markedForSelection;
+                if (delayAdd) {
+                    mTabToAddDelayed = tab;
+                    return;
+                }
                 onTabAdded(tab, !mActionsOnAllRelatedTabs);
                 if (type == TabLaunchType.FROM_RESTORE && mActionsOnAllRelatedTabs) {
                     // When tab is restored after restoring stage (e.g. exiting multi-window mode,
@@ -763,7 +754,7 @@ class TabListMediator {
 
         mTabGridItemTouchHelperCallback = new TabGridItemTouchHelperCallback(context, mModel,
                 mTabModelSelector, mTabClosedListener, mTabGridDialogHandler, mComponentName,
-                mActionsOnAllRelatedTabs, mMode);
+                mActionsOnAllRelatedTabs, mMode, onLongPressTabItemEventListener);
 
         // Right now we need to update layout only if there is a price welcome message card in tab
         // switcher.
@@ -792,6 +783,26 @@ class TabListMediator {
                 }
             };
             mModel.addObserver(mListObserver);
+        }
+    }
+
+    private void selectTab(int oldIndex, int newIndex) {
+        if (oldIndex != TabModel.INVALID_TAB_INDEX) {
+            int lastId = mModel.get(oldIndex).model.get(TAB_ID);
+            mModel.get(oldIndex).model.set(TabProperties.IS_SELECTED, false);
+            if (mActionsOnAllRelatedTabs && mThumbnailProvider != null && mVisible) {
+                mModel.get(oldIndex).model.set(TabProperties.THUMBNAIL_FETCHER,
+                        new ThumbnailFetcher(mThumbnailProvider, lastId, true, false));
+            }
+        }
+
+        if (newIndex != TabModel.INVALID_TAB_INDEX) {
+            int newId = mModel.get(newIndex).model.get(TAB_ID);
+            mModel.get(newIndex).model.set(TabProperties.IS_SELECTED, true);
+            if (mThumbnailProvider != null && mVisible) {
+                mModel.get(newIndex).model.set(TabProperties.THUMBNAIL_FETCHER,
+                        new ThumbnailFetcher(mThumbnailProvider, newId, true, false));
+            }
         }
     }
 
@@ -1130,11 +1141,12 @@ class TabListMediator {
         return index;
     }
 
-    private void onTabAdded(Tab tab, boolean onlyShowRelatedTabs) {
+    private int onTabAdded(Tab tab, boolean onlyShowRelatedTabs) {
         int index = getIndexOfTab(tab, onlyShowRelatedTabs);
-        if (index == TabList.INVALID_TAB_INDEX) return;
+        if (index == TabList.INVALID_TAB_INDEX) return index;
 
         addTabInfoToModel(PseudoTab.fromTab(tab), index, mTabModelSelector.getCurrentTab() == tab);
+        return index;
     }
 
     private void onTabMoved(int newIndex, int curIndex) {
@@ -1255,6 +1267,12 @@ class TabListMediator {
     void postHiding() {
         mVisible = false;
         unregisterOnScrolledListener();
+        // if tab was marked for add later, add to model and mark as selected.
+        if (mTabToAddDelayed != null) {
+            int index = onTabAdded(mTabToAddDelayed, !mActionsOnAllRelatedTabs);
+            selectTab(mLastSelectedTabListModelIndex, index);
+            mTabToAddDelayed = null;
+        }
     }
 
     private boolean isSelectedTab(PseudoTab tab, int tabModelSelectedTabId) {

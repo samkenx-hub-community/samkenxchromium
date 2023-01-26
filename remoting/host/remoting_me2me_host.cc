@@ -19,6 +19,7 @@
 #include "base/functional/callback.h"
 #include "base/memory/raw_ptr.h"
 #include "base/message_loop/message_pump_type.h"
+#include "base/metrics/field_trial.h"
 #include "base/notreached.h"
 #include "base/run_loop.h"
 #include "base/strings/string_number_conversions.h"
@@ -435,6 +436,9 @@ class HostProcess : public ConfigWatcher::Delegate,
   bool security_key_auth_policy_enabled_ = false;
   bool security_key_extension_supported_ = true;
   absl::optional<int> max_session_duration_minutes_;
+
+  // Allows us to override field trials which are causing issues for chromoting.
+  std::unique_ptr<base::FieldTrialList> field_trial_list_;
 
   // Used to specify which window to stream, if enabled.
   webrtc::WindowId window_id_ = 0;
@@ -1710,6 +1714,15 @@ void HostProcess::StartHost() {
   // This thread is used as a network thread in WebRTC.
   webrtc::ThreadWrapper::EnsureForCurrentMessageLoop();
 
+  // Initialize global field trials.
+  field_trial_list_ = std::make_unique<base::FieldTrialList>();
+
+  // Override LossBasedBweV2 trial.
+  // TODO(b/266103942): Remove this override once we figure out why the BWE is
+  // crashing for some users and have a fix available.
+  base::FieldTrialList::CreateTrialsFromString(
+      "WebRTC-Bwe-LossBasedBweV2/Enabled:false/");
+
   SetState(HOST_STARTED);
 
   InitializeSignaling();
@@ -1762,8 +1775,10 @@ void HostProcess::StartHost() {
         enable_user_interface_);
   }
 
-  // The feature is enabled for all Googlers using a supported platform.
-  desktop_environment_options_.set_enable_remote_open_url(is_googler_);
+  // Always enable remote open URL when the platform supports it. There is an
+  // additional IsRemoteOpenUrlSupported() check that makes sure the capability
+  // won't be advertised if it's missing a registry key or something.
+  desktop_environment_options_.set_enable_remote_open_url(true);
 
 #if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_WIN)
   desktop_environment_options_.set_enable_remote_webauthn(is_googler_);

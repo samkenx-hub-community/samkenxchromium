@@ -559,6 +559,14 @@ class CONTENT_EXPORT NavigationRequest
   // new process.
   void ResetStateForSiteInstanceChange();
 
+  // If a navigation has been cancelled, and was initiated by the parent
+  // document, report it with the appropriate ResourceTiming entry information.
+  //
+  // The ResourceTiming entry may not be sent if the current frame
+  // does not have a parent, or if the navigation was cancelled before
+  // a request was made.
+  void MaybeAddResourceTimingEntryForCancelledNavigation();
+
   // Lazily initializes and returns the mojo::NavigationClient interface used
   // for commit.
   mojom::NavigationClient* GetCommitNavigationClient();
@@ -858,27 +866,6 @@ class CONTENT_EXPORT NavigationRequest
   // Returns the current url from GetURL() packaged with other state required to
   // properly determine SiteInstances and process allocation.
   UrlInfo GetUrlInfo();
-
-  // Return the parent's base url, snapshotted when this NavigationRequest was
-  // created. Used for sending to srcdoc renderers. See
-  // https://crbug.com/1356658 for further details. Note: The returned value
-  // will be empty unless (i) the navigation is to about:srcdoc, and (ii)
-  // IsolateSandboxedIframes is enabled.
-  // TODO(wjmaclean):  https://crbug.com/1356658 Make this also apply for
-  // about:blank navigations as well.
-
-  // Return the parent's base url, snapshotted when this NavigationRequest was
-  // created. Used for sending to srcdoc renderers. See
-  // https://crbug.com/1356658 for further details.
-  // Note: The returned value will be empty unless:
-  // 1. The navigation is to about:srcdoc, and
-  // 2. IsolateSandboxedIframes is enabled.
-  //
-  // TODO(https://crbug.com/1356658) Make this also apply for
-  // about:blank navigations as well.
-  const GURL& inherited_base_url() const {
-    return commit_params_->fallback_srcdoc_baseurl;
-  }
 
   bool is_overriding_user_agent() const {
     return commit_params_->is_overriding_user_agent;
@@ -1717,6 +1704,16 @@ class CONTENT_EXPORT NavigationRequest
   // Called on FrameTreeNode's NavigationRequest (if any) when another
   // NavigationRequest associated with the same FrameTreeNode is destroyed.
   void ResumeCommitIfNeeded();
+
+  // Used to detect if the page being navigated to is participating in the
+  // related deprecation trial and recording that in NavigationControllerImpl.
+  //
+  // Not called for same-document navigation requests nor for requests served
+  // from the back-forward cache or from prerendered pages as work would be
+  // redundant.
+  //
+  // TODO(crbug.com/1407150): Remove this when deprecation trial is complete.
+  void MaybeRegisterOriginForUnpartitionedSessionStorageAccess();
 
   // Never null. The pointee node owns this navigation request instance.
   FrameTreeNode* const frame_tree_node_;

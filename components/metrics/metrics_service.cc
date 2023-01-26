@@ -291,6 +291,11 @@ MetricsService::MetricsService(MetricsStateManager* state_manager,
     logs_event_manager_.AddObserver(logs_event_observer_.get());
   }
 
+  cloned_install_subscription_ =
+      state_manager->AddOnClonedInstallDetectedCallback(
+          base::BindOnce(&MetricsService::OnClonedInstallDetected,
+                         self_ptr_factory_.GetWeakPtr()));
+
   RegisterMetricsProvider(
       std::make_unique<StabilityMetricsProvider>(local_state_));
 
@@ -489,6 +494,7 @@ void MetricsService::OnApplicationNotIdle() {
 #if BUILDFLAG(IS_ANDROID) || BUILDFLAG(IS_IOS)
 void MetricsService::OnAppEnterBackground(bool keep_recording_in_background) {
   is_in_foreground_ = false;
+  reporting_service_.SetIsInForegound(false);
   if (!keep_recording_in_background) {
     rotation_scheduler_->Stop();
     reporting_service_.Stop();
@@ -520,6 +526,7 @@ void MetricsService::OnAppEnterBackground(bool keep_recording_in_background) {
 
 void MetricsService::OnAppEnterForeground(bool force_open_new_log) {
   is_in_foreground_ = true;
+  reporting_service_.SetIsInForegound(true);
   state_manager_->LogHasSessionShutdownCleanly(false);
   StartSchedulerIfNecessary();
 
@@ -1351,6 +1358,14 @@ bool MetricsService::IsTooEarlyToCloseLog() {
              features::kMetricsServiceAllowEarlyLogClose)
              ? state_ < INIT_TASK_SCHEDULED
              : state_ < SENDING_LOGS;
+}
+
+void MetricsService::OnClonedInstallDetected() {
+  // Purge all logs, as they may come from a previous install. Unfortunately,
+  // since the cloned install detector works asynchronously, it is possible that
+  // this is called after logs were already sent. However, practically speaking,
+  // this should not happen, since logs are only sent late into the session.
+  reporting_service_.metrics_log_store()->Purge();
 }
 
 // static

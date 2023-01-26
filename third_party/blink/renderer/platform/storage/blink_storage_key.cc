@@ -41,12 +41,32 @@ BlinkStorageKey::BlinkStorageKey(
                           ? top_level_site
                           : BlinkSchemefulSite(origin)),
       top_level_site_if_third_party_enabled_(top_level_site),
-      nonce_(nonce ? absl::make_optional(*nonce) : absl::nullopt),
+      nonce_(base::OptionalFromPtr(nonce)),
       ancestor_chain_bit_(StorageKey::IsThirdPartyStoragePartitioningEnabled()
                               ? ancestor_chain_bit
                               : mojom::blink::AncestorChainBit::kSameSite),
       ancestor_chain_bit_if_third_party_enabled_(ancestor_chain_bit) {
+#if DCHECK_IS_ON()
   DCHECK(origin_);
+  if (nonce) {
+    // If we're setting a `nonce`, the `top_level_site` must be the same as
+    // the `origin` and the `ancestor_chain_bit` must be kSameSite. We don't
+    // serialize those pieces of information so have to check to prevent
+    // mistaken reliance on what is supposed to be an invariant.
+    DCHECK(!nonce->is_empty());
+    DCHECK(top_level_site == BlinkSchemefulSite(origin));
+    DCHECK_EQ(ancestor_chain_bit, mojom::blink::AncestorChainBit::kSameSite);
+  } else if (top_level_site.IsOpaque()) {
+    // If we're setting an opaque `top_level_site`, the `ancestor_chain_bit`
+    // must be kSameSite. We don't serialize that information so have to check
+    // to prevent mistaken reliance on what is supposed to be an invariant.
+    DCHECK_EQ(ancestor_chain_bit, mojom::blink::AncestorChainBit::kSameSite);
+  } else if (top_level_site != BlinkSchemefulSite(origin)) {
+    // If `top_level_site` doesn't match `origin` then we must be making a
+    // third-party StorageKey and `ancestor_chain_bit` must be kCrossSite.
+    DCHECK_EQ(ancestor_chain_bit, mojom::blink::AncestorChainBit::kCrossSite);
+  }
+#endif
 }
 
 // static
@@ -70,7 +90,8 @@ BlinkStorageKey BlinkStorageKey::CreateForTesting(
     scoped_refptr<const SecurityOrigin> origin,
     const BlinkSchemefulSite& top_level_site) {
   return BlinkStorageKey(origin, top_level_site, nullptr,
-                         BlinkSchemefulSite(origin) == top_level_site
+                         (BlinkSchemefulSite(origin) == top_level_site ||
+                          top_level_site.IsOpaque())
                              ? mojom::blink::AncestorChainBit::kSameSite
                              : mojom::blink::AncestorChainBit::kCrossSite);
 }
