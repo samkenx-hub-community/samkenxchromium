@@ -802,7 +802,7 @@
       //
       // https://csswg.sesse.net/css-nesting-1/
       name: "CSSNesting",
-      status: "experimental"
+      status: "stable"
     },
     {
       name: "CSSNewRootFontUnits",
@@ -913,9 +913,19 @@
       name: "CSSStyleQueries",
       status: "stable"
     },
+    {
+      name: "CSSSystemAccentColor",
+      status: "experimental",
+    },
     // Support for CSS Toggles, https://tabatkins.github.io/css-toggle/
     {
       name: "CSSToggles",
+      status: "experimental",
+    },
+    {
+      // Support for CSS top-layer property for being able to transition
+      // See: https://github.com/w3c/csswg-drafts/issues/8189
+      name: "CSSTopLayerForTransitions",
       status: "experimental",
     },
     {
@@ -962,6 +972,11 @@
     {
       name: "Database",
       public: true,
+      status: "stable",
+    },
+    {
+      name: "DateInputInlineBlock",
+      base_feature: "DateInputInlineBlock",
       status: "stable",
     },
     {
@@ -1078,6 +1093,8 @@
     {
       name: "DisableThirdPartySessionStoragePartitioningAfterGeneralPartitioning",
       origin_trial_feature_name: "DisableThirdPartySessionStoragePartitioningAfterGeneralPartitioning",
+      origin_trial_type: "deprecation",
+      origin_trial_allows_insecure: true,
       status: "experimental",
     },
     // This feature will represent the deprecation trial that allows first
@@ -1085,6 +1102,9 @@
     // on their site.
     {
       name: "DisableThirdPartyStoragePartitioning",
+      origin_trial_feature_name: "DisableThirdPartyStoragePartitioning",
+      origin_trial_type: "deprecation",
+      origin_trial_allows_insecure: true,
       status: "experimental",
       browser_process_read_write_access: true,
     },
@@ -1493,6 +1513,11 @@
         },
     },
     {
+      name: "GetDisplayMediaRequiresUserActivation",
+      depends_on: ["GetDisplayMedia"],
+      status: "experimental",
+    },
+    {
       // Enables the getDisplayMediaSet API for multi surface capture.
       name: "GetDisplayMediaSet",
       depends_on: ["GetDisplayMedia"],
@@ -1628,6 +1653,7 @@
     },
     {
       name: "KeyboardFocusableScrollers",
+      base_feature: "KeyboardFocusableScrollers",
       status: "experimental",
     },
     {
@@ -1645,6 +1671,11 @@
       depends_on: ["LayoutNGPrinting"],
       status: "stable",
       base_feature: "LayoutMediaNGContainer",
+    },
+    {
+      name: "LayoutMediaNoInlineChildren",
+      base_feature: "LayoutMediaNoInlineChildren",
+      status: "stable",  // Since M112.
     },
     {
       // A kill-switch for a fix of crbug.com/1366268.
@@ -1767,6 +1798,11 @@
     {
       name: "MediaCaptureBackgroundBlur",
       status: "experimental",
+    },
+    {
+      name: "MediaCaptureConfigurationChange",
+      status: "experimental",
+      implied_by: ["MediaCaptureBackgroundBlur"],
     },
     // Set to reflect the MediaCastOverlayButton feature.
     {
@@ -1974,6 +2010,13 @@
     {
       name: "OriginTrialsSampleAPI",
       origin_trial_feature_name: "Frobulate",
+    },
+    // As above. Do not change this flag to stable, as it exists solely to
+    // generate code used by the origin trials sample API implementation.
+    {
+      name: "OriginTrialsSampleAPIBrowserReadWrite",
+      origin_trial_feature_name: "FrobulateBrowserReadWrite",
+      browser_process_read_write_access: true,
     },
     // As above. Do not change this flag to stable, as it exists solely to
     // generate code used by the origin trials sample API implementation.
@@ -2433,12 +2476,6 @@
       base_feature: "SanitizerAPI",
     },
     {
-      name: "SanitizerAPIv0",
-      status: "stable",
-      implied_by: ["SanitizerAPI"],
-      base_feature: "SanitizerAPIv0",
-    },
-    {
       // https://wicg.github.io/webcomponents/proposals/Scoped-Custom-Element-Registries
       name: "ScopedCustomElementRegistry",
       status: "test",
@@ -2470,6 +2507,11 @@
     {
       name: "ScrollEndEvents",
       status: "experimental",
+    },
+    {
+      name: "ScrollOverlapOptimization",
+      status: "experimental",
+      base_feature: "ScrollOverlapOptimization",
     },
     {
       name: "ScrollTimeline",
@@ -2709,12 +2751,14 @@
       // Enabled when blink::features::kStorageAccessAPI is enabled.
       name: "StorageAccessAPI",
       status: "experimental",
+      base_feature: "StorageAccessAPI",
       implied_by: ["FirstPartySets"],
     },
     {
       name: "StorageAccessAPIForOriginExtension",
       public: true,
       status: "test",
+      depends_on: ["StorageAccessAPI"],
       base_feature: "StorageAccessAPIForOriginExtension",
     },
     {
@@ -2822,6 +2866,11 @@
     {
       name: "TextFragmentTapOpensContextMenu",
       status: {"Android": "stable"},
+    },
+    {
+      name: "ThirdPartyCookiesUserBypass",
+      status: "experimental",
+      browser_process_read_write_access: true,
     },
     // To enable the deprecation trial, use the
     // `DisableThirdPartyStoragePartitioning` feature instead.

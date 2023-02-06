@@ -54,10 +54,11 @@ export function setUp() {
   directoryModel = createFakeDirectoryModel();
   fileListModel = new FileListModel(new MockMetadataModel({}));
   directoryModel.getFileList = () => fileListModel;
+  directoryModel.isSearching = () => false;
   recentEntry = new FakeEntryImpl(
       'Recent', VolumeManagerCommon.RootType.RECENT,
       chrome.fileManagerPrivate.SourceRestriction.ANY_SOURCE,
-      chrome.fileManagerPrivate.RecentFileType.ALL);
+      chrome.fileManagerPrivate.FileCategory.ALL);
   emptyFolderController =
       new EmptyFolderController(element, directoryModel, recentEntry);
 }
@@ -76,28 +77,27 @@ export function testNoFilesMessage() {
   assertEquals(
       str('RECENT_EMPTY_FOLDER'), emptyFolderController.label_.innerText);
   // For audio filter.
-  recentEntry.recentFileType = chrome.fileManagerPrivate.RecentFileType.AUDIO;
+  recentEntry.fileCategory = chrome.fileManagerPrivate.FileCategory.AUDIO;
   emptyFolderController.updateUI_();
   assertFalse(element.hidden);
   assertEquals(
       str('RECENT_EMPTY_AUDIO_FOLDER'), emptyFolderController.label_.innerText);
   // For document filter.
-  recentEntry.recentFileType =
-      chrome.fileManagerPrivate.RecentFileType.DOCUMENT;
+  recentEntry.fileCategory = chrome.fileManagerPrivate.FileCategory.DOCUMENT;
   emptyFolderController.updateUI_();
   assertFalse(element.hidden);
   assertEquals(
       str('RECENT_EMPTY_DOCUMENTS_FOLDER'),
       emptyFolderController.label_.innerText);
   // For image filter.
-  recentEntry.recentFileType = chrome.fileManagerPrivate.RecentFileType.IMAGE;
+  recentEntry.fileCategory = chrome.fileManagerPrivate.FileCategory.IMAGE;
   emptyFolderController.updateUI_();
   assertFalse(element.hidden);
   assertEquals(
       str('RECENT_EMPTY_IMAGES_FOLDER'),
       emptyFolderController.label_.innerText);
   // For video filter.
-  recentEntry.recentFileType = chrome.fileManagerPrivate.RecentFileType.VIDEO;
+  recentEntry.fileCategory = chrome.fileManagerPrivate.FileCategory.VIDEO;
   emptyFolderController.updateUI_();
   assertFalse(element.hidden);
   assertEquals(
@@ -159,4 +159,16 @@ export function testShownForTrash() {
   assertFalse(element.hidden);
   const text = emptyFolderController.label_.innerText;
   assertTrue(text.includes(str('EMPTY_TRASH_FOLDER_TITLE')));
+}
+
+/**
+ * Tests that the empty state image shows up when search is active.
+ * @suppress {accessControls} access private method in test.
+ */
+export function testShowNoSearchResult() {
+  directoryModel.isSearching = () => true;
+  emptyFolderController.updateUI_();
+  assertFalse(element.hidden);
+  const text = emptyFolderController.label_.innerText;
+  assertTrue(text.includes(str('SEARCH_NO_MATCHING_RESULTS_TITLE')));
 }

@@ -23,6 +23,7 @@ void FidoAuthenticator::ExcludeAppIdCredentialsBeforeMakeCredential(
 
 void FidoAuthenticator::GetCredentialInformationForRequest(
     const CtapGetAssertionRequest& request,
+    const CtapGetAssertionOptions& options,
     GetCredentialInformationForRequestCallback callback) {
   NOTREACHED();
 }
@@ -166,21 +167,6 @@ void FidoAuthenticator::BioEnrollDelete(const pin::TokenResponse&,
   NOTREACHED();
 }
 
-void FidoAuthenticator::WriteLargeBlob(
-    LargeBlob large_blob,
-    const LargeBlobKey& large_blob_key,
-    const absl::optional<pin::TokenResponse> pin_uv_auth_token,
-    base::OnceCallback<void(CtapDeviceResponseCode)> callback) {
-  NOTREACHED();
-}
-
-void FidoAuthenticator::ReadLargeBlob(
-    const std::vector<LargeBlobKey>& large_blob_keys,
-    const absl::optional<pin::TokenResponse> pin_uv_auth_token,
-    LargeBlobReadCallback callback) {
-  NOTREACHED();
-}
-
 void FidoAuthenticator::GarbageCollectLargeBlob(
     const pin::TokenResponse& pin_uv_auth_token,
     base::OnceCallback<void(CtapDeviceResponseCode)> callback) {
@@ -213,7 +199,7 @@ ProtocolVersion FidoAuthenticator::SupportedProtocol() const {
 }
 
 bool FidoAuthenticator::SupportsCredProtectExtension() const {
-  return Options() && Options()->supports_cred_protect;
+  return Options().supports_cred_protect;
 }
 
 bool FidoAuthenticator::SupportsHMACSecretExtension() const {
@@ -221,10 +207,6 @@ bool FidoAuthenticator::SupportsHMACSecretExtension() const {
 }
 
 bool FidoAuthenticator::SupportsEnterpriseAttestation() const {
-  return false;
-}
-
-bool FidoAuthenticator::SupportsCredBlobOfSize(size_t num_bytes) const {
   return false;
 }
 

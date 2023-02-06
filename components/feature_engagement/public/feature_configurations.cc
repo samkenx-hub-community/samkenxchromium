@@ -9,6 +9,10 @@
 #include "components/feature_engagement/public/configuration.h"
 #include "components/feature_engagement/public/feature_constants.h"
 
+#if BUILDFLAG(IS_IOS)
+#include "components/feature_engagement/public/ios_promo_feature_configuration.h"
+#endif  // BUILDFLAG(IS_IOS)
+
 namespace feature_engagement {
 
 FeatureConfig CreateAlwaysTriggerConfig(const base::Feature* feature) {
@@ -1010,6 +1014,59 @@ absl::optional<FeatureConfig> GetClientSideFeatureConfig(
                                              Comparator(EQUAL, 0), 360, 360));
     return config;
   }
+
+  if (kIPHRequestDesktopSiteExceptionsGenericFeature.name == feature->name) {
+    // A config that allows the RDS site-level setting IPH to be shown to
+    // tablet users. This will be triggered a maximum of 2 times (once per
+    // 2 weeks), and if the user has not used the app menu to create a desktop
+    // site exception in a span of a year.
+    absl::optional<FeatureConfig> config = FeatureConfig();
+    config->valid = true;
+    config->availability = Comparator(GREATER_THAN_OR_EQUAL, 2);
+    config->session_rate = Comparator(LESS_THAN, 1);
+    config->used = EventConfig("app_menu_desktop_site_exception_added",
+                               Comparator(EQUAL, 0), 360, 360);
+    config->trigger =
+        EventConfig("request_desktop_site_exceptions_generic_iph_trigger",
+                    Comparator(LESS_THAN, 2), 720, 720);
+    config->event_configs.insert(
+        EventConfig("request_desktop_site_exceptions_generic_iph_trigger",
+                    Comparator(EQUAL, 0), 14, 14));
+    return config;
+  }
+
+  if (kIPHRequestDesktopSiteExceptionsSpecificFeature.name == feature->name) {
+    // A config that allows the RDS site-level setting IPH to be shown on sites
+    // that are more functional in desktop mode. This will be triggered a
+    // maximum of 2 times (once per 2 weeks), and if the user has not used the
+    // app menu to create a desktop site exception in a span of a year.
+    absl::optional<FeatureConfig> config = FeatureConfig();
+    config->valid = true;
+    config->availability = Comparator(GREATER_THAN_OR_EQUAL, 2);
+    config->session_rate = Comparator(LESS_THAN, 1);
+    config->used = EventConfig("app_menu_desktop_site_exception_added",
+                               Comparator(EQUAL, 0), 360, 360);
+    config->trigger =
+        EventConfig("request_desktop_site_exceptions_specific_iph_trigger",
+                    Comparator(LESS_THAN, 2), 720, 720);
+    config->event_configs.insert(
+        EventConfig("request_desktop_site_exceptions_specific_iph_trigger",
+                    Comparator(EQUAL, 0), 14, 14));
+    return config;
+  }
+
+  if (kIPHPageZoomFeature.name == feature->name) {
+    absl::optional<FeatureConfig> config = FeatureConfig();
+    config->valid = true;
+    config->availability = Comparator(ANY, 0);
+    config->session_rate = Comparator(EQUAL, 0);
+    config->trigger =
+        EventConfig("page_zoom_iph_trigger", Comparator(EQUAL, 0), 1440, 1440);
+    config->used =
+        EventConfig("page_zoom_opened", Comparator(EQUAL, 0), 1440, 1440);
+    return config;
+  }
+
 #endif  // BUILDFLAG(IS_ANDROID)
 
 #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_APPLE) || BUILDFLAG(IS_LINUX) || \
@@ -1090,12 +1147,14 @@ absl::optional<FeatureConfig> GetClientSideFeatureConfig(
     // window of one week between impressions.
     absl::optional<FeatureConfig> config = FeatureConfig();
     config->valid = true;
-    config->availability = Comparator(GREATER_THAN_OR_EQUAL, 7);
+    config->availability = Comparator(ANY, 0);
     config->session_rate = Comparator(LESS_THAN, 1);
     config->trigger = EventConfig("price_notifications_trigger",
-                                  Comparator(LESS_THAN, 3), 365, 365);
+                                  Comparator(LESS_THAN, 3), 730, 730);
     config->used =
-        EventConfig("price_notifications_used", Comparator(EQUAL, 0), 365, 365);
+        EventConfig("price_notifications_used", Comparator(EQUAL, 0), 730, 730);
+    config->event_configs.insert(EventConfig("price_notifications_trigger",
+                                             Comparator(EQUAL, 0), 7, 730));
     return config;
   }
 
@@ -1180,6 +1239,12 @@ absl::optional<FeatureConfig> GetClientSideFeatureConfig(
     config->blocked_by.type = BlockedBy::Type::NONE;
     config->blocking.type = Blocking::Type::NONE;
     return config;
+  }
+
+  // iOS Promo Configs are split out into a separate file, so check that too.
+  if (absl::optional<FeatureConfig> ios_promo_feature_config =
+          GetClientSideiOSPromoFeatureConfig(feature)) {
+    return ios_promo_feature_config;
   }
 #endif  // BUILDFLAG(IS_IOS)
 

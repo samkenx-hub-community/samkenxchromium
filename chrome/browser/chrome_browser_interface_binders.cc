@@ -42,6 +42,8 @@
 #include "chrome/browser/ui/webui/omnibox/omnibox.mojom.h"
 #include "chrome/browser/ui/webui/omnibox/omnibox_ui.h"
 #include "chrome/browser/ui/webui/segmentation_internals/segmentation_internals_ui.h"
+#include "chrome/browser/ui/webui/suggest_internals/suggest_internals.mojom.h"
+#include "chrome/browser/ui/webui/suggest_internals/suggest_internals_ui.h"
 #include "chrome/browser/ui/webui/usb_internals/usb_internals.mojom.h"
 #include "chrome/browser/ui/webui/usb_internals/usb_internals_ui.h"
 #include "chrome/browser/web_applications/web_app_utils.h"
@@ -174,6 +176,7 @@
 #include "chrome/browser/ui/webui/side_panel/read_anything/read_anything_ui.h"
 #include "chrome/browser/ui/webui/side_panel/reading_list/reading_list.mojom.h"
 #include "chrome/browser/ui/webui/side_panel/reading_list/reading_list_ui.h"
+#include "chrome/browser/ui/webui/side_panel/search_companion/search_companion_side_panel_ui.h"
 #include "chrome/browser/ui/webui/side_panel/user_notes/user_notes.mojom.h"
 #include "chrome/browser/ui/webui/side_panel/user_notes/user_notes_side_panel_ui.h"
 #include "chrome/browser/ui/webui/tab_search/tab_search.mojom.h"
@@ -335,15 +338,15 @@
 #endif
 
 #if BUILDFLAG(ENABLE_SPEECH_SERVICE)
-#include "chrome/browser/accessibility/live_caption_speech_recognition_host.h"
-#include "chrome/browser/accessibility/live_caption_unavailability_notifier.h"
+#include "chrome/browser/accessibility/live_caption/live_caption_speech_recognition_host.h"
+#include "chrome/browser/accessibility/live_caption/live_caption_unavailability_notifier.h"
 #include "chrome/browser/speech/speech_recognition_client_browser_interface.h"
 #include "chrome/browser/speech/speech_recognition_client_browser_interface_factory.h"
 #include "chrome/browser/speech/speech_recognition_service.h"
 #include "media/mojo/mojom/renderer_extensions.mojom.h"
 #include "media/mojo/mojom/speech_recognition.mojom.h"  // nogncheck
 #if BUILDFLAG(IS_CHROMEOS_LACROS)
-#include "chrome/browser/accessibility/live_caption_surface.h"
+#include "chrome/browser/accessibility/live_caption/live_caption_surface.h"
 #include "chromeos/crosapi/mojom/speech_recognition.mojom.h"
 #endif  // BUILDFLAG(IS_CHROMEOS_LACROS)
 #endif  // BUILDFLAG(ENABLE_SPEECH_SERVICE)
@@ -970,12 +973,25 @@ void PopulateChromeWebUIFrameBinders(
   if (history_clusters_service &&
       history_clusters_service->IsJourneysEnabled()) {
     if (base::FeatureList::IsEnabled(history_clusters::kSidePanelJourneys)) {
-      RegisterWebUIControllerInterfaceBinder<
-          history_clusters::mojom::PageHandler, HistoryUI,
-          HistoryClustersSidePanelUI>(map);
+      if (base::FeatureList::IsEnabled(
+              ntp_features::kNtpHistoryClustersModule)) {
+        RegisterWebUIControllerInterfaceBinder<
+            history_clusters::mojom::PageHandler, HistoryUI, NewTabPageUI,
+            HistoryClustersSidePanelUI>(map);
+      } else {
+        RegisterWebUIControllerInterfaceBinder<
+            history_clusters::mojom::PageHandler, HistoryUI,
+            HistoryClustersSidePanelUI>(map);
+      }
     } else {
-      RegisterWebUIControllerInterfaceBinder<
-          history_clusters::mojom::PageHandler, HistoryUI>(map);
+      if (base::FeatureList::IsEnabled(
+              ntp_features::kNtpHistoryClustersModule)) {
+        RegisterWebUIControllerInterfaceBinder<
+            history_clusters::mojom::PageHandler, NewTabPageUI, HistoryUI>(map);
+      } else {
+        RegisterWebUIControllerInterfaceBinder<
+            history_clusters::mojom::PageHandler, HistoryUI>(map);
+      }
     }
   }
 
@@ -985,6 +1001,9 @@ void PopulateChromeWebUIFrameBinders(
 
   RegisterWebUIControllerInterfaceBinder<omnibox::mojom::PageHandler,
                                          NewTabPageUI, OmniboxPopupUI>(map);
+
+  RegisterWebUIControllerInterfaceBinder<suggest_internals::mojom::PageHandler,
+                                         SuggestInternalsUI>(map);
 
   RegisterWebUIControllerInterfaceBinder<
       customize_themes::mojom::CustomizeThemesHandlerFactory, NewTabPageUI
@@ -1040,6 +1059,12 @@ void PopulateChromeWebUIFrameBinders(
   RegisterWebUIControllerInterfaceBinder<
       shopping_list::mojom::ShoppingListHandlerFactory, BookmarksSidePanelUI>(
       map);
+
+  if (base::FeatureList::IsEnabled(features::kSidePanelSearchCompanion)) {
+    RegisterWebUIControllerInterfaceBinder<
+        side_panel::mojom::SearchCompanionPageHandlerFactory,
+        SearchCompanionSidePanelUI>(map);
+  }
 
   if (customize_chrome::IsSidePanelEnabled()) {
     RegisterWebUIControllerInterfaceBinder<

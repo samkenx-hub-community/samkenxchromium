@@ -47,7 +47,6 @@
 #include "third_party/blink/renderer/core/css/resolver/style_builder_converter.h"
 #include "third_party/blink/renderer/core/css/resolver/style_resolver.h"
 #include "third_party/blink/renderer/core/css/resolver/style_resolver_state.h"
-#include "third_party/blink/renderer/core/css/scoped_css_value.h"
 #include "third_party/blink/renderer/core/css/style_engine.h"
 #include "third_party/blink/renderer/core/css/zoom_adjusted_pixel_value.h"
 #include "third_party/blink/renderer/core/css_value_keywords.h"
@@ -2384,13 +2383,8 @@ void Content::ApplyInherit(StyleResolverState& state) const {
 
 void Content::ApplyValue(StyleResolverState& state,
                          const CSSValue& value) const {
-  NOTREACHED();
-}
-
-void Content::ApplyValue(StyleResolverState& state,
-                         const ScopedCSSValue& scoped_value) const {
+  DCHECK(value.IsScopedValue());
   ComputedStyleBuilder& builder = state.StyleBuilder();
-  const CSSValue& value = scoped_value.GetCSSValue();
   if (auto* identifier_value = DynamicTo<CSSIdentifierValue>(value)) {
     DCHECK(identifier_value->GetValueID() == CSSValueID::kNormal ||
            identifier_value->GetValueID() == CSSValueID::kNone);
@@ -2415,7 +2409,7 @@ void Content::ApplyValue(StyleResolverState& state,
       next_content = MakeGarbageCollected<CounterContentData>(
           AtomicString(counter_value->Identifier()), counter_value->ListStyle(),
           AtomicString(counter_value->Separator()),
-          scoped_value.GetTreeScope());
+          counter_value->GetTreeScope());
     } else if (auto* item_identifier_value =
                    DynamicTo<CSSIdentifierValue>(item.Get())) {
       QuoteType quote_type;
@@ -9586,6 +9580,13 @@ const CSSValue* ToggleVisibility::CSSValueFromComputedStyleInternal(
   result_list->Append(
       *MakeGarbageCollected<CSSCustomIdentValue>(toggle_visibility));
   return result_list;
+}
+
+const CSSValue* TopLayer::CSSValueFromComputedStyleInternal(
+    const ComputedStyle& style,
+    const LayoutObject*,
+    bool allow_visited_style) const {
+  return CSSIdentifierValue::Create(style.TopLayer());
 }
 
 const CSSValue* WebkitTransformOriginY::ParseSingleValue(

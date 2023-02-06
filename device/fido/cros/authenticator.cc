@@ -48,7 +48,8 @@ namespace {
 
 AuthenticatorSupportedOptions ChromeOSAuthenticatorOptions() {
   AuthenticatorSupportedOptions options;
-  options.is_platform_device = true;
+  options.is_platform_device =
+      AuthenticatorSupportedOptions::PlatformDevice::kYes;
   // TODO(yichengli): change supports_resident_key to true once it's supported.
   options.supports_resident_key = false;
   // Even if the user has no fingerprints enrolled, we will have password
@@ -61,9 +62,8 @@ AuthenticatorSupportedOptions ChromeOSAuthenticatorOptions() {
 
 }  // namespace
 
-const absl::optional<AuthenticatorSupportedOptions>&
-ChromeOSAuthenticator::Options() const {
-  static const absl::optional<AuthenticatorSupportedOptions> options =
+const AuthenticatorSupportedOptions& ChromeOSAuthenticator::Options() const {
+  static const AuthenticatorSupportedOptions options =
       ChromeOSAuthenticatorOptions();
   return options;
 }
@@ -275,6 +275,7 @@ void ChromeOSAuthenticator::GetAssertion(CtapGetAssertionRequest request,
 
 void ChromeOSAuthenticator::GetCredentialInformationForRequest(
     const CtapGetAssertionRequest& request,
+    const CtapGetAssertionOptions& options,
     GetCredentialInformationForRequestCallback callback) {
   u2f::HasCredentialsRequest req;
   req.set_rp_id(request.rp_id);

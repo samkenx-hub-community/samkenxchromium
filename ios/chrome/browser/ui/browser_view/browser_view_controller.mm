@@ -50,7 +50,7 @@
 #import "ios/chrome/browser/ui/browser_container/browser_container_view_controller.h"
 #import "ios/chrome/browser/ui/bubble/bubble_presenter.h"
 #import "ios/chrome/browser/ui/bubble/bubble_presenter_delegate.h"
-#import "ios/chrome/browser/ui/commands/browser_commands.h"
+#import "ios/chrome/browser/ui/commands/application_commands.h"
 #import "ios/chrome/browser/ui/commands/browser_coordinator_commands.h"
 #import "ios/chrome/browser/ui/commands/command_dispatcher.h"
 #import "ios/chrome/browser/ui/commands/help_commands.h"
@@ -402,6 +402,13 @@ NSString* const kBrowserViewControllerSnackbarCategory =
 // Command handler for snackbar commands
 @property(nonatomic, weak) id<SnackbarCommands> snackbarCommandsHandler;
 
+// Command handler for application commands
+@property(nonatomic, weak) id<ApplicationCommands> applicationCommandsHandler;
+
+// Command handler for browser coordinator commands
+@property(nonatomic, weak) id<BrowserCoordinatorCommands>
+    browserCoordinatorCommandsHandler;
+
 // The FullscreenController.
 @property(nonatomic, assign) FullscreenController* fullscreenController;
 
@@ -492,7 +499,9 @@ NSString* const kBrowserViewControllerSnackbarCategory =
     self.helpHandler = dependencies.helpHandler;
     self.popupMenuCommandsHandler = dependencies.popupMenuCommandsHandler;
     self.snackbarCommandsHandler = dependencies.snackbarCommandsHandler;
-
+    self.applicationCommandsHandler = dependencies.applicationCommandsHandler;
+    self.browserCoordinatorCommandsHandler =
+        dependencies.browserCoordinatorCommandsHandler;
     dependencies.lensCoordinator.delegate = self;
 
     _inNewTabAnimation = NO;
@@ -525,15 +534,8 @@ NSString* const kBrowserViewControllerSnackbarCategory =
 
 #pragma mark - Public Properties
 
-- (id<ApplicationCommands,
-      BrowserCommands,
-      BrowserCoordinatorCommands,
-      FindInPageCommands,
-      PasswordBreachCommands,
-      ToolbarCommands>)dispatcher {
-  return static_cast<
-      id<ApplicationCommands, BrowserCommands, BrowserCoordinatorCommands,
-         FindInPageCommands, PasswordBreachCommands, ToolbarCommands>>(
+- (id<FindInPageCommands, ToolbarCommands>)dispatcher {
+  return static_cast<id<FindInPageCommands, ToolbarCommands>>(
       self.commandDispatcher);
 }
 
@@ -1828,7 +1830,6 @@ NSString* const kBrowserViewControllerSnackbarCategory =
     // Create the NamedGuides and add them to the browser view.
     NSArray<GuideName*>* guideNames = @[
       kContentAreaGuide,
-      kPrimaryToolbarGuide,
       kOmniboxGuide,
     ];
     AddNamedGuidesToView(guideNames, self.view);
@@ -1903,7 +1904,6 @@ NSString* const kBrowserViewControllerSnackbarCategory =
 - (void)displayWebState:(web::WebState*)webState {
   DCHECK(webState);
   [self loadViewIfNeeded];
-  self.ntpCoordinator.webState = webState;
 
   // Set this before triggering any of the possible page loads below.
   webState->SetKeepRenderProcessAlive(true);
@@ -1944,7 +1944,6 @@ NSString* const kBrowserViewControllerSnackbarCategory =
     if (NTPHelper && NTPHelper->IsActive()) {
       NewTabPageCoordinator* coordinator = self.ntpCoordinator;
       UIViewController* viewController = coordinator.viewController;
-      [coordinator ntpDidChangeVisibility:YES];
       viewController.view.frame = [self ntpFrameForWebState:webState];
       [viewController.view layoutIfNeeded];
       // TODO(crbug.com/873729): For a newly created WebState, the session will
@@ -2079,9 +2078,8 @@ NSString* const kBrowserViewControllerSnackbarCategory =
     return nil;
   NewTabPageTabHelper* NTPHelper = NewTabPageTabHelper::FromWebState(webState);
   if (NTPHelper && NTPHelper->IsActive()) {
-    return self.ntpCoordinator.webState != nil
-               ? self.ntpCoordinator.viewController.view
-               : nil;
+    return self.ntpCoordinator.started ? self.ntpCoordinator.viewController.view
+                                       : nil;
   }
   DCHECK(self.browser->GetWebStateList()->GetIndexOfWebState(webState) !=
          WebStateList::kInvalidIndex);
@@ -2603,8 +2601,9 @@ NSString* const kBrowserViewControllerSnackbarCategory =
 }
 
 - (void)displaySavedPasswordList {
-  [self.dispatcher showSavedPasswordsSettingsFromViewController:self
-                                               showCancelButton:YES];
+  [self.applicationCommandsHandler
+      showSavedPasswordsSettingsFromViewController:self
+                                  showCancelButton:YES];
 }
 
 #pragma mark - WebStateContainerViewProvider
@@ -2741,13 +2740,13 @@ NSString* const kBrowserViewControllerSnackbarCategory =
   switch (action) {
     case OverscrollAction::NEW_TAB:
       base::RecordAction(base::UserMetricsAction("MobilePullGestureNewTab"));
-      [self.dispatcher
+      [self.applicationCommandsHandler
           openURLInNewTab:[OpenNewTabCommand
                               commandWithIncognito:_isOffTheRecord]];
       break;
     case OverscrollAction::CLOSE_TAB:
       base::RecordAction(base::UserMetricsAction("MobilePullGestureCloseTab"));
-      [self.dispatcher closeCurrentTab];
+      [self.browserCoordinatorCommandsHandler closeCurrentTab];
       break;
     case OverscrollAction::REFRESH:
       base::RecordAction(base::UserMetricsAction("MobilePullGestureReload"));
@@ -3131,21 +3130,18 @@ NSString* const kBrowserViewControllerSnackbarCategory =
                 oldWebState:(web::WebState*)oldWebState
                     atIndex:(int)atIndex
                      reason:(ActiveWebStateChangeReason)reason {
+  if (reason == ActiveWebStateChangeReason::Inserted) {
+    [self didInsertActiveWebState:newWebState];
+  }
+
   if (oldWebState) {
     // TODO(crbug.com/1272514): Move webstate lifecycle updates to a browser
     // agent.
     oldWebState->WasHidden();
     oldWebState->SetKeepRenderProcessAlive(false);
 
-    NewTabPageTabHelper* NTPHelper =
-        NewTabPageTabHelper::FromWebState(oldWebState);
-    if (NTPHelper && NTPHelper->IsActive()) {
-      [self.ntpCoordinator ntpDidChangeVisibility:NO];
-    }
     [self dismissPopups];
   }
-  // TODO(crbug.com/1272513): Move this update to NTPCoordinator.
-  self.ntpCoordinator.webState = newWebState;
   // NOTE: webStateSelected expects to always be called with a
   // non-null WebState.
   if (!newWebState)
@@ -3154,12 +3150,6 @@ NSString* const kBrowserViewControllerSnackbarCategory =
   // TODO(crbug.com/1272514): Move webstate lifecycle updates to a browser
   // agent.
   self.currentWebState->GetWebViewProxy().scrollViewProxy.clipsToBounds = NO;
-
-  NewTabPageTabHelper* NTPHelper =
-      NewTabPageTabHelper::FromWebState(newWebState);
-  if (NTPHelper && NTPHelper->IsActive()) {
-    [self.ntpCoordinator ntpDidChangeVisibility:YES];
-  }
 
   [self webStateSelected:newWebState notifyToolbar:YES];
 }
@@ -3202,6 +3192,19 @@ NSString* const kBrowserViewControllerSnackbarCategory =
   DCHECK(webState);
 
   DCHECK_EQ(self.browser->GetWebStateList(), webStateList);
+  // If activating, action will be taken when the didChangeActiveWebState
+  // call is received.
+  if (!activating) {
+    [self initiateNewTabAnimationForWebState:webState willOpenInBackground:YES];
+  }
+}
+
+#pragma mark - WebStateListObserver helpers (new tab animations)
+
+// Called when a WebState is inserted and made active, in order to start the
+// new tab animation.
+- (void)didInsertActiveWebState:(web::WebState*)webState {
+  DCHECK(webState);
 
   // Don't initiate Tab animation while session restoration is in progress
   // (see crbug.com/763964).
@@ -3222,6 +3225,9 @@ NSString* const kBrowserViewControllerSnackbarCategory =
   // be different from default, so we reset it.
   NewTabPageTabHelper* NTPHelper = NewTabPageTabHelper::FromWebState(webState);
   if (NTPHelper && NTPHelper->IsActive()) {
+    // TODO(crbug.com/1411808): The NTP should be started by the mediator or
+    // coordinator layer.
+    [self.ntpCoordinator start];
     FeedType defaultFeedType = NTPHelper->DefaultFeedType();
     if (self.ntpCoordinator.selectedFeed != defaultFeedType) {
       [self.ntpCoordinator selectFeedType:defaultFeedType];
@@ -3229,14 +3235,10 @@ NSString* const kBrowserViewControllerSnackbarCategory =
   }
 
   BOOL inBackground =
-      !activating ||
-      NewTabPageTabHelper::FromWebState(webState)->ShouldShowStartSurface() ||
-      !animated;
+      (NTPHelper && NTPHelper->ShouldShowStartSurface()) || !animated;
   [self initiateNewTabAnimationForWebState:webState
                       willOpenInBackground:inBackground];
 }
-
-#pragma mark - WebStateListObserver helpers (new tab animations)
 
 - (void)initiateNewTabAnimationForWebState:(web::WebState*)webState
                       willOpenInBackground:(BOOL)background {
@@ -3315,15 +3317,13 @@ NSString* const kBrowserViewControllerSnackbarCategory =
   // Create the new page image, and load with the new tab snapshot except if
   // it is the NTP.
   UIView* newPage = [self viewForWebState:webState];
+  DCHECK(newPage);
   GURL tabURL = webState->GetVisibleURL();
   // Toolbar snapshot is only used for the UIRefresh animation.
   UIView* toolbarSnapshot;
 
   if (tabURL == kChromeUINewTabURL && !_isOffTheRecord &&
       ![self canShowTabStrip]) {
-    // Update NTPCoordinator's WebState here since `self.currentWebState` has
-    // not been update to `webState` yet.
-    self.ntpCoordinator.webState = webState;
     // Add a snapshot of the primary toolbar to the background as the
     // animation runs.
     UIViewController* toolbarViewController =
@@ -3341,7 +3341,6 @@ NSString* const kBrowserViewControllerSnackbarCategory =
       newPage.frame = self.contentArea.bounds;
     }
   }
-  [newPage layoutIfNeeded];
   newPage.userInteractionEnabled = NO;
   NSInteger currentAnimationIdentifier = ++_NTPAnimationIdentifier;
 
@@ -3420,9 +3419,9 @@ NSString* const kBrowserViewControllerSnackbarCategory =
                     action:@selector(authenticateIncognitoContent)
           forControlEvents:UIControlEventTouchUpInside];
 
-      DCHECK(self.dispatcher);
+      DCHECK(self.applicationCommandsHandler);
       [self.blockingView.tabSwitcherButton
-                 addTarget:self.dispatcher
+                 addTarget:self.applicationCommandsHandler
                     action:@selector(displayRegularTabSwitcherInGridLayout)
           forControlEvents:UIControlEventTouchUpInside];
     }

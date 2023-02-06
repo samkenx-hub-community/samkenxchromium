@@ -51,6 +51,7 @@
 <translation id="1433628812591023318">To drop files in Parallels Desktop, the file must be moved to Windows files.</translation>
 <translation id="1435838927755162558">Share folder with Parallels Desktop</translation>
 <translation id="1439919885608649279">Person with flowers</translation>
+<translation id="1458457385801829801">Eject <ph name="TARGET_NAME" /></translation>
 <translation id="1471718551822868769">Slovak</translation>
 <translation id="1482884275703521657">Finnish</translation>
 <translation id="148466539719134488">Swiss</translation>
@@ -58,6 +59,7 @@
 <translation id="1499943022354839699">English (US) with Dvorak keyboard</translation>
 <translation id="1515909359182093592"><ph name="INPUT_LABEL" /> – host</translation>
 <translation id="1521655867290435174">Google Sheets</translation>
+<translation id="1521795806314479294">Preparing <ph name="FILE_NAME" />…</translation>
 <translation id="1538729222189715449">Opening Linux files...</translation>
 <translation id="1547964879613821194">Canadian English</translation>
 <translation id="1556189134700913550">Apply to all</translation>
@@ -82,6 +84,7 @@
 <translation id="1722487484194605434">Zipping <ph name="NUMBER_OF_ITEMS" /> items…</translation>
 <translation id="1722687688096767818">Adding profile…</translation>
 <translation id="1726100011689679555">Name servers</translation>
+<translation id="1727562178154619254">Ready to sync</translation>
 <translation id="1729953886957086472">German (Germany)</translation>
 <translation id="1730235522912993863">Chinese Cangjie</translation>
 <translation id="1731889557567069540"><ph name="NUMBER_OF_ITEMS" /> items copied.</translation>
@@ -128,6 +131,7 @@
 <translation id="2084108471225856927">Device settings</translation>
 <translation id="2084809735218147718">Signing thank you</translation>
 <translation id="2088690981887365033">VPN network</translation>
+<translation id="2114191879048183086"><ph name="NUMBER_OF_ITEMS" /> items will be deleted and you won't be able to restore them.</translation>
 <translation id="2122305276694332719">Automatically connecting to a hidden network allows others to see your device and some network settings, and is not recommended.</translation>
 <translation id="2125607626296734455">Khmer</translation>
 <translation id="2139545522194199494">Network <ph name="NETWORK_INDEX" /> of <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, signal strength <ph name="SIGNAL_STRENGTH" />%, managed by your administrator, connect</translation>
@@ -346,6 +350,7 @@
 <translation id="3924145049010392604">Meta</translation>
 <translation id="3943857333388298514">Paste</translation>
 <translation id="3952872973865944257">Telugu phonetic</translation>
+<translation id="3954354850384043518">In progress</translation>
 <translation id="3958548648197196644">Kiwi</translation>
 <translation id="3971140002794351170">Download mobile profile, network <ph name="NETWORK_INDEX" /> of <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, <ph name="NETWORK_PROVIDER_NAME" /></translation>
 <translation id="3973925058222872294">English (UK)</translation>
@@ -397,6 +402,7 @@
 <translation id="4398096759193130964">Restore the items or drag them to a new folder outside the bin</translation>
 <translation id="4401287888955153199">Extract all</translation>
 <translation id="4410695710508688828">Extract operation failed. <ph name="ERROR_MESSAGE" /></translation>
+<translation id="4414834425328380570">‘<ph name="FILE_NAME" />’ will be deleted and you won't be able to restore it.</translation>
 <translation id="4418686080762064601">Create a shortcut for your files</translation>
 <translation id="4425149324548788773">My Drive</translation>
 <translation id="4439427728133035643">Network <ph name="NETWORK_INDEX" /> of <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, signal strength <ph name="SIGNAL_STRENGTH" />%, connect</translation>
@@ -404,6 +410,7 @@
 <translation id="4462159676511157176">Custom name servers</translation>
 <translation id="4465725236958772856">Network <ph name="NETWORK_INDEX" /> of <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, managed by your administrator, connect</translation>
 <translation id="4470564870223067757">Hangul 2 Set</translation>
+<translation id="4474142134969976028">No matching results</translation>
 <translation id="4477002475007461989">Romanian</translation>
 <translation id="4477219268485577442">Bulgarian phonetic</translation>
 <translation id="4508265954913339219">Activation failed</translation>
@@ -475,6 +482,7 @@
 <translation id="4973523518332075481">Use a name that's <ph name="MAX_LENGTH" /> characters or less</translation>
 <translation id="4973970068702235170">Zipping failed, unexpected error: <ph name="ERROR_MESSAGE" /></translation>
 <translation id="4984616446166309645">Japanese</translation>
+<translation id="4987699874727873250">English (India)</translation>
 <translation id="4988205478593450158">Are you sure that you want to delete '<ph name="FILE_NAME" />'?</translation>
 <translation id="498902553138568924">Red butterfly</translation>
 <translation id="4992066212339426712">Unmute</translation>
@@ -505,6 +513,7 @@
    Removing your device while it is in use may cause data loss. Please wait until the operation is over, then eject the device using the Files app.</translation>
 <translation id="5163869187418756376">Sharing failed. Please check your connection and try again later.</translation>
 <translation id="516592729076796170">US Programmer Dvorak</translation>
+<translation id="5167102019886320507">Preparing <ph name="NUMBER_OF_ITEMS" /> items…</translation>
 <translation id="5177526793333269655">Thumbnail view</translation>
 <translation id="5181896909298187506">No recent files</translation>
 <translation id="5194713942430106590">Click to sort the column in ascending order.</translation>
@@ -686,6 +695,7 @@
 <translation id="6657585470893396449">Password</translation>
 <translation id="6658865850469097484">Files in the bin for more than 30 days will be automatically deleted.</translation>
 <translation id="6673674183150363784">French (France) with Bépo keyboard</translation>
+<translation id="670380500182402678">Replace all</translation>
 <translation id="6710022688720561421">Robot</translation>
 <translation id="6710213216561001401">Previous</translation>
 <translation id="6732801395666424405">Certificates not loaded</translation>
@@ -808,6 +818,7 @@
 <translation id="7655441028674523381">Easily access Google Photos</translation>
 <translation id="7658239707568436148">Cancel</translation>
 <translation id="7663224033570512922">Hindi</translation>
+<translation id="7665680517722058469">Try another search</translation>
 <translation id="7689532716264131859"><ph name="NUMBER_OF_ITEMS" /> items moved to the bin</translation>
 <translation id="7693909743393669729">Formatting a drive will erase all data stored on it and remove all existing partitions, including partitions that may not be visible. This action cannot be undone.</translation>
 <translation id="7695430100978772476">Could not format <ph name="DRIVE_NAME" /></translation>
@@ -904,6 +915,7 @@
 <translation id="8386903983509584791">Scan completed</translation>
 <translation id="8387733224523483503"><ph name="FILE_NAME" /> extracted.</translation>
 <translation id="8395901698320285466">Dimensions</translation>
+<translation id="8404498045299006085">Keep all</translation>
 <translation id="8408068190360279472"><ph name="NETWORK_TYPE" /> network, connecting</translation>
 <translation id="8425213833346101688">Change</translation>
 <translation id="8431909052837336408">Change SIM PIN</translation>
@@ -930,6 +942,7 @@
 <translation id="8560515948038859357">Cantonese</translation>
 <translation id="8561206103590473338">Elephant</translation>
 <translation id="8566466896628108558">Network <ph name="NETWORK_INDEX" /> of <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, <ph name="SECURITY_STATUS" />, signal strength <ph name="SIGNAL_STRENGTH" />%, blocked by your administrator, details</translation>
+<translation id="8568374623837201676">Permanently delete this file?</translation>
 <translation id="8569764466147087991">Select a file to open</translation>
 <translation id="8577897833047451336">Croatian</translation>
 <translation id="8578308463707544055">Indonesian</translation>
@@ -962,6 +975,7 @@
 <translation id="8866284467018526531">Arabic transliteration</translation>
 <translation id="8873014196523807561">To restore these items, drag them to a new folder. The original folders for some of these items have been deleted.</translation>
 <translation id="8874184842967597500">Not connected</translation>
+<translation id="8876368061475701452">Queued</translation>
 <translation id="8900820606136623064">Hungarian</translation>
 <translation id="8903931173357132290">Graduate</translation>
 <translation id="8912078710089354287">Dog wagging tail</translation>

@@ -798,8 +798,7 @@ void RootWindowController::ShowContextMenu(const gfx::Point& location_in_screen,
   // that the launcher UI is fullscreen in tablet mode, so the whole root window
   // can be perceived by users to be part of the launcher.
   auto* const app_list_controller = Shell::Get()->app_list_controller();
-  if (features::IsLauncherAppSortEnabled() && tablet_mode &&
-      app_list_controller->IsVisible(display_id) &&
+  if (tablet_mode && app_list_controller->IsVisible(display_id) &&
       app_list_controller->GetCurrentAppListPage() ==
           AppListState::kStateApps) {
     ui::SimpleMenuModel* menu_model = root_window_menu_model_adapter_->model();
@@ -1301,15 +1300,13 @@ void RootWindowController::CreateContainers() {
   overlay_container->SetLayoutManager(
       std::make_unique<OverlayLayoutManager>(overlay_container));
 
-  if (features::IsAmbientModeEnabled()) {
-    aura::Window* ambient_container =
-        CreateContainer(kShellWindowId_AmbientModeContainer,
-                        "AmbientModeContainer", lock_screen_related_containers);
-    ::wm::SetChildWindowVisibilityChangesAnimated(ambient_container);
-    ambient_container->SetProperty(::wm::kUsesScreenCoordinatesKey, true);
-    ambient_container->SetLayoutManager(
-        std::make_unique<FillLayoutManager>(ambient_container));
-  }
+  aura::Window* ambient_container =
+      CreateContainer(kShellWindowId_AmbientModeContainer,
+                      "AmbientModeContainer", lock_screen_related_containers);
+  ::wm::SetChildWindowVisibilityChangesAnimated(ambient_container);
+  ambient_container->SetProperty(::wm::kUsesScreenCoordinatesKey, true);
+  ambient_container->SetLayoutManager(
+      std::make_unique<FillLayoutManager>(ambient_container));
 
   aura::Window* mouse_cursor_container =
       CreateContainer(kShellWindowId_MouseCursorContainer,

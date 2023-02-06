@@ -12,9 +12,7 @@
 #include <utility>
 #include <vector>
 
-#include "base/allocator/partition_alloc_features.h"
 #include "base/allocator/partition_allocator/partition_alloc_buildflags.h"
-#include "base/allocator/partition_allocator/starscan/pcscan.h"
 #include "base/check_op.h"
 #include "base/command_line.h"
 #include "base/containers/contains.h"
@@ -101,7 +99,6 @@
 #include "content/browser/screen_orientation/screen_orientation_provider.h"
 #include "content/browser/shared_storage/shared_storage_budget_charger.h"
 #include "content/browser/site_instance_impl.h"
-#include "content/browser/starscan_load_observer.h"
 #include "content/browser/wake_lock/wake_lock_context_host.h"
 #include "content/browser/web_contents/java_script_dialog_commit_deferring_condition.h"
 #include "content/browser/web_contents/web_contents_view.h"
@@ -206,6 +203,11 @@
 
 #if defined(USE_AURA)
 #include "ui/aura/window.h"
+#endif
+
+#if BUILDFLAG(USE_PARTITION_ALLOC_AS_MALLOC) && BUILDFLAG(USE_STARSCAN)
+#include "base/allocator/partition_allocator/starscan/pcscan.h"
+#include "content/browser/starscan_load_observer.h"
 #endif
 
 namespace content {
@@ -1051,13 +1053,13 @@ WebContentsImpl::WebContentsImpl(BrowserContext* browser_context)
     SharedStorageBudgetCharger::CreateForWebContents(this);
   }
 
-#if BUILDFLAG(USE_PARTITION_ALLOC_AS_MALLOC) && PA_CONFIG(ALLOW_PCSCAN)
+#if BUILDFLAG(USE_PARTITION_ALLOC_AS_MALLOC) && BUILDFLAG(USE_STARSCAN)
   // TODO(1231679): Remove or move to another place after finishing the PCScan
   // experiment.
   if (partition_alloc::internal::PCScan::IsInitialized()) {
     star_scan_load_observer_ = std::make_unique<StarScanLoadObserver>(this);
   }
-#endif
+#endif  // BUILDFLAG(USE_PARTITION_ALLOC_AS_MALLOC) && BUILDFLAG(USE_STARSCAN)
 }
 
 WebContentsImpl::~WebContentsImpl() {
@@ -2440,12 +2442,9 @@ const base::Location& WebContentsImpl::GetCreatorLocation() {
   return creator_location_;
 }
 
-float WebContentsImpl::GetPictureInPictureInitialAspectRatio() {
-  return pip_initial_aspect_ratio_;
-}
-
-bool WebContentsImpl::GetPictureInPictureLockAspectRatio() {
-  return pip_lock_aspect_ratio_;
+const absl::optional<blink::mojom::PictureInPictureWindowOptions>&
+WebContentsImpl::GetPictureInPictureOptions() const {
+  return picture_in_picture_options_;
 }
 
 #if BUILDFLAG(IS_ANDROID)
@@ -2660,15 +2659,13 @@ std::unique_ptr<WebContents> WebContentsImpl::DetachFromOuterWebContents() {
   // current one, since the view can be swapped due to a cross-origin
   // navigation.
   std::set<RenderViewHostImpl*> render_view_hosts;
-  for (auto& render_view_host : GetPrimaryFrameTree().render_view_hosts()) {
-    if (render_view_host.second->GetWidget() &&
-        render_view_host.second->GetWidget()->GetView()) {
-      DCHECK(render_view_host.second->GetWidget()
-                 ->GetView()
-                 ->IsRenderWidgetHostViewChildFrame());
-      render_view_hosts.insert(render_view_host.second);
+  primary_frame_tree_.ForEachRenderViewHost([&render_view_hosts](
+                                                RenderViewHostImpl* rvh) {
+    if (rvh->GetWidget() && rvh->GetWidget()->GetView()) {
+      DCHECK(rvh->GetWidget()->GetView()->IsRenderWidgetHostViewChildFrame());
+      render_view_hosts.insert(rvh);
     }
-  }
+  });
 
   for (auto* render_view_host : render_view_hosts)
     render_view_host->GetWidget()->GetView()->Destroy();
@@ -3102,9 +3099,8 @@ void WebContentsImpl::SetPageFrozen(bool frozen) {
   // A visible page is never frozen.
   DCHECK_NE(Visibility::VISIBLE, GetVisibility());
 
-  for (auto& entry : primary_frame_tree_.render_view_hosts()) {
-    entry.second->SetIsFrozen(frozen);
-  }
+  primary_frame_tree_.ForEachRenderViewHost(
+      [&frozen](RenderViewHostImpl* rvh) { rvh->SetIsFrozen(frozen); });
 }
 
 std::unique_ptr<WebContents> WebContentsImpl::Clone() {
@@ -3139,15 +3135,9 @@ void WebContentsImpl::Init(const WebContents::CreateParams& params,
   java_creator_location_ = params.java_creator_location;
 #endif  // BUILDFLAG(IS_ANDROID)
 
-  // An initial aspect ratio of 0.0 implies that the website did not set one and
-  // therefore we should use a default value. We will also use a default value
-  // if the website has given an invalid aspect ratio (i.e. a negative one).
-  pip_initial_aspect_ratio_ =
-      params.initial_picture_in_picture_aspect_ratio <= 0.0f
-          ? 1.0f
-          : params.initial_picture_in_picture_aspect_ratio;
-
-  pip_lock_aspect_ratio_ = params.lock_picture_in_picture_aspect_ratio;
+  if (params.picture_in_picture_options.has_value()) {
+    picture_in_picture_options_ = params.picture_in_picture_options;
+  }
 
   // This is set before initializing the render manager since
   // RenderFrameHostManager::Init calls back into us via its delegate to ask if
@@ -4100,10 +4090,7 @@ FrameTree* WebContentsImpl::CreateNewWindow(
   create_params.renderer_initiated_creation = !is_new_browsing_instance;
 
   if (params.pip_options) {
-    create_params.initial_picture_in_picture_aspect_ratio =
-        params.pip_options->initial_aspect_ratio;
-    create_params.lock_picture_in_picture_aspect_ratio =
-        params.pip_options->lock_aspect_ratio;
+    create_params.picture_in_picture_options = *(params.pip_options);
   }
 
   // Check whether there is an available prerendered page for this navigation if
@@ -6324,9 +6311,8 @@ void WebContentsImpl::SetWebPreferences(
   // cached pages), and make them send the current WebPreferences
   // to the renderer. WebPreferences updates for back-forward cached pages will
   // be sent when we restore those pages from the back-forward cache.
-  for (auto& rvh : primary_frame_tree_.render_view_hosts()) {
-    rvh.second->SendWebPreferencesToRenderer();
-  }
+  primary_frame_tree_.ForEachRenderViewHost(
+      [](RenderViewHostImpl* rvh) { rvh->SendWebPreferencesToRenderer(); });
 }
 
 void WebContentsImpl::RecomputeWebPreferencesSlow() {
@@ -8526,6 +8512,10 @@ gfx::Size WebContentsImpl::GetSize() {
 #elif BUILDFLAG(IS_ANDROID)
   ui::ViewAndroid* view_android = GetNativeView();
   return view_android->bounds().size();
+#elif BUILDFLAG(IS_IOS)
+  // TODO(crbug.com/1411704): Implement me.
+  NOTREACHED();
+  return gfx::Size();
 #endif
 }
 
@@ -9436,9 +9426,10 @@ void WebContentsImpl::ForEachRenderViewHost(
             if ((view_mask & ForEachRenderViewHostTypes::kActiveViews) == 0)
               return;
           }
-          for (auto& render_view_host : frame_tree.render_view_hosts()) {
-            render_view_hosts.insert(render_view_host.second);
-          }
+          frame_tree.ForEachRenderViewHost(
+              [&render_view_hosts](RenderViewHostImpl* rvh) {
+                render_view_hosts.insert(rvh);
+              });
         },
         view_mask, std::ref(render_view_hosts)));
   }

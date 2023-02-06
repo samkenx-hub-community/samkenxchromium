@@ -12,7 +12,7 @@
 #include <ostream>
 #include <string>
 
-#include "base/functional/callback_forward.h"
+#include "base/functional/function_ref.h"
 #include "base/strings/string_piece_forward.h"
 #include "base/values.h"
 #include "content/browser/attribution_reporting/attribution_parser_test_utils.h"
@@ -39,13 +39,13 @@ class AttributionInteropParser {
 
   // Converts interop test input to simulator input format. The error state from
   // the previous parsing will be reset.
-  absl::optional<base::Value> SimulatorInputFromInteropInput(
+  absl::optional<base::Value::Dict> SimulatorInputFromInteropInput(
       base::Value::Dict& input);
 
   // Converts simulator output to interop test output format. The error state
   // from the previous parsing will be reset.
-  absl::optional<base::Value> InteropOutputFromSimulatorOutput(
-      base::Value output);
+  absl::optional<base::Value::Dict> InteropOutputFromSimulatorOutput(
+      base::Value::Dict output);
 
   // Parses the configuration. The error state from the previous parsing will be
   // reset.
@@ -75,7 +75,7 @@ class AttributionInteropParser {
                                             base::StringPiece key);
 
   void ParseList(base::Value* values,
-                 base::RepeatingCallback<void(base::Value)> callback,
+                 base::FunctionRef<void(base::Value)> callback,
                  size_t expected_size = 0);
 
   // Returns `attribution_src_url` in the request if exists.
@@ -91,6 +91,8 @@ class AttributionInteropParser {
   base::Value::List ParseEventLevelReports(base::Value::Dict& output);
 
   base::Value::List ParseAggregatableReports(base::Value::Dict& output);
+
+  base::Value::List ParseVerboseDebugReports(base::Value::Dict& output);
 
   // Returns true if `key` is present in `dict` and the integer is parsed
   // successfully.

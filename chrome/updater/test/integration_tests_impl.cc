@@ -36,7 +36,6 @@
 #include "base/strings/stringprintf.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/task/sequenced_task_runner.h"
-#include "base/task/single_thread_task_runner_thread_mode.h"
 #include "base/task/task_traits.h"
 #include "base/task/thread_pool.h"
 #include "base/test/bind.h"
@@ -199,7 +198,8 @@ void ExpectSequence(UpdaterScope scope,
                     const std::string& install_data_index,
                     int event_type,
                     const base::Version& from_version,
-                    const base::Version& to_version) {
+                    const base::Version& to_version,
+                    bool is_update_check_only) {
   base::FilePath test_data_path;
   ASSERT_TRUE(base::PathService::Get(chrome::DIR_TEST_DATA, &test_data_path));
   base::FilePath crx_path = test_data_path.Append(FILE_PATH_LITERAL("updater"))
@@ -226,19 +226,22 @@ void ExpectSequence(UpdaterScope scope,
                         test_server->base_url().spec(), to_version, crx_path,
                         kDoNothingCRXRun, {}));
 
-  // Second request: update download.
-  std::string crx_bytes;
-  base::ReadFileToString(crx_path, &crx_bytes);
-  test_server->ExpectOnce({base::BindRepeating(RequestMatcherRegex, "")},
-                          crx_bytes);
+  if (!is_update_check_only) {
+    // Second request: update download.
+    std::string crx_bytes;
+    base::ReadFileToString(crx_path, &crx_bytes);
+    test_server->ExpectOnce({base::BindRepeating(RequestMatcherRegex, "")},
+                            crx_bytes);
+  }
 
   // Third request: event ping.
   test_server->ExpectOnce(
       {base::BindRepeating(
            RequestMatcherRegex,
-           base::StringPrintf(R"(.*"eventresult":1,"eventtype":%d,)"
+           base::StringPrintf(R"(.*"eventresult":%d,"eventtype":%d,)"
                               R"("nextversion":"%s","previousversion":"%s".*)",
-                              event_type, to_version.GetString().c_str(),
+                              !is_update_check_only, event_type,
+                              to_version.GetString().c_str(),
                               from_version.GetString().c_str())),
        GetScopePredicate(scope)},
       ")]}'\n");
@@ -368,6 +371,25 @@ void RunWakeActive(UpdaterScope scope, int expected_exit_code) {
   RunUpdaterWithSwitch(active_version, scope, kWakeSwitch, expected_exit_code);
 }
 
+// TODO(crbug.com/1396103): remove this `#if` once mojo interface changes are
+// done in separate CL.
+#if BUILDFLAG(IS_WIN)
+void Update(UpdaterScope scope,
+            const std::string& app_id,
+            const std::string& install_data_index,
+            bool do_update_check_only) {
+  scoped_refptr<UpdateService> update_service = CreateUpdateServiceProxy(scope);
+  base::RunLoop loop;
+  update_service->Update(
+      app_id, install_data_index, UpdateService::Priority::kForeground,
+      UpdateService::PolicySameVersionUpdate::kNotAllowed, do_update_check_only,
+      base::DoNothing(),
+      base::BindLambdaForTesting(
+          [&loop](UpdateService::Result result_unused) { loop.Quit(); }));
+  loop.Run();
+}
+#else   // BUILDFLAG(IS_WIN)
+
 void Update(UpdaterScope scope,
             const std::string& app_id,
             const std::string& install_data_index) {
@@ -380,6 +402,7 @@ void Update(UpdaterScope scope,
           [&loop](UpdateService::Result result_unused) { loop.Quit(); }));
   loop.Run();
 }
+#endif  // BUILDFLAG(IS_WIN)
 
 void UpdateAll(UpdaterScope scope) {
   scoped_refptr<UpdateService> update_service = CreateUpdateServiceProxy(scope);
@@ -569,6 +592,16 @@ void ExpectSelfUpdateSequence(UpdaterScope scope, ScopedServer* test_server) {
       ")]}'\n");
 }
 
+void ExpectUpdateCheckSequence(UpdaterScope scope,
+                               ScopedServer* test_server,
+                               const std::string& app_id,
+                               const std::string& install_data_index,
+                               const base::Version& from_version,
+                               const base::Version& to_version) {
+  ExpectSequence(scope, test_server, app_id, install_data_index, 3,
+                 from_version, to_version, /*is_update_check_only*/ true);
+}
+
 void ExpectUpdateSequence(UpdaterScope scope,
                           ScopedServer* test_server,
                           const std::string& app_id,
@@ -576,7 +609,7 @@ void ExpectUpdateSequence(UpdaterScope scope,
                           const base::Version& from_version,
                           const base::Version& to_version) {
   ExpectSequence(scope, test_server, app_id, install_data_index, 3,
-                 from_version, to_version);
+                 from_version, to_version, /*is_update_check_only*/ false);
 }
 
 void ExpectInstallSequence(UpdaterScope scope,
@@ -586,7 +619,7 @@ void ExpectInstallSequence(UpdaterScope scope,
                            const base::Version& from_version,
                            const base::Version& to_version) {
   ExpectSequence(scope, test_server, app_id, install_data_index, 2,
-                 from_version, to_version);
+                 from_version, to_version, /*is_update_check_only*/ false);
 }
 
 // Runs multiple cycles of instantiating the update service, calling
@@ -619,10 +652,7 @@ void StressUpdateService(UpdaterScope scope) {
           UpdaterScope scope,
           scoped_refptr<base::SequencedTaskRunner> task_runner,
           LoopClosure loop_closure) {
-        auto service_task_runner =
-            base::ThreadPool::CreateSingleThreadTaskRunner(
-                {}, base::SingleThreadTaskRunnerThreadMode::DEDICATED);
-        service_task_runner->PostDelayedTask(
+        base::ThreadPool::CreateSequencedTaskRunner({})->PostDelayedTask(
             FROM_HERE,
             base::BindLambdaForTesting([scope, task_runner, loop_closure]() {
               auto update_service = CreateUpdateServiceProxy(scope);
@@ -675,6 +705,11 @@ void CallServiceUpdate(UpdaterScope updater_scope,
   service_proxy->Update(
       app_id, install_data_index, UpdateService::Priority::kForeground,
       policy_same_version_update,
+// TODO(crbug.com/1396103): remove this `#if` once mojo interface changes are
+// done in separate CL.
+#if BUILDFLAG(IS_WIN)
+      /*do_update_check_only=*/false,
+#endif  // BUILDFLAG(IS_WIN)
       base::BindLambdaForTesting([](const UpdateService::UpdateState&) {}),
       base::BindLambdaForTesting([&](UpdateService::Result result) {
         EXPECT_EQ(result, UpdateService::Result::kSuccess);

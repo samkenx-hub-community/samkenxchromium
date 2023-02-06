@@ -48,6 +48,7 @@
 #include "content/browser/attribution_reporting/attribution_report.h"
 #include "content/browser/attribution_reporting/attribution_report_network_sender.h"
 #include "content/browser/attribution_reporting/attribution_report_sender.h"
+#include "content/browser/attribution_reporting/attribution_reporting.h"
 #include "content/browser/attribution_reporting/attribution_storage.h"
 #include "content/browser/attribution_reporting/attribution_storage_delegate.h"
 #include "content/browser/attribution_reporting/attribution_storage_delegate_impl.h"
@@ -58,7 +59,6 @@
 #include "content/browser/attribution_reporting/stored_source.h"
 #include "content/browser/storage_partition_impl.h"
 #include "content/public/browser/attribution_data_model.h"
-#include "content/public/browser/attribution_reporting.h"
 #include "content/public/browser/browser_context.h"
 #include "content/public/browser/browsing_data_filter_builder.h"
 #include "content/public/browser/content_browser_client.h"
@@ -802,18 +802,19 @@ void AttributionManagerImpl::OnClearDataComplete() {
   NotifyReportsChanged(AttributionReport::Type::kAggregatableAttribution);
 }
 
-// TODO(crbug.com/1407369): Propagate calls to storage
 void AttributionManagerImpl::GetAllDataKeys(
     base::OnceCallback<void(std::vector<AttributionManager::DataKey>)>
         callback) {
-  std::move(callback).Run({});
+  attribution_storage_.AsyncCall(&AttributionStorage::GetAllDataKeys)
+      .Then(std::move(callback));
 }
 
-// TODO(crbug.com/1407369): Propagate calls to storage
 void AttributionManagerImpl::RemoveAttributionDataByDataKey(
     const AttributionManager::DataKey& data_key,
     base::OnceClosure callback) {
-  std::move(callback).Run();
+  attribution_storage_.AsyncCall(&AttributionStorage::DeleteByDataKey)
+      .WithArgs(data_key)
+      .Then(std::move(callback));
 }
 
 void AttributionManagerImpl::GetReportsToSend() {

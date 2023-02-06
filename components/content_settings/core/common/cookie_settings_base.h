@@ -210,14 +210,20 @@ class CookieSettingsBase {
   // grants, but applies to subresources more broadly (at the top-level rather
   // than only for a single frame).
   bool ShouldConsiderTopLevelStorageAccessGrants(
-      QueryReason query_reason) const;
+      QueryReason query_reason,
+      net::CookieSettingOverrides overrides) const;
 
   // Static version of the above, exposed for testing.
   static bool ShouldConsiderStorageAccessGrantsInternal(
       QueryReason query_reason,
-      bool storage_access_api_enabled,
       bool storage_access_api_grants_unpartitioned_storage,
       bool is_storage_partitioned);
+
+  // Controls whether Storage Access API grants allow access to unpartitioned
+  // *storage*, in addition to unpartitioned cookies. This is static so that all
+  // instances behave consistently.
+  static void SetStorageAccessAPIGrantsUnpartitionedStorageForTesting(
+      bool grants);
 
  protected:
   // Returns true iff the request is considered third-party.
@@ -239,8 +245,7 @@ class CookieSettingsBase {
       content_settings::SettingSource* source,
       QueryReason query_reason) const = 0;
 
-  const bool storage_access_api_enabled_;
-  const bool storage_access_api_grants_unpartitioned_storage_;
+  static bool storage_access_api_grants_unpartitioned_storage_;
   const bool is_storage_partitioned_;
   const bool is_privacy_sandbox_v4_enabled_;
 };

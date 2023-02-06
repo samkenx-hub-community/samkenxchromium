@@ -915,6 +915,19 @@ void WallpaperControllerImpl::Init(
   SetDevicePolicyWallpaperPath(device_policy_wallpaper_path);
 }
 
+bool WallpaperControllerImpl::CanSetUserWallpaper(
+    const AccountId& account_id) const {
+  // There is no visible wallpaper in kiosk mode.
+  if (IsInKioskMode()) {
+    return false;
+  }
+  // Don't allow user wallpapers while policy is in effect.
+  if (IsWallpaperControlledByPolicy(account_id)) {
+    return false;
+  }
+  return true;
+}
+
 void WallpaperControllerImpl::SetCustomWallpaper(
     const AccountId& account_id,
     const base::FilePath& file_path,
@@ -1636,6 +1649,10 @@ void WallpaperControllerImpl::OnColorCalculationComplete(
       info.location, wallpaper_calculated_colors.prominent_colors);
   pref_manager_->CacheKMeanColor(info.location,
                                  wallpaper_calculated_colors.k_mean_color);
+  if (features::IsJellyEnabled()) {
+    pref_manager_->CacheCelebiColor(info.location,
+                                    wallpaper_calculated_colors.celebi_color);
+  }
   SetCalculatedColors(wallpaper_calculated_colors);
 
   // Release the color calculator after it has returned a result by calling this
@@ -1953,17 +1970,6 @@ void WallpaperControllerImpl::SetDefaultWallpaperImpl(
   }
 }
 
-bool WallpaperControllerImpl::CanSetUserWallpaper(
-    const AccountId& account_id) const {
-  // There is no visible wallpaper in kiosk mode.
-  if (IsInKioskMode())
-    return false;
-  // Don't allow user wallpapers while policy is in effect.
-  if (IsWallpaperControlledByPolicy(account_id))
-    return false;
-  return true;
-}
-
 bool WallpaperControllerImpl::WallpaperIsAlreadyLoaded(
     const gfx::ImageSkia& image,
     bool compare_layouts,
@@ -2037,7 +2043,7 @@ void WallpaperControllerImpl::OnWallpaperVariantsFetched(
     bool start_daily_refresh_timer,
     SetWallpaperCallback callback,
     absl::optional<OnlineWallpaperParams> params) {
-  DCHECK(type == WallpaperType::kDaily || type == WallpaperType::kOnline);
+  DCHECK(IsOnlineWallpaper(type));
   if (params) {
     SetOnlineWallpaper(*params, std::move(callback));
 
@@ -2371,8 +2377,7 @@ void WallpaperControllerImpl::SetWallpaperFromInfo(const AccountId& account_id,
   }
 
   base::FilePath wallpaper_path;
-  if (info.type == WallpaperType::kOnline ||
-      info.type == WallpaperType::kDaily) {
+  if (IsOnlineWallpaper(info.type)) {
     wallpaper_path =
         GetOnlineWallpaperPath(info.location, GetAppropriateResolution());
 
@@ -2600,8 +2605,10 @@ void WallpaperControllerImpl::SetCalculatedColors(
 void WallpaperControllerImpl::ResetCalculatedColors() {
   static const std::vector<SkColor> kInvalidColors(color_profiles_.size(),
                                                    kInvalidWallpaperColor);
-  SetCalculatedColors(
-      WallpaperCalculatedColors(kInvalidColors, kInvalidWallpaperColor));
+  SetCalculatedColors(WallpaperCalculatedColors(
+      /*prominent_colors=*/kInvalidColors,
+      /*k_mean_color=*/kInvalidWallpaperColor,
+      /*celebi_color=*/kInvalidWallpaperColor));
 }
 
 void WallpaperControllerImpl::CalculateWallpaperColors() {
@@ -2884,6 +2891,11 @@ constexpr bool WallpaperControllerImpl::IsWallpaperTypeSyncable(
 void WallpaperControllerImpl::SetDailyRefreshCollectionId(
     const AccountId& account_id,
     const std::string& collection_id) {
+  if (!CanSetUserWallpaper(account_id)) {
+    LOG(WARNING) << "Invalid request to set daily refresh collection id";
+    return;
+  }
+
   WallpaperInfo info;
   if (!GetUserWallpaperInfo(account_id, &info))
     return;
@@ -3220,8 +3232,7 @@ void WallpaperControllerImpl::HandleGooglePhotosWallpaperInfoSyncedIn(
 void WallpaperControllerImpl::HandleSettingOnlineWallpaperFromWallpaperInfo(
     const AccountId& account_id,
     const WallpaperInfo& info) {
-  DCHECK(info.type == WallpaperType::kDaily ||
-         info.type == WallpaperType::kOnline);
+  DCHECK(IsOnlineWallpaper(info.type));
   if (!info.asset_id.has_value()) {
     // If a user has not changed their wallpaper since the addition of asset_id,
     // we can have a WallpaperInfo without an asset_id from synced data.

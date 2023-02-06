@@ -375,7 +375,11 @@ export class Panel extends PanelInterface {
         binding.keySeq = await KeyUtil.keySequenceToString(keySeq, true);
         const titleMsgId = CommandStore.messageForCommand(command);
         if (!titleMsgId) {
-          console.error('No localization for: ' + command);
+          // Title messages are intentionally missing for some keyboard
+          // shortcuts.
+          if (!(command in COMMANDS_WITH_NO_MSG_ID)) {
+            console.error('No localization for: ' + command);
+          }
           binding.title = '';
           continue;
         }
@@ -513,7 +517,7 @@ export class Panel extends PanelInterface {
           this.menuManager_.getSelectedMenu(opt_activateMenuTitle);
 
       const activateFirstItem = (selectedMenu !== this.menuManager_.searchMenu);
-      this.activateMenu_(selectedMenu, activateFirstItem);
+      this.menuManager_.activateMenu(selectedMenu, activateFirstItem);
     };
 
     // The panel does not get focus immediately when we request to be full
@@ -549,7 +553,9 @@ export class Panel extends PanelInterface {
     $('menu-bar').appendChild(menu.menuBarItemElement);
     menu.menuBarItemElement.addEventListener(
         'mouseover',
-        () => this.activateMenu_(menu, true /* activateFirstItem */), false);
+        () =>
+            this.menuManager_.activateMenu(menu, true /* activateFirstItem */),
+        false);
     menu.menuBarItemElement.addEventListener(
         'mouseup', event => this.onMouseUpOnMenuTitle_(menu, event), false);
     $('menus_background').appendChild(menu.menuContainerElement);
@@ -566,7 +572,7 @@ export class Panel extends PanelInterface {
     const groups = data.groups;
     const cols = data.cols;
     const rows = data.rows;
-    const sideBySide = LocalStorage.get('brailleSideBySide');
+    const sideBySide = SettingsManager.get('brailleSideBySide');
 
     const addBorders = event => {
       const cell = event.target;
@@ -708,7 +714,8 @@ export class Panel extends PanelInterface {
     $('menu-bar').appendChild(menu.menuBarItemElement);
     menu.menuBarItemElement.addEventListener(
         'mouseover',
-        () => this.activateMenu_(menu, true /* activateFirstItem */));
+        () =>
+            this.menuManager_.activateMenu(menu, true /* activateFirstItem */));
     menu.menuBarItemElement.addEventListener(
         'mouseup', event => this.onMouseUpOnMenuTitle_(menu, event));
     $('menus_background').appendChild(menu.menuContainerElement);
@@ -747,7 +754,7 @@ export class Panel extends PanelInterface {
     $('menu-bar').appendChild(this.menuManager_.searchMenu.menuBarItemElement);
     this.menuManager_.searchMenu.menuBarItemElement.addEventListener(
         'mouseover',
-        () => this.activateMenu_(
+        () => this.menuManager_.activateMenu(
             this.menuManager_.searchMenu, false /* activateFirstItem */),
         false);
     this.menuManager_.searchMenu.menuBarItemElement.addEventListener(
@@ -759,31 +766,6 @@ export class Panel extends PanelInterface {
         .appendChild(this.menuManager_.searchMenu.menuContainerElement);
     this.menuManager_.menus.push(this.menuManager_.searchMenu);
     return this.menuManager_.searchMenu;
-  }
-
-  /**
-   * Activate a menu, which implies hiding the previous active menu.
-   * @param {PanelMenu} menu The new menu to activate.
-   * @param {boolean} activateFirstItem Whether or not we should activate the
-   *     menu's first item.
-   * @private
-   */
-  activateMenu_(menu, activateFirstItem) {
-    if (menu === this.menuManager_.activeMenu) {
-      return;
-    }
-
-    if (this.menuManager_.activeMenu) {
-      this.menuManager_.activeMenu.deactivate();
-      this.menuManager_.activeMenu = null;
-    }
-
-    this.menuManager_.activeMenu = menu;
-    this.pendingCallback_ = null;
-
-    if (this.menuManager_.activeMenu) {
-      this.menuManager_.activeMenu.activate(activateFirstItem);
-    }
   }
 
   /**
@@ -833,7 +815,7 @@ export class Panel extends PanelInterface {
       return;
     }
 
-    this.activateMenu_(
+    this.menuManager_.activateMenu(
         this.menuManager_.menus[activeIndex], true /* activateFirstItem */);
   }
 
@@ -905,7 +887,7 @@ export class Panel extends PanelInterface {
    * @private
    */
   onMouseUpOnMenuTitle_(menu, mouseUpEvent) {
-    this.activateMenu_(menu, true /* activateFirstItem */);
+    this.menuManager_.activateMenu(menu, true /* activateFirstItem */);
     mouseUpEvent.preventDefault();
     mouseUpEvent.stopPropagation();
   }
@@ -1197,7 +1179,7 @@ export class Panel extends PanelInterface {
     const query = event.target.value.toLowerCase();
     this.menuManager_.searchMenu.clear();
     // Show the search results menu.
-    this.activateMenu_(
+    this.menuManager_.activateMenu(
         this.menuManager_.searchMenu, false /* activateFirstItem */);
     // Populate.
     if (query) {
@@ -1306,6 +1288,21 @@ Panel.ACTION_TO_MSG_ID = {
   showContextMenu: 'show_context_menu',
   longClick: 'force_long_click_on_current_item',
 };
+
+const COMMANDS_WITH_NO_MSG_ID = [
+  'nativeNextCharacter',
+  'nativePreviousCharacter',
+  'nativeNextWord',
+  'nativePreviousWord',
+  'enableLogging',
+  'disableLogging',
+  'dumpTree',
+  'showActionsMenu',
+  'enableChromeVoxArcSupportForCurrentApp',
+  'disableChromeVoxArcSupportForCurrentApp',
+  'showTalkBackKeyboardShortcuts',
+  'copy',
+];
 
 window.addEventListener('load', async () => await Panel.init(), false);
 

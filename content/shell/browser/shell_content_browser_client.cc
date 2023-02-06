@@ -6,6 +6,7 @@
 
 #include <stddef.h>
 
+#include <functional>
 #include <memory>
 #include <string>
 #include <utility>
@@ -13,11 +14,13 @@
 
 #include "base/base_switches.h"
 #include "base/command_line.h"
+#include "base/containers/cxx20_erase.h"
 #include "base/containers/flat_set.h"
 #include "base/feature_list.h"
 #include "base/files/file.h"
 #include "base/files/file_util.h"
 #include "base/logging.h"
+#include "base/no_destructor.h"
 #include "base/path_service.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_piece_forward.h"
@@ -74,7 +77,8 @@
 #include "mojo/public/cpp/bindings/self_owned_receiver.h"
 #include "net/ssl/client_cert_identity.h"
 #include "services/device/public/cpp/geolocation/location_system_permission_status.h"
-#include "services/network/public/mojom/ct_log_info.mojom.h"
+#include "services/network/public/cpp/features.h"
+#include "services/network/public/cpp/network_service_buildflags.h"
 #include "services/network/public/mojom/network_context.mojom.h"
 #include "services/network/public/mojom/network_service.mojom.h"
 #include "third_party/blink/public/common/features.h"
@@ -112,11 +116,21 @@
 #include "media/mojo/services/media_service_factory.h"  // nogncheck
 #endif
 
+#if BUILDFLAG(IS_CT_SUPPORTED)
+#include "services/network/public/mojom/ct_log_info.mojom.h"
+#endif
+
 namespace content {
 
 namespace {
 
-ShellContentBrowserClient* g_browser_client = nullptr;
+// Tests may install their own ShellContentBrowserClient, track the list here.
+// The list is ordered with oldest first and newer ones added after it.
+std::vector<ShellContentBrowserClient*>&
+GetShellContentBrowserClientInstances() {
+  static base::NoDestructor<std::vector<ShellContentBrowserClient*>> instances;
+  return *instances;
+}
 
 #if BUILDFLAG(IS_ANDROID)
 int GetCrashSignalFD(const base::CommandLine& command_line) {
@@ -266,21 +280,21 @@ bool ShellContentBrowserClient::allow_any_cors_exempt_header_for_browser_ =
     false;
 
 ShellContentBrowserClient* ShellContentBrowserClient::Get() {
-  return g_browser_client;
+  auto& instances = GetShellContentBrowserClientInstances();
+  return instances.empty() ? nullptr : instances.back();
 }
 
 ShellContentBrowserClient::ShellContentBrowserClient() {
-  DCHECK(!g_browser_client);
+  GetShellContentBrowserClientInstances().push_back(this);
 #if BUILDFLAG(IS_MAC)
   location_manager_ = std::make_unique<device::FakeGeolocationManager>();
   location_manager_->SetSystemPermission(
       device::LocationSystemPermissionStatus::kAllowed);
 #endif
-  g_browser_client = this;
 }
 
 ShellContentBrowserClient::~ShellContentBrowserClient() {
-  g_browser_client = nullptr;
+  base::Erase(GetShellContentBrowserClientInstances(), this);
 }
 
 std::unique_ptr<BrowserMainParts>
@@ -401,6 +415,21 @@ bool ShellContentBrowserClient::IsIsolatedContextAllowedForUrl(
   static base::flat_set<url::Origin> isolated_context_origins =
       GetIsolatedContextOriginSetFromFlag();
   return isolated_context_origins.contains(url::Origin::Create(lock_url));
+}
+
+bool ShellContentBrowserClient::IsSharedStorageAllowed(
+    content::BrowserContext* browser_context,
+    content::RenderFrameHost* rfh,
+    const url::Origin& top_frame_origin,
+    const url::Origin& accessing_origin) {
+  return true;
+}
+
+bool ShellContentBrowserClient::IsSharedStorageSelectURLAllowed(
+    content::BrowserContext* browser_context,
+    const url::Origin& top_frame_origin,
+    const url::Origin& accessing_origin) {
+  return true;
 }
 
 GeneratedCodeCacheSettings
@@ -718,18 +747,36 @@ void ShellContentBrowserClient::SetUpFieldTrials() {
 
   variations::SafeSeedManager safe_seed_manager(local_state_.get());
 
-  const base::CommandLine* command_line =
-      base::CommandLine::ForCurrentProcess();
+  const base::CommandLine& command_line =
+      *base::CommandLine::ForCurrentProcess();
+
+  // Overrides for content/common and lower layers' switches.
+  std::vector<base::FeatureList::FeatureOverrideInfo> feature_overrides =
+      content::GetSwitchDependentFeatureOverrides(command_line);
+
+  // Overrides for content/shell switches.
+
+  // Overrides for --run-web-tests.
+  if (switches::IsRunWebTestsSwitchPresent()) {
+    // Disable artificial timeouts for PNA-only preflights in warning-only mode
+    // for web tests. We do not exercise this behavior with web tests as it is
+    // intended to be a temporary rollout stage, and the short timeout causes
+    // flakiness when the test server takes just a tad too long to respond.
+    feature_overrides.emplace_back(
+        std::cref(
+            network::features::kPrivateNetworkAccessPreflightShortTimeout),
+        base::FeatureList::OVERRIDE_DISABLE_FEATURE);
+  }
+
   // Since this is a test-only code path, some arguments to SetUpFieldTrials are
   // null.
   // TODO(crbug/1248066): Consider passing a low entropy source.
   variations::PlatformFieldTrials platform_field_trials;
   field_trial_creator.SetUpFieldTrials(
       variation_ids,
-      command_line->GetSwitchValueASCII(
+      command_line.GetSwitchValueASCII(
           variations::switches::kForceVariationIds),
-      content::GetSwitchDependentFeatureOverrides(*command_line),
-      std::move(feature_list), metrics_state_manager.get(),
+      feature_overrides, std::move(feature_list), metrics_state_manager.get(),
       &platform_field_trials, &safe_seed_manager,
       /*add_entropy_source_to_variations_ids=*/false);
 }

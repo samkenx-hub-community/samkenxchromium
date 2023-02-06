@@ -200,11 +200,8 @@
 #include "chromeos/ash/components/dbus/session_manager/session_manager_client.h"
 #include "chromeos/ash/components/dbus/update_engine/update_engine_client.h"
 #include "chromeos/ash/components/geolocation/simple_geolocation_provider.h"
-#include "chromeos/ash/components/network/network_handler.h"
-#include "chromeos/ash/components/network/network_handler_callbacks.h"
 #include "chromeos/ash/components/network/network_state.h"
 #include "chromeos/ash/components/network/network_state_handler.h"
-#include "chromeos/ash/components/network/portal_detector/network_portal_detector.h"
 #include "chromeos/ash/components/settings/cros_settings_names.h"
 #include "chromeos/ash/components/settings/cros_settings_provider.h"
 #include "chromeos/ash/components/settings/timezone_settings.h"
@@ -648,7 +645,7 @@ WizardController::CreateScreens() {
   append(std::make_unique<RecoveryEligibilityScreen>(
       base::BindRepeating(&WizardController::OnRecoveryEligibilityScreenExit,
                           weak_factory_.GetWeakPtr())));
-  if (features::IsCryptohomeRecoverySetupEnabled()) {
+  if (features::IsCryptohomeRecoveryEnabled()) {
     append(std::make_unique<CryptohomeRecoverySetupScreen>(
         oobe_ui->GetView<CryptohomeRecoverySetupScreenHandler>()->AsWeakPtr(),
         base::BindRepeating(
@@ -847,7 +844,7 @@ WizardController::CreateScreens() {
       base::BindRepeating(&WizardController::OnThemeSelectionScreenExit,
                           weak_factory_.GetWeakPtr())));
 
-  if (features::IsCryptohomeRecoveryFlowEnabled()) {
+  if (features::IsCryptohomeRecoveryEnabled()) {
     append(std::make_unique<CryptohomeRecoveryScreen>(
         oobe_ui->GetView<CryptohomeRecoveryScreenHandler>()->AsWeakPtr(),
         base::BindRepeating(&WizardController::OnCryptohomeRecoveryScreenExit,
@@ -1108,15 +1105,16 @@ void WizardController::ShowTouchpadScrollScreen() {
 }
 
 void WizardController::ShowCryptohomeRecoverySetupScreen() {
-  CHECK(features::IsCryptohomeRecoverySetupEnabled());
+  CHECK(features::IsCryptohomeRecoveryEnabled());
   SetCurrentScreen(GetScreen(CryptohomeRecoverySetupScreenView::kScreenId));
 }
 
 void WizardController::ShowAuthenticationSetupScreen() {
-  if (features::IsCryptohomeRecoverySetupEnabled())
+  if (features::IsCryptohomeRecoveryEnabled()) {
     ShowCryptohomeRecoverySetupScreen();
-  else
+  } else {
     ShowFingerprintSetupScreen();
+  }
 }
 
 void WizardController::ShowActiveDirectoryPasswordChangeScreen(
@@ -1144,7 +1142,7 @@ void WizardController::ShowArcVmDataMigrationScreen() {
 
 void WizardController::ShowCryptohomeRecoveryScreen(
     std::unique_ptr<UserContext> user_context) {
-  DCHECK(features::IsCryptohomeRecoveryFlowEnabled());
+  DCHECK(features::IsCryptohomeRecoveryEnabled());
   wizard_context_->user_context = std::move(user_context);
   SetCurrentScreen(GetScreen(CryptohomeRecoveryScreenView::kScreenId));
 }
@@ -2204,12 +2202,7 @@ void WizardController::PerformPostNetworkScreenActions() {
                    ServicesCustomizationDocument::GetInstance()
                        ->EnsureCustomizationAppliedClosure());
 
-  // Enable portal check for official builds.
-  // ChromiumOS builds would go though this code path too.
-  NetworkHandler::Get()->network_state_handler()->SetCheckPortalList(
-      NetworkStateHandler::kDefaultCheckPortalList);
   GetAutoEnrollmentController()->Start();
-  network_portal_detector::GetInstance()->Enable();
 }
 
 void WizardController::PerformOOBECompletedActions() {

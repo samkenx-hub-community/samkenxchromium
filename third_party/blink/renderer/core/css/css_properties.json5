@@ -621,14 +621,6 @@
       valid_type: "bool",
     },
 
-    // - tree_scoped_value: true
-    // Whether the property takes a tree-scoped reference as its value.
-    // https://drafts.csswg.org/css-scoping/#css-tree-scoped-reference
-    tree_scoped_value: {
-      default: false,
-      valid_type: "bool",
-    },
-
     // Whether changing this property is so independent that we can apply
     // a change to them incrementally on top of the old style. This happens
     // only when inline style is changed. Conceptually, this could be a blocklist,
@@ -663,6 +655,17 @@
     // we should fix all of these and remove the flag.
     idempotent: {
       default: true,
+      valid_type: "bool",
+    },
+
+    // If true, this property will accept a CSSNumericLiteralValue
+    // (created by a fast-path parser), with no restrictions on range.
+    // (NaN and infinities will be sent through the normal ParseSingleValue
+    // path.) A typical case is the properties that can accept an alpha value;
+    // percent values will take the slow paths, but simple numbers will be sent
+    // directly through.
+    accepts_numeric_literal: {
+      default: false,
       valid_type: "bool",
     },
 
@@ -921,7 +924,6 @@
       },
       keywords: ["none", "auto"],
       typedom_types: ["Keyword"],
-      tree_scoped_value: true,
       separator: ",",
       valid_for_marker: true,
       runtime_flag: "CSSScrollTimeline",
@@ -1606,7 +1608,6 @@
       keywords: ["none"],
       typedom_types: ["Keyword"],
       runtime_flag: "CSSAnchorPositioning",
-      tree_scoped_value: true,
     },
     {
       name: "anchor-scroll",
@@ -1621,7 +1622,6 @@
       keywords: ["none"],
       typedom_types: ["Keyword"],
       runtime_flag: "CSSAnchorPositioning",
-      tree_scoped_value: true,
     },
     {
       name: "aspect-ratio",
@@ -2543,7 +2543,6 @@
       property_methods: ["ParseSingleValue", "CSSValueFromComputedStyleInternal"],
       type_name: "ScopedCSSNameList",
       wrapper_pointer_name: "Persistent",
-      tree_scoped_value: true,
       default_value: "nullptr",
       field_group: "*",
       field_template: "external",
@@ -2576,7 +2575,6 @@
       computed_style_custom_functions: ["getter"],
       style_builder_custom_functions: ["initial", "inherit", "value"],
       valid_for_marker: true,
-      tree_scoped_value: true,
       supports_incremental_style: true,
     },
     {
@@ -2736,6 +2734,7 @@
       default_value: "1",
       converter: "ConvertAlpha",
       typedom_types: ["Number"],
+      accepts_numeric_literal: true,
     },
     {
       name: "fill-rule",
@@ -2859,6 +2858,7 @@
       converter: "ConvertAlpha",
       typedom_types: ["Number"],
       supports_incremental_style: true,
+      accepts_numeric_literal: true,
     },
     {
       name: "grid-auto-columns",
@@ -3579,6 +3579,7 @@
       valid_for_first_line: true,
       valid_for_cue: true,
       supports_incremental_style: true,
+      accepts_numeric_literal: true,
     },
     {
       name: "order",
@@ -3989,7 +3990,6 @@
       keywords: ["none"],
       typedom_types: ["Keyword"],
       runtime_flag: "CSSAnchorPositioning",
-      tree_scoped_value: true,
     },
     {
       name: "quotes",
@@ -4397,7 +4397,6 @@
       default_value: "nullptr",
       type_name: "ScopedCSSNameList",
       wrapper_pointer_name: "Persistent",
-      tree_scoped_value: true,
       converter: "ConvertViewTimelineName",
       separator: ",",
       runtime_flag: "CSSScrollTimeline",
@@ -4412,6 +4411,7 @@
       type_name: "float",
       computed_style_custom_functions: ["setter"],
       typedom_types: ["Number"],
+      accepts_numeric_literal: true,
     },
     {
       name: "shape-margin",
@@ -4495,6 +4495,7 @@
       default_value: "1",
       converter: "ConvertAlpha",
       typedom_types: ["Number"],
+      accepts_numeric_literal: true,
     },
     {
       name: "stroke",
@@ -4593,6 +4594,7 @@
       default_value: "1",
       converter: "ConvertAlpha",
       typedom_types: ["Number"],
+      accepts_numeric_literal: true,
     },
     {
       name: "stroke-width",
@@ -4970,6 +4972,16 @@
       valid_for_position_fallback: true,
     },
     {
+      name: "top-layer",
+      runtime_flag: "CSSTopLayerForTransitions",
+      property_methods: ["CSSValueFromComputedStyleInternal"],
+      field_group: "*",
+      field_template: "keyword",
+      keywords: ["none", "browser"],
+      default_value: "none",
+      typedom_types: ["Keyword"],
+    },
+    {
       name: "touch-action",
       property_methods: ["ParseSingleValue", "CSSValueFromComputedStyleInternal"],
       field_group: "*",
@@ -5146,7 +5158,6 @@
       default_value: "nullptr",
       type_name: "ScopedCSSNameList",
       wrapper_pointer_name: "Persistent",
-      tree_scoped_value: true,
       converter: "ConvertViewTimelineName",
       separator: ",",
       runtime_flag: "CSSViewTimeline",
@@ -5298,6 +5309,7 @@
       field_template: "primitive",
       default_value: "0.0f",
       type_name: "float",
+      accepts_numeric_literal: true,
     },
     {
       name: "-webkit-box-ordinal-group",

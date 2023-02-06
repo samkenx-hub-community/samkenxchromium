@@ -25,6 +25,7 @@ import org.chromium.chrome.browser.optimization_guide.OptimizationGuidePushNotif
 import org.chromium.chrome.browser.page_annotations.PageAnnotationsServiceConfig;
 import org.chromium.chrome.browser.tab.state.FilePersistedTabDataStorage;
 import org.chromium.chrome.browser.tabmodel.TabPersistentStore;
+import org.chromium.chrome.browser.tasks.tab_management.TabManagementFieldTrial;
 import org.chromium.chrome.browser.tasks.tab_management.TabUiFeatureUtilities;
 import org.chromium.chrome.features.start_surface.StartSurfaceConfiguration;
 
@@ -87,7 +88,6 @@ public class ChromeCachedFlags {
                 ChromeFeatureList.sCriticalPersistedTabData,
                 ChromeFeatureList.sDiscoverMultiColumn,
                 ChromeFeatureList.sTabStripRedesign,
-                ChromeFeatureList.sDiscardOccludedBitmaps,
                 ChromeFeatureList.sDownloadsAutoResumptionNative,
                 ChromeFeatureList.sEarlyLibraryLoad,
                 ChromeFeatureList.sFeedLoadingPlaceholder,
@@ -108,6 +108,7 @@ public class ChromeCachedFlags {
                 ChromeFeatureList.sQueryTiles,
                 ChromeFeatureList.sQueryTilesOnStart,
                 ChromeFeatureList.sReadLater,
+                ChromeFeatureList.sShouldIgnoreIntentSkipInternalCheck,
                 ChromeFeatureList.sStartSurfaceAndroid,
                 ChromeFeatureList.sStartSurfaceDisabledFeedImprovement,
                 ChromeFeatureList.sStartSurfaceReturnTime,
@@ -181,8 +182,8 @@ public class ChromeCachedFlags {
                 TabUiFeatureUtilities.ENABLE_TAB_SELECTION_EDITOR_V2_LONGPRESS_ENTRY,
                 TabUiFeatureUtilities.ENABLE_TAB_SELECTION_EDITOR_V2_SHARE,
                 TabUiFeatureUtilities.ENABLE_TAB_SELECTION_EDITOR_V2_BOOKMARKS,
-                TabUiFeatureUtilities.TAB_STRIP_REDESIGN_ENABLE_FOLIO,
-                TabUiFeatureUtilities.TAB_STRIP_REDESIGN_ENABLE_DETACHED,
+                TabManagementFieldTrial.TAB_STRIP_REDESIGN_ENABLE_FOLIO,
+                TabManagementFieldTrial.TAB_STRIP_REDESIGN_ENABLE_DETACHED,
                 VersionNumberGetter.MIN_SDK_VERSION,
                 ChromeActivity.CONTENT_VIS_DELAY_MS);
         // clang-format on

@@ -424,7 +424,7 @@ void FastPairPairerImpl::AttemptSendAccountKey() {
   if (device_->protocol() == Protocol::kFastPairSubsequent) {
     QP_LOG(INFO) << __func__
                  << ": Saving Account Key locally for subsequent pair";
-    FastPairRepository::Get()->AssociateAccountKeyLocally(device_);
+    FastPairRepository::Get()->WriteAccountAssociationToLocalRegistry(device_);
 
     // If the Saved Devices feature is enabled and we are utilizing a "loose"
     // interpretation of a user's opt-in status, then we will opt-in the user
@@ -511,10 +511,10 @@ void FastPairPairerImpl::OnIsDeviceSavedToAccount(
     // If the device is saved to Footprints, don't write a new account key to
     // the device, and return that we've finished the pairing procedure
     // successfully. We could rework some of our APIs here so that we can call
-    // AssociateAccountKeyLocally similar to how we handle Subsequent pairing
-    // above. However, the first time a not discoverable advertisement for this
-    // device is found we'll add the account key to our SavedDeviceRegistry as
-    // expected.
+    // `WriteAccountAssociationToLocalRegistry` similar to how we handle
+    // Subsequent pairing above. However, the first time a not discoverable
+    // advertisement for this device is found we'll add the account key to our
+    // SavedDeviceRegistry as expected.
     QP_LOG(INFO) << __func__
                  << ": Device is already saved, skipping write account key. "
                     "Pairing procedure complete.";
@@ -565,8 +565,17 @@ void FastPairPairerImpl::OnWriteAccountKey(
     return;
   }
 
-  FastPairRepository::Get()->AssociateAccountKey(
-      device_, std::vector<uint8_t>(account_key.begin(), account_key.end()));
+  const std::vector<uint8_t> account_key_vec(account_key.begin(),
+                                             account_key.end());
+
+  device_->set_account_key(account_key_vec);
+  if (!FastPairRepository::Get()->WriteAccountAssociationToLocalRegistry(
+          device_)) {
+    QP_LOG(WARNING) << "Failed to write account association to Local Registry.";
+  }
+
+  FastPairRepository::Get()->WriteAccountAssociationToFootprints(
+      device_, account_key_vec);
 
   // If the Saved Devices feature is enabled and we are utilizing a "loose"
   // interpretation of a user's opt-in status, then we will opt-in the user

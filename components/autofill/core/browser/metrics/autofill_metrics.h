@@ -165,8 +165,8 @@ class AutofillMetrics {
     NUM_SUBMITTED_SERVER_CARD_EXPIRATION_STATUS_METRICS,
   };
 
-  // Metric to distinguish between local credit card saves and upload credit
-  // card saves.
+  // Metric to distinguish between local and server saves for credit cards or
+  // IBANs.
   enum class SaveTypeMetric {
     LOCAL = 0,
     SERVER = 1,
@@ -1087,16 +1087,6 @@ class AutofillMetrics {
   // This should be called each time a new chrome profile is launched.
   static void LogIsAutofillCreditCardEnabledAtStartup(bool enabled);
 
-  // Records statistics for the number of used, disused and country-less address
-  // profiles. This is called each time a new chrome profile is launched.
-  static void LogStoredProfileCountStatistics(size_t num_profiles,
-                                              size_t num_disused_profiles,
-                                              size_t num_countryless_profiles);
-
-  // Records the number of days since an address profile was last used. This is
-  // called once per address profile each time a new chrome profile is launched.
-  static void LogStoredProfileDaysSinceLastUse(size_t days);
-
   // Logs various metrics about the local and server cards associated with a
   // profile. This should be called each time a new chrome profile is launched.
   static void LogStoredCreditCardMetrics(
@@ -1372,6 +1362,10 @@ class AutofillMetrics {
   static void LogNewProfileWithIgnoredCountryImportDecision(
       AutofillClient::SaveAddressProfileOfferUserDecision decision);
 
+  // Logs the number of fields with an unrecognized autocomplete attributed that
+  // were considered for the import due to AutofillFillAndImportFromMoreFields.
+  static void LogNewProfileNumberOfAutocompleteUnrecognizedFields(int count);
+
   // Logs that a specific type was edited in a save prompt.
   static void LogNewProfileEditedType(ServerFieldType edited_type);
 
@@ -1386,6 +1380,10 @@ class AutofillMetrics {
   // be imported after an invalid country was ignored.
   static void LogProfileUpdateWithIgnoredCountryImportDecision(
       AutofillClient::SaveAddressProfileOfferUserDecision decision);
+
+  // Logs the number of fields with an unrecognized autocomplete attributed that
+  // were considered for the update due to AutofillFillAndImportFromMoreFields.
+  static void LogProfileUpdateNumberOfAutocompleteUnrecognizedFields(int count);
 
   // Logs that a specific type changed in a profile update that received the
   // user |decision|. Note that additional manual edits in the update prompt are

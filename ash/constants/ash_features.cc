@@ -68,47 +68,6 @@ BASE_FEATURE(kAllowScrollSettings,
              "AllowScrollSettings",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-// Controls whether to enable Ambient mode feature.
-BASE_FEATURE(kAmbientModeFeature,
-             "ChromeOSAmbientMode",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
-constexpr base::FeatureParam<bool> kAmbientModeCapturedOnPixelAlbumEnabled{
-    &kAmbientModeFeature, "CapturedOnPixelAlbumEnabled", false};
-
-constexpr base::FeatureParam<bool> kAmbientModeCapturedOnPixelPhotosEnabled{
-    &kAmbientModeFeature, "CapturedOnPixelPhotosEnabled", false};
-
-constexpr base::FeatureParam<bool> kAmbientModeCulturalInstitutePhotosEnabled{
-    &kAmbientModeFeature, "CulturalInstitutePhotosEnabled", false};
-
-constexpr base::FeatureParam<bool> kAmbientModeDefaultFeedEnabled{
-    &kAmbientModeFeature, "DefaultFeedEnabled", false};
-
-constexpr base::FeatureParam<bool> kAmbientModeEarthAndSpaceAlbumEnabled{
-    &kAmbientModeFeature, "EarthAndSpaceAlbumEnabled", true};
-
-constexpr base::FeatureParam<bool> kAmbientModeFeaturedPhotoAlbumEnabled{
-    &kAmbientModeFeature, "FeaturedPhotoAlbumEnabled", true};
-
-constexpr base::FeatureParam<bool> kAmbientModeFeaturedPhotosEnabled{
-    &kAmbientModeFeature, "FeaturedPhotosEnabled", true};
-
-constexpr base::FeatureParam<bool> kAmbientModeFineArtAlbumEnabled{
-    &kAmbientModeFeature, "FineArtAlbumEnabled", false};
-
-constexpr base::FeatureParam<bool> kAmbientModeGeoPhotosEnabled{
-    &kAmbientModeFeature, "GeoPhotosEnabled", true};
-
-constexpr base::FeatureParam<bool> kAmbientModePersonalPhotosEnabled{
-    &kAmbientModeFeature, "PersonalPhotosEnabled", true};
-
-constexpr base::FeatureParam<bool> kAmbientModeRssPhotosEnabled{
-    &kAmbientModeFeature, "RssPhotosEnabled", false};
-
-constexpr base::FeatureParam<bool> kAmbientModeStreetArtAlbumEnabled{
-    &kAmbientModeFeature, "StreetArtAlbumEnabled", false};
-
 // Controls whether to enable AutoEnrollment for Kiosk in OOBE
 BASE_FEATURE(kAutoEnrollmentKioskInOobe,
              "AutoEnrollmentKioskInOobe",
@@ -129,10 +88,6 @@ BASE_FEATURE(kAmbientModePhotoPreviewFeature,
 // may decrease the animation's smoothness if not done properly.
 BASE_FEATURE(kAmbientModeThrottleAnimation,
              "ChromeOSAmbientModeThrottleAnimation",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-
-BASE_FEATURE(kAmbientSubpageUIChange,
-             "AmbientSubpageUIChange",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 BASE_FEATURE(kApnRevamp, "ApnRevamp", base::FEATURE_DISABLED_BY_DEFAULT);
@@ -542,17 +497,13 @@ BASE_FEATURE(kCryptAuthV2Enrollment,
 // Enables the cryptohome recovery feature:
 // - Enable recovery via the recovery service.
 // - New UI for Cryptohome recovery and Gaia password changed screen.
-// - Adds a "forgot password" button to the error bubble that opens when the
+// - Adds a "recover user" button to the error bubble that opens when the
 //   user fails to enter their correct password.
-BASE_FEATURE(kCryptohomeRecoveryFlow,
-             "CryptohomeRecoveryFlow",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-
-// Enables the UI to enable or disable cryptohome recovery in the settings
+// - Enables the UI to enable or disable cryptohome recovery in the settings
 // page. Also guards the wiring of cryptohome recovery settings to the
 // cryptohome backend.
-BASE_FEATURE(kCryptohomeRecoverySetup,
-             "CryptohomeRecoverySetup",
+BASE_FEATURE(kCryptohomeRecovery,
+             "CryptohomeRecovery",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 BASE_FEATURE(kDarkLightModeKMeansColor,
@@ -972,7 +923,7 @@ BASE_FEATURE(kFloatingWorkspace,
 
 // Maximum delay to wait for restoring Floating Workspace after login.
 constexpr base::FeatureParam<base::TimeDelta>
-    kFloatingWorkspaceMaxTimeAvaliableForRestoreAfterLogin{
+    kFloatingWorkspaceMaxTimeAvailableForRestoreAfterLogin{
         &kFloatingWorkspace, "MaxTimeAvailableForRestoreAfterLogin",
         base::Seconds(3)};
 
@@ -983,7 +934,7 @@ BASE_FEATURE(kFloatingWorkspaceV2,
 
 // Maximum delay to wait for restoring Floating Workspace V2 after login.
 constexpr base::FeatureParam<base::TimeDelta>
-    kFloatingWorkspaceV2MaxTimeAvaliableForRestoreAfterLogin{
+    kFloatingWorkspaceV2MaxTimeAvailableForRestoreAfterLogin{
         &kFloatingWorkspaceV2, "MaxTimeAvailableForRestoreAfterLoginV2",
         base::Seconds(15)};
 
@@ -1108,12 +1059,6 @@ BASE_FEATURE(kHibernate, "Hibernate", base::FEATURE_DISABLED_BY_DEFAULT);
 BASE_FEATURE(kProductivityLauncherImageSearch,
              "ProductivityLauncherImageSearch",
              base::FEATURE_DISABLED_BY_DEFAULT);
-
-// Enables or disables the flag to synchronize launcher item colors. It is
-// in effect only when kLauncherAppSort is enabled.
-BASE_FEATURE(kLauncherItemColorSync,
-             "LauncherItemColorSync",
-             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // Enables a privacy improvement that removes wrongly configured hidden
 // networks and mitigates the creation of these networks. crbug/1327803.
@@ -1322,23 +1267,6 @@ BASE_FEATURE(kLacrosProfileBackwardMigration,
              "LacrosProfileBackwardMigration",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-// Enables or disables sorting app icons shown on the launcher.
-BASE_FEATURE(kLauncherAppSort,
-             "LauncherAppSort",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
-// When enabled, app list folders will be moved so app list remains sorted when
-// they get renamed, or created.
-BASE_FEATURE(kLauncherFolderRenameKeepsSortOrder,
-             "LauncherFolderRenameKeepsSortOrder",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
-// When enabled, the app list sort nudge and toast will have additional
-// buttons for dismissal.
-BASE_FEATURE(kLauncherDismissButtonsOnSortNudgeAndToast,
-             "LauncherDismissButtonsOnSortNudgeAndToast",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
 // Uses short intervals for launcher nudge for testing if enabled.
 BASE_FEATURE(kLauncherNudgeShortInterval,
              "LauncherNudgeShortInterval",
@@ -1534,12 +1462,6 @@ BASE_FEATURE(kOobeQuickStart,
              "OobeQuickStart",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-// Removes "Shut down" button from OOBE, except first login screen and
-// successful enrollment step.
-BASE_FEATURE(kOobeRemoveShutdownButton,
-             "OobeRemoveShutdownButton",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
 BASE_FEATURE(kOnlyShowNewShortcutsApp,
              "OnlyShowNewShortcutsApp",
              base::FEATURE_DISABLED_BY_DEFAULT);
@@ -1588,6 +1510,11 @@ BASE_FEATURE(kPcieBillboardNotification,
 // Limits the items on the shelf to the ones associated with windows the
 // currently active desk.
 BASE_FEATURE(kPerDeskShelf, "PerDeskShelf", base::FEATURE_DISABLED_BY_DEFAULT);
+
+// Enables Jelly features in Personalization App.
+BASE_FEATURE(kPersonalizationJelly,
+             "PersonalizationJelly",
+             base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Provides a UI for users to view information about their Android phone
 // and perform phone-side actions within ChromeOS.
@@ -1894,6 +1821,11 @@ BASE_FEATURE(kShelfLauncherNudge,
 // Enables the shelf party.
 BASE_FEATURE(kShelfParty, "ShelfParty", base::FEATURE_DISABLED_BY_DEFAULT);
 
+// Enables the shelf party.
+BASE_FEATURE(kShelfStackedHotseat,
+             "ShelfStackedHotseat",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 // Enables Shelf Palm Rejection in tablet mode by defining a pixel offset for
 // the swipe gesture to show the extended hotseat. Limited to certain apps.
 BASE_FEATURE(kShelfPalmRejectionSwipeOffset,
@@ -2138,11 +2070,6 @@ BASE_FEATURE(kWallpaperFastRefresh,
              "WallpaperFastRefresh",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-// Enable full screen wallpaper preview in new wallpaper experience.
-BASE_FEATURE(kWallpaperFullScreenPreview,
-             "WallpaperFullScreenPreview",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
 // Enable using google photos shared albums for wallpaper.
 BASE_FEATURE(kWallpaperGooglePhotosSharedAlbums,
              "WallpaperGooglePhotosSharedAlbums",
@@ -2293,10 +2220,6 @@ bool IsAutoEnrollmentKioskInOobeEnabled() {
   return base::FeatureList::IsEnabled(kAutoEnrollmentKioskInOobe);
 }
 
-bool IsAvatarsCloudMigrationEnabled() {
-  return base::FeatureList::IsEnabled(kAvatarsCloudMigration);
-}
-
 bool DoWindowsFollowCursor() {
   return base::FeatureList::IsEnabled(kWindowsFollowCursor);
 }
@@ -2325,20 +2248,12 @@ bool IsAmbientModeDevUseProdEnabled() {
   return base::FeatureList::IsEnabled(kAmbientModeDevUseProdFeature);
 }
 
-bool IsAmbientModeEnabled() {
-  return base::FeatureList::IsEnabled(kAmbientModeFeature);
-}
-
 bool IsAmbientModePhotoPreviewEnabled() {
   return base::FeatureList::IsEnabled(kAmbientModePhotoPreviewFeature);
 }
 
 bool IsAmbientModeThrottleAnimationEnabled() {
   return base::FeatureList::IsEnabled(kAmbientModeThrottleAnimation);
-}
-
-bool IsAmbientSubpageUIChangeEnabled() {
-  return base::FeatureList::IsEnabled(kAmbientSubpageUIChange);
 }
 
 bool IsApnRevampEnabled() {
@@ -2443,12 +2358,6 @@ bool IsCryptauthAttestationSyncingEnabled() {
   return base::FeatureList::IsEnabled(kCryptauthAttestationSyncing);
 }
 
-bool IsDesksCloseAllEnabled() {
-  // TODO(b/263166880): Remove this function and all code paths where this is
-  // false.
-  return true;
-}
-
 bool IsDnsOverHttpsWithIdentifiersReuseOldPolicyEnabled() {
   return base::FeatureList::IsEnabled(
       kDnsOverHttpsWithIdentifiersReuseOldPolicy);
@@ -2456,11 +2365,6 @@ bool IsDnsOverHttpsWithIdentifiersReuseOldPolicyEnabled() {
 
 bool IsDnsOverHttpsWithIdentifiersEnabled() {
   return base::FeatureList::IsEnabled(kDnsOverHttpsWithIdentifiers);
-}
-
-bool IsLauncherItemColorSyncEnabled() {
-  return IsLauncherAppSortEnabled() &&
-         base::FeatureList::IsEnabled(kLauncherItemColorSync);
 }
 
 bool IsConsumerAutoUpdateToggleAllowed() {
@@ -2486,12 +2390,8 @@ bool IsCrosPrivacyHubV1Enabled() {
          IsCrosPrivacyHubV2Enabled();
 }
 
-bool IsCryptohomeRecoveryFlowEnabled() {
-  return base::FeatureList::IsEnabled(kCryptohomeRecoveryFlow);
-}
-
-bool IsCryptohomeRecoverySetupEnabled() {
-  return base::FeatureList::IsEnabled(kCryptohomeRecoverySetup);
+bool IsCryptohomeRecoveryEnabled() {
+  return base::FeatureList::IsEnabled(kCryptohomeRecovery);
 }
 
 bool IsDarkLightModeEnabled() {
@@ -2771,21 +2671,6 @@ bool IsLanguagePacksEnabled() {
          base::FeatureList::IsEnabled(kHandwritingLegacyRecognitionAllLang);
 }
 
-bool IsLauncherAppSortEnabled() {
-  return base::FeatureList::IsEnabled(kLauncherAppSort);
-}
-
-bool IsLauncherFolderRenameKeepsSortOrderEnabled() {
-  return IsLauncherAppSortEnabled() &&
-         base::FeatureList::IsEnabled(kLauncherFolderRenameKeepsSortOrder);
-}
-
-bool IsLauncherDismissButtonsOnSortNudgeAndToastEnabled() {
-  return IsLauncherAppSortEnabled() &&
-         base::FeatureList::IsEnabled(
-             kLauncherDismissButtonsOnSortNudgeAndToast);
-}
-
 bool IsLauncherNudgeShortIntervalEnabled() {
   return base::FeatureList::IsEnabled(kLauncherNudgeShortInterval);
 }
@@ -2937,10 +2822,6 @@ bool IsOobeQuickStartEnabled() {
   return base::FeatureList::IsEnabled(kOobeQuickStart);
 }
 
-bool IsOobeRemoveShutdownButtonEnabled() {
-  return base::FeatureList::IsEnabled(kOobeRemoveShutdownButton);
-}
-
 bool IsOobeTouchpadScrollEnabled() {
   return base::FeatureList::IsEnabled(kOobeTouchpadScroll);
 }
@@ -2963,6 +2844,11 @@ bool IsPcieBillboardNotificationEnabled() {
 
 bool IsPerDeskShelfEnabled() {
   return base::FeatureList::IsEnabled(kPerDeskShelf);
+}
+
+bool IsPersonalizationJellyEnabled() {
+  return base::FeatureList::IsEnabled(kPersonalizationJelly) &&
+         IsJellyEnabled();
 }
 
 bool IsPhoneHubCameraRollEnabled() {
@@ -3142,6 +3028,10 @@ bool IsShelfPalmRejectionSwipeOffsetEnabled() {
   return base::FeatureList::IsEnabled(kShelfPalmRejectionSwipeOffset);
 }
 
+bool IsShelfStackedHotseatEnabled() {
+  return base::FeatureList::IsEnabled(kShelfStackedHotseat);
+}
+
 bool IsShimlessRMAFlowEnabled() {
   return base::FeatureList::IsEnabled(kShimlessRMAFlow);
 }
@@ -3231,10 +3121,6 @@ bool IsViewPpdEnabled() {
 
 bool IsWallpaperFastRefreshEnabled() {
   return base::FeatureList::IsEnabled(kWallpaperFastRefresh);
-}
-
-bool IsWallpaperFullScreenPreviewEnabled() {
-  return base::FeatureList::IsEnabled(kWallpaperFullScreenPreview);
 }
 
 bool IsWallpaperGooglePhotosSharedAlbumsEnabled() {

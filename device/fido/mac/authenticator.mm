@@ -53,6 +53,7 @@ void TouchIdAuthenticator::InitializeAuthenticator(base::OnceClosure callback) {
 
 void TouchIdAuthenticator::GetCredentialInformationForRequest(
     const CtapGetAssertionRequest& request,
+    const CtapGetAssertionOptions& options,
     GetCredentialInformationForRequestCallback callback) {
   if (!request.allow_list.empty()) {
     // Non resident credentials request.
@@ -128,7 +129,8 @@ namespace {
 
 AuthenticatorSupportedOptions TouchIdAuthenticatorOptions() {
   AuthenticatorSupportedOptions options;
-  options.is_platform_device = true;
+  options.is_platform_device =
+      AuthenticatorSupportedOptions::PlatformDevice::kYes;
   options.supports_resident_key = true;
   options.user_verification_availability = AuthenticatorSupportedOptions::
       UserVerificationAvailability::kSupportedAndConfigured;
@@ -138,9 +140,8 @@ AuthenticatorSupportedOptions TouchIdAuthenticatorOptions() {
 
 }  // namespace
 
-const absl::optional<AuthenticatorSupportedOptions>&
-TouchIdAuthenticator::Options() const {
-  static const absl::optional<AuthenticatorSupportedOptions> options =
+const AuthenticatorSupportedOptions& TouchIdAuthenticator::Options() const {
+  static const AuthenticatorSupportedOptions options =
       TouchIdAuthenticatorOptions();
   return options;
 }

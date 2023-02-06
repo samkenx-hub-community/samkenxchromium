@@ -138,6 +138,7 @@
 #include "components/search/ntp_features.h"
 #include "components/site_engagement/content/site_engagement_helper.h"
 #include "components/site_engagement/content/site_engagement_service.h"
+#include "components/supervised_user/core/common/buildflags.h"
 #include "components/tracing/common/tracing_switches.h"
 #include "components/ukm/content/source_url_recorder.h"
 #include "components/user_notes/user_notes_features.h"
@@ -190,10 +191,6 @@
 #include "chrome/browser/page_info/about_this_site_tab_helper.h"
 #include "chrome/browser/ui/side_search/side_search_tab_contents_helper.h"
 #include "chrome/browser/ui/side_search/side_search_utils.h"
-#endif
-
-#if BUILDFLAG(IS_CHROMEOS_ASH)
-#include "chrome/browser/ash/app_list/search/cros_action_history/cros_action_recorder_tab_tracker.h"
 #endif
 
 #if BUILDFLAG(IS_CHROMEOS_LACROS)
@@ -524,7 +521,6 @@ void TabHelpers::AttachTabHelpers(WebContents* web_contents) {
 #endif
 
 #if BUILDFLAG(IS_CHROMEOS_ASH)
-  app_list::CrOSActionRecorderTabTracker::CreateForWebContents(web_contents);
   GoogleOneOfferIphTabHelper::CreateForWebContents(web_contents);
 #endif
 
@@ -552,6 +548,7 @@ void TabHelpers::AttachTabHelpers(WebContents* web_contents) {
   if (base::FeatureList::IsEnabled(
           features::kHappinessTrackingSurveysForDesktopDemo) ||
       base::FeatureList::IsEnabled(features::kTrustSafetySentimentSurvey) ||
+      base::FeatureList::IsEnabled(features::kTrustSafetySentimentSurveyV2) ||
       base::FeatureList::IsEnabled(performance_manager::features::
                                        kPerformanceControlsPerformanceSurvey) ||
       base::FeatureList::IsEnabled(

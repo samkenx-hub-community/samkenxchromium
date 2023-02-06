@@ -432,7 +432,11 @@ class CONTENT_EXPORT InterestGroupAuction
   // Takes ownership of the `auction_config`, so that the reporter can outlive
   // other auction-related classes.
   std::unique_ptr<InterestGroupAuctionReporter> CreateReporter(
-      std::unique_ptr<blink::AuctionConfig> auction_config);
+      std::unique_ptr<blink::AuctionConfig> auction_config,
+      const url::Origin& frame_origin,
+      network::mojom::ClientSecurityStatePtr client_security_state,
+      scoped_refptr<network::SharedURLLoaderFactory> url_loader_factory,
+      blink::InterestGroupSet interest_groups_that_bid);
 
   // Called by AuctionRunner (for component auctions, indirectly via
   // NotifyComponentConfigPromisesResolved) when all promises relevant to this
@@ -463,7 +467,10 @@ class CONTENT_EXPORT InterestGroupAuction
   void GetInterestGroupsThatBid(blink::InterestGroupSet& interest_groups) const;
 
   // Retrieves any debug reporting URLs. May only be called once, since it takes
-  // ownership of stored reporting URLs.
+  // ownership of stored reporting URLs. This is called internally by
+  // CreateReporter() so may only be called in the case an auction has no
+  // winner, and thus CreateReporter() need not be called.
+  //
   // Note: Temporarily, this function also fills post auction signals to private
   // aggregation requests from generateBid() and scoreAd(), so this function
   // must be called before TakePrivateAggregationRequests() to make sure that

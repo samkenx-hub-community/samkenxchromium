@@ -265,11 +265,21 @@ class FinchTestCase(common.BaseIsolatedScriptArgsAdapter):
     # for Chrome and WebLayer.
     return True
 
-  def enable_wifi(self):
+  def enable_internet(self):
+    self._device.RunShellCommand(
+        ['settings', 'put', 'global', 'airplane_mode_on', '0'])
+    self._device.RunShellCommand(
+        ['am', 'broadcast', '-a',
+         'android.intent.action.AIRPLANE_MODE'])
     self._device.RunShellCommand(['svc', 'wifi', 'enable'])
+    self._device.RunShellCommand(['svc', 'data', 'enable'])
 
-  def disable_wifi(self):
-    self._device.RunShellCommand(['svc', 'wifi', 'disable'])
+  def disable_internet(self):
+    self._device.RunShellCommand(
+        ['settings', 'put', 'global', 'airplane_mode_on', '1'])
+    self._device.RunShellCommand(
+        ['am', 'broadcast', '-a',
+         'android.intent.action.AIRPLANE_MODE'])
 
   @contextlib.contextmanager
   def _archive_logcat(self, filename, endpoint_name):
@@ -315,7 +325,7 @@ class FinchTestCase(common.BaseIsolatedScriptArgsAdapter):
   def __enter__(self):
     self._device.EnableRoot()
     # Run below commands to ensure that the device can download a seed
-    self.disable_wifi()
+    self.disable_internet()
     self._device.adb.Emu(['power', 'ac', 'on'])
     self._skia_gold_tmp_dir = tempfile.mkdtemp()
     self._skia_gold_session_manager = (
@@ -906,11 +916,11 @@ class WebViewFinchTestCase(FinchTestCase):
       # seed is loaded. We check for this log for versions >= 110.0.5463.0
       # because it is the first version of WebView that contains
       # crrev.com/c/4076271.
-      webview_update = self._device.GetWebViewUpdateServiceDump()
-      check_for_vlog = ('CurrentWebViewVersion' in webview_update and
-                        _is_version_greater_than_or_equal(
-                            webview_update['CurrentWebViewVersion'],
-                            '110.0.5463.0'))
+      webview_version = self._device.GetApplicationVersion(
+          self._device.GetWebViewProvider())
+      check_for_vlog = (webview_version and
+                        _is_version_greater_than_or_equal(webview_version,
+                                                          '110.0.5463.0'))
       field_trial_check_name = 'check_for_logged_field_trials'
 
       if check_for_vlog:
@@ -1048,8 +1058,7 @@ class WebViewFinchTestCase(FinchTestCase):
   @contextlib.contextmanager
   def _install_webview_with_tool(self):
     """Install WebView with the WebView installer tool"""
-    original_webview_provider = (
-        self._device.GetWebViewUpdateServiceDump()['CurrentWebViewPackage'])
+    original_webview_provider = self._device.GetWebViewProvider()
     current_webview_provider = None
 
     try:
@@ -1078,8 +1087,7 @@ class WebViewFinchTestCase(FinchTestCase):
       assert exit_code == 0, (
           'The WebView installer tool failed to install WebView')
 
-      current_webview_provider = (
-        self._device.GetWebViewUpdateServiceDump()['CurrentWebViewPackage'])
+      current_webview_provider = self._device.GetWebViewProvider()
       yield
     finally:
       self._device.SetWebViewImplementation(original_webview_provider)
@@ -1206,7 +1214,7 @@ def main(args):
                                  check_seed_loaded=True)
 
       # enable wifi so that a new seed can be downloaded from the finch server
-      test_case.enable_wifi()
+      test_case.enable_internet()
 
       # TODO(b/187185389): Figure out why WebView needs an extra restart
       # to fetch and load a new finch seed.
@@ -1229,7 +1237,7 @@ def main(args):
 
       # Disable wifi so that new updates will not be downloaded which can cause
       # timeouts in the adb commands run below.
-      test_case.disable_wifi()
+      test_case.disable_internet()
     else:
       installed_seed = test_case.install_seed()
       # If the seed is placed in a local path, we can pass it from the command

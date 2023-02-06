@@ -1618,6 +1618,28 @@ IN_PROC_BROWSER_TEST_P(SpokenFeedbackTest, ResetTtsSettings) {
   sm_.Replay();
 }
 
+// Tests the keyboard shortcut to cycle the punctuation echo setting,
+// Search+A then P.
+IN_PROC_BROWSER_TEST_P(SpokenFeedbackTest, TogglePunctuationEcho) {
+  EnableChromeVox();
+  sm_.Call([this]() {
+    SendKeyPressWithSearch(ui::VKEY_A);
+    SendKeyPress(ui::VKEY_P);
+  });
+  sm_.ExpectSpeech("All punctuation");
+  sm_.Call([this]() {
+    SendKeyPressWithSearch(ui::VKEY_A);
+    SendKeyPress(ui::VKEY_P);
+  });
+  sm_.ExpectSpeech("No punctuation");
+  sm_.Call([this]() {
+    SendKeyPressWithSearch(ui::VKEY_A);
+    SendKeyPress(ui::VKEY_P);
+  });
+  sm_.ExpectSpeech("Some punctuation");
+  sm_.Replay();
+}
+
 IN_PROC_BROWSER_TEST_P(SpokenFeedbackTest, ShowFormControlsList) {
   EnableChromeVox();
   sm_.Call([this]() {
@@ -1940,25 +1962,15 @@ IN_PROC_BROWSER_TEST_P(SpokenFeedbackTest, KeyboardShortcutViewer) {
   sm_.Replay();
 }
 
-//
 // Spoken feedback tests of the out-of-box experience.
-//
-
-// Parameter value represents if the OobeRemoveShutdownButton feature is
-// enabled.
-class OobeSpokenFeedbackTest : public OobeBaseTest,
-                               public testing::WithParamInterface<bool> {
- protected:
-  OobeSpokenFeedbackTest() {
-    feature_list_.InitWithFeatureState(features::kOobeRemoveShutdownButton,
-                                       GetParam());
-  }
-
+class OobeSpokenFeedbackTest : public OobeBaseTest {
+ public:
+  OobeSpokenFeedbackTest() = default;
   OobeSpokenFeedbackTest(const OobeSpokenFeedbackTest&) = delete;
   OobeSpokenFeedbackTest& operator=(const OobeSpokenFeedbackTest&) = delete;
+  ~OobeSpokenFeedbackTest() override = default;
 
-  ~OobeSpokenFeedbackTest() override {}
-
+ protected:
   void SetUpCommandLine(base::CommandLine* command_line) override {
     OobeBaseTest::SetUpCommandLine(command_line);
     // Many bots don't have keyboard/mice which triggers the HID detection
@@ -1970,13 +1982,10 @@ class OobeSpokenFeedbackTest : public OobeBaseTest,
   }
 
   test::SpeechMonitor sm_;
-
- private:
-  base::test::ScopedFeatureList feature_list_;
 };
 
 // TODO(crbug.com/1310682) - Re-enable this test.
-IN_PROC_BROWSER_TEST_P(OobeSpokenFeedbackTest, DISABLED_SpokenFeedbackInOobe) {
+IN_PROC_BROWSER_TEST_F(OobeSpokenFeedbackTest, DISABLED_SpokenFeedbackInOobe) {
   ui_controls::EnableUIControls();
   ASSERT_FALSE(AccessibilityManager::Get()->IsSpokenFeedbackEnabled());
   AccessibilityManager::Get()->EnableSpokenFeedbackWithTutorial();
@@ -2002,18 +2011,14 @@ IN_PROC_BROWSER_TEST_P(OobeSpokenFeedbackTest, DISABLED_SpokenFeedbackInOobe) {
     ASSERT_TRUE(ui_test_utils::SendKeyPressToWindowSync(
         nullptr, ui::VKEY_TAB, false, false, false, false));
   });
-  if (GetParam()) {
-    sm_.ExpectSpeechPattern("*Status tray*");
-  } else {
-    sm_.ExpectSpeech("Shut down");
-  }
+  sm_.ExpectSpeechPattern("*Status tray*");
   sm_.ExpectSpeech("Button");
 
   sm_.Replay();
 }
 
 // TODO(akihiroota): fix flakiness: http://crbug.com/1172390
-IN_PROC_BROWSER_TEST_P(OobeSpokenFeedbackTest,
+IN_PROC_BROWSER_TEST_F(OobeSpokenFeedbackTest,
                        DISABLED_SpokenFeedbackTutorialInOobe) {
   ui_controls::EnableUIControls();
   ASSERT_FALSE(AccessibilityManager::Get()->IsSpokenFeedbackEnabled());
@@ -2053,29 +2058,54 @@ class SigninToUserProfileSwitchTest : public OobeSpokenFeedbackTest {
       &mixin_host_, DeviceStateMixin::State::OOBE_COMPLETED_UNOWNED};
 };
 
-// Verifies that spoken feedback correctly handles profile switch (signin ->
-// user) and announces the sync consent screen correctly.
-// TODO(crbug.com/1184714): Fix flakiness.
-IN_PROC_BROWSER_TEST_P(SigninToUserProfileSwitchTest, DISABLED_LoginAsNewUser) {
+// Verifies spoken feedback during sign in.
+IN_PROC_BROWSER_TEST_F(SigninToUserProfileSwitchTest, BeforeLoginAsNewUser) {
+  sm_.Call([]() {
+    AccessibilityManager::Get()->EnableSpokenFeedback(true);
+    // Force sync screen.
+    LoginDisplayHost::default_host()->GetWizardContext()->is_branded_build =
+        true;
+    ASSERT_TRUE(IsSigninBrowserContext(AccessibilityManager::Get()->profile()));
+  });
+  sm_.ExpectSpeechPattern("*");
+  sm_.Replay();
+}
+
+// Verifies spoken feedback during log in as a new user. Turns on ChromeVox
+// after sign in; otherwise, the test fails due to timed out.
+IN_PROC_BROWSER_TEST_F(SigninToUserProfileSwitchTest, LoginAsNewUser) {
+  ASSERT_FALSE(AccessibilityManager::Get()->IsSpokenFeedbackEnabled());
   // Force sync screen.
   LoginDisplayHost::default_host()->GetWizardContext()->is_branded_build = true;
-  AccessibilityManager::Get()->EnableSpokenFeedback(true);
-  sm_.ExpectSpeechPattern("*");
+  ASSERT_TRUE(IsSigninBrowserContext(AccessibilityManager::Get()->profile()));
 
   sm_.Call([this]() {
-    ASSERT_TRUE(IsSigninBrowserContext(AccessibilityManager::Get()->profile()));
+    AccessibilityManager::Get()->EnableSpokenFeedback(true);
     login_manager_.LoginAsNewRegularUser();
   });
+  sm_.ExpectSpeechPattern("*Accept and continue*");
 
-  sm_.ExpectSpeechPattern("Welcome to the ChromeVox tutorial*");
-
-  // The tutorial can be exited by pressing Escape.
+  // Check that profile switched to the active user.
   sm_.Call([]() {
-    ASSERT_TRUE(ui_test_utils::SendKeyPressToWindowSync(
-        nullptr, ui::VKEY_ESCAPE, false, false, false, false));
+    ASSERT_EQ(AccessibilityManager::Get()->profile(),
+              ProfileManager::GetActiveUserProfile());
   });
+  sm_.Replay();
+}
 
-  sm_.ExpectSpeech("Accept and continue");
+// Verifies spoken feedback after log in as a new user.
+IN_PROC_BROWSER_TEST_F(SigninToUserProfileSwitchTest, AfterLoginAsNewUser) {
+  ASSERT_FALSE(AccessibilityManager::Get()->IsSpokenFeedbackEnabled());
+  // Force sync screen.
+  LoginDisplayHost::default_host()->GetWizardContext()->is_branded_build = true;
+  ASSERT_TRUE(IsSigninBrowserContext(AccessibilityManager::Get()->profile()));
+
+  sm_.Call([this]() {
+    // Log in, then activate ChromeVox.
+    login_manager_.LoginAsNewRegularUser();
+    AccessibilityManager::Get()->EnableSpokenFeedback(true);
+  });
+  sm_.ExpectSpeechPattern("*Accept and continue*");
 
   // Check that profile switched to the active user.
   sm_.Call([]() {
@@ -2158,8 +2188,5 @@ IN_PROC_BROWSER_TEST_F(DeskTemplatesSpokenFeedbackTest, DeskTemplatesBasic) {
 
   sm_.Replay();
 }
-
-INSTANTIATE_TEST_SUITE_P(All, OobeSpokenFeedbackTest, testing::Bool());
-INSTANTIATE_TEST_SUITE_P(All, SigninToUserProfileSwitchTest, testing::Bool());
 
 }  // namespace ash

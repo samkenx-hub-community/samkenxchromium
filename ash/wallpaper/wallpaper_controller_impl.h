@@ -225,6 +225,10 @@ class ASH_EXPORT WallpaperControllerImpl
                            bool show_wallpaper,
                            const base::FilePath& wallpaper_path);
 
+  // Returns false when the color extraction algorithm shouldn't be run based on
+  // system state (e.g. wallpaper image, SessionState, etc.).
+  bool ShouldCalculateColors() const;
+
   // WallpaperController:
   void SetClient(WallpaperControllerClient* client) override;
   void SetDriveFsDelegate(
@@ -233,6 +237,7 @@ class ASH_EXPORT WallpaperControllerImpl
             const base::FilePath& wallpapers,
             const base::FilePath& custom_wallpapers,
             const base::FilePath& device_policy_wallpaper) override;
+  bool CanSetUserWallpaper(const AccountId& account_id) const override;
   void SetCustomWallpaper(const AccountId& account_id,
                           const base::FilePath& file_path,
                           WallpaperLayout layout,
@@ -432,10 +437,6 @@ class ASH_EXPORT WallpaperControllerImpl
                                bool show_wallpaper,
                                SetWallpaperCallback callback);
 
-  // When kiosk app is running or policy is enforced, setting a user wallpaper
-  // is not allowed.
-  bool CanSetUserWallpaper(const AccountId& account_id) const;
-
   // Returns true if the specified wallpaper is already stored in
   // |current_wallpaper_|. If |compare_layouts| is false, layout is ignored.
   bool WallpaperIsAlreadyLoaded(const gfx::ImageSkia& image,
@@ -633,10 +634,6 @@ class ASH_EXPORT WallpaperControllerImpl
   // state.
   void OnColorCalculationComplete(const WallpaperInfo& info,
                                   const WallpaperCalculatedColors& colors);
-
-  // Returns false when the color extraction algorithm shouldn't be run based on
-  // system state (e.g. wallpaper image, SessionState, etc.).
-  bool ShouldCalculateColors() const;
 
   // The callback when decoding of the always-on-top wallpaper completes.
   void OnAlwaysOnTopWallpaperDecoded(const WallpaperInfo& info,

@@ -936,6 +936,13 @@ HttpHandler::HttpHandler(
           WrapToCommand("SetSPCTransactionMode",
                         base::BindRepeating(&ExecuteSetSPCTransactionMode))),
 
+      // Extensions for Custom Handlers API:
+      // https://html.spec.whatwg.org/multipage/system-state.html#rph-automation
+      CommandMapping(
+          kPost, "session/:sessionId/custom-handlers/set-mode",
+          WrapToCommand("SetRPHRegistrationMode",
+                        base::BindRepeating(&ExecuteSetRPHRegistrationMode))),
+
       // Extension for Permissions Standard Automation "set permission" command:
       // https://w3c.github.io/permissions/#set-permission-command
       CommandMapping(kPost, "session/:sessionId/permissions",
@@ -1403,7 +1410,7 @@ HttpHandler::PrepareStandardResponse(
   base::Value::Dict body_params;
   if (status.IsError()){
     base::Value* inner_params =
-        body_params.Set("value", base::Value(base::Value::Type::DICTIONARY));
+        body_params.Set("value", base::Value(base::Value::Type::DICT));
     inner_params->SetStringKey("error", StatusCodeToString(status.code()));
     inner_params->SetStringKey("message", status.message());
     inner_params->SetStringKey("stacktrace", status.stack_trace());

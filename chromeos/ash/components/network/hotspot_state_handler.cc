@@ -169,8 +169,16 @@ void HotspotStateHandler::UpdateHotspotConfigAndRunCallback(
 
 void HotspotStateHandler::OnPropertyChanged(const std::string& key,
                                             const base::Value& value) {
-  if (key == shill::kTetheringStatusProperty)
+  if (key == shill::kTetheringStatusProperty) {
     UpdateHotspotStatus(value.GetDict());
+  } else if (key == shill::kProfilesProperty) {
+    // Shill initializes the tethering config with random value and signals
+    // "Profiles" property changes when the tethering config is fully loaded
+    // from persistent storage.
+    ShillManagerClient::Get()->GetProperties(
+        base::BindOnce(&HotspotStateHandler::UpdateHotspotConfigAndRunCallback,
+                       weak_ptr_factory_.GetWeakPtr(), base::DoNothing()));
+  }
 }
 
 void HotspotStateHandler::OnManagerProperties(
@@ -217,10 +225,6 @@ void HotspotStateHandler::UpdateHotspotStatus(const base::Value::Dict& status) {
 
   active_client_count_ = active_client_count;
   NotifyHotspotStatusChanged();
-}
-
-void HotspotStateHandler::SetPolicyAllowHotspot(bool allow) {
-  // TODO (jiajunz)
 }
 
 void HotspotStateHandler::NotifyHotspotStatusChanged() {

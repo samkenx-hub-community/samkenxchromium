@@ -394,6 +394,19 @@ bool FloatController::IsFloatedWindowTuckedForTablet(
   return floated_window_info->is_tucked_for_tablet();
 }
 
+bool FloatController::IsFloatedWindowAlignedWithShelf(
+    aura::Window* floated_window) const {
+  auto* floated_window_info = MaybeGetFloatedWindowInfo(floated_window);
+  DCHECK(floated_window_info);
+  if (floated_window_info->is_tucked_for_tablet()) {
+    return false;
+  }
+
+  MagnetismCorner magnetism_corner = floated_window_info->magnetism_corner();
+  return magnetism_corner == MagnetismCorner::kBottomLeft ||
+         magnetism_corner == MagnetismCorner::kBottomRight;
+}
+
 views::Widget* FloatController::GetTuckHandleWidget(
     const aura::Window* floated_window) const {
   auto* floated_window_info = MaybeGetFloatedWindowInfo(floated_window);
@@ -401,35 +414,43 @@ views::Widget* FloatController::GetTuckHandleWidget(
   return floated_window_info->GetTuckHandleWidget();
 }
 
-void FloatController::OnDragCompletedForTablet(
-    aura::Window* floated_window,
-    const gfx::PointF& last_location_in_parent) {
+void FloatController::OnDragCompletedForTablet(aura::Window* floated_window) {
   auto* floated_window_info = MaybeGetFloatedWindowInfo(floated_window);
   DCHECK(floated_window_info);
 
   // Use the display bounds since the user may drag on to the shelf or spoken
   // feedback bar.
-  const gfx::RectF display_bounds(
+  const gfx::Point display_bounds_center =
       display::Screen::GetScreen()
           ->GetDisplayNearestWindow(floated_window->GetRootWindow())
-          .bounds());
+          .bounds()
+          .CenterPoint();
+  const int display_bounds_center_x = display_bounds_center.x();
+  const int display_bounds_center_y = display_bounds_center.y();
 
   // Check which corner to magnetize to based on which quadrant of the display
-  // the mouse/touch was released. If it somehow falls outside, then magnetize
-  // to the previous location.
-  gfx::RectF display_bounds_left, display_bounds_right;
-  display_bounds.SplitVertically(&display_bounds_left, &display_bounds_right);
-  const float center_y = display_bounds.CenterPoint().y();
-  MagnetismCorner magnetism_corner = floated_window_info->magnetism_corner();
-  if (display_bounds_left.InclusiveContains(last_location_in_parent)) {
-    magnetism_corner = last_location_in_parent.y() < center_y
-                           ? MagnetismCorner::kTopLeft
-                           : MagnetismCorner::kBottomLeft;
-  } else if (display_bounds_right.InclusiveContains(last_location_in_parent)) {
-    magnetism_corner = last_location_in_parent.y() < center_y
-                           ? MagnetismCorner::kTopRight
-                           : MagnetismCorner::kBottomRight;
+  // the centerpoint of the window was on touch released. Not that the
+  // centerpoint may be offscreen.
+  const gfx::Point float_window_center =
+      floated_window->GetBoundsInScreen().CenterPoint();
+  const int float_window_center_x = float_window_center.x();
+  const int float_window_center_y = float_window_center.y();
+  MagnetismCorner magnetism_corner;
+  if (float_window_center_x < display_bounds_center_x &&
+      float_window_center_y < display_bounds_center_y) {
+    magnetism_corner = MagnetismCorner::kTopLeft;
+  } else if (float_window_center_x >= display_bounds_center_x &&
+             float_window_center_y < display_bounds_center_y) {
+    magnetism_corner = MagnetismCorner::kTopRight;
+  } else if (float_window_center_x < display_bounds_center_x &&
+             float_window_center_y >= display_bounds_center_y) {
+    magnetism_corner = MagnetismCorner::kBottomLeft;
+  } else {
+    DCHECK_GE(float_window_center_x, display_bounds_center_x);
+    DCHECK_GE(float_window_center_y, display_bounds_center_y);
+    magnetism_corner = MagnetismCorner::kBottomRight;
   }
+
   floated_window_info->set_magnetism_corner(magnetism_corner);
   UpdateWindowBoundsForTablet(floated_window,
                               WindowState::BoundsChangeAnimationType::kAnimate);
@@ -551,8 +572,13 @@ void FloatController::OnMovingFloatedWindowToDesk(aura::Window* floated_window,
                                          .id());
   }
 
-  // Hide `floated_window` since it's been moved to an inactive desk.
-  HideFloatedWindow(floated_window);
+  // Update `floated_window` visibility based on target desk's activation
+  // status.
+  if (target_desk->is_active()) {
+    ShowFloatedWindow(floated_window);
+  } else {
+    HideFloatedWindow(floated_window);
+  }
   active_desk->NotifyContentChanged();
   target_desk->NotifyContentChanged();
 }
@@ -699,6 +725,13 @@ void FloatController::FloatImpl(aura::Window* window) {
   // container.
   const Desk* desk = desks_util::GetDeskForContext(window);
   DCHECK(desk);
+
+  // TODO(b/267363112): Allow a floated window to be assigned to all desks.
+  // If window is visible to all desks, unset it.
+  if (desks_util::IsWindowVisibleOnAllWorkspaces(window)) {
+    window->SetProperty(aura::client::kWindowWorkspaceKey,
+                        aura::client::kWindowWorkspaceUnassignedWorkspace);
+  }
 
   auto* previously_floated_window = FindFloatedWindowOfDesk(desk);
   // Add floated window to `floated_window_info_map_`.

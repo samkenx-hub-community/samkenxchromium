@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include "ash/shell.h"
 #include "chrome/browser/ash/accessibility/accessibility_manager.h"
 
 #include "ash/constants/ash_features.h"
@@ -27,7 +28,6 @@
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/profiles/profile_manager.h"
 #include "chrome/browser/profiles/profile_test_util.h"
-#include "chrome/browser/supervised_user/supervised_user_constants.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/common/chrome_switches.h"
 #include "chrome/common/extensions/extension_constants.h"
@@ -39,6 +39,7 @@
 #include "components/prefs/pref_service.h"
 #include "components/prefs/scoped_user_pref_update.h"
 #include "components/session_manager/core/session_manager.h"
+#include "components/supervised_user/core/common/supervised_user_constants.h"
 #include "components/user_manager/user_names.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/test/browser_test.h"
@@ -51,7 +52,9 @@
 #include "ui/base/ime/ash/input_method_manager.h"
 #include "ui/base/ui_base_switches.h"
 #include "ui/compositor/scoped_animation_duration_scale_mode.h"
+#include "ui/display/test/display_manager_test_api.h"
 #include "ui/message_center/message_center.h"
+#include "ui/views/widget/widget_utils.h"
 
 namespace ash {
 
@@ -476,6 +479,10 @@ class AccessibilityManagerTest : public MixinBasedInProcessBrowserTest {
     return AccessibilityManager::Get()->chromevox_panel_ != nullptr;
   }
 
+  ChromeVoxPanel* GetChromeVoxPanel() {
+    return AccessibilityManager::Get()->chromevox_panel_;
+  }
+
   base::FilePath TtsDlcTypeToPath(DlcType dlc) {
     return AccessibilityManager::Get()->TtsDlcTypeToPath(dlc);
   }
@@ -885,6 +892,37 @@ IN_PROC_BROWSER_TEST_F(AccessibilityManagerTest, ChromeVoxPanel) {
   SetSpokenFeedbackEnabled(false);
   ASSERT_FALSE(IsSpokenFeedbackEnabled());
   ASSERT_FALSE(IsChromeVoxPanelActive());
+}
+
+IN_PROC_BROWSER_TEST_F(AccessibilityManagerTest,
+                       ChromeVoxPanelMultipleDisplays) {
+  // Start with two displays, the non-primary one is active for new windows.
+  display::test::DisplayManagerTestApi(ash::Shell::Get()->display_manager())
+      .UpdateDisplay("600x600,800x800");
+  auto root_windows = ash::Shell::GetAllRootWindows();
+  ASSERT_EQ(2u, root_windows.size());
+  ASSERT_EQ(ash::Shell::GetPrimaryRootWindow(), root_windows[0]);
+  ash::Shell::SetRootWindowForNewWindows(root_windows[1]);
+  EXPECT_EQ(800, root_windows[1]->GetBoundsInRootWindow().width());
+
+  // Launch ChromeVox.
+  extensions::ExtensionHostTestHelper host_helper(
+      AccessibilityManager::Get()->profile(),
+      extension_misc::kChromeVoxExtensionId);
+  SetSpokenFeedbackEnabled(true);
+  host_helper.WaitForHostCompletedFirstLoad();
+
+  ASSERT_TRUE(IsSpokenFeedbackEnabled());
+  ChromeVoxPanel* panel = GetChromeVoxPanel();
+  ASSERT_NE(nullptr, panel);
+
+  // Check the panel is visible on the primary root window and is sized
+  // correctly for it.
+  EXPECT_EQ(views::GetRootWindow(panel->GetWidget()), root_windows[0]);
+  EXPECT_GT(panel->GetWidget()->GetWindowBoundsInScreen().height(), 10);
+  EXPECT_EQ(600, panel->GetWidget()->GetWindowBoundsInScreen().width());
+  EXPECT_TRUE(root_windows[0]->GetBoundsInScreen().Contains(
+      panel->GetWidget()->GetWindowBoundsInScreen()));
 }
 
 IN_PROC_BROWSER_TEST_F(AccessibilityManagerTest, TtsDlcTypeToPath) {

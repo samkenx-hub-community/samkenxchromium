@@ -25,6 +25,8 @@ import org.chromium.base.MathUtils;
 import org.chromium.base.ObserverList;
 import org.chromium.base.jank_tracker.JankTracker;
 import org.chromium.base.metrics.RecordHistogram;
+import org.chromium.base.supplier.ObservableSupplier;
+import org.chromium.base.supplier.ObservableSupplierImpl;
 import org.chromium.base.supplier.OneshotSupplier;
 import org.chromium.base.supplier.OneshotSupplierImpl;
 import org.chromium.base.supplier.Supplier;
@@ -46,6 +48,7 @@ import org.chromium.chrome.browser.omnibox.SearchEngineLogoUtils;
 import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.chrome.browser.share.ShareDelegate;
 import org.chromium.chrome.browser.share.crow.CrowButtonDelegate;
+import org.chromium.chrome.browser.suggestions.tile.TileGroupDelegateImpl;
 import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.browser.tabmodel.TabCreatorManager;
 import org.chromium.chrome.browser.tabmodel.TabModelSelector;
@@ -102,7 +105,7 @@ public class StartSurfaceCoordinator implements StartSurface {
     private final MultiWindowModeStateDispatcher mMultiWindowModeStateDispatcher;
     private final Supplier<Toolbar> mToolbarSupplier;
     // TODO(crbug.com/1315676): Directly return the supplier from {@link TabSwitcherCoordinator}.
-    private final OneshotSupplierImpl<TabSwitcherCustomViewManager>
+    private final ObservableSupplierImpl<TabSwitcherCustomViewManager>
             mTabSwitcherCustomViewManagerSupplier;
     private final CrowButtonDelegate mCrowButtonDelegate;
     private final OneshotSupplier<IncognitoReauthController> mIncognitoReauthControllerSupplier;
@@ -282,7 +285,7 @@ public class StartSurfaceCoordinator implements StartSurface {
         mCrowButtonDelegate = crowButtonDelegate;
         mIncognitoReauthControllerSupplier = incognitoReauthControllerSupplier;
 
-        mTabSwitcherCustomViewManagerSupplier = new OneshotSupplierImpl<>();
+        mTabSwitcherCustomViewManagerSupplier = new ObservableSupplierImpl<>();
         boolean excludeQueryTiles = !mIsStartSurfaceEnabled
                 || !ChromeFeatureList.sQueryTilesOnStart.isEnabled();
         mIsStartSurfaceRefactorEnabled =
@@ -492,6 +495,18 @@ public class StartSurfaceCoordinator implements StartSurface {
     }
 
     @Override
+    public void beforeShowTabSwitcherView() {
+        // TODO(crbug/1386265): This is a temporary workaround to ensure the layout can run
+        // offscreen while invisible for animation purposes. We should refactor this so that the
+        // visibility is controlled independently of IS_SHOWING_OVERVIEW. The final state is
+        // View.VISIBLE after the animation so we don't need to restore the state after the
+        // animation changes.
+        if (mSwipeRefreshLayout != null) {
+            mSwipeRefreshLayout.setVisibility(View.VISIBLE);
+        }
+    }
+
+    @Override
     public void beforeHideTabSwitcherView() {
         mStartSurfaceMediator.beforeHideTabSwitcherView();
     }
@@ -640,7 +655,8 @@ public class StartSurfaceCoordinator implements StartSurface {
     }
 
     @Override
-    public OneshotSupplier<TabSwitcherCustomViewManager> getTabSwitcherCustomViewManagerSupplier() {
+    public ObservableSupplier<TabSwitcherCustomViewManager>
+    getTabSwitcherCustomViewManagerSupplier() {
         return mTabSwitcherCustomViewManagerSupplier;
     }
 
@@ -720,6 +736,11 @@ public class StartSurfaceCoordinator implements StartSurface {
     @VisibleForTesting
     public boolean isMVTilesInitializedForTesting() {
         return mTasksSurface.isMVTilesInitialized();
+    }
+
+    @VisibleForTesting
+    public TileGroupDelegateImpl getTileGroupDelegateForTesting() {
+        return mTasksSurface.getTileGroupDelegate();
     }
 
     /**

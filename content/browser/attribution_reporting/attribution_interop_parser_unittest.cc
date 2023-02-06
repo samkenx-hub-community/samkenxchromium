@@ -11,7 +11,7 @@
 #include "base/strings/strcat.h"
 #include "base/test/values_test_util.h"
 #include "base/values.h"
-#include "content/public/browser/attribution_config.h"
+#include "content/browser/attribution_reporting/attribution_config.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
@@ -159,6 +159,19 @@ TEST(AttributionInteropParserTest, ValidOutput) {
             "value": "0x159"
           }]
         }
+      }],
+      "verbose_debug_reports": [{
+        "report": [{
+          "body": {
+            "attribution_destination": "https://destination2.test",
+            "limit": "1",
+            "source_event_id": "222",
+            "source_site": "https://source1.test"
+           },
+           "type": "source-destination-limit"
+        }],
+        "report_time": "1643235575000",
+        "report_url": "https://reporter1.test/.well-known/attribution-reporting/debug/verbose"
       }]
     })json";
 
@@ -184,10 +197,23 @@ TEST(AttributionInteropParserTest, ValidOutput) {
             "value": "0x159"
           }]
         }
+      }],
+      "verbose_debug_reports": [{
+        "payload": [{
+          "body": {
+            "attribution_destination": "https://destination2.test",
+            "limit": "1",
+            "source_event_id": "222",
+            "source_site": "https://source1.test"
+           },
+           "type": "source-destination-limit"
+        }],
+        "report_time": "1643235575000",
+        "report_url": "https://reporter1.test/.well-known/attribution-reporting/debug/verbose"
       }]
     })json";
 
-  base::Value input = base::test::ParseJson(kInputJson);
+  base::Value::Dict input = base::test::ParseJsonDict(kInputJson);
 
   std::ostringstream error_stream;
   EXPECT_THAT(AttributionInteropParser(error_stream)
@@ -731,7 +757,7 @@ class AttributionInteropParseOutputErrorTest
 TEST_P(AttributionInteropParseOutputErrorTest, InvalidOutputFails) {
   const ParseErrorTestCase& test_case = GetParam();
 
-  base::Value value = base::test::ParseJson(test_case.json);
+  base::Value::Dict value = base::test::ParseJsonDict(test_case.json);
 
   std::ostringstream error_stream;
   AttributionInteropParser parser(error_stream);
@@ -742,10 +768,6 @@ TEST_P(AttributionInteropParseOutputErrorTest, InvalidOutputFails) {
 }
 
 const ParseErrorTestCase kParseOutputErrorTestCases[] = {
-    {
-        R"(input root: must be a dictionary)",
-        R"json(1)json",
-    },
     {
         R"(["event_level_reports"]: must be a list)",
         R"json({
@@ -841,6 +863,45 @@ const ParseErrorTestCase kParseOutputErrorTestCases[] = {
             "test_info": {
               "histograms": []
             }
+          }]
+        })json",
+    },
+    {
+        R"(["verbose_debug_reports"]: must be a list)",
+        R"json({
+          "verbose_debug_reports": {}
+        })json",
+    },
+    {
+        R"(["verbose_debug_reports"][0]: must be a dictionary)",
+        R"json({
+          "verbose_debug_reports": [""]
+        })json",
+    },
+    {
+        R"(["verbose_debug_reports"][0]["report"]: must be present)",
+        R"json({
+          "verbose_debug_reports": [{
+            "report_time": "",
+            "report_url": ""
+          }]
+        })json",
+    },
+    {
+        R"(["verbose_debug_reports"][0]["report_time"]: must be present)",
+        R"json({
+          "verbose_debug_reports": [{
+            "report": [],
+            "report_url": ""
+          }]
+        })json",
+    },
+    {
+        R"(["verbose_debug_reports"][0]["report_url"]: must be present)",
+        R"json({
+          "verbose_debug_reports": [{
+            "report": [],
+            "report_time": ""
           }]
         })json",
     }};

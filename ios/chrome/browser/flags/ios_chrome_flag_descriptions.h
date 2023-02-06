@@ -41,14 +41,14 @@ extern const char kAutofillEnableNewCardUnmaskPromptViewName[];
 extern const char kAutofillEnableNewCardUnmaskPromptViewDescription[];
 
 // Title and description for the flag to control the new autofill suggestion
-// ranking formula.
-extern const char kAutofillEnableRankingFormulaName[];
-extern const char kAutofillEnableRankingFormulaDescription[];
-
-// Title and description for the flag to control the new autofill suggestion
 // ranking formula for address profiles.
 extern const char kAutofillEnableRankingFormulaAddressProfilesName[];
 extern const char kAutofillEnableRankingFormulaAddressProfilesDescription[];
+
+// Title and description for the flag to control the new autofill suggestion
+// ranking formula for credit cards.
+extern const char kAutofillEnableRankingFormulaCreditCardsName[];
+extern const char kAutofillEnableRankingFormulaCreditCardsDescription[];
 
 // Title and description for the flag that controls whether the remade Autofill
 // Downstream metrics are enabled.
@@ -142,12 +142,6 @@ extern const char kAppleCalendarExperienceKitDescription[];
 extern const char kEmailName[];
 extern const char kEmailDescription[];
 
-// Title and description for enable accessibility identifier to omnibox leading
-// image.
-extern const char kEnableAccessibilityIdentifierToOmniboxLeadingImageName[];
-extern const char
-    kEnableAccessibilityIdentifierToOmniboxLeadingImageDescription[];
-
 // Title and description for the flag to enable phone numbers detection and
 // processing.
 extern const char kPhoneNumberName[];
@@ -176,15 +170,15 @@ extern const char kLongPressSurroundingTextDescription[];
 extern const char kMapsExperienceKitName[];
 extern const char kMapsExperienceKitDescription[];
 
+// Title and description for the flag to enable the Close All Tabs confirmation
+// dialog.
+extern const char kCloseAllTabsConfirmationName[];
+extern const char kCloseAllTabsConfirmationDescription[];
+
 // Title and description for the flag that updates the Content Suggestions to a
 // new module design.
 extern const char kContentSuggestionsUIModuleRefreshName[];
 extern const char kContentSuggestionsUIModuleRefreshDescription[];
-
-// Title and description for the flag to control which crash generation tool
-// is used.
-extern const char kCrashpadIOSName[];
-extern const char kCrashpadIOSDescription[];
 
 // Title and description for the flag to enable the Credential
 // Provider Extension promo.
@@ -236,6 +230,14 @@ extern const char kEnableFeedBottomSignInPromoDescription[];
 // by the discover feed card menu.
 extern const char kEnableFeedCardMenuSignInPromoName[];
 extern const char kEnableFeedCardMenuSignInPromoDescription[];
+
+// Title and description for the flag to enable the Feed image caching.
+extern const char kEnableFeedImageCachingName[];
+extern const char kEnableFeedImageCachingDescription[];
+
+// Title and description for the flag to enable Feed synthetic capabilities.
+extern const char kEnableFeedSyntheticCapabilitiesName[];
+extern const char kEnableFeedSyntheticCapabilitiesDescription[];
 
 // Title and description for the flag to enable DMToken deletion.
 extern const char kDmTokenDeletionName[];
@@ -535,6 +537,10 @@ extern const char kOmniboxMultilineSearchSuggestDescription[];
 extern const char kOmniboxNewImplementationName[];
 extern const char kOmniboxNewImplementationDescription[];
 
+// Title and description for the flag to show most visited on SRP.
+extern const char kOmniboxMostVisitedTilesOnSrpName[];
+extern const char kOmniboxMostVisitedTilesOnSrpDescription[];
+
 // Title and description for the flag to enable Omnibox On Device Head
 // suggestions (incognito).
 extern const char kOmniboxOnDeviceHeadSuggestionsIncognitoName[];
@@ -730,11 +736,6 @@ extern const char kToolbarContainerDescription[];
 // Title and Description for the flag to enable the trending queries module.
 extern const char kTrendingQueriesModuleName[];
 extern const char kTrendingQueriesModuleDescription[];
-
-// Title and description for the flag to enable removing any entry points to the
-// history UI from Incognito mode.
-extern const char kUpdateHistoryEntryPointsInIncognitoName[];
-extern const char kUpdateHistoryEntryPointsInIncognitoDescription[];
 
 // Title and description for the flag to enable using Lens to search for an
 // image from the long press context menu.

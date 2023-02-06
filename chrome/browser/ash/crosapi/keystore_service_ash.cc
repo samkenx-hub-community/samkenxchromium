@@ -683,13 +683,12 @@ void KeystoreServiceAsh::GenerateKey(
 // static
 void KeystoreServiceAsh::DidGenerateKey(
     GenerateKeyCallback callback,
-    const std::string& public_key,
+    std::vector<uint8_t> public_key,
     chromeos::platform_keys::Status status) {
   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
   crosapi::mojom::KeystoreBinaryResultPtr result_ptr;
   if (status == chromeos::platform_keys::Status::kSuccess) {
-    result_ptr = mojom::KeystoreBinaryResult::NewBlob(
-        std::vector<uint8_t>(public_key.begin(), public_key.end()));
+    result_ptr = mojom::KeystoreBinaryResult::NewBlob(std::move(public_key));
   } else {
     result_ptr = mojom::KeystoreBinaryResult::NewError(
         chromeos::platform_keys::StatusToKeystoreError(status));
@@ -781,13 +780,13 @@ void KeystoreServiceAsh::Sign(bool is_keystore_provided,
 
 // static
 void KeystoreServiceAsh::DidSign(SignCallback callback,
-                                 const std::string& signature,
+                                 std::vector<uint8_t> signature,
                                  chromeos::platform_keys::Status status) {
   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
 
   if (status == chromeos::platform_keys::Status::kSuccess) {
-    std::move(callback).Run(mojom::KeystoreBinaryResult::NewBlob(
-        std::vector<uint8_t>(signature.begin(), signature.end())));
+    std::move(callback).Run(
+        mojom::KeystoreBinaryResult::NewBlob(std::move(signature)));
   } else {
     std::move(callback).Run(mojom::KeystoreBinaryResult::NewError(
         chromeos::platform_keys::StatusToKeystoreError(status)));

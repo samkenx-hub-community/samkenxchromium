@@ -11,16 +11,18 @@
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/views/autofill/payments/dialog_view_ids.h"
 #include "chrome/browser/ui/views/autofill/payments/save_iban_bubble_view.h"
+#include "chrome/browser/ui/views/autofill/payments/save_payment_icon_view.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
+#include "chrome/browser/ui/views/toolbar/toolbar_view.h"
 #include "chrome/test/base/ui_test_utils.h"
 #include "components/autofill/content/browser/content_autofill_driver.h"
 #include "components/autofill/content/browser/test_autofill_manager_injector.h"
 #include "components/autofill/core/browser/browser_autofill_manager.h"
 #include "components/autofill/core/browser/form_data_importer.h"
 #include "components/autofill/core/browser/payments/iban_save_manager.h"
-#include "components/autofill/core/browser/payments/iban_save_strike_database.h"
 #include "components/autofill/core/browser/personal_data_manager.h"
-#include "components/autofill/core/browser/strike_database_integrator_base.h"
+#include "components/autofill/core/browser/strike_databases/payments/iban_save_strike_database.h"
+#include "components/autofill/core/browser/strike_databases/strike_database_integrator_base.h"
 #include "components/autofill/core/browser/test_autofill_manager_waiter.h"
 #include "components/autofill/core/browser/test_event_waiter.h"
 #include "components/autofill/core/common/autofill_payments_features.h"
@@ -30,6 +32,7 @@
 #include "ui/events/base_event_utils.h"
 #include "ui/views/bubble/bubble_frame_view.h"
 #include "ui/views/test/widget_test.h"
+#include "ui/views/view.h"
 #include "ui/views/widget/widget.h"
 
 namespace {
@@ -83,6 +86,7 @@ class SaveIbanBubbleViewFullFormBrowserTest
     ACCEPT_SAVE_IBAN_COMPLETE,
     DECLINE_SAVE_IBAN_COMPLETE,
     BUBBLE_SHOWN,
+    ICON_SHOWN
   };
 
   // SyncTest::SetUpOnMainThread:
@@ -102,18 +106,13 @@ class SaveIbanBubbleViewFullFormBrowserTest
     // HTML pages in tests. Since ContentAutofillDriver is per RFH, the driver
     // that this method starts observing will also be the one to notify later.
     AddBlankTabAndShow(GetBrowser(0));
-    autofill_manager_injector_ =
-        std::make_unique<TestAutofillManagerInjector<TestAutofillManager>>(
-            GetActiveWebContents());
 
     // Wait for Personal Data Manager to be fully loaded to prevent that
     // spurious notifications deceive the tests.
     WaitForPersonalDataManagerToBeLoaded(GetProfile(0));
 
     // Set up this class as the ObserverForTest implementation.
-    iban_save_manager_ = ContentAutofillDriver::GetForRenderFrameHost(
-                             GetActiveWebContents()->GetPrimaryMainFrame())
-                             ->autofill_manager()
+    iban_save_manager_ = autofill_manager()
                              ->client()
                              ->GetFormDataImporter()
                              ->iban_save_manager_for_testing();
@@ -122,9 +121,8 @@ class SaveIbanBubbleViewFullFormBrowserTest
   }
 
   // The primary main frame's AutofillManager.
-  TestAutofillManager* GetAutofillManager() {
-    DCHECK(autofill_manager_injector_);
-    return autofill_manager_injector_->GetForPrimaryMainFrame();
+  TestAutofillManager* autofill_manager() {
+    return autofill_manager_injector_[GetActiveWebContents()];
   }
 
   // IBANSaveManager::ObserverForTest:
@@ -155,10 +153,16 @@ class SaveIbanBubbleViewFullFormBrowserTest
     }
   }
 
+  void OnIconShown() override {
+    if (event_waiter_) {
+      event_waiter_->OnEvent(DialogEvent::ICON_SHOWN);
+    }
+  }
+
   void NavigateToAndWaitForForm(const std::string& file_path) {
     ASSERT_TRUE(ui_test_utils::NavigateToURL(
         GetBrowser(0), embedded_test_server()->GetURL(file_path)));
-    ASSERT_TRUE(GetAutofillManager()->WaitForFormsSeen(1));
+    ASSERT_TRUE(autofill_manager()->WaitForFormsSeen(1));
   }
 
   void SubmitFormAndWaitForIbanLocalSaveBubble() {
@@ -228,6 +232,15 @@ class SaveIbanBubbleViewFullFormBrowserTest
         FindViewInBubbleById(DialogViewId::CANCEL_BUTTON));
   }
 
+  void ClickOnCloseButton() {
+    SaveIbanBubbleView* save_iban_bubble_views = GetSaveIbanBubbleView();
+    CHECK(save_iban_bubble_views);
+    ClickOnDialogViewAndWaitForWidgetDestruction(
+        save_iban_bubble_views->GetBubbleFrameView()
+            ->GetCloseButtonForTesting());
+    CHECK(!GetSaveIbanBubbleView());
+  }
+
   SaveIbanBubbleView* GetSaveIbanBubbleView() {
     SaveIbanBubbleController* save_iban_bubble_controller =
         SaveIbanBubbleController::GetOrCreate(GetActiveWebContents());
@@ -242,6 +255,16 @@ class SaveIbanBubbleViewFullFormBrowserTest
     }
 
     return static_cast<SaveIbanBubbleView*>(save_iban_bubble_view);
+  }
+
+  SavePaymentIconView* GetSaveIbanIconView() {
+    BrowserView* browser_view =
+        BrowserView::GetBrowserViewForBrowser(GetBrowser(0));
+    PageActionIconView* icon =
+        browser_view->toolbar_button_provider()->GetPageActionIconView(
+            PageActionIconType::kSaveIban);
+    CHECK(browser_view->GetLocationBarView()->Contains(icon));
+    return static_cast<SavePaymentIconView*>(icon);
   }
 
   content::WebContents* GetActiveWebContents() {
@@ -301,8 +324,7 @@ class SaveIbanBubbleViewFullFormBrowserTest
  private:
   base::test::ScopedFeatureList feature_list_;
   std::unique_ptr<autofill::EventWaiter<DialogEvent>> event_waiter_;
-  std::unique_ptr<TestAutofillManagerInjector<TestAutofillManager>>
-      autofill_manager_injector_;
+  TestAutofillManagerInjector<TestAutofillManager> autofill_manager_injector_;
 };
 
 // Tests the local save bubble. Ensures that clicking the 'No thanks' button
@@ -348,13 +370,26 @@ IN_PROC_BROWSER_TEST_F(SaveIbanBubbleViewFullFormBrowserTest,
   // Submit the form a fourth time. Since the IBAN now has maximum strikes,
   // the bubble should not be shown.
   FillForm(kIbanValue);
-  ResetEventWaiterForSequence({DialogEvent::OFFERED_LOCAL_SAVE});
+  ResetEventWaiterForSequence(
+      {DialogEvent::OFFERED_LOCAL_SAVE, DialogEvent::ICON_SHOWN});
   SubmitForm();
   WaitForObservedEvent();
 
   EXPECT_TRUE(iban_save_manager_->GetIBANSaveStrikeDatabaseForTesting()
                   ->ShouldBlockFeature(kIbanValue));
+
+  EXPECT_TRUE(GetSaveIbanIconView()->GetVisible());
   EXPECT_FALSE(GetSaveIbanBubbleView());
+
+  // Click the icon to show the bubble.
+  ResetEventWaiterForSequence({DialogEvent::BUBBLE_SHOWN});
+  ClickOnView(GetSaveIbanIconView());
+  WaitForObservedEvent();
+  EXPECT_TRUE(FindViewInBubbleById(DialogViewId::MAIN_CONTENT_VIEW_LOCAL)
+                  ->GetVisible());
+
+  ClickOnCancelButton();
+  WaitForObservedEvent();
 }
 
 // Tests the local save bubble. Ensures that clicking the 'Save' button
@@ -368,6 +403,18 @@ IN_PROC_BROWSER_TEST_F(SaveIbanBubbleViewFullFormBrowserTest,
   ClickOnSaveButton();
   WaitForObservedEvent();
 
+  EXPECT_FALSE(GetSaveIbanBubbleView());
+}
+
+// Tests the local save bubble. Ensures that clicking the [X] button will still
+// see the omnibox icon.
+IN_PROC_BROWSER_TEST_F(SaveIbanBubbleViewFullFormBrowserTest,
+                       Local_ClickingClosesBubbleStillShowOmnibox) {
+  FillForm();
+  SubmitFormAndWaitForIbanLocalSaveBubble();
+
+  ClickOnCloseButton();
+  EXPECT_TRUE(GetSaveIbanIconView()->GetVisible());
   EXPECT_FALSE(GetSaveIbanBubbleView());
 }
 

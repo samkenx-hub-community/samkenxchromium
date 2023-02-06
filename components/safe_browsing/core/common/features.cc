@@ -84,6 +84,12 @@ BASE_FEATURE(kEsbIphBubbleAndCollapseSettings,
              "EsbIphBubbleAndCollapseSettings",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
+const base::FeatureParam<bool> kEsbIphBubbleAndCollapseSettingsEnableIph{
+    &kEsbIphBubbleAndCollapseSettings, "EnableEsbIphBubble", false};
+
+const base::FeatureParam<bool> kEsbIphBubbleAndCollapseSettingsEnableCollapse{
+    &kEsbIphBubbleAndCollapseSettings, "EnableEsbSettingCollapse", false};
+
 BASE_FEATURE(kExtensionTelemetry,
              "SafeBrowsingExtensionTelemetry",
              base::FEATURE_ENABLED_BY_DEFAULT);
@@ -107,6 +113,18 @@ BASE_FEATURE(kExtensionTelemetryPersistence,
 BASE_FEATURE(kExtensionTelemetryConfiguration,
              "SafeBrowsingExtensionTelemetryConfiguration",
              base::FEATURE_DISABLED_BY_DEFAULT);
+
+BASE_FEATURE(kExtensionTelemetryFileData,
+             "SafeBrowsingExtensionTelemetryFileData",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+const base::FeatureParam<int> kExtensionTelemetryFileDataMaxFilesToProcess{
+    &kExtensionTelemetryFileData, "MaxFilesToProcess",
+    /*default_value=*/50};
+
+const base::FeatureParam<int> kExtensionTelemetryFileDataMaxFileSizeBytes{
+    &kExtensionTelemetryFileData, "MaxFileSizeBytes",
+    /*default_value=100KB*/ 100 * 1024};
 
 BASE_FEATURE(kExtensionTelemetryPotentialPasswordTheft,
              "SafeBrowsingExtensionTelemetryPotentialPasswordTheft",

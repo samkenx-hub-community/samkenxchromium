@@ -25,6 +25,7 @@
 #include "ash/ime/ime_controller_impl.h"
 #include "ash/keyboard/keyboard_controller_impl.h"
 #include "ash/media/media_controller_impl.h"
+#include "ash/public/cpp/ambient/ambient_client.h"
 #include "ash/public/cpp/assistant/assistant_state.h"
 #include "ash/public/cpp/new_window_delegate.h"
 #include "ash/public/cpp/projector/projector_controller.h"
@@ -484,7 +485,7 @@ bool CanShowStylusTools() {
 }
 
 bool CanStartAmbientMode() {
-  return features::IsAmbientModeEnabled();
+  return AmbientClient::Get() && AmbientClient::Get()->IsAmbientModeAllowed();
 }
 
 bool CanSwapPrimaryDisplay() {
@@ -1072,6 +1073,7 @@ void ToggleAssignToAllDesk() {
   if (!active_window)
     return;
 
+  // TODO(b/267363112): Allow a floated window to be assigned to all desks.
   // Only children of the desk container should have their assigned to all
   // desks state toggled to avoid interfering with special windows like
   // always-on-top windows, floated windows, etc.

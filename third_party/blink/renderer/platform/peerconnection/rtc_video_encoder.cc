@@ -404,19 +404,19 @@ struct FrameInfo {
 
 webrtc::VideoCodecType ProfileToWebRtcVideoCodecType(
     media::VideoCodecProfile profile) {
-  if (profile >= media::VP8PROFILE_MIN && profile <= media::VP8PROFILE_MAX) {
-    return webrtc::kVideoCodecVP8;
-  } else if (profile == media::VP9PROFILE_MIN) {
-    return webrtc::kVideoCodecVP9;
-  } else if (profile >= media::H264PROFILE_MIN &&
-             profile <= media::H264PROFILE_MAX) {
-    return webrtc::kVideoCodecH264;
-  } else if (profile >= media::AV1PROFILE_MIN &&
-             profile <= media::AV1PROFILE_MAX) {
-    return webrtc::kVideoCodecAV1;
+  switch (media::VideoCodecProfileToVideoCodec(profile)) {
+    case media::VideoCodec::kH264:
+      return webrtc::kVideoCodecH264;
+    case media::VideoCodec::kVP8:
+      return webrtc::kVideoCodecVP8;
+    case media::VideoCodec::kVP9:
+      return webrtc::kVideoCodecVP9;
+    case media::VideoCodec::kAV1:
+      return webrtc::kVideoCodecAV1;
+    default:
+      NOTREACHED() << "Invalid profile " << GetProfileName(profile);
+      return webrtc::kVideoCodecGeneric;
   }
-  NOTREACHED() << "Invalid profile " << GetProfileName(profile);
-  return webrtc::kVideoCodecGeneric;
 }
 
 void RecordInitEncodeUMA(int32_t init_retval,
@@ -456,11 +456,6 @@ void RecordEncoderShutdownReasonUMA(RTCVideoEncoderShutdownReason reason,
 }  // namespace
 
 namespace features {
-// Make RTCVideoEncoder::Encode() asynchronous.
-BASE_FEATURE(kWebRtcEncoderAsyncEncode,
-             "WebRtcEncoderAsyncEncode",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-
 // Fallback from hardware encoder (if available) to software, for WebRTC
 // screensharing that uses temporal scalability.
 BASE_FEATURE(kWebRtcScreenshareSwEncoding,
@@ -1326,8 +1321,10 @@ void RTCVideoEncoder::Impl::EncodeOneFrame(FrameChunk frame_chunk) {
         storage == media::VideoFrame::STORAGE_SHMEM;
     const bool is_gmb_frame =
         storage == media::VideoFrame::STORAGE_GPU_MEMORY_BUFFER;
-    requires_copy_or_scale =
-        RequiresSizeChange(*frame) || !(is_memory_based_frame || is_gmb_frame);
+    const bool is_right_format = frame->format() == media::PIXEL_FORMAT_I420 ||
+                                 frame->format() == media::PIXEL_FORMAT_NV12;
+    requires_copy_or_scale = !is_right_format || RequiresSizeChange(*frame) ||
+                             !(is_memory_based_frame || is_gmb_frame);
   }
 
   if (requires_copy_or_scale) {

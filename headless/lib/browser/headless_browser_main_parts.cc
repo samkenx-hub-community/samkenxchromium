@@ -4,6 +4,7 @@
 
 #include "headless/lib/browser/headless_browser_main_parts.h"
 
+#include <memory.h>
 #include <stdio.h>
 
 #include "base/debug/alias.h"
@@ -16,6 +17,8 @@
 #include "headless/lib/browser/headless_screen.h"
 #include "headless/lib/browser/headless_select_file_dialog_factory.h"
 #include "headless/public/switches.h"
+#include "ui/base/clipboard/clipboard.h"
+#include "ui/base/clipboard/clipboard_non_backed.h"
 
 #if defined(HEADLESS_USE_PREFS)
 #include "components/os_crypt/os_crypt.h"  // nogncheck
@@ -26,8 +29,8 @@
 #endif
 
 #if defined(HEADLESS_USE_POLICY)
+#include "components/headless/policy/headless_mode_policy.h"  // nogncheck
 #include "components/keyed_service/content/browser_context_dependency_manager.h"
-#include "headless/lib/browser/policy/headless_mode_policy.h"
 #include "headless/lib/browser/policy/headless_policies.h"
 #endif
 
@@ -50,6 +53,21 @@ const base::FilePath::CharType kLocalStateFilename[] =
 
 }  // namespace
 
+// Headless clipboard that is independent of any platform clipboard.
+class HeadlessClipboard : public ui::ClipboardNonBacked {
+ public:
+  HeadlessClipboard() = default;
+
+  HeadlessClipboard(const HeadlessClipboard&) = delete;
+  HeadlessClipboard& operator=(const HeadlessClipboard&) = delete;
+
+  ~HeadlessClipboard() override = default;
+
+  static std::unique_ptr<HeadlessClipboard> Create() {
+    return std::make_unique<HeadlessClipboard>();
+  }
+};
+
 HeadlessBrowserMainParts::HeadlessBrowserMainParts(HeadlessBrowserImpl* browser)
     : browser_(browser) {}
 
@@ -60,6 +78,9 @@ int HeadlessBrowserMainParts::PreMainMessageLoopRun() {
   CreatePrefService();
 #endif
   MaybeStartLocalDevToolsHttpHandler();
+
+  ui::Clipboard::SetClipboardForCurrentThread(HeadlessClipboard::Create());
+
   browser_->PlatformInitialize();
   browser_->RunOnStartCallback();
   HeadlessSelectFileDialogFactory::SetUp();
@@ -116,7 +137,7 @@ void HeadlessBrowserMainParts::MaybeStartLocalDevToolsHttpHandler() {
 
 #if defined(HEADLESS_USE_POLICY)
   const PrefService* pref_service = browser_->GetPrefs();
-  if (!policy::IsRemoteDebuggingAllowed(pref_service)) {
+  if (!IsRemoteDebuggingAllowed(pref_service)) {
     // Follow content/browser/devtools/devtools_http_handler.cc that reports its
     // remote debugging port on stderr for symmetry.
     fputs("\nDevTools remote debugging is disallowed by the system admin.\n",
@@ -161,7 +182,7 @@ void HeadlessBrowserMainParts::CreatePrefService() {
   PrefServiceFactory factory;
 
 #if defined(HEADLESS_USE_POLICY)
-  policy::RegisterPrefs(pref_registry.get());
+  RegisterHeadlessPrefs(pref_registry.get());
 
   policy_connector_ =
       std::make_unique<policy::HeadlessBrowserPolicyConnector>();

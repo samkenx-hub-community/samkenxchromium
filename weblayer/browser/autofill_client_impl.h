@@ -112,9 +112,10 @@ class AutofillClientImpl
       AddressProfileSavePromptCallback callback) override;
   bool HasCreditCardScanFeature() override;
   void ScanCreditCard(CreditCardScanCallback callback) override;
-  bool TryToShowFastCheckout(const autofill::FormData& form,
-                             const autofill::FormFieldData& field,
-                             autofill::AutofillDriver* driver) override;
+  bool TryToShowFastCheckout(
+      const autofill::FormData& form,
+      const autofill::FormFieldData& field,
+      base::WeakPtr<autofill::AutofillManager> autofill_manager) override;
   void HideFastCheckout(bool allow_further_runs) override;
   bool IsFastCheckoutSupported() override;
   bool IsShowingFastCheckoutUI() override;
@@ -129,7 +130,7 @@ class AutofillClientImpl
   void UpdateAutofillPopupDataListValues(
       const std::vector<std::u16string>& values,
       const std::vector<std::u16string>& labels) override;
-  base::span<const autofill::Suggestion> GetPopupSuggestions() const override;
+  std::vector<autofill::Suggestion> GetPopupSuggestions() const override;
   void PinPopupView() override;
   autofill::AutofillClient::PopupOpenArgs GetReopenPopupArgs() const override;
   void UpdatePopup(const std::vector<autofill::Suggestion>& suggestions,
@@ -143,7 +144,6 @@ class AutofillClientImpl
   void DidFillOrPreviewField(const std::u16string& autofilled_value,
                              const std::u16string& profile_full_name) override;
   bool IsContextSecure() const override;
-  bool ShouldShowSigninPromo() override;
   void ExecuteCommand(int id) override;
   void OpenPromoCodeOfferDetailsURL(const GURL& url) override;
   autofill::FormInteractionsFlowId GetCurrentFormInteractionsFlowId() override;

@@ -9,6 +9,7 @@
 #include "base/notreached.h"
 #include "ui/gl/gl_bindings.h"
 #include "ui/gl/gl_image_native_pixmap.h"
+#include "ui/gl/scoped_binders.h"
 
 namespace ui {
 
@@ -73,16 +74,14 @@ std::unique_ptr<NativePixmapGLBinding> NativePixmapEGLBinding::Create(
 
   auto binding = std::make_unique<NativePixmapEGLBinding>(std::move(gl_image),
                                                           plane_format);
-  if (!binding->BindTexture(target, texture_id)) {
-    return nullptr;
-  }
+  binding->BindTexture(target, texture_id);
 
   return binding;
 }
 
-bool NativePixmapEGLBinding::BindTexture(GLenum target, GLuint texture_id) {
-  return NativePixmapGLBinding::BindTexture(gl_image_.get(), target,
-                                            texture_id);
+void NativePixmapEGLBinding::BindTexture(GLenum target, GLuint texture_id) {
+  gl::ScopedTextureBinder binder(target, texture_id);
+  gl_image_->BindTexImage(target);
 }
 
 GLuint NativePixmapEGLBinding::GetInternalFormat() {

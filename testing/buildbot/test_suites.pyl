@@ -1200,6 +1200,18 @@
         ],
         'use_isolated_scripts_api': True,
       },
+      'keyboard_accessory_junit_tests': {
+        'mixins': [
+          'x86-64',
+          'linux-bionic',
+          'junit-swarming',
+        ],
+        'remove_mixins': [
+          'emulator-4-cores',
+          'nougat-x86-emulator',
+        ],
+        'use_isolated_scripts_api': True,
+      },
       'media_base_junit_tests': {
         'mixins': [
           'x86-64',
@@ -2117,6 +2129,120 @@
       }
     },
 
+
+    'devtools_webkit_and_tab_target_isolated_scripts': {
+      'blink_web_tests': {
+        # layout test failures are retried 3 times when '--test-list' is not
+        # passed, but 0 times when '--test-list' is passed. We want to always
+        # retry 3 times, so we explicitly specify it.
+        'args': [
+          '--num-retries=3',
+        ],
+        'isolate_name': 'blink_web_tests',
+        'merge': {
+          'args': [
+            '--verbose',
+          ],
+          'script': '//third_party/blink/tools/merge_web_test_results.py',
+        },
+        'mixins': [
+          'blink_tests_write_run_histories',
+          # TODO(crbug.com/1327314): Enable for blink web tests.
+          'disable_check_flakiness_web_tests',
+          'skia_gold_test',
+        ],
+        'resultdb': {
+          'enable': True,
+        },
+        'results_handler': 'layout tests',
+        'swarming': {
+          'shards': 5,
+        }
+      },
+      'blink_web_tests_dt_tab_target': {
+        # layout test failures are retried 3 times when '--test-list' is not
+        # passed, but 0 times when '--test-list' is passed. We want to always
+        # retry 3 times, so we explicitly specify it.
+        'args': [
+          '--flag-specific=devtools-tab-target',
+          '--num-retries=3',
+        ],
+        'isolate_name': 'blink_web_tests',
+        'merge': {
+          'args': [
+            '--verbose',
+          ],
+          'script': '//third_party/blink/tools/merge_web_test_results.py',
+        },
+        'mixins': [
+          'blink_tests_write_run_histories',
+          # TODO(crbug.com/1327314): Enable for blink web tests.
+          'disable_check_flakiness_web_tests',
+          'skia_gold_test',
+        ],
+        'resultdb': {
+          'enable': True,
+        },
+        'results_handler': 'layout tests',
+        'swarming': {
+          'shards': 5,
+        }
+      },
+      'blink_wpt_tests': {
+        # layout test failures are retried 3 times when '--test-list' is not
+        # passed, but 0 times when '--test-list' is passed. We want to always
+        # retry 3 times, so we explicitly specify it.
+        'args': [
+          '--num-retries=3',
+        ],
+        'isolate_name': 'blink_wpt_tests',
+        'merge': {
+          'args': [
+            '--verbose',
+          ],
+          'script': '//third_party/blink/tools/merge_web_test_results.py',
+        },
+        'mixins': [
+          'blink_tests_write_run_histories',
+          # TODO(crbug.com/1327314): Enable for blink web tests.
+          'disable_check_flakiness_web_tests',
+          'skia_gold_test',
+        ],
+        'resultdb': {
+          'enable': True,
+        },
+        'results_handler': 'layout tests',
+        'swarming': {
+          'shards': 7,
+        }
+      },
+      'webkit_layout_from_devtools': {
+        # TODO(crbug.com/816629) - Move these args into //BUILD.gn .
+        # layout test failures are retried 3 times when '--test-list' is not
+        # passed, but 0 times when '--test-list' is passed. We want to always
+        # retry 3 times, so we explicitly specify it.
+        'args': [
+          '--num-retries=3',
+          '--layout-tests-directory=../../third_party/devtools-frontend/src/test/webtests/',
+          'http/tests/devtools',
+        ],
+        'isolate_name': 'devtools_web_tests',
+        'merge': {
+          'args': [
+            '--verbose',
+          ],
+          'script': '//third_party/blink/tools/merge_web_test_results.py',
+        },
+        'resultdb': {
+          'enable': True,
+        },
+        'results_handler': 'layout tests',
+        'swarming': {
+          'shards': 4,
+        }
+      },
+    },
+
     'devtools_webkit_isolated_scripts': {
       'blink_web_tests': {
         # layout test failures are retried 3 times when '--test-list' is not
@@ -2852,57 +2978,6 @@
         'linux_args': [ '--no-xvfb' ],
         'test': 'browser_tests',
       },
-    },
-
-    'gpu_fuchsia_common_telemetry_tests': {
-      'info_collection': {
-        'args': [
-          '--expected-vendor-id',
-          '${gpu_vendor_id}',
-          '$$MAGIC_SUBSTITUTION_GPUExpectedDeviceId',
-        ],
-        'mixins': [
-          'has_native_resultdb_integration',
-        ],
-      },
-      'pixel_skia_validating': {
-        'name': 'pixel_skia_gold_validating_test',
-        'args': [
-          '--dont-restore-color-profile-after-test',
-          '--test-machine-name',
-          '${buildername}',
-          '--extra-browser-args=--use-cmd-decoder=validating',
-        ],
-        'mixins': [
-          'skia_gold_test',
-          'has_native_resultdb_integration',
-        ],
-        'telemetry_test_name': 'pixel',
-      },
-      'screenshot_sync_validating': {
-        'name': 'screenshot_sync_validating_tests',
-        'telemetry_test_name': 'screenshot_sync',
-        'args': [
-          '--dont-restore-color-profile-after-test',
-          '--extra-browser-args=--use-cmd-decoder=validating',
-         ],
-        'mixins': [
-          'has_native_resultdb_integration',
-        ],
-      },
-      'trace_test': {
-        'mixins': [
-          'has_native_resultdb_integration',
-        ],
-      },
-      'webgl1_conformance': {
-        'mixins': [
-          'has_native_resultdb_integration',
-        ],
-        'swarming': {
-          'shards': 18,
-        },
-      }
     },
 
     'gpu_fyi_and_optional_non_linux_gtests': {
@@ -4975,12 +5050,6 @@
       },
     },
 
-    # TODO(crbug.com/1381588): remove this test definition once
-    # crbug.com/1394839 is resolved.
-    'updater_gtests_mac_user': {
-      'updater_tests': {},
-    },
-
     'updater_gtests_win': {
       'updater_tests': {},
       'updater_tests_system': {
@@ -5085,11 +5154,6 @@
       'cast_runner_unittests': {},
       'web_engine_browsertests': {},
       'web_engine_integration_tests': {
-        'args': [
-          '--test-arg=--vmodule=test_navigation_listener=1',
-        ],
-      },
-      'web_engine_integration_tests_cfv1': {
         'args': [
           '--test-arg=--vmodule=test_navigation_listener=1',
         ],
@@ -5251,6 +5315,7 @@
     'webview_trichrome_64_cts_tests': {
       'webview_trichrome_64_cts_tests': {
         'swarming': {
+          'shards': 2,
           'cipd_packages': [
             {
               'cipd_package': 'chromium/android_webview/tools/cts_archive',
@@ -5259,6 +5324,25 @@
             }
           ]
         },
+      },
+    },
+
+    'webview_trichrome_64_cts_tests_no_field_trial': {
+      'webview_trichrome_64_cts_tests_no_field_trial': {
+        'args': [
+          '--disable-field-trial-config',
+        ],
+        'swarming': {
+          'shards': 2,
+          'cipd_packages': [
+            {
+              "cipd_package": 'chromium/android_webview/tools/cts_archive',
+              'location': 'android_webview/tools/cts_archive',
+              'revision': 'C4m9-gZKvvtS0-KQ9cMRi6wEfZH_TeWSiXEgsgtGtsMC',
+            }
+          ]
+        },
+        'test': 'webview_trichrome_64_cts_tests',
       },
     },
 
@@ -5684,7 +5768,6 @@
 
     'chromeos_vm_gtests': [
       'chromeos_browser_all_tast_tests',
-      'chromeos_browser_finch_tests',
       'chromeos_browser_integration_tests',
       'chromeos_system_friendly_gtests',
     ],
@@ -6090,11 +6173,6 @@
       'gpu_desktop_specific_gtests',
     ],
 
-    'gpu_fuchsia_telemetry_experimental_tests': [
-      'gpu_fuchsia_common_telemetry_tests',
-      'gpu_mediapipe_validating_telemetry_tests',
-    ],
-
     'gpu_fuchsia_telemetry_tests': [
       'gpu_validating_telemetry_tests',
     ],
@@ -6443,6 +6521,11 @@
       'webview_ui_instrumentation_tests_no_field_trial',
     ],
 
+    'webview_trichrome_64_cts_gtests': [
+      'webview_trichrome_64_cts_tests',
+      'webview_trichrome_64_cts_tests_no_field_trial',
+    ],
+
     'win_specific_isolated_scripts_and_sizes': [
       'chrome_sizes',
       'win_specific_isolated_scripts',
@@ -6479,7 +6562,11 @@
       'webview_ui_instrumentation_tests': {},
     },
 
-    'android_12_13_emulator_gtests': {
+    'android_12_emulator_fyi_gtests': {
+      'oop_network_service_tests': {},
+    },
+
+    'android_12_emulator_gtests': {
       'android_emulator_specific_chrome_public_tests': {},
       'android_monochrome_smoke_tests': {},
       'android_smoke_tests': {},
@@ -6497,10 +6584,6 @@
       'webview_ui_instrumentation_tests': {},
     },
 
-    'android_12_emulator_fyi_gtests': {
-      'oop_network_service_tests': {},
-    },
-
     'android_12l_emulator_gtests': {
       'android_emulator_specific_chrome_public_tests': {},
       'android_monochrome_smoke_tests': {},
@@ -6510,6 +6593,25 @@
       'chromium_gtests_for_devices_with_graphical_output': {},
       'linux_flavor_specific_chromium_gtests': {},
       'system_webview_shell_instrumentation_tests': {}, # Not an experimental test
+      'webview_ui_instrumentation_tests': {},
+    },
+
+    'android_13_emulator_gtests': {
+      'android_emulator_specific_chrome_public_tests': {},
+      'android_monochrome_smoke_tests': {},
+      'android_smoke_tests': {},
+      'android_specific_chromium_gtests': {},  # Already includes gl_gtests.
+      'chromium_gtests': {},
+      'chromium_gtests_for_devices_with_graphical_output': {},
+      'linux_flavor_specific_chromium_gtests': {},
+      'system_webview_shell_instrumentation_tests': {}, # Not an experimental test
+      'webview_trichrome_64_cts_tests': {
+        'variants': [
+          'WEBVIEW_TRICHROME_FULL_CTS_TESTS',
+          'WEBVIEW_TRICHROME_INSTANT_CTS_TESTS',
+        ]
+      },
+      'webview_trichrome_64_cts_tests_no_field_trial': {},
       'webview_ui_instrumentation_tests': {},
     },
 

@@ -60,6 +60,7 @@
 #include "content/browser/renderer_host/pending_beacon_host.h"
 #include "content/browser/renderer_host/policy_container_host.h"
 #include "content/browser/renderer_host/render_widget_host_impl.h"
+#include "content/browser/renderer_host/runtime_feature_state_controller_impl.h"
 #include "content/browser/renderer_host/transient_allow_popup.h"
 #include "content/browser/site_instance_group.h"
 #include "content/browser/site_instance_impl.h"
@@ -144,6 +145,7 @@
 #include "third_party/blink/public/mojom/portal/portal.mojom-forward.h"
 #include "third_party/blink/public/mojom/presentation/presentation.mojom-forward.h"
 #include "third_party/blink/public/mojom/render_accessibility.mojom.h"
+#include "third_party/blink/public/mojom/runtime_feature_state/runtime_feature_state_controller.mojom.h"
 #include "third_party/blink/public/mojom/security_context/insecure_request_policy.mojom-forward.h"
 #include "third_party/blink/public/mojom/sms/webotp_service.mojom-forward.h"
 #include "third_party/blink/public/mojom/speech/speech_synthesis.mojom-forward.h"
@@ -225,6 +227,9 @@ CONTENT_EXPORT BASE_DECLARE_FEATURE(
 
 // Feature to evict when accessibility events occur while in back/forward cache.
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kEvictOnAXEvents);
+
+// Feature to make SpeechSynthesis no longer block back/forward cache.
+CONTENT_EXPORT BASE_DECLARE_FEATURE(kUnblockSpeechSynthesisForBFCache);
 }  // namespace features
 
 namespace content {
@@ -265,6 +270,7 @@ class RenderFrameProxyHost;
 class RenderProcessHost;
 class RenderViewHostImpl;
 class RenderWidgetHostView;
+class RuntimeFeatureStateControllerImpl;
 class ServiceWorkerContainerHost;
 class SiteInfo;
 class SpeechSynthesisImpl;
@@ -2007,6 +2013,10 @@ class CONTENT_EXPORT RenderFrameHostImpl
       mojo::PendingReceiver<blink::mojom::NonAssociatedLocalFrameHost>
           receiver);
 
+  void CreateRuntimeFeatureStateController(
+      mojo::PendingReceiver<blink::mojom::RuntimeFeatureStateController>
+          receiver);
+
   // Prerender2:
   // Tells PrerenderHostRegistry to cancel the prerendering of the page this
   // frame is in, which destroys this frame.
@@ -2058,9 +2068,6 @@ class CONTENT_EXPORT RenderFrameHostImpl
   }
 
   bool IsCredentialless() const override;
-
-  void AddObserver(RenderFrameHostObserver* observer) override;
-  void RemoveObserver(RenderFrameHostObserver* observer) override;
 
   bool is_fenced_frame_root_originating_from_opaque_url() const {
     return is_fenced_frame_root_originating_from_opaque_url_;
@@ -2310,6 +2317,10 @@ class CONTENT_EXPORT RenderFrameHostImpl
       const std::string& event_data,
       const std::string& event_type,
       blink::FencedFrame::ReportingDestination destination) override;
+  void SetFencedFrameAutomaticBeaconReportEventData(
+      const std::string& event_data,
+      const std::vector<blink::FencedFrame::ReportingDestination>& destination)
+      override;
   void CreatePortal(
       mojo::PendingAssociatedReceiver<blink::mojom::Portal> pending_receiver,
       mojo::PendingAssociatedRemote<blink::mojom::PortalClient> client,
@@ -2782,6 +2793,11 @@ class CONTENT_EXPORT RenderFrameHostImpl
   // queried while attempting to close the current tab/window.  Should only be
   // used on primary main frames.
   bool IsPageReadyToBeClosed();
+
+  // Checks Blink runtime-enabled features (BREF) to create and return
+  // a CookieSettingOverrides pertaining to the last committed document in the
+  // frame. Can only be called on a frame with a committed navigation.
+  net::CookieSettingOverrides GetCookieSettingOverrides();
 
  protected:
   friend class RenderFrameHostFactory;
@@ -4222,6 +4238,10 @@ class CONTENT_EXPORT RenderFrameHostImpl
   // Hosts blink::mojom::PushMessaging for the RenderFrame.
   std::unique_ptr<PushMessagingManager> push_messaging_manager_;
 
+  // Hosts blink::mojom::RuntimeFeatureStateController for the RenderFrame.
+  std::unique_ptr<RuntimeFeatureStateControllerImpl>
+      runtime_feature_state_controller_;
+
   // Hosts blink::mojom::SpeechSynthesis for the RenderFrame.
   std::unique_ptr<SpeechSynthesisImpl> speech_synthesis_impl_;
 
@@ -4770,9 +4790,6 @@ class CONTENT_EXPORT RenderFrameHostImpl
   // and it's meant to generally be stable for the FTN lifetime, but is allowed
   // to change across MPArch activations like prerendering.
   const base::UnguessableToken devtools_frame_token_;
-
-  // The observers watching our state changed event.
-  base::ObserverList<RenderFrameHostObserver> observers_;
 
   // BrowserInterfaceBroker implementation through which this
   // RenderFrameHostImpl exposes document-scoped Mojo services to the currently

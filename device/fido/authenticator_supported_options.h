@@ -8,6 +8,7 @@
 #include "base/component_export.h"
 #include "components/cbor/values.h"
 #include "device/fido/fido_constants.h"
+#include "third_party/abseil-cpp/absl/types/optional.h"
 
 namespace device {
 
@@ -37,6 +38,13 @@ struct COMPONENT_EXPORT(DEVICE_FIDO) AuthenticatorSupportedOptions {
     kNotSupported
   };
 
+  enum class PlatformDevice {
+    kNo,
+    kYes,
+    // kBoth authenticators may forward requests to both types of device.
+    kBoth,
+  };
+
   AuthenticatorSupportedOptions();
   AuthenticatorSupportedOptions(const AuthenticatorSupportedOptions& other);
   AuthenticatorSupportedOptions& operator=(
@@ -44,8 +52,9 @@ struct COMPONENT_EXPORT(DEVICE_FIDO) AuthenticatorSupportedOptions {
   ~AuthenticatorSupportedOptions();
 
   // Indicates that the authenticator is attached to the client and therefore
-  // can't be removed and used on another client.
-  bool is_platform_device = false;
+  // can't be removed and used on another client. If `kBoth` then the
+  // authenticator handles both types of requests (e.g. Windows Hello).
+  PlatformDevice is_platform_device = PlatformDevice::kNo;
   // Indicates that the authenticator is capable of storing keys on the
   // authenticator itself
   // and therefore can satisfy the authenticatorGetAssertion request with
@@ -106,6 +115,9 @@ struct COMPONENT_EXPORT(DEVICE_FIDO) AuthenticatorSupportedOptions {
   // If true, indicates that the authenticator supports the minPinLength
   // extension.
   bool supports_min_pin_length_extension = false;
+  // max_cred_blob_length is the longest credBlob value that this authenticator
+  // can store. A value of `nullopt` indicates no support for credBlob.
+  absl::optional<uint16_t> max_cred_blob_length;
 };
 
 COMPONENT_EXPORT(DEVICE_FIDO)

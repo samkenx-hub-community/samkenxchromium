@@ -8,6 +8,7 @@
 #include "chrome/browser/ui/browser_content_setting_bubble_model_delegate.h"
 #include "chrome/browser/ui/browser_finder.h"
 #include "chrome/browser/ui/color/chrome_color_id.h"
+#include "chrome/browser/ui/layout_constants.h"
 #include "chrome/browser/ui/views/chrome_layout_provider.h"
 #include "chrome/browser/ui/views/chrome_typography.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
@@ -67,9 +68,6 @@ constexpr int kFrameBorderThickness = 4;
 
 constexpr int kResizeBorder = 10;
 constexpr int kResizeAreaCornerSize = 16;
-
-// The window has a smaller minimum size than normal Chrome windows.
-constexpr gfx::Size kMinWindowSize(300, 300);
 
 // The time duration that the top bar animation will take in total.
 constexpr base::TimeDelta kAnimationDuration = base::Milliseconds(250);
@@ -276,6 +274,11 @@ PictureInPictureBrowserFrameView::PictureInPictureBrowserFrameView(
                                        views::MaximumFlexSizeRule::kUnbounded))
           .Build());
 
+  // Creates a container view for the top right buttons to handle the button
+  // animations.
+  button_container_view_ = top_bar_container_view_->AddChildView(
+      std::make_unique<views::FlexLayoutView>());
+
   // Creates the content setting models. Currently we only support camera and
   // microphone settings.
   constexpr ContentSettingImageModel::ImageType kContentSettingImageOrder[] = {
@@ -284,12 +287,7 @@ PictureInPictureBrowserFrameView::PictureInPictureBrowserFrameView(
   for (auto type : kContentSettingImageOrder)
     models.push_back(ContentSettingImageModel::CreateForContentType(type));
 
-  // Creates a container view for the top right buttons to handle the button
-  // animations.
-  button_container_view_ = top_bar_container_view_->AddChildView(
-      std::make_unique<views::FlexLayoutView>());
-
-  // Creates the content setting views.
+  // Creates the content setting views based on the models.
   for (auto& model : models) {
     auto image_view = std::make_unique<ContentSettingImageView>(
         std::move(model), this, this, font_list);
@@ -368,6 +366,15 @@ gfx::Rect PictureInPictureBrowserFrameView::GetBoundsForTabStripRegion(
   return gfx::Rect();
 }
 
+gfx::Rect PictureInPictureBrowserFrameView::GetBoundsForWebAppFrameToolbar(
+    const gfx::Size& toolbar_preferred_size) const {
+  return gfx::Rect();
+}
+
+void PictureInPictureBrowserFrameView::LayoutWebAppWindowTitle(
+    const gfx::Rect& available_space,
+    views::Label& window_title_label) const {}
+
 int PictureInPictureBrowserFrameView::GetTopInset(bool restored) const {
   return GetTopAreaHeight();
 }
@@ -441,7 +448,7 @@ void PictureInPictureBrowserFrameView::UpdateWindowIcon() {
 }
 
 gfx::Size PictureInPictureBrowserFrameView::GetMinimumSize() const {
-  return kMinWindowSize;
+  return PictureInPictureWindowManager::GetMinimumWindowSize();
 }
 
 gfx::Size PictureInPictureBrowserFrameView::GetMaximumSize() const {
@@ -450,7 +457,7 @@ gfx::Size PictureInPictureBrowserFrameView::GetMaximumSize() const {
 
   auto display = display::Screen::GetScreen()->GetDisplayNearestWindow(
       GetWidget()->GetNativeWindow());
-  return gfx::ScaleToRoundedSize(display.size(), 0.8);
+  return PictureInPictureWindowManager::GetMaximumWindowSize(display);
 }
 
 void PictureInPictureBrowserFrameView::OnThemeChanged() {
@@ -618,7 +625,7 @@ ui::ImageModel PictureInPictureBrowserFrameView::GetLocationIcon(
 SkColor
 PictureInPictureBrowserFrameView::GetIconLabelBubbleSurroundingForegroundColor()
     const {
-  return GetColorProvider()->GetColor(kColorOmniboxSecurityChipSecure);
+  return GetColorProvider()->GetColor(kColorPipWindowForeground);
 }
 
 SkColor PictureInPictureBrowserFrameView::GetIconLabelBubbleBackgroundColor()
@@ -780,8 +787,22 @@ LocationIconView* PictureInPictureBrowserFrameView::GetLocationIconView() {
 }
 
 void PictureInPictureBrowserFrameView::UpdateContentSettingsIcons() {
+  const auto kButtonContainerViewWithCameraButtonInsets =
+      gfx::Insets::TLBR(0, 0, 0, GetLayoutConstant(TAB_AFTER_TITLE_PADDING));
+  const auto kButtonContainerViewInsets =
+      gfx::Insets::VH(0, GetLayoutConstant(TAB_AFTER_TITLE_PADDING));
+
   for (auto* view : content_setting_views_) {
     view->Update();
+
+    // Currently the only content setting view we have is for camera and
+    // microphone settings, and we add margin insets based on its visibility to
+    // the button container view to be consistent with the normal browser
+    // window.
+    button_container_view_->SetProperty(
+        views::kMarginsKey,
+        (view->GetVisible() ? kButtonContainerViewWithCameraButtonInsets
+                            : kButtonContainerViewInsets));
   }
 }
 

@@ -704,7 +704,7 @@
         ],
         'os_type': 'android',
         'test_suites': {
-          'gtest_tests': 'android_12_13_emulator_gtests',
+          'gtest_tests': 'android_12_emulator_gtests',
         }
       },
       'android-12l-x64-dbg-tests': {
@@ -730,7 +730,7 @@
         ],
         'os_type': 'android',
         'test_suites': {
-          'gtest_tests': 'android_12_13_emulator_gtests',
+          'gtest_tests': 'android_13_emulator_gtests',
         }
       },
       'android-arm64-proguard-rel': {
@@ -1132,6 +1132,19 @@
         'os_type': 'android',
         'test_suites': {
           'gtest_tests': 'webview_bot_all_gtests',
+        }
+      },
+      'android-webview-13-x64-dbg-tests': {
+        'mixins': [
+          '13-x64-emulator',
+          'emulator-8-cores',
+          'has_native_resultdb_integration',
+          'linux-bionic',
+          'x86-64',
+        ],
+        'os_type': 'android',
+        'test_suites': {
+          'gtest_tests': 'webview_trichrome_64_cts_gtests',
         }
       },
       'android-webview-pie-x86-wpt-fyi-rel': {
@@ -2067,7 +2080,7 @@
   },
   {
     'name': 'chromium.coverage',
-    'mixins': [],
+    'mixins': ['chromium-tester-service-account'],
     'machines': {
       'android-code-coverage': {
         'mixins': [
@@ -2572,7 +2585,7 @@
         'additional_compile_targets': ['blink_tests'],
         'test_suites': {
           'gtest_tests': 'blink_unittests',
-          'isolated_scripts': 'devtools_webkit_isolated_scripts',
+          'isolated_scripts': 'devtools_webkit_and_tab_target_isolated_scripts',
         },
       },
     },
@@ -2740,28 +2753,6 @@
           ],
         },
         'test_suites': {
-          'gtest_tests': 'fuchsia_chrome_large_gtests',
-        },
-      },
-      'fuchsia-x64-workstation': {
-        'browser_config': 'fuchsia-chrome',
-        'os_type': 'fuchsia',
-        'mixins': [
-          'fuchsia-test-workstation',
-          'linux-bionic',
-        ],
-        'swarming': {
-          'dimension_sets': [
-            {
-              'kvm': '1',
-            },
-          ],
-        },
-        'test_suites': {
-          # TODO(crbug.com/1372220): Consider running all telemetry tests.
-          'gpu_telemetry_tests': 'gpu_fuchsia_telemetry_experimental_tests',
-          # TODO(crbug.com/1372220): Consider running more gtests here, Ideally
-          # "fuchsia_gtests".
           'gtest_tests': 'fuchsia_chrome_large_gtests',
         },
       },
@@ -5232,7 +5223,7 @@
       },
       'WebKit Linux MSAN': {
         'mixins': [
-          'linux-bionic',
+          'linux-focal',
         ],
         'test_suites': {
           'isolated_scripts': 'chromium_webkit_isolated_scripts',
@@ -5539,7 +5530,7 @@
         'test_suites': {
           'gtest_tests': 'rust_gtests',
           # Currently `can_build_rust_unit_tests` is false on Android (because
-          # `rustc_can_link` is false).
+          # we need to construct an APK instead of compile an exe).
           # TODO(https://crbug.com/1260120): Cover `rust_native_tests` here.
         },
       },
@@ -5552,7 +5543,7 @@
         'test_suites': {
           'gtest_tests': 'rust_gtests',
           # Currently `can_build_rust_unit_tests` is false on Android (because
-          # `rustc_can_link` is false).
+          # we need to construct an APK instead of compile an exe).
           # TODO(https://crbug.com/1260120): Cover `rust_native_tests` here.
         },
       },
@@ -5861,13 +5852,22 @@
           ]
         },
       },
-
-      # TODO(crbug.com/1381588, crbug.com/1405483): replace
-      # `updater_gtests_mac_user` with `updater_gtests_mac` once
-      # crbug.com/1394839 is resolved.
+      'mac12-arm64-updater-tester-rel': {
+        'swarming': {
+          'dimension_sets': [
+            {
+              'cpu': 'arm-64',
+              'os': 'Mac-12',
+            }
+          ]
+        },
+        'test_suites': {
+          'gtest_tests': 'updater_gtests_mac',
+        },
+      },
       'mac12-x64-updater-tester-asan-dbg': {
         'test_suites': {
-          'gtest_tests': 'updater_gtests_mac_user',
+          'gtest_tests': 'updater_gtests_mac',
         },
         'swarming': {
           'dimension_sets': [
@@ -5878,11 +5878,9 @@
           ]
         },
       },
-      # TODO(crbug.com/1405483): replace `updater_gtests_mac_user` with
-      # `updater_gtests_mac` once crbug.com/1394839 is resolved.
       'mac13-arm64-updater-tester-dbg': {
         'test_suites': {
-          'gtest_tests': 'updater_gtests_mac_user',
+          'gtest_tests': 'updater_gtests_mac',
         },
         'swarming': {
           'dimension_sets': [
@@ -5893,11 +5891,9 @@
           ]
         },
       },
-      # TODO(crbug.com/1405483): replace `updater_gtests_mac_user` with
-      # `updater_gtests_mac` once crbug.com/1394839 is resolved.
       'mac13-x64-updater-tester-rel': {
         'test_suites': {
-          'gtest_tests': 'updater_gtests_mac_user',
+          'gtest_tests': 'updater_gtests_mac',
         },
         'swarming': {
           'dimension_sets': [
@@ -6652,6 +6648,17 @@
           'isolated_scripts': 'chromeos_isolated_scripts',
         },
       },
+      'chromeos-betty-pi-arc-finch-smoke-chrome': {
+        'additional_compile_targets': [
+          'chromiumos_preflight',
+        ],
+        'mixins': [
+          'chromeos-betty-finch',
+        ],
+        'test_suites': {
+          'gtest_tests': 'chromeos_browser_finch_tests',
+        },
+      },
       'lacros-amd64-generic-chrome-fyi': {
         'additional_compile_targets': [
           'chrome',
@@ -6773,6 +6780,22 @@
       'mac12.0.arm64-blink-rel': {
         'mixins': [
           'mac_12_arm64',
+        ],
+        'test_suites': {
+          'isolated_scripts': 'chromium_webkit_isolated_scripts',
+        },
+      },
+      'mac13-blink-rel': {
+        'mixins': [
+          'mac_beta_x64',
+        ],
+        'test_suites': {
+          'isolated_scripts': 'chromium_webkit_isolated_scripts',
+        },
+      },
+      'mac13.arm64-blink-rel': {
+        'mixins': [
+          'mac_beta_arm64',
         ],
         'test_suites': {
           'isolated_scripts': 'chromium_webkit_isolated_scripts',

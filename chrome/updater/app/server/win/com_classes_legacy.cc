@@ -322,16 +322,18 @@ class AppWebImpl : public IDispatchImpl<IAppWeb> {
 
   // Invokes the in-process update service on the main sequence. Forwards the
   // callbacks to a sequenced task runner. |obj| is bound to this object.
-  HRESULT CheckForUpdate() {
+  HRESULT Update(bool do_update_check_only) {
     using AppWebImplPtr = Microsoft::WRL::ComPtr<AppWebImpl>;
     scoped_refptr<ComServerApp> com_server = AppServerSingletonInstance();
     com_server->main_task_runner()->PostTask(
         FROM_HERE,
         base::BindOnce(
-            [](scoped_refptr<UpdateService> update_service, AppWebImplPtr obj) {
+            [](scoped_refptr<UpdateService> update_service, AppWebImplPtr obj,
+               bool do_update_check_only) {
               update_service->Update(
                   obj->app_id_, "", UpdateService::Priority::kForeground,
                   UpdateService::PolicySameVersionUpdate::kNotAllowed,
+                  do_update_check_only,
                   base::BindRepeating(
                       [](AppWebImplPtr obj,
                          const UpdateService::UpdateState& state_update) {
@@ -350,7 +352,8 @@ class AppWebImpl : public IDispatchImpl<IAppWeb> {
                       },
                       obj));
             },
-            com_server->update_service(), AppWebImplPtr(this)));
+            com_server->update_service(), AppWebImplPtr(this),
+            do_update_check_only));
     return S_OK;
   }
 
@@ -588,15 +591,23 @@ class AppBundleWebImpl : public IDispatchImpl<IAppBundleWeb> {
     if (!app_web_)
       return E_UNEXPECTED;
 
-    return app_web_->CheckForUpdate();
+    return app_web_->Update(/*do_update_check_only=*/true);
   }
 
   IFACEMETHODIMP download() override {
-    LOG(ERROR) << "Reached unimplemented COM method: " << __func__;
-    return E_NOTIMPL;
+    VLOG(1) << "`install()` implements the download: " << __func__;
+    return S_OK;
   }
 
-  IFACEMETHODIMP install() override { return S_OK; }
+  IFACEMETHODIMP install() override {
+    base::AutoLock lock{lock_};
+
+    if (!app_web_) {
+      return E_UNEXPECTED;
+    }
+
+    return app_web_->Update(/*do_update_check_only=*/false);
+  }
 
   IFACEMETHODIMP pause() override {
     LOG(ERROR) << "Reached unimplemented COM method: " << __func__;

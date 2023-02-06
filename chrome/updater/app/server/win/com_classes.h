@@ -109,6 +109,7 @@ class UpdaterImpl : public DynamicIIDsImpl<IUpdater,
                         const wchar_t* install_data_index,
                         LONG priority,
                         BOOL same_version_update_allowed,
+                        BOOL do_update_check_only,
                         IUpdaterObserver* observer) override;
   IFACEMETHODIMP UpdateAll(IUpdaterObserver* observer) override;
   IFACEMETHODIMP Install(const wchar_t* app_id,

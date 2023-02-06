@@ -121,11 +121,9 @@ CameraEffectsController::CameraEffectsController() {
           // The callback passed to CameraHalDispatcherImpl will be called on a
           // different thread inside CameraHalDispatcherImpl, so we need always
           // post the callback onto current task runner.
-          base::BindPostTask(
-              base::SequencedTaskRunner::GetCurrentDefault(),
-              base::BindRepeating(
-                  &CameraEffectsController::OnNewCameraEffectsSet,
-                  weak_factory_.GetWeakPtr())));
+          base::BindPostTaskToCurrentDefault(base::BindRepeating(
+              &CameraEffectsController::OnNewCameraEffectsSet,
+              weak_factory_.GetWeakPtr())));
 }
 
 CameraEffectsController::~CameraEffectsController() {
@@ -467,8 +465,9 @@ void CameraEffectsController::AddBackgroundBlurStateToEffect(
     int state_value,
     int string_id) {
   DCHECK(effect);
+  // TODO(b/265200087): Replace the icon with the proper icon per effect.
   effect->AddState(std::make_unique<VcEffectState>(
-      /*icon=*/nullptr,
+      /*icon=*/&ash::kPrivacyIndicatorsCameraIcon,
       /*label_text=*/l10n_util::GetStringUTF16(string_id),
       /*accessible_name_id=*/string_id,
       /*button_callback=*/

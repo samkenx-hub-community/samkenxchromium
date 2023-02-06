@@ -116,6 +116,7 @@ class CORE_EXPORT CSSSelector {
   ~CSSSelector();
 
   String SelectorText() const;
+  String SimpleSelectorTextForDebug() const;
 
   CSSSelector& operator=(const CSSSelector&) = delete;
   CSSSelector& operator=(CSSSelector&&);
@@ -242,6 +243,9 @@ class CORE_EXPORT CSSSelector {
     kPseudoOnlyOfType,
     kPseudoOptional,
     kPseudoParent,  // Written as & (in nested rules).
+    // Something that was unparsable, but contained a & and thus must be kept
+    // for serialization purposes.
+    kPseudoParentUnparsed,
     kPseudoPart,
     kPseudoPlaceholder,
     kPseudoPlaceholderShown,
@@ -341,6 +345,7 @@ class CORE_EXPORT CSSSelector {
                         const CSSParserContext&,
                         bool has_arguments,
                         CSSParserMode);
+  void SetUnparsedPlaceholder(const AtomicString&);
   void UpdatePseudoPage(const AtomicString&, const Document*);
   static PseudoType NameToPseudoType(const AtomicString&,
                                      bool has_arguments,
@@ -504,6 +509,7 @@ class CORE_EXPORT CSSSelector {
 
   unsigned SpecificityForOneSelector() const;
   unsigned SpecificityForPage() const;
+  bool SerializeSimpleSelector(StringBuilder& builder) const;
   const CSSSelector* SerializeCompound(StringBuilder&) const;
 
   struct RareData : public GarbageCollected<RareData> {

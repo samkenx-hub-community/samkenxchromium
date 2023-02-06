@@ -49,7 +49,6 @@
 #include "net/test/gtest_util.h"
 #include "net/test/test_data_directory.h"
 #include "net/test/test_with_task_environment.h"
-#include "net/third_party/quiche/src/quiche/quic/core/crypto/null_encrypter.h"
 #include "net/third_party/quiche/src/quiche/quic/core/quic_utils.h"
 #include "net/third_party/quiche/src/quiche/quic/test_tools/crypto_test_utils.h"
 #include "net/third_party/quiche/src/quiche/quic/test_tools/mock_clock.h"
@@ -95,34 +94,11 @@ static const int kLen333 = kLen3 + kLen3 + kLen3;
 static constexpr int k0ByteConnectionId = 0;
 static constexpr int k8ByteConnectionId = 8;
 
-struct TestParams {
-  quic::ParsedQuicVersion version;
-  bool client_headers_include_h2_stream_dependency;
-};
-
-// Used by ::testing::PrintToStringParamName().
-std::string PrintToString(const TestParams& p) {
-  return base::StrCat(
-      {ParsedQuicVersionToString(p.version), "_",
-       (p.client_headers_include_h2_stream_dependency ? "" : "No"),
-       "Dependency"});
-}
-
-std::vector<TestParams> GetTestParams() {
-  std::vector<TestParams> params;
-  quic::ParsedQuicVersionVector all_supported_versions =
-      quic::AllSupportedVersions();
-  for (const auto& version : all_supported_versions) {
-    params.push_back(TestParams{version, false});
-    params.push_back(TestParams{version, true});
-  }
-  return params;
-}
-
 }  // anonymous namespace
 
-class QuicProxyClientSocketTest : public ::testing::TestWithParam<TestParams>,
-                                  public WithTaskEnvironment {
+class QuicProxyClientSocketTest
+    : public ::testing::TestWithParam<quic::ParsedQuicVersion>,
+      public WithTaskEnvironment {
  protected:
   static const bool kFin = true;
   static const bool kIncludeVersion = true;
@@ -145,7 +121,7 @@ class QuicProxyClientSocketTest : public ::testing::TestWithParam<TestParams>,
             : quiche::VARIABLE_LENGTH_INTEGER_LENGTH_0;
     size_t min_data_length = 1;
     size_t min_packet_length =
-        quic::NullEncrypter(quic::Perspective::IS_CLIENT)
+        quic::test::TaggingEncrypter(quic::ENCRYPTION_FORWARD_SECURE)
             .GetCiphertextSize(min_data_length) +
         quic::QuicPacketCreator::StreamFramePacketOverhead(
             version.transport_version, k8ByteConnectionId, k0ByteConnectionId,
@@ -158,7 +134,7 @@ class QuicProxyClientSocketTest : public ::testing::TestWithParam<TestParams>,
   }
 
   QuicProxyClientSocketTest()
-      : version_(GetParam().version),
+      : version_(GetParam()),
         client_data_stream_id1_(
             quic::VersionUsesHttp3(version_.transport_version)
                 ? quic::QuicUtils::GetFirstBidirectionalStreamId(
@@ -169,8 +145,6 @@ class QuicProxyClientSocketTest : public ::testing::TestWithParam<TestParams>,
                       quic::Perspective::IS_CLIENT) +
                       quic::QuicUtils::StreamIdDelta(
                           version_.transport_version)),
-        client_headers_include_h2_stream_dependency_(
-            GetParam().client_headers_include_h2_stream_dependency),
         mock_quic_data_(version_),
         crypto_config_(
             quic::test::crypto_test_utils::ProofVerifierForTesting()),
@@ -179,8 +153,7 @@ class QuicProxyClientSocketTest : public ::testing::TestWithParam<TestParams>,
                       connection_id_,
                       &clock_,
                       kProxyHost,
-                      quic::Perspective::IS_CLIENT,
-                      client_headers_include_h2_stream_dependency_),
+                      quic::Perspective::IS_CLIENT),
         server_maker_(version_,
                       connection_id_,
                       &clock_,
@@ -285,8 +258,7 @@ class QuicProxyClientSocketTest : public ::testing::TestWithParam<TestParams>,
         kQuicYieldAfterPacketsRead,
         quic::QuicTime::Delta::FromMilliseconds(
             kQuicYieldAfterDurationMilliseconds),
-        client_headers_include_h2_stream_dependency_, /*cert_verify_flags=*/0,
-        quic::test::DefaultQuicConfig(),
+        /*cert_verify_flags=*/0, quic::test::DefaultQuicConfig(),
         std::make_unique<TestQuicCryptoClientConfigHandle>(&crypto_config_),
         "CONNECTION_UNKNOWN", dns_start, dns_end,
         std::make_unique<quic::QuicClientPushPromiseIndex>(), nullptr,
@@ -389,7 +361,7 @@ class QuicProxyClientSocketTest : public ::testing::TestWithParam<TestParams>,
     return client_maker_.MakeRequestHeadersPacket(
         packet_number, client_data_stream_id1_, kIncludeVersion, !kFin,
         ConvertRequestPriorityToQuicPriority(request_priority),
-        std::move(block), 0, nullptr);
+        std::move(block), nullptr);
   }
 
   std::unique_ptr<quic::QuicReceivedPacket>
@@ -407,7 +379,7 @@ class QuicProxyClientSocketTest : public ::testing::TestWithParam<TestParams>,
     return client_maker_.MakeRequestHeadersPacket(
         packet_number, client_data_stream_id1_, kIncludeVersion, !kFin,
         ConvertRequestPriorityToQuicPriority(request_priority),
-        std::move(block), 0, nullptr);
+        std::move(block), nullptr);
   }
 
   std::unique_ptr<quic::QuicReceivedPacket> ConstructConnectAuthRequestPacket(
@@ -419,7 +391,7 @@ class QuicProxyClientSocketTest : public ::testing::TestWithParam<TestParams>,
     return client_maker_.MakeRequestHeadersPacket(
         packet_number, client_data_stream_id1_, kIncludeVersion, !kFin,
         ConvertRequestPriorityToQuicPriority(request_priority),
-        std::move(block), 0, nullptr);
+        std::move(block), nullptr);
   }
 
   std::unique_ptr<quic::QuicReceivedPacket> ConstructDataPacket(
@@ -617,7 +589,6 @@ class QuicProxyClientSocketTest : public ::testing::TestWithParam<TestParams>,
   quic::test::QuicFlagSaver saver_;
   const quic::ParsedQuicVersion version_;
   const quic::QuicStreamId client_data_stream_id1_;
-  const bool client_headers_include_h2_stream_dependency_;
 
   // order of destruction of these members matter
   quic::MockClock clock_;
@@ -1101,8 +1072,8 @@ TEST_P(QuicProxyClientSocketTest, WriteSplitsLargeDataIntoMultiplePackets) {
         !kIncludeDiversificationNonce, k8ByteConnectionId,
         quic::PACKET_1BYTE_PACKET_NUMBER, offset);
     if (version_.HasIetfQuicFrames() && i == 0) {
-      // 3673 is the data frame length from packet length.
-      std::string header2 = ConstructDataHeader(3673);
+      // 3661 is the data frame length from packet length.
+      std::string header2 = ConstructDataHeader(3661);
       mock_quic_data_.AddWrite(
           SYNCHRONOUS,
           ConstructDataPacket(
@@ -2091,7 +2062,7 @@ TEST_P(QuicProxyClientSocketTest, RstWithReadAndWritePendingDelete) {
 
 INSTANTIATE_TEST_SUITE_P(VersionIncludeStreamDependencySequence,
                          QuicProxyClientSocketTest,
-                         ::testing::ValuesIn(GetTestParams()),
+                         ::testing::ValuesIn(quic::AllSupportedVersions()),
                          ::testing::PrintToStringParamName());
 
 }  // namespace net::test

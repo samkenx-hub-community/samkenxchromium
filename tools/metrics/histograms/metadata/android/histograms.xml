@@ -601,7 +601,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Android.BiometricAuth.AuthRequester"
-    enum="BiometricAuthRequester" expires_after="M112">
+    enum="BiometricAuthRequester" expires_after="M118">
   <owner>ioanap@chromium.org</owner>
   <owner>fhorschig@chromium.org</owner>
   <summary>
@@ -1230,7 +1230,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Android.DragDrop.FromWebContent.DropInWebContent.Duration"
-    units="ms" expires_after="2023-05-27">
+    units="ms" expires_after="2023-07-30">
   <owner>wenyufu@chromium.org</owner>
   <owner>clank-large-form-factors@google.com</owner>
   <summary>
@@ -1343,7 +1343,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Android.DragDrop.Image.Size" units="KB"
-    expires_after="2023-05-27">
+    expires_after="2023-07-30">
   <owner>shuyng@google.com</owner>
   <owner>clank-large-form-factors@google.com</owner>
   <summary>
@@ -1354,7 +1354,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Android.DragDrop.Image.UriCreatedInterval" units="ms"
-    expires_after="2023-05-27">
+    expires_after="2023-07-30">
   <owner>shuyng@google.com</owner>
   <owner>clank-large-form-factors@google.com</owner>
   <summary>
@@ -1498,7 +1498,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Android.FontLookup.Blink.DLFontsLatencySuccess2"
-    units="microseconds" expires_after="2023-05-27">
+    units="microseconds" expires_after="2023-07-30">
   <owner>drott@chromium.org</owner>
   <owner>layout-dev@chromium.org</owner>
   <summary>
@@ -1768,13 +1768,13 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
-<histogram name="Android.Intent.ShouldIgnoreNewTabResult"
-    enum="NavigationInterceptResult" expires_after="2023-11-07">
+<histogram name="Android.Intent.ShareIntentUrlCount" units="URLs"
+    expires_after="2024-02-01">
   <owner>mthiesse@chromium.org</owner>
-  <owner>yfriedman@chromium.org</owner>
+  <owner>tedchoc@google.com</owner>
   <summary>
-    Records the result of Navigation Interception for popup navigations from
-    Tabs.
+    Number of URLs present in Text Share intents (ACTION_SEND) received by
+    Chrome.
   </summary>
 </histogram>
 
@@ -2568,9 +2568,8 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Android.Omnibox.SuggestionsListScrolled.{PageClass}"
-    enum="Boolean" expires_after="2023-01-31">
+    enum="Boolean" expires_after="2024-02-01">
   <owner>ender@chromium.org</owner>
-  <owner>mpearson@chromium.org</owner>
   <owner>jdonnelly@chromium.org</owner>
   <summary>
     For every interaction with the Omnibox, this metric records whether the user
@@ -3111,9 +3110,7 @@ chromium-metrics-reviews@google.com.
 <histogram name="Android.PrepareMenu.OpenWebApkVisibilityCheck" units="ms"
     expires_after="2023-06-01">
   <owner>hartmanng@chromium.org</owner>
-  <owner>
-    src/chrome/android/java/src/org/chromium/chrome/browser/webapps/OWNERS
-  </owner>
+  <owner>src/chrome/android/webapk/OWNERS</owner>
   <summary>
     Measures the amount of time spent querying for whether a WebAPK is already
     installed.
@@ -3140,6 +3137,16 @@ chromium-metrics-reviews@google.com.
     means Mobile site while true means Desktop site. This is recorded when a
     user manually edits a domain level Request Desktop Setting from the site
     settings exception list.
+  </summary>
+</histogram>
+
+<histogram name="Android.RequestDesktopSite.PerSiteIphDismissed.AppMenuOpened"
+    enum="Boolean" expires_after="2023-07-26">
+  <owner>aishwaryarj@google.com</owner>
+  <owner>shuyng@google.com</owner>
+  <summary>
+    Records if a user opened the app menu as a consequence of showing the
+    per-site IPH, emitted when the IPH is dismissed.
   </summary>
 </histogram>
 
@@ -3654,7 +3661,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Android.TabSwitcher.IncognitoClickedIsEmpty" enum="Boolean"
-    expires_after="2023-02-02">
+    expires_after="M115">
   <owner>roagarwal@chromium.org</owner>
   <owner>chrome-incognito@google.com</owner>
   <summary>
@@ -3853,7 +3860,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Android.WebView.Callback.Counts" enum="WebViewCallbackType"
-    expires_after="2023-05-27">
+    expires_after="2023-07-30">
   <owner>ntfschr@chromium.org</owner>
   <owner>src/android_webview/OWNERS</owner>
   <summary>Records the invocation count of WebView callbacks.</summary>
@@ -4276,7 +4283,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Android.WebView.Gfx.HardwareDrawType"
-    enum="WebViewDrawAndSubmissionType" expires_after="2023-05-27">
+    enum="WebViewDrawAndSubmissionType" expires_after="2023-07-30">
   <owner>vasilyt@chromium.org</owner>
   <owner>boliu@chromium.org</owner>
   <summary>
@@ -4288,7 +4295,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Android.WebView.InputStreamTime" units="ms"
-    expires_after="2023-05-27">
+    expires_after="2023-07-30">
   <owner>jam@chromium.org</owner>
   <owner>cduvall@chromium.org</owner>
   <summary>
@@ -4793,7 +4800,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Android.WebView.SecureCookieAction" enum="SecureCookieAction"
-    expires_after="2023-05-27">
+    expires_after="2023-07-30">
   <owner>ntfschr@chromium.org</owner>
   <owner>src/android_webview/OWNERS</owner>
   <summary>
@@ -4851,8 +4858,8 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Android.WebView.SitesVisitedWeekly" units="sites"
-    expires_after="2023-02-15">
-  <owner>bewise@chromium.org</owner>
+    expires_after="2023-12-15">
+  <owner>mvanouwerkerk@chromium.org</owner>
   <owner>src/android_webview/OWNERS</owner>
   <summary>
     Measures the count of distinct sites visited per week in WebView. This is

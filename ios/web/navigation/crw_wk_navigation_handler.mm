@@ -375,17 +375,30 @@ web::HttpsUpgradeType GetFailedHttpsUpgradeType(
     return;
   }
 
+  BOOL hasTappedRecently =
+      self.userInteractionState->HasUserTappedRecently(webView);
   BOOL userInteractedWithRequestMainFrame =
-      self.userInteractionState->HasUserTappedRecently(webView) &&
+      hasTappedRecently &&
       net::GURLWithNSURL(action.request.mainDocumentURL) ==
           self.userInteractionState->LastUserInteraction()->main_document_url;
   BOOL isCrossOriginTargetFrame = NO;
   if (action.sourceFrame && action.targetFrame &&
+      action.sourceFrame.webView == action.targetFrame.webView &&
       action.sourceFrame != action.targetFrame) {
     isCrossOriginTargetFrame = !url::IsSameOriginWith(
         web::GURLOriginWithWKSecurityOrigin(action.sourceFrame.securityOrigin),
         web::GURLOriginWithWKSecurityOrigin(action.targetFrame.securityOrigin));
   }
+
+  // Ref: crbug.com/1408799
+  if (base::FeatureList::IsEnabled(
+          web::features::kPreventNavigationWithoutUserInteraction) &&
+      isMainFrameNavigationAction && isCrossOriginTargetFrame &&
+      !hasTappedRecently) {
+    decisionHandler(WKNavigationActionPolicyCancel);
+    return;
+  }
+
   const web::WebStatePolicyDecider::RequestInfo requestInfo(
       transition, isMainFrameNavigationAction, isCrossOriginTargetFrame,
       userInteractedWithRequestMainFrame);

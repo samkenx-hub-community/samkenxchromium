@@ -291,6 +291,35 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
+<histogram name="Storage.Blob.RegisterURLTimeWithoutPartitioningSupport"
+    units="ms" expires_after="M115">
+  <owner>awillia@chromium.org</owner>
+  <owner>chrome-owp-storage@chromium.org</owner>
+  <summary>
+    Recorded when the PublicURLManager::RegisterURL method calls the per-process
+    BlobURLStore::Register mojo interface method. The value recorded is the time
+    taken for the call to complete. This histogram is only logged when the
+    SupportPartitionedBlobUrl feature is disabled.
+  </summary>
+</histogram>
+
+<histogram name="Storage.Blob.RegisterURLTimeWithPartitioningSupport.{Type}"
+    units="ms" expires_after="M115">
+  <owner>awillia@chromium.org</owner>
+  <owner>chrome-owp-storage@chromium.org</owner>
+  <summary>
+    Recorded when the PublicURLManager::RegisterURL method calls the
+    BlobURLStore::Register mojo interface method. The value recorded is the time
+    taken for the call to complete. This variation of the histogram records
+    results from {Type}. This histogram is only logged when the
+    SupportPartitionedBlobUrl feature is enabled.
+  </summary>
+  <token key="Type">
+    <variant name="Frame" summary="frame execution contexts"/>
+    <variant name="Worker" summary="worker execution contexts"/>
+  </token>
+</histogram>
+
 <histogram name="Storage.FileSystemAccess.PersistedPermissions.Age.{Type}"
     units="ms" expires_after="2024-05-01">
   <owner>asully@chromium.org</owner>
@@ -485,7 +514,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Storage.InterestGroup.DBSize" units="KB"
-    expires_after="2023-04-30">
+    expires_after="2023-07-30">
   <owner>behamilton@google.com</owner>
   <owner>pauljensen@chromium.org</owner>
   <summary>
@@ -495,7 +524,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Storage.InterestGroup.PerSiteCount" units="groups"
-    expires_after="2023-04-30">
+    expires_after="2023-07-30">
   <owner>behamilton@google.com</owner>
   <owner>pauljensen@chromium.org</owner>
   <summary>
@@ -1094,7 +1123,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Storage.StoragePressure.Bubble"
-    enum="StoragePressureBubbleUserAction" expires_after="2023-03-09">
+    enum="StoragePressureBubbleUserAction" expires_after="2024-02-01">
   <owner>ayui@chromium.org</owner>
   <owner>chrome-owp-storage@google.com</owner>
   <summary>

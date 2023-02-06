@@ -5,6 +5,7 @@
 #import "ios/chrome/browser/ui/autofill/chrome_autofill_client_ios.h"
 
 #import <utility>
+#import <vector>
 
 #import "base/check.h"
 #import "base/functional/bind.h"
@@ -148,9 +149,9 @@ ChromeAutofillClientIOS::GetAutocompleteHistoryManager() {
   return autocomplete_history_manager_;
 }
 
-CreditCardCVCAuthenticator* ChromeAutofillClientIOS::GetCVCAuthenticator() {
+CreditCardCvcAuthenticator* ChromeAutofillClientIOS::GetCvcAuthenticator() {
   if (!cvc_authenticator_)
-    cvc_authenticator_ = std::make_unique<CreditCardCVCAuthenticator>(this);
+    cvc_authenticator_ = std::make_unique<CreditCardCvcAuthenticator>(this);
   return cvc_authenticator_.get();
 }
 
@@ -391,9 +392,10 @@ bool ChromeAutofillClientIOS::IsFastCheckoutSupported() {
   return false;
 }
 
-bool ChromeAutofillClientIOS::TryToShowFastCheckout(const FormData& form,
-                                                    const FormFieldData& field,
-                                                    AutofillDriver* driver) {
+bool ChromeAutofillClientIOS::TryToShowFastCheckout(
+    const FormData& form,
+    const FormFieldData& field,
+    base::WeakPtr<AutofillManager> autofill_manager) {
   return false;
 }
 
@@ -430,10 +432,9 @@ void ChromeAutofillClientIOS::UpdateAutofillPopupDataListValues(
   // No op. ios/web_view does not support display datalist.
 }
 
-base::span<const Suggestion> ChromeAutofillClientIOS::GetPopupSuggestions()
-    const {
+std::vector<Suggestion> ChromeAutofillClientIOS::GetPopupSuggestions() const {
   NOTIMPLEMENTED();
-  return base::span<const Suggestion>();
+  return {};
 }
 
 void ChromeAutofillClientIOS::PinPopupView() {
@@ -486,10 +487,6 @@ void ChromeAutofillClientIOS::DidFillOrPreviewField(
 
 bool ChromeAutofillClientIOS::IsContextSecure() const {
   return IsContextSecureForWebState(web_state_);
-}
-
-bool ChromeAutofillClientIOS::ShouldShowSigninPromo() {
-  return false;
 }
 
 void ChromeAutofillClientIOS::ExecuteCommand(int id) {

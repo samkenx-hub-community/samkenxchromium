@@ -18,9 +18,10 @@
 #import "ios/chrome/browser/main/browser_list.h"
 #import "ios/chrome/browser/main/browser_list_factory.h"
 #import "ios/chrome/browser/main/browser_util.h"
+#import "ios/chrome/browser/snapshots/snapshot_tab_helper.h"
+#import "ios/chrome/browser/tabs/features.h"
 #import "ios/chrome/browser/ui/tab_switcher/tab_collection_consumer.h"
 #import "ios/chrome/browser/ui/tab_switcher/tab_collection_drag_drop_metrics.h"
-#import "ios/chrome/browser/ui/tab_switcher/tab_grid/pinned_tabs/features.h"
 #import "ios/chrome/browser/ui/tab_switcher/tab_switcher_item.h"
 #import "ios/chrome/browser/ui/tab_switcher/tab_utils.h"
 #import "ios/chrome/browser/url/url_util.h"
@@ -298,7 +299,14 @@ NSArray* CreatePinnedTabConsumerItems(WebStateList* web_state_list) {
 
 - (void)snapshotForIdentifier:(NSString*)identifier
                    completion:(void (^)(UIImage*))completion {
-  // TODO (crbug.com/1406524): Implement or remove.
+  web::WebState* webState =
+      GetWebState(self.webStateList, identifier, /*pinned=*/YES);
+  if (webState) {
+    SnapshotTabHelper::FromWebState(webState)->RetrieveColorSnapshot(
+        ^(UIImage* image) {
+          completion(image);
+        });
+  }
 }
 
 - (void)faviconForIdentifier:(NSString*)identifier
@@ -447,7 +455,8 @@ NSArray* CreatePinnedTabConsumerItems(WebStateList* web_state_list) {
         // Move tab across Browsers.
         base::UmaHistogramEnumeration(kUmaPinnedViewDragOrigin,
                                       DragItemOrigin::kOtherBrwoser);
-        MoveTabToBrowser(tabInfo.tabID, self.browser, destinationIndex);
+        MoveTabToBrowser(tabInfo.tabID, self.browser, destinationIndex,
+                         WebStateList::INSERT_PINNED);
         return;
       }
       base::UmaHistogramEnumeration(kUmaPinnedViewDragOrigin,

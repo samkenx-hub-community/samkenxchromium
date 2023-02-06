@@ -17,6 +17,7 @@ import {IronListElement} from 'chrome://resources/polymer/v3_0/iron-list/iron-li
 import {IronScrollThresholdElement} from 'chrome://resources/polymer/v3_0/iron-scroll-threshold/iron-scroll-threshold.js';
 import {afterNextRender} from 'chrome://resources/polymer/v3_0/polymer/polymer_bundled.min.js';
 
+import {isGooglePhotosSharedAlbumsEnabled} from '../load_time_booleans.js';
 import {dismissErrorAction, setErrorAction} from '../personalization_actions.js';
 import {CurrentWallpaper, GooglePhotosAlbum, GooglePhotosPhoto, WallpaperProviderInterface, WallpaperType} from '../personalization_app.mojom-webui.js';
 import {PersonalizationStateError} from '../personalization_state.js';
@@ -79,6 +80,13 @@ export class GooglePhotosPhotosByAlbumId extends WithPersonalizationStore {
       photosByAlbumIdLoading_: Object,
       photosByAlbumIdResumeTokens_: Object,
 
+      isSharedAlbumsEnabled_: {
+        type: Boolean,
+        value() {
+          return isGooglePhotosSharedAlbumsEnabled();
+        },
+      },
+
       error_: {
         type: Object,
         value: null,
@@ -123,6 +131,9 @@ export class GooglePhotosPhotosByAlbumId extends WithPersonalizationStore {
 
   /** The resume tokens needed to fetch the next page of photos by album id. */
   private photosByAlbumIdResumeTokens_: Record<string, string|null>|undefined;
+
+  /** Whether feature flag |kGooglePhotosSharedAlbums| is enabled. */
+  private isSharedAlbumsEnabled_: boolean;
 
   /** The current personalization error state. */
   private error_: PersonalizationStateError|null;
@@ -292,9 +303,39 @@ export class GooglePhotosPhotosByAlbumId extends WithPersonalizationStore {
     assert(e.model.photo, 'google photos album photo selected event has photo');
     if (!this.isPhotoPlaceholder_(e.model.photo)) {
       selectWallpaper(e.model.photo, this.wallpaperProvider_, this.getStore());
-      recordWallpaperGooglePhotosSourceUMA(WallpaperGooglePhotosSource.ALBUMS);
+      // Depends on whether shared albums feature is enabled, records Google
+      // Photos source metric for all albums, owned albums or shared albums
+      // accordingly.
+      if (!this.isSharedAlbumsEnabled_) {
+        recordWallpaperGooglePhotosSourceUMA(
+            WallpaperGooglePhotosSource.ALBUMS);
+      } else {
+        const isAlbumShared =
+            this.isAlbumShared_(this.albumId, this.albums_, this.albumsShared_);
+        if (isAlbumShared !== null) {
+          recordWallpaperGooglePhotosSourceUMA(
+              isAlbumShared ? WallpaperGooglePhotosSource.SHARED_ALBUMS :
+                              WallpaperGooglePhotosSource.OWNED_ALBUMS);
+        }
+      }
     }
   }
+
+  /** Checks whether an album with albumId id is a shared or owned album. */
+  private isAlbumShared_(
+      albumId: GooglePhotosPhotosByAlbumId['albumId'],
+      albums: GooglePhotosPhotosByAlbumId['albums_'],
+      albumsShared: GooglePhotosPhotosByAlbumId['albumsShared_']): boolean
+      |null {
+    if (findAlbumById(albumId, albums)) {
+      return false;
+    } else if (findAlbumById(albumId, albumsShared)) {
+      return true;
+    }
+    console.warn('No matching album id found. ', albumId);
+    return null;
+  }
+
 
   /** Returns the aria label for the specified |photo|. */
   private getPhotoAriaLabel_(photo: GooglePhotosPhoto|null): string|undefined {

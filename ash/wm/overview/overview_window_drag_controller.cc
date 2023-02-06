@@ -13,7 +13,8 @@
 #include "ash/screen_util.h"
 #include "ash/shell.h"
 #include "ash/utility/haptics_util.h"
-#include "ash/wm/desks/cros_next_desk_button.h"
+#include "ash/wm/desks/cros_next_default_desk_button.h"
+#include "ash/wm/desks/cros_next_desk_icon_button.h"
 #include "ash/wm/desks/desk_preview_view.h"
 #include "ash/wm/desks/desks_bar_view.h"
 #include "ash/wm/desks/desks_util.h"
@@ -25,6 +26,7 @@
 #include "ash/wm/overview/overview_item_view.h"
 #include "ash/wm/overview/overview_session.h"
 #include "ash/wm/overview/overview_utils.h"
+#include "ash/wm/overview/scoped_float_container_stacker.h"
 #include "ash/wm/splitview/split_view_constants.h"
 #include "ash/wm/splitview/split_view_drag_indicators.h"
 #include "ash/wm/splitview/split_view_utils.h"
@@ -40,7 +42,6 @@
 #include "ui/aura/window.h"
 #include "ui/aura/window_observer.h"
 #include "ui/compositor/layer.h"
-#include "ui/compositor/layer_animator.h"
 #include "ui/compositor/presentation_time_recorder.h"
 #include "ui/display/display.h"
 #include "ui/events/devices/haptic_touchpad_effects.h"
@@ -198,88 +199,6 @@ class OverviewItemMoveHelper : public aura::WindowObserver {
 };
 
 }  // namespace
-
-// Helps with handling the workflow when you drag an overview item and there is
-// a floated window. Floated windows are in a higher z-order container, so
-// dragging the item would normally go under the floated window. This helper
-// handles stacking the float container below the desk containers during the
-// drag, and restoring it after dragging is finished and the window animation is
-// complete, or overview ends.
-class OverviewWindowDragController::ScopedFloatDragHelper
-    : public aura::WindowObserver,
-      public ui::ImplicitAnimationObserver {
- public:
-  explicit ScopedFloatDragHelper(OverviewWindowDragController* owner)
-      : owner_(owner) {
-    // Dragging can happen across multiple displays. Place the float container
-    // under the desk containers while this object lives.
-    for (aura::Window* root : Shell::GetAllRootWindows()) {
-      aura::Window* desk_container =
-          root->GetChildById(kShellWindowId_DeskContainerA);
-      aura::Window* float_container =
-          root->GetChildById(kShellWindowId_FloatContainer);
-      float_container->parent()->StackChildBelow(float_container,
-                                                 desk_container);
-    }
-  }
-  ScopedFloatDragHelper(const ScopedFloatDragHelper&) = delete;
-  ScopedFloatDragHelper& operator=(const ScopedFloatDragHelper&) = delete;
-  ~ScopedFloatDragHelper() override {
-    if (dragged_window_)
-      dragged_window_->layer()->GetAnimator()->RemoveObserver(this);
-
-    // Restack the float container below the app list container.
-    for (aura::Window* root : Shell::GetAllRootWindows()) {
-      aura::Window* app_list_container =
-          root->GetChildById(kShellWindowId_AppListContainer);
-      aura::Window* float_container =
-          root->GetChildById(kShellWindowId_FloatContainer);
-      float_container->parent()->StackChildBelow(float_container,
-                                                 app_list_container);
-    }
-  }
-
-  // Called when a gesture is completed or canceled. Preferred over directly
-  // destroying this object as this handles the case where the window is
-  // animating.
-  void Shutdown(aura::Window* dragged_window) {
-    auto* animator = dragged_window->layer()->GetAnimator();
-    if (!animator->is_animating()) {
-      // Destroys `this`.
-      owner_->DestroyFloatDragHelper();
-      return;
-    }
-
-    dragged_window_ = dragged_window;
-    dragged_window_observation_.Observe(dragged_window);
-    animator->AddObserver(this);
-  }
-
-  // aura::WindowObserver:
-  void OnWindowDestroyed(aura::Window* window) override {
-    DCHECK_EQ(dragged_window_, window);
-    dragged_window_->layer()->GetAnimator()->RemoveObserver(this);
-    dragged_window_ = nullptr;
-    dragged_window_observation_.Reset();
-
-    // Destroys `this`.
-    owner_->DestroyFloatDragHelper();
-  }
-
-  // ui::ImplicitAnimationObserver:
-  void OnImplicitAnimationsCompleted() override {
-    // Destroys `this`.
-    owner_->DestroyFloatDragHelper();
-  }
-
- private:
-  OverviewWindowDragController* const owner_;
-
-  aura::Window* dragged_window_ = nullptr;
-
-  base::ScopedObservation<aura::Window, aura::WindowObserver>
-      dragged_window_observation_{this};
-};
 
 OverviewWindowDragController::OverviewWindowDragController(
     OverviewSession* overview_session,
@@ -541,6 +460,10 @@ void OverviewWindowDragController::ResetGesture() {
 void OverviewWindowDragController::ResetOverviewSession() {
   overview_session_ = nullptr;
   new_desk_button_scale_up_timer_.Stop();
+}
+
+void OverviewWindowDragController::DestroyFloatDragHelper() {
+  float_drag_helper_.reset();
 }
 
 void OverviewWindowDragController::StartDragToCloseMode() {
@@ -819,7 +742,9 @@ OverviewWindowDragController::CompleteNormalDrag(
     // shutting down or not here before triggering `MaybeShrinkDesksBarView`.
     if (!overview_session_->is_shutting_down()) {
       if (features::IsJellyrollEnabled()) {
-        current_grid->desks_bar_view()->UpdateNewDeskButton(
+        auto* desks_bar_view = current_grid->desks_bar_view();
+        desks_bar_view->UpdateDeskIconButtonState(
+            desks_bar_view->new_desk_button(),
             CrOSNextDeskIconButton::State::kExpanded);
       } else {
         current_grid->MaybeShrinkDesksBarView();
@@ -864,7 +789,9 @@ OverviewWindowDragController::CompleteNormalDrag(
     item_->set_should_restack_on_animation_end(true);
     overview_session_->PositionWindows(/*animate=*/true);
     if (features::IsJellyrollEnabled()) {
-      current_grid->desks_bar_view()->UpdateNewDeskButton(
+      auto* desks_bar_view = current_grid->desks_bar_view();
+      desks_bar_view->UpdateDeskIconButtonState(
+          desks_bar_view->new_desk_button(),
           CrOSNextDeskIconButton::State::kExpanded);
     } else {
       current_grid->MaybeShrinkDesksBarView();
@@ -1027,11 +954,7 @@ void OverviewWindowDragController::MaybeCreateFloatDragHelper() {
     return;
   }
 
-  float_drag_helper_ = std::make_unique<ScopedFloatDragHelper>(this);
-}
-
-void OverviewWindowDragController::DestroyFloatDragHelper() {
-  float_drag_helper_.reset();
+  float_drag_helper_ = std::make_unique<ScopedFloatContainerStacker>(this);
 }
 
 void OverviewWindowDragController::MaybeScaleUpNewDeskButton() {
@@ -1039,10 +962,15 @@ void OverviewWindowDragController::MaybeScaleUpNewDeskButton() {
     return;
   }
 
-  item_->overview_grid()
-      ->desks_bar_view()
-      ->UpdateNewDeskButton(/*target_state=*/
-                            CrOSNextDeskIconButton::State::kDragAndDrop);
+  auto* desks_bar_view = item_->overview_grid()->desks_bar_view();
+  auto* new_desk_button = desks_bar_view->new_desk_button();
+
+  if (!new_desk_button->GetEnabled()) {
+    return;
+  }
+
+  desks_bar_view->UpdateDeskIconButtonState(
+      new_desk_button, /*target_state=*/CrOSNextDeskIconButton::State::kActive);
 }
 
 }  // namespace ash

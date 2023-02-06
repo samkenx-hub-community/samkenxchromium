@@ -804,7 +804,6 @@ Document::Document(const DocumentInit& initializer,
           this,
           &Document::DidAssociateFormControlsTimerFired),
       parser_sync_policy_(kAllowDeferredParsing),
-      node_count_(0),
       // Use the source id from the document initializer if it is available.
       // Otherwise, generate a new source id to cover any cases that don't
       // receive a valid source id, this for example includes but is not limited
@@ -2246,6 +2245,10 @@ void Document::UpdateStyleAndLayoutTreeForThisDocument() {
   FontFaceSetDocument::DidLayout(*this);
 
   UnblockLoadEventAfterLayoutTreeUpdate();
+
+  if (auto* document_rules = DocumentSpeculationRules::FromIfExists(*this)) {
+    document_rules->DocumentStyleUpdated();
+  }
 
   TRACE_EVENT_END1("blink,devtools.timeline", "UpdateLayoutTree",
                    "elementCount", element_count);
@@ -6155,6 +6158,21 @@ ScriptPromise Document::requestStorageAccessForOrigin(
     return promise;
   }
 
+  if (!dom_window_->isSecureContext()) {
+    AddConsoleMessage(MakeGarbageCollected<ConsoleMessage>(
+        mojom::blink::ConsoleMessageSource::kSecurity,
+        mojom::blink::ConsoleMessageLevel::kError,
+        "requestStorageAccessForOrigin: May not be used in an insecure "
+        "context."));
+    FireRequestStorageAccessForOriginHistogram(
+        RequestStorageResult::REJECTED_INSECURE_CONTEXT);
+
+    resolver->Reject(V8ThrowDOMException::CreateOrEmpty(
+        script_state->GetIsolate(), DOMExceptionCode::kNotAllowedError,
+        "requestStorageAccessForOrigin not allowed"));
+    return promise;
+  }
+
   KURL origin_as_kurl{origin};
   scoped_refptr<SecurityOrigin> supplied_origin =
       SecurityOrigin::Create(origin_as_kurl);
@@ -7682,10 +7700,25 @@ void Document::AddConsoleMessage(ConsoleMessage* message,
 }
 
 void Document::AddToTopLayer(Element* element, const Element* before) {
-  if (element->IsInTopLayer())
-    return;
+  if (element->IsInTopLayer()) {
+    if (RuntimeEnabledFeatures::CSSTopLayerForTransitionsEnabled() &&
+        top_layer_elements_pending_removal_.Contains(element)) {
+      // Since the html spec currently says close() should remove the dialog
+      // element from the top layer immediately, we need to remove any
+      // transitioning elements out of the top layer in order to keep the
+      // behavior of re-adding the element to the end of the top layer list for
+      // cases where style change events do not happen between close() and
+      // showModal():
+      //
+      // dialog.close();
+      // dialog.showModal();
+      RemoveFromTopLayerImmediately(element);
+    } else {
+      return;
+    }
+  }
 
-  DCHECK(!top_layer_elements_.Contains(element));
+  DCHECK(!top_layer_elements_pending_removal_.Contains(element));
   DCHECK(!before || top_layer_elements_.Contains(before));
 
   // The view transition root pseudo-element should always be the last element
@@ -7717,12 +7750,51 @@ void Document::AddToTopLayer(Element* element, const Element* before) {
   probe::TopLayerElementsChanged(this);
 }
 
-void Document::RemoveFromTopLayer(Element* element) {
-  if (!element->IsInTopLayer())
+void Document::ScheduleForTopLayerRemoval(Element* element) {
+  if (!RuntimeEnabledFeatures::CSSTopLayerForTransitionsEnabled()) {
+    RemoveFromTopLayerImmediately(element);
     return;
+  }
+  if (!element->IsInTopLayer()) {
+    return;
+  }
+  top_layer_elements_pending_removal_.insert(element);
+  ScheduleLayoutTreeUpdateIfNeeded();
+}
+
+bool Document::RemoveFinishedTopLayerElements() {
+  pending_top_layer_update_ = false;
+  if (top_layer_elements_pending_removal_.empty()) {
+    return false;
+  }
+  DCHECK(RuntimeEnabledFeatures::CSSTopLayerForTransitionsEnabled());
+  HeapVector<Member<Element>> to_remove;
+  for (Element* element : top_layer_elements_pending_removal_) {
+    const ComputedStyle* style = element->GetComputedStyle();
+    if (!style || style->TopLayer() == ETopLayer::kNone) {
+      to_remove.push_back(element);
+    }
+  }
+  if (to_remove.empty()) {
+    return false;
+  }
+  for (Element* remove_element : to_remove) {
+    RemoveFromTopLayerImmediately(remove_element);
+  }
+  pending_top_layer_update_ = true;
+  return true;
+}
+
+void Document::RemoveFromTopLayerImmediately(Element* element) {
+  if (!element->IsInTopLayer()) {
+    return;
+  }
   wtf_size_t position = top_layer_elements_.Find(element);
   DCHECK_NE(position, kNotFound);
   top_layer_elements_.EraseAt(position);
+  if (RuntimeEnabledFeatures::CSSTopLayerForTransitionsEnabled()) {
+    top_layer_elements_pending_removal_.erase(element);
+  }
   element->SetIsInTopLayer(false);
   display_lock_document_state_->ElementRemovedFromTopLayer(element);
 
@@ -7731,8 +7803,15 @@ void Document::RemoveFromTopLayer(Element* element) {
 
 HTMLDialogElement* Document::ActiveModalDialog() const {
   for (const auto& element : base::Reversed(top_layer_elements_)) {
-    if (auto* dialog = DynamicTo<HTMLDialogElement>(*element))
-      return dialog;
+    if (auto* dialog = DynamicTo<HTMLDialogElement>(*element)) {
+      if (dialog->IsModal()) {
+        // Modal dialogs transitioning out after being closed are not considered
+        // to be active.
+        if (!top_layer_elements_pending_removal_.Contains(dialog)) {
+          return dialog;
+        }
+      }
+    }
   }
 
   return nullptr;
@@ -8507,6 +8586,7 @@ void Document::Trace(Visitor* visitor) const {
   visitor->Trace(lists_invalidated_at_document_);
   visitor->Trace(node_lists_);
   visitor->Trace(top_layer_elements_);
+  visitor->Trace(top_layer_elements_pending_removal_);
   visitor->Trace(popover_stack_);
   visitor->Trace(popover_pointerdown_target_);
   visitor->Trace(popovers_waiting_to_hide_);

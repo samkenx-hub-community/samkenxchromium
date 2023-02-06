@@ -356,7 +356,10 @@ absl::optional<AuthenticatorGetInfoResponse> ReadCTAPGetInfoResponse(
       if (!option_map_it->second.is_bool())
         return absl::nullopt;
 
-      options.is_platform_device = option_map_it->second.GetBool();
+      options.is_platform_device =
+          option_map_it->second.GetBool()
+              ? AuthenticatorSupportedOptions::PlatformDevice::kYes
+              : AuthenticatorSupportedOptions::PlatformDevice::kNo;
     }
 
     option_map_it = option_map.find(CBOR(kResidentKeyMapKey));
@@ -662,13 +665,13 @@ absl::optional<AuthenticatorGetInfoResponse> ReadCTAPGetInfoResponse(
     if (!it->second.is_unsigned()) {
       return absl::nullopt;
     }
-    const uint32_t max_cred_blob_length =
-        base::saturated_cast<uint32_t>(it->second.GetUnsigned());
+    const uint16_t max_cred_blob_length =
+        base::saturated_cast<uint16_t>(it->second.GetUnsigned());
     // CTAP 2.1 requires at least 32 bytes of credBlob to be supported.
     if (max_cred_blob_length < 32) {
       return absl::nullopt;
     }
-    response.max_cred_blob_length = max_cred_blob_length;
+    response.options.max_cred_blob_length = max_cred_blob_length;
   }
 
   it = response_map.find(CBOR(0x14));

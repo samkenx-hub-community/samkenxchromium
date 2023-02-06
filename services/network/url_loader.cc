@@ -491,6 +491,7 @@ URLLoader::URLLoader(
     mojo::PendingRemote<mojom::DevToolsObserver> devtools_observer,
     mojo::PendingRemote<mojom::AcceptCHFrameObserver> accept_ch_frame_observer,
     bool third_party_cookies_enabled,
+    net::CookieSettingOverrides cookie_setting_overrides,
     const CacheTransparencySettings* cache_transparency_settings)
     : url_request_context_(context.GetUrlRequestContext()),
       network_context_client_(context.GetNetworkContextClient()),
@@ -729,9 +730,11 @@ URLLoader::URLLoader(
         request.net_log_reference_info.value());
   }
 
-  if (network::cors::IsCorsEnabledRequestMode(request_mode_)) {
-    url_request_->set_cookie_setting_overrides(net::CookieSettingOverrides(
-        net::CookieSettingOverride::kTopLevelStorageAccessGrantEligible));
+  url_request_->cookie_setting_overrides().PutAll(cookie_setting_overrides);
+  if (request.is_outermost_main_frame &&
+      network::cors::IsCorsEnabledRequestMode(request_mode_)) {
+    url_request_->cookie_setting_overrides().Put(
+        net::CookieSettingOverride::kTopLevelStorageAccessGrantEligible);
   }
 
 #if BUILDFLAG(IS_ANDROID)
@@ -1153,7 +1156,7 @@ PrivateNetworkAccessCheckResult URLLoader::PrivateNetworkAccessCheck(
 
   url_request_->net_log().AddEvent(
       net::NetLogEventType::PRIVATE_NETWORK_ACCESS_CHECK, [&] {
-        base::Value dict(base::Value::Type::DICTIONARY);
+        base::Value dict(base::Value::Type::DICT);
         dict.SetStringKey(
             "client_address_space",
             IPAddressSpaceToStringPiece(
@@ -2257,7 +2260,7 @@ bool URLLoader::DispatchOnRawResponse() {
       std::move(header_array), raw_response_headers,
       private_network_access_checker_.ResponseAddressSpace().value_or(
           mojom::IPAddressSpace::kUnknown),
-      response_headers->response_code());
+      response_headers->response_code(), url_request_->cookie_partition_key());
 
   return true;
 }

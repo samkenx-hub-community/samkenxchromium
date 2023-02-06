@@ -71,7 +71,6 @@
 #include "chrome/browser/ui/webui/ash/login/lacros_data_migration_screen_handler.h"
 #include "chrome/browser/ui/webui/ash/login/oobe_ui.h"
 #include "chrome/browser/ui/webui/ash/login/os_install_screen_handler.h"
-#include "chrome/browser/ui/webui/ash/login/signin_screen_handler.h"
 #include "chrome/browser/ui/webui/ash/login/welcome_screen_handler.h"
 #include "chrome/common/chrome_constants.h"
 #include "chrome/common/chrome_switches.h"
@@ -540,8 +539,6 @@ void LoginDisplayHostWebUI::StartWizard(OobeScreenId first_screen) {
 
   TryToPlayOobeStartupSound();
 
-  // Keep parameters to restore if renderer crashes.
-  restore_path_ = RESTORE_WIZARD;
   first_screen_ = first_screen;
 
   VLOG(1) << "Login WebUI >> wizard";
@@ -580,7 +577,6 @@ void LoginDisplayHostWebUI::CancelUserAdding() {
 void LoginDisplayHostWebUI::OnStartSignInScreen() {
   DisableKeyboardOverscroll();
 
-  restore_path_ = RESTORE_SIGN_IN;
   finalize_animation_type_ = ANIMATION_WORKSPACE;
 
   VLOG(1) << "Login WebUI >> sign in";
@@ -595,9 +591,6 @@ void LoginDisplayHostWebUI::OnStartSignInScreen() {
   existing_user_controller_->Init(user_manager::UserManager::Get()->GetUsers());
 
   CHECK(login_display_);
-
-  // Legacy calls, will go away soon.
-  GetOobeUI()->signin_screen_handler()->Show();
 
   ShowGaiaDialogCommon(EmptyAccountId());
 

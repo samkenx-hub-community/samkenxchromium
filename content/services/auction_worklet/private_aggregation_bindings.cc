@@ -14,6 +14,7 @@
 #include "base/check.h"
 #include "base/feature_list.h"
 #include "base/ranges/algorithm.h"
+#include "base/strings/string_util.h"
 #include "content/common/aggregatable_report.mojom.h"
 #include "content/common/private_aggregation_features.h"
 #include "content/services/auction_worklet/auction_v8_helper.h"
@@ -87,9 +88,7 @@ absl::optional<auction_worklet::mojom::SignalBucketPtr> GetSignalBucket(
   gin::Dictionary result_dict(isolate, input.As<v8::Object>());
 
   std::string base_value_string;
-  // TODO(qingxinwu): Change it to "baseValue" to be consistent with the
-  // explainer.
-  if (!result_dict.Get("base_value", &base_value_string)) {
+  if (!result_dict.Get("baseValue", &base_value_string)) {
     return absl::nullopt;
   }
 
@@ -144,9 +143,7 @@ absl::optional<auction_worklet::mojom::SignalValuePtr> GetSignalValue(
   gin::Dictionary result_dict(isolate, input.As<v8::Object>());
 
   std::string base_value_string;
-  // TODO(qingxinwu): Change it to "baseValue" to be consistent with the
-  // explainer.
-  if (!result_dict.Get("base_value", &base_value_string)) {
+  if (!result_dict.Get("baseValue", &base_value_string)) {
     return absl::nullopt;
   }
 
@@ -268,6 +265,10 @@ ParseForEventContribution(v8::Isolate* isolate,
 }
 
 }  // namespace
+
+const char kReservedAlways[] = "reserved.always";
+const char kReservedWin[] = "reserved.win";
+const char kReservedLoss[] = "reserved.loss";
 
 PrivateAggregationBindings::PrivateAggregationBindings(
     AuctionV8Helper* v8_helper,
@@ -391,6 +392,13 @@ void PrivateAggregationBindings::ReportContributionForEvent(
     return;
   }
 
+  if (base::StartsWith(event_type, "reserved.") && event_type != kReservedWin &&
+      event_type != kReservedLoss && event_type != kReservedAlways) {
+    // Don't throw an error if an invalid reserved event type is provided, to
+    // provide forward compatibility with new reserved event types added later.
+    return;
+  }
+
   std::string error;
   auction_worklet::mojom::AggregatableReportForEventContributionPtr
       contribution =
@@ -403,8 +411,6 @@ void PrivateAggregationBindings::ReportContributionForEvent(
     return;
   }
 
-  // TODO(qingxinwu): Throw an error if `event_type` has "reserved." prefix, but
-  // is not recognized as one of the reserved event types.
   bindings->private_aggregation_contributions_.push_back(
       auction_worklet::mojom::AggregatableReportContribution::
           NewForEventContribution(std::move(contribution)));

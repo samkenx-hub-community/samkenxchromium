@@ -34,6 +34,7 @@ import org.chromium.base.test.util.CriteriaHelper;
 import org.chromium.base.test.util.DisableIf;
 import org.chromium.base.test.util.DisabledTest;
 import org.chromium.base.test.util.Feature;
+import org.chromium.base.test.util.MetricsUtils.HistogramDelta;
 import org.chromium.base.test.util.Restriction;
 import org.chromium.base.test.util.UrlUtils;
 import org.chromium.chrome.R;
@@ -576,6 +577,7 @@ public class NavigateTest {
     @Test
     @MediumTest
     @Feature({"Navigation"})
+    @DisabledTest(message = "https://crbug.com/1410635")
     @Features.DisableFeatures({ChromeFeatureList.BACK_GESTURE_REFACTOR})
     public void testNavigateBackWithTabSwitcher() throws Exception {
         final String[] urls = {mTestServer.getURL("/chrome/test/data/android/navigate/one.html"),
@@ -585,6 +587,15 @@ public class NavigateTest {
         for (String url : urls) {
             navigateAndObserve(url);
         }
+
+        String histogram = BackPressManager.getHistogramForTesting();
+
+        HistogramDelta tabHistoryDelta = new HistogramDelta(histogram,
+                BackPressManager.getHistogramValueForTesting(BackPressHandler.Type.TAB_HISTORY));
+        HistogramDelta startSurfaceDelta = new HistogramDelta(histogram,
+                BackPressManager.getHistogramValueForTesting(BackPressHandler.Type.START_SURFACE));
+        HistogramDelta tabSwitcherDelta = new HistogramDelta(histogram,
+                BackPressManager.getHistogramValueForTesting(BackPressHandler.Type.TAB_SWITCHER));
 
         ChromeTabbedActivity cta = mActivityTestRule.getActivity();
         TabUiTestHelper.enterTabSwitcher(cta);
@@ -596,6 +607,10 @@ public class NavigateTest {
             int type = mActivityTestRule.getActivity().getLayoutManager().getActiveLayoutType();
             Assert.assertEquals(LayoutType.BROWSING, type);
         });
+        Assert.assertEquals(
+                "No page navigation when exiting tab switcher.", 0, tabHistoryDelta.getDelta());
+        Assert.assertEquals("Either start surface or tab switcher handles back press.", 1,
+                startSurfaceDelta.getDelta() + tabSwitcherDelta.getDelta());
     }
 
     /**
@@ -605,6 +620,7 @@ public class NavigateTest {
     @MediumTest
     @Feature({"Navigation"})
     @Features.EnableFeatures({ChromeFeatureList.BACK_GESTURE_REFACTOR})
+    @DisabledTest(message = "https://crbug.com/1410635")
     public void testNavigateBackWithTabSwitcher_BackPressRefactor() throws Exception {
         // Disable iph
         TestThreadUtils.runOnUiThreadBlocking(() -> {

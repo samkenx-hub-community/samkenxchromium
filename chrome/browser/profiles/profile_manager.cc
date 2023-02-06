@@ -85,6 +85,7 @@
 #include "components/signin/public/base/signin_pref_names.h"
 #include "components/signin/public/identity_manager/identity_manager.h"
 #include "components/signin/public/identity_manager/primary_account_mutator.h"
+#include "components/supervised_user/core/common/buildflags.h"
 #include "components/sync/base/stop_source.h"
 #include "content/public/browser/browser_task_traits.h"
 #include "content/public/browser/browser_thread.h"
@@ -110,13 +111,13 @@
 #if BUILDFLAG(ENABLE_SUPERVISED_USERS)
 #include "chrome/browser/supervised_user/child_accounts/child_account_service.h"
 #include "chrome/browser/supervised_user/child_accounts/child_account_service_factory.h"
-#include "chrome/browser/supervised_user/supervised_user_constants.h"
 #include "chrome/browser/supervised_user/supervised_user_service.h"
 #include "chrome/browser/supervised_user/supervised_user_service_factory.h"
+#include "components/supervised_user/core/common/supervised_user_constants.h"
 #endif
 
 #if !BUILDFLAG(IS_ANDROID)
-#include "chrome/browser/accessibility/live_caption_controller_factory.h"
+#include "chrome/browser/accessibility/live_caption/live_caption_controller_factory.h"
 #include "chrome/browser/lifetime/application_lifetime_desktop.h"
 #include "chrome/browser/profiles/nuke_profile_directory_utils.h"
 #include "chrome/browser/ui/browser.h"
@@ -1370,12 +1371,6 @@ void ProfileManager::DoFinalInit(ProfileInfo* profile_info,
 
   for (auto& observer : observers_)
     observer.OnProfileAdded(profile);
-
-  // At this point, the user policy service and the child account service
-  // had enough time to initialize and should have updated the user signout
-  // flag attached to the profile.
-  signin_util::UserSignoutSetting::GetForProfile(profile)
-      ->InitializeUserSignoutSettingIfNeeded();
 
   if (PrimaryAccountPolicyManager* primary_account_policy_manager =
           PrimaryAccountPolicyManagerFactory::GetForProfile(profile)) {

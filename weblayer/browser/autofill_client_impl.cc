@@ -265,7 +265,7 @@ bool AutofillClientImpl::IsFastCheckoutSupported() {
 bool AutofillClientImpl::TryToShowFastCheckout(
     const autofill::FormData& form,
     const autofill::FormFieldData& field,
-    autofill::AutofillDriver* driver) {
+    base::WeakPtr<autofill::AutofillManager> autofill_manager) {
   return false;
 }
 
@@ -309,10 +309,10 @@ void AutofillClientImpl::HideAutofillPopup(autofill::PopupHidingReason reason) {
   // take.
 }
 
-base::span<const autofill::Suggestion> AutofillClientImpl::GetPopupSuggestions()
+std::vector<autofill::Suggestion> AutofillClientImpl::GetPopupSuggestions()
     const {
   NOTIMPLEMENTED();
-  return base::span<const autofill::Suggestion>();
+  return {};
 }
 
 void AutofillClientImpl::PinPopupView() {
@@ -356,11 +356,6 @@ void AutofillClientImpl::DidFillOrPreviewField(
 }
 
 bool AutofillClientImpl::IsContextSecure() const {
-  NOTREACHED();
-  return false;
-}
-
-bool AutofillClientImpl::ShouldShowSigninPromo() {
   NOTREACHED();
   return false;
 }

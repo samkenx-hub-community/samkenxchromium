@@ -92,10 +92,7 @@ scoped_refptr<gl::GLImageNativePixmap> CreateAndBindImage(
     LOG(ERROR) << "Could not initialize the GL image";
     return nullptr;
   }
-  if (!image->BindTexImage(target)) {
-    LOG(ERROR) << "Could not bind the GL image to the texture";
-    return nullptr;
-  }
+  image->BindTexImage(target);
   return image;
 }
 
@@ -422,7 +419,9 @@ void GLImageProcessorBackend::Process(scoped_refptr<VideoFrame> input_frame,
                                       scoped_refptr<VideoFrame> output_frame,
                                       FrameReadyCB cb) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(backend_sequence_checker_);
-  TRACE_EVENT0("media", "GLImageProcessorBackend::Process");
+  TRACE_EVENT2("media", "GLImageProcessorBackend::Process", "input_frame",
+               input_frame->AsHumanReadableString(), "output_frame",
+               output_frame->AsHumanReadableString());
   SCOPED_UMA_HISTOGRAM_TIMER("GLImageProcessorBackend::Process");
 
   if (!gl_context_->MakeCurrent(gl_surface_.get())) {

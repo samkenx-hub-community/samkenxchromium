@@ -447,8 +447,10 @@ TaskEnvironment::TestTaskTracker* TaskEnvironment::CreateThreadPool() {
 
   auto task_tracker = std::make_unique<TestTaskTracker>();
   TestTaskTracker* raw_task_tracker = task_tracker.get();
+  // Disable background threads to avoid hangs when flushing background tasks.
   auto thread_pool = std::make_unique<internal::ThreadPoolImpl>(
-      std::string(), std::move(task_tracker));
+      std::string(), std::move(task_tracker),
+      /*use_background_threads=*/false);
   ThreadPoolInstance::Set(std::move(thread_pool));
   DCHECK(!g_task_tracker);
   g_task_tracker = raw_task_tracker;
@@ -538,6 +540,10 @@ void TaskEnvironment::DestroyThreadPool() {
   ThreadPoolInstance::Get()->JoinForTesting();
   DCHECK_EQ(g_task_tracker, task_tracker_);
   g_task_tracker = nullptr;
+
+  // Task runner lists will be destroyed when resetting thread pool instance.
+  scoped_lazy_task_runner_list_for_testing_.reset();
+
   // Destroying ThreadPoolInstance state can result in waiting on worker
   // threads. Make sure this is allowed to avoid flaking tests that have
   // disallowed waits on their main thread.

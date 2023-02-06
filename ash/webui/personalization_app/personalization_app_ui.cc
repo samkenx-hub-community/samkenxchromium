@@ -359,9 +359,6 @@ void PersonalizationAppUI::BindInterface(
 }
 
 void PersonalizationAppUI::AddBooleans(content::WebUIDataSource* source) {
-  source->AddBoolean("fullScreenPreviewEnabled",
-                     features::IsWallpaperFullScreenPreviewEnabled());
-
   source->AddBoolean("isGooglePhotosIntegrationEnabled",
                      wallpaper_provider_->IsEligibleForGooglePhotos());
 
@@ -378,16 +375,11 @@ void PersonalizationAppUI::AddBooleans(content::WebUIDataSource* source) {
       features::IsRgbKeyboardEnabled() &&
           Shell::Get()->rgb_keyboard_manager()->IsRgbKeyboardSupported());
 
-  source->AddBoolean("isAvatarsCloudMigrationEnabled",
-                     features::IsAvatarsCloudMigrationEnabled());
-
-  source->AddBoolean("isJellyEnabled", features::IsJellyEnabled());
-
   source->AddBoolean("isScreenSaverPreviewEnabled",
                      features::IsScreenSaverPreviewEnabled());
 
-  source->AddBoolean("isAmbientSubpageUiChangeEnabled",
-                     features::IsAmbientSubpageUIChangeEnabled());
+  source->AddBoolean("isPersonalizationJellyEnabled",
+                     features::IsPersonalizationJellyEnabled());
 
   // TODO(b/258838122): update when the screen saver policy code is ready.
   source->AddBoolean("isAmbientModeManaged", false);

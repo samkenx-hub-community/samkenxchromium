@@ -51,6 +51,7 @@
 <translation id="1433628812591023318">ត្រូវតែផ្លាស់ទី​ឯកសារ​ទៅថតឯកសារ​របស់ Windows សិន ទើបអាចទម្លាក់​ឯកសារនោះ​ទៅក្នុង Parallels Desktop បាន។</translation>
 <translation id="1435838927755162558">ចែករំលែក​ថត​ជាមួយ Parallels Desktop</translation>
 <translation id="1439919885608649279">មនុស្ស​កាន់ផ្កា</translation>
+<translation id="1458457385801829801">ដក <ph name="TARGET_NAME" /> ចេញ</translation>
 <translation id="1471718551822868769">ភាសា​ស្លូវ៉ាគី</translation>
 <translation id="1482884275703521657">ភាសា​ហ្វាំងឡង់</translation>
 <translation id="148466539719134488">ស្វីស</translation>
@@ -128,6 +129,7 @@
 <translation id="2084108471225856927">ការកំណត់ឧបករណ៍</translation>
 <translation id="2084809735218147718">កំពុងបង្ហាញ​កាយវិការ​អរគុណ</translation>
 <translation id="2088690981887365033">បណ្ដាញ VPN</translation>
+<translation id="2114191879048183086">ធាតុ <ph name="NUMBER_OF_ITEMS" /> នឹង​ត្រូ​វបាន​លុប ហើយ​អ្នកនឹង​មិន​អាច​ស្ដារ​ធាតុ​ទាំងនេះ​បាន​ទេ។</translation>
 <translation id="2122305276694332719">ការតភ្ជាប់ទៅបណ្ដាញដែលបានលាក់ដោយស្វ័យប្រវត្តិ​​អាចឱ្យអ្នកដទៃ​អាចមើលឃើញការកំណត់បណ្ដាញមួយចំនួន​ និងឧបករណ៍​របស់អ្នក ដូច្នេះយើង​សូមណែនាំមិន​ឱ្យធ្វើការតភ្ជាប់​ទេ។</translation>
 <translation id="2125607626296734455">ភាសា​ខ្មែរ</translation>
 <translation id="2139545522194199494">បណ្ដាញ <ph name="NETWORK_INDEX" /> នៃ <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, កម្លាំង​រលកសញ្ញា <ph name="SIGNAL_STRENGTH" />%, គ្រប់គ្រងដោយ​អ្នកគ្រប់គ្រង​របស់អ្នក, ភ្ជាប់</translation>
@@ -346,6 +348,7 @@
 <translation id="3924145049010392604">Meta</translation>
 <translation id="3943857333388298514">បិទភ្ជាប់</translation>
 <translation id="3952872973865944257">សូរសព្ទ​ជាភាសា​តេលូហ្គូ</translation>
+<translation id="3954354850384043518">កំពុងដំណើរការ</translation>
 <translation id="3958548648197196644">គីវី</translation>
 <translation id="3971140002794351170">ទាញយក​កម្រងព័ត៌មាន​ឧបករណ៍​ចល័ត បណ្ដាញ <ph name="NETWORK_INDEX" /> នៃ <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, <ph name="NETWORK_PROVIDER_NAME" /></translation>
 <translation id="3973925058222872294">ភាសា​អង់គ្លេស (ចក្រភព​អង់គ្លេស)</translation>
@@ -397,6 +400,7 @@
 <translation id="4398096759193130964">ស្ដារធាតុ ឬអូសធាតុទាំងនេះទៅក្នុងថតថ្មីនៅក្រៅធុងសំរាម</translation>
 <translation id="4401287888955153199">ដកទាំងអស់</translation>
 <translation id="4410695710508688828">ការស្រង់​ប្រតិបត្តិការ​មិនបានសម្រេចទេ។ <ph name="ERROR_MESSAGE" /></translation>
+<translation id="4414834425328380570">"<ph name="FILE_NAME" />" នឹង​ត្រូវ​​បានលុប ហើយ​អ្នកនឹង​មិន​អាច​ស្ដារ​វា​​​បាន​ទេ។</translation>
 <translation id="4418686080762064601">បង្កើត​ផ្លូវកាត់​សម្រាប់​ឯកសារ​របស់អ្នក</translation>
 <translation id="4425149324548788773">ដ្រាយរបស់ខ្ញុំ</translation>
 <translation id="4439427728133035643">បណ្ដាញ <ph name="NETWORK_INDEX" /> នៃ <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, កម្លាំងរលកសញ្ញា <ph name="SIGNAL_STRENGTH" />%, ភ្ជាប់</translation>
@@ -685,6 +689,7 @@
 <translation id="6657585470893396449">ពាក្យសម្ងាត់</translation>
 <translation id="6658865850469097484">ឯកសារ​នៅក្នុង​ធុងសំរាម​លើសពី 30 ថ្ងៃ​នឹង​ត្រូវបាន​លុបចេញ​ដោយស្វ័យប្រវត្តិ។</translation>
 <translation id="6673674183150363784">ភាសា​បារាំង (បារាំង) ដែលប្រើ​ក្ដារចុច Bépo</translation>
+<translation id="670380500182402678">ជំនួស​ទាំងអស់</translation>
 <translation id="6710022688720561421">មនុស្សយន្ត</translation>
 <translation id="6710213216561001401">មុន</translation>
 <translation id="6732801395666424405">វិញ្ញាបនប័ត្រមិនត្រូវបានដំណើរការទេ</translation>
@@ -903,6 +908,7 @@
 <translation id="8386903983509584791">ការស្កេនបានបញ្ចប់</translation>
 <translation id="8387733224523483503">បានស្រង់ <ph name="FILE_NAME" />។</translation>
 <translation id="8395901698320285466">ទំហំ</translation>
+<translation id="8404498045299006085">រក្សាទុកទាំងអស់</translation>
 <translation id="8408068190360279472">បណ្ដាញ <ph name="NETWORK_TYPE" />, កំពុង​ភ្ជាប់</translation>
 <translation id="8425213833346101688">ប្តូរ</translation>
 <translation id="8431909052837336408">ប្ដូរកូដ PIN ស៊ីមកាត</translation>
@@ -929,6 +935,7 @@
 <translation id="8560515948038859357">ភាសាចិនកាតាំង</translation>
 <translation id="8561206103590473338">ដំរី</translation>
 <translation id="8566466896628108558">បណ្ដាញ <ph name="NETWORK_INDEX" /> នៃ <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, <ph name="SECURITY_STATUS" />, កម្លាំងរលកសញ្ញា <ph name="SIGNAL_STRENGTH" />%, បានទប់ស្កាត់ដោយអ្នកគ្រប់គ្រងរបស់អ្នក, ព័ត៌មានលម្អិត</translation>
+<translation id="8568374623837201676">លុប​ឯកសារ​នេះ​ជា​អចិន្ត្រៃយ៍ឬ?</translation>
 <translation id="8569764466147087991">ជ្រើសរើសឯកសារដើម្បីបើក</translation>
 <translation id="8577897833047451336">ភាសា​ក្រូអាត</translation>
 <translation id="8578308463707544055">ភាសា​ឥណ្ឌូនេស៊ី</translation>
@@ -961,6 +968,7 @@
 <translation id="8866284467018526531">ការសរសេរតាម​សូរសព្ទជាភាសា​អារ៉ាប់</translation>
 <translation id="8873014196523807561">ដើម្បី​ស្ដារ​ធាតុ​ទាំងនេះ សូម​អូស​ធាតុ​ទៅ​ថត​ថ្មី។ ថត​ដើម​សម្រាប់​ធាតុ​មួយចំនួន​ក្នុងចំណោម​ធាតុ​ទាំងនេះ​ត្រូវ​បាន​លុប។</translation>
 <translation id="8874184842967597500">មិនបានភ្ជាប់ទេ</translation>
+<translation id="8876368061475701452">​បាន​ដាក់​ក្នុង​ជួរ</translation>
 <translation id="8900820606136623064">ភាសាហុងគ្រី</translation>
 <translation id="8903931173357132290">និស្សិតបញ្ចប់ការសិក្សា</translation>
 <translation id="8912078710089354287">ឆ្កែកំពុង​បក់កន្ទុយ</translation>

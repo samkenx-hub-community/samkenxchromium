@@ -47,7 +47,6 @@
 #include "net/test/test_with_task_environment.h"
 #include "net/third_party/quiche/src/quiche/common/quiche_text_utils.h"
 #include "net/third_party/quiche/src/quiche/quic/core/crypto/crypto_protocol.h"
-#include "net/third_party/quiche/src/quiche/quic/core/crypto/null_decrypter.h"
 #include "net/third_party/quiche/src/quiche/quic/core/crypto/quic_decrypter.h"
 #include "net/third_party/quiche/src/quiche/quic/core/crypto/quic_encrypter.h"
 #include "net/third_party/quiche/src/quiche/quic/core/http/spdy_utils.h"
@@ -85,30 +84,6 @@ enum DelegateMethod {
   kOnDataSent,
   kOnFailed
 };
-
-struct TestParams {
-  quic::ParsedQuicVersion version;
-  bool client_headers_include_h2_stream_dependency;
-};
-
-// Used by ::testing::PrintToStringParamName().
-std::string PrintToString(const TestParams& p) {
-  return base::StrCat(
-      {ParsedQuicVersionToString(p.version), "_",
-       (p.client_headers_include_h2_stream_dependency ? "" : "No"),
-       "Dependency"});
-}
-
-std::vector<TestParams> GetTestParams() {
-  std::vector<TestParams> params;
-  quic::ParsedQuicVersionVector all_supported_versions =
-      quic::AllSupportedVersions();
-  for (const auto& version : all_supported_versions) {
-    params.push_back(TestParams{version, false});
-    params.push_back(TestParams{version, true});
-  }
-  return params;
-}
 
 class TestDelegateBase : public BidirectionalStreamImpl::Delegate {
  public:
@@ -413,7 +388,7 @@ class DeleteStreamDelegate : public TestDelegateBase {
 }  // namespace
 
 class BidirectionalStreamQuicImplTest
-    : public ::testing::TestWithParam<TestParams>,
+    : public ::testing::TestWithParam<quic::ParsedQuicVersion>,
       public WithTaskEnvironment {
  protected:
   static const bool kFin = true;
@@ -431,9 +406,7 @@ class BidirectionalStreamQuicImplTest
   };
 
   BidirectionalStreamQuicImplTest()
-      : version_(GetParam().version),
-        client_headers_include_h2_stream_dependency_(
-            GetParam().client_headers_include_h2_stream_dependency),
+      : version_(GetParam()),
         crypto_config_(
             quic::test::crypto_test_utils::ProofVerifierForTesting()),
         read_buffer_(base::MakeRefCounted<IOBufferWithSize>(4096)),
@@ -443,8 +416,7 @@ class BidirectionalStreamQuicImplTest
                       connection_id_,
                       &clock_,
                       kDefaultServerHostName,
-                      quic::Perspective::IS_CLIENT,
-                      client_headers_include_h2_stream_dependency_),
+                      quic::Perspective::IS_CLIENT),
         server_maker_(version_,
                       connection_id_,
                       &clock_,
@@ -530,7 +502,8 @@ class BidirectionalStreamQuicImplTest
     if (connection_->version().KnowsWhichDecrypterToUse()) {
       connection_->InstallDecrypter(
           quic::ENCRYPTION_FORWARD_SECURE,
-          std::make_unique<quic::NullDecrypter>(quic::Perspective::IS_CLIENT));
+          std::make_unique<quic::test::StrictTaggingDecrypter>(
+              quic::ENCRYPTION_FORWARD_SECURE));
     }
     base::TimeTicks dns_end = base::TimeTicks::Now();
     base::TimeTicks dns_start = dns_end - base::Milliseconds(1);
@@ -557,8 +530,7 @@ class BidirectionalStreamQuicImplTest
         kQuicYieldAfterPacketsRead,
         quic::QuicTime::Delta::FromMilliseconds(
             kQuicYieldAfterDurationMilliseconds),
-        client_headers_include_h2_stream_dependency_, /*cert_verify_flags=*/0,
-        quic::test::DefaultQuicConfig(),
+        /*cert_verify_flags=*/0, quic::test::DefaultQuicConfig(),
         std::make_unique<TestQuicCryptoClientConfigHandle>(&crypto_config_),
         "CONNECTION_UNKNOWN", dns_start, dns_end,
         std::make_unique<quic::QuicClientPushPromiseIndex>(), nullptr,
@@ -628,23 +600,12 @@ class BidirectionalStreamQuicImplTest
       bool fin,
       RequestPriority request_priority,
       size_t* spdy_headers_frame_length) {
-    return ConstructRequestHeadersPacketInner(stream_id, fin, request_priority,
-                                              0, spdy_headers_frame_length);
-  }
-
-  std::unique_ptr<quic::QuicReceivedPacket> ConstructRequestHeadersPacketInner(
-      quic::QuicStreamId stream_id,
-      bool fin,
-      RequestPriority request_priority,
-      quic::QuicStreamId parent_stream_id,
-      size_t* spdy_headers_frame_length) {
     spdy::SpdyPriority priority =
         ConvertRequestPriorityToQuicPriority(request_priority);
     std::unique_ptr<quic::QuicReceivedPacket> packet(
         client_maker_.MakeRequestHeadersPacket(
             ++packet_number_, stream_id, kIncludeVersion, fin, priority,
-            std::move(request_headers_), parent_stream_id,
-            spdy_headers_frame_length));
+            std::move(request_headers_), spdy_headers_frame_length));
     DVLOG(2) << "packet(" << packet_number_ << "): " << std::endl
              << quiche::QuicheTextUtils::HexDump(packet->AsStringPiece());
     return packet;
@@ -661,7 +622,7 @@ class BidirectionalStreamQuicImplTest
     std::unique_ptr<quic::QuicReceivedPacket> packet(
         client_maker_.MakeRequestHeadersAndMultipleDataFramesPacket(
             ++packet_number_, stream_id_, kIncludeVersion, fin, priority,
-            std::move(request_headers_), 0, spdy_headers_frame_length, data));
+            std::move(request_headers_), spdy_headers_frame_length, data));
     DVLOG(2) << "packet(" << packet_number_ << "): " << std::endl
              << quiche::QuicheTextUtils::HexDump(packet->AsStringPiece());
     return packet;
@@ -813,7 +774,6 @@ class BidirectionalStreamQuicImplTest
  protected:
   quic::test::QuicFlagSaver saver_;
   const quic::ParsedQuicVersion version_;
-  const bool client_headers_include_h2_stream_dependency_;
   RecordingNetLogObserver net_log_observer_;
   NetLogWithSource net_log_with_source_{
       NetLogWithSource::Make(NetLogSourceType::NONE)};
@@ -849,7 +809,7 @@ class BidirectionalStreamQuicImplTest
 
 INSTANTIATE_TEST_SUITE_P(Version,
                          BidirectionalStreamQuicImplTest,
-                         ::testing::ValuesIn(GetTestParams()),
+                         ::testing::ValuesIn(quic::AllSupportedVersions()),
                          ::testing::PrintToStringParamName());
 
 TEST_P(BidirectionalStreamQuicImplTest, GetRequest) {
@@ -968,7 +928,7 @@ TEST_P(BidirectionalStreamQuicImplTest, LoadTimingTwoRequests) {
   SetRequest("GET", "/", DEFAULT_PRIORITY);
   AddWrite(ConstructRequestHeadersPacketInner(
       GetNthClientInitiatedBidirectionalStreamId(1), kFin, DEFAULT_PRIORITY,
-      GetNthClientInitiatedBidirectionalStreamId(0), nullptr));
+      nullptr));
   client_maker_.SetEncryptionLevel(quic::ENCRYPTION_FORWARD_SECURE);
   AddWrite(ConstructClientAckPacket(3, 1));
   Initialize();

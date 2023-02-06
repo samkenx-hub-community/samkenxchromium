@@ -345,31 +345,6 @@ bool DoesHeaderContainClientHint(
   return headers.GetHeader(header, &value) && value == "?1";
 }
 
-void LogUserAgentOverrideHistogram(const std::string& user_agent) {
-  std::string ua_original = GetContentClient()->browser()->GetUserAgent();
-  base::UmaHistogramEnumeration("Navigation.UserAgentStringType",
-                                UserAgentStringType::kOverriden);
-
-  if (!base::FeatureList::IsEnabled(
-          blink::features::kUserAgentOverrideExperiment)) {
-    return;
-  }
-
-  auto it = user_agent.find(ua_original);
-  blink::UserAgentOverride::UserAgentOverrideHistogram histogram =
-      blink::UserAgentOverride::UserAgentOverrideHistogram::UserAgentOverriden;
-  if (it == 0) {
-    histogram = blink::UserAgentOverride::UserAgentOverrideHistogram::
-        UserAgentOverrideSuffix;
-  } else if (it != std::string::npos) {
-    histogram = blink::UserAgentOverride::UserAgentOverrideHistogram::
-        UserAgentOverrideSubstring;
-  }
-
-  base::UmaHistogramEnumeration(
-      blink::UserAgentOverride::kUserAgentOverrideHistogram, histogram);
-}
-
 // Computes the value that should be set for the User-Agent header, based on the
 // values of relevant headers like Sec-CH-UA-Reduced or Sec-CH-UA-Full.  If
 // `user_agent_override` is non-empty, `user_agent_override` is returned as the
@@ -378,7 +353,8 @@ std::string ComputeUserAgentValue(const net::HttpRequestHeaders& headers,
                                   const std::string& user_agent_override,
                                   content::BrowserContext* context) {
   if (!user_agent_override.empty()) {
-    LogUserAgentOverrideHistogram(user_agent_override);
+    base::UmaHistogramEnumeration("Navigation.UserAgentStringType",
+                                  UserAgentStringType::kOverriden);
     return user_agent_override;
   }
 
@@ -1143,7 +1119,8 @@ std::unique_ptr<NavigationRequest> NavigationRequest::Create(
       net::LOAD_NORMAL, false /* skip_service_worker */,
       blink::mojom::RequestContextType::LOCATION,
       blink::mojom::MixedContentContextType::kBlockable, is_form_submission,
-      false /* was_initiated_by_link_click */, GURL() /* searchable_form_url */,
+      false /* was_initiated_by_link_click */,
+      blink::mojom::ForceHistoryPush::kNo, GURL() /* searchable_form_url */,
       std::string() /* searchable_form_encoding */,
       GURL() /* client_side_redirect_url */,
       absl::nullopt /* devtools_initiator_info */,
@@ -1615,6 +1592,8 @@ NavigationRequest::NavigationRequest(
   // If `rfh_restored_from_back_forward_cache` was set, it should not be
   // invalidated yet at this point.
   CHECK(!rfh_restored_from_back_forward_cache.WasInvalidated());
+  CheckSoftNavigationHeuristicsInvariants();
+
   ScopedCrashKeys crash_keys(*this);
 
   ComputeDownloadPolicy();
@@ -2769,6 +2748,8 @@ void NavigationRequest::ResetForCrossDocumentRestart() {
 
   policy_container_builder_->ResetForCrossDocumentRestart();
   commit_params_->soft_navigation_heuristics_task_id = absl::nullopt;
+
+  CheckSoftNavigationHeuristicsInvariants();
 }
 
 void NavigationRequest::ResetStateForSiteInstanceChange() {
@@ -4750,9 +4731,9 @@ void NavigationRequest::MaybeAddResourceTimingEntryForCancelledNavigation() {
   }
 
   blink::mojom::ResourceTimingInfoPtr timing_info =
-      GenerateResourceTimingForNavigation(
-          parent_rfh->GetLastCommittedOrigin(), *common_params_,
-          *commit_params_, *response_head_, request_context_type());
+      GenerateResourceTimingForNavigation(parent_rfh->GetLastCommittedOrigin(),
+                                          *common_params_, *commit_params_,
+                                          *response_head_);
   timing_info->response_end = base::TimeTicks::Now();
   parent_rfh->GetAssociatedLocalFrame()
       ->AddResourceTimingEntryFromNonNavigatedFrame(
@@ -5197,16 +5178,7 @@ void NavigationRequest::CommitNavigation() {
   // A navigation request should only commit once the response has been
   // processed.
   DCHECK_GE(state_, WILL_PROCESS_RESPONSE);
-#if DCHECK_IS_ON()
-  // In NavigationControllerImpl::NavigateToExistingPendingEntry we're verifying
-  // that the task ID is only passed along if the initiator RFH is the same as
-  // the navigated RFH.
-  if (commit_params_->soft_navigation_heuristics_task_id) {
-    DCHECK(IsSameDocument());
-    DCHECK(IsInMainFrame());
-    DCHECK(!frame_tree_node()->IsFencedFrameRoot());
-  }
-#endif
+  CheckSoftNavigationHeuristicsInvariants();
 
   if (!CoopCoepSanityCheck())
     return;
@@ -8330,6 +8302,14 @@ bool NavigationRequest::ShouldReplaceCurrentEntryForSameUrlNavigation() const {
   if (!frame_tree_node_->navigator().controller().GetEntryCount())
     return false;
 
+  // The NavigationAPI allows a page to request a navigation that pushes even in
+  // situations where the browser would implicitly convert the navigation to
+  // a replace.
+  if (begin_params_->force_history_push ==
+      blink::mojom::ForceHistoryPush::kYes) {
+    return false;
+  }
+
   // Reloads and history navigations have special handling and don't need to
   // set |common_params_->should_replace_current_entry|.
   if (common_params_->navigation_type !=
@@ -8707,16 +8687,32 @@ void NavigationRequest::
   if (!common_params_ || !response_head_ || !response_head_->headers) {
     return;
   }
-  if (!blink::TrialTokenValidator().RequestEnablesFeature(
+  if (!blink::TrialTokenValidator().RequestEnablesDeprecatedFeature(
           common_params_->url, response_head_->headers.get(),
           "DisableThirdPartySessionStoragePartitioningAfterGeneralPartitioning",
           base::Time::Now())) {
+    frame_tree_node()
+        ->frame_tree()
+        .UnregisterOriginForUnpartitionedSessionStorageAccess(
+            url::Origin::Create(common_params_->url));
     return;
   }
   frame_tree_node()
       ->frame_tree()
       .RegisterOriginForUnpartitionedSessionStorageAccess(
           url::Origin::Create(common_params_->url));
+}
+
+void NavigationRequest::CheckSoftNavigationHeuristicsInvariants() {
+  if (!commit_params_->soft_navigation_heuristics_task_id) {
+    return;
+  }
+  // In NavigationControllerImpl::NavigateToExistingPendingEntry we're verifying
+  // that the task ID is only passed along if the initiator RFH is the same as
+  // the navigated RFH.
+  DCHECK(IsSameDocument());
+  DCHECK(IsInMainFrame());
+  DCHECK(!frame_tree_node()->IsFencedFrameRoot());
 }
 
 }  // namespace content

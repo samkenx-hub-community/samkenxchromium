@@ -25,6 +25,10 @@
 
 namespace content {
 
+const char kReservedAlways[] = "reserved.always";
+const char kReservedWin[] = "reserved.win";
+const char kReservedLoss[] = "reserved.loss";
+
 namespace {
 
 // Returns the actual value of `base_value` with corresponding post auction
@@ -129,8 +133,8 @@ absl::optional<absl::uint128> CalculateBucket(
 }
 
 // Returns contribution's value calculated from `base`, and `value_obj`'s scale
-// and offset. Returns absl::nullopt if `base` is absl::nullopt, or base or
-// scale being NaN/infinity
+// and offset. Returns 0 if the calculated value is negative. Returns
+// absl::nullopt if `base` is absl::nullopt, or base or scale is NaN/infinity.
 absl::optional<int32_t> CalculateValue(
     const auction_worklet::mojom::SignalValuePtr& value_obj,
     absl::optional<double> base) {
@@ -148,18 +152,24 @@ absl::optional<int32_t> CalculateValue(
   }
 
   // Note: truncates the floating point result, without losing precision since
-  // doubles can store all 32-bit integers exactly. Saturating as needed.
-  // Mojom should guarantee offset being int32.
-  // TODO(crbug.com/1410402): Clamp negative value to 0.
+  // doubles can store all 32-bit integers exactly. Saturating as needed. Mojom
+  // should guarantee offset being int32.
   base::ClampedNumeric<int32_t> value = scaled_base_value + value_obj->offset;
+
+  // Returns 0 if value is negative, since Private Aggregation API and the
+  // aggregation service does not support negative value in contribution.
+  if (value < 0) {
+    return 0;
+  }
   return value;
 }
 
 // Calculates given for-event `contribution`'s bucket and value with given post
 // auction signals such as `winning_bid`, and returns a histogram contribution
-// with calculated bucket and value. Returns nullptr if
-// `contribution`'s bucket cannot be calculated to a valid uint128 number, or
-// `contribution`'s value cannot be calculated to a valid integer.
+// with calculated bucket and value. A negative value will be clamped to 0.
+// Returns nullptr if `contribution`'s bucket cannot be calculated to a valid
+// uint128 number, or `contribution`'s value cannot be calculated to a valid
+// integer.
 auction_worklet::mojom::AggregatableReportContributionPtr
 CalculateContributionBucketAndValue(
     auction_worklet::mojom::AggregatableReportForEventContributionPtr
@@ -185,8 +195,16 @@ CalculateContributionBucketAndValue(
   }
 
   if (contribution->value->is_int_value()) {
-    // TODO(crbug.com/1410402): Clamp negative value to 0.
     value = contribution->value->get_int_value();
+    if (value < 0) {
+      // Clamps value to 0 if it's negative. The worklet code should prevent
+      // this, but the worklet process may be compromised. Since it has no
+      // effect on the result of the auction, we just clamp it to 0 instead of
+      // terminate the auction.
+      // TODO(crbug.com/1410534): Report a bad mojom message when int value is
+      // negative.
+      value = 0;
+    }
   } else {
     const auction_worklet::mojom::SignalValuePtr& value_obj =
         contribution->value->get_signal_value();
@@ -216,6 +234,9 @@ FillInPrivateAggregationRequest(
     bool is_winner) {
   DCHECK(request);
   if (request->contribution->is_histogram_contribution()) {
+    // TODO(crbug.com/1410534): Report a bad mojom message when contribution's
+    // value is negative. The worklet code should prevent that, but the worklet
+    // process may be compromised.
     return request;
   }
 
@@ -231,8 +252,21 @@ FillInPrivateAggregationRequest(
     // TODO(crbug.com/1410340): Supports requests with non-reserved event types.
     return nullptr;
   }
-  if ((is_winner && event_type == "reserved.loss") ||
-      (!is_winner && event_type == "reserved.win")) {
+
+  // Rejects invalid reserved event type. The worklet code should prevent this,
+  // but the process may be compromised. This is largely preventing the owner
+  // from messing up its own private aggregation reporting function.
+  //
+  // Note that the data received here has no effect on the result of the
+  // auction, so just reject the data and continue with the auction to keep
+  // the code simple.
+  if (event_type != kReservedWin && event_type != kReservedLoss &&
+      event_type != kReservedAlways) {
+    return nullptr;
+  }
+
+  if ((is_winner && event_type == kReservedLoss) ||
+      (!is_winner && event_type == kReservedWin)) {
     return nullptr;
   }
   auction_worklet::mojom::AggregatableReportContributionPtr

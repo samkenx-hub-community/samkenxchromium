@@ -4352,11 +4352,16 @@ void RenderFrameImpl::DidObserveLoadingBehavior(
 
 void RenderFrameImpl::DidObserveSubresourceLoad(
     uint32_t number_of_subresources_loaded,
-    uint32_t number_of_subresource_loads_handled_by_service_worker) {
+    uint32_t number_of_subresource_loads_handled_by_service_worker,
+    bool pervasive_payload_requested,
+    int64_t pervasive_bytes_fetched,
+    int64_t total_bytes_fetched) {
   for (auto& observer : observers_)
     observer.DidObserveSubresourceLoad(
         number_of_subresources_loaded,
-        number_of_subresource_loads_handled_by_service_worker);
+        number_of_subresource_loads_handled_by_service_worker,
+        pervasive_payload_requested, pervasive_bytes_fetched,
+        total_bytes_fetched);
 }
 
 void RenderFrameImpl::DidObserveNewFeatureUsage(
@@ -5794,7 +5799,8 @@ void RenderFrameImpl::BeginNavigationInternal(
           load_flags, info->url_request.GetSkipServiceWorker(),
           blink::GetRequestContextTypeForWebURLRequest(info->url_request),
           blink::GetMixedContentContextTypeForWebURLRequest(info->url_request),
-          is_form_submission, was_initiated_by_link_click, searchable_form_url,
+          is_form_submission, was_initiated_by_link_click,
+          info->force_history_push, searchable_form_url,
           searchable_form_encoding, client_side_redirect_url,
           std::move(devtools_initiator),
           info->url_request.TrustTokenParams()
@@ -6274,8 +6280,11 @@ WebView* RenderFrameImpl::CreateNewWindow(
   if (pip_options) {
     CHECK_EQ(policy, blink::kWebNavigationPolicyPictureInPicture);
     auto pip_mojom_opts = blink::mojom::PictureInPictureWindowOptions::New();
+    pip_mojom_opts->width = pip_options->width;
+    pip_mojom_opts->height = pip_options->height;
     pip_mojom_opts->initial_aspect_ratio = pip_options->initial_aspect_ratio;
-    pip_mojom_opts->lock_aspect_ratio = pip_options->lock_aspect_ratio;
+    // TODO(crbug.com/1410379): Remove this from mojom and the browser side.
+    pip_mojom_opts->lock_aspect_ratio = false;
     params->pip_options = std::move(pip_mojom_opts);
   }
 

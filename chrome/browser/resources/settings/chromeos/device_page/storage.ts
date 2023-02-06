@@ -60,6 +60,12 @@ class SettingsStorageElement extends SettingsStorageElementBase {
         value: false,
       },
 
+      showDriveOfflineStorage_: {
+        type: Boolean,
+        value: loadTimeData.getBoolean('enableDriveFsBulkPinning'),
+        readonly: true,
+      },
+
       showCrostini: Boolean,
 
       isGuest_: {
@@ -90,6 +96,7 @@ class SettingsStorageElement extends SettingsStorageElementBase {
   private isGuest_: boolean;
   private route_: Route;
   private showCrostiniStorage_: boolean;
+  private showDriveOfflineStorage_: boolean;
   private showOtherUsers_: boolean;
   private sizeStat_: StorageSizeStat;
   private updateTimerId_: number;
@@ -123,6 +130,9 @@ class SettingsStorageElement extends SettingsStorageElementBase {
     this.addWebUiListener(
         'storage-apps-size-changed',
         (size: string) => this.handleAppsSizeChanged_(size));
+    this.addWebUiListener(
+        'storage-drive-offline-size-changed',
+        (size: string) => this.handleDriveOfflineSizeChanged_(size));
     this.addWebUiListener(
         'storage-crostini-size-changed',
         (size: string) => this.handleCrostiniSizeChanged_(size));
@@ -189,6 +199,14 @@ class SettingsStorageElement extends SettingsStorageElementBase {
   }
 
   /**
+   * Handler for tapping the "Offline files" item.
+   */
+  private onDriveOfflineTap_(): void {
+    // TODO(b/266631636): Offline files row should redirect users to Files
+    // settings > Drive settings.
+  }
+
+  /**
    * Handler for tapping the "Linux storage" item.
    */
   private onCrostiniTap_(): void {
@@ -241,6 +259,15 @@ class SettingsStorageElement extends SettingsStorageElementBase {
   private handleAppsSizeChanged_(size: string): void {
     this.shadowRoot!.querySelector<CrLinkRowElement>('#appsSize')!.subLabel =
         size;
+  }
+
+  /**
+   * @param size Formatted string representing the size of pinned files in
+   *     Google Drive.
+   */
+  private handleDriveOfflineSizeChanged_(size: string): void {
+    this.shadowRoot!.querySelector<CrLinkRowElement>(
+                        '#driveOfflineSize')!.subLabel = size;
   }
 
   /**

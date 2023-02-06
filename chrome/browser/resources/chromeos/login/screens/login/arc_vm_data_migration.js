@@ -10,6 +10,7 @@ import '//resources/polymer/v3_0/iron-icon/iron-icon.js';
 import '//resources/polymer/v3_0/paper-styles/color.js';
 import '../../components/common_styles/oobe_dialog_host_styles.css.js';
 import '../../components/dialogs/oobe_adaptive_dialog.js';
+import '../../components/dialogs/oobe_loading_dialog.js';
 import '../../components/oobe_icons.html.js';
 
 import {html, mixinBehaviors, PolymerElement} from '//resources/polymer/v3_0/polymer/polymer_bundled.min.js';
@@ -22,6 +23,7 @@ import {OOBE_UI_STATE} from '../../components/display_manager_types.js';
 
 // Keep in sync with ArcVmDataMigrationScreenView::UIState.
 var ArcVmDataMigrationUIState = {
+  LOADING: 'loading',
   WELCOME: 'welcome',
 };
 
@@ -57,15 +59,26 @@ class ArcVmDataMigrationScreen extends ArcVmDataMigrationScreenElementBase {
   }
 
   static get properties() {
-    return {};
+    return {
+      hasEnoughFreeDiskSpace: Boolean,
+      requiredFreeDiskSpaceInString: String,
+      minimumBatteryPercent: Number,
+      hasEnoughBattery: Boolean,
+      isConnectedToCharger: Boolean,
+    };
   }
 
   constructor() {
     super();
+    this.hasEnoughFreeDiskSpace = true;
+    this.requiredFreeDiskSpaceInString = '';
+    this.minimumBatteryPercent = 0;
+    this.hasEnoughBattery = true;
+    this.isConnectedToCharger = true;
   }
 
   defaultUIStep() {
-    return ArcVmDataMigrationUIState.WELCOME;
+    return ArcVmDataMigrationUIState.LOADING;
   }
 
   get UI_STEPS() {
@@ -75,6 +88,9 @@ class ArcVmDataMigrationScreen extends ArcVmDataMigrationScreenElementBase {
   get EXTERNAL_API() {
     return [
       'setUIState',
+      'setRequiredFreeDiskSpace',
+      'setMinimumBatteryPercent',
+      'setBatteryState',
     ];
   }
 
@@ -89,6 +105,24 @@ class ArcVmDataMigrationScreen extends ArcVmDataMigrationScreenElementBase {
 
   setUIState(state) {
     this.setUIStep(Object.values(ArcVmDataMigrationUIState)[state]);
+  }
+
+  setRequiredFreeDiskSpace(requiredFreeDiskSpaceInString) {
+    this.hasEnoughFreeDiskSpace = false;
+    this.requiredFreeDiskSpaceInString = requiredFreeDiskSpaceInString;
+  }
+
+  setMinimumBatteryPercent(minimumBatteryPercent) {
+    this.minimumBatteryPercent = Math.floor(minimumBatteryPercent);
+  }
+
+  setBatteryState(hasEnoughBattery, isConnectedToCharger) {
+    this.hasEnoughBattery = hasEnoughBattery;
+    this.isConnectedToCharger = isConnectedToCharger;
+  }
+
+  shouldDisableUpdateButton_(hasEnoughFreeDiskSpace, hasEnoughBattery) {
+    return !hasEnoughFreeDiskSpace || !hasEnoughBattery;
   }
 
   onSkipButtonClicked_() {

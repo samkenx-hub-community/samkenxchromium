@@ -27,6 +27,7 @@
 #include "content/services/auction_worklet/report_bindings.h"
 #include "content/services/auction_worklet/set_bid_bindings.h"
 #include "content/services/auction_worklet/set_priority_bindings.h"
+#include "content/services/auction_worklet/worklet_test_util.h"
 #include "gin/converter.h"
 #include "gin/dictionary.h"
 #include "testing/gmock/include/gmock/gmock-matchers.h"
@@ -80,6 +81,19 @@ class ContextRecyclerTest : public testing::Test {
     std::vector<v8::Local<v8::Value>> args;
     if (!maybe_arg.IsEmpty())
       args.push_back(maybe_arg);
+    return helper_->RunScript(scope.GetContext(), script,
+                              /*debug_id=*/nullptr,
+                              AuctionV8Helper::ExecMode::kTopLevelAndFunction,
+                              function_name, args,
+                              /*script_timeout=*/absl::nullopt, error_msgs);
+  }
+
+  // Runs a function with a list of arguments.
+  v8::MaybeLocal<v8::Value> Run(ContextRecyclerScope& scope,
+                                v8::Local<v8::UnboundScript> script,
+                                const std::string& function_name,
+                                std::vector<std::string>& error_msgs,
+                                std::vector<v8::Local<v8::Value>> args) {
     return helper_->RunScript(scope.GetContext(), script,
                               /*debug_id=*/nullptr,
                               AuctionV8Helper::ExecMode::kTopLevelAndFunction,
@@ -778,6 +792,301 @@ TEST_F(ContextRecyclerTest, BidderLazyFiller2) {
         "\"priorityVector\":null,"
         "\"prevWins\":[]}",
         str_result);
+  }
+}
+
+TEST_F(ContextRecyclerTest, SharedStorageMethods) {
+  using RequestType =
+      auction_worklet::TestAuctionSharedStorageHost::RequestType;
+  using Request = auction_worklet::TestAuctionSharedStorageHost::Request;
+
+  const char kScript[] = R"(
+    function testSet(...args) {
+      sharedStorage.set(...args);
+    }
+
+    function testAppend(...args) {
+      sharedStorage.append(...args);
+    }
+
+    function testDelete(...args) {
+      sharedStorage.delete(...args);
+    }
+
+    function testClear(...args) {
+      sharedStorage.clear(...args);
+    }
+  )";
+
+  v8::Local<v8::UnboundScript> script = Compile(kScript);
+  ASSERT_FALSE(script.IsEmpty());
+
+  auction_worklet::TestAuctionSharedStorageHost test_shared_storage_host;
+
+  ContextRecycler context_recycler(helper_.get());
+  context_recycler.AddSharedStorageBindings(
+      &test_shared_storage_host,
+      /*shared_storage_permissions_policy_allowed=*/true);
+
+  {
+    ContextRecyclerScope scope(context_recycler);
+    std::vector<std::string> error_msgs;
+
+    Run(scope, script, "testSet", error_msgs,
+        /*args=*/
+        std::vector<v8::Local<v8::Value>>(
+            {gin::ConvertToV8(helper_->isolate(), std::string("a")),
+             gin::ConvertToV8(helper_->isolate(), std::string("b"))}));
+    EXPECT_THAT(error_msgs, ElementsAre());
+
+    EXPECT_THAT(test_shared_storage_host.observed_requests(),
+                ElementsAre(Request{.type = RequestType::kSet,
+                                    .key = u"a",
+                                    .value = u"b",
+                                    .ignore_if_present = false}));
+
+    test_shared_storage_host.ClearObservedRequests();
+  }
+
+  {
+    ContextRecyclerScope scope(context_recycler);
+    std::vector<std::string> error_msgs;
+
+    gin::Dictionary options_dict =
+        gin::Dictionary::CreateEmpty(helper_->isolate());
+    options_dict.Set("ignoreIfPresent", true);
+
+    Run(scope, script, "testSet", error_msgs,
+        /*args=*/
+        std::vector<v8::Local<v8::Value>>(
+            {gin::ConvertToV8(helper_->isolate(), std::string("a")),
+             gin::ConvertToV8(helper_->isolate(), std::string("b")),
+             gin::ConvertToV8(helper_->isolate(), options_dict)}));
+    EXPECT_THAT(error_msgs, ElementsAre());
+
+    EXPECT_THAT(test_shared_storage_host.observed_requests(),
+                ElementsAre(Request{.type = RequestType::kSet,
+                                    .key = u"a",
+                                    .value = u"b",
+                                    .ignore_if_present = true}));
+
+    test_shared_storage_host.ClearObservedRequests();
+  }
+
+  {
+    ContextRecyclerScope scope(context_recycler);
+    std::vector<std::string> error_msgs;
+
+    Run(scope, script, "testAppend", error_msgs,
+        /*args=*/
+        std::vector<v8::Local<v8::Value>>(
+            {gin::ConvertToV8(helper_->isolate(), std::string("a")),
+             gin::ConvertToV8(helper_->isolate(), std::string("b"))}));
+    EXPECT_THAT(error_msgs, ElementsAre());
+
+    EXPECT_THAT(test_shared_storage_host.observed_requests(),
+                ElementsAre(Request{.type = RequestType::kAppend,
+                                    .key = u"a",
+                                    .value = u"b",
+                                    .ignore_if_present = false}));
+
+    test_shared_storage_host.ClearObservedRequests();
+  }
+
+  {
+    ContextRecyclerScope scope(context_recycler);
+    std::vector<std::string> error_msgs;
+
+    Run(scope, script, "testDelete", error_msgs,
+        /*args=*/
+        std::vector<v8::Local<v8::Value>>(
+            {gin::ConvertToV8(helper_->isolate(), std::string("a"))}));
+    EXPECT_THAT(error_msgs, ElementsAre());
+
+    EXPECT_THAT(test_shared_storage_host.observed_requests(),
+                ElementsAre(Request{.type = RequestType::kDelete,
+                                    .key = u"a",
+                                    .value = std::u16string(),
+                                    .ignore_if_present = false}));
+
+    test_shared_storage_host.ClearObservedRequests();
+  }
+
+  {
+    ContextRecyclerScope scope(context_recycler);
+    std::vector<std::string> error_msgs;
+
+    Run(scope, script, "testClear", error_msgs,
+        /*args=*/
+        std::vector<v8::Local<v8::Value>>(
+            {gin::ConvertToV8(helper_->isolate(), std::string("a"))}));
+    EXPECT_THAT(error_msgs, ElementsAre());
+
+    EXPECT_THAT(test_shared_storage_host.observed_requests(),
+                ElementsAre(Request{.type = RequestType::kClear,
+                                    .key = std::u16string(),
+                                    .value = std::u16string(),
+                                    .ignore_if_present = false}));
+
+    test_shared_storage_host.ClearObservedRequests();
+  }
+
+  {
+    ContextRecyclerScope scope(context_recycler);
+    std::vector<std::string> error_msgs;
+
+    Run(scope, script, "testSet", error_msgs,
+        /*args=*/std::vector<v8::Local<v8::Value>>());
+    EXPECT_THAT(
+        error_msgs,
+        ElementsAre(
+            "https://example.org/script.js:3 Uncaught TypeError: Missing or "
+            "invalid \"key\" argument in sharedStorage.set()."));
+  }
+
+  {
+    ContextRecyclerScope scope(context_recycler);
+    std::vector<std::string> error_msgs;
+
+    Run(scope, script, "testSet", error_msgs, /*args=*/
+        std::vector<v8::Local<v8::Value>>(
+            {gin::ConvertToV8(helper_->isolate(), std::string("a"))}));
+    EXPECT_THAT(
+        error_msgs,
+        ElementsAre(
+            "https://example.org/script.js:3 Uncaught TypeError: Missing or "
+            "invalid \"value\" argument in sharedStorage.set()."));
+  }
+
+  {
+    ContextRecyclerScope scope(context_recycler);
+    std::vector<std::string> error_msgs;
+
+    Run(scope, script, "testSet", error_msgs, /*args=*/
+        std::vector<v8::Local<v8::Value>>(
+            {gin::ConvertToV8(helper_->isolate(), std::string("a")),
+             gin::ConvertToV8(helper_->isolate(), std::string("b")),
+             gin::ConvertToV8(helper_->isolate(), true)}));
+    EXPECT_THAT(
+        error_msgs,
+        ElementsAre("https://example.org/script.js:3 Uncaught TypeError: "
+                    "Invalid \"options\" argument in sharedStorage.set()."));
+  }
+
+  {
+    ContextRecyclerScope scope(context_recycler);
+    std::vector<std::string> error_msgs;
+
+    Run(scope, script, "testAppend", error_msgs,
+        /*args=*/std::vector<v8::Local<v8::Value>>());
+    EXPECT_THAT(
+        error_msgs,
+        ElementsAre(
+            "https://example.org/script.js:7 Uncaught TypeError: Missing or "
+            "invalid \"key\" argument in sharedStorage.append()."));
+  }
+
+  {
+    ContextRecyclerScope scope(context_recycler);
+    std::vector<std::string> error_msgs;
+
+    Run(scope, script, "testAppend", error_msgs, /*args=*/
+        std::vector<v8::Local<v8::Value>>(
+            {gin::ConvertToV8(helper_->isolate(), std::string("a"))}));
+    EXPECT_THAT(
+        error_msgs,
+        ElementsAre(
+            "https://example.org/script.js:7 Uncaught TypeError: Missing or "
+            "invalid \"value\" argument in sharedStorage.append()."));
+  }
+
+  {
+    ContextRecyclerScope scope(context_recycler);
+    std::vector<std::string> error_msgs;
+
+    Run(scope, script, "testDelete", error_msgs,
+        /*args=*/std::vector<v8::Local<v8::Value>>());
+    EXPECT_THAT(
+        error_msgs,
+        ElementsAre(
+            "https://example.org/script.js:11 Uncaught TypeError: Missing or "
+            "invalid \"key\" argument in sharedStorage.delete()."));
+  }
+}
+
+TEST_F(ContextRecyclerTest, SharedStorageMethodsPermissionsPolicyDisabled) {
+  const char kScript[] = R"(
+    function testSet(...args) {
+      sharedStorage.set(...args);
+    }
+
+    function testAppend(...args) {
+      sharedStorage.append(...args);
+    }
+
+    function testDelete(...args) {
+      sharedStorage.delete(...args);
+    }
+
+    function testClear(...args) {
+      sharedStorage.clear(...args);
+    }
+  )";
+
+  v8::Local<v8::UnboundScript> script = Compile(kScript);
+  ASSERT_FALSE(script.IsEmpty());
+
+  ContextRecycler context_recycler(helper_.get());
+  context_recycler.AddSharedStorageBindings(
+      nullptr,
+      /*shared_storage_permissions_policy_allowed=*/false);
+
+  {
+    ContextRecyclerScope scope(context_recycler);
+    std::vector<std::string> error_msgs;
+
+    Run(scope, script, "testSet", error_msgs,
+        /*args=*/std::vector<v8::Local<v8::Value>>());
+    EXPECT_THAT(error_msgs,
+                ElementsAre("https://example.org/script.js:3 Uncaught "
+                            "TypeError: The \"shared-storage\" Permissions "
+                            "Policy denied the method on sharedStorage."));
+  }
+
+  {
+    ContextRecyclerScope scope(context_recycler);
+    std::vector<std::string> error_msgs;
+
+    Run(scope, script, "testAppend", error_msgs,
+        /*args=*/std::vector<v8::Local<v8::Value>>());
+    EXPECT_THAT(error_msgs,
+                ElementsAre("https://example.org/script.js:7 Uncaught "
+                            "TypeError: The \"shared-storage\" Permissions "
+                            "Policy denied the method on sharedStorage."));
+  }
+
+  {
+    ContextRecyclerScope scope(context_recycler);
+    std::vector<std::string> error_msgs;
+
+    Run(scope, script, "testDelete", error_msgs,
+        /*args=*/std::vector<v8::Local<v8::Value>>());
+    EXPECT_THAT(error_msgs,
+                ElementsAre("https://example.org/script.js:11 Uncaught "
+                            "TypeError: The \"shared-storage\" Permissions "
+                            "Policy denied the method on sharedStorage."));
+  }
+
+  {
+    ContextRecyclerScope scope(context_recycler);
+    std::vector<std::string> error_msgs;
+
+    Run(scope, script, "testClear", error_msgs,
+        /*args=*/std::vector<v8::Local<v8::Value>>());
+    EXPECT_THAT(error_msgs,
+                ElementsAre("https://example.org/script.js:15 Uncaught "
+                            "TypeError: The \"shared-storage\" Permissions "
+                            "Policy denied the method on sharedStorage."));
   }
 }
 
@@ -1558,6 +1867,13 @@ TEST_F(ContextRecyclerPrivateAggregationExtensionsEnabledTest,
       privateAggregation.reportContributionForEvent(args, 'reserved.win');
     }
 
+    function testInvalidReservedEventType(args) {
+      if (typeof args.bucket === "string") {
+        args.bucket = BigInt(args.bucket);
+      }
+      privateAggregation.reportContributionForEvent("reserved.something", args);
+    }
+
     function doNothing() {}
   )";
 
@@ -1587,13 +1903,13 @@ TEST_F(ContextRecyclerPrivateAggregationExtensionsEnabledTest,
     ASSERT_EQ(pa_requests.size(), 4u);
     EXPECT_EQ(pa_requests[0],
               CreateForEventRequest(/*bucket=*/123, /*value=*/45,
-                                    /*event_type=*/"reserved.win"));
+                                    /*event_type=*/kReservedWin));
     EXPECT_EQ(pa_requests[1],
               CreateForEventRequest(/*bucket=*/123, /*value=*/46,
-                                    /*event_type=*/"reserved.loss"));
+                                    /*event_type=*/kReservedLoss));
     EXPECT_EQ(pa_requests[2],
               CreateForEventRequest(/*bucket=*/123, /*value=*/47,
-                                    /*event_type=*/"reserved.always"));
+                                    /*event_type=*/kReservedAlways));
     EXPECT_EQ(pa_requests[3],
               CreateForEventRequest(/*bucket=*/123, /*value=*/48,
                                     /*event_type=*/"click"));
@@ -1672,6 +1988,26 @@ TEST_F(ContextRecyclerPrivateAggregationExtensionsEnabledTest,
                     .empty());
   }
 
+  // Invalid reserved event type.
+  {
+    ContextRecyclerScope scope(context_recycler);
+    std::vector<std::string> error_msgs;
+
+    gin::Dictionary dict = gin::Dictionary::CreateEmpty(helper_->isolate());
+    dict.Set("bucket", std::string("123"));
+    dict.Set("value", 45);
+
+    Run(scope, script, "testInvalidReservedEventType", error_msgs,
+        gin::ConvertToV8(helper_->isolate(), dict));
+    // Don't throw an error if an invalid reserved event type is provided, to
+    // provide forward compatibility with new reserved event types added later.
+    EXPECT_THAT(error_msgs, ElementsAre());
+
+    EXPECT_TRUE(context_recycler.private_aggregation_bindings()
+                    ->TakePrivateAggregationRequests()
+                    .empty());
+  }
+
   // Large bucket
   {
     ContextRecyclerScope scope(context_recycler);
@@ -1691,7 +2027,7 @@ TEST_F(ContextRecyclerPrivateAggregationExtensionsEnabledTest,
                 NewIdBucket(absl::MakeUint128(/*high=*/1, /*low=*/0)),
             /*value=*/
             auction_worklet::mojom::ForEventSignalValue::NewIntValue(45),
-            /*event_type=*/"reserved.win");
+            /*event_type=*/kReservedWin);
 
     ExpectOneForEventRequestEqualTo(
         context_recycler.private_aggregation_bindings()
@@ -1718,7 +2054,7 @@ TEST_F(ContextRecyclerPrivateAggregationExtensionsEnabledTest,
                 NewIdBucket(absl::Uint128Max()),
             /*value=*/
             auction_worklet::mojom::ForEventSignalValue::NewIntValue(45),
-            /*event_type=*/"reserved.win");
+            /*event_type=*/kReservedWin);
 
     ExpectOneForEventRequestEqualTo(
         context_recycler.private_aggregation_bindings()
@@ -1745,7 +2081,7 @@ TEST_F(ContextRecyclerPrivateAggregationExtensionsEnabledTest,
                 NewIdBucket(0),
             /*value=*/
             auction_worklet::mojom::ForEventSignalValue::NewIntValue(45),
-            /*event_type=*/"reserved.win");
+            /*event_type=*/kReservedWin);
 
     ExpectOneForEventRequestEqualTo(
         context_recycler.private_aggregation_bindings()
@@ -1772,7 +2108,7 @@ TEST_F(ContextRecyclerPrivateAggregationExtensionsEnabledTest,
                 NewIdBucket(123),
             /*value=*/
             auction_worklet::mojom::ForEventSignalValue::NewIntValue(0),
-            /*event_type=*/"reserved.win");
+            /*event_type=*/kReservedWin);
 
     ExpectOneForEventRequestEqualTo(
         context_recycler.private_aggregation_bindings()
@@ -1810,10 +2146,10 @@ TEST_F(ContextRecyclerPrivateAggregationExtensionsEnabledTest,
     ASSERT_EQ(pa_requests.size(), 2u);
     EXPECT_EQ(pa_requests[0],
               CreateForEventRequest(/*bucket=*/123, /*value=*/45,
-                                    /*event_type=*/"reserved.win"));
+                                    /*event_type=*/kReservedWin));
     EXPECT_EQ(pa_requests[1],
               CreateForEventRequest(/*bucket=*/678, /*value=*/90,
-                                    /*event_type=*/"reserved.win"));
+                                    /*event_type=*/kReservedWin));
   }
 
   // Too large bucket
@@ -1844,7 +2180,7 @@ TEST_F(ContextRecyclerPrivateAggregationExtensionsEnabledTest,
 
     gin::Dictionary bucket_dict =
         gin::Dictionary::CreateEmpty(helper_->isolate());
-    bucket_dict.Set("base_value", std::string("bidRejectReason"));
+    bucket_dict.Set("baseValue", std::string("bidRejectReason"));
     bucket_dict.Set("scale", 2);
     bucket_dict.Set("offset", std::string("-255"));
 
@@ -1869,7 +2205,7 @@ TEST_F(ContextRecyclerPrivateAggregationExtensionsEnabledTest,
                 NewSignalBucket(std::move(signal_bucket)),
             /*value=*/
             auction_worklet::mojom::ForEventSignalValue::NewIntValue(1),
-            /*event_type=*/"reserved.win");
+            /*event_type=*/kReservedWin);
 
     ExpectOneForEventRequestEqualTo(
         context_recycler.private_aggregation_bindings()
@@ -1884,7 +2220,7 @@ TEST_F(ContextRecyclerPrivateAggregationExtensionsEnabledTest,
 
     gin::Dictionary bucket_dict =
         gin::Dictionary::CreateEmpty(helper_->isolate());
-    bucket_dict.Set("base_value", std::string("bidRejectReason"));
+    bucket_dict.Set("baseValue", std::string("bidRejectReason"));
 
     gin::Dictionary dict = gin::Dictionary::CreateEmpty(helper_->isolate());
     dict.Set("bucket", bucket_dict);
@@ -1905,7 +2241,7 @@ TEST_F(ContextRecyclerPrivateAggregationExtensionsEnabledTest,
                 NewSignalBucket(signal_bucket.Clone()),
             /*value=*/
             auction_worklet::mojom::ForEventSignalValue::NewIntValue(1),
-            /*event_type=*/"reserved.win");
+            /*event_type=*/kReservedWin);
 
     ExpectOneForEventRequestEqualTo(
         context_recycler.private_aggregation_bindings()
@@ -1913,7 +2249,7 @@ TEST_F(ContextRecyclerPrivateAggregationExtensionsEnabledTest,
         expected_contribution.Clone());
   }
 
-  // Invalid bucket dictionary, which has no base_value key
+  // Invalid bucket dictionary, which has no "baseValue" key.
   {
     ContextRecyclerScope scope(context_recycler);
     std::vector<std::string> error_msgs;
@@ -1937,14 +2273,14 @@ TEST_F(ContextRecyclerPrivateAggregationExtensionsEnabledTest,
                     .empty());
   }
 
-  // Invalid bucket dictionary, whose base_value is invalid.
+  // Invalid bucket dictionary, whose baseValue is invalid.
   {
     ContextRecyclerScope scope(context_recycler);
     std::vector<std::string> error_msgs;
 
     gin::Dictionary bucket_dict =
         gin::Dictionary::CreateEmpty(helper_->isolate());
-    bucket_dict.Set("base_value", std::string("notValidBaseValue"));
+    bucket_dict.Set("baseValue", std::string("notValidBaseValue"));
 
     gin::Dictionary dict = gin::Dictionary::CreateEmpty(helper_->isolate());
     dict.Set("bucket", bucket_dict);
@@ -1968,7 +2304,7 @@ TEST_F(ContextRecyclerPrivateAggregationExtensionsEnabledTest,
 
     gin::Dictionary bucket_dict =
         gin::Dictionary::CreateEmpty(helper_->isolate());
-    bucket_dict.Set("base_value", std::string("winningBid"));
+    bucket_dict.Set("baseValue", std::string("winningBid"));
     bucket_dict.Set("scale", std::string("255"));
 
     gin::Dictionary dict = gin::Dictionary::CreateEmpty(helper_->isolate());
@@ -1993,7 +2329,7 @@ TEST_F(ContextRecyclerPrivateAggregationExtensionsEnabledTest,
 
     gin::Dictionary bucket_dict =
         gin::Dictionary::CreateEmpty(helper_->isolate());
-    bucket_dict.Set("base_value", std::string("winningBid"));
+    bucket_dict.Set("baseValue", std::string("winningBid"));
     bucket_dict.Set("offset", 255);
 
     gin::Dictionary dict = gin::Dictionary::CreateEmpty(helper_->isolate());
@@ -2018,7 +2354,7 @@ TEST_F(ContextRecyclerPrivateAggregationExtensionsEnabledTest,
 
     gin::Dictionary value_dict =
         gin::Dictionary::CreateEmpty(helper_->isolate());
-    value_dict.Set("base_value", std::string("winningBid"));
+    value_dict.Set("baseValue", std::string("winningBid"));
     value_dict.Set("scale", 2);
     value_dict.Set("offset", -5);
 
@@ -2042,7 +2378,7 @@ TEST_F(ContextRecyclerPrivateAggregationExtensionsEnabledTest,
             /*value=*/
             auction_worklet::mojom::ForEventSignalValue::NewSignalValue(
                 std::move(signal_value)),
-            /*event_type=*/"reserved.win");
+            /*event_type=*/kReservedWin);
 
     ExpectOneForEventRequestEqualTo(
         context_recycler.private_aggregation_bindings()

@@ -7,6 +7,7 @@ import {AutomationPredicate} from '../../common/automation_predicate.js';
 import {AutomationUtil} from '../../common/automation_util.js';
 import {constants} from '../../common/constants.js';
 import {CursorRange} from '../../common/cursors/range.js';
+import {Flags} from '../../common/flags.js';
 import {InstanceChecker} from '../../common/instance_checker.js';
 import {LocalStorage} from '../../common/local_storage.js';
 import {NavBraille} from '../common/braille/nav_braille.js';
@@ -42,6 +43,7 @@ import {BackgroundKeyboardHandler} from './keyboard_handler.js';
 import {LiveRegions} from './live_regions.js';
 import {EventStreamLogger} from './logging/event_stream_logger.js';
 import {LogStore} from './logging/log_store.js';
+import {LogUrlWatcher} from './logging/log_url_watcher.js';
 import {MathHandler} from './math_handler.js';
 import {MediaAutomationHandler} from './media_automation_handler.js';
 import {Output} from './output/output.js';
@@ -110,8 +112,8 @@ export class Background extends ChromeVoxState {
   }
 
   static async init() {
-    // Initialize storage, settings, braille, prefs, TTS, and legacy background
-    // page first.
+    // Pre-initialization.
+    await Flags.init();
     await LocalStorage.init();
     await SettingsManager.init();
     BrailleBackground.init();
@@ -122,6 +124,7 @@ export class Background extends ChromeVoxState {
 
     ChromeVoxState.instance = new Background();
 
+    // Standard initialization.
     AutoScrollHandler.init();
     BackgroundKeyboardHandler.init();
     BrailleCommandHandler.init();
@@ -136,11 +139,13 @@ export class Background extends ChromeVoxState {
     LiveRegions.init();
     LocaleOutputHelper.init();
     LogStore.init();
+    LogUrlWatcher.init();
     PageLoadSoundHandler.init();
     PanelBackground.init();
     RangeAutomationHandler.init();
     SmartStickyMode.init();
 
+    // Async initialization.
     // Allow all async initializers to run simultaneously, but wait for them to
     // complete before continuing.
     await Promise.all([

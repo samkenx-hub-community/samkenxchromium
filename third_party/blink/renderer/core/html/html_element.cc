@@ -60,7 +60,7 @@
 #include "third_party/blink/renderer/core/event_type_names.h"
 #include "third_party/blink/renderer/core/events/keyboard_event.h"
 #include "third_party/blink/renderer/core/events/pointer_event.h"
-#include "third_party/blink/renderer/core/events/popover_toggle_event.h"
+#include "third_party/blink/renderer/core/events/toggle_event.h"
 #include "third_party/blink/renderer/core/frame/csp/content_security_policy.h"
 #include "third_party/blink/renderer/core/frame/local_dom_window.h"
 #include "third_party/blink/renderer/core/frame/local_frame.h"
@@ -99,6 +99,7 @@
 #include "third_party/blink/renderer/platform/bindings/exception_state.h"
 #include "third_party/blink/renderer/platform/heap/garbage_collected.h"
 #include "third_party/blink/renderer/platform/instrumentation/use_counter.h"
+#include "third_party/blink/renderer/platform/scheduler/public/post_cancellable_task.h"
 #include "third_party/blink/renderer/platform/text/bidi_resolver.h"
 #include "third_party/blink/renderer/platform/text/bidi_text_run.h"
 #include "third_party/blink/renderer/platform/text/text_run_iterator.h"
@@ -426,8 +427,6 @@ AttributeTriggers* HTMLElement::TriggersForAttributeName(
 
       {html_names::kOnabortAttr, kNoWebFeature, event_type_names::kAbort,
        nullptr},
-      {html_names::kOnaftertoggleAttr, kNoWebFeature,
-       event_type_names::kAftertoggle, nullptr},
       {html_names::kOnanimationendAttr, kNoWebFeature,
        event_type_names::kAnimationend, nullptr},
       {html_names::kOnanimationiterationAttr, kNoWebFeature,
@@ -1360,12 +1359,12 @@ void HTMLElement::ShowPopoverInternal(ExceptionState* exception_state) {
   }
 
   // Fire the "opening" beforetoggle event.
-  auto* event = PopoverToggleEvent::CreateBubble(
+  auto* event = ToggleEvent::CreateBubble(
       event_type_names::kBeforetoggle, Event::Cancelable::kYes,
-      /*current_state*/ "closed", /*new_state*/ "open");
+      /*old_state*/ "closed", /*new_state*/ "open");
   DCHECK(event->bubbles());
   DCHECK(event->cancelable());
-  DCHECK_EQ(event->currentState(), "closed");
+  DCHECK_EQ(event->oldState(), "closed");
   DCHECK_EQ(event->newState(), "open");
   event->SetTarget(this);
   if (DispatchEvent(*event) != DispatchEventResult::kNotCanceled)
@@ -1439,16 +1438,35 @@ void HTMLElement::ShowPopoverInternal(ExceptionState* exception_state) {
     GetPopoverData()->setPreviouslyFocusedElement(originally_focused_element);
   }
 
-  // Queue the "opening" aftertoggle event.
-  auto* after_event = PopoverToggleEvent::CreateBubble(
-      event_type_names::kAftertoggle, Event::Cancelable::kNo,
-      /*current_state*/ "open", /*new_state*/ "open");
+  // Queue the "opening" toggle event.
+  String old_state = "closed";
+  ToggleEvent* after_event;
+  if (GetPopoverData()->hasPendingToggleEventTask()) {
+    // There's already a queued 'toggle' event. Cancel it and fire a new one
+    // keeping the original value for old_state.
+    old_state =
+        GetPopoverData()->pendingToggleEventStartedClosed() ? "closed" : "open";
+    GetPopoverData()->cancelPendingToggleEventTask();
+  } else {
+    GetPopoverData()->setPendingToggleEventStartedClosed(true);
+  }
+  after_event = ToggleEvent::CreateBubble(event_type_names::kToggle,
+                                          Event::Cancelable::kNo, old_state,
+                                          /*new_state*/ "open");
+  DCHECK_EQ(after_event->newState(), "open");
+  DCHECK_EQ(after_event->oldState(), old_state);
   DCHECK(after_event->bubbles());
   DCHECK(!after_event->cancelable());
-  DCHECK_EQ(after_event->currentState(), "open");
-  DCHECK_EQ(after_event->newState(), "open");
   after_event->SetTarget(this);
-  GetDocument().EnqueueAnimationFrameEvent(after_event);
+  GetPopoverData()->setPendingToggleEventTask(PostCancellableTask(
+      *GetDocument().GetTaskRunner(TaskType::kDOMManipulation), FROM_HERE,
+      WTF::BindOnce(
+          [](HTMLElement* element, ToggleEvent* event) {
+            DCHECK(element);
+            DCHECK(event);
+            element->DispatchEvent(*event);
+          },
+          WrapPersistent(this), WrapPersistent(after_event))));
 }
 
 // static
@@ -1589,12 +1607,12 @@ void HTMLElement::HidePopoverInternal(HidePopoverFocusBehavior focus_behavior,
   }
 
   // Fire the "closing" beforetoggle event.
-  auto* event = PopoverToggleEvent::CreateBubble(
+  auto* event = ToggleEvent::CreateBubble(
       event_type_names::kBeforetoggle, Event::Cancelable::kNo,
-      /*current_state*/ "open", /*new_state*/ "closed");
+      /*old_state*/ "open", /*new_state*/ "closed");
   DCHECK(event->bubbles());
   DCHECK(!event->cancelable());
-  DCHECK_EQ(event->currentState(), "open");
+  DCHECK_EQ(event->oldState(), "open");
   DCHECK_EQ(event->newState(), "closed");
   event->SetTarget(this);
   auto result = DispatchEvent(*event);
@@ -1630,16 +1648,35 @@ void HTMLElement::HidePopoverInternal(HidePopoverFocusBehavior focus_behavior,
             this, std::move(animations)));
   }
 
-  // Queue the "closing" aftertoggle event.
-  auto* after_event = PopoverToggleEvent::CreateBubble(
-      event_type_names::kAftertoggle, Event::Cancelable::kNo,
-      /*current_state*/ "closed", /*new_state*/ "closed");
+  // Queue the "closing" toggle event.
+  String old_state = "open";
+  ToggleEvent* after_event;
+  if (GetPopoverData()->hasPendingToggleEventTask()) {
+    // There's already a queued 'toggle' event. Cancel it and fire a new one
+    // keeping the original value for old_state.
+    old_state =
+        GetPopoverData()->pendingToggleEventStartedClosed() ? "closed" : "open";
+    GetPopoverData()->cancelPendingToggleEventTask();
+  } else {
+    GetPopoverData()->setPendingToggleEventStartedClosed(false);
+  }
+  after_event = ToggleEvent::CreateBubble(event_type_names::kToggle,
+                                          Event::Cancelable::kNo, old_state,
+                                          /*new_state*/ "closed");
+  DCHECK_EQ(after_event->newState(), "closed");
+  DCHECK_EQ(after_event->oldState(), old_state);
   DCHECK(after_event->bubbles());
   DCHECK(!after_event->cancelable());
-  DCHECK_EQ(after_event->currentState(), "closed");
-  DCHECK_EQ(after_event->newState(), "closed");
   after_event->SetTarget(this);
-  GetDocument().EnqueueAnimationFrameEvent(after_event);
+  GetPopoverData()->setPendingToggleEventTask(PostCancellableTask(
+      *GetDocument().GetTaskRunner(TaskType::kDOMManipulation), FROM_HERE,
+      WTF::BindOnce(
+          [](HTMLElement* element, ToggleEvent* event) {
+            DCHECK(element);
+            DCHECK(event);
+            element->DispatchEvent(*event);
+          },
+          WrapPersistent(this), WrapPersistent(after_event))));
 
   Element* previously_focused_element =
       GetPopoverData()->previouslyFocusedElement();
@@ -1660,7 +1697,7 @@ void HTMLElement::PopoverHideFinishIfNeeded() {
   DCHECK(RuntimeEnabledFeatures::HTMLPopoverAttributeEnabled(
       GetDocument().GetExecutionContext()));
   GetDocument().PopoversWaitingToHide().erase(this);
-  GetDocument().RemoveFromTopLayer(this);
+  GetDocument().ScheduleForTopLayerRemoval(this);
   // Re-apply display:none, and start matching `:closed`.
   if (GetPopoverData()) {
     GetPopoverData()->setVisibilityState(PopoverVisibilityState::kHidden);
@@ -1774,7 +1811,7 @@ const HTMLElement* NearestInclusiveTargetPopoverForInvoker(const Node* node) {
 // first one to open is the "parent" and the second is the "child". Only
 // popover=auto popovers are considered.
 const HTMLElement* HTMLElement::FindTopmostPopoverAncestor(
-    const HTMLElement& new_popover) {
+    HTMLElement& new_popover) {
   DCHECK(new_popover.HasPopoverAttribute());
   auto& document = new_popover.GetDocument();
   DCHECK(RuntimeEnabledFeatures::HTMLPopoverAttributeEnabled(
@@ -1908,10 +1945,17 @@ void HTMLElement::InvokePopover(Element* invoker) {
   ShowPopoverInternal(/*exception_state=*/nullptr);
 }
 
-Element* HTMLElement::anchorElement() const {
-  if (PopoverData* data = GetPopoverData())
-    return data->anchorElement();
-  return nullptr;
+Element* HTMLElement::anchorElement() {
+  Element* element = GetElementAttribute(html_names::kAnchorAttr);
+  DCHECK(!GetPopoverData() || element == GetPopoverData()->anchorElement());
+  return element;
+}
+
+void HTMLElement::setAnchorElement(Element* new_element) {
+  SetElementAttribute(html_names::kAnchorAttr, new_element);
+  if (GetPopoverData()) {
+    ResetPopoverAnchorObserver();
+  }
 }
 
 void HTMLElement::ResetPopoverAnchorObserver() {
@@ -1919,6 +1963,8 @@ void HTMLElement::ResetPopoverAnchorObserver() {
   DCHECK(HasPopoverAttribute());
   DCHECK(RuntimeEnabledFeatures::HTMLPopoverAttributeEnabled(
       GetDocument().GetExecutionContext()));
+  // This attaches an idref observer on the target idref. If an element
+  // reference is set instead of an idref, the observer will be detached.
   const AtomicString& anchor_id = FastGetAttribute(html_names::kAnchorAttr);
   GetPopoverData()->setAnchorObserver(
       IsInTreeScope() && anchor_id
@@ -1930,11 +1976,11 @@ void HTMLElement::ResetPopoverAnchorObserver() {
 void HTMLElement::PopoverAnchorElementChanged() {
   DCHECK(GetPopoverData());
   DCHECK(HasPopoverAttribute());
-  const AtomicString& anchor_id = FastGetAttribute(html_names::kAnchorAttr);
-  Element* new_anchor = IsInTreeScope() && anchor_id
-                            ? GetTreeScope().getElementById(anchor_id)
-                            : nullptr;
-  Element* old_anchor = anchorElement();
+  Element* new_anchor = nullptr;
+  if (IsInTreeScope()) {
+    new_anchor = GetElementAttribute(html_names::kAnchorAttr);
+  }
+  Element* old_anchor = GetPopoverData()->anchorElement();
   if (new_anchor == old_anchor)
     return;
   if (old_anchor)

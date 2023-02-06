@@ -13,9 +13,12 @@ export class TestMetricsBrowserProxy extends TestBrowserProxy implements
       'recordSafetyCheckInteractionHistogram',
       'recordSafetyCheckNotificationsListCountHistogram',
       'recordSafetyCheckNotificationsModuleInteractionsHistogram',
+      'recordSafetyCheckNotificationsModuleEntryPointShown',
       'recordSafetyCheckUnusedSitePermissionsListCountHistogram',
       'recordSafetyCheckUnusedSitePermissionsModuleInteractionsHistogram',
+      'recordSafetyCheckUnusedSitePermissionsModuleEntryPointShown',
       'recordSettingsPageHistogram',
+      'recordPrivacyGuideFlowLengthHistogram',
       'recordSafeBrowsingInteractionHistogram',
       'recordPrivacyGuideNextNavigationHistogram',
       'recordPrivacyGuideEntryExitHistogram',
@@ -43,6 +46,11 @@ export class TestMetricsBrowserProxy extends TestBrowserProxy implements
         interaction);
   }
 
+  recordSafetyCheckNotificationsModuleEntryPointShown(visible: boolean) {
+    this.methodCalled(
+        'recordSafetyCheckNotificationsModuleEntryPointShown', visible);
+  }
+
   recordSafetyCheckUnusedSitePermissionsListCountHistogram(suggestions:
                                                                number) {
     this.methodCalled(
@@ -55,6 +63,12 @@ export class TestMetricsBrowserProxy extends TestBrowserProxy implements
     this.methodCalled(
         'recordSafetyCheckUnusedSitePermissionsModuleInteractionsHistogram',
         interaction);
+  }
+
+  recordSafetyCheckUnusedSitePermissionsModuleEntryPointShown(visible:
+                                                                  boolean) {
+    this.methodCalled(
+        'recordSafetyCheckUnusedSitePermissionsModuleEntryPointShown', visible);
   }
 
   recordSettingsPageHistogram(interaction: PrivacyElementInteractions) {
@@ -77,5 +91,9 @@ export class TestMetricsBrowserProxy extends TestBrowserProxy implements
 
   recordPrivacyGuideSettingsStatesHistogram(state: PrivacyGuideSettingsStates) {
     this.methodCalled('recordPrivacyGuideSettingsStatesHistogram', state);
+  }
+
+  recordPrivacyGuideFlowLengthHistogram(steps: number) {
+    this.methodCalled('recordPrivacyGuideFlowLengthHistogram', steps);
   }
 }

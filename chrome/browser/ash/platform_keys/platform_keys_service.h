@@ -26,15 +26,14 @@ class NSSCertDatabase;
 class ClientCertStore;
 }  // namespace net
 
-namespace ash {
-namespace platform_keys {
+namespace ash::platform_keys {
 
 using GenerateKeyCallback =
-    base::OnceCallback<void(const std::string& public_key_spki_der,
+    base::OnceCallback<void(std::vector<uint8_t> public_key_spki_der,
                             chromeos::platform_keys::Status status)>;
 
 using SignCallback =
-    base::OnceCallback<void(const std::string& signature,
+    base::OnceCallback<void(std::vector<uint8_t> signature,
                             chromeos::platform_keys::Status status)>;
 
 // If the certificate request could be processed successfully, |matches| will
@@ -411,7 +410,6 @@ class PlatformKeysServiceImpl final : public PlatformKeysService {
   base::WeakPtrFactory<PlatformKeysServiceImpl> weak_factory_{this};
 };
 
-}  // namespace platform_keys
-}  // namespace ash
+}  // namespace ash::platform_keys
 
 #endif  // CHROME_BROWSER_ASH_PLATFORM_KEYS_PLATFORM_KEYS_SERVICE_H_

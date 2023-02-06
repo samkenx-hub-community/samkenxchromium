@@ -91,7 +91,7 @@ struct Config {
   // and accessing clusters will retrieve them from the history DB. If disabled,
   // updating clusters is a no-op and accessing clusters will generate and
   // return new clusters without persisting them.
-  bool persist_clusters_in_history_db = false;
+  bool persist_clusters_in_history_db = true;
 
   // No effect if `persist_clusters_in_history_db` is disabled. Determines how
   // soon to update clusters after startup in minutes. E.g., by default, will
@@ -160,10 +160,6 @@ struct Config {
   // suggestions are allowed to display the chip. Does nothing if
   // `omnibox_action` is disabled.
   bool omnibox_action_on_navigation_intents = false;
-
-  // If enabled, allowed the action chip to appear on search entity suggestions.
-  // TODO(crbug.com/1394812): Clean this flag up beyond M110.
-  bool omnibox_action_on_entities = true;
 
   // The `kOmniboxHistoryClusterProvider` feature and child params.
 

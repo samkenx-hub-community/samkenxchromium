@@ -63,7 +63,7 @@ class CertProvisioningWorkerStatic : public CertProvisioningWorker {
   void GenerateKey();
 
   void GenerateRegularKey();
-  void OnGenerateRegularKeyDone(const std::string& public_key_spki_der,
+  void OnGenerateRegularKeyDone(std::vector<uint8_t> public_key_spki_der,
                                 chromeos::platform_keys::Status status);
 
   void GenerateKeyForVa();
@@ -94,7 +94,7 @@ class CertProvisioningWorkerStatic : public CertProvisioningWorker {
 
   void SignCsr();
   void OnSignCsrDone(base::TimeTicks start_time,
-                     const std::string& signature,
+                     std::vector<uint8_t> signature,
                      chromeos::platform_keys::Status status);
 
   void FinishCsr();

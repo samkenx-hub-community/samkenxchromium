@@ -15,6 +15,7 @@
 #import "base/notreached.h"
 #import "base/numerics/safe_conversions.h"
 #import "base/strings/sys_string_conversions.h"
+#import "ios/chrome/browser/tabs/features.h"
 #import "ios/chrome/browser/ui/commands/thumb_strip_commands.h"
 #import "ios/chrome/browser/ui/commerce/price_card/price_card_data_source.h"
 #import "ios/chrome/browser/ui/commerce/price_card/price_card_item.h"
@@ -745,14 +746,12 @@ NSIndexPath* CreateIndexPath(NSInteger index) {
 
 - (UIPointerRegion*)pointerInteraction:(UIPointerInteraction*)interaction
                       regionForRequest:(UIPointerRegionRequest*)request
-                         defaultRegion:(UIPointerRegion*)defaultRegion
-    API_AVAILABLE(ios(13.4)) {
+                         defaultRegion:(UIPointerRegion*)defaultRegion {
   return defaultRegion;
 }
 
 - (UIPointerStyle*)pointerInteraction:(UIPointerInteraction*)interaction
-                       styleForRegion:(UIPointerRegion*)region
-    API_AVAILABLE(ios(13.4)) {
+                       styleForRegion:(UIPointerRegion*)region {
   UIPointerLiftEffect* effect = [UIPointerLiftEffect
       effectWithPreview:[[UITargetedPreview alloc]
                             initWithView:interaction.view]];
@@ -948,6 +947,22 @@ NSIndexPath* CreateIndexPath(NSInteger index) {
                                          toIndex:destinationIndex
                               placeholderContext:context];
     }
+  }
+}
+
+- (void)collectionView:(UICollectionView*)collectionView
+    dropSessionDidEnter:(id<UIDropSession>)session {
+  if (IsPinnedTabsEnabled()) {
+    // Notify the delegate that a drag cames from another app.
+    [self.delegate gridViewControllerDragSessionWillBegin:self];
+  }
+}
+
+- (void)collectionView:(UICollectionView*)collectionView
+     dropSessionDidEnd:(id<UIDropSession>)session {
+  if (IsPinnedTabsEnabled()) {
+    // Notify the delegate that a drag ends from another app.
+    [self.delegate gridViewControllerDropAnimationDidEnd:self];
   }
 }
 

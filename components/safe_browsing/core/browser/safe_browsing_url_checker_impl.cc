@@ -131,7 +131,8 @@ SafeBrowsingUrlCheckerImpl::SafeBrowsingUrlCheckerImpl(
     UrlRealTimeMechanism::WebUIDelegate* webui_delegate,
     base::WeakPtr<HashRealTimeService> hash_realtime_service_on_ui,
     scoped_refptr<SafeBrowsingLookupMechanismExperimenter>
-        mechanism_experimenter)
+        mechanism_experimenter,
+    bool is_mechanism_experiment_allowed)
     : headers_(headers),
       load_flags_(load_flags),
       request_destination_(request_destination),
@@ -152,7 +153,8 @@ SafeBrowsingUrlCheckerImpl::SafeBrowsingUrlCheckerImpl(
       url_lookup_service_on_ui_(url_lookup_service_on_ui),
       webui_delegate_(webui_delegate),
       hash_realtime_service_on_ui_(hash_realtime_service_on_ui),
-      mechanism_experimenter_(mechanism_experimenter) {
+      mechanism_experimenter_(mechanism_experimenter),
+      is_mechanism_experiment_allowed_(is_mechanism_experiment_allowed) {
   DCHECK(!web_contents_getter_.is_null());
   DCHECK(!can_rt_check_subresource_url_ || real_time_lookup_enabled_);
   DCHECK(real_time_lookup_enabled_ || can_check_db_);
@@ -290,6 +292,33 @@ void SafeBrowsingUrlCheckerImpl::OnUrlResultInternal(
   TRACE_EVENT_NESTABLE_ASYNC_END1("safe_browsing", "CheckUrl",
                                   TRACE_ID_LOCAL(this), "url", url.spec());
 
+  // TODO(crbug.com/1410253): Deprecate this once the experiment is complete.
+  if (mechanism_experimenter_ &&
+      mechanism_experimenter_->IsCheckInExperiment(next_index_)) {
+    // This might be run again if the result was actually safe in the
+    // CheckExperimentEligibilityAndStartBlockingPage call below. The
+    // experimenter will discard the second call it receives. It's necessary to
+    // call into it twice because:
+    //   1. If it's not unsafe, we need this first call, because the code below
+    //      is not called.
+    //   2. If it is unsafe, this first call is insufficient. The call to show
+    //      the blocking page must be done after the eligibility is determined.
+    //      Since these calls end up getting kicked off on another thread, the
+    //      two must be done in the same task to ensure the order is correct.
+    url_checker_delegate_->CheckLookupMechanismExperimentEligibility(
+        // Create a dummy resource to use to determine eligibility. Of the
+        // parameters supplied, only |url| is used, so the others can be
+        // anything. The call also uses web_contents-related fields that are
+        // populated within the |MakeUnsafeResource| function.
+        MakeUnsafeResource(url, SBThreatType::SB_THREAT_TYPE_SAFE, metadata,
+                           /*is_from_real_time_check=*/false,
+                           /*rt_lookup_response=*/nullptr),
+        base::BindOnce(&SafeBrowsingLookupMechanismExperimenter::
+                           SetCheckExperimentEligibility,
+                       mechanism_experimenter_, next_index_),
+        base::SequencedTaskRunner::GetCurrentDefault());
+  }
+
   const bool is_prefetch = (load_flags_ & net::LOAD_PREFETCH);
 
   // Handle main frame and subresources. We do this to catch resources flagged
@@ -358,10 +387,28 @@ void SafeBrowsingUrlCheckerImpl::OnUrlResultInternal(
 
   state_ = STATE_DISPLAYING_BLOCKING_PAGE;
 
-  url_checker_delegate_->StartDisplayingBlockingPageHelper(
-      resource, urls_[next_index_].method, headers_,
-      request_destination_ == network::mojom::RequestDestination::kDocument,
-      has_user_gesture_);
+  // TODO(crbug.com/1410253): Deprecate this once the experiment is complete.
+  if (mechanism_experimenter_ &&
+      mechanism_experimenter_->IsCheckInExperiment(next_index_)) {
+    // We replace the call to StartDisplayingBlockingPageHelper with this call.
+    // It first determines the experiment's eligibility and then does the same
+    // thing that StartDisplayingBlockingPageHelper does. This is because the
+    // second call can affect the values used to determine the experiment's
+    // eligibility. The two are combined into a single call because they are
+    // performed on a separate thread, and we need to ensure that the experiment
+    // eligibility is determined first.
+    url_checker_delegate_->CheckExperimentEligibilityAndStartBlockingPage(
+        resource,
+        base::BindOnce(&SafeBrowsingLookupMechanismExperimenter::
+                           SetCheckExperimentEligibility,
+                       mechanism_experimenter_, next_index_),
+        base::SequencedTaskRunner::GetCurrentDefault());
+  } else {
+    url_checker_delegate_->StartDisplayingBlockingPageHelper(
+        resource, urls_[next_index_].method, headers_,
+        request_destination_ == network::mojom::RequestDestination::kDocument,
+        has_user_gesture_);
+  }
 }
 
 void SafeBrowsingUrlCheckerImpl::CheckUrlImpl(const GURL& url,
@@ -481,6 +528,9 @@ SafeBrowsingLookupMechanism::StartCheckResult
 SafeBrowsingUrlCheckerImpl::KickOffLookupMechanism(
     const GURL& url,
     bool can_perform_full_url_lookup) {
+  if (is_mechanism_experiment_allowed_) {
+    database_manager_->SetLookupMechanismExperimentIsEnabled();
+  }
   base::UmaHistogramBoolean("SafeBrowsing.RT.CanCheckDatabase", can_check_db_);
   std::unique_ptr<SafeBrowsingLookupMechanism> lookup_mechanism;
   DCHECK(!lookup_mechanism_runner_);
@@ -489,6 +539,7 @@ SafeBrowsingUrlCheckerImpl::KickOffLookupMechanism(
     if (can_check_db_ && mechanism_experimenter_ &&
         HashRealTimeMechanism::CanCheckUrl(url, request_destination_)) {
       return mechanism_experimenter_->RunChecks(
+          next_index_,
           base::BindOnce(&SafeBrowsingUrlCheckerImpl::OnUrlResult,
                          weak_factory_.GetWeakPtr()),
           url, url_checker_delegate_->GetThreatTypes(), request_destination_,
@@ -503,12 +554,13 @@ SafeBrowsingUrlCheckerImpl::KickOffLookupMechanism(
           database_manager_, can_check_db_,
           can_check_high_confidence_allowlist_,
           url_lookup_service_metric_suffix_, last_committed_url_,
-          ui_task_runner_, url_lookup_service_on_ui_, webui_delegate_);
+          ui_task_runner_, url_lookup_service_on_ui_, webui_delegate_,
+          MechanismExperimentHashDatabaseCache::kNoExperiment);
     }
   } else {
     lookup_mechanism = std::make_unique<HashDatabaseMechanism>(
         url, url_checker_delegate_->GetThreatTypes(), database_manager_,
-        can_check_db_);
+        can_check_db_, MechanismExperimentHashDatabaseCache::kNoExperiment);
   }
   lookup_mechanism_runner_ =
       std::make_unique<SafeBrowsingLookupMechanismRunner>(

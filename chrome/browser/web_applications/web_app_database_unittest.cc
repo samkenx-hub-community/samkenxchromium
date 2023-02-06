@@ -74,9 +74,9 @@ class WebAppDatabaseTest : public WebAppTest {
     provider_->SetDatabaseFactory(std::move(database_factory));
     provider_->SetSyncBridge(std::move(sync_bridge));
 
-    sync_bridge_->SetSubsystems(database_factory_,
-                                &provider_->GetCommandManager(),
-                                &provider_->scheduler());
+    sync_bridge_->SetSubsystems(
+        database_factory_, &provider_->GetCommandManager(),
+        &provider_->scheduler(), &provider_->GetInstallManager());
 
     ON_CALL(mock_processor_, IsTrackingMetadata())
         .WillByDefault(testing::Return(true));
@@ -387,7 +387,6 @@ TEST_F(WebAppDatabaseTest, WebAppWithoutOptionalFields) {
   EXPECT_FALSE(app->run_on_os_login_os_integration_state().has_value());
   EXPECT_TRUE(app->manifest_url().is_empty());
   EXPECT_FALSE(app->manifest_id().has_value());
-  EXPECT_FALSE(app->IsStorageIsolated());
   EXPECT_TRUE(app->permissions_policy().empty());
   EXPECT_FALSE(app->isolation_data().has_value());
   RegisterApp(std::move(app));
@@ -456,7 +455,6 @@ TEST_F(WebAppDatabaseTest, WebAppWithoutOptionalFields) {
   EXPECT_FALSE(app_copy->run_on_os_login_os_integration_state().has_value());
   EXPECT_TRUE(app_copy->manifest_url().is_empty());
   EXPECT_FALSE(app_copy->manifest_id().has_value());
-  EXPECT_FALSE(app_copy->IsStorageIsolated());
   EXPECT_TRUE(app_copy->permissions_policy().empty());
   EXPECT_FALSE(app_copy->tab_strip());
 }

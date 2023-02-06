@@ -233,6 +233,8 @@ void WaylandToplevelWindow::Minimize() {
   // configured and they will stay forever minimized as a Wayland compositor
   // will not activate those windows (upon user interaction) because the before
   // mentioned initial configure/ack_configure messaging hasn't happened.
+  //
+  // TODO(crbug.com/1293740): find a solution to this workaround.
   if (IsSurfaceConfigured()) {
     SetWindowState(PlatformWindowState::kMinimized);
   } else {
@@ -541,7 +543,7 @@ void WaylandToplevelWindow::OnSequencePoint(int64_t seq) {
 
 bool WaylandToplevelWindow::OnInitialize(
     PlatformWindowInitProperties properties,
-    State* state) {
+    PlatformWindowDelegate::State* state) {
 #if BUILDFLAG(IS_CHROMEOS_LACROS)
   auto token = base::UnguessableToken::Create();
   window_unique_id_ =

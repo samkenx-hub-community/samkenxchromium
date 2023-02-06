@@ -143,7 +143,6 @@
 #include "content/browser/web_package/web_bundle_handle_tracker.h"
 #include "content/browser/web_package/web_bundle_navigation_info.h"
 #include "content/browser/web_package/web_bundle_source.h"
-#include "content/browser/webauth/authenticator_environment_impl.h"
 #include "content/browser/webauth/authenticator_impl.h"
 #include "content/browser/webauth/webauth_request_security_checker.h"
 #include "content/browser/webid/federated_auth_request_impl.h"
@@ -173,7 +172,6 @@
 #include "content/public/browser/document_service_internal.h"
 #include "content/public/browser/download_manager.h"
 #include "content/public/browser/global_routing_id.h"
-#include "content/public/browser/render_frame_host_observer.h"
 #include "content/public/browser/render_process_host.h"
 #include "content/public/browser/render_widget_host_view.h"
 #include "content/public/browser/shared_cors_origin_access_list.h"
@@ -240,6 +238,7 @@
 #include "third_party/blink/public/common/permissions_policy/permissions_policy.h"
 #include "third_party/blink/public/common/privacy_budget/identifiability_study_document_created.h"
 #include "third_party/blink/public/common/privacy_budget/identifiability_study_settings.h"
+#include "third_party/blink/public/common/runtime_feature_state/runtime_feature_state_context.h"
 #include "third_party/blink/public/common/scheduler/web_scheduler_tracked_feature.h"
 #include "third_party/blink/public/common/storage_key/storage_key.h"
 #include "third_party/blink/public/mojom/back_forward_cache_not_restored_reasons.mojom.h"
@@ -313,6 +312,10 @@ BASE_FEATURE(kEvictOnAXEvents,
              base::FEATURE_DISABLED_BY_DEFAULT
 #endif
 );
+
+BASE_FEATURE(kUnblockSpeechSynthesisForBFCache,
+             "UnblockSpeechSynthesisForBFCache",
+             base::FEATURE_DISABLED_BY_DEFAULT);
 
 }  // namespace features
 
@@ -791,6 +794,28 @@ bool VerifyThatBrowserAndRendererCalculatedOriginsToCommitMatch(
   return true;
 }
 
+#if BUILDFLAG(IS_ANDROID)
+void DumpPrerenderTerminationSnapshot(
+    const ChildProcessTerminationInfo& info,
+    RenderFrameHostImpl::LifecycleStateImpl lifecycle_state) {
+  SCOPED_CRASH_KEY_BOOL("Prerender", "has_visible_clients",
+                        info.renderer_has_visible_clients);
+  SCOPED_CRASH_KEY_BOOL("Prerender", "was_subframe",
+                        info.renderer_was_subframe);
+  SCOPED_CRASH_KEY_BOOL("Prerender", "was_killed_by_browser",
+                        info.was_killed_intentionally_by_browser);
+  SCOPED_CRASH_KEY_BOOL("Prerender", "threw_exception_during_init",
+                        info.threw_exception_during_init);
+  SCOPED_CRASH_KEY_BOOL("Prerender", "clean_exit", info.clean_exit);
+  SCOPED_CRASH_KEY_NUMBER("Prerender", "termination_state",
+                          static_cast<int>(info.status));
+  SCOPED_CRASH_KEY_NUMBER("Prerender", "exit_code", info.exit_code);
+  SCOPED_CRASH_KEY_STRING32("Prerender", "rfhi_lifecycle",
+                            LifecycleStateImplToString(lifecycle_state));
+  base::debug::DumpWithoutCrashing();
+}
+#endif  // BUILDFLAG(IS_ANDROID)
+
 // Enum used for Navigation.VerifyDidCommitParams histogram, to indicate which
 // DidCommitProvisionalLoadParams differ when comparing browser- vs
 // renderer-calculated values.
@@ -1130,14 +1155,66 @@ bool CoopSuppressOpener(const RenderFrameHostImpl* opener) {
   switch (opener->GetMainFrame()->cross_origin_opener_policy().value) {
     case network::mojom::CrossOriginOpenerPolicyValue::kUnsafeNone:
     case network::mojom::CrossOriginOpenerPolicyValue::kSameOriginAllowPopups:
+      return false;
+
+    // TODO(https://crbug.com/1385827): Ideally, we'd like to have support
+    // for cross-origin iframes in COOP: restrict-properties pages opening
+    // popups. This is somewhat complex, because it would break some COOP
+    // invariants and other changes need to happen first. See the bug for
+    // details. For now, set no-opener.
     case network::mojom::CrossOriginOpenerPolicyValue::kRestrictProperties:
     case network::mojom::CrossOriginOpenerPolicyValue::
         kRestrictPropertiesPlusCoep:
-      return false;
+
     case network::mojom::CrossOriginOpenerPolicyValue::kSameOrigin:
     case network::mojom::CrossOriginOpenerPolicyValue::kSameOriginPlusCoep:
       return !PopupInheritCOOP(opener);
   }
+}
+
+// Checks Blink runtime-enabled feature (BREF) for third-party cookie
+// deprecation user bypass. This pulls the BREF from the committed frame
+// context; for a committing navigation the overload taking a NavigationRequest
+// should be called. For a subframe, the BREF is pulled from the main frame
+// context. If the main frame has no committed navigation (eg. an empty
+// initial document), then false is returned.
+// TODO(crbug.com/1386190): Follow up on whether any inner page scenarios
+// (eg. portals, guestview) require escaping out using GetOutermostMainFrame
+// or GetOutermostMainFrameOrEmbedder.
+// TODO(crbug.com/1386190): Currently a popup frame is an empty doc that returns
+// false. Follow up on whether it should instead use the BREF from its opener.
+bool GetIsThirdPartyCookiesUserBypassEnabled(RenderFrameHostImpl& frame) {
+  RenderFrameHost* main_frame = frame.GetMainFrame();
+  auto* document_data =
+      RuntimeFeatureStateDocumentData::GetForCurrentDocument(main_frame);
+  if (document_data) {
+    blink::RuntimeFeatureStateReadContext read_context =
+        document_data->runtime_feature_read_context();
+    return read_context.IsThirdPartyCookiesUserBypassEnabled();
+  }
+  return false;
+}
+
+// Checks Blink runtime-enabled feature (BREF) for third-party cookie
+// deprecation user bypass. This pulls the BREF from a pending navigation
+// request context; for a committed frame the overload taking a
+// RenderFrameHostImpl should be called. For a subframe, the BREF is *not*
+// pulled from the pending navigation request and is instead pulled from the
+// committed context on the main frame.
+// The passed in NavigationRequest must have a non-null RFH.
+// TODO(crbug.com/1386190): Follow up on whether any inner page scenarios
+// (eg. portals, guestview) require escaping out using GetOutermostMainFrame
+// or GetOutermostMainFrameOrEmbedder.
+bool GetIsThirdPartyCookiesUserBypassEnabled(
+    NavigationRequest& navigation_request) {
+  if (navigation_request.IsInMainFrame()) {
+    blink::RuntimeFeatureStateContext state_context =
+        navigation_request.GetRuntimeFeatureStateContext();
+    return state_context.IsThirdPartyCookiesUserBypassEnabled();
+  }
+  DCHECK(navigation_request.GetRenderFrameHost());
+  return GetIsThirdPartyCookiesUserBypassEnabled(
+      *navigation_request.GetRenderFrameHost());
 }
 
 }  // namespace
@@ -1158,6 +1235,12 @@ class RenderFrameHostImpl::SubresourceLoaderFactoriesConfig {
         DetermineAfterCommitWhetherToForbidTrustTokenRedemption(frame);
     result.ukm_source_id_ =
         ukm::SourceIdObj::FromInt64(frame.GetPageUkmSourceId());
+
+    if (GetIsThirdPartyCookiesUserBypassEnabled(frame)) {
+      result.cookie_setting_overrides_.Put(
+          net::CookieSettingOverride::kForceThirdPartyByUser);
+    }
+
     return result;
   }
 
@@ -1191,6 +1274,11 @@ class RenderFrameHostImpl::SubresourceLoaderFactoriesConfig {
           DetermineWhetherToForbidTrustTokenRedemption(
               navigation_request.GetRenderFrameHost(),
               navigation_request.commit_params(), result.origin());
+
+      if (GetIsThirdPartyCookiesUserBypassEnabled(navigation_request)) {
+        result.cookie_setting_overrides_.Put(
+            net::CookieSettingOverride::kForceThirdPartyByUser);
+      }
     }
 
     return result;
@@ -1260,6 +1348,10 @@ class RenderFrameHostImpl::SubresourceLoaderFactoriesConfig {
 
   const ukm::SourceIdObj& ukm_source_id() const { return ukm_source_id_; }
 
+  const net::CookieSettingOverrides& cookie_setting_overrides() const {
+    return cookie_setting_overrides_;
+  }
+
  private:
   // Private constructor - please go through the static For... methods.
   SubresourceLoaderFactoriesConfig() = default;
@@ -1271,6 +1363,7 @@ class RenderFrameHostImpl::SubresourceLoaderFactoriesConfig {
       coep_reporter_;
   network::mojom::TrustTokenRedemptionPolicy trust_token_redemption_policy_;
   ukm::SourceIdObj ukm_source_id_;
+  net::CookieSettingOverrides cookie_setting_overrides_;
 };
 
 struct PendingNavigation {
@@ -1875,8 +1968,9 @@ void RenderFrameHostImpl::DidEnterBackForwardCacheInternal() {
   GetProcess()->PauseSocketManagerForRenderFrameHost(GetGlobalId());
 #endif  // BUILDFLAG(IS_P2P_ENABLED)
 
-  for (auto& observer : observers_) {
-    observer.DidEnterBackForwardCache();
+  if (auto* permission_service_context =
+          PermissionServiceContext::GetForCurrentDocument(this)) {
+    permission_service_context->StoreStatusAtBFCacheEntry();
   }
 }
 
@@ -2510,7 +2604,8 @@ RenderFrameHostImpl::CreateURLLoaderFactoriesForIsolatedWorlds(
         URLLoaderFactoryParamsHelper::CreateForIsolatedWorld(
             this, isolated_world_origin, config.origin(),
             config.isolation_info(), config.GetClientSecurityState(),
-            config.trust_token_redemption_policy());
+            config.trust_token_redemption_policy(),
+            config.cookie_setting_overrides());
 
     mojo::PendingRemote<network::mojom::URLLoaderFactory> factory_remote;
     CreateNetworkServiceDefaultFactoryAndObserve(
@@ -3051,10 +3146,16 @@ void RenderFrameHostImpl::RenderProcessGone(
                   kRendererProcessKilled);
   }
 
-  CancelPrerendering(PrerenderCancellationReason(
-      info.status == base::TERMINATION_STATUS_PROCESS_CRASHED
-          ? PrerenderFinalStatus::kRendererProcessCrashed
-          : PrerenderFinalStatus::kRendererProcessKilled));
+  if (CancelPrerendering(PrerenderCancellationReason(
+          info.status == base::TERMINATION_STATUS_PROCESS_CRASHED
+              ? PrerenderFinalStatus::kRendererProcessCrashed
+              : PrerenderFinalStatus::kRendererProcessKilled))) {
+#if BUILDFLAG(IS_ANDROID)
+    // TODO(https://crbug.com/1407056): Report detailed status about the gone
+    // process for debugging.
+    DumpPrerenderTerminationSnapshot(info, lifecycle_state_);
+#endif  // BUILDFLAG(IS_ANDROID)
+  }
 
   if (owned_render_widget_host_)
     owned_render_widget_host_->RendererExited();
@@ -3623,14 +3724,6 @@ void RenderFrameHostImpl::SetCrossOriginOpenerPolicyReporter(
 
 bool RenderFrameHostImpl::IsCredentialless() const {
   return policy_container_host_->policies().is_credentialless;
-}
-
-void RenderFrameHostImpl::AddObserver(RenderFrameHostObserver* observer) {
-  observers_.AddObserver(observer);
-}
-
-void RenderFrameHostImpl::RemoveObserver(RenderFrameHostObserver* observer) {
-  observers_.RemoveObserver(observer);
 }
 
 void RenderFrameHostImpl::OnCreateChildFrame(
@@ -7414,7 +7507,8 @@ RenderFrameHostImpl::CreateCrossOriginPrefetchLoaderFactoryBundle() {
       SubresourceLoaderFactoriesConfig::ForLastCommittedNavigation(*this);
   network::mojom::URLLoaderFactoryParamsPtr factory_params =
       URLLoaderFactoryParamsHelper::CreateForPrefetch(
-          this, subresource_loader_factories_config.GetClientSecurityState());
+          this, subresource_loader_factories_config.GetClientSecurityState(),
+          subresource_loader_factories_config.cookie_setting_overrides());
 
   mojo::PendingRemote<network::mojom::URLLoaderFactory> pending_default_factory;
   bool bypass_redirect_checks = false;
@@ -7677,6 +7771,12 @@ void RenderFrameHostImpl::SendFencedFrameReportingBeacon(
         "consistent between the two.");
     return;
   }
+  if (event_data.length() > blink::kFencedFrameMaxBeaconLength) {
+    mojo::ReportBadMessage(
+        "The data provided to SendFencedFrameReportingBeacon() exceeds the "
+        "maximum length, which is 64KB.");
+    return;
+  }
 
   if (destination ==
           blink::FencedFrame::ReportingDestination::kSharedStorageSelectUrl &&
@@ -7696,6 +7796,31 @@ void RenderFrameHostImpl::SendFencedFrameReportingBeacon(
     AddMessageToConsole(blink::mojom::ConsoleMessageLevel::kError,
                         error_message);
   }
+}
+
+void RenderFrameHostImpl::SetFencedFrameAutomaticBeaconReportEventData(
+    const std::string& event_data,
+    const std::vector<blink::FencedFrame::ReportingDestination>& destination) {
+  if (event_data.length() > blink::kFencedFrameMaxBeaconLength) {
+    mojo::ReportBadMessage(
+        "The data provided to SetFencedFrameAutomaticBeaconReportEventData() "
+        "exceeds the maximum length, which is 64KB.");
+    return;
+  }
+
+  // The call is ignored if the RenderFrameHost is not the currently active one
+  // in the FrameTreeNode. For instance, this is ignored when it is pending
+  // deletion or if it entered the BackForwardCache.
+  //
+  // Note: The renderer process already tests the document is not detached from
+  // the frame tree before sending the IPC, but this might race with frame
+  // deletion IPC sent from other processes.
+  if (!IsActive()) {
+    return;
+  }
+  CHECK(owner_);  // See `owner_` invariants about `IsActive()`.
+
+  owner_->SetFencedFrameAutomaticBeaconReportEventData(event_data, destination);
 }
 
 void RenderFrameHostImpl::CreatePortal(
@@ -10159,7 +10284,8 @@ RenderFrameHostImpl::CreateURLLoaderFactoryParamsForMainWorld(
   return URLLoaderFactoryParamsHelper::CreateForFrame(
       this, config.origin(), config.isolation_info(),
       config.GetClientSecurityState(), config.GetCoepReporter(), GetProcess(),
-      config.trust_token_redemption_policy(), debug_tag);
+      config.trust_token_redemption_policy(), config.cookie_setting_overrides(),
+      debug_tag);
 }
 
 bool RenderFrameHostImpl::CreateNetworkServiceDefaultFactoryAndObserve(
@@ -10575,6 +10701,14 @@ void RenderFrameHostImpl::BindNonAssociatedLocalFrameHost(
   non_associated_local_frame_host_receiver_.Bind(std::move(receiver));
 }
 
+void RenderFrameHostImpl::CreateRuntimeFeatureStateController(
+    mojo::PendingReceiver<blink::mojom::RuntimeFeatureStateController>
+        receiver) {
+  runtime_feature_state_controller_ =
+      std::make_unique<RuntimeFeatureStateControllerImpl>(*this,
+                                                          std::move(receiver));
+}
+
 bool RenderFrameHostImpl::CancelPrerendering(
     const PrerenderCancellationReason& reason) {
   // A prerendered page is identified by its root FrameTreeNode id, so if this
@@ -10840,11 +10974,12 @@ void RenderFrameHostImpl::GetSpeechSynthesis(
   }
   speech_synthesis_impl_->AddReceiver(std::move(receiver));
 
-  // Blocklist SpeechSynthesis for BackForwardCache, because currently we do not
-  // handle speech synthesis after placing the page in BackForwardCache.
-  // TODO(sreejakshetty): Make SpeechSynthesis compatible with BackForwardCache.
-  OnBackForwardCacheDisablingFeatureUsed(
-      BackForwardCacheDisablingFeature::kSpeechSynthesis);
+  if (!base::FeatureList::IsEnabled(
+          features::kUnblockSpeechSynthesisForBFCache)) {
+    // Blocklist SpeechSynthesis for BackForwardCache when the flag is off.
+    OnBackForwardCacheDisablingFeatureUsed(
+        BackForwardCacheDisablingFeature::kSpeechSynthesis);
+  }
 }
 
 void RenderFrameHostImpl::GetSensorProvider(
@@ -11027,7 +11162,7 @@ void RenderFrameHostImpl::CreateBucketManagerHost(
 
 void RenderFrameHostImpl::CreatePermissionService(
     mojo::PendingReceiver<blink::mojom::PermissionService> receiver) {
-  PermissionServiceContext::GetForCurrentDocument(this)->CreateService(
+  PermissionServiceContext::GetOrCreateForCurrentDocument(this)->CreateService(
       std::move(receiver));
 }
 
@@ -11056,13 +11191,17 @@ void RenderFrameHostImpl::GetVirtualAuthenticatorManager(
     mojo::PendingReceiver<blink::test::mojom::VirtualAuthenticatorManager>
         receiver) {
 #if !BUILDFLAG(IS_ANDROID)
+  // VirtualAuthenticatorManagerImpl is enabled at the frame level. Inactive
+  // document are detached. They don't have a frame anymore, so they can't be
+  // used to enable this test-only feature.
+  if (!IsActive()) {
+    return;
+  }
+
   if (base::CommandLine::ForCurrentProcess()->HasSwitch(
           switches::kEnableWebAuthDeprecatedMojoTestingApi)) {
-    auto* environment_singleton = AuthenticatorEnvironmentImpl::GetInstance();
-    environment_singleton->EnableVirtualAuthenticatorFor(frame_tree_node_,
-                                                         /*enable_ui=*/false);
-    environment_singleton->AddVirtualAuthenticatorReceiver(frame_tree_node_,
-                                                           std::move(receiver));
+    CHECK(owner_);
+    owner_->GetVirtualAuthenticatorManager(std::move(receiver));
   }
 #endif  // !BUILDFLAG(IS_ANDROID)
 }
@@ -14042,12 +14181,6 @@ void RenderFrameHostImpl::SetLifecycleState(LifecycleStateImpl new_state) {
         }
       }
     }
-
-    if (lifecycle_state_ == LifecycleStateImpl::kInBackForwardCache) {
-      for (auto& observer : observers_) {
-        observer.DidRestoreFromBackForwardCache();
-      }
-    }
   }
 
   if (lifecycle_state() == LifecycleStateImpl::kInBackForwardCache)
@@ -14084,6 +14217,14 @@ void RenderFrameHostImpl::SetLifecycleState(LifecycleStateImpl new_state) {
     if (old_lifecycle_state != new_lifecycle_state) {
       delegate_->RenderFrameHostStateChanged(this, old_lifecycle_state,
                                              new_lifecycle_state);
+    }
+  }
+
+  if (new_state == LifecycleStateImpl::kActive &&
+      old_state == LifecycleStateImpl::kInBackForwardCache) {
+    if (auto* permission_service_context =
+            PermissionServiceContext::GetForCurrentDocument(this)) {
+      permission_service_context->NotifyPermissionStatusChangedIfNeeded();
     }
   }
 }
@@ -14470,6 +14611,12 @@ void RenderFrameHostImpl::DocumentAssociatedData::
 std::ostream& operator<<(std::ostream& o,
                          const RenderFrameHostImpl::LifecycleStateImpl& s) {
   return o << LifecycleStateImplToString(s);
+}
+
+net::CookieSettingOverrides RenderFrameHostImpl::GetCookieSettingOverrides() {
+  auto subresource_loader_factories_config =
+      SubresourceLoaderFactoriesConfig::ForLastCommittedNavigation(*this);
+  return subresource_loader_factories_config.cookie_setting_overrides();
 }
 
 }  // namespace content

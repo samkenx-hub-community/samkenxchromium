@@ -216,12 +216,7 @@ OSInfo::OSInfo(const _OSVERSIONINFOEXW& version_info,
 
 OSInfo::~OSInfo() = default;
 
-Version OSInfo::Kernel32Version() const {
-  // Allow the calls to `Kernel32BaseVersion()` to block, as they only happen
-  // once (after which the result is cached in `kernel32_version`), and reading
-  // from kernel32.dll is fast in practice because it is used by all processes
-  // and therefore likely to be in the OS's file cache.
-  base::ScopedAllowBlocking allow_blocking;
+Version OSInfo::Kernel32Version() {
   static const Version kernel32_version =
       MajorMinorBuildToVersion(Kernel32BaseVersion().components()[0],
                                Kernel32BaseVersion().components()[1],
@@ -229,7 +224,7 @@ Version OSInfo::Kernel32Version() const {
   return kernel32_version;
 }
 
-OSInfo::VersionNumber OSInfo::Kernel32VersionNumber() const {
+OSInfo::VersionNumber OSInfo::Kernel32VersionNumber() {
   DCHECK_EQ(Kernel32BaseVersion().components().size(), 4u);
   static const VersionNumber version = {
       .major = Kernel32BaseVersion().components()[0],
@@ -242,8 +237,13 @@ OSInfo::VersionNumber OSInfo::Kernel32VersionNumber() const {
 // Retrieve a version from kernel32. This is useful because when running in
 // compatibility mode for a down-level version of the OS, the file version of
 // kernel32 will still be the "real" version.
-base::Version OSInfo::Kernel32BaseVersion() const {
+base::Version OSInfo::Kernel32BaseVersion() {
   static const NoDestructor<base::Version> version([] {
+    // Allow the calls to `Kernel32BaseVersion()` to block, as they only happen
+    // once (after which the result is cached in `version`), and reading from
+    // kernel32.dll is fast in practice because it is used by all processes and
+    // therefore likely to be in the OS's file cache.
+    base::ScopedAllowBlocking allow_blocking;
     std::unique_ptr<FileVersionInfoWin> file_version_info =
         FileVersionInfoWin::CreateFileVersionInfoWin(
             FilePath(FILE_PATH_LITERAL("kernel32.dll")));
@@ -312,13 +312,16 @@ Version OSInfo::MajorMinorBuildToVersion(uint32_t major,
                                          uint32_t minor,
                                          uint32_t build) {
   if (major == 11) {
-    if (build >= 22621) {
-      return Version::WIN11_22H2;
-    }
+    // We know nothing about this version of Windows or even if it exists.
+    // Known Windows 11 versions have a major number 10 and are thus handled by
+    // the == 10 block below.
     return Version::WIN11;
   }
 
   if (major == 10) {
+    if (build >= 22621) {
+      return Version::WIN11_22H2;
+    }
     if (build >= 22000) {
       return Version::WIN11;
     }

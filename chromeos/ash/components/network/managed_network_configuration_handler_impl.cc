@@ -6,6 +6,7 @@
 
 #include <iterator>
 #include <memory>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -88,12 +89,13 @@ void LogErrorWithDictAndCallCallback(base::OnceClosure callback,
   std::move(callback).Run();
 }
 
-std::string GetStringFromDictionary(const base::Value& dict, const char* key) {
-  const base::Value* v = dict.FindKey(key);
-  return v ? v->GetString() : std::string();
+std::string GetStringFromDictionary(const base::Value::Dict& dict,
+                                    const char* key) {
+  const std::string* v = dict.FindString(key);
+  return v ? *v : std::string();
 }
 
-bool MatchesExistingNetworkState(const base::Value& properties,
+bool MatchesExistingNetworkState(const base::Value::Dict& properties,
                                  const NetworkState* network_state) {
   std::string type =
       GetStringFromDictionary(properties, ::onc::network_config::kType);
@@ -106,7 +108,8 @@ bool MatchesExistingNetworkState(const base::Value& properties,
   if (type != ::onc::network_type::kWiFi)
     return true;
 
-  const base::Value* wifi = properties.FindKey(::onc::network_config::kWiFi);
+  const base::Value::Dict* wifi =
+      properties.FindDict(::onc::network_config::kWiFi);
   if (!wifi) {
     NET_LOG(ERROR) << "WiFi network configuration missing is WiFi properties: "
                    << NetworkId(network_state);
@@ -132,24 +135,28 @@ bool MatchesExistingNetworkState(const base::Value& properties,
 }
 
 // Checks if |onc| is an unmanaged wifi network that has AutoConnect=true.
-bool EnablesUnmanagedWifiAutoconnect(const base::Value& onc_dict) {
-  const base::Value* type = onc_dict.FindKeyOfType(::onc::network_config::kType,
-                                                   base::Value::Type::STRING);
-  if (!type || type->GetString() != ::onc::network_type::kWiFi)
-    return false;
-
-  const base::Value* source = onc_dict.FindKeyOfType(
-      ::onc::network_config::kSource, base::Value::Type::STRING);
-  if (!source ||
-      source->GetString() == ::onc::network_config::kSourceDevicePolicy ||
-      source->GetString() == ::onc::network_config::kSourceUserPolicy) {
+bool EnablesUnmanagedWifiAutoconnect(const base::Value::Dict& onc_dict) {
+  const std::string* type = onc_dict.FindString(::onc::network_config::kType);
+  if (!type || *type != ::onc::network_type::kWiFi) {
     return false;
   }
 
-  const base::Value* autoconnect = onc_dict.FindPathOfType(
-      {::onc::network_config::kWiFi, ::onc::wifi::kAutoConnect},
-      base::Value::Type::BOOLEAN);
-  return autoconnect && autoconnect->GetBool();
+  const std::string* source =
+      onc_dict.FindString(::onc::network_config::kSource);
+  if (!source || *source == ::onc::network_config::kSourceDevicePolicy ||
+      *source == ::onc::network_config::kSourceUserPolicy) {
+    return false;
+  }
+
+  const base::Value::Dict* wifi_config =
+      onc_dict.FindDict(::onc::network_config::kWiFi);
+  if (!wifi_config) {
+    return false;
+  }
+
+  absl::optional<bool> autoconnect =
+      wifi_config->FindBool(::onc::wifi::kAutoConnect);
+  return autoconnect.has_value() && autoconnect.value();
 }
 
 }  // namespace
@@ -299,7 +306,7 @@ void ManagedNetworkConfigurationHandlerImpl::SetProperties(
 
   // Don't allow AutoConnect=true for unmanaged wifi networks if
   // 'AllowOnlyPolicyNetworksToAutoconnect' policy is active.
-  if (EnablesUnmanagedWifiAutoconnect(validated_user_settings) &&
+  if (EnablesUnmanagedWifiAutoconnect(validated_user_settings.GetDict()) &&
       AllowOnlyPolicyNetworksToAutoconnect()) {
     InvokeErrorCallback(service_path, std::move(error_callback),
                         kInvalidUserSettings);
@@ -357,16 +364,16 @@ void ManagedNetworkConfigurationHandlerImpl::CreateConfiguration(
     const base::Value& properties,
     network_handler::ServiceResultCallback callback,
     network_handler::ErrorCallback error_callback) const {
-  std::string guid =
-      GetStringFromDictionary(properties, ::onc::network_config::kGUID);
+  std::string guid = GetStringFromDictionary(properties.GetDict(),
+                                             ::onc::network_config::kGUID);
   const NetworkState* network_state = nullptr;
   if (!guid.empty())
     network_state = network_state_handler_->GetNetworkStateFromGuid(guid);
   if (network_state) {
     NET_LOG(USER) << "CreateConfiguration for: " << NetworkId(network_state);
   } else {
-    std::string type =
-        GetStringFromDictionary(properties, ::onc::network_config::kType);
+    std::string type = GetStringFromDictionary(properties.GetDict(),
+                                               ::onc::network_config::kType);
     NET_LOG(USER) << "Create new network configuration, Type: " << type;
   }
 
@@ -442,7 +449,8 @@ void ManagedNetworkConfigurationHandlerImpl::CreateConfiguration(
     // forgotten while the UI is open. Configuration should succeed and the GUID
     // can be reused.
     if (network_state) {
-      if (!MatchesExistingNetworkState(validated_properties, network_state)) {
+      if (!MatchesExistingNetworkState(validated_properties.GetDict(),
+                                       network_state)) {
         InvokeErrorCallback(network_state->path(), std::move(error_callback),
                             kNetworkAlreadyConfigured);
         return;
@@ -694,7 +702,7 @@ void ManagedNetworkConfigurationHandlerImpl::
         const base::Value& existing_properties,
         const base::Value& new_properties,
         base::OnceClosure callback) {
-  base::Value shill_properties(base::Value::Type::DICTIONARY);
+  base::Value shill_properties(base::Value::Type::DICT);
 
   const std::string* profile =
       existing_properties.FindStringKey(shill::kProfileProperty);
@@ -703,7 +711,7 @@ void ManagedNetworkConfigurationHandlerImpl::
     // Profile property properly.
     NET_LOG(ERROR) << "Missing profile property: "
                    << shill_property_util::GetNetworkIdFromProperties(
-                          existing_properties);
+                          existing_properties.GetDict());
     std::move(callback).Run();
     return;
   }
@@ -713,7 +721,8 @@ void ManagedNetworkConfigurationHandlerImpl::
           existing_properties, true /* properties were read from Shill */,
           &shill_properties)) {
     NET_LOG(ERROR) << "Missing identifying properties",
-        shill_property_util::GetNetworkIdFromProperties(existing_properties);
+        shill_property_util::GetNetworkIdFromProperties(
+            existing_properties.GetDict());
   }
 
   shill_properties.MergeDictionary(&new_properties);

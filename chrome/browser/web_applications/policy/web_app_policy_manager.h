@@ -152,10 +152,11 @@ class WebAppPolicyManager {
   RunOnOsLoginPolicy GetUrlRunOnOsLoginPolicyByUnhashedAppId(
       const std::string& unhashed_app_id) const;
 
-  // Parses install options from a Value, which represents one entry of the
-  // kWepAppInstallForceList. If the value contains a custom_name or
-  // custom_icon, it is inserted into the custom_manifest_values_by_url_ map.
-  ExternalInstallOptions ParseInstallPolicyEntry(const base::Value& entry);
+  // Parses install options from a `base::Value::Dict`, which represents one
+  // entry of the kWepAppInstallForceList. If the value contains a custom_name
+  // or custom_icon, it is inserted into the custom_manifest_values_by_url_ map.
+  ExternalInstallOptions ParseInstallPolicyEntry(
+      const base::Value::Dict& entry);
 
   void ObserveDisabledSystemFeaturesPolicy();
 
@@ -166,6 +167,7 @@ class WebAppPolicyManager {
   // Populates ids lists of web apps disabled by SystemFeaturesDisableList
   // policy.
   void PopulateDisabledWebAppsIdsLists();
+  void OnWebAppForceInstallPolicyParsed();
 
   raw_ptr<Profile> profile_;
   raw_ptr<PrefService> pref_service_;

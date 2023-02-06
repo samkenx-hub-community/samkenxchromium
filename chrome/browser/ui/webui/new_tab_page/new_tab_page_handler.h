@@ -91,7 +91,8 @@ class NewTabPageHandler : public new_tab_page::mojom::PageHandler,
                           const std::string& attribution_2,
                           const GURL& attribution_url,
                           const GURL& image_url,
-                          const GURL& thumbnail_url) override;
+                          const GURL& thumbnail_ur,
+                          const std::string& collection_id) override;
   void SetDailyRefreshCollectionId(const std::string& collection_id) override;
   void SetNoBackgroundImage() override;
   void RevertBackgroundChanges() override;
@@ -124,6 +125,7 @@ class NewTabPageHandler : public new_tab_page::mojom::PageHandler,
   void SetCustomizeChromeSidePanelVisible(
       bool visible,
       new_tab_page::mojom::CustomizeChromeSection section) override;
+  void IncrementCustomizeChromeButtonOpenCount() override;
   void OnAppRendered(double time) override;
   void OnOneGoogleBarRendered(double time) override;
   void OnPromoRendered(double time,

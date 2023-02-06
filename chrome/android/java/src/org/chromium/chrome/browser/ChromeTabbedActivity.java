@@ -456,6 +456,7 @@ public class ChromeTabbedActivity extends ChromeActivity<ChromeActivityComponent
         mMultiInstanceManager = MultiInstanceManager.create(this, getTabModelOrchestratorSupplier(),
                 getMultiWindowModeStateDispatcher(), getLifecycleDispatcher(),
                 getModalDialogManagerSupplier(), this);
+        StartSurfaceUserData.reset();
     }
 
     @Override
@@ -1037,6 +1038,8 @@ public class ChromeTabbedActivity extends ChromeActivity<ChromeActivityComponent
             ChromeAccessibilityUtil.get().addObserver(mLayoutManager);
             if (isTablet()) ChromeAccessibilityUtil.get().addObserver(mCompositorViewHolder);
             if (BackPressManager.isEnabled()) initializeBackPressHandlers();
+
+            mInactivityTracker.setLastVisibleTimeMsAndRecord(System.currentTimeMillis());
         }
     }
 
@@ -1073,6 +1076,8 @@ public class ChromeTabbedActivity extends ChromeActivity<ChromeActivityComponent
 
         if (!isWarmOnResume()) {
             SuggestionsMetrics.recordArticlesListVisible();
+        } else {
+            mInactivityTracker.setLastVisibleTimeMsAndRecord(System.currentTimeMillis());
         }
 
         FeatureNotificationUtils.handleIntentIfApplicable(getIntent());
@@ -1088,7 +1093,7 @@ public class ChromeTabbedActivity extends ChromeActivity<ChromeActivityComponent
 
         NavigationPredictorBridge.onPause();
         // Always track the last backgrounded time in case others are using the pref.
-        mInactivityTracker.setLastBackgroundedTimeInPrefsSync(System.currentTimeMillis());
+        mInactivityTracker.setLastBackgroundedTimeInPrefs(System.currentTimeMillis());
 
         super.onPauseWithNative();
     }
@@ -1762,16 +1767,13 @@ public class ChromeTabbedActivity extends ChromeActivity<ChromeActivityComponent
     public void performPostInflationStartup() {
         super.performPostInflationStartup();
 
+        if (isFinishing()) return;
+
         FontPreloader.getInstance().onPostInflationStartupTabbedActivity();
 
         TabModelSelector tabModelSelector = getTabModelSelector();
         IncognitoProfileDestroyer.observeTabModelSelector(tabModelSelector);
         IncognitoNotificationPresenceController.observeTabModelSelector(tabModelSelector);
-
-        // Critical path for startup. Create the minimum objects needed
-        // to allow a blank screen draw (without depending on any native code)
-        // and then yield ASAP.
-        if (isFinishing()) return;
 
         // Don't show the keyboard until user clicks in.
         getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN
@@ -1907,7 +1909,7 @@ public class ChromeTabbedActivity extends ChromeActivity<ChromeActivityComponent
         boolean tabModelWasCreated = mTabModelOrchestrator.createTabModels(
                 this, this, mNextTabPolicySupplier, mWindowId);
         if (!tabModelWasCreated) {
-            finish();
+            finishAndRemoveTask();
             return;
         }
 
@@ -2024,6 +2026,8 @@ public class ChromeTabbedActivity extends ChromeActivity<ChromeActivityComponent
     protected void initDeferredStartupForActivity() {
         super.initDeferredStartupForActivity();
         DeferredStartupHandler.getInstance().addDeferredTask(() -> {
+            if (isActivityFinishingOrDestroyed()) return;
+
             ActivityManager am = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
             RecordHistogram.recordSparseHistogram(
                     "MemoryAndroid.DeviceMemoryClass", am.getMemoryClass());
@@ -2913,7 +2917,7 @@ public class ChromeTabbedActivity extends ChromeActivity<ChromeActivityComponent
     }
     private void returnToOverviewModeOnBackPressed() {
         Tab currentTab = getActivityTab();
-        assert currentTab != null;
+        assert currentTab != null && !currentTab.canGoBack();
 
         // If current tab is an incognito one, we need to change tab model to non-incognito for
         // showing non-incognito start surface homepage.

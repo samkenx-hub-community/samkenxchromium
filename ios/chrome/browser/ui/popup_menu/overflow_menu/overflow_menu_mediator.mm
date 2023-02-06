@@ -39,6 +39,7 @@
 #import "ios/chrome/browser/policy/browser_policy_connector_ios.h"
 #import "ios/chrome/browser/policy/policy_util.h"
 #import "ios/chrome/browser/reading_list/offline_url_utils.h"
+#import "ios/chrome/browser/tabs/features.h"
 #import "ios/chrome/browser/translate/chrome_ios_translate_client.h"
 #import "ios/chrome/browser/ui/commands/activity_service_commands.h"
 #import "ios/chrome/browser/ui/commands/application_commands.h"
@@ -60,9 +61,7 @@
 #import "ios/chrome/browser/ui/popup_menu/overflow_menu/overflow_menu_swift.h"
 #import "ios/chrome/browser/ui/popup_menu/popup_menu_constants.h"
 #import "ios/chrome/browser/ui/reading_list/reading_list_utils.h"
-#import "ios/chrome/browser/ui/sharing/activity_services/activity_params.h"
-#import "ios/chrome/browser/ui/sharing/activity_services/canonical_url_retriever.h"
-#import "ios/chrome/browser/ui/tab_switcher/tab_grid/pinned_tabs/features.h"
+#import "ios/chrome/browser/ui/sharing/sharing_params.h"
 #import "ios/chrome/browser/ui/util/uikit_ui_util.h"
 #import "ios/chrome/browser/ui/whats_new/whats_new_util.h"
 #import "ios/chrome/browser/url/chrome_url_constants.h"
@@ -1213,6 +1212,7 @@ OverflowMenuFooter* CreateOverflowMenuManagedFooter(int nameID,
   // the followAction should be valid.
   if (!self.followAction) {
     self.followAction = [self createFollowActionIfNeeded];
+    DCHECK(!self.followAction || self.webState != nullptr);
   }
 
   if (self.followAction) {
@@ -1230,7 +1230,9 @@ OverflowMenuFooter* CreateOverflowMenuManagedFooter(int nameID,
     self.readLaterAction
   ]];
 
-  if (IsPriceNotificationsEnabled()) {
+  if (self.webState &&
+      IsPriceTrackingEnabled(ChromeBrowserState::FromBrowserState(
+          self.webState->GetBrowserState()))) {
     [pageActions addObject:self.openPriceNotificationsAction];
   }
 

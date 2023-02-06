@@ -13,12 +13,15 @@
 #include "base/task/single_thread_task_runner.h"
 #include "base/test/metrics/histogram_tester.h"
 #include "base/threading/thread_restrictions.h"
+#include "base/values.h"
 #include "chrome/browser/ash/file_manager/copy_or_move_io_task_scanning_impl.h"
 #include "chrome/browser/ash/file_manager/file_manager_browsertest_base.h"
 #include "chrome/browser/ash/file_manager/path_util.h"
 #include "chrome/browser/ash/login/test/device_state_mixin.h"
 #include "chrome/browser/ash/login/test/logged_in_user_mixin.h"
 #include "chrome/browser/ash/policy/dlp/dlp_files_controller.h"
+#include "chrome/browser/ash/settings/scoped_testing_cros_settings.h"
+#include "chrome/browser/ash/settings/stub_cros_settings_provider.h"
 #include "chrome/browser/chromeos/policy/dlp/dlp_rules_manager.h"
 #include "chrome/browser/chromeos/policy/dlp/dlp_rules_manager_factory.h"
 #include "chrome/browser/chromeos/policy/dlp/mock_dlp_rules_manager.h"
@@ -34,6 +37,7 @@
 #include "chrome/common/chrome_features.h"
 #include "chrome/common/pref_names.h"
 #include "chrome/test/base/fake_gaia_mixin.h"
+#include "chromeos/ash/components/settings/cros_settings_names.h"
 #include "chromeos/dbus/dlp/dlp_client.h"
 #include "chromeos/dbus/dlp/dlp_service.pb.h"
 #include "components/account_id/account_id.h"
@@ -49,6 +53,9 @@
 #include "testing/gmock/include/gmock/gmock.h"
 
 namespace file_manager {
+namespace {
+constexpr char kOwnerEmail[] = "owner@example.com";
+}
 
 // FilesAppBrowserTest parameters.
 struct TestCase {
@@ -199,6 +206,16 @@ struct TestCase {
     return *this;
   }
 
+  TestCase& FeatureIds(const std::vector<std::string>& ids) {
+    options.feature_ids = ids;
+    return *this;
+  }
+
+  TestCase& EnableBulkPinning() {
+    options.enable_drive_bulk_pinning = true;
+    return *this;
+  }
+
   TestCase& SetDeviceMode(DeviceMode device_mode) {
     options.device_mode = device_mode;
     return *this;
@@ -212,77 +229,98 @@ struct TestCase {
   std::string GetFullName() const {
     std::string full_name = name;
 
-    if (options.guest_mode == IN_GUEST_MODE)
+    if (options.guest_mode == IN_GUEST_MODE) {
       full_name += "_GuestMode";
+    }
 
-    if (options.guest_mode == IN_INCOGNITO)
+    if (options.guest_mode == IN_INCOGNITO) {
       full_name += "_Incognito";
+    }
 
-    if (options.tablet_mode)
+    if (options.tablet_mode) {
       full_name += "_TabletMode";
+    }
 
-    if (options.files_experimental)
+    if (options.files_experimental) {
       full_name += "_FilesExperimental";
+    }
 
     if (options.enable_conflict_dialog) {
       full_name += "_ConflictDialog";
     }
 
-    if (!options.native_smb)
+    if (!options.native_smb) {
       full_name += "_DisableNativeSmb";
+    }
 
-    if (options.generic_documents_provider)
+    if (options.generic_documents_provider) {
       full_name += "_GenericDocumentsProvider";
+    }
 
-    if (options.photos_documents_provider)
+    if (options.photos_documents_provider) {
       full_name += "_PhotosDocumentsProvider";
+    }
 
-    if (options.single_partition_format)
+    if (options.single_partition_format) {
       full_name += "_SinglePartitionFormat";
+    }
 
-    if (options.enable_trash)
+    if (options.enable_trash) {
       full_name += "_Trash";
+    }
 
-    if (options.enable_mirrorsync)
+    if (options.enable_mirrorsync) {
       full_name += "_MirrorSync";
+    }
 
-    if (options.enable_inline_status_sync)
+    if (options.enable_inline_status_sync) {
       full_name += "_InlineStatusSync";
+    }
 
-    if (options.file_transfer_connector_report_only)
+    if (options.file_transfer_connector_report_only) {
       full_name += "_ReportOnly";
+    }
 
-    if (options.enable_search_v2)
+    if (options.enable_search_v2) {
       full_name += "_SearchV2";
+    }
 
-    if (options.enable_os_feedback)
+    if (options.enable_os_feedback) {
       full_name += "_OsFeedback";
+    }
 
     if (options.enable_google_one_offer_files_banner) {
       full_name += "_GoogleOneOfferFilesBanner";
     }
 
+    if (options.enable_drive_bulk_pinning) {
+      full_name += "_DriveBulkPinning";
+    }
+
     switch (options.device_mode) {
-      case DEVICE_MODE_NOT_SET:
+      case kDeviceModeNotSet:
         break;
-      case CONSUMER_OWNED:
+      case kConsumerOwned:
         full_name += "_DeviceModeConsumerOwned";
         break;
-      case ENROLLED:
+      case kEnrolled:
         full_name += "_DeviceModeEnrolled";
     }
 
     switch (options.test_account_type) {
-      case TEST_ACCOUNT_TYPE_NOT_SET:
+      case kTestAccountTypeNotSet:
         break;
-      case ENTERPRISE:
+      case kEnterprise:
         full_name += "_AccountTypeEnterprise";
         break;
-      case CHILD:
+      case kChild:
         full_name += "_AccountTypeChild";
         break;
-      case NON_MANAGED:
+      case kNonManged:
         full_name += "_AccountTypeNonManaged";
+        break;
+      case kNonManagedNonOwner:
+        full_name += "_AccountTypeNonManagedNonOwner";
         break;
     }
 
@@ -353,6 +391,28 @@ class LoggedInUserFilesAppBrowserTest : public FilesAppBrowserTest {
         &mixin_host_, LogInTypeFor(GetOptions().test_account_type),
         embedded_test_server(), this, /*should_launch_browser=*/false,
         AccountIdFor(GetOptions().test_account_type));
+
+    // Set up owner email of a device. We set up owner email only if a device is
+    // kConsumerOwned. If a device is enrolled, an account cannot be an owner of
+    // a device.
+    if (GetOptions().device_mode == kConsumerOwned) {
+      std::string owner_email;
+
+      switch (GetOptions().test_account_type) {
+        case kTestAccountTypeNotSet:
+        case kEnterprise:
+        case kChild:
+        case kNonManged:
+          owner_email = logged_in_user_mixin_->GetAccountId().GetUserEmail();
+          break;
+        case kNonManagedNonOwner:
+          owner_email = kOwnerEmail;
+          break;
+      }
+
+      scoped_testing_cros_settings_.device_settings()->Set(
+          ash::kDeviceOwner, base::Value(owner_email));
+    }
   }
 
   void SetUpOnMainThread() override {
@@ -367,14 +427,14 @@ class LoggedInUserFilesAppBrowserTest : public FilesAppBrowserTest {
  private:
   ash::DeviceStateMixin::State DeviceStateFor(DeviceMode device_mode) {
     switch (device_mode) {
-      case DEVICE_MODE_NOT_SET:
+      case kDeviceModeNotSet:
         CHECK(false) << "device_mode option must be set for "
                         "LoggedInUserFilesAppBrowserTest";
-        // `base::ImmediateCrash` is necessary for https://crbug.com/1061742.
+        // TODO(crbug.com/1061742): `base::ImmediateCrash` is necessary.
         base::ImmediateCrash();
-      case CONSUMER_OWNED:
+      case kConsumerOwned:
         return ash::DeviceStateMixin::State::OOBE_COMPLETED_CONSUMER_OWNED;
-      case ENROLLED:
+      case kEnrolled:
         return ash::DeviceStateMixin::State::OOBE_COMPLETED_CLOUD_ENROLLED;
     }
   }
@@ -382,35 +442,37 @@ class LoggedInUserFilesAppBrowserTest : public FilesAppBrowserTest {
   ash::LoggedInUserMixin::LogInType LogInTypeFor(
       TestAccountType test_account_type) {
     switch (test_account_type) {
-      case TEST_ACCOUNT_TYPE_NOT_SET:
+      case kTestAccountTypeNotSet:
         CHECK(false) << "test_account_type option must be set for "
                         "LoggedInUserFilesAppBrowserTest";
-        // `base::ImmediateCrash` is necessary for https://crbug.com/1061742.
+        // TODO(crbug.com/1061742): `base::ImmediateCrash` is necessary.
         base::ImmediateCrash();
-      case ENTERPRISE:
+      case kEnterprise:
         return ash::LoggedInUserMixin::LogInType::kRegular;
-      case CHILD:
+      case kChild:
         return ash::LoggedInUserMixin::LogInType::kChild;
-      case NON_MANAGED:
+      case kNonManged:
+      case kNonManagedNonOwner:
         return ash::LoggedInUserMixin::LogInType::kRegular;
     }
   }
 
   absl::optional<AccountId> AccountIdFor(TestAccountType test_account_type) {
     switch (test_account_type) {
-      case TEST_ACCOUNT_TYPE_NOT_SET:
+      case kTestAccountTypeNotSet:
         CHECK(false) << "test_account_type option must be set for "
                         "LoggedInUserFilesAppBrowserTest";
         // `base::ImmediateCrash` is necessary for https://crbug.com/1061742.
         base::ImmediateCrash();
-      case ENTERPRISE:
+      case kEnterprise:
         return AccountId::FromUserEmailGaiaId(
             FakeGaiaMixin::kEnterpriseUser1,
             FakeGaiaMixin::kEnterpriseUser1GaiaId);
-      case CHILD:
+      case kChild:
         // Use the default account provided by `LoggedInUserMixin`.
         return absl::nullopt;
-      case NON_MANAGED:
+      case kNonManged:
+      case kNonManagedNonOwner:
         // Use the default account provided by `LoggedInUserMixin`.
         return absl::nullopt;
     }
@@ -418,6 +480,8 @@ class LoggedInUserFilesAppBrowserTest : public FilesAppBrowserTest {
 
   std::unique_ptr<ash::LoggedInUserMixin> logged_in_user_mixin_;
   std::unique_ptr<ash::DeviceStateMixin> device_state_mixin_;
+
+  ash::ScopedTestingCrosSettings scoped_testing_cros_settings_;
 };
 
 IN_PROC_BROWSER_TEST_P(LoggedInUserFilesAppBrowserTest, Test) {
@@ -460,22 +524,6 @@ class DlpFilesAppBrowserTest : public FilesAppBrowserTest {
   DlpFilesAppBrowserTest() = default;
   ~DlpFilesAppBrowserTest() override = default;
 
-  std::unique_ptr<KeyedService> SetDlpRulesManager(
-      content::BrowserContext* context) {
-    auto dlp_rules_manager =
-        std::make_unique<testing::NiceMock<policy::MockDlpRulesManager>>();
-    mock_rules_manager_ = dlp_rules_manager.get();
-    ON_CALL(*mock_rules_manager_, IsFilesPolicyEnabled)
-        .WillByDefault(testing::Return(true));
-
-    files_controller_ =
-        std::make_unique<policy::DlpFilesController>(*mock_rules_manager_);
-    ON_CALL(*mock_rules_manager_, GetDlpFilesController)
-        .WillByDefault(testing::Return(files_controller_.get()));
-
-    return dlp_rules_manager;
-  }
-
   void SetUpOnMainThread() override {
     FilesAppBrowserTest::SetUpOnMainThread();
     policy::DlpRulesManagerFactory::GetInstance()->SetTestingFactory(
@@ -484,15 +532,6 @@ class DlpFilesAppBrowserTest : public FilesAppBrowserTest {
                             base::Unretained(this)));
   }
 
-  absl::optional<ino64_t> GetInodeValue(const base::FilePath& path) {
-    struct stat file_stats;
-    if (stat(path.value().c_str(), &file_stats) != 0) {
-      return absl::nullopt;
-    }
-    return file_stats.st_ino;
-  }
-
-  // TODO(b/261163959): Optimize DLP messages.
   bool HandleDlpCommands(const std::string& name,
                          const base::Value::Dict& value,
                          std::string* output) override {
@@ -552,26 +591,14 @@ class DlpFilesAppBrowserTest : public FilesAppBrowserTest {
               ::testing::Return(policy::DlpRulesManager::Level::kAllow));
       return true;
     }
-    if (name == "setBlockedArc") {
+    if (name == "setBlockedComponent") {
+      auto* component_str = value.FindString("component");
+      EXPECT_TRUE(component_str);
+      auto component = MapToPolicyComponent(*component_str);
+      EXPECT_NE(policy::DlpRulesManager::Component::kUnknownComponent,
+                component);
       policy::DlpRulesManager::AggregatedComponents components;
-      components[policy::DlpRulesManager::Level::kBlock].insert(
-          policy::DlpRulesManager::Component::kArc);
-      EXPECT_CALL(*mock_rules_manager_, GetAggregatedComponents)
-          .WillOnce(testing::Return(components));
-      return true;
-    }
-    if (name == "setBlockedCrostini") {
-      policy::DlpRulesManager::AggregatedComponents components;
-      components[policy::DlpRulesManager::Level::kBlock].insert(
-          policy::DlpRulesManager::Component::kCrostini);
-      EXPECT_CALL(*mock_rules_manager_, GetAggregatedComponents)
-          .WillOnce(testing::Return(components));
-      return true;
-    }
-    if (name == "setBlockedPluginVM") {
-      policy::DlpRulesManager::AggregatedComponents components;
-      components[policy::DlpRulesManager::Level::kBlock].insert(
-          policy::DlpRulesManager::Component::kPluginVm);
+      components[policy::DlpRulesManager::Level::kBlock].insert(component);
       EXPECT_CALL(*mock_rules_manager_, GetAggregatedComponents)
           .WillOnce(testing::Return(components));
       return true;
@@ -615,6 +642,57 @@ class DlpFilesAppBrowserTest : public FilesAppBrowserTest {
     return false;
   }
 
+  // MockDlpRulesManager is owned by KeyedService and is guaranteed to outlive
+  // this class.
+  policy::MockDlpRulesManager* mock_rules_manager_ = nullptr;
+
+ private:
+  std::unique_ptr<KeyedService> SetDlpRulesManager(
+      content::BrowserContext* context) {
+    auto dlp_rules_manager =
+        std::make_unique<testing::NiceMock<policy::MockDlpRulesManager>>();
+    mock_rules_manager_ = dlp_rules_manager.get();
+    ON_CALL(*mock_rules_manager_, IsFilesPolicyEnabled)
+        .WillByDefault(testing::Return(true));
+
+    files_controller_ =
+        std::make_unique<policy::DlpFilesController>(*mock_rules_manager_);
+    ON_CALL(*mock_rules_manager_, GetDlpFilesController)
+        .WillByDefault(testing::Return(files_controller_.get()));
+
+    return dlp_rules_manager;
+  }
+
+  // Maps |component| to DlpRulesManager::Component.
+  policy::DlpRulesManager::Component MapToPolicyComponent(
+      const std::string& component) {
+    if (component == "arc") {
+      return policy::DlpRulesManager::Component::kArc;
+    }
+    if (component == "crostini") {
+      return policy::DlpRulesManager::Component::kCrostini;
+    }
+    if (component == "pluginVm") {
+      return policy::DlpRulesManager::Component::kPluginVm;
+    }
+    if (component == "usb") {
+      return policy::DlpRulesManager::Component::kUsb;
+    }
+    if (component == "drive") {
+      return policy::DlpRulesManager::Component::kDrive;
+    }
+    return policy::DlpRulesManager::Component::kUnknownComponent;
+  }
+
+  // Returns the inode value for |path|, if found.
+  absl::optional<ino64_t> GetInodeValue(const base::FilePath& path) {
+    struct stat file_stats;
+    if (stat(path.value().c_str(), &file_stats) != 0) {
+      return absl::nullopt;
+    }
+    return file_stats.st_ino;
+  }
+
   // Invokes `callback` with the previously constructed `response`. Note that
   // the result doesn't depend on the value of `request`.
   void GetFilesSourcesMock(
@@ -623,10 +701,6 @@ class DlpFilesAppBrowserTest : public FilesAppBrowserTest {
       chromeos::DlpClient::GetFilesSourcesCallback callback) {
     std::move(callback).Run(response);
   }
-
-  // MockDlpRulesManager is owned by KeyedService and is guaranteed to outlive
-  // this class.
-  policy::MockDlpRulesManager* mock_rules_manager_ = nullptr;
 
   std::unique_ptr<policy::DlpFilesController> files_controller_;
 };
@@ -1129,12 +1203,21 @@ WRAPPED_INSTANTIATE_TEST_SUITE_P(
 WRAPPED_INSTANTIATE_TEST_SUITE_P(
     CreateNewFolder, /* create_new_folder.js */
     FilesAppBrowserTest,
-    ::testing::Values(TestCase("selectCreateFolderDownloads"),
-                      TestCase("selectCreateFolderDownloads").InGuestMode(),
-                      TestCase("createFolderDownloads"),
-                      TestCase("createFolderDownloads").InGuestMode(),
-                      TestCase("createFolderNestedDownloads"),
-                      TestCase("createFolderDrive")));
+    ::testing::Values(
+        TestCase("selectCreateFolderDownloads")
+            .FeatureIds({"screenplay-d9f79e27-bec2-4d15-9ba3-ae2bcd1e4bb5"}),
+        TestCase("selectCreateFolderDownloads")
+            .InGuestMode()
+            .FeatureIds({"screenplay-d9f79e27-bec2-4d15-9ba3-ae2bcd1e4bb5"}),
+        TestCase("createFolderDownloads")
+            .FeatureIds({"screenplay-d9f79e27-bec2-4d15-9ba3-ae2bcd1e4bb5"}),
+        TestCase("createFolderDownloads")
+            .InGuestMode()
+            .FeatureIds({"screenplay-d9f79e27-bec2-4d15-9ba3-ae2bcd1e4bb5"}),
+        TestCase("createFolderNestedDownloads")
+            .FeatureIds({"screenplay-d9f79e27-bec2-4d15-9ba3-ae2bcd1e4bb5"}),
+        TestCase("createFolderDrive")
+            .FeatureIds({"screenplay-d9f79e27-bec2-4d15-9ba3-ae2bcd1e4bb5"})));
 
 WRAPPED_INSTANTIATE_TEST_SUITE_P(
     KeyboardOperations, /* keyboard_operations.js */
@@ -1456,7 +1539,9 @@ WRAPPED_INSTANTIATE_TEST_SUITE_P(
         TestCase("driveOfflineInfoBanner"),
         TestCase("driveDeleteDialogDoesntMentionPermanentDelete"),
         TestCase("driveInlineSyncStatusSingleFile").EnableInlineStatusSync(),
-        TestCase("driveInlineSyncStatusParentFolder").EnableInlineStatusSync()
+        TestCase("driveInlineSyncStatusParentFolder").EnableInlineStatusSync(),
+        TestCase("driveLocalDeleteUnpinsItem").EnableBulkPinning(),
+        TestCase("driveCloudDeleteUnpinsItem").EnableBulkPinning()
         // TODO(b/189173190): Enable
         // TestCase("driveEnableDocsOfflineDialog"),
         // TODO(b/189173190): Enable
@@ -1536,13 +1621,16 @@ WRAPPED_INSTANTIATE_TEST_SUITE_P(
         TestCase("transferShowDlpToast").EnableDlp(),
         TestCase("dlpShowManagedIcon").EnableDlp(),
         TestCase("dlpContextMenuRestrictionDetails").EnableDlp(),
-        TestCase("saveAsDlpRestrictedDirectory").EnableDlp(),
+        TestCase("saveAsDlpRestrictedAndroid").EnableArcVm().EnableDlp(),
         TestCase("saveAsDlpRestrictedCrostini").EnableDlp(),
+        TestCase("saveAsDlpRestrictedVm").EnableDlp(),
+        TestCase("saveAsDlpRestrictedUsb").EnableDlp(),
+        TestCase("saveAsDlpRestrictedDrive").EnableDlp(),
         TestCase("saveAsNonDlpRestricted").EnableDlp(),
         TestCase("saveAsDlpRestrictedRedirectsToMyFiles").EnableDlp(),
-        TestCase("saveAsDlpRestrictedVm").EnableDlp(),
         TestCase("openDlpRestrictedFile").EnableDlp(),
-        TestCase("openFolderDlpRestricted").EnableDlp()));
+        TestCase("openFolderDlpRestricted").EnableDlp(),
+        TestCase("fileTasksDlpRestricted").EnableDlp()));
 
 WRAPPED_INSTANTIATE_TEST_SUITE_P(
     DriveSpecific, /* drive_specific.js */
@@ -1552,31 +1640,36 @@ WRAPPED_INSTANTIATE_TEST_SUITE_P(
         // to `policy::DeviceMode::DEVICE_MODE_CONSUMER` in
         // `FilesAppBrowserTest`.
         TestCase("driveGoogleOneOfferBannerEnabled")
-            .SetDeviceMode(DeviceMode::CONSUMER_OWNED)
-            .SetTestAccountType(TestAccountType::NON_MANAGED)
+            .SetDeviceMode(DeviceMode::kConsumerOwned)
+            .SetTestAccountType(TestAccountType::kNonManged)
             .EnableGoogleOneOfferFilesBanner(),
         // Google One offer banner is disabled by default.
         TestCase("driveGoogleOneOfferBannerDisabled")
-            .SetDeviceMode(DeviceMode::CONSUMER_OWNED)
-            .SetTestAccountType(TestAccountType::NON_MANAGED),
+            .SetDeviceMode(DeviceMode::kConsumerOwned)
+            .SetTestAccountType(TestAccountType::kNonManged),
         TestCase("driveGoogleOneOfferBannerDismiss")
-            .SetDeviceMode(DeviceMode::CONSUMER_OWNED)
-            .SetTestAccountType(TestAccountType::NON_MANAGED)
+            .SetDeviceMode(DeviceMode::kConsumerOwned)
+            .SetTestAccountType(TestAccountType::kNonManged)
             .EnableGoogleOneOfferFilesBanner(),
         TestCase("driveGoogleOneOfferBannerDisabled")
             .EnableGoogleOneOfferFilesBanner()
-            .SetDeviceMode(DeviceMode::CONSUMER_OWNED)
-            .SetTestAccountType(TestAccountType::ENTERPRISE),
+            .SetDeviceMode(DeviceMode::kConsumerOwned)
+            .SetTestAccountType(TestAccountType::kEnterprise),
         TestCase("driveGoogleOneOfferBannerDisabled")
             .EnableGoogleOneOfferFilesBanner()
-            .SetDeviceMode(DeviceMode::CONSUMER_OWNED)
-            .SetTestAccountType(TestAccountType::CHILD),
+            .SetDeviceMode(DeviceMode::kConsumerOwned)
+            .SetTestAccountType(TestAccountType::kChild),
         // Google One offer is for a device. The banner will not
         // be shown for an enrolled device.
         TestCase("driveGoogleOneOfferBannerDisabled")
             .EnableGoogleOneOfferFilesBanner()
-            .SetDeviceMode(DeviceMode::ENROLLED)
-            .SetTestAccountType(TestAccountType::NON_MANAGED)));
+            .SetDeviceMode(DeviceMode::kEnrolled)
+            .SetTestAccountType(TestAccountType::kNonManged),
+        // We do not show a banner if a profile is not an owner profile.
+        TestCase("driveGoogleOneOfferBannerDisabled")
+            .EnableGoogleOneOfferFilesBanner()
+            .SetDeviceMode(kConsumerOwned)
+            .SetTestAccountType(kNonManagedNonOwner)));
 
 #define FILE_TRANSFER_TEST_CASE(name) \
   TestCase(name).EnableFileTransferConnector()

@@ -46,7 +46,6 @@ import org.chromium.chrome.browser.preferences.ChromePreferenceKeys;
 import org.chromium.chrome.browser.preferences.SharedPreferencesManager;
 import org.chromium.chrome.browser.price_tracking.PriceTrackingFeatures;
 import org.chromium.chrome.browser.price_tracking.PriceTrackingUtilities;
-import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.chrome.browser.tab.EmptyTabObserver;
 import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.browser.tab.TabCreationState;
@@ -347,10 +346,10 @@ class TabListMediator {
     private final SelectionDelegateProvider mSelectionDelegateProvider;
     private final GridCardOnClickListenerProvider mGridCardOnClickListenerProvider;
     private final TabGridDialogHandler mTabGridDialogHandler;
-    private final String mComponentName;
     private final TabListFaviconProvider mTabListFaviconProvider;
     private final PriceWelcomeMessageController mPriceWelcomeMessageController;
 
+    private String mComponentName;
     private ThumbnailProvider mThumbnailProvider;
     private boolean mActionsOnAllRelatedTabs;
     private ComponentCallbacks mComponentCallbacks;
@@ -648,8 +647,9 @@ class TabListMediator {
                     @TabCreationState int creationState, boolean markedForSelection) {
                 if (!mTabModelSelector.isTabStateInitialized()) return;
                 // Check if we need to delay tab addition to model.
-                boolean delayAdd =
-                        (type == TabLaunchType.FROM_TAB_SWITCHER_UI) && markedForSelection;
+                boolean delayAdd = (type == TabLaunchType.FROM_TAB_SWITCHER_UI)
+                        && markedForSelection
+                        && TabSwitcherCoordinator.COMPONENT_NAME.equals(mComponentName);
                 if (delayAdd) {
                     mTabToAddDelayed = tab;
                     return;
@@ -806,8 +806,9 @@ class TabListMediator {
         }
     }
 
-    public void initWithNative(Profile profile) {
-        mTabListFaviconProvider.initWithNative(profile);
+    public void initWithNative() {
+        mTabListFaviconProvider.initWithNative(
+                mTabModelSelector.getModel(/*isIncognito=*/false).getProfile());
         mTabModelSelector.getTabModelFilterProvider().addTabModelFilterObserver(mTabModelObserver);
 
         if (mTabModelSelector.getTabModelFilterProvider().getCurrentTabModelFilter()
@@ -1400,9 +1401,9 @@ class TabListMediator {
      * @return The callback that hosts the logic for swipe and drag related actions.
      */
     ItemTouchHelper.SimpleCallback getItemTouchHelperCallback(final float swipeToDismissThreshold,
-            final float mergeThreshold, final float ungroupThreshold, final Profile profile) {
+            final float mergeThreshold, final float ungroupThreshold) {
         mTabGridItemTouchHelperCallback.setupCallback(
-                swipeToDismissThreshold, mergeThreshold, ungroupThreshold, profile);
+                swipeToDismissThreshold, mergeThreshold, ungroupThreshold);
         return mTabGridItemTouchHelperCallback;
     }
 
@@ -2042,5 +2043,15 @@ class TabListMediator {
             }
         }
         return TabModel.INVALID_TAB_INDEX;
+    }
+
+    @VisibleForTesting
+    Tab getTabToAddDelayedForTesting() {
+        return mTabToAddDelayed;
+    }
+
+    @VisibleForTesting
+    void setComponentNameForTesting(String name) {
+        mComponentName = name;
     }
 }

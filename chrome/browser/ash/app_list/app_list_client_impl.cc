@@ -9,11 +9,12 @@
 #include <utility>
 #include <vector>
 
-#include "ash/constants/ash_features.h"
 #include "ash/public/cpp/app_list/app_list_controller.h"
 #include "ash/public/cpp/app_list/app_list_types.h"
 #include "ash/public/cpp/new_window_delegate.h"
 #include "ash/public/cpp/tablet_mode.h"
+#include "ash/shell.h"
+#include "ash/system/federated/federated_service_controller_impl.h"
 #include "base/functional/bind.h"
 #include "base/metrics/histogram_functions.h"
 #include "base/metrics/histogram_macros.h"
@@ -26,7 +27,6 @@
 #include "chrome/browser/ash/app_list/app_list_syncable_service_factory.h"
 #include "chrome/browser/ash/app_list/app_sync_ui_state_watcher.h"
 #include "chrome/browser/ash/app_list/search/chrome_search_result.h"
-#include "chrome/browser/ash/app_list/search/cros_action_history/cros_action_recorder.h"
 #include "chrome/browser/ash/app_list/search/ranking/launch_data.h"
 #include "chrome/browser/ash/app_list/search/search_controller.h"
 #include "chrome/browser/ash/app_list/search/search_controller_factory.h"
@@ -159,8 +159,7 @@ void AppListClientImpl::OnAppListControllerDestroyed() {
 
 void AppListClientImpl::StartSearch(const std::u16string& trimmed_query) {
   if (search_controller_) {
-    if (trimmed_query.empty() &&
-        ash::features::IsProductivityLauncherEnabled()) {
+    if (trimmed_query.empty()) {
       search_controller_->ClearSearch();
     } else {
       search_controller_->StartSearch(trimmed_query);
@@ -406,11 +405,7 @@ void AppListClientImpl::OnSearchResultVisibilityChanged(const std::string& id,
 
 void AppListClientImpl::OnQuickSettingsChanged(
     const std::string& setting_name,
-    const std::map<std::string, int>& values) {
-  // CrOS action recorder.
-  app_list::CrOSActionRecorder::GetCrosActionRecorder()->RecordAction(
-      {base::StrCat({"SettingsChanged-", setting_name})}, values);
-}
+    const std::map<std::string, int>& values) {}
 
 void AppListClientImpl::ActiveUserChanged(user_manager::User* active_user) {
   if (user_manager::UserManager::Get()->IsCurrentUserNew()) {
@@ -502,7 +497,8 @@ void AppListClientImpl::SetProfile(Profile* new_profile) {
 
 void AppListClientImpl::SetUpSearchUI() {
   search_controller_ = app_list::CreateSearchController(
-      profile_, current_model_updater_, this, GetNotifier());
+      profile_, current_model_updater_, this, GetNotifier(),
+      ash::Shell::Get()->federated_service_controller());
 
   // Refresh the results used for the suggestion chips with empty query.
   // This fixes crbug.com/999287.

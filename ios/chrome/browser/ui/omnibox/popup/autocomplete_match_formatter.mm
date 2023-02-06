@@ -243,12 +243,20 @@ UIColor* DimColorIncognito() {
 }
 
 - (UIImage*)matchTypeIcon {
-  return GetOmniboxSuggestionIconForAutocompleteMatchType(
-      _match.type, /* is_starred */ false);
+  return GetOmniboxSuggestionIconForAutocompleteMatchType(_match.type);
+}
+
+- (NSString*)matchTypeIconAccessibilityIdentifier {
+  return base::SysUTF8ToNSString(AutocompleteMatchType::ToString(_match.type));
 }
 
 - (BOOL)isMatchTypeSearch {
   return AutocompleteMatch::IsSearchType(_match.type);
+}
+
+- (BOOL)isWrapping {
+  return self.isMatchTypeSearch && !self.hasAnswer &&
+         _match.type != AutocompleteMatchType::SEARCH_SUGGEST_ENTITY;
 }
 
 - (CrURL*)destinationUrl {

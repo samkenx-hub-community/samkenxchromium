@@ -128,10 +128,10 @@ class BrowserURLLoaderThrottle::CheckerOnIO
     }
 
     if (is_mechanism_experiment_allowed_ &&
-        request_destination == network::mojom::RequestDestination::kDocument &&
-        !(load_flags & net::LOAD_PREFETCH)) {
+        request_destination == network::mojom::RequestDestination::kDocument) {
       mechanism_experimenter_ =
-          base::MakeRefCounted<SafeBrowsingLookupMechanismExperimenter>();
+          base::MakeRefCounted<SafeBrowsingLookupMechanismExperimenter>(
+              /*is_prefetch=*/load_flags & net::LOAD_PREFETCH);
     }
     url_checker_ = std::make_unique<SafeBrowsingUrlCheckerImpl>(
         headers, load_flags, request_destination, has_user_gesture,
@@ -142,7 +142,8 @@ class BrowserURLLoaderThrottle::CheckerOnIO
         can_check_high_confidence_allowlist_, url_lookup_service_metric_suffix_,
         last_committed_url_, content::GetUIThreadTaskRunner({}),
         url_lookup_service_, WebUIInfoSingleton::GetInstance(),
-        hash_realtime_service_, mechanism_experimenter_);
+        hash_realtime_service_, mechanism_experimenter_,
+        is_mechanism_experiment_allowed_);
 
     CheckUrl(url, method);
   }
@@ -393,9 +394,17 @@ void BrowserURLLoaderThrottle::WillProcessResponse(
       "SafeBrowsing.BrowserThrottle.IsCheckCompletedOnProcessResponse",
       check_completed);
   if (is_start_request_called_) {
+    base::TimeTicks process_time = base::TimeTicks::Now();
     base::UmaHistogramTimes(
         "SafeBrowsing.BrowserThrottle.IntervalBetweenStartAndProcess",
-        base::TimeTicks::Now() - start_request_time_);
+        process_time - start_request_time_);
+    bool is_response_from_cache = response_head->was_fetched_via_cache &&
+                                  !response_head->network_accessed;
+    base::UmaHistogramTimes(
+        base::StrCat(
+            {"SafeBrowsing.BrowserThrottle.IntervalBetweenStartAndProcess",
+             is_response_from_cache ? ".FromCache" : ".FromNetwork"}),
+        process_time - start_request_time_);
     is_start_request_called_ = false;
   }
 

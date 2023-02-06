@@ -55,6 +55,7 @@ import org.chromium.base.supplier.Supplier;
 import org.chromium.chrome.R;
 import org.chromium.chrome.browser.back_press.BackPressManager;
 import org.chromium.chrome.browser.browser_controls.BrowserControlsStateProvider;
+import org.chromium.chrome.browser.feed.FeedActionDelegate;
 import org.chromium.chrome.browser.feed.FeedReliabilityLogger;
 import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.lens.LensEntryPoint;
@@ -314,17 +315,8 @@ class StartSurfaceMediator implements TabSwitcher.TabSwitcherViewObserver, View.
                     // don't want to hide the overview when creating a tab in the background, so
                     // when a background tab is added to an empty tab model, we should skip the next
                     // onTabSelecting().
-                    int tabCount = mTabModelSelector.getModel(false).getCount();
-                    mHideOverviewOnTabSelecting =
-                            tabCount != 0 || type != TabLaunchType.FROM_LONGPRESS_BACKGROUND;
-
-                    // Updates the visibility of the tab switcher module if it is invisible and a
-                    // new Tab is created in the background without hiding the Start surface
-                    // homepage.
-                    if (isHomepageShown() && !mHideOverviewOnTabSelecting
-                            && !mPropertyModel.get(IS_TAB_CAROUSEL_VISIBLE)) {
-                        setTabCarouselVisibility(!mIsIncognito);
-                    }
+                    mHideOverviewOnTabSelecting = mTabModelSelector.getModel(false).getCount() != 0
+                            || type != TabLaunchType.FROM_LONGPRESS_BACKGROUND;
                 }
 
                 @Override
@@ -1496,5 +1488,12 @@ class StartSurfaceMediator implements TabSwitcher.TabSwitcherViewObserver, View.
         return mIsStartSurfaceRefactorEnabled
                 ? mIsHomepageShown
                 : mStartSurfaceState == StartSurfaceState.SHOWN_HOMEPAGE;
+    }
+
+    @VisibleForTesting
+    public FeedActionDelegate getFeedActionDelegateForTesting() {
+        assert mPropertyModel.get(EXPLORE_SURFACE_COORDINATOR) != null;
+        return mPropertyModel.get(EXPLORE_SURFACE_COORDINATOR)
+                .getFeedActionDelegateForTesting(); // IN-TEST
     }
 }

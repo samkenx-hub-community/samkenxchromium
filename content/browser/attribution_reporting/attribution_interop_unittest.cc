@@ -14,9 +14,8 @@
 #include "base/path_service.h"
 #include "base/test/values_test_util.h"
 #include "base/values.h"
+#include "content/browser/attribution_reporting/attribution_config.h"
 #include "content/browser/attribution_reporting/attribution_interop_parser.h"
-#include "content/public/browser/attribution_config.h"
-#include "content/public/browser/attribution_reporting.h"
 #include "content/public/test/attribution_simulator.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
@@ -95,7 +94,7 @@ TEST_P(AttributionInteropTest, HasExpectedOutput) {
     error_stream.str("");
   }
 
-  absl::optional<base::Value> input =
+  absl::optional<base::Value::Dict> input =
       parser.SimulatorInputFromInteropInput(dict);
   EXPECT_TRUE(input) << error_stream.str();
 
@@ -104,23 +103,11 @@ TEST_P(AttributionInteropTest, HasExpectedOutput) {
 
   ASSERT_TRUE(is_config_valid && input);
 
-  AttributionSimulationOptions options{
-      .noise_mode = AttributionNoiseMode::kNone,
-      .config = config,
-      .delay_mode = AttributionDelayMode::kDefault,
-      .output_options =
-          AttributionSimulationOutputOptions{
-              .remove_report_ids = true,
-              .remove_assembled_report = true,
-          },
-  };
+  auto simulator_output = RunAttributionSimulation(std::move(*input), config);
+  ASSERT_TRUE(simulator_output.has_value()) << simulator_output.error();
 
-  base::Value simulator_output =
-      RunAttributionSimulation(std::move(*input), options, error_stream);
-  ASSERT_FALSE(simulator_output.is_none()) << error_stream.str();
-
-  absl::optional<base::Value> actual_output =
-      parser.InteropOutputFromSimulatorOutput(std::move(simulator_output));
+  absl::optional<base::Value::Dict> actual_output =
+      parser.InteropOutputFromSimulatorOutput(std::move(*simulator_output));
   EXPECT_TRUE(actual_output) << error_stream.str();
 
   if (expected_output) {

@@ -9,7 +9,7 @@ import 'chrome://resources/cr_elements/cr_button/cr_button.js';
 import 'chrome://resources/cr_elements/cr_shared_style.css.js';
 
 import {startColorChangeUpdater} from 'chrome://resources/cr_components/color_change_listener/colors_css_updater.js';
-import {ClickInfo, Command} from 'chrome://resources/js/browser_command/browser_command.mojom-webui.js';
+import {ClickInfo, Command} from 'chrome://resources/js/browser_command.mojom-webui.js';
 import {BrowserCommandProxy} from 'chrome://resources/js/browser_command/browser_command_proxy.js';
 import {hexColorToSkColor, skColorToRgba} from 'chrome://resources/js/color_utils.js';
 import {EventTracker} from 'chrome://resources/js/event_tracker.js';
@@ -25,7 +25,7 @@ import {loadTimeData} from './i18n_setup.js';
 import {IframeElement} from './iframe.js';
 import {LogoElement} from './logo.js';
 import {recordLoadDuration} from './metrics_utils.js';
-import {CustomizeChromeSection, PageCallbackRouter, PageHandlerRemote, Theme} from './new_tab_page.mojom-webui.js';
+import {CustomizeChromeSection, NtpBackgroundImageSource, PageCallbackRouter, PageHandlerRemote, Theme} from './new_tab_page.mojom-webui.js';
 import {NewTabPageProxy} from './new_tab_page_proxy.js';
 import {$$} from './utils.js';
 import {Action as VoiceAction, recordVoiceAction} from './voice_search_overlay.js';
@@ -373,6 +373,9 @@ export class AppElement extends PolymerElement {
     super.connectedCallback();
     this.setThemeListenerId_ =
         this.callbackRouter_.setTheme.addListener((theme: Theme) => {
+          if (!this.theme_) {
+            this.onThemeLoaded_(theme);
+          }
           performance.measure('theme-set');
           this.theme_ = theme;
         });
@@ -419,6 +422,13 @@ export class AppElement extends PolymerElement {
           });
     }
     FocusOutlineManager.forDocument(document);
+
+    if (loadTimeData.valueExists('modulesMaxWidthPx')) {
+      this.updateStyles({
+        '--ntp-module-max-width':
+            `${loadTimeData.getInteger('modulesMaxWidthPx')}px`,
+      });
+    }
   }
 
   override disconnectedCallback() {
@@ -528,6 +538,7 @@ export class AppElement extends PolymerElement {
     if (this.customizeChromeEnabled_) {
       this.setCustomizeChromeSidePanelVisible_(!this.showCustomize_);
       if (!this.showCustomize_) {
+        this.pageHandler_.incrementCustomizeChromeButtonOpenCount();
         recordCustomizeChromeOpen(
             NtpCustomizeChromeEntryPoint.CUSTOMIZE_BUTTON);
       }
@@ -580,6 +591,20 @@ export class AppElement extends PolymerElement {
     }
     this.updateBackgroundImagePath_();
   }
+
+
+  private onThemeLoaded_(theme: Theme) {
+    chrome.metricsPrivate.recordEnumerationValue(
+        'NewTabPage.BackgroundImageSource',
+        (theme.backgroundImage ? theme.backgroundImage.imageSource :
+                                 NtpBackgroundImageSource.kNoImage),
+        NtpBackgroundImageSource.MAX_VALUE);
+
+    chrome.metricsPrivate.recordSparseValueWithPersistentHash(
+        'NewTabPage.Collections.IdOnLoad',
+        theme.backgroundImageCollectionId ?? '');
+  }
+
 
   private onPromoAndModulesLoadedChange_() {
     if (this.promoAndModulesLoaded_ &&

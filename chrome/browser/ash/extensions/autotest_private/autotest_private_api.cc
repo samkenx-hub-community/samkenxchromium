@@ -127,7 +127,6 @@
 #include "chrome/browser/lifetime/application_lifetime.h"
 #include "chrome/browser/policy/chrome_policy_conversions_client.h"
 #include "chrome/browser/profiles/profile.h"
-#include "chrome/browser/profiles/profile_manager.h"
 #include "chrome/browser/signin/identity_manager_factory.h"
 #include "chrome/browser/ui/ash/default_pinned_apps.h"
 #include "chrome/browser/ui/ash/holding_space/holding_space_keyed_service.h"
@@ -4508,6 +4507,16 @@ AutotestPrivateGetAppWindowListFunction::Run() {
         (window->GetProperty(aura::client::kResizeBehaviorKey) &
          aura::client::kResizeBehaviorCanResize) != 0;
 
+    window_info.stacking_order = -1;
+    // Find the window's stacking order among its siblings.
+    if (auto* parent = window->parent()) {
+      const auto& children = parent->children();
+      auto it = std::find(children.rbegin(), children.rend(), window);
+      if (it != children.rend()) {
+        window_info.stacking_order = it - children.rbegin();
+      }
+    }
+
     if (window->GetProperty(aura::client::kAppType) ==
         static_cast<int>(ash::AppType::ARC_APP)) {
       std::string* package_name = window->GetProperty(ash::kArcPackageNameKey);
@@ -4973,8 +4982,7 @@ AutotestPrivateWaitForLauncherStateFunction::Run() {
   // Exceptionally, allow waiting for kClosed state in clamshell mode, so tests
   // can wait for fullscreen launcher state change to finish when exiting tablet
   // mode.
-  if (ash::features::IsProductivityLauncherEnabled() &&
-      !ash::TabletMode::Get()->InTabletMode() &&
+  if (!ash::TabletMode::Get()->InTabletMode() &&
       target_state != ash::AppListViewState::kClosed) {
     return RespondNow(Error("Not supported for bubble launcher"));
   }

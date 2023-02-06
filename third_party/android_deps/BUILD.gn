@@ -1344,7 +1344,9 @@ if (!limit_android_deps) {
       ":io_grpc_grpc_context_java",
       "//third_party/android_deps:guava_android_java",
     ]
-    bypass_platform_checks = true
+
+    # https://crbug.com/1412551
+    requires_android = true
   }
 
   # This is generated, do not edit. Update BuildConfigGenerator.groovy instead.
@@ -1371,7 +1373,9 @@ if (!limit_android_deps) {
       "//third_party/android_deps:guava_android_java",
       "//third_party/android_deps:protobuf_lite_runtime_java",
     ]
-    bypass_platform_checks = true
+
+    # https://crbug.com/1412551
+    requires_android = true
   }
 
   # This is generated, do not edit. Update BuildConfigGenerator.groovy instead.
@@ -1384,7 +1388,9 @@ if (!limit_android_deps) {
       ":io_grpc_grpc_api_java",
       "//third_party/android_deps:guava_android_java",
     ]
-    bypass_platform_checks = true
+
+    # https://crbug.com/1412551
+    requires_android = true
   }
 
   # This is generated, do not edit. Update BuildConfigGenerator.groovy instead.
@@ -1480,7 +1486,7 @@ if (!limit_android_deps) {
 
   # This is generated, do not edit. Update BuildConfigGenerator.groovy instead.
   java_prebuilt("org_mockito_mockito_core_java") {
-    jar_path = "libs/org_mockito_mockito_core/mockito-core-4.7.0.jar"
+    jar_path = "libs/org_mockito_mockito_core/mockito-core-5.1.1.jar"
     output_name = "org_mockito_mockito_core"
     supports_android = true
     testonly = true
@@ -2066,6 +2072,9 @@ if (!limit_android_deps) {
       "//third_party/androidx:*",
     ]
     deps = [ "//third_party/androidx:androidx_annotation_annotation_java" ]
+
+    # https://crbug.com/1412551
+    requires_android = true
   }
 
   # This is generated, do not edit. Update BuildConfigGenerator.groovy instead.
@@ -2185,7 +2194,9 @@ if (!limit_android_deps) {
       ":*",
       "//third_party/androidx:*",
     ]
-    bypass_platform_checks = true
+
+    # https://crbug.com/1412551
+    requires_android = true
   }
 
   # This is generated, do not edit. Update BuildConfigGenerator.groovy instead.
@@ -2209,7 +2220,9 @@ if (!limit_android_deps) {
       ":org_codehaus_mojo_animal_sniffer_annotations_java",
       "//third_party/android_deps:guava_android_java",
     ]
-    bypass_platform_checks = true
+
+    # https://crbug.com/1412551
+    requires_android = true
   }
 
   # This is generated, do not edit. Update BuildConfigGenerator.groovy instead.
@@ -2228,7 +2241,7 @@ if (!limit_android_deps) {
 
   # This is generated, do not edit. Update BuildConfigGenerator.groovy instead.
   java_prebuilt("net_bytebuddy_byte_buddy_java") {
-    jar_path = "libs/net_bytebuddy_byte_buddy/byte-buddy-1.12.13.jar"
+    jar_path = "libs/net_bytebuddy_byte_buddy/byte-buddy-1.12.22.jar"
     output_name = "net_bytebuddy_byte_buddy"
     supports_android = true
 
@@ -2247,7 +2260,7 @@ if (!limit_android_deps) {
   # This is generated, do not edit. Update BuildConfigGenerator.groovy instead.
   java_prebuilt("net_bytebuddy_byte_buddy_agent_java") {
     jar_path =
-        "libs/net_bytebuddy_byte_buddy_agent/byte-buddy-agent-1.12.13.jar"
+        "libs/net_bytebuddy_byte_buddy_agent/byte-buddy-agent-1.12.22.jar"
     output_name = "net_bytebuddy_byte_buddy_agent"
     supports_android = true
 
@@ -2313,7 +2326,7 @@ if (!limit_android_deps) {
 
   # This is generated, do not edit. Update BuildConfigGenerator.groovy instead.
   java_prebuilt("org_objenesis_objenesis_java") {
-    jar_path = "libs/org_objenesis_objenesis/objenesis-3.2.jar"
+    jar_path = "libs/org_objenesis_objenesis/objenesis-3.3.jar"
     output_name = "org_objenesis_objenesis"
     supports_android = true
 

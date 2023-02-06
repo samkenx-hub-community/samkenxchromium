@@ -114,6 +114,7 @@ import org.chromium.chrome.browser.tab.TabCreationState;
 import org.chromium.chrome.browser.tab.TabImpl;
 import org.chromium.chrome.browser.tab.TabLaunchType;
 import org.chromium.chrome.browser.tab.TabObserver;
+import org.chromium.chrome.browser.tab.TabSelectionType;
 import org.chromium.chrome.browser.tab.state.CriticalPersistedTabData;
 import org.chromium.chrome.browser.tab.state.PersistedTabDataConfiguration;
 import org.chromium.chrome.browser.tab.state.ShoppingPersistedTabData;
@@ -334,7 +335,6 @@ public class TabListMediatorUnitTest {
 
     @Before
     public void setUp() {
-
         MockitoAnnotations.initMocks(this);
         mMocker.mock(UrlUtilitiesJni.TEST_HOOKS, mUrlUtilitiesJniMock);
         mMocker.mock(EndpointFetcherJni.TEST_HOOKS, mEndpointFetcherJniMock);
@@ -368,6 +368,10 @@ public class TabListMediatorUnitTest {
                 .when(mTabContentManager)
                 .getTabThumbnailWithCallback(anyInt(), any(), any(), anyBoolean(), anyBoolean());
         doReturn(mTabModel).when(mTabModelSelector).getCurrentModel();
+        // Incognito is unused. Mock the same profile for simplified test.
+        doReturn(mTabModel).when(mTabModelSelector).getModel(false);
+        doReturn(mTabModel).when(mTabModelSelector).getModel(true);
+        doReturn(mProfile).when(mTabModel).getProfile();
         doReturn(tabModelList).when(mTabModelSelector).getModels();
 
         doReturn(mTabModelFilterProvider).when(mTabModelSelector).getTabModelFilterProvider();
@@ -435,7 +439,7 @@ public class TabListMediatorUnitTest {
 
         // TabModelObserver is registered when native is ready.
         assertThat(mTabModelObserverCaptor.getAllValues().isEmpty(), equalTo(true));
-        mMediator.initWithNative(mProfile);
+        mMediator.initWithNative();
         assertThat(mTabModelObserverCaptor.getAllValues().isEmpty(), equalTo(false));
 
         doAnswer(invocation -> {
@@ -974,12 +978,52 @@ public class TabListMediatorUnitTest {
         doReturn(Arrays.asList(newTab)).when(mTabModelFilter).getRelatedTabList(eq(TAB3_ID));
         assertThat(mModel.size(), equalTo(2));
 
-        mTabModelObserverCaptor.getValue().didAddTab(
-                newTab, TabLaunchType.FROM_CHROME_UI, TabCreationState.LIVE_IN_FOREGROUND, false);
+        mTabModelObserverCaptor.getValue().didAddTab(newTab, TabLaunchType.FROM_TAB_SWITCHER_UI,
+                TabCreationState.LIVE_IN_FOREGROUND, false);
 
         assertThat(mModel.size(), equalTo(3));
         assertThat(mModel.get(2).model.get(TabProperties.TAB_ID), equalTo(TAB3_ID));
         assertThat(mModel.get(2).model.get(TabProperties.TITLE), equalTo(TAB3_TITLE));
+    }
+
+    @Test
+    public void tabAddition_GTS_delayAdd() {
+        mMediator.setComponentNameForTesting(TabSwitcherCoordinator.COMPONENT_NAME);
+        initAndAssertAllProperties();
+        doReturn(true).when(mTabModelSelector).isTabStateInitialized();
+
+        TabImpl newTab = prepareTab(TAB3_ID, TAB3_TITLE, TAB3_URL);
+        doReturn(mTab1).when(mTabModelFilter).getTabAt(0);
+        doReturn(mTab2).when(mTabModelFilter).getTabAt(1);
+        doReturn(newTab).when(mTabModelFilter).getTabAt(2);
+        doReturn(Arrays.asList(mTab1, mTab2, newTab))
+                .when(mTabModelFilter)
+                .getRelatedTabList(TAB1_ID);
+        doReturn(3).when(mTabModelFilter).getCount();
+        doReturn(Arrays.asList(newTab)).when(mTabModelFilter).getRelatedTabList(eq(TAB3_ID));
+        assertThat(mModel.size(), equalTo(2));
+
+        TabModelObserver tabModelObserver = mTabModelObserverCaptor.getValue();
+        // Add tab marked as delayed
+        tabModelObserver.didAddTab(newTab, TabLaunchType.FROM_TAB_SWITCHER_UI,
+                TabCreationState.LIVE_IN_FOREGROUND, true);
+
+        // Verify tab did not get added and delayed tab is captured.
+        assertThat(mModel.size(), equalTo(2));
+        assertThat(mMediator.getTabToAddDelayedForTesting(), equalTo(newTab));
+
+        // Select delayed tab
+        tabModelObserver.didSelectTab(newTab, TabSelectionType.FROM_USER, mTab1.getId());
+        // Assert old tab is still marked as selected
+        assertThat(mModel.get(0).model.get(TabProperties.IS_SELECTED), equalTo(true));
+
+        // Hide GTS to complete tab addition and selection
+        mMediator.postHiding();
+        // Assert tab added and selected. Assert old tab is de-selected.
+        assertThat(mModel.size(), equalTo(3));
+        assertThat(mModel.get(0).model.get(TabProperties.IS_SELECTED), equalTo(false));
+        assertThat(mModel.get(2).model.get(TabProperties.IS_SELECTED), equalTo(true));
+        assertNull(mMediator.getTabToAddDelayedForTesting());
     }
 
     @Test
@@ -996,8 +1040,8 @@ public class TabListMediatorUnitTest {
         doReturn(Arrays.asList(mTab2, newTab)).when(mTabModelFilter).getRelatedTabList(eq(TAB3_ID));
         assertThat(mModel.size(), equalTo(2));
 
-        mTabModelObserverCaptor.getValue().didAddTab(
-                newTab, TabLaunchType.FROM_CHROME_UI, TabCreationState.LIVE_IN_FOREGROUND, false);
+        mTabModelObserverCaptor.getValue().didAddTab(newTab, TabLaunchType.FROM_TAB_SWITCHER_UI,
+                TabCreationState.LIVE_IN_FOREGROUND, false);
 
         assertThat(mModel.size(), equalTo(2));
     }
@@ -1119,7 +1163,7 @@ public class TabListMediatorUnitTest {
                 getTabThumbnailCallback(), mTitleProvider, mTabListFaviconProvider, true, null,
                 mGridCardOnClickListenerProvider, null, null, getClass().getSimpleName(),
                 UiType.CLOSABLE, null);
-        mMediator.initWithNative(mProfile);
+        mMediator.initWithNative();
         // mTabModelObserverCaptor captures on every initWithNative calls. There is one
         // initWithNative call in the setup already.
         verify(mTabModelFilterProvider, times(2))
@@ -3017,7 +3061,7 @@ public class TabListMediatorUnitTest {
                 getTabThumbnailCallback(), mTitleProvider, mTabListFaviconProvider, true, null,
                 null, null, null, getClass().getSimpleName(), TabProperties.UiType.CLOSABLE, null);
         mMediator.registerOrientationListener(mGridLayoutManager);
-        mMediator.initWithNative(mProfile);
+        mMediator.initWithNative();
         initAndAssertAllProperties();
 
         PropertyModel model = mock(PropertyModel.class);
@@ -3034,7 +3078,7 @@ public class TabListMediatorUnitTest {
                 getTabThumbnailCallback(), mTitleProvider, mTabListFaviconProvider, true, null,
                 null, null, null, getClass().getSimpleName(), TabProperties.UiType.CLOSABLE, null);
         mMediator.registerOrientationListener(mGridLayoutManager);
-        mMediator.initWithNative(mProfile);
+        mMediator.initWithNative();
         initWithThreeTabs();
 
         PropertyModel model = mock(PropertyModel.class);
@@ -3355,7 +3399,7 @@ public class TabListMediatorUnitTest {
                 null, null, null, getClass().getSimpleName(), TabProperties.UiType.SELECTABLE,
                 null);
         mMediator.registerOrientationListener(mGridLayoutManager);
-        mMediator.initWithNative(mProfile);
+        mMediator.initWithNative();
         initAndAssertAllProperties();
         when(mSelectionDelegate.isItemSelected(TAB1_ID)).thenReturn(false);
         Tab tab3 = prepareTab(TAB3_ID, TAB3_TITLE, TAB3_URL);
@@ -3390,7 +3434,7 @@ public class TabListMediatorUnitTest {
                 null, null, null, getClass().getSimpleName(), TabProperties.UiType.SELECTABLE,
                 null);
         mMediator.registerOrientationListener(mGridLayoutManager);
-        mMediator.initWithNative(mProfile);
+        mMediator.initWithNative();
         initAndAssertAllProperties();
         Tab tab3 = prepareTab(TAB3_ID, TAB3_TITLE, TAB3_URL);
         when(mSelectionDelegate.isItemSelected(TAB1_ID)).thenReturn(false);
@@ -3425,7 +3469,7 @@ public class TabListMediatorUnitTest {
                 null, null, null, getClass().getSimpleName(), TabProperties.UiType.SELECTABLE,
                 null);
         mMediator.registerOrientationListener(mGridLayoutManager);
-        mMediator.initWithNative(mProfile);
+        mMediator.initWithNative();
         initAndAssertAllProperties();
         Tab tab3 = prepareTab(TAB3_ID, TAB3_TITLE, TAB3_URL);
         Tab tab4 = prepareTab(TAB3_ID, TAB3_TITLE, TAB3_URL);
@@ -3588,8 +3632,7 @@ public class TabListMediatorUnitTest {
     }
 
     private TabGridItemTouchHelperCallback getItemTouchHelperCallback() {
-        return (TabGridItemTouchHelperCallback) mMediator.getItemTouchHelperCallback(
-                0f, 0f, 0f, mProfile);
+        return (TabGridItemTouchHelperCallback) mMediator.getItemTouchHelperCallback(0f, 0f, 0f);
     }
 
     private void setUpForTabGroupOperation(@TabListMediatorType int type, @TabListMode int mode) {
@@ -3624,7 +3667,7 @@ public class TabListMediatorUnitTest {
 
         // TabGroupModelFilterObserver is registered when native is ready.
         assertThat(mTabGroupModelFilterObserverCaptor.getAllValues().isEmpty(), equalTo(true));
-        mMediator.initWithNative(mProfile);
+        mMediator.initWithNative();
         assertThat(mTabGroupModelFilterObserverCaptor.getAllValues().isEmpty(), equalTo(false));
 
         // There are two TabModelObserver and two TabGroupModelFilter.Observer added when

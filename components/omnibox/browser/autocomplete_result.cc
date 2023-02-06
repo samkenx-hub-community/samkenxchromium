@@ -383,11 +383,19 @@ void AutocompleteResult::SortAndCull(
 
     PSections sections;
     if (is_zero_suggest) {
-      sections.push_back(std::make_unique<DesktopZpsSection>());
-    } else if (matches_.size() > 2) {  // Grouping is a no-op for only 1 match.
-      sections.push_back(std::make_unique<DesktopNonZpsSection>());
+      sections.push_back(
+          std::make_unique<DesktopZpsSection>(suggestion_groups_map_));
+      if (page_classification == OmniboxEventProto::NTP_REALBOX &&
+          base::FeatureList::IsEnabled(omnibox::kKeepSecondaryZeroSuggest)) {
+        // Allow secondary zero-prefix suggestions in the NTP realbox, if any.
+        sections.push_back(std::make_unique<DesktopSecondaryZpsSection>(
+            suggestion_groups_map_));
+      }
+    } else {
+      sections.push_back(
+          std::make_unique<DesktopNonZpsSection>(suggestion_groups_map_));
     }
-    matches_ = Section::GroupMatches(std::move(sections), std::move(matches_));
+    matches_ = Section::GroupMatches(std::move(sections), matches_);
 
   } else {
     // Limit history cluster suggestions to 1. This has to be done before
@@ -607,7 +615,7 @@ void AutocompleteResult::AttachPedalsToMatches(
     AutocompleteMatch& match = matches_[i];
     // Skip matches that already have an `action` or are not suitable
     // for actions.
-    if (match.action || !match.IsActionCompatible()) {
+    if (!match.actions.empty() || !match.IsActionCompatible()) {
       continue;
     }
 
@@ -615,8 +623,9 @@ void AutocompleteResult::AttachPedalsToMatches(
         provider->FindReadyPedalMatch(input, match.contents);
     if (pedal) {
       const auto result = pedals_found.insert(pedal);
-      if (result.second)
-        match.action = pedal;
+      if (result.second) {
+        match.actions.push_back(pedal);
+      }
     }
   }
 }

@@ -78,6 +78,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Logic related to the URL overriding/intercepting functionality.
@@ -502,8 +503,7 @@ public class ExternalNavigationHandler {
     private OverrideUrlLoadingResult handleFallbackUrl(ExternalNavigationParams params,
             Intent targetIntent, GURL browserFallbackUrl, boolean canLaunchExternalFallback) {
         if (browserFallbackUrl.isEmpty()
-                || (params.getRedirectHandler() != null
-                        && params.getRedirectHandler().isOnNavigation()
+                || (params.getRedirectHandler().isOnNavigation()
                         // For instance, if this is a chained fallback URL, we ignore it.
                         && params.getRedirectHandler().shouldNotOverrideUrlLoading())) {
             return OverrideUrlLoadingResult.forNoOverride();
@@ -551,7 +551,7 @@ public class ExternalNavigationHandler {
         // Otherwise, it can be used in chain for fingerprinting multiple app installation
         // status in one shot. In order to prevent this scenario, we notify redirection
         // handler that redirection from the current navigation should stay in this app.
-        if (params.getRedirectHandler() != null && params.getRedirectHandler().isOnNavigation()
+        if (params.getRedirectHandler().isOnNavigation()
                 && !params.getRedirectHandler()
                             .getAndClearShouldNotBlockOverrideUrlLoadingOnCurrentRedirectionChain()) {
             params.getRedirectHandler().setShouldNotOverrideUrlLoadingOnCurrentRedirectChain();
@@ -926,7 +926,6 @@ public class ExternalNavigationHandler {
             Intent targetIntent, QueryIntentActivitiesSupplier resolvingInfos,
             boolean isExternalProtocol) {
         RedirectHandler handler = params.getRedirectHandler();
-        if (handler == null) return false;
         RedirectHandler.InitialNavigationState initialState = handler.getInitialNavigationState();
 
         // If a navigation chain has used the history API to go back/forward external navigation is
@@ -987,11 +986,7 @@ public class ExternalNavigationHandler {
 
         // Ensure the navigation was started with a user gesture so that inactive pages can't launch
         // apps unexpectedly, unless we trust the calling app for a CCT/TWA.
-        // TODO(https://crbug.com/839751): Remove gesture exception for form submits.
-        if (initialState.isRendererInitiated && !initialState.hasUserGesture
-                && (!initialState.isFromFormSubmit
-                        || ExternalIntentsFeatures.BLOCK_EXTERNAL_FORM_SUBMIT_WITHOUT_GESTURE
-                                   .isEnabled())) {
+        if (initialState.isRendererInitiated && !initialState.hasUserGesture) {
             if (isExternalProtocol) handler.maybeLogExternalRedirectBlockedWithMissingGesture();
             if (debug()) Log.i(TAG, "Navigation chain started without a gesture.");
             return true;
@@ -1317,20 +1312,29 @@ public class ExternalNavigationHandler {
     @VisibleForTesting
     protected AlertDialog showLeavingIncognitoAlert(final Context context,
             final ExternalNavigationParams params, final Intent intent, final GURL fallbackUrl) {
+        // https://crbug.com/1412842: It seems dialogs sometimes end up with multiple results
+        // chosen.
+        final AtomicBoolean dialogResultChosen = new AtomicBoolean(false);
         return new AlertDialog.Builder(context, R.style.ThemeOverlay_BrowserUI_AlertDialog)
                 .setTitle(R.string.external_app_leave_incognito_warning_title)
                 .setMessage(R.string.external_app_leave_incognito_warning)
                 .setPositiveButton(R.string.external_app_leave_incognito_leave,
                         (DialogInterface dialog, int which) -> {
+                            if (dialogResultChosen.get()) return;
+                            dialogResultChosen.set(true);
                             onUserDecidedWhetherToLaunchIncognitoIntent(
                                     /*shouldLaunch=*/true, params, intent, fallbackUrl);
                         })
                 .setNegativeButton(R.string.external_app_leave_incognito_stay,
                         (DialogInterface dialog, int which) -> {
+                            if (dialogResultChosen.get()) return;
+                            dialogResultChosen.set(true);
                             onUserDecidedWhetherToLaunchIncognitoIntent(
                                     /*shouldLaunch=*/false, params, intent, fallbackUrl);
                         })
                 .setOnCancelListener((DialogInterface dialog) -> {
+                    if (dialogResultChosen.get()) return;
+                    dialogResultChosen.set(true);
                     onUserDecidedWhetherToLaunchIncognitoIntent(
                             /*shouldLaunch=*/false, params, intent, fallbackUrl);
                 })
@@ -1386,7 +1390,7 @@ public class ExternalNavigationHandler {
     private boolean shouldKeepIntentRedirectInApp(ExternalNavigationParams params,
             boolean incomingIntentRedirect, List<ResolveInfo> resolvingInfos,
             boolean isExternalProtocol) {
-        if (params.getRedirectHandler() != null && incomingIntentRedirect && !isExternalProtocol
+        if (incomingIntentRedirect && !isExternalProtocol
                 && !params.getRedirectHandler().isFromCustomTabIntent()
                 && !params.getRedirectHandler().hasNewResolver(
                         resolvingInfos, (Intent intent) -> queryIntentActivities(intent))) {
@@ -1590,11 +1594,11 @@ public class ExternalNavigationHandler {
         if (!mDelegate.maybeSetTargetPackage(targetIntent, resolvingInfos)) {
             requiresIntentChooser = isInsecureIntentToOtherBrowser(targetIntent, resolvingInfos,
                     isIntentWithSupportedProtocol, resolveActivity, intentHasExtras);
-        }
 
-        if (shouldAvoidShowingDisambiguationPrompt(
-                    isExternalProtocol, intentDataUrl, resolvingInfos, resolveActivity)) {
-            return OverrideUrlLoadingResult.forNoOverride();
+            if (shouldAvoidShowingDisambiguationPrompt(
+                        isExternalProtocol, intentDataUrl, resolvingInfos, resolveActivity)) {
+                return OverrideUrlLoadingResult.forNoOverride();
+            }
         }
 
         if (requiresPromptForExternalIntent) {
@@ -2350,9 +2354,8 @@ public class ExternalNavigationHandler {
      * @return whether this navigation is a redirect from an intent.
      */
     private static boolean isIncomingIntentRedirect(ExternalNavigationParams params) {
-        boolean isOnEffectiveIntentRedirect = params.getRedirectHandler() == null
-                ? false
-                : params.getRedirectHandler().isOnNoninitialLoadForIntentNavigationChain();
+        boolean isOnEffectiveIntentRedirect =
+                params.getRedirectHandler().isOnNoninitialLoadForIntentNavigationChain();
         return (params.isFromIntent() && params.isRedirect()) || isOnEffectiveIntentRedirect;
     }
 

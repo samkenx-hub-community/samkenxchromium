@@ -49,7 +49,6 @@ export class ChromeVoxPrefs {
         LocalStorage.set(pref, ChromeVoxPrefs.DEFAULT_PREFS[pref]);
       }
     }
-    ChromeVoxPrefs.instance.enableOrDisableLogUrlWatcher_();
 
     BridgeHelper.registerHandler(
         TARGET, Action.GET_PREFS, () => ChromeVoxPrefs.instance.getPrefs());
@@ -100,7 +99,7 @@ export class ChromeVoxPrefs {
    * @param {boolean} value The new value of the pref.
    */
   setLoggingPrefs(key, value) {
-    LocalStorage.set(key, value);
+    SettingsManager.set(key, value);
     if (key === 'enableSpeechLogging') {
       TtsBackground.console.setEnabled(value);
     } else if (key === 'enableEventStreamLogging') {
@@ -151,7 +150,7 @@ export class ChromeVoxPrefs {
 
   enableOrDisableLogUrlWatcher_() {
     for (const pref of Object.values(ChromeVoxPrefs.loggingPrefs)) {
-      if (LocalStorage.get(pref)) {
+      if (SettingsManager.getBoolean(pref)) {
         LogUrlWatcher.create();
         return;
       }
@@ -169,33 +168,10 @@ export class ChromeVoxPrefs {
  * @type {Object<Object>}
  */
 ChromeVoxPrefs.DEFAULT_PREFS = {
-  'announceDownloadNotifications': true,
-  'announceRichTextAttributes': true,
-  'audioStrategy': 'audioNormal',
   'brailleCaptions': false,
-  'brailleSideBySide': true,
-  'brailleTableType': 'brailleTable8',
-  'brailleTable6': 'en-UEB-g2',
-  'brailleTable8': 'en-nabcc',
-  'capitalStrategy': 'increasePitch',
-  'cvoxKey': '',
-  'enableBrailleLogging': false,
-  'enableEarconLogging': false,
-  'enableSpeechLogging': false,
   'earcons': true,
-  'enableEventStreamLogging': false,
-  'focusFollowsMouse': false,
-  'granularity': undefined,
-  'languageSwitching': false,
-  'menuBrailleCommands': false,
-  'numberReadingStyle': 'asWords',
-  'position': {},
-  'smartStickyMode': true,
-  'speakTextUnderMouse': false,
   'sticky': false,
   'typingEcho': 0,
-  'usePitchChanges': true,
-  'useVerboseMode': true,
 
   // eventStreamFilters
   'activedescendantchanged': true,
@@ -224,7 +200,7 @@ ChromeVoxPrefs.DEFAULT_PREFS = {
   'mediaStartedPlaying': true,
   'mediaStoppedPlaying': true,
   'menuEnd': true,
-  'menuListItemSelected': true,
+  'menuItemSelected': true,
   'menuListValueChanged': true,
   'menuPopupEnd': true,
   'menuPopupStart': true,

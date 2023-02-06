@@ -329,7 +329,6 @@ void SetRuntimeFeaturesFromChromiumFeatures() {
           {"OriginIsolationHeader", features::kOriginIsolationHeader},
           {"PartitionedCookies", net::features::kPartitionedCookies},
           {"ReduceAcceptLanguage", network::features::kReduceAcceptLanguage},
-          {"StorageAccessAPI", net::features::kStorageAccessAPI},
           {"TopicsAPI", features::kPrivacySandboxAdsAPIsOverride,
            kSetOnlyIfOverridden},
           {"TopicsXHR", features::kPrivacySandboxAdsAPIsOverride,
@@ -387,8 +386,6 @@ void SetRuntimeFeaturesFromCommandLine(const base::CommandLine& command_line) {
        switches::kEnableNetworkInformationDownlinkMax, true},
       {wrf::EnableNotifications, switches::kDisableNotifications, false},
       {wrf::EnablePreciseMemoryInfo, switches::kEnablePreciseMemoryInfo, true},
-      {wrf::EnablePrefixedStorageInfo,
-       blink::switches::kPrefixedStorageInfoEnabled, true},
       // Chrome's Push Messaging implementation relies on Web Notifications.
       {wrf::EnablePushMessaging, switches::kDisableNotifications, false},
       {wrf::EnableScriptedSpeechRecognition, switches::kDisableSpeechAPI,
@@ -408,7 +405,10 @@ void SetRuntimeFeaturesFromCommandLine(const base::CommandLine& command_line) {
       {wrf::EnableWebGPUDeveloperFeatures,
        switches::kEnableWebGPUDeveloperFeatures, true},
       {wrf::EnableDirectSockets, switches::kIsolatedAppOrigins, true},
+      {wrf::EnableDirectSockets, switches::kEnableIsolatedWebAppsInRenderer,
+       true},
   };
+
   for (const auto& mapping : switchToFeatureMapping) {
     if (command_line.HasSwitch(mapping.switch_name)) {
       mapping.feature_enabler(mapping.target_enabled_state);
@@ -634,20 +634,6 @@ void ResolveInvalidConfigurations() {
         << switches::kEnableFeatures << "="
         << blink::features::kBrowsingTopicsXHR.name << " in addition.";
     WebRuntimeFeatures::EnableTopicsXHR(false);
-  }
-
-  // Storage Access API ForSite cannot be enabled unless the larger Storage
-  // Access API is also enabled.
-  if (base::FeatureList::IsEnabled(
-          blink::features::kStorageAccessAPIForOriginExtension) &&
-      !base::FeatureList::IsEnabled(net::features::kStorageAccessAPI)) {
-    LOG_IF(WARNING,
-           WebRuntimeFeatures::IsStorageAccessAPIForOriginExtensionEnabled())
-        << "requestStorageAccessForOrigin cannot be enabled in this "
-           "configuration. Use --"
-        << switches::kEnableFeatures << "="
-        << net::features::kStorageAccessAPI.name << " in addition.";
-    WebRuntimeFeatures::EnableStorageAccessAPIForOriginExtension(false);
   }
 }
 

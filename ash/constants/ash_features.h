@@ -25,40 +25,12 @@ COMPONENT_EXPORT(ASH_CONSTANTS) BASE_DECLARE_FEATURE(kAllowRepeatedUpdates);
 COMPONENT_EXPORT(ASH_CONSTANTS) BASE_DECLARE_FEATURE(kAllowScrollSettings);
 COMPONENT_EXPORT(ASH_CONSTANTS)
 BASE_DECLARE_FEATURE(kAlwaysReinstallSystemWebApps);
-COMPONENT_EXPORT(ASH_CONSTANTS) BASE_DECLARE_FEATURE(kAmbientModeFeature);
-COMPONENT_EXPORT(ASH_CONSTANTS)
-extern const base::FeatureParam<bool> kAmbientModeCapturedOnPixelAlbumEnabled;
-COMPONENT_EXPORT(ASH_CONSTANTS)
-extern const base::FeatureParam<bool> kAmbientModeCapturedOnPixelPhotosEnabled;
-COMPONENT_EXPORT(ASH_CONSTANTS)
-extern const base::FeatureParam<bool>
-    kAmbientModeCulturalInstitutePhotosEnabled;
-COMPONENT_EXPORT(ASH_CONSTANTS)
-extern const base::FeatureParam<bool> kAmbientModeDefaultFeedEnabled;
-COMPONENT_EXPORT(ASH_CONSTANTS)
-extern const base::FeatureParam<bool> kAmbientModeEarthAndSpaceAlbumEnabled;
-COMPONENT_EXPORT(ASH_CONSTANTS)
-extern const base::FeatureParam<bool> kAmbientModeFeaturedPhotoAlbumEnabled;
-COMPONENT_EXPORT(ASH_CONSTANTS)
-extern const base::FeatureParam<bool> kAmbientModeFeaturedPhotosEnabled;
-COMPONENT_EXPORT(ASH_CONSTANTS)
-extern const base::FeatureParam<bool> kAmbientModeFineArtAlbumEnabled;
-COMPONENT_EXPORT(ASH_CONSTANTS)
-extern const base::FeatureParam<bool> kAmbientModeGeoPhotosEnabled;
-COMPONENT_EXPORT(ASH_CONSTANTS)
-extern const base::FeatureParam<bool> kAmbientModePersonalPhotosEnabled;
-COMPONENT_EXPORT(ASH_CONSTANTS)
-extern const base::FeatureParam<bool> kAmbientModeRssPhotosEnabled;
-COMPONENT_EXPORT(ASH_CONSTANTS)
-extern const base::FeatureParam<bool> kAmbientModeStreetArtAlbumEnabled;
 COMPONENT_EXPORT(ASH_CONSTANTS)
 BASE_DECLARE_FEATURE(kAmbientModeDevUseProdFeature);
 COMPONENT_EXPORT(ASH_CONSTANTS)
 BASE_DECLARE_FEATURE(kAmbientModePhotoPreviewFeature);
 COMPONENT_EXPORT(ASH_CONSTANTS)
 BASE_DECLARE_FEATURE(kAmbientModeThrottleAnimation);
-COMPONENT_EXPORT(ASH_CONSTANTS)
-BASE_DECLARE_FEATURE(kAmbientSubpageUIChange);
 COMPONENT_EXPORT(ASH_CONSTANTS) BASE_DECLARE_FEATURE(kApnRevamp);
 COMPONENT_EXPORT(ASH_CONSTANTS)
 BASE_DECLARE_FEATURE(kAppCollectionFolderRefresh);
@@ -164,8 +136,7 @@ COMPONENT_EXPORT(ASH_CONSTANTS)
 BASE_DECLARE_FEATURE(kCryptAuthV2DedupDeviceLastActivityTime);
 COMPONENT_EXPORT(ASH_CONSTANTS) BASE_DECLARE_FEATURE(kCryptAuthV2DeviceSync);
 COMPONENT_EXPORT(ASH_CONSTANTS) BASE_DECLARE_FEATURE(kCryptAuthV2Enrollment);
-COMPONENT_EXPORT(ASH_CONSTANTS) BASE_DECLARE_FEATURE(kCryptohomeRecoveryFlow);
-COMPONENT_EXPORT(ASH_CONSTANTS) BASE_DECLARE_FEATURE(kCryptohomeRecoverySetup);
+COMPONENT_EXPORT(ASH_CONSTANTS) BASE_DECLARE_FEATURE(kCryptohomeRecovery);
 COMPONENT_EXPORT(ASH_CONSTANTS) BASE_DECLARE_FEATURE(kDarkLightModeKMeansColor);
 COMPONENT_EXPORT(ASH_CONSTANTS) BASE_DECLARE_FEATURE(kDeskTemplateSync);
 COMPONENT_EXPORT(ASH_CONSTANTS) BASE_DECLARE_FEATURE(kDeviceActiveClient);
@@ -293,11 +264,11 @@ BASE_DECLARE_FEATURE(kFirstPartyVietnameseInput);
 COMPONENT_EXPORT(ASH_CONSTANTS) BASE_DECLARE_FEATURE(kFloatingWorkspace);
 COMPONENT_EXPORT(ASH_CONSTANTS)
 extern const base::FeatureParam<base::TimeDelta>
-    kFloatingWorkspaceMaxTimeAvaliableForRestoreAfterLogin;
+    kFloatingWorkspaceMaxTimeAvailableForRestoreAfterLogin;
 COMPONENT_EXPORT(ASH_CONSTANTS) BASE_DECLARE_FEATURE(kFloatingWorkspaceV2);
 COMPONENT_EXPORT(ASH_CONSTANTS)
 extern const base::FeatureParam<base::TimeDelta>
-    kFloatingWorkspaceV2MaxTimeAvaliableForRestoreAfterLogin;
+    kFloatingWorkspaceV2MaxTimeAvailableForRestoreAfterLogin;
 COMPONENT_EXPORT(ASH_CONSTANTS)
 extern const base::FeatureParam<base::TimeDelta>
     kFloatingWorkspaceV2PeriodicJobIntervalInSeconds;
@@ -392,11 +363,6 @@ COMPONENT_EXPORT(ASH_CONSTANTS)
 BASE_DECLARE_FEATURE(kLacrosMoveProfileMigration);
 COMPONENT_EXPORT(ASH_CONSTANTS)
 BASE_DECLARE_FEATURE(kLacrosProfileBackwardMigration);
-COMPONENT_EXPORT(ASH_CONSTANTS) BASE_DECLARE_FEATURE(kLauncherAppSort);
-COMPONENT_EXPORT(ASH_CONSTANTS)
-BASE_DECLARE_FEATURE(kLauncherFolderRenameKeepsSortOrder);
-COMPONENT_EXPORT(ASH_CONSTANTS)
-BASE_DECLARE_FEATURE(kLauncherDismissButtonsOnSortNudgeAndToast);
 COMPONENT_EXPORT(ASH_CONSTANTS)
 BASE_DECLARE_FEATURE(kLauncherNudgeShortInterval);
 COMPONENT_EXPORT(ASH_CONSTANTS)
@@ -448,7 +414,6 @@ COMPONENT_EXPORT(ASH_CONSTANTS) BASE_DECLARE_FEATURE(kOobeHidDetectionRevamp);
 COMPONENT_EXPORT(ASH_CONSTANTS) BASE_DECLARE_FEATURE(kOobeJelly);
 COMPONENT_EXPORT(ASH_CONSTANTS) BASE_DECLARE_FEATURE(kOobeQuickStart);
 COMPONENT_EXPORT(ASH_CONSTANTS) BASE_DECLARE_FEATURE(kOobeNewRecommendApps);
-COMPONENT_EXPORT(ASH_CONSTANTS) BASE_DECLARE_FEATURE(kOobeRemoveShutdownButton);
 COMPONENT_EXPORT(ASH_CONSTANTS) BASE_DECLARE_FEATURE(kOobeTouchpadScroll);
 COMPONENT_EXPORT(ASH_CONSTANTS)
 BASE_DECLARE_FEATURE(kOsSettingsAppNotificationsPage);
@@ -461,6 +426,7 @@ COMPONENT_EXPORT(ASH_CONSTANTS)
 BASE_DECLARE_FEATURE(kPcieBillboardNotification);
 COMPONENT_EXPORT(ASH_CONSTANTS) BASE_DECLARE_FEATURE(kPerDeskShelf);
 COMPONENT_EXPORT(ASH_CONSTANTS) BASE_DECLARE_FEATURE(kPerUserMetrics);
+COMPONENT_EXPORT(ASH_CONSTANTS) BASE_DECLARE_FEATURE(kPersonalizationJelly);
 COMPONENT_EXPORT(ASH_CONSTANTS) BASE_DECLARE_FEATURE(kPhoneHub);
 COMPONENT_EXPORT(ASH_CONSTANTS) BASE_DECLARE_FEATURE(kPhoneHubCameraRoll);
 COMPONENT_EXPORT(ASH_CONSTANTS)
@@ -544,6 +510,7 @@ COMPONENT_EXPORT(ASH_CONSTANTS)
 BASE_DECLARE_FEATURE(kShelfGesturesWithVirtualKeyboard);
 COMPONENT_EXPORT(ASH_CONSTANTS) BASE_DECLARE_FEATURE(kShelfLauncherNudge);
 COMPONENT_EXPORT(ASH_CONSTANTS) BASE_DECLARE_FEATURE(kShelfParty);
+COMPONENT_EXPORT(ASH_CONSTANTS) BASE_DECLARE_FEATURE(kShelfStackedHotseat);
 COMPONENT_EXPORT(ASH_CONSTANTS)
 BASE_DECLARE_FEATURE(kShelfPalmRejectionSwipeOffset);
 COMPONENT_EXPORT(ASH_CONSTANTS) BASE_DECLARE_FEATURE(kShimlessRMAFlow);
@@ -612,8 +579,6 @@ COMPONENT_EXPORT(ASH_CONSTANTS) BASE_DECLARE_FEATURE(kVmPerBootShaderCache);
 COMPONENT_EXPORT(ASH_CONSTANTS) BASE_DECLARE_FEATURE(kWakeOnWifiAllowed);
 COMPONENT_EXPORT(ASH_CONSTANTS) BASE_DECLARE_FEATURE(kWallpaperFastRefresh);
 COMPONENT_EXPORT(ASH_CONSTANTS)
-BASE_DECLARE_FEATURE(kWallpaperFullScreenPreview);
-COMPONENT_EXPORT(ASH_CONSTANTS)
 BASE_DECLARE_FEATURE(kWallpaperGooglePhotosSharedAlbums);
 COMPONENT_EXPORT(ASH_CONSTANTS) BASE_DECLARE_FEATURE(kWallpaperPerDesk);
 COMPONENT_EXPORT(ASH_CONSTANTS)
@@ -635,7 +600,6 @@ COMPONENT_EXPORT(ASH_CONSTANTS) bool ArePromiseIconsEnabled();
 COMPONENT_EXPORT(ASH_CONSTANTS) bool AreSystemSoundsEnabled();
 COMPONENT_EXPORT(ASH_CONSTANTS) bool IsAutocompleteExtendedSuggestionsEnabled();
 COMPONENT_EXPORT(ASH_CONSTANTS) bool IsAutoEnrollmentKioskInOobeEnabled();
-COMPONENT_EXPORT(ASH_CONSTANTS) bool IsAvatarsCloudMigrationEnabled();
 COMPONENT_EXPORT(ASH_CONSTANTS) bool AreImprovedScreenCaptureSettingsEnabled();
 COMPONENT_EXPORT(ASH_CONSTANTS) bool DoWindowsFollowCursor();
 COMPONENT_EXPORT(ASH_CONSTANTS) bool Is16DesksEnabled();
@@ -644,10 +608,8 @@ COMPONENT_EXPORT(ASH_CONSTANTS) bool IsAdaptiveChargingForTestingEnabled();
 COMPONENT_EXPORT(ASH_CONSTANTS) bool IsAdjustSplitViewForVKEnabled();
 COMPONENT_EXPORT(ASH_CONSTANTS) bool IsAllowAmbientEQEnabled();
 COMPONENT_EXPORT(ASH_CONSTANTS) bool IsAmbientModeDevUseProdEnabled();
-COMPONENT_EXPORT(ASH_CONSTANTS) bool IsAmbientModeEnabled();
 COMPONENT_EXPORT(ASH_CONSTANTS) bool IsAmbientModePhotoPreviewEnabled();
 COMPONENT_EXPORT(ASH_CONSTANTS) bool IsAmbientModeThrottleAnimationEnabled();
-COMPONENT_EXPORT(ASH_CONSTANTS) bool IsAmbientSubpageUIChangeEnabled();
 COMPONENT_EXPORT(ASH_CONSTANTS) bool IsApnRevampEnabled();
 COMPONENT_EXPORT(ASH_CONSTANTS) bool IsAppCollectionFolderRefreshEnabled();
 COMPONENT_EXPORT(ASH_CONSTANTS) bool IsAppNotificationsPageEnabled();
@@ -670,7 +632,6 @@ COMPONENT_EXPORT(ASH_CONSTANTS) bool IsCaptivePortalErrorPageEnabled();
 COMPONENT_EXPORT(ASH_CONSTANTS)
 bool IsCheckPasswordsAgainstCryptohomeHelperEnabled();
 COMPONENT_EXPORT(ASH_CONSTANTS) bool IsChromadAvailableEnabled();
-COMPONENT_EXPORT(ASH_CONSTANTS) bool IsLauncherItemColorSyncEnabled();
 COMPONENT_EXPORT(ASH_CONSTANTS)
 bool IsClipboardHistoryNudgeSessionResetEnabled();
 COMPONENT_EXPORT(ASH_CONSTANTS) bool IsClipboardHistoryRefreshEnabled();
@@ -682,12 +643,10 @@ COMPONENT_EXPORT(ASH_CONSTANTS) bool IsCrosPrivacyHubV2Enabled();
 COMPONENT_EXPORT(ASH_CONSTANTS) bool IsCrosPrivacyHubV1Enabled();
 COMPONENT_EXPORT(ASH_CONSTANTS)
 bool IsCryptauthAttestationSyncingEnabled();
-COMPONENT_EXPORT(ASH_CONSTANTS) bool IsCryptohomeRecoveryFlowEnabled();
-COMPONENT_EXPORT(ASH_CONSTANTS) bool IsCryptohomeRecoverySetupEnabled();
+COMPONENT_EXPORT(ASH_CONSTANTS) bool IsCryptohomeRecoveryEnabled();
 COMPONENT_EXPORT(ASH_CONSTANTS) bool IsDarkLightModeEnabled();
 COMPONENT_EXPORT(ASH_CONSTANTS) bool IsDarkLightModeKMeansColorEnabled();
 COMPONENT_EXPORT(ASH_CONSTANTS) bool IsDeepLinkingEnabled();
-COMPONENT_EXPORT(ASH_CONSTANTS) bool IsDesksCloseAllEnabled();
 COMPONENT_EXPORT(ASH_CONSTANTS) bool IsDeskTemplateSyncEnabled();
 COMPONENT_EXPORT(ASH_CONSTANTS) bool IsInputDeviceSettingsSplitEnabled();
 COMPONENT_EXPORT(ASH_CONSTANTS)
@@ -760,11 +719,6 @@ COMPONENT_EXPORT(ASH_CONSTANTS) bool IsJellyrollEnabled();
 COMPONENT_EXPORT(ASH_CONSTANTS)
 bool IsKeyboardBacklightToggleEnabled();
 COMPONENT_EXPORT(ASH_CONSTANTS) bool IsLanguagePacksEnabled();
-COMPONENT_EXPORT(ASH_CONSTANTS) bool IsLauncherAppSortEnabled();
-COMPONENT_EXPORT(ASH_CONSTANTS)
-bool IsLauncherFolderRenameKeepsSortOrderEnabled();
-COMPONENT_EXPORT(ASH_CONSTANTS)
-bool IsLauncherDismissButtonsOnSortNudgeAndToastEnabled();
 COMPONENT_EXPORT(ASH_CONSTANTS) bool IsLauncherNudgeShortIntervalEnabled();
 COMPONENT_EXPORT(ASH_CONSTANTS) bool IsLauncherNudgeSessionResetEnabled();
 COMPONENT_EXPORT(ASH_CONSTANTS) bool IsLicensePackagedOobeFlowEnabled();
@@ -853,6 +807,7 @@ bool IsProjectorFoldShortGapIntoPreviousTranscriptEnabled();
 COMPONENT_EXPORT(ASH_CONSTANTS) bool IsQsRevampEnabled();
 COMPONENT_EXPORT(ASH_CONSTANTS) bool IsQuickDimEnabled();
 COMPONENT_EXPORT(ASH_CONSTANTS) bool IsPerDeskZOrderEnabled();
+COMPONENT_EXPORT(ASH_CONSTANTS) bool IsPersonalizationJellyEnabled();
 COMPONENT_EXPORT(ASH_CONSTANTS) bool IsReleaseTrackUiEnabled();
 COMPONENT_EXPORT(ASH_CONSTANTS) bool IsReverseScrollGesturesEnabled();
 COMPONENT_EXPORT(ASH_CONSTANTS) bool IsRgbKeyboardEnabled();
@@ -868,6 +823,7 @@ COMPONENT_EXPORT(ASH_CONSTANTS)
 bool IsSettingsAppThemeChangeAnimationEnabled();
 COMPONENT_EXPORT(ASH_CONSTANTS) bool IsShelfLauncherNudgeEnabled();
 COMPONENT_EXPORT(ASH_CONSTANTS) bool IsShelfPalmRejectionSwipeOffsetEnabled();
+COMPONENT_EXPORT(ASH_CONSTANTS) bool IsShelfStackedHotseatEnabled();
 COMPONENT_EXPORT(ASH_CONSTANTS) bool IsSimLockPolicyEnabled();
 COMPONENT_EXPORT(ASH_CONSTANTS) bool IsShimlessRMAFlowEnabled();
 COMPONENT_EXPORT(ASH_CONSTANTS) bool IsShimlessRMAOsUpdateEnabled();
@@ -894,7 +850,6 @@ COMPONENT_EXPORT(ASH_CONSTANTS) bool IsVcBackgroundReplaceEnabled();
 COMPONENT_EXPORT(ASH_CONSTANTS) bool IsVcControlsUiFakeEffectsEnabled();
 COMPONENT_EXPORT(ASH_CONSTANTS) bool IsViewPpdEnabled();
 COMPONENT_EXPORT(ASH_CONSTANTS) bool IsWallpaperFastRefreshEnabled();
-COMPONENT_EXPORT(ASH_CONSTANTS) bool IsWallpaperFullScreenPreviewEnabled();
 COMPONENT_EXPORT(ASH_CONSTANTS)
 bool IsWallpaperGooglePhotosSharedAlbumsEnabled();
 COMPONENT_EXPORT(ASH_CONSTANTS) bool IsWallpaperPerDeskEnabled();

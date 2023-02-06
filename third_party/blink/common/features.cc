@@ -113,6 +113,12 @@ BASE_FEATURE(kBackForwardCacheWithKeepaliveRequest,
              "BackForwardCacheWithKeepaliveRequest",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
+// Enable background resource fetch in Blink. See https://crbug.com/1379780 for
+// more details.
+BASE_FEATURE(kBackgroundResourceFetch,
+             "BackgroundResourceFetch",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 // Enable intervention for download that was initiated from or occurred in an ad
 // frame without user activation.
 BASE_FEATURE(kBlockingDownloadsInAdFrameWithoutUserActivation,
@@ -321,16 +327,12 @@ const base::FeatureParam<int> kSharedStorageReportEventBitBudgetPerPageLoad = {
     &kSharedStorageReportEventLimit,
     "SharedStorageReportEventBitBudgetPerPageLoad", 9};
 
-BASE_FEATURE(kSameSiteCrossOriginForSpeculationRulesPrerender,
-             "SameSiteCrossOriginForSpeculationRulesPrerender",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
-BASE_FEATURE(kSameSiteRedirectionForEmbedderTriggeredPrerender,
-             "SameSiteRedirectionForEmbedderTriggeredPrerender",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
 BASE_FEATURE(kPrerender2SequentialPrerendering,
              "Prerender2SequentialPrerendering",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+BASE_FEATURE(kPrerender2MainFrameNavigation,
+             "Prerender2MainFrameNavigation",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 const char kPrerender2MaxNumOfRunningSpeculationRules[] =
@@ -350,11 +352,6 @@ BASE_FEATURE(kPrerender2InBackground,
 BASE_FEATURE(kPrerender2InNewTab,
              "Prerender2InNewTab",
              base::FEATURE_DISABLED_BY_DEFAULT);
-
-bool IsSameSiteCrossOriginForSpeculationRulesPrerender2Enabled() {
-  return base::FeatureList::IsEnabled(
-      blink::features::kSameSiteCrossOriginForSpeculationRulesPrerender);
-}
 
 bool OSKResizesVisualViewportByDefault() {
   return base::FeatureList::IsEnabled(
@@ -878,6 +875,14 @@ BASE_FEATURE(kWebAppEnableUrlHandlers,
              "WebAppEnableUrlHandlers",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
+// Controls scope extensions feature in web apps. Controls parsing of
+// "scope_extensions" field in web app manifests. See explainer for more
+// information:
+// https://github.com/WICG/manifest-incubations/blob/gh-pages/scope_extensions-explainer.md
+BASE_FEATURE(kWebAppEnableScopeExtensions,
+             "WebAppEnableScopeExtensions",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 // Controls parsing of the "lock_screen" dictionary field and its "start_url"
 // entry in web app manifests.  See explainer for more information:
 // https://github.com/WICG/lock-screen/
@@ -1214,10 +1219,15 @@ int GetMaxUnthrottledTimeoutNestingLevel() {
   return kMaxUnthrottledTimeoutNestingLevelParam.Get();
 }
 
-// Enables reporting and web-exposure (respectively) of the time the first frame
-// of an animated image was painted.
+// Enables reporting as LCP of the time the first frame of an animated image was
+// painted.
 BASE_FEATURE(kLCPAnimatedImagesReporting,
              "LCPAnimatedImagesReporting",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+// Enables reporting as LCP of the time the first frame of a video was painted.
+BASE_FEATURE(kLCPVideoFirstFrame,
+             "LCPVideoFirstFrame",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 BASE_FEATURE(kOriginAgentClusterDefaultEnabled,
@@ -1256,10 +1266,6 @@ BASE_FEATURE(kReportFCPOnlyOnSuccessfulCommit,
 BASE_FEATURE(kRegionCaptureExperimentalSubtypes,
              "RegionCaptureExperimentalSubtypes",
              base::FEATURE_ENABLED_BY_DEFAULT);
-
-BASE_FEATURE(kUserAgentOverrideExperiment,
-             "UserAgentOverrideExperiment",
-             base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Allow access to WebSQL APIs.
 BASE_FEATURE(kWebSQLAccess, "kWebSQLAccess", base::FEATURE_ENABLED_BY_DEFAULT);
@@ -1486,11 +1492,6 @@ BASE_FEATURE(kThreadedPreloadScanner,
              "ThreadedPreloadScanner",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-// Allow access to WebSQL in non-secure contexts.
-BASE_FEATURE(kWebSQLNonSecureContextAccess,
-             "WebSQLNonSecureContextAccess",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-
 BASE_FEATURE(kFileSystemUrlNavigation,
              "FileSystemUrlNavigation",
              base::FEATURE_DISABLED_BY_DEFAULT);
@@ -1531,6 +1532,10 @@ BASE_FEATURE(kThreadedHtmlTokenizer,
 const base::FeatureParam<int> kThreadedHtmlTokenizerTokenMaxCount{
     &kThreadedHtmlTokenizer, "max-count", 2048};
 
+BASE_FEATURE(kWebRtcEncoderAsyncEncode,
+             "WebRtcEncoderAsyncEncode",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 BASE_FEATURE(kWebRtcThreadsUseResourceEfficientType,
              "WebRtcThreadsUseResourceEfficientType",
              base::FEATURE_DISABLED_BY_DEFAULT);
@@ -1562,6 +1567,10 @@ const base::FeatureParam<bool> kProcessHtmlDataImmediatelySubsequentChunks{
 BASE_FEATURE(kFastPathPaintPropertyUpdates,
              "FastPathPaintPropertyUpdates",
              base::FEATURE_ENABLED_BY_DEFAULT);
+
+BASE_FEATURE(kThrottleOffscreenAnimatingSvgImages,
+             "ThrottleOffscreenAnimatingSvgImages",
+             base::FEATURE_DISABLED_BY_DEFAULT);
 
 BASE_FEATURE(kThreadedBodyLoader,
              "ThreadedBodyLoader",

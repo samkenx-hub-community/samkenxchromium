@@ -1595,6 +1595,14 @@ Page::PrerenderFinalStatus PrerenderFinalStatusToProtocol(
           PrimaryMainFrameRendererProcessKilled;
     case PrerenderFinalStatus::kActivationFramePolicyNotCompatible:
       return Page::PrerenderFinalStatusEnum::ActivationFramePolicyNotCompatible;
+    case PrerenderFinalStatus::kPreloadingDisabled:
+      return Page::PrerenderFinalStatusEnum::PreloadingDisabled;
+    case PrerenderFinalStatus::kBatterySaverEnabled:
+      return Page::PrerenderFinalStatusEnum::BatterySaverEnabled;
+    case PrerenderFinalStatus::kActivatedDuringMainFrameNavigation:
+      return Page::PrerenderFinalStatusEnum::ActivatedDuringMainFrameNavigation;
+    case PrerenderFinalStatus::kPreloadingUnsupportedByWebContents:
+      return Page::PrerenderFinalStatusEnum::PreloadingUnsupportedByWebContents;
   }
 }
 

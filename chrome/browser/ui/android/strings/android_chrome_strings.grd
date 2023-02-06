@@ -321,11 +321,11 @@ CHAR_LIMIT guidelines:
       <message name="IDS_ALLOW_CHROME_SIGNIN_SUMMARY" desc="Summary for a checkbox in Google services that controls sign-in and sync prompts.">
         Shows prompts to sign in to Chrome
       </message>
-      <message name="IDS_AUTOCOMPLETE_SEARCHES_AND_URLS_TITLE" desc="Title for a checkbox in Settings that controls URL and search autocompletion and informs the user about the data shared by this feature.">
-        Autocomplete searches and URLs
+      <message name="IDS_IMPROVE_SEARCH_SUGGESTIONS_TITLE" desc="Title for a checkbox in Settings that controls URL and search autocompletion and informs the user about the data shared by this feature.">
+        Improve search suggestions
       </message>
-      <message name="IDS_AUTOCOMPLETE_SEARCHES_AND_URLS_SUMMARY" desc="Summary for a checkbox in Settings that controls URL and search autocompletion and informs the user about the data shared by this feature.">
-        Sends some cookies and searches from the address bar and search box to your default search engine
+      <message name="IDS_IMPROVE_SEARCH_SUGGESTIONS_SUMMARY" desc="Summary for a checkbox in Settings that controls URL and search autocompletion and informs the user about the data shared by this feature.">
+        When you type in the address bar or search box, Chrome sends what you type to your default search engine to get better suggestions. This is off in Incognito.
       </message>
       <message name ="IDS_SETTINGS_INCOGNITO_TAB_LOCK_TITLE" desc = "Title for a toggle in Settings that allows users to lock their existing Incognito tabs with a device reauthentication mechanism.">
         Lock Incognito tabs when you leave Chrome
@@ -2527,7 +2527,7 @@ To change this setting, <ph name="BEGIN_LINK">&lt;resetlink&gt;</ph>reset sync<p
       <message name="IDS_CONTEXTMENU_SEARCH_IMAGE_WITH_GOOGLE_LENS" desc="Context sensitive menu item for deep linking into google lens. [CHAR_LIMIT=30]">
         Search image with Google Lens <ph name="BEGIN_NEW">&lt;new&gt;</ph>New<ph name="END_NEW">&lt;/new&gt;</ph>
       </message>
-      <message name="IDS_CONTEXTMENU_SEARCH_IMAGE_WITH_GOOGLE_LENS_ALT_TEXT_1" desc="ALT TXT 1: Context sensitive menu item for deep linking into google lens. [CHAR_LIMIT=30]">
+      <message name="IDS_CONTEXTMENU_SEARCH_IMAGE_WITH_GOOGLE_LENS_ALT_TEXT_1" desc="ALT TXT 1: Context sensitive menu item for deep linking into google lens. [CHAR_LIMIT=44]">
         Search image with Google <ph name="BEGIN_NEW">&lt;new&gt;</ph>New<ph name="END_NEW">&lt;/new&gt;</ph>
       </message>
       <message name="IDS_CONTEXTMENU_SEARCH_IMAGE_WITH_GOOGLE_LENS_ALT_TEXT_2" desc="ALT TXT 2: Context sensitive menu item for deep linking into google lens. [CHAR_LIMIT=30]">
@@ -2982,6 +2982,9 @@ To change this setting, <ph name="BEGIN_LINK">&lt;resetlink&gt;</ph>reset sync<p
       <message name="IDS_FRE_BROWSER_MANAGED_BY_ORGANIZATION" desc="Text that indicates the browser is managed by policy">
         Your browser is managed by your organization
       </message>
+      <message name="IDS_FRE_BROWSER_MANAGED_BY_PARENTS" desc="Text that indicates the browser is managed by parents">
+        Your browser is managed by your parents
+       </message>
 
       <!-- Signin First Run strings -->
       <message name="IDS_SIGNIN_FRE_DISMISS_BUTTON" desc="Button on the very first screen of Chrome to continue without signing into Chrome. Ensure consistency with OneGoogle strings while still omitting “Chrome” (see e.g. TC ID 5336438894576002929).">
@@ -3263,6 +3266,9 @@ To change this setting, <ph name="BEGIN_LINK">&lt;resetlink&gt;</ph>reset sync<p
       </message>
       <message name="IDS_CORMORANT_CREATOR_OFFLINE_FAILURE_SNACKBAR" desc="Creator page snackbar messsage after a user take a follow/unfollow action while offline.">
         You’re offline. Check your internet connection and try again.
+      </message>
+      <message name="IDS_CORMORANT_CREATOR_PREVIEW" desc="Accessibility readout for the title of a Creator feed, informing the user that it's the preview of the feed content from a particular website.">
+        <ph name="SITE_NAME">%1$s<ex>Reuters</ex></ph> Preview
       </message>
       <message name="IDS_FEED_MANAGE_ACTIVITY" desc="Menu item to manage my activity from the feed header overflow menu.">
         Activity
@@ -3605,12 +3611,6 @@ To change this setting, <ph name="BEGIN_LINK">&lt;resetlink&gt;</ph>reset sync<p
       </message>
       <message name="IDS_MENU_EDIT_BOOKMARK" desc="Menu item for editing the content of the bookmark for the current page. [CHAR_LIMIT=27]">
         Edit Bookmark
-      </message>
-      <message name="IDS_MENU_ADD_TO_READING_LIST" desc="Menu item for adding the current page to the reading list. [CHAR_LIMIT=27]">
-        Add to reading list
-      </message>
-      <message name="IDS_MENU_DELETE_FROM_READING_LIST" desc="Menu item for removing the current page from the reading list. [CHAR_LIMIT=27]">
-        Delete from reading list
       </message>
       <message name="IDS_MENU_FIND_IN_PAGE" desc="Menu item allowing users to find text within the current page. [CHAR_LIMIT=27]">
         Find in page
@@ -3985,6 +3985,15 @@ To change this setting, <ph name="BEGIN_LINK">&lt;resetlink&gt;</ph>reset sync<p
       <message name="IDS_RDS_APP_MENU_USER_EDUCATION_DIALOG_MESSAGE" desc="Message on the dialog shown to educate the user about the desktop site app menu site-level setting.">
         When you select desktop site once, the setting is applied to the site each time you visit
       </message>
+      <message name="IDS_RDS_SITE_SETTINGS_GENERIC_IPH_TEXT_DESKTOP" desc="Message on the generic text bubble shown to educate the user about using the desktop site site-level setting to switch to desktop mode.">
+        You can request the desktop site for <ph name="HOST_NAME">%1$s<ex>www.example.com</ex></ph>
+      </message>
+      <message name="IDS_RDS_SITE_SETTINGS_GENERIC_IPH_TEXT_MOBILE" desc="Message on the generic text bubble shown to educate the user about using the desktop site site-level setting to switch to mobile mode.">
+        You can request the mobile site for <ph name="HOST_NAME">%1$s<ex>www.example.com</ex></ph>
+      </message>
+      <message name="IDS_RDS_SITE_SETTINGS_SPECIFIC_IPH_TEXT" desc="Message on the text bubble shown on specific websites more functional in desktop mode to educate the user about using the desktop site site-level setting.">
+        Switch to desktop site for a better view of this site
+      </message>
 
       <!-- Accessibility -->
 
@@ -4017,7 +4026,16 @@ To change this setting, <ph name="BEGIN_LINK">&lt;resetlink&gt;</ph>reset sync<p
         Switch or close tabs
       </message>
       <message name="IDS_ACCESSIBILITY_TOOLBAR_BTN_IDENTITY_DISC" desc="The content description for a toolbar button displaying user profile picture. Tapping on this button navigates to 'Sync and Google services' page in settings">
-        Manage account
+              Manage account
+      </message>
+      <message name="IDS_ACCESSIBILITY_TOOLBAR_BTN_IDENTITY_DISC_WITH_NAME_AND_EMAIL" desc="The content description for a toolbar button displaying user profile picture. Tapping on this button navigates to 'Sync and Google services' page in settings">
+        Signed in as <ph name="USER_NAME">%1$s<ex>Peter Parker</ex></ph>. <ph name="USER_EMAIL">%2$s<ex>peter.parker@gmail.com</ex></ph>. Button. Opens settings.
+      </message>
+      <message name="IDS_ACCESSIBILITY_TOOLBAR_BTN_IDENTITY_DISC_WITH_NAME" desc="The content description for a toolbar button displaying user profile picture, for users who don't have a readable email address. Tapping on this button navigates to 'Sync and Google services' page in settings">
+              Signed in as <ph name="USER_NAME">%s<ex>Bruce Wayne</ex></ph>. Button. Opens settings.
+      </message>
+      <message name="IDS_ACCESSIBILITY_TOOLBAR_BTN_SIGNED_OUT_IDENTITY_DISC" desc="The content description for a toolbar button displaying the signed-out avatar. Tapping on this button navigates to 'Turn on Sync' page in settings">
+        Signed out. Button. Opens dialog to sign in and turn on sync.
       </message>
       <message name="IDS_ACCESSIBILITY_TOOLBAR_BTN_HOME" desc="Content description for the home button.">
         Home
@@ -4155,7 +4173,7 @@ To change this setting, <ph name="BEGIN_LINK">&lt;resetlink&gt;</ph>reset sync<p
         Send to your devices
       </message>
 
-      <!-- Omnibox Autocomplete -->
+      <!-- Omnibox Suggestions -->
       <message name="IDS_OMNIBOX_CONFIRM_DELETE" desc="A message within a modal dialog that confirms the user wants to delete a suggestion from the list dropdown in the omnibox">
         Remove suggestion from history?
       </message>
@@ -5224,10 +5242,6 @@ To change this setting, <ph name="BEGIN_LINK">&lt;resetlink&gt;</ph>reset sync<p
 
       <message name="IDS_SHARING_SAVE_IMAGE" desc="Label for the button in sharing hub for saving an image to device.">
         Save to device
-      </message>
-
-      <message name="IDS_SHARING_COPIED" desc="Text shown in the toast notification when Copy is selected in the sharing hub.">
-        Copied
       </message>
 
       <message name="IDS_TEXT_COPIED" desc="Text shown in the toast notification when Copy Text is selected in the sharing hub.">

@@ -28,7 +28,6 @@ namespace drivefs::pinning {
 namespace {
 
 using base::BindOnce;
-using base::FilePath;
 using base::OnceCallback;
 using base::SequencedTaskRunner;
 using base::test::RunClosure;
@@ -48,12 +47,14 @@ using std::vector;
 using testing::_;
 using testing::AnyNumber;
 using testing::DoAll;
+using testing::ElementsAre;
 using testing::Field;
 using testing::IsEmpty;
 using testing::Return;
 using testing::SizeIs;
 
 using Id = PinManager::Id;
+using Path = base::FilePath;
 
 // Shorthand way to represent drive files with the information that is relevant
 // for the pinning manager.
@@ -61,7 +62,7 @@ struct DriveItem {
   static int64_t counter;
   int64_t stable_id = ++counter;
   int64_t size = 0;
-  FilePath path;
+  Path path;
   FileMetadata::Type type = FileMetadata::Type::kFile;
   bool pinned = false;
   bool available_offline = false;
@@ -100,7 +101,9 @@ ACTION_P(PopulateSearchItems, items) {
   result.reserve(items.size());
   for (const DriveItem& item : items) {
     QueryItemPtr p = QueryItem::New();
-    p->path = item.path;
+    // Paths must be parented at "/root" to be considered for space
+    // calculations.
+    p->path = item.path.empty() ? Path("/root/file.txt") : item.path;
     p->metadata = MakeMetadata(item);
     result.push_back(std::move(p));
   }
@@ -149,7 +152,7 @@ class MockDriveFs : public mojom::DriveFsInterceptorForTesting,
 
   MOCK_METHOD(void,
               SetPinned,
-              (const FilePath&, bool, OnceCallback<void(FileError)>),
+              (const Path&, bool, OnceCallback<void(FileError)>),
               (override));
 
   MOCK_METHOD(void,
@@ -159,7 +162,7 @@ class MockDriveFs : public mojom::DriveFsInterceptorForTesting,
 
   MOCK_METHOD(void,
               GetMetadata,
-              (const FilePath&, OnceCallback<void(FileError, FileMetadataPtr)>),
+              (const Path&, OnceCallback<void(FileError, FileMetadataPtr)>),
               (override));
 
   MOCK_METHOD(void,
@@ -173,7 +176,7 @@ class MockDriveFs : public mojom::DriveFsInterceptorForTesting,
 
 class MockSpaceGetter {
  public:
-  MOCK_METHOD(void, GetFreeSpace, (const FilePath&, PinManager::SpaceResult));
+  MOCK_METHOD(void, GetFreeSpace, (const Path&, PinManager::SpaceResult));
 };
 
 class MockObserver : public PinManager::Observer {
@@ -185,11 +188,6 @@ class MockObserver : public PinManager::Observer {
 }  // namespace
 
 class DriveFsPinManagerTest : public testing::Test {
- public:
-  DriveFsPinManagerTest() = default;
-  DriveFsPinManagerTest(const DriveFsPinManagerTest&) = delete;
-  DriveFsPinManagerTest& operator=(const DriveFsPinManagerTest&) = delete;
-
  protected:
   void SetUp() override {
     ASSERT_TRUE(temp_dir_.CreateUniqueTempDir());
@@ -235,12 +233,78 @@ class DriveFsPinManagerTest : public testing::Test {
   base::test::TaskEnvironment task_environment_{
       base::test::TaskEnvironment::TimeSource::MOCK_TIME};
   base::ScopedTempDir temp_dir_;
-  FilePath gcache_dir_;
+  Path gcache_dir_;
   MockSpaceGetter space_getter_;
   MockDriveFs drivefs_;
 };
 
-// Tests DriveFsPinManagerTest::Add().
+// Tests PinManager::CanPin().
+TEST_F(DriveFsPinManagerTest, CanPin) {
+  using Type = FileMetadata::Type;
+  using CanPinStatus = FileMetadata::CanPinStatus;
+
+  Path path("/root/poi");
+  FileMetadata md;
+  md.stable_id = 57;
+  md.size = 1456754;
+  md.can_pin = CanPinStatus::kOk;
+  md.pinned = false;
+  md.available_offline = false;
+
+  // Non-empty file can be pinned.
+  md.type = Type::kFile;
+  EXPECT_TRUE(PinManager::CanPin(md, path));
+
+  // Hosted doc can be pinned.
+  md.size = 0;
+  md.type = Type::kHosted;
+  EXPECT_TRUE(PinManager::CanPin(md, path));
+
+  // Directory cannot be pinned.
+  md.type = Type::kDirectory;
+  EXPECT_FALSE(PinManager::CanPin(md, path));
+
+  // Back to pinnable case.
+  md.type = Type::kFile;
+  md.size = 1;
+  EXPECT_TRUE(PinManager::CanPin(md, path));
+
+  // Zero-sized file cannot be pinned.
+  md.size = 0;
+  EXPECT_FALSE(PinManager::CanPin(md, path));
+  md.size = 1456754;
+  EXPECT_TRUE(PinManager::CanPin(md, path));
+
+  // Unpinnable file cannot be pinned.
+  md.can_pin = CanPinStatus::kDisabled;
+  EXPECT_FALSE(PinManager::CanPin(md, path));
+  md.can_pin = CanPinStatus::kOk;
+  EXPECT_TRUE(PinManager::CanPin(md, path));
+
+  // Already pinned and cached file does not need to be pinned.
+  md.pinned = true;
+  md.available_offline = true;
+  EXPECT_FALSE(PinManager::CanPin(md, path));
+
+  // Already pinned file that is not cached yet should be followed as if it was
+  // just pinned.
+  md.pinned = true;
+  md.available_offline = false;
+  EXPECT_TRUE(PinManager::CanPin(md, path));
+
+  // Unpinned file should be pinned even if it is already cached.
+  md.pinned = false;
+  md.available_offline = true;
+  EXPECT_TRUE(PinManager::CanPin(md, path));
+  md.available_offline = false;
+  EXPECT_TRUE(PinManager::CanPin(md, path));
+
+  // File that is not under /root/... cannot be pinned.
+  path = Path("/shared/poi");
+  EXPECT_FALSE(PinManager::CanPin(md, path));
+}
+
+// Tests PinManager::Add().
 TEST_F(DriveFsPinManagerTest, Add) {
   PinManager manager(temp_dir_.GetPath(), &drivefs_);
 
@@ -253,11 +317,11 @@ TEST_F(DriveFsPinManagerTest, Add) {
   }
 
   const Id id1 = Id(549);
-  const string path1 = "Path 1";
+  const Path path1 = Path("Path 1");
   const int64_t size1 = 698248964;
 
   const Id id2 = Id(17);
-  const string path2 = "Path 2";
+  const Path path2 = Path("Path 2");
   const int64_t size2 = 78964533;
 
   DCHECK_CALLED_ON_VALID_SEQUENCE(manager.sequence_checker_);
@@ -265,24 +329,25 @@ TEST_F(DriveFsPinManagerTest, Add) {
   EXPECT_THAT(manager.files_to_track_, IsEmpty());
 
   // Add an item.
-  EXPECT_TRUE(manager.Add(id1, path1, size1));
-  EXPECT_THAT(manager.files_to_pin_, SizeIs(1));
-  EXPECT_THAT(manager.files_to_track_, IsEmpty());
+  EXPECT_TRUE(manager.Add(id1, path1, size1, false));
+  EXPECT_THAT(manager.files_to_pin_, ElementsAre(id1));
+  EXPECT_THAT(manager.files_to_track_, SizeIs(1));
 
   // Try to add a conflicting item with the same ID, but different path and
   // size.
-  EXPECT_FALSE(manager.Add(id1, path2, size2));
-  EXPECT_THAT(manager.files_to_pin_, SizeIs(1));
-  EXPECT_THAT(manager.files_to_track_, IsEmpty());
+  EXPECT_FALSE(manager.Add(id1, path2, size2, true));
+  EXPECT_THAT(manager.files_to_pin_, ElementsAre(id1));
+  EXPECT_THAT(manager.files_to_track_, SizeIs(1));
 
   {
-    const auto it = manager.files_to_pin_.find(id1);
-    ASSERT_NE(it, manager.files_to_pin_.end());
+    const auto it = manager.files_to_track_.find(id1);
+    ASSERT_NE(it, manager.files_to_track_.end());
     const auto& [id, file] = *it;
     EXPECT_EQ(id, id1);
     EXPECT_EQ(file.path, path1);
     EXPECT_EQ(file.total, size1);
     EXPECT_EQ(file.transferred, 0);
+    EXPECT_FALSE(file.pinned);
     EXPECT_FALSE(file.in_progress);
   }
 
@@ -292,22 +357,25 @@ TEST_F(DriveFsPinManagerTest, Add) {
     EXPECT_EQ(progress.pinned_bytes, 0);
     EXPECT_EQ(progress.bytes_to_pin, size1);
     EXPECT_EQ(progress.required_space, 698249216);
+    EXPECT_EQ(progress.syncing_files, 0);
+    EXPECT_EQ(progress.files_to_pin, 1);
   }
 
-  // Add a second item.
-  EXPECT_TRUE(manager.Add(id2, path2, size2));
-  EXPECT_THAT(manager.files_to_pin_, SizeIs(2));
-  EXPECT_THAT(manager.files_to_track_, IsEmpty());
+  // Add a second item, but which is already pinned this time.
+  EXPECT_TRUE(manager.Add(id2, path2, size2, true));
+  EXPECT_THAT(manager.files_to_pin_, ElementsAre(id1));
+  EXPECT_THAT(manager.files_to_track_, SizeIs(2));
 
   {
-    const auto it = manager.files_to_pin_.find(id2);
-    ASSERT_NE(it, manager.files_to_pin_.end());
+    const auto it = manager.files_to_track_.find(id2);
+    ASSERT_NE(it, manager.files_to_track_.end());
     const auto& [id, file] = *it;
     EXPECT_EQ(id, id2);
     EXPECT_EQ(file.path, path2);
     EXPECT_EQ(file.total, size2);
     EXPECT_EQ(file.transferred, 0);
     EXPECT_FALSE(file.in_progress);
+    EXPECT_TRUE(file.pinned);
   }
 
   {
@@ -316,10 +384,12 @@ TEST_F(DriveFsPinManagerTest, Add) {
     EXPECT_EQ(progress.pinned_bytes, 0);
     EXPECT_EQ(progress.bytes_to_pin, size1 + size2);
     EXPECT_EQ(progress.required_space, 777216000);
+    EXPECT_EQ(progress.syncing_files, 1);
+    EXPECT_EQ(progress.files_to_pin, 2);
   }
 }
 
-// Tests DriveFsPinManagerTest::Update().
+// Tests PinManager::Update().
 TEST_F(DriveFsPinManagerTest, Update) {
   PinManager manager(temp_dir_.GetPath(), &drivefs_);
 
@@ -337,11 +407,11 @@ TEST_F(DriveFsPinManagerTest, Update) {
   }
 
   const Id id1 = Id(549);
-  const string path1 = "Path 1";
+  const Path path1 = Path("Path 1");
   const int64_t size1 = 2000;
 
   const Id id2 = Id(17);
-  const string path2 = "Path 2";
+  const Path path2 = Path("Path 2");
   const int64_t size2 = 5000;
 
   // Put in place a file to track.
@@ -349,6 +419,7 @@ TEST_F(DriveFsPinManagerTest, Update) {
     const auto [it, ok] = manager.files_to_track_.try_emplace(
         id1, PinManager::File{.path = path1, .total = size1});
     ASSERT_TRUE(ok);
+    manager.progress_.syncing_files++;
   }
 
   EXPECT_THAT(manager.files_to_track_, SizeIs(1));
@@ -468,7 +539,7 @@ TEST_F(DriveFsPinManagerTest, Update) {
     EXPECT_EQ(progress.pinned_files, 0);
     EXPECT_EQ(progress.pinned_bytes, 7000);
     EXPECT_EQ(progress.bytes_to_pin, 13000);
-    EXPECT_EQ(progress.required_space, 24576);
+    EXPECT_EQ(progress.required_space, 20480);
   }
 
   // Update path.
@@ -491,7 +562,7 @@ TEST_F(DriveFsPinManagerTest, Update) {
     EXPECT_EQ(progress.pinned_files, 0);
     EXPECT_EQ(progress.pinned_bytes, 7000);
     EXPECT_EQ(progress.bytes_to_pin, 13000);
-    EXPECT_EQ(progress.required_space, 24576);
+    EXPECT_EQ(progress.required_space, 20480);
   }
 
   // Progress goes backwards.
@@ -514,11 +585,11 @@ TEST_F(DriveFsPinManagerTest, Update) {
     EXPECT_EQ(progress.pinned_files, 0);
     EXPECT_EQ(progress.pinned_bytes, 6000);
     EXPECT_EQ(progress.bytes_to_pin, 13000);
-    EXPECT_EQ(progress.required_space, 24576);
+    EXPECT_EQ(progress.required_space, 20480);
   }
 }
 
-// Tests DriveFsPinManagerTest::Remove().
+// Tests PinManager::Remove().
 TEST_F(DriveFsPinManagerTest, Remove) {
   PinManager manager(temp_dir_.GetPath(), &drivefs_);
 
@@ -536,10 +607,10 @@ TEST_F(DriveFsPinManagerTest, Remove) {
   }
 
   const Id id1 = Id(549);
-  const string path1 = "Path 1";
+  const Path path1 = Path("Path 1");
 
   const Id id2 = Id(17);
-  const string path2 = "Path 2";
+  const Path path2 = Path("Path 2");
 
   // Put in place a file to track.
   {
@@ -547,15 +618,19 @@ TEST_F(DriveFsPinManagerTest, Remove) {
         id1, PinManager::File{.path = path1,
                               .transferred = 1200,
                               .total = 3000,
+                              .pinned = true,
                               .in_progress = true});
     ASSERT_TRUE(ok);
+    manager.progress_.syncing_files++;
   }
 
   EXPECT_THAT(manager.files_to_track_, SizeIs(1));
+  EXPECT_EQ(manager.progress_.syncing_files, 1);
 
   // Try to remove an unknown file.
   EXPECT_FALSE(manager.Remove(id2, path2));
   EXPECT_THAT(manager.files_to_track_, SizeIs(1));
+  EXPECT_EQ(manager.progress_.syncing_files, 1);
 
   {
     const auto it = manager.files_to_track_.find(id1);
@@ -574,6 +649,7 @@ TEST_F(DriveFsPinManagerTest, Remove) {
     EXPECT_EQ(progress.pinned_bytes, 5000);
     EXPECT_EQ(progress.bytes_to_pin, 10000);
     EXPECT_EQ(progress.required_space, 20480);
+    EXPECT_EQ(progress.syncing_files, 1);
   }
 
   // Remove file with default final size.
@@ -586,6 +662,7 @@ TEST_F(DriveFsPinManagerTest, Remove) {
     EXPECT_EQ(progress.pinned_bytes, 6800);
     EXPECT_EQ(progress.bytes_to_pin, 10000);
     EXPECT_EQ(progress.required_space, 20480);
+    EXPECT_EQ(progress.syncing_files, 0);
   }
 
   // Put in place a file to track.
@@ -594,6 +671,7 @@ TEST_F(DriveFsPinManagerTest, Remove) {
         id1, PinManager::File{.path = path1,
                               .transferred = 1200,
                               .total = 3000,
+                              .pinned = false,
                               .in_progress = true});
     ASSERT_TRUE(ok);
   }
@@ -609,7 +687,8 @@ TEST_F(DriveFsPinManagerTest, Remove) {
     EXPECT_EQ(progress.pinned_files, 0);
     EXPECT_EQ(progress.pinned_bytes, 5600);
     EXPECT_EQ(progress.bytes_to_pin, 7000);
-    EXPECT_EQ(progress.required_space, 16384);
+    EXPECT_EQ(progress.required_space, 20480);
+    EXPECT_EQ(progress.syncing_files, 0);
   }
 
   // Put in place a file to track.
@@ -618,8 +697,10 @@ TEST_F(DriveFsPinManagerTest, Remove) {
         id1, PinManager::File{.path = path1,
                               .transferred = 5000,
                               .total = 6000,
+                              .pinned = true,
                               .in_progress = true});
     ASSERT_TRUE(ok);
+    manager.progress_.syncing_files++;
   }
 
   EXPECT_THAT(manager.files_to_track_, SizeIs(1));
@@ -634,10 +715,11 @@ TEST_F(DriveFsPinManagerTest, Remove) {
     EXPECT_EQ(progress.pinned_bytes, 10600);
     EXPECT_EQ(progress.bytes_to_pin, 11000);
     EXPECT_EQ(progress.required_space, 20480);
+    EXPECT_EQ(progress.syncing_files, 0);
   }
 }
 
-// Tests DriveFsPinManagerTest::OnSyncingEvent().
+// Tests PinManager::OnSyncingEvent().
 TEST_F(DriveFsPinManagerTest, OnSyncingEvent) {
   PinManager manager(temp_dir_.GetPath(), &drivefs_);
 
@@ -655,21 +737,23 @@ TEST_F(DriveFsPinManagerTest, OnSyncingEvent) {
   }
 
   const Id id1 = Id(549);
-  const string path1 = "Path 1";
+  const Path path1 = Path("Path 1");
 
   const Id id2 = Id(17);
-  const string path2 = "Path 2";
+  const Path path2 = Path("Path 2");
 
   // Put in place a couple of files to track.
   {
     const auto [it, ok] = manager.files_to_track_.try_emplace(
-        id1, PinManager::File{.path = path1, .total = 10000});
+        id1, PinManager::File{.path = path1, .total = 10000, .pinned = true});
     ASSERT_TRUE(ok);
+    manager.progress_.syncing_files++;
   }
   {
     const auto [it, ok] = manager.files_to_track_.try_emplace(
-        id2, PinManager::File{.path = path2, .total = 20000});
+        id2, PinManager::File{.path = path2, .total = 20000, .pinned = true});
     ASSERT_TRUE(ok);
+    manager.progress_.syncing_files++;
   }
 
   EXPECT_THAT(manager.files_to_track_, SizeIs(2));
@@ -678,7 +762,7 @@ TEST_F(DriveFsPinManagerTest, OnSyncingEvent) {
   {
     ItemEvent event;
     event.stable_id = static_cast<int64_t>(id2);
-    event.path = path2;
+    event.path = path2.value();
     event.state = ItemEvent::State(-1);
     event.bytes_to_transfer = -1;
     event.bytes_transferred = -1;
@@ -689,6 +773,7 @@ TEST_F(DriveFsPinManagerTest, OnSyncingEvent) {
 
   {
     const Progress progress = manager.GetProgress();
+    EXPECT_EQ(progress.syncing_files, 2);
     EXPECT_EQ(progress.failed_files, 0);
     EXPECT_EQ(progress.pinned_files, 0);
     EXPECT_EQ(progress.pinned_bytes, 0);
@@ -700,7 +785,7 @@ TEST_F(DriveFsPinManagerTest, OnSyncingEvent) {
   {
     ItemEvent event;
     event.stable_id = static_cast<int64_t>(id1);
-    event.path = path1;
+    event.path = path1.value();
     event.state = ItemEvent::State::kQueued;
     event.bytes_to_transfer = 0;
     EXPECT_TRUE(manager.OnSyncingEvent(event));
@@ -711,6 +796,7 @@ TEST_F(DriveFsPinManagerTest, OnSyncingEvent) {
 
   {
     const Progress progress = manager.GetProgress();
+    EXPECT_EQ(progress.syncing_files, 2);
     EXPECT_EQ(progress.failed_files, 0);
     EXPECT_EQ(progress.pinned_files, 0);
     EXPECT_EQ(progress.pinned_bytes, 0);
@@ -726,6 +812,7 @@ TEST_F(DriveFsPinManagerTest, OnSyncingEvent) {
     EXPECT_EQ(file.path, path1);
     EXPECT_EQ(file.total, 10000);
     EXPECT_EQ(file.transferred, 0);
+    EXPECT_TRUE(file.pinned);
     EXPECT_TRUE(file.in_progress);
   }
 
@@ -733,7 +820,7 @@ TEST_F(DriveFsPinManagerTest, OnSyncingEvent) {
   {
     ItemEvent event;
     event.stable_id = static_cast<int64_t>(id1);
-    event.path = path1;
+    event.path = path1.value();
     event.state = ItemEvent::State::kInProgress;
     event.bytes_to_transfer = 10000;
     event.bytes_transferred = 5000;
@@ -745,11 +832,12 @@ TEST_F(DriveFsPinManagerTest, OnSyncingEvent) {
 
   {
     const Progress progress = manager.GetProgress();
+    EXPECT_EQ(progress.syncing_files, 2);
     EXPECT_EQ(progress.failed_files, 0);
     EXPECT_EQ(progress.pinned_files, 0);
     EXPECT_EQ(progress.pinned_bytes, 5000);
     EXPECT_EQ(progress.bytes_to_pin, 30000);
-    EXPECT_EQ(progress.required_space, 32768);
+    EXPECT_EQ(progress.required_space, 24576);
   }
 
   {
@@ -760,6 +848,7 @@ TEST_F(DriveFsPinManagerTest, OnSyncingEvent) {
     EXPECT_EQ(file.path, path1);
     EXPECT_EQ(file.total, 10000);
     EXPECT_EQ(file.transferred, 5000);
+    EXPECT_TRUE(file.pinned);
     EXPECT_TRUE(file.in_progress);
   }
 
@@ -767,7 +856,7 @@ TEST_F(DriveFsPinManagerTest, OnSyncingEvent) {
   {
     ItemEvent event;
     event.stable_id = static_cast<int64_t>(id1);
-    event.path = path1;
+    event.path = path1.value();
     event.state = ItemEvent::State::kCompleted;
     event.bytes_to_transfer = -1;
     event.bytes_transferred = -1;
@@ -779,11 +868,12 @@ TEST_F(DriveFsPinManagerTest, OnSyncingEvent) {
 
   {
     const Progress progress = manager.GetProgress();
+    EXPECT_EQ(progress.syncing_files, 1);
     EXPECT_EQ(progress.failed_files, 0);
     EXPECT_EQ(progress.pinned_files, 1);
     EXPECT_EQ(progress.pinned_bytes, 10000);
     EXPECT_EQ(progress.bytes_to_pin, 30000);
-    EXPECT_EQ(progress.required_space, 32768);
+    EXPECT_EQ(progress.required_space, 20480);
   }
 
   {
@@ -795,7 +885,7 @@ TEST_F(DriveFsPinManagerTest, OnSyncingEvent) {
   {
     ItemEvent event;
     event.stable_id = static_cast<int64_t>(id2);
-    event.path = path2;
+    event.path = path2.value();
     event.state = ItemEvent::State::kFailed;
     event.bytes_to_transfer = -1;
     event.bytes_transferred = -1;
@@ -807,11 +897,12 @@ TEST_F(DriveFsPinManagerTest, OnSyncingEvent) {
 
   {
     const Progress progress = manager.GetProgress();
+    EXPECT_EQ(progress.syncing_files, 0);
     EXPECT_EQ(progress.failed_files, 1);
     EXPECT_EQ(progress.pinned_files, 1);
     EXPECT_EQ(progress.pinned_bytes, 10000);
     EXPECT_EQ(progress.bytes_to_pin, 10000);
-    EXPECT_EQ(progress.required_space, 12288);
+    EXPECT_EQ(progress.required_space, 0);
   }
 
   {
@@ -1013,14 +1104,13 @@ TEST_F(DriveFsPinManagerTest, DISABLED_OnlyUnpinnedItemsShouldGetPinned) {
 
   base::RunLoop run_loop;
 
-  vector<DriveItem> items = {
-      {.size = 128, .path = FilePath("/a")},
-      {.size = 128, .path = FilePath("/b")},
-      {.size = 128, .path = FilePath("/c"), .pinned = true}};
+  vector<DriveItem> items = {{.size = 128, .path = Path("/a")},
+                             {.size = 128, .path = Path("/b")},
+                             {.size = 128, .path = Path("/c"), .pinned = true}};
 
   ON_CALL(drivefs_, GetMetadata(_, _))
       .WillByDefault(
-          [&items](const FilePath& path,
+          [&items](const Path& path,
                    OnceCallback<void(FileError, FileMetadataPtr)> callback) {
             for (const DriveItem& item : items) {
               if (item.path == path) {
@@ -1091,8 +1181,8 @@ TEST_F(DriveFsPinManagerTest,
 
   base::RunLoop run_loop;
 
-  FilePath gdoc_path("/a.gdoc");
-  FilePath b_path("/b");
+  Path gdoc_path("/a.gdoc");
+  Path b_path("/b");
   const vector<DriveItem> items = {
       // The `a.gdoc` file will never receive an `OnSyncingStatusUpdate` and
       // thus needs to be removed via the periodic removal task.
@@ -1118,7 +1208,7 @@ TEST_F(DriveFsPinManagerTest,
       .WillOnce(RunOnceCallback<2>(FileError::FILE_ERROR_OK))
       // `RunOnceCallback` can't be chained together in a `DoAll` action
       // combinator, so use an inline lambda instead.
-      .WillOnce([&run_loop](const FilePath& path, bool pinned,
+      .WillOnce([&run_loop](const Path& path, bool pinned,
                             OnceCallback<void(FileError)> callback) {
         std::move(callback).Run(FileError::FILE_ERROR_OK);
         run_loop.QuitClosure().Run();
@@ -1181,7 +1271,7 @@ TEST_F(DriveFsPinManagerTest,
 
   base::RunLoop run_loop;
 
-  FilePath file_path("/b");
+  Path file_path("/b");
   const vector<DriveItem> items = {{.size = 128, .path = file_path}};
 
   EXPECT_CALL(drivefs_, OnStartSearchQuery(_)).Times(2);
@@ -1202,7 +1292,7 @@ TEST_F(DriveFsPinManagerTest,
       .Times(1)
       // `RunOnceCallback` can't be chained together in a `DoAll` action
       // combinator, so use an inline lambda instead.
-      .WillOnce([&run_loop](const FilePath& path, bool pinned,
+      .WillOnce([&run_loop](const Path& path, bool pinned,
                             OnceCallback<void(FileError)> callback) {
         std::move(callback).Run(FileError::FILE_ERROR_OK);
         run_loop.QuitClosure().Run();

@@ -471,7 +471,7 @@ class RasterDecoderImpl final : public RasterDecoder,
                           int* entries_processed) override;
   base::StringPiece GetLogPrefix() override;
 
-#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC)
+#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_APPLE)
   void AttachImageToTextureWithDecoderBinding(uint32_t client_texture_id,
                                               uint32_t texture_target,
                                               gl::GLImage* image) override;
@@ -620,15 +620,15 @@ class RasterDecoderImpl final : public RasterDecoder,
   void DoFlush();
   void DoGetIntegerv(GLenum pname, GLint* params, GLsizei params_size);
   void DoTraceEndCHROMIUM();
-  void DoCopySubTextureINTERNAL(GLint xoffset,
-                                GLint yoffset,
-                                GLint x,
-                                GLint y,
-                                GLsizei width,
-                                GLsizei height,
-                                GLboolean unpack_flip_y,
-                                const volatile GLbyte* mailboxes);
-  bool TryCopySubTextureINTERNALMemory(
+  void DoCopySharedImageINTERNAL(GLint xoffset,
+                                 GLint yoffset,
+                                 GLint x,
+                                 GLint y,
+                                 GLsizei width,
+                                 GLsizei height,
+                                 GLboolean unpack_flip_y,
+                                 const volatile GLbyte* mailboxes);
+  bool TryCopySharedImageINTERNALMemory(
       GLint xoffset,
       GLint yoffset,
       GLint x,
@@ -1013,12 +1013,6 @@ RasterDecoderImpl::RasterDecoderImpl(
 }
 
 RasterDecoderImpl::~RasterDecoderImpl() {
-  // Client can call BeginRasterChromium and then channel can be closed and
-  // decoder destroyed. Finish raster first.
-  if (sk_surface_ || scoped_shared_image_raster_write_) {
-    DoEndRasterCHROMIUM();
-  }
-
   shared_context_state_->RemoveContextLostObserver(this);
 }
 
@@ -1085,32 +1079,18 @@ void RasterDecoderImpl::Destroy(bool have_context) {
 
   DCHECK(!have_context || shared_context_state_->context()->IsCurrent(nullptr));
 
+  // Client can call BeginRasterChromium and then channel can be closed and
+  // decoder destroyed. Finish raster first.
+  // Note: `have_context` is always false for Vulkan, so we don't gate this code
+  // on it.
+  if (sk_surface_ || scoped_shared_image_raster_write_) {
+    DoEndRasterCHROMIUM();
+  }
+
   if (have_context) {
     if (use_gpu_raster_) {
       transfer_cache()->DeleteAllEntriesForDecoder(raster_decoder_id_);
     }
-
-    // Make sure we flush any pending skia work on this context.
-    if (sk_surface_) {
-      GrFlushInfo flush_info = {
-          .fNumSemaphores = end_semaphores_.size(),
-          .fSignalSemaphores = end_semaphores_.data(),
-      };
-      AddVulkanCleanupTaskForSkiaFlush(
-          shared_context_state_->vk_context_provider(), &flush_info);
-      auto result = sk_surface_->flush(flush_info);
-      DCHECK(result == GrSemaphoresSubmitted::kYes || end_semaphores_.empty());
-      end_semaphores_.clear();
-      sk_surface_ = nullptr;
-    }
-
-    if (gr_context())
-      gr_context()->flushAndSubmit();
-
-    scoped_shared_image_write_.reset();
-    shared_image_.reset();
-    sk_surface_for_testing_.reset();
-    paint_op_shared_image_provider_.reset();
   }
 
   if (query_manager_) {
@@ -1176,7 +1156,8 @@ Capabilities RasterDecoderImpl::GetCapabilities() {
       SharedImageManager::SupportsScanoutImages();
   // TODO(piman): have a consistent limit in shared image backings.
   // https://crbug.com/960588
-  if (shared_context_state_->GrContextIsGL()) {
+  if (shared_context_state_->GrContextIsGL() ||
+      shared_context_state_->GrContextIsMetal()) {
     api()->glGetIntegervFn(GL_MAX_TEXTURE_SIZE, &caps.max_texture_size);
   } else if (shared_context_state_->GrContextIsVulkan()) {
 #if BUILDFLAG(ENABLE_VULKAN)
@@ -1565,7 +1546,7 @@ base::StringPiece RasterDecoderImpl::GetLogPrefix() {
   return logger_.GetLogPrefix();
 }
 
-#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC)
+#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_APPLE)
 void RasterDecoderImpl::AttachImageToTextureWithDecoderBinding(
     uint32_t client_texture_id,
     uint32_t texture_target,
@@ -1922,7 +1903,7 @@ error::Error RasterDecoderImpl::HandleSetActiveURLCHROMIUM(
   return error::kNoError;
 }
 
-void RasterDecoderImpl::DoCopySubTextureINTERNAL(
+void RasterDecoderImpl::DoCopySharedImageINTERNAL(
     GLint xoffset,
     GLint yoffset,
     GLint x,
@@ -1934,14 +1915,14 @@ void RasterDecoderImpl::DoCopySubTextureINTERNAL(
   Mailbox source_mailbox = Mailbox::FromVolatile(
       reinterpret_cast<const volatile Mailbox*>(mailboxes)[0]);
   DLOG_IF(ERROR, !source_mailbox.Verify())
-      << "CopySubTexture was passed an invalid mailbox";
+      << "CopySharedImage was passed an invalid mailbox";
   Mailbox dest_mailbox = Mailbox::FromVolatile(
       reinterpret_cast<const volatile Mailbox*>(mailboxes)[1]);
   DLOG_IF(ERROR, !dest_mailbox.Verify())
-      << "CopySubTexture was passed an invalid mailbox";
+      << "CopySharedImage was passed an invalid mailbox";
 
   if (source_mailbox == dest_mailbox) {
-    LOCAL_SET_GL_ERROR(GL_INVALID_OPERATION, "glCopySubTexture",
+    LOCAL_SET_GL_ERROR(GL_INVALID_OPERATION, "glCopySharedImage",
                        "source and destination mailboxes are the same");
     return;
   }
@@ -1949,14 +1930,15 @@ void RasterDecoderImpl::DoCopySubTextureINTERNAL(
   auto dest_shared_image = shared_image_representation_factory_.ProduceSkia(
       dest_mailbox, shared_context_state_);
   if (!dest_shared_image) {
-    LOCAL_SET_GL_ERROR(GL_INVALID_VALUE, "glCopySubTexture", "unknown mailbox");
+    LOCAL_SET_GL_ERROR(GL_INVALID_VALUE, "glCopySharedImage",
+                       "unknown mailbox");
     return;
   }
 
   gfx::Size dest_size = dest_shared_image->size();
   gfx::Rect dest_rect(xoffset, yoffset, width, height);
   if (!gfx::Rect(dest_size).Contains(dest_rect)) {
-    LOCAL_SET_GL_ERROR(GL_INVALID_VALUE, "glCopySubTexture",
+    LOCAL_SET_GL_ERROR(GL_INVALID_VALUE, "glCopySharedImage",
                        "destination texture bad dimensions.");
     return;
   }
@@ -1970,7 +1952,7 @@ void RasterDecoderImpl::DoCopySubTextureINTERNAL(
           &begin_semaphores, &end_semaphores,
           SharedImageRepresentation::AllowUnclearedAccess::kYes);
   if (!dest_scoped_access) {
-    LOCAL_SET_GL_ERROR(GL_INVALID_VALUE, "glCopySubTexture",
+    LOCAL_SET_GL_ERROR(GL_INVALID_VALUE, "glCopySharedImage",
                        "Dest shared image is not writable");
     return;
   }
@@ -1984,13 +1966,13 @@ void RasterDecoderImpl::DoCopySubTextureINTERNAL(
   } else {
     // No users of RasterDecoder leverage this functionality. Clearing uncleared
     // regions could be added here if needed.
-    LOCAL_SET_GL_ERROR(GL_INVALID_VALUE, "glCopySubTexture",
+    LOCAL_SET_GL_ERROR(GL_INVALID_VALUE, "glCopySharedImage",
                        "Cannot clear non-combineable rects.");
     return;
   }
 
   // Attempt to upload directly from CPU shared memory to destination texture.
-  if (TryCopySubTextureINTERNALMemory(
+  if (TryCopySharedImageINTERNALMemory(
           xoffset, yoffset, x, y, width, height, new_cleared_rect,
           unpack_flip_y, source_mailbox, dest_shared_image.get(),
           dest_scoped_access.get(), begin_semaphores, end_semaphores)) {
@@ -2023,7 +2005,7 @@ void RasterDecoderImpl::DoCopySubTextureINTERNAL(
   }
 
   if (!source_shared_image) {
-    LOCAL_SET_GL_ERROR(GL_INVALID_VALUE, "glCopySubTexture",
+    LOCAL_SET_GL_ERROR(GL_INVALID_VALUE, "glCopySharedImage",
                        "unknown source image mailbox.");
     return;
   }
@@ -2031,7 +2013,7 @@ void RasterDecoderImpl::DoCopySubTextureINTERNAL(
   gfx::Size source_size = source_shared_image->size();
   gfx::Rect source_rect(x, y, width, height);
   if (!gfx::Rect(source_size).Contains(source_rect)) {
-    LOCAL_SET_GL_ERROR(GL_INVALID_VALUE, "glCopySubTexture",
+    LOCAL_SET_GL_ERROR(GL_INVALID_VALUE, "glCopySharedImage",
                        "source texture bad dimensions.");
     return;
   }
@@ -2048,7 +2030,7 @@ void RasterDecoderImpl::DoCopySubTextureINTERNAL(
   }
 
   if (!source_scoped_access) {
-    LOCAL_SET_GL_ERROR(GL_INVALID_VALUE, "glCopySubTexture",
+    LOCAL_SET_GL_ERROR(GL_INVALID_VALUE, "glCopySharedImage",
                        "Source shared image is not accessable");
     // We still need to flush surface for begin semaphores above.
     FlushSurface(dest_scoped_access.get());
@@ -2056,7 +2038,7 @@ void RasterDecoderImpl::DoCopySubTextureINTERNAL(
     auto source_image = source_scoped_access->CreateSkImage(
         shared_context_state_->gr_context());
     if (!source_image) {
-      LOCAL_SET_GL_ERROR(GL_INVALID_VALUE, "glCopySubTexture",
+      LOCAL_SET_GL_ERROR(GL_INVALID_VALUE, "glCopySharedImage",
                          "Couldn't create SkImage from source shared image.");
     }
 
@@ -2127,7 +2109,7 @@ void RasterDecoderImpl::DoCopySubTextureINTERNAL(
   SubmitIfNecessary(std::move(end_semaphores));
 }
 
-bool RasterDecoderImpl::TryCopySubTextureINTERNALMemory(
+bool RasterDecoderImpl::TryCopySharedImageINTERNALMemory(
     GLint xoffset,
     GLint yoffset,
     GLint x,
@@ -2141,28 +2123,33 @@ bool RasterDecoderImpl::TryCopySubTextureINTERNALMemory(
     SkiaImageRepresentation::ScopedWriteAccess* dest_scoped_access,
     const std::vector<GrBackendSemaphore>& begin_semaphores,
     std::vector<GrBackendSemaphore>& end_semaphores) {
-  if (unpack_flip_y)
+  if (unpack_flip_y) {
     return false;
+  }
 
   auto source_shared_image =
       shared_image_representation_factory_.ProduceMemory(source_mailbox);
-  if (!source_shared_image)
+  if (!source_shared_image) {
     return false;
+  }
 
   gfx::Size source_size = source_shared_image->size();
   gfx::Rect source_rect(x, y, width, height);
-  if (!gfx::Rect(source_size).Contains(source_rect))
+  if (!gfx::Rect(source_size).Contains(source_rect)) {
     return false;
+  }
 
   auto scoped_read_access = source_shared_image->BeginScopedReadAccess();
-  if (!scoped_read_access)
+  if (!scoped_read_access) {
     return false;
+  }
 
   SkPixmap pm = scoped_read_access->pixmap();
   SkIRect skIRect = RectToSkIRect(source_rect);
   SkPixmap subset;
-  if (!pm.extractSubset(&subset, skIRect))
+  if (!pm.extractSubset(&subset, skIRect)) {
     return false;
+  }
 
   if (!begin_semaphores.empty()) {
     bool result = dest_scoped_access->surface()->wait(

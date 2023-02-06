@@ -54,6 +54,7 @@
 #include "base/containers/contains.h"
 #include "base/containers/unique_ptr_adapters.h"
 #include "base/cxx17_backports.h"
+#include "base/debug/crash_logging.h"
 #include "base/functional/bind.h"
 #include "base/guid.h"
 #include "base/i18n/number_formatting.h"
@@ -76,6 +77,7 @@
 #include "ui/aura/window_tracker.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/events/devices/haptic_touchpad_effects.h"
+#include "ui/views/widget/native_widget_private.h"
 #include "ui/wm/core/window_animations.h"
 #include "ui/wm/core/window_util.h"
 #include "ui/wm/public/activation_client.h"
@@ -1129,11 +1131,19 @@ const Desk* DesksController::CreateNewDeskForSavedDesk(
   if (animation_)
     animation_.reset();
 
-  // Desk name was set to a default name upon creation. If
-  // `customized_desk_name` is not empty, override desk name to be
-  // `customized_desk_name` or `customized_desk_name ({counter})` to resolve
-  // naming conflicts.
-  std::u16string desk_name = CreateUniqueDeskName(customized_desk_name);
+  // Call `HideSavedDeskLibrary` before the new desk is created to update the
+  // state of the library button, otherwise the library button will be laid out
+  // with the wrong state when the new desk is created.
+  if (template_type == DeskTemplateType::kTemplate ||
+      template_type == DeskTemplateType::kFloatingWorkspace) {
+    if (auto* session =
+            Shell::Get()->overview_controller()->overview_session()) {
+      session->HideSavedDeskLibrary();
+      for (auto& grid : session->grid_list()) {
+        grid->RemoveAllItemsForSavedDeskLaunch();
+      }
+    }
+  }
 
   switch (template_type) {
     case DeskTemplateType::kTemplate:
@@ -1150,6 +1160,12 @@ const Desk* DesksController::CreateNewDeskForSavedDesk(
   }
 
   Desk* desk = desks().back().get();
+
+  // Desk name was set to a default name upon creation. If
+  // `customized_desk_name` is not empty, override desk name to be
+  // `customized_desk_name` or `customized_desk_name ({counter})` to resolve
+  // naming conflicts.
+  std::u16string desk_name = CreateUniqueDeskName(customized_desk_name);
 
   if (!desk_name.empty()) {
     desk->SetName(desk_name, /*set_by_user=*/true);
@@ -1183,13 +1199,6 @@ const Desk* DesksController::CreateNewDeskForSavedDesk(
       }
     }
 
-    if (auto* session =
-            Shell::Get()->overview_controller()->overview_session()) {
-      session->HideSavedDeskLibrary();
-      for (auto& grid : session->grid_list())
-        grid->RemoveAllItemsForSavedDeskLaunch();
-    }
-
     ActivateDesk(desk, DesksSwitchSource::kLaunchTemplate);
     DCHECK(!animation_);
   }
@@ -1205,7 +1214,7 @@ bool DesksController::OnSingleInstanceAppLaunchingFromSavedDesk(
   aura::Window* existing_app_instance_window = nullptr;
   Desk* src_desk = nullptr;
   for (auto& desk : desks()) {
-    for (aura::Window* window : desk->windows()) {
+    for (aura::Window* window : desk->GetAllAssociatedWindows()) {
       const std::string* const app_id_ptr = window->GetProperty(kAppIDKey);
       if (app_id_ptr && *app_id_ptr == app_id) {
         existing_app_instance_window = window;
@@ -1252,6 +1261,15 @@ bool DesksController::OnSingleInstanceAppLaunchingFromSavedDesk(
       src_desk->MoveWindowToDesk(existing_app_instance_window, target_desk,
                                  existing_app_instance_window->GetRootWindow(),
                                  /*unminimize=*/false);
+      // If the floated window is the single instance window, we need to let
+      // float controller handle move window to desk, as floated window
+      // doesn't belong to desk container.
+      if (WindowState::Get(existing_app_instance_window)->IsFloated()) {
+        Shell::Get()->float_controller()->OnMovingFloatedWindowToDesk(
+            existing_app_instance_window, src_desk, target_desk,
+            existing_app_instance_window->GetRootWindow());
+      }
+
       MaybeUpdateShelfItems(
           /*windows_on_inactive_desk=*/{},
           /*windows_on_active_desk=*/{existing_app_instance_window});
@@ -1998,6 +2016,67 @@ void DesksController::CleanUpClosedAppWindowsTask(
     aura::Window* window = closing_window_tracker->Pop();
     views::Widget* widget = views::Widget::GetWidgetForNativeView(window);
     DCHECK(widget);
+
+    // TODO(b/266617023): Clean this up when bug is resolved.
+    // Crash keys for b/266617023.
+    // We want to understand everything about the window that is causing the
+    // crash so we know how to reproduce.
+    SCOPED_CRASH_KEY_NUMBER("CloseAll", "window_type", window->GetType());
+    SCOPED_CRASH_KEY_NUMBER("CloseAll", "window_app_type",
+                            window->GetProperty(aura::client::kAppType));
+    SCOPED_CRASH_KEY_NUMBER(
+        "CloseAll", "window_z_level",
+        static_cast<int>(window->GetProperty(aura::client::kZOrderingKey)));
+    SCOPED_CRASH_KEY_BOOL("CloseAll", "window_is_visible", window->IsVisible());
+    SCOPED_CRASH_KEY_BOOL("CloseAll", "window_has_focus", window->HasFocus());
+    SCOPED_CRASH_KEY_BOOL("CloseAll", "window_visible_all",
+                          desks_util::IsWindowVisibleOnAllWorkspaces(window));
+
+    // Window bounds logging.
+    SCOPED_CRASH_KEY_STRING64("CloseAll", "window_bounds",
+                              window->bounds().ToString());
+
+    // Window state logging.
+    WindowState* window_state = WindowState::Get(window);
+    SCOPED_CRASH_KEY_BOOL("CloseAll", "window_state_exists", !!window_state);
+    if (window_state) {
+      SCOPED_CRASH_KEY_NUMBER("CloseAll", "window_state_type",
+                              static_cast<int>(window_state->GetStateType()));
+      SCOPED_CRASH_KEY_BOOL("CloseAll", "window_state_is_minimized",
+                            window_state->IsMinimized());
+      SCOPED_CRASH_KEY_BOOL("CloseAll", "window_state_is_maximized",
+                            window_state->IsMaximized());
+      SCOPED_CRASH_KEY_BOOL("CloseAll", "window_state_is_fullscreen",
+                            window_state->IsFullscreen());
+      SCOPED_CRASH_KEY_BOOL("CloseAll", "window_state_is_snapped",
+                            window_state->IsSnapped());
+      SCOPED_CRASH_KEY_BOOL("CloseAll", "window_state_is_pinned",
+                            window_state->IsPinned());
+      SCOPED_CRASH_KEY_BOOL("CloseAll", "window_state_is_trustedpinned",
+                            window_state->IsTrustedPinned());
+      SCOPED_CRASH_KEY_BOOL("CloseAll", "window_state_is_pip",
+                            window_state->IsPip());
+      SCOPED_CRASH_KEY_BOOL("CloseAll", "window_state_is_floated",
+                            window_state->IsFloated());
+      SCOPED_CRASH_KEY_BOOL("CloseAll", "window_state_is_active",
+                            window_state->IsActive());
+      SCOPED_CRASH_KEY_BOOL("CloseAll", "window_state_userpositionable",
+                            window_state->IsUserPositionable());
+    }
+
+    // Environment logging.
+    SCOPED_CRASH_KEY_BOOL(
+        "CloseAll", "in_overview_session",
+        Shell::Get()->overview_controller()->InOverviewSession());
+    SCOPED_CRASH_KEY_NUMBER("CloseAll", "desk_count", desks_.size());
+
+    // Understand the window's connection to the widget.
+    views::internal::NativeWidgetPrivate* native_widget =
+        views::internal::NativeWidgetPrivate::GetNativeWidgetForNativeView(
+            window);
+    SCOPED_CRASH_KEY_BOOL("CloseAll", "native_widget_exists", !!native_widget);
+    SCOPED_CRASH_KEY_BOOL("CloseAll", "native_widget_has_widget",
+                          native_widget && native_widget->GetWidget());
 
     // Forcefully close this app window. `CloseNow` which directly deleted the
     // associated native widget. This will skip many Window shutdown hook

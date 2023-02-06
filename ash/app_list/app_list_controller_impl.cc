@@ -64,6 +64,7 @@
 #include "chromeos/ui/wm/features.h"
 #include "components/pref_registry/pref_registry_syncable.h"
 #include "components/prefs/pref_registry_simple.h"
+#include "ui/compositor/compositor.h"
 #include "ui/compositor/layer.h"
 #include "ui/compositor/layer_animation_sequence.h"
 #include "ui/display/manager/display_manager.h"
@@ -431,9 +432,6 @@ void AppListControllerImpl::OnSessionStateChanged(
 }
 
 void AppListControllerImpl::OnUserSessionAdded(const AccountId& account_id) {
-  if (!features::IsLauncherAppSortEnabled())
-    return;
-
   if (!client_)
     return;
 
@@ -481,8 +479,6 @@ void AppListControllerImpl::UpdateAppListWithNewTemporarySortOrder(
     const absl::optional<AppListSortOrder>& new_order,
     bool animate,
     base::OnceClosure update_position_closure) {
-  DCHECK(features::IsLauncherAppSortEnabled());
-
   if (new_order) {
     RecordAppListSortAction(*new_order, IsInTabletMode());
 
@@ -1256,14 +1252,6 @@ void AppListControllerImpl::GetContextMenuModel(
   if (client_)
     client_->GetContextMenuModel(profile_id_, id, item_context,
                                  std::move(callback));
-}
-
-ui::ImplicitAnimationObserver* AppListControllerImpl::GetAnimationObserver(
-    AppListViewState target_state) {
-  // |presenter_| observes the close animation only.
-  if (target_state == AppListViewState::kClosed)
-    return fullscreen_presenter_.get();
-  return nullptr;
 }
 
 void AppListControllerImpl::ShowWallpaperContextMenu(

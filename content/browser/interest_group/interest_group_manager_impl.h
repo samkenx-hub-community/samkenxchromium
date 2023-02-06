@@ -228,12 +228,12 @@ class CONTENT_EXPORT InterestGroupManagerImpl : public InterestGroupManager {
   void GetLastMaintenanceTimeForTesting(
       base::RepeatingCallback<void(base::Time)> callback) const;
 
-  // Enqueues reports for the specified URLs.
-  void EnqueueReports(
+  // Enqueues reports for the specified URLs. Virtual for testing.
+  virtual void EnqueueReports(
       ReportType report_type,
-      const std::vector<GURL>& report_urls,
+      std::vector<GURL> report_urls,
       const url::Origin& frame_origin,
-      network::mojom::ClientSecurityState& client_security_state,
+      const network::mojom::ClientSecurityState& client_security_state,
       scoped_refptr<network::SharedURLLoaderFactory> url_loader_factory);
 
   // Update the interest group priority.

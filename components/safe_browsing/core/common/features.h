@@ -81,6 +81,15 @@ BASE_DECLARE_FEATURE(kDownloadTailoredWarnings);
 // no IPH bubble will appear and the ESB option will be expanded on page load.
 BASE_DECLARE_FEATURE(kEsbIphBubbleAndCollapseSettings);
 
+// Specifies whether the ESB IPH bubble on the security settings page is
+// enabled or not.
+extern const base::FeatureParam<bool> kEsbIphBubbleAndCollapseSettingsEnableIph;
+
+// Specifies whether the ESB option on the security settings page is collapsed
+// or not.
+extern const base::FeatureParam<bool>
+    kEsbIphBubbleAndCollapseSettingsEnableCollapse;
+
 // Enables collection of signals related to extension activity and uploads
 // of telemetry reports to SB servers.
 BASE_DECLARE_FEATURE(kExtensionTelemetry);
@@ -88,6 +97,20 @@ BASE_DECLARE_FEATURE(kExtensionTelemetry);
 // Allows the Extension Telemetry Service to accept and use configurations
 // sent by the server.
 BASE_DECLARE_FEATURE(kExtensionTelemetryConfiguration);
+
+// Allows the Extension Telemetry Service to process installed extension files
+// and attach file data to reports.
+BASE_DECLARE_FEATURE(kExtensionTelemetryFileData);
+
+// Specifies the max number of files to process per extension in Extension
+// Telemetry's File Processor.
+extern const base::FeatureParam<int>
+    kExtensionTelemetryFileDataMaxFilesToProcess;
+
+// Specifies the max file size to process in Extension Telemetry's File
+// Processor.
+extern const base::FeatureParam<int>
+    kExtensionTelemetryFileDataMaxFileSizeBytes;
 
 // Enables data collected by the kExtensionTelemetry to be written and read to
 // disk. This data will be uploaded for analysis.

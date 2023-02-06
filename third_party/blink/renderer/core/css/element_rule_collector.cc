@@ -188,14 +188,15 @@ class CascadeLayerSeeker {
     if (vtt_originating_element) {
       return nullptr;
     }
-    if (scope) {
-      return scope->ContainingTreeScope()
-          .GetScopedStyleResolver()
-          ->GetCascadeLayerMap();
-    }
     // Assume there are no UA cascade layers, so we only check user layers.
     if (!style_sheet) {
       return nullptr;
+    }
+    if (scope) {
+      DCHECK(scope->ContainingTreeScope().GetScopedStyleResolver());
+      return scope->ContainingTreeScope()
+          .GetScopedStyleResolver()
+          ->GetCascadeLayerMap();
     }
     Document* document = style_sheet->OwnerDocument();
     if (!document) {
@@ -715,6 +716,13 @@ void ElementRuleCollector::CollectMatchingRules(
           bundle.rule_set->SpatialNavigationInterestPseudoClassRules(),
           match_request, bundle.rule_set, bundle.style_sheet,
           bundle.style_sheet_index, checker);
+    }
+  }
+  if (element.GetDocument().documentElement() == element) {
+    for (const auto bundle : match_request.AllRuleSets()) {
+      CollectMatchingRulesForList(
+          bundle.rule_set->RootElementRules(), match_request, bundle.rule_set,
+          bundle.style_sheet, bundle.style_sheet_index, checker);
     }
   }
   AtomicString element_name = matching_ua_rules_

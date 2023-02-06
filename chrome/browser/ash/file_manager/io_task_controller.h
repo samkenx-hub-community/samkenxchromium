@@ -45,8 +45,14 @@ class IOTaskController {
   // Queues an IOTask and returns its ID.
   IOTaskId Add(std::unique_ptr<IOTask> task);
 
+  // Resumes a task from the queue.
+  void Resume(IOTaskId task_id, ResumeParams params);
+
   // Cancels or removes a task from the queue.
   void Cancel(IOTaskId task_id);
+
+  // Makes all tasks in state::PAUSED emit (broadcast) their progress status.
+  void ProgressPausedTasks();
 
   // For tests only; returns the current wake lock counter. This counter is
   // incremented by 1 for every time we get a wake lock and decremented every

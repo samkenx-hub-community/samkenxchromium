@@ -1545,37 +1545,6 @@ void AutofillMetrics::LogIsAutofillCreditCardEnabledAtPageLoad(
 }
 
 // static
-void AutofillMetrics::LogStoredProfileCountStatistics(
-    size_t num_profiles,
-    size_t num_disused_profiles,
-    size_t num_countryless_profiles) {
-  UMA_HISTOGRAM_COUNTS_1M("Autofill.StoredProfileCount", num_profiles);
-
-  // For users without any profiles do not record the other metrics.
-  if (num_profiles == 0)
-    return;
-
-  DCHECK_LE(num_disused_profiles, num_profiles);
-  size_t num_used_profiles = num_profiles - num_disused_profiles;
-
-  UMA_HISTOGRAM_COUNTS_1000("Autofill.StoredProfileUsedCount",
-                            num_used_profiles);
-  UMA_HISTOGRAM_COUNTS_1000("Autofill.StoredProfileDisusedCount",
-                            num_disused_profiles);
-  UMA_HISTOGRAM_COUNTS_1M("Autofill.StoredProfileWithoutCountryCount",
-                          num_countryless_profiles);
-
-  int use_percentage = (100 * num_used_profiles) / num_profiles;
-  UMA_HISTOGRAM_PERCENTAGE("Autofill.StoredProfileUsedPercentage",
-                           use_percentage);
-}
-
-// static
-void AutofillMetrics::LogStoredProfileDaysSinceLastUse(size_t days) {
-  UMA_HISTOGRAM_COUNTS_1000("Autofill.DaysSinceLastUse.StoredProfile", days);
-}
-
-// static
 void AutofillMetrics::LogStoredCreditCardMetrics(
     const std::vector<std::unique_ptr<CreditCard>>& local_cards,
     const std::vector<std::unique_ptr<CreditCard>>& server_cards,
@@ -2485,7 +2454,7 @@ void AutofillMetrics::FormInteractionsUkmLogger::
     return;
   }
 
-  // Set the fields with autofill information according to Autofill FieldInfo
+  // Set the fields with autofill information according to Autofill2.FieldInfo
   // UKM schema:
   // https://docs.google.com/document/d/1ZH0JbL6bES3cD4KqZWsGR6n8I-rhnkx6no6nQOgYq5w/
   OptionalBoolean was_focused = OptionalBoolean::kFalse;
@@ -2562,12 +2531,18 @@ void AutofillMetrics::FormInteractionsUkmLogger::
       suggestion_was_shown |= event->suggestion_is_shown;
       if (suggestion_was_shown == OptionalBoolean::kTrue &&
           suggestion_was_accepted == OptionalBoolean::kUndefined) {
-        // Only switch from unknown to false on the first suggestion.
+        // Initialize suggestion_was_accepted to a defined value when the first
+        // time the suggestion is shown.
         suggestion_was_accepted = OptionalBoolean::kFalse;
       }
     }
 
-    if (absl::holds_alternative<TriggerFillFieldLogEvent>(log_event)) {
+    if (auto* event = absl::get_if<TriggerFillFieldLogEvent>(&log_event)) {
+      // Ignore events which are not address or credit card fill events.
+      if (event->data_type != FillDataType::kAutofillProfile &&
+          event->data_type != FillDataType::kCreditCard) {
+        continue;
+      }
       suggestion_was_accepted = OptionalBoolean::kTrue;
     }
 
@@ -2576,12 +2551,20 @@ void AutofillMetrics::FormInteractionsUkmLogger::
       had_value_before_filling |= event->had_value_before_filling;
       autofill_skipped_status.insert(event->autofill_skipped_status);
       had_value_after_filling = event->had_value_after_filling;
+      if (was_autofilled == OptionalBoolean::kTrue &&
+          filled_value_was_modified == OptionalBoolean::kUndefined) {
+        // Initialize filled_value_was_modified to a defined value when the
+        // field is filled for the first time.
+        filled_value_was_modified = OptionalBoolean::kFalse;
+      }
       ++autofill_count;
     }
 
     if (auto* event = absl::get_if<TypingFieldLogEvent>(&log_event)) {
       user_typed_into_field = OptionalBoolean::kTrue;
-      filled_value_was_modified |= was_autofilled;
+      if (was_autofilled == OptionalBoolean::kTrue) {
+        filled_value_was_modified = OptionalBoolean::kTrue;
+      }
       has_value_after_typing = event->has_value_after_typing;
     }
 
@@ -2643,7 +2626,7 @@ void AutofillMetrics::FormInteractionsUkmLogger::
                           has_value_after_typing == OptionalBoolean::kTrue);
   }
 
-  ukm::builders::Autofill_FieldInfo builder(source_id_);
+  ukm::builders::Autofill2_FieldInfo builder(source_id_);
   builder
       .SetFormSessionIdentifier(
           AutofillMetrics::FormGlobalIdToHash64Bit(form.global_id()))
@@ -2651,7 +2634,8 @@ void AutofillMetrics::FormInteractionsUkmLogger::
           AutofillMetrics::FieldGlobalIdToHash64Bit(field.global_id()))
       .SetFieldSignature(HashFieldSignature(field.GetFieldSignature()))
       .SetWasFocused(OptionalBooleanToBool(was_focused))
-      .SetIsFocusable(field.IsFocusable());
+      .SetIsFocusable(field.IsFocusable())
+      .SetUserTypedIntoField(OptionalBooleanToBool(user_typed_into_field));
 
   if (was_focused == OptionalBoolean::kTrue) {
     builder
@@ -2673,10 +2657,9 @@ void AutofillMetrics::FormInteractionsUkmLogger::
         .SetWasRefill(autofill_count > 1);
   }
 
-  if (user_typed_into_field == OptionalBoolean::kTrue) {
-    builder.SetUserTypedIntoField(OptionalBooleanToBool(user_typed_into_field))
-        .SetFilledValueWasModified(
-            OptionalBooleanToBool(filled_value_was_modified));
+  if (filled_value_was_modified != OptionalBoolean::kUndefined) {
+    builder.SetFilledValueWasModified(
+        OptionalBooleanToBool(filled_value_was_modified));
   }
 
   if (had_typed_or_filled_value_at_submission != OptionalBoolean::kUndefined) {
@@ -3024,6 +3007,13 @@ void AutofillMetrics::LogNewProfileWithIgnoredCountryImportDecision(
       "Autofill.ProfileImport.NewProfileWithIgnoredCountryDecision", decision);
 }
 
+void AutofillMetrics::LogNewProfileNumberOfAutocompleteUnrecognizedFields(
+    int count) {
+  base::UmaHistogramExactLinear(
+      "Autofill.ProfileImport.NewProfileNumberOfAutocompleteUnrecognizedFields",
+      count, /*exclusive_max=*/20);
+}
+
 void AutofillMetrics::LogNewProfileEditedType(ServerFieldType edited_type) {
   base::UmaHistogramEnumeration(
       "Autofill.ProfileImport.NewProfileEditedType",
@@ -3048,6 +3038,14 @@ void AutofillMetrics::LogProfileUpdateWithIgnoredCountryImportDecision(
   base::UmaHistogramEnumeration(
       "Autofill.ProfileImport.UpdateProfileWithIgnoredCountryDecision",
       decision);
+}
+
+void AutofillMetrics::LogProfileUpdateNumberOfAutocompleteUnrecognizedFields(
+    int count) {
+  base::UmaHistogramExactLinear(
+      "Autofill.ProfileImport."
+      "UpdateProfileNumberOfAutocompleteUnrecognizedFields",
+      count, /*exclusive_max=*/20);
 }
 
 void AutofillMetrics::LogProfileUpdateAffectedType(

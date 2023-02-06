@@ -267,6 +267,7 @@ source_set("browser") {
     "//ui/base/ime/init",
     "//ui/color",
     "//ui/color:mixers",
+    "//ui/compositor",
     "//ui/display",
     "//ui/display/types",
     "//ui/display/util",
@@ -412,7 +413,10 @@ source_set("browser") {
     "attribution_reporting/aggregatable_attribution_utils.h",
     "attribution_reporting/aggregatable_histogram_contribution.cc",
     "attribution_reporting/aggregatable_histogram_contribution.h",
+    "attribution_reporting/attribution_beacon_id.h",
     "attribution_reporting/attribution_config.cc",
+    "attribution_reporting/attribution_config.h",
+    "attribution_reporting/attribution_constants.h",
     "attribution_reporting/attribution_cookie_checker.h",
     "attribution_reporting/attribution_cookie_checker_impl.cc",
     "attribution_reporting/attribution_cookie_checker_impl.h",
@@ -447,6 +451,7 @@ source_set("browser") {
     "attribution_reporting/attribution_report_network_sender.cc",
     "attribution_reporting/attribution_report_network_sender.h",
     "attribution_reporting/attribution_report_sender.h",
+    "attribution_reporting/attribution_reporting.h",
     "attribution_reporting/attribution_source_type.cc",
     "attribution_reporting/attribution_source_type.h",
     "attribution_reporting/attribution_storage.cc",
@@ -1114,6 +1119,8 @@ source_set("browser") {
     "interest_group/auction_process_manager.h",
     "interest_group/auction_runner.cc",
     "interest_group/auction_runner.h",
+    "interest_group/auction_shared_storage_host.cc",
+    "interest_group/auction_shared_storage_host.h",
     "interest_group/auction_url_loader_factory_proxy.cc",
     "interest_group/auction_url_loader_factory_proxy.h",
     "interest_group/auction_worklet_manager.cc",
@@ -1863,6 +1870,8 @@ source_set("browser") {
     "renderer_host/renderer_cancellation_throttle.h",
     "renderer_host/renderer_sandboxed_process_launcher_delegate.cc",
     "renderer_host/renderer_sandboxed_process_launcher_delegate.h",
+    "renderer_host/runtime_feature_state_controller_impl.cc",
+    "renderer_host/runtime_feature_state_controller_impl.h",
     "renderer_host/should_swap_browsing_instance.h",
     "renderer_host/stored_page.cc",
     "renderer_host/stored_page.h",
@@ -2596,6 +2605,20 @@ source_set("browser") {
     weak_frameworks = [
       "UniformTypeIdentifiers.framework",  # macOS 11
     ]
+  } else if (is_ios) {
+    sources += [
+      "child_process_launcher_helper_ios.cc",
+      "renderer_host/browser_compositor_ios.h",
+      "renderer_host/browser_compositor_ios.mm",
+      "renderer_host/delegated_frame_host_client_ios.cc",
+      "renderer_host/delegated_frame_host_client_ios.h",
+      "renderer_host/render_widget_host_view_ios.h",
+      "renderer_host/render_widget_host_view_ios.mm",
+      "web_contents/web_contents_view_ios.h",
+      "web_contents/web_contents_view_ios.mm",
+    ]
+    frameworks += [ "IOSurface.framework" ]
+    deps += [ "//ui/accelerated_widget_mac" ]
   } else {
     # Not Mac.
     deps += [ "//sandbox" ]
@@ -2888,6 +2911,15 @@ source_set("browser") {
     configs += [ "//build/config/linux/pangocairo" ]
   }
 
+  if (is_ios) {
+    sources += [
+      "renderer_host/input/web_input_event_builders_ios.h",
+      "renderer_host/input/web_input_event_builders_ios.mm",
+      "renderer_host/native_web_keyboard_event_ios.mm",
+      "speech/tts_ios.mm",
+    ]
+  }
+
   if (is_android) {
     sources += [
       "accessibility/accessibility_tree_formatter_android.cc",
@@ -3068,6 +3100,7 @@ source_set("browser") {
     deps += [
       ":reflection_jni_headers",
       "//build/config/freetype",
+      "//cc/slim",
       "//components/tracing:graphics_provider",
       "//content/public/android:jni",
       "//device/gamepad/public/mojom",
@@ -3109,8 +3142,6 @@ source_set("browser") {
       # The Direct Sockets API is not implemented on Android.
       "direct_sockets/direct_sockets_service_impl.cc",
       "direct_sockets/direct_sockets_service_impl.h",
-      "direct_sockets/resolve_host_and_open_socket.cc",
-      "direct_sockets/resolve_host_and_open_socket.h",
 
       # Non-Android platforms that don't presently support
       # enable_screen_capture, like Fuchsia, nevertheless compile
@@ -3210,7 +3241,7 @@ source_set("browser") {
     ]
   }
 
-  if (use_aura || is_mac) {
+  if (use_aura || is_apple) {
     sources += [
       "compositor/image_transport_factory.cc",
       "compositor/image_transport_factory.h",

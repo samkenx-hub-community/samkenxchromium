@@ -37,7 +37,6 @@ import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.when;
 
-import static org.chromium.chrome.browser.flags.ChromeFeatureList.DISCARD_OCCLUDED_BITMAPS;
 import static org.chromium.chrome.browser.flags.ChromeFeatureList.GRID_TAB_SWITCHER_FOR_TABLETS;
 import static org.chromium.chrome.browser.flags.ChromeFeatureList.TAB_GRID_LAYOUT_ANDROID;
 import static org.chromium.chrome.browser.flags.ChromeFeatureList.TAB_GROUPS_ANDROID;
@@ -116,6 +115,7 @@ import org.chromium.chrome.browser.layouts.LayoutType;
 import org.chromium.chrome.browser.night_mode.ChromeNightModeTestUtils;
 import org.chromium.chrome.browser.tasks.pseudotab.TabAttributeCache;
 import org.chromium.chrome.browser.tasks.tab_groups.TabGroupModelFilter;
+import org.chromium.chrome.browser.ui.messages.snackbar.SnackbarManager;
 import org.chromium.chrome.tab_ui.R;
 import org.chromium.chrome.test.ChromeJUnit4RunnerDelegate;
 import org.chromium.chrome.test.ChromeTabbedActivityTestRule;
@@ -145,8 +145,7 @@ import java.util.concurrent.ExecutionException;
 @CommandLineFlags.Add({ChromeSwitches.DISABLE_FIRST_RUN_EXPERIENCE})
 @Restriction({Restriction.RESTRICTION_TYPE_NON_LOW_END_DEVICE})
 @Features.EnableFeatures({TAB_GRID_LAYOUT_ANDROID, TAB_GROUPS_ANDROID,
-    TAB_GROUPS_FOR_TABLETS, GRID_TAB_SWITCHER_FOR_TABLETS, TAB_STRIP_IMPROVEMENTS,
-    DISCARD_OCCLUDED_BITMAPS})
+    TAB_GROUPS_FOR_TABLETS, GRID_TAB_SWITCHER_FOR_TABLETS, TAB_STRIP_IMPROVEMENTS})
 @DoNotBatch(reason = "crbug.com/1380489")
 public class TabGridDialogTest {
     // clang-format on
@@ -642,12 +641,14 @@ public class TabGridDialogTest {
     public void
     testDialogSelectionEditorV2_BookmarkSingleTabView() throws ExecutionException {
         final ChromeTabbedActivity cta = mActivityTestRule.getActivity();
+        SnackbarManager snackbarManager = cta.getSnackbarManager();
         createTabs(cta, false, 2);
         enterTabSwitcher(cta);
         verifyTabSwitcherCardCount(cta, 2);
 
         // Create a tab group.
         mergeAllNormalTabsToAGroup(cta);
+        TestThreadUtils.runOnUiThreadBlocking(() -> snackbarManager.dismissAllSnackbars());
         verifyTabSwitcherCardCount(cta, 1);
 
         // Open the selection editor.
@@ -681,12 +682,14 @@ public class TabGridDialogTest {
     public void
     testDialogSelectionEditorV2_BookmarkTabsView() throws ExecutionException {
         final ChromeTabbedActivity cta = mActivityTestRule.getActivity();
+        SnackbarManager snackbarManager = cta.getSnackbarManager();
         createTabs(cta, false, 2);
         enterTabSwitcher(cta);
         verifyTabSwitcherCardCount(cta, 2);
 
         // Create a tab group.
         mergeAllNormalTabsToAGroup(cta);
+        TestThreadUtils.runOnUiThreadBlocking(() -> snackbarManager.dismissAllSnackbars());
         verifyTabSwitcherCardCount(cta, 1);
 
         // Open the selection editor.

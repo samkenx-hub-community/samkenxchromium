@@ -663,11 +663,23 @@ void NativeWidgetNSWindowBridge::SetVisibilityState(
   // In headless mode the platform window is always hidden, so instead of
   // changing its visibility state just maintain a local flag to track the
   // expected visibility state and lie to the upper layer pretending the
-  // window did change its visibility state.
+  // window did change its visibility and activation state.
   if (headless_mode_window_) {
     headless_mode_window_->visibility_state =
         new_state != WindowVisibilityState::kHideWindow;
     host_->OnVisibilityChanged(headless_mode_window_->visibility_state);
+    if (new_state == WindowVisibilityState::kShowAndActivateWindow) {
+      base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
+          FROM_HERE,
+          base::BindOnce(
+              [](WeakPtrNSObject* handle) {
+                if (auto* bridge = ui::WeakPtrNSObjectFactory<
+                        NativeWidgetNSWindowBridge>::Get(handle)) {
+                  bridge->OnWindowKeyStatusChangedTo(/*is_key*/ true);
+                }
+              },
+              ns_weak_factory_.handle()));
+    }
     return;
   }
 
@@ -913,6 +925,12 @@ void NativeWidgetNSWindowBridge::EnableImmersiveFullscreen(
       ns_window(), GetFromId(fullscreen_overlay_widget_id)->ns_window(),
       std::move(callback));
   immersive_mode_controller_->Enable();
+
+  // Reveal locks can outlive immersive_mode_controller_, re-establish any
+  // outstanding locks.
+  for (int i = 0; i < immersive_fullscreen_reveal_lock_count_; ++i) {
+    immersive_mode_controller_->RevealLock();
+  }
 }
 
 void NativeWidgetNSWindowBridge::DisableImmersiveFullscreen() {
@@ -934,12 +952,15 @@ void NativeWidgetNSWindowBridge::OnTopContainerViewBoundsChanged(
 }
 
 void NativeWidgetNSWindowBridge::ImmersiveFullscreenRevealLock() {
+  ++immersive_fullscreen_reveal_lock_count_;
   if (immersive_mode_controller_) {
     immersive_mode_controller_->RevealLock();
   }
 }
 
 void NativeWidgetNSWindowBridge::ImmersiveFullscreenRevealUnlock() {
+  --immersive_fullscreen_reveal_lock_count_;
+  DCHECK(immersive_fullscreen_reveal_lock_count_ >= 0);
   if (immersive_mode_controller_) {
     immersive_mode_controller_->RevealUnlock();
   }

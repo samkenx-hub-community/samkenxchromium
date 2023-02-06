@@ -44,10 +44,33 @@ struct PlatformCredentialListDeleter {
   raw_ptr<WinWebAuthnApi> win_api_;
 };
 
+AuthenticatorSupportedOptions WinWebAuthnApiOptions(int api_version) {
+  AuthenticatorSupportedOptions options;
+  options.is_platform_device =
+      AuthenticatorSupportedOptions::PlatformDevice::kBoth;
+  options.supports_resident_key = true;
+  options.user_verification_availability = AuthenticatorSupportedOptions::
+      UserVerificationAvailability::kSupportedAndConfigured;
+  options.supports_user_presence = true;
+  options.supports_cred_protect = api_version >= WEBAUTHN_API_VERSION_2;
+  options.enterprise_attestation = api_version >= WEBAUTHN_API_VERSION_3;
+  options.supports_large_blobs = api_version >= WEBAUTHN_API_VERSION_3;
+  options.supports_min_pin_length_extension =
+      api_version >= WEBAUTHN_API_VERSION_3;
+  if (api_version >= WEBAUTHN_API_VERSION_3) {
+    // The 256-byte maximum length here is an arbitrary sanity limit. Blobs are
+    // generally 32 bytes so this is intended to be larger than any reasonable
+    // request.
+    options.max_cred_blob_length = 256;
+  }
+  return options;
+}
+
 }  // namespace
 
 // static
 void WinWebAuthnApiAuthenticator::IsUserVerifyingPlatformAuthenticatorAvailable(
+    bool is_off_the_record,
     WinWebAuthnApi* api,
     base::OnceCallback<void(bool is_available)> callback) {
   base::ThreadPool::PostTaskAndReplyWithResult(
@@ -55,14 +78,19 @@ void WinWebAuthnApiAuthenticator::IsUserVerifyingPlatformAuthenticatorAvailable(
       {base::TaskPriority::USER_VISIBLE, base::MayBlock(),
        base::TaskShutdownBehavior::CONTINUE_ON_SHUTDOWN},
       base::BindOnce(
-          [](WinWebAuthnApi* api) {
+          [](bool is_off_the_record, WinWebAuthnApi* api) {
             BOOL result;
-            return api && api->IsAvailable() &&
-                   api->IsUserVerifyingPlatformAuthenticatorAvailable(
+            if (!api || !api->IsAvailable()) {
+              return false;
+            }
+            if (is_off_the_record && api->Version() < WEBAUTHN_API_VERSION_4) {
+              return false;
+            }
+            return api->IsUserVerifyingPlatformAuthenticatorAvailable(
                        &result) == S_OK &&
                    result == TRUE;
           },
-          api),
+          is_off_the_record, api),
       std::move(callback));
 }
 
@@ -144,7 +172,9 @@ void WinWebAuthnApiAuthenticator::DeletePlatformCredential(
 WinWebAuthnApiAuthenticator::WinWebAuthnApiAuthenticator(
     HWND current_window,
     WinWebAuthnApi* win_api)
-    : current_window_(current_window), win_api_(win_api) {
+    : options_(WinWebAuthnApiOptions(win_api->Version())),
+      current_window_(current_window),
+      win_api_(win_api) {
   CHECK(win_api_->IsAvailable());
   CoCreateGuid(&cancellation_id_);
 }
@@ -249,6 +279,7 @@ void WinWebAuthnApiAuthenticator::GetAssertionDone(
 
 void WinWebAuthnApiAuthenticator::GetCredentialInformationForRequest(
     const CtapGetAssertionRequest& request,
+    const CtapGetAssertionOptions& request_options,
     base::OnceCallback<void(std::vector<DiscoverableCredentialMetadata>, bool)>
         callback) {
   // Since the Windows authenticator forwards requests to other devices such as
@@ -272,8 +303,7 @@ void WinWebAuthnApiAuthenticator::GetCredentialInformationForRequest(
   WEBAUTHN_GET_CREDENTIALS_OPTIONS options{
       .dwVersion = WEBAUTHN_GET_CREDENTIALS_OPTIONS_VERSION_1,
       .pwszRpId = base::as_wcstr(rp_id),
-      // TODO(nsatragno): plumb browser private mode status in.
-      .bBrowserInPrivateMode = false};
+      .bBrowserInPrivateMode = request_options.is_off_the_record_context};
   PWEBAUTHN_CREDENTIAL_DETAILS_LIST credentials = nullptr;
   HRESULT hresult = win_api_->GetPlatformCredentialList(&options, &credentials);
   std::unique_ptr<WEBAUTHN_CREDENTIAL_DETAILS_LIST,
@@ -339,23 +369,13 @@ bool WinWebAuthnApiAuthenticator::SupportsEnterpriseAttestation() const {
   return win_api_->Version() >= WEBAUTHN_API_VERSION_3;
 }
 
-bool WinWebAuthnApiAuthenticator::SupportsCredBlobOfSize(
-    size_t num_bytes) const {
-  return win_api_->Version() >= WEBAUTHN_API_VERSION_3;
-}
-
 bool WinWebAuthnApiAuthenticator::SupportsLargeBlobs() const {
   return win_api_->SupportsLargeBlobs();
 }
 
-const absl::optional<AuthenticatorSupportedOptions>&
-WinWebAuthnApiAuthenticator::Options() const {
-  // The request can potentially be fulfilled by any device that Windows
-  // communicates with, so returning AuthenticatorSupportedOptions really
-  // doesn't make much sense.
-  static const absl::optional<AuthenticatorSupportedOptions> no_options =
-      absl::nullopt;
-  return no_options;
+const AuthenticatorSupportedOptions& WinWebAuthnApiAuthenticator::Options()
+    const {
+  return options_;
 }
 
 base::WeakPtr<FidoAuthenticator> WinWebAuthnApiAuthenticator::GetWeakPtr() {

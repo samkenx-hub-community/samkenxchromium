@@ -14289,7 +14289,8 @@ TEST_F(LayerTreeHostImplTest,
         i == 0 ? ScrollUpdateEventMetrics::ScrollUpdateType::kStarted
                : ScrollUpdateEventMetrics::ScrollUpdateType::kContinued,
         /*delta=*/10.0f, base::TimeTicks::Now(),
-        base::TimeTicks::Now() + base::Milliseconds(1)));
+        base::TimeTicks::Now() + base::Milliseconds(1),
+        /*trace_id*/ base::IdType64<class ui::LatencyInfo>(123)));
     host_impl_->active_tree()->AppendEventsMetricsFromMainThread(
         std::move(events_metrics));
 
@@ -16770,6 +16771,9 @@ class TestRenderFrameMetadataObserver : public RenderFrameMetadataObserver {
       compositor_frame_metadata->send_frame_token_to_embedder = true;
     last_metadata_ = render_frame_metadata;
   }
+#if BUILDFLAG(IS_ANDROID)
+  void DidEndScroll() override {}
+#endif
 
   const absl::optional<RenderFrameMetadata>& last_metadata() const {
     return last_metadata_;

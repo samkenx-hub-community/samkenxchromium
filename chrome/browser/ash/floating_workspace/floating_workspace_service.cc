@@ -78,7 +78,9 @@ void FloatingWorkspaceService::InitForTest(
       InitForV1();
       break;
     case TestFloatingWorkspaceVersion::kFloatingWorkspaceV2Enabled:
-      InitForV2();
+      // For testings we don't need to add itself to observer list of
+      // DeskSyncBridge, tests can be done by calling
+      // EntriesAddedOrUpdatedRemotely directly so InitForV2 can be skipped.
       break;
   }
 }
@@ -104,7 +106,7 @@ void FloatingWorkspaceService::
     return;
   if (base::TimeTicks::Now() >
       initialization_timestamp_ +
-          ash::features::kFloatingWorkspaceMaxTimeAvaliableForRestoreAfterLogin
+          ash::features::kFloatingWorkspaceMaxTimeAvailableForRestoreAfterLogin
               .Get()) {
     // No need to restore any remote session 3 seconds (TBD) after login.
     should_run_restore_ = false;
@@ -125,7 +127,7 @@ void FloatingWorkspaceService::
         base::BindOnce(
             &FloatingWorkspaceService::TryRestoreMostRecentlyUsedSession,
             weak_pointer_factory_.GetWeakPtr()),
-        ash::features::kFloatingWorkspaceMaxTimeAvaliableForRestoreAfterLogin
+        ash::features::kFloatingWorkspaceMaxTimeAvailableForRestoreAfterLogin
             .Get());
     should_run_restore_ = false;
     return;
@@ -181,10 +183,6 @@ void FloatingWorkspaceService::InitForV2() {
   desk_sync_service_ = DeskSyncServiceFactory::GetForProfile(profile_);
   StartCaptureAndUploadActiveDesk();
   desk_sync_service_->GetDeskModel()->AddObserver(this);
-  syncer::SyncService* sync_service(
-      SyncServiceFactory::GetForProfile(profile_));
-  if (sync_service)
-    sync_service->TriggerRefresh({syncer::WORKSPACE_DESK});
 }
 
 const sync_sessions::SyncedSession*
@@ -266,12 +264,17 @@ void FloatingWorkspaceService::RestoreFloatingWorkspaceTemplate(
   if (base::TimeTicks::Now() >
       initialization_timestamp_ +
           ash::features::
-              kFloatingWorkspaceV2MaxTimeAvaliableForRestoreAfterLogin.Get()) {
+              kFloatingWorkspaceV2MaxTimeAvailableForRestoreAfterLogin.Get()) {
     // No need to restore any remote session 15 seconds (TBD) after login.
     should_run_restore_ = false;
     return;
   }
 
+  LaunchFloatingWorkspaceTemplate(desk_template);
+}
+
+void FloatingWorkspaceService::LaunchFloatingWorkspaceTemplate(
+    const DeskTemplate* desk_template) {
   DesksClient::Get()->LaunchDeskTemplate(
       desk_template->uuid(),
       base::BindOnce(&FloatingWorkspaceService::OnTemplateLaunched,

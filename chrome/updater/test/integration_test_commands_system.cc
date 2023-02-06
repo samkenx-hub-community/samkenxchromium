@@ -92,6 +92,17 @@ class IntegrationTestCommandsSystem : public IntegrationTestCommands {
     updater::test::ExpectSelfUpdateSequence(updater_scope_, test_server);
   }
 
+  void ExpectUpdateCheckSequence(
+      ScopedServer* test_server,
+      const std::string& app_id,
+      const std::string& install_data_index,
+      const base::Version& from_version,
+      const base::Version& to_version) const override {
+    updater::test::ExpectUpdateCheckSequence(updater_scope_, test_server,
+                                             app_id, install_data_index,
+                                             from_version, to_version);
+  }
+
   void ExpectUpdateSequence(ScopedServer* test_server,
                             const std::string& app_id,
                             const std::string& install_data_index,
@@ -185,11 +196,24 @@ class IntegrationTestCommandsSystem : public IntegrationTestCommands {
                {Param("exit_code", base::NumberToString(expected_exit_code))});
   }
 
+// TODO(crbug.com/1396103): remove this `#if` once mojo interface changes are
+// done in separate CL.
+#if BUILDFLAG(IS_WIN)
+  void Update(const std::string& app_id,
+              const std::string& install_data_index,
+              bool do_update_check_only) const override {
+    RunCommand("update", {Param("app_id", app_id),
+                          Param("install_data_index", install_data_index),
+                          Param("do_update_check_only",
+                                do_update_check_only ? "true" : "false")});
+  }
+#else   // BUILDFLAG(IS_WIN)
   void Update(const std::string& app_id,
               const std::string& install_data_index) const override {
     RunCommand("update", {Param("app_id", app_id),
                           Param("install_data_index", install_data_index)});
   }
+#endif  // BUILDFLAG(IS_WIN)
 
   void UpdateAll() const override { RunCommand("update_all", {}); }
 

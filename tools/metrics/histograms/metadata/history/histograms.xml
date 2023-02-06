@@ -22,6 +22,25 @@ chromium-metrics-reviews@google.com.
 
 <histograms>
 
+<variants name="ClusteringRequestSource">
+  <variant name="" summary="all requests"/>
+  <variant name=".AllKeywordCacheRefresh"
+      summary="only requests for the all-keyword-cache which occurs about
+               once every 2 hours but can vary if e.g. the user isn't
+               interacting with the omnibox"/>
+  <variant name=".NewTabPage"
+      summary="only requests for the Journeys module on load of the New Tab
+               Page"/>
+  <variant name=".ShortKeywordCacheRefresh"
+      summary="only requests for the short-keyword cache which occurs up to
+               once every 10 seconds but can vary if e.g. the user isn't
+               interacting with the omnibox"/>
+  <variant name=".WebUI"
+      summary="only requests for the Journeys WebUI within History or Side
+               Panel, either query-less or query states, both on load and on
+               scroll"/>
+</variants>
+
 <histogram name="History.AttemptedToFixProfileError" units="units"
     expires_after="2023-06-04">
   <owner>sky@chromium.org</owner>
@@ -871,20 +890,7 @@ chromium-metrics-reviews@google.com.
     <variant name="GetMostRecentPersistedClustersLatency"
         summary="persisted clusters from the history DB"/>
   </token>
-  <token key="Source">
-    <variant name="" summary="all requests"/>
-    <variant name=".AllKeywordCacheRefresh"
-        summary="only requests for the all-keyword-cache which occurs about
-                 once every 2 hours but can vary if e.g. the user isn't
-                 interacting with the omnibox"/>
-    <variant name=".ShortKeywordCacheRefresh"
-        summary="only requests for the short-keyword cache which occurs up to
-                 once every 10 seconds but can vary if e.g. the user isn't
-                 interacting with the omnibox"/>
-    <variant name=".WebUI"
-        summary="only requests for the Journeys WebUI, either query-less or
-                 query states, both on load and on scroll"/>
-  </token>
+  <token key="Source" variants="ClusteringRequestSource"/>
 </histogram>
 
 <histogram
@@ -928,9 +934,7 @@ chromium-metrics-reviews@google.com.
     <variant name="GetMostRecentPersistedClustersLatency"
         summary="persisted raw context clusters from the history DB"/>
   </token>
-  <token key="Source">
-    <variant name="" summary="all requests"/>
-  </token>
+  <token key="Source" variants="ClusteringRequestSource"/>
 </histogram>
 
 <histogram name="History.Clusters.Backend.KeywordCache.AllKeywordPhraseCount"
@@ -1378,6 +1382,17 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
+<histogram name="History.Clusters.JourneysEligibleAndEnabledAtSessionStart"
+    units="BooleanEnabled" expires_after="2023-06-18">
+  <owner>sophiechang@chromium.org</owner>
+  <owner>chrome-journeys@google.com</owner>
+  <component>UI&gt;Browser&gt;Journeys</component>
+  <summary>
+    Records whether a user that is Journeys eligible has Journeys enabled. This
+    is recorded once at the start of the session.
+  </summary>
+</histogram>
+
 <histogram name="History.Clusters.KeywordCache.Latency" units="ms"
     expires_after="2023-10-01">
   <owner>tommycli@chromium.org</owner>
@@ -1537,7 +1552,8 @@ chromium-metrics-reviews@google.com.
     <variant name="RelatedSearchClicked"
         summary="clicks a related search suggestion"/>
     <variant name="RelatedVisitsVisibilityToggled"
-        summary="toggles visibility of the default-hidden related visits"/>
+        summary="toggles visibility of the default-hidden related visits.
+                 Deprecated 1/25/23."/>
     <variant name="VisitClicked" summary="clicks a visit"/>
   </token>
 </histogram>

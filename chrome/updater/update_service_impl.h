@@ -51,10 +51,16 @@ class UpdateServiceImpl : public UpdateService {
       base::OnceCallback<void(const std::vector<AppState>&)>) override;
   void RunPeriodicTasks(base::OnceClosure callback) override;
   void UpdateAll(StateChangeCallback state_update, Callback callback) override;
+
   void Update(const std::string& app_id,
               const std::string& install_data_index,
               Priority priority,
               PolicySameVersionUpdate policy_same_version_update,
+// TODO(crbug.com/1396103): remove this `#if` once mojo interface changes are
+// done in separate CL.
+#if BUILDFLAG(IS_WIN)
+              bool do_update_check_only,
+#endif  // BUILDFLAG(IS_WIN)
               StateChangeCallback state_update,
               Callback callback) override;
   void Install(const RegistrationRequest& registration,

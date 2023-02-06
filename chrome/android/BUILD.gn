@@ -90,9 +90,9 @@ if (current_toolchain == default_toolchain) {
   app_hooks_impl = "java/src/org/chromium/chrome/browser/AppHooksImpl.java"
 
   # Exclude it from JNI registration if VR is not enabled.
-  chrome_jni_sources_exclusions = []
+  chrome_jni_file_exclusions = []
   if (!enable_vr) {
-    chrome_jni_sources_exclusions += [ "//chrome/android/features/vr/java/src/org/chromium/chrome/browser/vr/VrModuleProvider.java" ]
+    chrome_jni_file_exclusions += [ "//chrome/android/features/vr/java/src/org/chromium/chrome/browser/vr/VrModuleProvider.java" ]
   }
 
   jinja_template("chrome_public_android_manifest") {
@@ -1393,6 +1393,7 @@ if (current_toolchain == default_toolchain) {
       "//chrome/browser/android/browserservices/intents:java",
       "//chrome/browser/android/browserservices/verification:java",
       "//chrome/browser/android/crypto:java",
+      "//chrome/browser/commerce/android:java",
       "//chrome/browser/commerce/subscriptions/android:subscriptions_java",
       "//chrome/browser/contextmenu:java",
       "//chrome/browser/download/android:download_java_tests",
@@ -1513,6 +1514,7 @@ if (current_toolchain == default_toolchain) {
       "//chrome/android/features/tab_ui:java_resources",
       "//chrome/android/features/tab_ui:tab_suggestions_java",
       "//chrome/android/features/tab_ui:test_support_javalib",
+      "//chrome/android/features/tab_ui/public:java",
       "//chrome/android/webapk/libs/client:client_java",
       "//chrome/android/webapk/libs/common:common_java",
       "//chrome/android/webapk/libs/runtime_library:webapk_service_aidl_java",
@@ -2124,8 +2126,14 @@ if (current_toolchain == default_toolchain) {
 
   generate_jni_registration("chrome_jni_registration") {
     targets = [ ":chrome_public_base_module_java" ]
+    if (enable_vr) {
+      targets += [ "//chrome/android/features/vr:java" ]
+    }
     manual_jni_registration = true
-    sources_exclusions = chrome_jni_sources_exclusions
+    file_exclusions = chrome_jni_file_exclusions
+    if (allow_jni_multiplexing) {
+      enable_jni_multiplexing = true
+    }
   }
 
   # The test apks do not use chromium linker, but using manual JNI registration
@@ -2133,8 +2141,28 @@ if (current_toolchain == default_toolchain) {
   generate_jni_registration("chrome_jni_for_test_registration") {
     testonly = true
     targets = [ ":chrome_public_base_module_java_for_test" ]
+    if (enable_vr) {
+      targets += [ "//chrome/android/features/vr:java" ]
+    }
     manual_jni_registration = true
-    sources_exclusions = chrome_jni_sources_exclusions
+    file_exclusions = chrome_jni_file_exclusions
+    if (allow_jni_multiplexing) {
+      enable_jni_multiplexing = true
+    }
+  }
+
+  if (allow_jni_multiplexing) {
+    generate_jni_registration("monochrome_jni_registration") {
+      targets = [
+        ":monochrome_java",
+        ":chrome_all_java",
+      ]
+      if (enable_vr) {
+        targets += [ "//chrome/android/features/vr:java" ]
+      }
+      file_exclusions = chrome_jni_file_exclusions
+      enable_jni_multiplexing = true
+    }
   }
 
   # This template instantiates targets responsible for generating pak
@@ -4004,6 +4032,9 @@ template("libchrome_impl") {
   chrome_common_shared_library(target_name) {
     sources = [ "../browser/android/chrome_entry_point.cc" ]
     deps = [ ":chrome_jni_registration($default_toolchain)" ]
+    if (allow_jni_multiplexing) {
+      enable_jni_multiplexing = true
+    }
     if (defined(invoker.deps)) {
       deps += invoker.deps
     }
@@ -4061,6 +4092,9 @@ chrome_common_shared_library("libchromefortest") {
   if (enable_vr) {
     deps += [ "//chrome/browser/android/vr:test_support" ]
   }
+  if (allow_jni_multiplexing) {
+    enable_jni_multiplexing = true
+  }
 
   # Make this a partitioned library, since some partitioned code is linked in
   # (otherwise, the library will warn at build time that it contains multiple
@@ -4083,9 +4117,16 @@ template("libmonochrome_apk_or_bundle_tmpl") {
       deps += invoker.deps
     }
 
+    defines = []
     if (webview_includes_weblayer) {
-      defines = [ "WEBVIEW_INCLUDES_WEBLAYER" ]
+      defines += [ "WEBVIEW_INCLUDES_WEBLAYER" ]
       deps += [ "//weblayer:weblayer_lib" ]
+    }
+
+    if (allow_jni_multiplexing) {
+      defines += [ "JNI_REGISTRATION_REQUIRED" ]
+      deps += [ ":monochrome_jni_registration($default_toolchain)" ]
+      enable_jni_multiplexing = true
     }
 
     if (enable_vr) {

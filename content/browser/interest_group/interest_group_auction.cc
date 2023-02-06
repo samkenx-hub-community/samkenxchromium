@@ -27,6 +27,7 @@
 #include "base/strings/escape.h"
 #include "base/strings/strcat.h"
 #include "base/strings/string_number_conversions.h"
+#include "base/strings/stringprintf.h"
 #include "base/task/sequenced_task_runner.h"
 #include "base/time/time.h"
 #include "base/trace_event/trace_event.h"
@@ -373,6 +374,7 @@ class InterestGroupAuction::BuyerHelper
 
   void OnBiddingSignalsReceived(
       const base::flat_map<std::string, double>& priority_vector,
+      base::TimeDelta trusted_signals_fetch_duration,
       base::OnceClosure resume_generate_bid_callback) override {
     BidState* state = generate_bid_client_receiver_set_.current_context();
     absl::optional<double> new_priority;
@@ -403,6 +405,7 @@ class InterestGroupAuction::BuyerHelper
                      auction_worklet::mojom::PrioritySignalsDoublePtr>
           update_priority_signals_overrides,
       PrivateAggregationRequests pa_requests,
+      base::TimeDelta bidding_duration,
       const std::vector<std::string>& errors) override {
     OnGenerateBidCompleteInternal(
         generate_bid_client_receiver_set_.current_context(),
@@ -678,6 +681,8 @@ class InterestGroupAuction::BuyerHelper
     auction_worklet::mojom::KAnonymityBidMode kanon_mode =
         auction_->kanon_mode();
     bid_state->kanon_render_urls = ComputeKAnon(*bid_state->bidder, kanon_mode);
+    bid_state->worklet_handle->AuthorizeSubresourceUrls(
+        *auction_->subresource_url_builder_);
     bid_state->worklet_handle->GetBidderWorklet()->BeginGenerateBid(
         auction_worklet::mojom::BidderWorkletNonSharedParams::New(
             interest_group.name,
@@ -729,7 +734,7 @@ class InterestGroupAuction::BuyerHelper
     }
 
     bid_state->bid_finalizer->FinishGenerateBid(
-        auction_->config_->non_shared_params.auction_signals.maybe_json(),
+        auction_->config_->non_shared_params.auction_signals.value(),
         GetPerBuyerSignals(*auction_->config_,
                            bid_state->bidder->interest_group.owner),
         auction_->PerBuyerTimeout(bid_state));
@@ -1338,7 +1343,11 @@ void InterestGroupAuction::StartBiddingAndScoringPhase(
 
 std::unique_ptr<InterestGroupAuctionReporter>
 InterestGroupAuction::CreateReporter(
-    std::unique_ptr<blink::AuctionConfig> auction_config) {
+    std::unique_ptr<blink::AuctionConfig> auction_config,
+    const url::Origin& frame_origin,
+    network::mojom::ClientSecurityStatePtr client_security_state,
+    scoped_refptr<network::SharedURLLoaderFactory> url_loader_factory,
+    blink::InterestGroupSet interest_groups_that_bid) {
   DCHECK(!load_interest_groups_phase_callback_);
   DCHECK(!bidding_and_scoring_phase_callback_);
   DCHECK_EQ(*final_auction_result_, AuctionResult::kSuccess);
@@ -1374,6 +1383,16 @@ InterestGroupAuction::CreateReporter(
   winning_bid_info.bid_duration = winner->bid->bid_duration;
   winning_bid_info.bidding_signals_data_version =
       winner->bid->bidding_signals_data_version;
+  if (winner->bid->bid_ad->metadata) {
+    //`metadata` is already in JSON so no quotes are needed.
+    winning_bid_info.ad_metadata =
+        base::StringPrintf(R"({"render_url":"%s","metadata":%s})",
+                           winner->bid->render_url.spec().c_str(),
+                           winner->bid->bid_ad->metadata.value().c_str());
+  } else {
+    winning_bid_info.ad_metadata = base::StringPrintf(
+        R"({"render_url":"%s"})", winner->bid->render_url.spec().c_str());
+  }
 
   InterestGroupAuctionReporter::SellerWinningBidInfo
       top_level_seller_winning_bid_info;
@@ -1424,11 +1443,19 @@ InterestGroupAuction::CreateReporter(
             ->Clone();
   }
 
+  std::vector<GURL> debug_win_report_urls;
+  std::vector<GURL> debug_loss_report_urls;
+  TakeDebugReportUrlsAndFillInPrivateAggregationRequests(
+      debug_win_report_urls, debug_loss_report_urls);
+
   return std::make_unique<InterestGroupAuctionReporter>(
-      auction_worklet_manager_, std::move(auction_config),
-      std::move(winning_bid_info), std::move(top_level_seller_winning_bid_info),
+      interest_group_manager_, auction_worklet_manager_,
+      std::move(auction_config), frame_origin, std::move(client_security_state),
+      std::move(url_loader_factory), std::move(winning_bid_info),
+      std::move(top_level_seller_winning_bid_info),
       std::move(component_seller_winning_bid_info),
-      TakePrivateAggregationRequests());
+      std::move(interest_groups_that_bid), std::move(debug_win_report_urls),
+      std::move(debug_loss_report_urls), TakePrivateAggregationRequests());
 }
 
 void InterestGroupAuction::NotifyConfigPromisesResolved() {
@@ -2021,7 +2048,7 @@ void InterestGroupAuction::RequestSellerWorklet() {
                                     *trace_id_);
   if (auction_worklet_manager_->RequestSellerWorklet(
           config_->decision_logic_url, config_->trusted_scoring_signals_url,
-          *subresource_url_builder_, config_->seller_experiment_group_id,
+          config_->seller_experiment_group_id,
           base::BindOnce(&InterestGroupAuction::OnSellerWorkletReceived,
                          base::Unretained(this)),
           base::BindOnce(&InterestGroupAuction::OnSellerWorkletFatalError,
@@ -2196,6 +2223,7 @@ void InterestGroupAuction::ScoreBidIfReady(std::unique_ptr<Bid> bid) {
   score_ad_receivers_.Add(
       this, score_ad_remote.InitWithNewPipeAndPassReceiver(), std::move(bid));
   DCHECK_EQ(0, config_->non_shared_params.NumPromises());
+  seller_worklet_handle_->AuthorizeSubresourceUrls(*subresource_url_builder_);
   seller_worklet_handle_->GetSellerWorklet()->ScoreAd(
       bid_raw->ad_metadata, bid_raw->bid, config_->non_shared_params,
       GetDirectFromSellerSellerSignals(*subresource_url_builder_),
@@ -2602,9 +2630,9 @@ bool InterestGroupAuction::RequestBidderWorklet(
   return auction_worklet_manager_->RequestBidderWorklet(
       interest_group.bidding_url.value_or(GURL()),
       interest_group.bidding_wasm_helper_url,
-      interest_group.trusted_bidding_signals_url, *subresource_url_builder_,
-      experiment_group_id, std::move(worklet_available_callback),
-      std::move(fatal_error_callback), bid_state.worklet_handle);
+      interest_group.trusted_bidding_signals_url, experiment_group_id,
+      std::move(worklet_available_callback), std::move(fatal_error_callback),
+      bid_state.worklet_handle);
 }
 
 }  // namespace content

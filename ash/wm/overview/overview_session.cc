@@ -227,9 +227,7 @@ void OverviewSession::Init(const WindowList& windows,
 
     // Do not animate if there is any window that is being dragged in the
     // grid.
-    if (enter_exit_overview_type_ == OverviewEnterExitType::kImmediateEnter ||
-        enter_exit_overview_type_ ==
-            OverviewEnterExitType::kImmediateEnterWithoutFocus) {
+    if (ShouldEnterWithoutAnimations()) {
       overview_grid->PositionWindows(/*animate=*/false);
     } else {
       // Exit only types should not appear here:
@@ -1110,6 +1108,12 @@ bool OverviewSession::WillShowSavedDeskLibrary() const {
                             : grid_list_.front()->WillShowSavedDeskLibrary();
 }
 
+bool OverviewSession::ShouldEnterWithoutAnimations() const {
+  return enter_exit_overview_type_ == OverviewEnterExitType::kImmediateEnter ||
+         enter_exit_overview_type_ ==
+             OverviewEnterExitType::kImmediateEnterWithoutFocus;
+}
+
 void OverviewSession::UpdateAccessibilityFocus() {
   if (is_shutting_down())
     return;
@@ -1335,8 +1339,9 @@ void OverviewSession::OnKeyEvent(ui::KeyEvent* event) {
     }
     case ui::VKEY_Z: {
       // Ctrl + Z undos a close all operation if the toast has not yet expired.
-      if (!is_control_down || !features::IsDesksCloseAllEnabled())
+      if (!is_control_down) {
         return;
+      }
 
       DesksController::Get()->MaybeCancelDeskRemoval();
       break;
