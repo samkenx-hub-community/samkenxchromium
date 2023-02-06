@@ -618,23 +618,22 @@ void SystemNotificationManager::HandleIOTaskProgress(
   std::string id = base::StrCat(
       {kSwaFileOperationPrefix, base::NumberToString(status.task_id)});
 
-  // If there are any SWA windows open, we remove the progress in system
-  // notification.
+  // If there are any SWA windows open, remove the IOTask progress from system
+  // notifications.
   if (!status.show_notification || DoFilesSwaWindowsExist()) {
-    GetNotificationDisplayService()->Close(NotificationHandler::Type::TRANSIENT,
-                                           id);
+    Dismiss(id);
     return;
   }
 
+  // If the IOTask state has completed, remove the IOTask progress from system
+  // notifications.
   if (status.IsCompleted()) {
-    GetNotificationDisplayService()->Close(NotificationHandler::Type::TRANSIENT,
-                                           id);
+    Dismiss(id);
     return;
   }
 
   // From here state is kQueued or kInProgress:
-  std::u16string title = l10n_util::GetStringUTF16(IDS_FILEMANAGER_APP_NAME);
-
+  std::u16string title = app_name_;
   std::u16string message = GetIOTaskMessage(profile_, status);
 
   int progress = 0;
