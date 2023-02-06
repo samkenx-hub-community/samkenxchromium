@@ -1500,6 +1500,7 @@ crbug.com/1396218 fragmentation/table-overlapping-rowspan.html [ Failure ]
 
 ### Tests failing with LayoutNGFlexFragmentation enabled:
 crbug.com/1367912 external/wpt/css/css-break/flexbox/multi-line-row-flex-fragmentation-058.html [ Failure ]
+crbug.com/1413089 external/wpt/css/css-break/flexbox/multi-line-row-flex-fragmentation-063-print.html [ Failure ]
 crbug.com/1367912 external/wpt/css/css-break/flexbox/single-line-column-flex-fragmentation-043.html [ Failure ]
 crbug.com/1225630 fast/multicol/flexbox/doubly-nested-with-zero-width-flexbox-and-forced-break-crash.html [ Skip Timeout ]
 
@@ -2977,7 +2978,8 @@ crbug.com/webrtc/10567 external/wpt/webrtc/RTCRtpParameters-encodings.html [ Fai
 crbug.com/webrtc/10567 external/wpt/webrtc/simulcast/setParameters-encodings.https.html [ Failure Pass ]
 
 # ====== New tests from wpt-importer added here ======
-crbug.com/626703 external/wpt/css/css-break/flexbox/multi-line-row-flex-fragmentation-063-print.html [ Failure ]
+crbug.com/626703 external/wpt/css/css-images/image-set/image-set-type-unsupported-rendering-2.html [ Failure ]
+crbug.com/626703 external/wpt/css/css-images/image-set/image-set-type-unsupported-rendering.html [ Failure ]
 crbug.com/626703 external/wpt/css/css-counter-styles/counter-style-at-rule/descriptor-prefix.html [ Failure ]
 crbug.com/626703 external/wpt/css/css-counter-styles/counter-style-at-rule/fallback-cycle.html [ Failure ]
 crbug.com/626703 external/wpt/css/css-counter-styles/counter-style-at-rule/suffix-fallback.html [ Failure ]
@@ -5258,8 +5260,6 @@ crbug.com/1215390 [ Linux ] external/wpt/pointerevents/pointerevent_pointerId_sc
 crbug.com/1237640 http/tests/inspector-protocol/network/disabled-cache-navigation.js [ Pass Timeout ]
 crbug.com/1239175 http/tests/navigation/same-and-different-back.html [ Failure Pass ]
 crbug.com/1239164 http/tests/inspector-protocol/network/navigate-iframe-in2in.js [ Failure Pass ]
-crbug.com/1237909 [ Mac11-arm64 Release ] external/wpt/webrtc-svc/RTCRtpParameters-scalability-h264.html [ Crash Pass Timeout ]
-crbug.com/1237909 [ Mac12-arm64 Release ] external/wpt/webrtc-svc/RTCRtpParameters-scalability-h264.html [ Crash Pass Timeout ]
 
 # Sheriff 2021-08-19
 crbug.com/1234315 [ Mac ] virtual/threaded/external/wpt/animation-worklet/worklet-animation-with-scroll-timeline-and-overflow-hidden.https.html [ Failure Timeout ]
@@ -6908,3 +6908,6 @@ crbug.com/1289550 fast/block/float/4145535-crash.html [ Failure Pass ]
 
 # TODO(crbug.com/1411508) Investigate the flake and enable again.
 crbug.com/1411508 external/wpt/performance-timeline/not-restored-reasons/performance-navigation-timing-attributes.tentative.window.html [ Failure Pass ]
+
+# Sheriff 2023-02-06
+crbug.com/1413112 [ Mac10.15 ] virtual/reduce-accept-language/http/tests/inspector-protocol/network/navigate-iframe-in2out.js [ Failure ]

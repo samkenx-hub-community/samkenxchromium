@@ -432,6 +432,8 @@ enum class ToolbarKind {
   id<SnackbarCommands> _snackbarCommandsHandler;
   id<ApplicationCommands> _applicationCommandsHandler;
   id<BrowserCoordinatorCommands> _browserCoordinatorCommandsHandler;
+  id<FindInPageCommands> _findInPageCommandsHandler;
+  id<ToolbarCommands> _toolbarCommandsHandler;
   absl::optional<ToolbarKind> _nextToolbarToPresent;
   CredentialProviderPromoCoordinator* _credentialProviderPromoCoordinator;
 }
@@ -790,6 +792,9 @@ enum class ToolbarKind {
       HandlerForProtocol(_dispatcher, ApplicationCommands);
   _browserCoordinatorCommandsHandler =
       HandlerForProtocol(_dispatcher, BrowserCoordinatorCommands);
+  _findInPageCommandsHandler =
+      HandlerForProtocol(_dispatcher, FindInPageCommands);
+  _toolbarCommandsHandler = HandlerForProtocol(_dispatcher, ToolbarCommands);
 
   // SnackbarCoordinator is not created yet and therefore not dispatching
   // SnackbarCommands.
@@ -822,6 +827,9 @@ enum class ToolbarKind {
       _applicationCommandsHandler;
   _viewControllerDependencies.browserCoordinatorCommandsHandler =
       _browserCoordinatorCommandsHandler;
+  _viewControllerDependencies.findInPageCommandsHandler =
+      _findInPageCommandsHandler;
+  _viewControllerDependencies.toolbarCommandsHandler = _toolbarCommandsHandler;
 }
 
 - (void)updateViewControllerDependencies {
@@ -875,6 +883,8 @@ enum class ToolbarKind {
   _viewControllerDependencies.snackbarCommandsHandler = nil;
   _viewControllerDependencies.applicationCommandsHandler = nil;
   _viewControllerDependencies.browserCoordinatorCommandsHandler = nil;
+  _viewControllerDependencies.findInPageCommandsHandler = nil;
+  _viewControllerDependencies.toolbarCommandsHandler = nil;
 
   [_bookmarksCoordinator shutdown];
   _bookmarksCoordinator = nil;
