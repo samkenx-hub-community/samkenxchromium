@@ -22,6 +22,7 @@ ChromeVoxBackgroundTest = class extends ChromeVoxE2ETest {
     await importModule(
         'BrailleCommandHandler',
         '/chromevox/background/braille/braille_command_handler.js');
+    await importModule('ChromeVox', '/chromevox/background/chromevox.js');
     await importModule(
         'ChromeVoxRange', '/chromevox/background/chromevox_range.js');
     await importModule(
@@ -1305,19 +1306,19 @@ AX_TEST_F('ChromeVoxBackgroundTest', 'ForceClickInPageLinks', async function() {
 // Note: this test needs the test server running because the browser
 // does not follow same-page links on data urls (because it modifies the
 // url fragment, and any change to the url is disallowed for a data url).
-// crbug.com/1356181 Disable due to flaky.
 AX_TEST_F(
-    'ChromeVoxBackgroundTestWithTestServer',
-    'DISABLED_InPageLinks', async function() {
+    'ChromeVoxBackgroundTestWithTestServer', 'InPageLinks', async function() {
       const mockFeedback = this.createMockFeedback();
       const root = await this.runWithLoadedTree(undefined, {
         url: `${
             testRunnerParams
                 .testServerBaseUrl}accessibility/in_page_links.html`,
       });
+      const link = root.find({role: RoleType.LINK});
       mockFeedback.call(doCmd('nextObject'))
           .expectSpeech('Jump', 'Internal link')
-          .call(press(KeyCode.RETURN))
+          // Use doDefault instead of press(KeyCode.RETURN) to avoid flakes.
+          .call(doDefault(link))
           .expectSpeech('Found It')
           .call(doCmd('nextHeading'))
           .expectSpeech('Continue Here', 'Heading 2');

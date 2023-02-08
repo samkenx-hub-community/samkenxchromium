@@ -944,6 +944,7 @@ Esta política no tiene efecto si la opción para conservar los datos de navegac
 <translation id="1883274744253492031">Habilitar la actualización automática de contenido mixto</translation>
 <translation id="1885782360784839335">Permitir que se muestre el contenido promocional en la pestaña completa</translation>
 <translation id="1888871729456797026">El token de inscripción de la política de nube en computadoras de escritorio</translation>
+<translation id="1890850749633603276">Restablecer el comportamiento permisivo de <ph name="WEBVIEW_TAG_NAME" /> de las apps de Chrome</translation>
 <translation id="1893271062894546361">Si habilitas esta política, la IU de los controles de reproducción de contenido multimedia estará disponible en las sesiones de <ph name="PRODUCT_NAME" /> que inicien otros dispositivos en la red local.
 
       Si no estableces esta política para los usuarios empresariales o la inhabilitas, la IU de los controles de reproducción de contenido multimedia no estará disponible en las sesiones de <ph name="PRODUCT_NAME" /> que inicien otros dispositivos en la red local.
@@ -1183,23 +1184,6 @@ Esta política no tendrá ningún efecto si estableces la política <ph name="DE
 <translation id="20838788335877967">Inhabilitar la generación de informes sobre la identificación de usuarios</translation>
 <translation id="208566302163036794">Bloquea las funciones inhabilitadas</translation>
 <translation id="208623333578980446">Permite los bloqueos de activación de pantalla para la administración de energía</translation>
-<translation id="2087277084358676117">Esta política se puede usar de manera temporal para habilitar la compatibilidad con la
-API de PPB_VideoDecoder(Dev) de forma automática.
-
-Si no la estableces o la inhabilitas, el navegador decidirá
-si la API es compatible.
-Si la habilitas, se admitirá la API.
-
-Esta política se puede usar en caso de que la eliminación continua de la compatibilidad con esta API
-muestre problemas. Si tienes que utilizar la política, informa un error en crbug.com
-en el que expliques tu caso de uso y agrega a {blundell, vasilyt}@chromium.org en el campo CC. La política está
-programada para estar vigente hasta la versión 114 de <ph name="PRODUCT_NAME" />,
-después de lo cual se planea quitar la compatibilidad con esta API
-de forma incondicional.
-
-NOTA: Cuando se cambia el valor de la política, las pestañas nuevas obtienen el
-valor nuevo. Las pestañas existentes deberán cerrarse y volverse a abrir para obtener el
-valor nuevo.</translation>
 <translation id="2089541797660774692">Habilitar los informes en la nube de navegadores administrados</translation>
 <translation id="2090939118981888335">Si habilitas la política, se activará el proxy de compresión de datos. Si la inhabilitas, se desactivará el proxy.
 
@@ -3038,6 +3022,14 @@ Si no estableces esta política, o la lista no contiene referencias de imagen v�
       Si no se establece esta política, los usuarios administrados por empresas no podrán usar la configuración predeterminada, pero los usuarios no administrados sí podrán usarla.</translation>
 <translation id="3791179836066841809">Documentación para la política</translation>
 <translation id="3791556154364029875">Habilitar Floating Workspace y abrir ventanas del navegador remotas al acceder</translation>
+<translation id="3793998702484455655">Chrome intentará actualizar algunos tipos de subrecursos con contenido mixto (HTTP en un sitio HTTPS) en iOS.
+Para obtener más información, consulta https://chromium.googlesource.com/chromium/src/+/main/docs/security/autoupgrade-mixed.md.
+
+La función estará habilitada de forma predeterminada. Si habilitas la política o no la estableces, la función estará habilitada.
+
+Si la inhabilitas, se inhabilitará la función.
+
+Esta política es una solución temporal y se quitará en algunos momentos importantes (se prevé quitarla en la versión M113 de manera provisoria).</translation>
 <translation id="3795413481405077588">Esta política permite que un administrador especifique la configuración para las aplicaciones web instaladas.
 
       Esta política asigna una ID de aplicación web a su parámetro de configuración específico. Es posible establecer una configuración predeterminada usando la ID especial <ph name="DEFAULT_SCOPE" />, que se aplicará a todas las aplicaciones web que no tengan una configuración personalizada en esta política.
@@ -3890,6 +3882,7 @@ Se planea quitar esta política en la versión 113 de <ph name="PRODUCT_NAME" />
       Nota: Esta configuración anulará <ph name="REMOTE_ACCESS_HOST_CLIENT_DOMAIN_POLICY_NAME" />, si se aplica.</translation>
 <translation id="4658380868451934335">Habilitar el dictado en la pantalla de acceso</translation>
 <translation id="4660356908994631271">Mostrar el botón de Google Lens en el cuadro de búsqueda de la página Nueva pestaña</translation>
+<translation id="4661885151480410620">Aplicar cambios de comportamiento según el proceso de lanzamiento de funciones</translation>
 <translation id="4661889655253181651">La configuración del contenido permite especificar de qué manera se manipulará el contenido de un tipo específico (por ejemplo, cookies, imágenes o JavaScript).</translation>
 <translation id="4663509616441994711">Inhabilitar la combinación de políticas de nube destinadas a los usuarios</translation>
 <translation id="4663588423815449593">Forzar a <ph name="PEPPER_NAME" /> a usar el decodificador de video heredado</translation>
@@ -4757,6 +4750,10 @@ Si la inhabilitas o no la estableces, el restablecimiento completo de la configu
       Cuando se establece el valor de esta política y este no es 0, la sesión del usuario que haya accedido en ese momento en el modo de demostración se cerrará automáticamente una vez transcurrido el período de inactividad especificado.
 
       El valor de la política se debe especificar en milisegundos.</translation>
+<translation id="5501031245538651575">A partir de M110, se quitará la API no estándar de window.webkitStorageInfo. Esta política vuelve a habilitar la API.
+Si habilitas esta política, la API de window.webkitStorageInfo estará disponible.
+Si la inhabilitas o no la estableces, la API de window.webkitStorageInfo no estará disponible.
+Esto se quitó en M112.</translation>
 <translation id="5502683401545256109">Esta política controla si se le solicita al usuario que seleccione un certificado de cliente en la pantalla de acceso del marco que aloja el flujo de SAML cuando más de un certificado coincide con <ph name="DEVICE_LOGIN_SCREEN_AUTO_SELECT_CERTIFICATE_FOR_URLS_POLICY_NAME" />.
       Si habilitas esta política, se le pedirá al usuario que seleccione el certificado de cliente cada vez que la política de selección automática coincida con múltiples certificados.
       Si inhabilitas esta política o no la estableces, no se le solicitará nunca al usuario que seleccione un certificado de cliente en la pantalla de acceso.
@@ -5330,6 +5327,7 @@ Si ninguna de las entradas tiene un valor de <ph name="CHROMEOS_VERSION_PROPERTY
       4: Bloquear los archivos maliciosos detectados por el servidor de Navegación segura, pero no los tipos de archivos peligrosos (recomendado)
 
       Nota: Estas restricciones se aplican a las descargas que se inician desde el contenido de páginas web o con la opción "Descargar vínculo" del menú. No se aplican a la acción de descargar la página que se muestra actualmente ni a la opción para guardar como PDF desde las opciones de impresión. Obtén más información sobre la Navegación segura ( https://developers.google.com/safe-browsing ).</translation>
+<translation id="6118226055960302400">Restablecer el comportamiento permisivo</translation>
 <translation id="6119207979839638596">Se quitó esta política en M75 después de que se quitara la política de la versión máx. de TLS de <ph name="PRODUCT_NAME" />.
 
       Si no se configura esta política, <ph name="PRODUCT_NAME" /> usará la versión máxima predeterminada.
@@ -5523,16 +5521,6 @@ Para obtener más información, consulta https://developer.chrome.com/blog/immut
       Ten en cuenta que se anunció que esta política se quitaría en la versión 82 de <ph name="PRODUCT_NAME" />, pero se quitó en la versión 84.</translation>
 <translation id="6276087670023098167">Inhabilitar los informes sobre la identificación de máquinas</translation>
 <translation id="627672037430076089">No permitir las conexiones de asistencia remota a esta máquina</translation>
-<translation id="6277043520666738324">Esta política controla si los complementos de <ph name="PEPPER_NAME" /> pueden usar el nuevo decodificador para comunicarse con los decodificadores de hardware en lugar del decodificador de video heredado.
-
-La migración solo afecta los detalles de implementación internos y no debe
-cambiar ningún comportamiento. Sin embargo, esta política se puede usar en caso de que las aplicaciones PPAPI
-no funcionen como se espera.
-
-Si no estableces la política o la habilitas, el navegador decidirá
-qué implementación se utiliza.
-Si la inhabilitas, el navegador usará la implementación anterior
-hasta que esta política venza.</translation>
 <translation id="6277314550042130537">Utilizar la aprobación de la política de KDC durante la autenticación de HTTP</translation>
 <translation id="6278428485366576908">Tema</translation>
 <translation id="6279722058145292462">Si estableces la política, se especificará la frecuencia (expresada en días) con la que un cliente cambia la contraseña de la cuenta de máquina. El cliente genera la contraseña de forma aleatoria, y el usuario no puede verla. Si inhabilitas esta política o la estableces en una cantidad alta de días, la seguridad puede verse afectada de forma negativa porque los potenciales atacantes tendrán más tiempo para encontrar y usar la contraseña de la cuenta de máquina.
@@ -6442,23 +6430,6 @@ Si se selecciona "U2F_EXTENDED", el segundo factor integrado proporcionará func
       Si se establece como obligatoria, los usuarios no podrán cambiarla ni anularla.
 
       Si no la estableces, se ubicará la biblioteca de forma predeterminada en la parte inferior de la pantalla y el usuario podrá cambiar su posición.</translation>
-<translation id="7037853989942016900">Esta política controla la refactorización reciente de las APIs de Graphics3D en el complemento PPAPI.
-
-La migración solo afecta los detalles de implementación internos y no debe
-cambiar ningún comportamiento. Sin embargo, esta política se puede usar en caso de que las aplicaciones PPAPI
-no funcionen como se espera.
-
-Si no estableces la política o la habilitas, el navegador decidirá
-qué implementación se utiliza.
-Si la inhabilitas, el navegador usará la implementación anterior
-hasta que la política venza.
-
-Si tienes que utilizar la política, informa un error en crbug.com en el que expliques tu
-caso de uso. La política está programada para ofrecerse a través de la versión 114 de <ph name="PRODUCT_NAME" />, después de lo cual
-se quitará la implementación anterior.
-
-NOTA: Solo los procesos del renderizado recién iniciado reflejarán los cambios de esta
-política mientras se esté ejecutando el navegador.</translation>
 <translation id="7039815268521168329">Mostrar el flujo de Voice Match de Asistente de Google durante la configuración inicial</translation>
 <translation id="7040229947030068419">Valor de ejemplo:</translation>
 <translation id="7044883996351280650">Controlar el servicio de restablecimiento y copias de seguridad</translation>
@@ -6707,6 +6678,35 @@ política mientras se esté ejecutando el navegador.</translation>
 
       En <ph name="MAC_OS_NAME" />, esta política no tendrá efecto si la política <ph name="CHROME_ROOT_STORE_ENABLED_POLICY_NAME" /> se estableció como falsa.</translation>
 <translation id="7278854311116092134">Nombres de hosts de mensajería nativa que deben excluirse de la lista de elementos bloqueados</translation>
+<translation id="7287869314269886809">La <ph name="WEBVIEW_TAG_NAME" /> de las apps de Chrome permite
+un comportamiento que se está quitando de
+<ph name="PRODUCT_NAME" />.
+
+El comportamiento anterior mostraba una página intersticial cuando una
+<ph name="WEBVIEW_TAG_NAME" /> navegaba a una página
+con un certificado SSL no válido. Esta página intersticial le da al usuario la opción
+de continuar de forma no segura. El comportamiento nuevo muestra una página de error sin la opción
+de continuar de forma no segura.
+
+El comportamiento anterior también permite el
+evento <ph name="NEWWINDOW_EVENT_NAME" /> de
+<ph name="WEBVIEW_TAG_NAME" />
+(https://developer.chrome.com/docs/extensions/reference/webviewTag/#event-newwindow)
+para adjuntar la ventana nueva a un elemento de <ph name="WEBVIEW_TAG_NAME" />
+en una ventana independiente de la app de la <ph name="WEBVIEW_TAG_NAME" />
+de origen. Con el nuevo comportamiento, este
+elemento adjunto sigue permitido; sin embargo, la referencia de la ventana que se muestra de la
+llamada a <ph name="WINDOW_OPEN_NAME" /> en la <ph name="WEBVIEW_TAG_NAME" />
+de origen no es válida.
+
+Si la habilitas, se usa el comportamiento anterior.
+Si la inhabilitas o no la estableces, el cambio de comportamiento tendrá efecto a medida
+que se implementa a través del proceso de lanzamiento
+de <ph name="PRODUCT_NAME" />.
+
+Esta política es una solución temporal por si las empresas
+experimentan fallas debido a estos cambios. Esta política se quitará
+en una versión futura.</translation>
 <translation id="7291084543582732020">Cuando se habilita esta configuración, los usuarios pueden usar Smart Lock si se satisfacen los requisitos de la función.
 
       Si se inhabilita esta configuración, los usuarios no podrán usar Smart Lock.
@@ -7035,52 +7035,6 @@ Esto reemplaza la política <ph name="WINDOW_PLACEMENT_BLOCKED_FOR_URLS_POLICY_N
 
       Si inhabilitas la política, cuando los usuarios realicen acciones que generen un diálogo de selección de archivos, como importar favoritos, subir archivos o guardar vínculos, se mostrará en su lugar un mensaje. Se considerará como si el usuario hubiera hecho clic en Cancelar en el diálogo de selección de archivos.</translation>
 <translation id="7638300388094655454">Google Cast</translation>
-<translation id="7638726624761352254">Si estableces la política, se especificará una lista de apps web que se instalan de manera silenciosa, sin la interacción del usuario, y que este no podrá desinstalar ni desactivar.
-
-      Cada elemento de la lista de la política es un objeto con un miembro obligatorio:
-      <ph name="URL_LABEL" /> (la URL de la app web que se instalará)
-
-      y 6 miembros opcionales:
-      - <ph name="DEFAULT_LAUNCH_CONTAINER_LABEL" />
-      (establece la manera en la que se abrirá la app web; la opción predeterminada es una nueva pestaña)
-
-      - <ph name="CREATE_DESKTOP_SHORTCUT_LABEL" />
-      (verdadero, si se crean accesos directos de escritorio para <ph name="LINUX_OS_NAME" /> y
-      <ph name="MS_WIN_NAME" />).
-
-      - <ph name="FALLBACK_APP_NAME_LABEL" />
-      (A partir de la versión 90 de <ph name="PRODUCT_NAME" />,
-      te permite anular el nombre de la app si no es una
-      app web progresiva [AWP], o el nombre de la app instalada
-      temporalmente si es una AWP, pero se requiere autenticación para que la
-      instalación pueda completarse. Si se proporcionan
-      <ph name="CUSTOM_NAME_LABEL" /> y
-      <ph name="FALLBACK_APP_NAME_LABEL" />,
-      se ignorará este último).
-
-      - <ph name="OVERRIDE_APP_NAME_LABEL" />
-      (A partir de la versión 99 de <ph name="PRODUCT_OS_NAME" />,
-      y la versión 111 en los demás sistemas operativos, te permite
-      anular de forma permanente el nombre de la app para todas las apps web y AWP).
-
-      - <ph name="CUSTOM_ICON_LABEL" />
-      (A partir de la versión 99 de<ph name="PRODUCT_OS_NAME" />,
-      y la versión 111 en los demás sistemas operativos, te permite
-      anular el ícono de las apps instaladas. Los íconos deben tener forma cuadrada,
-      un tamaño máximo de 1 MB y uno de los siguientes formatos: jpeg, png, gif, webp o ico.
-      El valor de hash del archivo del ícono debe ser SHA256).
-
-      - <ph name="INSTALL_AS_SHORTCUT_LABEL" />
-      (A partir de la versión 107 de
-      <ph name="PRODUCT_NAME" />). Si se habilita, la <ph name="URL_LABEL" />
-      se instalará como acceso directo, como si se hiciera mediante la opción "Crear acceso directo…"
-      en la GUI del navegador para computadoras.
-      Ten en cuenta que, en caso de que se instale como acceso directo, no se actualizará si
-      cambia el manifiesto de <ph name="URL_LABEL" />.
-      Si se inhabilita o no se establece, la app web en la
-      <ph name="URL_LABEL" /> determinada se instalará normalmente.
-
-      Para fijar apps a la barra de <ph name="PRODUCT_OS_NAME" />, consulta <ph name="PINNED_LAUNCHER_APPS_POLICY_NAME" />.</translation>
 <translation id="7638764766629234761">Permite el uso de notificaciones del sistema</translation>
 <translation id="7643151458117317518">Una política para controlar si se puede inhabilitar la configuración de <ph name="PRIVACY_SANDBOX_NAME" /> de medición de anuncios para los usuarios.
 

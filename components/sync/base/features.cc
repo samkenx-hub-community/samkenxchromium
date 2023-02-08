@@ -24,10 +24,6 @@ BASE_FEATURE(kPasswordNotesWithBackup,
              "PasswordNotesWithBackup",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-BASE_FEATURE(kSyncAllowWalletDataInTransportModeWithCustomPassphrase,
-             "SyncAllowAutofillWalletDataInTransportModeWithCustomPassphrase",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-
 #if BUILDFLAG(IS_ANDROID)
 BASE_FEATURE(kSyncAndroidLimitNTPPromoImpressions,
              "SyncAndroidLimitNTPPromoImpressions",
@@ -72,10 +68,6 @@ BASE_FEATURE(kSyncTrustedVaultPeriodicDegradedRecoverabilityPolling,
              "SyncTrustedVaultDegradedRecoverabilityHandler",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-BASE_FEATURE(kSyncTrustedVaultPassphrasePromo,
-             "SyncTrustedVaultPassphrasePromo",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
 // Keep this entry in sync with the equivalent name in
 // ChromeFeatureList.java.
 BASE_FEATURE(kSyncTrustedVaultVerifyDeviceRegistration,
@@ -92,10 +84,6 @@ BASE_FEATURE(kSyncTrustedVaultResetKeysAreStale,
 
 BASE_FEATURE(kSyncTrustedVaultUseMD5HashedFile,
              "SyncTrustedVaultUseMD5HashedFile",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
-BASE_FEATURE(kSyncTrustedVaultBypassThrottlingForNetworkErrors,
-             "SyncTrustedVaultBypassThrottlingForNetworkErrors",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
 BASE_FEATURE(kUseSyncInvalidations,
@@ -149,5 +137,9 @@ BASE_FEATURE(kSyncAllowClearingMetadataWhenDataTypeIsStopped,
 BASE_FEATURE(kSyncEnableLoadModelsTimeout,
              "SyncEnableLoadModelsTimeout",
              base::FEATURE_ENABLED_BY_DEFAULT);
+
+BASE_FEATURE(kSyncEnforcePreferencesAllowlist,
+             "SyncEnforcePreferencesAllowlist",
+             base::FEATURE_DISABLED_BY_DEFAULT);
 
 }  // namespace syncer

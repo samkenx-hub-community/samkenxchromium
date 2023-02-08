@@ -13,7 +13,6 @@
 #include "base/numerics/safe_conversions.h"
 #include "base/strings/strcat.h"
 #include "base/strings/utf_string_conversions.h"
-#include "chrome/browser/ash/drive/drivefs_native_message_host.h"
 #include "chrome/browser/ash/drive/file_system_util.h"
 #include "chrome/browser/ash/extensions/file_manager/drivefs_event_router.h"
 #include "chrome/browser/ash/file_manager/fileapi_util.h"
@@ -264,6 +263,7 @@ SystemNotificationManager::CreateIOTaskProgressNotification(
   // Button click delegate to handle the state::PAUSED IOTask case, where the
   // user [X] closes this system notification, but did not press its buttons.
   // In that case, default behavior is to auto-click button 1.
+  // TODO(b/255264604): ask UX here, which button should be the default?
   class IOTaskProgressNotificationClickDelegate
       : public message_center::HandleNotificationClickDelegate {
    public:
@@ -321,9 +321,6 @@ void SystemNotificationManager::HandleIOTaskProgressNotificationClick(
     return;
   }
 
-  // Dismiss the notification now (to ignore button double-clicks).
-  Dismiss(notification_id);
-
   if (button_index == 0) {
     if (io_task_controller_) {
       io_task_controller_->Cancel(task_id);
@@ -335,6 +332,7 @@ void SystemNotificationManager::HandleIOTaskProgressNotificationClick(
   if (paused && button_index == 1) {
     platform_util::ShowItemInFolder(
         profile_, file_manager::util::GetMyFilesFolderForProfile(profile_));
+    Dismiss(notification_id);
   }
 }
 

@@ -17,7 +17,9 @@ import static org.chromium.chrome.browser.customtabs.features.partialcustomtab.P
 import static org.chromium.chrome.browser.customtabs.features.partialcustomtab.PartialCustomTabTestRule.DEVICE_HEIGHT_LANDSCAPE;
 import static org.chromium.chrome.browser.customtabs.features.partialcustomtab.PartialCustomTabTestRule.DEVICE_WIDTH;
 import static org.chromium.chrome.browser.customtabs.features.partialcustomtab.PartialCustomTabTestRule.DEVICE_WIDTH_LANDSCAPE;
+import static org.chromium.chrome.browser.customtabs.features.partialcustomtab.PartialCustomTabTestRule.FULL_HEIGHT;
 
+import android.os.Build;
 import android.view.View;
 import android.view.WindowManager;
 
@@ -43,6 +45,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 @LooperMode(Mode.PAUSED)
 @Features.EnableFeatures({ChromeFeatureList.CCT_RESIZABLE_SIDE_SHEET})
 public class PartialCustomTabSideSheetStrategyTest {
+    private static final float MINIMAL_WIDTH_RATIO = 0.33f;
     private boolean mFullscreen;
 
     @Rule
@@ -52,12 +55,26 @@ public class PartialCustomTabSideSheetStrategyTest {
     public final PartialCustomTabTestRule mPCCTTestRule = new PartialCustomTabTestRule();
 
     private PartialCustomTabSideSheetStrategy createPcctSideSheetStrategy(@Px int widthPx) {
-        PartialCustomTabSideSheetStrategy pcct =
-                new PartialCustomTabSideSheetStrategy(mPCCTTestRule.mActivity, widthPx,
-                        mPCCTTestRule.mOnResizedCallback, mPCCTTestRule.mFullscreenManager, false,
-                        true, mPCCTTestRule.mHandleStrategyFactory);
-        pcct.setMockViewForTesting(mPCCTTestRule.mToolbarView, mPCCTTestRule.mToolbarCoordinator);
+        PartialCustomTabSideSheetStrategy pcct = new PartialCustomTabSideSheetStrategy(
+                mPCCTTestRule.mActivity, widthPx, mPCCTTestRule.mOnResizedCallback,
+                mPCCTTestRule.mFullscreenManager, false, true, /*showMaximizedButton=*/true,
+                /*startMaximized=*/false, mPCCTTestRule.mHandleStrategyFactory);
+        pcct.setMockViewForTesting(mPCCTTestRule.mCoordinatorLayout, mPCCTTestRule.mToolbarView,
+                mPCCTTestRule.mToolbarCoordinator);
         return pcct;
+    }
+
+    @Test
+    @Config(sdk = Build.VERSION_CODES.Q)
+    public void create_sideSheetStrategy_Q() {
+        mPCCTTestRule.configLandscapeMode();
+        PartialCustomTabSideSheetStrategy strategy = createPcctSideSheetStrategy(2000);
+
+        assertEquals("Side-Sheet PCCT should be created",
+                PartialCustomTabBaseStrategy.PartialCustomTabType.SIDE_SHEET,
+                strategy.getStrategyType());
+        assertEquals(
+                "Side-sheet has wrong width", 2000, mPCCTTestRule.mAttributeResults.get(0).width);
     }
 
     @Test
@@ -79,8 +96,8 @@ public class PartialCustomTabSideSheetStrategyTest {
         mPCCTTestRule.verifyWindowFlagsSet();
 
         assertTabIsAtFullLandscapeHeight();
-        assertEquals(
-                "Side-sheet has wrong width", 5000, mPCCTTestRule.mAttributeResults.get(0).width);
+        assertEquals("Side-sheet has wrong width", DEVICE_WIDTH_LANDSCAPE,
+                mPCCTTestRule.mAttributeResults.get(0).width);
     }
 
     @Test
@@ -90,8 +107,9 @@ public class PartialCustomTabSideSheetStrategyTest {
         mPCCTTestRule.verifyWindowFlagsSet();
 
         assertTabIsAtFullLandscapeHeight();
-        assertEquals(
-                "Side-sheet has wrong width", 100, mPCCTTestRule.mAttributeResults.get(0).width);
+        assertEquals("Side-sheet has wrong width",
+                (int) (DEVICE_WIDTH_LANDSCAPE * MINIMAL_WIDTH_RATIO),
+                mPCCTTestRule.mAttributeResults.get(0).width);
     }
 
     @Test
@@ -195,6 +213,25 @@ public class PartialCustomTabSideSheetStrategyTest {
         strategy.onExitFullscreen(null);
         PartialCustomTabTestRule.waitForAnimationToFinish();
         assertFalse(getWindowAttributes().isFullscreen());
+        assertEquals(height, getWindowAttributes().height);
+        assertEquals(width, getWindowAttributes().width);
+        verify(mPCCTTestRule.mOnResizedCallback).onResized(eq(height), eq(width));
+    }
+
+    @Test
+    public void enterAndExitMaximizeMode() {
+        var strategy = createPcctSideSheetStrategy(2000);
+        assertFalse(getWindowAttributes().isFullscreen());
+        int height = getWindowAttributes().height;
+        int width = getWindowAttributes().width;
+
+        strategy.toggleMaximize();
+        PartialCustomTabTestRule.waitForAnimationToFinish();
+        verify(mPCCTTestRule.mOnResizedCallback).onResized(eq(FULL_HEIGHT), eq(DEVICE_WIDTH));
+        clearInvocations(mPCCTTestRule.mOnResizedCallback);
+
+        strategy.toggleMaximize();
+        PartialCustomTabTestRule.waitForAnimationToFinish();
         assertEquals(height, getWindowAttributes().height);
         assertEquals(width, getWindowAttributes().width);
         verify(mPCCTTestRule.mOnResizedCallback).onResized(eq(height), eq(width));

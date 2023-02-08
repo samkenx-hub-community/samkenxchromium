@@ -1957,6 +1957,17 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
+<histogram name="Cast.Channel.LaunchSession.Flags" enum="CastChannelFlag"
+    expires_after="2024-02-03">
+  <owner>mfoltz@chromium.org</owner>
+  <owner>media-dev@chromium.org</owner>
+  <summary>
+    Records any flags observed on the Cast channel used to launch a Cast
+    session. A single channel may have multiple flags, and each flag is logged
+    as a separate count.
+  </summary>
+</histogram>
+
 <histogram name="Cast.Channel.Nonce" enum="CastNonceStatus"
     expires_after="never">
 <!-- expires-never: Used for Cast device health monitoring. -->
@@ -7285,7 +7296,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="InstanceID.GetToken.RequestStatus"
-    enum="GCMRegistrationRequestStatus" expires_after="2023-06-04">
+    enum="GCMRegistrationRequestStatus" expires_after="2023-08-06">
   <owner>peter@chromium.org</owner>
   <summary>Status code of the outcome of GetToken request.</summary>
 </histogram>
@@ -9614,7 +9625,7 @@ chromium-metrics-reviews@google.com.
 
 <histogram name="PaintHolding.CommitTrigger2" enum="PaintHoldingCommitTrigger2"
     expires_after="2023-06-04">
-  <owner>schenney@chromium.org</owner>
+  <owner>pdr@chromium.org</owner>
   <owner>paint-dev@chromium.org</owner>
   <summary>
     Records the reason that a commit was triggered, to enable research into
@@ -9624,7 +9635,7 @@ chromium-metrics-reviews@google.com.
 
 <histogram name="PaintHolding.InputTiming3" enum="PaintHoldingInputTiming"
     expires_after="2023-07-09">
-  <owner>schenney@chromium.org</owner>
+  <owner>pdr@chromium.org</owner>
   <owner>paint-dev@chromium.org</owner>
   <summary>
     Records whether or not input arrived before the first paint.
@@ -9671,9 +9682,9 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Pepper.InterfaceUsed" enum="PepperInterface"
-    expires_after="2023-01-15">
-  <owner>bbudge@chromium.org</owner>
-  <owner>raymes@chromium.org</owner>
+    expires_after="2024-01-15">
+  <owner>fabiansommer@chromium.org</owner>
+  <owner>dschuff@chromium.org</owner>
   <summary>
     The number of out-of-process plugin processes that have loaded a particular
     PPB interface version.
@@ -11043,7 +11054,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="RenderViewContextMenu.Shown" enum="RenderViewContextMenuItem"
-    expires_after="2023-04-17">
+    expires_after="2023-08-06">
   <owner>avi@chromium.org</owner>
   <owner>edwardjung@chromium.org</owner>
   <owner>mpearson@chromium.org</owner>
@@ -11478,7 +11489,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="SB2.RemoteCall.CanCheckUrl" enum="BooleanCanCheckUrl"
-    expires_after="2023-06-04">
+    expires_after="2023-08-06">
   <owner>vakh@chromium.org</owner>
   <owner>chrome-counter-abuse-alerts@google.com</owner>
   <summary>
@@ -14975,7 +14986,7 @@ regressions. -->
 </histogram>
 
 <histogram name="WebFont.DownloadTime.LoadError" units="ms"
-    expires_after="2023-06-04">
+    expires_after="2023-08-06">
   <owner>kenjibaheux@chromium.org</owner>
   <owner>ksakamoto@chromium.org</owner>
   <summary>

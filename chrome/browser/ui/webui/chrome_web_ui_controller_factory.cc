@@ -147,7 +147,6 @@
 #include "chrome/browser/ui/webui/feedback/feedback_ui.h"
 #include "chrome/browser/ui/webui/history/history_ui.h"
 #include "chrome/browser/ui/webui/identity_internals_ui.h"
-#include "chrome/browser/ui/webui/image_editor/image_editor_ui.h"
 #include "chrome/browser/ui/webui/inspect_ui.h"
 #include "chrome/browser/ui/webui/management/management_ui.h"
 #include "chrome/browser/ui/webui/media_router/media_router_internals_ui.h"
@@ -570,6 +569,15 @@ void BindEcheDisplayStreamHandler(
   }
 }
 
+void BindEcheStreamOrientationObserver(
+    ash::eche_app::EcheAppManager* manager,
+    mojo::PendingReceiver<ash::eche_app::mojom::StreamOrientationObserver>
+        receiver) {
+  if (manager) {
+    manager->BindStreamOrientationObserverInterface(std::move(receiver));
+  }
+}
+
 template <>
 WebUIController* NewWebUI<ash::eche_app::EcheAppUI>(WebUI* web_ui,
                                                     const GURL& url) {
@@ -581,7 +589,8 @@ WebUIController* NewWebUI<ash::eche_app::EcheAppUI>(WebUI* web_ui,
       base::BindRepeating(&BindSystemInfoProvider, manager),
       base::BindRepeating(&BindEcheUidGenerator, manager),
       base::BindRepeating(&BindEcheNotificationGenerator, manager),
-      base::BindRepeating(&BindEcheDisplayStreamHandler, manager));
+      base::BindRepeating(&BindEcheDisplayStreamHandler, manager),
+      base::BindRepeating(&BindEcheStreamOrientationObserver, manager));
 }
 
 template <>
@@ -1058,9 +1067,6 @@ WebUIFactoryFunction GetWebUIFactoryFunction(WebUI* web_ui,
   if (url.host_piece() == chrome::kChromeUISyncConfirmationHost &&
       !profile->IsOffTheRecord()) {
     return &NewWebUI<SyncConfirmationUI>;
-  }
-  if (url.host_piece() == chrome::kChromeUIImageEditorHost) {
-    return &NewWebUI<image_editor::ImageEditorUI>;
   }
 #endif  // BUILDFLAG(IS_ANDROID)
 #if !BUILDFLAG(IS_CHROMEOS_ASH) && !BUILDFLAG(IS_ANDROID)

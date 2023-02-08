@@ -2595,8 +2595,7 @@ BrowserView::ShowScreenshotCapturedBubble(content::WebContents* contents,
                                           const gfx::Image& image) {
   auto* bubble = new sharing_hub::ScreenshotCapturedBubble(
       toolbar_button_provider()->GetAnchorView(PageActionIconType::kSharingHub),
-      contents, image, browser_->profile(),
-      base::BindOnce(base::IgnoreResult(&Navigate)));
+      contents, image, browser_->profile());
 
   views::BubbleDialogDelegateView::CreateBubble(bubble);
   bubble->ShowForReason(LocationBarBubbleDelegateView::USER_GESTURE);
@@ -2670,7 +2669,7 @@ views::Button* BrowserView::GetSharingHubIconButton() {
 }
 
 void BrowserView::ToggleMultitaskMenu() const {
-  DCHECK(chromeos::wm::features::IsFloatWindowEnabled());
+  DCHECK(chromeos::wm::features::IsWindowLayoutMenuEnabled());
   auto* frame_view =
       static_cast<BrowserNonClientFrameViewChromeOS*>(frame_->GetFrameView());
   if (!frame_view) {

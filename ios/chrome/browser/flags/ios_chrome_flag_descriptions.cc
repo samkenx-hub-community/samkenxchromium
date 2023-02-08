@@ -108,12 +108,6 @@ const char kAutofillPruneSuggestionsName[] = "Autofill Prune Suggestions";
 const char kAutofillPruneSuggestionsDescription[] =
     "Further limits the number of suggestions in the Autofill dropdown.";
 
-const char kAutofillSaveCardDismissOnNavigationName[] =
-    "Save Card Dismiss on Navigation";
-const char kAutofillSaveCardDismissOnNavigationDescription[] =
-    "Dismisses the Save Card Infobar on a user initiated Navigation, other "
-    "than one caused by submitted form.";
-
 const char kAutofillSuggestServerCardInsteadOfLocalCardName[] =
     "Suggest Server card instead of Local card for deduped cards";
 const char kAutofillSuggestServerCardInsteadOfLocalCardDescription[] =
@@ -485,6 +479,12 @@ const char kIOSSharedHighlightingV2Description[] =
     "Enables improvements to text fragments UI, including a menu for removing "
     "or resharing a highlight.";
 
+const char kIOSShowPasswordStorageInSaveInfobarName[] =
+    "Show password storage in save infobar";
+const char kIOSShowPasswordStorageInSaveInfobarDescription[] =
+    "Modifies the save password infobar to show whether the save happens to an "
+    "account or only to the current device";
+
 const char kKeyboardShortcutsMenuName[] = "Keyboard Shortcuts Menu";
 const char kKeyboardShortcutsMenuDescription[] =
     "Enables the new keyboard shortcuts menu.";
@@ -793,12 +793,6 @@ const char kSynthesizedRestoreSessionDescription[] =
 const char kSyncEnableHistoryDataTypeName[] = "Enable History sync data type";
 const char kSyncEnableHistoryDataTypeDescription[] =
     "Enables the History sync data type instead of TypedURLs";
-
-const char kSyncTrustedVaultPassphrasePromoName[] =
-    "Enable promos for sync trusted vault passphrase.";
-const char kSyncTrustedVaultPassphrasePromoDescription[] =
-    "Enables promos for an experimental sync passphrase type, referred to as "
-    "trusted vault.";
 
 const char kSyncInvalidationsName[] = "Use Sync standalone invalidations";
 const char kSyncInvalidationsDescription[] =

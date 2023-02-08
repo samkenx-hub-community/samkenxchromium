@@ -46,6 +46,10 @@ BASE_FEATURE(kServiceWorkerStorageControlResponseQueue,
              "ServiceWorkerStorageControlResponseQueue",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
+// A hard limit of the ServiceWorkerScopeCacheLimitPerKey feature param.
+// (https://crbug.com/1411197)
+const int kServiceWorkerScopeCacheHardLimitPerKey = 100;
+
 blink::ServiceWorkerStatusCode DatabaseStatusToStatusCode(
     storage::mojom::ServiceWorkerDatabaseStatus status) {
   switch (status) {
@@ -245,6 +249,7 @@ void ServiceWorkerRegistry::CreateNewVersion(
 }
 
 void ServiceWorkerRegistry::FindRegistrationForClientUrl(
+    Purpose purpose,
     const GURL& client_url,
     const blink::StorageKey& key,
     FindRegistrationCallback callback) {
@@ -261,6 +266,15 @@ void ServiceWorkerRegistry::FindRegistrationForClientUrl(
       return blink::ServiceWorkerScopeMatches(scope, client_url);
     });
   }
+  if (purpose == Purpose::kNavigation) {
+    base::UmaHistogramBoolean(
+        "ServiceWorker.FindRegistrationForClientUrl.SkippedMojoCall."
+        "OnNavigation",
+        no_registration);
+  }
+  base::UmaHistogramBoolean(
+      "ServiceWorker.FindRegistrationForClientUrl.IsCalledForNavigation",
+      purpose == Purpose::kNavigation);
   // To connect this TRACE_EVENT with the callback, Time::Now() is used as a
   // trace event id.
   int64_t trace_event_id =
@@ -1406,7 +1420,11 @@ void ServiceWorkerRegistry::DidStoreRegistration(
 
   auto iter = registration_scope_cache_.find(key);
   if (iter != registration_scope_cache_.end()) {
-    iter->second.insert(stored_scope);
+    std::set<GURL>& scopes = iter->second;
+    scopes.insert(stored_scope);
+    if (scopes.size() > kServiceWorkerScopeCacheHardLimitPerKey) {
+      registration_scope_cache_.erase(iter);
+    }
   }
 
   if (storage_policy_observer_)

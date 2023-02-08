@@ -324,6 +324,8 @@ public final class ProductionSupportedFlagList {
                     "If enabled, SVG images will suspend animations when all "
                             + "instances of the image are outside of the "
                             + "viewport."),
+            Flag.baseFeature(BlinkFeatures.SCROLL_OVERLAP_OPTIMIZATION,
+                    "Enables scroll overlap optimization. See https://crbug.com/1401086#c29."),
             Flag.baseFeature("PreconnectOnRedirect"),
             Flag.baseFeature("PreconnectInNetworkService"), Flag.baseFeature("PrefetchDNSWithURL"),
             Flag.baseFeature(BlinkFeatures.SEND_MOUSE_EVENTS_DISABLED_FORM_CONTROLS,
@@ -348,6 +350,12 @@ public final class ProductionSupportedFlagList {
             Flag.baseFeature(MetricsFeatures.METRICS_SERVICE_ASYNC_COLLECTION,
                     "Controls whether the metrics service creates periodic logs"
                             + " in a background thread or on the main thread."),
+            Flag.baseFeature(MetricsFeatures.METRICS_CLEAR_LOGS_ON_CLONED_INSTALL,
+                    "Controls whether UMA logs are cleared when a cloned "
+                            + "install is detected."),
+            Flag.baseFeature(MetricsFeatures.REPORTING_SERVICE_FLUSH_PREFS_ON_UPLOAD_IN_BACKGROUND,
+                    "Controls whether we immediately flush Local State after "
+                            + "uploading a UMA log while in background."),
             Flag.baseFeature(ContentFeatures.MAIN_THREAD_COMPOSITING_PRIORITY,
                     "When enabled runs the main thread at compositing priority."),
             Flag.baseFeature(AwFeatures.WEBVIEW_UMA_UPLOAD_QUALITY_OF_SERVICE_SET_TO_DEFAULT,
@@ -361,6 +369,10 @@ public final class ProductionSupportedFlagList {
             Flag.baseFeature("WebViewEnableDnsPrefetchAndPreconnect"),
             Flag.baseFeature(BlinkFeatures.KEYBOARD_FOCUSABLE_SCROLLERS,
                     "When enabled, can focus on a scroller element using the keyboard."),
+            Flag.commandLine(AwSwitches.WEBVIEW_ENABLE_TRUST_TOKENS_COMPONENT,
+                    "Enables downloading TrustTokenKeyCommitmentsComponent by the component"
+                            + " updater downloading service in nonembedded WebView."
+                            + " See https://crbug.com/1170468."),
             // Add new commandline switches and features above. The final entry should have a
             // trailing comma for cleaner diffs.
     };

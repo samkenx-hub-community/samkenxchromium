@@ -194,33 +194,6 @@ class NetworkScreenTester extends ScreenElementApi {
   }
 }
 
-class EulaScreenTester extends ScreenElementApi {
-  constructor() {
-    super('oobe-eula-md');
-    this.eulaStep = new PolymerElementApi(this, '#eulaDialog');
-    this.nextButton = new PolymerElementApi(this, '#acceptButton');
-  }
-
-  /** @override */
-  shouldSkip() {
-    // Eula screen should skipped on non-branded build and on CfM devices.
-    return loadTimeData.getBoolean('testapi_shouldSkipEula');
-  }
-
-  /**
-   * Returns if the EULA Screen is ready for test interaction.
-   * @return {boolean}
-   */
-  isReadyForTesting() {
-    return this.isVisible() && this.eulaStep.isVisible() &&
-        this.nextButton.isVisible();
-  }
-
-  getNextButtonName() {
-    return loadTimeData.getString('oobeEulaAcceptAndContinueButtonText');
-  }
-}
-
 class UpdateScreenTester extends ScreenElementApi {
   constructor() {
     super('oobe-update');
@@ -753,6 +726,7 @@ class ConsolidatedConsentScreenTester extends ScreenElementApi {
     this.nextButton = new PolymerElementApi(this, '#acceptButton');
     this.readMoreButton =
         new PolymerElementApi(this.loadedStep, '#readMoreButton');
+    this.recoveryToggle = new PolymerElementApi(this, '#recoveryOptIn');
   }
 
   /** @override */
@@ -778,6 +752,14 @@ class ConsolidatedConsentScreenTester extends ScreenElementApi {
   getNextButtonName() {
     return loadTimeData.getString('consolidatedConsentAcceptAndContinue');
   }
+
+  /**
+   * Enable the toggle which controls whether the user opted-in the the
+   * cryptohome recovery feature.
+   */
+  enableRecoveryToggle() {
+    this.recoveryToggle.element().checked = true;
+  }
 }
 
 class SmartPrivacyProtectionScreenTester extends ScreenElementApi {
@@ -802,13 +784,18 @@ class SmartPrivacyProtectionScreenTester extends ScreenElementApi {
   }
 }
 
+class CryptohomeRecoverySetupScreenTester extends ScreenElementApi {
+  constructor() {
+    super('cryptohome-recovery-setup');
+  }
+}
+
 export class OobeApiProvider {
   constructor() {
     this.screens = {
       HIDDetectionScreen: new HIDDetectionScreenTester(),
       WelcomeScreen: new WelcomeScreenTester(),
       NetworkScreen: new NetworkScreenTester(),
-      EulaScreen: new EulaScreenTester(),
       UpdateScreen: new UpdateScreenTester(),
       EnrollmentScreen: new EnrollmentScreenTester(),
       UserCreationScreen: new UserCreationScreenTester(),
@@ -829,6 +816,7 @@ export class OobeApiProvider {
       GestureNavigation: new GestureNavigationScreenTester(),
       ConsolidatedConsentScreen: new ConsolidatedConsentScreenTester(),
       SmartPrivacyProtectionScreen: new SmartPrivacyProtectionScreenTester(),
+      CryptohomeRecoverySetupScreen: new CryptohomeRecoverySetupScreenTester(),
     };
 
     this.loginWithPin = function(username, pin) {

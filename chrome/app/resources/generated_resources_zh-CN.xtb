@@ -219,6 +219,7 @@
 <translation id="1192706927100816598">{0,plural, =1{您将在 # 秒后自动退出。
 <ph name="DOMAIN" /> 要求您使智能卡保持插入状态。}other{您将在 # 秒后自动退出。
 <ph name="DOMAIN" /> 要求您使智能卡保持插入状态。}}</translation>
+<translation id="119330003005586565">您已读过的页面</translation>
 <translation id="1193927020065025187">此网站可能正试图诱骗您允许显示侵扰性通知</translation>
 <translation id="1195210374336998651">转到应用设置</translation>
 <translation id="1195447618553298278">未知错误。</translation>
@@ -373,6 +374,7 @@
 <translation id="1339009753652684748">只需说“Ok Google”即可使用您的 Google 助理。为了省电，请选择“开启（推荐）”。选择这一选项后，只有当您的设备已接通电源或正在充电时，Google 助理才会做出响应。</translation>
 <translation id="13392265090583506">无障碍设置</translation>
 <translation id="1340527397989195812">使用“文件”应用备份设备上的媒体。</translation>
+<translation id="1341871421050612057">无法与 <ph name="USERNAME" /> 同步</translation>
 <translation id="1343865611738742294">授权 Linux 应用访问 USB 设备。Linux 不会记住已被拔出的 USB 设备。</translation>
 <translation id="1343920184519992513">继续浏览上次打开的网页并打开一组特定网页</translation>
 <translation id="134589511016534552">媒体标签页也会显示在“打开的标签页”部分中</translation>
@@ -408,6 +410,7 @@
 <translation id="1378848228640136848">{NUM_COMPROMISED,plural, =0{没有任何已泄露的密码}=1{有 1 个已泄露的密码}other{有 {NUM_COMPROMISED} 个已泄露的密码}}</translation>
 <translation id="1380028686461971526">自动联网</translation>
 <translation id="1381567580865186407">系统会将<ph name="LANGUAGE" />语音发送给 Google 以供处理</translation>
+<translation id="1383381142702995121">管理此扩展程序</translation>
 <translation id="1383597849754832576">无法下载实时字幕文件。请稍后再试。</translation>
 <translation id="1383861834909034572">完成时打开</translation>
 <translation id="1383876407941801731">搜索</translation>
@@ -3030,6 +3033,7 @@
 <translation id="372062398998492895">CUPS</translation>
 <translation id="3721119614952978349">您与 Google</translation>
 <translation id="3722108462506185496">启动虚拟机服务时出错。请重试。</translation>
+<translation id="3722624153992426516">已收到<ph name="IMPORT_CERTIFICATE__INSTRUCTION_NAME" />说明</translation>
 <translation id="3726965532284929944">QT</translation>
 <translation id="3727144509609414201">可用的 Wi-Fi 网络</translation>
 <translation id="3727187387656390258">审查弹出内容</translation>
@@ -3385,6 +3389,7 @@
 <translation id="402211067068791756">此操作会清除显示的网站所存储的 <ph name="TOTAL_USAGE" /> 数据</translation>
 <translation id="4022426551683927403">添加到字典中(&amp;A)</translation>
 <translation id="4025039777635956441">将所选网站静音</translation>
+<translation id="402707738228916911">已收到<ph name="AUTHORIZE_INSTRUCTION_NAME" />说明</translation>
 <translation id="4027958407426528157">在您的 <ph name="DEVICE_TYPE" /> 已安装的应用内打开网站</translation>
 <translation id="4028467762035011525">添加输入法</translation>
 <translation id="4029556917477724407">从“<ph name="PAGE_TITLE" />”页面返回</translation>
@@ -4122,6 +4127,7 @@
 <translation id="4713409221649555176">关闭所有窗口时删除</translation>
 <translation id="47158868804223727">点击相应的分组名称以展开或收起该分组</translation>
 <translation id="4716483597559580346">执行 Powerwash 操作以提高安全性</translation>
+<translation id="471759229191973607">更改主题</translation>
 <translation id="4722735765955348426"><ph name="USERNAME" /> 的密码</translation>
 <translation id="4722920479021006856"><ph name="APP_NAME" />正在共享您的屏幕。</translation>
 <translation id="4722989931633062466">不得显示第三方登录提示</translation>
@@ -4211,6 +4217,7 @@
 <translation id="4807098396393229769">持卡人姓名</translation>
 <translation id="4808667324955055115">已拦截弹出式窗口：</translation>
 <translation id="4809079943450490359">您的设备管理员温馨提示：</translation>
+<translation id="4809447465126035330">删除</translation>
 <translation id="480990236307250886">打开主页</translation>
 <translation id="4809927044794281115">浅色主题</translation>
 <translation id="4811212958317149293">开关控制键盘自动扫描</translation>
@@ -5013,6 +5020,7 @@
 <translation id="5556459405103347317">重新加载</translation>
 <translation id="5558129378926964177">放大(&amp;I)</translation>
 <translation id="5558247502209241936">允许在窗口中打开此应用</translation>
+<translation id="5559311991468302423">删除此地址</translation>
 <translation id="55601339223879446">调整您的桌面在显示屏内的边界</translation>
 <translation id="5561162485081632007">检测危险事件并在此类事件发生时向您发出警告</translation>
 <translation id="5562781907504170924">此标签页已连接到蓝牙设备。</translation>
@@ -5499,6 +5507,7 @@
 <translation id="6007240208646052708">不支持使用您所用的语言执行语音搜索。</translation>
 <translation id="6010651352520077187">当此功能处于开启状态时，“Google 翻译”会询问您是否要将网站翻译成您的首选语言。它还可以自动翻译网站。</translation>
 <translation id="6011193465932186973">指纹</translation>
+<translation id="6011308810877101166">改进搜索建议</translation>
 <translation id="6011908034087870826">正在将链接发送到“<ph name="DEVICE_NAME" />”</translation>
 <translation id="6013027779243312217">为您的音频和视频生成字幕</translation>
 <translation id="6014293228235665243">未读</translation>
@@ -5659,6 +5668,7 @@
 <translation id="6150961653851236686">将网页翻译成此语言</translation>
 <translation id="6151323131516309312">按 <ph name="SEARCH_KEY" /> 可通过 <ph name="SITE_NAME" /> 进行搜索</translation>
 <translation id="6151771661215463137">“下载”文件夹中已存在此文件。</translation>
+<translation id="6152918902620844577">正在等待下一项操作</translation>
 <translation id="6154240335466762404">移除所有端口</translation>
 <translation id="615436196126345398">协议</translation>
 <translation id="6155141482566063812">背景标签页正在共享您的屏幕</translation>
@@ -5815,6 +5825,7 @@
 <translation id="630292539633944562">个人信息建议</translation>
 <translation id="6305607932814307878">全局政策：</translation>
 <translation id="6305909198255586420">请使用您的主要个人资料进行安装</translation>
+<translation id="630750887748244481">您的家长已为 Chrome 停用“网站、应用和扩展程序的权限”，因此您无法添加这款扩展程序。</translation>
 <translation id="6307990684951724544">系统繁忙</translation>
 <translation id="6308493641021088955">登录服务提供方：<ph name="EXTENSION_NAME" /></translation>
 <translation id="6308937455967653460">链接另存为(&amp;K)...</translation>
@@ -6398,6 +6409,7 @@
 <translation id="6839916869147598086">登录发生变化</translation>
 <translation id="6840155290835956714">发送前先询问</translation>
 <translation id="6840184929775541289">不是证书授权中心</translation>
+<translation id="6840214587087739194">已删除此地址</translation>
 <translation id="6841143363521180029">已加密</translation>
 <translation id="6841186874966388268">错误</translation>
 <translation id="6842136130964845393">若要确保您能随时访问自己的已保存密码，请验证是您本人在操作</translation>
@@ -7141,6 +7153,7 @@
 <translation id="7532009420053991888"><ph name="LINUX_APP_NAME" /> 无响应。请选择“强制关闭”以关闭此应用。</translation>
 <translation id="7535730537657706072">若要清除您设备中的无痕浏览记录，请关闭所有无痕式标签页</translation>
 <translation id="7537451260744431038">网站无法使用 Cookie 来提升您的浏览体验，例如让您保持登录状态或记住您购物车中的商品</translation>
+<translation id="7538088324298143359">使用 <ph name="SEARCH_ENGINE" /> 搜索图片中的内容</translation>
 <translation id="7540972813190816353">检查更新时出错：<ph name="ERROR" /></translation>
 <translation id="7541076351905098232"><ph name="MANAGER" /> 已将此设备回滚到上一个版本。请保存重要文件，然后重启。此设备上的所有数据都将被删除。</translation>
 <translation id="7541773865713908457">使用“<ph name="APP_NAME" />”应用来<ph name="ACTION_NAME" /></translation>
@@ -7368,6 +7381,7 @@
 <translation id="7730683939467795481">此网页被扩展程序“<ph name="EXTENSION_NAME" />”更改了</translation>
 <translation id="7735165285389721951">已有一项 Steam 安装正在运行。请等待其完成，然后重试</translation>
 <translation id="7737115349420013392">正在与“<ph name="DEVICE_NAME" />”配对…</translation>
+<translation id="7737203573077018777">已收到<ph name="PROOF_OF_POSSESSION_INSTRUCTION_NAME" />说明</translation>
 <translation id="7737846262459425222">您随时可在“设置”&gt;“Google 助理”&gt;“屏幕上下文”下更改此设置。</translation>
 <translation id="7737948071472253612">不允许使用您的摄像头</translation>
 <translation id="77381465218432215">显示重音符号和特殊字符</translation>
@@ -7568,6 +7582,7 @@
 <translation id="7912080627461681647">您已在服务器上更改密码。请先退出，然后重新登录。</translation>
 <translation id="7912974581251770345">翻译</translation>
 <translation id="7915457674565721553">请连接到互联网以设置家长控制</translation>
+<translation id="7916364730877325865">贵组织不允许您使用此帐号开启同步功能</translation>
 <translation id="7918257978052780342">注册</translation>
 <translation id="7919123827536834358">自动翻译这些语言</translation>
 <translation id="7919210519031517829"><ph name="DURATION" /> 秒</translation>
@@ -7885,7 +7900,7 @@
 <translation id="8188389033983459049">请检查您的设备设置，并开启蓝牙以继续</translation>
 <translation id="8188742492803591566">只需输入 Chromecast 或电视上显示的访问代码，即可开始投放您的屏幕。</translation>
 <translation id="8189306097519446565">学校帐号</translation>
-<translation id="8189750580333936930">隐私沙盒</translation>
+<translation id="8189750580333936930">Privacy Sandbox</translation>
 <translation id="8191230140820435481">管理您的应用、扩展程序和主题背景</translation>
 <translation id="8192944472786724289"><ph name="APP_NAME" />想分享您屏幕上的内容。</translation>
 <translation id="8193953846147532858"><ph name="BEGIN_LINK" />您的设备<ph name="END_LINK" /> · <ph name="EMAIL" /></translation>
@@ -7953,6 +7968,7 @@
 <translation id="8251509999076836464">正在与“<ph name="DEVICE_NAME" />”配对</translation>
 <translation id="8251578425305135684">已删除缩略图。</translation>
 <translation id="825238165904109940">总是显示完整网址</translation>
+<translation id="8252538334423261825">无法添加扩展程序</translation>
 <translation id="8252569384384439529">正在上传…</translation>
 <translation id="8253198102038551905">点击“+”可查看网络属性</translation>
 <translation id="8255212965098517578">近期的照片、通知和应用</translation>
@@ -8238,6 +8254,7 @@
 <translation id="8525306231823319788">全屏</translation>
 <translation id="8526813720153458066">SSH</translation>
 <translation id="8528074251912154910">添加语言</translation>
+<translation id="8528479410903501741">保存 IBAN</translation>
 <translation id="8528962588711550376">正在登录。</translation>
 <translation id="8529925957403338845">即时网络共享连接失败</translation>
 <translation id="8531701051932785007">“增强型安全浏览”功能处于关闭状态</translation>
@@ -8353,6 +8370,7 @@
 <translation id="8639635302972078117">发送使用情况数据和诊断数据。目前，此设备会自动向 Google 发送诊断数据、设备数据和应用使用情况数据。我们会使用这些数据提高系统和应用的稳定性，并改进其他方面，但不会利用数据辨识您孩子的身份。部分汇总数据还会对 Google 应用和合作伙伴（例如 Android 开发者）有所帮助。如果您已为孩子开启“其他网络与应用活动记录”设置，这些数据可能会被保存到其 Google 帐号中。</translation>
 <translation id="8642900771896232685">2 秒</translation>
 <translation id="8642947597466641025">放大文字</translation>
+<translation id="8643403533759285912">删除群组</translation>
 <translation id="8643443571868262066"><ph name="FILE_NAME" /> 可能含有危险内容。发送给 Google 高级保护进行扫描？</translation>
 <translation id="8644047503904673749">{COUNT,plural, =0{无 Cookie}=1{屏蔽了 1 个 Cookie}other{屏蔽了 # 个 Cookie}}</translation>
 <translation id="864423554496711319">设备已保存到您的帐号中</translation>
@@ -8826,6 +8844,7 @@
 <translation id="90528604757378587">后台活动和某些视觉效果（例如流畅滚动）可能会受到限制。</translation>
 <translation id="9053563360605707198">双面打印</translation>
 <translation id="9055636786322918818">强制执行 RC4 加密。选中此选项会令您面临更大的风险，因为 RC4 加密不安全。</translation>
+<translation id="9056788090206401048">您需要开启蓝牙，才能在一部不同的设备上使用通行密钥。您随时可在设置中管理此选项。</translation>
 <translation id="9056810968620647706">未找到匹配项。</translation>
 <translation id="9057007989365783744"><ph name="SUPERVISED_USER_NAME" />想访问以下内容：</translation>
 <translation id="9057354806206861646">更新时间表</translation>

@@ -5,12 +5,14 @@
 #include "chrome/browser/ui/views/autofill/popup/popup_row_view.h"
 
 #include <algorithm>
+#include <memory>
 #include <string>
 #include <type_traits>
 #include <utility>
 
 #include "base/containers/contains.h"
 #include "base/feature_list.h"
+#include "base/memory/ptr_util.h"
 #include "base/memory/raw_ptr.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/time/time.h"
@@ -57,7 +59,6 @@
 #include "ui/views/controls/image_view.h"
 #include "ui/views/controls/label.h"
 #include "ui/views/controls/menu/menu_config.h"
-#include "ui/views/controls/separator.h"
 #include "ui/views/controls/throbber.h"
 #include "ui/views/layout/box_layout.h"
 #include "ui/views/layout/box_layout_view.h"
@@ -116,11 +117,6 @@ constexpr PopupItemId kItemTypesUsingLeadingIcons[] = {
     PopupItemId::POPUP_ITEM_ID_PASSWORD_ACCOUNT_STORAGE_OPT_IN,
     PopupItemId::POPUP_ITEM_ID_PASSWORD_ACCOUNT_STORAGE_RE_SIGNIN,
     PopupItemId::POPUP_ITEM_ID_PASSWORD_ACCOUNT_STORAGE_OPT_IN_AND_GENERATE};
-
-int GetContentsVerticalPadding() {
-  return ChromeLayoutProvider::Get()->GetDistanceMetric(
-      DISTANCE_CONTENT_LIST_VERTICAL_SINGLE);
-}
 
 // Builds a column set for |layout| used in the autofill dropdown.
 void BuildColumnSet(views::TableLayoutView* layout_view) {
@@ -303,30 +299,85 @@ std::u16string GetIconAccessibleName(const std::string& icon_text) {
 
 namespace autofill {
 
-/************** PopupItemView **************/
-PopupItemView::~PopupItemView() = default;
+/************** PopupRowView **************/
 
-PopupItemView::PopupItemView(PopupViewViews* popup_view,
-                             int line_number,
-                             int frontend_id)
-    : PopupRowView(popup_view, line_number), frontend_id_(frontend_id) {}
+PopupRowView::~PopupRowView() = default;
 
-int PopupItemView::GetFrontendId() const {
-  return frontend_id_;
+PopupRowView::PopupRowView(PopupViewViews& popup_view,
+                           int line_number,
+                           int frontend_id)
+    : popup_view_(popup_view),
+      line_number_(line_number),
+      frontend_id_(frontend_id) {
+  // TODO(crbug.com/1411172): Remove once the responsibility to track selected
+  // state is moved to individual cells.
+  SetNotifyEnterExitOnChild(true);
 }
 
-void PopupItemView::GetAccessibleNodeData(ui::AXNodeData* node_data) {
+void PopupRowView::SetSelected(bool selected) {
+  if (selected == selected_) {
+    return;
+  }
+
+  selected_ = selected;
+  if (selected) {
+    popup_view().NotifyAXSelection(this);
+  }
+  RefreshStyle();
+  OnPropertyChanged(&selected_, views::kPropertyEffectsNone);
+}
+
+void PopupRowView::MaybeShowIphPromo() {
+  std::string feature_name = popup_view()
+                                 .controller()
+                                 ->GetSuggestionAt(GetLineNumber())
+                                 .feature_for_iph;
+  if (feature_name.empty()) {
+    return;
+  }
+
+  if (feature_name == "IPH_AutofillVirtualCardSuggestion") {
+    SetProperty(views::kElementIdentifierKey,
+                kAutofillCreditCardSuggestionEntryElementId);
+    Browser* browser = popup_view().browser();
+    DCHECK(browser);
+    browser->window()->MaybeShowFeaturePromo(
+        feature_engagement::kIPHAutofillVirtualCardSuggestionFeature);
+  }
+}
+
+bool PopupRowView::OnMouseDragged(const ui::MouseEvent& event) {
+  return true;
+}
+
+bool PopupRowView::OnMousePressed(const ui::MouseEvent& event) {
+  return true;
+}
+
+ui::ColorId PopupRowView::GetBackgroundColorId() const {
+  return GetSelected() ? ui::kColorDropdownBackgroundSelected
+                       : ui::kColorDropdownBackground;
+}
+
+bool PopupRowView::HandleAccessibleAction(const ui::AXActionData& action_data) {
+  base::WeakPtr<AutofillPopupController> controller = popup_view().controller();
+  if (controller && action_data.action == ax::mojom::Action::kFocus) {
+    controller->SetSelectedLine(line_number_);
+  }
+  return View::HandleAccessibleAction(action_data);
+}
+
+void PopupRowView::GetAccessibleNodeData(ui::AXNodeData* node_data) {
   // Options are selectable.
   node_data->role = ax::mojom::Role::kListBoxOption;
   node_data->AddBoolAttribute(ax::mojom::BoolAttribute::kSelected,
                               GetSelected());
 
   // It is possible for the screen reader to request the a11y role of an
-  // PopupItemView one final time when the Autofill popup gets hidden.
+  // PopupRowView one final time when the Autofill popup gets hidden.
   // At this point the controller is already invalid. Therefore we skip all
   // steps that require a controller.
-  base::WeakPtr<AutofillPopupController> controller =
-      popup_view()->controller();
+  base::WeakPtr<AutofillPopupController> controller = popup_view().controller();
   if (!controller) {
     return;
   }
@@ -352,17 +403,17 @@ void PopupItemView::GetAccessibleNodeData(ui::AXNodeData* node_data) {
   node_data->AddIntAttribute(ax::mojom::IntAttribute::kPosInSet, pos_in_set);
 }
 
-void PopupItemView::OnPaint(gfx::Canvas* canvas) {
-  PopupRowView::OnPaint(canvas);
+void PopupRowView::OnPaint(gfx::Canvas* canvas) {
+  views::View::OnPaint(canvas);
   mouse_observed_outside_item_bounds_ |= !IsMouseInsideItemBounds();
 }
 
-void PopupItemView::OnThemeChanged() {
-  PopupRowView::OnThemeChanged();
+void PopupRowView::OnThemeChanged() {
+  views::View::OnThemeChanged();
   RefreshStyle();
 }
 
-void PopupItemView::OnMouseEntered(const ui::MouseEvent& event) {
+void PopupRowView::OnMouseEntered(const ui::MouseEvent& event) {
   // OnMouseEntered() does not imply that the mouse had been outside of the
   // item's bounds before: OnMouseEntered() also fires if the mouse moves just a
   // little bit on the item. We don't want to show a preview in such a case.
@@ -370,27 +421,25 @@ void PopupItemView::OnMouseEntered(const ui::MouseEvent& event) {
     return;
   }
 
-  base::WeakPtr<AutofillPopupController> controller =
-      popup_view()->controller();
+  base::WeakPtr<AutofillPopupController> controller = popup_view().controller();
   if (controller) {
     controller->SetSelectedLine(GetLineNumber());
   }
 }
 
-void PopupItemView::OnMouseExited(const ui::MouseEvent& event) {
+void PopupRowView::OnMouseExited(const ui::MouseEvent& event) {
   // OnMouseExited() does not imply that the mouse has left the item's screen
   // bounds: OnMouseExited() also fires (on Windows, at least) even when another
   // popup overlays this item (crbug.com/1287364).
   mouse_observed_outside_item_bounds_ |= !IsMouseInsideItemBounds();
 
-  base::WeakPtr<AutofillPopupController> controller =
-      popup_view()->controller();
+  base::WeakPtr<AutofillPopupController> controller = popup_view().controller();
   if (controller) {
     controller->SelectionCleared();
   }
 }
 
-void PopupItemView::OnMouseReleased(const ui::MouseEvent& event) {
+void PopupRowView::OnMouseReleased(const ui::MouseEvent& event) {
   // Ignore mouse clicks unless the user made the explicit choice to selected
   // the current item.
   if (!mouse_observed_outside_item_bounds_) {
@@ -399,22 +448,20 @@ void PopupItemView::OnMouseReleased(const ui::MouseEvent& event) {
 
   // Ignore clicks immediately after the popup was shown. This is to prevent
   // users accidentally accepting suggestions (crbug.com/1279268).
-  if (popup_view()->time_delta_since_popup_shown() <=
+  if (popup_view().time_delta_since_popup_shown() <=
       kIgnoreEarlyClicksOnPopupDuration) {
     return;
   }
 
-  base::WeakPtr<AutofillPopupController> controller =
-      popup_view()->controller();
+  base::WeakPtr<AutofillPopupController> controller = popup_view().controller();
   if (controller && event.IsOnlyLeftMouseButton() &&
       HitTestPoint(event.location())) {
     controller->AcceptSuggestion(GetLineNumber());
   }
 }
 
-void PopupItemView::OnGestureEvent(ui::GestureEvent* event) {
-  base::WeakPtr<AutofillPopupController> controller =
-      popup_view()->controller();
+void PopupRowView::OnGestureEvent(ui::GestureEvent* event) {
+  base::WeakPtr<AutofillPopupController> controller = popup_view().controller();
   if (!controller) {
     return;
   }
@@ -434,9 +481,8 @@ void PopupItemView::OnGestureEvent(ui::GestureEvent* event) {
   }
 }
 
-void PopupItemView::CreateContent() {
-  base::WeakPtr<AutofillPopupController> controller =
-      popup_view()->controller();
+void PopupRowView::CreateContent() {
+  base::WeakPtr<AutofillPopupController> controller = popup_view().controller();
 
   auto* layout_manager = SetLayoutManager(std::make_unique<views::BoxLayout>(
       views::BoxLayout::Orientation::kHorizontal,
@@ -510,7 +556,7 @@ void PopupItemView::CreateContent() {
   }
 }
 
-void PopupItemView::RefreshStyle() {
+void PopupRowView::RefreshStyle() {
   SetBackground(views::CreateThemedSolidBackground(GetBackgroundColorId()));
 
   // Set style for each label in this view depending on current state since the
@@ -535,9 +581,9 @@ void PopupItemView::RefreshStyle() {
   SchedulePaint();
 }
 
-std::unique_ptr<views::Label> PopupItemView::CreateMainTextView() {
+std::unique_ptr<views::Label> PopupRowView::CreateMainTextView() {
   const Suggestion::Text& main_text =
-      popup_view()->controller()->GetSuggestionAt(GetLineNumber()).main_text;
+      popup_view().controller()->GetSuggestionAt(GetLineNumber()).main_text;
   if (!main_text.is_primary) {
     std::unique_ptr<views::Label> label = CreateLabelWithStyleAndContext(
         main_text.value, views::style::CONTEXT_DIALOG_BODY_TEXT,
@@ -547,7 +593,7 @@ std::unique_ptr<views::Label> PopupItemView::CreateMainTextView() {
   }
 
   std::unique_ptr<views::Label> label = CreateLabelWithStyleAndContext(
-      popup_view()->controller()->GetSuggestionMainTextAt(GetLineNumber()),
+      popup_view().controller()->GetSuggestionMainTextAt(GetLineNumber()),
       views::style::CONTEXT_DIALOG_BODY_TEXT, GetPrimaryTextStyle());
 
   const gfx::Font::Weight font_weight = GetPrimaryTextWeight();
@@ -559,9 +605,9 @@ std::unique_ptr<views::Label> PopupItemView::CreateMainTextView() {
   return label;
 }
 
-std::unique_ptr<views::Label> PopupItemView::CreateMinorTextView() {
+std::unique_ptr<views::Label> PopupRowView::CreateMinorTextView() {
   std::u16string text =
-      popup_view()->controller()->GetSuggestionMinorTextAt(GetLineNumber());
+      popup_view().controller()->GetSuggestionMinorTextAt(GetLineNumber());
   if (text.empty()) {
     return nullptr;
   }
@@ -573,16 +619,16 @@ std::unique_ptr<views::Label> PopupItemView::CreateMinorTextView() {
   return label;
 }
 
-std::unique_ptr<views::View> PopupItemView::CreateDescriptionView() {
+std::unique_ptr<views::View> PopupRowView::CreateDescriptionView() {
   return nullptr;
 }
 
-std::vector<std::unique_ptr<views::View>> PopupItemView::CreateSubtextViews() {
+std::vector<std::unique_ptr<views::View>> PopupRowView::CreateSubtextViews() {
   return {};
 }
 
-void PopupItemView::UpdateLayoutSize(views::BoxLayout* layout_manager,
-                                     int64_t num_subtexts) {
+void PopupRowView::UpdateLayoutSize(views::BoxLayout* layout_manager,
+                                    int64_t num_subtexts) {
   const int kStandardRowHeight =
       views::MenuConfig::instance().touchable_menu_height;
   if (num_subtexts == 0) {
@@ -601,9 +647,9 @@ void PopupItemView::UpdateLayoutSize(views::BoxLayout* layout_manager,
   }
 }
 
-void PopupItemView::AddSpacerWithSize(int spacer_width,
-                                      bool resize,
-                                      views::BoxLayout* layout) {
+void PopupRowView::AddSpacerWithSize(int spacer_width,
+                                     bool resize,
+                                     views::BoxLayout* layout) {
   auto spacer = std::make_unique<views::View>();
   spacer->SetPreferredSize(gfx::Size(spacer_width, 1));
   layout->SetFlexForView(AddChildView(std::move(spacer)),
@@ -611,9 +657,8 @@ void PopupItemView::AddSpacerWithSize(int spacer_width,
                          /*use_min_size=*/true);
 }
 
-std::u16string PopupItemView::GetVoiceOverString() {
-  base::WeakPtr<AutofillPopupController> controller =
-      popup_view()->controller();
+std::u16string PopupRowView::GetVoiceOverString() {
+  base::WeakPtr<AutofillPopupController> controller = popup_view().controller();
 
   auto suggestion = controller->GetSuggestionAt(GetLineNumber());
 
@@ -654,20 +699,23 @@ std::u16string PopupItemView::GetVoiceOverString() {
   return base::JoinString(text, u" ");
 }
 
-BEGIN_METADATA(PopupItemView, PopupRowView)
+BEGIN_METADATA(PopupRowView, views::View)
+ADD_PROPERTY_METADATA(bool, Selected)
+ADD_READONLY_PROPERTY_METADATA(int, LineNumber)
 ADD_READONLY_PROPERTY_METADATA(int, FrontendId)
 END_METADATA
 
 /************** PopupSuggestionView **************/
 
 // static
-PopupSuggestionView* PopupSuggestionView::Create(PopupViewViews* popup_view,
-                                                 int line_number,
-                                                 int frontend_id,
-                                                 PopupType popup_type) {
-  PopupSuggestionView* result =
-      new PopupSuggestionView(popup_view, line_number, frontend_id, popup_type);
-  result->Init();
+std::unique_ptr<PopupSuggestionView> PopupSuggestionView::Create(
+    PopupViewViews& popup_view,
+    int line_number,
+    int frontend_id,
+    PopupType popup_type) {
+  auto result = base::WrapUnique(new PopupSuggestionView(
+      popup_view, line_number, frontend_id, popup_type));
+  result->CreateContent();
   return result;
 }
 
@@ -679,22 +727,22 @@ gfx::Font::Weight PopupSuggestionView::GetPrimaryTextWeight() const {
   return gfx::Font::Weight::NORMAL;
 }
 
-PopupSuggestionView::PopupSuggestionView(PopupViewViews* popup_view,
+PopupSuggestionView::PopupSuggestionView(PopupViewViews& popup_view,
                                          int line_number,
                                          int frontend_id,
                                          PopupType popup_type)
-    : PopupItemView(popup_view, line_number, frontend_id),
+    : PopupRowView(popup_view, line_number, frontend_id),
       popup_type_(popup_type) {
   SetFocusBehavior(FocusBehavior::ALWAYS);
 }
 
 std::unique_ptr<views::Label> PopupSuggestionView::CreateMainTextView() {
-  std::unique_ptr<views::Label> label = PopupItemView::CreateMainTextView();
+  std::unique_ptr<views::Label> label = PopupRowView::CreateMainTextView();
   if (popup_type_ == PopupType::kAddresses) {
     label->SetMaximumWidthSingleLine(kAutofillPopupAddressProfileMaxWidth);
   } else if (popup_type_ == PopupType::kCreditCards &&
              popup_view()
-                 ->controller()
+                 .controller()
                  ->GetSuggestionAt(GetLineNumber())
                  .main_text.should_truncate.value()) {
     // should_truncate should only be set to true iff the experiments are
@@ -712,7 +760,7 @@ std::vector<std::unique_ptr<views::View>>
 PopupSuggestionView::CreateSubtextViews() {
   std::vector<std::unique_ptr<views::View>> subtext_view;
   for (const std::vector<Suggestion::Text>& label_row :
-       popup_view()->controller()->GetSuggestionLabelsAt(GetLineNumber())) {
+       popup_view().controller()->GetSuggestionLabelsAt(GetLineNumber())) {
     DCHECK_LE(label_row.size(), 2U);
     DCHECK(!label_row.empty());
     if (base::ranges::all_of(label_row, &std::u16string::empty,
@@ -758,18 +806,18 @@ PopupSuggestionView::CreateSubtextViews() {
   return subtext_view;
 }
 
-BEGIN_METADATA(PopupSuggestionView, PopupItemView)
+BEGIN_METADATA(PopupSuggestionView, PopupRowView)
 END_METADATA
 
 /************** PopupPasswordSuggestionView **************/
 
-PopupPasswordSuggestionView* PopupPasswordSuggestionView::Create(
-    PopupViewViews* popup_view,
-    int line_number,
-    int frontend_id) {
-  PopupPasswordSuggestionView* result =
-      new PopupPasswordSuggestionView(popup_view, line_number, frontend_id);
-  result->Init();
+std::unique_ptr<PopupPasswordSuggestionView>
+PopupPasswordSuggestionView::Create(PopupViewViews& popup_view,
+                                    int line_number,
+                                    int frontend_id) {
+  auto result = base::WrapUnique(
+      new PopupPasswordSuggestionView(popup_view, line_number, frontend_id));
+  result->CreateContent();
   return result;
 }
 
@@ -815,7 +863,7 @@ gfx::Font::Weight PopupPasswordSuggestionView::GetPrimaryTextWeight() const {
 }
 
 PopupPasswordSuggestionView::PopupPasswordSuggestionView(
-    PopupViewViews* popup_view,
+    PopupViewViews& popup_view,
     int line_number,
     int frontend_id)
     : PopupSuggestionView(popup_view,
@@ -823,7 +871,7 @@ PopupPasswordSuggestionView::PopupPasswordSuggestionView(
                           frontend_id,
                           PopupType::kPasswords) {
   std::vector<std::vector<Suggestion::Text>> labels =
-      popup_view->controller()->GetSuggestionLabelsAt(line_number);
+      popup_view.controller()->GetSuggestionLabelsAt(line_number);
   if (!labels.empty()) {
     DCHECK_EQ(labels.size(), 1U);
     DCHECK_EQ(labels[0].size(), 1U);
@@ -831,7 +879,7 @@ PopupPasswordSuggestionView::PopupPasswordSuggestionView(
   }
 
   masked_password_ =
-      popup_view->controller()->GetSuggestionAt(line_number).additional_label;
+      popup_view.controller()->GetSuggestionAt(line_number).additional_label;
 }
 
 BEGIN_METADATA(PopupPasswordSuggestionView, PopupSuggestionView)
@@ -840,18 +888,18 @@ END_METADATA
 /************** PopupFooterView **************/
 
 // static
-PopupFooterView* PopupFooterView::Create(PopupViewViews* popup_view,
-                                         int line_number,
-                                         int frontend_id) {
-  PopupFooterView* result =
-      new PopupFooterView(popup_view, line_number, frontend_id);
-  result->Init();
+std::unique_ptr<PopupFooterView> PopupFooterView::Create(
+    PopupViewViews& popup_view,
+    int line_number,
+    int frontend_id) {
+  auto result = base::WrapUnique(
+      new PopupFooterView(popup_view, line_number, frontend_id));
+  result->CreateContent();
   return result;
 }
 
 void PopupFooterView::CreateContent() {
-  base::WeakPtr<AutofillPopupController> controller =
-      popup_view()->controller();
+  base::WeakPtr<AutofillPopupController> controller = popup_view().controller();
 
   SetBorder(views::CreateThemedSolidSidedBorder(gfx::Insets(),
                                                 ui::kColorMenuSeparator));
@@ -913,171 +961,14 @@ gfx::Font::Weight PopupFooterView::GetPrimaryTextWeight() const {
   return gfx::Font::Weight::NORMAL;
 }
 
-PopupFooterView::PopupFooterView(PopupViewViews* popup_view,
+PopupFooterView::PopupFooterView(PopupViewViews& popup_view,
                                  int line_number,
                                  int frontend_id)
-    : PopupItemView(popup_view, line_number, frontend_id) {
+    : PopupRowView(popup_view, line_number, frontend_id) {
   SetFocusBehavior(FocusBehavior::ALWAYS);
 }
 
-BEGIN_METADATA(PopupFooterView, PopupItemView)
-END_METADATA
-
-/************** PopupSeparatorView **************/
-
-// static
-PopupSeparatorView* PopupSeparatorView::Create(PopupViewViews* popup_view,
-                                               int line_number) {
-  PopupSeparatorView* result = new PopupSeparatorView(popup_view, line_number);
-  result->Init();
-  return result;
-}
-
-void PopupSeparatorView::GetAccessibleNodeData(ui::AXNodeData* node_data) {
-  // Separators are not selectable.
-  node_data->role = ax::mojom::Role::kSplitter;
-}
-
-void PopupSeparatorView::CreateContent() {
-  SetUseDefaultFillLayout(true);
-
-  AddChildView(views::Builder<views::Separator>()
-                   .SetBorder(views::CreateEmptyBorder(
-                       gfx::Insets::VH(GetContentsVerticalPadding(), 0)))
-                   .SetColorId(ui::kColorSeparator)
-                   .Build());
-
-  SetBackground(views::CreateThemedSolidBackground(GetBackgroundColorId()));
-}
-
-PopupSeparatorView::PopupSeparatorView(PopupViewViews* popup_view,
-                                       int line_number)
-    : PopupRowView(popup_view, line_number) {
-  SetFocusBehavior(FocusBehavior::NEVER);
-}
-
-BEGIN_METADATA(PopupSeparatorView, PopupRowView)
-END_METADATA
-
-/************** PopupWarningView **************/
-
-// static
-PopupWarningView* PopupWarningView::Create(PopupViewViews* popup_view,
-                                           int line_number) {
-  PopupWarningView* result = new PopupWarningView(popup_view, line_number);
-  result->Init();
-  return result;
-}
-
-void PopupWarningView::GetAccessibleNodeData(ui::AXNodeData* node_data) {
-  base::WeakPtr<AutofillPopupController> controller =
-      popup_view()->controller();
-  if (!controller) {
-    return;
-  }
-
-  node_data->role = ax::mojom::Role::kStaticText;
-  node_data->SetNameChecked(
-      controller->GetSuggestionAt(GetLineNumber()).main_text.value);
-}
-
-void PopupWarningView::CreateContent() {
-  base::WeakPtr<AutofillPopupController> controller =
-      popup_view()->controller();
-
-  SetUseDefaultFillLayout(true);
-  SetBorder(views::CreateEmptyBorder(gfx::Insets::VH(
-      PopupBaseView::GetCornerRadius(), PopupBaseView::GetHorizontalMargin())));
-
-  AddChildView(
-      views::Builder<views::Label>()
-          .SetText(controller->GetSuggestionMainTextAt(GetLineNumber()))
-          .SetTextContext(views::style::CONTEXT_DIALOG_BODY_TEXT)
-          .SetTextStyle(ChromeTextStyle::STYLE_RED)
-          .SetMultiLine(true)
-          .SetHorizontalAlignment(gfx::HorizontalAlignment::ALIGN_LEFT)
-          .SetEnabledColorId(ui::kColorAlertHighSeverity)
-          .Build());
-}
-
-BEGIN_METADATA(PopupWarningView, PopupRowView)
-END_METADATA
-
-/************** PopupRowView **************/
-void PopupRowView::SetSelected(bool selected) {
-  if (selected == selected_) {
-    return;
-  }
-
-  selected_ = selected;
-  if (selected) {
-    popup_view_->NotifyAXSelection(this);
-  }
-  RefreshStyle();
-  OnPropertyChanged(&selected_, views::kPropertyEffectsNone);
-}
-
-void PopupRowView::MaybeShowIphPromo() {
-  std::string feature_name = popup_view()
-                                 ->controller()
-                                 ->GetSuggestionAt(GetLineNumber())
-                                 .feature_for_iph;
-  if (feature_name.empty()) {
-    return;
-  }
-
-  if (feature_name == "IPH_AutofillVirtualCardSuggestion") {
-    SetProperty(views::kElementIdentifierKey,
-                kAutofillCreditCardSuggestionEntryElementId);
-    Browser* browser = popup_view()->browser();
-    DCHECK(browser);
-    browser->window()->MaybeShowFeaturePromo(
-        feature_engagement::kIPHAutofillVirtualCardSuggestionFeature);
-  }
-}
-
-bool PopupRowView::OnMouseDragged(const ui::MouseEvent& event) {
-  return true;
-}
-
-bool PopupRowView::OnMousePressed(const ui::MouseEvent& event) {
-  return true;
-}
-
-PopupRowView::PopupRowView(PopupViewViews* popup_view, int line_number)
-    : popup_view_(popup_view), line_number_(line_number) {
-  SetNotifyEnterExitOnChild(true);
-}
-
-void PopupRowView::Init() {
-  CreateContent();
-}
-
-int PopupRowView::GetLineNumber() const {
-  return line_number_;
-}
-
-bool PopupRowView::GetSelected() const {
-  return selected_;
-}
-
-ui::ColorId PopupRowView::GetBackgroundColorId() const {
-  return GetSelected() ? ui::kColorDropdownBackgroundSelected
-                       : ui::kColorDropdownBackground;
-}
-
-bool PopupRowView::HandleAccessibleAction(const ui::AXActionData& action_data) {
-  base::WeakPtr<AutofillPopupController> controller =
-      popup_view()->controller();
-  if (controller && action_data.action == ax::mojom::Action::kFocus) {
-    controller->SetSelectedLine(line_number_);
-  }
-  return View::HandleAccessibleAction(action_data);
-}
-
-BEGIN_METADATA(PopupRowView, views::View)
-ADD_PROPERTY_METADATA(bool, Selected)
-ADD_READONLY_PROPERTY_METADATA(int, LineNumber)
+BEGIN_METADATA(PopupFooterView, PopupRowView)
 END_METADATA
 
 }  // namespace autofill

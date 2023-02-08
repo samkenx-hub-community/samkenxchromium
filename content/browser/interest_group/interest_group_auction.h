@@ -184,10 +184,10 @@ class CONTENT_EXPORT InterestGroupAuction
     // there's a crash if this is dereferenced after move.
     std::unique_ptr<StorageInterestGroup> bidder;
 
-    // Set of render URLs that are k-anonymous for use as ad or ad component
-    // render URLs for this interest group.
+    // Set of render keys that are k-anonymous and correspond to ad or ad
+    // component render URLs for this interest group.
     // (Not set if we are not configured to care).
-    base::flat_map<GURL, bool> kanon_render_urls;
+    base::flat_map<std::string, bool> kanon_keys;
 
     // This starts off as the base priority of the interest group, but is
     // updated by sparse vector multiplications using first the priority vector
@@ -483,14 +483,23 @@ class CONTENT_EXPORT InterestGroupAuction
       std::vector<GURL>& debug_win_report_urls,
       std::vector<GURL>& debug_loss_report_urls);
 
-  // Retrieves all requests to the Private Aggregation API returned by
-  // GenerateBid() and ScoreAd(). The return value is keyed by reporting origin
-  // of the associated requests. May only be called by external consumers after
-  // an auction has failed (on success, used internally to pass them to the
-  // InterestGroupAuctionReporter). May only be called once, since it takes
-  // ownership of stored reporting URLs.
+  // Retrieves all requests with reserved event type to the Private Aggregation
+  // API returned by GenerateBid() and ScoreAd(). The return value is keyed by
+  // reporting origin of the associated requests. May only be called by external
+  // consumers after an auction has failed (on success, used internally to pass
+  // them to the InterestGroupAuctionReporter). May only be called once, since
+  // it takes ownership of stored reporting URLs.
   std::map<url::Origin, PrivateAggregationRequests>
-  TakePrivateAggregationRequests();
+  TakeReservedPrivateAggregationRequests();
+
+  // Retrieves all requests with non-reserved event type to the Private
+  // Aggregation API returned by GenerateBid(). The return value is keyed by
+  // event type of the associated requests. May only be called by external
+  // consumers after an auction has failed (on success, used internally to pass
+  // them to the InterestGroupAuctionReporter). May only be called once, since
+  // it takes ownership of stored reporting URLs.
+  std::map<std::string, PrivateAggregationRequests>
+  TakeNonReservedPrivateAggregationRequests();
 
   // Retrieves any errors from the auction. May only be called once, since it
   // takes ownership of stored errors.
@@ -508,6 +517,10 @@ class CONTENT_EXPORT InterestGroupAuction
   // failed auction may result in keys that still need to be joined, for
   // instance if the reason the auction failed was that none of the bids were
   // k-anonymous.
+  //
+  // If CreateReporter() is invoked, the returned reporter will automatically
+  // join the k-anon sets if it's informed the winning ad has been navigated to,
+  // so there's no need for anything else to invoke this method.
   base::flat_set<std::string> GetKAnonKeysToJoin() const;
 
   // Returns the top bid of whichever auction (k-anon or not, depending on the
@@ -914,12 +927,19 @@ class CONTENT_EXPORT InterestGroupAuction
   // Holds a reference to the SellerWorklet used by the auction.
   std::unique_ptr<AuctionWorkletManager::WorkletHandle> seller_worklet_handle_;
 
-  // Stores all pending Private Aggregation API report requests from the bidding
-  // and scoring phase. These are passed to the InterestGroupAuctionReporter
-  // when it's created. Keyed by the origin of the script that issued the
-  // request (i.e. the reporting origin).
+  // Stores all pending Private Aggregation API report requests of reserved
+  // event type from the bidding and scoring phase. These are passed to the
+  // InterestGroupAuctionReporter when it's created. Keyed by the origin of the
+  // script that issued the request (i.e. the reporting origin).
   std::map<url::Origin, PrivateAggregationRequests>
-      private_aggregation_requests_;
+      private_aggregation_requests_reserved_;
+
+  // Stores all pending Private Aggregation API report requests of non-reserved
+  // event type. Only comes from bidding phase of winning buyer. These are
+  // passed to the InterestGroupAuctionReporter when it's created. Keyed by the
+  // request's event type.
+  std::map<std::string, PrivateAggregationRequests>
+      private_aggregation_requests_non_reserved_;
 
   // All errors reported by worklets thus far.
   std::vector<std::string> errors_;

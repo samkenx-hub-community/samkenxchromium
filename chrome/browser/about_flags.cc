@@ -4164,10 +4164,6 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kEnableIsolatedWebAppDevModeName,
      flag_descriptions::kEnableIsolatedWebAppDevModeDescription, kOsAll,
      FEATURE_VALUE_TYPE(features::kIsolatedWebAppDevMode)},
-    {"install-isolated-web-app-from-file",
-     flag_descriptions::kInstallIsolatedWebAppFromFile,
-     flag_descriptions::kInstallIsolatedWebAppFromFileDescription, kOsAll,
-     ORIGIN_LIST_VALUE_TYPE(switches::kInstallIsolatedWebAppFromFile, "")},
     {"install-isolated-web-app-from-url",
      flag_descriptions::kInstallIsolatedWebAppFromUrl,
      flag_descriptions::kInstallIsolatedWebAppFromUrlDescription, kOsAll,
@@ -4179,9 +4175,6 @@ const FeatureEntry kFeatureEntries[] = {
     {"isolate-origins", flag_descriptions::kIsolateOriginsName,
      flag_descriptions::kIsolateOriginsDescription, kOsAll,
      ORIGIN_LIST_VALUE_TYPE(switches::kIsolateOrigins, "")},
-    {"isolated-app-origins", flag_descriptions::kIsolatedAppOriginsName,
-     flag_descriptions::kIsolatedAppOriginsDescription, kOsAll,
-     ORIGIN_LIST_VALUE_TYPE(switches::kIsolatedAppOrigins, "")},
     {about_flags::kSiteIsolationTrialOptOutInternalName,
      flag_descriptions::kSiteIsolationOptOutName,
      flag_descriptions::kSiteIsolationOptOutDescription, kOsAll,
@@ -4642,6 +4635,10 @@ const FeatureEntry kFeatureEntries[] = {
                                     "ForceDarkVariations")},
 #endif  // BUILDFLAG(IS_CHROMEOS_ASH)
 #if BUILDFLAG(IS_ANDROID)
+    {"enable-accessibility-form-controls-mode",
+     flag_descriptions::kAccessibilityFormControlsModeName,
+     flag_descriptions::kAccessibilityFormControlsModeDescription, kOsAndroid,
+     FEATURE_VALUE_TYPE(features::kAccessibilityFormControlsMode)},
     {"enable-accessibility-page-zoom",
      flag_descriptions::kAccessibilityPageZoomName,
      flag_descriptions::kAccessibilityPageZoomDescription, kOsAndroid,
@@ -4906,7 +4903,7 @@ const FeatureEntry kFeatureEntries[] = {
      FEATURE_VALUE_TYPE(arc::kArcUpdateO4CListViaA2C2)},
     {"arc-vmm-swap", flag_descriptions::kArcVmmSwapName,
      flag_descriptions::kArcVmmSwapDesc, kOsCrOS,
-     PLATFORM_FEATURE_NAME_TYPE("CrOSArcVmmSwap")},
+     PLATFORM_FEATURE_NAME_TYPE("CrOSLateBootArcVmmSwap")},
     {"arc-vmm-swap-keyboard-shortcut",
      flag_descriptions::kArcVmmSwapKBShortcutName,
      flag_descriptions::kArcVmmSwapKBShortcutDesc, kOsCrOS,
@@ -4998,6 +4995,9 @@ const FeatureEntry kFeatureEntries[] = {
     {"files-conflict-dialog", flag_descriptions::kFilesConflictDialogName,
      flag_descriptions::kFilesConflictDialogDescription, kOsCrOS,
      FEATURE_VALUE_TYPE(ash::features::kFilesConflictDialog)},
+    {"files-drive-shortcuts", flag_descriptions::kFilesDriveShortcutsName,
+     flag_descriptions::kFilesDriveShortcutsDescription, kOsCrOS,
+     FEATURE_VALUE_TYPE(ash::features::kFilesDriveShortcuts)},
     {"files-inline-sync-status", flag_descriptions::kFilesInlineSyncStatusName,
      flag_descriptions::kFilesInlineSyncStatusDescription, kOsCrOS,
      FEATURE_VALUE_TYPE(ash::features::kFilesInlineSyncStatus)},
@@ -5907,7 +5907,7 @@ const FeatureEntry kFeatureEntries[] = {
         "zero-copy-tab-capture",
         flag_descriptions::kEnableZeroCopyTabCaptureName,
         flag_descriptions::kEnableZeroCopyTabCaptureDescription,
-        kOsMac | kOsWin,
+        kOsMac | kOsWin | kOsCrOS,
         FEATURE_VALUE_TYPE(blink::features::kZeroCopyTabCapture),
     },
 
@@ -6390,10 +6390,6 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kSharingDesktopScreenshotsName,
      flag_descriptions::kSharingDesktopScreenshotsDescription, kOsDesktop,
      FEATURE_VALUE_TYPE(sharing_hub::kDesktopScreenshots)},
-    {"sharing-desktop-screenshots-edit",
-     flag_descriptions::kSharingDesktopScreenshotsEditName,
-     flag_descriptions::kSharingDesktopScreenshotsEditDescription, kOsDesktop,
-     FEATURE_VALUE_TYPE(share::kSharingDesktopScreenshotsEdit)},
     {"sharing-desktop-share-preview",
      flag_descriptions::kSharingDesktopSharePreviewName,
      flag_descriptions::kSharingDesktopSharePreviewDescription, kOsDesktop,
@@ -6407,9 +6403,9 @@ const FeatureEntry kFeatureEntries[] = {
 #endif
 
 #if BUILDFLAG(IS_CHROMEOS_ASH)
-    {"float-window", flag_descriptions::kFloatWindow,
-     flag_descriptions::kFloatWindowDescription, kOsCrOS,
-     FEATURE_VALUE_TYPE(chromeos::wm::features::kFloatWindow)},
+    {"window-layout-menu", flag_descriptions::kWindowLayoutMenu,
+     flag_descriptions::kWindowLayoutMenuDescription, kOsCrOS,
+     FEATURE_VALUE_TYPE(chromeos::wm::features::kWindowLayoutMenu)},
     {"cros-labs-overview-desk-navigation",
      flag_descriptions::kOverviewDeskNavigationName,
      flag_descriptions::kOverviewDeskNavigationDescription, kOsCrOS,
@@ -6655,11 +6651,6 @@ const FeatureEntry kFeatureEntries[] = {
      kOsCrOS,
      FEATURE_VALUE_TYPE(
          features::kAccessibilityAcceleratorNotificationsTimeout)},
-
-    {"enable-chromevox-q1-fast-track-features",
-     flag_descriptions::kChromeVoxQ1FastTrackFeaturesName,
-     flag_descriptions::kChromeVoxQ1FastTrackFeaturesDescription, kOsCrOS,
-     FEATURE_VALUE_TYPE(features::kChromeVoxQ1FastTrackFeatures)},
 
     {"enable-accessibility-service",
      flag_descriptions::kAccessibilityServiceName,
@@ -7854,9 +7845,13 @@ const FeatureEntry kFeatureEntries[] = {
                                     kFedCmFeatureVariations,
                                     "FedCmFeatureVariations")},
 
-    {"fedcm-auto-sign-in", flag_descriptions::kFedCmAutoSigninName,
-     flag_descriptions::kFedCmAutoSigninDescription, kOsAll,
-     FEATURE_VALUE_TYPE(features::kFedCmAutoSignin)},
+    {"fedcm-auto-re-authn", flag_descriptions::kFedCmAutoReauthnName,
+     flag_descriptions::kFedCmAutoReauthnDescription, kOsAll,
+     FEATURE_VALUE_TYPE(features::kFedCmAutoReauthn)},
+
+    {"fedcm-idp-registration", flag_descriptions::kFedCmIdPRegistrationName,
+     flag_descriptions::kFedCmIdPRegistrationDescription, kOsDesktop,
+     FEATURE_VALUE_TYPE(features::kFedCmIdPRegistration)},
 
     {"fedcm-iframe-support", flag_descriptions::kFedCmIframeSupportName,
      flag_descriptions::kFedCmIframeSupportDescription, kOsAll,
@@ -8050,12 +8045,6 @@ const FeatureEntry kFeatureEntries[] = {
          kPasswordStrengthIndicatorVariations,
          "PasswordStrengthIndicator")},
 
-#if BUILDFLAG(IS_CHROMEOS_ASH)
-    {"partial-split", flag_descriptions::kPartialSplit,
-     flag_descriptions::kPartialSplitDescription, kOsCrOS,
-     FEATURE_VALUE_TYPE(chromeos::wm::features::kPartialSplit)},
-#endif  // BUILDFLAG(IS_CHROMEOS_ASH)
-
 #if BUILDFLAG(IS_ANDROID)
     {"privacy-guide-android", flag_descriptions::kPrivacyGuideAndroidName,
      flag_descriptions::kPrivacyGuideAndroidDescription, kOsAndroid,
@@ -8097,11 +8086,6 @@ const FeatureEntry kFeatureEntries[] = {
     {"chrome-whats-new-ui", flag_descriptions::kChromeWhatsNewUIName,
      flag_descriptions::kChromeWhatsNewUIDescription, kOsDesktop,
      FEATURE_VALUE_TYPE(features::kChromeWhatsNewUI)},
-
-    {"sync-trusted-vault-passphrase-promo",
-     flag_descriptions::kSyncTrustedVaultPassphrasePromoName,
-     flag_descriptions::kSyncTrustedVaultPassphrasePromoDescription, kOsAll,
-     FEATURE_VALUE_TYPE(::syncer::kSyncTrustedVaultPassphrasePromo)},
 
     {"sync-standalone-invalidations", flag_descriptions::kSyncInvalidationsName,
      flag_descriptions::kSyncInvalidationsDescription, kOsAll,
@@ -9324,6 +9308,19 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kWebViewTagMPArchBehaviorDescription, kOsDesktop,
      FEATURE_VALUE_TYPE(extensions_features::kWebviewTagMPArchBehavior)},
 #endif  // BUILDFLAG(ENABLE_EXTENSIONS)
+
+    {"autofill-enable-page-load-metadata-integration",
+     flag_descriptions::kAutofillEnablePageLoadMetadataIntegrationName,
+     flag_descriptions::kAutofillEnablePageLoadMetadataIntegrationDescription,
+     kOsAll,
+     FEATURE_VALUE_TYPE(
+         autofill::features::kAutofillEnablePageLoadMetadataIntegration)},
+
+#if BUILDFLAG(IS_CHROMEOS_ASH)
+    {"system-live-caption", flag_descriptions::kSystemLiveCaptionName,
+     flag_descriptions::kSystemLiveCaptionDescription, kOsCrOS,
+     FEATURE_VALUE_TYPE(ash::features::kSystemLiveCaption)},
+#endif  // BUILDFLAG(IS_CHROMEOS_ASH)
 
     // NOTE: Adding a new flag requires adding a corresponding entry to enum
     // "LoginCustomFlags" in tools/metrics/histograms/enums.xml. See "Flag

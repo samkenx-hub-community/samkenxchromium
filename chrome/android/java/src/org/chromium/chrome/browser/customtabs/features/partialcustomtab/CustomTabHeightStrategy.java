@@ -32,8 +32,9 @@ public class CustomTabHeightStrategy implements FindToolbarObserver {
             @Px int initialWidth, int breakPointDp, boolean isPartialCustomTabFixedHeight,
             CustomTabsConnection connection, @Nullable CustomTabsSessionToken session,
             ActivityLifecycleDispatcher lifecycleDispatcher, FullscreenManager fullscreenManager,
-            boolean isTablet, boolean interactWithBackground) {
-        if (initialHeight <= 0) {
+            boolean isTablet, boolean interactWithBackground, boolean showMaximizeButton) {
+        if (initialHeight <= 0
+                && (!ChromeFeatureList.sCctResizableSideSheet.isEnabled() || initialWidth <= 0)) {
             return new CustomTabHeightStrategy();
         }
 
@@ -42,13 +43,14 @@ public class CustomTabHeightStrategy implements FindToolbarObserver {
                     breakPointDp, isPartialCustomTabFixedHeight,
                     (height, width)
                             -> connection.onResized(session, height, width),
-                    lifecycleDispatcher, fullscreenManager, isTablet, interactWithBackground);
+                    lifecycleDispatcher, fullscreenManager, isTablet, interactWithBackground,
+                    showMaximizeButton);
         } else {
             return new PartialCustomTabHeightStrategy(activity, initialHeight,
                     isPartialCustomTabFixedHeight,
                     (height, width)
                             -> connection.onResized(session, height, width),
-                    lifecycleDispatcher, fullscreenManager, isTablet, interactWithBackground,
+                    lifecycleDispatcher, fullscreenManager, isTablet, interactWithBackground, false,
                     new PartialCustomTabHandleStrategyFactory());
         }
     }

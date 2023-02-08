@@ -62,7 +62,6 @@
 #include "chrome/browser/ui/webui/ash/login/encryption_migration_screen_handler.h"
 #include "chrome/browser/ui/webui/ash/login/enrollment_screen_handler.h"
 #include "chrome/browser/ui/webui/ash/login/error_screen_handler.h"
-#include "chrome/browser/ui/webui/ash/login/eula_screen_handler.h"
 #include "chrome/browser/ui/webui/ash/login/family_link_notice_screen_handler.h"
 #include "chrome/browser/ui/webui/ash/login/fingerprint_setup_screen_handler.h"
 #include "chrome/browser/ui/webui/ash/login/gaia_password_changed_screen_handler.h"
@@ -178,7 +177,6 @@ constexpr char kLogo24PX1XSvgPath[] = "logo_24px-1x.svg";
 constexpr char kLogo24PX2XSvgPath[] = "logo_24px-2x.svg";
 constexpr char kSyncConsentIcons[] = "sync-consent-icons.html";
 constexpr char kSyncConsentIconsJs[] = "sync-consent-icons.m.js";
-constexpr char kArcAppDownloadingVideoPath[] = "res/arc_app_dowsnloading.mp4";
 #endif
 
 // Adds various product logo resources.
@@ -210,11 +208,6 @@ void AddArcScreensResources(content::WebUIDataSource* source) {
   source->AddResourcePath(kArcPlaystoreJSPath, IDR_ARC_SUPPORT_PLAYSTORE_JS);
   source->AddResourcePath(kArcPlaystoreLogoPath,
                           IDR_ARC_SUPPORT_PLAYSTORE_LOGO);
-
-#if BUILDFLAG(GOOGLE_CHROME_BRANDING)
-  source->AddResourcePath(kArcAppDownloadingVideoPath,
-                          IDR_OOBE_ARC_APPS_DOWNLOADING_VIDEO);
-#endif
 }
 
 void AddAssistantScreensResources(content::WebUIDataSource* source) {
@@ -351,8 +344,6 @@ void OobeUI::ConfigureOobeDisplay() {
     }
   }
 
-  AddScreenHandler(std::make_unique<EulaScreenHandler>());
-
   AddScreenHandler(std::make_unique<NetworkScreenHandler>());
 
   AddScreenHandler(std::make_unique<EnableAdbSideloadingScreenHandler>());
@@ -377,8 +368,7 @@ void OobeUI::ConfigureOobeDisplay() {
       std::make_unique<ErrorScreen>(GetView<ErrorScreenHandler>()->AsWeakPtr());
   ErrorScreen* error_screen = error_screen_.get();
 
-  AddScreenHandler(std::make_unique<EnrollmentScreenHandler>(
-      network_state_informer_, error_screen));
+  AddScreenHandler(std::make_unique<EnrollmentScreenHandler>());
 
   AddScreenHandler(std::make_unique<LocaleSwitchScreenHandler>(core_handler_));
 
@@ -620,7 +610,6 @@ void OobeUI::AddOobeComponents(content::WebUIDataSource* source) {
                             IDR_OOBE_COMPONENTS_OOBE_CUSTOM_VARS_CSS_JS);
   }
 
-  source->AddResourcePath("spinner.json", IDR_LOGIN_SPINNER_ANIMATION);
   source->OverrideContentSecurityPolicy(
       network::mojom::CSPDirectiveName::WorkerSrc,
       "worker-src blob: chrome://resources 'self';");

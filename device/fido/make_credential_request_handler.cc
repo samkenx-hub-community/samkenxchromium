@@ -124,7 +124,7 @@ MakeCredentialStatus IsCandidateAuthenticatorPostTouch(
     const MakeCredentialOptions& options,
     const FidoRequestHandlerBase::Observer* observer) {
   if (options.cred_protect_request && options.cred_protect_request->second &&
-      !authenticator->SupportsCredProtectExtension()) {
+      !authenticator->Options().supports_cred_protect) {
     return MakeCredentialStatus::kAuthenticatorMissingResidentKeys;
   }
 
@@ -279,7 +279,7 @@ bool ValidateResponseExtensions(
     const std::string& ext_name = it.first.GetString();
 
     if (ext_name == kExtensionCredProtect) {
-      if (!authenticator.SupportsCredProtectExtension() ||
+      if (!authenticator.Options().supports_cred_protect ||
           !it.second.is_integer()) {
         return false;
       }
@@ -1010,14 +1010,16 @@ void MakeCredentialRequestHandler::SpecializeRequestForAuthenticator(
   }
 
   if (options_.cred_protect_request &&
-      authenticator->SupportsCredProtectExtension()) {
+      authenticator->Options().supports_cred_protect) {
     request->cred_protect = CredProtectForAuthenticator(
         options_.cred_protect_request->first, *authenticator);
     request->cred_protect_enforce = options_.cred_protect_request->second;
   }
 
-  if (request->hmac_secret && !authenticator->SupportsHMACSecretExtension()) {
-    request->hmac_secret = false;
+  if (request->hmac_secret) {
+    request->prf = auth_options.supports_prf;
+    request->hmac_secret =
+        !auth_options.supports_prf && auth_options.supports_hmac_secret;
   }
 
   if (request->large_blob_key && !auth_options.supports_large_blobs) {
@@ -1029,7 +1031,7 @@ void MakeCredentialRequestHandler::SpecializeRequestForAuthenticator(
     request->min_pin_length_requested = false;
   }
 
-  if (!authenticator->SupportsEnterpriseAttestation()) {
+  if (!authenticator->Options().enterprise_attestation) {
     switch (request->attestation_preference) {
       case AttestationConveyancePreference::kEnterpriseApprovedByBrowser:
         // If enterprise attestation is approved by policy then downgrade to
@@ -1057,7 +1059,8 @@ void MakeCredentialRequestHandler::SpecializeRequestForAuthenticator(
     request->cred_blob.reset();
   }
 
-  if (request->device_public_key && !authenticator->SupportsDevicePublicKey()) {
+  if (request->device_public_key &&
+      !authenticator->Options().supports_device_public_key) {
     request->device_public_key.reset();
   }
 }

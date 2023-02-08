@@ -65,7 +65,8 @@ BASE_FEATURE(kServiceWorkerScopeCache,
              "ServiceWorkerScopeCache",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-// The scope URL count limit per the storage key.
+// The scope URL count limit per the storage key. This must be set less than or
+// equal to 'kServiceWorkerScopeCacheHardLimitPerKey'.
 const base::FeatureParam<int> kServiceWorkerScopeCacheLimitPerKey{
     &kServiceWorkerScopeCache, "ServiceWorkerScopeCacheLimitPerKey", 100};
 
@@ -1742,6 +1743,10 @@ void ServiceWorkerStorage::FindForClientUrlInDB(
   mojom::ServiceWorkerRegistrationDataPtr data;
   auto resources = std::make_unique<ResourceList>();
   status = ServiceWorkerDatabase::Status::kErrorNotFound;
+
+  base::UmaHistogramCounts1000(
+      "ServiceWorker.Storage.FindForClientUrlInDB.ScopeCountForStorageKey",
+      registration_data_list.size());
 
   // Find one with a scope match.
   blink::ServiceWorkerLongestScopeMatcher matcher(client_url);

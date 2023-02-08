@@ -669,7 +669,7 @@
 <translation id="4678082183394354975">მუქი თემა საიტებისთვის ჩართულია Chrome-ში</translation>
 <translation id="4684427112815847243">ყველაფრის სინქრონიზაცია</translation>
 <translation id="4685741273709472646">აირჩიეთ ჩამოსაშლელი სიიდან</translation>
-<translation id="4687718960473379118">საიტების მიერ შემოთავაზებული რეკლამა</translation>
+<translation id="4687718960473379118">საიტების მიერ შემოთავაზებული რეკლამები</translation>
 <translation id="4689792375321623175">სურათის ძიება Google-ით <ph name="BEGIN_NEW" />სიახლე<ph name="END_NEW" /></translation>
 <translation id="4695891336199304370">{SHIPPING_OPTIONS,plural, =1{<ph name="SHIPPING_OPTION_PREVIEW" />\u2026 და <ph name="NUMBER_OF_ADDITIONAL_SHIPPING_OPTIONS" /> სხვა}other{<ph name="SHIPPING_OPTION_PREVIEW" />\u2026 და <ph name="NUMBER_OF_ADDITIONAL_SHIPPING_OPTIONS" /> სხვა}}</translation>
 <translation id="4699172675775169585">ქეშირებული სურათები და ფაილები</translation>
@@ -922,6 +922,7 @@
 <translation id="6000203700195075278">თვალის ხელახლა მიდევნება</translation>
 <translation id="6002122790816966947">თქვენი მოწყობილობები</translation>
 <translation id="6005538289190791541">შემოთავაზებული პაროლი</translation>
+<translation id="6011308810877101166">ძიების შემოთავაზებების გაუმჯობესება</translation>
 <translation id="6039379616847168523">შემდეგ ჩანართზე გადასვლა</translation>
 <translation id="6040143037577758943">დახურვა</translation>
 <translation id="604124094241169006">ავტომატური</translation>
@@ -1452,6 +1453,7 @@
 <translation id="8746155870861185046">გამოყოფილის გაზიარება</translation>
 <translation id="8748850008226585750">შიგთავსი დამალულია</translation>
 <translation id="8756969031206844760">გსურთ პაროლის განახლება?</translation>
+<translation id="8765470054473112089">მისამართთა ზოლში ან საძიებო ველში ტექსტის აკრეფისას უკეთესი შემოთავაზებების მისაღებად Chrome თქვენ მიერ აკრეფილ ტექსტს გაუგზავნის თქვენს ნაგულისხმევ საძიებო სისტემას. აღნიშნული ფუნქცია გამორთულია ინკოგნიტო რეჟიმში.</translation>
 <translation id="8766529642647037772">გსურთ, შექმნათ ამის მსგავსი გამოყოფილი ბმული?</translation>
 <translation id="8773160212632396039">მოთხოვნა მუშავდება</translation>
 <translation id="8788265440806329501">ნავიგაციის ისტორია დახურულია</translation>

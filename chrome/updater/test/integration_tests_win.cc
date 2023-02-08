@@ -101,27 +101,6 @@ HRESULT CreateLocalServer(GUID clsid,
                             IID_PPV_ARGS(&server));
 }
 
-// Returns the root directory where the updater product is installed. This
-// is the parent directory where the versioned directories of the
-// updater instances are.
-absl::optional<base::FilePath> GetProductPath(UpdaterScope scope) {
-  base::FilePath app_data_dir;
-  if (!base::PathService::Get(IsSystemInstall(scope) ? base::DIR_PROGRAM_FILES
-                                                     : base::DIR_LOCAL_APP_DATA,
-                              &app_data_dir)) {
-    return absl::nullopt;
-  }
-  return app_data_dir.AppendASCII(COMPANY_SHORTNAME_STRING)
-      .AppendASCII(PRODUCT_FULLNAME_STRING);
-}
-
-// Returns the versioned directory of this updater instances.
-absl::optional<base::FilePath> GetProductVersionPath(UpdaterScope scope) {
-  absl::optional<base::FilePath> product_path = GetProductPath(scope);
-  return product_path ? product_path->AppendASCII(kUpdaterVersion)
-                      : product_path;
-}
-
 [[nodiscard]] bool RegKeyExists(HKEY root, const std::wstring& path) {
   return base::win::RegKey(root, path.c_str(), Wow6432(KEY_QUERY_VALUE))
       .Valid();
@@ -328,24 +307,16 @@ void CheckInstallation(UpdaterScope scope,
             .c_str());
   }
 
-  const absl::optional<base::FilePath> product_version_path =
-      GetProductVersionPath(scope);
-  const absl::optional<base::FilePath> data_dir_path = GetDataDirPath(scope);
-
-  for (const absl::optional<base::FilePath>& path :
-       {product_version_path, data_dir_path}) {
-    if (!is_active_and_sxs && path == data_dir_path)
-      continue;
-
-    EXPECT_TRUE(path);
-    EXPECT_TRUE(WaitFor(base::BindLambdaForTesting([&]() {
-                          return is_installed == base::PathExists(*path);
-                        }),
-                        base::BindLambdaForTesting([&]() {
-                          VLOG(0) << "Still waiting for " << *path
-                                  << " where is_installed=" << is_installed;
-                        })));
-  }
+  const absl::optional<base::FilePath> path =
+      GetVersionedInstallDirectory(scope, base::Version(kUpdaterVersion));
+  EXPECT_TRUE(path);
+  EXPECT_TRUE(WaitFor(base::BindLambdaForTesting([&]() {
+                        return is_installed == base::PathExists(*path);
+                      }),
+                      base::BindLambdaForTesting([&]() {
+                        VLOG(0) << "Still waiting for " << *path
+                                << " where is_installed=" << is_installed;
+                      })));
 }
 
 // Returns true if any updater process is found running in any session in the
@@ -544,6 +515,17 @@ base::win::ScopedVariant GetDispatchProperty(
   return result;
 }
 
+std::wstring GetAppVersionWebString(
+    Microsoft::WRL::ComPtr<IDispatch> version_web_dispatch) {
+  Microsoft::WRL::ComPtr<IAppVersionWeb> version_web;
+  EXPECT_HRESULT_SUCCEEDED(version_web_dispatch.As(&version_web));
+
+  base::win::ScopedBstr version;
+  EXPECT_HRESULT_SUCCEEDED(version_web->get_version(version.Receive()));
+
+  return version.Get();
+}
+
 }  // namespace
 
 base::FilePath GetSetupExecutablePath() {
@@ -551,26 +533,6 @@ base::FilePath GetSetupExecutablePath() {
   if (!base::PathService::Get(base::DIR_EXE, &out_dir))
     return base::FilePath();
   return out_dir.AppendASCII("UpdaterSetup_test.exe");
-}
-
-absl::optional<base::FilePath> GetInstalledExecutablePath(UpdaterScope scope) {
-  absl::optional<base::FilePath> path = GetProductVersionPath(scope);
-  if (!path)
-    return absl::nullopt;
-  return path->Append(GetExecutableRelativePath());
-}
-
-absl::optional<base::FilePath> GetFakeUpdaterInstallFolderPath(
-    UpdaterScope scope,
-    const base::Version& version) {
-  absl::optional<base::FilePath> path = GetProductVersionPath(scope);
-  if (!path)
-    return absl::nullopt;
-  return path->AppendASCII(version.GetString());
-}
-
-absl::optional<base::FilePath> GetDataDirPath(UpdaterScope scope) {
-  return GetProductPath(scope);
 }
 
 void Clean(UpdaterScope scope) {
@@ -629,7 +591,7 @@ void Clean(UpdaterScope scope) {
   if (target_path)
     base::DeleteFile(*target_path);
 
-  absl::optional<base::FilePath> path = GetProductPath(scope);
+  absl::optional<base::FilePath> path = GetInstallDirectory(scope);
   ASSERT_TRUE(path);
   ASSERT_TRUE(base::DeletePathRecursively(*path)) << *path;
 
@@ -946,8 +908,8 @@ HRESULT DoLoopUntilDone(Microsoft::WRL::ComPtr<IAppBundleWeb> bundle,
     Microsoft::WRL::ComPtr<ICurrentState> state;
     EXPECT_HRESULT_SUCCEEDED(state_dispatch.As(&state));
 
-    std::wstring stateDescription;
-    std::wstring extraData;
+    std::wstring state_description;
+    std::wstring extra_data;
 
     EXPECT_HRESULT_SUCCEEDED(state->get_stateValue(&state_value));
 
@@ -955,17 +917,33 @@ HRESULT DoLoopUntilDone(Microsoft::WRL::ComPtr<IAppBundleWeb> bundle,
 
     switch (state_value) {
       case STATE_INIT:
-        stateDescription = L"Initializating...";
+        state_description = L"Initializating...";
         break;
 
       case STATE_WAITING_TO_CHECK_FOR_UPDATE:
       case STATE_CHECKING_FOR_UPDATE: {
-        stateDescription = L"Checking for update...";
+        state_description = L"Checking for update...";
+
+        Microsoft::WRL::ComPtr<IDispatch> current_version_web_dispatch;
+        EXPECT_HRESULT_SUCCEEDED(
+            app->get_currentVersionWeb(&current_version_web_dispatch));
+
+        extra_data = base::StrCat(
+            {L"[Current Version: ",
+             GetAppVersionWebString(current_version_web_dispatch), L"]"});
         break;
       }
 
       case STATE_UPDATE_AVAILABLE: {
-        stateDescription = L"Update available!";
+        state_description = L"Update available!";
+        Microsoft::WRL::ComPtr<IDispatch> next_version_web_dispatch;
+        EXPECT_HRESULT_SUCCEEDED(
+            app->get_nextVersionWeb(&next_version_web_dispatch));
+
+        extra_data = base::StrCat(
+            {L"[Next Version: ",
+             GetAppVersionWebString(next_version_web_dispatch), L"]"});
+
         if (!done) {
           EXPECT_HRESULT_SUCCEEDED(bundle->install());
         }
@@ -974,11 +952,11 @@ HRESULT DoLoopUntilDone(Microsoft::WRL::ComPtr<IAppBundleWeb> bundle,
 
       case STATE_WAITING_TO_DOWNLOAD:
       case STATE_RETRYING_DOWNLOAD:
-        stateDescription = L"Contacting server...";
+        state_description = L"Contacting server...";
         break;
 
       case STATE_DOWNLOADING: {
-        stateDescription = L"Downloading...";
+        state_description = L"Downloading...";
 
         ULONG bytes_downloaded = 0;
         state->get_bytesDownloaded(&bytes_downloaded);
@@ -989,7 +967,7 @@ HRESULT DoLoopUntilDone(Microsoft::WRL::ComPtr<IAppBundleWeb> bundle,
         LONG download_time_remaining_ms = 0;
         state->get_downloadTimeRemainingMs(&download_time_remaining_ms);
 
-        extraData = base::StringPrintf(
+        extra_data = base::StringPrintf(
             L"[Bytes downloaded: %d][Bytes total: %d][Time remaining: %d]",
             bytes_downloaded, total_bytes_to_download,
             download_time_remaining_ms);
@@ -1000,14 +978,14 @@ HRESULT DoLoopUntilDone(Microsoft::WRL::ComPtr<IAppBundleWeb> bundle,
       case STATE_EXTRACTING:
       case STATE_APPLYING_DIFFERENTIAL_PATCH:
       case STATE_READY_TO_INSTALL: {
-        stateDescription = L"Download completed!";
+        state_description = L"Download completed!";
         ULONG bytes_downloaded = 0;
         state->get_bytesDownloaded(&bytes_downloaded);
 
         ULONG total_bytes_to_download = 0;
         state->get_totalBytesToDownload(&total_bytes_to_download);
 
-        extraData =
+        extra_data =
             base::StringPrintf(L"[Bytes downloaded: %d][Bytes total: %d]",
                                bytes_downloaded, total_bytes_to_download);
 
@@ -1018,33 +996,33 @@ HRESULT DoLoopUntilDone(Microsoft::WRL::ComPtr<IAppBundleWeb> bundle,
 
       case STATE_WAITING_TO_INSTALL:
       case STATE_INSTALLING: {
-        stateDescription = L"Installing...";
+        state_description = L"Installing...";
 
         LONG install_progress = 0;
         state->get_installProgress(&install_progress);
         LONG install_time_remaining_ms = 0;
         state->get_installTimeRemainingMs(&install_time_remaining_ms);
 
-        extraData =
+        extra_data =
             base::StringPrintf(L"[Install Progress: %d][Time remaining: %d]",
                                install_progress, install_time_remaining_ms);
         break;
       }
 
       case STATE_INSTALL_COMPLETE:
-        stateDescription = L"Done!";
+        state_description = L"Done!";
         break;
 
       case STATE_PAUSED:
-        stateDescription = L"Paused...";
+        state_description = L"Paused...";
         break;
 
       case STATE_NO_UPDATE:
-        stateDescription = L"No update available!";
+        state_description = L"No update available!";
         break;
 
       case STATE_ERROR: {
-        stateDescription = L"Error!";
+        state_description = L"Error!";
 
         EXPECT_HRESULT_SUCCEEDED(state->get_errorCode(&error_code));
 
@@ -1056,22 +1034,22 @@ HRESULT DoLoopUntilDone(Microsoft::WRL::ComPtr<IAppBundleWeb> bundle,
         EXPECT_HRESULT_SUCCEEDED(
             state->get_installerResultCode(&installer_result_code));
 
-        extraData = base::StringPrintf(
+        extra_data = base::StringPrintf(
             L"[errorCode: %d][completionMessage: %ls][installerResultCode: %d]",
             error_code, completion_message.Get(), installer_result_code);
         break;
       }
 
       default:
-        stateDescription = L"Unhandled state...";
+        state_description = L"Unhandled state...";
         break;
     }
 
     // TODO(crbug.com/1245992): Remove this logging once the code is test
     // flakiness is eliminated and no further debugging is needed.
     LOG(ERROR) << base::StringPrintf(L"[State: %d][%ls]%ls", state_value,
-                                     stateDescription.c_str(),
-                                     extraData.c_str());
+                                     state_description.c_str(),
+                                     extra_data.c_str());
     base::PlatformThread::Sleep(base::Seconds(1));
   }
 
@@ -1423,7 +1401,7 @@ void RunUninstallCmdLine(UpdaterScope scope) {
 
 void RunHandoff(UpdaterScope scope, const std::string& app_id) {
   const absl::optional<base::FilePath> installed_executable_path =
-      GetInstalledExecutablePath(scope);
+      GetUpdaterExecutablePath(scope);
   ASSERT_TRUE(installed_executable_path);
   ASSERT_TRUE(base::PathExists(*installed_executable_path));
 
@@ -1560,7 +1538,7 @@ void RunOfflineInstall(UpdaterScope scope,
   EXPECT_TRUE(DeleteRegKey(root, app_client_state_key));
 
   const absl::optional<base::FilePath> updater_exe =
-      GetInstalledExecutablePath(scope);
+      GetUpdaterExecutablePath(scope);
   ASSERT_TRUE(updater_exe.has_value());
 
   const base::FilePath exe_dir(updater_exe->DirName());

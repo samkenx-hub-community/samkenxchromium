@@ -63,6 +63,7 @@ import java.util.function.BooleanSupplier;
  */
 public class PartialCustomTabTestRule implements TestRule {
     // Pixel 3 XL metrics
+    static final float DENSITY = 1.25f;
     static final int DEVICE_HEIGHT = 2960;
     static final int DEVICE_WIDTH = 1440;
     static final int DEVICE_HEIGHT_LANDSCAPE = DEVICE_WIDTH;
@@ -111,7 +112,7 @@ public class PartialCustomTabTestRule implements TestRule {
     @Mock
     CircularProgressDrawable mSpinner;
     @Mock
-    View mToolbarView;
+    CustomTabToolbar mToolbarView;
     @Mock
     View mToolbarCoordinator;
     @Mock
@@ -121,13 +122,12 @@ public class PartialCustomTabTestRule implements TestRule {
     @Mock
     GradientDrawable mDragBarBackground;
     @Mock
-    CustomTabToolbar mCustomTabToolbar;
-    @Mock
     ColorDrawable mColorDrawable;
     @Mock
     PartialCustomTabHandleStrategyFactory mHandleStrategyFactory;
-
+    @Mock
     DisplayMetrics mMetrics;
+
     Context mContext;
     List<WindowManager.LayoutParams> mAttributeResults;
     DisplayMetrics mRealMetrics;
@@ -157,6 +157,8 @@ public class PartialCustomTabTestRule implements TestRule {
         when(mRootView.getLayoutParams()).thenReturn(mAttributes);
         when(mWindowManager.getDefaultDisplay()).thenReturn(mDisplay);
         when(mResources.getConfiguration()).thenReturn(mConfiguration);
+        mMetrics.density = DENSITY;
+        when(mResources.getDisplayMetrics()).thenReturn(mMetrics);
         when(mContentFrame.getLayoutParams()).thenReturn(mLayoutParams);
         when(mContentFrame.getHeight()).thenReturn(DEVICE_HEIGHT - NAVBAR_HEIGHT);
         when(mCoordinatorLayout.getLayoutParams()).thenReturn(mCoordinatorLayoutParams);
@@ -174,8 +176,6 @@ public class PartialCustomTabTestRule implements TestRule {
         when(mToolbarView.getBackground()).thenReturn(mColorDrawable);
         when(mToolbarView.getLayoutParams()).thenReturn(mLayoutParams);
         when(mColorDrawable.getColor()).thenReturn(2);
-        when(mCustomTabToolbar.getLayoutParams()).thenReturn(mLayoutParams);
-        when(mCustomTabToolbar.getBackground()).thenReturn(mColorDrawable);
         when(mDragBar.getBackground()).thenReturn(mDragBarBackground);
         when(mHandleStrategyFactory.create(anyInt(), any(Context.class), any(BooleanSupplier.class),
                      any(Supplier.class),
@@ -197,6 +197,7 @@ public class PartialCustomTabTestRule implements TestRule {
         mRealMetrics = new DisplayMetrics();
         mRealMetrics.widthPixels = DEVICE_WIDTH;
         mRealMetrics.heightPixels = DEVICE_HEIGHT;
+        mRealMetrics.density = DENSITY;
         doAnswer(invocation -> {
             DisplayMetrics displayMetrics = invocation.getArgument(0);
             displayMetrics.setTo(mRealMetrics);
@@ -223,6 +224,7 @@ public class PartialCustomTabTestRule implements TestRule {
         mConfiguration.orientation = Configuration.ORIENTATION_PORTRAIT;
         mRealMetrics.widthPixels = DEVICE_WIDTH;
         mRealMetrics.heightPixels = DEVICE_HEIGHT;
+        mRealMetrics.density = DENSITY;
         when(mContentFrame.getHeight()).thenReturn(DEVICE_HEIGHT - NAVBAR_HEIGHT);
         when(mDisplay.getRotation()).thenReturn(Surface.ROTATION_90);
     }
@@ -235,6 +237,7 @@ public class PartialCustomTabTestRule implements TestRule {
         mConfiguration.orientation = Configuration.ORIENTATION_LANDSCAPE;
         mRealMetrics.widthPixels = DEVICE_HEIGHT;
         mRealMetrics.heightPixels = DEVICE_WIDTH;
+        mRealMetrics.density = DENSITY;
         when(mContentFrame.getHeight()).thenReturn(DEVICE_WIDTH);
         when(mDisplay.getRotation()).thenReturn(direction);
     }

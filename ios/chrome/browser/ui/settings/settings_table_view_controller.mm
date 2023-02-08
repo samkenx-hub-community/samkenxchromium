@@ -959,7 +959,7 @@ UIImage* GetBrandedGoogleServicesSymbol() {
                                text:l10n_util::GetNSString(
                                         IDS_AUTOFILL_ADDRESSES_SETTINGS_TITLE)
                          detailText:detailText
-                             symbol:DefaultSettingsRootSymbol(kPinSymbol)
+                             symbol:CustomSettingsRootSymbol(kLocationSymbol)
               symbolBackgroundColor:[UIColor colorNamed:kYellow500Color]
             accessibilityIdentifier:kSettingsAddressesAndMoreCellId];
   } else {
@@ -1593,8 +1593,8 @@ UIImage* GetBrandedGoogleServicesSymbol() {
       break;
     case SettingsItemTypeAutofillProfile:
       base::RecordAction(base::UserMetricsAction("AutofillAddressesViewed"));
-      controller = [[AutofillProfileTableViewController alloc]
-          initWithBrowserState:_browserState];
+      controller =
+          [[AutofillProfileTableViewController alloc] initWithBrowser:_browser];
       break;
     case SettingsItemTypePriceNotifications:
       DCHECK(IsPriceNotificationsEnabled());

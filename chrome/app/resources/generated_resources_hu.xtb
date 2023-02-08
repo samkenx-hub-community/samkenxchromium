@@ -221,6 +221,7 @@ Jelszavait bármikor ellenőrizheti itt: <ph name="GOOGLE_PASSWORD_MANAGER" />.<
 <translation id="1192706927100816598">{0,plural, =1{A rendszer # másodperc múlva automatikusan kijelentkezteti.
 A(z) <ph name="DOMAIN" /> megköveteli, hogy ne távolítsa el az intelligens kártyát.}other{A rendszer # másodperc múlva automatikusan kijelentkezteti.
 A(z) <ph name="DOMAIN" /> megköveteli, hogy ne távolítsa el az intelligens kártyát.}}</translation>
+<translation id="119330003005586565">Elolvasott oldalak</translation>
 <translation id="1193927020065025187">Előfordulhat, hogy ez a webhely arra próbálja megtévesztő módon rávenni Önt, hogy engedélyezze a tolakodó értesítéseket.</translation>
 <translation id="1195210374336998651">Ugrás az alkalmazás beállításaihoz</translation>
 <translation id="1195447618553298278">Ismeretlen hiba.</translation>
@@ -5533,6 +5534,7 @@ Győződjön meg arról, hogy nem ad ki bizalmas adatokat.</translation>
 <translation id="6007240208646052708">A hangalapú keresés nem áll rendelkezésre az Ön nyelvén.</translation>
 <translation id="6010651352520077187">Ha be van kapcsolva, a Google Fordító lefordítja a webhelyeket a kívánt nyelvre. A webhelyek automatikus lefordítására is alkalmas.</translation>
 <translation id="6011193465932186973">Ujjlenyomat</translation>
+<translation id="6011308810877101166">Keresési javaslatok javítása</translation>
 <translation id="6011908034087870826">Link küldése a következő eszközre: <ph name="DEVICE_NAME" /></translation>
 <translation id="6013027779243312217">Feliratokat kaphat az audio- és videótartalmakhoz</translation>
 <translation id="6014293228235665243">Olvasatlan</translation>
@@ -5850,6 +5852,7 @@ A(z) <ph name="DOMAIN" /> megköveteli, hogy ne távolítsa el az intelligens k�
 <translation id="630292539633944562">Személyes adatokra vonatkozó javaslatok</translation>
 <translation id="6305607932814307878">Globális irányelvek:</translation>
 <translation id="6305909198255586420">Kérjük, az elsődleges profiljával végezze el a telepítést</translation>
+<translation id="630750887748244481">Szülőd kikapcsolta a Chrome „Engedélyek webhelyek, alkalmazások és bővítmények számára” beállítását. A bővítmény hozzáadása nem engedélyezett.</translation>
 <translation id="6307990684951724544">A rendszer foglalt</translation>
 <translation id="6308493641021088955">A bejelentkezést biztosítja: <ph name="EXTENSION_NAME" /></translation>
 <translation id="6308937455967653460">Link mentése &amp;másként...</translation>
@@ -7991,6 +7994,7 @@ A kulcsfájlt tartsa biztonságos helyen. Szüksége lesz rá ahhoz, hogy új ve
 <translation id="8251509999076836464">Folyamatban van a következőhöz való párosítás: <ph name="DEVICE_NAME" /></translation>
 <translation id="8251578425305135684">Indexkép eltávolítva.</translation>
 <translation id="825238165904109940">Mindig mutassa a teljes URL-eket</translation>
+<translation id="8252538334423261825">A bővítményt nem lehet hozzáadni</translation>
 <translation id="8252569384384439529">Feltöltés…</translation>
 <translation id="8253198102038551905">Kattintson a „+” gombra a hálózati tulajdonságok lekéréséhez.</translation>
 <translation id="8255212965098517578">Friss fotók, értesítések és alkalmazások</translation>
@@ -8391,6 +8395,7 @@ A kulcsfájlt tartsa biztonságos helyen. Szüksége lesz rá ahhoz, hogy új ve
 <translation id="8639635302972078117">Használati és diagnosztikai adatok küldése. Ez az eszköz jelenleg automatikusan küld diagnosztikai, eszköz- és alkalmazáshasználati adatokat a Google-nak. Az adatok a rendszer- és alkalmazásstabilitás javításában, valamint más fejlesztésekben segítenek, nem használjuk fel őket az Ön gyermekének azonosítására. Bizonyos összesített adatok a Google-alkalmazásoknak és -partnereknek, például az Android-fejlesztőknek is segítenek. Ha az Internetes és alkalmazástevékenységek beállítás is be van kapcsolva a gyermekénél, akkor a rendszer ezeket az adatokat mentheti a gyermek Google-fiókjába.</translation>
 <translation id="8642900771896232685">2 másodperc</translation>
 <translation id="8642947597466641025">Szöveg nagyítása</translation>
+<translation id="8643403533759285912">Csoport törlése</translation>
 <translation id="8643443571868262066">A(z) <ph name="FILE_NAME" /> veszélyes lehet. Elküldi a Google Speciális védelem szolgáltatásának vizsgálatra?</translation>
 <translation id="8644047503904673749">{COUNT,plural, =0{Nincs cookie}=1{1 cookie van letiltva}other{# cookie van letiltva}}</translation>
 <translation id="864423554496711319">Fiókjába mentett eszközök</translation>
@@ -8864,6 +8869,7 @@ A(z) <ph name="DOMAIN" /> megköveteli, hogy ne távolítsa el az intelligens k�
 <translation id="90528604757378587">Lehetséges, hogy a háttértevékenységek és bizonyos vizuális effektek (például a finomgörgetés) korlátozottak.</translation>
 <translation id="9053563360605707198">Nyomtatás mindkét oldalra</translation>
 <translation id="9055636786322918818">Az RC4 titkosítás kényszerítése. A beállítás használata növeli a kockázatot, mivel az RC4-kódok nem biztonságosak.</translation>
+<translation id="9056788090206401048">Ahhoz, hogy az azonosítókulcsot használhassa másik eszközön, a Bluetoothnak bekapcsolva kell lennie. Ezt bármikor kezelheti a beállítások között.</translation>
 <translation id="9056810968620647706">Nincs találat.</translation>
 <translation id="9057007989365783744"><ph name="SUPERVISED_USER_NAME" /> hozzá szeretne férni a következő tartalomhoz:</translation>
 <translation id="9057354806206861646">Ütemezés frissítése</translation>

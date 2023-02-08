@@ -24,6 +24,9 @@ BASE_FEATURE(kInstantTetheringBackgroundAdvertisementSupport,
              "InstantTetheringBackgroundAdvertisementSupport",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
+constexpr char kChromeOSReleaseTrack[] = "CHROMEOS_RELEASE_TRACK";
+constexpr char kTestImageRelease[] = "testimage-channel";
+
 }  // namespace
 
 // Enables the UI and logic that minimizes the amount of time the device spends
@@ -893,6 +896,12 @@ BASE_FEATURE(kFilesConflictDialog,
              "FilesConflictDialog",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
+// Enables shortcut icons to be shown in Google Drive when an item is a
+// shortcut.
+BASE_FEATURE(kFilesDriveShortcuts,
+             "FilesDriveShortcuts",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 // Enable inline sync status in Files app.
 BASE_FEATURE(kFilesInlineSyncStatus,
              "FilesInlineSyncStatus",
@@ -1203,9 +1212,6 @@ BASE_FEATURE(kIppClientInfo, "IppClientInfo", base::FEATURE_ENABLED_BY_DEFAULT);
 
 // Enables Jelly features.
 BASE_FEATURE(kJelly, "Jelly", base::FEATURE_DISABLED_BY_DEFAULT);
-
-// Enables Jellyroll features.
-BASE_FEATURE(kJellyroll, "Jellyroll", base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Enables IME button in the floating accessibility menu for the Kiosk session.
 BASE_FEATURE(kKioskEnableImeButton,
@@ -2658,10 +2664,6 @@ bool IsJellyEnabled() {
   return base::FeatureList::IsEnabled(kJelly);
 }
 
-bool IsJellyrollEnabled() {
-  return base::FeatureList::IsEnabled(kJellyroll);
-}
-
 bool IsKeyboardBacklightToggleEnabled() {
   return base::FeatureList::IsEnabled(kEnableKeyboardBacklightToggle);
 }
@@ -2697,7 +2699,14 @@ bool IsEducationEnrollmentOobeFlowEnabled() {
 }
 
 bool IsGameDashboardEnabled() {
-  return base::FeatureList::IsEnabled(kGameDashboard);
+  if (!base::FeatureList::IsEnabled(kGameDashboard)) {
+    return false;
+  }
+
+  // Only allow the dashboard on test images until further in development.
+  std::string track;
+  return base::SysInfo::GetLsbReleaseValue(kChromeOSReleaseTrack, &track) &&
+         track.find(kTestImageRelease) != std::string::npos;
 }
 
 bool IsLockScreenInlineReplyEnabled() {

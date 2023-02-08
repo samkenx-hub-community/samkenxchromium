@@ -779,14 +779,53 @@ void StorageHandler::GetTrustTokens(
       base::BindOnce(&SendTrustTokens, std::move(callback)));
 }
 
+namespace {
+
+void SendClearTrustTokensStatus(
+    std::unique_ptr<StorageHandler::ClearTrustTokensCallback> callback,
+    network::mojom::DeleteStoredTrustTokensStatus status) {
+  switch (status) {
+    case network::mojom::DeleteStoredTrustTokensStatus::kSuccessTokensDeleted:
+      callback->sendSuccess(/* didDeleteTokens */ true);
+      break;
+    case network::mojom::DeleteStoredTrustTokensStatus::kSuccessNoTokensDeleted:
+      callback->sendSuccess(/* didDeleteTokens */ false);
+      break;
+    case network::mojom::DeleteStoredTrustTokensStatus::kFailureFeatureDisabled:
+      callback->sendFailure(
+          Response::ServerError("The Trust Tokens feature is disabled."));
+      break;
+    case network::mojom::DeleteStoredTrustTokensStatus::kFailureInvalidOrigin:
+      callback->sendFailure(
+          Response::InvalidParams("The provided issuerOrigin is invalid. It "
+                                  "must be a HTTP/HTTPS trustworthy origin."));
+      break;
+  }
+}
+
+}  // namespace
+
+void StorageHandler::ClearTrustTokens(
+    const std::string& issuerOrigin,
+    std::unique_ptr<ClearTrustTokensCallback> callback) {
+  if (!storage_partition_) {
+    callback->sendFailure(Response::InternalError());
+    return;
+  }
+
+  storage_partition_->GetNetworkContext()->DeleteStoredTrustTokens(
+      url::Origin::Create(GURL(issuerOrigin)),
+      base::BindOnce(&SendClearTrustTokensStatus, std::move(callback)));
+}
+
 void StorageHandler::OnInterestGroupAccessed(
     const base::Time& access_time,
-    InterestGroupManagerImpl::InterestGroupObserverInterface::AccessType type,
-    const std::string& owner_origin,
+    InterestGroupManagerImpl::InterestGroupObserver::AccessType type,
+    const url::Origin& owner_origin,
     const std::string& name) {
   DCHECK_CURRENTLY_ON(BrowserThread::UI);
   using AccessType =
-      InterestGroupManagerImpl::InterestGroupObserverInterface::AccessType;
+      InterestGroupManagerImpl::InterestGroupObserver::AccessType;
   std::string type_enum;
   switch (type) {
     case AccessType::kJoin:
@@ -809,7 +848,7 @@ void StorageHandler::OnInterestGroupAccessed(
       break;
   };
   frontend_->InterestGroupAccessed(access_time.ToDoubleT(), type_enum,
-                                   owner_origin, name);
+                                   owner_origin.Serialize(), name);
 }
 
 namespace {

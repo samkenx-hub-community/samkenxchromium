@@ -53,7 +53,6 @@
 #include "chrome/renderer/chrome_render_thread_observer.h"
 #include "chrome/renderer/google_accounts_private_api_extension.h"
 #include "chrome/renderer/loadtimes_extension_bindings.h"
-#include "chrome/renderer/media/chrome_key_systems.h"
 #include "chrome/renderer/media/flash_embed_rewrite.h"
 #include "chrome/renderer/media/webrtc_logging_agent_impl.h"
 #include "chrome/renderer/net/net_error_helper.h"
@@ -245,6 +244,10 @@
 
 #if BUILDFLAG(ENABLE_SUPERVISED_USERS)
 #include "chrome/renderer/supervised_user/supervised_user_error_page_controller_delegate_impl.h"
+#endif
+
+#if BUILDFLAG(ENABLE_LIBRARY_CDMS) || BUILDFLAG(IS_WIN) || BUILDFLAG(IS_ANDROID)
+#include "chrome/renderer/media/chrome_key_systems.h"
 #endif
 
 using autofill::AutofillAgent;
@@ -665,11 +668,15 @@ void ChromeContentRendererClient::RenderFrameCreated(
       render_frame_observer->associated_interfaces();
 
   if (!render_frame->IsInFencedFrameTree() ||
-      base::FeatureList::IsEnabled(
-          autofill::features::kAutofillEnableWithinFencedFrame) ||
-      base::FeatureList::IsEnabled(
-          password_manager::features::
-              kEnablePasswordManagerWithinFencedFrame)) {
+      (base::FeatureList::IsEnabled(
+           autofill::features::kAutofillEnableWithinFencedFrame) &&
+       base::FeatureList::IsEnabled(
+           blink::features::kFencedFramesAPIChanges)) ||
+      (base::FeatureList::IsEnabled(
+           password_manager::features::
+               kEnablePasswordManagerWithinFencedFrame) &&
+       base::FeatureList::IsEnabled(
+           blink::features::kFencedFramesAPIChanges))) {
     PasswordAutofillAgent* password_autofill_agent =
         new PasswordAutofillAgent(render_frame, associated_interfaces);
     PasswordGenerationAgent* password_generation_agent =
@@ -1534,7 +1541,11 @@ ChromeContentRendererClient::CreateWebSocketHandshakeThrottleProvider() {
 
 void ChromeContentRendererClient::GetSupportedKeySystems(
     media::GetSupportedKeySystemsCB cb) {
+#if BUILDFLAG(ENABLE_LIBRARY_CDMS) || BUILDFLAG(IS_WIN) || BUILDFLAG(IS_ANDROID)
   GetChromeKeySystems(std::move(cb));
+#else
+  std::move(cb).Run({});
+#endif
 }
 
 bool ChromeContentRendererClient::ShouldReportDetailedMessageForSource(

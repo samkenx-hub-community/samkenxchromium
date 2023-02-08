@@ -468,22 +468,6 @@ BUILDERS = {
                 },
             },
             {
-                'name': 'resource_sizes_chrome_modern_minimal_apks',
-                'isolate': 'resource_sizes_chrome_modern_minimal_apks',
-                'type': TEST_TYPES.GENERIC,
-                'resultdb': {
-                    'has_native_resultdb_integration': True,
-                },
-            },
-            {
-                'name': 'resource_sizes_chrome_modern_public_minimal_apks',
-                'isolate': 'resource_sizes_chrome_modern_public_minimal_apks',
-                'type': TEST_TYPES.GENERIC,
-                'resultdb': {
-                    'has_native_resultdb_integration': True,
-                },
-            },
-            {
                 'name': 'resource_sizes_trichrome_google',
                 'isolate': 'resource_sizes_trichrome_google',
                 'type': TEST_TYPES.GENERIC,
@@ -563,22 +547,6 @@ BUILDERS = {
             {
                 'name': 'resource_sizes_monochrome_public_minimal_apks',
                 'isolate': 'resource_sizes_monochrome_public_minimal_apks',
-                'type': TEST_TYPES.GENERIC,
-                'resultdb': {
-                    'has_native_resultdb_integration': True,
-                },
-            },
-            {
-                'name': 'resource_sizes_chrome_modern_minimal_apks',
-                'isolate': 'resource_sizes_chrome_modern_minimal_apks',
-                'type': TEST_TYPES.GENERIC,
-                'resultdb': {
-                    'has_native_resultdb_integration': True,
-                },
-            },
-            {
-                'name': 'resource_sizes_chrome_modern_public_minimal_apks',
-                'isolate': 'resource_sizes_chrome_modern_public_minimal_apks',
                 'type': TEST_TYPES.GENERIC,
                 'resultdb': {
                     'has_native_resultdb_integration': True,
@@ -1626,8 +1594,6 @@ RESOURCE_SIZES_METADATA = BenchmarkMetadata(
 
 
 OTHER_BENCHMARKS = {
-    'resource_sizes_chrome_modern_minimal_apks': RESOURCE_SIZES_METADATA,
-    'resource_sizes_chrome_modern_public_minimal_apks': RESOURCE_SIZES_METADATA,
     'resource_sizes_monochrome_minimal_apks': RESOURCE_SIZES_METADATA,
     'resource_sizes_monochrome_public_minimal_apks': RESOURCE_SIZES_METADATA,
     'resource_sizes_trichrome': RESOURCE_SIZES_METADATA,

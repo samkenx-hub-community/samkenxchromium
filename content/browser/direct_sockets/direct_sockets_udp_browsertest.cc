@@ -78,8 +78,6 @@ class DirectSocketsUdpBrowserTest : public ContentBrowserTest {
 
     client_ = std::make_unique<test::IsolatedWebAppContentBrowserClient>(
         url::Origin::Create(GetTestPageURL()));
-    scoped_client_ =
-        std::make_unique<ScopedContentBrowserClientSetting>(client_.get());
     runner_ =
         std::make_unique<content::test::AsyncJsRunner>(shell()->web_contents());
 
@@ -125,7 +123,6 @@ class DirectSocketsUdpBrowserTest : public ContentBrowserTest {
   mojo::Remote<network::mojom::UDPSocket> server_socket_;
 
   std::unique_ptr<test::IsolatedWebAppContentBrowserClient> client_;
-  std::unique_ptr<ScopedContentBrowserClientSetting> scoped_client_;
   std::unique_ptr<content::test::AsyncJsRunner> runner_;
 };
 
@@ -417,21 +414,6 @@ IN_PROC_BROWSER_TEST_F(DirectSocketsUdpBrowserTest, UdpMessageConfigurations) {
         EvalJs(shell(), script).ExtractString(),
         testing::HasSubstr(
             "UDPMessage: 'remoteAddress' and 'remotePort' must be specified"));
-  }
-
-  {
-    const std::string script = R"(
-      testUdpMessageConfiguration({
-        localAddress: '127.0.0.1',
-      }, {
-        data: (new TextEncoder()).encode("meow"),
-        remoteAddress: 'direct-sockets.com',
-        remotePort: 53,
-      })
-    )";
-    ASSERT_THAT(
-        EvalJs(shell(), script).ExtractString(),
-        testing::HasSubstr("UDPMessage: 'remoteAddress' must be a valid IP"));
   }
 
   {

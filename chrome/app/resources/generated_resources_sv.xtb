@@ -221,6 +221,7 @@ Du kan kontrollera dina lösenord när du vill i <ph name="GOOGLE_PASSWORD_MANAG
 <translation id="1192706927100816598">{0,plural, =1{Du kommer att loggas ut automatiskt om # sekund.
 <ph name="DOMAIN" /> kräver att du har smartkortet isatt.}other{Du kommer att loggas ut automatiskt om # sekunder.
 <ph name="DOMAIN" /> kräver att du har smartkortet isatt.}}</translation>
+<translation id="119330003005586565">Sidor du har läst</translation>
 <translation id="1193927020065025187">Den här webbplatsen kan försöka lura dig att tillåta påträngande aviseringar</translation>
 <translation id="1195210374336998651">Öppna appinställningarna</translation>
 <translation id="1195447618553298278">Okänt fel.</translation>
@@ -5533,6 +5534,7 @@ Du kan tilldela flera brytare denna åtgärd.</translation>
 <translation id="6007240208646052708">Röstsökning är inte tillgängligt på ditt språk.</translation>
 <translation id="6010651352520077187">När detta är aktiverat blir du tillfrågad om du vill översätta webbplatser till språket du föredrar med Google Översätt. Funktionen kan också översätta webbplatser automatiskt.</translation>
 <translation id="6011193465932186973">Fingeravtryck</translation>
+<translation id="6011308810877101166">Förbättra sökförslag</translation>
 <translation id="6011908034087870826">Länken skickas till <ph name="DEVICE_NAME" /></translation>
 <translation id="6013027779243312217">Få textad ljud- och videouppspelning</translation>
 <translation id="6014293228235665243">Olästa</translation>
@@ -5850,6 +5852,7 @@ Du kan tilldela flera brytare denna åtgärd.</translation>
 <translation id="630292539633944562">Personuppgiftsförslag</translation>
 <translation id="6305607932814307878">Global policy:</translation>
 <translation id="6305909198255586420">Installera med din primära profil</translation>
+<translation id="630750887748244481">Din förälder har inaktiverat Behörigheter för webbplatser, appar och tillägg för Chrome. Det är inte tillåtet att lägga till det här tillägget.</translation>
 <translation id="6307990684951724544">Systemet är upptaget</translation>
 <translation id="6308493641021088955">Inloggning tillhandahålls av <ph name="EXTENSION_NAME" /></translation>
 <translation id="6308937455967653460">Spara l&amp;änk som...</translation>
@@ -7991,6 +7994,7 @@ Spara nyckelfilen på ett säkert ställe. Den behövs om du ska skapa nya versi
 <translation id="8251509999076836464">Parkopplar till <ph name="DEVICE_NAME" /></translation>
 <translation id="8251578425305135684">Miniatyren har tagits bort.</translation>
 <translation id="825238165904109940">Visa alltid hela webbadresser</translation>
+<translation id="8252538334423261825">Det gick inte att lägga till tillägget</translation>
 <translation id="8252569384384439529">Laddar upp …</translation>
 <translation id="8253198102038551905">Klicka på + för att hämta nätverksegenskaperna</translation>
 <translation id="8255212965098517578">Senaste foton, aviseringar och appar</translation>
@@ -8391,6 +8395,7 @@ Spara nyckelfilen på ett säkert ställe. Den behövs om du ska skapa nya versi
 <translation id="8639635302972078117">Skicka diagnostik- och användningsdata. Den här enheten skickar för närvarande diagnostikdata, enhetsdata och data om appanvändning till Google automatiskt. Denna data används till att förbättra systemets och apparnas stabilitet med mera och inte till att identifiera ditt barn. Viss samlad data används även till att förbättra appar från Google och Googles partner, till exempel Android-utvecklare. Om ytterligare webb- och appaktivitet har aktiverats för ditt barn kan denna data sparas i Google-kontot.</translation>
 <translation id="8642900771896232685">2 sekunder</translation>
 <translation id="8642947597466641025">Förstora texten</translation>
+<translation id="8643403533759285912">Radera grupp</translation>
 <translation id="8643443571868262066"><ph name="FILE_NAME" /> kan vara farlig. Vill du skicka den till Avancerat skydd från Google för skanning?</translation>
 <translation id="8644047503904673749">{COUNT,plural, =0{Inga cookies}=1{1 cookie blockeras}other{# cookies blockeras}}</translation>
 <translation id="864423554496711319">Enheter som har sparats i kontot</translation>
@@ -8864,6 +8869,7 @@ Spara nyckelfilen på ett säkert ställe. Den behövs om du ska skapa nya versi
 <translation id="90528604757378587">Bakgrundsaktivitet och vissa visuella effekter, till exempel jämn scrollning, kan begränsas.</translation>
 <translation id="9053563360605707198">Dubbelsidig utskrift</translation>
 <translation id="9055636786322918818">Tillämpa RC4-kryptering. Det här alternativet är mer riskabelt eftersom RC4-chiffer är osäkra.</translation>
+<translation id="9056788090206401048">Bluetooth måste vara aktiverat om du vill använda nyckeln på en annan enhet. Du kan när som helst hantera detta i inställningarna.</translation>
 <translation id="9056810968620647706">Inga träffar hittades.</translation>
 <translation id="9057007989365783744"><ph name="SUPERVISED_USER_NAME" /> vill få åtkomst till följande innehåll:</translation>
 <translation id="9057354806206861646">Uppdatera schema</translation>

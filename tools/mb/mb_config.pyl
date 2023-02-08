@@ -341,7 +341,6 @@
     },
 
     'chromium.fyi': {
-      'CFI Linux CF (reclient shadow)': 'cfi_full_cfi_icall_cfi_diag_recover_release_static_reclient',
       'Comparison Android (reclient)': {
         'goma': 'android_webview_google_debug_static_bot_arm64',
         'reclient': 'android_webview_google_debug_static_bot_arm64_reclient',
@@ -380,7 +379,6 @@
       },
       'Linux Builder (j-500) (reclient)': 'gpu_tests_release_bot_reclient',
       'Linux Builder (reclient compare)': 'gpu_tests_release_bot_reclient',
-      'Linux CFI (reclient shadow)': 'cfi_full_cfi_icall_cfi_diag_thin_lto_release_static_dcheck_always_on_reclient',
       'Linux Viz': 'release_trybot_minimal_symbols_reclient',
       # TODO(crbug.com/1260232): remove this after the migration.
       'Mac Builder (reclient compare)': 'gpu_tests_release_bot_minimal_symbols_reclient',
@@ -407,8 +405,6 @@
       # TODO(crbug.com/1235218): remove after the migration.
       'chromeos-amd64-generic-rel (reclient compare)': 'chromeos_amd64-generic-vm_use_fake_dbus_clients_reclient',
       'chromeos-amd64-generic-rel (reclient)': 'chromeos_amd64-generic-vm_use_fake_dbus_clients_reclient',
-      'fuchsia-fyi-arm64-cfv2-script': 'release_bot_fuchsia_arm64_reclient',
-      'fuchsia-fyi-cfv2-script': 'release_bot_fuchsia_reclient',
       'ios-fieldtrial-rel': 'ios_simulator_debug_static_bot_xctest_arm64_reclient',
       'ios-m1-simulator': 'ios_simulator_debug_static_bot_xctest_arm64_reclient',
       'ios-m1-simulator-cronet': 'ios_cronet_xctest_arm64_reclient',
@@ -765,24 +761,24 @@
     },
 
     'chromium.webrtc': {
-      'WebRTC Chromium Android Builder': 'android_debug_static_bot_arm64',
-      'WebRTC Chromium Linux Builder': 'gpu_tests_release_bot',
-      'WebRTC Chromium Mac Builder': 'gpu_tests_release_bot',
-      'WebRTC Chromium Win Builder': 'release_bot_minimal_symbols_no_com_init_hooks_with_codecs',
+      'WebRTC Chromium Android Builder': 'android_debug_static_bot_arm64_reclient',
+      'WebRTC Chromium Linux Builder': 'gpu_tests_release_bot_reclient',
+      'WebRTC Chromium Mac Builder': 'gpu_tests_release_bot_reclient',
+      'WebRTC Chromium Win Builder': 'release_bot_minimal_symbols_no_com_init_hooks_with_codecs_reclient',
     },
 
     'chromium.webrtc.fyi': {
-      'WebRTC Chromium FYI Android Builder': 'android_release_bot_minimal_symbols',
-      'WebRTC Chromium FYI Android Builder (dbg)': 'android_debug_static_bot',
-      'WebRTC Chromium FYI Android Builder ARM64 (dbg)': 'android_debug_static_bot_arm64',
-      'WebRTC Chromium FYI Linux Builder': 'gpu_tests_release_bot',
-      'WebRTC Chromium FYI Linux Builder (dbg)': 'debug_bot',
-      'WebRTC Chromium FYI Mac Builder': 'gpu_tests_release_bot',
-      'WebRTC Chromium FYI Mac Builder (dbg)': 'debug_bot',
-      'WebRTC Chromium FYI Win Builder': 'release_bot_minimal_symbols_no_com_init_hooks_with_codecs',
-      'WebRTC Chromium FYI Win Builder (dbg)': 'debug_bot_no_com_init_hooks_with_codecs',
-      'WebRTC Chromium FYI ios-device': 'ios_device_release_compile_only',
-      'WebRTC Chromium FYI ios-simulator': 'ios_simulator_debug_static_bot_xctest',
+      'WebRTC Chromium FYI Android Builder': 'android_release_bot_minimal_symbols_reclient',
+      'WebRTC Chromium FYI Android Builder (dbg)': 'android_debug_static_bot_reclient',
+      'WebRTC Chromium FYI Android Builder ARM64 (dbg)': 'android_debug_static_bot_arm64_reclient',
+      'WebRTC Chromium FYI Linux Builder': 'gpu_tests_release_bot_reclient',
+      'WebRTC Chromium FYI Linux Builder (dbg)': 'debug_bot_reclient',
+      'WebRTC Chromium FYI Mac Builder': 'gpu_tests_release_bot_reclient',
+      'WebRTC Chromium FYI Mac Builder (dbg)': 'debug_bot_reclient',
+      'WebRTC Chromium FYI Win Builder': 'release_bot_minimal_symbols_no_com_init_hooks_with_codecs_reclient',
+      'WebRTC Chromium FYI Win Builder (dbg)': 'debug_bot_no_com_init_hooks_with_codecs_reclient',
+      'WebRTC Chromium FYI ios-device': 'ios_device_release_compile_only_reclient',
+      'WebRTC Chromium FYI ios-simulator': 'ios_simulator_debug_static_bot_xctest_reclient',
     },
 
     'chromium.win': {
@@ -1556,12 +1552,12 @@
       'android', 'debug_bot_reclient', 'android_external', 'android_fastbuild',
     ],
 
-    'android_debug_static_bot': [
-      'android', 'debug_static_bot',
+    'android_debug_static_bot_arm64_reclient': [
+      'android', 'debug_static_bot_reclient', 'arm64',
     ],
 
-    'android_debug_static_bot_arm64': [
-      'android', 'debug_static_bot', 'arm64',
+    'android_debug_static_bot_reclient': [
+      'android', 'debug_static_bot_reclient',
     ],
 
     'android_debug_static_bot_x64_reclient_webview_trichrome_webview_shell': [
@@ -1639,6 +1635,10 @@
     'android_release_bot_minimal_symbols_arm64_webview_monochrome_reclient': [
       'android', 'release_bot_reclient', 'minimal_symbols', 'arm64',
       'strip_debug_info', 'webview_monochrome',
+    ],
+
+    'android_release_bot_minimal_symbols_reclient': [
+      'android', 'release_bot_reclient', 'minimal_symbols', 'strip_debug_info',
     ],
 
     'android_release_bot_minimal_symbols_x64_fastbuild_webview_trichrome_reclient': [
@@ -2529,8 +2529,8 @@
       'debug_bot_local_build',
     ],
 
-    'debug_bot_no_com_init_hooks_with_codecs': [
-      'debug_bot', 'no_com_init_hooks', 'chrome_with_codecs'
+    'debug_bot_no_com_init_hooks_with_codecs_reclient': [
+      'debug_bot_reclient', 'no_com_init_hooks', 'chrome_with_codecs'
     ],
 
     'debug_bot_reclient': [
@@ -2551,7 +2551,7 @@
 
     'fuchsia_clang_code_coverage_reclient': [
       'clang', 'fuchsia', 'fuchsia_code_coverage', 'no_symbols', 'release_bot_reclient',
-      'use_clang_coverage', 'fuchsia_legacy_script',
+      'use_clang_coverage',
     ],
 
     'fuchsia_clang_tot_official_arm64': [
@@ -3089,7 +3089,7 @@
     ],
 
     'libfuzzer_ubsan_release_bot_reclient': [
-      'libfuzzer', 'ubsan_security_non_vptr', 'release_bot_reclient', 'chromeos_codecs', 'pdf_xfa', 'disable_nacl', 'optimize_for_fuzzing', 'disable_seed_corpus',
+      'libfuzzer', 'ubsan_security_non_vptr', 'release_bot_reclient', 'chromeos_codecs', 'pdf_xfa', 'disable_nacl', 'optimize_for_fuzzing', 'disable_seed_corpus', 'shared',
     ],
 
     'libfuzzer_windows_asan_clang_tot_release_bot': [
@@ -3533,8 +3533,8 @@
       'release_bot', 'minimal_symbols', 'no_clang', 'no_goma',
     ],
 
-    'release_bot_minimal_symbols_no_com_init_hooks_with_codecs': [
-      'release_bot', 'minimal_symbols', 'no_com_init_hooks', 'chrome_with_codecs'
+    'release_bot_minimal_symbols_no_com_init_hooks_with_codecs_reclient': [
+      'release_bot_reclient', 'minimal_symbols', 'no_com_init_hooks', 'chrome_with_codecs'
     ],
 
     'release_bot_minimal_symbols_reclient': [
@@ -4240,11 +4240,6 @@
 
     'fuchsia_include_sd_images': {
       'gn_args': 'fuchsia_additional_boot_images=["//third_party/fuchsia-sdk/images-internal/astro-release/","//third_party/fuchsia-sdk/images-internal/sherlock-release/","//third_party/fuchsia-sdk/images-internal/nelson-release/"]',
-    },
-
-    # TODO(crbug/1336775): Remove when --ram-size-mb is added in new scripts
-    'fuchsia_legacy_script': {
-      'gn_args': 'use_v2_script_default=false',
     },
 
     'full_symbols': {

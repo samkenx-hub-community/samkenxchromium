@@ -48,7 +48,6 @@
 #include "content/browser/attribution_reporting/attribution_report.h"
 #include "content/browser/attribution_reporting/attribution_report_network_sender.h"
 #include "content/browser/attribution_reporting/attribution_report_sender.h"
-#include "content/browser/attribution_reporting/attribution_reporting.h"
 #include "content/browser/attribution_reporting/attribution_storage.h"
 #include "content/browser/attribution_reporting/attribution_storage_delegate.h"
 #include "content/browser/attribution_reporting/attribution_storage_delegate_impl.h"
@@ -383,7 +382,7 @@ bool AttributionManagerImpl::IsReportAllowed(
   return IsOperationAllowed(
       storage_partition_.get(),
       ContentBrowserClient::AttributionReportingOperation::kReport,
-      &*common_info.source_origin(), &*common_info.destination_origin(),
+      &*common_info.source_origin(), &*report.attribution_info().context_origin,
       &*common_info.reporting_origin());
 }
 

@@ -188,22 +188,21 @@ web_component_files = [
   "chromeos/os_languages_page/os_languages_section.ts",
   "chromeos/os_languages_page/smart_inputs_page.ts",
   "chromeos/os_people_page/account_manager.js",
-  "chromeos/os_people_page/fingerprint_list.js",
-  "chromeos/os_people_page/local_data_recovery_dialog.js",
-  "chromeos/os_people_page/lock_screen.js",
-  "chromeos/os_people_page/lock_screen_password_prompt_dialog.js",
+  "chromeos/os_people_page/fingerprint_list.ts",
+  "chromeos/os_people_page/local_data_recovery_dialog.ts",
+  "chromeos/os_people_page/lock_screen.ts",
+  "chromeos/os_people_page/lock_screen_password_prompt_dialog.ts",
   "chromeos/os_people_page/os_people_page.ts",
   "chromeos/os_people_page/os_personalization_options.ts",
   "chromeos/os_people_page/os_signout_dialog.ts",
   "chromeos/os_people_page/os_sync_controls.ts",
   "chromeos/os_people_page/os_sync_encryption_options.ts",
   "chromeos/os_people_page/os_sync_page.ts",
-  "chromeos/os_people_page/pin_autosubmit_dialog.js",
-  "chromeos/os_people_page/setup_fingerprint_dialog.js",
-  "chromeos/os_people_page/setup_pin_dialog.js",
-  "chromeos/os_people_page/users_add_user_dialog.ts",
+  "chromeos/os_people_page/pin_autosubmit_dialog.ts",
+  "chromeos/os_people_page/setup_fingerprint_dialog.ts",
+  "chromeos/os_people_page/setup_pin_dialog.ts",
   "chromeos/os_people_page/user_list.ts",
-  "chromeos/os_people_page/users_page.ts",
+  "chromeos/os_people_page/users_add_user_dialog.ts",
   "chromeos/os_printing_page/cups_add_print_server_dialog.ts",
   "chromeos/os_printing_page/cups_add_printer_dialog.ts",
   "chromeos/os_printing_page/cups_add_printer_manually_dialog.ts",
@@ -217,6 +216,7 @@ web_component_files = [
   "chromeos/os_printing_page/cups_saved_printers.ts",
   "chromeos/os_printing_page/cups_settings_add_printer_dialog.ts",
   "chromeos/os_printing_page/os_printing_page.ts",
+  "chromeos/os_privacy_page/manage_users_page.ts",
   "chromeos/os_privacy_page/metrics_consent_toggle_button.ts",
   "chromeos/os_privacy_page/os_privacy_page.ts",
   "chromeos/os_privacy_page/peripheral_data_access_protection_dialog.ts",
@@ -327,7 +327,6 @@ non_web_component_files = [
   "chromeos/ensure_lazy_loaded.ts",
   "chromeos/google_assistant_page/google_assistant_browser_proxy.ts",
   "chromeos/guest_os/guest_os_browser_proxy.ts",
-  "chromeos/icon.js",
   "chromeos/internet_page/cellular_setup_settings_delegate.ts",
   "chromeos/internet_page/internet_page_browser_proxy.ts",
   "chromeos/kerberos_page/kerberos_accounts_browser_proxy.ts",
@@ -378,9 +377,9 @@ non_web_component_files = [
   "chromeos/os_languages_page/languages_types.ts",
   "chromeos/os_page_visibility.js",
   "chromeos/os_people_page/account_manager_browser_proxy.js",
-  "chromeos/os_people_page/fingerprint_browser_proxy.js",
+  "chromeos/os_people_page/fingerprint_browser_proxy.ts",
   "chromeos/os_people_page/lock_state_behavior.js",
-  "chromeos/os_people_page/plural_string_proxy_wrapper.js",
+  "chromeos/os_people_page/plural_string_proxy_wrapper.ts",
   "chromeos/os_people_page/os_sync_browser_proxy.ts",
   "chromeos/os_printing_page/cups_printer_dialog_util.ts",
   "chromeos/os_printing_page/cups_printer_types.ts",
@@ -439,6 +438,7 @@ mojom_webui_files = [
   "mojom-webui/setting.mojom-webui.js",
 ]
 
+# TODO(b/207087930) Consider moving these shared files to chrome://resources
 # Files below are from Nearby Share and shared with ChromeOS Settings
 nearby_share_shared_files = [
   "shared/nearby_contact_visibility.js",
@@ -474,16 +474,6 @@ nearby_share_shared_files = [
 # TODO(crbug/1315757) JS files here are available for TS conversion
 src_ts_files = non_web_component_files + web_component_files
 
-# TODO(crbug.com/1121865): browser_resolver_prefix_replacements allows path
-# from ../../shared/* to resolve to ../../../nearby_share/shared/* for closure
-# purposes.
-nearby_share_closure_flags = [
-  "js_module_root=" +
-      rebase_path("//chrome/browser/resources/nearby_share", root_build_dir),
-  "js_module_root=./gen/chrome/browser/resources/nearby_share",
-  "browser_resolver_prefix_replacements=\"../../shared/=../../../nearby_share/shared/\"",
-]
-
 # TODO(crbug.com/1179821) This allows WebUI mojom files listed under the
 # mojom-webui/ folder to be properly resolved during closure compilation.
 mojom_webui_closure_flags = [
@@ -516,5 +506,4 @@ mojom_webui_closure_flags = [
 # TODO(crbug.com/1315757) Remove once ChromeOS Settings is fully migrated to
 # TypeScript and no longer using Closure compilation
 os_settings_closure_flags =
-    settings_closure_flags + nearby_share_closure_flags + mojom_js_args +
-    mojom_webui_closure_flags
+    settings_closure_flags + mojom_js_args + mojom_webui_closure_flags

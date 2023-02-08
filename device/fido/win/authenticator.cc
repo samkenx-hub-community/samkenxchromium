@@ -63,6 +63,7 @@ AuthenticatorSupportedOptions WinWebAuthnApiOptions(int api_version) {
     // request.
     options.max_cred_blob_length = 256;
   }
+  options.supports_hmac_secret = true;
   return options;
 }
 
@@ -320,7 +321,7 @@ void WinWebAuthnApiAuthenticator::GetCredentialInformationForRequest(
     }
     case NTE_NOT_FOUND:
       FIDO_LOG(DEBUG) << "No credentials found";
-      std::move(callback).Run(/*credentials=*/{}, /*has_credentials=*/true);
+      std::move(callback).Run(/*credentials=*/{}, /*has_credentials=*/false);
       return;
     default:
       FIDO_LOG(ERROR) << "Windows API returned unknown result: " << hresult;
@@ -355,18 +356,6 @@ WinWebAuthnApiAuthenticator::AuthenticatorTransport() const {
   // The Windows API could potentially use any external or
   // platform authenticator.
   return absl::nullopt;
-}
-
-bool WinWebAuthnApiAuthenticator::SupportsCredProtectExtension() const {
-  return win_api_->Version() >= WEBAUTHN_API_VERSION_2;
-}
-
-bool WinWebAuthnApiAuthenticator::SupportsHMACSecretExtension() const {
-  return true;
-}
-
-bool WinWebAuthnApiAuthenticator::SupportsEnterpriseAttestation() const {
-  return win_api_->Version() >= WEBAUTHN_API_VERSION_3;
 }
 
 bool WinWebAuthnApiAuthenticator::SupportsLargeBlobs() const {

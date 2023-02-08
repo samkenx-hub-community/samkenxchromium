@@ -535,7 +535,7 @@ void CertProvisioningWorkerDynamic::OnProofOfPossessionInstructionReceived(
     return;
   }
 
-  data_to_sign_ = proof_of_possession_instruction.data_to_sign();
+  data_to_sign_ = StrToBytes(proof_of_possession_instruction.data_to_sign());
   RETURN_ON_FINAL_STATE(UpdateState(
       FROM_HERE,
       CertProvisioningWorkerState::kProofOfPossessionInstructionReceived));
@@ -689,7 +689,7 @@ void CertProvisioningWorkerDynamic::BuildProofOfPossession() {
 
   platform_keys_service_->SignRSAPKCS1Raw(
       GetPlatformKeysTokenId(cert_scope_), std::move(data_to_sign_),
-      BytesToStr(public_key_),
+      public_key_,
       base::BindRepeating(
           &CertProvisioningWorkerDynamic::OnBuildProofOfPossessionDone,
           weak_factory_.GetWeakPtr(), base::TimeTicks::Now()));
@@ -897,7 +897,7 @@ void CertProvisioningWorkerDynamic::CleanUpAndRunCallback() {
     return;
   } else if (key_location_ == KeyLocation::kPkcs11Token) {
     platform_keys_service_->RemoveKey(
-        GetPlatformKeysTokenId(cert_scope_), BytesToStr(public_key_),
+        GetPlatformKeysTokenId(cert_scope_), public_key_,
         base::BindOnce(&CertProvisioningWorkerDynamic::OnRemoveKeyDone,
                        weak_factory_.GetWeakPtr()));
     return;

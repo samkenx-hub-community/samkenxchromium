@@ -5,6 +5,7 @@
 #include <string>
 
 #include "base/base64.h"
+#include "base/check_deref.h"
 #include "base/containers/contains.h"
 #include "base/files/file_util.h"
 #include "base/functional/bind.h"
@@ -291,16 +292,24 @@ IN_PROC_BROWSER_TEST_F(DevToolsProtocolTest, SetRPHRegistrationMode) {
   EXPECT_EQ(custom_handlers::RphRegistrationMode::kNone,
             registry->registration_mode());
 
-  // Set an invalid value
+  // Set a value not defined in AutoResponseMode enum
+  base::Value::Dict params_invalid_enum;
+  params_invalid_enum.Set("mode", "accept");
+  SendCommandAsync("Page.setRPHRegistrationMode",
+                   std::move(params_invalid_enum));
+  EXPECT_EQ(custom_handlers::RphRegistrationMode::kNone,
+            registry->registration_mode());
+
+  // Set a invalid value, but defined in the AutoResponseMode enum
   base::Value::Dict params_invalid;
-  params_invalid.Set("mode", "accept");
+  params_invalid.Set("mode", "autoOptOut");
   SendCommandAsync("Page.setRPHRegistrationMode", std::move(params_invalid));
   EXPECT_EQ(custom_handlers::RphRegistrationMode::kNone,
             registry->registration_mode());
 
-  // Set an value value
+  // Set a valid value
   base::Value::Dict params;
-  params.Set("mode", "autoaccept");
+  params.Set("mode", "autoAccept");
   SendCommandAsync("Page.setRPHRegistrationMode", std::move(params));
   EXPECT_EQ(custom_handlers::RphRegistrationMode::kAutoAccept,
             registry->registration_mode());
@@ -683,16 +692,16 @@ IN_PROC_BROWSER_TEST_F(ExtensionProtocolTest,
   const base::Value::Dict* result = SendCommandSync("Target.getTargets");
 
   std::string target_id;
-  base::Value ext_target;
+  base::Value::Dict ext_target;
   for (const auto& target : *result->FindList("targetInfos")) {
     if (*target.FindStringKey("type") == "service_worker") {
-      ext_target = target.Clone();
+      ext_target = target.Clone().TakeDict();
       break;
     }
   }
   {
     base::Value::Dict params;
-    params.Set("targetId", *ext_target.FindStringKey("targetId"));
+    params.Set("targetId", CHECK_DEREF(ext_target.FindString("targetId")));
     params.Set("waitForDebuggerOnStart", false);
     SendCommandSync("Target.autoAttachRelated", std::move(params));
   }
@@ -701,10 +710,12 @@ IN_PROC_BROWSER_TEST_F(ExtensionProtocolTest,
       WaitForNotification("Target.attachedToTarget", true);
   base::Value* targetInfo = attached.Find("targetInfo");
   ASSERT_THAT(targetInfo, testing::NotNull());
-  EXPECT_THAT(*targetInfo, base::test::DictionaryHasValue(
-                               "type", base::Value("service_worker")));
-  EXPECT_THAT(*targetInfo, base::test::DictionaryHasValue(
-                               "url", *ext_target.FindKey("url")));
+  EXPECT_THAT(
+      targetInfo->GetDict(),
+      base::test::DictionaryHasValue("type", base::Value("service_worker")));
+  EXPECT_THAT(targetInfo->GetDict(),
+              base::test::DictionaryHasValue(
+                  "url", CHECK_DEREF(ext_target.Find("url"))));
   EXPECT_THAT(attached.FindBool("waitingForDebugger"),
               testing::Optional(false));
 

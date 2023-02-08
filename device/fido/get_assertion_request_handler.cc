@@ -275,6 +275,7 @@ void ReportGetAssertionResponseTransport(FidoAuthenticator* authenticator) {
 
 CtapGetAssertionRequest SpecializeRequestForAuthenticator(
     const CtapGetAssertionRequest& request,
+    const CtapGetAssertionOptions& options,
     const FidoAuthenticator& authenticator) {
   CtapGetAssertionRequest specialized_request(request);
 
@@ -286,8 +287,12 @@ CtapGetAssertionRequest SpecializeRequestForAuthenticator(
       !authenticator.Options().max_cred_blob_length.has_value()) {
     specialized_request.get_cred_blob = false;
   }
-  if (request.device_public_key && !authenticator.SupportsDevicePublicKey()) {
+  if (request.device_public_key &&
+      !authenticator.Options().supports_device_public_key) {
     specialized_request.device_public_key.reset();
+  }
+  if (!options.prf_inputs.empty() && authenticator.Options().supports_prf) {
+    specialized_request.prf_inputs = options.prf_inputs;
   }
   return specialized_request;
 }
@@ -298,7 +303,8 @@ CtapGetAssertionOptions SpecializeOptionsForAuthenticator(
   CtapGetAssertionOptions specialized_options(options);
 
   if (!options.prf_inputs.empty() &&
-      !authenticator.SupportsHMACSecretExtension()) {
+      (!authenticator.Options().supports_hmac_secret ||
+       authenticator.Options().supports_prf)) {
     specialized_options.prf_inputs.clear();
   }
 
@@ -421,7 +427,7 @@ void GetAssertionRequestHandler::DispatchRequest(
   }
 
   CtapGetAssertionRequest request =
-      SpecializeRequestForAuthenticator(request_, *authenticator);
+      SpecializeRequestForAuthenticator(request_, options_, *authenticator);
   CtapGetAssertionOptions options =
       SpecializeOptionsForAuthenticator(options_, *authenticator);
   PINUVDisposition uv_disposition =
@@ -742,7 +748,7 @@ void GetAssertionRequestHandler::DispatchRequestWithToken(
   options_.pin_uv_auth_token = std::move(token);
   state_ = State::kWaitingForResponseWithToken;
   CtapGetAssertionRequest request = SpecializeRequestForAuthenticator(
-      request_, *selected_authenticator_for_pin_uv_auth_token_);
+      request_, options_, *selected_authenticator_for_pin_uv_auth_token_);
   CtapGetAssertionOptions options = SpecializeOptionsForAuthenticator(
       options_, *selected_authenticator_for_pin_uv_auth_token_);
 

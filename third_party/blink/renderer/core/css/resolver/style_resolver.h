@@ -73,8 +73,7 @@ class CORE_EXPORT StyleResolver final : public GarbageCollected<StyleResolver> {
   // Return a reference to the initial style singleton.
   const ComputedStyle& InitialStyle() const;
 
-  // Create a new ComputedStyle copy based on the initial style singleton.
-  scoped_refptr<ComputedStyle> CreateComputedStyle() const;
+  // Create a new ComputedStyleBuilder based on the initial style singleton.
   ComputedStyleBuilder CreateComputedStyleBuilder() const;
 
   // Create a ComputedStyle for initial styles to be used as the basis for the
@@ -174,7 +173,7 @@ class CORE_EXPORT StyleResolver final : public GarbageCollected<StyleResolver> {
 
   Element* FindContainerForElement(Element*, const ContainerSelector&);
 
-  Font ComputeFont(Element&, ComputedStyle&, const CSSPropertyValueSet&);
+  Font ComputeFont(Element&, const ComputedStyle&, const CSSPropertyValueSet&);
 
   // FIXME: Rename to reflect the purpose, like didChangeFontSize or something.
   void InvalidateMatchedPropertiesCache();

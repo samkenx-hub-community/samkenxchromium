@@ -68,6 +68,7 @@
 
 @property(nonatomic, copy) NSArray* suggestions;
 @property(nonatomic, assign) BOOL suggestionRetrievalComplete;
+@property(nonatomic, assign) BOOL suggestionRetrievalStarted;
 
 @end
 
@@ -78,7 +79,7 @@
 
 - (void)retrieveSuggestionsForForm:(const autofill::FormActivityParams&)params
                           webState:(web::WebState*)webState {
-  self.suggestionRetrievalComplete = NO;
+  self.suggestionRetrievalStarted = YES;
   [super retrieveSuggestionsForForm:params webState:webState];
 }
 
@@ -89,6 +90,12 @@
 
 - (void)onNoSuggestionsAvailable {
   self.suggestionRetrievalComplete = YES;
+}
+
+- (void)resetSuggestionAvailable {
+  self.suggestionRetrievalComplete = NO;
+  self.suggestionRetrievalStarted = NO;
+  self.suggestions = nil;
 }
 
 @end
@@ -225,6 +232,12 @@ class AutofillControllerTest : public PlatformTest {
   ~AutofillControllerTest() override {}
 
  protected:
+  class TestAutofillClient : public ChromeAutofillClientIOS {
+   public:
+    using ChromeAutofillClientIOS::ChromeAutofillClientIOS;
+    AutofillDownloadManager* GetDownloadManager() override { return nullptr; }
+  };
+
   class TestAutofillManager : public BrowserAutofillManager {
    public:
     TestAutofillManager(AutofillDriverIOS* driver, AutofillClient* client)
@@ -253,6 +266,7 @@ class AutofillControllerTest : public PlatformTest {
   // If `wait_for_trigger` is yes, wait for the call to
   // `retrieveSuggestionsForForm` to avoid considering a former call.
   void WaitForSuggestionRetrieval(BOOL wait_for_trigger);
+  void ResetWaitForSuggestionRetrieval();
 
   // Loads the page and wait until the initial form processing has been done.
   // This processing must find `expected_size` forms.
@@ -288,7 +302,7 @@ class AutofillControllerTest : public PlatformTest {
   // Histogram tester for these tests.
   std::unique_ptr<base::HistogramTester> histogram_tester_;
 
-  std::unique_ptr<autofill::ChromeAutofillClientIOS> autofill_client_;
+  std::unique_ptr<autofill::AutofillClient> autofill_client_;
 
   AutofillAgent* autofill_agent_;
 
@@ -323,9 +337,9 @@ void AutofillControllerTest::SetUp() {
   InfoBarManagerImpl::CreateForWebState(web_state());
   infobars::InfoBarManager* infobar_manager =
       InfoBarManagerImpl::FromWebState(web_state());
-  autofill_client_.reset(new autofill::ChromeAutofillClientIOS(
+  autofill_client_ = std::make_unique<TestAutofillClient>(
       browser_state_.get(), web_state(), infobar_manager, autofill_agent_,
-      /*password_generation_manager=*/nullptr));
+      /*password_generation_manager=*/nullptr);
 
   if (base::FeatureList::IsEnabled(
           autofill::features::kAutofillUseAlternativeStateNameMap)) {
@@ -366,18 +380,22 @@ void AutofillControllerTest::TearDown() {
   web_state_.reset();
 }
 
+void AutofillControllerTest::ResetWaitForSuggestionRetrieval() {
+  [suggestion_controller() resetSuggestionAvailable];
+}
+
 void AutofillControllerTest::WaitForSuggestionRetrieval(BOOL wait_for_trigger) {
   // Wait for the message queue to ensure that JS events fired in the tests
   // trigger TestSuggestionController's retrieveSuggestionsForFormNamed: method
   // and set suggestionRetrievalComplete to NO.
   if (wait_for_trigger) {
     WaitForCondition(^bool {
-      return ![suggestion_controller() suggestionRetrievalComplete];
+      return suggestion_controller().suggestionRetrievalStarted;
     });
   }
   // Now we can wait for suggestionRetrievalComplete to be set to YES.
   WaitForCondition(^bool {
-    return [suggestion_controller() suggestionRetrievalComplete];
+    return suggestion_controller().suggestionRetrievalComplete;
   });
 }
 
@@ -506,6 +524,7 @@ void AutofillControllerTest::SetUpForSuggestions(
 TEST_F(AutofillControllerTest, ProfileSuggestions) {
   SetUpForSuggestions(kProfileFormHtml, 1);
   ForceViewRendering(web_state()->GetView());
+  ResetWaitForSuggestionRetrieval();
   web::test::ExecuteJavaScript(@"document.forms[0].name.focus()", web_state());
   WaitForSuggestionRetrieval(/*wait_for_trigger=*/YES);
   ExpectMetric("Autofill.AddressSuggestionsCount", 1);
@@ -522,6 +541,7 @@ TEST_F(AutofillControllerTest, ProfileSuggestionsTwoAnonymousForms) {
       [NSString stringWithFormat:@"%@%@", kProfileFormHtml, kProfileFormHtml],
       2);
   ForceViewRendering(web_state()->GetView());
+  ResetWaitForSuggestionRetrieval();
   web::test::ExecuteJavaScript(@"document.forms[0].name.focus()", web_state());
   WaitForSuggestionRetrieval(/*wait_for_trigger=*/YES);
   ExpectMetric("Autofill.AddressSuggestionsCount", 1);
@@ -537,6 +557,7 @@ TEST_F(AutofillControllerTest, ProfileSuggestionsTwoAnonymousForms) {
 TEST_F(AutofillControllerTest, ProfileSuggestionsFromSelectField) {
   SetUpForSuggestions(kProfileFormHtml, 1);
   ForceViewRendering(web_state()->GetView());
+  ResetWaitForSuggestionRetrieval();
   web::test::ExecuteJavaScript(@"document.forms[0].state.focus()", web_state());
   WaitForSuggestionRetrieval(/*wait_for_trigger=*/YES);
   ExpectMetric("Autofill.AddressSuggestionsCount", 1);
@@ -576,6 +597,7 @@ TEST_F(AutofillControllerTest, MultipleProfileSuggestions) {
   EXPECT_EQ(2U, personal_data_manager->GetProfiles().size());
   EXPECT_TRUE(LoadHtmlAndWaitForFormFetched(kProfileFormHtml, 1));
   ForceViewRendering(web_state()->GetView());
+  ResetWaitForSuggestionRetrieval();
   web::test::ExecuteJavaScript(@"document.forms[0].name.focus()", web_state());
   WaitForSuggestionRetrieval(/*wait_for_trigger=*/YES);
   ExpectMetric("Autofill.AddressSuggestionsCount", 2);
@@ -643,7 +665,7 @@ void AutofillControllerTest::SetUpKeyValueData() {
 // AutofillAgent, once data has been loaded into a test data manager.
 TEST_F(AutofillControllerTest, KeyValueSuggestions) {
   SetUpKeyValueData();
-
+  ResetWaitForSuggestionRetrieval();
   // Focus element.
   web::test::ExecuteJavaScript(@"document.forms[0].greeting.value='B'",
                                web_state());
@@ -660,9 +682,11 @@ TEST_F(AutofillControllerTest, KeyValueSuggestions) {
 // happen in practice and should not result in a crash or incorrect behavior.
 TEST_F(AutofillControllerTest, KeyValueTypedSuggestions) {
   SetUpKeyValueData();
+  ResetWaitForSuggestionRetrieval();
   web::test::ExecuteJavaScript(@"document.forms[0].greeting.focus()",
                                web_state());
   WaitForSuggestionRetrieval(/*wait_for_trigger=*/YES);
+  ResetWaitForSuggestionRetrieval();
   web::test::ExecuteJavaScript(@"event = document.createEvent('TextEvent');",
                                web_state());
   web::test::ExecuteJavaScript(
@@ -682,9 +706,11 @@ TEST_F(AutofillControllerTest, KeyValueFocusChange) {
   SetUpKeyValueData();
 
   // Focus the dummy field and confirm no suggestions are presented.
+  ResetWaitForSuggestionRetrieval();
   web::test::ExecuteJavaScript(@"document.forms[0].dummy.focus()", web_state());
   WaitForSuggestionRetrieval(/*wait_for_trigger=*/YES);
   ASSERT_EQ(0U, [suggestion_controller() suggestions].count);
+  ResetWaitForSuggestionRetrieval();
 
   // Enter 'B' in the dummy field and confirm no suggestions are presented.
   web::test::ExecuteJavaScript(@"event = document.createEvent('TextEvent');",
@@ -692,16 +718,19 @@ TEST_F(AutofillControllerTest, KeyValueFocusChange) {
   web::test::ExecuteJavaScript(
       @"event.initTextEvent('textInput', true, true, window, 'B');",
       web_state());
+
   web::test::ExecuteJavaScript(@"document.forms[0].dummy.dispatchEvent(event);",
                                web_state());
   WaitForSuggestionRetrieval(/*wait_for_trigger=*/YES);
   ASSERT_EQ(0U, [suggestion_controller() suggestions].count);
+  ResetWaitForSuggestionRetrieval();
 
   // Enter 'B' in the greeting field and confirm that one suggestion ("Bonjour")
   // is presented.
   web::test::ExecuteJavaScript(@"document.forms[0].greeting.focus()",
                                web_state());
   WaitForSuggestionRetrieval(/*wait_for_trigger=*/YES);
+  ResetWaitForSuggestionRetrieval();
   web::test::ExecuteJavaScript(@"event = document.createEvent('TextEvent');",
                                web_state());
   web::test::ExecuteJavaScript(
@@ -710,6 +739,7 @@ TEST_F(AutofillControllerTest, KeyValueFocusChange) {
   web::test::ExecuteJavaScript(
       @"document.forms[0].greeting.dispatchEvent(event);", web_state());
   WaitForSuggestionRetrieval(/*wait_for_trigger=*/YES);
+
   ASSERT_EQ(1U, [suggestion_controller() suggestions].count);
   FormSuggestion* suggestion = [suggestion_controller() suggestions][0];
   EXPECT_NSEQ(@"Bonjour", suggestion.value);
@@ -720,7 +750,7 @@ TEST_F(AutofillControllerTest, KeyValueFocusChange) {
 // been loaded into a test data manager.
 TEST_F(AutofillControllerTest, NoKeyValueSuggestionsWithoutTyping) {
   SetUpKeyValueData();
-
+  ResetWaitForSuggestionRetrieval();
   // Focus element.
   web::test::ExecuteJavaScript(@"document.forms[0].greeting.focus()",
                                web_state());

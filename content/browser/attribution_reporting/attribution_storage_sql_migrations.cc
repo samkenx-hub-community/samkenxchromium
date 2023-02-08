@@ -20,6 +20,14 @@ namespace content {
 
 namespace {
 
+// Ensure that both version numbers are updated together to prevent crashes on
+// downgrades as in crbug.com/1413728.
+[[nodiscard]] bool SetVersionNumbers(sql::MetaTable* meta_table, int version) {
+  DCHECK(meta_table);
+  return meta_table->SetVersionNumber(version) &&
+         meta_table->SetCompatibleVersionNumber(version);
+}
+
 // Wrap each migration in its own transaction. This results in smaller
 // transactions, so it's less likely that a transaction's buffer will need to
 // spill to disk. Also, if the database grows a lot and Chrome stops (user
@@ -46,8 +54,7 @@ bool MigrateToVersion36(sql::Database* db, sql::MetaTable* meta_table) {
     return false;
   }
 
-  meta_table->SetVersionNumber(36);
-  return transaction.Commit();
+  return SetVersionNumbers(meta_table, 36) && transaction.Commit();
 }
 
 bool MigrateToVersion37(sql::Database* db, sql::MetaTable* meta_table) {
@@ -91,8 +98,7 @@ bool MigrateToVersion37(sql::Database* db, sql::MetaTable* meta_table) {
     return false;
   }
 
-  meta_table->SetVersionNumber(37);
-  return transaction.Commit();
+  return SetVersionNumbers(meta_table, 37) && transaction.Commit();
 }
 
 bool MigrateToVersion38(sql::Database* db, sql::MetaTable* meta_table) {
@@ -189,8 +195,7 @@ bool MigrateToVersion38(sql::Database* db, sql::MetaTable* meta_table) {
     return false;
   }
 
-  meta_table->SetVersionNumber(38);
-  return transaction.Commit();
+  return SetVersionNumbers(meta_table, 38) && transaction.Commit();
 }
 
 bool MigrateToVersion39(sql::Database* db, sql::MetaTable* meta_table) {
@@ -274,8 +279,7 @@ bool MigrateToVersion39(sql::Database* db, sql::MetaTable* meta_table) {
     return false;
   }
 
-  meta_table->SetVersionNumber(39);
-  return transaction.Commit();
+  return SetVersionNumbers(meta_table, 39) && transaction.Commit();
 }
 
 bool MigrateToVersion40(sql::Database* db, sql::MetaTable* meta_table) {
@@ -321,8 +325,7 @@ bool MigrateToVersion40(sql::Database* db, sql::MetaTable* meta_table) {
     return false;
   }
 
-  meta_table->SetVersionNumber(40);
-  return transaction.Commit();
+  return SetVersionNumbers(meta_table, 40) && transaction.Commit();
 }
 
 bool MigrateToVersion41(sql::Database* db, sql::MetaTable* meta_table) {
@@ -338,8 +341,7 @@ bool MigrateToVersion41(sql::Database* db, sql::MetaTable* meta_table) {
     return false;
   }
 
-  meta_table->SetVersionNumber(41);
-  return transaction.Commit();
+  return SetVersionNumbers(meta_table, 41) && transaction.Commit();
 }
 
 bool MigrateToVersion42(sql::Database* db, sql::MetaTable* meta_table) {
@@ -369,8 +371,7 @@ bool MigrateToVersion42(sql::Database* db, sql::MetaTable* meta_table) {
     return false;
   }
 
-  meta_table->SetVersionNumber(42);
-  return transaction.Commit();
+  return SetVersionNumbers(meta_table, 42) && transaction.Commit();
 }
 
 bool MigrateToVersion43(sql::Database* db, sql::MetaTable* meta_table) {
@@ -395,8 +396,7 @@ bool MigrateToVersion43(sql::Database* db, sql::MetaTable* meta_table) {
     return false;
   }
 
-  meta_table->SetVersionNumber(43);
-  return transaction.Commit();
+  return SetVersionNumbers(meta_table, 43) && transaction.Commit();
 }
 
 bool MigrateToVersion44(sql::Database* db, sql::MetaTable* meta_table) {
@@ -526,8 +526,7 @@ bool MigrateToVersion44(sql::Database* db, sql::MetaTable* meta_table) {
     }
   }
 
-  meta_table->SetVersionNumber(44);
-  return transaction.Commit();
+  return SetVersionNumbers(meta_table, 44) && transaction.Commit();
 }
 
 bool MigrateToVersion45(sql::Database* db, sql::MetaTable* meta_table) {
@@ -543,8 +542,20 @@ bool MigrateToVersion45(sql::Database* db, sql::MetaTable* meta_table) {
     return false;
   }
 
-  meta_table->SetVersionNumber(45);
-  return transaction.Commit();
+  return SetVersionNumbers(meta_table, 45) && transaction.Commit();
+}
+
+bool MigrateToVersion46(sql::Database* db, sql::MetaTable* meta_table) {
+  sql::Transaction transaction(db);
+  if (!transaction.Begin()) {
+    return false;
+  }
+
+  if (!db->Execute("ALTER TABLE sources DROP COLUMN destination_origin")) {
+    return false;
+  }
+
+  return SetVersionNumbers(meta_table, 46) && transaction.Commit();
 }
 
 }  // namespace
@@ -606,6 +617,11 @@ bool UpgradeAttributionStorageSqlSchema(sql::Database* db,
   }
   if (meta_table->GetVersionNumber() == 44) {
     if (!MigrateToVersion45(db, meta_table)) {
+      return false;
+    }
+  }
+  if (meta_table->GetVersionNumber() == 45) {
+    if (!MigrateToVersion46(db, meta_table)) {
       return false;
     }
   }

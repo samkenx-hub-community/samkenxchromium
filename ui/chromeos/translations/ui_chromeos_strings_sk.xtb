@@ -59,6 +59,7 @@
 <translation id="1499943022354839699">Anglická (US) klávesnica s rozložením Dvorak</translation>
 <translation id="1515909359182093592"><ph name="INPUT_LABEL" /> – hostiteľ</translation>
 <translation id="1521655867290435174">Tabuľky Google</translation>
+<translation id="1521795806314479294">Pripravuje sa súbor <ph name="FILE_NAME" />…</translation>
 <translation id="1538729222189715449">Otvárajú sa súbory Linux…</translation>
 <translation id="1547964879613821194">Kanadská anglická klávesnica</translation>
 <translation id="1556189134700913550">Použiť pre všetky položky</translation>
@@ -83,6 +84,7 @@
 <translation id="1722487484194605434">Prebieha komprimovanie <ph name="NUMBER_OF_ITEMS" /> položiek…</translation>
 <translation id="1722687688096767818">Pridáva sa profil…</translation>
 <translation id="1726100011689679555">Menné servery</translation>
+<translation id="1727562178154619254">Pripravené na synchronizáciu</translation>
 <translation id="1729953886957086472">Nemecká (Nemecko) klávesnica</translation>
 <translation id="1730235522912993863">Čínska klávesnica Cangjie</translation>
 <translation id="1731889557567069540">Počet skopírovaných položiek: <ph name="NUMBER_OF_ITEMS" />.</translation>
@@ -408,6 +410,7 @@
 <translation id="4462159676511157176">Vlastné menné servery</translation>
 <translation id="4465725236958772856"><ph name="NETWORK_INDEX" />. sieť z <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, ovládaná správcom, pripojenie</translation>
 <translation id="4470564870223067757">Hangul 2 Set</translation>
+<translation id="4474142134969976028">Žiadne zodpovedajúce výsledky</translation>
 <translation id="4477002475007461989">Rumunská klávesnica</translation>
 <translation id="4477219268485577442">Bulharská fonetická klávesnica</translation>
 <translation id="4508265954913339219">Aktivácia zlyhala</translation>
@@ -479,6 +482,7 @@
 <translation id="4973523518332075481">Použite názov s maximálne <ph name="MAX_LENGTH" /> znakmi</translation>
 <translation id="4973970068702235170">Komprimovanie zlyhalo, neočakávaná chyba: <ph name="ERROR_MESSAGE" /></translation>
 <translation id="4984616446166309645">Japonská klávesnica</translation>
+<translation id="4987699874727873250">angličtina (India)</translation>
 <translation id="4988205478593450158">Naozaj chcete odstrániť súbor <ph name="FILE_NAME" />?</translation>
 <translation id="498902553138568924">Červený motýľ</translation>
 <translation id="4992066212339426712">Zapnúť zvuk</translation>
@@ -509,6 +513,7 @@
        Odpojením zariadenia počas používania môžete spôsobiť stratu údajov. Počkajte na dokončenie operácie a následne zariadenie vysuňte pomocou aplikácie Súbory.</translation>
 <translation id="5163869187418756376">Zdieľanie zlyhalo. Skontrolujte pripojenie a skúste to neskôr.</translation>
 <translation id="516592729076796170">US Programmer Dvorak</translation>
+<translation id="5167102019886320507">Pripravujú sa položky (<ph name="NUMBER_OF_ITEMS" />)…</translation>
 <translation id="5177526793333269655">Zobrazenie miniatúr</translation>
 <translation id="5181896909298187506">Žiadne nedávne súbory</translation>
 <translation id="5194713942430106590">Kliknutím zoradíte stĺpec vo vzostupnom poradí.</translation>
@@ -813,6 +818,7 @@ s ostatnými, a to všetko na jednom mieste.<ph name="MARKUP_9" /></translatio
 <translation id="7655441028674523381">Jednoduchý prístup k Fotkám Google</translation>
 <translation id="7658239707568436148">Zrušiť</translation>
 <translation id="7663224033570512922">Hindská klávesnica</translation>
+<translation id="7665680517722058469">Skúste iné vyhľadávanie</translation>
 <translation id="7689532716264131859">Položky (<ph name="NUMBER_OF_ITEMS" />) boli presunuté do koša</translation>
 <translation id="7693909743393669729">Formátovaním kľúča vymažete všetky dáta, ktoré sú v ňom uložené, ako aj všetky existujúce oddiely vrátane tých, ktoré nemusia byť viditeľné. Táto akcia sa nedá vrátiť späť.</translation>
 <translation id="7695430100978772476">Disk <ph name="DRIVE_NAME" /> sa nepodarilo naformátovať</translation>
@@ -969,6 +975,7 @@ s ostatnými, a to všetko na jednom mieste.<ph name="MARKUP_9" /></translatio
 <translation id="8866284467018526531">Arabská klávesnica (prepis)</translation>
 <translation id="8873014196523807561">Ak chcete tieto položky obnoviť, presuňte ich do nového priečinka. Pôvodné priečinky pre niektoré tieto položky boli odstránené.</translation>
 <translation id="8874184842967597500">Nepripojené</translation>
+<translation id="8876368061475701452">V poradí</translation>
 <translation id="8900820606136623064">Maďarčina</translation>
 <translation id="8903931173357132290">Absolvent</translation>
 <translation id="8912078710089354287">Pes krútiaci chvostom</translation>

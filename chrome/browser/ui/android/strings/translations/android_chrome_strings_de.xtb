@@ -404,7 +404,7 @@ Private Stake Tokens verbessern den Datenschutz im Web und können nicht dazu ve
 <translation id="316694332262407393">Chrome wird hier bereits ausgeführt.</translation>
 <translation id="3167258285411721858">Du kannst die mobile Website für <ph name="HOST_NAME" /> anfordern</translation>
 <translation id="3169472444629675720">Discover</translation>
-<translation id="3187472288455401631">Anzeigenanalyse</translation>
+<translation id="3187472288455401631">Analyse von Werbung</translation>
 <translation id="3207960819495026254">Mit einem Lesezeichen versehen</translation>
 <translation id="3208584281581115441">Jetzt prüfen</translation>
 <translation id="3211426585530211793"><ph name="ITEM_TITLE" /> gelöscht</translation>
@@ -670,7 +670,7 @@ Eventuell findest du unter <ph name="BEGIN_LINK" />history.google.com<ph name="E
 <translation id="4684427112815847243">Alles synchronisieren</translation>
 <translation id="4685741273709472646">Wähle eine Option aus der Drop-down-Liste aus</translation>
 <translation id="4687718960473379118">Von Websites vorgeschlagene Werbung</translation>
-<translation id="4689792375321623175">Bild mit Google suchen <ph name="BEGIN_NEW" />Neu<ph name="END_NEW" /></translation>
+<translation id="4689792375321623175">Google-Suche anhand des Bildes <ph name="BEGIN_NEW" />Neu<ph name="END_NEW" /></translation>
 <translation id="4695891336199304370">{SHIPPING_OPTIONS,plural, =1{<ph name="SHIPPING_OPTION_PREVIEW" />\u2026 und <ph name="NUMBER_OF_ADDITIONAL_SHIPPING_OPTIONS" /> weitere}other{<ph name="SHIPPING_OPTION_PREVIEW" />\u2026 und <ph name="NUMBER_OF_ADDITIONAL_SHIPPING_OPTIONS" /> weitere}}</translation>
 <translation id="4699172675775169585">Bilder und Dateien im Cache</translation>
 <translation id="4719927025381752090">Übersetzung anbieten</translation>
@@ -922,6 +922,7 @@ Wenn du diese Einstellung ändern möchtest, <ph name="BEGIN_LINK" />setze die S
 <translation id="6000203700195075278">Wieder folgen</translation>
 <translation id="6002122790816966947">Meine Geräte</translation>
 <translation id="6005538289190791541">Vorgeschlagenes Passwort</translation>
+<translation id="6011308810877101166">Suchvorschläge verbessern</translation>
 <translation id="6039379616847168523">Zum nächsten Tab wechseln</translation>
 <translation id="6040143037577758943">Schließen</translation>
 <translation id="604124094241169006">Automatisch</translation>
@@ -952,7 +953,7 @@ Wenn du diese Einstellung ändern möchtest, <ph name="BEGIN_LINK" />setze die S
 <translation id="6193448654517602979">Tabs auswählen</translation>
 <translation id="6196315980958524839">Passwörter werden auf diesem Gerät im Google Passwortmanager gespeichert</translation>
 <translation id="6202812185118613467">Melde dich wieder an, um die Synchronisierung zu starten</translation>
-<translation id="6205314730813004066">Datenschutz bei Werbung</translation>
+<translation id="6205314730813004066">Datenschutz bei Anzeigen</translation>
 <translation id="6210748933810148297"><ph name="EMAIL" /> ist nicht deine E-Mail-Adresse?</translation>
 <translation id="6211386937064921208">Vorschau für diese Seite</translation>
 <translation id="6221633008163990886">Zum Exportieren deiner Passwörter entsperren</translation>
@@ -1452,6 +1453,7 @@ Einige Websites schalten möglicherweise Werbeanzeigen, deren Auswahl nicht dara
 <translation id="8746155870861185046">Markierung teilen</translation>
 <translation id="8748850008226585750">Inhalte ausgeblendet</translation>
 <translation id="8756969031206844760">Passwort aktualisieren?</translation>
+<translation id="8765470054473112089">Wenn du etwas in die Adressleiste oder das Suchfeld eingibst, sendet Chrome deine Eingabe an deine Standardsuchmaschine, damit du bessere Vorschläge erhältst. Im Inkognitomodus ist diese Funktion deaktiviert.</translation>
 <translation id="8766529642647037772">Möchtest du einen hervorgehobenen Link wie diesen erstellen?</translation>
 <translation id="8773160212632396039">Anfrage wird verarbeitet</translation>
 <translation id="8788265440806329501">Der Navigationsverlauf wurde geschlossen</translation>

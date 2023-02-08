@@ -39,7 +39,6 @@
 #include "chrome/browser/accessibility/accessibility_labels_service.h"
 #include "chrome/browser/accessibility/accessibility_labels_service_factory.h"
 #include "chrome/browser/after_startup_task_utils.h"
-#include "chrome/browser/ash/crosapi/browser_util.h"
 #include "chrome/browser/bluetooth/chrome_bluetooth_delegate_impl_client.h"
 #include "chrome/browser/browser_about_handler.h"
 #include "chrome/browser/browser_features.h"
@@ -385,6 +384,7 @@
 #include "chrome/browser/ash/arc/fileapi/arc_content_file_system_backend_delegate.h"
 #include "chrome/browser/ash/arc/fileapi/arc_documents_provider_backend_delegate.h"
 #include "chrome/browser/ash/chrome_browser_main_parts_ash.h"
+#include "chrome/browser/ash/crosapi/browser_util.h"
 #include "chrome/browser/ash/drive/fileapi/drivefs_file_system_backend_delegate.h"
 #include "chrome/browser/ash/file_manager/app_id.h"
 #include "chrome/browser/ash/file_system_provider/fileapi/backend_delegate.h"
@@ -472,6 +472,7 @@
 #include "chrome/browser/devtools/chrome_devtools_manager_delegate.h"
 #include "chrome/browser/devtools/devtools_window.h"
 #include "chrome/browser/direct_sockets/chrome_direct_sockets_delegate.h"
+#include "chrome/browser/headless/chrome_browser_main_extra_parts_headless.h"
 #include "chrome/browser/media/unified_autoplay_config.h"
 #include "chrome/browser/new_tab_page/new_tab_page_util.h"
 #include "chrome/browser/page_info/about_this_site_side_panel_throttle.h"
@@ -1752,6 +1753,11 @@ ChromeContentBrowserClient::CreateBrowserMainParts(bool is_integration_test) {
           chrome::enterprise_util::ChromeBrowserMainExtraPartsEnterprise>());
 #endif
 
+#if !BUILDFLAG(IS_ANDROID)
+  main_parts->AddParts(
+      std::make_unique<headless::ChromeBrowserMainExtraPartsHeadless>());
+#endif
+
   // Always add ChromeBrowserMainExtraPartsGpu last to make sure
   // GpuDataManager initialization could pick up about:flags settings.
   main_parts->AddParts(std::make_unique<ChromeBrowserMainExtraPartsGpu>());
@@ -2442,8 +2448,7 @@ void ChromeContentBrowserClient::PersistIsolatedOrigin(
 
 bool ChromeContentBrowserClient::ShouldUrlUseApplicationIsolationLevel(
     content::BrowserContext* browser_context,
-    const GURL& url,
-    bool origin_matches_flag) {
+    const GURL& url) {
 #if BUILDFLAG(ENABLE_EXTENSIONS)
 
   if (!content::IsolatedWebAppsPolicy::AreIsolatedWebAppsEnabled(
@@ -3817,7 +3822,7 @@ ChromeContentBrowserClient::GetTtsControllerDelegate() {
 void ChromeContentBrowserClient::MaybeOverrideManifest(
     content::RenderFrameHost* render_frame_host,
     blink::mojom::ManifestPtr& manifest) {
-#if BUILDFLAG(IS_CHROMEOS)
+#if !BUILDFLAG(IS_ANDROID)
   Profile* profile =
       Profile::FromBrowserContext(render_frame_host->GetBrowserContext());
   auto* provider = web_app::WebAppProvider::GetForWebApps(profile);
@@ -7370,6 +7375,8 @@ bool ChromeContentBrowserClient::OpenExternally(
   // instead, which will load them in an app window.
   bool should_open_in_ash_app =
       from_webui && !crosapi::browser_util::IsAshWebBrowserEnabled() &&
+      // Terminal's tabs must remain in the Terminal SWA.
+      !url.SchemeIs(content::kChromeUIUntrustedScheme) &&
       ChromeWebUIControllerFactory::GetInstance()->CanHandleUrl(url) &&
       !ash::GetCapturingSystemAppForURL(profile, url);
   if (should_open_in_ash_app) {
@@ -7383,7 +7390,7 @@ bool ChromeContentBrowserClient::OpenExternally(
         std::make_unique<apps::WindowInfo>(display_id));
     return true;
   }
-#endif
+#endif  // BUILDFLAG(IS_CHROMEOS_ASH)
 
   return false;
 }

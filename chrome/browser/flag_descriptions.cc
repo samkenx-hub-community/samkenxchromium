@@ -66,6 +66,11 @@ const char kAllowInsecureLocalhostDescription[] =
     "Allows requests to localhost over HTTPS even when an invalid certificate "
     "is presented.";
 
+const char kWindowLayoutMenu[] = "New Window Layout Menu";
+const char kWindowLayoutMenuDescription[] =
+    "Enables the new Window Layout menu for adjusting window layouts. Also "
+    "enables Floating windows and partial split-screen layouts.";
+
 const char kWindowsFollowCursorName[] =
     "Windows open on the display with the cursor";
 const char kWindowsFollowCursorDescription[] =
@@ -388,6 +393,14 @@ const char kAutofillEnableOffersInClankKeyboardAccessoryName[] =
 const char kAutofillEnableOffersInClankKeyboardAccessoryDescription[] =
     "When enabled, offers will be displayed in the keyboard accessory when "
     "available.";
+
+const char kAutofillEnablePageLoadMetadataIntegrationName[] =
+    "Enable Autofill Page Load Metadata integration";
+const char kAutofillEnablePageLoadMetadataIntegrationDescription[] =
+    "When enabled, client side filtering functionality will be triggered for "
+    "certain autofill use-cases, for example filtering displaying virtual card "
+    "suggestions on websites where the merchant has opted-out of virtual "
+    "cards.";
 
 const char kAutofillEnableRankingFormulaAddressProfilesName[] =
     "Enable new Autofill suggestion ranking formula for profiles";
@@ -758,12 +771,6 @@ const char kDisruptiveNotificationPermissionRevocationDescription[] =
     "disruptive notifications unless the permission was granted through a "
     "prompt that informed the user about this possibility.";
 
-const char kIsolatedAppOriginsName[] = "Isolated App Origins";
-const char kIsolatedAppOriginsDescription[] =
-    "Enables Isolated App policy enforcement and related APIs (e.g. Direct "
-    "Sockets API) for development purposes for a set of origins, specified as "
-    "a comma-separated list.";
-
 const char kDoubleBufferCompositingName[] = "Double buffered compositing";
 const char kDoubleBufferCompositingDescription[] =
     "Use double buffer for compositing (instead of triple-buffering). "
@@ -995,12 +1002,6 @@ const char kAccessibilityAcceleratorNotificationsTimeoutDescription[] =
     "Enables notifications for accessibility features turned on by keyboard "
     "shortcut (docked magnifier, screen magnifier and high contrast) to time "
     "out instead of remaining pinned.";
-
-const char kChromeVoxQ1FastTrackFeaturesName[] =
-    "ChromeVox Q1 Fast-Track Features";
-const char kChromeVoxQ1FastTrackFeaturesDescription[] =
-    "This option enables experimental Accessibility ChromeVox improvements for "
-    "Chrome OS.";
 
 const char kAccessibilityServiceName[] = "Experimental Accessibility Service";
 const char kAccessibilityServiceDescription[] =
@@ -1474,9 +1475,14 @@ const char kFedCmName[] = "FedCM";
 const char kFedCmDescription[] =
     "Enables JavaScript API to intermediate federated identity requests.";
 
-const char kFedCmAutoSigninName[] = "FedCmAutoSignin";
-const char kFedCmAutoSigninDescription[] =
-    "Enables auto sign-in in the FedCM API. Requires FedCM to be enabled.";
+const char kFedCmAutoReauthnName[] = "FedCmAutoReauthn";
+const char kFedCmAutoReauthnDescription[] =
+    "Enables auto re-authentication in the FedCM API. Requires FedCM to be "
+    "enabled.";
+
+const char kFedCmIdPRegistrationName[] = "FedCM with IdP Registration support";
+const char kFedCmIdPRegistrationDescription[] =
+    "Enables RPs to get identity credentials from registered IdPs.";
 
 const char kFedCmIframeSupportName[] = "FedCM with iframe support";
 const char kFedCmIframeSupportDescription[] =
@@ -1787,12 +1793,6 @@ const char kInProductHelpSnoozeDescription[] =
 const char kInProductHelpUseClientConfigName[] = "IPH Use Client Config";
 const char kInProductHelpUseClientConfigDescription[] =
     "Enable In-Product Help to use client side configuration.";
-
-const char kInstallIsolatedWebAppFromFile[] =
-    "Install Isolated Web App from Unsigned Web Bundle";
-const char kInstallIsolatedWebAppFromFileDescription[] =
-    "Installs a new developer mode Isolated Web App backed by the unsigned "
-    "Web Bundle at the provided path.";
 
 const char kInstallIsolatedWebAppFromUrl[] =
     "Install Isolated Web App from Proxy URL";
@@ -3403,6 +3403,12 @@ const char kDmTokenDeletionDescription[] =
 
 #if BUILDFLAG(IS_ANDROID)
 
+const char kAccessibilityFormControlsModeName[] =
+    "Experimental Accessibility Mode for Form Controls only";
+const char kAccessibilityFormControlsModeDescription[] =
+    "Enable experimental accessibility mode to support password managers and "
+    "form fillers when full assistive technology is not running.";
+
 const char kAccessibilityPageZoomName[] = "Accessibility Page Zoom";
 const char kAccessibilityPageZoomDescription[] =
     "Whether the UI and underlying code for page zoom should be enabled to"
@@ -4387,11 +4393,6 @@ const char kSCTAuditingName[] = "SCT auditing";
 const char kSCTAuditingDescription[] =
     "Enables SCT auditing for users who have opted in to Safe Browsing "
     "Extended Reporting.";
-
-const char kSharingDesktopScreenshotsEditName[] =
-    "Desktop Screenshots Edit Mode";
-const char kSharingDesktopScreenshotsEditDescription[] =
-    "Enables an edit flow for users who create screenshots on desktop";
 
 const char kSharingDesktopSharePreviewName[] = "Desktop share hub preview";
 const char kSharingDesktopSharePreviewDescription[] =
@@ -5429,6 +5430,10 @@ const char kFilesConflictDialogDescription[] =
     "When enabled, the conflict dialog will be shown during file transfers "
     "if a file entry in the transfer exists at the destination.";
 
+const char kFilesDriveShortcutsName[] = "Files app Google Drive shortcut icons";
+const char kFilesDriveShortcutsDescription[] =
+    "When enabled, shows an icon for files in Google Drive that are shortcuts";
+
 const char kFilesExtractArchiveName[] = "Extract archive in Files app";
 const char kFilesExtractArchiveDescription[] =
     "Enable the simplified archive extraction feature in Files app";
@@ -5450,12 +5455,6 @@ const char kFilesSinglePartitionFormatDescription[] =
 const char kFilesTrashName[] = "Enable Files Trash.";
 const char kFilesTrashDescription[] =
     "Enable trash for My files volume in Files App.";
-
-const char kFloatWindow[] = "Float current active window";
-const char kFloatWindowDescription[] =
-    "Enables the accelerator (Command + Alt + F) to float current active "
-    "window. You can also access this from Multitask Menu, by "
-    "hovering/long-pressing on the maximize button on the window frame.";
 
 const char kForceSpectreVariant2MitigationName[] =
     "Force Spectre variant 2 mitigagtion";
@@ -5738,10 +5737,6 @@ const char kOsSettingsSearchFeedbackDescription[] =
     "Enables search result feedback in ChromeOS Settings when no search "
     "results are returned.";
 
-const char kPartialSplit[] = "Partial Split";
-const char kPartialSplitDescription[] =
-    "Enables the option to snap two windows into 2/3 and 1/3 for split view.";
-
 const char kPcieBillboardNotificationName[] = "Pcie billboard notification";
 const char kPcieBillboardNotificationDescription[] =
     "Enable Pcie peripheral billboard notification.";
@@ -5920,6 +5915,11 @@ const char kSystemJapanesePhysicalTypingDescription[] =
     "Use the system input engine instead of the Chrome extension for physical "
     "typing in Japanese. This also replaces the Japanese extension settings "
     "page with one built into the UI and migrates the data to a new location.";
+
+const char kSystemLiveCaptionName[] = "System Live Caption";
+const char kSystemLiveCaptionDescription[] =
+    "Enables the live caption feature for non-Chrome (e.g. Android, linux) "
+    "audio.";
 
 const char kCaptivePortalErrorPageName[] =
     "Enables Captive Portal error page suggestions.";

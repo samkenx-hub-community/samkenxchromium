@@ -93,11 +93,6 @@ extern const char kAutofillParseVcnCardOnFileStandaloneCvcFieldsDescription[];
 extern const char kAutofillPruneSuggestionsName[];
 extern const char kAutofillPruneSuggestionsDescription[];
 
-// Title and description for the flag to control dismissing the Save Card
-// Infobar on Navigation.
-extern const char kAutofillSaveCardDismissOnNavigationName[];
-extern const char kAutofillSaveCardDismissOnNavigationDescription[];
-
 // Title and description for the flag to suggest Server card instead of a
 // deduped Local card.
 extern const char kAutofillSuggestServerCardInsteadOfLocalCardName[];
@@ -431,6 +426,11 @@ extern const char kIOSSharedHighlightingAmpDescription[];
 extern const char kIOSSharedHighlightingV2Name[];
 extern const char kIOSSharedHighlightingV2Description[];
 
+// Title and description for the flag that modifies the save password infobar
+// to show whether the save happens to an account or only to the current device.
+extern const char kIOSShowPasswordStorageInSaveInfobarName[];
+extern const char kIOSShowPasswordStorageInSaveInfobarDescription[];
+
 // Title and description for the flag to enable Keyboard Shortcuts Refresh.
 extern const char kKeyboardShortcutsMenuName[];
 extern const char kKeyboardShortcutsMenuDescription[];
@@ -704,11 +704,6 @@ extern const char kSynthesizedRestoreSessionDescription[];
 // Title and description for the flag to enable the Sync History data type.
 extern const char kSyncEnableHistoryDataTypeName[];
 extern const char kSyncEnableHistoryDataTypeDescription[];
-
-// Title and description for the flag to control if Chrome Sync should support
-// trusted vault passphrase promos.
-extern const char kSyncTrustedVaultPassphrasePromoName[];
-extern const char kSyncTrustedVaultPassphrasePromoDescription[];
 
 // Title and description for the flag to enable Sync standalone invalidations.
 extern const char kSyncInvalidationsName[];

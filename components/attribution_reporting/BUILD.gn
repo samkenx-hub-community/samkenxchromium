@@ -39,26 +39,25 @@ component("attribution_reporting") {
     "parsing_utils.h",
     "source_registration.cc",
     "source_registration.h",
+    "source_type.cc",
+    "source_type.h",
     "suitable_origin.cc",
     "suitable_origin.h",
-    "trigger_attestation.cc",
-    "trigger_attestation.h",
     "trigger_registration.cc",
     "trigger_registration.h",
   ]
 
   public_deps = [
     ":mojom",
+    ":source_type_mojom",
     "//base",
     "//components/aggregation_service",
     "//components/aggregation_service:mojom",
+    "//net",
     "//url",
   ]
 
-  deps = [
-    "//net",
-    "//services/network/public/cpp",
-  ]
+  deps = [ "//services/network/public/cpp" ]
 
   defines = [ "IS_ATTRIBUTION_REPORTING_IMPL" ]
 }
@@ -78,7 +77,6 @@ source_set("unit_tests") {
     "parsing_utils_unittest.cc",
     "source_registration_unittest.cc",
     "suitable_origin_unittest.cc",
-    "trigger_attestation_unittest.cc",
     "trigger_registration_unittest.cc",
   ]
 
@@ -99,7 +97,10 @@ source_set("test_support") {
     "test_utils.h",
   ]
 
-  public_deps = [ ":attribution_reporting" ]
+  public_deps = [
+    ":attribution_reporting",
+    "//services/network/public/cpp",
+  ]
 
   deps = [ "//base" ]
 }
@@ -160,11 +161,11 @@ mojom("registration_mojom") {
   sources = [ "registration.mojom" ]
 
   generate_java = true
-  webui_module_path = "/"
 
   deps = [
     "//components/aggregation_service:mojom",
     "//mojo/public/mojom/base",
+    "//services/network/public/mojom:mojom_schemeful_site",
     "//url/mojom:url_mojom_origin",
   ]
 
@@ -233,13 +234,6 @@ mojom("registration_mojom") {
           forward_declaration = "namespace attribution_reporting { struct AggregatableTriggerData; }"
         },
         {
-          mojom = "attribution_reporting.mojom.TriggerAttestation"
-          cpp = "::attribution_reporting::TriggerAttestation"
-          forward_declaration =
-              "namespace attribution_reporting { class TriggerAttestation; }"
-          move_only = true
-        },
-        {
           mojom = "attribution_reporting.mojom.TriggerRegistration"
           cpp = "::attribution_reporting::TriggerRegistration"
           forward_declaration =
@@ -272,7 +266,14 @@ component("registration_mojom_traits") {
     "//base",
     "//components/aggregation_service:mojom_shared",
     "//mojo/public/cpp/base:shared_typemap_traits",
+    "//net",
+    "//services/network/public/mojom",
     "//url",
     "//url/mojom:mojom_traits",
   ]
+}
+
+mojom("source_type_mojom") {
+  sources = [ "source_type.mojom" ]
+  webui_module_path = "/"
 }

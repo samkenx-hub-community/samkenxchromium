@@ -1137,7 +1137,8 @@ NSInteger kTrailingSymbolSize = 18;
   NSAttributedString* info = [self.delegate passwordCheckErrorInfo];
   // If no info returned by mediator handle this tap as tap on a cell.
   if (!info) {
-    [self showPasswordIssuesPage];
+    IsPasswordCheckupEnabled() ? [self showPasswordCheckupPage]
+                               : [self showPasswordIssuesPage];
     return;
   }
 
@@ -1805,10 +1806,12 @@ NSInteger kTrailingSymbolSize = 18;
               self.insecurePasswordsCount));
       if (UseSymbols()) {
         _passwordProblemsItem.trailingImage =
-            DefaultSymbolTemplateWithPointSize(kWarningFillSymbol,
+            DefaultSymbolTemplateWithPointSize(IsPasswordGroupingEnabled()
+                                                   ? kErrorCircleFillSymbol
+                                                   : kWarningFillSymbol,
                                                kTrailingSymbolSize);
-        _passwordProblemsItem.trailingImageTintColor =
-            [UIColor colorNamed:kRedColor];
+        _passwordProblemsItem.trailingImageTintColor = [UIColor
+            colorNamed:IsPasswordGroupingEnabled() ? kRed500Color : kRedColor];
       } else {
         _passwordProblemsItem.trailingImage =
             [UIImage imageNamed:@"round_settings_unsafe_state"];
@@ -2072,8 +2075,19 @@ NSInteger kTrailingSymbolSize = 18;
   [self.delegate deleteCredentials:credentialsToDelete];
 }
 
+// Notifies the handler to show the Password Checkup homepage if the state of
+// the Password Check cell allows it.
+- (void)showPasswordCheckupPage {
+  if (![self IsPasswordCheckTappable]) {
+    return;
+  }
+  [self.handler showPasswordCheckup];
+}
+
 // Notifies the handler to show the password issues page if the state of the
 // Password Check cell allows it.
+// TODO(crbug.com/1406871): Remove when kIOSPasswordCheckup is enabled by
+// default.
 - (void)showPasswordIssuesPage {
   if (![self IsPasswordCheckTappable]) {
     return;
@@ -2264,7 +2278,8 @@ NSInteger kTrailingSymbolSize = 18;
       [self.handler showPasswordsInOtherAppsPromo];
       break;
     case ItemTypePasswordCheckStatus:
-      [self showPasswordIssuesPage];
+      IsPasswordCheckupEnabled() ? [self showPasswordCheckupPage]
+                                 : [self showPasswordIssuesPage];
       break;
     case ItemTypeSavedPassword: {
       DCHECK_EQ(SectionIdentifierSavedPasswords,

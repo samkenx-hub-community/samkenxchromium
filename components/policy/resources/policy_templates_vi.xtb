@@ -1178,23 +1178,6 @@ Chính sách này sẽ không có hiệu lực khi bạn đặt chính sách <ph
 <translation id="20838788335877967">Tắt chính sách báo cáo thông tin nhận dạng người dùng</translation>
 <translation id="208566302163036794">Chặn các tính năng đã tắt</translation>
 <translation id="208623333578980446">Cho phép khóa chế độ thức của màn hình để quản lý nguồn điện</translation>
-<translation id="2087277084358676117">Chính sách này có thể tạm thời được dùng để buộc bật chế độ hỗ trợ cho
-API PPB_VideoDecoder(Dev).
-
-Khi bạn không đặt hoặc đặt chính sách này thành Tắt, trình duyệt sẽ quyết định liệu
-API có được hỗ trợ hay không.
-Khi bạn đặt chính sách này thành Bật, API sẽ được hỗ trợ.
-
-Bạn có thể sử dụng chính sách này trong trường hợp quyết định đang diễn ra của chúng tôi về việc loại bỏ chế độ hỗ trợ cho API này
-gặp vấn đề. Nếu bạn phải sử dụng chính sách này, vui lòng báo cáo lỗi trên crbug.com
-giải thích trường hợp sử dụng của bạn và CC {blundell, vasilyt}@chromium.org. Theo lịch biểu, chính sách này
-sẽ được phát hành đến hết <ph name="PRODUCT_NAME" />
-phiên bản 114, sau đó, chế độ hỗ trợ cho API này dự kiến sẽ bị loại bỏ
-vô điều kiện.
-
-LƯU Ý: Khi giá trị của chính sách thay đổi, thẻ mới sẽ nhận giá trị
-mới. Bạn sẽ cần đóng và mở lại các thẻ hiện có để nhận giá trị
-mới.</translation>
 <translation id="2089541797660774692">Bật tính năng báo cáo trên đám mây qua trình duyệt được quản lý</translation>
 <translation id="2090939118981888335">Nếu bạn đặt chính sách này thành Bật, proxy nén dữ liệu sẽ được phép hoạt động. Nếu bạn đặt chính sách này thành Tắt, proxy nén dữ liệu sẽ không được phép hoạt động.
 
@@ -1466,6 +1449,16 @@ Nếu đặt chính sách này, thì bạn cần đặt chính sách <ph name="P
       Nếu bạn đặt chính sách này thành Tắt, tính năng này sẽ không sử dụng được.</translation>
 <translation id="2342066287156668839">Bật hạn mức ổn định.</translation>
 <translation id="2345547870894930157">Bật chế độ DNS qua HTTPS không có phương án dự phòng cho truy vấn không an toàn</translation>
+<translation id="234856189825555040">Chính sách này kiểm soát việc các trình bổ trợ <ph name="PEPPER_NAME" /> có thể sử dụng bộ giải mã mới để giao tiếp với các bộ giải mã phần cứng thay vì bộ giải mã video cũ hay không.
+
+Quá trình di chuyển chỉ ảnh hưởng đến thông tin triển khai nội bộ và không thay đổi hành vi nào. Tuy nhiên, bạn có thể sử dụng chính sách này trong trường hợp một ứng dụng PPAPI nào đó hoạt động không như dự kiến.
+
+Khi bạn không đặt chính sách này hoặc đặt thành Bật, trình duyệt sẽ quyết định phương thức triển khai nào được sử dụng.
+Khi bạn đặt chính sách này thành Tắt, trình duyệt sẽ sử dụng phương thức triển khai cũ cho đến khi chính sách này hết hạn.
+
+Nếu bạn phải sử dụng chính sách này, vui lòng báo cáo lỗi trên crbug.com, giải thích trường hợp sử dụng của bạn và CC {andrescj, blundell, pmolinalopez, vasilyt}@chromium.org. Theo lịch, chính sách này sẽ được cung cấp thông qua phiên bản 114 của <ph name="PRODUCT_NAME" />, sau đó phương thức triển khai cũ sẽ bị loại bỏ.
+
+LƯU Ý: Chỉ các quy trình kết xuất đồ hoạ mới bắt đầu mới thể hiện các thay đổi đối với chính sách này trong khi trình duyệt đang chạy.</translation>
 <translation id="2349117476121456297">Khi bạn đặt chính sách này thành True, hàng phím trên cùng của bàn phím sẽ đóng vai trò là các lệnh phím chức năng. Khi bạn nhấn phím Tìm kiếm, các phím này sẽ trở về chế độ phím phương tiện.
 
       Nếu bạn đặt chính sách này thành False hoặc không đặt chính sách này, thì bàn phím sẽ mặc định tạo ra các lệnh phím phương tiện. Khi bạn nhấn phím Tìm kiếm, các phím sẽ thay đổi thành phím chức năng.</translation>
@@ -3254,6 +3247,11 @@ Chính sách này là giải pháp tạm thời và sẽ bị xoá ở một và
 <translation id="3994043824457743421">Cho thông báo giữa trang xuất hiện trên trang Thẻ mới</translation>
 <translation id="399433537808390819">Không cung cấp Chế độ màn hình hợp nhất cho người dùng</translation>
 <translation id="3995880046827722248">Manifest v2 bị vô hiệu hoá</translation>
+<translation id="3996118331995847766">Nếu bạn đặt <ph name="DEVICE_ADVANCED_BATTERY_CHARGE_MODE_ENABLED_POLICY_NAME" /> thành Bật thì việc đặt <ph name="DEVICE_ADVANCED_BATTERY_CHARGE_MODE_DAY_CONFIG_POLICY_NAME" /> sẽ cho phép bạn thiết lập chế độ sạc pin nâng cao. Từ <ph name="CHARGE_START_TIME_FIELD_NAME" /> đến <ph name="CHARGE_END_TIME_FIELD_NAME" />, pin của thiết bị sẽ chỉ được phép sạc đầy một lần. Trong thời gian còn lại, pin được duy trì ở trạng thái sạc thấp hơn. Giá trị của <ph name="CHARGE_START_TIME_FIELD_NAME" /> phải nhỏ hơn <ph name="CHARGE_END_TIME_FIELD_NAME" />.
+
+      Nếu bạn không đặt chính sách này thì chế độ sạc pin nâng cao sẽ luôn tắt.
+
+      Giá trị hợp lệ của trường <ph name="MINUTE_FIELD_NAME" /> trong <ph name="CHARGE_START_TIME_FIELD_NAME" /> và <ph name="CHARGE_END_TIME_FIELD_NAME" /> là 0, 15, 30, 45.</translation>
 <translation id="3996325823532867220">Chính sách này không còn được hỗ trợ. Tuy nhiên, chính sách liên quan <ph name="CHROME_ROOT_STORE_ENABLED_POLICY_NAME" /> có thể được hỗ trợ trên một số nền tảng nhất định.
 
       Khi bạn bật chế độ cài đặt này, <ph name="PRODUCT_NAME" /> sẽ sử dụng trình xác minh chứng chỉ tích hợp sẵn để xác minh chứng chỉ máy chủ.
@@ -3435,6 +3433,19 @@ Nếu bạn đặt chính sách này thành Tắt, thì <ph name="PRODUCT_NAME" 
           Nếu bạn đặt chính sách này, thì người dùng sẽ không thể thay đổi hay ghi đè chính sách.
 
           Nếu bạn không đặt chính sách này, thì ban đầu, tính năng làm nổi bật dấu chèn sẽ tắt trên màn hình đăng nhập nhưng người dùng có thể bật bất cứ lúc nào.</translation>
+<translation id="4182348537826882258">Nếu bạn đặt chính sách <ph name="URL_BLOCKLIST_POLICY_NAME" />, hệ thống sẽ ngừng tải các trang web có URL bị cấm. Quản trị viên có thể chỉ định danh sách mẫu URL cần chặn. Nếu bạn không đặt chính sách này thì hệ thống không chặn URL nào trong trình duyệt. Bạn có thể xác định tối đa 1.000 trường hợp ngoại lệ trong <ph name="URL_ALLOWLIST_POLICY_NAME" />. Xem cách định dạng mẫu URL (https://support.google.com/chrome/a?p=url_blocklist_filter_format).
+
+Lưu ý: Chính sách này không áp dụng với URL JavaScript trong trang có dữ liệu được tải tự động. Nếu bạn đã chặn example.com/abc, example.com vẫn tải được URL đó qua XMLHTTPRequest. Ngoài ra, chính sách này không ngăn các trang web cập nhật URL hiển thị trong thanh địa chỉ thành URL bị chặn bằng API Lịch sử JavaScript.
+
+Từ <ph name="PRODUCT_NAME" /> phiên bản 73, bạn có thể chặn các URL javascript://*. Tuy nhiên, chính sách này chỉ ảnh hưởng đến JavaScript đã nhập vào thanh địa chỉ (hoặc các bookmarklet chẳng hạn).
+
+Từ <ph name="PRODUCT_NAME" /> phiên bản 92, chính sách này cũng được hỗ trợ ở chế độ không có giao diện người dùng.
+
+Lưu ý: Việc chặn các URL nội bộ chrome://* và chrome-untrusted://* có thể dẫn đến lỗi không mong muốn hoặc có thể bị bỏ qua trong một số trường hợp. Thay vì chặn một số URL nội bộ nhất định, hãy xem có chính sách cụ thể hơn không. Ví dụ:
+
+– Thay vì chặn chrome://settings/certificates, hãy sử dụng <ph name="CA_CERTIFICATE_MANAGEMENT_ALLOWED_POLICY_NAME" />.
+
+– Thay vì chặn chrome-untrusted://crosh, hãy sử dụng <ph name="SYSTEM_FEATURES_DISABLE_LIST_POLICY_NAME" />.</translation>
 <translation id="4183229833636799228">Cài đặt <ph name="FLASH_PLUGIN_NAME" /> mặc định</translation>
 <translation id="4185868802416355029">Cho phép các tiện ích được quản lý sử dụng API Enterprise Hardware Platform</translation>
 <translation id="4186244263855283575">Cho phép đặt một lịch biểu tùy chỉnh để khởi động lại thiết bị. Sau khi bạn đặt giá trị thành True, thiết bị sẽ khởi động lại theo lịch biểu. Bạn phải xóa chính sách này để hủy mọi lượt khởi động lại theo lịch biểu khác.
@@ -3529,6 +3540,13 @@ Nếu bạn đặt chính sách này thành Tắt, thì <ph name="PRODUCT_NAME" 
 
       Nếu có nhiều tài khoản người dùng trên một thiết bị được quản lý, thì thông báo sẽ chỉ hiển thị khi bạn đặt chính sách này thành bật.</translation>
 <translation id="4303167373847512281">Cho phép chế độ nhà phát triển</translation>
+<translation id="4307116964468610577">Chính sách này kéo dài tuổi thọ của pin hệ thống nhờ chỉ sạc đầy pin một lần mỗi ngày. Đối với thời gian còn lại trong ngày, pin được duy trì ở trạng thái sạc thấp hơn vì chế độ này có lợi hơn cho khả năng tích trữ, ngay cả khi bạn cắm hệ thống vào nguồn điện.
+
+      Nếu bạn đặt <ph name="DEVICE_ADVANCED_BATTERY_CHARGE_MODE_DAY_CONFIG_POLICY_NAME" /> thì việc đặt <ph name="DEVICE_ADVANCED_BATTERY_CHARGE_MODE_ENABLED_POLICY_NAME" /> thành Bật sẽ luôn bật chính sách quản lý điện năng của chế độ sạc pin nâng cao (nếu thiết bị có hỗ trợ). Khi sử dụng một thuật toán sạc chuẩn và các kỹ thuật khác ngoài giờ làm việc, chế độ này cho phép người dùng tăng tối đa độ bền của pin. Trong giờ làm việc, hệ thống sử dụng chế độ sạc nhanh nên quá trình sạc pin sẽ nhanh hơn. Hãy chỉ định thời gian mà hệ thống được dùng nhiều nhất mỗi ngày theo thời gian bắt đầu và thời lượng.
+
+      Nếu bạn đặt chính sách này thành Tắt hoặc không đặt, chế độ sạc pin nâng cao sẽ luôn tắt.
+
+      Người dùng không thể thay đổi chế độ cài đặt này.</translation>
 <translation id="4309091698378414920">Bật tính năng làm nổi bật con nháy</translation>
 <translation id="4311195029067684288">Đầy</translation>
 <translation id="4311662690937656540">Buộc đăng nhập trực tuyến trên màn hình đăng nhập và màn hình khoá</translation>
@@ -4863,6 +4881,7 @@ Nếu bạn không đặt chính sách, thì tất cả miền sẽ không thể
       Để biết thông tin chi tiết về các mẫu <ph name="URL_LABEL" /> hợp lệ, vui lòng xem tại https://cloud.google.com/docs/chrome-enterprise/policies/url-patterns. Chúng tôi không chấp nhận giá trị <ph name="WILDCARD_VALUE" /> đối với chính sách này.</translation>
 <translation id="5620392548325769024">Bật chế độ hiển thị trang chào mừng vào lần đầu tiên chạy trình duyệt sau khi nâng cấp hệ điều hành</translation>
 <translation id="5621503441067774084">Bật tính năng làm nổi bật con trỏ trên màn hình đăng nhập</translation>
+<translation id="5622590774455244290">Các ứng dụng Android có thể tự do lựa chọn tuân thủ danh sách này nên bạn không thể buộc các ứng dụng đó tuân thủ.</translation>
 <translation id="5622924058222112599">Cho phép thực hiện quy trình phát hành mặc định đối với thuật toán CECPQ2</translation>
 <translation id="5623304306796942802">Lời nhắc khi có nhiều chứng chỉ khớp</translation>
 <translation id="5625771176514429288">Ứng dụng Chrome sẽ được phép chạy trên các nền tảng này.</translation>
@@ -4906,6 +4925,29 @@ Bạn có thể điều chỉnh thời gian chờ ở trạng thái không hoạ
       Việc đặt chính sách này thành Bật sẽ ẩn các cảnh báo về việc ngừng cung cấp.
       Việc đặt thành Tắt hoặc không đặt chính sách này sẽ hiển thị các cảnh báo về việc ngừng cung cấp.</translation>
 <translation id="5666457529647159548">Cho phép người dùng quản lý các chứng chỉ ứng dụng khách đã cài đặt.</translation>
+<translation id="5670286392821164294">Chính sách này đưa ra cách ghi đè danh sách nhóm mà trình duyệt dùng cho các tính năng của Nhóm bên thứ nhất.
+
+      Mọi nhóm trong danh sách Nhóm bên thứ nhất của trình duyệt đều phải đáp ứng yêu cầu về Nhóm bên thứ nhất.
+      Nhóm bên thứ nhất phải chứa một trang web chính và tối thiểu một trang web thành viên.
+      Một nhóm cũng có thể chứa danh sách trang web dịch vụ thuộc sở hữu của nhóm đó và bản đồ từ một trang web đến tất cả biến thể ccTLD (miền cấp cao nhất theo mã quốc gia) của trang web đó.
+      Hãy truy cập https: //github.com/WICG/first-party-sets để biết thêm thông tin về Nhóm bên thứ nhất mà <ph name="PRODUCT_NAME" /> sử dụng.
+
+      Tất cả trang web trong một Nhóm bên thứ nhất đều phải là miền có thể đăng ký và được phân phát qua HTTPS. Mỗi trang web trong Nhóm bên thứ nhất cũng phải là duy nhất, nghĩa là mỗi trang web chỉ được liệt kê một lần trong một Nhóm bên thứ nhất.
+
+      Khi bạn cung cấp một thư mục trống cho chính sách này, trình duyệt sẽ sử dụng danh sách Nhóm bên thứ nhất công khai.
+
+      Đối với mọi trang web ở Nhóm bên thứ nhất trong danh sách <ph name="REPLACEMENTS" />, nếu một trang web cũng xuất hiện trong Nhóm bên thứ nhất thuộc danh sách của trình duyệt thì trang web đó sẽ bị loại bỏ khỏi Nhóm bên thứ nhất của trình duyệt.
+      Sau đó, Nhóm bên thứ nhất của chính sách sẽ được thêm vào danh sách Nhóm bên thứ nhất của trình duyệt.
+
+      Đối với mọi trang web ở Nhóm bên thứ nhất trong danh sách <ph name="ADDITIONS" />, nếu một trang web cũng xuất hiện trong Nhóm bên thứ nhất thuộc danh sách của trình duyệt thì Nhóm bên thứ nhất của trình duyệt sẽ được cập nhật sao cho có thể thêm Nhóm bên thứ nhất mới vào danh sách của trình duyệt. Sau khi danh sách của trình duyệt được cập nhật, Nhóm bên thứ nhất của chính sách sẽ được thêm vào danh sách Nhóm bên thứ nhất của trình duyệt.
+
+      Danh sách Nhóm bên thứ nhất của trình duyệt yêu cầu mỗi trang web thuộc danh sách này chỉ xuất hiện trong một nhóm. Đây cũng là yêu cầu đối với cả danh sách <ph name="REPLACEMENTS" /> và danh sách <ph name="ADDITIONS" />. Tương tự như vậy, một trang web không được xuất hiện trong cả danh sách <ph name="REPLACEMENTS" /> và danh sách <ph name="ADDITIONS" />.
+
+      Hệ thống không hỗ trợ việc dùng ký tự đại diện (*) làm giá trị chính sách, cũng như trong mọi Nhóm bên thứ nhất thuộc những danh sách này.
+
+      Mọi nhóm mà chính sách cung cấp đều phải là Nhóm bên thứ nhất hợp lệ. Nếu không, lỗi tương ứng sẽ xảy ra.
+
+      Chính sách này chỉ có trên các phiên bản Windows liên kết với miền <ph name="MS_AD_NAME" />, phiên bản Windows 10 Pro hay Enterprise đã đăng ký dịch vụ quản lý thiết bị hoặc phiên bản macOS được quản lý thông qua phần mềm MDM (Quản lý thiết bị di động) hay đã liên kết với một miền thông qua MCX.</translation>
 <translation id="567377007899266033">Nếu bạn đặt chính sách này thành True, thì hệ thống sẽ gửi cho Google các báo cáo về sự kiện cài đặt tiện ích do khóa, chính sách kích hoạt. Nếu bạn đặt chính sách này thành False, thì sẽ không có sự kiện nào được ghi lại. Nếu bạn không đặt chính sách này, thì giá trị mặc định sẽ được đặt thành True.</translation>
 <translation id="5676740747107495269">Hiển thị tùy chọn hỗ trợ tiếp cận trong trình đơn của khay hệ thống trên màn hình đăng nhập</translation>
 <translation id="567832102568869993">Kích hoạt một thao tác khi máy tính ở trạng thái rảnh.
@@ -5497,12 +5539,6 @@ Xem thêm thông tin chi tiết tại https://developer.chrome.com/blog/immutabl
       Xin lưu ý rằng chúng tôi đã thông báo việc loại bỏ chính sách này trong <ph name="PRODUCT_NAME" /> phiên bản 82. Tuy nhiên, chính sách này sẽ bị loại bỏ trong phiên bản 84.</translation>
 <translation id="6276087670023098167">Tắt chính sách báo cáo thông tin nhận dạng máy</translation>
 <translation id="627672037430076089">Ngăn các kết nối hỗ trợ từ xa đến máy này</translation>
-<translation id="6277043520666738324">Chính sách này kiểm soát việc các trình bổ trợ <ph name="PEPPER_NAME" /> có thể sử dụng bộ giải mã mới để giao tiếp với các bộ giải mã phần cứng thay vì bộ giải mã video cũ hay không.
-
-Quá trình di chuyển chỉ ảnh hưởng đến thông tin chi tiết triển khai nội bộ và sẽ không làm thay đổi hành vi nào. Tuy nhiên, chính sách này có thể được sử dụng trong trường hợp có bất kỳ ứng dụng PPAPI nào không hoạt động như dự kiến.
-
-Khi bạn không đặt chính sách này hoặc đặt thành Bật, trình duyệt sẽ quyết định hoạt động triển khai nào được sử dụng.
-Khi bạn đặt chính sách này thành Tắt, trình duyệt sẽ sử dụng phương thức triển khai cũ cho đến khi chính sách này hết hạn.</translation>
 <translation id="6277314550042130537">Yêu cầu phê duyệt chính sách KDC trong quá trình xác thực HTTP</translation>
 <translation id="6278428485366576908">Giao diện</translation>
 <translation id="6279722058145292462">Nếu bạn đặt chính sách này, hệ thống sẽ chỉ định tần suất (tính theo ngày) mà một máy khách sẽ thay đổi mật khẩu tài khoản cho máy của mình. Mật khẩu do máy khách tạo ngẫu nhiên và không hiển thị với người dùng. Việc tắt chính sách này hoặc đặt một số ngày lớn hơn có thể ảnh hưởng tiêu cực đến tính bảo mật vì kẻ tấn công sẽ có thêm thời gian tìm ra mật khẩu tài khoản của máy và sử dụng mật khẩu đó.
@@ -6126,6 +6162,16 @@ Trong tương lai, chúng tôi sẽ loại bỏ chính sách này khỏi <ph nam
 
       Nếu bạn đặt thành Tắt hoặc không đặt chính sách này thì sẽ không có thông tin nào về hoạt động sử dụng được báo cáo.</translation>
 <translation id="6823711520976094072">Nếu bạn đặt giá trị nhỏ hơn 1 MB hoặc không đặt giá trị, thì <ph name="PRODUCT_OS_NAME" /> sẽ sử dụng kích thước mặc định là 256 MiB để lưu ứng dụng và tiện ích vào bộ nhớ đệm nhằm giúp nhiều người dùng trên một thiết bị có thể cài đặt. Nhờ đó, người dùng không phải tải xuống lại từng ứng dụng/tiện ích.</translation>
+<translation id="6829632070341067746">Chính sách này kiểm soát hoạt động tái cấu trúc gần đây của các API Graphics3D trong trình bổ trợ PPAPI.
+
+Quá trình di chuyển chỉ ảnh hưởng đến thông tin triển khai nội bộ và không thay đổi hành vi nào. Tuy nhiên, bạn có thể sử dụng chính sách này trong trường hợp một ứng dụng PPAPI nào đó hoạt động không như dự kiến.
+
+Khi bạn không đặt chính sách này hoặc đặt thành Bật, trình duyệt sẽ quyết định phương thức triển khai nào được sử dụng.
+Khi bạn đặt chính sách này thành Tắt, trình duyệt sẽ sử dụng phương thức triển khai cũ cho đến khi chính sách này hết hạn.
+
+Nếu bạn phải sử dụng chính sách này, vui lòng báo cáo lỗi trên crbug.com, giải thích trường hợp sử dụng của bạn và CC {blundell, vasilyt}@chromium.org. Theo lịch, chính sách này sẽ được cung cấp thông qua phiên bản 114 của <ph name="PRODUCT_NAME" />, sau đó phương thức triển khai cũ sẽ bị loại bỏ.
+
+LƯU Ý: Chỉ các quy trình kết xuất đồ hoạ mới bắt đầu mới thể hiện các thay đổi đối với chính sách này trong khi trình duyệt đang chạy.</translation>
 <translation id="6833023569065717572">Khi bạn đặt chính sách này thành Bật, màn hình đăng nhập của thiết bị sẽ dùng định dạng đồng hồ 24 giờ.
 
       Khi bạn đặt chính sách này thành Tắt, màn hình đăng nhập của thiết bị sẽ dùng định dạng đồng hồ 12 giờ.
@@ -6401,16 +6447,6 @@ tức là chặn những yêu cầu này, sẽ được áp dụng.</translation
       Nếu bạn đặt chính sách này thành bắt buộc, thì người dùng sẽ không thể thay đổi hoặc ghi đè chính sách này.
 
       Nếu bạn không đặt chính sách này, thì kệ sẽ được đặt ở cuối màn hình theo mặc định và người dùng có thể thay đổi vị trí của kệ.</translation>
-<translation id="7037853989942016900">Chính sách này kiểm soát hoạt động tái cấu trúc gần đây của các API Graphics3D trong trình bổ trợ PPAPI.
-
-Quá trình di chuyển chỉ ảnh hưởng đến thông tin triển khai nội bộ và không thay đổi hành vi nào. Tuy nhiên, chính sách này có thể được sử dụng trong trường hợp bất kỳ ứng dụng PPAPI nào không hoạt động như dự kiến.
-
-Khi bạn không đặt chính sách này hoặc đặt thành Bật, trình duyệt sẽ quyết định phương thức triển khai nào được sử dụng.
-Khi bạn đặt chính sách này thành Tắt, trình duyệt sẽ sử dụng phương thức triển khai cũ cho đến khi chính sách này hết hạn.
-
-Nếu bạn phải sử dụng chính sách này, vui lòng báo cáo lỗi trên crbug.com kèm thông tin giải thích trường hợp sử dụng của bạn. Theo lịch, chính sách này sẽ được cung cấp thông qua phiên bản 114 của <ph name="PRODUCT_NAME" />, sau đó phương thức triển khai cũ sẽ bị loại bỏ.
-
-LƯU Ý: Chỉ các quy trình kết xuất đồ hoạ mới bắt đầu mới phản ánh các thay đổi đối với chính sách này trong khi trình duyệt đang chạy.</translation>
 <translation id="7039815268521168329">Hiển thị quy trình so khớp giọng nói của Trợ lý Google trong quá trình thiết lập ban đầu</translation>
 <translation id="7040229947030068419">Giá trị mẫu:</translation>
 <translation id="7044883996351280650">Kiểm soát dịch vụ sao lưu và khôi phục trên thiết bị Android</translation>
@@ -6432,6 +6468,14 @@ LƯU Ý: Chỉ các quy trình kết xuất đồ hoạ mới bắt đầu mới
 <translation id="7081784525008938771">Nếu bạn không đặt hoặc đặt chính sách này thành Bật, thì người dùng sẽ được coi là không hoạt động trong khi video phát. Điều này ngăn hệ thống đạt tới thời gian trì hoãn khi ở chế độ rảnh, thời gian trì hoãn giảm độ sáng màn hình, thời gian trì hoãn tắt màn hình cũng như thời gian trì hoãn khóa màn hình và ngăn việc thực hiện các hành động tương ứng.
 
       Nếu bạn đặt chính sách này thành Tắt, hệ thống có thể coi người dùng là không hoạt động bất kể hoạt động video là gì.</translation>
+<translation id="7084631508902923941">Các tiện ích kết nối với một trong những nguồn gốc này sẽ vẫn chạy miễn là cổng đang kết nối.
+
+Nếu bạn không đặt chính sách này, giá trị mặc định của chính sách sẽ được sử dụng. Đây là những nguồn gốc ứng dụng cung cấp SDK được xác định là không hỗ trợ khả năng khởi động lại kết nối đã đóng về trạng thái trước đó:
+– Trình kết nối thẻ thông minh
+– Citrix Receiver (phiên bản ổn định, beta, sao lưu)
+– VMware Horizon (phiên bản ổn định, beta)
+
+Nếu bạn đặt chính sách này, danh sách giá trị mặc định sẽ được mở rộng để bổ sung các giá trị mới thiết lập. Cả mục nhập giá trị mặc định và mục nhập do chính sách cung cấp đều sẽ cấp trường hợp ngoại lệ cho các tiện ích kết nối miễn là cổng đang kết nối.</translation>
 <translation id="7086720321892395256">Kiểm soát các chính sách người dùng và thiết bị dành cho tính năng màn hình bảo vệ quyền riêng tư.</translation>
 <translation id="7090500018761495290">Bật lại API Event.path cho đến phiên bản M115.</translation>
 <translation id="7090668780328470271">Nếu đặt chính sách này, bạn có thể liệt kê các mẫu URL để chỉ định những trang web không được phép yêu cầu người dùng cấp quyền truy cập vào thiết bị USB.
@@ -7001,52 +7045,6 @@ Chính sách này sẽ thay thế chính sách <ph name="WINDOW_PLACEMENT_BLOCKE
 
       Khi bạn đặt chính sách này thành Tắt, bất cứ khi nào người dùng thực hiện thao tác làm kích hoạt hộp thoại chọn tệp (chẳng hạn như nhập dấu trang, tải tệp lên, lưu đường liên kết, v.v), một thông báo sẽ xuất hiện. Người dùng được xem là đã nhấp vào nút Hủy trên hộp thoại chọn tệp.</translation>
 <translation id="7638300388094655454">Google Cast</translation>
-<translation id="7638726624761352254">Khi bạn đặt chính sách này, hệ thống sẽ chỉ định một danh sách ứng dụng web tự động cài đặt mà không cần sự can thiệp của người dùng, cũng như chỉ định những người dùng không thể gỡ cài đặt hay tắt đi.
-
-      Mỗi mục trong danh sách của chính sách này là một đối tượng chứa một thành phần bắt buộc:
-      <ph name="URL_LABEL" /> (URL của ứng dụng web sẽ cài đặt)
-
-      và 6 thành phần không bắt buộc:
-      – <ph name="DEFAULT_LAUNCH_CONTAINER_LABEL" />
-      (chỉ định cách mở ứng dụng web – mặc định là một thẻ mới)
-
-      – <ph name="CREATE_DESKTOP_SHORTCUT_LABEL" />
-      (chọn Đúng nếu bạn muốn tạo lối tắt trên màn hình <ph name="LINUX_OS_NAME" /> và
-      <ph name="MS_WIN_NAME" />).
-
-      – <ph name="FALLBACK_APP_NAME_LABEL" />
-      (Kể từ <ph name="PRODUCT_NAME" /> phiên bản 90,
-      bạn có thể ghi đè tên ứng dụng nếu tên đó không phải là một
-      Ứng dụng web tiến bộ (PWA) hoặc ghi đè tên ứng dụng tạm thời
-      được cài đặt nếu tên đó là một PWA nhưng cần xác thực trước khi
-      hoàn tất quá trình cài đặt. Nếu hệ thống cung cấp cả chính sách
-      <ph name="CUSTOM_NAME_LABEL" /> và
-      <ph name="FALLBACK_APP_NAME_LABEL" />,
-      thì chính sách thứ hai sẽ bị bỏ qua.)
-
-      – <ph name="OVERRIDE_APP_NAME_LABEL" />
-      (Kể từ <ph name="PRODUCT_OS_NAME" />
-      phiên bản 99 và phiên bản 111 trên tất cả các hệ điều hành khác, bạn có thể
-      ghi đè vĩnh viễn tên ứng dụng cho tất cả các ứng dụng web và PWA.)
-
-      – <ph name="CUSTOM_ICON_LABEL" />
-      (Kể từ <ph name="PRODUCT_OS_NAME" />
-      phiên bản 99 và phiên bản 111 trên tất cả các hệ điều hành khác, bạn có thể
-      ghi đè biểu tượng ứng dụng của các ứng dụng cần cài đặt. Các biểu tượng phải là hình vuông,
-      có kích thước tối đa 1 MB và thuộc một trong các định dạng sau: jpeg, png, gif, webp, ico.
-      Giá trị hàm băm phải là hàm băm SHA256 của tệp biểu tượng.)
-
-      – <ph name="INSTALL_AS_SHORTCUT_LABEL" />
-      (Kể từ <ph name="PRODUCT_NAME" />
-      phiên bản 107). Nếu được bật, <ph name="URL_LABEL" /> đã cho
-      sẽ được cài đặt dưới dạng lối tắt, như thể được thực hiện thông qua lựa chọn "Tạo lối tắt..."
-      trong GUI (Giao diện người dùng đồ hoạ) của trình duyệt dành cho máy tính.
-      Lưu ý rằng khi được cài đặt dưới dạng lối tắt, nhãn URL này sẽ không được cập nhật nếu
-      tệp kê khai trong <ph name="URL_LABEL" /> thay đổi.
-      Nếu bị tắt hoặc không được đặt, ứng dụng web tại
-      <ph name="URL_LABEL" /> đã cho sẽ được cài đặt bình thường.
-
-      Xem <ph name="PINNED_LAUNCHER_APPS_POLICY_NAME" /> để biết cách ghim ứng dụng vào kệ <ph name="PRODUCT_OS_NAME" />.</translation>
 <translation id="7638764766629234761">Cho phép sử dụng các thông báo hệ thống</translation>
 <translation id="7643151458117317518">Chính sách kiểm soát việc có thể tắt chế độ cài đặt Đo lường quảng cáo của <ph name="PRIVACY_SANDBOX_NAME" /> cho người dùng của bạn hay không.
 
@@ -7097,6 +7095,21 @@ Nếu đặt chính sách này, thì bạn cần đặt chính sách <ph name="P
 
           Bạn phải chỉ định giá trị của chính sách bằng mili giây. Các giá trị được giới hạn ở mức nhỏ hơn hoặc bằng thời gian chờ tắt màn hình (nếu có đặt thời gian này) và thời gian chờ khi ở chế độ tạm vắng.</translation>
 <translation id="7680437377926096177">Ngăn hiện hộp thoại đăng xuất khi cửa sổ cuối cùng đóng lại.</translation>
+<translation id="7682459947751785310">Chính sách này có thể tạm thời được dùng để buộc bật chế độ hỗ trợ cho
+API PPB_VideoDecoder(Dev).
+
+Khi bạn không đặt hoặc đặt chính sách này thành Tắt, trình duyệt sẽ quyết định liệu
+API này có được hỗ trợ hay không.
+Khi bạn đặt chính sách thành Bật, API này sẽ được hỗ trợ.
+
+Bạn có thể sử dụng chính sách này trong trường hợp quyết định đang diễn ra của chúng tôi về việc loại bỏ chế độ hỗ trợ cho API này
+gặp vấn đề. Nếu bạn phải sử dụng chính sách này, vui lòng báo cáo lỗi trên crbug.com,
+giải thích trường hợp sử dụng của bạn và CC {blundell, vasilyt}@chromium.org. Theo lịch, chính sách này
+sẽ hoạt động đến hết <ph name="PRODUCT_NAME" />
+phiên bản 114, sau đó, chế độ hỗ trợ cho API này dự kiến sẽ bị loại bỏ
+vô điều kiện.
+
+LƯU Ý: Chỉ các quy trình kết xuất đồ hoạ mới bắt đầu mới thể hiện các thay đổi đối với chính sách này trong khi trình duyệt đang chạy.</translation>
 <translation id="7683777542468165012">Làm mới chính sách động</translation>
 <translation id="7687943045976362719">Nếu bạn đặt chính sách này, <ph name="PRODUCT_FRAME_NAME" /> sẽ xử lý các loại nội dung được chỉ định.
 
@@ -7190,6 +7203,7 @@ Nếu đặt chính sách này, thì bạn cần đặt chính sách <ph name="P
       Nếu bạn tắt hoặc không đặt chính sách này, thì Ứng dụng Chrome có thể không được phép chạy, tuỳ thuộc vào trạng thái triển khai việc dừng hỗ trợ.
       Trong cả hai trường hợp, Ứng dụng Chrome bị buộc cài đặt theo chính sách vẫn được phép chạy.</translation>
 <translation id="7774768074957326919">Sử dụng cài đặt proxy hệ thống</translation>
+<translation id="7776848995687565978">Thiết lập danh sách nguồn gốc cấp vòng đời của nền mở rộng cho các tiện ích kết nối.</translation>
 <translation id="777734450201217641">Bật phím tắt của tính năng hỗ trợ tiếp cận trên màn hình đăng nhập.
 
           Nếu đặt chính sách này thành true, thì phím tắt của tính năng hỗ trợ tiếp cận sẽ luôn bật trong màn hình đăng nhập.
@@ -8637,6 +8651,52 @@ Nếu bạn không đặt chính sách này, thì thao tác mới sẽ được 
       Khả năng khôi phục thực tế cũng có thể phụ thuộc vào bảng mạch và các bản vá lỗ hổng bảo mật nghiêm trọng.</translation>
 <translation id="9123464369663964441">Cho phép người dùng thêm trường hợp ngoại lệ để cho phép nội dung hỗn hợp</translation>
 <translation id="9124770007620653639">Không bao giờ gửi dữ liệu về độ tin cậy của miền cho Google</translation>
+<translation id="9126491667911789829">Khi bạn đặt chính sách này, hệ thống sẽ chỉ định một danh sách ứng dụng web tự động cài đặt mà không cần sự can thiệp của người dùng, cũng như chỉ định những người dùng không thể gỡ cài đặt hay tắt đi.
+
+      Mỗi mục trong danh sách của chính sách này là một đối tượng chứa một thành phần bắt buộc:
+      <ph name="URL_LABEL" /> (URL của ứng dụng web sẽ cài đặt)
+
+      và 6 thành phần không bắt buộc:
+      – <ph name="DEFAULT_LAUNCH_CONTAINER_LABEL" />
+      (chỉ định cách mở ứng dụng web – mặc định là một thẻ mới)
+
+      – <ph name="CREATE_DESKTOP_SHORTCUT_LABEL" />
+      (chọn Đúng nếu bạn muốn tạo lối tắt trên màn hình <ph name="LINUX_OS_NAME" /> và
+      <ph name="MS_WIN_NAME" />).
+
+      – <ph name="FALLBACK_APP_NAME_LABEL" />
+      (Kể từ <ph name="PRODUCT_NAME" /> phiên bản 90,
+      bạn có thể ghi đè tên ứng dụng nếu tên đó không phải là một
+      Ứng dụng web tiến bộ (PWA) hoặc ghi đè tên ứng dụng tạm thời
+      được cài đặt nếu tên đó là một PWA nhưng cần xác thực trước khi
+      hoàn tất quá trình cài đặt. Nếu hệ thống cung cấp cả chính sách
+      <ph name="CUSTOM_NAME_LABEL" /> và
+      <ph name="FALLBACK_APP_NAME_LABEL" />,
+      thì chính sách thứ hai sẽ bị bỏ qua.)
+
+      – <ph name="OVERRIDE_APP_NAME_LABEL" />
+      (Kể từ <ph name="PRODUCT_OS_NAME" />
+      phiên bản 99 và phiên bản 112 trên tất cả các hệ điều hành máy tính khác, bạn có thể
+      ghi đè vĩnh viễn tên ứng dụng cho tất cả các ứng dụng web và PWA.)
+
+      – <ph name="CUSTOM_ICON_LABEL" />
+      (Kể từ <ph name="PRODUCT_OS_NAME" />
+      phiên bản 99 và phiên bản 112 trên tất cả các hệ điều hành máy tính khác, bạn có thể
+      ghi đè biểu tượng ứng dụng của các ứng dụng cần cài đặt. Các biểu tượng phải là hình vuông,
+      có kích thước tối đa 1 MB và thuộc một trong các định dạng sau: jpeg, png, gif, webp, ico.
+      Giá trị băm phải là hàm băm SHA256 của tệp biểu tượng.)
+
+      – <ph name="INSTALL_AS_SHORTCUT_LABEL" />
+      (Kể từ <ph name="PRODUCT_NAME" />
+      phiên bản 107). Nếu được bật, <ph name="URL_LABEL" /> đã cho
+      sẽ được cài đặt dưới dạng lối tắt, như thể được thực hiện thông qua lựa chọn "Tạo lối tắt..."
+      trong GUI (Giao diện người dùng đồ hoạ) của trình duyệt dành cho máy tính.
+      Lưu ý rằng khi được cài đặt dưới dạng lối tắt, nhãn URL này sẽ không được cập nhật nếu
+      tệp kê khai trong <ph name="URL_LABEL" /> thay đổi.
+      Nếu bị tắt hoặc không được đặt, ứng dụng web tại
+      <ph name="URL_LABEL" /> đã cho sẽ được cài đặt bình thường.
+
+      Xem <ph name="PINNED_LAUNCHER_APPS_POLICY_NAME" /> để biết cách ghim ứng dụng vào kệ <ph name="PRODUCT_OS_NAME" />.</translation>
 <translation id="9129169595075460149">Khi bạn đặt chính sách này thành Bật, tính năng Tìm kiếm an toàn trong Google Tìm kiếm sẽ luôn hoạt động và người dùng không thể thay đổi tùy chọn cài đặt này.
 
       Khi bạn đặt thành Tắt hoặc không đặt chính sách này, tính năng Tìm kiếm an toàn trong Google Tìm kiếm sẽ không được thực thi.</translation>

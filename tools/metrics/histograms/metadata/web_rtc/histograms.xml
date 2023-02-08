@@ -317,7 +317,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="WebRTC.Audio.DelayedPacketOutageEventMs" units="ms"
-    expires_after="2023-06-04">
+    expires_after="2023-08-06">
   <owner>hlundin@chromium.org</owner>
   <owner>webrtc-audio-uma@google.com</owner>
   <summary>
@@ -592,7 +592,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="WebRTC.Audio.ExpandRatePercent" units="%"
-    expires_after="2023-06-04">
+    expires_after="2023-08-06">
   <owner>hlundin@chromium.org</owner>
   <owner>webrtc-audio-uma@google.com</owner>
   <summary>
@@ -941,6 +941,24 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
+<histogram name="WebRTC.DesktopCapture.IsZeroHzActive.{CapturerType}"
+    enum="BooleanActive" expires_after="2024-02-03">
+  <owner>henrika@chromium.org</owner>
+  <owner>webrtc-dev@chromium.org</owner>
+  <summary>
+    A boolean is recorded to this histogram for each captured video frame where
+    the desktop media source is given by {CapturerType}. Only recorded for
+    capturers that support detection of whether 0Hz is active or not which
+    requires that each captured frame must contain a representation of what
+    regions have been updated since the last frame. Windows WGC is an example of
+    a capturer which does not support this.
+  </summary>
+  <token key="CapturerType">
+    <variant name="Screen" summary="Screen capture type"/>
+    <variant name="Window" summary="Window capture type"/>
+  </token>
+</histogram>
+
 <histogram name="WebRTC.DesktopCapture.Win.DesktopCapturerImpl"
     enum="WebRtcDesktopCapturerImpl" expires_after="2023-06-18">
   <owner>alcooper@chromium.org</owner>
@@ -1010,7 +1028,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="WebRTC.DesktopCaptureCounters" enum="DesktopCaptureCounters"
-    expires_after="2023-06-04">
+    expires_after="2023-08-06">
   <owner>toprice@chromium.org</owner>
   <owner>webrtc-dev@chromium.org</owner>
   <summary>
@@ -1860,7 +1878,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="WebRTC.SentVideoTrackDuration" units="ms"
-    expires_after="2023-06-04">
+    expires_after="2023-08-06">
   <owner>perkj@chromium.org</owner>
   <summary>
     Durations of video tracks sent over a PeerConnection. The stopwatch starts
