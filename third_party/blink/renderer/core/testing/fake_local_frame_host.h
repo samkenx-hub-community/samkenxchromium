@@ -80,11 +80,13 @@ class FakeLocalFrameHost : public mojom::blink::LocalFrameHost {
       const WTF::String& key,
       bool has_user_gesture,
       absl::optional<blink::scheduler::TaskAttributionId> task_id) override {}
+  void NavigateEventHandlerPresenceChanged(bool present) override {}
   void UpdateTitle(const WTF::String& title,
                    base::i18n::TextDirection title_direction) override;
   void UpdateUserActivationState(
       mojom::blink::UserActivationUpdateType update_type,
       mojom::UserActivationNotificationType notification_type) override;
+  void DidConsumeHistoryUserActivation() override {}
   void HandleAccessibilityFindInPageResult(
       mojom::blink::FindInPageResultAXParamsPtr params) override;
   void HandleAccessibilityFindInPageTermination() override;

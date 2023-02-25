@@ -53,7 +53,14 @@ class CrostiniThrottleFactory : public ProfileKeyedServiceFactory {
   friend class base::NoDestructor<CrostiniThrottleFactory>;
 
   CrostiniThrottleFactory()
-      : ProfileKeyedServiceFactory("CrostiniThrottleFactory") {}
+      : ProfileKeyedServiceFactory(
+            "CrostiniThrottleFactory",
+            ProfileSelections::Builder()
+                .WithRegular(ProfileSelection::kOriginalOnly)
+                // TODO(crbug.com/1418376): Check if this service is needed in
+                // Guest mode.
+                .WithGuest(ProfileSelection::kOriginalOnly)
+                .Build()) {}
   ~CrostiniThrottleFactory() override = default;
 
   // BrowserContextKeyedServiceFactory:
@@ -86,6 +93,11 @@ void CrostiniThrottle::Shutdown() {
 
 void CrostiniThrottle::ThrottleInstance(bool should_throttle) {
   delegate_->SetCpuRestriction(should_throttle);
+}
+
+// static
+void CrostiniThrottle::EnsureFactoryBuilt() {
+  CrostiniThrottleFactory::GetInstance();
 }
 
 }  // namespace crostini

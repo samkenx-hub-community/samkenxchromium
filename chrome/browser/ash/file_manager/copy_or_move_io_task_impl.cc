@@ -33,7 +33,6 @@
 #include "chrome/browser/ash/file_manager/io_task_util.h"
 #include "chrome/browser/ash/file_manager/path_util.h"
 #include "chrome/browser/ash/file_manager/volume_manager.h"
-#include "components/drive/file_system_core_util.h"
 #include "content/public/browser/browser_task_traits.h"
 #include "content/public/browser/browser_thread.h"
 #include "google_apis/common/task_util.h"
@@ -358,9 +357,8 @@ void CopyOrMoveIOTaskImpl::GotFreeDiskSpace(int64_t free_space) {
   }
 
   if (is_drive) {
-    bool is_shared_drive = drive_integration_service->GetMountPointPath()
-                               .Append(drive::util::kDriveTeamDrivesDirName)
-                               .IsParent(progress_.destination_folder.path());
+    bool is_shared_drive = drive_integration_service->IsSharedDrive(
+        progress_.destination_folder.path());
     drive_integration_service->GetPooledQuotaUsage(
         base::BindOnce(base::BindOnce(
             &CopyOrMoveIOTaskImpl::GotDrivePooledQuota,
@@ -507,7 +505,8 @@ void CopyOrMoveIOTaskImpl::CopyOrMoveFile(
 
   // If the base names are not the same, then the destination url exists and
   // we must resolve the file name conflict.  If the user's previous resolve
-  // was 'ApplyToAll', use it to automatically resolve the conflict.
+  // was 'ApplyToAll', |conflict_resolve_| contains 'keepboth' or 'replace'.
+  // Use it to automatically resolve the conflict (no need to ask the UI).
   if (!conflict_resolve_.empty()) {
     ResumeParams params;
     params.conflict_resolve = conflict_resolve_;

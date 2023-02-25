@@ -90,9 +90,9 @@ using SetAttributeForKeyCallback =
 
 // If the attribute value has been successfully retrieved, |attribute_value|
 // will contain the result. If an error occurs, |attribute_value| will be empty.
-using GetAttributeForKeyCallback =
-    base::OnceCallback<void(const absl::optional<std::string>& attribute_value,
-                            chromeos::platform_keys::Status status)>;
+using GetAttributeForKeyCallback = base::OnceCallback<void(
+    absl::optional<std::vector<uint8_t>> attribute_value,
+    chromeos::platform_keys::Status status)>;
 
 // If the availability of the key on the provided token has been successfully
 // determined, |on_token| will contain the result. If an error occurs,
@@ -257,7 +257,7 @@ class PlatformKeysService : public KeyedService {
       chromeos::platform_keys::TokenId token_id,
       const std::string& public_key_spki_der,
       chromeos::platform_keys::KeyAttributeType attribute_type,
-      const std::string& attribute_value,
+      std::vector<uint8_t> attribute_value,
       SetAttributeForKeyCallback callback) = 0;
 
   // Gets |attribute_type| for the private key corresponding to
@@ -275,7 +275,7 @@ class PlatformKeysService : public KeyedService {
   // be invoked on the UI thread with the result. If an error occurred, an error
   // |status| will be returned and absl::nullopt |on_token| will be returned.
   virtual void IsKeyOnToken(chromeos::platform_keys::TokenId token_id,
-                            const std::string& public_key_spki_der,
+                            std::vector<uint8_t> public_key_spki_der,
                             IsKeyOnTokenCallback callback) = 0;
 
   // Softoken NSS PKCS11 module (used for testing) allows only predefined key
@@ -386,7 +386,7 @@ class PlatformKeysServiceImpl final : public PlatformKeysService {
       chromeos::platform_keys::TokenId token_id,
       const std::string& public_key_spki_der,
       chromeos::platform_keys::KeyAttributeType attribute_type,
-      const std::string& attribute_value,
+      std::vector<uint8_t> attribute_value,
       SetAttributeForKeyCallback callback) override;
   void GetAttributeForKey(
       chromeos::platform_keys::TokenId token_id,
@@ -394,7 +394,7 @@ class PlatformKeysServiceImpl final : public PlatformKeysService {
       chromeos::platform_keys::KeyAttributeType attribute_type,
       GetAttributeForKeyCallback callback) override;
   void IsKeyOnToken(chromeos::platform_keys::TokenId token_id,
-                    const std::string& public_key_spki_der,
+                    std::vector<uint8_t> public_key_spki_der,
                     IsKeyOnTokenCallback callback) override;
   void SetMapToSoftokenAttrsForTesting(
       bool map_to_softoken_attrs_for_testing) override;

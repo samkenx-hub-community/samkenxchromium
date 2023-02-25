@@ -274,7 +274,7 @@ void HardwareDisplayPlaneManager::ResetConnectorsCache(
       continue;
     }
     GetDrmPropertyForName(drm_, props.get(), "CRTC_ID", &state_props.crtc_id);
-    DCHECK(!drm_->is_atomic() || state_props.crtc_id.id);
+    DCHECK(!IsAtomic(*drm_) || state_props.crtc_id.id);
     GetDrmPropertyForName(drm_, props.get(), "link-status",
                           &state_props.link_status);
 
@@ -394,10 +394,10 @@ bool HardwareDisplayPlaneManager::InitializeCrtcState() {
 
     GetDrmPropertyForName(drm_, props.get(), "ACTIVE",
                           &state.properties.active);
-    DCHECK(!drm_->is_atomic() || state.properties.active.id);
+    DCHECK(!IsAtomic(*drm_) || state.properties.active.id);
     GetDrmPropertyForName(drm_, props.get(), "MODE_ID",
                           &state.properties.mode_id);
-    DCHECK(!drm_->is_atomic() || state.properties.mode_id.id);
+    DCHECK(!IsAtomic(*drm_) || state.properties.mode_id.id);
     // These properties are optional. If they don't exist we can tell by the
     // invalid ID.
     GetDrmPropertyForName(drm_, props.get(), "CTM", &state.properties.ctm);
@@ -449,8 +449,7 @@ void HardwareDisplayPlaneManager::DisableConnectedConnectorsToCrtcs(
     // encoder).
     if (connector->encoder_id &&
         connector->connection == DRM_MODE_DISCONNECTED) {
-      ScopedDrmEncoderPtr encoder(
-          drmModeGetEncoder(drm_->get_fd(), connector->encoder_id));
+      ScopedDrmEncoderPtr encoder = drm_->GetEncoder(connector->encoder_id);
       if (encoder)
         drm_->DisableCrtc(encoder->crtc_id);
     }
@@ -474,7 +473,7 @@ void HardwareDisplayPlaneManager::UpdateCrtcAndPlaneStatesAfterModeset(
   base::flat_set<HardwareDisplayPlaneList*> disable_planes_lists;
 
   for (const auto& crtc_request : commit_request) {
-    bool is_enabled = crtc_request.should_enable();
+    bool is_enabled = crtc_request.should_enable_crtc();
 
     auto connector_index = LookupConnectorIndex(crtc_request.connector_id());
     DCHECK(connector_index.has_value());
@@ -483,6 +482,7 @@ void HardwareDisplayPlaneManager::UpdateCrtcAndPlaneStatesAfterModeset(
 
     CrtcState& crtc_state = CrtcStateForCrtcId(crtc_request.crtc_id());
     crtc_state.properties.active.value = static_cast<uint64_t>(is_enabled);
+    crtc_state.properties.vrr_enabled.value = crtc_request.enable_vrr();
 
     if (is_enabled) {
       crtc_state.mode = crtc_request.mode();

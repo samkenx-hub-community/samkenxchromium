@@ -5,12 +5,12 @@
 import 'chrome://webui-test/mojo_webui_test_support.js';
 import 'chrome://customize-chrome-side-panel.top-chrome/categories.js';
 
-import {CategoriesElement} from 'chrome://customize-chrome-side-panel.top-chrome/categories.js';
+import {CategoriesElement, CHANGE_CHROME_THEME_CLASSIC_ELEMENT_ID, CHROME_THEME_COLLECTION_ELEMENT_ID} from 'chrome://customize-chrome-side-panel.top-chrome/categories.js';
 import {BackgroundCollection, CustomizeChromePageCallbackRouter, CustomizeChromePageHandlerRemote, CustomizeChromePageRemote} from 'chrome://customize-chrome-side-panel.top-chrome/customize_chrome.mojom-webui.js';
 import {CustomizeChromeApiProxy} from 'chrome://customize-chrome-side-panel.top-chrome/customize_chrome_api_proxy.js';
-import {assertEquals, assertTrue} from 'chrome://webui-test/chai_assert.js';
+import {assertDeepEquals, assertEquals, assertTrue} from 'chrome://webui-test/chai_assert.js';
 import {waitAfterNextRender} from 'chrome://webui-test/polymer_test_util.js';
-import {TestBrowserProxy} from 'chrome://webui-test/test_browser_proxy.js';
+import {TestMock} from 'chrome://webui-test/test_mock.js';
 import {eventToPromise} from 'chrome://webui-test/test_util.js';
 
 import {createBackgroundImage, createTheme, installMock} from './test_support.js';
@@ -29,7 +29,7 @@ function createTestCollections(length: number): BackgroundCollection[] {
 
 suite('CategoriesTest', () => {
   let categoriesElement: CategoriesElement;
-  let handler: TestBrowserProxy<CustomizeChromePageHandlerRemote>;
+  let handler: TestMock<CustomizeChromePageHandlerRemote>;
   let callbackRouterRemote: CustomizeChromePageRemote;
 
   async function setInitialSettings(numCollections: number) {
@@ -143,6 +143,9 @@ suite('CategoriesTest', () => {
         categoriesElement.shadowRoot!.querySelectorAll('[checked]');
     assertEquals(1, checkedCategories.length);
     assertEquals(checkedCategories[0]!.parentElement!.id, 'classicChromeTile');
+    assertEquals(
+        checkedCategories[0]!.parentElement!.getAttribute('aria-current'),
+        'true');
 
     // Set a theme with a color.
     theme.foregroundColor = {value: 0xffff0000};
@@ -155,6 +158,9 @@ suite('CategoriesTest', () => {
         categoriesElement.shadowRoot!.querySelectorAll('[checked]');
     assertEquals(1, checkedCategories.length);
     assertEquals(checkedCategories[0]!.parentElement!.id, 'chromeColorsTile');
+    assertEquals(
+        checkedCategories[0]!.parentElement!.getAttribute('aria-current'),
+        'true');
 
     // Set a theme with local background.
     const backgroundImage = createBackgroundImage('https://test.jpg');
@@ -169,6 +175,9 @@ suite('CategoriesTest', () => {
         categoriesElement.shadowRoot!.querySelectorAll('[checked]');
     assertEquals(1, checkedCategories.length);
     assertEquals(checkedCategories[0]!.parentElement!.id, 'uploadImageTile');
+    assertEquals(
+        checkedCategories[0]!.parentElement!.getAttribute('aria-current'),
+        'true');
 
     // Set a theme with collection background.
     backgroundImage.isUploadedImage = false;
@@ -184,6 +193,9 @@ suite('CategoriesTest', () => {
     assertEquals(1, checkedCategories.length);
     assertEquals(
         checkedCategories[0]!.parentElement!.className, 'tile collection');
+    assertEquals(
+        checkedCategories[0]!.parentElement!.getAttribute('aria-current'),
+        'true');
 
     // Set a CWS theme.
     theme.thirdPartyThemeInfo = {
@@ -198,5 +210,16 @@ suite('CategoriesTest', () => {
     checkedCategories =
         categoriesElement.shadowRoot!.querySelectorAll('[checked]');
     assertEquals(0, checkedCategories.length);
+  });
+
+  test('help bubble can correctly find anchor elements', async () => {
+    await setInitialSettings(5);
+    assertDeepEquals(
+        categoriesElement.getSortedAnchorStatusesForTesting(),
+        [
+          [CHANGE_CHROME_THEME_CLASSIC_ELEMENT_ID, true],
+          [CHROME_THEME_COLLECTION_ELEMENT_ID, true],
+        ],
+    );
   });
 });

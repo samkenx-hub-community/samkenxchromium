@@ -502,7 +502,14 @@ class CONTENT_EXPORT FrameTreeNode : public RenderFrameHostOwner {
 
   // Helper for GetParentOrOuterDocument/GetParentOrOuterDocumentOrEmbedder.
   // Do not use directly.
-  RenderFrameHostImpl* GetParentOrOuterDocumentHelper(bool escape_guest_view);
+  // `escape_guest_view` determines whether to iterate out of guest views and is
+  // the behaviour distinction between GetParentOrOuterDocument and
+  // GetParentOrOuterDocumentOrEmbedder. See the comment on
+  // GetParentOrOuterDocumentOrEmbedder for details.
+  // `include_prospective` includes embedders which own our frame tree, but have
+  // not yet attached it to the outer frame tree.
+  RenderFrameHostImpl* GetParentOrOuterDocumentHelper(bool escape_guest_view,
+                                                      bool include_prospective);
 
   // Sets the unique_name and name fields on replication_state_. To be used in
   // prerender activation to make sure the FrameTreeNode replication state is
@@ -621,6 +628,8 @@ class CONTENT_EXPORT FrameTreeNode : public RenderFrameHostOwner {
       blink::mojom::UserActivationUpdateType update_type,
       blink::mojom::UserActivationNotificationType notification_type) override;
 
+  void DidConsumeHistoryUserActivation() override;
+
   std::unique_ptr<NavigationRequest>
   CreateNavigationRequestForSynchronousRendererCommit(
       RenderFrameHostImpl* render_frame_host,
@@ -638,7 +647,6 @@ class CONTENT_EXPORT FrameTreeNode : public RenderFrameHostOwner {
       const std::vector<GURL>& redirects,
       const GURL& original_url,
       std::unique_ptr<CrossOriginEmbedderPolicyReporter> coep_reporter,
-      std::unique_ptr<WebBundleNavigationInfo> web_bundle_navigation_info,
       std::unique_ptr<SubresourceWebBundleNavigationInfo>
           subresource_web_bundle_navigation_info,
       int http_response_code) override;

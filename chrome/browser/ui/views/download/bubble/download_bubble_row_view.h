@@ -53,7 +53,6 @@ class DownloadBubbleRowView : public views::View,
   // Overrides views::View:
   void AddedToWidget() override;
   void RemovedFromWidget() override;
-  void OnThemeChanged() override;
   void Layout() override;
   Views GetChildrenInZOrder() override;
   bool OnMouseDragged(const ui::MouseEvent& event) override;
@@ -61,8 +60,8 @@ class DownloadBubbleRowView : public views::View,
   void OnMouseEntered(const ui::MouseEvent& event) override;
   void OnMouseExited(const ui::MouseEvent& event) override;
   gfx::Size CalculatePreferredSize() const override;
-  void AddLayerBeneathView(ui::Layer* layer) override;
-  void RemoveLayerBeneathView(ui::Layer* layer) override;
+  void AddLayerToRegion(ui::Layer* layer, views::LayerRegion region) override;
+  void RemoveLayerFromRegions(ui::Layer* layer) override;
 
   // Overrides views::FocusChangeListener
   void OnWillChangeFocus(views::View* before, views::View* now) override;

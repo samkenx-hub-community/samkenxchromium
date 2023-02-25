@@ -14,11 +14,13 @@
 #include "base/allocator/partition_alloc_features.h"
 #include "base/allocator/partition_alloc_support.h"
 #include "base/allocator/partition_allocator/dangling_raw_ptr_checks.h"
+#include "base/allocator/partition_allocator/partition_alloc-inl.h"
 #include "base/allocator/partition_allocator/partition_alloc.h"
 #include "base/allocator/partition_allocator/partition_alloc_base/numerics/checked_math.h"
 #include "base/allocator/partition_allocator/partition_alloc_buildflags.h"
 #include "base/allocator/partition_allocator/partition_alloc_config.h"
 #include "base/allocator/partition_allocator/partition_alloc_constants.h"
+#include "base/allocator/partition_allocator/partition_alloc_hooks.h"
 #include "base/allocator/partition_allocator/pointers/raw_ptr_test_support.h"
 #include "base/allocator/partition_allocator/pointers/raw_ref.h"
 #include "base/allocator/partition_allocator/tagging.h"
@@ -94,27 +96,31 @@ static_assert(
 // this namespace calls the correct functions from this namespace.
 namespace {
 
-// `kEmpty` matches what `CountingRawPtr` does internally.
+// `kAllowPtrArithmetic` matches what `CountingRawPtr` does internally.
 // `kUseCountingWrapperForTest` is removed.
 using RawPtrCountingImpl = base::internal::RawPtrCountingImplWrapperForTest<
-    base::RawPtrTraits::kEmpty>;
+    base::RawPtrTraits::kAllowPtrArithmetic>;
 
-// `kMayDangle` matches what `CountingRawPtrMayDangle` does internally.
-// `kUseCountingWrapperForTest` is removed, and `kMayDangle` is kept.
+// `kMayDangle | kAllowPtrArithmetic` matches what `CountingRawPtrMayDangle`
+// does internally. `kUseCountingWrapperForTest` is removed, and `kMayDangle`
+// and `kAllowPtrArithmetic` are kept.
 using RawPtrCountingMayDangleImpl =
     base::internal::RawPtrCountingImplWrapperForTest<
-        base::RawPtrTraits::kMayDangle>;
+        base::RawPtrTraits::kMayDangle |
+        base::RawPtrTraits::kAllowPtrArithmetic>;
 
 template <typename T>
-using CountingRawPtr =
-    raw_ptr<T, base::RawPtrTraits::kUseCountingWrapperForTest>;
+using CountingRawPtr = raw_ptr<T,
+                               base::RawPtrTraits::kUseCountingWrapperForTest |
+                                   base::RawPtrTraits::kAllowPtrArithmetic>;
 static_assert(std::is_same_v<CountingRawPtr<int>::Impl, RawPtrCountingImpl>);
 
 template <typename T>
 using CountingRawPtrMayDangle =
     raw_ptr<T,
             base::RawPtrTraits::kMayDangle |
-                base::RawPtrTraits::kUseCountingWrapperForTest>;
+                base::RawPtrTraits::kUseCountingWrapperForTest |
+                base::RawPtrTraits::kAllowPtrArithmetic>;
 static_assert(std::is_same_v<CountingRawPtrMayDangle<int>::Impl,
                              RawPtrCountingMayDangleImpl>);
 
@@ -1473,7 +1479,7 @@ TEST_F(BackupRefPtrTest, EndPointer) {
     // should not result in a crash or corrupt the free list.
     char* raw_ptr1 =
         reinterpret_cast<char*>(allocator_.root()->Alloc(size, ""));
-    raw_ptr<char> wrapped_ptr = raw_ptr1 + size;
+    raw_ptr<char, AllowPtrArithmetic> wrapped_ptr = raw_ptr1 + size;
     wrapped_ptr = nullptr;
     // We need to make two more allocations to turn the possible free list
     // corruption into an observable crash.
@@ -1540,8 +1546,7 @@ void RunBackupRefPtrImplAdvanceTest(
     partition_alloc::PartitionAllocator& allocator,
     size_t requested_size) {
   char* ptr = static_cast<char*>(allocator.root()->Alloc(requested_size, ""));
-  raw_ptr<char> protected_ptr = ptr;
-
+  raw_ptr<char, AllowPtrArithmetic> protected_ptr = ptr;
   protected_ptr += 123;
   protected_ptr -= 123;
   protected_ptr = protected_ptr + 123;
@@ -1626,7 +1631,7 @@ TEST_F(BackupRefPtrTest, AdvanceAcrossPools) {
 
   char* in_pool_ptr = static_cast<char*>(allocator_.root()->Alloc(123, ""));
 
-  raw_ptr<char> protected_ptr = array1;
+  raw_ptr<char, AllowPtrArithmetic> protected_ptr = array1;
   // Nothing bad happens. Both pointers are outside of the BRP pool, so no
   // checks are triggered.
   protected_ptr += (array2 - array1);
@@ -2038,6 +2043,32 @@ TEST_F(BackupRefPtrTest, Duplicate) {
 }
 #endif  // PA_USE_OOB_POISON
 
+namespace {
+constexpr uint8_t kCustomQuarantineByte = 0xff;
+static_assert(kCustomQuarantineByte !=
+              partition_alloc::internal::kQuarantinedByte);
+
+void CustomQuarantineHook(void* address, size_t size) {
+  partition_alloc::internal::SecureMemset(address, kCustomQuarantineByte, size);
+}
+}  // namespace
+
+TEST_F(BackupRefPtrTest, QuarantineHook) {
+  partition_alloc::PartitionAllocHooks::SetQuarantineOverrideHook(
+      CustomQuarantineHook);
+  uint8_t* native_ptr =
+      static_cast<uint8_t*>(allocator_.root()->Alloc(sizeof(uint8_t), ""));
+  *native_ptr = 0;
+  raw_ptr<uint8_t> smart_ptr = native_ptr;
+
+  allocator_.root()->Free(smart_ptr);
+  // Access the allocation through the native pointer to avoid triggering
+  // dereference checks in debug builds.
+  EXPECT_EQ(*native_ptr, kCustomQuarantineByte);
+
+  partition_alloc::PartitionAllocHooks::SetQuarantineOverrideHook(nullptr);
+}
+
 #endif  // BUILDFLAG(ENABLE_BACKUP_REF_PTR_SUPPORT) &&
         // !defined(MEMORY_TOOL_REPLACES_ALLOCATOR)
 
@@ -2401,7 +2432,7 @@ TEST_F(HookableRawPtrImplTest, UnsafelyUnwrapForComparison) {
 TEST_F(HookableRawPtrImplTest, Advance) {
   EXPECT_CALL(hooks_, Advance).Times(1);
   int* ptr = new int[10];
-  raw_ptr<int> interesting_ptr = ptr;
+  raw_ptr<int, AllowPtrArithmetic> interesting_ptr = ptr;
   interesting_ptr += 1;
   delete[] ptr;
 }

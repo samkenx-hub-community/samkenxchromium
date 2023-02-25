@@ -20,8 +20,18 @@ crosapi::mojom::LacrosFeedbackSource ToMojoLacrosFeedbackSource(
       return crosapi::mojom::LacrosFeedbackSource::kLacrosSettingsAboutPage;
     case kFeedbackSourceAutofillContextMenu:
       return crosapi::mojom::LacrosFeedbackSource::kLacrosAutofillContextMenu;
+    case kFeedbackSourceSadTabPage:
+      return crosapi::mojom::LacrosFeedbackSource::kLacrosSadTabPage;
+    case kFeedbackSourceChromeLabs:
+      return crosapi::mojom::LacrosFeedbackSource::kLacrosChromeLabs;
+    case kFeedbackSourceQuickAnswers:
+      return crosapi::mojom::LacrosFeedbackSource::kLacrosQuickAnswers;
+    case kFeedbackSourceWindowLayoutMenu:
+      return crosapi::mojom::LacrosFeedbackSource::kLacrosWindowLayoutMenu;
     default:
-      NOTREACHED() << "ShowFeedbackPage is called by unknown Lacros source";
+      LOG(ERROR) << "ShowFeedbackPage is called by unknown Lacros source: "
+                 << static_cast<int>(source);
+      NOTREACHED();
       return crosapi::mojom::LacrosFeedbackSource::kUnknown;
   }
 }

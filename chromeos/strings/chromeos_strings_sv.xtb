@@ -16,6 +16,7 @@
 <translation id="1128128132059598906">EAP-TTLS</translation>
 <translation id="1145018782460575098">Fönstret Uppdatera firmware för externa enheter är öppet. <ph name="NUM_UPDATES" /> uppdateringar är tillgängliga.</translation>
 <translation id="1145516343487477149">Hitta hjälpartiklar och svar på vanliga frågor om Chromebook</translation>
+<translation id="1167755866710282443">Öppna menyn för att anpassa tangenter. Flytta menyn genom att trycka och dra.</translation>
 <translation id="1175697296044146566">Denna <ph name="DEVICE_TYPE" /> hanteras av <ph name="MANAGER" />.</translation>
 <translation id="1175951029573070619">Genomsnittlig (<ph name="SIGNAL_STRENGTH" />)</translation>
 <translation id="1181037720776840403">Ta bort</translation>
@@ -326,6 +327,7 @@
 <translation id="4110686435123617899">Välj detta album: <ph name="TITLE" /> <ph name="DESC" /></translation>
 <translation id="4111761024568264522">USB-styrplatta</translation>
 <translation id="4117637339509843559">Mörkt läge</translation>
+<translation id="4130035430755296270">Håll muspekaren över för fler layoutalternativ</translation>
 <translation id="4131410914670010031">Svartvitt</translation>
 <translation id="4145784616224233563">HTTP-brandvägg</translation>
 <translation id="4147897805161313378">Google Foto</translation>
@@ -414,6 +416,7 @@
 <translation id="484790837831576105">(Android) DNS-upplösning</translation>
 <translation id="4848429997038228357">KÖRS</translation>
 <translation id="4854586501323951986">Inbyggd pekskärm</translation>
+<translation id="4855250849489639581">Svep nedåt för fler layoutalternativ</translation>
 <translation id="4861758251032006121">{ATTEMPTS_LEFT,plural, =1{<ph name="ERROR_MESSAGE" /> {0} försök kvar}other{<ph name="ERROR_MESSAGE" /> {0} försök kvar}}</translation>
 <translation id="4873827928179867585">Autentiseringsalgoritm</translation>
 <translation id="4880328057631981605">Namn på åtkomstpunkt (APN)</translation>
@@ -517,6 +520,7 @@
 <translation id="576835345334454681">Tangenten som ökar skärmens ljusstyrka</translation>
 <translation id="57838592816432529">Stäng av ljudet</translation>
 <translation id="5784136236926853061">Hög HTTP-latens</translation>
+<translation id="5826644637650799838">Om konsten</translation>
 <translation id="5832805196449965646">Lägg till person</translation>
 <translation id="583281660410589416">Okänd</translation>
 <translation id="5843706793424741864">Fahrenheit</translation>
@@ -673,6 +677,7 @@
 <translation id="7172721935181587524">1 bild</translation>
 <translation id="7177485034254901881">Denna <ph name="DEVICE_TYPE" /> hanteras av <ph name="MANAGER" />. Administratörer kan fjärrkonfigurera enheten.</translation>
 <translation id="7180611975245234373">Uppdatera</translation>
+<translation id="7180865173735832675">Anpassa</translation>
 <translation id="7212734716605298123">Firmware-uppdateringar för externa enheter</translation>
 <translation id="7216409898977639127">Mobiloperatör</translation>
 <translation id="725133483556299729">Välj e-postadress</translation>
@@ -744,6 +749,7 @@
 <translation id="7881066108824108340">DNS</translation>
 <translation id="7882358943899516840">Leverantörstyp</translation>
 <translation id="7882501334836096755">Offentlig nyckel</translation>
+<translation id="78957024357676568">vänster</translation>
 <translation id="7915220255123750251">Hantera APN-inställningar för nätverket. APN upprättar en anslutning mellan ett mobilnätverk och internet.</translation>
 <translation id="7936303884198020182">Inga namnservrar hittades</translation>
 <translation id="7942349550061667556">Röd</translation>
@@ -775,6 +781,7 @@
 <translation id="8226628635270268143">Välj favoritfoton och favoritalbum</translation>
 <translation id="8227119283605456246">Bifoga fil</translation>
 <translation id="8230672074305416752">Det gick inte att pinga standardnätverkets gateway</translation>
+<translation id="8242426110754782860">Fortsätt</translation>
 <translation id="8246209727385807362">Okänd operatör</translation>
 <translation id="827422111966801947">Indigoblå</translation>
 <translation id="8286154143153872371">Anslut till ett nätverk och läs in sidan igen för att se bakgrunden.</translation>
@@ -852,6 +859,7 @@
 <translation id="8930622219860340959">Trådlöst</translation>
 <translation id="8936793075252196307">Klientens IP-adress</translation>
 <translation id="894617464444543719">Enheten är en telefon.</translation>
+<translation id="8957423540740801332">höger</translation>
 <translation id="8968751544471797276">Laddningshastighet</translation>
 <translation id="8970109610781093811">Kör igen</translation>
 <translation id="8983038754672563810">HSPA</translation>

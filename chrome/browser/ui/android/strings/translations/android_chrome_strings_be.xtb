@@ -304,7 +304,6 @@
 <translation id="2669454659051515572">Усе, хто карыстаецца гэтай прыладай, могуць бачыць спампаваныя файлы</translation>
 <translation id="2702516483241149200">Навінка: абагульце спасылку, пры выкарыстанні якой старонка прагартаецца гэтага фрагмента тэксту</translation>
 <translation id="2707726405694321444">Абнавіць старонку</translation>
-<translation id="2709516037105925701">Аўтазапаўненне</translation>
 <translation id="271033894570825754">Новае</translation>
 <translation id="2711073837061989559">Пробныя версіі функцый</translation>
 <translation id="2718352093833049315">Толькі па Wi-Fi</translation>
@@ -396,7 +395,6 @@
 <translation id="3114507951000454849">Чытайце сённяшнія навіны <ph name="NEWS_ICON" /></translation>
 <translation id="311958134571892113">картка звязана з наступнай карткай:</translation>
 <translation id="3123734510202723619">Апавяшчэнні</translation>
-<translation id="3130863904455712965">Гісторыя і іншыя даныя</translation>
 <translation id="3134784203083076891">"</translation>
 <translation id="314939179385989105">Галоўная старонка Chrome</translation>
 <translation id="3157931365184549694">Аднавіць</translation>
@@ -453,6 +451,7 @@
 <translation id="3421726884497337397">Выберыце, калі блакіраваць староннія файлы cookie</translation>
 <translation id="3428747202529429621">Абараняе вас у браўзеры Chrome і можа выкарыстоўвацца для паляпшэння бяспекі ў іншых праграмах Google, калі вы ўвайшлі ва ўліковы запіс</translation>
 <translation id="3429160811076349561">Пробныя функцыі выключаны</translation>
+<translation id="3432973700170747422">Выдаліць за апошнія 15 хв</translation>
 <translation id="3435465986463792564">Адкрылі шмат акон? Кіраваць імі можна тут</translation>
 <translation id="3435738964857648380">Бяспека</translation>
 <translation id="3443221991560634068">Перазагрузіць бягучую старонку</translation>
@@ -519,7 +518,6 @@
 <translation id="3830886834687455630">Для праверкі пароляў абнавіце сэрвісы Google Play</translation>
 <translation id="3845098929839618392">Адкрыць ва ўкладцы інкогніта</translation>
 <translation id="3856096718352044181">Праверце, ці сапраўдны гэта аператар, або паўтарыце спробу</translation>
-<translation id="3858127568696903256">Тут знаходзіцца змесціва, на якое вы падпісаны</translation>
 <translation id="3858860766373142691">Назва</translation>
 <translation id="3861633093716975811">Папулярныя відэа</translation>
 <translation id="3874520961715512166">Сайт выдалены</translation>
@@ -922,6 +920,7 @@
 <translation id="6000203700195075278">Падпісацца зноў</translation>
 <translation id="6002122790816966947">Вашы прылады</translation>
 <translation id="6005538289190791541">Прапанаваны пароль</translation>
+<translation id="6011308810877101166">Паляпшаць прапановы пошуку</translation>
 <translation id="6039379616847168523">Перайсці на наступную ўкладку</translation>
 <translation id="6040143037577758943">Закрыць</translation>
 <translation id="604124094241169006">Аўтаматычна</translation>
@@ -989,7 +988,6 @@
 <translation id="6397616442223433927">Зноў у інтэрнэце</translation>
 <translation id="6401458660421980302">Каб адправіць гэту ўкладку на іншую прыладу, увайдзіце з гэтай прылады ў Chrome</translation>
 <translation id="6402652558933147609"><ph name="ERROR_CODE" /> на <ph name="VIOLATED_URL" /></translation>
-<translation id="6403371459378431832">Сінхранізуйце даныя на ўсіх прыладах</translation>
 <translation id="6404511346730675251">Змяніце закладку</translation>
 <translation id="6406506848690869874">Сінхранізаваць</translation>
 <translation id="6407224748847589805">Не ўдалося падключыцца да вашага камп'ютара. Паспрабуйце іншы спосаб спраўджання.</translation>
@@ -1227,6 +1225,7 @@
 <translation id="7596558890252710462">Аперацыйная сістэма</translation>
 <translation id="7605594153474022051">Сінхранізацыя не працуе</translation>
 <translation id="7612619742409846846">Уваход у Google выкананы ад імя</translation>
+<translation id="7612989789287281429">Выконваецца ўваход…</translation>
 <translation id="7616551326690708776">Выберыце шаблон для вылучанага тэксту.</translation>
 <translation id="7619072057915878432">Не ўдалося спампаваць файл "<ph name="FILE_NAME" />" з-за збояў сеткі.</translation>
 <translation id="7626032353295482388">Вас вітае Chrome</translation>
@@ -1245,6 +1244,7 @@
 <translation id="7682724950699840886">Паспрабуйце наступнае: праверце, ці дастаткова месца на прыладзе, затым паўтарыце экспарт.</translation>
 <translation id="7686086654630106285">Падрабязней пра рэкламу, якая прапануецца сайтамі</translation>
 <translation id="768618399695552958">Некаторыя са старонак, якія вы наведваеце, перадзагружаюцца. Калі пераход на іх ажыццяўляецца з сайта Google, перадзагрузка можа ажыццяўляцца праз серверы Google.</translation>
+<translation id="7691043218961417207">Шукайце змесціва, на якое варта падпісацца</translation>
 <translation id="7698359219371678927">Напісаць электронны ліст у праграме "<ph name="APP_NAME" />"</translation>
 <translation id="7707922173985738739">Выкарыстоўваць мабільную перадачу даных</translation>
 <translation id="7709094866268987903">Выдаленыя вамі інтарэсы будуць з'яўляцца тут</translation>
@@ -1318,7 +1318,6 @@
 <translation id="8037801708772278989">Праверка праводзілася толькі што</translation>
 <translation id="804335162455518893">SD-карта не знойдзена</translation>
 <translation id="8048533522416101084">{TAB_COUNT,plural, =1{<ph name="TAB_COUNT_ONE" /> укладка ў рэжыме інкогніта}one{<ph name="TAB_COUNT_NORMAL" /> укладка ў рэжыме інкогніта}few{<ph name="TAB_COUNT_NORMAL" /> укладкі ў рэжыме інкогніта}many{<ph name="TAB_COUNT_NORMAL" /> укладак у рэжыме інкогніта}other{<ph name="TAB_COUNT_NORMAL" /> укладкі ў рэжыме інкогніта}}</translation>
-<translation id="8048728378294435881">Стварайце рэзервовыя копіі сваіх даных, каб іх можна было выкарыстоўваць на іншых прыладах</translation>
 <translation id="8051695050440594747">Даступна <ph name="MEGABYTES" /> МБ</translation>
 <translation id="8058655154417507695">Год заканчэння тэрміну дзеяння</translation>
 <translation id="8058746566562539958">Адкрыць у новай укладцы Chrome</translation>
@@ -1452,6 +1451,7 @@
 <translation id="8746155870861185046">Абагуліць вылучанае змесціва</translation>
 <translation id="8748850008226585750">Змесціва схавана</translation>
 <translation id="8756969031206844760">Абнавіць пароль?</translation>
+<translation id="8765470054473112089">Пры ўводзе тэксту ў адрасны радок або ў поле пошуку Chrome будзе адпраўляць яго ў стандартную пошукавую сістэму, каб падабраць для вас найлепшыя прапановы пошуку. У рэжыме інкогніта гэта функцыя не працуе.</translation>
 <translation id="8766529642647037772">Стварыць такую ж вылучаную спасылку, як гэта?</translation>
 <translation id="8773160212632396039">Запыт апрацоўваецца</translation>
 <translation id="8788265440806329501">Гісторыя навігацыі закрыта</translation>

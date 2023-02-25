@@ -69,6 +69,7 @@
 #import "ios/chrome/browser/ui/commands/command_dispatcher.h"
 #import "ios/chrome/browser/ui/commands/feed_commands.h"
 #import "ios/chrome/browser/ui/commands/find_in_page_commands.h"
+#import "ios/chrome/browser/ui/commands/load_query_commands.h"
 #import "ios/chrome/browser/ui/commands/new_tab_page_commands.h"
 #import "ios/chrome/browser/ui/commands/page_info_commands.h"
 #import "ios/chrome/browser/ui/commands/password_breach_commands.h"
@@ -436,6 +437,7 @@ enum class ToolbarKind {
   id<ToolbarCommands> _toolbarCommandsHandler;
   absl::optional<ToolbarKind> _nextToolbarToPresent;
   CredentialProviderPromoCoordinator* _credentialProviderPromoCoordinator;
+  BOOL _isOffTheRecord;
 }
 
 #pragma mark - ChromeCoordinator
@@ -481,7 +483,6 @@ enum class ToolbarKind {
   [self uninstallDelegatesForBrowser];
   [self.tabEventsMediator disconnect];
   [self.tabLifecycleMediator disconnect];
-  self.viewController.commandDispatcher = nil;
   [self.dispatcher stopDispatchingToTarget:self];
   [self stopChildCoordinators];
   [self destroyViewController];
@@ -620,7 +621,6 @@ enum class ToolbarKind {
                      initWithBrowser:self.browser
       browserContainerViewController:self.browserContainerCoordinator
                                          .viewController
-                          dispatcher:self.dispatcher
                  keyCommandsProvider:_keyCommandsProvider
                         dependencies:_viewControllerDependencies];
   self.tabLifecycleMediator.baseViewController = self.viewController;
@@ -637,6 +637,8 @@ enum class ToolbarKind {
 - (void)destroyViewController {
   // TODO(crbug.com/1272516): Set the WebUsageEnablerBrowserAgent to disabled.
   self.viewController.active = NO;
+  // TODO(crbug.com/1415244): Remove when BVC will no longer handle commands.
+  [self.dispatcher stopDispatchingToTarget:self.viewController];
   [self.viewController shutdown];
   _viewController = nil;
 }
@@ -840,6 +842,12 @@ enum class ToolbarKind {
   // HandlerForProtocol method.
   _viewControllerDependencies.loadQueryCommandsHandler =
       static_cast<id<LoadQueryCommands>>(_dispatcher);
+  // TODO(crbug.com/1413769) Typecast should be performed using
+  // HandlerForProtocol method.
+  _viewControllerDependencies.omniboxCommandsHandler =
+      static_cast<id<OmniboxCommands>>(_dispatcher);
+  _viewControllerDependencies.isOffTheRecord =
+      self.browser->GetBrowserState()->IsOffTheRecord();
 }
 
 - (void)updateViewControllerDependencies {
@@ -896,6 +904,7 @@ enum class ToolbarKind {
   _viewControllerDependencies.findInPageCommandsHandler = nil;
   _viewControllerDependencies.toolbarCommandsHandler = nil;
   _viewControllerDependencies.loadQueryCommandsHandler = nil;
+  _viewControllerDependencies.omniboxCommandsHandler = nil;
 
   [_bookmarksCoordinator shutdown];
   _bookmarksCoordinator = nil;
@@ -2521,6 +2530,7 @@ enum class ToolbarKind {
   NewTabPageCoordinator* NTPCoordinator = self.NTPCoordinator;
   DCHECK(NTPCoordinator);
   if (NTPHelper->IsActive()) {
+    [NTPCoordinator start];
     [NTPCoordinator didNavigateToNTP];
   } else {
     [NTPCoordinator didNavigateAwayFromNTP];

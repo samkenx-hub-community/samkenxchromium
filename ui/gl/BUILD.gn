@@ -224,10 +224,10 @@ component("gl") {
       ]
     }
 
-    if (is_linux || is_chromeos || use_ozone) {
+    if (is_linux || is_chromeos) {
       sources += [
-        "gl_image_native_pixmap.cc",
-        "gl_image_native_pixmap.h",
+        "gl_image_gl_texture.cc",
+        "gl_image_gl_texture.h",
       ]
     }
 
@@ -601,7 +601,7 @@ test("gl_unittests") {
   }
 
   if (is_linux || is_chromeos_lacros) {
-    sources += [ "gl_image_native_pixmap_unittest.cc" ]
+    sources += [ "gl_image_gl_texture_unittest.cc" ]
   }
 
   include_dirs = [ "//third_party/khronos" ]

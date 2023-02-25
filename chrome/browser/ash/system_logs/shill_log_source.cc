@@ -113,7 +113,7 @@ void ShillLogSource::OnGetManagerProperties(
 }
 
 void ShillLogSource::OnGetDevice(const std::string& device_path,
-                                 absl::optional<base::Value> properties) {
+                                 absl::optional<base::Value::Dict> properties) {
   if (!properties) {
     LOG(ERROR) << "Get Device Properties Failed for : " << device_path;
   } else {
@@ -125,19 +125,21 @@ void ShillLogSource::OnGetDevice(const std::string& device_path,
 
 void ShillLogSource::AddDeviceAndRequestIPConfigs(
     const std::string& device_path,
-    const base::Value& properties) {
+    const base::Value::Dict& properties) {
   base::Value* device = devices_.Set(
-      device_path, ScrubAndExpandProperties(device_path, properties.GetDict()));
+      device_path, ScrubAndExpandProperties(device_path, properties));
 
-  const base::Value* ip_configs =
-      properties.FindListKey(shill::kIPConfigsProperty);
-  if (!ip_configs)
+  const base::Value::List* ip_configs =
+      properties.FindList(shill::kIPConfigsProperty);
+  if (!ip_configs) {
     return;
+  }
 
-  for (const base::Value& ip_config : ip_configs->GetList()) {
+  for (const base::Value& ip_config : *ip_configs) {
     std::string ip_config_path = GetString(&ip_config);
-    if (ip_config_path.empty())
+    if (ip_config_path.empty()) {
       continue;
+    }
     ip_config_paths_.insert(ip_config_path);
     ash::ShillIPConfigClient::Get()->GetProperties(
         dbus::ObjectPath(ip_config_path),
@@ -176,13 +178,14 @@ void ShillLogSource::AddIPConfig(const std::string& device_path,
                   ScrubAndExpandProperties(ip_config_path, properties));
 }
 
-void ShillLogSource::OnGetService(const std::string& service_path,
-                                  absl::optional<base::Value> properties) {
+void ShillLogSource::OnGetService(
+    const std::string& service_path,
+    absl::optional<base::Value::Dict> properties) {
   if (!properties) {
     LOG(ERROR) << "Get Service Properties Failed for : " << service_path;
   } else {
-    services_.Set(service_path, ScrubAndExpandProperties(
-                                    service_path, properties->GetDict()));
+    services_.Set(service_path,
+                  ScrubAndExpandProperties(service_path, properties.value()));
   }
   service_paths_.erase(service_path);
   CheckIfDone();
@@ -196,9 +199,11 @@ base::Value::Dict ShillLogSource::ScrubAndExpandProperties(
   // Convert UIData from a string to a dictionary.
   std::string* ui_data = dict.FindString(shill::kUIDataProperty);
   if (ui_data) {
-    base::Value ui_data_dict(chromeos::onc::ReadDictionaryFromJson(*ui_data));
-    if (ui_data_dict.is_dict())
-      dict.Set(shill::kUIDataProperty, std::move(ui_data_dict));
+    absl::optional<base::Value::Dict> ui_data_dict =
+        chromeos::onc::ReadDictionaryFromJson(*ui_data);
+    if (ui_data_dict.has_value()) {
+      dict.Set(shill::kUIDataProperty, std::move(*ui_data_dict));
+    }
   }
 
   if (!scrub_)

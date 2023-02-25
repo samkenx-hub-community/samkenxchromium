@@ -68,26 +68,40 @@ bool CheckIfPowerWithIdExists(sql::Database* db, const base::GUID& guid) {
   return count > 0;
 }
 
+bool MatchPattern(std::string field, std::string pattern, bool case_sensitive) {
+  if (!case_sensitive) {
+    field = base::ToLowerASCII(field);
+    pattern = base::ToLowerASCII(pattern);
+  }
+  return base::MatchPattern(field, pattern);
+}
+
 bool MatchesSearchQuery(const sync_pb::PowerBookmarkSpecifics& specifics,
-                        const std::string& query) {
+                        const std::string& query,
+                        bool case_sensitive) {
   if (query.empty()) {
     return true;
   }
   std::string pattern = base::StrCat({"*", query, "*"});
-  if (base::MatchPattern(specifics.url(), pattern))
-    return true;
+  std::vector<std::string> match_fields = {};
 
-  // A note can be matched by its contents.
+  // Different powers can define their own match fields.
   switch (specifics.power_type()) {
     case sync_pb::PowerBookmarkSpecifics::POWER_TYPE_NOTE:
-      if (base::MatchPattern(
-              specifics.power_entity().note_entity().plain_text(), pattern)) {
-        return true;
-      }
+      match_fields.push_back(
+          specifics.power_entity().note_entity().plain_text());
       break;
     default:
+      match_fields.push_back(specifics.url());
       break;
   }
+
+  for (const std::string& match_field : match_fields) {
+    if (MatchPattern(match_field, pattern, case_sensitive)) {
+      return true;
+    }
+  }
+
   return false;
 }
 
@@ -98,7 +112,8 @@ bool MatchesSearchParams(const sync_pb::PowerBookmarkSpecifics& specifics,
       search_params.power_type != specifics.power_type()) {
     return false;
   }
-  if (!MatchesSearchQuery(specifics, search_params.query)) {
+  if (!MatchesSearchQuery(specifics, search_params.query,
+                          search_params.case_sensitive)) {
     return false;
   }
   return true;
@@ -235,6 +250,11 @@ bool PowerBookmarkDatabaseImpl::InitSchema() {
     db_.Raze();
   }
 
+  sql::Transaction transaction(&db_);
+  if (!transaction.Begin()) {
+    return false;
+  }
+
   // Create the meta table if it doesn't exist.
   if (!meta_table_.Init(&db_, kCurrentVersionNumber,
                         kCompatibleVersionNumber)) {
@@ -250,13 +270,16 @@ bool PowerBookmarkDatabaseImpl::InitSchema() {
     return false;
   }
 
-  meta_table_.SetVersionNumber(kCurrentVersionNumber);
-  meta_table_.SetCompatibleVersionNumber(kCompatibleVersionNumber);
-  return true;
+  return meta_table_.SetVersionNumber(kCurrentVersionNumber) &&
+         meta_table_.SetCompatibleVersionNumber(kCompatibleVersionNumber) &&
+         transaction.Commit();
 }
 
 bool PowerBookmarkDatabaseImpl::CreateSchema() {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+
+  // Ensure that the schema is created atomically.
+  DCHECK(db_.HasActiveTransactions());
 
   // `id` is the primary key of the table, corresponds to a base::GUID.
   // `url` The URL of the target page.

@@ -70,6 +70,12 @@ class CORE_EXPORT StyleResolverState {
   // grab the document from.  This is why we have to store the document
   // separately.
   Document& GetDocument() const { return *document_; }
+  // Returns the element we are computing style for. This returns the same as
+  // GetElement() unless this is a pseudo element request or we are resolving
+  // style for an SVG element instantiated in a <use> shadow tree. This method
+  // may return nullptr if it is a pseudo element request with no actual
+  // PseudoElement present.
+  Element* GetStyledElement() const { return styled_element_; }
   // These are all just pass-through methods to ElementResolveContext.
   Element& GetElement() const { return element_context_.GetElement(); }
   const ContainerNode* ParentNode() const {
@@ -93,7 +99,7 @@ class CORE_EXPORT StyleResolverState {
   }
   ComputedStyleBuilder& StyleBuilder() { return *style_builder_; }
   const ComputedStyleBuilder& StyleBuilder() const { return *style_builder_; }
-  scoped_refptr<ComputedStyle> TakeStyle();
+  scoped_refptr<const ComputedStyle> TakeStyle();
 
   const CSSToLengthConversionData& CssToLengthConversionData() const {
     return css_to_length_conversion_data_;
@@ -133,6 +139,11 @@ class CORE_EXPORT StyleResolverState {
   const ComputedStyle* LayoutParentStyle() const {
     return layout_parent_style_.get();
   }
+
+  void SetOldStyle(scoped_refptr<const ComputedStyle> old_style) {
+    old_style_ = std::move(old_style);
+  }
+  const ComputedStyle* OldStyle() const { return old_style_.get(); }
 
   ElementStyleResources& GetElementStyleResources() {
     return element_style_resources_;
@@ -228,13 +239,21 @@ class CORE_EXPORT StyleResolverState {
   // presence of display: contents. This is the style against which we have to
   // do adjustment.
   scoped_refptr<const ComputedStyle> layout_parent_style_;
+  // The ComputedStyle stored on the element before the current lifecycle update
+  // started.
+  scoped_refptr<const ComputedStyle> old_style_;
 
   CSSAnimationUpdate animation_update_;
   StyleRequest::RequestType pseudo_request_type_;
 
   FontBuilder font_builder_;
 
-  PseudoElement* pseudo_element_;
+  // May be different than GetElement() if the element being styled is a pseudo
+  // element or an instantiation via an SVG <use> element. In those cases,
+  // GetElement() returns the originating element, or the element instatiated
+  // from respectively.
+  Element* styled_element_;
+
   ElementStyleResources element_style_resources_;
   ElementType element_type_;
   Element* container_unit_context_;

@@ -98,16 +98,14 @@ class NavigateReaction final : public ScriptFunction::Callable {
     NavigationApi* navigation_api = window->navigation();
     navigation_api->ongoing_navigate_event_ = nullptr;
 
+    navigate_event_->Finish(resolve_type_ == ResolveType::kFulfill);
+
     if (resolve_type_ == ResolveType::kFulfill) {
-      if (react_type_ == ReactType::kIntercept)
-        navigate_event_->PotentiallyProcessScrollBehavior();
       navigation_api->ResolvePromisesAndFireNavigateSuccessEvent(navigation_);
     } else {
       navigation_api->RejectPromisesAndFireNavigateErrorEvent(navigation_,
                                                               value);
     }
-
-    navigate_event_->ResetFocusIfNeeded();
 
     if (react_type_ == ReactType::kIntercept && window->GetFrame()) {
       window->GetFrame()->Loader().DidFinishNavigation(
@@ -756,8 +754,8 @@ NavigationApi::DispatchResult NavigationApi::DispatchNavigateEvent(
     return DispatchResult::kContinue;
   }
 
-  auto* script_state = ToScriptStateForMainWorld(window_->GetFrame());
-  DCHECK(script_state);
+  LocalFrame* frame = window_->GetFrame();
+  auto* script_state = ToScriptStateForMainWorld(frame);
   ScriptState::Scope scope(script_state);
 
   if (params->frame_load_type == WebFrameLoadType::kBackForward &&
@@ -796,8 +794,15 @@ NavigationApi::DispatchResult NavigationApi::DispatchNavigateEvent(
   }
   init->setDestination(destination);
 
+  bool should_allow_traversal_cancellation =
+      RuntimeEnabledFeatures::NavigateEventCancelableTraversalsEnabled() &&
+      params->frame_load_type == WebFrameLoadType::kBackForward &&
+      params->event_type != NavigateEventType::kCrossDocument &&
+      frame->IsMainFrame() &&
+      (!params->is_browser_initiated || frame->IsHistoryUserActivationActive());
   init->setCancelable(params->frame_load_type !=
-                      WebFrameLoadType::kBackForward);
+                          WebFrameLoadType::kBackForward ||
+                      should_allow_traversal_cancellation);
   init->setCanIntercept(
       CanChangeToUrlForHistoryApi(params->url, window_->GetSecurityOrigin(),
                                   current_url) &&
@@ -831,8 +836,7 @@ NavigationApi::DispatchResult NavigationApi::DispatchNavigateEvent(
   }
   auto* navigate_event =
       NavigateEvent::Create(window_, event_type_names::kNavigate, init);
-  navigate_event->SetUrl(params->url);
-  navigate_event->SaveStateFromDestinationItem(params->destination_item);
+  navigate_event->SetDispatchParams(params);
 
   DCHECK(!ongoing_navigate_event_);
   ongoing_navigate_event_ = navigate_event;
@@ -840,29 +844,20 @@ NavigationApi::DispatchResult NavigationApi::DispatchNavigateEvent(
   DispatchEvent(*navigate_event);
 
   if (navigate_event->defaultPrevented()) {
-    if (!navigate_event->signal()->aborted())
+    if (!navigate_event->signal()->aborted()) {
+      if (params->frame_load_type == WebFrameLoadType::kBackForward &&
+          window_->GetFrame()) {
+        window_->GetFrame()->ConsumeHistoryUserActivation();
+      }
       FinalizeWithAbortedNavigationError(script_state, ongoing_navigation_);
+    }
     return DispatchResult::kAbort;
   }
 
   if (navigate_event->HasNavigationActions()) {
     transition_ = MakeGarbageCollected<NavigationTransition>(
         script_state, navigation_type, currentEntry());
-
-    DCHECK(!params->destination_item || !params->state_object);
-    auto* state_object = params->destination_item
-                             ? params->destination_item->StateObject()
-                             : params->state_object.get();
-
-    // In the spec, the URL and history update steps are not called for reloads.
-    // In our implementation, we call the corresponding function anyway, but
-    // |type| being a reload type makes it do none of the spec-relevant
-    // steps. Instead it does stuff like the loading spinner and use counters.
-    window_->document()->Loader()->RunURLAndHistoryUpdateSteps(
-        params->url, params->destination_item,
-        mojom::blink::SameDocumentNavigationType::kNavigationApiIntercept,
-        state_object, params->frame_load_type, params->is_browser_initiated,
-        params->is_synchronously_committed_same_document);
+    navigate_event->DoCommit();
 
     // This is considered a soft navigation URL change at this point, when the
     // user visible URL change happens, and before the interception handler
@@ -965,6 +960,10 @@ void NavigationApi::TraverseCancelled(
         "Navigating to key " + key +
             " would require a navigation that "
             "violates this frame's sandbox policy");
+  } else if (reason ==
+             mojom::blink::TraverseCancelledReason::kAbortedBeforeCommit) {
+    exception = MakeGarbageCollected<DOMException>(
+        DOMExceptionCode::kAbortError, "Navigation was aborted");
   }
   DCHECK(exception);
 
@@ -1056,6 +1055,36 @@ int NavigationApi::GetIndexFor(NavigationHistoryEntry* entry) {
 
 const AtomicString& NavigationApi::InterfaceName() const {
   return event_target_names::kNavigation;
+}
+
+void NavigationApi::AddedEventListener(
+    const AtomicString& event_type,
+    RegisteredEventListener& registered_listener) {
+  EventTargetWithInlineData::AddedEventListener(event_type,
+                                                registered_listener);
+  LocalFrame* frame = window_->GetFrame();
+  if (event_type != event_type_names::kNavigate || !frame) {
+    return;
+  }
+  navigate_event_handler_count_++;
+  if (navigate_event_handler_count_ == 1) {
+    frame->GetLocalFrameHostRemote().NavigateEventHandlerPresenceChanged(true);
+  }
+}
+
+void NavigationApi::RemovedEventListener(
+    const AtomicString& event_type,
+    const RegisteredEventListener& registered_listener) {
+  EventTargetWithInlineData::RemovedEventListener(event_type,
+                                                  registered_listener);
+  LocalFrame* frame = window_->GetFrame();
+  if (event_type != event_type_names::kNavigate || !frame) {
+    return;
+  }
+  navigate_event_handler_count_--;
+  if (navigate_event_handler_count_ == 0) {
+    frame->GetLocalFrameHostRemote().NavigateEventHandlerPresenceChanged(false);
+  }
 }
 
 void NavigationApi::Trace(Visitor* visitor) const {

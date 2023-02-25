@@ -22,6 +22,7 @@
 #include "base/memory/ptr_util.h"
 #include "base/memory/raw_ptr.h"
 #include "base/metrics/histogram_macros.h"
+#include "base/numerics/safe_conversions.h"
 #include "base/rand_util.h"
 #include "base/ranges/algorithm.h"
 #include "base/strings/escape.h"
@@ -188,6 +189,67 @@ static const char* ScoreAdTraceEventName(const InterestGroupAuction::Bid& bid) {
   } else {
     return "seller_worklet_score_ad";
   }
+}
+
+// Helper for ReportPaBuyersValueIfAllowed() -- returns true iff
+// `interest_group`'s seller capabilities has authorized `capability` for
+// `seller`.
+bool CanReportPaBuyersValue(const blink::InterestGroup& interest_group,
+                            blink::InterestGroup::SellerCapabilities capability,
+                            const url::Origin& seller) {
+  if (interest_group.seller_capabilities) {
+    auto it = interest_group.seller_capabilities->find(seller);
+    if (it != interest_group.seller_capabilities->end()) {
+      return it->second.Has(capability);
+    }
+  }
+  return interest_group.all_sellers_capabilities.Has(capability);
+}
+
+// Helper for ReportPaBuyersValueIfAllowed() -- returns the bucket base
+// of `buyer`, if present in `config`'s `auction_report_buyer_keys`.
+absl::optional<absl::uint128> BucketBaseForReportPaBuyers(
+    const blink::AuctionConfig& config,
+    const url::Origin& buyer) {
+  if (!config.non_shared_params.auction_report_buyer_keys) {
+    return absl::nullopt;
+  }
+  // Find the index of the buyer in `buyers`. It should be present, since we
+  // only load interest groups belonging to owners from `buyers`.
+  DCHECK(config.non_shared_params.interest_group_buyers);
+  const std::vector<url::Origin>& buyers =
+      *config.non_shared_params.interest_group_buyers;
+  absl::optional<size_t> index;
+  for (size_t i = 0; i < buyers.size(); i++) {
+    if (buyer == buyers.at(i)) {
+      index = i;
+      break;
+    }
+  }
+  DCHECK(index);
+  // Use that index to get the associated bucket base, if present.
+  if (*index >= config.non_shared_params.auction_report_buyer_keys->size()) {
+    return absl::nullopt;
+  }
+  return config.non_shared_params.auction_report_buyer_keys->at(*index);
+}
+
+// Helper for ReportPaBuyersValueIfAllowed() -- returns the
+// AuctionReportBuyersConfig for `buyer_report_type`, if it exists in
+// `auction_report_buyers` in `config`.
+absl::optional<blink::AuctionConfig::NonSharedParams::AuctionReportBuyersConfig>
+ReportBuyersConfigForPaBuyers(
+    blink::AuctionConfig::NonSharedParams::BuyerReportType buyer_report_type,
+    const blink::AuctionConfig& config) {
+  if (!config.non_shared_params.auction_report_buyers) {
+    return absl::nullopt;
+  }
+  const auto& report_buyers = *config.non_shared_params.auction_report_buyers;
+  auto it = report_buyers.find(buyer_report_type);
+  if (it == report_buyers.end()) {
+    return absl::nullopt;
+  }
+  return it->second;
 }
 
 }  // namespace
@@ -393,12 +455,14 @@ class InterestGroupAuction::BuyerHelper
 
   void OnBiddingSignalsReceived(
       const base::flat_map<std::string, double>& priority_vector,
-      base::TimeDelta trusted_signals_fetch_duration,
+      base::TimeDelta trusted_signals_fetch_latency,
       base::OnceClosure resume_generate_bid_callback) override {
     BidState* state = generate_bid_client_receiver_set_.current_context();
+    const blink::InterestGroup& interest_group = state->bidder->interest_group;
+    auction_->ReportTrustedSignalsFetchLatency(interest_group,
+                                               trusted_signals_fetch_latency);
     absl::optional<double> new_priority;
     if (!priority_vector.empty()) {
-      const auto& interest_group = state->bidder->interest_group;
       new_priority = CalculateInterestGroupPriority(
           *auction_->config_, *state->bidder, auction_->auction_start_time_,
           priority_vector,
@@ -424,11 +488,13 @@ class InterestGroupAuction::BuyerHelper
                      auction_worklet::mojom::PrioritySignalsDoublePtr>
           update_priority_signals_overrides,
       PrivateAggregationRequests pa_requests,
-      base::TimeDelta bidding_duration,
+      base::TimeDelta bidding_latency,
       const std::vector<std::string>& errors) override {
+    BidState* state = generate_bid_client_receiver_set_.current_context();
+    const blink::InterestGroup& interest_group = state->bidder->interest_group;
+    auction_->ReportBiddingLatency(interest_group, bidding_latency);
     OnGenerateBidCompleteInternal(
-        generate_bid_client_receiver_set_.current_context(),
-        std::move(mojo_bid), std::move(mojo_kanon_bid),
+        state, std::move(mojo_bid), std::move(mojo_kanon_bid),
         bidding_signals_data_version, has_bidding_signals_data_version,
         debug_loss_report_url, debug_win_report_url, set_priority,
         has_set_priority, std::move(update_priority_signals_overrides),
@@ -458,12 +524,20 @@ class InterestGroupAuction::BuyerHelper
 
   const url::Origin& owner() const { return owner_; }
 
-  void GetInterestGroupsThatBid(
+  void GetInterestGroupsThatBidAndReportBidCounts(
       blink::InterestGroupSet& interest_groups) const {
+    size_t bid_count = 0;
     for (const auto& bid_state : bid_states_) {
       if (bid_state->made_bid) {
         interest_groups.emplace(bid_state->bidder->interest_group.owner,
                                 bid_state->bidder->interest_group.name);
+        bid_count++;
+      }
+    }
+    for (const auto& bid_state : bid_states_) {
+      if (auction_->ReportBidCount(bid_state->bidder->interest_group,
+                                   bid_count)) {
+        break;
       }
     }
   }
@@ -713,8 +787,13 @@ class InterestGroupAuction::BuyerHelper
     auction_worklet::mojom::KAnonymityBidMode kanon_mode =
         auction_->kanon_mode();
     bid_state->kanon_keys = ComputeKAnon(*bid_state->bidder, kanon_mode);
-    bid_state->worklet_handle->AuthorizeSubresourceUrls(
-        *auction_->subresource_url_builder_);
+    SubresourceUrlBuilder* url_builder =
+        auction_->SubresourceUrlBuilderIfReady();
+    if (url_builder) {
+      bid_state->worklet_handle->AuthorizeSubresourceUrls(*url_builder);
+      bid_state->handled_direct_from_seller_signals_in_begin_generate_bid =
+          true;
+    }
     bid_state->worklet_handle->GetBidderWorklet()->BeginGenerateBid(
         auction_worklet::mojom::BidderWorkletNonSharedParams::New(
             interest_group.name,
@@ -727,9 +806,8 @@ class InterestGroupAuction::BuyerHelper
             KAnonKeysToMojom(bid_state->kanon_keys)),
         kanon_mode, bid_state->bidder->joining_origin,
         GetDirectFromSellerPerBuyerSignals(
-            *auction_->subresource_url_builder_,
-            bid_state->bidder->interest_group.owner),
-        GetDirectFromSellerAuctionSignals(*auction_->subresource_url_builder_),
+            url_builder, bid_state->bidder->interest_group.owner),
+        GetDirectFromSellerAuctionSignals(url_builder),
         auction_->config_->seller,
         auction_->parent_ ? auction_->parent_->config_->seller
                           : absl::optional<url::Origin>(),
@@ -766,11 +844,25 @@ class InterestGroupAuction::BuyerHelper
       return;
     }
 
+    SubresourceUrlBuilder* url_builder =
+        auction_->SubresourceUrlBuilderIfReady();
+    if (url_builder) {
+      if (bid_state->handled_direct_from_seller_signals_in_begin_generate_bid) {
+        // Don't provide direct-from-seller info to FinishGenerateBid below
+        // since we already provided it to BeginGenerateBid.
+        url_builder = nullptr;
+      } else {
+        bid_state->worklet_handle->AuthorizeSubresourceUrls(*url_builder);
+      }
+    }
     bid_state->bid_finalizer->FinishGenerateBid(
         auction_->config_->non_shared_params.auction_signals.value(),
         GetPerBuyerSignals(*auction_->config_,
                            bid_state->bidder->interest_group.owner),
-        auction_->PerBuyerTimeout(bid_state));
+        auction_->PerBuyerTimeout(bid_state),
+        GetDirectFromSellerPerBuyerSignals(
+            url_builder, bid_state->bidder->interest_group.owner),
+        GetDirectFromSellerAuctionSignals(url_builder));
     bid_state->bid_finalizer.reset();
   }
 
@@ -1194,12 +1286,10 @@ InterestGroupAuction::InterestGroupAuction(
       auction_worklet_manager_(auction_worklet_manager),
       interest_group_manager_(interest_group_manager),
       config_(config),
-      config_promises_resolved_(config_->non_shared_params.NumPromises() == 0),
+      config_promises_resolved_(config_->NumPromises() == 0),
       parent_(parent),
       auction_start_time_(auction_start_time),
-      creation_time_(base::TimeTicks::Now()),
-      subresource_url_builder_(std::make_unique<SubresourceUrlBuilder>(
-          config->direct_from_seller_signals)) {
+      creation_time_(base::TimeTicks::Now()) {
   TRACE_EVENT_NESTABLE_ASYNC_BEGIN1("fledge", "auction", *trace_id_,
                                     "decision_logic_url",
                                     config_->decision_logic_url);
@@ -1374,10 +1464,15 @@ void InterestGroupAuction::StartBiddingAndScoringPhase(
 
 std::unique_ptr<InterestGroupAuctionReporter>
 InterestGroupAuction::CreateReporter(
+    AttributionManager* attribution_manager,
+    PrivateAggregationManager* private_aggregation_manager,
+    InterestGroupAuctionReporter::LogPrivateAggregationRequestsCallback
+        log_private_aggregation_requests_callback,
+    scoped_refptr<network::SharedURLLoaderFactory> url_loader_factory,
     std::unique_ptr<blink::AuctionConfig> auction_config,
+    const url::Origin& main_frame_origin,
     const url::Origin& frame_origin,
     network::mojom::ClientSecurityStatePtr client_security_state,
-    scoped_refptr<network::SharedURLLoaderFactory> url_loader_factory,
     blink::InterestGroupSet interest_groups_that_bid) {
   DCHECK(!load_interest_groups_phase_callback_);
   DCHECK(!bidding_and_scoring_phase_callback_);
@@ -1428,6 +1523,7 @@ InterestGroupAuction::CreateReporter(
   InterestGroupAuctionReporter::SellerWinningBidInfo
       top_level_seller_winning_bid_info;
   top_level_seller_winning_bid_info.auction_config = config_;
+  DCHECK(subresource_url_builder_);  // Must have been created by scoring.
   top_level_seller_winning_bid_info.subresource_url_builder =
       std::move(subresource_url_builder_);
   top_level_seller_winning_bid_info.bid = winner->bid->bid;
@@ -1457,6 +1553,7 @@ InterestGroupAuction::CreateReporter(
     component_seller_winning_bid_info.emplace();
     component_seller_winning_bid_info->auction_config =
         component_auction->config_;
+    DCHECK(component_auction->subresource_url_builder_);
     component_seller_winning_bid_info->subresource_url_builder =
         std::move(component_auction->subresource_url_builder_);
     const LeaderInfo& component_leader = component_auction->leader_info();
@@ -1480,10 +1577,11 @@ InterestGroupAuction::CreateReporter(
       debug_win_report_urls, debug_loss_report_urls);
 
   return std::make_unique<InterestGroupAuctionReporter>(
-      interest_group_manager_, auction_worklet_manager_,
-      std::move(auction_config), frame_origin, std::move(client_security_state),
-      std::move(url_loader_factory), std::move(winning_bid_info),
-      std::move(top_level_seller_winning_bid_info),
+      interest_group_manager_, auction_worklet_manager_, attribution_manager,
+      private_aggregation_manager, log_private_aggregation_requests_callback,
+      std::move(auction_config), main_frame_origin, frame_origin,
+      std::move(client_security_state), std::move(url_loader_factory),
+      std::move(winning_bid_info), std::move(top_level_seller_winning_bid_info),
       std::move(component_seller_winning_bid_info),
       std::move(interest_groups_that_bid), std::move(debug_win_report_urls),
       std::move(debug_loss_report_urls), GetKAnonKeysToJoin(),
@@ -1493,7 +1591,7 @@ InterestGroupAuction::CreateReporter(
 
 void InterestGroupAuction::NotifyConfigPromisesResolved() {
   DCHECK(!config_promises_resolved_);
-  DCHECK_EQ(0, config_->non_shared_params.NumPromises());
+  DCHECK_EQ(0, config_->NumPromises());
   config_promises_resolved_ = true;
   for (const auto& buyer_helper : buyer_helpers_) {
     buyer_helper->NotifyConfigPromisesResolved();
@@ -1550,18 +1648,19 @@ size_t InterestGroupAuction::NumPotentialBidders() const {
   return num_interest_groups;
 }
 
-void InterestGroupAuction::GetInterestGroupsThatBid(
+void InterestGroupAuction::GetInterestGroupsThatBidAndReportBidCounts(
     blink::InterestGroupSet& interest_groups) const {
   if (!all_bids_scored_)
     return;
 
   for (auto& buyer_helper : buyer_helpers_) {
-    buyer_helper->GetInterestGroupsThatBid(interest_groups);
+    buyer_helper->GetInterestGroupsThatBidAndReportBidCounts(interest_groups);
   }
 
   // Retrieve data from component auctions as well.
   for (const auto& component_auction_info : component_auctions_) {
-    component_auction_info.second->GetInterestGroupsThatBid(interest_groups);
+    component_auction_info.second->GetInterestGroupsThatBidAndReportBidCounts(
+        interest_groups);
   }
 }
 
@@ -1646,6 +1745,48 @@ GURL InterestGroupAuction::FillPostAuctionSignals(
   return url.ReplaceComponents(replacements);
 }
 
+bool InterestGroupAuction::ReportPaBuyersValueIfAllowed(
+    const blink::InterestGroup& interest_group,
+    blink::InterestGroup::SellerCapabilities capability,
+    blink::AuctionConfig::NonSharedParams::BuyerReportType buyer_report_type,
+    int value) {
+  if (!CanReportPaBuyersValue(interest_group, capability, config_->seller)) {
+    return false;
+  }
+
+  absl::optional<absl::uint128> bucket_base =
+      BucketBaseForReportPaBuyers(*config_, interest_group.owner);
+  if (!bucket_base) {
+    return false;
+  }
+
+  absl::optional<
+      blink::AuctionConfig::NonSharedParams::AuctionReportBuyersConfig>
+      report_buyers_config =
+          ReportBuyersConfigForPaBuyers(buyer_report_type, *config_);
+  if (!report_buyers_config) {
+    return false;
+  }
+
+  // TODO(caraitto): Consider adding renderer and Mojo validation to ensure that
+  // bucket sums can't be out of range, and scales can't be negative, infinite,
+  // or NaN.
+  PrivateAggregationRequests& destination_vector =
+      private_aggregation_requests_reserved_[config_->seller];
+  destination_vector.push_back(
+      auction_worklet::mojom::PrivateAggregationRequest::New(
+          auction_worklet::mojom::AggregatableReportContribution::
+              NewHistogramContribution(
+                  content::mojom::AggregatableReportHistogramContribution::New(
+                      *bucket_base + report_buyers_config->bucket,
+                      base::saturated_cast<int32_t>(
+                          std::max(0.0, value * report_buyers_config->scale)))),
+          // TODO(caraitto): Consider allowing these to be set.
+          content::mojom::AggregationServiceMode::kDefault,
+          content::mojom::DebugModeDetails::New()));
+  return true;
+}
+
 bool InterestGroupAuction::HasNonKAnonWinner() const {
   if (!final_auction_result_) {
     return false;
@@ -1676,6 +1817,16 @@ bool InterestGroupAuction::NonKAnonWinnerIsKAnon() const {
          top_non_kanon_enforced_bid()
                  ->bid->auction->top_non_kanon_enforced_bid()
                  ->bid->bid_role == Bid::BidRole::kBothKAnonModes;
+}
+
+SubresourceUrlBuilder* InterestGroupAuction::SubresourceUrlBuilderIfReady() {
+  if (!subresource_url_builder_ &&
+      !config_->direct_from_seller_signals.is_promise()) {
+    subresource_url_builder_ = std::make_unique<SubresourceUrlBuilder>(
+        config_->direct_from_seller_signals.value());
+  }
+
+  return subresource_url_builder_.get();
 }
 
 void InterestGroupAuction::
@@ -1834,6 +1985,46 @@ void InterestGroupAuction::TakePostAuctionUpdateOwners(
   }
 }
 
+bool InterestGroupAuction::ReportInterestGroupCount(
+    const blink::InterestGroup& interest_group,
+    size_t count) {
+  return ReportPaBuyersValueIfAllowed(
+      interest_group,
+      blink::InterestGroup::SellerCapabilities::kInterestGroupCounts,
+      blink::AuctionConfig::NonSharedParams::BuyerReportType::
+          kInterestGroupCount,
+      count);
+}
+
+bool InterestGroupAuction::ReportBidCount(
+    const blink::InterestGroup& interest_group,
+    size_t count) {
+  return ReportPaBuyersValueIfAllowed(
+      interest_group,
+      blink::InterestGroup::SellerCapabilities::kInterestGroupCounts,
+      blink::AuctionConfig::NonSharedParams::BuyerReportType::kBidCount, count);
+}
+
+void InterestGroupAuction::ReportTrustedSignalsFetchLatency(
+    const blink::InterestGroup& interest_group,
+    base::TimeDelta trusted_signals_fetch_latency) {
+  ReportPaBuyersValueIfAllowed(
+      interest_group, blink::InterestGroup::SellerCapabilities::kLatencyStats,
+      blink::AuctionConfig::NonSharedParams::BuyerReportType::
+          kTotalSignalsFetchLatency,
+      trusted_signals_fetch_latency.InMilliseconds());
+}
+
+void InterestGroupAuction::ReportBiddingLatency(
+    const blink::InterestGroup& interest_group,
+    base::TimeDelta bidding_latency) {
+  ReportPaBuyersValueIfAllowed(
+      interest_group, blink::InterestGroup::SellerCapabilities::kLatencyStats,
+      blink::AuctionConfig::NonSharedParams::BuyerReportType::
+          kTotalGenerateBidLatency,
+      bidding_latency.InMilliseconds());
+}
+
 base::flat_set<std::string> InterestGroupAuction::GetKAnonKeysToJoin() const {
   if (!HasNonKAnonWinner()) {
     return {};
@@ -1921,25 +2112,32 @@ absl::optional<std::string> InterestGroupAuction::GetPerBuyerSignals(
 }
 
 absl::optional<GURL> InterestGroupAuction::GetDirectFromSellerAuctionSignals(
-    const SubresourceUrlBuilder& subresource_url_builder) {
-  if (subresource_url_builder.auction_signals())
-    return subresource_url_builder.auction_signals()->subresource_url;
+    const SubresourceUrlBuilder* subresource_url_builder) {
+  if (subresource_url_builder && subresource_url_builder->auction_signals()) {
+    return subresource_url_builder->auction_signals()->subresource_url;
+  }
   return absl::nullopt;
 }
 
 absl::optional<GURL> InterestGroupAuction::GetDirectFromSellerPerBuyerSignals(
-    const SubresourceUrlBuilder& subresource_url_builder,
+    const SubresourceUrlBuilder* subresource_url_builder,
     const url::Origin& owner) {
-  auto it = subresource_url_builder.per_buyer_signals().find(owner);
-  if (it == subresource_url_builder.per_buyer_signals().end())
+  if (!subresource_url_builder) {
     return absl::nullopt;
+  }
+
+  auto it = subresource_url_builder->per_buyer_signals().find(owner);
+  if (it == subresource_url_builder->per_buyer_signals().end()) {
+    return absl::nullopt;
+  }
   return it->second.subresource_url;
 }
 
 absl::optional<GURL> InterestGroupAuction::GetDirectFromSellerSellerSignals(
-    const SubresourceUrlBuilder& subresource_url_builder) {
-  if (subresource_url_builder.seller_signals())
-    return subresource_url_builder.seller_signals()->subresource_url;
+    const SubresourceUrlBuilder* subresource_url_builder) {
+  if (subresource_url_builder && subresource_url_builder->seller_signals()) {
+    return subresource_url_builder->seller_signals()->subresource_url;
+  }
   return absl::nullopt;
 }
 
@@ -1952,6 +2150,12 @@ void InterestGroupAuction::OnInterestGroupRead(
   if (interest_groups.empty()) {
     OnOneLoadCompleted();
     return;
+  }
+  for (const StorageInterestGroup& group : interest_groups) {
+    if (ReportInterestGroupCount(group.interest_group,
+                                 interest_groups.size())) {
+      break;
+    }
   }
   post_auction_update_owners_.push_back(
       interest_groups[0].interest_group.owner);
@@ -2285,12 +2489,14 @@ void InterestGroupAuction::ScoreBidIfReady(std::unique_ptr<Bid> bid) {
   mojo::PendingRemote<auction_worklet::mojom::ScoreAdClient> score_ad_remote;
   score_ad_receivers_.Add(
       this, score_ad_remote.InitWithNewPipeAndPassReceiver(), std::move(bid));
-  DCHECK_EQ(0, config_->non_shared_params.NumPromises());
-  seller_worklet_handle_->AuthorizeSubresourceUrls(*subresource_url_builder_);
+  DCHECK_EQ(0, config_->NumPromises());
+  SubresourceUrlBuilder* url_builder = SubresourceUrlBuilderIfReady();
+  DCHECK(url_builder);  // Should be ready by now.
+  seller_worklet_handle_->AuthorizeSubresourceUrls(*url_builder);
   seller_worklet_handle_->GetSellerWorklet()->ScoreAd(
       bid_raw->ad_metadata, bid_raw->bid, config_->non_shared_params,
-      GetDirectFromSellerSellerSignals(*subresource_url_builder_),
-      GetDirectFromSellerAuctionSignals(*subresource_url_builder_),
+      GetDirectFromSellerSellerSignals(url_builder),
+      GetDirectFromSellerAuctionSignals(url_builder),
       GetOtherSellerParam(*bid_raw), bid_raw->interest_group->owner,
       bid_raw->render_url, bid_raw->ad_components,
       bid_raw->bid_duration.InMilliseconds(), SellerTimeout(), bid_trace_id,

@@ -11,12 +11,10 @@ Certaines fonctionnalités ne seront peut-être pas disponibles, et les modifica
 <translation id="1131805035311359397">Pour vérifier si vos mots de passe sont suffisamment sécurisés afin d'empêcher toute violation de données et autres problèmes de sécurité, <ph name="BEGIN_LINK" />connectez-vous à Chromium<ph name="END_LINK" />.</translation>
 <translation id="1185134272377778587">À propos de Chromium</translation>
 <translation id="1203500561924088507">Merci d'avoir installé notre produit. Vous devez redémarrer votre navigateur avant d'utiliser <ph name="BUNDLE_NAME" />.</translation>
-<translation id="1231839967188101156">Lorsque cette option est activée, Chromium libère de la mémoire dans les onglets inactifs. Ainsi, les onglets actifs et d'autres applis peuvent utiliser davantage de ressources, et Chromium reste rapide. Vos onglets inactifs redeviennent actifs lorsque vous les consultez. <ph name="BEGIN_LINK" />En savoir plus<ph name="END_LINK" /></translation>
 <translation id="1261119230216066228">L'économiseur de mémoire rend Chromium plus rapide</translation>
 <translation id="1315551408014407711">Configurer votre nouveau profil Chromium</translation>
 <translation id="1396446129537741364">Tentative d'affichage des mots de passe dans Chromium</translation>
 <translation id="1414495520565016063">Vous êtes connecté à Chromium.</translation>
-<translation id="1493803763272692301">Profitez pleinement de Chromium</translation>
 <translation id="1524282610922162960">Partager un onglet Chromium</translation>
 <translation id="1553461853655228091">Chromium a besoin de votre autorisation pour accéder à votre appareil photo et créer un plan 3D de votre environnement</translation>
 <translation id="1607715478322902680">{COUNT,plural, =0{À la demande de votre administrateur, vous devez relancer Chromium pour installer une mise à jour}=1{À la demande de votre administrateur, vous devez relancer Chromium pour installer une mise à jour. Sachez que la fenêtre de navigation privée ne sera pas rouverte.}one{À la demande de votre administrateur, vous devez relancer Chromium pour installer une mise à jour. Sachez que la fenêtre de navigation privée (#) ne sera pas rouverte.}other{À la demande de votre administrateur, vous devez relancer Chromium pour installer une mise à jour. Sachez que les # fenêtres de navigation privée ne seront pas rouvertes.}}</translation>
@@ -33,6 +31,7 @@ Les autorisations que vous avez déjà accordées aux sites Web et aux applis pe
 <translation id="185970820835152459">Vous pouvez gérer les comptes Google auxquels vous êtes connecté. Ils vous permettent d'accéder au navigateur Chromium, au Play Store, à Gmail, etc. Pour ajouter le compte d'une autre personne, comme un membre de votre famille, ajoutez un nouvel utilisateur à votre <ph name="DEVICE_TYPE" /> à la place. <ph name="LINK_BEGIN" />En savoir plus<ph name="LINK_END" /></translation>
 <translation id="1863308913976887472">Les sites peuvent stocker des informations sur vos centres d'intérêt dans Chromium. Par exemple, si vous allez sur un site afin d'acheter des chaussures pour un marathon, le site peut définir le marathon comme l'un de vos centres d'intérêt. Ensuite, si vous consultez un autre site pour vous enregistrer pour une course, ce site peut diffuser une annonce pour des chaussures de running en se basant sur vos centres d'intérêt.</translation>
 <translation id="1881322772814446296">Vous vous connectez avec un compte géré et donnez le contrôle de votre profil Chromium à son administrateur. Vos données Chromium, telles que les applications, les favoris, l'historique, les mots de passe et les autres paramètres, vont être définitivement associées à <ph name="USER_NAME" />. Vous pouvez supprimer ces données via le tableau de bord des comptes Google, mais vous ne pouvez pas les associer à un autre compte. Vous pouvez éventuellement créer un nouveau profil pour maintenir vos données Chromium séparées. <ph name="LEARN_MORE" /></translation>
+<translation id="1906696617298807388">Lorsque vous saisissez du texte dans la barre d'adresse ou dans le champ de recherche, Chromium envoie ce que vous saisissez à Google Drive pour obtenir des suggestions d'éléments. Ce paramètre est désactivé en navigation privée.</translation>
 <translation id="1911763535808217981">Désactiver cette option vous permet de vous connecter à des sites Google tels que Gmail sans vous connecter à Chromium</translation>
 <translation id="1929939181775079593">Chromium ne répond pas. Voulez-vous le relancer maintenant ?</translation>
 <translation id="193439633299369377">Redémarrez Chromium OS pour appliquer la mise à jour.</translation>
@@ -123,7 +122,6 @@ Les autorisations que vous avez déjà accordées aux sites Web et aux applis pe
 <translation id="3702352323269013324">En savoir plus sur la personnalisation des annonces dans Chromium</translation>
 <translation id="370962675267501463">{COUNT,plural, =0{Votre administrateur vous demande de relancer Chromium pour installer cette mise à jour}=1{Votre administrateur vous demande de relancer Chromium pour installer cette mise à jour. Sachez que la fenêtre de navigation privée ne sera pas rouverte.}one{Votre administrateur vous demande de relancer Chromium pour installer cette mise à jour. Sachez que la fenêtre de navigation privée (#) ne sera pas rouverte.}other{Votre administrateur vous demande de relancer Chromium pour installer cette mise à jour. Sachez que les # fenêtres de navigation privée ne seront pas rouvertes.}}</translation>
 <translation id="3713809861844741608">Ouvrir le lien dans un nouvel ongle&amp;t Chromium</translation>
-<translation id="3728336900324680424">Chromium va accéder à votre Drive pour proposer des suggestions dans la barre d'adresse</translation>
 <translation id="378917192836375108">Avec Chromium, cliquez sur un numéro de téléphone sur le Web et appelez-le dans Skype !</translation>
 <translation id="3830894615770080216">Système Chromium OS</translation>
 <translation id="3848258323044014972"><ph name="PAGE_TITLE" /> – Chromium</translation>
@@ -219,6 +217,7 @@ Les autorisations que vous avez déjà accordées aux sites Web et aux applis pe
 <translation id="6072463441809498330">Rendre Chromium plus rapide</translation>
 <translation id="608006075545470555">Ajouter un profil professionnel à ce navigateur</translation>
 <translation id="6096348254544841612">Personnalisez et contrôlez Chromium. Une mise à jour est disponible.</translation>
+<translation id="6102072151902574948">Lorsque cette option est activée, Chromium préserve l'autonomie de la batterie en limitant l'activité et les effets visuels en arrière-plan, comme le défilement fluide et la fréquence d'images vidéo.</translation>
 <translation id="6119438414301547735">Autoriser l'extension à afficher les demandes d'accès dans la barre d'outils Chromium</translation>
 <translation id="6120345080069858279">Chromium va enregistrer ce mot de passe dans votre compte Google. Vous n'avez pas besoin de le retenir.</translation>
 <translation id="6129621093834146363">Chromium a bloqué <ph name="FILE_NAME" />, car ce fichier est dangereux.</translation>
@@ -279,6 +278,7 @@ Certaines fonctionnalités seront peut-être indisponibles. Veuillez spécifier 
 <translation id="6940431691900807093">Ensuite, un site que vous consultez pourra demander à Chromium de voir vos centres d'intérêt pour personnaliser les annonces qui vous sont présentées. Chromium peut partager jusqu'à trois centres d'intérêt.</translation>
 <translation id="6964305034639999644">Ouvrir le lien dans la fenêtre de navi&amp;gation privée Chromium</translation>
 <translation id="6978145336957848883">Les mots de passe peu sécurisés sont faciles à deviner. Laissez Chromium <ph name="BEGIN_LINK" />créer et mémoriser des mots de passe sécurisés à votre place<ph name="END_LINK" />.</translation>
+<translation id="6981396265751285733">Lorsque cette option est activée, Chromium libère de la mémoire dans les onglets inactifs. Ainsi, les onglets actifs et d'autres applis peuvent utiliser davantage de ressources, et Chromium reste rapide. Vos onglets inactifs redeviennent actifs lorsque vous les consultez.</translation>
 <translation id="6984667024406244807">Chromium est inactif</translation>
 <translation id="6985329841647292029">Conditions d'utilisation de Chromium OS</translation>
 <translation id="6990124437352146030">Chromium a besoin de votre autorisation pour accéder à votre micro pour ce site</translation>
@@ -323,6 +323,7 @@ Chromium ne peut pas récupérer vos paramètres.</translation>
 <translation id="7790626492778995050"><ph name="PAGE_TITLE" /> – Chromium Canary</translation>
 <translation id="7828947555739565424">Il existe déjà un profil Chromium associé à ce compte sur cet appareil</translation>
 <translation id="7845233973568007926">Merci d'avoir installé notre produit. Vous devez redémarrer votre ordinateur avant d'utiliser <ph name="BUNDLE_NAME" />.</translation>
+<translation id="7859018312476869945">Lorsque vous saisissez du texte dans la barre d'adresse ou le champ de recherche, Chromium envoie le contenu saisi à votre moteur de recherche par défaut pour obtenir de meilleures suggestions. Ce paramètre est désactivé en navigation privée.</translation>
 <translation id="7867198900892795913">Échec de l'installation de la dernière version de Chromium. Vous ne disposez donc pas des nouvelles fonctionnalités, ni des correctifs de sécurité.</translation>
 <translation id="7872446069773932638">Téléchargement… <ph name="SECONDS" /> seconde(s) restante(s)</translation>
 <translation id="7877292582355102282"><ph name="BEGIN_BOLD" />Comment vous pouvez gérer vos données<ph name="END_BOLD" /> : pour protéger votre confidentialité, nous supprimons automatiquement vos centres d'intérêt s'ils datent de plus de quatre semaines. Au fil de votre navigation, un centre d'intérêt peut réapparaître dans la liste. Vous pouvez aussi supprimer des centres d'intérêt si vous ne souhaitez pas que Chromium les prenne en compte.</translation>
@@ -351,7 +352,6 @@ Chromium ne peut pas récupérer vos paramètres.</translation>
 <translation id="8550334526674375523">Ce profil professionnel est parfaitement séparé de votre profil personnel.</translation>
 <translation id="8558383651099478961">Ton parent a désactivé l'option "Autorisations des sites, applications et extensions" pour Chromium. Tu ne peux pas ajouter cette <ph name="EXTENSION_TYPE_PARAMETER" />.</translation>
 <translation id="8568283329061645092">Chromium peut vérifier vos mots de passe lorsque vous vous connectez à votre compte Google</translation>
-<translation id="8574036838419011058">Lorsque cette option est activée, Chromium préserve l'autonomie de la batterie en limitant l'activité et les effets visuels en arrière-plan, comme le défilement fluide et la fréquence d'images vidéo. <ph name="BEGIN_LINK" />En savoir plus<ph name="END_LINK" /></translation>
 <translation id="8586442755830160949">Copyright Auteurs de Chromium <ph name="YEAR" />. Tous droits réservés.</translation>
 <translation id="8608079656141766906"><ph name="BEGIN_BOLD" />Comment nous utilisons ces données<ph name="END_BOLD" /> : les sites peuvent stocker des informations sur vos centres d'intérêt dans Chromium. Par exemple, si vous allez sur un site afin d'acheter des chaussures pour un marathon, le site peut définir le marathon comme l'un de vos centres d'intérêt. Ensuite, si vous consultez un autre site pour vous enregistrer pour une course, ce site peut diffuser une annonce pour des chaussures de running en se basant sur vos centres d'intérêt.</translation>
 <translation id="8619360774459241877">Lancement de Chromium…</translation>

@@ -5,6 +5,8 @@
 #include "chrome/browser/ui/webui/password_manager/password_manager_ui.h"
 
 #include "base/strings/utf_string_conversions.h"
+#include "chrome/browser/extensions/api/passwords_private/passwords_private_delegate.h"
+#include "chrome/browser/extensions/api/passwords_private/passwords_private_delegate_factory.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/webui/favicon_source.h"
 #include "chrome/browser/ui/webui/managed_ui_handler.h"
@@ -62,6 +64,8 @@ content::WebUIDataSource* CreateAndAddPasswordsUIHTMLSource(
     {"addShortcut", IDS_PASSWORD_MANAGER_UI_ADD_SHORTCUT_TITLE},
     {"addShortcutDescription",
      IDS_PASSWORD_MANAGER_UI_ADD_SHORTCUT_DESCRIPTION},
+    {"alreadyChangedPasswordLink",
+     IDS_PASSWORD_MANAGER_UI_ALREADY_CHANGED_PASSWORD},
     {"autosigninDescription", IDS_PASSWORD_MANAGER_UI_AUTOSIGNIN_TOGGLE_DESC},
     {"autosigninLabel", IDS_PASSWORD_MANAGER_UI_AUTOSIGNIN_TOGGLE_LABEL},
     {"blockedSitesDescription",
@@ -71,6 +75,7 @@ content::WebUIDataSource* CreateAndAddPasswordsUIHTMLSource(
     {"blockedSitesTitle", IDS_PASSWORD_MANAGER_UI_BLOCKED_SITES_TITLE},
     {"cancel", IDS_CANCEL},
     {"changePassword", IDS_PASSWORD_MANAGER_UI_CHANGE_PASSWORD_BUTTON},
+    {"changePasswordInApp", IDS_PASSWORD_MANAGER_UI_CHANGE_PASSWORD_IN_APP},
     {"checkup", IDS_PASSWORD_MANAGER_UI_CHECKUP},
     {"checkupCanceled", IDS_PASSWORD_MANAGER_UI_CHECKUP_CANCELED},
     {"checkupErrorGeneric", IDS_PASSWORD_MANAGER_UI_CHECKUP_OTHER_ERROR},
@@ -93,7 +98,15 @@ content::WebUIDataSource* CreateAndAddPasswordsUIHTMLSource(
     {"copyPassword", IDS_PASSWORD_MANAGER_UI_COPY_PASSWORD},
     {"copyUsername", IDS_PASSWORD_MANAGER_UI_COPY_USERNAME},
     {"deletePassword", IDS_DELETE},
+    {"deletePasswordConfirmationDescription",
+     IDS_PASSWORD_MANAGER_UI_DELETE_PASSWORD_CONFIRMATION_DESCRIPTION},
+    {"deletePasswordConfirmationTitle",
+     IDS_PASSWORD_MANAGER_UI_DELETE_PASSWORD_CONFIRMATION_TITLE},
     {"downloadFile", IDS_PASSWORD_MANAGER_UI_DOWNLOAD_FILE},
+    {"downloadLinkShow", IDS_DOWNLOAD_LINK_SHOW},
+    {"editDisclaimerDescription",
+     IDS_PASSWORD_MANAGER_UI_EDIT_DISCLAIMER_DESCRIPTION},
+    {"editDisclaimerTitle", IDS_PASSWORD_MANAGER_UI_EDIT_DISCLAIMER_TITLE},
     {"editPassword", IDS_EDIT},
     {"editPasswordFootnote", IDS_PASSWORD_MANAGER_UI_PASSWORD_EDIT_FOOTNOTE},
     {"editPasswordTitle", IDS_PASSWORD_MANAGER_UI_EDIT_PASSWORD},
@@ -109,6 +122,7 @@ content::WebUIDataSource* CreateAndAddPasswordsUIHTMLSource(
     {"exportPasswordsFailTitle",
      IDS_PASSWORD_MANAGER_UI_EXPORTING_FAILURE_TITLE},
     {"exportPasswordsTryAgain", IDS_PASSWORD_MANAGER_UI_EXPORT_TRY_AGAIN},
+    {"exportSuccessful", IDS_PASSWORD_MANAGER_UI_EXPORT_SUCCESSFUL},
     {"federationLabel", IDS_PASSWORD_MANAGER_UI_FEDERATION_LABEL},
     {"help", IDS_PASSWORD_MANAGER_UI_HELP},
     {"hidePassword", IDS_PASSWORD_MANAGER_UI_HIDE_PASSWORD},
@@ -120,10 +134,12 @@ content::WebUIDataSource* CreateAndAddPasswordsUIHTMLSource(
     {"localPasswordManager",
      IDS_PASSWORD_BUBBLES_PASSWORD_MANAGER_LINK_TEXT_SAVING_ON_DEVICE},
     {"menu", IDS_MENU},
+    {"missingTLD", IDS_PASSWORD_MANAGER_UI_MISSING_TLD},
     {"moreActions", IDS_PASSWORD_MANAGER_UI_MORE_ACTIONS},
     {"muteCompromisedPassword", IDS_PASSWORD_MANAGER_UI_MUTE_ISSUE},
     {"mutedCompromisedCredentials",
      IDS_PASSWORD_MANAGER_UI_MUTED_COMPROMISED_PASSWORDS},
+    {"notValidWebsite", IDS_PASSWORD_MANAGER_UI_NOT_VALID_WEB_ADDRESS},
     {"notesLabel", IDS_PASSWORD_MANAGER_UI_NOTES_LABEL},
     {"passwordCopiedToClipboard",
      IDS_PASSWORD_MANAGER_UI_PASSWORD_COPIED_TO_CLIPBOARD},
@@ -143,6 +159,7 @@ content::WebUIDataSource* CreateAndAddPasswordsUIHTMLSource(
     {"savePasswordsLabel", IDS_PASSWORD_MANAGER_UI_SAVE_PASSWORDS_TOGGLE_LABEL},
     {"searchPrompt", IDS_PASSWORD_MANAGER_UI_SEARCH_PROMPT},
     {"settings", IDS_PASSWORD_MANAGER_UI_SETTINGS},
+    {"showMore", IDS_PASSWORD_MANAGER_UI_SHOW_MORE},
     {"showPassword", IDS_PASSWORD_MANAGER_UI_SHOW_PASSWORD},
     {"sitesLabel", IDS_PASSWORD_MANAGER_UI_SITES_LABEL},
     {"title", IDS_PASSWORD_MANAGER_UI_TITLE},
@@ -243,6 +260,8 @@ void AddPluralStrings(content::WebUI* web_ui) {
       "reusedPasswords", IDS_PASSWORD_MANAGER_UI_REUSED_PASSWORDS_COUNT);
   plural_string_handler->AddLocalizedString(
       "weakPasswords", IDS_PASSWORD_MANAGER_UI_WEAK_PASSWORDS_COUNT);
+  plural_string_handler->AddLocalizedString(
+      "searchResults", IDS_PASSWORD_MANAGER_UI_SEARCH_RESULT);
   web_ui->AddMessageHandler(std::move(plural_string_handler));
 }
 
@@ -252,12 +271,17 @@ PasswordManagerUI::PasswordManagerUI(content::WebUI* web_ui)
     : WebUIController(web_ui) {
   // Set up the chrome://password-manager/ source.
   Profile* profile = Profile::FromWebUI(web_ui);
+  passwords_private_delegate_ =
+      extensions::PasswordsPrivateDelegateFactory::GetForBrowserContext(profile,
+                                                                        true);
   auto* source = CreateAndAddPasswordsUIHTMLSource(profile, web_ui);
   AddPluralStrings(web_ui);
   ManagedUIHandler::Initialize(web_ui, source);
   content::URLDataSource::Add(profile,
                               std::make_unique<SanitizedImageSource>(profile));
 }
+
+PasswordManagerUI::~PasswordManagerUI() = default;
 
 // static
 base::RefCountedMemory* PasswordManagerUI::GetFaviconResourceBytes(

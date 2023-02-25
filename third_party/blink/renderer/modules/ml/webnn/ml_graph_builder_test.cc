@@ -18,6 +18,7 @@
 #include "third_party/blink/renderer/core/dom/dom_exception.h"
 #include "third_party/blink/renderer/modules/ml/webnn/ml_graph.h"
 #include "third_party/blink/renderer/modules/ml/webnn/ml_graph_builder.h"
+#include "third_party/blink/renderer/modules/ml/webnn/ml_graph_test_base.h"
 #include "third_party/blink/renderer/modules/ml/webnn/ml_operand.h"
 #include "third_party/blink/renderer/modules/ml/webnn/ml_operator.h"
 
@@ -2367,94 +2368,6 @@ FakeMLGraphBackend* ToFakeMLGraphBackend(V8TestingScope* scope,
       scope->GetIsolate(), value.V8Value(), scope->GetExceptionState());
 }
 
-MLGraph* ToMLGraph(V8TestingScope* scope, ScriptValue value) {
-  return NativeValueTraits<MLGraph>::NativeValue(
-      scope->GetIsolate(), value.V8Value(), scope->GetExceptionState());
-}
-
-std::string ExecutionModeParamToString(
-    const ::testing::TestParamInfo<ExecutionMode>& execution_mode) {
-  switch (execution_mode.param) {
-    case ExecutionMode::kAsync:
-      return "Async";
-    case ExecutionMode::kSync:
-      return "Sync";
-  }
-}
-
-MLGraphTestBase::BuildResult MLGraphTestBase::BuildGraph(
-    V8TestingScope& scope,
-    MLGraphBuilder* builder,
-    const MLNamedOperands& named_operands) {
-  switch (GetParam()) {
-    case ExecutionMode::kAsync: {
-      ScriptPromiseTester tester(
-          scope.GetScriptState(),
-          builder->buildAsync(scope.GetScriptState(), named_operands,
-                              scope.GetExceptionState()));
-      tester.WaitUntilSettled();
-      if (tester.IsFulfilled()) {
-        return BuildResult{.graph = ToMLGraph(&scope, tester.Value()),
-                           .exception = nullptr};
-      } else {
-        return BuildResult{.graph = nullptr,
-                           .exception = V8DOMException::ToImplWithTypeCheck(
-                               scope.GetIsolate(), tester.Value().V8Value())};
-      }
-    }
-    case ExecutionMode::kSync: {
-      auto* graph =
-          builder->buildSync(named_operands, scope.GetExceptionState());
-      if (graph) {
-        return BuildResult{.graph = static_cast<MLGraph*>(graph),
-                           .exception = nullptr};
-      } else {
-        return BuildResult{
-            .graph = nullptr,
-            .exception = MakeGarbageCollected<DOMException>(
-                scope.GetExceptionState().CodeAs<DOMExceptionCode>(),
-                scope.GetExceptionState().Message())};
-      }
-    }
-    default:
-      NOTREACHED();
-  }
-}
-
-DOMException* MLGraphTestBase::ComputeGraph(
-    V8TestingScope& scope,
-    MLGraph* graph,
-    const MLNamedArrayBufferViews& inputs,
-    const MLNamedArrayBufferViews& outputs) {
-  switch (GetParam()) {
-    case ExecutionMode::kAsync: {
-      auto* resolver =
-          MakeGarbageCollected<ScriptPromiseResolver>(scope.GetScriptState());
-      ScriptPromiseTester tester(scope.GetScriptState(), resolver->Promise());
-      graph->ComputeAsync(inputs, outputs, resolver);
-      tester.WaitUntilSettled();
-      if (tester.IsFulfilled()) {
-        return nullptr;
-      } else {
-        return V8DOMException::ToImplWithTypeCheck(scope.GetIsolate(),
-                                                   tester.Value().V8Value());
-      }
-    }
-    case ExecutionMode::kSync: {
-      graph->ComputeSync(inputs, outputs, scope.GetExceptionState());
-      if (scope.GetExceptionState().HadException()) {
-        return MakeGarbageCollected<DOMException>(
-            scope.GetExceptionState().CodeAs<DOMExceptionCode>(),
-            scope.GetExceptionState().Message());
-      } else {
-        return nullptr;
-      }
-    }
-    default:
-      NOTREACHED();
-  }
-}
-
 namespace {
 
 // Helper class to create the FakeMLGraphBackend that is intended to test
@@ -2562,6 +2475,58 @@ TEST_P(FakeMLGraphTest, BuildTest) {
     EXPECT_EQ(exception->name(),
               DOMException::GetErrorName(DOMExceptionCode::kDataError));
     EXPECT_EQ(exception->message(), "The input name \"a\" is duplicated.");
+  }
+  {
+    // Test building a graph with an elementwise add operator that uses the same
+    // input for both lhs and rhs:
+    //   [a]
+    //   / \
+    //   \ /
+    //   add
+    //    |
+    //   [b]
+    auto* a =
+        BuildInput(builder, "a", {3, 4, 5}, V8MLOperandType::Enum::kFloat32,
+                   scope.GetExceptionState());
+    auto* output = builder->add(a, a, scope.GetExceptionState());
+    ASSERT_NE(output, nullptr);
+    auto [graph, exception] = BuildGraph(scope, builder, {{"b", output}});
+    EXPECT_NE(graph, nullptr);
+    const auto& inputs = graph->GetInputResourcesInfo();
+    EXPECT_EQ(inputs.size(), static_cast<uint32_t>(1));
+    EXPECT_EQ(inputs.at("a").type, a->Type());
+    EXPECT_EQ(inputs.at("a").byte_length, a->ByteLength());
+    const auto& outputs = graph->GetOutputResourcesInfo();
+    EXPECT_EQ(outputs.size(), static_cast<uint32_t>(1));
+    EXPECT_EQ(outputs.at("b").type, output->Type());
+    EXPECT_EQ(outputs.at("b").byte_length, output->ByteLength());
+  }
+  {
+    // Test building a graph with two operators sharing a same input:
+    //      [a]
+    //     /   \
+    //  relu   sigmoid
+    //    |      |
+    //   [b]    [c]
+    auto* a =
+        BuildInput(builder, "a", {3, 4, 5}, V8MLOperandType::Enum::kFloat32,
+                   scope.GetExceptionState());
+    auto* b = builder->relu(a, scope.GetExceptionState());
+    ASSERT_NE(b, nullptr);
+    auto* c = builder->sigmoid(a, scope.GetExceptionState());
+    ASSERT_NE(c, nullptr);
+    auto [graph, exception] = BuildGraph(scope, builder, {{"b", b}, {"c", c}});
+    EXPECT_NE(graph, nullptr);
+    const auto& inputs = graph->GetInputResourcesInfo();
+    EXPECT_EQ(inputs.size(), static_cast<uint32_t>(1));
+    EXPECT_EQ(inputs.at("a").type, a->Type());
+    EXPECT_EQ(inputs.at("a").byte_length, a->ByteLength());
+    const auto& outputs = graph->GetOutputResourcesInfo();
+    EXPECT_EQ(outputs.size(), static_cast<uint32_t>(2));
+    EXPECT_EQ(outputs.at("b").type, b->Type());
+    EXPECT_EQ(outputs.at("b").byte_length, b->ByteLength());
+    EXPECT_EQ(outputs.at("c").type, b->Type());
+    EXPECT_EQ(outputs.at("c").byte_length, b->ByteLength());
   }
   {
     // Test building a fake graph with two inputs, one gemm operation and one

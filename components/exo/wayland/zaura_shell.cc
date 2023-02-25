@@ -297,6 +297,12 @@ void aura_surface_hide_tooltip(wl_client* client, wl_resource* resource) {
   GetUserDataAs<AuraSurface>(resource)->HideTooltip();
 }
 
+void aura_surface_set_accessibility_id(wl_client* client,
+                                       wl_resource* resource,
+                                       int32_t id) {
+  GetUserDataAs<AuraSurface>(resource)->SetAccessibilityId(id);
+}
+
 const struct zaura_surface_interface aura_surface_implementation = {
     aura_surface_set_frame,
     aura_surface_set_parent,
@@ -328,6 +334,7 @@ const struct zaura_surface_interface aura_surface_implementation = {
     aura_surface_release,
     aura_surface_show_tooltip,
     aura_surface_hide_tooltip,
+    aura_surface_set_accessibility_id,
 };
 
 }  // namespace
@@ -709,6 +716,10 @@ void AuraSurface::HideTooltip() {
   ash::Shell::Get()->tooltip_controller()->UpdateTooltip(window);
 }
 
+void AuraSurface::SetAccessibilityId(int id) {
+  surface_->SetClientAccessibilityId(id);
+}
+
 chromeos::OrientationType OrientationLock(uint32_t orientation_lock) {
   switch (orientation_lock) {
     case ZAURA_TOPLEVEL_ORIENTATION_LOCK_NONE:
@@ -736,7 +747,8 @@ using AuraSurfaceConfigureCallback =
     base::RepeatingCallback<void(const gfx::Rect& bounds,
                                  chromeos::WindowStateType state_type,
                                  bool resizing,
-                                 bool activated)>;
+                                 bool activated,
+                                 float raster_scale)>;
 
 uint32_t HandleAuraSurfaceConfigureCallback(
     wl_resource* resource,
@@ -746,10 +758,11 @@ uint32_t HandleAuraSurfaceConfigureCallback(
     chromeos::WindowStateType state_type,
     bool resizing,
     bool activated,
-    const gfx::Vector2d& origin_offset) {
+    const gfx::Vector2d& origin_offset,
+    float raster_scale) {
   uint32_t serial =
       serial_tracker->GetNextSerial(SerialTracker::EventType::OTHER_EVENT);
-  callback.Run(bounds, state_type, resizing, activated);
+  callback.Run(bounds, state_type, resizing, activated, raster_scale);
   xdg_surface_send_configure(resource, serial);
   wl_client_flush(wl_resource_get_client(resource));
   return serial;
@@ -898,7 +911,8 @@ void AddState(wl_array* states, T state) {
 void AuraToplevel::OnConfigure(const gfx::Rect& bounds,
                                chromeos::WindowStateType state_type,
                                bool resizing,
-                               bool activated) {
+                               bool activated,
+                               float raster_scale) {
   wl_array states;
   wl_array_init(&states);
   if (state_type == chromeos::WindowStateType::kMaximized)
@@ -930,6 +944,12 @@ void AuraToplevel::OnConfigure(const gfx::Rect& bounds,
   zaura_toplevel_send_configure(aura_toplevel_resource_, bounds.x(), bounds.y(),
                                 bounds.width(), bounds.height(), &states);
   wl_array_release(&states);
+
+  if (wl_resource_get_version(aura_toplevel_resource_) >=
+      ZAURA_TOPLEVEL_CONFIGURE_RASTER_SCALE_SINCE_VERSION) {
+    uint32_t value = *reinterpret_cast<uint32_t*>(&raster_scale);
+    zaura_toplevel_send_configure_raster_scale(aura_toplevel_resource_, value);
+  }
 }
 
 AuraPopup::AuraPopup(ShellSurfaceBase* shell_surface)
@@ -1100,6 +1120,7 @@ const uint32_t kFixedBugIds[] = {
     1400226,
     1402158,
     1405471,
+    1410676,
 };
 
 // Implements aura shell interface and monitors workspace state needed

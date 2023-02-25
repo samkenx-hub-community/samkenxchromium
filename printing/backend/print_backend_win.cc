@@ -106,24 +106,32 @@ void GetDeviceCapabilityArray(const wchar_t* printer,
   result->swap(tmp);
 }
 
+gfx::Size GetDefaultDpi(HDC hdc) {
+  int dpi_x = GetDeviceCaps(hdc, LOGPIXELSX);
+  int dpi_y = GetDeviceCaps(hdc, LOGPIXELSY);
+  return gfx::Size(dpi_x, dpi_y);
+}
+
 gfx::Rect LoadPaperPrintableAreaUm(const wchar_t* printer, DEVMODE* devmode) {
   base::win::ScopedCreateDC hdc(
       CreateDC(L"WINSPOOL", printer, nullptr, devmode));
 
-  int dpi_x = GetDeviceCaps(hdc.get(), LOGPIXELSX);
-  int dpi_y = GetDeviceCaps(hdc.get(), LOGPIXELSY);
+  gfx::Size default_dpi = GetDefaultDpi(hdc.get());
 
   gfx::Rect printable_area_device_units =
       GetPrintableAreaDeviceUnits(hdc.get());
 
   // Device units can be non-square, so scale for non-square DPIs and convert to
   // microns.
-  gfx::Rect printable_area_um = gfx::Rect(
-      ConvertUnit(printable_area_device_units.x(), dpi_x, kMicronsPerInch),
-      ConvertUnit(printable_area_device_units.y(), dpi_y, kMicronsPerInch),
-      ConvertUnit(printable_area_device_units.width(), dpi_x, kMicronsPerInch),
-      ConvertUnit(printable_area_device_units.height(), dpi_y,
-                  kMicronsPerInch));
+  gfx::Rect printable_area_um =
+      gfx::Rect(ConvertUnit(printable_area_device_units.x(),
+                            default_dpi.width(), kMicronsPerInch),
+                ConvertUnit(printable_area_device_units.y(),
+                            default_dpi.height(), kMicronsPerInch),
+                ConvertUnit(printable_area_device_units.width(),
+                            default_dpi.width(), kMicronsPerInch),
+                ConvertUnit(printable_area_device_units.height(),
+                            default_dpi.height(), kMicronsPerInch));
 
   return printable_area_um;
 }
@@ -164,6 +172,12 @@ void LoadPaper(const wchar_t* printer,
   for (size_t i = 0; i < sizes.size(); ++i) {
     PrinterSemanticCapsAndDefaults::Paper paper;
     paper.size_um.SetSize(sizes[i].x * kToUm, sizes[i].y * kToUm);
+
+    // Skip papers with empty paper sizes.
+    if (paper.size_um.IsEmpty()) {
+      continue;
+    }
+
     if (!names.empty()) {
       const wchar_t* name_start = names[i].chars;
       std::wstring tmp_name(name_start, kMaxPaperName);
@@ -200,10 +214,10 @@ void LoadPaper(const wchar_t* printer,
 
   // Copy paper with the same ID as default paper.
   if (devmode->dmFields & DM_PAPERSIZE) {
-    for (size_t i = 0; i < ids.size(); ++i) {
-      if (ids[i] == devmode->dmPaperSize) {
-        DCHECK_EQ(ids.size(), caps->papers.size());
-        caps->default_paper = caps->papers[i];
+    std::string default_vendor_id = base::NumberToString(devmode->dmPaperSize);
+    for (const PrinterSemanticCapsAndDefaults::Paper& paper : caps->papers) {
+      if (paper.vendor_id == default_vendor_id) {
+        caps->default_paper = paper;
         break;
       }
     }
@@ -218,8 +232,10 @@ void LoadPaper(const wchar_t* printer,
   if (!default_size.IsEmpty()) {
     // Reset default paper if `dmPaperWidth` or `dmPaperLength` does not
     // match default paper set by.
-    if (default_size != caps->default_paper.size_um)
+    if (default_size != caps->default_paper.size_um) {
       caps->default_paper = PrinterSemanticCapsAndDefaults::Paper();
+      caps->default_paper.printable_area_um = gfx::Rect(default_size);
+    }
     caps->default_paper.size_um = default_size;
   }
 }
@@ -234,14 +250,22 @@ void LoadDpi(const wchar_t* printer,
   for (size_t i = 0; i < dpis.size(); ++i)
     caps->dpis.push_back(gfx::Size(dpis[i].x, dpis[i].y));
 
-  if (!devmode)
-    return;
-
-  if ((devmode->dmFields & DM_PRINTQUALITY) && devmode->dmPrintQuality > 0) {
+  if (devmode && (devmode->dmFields & DM_PRINTQUALITY) &&
+      devmode->dmPrintQuality > 0) {
     caps->default_dpi.SetSize(devmode->dmPrintQuality, devmode->dmPrintQuality);
     if (devmode->dmFields & DM_YRESOLUTION) {
       caps->default_dpi.set_height(devmode->dmYResolution);
     }
+  }
+
+  // If there's no DPI in the list, add the default DPI to the list.
+  if (dpis.empty()) {
+    if (caps->default_dpi.IsEmpty()) {
+      base::win::ScopedCreateDC hdc(
+          CreateDC(L"WINSPOOL", printer, nullptr, devmode));
+      caps->default_dpi = GetDefaultDpi(hdc.get());
+    }
+    caps->dpis.push_back(caps->default_dpi);
   }
 }
 

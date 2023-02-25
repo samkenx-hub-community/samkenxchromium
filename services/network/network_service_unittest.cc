@@ -615,8 +615,6 @@ TEST_F(NetworkServiceTest, DnsOverHttpsEnableDisable) {
       /*insecure_dns_client_enabled=*/false, net::SecureDnsMode::kAutomatic,
       kConfig1,
       /*additional_dns_types_enabled=*/true);
-  EXPECT_TRUE(
-      service()->host_resolver_manager()->GetDnsConfigAsValue().is_dict());
   EXPECT_EQ(kConfig1, dns_client_ptr->GetEffectiveConfig()->doh_config);
 
   // Enable DNS over HTTPS for two servers.
@@ -625,8 +623,6 @@ TEST_F(NetworkServiceTest, DnsOverHttpsEnableDisable) {
       /*insecure_dns_client_enabled=*/true, net::SecureDnsMode::kSecure,
       kConfig2,
       /*additional_dns_types_enabled=*/true);
-  EXPECT_TRUE(
-      service()->host_resolver_manager()->GetDnsConfigAsValue().is_dict());
   EXPECT_EQ(kConfig2, dns_client_ptr->GetEffectiveConfig()->doh_config);
 }
 
@@ -736,11 +732,11 @@ TEST_F(NetworkServiceTest, DohProbe_MultipleContexts) {
   EXPECT_TRUE(dns_client_ptr->factory()->doh_probes_running());
 
   network_context2.reset();
-  task_environment()->FastForwardUntilNoTasksRemain();
+  task_environment()->RunUntilIdle();
   EXPECT_TRUE(dns_client_ptr->factory()->doh_probes_running());
 
   network_context1.reset();
-  task_environment()->FastForwardUntilNoTasksRemain();
+  task_environment()->RunUntilIdle();
   EXPECT_FALSE(dns_client_ptr->factory()->doh_probes_running());
 }
 
@@ -814,7 +810,7 @@ TEST_F(NetworkServiceTest, DohProbe_ContextRemovedBeforeTimeout) {
   EXPECT_FALSE(dns_client_ptr->factory()->doh_probes_running());
 
   network_context.reset();
-  task_environment()->FastForwardUntilNoTasksRemain();
+  task_environment()->RunUntilIdle();
   EXPECT_FALSE(dns_client_ptr->factory()->doh_probes_running());
 
   task_environment()->FastForwardBy(NetworkService::kInitialDohProbeTimeout);
@@ -844,7 +840,7 @@ TEST_F(NetworkServiceTest, DohProbe_ContextRemovedAfterTimeout) {
   EXPECT_TRUE(dns_client_ptr->factory()->doh_probes_running());
 
   network_context.reset();
-  task_environment()->FastForwardUntilNoTasksRemain();
+  task_environment()->RunUntilIdle();
   EXPECT_FALSE(dns_client_ptr->factory()->doh_probes_running());
 }
 

@@ -19,6 +19,7 @@
 #include "chromeos/ash/services/cros_healthd/public/mojom/cros_healthd_probe.mojom.h"
 #include "chromeos/dbus/power/power_manager_client.h"
 #include "mojo/public/cpp/bindings/remote.h"
+#include "ui/gfx/image/image_skia.h"
 
 namespace app_list {
 
@@ -38,11 +39,11 @@ class SystemInfoCardProvider : public SearchProvider,
 
   SystemInfoCardProvider(const SystemInfoCardProvider&) = delete;
   SystemInfoCardProvider& operator=(const SystemInfoCardProvider&) = delete;
-  ash::AppListSearchResultType ResultType() const override;
 
   // SearchProvider:
   void Start(const std::u16string& query) override;
   void StopQuery() override;
+  ash::AppListSearchResultType ResultType() const override;
 
   // SizeCalculator::Observer:
   void OnSizeCalculated(
@@ -98,7 +99,11 @@ class SystemInfoCardProvider : public SearchProvider,
   std::bitset<::ash::settings::SizeCalculator::kCalculationTypeCount>
       calculation_state_;
 
+  // Last query. It is reset when view is closed.
+  std::u16string last_query_;
+
   Profile* const profile_;
+  double relevance_;
   mojo::Remote<ash::cros_healthd::mojom::CrosHealthdProbeService>
       probe_service_;
   std::string chromeOS_version_{""};
@@ -106,6 +111,9 @@ class SystemInfoCardProvider : public SearchProvider,
   ash::cros_healthd::mojom::MemoryInfo* memory_info_{nullptr};
   std::unique_ptr<CpuData> cpu_usage_{nullptr};
   std::unique_ptr<BatteryHealth> battery_health_{nullptr};
+  gfx::ImageSkia os_settings_icon_;
+  gfx::ImageSkia diagnostics_icon_;
+
   base::WeakPtrFactory<SystemInfoCardProvider> weak_factory_{this};
 };
 }  // namespace app_list

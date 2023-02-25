@@ -68,6 +68,10 @@ TestingProfileManager::TestingProfileManager(
 TestingProfileManager::~TestingProfileManager() {
   ProfileDestroyer::DestroyPendingProfilesForShutdown();
 
+  // Drop unowned references before destroying the object that owns them.
+  profile_manager_ = nullptr;
+  local_state_ = nullptr;
+
   // Destroying this class also destroys the LocalState, so make sure the
   // associated ProfileManager is also destroyed.
   browser_process_->SetProfileManager(nullptr);
@@ -141,7 +145,7 @@ TestingProfile* TestingProfileManager::CreateTestingProfile(
   entry->SetAvatarIconIndex(avatar_id);
 #if BUILDFLAG(ENABLE_SUPERVISED_USERS)
   entry->SetSupervisedUserId(is_supervised_profile
-                                 ? ::supervised_users::kChildAccountSUID
+                                 ? ::supervised_user::kChildAccountSUID
                                  : std::string());
 #endif
   entry->SetLocalProfileName(user_name, entry->IsUsingDefaultName());

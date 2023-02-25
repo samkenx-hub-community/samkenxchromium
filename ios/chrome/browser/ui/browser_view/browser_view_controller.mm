@@ -15,61 +15,43 @@
 #import "base/metrics/user_metrics_action.h"
 #import "base/strings/sys_string_conversions.h"
 #import "base/task/sequenced_task_runner.h"
-#import "components/bookmarks/browser/bookmark_model.h"
-#import "components/feature_engagement/public/event_constants.h"
-#import "components/feature_engagement/public/tracker.h"
 #import "components/reading_list/core/reading_list_model.h"
 #import "components/strings/grit/components_strings.h"
 #import "components/ukm/ios/ukm_url_recorder.h"
 #import "ios/chrome/app/application_delegate/app_state.h"
-#import "ios/chrome/browser/application_context/application_context.h"
-#import "ios/chrome/browser/bookmarks/bookmark_model_factory.h"
 #import "ios/chrome/browser/browser_state/chrome_browser_state.h"
 #import "ios/chrome/browser/crash_report/crash_keys_helper.h"
 #import "ios/chrome/browser/discover_feed/feed_constants.h"
 #import "ios/chrome/browser/feature_engagement/tracker_util.h"
-#import "ios/chrome/browser/infobars/infobar_manager_impl.h"
 #import "ios/chrome/browser/main/browser.h"
 #import "ios/chrome/browser/metrics/new_tab_page_uma.h"
 #import "ios/chrome/browser/metrics/tab_usage_recorder_browser_agent.h"
 #import "ios/chrome/browser/ntp/new_tab_page_tab_helper.h"
 #import "ios/chrome/browser/overscroll_actions/overscroll_actions_tab_helper.h"
-#import "ios/chrome/browser/passwords/password_controller.h"
-#import "ios/chrome/browser/prerender/preload_controller_delegate.h"
 #import "ios/chrome/browser/prerender/prerender_service.h"
-#import "ios/chrome/browser/prerender/prerender_service_factory.h"
-#import "ios/chrome/browser/reading_list/offline_page_tab_helper.h"
 #import "ios/chrome/browser/reading_list/reading_list_model_factory.h"
 #import "ios/chrome/browser/sessions/session_restoration_browser_agent.h"
-#import "ios/chrome/browser/signin/authentication_service.h"
-#import "ios/chrome/browser/signin/authentication_service_factory.h"
 #import "ios/chrome/browser/snapshots/snapshot_tab_helper.h"
-#import "ios/chrome/browser/tabs/tab_title_util.h"
 #import "ios/chrome/browser/ui/authentication/re_signin_infobar_delegate.h"
 #import "ios/chrome/browser/ui/bookmarks/bookmarks_coordinator.h"
 #import "ios/chrome/browser/ui/browser_container/browser_container_view_controller.h"
 #import "ios/chrome/browser/ui/bubble/bubble_presenter.h"
-#import "ios/chrome/browser/ui/bubble/bubble_presenter_delegate.h"
 #import "ios/chrome/browser/ui/commands/application_commands.h"
 #import "ios/chrome/browser/ui/commands/browser_coordinator_commands.h"
-#import "ios/chrome/browser/ui/commands/command_dispatcher.h"
 #import "ios/chrome/browser/ui/commands/find_in_page_commands.h"
 #import "ios/chrome/browser/ui/commands/help_commands.h"
 #import "ios/chrome/browser/ui/commands/reading_list_add_command.h"
 #import "ios/chrome/browser/ui/commands/snackbar_commands.h"
 #import "ios/chrome/browser/ui/commands/text_zoom_commands.h"
-#import "ios/chrome/browser/ui/content_suggestions/content_suggestions_feature.h"
 #import "ios/chrome/browser/ui/content_suggestions/ntp_home_constant.h"
 #import "ios/chrome/browser/ui/default_promo/default_browser_promo_non_modal_scheduler.h"
 #import "ios/chrome/browser/ui/default_promo/default_promo_non_modal_presentation_delegate.h"
-#import "ios/chrome/browser/ui/download/download_manager_coordinator.h"
 #import "ios/chrome/browser/ui/first_run/first_run_util.h"
 #import "ios/chrome/browser/ui/fullscreen/fullscreen_animator.h"
 #import "ios/chrome/browser/ui/fullscreen/fullscreen_ui_element.h"
 #import "ios/chrome/browser/ui/fullscreen/fullscreen_ui_updater.h"
 #import "ios/chrome/browser/ui/fullscreen/scoped_fullscreen_disabler.h"
 #import "ios/chrome/browser/ui/gestures/view_revealing_vertical_pan_handler.h"
-#import "ios/chrome/browser/ui/incognito_reauth/incognito_reauth_commands.h"
 #import "ios/chrome/browser/ui/incognito_reauth/incognito_reauth_scene_agent.h"
 #import "ios/chrome/browser/ui/incognito_reauth/incognito_reauth_view.h"
 #import "ios/chrome/browser/ui/lens/lens_coordinator.h"
@@ -85,7 +67,6 @@
 #import "ios/chrome/browser/ui/popup_menu/popup_menu_coordinator.h"
 #import "ios/chrome/browser/ui/side_swipe/side_swipe_controller.h"
 #import "ios/chrome/browser/ui/side_swipe/swipe_view.h"
-#import "ios/chrome/browser/ui/start_surface/start_surface_features.h"
 #import "ios/chrome/browser/ui/tab_switcher/tab_strip/tab_strip_coordinator.h"
 #import "ios/chrome/browser/ui/tabs/background_tab_animation_view.h"
 #import "ios/chrome/browser/ui/tabs/foreground_tab_animation_view.h"
@@ -101,7 +82,6 @@
 #import "ios/chrome/browser/ui/toolbar/fullscreen/toolbar_ui_broadcasting_util.h"
 #import "ios/chrome/browser/ui/toolbar/primary_toolbar_coordinator.h"
 #import "ios/chrome/browser/ui/toolbar/public/toolbar_constants.h"
-#import "ios/chrome/browser/ui/toolbar/public/toolbar_coordinating.h"
 #import "ios/chrome/browser/ui/toolbar/public/toolbar_utils.h"
 #import "ios/chrome/browser/ui/toolbar/secondary_toolbar_coordinator.h"
 #import "ios/chrome/browser/ui/toolbar_container/toolbar_container_coordinator.h"
@@ -111,7 +91,6 @@
 #import "ios/chrome/browser/ui/util/named_guide_util.h"
 #import "ios/chrome/browser/ui/util/uikit_ui_util.h"
 #import "ios/chrome/browser/ui/util/url_with_title.h"
-#import "ios/chrome/browser/upgrade/upgrade_center.h"
 #import "ios/chrome/browser/url/chrome_url_constants.h"
 #import "ios/chrome/browser/url_loading/new_tab_animation_tab_helper.h"
 #import "ios/chrome/browser/url_loading/url_loading_browser_agent.h"
@@ -120,11 +99,8 @@
 #import "ios/chrome/browser/url_loading/url_loading_params.h"
 #import "ios/chrome/browser/voice/voice_search_navigations_tab_helper.h"
 #import "ios/chrome/browser/web/page_placeholder_tab_helper.h"
-#import "ios/chrome/browser/web/sad_tab_tab_helper.h"
 #import "ios/chrome/browser/web/web_navigation_browser_agent.h"
 #import "ios/chrome/browser/web/web_navigation_util.h"
-#import "ios/chrome/browser/web_state_list/all_web_state_observation_forwarder.h"
-#import "ios/chrome/browser/web_state_list/tab_insertion_browser_agent.h"
 #import "ios/chrome/browser/web_state_list/web_state_list.h"
 #import "ios/chrome/browser/web_state_list/web_state_list_observer_bridge.h"
 #import "ios/chrome/browser/web_state_list/web_usage_enabler/web_usage_enabler_browser_agent.h"
@@ -134,7 +110,7 @@
 #import "ios/chrome/common/ui/util/constraints_ui_util.h"
 #import "ios/chrome/common/ui/util/ui_util.h"
 #import "ios/chrome/grit/ios_strings.h"
-#import "ios/components/webui/web_ui_url_constants.h"
+#import "ios/public/provider/chrome/browser/find_in_page/find_in_page_api.h"
 #import "ios/public/provider/chrome/browser/fullscreen/fullscreen_api.h"
 #import "ios/public/provider/chrome/browser/voice_search/voice_search_api.h"
 #import "ios/public/provider/chrome/browser/voice_search/voice_search_controller.h"
@@ -278,8 +254,8 @@ NSString* const kBrowserViewControllerSnackbarCategory =
   BOOL _isShutdown;
 
   // Whether or not Incognito* is enabled.
-  // TODO(crbug.com/1329092): Set this in the init.
   BOOL _isOffTheRecord;
+
   // Whether the current content is incognito and requires biometric
   // authentication from the user before it can be accessed.
   BOOL _itemsRequireAuthentication;
@@ -390,6 +366,9 @@ NSString* const kBrowserViewControllerSnackbarCategory =
 // Command handler for load query commands
 @property(nonatomic, weak) id<LoadQueryCommands> loadQueryCommandsHandler;
 
+// Command handler for omnibox commands
+@property(nonatomic, weak) id<OmniboxCommands> omniboxCommandsHandler;
+
 // Command handler for text zoom commands
 @property(nonatomic, weak) id<TextZoomCommands> textZoomHandler;
 
@@ -478,7 +457,6 @@ NSString* const kBrowserViewControllerSnackbarCategory =
 - (instancetype)initWithBrowser:(Browser*)browser
     browserContainerViewController:
         (BrowserContainerViewController*)browserContainerViewController
-                        dispatcher:(CommandDispatcher*)dispatcher
                keyCommandsProvider:(KeyCommandsProvider*)keyCommandsProvider
                       dependencies:
                           (BrowserViewControllerDependencies)dependencies {
@@ -488,7 +466,6 @@ NSString* const kBrowserViewControllerSnackbarCategory =
 
     self.browser = browser;
     _browserContainerViewController = browserContainerViewController;
-    _commandDispatcher = dispatcher;
     _keyCommandsProvider = keyCommandsProvider;
     // TODO(crbug.com/1328039): Remove all use of the prerender service from BVC
     _prerenderService = dependencies.prerenderService;
@@ -514,14 +491,14 @@ NSString* const kBrowserViewControllerSnackbarCategory =
     self.findInPageCommandsHandler = dependencies.findInPageCommandsHandler;
     self.toolbarCommandsHandler = dependencies.toolbarCommandsHandler;
     self.loadQueryCommandsHandler = dependencies.loadQueryCommandsHandler;
+    self.omniboxCommandsHandler = dependencies.omniboxCommandsHandler;
+    _isOffTheRecord = dependencies.isOffTheRecord;
 
     dependencies.lensCoordinator.delegate = self;
 
     _inNewTabAnimation = NO;
     self.fullscreenController = dependencies.fullscreenController;
     _footerFullscreenProgress = 1.0;
-
-    _isOffTheRecord = browser->GetBrowserState()->IsOffTheRecord();
 
     _webStateListObserver = std::make_unique<WebStateListObserverBridge>(self);
     browser->GetWebStateList()->AddObserver(_webStateListObserver.get());
@@ -789,7 +766,7 @@ NSString* const kBrowserViewControllerSnackbarCategory =
                      focusOmnibox:(BOOL)focusOmnibox
                     inheritOpener:(BOOL)inheritOpener {
   const base::TimeTicks startTime = base::TimeTicks::Now();
-  BOOL offTheRecord = _isOffTheRecord;
+  const BOOL offTheRecord = _isOffTheRecord;
   ProceduralBlock oldForegroundTabWasAddedCompletionBlock =
       self.foregroundTabWasAddedCompletionBlock;
   id<OmniboxCommands> omniboxCommandHandler = self.omniboxHandler;
@@ -829,7 +806,7 @@ NSString* const kBrowserViewControllerSnackbarCategory =
 
   UrlLoadParams params = UrlLoadParams::InNewTab(GURL(kChromeUINewTabURL));
   params.web_params.transition_type = ui::PAGE_TRANSITION_TYPED;
-  params.in_incognito = _isOffTheRecord;
+  params.in_incognito = offTheRecord;
   params.inherit_opener = inheritOpener;
   UrlLoadingBrowserAgent::FromBrowser(self.browser)->Load(params);
 }
@@ -1010,7 +987,6 @@ NSString* const kBrowserViewControllerSnackbarCategory =
 
   _bubblePresenter = nil;
 
-  [self.commandDispatcher stopDispatchingToTarget:self];
   self.browser->GetWebStateList()->RemoveObserver(_webStateListObserver.get());
   self.browser = nullptr;
 
@@ -1281,7 +1257,9 @@ NSString* const kBrowserViewControllerSnackbarCategory =
   // updateToobar];
   if (ShouldShowCompactToolbar(previousTraitCollection) !=
       ShouldShowCompactToolbar(self)) {
-    [self.findInPageCommandsHandler hideFindUI];
+    if (!ios::provider::IsNativeFindInPageWithSystemFindPanel()) {
+      [self.findInPageCommandsHandler hideFindUI];
+    }
     [self.textZoomHandler hideTextZoomUI];
   }
 
@@ -1756,9 +1734,7 @@ NSString* const kBrowserViewControllerSnackbarCategory =
 
   [_sideSwipeController addHorizontalGesturesToView:self.view];
 
-  // TODO(crbug.com/1329089): Inject this handler.
-  self.omniboxHandler =
-      HandlerForProtocol(self.browser->GetCommandDispatcher(), OmniboxCommands);
+  self.omniboxHandler = self.omniboxCommandsHandler;
 }
 
 // Sets up the frame for the fake status bar. View must be loaded.
@@ -1947,8 +1923,11 @@ NSString* const kBrowserViewControllerSnackbarCategory =
     NewTabPageTabHelper* NTPHelper =
         NewTabPageTabHelper::FromWebState(webState);
     if (NTPHelper && NTPHelper->IsActive()) {
-      NewTabPageCoordinator* coordinator = self.ntpCoordinator;
-      UIViewController* viewController = coordinator.viewController;
+      NewTabPageCoordinator* NTPCoordinator = self.ntpCoordinator;
+      // TODO(crbug.com/1411808): The NTP should be started by the mediator or
+      // coordinator layer.
+      [NTPCoordinator start];
+      UIViewController* viewController = NTPCoordinator.viewController;
       viewController.view.frame = [self ntpFrameForWebState:webState];
       [viewController.view layoutIfNeeded];
       // TODO(crbug.com/873729): For a newly created WebState, the session will
@@ -1957,7 +1936,7 @@ NSString* const kBrowserViewControllerSnackbarCategory =
       self.browserContainerViewController.contentView = nil;
       self.browserContainerViewController.contentViewController =
           viewController;
-      [coordinator constrainDiscoverHeaderMenuButtonNamedGuide];
+      [NTPCoordinator constrainDiscoverHeaderMenuButtonNamedGuide];
     } else {
       self.browserContainerViewController.contentView =
           [self viewForWebState:webState];
@@ -2644,19 +2623,6 @@ NSString* const kBrowserViewControllerSnackbarCategory =
   }
 }
 
-- (void)tabDidLoadURL:(GURL)URL
-       transitionType:(ui::PageTransition)transitionType {
-  // Deactivate the NTP immediately on a load to hide the NTP quickly, but
-  // after calling UrlLoadingService::Load.  Otherwise, if the
-  // webState has never been visible (such as during startup with an NTP), it's
-  // possible the webView can trigger a unnecessary load for chrome://newtab.
-  if (self.currentWebState->GetVisibleURL() != kChromeUINewTabURL) {
-    if (self.isNTPActiveForCurrentWebState) {
-      NewTabPageTabHelper::FromWebState(self.currentWebState)->Deactivate();
-    }
-  }
-}
-
 - (void)newTabWillLoadURL:(GURL)URL isUserInitiated:(BOOL)isUserInitiated {
   if (isUserInitiated) {
     // Send either the "New Tab Opened" or "New Incognito Tab" opened to the
@@ -3139,11 +3105,6 @@ NSString* const kBrowserViewControllerSnackbarCategory =
   }
 
   if (oldWebState) {
-    // TODO(crbug.com/1272514): Move webstate lifecycle updates to a browser
-    // agent.
-    oldWebState->WasHidden();
-    oldWebState->SetKeepRenderProcessAlive(false);
-
     [self dismissPopups];
   }
   // NOTE: webStateSelected expects to always be called with a
@@ -3151,23 +3112,7 @@ NSString* const kBrowserViewControllerSnackbarCategory =
   if (!newWebState)
     return;
 
-  // TODO(crbug.com/1272514): Move webstate lifecycle updates to a browser
-  // agent.
-  self.currentWebState->GetWebViewProxy().scrollViewProxy.clipsToBounds = NO;
-
   [self webStateSelected:newWebState notifyToolbar:YES];
-}
-
-// A WebState has been removed, remove its views from display if necessary.
-- (void)webStateList:(WebStateList*)webStateList
-    didDetachWebState:(web::WebState*)webState
-              atIndex:(int)atIndex {
-  // TODO(crbug.com/1272514): Move webstate lifecycle updates to a browser
-  // agent.
-  if (webState->IsRealized()) {
-    webState->WasHidden();
-    webState->SetKeepRenderProcessAlive(false);
-  }
 }
 
 - (void)webStateList:(WebStateList*)webStateList

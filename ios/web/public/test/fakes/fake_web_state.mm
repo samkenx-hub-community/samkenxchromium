@@ -151,11 +151,11 @@ NavigationManager* FakeWebState::GetNavigationManager() {
   return navigation_manager_.get();
 }
 
-const WebFramesManager* FakeWebState::GetWebFramesManager() const {
+const WebFramesManager* FakeWebState::GetPageWorldWebFramesManager() const {
   return web_frames_manager_.get();
 }
 
-WebFramesManager* FakeWebState::GetWebFramesManager() {
+WebFramesManager* FakeWebState::GetPageWorldWebFramesManager() {
   return web_frames_manager_.get();
 }
 
@@ -572,6 +572,10 @@ void FakeWebState::SetFindInteractionEnabled(bool enabled) {
 id<CRWFindInteraction> FakeWebState::GetFindInteraction()
     API_AVAILABLE(ios(16)) {
   return is_find_interaction_enabled_ ? find_interaction_ : nil;
+}
+
+id FakeWebState::GetActivityItem() API_AVAILABLE(ios(16.4)) {
+  return nil;
 }
 
 FakeWebStateWithPolicyCache::FakeWebStateWithPolicyCache(

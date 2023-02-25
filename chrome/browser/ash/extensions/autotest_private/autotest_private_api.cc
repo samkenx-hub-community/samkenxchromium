@@ -4395,7 +4395,7 @@ AutotestPrivateWaitForDisplayRotationFunction::Run() {
 
   auto result = CheckScreenRotationAnimation();
   if (result)
-    return RespondNow(std::move(result));
+    return RespondNow(std::move(*result));
   return RespondLater();
 }
 
@@ -4427,10 +4427,10 @@ void AutotestPrivateWaitForDisplayRotationFunction::
   auto result = CheckScreenRotationAnimation();
   // Wait for the rotation if unlocking causes rotation.
   if (result)
-    Respond(std::move(result));
+    Respond(std::move(*result));
 }
 
-ExtensionFunction::ResponseValue
+absl::optional<ExtensionFunction::ResponseValue>
 AutotestPrivateWaitForDisplayRotationFunction::CheckScreenRotationAnimation() {
   auto* root_window = ash::Shell::GetRootWindowForDisplayId(display_id_);
   if (!root_window) {
@@ -4451,7 +4451,7 @@ AutotestPrivateWaitForDisplayRotationFunction::CheckScreenRotationAnimation() {
   self_ = this;
 
   animator->AddObserver(this);
-  return nullptr;
+  return absl::nullopt;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -6436,6 +6436,7 @@ void AutotestPrivateStopFrameCountingFunction::OnDataReceived(
     result_per_sink_data.sink_type =
         CompositorFrameSinkTypeToString(per_sink_data->type);
     result_per_sink_data.is_root = per_sink_data->is_root;
+    result_per_sink_data.debug_label = per_sink_data->debug_label;
 
     if (per_sink_data->start_bucket != 0) {
       result_per_sink_data.presented_frames.resize(per_sink_data->start_bucket,

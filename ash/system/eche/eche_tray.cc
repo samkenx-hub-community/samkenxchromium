@@ -460,6 +460,7 @@ bool EcheTray::LoadBubble(const GURL& url,
 void EcheTray::PurgeAndClose() {
   StopLoadingAnimation();
   SetIconVisibility(false);
+  is_landscape_ = false;
 
   if (!bubble_)
     return;
@@ -601,7 +602,7 @@ gfx::Size EcheTray::CalculateSizeForEche() const {
   gfx::Size size = gfx::ScaleToFlooredSize(kDefaultBubbleSize, height_scale);
 
   // TODO(b/258306301): Verify the correct sizing for Landscape
-  if (stream_orientation_ == eche_app::mojom::StreamOrientation::kLandscape) {
+  if (is_landscape_) {
     size = gfx::Size(size.height(), size.width());
   }
 
@@ -641,7 +642,7 @@ std::unique_ptr<views::View> EcheTray::CreateBubbleHeaderView(
       l10n_util::GetStringFUTF16(ID_ASH_ECHE_APP_STREAMING_BUBBLE_TITLE,
                                  phone_name),
       views::style::CONTEXT_DIALOG_TITLE, views::style::STYLE_PRIMARY,
-      gfx::DirectionalityMode::DIRECTIONALITY_AS_URL));
+      gfx::DirectionalityMode::DIRECTIONALITY_FROM_TEXT));
   ConfigureLabelText(title);
 
   // Add minimize button
@@ -787,13 +788,12 @@ void EcheTray::OnShelfAlignmentChanged(aura::Window* root_window,
   UpdateEcheSizeAndBubbleBounds();
 }
 
-void EcheTray::OnStreamOrientationChanged(
-    eche_app::mojom::StreamOrientation orientation) {
-  if (stream_orientation_ == orientation) {
+void EcheTray::OnStreamOrientationChanged(bool is_landscape) {
+  if (is_landscape_ == is_landscape) {
     return;
   }
 
-  stream_orientation_ = orientation;
+  is_landscape_ = is_landscape;
   UpdateEcheSizeAndBubbleBounds();
 }
 

@@ -23,7 +23,7 @@ class AccountSelectionViewAndroid : public AccountSelectionView {
       const std::string& rp_for_display,
       const std::vector<content::IdentityProviderData>& identity_provider_data,
       Account::SignInMode sign_in_mode,
-      bool show_auto_signin_checkbox) override;
+      bool show_auto_reauthn_checkbox) override;
   void ShowFailureDialog(const std::string& rp_for_display,
                          const std::string& idp_for_display) override;
 
@@ -34,7 +34,6 @@ class AccountSelectionViewAndroid : public AccountSelectionView {
       const base::android::JavaParamRef<jobject>& account_picture_url,
       bool is_sign_in);
   void OnDismiss(JNIEnv* env, jint dismiss_reason);
-  void OnAutoSignInCancelled(JNIEnv* env);
 
  private:
   // Returns either true if the java counterpart of this bridge is initialized

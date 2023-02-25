@@ -162,7 +162,7 @@
   "chrome/browser/resources/chromeos/app_icon/app_icon_resources.grd": {
     "structures": [1395],
   },
-  "chrome/browser/resources/chromeos/login/oobe_conditional_resources.grd": {
+  "<(SHARED_INTERMEDIATE_DIR)/chrome/browser/resources/chromeos/login/oobe_conditional_resources.grd": {
     "META": {"sizes": {"includes": [150], "structures": [300]}},
     "includes": [1400],
     "structures": [1420],
@@ -400,6 +400,10 @@
     "META": {"sizes": {"includes": [5]}},
     "includes": [2240],
   },
+  "<(SHARED_INTERMEDIATE_DIR)/chrome/browser/resources/chromeos/healthd_internals/resources.grd": {
+    "META": {"sizes": {"includes": [5]}},
+    "includes": [2250],
+  },
   "<(SHARED_INTERMEDIATE_DIR)/chrome/browser/resources/chromeos/internet_config_dialog/internet_config_dialog_resources.grd": {
     "META": {"sizes": {"includes": [10],}},
     "includes": [2260],
@@ -429,7 +433,7 @@
     "includes": [2335],
   },
   "<(SHARED_INTERMEDIATE_DIR)/chrome/browser/resources/app_home/resources.grd": {
-    "META": {"sizes": {"includes": [10]}},
+    "META": {"sizes": {"includes": [20]}},
     "includes": [2340],
   },
   "<(SHARED_INTERMEDIATE_DIR)/chrome/browser/resources/gaia_auth_host/resources.grd": {
@@ -626,6 +630,10 @@
     "META": {"sizes": {"includes": [10]}},
     "includes": [3030],
   },
+  "<(SHARED_INTERMEDIATE_DIR)/ash/webui/common/resources/resources.grd": {
+    "META": {"sizes": {"includes": [400]}},
+    "includes": [3035],
+  },
   "ash/webui/help_app_ui/resources/help_app_resources.grd": {
     "includes": [3040],
   },
@@ -710,7 +718,7 @@
     "META": {"join": 2},
     "includes": [3330],
   },
-  "<(SHARED_INTERMEDIATE_DIR)/ash/webui/personalization_app/resources/ash_personalization_app_resources.grd": {
+  "<(SHARED_INTERMEDIATE_DIR)/ash/webui/personalization_app/resources/resources.grd": {
     "META": {"sizes": {"includes": [200],}},
     "includes": [3340],
   },

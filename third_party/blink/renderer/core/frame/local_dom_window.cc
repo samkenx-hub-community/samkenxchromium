@@ -1308,8 +1308,23 @@ void LocalDOMWindow::DispatchMessageEventWithOriginCheck(
                       WebFeature::kCapabilityDelegationOfFullscreenRequest);
     fullscreen_request_token_.Activate();
   }
+  if (RuntimeEnabledFeatures::CapabilityDelegationDisplayCaptureRequestEnabled(
+          this) &&
+      event->delegatedCapability() ==
+          mojom::blink::DelegatedCapability::kDisplayCaptureRequest) {
+    // TODO(crbug.com/1412770): Add use counter.
+    display_capture_request_token_.Activate();
+  }
 
-  DispatchEvent(*event);
+  if (GetFrame() &&
+      GetFrame()->GetPage()->GetPageScheduler()->IsInBackForwardCache()) {
+    // Enqueue the event when the page is in back/forward cache, so that it
+    // would not cause JavaScript execution. The event will be dispatched upon
+    // restore.
+    EnqueueEvent(*event, TaskType::kInternalDefault);
+  } else {
+    DispatchEvent(*event);
+  }
 }
 
 DOMSelection* LocalDOMWindow::getSelection() {
@@ -2415,6 +2430,14 @@ bool LocalDOMWindow::IsFullscreenRequestTokenActive() const {
 
 bool LocalDOMWindow::ConsumeFullscreenRequestToken() {
   return fullscreen_request_token_.ConsumeIfActive();
+}
+
+bool LocalDOMWindow::IsDisplayCaptureRequestTokenActive() const {
+  return display_capture_request_token_.IsActive();
+}
+
+bool LocalDOMWindow::ConsumeDisplayCaptureRequestToken() {
+  return display_capture_request_token_.ConsumeIfActive();
 }
 
 void LocalDOMWindow::SetIsInBackForwardCache(bool is_in_back_forward_cache) {

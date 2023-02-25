@@ -8,7 +8,6 @@
 
 #include "base/check.h"
 #include "chromeos/ui/base/display_util.h"
-#include "chromeos/ui/frame/frame_header.h"
 #include "chromeos/ui/frame/multitask_menu/float_controller_base.h"
 #include "chromeos/ui/frame/multitask_menu/multitask_menu_view.h"
 #include "chromeos/ui/wm/window_util.h"
@@ -22,8 +21,14 @@ namespace chromeos {
 namespace {
 
 constexpr int kMultitaskMenuBubbleCornerRadius = 8;
+// Padding between the edges of the menu and the elements.
 constexpr int kPaddingWide = 12;
+// Padding between the elements.
 constexpr int kPaddingNarrow = 8;
+
+// Dogfood feedback button layout values.
+constexpr int kButtonWidth = 120;
+constexpr int kButtonHeight = 28;
 
 }  // namespace
 
@@ -44,26 +49,13 @@ MultitaskMenu::MultitaskMenu(views::View* anchor,
 
   RegisterWindowClosingCallback(std::move(close_callback));
 
-  // Check the model to see which buttons we should show. Since this menu is
-  // triggered from the maximize button on the frame, it should have a frame
-  // header, and can be maximized and therefore fullscreened. The exception is
-  // in tests, where we show all the buttons.
   uint8_t buttons = MultitaskMenuView::kFullscreen;
-  auto* frame_header = FrameHeader::Get(parent_widget);
-  const CaptionButtonModel* caption_button_model =
-      frame_header ? frame_header->GetCaptionButtonModel() : nullptr;
 
-  if (!caption_button_model ||
-      caption_button_model->IsVisible(
-          views::CAPTION_BUTTON_ICON_LEFT_TOP_SNAPPED)) {
+  if (SnapController::Get()->CanSnap(parent_window())) {
     buttons |= MultitaskMenuView::kHalfSplit;
     buttons |= MultitaskMenuView::kPartialSplit;
   }
 
-  // The frame caption button to float/unfloat is only shown with the ash dev
-  // flag on, or in tablet mode when a window is floated. The multitask menu
-  // float button is shown whenever a window can be floated, so linking with the
-  // model does not work here.
   if (chromeos::wm::CanFloatWindow(parent_window())) {
     buttons |= MultitaskMenuView::kFloat;
   }
@@ -74,8 +66,9 @@ MultitaskMenu::MultitaskMenu(views::View* anchor,
       base::BindRepeating(&MultitaskMenu::HideBubble, base::Unretained(this)),
       buttons));
 
-  multitask_menu_view_->SetLayoutManager(std::make_unique<views::TableLayout>())
-      ->AddPaddingColumn(views::TableLayout::kFixedSize, kPaddingWide)
+  auto* layout = multitask_menu_view_->SetLayoutManager(
+      std::make_unique<views::TableLayout>());
+  layout->AddPaddingColumn(views::TableLayout::kFixedSize, kPaddingWide)
       .AddColumn(views::LayoutAlignment::kCenter,
                  views::LayoutAlignment::kCenter,
                  views::TableLayout::kFixedSize,
@@ -90,7 +83,16 @@ MultitaskMenu::MultitaskMenu(views::View* anchor,
       .AddRows(1, views::TableLayout::kFixedSize, 0)
       .AddPaddingRow(views::TableLayout::kFixedSize, kPaddingNarrow)
       .AddRows(1, views::TableLayout::kFixedSize, 0)
+      .AddPaddingRow(views::TableLayout::kFixedSize, kPaddingWide)
+      .AddRows(1, views::TableLayout::kFixedSize, kButtonHeight)
       .AddPaddingRow(views::TableLayout::kFixedSize, kPaddingWide);
+  layout->SetChildViewIgnoredByLayout(multitask_menu_view_->feedback_button(),
+                                      true);
+  auto pref_size = multitask_menu_view_->GetPreferredSize();
+  multitask_menu_view_->feedback_button()->SetBounds(
+      (pref_size.width() - kButtonWidth) / 2,
+      pref_size.height() - kButtonHeight - kPaddingWide, kButtonWidth,
+      kButtonHeight);
 
   display_observer_.emplace(this);
 }

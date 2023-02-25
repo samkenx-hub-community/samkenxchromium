@@ -6,7 +6,6 @@
 
 #include <utility>
 
-#include "ash/constants/ash_features.h"
 #include "build/build_config.h"
 #include "build/chromeos_buildflags.h"
 #include "build/config/chromebox_for_meetings/buildflags.h"
@@ -141,6 +140,7 @@
 #include "chrome/browser/cart/chrome_cart.mojom.h"
 #include "chrome/browser/new_tab_page/modules/drive/drive.mojom.h"
 #include "chrome/browser/new_tab_page/modules/feed/feed.mojom.h"
+#include "chrome/browser/new_tab_page/modules/history_clusters/history_clusters.mojom.h"
 #include "chrome/browser/new_tab_page/modules/photos/photos.mojom.h"
 #include "chrome/browser/new_tab_page/modules/recipes/recipes.mojom.h"
 #include "chrome/browser/new_tab_page/new_tab_page_util.h"
@@ -182,6 +182,7 @@
 #include "chrome/browser/ui/webui/whats_new/whats_new_ui.h"
 #include "chrome/common/webui_url_constants.h"
 #include "components/commerce/core/mojom/shopping_list.mojom.h"  // nogncheck crbug.com/1125897
+#include "components/image_service/mojom/image_service.mojom.h"
 #include "components/search/ntp_features.h"
 #include "ui/webui/resources/cr_components/color_change_listener/color_change_listener.mojom.h"
 #include "ui/webui/resources/cr_components/customize_themes/customize_themes.mojom.h"
@@ -211,6 +212,7 @@
 #endif  // !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_CHROMEOS_ASH)
 
 #if BUILDFLAG(IS_CHROMEOS_ASH)
+#include "ash/constants/ash_features.h"
 #include "ash/webui/camera_app_ui/camera_app_helper.mojom.h"
 #include "ash/webui/camera_app_ui/camera_app_ui.h"
 #include "ash/webui/color_internals/color_internals_ui.h"
@@ -250,6 +252,7 @@
 #include "ash/webui/scanning/mojom/scanning.mojom.h"
 #include "ash/webui/scanning/scanning_ui.h"
 #include "ash/webui/shimless_rma/shimless_rma.h"
+#include "ash/webui/shortcut_customization_ui/backend/search/search.mojom.h"
 #include "ash/webui/shortcut_customization_ui/mojom/shortcut_customization.mojom.h"
 #include "ash/webui/shortcut_customization_ui/shortcut_customization_app_ui.h"
 #include "ash/webui/system_extensions_internals_ui/mojom/system_extensions_internals_ui.mojom.h"
@@ -264,6 +267,7 @@
 #include "chrome/browser/ui/webui/ash/audio/audio_ui.h"
 #include "chrome/browser/ui/webui/ash/bluetooth_pairing_dialog.h"
 #include "chrome/browser/ui/webui/ash/cloud_upload/cloud_upload.mojom.h"
+#include "chrome/browser/ui/webui/ash/cloud_upload/cloud_upload_dialog.h"
 #include "chrome/browser/ui/webui/ash/cloud_upload/cloud_upload_ui.h"
 #include "chrome/browser/ui/webui/ash/crostini_installer/crostini_installer.mojom.h"
 #include "chrome/browser/ui/webui/ash/crostini_installer/crostini_installer_ui.h"
@@ -289,6 +293,7 @@
 #include "chrome/browser/ui/webui/ash/vm/vm_ui.h"
 #include "chrome/browser/ui/webui/nearby_share/nearby_share.mojom.h"
 #include "chrome/browser/ui/webui/nearby_share/nearby_share_dialog_ui.h"
+#include "chrome/browser/ui/webui/settings/ash/input_device_settings/input_device_settings_provider.mojom.h"
 #include "chrome/browser/ui/webui/settings/ash/os_apps_page/mojom/app_notification_handler.mojom.h"
 #include "chrome/browser/ui/webui/settings/ash/os_settings_ui.h"
 #include "chrome/browser/ui/webui/settings/ash/search/search.mojom.h"
@@ -971,25 +976,18 @@ void PopulateChromeWebUIFrameBinders(
   if (history_clusters_service &&
       history_clusters_service->IsJourneysEnabled()) {
     if (base::FeatureList::IsEnabled(history_clusters::kSidePanelJourneys)) {
-      if (base::FeatureList::IsEnabled(
-              ntp_features::kNtpHistoryClustersModule)) {
-        RegisterWebUIControllerInterfaceBinder<
-            history_clusters::mojom::PageHandler, HistoryUI, NewTabPageUI,
-            HistoryClustersSidePanelUI>(map);
-      } else {
-        RegisterWebUIControllerInterfaceBinder<
-            history_clusters::mojom::PageHandler, HistoryUI,
-            HistoryClustersSidePanelUI>(map);
-      }
+      RegisterWebUIControllerInterfaceBinder<
+          history_clusters::mojom::PageHandler, HistoryUI,
+          HistoryClustersSidePanelUI>(map);
     } else {
-      if (base::FeatureList::IsEnabled(
-              ntp_features::kNtpHistoryClustersModule)) {
-        RegisterWebUIControllerInterfaceBinder<
-            history_clusters::mojom::PageHandler, NewTabPageUI, HistoryUI>(map);
-      } else {
-        RegisterWebUIControllerInterfaceBinder<
-            history_clusters::mojom::PageHandler, HistoryUI>(map);
-      }
+      RegisterWebUIControllerInterfaceBinder<
+          history_clusters::mojom::PageHandler, HistoryUI>(map);
+    }
+
+    if (history_clusters_service->IsJourneysImagesEnabled()) {
+      RegisterWebUIControllerInterfaceBinder<
+          image_service::mojom::ImageServiceHandler, HistoryUI,
+          HistoryClustersSidePanelUI>(map);
     }
   }
 
@@ -1048,6 +1046,11 @@ void PopulateChromeWebUIFrameBinders(
   if (base::FeatureList::IsEnabled(ntp_features::kNtpFeedModule)) {
     RegisterWebUIControllerInterfaceBinder<ntp::feed::mojom::FeedHandler,
                                            NewTabPageUI>(map);
+  }
+
+  if (base::FeatureList::IsEnabled(ntp_features::kNtpHistoryClustersModule)) {
+    RegisterWebUIControllerInterfaceBinder<
+        ntp::history_clusters::mojom::PageHandler, NewTabPageUI>(map);
   }
 
   RegisterWebUIControllerInterfaceBinder<
@@ -1138,6 +1141,10 @@ void PopulateChromeWebUIFrameBinders(
 
   RegisterWebUIControllerInterfaceBinder<
       ash::settings::app_notification::mojom::AppNotificationsHandler,
+      ash::settings::OSSettingsUI>(map);
+
+  RegisterWebUIControllerInterfaceBinder<
+      ash::settings::mojom::InputDeviceSettingsProvider,
       ash::settings::OSSettingsUI>(map);
 
   RegisterWebUIControllerInterfaceBinder<
@@ -1288,6 +1295,12 @@ void PopulateChromeWebUIFrameBinders(
     RegisterWebUIControllerInterfaceBinder<
         ash::shortcut_customization::mojom::AcceleratorConfigurationProvider,
         ash::ShortcutCustomizationAppUI>(map);
+
+    if (ash::features::IsSearchInShortcutsAppEnabled()) {
+      RegisterWebUIControllerInterfaceBinder<
+          ash::shortcut_customization::mojom::SearchHandler,
+          ash::ShortcutCustomizationAppUI>(map);
+    }
   }
 
   RegisterWebUIControllerInterfaceBinder<
@@ -1346,13 +1359,13 @@ void PopulateChromeWebUIFrameBinders(
         ash::ManageMirrorSyncUI>(map);
   }
 
-  if (ash::features::IsUploadOfficeToCloudEnabled()) {
+  if (ash::cloud_upload::IsEligibleAndEnabledUploadOfficeToCloud()) {
     RegisterWebUIControllerInterfaceBinder<
         ash::cloud_upload::mojom::PageHandlerFactory,
         ash::cloud_upload::CloudUploadUI>(map);
   }
 
-  if (ash::features::IsUploadOfficeToCloudEnabled()) {
+  if (ash::cloud_upload::IsEligibleAndEnabledUploadOfficeToCloud()) {
     RegisterWebUIControllerInterfaceBinder<
         ash::office_fallback::mojom::PageHandlerFactory,
         ash::office_fallback::OfficeFallbackUI>(map);

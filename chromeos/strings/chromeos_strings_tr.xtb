@@ -16,6 +16,7 @@
 <translation id="1128128132059598906">EAP-TTLS</translation>
 <translation id="1145018782460575098">Harici cihazlar için donanım yazılımını güncelleme penceresi açık. <ph name="NUM_UPDATES" /> güncelleme var.</translation>
 <translation id="1145516343487477149">Sık sorulan Chromebook sorularıyla ilgili yardım makaleleri ve yanıtlar bulun</translation>
+<translation id="1167755866710282443">Tuşları özelleştirmek için menüyü açın. Taşımak için menüyü sürükleyin.</translation>
 <translation id="1175697296044146566">Bu <ph name="DEVICE_TYPE" />, <ph name="MANAGER" /> tarafından yönetiliyor.</translation>
 <translation id="1175951029573070619">Ortalama (<ph name="SIGNAL_STRENGTH" />)</translation>
 <translation id="1181037720776840403">Kaldır</translation>
@@ -326,6 +327,7 @@
 <translation id="4110686435123617899"><ph name="TITLE" /> <ph name="DESC" /> albümünü seçin</translation>
 <translation id="4111761024568264522">USB dokunmatik alan</translation>
 <translation id="4117637339509843559">Koyu mod</translation>
+<translation id="4130035430755296270">Fareyle üzerine gelmeye devam ederek düzenle ilgili daha fazla seçenek görün</translation>
 <translation id="4131410914670010031">Siyah beyaz</translation>
 <translation id="4145784616224233563">HTTP Güvenlik Duvarı</translation>
 <translation id="4147897805161313378">Google Fotoğraflar</translation>
@@ -414,6 +416,7 @@
 <translation id="484790837831576105">(Android) DNS çözümleme</translation>
 <translation id="4848429997038228357">ÇALIŞIYOR</translation>
 <translation id="4854586501323951986">Yerleşik dokunmatik ekran</translation>
+<translation id="4855250849489639581">Düzenle ilgili daha fazla seçenek için aşağı kaydırın</translation>
 <translation id="4861758251032006121">{ATTEMPTS_LEFT,plural, =1{<ph name="ERROR_MESSAGE" /> {0} deneme hakkınız kaldı}other{<ph name="ERROR_MESSAGE" /> {0} deneme hakkınız kaldı}}</translation>
 <translation id="4873827928179867585">Kimlik doğrulama algoritması</translation>
 <translation id="4880328057631981605">Erişim noktası adı</translation>
@@ -517,6 +520,7 @@
 <translation id="576835345334454681">Ekran parlaklığını artır</translation>
 <translation id="57838592816432529">Sesi kapat</translation>
 <translation id="5784136236926853061">Yüksek HTTP gecikmesi</translation>
+<translation id="5826644637650799838">Eser hakkında</translation>
 <translation id="5832805196449965646">Kişi Ekle</translation>
 <translation id="583281660410589416">Bilinmiyor</translation>
 <translation id="5843706793424741864">Fahrenhayt</translation>
@@ -673,6 +677,7 @@
 <translation id="7172721935181587524">1 Resim</translation>
 <translation id="7177485034254901881">Bu <ph name="DEVICE_TYPE" />, <ph name="MANAGER" /> tarafından yönetiliyor. Yöneticiler bu cihazı uzaktan yapılandırabilir.</translation>
 <translation id="7180611975245234373">Yenile</translation>
+<translation id="7180865173735832675">Özelleştir</translation>
 <translation id="7212734716605298123">Harici cihazlar için donanım yazılımı güncellemeleri</translation>
 <translation id="7216409898977639127">Hücresel sağlayıcı</translation>
 <translation id="725133483556299729">E-posta'yı seçme</translation>
@@ -744,6 +749,7 @@
 <translation id="7881066108824108340">DNS</translation>
 <translation id="7882358943899516840">Sağlayıcı türü</translation>
 <translation id="7882501334836096755">Ortak anahtar</translation>
+<translation id="78957024357676568">sol</translation>
 <translation id="7915220255123750251">Ağ APN ayarlarını yönetin. APN'ler, hücresel ağ ve internet arasında bir bağlantı oluşturur.</translation>
 <translation id="7936303884198020182">Alan adı sunucusu bulunamadı</translation>
 <translation id="7942349550061667556">Kırmızı</translation>
@@ -775,6 +781,7 @@
 <translation id="8226628635270268143">En beğendiğiniz fotoğraf ve albümleri seçin</translation>
 <translation id="8227119283605456246">Dosya ekle</translation>
 <translation id="8230672074305416752">Varsayılan ağ geçidi pinglenemedi</translation>
+<translation id="8242426110754782860">Devam et</translation>
 <translation id="8246209727385807362">Bilinmeyen operatör</translation>
 <translation id="827422111966801947">Çivit Mavisi</translation>
 <translation id="8286154143153872371">Duvar kağıdını görmek için lütfen bir ağa bağlanıp sayfayı yeniden yükleyin.</translation>
@@ -852,6 +859,7 @@
 <translation id="8930622219860340959">WiFi (Kablosuz)</translation>
 <translation id="8936793075252196307">İstemci IP adresleri</translation>
 <translation id="894617464444543719">Cihazın türü telefon.</translation>
+<translation id="8957423540740801332">sağ</translation>
 <translation id="8968751544471797276">Şarj olma hızı</translation>
 <translation id="8970109610781093811">Yeniden çalıştır</translation>
 <translation id="8983038754672563810">HSPA</translation>

@@ -16,6 +16,7 @@
 <translation id="1128128132059598906">EAP-TTLS</translation>
 <translation id="1145018782460575098">Glugginn fyrir uppfærslu fastbúnaðar fyrir ytri tæki er opinn. <ph name="NUM_UPDATES" /> uppfærslur í boði.</translation>
 <translation id="1145516343487477149">Finndu hjálpargreinar og svör við algengum spurningum um Chromebook</translation>
+<translation id="1167755866710282443">Opnaðu valmyndina til að sérsníða lykla. Dragðu valmyndina til að færa hana.</translation>
 <translation id="1175697296044146566"><ph name="DEVICE_TYPE" /> er í umsjón <ph name="MANAGER" />.</translation>
 <translation id="1175951029573070619">Í meðallagi (<ph name="SIGNAL_STRENGTH" />)</translation>
 <translation id="1181037720776840403">Fjarlægja</translation>
@@ -326,6 +327,7 @@
 <translation id="4110686435123617899">Velja albúm <ph name="TITLE" /> <ph name="DESC" /></translation>
 <translation id="4111761024568264522">USB-snertiflötur</translation>
 <translation id="4117637339509843559">Dökk stilling</translation>
+<translation id="4130035430755296270">Haltu bendlinum lengur yfir til að sjá fleiri valkosti fyrir uppsetningu</translation>
 <translation id="4131410914670010031">Svarthvítt</translation>
 <translation id="4145784616224233563">HTTP-eldveggur</translation>
 <translation id="4147897805161313378">Google-myndir</translation>
@@ -414,6 +416,7 @@
 <translation id="484790837831576105">(Android) DNS-lausn</translation>
 <translation id="4848429997038228357">Í GANGI</translation>
 <translation id="4854586501323951986">Innbyggður snertiskjár</translation>
+<translation id="4855250849489639581">Strjúktu niður til að sjá fleiri uppsetningarvalkosti</translation>
 <translation id="4861758251032006121">{ATTEMPTS_LEFT,plural, =1{<ph name="ERROR_MESSAGE" /> {0} tilraun eftir}one{<ph name="ERROR_MESSAGE" /> {0} tilraun eftir}other{<ph name="ERROR_MESSAGE" /> {0} tilraunir eftir}}</translation>
 <translation id="4873827928179867585">Auðkenningarreiknirit</translation>
 <translation id="4880328057631981605">Heiti aðgangsstaðar</translation>
@@ -517,6 +520,7 @@
 <translation id="576835345334454681">Auka birtustig skjás</translation>
 <translation id="57838592816432529">Þagga</translation>
 <translation id="5784136236926853061">Langur HTTP-biðtími</translation>
+<translation id="5826644637650799838">Um listaverkið</translation>
 <translation id="5832805196449965646">Bæta notanda við</translation>
 <translation id="583281660410589416">Óþekkt</translation>
 <translation id="5843706793424741864">Fahrenheit</translation>
@@ -673,6 +677,7 @@
 <translation id="7172721935181587524">1 mynd</translation>
 <translation id="7177485034254901881"><ph name="MANAGER" /> hefur umsjón með þessu <ph name="DEVICE_TYPE" />. Kerfisstjórar geta stillt tækið í gegnum fjartengingu.</translation>
 <translation id="7180611975245234373">Endurnýja</translation>
+<translation id="7180865173735832675">Sérsníða</translation>
 <translation id="7212734716605298123">Fastbúnaðaruppfærslur fyrir ytri tæki</translation>
 <translation id="7216409898977639127">Farsímafyrirtæki</translation>
 <translation id="725133483556299729">Velja netfang</translation>
@@ -744,6 +749,7 @@
 <translation id="7881066108824108340">DNS</translation>
 <translation id="7882358943899516840">Gerð veitu</translation>
 <translation id="7882501334836096755">Opinber lykill</translation>
+<translation id="78957024357676568">vinstri</translation>
 <translation id="7915220255123750251">Stjórna stillingum aðgangsstaðar netkerfis. Aðgangsstaðir tengja saman farsímakerfi og internetið.</translation>
 <translation id="7936303884198020182">Engir nafnaþjónar fundust</translation>
 <translation id="7942349550061667556">Rauður</translation>
@@ -775,6 +781,7 @@
 <translation id="8226628635270268143">Veldu uppáhaldsmyndir og -möppur</translation>
 <translation id="8227119283605456246">Hengja skrá við</translation>
 <translation id="8230672074305416752">Ping-prófun sjálfvalinnar netkerfisgáttar mistókst</translation>
+<translation id="8242426110754782860">Halda áfram</translation>
 <translation id="8246209727385807362">Óþekkt símafyrirtæki</translation>
 <translation id="827422111966801947">Dimmfjólublár</translation>
 <translation id="8286154143153872371">Tengstu neti og endurhladdu síðuna til að sjá veggfóður.</translation>
@@ -852,6 +859,7 @@
 <translation id="8930622219860340959">Þráðlaust</translation>
 <translation id="8936793075252196307">IP-tala biðlara</translation>
 <translation id="894617464444543719">Tækið er sími.</translation>
+<translation id="8957423540740801332">hægri</translation>
 <translation id="8968751544471797276">Hleðsluhraði</translation>
 <translation id="8970109610781093811">Keyra aftur</translation>
 <translation id="8983038754672563810">HSPA</translation>

@@ -15,9 +15,9 @@
 #include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "base/timer/timer.h"
+#include "components/attribution_reporting/source_type.mojom-forward.h"
 #include "content/browser/attribution_reporting/attribution_beacon_id.h"
 #include "content/browser/attribution_reporting/attribution_data_host_manager.h"
-#include "content/browser/attribution_reporting/attribution_source_type.h"
 #include "content/common/content_export.h"
 #include "mojo/public/cpp/bindings/receiver_set.h"
 #include "services/data_decoder/public/cpp/data_decoder.h"
@@ -67,7 +67,8 @@ class CONTENT_EXPORT AttributionDataHostManagerImpl
       mojo::PendingReceiver<blink::mojom::AttributionDataHost> data_host,
       attribution_reporting::SuitableOrigin context_origin,
       bool is_within_fenced_frame,
-      attribution_reporting::mojom::RegistrationType) override;
+      attribution_reporting::mojom::RegistrationType,
+      GlobalRenderFrameHostId render_frame_id) override;
   bool RegisterNavigationDataHost(
       mojo::PendingReceiver<blink::mojom::AttributionDataHost> data_host,
       const blink::AttributionSrcToken& attribution_src_token,
@@ -79,12 +80,14 @@ class CONTENT_EXPORT AttributionDataHostManagerImpl
       const attribution_reporting::SuitableOrigin& source_origin,
       AttributionInputEvent input_event,
       blink::mojom::AttributionNavigationType nav_type,
-      bool is_within_fenced_frame) override;
+      bool is_within_fenced_frame,
+      GlobalRenderFrameHostId render_frame_id) override;
   void NotifyNavigationForDataHost(
       const blink::AttributionSrcToken& attribution_src_token,
       const attribution_reporting::SuitableOrigin& source_origin,
       blink::mojom::AttributionNavigationType nav_type,
-      bool is_within_fenced_frame) override;
+      bool is_within_fenced_frame,
+      GlobalRenderFrameHostId render_frame_id) override;
   void NotifyNavigationFailure(
       const absl::optional<blink::AttributionSrcToken>& attribution_src_token,
       int64_t navigation_id) override;
@@ -93,7 +96,8 @@ class CONTENT_EXPORT AttributionDataHostManagerImpl
       BeaconId beacon_id,
       attribution_reporting::SuitableOrigin source_origin,
       bool is_within_fenced_frame,
-      absl::optional<AttributionInputEvent> input_event) override;
+      AttributionInputEvent input_event,
+      GlobalRenderFrameHostId render_frame_id) override;
   void NotifyFencedFrameReportingBeaconSent(BeaconId beacon_id) override;
   void NotifyFencedFrameReportingBeaconData(
       BeaconId beacon_id,
@@ -144,7 +148,7 @@ class CONTENT_EXPORT AttributionDataHostManagerImpl
       const std::string& header_value,
       const attribution_reporting::SuitableOrigin& reporting_origin,
       const attribution_reporting::SuitableOrigin& source_origin,
-      AttributionSourceType source_type,
+      attribution_reporting::mojom::SourceType,
       bool is_within_fenced_frame);
 
   void MaybeOnBeaconRegistrationsFinished(BeaconId beacon_id);

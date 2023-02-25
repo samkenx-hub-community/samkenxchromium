@@ -8,9 +8,9 @@
 #include <utility>
 
 #include "base/logging.h"
+#include "base/task/bind_post_task.h"
 #include "base/task/sequenced_task_runner.h"
 #include "base/trace_event/trace_event.h"
-#include "media/base/bind_to_current_loop.h"
 #include "media/base/bitstream_buffer.h"
 #include "media/base/limits.h"
 #include "media/base/media_util.h"
@@ -123,8 +123,8 @@ void MojoVideoEncodeAcceleratorService::Initialize(
   }
 
   encoder_ = std::move(create_vea_callback_)
-                 .Run(config, this, *gpu_preferences_, gpu_workarounds_,
-                      *gpu_device_, media_log_->Clone());
+                 .Run(config, this, gpu_preferences_, gpu_workarounds_,
+                      gpu_device_, media_log_->Clone());
   if (!encoder_) {
     MEDIA_LOG(ERROR, media_log_.get())
         << __func__ << " Error creating or initializing VEA";
@@ -166,7 +166,8 @@ void MojoVideoEncodeAcceleratorService::Encode(
                     base::TimeTicks::Now());
   }
 
-  frame->AddDestructionObserver(media::BindToCurrentLoop(std::move(callback)));
+  frame->AddDestructionObserver(
+      base::BindPostTaskToCurrentDefault(std::move(callback)));
   encoder_->Encode(frame, force_keyframe);
 }
 

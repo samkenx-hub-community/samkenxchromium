@@ -31,6 +31,7 @@ extern const char kSafeBrowsingForTrustedSourcesEnabled[];
 extern const char kDisableScreenshots[];
 extern const char kDownloadRestrictions[];
 extern const char kDownloadBubbleEnabled[];
+extern const char kDownloadDuplicateFilePromptEnabled[];
 extern const char kForceEphemeralProfiles[];
 extern const char kHomePageIsNewTabPage[];
 extern const char kHomePage[];
@@ -207,22 +208,9 @@ extern const char kPrintingAPIExtensionsAllowlist[];
 extern const char kEnableSyncConsent[];
 #endif
 #if BUILDFLAG(IS_CHROMEOS_ASH)
-extern const char kTapToClickEnabled[];
-extern const char kEnableTouchpadThreeFingerClick[];
-extern const char kPrimaryMouseButtonRight[];
 extern const char kPrimaryPointingStickButtonRight[];
 extern const char kOwnerPrimaryPointingStickButtonRight[];
-extern const char kMouseAcceleration[];
-extern const char kMouseScrollAcceleration[];
 extern const char kPointingStickAcceleration[];
-extern const char kTouchpadAcceleration[];
-extern const char kTouchpadScrollAcceleration[];
-extern const char kTouchpadHapticFeedback[];
-extern const char kTouchpadHapticClickSensitivity[];
-extern const char kMouseSensitivity[];
-extern const char kMouseScrollSensitivity[];
-extern const char kTouchpadSensitivity[];
-extern const char kTouchpadScrollSensitivity[];
 extern const char kPointingStickSensitivity[];
 extern const char kUse24HourClock[];
 extern const char kUserTimezone[];
@@ -403,13 +391,7 @@ extern const char kPolicyThemeColor[];
 extern const char kExtensionsUIDeveloperMode[];
 extern const char kExtensionsUIDismissedADTPromo[];
 extern const char kExtensionCommands[];
-extern const char kPluginsLastInternalDirectory[];
-extern const char kPluginsPluginsList[];
 extern const char kPluginsAlwaysOpenPdfExternally[];
-#if BUILDFLAG(ENABLE_PLUGINS)
-extern const char kPluginsShowDetails[];
-#endif
-extern const char kPluginsAllowOutdated[];
 extern const char kDefaultBrowserLastDeclined[];
 extern const char kResetCheckDefaultBrowser[];
 extern const char kDefaultBrowserSettingEnabled[];
@@ -420,9 +402,6 @@ extern const char kShowUpdatePromotionInfoBar[];
 // of lacros-chrome is complete.
 #if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS_LACROS)
 extern const char kUseCustomChromeFrame[];
-#endif
-#if BUILDFLAG(ENABLE_PLUGINS)
-extern const char kContentSettingsPluginAllowlist[];
 #endif
 extern const char kPartitionDefaultZoomLevel[];
 extern const char kPartitionPerHostZoomLevels[];
@@ -533,7 +512,6 @@ extern const char kGCMProductCategoryForSubtypes[];
 
 extern const char kEasyUnlockAllowed[];
 extern const char kEasyUnlockPairing[];
-extern const char kHasSeenSmartLockSignInRemovedNotification[];
 
 #if BUILDFLAG(ENABLE_EXTENSIONS)
 extern const char kToolbarIconSurfacingBubbleAcknowledged[];
@@ -547,9 +525,11 @@ extern const char kWebRTCUDPPortRange[];
 extern const char kWebRtcEventLogCollectionAllowed[];
 extern const char kWebRtcLocalIpsAllowedUrls[];
 extern const char kWebRTCAllowLegacyTLSProtocols[];
+extern const char kWebRtcTextLogCollectionAllowed[];
 
 #if BUILDFLAG(IS_CHROMEOS_LACROS) || BUILDFLAG(ENABLE_DICE_SUPPORT)
 extern const char kFirstRunFinished[];
+extern const char kFirstRunStudyGroup[];
 #endif
 
 #if !BUILDFLAG(IS_ANDROID)
@@ -630,6 +610,8 @@ extern const char kDefaultTasksBySuffix[];
 extern const char kDefaultHandlersForFileExtensions[];
 extern const char kOfficeSetupComplete[];
 extern const char kOfficeFilesAlwaysMove[];
+extern const char kOfficeFileMovedToOneDrive[];
+extern const char kOfficeFileMovedToGoogleDrive[];
 #endif
 
 extern const char kSharedClipboardEnabled[];
@@ -829,8 +811,6 @@ extern const char kLastRsuDeviceIdUploaded[];
 extern const char kDeviceName[];
 #endif  // BUILDFLAG(IS_CHROMEOS_ASH)
 
-extern const char kClearPluginLSODataEnabled[];
-extern const char kPepperFlashSettingsEnabled[];
 extern const char kDiskCacheDir[];
 extern const char kDiskCacheSize[];
 
@@ -1159,6 +1139,11 @@ extern const char kCACertificateManagementAllowed[];
 #if BUILDFLAG(CHROME_ROOT_STORE_POLICY_SUPPORTED)
 extern const char kChromeRootStoreEnabled[];
 #endif
+#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) || \
+    BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_ANDROID)
+// TODO(https://crbug.com/1406103): delete this after a few milestones.
+extern const char kEnforceLocalAnchorConstraintsEnabled[];
+#endif
 
 extern const char kSharingVapidKey[];
 extern const char kSharingFCMRegistration[];
@@ -1307,6 +1292,12 @@ extern const char kNewBaseUrlInheritanceBehaviorAllowed[];
 #if BUILDFLAG(IS_ANDROID) || BUILDFLAG(IS_LINUX)
 extern const char kOutOfProcessSystemDnsResolutionEnabled[];
 #endif  // BUILDFLAG(IS_ANDROID) || BUILDFLAG(IS_LINUX)
+
+#if BUILDFLAG(IS_ANDROID)
+extern const char kQuickDeleteDialogSuppressed[];
+#endif
+
+extern const char kHttpAllowlist[];
 
 }  // namespace prefs
 

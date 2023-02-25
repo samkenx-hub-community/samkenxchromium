@@ -40,12 +40,12 @@ class NetworkingPrivateLacros : public NetworkingPrivateDelegate {
                 DictionaryCallback success_callback,
                 FailureCallback failure_callback) override;
   void SetProperties(const std::string& guid,
-                     base::Value properties,
+                     base::Value::Dict properties,
                      bool allow_set_shared_config,
                      VoidCallback success_callback,
                      FailureCallback failure_callback) override;
   void CreateNetwork(bool shared,
-                     base::Value properties,
+                     base::Value::Dict properties,
                      StringCallback success_callback,
                      FailureCallback failure_callback) override;
   void ForgetNetwork(const std::string& guid,

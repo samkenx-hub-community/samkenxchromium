@@ -198,12 +198,6 @@ BASE_FEATURE(kUiCompositorScrollWithLayers,
 #endif
 );
 
-// Enables compositor threaded scrollbar scrolling by mapping pointer events to
-// gesture events.
-BASE_FEATURE(kCompositorThreadedScrollbarScrolling,
-             "CompositorThreadedScrollbarScrolling",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
 // Enables the use of a touch fling curve that is based on the behavior of
 // native apps on Windows.
 BASE_FEATURE(kExperimentalFlingAnimation,
@@ -418,6 +412,15 @@ double RawDrawTileSizeFactor() {
 bool IsRawDrawUsingMSAA() {
   return kIsRawDrawUsingMSAA.Get();
 }
+
+#if BUILDFLAG(IS_ANDROID)
+BASE_FEATURE(kUseToastManager,
+             "UseToastManager",
+             base::FEATURE_ENABLED_BY_DEFAULT);
+bool UseToastManager() {
+  return base::FeatureList::IsEnabled(kUseToastManager);
+}
+#endif  // BUILDFLAG(IS_ANDROID)
 
 BASE_FEATURE(kEnableVariableRefreshRate,
              "EnableVariableRefreshRate",

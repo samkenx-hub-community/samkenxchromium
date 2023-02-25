@@ -304,7 +304,6 @@ Mae tocynnau ymddiriedaeth yn gwella eich preifatrwydd ar y we ac ni ellir eu de
 <translation id="2669454659051515572">Gall unrhyw un sy'n defnyddio'r ddyfais hon weld ffeiliau sydd wedi'u lawrlwytho</translation>
 <translation id="2702516483241149200">Newydd: gallwch rannu dolen sy'n sgrolio i'r testun hwn</translation>
 <translation id="2707726405694321444">Ail-lwytho'r dudalen</translation>
-<translation id="2709516037105925701">Awtolenwi</translation>
 <translation id="271033894570825754">Newydd</translation>
 <translation id="2711073837061989559">Profion</translation>
 <translation id="2718352093833049315">Dim ond ar Wi-Fi</translation>
@@ -396,7 +395,6 @@ Mae tocynnau ymddiriedaeth yn gwella eich preifatrwydd ar y we ac ni ellir eu de
 <translation id="3114507951000454849">Darllen y newyddion heddiw <ph name="NEWS_ICON" /></translation>
 <translation id="311958134571892113">wedi cysylltu â</translation>
 <translation id="3123734510202723619">Cyhoeddiadau</translation>
-<translation id="3130863904455712965">Hanes a rhagor</translation>
 <translation id="3134784203083076891">”</translation>
 <translation id="314939179385989105">Tudalen hafan Chrome</translation>
 <translation id="3157931365184549694">Adfer</translation>
@@ -453,6 +451,7 @@ Mae tocynnau ymddiriedaeth yn gwella eich preifatrwydd ar y we ac ni ellir eu de
 <translation id="3421726884497337397">Dewis pryd i rwystro cwcis trydydd parti</translation>
 <translation id="3428747202529429621">Yn eich cadw'n ddiogel ar Chrome a gellir ei ddefnyddio i wella'ch diogelwch mewn apiau Google eraill pan fyddwch wedi'ch mewngofnodi</translation>
 <translation id="3429160811076349561">Mae nodweddion prawf wedi'u diffodd</translation>
+<translation id="3432973700170747422">Dileu'r 15 munud diwethaf</translation>
 <translation id="3435465986463792564">Oes gennych chi lawer o ffenestri? Gallwch eu rheoli o'r fan hon</translation>
 <translation id="3435738964857648380">Diogelwch</translation>
 <translation id="3443221991560634068">Ail-lwytho'r dudalen bresennol</translation>
@@ -519,7 +518,6 @@ Mae tocynnau ymddiriedaeth yn gwella eich preifatrwydd ar y we ac ni ellir eu de
 <translation id="3830886834687455630">Diweddarwch wasanaethau Google Play i wirio'ch cyfrineiriau</translation>
 <translation id="3845098929839618392">Agor mewn tab Anhysbys</translation>
 <translation id="3856096718352044181">Cadarnhewch fod hwn yn ddarparwr dilys neu rhowch gynnig arall arni yn nes ymlaen</translation>
-<translation id="3858127568696903256">Gweld y cynnwys rydych yn ei ddilyn yma</translation>
 <translation id="3858860766373142691">Enw</translation>
 <translation id="3861633093716975811">Fideos poblogaidd</translation>
 <translation id="3874520961715512166">Gwefan wedi'i thynnu</translation>
@@ -922,6 +920,7 @@ I newid y gosodiad hwn, <ph name="BEGIN_LINK" />ailosodwch gysoni<ph name="END_L
 <translation id="6000203700195075278">Ail-ddilyn</translation>
 <translation id="6002122790816966947">Eich dyfeisiau</translation>
 <translation id="6005538289190791541">Cyfrinair a awgrymir</translation>
+<translation id="6011308810877101166">Gwella awgrymiadau chwilio</translation>
 <translation id="6039379616847168523">Neidio i'r tab nesaf</translation>
 <translation id="6040143037577758943">Cau</translation>
 <translation id="604124094241169006">Awtomatig</translation>
@@ -989,7 +988,6 @@ Er enghraifft, gall rhai gwefannau ymateb i'r cais hwn drwy ddangos hysbysebion 
 <translation id="6397616442223433927">Yn ôl ar-lein</translation>
 <translation id="6401458660421980302">I anfon y tab hwn i ddyfais arall, mewngofnodwch i Chrome yno</translation>
 <translation id="6402652558933147609"><ph name="ERROR_CODE" /> ar <ph name="VIOLATED_URL" /></translation>
-<translation id="6403371459378431832">Cysoni eich data ar bob dyfais</translation>
 <translation id="6404511346730675251">Golygu nod tudalen</translation>
 <translation id="6406506848690869874">Cysoni</translation>
 <translation id="6407224748847589805">Methu â chysylltu â'ch cyfrifiadur. Rhowch gynnig ar opsiwn dilysu arall.</translation>
@@ -1227,6 +1225,7 @@ Er enghraifft, gall rhai gwefannau ymateb i'r cais hwn drwy ddangos hysbysebion 
 <translation id="7596558890252710462">System weithredu</translation>
 <translation id="7605594153474022051">Nid yw Cysoni yn gweithio</translation>
 <translation id="7612619742409846846">Wedi mewngofnodi i Google fel</translation>
+<translation id="7612989789287281429">Wrthi'n mewngofnodi…</translation>
 <translation id="7616551326690708776">Dewiswch dempled ar gyfer eich amlygu.</translation>
 <translation id="7619072057915878432">Wedi methu â lawrlwytho <ph name="FILE_NAME" /> oherwydd methiannau rhwydwaith.</translation>
 <translation id="7626032353295482388">Croeso i Chrome</translation>
@@ -1245,6 +1244,7 @@ Er enghraifft, gall rhai gwefannau ymateb i'r cais hwn drwy ddangos hysbysebion 
 <translation id="7682724950699840886">Rhowch gynnig ar yr argymhellion canlynol: gwnewch yn siŵr bod digon o le ar eich dyfais, rhowch gynnig arall ar allforio.</translation>
 <translation id="7686086654630106285">Rhagor am hysbysebion a awgrymir gan wefan</translation>
 <translation id="768618399695552958">Mae rhai o'r tudalennau rydych yn ymweld â nhw wedi'u rhaglwytho. Gellir rhaglwytho tudalennau drwy weinyddion Google pan fyddant wedi'u cysylltu o wefan Google.</translation>
+<translation id="7691043218961417207">Archwilio cynnwys i ddilyn</translation>
 <translation id="7698359219371678927">Crëwch e-bost yn <ph name="APP_NAME" /></translation>
 <translation id="7707922173985738739">Defnyddio data symudol</translation>
 <translation id="7709094866268987903">Bydd diddordebau a dynnwyd gennych yn ymddangos yma</translation>
@@ -1318,7 +1318,6 @@ Er enghraifft, gall rhai gwefannau ymateb i'r cais hwn drwy ddangos hysbysebion 
 <translation id="8037801708772278989">Newydd ei wirio</translation>
 <translation id="804335162455518893">Ni chanfuwyd cerdyn SD.</translation>
 <translation id="8048533522416101084">{TAB_COUNT,plural, =1{<ph name="TAB_COUNT_ONE" /> tab anhysbys}zero{<ph name="TAB_COUNT_NORMAL" /> tab anhysbys}two{<ph name="TAB_COUNT_NORMAL" /> dab anhysbys}few{<ph name="TAB_COUNT_NORMAL" /> thab anhysbys}many{<ph name="TAB_COUNT_NORMAL" /> thab anhysbys}other{<ph name="TAB_COUNT_NORMAL" /> tab anhysbys}}</translation>
-<translation id="8048728378294435881">Gwneud copïau wrth gefn o'ch pethau a'u defnyddio ar unrhyw ddyfais</translation>
 <translation id="8051695050440594747"><ph name="MEGABYTES" /> MB ar gael</translation>
 <translation id="8058655154417507695">Blwyddyn darfod</translation>
 <translation id="8058746566562539958">Agor mewn tab Chrome newydd</translation>
@@ -1452,6 +1451,7 @@ Er enghraifft, gall rhai gwefannau ymateb i'r cais hwn drwy ddangos hysbysebion 
 <translation id="8746155870861185046">Rhannu'r testun a amlygir</translation>
 <translation id="8748850008226585750">Mae'r cynnwys wedi'i guddio</translation>
 <translation id="8756969031206844760">Diweddaru'r cyfrinair?</translation>
+<translation id="8765470054473112089">Pan fyddwch yn teipio yn y bar cyfeiriad neu'r blwch chwilio, bydd Chrome yn anfon yr hyn rydych yn ei deipio i'ch peiriant chwilio diofyn i gael awgrymiadau gwell. Mae hwn wedi'i ddiffodd yn y modd Anhysbys.</translation>
 <translation id="8766529642647037772">Creu dolen sydd wedi'i hamlygu fel yr un hon?</translation>
 <translation id="8773160212632396039">Wrthi'n prosesu'r cais</translation>
 <translation id="8788265440806329501">Mae hanes llywio ar gau</translation>

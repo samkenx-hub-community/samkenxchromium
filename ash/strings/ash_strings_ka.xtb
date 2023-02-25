@@ -133,11 +133,13 @@
 <translation id="163517899691012366">შეტყობინებები დადუმებულია, როცა ჩართულია რეჟიმი „არ შემაწუხოთ“</translation>
 <translation id="1637505162081889933"><ph name="NUM_DEVICES" /> მოწყობილობა</translation>
 <translation id="1639239467298939599">იტვირთება</translation>
+<translation id="1647986356840967552">წინა გვერდი</translation>
 <translation id="1654477262762802994">ხმოვანი მოთხოვნის დაწყება</translation>
 <translation id="1668469839109562275">ჩაშენებული VPN</translation>
 <translation id="1677472565718498478">დარჩენილია <ph name="TIME" /></translation>
 <translation id="1677507110654891115"><ph name="FEATURE_NAME" /> არ არის დაკავშირებული.</translation>
 <translation id="1677582821739292812">ვიღაც უყურებს თქვენს ეკრანს</translation>
+<translation id="1683399938733266832">CPU-ს მიმდინარე მოხმარება: <ph name="CPU_USEAGE" />%</translation>
 <translation id="169515659049020177">Shift</translation>
 <translation id="1698080062160024910"><ph name="TOTAL_TIME" />-იანი ტაიმერი · <ph name="LABEL" /></translation>
 <translation id="1698760176351776263">IPv6 მისამართი: <ph name="ADDRESS" /></translation>
@@ -286,6 +288,7 @@
 <translation id="2475982808118771221">შეცდომა მოხდა</translation>
 <translation id="2482878487686419369">შეტყობინებები</translation>
 <translation id="2484513351006226581">კლავიატურის განლაგების გადასართველად გამოიყენეთ კლავიშთა კომბინაცია: <ph name="KEYBOARD_SHORTCUT" />.</translation>
+<translation id="2487915095798731898">გაწევრიანება</translation>
 <translation id="2501920221385095727">კლავიშების ფიქსაცია</translation>
 <translation id="2509468283778169019">CAPS LOCK ჩართულია</translation>
 <translation id="2515586267016047495">Alt</translation>
@@ -380,6 +383,7 @@
 <translation id="3051189971848907985">მიმდინარეობს პროფილის გადარქმევა. მოითმინეთ რამდენიმე წუთი.</translation>
 <translation id="3055162170959710888">ამ მოწყობილობას დღეს <ph name="USED_TIME" /> იყენებდით</translation>
 <translation id="3062298103034426069">მხარდაუჭერელია</translation>
+<translation id="3068622547379332530">ვერსია <ph name="VERSION_NAME" /> (<ph name="OFFICIAL_STATUS" />) <ph name="CHANNEL_NAME" /> <ph name="PROCESSOR_VARIATION" /></translation>
 <translation id="3068711042108640621">თარო მდებარეობს მარცხენა ნაწილში</translation>
 <translation id="3077734595579995578">shift</translation>
 <translation id="3081696990447829002">მენიუს გაშლა</translation>
@@ -545,6 +549,7 @@
 <translation id="3925540965556789199"><ph name="DATE" />, მომდინარეობს მოვლენების ჩატვირთვა.</translation>
 <translation id="3932043219784172185">დაკავშირებული მოწყობილობები არ არის</translation>
 <translation id="3934456833412894880">ადაპტირებადი დატენა ჩართულია. ბატარეის ვარგისიანობის გასახანგრძლივებლად ის დარჩება 80%-ზე და სრულად დაიტენება, როცა დაგჭირდებათ.</translation>
+<translation id="3936620957945677513">ღონისძიებაში „<ph name="EVENT_SUMMARY" />“ რომ ჩაერთოთ, დააჭირეთ ღილაკს Enter</translation>
 <translation id="3943857333388298514">ჩასმა</translation>
 <translation id="394485226368336402">აუდიოს პარამეტრები</translation>
 <translation id="3945319193631853098">შეეხეთ დაყენების დასასრულებლად</translation>
@@ -555,6 +560,7 @@
 <translation id="397105322502079400">ანგარიშობს…</translation>
 <translation id="397726367135689299">ბატარეა შეიძლება არასწორად იტენებოდეს.</translation>
 <translation id="3977512764614765090">ბატარეის დონეა <ph name="PERCENTAGE" />% და იტენება.</translation>
+<translation id="3984536049089846927">მომდევნო გვერდი</translation>
 <translation id="3986082989454912832">პასუხი</translation>
 <translation id="3995138139523574647">USB-C მოწყობილობა (მარჯვენა უკანა პორტი)</translation>
 <translation id="40062176907008878">ხელნაწერი</translation>
@@ -577,7 +583,7 @@
 <translation id="4123259114412175274">თქვენი Chromebook განსაბლოკად დარწმუნდით, რომ თქვენი ტელეფონის Bluetooth ჩართულია</translation>
 <translation id="4125970834901680537">აპების სტრიმინგი ვერ მოხერხდება ტაბლეტის რეჟიმში. ცადეთ ხელახლა ლეპტოპის რეჟიმის გამოყენებით.</translation>
 <translation id="4129129681837227511">ჩაკეტილ ეკრანზე შეტყობინებების სანახავად საჭიროა განბლოკვა და პარამეტრის შეცვლა</translation>
-<translation id="4130035430755296270">განლაგებების მეტი ვარიანტებისთვის გააგრძელეთ გადატარება</translation>
+<translation id="4131973331381812765">ტემპერატურა: <ph name="TEMPERATURE" />°C — მიმდინარე სიჩქარე: <ph name="CPU_AVERAGE_CURRENT_FREQUENCY_GHZ" /> გჰც</translation>
 <translation id="4136724716305260864">ჩართულია მზის ამოსვლამდე</translation>
 <translation id="4146833061457621061">მუსიკის დაკვრა</translation>
 <translation id="4150201353443180367">ჩვენება</translation>
@@ -732,6 +738,7 @@
 <translation id="4895488851634969361">ბატარეა სავსეა.</translation>
 <translation id="490375751687810070">ვერტიკალური</translation>
 <translation id="490788395437447240">ბატარეის დონეა <ph name="BATTERY_PERCENTAGE" />%</translation>
+<translation id="491504982845934899">გააქტიურება მოწყობილობის დაყენების შემდეგ <ph name="NETWORK_NAME" /></translation>
 <translation id="4917385247580444890">ძლიერი</translation>
 <translation id="4918086044614829423">მიღება</translation>
 <translation id="4919841137949306064"><ph name="APP_NAME" /> ამჟამად იყენებს თქვენს კამერას</translation>
@@ -1328,6 +1335,7 @@
 <translation id="8131740175452115882">დაადასტურება</translation>
 <translation id="8131994907636310308">დალაგების ამომხტარი ფანჯრის დახურვა</translation>
 <translation id="8132793192354020517">დაკავშირებულია <ph name="NAME" />-თან</translation>
+<translation id="8138705869659070104">გააქტიურება მოწყობილობის დაყენების შემდეგ</translation>
 <translation id="813913629614996137">მიმდინარეობს ინიცირება…</translation>
 <translation id="8142441511840089262">ორმაგი დაწკაპუნება</translation>
 <translation id="8142699993796781067">პირადი ქსელი</translation>
@@ -1459,6 +1467,7 @@
 <translation id="8850991929411075241">Search+Esc</translation>
 <translation id="8853703225951107899">თქვენი PIN-კოდის ან პაროლის დადასტურება კვლავ ვერ მოხერხდა. გაითვალისწინეთ: თუ ახლახან შეცვალეთ პაროლი, გამოიყენეთ თქვენი ძველი პაროლი. ახალი პაროლი ძალაში შევა, როცა სისტემიდან გახვალთ.</translation>
 <translation id="8855885154700222542">სრულეკრანიან რეჟიმზე გადართვის კლავიში</translation>
+<translation id="8858369206579825206">კონფიდენციალურობის მართვის პარამეტრები</translation>
 <translation id="8870509716567206129">ეკრანის გაყოფა არ არის მხარდაჭერილი აპის მიერ.</translation>
 <translation id="8874184842967597500">არ არის დაკავშირებული</translation>
 <translation id="8876661425082386199">შეამოწმეთ კავშირი</translation>

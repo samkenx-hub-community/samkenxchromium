@@ -12,6 +12,7 @@ import org.chromium.cc.base.CcFeatures;
 import org.chromium.cc.base.CcSwitches;
 import org.chromium.components.autofill.AutofillFeatures;
 import org.chromium.components.feature_engagement.FeatureConstants;
+import org.chromium.components.metrics.AndroidMetricsFeatures;
 import org.chromium.components.metrics.MetricsFeatures;
 import org.chromium.components.metrics.MetricsSwitches;
 import org.chromium.components.network_session_configurator.NetworkSessionSwitches;
@@ -30,9 +31,8 @@ import org.chromium.ui.accessibility.AccessibilityFeatures;
  * so it must not compromise the Android security model (i.e., WebView must still protect the app's
  * private data from being user visible).
  *
- * <p>
- * This lives in the common package so it can be shared by dev UI (to know which features/flags to
- * display) as well as the WebView implementation (so it knows which features/flags are safe to
+ * <p>This lives in the common package so it can be shared by dev UI (to know which features/flags
+ * to display) as well as the WebView implementation (so it knows which features/flags are safe to
  * honor).
  */
 public final class ProductionSupportedFlagList {
@@ -108,6 +108,8 @@ public final class ProductionSupportedFlagList {
                     "Disables WebView from checking for app recovery mitigations."),
             Flag.commandLine(AwSwitches.WEBVIEW_ENABLE_APP_RECOVERY,
                     "Enables WebView to check for app recovery mitigations."),
+            Flag.baseFeature("DefaultPassthroughCommandDecoder",
+                    "Use the passthrough GLES2 command decoder."),
             Flag.baseFeature(GpuFeatures.WEBVIEW_VULKAN,
                     "Use Vulkan for composite. Requires Android device and OS support. May crash "
                             + "if enabled on unsupported device."),
@@ -175,8 +177,6 @@ public final class ProductionSupportedFlagList {
             Flag.baseFeature(AutofillFeatures.AUTOFILL_ALWAYS_PARSE_PLACEHOLDERS,
                     "When enabled, Autofill local heuristics consider the placeholder attribute "
                             + "for determining field types."),
-            Flag.baseFeature(AutofillFeatures.AUTOFILL_IMPROVED_LABEL_FOR_INFERENCE,
-                    "When enabled, Autofill associates assigned labels with inputs in unowned forms."),
             Flag.baseFeature(AutofillFeatures.AUTOFILL_SERVER_BEHAVIORS,
                     "When enabled, Autofill will request experimental "
                             + "predictions from the Autofill API."),
@@ -211,6 +211,8 @@ public final class ProductionSupportedFlagList {
             Flag.baseFeature(AwFeatures.WEBVIEW_USE_METRICS_UPLOAD_SERVICE,
                     "Upload UMA metrics logs through MetricsUploadService not via GMS-core"
                             + " directly."),
+            Flag.baseFeature(AndroidMetricsFeatures.ANDROID_METRICS_ASYNC_METRIC_LOGGING,
+                    "Initiate metric uploading on a background thread."),
             Flag.baseFeature(BlinkFeatures.SET_TIMEOUT_WITHOUT_CLAMP,
                     "Enables faster setTimeout(,0) by removing the 1 ms clamping."),
             Flag.baseFeature(BlinkFeatures.PAINT_HOLDING_CROSS_ORIGIN,
@@ -283,8 +285,6 @@ public final class ProductionSupportedFlagList {
             Flag.baseFeature(BaseFeatures.ALWAYS_ABANDON_SCHEDULED_TASK,
                     "Controls whether or not the scheduled task is always abandoned when a timer "
                             + "is stopped or resets."),
-            Flag.baseFeature(BlinkFeatures.PRETOKENIZE_CSS,
-                    "If enabled, CSS will be tokenized in a background thread when possible."),
             Flag.baseFeature(BlinkFeatures.VIEW_TRANSITION,
                     "Enables the experimental View Transitions API."
                             + " See https://github.com/WICG/view-transitions/blob/main/explainer.md."),
@@ -307,6 +307,8 @@ public final class ProductionSupportedFlagList {
                             + "for commit to finish on the compositor thread."),
             Flag.baseFeature(CcFeatures.USE_DMSAA_FOR_TILES,
                     "Switches skia to use DMSAA instead of MSAA for tile raster"),
+            Flag.baseFeature(BlinkFeatures.CSS_PAINTING_FOR_SPELLING_GRAMMAR_ERRORS,
+                    "Use the new CSS-based painting for spelling and grammar errors"),
             Flag.baseFeature(
                     CcFeatures.AVOID_RASTER_DURING_ELASTIC_OVERSCROLL, "No effect on webview"),
             Flag.baseFeature(BlinkFeatures.WEB_RTC_ENCODER_ASYNC_ENCODE,
@@ -373,6 +375,19 @@ public final class ProductionSupportedFlagList {
                     "Enables downloading TrustTokenKeyCommitmentsComponent by the component"
                             + " updater downloading service in nonembedded WebView."
                             + " See https://crbug.com/1170468."),
+            Flag.baseFeature(BlinkFeatures.STYLUS_RICH_GESTURES,
+                    "When enabled, stylus input can be used to draw rich gestures which "
+                            + "affect text in editable web content."),
+            Flag.baseFeature(AwFeatures.WEBVIEW_ZOOM_KEYBOARD_SHORTCUTS,
+                    "Enables WebView to use zoom keyboard shortcuts on hardware keyboards."),
+            Flag.baseFeature(ContentFeatures.PRIVACY_SANDBOX_ADS_AP_IS_OVERRIDE,
+                    "When enabled, the following ads APIs will be available: Attribution Reporting,"
+                            + "FLEDGE, Topics."),
+            Flag.baseFeature(BlinkFeatures.WEB_RTC_STATS_REPORT_IDL,
+                    "Backs the WebRTC stats report object with generated objects defined in IDL"),
+            Flag.baseFeature(BlinkFeatures.RENDER_BLOCKING_FONTS,
+                    "When enabled, blocks rendering on font preloads to reduce CLS. "
+                            + "See go/critical-font-analysis"),
             // Add new commandline switches and features above. The final entry should have a
             // trailing comma for cleaner diffs.
     };

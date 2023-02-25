@@ -133,11 +133,13 @@ Para comezar, podes probar o seguinte.</translation>
 <translation id="163517899691012366">Cando está activado o modo Non molestar, as notificacións están silenciadas</translation>
 <translation id="1637505162081889933"><ph name="NUM_DEVICES" /> dispositivos</translation>
 <translation id="1639239467298939599">Cargando</translation>
+<translation id="1647986356840967552">Páxina anterior</translation>
 <translation id="1654477262762802994">Iniciar unha consulta de voz</translation>
 <translation id="1668469839109562275">VPN integrada</translation>
 <translation id="1677472565718498478">Tempo restante: <ph name="TIME" /></translation>
 <translation id="1677507110654891115">A función <ph name="FEATURE_NAME" /> non está conectada.</translation>
 <translation id="1677582821739292812">Alguén está mirando a túa pantalla</translation>
+<translation id="1683399938733266832">Uso actual da CPU: <ph name="CPU_USEAGE" /> %</translation>
 <translation id="169515659049020177">Maiús</translation>
 <translation id="1698080062160024910">Temporizador de <ph name="TOTAL_TIME" /> · <ph name="LABEL" /></translation>
 <translation id="1698760176351776263">Enderezo IPv6: <ph name="ADDRESS" /></translation>
@@ -286,6 +288,7 @@ Para comezar, podes probar o seguinte.</translation>
 <translation id="2475982808118771221">Produciuse un erro</translation>
 <translation id="2482878487686419369">Notificacións</translation>
 <translation id="2484513351006226581">Para cambiar o deseño de teclado, preme <ph name="KEYBOARD_SHORTCUT" />.</translation>
+<translation id="2487915095798731898">Unirse</translation>
 <translation id="2501920221385095727">Teclas presas</translation>
 <translation id="2509468283778169019">Bloqueo de maiúsculas activado</translation>
 <translation id="2515586267016047495">Alt</translation>
@@ -380,6 +383,7 @@ Para comezar, podes probar o seguinte.</translation>
 <translation id="3051189971848907985">Cambiando nome de perfil. Agarda uns minutos.</translation>
 <translation id="3055162170959710888">Hoxe utilizaches este dispositivo durante <ph name="USED_TIME" /></translation>
 <translation id="3062298103034426069">Función non admitida</translation>
+<translation id="3068622547379332530">Versión <ph name="VERSION_NAME" /> (<ph name="OFFICIAL_STATUS" />), <ph name="CHANNEL_NAME" /> <ph name="PROCESSOR_VARIATION" /></translation>
 <translation id="3068711042108640621">O estante está na parte esquerda</translation>
 <translation id="3077734595579995578">maiús</translation>
 <translation id="3081696990447829002">Despregar menú</translation>
@@ -556,6 +560,7 @@ Todos os usuarios deben pechar sesión para poder continuar.</translation>
 <translation id="397105322502079400">Calculando...</translation>
 <translation id="397726367135689299">É posible que cargar a batería non sexa fiable.</translation>
 <translation id="3977512764614765090">Nivel de batería: <ph name="PERCENTAGE" /> % (cargando).</translation>
+<translation id="3984536049089846927">Páxina seguinte</translation>
 <translation id="3986082989454912832">Responder</translation>
 <translation id="3995138139523574647">Dispositivo USB‑C (porto dereito posterior)</translation>
 <translation id="40062176907008878">Escritura manual</translation>
@@ -578,7 +583,7 @@ Todos os usuarios deben pechar sesión para poder continuar.</translation>
 <translation id="4123259114412175274">Para desbloquear o Chromebook, asegúrate de ter activado o Bluetooth do teléfono</translation>
 <translation id="4125970834901680537">Non se pode emitir contido de aplicacións no modo de tableta. Téntao de novo no modo de ordenador portátil.</translation>
 <translation id="4129129681837227511">Para ver notificacións na pantalla de bloqueo, desbloquea o dispositivo e cambia a opción de configuración correspondente</translation>
-<translation id="4130035430755296270">Pasa o cursor por enriba para ver máis opcións de deseño</translation>
+<translation id="4131973331381812765">Temperatura: <ph name="TEMPERATURE" /> °C. Velocidade actual: <ph name="CPU_AVERAGE_CURRENT_FREQUENCY_GHZ" /> GHz</translation>
 <translation id="4136724716305260864">Función activada ata o amencer</translation>
 <translation id="4146833061457621061">Reproducir música</translation>
 <translation id="4150201353443180367">Pantalla</translation>
@@ -733,6 +738,7 @@ Todos os usuarios deben pechar sesión para poder continuar.</translation>
 <translation id="4895488851634969361">A batería está completamente cargada.</translation>
 <translation id="490375751687810070">Vertical</translation>
 <translation id="490788395437447240"><ph name="BATTERY_PERCENTAGE" /> % de batería</translation>
+<translation id="491504982845934899">Activar despois da configuración do dispositivo <ph name="NETWORK_NAME" /></translation>
 <translation id="4917385247580444890">Forte</translation>
 <translation id="4918086044614829423">Aceptar</translation>
 <translation id="4919841137949306064"><ph name="APP_NAME" /> está usando a cámara nestes intres</translation>
@@ -914,6 +920,7 @@ Todos os usuarios deben pechar sesión para poder continuar.</translation>
 <translation id="5867606971598166637">A persoa que administra o sistema está supervisando as túas pantallas</translation>
 <translation id="5876666360658629066">Escribe o código parental</translation>
 <translation id="5881540930187678962">Configurar O meu teléfono máis tarde</translation>
+<translation id="5881663018261910378">Desactivada</translation>
 <translation id="5887954372087850114">A ventá <ph name="WINDOW_TITLE" /> está asignada ao escritorio <ph name="DESK_TITLE" /> e a ningún outro máis</translation>
 <translation id="5895138241574237353">Reiniciar</translation>
 <translation id="589817443623831496">Exploración por punto</translation>
@@ -1328,6 +1335,7 @@ Nova instalación</translation>
 <translation id="8131740175452115882">Confirmar</translation>
 <translation id="8131994907636310308">Pechar notificación de ordenar</translation>
 <translation id="8132793192354020517">Conectado a <ph name="NAME" /></translation>
+<translation id="8138705869659070104">Activar tras a configuración</translation>
 <translation id="813913629614996137">Iniciando...</translation>
 <translation id="8142441511840089262">Dobre clic</translation>
 <translation id="8142699993796781067">Rede privada</translation>
@@ -1459,6 +1467,7 @@ Nova instalación</translation>
 <translation id="8850991929411075241">Busca+Esc</translation>
 <translation id="8853703225951107899">Aínda non se puido verificar o teu PIN ou contrasinal. Nota: Se cambiaches o contrasinal recentemente, utiliza o antigo. O contrasinal novo aplicarase en canto peches sesión.</translation>
 <translation id="8855885154700222542">Tecla de pantalla completa</translation>
+<translation id="8858369206579825206">Controis de privacidade</translation>
 <translation id="8870509716567206129">A aplicación non é compatible coa función de pantalla dividida.</translation>
 <translation id="8874184842967597500">Non conectada</translation>
 <translation id="8876661425082386199">Comproba a conexión</translation>

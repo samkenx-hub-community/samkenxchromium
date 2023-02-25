@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include "base/values.h"
 #include "chrome/browser/extensions/api/downloads/downloads_api.h"
 
 #include <stddef.h>
@@ -173,18 +174,23 @@ class DownloadsEventsListener : public EventRouter::TestObserver {
         if (!args_.is_list() || !other.args_.is_list() ||
             args_.GetList().empty() || other.args_.GetList().empty())
           return false;
-        const base::Value& left_dict = args_.GetList()[0];
-        const base::Value& right_dict = other.args_.GetList()[0];
-        if (!left_dict.is_dict() || !right_dict.is_dict())
+        const base::Value& left_value = args_.GetList()[0];
+        const base::Value& right_value = other.args_.GetList()[0];
+        if (!left_value.is_dict() || !right_value.is_dict()) {
           return false;
+        }
+
+        const base::Value::Dict& left_dict = left_value.GetDict();
+        const base::Value::Dict& right_dict = right_value.GetDict();
         // Expect that all keys present in both dictionaries are equal. If a key
         // is only present in one of the dictionaries, ignore it. This allows us
         // to verify the properties we care about in the test without needing to
         // specify each.
-        for (auto it : left_dict.DictItems()) {
-          const base::Value* right_value = right_dict.FindKey(it.first);
-          if (!right_value || *right_value != it.second)
+        for (const auto [left_dict_key, left_dict_value] : left_dict) {
+          const base::Value* right_dict_value = right_dict.Find(left_dict_key);
+          if (!right_dict_value || *right_dict_value != left_dict_value) {
             return false;
+          }
         }
         return true;
       }
@@ -865,7 +871,7 @@ class HTML5FileWriter {
     // Create a temp file.
     base::FilePath temp_file;
     if (!base::CreateTemporaryFile(&temp_file) ||
-        base::WriteFile(temp_file, data, length) != length) {
+        !base::WriteFile(temp_file, base::StringPiece(data, length))) {
       return false;
     }
     // Invoke the fileapi to copy it into the sandboxed filesystem.
@@ -1019,7 +1025,7 @@ IN_PROC_BROWSER_TEST_F(DownloadExtensionTest, DownloadExtensionTest_Open) {
   std::unique_ptr<ExtensionFunctionDispatcher> dispatcher(
       new ExtensionFunctionDispatcher(current_browser()->profile()));
   open_function->SetDispatcher(dispatcher->AsWeakPtr());
-  open_function->RunWithValidation()->Execute();
+  open_function->RunWithValidation().Execute();
   response_helper.WaitForResponse();
   EXPECT_TRUE(response_helper.has_response());
   EXPECT_TRUE(response_helper.GetResponse());
@@ -1231,7 +1237,7 @@ IN_PROC_BROWSER_TEST_F(DownloadExtensionTest,
 
   {
     base::ScopedAllowBlockingForTesting allow_blocking;
-    EXPECT_EQ(0, base::WriteFile(real_path, "", 0));
+    EXPECT_TRUE(base::WriteFile(real_path, ""));
     ASSERT_TRUE(base::PathExists(real_path));
     ASSERT_FALSE(base::PathExists(fake_path));
   }
@@ -1330,7 +1336,7 @@ IN_PROC_BROWSER_TEST_F(DownloadExtensionTest,
   ASSERT_EQ(1UL, result->GetList().size());
   const base::Value& item_value = result->GetList()[0];
   ASSERT_TRUE(item_value.is_dict());
-  absl::optional<int> item_id = item_value.FindIntKey("id");
+  absl::optional<int> item_id = item_value.GetDict().FindInt("id");
   ASSERT_TRUE(item_id);
   ASSERT_EQ(all_downloads[0]->GetId(), static_cast<uint32_t>(*item_id));
 }
@@ -1350,7 +1356,7 @@ IN_PROC_BROWSER_TEST_F(DownloadExtensionTest, DownloadExtensionTest_SearchId) {
   ASSERT_EQ(1UL, result->GetList().size());
   const base::Value& item_value = result->GetList()[0];
   ASSERT_TRUE(item_value.is_dict());
-  absl::optional<int> item_id = item_value.FindIntKey("id");
+  absl::optional<int> item_id = item_value.GetDict().FindInt("id");
   ASSERT_TRUE(item_id);
   ASSERT_EQ(items[0]->GetId(), static_cast<uint32_t>(*item_id));
 }
@@ -1393,8 +1399,8 @@ IN_PROC_BROWSER_TEST_F(DownloadExtensionTest,
   const base::Value& item1_value = result->GetList()[1];
   ASSERT_TRUE(item0_value.is_dict());
   ASSERT_TRUE(item1_value.is_dict());
-  const std::string* item0_name = item0_value.FindStringKey("filename");
-  const std::string* item1_name = item1_value.FindStringKey("filename");
+  const std::string* item0_name = item0_value.GetDict().FindString("filename");
+  const std::string* item1_name = item1_value.GetDict().FindString("filename");
   ASSERT_TRUE(item0_name);
   ASSERT_TRUE(item1_name);
   ASSERT_GT(items[0]->GetTargetFilePath().value(),
@@ -1423,8 +1429,8 @@ IN_PROC_BROWSER_TEST_F(DownloadExtensionTest,
   const base::Value& item1_value = result->GetList()[1];
   ASSERT_TRUE(item0_value.is_dict());
   ASSERT_TRUE(item1_value.is_dict());
-  const std::string* item0_name = item0_value.FindStringKey("filename");
-  const std::string* item1_name = item1_value.FindStringKey("filename");
+  const std::string* item0_name = item0_value.GetDict().FindString("filename");
+  const std::string* item1_name = item1_value.GetDict().FindString("filename");
   ASSERT_TRUE(item0_name);
   ASSERT_TRUE(item1_name);
   ASSERT_GT(items[0]->GetTargetFilePath().value(),
@@ -1533,7 +1539,7 @@ IN_PROC_BROWSER_TEST_F(DownloadExtensionTest,
   ASSERT_EQ(1UL, result->GetList().size());
   const base::Value& item_value = result->GetList()[0];
   ASSERT_TRUE(item_value.is_dict());
-  const std::string* item_name = item_value.FindStringKey("filename");
+  const std::string* item_name = item_value.GetDict().FindString("filename");
   ASSERT_TRUE(item_name);
   ASSERT_EQ(items[2]->GetTargetFilePath().AsUTF8Unsafe(), *item_name);
 }
@@ -1573,22 +1579,20 @@ IN_PROC_BROWSER_TEST_F(
   ASSERT_TRUE(result_value->is_list());
   ASSERT_EQ(2UL, result_value->GetList().size());
   {
-    const base::Value& result_dict = result_value->GetList()[0];
-    ASSERT_TRUE(result_dict.is_dict());
-    const std::string* filename = result_dict.FindStringKey("filename");
+    const base::Value::Dict& result_dict = result_value->GetList()[0].GetDict();
+    const std::string* filename = result_dict.FindString("filename");
     ASSERT_TRUE(filename);
-    absl::optional<bool> is_incognito = result_dict.FindBoolKey("incognito");
+    absl::optional<bool> is_incognito = result_dict.FindBool("incognito");
     ASSERT_TRUE(is_incognito.has_value());
     EXPECT_TRUE(on_item->GetTargetFilePath() ==
                 base::FilePath::FromUTF8Unsafe(*filename));
     EXPECT_FALSE(is_incognito.value());
   }
   {
-    const base::Value& result_dict = result_value->GetList()[1];
-    ASSERT_TRUE(result_dict.is_dict());
-    const std::string* filename = result_dict.FindStringKey("filename");
+    const base::Value::Dict& result_dict = result_value->GetList()[1].GetDict();
+    const std::string* filename = result_dict.FindString("filename");
     ASSERT_TRUE(filename);
-    absl::optional<bool> is_incognito = result_dict.FindBoolKey("incognito");
+    absl::optional<bool> is_incognito = result_dict.FindBool("incognito");
     ASSERT_TRUE(is_incognito.has_value());
     EXPECT_TRUE(off_item->GetTargetFilePath() ==
                 base::FilePath::FromUTF8Unsafe(*filename));
@@ -1604,13 +1608,12 @@ IN_PROC_BROWSER_TEST_F(
   ASSERT_TRUE(result_value->is_list());
   ASSERT_EQ(1UL, result_value->GetList().size());
   {
-    const base::Value& result_dict = result_value->GetList()[0];
-    ASSERT_TRUE(result_dict.is_dict());
-    const std::string* filename = result_dict.FindStringKey("filename");
+    const base::Value::Dict& result_dict = result_value->GetList()[0].GetDict();
+    const std::string* filename = result_dict.FindString("filename");
     ASSERT_TRUE(filename);
     EXPECT_TRUE(on_item->GetTargetFilePath() ==
                 base::FilePath::FromUTF8Unsafe(*filename));
-    absl::optional<bool> is_incognito = result_dict.FindBoolKey("incognito");
+    absl::optional<bool> is_incognito = result_dict.FindBool("incognito");
     ASSERT_TRUE(is_incognito.has_value());
     EXPECT_FALSE(is_incognito.value());
   }

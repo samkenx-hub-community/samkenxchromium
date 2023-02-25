@@ -190,10 +190,8 @@ bool IsTransportSocketPoolStalled(HttpNetworkSession* session) {
 // Takes in a Value created from a NetLogHttpResponseParameter, and returns
 // a JSONified list of headers as a single string.  Uses single quotes instead
 // of double quotes for easier comparison.
-std::string GetHeaders(const base::Value& params) {
-  if (!params.is_dict())
-    return "";
-  const base::Value::List* header_list = params.GetDict().FindList("headers");
+std::string GetHeaders(const base::Value::Dict& params) {
+  const base::Value::List* header_list = params.FindList("headers");
   if (!header_list)
     return "";
   std::string headers;
@@ -16836,7 +16834,7 @@ TEST_F(HttpNetworkTransactionTest, ClientAuthCertCache_Direct_NoFalseStart) {
   // requiring a client certificate, this fallback handshake should also
   // fail.
   SSLSocketDataProvider ssl_data3(ASYNC, ERR_SSL_PROTOCOL_ERROR);
-  ssl_data3.expected_disable_legacy_crypto = false;
+  ssl_data3.expected_disable_sha1_server_signatures = false;
   ssl_data3.cert_request_info = cert_request.get();
   session_deps_.socket_factory->AddSSLSocketDataProvider(&ssl_data3);
   StaticSocketDataProvider data3;

@@ -4,6 +4,8 @@
 
 #include "chrome/browser/ash/arc/input_overlay/ui/edit_finish_view.h"
 
+#include <memory>
+
 #include "ash/app_list/app_list_util.h"
 #include "ash/style/style_util.h"
 #include "base/functional/bind.h"
@@ -12,12 +14,17 @@
 #include "chrome/browser/ash/arc/input_overlay/util.h"
 #include "chrome/grit/generated_resources.h"
 #include "third_party/skia/include/core/SkColor.h"
+#include "ui/accessibility/ax_enums.mojom-shared.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/color/color_id.h"
-#include "ui/compositor/layer.h"
 #include "ui/events/event.h"
 #include "ui/gfx/geometry/size.h"
+#include "ui/views/accessibility/view_accessibility.h"
+#include "ui/views/animation/flood_fill_ink_drop_ripple.h"
+#include "ui/views/animation/ink_drop.h"
+#include "ui/views/animation/ink_drop_highlight.h"
 #include "ui/views/background.h"
+#include "ui/views/controls/focus_ring.h"
 #include "ui/views/controls/highlight_path_generator.h"
 #include "ui/views/layout/box_layout.h"
 
@@ -31,7 +38,6 @@ constexpr int kViewMargin = 8;
 constexpr int kViewCornerRadius = 16;
 constexpr int kViewBackgroundColor = SkColorSetA(SK_ColorBLACK, 0xCC /*80%*/);
 constexpr int kParentPadding = 16;
-constexpr int kBackgroundBlur = 10;
 // Space between children.
 constexpr int kSpaceRow = 4;
 // Alpha view features.
@@ -58,12 +64,38 @@ constexpr int kButtonHeightAlpha = 56;
 // Since we only need the dark mode for the kEdit mode, so dark background is
 // passed for setting up the ink drop.
 constexpr SkColor kEditBackgroundColor = SkColorSetA(SK_ColorBLACK, 0x99);
+constexpr SkColor kInkDropBaseColor = SK_ColorWHITE;
+constexpr float kInkDropOpacity = 0.08f;
 
 // About focus ring.
 // Gap between focus ring outer edge to label.
 constexpr float kHaloInset = -6;
 // Thickness of focus ring.
 constexpr float kHaloThickness = 4;
+
+std::unique_ptr<views::InkDrop> CreateInkDrop(views::Button* view) {
+  return views::InkDrop::CreateInkDropForFloodFillRipple(
+      views::InkDrop::Get(view), /*highlight_on_hover=*/true,
+      /*highlight_on_focus=*/true);
+}
+
+std::unique_ptr<views::InkDropRipple> CreateInkDropRipple(
+    const views::Button* view) {
+  return std::make_unique<views::FloodFillInkDropRipple>(
+      const_cast<views::InkDropHost*>(views::InkDrop::Get(view)), view->size(),
+      gfx::Insets(),
+      views::InkDrop::Get(view)->GetInkDropCenterBasedOnLastEvent(),
+      kInkDropBaseColor, kInkDropOpacity);
+}
+
+std::unique_ptr<views::InkDropHighlight> CreateInkDropHighlight(
+    views::Button* view) {
+  auto highlight = std::make_unique<views::InkDropHighlight>(
+      gfx::SizeF(view->size()), kInkDropBaseColor);
+  highlight->set_visible_opacity(kInkDropOpacity);
+  return highlight;
+}
+
 }  // namespace
 
 class EditFinishView::ChildButton : public views::LabelButton {
@@ -109,10 +141,14 @@ class EditFinishView::ChildButton : public views::LabelButton {
     focus_ring->SetHaloInset(kHaloInset);
     focus_ring->SetHaloThickness(kHaloThickness);
     focus_ring->SetColorId(ui::kColorAshInputOverlayFocusRing);
-    ash::StyleUtil::SetUpInkDropForButton(this, gfx::Insets(),
-                                          /*highlight_on_hover=*/true,
-                                          /*highlight_on_focus=*/true,
-                                          kEditBackgroundColor);
+    if (AllowReposition()) {
+      SetUpInkDropForButton();
+    } else {
+      ash::StyleUtil::SetUpInkDropForButton(this, gfx::Insets(),
+                                            /*highlight_on_hover=*/true,
+                                            /*highlight_on_focus=*/true,
+                                            kEditBackgroundColor);
+    }
   }
   ~ChildButton() override = default;
 
@@ -123,11 +159,15 @@ class EditFinishView::ChildButton : public views::LabelButton {
   }
 
   bool OnMouseDragged(const ui::MouseEvent& event) override {
-    if (AllowReposition()) {
-      is_dragging_ = true;
-      on_mouse_dragged_callback_.Run(event);
-    }
-    return LabelButton::OnMouseDragged(event);
+    if (!AllowReposition())
+      return LabelButton::OnMouseDragged(event);
+
+    is_dragging_ = true;
+    on_mouse_dragged_callback_.Run(event);
+    views::InkDrop::Get(this)->GetInkDrop()->SetHovered(false);
+    views::InkDrop::Get(this)->AnimateToState(views::InkDropState::HIDDEN,
+                                              /*event=*/nullptr);
+    return true;
   }
 
   void OnMouseReleased(const ui::MouseEvent& event) override {
@@ -135,11 +175,25 @@ class EditFinishView::ChildButton : public views::LabelButton {
       LabelButton::OnMouseReleased(event);
       return;
     }
+    // Don't trigger button pressed event when it is dragged.
     is_dragging_ = false;
     on_mouse_released_callback_.Run(event);
   }
 
  private:
+  // Set inkdrop without theme.
+  void SetUpInkDropForButton() {
+    auto* ink_drop = views::InkDrop::Get(this);
+    ink_drop->SetMode(views::InkDropHost::InkDropMode::ON);
+    SetHasInkDropActionOnClick(true);
+    ink_drop->SetCreateInkDropCallback(
+        base::BindRepeating(&CreateInkDrop, this));
+    ink_drop->SetCreateRippleCallback(
+        base::BindRepeating(&CreateInkDropRipple, this));
+    ink_drop->SetCreateHighlightCallback(
+        base::BindRepeating(&CreateInkDropHighlight, this));
+  }
+
   bool is_dragging_ = false;
 
   // Callbacks for dragging.
@@ -179,10 +233,7 @@ void EditFinishView::Init(const gfx::Size& parent_size) {
                     : views::CreateSolidBackground(SK_ColorTRANSPARENT));
 
   if (AllowReposition()) {
-    SetPaintToLayer();
-    layer()->SetFillsBoundsOpaquely(false);
-    layer()->SetBackgroundBlur(kBackgroundBlur);
-    layer()->SetRoundedCornerRadius(gfx::RoundedCornersF(kViewCornerRadius));
+    SetFocusRing();
   }
 
   auto on_mouse_pressed_callback = base::BindRepeating(
@@ -219,6 +270,20 @@ void EditFinishView::Init(const gfx::Size& parent_size) {
       gfx::Size(AllowReposition() ? width + 2 * kViewMargin : width, height));
   SetPosition(gfx::Point(std::max(0, parent_size.width() - width - kSideMargin),
                          std::max(0, parent_size.height() / 3 - height / 2)));
+}
+
+void EditFinishView::SetFocusRing() {
+  SetFocusBehavior(FocusBehavior::ALWAYS);
+  GetViewAccessibility().OverrideRole(ax::mojom::Role::kGroup);
+  // TODO(b/260868602): Update the name.
+  GetViewAccessibility().OverrideName(GetClassName());
+  views::FocusRing::Install(this);
+  views::InstallRoundRectHighlightPathGenerator(this, gfx::Insets(),
+                                                kButtonCornerRadius);
+  auto* focus_ring = views::FocusRing::Get(this);
+  focus_ring->SetHaloInset(kHaloInset);
+  focus_ring->SetHaloThickness(kHaloThickness);
+  focus_ring->SetColorId(ui::kColorAshInputOverlayFocusRing);
 }
 
 int EditFinishView::CalculateWidth() {
@@ -280,7 +345,8 @@ void EditFinishView::OnGestureEvent(ui::GestureEvent* event) {
 bool EditFinishView::OnKeyPressed(const ui::KeyEvent& event) {
   auto target_position = origin();
   if (!AllowReposition() ||
-      !UpdatePositionByArrowKey(event.key_code(), target_position)) {
+      !UpdatePositionByArrowKey(event.key_code(), target_position) ||
+      !HasFocus()) {
     return views::View::OnKeyPressed(event);
   }
 
@@ -290,7 +356,7 @@ bool EditFinishView::OnKeyPressed(const ui::KeyEvent& event) {
 }
 
 bool EditFinishView::OnKeyReleased(const ui::KeyEvent& event) {
-  if (!AllowReposition() || !ash::IsArrowKeyEvent(event))
+  if (!AllowReposition() || !ash::IsArrowKeyEvent(event) || !HasFocus())
     return views::View::OnKeyReleased(event);
 
   RecordInputOverlayButtonGroupReposition(
@@ -321,8 +387,9 @@ void EditFinishView::OnResetButtonPressed() {
   if (!display_overlay_controller_)
     return;
   display_overlay_controller_->OnCustomizeRestore();
-  // Take the focus from |ActionLabel|.
-  reset_button_->RequestFocus();
+  if (reset_button_->HasFocus() || !parent())
+    return;
+  ResetFocusTo(parent());
 }
 
 void EditFinishView::OnSaveButtonPressed() {

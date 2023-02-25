@@ -9,9 +9,11 @@
 #include <string>
 #include <vector>
 
+#include "base/component_export.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/ref_counted.h"
 #include "base/task/single_thread_task_runner.h"
+#include "base/threading/platform_thread.h"
 #include "cc/resources/ui_resource_bitmap.h"
 #include "cc/resources/ui_resource_client.h"
 #include "cc/slim/frame_sink.h"
@@ -37,6 +39,7 @@
 namespace cc::slim {
 
 class FrameSinkImplClient;
+class TestFrameSinkImpl;
 
 // Slim implementation of FrameSink.
 // * Owns mojo interfaces to viz and responsible for submitting frames and
@@ -44,9 +47,10 @@ class FrameSinkImplClient;
 // * Owns ContextProvider.
 // * Listen and respond to context loss or GPU process crashes.
 // * Manage uploading UIResource.
-class FrameSinkImpl : public FrameSink,
-                      public viz::ContextLostObserver,
-                      public viz::mojom::CompositorFrameSinkClient {
+class COMPONENT_EXPORT(CC_SLIM) FrameSinkImpl
+    : public FrameSink,
+      public viz::ContextLostObserver,
+      public viz::mojom::CompositorFrameSinkClient {
  public:
   ~FrameSinkImpl() override;
 
@@ -55,15 +59,18 @@ class FrameSinkImpl : public FrameSink,
   }
   void SetLocalSurfaceId(const viz::LocalSurfaceId& local_surface_id);
 
-  // Called by LayerTree.
-  bool BindToClient(FrameSinkImplClient* client);
-  void SetNeedsBeginFrame(bool needs_begin_frame);
+  // Called by LayerTree. Virtual for testing.
+  virtual bool BindToClient(FrameSinkImplClient* client);
+  virtual void SetNeedsBeginFrame(bool needs_begin_frame);
   void UploadUIResource(cc::UIResourceId resource_id,
                         cc::UIResourceBitmap resource_bitmap);
   void MarkUIResourceForDeletion(cc::UIResourceId resource_id);
   viz::ResourceId GetVizResourceId(cc::UIResourceId id);
   bool IsUIResourceOpaque(cc::UIResourceId resource_id);
   gfx::Size GetUIResourceSize(cc::UIResourceId resource_id);
+  viz::ClientResourceProvider* client_resource_provider() {
+    return &resource_provider_;
+  }
 
   // viz::ContextLostObserver
   void OnContextLost() override;
@@ -72,7 +79,9 @@ class FrameSinkImpl : public FrameSink,
   void DidReceiveCompositorFrameAck(
       std::vector<viz::ReturnedResource> resources) override;
   void OnBeginFrame(const viz::BeginFrameArgs& begin_frame_args,
-                    const viz::FrameTimingDetailsMap& timing_details) override;
+                    const viz::FrameTimingDetailsMap& timing_details,
+                    bool frame_ack,
+                    std::vector<viz::ReturnedResource> resources) override;
   void OnBeginFramePausedChanged(bool paused) override {}
   void ReclaimResources(std::vector<viz::ReturnedResource> resources) override;
   void OnCompositorFrameTransitionDirectiveProcessed(
@@ -80,6 +89,7 @@ class FrameSinkImpl : public FrameSink,
 
  private:
   friend class FrameSink;
+  friend class TestFrameSinkImpl;
 
   struct UploadedUIResource {
     UploadedUIResource();
@@ -98,7 +108,8 @@ class FrameSinkImpl : public FrameSink,
                     compositor_frame_sink_associated_remote,
                 mojo::PendingReceiver<viz::mojom::CompositorFrameSinkClient>
                     client_receiver,
-                scoped_refptr<viz::ContextProvider> context_provider);
+                scoped_refptr<viz::ContextProvider> context_provider,
+                base::PlatformThreadId io_thread_id);
 
   using UploadedResourceMap =
       base::flat_map<cc::UIResourceId, UploadedUIResource>;
@@ -114,6 +125,8 @@ class FrameSinkImpl : public FrameSink,
       pending_client_receiver_;
 
   mojo::AssociatedRemote<viz::mojom::CompositorFrameSink> frame_sink_remote_;
+  // Separate from AssociatedRemote above for testing.
+  viz::mojom::CompositorFrameSink* frame_sink_ = nullptr;
   mojo::Receiver<viz::mojom::CompositorFrameSinkClient> client_receiver_{this};
   scoped_refptr<viz::ContextProvider> context_provider_;
   raw_ptr<FrameSinkImplClient> client_ = nullptr;
@@ -123,6 +136,11 @@ class FrameSinkImpl : public FrameSink,
   viz::ClientResourceProvider resource_provider_;
   // Last `HitTestRegionList` sent to viz.
   absl::optional<viz::HitTestRegionList> hit_test_region_list_;
+  base::PlatformThreadId io_thread_id_;
+
+  viz::LocalSurfaceId last_submitted_local_surface_id_;
+  float last_submitted_device_scale_factor_ = 1.f;
+  gfx::Size last_submitted_size_in_pixels_;
 
   bool needs_begin_frame_ = false;
 };

@@ -8,19 +8,19 @@ import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
-import android.view.KeyEvent;
 import android.view.View;
-import android.view.inputmethod.InputMethodManager;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
+import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ProgressBar;
 import android.widget.Spinner;
 import android.widget.TextView;
-import android.widget.TextView.OnEditorActionListener;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.ContextCompat;
 
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
@@ -36,6 +36,8 @@ import org.chromium.webengine.WebFragment;
 import org.chromium.webengine.WebMessageCallback;
 import org.chromium.webengine.WebMessageReplyProxy;
 import org.chromium.webengine.WebSandbox;
+import org.chromium.webengine.shell.topbar.TopBarImpl;
+import org.chromium.webengine.shell.topbar.TopBarObservers;
 
 import java.util.Arrays;
 
@@ -43,7 +45,7 @@ import java.util.Arrays;
  * Activity for managing the Demo Shell.
  *
  * TODO(swestphal):
- *  - UI to add/remove/switch tabs
+ *  - UI to add/remove tabs
  *  - Expose some tab/navigation events in the UI
  *  - Move cookie test to manual-test activity
  *  - Move registerWebMessageCallback to manual-test activity
@@ -76,7 +78,7 @@ public class WebEngineShellActivity extends AppCompatActivity {
 
             @Override
             public void onFailure(Throwable thrown) {}
-        }, mContext.getMainExecutor());
+        }, ContextCompat.getMainExecutor(mContext));
 
         ListenableFuture<WebSandbox> webSandboxFuture = WebSandbox.create(mContext);
         Futures.addCallback(webSandboxFuture, new FutureCallback<WebSandbox>() {
@@ -86,8 +88,12 @@ public class WebEngineShellActivity extends AppCompatActivity {
             }
 
             @Override
-            public void onFailure(Throwable thrown) {}
-        }, mContext.getMainExecutor());
+            public void onFailure(Throwable thrown) {
+                Toast.makeText(mContext, "Failed to start WebSandbox. WebView update needed.",
+                             Toast.LENGTH_LONG)
+                        .show();
+            }
+        }, ContextCompat.getMainExecutor(mContext));
     }
 
     @Override
@@ -121,7 +127,7 @@ public class WebEngineShellActivity extends AppCompatActivity {
 
             @Override
             public void onFailure(Throwable thrown) {}
-        }, mContext.getMainExecutor());
+        }, ContextCompat.getMainExecutor(mContext));
     }
 
     private void onWebEngineReady(WebEngine webEngine) {
@@ -131,12 +137,15 @@ public class WebEngineShellActivity extends AppCompatActivity {
         Tab activeTab = mTabManager.getActiveTab();
         ProgressBar progressBar = findViewById(R.id.progress_bar);
         EditText urlBar = findViewById(R.id.url_bar);
+        Button tabCountButton = findViewById(R.id.tab_count);
+        Spinner tabListSpinner = findViewById(R.id.tab_list);
+        new TopBarObservers(new TopBarImpl(this, mTabManager, urlBar, progressBar, tabCountButton,
+                                    tabListSpinner),
+                mTabManager);
 
-        activeTab.registerTabObserver(
-                new DefaultObservers.DefaultTabObserver(urlBar, activeTab, mTabManager));
+        mTabManager.registerTabListObserver(new DefaultObservers.DefaultTabListObserver());
         activeTab.getNavigationController().registerNavigationObserver(
-                new DefaultObservers.DefaultNavigationObserver(
-                        progressBar, activeTab, mTabManager) {
+                new DefaultObservers.DefaultNavigationObserver() {
                     @Override
                     public void onNavigationCompleted(@NonNull Navigation navigation) {
                         super.onNavigationCompleted(navigation);
@@ -151,10 +160,9 @@ public class WebEngineShellActivity extends AppCompatActivity {
                             public void onFailure(Throwable thrown) {
                                 Log.w(TAG, "executeScript failed: " + thrown);
                             }
-                        }, mContext.getMainExecutor());
+                        }, ContextCompat.getMainExecutor(mContext));
                     }
                 });
-
         activeTab.getNavigationController().navigate("https://www.google.com");
 
         activeTab.registerWebMessageCallback(new WebMessageCallback() {
@@ -171,8 +179,7 @@ public class WebEngineShellActivity extends AppCompatActivity {
             public void onWebMessageReplyProxyActiveStateChanged(WebMessageReplyProxy proxy) {}
         }, "x", Arrays.asList("*"));
 
-        mTabManager.registerTabListObserver(
-                new DefaultObservers.DefaultTabListObserver(progressBar, urlBar, mTabManager));
+        activeTab.registerTabObserver(new DefaultObservers.DefaultTabObserver());
 
         activeTab.addMessageEventListener((Tab source, String message) -> {
             Log.w(TAG, "Received post message from web content: " + message);
@@ -194,27 +201,14 @@ public class WebEngineShellActivity extends AppCompatActivity {
 
                     @Override
                     public void onFailure(Throwable thrown) {}
-                }, mContext.getMainExecutor());
+                }, ContextCompat.getMainExecutor(mContext));
             }
 
             @Override
             public void onFailure(Throwable thrown) {
                 Log.w(TAG, "setCookie failed: " + thrown);
             }
-        }, mContext.getMainExecutor());
-
-        urlBar.setOnEditorActionListener(new OnEditorActionListener() {
-            @Override
-            public boolean onEditorAction(TextView v, int actionId, KeyEvent event) {
-                String query = v.getText().toString();
-                mTabManager.getActiveTab().getNavigationController().navigate(query);
-                // Hides keyboard on Enter key pressed
-                InputMethodManager imm =
-                        (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
-                imm.hideSoftInputFromWindow(v.getWindowToken(), 0);
-                return true;
-            }
-        });
+        }, ContextCompat.getMainExecutor(mContext));
 
         getSupportFragmentManager()
                 .beginTransaction()
@@ -246,14 +240,13 @@ public class WebEngineShellActivity extends AppCompatActivity {
                 }
                 WebEngineShellActivity.super.onBackPressed();
             }
-        }, mContext.getMainExecutor());
+        }, ContextCompat.getMainExecutor(mContext));
     }
 
     // TODO(swestphal): Move this to a helper class.
     static void setupActivitySpinner(Spinner spinner, Activity activity, int index) {
-        ArrayAdapter<CharSequence> adapter = ArrayAdapter.createFromResource(
-                activity, R.array.activities_drop_down, android.R.layout.simple_spinner_item);
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        ArrayAdapter<CharSequence> adapter = ArrayAdapter.createFromResource(activity,
+                R.array.activities_drop_down, android.R.layout.simple_spinner_dropdown_item);
         spinner.setAdapter(adapter);
         spinner.setSelection(index, false);
         spinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {

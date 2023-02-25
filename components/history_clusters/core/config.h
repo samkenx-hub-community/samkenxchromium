@@ -291,7 +291,8 @@ struct Config {
 
   // The set of collections to block from being content clustered.
   base::flat_set<std::string> collections_to_block_from_content_clustering = {
-      "/collection/it_glosssary", "/collection/software"};
+      "/collection/it_glosssary", "/collection/software",
+      "/collection/websites"};
 
   // Whether to merge similar clusters using pairwise merge.
   bool use_pairwise_merge = false;
@@ -389,8 +390,10 @@ struct Config {
 };
 
 // Returns the set of collections that should not be included for content
-// clustering.
-base::flat_set<std::string> JourneysCollectionContentClusteringBlocklist();
+// clustering. If the experiment string is empty or malformed, `default_value`
+// will be used.
+base::flat_set<std::string> JourneysCollectionContentClusteringBlocklist(
+    const base::flat_set<std::string>& default_value);
 
 // Returns the set of mids that should be blocked from being used by the
 // clustering backend, particularly for potential keywords used for omnibox

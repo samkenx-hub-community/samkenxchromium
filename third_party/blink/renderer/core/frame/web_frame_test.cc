@@ -81,8 +81,6 @@
 #include "third_party/blink/public/platform/web_cache.h"
 #include "third_party/blink/public/platform/web_security_origin.h"
 #include "third_party/blink/public/platform/web_url.h"
-#include "third_party/blink/public/platform/web_url_loader_client.h"
-#include "third_party/blink/public/platform/web_url_loader_mock_factory.h"
 #include "third_party/blink/public/platform/web_url_response.h"
 #include "third_party/blink/public/test/test_web_frame_content_dumper.h"
 #include "third_party/blink/public/web/web_console_message.h"
@@ -198,6 +196,7 @@
 #include "third_party/blink/renderer/platform/loader/fetch/raw_resource.h"
 #include "third_party/blink/renderer/platform/loader/fetch/resource_fetcher.h"
 #include "third_party/blink/renderer/platform/loader/fetch/resource_fetcher_properties.h"
+#include "third_party/blink/renderer/platform/loader/fetch/url_loader/url_loader_client.h"
 #include "third_party/blink/renderer/platform/runtime_enabled_features.h"
 #include "third_party/blink/renderer/platform/runtime_feature_state/runtime_feature_state_override_context.h"
 #include "third_party/blink/renderer/platform/scheduler/public/event_loop.h"
@@ -207,6 +206,7 @@
 #include "third_party/blink/renderer/platform/testing/runtime_enabled_features_test_helpers.h"
 #include "third_party/blink/renderer/platform/testing/testing_platform_support.h"
 #include "third_party/blink/renderer/platform/testing/unit_test_helpers.h"
+#include "third_party/blink/renderer/platform/testing/url_loader_mock_factory.h"
 #include "third_party/blink/renderer/platform/testing/url_test_helpers.h"
 #include "third_party/blink/renderer/platform/weborigin/kurl_hash.h"
 #include "third_party/blink/renderer/platform/weborigin/scheme_registry.h"
@@ -558,8 +558,8 @@ class ScriptExecutionCallbackHelper final {
   bool DidComplete() const { return did_complete_; }
 
   WebScriptExecutionCallback Callback() {
-    return base::BindOnce(&ScriptExecutionCallbackHelper::Completed,
-                          base::Unretained(this));
+    return WTF::BindOnce(&ScriptExecutionCallbackHelper::Completed,
+                         WTF::Unretained(this));
   }
 
   // Returns true if any results (even if they were empty) were passed to the
@@ -1119,6 +1119,25 @@ TEST_F(WebFrameTest, CapabilityDelegationMessageEventTest) {
     ScriptExecutionCallbackHelper callback_helper;
     ExecuteScriptInMainWorld(web_view_helper.GetWebView()->MainFrameImpl(),
                              post_message_w_fullscreen_request,
+                             callback_helper.Callback(),
+                             blink::mojom::PromiseResultOption::kAwait,
+                             blink::mojom::UserActivationOption::kActivate);
+    RunPendingTasks();
+    EXPECT_TRUE(callback_helper.DidComplete());
+    EXPECT_TRUE(message_event_listener->DelegateCapability());
+  }
+
+  {
+    String post_message_w_display_capture_request(
+        "window.frames[0].postMessage("
+        "'1', {targetOrigin: '/', delegate: 'display-capture'});");
+
+    // The delegation info is passed through a postMessage that is sent with
+    // both user activation and the delegation option for another known
+    // capability.
+    ScriptExecutionCallbackHelper callback_helper;
+    ExecuteScriptInMainWorld(web_view_helper.GetWebView()->MainFrameImpl(),
+                             post_message_w_display_capture_request,
                              callback_helper.Callback(),
                              blink::mojom::PromiseResultOption::kAwait,
                              blink::mojom::UserActivationOption::kActivate);
@@ -6438,8 +6457,10 @@ TEST_F(WebFrameTest, DISABLED_PositionForPointTest) {
   EXPECT_EQ(64, ComputeOffset(layout_object, 1000, 1000));
 }
 
-#if BUILDFLAG(IS_FUCHSIA)
+#if BUILDFLAG(IS_FUCHSIA) || BUILDFLAG(IS_APPLE) || BUILDFLAG(IS_LINUX) || \
+    BUILDFLAG(IS_CHROMEOS)
 // TODO(crbug.com/1090246): Fix these tests on Fuchsia and re-enable.
+// TODO(crbug.com/1317375): Build these tests on all platforms.
 #define MAYBE_SelectRangeStaysHorizontallyAlignedWhenMoved \
   DISABLED_SelectRangeStaysHorizontallyAlignedWhenMoved
 #define MAYBE_MoveCaretStaysHorizontallyAlignedWhenMoved \
@@ -6450,8 +6471,6 @@ TEST_F(WebFrameTest, DISABLED_PositionForPointTest) {
 #define MAYBE_MoveCaretStaysHorizontallyAlignedWhenMoved \
   MoveCaretStaysHorizontallyAlignedWhenMoved
 #endif
-// TODO(crbug.com/1317375): Build these tests on all platforms.
-#if !BUILDFLAG(IS_MAC) && !BUILDFLAG(IS_LINUX) && !BUILDFLAG(IS_CHROMEOS)
 TEST_F(WebFrameTest, MAYBE_SelectRangeStaysHorizontallyAlignedWhenMoved) {
   RegisterMockedHttpURLLoad("move_caret.html");
 
@@ -6534,7 +6553,6 @@ TEST_F(WebFrameTest, MAYBE_MoveCaretStaysHorizontallyAlignedWhenMoved) {
   EXPECT_EQ(start_rect, initial_start_rect);
   EXPECT_EQ(end_rect, initial_end_rect);
 }
-#endif  // !BUILDFLAG(IS_MAC) && !BUILDFLAG(IS_LINUX) && !BUILDFLAG(IS_CHROMEOS)
 
 class CompositedSelectionBoundsTest
     : public WebFrameTest,
@@ -7256,9 +7274,9 @@ class TestAccessInitialDocumentLocalFrameHost
   void Init(blink::AssociatedInterfaceProvider* provider) {
     provider->OverrideBinderForTesting(
         mojom::blink::LocalMainFrameHost::Name_,
-        base::BindRepeating(
+        WTF::BindRepeating(
             &TestAccessInitialDocumentLocalFrameHost::BindFrameHostReceiver,
-            base::Unretained(this)));
+            WTF::Unretained(this)));
   }
 
   // LocalMainFrameHost:
@@ -8051,7 +8069,7 @@ TEST_F(WebFrameTest,
   frame_test_helpers::WebViewHelper web_view_helper;
   web_view_helper.InitializeAndLoad("data:text/html,<iframe></iframe>");
 
-  StorageKey storage_key = StorageKey::CreateWithNonceForTesting(
+  StorageKey storage_key = StorageKey::CreateWithNonce(
       url::Origin(), base::UnguessableToken::Create());
 
   auto* child_frame =
@@ -11219,13 +11237,12 @@ TEST_F(WebFrameTest, ImageDocumentLoadResponseEnd) {
   ImageResourceContent* image_content = img_document->CachedImage();
 
   EXPECT_TRUE(image_content);
-  EXPECT_NE(base::TimeTicks(), image_content->LoadResponseEnd());
+  EXPECT_NE(base::TimeTicks(), image_content->LoadEnd());
 
   DocumentLoader* loader = document->Loader();
 
   EXPECT_TRUE(loader);
-  EXPECT_EQ(loader->GetTiming().ResponseEnd(),
-            image_content->LoadResponseEnd());
+  EXPECT_EQ(loader->GetTiming().ResponseEnd(), image_content->LoadEnd());
 }
 
 TEST_F(WebFrameTest, CopyImageDocument) {
@@ -11966,13 +11983,13 @@ TEST_F(WebFrameTest, ScriptPriority) {
   client.VerifyAllRequests();
 }
 
-class MultipleDataChunkDelegate : public WebURLLoaderTestDelegate {
+class MultipleDataChunkDelegate : public URLLoaderTestDelegate {
  public:
   MultipleDataChunkDelegate() = default;
   ~MultipleDataChunkDelegate() override = default;
 
-  // WebURLLoaderTestDelegate:
-  void DidReceiveData(WebURLLoaderClient* original_client,
+  // URLLoaderTestDelegate:
+  void DidReceiveData(URLLoaderClient* original_client,
                       const char* data,
                       size_t data_length) override {
     EXPECT_GT(data_length, 16u);

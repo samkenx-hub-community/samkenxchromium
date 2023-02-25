@@ -305,7 +305,6 @@
 <translation id="2669454659051515572">يمكن لأي شخص يستخدم هذا الجهاز الاطّلاع على الملفات التي تم تنزيلها.</translation>
 <translation id="2702516483241149200">ميزة جديدة: يمكنك مشاركة رابط يؤدي إلى هذا النص.</translation>
 <translation id="2707726405694321444">إعادة تحميل الصفحة</translation>
-<translation id="2709516037105925701">الملء التلقائي</translation>
 <translation id="271033894570825754">جديد</translation>
 <translation id="2711073837061989559">الإصدارات التجريبية</translation>
 <translation id="2718352093833049315">‏باستخدام شبكة Wi-Fi فقط</translation>
@@ -397,7 +396,6 @@
 <translation id="3114507951000454849">الاطّلاع على أخبار اليوم <ph name="NEWS_ICON" /></translation>
 <translation id="311958134571892113">مرتبطة بـ</translation>
 <translation id="3123734510202723619">الإعلامات</translation>
-<translation id="3130863904455712965">السجلّ وغير ذلك</translation>
 <translation id="3134784203083076891">"</translation>
 <translation id="314939179385989105">‏الصفحة الرئيسية لمتصفّح Chrome</translation>
 <translation id="3157931365184549694">استعادة</translation>
@@ -454,6 +452,7 @@
 <translation id="3421726884497337397">اختيار الحالات التي يتم فيها حظر ملفات ملف تعريف الارتباط التابعة لجهات خارجية</translation>
 <translation id="3428747202529429621">‏يوفّر لك هذا الوضع حماية في Chrome، ويمكن استخدامه لتحسين مستوى أمانك في تطبيقات Google الأخرى عندما تكون مسجلًا دخولك.</translation>
 <translation id="3429160811076349561">تم إيقاف ميزات الإصدار التجريبي.</translation>
+<translation id="3432973700170747422">حذف بيانات آخر 15 دقيقة</translation>
 <translation id="3435465986463792564">هل لديك العديد من النوافذ؟ يمكنك إدارتها من هنا.</translation>
 <translation id="3435738964857648380">أمن المعلومات</translation>
 <translation id="3443221991560634068">إعادة تحميل الصفحة الحالية</translation>
@@ -520,7 +519,6 @@
 <translation id="3830886834687455630">‏يجب تحديث "خدمات Google Play" للتحقّق من كلمات المرور.</translation>
 <translation id="3845098929839618392">فتح في علامة تبويب تصفّح متخفي</translation>
 <translation id="3856096718352044181">يُرجى إثبات صلاحية مقدّم الخدمة أو المحاولة مجددًا.</translation>
-<translation id="3858127568696903256">اطّلِع هنا على المحتوى الذي تتابعه.</translation>
 <translation id="3858860766373142691">الاسم</translation>
 <translation id="3861633093716975811">الفيديوهات الرائجة</translation>
 <translation id="3874520961715512166">تمت إزالة الموقع الإلكتروني.</translation>
@@ -991,7 +989,6 @@
 <translation id="6397616442223433927">تمّت استعادة الاتصال بالإنترنت.</translation>
 <translation id="6401458660421980302">‏لإرسال علامة التبويب هذه إلى جهاز آخر، عليك تسجيل الدخول إلى Chrome على ذلك الجهاز.</translation>
 <translation id="6402652558933147609"><ph name="ERROR_CODE" /> في <ph name="VIOLATED_URL" /></translation>
-<translation id="6403371459378431832">مزامنة بياناتك على جميع الأجهزة</translation>
 <translation id="6404511346730675251">تعديل الإشارة المرجعية</translation>
 <translation id="6406506848690869874">المزامنة</translation>
 <translation id="6407224748847589805">تعذّر الاتصال بجهاز الكمبيوتر. يمكنك تجربة خيار آخر لإثبات الهوية.</translation>
@@ -1229,6 +1226,7 @@
 <translation id="7596558890252710462">نظام التشغيل</translation>
 <translation id="7605594153474022051">المزامنة لا تعمل</translation>
 <translation id="7612619742409846846">‏أنت مسجّل الدخول إلى Google باستخدام</translation>
+<translation id="7612989789287281429">جارٍ تسجيل الدخول…</translation>
 <translation id="7616551326690708776">اختَر نموذجًا للنص المحدَّد.</translation>
 <translation id="7619072057915878432">تعذّر تنزيل الملف <ph name="FILE_NAME" /> بسبب إخفاقات الشبكة.</translation>
 <translation id="7626032353295482388">‏مرحبًا بك في Chrome‏</translation>
@@ -1247,6 +1245,7 @@
 <translation id="7682724950699840886">يمكنك تجربة النصائح التالية: تأكد من توفر مساحة كافية على جهازك وحاول التصدير مرة أخرى.</translation>
 <translation id="7686086654630106285">مزيد من المعلومات عن الإعلانات التي تقترحها المواقع الإلكترونية</translation>
 <translation id="768618399695552958">‏إنّ بعض الصفحات التي تنتقل إليها يتم تحميلها مُسبقًا. يمكن تحميل صفحات الويب مُسبقًا من خلال خوادم Google عند ربطها من موقع مصمَّم في "مواقع Google".</translation>
+<translation id="7691043218961417207">استكشاف محتوًى لمتابعته</translation>
 <translation id="7698359219371678927">إنشاء بريد إلكتروني في <ph name="APP_NAME" /></translation>
 <translation id="7707922173985738739">استخدام بيانات الجوّال</translation>
 <translation id="7709094866268987903">ستظهر الاهتمامات التي حذفتها هنا.</translation>
@@ -1320,7 +1319,6 @@
 <translation id="8037801708772278989">تمّ إجراء عملية التحقُّق للتوّ.</translation>
 <translation id="804335162455518893">‏لم يتم العثور على بطاقة SD.</translation>
 <translation id="8048533522416101084">{TAB_COUNT,plural, =1{علامة تبويب واحدة في وضع التصفُّح المتخفي (<ph name="TAB_COUNT_ONE" />)}zero{<ph name="TAB_COUNT_NORMAL" /> علامة تبويب في وضع التصفُّح المتخفي}two{علامتا تبويب في وضع التصفُّح المتخفي (<ph name="TAB_COUNT_NORMAL" />)}few{<ph name="TAB_COUNT_NORMAL" /> علامات تبويب في وضع التصفُّح المتخفي}many{<ph name="TAB_COUNT_NORMAL" /> علامة تبويب في وضع التصفُّح المتخفي}other{<ph name="TAB_COUNT_NORMAL" /> علامة تبويب في وضع التصفُّح المتخفي}}</translation>
-<translation id="8048728378294435881">الاحتفاظ بنسخة احتياطية من بياناتك واستخدامها على أي جهاز</translation>
 <translation id="8051695050440594747">هناك <ph name="MEGABYTES" /> ميغابايت متوفرة</translation>
 <translation id="8058655154417507695">سنة انتهاء الصلاحية</translation>
 <translation id="8058746566562539958">‏فتح بعلامة تبويب Chrome جديدة</translation>
@@ -1498,6 +1496,7 @@
 <translation id="8970887620466824814">حدث خطأ.</translation>
 <translation id="8972098258593396643">هل تريد التنزيل إلى المجلد التلقائي؟</translation>
 <translation id="8987641763863173640">إدارة إعدادات معاينة الفيديو</translation>
+<translation id="8987736167266086032">الاستئناف من حيث توقفت</translation>
 <translation id="8989968390305463310">‏يؤثر سجلّ تصفّحك في الإعلانات التي تظهر لك وفي تقدير اهتماماتك على النحو الموضّح أدناه. لحماية خصوصيتك، يحذف Chrome تلقائيًا اهتماماتك بشكل متواصل مرة واحدة على الأقل شهريًا. ويمكنك تحديث الاهتمامات ما لم تزِلها.</translation>
 <translation id="8993760627012879038">فتح علامة تبويب جديدة في وضع التصفّح المتخفّي</translation>
 <translation id="8996847606757455498">اختيار مقدِّم خدمة آخر</translation>

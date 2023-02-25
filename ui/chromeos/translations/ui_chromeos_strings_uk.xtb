@@ -27,12 +27,12 @@
 <translation id="1201402288615127009">Далі</translation>
 <translation id="1209796539517632982">Імена серверів – автоматично</translation>
 <translation id="1210831758834677569">Лаоська</translation>
+<translation id="1221555006497674479">На спільному диску закінчується місце. Залишилося <ph name="REMAINING_PERCENTAGE" />% з <ph name="TOTAL_SPACE" /> пам’яті.</translation>
 <translation id="1243314992276662751">Завантажити</translation>
 <translation id="1249250836236328755">Жанр</translation>
 <translation id="1254593899333212300">Пряме з'єднання з Інтернетом</translation>
 <translation id="1272293450992660632">Значення PIN-кодів не збігаються.</translation>
 <translation id="1280820357415527819">Пошук мобільних мереж</translation>
-<translation id="1291603679744561561">SIM-карту заблоковано</translation>
 <translation id="1293556467332435079">Файли</translation>
 <translation id="1297922636971898492">Диск Google зараз недоступний. Завантаження автоматично відновиться після повторного під’єднання до Google Диска.</translation>
 <translation id="1307931752636661898">Не вдається переглянути файли Linux</translation>
@@ -59,7 +59,6 @@
 <translation id="1499943022354839699">Англійська (США), розкладка Дворака</translation>
 <translation id="1515909359182093592"><ph name="INPUT_LABEL" /> – хост</translation>
 <translation id="1521655867290435174">Google Таблиці</translation>
-<translation id="1521795806314479294">Підготовка файлу "<ph name="FILE_NAME" />"…</translation>
 <translation id="1538729222189715449">Відкриваються файли Linux…</translation>
 <translation id="1547964879613821194">Англійська (Канада)</translation>
 <translation id="1556189134700913550">Застосувати до всіх</translation>
@@ -75,6 +74,7 @@
 <translation id="1641780993263690097">Китайська, піньїнь</translation>
 <translation id="1646019627374511909">Файли (<ph name="NUMBER_OF_ITEMS" />) завантажуються на пристрій</translation>
 <translation id="164969095109328410">Пристрій Chrome</translation>
+<translation id="1661207570040737402">Спільний диск Google Workspace заповнено.</translation>
 <translation id="1661867754829461514">Відсутній PIN-код</translation>
 <translation id="166439687370499867">Заборонено змінювати налаштування спільної мережі</translation>
 <translation id="1665611772925418501">Файл неможливо змінити.</translation>
@@ -84,7 +84,6 @@
 <translation id="1722487484194605434">Архівування елементів (<ph name="NUMBER_OF_ITEMS" />)…</translation>
 <translation id="1722687688096767818">Додається профіль…</translation>
 <translation id="1726100011689679555">Сервери імен</translation>
-<translation id="1727562178154619254">Можна синхронізувати</translation>
 <translation id="1729953886957086472">Німецька (Німеччина)</translation>
 <translation id="1730235522912993863">Китайська, цанцзе</translation>
 <translation id="1731889557567069540">Скопійовано елементів: <ph name="NUMBER_OF_ITEMS" />.</translation>
@@ -194,6 +193,7 @@
 <translation id="2574327434504608656">Bruschetta надано доступ до 1 папки</translation>
 <translation id="2578394532502990878">Тамільська, фонетична розкладка</translation>
 <translation id="2579959351793446050">Орія</translation>
+<translation id="2587195714949534472">Підготовка до синхронізації файлу "<ph name="FILE_NAME" />"…</translation>
 <translation id="2602810353103180630">Мережа №<ph name="NETWORK_INDEX" />; загалом мереж: <ph name="NETWORK_COUNT" />; назва мережі: <ph name="NETWORK_NAME" />; стан з’єднання: <ph name="CONNECTION_STATUS" />; рівень сигналу: <ph name="SIGNAL_STRENGTH" />%; заблоковано адміністратором; відомості</translation>
 <translation id="2614589611416690597">Відео <ph name="VIDEO_TYPE" /></translation>
 <translation id="2620090360073999360">Зараз неможливо отримати доступ до Google Диска.</translation>
@@ -295,6 +295,7 @@
 <translation id="3486821258960016770">Монгольська</translation>
 <translation id="3495304270784461826">Помилок: <ph name="COUNT" />.</translation>
 <translation id="3509680540198371098">Мережа <ph name="NETWORK_INDEX" /> з <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, <ph name="SECURITY_STATUS" />, <ph name="CONNECTION_STATUS" />, рівень сигналу – <ph name="SIGNAL_STRENGTH" />%. Докладніше</translation>
+<translation id="3511705761158917664">Підготовка до синхронізації файлів (<ph name="NUMBER_OF_ITEMS" />)…</translation>
 <translation id="3522708245912499433">Португальська</translation>
 <translation id="3524311639100184459">Увага: ці файли тимчасові й можуть автоматично видалятися, щоб звільнити місце на диску.  <ph name="BEGIN_LINK" />Докладніше<ph name="END_LINK" /></translation>
 <translation id="3527085408025491307">Папка</translation>
@@ -350,11 +351,11 @@
 <translation id="3924145049010392604">Meta</translation>
 <translation id="3943857333388298514">Вставити</translation>
 <translation id="3952872973865944257">Телугу, фонетична розкладка</translation>
-<translation id="3954354850384043518">Завантаження триває</translation>
 <translation id="3958548648197196644">Ківі</translation>
 <translation id="3971140002794351170">Завантажити мобільний профіль, мережа <ph name="NETWORK_INDEX" /> з <ph name="NETWORK_COUNT" />, "<ph name="NETWORK_NAME" />", <ph name="NETWORK_PROVIDER_NAME" /></translation>
 <translation id="3973925058222872294">Англійська (Велика Британія)</translation>
 <translation id="3975895378829046965">Бенгальська, фонетична розкладка</translation>
+<translation id="3999574733850440202">Нещодавно відкриті файли Microsoft переміщено в сервіс OneDrive</translation>
 <translation id="4002066346123236978">Назва</translation>
 <translation id="4017788180641807848">Англійська (США), розкладка Workman</translation>
 <translation id="4019998208269143058">Закріпити в розділі "Швидкий доступ до файлів"</translation>
@@ -410,6 +411,7 @@
 <translation id="4462159676511157176">Імена серверів – персоналізовано</translation>
 <translation id="4465725236958772856">Мережа <ph name="NETWORK_INDEX" /> з <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />. Мережею керує адміністратор. Підключитися</translation>
 <translation id="4470564870223067757">Клавіатура хангул із 2 наборами клавіш</translation>
+<translation id="4474142134969976028">Немає результатів</translation>
 <translation id="4477002475007461989">Румунська</translation>
 <translation id="4477219268485577442">Болгарська (фонетична)</translation>
 <translation id="4508265954913339219">Помилка активації</translation>
@@ -512,7 +514,6 @@
    Видалення пристрою під час його використання може спричинити втрату даних. Зачекайте, доки операція завершиться, а потім відключіть пристрій за допомогою програми "Файли".</translation>
 <translation id="5163869187418756376">Помилка надання доступу. Перевірте з’єднання та повторіть спробу пізніше.</translation>
 <translation id="516592729076796170">Розкладка Дворака для програмістів (США)</translation>
-<translation id="5167102019886320507">Підготовка файлів (<ph name="NUMBER_OF_ITEMS" />)…</translation>
 <translation id="5177526793333269655">Перегляд ескізів</translation>
 <translation id="5181896909298187506">Немає нещодавніх файлів</translation>
 <translation id="5194713942430106590">Натисніть, щоб відсортувати стовпці в порядку зростання.</translation>
@@ -792,6 +793,7 @@
 <translation id="7458955835361612701">Немає нещодавніх зображень</translation>
 <translation id="7460898608667578234">Українська</translation>
 <translation id="7469894403370665791">Автоматично з'єднувати з цією мережею</translation>
+<translation id="7481358317100446445">Готова</translation>
 <translation id="7486315294984620427">Щоб перетягнути файли в Parallels Desktop, спершу скопіюйте їх у папку "Файли Windows".</translation>
 <translation id="749452993132003881">Хірагана</translation>
 <translation id="7495372004724182530">Малаялам, фонетична розкладка</translation>
@@ -817,6 +819,7 @@
 <translation id="7655441028674523381">Легкий доступ до Google Фото</translation>
 <translation id="7658239707568436148">Скасувати</translation>
 <translation id="7663224033570512922">Гінді</translation>
+<translation id="7665680517722058469">Введіть інший пошуковий запит</translation>
 <translation id="7689532716264131859">Об’єкти (<ph name="NUMBER_OF_ITEMS" />) переміщено в кошик</translation>
 <translation id="7693909743393669729">Якщо відформатувати диск, усі наявні на ньому дані та розділи (зокрема, невидимі) буде видалено. Цю дію не можна відмінити.</translation>
 <translation id="7695430100978772476">Не вдалося відформатувати диск "<ph name="DRIVE_NAME" />"</translation>
@@ -828,6 +831,7 @@
 <translation id="7724603315864178912">Вирізати</translation>
 <translation id="7732111077498238432">Мережа контролюється правилами</translation>
 <translation id="7736003208887389532">Видалити ці файли назавжди?</translation>
+<translation id="7740287852186792672">Результати пошуку</translation>
 <translation id="7748626145866214022">На панелі дій доступно більше параметрів. Натисніть Alt + A, щоб відкрити її.</translation>
 <translation id="7760449188139285140">Китайська, вубі</translation>
 <translation id="7765158879357617694">Перемістити</translation>
@@ -879,6 +883,7 @@
 <translation id="8116072619078571545">Крижана вода</translation>
 <translation id="8128733386027980860">Англійська (Велика Британія), розкладка Дворака</translation>
 <translation id="8137331602592933310">Вам надали доступ до файлу "<ph name="FILENAME" />". Ви не можете його видалити, оскільки він вам не належить.</translation>
+<translation id="8138705869659070104">Потрібно налаштувати пристрій</translation>
 <translation id="813913629614996137">Ініціалізація...</translation>
 <translation id="8147028810663464959">Ширина символів – повна</translation>
 <translation id="8151638057146502721">Налаштувати</translation>
@@ -904,6 +909,7 @@
 <translation id="8300849813060516376">Помилка OTASP</translation>
 <translation id="8312871300878166382">Вставити в папку</translation>
 <translation id="8329978297633540474">Звичайний текст</translation>
+<translation id="8332007959299458842">Нещодавно відкриті файли Microsoft переміщено на Google Диск</translation>
 <translation id="8335587457941836791">Відкріпити від панелі запуску</translation>
 <translation id="8335837413233998004">Білоруська</translation>
 <translation id="8336153091935557858">Учора <ph name="YESTERDAY_DAYTIME" /></translation>
@@ -991,6 +997,7 @@
 <translation id="9046895021617826162">Помилка з'єднання</translation>
 <translation id="9065512565307033593">Якщо ви не пройдете цю перевірку, вам буде закрито доступ до мережі.</translation>
 <translation id="908378762078012445">Російська, фонетична розкладка AATSEEL</translation>
+<translation id="9086302186042011942">Синхронізація</translation>
 <translation id="9099674669267916096">Кількість сторінок</translation>
 <translation id="9100610230175265781">Потрібно вказати парольну фразу</translation>
 <translation id="9110990317705400362">Ми постійно шукаємо способи зробити перегляд веб-сторінок безпечнішим. Раніше будь-який веб-сайт міг пропонувати вам додати розширення у веб-переглядач. В останніх версіях Google Chrome ви маєте чітко вказати, що хочете встановити ці розширення, додавши їх на сторінці "Розширення". <ph name="BEGIN_LINK" />Докладніше<ph name="END_LINK" /></translation>

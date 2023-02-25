@@ -36,7 +36,7 @@ if (is_android) {
 # Writable mmap isn't supported on Fuchsia, so it should be bypassed.
 posix_bypass_mmap = (is_android && current_cpu != "x86") || is_fuchsia
 
-enable_built_in_dns = !is_ios
+enable_built_in_dns = use_blink
 
 # Unix sockets are not supported on iOS.
 enable_unix_sockets = is_posix && !is_ios
@@ -52,9 +52,8 @@ enable_python_utils =
     !is_arm_cast_shell_build && !is_android && !is_fuchsia && !is_ios
 
 # Platforms that cannot use python_utils (like Android but see full
-# list above) will instead use a remote server, except for iOS which
-# won't get either.
-use_remote_test_server = !enable_python_utils && !is_ios
+# list above) will instead use a remote server.
+use_remote_test_server = !enable_python_utils && enable_websockets
 
 # Whether //net should use an external GSSAPI library for implementing HTTP
 # Negotiate authentication. All platforms for which use_kerberos is true should
@@ -316,6 +315,8 @@ component("net") {
     "cert/internal/revocation_checker.h",
     "cert/internal/system_trust_store.cc",
     "cert/internal/system_trust_store.h",
+    "cert/internal/trust_store_features.cc",
+    "cert/internal/trust_store_features.h",
     "cert/known_roots.cc",
     "cert/known_roots.h",
     "cert/merkle_audit_proof.cc",
@@ -1495,6 +1496,7 @@ component("net") {
       "Foundation.framework",
       "Security.framework",
       "SystemConfiguration.framework",
+      "UniformTypeIdentifiers.framework",
     ]
   }
 
@@ -1506,6 +1508,7 @@ component("net") {
       "MobileCoreServices.framework",
       "Security.framework",
       "SystemConfiguration.framework",
+      "UniformTypeIdentifiers.framework",
     ]
   }
 
@@ -2039,7 +2042,7 @@ static_library("test_support") {
     configs += [ "//build/config/linux/nss" ]
   }
 
-  if (!is_ios) {
+  if (enable_websockets) {
     sources += [
       "test/spawned_test_server/base_test_server.cc",
       "test/spawned_test_server/base_test_server.h",

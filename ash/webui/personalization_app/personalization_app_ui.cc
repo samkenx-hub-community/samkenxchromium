@@ -71,6 +71,10 @@ void AddStrings(content::WebUIDataSource* source) {
       {"defaultWallpaper", IDS_PERSONALIZATION_APP_DEFAULT_WALLPAPER},
       {"back", IDS_PERSONALIZATION_APP_BACK_BUTTON},
       {"currentlySet", IDS_PERSONALIZATION_APP_CURRENTLY_SET},
+      {"descriptionDialogOpen",
+       IDS_PERSONALIZATION_APP_WALLPAPER_DESCRIPTION_DIALOG_OPEN},
+      {"descriptionDialogClose",
+       IDS_PERSONALIZATION_APP_WALLPAPER_DESCRIPTION_DIALOG_CLOSE},
       {"myImagesLabel", IDS_PERSONALIZATION_APP_MY_IMAGES},
       {"wallpaperCollections", IDS_PERSONALIZATION_APP_WALLPAPER_COLLECTIONS},
       {"center", IDS_PERSONALIZATION_APP_CENTER},
@@ -244,6 +248,8 @@ void AddStrings(content::WebUIDataSource* source) {
        IDS_PERSONALIZATION_APP_KEYBOARD_BACKLIGHT_RAINBOW_COLOR_LABEL},
       {"wallpaperColorNudgeText",
        IDS_PERSONALIZATION_APP_KEYBOARD_BACKLIGHT_WALLPAPER_COLOR_NUDGE_TEXT},
+      {"zoneCustomize",
+       IDS_PERSONALIZATION_APP_KEYBOARD_BACKLIGHT_ZONE_CUSTOMIZATION_BUTTON},
 
       // Google Photos strings
       // TODO(b/229149314): Finalize error and retry strings.
@@ -252,6 +258,14 @@ void AddStrings(content::WebUIDataSource* source) {
       {"googlePhotosTryAgain", IDS_PERSONALIZATION_APP_GOOGLE_PHOTOS_TRY_AGAIN},
       {"googlePhotosAlbumShared",
        IDS_PERSONALIZATION_APP_GOOGLE_PHOTOS_ALBUM_SHARED},
+      {"googlePhotosSharedAlbumDialogTitle",
+       IDS_PERSONALIZATION_APP_GOOGLE_PHOTOS_SHARED_ALBUM_DIALOG_TITLE},
+      {"googlePhotosSharedAlbumDialogContent",
+       IDS_PERSONALIZATION_APP_GOOGLE_PHOTOS_SHARED_ALBUM_DIALOG_CONTENT},
+      {"googlePhotosSharedAlbumDialogCloseButton",
+       IDS_PERSONALIZATION_APP_GOOGLE_PHOTOS_SHARED_ALBUM_DIALOG_CLOSE_BUTTON},
+      {"googlePhotosSharedAlbumDialogAcceptButton",
+       IDS_PERSONALIZATION_APP_GOOGLE_PHOTOS_SHARED_ALBUM_DIALOG_ACCEPT_BUTTON},
       {"googlePhotosAlbumsTabLabel",
        IDS_PERSONALIZATION_APP_GOOGLE_PHOTOS_ALBUMS_TAB},
       {"googlePhotosPhotosTabLabel",
@@ -380,6 +394,11 @@ void PersonalizationAppUI::AddBooleans(content::WebUIDataSource* source) {
 
   source->AddBoolean("isPersonalizationJellyEnabled",
                      features::IsPersonalizationJellyEnabled());
+
+  source->AddBoolean(
+      "isMultiZoneRgbKeyboardSupported",
+      features::IsMultiZoneRgbKeyboardEnabled() &&
+          Shell::Get()->rgb_keyboard_manager()->GetZoneCount() > 1);
 }
 
 void PersonalizationAppUI::HandleWebUIRequest(

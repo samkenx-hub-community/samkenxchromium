@@ -26,6 +26,11 @@ class COMPONENT_EXPORT(CC_SLIM) SolidColorLayer : public Layer {
   explicit SolidColorLayer(scoped_refptr<cc::SolidColorLayer> cc_layer);
   ~SolidColorLayer() override;
 
+  void AppendQuads(viz::CompositorRenderPass& render_pass,
+                   FrameData& data,
+                   const gfx::Transform& transform,
+                   const gfx::Rect* clip) override;
+
   cc::SolidColorLayer* cc_layer() const;
 };
 

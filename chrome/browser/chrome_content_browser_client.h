@@ -313,6 +313,7 @@ class ChromeContentBrowserClient : public content::ContentBrowserClient {
   bool IsAttributionReportingOperationAllowed(
       content::BrowserContext* browser_context,
       AttributionReportingOperation operation,
+      content::RenderFrameHost* rfh,
       const url::Origin* impression_origin,
       const url::Origin* conversion_origin,
       const url::Origin* reporting_origin) override;
@@ -518,6 +519,7 @@ class ChromeContentBrowserClient : public content::ContentBrowserClient {
       content::NavigationHandle* navigation_handle) override;
   std::unique_ptr<media::ScreenEnumerator> CreateScreenEnumerator()
       const override;
+  bool EnforceSystemAudioEchoCancellation() override;
 #if BUILDFLAG(ENABLE_MEDIA_REMOTING)
   void CreateMediaRemoter(
       content::RenderFrameHost* render_frame_host,

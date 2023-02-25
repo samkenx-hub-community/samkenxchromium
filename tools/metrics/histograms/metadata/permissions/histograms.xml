@@ -149,7 +149,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Permissions.API.CreatedPermissionStatusObjects" units="units"
-    expires_after="2023-06-04">
+    expires_after="2023-08-08">
   <owner>andypaicu@chromium.org</owner>
   <owner>src/components/permissions/PERMISSIONS_OWNERS</owner>
   <summary>
@@ -178,7 +178,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Permissions.AutoBlocker.EmbargoStatus"
-    enum="PermissionEmbargoStatus" expires_after="2023-06-18">
+    enum="PermissionEmbargoStatus" expires_after="2023-08-20">
   <owner>engedy@chromium.org</owner>
   <owner>src/components/permissions/PERMISSIONS_OWNERS</owner>
   <summary>
@@ -581,6 +581,26 @@ chromium-metrics-reviews@google.com.
   <token key="PermissionType" variants="Top2PermissionTypes"/>
 </histogram>
 
+<histogram name="Permissions.PageInfo.Changed.{PermissionType}.{ReloadInfoBar}"
+    enum="PermissionChangeAction" expires_after="2023-10-31">
+  <owner>elklm@chromium.org</owner>
+  <owner>src/components/permissions/PERMISSIONS_OWNERS</owner>
+  <summary>
+    This metric measures how often and in what way users change permissions
+    state via PageInfo and if we show a &quot;Reload this page&quot; info bar.
+    Recorded when users changes permissions state or clicks the &quot;Reset
+    permission&quot; button in PageInfo.
+  </summary>
+  <token key="PermissionType">
+    <variant name="AudioCapture"/>
+    <variant name="VideoCapture"/>
+  </token>
+  <token key="ReloadInfoBar">
+    <variant name="ReloadInfobarNotShown"/>
+    <variant name="ReloadInfobarShown"/>
+  </token>
+</histogram>
+
 <histogram name="Permissions.PageInfo.ChangedWithin1m.{PermissionType}"
     enum="PermissionChangeAction" expires_after="2023-10-31">
   <owner>fjacky@chromium.org</owner>
@@ -610,7 +630,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Permissions.PredictionService.PredictionSource"
-    enum="PermissionPredictionSource" expires_after="2023-06-04">
+    enum="PermissionPredictionSource" expires_after="2023-08-08">
   <owner>ravjit@chromium.org</owner>
   <owner>src/components/permissions/PERMISSIONS_OWNERS</owner>
   <summary>
@@ -669,7 +689,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Permissions.Prompt.Accepted.PriorDismissCount2" units="units"
-    expires_after="2023-06-18">
+    expires_after="2023-08-20">
   <owner>engedy@chromium.org</owner>
   <owner>src/components/permissions/PERMISSIONS_OWNERS</owner>
   <summary>
@@ -1049,7 +1069,7 @@ chromium-metrics-reviews@google.com.
 
 <histogram
     name="Permissions.QuietNotificationPrompts.DidEnableAdapativelyInPrefs"
-    enum="Boolean" expires_after="2023-06-04">
+    enum="Boolean" expires_after="2023-08-08">
   <owner>andypaicu@chromium.org</owner>
   <owner>engedy@chromium.org</owner>
   <owner>hkamila@chromium.org</owner>
@@ -1062,7 +1082,7 @@ chromium-metrics-reviews@google.com.
 
 <histogram
     name="Permissions.QuietNotificationPrompts.EnabledStateInPrefsChangedTo"
-    enum="BooleanEnabled" expires_after="2023-06-04">
+    enum="BooleanEnabled" expires_after="2023-08-08">
   <owner>andypaicu@chromium.org</owner>
   <owner>engedy@chromium.org</owner>
   <owner>hkamila@chromium.org</owner>
@@ -1111,7 +1131,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram base="true" name="Permissions.Revocation.ElapsedTimeSinceGrant"
-    units="seconds" expires_after="2023-06-04">
+    units="seconds" expires_after="2023-08-08">
   <owner>engedy@chromium.org</owner>
   <owner>src/components/permissions/PERMISSIONS_OWNERS</owner>
   <summary>
@@ -1227,7 +1247,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="SiteEngagementService.OriginsEngaged" units="units"
-    expires_after="2023-06-18">
+    expires_after="2023-08-20">
   <owner>calamity@chromium.org</owner>
   <owner>dominickn@chromium.org</owner>
   <summary>
@@ -1278,7 +1298,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="WebsiteSettings.Action" enum="WebsiteSettingsAction"
-    expires_after="2023-06-18">
+    expires_after="2023-08-20">
   <owner>estark@chromium.org</owner>
   <owner>dullweber@chromium.org</owner>
   <summary>
@@ -1358,7 +1378,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="WebsiteSettings.GetAllSitesLoadTime" units="ms"
-    expires_after="2023-06-18">
+    expires_after="2023-08-20">
   <owner>olesiamarukhno@google.com</owner>
   <owner>sauski@google.com</owner>
   <owner>chrome-friendly-settings@google.com</owner>

@@ -100,6 +100,9 @@ class ASH_EXPORT WindowState : public aura::WindowObserver {
     // Cross fade animation. Copies old layer, and fades it out while fading the
     // new layer in.
     kCrossFade,
+    // Custom cross fade animations when floating/unfloating a window.
+    kCrossFadeFloat,
+    kCrossFadeUnfloat,
     // Bounds animation.
     kAnimate,
     // Bounds animation with zero tween. Updates the bounds once at the end of
@@ -536,9 +539,12 @@ class ASH_EXPORT WindowState : public aura::WindowObserver {
       base::TimeDelta duration = kBoundsChangeSlideDuration,
       gfx::Tween::Type animation_type = gfx::Tween::LINEAR);
 
-  // Sets the window's |bounds| and transition to the new bounds with
-  // a cross fade animation.
-  void SetBoundsDirectCrossFade(const gfx::Rect& bounds);
+  // Sets the window's `bounds` and transition to the new bounds with
+  // a cross fade animation. If `float_state` has a value, sets a custom
+  // float/unfloat cross fade animation.
+  void SetBoundsDirectCrossFade(
+      const gfx::Rect& bounds,
+      absl::optional<bool> float_state = absl::nullopt);
 
   // Called before the state change and update PIP related state, such as next
   // window animation type, upon state change.
@@ -629,6 +635,8 @@ class ASH_EXPORT WindowState : public aura::WindowObserver {
   ui::ZOrderLevel cached_z_order_;
   bool allow_set_bounds_direct_ = false;
   bool is_moving_to_another_display_ = false;
+
+  bool is_handling_float_event_ = false;
 
   // Contains the window's target snap ratio if it's going to be snapped by a
   // WMEvent, and the updated window snap ratio if the snapped window's bounds

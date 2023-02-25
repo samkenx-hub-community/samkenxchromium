@@ -134,6 +134,10 @@ const CGFloat kShiftTilesUpAnimationDuration = 0.1;
 // the Content Suggestions header as the animation progresses.
 @property(nonatomic, assign) CFTimeInterval shiftTileStartTime;
 
+// YES if `-viewDidLoad:` has finished executing. This is used to ensure that
+// constraints are not set before the views have been added to view hierarchy.
+@property(nonatomic, assign) BOOL viewDidFinishLoading;
+
 @end
 
 @implementation NewTabPageViewController
@@ -201,13 +205,8 @@ const CGFloat kShiftTilesUpAnimationDuration = 0.1;
 
   self.identityDiscButton = [self.headerController identityDiscButton];
   DCHECK(self.identityDiscButton);
-}
 
-- (void)viewWillLayoutSubviews {
-  [super viewWillLayoutSubviews];
-
-  [self updateNTPLayout];
-  [self.headerController updateConstraints];
+  self.viewDidFinishLoading = YES;
 }
 
 - (void)viewWillAppear:(BOOL)animated {
@@ -215,8 +214,13 @@ const CGFloat kShiftTilesUpAnimationDuration = 0.1;
 
   self.headerController.showing = YES;
 
-  [self applyCollectionViewConstraints];
   [self updateNTPLayout];
+
+  // Scroll to the top before coming into view to minimize sudden visual jerking
+  // for startup instances showing the NTP.
+  if (!self.viewDidAppear) {
+    [self setContentOffsetToTop];
+  }
 
   if (self.focusAccessibilityOmniboxWhenViewAppears && !self.omniboxFocused) {
     [self.headerController focusAccessibilityOnOmnibox];
@@ -225,6 +229,21 @@ const CGFloat kShiftTilesUpAnimationDuration = 0.1;
 
 - (void)viewDidAppear:(BOOL)animated {
   [super viewDidAppear:animated];
+
+  // `-feedLayoutDidEndUpdates` handles the need to either scroll to the top of
+  // go back to a previous scroll state when the feed is enabled. This handles
+  // the instance when the feed is not enabled.
+  // `-viewWillAppear:` is not the suitable place for this as long as the user
+  // can open a new tab while an NTP is currently visible. `-viewWillAppear:` is
+  // called before the offset can be saved, so `-setContentOffsetToTop` will
+  // reset any scrolled position.
+  if (!self.feedVisible) {
+    if (self.hasSavedOffsetFromPreviousScrollState) {
+      [self setContentOffset:self.savedScrollOffset];
+    } else {
+      [self setContentOffsetToTop];
+    }
+  }
 
   // Updates omnibox to ensure that the dimensions are correct when navigating
   // back to the NTP.
@@ -267,13 +286,16 @@ const CGFloat kShiftTilesUpAnimationDuration = 0.1;
 - (void)viewSafeAreaInsetsDidChange {
   [super viewSafeAreaInsetsDidChange];
 
-  [self.headerController updateConstraints];
-  // Only update the insets if this NTP is being viewed for this first time. If
-  // we are reopening an existing NTP, the insets are already ok.
-  // TODO(crbug.com/1170995): Remove this once we use a custom feed header.
   if (!self.viewDidAppear) {
-    [self updateFeedInsetsForContentAbove];
+    // The native views in the NTP are not top anchored to the surface in any
+    // way. They are stacked on top of the top of the Feed contents, and the top
+    // Safe Area insets are factored in the height needed above the feed in
+    // -updateFeedInsetsForContentAbove. Update that height here as it is the
+    // soonest place the Safe Area insets are ready.
+    [self updateHeightAboveFeedAndScrollToTopIfNeeded];
   }
+
+  [self.headerController updateConstraints];
 }
 
 - (void)viewWillTransitionToSize:(CGSize)size
@@ -421,14 +443,15 @@ const CGFloat kShiftTilesUpAnimationDuration = 0.1;
   // changes in feed visibility.
   [self applyCollectionViewConstraints];
 
+  // Force relayout so that the views added in this method are rendered ASAP,
+  // ensuring it is showing in the new tab animation.
+  [self.view setNeedsLayout];
+  [self.view layoutIfNeeded];
+
   // If the feed is not visible, we control the delegate ourself (since it is
-  // otherwise controlled by the feed service). The view is also layed out
-  // so that we can correctly calculate the minimum height.
+  // otherwise controlled by the feed service).
   if (!self.isFeedVisible) {
     self.feedWrapperViewController.contentCollectionView.delegate = self;
-
-    [self.view setNeedsLayout];
-    [self.view layoutIfNeeded];
     [self setMinimumHeight];
   }
 }
@@ -458,8 +481,16 @@ const CGFloat kShiftTilesUpAnimationDuration = 0.1;
   [self updateFakeOmniboxOnNewWidth:self.collectionView.bounds.size.width];
   // Ensure initial fake omnibox layout.
   [self updateFakeOmniboxForScrollPosition];
+}
 
-  if (!self.viewDidAppear && !self.hasSavedOffsetFromPreviousScrollState) {
+- (void)updateHeightAboveFeedAndScrollToTopIfNeeded {
+  if (self.viewDidFinishLoading &&
+      !self.hasSavedOffsetFromPreviousScrollState) {
+    // Do not scroll to the top if there is a saved scroll state. Also,
+    // `-setContentOffsetToTop` potentially updates constaints, and if
+    // viewDidLoad has not finished, some views may not in the view hierarchy
+    // yet.
+    [self updateFeedInsetsForContentAbove];
     [self setContentOffsetToTop];
   }
 }
@@ -512,16 +543,12 @@ const CGFloat kShiftTilesUpAnimationDuration = 0.1;
 
 - (void)feedLayoutDidEndUpdates {
   [self updateFeedInsetsForMinimumHeight];
-  // Update saved scroll state after updating insets
+  // Updating insets can influence contentOffset, so update saved scroll state
+  // after it. This handles what the starting offset be with the feed enabled,
+  // `-viewWillAppear:` handles when the feed is not enabled.
   if (self.hasSavedOffsetFromPreviousScrollState) {
     [self setContentOffset:self.savedScrollOffset];
-    self.hasSavedOffsetFromPreviousScrollState = NO;
   }
-  [self updateStickyElements];
-}
-
-- (void)updateStickyElements {
-  [self handleStickyElementsForScrollPosition:[self scrollPosition] force:YES];
 }
 
 #pragma mark - NewTabPageConsumer
@@ -549,10 +576,19 @@ const CGFloat kShiftTilesUpAnimationDuration = 0.1;
     return;
   }
   [self setContentOffset:-[self heightAboveFeed]];
+  // TODO(crbug.com/1406940): Constraint updating should not be necessary since
+  // scrollViewDidScroll: calls this if needed.
   [self setInitialFakeOmniboxConstraints];
   if ([self.ntpContentDelegate isContentHeaderSticky]) {
     [self setInitialFeedHeaderConstraints];
   }
+  // Reset here since none of the view lifecycle callbacks are called reliably
+  // to be able to be used (it seems) (i.e. switching between NTPs where there
+  // is saved scroll state in the destination tab). If the content offset is
+  // being set to the top, it is safe to assume this can be set to NO. Being
+  // called before setSavedContentOffset: is no problem since then it will be
+  // subsequently overriden to YES.
+  self.hasSavedOffsetFromPreviousScrollState = NO;
 }
 
 - (CGFloat)heightAboveFeed {

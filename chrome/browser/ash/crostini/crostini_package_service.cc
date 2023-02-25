@@ -38,7 +38,14 @@ class CrostiniPackageServiceFactory : public ProfileKeyedServiceFactory {
   friend class base::NoDestructor<CrostiniPackageServiceFactory>;
 
   CrostiniPackageServiceFactory()
-      : ProfileKeyedServiceFactory("CrostiniPackageService") {
+      : ProfileKeyedServiceFactory(
+            "CrostiniPackageService",
+            ProfileSelections::Builder()
+                .WithRegular(ProfileSelection::kOriginalOnly)
+                // TODO(crbug.com/1418376): Check if this service is needed in
+                // Guest mode.
+                .WithGuest(ProfileSelection::kOriginalOnly)
+                .Build()) {
     DependsOn(CrostiniManagerFactory::GetInstance());
   }
 
@@ -606,6 +613,11 @@ std::string CrostiniPackageService::GetUniqueNotificationId() {
 
 CrostiniManager::RestartId CrostiniPackageService::GetRestartIdForTesting() {
   return restart_id_for_testing_;
+}
+
+// static
+void CrostiniPackageService::EnsureFactoryBuilt() {
+  CrostiniPackageServiceFactory::GetInstance();
 }
 
 }  // namespace crostini

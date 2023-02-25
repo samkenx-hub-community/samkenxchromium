@@ -19,8 +19,8 @@ import {I18nMixin} from 'chrome://resources/cr_elements/i18n_mixin.js';
 import {assert} from 'chrome://resources/js/assert_ts.js';
 import {PolymerElement} from 'chrome://resources/polymer/v3_0/polymer/polymer_bundled.min.js';
 
-import {AudioDevice, AudioEffectState, AudioSystemProperties, AudioSystemPropertiesObserverReceiver, MuteState} from '../../mojom-webui/audio/cros_audio_config.mojom-webui.js';
-import {routes} from '../os_route.js';
+import {AudioDevice, AudioDeviceType, AudioEffectState, AudioSystemProperties, AudioSystemPropertiesObserverReceiver, MuteState} from '../../mojom-webui/cros_audio_config.mojom-webui.js';
+import {routes} from '../os_settings_routes.js';
 import {RouteObserverMixin} from '../route_observer_mixin.js';
 import {Route} from '../router.js';
 
@@ -179,7 +179,17 @@ class SettingsAudioElement extends SettingsAudioElementBase {
 
   /** Handles updates to noise cancellation state. */
   protected onNoiseCancellationEnabledChanged(
-      enabled: SettingsAudioElement['isNoiseCancellationEnabled_']): void {
+      enabled: SettingsAudioElement['isNoiseCancellationEnabled_'],
+      previousEnabled: SettingsAudioElement['isNoiseCancellationEnabled_']):
+      void {
+    // Polymer triggers change event on all assignment to
+    // `isNoiseCancellationEnabled_` even if the value is logically unchanged.
+    // Check previous value before calling `setNoiseCancellationEnabled` to test
+    // if value actually updated.
+    if (previousEnabled === undefined || previousEnabled === enabled) {
+      return;
+    }
+
     this.crosAudioConfig_.setNoiseCancellationEnabled(enabled);
   }
 
@@ -282,6 +292,71 @@ class SettingsAudioElement extends SettingsAudioElementBase {
   protected shouldDisableInputGainControls(): boolean {
     return this.audioSystemProperties_.inputMuteState ===
         MuteState.kMutedExternally;
+  }
+
+  /** Translates the device name if applicable. */
+  private getDeviceName_(audioDevice: AudioDevice): string {
+    switch (audioDevice.deviceType) {
+      case AudioDeviceType.kHeadphone:
+        return this.i18n('audioDeviceHeadphoneLabel');
+      case AudioDeviceType.kMic:
+        return this.i18n('audioDeviceMicJackLabel');
+      case AudioDeviceType.kUsb:
+        return this.i18n('audioDeviceUsbLabel', audioDevice.displayName);
+      case AudioDeviceType.kBluetooth:
+      case AudioDeviceType.kBluetoothNbMic:
+        return this.i18n('audioDeviceBluetoothLabel', audioDevice.displayName);
+      case AudioDeviceType.kHdmi:
+        return this.i18n('audioDeviceHdmiLabel', audioDevice.displayName);
+      case AudioDeviceType.kInternalSpeaker:
+        return this.i18n('audioDeviceInternalSpeakersLabel');
+      case AudioDeviceType.kInternalMic:
+        return this.i18n('audioDeviceInternalMicLabel');
+      case AudioDeviceType.kFrontMic:
+        return this.i18n('audioDeviceFrontMicLabel');
+      case AudioDeviceType.kRearMic:
+        return this.i18n('audioDeviceRearMicLabel');
+      default:
+        return audioDevice.displayName;
+    }
+  }
+
+  /**
+   * Returns the appropriate tooltip for output and input device mute buttons
+   * based on `muteState`.
+   */
+  private getMuteTooltip_(muteState: MuteState): string {
+    switch (muteState) {
+      case MuteState.kNotMuted:
+        return this.i18n('audioToggleToMuteTooltip');
+      case MuteState.kMutedByUser:
+        return this.i18n('audioToggleToUnmuteTooltip');
+      case MuteState.kMutedByPolicy:
+        return this.i18n('audioMutedByPolicyTooltip');
+      case MuteState.kMutedExternally:
+        return this.i18n('audioMutedExternallyTooltip');
+      default:
+        return '';
+    }
+  }
+
+  /** Returns the appropriate aria-label for input mute button. */
+  protected getInputMuteButtonAriaLabel(): string {
+    if (this.audioSystemProperties_.inputMuteState ===
+        MuteState.kMutedExternally) {
+      return this.i18n('audioInputMuteButtonAriaLabelMutedByHardwareSwitch');
+    }
+
+    return this.isInputMuted_ ?
+        this.i18n('audioInputMuteButtonAriaLabelMuted') :
+        this.i18n('audioInputMuteButtonAriaLabelNotMuted');
+  }
+
+  /** Returns the appropriate aria-label for output mute button. */
+  protected getOutputMuteButtonAriaLabel(): string {
+    return this.isOutputMuted_ ?
+        this.i18n('audioOutputMuteButtonAriaLabelMuted') :
+        this.i18n('audioOutputMuteButtonAriaLabelNotMuted');
   }
 }
 

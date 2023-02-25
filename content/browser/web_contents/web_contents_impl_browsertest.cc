@@ -310,6 +310,26 @@ IN_PROC_BROWSER_TEST_F(WebContentsImplBrowserTest, DidStopLoadingDetails) {
             load_observer.controller_);
 }
 
+// Regression test for https://crbug.com/1405036
+// Dumping the accessibility tree should not crash, even if it has not received
+// an ID through a renderer tree yet.
+IN_PROC_BROWSER_TEST_F(WebContentsImplBrowserTest,
+                       DumpAccessibilityTreeWithoutTreeID) {
+  ASSERT_TRUE(embedded_test_server()->Start());
+
+  LoadStopNotificationObserver load_observer(
+      &shell()->web_contents()->GetController());
+  EXPECT_TRUE(
+      NavigateToURL(shell(), embedded_test_server()->GetURL("/title1.html")));
+  load_observer.Wait();
+  std::string expected = "-";
+
+  std::vector<ui::AXPropertyFilter> property_filters;
+  EXPECT_EQ(
+      shell()->web_contents()->DumpAccessibilityTree(false, property_filters),
+      expected);
+}
+
 // Test that DidStopLoading includes the correct URL in the details when a
 // pending entry is present.
 IN_PROC_BROWSER_TEST_F(WebContentsImplBrowserTest,
@@ -3636,11 +3656,53 @@ IN_PROC_BROWSER_TEST_F(WebContentsImplBrowserTest, FrozenAndUnfrozenIPC) {
 }
 
 IN_PROC_BROWSER_TEST_F(WebContentsImplBrowserTest,
+                       SuppressedPopupWindowBrowserNavResumeLoad) {
+  // This test verifies a suppressed pop up that requires navigation from
+  // browser side works with a delegate that delays navigations of pop ups.
+  base::FilePath test_data_dir;
+  CHECK(base::PathService::Get(base::DIR_SOURCE_ROOT, &test_data_dir));
+  base::FilePath simple_links_path =
+      test_data_dir.Append(GetTestDataFilePath())
+          .Append(FILE_PATH_LITERAL("simple_links.html"));
+  GURL url("file://" + simple_links_path.AsUTF8Unsafe());
+
+  shell()->set_delay_popup_contents_delegate_for_testing(true);
+  EXPECT_TRUE(NavigateToURL(shell(), url));
+
+  Shell* new_shell = nullptr;
+  WebContents* new_contents = nullptr;
+  {
+    ShellAddedObserver new_shell_observer;
+    bool success = false;
+    EXPECT_TRUE(ExecuteScriptAndExtractBool(
+        shell(),
+        "window.domAutomationController.send(clickLinkToSelfNoOpener());",
+        &success));
+    new_shell = new_shell_observer.GetShell();
+    new_contents = new_shell->web_contents();
+    // Delaying popup holds the initial load of |url|.
+    EXPECT_TRUE(WaitForLoadStop(new_contents));
+    EXPECT_TRUE(new_contents->GetController()
+                    .GetLastCommittedEntry()
+                    ->IsInitialEntry());
+    EXPECT_NE(url, new_contents->GetLastCommittedURL());
+  }
+
+  EXPECT_FALSE(new_contents->GetDelegate());
+  new_contents->SetDelegate(new_shell);
+  EXPECT_TRUE(
+      static_cast<WebContentsImpl*>(new_contents)->delayed_load_url_params_);
+  new_contents->ResumeLoadingCreatedWebContents();
+  EXPECT_TRUE(WaitForLoadStop(new_contents));
+  EXPECT_EQ(url, new_contents->GetLastCommittedURL());
+}
+
+IN_PROC_BROWSER_TEST_F(WebContentsImplBrowserTest,
                        PopupWindowBrowserNavResumeLoad) {
   // This test verifies a pop up that requires navigation from browser side
   // works with a delegate that delays navigations of pop ups.
-  // Create a file: scheme pop up from a file: scheme page, which requires
-  // requires an OpenURL IPC to the browser process.
+  // Create a file: scheme non-suppressed pop up from a file: scheme page will
+  // be blocked and wait for the renderer to signal.
   base::FilePath test_data_dir;
   CHECK(base::PathService::Get(base::DIR_SOURCE_ROOT, &test_data_dir));
   base::FilePath simple_links_path =
@@ -3671,6 +3733,11 @@ IN_PROC_BROWSER_TEST_F(WebContentsImplBrowserTest,
 
   EXPECT_FALSE(new_contents->GetDelegate());
   new_contents->SetDelegate(new_shell);
+  EXPECT_FALSE(
+      static_cast<WebContentsImpl*>(new_contents)->delayed_load_url_params_);
+  EXPECT_FALSE(
+      static_cast<WebContentsImpl*>(new_contents)->delayed_open_url_params_);
+  EXPECT_TRUE(static_cast<WebContentsImpl*>(new_contents)->is_resume_pending_);
   new_contents->ResumeLoadingCreatedWebContents();
   EXPECT_TRUE(WaitForLoadStop(new_contents));
   EXPECT_EQ(url, new_contents->GetLastCommittedURL());
@@ -4000,6 +4067,84 @@ IN_PROC_BROWSER_TEST_F(WebContentsImplBrowserTest, PropagateFullscreenOptions) {
   }
 
   EXPECT_TRUE(test_delegate.fullscreen_options().prefers_navigation_bar);
+}
+
+// Tests that when toggling EnterFullscreen/ExitFullscreen that each state
+// properly synchronizes with the Renderer, fulfilling the Promises. Even when
+// there has been no layout changes, such as when the Renderer is already
+// embedded in a fullscreen context, with no OS nor Browser control insets.
+//
+// Also confirms that each state change does not block the subsequent one.
+// Finally on Android, which supports full browser ScreenOrientation locks, that
+// we can successfully apply the lock.
+IN_PROC_BROWSER_TEST_F(WebContentsImplBrowserTest, ToggleFullscreen) {
+  ASSERT_TRUE(embedded_test_server()->Start());
+  WebContentsImpl* web_contents =
+      static_cast<WebContentsImpl*>(shell()->web_contents());
+
+  TestWCDelegateForDialogsAndFullscreen test_delegate(web_contents);
+
+  GURL url = embedded_test_server()->GetURL("a.com", "/page_with_iframe.html");
+  EXPECT_TRUE(NavigateToURL(web_contents, url));
+  RenderFrameHostImpl* main_frame = web_contents->GetPrimaryMainFrame();
+
+  EXPECT_FALSE(IsInFullscreen());
+
+  // Make the top page fullscreen with system navigation ui.
+  {
+    test_delegate.WillWaitForFullscreenEnter();
+    TitleWatcher title_watcher(web_contents, u"main_fullscreen_fulfilled");
+    EXPECT_TRUE(ExecJs(
+        main_frame,
+        "document.body.requestFullscreen({ navigationUI: 'show' }).then(() => "
+        "{document.title = 'main_fullscreen_fulfilled'});"));
+    test_delegate.Wait();
+
+    std::u16string title = title_watcher.WaitAndGetTitle();
+    ASSERT_EQ(title, u"main_fullscreen_fulfilled");
+  }
+  EXPECT_TRUE(IsInFullscreen());
+
+  // Full document orientation lock is only available on Android.
+#if BUILDFLAG(IS_ANDROID)
+  {
+    TitleWatcher title_watcher(web_contents, u"portrait_lock_fulfilled");
+    EXPECT_TRUE(ExecJs(main_frame,
+                       "screen.orientation.lock('portrait').then(() => "
+                       "{document.title = 'portrait_lock_fulfilled'});"));
+    std::u16string title = title_watcher.WaitAndGetTitle();
+    ASSERT_EQ(title, u"portrait_lock_fulfilled");
+  }
+#endif
+
+  // Exiting fullscreen should update the title. This should not block
+  // subsequent request to re-enter fullscreen.
+  {
+    test_delegate.WillWaitForFullscreenExit();
+    TitleWatcher title_watcher(web_contents, u"main_exit_fullscreen_fulfilled");
+    EXPECT_TRUE(
+        ExecJs(main_frame,
+               "document.exitFullscreen().then(() => "
+               "{document.title = 'main_exit_fullscreen_fulfilled'});"));
+    test_delegate.Wait();
+
+    std::u16string title = title_watcher.WaitAndGetTitle();
+    ASSERT_EQ(title, u"main_exit_fullscreen_fulfilled");
+  }
+
+  // Make the top page fullscreen with system navigation ui.
+  {
+    test_delegate.WillWaitForFullscreenEnter();
+    TitleWatcher title_watcher(web_contents, u"main_fullscreen_fulfilled");
+    EXPECT_TRUE(ExecJs(
+        main_frame,
+        "document.body.requestFullscreen({ navigationUI: 'show' }).then(() => "
+        "{document.title = 'main_fullscreen_fulfilled'});"));
+    test_delegate.Wait();
+
+    std::u16string title = title_watcher.WaitAndGetTitle();
+    ASSERT_EQ(title, u"main_fullscreen_fulfilled");
+  }
 }
 
 class MockDidOpenRequestedURLObserver : public WebContentsObserver {

@@ -20,7 +20,7 @@
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
 
-namespace autofill::metrics {
+namespace autofill::autofill_metrics {
 
 constexpr char kTestProfileId[] = "00000000-0000-0000-0000-000000000001";
 constexpr char kTestLocalCardId[] = "10000000-0000-0000-0000-000000000001";
@@ -32,6 +32,12 @@ class MockAutofillClient : public TestAutofillClient {
   MockAutofillClient();
   ~MockAutofillClient() override;
   MOCK_METHOD(void, ExecuteCommand, (int), (override));
+  MOCK_METHOD(bool, IsTouchToFillCreditCardSupported, (), (override));
+  MOCK_METHOD(bool,
+              ShowTouchToFillCreditCard,
+              (base::WeakPtr<TouchToFillDelegate>,
+               base::span<const autofill::CreditCard* const>),
+              (override));
 };
 
 class AutofillMetricsBaseTest {
@@ -215,7 +221,7 @@ class AutofillMetricsBaseTest {
   syncer::TestSyncService sync_service_;
   std::unique_ptr<TestAutofillDriver> autofill_driver_;
   raw_ptr<AutofillExternalDelegate> external_delegate_;
-  raw_ptr<TouchToFillDelegateImpl> touch_to_fill_delgate_;
+  raw_ptr<TouchToFillDelegateImpl> touch_to_fill_delegate_;
 
  private:
   void CreateTestAutofillProfiles();
@@ -224,6 +230,6 @@ class AutofillMetricsBaseTest {
   CreditCard credit_card_ = test::GetMaskedServerCard();
 };
 
-}  // namespace autofill::metrics
+}  // namespace autofill::autofill_metrics
 
 #endif  // COMPONENTS_AUTOFILL_CORE_BROWSER_METRICS_AUTOFILL_METRICS_TEST_BASE_H_

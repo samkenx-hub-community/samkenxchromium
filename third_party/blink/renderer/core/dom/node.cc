@@ -374,8 +374,9 @@ NodeList* Node::childNodes() {
 
 Node* Node::PseudoAwarePreviousSibling() const {
   Element* parent = parentElement();
-  if (!parent || previousSibling())
+  if (!parent || HasPreviousSibling()) {
     return previousSibling();
+  }
   switch (GetPseudoId()) {
     case kPseudoIdAfter:
       if (Node* previous = parent->lastChild())
@@ -399,8 +400,9 @@ Node* Node::PseudoAwarePreviousSibling() const {
 
 Node* Node::PseudoAwareNextSibling() const {
   Element* parent = parentElement();
-  if (!parent || nextSibling())
+  if (!parent || HasNextSibling()) {
     return nextSibling();
+  }
   switch (GetPseudoId()) {
     case kPseudoIdMarker:
       if (Node* next = parent->GetPseudoElement(kPseudoIdBefore))
@@ -1041,11 +1043,6 @@ void Node::SetLayoutObject(LayoutObject* layout_object) {
 void Node::SetComputedStyle(scoped_refptr<const ComputedStyle> computed_style) {
   // We don't set computed style for text nodes.
   DCHECK(IsElementNode());
-
-  if (auto* element = DynamicTo<Element>(this)) {
-    ViewTransitionSupplement::From(GetDocument())
-        ->UpdateViewTransitionNames(*element, computed_style.get());
-  }
 
   // Already pointing to a non empty NodeData so just set the pointer
   // to the new LayoutObject.

@@ -88,11 +88,6 @@ PrivacySandboxSettingsImpl::PrivacySandboxSettingsImpl(
 
   pref_change_registrar_.Init(pref_service_);
   pref_change_registrar_.Add(
-      prefs::kPrivacySandboxApisEnabledV2,
-      base::BindRepeating(
-          &PrivacySandboxSettingsImpl::OnPrivacySandboxPrefChanged,
-          base::Unretained(this)));
-  pref_change_registrar_.Add(
       prefs::kPrivacySandboxFirstPartySetsEnabled,
       base::BindRepeating(
           &PrivacySandboxSettingsImpl::OnFirstPartySetsEnabledPrefChanged,
@@ -244,6 +239,19 @@ PrivacySandboxSettingsImpl::GetM1AttributionReportingAllowedStatus(
 
   return GetSiteAccessAllowedStatus(top_frame_origin,
                                     reporting_origin.GetURL());
+}
+
+bool PrivacySandboxSettingsImpl::IsAttributionReportingEverAllowed() const {
+  // M1 specific
+  if (base::FeatureList::IsEnabled(privacy_sandbox::kPrivacySandboxSettings4)) {
+    Status status = GetM1PrivacySandboxApiEnabledStatus(
+        prefs::kPrivacySandboxM1AdMeasurementEnabled);
+    base::UmaHistogramEnumeration(
+        "PrivacySandbox.IsAttributionReportingEverAllowed", status);
+    return IsAllowed(status);
+  }
+
+  return IsPrivacySandboxEnabled();
 }
 
 bool PrivacySandboxSettingsImpl::IsAttributionReportingAllowed(
@@ -498,22 +506,12 @@ void PrivacySandboxSettingsImpl::SetPrivacySandboxEnabled(bool enabled) {
   pref_service_->SetBoolean(prefs::kPrivacySandboxApisEnabledV2, enabled);
 }
 
-bool PrivacySandboxSettingsImpl::IsTrustTokensAllowed() {
-  return IsPrivacySandboxEnabled();
-}
-
 bool PrivacySandboxSettingsImpl::IsPrivacySandboxRestricted() const {
   return delegate_->IsPrivacySandboxRestricted();
 }
 
 void PrivacySandboxSettingsImpl::OnCookiesCleared() {
   SetTopicsDataAccessibleFromNow();
-}
-
-void PrivacySandboxSettingsImpl::OnPrivacySandboxPrefChanged() {
-  for (auto& observer : observers_) {
-    observer.OnTrustTokenBlockingChanged(!IsTrustTokensAllowed());
-  }
 }
 
 void PrivacySandboxSettingsImpl::OnFirstPartySetsEnabledPrefChanged() {
@@ -551,8 +549,7 @@ bool PrivacySandboxSettingsImpl::IsPrivacySandboxEnabledForContext(
   // for cookies is provided so the context is always treated as a third party.
   return cookie_settings_->IsFullCookieAccessAllowed(
       url, net::SiteForCookies(), top_frame_origin,
-      net::CookieSettingOverrides(),
-      content_settings::CookieSettings::QueryReason::kPrivacySandbox);
+      net::CookieSettingOverrides());
 }
 
 void PrivacySandboxSettingsImpl::SetTopicsDataAccessibleFromNow() const {

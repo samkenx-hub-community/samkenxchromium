@@ -247,7 +247,7 @@ class WorkerTest : public ContentBrowserTest,
     auto* service = static_cast<SharedWorkerServiceImpl*>(
         partition->GetSharedWorkerService());
     return service->FindMatchingSharedWorkerHost(
-        url, "", blink::StorageKey(url::Origin::Create(url)));
+        url, "", blink::StorageKey::CreateFirstParty(url::Origin::Create(url)));
   }
 
   net::test_server::EmbeddedTestServer* ssl_server() { return &ssl_server_; }
@@ -379,7 +379,7 @@ IN_PROC_BROWSER_TEST_P(WorkerTest, SharedWorkerInCOEPRequireCorpDocument) {
       ProcessLock::FromSiteInfo(page_rfh->GetSiteInstance()->GetSiteInfo());
   EXPECT_TRUE(page_lock.GetWebExposedIsolationInfo().is_isolated());
   EXPECT_GT(page_rfh->GetWebExposedIsolationLevel(),
-            RenderFrameHost::WebExposedIsolationLevel::kNotIsolated);
+            WebExposedIsolationLevel::kNotIsolated);
 
   // Create a shared worker from the cross-origin-isolated page:
 

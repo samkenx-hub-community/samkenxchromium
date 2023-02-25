@@ -1499,18 +1499,7 @@ RenderProcessHostImpl::RenderProcessHostImpl(
     BrowserContext* browser_context,
     StoragePartitionImpl* storage_partition_impl,
     int flags)
-    : fast_shutdown_started_(false),
-      deleting_soon_(false),
-#ifndef NDEBUG
-      is_self_deleted_(false),
-#endif
-      pending_views_(0),
-      keep_alive_ref_count_(0),
-      worker_ref_count_(0),
-      shutdown_delay_ref_count_(0),
-      are_ref_counts_disabled_(false),
-      visible_clients_(0),
-      priority_(!blink::kLaunchingProcessIsBackgrounded,
+    : priority_(!blink::kLaunchingProcessIsBackgrounded,
                 false /* has_media_stream */,
                 false /* has_foreground_service_worker */,
                 frame_depth_,
@@ -1741,6 +1730,13 @@ bool RenderProcessHostImpl::Init() {
   CreateMessageFilters();
   RegisterMojoInterfaces();
 
+  auto attribution_os_support =
+      attribution_reporting::mojom::OsSupport::kDisabled;
+  if (auto* attribution_manager =
+          AttributionManager::FromBrowserContext(browser_context_)) {
+    attribution_os_support = attribution_manager->GetOsSupport();
+  }
+
   // Call this now and not in OnProcessLaunched in case any mojo calls get
   // dispatched before this.
   GetRendererInterface()->InitializeRenderer(
@@ -1750,7 +1746,7 @@ bool RenderProcessHostImpl::Init() {
       GetContentClient()->browser()->GetReducedUserAgent(),
       GetContentClient()->browser()->GetUserAgentMetadata(),
       storage_partition_impl_->cors_exempt_header_list(),
-      AttributionManager::GetOsSupport());
+      attribution_os_support);
 
   if (run_renderer_in_process()) {
     DCHECK(g_renderer_main_thread_factory);
@@ -2082,7 +2078,8 @@ void RenderProcessHostImpl::CreateLockManagerWithBucketInfo(
     mojo::PendingReceiver<blink::mojom::LockManager> receiver,
     storage::QuotaErrorOr<storage::BucketInfo> bucket) {
   storage_partition_impl_->GetLockManager()->BindReceiver(
-      bucket.ok() ? bucket->id : storage::BucketId(), std::move(receiver));
+      bucket.has_value() ? bucket->id : storage::BucketId(),
+      std::move(receiver));
 }
 
 void RenderProcessHostImpl::CreatePermissionService(
@@ -2140,21 +2137,13 @@ void RenderProcessHostImpl::CreateWebSocketConnector(
     mojo::PendingReceiver<blink::mojom::WebSocketConnector> receiver) {
   // TODO(jam): is it ok to not send extraHeaders for sockets created from
   // shared and service workers?
-  //
-  // Shared Workers and service workers are not directly associated with a
-  // frame, so the concept of "top-level frame" does not exist. Can use
-  // (origin, origin, origin) for the IsolationInfo for requests because these
-  // workers can only be created when the site has cookie access.
-  //
-  // TODO(https://crbug.com/1199077): We should consider using
-  // storage_key().top_frame_origin() instead once that is fully populated.
   mojo::MakeSelfOwnedReceiver(
       std::make_unique<WebSocketConnectorImpl>(
           GetID(), MSG_ROUTING_NONE, storage_key.origin(),
           net::IsolationInfo::Create(
-              net::IsolationInfo::RequestType::kOther, storage_key.origin(),
-              storage_key.origin(),
-              net::SiteForCookies::FromOrigin(storage_key.origin()),
+              net::IsolationInfo::RequestType::kOther,
+              url::Origin::Create(storage_key.top_level_site().GetURL()),
+              storage_key.origin(), storage_key.ToNetSiteForCookies(),
               /*party_context=*/absl::nullopt,
               storage_key.nonce().has_value() ? &storage_key.nonce().value()
                                               : nullptr)),
@@ -2176,6 +2165,7 @@ void RenderProcessHostImpl::ReinitializeLogging(
 #if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS)
 void RenderProcessHostImpl::CreateStableVideoDecoder(
     mojo::PendingReceiver<media::stable::mojom::StableVideoDecoder> receiver) {
+  DCHECK_CURRENTLY_ON(BrowserThread::UI);
   if (!stable_video_decoder_factory_remote_.is_bound()) {
     LaunchStableVideoDecoderFactory(
         stable_video_decoder_factory_remote_.BindNewPipeAndPassReceiver());
@@ -2672,7 +2662,7 @@ bool RenderProcessHostImpl::IsProcessBackgrounded() {
 
 void RenderProcessHostImpl::IncrementKeepAliveRefCount(uint64_t handle_id) {
   DCHECK_CURRENTLY_ON(BrowserThread::UI);
-  DCHECK(!are_ref_counts_disabled_);
+  CHECK(!are_ref_counts_disabled_);
   if (base::FeatureList::IsEnabled(kCheckNoNewRefCountsWhenRphDeletingSoon)) {
     CHECK(!deleting_soon_);
   }
@@ -2688,8 +2678,8 @@ bool RenderProcessHostImpl::AreAllRefCountsZero() {
 
 void RenderProcessHostImpl::DecrementKeepAliveRefCount(uint64_t handle_id) {
   DCHECK_CURRENTLY_ON(BrowserThread::UI);
-  DCHECK(!are_ref_counts_disabled_);
-  DCHECK_GT(keep_alive_ref_count_, 0U);
+  CHECK(!are_ref_counts_disabled_);
+  CHECK_GT(keep_alive_ref_count_, 0);
   --keep_alive_ref_count_;
   DCHECK(keep_alive_start_times_.contains(handle_id));
   keep_alive_start_times_.erase(handle_id);
@@ -2750,7 +2740,7 @@ void RenderProcessHostImpl::UnregisterRenderFrameHost(
 
 void RenderProcessHostImpl::IncrementWorkerRefCount() {
   DCHECK_CURRENTLY_ON(BrowserThread::UI);
-  DCHECK(!are_ref_counts_disabled_);
+  CHECK(!are_ref_counts_disabled_);
   if (base::FeatureList::IsEnabled(kCheckNoNewRefCountsWhenRphDeletingSoon)) {
     CHECK(!deleting_soon_);
   }
@@ -2759,8 +2749,8 @@ void RenderProcessHostImpl::IncrementWorkerRefCount() {
 
 void RenderProcessHostImpl::DecrementWorkerRefCount() {
   DCHECK_CURRENTLY_ON(BrowserThread::UI);
-  DCHECK(!are_ref_counts_disabled_);
-  DCHECK_GT(worker_ref_count_, 0U);
+  CHECK(!are_ref_counts_disabled_);
+  CHECK_GT(worker_ref_count_, 0);
   --worker_ref_count_;
   if (AreAllRefCountsZero())
     Cleanup();
@@ -3440,6 +3430,7 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
     blink::switches::kDisablePreferCompositingToLCDText,
     blink::switches::kDisableRGBA4444Textures,
     blink::switches::kDisableThreadedScrolling,
+    blink::switches::kDisableThrottleNonVisibleCrossOriginIframes,
     blink::switches::kEnableLowResTiling,
     blink::switches::kEnablePreferCompositingToLCDText,
     blink::switches::kEnableRGBA4444Textures,
@@ -4819,6 +4810,8 @@ void RenderProcessHostImpl::ProcessDied(
 }
 
 void RenderProcessHostImpl::ResetIPC() {
+  DCHECK_CURRENTLY_ON(BrowserThread::UI);
+  media_interface_proxy_.reset();
   renderer_host_receiver_.reset();
   io_thread_host_impl_.reset();
   associated_interfaces_.reset();
@@ -5317,8 +5310,8 @@ void RenderProcessHostImpl::CancelProcessShutdownDelay(
   }
 
   // Decrement shutdown delay ref count.
-  DCHECK(!are_ref_counts_disabled_);
-  DCHECK_GT(shutdown_delay_ref_count_, 0U);
+  CHECK(!are_ref_counts_disabled_);
+  CHECK_GT(shutdown_delay_ref_count_, 0);
   shutdown_delay_ref_count_--;
   if (AreAllRefCountsZero())
     Cleanup();
@@ -5418,11 +5411,6 @@ void RenderProcessHostImpl::ProvideSwapFileForRenderer() {
               allocator->ProvideTemporaryFile(std::move(file));
           },
           std::move(allocator)));
-}
-
-void RenderProcessHostImpl::SetOsSupportForAttributionReporting(
-    attribution_reporting::mojom::OsSupport os_support) {
-  GetRendererInterface()->SetOsSupportForAttributionReporting(os_support);
 }
 
 #if BUILDFLAG(IS_ANDROID)

@@ -70,6 +70,7 @@
 #include "third_party/blink/public/mojom/frame/blocked_navigation_types.mojom-shared.h"
 #include "third_party/blink/public/mojom/frame/frame.mojom-forward.h"
 #include "third_party/blink/public/mojom/frame/text_autosizer_page_info.mojom.h"
+#include "third_party/blink/public/mojom/input/input_handler.mojom-shared.h"
 #include "third_party/blink/public/mojom/loader/resource_load_info.mojom-forward.h"
 #include "third_party/blink/public/mojom/media/capture_handle_config.mojom.h"
 #include "third_party/blink/public/mojom/page/display_cutout.mojom-shared.h"
@@ -929,6 +930,9 @@ class CONTENT_EXPORT WebContentsImpl : public WebContents,
                           const absl::optional<std::u16string>& value) override;
   void MoveRangeSelectionExtent(const gfx::Point& extent) override;
   void SelectRange(const gfx::Point& base, const gfx::Point& extent) override;
+  void SelectAroundCaret(blink::mojom::SelectionGranularity granularity,
+                         bool should_show_handle,
+                         bool should_show_context_menu) override;
   void MoveCaret(const gfx::Point& extent) override;
   void AdjustSelectionByCharacterOffset(int start_adjust,
                                         int end_adjust,
@@ -981,7 +985,6 @@ class CONTENT_EXPORT WebContentsImpl : public WebContents,
       RenderViewHost* render_view_host) override;
   void BeforeUnloadFiredFromRenderManager(
       bool proceed,
-      const base::TimeTicks& proceed_time,
       bool* proceed_to_fire_unload) override;
   void CancelModalDialogsForRenderManager() override;
   void NotifySwappedFromRenderManager(RenderFrameHostImpl* old_frame,
@@ -1024,6 +1027,7 @@ class CONTENT_EXPORT WebContentsImpl : public WebContents,
   void DidStopLoading() override;
   bool IsHidden() override;
   int GetOuterDelegateFrameTreeNodeId() override;
+  RenderFrameHostImpl* GetProspectiveOuterDocument() override;
   FrameTree* LoadingTree() override;
   void SetFocusedFrame(FrameTreeNode* node, SiteInstanceGroup* source) override;
 
@@ -1439,6 +1443,10 @@ class CONTENT_EXPORT WebContentsImpl : public WebContents,
   FRIEND_TEST_ALL_PREFIXES(PointerLockBrowserTest,
                            PointerLockInnerContentsCrashes);
   FRIEND_TEST_ALL_PREFIXES(PointerLockBrowserTest, PointerLockOopifCrashes);
+  FRIEND_TEST_ALL_PREFIXES(WebContentsImplBrowserTest,
+                           PopupWindowBrowserNavResumeLoad);
+  FRIEND_TEST_ALL_PREFIXES(WebContentsImplBrowserTest,
+                           SuppressedPopupWindowBrowserNavResumeLoad);
 
   // So |find_request_manager_| can be accessed for testing.
   friend class FindRequestManagerTest;

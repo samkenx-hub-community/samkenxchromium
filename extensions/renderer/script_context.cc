@@ -17,6 +17,7 @@
 #include "content/public/renderer/v8_value_converter.h"
 #include "extensions/common/constants.h"
 #include "extensions/common/content_script_injection_url_getter.h"
+#include "extensions/common/context_data.h"
 #include "extensions/common/extension.h"
 #include "extensions/common/extension_api.h"
 #include "extensions/common/extension_urls.h"
@@ -27,6 +28,7 @@
 #include "extensions/renderer/v8_helpers.h"
 #include "third_party/blink/public/mojom/service_worker/service_worker_registration.mojom.h"
 #include "third_party/blink/public/platform/web_security_origin.h"
+#include "third_party/blink/public/web/blink.h"
 #include "third_party/blink/public/web/web_document.h"
 #include "third_party/blink/public/web/web_document_loader.h"
 #include "third_party/blink/public/web/web_local_frame.h"
@@ -41,8 +43,7 @@ namespace extensions {
 
 namespace {
 
-class RendererContextData
-    : public ContentScriptInjectionUrlGetter::ContextData {
+class RendererContextData : public ContextData {
  public:
   explicit RendererContextData(const blink::WebLocalFrame* frame)
       : frame_(frame) {}
@@ -51,6 +52,10 @@ class RendererContextData
 
   std::unique_ptr<ContextData> Clone() const override {
     return std::make_unique<RendererContextData>(frame_);
+  }
+
+  bool IsIsolatedApplication() const override {
+    return blink::IsIsolatedContext();
   }
 
   std::unique_ptr<ContextData> GetLocalParentOrOpener() const override {

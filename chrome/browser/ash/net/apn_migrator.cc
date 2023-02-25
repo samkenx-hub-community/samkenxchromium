@@ -97,8 +97,7 @@ void ApnMigrator::SetShillUserApnListForNetwork(
     const base::Value::List* apn_list) {
   network_configuration_handler_->SetProperties(
       network.path(),
-      base::Value(
-          chromeos::network_config::UserApnListToOnc(network.guid(), apn_list)),
+      chromeos::network_config::UserApnListToOnc(network.guid(), apn_list),
       base::BindOnce(&OnSetShillUserApnListSuccess),
       base::BindOnce(&OnSetShillUserApnListFailure, network.guid()));
 }
@@ -139,12 +138,13 @@ void ApnMigrator::MigrateNetwork(const NetworkState& network) {
                      weak_factory_.GetWeakPtr(), network.iccid()));
 }
 
-void ApnMigrator::OnGetManagedProperties(std::string iccid,
-                                         const std::string& service_path,
-                                         absl::optional<base::Value> properties,
-                                         absl::optional<std::string> error) {
+void ApnMigrator::OnGetManagedProperties(
+    std::string iccid,
+    const std::string& service_path,
+    absl::optional<base::Value::Dict> properties,
+    absl::optional<std::string> error) {
   // TODO(b/162365553): Implement this case: Network with custom APNs needs to
-  // be migrated
+  // be migrated.
   managed_cellular_pref_handler_->AddApnMigratedIccid(iccid);
   iccids_in_migration_.erase(iccid);
 }

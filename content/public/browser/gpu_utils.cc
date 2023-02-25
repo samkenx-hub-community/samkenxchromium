@@ -119,10 +119,8 @@ const gpu::GpuPreferences GetGpuPreferencesFromCommandLine() {
   gpu_preferences.disable_vulkan_fallback_to_gl_for_testing =
       command_line->HasSwitch(switches::kDisableVulkanFallbackToGLForTesting);
 
-#if BUILDFLAG(IS_MAC)
+#if BUILDFLAG(IS_MAC) || BUILDFLAG(IS_IOS)
   gpu_preferences.enable_metal = base::FeatureList::IsEnabled(features::kMetal);
-#elif BUILDFLAG(IS_IOS)
-  gpu_preferences.enable_metal = true;
 #endif
 
   gpu_preferences.enable_gpu_benchmarking_extension =
@@ -170,6 +168,10 @@ const gpu::GpuPreferences GetGpuPreferencesFromCommandLine() {
                         &gpu_preferences.vulkan_sync_cpu_memory_limit)) {
     gpu_preferences.vulkan_sync_cpu_memory_limit *= 1024 * 1024;
   }
+
+  gpu_preferences.force_separate_egl_display_for_webgl_testing =
+      command_line->HasSwitch(
+          switches::kForceSeparateEGLDisplayForWebGLTesting);
 
   // Some of these preferences are set or adjusted in
   // GpuDataManagerImplPrivate::AppendGpuCommandLine.

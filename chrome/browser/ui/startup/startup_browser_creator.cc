@@ -271,8 +271,7 @@ void DumpBrowserHistograms(const base::FilePath& output_file) {
 
   base::ScopedBlockingCall scoped_blocking_call(FROM_HERE,
                                                 base::BlockingType::MAY_BLOCK);
-  base::WriteFile(output_file, output_string.data(),
-                  static_cast<int>(output_string.size()));
+  base::WriteFile(output_file, output_string);
 }
 
 // Returns whether |profile_info.profile| can be opened during Chrome startup
@@ -1585,6 +1584,8 @@ StartupProfileInfo GetStartupProfile(const base::FilePath& cur_dir,
   ProfileManager* profile_manager = g_browser_process->profile_manager();
   StartupProfilePathInfo path_info = GetStartupProfilePath(
       cur_dir, command_line, /*ignore_profile_picker=*/false);
+  base::UmaHistogramEnumeration("ProfilePicker.StartupMode.GetStartupProfile",
+                                path_info.mode);
 
   switch (path_info.mode) {
     case StartupProfileMode::kProfilePicker:

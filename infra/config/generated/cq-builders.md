@@ -344,6 +344,16 @@ builder.
   * [`//content/browser/tracing/.+`](https://cs.chromium.org/chromium/src/content/browser/tracing/)
   * [`//services/tracing/.+`](https://cs.chromium.org/chromium/src/services/tracing/)
 
+* [linux-updater-try-builder-dbg](https://ci.chromium.org/p/chromium/builders/try/linux-updater-try-builder-dbg) ([definition](https://cs.chromium.org/search?q=+file:/try/.*\.star$+""linux-updater-try-builder-dbg""))
+
+  Location filters:
+  * [`//chrome/updater/.+`](https://cs.chromium.org/chromium/src/chrome/updater/)
+
+* [linux-updater-try-builder-rel](https://ci.chromium.org/p/chromium/builders/try/linux-updater-try-builder-rel) ([definition](https://cs.chromium.org/search?q=+file:/try/.*\.star$+""linux-updater-try-builder-rel""))
+
+  Location filters:
+  * [`//chrome/updater/.+`](https://cs.chromium.org/chromium/src/chrome/updater/)
+
 * [linux-x64-castos-dbg](https://ci.chromium.org/p/chromium/builders/try/linux-x64-castos-dbg) ([definition](https://cs.chromium.org/search?q=+file:/try/.*\.star$+""linux-x64-castos-dbg""))
 
   Location filters:
@@ -478,9 +488,6 @@ as required builders.
   * [`//third_party/nearby/README.chromium`](https://cs.chromium.org/search?q=+file:third_party/nearby/README.chromium)
 
 * [linux-1mbu-compile-fyi-rel](https://ci.chromium.org/p/chromium/builders/try/linux-1mbu-compile-fyi-rel) ([definition](https://cs.chromium.org/search?q=+file:/try/.*\.star$+""linux-1mbu-compile-fyi-rel""))
-  * Experiment percentage: 5.0
-
-* [linux-chromeos-rel-rts](https://ci.chromium.org/p/chromium/builders/try/linux-chromeos-rel-rts) ([definition](https://cs.chromium.org/search?q=+file:/try/.*\.star$+""linux-chromeos-rel-rts""))
   * Experiment percentage: 5.0
 
 * [linux-rel-ml](https://ci.chromium.org/p/chromium/builders/try/linux-rel-ml) ([definition](https://cs.chromium.org/search?q=+file:/try/.*\.star$+""linux-rel-ml""))

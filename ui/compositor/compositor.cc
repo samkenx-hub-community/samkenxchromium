@@ -225,11 +225,6 @@ Compositor::Compositor(const viz::FrameSinkId& frame_sink_id,
   settings.wait_for_all_pipeline_stages_before_draw =
       command_line->HasSwitch(switches::kRunAllCompositorStagesBeforeDraw);
 
-  if (base::FeatureList::IsEnabled(
-          features::kCompositorThreadedScrollbarScrolling)) {
-    settings.compositor_threaded_scrollbar_scrolling = true;
-  }
-
   if (features::IsPercentBasedScrollingEnabled()) {
     settings.percent_based_scrolling = true;
   }
@@ -329,9 +324,8 @@ void Compositor::AddChildFrameSink(const viz::FrameSinkId& frame_sink_id) {
 
 void Compositor::RemoveChildFrameSink(const viz::FrameSinkId& frame_sink_id) {
   auto it = child_frame_sinks_.find(frame_sink_id);
-  DCHECK(it != child_frame_sinks_.end());
+  CHECK(it != child_frame_sinks_.end());
   DCHECK(it->is_valid());
-
   context_factory_->GetHostFrameSinkManager()->UnregisterFrameSinkHierarchy(
       frame_sink_id_, *it);
   child_frame_sinks_.erase(it);

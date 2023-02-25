@@ -243,6 +243,7 @@ namespace wifi {
 const char kAllowGatewayARPPolling[] = "AllowGatewayARPPolling";
 const char kAutoConnect[] = "AutoConnect";
 const char kBSSID[] = "BSSID";
+const char kBSSIDAllowlist[] = "BSSIDAllowlist";
 const char kEAP[] = "EAP";
 const char kFrequency[] = "Frequency";
 const char kFrequencyList[] = "FrequencyList";
@@ -462,6 +463,7 @@ const char kPasswordAndOTP[] = "PasswordAndOTP";
 namespace wireguard {
 const char kAllowedIPs[] = "AllowedIPs";
 const char kEndpoint[] = "Endpoint";
+const char kIPAddresses[] = "IPAddresses";
 const char kPeers[] = "Peers";
 const char kPersistentKeepalive[] = "PersistentKeepalive";
 const char kPresharedKey[] = "PresharedKey";

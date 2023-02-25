@@ -133,11 +133,13 @@ Ecco alcune cose che puoi provare per iniziare.</translation>
 <translation id="163517899691012366">Le notifiche sono disattivate quando è attiva la funzionalità Non disturbare</translation>
 <translation id="1637505162081889933"><ph name="NUM_DEVICES" /> dispositivi</translation>
 <translation id="1639239467298939599">Caricamento</translation>
+<translation id="1647986356840967552">Pagina precedente</translation>
 <translation id="1654477262762802994">Avvia una query vocale</translation>
 <translation id="1668469839109562275">VPN integrata</translation>
 <translation id="1677472565718498478"><ph name="TIME" /> rimanenti</translation>
 <translation id="1677507110654891115">La funzionalità <ph name="FEATURE_NAME" /> non è connessa.</translation>
 <translation id="1677582821739292812">Qualcuno sta guardando il tuo schermo</translation>
+<translation id="1683399938733266832">Utilizzo attuale della CPU: <ph name="CPU_USEAGE" />%</translation>
 <translation id="169515659049020177">Maiusc</translation>
 <translation id="1698080062160024910">Timer: <ph name="TOTAL_TIME" /> · <ph name="LABEL" /></translation>
 <translation id="1698760176351776263">Indirizzo IPv6: <ph name="ADDRESS" /></translation>
@@ -286,6 +288,7 @@ Ecco alcune cose che puoi provare per iniziare.</translation>
 <translation id="2475982808118771221">Si è verificato un errore</translation>
 <translation id="2482878487686419369">Notifiche</translation>
 <translation id="2484513351006226581">Premi <ph name="KEYBOARD_SHORTCUT" /> per cambiare il layout della tastiera.</translation>
+<translation id="2487915095798731898">Partecipa</translation>
 <translation id="2501920221385095727">Tasti permanenti</translation>
 <translation id="2509468283778169019">BLOC MAIUSC è attivo</translation>
 <translation id="2515586267016047495">Alt</translation>
@@ -380,6 +383,7 @@ Ecco alcune cose che puoi provare per iniziare.</translation>
 <translation id="3051189971848907985">Ridenominazione del profilo in corso… Attendi qualche minuto.</translation>
 <translation id="3055162170959710888">Oggi hai utilizzato questo dispositivo per <ph name="USED_TIME" /></translation>
 <translation id="3062298103034426069">Non supportate</translation>
+<translation id="3068622547379332530">Versione <ph name="VERSION_NAME" /> (<ph name="OFFICIAL_STATUS" />) <ph name="CHANNEL_NAME" /> <ph name="PROCESSOR_VARIATION" /></translation>
 <translation id="3068711042108640621">Barra delle app a sinistra</translation>
 <translation id="3077734595579995578">maiusc</translation>
 <translation id="3081696990447829002">Espandi il menu</translation>
@@ -546,6 +550,7 @@ Collega il dispositivo all'alimentazione.</translation>
 <translation id="3925540965556789199"><ph name="DATE" />, caricamento eventi in corso…</translation>
 <translation id="3932043219784172185">Nessun dispositivo connesso</translation>
 <translation id="3934456833412894880">Ricarica adattiva attiva. La batteria rimarrà all'80% per farla durare di più e verrà ricaricata completamente quando ti servirà.</translation>
+<translation id="3936620957945677513">Premi Invio per partecipare all'evento <ph name="EVENT_SUMMARY" /></translation>
 <translation id="3943857333388298514">Incolla</translation>
 <translation id="394485226368336402">Impostazioni audio</translation>
 <translation id="3945319193631853098">Tocca per completare la configurazione</translation>
@@ -556,6 +561,7 @@ Collega il dispositivo all'alimentazione.</translation>
 <translation id="397105322502079400">Calcolo in corso...</translation>
 <translation id="397726367135689299">La ricarica della batteria potrebbe non essere affidabile.</translation>
 <translation id="3977512764614765090">Percentuale di carica della batteria: <ph name="PERCENTAGE" />%. La batteria è in carica.</translation>
+<translation id="3984536049089846927">Pagina successiva</translation>
 <translation id="3986082989454912832">Rispondi</translation>
 <translation id="3995138139523574647">Dispositivo USB-C (porta posteriore destra)</translation>
 <translation id="40062176907008878">Scrittura a mano libera</translation>
@@ -578,7 +584,7 @@ Collega il dispositivo all'alimentazione.</translation>
 <translation id="4123259114412175274">Per sbloccare Chromebook, assicurati che il Bluetooth del telefono sia attivo</translation>
 <translation id="4125970834901680537">Impossibile riprodurre app in streaming in modalità tablet. Riprova in modalità laptop.</translation>
 <translation id="4129129681837227511">Se vuoi vedere le notifiche nella schermata di blocco, sblocca il dispositivo per cambiare l'impostazione</translation>
-<translation id="4130035430755296270">Continua a passare il mouse sopra per altre opzioni di layout</translation>
+<translation id="4131973331381812765">Temperatura: <ph name="TEMPERATURE" /> °C - Velocità attuale: <ph name="CPU_AVERAGE_CURRENT_FREQUENCY_GHZ" /> GHz</translation>
 <translation id="4136724716305260864">Funzionalità attiva fino all'alba</translation>
 <translation id="4146833061457621061">Fammi ascoltare musica</translation>
 <translation id="4150201353443180367">Display</translation>
@@ -733,6 +739,7 @@ Collega il dispositivo all'alimentazione.</translation>
 <translation id="4895488851634969361">La batteria è carica.</translation>
 <translation id="490375751687810070">Verticale</translation>
 <translation id="490788395437447240">Livello batteria: <ph name="BATTERY_PERCENTAGE" />%</translation>
+<translation id="491504982845934899">Attiva <ph name="NETWORK_NAME" /> dopo la configurazione del dispositivo</translation>
 <translation id="4917385247580444890">Forte</translation>
 <translation id="4918086044614829423">Accetto</translation>
 <translation id="4919841137949306064"><ph name="APP_NAME" /> sta usando la fotocamera</translation>
@@ -1329,6 +1336,7 @@ Nuova installazione</translation>
 <translation id="8131740175452115882">Conferma</translation>
 <translation id="8131994907636310308">Chiudi notifica toast di ordinamento</translation>
 <translation id="8132793192354020517">Connesso a <ph name="NAME" /></translation>
+<translation id="8138705869659070104">Attiva dopo configur. dispos.</translation>
 <translation id="813913629614996137">Inizializzazione...</translation>
 <translation id="8142441511840089262">Doppio clic</translation>
 <translation id="8142699993796781067">Rete privata</translation>
@@ -1459,6 +1467,7 @@ Nuova installazione</translation>
 <translation id="8850991929411075241">Tasto di ricerca+ESC</translation>
 <translation id="8853703225951107899">Non è stato di nuovo possibile verificare il PIN o la password. Nota: se hai modificato la password di recente, usa la password precedente. La nuova password verrà applicata quando uscirai dall'account.</translation>
 <translation id="8855885154700222542">Tasto schermo intero</translation>
+<translation id="8858369206579825206">Controlli per la privacy</translation>
 <translation id="8870509716567206129">L'app non supporta la modalità Schermo diviso.</translation>
 <translation id="8874184842967597500">Non connesso</translation>
 <translation id="8876661425082386199">Controlla la connessione</translation>

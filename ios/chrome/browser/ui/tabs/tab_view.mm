@@ -124,6 +124,7 @@ UIImage* DefaultFaviconImage() {
 - (id)initWithEmptyView:(BOOL)emptyView selected:(BOOL)selected {
   if ((self = [super initWithFrame:CGRectZero])) {
     _pinned = NO;
+    self.isAccessibilityElement = NO;
     [self setOpaque:NO];
     [self createCommonViews];
     if (!emptyView)
@@ -299,10 +300,21 @@ UIImage* DefaultFaviconImage() {
 - (void)createButtonsAndLabel {
   _closeButton = [HighlightButton buttonWithType:UIButtonTypeCustom];
   [_closeButton setTranslatesAutoresizingMaskIntoConstraints:NO];
+
+  // TODO(crbug.com/1418068): Remove after minimum version required is >=
+  // iOS 15.
+#if __IPHONE_OS_VERSION_MIN_REQUIRED >= __IPHONE_15_0
+  NSDirectionalEdgeInsets contentInsets =
+      NSDirectionalEdgeInsetsMake(kTabCloseTopInset, kTabCloseLeftInset,
+                                  kTabCloseBottomInset, kTabCloseRightInset);
+  [_closeButton.configuration setContentInsets:contentInsets];
+#else
   [_closeButton setContentEdgeInsets:UIEdgeInsetsMake(kTabCloseTopInset,
                                                       kTabCloseLeftInset,
                                                       kTabCloseBottomInset,
                                                       kTabCloseRightInset)];
+#endif  // __IPHONE_OS_VERSION_MIN_REQUIRED >= __IPHONE_15_0
+
   UIImage* closeButton =
       UseSymbols()
           ? DefaultSymbolTemplateWithPointSize(kXMarkSymbol,

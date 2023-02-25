@@ -11,7 +11,7 @@
 
 #include "base/functional/callback.h"
 #include "base/time/time.h"
-#include "components/device_reauth/biometric_authenticator.h"
+#include "components/device_reauth/device_authenticator.h"
 #include "components/password_manager/core/browser/password_form.h"
 #include "components/password_manager/core/browser/password_manager_client.h"
 #include "components/password_manager/core/browser/password_store_interface.h"
@@ -178,8 +178,8 @@ bool ShouldShowBiometricAuthenticationBeforeFillingPromo(
 #endif
 
 // Helper which checks if biometric authentication is available.
-bool CanUseBiometricAuth(device_reauth::BiometricAuthenticator* authenticator,
-                         device_reauth::BiometricAuthRequester requester,
+bool CanUseBiometricAuth(device_reauth::DeviceAuthenticator* authenticator,
+                         device_reauth::DeviceAuthRequester requester,
                          password_manager::PasswordManagerClient* client);
 
 // Strips any authentication data, as well as query and ref portions of URL.
@@ -206,6 +206,16 @@ bool IsCredentialProviderEnabledOnStartup(const PrefService* prefs);
 // provider in their iOS settings at startup.
 void SetCredentialProviderEnabledOnStartup(PrefService* prefs, bool enabled);
 #endif
+
+// Retrieves the extended top level domain for a given |url|
+// ("https://www.facebook.com/" => "facebook.com"). If the calculated top
+// private domain matches an entry from the |psl_extensions| (e.g. "app.link"),
+// the domain is extended by one level ("https://facebook.app.link/" =>
+// "facebook.app.link"). If the |url| is not a valid URI or has an unsupported
+// schema (e.g. "android://"), empty string is returned.
+std::string GetExtendedTopLevelDomain(
+    const GURL& url,
+    const base::flat_set<std::string>& psl_extensions);
 
 // Contains all special symbols considered for password-generation.
 constexpr char kSpecialSymbols[] = "!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~";

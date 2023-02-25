@@ -20,10 +20,6 @@ class DeviceImageInfo;
 }  // namespace bluetooth_config
 }  // namespace chromeos
 
-namespace device {
-class BluetoothDevice;
-}  // namespace device
-
 namespace ash {
 namespace quick_pair {
 
@@ -94,6 +90,15 @@ class FastPairRepository {
       const std::string& mac_address,
       DeleteAssociatedDeviceCallback callback) = 0;
 
+  // Updates the display name of the device saved on the Footprints server. The
+  // function will first check the cache for the device, if the device is not
+  // found in the cache and |cache_may_be_stale| is set to true, it will trigger
+  // a server call to refresh the cache.
+  virtual void UpdateAssociatedDeviceFootprintsName(
+      const std::string& mac_address,
+      const std::string& nickname,
+      bool cache_may_be_stale) = 0;
+
   // Deletes the associated data for a given |account_key|.
   // Runs true if a delete is successful for this account key, false
   // otherwise on |callback|.
@@ -117,13 +122,13 @@ class FastPairRepository {
   // disk, if model ID is not already persisted.
   virtual bool PersistDeviceImages(scoped_refptr<Device> device) = 0;
 
-  // Evicts the images and device ID belonging to |device| from
-  // disk, if model ID is not in use by other device IDs.
-  virtual bool EvictDeviceImages(const device::BluetoothDevice* device) = 0;
+  // Evicts the images and mac address record for |mac_address| from
+  // disk, if model ID is not in use by other mac addresses.
+  virtual bool EvictDeviceImages(const std::string& mac_address) = 0;
 
-  // Returns device images belonging to |device_id|, if found.
+  // Returns device images belonging to |mac_address|, if found.
   virtual absl::optional<bluetooth_config::DeviceImageInfo> GetImagesForDevice(
-      const std::string& device_id) = 0;
+      const std::string& mac_address) = 0;
 
   // Fetches the opt in status from Footprints to determine the status for
   // saving a user's devices to their account, which is synced all across a

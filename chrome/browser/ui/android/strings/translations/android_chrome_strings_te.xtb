@@ -304,7 +304,6 @@
 <translation id="2669454659051515572">డౌన్‌లోడ్ చేసిన ఫైల్స్‌ను ఈ పరికరాన్ని ఉపయోగించే ఎవరైనా చూడగలరు</translation>
 <translation id="2702516483241149200">కొత్తది: ఈ టెక్స్ట్‌కు స్క్రోల్ చేసే లింక్‌ను షేర్ చేయండి</translation>
 <translation id="2707726405694321444">పేజీని రిఫ్రెష్ చేయండి</translation>
-<translation id="2709516037105925701">ఆటో-ఫిల్</translation>
 <translation id="271033894570825754">కొత్తది</translation>
 <translation id="2711073837061989559">ట్రయల్స్</translation>
 <translation id="2718352093833049315">Wi-Fiలో మాత్రమే</translation>
@@ -396,7 +395,6 @@
 <translation id="3114507951000454849">ఈరోజు వార్తలను చదవండి <ph name="NEWS_ICON" /></translation>
 <translation id="311958134571892113">దీనితో లింక్ చేయబడింది</translation>
 <translation id="3123734510202723619">అనౌన్స్‌మెంట్‌లు</translation>
-<translation id="3130863904455712965">హిస్టరీ, ఇంకా మరెన్నో</translation>
 <translation id="3134784203083076891">”</translation>
 <translation id="314939179385989105">Chrome హోమ్ పేజీ</translation>
 <translation id="3157931365184549694">పునరుద్ధరించు</translation>
@@ -453,6 +451,7 @@
 <translation id="3421726884497337397">థర్డ్-పార్టీ కుక్కీలను ఎప్పుడు బ్లాక్ చేయాలో ఎంచుకోండి</translation>
 <translation id="3428747202529429621">Chromeలో మిమ్మల్ని సురక్షితంగా ఉంచుతుంది, మీరు సైన్ ఇన్ చేసినప్పుడు ఇతర యాప్‌లలో మీ భద్రతను మెరుగుపరచడానికి ఉపయోగించబడవచ్చు</translation>
 <translation id="3429160811076349561">ట్రయల్ ఫీచర్‌లు ఆఫ్ చేయబడి ఉన్నాయి</translation>
+<translation id="3432973700170747422">గత 15 ని డేటా తొలగించండి</translation>
 <translation id="3435465986463792564">చాలా విండోలు ఉన్నాయా? మీరు వాటిని ఇక్కడ నుండి మేనేజ్ చేయవచ్చు</translation>
 <translation id="3435738964857648380">భద్రత</translation>
 <translation id="3443221991560634068">ప్రస్తుత పేజీని మళ్లీ లోడ్ చేయండి</translation>
@@ -519,7 +518,6 @@
 <translation id="3830886834687455630">మీ పాస్‌వర్డ్‌లను చెక్ చేయడానికి Google Play సర్వీసులను అప్‌డేట్ చేయండి</translation>
 <translation id="3845098929839618392">అజ్ఞాత ట్యాబ్‌లో తెరువు</translation>
 <translation id="3856096718352044181">దయచేసి ఇది చెల్లుబాటు అయ్యే ప్రొవైడర్ అని వెరిఫై చేయండి లేదా తర్వాత మళ్లీ ట్రై చేయండి</translation>
-<translation id="3858127568696903256">మీరు ఫాలో అయ్యే కంటెంట్‌ను ఇక్కడ చూడండి</translation>
 <translation id="3858860766373142691">పేరు</translation>
 <translation id="3861633093716975811">జనాదరణ పొందిన వీడియోలు</translation>
 <translation id="3874520961715512166">సైట్ తీసివేయబడింది</translation>
@@ -990,7 +988,6 @@
 <translation id="6397616442223433927">తిరిగి ఆన్‌లైన్‌లోకి వచ్చింది</translation>
 <translation id="6401458660421980302">ఈ ట్యాబ్‌ను మరొక పరికరానికి పంపడానికి, అక్కడ Chromeకు సైన్ ఇన్ చేయండి</translation>
 <translation id="6402652558933147609"><ph name="VIOLATED_URL" />లో <ph name="ERROR_CODE" /></translation>
-<translation id="6403371459378431832">అన్ని పరికరాలలో మీ డేటాను సింక్ చేయండి</translation>
 <translation id="6404511346730675251">బుక్‌మార్క్‌ను ఎడిట్ చేయండి</translation>
 <translation id="6406506848690869874">సింక్</translation>
 <translation id="6407224748847589805">మీ కంప్యూటర్‌కు కనెక్ట్ చేయడం సాధ్యపడదు. మరొక వెరిఫికేషన్ ఆప్షన్‌ను ట్రై చేయండి.</translation>
@@ -1228,6 +1225,7 @@
 <translation id="7596558890252710462">ఆపరేటింగ్ సిస్టమ్</translation>
 <translation id="7605594153474022051">సింక్‌ పని చేయడం లేదు</translation>
 <translation id="7612619742409846846">Googleకు ఇలా సైన్ ఇన్ చేశారు</translation>
+<translation id="7612989789287281429">మిమ్మల్ని సైన్ ఇన్ చేస్తోంది…</translation>
 <translation id="7616551326690708776">మీ హైలైట్ కోసం ఒక టెంప్లేట్‌ను ఎంచుకోండి.</translation>
 <translation id="7619072057915878432">నెట్‌వర్క్ వైఫల్యాల కారణంగా <ph name="FILE_NAME" /> డౌన్‌లోడ్ విఫలమైంది.</translation>
 <translation id="7626032353295482388">Chromeకు స్వాగతం</translation>
@@ -1246,6 +1244,7 @@
 <translation id="7682724950699840886">కింది చిట్కాలను ప్రయత్నించండి: మీ పరికరంలో తగినంత స్థలం ఉన్నట్లు నిర్ధారించుకోండి, మళ్లీ ఎగుమతి చేయడానికి ప్రయత్నించండి.</translation>
 <translation id="7686086654630106285">సైట్ సూచించిన యాడ్‌ల గురించి మరింత సమాచారం</translation>
 <translation id="768618399695552958">మీరు సందర్శించే కొన్ని పేజీలు ప్రీ - లోడ్ చేయబడ్డాయి. Google సైట్ నుండి లింక్ చేసినప్పుడు పేజీలు Google సర్వర్‌ల ద్వారా ప్రీ - లోడ్ చేయబడవచ్చు.</translation>
+<translation id="7691043218961417207">ఫాలో అవ్వాల్సిన కంటెంట్‌ను అన్వేషించండి</translation>
 <translation id="7698359219371678927"><ph name="APP_NAME" />లో ఈమెయిల్‌ను క్రియేట్ చేయండి</translation>
 <translation id="7707922173985738739">మొబైల్ డేటాను ఉపయోగిస్తుంది</translation>
 <translation id="7709094866268987903">మీరు తీసివేసిన ఆసక్తులు ఇక్కడ కనిపిస్తాయి</translation>
@@ -1319,7 +1318,6 @@
 <translation id="8037801708772278989">ఇప్పుడే చెక్ చేసింది</translation>
 <translation id="804335162455518893">SD కార్డ్ కనుగొనబడలేదు</translation>
 <translation id="8048533522416101084">{TAB_COUNT,plural, =1{<ph name="TAB_COUNT_ONE" /> అజ్ఞాత ట్యాబ్}other{<ph name="TAB_COUNT_NORMAL" /> అజ్ఞాత ట్యాబ్‌లు}}</translation>
-<translation id="8048728378294435881">మీ అంశాలను బ్యాకప్ చేసి, వాటిని ఏ పరికరంలోనైనా ఉపయోగించండి</translation>
 <translation id="8051695050440594747"><ph name="MEGABYTES" /> MB అందుబాటులో ఉంది</translation>
 <translation id="8058655154417507695">గడువు ముగింపు సంవత్సరం</translation>
 <translation id="8058746566562539958">కొత్త Chrome ట్యాబ్‌లో తెరువు</translation>
@@ -1497,6 +1495,7 @@
 <translation id="8970887620466824814">ఏదో తప్పు జరిగింది.</translation>
 <translation id="8972098258593396643">డిఫాల్ట్ ఫోల్డర్‌కు డౌన్‌లోడ్ చేయాలా?</translation>
 <translation id="8987641763863173640">వీడియో ప్రివ్యూ సెట్టింగ్‌లను మేనేజ్ చేస్తుంది</translation>
+<translation id="8987736167266086032">మీరు ఎక్కడ ఆపుతారో అక్కడి నుండే కొనసాగించవచ్చు</translation>
 <translation id="8989968390305463310">మీ బ్రౌజింగ్ హిస్టరీ మీరు చూసే యాడ్‌లను, దిగువున అంచనా వేసిన ఆసక్తులపై ప్రభావం చూపుతుంది. మీ గోప్యతను రక్షించడానికి, Chrome ప్రతి నెలా దశల వారీగా మీ ఆసక్తులను ఆటోమేటిక్‌గా తొలగిస్తుంది. ఆసక్తులు మీరు తీసివేస్తే మినహా, రిఫ్రెష్ అవుతూనే ఉంటాయి.</translation>
 <translation id="8993760627012879038">కొత్త ట్యాబ్‌ను అజ్ఞాత మోడ్‌లో తెరవండి</translation>
 <translation id="8996847606757455498">మరొక ప్రొవైడర్‌ను ఎంచుకోండి</translation>

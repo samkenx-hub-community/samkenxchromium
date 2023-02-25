@@ -31,6 +31,15 @@
             (PinnedTabsViewController*)pinnedTabsViewController
               didChangeItemCount:(NSUInteger)count;
 
+// Tells the delegate that the item with `itemID` was moved.
+- (void)pinnedTabsViewController:
+            (PinnedTabsViewController*)pinnedTabsViewController
+               didMoveItemWithID:(NSString*)itemID;
+
+// Tells the delegate that the item with `itemID` was removed.
+- (void)pinnedTabsViewController:(PinnedTabsViewController*)gridViewController
+             didRemoveItemWIthID:(NSString*)itemID;
+
 // Tells the delegate that the `pinnedTabsViewController` visibility has
 // changed.
 - (void)pinnedTabsViewControllerVisibilityDidChange:
@@ -56,6 +65,9 @@
 
 // Tracks if a drop animation is in progress.
 @property(nonatomic, assign) BOOL dropAnimationInProgress;
+
+// Returns YES if the collection has no items.
+@property(nonatomic, readonly, getter=isCollectionEmpty) BOOL collectionEmpty;
 
 // YES if the selected cell is visible in the Pinned Tabs collection.
 @property(nonatomic, readonly, getter=isSelectedCellVisible)

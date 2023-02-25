@@ -27,12 +27,12 @@
 <translation id="1201402288615127009">بعدی</translation>
 <translation id="1209796539517632982">سرورهای نام خودکار</translation>
 <translation id="1210831758834677569">لائوسی</translation>
+<translation id="1221555006497674479">فضای ذخیره‌سازی کم است، <ph name="REMAINING_PERCENTAGE" />٪ از <ph name="TOTAL_SPACE" /> فضای ذخیره‌سازی درایو مشترک باقی مانده است.</translation>
 <translation id="1243314992276662751">بارگذاری</translation>
 <translation id="1249250836236328755">ژانر</translation>
 <translation id="1254593899333212300">اتصال اینترنتی مستقیم</translation>
 <translation id="1272293450992660632">مقادیر پین مطابقت ندارند.</translation>
 <translation id="1280820357415527819">درحال جستجوی شبکه‌های دستگاه همراه</translation>
-<translation id="1291603679744561561">سیم‌کارت قفل است</translation>
 <translation id="1293556467332435079">Files</translation>
 <translation id="1297922636971898492">‏Google Drive در حال حاضر در دسترس نیست. به محض در دسترس قرار گرفتن Google Drive بارگذاری کردن به صورت خودکار دوباره شروع می‌شود.</translation>
 <translation id="1307931752636661898">‏نمی‌توان فایل‌های Linux را مشاهده کرد</translation>
@@ -59,7 +59,6 @@
 <translation id="1499943022354839699">‏انگلیسی (آمریکایی) با صفحه‌کلید Dvorak</translation>
 <translation id="1515909359182093592"><ph name="INPUT_LABEL" /> - میزبان</translation>
 <translation id="1521655867290435174">‏کاربرگ‌نگار Google</translation>
-<translation id="1521795806314479294">درحال آماده‌سازی <ph name="FILE_NAME" />…</translation>
 <translation id="1538729222189715449">‏درحال باز کردن فایل‌های Linux…</translation>
 <translation id="1547964879613821194">انگلیسی کانادا</translation>
 <translation id="1556189134700913550">اعمال به همه</translation>
@@ -75,6 +74,7 @@
 <translation id="1641780993263690097">چینی (پین‌یین)</translation>
 <translation id="1646019627374511909">تنظیم <ph name="NUMBER_OF_ITEMS" /> فایل برای دسترسی آفلاین</translation>
 <translation id="164969095109328410">‏دستگاه Chrome</translation>
+<translation id="1661207570040737402">‏از کل فضای ذخیره‌سازی درایو مشترک Google Workspace استفاده کرده‌اید.</translation>
 <translation id="1661867754829461514">پین جا افتاده</translation>
 <translation id="166439687370499867">تغییر پیکربندی‌های شبکه هم‌رسانی‌شده مجاز نیست</translation>
 <translation id="1665611772925418501">امکان تغییر این فایل وجود نداشت.</translation>
@@ -84,7 +84,6 @@
 <translation id="1722487484194605434">در حال فشرده‌سازی <ph name="NUMBER_OF_ITEMS" /> مورد…</translation>
 <translation id="1722687688096767818">درحال افزودن نمایه…</translation>
 <translation id="1726100011689679555">سرورهای نام</translation>
-<translation id="1727562178154619254">آماده همگام‌سازی</translation>
 <translation id="1729953886957086472">آلمانی (آلمان)</translation>
 <translation id="1730235522912993863">چینی (کانجی)</translation>
 <translation id="1731889557567069540"><ph name="NUMBER_OF_ITEMS" /> مورد کپی شد.</translation>
@@ -194,6 +193,7 @@
 <translation id="2574327434504608656">‏یک پوشه با Bruschetta هم‌رسانی شد</translation>
 <translation id="2578394532502990878">تامیل (آوایی)</translation>
 <translation id="2579959351793446050">اوریه</translation>
+<translation id="2587195714949534472">درحال آماده شدن برای همگام‌سازی <ph name="FILE_NAME" />…</translation>
 <translation id="2602810353103180630">شبکه <ph name="NETWORK_INDEX" /> از <ph name="NETWORK_COUNT" />، <ph name="NETWORK_NAME" />، <ph name="CONNECTION_STATUS" />، قدرت سیگنال <ph name="SIGNAL_STRENGTH" />٪، سرپرستتان آن را مسدود کرده است، جزئیات</translation>
 <translation id="2614589611416690597">ویدیوی <ph name="VIDEO_TYPE" /></translation>
 <translation id="2620090360073999360">‏دسترسی به Google Drive در حال حاضر ممکن نیست.</translation>
@@ -295,6 +295,7 @@
 <translation id="3486821258960016770">مغولی</translation>
 <translation id="3495304270784461826"><ph name="COUNT" /> خطا.</translation>
 <translation id="3509680540198371098">شبکه <ph name="NETWORK_INDEX" /> از <ph name="NETWORK_COUNT" />، <ph name="NETWORK_NAME" />، <ph name="SECURITY_STATUS" />، <ph name="CONNECTION_STATUS" />، قدرت سیگنال <ph name="SIGNAL_STRENGTH" />٪، جزئیات</translation>
+<translation id="3511705761158917664">درحال آماده شدن برای همگام‌سازی <ph name="NUMBER_OF_ITEMS" /> مورد…</translation>
 <translation id="3522708245912499433">پرتغالی</translation>
 <translation id="3524311639100184459">احتیاط: این فایل‌ها موقتی هستند و ممکن است برای آزادسازی فضای دیسک به‌طور خودکار حذف شوند.  <ph name="BEGIN_LINK" />بیشتر بدانید<ph name="END_LINK" /></translation>
 <translation id="3527085408025491307">پوشه</translation>
@@ -350,11 +351,11 @@
 <translation id="3924145049010392604">Meta</translation>
 <translation id="3943857333388298514">جاگذاری</translation>
 <translation id="3952872973865944257">تلوگو (آوایی)</translation>
-<translation id="3954354850384043518">درحال انجام</translation>
 <translation id="3958548648197196644">کیوی</translation>
 <translation id="3971140002794351170">بارگیری نمایه تلفن همراه، شبکه <ph name="NETWORK_INDEX" /> از <ph name="NETWORK_COUNT" />، <ph name="NETWORK_NAME" />، <ph name="NETWORK_PROVIDER_NAME" /></translation>
 <translation id="3973925058222872294">انگلیسی (بریتانیا)</translation>
 <translation id="3975895378829046965">بنگلا (آوایی)</translation>
+<translation id="3999574733850440202">‏فایل‌های Microsoft اخیراً بازشده به OneDrive منتقل شده‌اند</translation>
 <translation id="4002066346123236978">عنوان</translation>
 <translation id="4017788180641807848">‏انگلیسی (آمریکایی) با صفحه‌کلید Workman</translation>
 <translation id="4019998208269143058">سنجاق کردن به «فایل‌های سریع»</translation>
@@ -513,7 +514,6 @@
  جداکردن دستگاه هنگامی که در حال استفاده است ممکن است باعث از دست رفتن داده‌ها شود.  لطفاً تا به پایان رسیدن عملیات صبر کنید، سپس دستگاه را با استفاده از برنامه Files خارج نمایید.</translation>
 <translation id="5163869187418756376">اشتراک‌گذاری انجام نشد. اتصال خود را بررسی کرده، بعداً دوباره امتحان کنید.</translation>
 <translation id="516592729076796170">دووراک آمریکایی برنامه‌نویس‌ها</translation>
-<translation id="5167102019886320507">درحال آماده‌سازی <ph name="NUMBER_OF_ITEMS" /> مورد…</translation>
 <translation id="5177526793333269655">نمای تصویر کوچک</translation>
 <translation id="5181896909298187506">هیچ فایلی در موارد اخیر وجود ندارد</translation>
 <translation id="5194713942430106590">کلیک کنید تا ستون به‌صورت صعودی مرتب شود.</translation>
@@ -793,6 +793,7 @@
 <translation id="7458955835361612701">هیچ تصویری در موارد اخیر وجود ندارد</translation>
 <translation id="7460898608667578234">اوکراینی</translation>
 <translation id="7469894403370665791">اتصال به این شبکه به صورت خودکار</translation>
+<translation id="7481358317100446445">آماده</translation>
 <translation id="7486315294984620427">‏برای رها کردن فایل‌ها در Parallels Desktop، فایل موردنظر باید در فایل‌های Windows کپی شود.</translation>
 <translation id="749452993132003881">هیراگانا</translation>
 <translation id="7495372004724182530">مالایالم (آوایی)</translation>
@@ -830,6 +831,7 @@
 <translation id="7724603315864178912">برش</translation>
 <translation id="7732111077498238432">شبکه توسط خط‌مشی کنترل می‌شود</translation>
 <translation id="7736003208887389532">این فایل‌ها برای همیشه حذف شود؟</translation>
+<translation id="7740287852186792672">نتایج جستجو</translation>
 <translation id="7748626145866214022">‏گزینه‌های بیشتر در نوار کنش دردسترس است. برای تمرکز بر نوار کنش، Alt + A را فشار دهید.</translation>
 <translation id="7760449188139285140">چینی (ووبی)</translation>
 <translation id="7765158879357617694">انتقال</translation>
@@ -881,6 +883,7 @@
 <translation id="8116072619078571545">آب یخ</translation>
 <translation id="8128733386027980860">‏انگلیسی (بریتانیا) با صفحه‌کلید Dvorak</translation>
 <translation id="8137331602592933310">«<ph name="FILENAME" />» با شما به اشتراک گذاشته شده است. شما نمی‌توانید آن را حذف کنید زیرا به شما تعلق ندارد.</translation>
+<translation id="8138705869659070104">فعال‌سازی بعداز راه‌اندازی دستگاه</translation>
 <translation id="813913629614996137">درحال مقداردهی اولیه…</translation>
 <translation id="8147028810663464959">عرض نویسه روی «کامل» تنظیم شده است</translation>
 <translation id="8151638057146502721">پیکربندی</translation>
@@ -906,6 +909,7 @@
 <translation id="8300849813060516376">‏OTASP انجام نشد</translation>
 <translation id="8312871300878166382">جای‌گذاری در پوشه</translation>
 <translation id="8329978297633540474">نوشتار ساده</translation>
+<translation id="8332007959299458842">‏فایل‌های Microsoft اخیراً بازشده به Google Drive منتقل شده‌اند</translation>
 <translation id="8335587457941836791">برداشتن سنجاق از راه‌انداز</translation>
 <translation id="8335837413233998004">بلاروسی</translation>
 <translation id="8336153091935557858">دیروز <ph name="YESTERDAY_DAYTIME" /></translation>
@@ -993,6 +997,7 @@
 <translation id="9046895021617826162">اتصال برقرار نشد</translation>
 <translation id="9065512565307033593">اگر نتوانید به‌تأیید برسانید، دسترسی شما به شبکه غیرفعال خواهد شد.</translation>
 <translation id="908378762078012445">‏روسی با صفحه‌کلید آوایی AATSEEL</translation>
+<translation id="9086302186042011942">همگام‌سازی</translation>
 <translation id="9099674669267916096">تعداد صفحه</translation>
 <translation id="9100610230175265781">گذرعبارت لازم است</translation>
 <translation id="9110990317705400362">‏همواره به دنبال راه‌هایی هستیم تا مرورتان را ایمن‌تر کنیم. قبلاً هر وب‌سایتی از شما می‌خواست برنامه‌افزودنی‌ای را در مرورگرتان اضافه کنید. در جدیدترین نسخه Google Chrome، باید به Chrome صراحتاً بگویید که می‌خواهید با افزودن این برنامه‌های افزودنی از طریق صفحه افزونه‌ها آنها را نصب کنید. <ph name="BEGIN_LINK" />بیشتر بدانید<ph name="END_LINK" /></translation>

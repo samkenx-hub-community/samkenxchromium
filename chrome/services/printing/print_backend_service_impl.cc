@@ -454,6 +454,18 @@ void PrintBackendServiceImpl::PrintingContextDelegate::SetAppLocale(
   locale_ = locale;
 }
 
+// Holds the context and associated delegate for persistent usage across
+// multiple settings calls until they are ready to be used to print a
+// document.  Required since `PrintingContext` does not own the corresponding
+// delegate object that it relies upon.
+struct PrintBackendServiceImpl::ContextContainer {
+  ContextContainer() = default;
+  ~ContextContainer() = default;
+
+  std::unique_ptr<PrintingContextDelegate> delegate;
+  std::unique_ptr<PrintingContext> context;
+};
+
 PrintBackendServiceImpl::PrintBackendServiceImpl(
     mojo::PendingReceiver<mojom::PrintBackendService> receiver)
     : receiver_(this, std::move(receiver)) {}
@@ -468,6 +480,7 @@ void PrintBackendServiceImpl::InitCommon(
     const std::string& locale
 #endif  // BUILDFLAG(IS_WIN)
 ) {
+  locale_ = locale;
   context_delegate_.SetAppLocale(locale);
 #if BUILDFLAG(IS_WIN)
   if (remote.is_valid())
@@ -566,24 +579,6 @@ void PrintBackendServiceImpl::FetchCapabilities(
   crash_keys_ = std::make_unique<crash_keys::ScopedPrinterInfo>(
       print_backend_->GetPrinterDriverInfo(printer_name));
 
-  PrinterSemanticCapsAndDefaults::Papers user_defined_papers;
-#if BUILDFLAG(IS_MAC)
-  {
-    // Blocking is needed here for when macOS reads paper sizes from file.
-    //
-    // Fetching capabilities in the browser process happens from the thread
-    // pool with the MayBlock() trait for macOS.  However this call can also
-    // run from a utility process's main thread where blocking is not
-    // implicitly allowed.  In order to preserve ordering, the utility process
-    // must process this synchronously by blocking.
-    //
-    // TODO(crbug.com/1163635):  Investigate whether utility process main
-    // thread should be allowed to block like in-process workers are.
-    base::ScopedAllowBlocking allow_blocking;
-    user_defined_papers = GetMacCustomPaperSizes();
-  }
-#endif
-
   PrinterBasicInfo printer_info;
   mojom::ResultCode result =
       print_backend_->GetPrinterBasicInfo(printer_name, &printer_info);
@@ -592,6 +587,7 @@ void PrintBackendServiceImpl::FetchCapabilities(
         mojom::PrinterCapsAndInfoResult::NewResultCode(result));
     return;
   }
+
   PrinterSemanticCapsAndDefaults caps;
   result =
       print_backend_->GetPrinterSemanticCapsAndDefaults(printer_name, &caps);
@@ -600,6 +596,7 @@ void PrintBackendServiceImpl::FetchCapabilities(
         mojom::PrinterCapsAndInfoResult::NewResultCode(result));
     return;
   }
+
 #if BUILDFLAG(IS_WIN)
   if (xml_parser_remote_.is_bound() &&
       base::FeatureList::IsEnabled(features::kReadPrinterCapabilitiesWithXps)) {
@@ -614,11 +611,51 @@ void PrintBackendServiceImpl::FetchCapabilities(
     MergeXpsCapabilities(std::move(xps_capabilities.value()), caps);
   }
 #endif  // BUILDFLAG(IS_WIN)
-  mojom::PrinterCapsAndInfoPtr caps_and_info = mojom::PrinterCapsAndInfo::New(
-      std::move(printer_info), std::move(user_defined_papers), std::move(caps));
+
+#if BUILDFLAG(IS_MAC)
+  {
+    // Blocking is needed here for when macOS reads paper sizes from file.
+    //
+    // Fetching capabilities in the browser process happens from the thread
+    // pool with the MayBlock() trait for macOS.  However this call can also
+    // run from a utility process's main thread where blocking is not
+    // implicitly allowed.  In order to preserve ordering, the utility process
+    // must process this synchronously by blocking.
+    //
+    // TODO(crbug.com/1163635):  Investigate whether utility process main
+    // thread should be allowed to block like in-process workers are.
+    base::ScopedAllowBlocking allow_blocking;
+    caps.user_defined_papers = GetMacCustomPaperSizes();
+  }
+#endif
+
+  mojom::PrinterCapsAndInfoPtr caps_and_info =
+      mojom::PrinterCapsAndInfo::New(std::move(printer_info), std::move(caps));
   std::move(callback).Run(
       mojom::PrinterCapsAndInfoResult::NewPrinterCapsAndInfo(
           std::move(caps_and_info)));
+}
+
+void PrintBackendServiceImpl::EstablishPrintingContext(uint32_t context_id
+#if BUILDFLAG(ENABLE_OOP_BASIC_PRINT_DIALOG)
+                                                       ,
+                                                       uint32_t parent_window_id
+#endif
+) {
+  auto context_container = std::make_unique<ContextContainer>();
+
+  context_container->delegate = CreatePrintingContextDelegate();
+#if BUILDFLAG(ENABLE_OOP_BASIC_PRINT_DIALOG)
+  context_container->delegate->SetParentWindow(parent_window_id);
+#endif
+
+  context_container->context = PrintingContext::Create(
+      context_container->delegate.get(), /*skip_system_calls=*/false);
+
+  bool inserted = persistent_printing_contexts_
+                      .insert({context_id, std::move(context_container)})
+                      .second;
+  DCHECK(inserted);
 }
 
 void PrintBackendServiceImpl::UseDefaultSettings(
@@ -849,6 +886,13 @@ void PrintBackendServiceImpl::OnDidCancel(
 
   // Do nothing more with this document.
   RemoveDocumentHelper(document_helper);
+}
+
+std::unique_ptr<PrintBackendServiceImpl::PrintingContextDelegate>
+PrintBackendServiceImpl::CreatePrintingContextDelegate() {
+  auto context_delegate = std::make_unique<PrintingContextDelegate>();
+  context_delegate->SetAppLocale(locale_);
+  return context_delegate;
 }
 
 PrintBackendServiceImpl::DocumentHelper*

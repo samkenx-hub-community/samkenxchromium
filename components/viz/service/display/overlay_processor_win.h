@@ -18,18 +18,16 @@
 #include "components/viz/service/viz_service_export.h"
 #include "gpu/ipc/common/surface_handle.h"
 
-namespace cc {
-class DisplayResourceProvider;
-}
-
 namespace viz {
+class DisplayResourceProvider;
+struct DebugRendererSettings;
+
 class VIZ_SERVICE_EXPORT OverlayProcessorWin
     : public OverlayProcessorInterface {
  public:
-  using CandidateList = std::vector<DCLayerOverlayCandidate>;
-
   OverlayProcessorWin(
       OutputSurface* output_surface,
+      const DebugRendererSettings* debug_settings,
       std::unique_ptr<DCLayerOverlayProcessor> dc_layer_overlay_processor);
 
   OverlayProcessorWin(const OverlayProcessorWin&) = delete;
@@ -65,7 +63,7 @@ class VIZ_SERVICE_EXPORT OverlayProcessorWin
       const FilterOperationsMap& render_pass_backdrop_filters,
       SurfaceDamageRectList surface_damage_rect_list,
       OutputSurfaceOverlayPlane* output_surface_plane,
-      CandidateList* overlay_candidates,
+      OverlayCandidateList* overlay_candidates,
       gfx::Rect* damage_rect,
       std::vector<gfx::Rect>* content_bounds) override;
 
@@ -82,7 +80,16 @@ class VIZ_SERVICE_EXPORT OverlayProcessorWin
   }
 
  private:
+  void InsertDebugBorderDrawQuadsForOverlayCandidates(
+      const OverlayCandidateList& dc_layer_overlays,
+      AggregatedRenderPass* root_render_pass,
+      const gfx::Rect& damage_rect);
+
   const raw_ptr<OutputSurface> output_surface_;
+
+  // Reference to the global viz singleton.
+  const raw_ptr<const DebugRendererSettings> debug_settings_;
+
   // Whether direct composition layers are being used with SetEnableDCLayers().
   bool using_dc_layers_ = false;
   // Number of frames since the last time direct composition layers were used.

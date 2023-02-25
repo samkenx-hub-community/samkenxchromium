@@ -16,6 +16,7 @@
 <translation id="1128128132059598906">EAP-TTLS</translation>
 <translation id="1145018782460575098">Vinduet for oppdatering av fastvare på eksterne enheter er åpent. <ph name="NUM_UPDATES" /> oppdateringer er tilgjengelige.</translation>
 <translation id="1145516343487477149">Finn hjelpeartikler og svar på vanlige Chromebook-spørsmål</translation>
+<translation id="1167755866710282443">Åpne menyen for å tilpasse tastene. Dra menyen for å flytte den.</translation>
 <translation id="1175697296044146566">Denne <ph name="DEVICE_TYPE" />-enheten administreres av <ph name="MANAGER" />.</translation>
 <translation id="1175951029573070619">Gjennomsnittlig (<ph name="SIGNAL_STRENGTH" />)</translation>
 <translation id="1181037720776840403">Fjern</translation>
@@ -326,6 +327,7 @@
 <translation id="4110686435123617899">Velg albumet <ph name="TITLE" /> med <ph name="DESC" /></translation>
 <translation id="4111761024568264522">USB-styreflate</translation>
 <translation id="4117637339509843559">Mørk modus</translation>
+<translation id="4130035430755296270">Hold markøren i ro for å se flere oppsettsalternativer</translation>
 <translation id="4131410914670010031">Svarthvitt</translation>
 <translation id="4145784616224233563">HTTP-brannmur</translation>
 <translation id="4147897805161313378">Google Foto</translation>
@@ -414,6 +416,7 @@
 <translation id="484790837831576105">(Android) DNS-oppslag</translation>
 <translation id="4848429997038228357">KJØRER</translation>
 <translation id="4854586501323951986">Innebygd berøringsskjerm</translation>
+<translation id="4855250849489639581">Sveip ned for å se flere layoutalternativer</translation>
 <translation id="4861758251032006121">{ATTEMPTS_LEFT,plural, =1{<ph name="ERROR_MESSAGE" /> {0} forsøk igjen}other{<ph name="ERROR_MESSAGE" /> {0} forsøk igjen}}</translation>
 <translation id="4873827928179867585">Algoritme for autentisering</translation>
 <translation id="4880328057631981605">Navn på tilgangspunkt</translation>
@@ -517,6 +520,7 @@
 <translation id="576835345334454681">Skjermlysstyrke opp</translation>
 <translation id="57838592816432529">Kutt lyden</translation>
 <translation id="5784136236926853061">Høy HTTP-tidsforsinkelse</translation>
+<translation id="5826644637650799838">Om kunsten</translation>
 <translation id="5832805196449965646">Legg til person</translation>
 <translation id="583281660410589416">Ukjent</translation>
 <translation id="5843706793424741864">Fahrenheit</translation>
@@ -673,6 +677,7 @@
 <translation id="7172721935181587524">1 bilde</translation>
 <translation id="7177485034254901881"><ph name="DEVICE_TYPE" /> administreres av <ph name="MANAGER" />. Administratorer kan konfigurere enheten eksternt.</translation>
 <translation id="7180611975245234373">Last inn på nytt</translation>
+<translation id="7180865173735832675">Tilpass</translation>
 <translation id="7212734716605298123">Fastvareoppdateringer for eksterne enheter</translation>
 <translation id="7216409898977639127">Mobiloperatør</translation>
 <translation id="725133483556299729">Velg en e-postadresse</translation>
@@ -744,6 +749,7 @@
 <translation id="7881066108824108340">DNS</translation>
 <translation id="7882358943899516840">Leverandørtype</translation>
 <translation id="7882501334836096755">Offentlig nøkkel</translation>
+<translation id="78957024357676568">venstre</translation>
 <translation id="7915220255123750251">Administrer APN-innstillingene for nettverket. APN oppretter en tilkobling mellom et mobilnettverk og internett.</translation>
 <translation id="7936303884198020182">Fant ingen navnetjenere</translation>
 <translation id="7942349550061667556">Rød</translation>
@@ -775,6 +781,7 @@
 <translation id="8226628635270268143">Velg favorittbildene og -albumene dine</translation>
 <translation id="8227119283605456246">Legg ved fil</translation>
 <translation id="8230672074305416752">Kunne ikke pinge gatewayen for standardnettverket</translation>
+<translation id="8242426110754782860">Gå videre</translation>
 <translation id="8246209727385807362">Ukjent operatør</translation>
 <translation id="827422111966801947">Indigo</translation>
 <translation id="8286154143153872371">Koble til et nettverk og last inn siden på nytt for å se bakgrunnsbildet.</translation>
@@ -852,6 +859,7 @@
 <translation id="8930622219860340959">Trådløs</translation>
 <translation id="8936793075252196307">Klient-IP-adresse</translation>
 <translation id="894617464444543719">Enheten er en telefon.</translation>
+<translation id="8957423540740801332">høyre</translation>
 <translation id="8968751544471797276">Ladefrekvens</translation>
 <translation id="8970109610781093811">Kjør på nytt</translation>
 <translation id="8983038754672563810">HSPA</translation>

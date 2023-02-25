@@ -34,6 +34,7 @@ import org.chromium.chrome.R;
 import org.chromium.chrome.browser.flags.BooleanCachedFieldTrialParameter;
 import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.flags.ChromeSwitches;
+import org.chromium.chrome.browser.flags.PostNativeFlag;
 import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.browser.tab.TabUtils;
 import org.chromium.chrome.browser.tasks.tab_management.TabUiFeatureUtilities;
@@ -58,6 +59,9 @@ import java.util.Set;
  */
 @JNINamespace("android")
 public class TabContentManager {
+    private static PostNativeFlag sThumbnailCacheRefactor =
+            new PostNativeFlag(ChromeFeatureList.THUMBNAIL_CACHE_REFACTOR);
+
     // These are used for UMA logging, so append only. Please update the
     // GridTabSwitcherThumbnailFetchingResult enum in enums.xml if these change.
     @IntDef({ThumbnailFetchingResult.GOT_JPEG, ThumbnailFetchingResult.GOT_ETC1,
@@ -84,9 +88,13 @@ public class TabContentManager {
     private final Set<Integer> mRefectchedTabIds = new HashSet<>();
 
     private float mThumbnailScale;
+    /**
+     * The limit on the number of fullsized or ETC1 compressed thumbnails in the in-memory cache.
+     * If in future there is a need for more bitmaps to be visible on the screen at once this value
+     * can be increased.
+     */
     private int mFullResThumbnailsMaxSize;
     private final ContentOffsetProvider mContentOffsetProvider;
-    private int[] mPriorityTabIds;
     private long mNativeTabContentManager;
 
     private final ArrayList<ThumbnailChangeListener> mListeners =
@@ -171,8 +179,6 @@ public class TabContentManager {
             }
         }
         mThumbnailScale = thumbnailScale;
-
-        mPriorityTabIds = new int[mFullResThumbnailsMaxSize];
     }
 
     /**
@@ -191,7 +197,8 @@ public class TabContentManager {
                 ChromeSwitches.APPROXIMATION_THUMBNAILS);
 
         boolean useApproximationThumbnails =
-                !DeviceFormFactor.isNonMultiDisplayContextOnTablet(mContext);
+                !DeviceFormFactor.isNonMultiDisplayContextOnTablet(mContext)
+                && !sThumbnailCacheRefactor.isEnabled();
         boolean saveJpegThumbnails = TabUiFeatureUtilities.isGridTabSwitcherEnabled(mContext);
 
         mNativeTabContentManager =
@@ -212,6 +219,13 @@ public class TabContentManager {
     }
 
     @CalledByNative
+    private Tab getTabById(int tabId) {
+        if (mTabFinder == null) return null;
+
+        return mTabFinder.getTabById(tabId);
+    }
+
+    @CalledByNative
     private long getNativePtr() {
         return mNativeTabContentManager;
     }
@@ -221,7 +235,7 @@ public class TabContentManager {
      * @param tab Tab whose cc layer will be attached.
      */
     public void attachTab(Tab tab) {
-        if (mNativeTabContentManager == 0) return;
+        if (mNativeTabContentManager == 0 || sThumbnailCacheRefactor.isEnabled()) return;
         TabContentManagerJni.get().attachTab(mNativeTabContentManager, tab, tab.getId());
     }
 
@@ -230,7 +244,7 @@ public class TabContentManager {
      * @param tab Tab whose cc layer will be detached.
      */
     public void detachTab(Tab tab) {
-        if (mNativeTabContentManager == 0) return;
+        if (mNativeTabContentManager == 0 || sThumbnailCacheRefactor.isEnabled()) return;
         TabContentManagerJni.get().detachTab(mNativeTabContentManager, tab, tab.getId());
     }
 
@@ -343,9 +357,7 @@ public class TabContentManager {
         getTabThumbnailFromDisk(tabId, thumbnailSize, (diskBitmap) -> {
             if (diskBitmap != null) callback.onResult(diskBitmap);
 
-            if (mTabFinder == null) return;
-
-            Tab tab = mTabFinder.getTabById(tabId);
+            Tab tab = getTabById(tabId);
             if (tab == null) return;
 
             captureThumbnail(tab, writeBack, (bitmap) -> {
@@ -569,21 +581,21 @@ public class TabContentManager {
 
     /**
      * Update the priority-ordered list of visible tabs.
-     * @param priority The list of tab ids ordered in terms of priority.
+     * @param priority The list of tab ids to load cached thumbnails for. Only the first
+     *                 {@link mFullResThumbnailsMaxSize} thumbnails will be loaded.
+     * @param primaryTabId The id of the current tab this is not loaded under the assumption it will
+     *                     have a live layer. If this is not the case it should be the first tab in
+     *                     the priority list.
      */
     public void updateVisibleIds(List<Integer> priority, int primaryTabId) {
         if (mNativeTabContentManager != 0) {
             int idsSize = min(mFullResThumbnailsMaxSize, priority.size());
-
-            if (idsSize != mPriorityTabIds.length) {
-                mPriorityTabIds = new int[idsSize];
-            }
-
+            int[] priorityIds = new int[idsSize];
             for (int i = 0; i < idsSize; i++) {
-                mPriorityTabIds[i] = priority.get(i);
+                priorityIds[i] = priority.get(i);
             }
             TabContentManagerJni.get().updateVisibleIds(
-                    mNativeTabContentManager, mPriorityTabIds, primaryTabId);
+                    mNativeTabContentManager, priorityIds, primaryTabId);
         }
     }
 

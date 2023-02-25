@@ -27,12 +27,12 @@
 <translation id="1201402288615127009">បន្ទាប់</translation>
 <translation id="1209796539517632982">ម៉ាស៊ីនមេដែលមានឈ្មោះស្វ័យប្រវត្តិ</translation>
 <translation id="1210831758834677569">ភាសា​ឡាវ</translation>
+<translation id="1221555006497674479">ទំហំផ្ទុកជិតអស់ហើយ នៅសល់ <ph name="REMAINING_PERCENTAGE" />% នៃទំហំផ្ទុកថាសរួម <ph name="TOTAL_SPACE" /> របស់អ្នក។</translation>
 <translation id="1243314992276662751">ទាញឡើង</translation>
 <translation id="1249250836236328755">ប្រភេទ</translation>
 <translation id="1254593899333212300">ការភ្ជាប់អ៊ីនធឺណិតផ្ទាល់</translation>
 <translation id="1272293450992660632">តម្លៃ PIN មិនត្រូវគ្នាទេ។</translation>
 <translation id="1280820357415527819">កំពុង​ស្វែងរក​បណ្ដាញ​ទូរសព្ទ​ចល័ត</translation>
-<translation id="1291603679744561561">បានចាក់​សោស៊ីម</translation>
 <translation id="1293556467332435079">ឯកសារ</translation>
 <translation id="1297922636971898492">Google Drive មិនមានទេឥឡូវនេះ។ ការទាញឡើងនឹងចាប់ផ្តើមឡើងវិញដោយស្វ័យប្រវត្តិនៅពេល Google Drive ត្រលប់មកវិញ។</translation>
 <translation id="1307931752636661898">មិនអាច​មើល​ឯកសារ Linux បានទេ</translation>
@@ -59,7 +59,6 @@
 <translation id="1499943022354839699">ភាសា​អង់គ្លេស (សហរដ្ឋអាមេរិក) ដែលប្រើ​ក្ដារចុច Dvorak</translation>
 <translation id="1515909359182093592"><ph name="INPUT_LABEL" /> - ម៉ាស៊ីន</translation>
 <translation id="1521655867290435174">Google បញ្ជី</translation>
-<translation id="1521795806314479294">កំពុង​រៀបចំ <ph name="FILE_NAME" />...</translation>
 <translation id="1538729222189715449">កំពុងបើក​ឯកសារ Linux...</translation>
 <translation id="1547964879613821194">ភាសាអង់គ្លេសកាណាដា</translation>
 <translation id="1556189134700913550">អនុវត្តទៅទាំងអស់</translation>
@@ -75,6 +74,7 @@
 <translation id="1641780993263690097">ភាសាចិន​ភីងអ៊ីង</translation>
 <translation id="1646019627374511909">កំពុង​កំណត់​ឱ្យ​ឯកសារ <ph name="NUMBER_OF_ITEMS" /> អាច​ប្រើ​បាន​ពេល​គ្មាន​អ៊ីនធឺណិត</translation>
 <translation id="164969095109328410">ឧបករណ៍ Chrome</translation>
+<translation id="1661207570040737402">អ្នកបានប្រើទំហំផ្ទុក Google Workspace ថាសរួមរបស់អ្នកអស់ហើយ។</translation>
 <translation id="1661867754829461514">បាត់បង់លេខសម្គាល់</translation>
 <translation id="166439687370499867">ការផ្លាស់ប្តូរការកំណត់រចនាសម្ព័ន្ធបណ្តាញដែលបានចែករំលែកមិនត្រូវបានអនុញ្ញាតទេ</translation>
 <translation id="1665611772925418501">ឯកសារនេះមិនអាចកែសម្រួលទេ។</translation>
@@ -84,7 +84,6 @@
 <translation id="1722487484194605434">កំពុងបង្រួមធាតុ <ph name="NUMBER_OF_ITEMS" /> ...</translation>
 <translation id="1722687688096767818">កំពុងបញ្ចូល​កម្រងព័ត៌មាន...</translation>
 <translation id="1726100011689679555">ដាក់​ឈ្មោះ​ឲ្យ​ម៉ាស៊ីន​មេ</translation>
-<translation id="1727562178154619254">ត្រៀមរួចរាល់​ក្នុងការធ្វើ​សមកាលកម្ម</translation>
 <translation id="1729953886957086472">ភាសា​អាល្លឺម៉ង់ (អាល្លឺម៉ង់)</translation>
 <translation id="1730235522912993863">ភាសាចិនខាន់ជី</translation>
 <translation id="1731889557567069540">បានចម្លង​ធាតុ <ph name="NUMBER_OF_ITEMS" />។</translation>
@@ -194,6 +193,7 @@
 <translation id="2574327434504608656">បាន​ចែករំលែក​ថត 1 ជា​មួយ Bruschetta</translation>
 <translation id="2578394532502990878">សូរសព្ទជាភាសា​តាមិល</translation>
 <translation id="2579959351793446050">ភាសា​អូឌៀ</translation>
+<translation id="2587195714949534472">កំពុង​រៀបចំ​ធ្វើ​សមកាលកម្ម <ph name="FILE_NAME" />...</translation>
 <translation id="2602810353103180630">បណ្ដាញ <ph name="NETWORK_INDEX" /> នៃ <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, <ph name="CONNECTION_STATUS" />, កម្លាំងរលកសញ្ញា <ph name="SIGNAL_STRENGTH" />%, បានទប់ស្កាត់ដោយអ្នកគ្រប់គ្រងរបស់អ្នក, ព័ត៌មានលម្អិត</translation>
 <translation id="2614589611416690597">វីដេអូ <ph name="VIDEO_TYPE" /></translation>
 <translation id="2620090360073999360">មិនអាចទៅកាន់ Google Drive បានទេនៅពេលនេះ។</translation>
@@ -295,6 +295,7 @@
 <translation id="3486821258960016770">ភាសា​ម៉ុងហ្គោលី</translation>
 <translation id="3495304270784461826"><ph name="COUNT" /> កំហុសឆ្គង។</translation>
 <translation id="3509680540198371098">បណ្ដាញ <ph name="NETWORK_INDEX" /> នៃ <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, <ph name="SECURITY_STATUS" />, <ph name="CONNECTION_STATUS" />, កម្លាំងរលកសញ្ញា <ph name="SIGNAL_STRENGTH" />%, ព័ត៌មានលម្អិត</translation>
+<translation id="3511705761158917664">កំពុង​រៀបចំ​ធ្វើ​សមកាលកម្មធាតុ <ph name="NUMBER_OF_ITEMS" />...</translation>
 <translation id="3522708245912499433">ភាសាប៉ទុយកាល់</translation>
 <translation id="3524311639100184459">ប្រុងប្រយ័ត្ន៖ ឯកសារទាំងនេះ​គឺជាឯកសារ​បណ្ដោះអាសន្ន និងអាចត្រូវបានលុប​ដោយស្វ័យប្រវត្តិ ដើម្បីបង្កើន​ទំហំផ្ទុកថាស។  <ph name="BEGIN_LINK" />ស្វែងយល់បន្ថែម<ph name="END_LINK" /></translation>
 <translation id="3527085408025491307">ថតឯកសារ</translation>
@@ -350,11 +351,11 @@
 <translation id="3924145049010392604">Meta</translation>
 <translation id="3943857333388298514">បិទភ្ជាប់</translation>
 <translation id="3952872973865944257">សូរសព្ទ​ជាភាសា​តេលូហ្គូ</translation>
-<translation id="3954354850384043518">កំពុងដំណើរការ</translation>
 <translation id="3958548648197196644">គីវី</translation>
 <translation id="3971140002794351170">ទាញយក​កម្រងព័ត៌មាន​ឧបករណ៍​ចល័ត បណ្ដាញ <ph name="NETWORK_INDEX" /> នៃ <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, <ph name="NETWORK_PROVIDER_NAME" /></translation>
 <translation id="3973925058222872294">ភាសា​អង់គ្លេស (ចក្រភព​អង់គ្លេស)</translation>
 <translation id="3975895378829046965">សូរសព្ទជា​ភាសា​បេងហ្គាល់</translation>
+<translation id="3999574733850440202">ឯកសារ Microsoft ដែលទើបបើកថ្មីៗបានផ្លាស់ទីទៅ OneDrive</translation>
 <translation id="4002066346123236978">ចំណងជើង</translation>
 <translation id="4017788180641807848">ភាសា​អង់គ្លេស (សហរដ្ឋអាមេរិក) ដែលប្រើ​ក្ដារចុច Workman</translation>
 <translation id="4019998208269143058">ខ្ទាស់ទៅឯកសាររហ័ស</translation>
@@ -513,7 +514,6 @@
    ការដកឧបករណ៍របស់អ្នកចេញ ខណៈពេលកំពុងប្រើប្រាស់អាចបណ្តាលឲ្យបាត់បង់ទិន្នន័យ។ សូមរង់ចាំរហូតដល់ប្រតិបត្តិការត្រូវបានបញ្ចប់ បន្ទាប់មកបញ្ចេញឧបករណ៍ដោយប្រើកម្មវិធីឯកសារ។</translation>
 <translation id="5163869187418756376">ការចែករំលែកបានបរាជ័យ។ ពិនិត្យការភ្ជាប់របស់អ្នក ហើយព្យាយាមម្តងទៀត។</translation>
 <translation id="516592729076796170">អ្នកសរសេរកម្មវិធីអាមេរិក Dvorak</translation>
-<translation id="5167102019886320507">កំពុង​រៀបចំ​ធាតុ <ph name="NUMBER_OF_ITEMS" />...</translation>
 <translation id="5177526793333269655">មើលរូបតំណាងតូច</translation>
 <translation id="5181896909298187506">គ្មាន​ឯកសារ​ថ្មីៗ​ទេ</translation>
 <translation id="5194713942430106590">ចុចដើម្បី​តម្រៀបជួរឈរ​តាមលំដាប់កើន។</translation>
@@ -760,6 +760,7 @@
 <translation id="7126604456862387217">'&lt;b&gt;<ph name="SEARCH_STRING" />&lt;/b&gt;' - &lt;em&gt;ស្វែងរក Drive&lt;/em&gt;</translation>
 <translation id="7135561821015524160">សូរសព្ទ​ជាភាសាកាន់ណាដា</translation>
 <translation id="714034171374937760">Chromebase</translation>
+<translation id="7162080671816799010">បាត់ 'ភាពត្រូវគ្នានៃ​ឈ្មោះ​ជំនួសនៃប្រធានបទ' ឬ 'ភាពត្រូវគ្នានៃ​កន្ទុយដូមែន' សម្រាប់​​បញ្ជាក់​ភាព​ត្រឹមត្រូវ​នៃអត្តសញ្ញាណ​ម៉ាស៊ីនមេផ្ទៀងផ្ទាត់</translation>
 <translation id="7165320105431587207">បានបរាជ័យក្នុងការកំណត់បណ្តាាញ</translation>
 <translation id="7170041865419449892">នៅក្រៅសេវា</translation>
 <translation id="7180611975245234373">ធ្វើឲ្យថ្មីឡើងវិញ…</translation>
@@ -792,6 +793,7 @@
 <translation id="7458955835361612701">គ្មាន​រូបភាព​ថ្មីៗទេ</translation>
 <translation id="7460898608667578234">ភាសាអ៊ុយក្រែន</translation>
 <translation id="7469894403370665791">ភ្ជាប់ទៅបណ្តាញនេះដោយស្វ័យប្រវត្តិ</translation>
+<translation id="7481358317100446445">អាចប្រើ​បានហើយ</translation>
 <translation id="7486315294984620427">ត្រូវតែចម្លង​ឯកសារ​ទៅថតឯកសារ​របស់ Windows សិន ទើបអាចទម្លាក់​ឯកសារនោះ​ទៅក្នុង Parallels Desktop បាន។</translation>
 <translation id="749452993132003881">ហ៊ីរ៉ាហ្កាណា</translation>
 <translation id="7495372004724182530">សូរសព្ទជា​ភាសា​ម៉ាឡាយ៉ាឡាម</translation>
@@ -829,6 +831,7 @@
 <translation id="7724603315864178912">កាត់</translation>
 <translation id="7732111077498238432">បណ្តាញត្រូវបានគ្រប់គ្រងដោយគោលការណ៍</translation>
 <translation id="7736003208887389532">លុប​ឯកសារ​ទាំងនេះ​ជាអចិន្ត្រៃយ៍​ឬ?</translation>
+<translation id="7740287852186792672">លទ្ធផលស្វែងរក</translation>
 <translation id="7748626145866214022">មានជម្រើស​ច្រើនទៀត​នៅ​លើរបារ​សកម្មភាព។ ចុច Alt + A ដើម្បី​ផ្ដោតលើរបារ​សកម្មភាព។</translation>
 <translation id="7760449188139285140">ភាសាចិន​វូប៊ី</translation>
 <translation id="7765158879357617694">ផ្លាស់ទី</translation>
@@ -880,6 +883,7 @@
 <translation id="8116072619078571545">ទឹកកក</translation>
 <translation id="8128733386027980860">ភាសា​អង់គ្លេស (ចក្រភព​អង់គ្លេស) ដែលប្រើ​ក្ដារចុច Dvorak</translation>
 <translation id="8137331602592933310">"<ph name="FILENAME" />" បានចែករំលែកជាមួយអ្នក។ អ្នកមិនអាចលុបវាទេ ពីព្រោះអ្នកមិនមានជាម្ចាស់របស់វា។</translation>
+<translation id="8138705869659070104">បើកដំណើរការបន្ទាប់ពីរៀបចំឧបករណ៍</translation>
 <translation id="813913629614996137">កំពុង​ចាប់ផ្ដើម…</translation>
 <translation id="8147028810663464959">តួអក្សរមានទទឹងពេញ</translation>
 <translation id="8151638057146502721">តំឡើង</translation>
@@ -905,6 +909,7 @@
 <translation id="8300849813060516376">OTASP បានបរាជ័យ</translation>
 <translation id="8312871300878166382">បិទភ្ជាប់ទៅក្នុងថតឯកសារ</translation>
 <translation id="8329978297633540474">អត្ថបទធម្មតា</translation>
+<translation id="8332007959299458842">ឯកសារ Microsoft ដែលទើបបើកថ្មីៗបានផ្លាស់ទីទៅ Google ថាស</translation>
 <translation id="8335587457941836791">ដកការដៅចេញពីធ្នើ</translation>
 <translation id="8335837413233998004">ភាសា​បេឡារុស</translation>
 <translation id="8336153091935557858">ម្សិលមិញ <ph name="YESTERDAY_DAYTIME" /></translation>
@@ -992,6 +997,7 @@
 <translation id="9046895021617826162">ការភ្ជាប់បានបរាជ័យ</translation>
 <translation id="9065512565307033593">ប្រសិនបើអ្នក​មិនអាចផ្ទៀងផ្ទាត់​បានទេ សិទ្ធិចូលប្រើ​បណ្ដាញ​របស់អ្នក​នឹងត្រូវបានបិទ។</translation>
 <translation id="908378762078012445">ភាសារុស្ស៊ី​ដែលប្រើ​ក្ដារចុចតាម​សូរសព្ទ AATSEEL</translation>
+<translation id="9086302186042011942">កំពុងធ្វើសមកម្ម</translation>
 <translation id="9099674669267916096">ចំនួន​ទំព័រ</translation>
 <translation id="9100610230175265781">តម្រូវឲ្យមានឃ្លាសម្ងាត់</translation>
 <translation id="9110990317705400362">យើងតែងតែស្វែងរកមធ្យោបាយដើម្បីធ្វើឲ្យការរុករករបស់អ្នកមានសុវត្ថិភាពជាងមុនជានិច្ច។ កាលពីមុន គេហទំព័រទាំងឡាយអាចជម្រុញអ្នកឲ្យបន្ថែមកម្មវិធីបន្ថែមទៅក្នុងកម្មវិធីរុករករបស់អ្នក។ នៅក្នុងកំណែចុងក្រោយនៃ Google Chrome អ្នកត្រូវប្រាប់ Chrome ឲ្យច្បាស់ថាអ្នកចង់តំឡើងកម្មវិធីទាំងនេះ ដោយការបន្ថែមពួកវាតាមរយៈទំព័រកម្មវិធីបន្ថែម។ <ph name="BEGIN_LINK" />ស្វែងយល់បន្ថែម<ph name="END_LINK" /></translation>

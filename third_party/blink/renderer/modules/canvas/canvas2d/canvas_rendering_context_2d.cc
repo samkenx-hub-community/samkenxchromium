@@ -451,13 +451,9 @@ cc::PaintCanvas* CanvasRenderingContext2D::GetPaintCanvas() {
   return canvas()->GetCanvas2DLayerBridge()->GetPaintCanvas();
 }
 
-cc::PaintCanvas* CanvasRenderingContext2D::GetPaintCanvasForDraw(
+void CanvasRenderingContext2D::WillDraw(
     const SkIRect& dirty_rect,
     CanvasPerformanceMonitor::DrawType draw_type) {
-  if (UNLIKELY(isContextLost() || !canvas() ||
-               !canvas()->GetCanvas2DLayerBridge() ||
-               !canvas()->GetCanvas2DLayerBridge()->ResourceProvider()))
-    return nullptr;
   CanvasRenderingContext::DidDraw(dirty_rect, draw_type);
   // Always draw everything during printing.
   if (!layer_count_) {
@@ -467,13 +463,13 @@ cc::PaintCanvas* CanvasRenderingContext2D::GetPaintCanvasForDraw(
         ->ResourceProvider()
         ->FlushIfRecordingLimitExceeded();
   }
-  return canvas()->GetCanvas2DLayerBridge()->GetPaintCanvas();
 }
 
-void CanvasRenderingContext2D::FlushCanvas() {
+void CanvasRenderingContext2D::FlushCanvas(
+    CanvasResourceProvider::FlushReason reason) {
   if (canvas() && canvas()->GetCanvas2DLayerBridge() &&
       canvas()->GetCanvas2DLayerBridge()->ResourceProvider()) {
-    canvas()->GetCanvas2DLayerBridge()->ResourceProvider()->FlushCanvas();
+    canvas()->GetCanvas2DLayerBridge()->ResourceProvider()->FlushCanvas(reason);
   }
 }
 
@@ -554,7 +550,8 @@ void CanvasRenderingContext2D::setFont(const String& new_font) {
           element_font_description.SpecifiedSize());
 
       font_style_builder.SetFontDescription(element_font_description);
-      scoped_refptr<ComputedStyle> font_style = font_style_builder.TakeStyle();
+      scoped_refptr<const ComputedStyle> font_style =
+          font_style_builder.TakeStyle();
       Font font = canvas()->GetDocument().GetStyleEngine().ComputeFont(
           *canvas(), *font_style, *parsed_style);
 
@@ -668,10 +665,11 @@ bool CanvasRenderingContext2D::CanCreateCanvas2dResourceProvider() const {
   return canvas()->GetOrCreateCanvas2DLayerBridge();
 }
 
-scoped_refptr<StaticBitmapImage> blink::CanvasRenderingContext2D::GetImage() {
+scoped_refptr<StaticBitmapImage> blink::CanvasRenderingContext2D::GetImage(
+    CanvasResourceProvider::FlushReason reason) {
   if (!IsPaintable())
     return nullptr;
-  return canvas()->GetCanvas2DLayerBridge()->NewImageSnapshot();
+  return canvas()->GetCanvas2DLayerBridge()->NewImageSnapshot(reason);
 }
 
 ImageData* CanvasRenderingContext2D::getImageDataInternal(
@@ -689,10 +687,11 @@ ImageData* CanvasRenderingContext2D::getImageDataInternal(
       sx, sy, sw, sh, image_data_settings, exception_state);
 }
 
-void CanvasRenderingContext2D::FinalizeFrame(bool printing) {
+void CanvasRenderingContext2D::FinalizeFrame(
+    CanvasResourceProvider::FlushReason reason) {
   TRACE_EVENT0("blink", "CanvasRenderingContext2D::FinalizeFrame");
   if (IsPaintable())
-    canvas()->GetCanvas2DLayerBridge()->FinalizeFrame(printing);
+    canvas()->GetCanvas2DLayerBridge()->FinalizeFrame(reason);
 }
 
 CanvasRenderingContextHost*
@@ -979,7 +978,7 @@ void CanvasRenderingContext2D::drawFormattedText(
         [&recording](cc::PaintCanvas* c,
                      const cc::PaintFlags* flags)  // draw lambda
         { c->drawPicture(std::move(recording)); },
-        [](const SkIRect& rect) { return false; }, gfx::RectFToSkRect(bounds),
+        [](const SkIRect& rect) { return false; }, bounds,
         CanvasRenderingContext2DState::PaintType::kFillPaintType,
         CanvasRenderingContext2DState::kNoImage,
         CanvasPerformanceMonitor::DrawType::kText);
@@ -1065,6 +1064,7 @@ void CanvasRenderingContext2D::DrawTextInternal(
       break;
   }
 
+  bounds.Offset(location.x(), location.y());
   if (paint_type == CanvasRenderingContext2DState::kStrokePaintType)
     InflateStrokeRect(bounds);
 
@@ -1078,8 +1078,6 @@ void CanvasRenderingContext2D::DrawTextInternal(
     c->scale(ClampTo<float>(width / font_width), 1);
     location.set_x(location.x() / ClampTo<float>(width / font_width));
   }
-
-  bounds.Offset(location.x(), location.y());
 
   Draw<OverdrawOp::kNone>(
       [this, text = std::move(text), direction, bidi_override, location](
@@ -1095,8 +1093,7 @@ void CanvasRenderingContext2D::DrawTextInternal(
       },
       [](const SkIRect& rect)  // overdraw test lambda
       { return false; },
-      gfx::RectFToSkRect(bounds), paint_type,
-      CanvasRenderingContext2DState::kNoImage,
+      bounds, paint_type, CanvasRenderingContext2DState::kNoImage,
       CanvasPerformanceMonitor::DrawType::kText);
 }
 

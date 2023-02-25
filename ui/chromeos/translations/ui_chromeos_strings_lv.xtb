@@ -27,12 +27,12 @@
 <translation id="1201402288615127009">Tālāk</translation>
 <translation id="1209796539517632982">Automātiski nosaukumu serveri</translation>
 <translation id="1210831758834677569">Laosiešu</translation>
+<translation id="1221555006497674479">Jūsu kopīgā diska <ph name="TOTAL_SPACE" /> krātuvē ir atlicis maz vietas (<ph name="REMAINING_PERCENTAGE" />%).</translation>
 <translation id="1243314992276662751">Augšupielādēt</translation>
 <translation id="1249250836236328755">Žanrs</translation>
 <translation id="1254593899333212300">Tiešais interneta savienojums</translation>
 <translation id="1272293450992660632">PIN vērtības nav vienādas.</translation>
 <translation id="1280820357415527819">Notiek mobilo tīklu meklēšana</translation>
-<translation id="1291603679744561561">SIM karte bloķēta</translation>
 <translation id="1293556467332435079">Faili</translation>
 <translation id="1297922636971898492">Google disks pašlaik nav pieejams. Augšupielāde tiks automātiski atsākta, tiklīdz Google disks atkal būs pieejams.</translation>
 <translation id="1307931752636661898">Nevar skatīt Linux failus</translation>
@@ -74,6 +74,7 @@
 <translation id="1641780993263690097">Ķīniešu, piņjiņs</translation>
 <translation id="1646019627374511909">Vairāki faili tiek padarīti pieejami bezsaistē (skaits: <ph name="NUMBER_OF_ITEMS" />)</translation>
 <translation id="164969095109328410">Chrome ierīce</translation>
+<translation id="1661207570040737402">Jūs esat izmantojis visu savu kopīgā diska Google Workspace krātuvi.</translation>
 <translation id="1661867754829461514">Trūkst PIN koda</translation>
 <translation id="166439687370499867">Nav atļauts mainīt koplietota tīkla konfigurāciju.</translation>
 <translation id="1665611772925418501">Failu nevarēja pārveidot.</translation>
@@ -192,6 +193,7 @@
 <translation id="2574327434504608656">Ar virtuālo mašīnu Bruschetta tiek kopīgota viena mape</translation>
 <translation id="2578394532502990878">Tamilu, fonētiskā</translation>
 <translation id="2579959351793446050">Oriju</translation>
+<translation id="2587195714949534472">Notiek gatavošanās faila “<ph name="FILE_NAME" />” sinhronizēšanai…</translation>
 <translation id="2602810353103180630"><ph name="NETWORK_INDEX" />. tīkls no <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, <ph name="CONNECTION_STATUS" />, signāla stiprums: <ph name="SIGNAL_STRENGTH" />%, bloķēja jūsu administrators, detalizēta informācija</translation>
 <translation id="2614589611416690597"><ph name="VIDEO_TYPE" /> video</translation>
 <translation id="2620090360073999360">Šobrīd Google disku nevar sasniegt.</translation>
@@ -293,6 +295,7 @@
 <translation id="3486821258960016770">Mongoļu</translation>
 <translation id="3495304270784461826"><ph name="COUNT" /> kļūdas.</translation>
 <translation id="3509680540198371098"><ph name="NETWORK_INDEX" />. tīkls no <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, <ph name="SECURITY_STATUS" />, <ph name="CONNECTION_STATUS" />, signāla stiprums:<ph name="SIGNAL_STRENGTH" />%, informācija</translation>
+<translation id="3511705761158917664">Notiek gatavošanās <ph name="NUMBER_OF_ITEMS" /> faila(-u) sinhronizēšanai…</translation>
 <translation id="3522708245912499433">Portugāļu valoda</translation>
 <translation id="3524311639100184459">Uzmanību! Šie ir pagaidu faili un var tikt automātiski izdzēsti, lai atbrīvotu vietu diskā.  <ph name="BEGIN_LINK" />Uzziniet vairāk<ph name="END_LINK" />.</translation>
 <translation id="3527085408025491307">Mape</translation>
@@ -348,11 +351,11 @@
 <translation id="3924145049010392604">Meta</translation>
 <translation id="3943857333388298514">Ielīmēt</translation>
 <translation id="3952872973865944257">Telugu, fonētiskā</translation>
-<translation id="3954354850384043518">Notiek lejupielāde</translation>
 <translation id="3958548648197196644">Kivi</translation>
 <translation id="3971140002794351170">Lejupielādēt mobilo sakaru profilu, tīkls numur <ph name="NETWORK_INDEX" />, tīklu skaits ir <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, <ph name="NETWORK_PROVIDER_NAME" /></translation>
 <translation id="3973925058222872294">Angļu (Apvienotā Karaliste)</translation>
 <translation id="3975895378829046965">Bengāļu, fonētiskā</translation>
+<translation id="3999574733850440202">Nesen atvērtie Microsoft faili ir pārvietoti uz pakalpojumu OneDrive.</translation>
 <translation id="4002066346123236978">Nosaukums</translation>
 <translation id="4017788180641807848">Angļu (ASV), ar Workman tastatūru</translation>
 <translation id="4019998208269143058">Piespraust sadaļai “Ātrā piekļuve failiem”</translation>
@@ -408,6 +411,7 @@
 <translation id="4462159676511157176">Pielāgoti nosaukumu serveri</translation>
 <translation id="4465725236958772856"><ph name="NETWORK_INDEX" />. tīkls no <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, pārvalda jūsu administrators, savienojums</translation>
 <translation id="4470564870223067757">Hangils (2 Set)</translation>
+<translation id="4474142134969976028">Nav atbilstošu rezultātu</translation>
 <translation id="4477002475007461989">Rumāņu</translation>
 <translation id="4477219268485577442">Bulgāru fonētiskā</translation>
 <translation id="4508265954913339219">Aktivizācija neizdevās</translation>
@@ -479,6 +483,7 @@
 <translation id="4973523518332075481">Izmantojiet nosaukumu, kas nepārsniedz <ph name="MAX_LENGTH" /> rakstzīmes.</translation>
 <translation id="4973970068702235170">Pārvietošana neizdevās; radās neparedzēta kļūda: <ph name="ERROR_MESSAGE" /></translation>
 <translation id="4984616446166309645">Japāņu</translation>
+<translation id="4987699874727873250">Angļu (Indija)</translation>
 <translation id="4988205478593450158">Vai tiesām vēlaties dzēst failu <ph name="FILE_NAME" />?</translation>
 <translation id="498902553138568924">Sarkans tauriņš</translation>
 <translation id="4992066212339426712">Ieslēgt skaņu</translation>
@@ -788,6 +793,7 @@
 <translation id="7458955835361612701">Nav nesenu attēlu</translation>
 <translation id="7460898608667578234">Ukraiņu valoda</translation>
 <translation id="7469894403370665791">Automātiski pievienoties šim tīklam</translation>
+<translation id="7481358317100446445">Gatavs</translation>
 <translation id="7486315294984620427">Lai nomestu failus darbvirsmā Parallels Desktop, attiecīgajam failam ir jābūt kopētam Windows failos.</translation>
 <translation id="749452993132003881">Hiragana</translation>
 <translation id="7495372004724182530">Malajalu, fonētiskā</translation>
@@ -813,6 +819,7 @@
 <translation id="7655441028674523381">Ērta piekļuve Google fotoattēliem</translation>
 <translation id="7658239707568436148">Atcelt</translation>
 <translation id="7663224033570512922">Hindi</translation>
+<translation id="7665680517722058469">Izmēģiniet citu meklēšanas vaicājumu</translation>
 <translation id="7689532716264131859">Vienumi (<ph name="NUMBER_OF_ITEMS" />) ir pārvietoti uz atkritni.</translation>
 <translation id="7693909743393669729">Formatējot disku, tiks dzēsti visi tajā glabātie dati un tiks noņemti visi esošie nodalījumi, tostarp tie, kas nav redzami. Šo darbību nevar atsaukt.</translation>
 <translation id="7695430100978772476">Nevarēja formatēt disku “<ph name="DRIVE_NAME" />”.</translation>
@@ -824,6 +831,7 @@
 <translation id="7724603315864178912">Izgriezt</translation>
 <translation id="7732111077498238432">Tīklu pārvalda politika</translation>
 <translation id="7736003208887389532">Vai vēlaties neatgriezeniski izdzēst šos failus?</translation>
+<translation id="7740287852186792672">Meklēšanas rezultāti</translation>
 <translation id="7748626145866214022">Vairāk pieejamu opciju darbību joslā. Lai izceltu darbību joslu, nospiediet taustiņu kombināciju Alt+A.</translation>
 <translation id="7760449188139285140">Ķīniešu, Wubi</translation>
 <translation id="7765158879357617694">Pārvietot</translation>
@@ -875,6 +883,7 @@
 <translation id="8116072619078571545">Ūdens ar ledu</translation>
 <translation id="8128733386027980860">Angļu (Apvienotā Karaliste), ar Dvorak tastatūru</translation>
 <translation id="8137331602592933310">Fails “<ph name="FILENAME" />” tika kopīgots ar jums. Jūs nevarat to dzēst, jo tas nepieder jums.</translation>
+<translation id="8138705869659070104">Aktivizēt pēc iestatīšanas</translation>
 <translation id="813913629614996137">Notiek inicializēšana...</translation>
 <translation id="8147028810663464959">Rakstzīmju platums ir pilns.</translation>
 <translation id="8151638057146502721">Konfigurēt</translation>
@@ -900,6 +909,7 @@
 <translation id="8300849813060516376">OTASP neizdevās</translation>
 <translation id="8312871300878166382">Ielīmēt mapē</translation>
 <translation id="8329978297633540474">Vienkāršs teksts</translation>
+<translation id="8332007959299458842">Nesen atvērtie Microsoft faili ir pārvietoti uz Google disku.</translation>
 <translation id="8335587457941836791">Atspraust no plaukta</translation>
 <translation id="8335837413233998004">Baltkrievu</translation>
 <translation id="8336153091935557858">Vakar plkst. <ph name="YESTERDAY_DAYTIME" /></translation>
@@ -987,6 +997,7 @@
 <translation id="9046895021617826162">Savienojums neizdevās</translation>
 <translation id="9065512565307033593">Ja verifikācija neizdosies, jūsu piekļuve tīklam tiks atspējota.</translation>
 <translation id="908378762078012445">Krievu, ar fonētisko AATSEEL tastatūru</translation>
+<translation id="9086302186042011942">Notiek sinhronizācija</translation>
 <translation id="9099674669267916096">Lappušu skaits</translation>
 <translation id="9100610230175265781">Jāievada ieejas frāze.</translation>
 <translation id="9110990317705400362">Mēs arvien meklējam veidus, kā papildus aizsargāt pārlūkošanu. Iepriekš jebkura vietne varēja aicināt pievienot paplašinājumu pārlūkā. Jaunākajās Google Chrome versijās lapā “Paplašinājumi” ir precīzi jānorāda, ka vēlaties instalēt šos paplašinājumus. <ph name="BEGIN_LINK" />Uzziniet vairāk<ph name="END_LINK" />.</translation>

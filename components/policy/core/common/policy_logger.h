@@ -11,47 +11,58 @@
 
 #include "base/location.h"
 #include "base/logging.h"
+#include "base/sequence_checker.h"
 #include "base/time/time.h"
 #include "base/values.h"
 #include "components/policy/policy_export.h"
 
+// Note: the DLOG_POLICY macro has no "#if DCHECK_IS_ON()" check because some
+// messages logged with DLOG are still important to be seen on the
+// chrome://policy/logs page in release mode. The DLOG call in StreamLog() will
+// do the check as usual for command line logging.
+#if BUILDFLAG(IS_ANDROID)
+#define LOG_POLICY(log_severity, log_source)                                  \
+  LOG_POLICY_##log_severity(::policy::PolicyLogger::LogHelper::LogType::kLog, \
+                            log_source)
+#define DLOG_POLICY(log_severity, log_source)                                  \
+  LOG_POLICY_##log_severity(::policy::PolicyLogger::LogHelper::LogType::kDLog, \
+                            log_source)
+#define VLOG_POLICY(log_verbosity, log_source)                        \
+  ::policy::PolicyLogger::LogHelper(                                  \
+      ::policy::PolicyLogger::LogHelper::LogType::kVLog,              \
+      ::policy::PolicyLogger::Log::Severity::kVerbose, log_verbosity, \
+      log_source, FROM_HERE)
+#define DVLOG_POLICY(log_verbosity, log_source)                       \
+  ::policy::PolicyLogger::LogHelper(                                  \
+      ::policy::PolicyLogger::LogHelper::LogType::kDLog,              \
+      ::policy::PolicyLogger::Log::Severity::kVerbose, log_verbosity, \
+      log_source, FROM_HERE)
+#define LOG_POLICY_INFO(log_type, log_source)                 \
+  ::policy::PolicyLogger::LogHelper(                          \
+      log_type, ::policy::PolicyLogger::Log::Severity::kInfo, \
+      ::policy::PolicyLogger::LogHelper::kNoVerboseLog, log_source, FROM_HERE)
+#define LOG_POLICY_WARNING(log_type, log_source)                 \
+  ::policy::PolicyLogger::LogHelper(                             \
+      log_type, ::policy::PolicyLogger::Log::Severity::kWarning, \
+      ::policy::PolicyLogger::LogHelper::kNoVerboseLog, log_source, FROM_HERE)
+#define LOG_POLICY_ERROR(log_type, log_source)                 \
+  ::policy::PolicyLogger::LogHelper(                           \
+      log_type, ::policy::PolicyLogger::Log::Severity::kError, \
+      ::policy::PolicyLogger::LogHelper::kNoVerboseLog, log_source, FROM_HERE)
+#else
+#define LOG_POLICY(log_severity, log_source) LOG(log_severity)
+#define DLOG_POLICY(log_severity, log_source) DLOG(log_severity)
+#define VLOG_POLICY(log_verbosity, log_source) VLOG(log_verbosity)
+#define DVLOG_POLICY(log_verbosity, log_source) DVLOG(log_verbosity)
+#endif  // BUILDFLAG(IS_ANDROID)
+
+#define POLICY_AUTH ::policy::PolicyLogger::Log::Source::kAuthentication
+#define POLICY_PROCESSING ::policy::PolicyLogger::Log::Source::kPolicyProcessing
+#define CBCM_ENROLLMENT ::policy::PolicyLogger::Log::Source::kCBCMEnrollment
+#define POLICY_FETCHING ::policy::PolicyLogger::Log::Source::kPolicyFetching
+#define PLATFORM_POLICY ::policy::PolicyLogger::Log::Source::kPlatformPolicy
+
 namespace policy {
-
-// TODO(b/265055305): define other kinds of logs like DLOG_POLICY and
-// VLOG_POLICY.
-#define LOG_POLICY(log_severity, log_source) \
-  LOG_POLICY_##log_severity(PolicyLogger::LogHelper::LogType::kLog, log_source)
-
-#define POLICY_PROCESSING PolicyLogger::Log::Source::kPolicyProcessing
-#define CBCM_ENROLLMENT PolicyLogger::Log::Source::kCBCMEnrollment
-#define POLICY_FETCHING PolicyLogger::Log::Source::kPolicyFetching
-#define PLATFORM_POLICY PolicyLogger::Log::Source::kPlatformPolicy
-
-#define LOG_POLICY_INFO(log_type, log_source)                              \
-  PolicyLogger::LogHelper(log_type, PolicyLogger::Log::Severity::kInfo, \
-                          log_source, FROM_HERE)
-#define LOG_POLICY_WARNING(log_type, log_source)                              \
-  PolicyLogger::LogHelper(log_type, PolicyLogger::Log::Severity::kWarning, \
-                          log_source, FROM_HERE)
-#define LOG_POLICY_ERROR(log_type, log_source)                              \
-  PolicyLogger::LogHelper(log_type, PolicyLogger::Log::Severity::kError, \
-                          log_source, FROM_HERE)
-
-namespace internal {
-
-// This class is used to explicitly ignore values in the conditional
-// logging macros. This avoids compiler warnings like "value computed
-// is not used" and "statement has no effect".
-class Voidify {
- public:
-  Voidify() = default;
-  // This has to be an operator with a precedence lower than << but
-  // higher than ?:
-  template <typename U>
-  void operator&(const U&) {}
-};
-
-}  // namespace internal
 
 // Collects logs to be displayed in chrome://policy-logs.
 class POLICY_EXPORT PolicyLogger {
@@ -63,9 +74,10 @@ class POLICY_EXPORT PolicyLogger {
       kPolicyProcessing,
       kCBCMEnrollment,
       kPolicyFetching,
-      kPlatformPolicy
+      kPlatformPolicy,
+      kAuthentication
     };
-    enum class Severity { kInfo, kWarning, kError };
+    enum class Severity { kInfo, kWarning, kError, kVerbose };
 
     Log(const Severity log_severity,
         const Source log_source,
@@ -97,9 +109,15 @@ class POLICY_EXPORT PolicyLogger {
   // object to the logs list when it is destroyed.
   class LogHelper {
    public:
-    enum class LogType { kLog, kDLog, KVLog };
+    // Value indicating that the log is not from VLOG, DVLOG, and other verbose
+    // log macros.
+    const static int kNoVerboseLog = -1;
+
+    enum class LogType { kLog, kDLog, kVLog };
+
     LogHelper(const LogType log_type,
               const PolicyLogger::Log::Severity log_severity,
+              const int log_verbosity,
               const PolicyLogger::Log::Source log_source,
               const base::Location location);
     LogHelper(const LogHelper&) = delete;
@@ -116,11 +134,12 @@ class POLICY_EXPORT PolicyLogger {
     }
 
     // Calls the appropriate base/logging macro.
-    void StreamLog();
+    void StreamLog() const;
 
    private:
     LogType log_type_;
     PolicyLogger::Log::Severity log_severity_;
+    int log_verbosity_;
     PolicyLogger::Log::Source log_source_;
     std::ostringstream message_buffer_;
     base::Location location_;
@@ -137,10 +156,10 @@ class POLICY_EXPORT PolicyLogger {
   base::Value::List GetAsList() const;
 
   // Checks if browser is running on Android.
-  bool IsPolicyLoggingEnabled();
+  bool IsPolicyLoggingEnabled() const;
 
   // Returns the logs size for testing purposes.
-  int GetPolicyLogsSizeForTesting();
+  size_t GetPolicyLogsSizeForTesting() const;
 
   // TODO(b/251799119): delete logs after an expiry period of ~30 minutes.
 
@@ -148,7 +167,9 @@ class POLICY_EXPORT PolicyLogger {
   // Adds a new log to the logs_ list.
   void AddLog(Log&& new_log);
 
-  std::vector<Log> logs_;
+  std::vector<Log> logs_ GUARDED_BY_CONTEXT(logs_list_sequence_checker_);
+
+  SEQUENCE_CHECKER(logs_list_sequence_checker_);
 };
 
 }  // namespace policy

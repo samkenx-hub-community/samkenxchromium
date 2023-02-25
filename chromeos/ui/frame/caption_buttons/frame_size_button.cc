@@ -14,6 +14,7 @@
 #include "chromeos/ui/frame/caption_buttons/snap_controller.h"
 #include "chromeos/ui/frame/frame_utils.h"
 #include "chromeos/ui/frame/multitask_menu/multitask_menu.h"
+#include "chromeos/ui/frame/multitask_menu/multitask_menu_nudge_controller.h"
 #include "chromeos/ui/wm/features.h"
 #include "ui/aura/window.h"
 #include "ui/aura/window_observer.h"
@@ -244,7 +245,11 @@ void FrameSizeButton::ShowMultitaskMenu(MultitaskMenuEntryType entry_type) {
         /*anchor=*/this, GetWidget(),
         base::BindOnce(&FrameSizeButton::OnMultitaskMenuClosed,
                        weak_factory_.GetWeakPtr()));
+    multitask_menu_->multitask_menu_view()->feedback_button()->SetCallback(
+        feedback_callback_);
     multitask_menu_->ShowBubble();
+    delegate_->GetMultitaskMenuNudgeController()->OnMenuOpened(
+        /*tablet_mode=*/false);
   }
 }
 
@@ -257,12 +262,22 @@ void FrameSizeButton::ToggleMultitaskMenu() {
         /*anchor=*/this, GetWidget(),
         base::BindOnce(&FrameSizeButton::OnMultitaskMenuClosed,
                        weak_factory_.GetWeakPtr()));
+    multitask_menu_->multitask_menu_view()->feedback_button()->SetCallback(
+        feedback_callback_);
+    delegate_->GetMultitaskMenuNudgeController()->OnMenuOpened(
+        /*tablet_mode=*/false);
   }
   multitask_menu_->ToggleBubble();
 }
 
 void FrameSizeButton::OnMultitaskMenuClosed() {
   multitask_menu_ = nullptr;
+}
+
+void FrameSizeButton::SetFeedbackButtonCallback(PressedCallback callback) {
+  // Callback cannot be set on the button here as the multitask menu has not
+  // been created yet, so store it for when it does get created.
+  feedback_callback_ = callback;
 }
 
 bool FrameSizeButton::OnMousePressed(const ui::MouseEvent& event) {

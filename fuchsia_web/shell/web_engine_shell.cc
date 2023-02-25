@@ -2,16 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fuchsia/ui/policy/cpp/fidl.h>
+#include <fuchsia/element/cpp/fidl.h>
+#include <fuchsia/io/cpp/fidl.h>
 #include <fuchsia/web/cpp/fidl.h>
 #include <lib/fdio/directory.h>
+#include <lib/fidl/cpp/interface_ptr.h>
 #include <lib/sys/cpp/component_context.h>
-#include <lib/ui/scenic/cpp/view_token_pair.h>
-#include <lib/vfs/cpp/pseudo_file.h>
+#include <lib/sys/cpp/service_directory.h>
+
 #include <iostream>
 #include <utility>
 
 #include "base/base_paths.h"
+#include "base/check.h"
 #include "base/command_line.h"
 #include "base/files/file_util.h"
 #include "base/fuchsia/file_utils.h"
@@ -26,10 +29,13 @@
 #include "base/task/single_thread_task_executor.h"
 #include "base/values.h"
 #include "build/build_config.h"
+#include "components/fuchsia_component_support/annotations_manager.h"
 #include "fuchsia_web/common/init_logging.h"
+#include "fuchsia_web/shell/present_frame.h"
 #include "fuchsia_web/shell/remote_debugging_port.h"
+#include "fuchsia_web/shell/shell_relauncher.h"
+#include "fuchsia_web/webinstance_host/web_instance_host.h"
 #include "fuchsia_web/webinstance_host/web_instance_host_constants.h"
-#include "fuchsia_web/webinstance_host/web_instance_host_v1.h"
 #include "third_party/widevine/cdm/buildflags.h"
 #include "url/gurl.h"
 
@@ -72,14 +78,21 @@ GURL GetUrlFromArgs(const base::CommandLine::StringVector& args) {
 }  // namespace
 
 int main(int argc, char** argv) {
+  base::CommandLine::Init(argc, argv);
+
+  base::CommandLine* command_line = base::CommandLine::ForCurrentProcess();
+  CHECK(InitLoggingFromCommandLine(*command_line));
+
   base::SingleThreadTaskExecutor executor(base::MessagePumpType::IO);
 
-  // Parse the command line arguments and set up logging.
-  CHECK(base::CommandLine::Init(argc, argv));
-  base::CommandLine* command_line = base::CommandLine::ForCurrentProcess();
-
-  CHECK(InitLoggingFromCommandLineDefaultingToStderrForTest(  // IN-TEST
-      command_line));
+  const bool use_context_provider = !command_line->HasSwitch(kUseWebInstance);
+  if (!use_context_provider) {
+    if (auto optional_exit_code = RelaunchForWebInstanceHostIfParent(
+            "#meta/web_engine_shell_for_web_instance_host.cm", *command_line);
+        optional_exit_code.has_value()) {
+      return optional_exit_code.value();
+    }
+  }
 
   absl::optional<uint16_t> remote_debugging_port =
       GetRemoteDebuggingPort(*command_line);
@@ -91,7 +104,6 @@ int main(int argc, char** argv) {
   const bool is_headless = command_line->HasSwitch(kHeadlessSwitch);
   const bool enable_protected_media_identifier_access =
       command_line->HasSwitch(kEnableProtectedMediaIdentifier);
-  const bool use_context_provider = !command_line->HasSwitch(kUseWebInstance);
   const bool enable_web_instance_tmp =
       command_line->HasSwitch(kEnableWebInstanceTmp);
   const bool with_webui = command_line->HasSwitch(switches::kWithWebui);
@@ -136,13 +148,6 @@ int main(int argc, char** argv) {
   create_context_params.set_content_directories(
       {std::move(content_directories)});
 
-  // WebEngine Contexts can only make use of the services provided by the
-  // embedder application. By passing a handle to this process' service
-  // directory to the ContextProvider, we are allowing the Context access to the
-  // same set of services available to this application.
-  create_context_params.set_service_directory(
-      base::OpenDirectoryHandle(base::FilePath(base::kServiceDirectoryPath)));
-
   // Enable other WebEngine features.
   fuchsia::web::ContextFeatureFlags features =
       fuchsia::web::ContextFeatureFlags::AUDIO |
@@ -153,10 +158,11 @@ int main(int argc, char** argv) {
 #if BUILDFLAG(ENABLE_WIDEVINE)
   features |= fuchsia::web::ContextFeatureFlags::WIDEVINE_CDM;
 #endif
-  if (is_headless)
+  if (is_headless) {
     features |= fuchsia::web::ContextFeatureFlags::HEADLESS;
-  else
+  } else {
     features |= fuchsia::web::ContextFeatureFlags::VULKAN;
+  }
 
   create_context_params.set_features(features);
   create_context_params.set_remote_debugging_port(*remote_debugging_port);
@@ -173,23 +179,29 @@ int main(int argc, char** argv) {
 
   base::RunLoop run_loop;
 
-  // Create the browser |context|.
-  fuchsia::web::ContextPtr context;
-
-  // Keep alive in run_loop scope.
   fuchsia::web::ContextProviderPtr web_context_provider;
-  std::unique_ptr<WebInstanceHostV1> web_instance_host;
+  std::unique_ptr<WebInstanceHost> web_instance_host;
+  fuchsia::web::ContextPtr context;
   fuchsia::io::DirectoryHandle tmp_directory;
 
   if (use_context_provider) {
     // Connect to the system instance of the ContextProvider.
+    // WebEngine Contexts can only make use of the services provided by the
+    // embedder application. By passing a handle to this process' service
+    // directory to the ContextProvider, we are allowing the Context access to
+    // the same set of services available to this application.
+    create_context_params.set_service_directory(
+        base::OpenDirectoryHandle(base::FilePath(base::kServiceDirectoryPath)));
     web_context_provider = base::ComponentContextForProcess()
                                ->svc()
                                ->Connect<fuchsia::web::ContextProvider>();
     web_context_provider->Create(std::move(create_context_params),
                                  context.NewRequest());
   } else {
-    web_instance_host = std::make_unique<WebInstanceHostV1>();
+    // Route services dynamically from web_engine_shell's parent down into
+    // created web_instances.
+    web_instance_host = std::make_unique<WebInstanceHost>(
+        *base::ComponentContextForProcess()->outgoing());
     if (enable_web_instance_tmp) {
       const zx_status_t status = fdio_open(
           "/tmp",
@@ -275,20 +287,25 @@ int main(int argc, char** argv) {
                               fuchsia::web::PermissionState::GRANTED);
   }
 
+  // The underlying PresentView call expects an AnnotationController and will
+  // return PresentViewError.INVALID_ARGS without one. The AnnotationController
+  // should serve WatchAnnotations, but it doesn't need to do anything.
+  // TODO(b/264899156): Remove this when AnnotationController becomes
+  // optional.
+  auto annotations_manager =
+      std::make_unique<fuchsia_component_support::AnnotationsManager>();
+  fuchsia::element::AnnotationControllerPtr annotation_controller;
+  annotations_manager->Connect(annotation_controller.NewRequest());
+
   if (is_headless) {
     frame->EnableHeadlessRendering();
   } else {
-    // Present a fullscreen view of |frame|.
-    auto view_tokens = scenic::ViewTokenPair::New();
-    frame->CreateView(std::move(view_tokens.view_token));
-    auto presenter = base::ComponentContextForProcess()
-                         ->svc()
-                         ->Connect<fuchsia::ui::policy::Presenter>();
-    presenter->PresentOrReplaceView(std::move(view_tokens.view_holder_token),
-                                    nullptr);
+    PresentFrame(frame.get(), std::move(annotation_controller));
   }
 
   LOG(INFO) << "Launched browser at URL " << url.spec();
+
+  base::ComponentContextForProcess()->outgoing()->ServeFromStartupInfo();
 
   // Run until the process is killed with CTRL-C or the connections to Web
   // Engine interfaces are dropped.

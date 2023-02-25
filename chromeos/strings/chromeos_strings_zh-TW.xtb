@@ -16,6 +16,7 @@
 <translation id="1128128132059598906">EAP-TTLS</translation>
 <translation id="1145018782460575098">更新外部裝置韌體的視窗已開啟。<ph name="NUM_UPDATES" /> 項可用的更新。</translation>
 <translation id="1145516343487477149">尋找說明文章，並回答 Chromebook 常見問題</translation>
+<translation id="1167755866710282443">開啟選單自訂按鍵，拖曳選單即可移動。</translation>
 <translation id="1175697296044146566">這部 <ph name="DEVICE_TYPE" /> 是由 <ph name="MANAGER" /> 管理。</translation>
 <translation id="1175951029573070619">一般 (<ph name="SIGNAL_STRENGTH" />)</translation>
 <translation id="1181037720776840403">移除</translation>
@@ -326,6 +327,7 @@
 <translation id="4110686435123617899">選取相簿「<ph name="TITLE" />，<ph name="DESC" />」</translation>
 <translation id="4111761024568264522">USB 觸控板</translation>
 <translation id="4117637339509843559">深色模式</translation>
+<translation id="4130035430755296270">將滑鼠游標懸停在上方，即可查看更多版面配置選項</translation>
 <translation id="4131410914670010031">黑白</translation>
 <translation id="4145784616224233563">HTTP 防火牆</translation>
 <translation id="4147897805161313378">Google 相簿</translation>
@@ -414,6 +416,7 @@
 <translation id="484790837831576105">(Android) DNS 解析</translation>
 <translation id="4848429997038228357">執行中</translation>
 <translation id="4854586501323951986">內建觸控螢幕</translation>
+<translation id="4855250849489639581">向下滑動即可查看更多版面配置選項</translation>
 <translation id="4861758251032006121">{ATTEMPTS_LEFT,plural, =1{<ph name="ERROR_MESSAGE" />剩餘嘗試次數：{0} 次}other{<ph name="ERROR_MESSAGE" />剩餘嘗試次數：{0} 次}}</translation>
 <translation id="4873827928179867585">驗證演算法</translation>
 <translation id="4880328057631981605">存取點名稱</translation>
@@ -517,6 +520,7 @@
 <translation id="576835345334454681">顯示亮度調高</translation>
 <translation id="57838592816432529">靜音</translation>
 <translation id="5784136236926853061">HTTP 延遲時間過長</translation>
+<translation id="5826644637650799838">關於這張桌布</translation>
 <translation id="5832805196449965646">新增使用者</translation>
 <translation id="583281660410589416">未知</translation>
 <translation id="5843706793424741864">華氏</translation>
@@ -673,6 +677,7 @@
 <translation id="7172721935181587524">1 張圖片</translation>
 <translation id="7177485034254901881">這部 <ph name="DEVICE_TYPE" /> 是由 <ph name="MANAGER" /> 管理。系統管理員可從遠端設定這部裝置。</translation>
 <translation id="7180611975245234373">重新整理</translation>
+<translation id="7180865173735832675">自訂</translation>
 <translation id="7212734716605298123">外部裝置適用的韌體更新</translation>
 <translation id="7216409898977639127">行動網路提供者</translation>
 <translation id="725133483556299729">選取電子郵件地址</translation>
@@ -744,6 +749,7 @@
 <translation id="7881066108824108340">DNS</translation>
 <translation id="7882358943899516840">供應商類型</translation>
 <translation id="7882501334836096755">公開金鑰</translation>
+<translation id="78957024357676568">向左鍵</translation>
 <translation id="7915220255123750251">管理網路 APN 設定。APN 會在行動網路和網際網路之間建立連線。</translation>
 <translation id="7936303884198020182">找不到任何名稱伺服器</translation>
 <translation id="7942349550061667556">紅色</translation>
@@ -775,6 +781,7 @@
 <translation id="8226628635270268143">選擇你最喜愛的相片和相簿</translation>
 <translation id="8227119283605456246">附加檔案</translation>
 <translation id="8230672074305416752">無法連線偵測預設的網路閘道</translation>
+<translation id="8242426110754782860">Proceed</translation>
 <translation id="8246209727385807362">不明電信業者</translation>
 <translation id="827422111966801947">靛藍</translation>
 <translation id="8286154143153872371">如要查看桌布，請連上網路並重新載入網頁。</translation>
@@ -852,6 +859,7 @@
 <translation id="8930622219860340959">無線</translation>
 <translation id="8936793075252196307">用戶端 IP 位址</translation>
 <translation id="894617464444543719">裝置類型為手機。</translation>
+<translation id="8957423540740801332">向右鍵</translation>
 <translation id="8968751544471797276">充電率</translation>
 <translation id="8970109610781093811">再執行一次</translation>
 <translation id="8983038754672563810">HSPA</translation>

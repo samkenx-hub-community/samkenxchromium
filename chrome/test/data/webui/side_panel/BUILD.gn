@@ -12,6 +12,7 @@ build_webui_tests("build") {
     "bookmarks/bookmarks_drag_manager_test.ts",
     "bookmarks/bookmarks_list_interactive_ui_test.ts",
     "bookmarks/bookmarks_list_test.ts",
+    "bookmarks/power_bookmarks_context_menu_test.ts",
     "bookmarks/power_bookmarks_edit_dialog_test.ts",
     "bookmarks/power_bookmarks_list_test.ts",
     "bookmarks/power_bookmarks_service_test.ts",
@@ -56,6 +57,6 @@ build_webui_tests("build") {
     "//chrome/browser/resources/side_panel/reading_list:build_ts",
     "//chrome/browser/resources/side_panel/user_notes:build_ts",
     "//ui/webui/resources/js:build_ts",
-    "//ui/webui/resources/mojo:library",
+    "//ui/webui/resources/mojo:build_ts",
   ]
 }

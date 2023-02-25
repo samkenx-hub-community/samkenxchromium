@@ -304,7 +304,6 @@ Los tokens de estado privado mejoran la privacidad en la Web y no pueden usarse 
 <translation id="2669454659051515572">Cualquier persona que use este dispositivo puede ver los archivos descargados</translation>
 <translation id="2702516483241149200">Nuevo: Comparte un vínculo directo a este texto.</translation>
 <translation id="2707726405694321444">Actualizar página</translation>
-<translation id="2709516037105925701">Autocompletar</translation>
 <translation id="271033894570825754">Nuevo</translation>
 <translation id="2711073837061989559">Pruebas</translation>
 <translation id="2718352093833049315">Solo en Wi-Fi</translation>
@@ -396,7 +395,6 @@ Los tokens de estado privado mejoran la privacidad en la Web y no pueden usarse 
 <translation id="3114507951000454849">Lee las noticias de hoy <ph name="NEWS_ICON" /></translation>
 <translation id="311958134571892113">te vinculaste con</translation>
 <translation id="3123734510202723619">Anuncios</translation>
-<translation id="3130863904455712965">Historial y más</translation>
 <translation id="3134784203083076891">"</translation>
 <translation id="314939179385989105">Página principal de Chrome</translation>
 <translation id="3157931365184549694">Restaurar</translation>
@@ -453,6 +451,7 @@ Los tokens de estado privado mejoran la privacidad en la Web y no pueden usarse 
 <translation id="3421726884497337397">Decide cuándo bloquear las cookies de terceros</translation>
 <translation id="3428747202529429621">Te protege en Chrome y puede usarse para mejorar tu seguridad en otras apps de Google cuando accedes a tu cuenta.</translation>
 <translation id="3429160811076349561">Las funciones de prueba están desactivadas</translation>
+<translation id="3432973700170747422">Borrar últimos 15 minutos</translation>
 <translation id="3435465986463792564">¿Tienes muchas ventanas? Puedes administrarlas desde aquí.</translation>
 <translation id="3435738964857648380">Seguridad</translation>
 <translation id="3443221991560634068">Volver a cargar la página actual</translation>
@@ -519,7 +518,6 @@ Los tokens de estado privado mejoran la privacidad en la Web y no pueden usarse 
 <translation id="3830886834687455630">Actualiza los Servicios de Google Play para revisar tus contraseñas.</translation>
 <translation id="3845098929839618392">Abrir en pestaña de incógnito</translation>
 <translation id="3856096718352044181">Verifica que sea un proveedor válido o vuelve a intentarlo más tarde</translation>
-<translation id="3858127568696903256">Mira el contenido que sigues aquí</translation>
 <translation id="3858860766373142691">Nombre</translation>
 <translation id="3861633093716975811">Videos populares</translation>
 <translation id="3874520961715512166">Se quitó el sitio</translation>
@@ -922,6 +920,7 @@ Para cambiar esta configuración, <ph name="BEGIN_LINK" />restablece la sincroni
 <translation id="6000203700195075278">Volver a seguir</translation>
 <translation id="6002122790816966947">Tus dispositivos</translation>
 <translation id="6005538289190791541">Contraseña sugerida</translation>
+<translation id="6011308810877101166">Mejorar las sugerencias de búsqueda</translation>
 <translation id="6039379616847168523">Ir a la pestaña siguiente</translation>
 <translation id="6040143037577758943">Cerrar</translation>
 <translation id="604124094241169006">Automático</translation>
@@ -989,7 +988,6 @@ Por ejemplo, algunos sitios web pueden responder a la solicitud mediante anuncio
 <translation id="6397616442223433927">De nuevo en línea</translation>
 <translation id="6401458660421980302">Para enviar esta pestaña a otro dispositivo, accede a Chrome allí.</translation>
 <translation id="6402652558933147609"><ph name="ERROR_CODE" /> de <ph name="VIOLATED_URL" /></translation>
-<translation id="6403371459378431832">Sincroniza tus datos en todos los dispositivos</translation>
 <translation id="6404511346730675251">Editar marcador</translation>
 <translation id="6406506848690869874">Sincronización</translation>
 <translation id="6407224748847589805">No se puede establecer la conexión con tu computadora. Prueba otra opción de verificación.</translation>
@@ -1227,6 +1225,7 @@ Por ejemplo, algunos sitios web pueden responder a la solicitud mediante anuncio
 <translation id="7596558890252710462">Sistema operativo</translation>
 <translation id="7605594153474022051">La sincronización no funciona</translation>
 <translation id="7612619742409846846">Accediste a Google como</translation>
+<translation id="7612989789287281429">Accediendo…</translation>
 <translation id="7616551326690708776">Selecciona una plantilla para el texto destacado.</translation>
 <translation id="7619072057915878432"><ph name="FILE_NAME" /> no se pudo descargar debido a fallas en la red.</translation>
 <translation id="7626032353295482388">Te damos la bienvenida a Chrome</translation>
@@ -1245,6 +1244,7 @@ Por ejemplo, algunos sitios web pueden responder a la solicitud mediante anuncio
 <translation id="7682724950699840886">Intenta las siguientes sugerencias: Antes de exportar las contraseñas nuevamente, asegúrate de que haya espacio suficiente en tu dispositivo.</translation>
 <translation id="7686086654630106285">Obtén más información sobre los anuncios sugeridos por sitios</translation>
 <translation id="768618399695552958">Algunas de las páginas que visitas están precargadas. Las páginas pueden precargarse por medio de servidores de Google cuando están vinculadas desde un sitio de Google.</translation>
+<translation id="7691043218961417207">Explorar contenido para seguir</translation>
 <translation id="7698359219371678927">Crear correo electrónico en <ph name="APP_NAME" /></translation>
 <translation id="7707922173985738739">Usa los datos móviles.</translation>
 <translation id="7709094866268987903">Los intereses que quitaste aparecerán aquí.</translation>
@@ -1318,7 +1318,6 @@ Por ejemplo, algunos sitios web pueden responder a la solicitud mediante anuncio
 <translation id="8037801708772278989">Se verificó recién</translation>
 <translation id="804335162455518893">No se encontró la tarjeta SD</translation>
 <translation id="8048533522416101084">{TAB_COUNT,plural, =1{<ph name="TAB_COUNT_ONE" /> pestaña de incógnito}other{<ph name="TAB_COUNT_NORMAL" /> pestañas de incógnito}}</translation>
-<translation id="8048728378294435881">Crea una copia de seguridad de tus datos y úsalos en cualquier dispositivo.</translation>
 <translation id="8051695050440594747"><ph name="MEGABYTES" /> MB disponibles</translation>
 <translation id="8058655154417507695">Año de vencimiento</translation>
 <translation id="8058746566562539958">Abrir en una nueva pestaña de Chrome</translation>
@@ -1452,6 +1451,7 @@ Por ejemplo, algunos sitios web pueden responder a la solicitud mediante anuncio
 <translation id="8746155870861185046">Compartir contenido destacado</translation>
 <translation id="8748850008226585750">Contenidos ocultos</translation>
 <translation id="8756969031206844760">¿Quieres actualizar la contraseña?</translation>
+<translation id="8765470054473112089">Cuando escribes en la barra de direcciones o en el cuadro de búsqueda, Chrome envía lo que escribes a tu motor de búsqueda predeterminado para obtener mejores sugerencias. Esta función está desactivada en el modo Incógnito.</translation>
 <translation id="8766529642647037772">¿Quieres crear un vínculo destacado como este?</translation>
 <translation id="8773160212632396039">Se está procesando la solicitud.</translation>
 <translation id="8788265440806329501">Se cerró el Historial de navegación</translation>
@@ -1495,6 +1495,7 @@ Por ejemplo, algunos sitios web pueden responder a la solicitud mediante anuncio
 <translation id="8970887620466824814">Se produjo un error</translation>
 <translation id="8972098258593396643">¿Deseas descargarlo a la carpeta predeterminada?</translation>
 <translation id="8987641763863173640">Administra la configuración de la vista previa de videos.</translation>
+<translation id="8987736167266086032">Retoma la sesión desde donde la dejaste</translation>
 <translation id="8989968390305463310">Tu historial de navegación afecta los anuncios que ves y los intereses como se estima a continuación. Para proteger tu privacidad, Chrome borra tus intereses automáticamente de manera continua todos los meses. Los intereses se pueden actualizar a no ser que los quites.</translation>
 <translation id="8993760627012879038">Abrir ventana nueva en modo de navegación incógnito</translation>
 <translation id="8996847606757455498">Elegir otro proveedor</translation>

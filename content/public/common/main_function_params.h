@@ -52,12 +52,9 @@ struct CONTENT_EXPORT MainFunctionParams {
   bool zygote_child = false;
 #endif
 
-#if BUILDFLAG(IS_IOS)
-  // For iOS in order to enter the UIApplication we must store the initial
-  // argc/argv from main().
-  int argc = 0;
-  const char** argv = nullptr;
-#endif
+  // Set to true if this content process's main function should enable startup
+  // tracing after initializing Mojo.
+  bool needs_startup_tracing_after_mojo_init = false;
 
   // Used by BrowserTestBase. If set, BrowserMainLoop runs this task instead of
   // the main message loop.

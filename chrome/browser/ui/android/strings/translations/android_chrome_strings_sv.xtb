@@ -304,7 +304,6 @@ Med förtroendetoken förbättras integriteten på webben. De kan inte användas
 <translation id="2669454659051515572">Alla som använder enheten kan se nedladdade filer</translation>
 <translation id="2702516483241149200">Nyhet: dela en länk som scrollar fram till den här texten</translation>
 <translation id="2707726405694321444">Uppdatera sidan</translation>
-<translation id="2709516037105925701">Autofyll</translation>
 <translation id="271033894570825754">Ny</translation>
 <translation id="2711073837061989559">Provversioner</translation>
 <translation id="2718352093833049315">Endast på wifi</translation>
@@ -396,7 +395,6 @@ Med förtroendetoken förbättras integriteten på webben. De kan inte användas
 <translation id="3114507951000454849">Läs dagens nyheter <ph name="NEWS_ICON" /></translation>
 <translation id="311958134571892113">länkat till</translation>
 <translation id="3123734510202723619">Meddelanden</translation>
-<translation id="3130863904455712965">Historik med mera</translation>
 <translation id="3134784203083076891">”</translation>
 <translation id="314939179385989105">Chromes startsida</translation>
 <translation id="3157931365184549694">Återställ</translation>
@@ -453,6 +451,7 @@ Med förtroendetoken förbättras integriteten på webben. De kan inte användas
 <translation id="3421726884497337397">Välj när cookies från tredje part ska blockeras</translation>
 <translation id="3428747202529429621">Skyddar dig i Chrome och kan användas för förbättrad säkerhet i andra Google-appar där du är inloggad</translation>
 <translation id="3429160811076349561">Provfunktionerna är inaktiverade</translation>
+<translation id="3432973700170747422">Radera senaste 15 minuterna</translation>
 <translation id="3435465986463792564">Har du många fönster? Du kan hantera dem härifrån</translation>
 <translation id="3435738964857648380">Säkerhet</translation>
 <translation id="3443221991560634068">Läs in den aktuella sidan igen</translation>
@@ -520,7 +519,6 @@ Med förtroendetoken förbättras integriteten på webben. De kan inte användas
 <translation id="3845098929839618392">Öppna i inkognitoflik
 </translation>
 <translation id="3856096718352044181">Verifiera att detta är en giltig leverantör eller försök igen senare</translation>
-<translation id="3858127568696903256">Här kan du se innehåll du följer</translation>
 <translation id="3858860766373142691">Namn</translation>
 <translation id="3861633093716975811">Populära videor</translation>
 <translation id="3874520961715512166">Webbplatsen har tagits bort</translation>
@@ -991,7 +989,6 @@ Vissa webbplatser kan till exempel svara på begäran genom att visa annonser so
 <translation id="6397616442223433927">Online igen</translation>
 <translation id="6401458660421980302">Om du vill skicka den här fliken till en annan enhet loggar du in i Chrome på den enheten</translation>
 <translation id="6402652558933147609"><ph name="ERROR_CODE" /> <ph name="VIOLATED_URL" /></translation>
-<translation id="6403371459378431832">Synkronisera din data på alla enheter</translation>
 <translation id="6404511346730675251">Redigera bokmärke</translation>
 <translation id="6406506848690869874">Synkronisera</translation>
 <translation id="6407224748847589805">Det går inte att ansluta till datorn. Försök med ett annat verifieringsalternativ.</translation>
@@ -1229,6 +1226,7 @@ Vissa webbplatser kan till exempel svara på begäran genom att visa annonser so
 <translation id="7596558890252710462">Operativsystem</translation>
 <translation id="7605594153474022051">Det går inte att synkronisera</translation>
 <translation id="7612619742409846846">Inloggad i Google som</translation>
+<translation id="7612989789287281429">Du loggas in …</translation>
 <translation id="7616551326690708776">Välj en mall för markeringen.</translation>
 <translation id="7619072057915878432">Det gick inte att ladda ned <ph name="FILE_NAME" /> på grund av nätverksfel.</translation>
 <translation id="7626032353295482388">Välkommen till Chrome</translation>
@@ -1247,6 +1245,7 @@ Vissa webbplatser kan till exempel svara på begäran genom att visa annonser so
 <translation id="7682724950699840886">Testa följande: kontrollera att det finns tillräckligt mycket utrymme på enheten, gör om exporten.</translation>
 <translation id="7686086654630106285">Mer om föreslagna annonser på webbplatser</translation>
 <translation id="768618399695552958">Vissa av sidorna du besöker läser in i förväg. Sidor kan läsas in i förväg via Googles servrar när de länkas från en Google-webbplats.</translation>
+<translation id="7691043218961417207">Utforska innehåll att följa</translation>
 <translation id="7698359219371678927">Skapa ett e-postmeddelande i <ph name="APP_NAME" /></translation>
 <translation id="7707922173985738739">Mobildata används</translation>
 <translation id="7709094866268987903">Intressen du har tagit bort visas här</translation>
@@ -1320,7 +1319,6 @@ Vissa webbplatser kan till exempel svara på begäran genom att visa annonser so
 <translation id="8037801708772278989">Genomsöktes alldeles nyss</translation>
 <translation id="804335162455518893">Det gick inte att hitta SD-kortet</translation>
 <translation id="8048533522416101084">{TAB_COUNT,plural, =1{<ph name="TAB_COUNT_ONE" /> inkognitoflik}other{<ph name="TAB_COUNT_NORMAL" /> inkognitoflikar}}</translation>
-<translation id="8048728378294435881">Säkerhetskopiera dina grejer och använd dem på vilken enhet som helst</translation>
 <translation id="8051695050440594747"><ph name="MEGABYTES" /> MB tillgängliga</translation>
 <translation id="8058655154417507695">Utgångsår</translation>
 <translation id="8058746566562539958">Öppna på ny flik i Chrome</translation>
@@ -1498,6 +1496,7 @@ Vissa webbplatser kan till exempel svara på begäran genom att visa annonser so
 <translation id="8970887620466824814">Något gick fel.</translation>
 <translation id="8972098258593396643">Vill du ladda ned till standardmappen?</translation>
 <translation id="8987641763863173640">Hantera inställningar för förhandsgranskning av video</translation>
+<translation id="8987736167266086032">Fortsätt där du slutade</translation>
 <translation id="8989968390305463310">Webbhistoriken påverkar vilka annonser som visas och vilka intressen som du uppskattas ha. Av integritetsskäl raderas dina intressen automatiskt och löpande varje månad. Intressen kan förnyas om du inte tar bort dem.</translation>
 <translation id="8993760627012879038">Öppna en ny flik i inkognitoläge</translation>
 <translation id="8996847606757455498">Välj en annan leverantör</translation>

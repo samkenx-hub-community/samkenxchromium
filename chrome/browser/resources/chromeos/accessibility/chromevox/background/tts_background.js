@@ -12,7 +12,6 @@ import {BridgeConstants} from '../common/bridge_constants.js';
 import {BridgeHelper} from '../common/bridge_helper.js';
 import {Msgs} from '../common/msgs.js';
 import {SettingsManager} from '../common/settings_manager.js';
-import {TtsInterface} from '../common/tts_interface.js';
 import {Personality, QueueMode, TtsSpeechProperties} from '../common/tts_types.js';
 
 import {ChromeVox} from './chromevox.js';
@@ -25,13 +24,19 @@ const TARGET = BridgeConstants.TtsBackground.TARGET;
 
 /** This class broadly handles TTS within the background context. */
 export class TtsBackground {
-  static init() {
-    TtsBackground.consoleTts_ = new ConsoleTts();
-    TtsBackground.primaryTts_ = new PrimaryTts();
-    TtsBackground.compositeTts_ = new CompositeTts()
-                                      .add(TtsBackground.primary)
-                                      .add(TtsBackground.console);
+  /** @private */
+  constructor() {
+    /** @private {!ConsoleTts} */
+    this.consoleTts_ = new ConsoleTts();
+    /** @private {!PrimaryTts} */
+    this.primaryTts_ = new PrimaryTts();
 
+    /** @private {!CompositeTts} */
+    this.compositeTts_ =
+        new CompositeTts().add(this.primaryTts_).add(this.consoleTts_);
+  }
+  static init() {
+    TtsBackground.instance = new TtsBackground();
     ChromeVox.tts = TtsBackground.composite;
 
     BridgeHelper.registerHandler(
@@ -44,32 +49,32 @@ export class TtsBackground {
 
   /** @return {!CompositeTts} */
   static get composite() {
-    if (!TtsBackground.compositeTts_) {
+    if (!TtsBackground.instance) {
       throw new Error(
           'Cannot access composite TTS before TtsBackground has been ' +
           'initialized.');
     }
-    return TtsBackground.compositeTts_;
+    return TtsBackground.instance.compositeTts_;
   }
 
   /** @return {!ConsoleTts} */
   static get console() {
-    if (!TtsBackground.consoleTts_) {
+    if (!TtsBackground.instance) {
       throw new Error(
           'Cannot access console TTS before TtsBackground has been ' +
           'initialized.');
     }
-    return TtsBackground.consoleTts_;
+    return TtsBackground.instance.consoleTts_;
   }
 
   /** @return {!PrimaryTts} */
   static get primary() {
-    if (!TtsBackground.primaryTts_) {
+    if (!TtsBackground.instance) {
       throw new Error(
           'Cannot access primary TTS before TtsBackground has been ' +
           'initialized.');
     }
-    return TtsBackground.primaryTts_;
+    return TtsBackground.instance.primaryTts_;
   }
 
   static resetTextToSpeechSettings() {
@@ -92,10 +97,3 @@ export class TtsBackground {
     });
   }
 }
-
-/** @private {CompositeTts} */
-TtsBackground.compositeTts_;
-/** @private {ConsoleTts} */
-TtsBackground.consoleTts_;
-/** @private {PrimaryTts} */
-TtsBackground.primaryTts_;

@@ -6,12 +6,11 @@
 #include <cstdint>
 
 #include "ash/constants/ash_features.h"
+#include "ash/focus_cycler.h"
 #include "ash/root_window_controller.h"
 #include "ash/shelf/shelf.h"
 #include "ash/shell.h"
 #include "ash/system/message_center/ash_message_popup_collection.h"
-#include "ash/system/message_center/ash_notification_view.h"
-#include "ash/system/message_center/message_popup_animation_waiter.h"
 #include "ash/system/message_center/unified_message_center_bubble.h"
 #include "ash/system/notification_center/notification_center_bubble.h"
 #include "ash/system/notification_center/notification_center_tray.h"
@@ -26,9 +25,11 @@
 #include "ui/events/test/event_generator.h"
 #include "ui/message_center/message_center.h"
 #include "ui/message_center/public/cpp/message_center_constants.h"
+#include "ui/message_center/public/cpp/notification.h"
 #include "ui/message_center/public/cpp/notification_types.h"
 #include "ui/message_center/public/cpp/notifier_id.h"
 #include "ui/message_center/views/message_popup_view.h"
+#include "ui/views/controls/focus_ring.h"
 
 namespace ash {
 
@@ -72,12 +73,13 @@ std::string NotificationCenterTestApi::AddCustomNotification(
     const std::u16string& display_source,
     const GURL& url,
     const message_center::NotifierId& notifier_id,
-    const message_center::NotificationPriority priority) {
+    const message_center::RichNotificationData& optional_fields) {
   const std::string id = GenerateNotificationId();
 
-  auto notification = CreateNotification(id, title, message, icon,
-                                         display_source, url, notifier_id);
-  notification->set_priority(priority);
+  auto notification =
+      CreateNotification(id, title, message, icon, display_source, url,
+                         notifier_id, optional_fields);
+
   message_center::MessageCenter::Get()->AddNotification(
       std::move(notification));
   return id;
@@ -95,20 +97,31 @@ std::string NotificationCenterTestApi::AddNotificationWithSourceUrl(
   GURL gurl = GURL(url);
   message_center::MessageCenter::Get()->AddNotification(CreateNotification(
       id, u"test_title", u"test_message", ui::ImageModel(),
-      base::EmptyString16(), gurl, message_center::NotifierId(gurl)));
+      base::EmptyString16(), gurl, message_center::NotifierId(gurl),
+      message_center::RichNotificationData()));
 
   return id;
+}
+
+std::string NotificationCenterTestApi::AddPinnedNotification() {
+  message_center::RichNotificationData optional_fields;
+  optional_fields.pinned = true;
+  return AddCustomNotification(
+      /*title=*/u"test_title",
+      /*message=*/u"test_message", ui::ImageModel(), base::EmptyString16(),
+      GURL(), message_center::NotifierId(), optional_fields);
 }
 
 std::string NotificationCenterTestApi::AddSystemNotification() {
   message_center::NotifierId notifier_id;
   notifier_id.type = message_center::NotifierType::SYSTEM_COMPONENT;
-
+  message_center::RichNotificationData optional_fields;
+  optional_fields.priority =
+      message_center::NotificationPriority::SYSTEM_PRIORITY;
   return AddCustomNotification(
       /*title=*/u"test_title",
       /*message=*/u"test_message", ui::ImageModel(), base::EmptyString16(),
-      GURL(), notifier_id,
-      message_center::NotificationPriority::SYSTEM_PRIORITY);
+      GURL(), notifier_id, optional_fields);
 }
 
 void NotificationCenterTestApi::RemoveNotification(const std::string& id) {
@@ -122,6 +135,12 @@ size_t NotificationCenterTestApi::GetNotificationCount() const {
 
 bool NotificationCenterTestApi::IsBubbleShown() {
   return notification_center_tray_->is_active() && GetWidget()->IsVisible();
+}
+
+bool NotificationCenterTestApi::IsPinnedIconShown() {
+  return notification_center_tray_->notification_icons_controller_->tray_items()
+      .back()
+      ->GetVisible();
 }
 
 bool NotificationCenterTestApi::IsPopupShown(const std::string& id) {
@@ -214,6 +233,16 @@ std::string NotificationCenterTestApi::NotificationIdToParentNotificationId(
   return id + message_center::kIdSuffixForGroupContainerNotification;
 }
 
+views::FocusRing* NotificationCenterTestApi::GetFocusRing() const {
+  return views::FocusRing::Get(notification_center_tray_);
+}
+
+void NotificationCenterTestApi::FocusTray() {
+  Shell::Get()->focus_cycler()->FocusWidget(
+      notification_center_tray_->GetWidget());
+  notification_center_tray_->RequestFocus();
+}
+
 std::string NotificationCenterTestApi::GenerateNotificationId() {
   return base::NumberToString(notification_id_++);
 }
@@ -248,10 +277,11 @@ NotificationCenterTestApi::CreateNotification(
     const ui::ImageModel& icon,
     const std::u16string& display_source,
     const GURL& url,
-    const message_center::NotifierId& notifier_id) {
+    const message_center::NotifierId& notifier_id,
+    const message_center::RichNotificationData& optional_fields) {
   return std::make_unique<message_center::Notification>(
       message_center::NOTIFICATION_TYPE_SIMPLE, id, title, message, icon,
-      display_source, url, notifier_id, message_center::RichNotificationData(),
+      display_source, url, notifier_id, optional_fields,
       new message_center::NotificationDelegate());
 }
 

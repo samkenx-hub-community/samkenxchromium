@@ -287,6 +287,10 @@ const char kAccessibilityChromeVoxEnableEventStreamLogging[] =
 // enabled.
 const char kAccessibilityChromeVoxEnableSpeechLogging[] =
     "settings.a11y.chromevox.enable_speech_logging";
+// A dictionary pref that defines which event stream filters in ChromeVox are
+// enabled. (e.g. {clicked: true, focus: false, hover: true})
+const char kAccessibilityChromeVoxEventStreamFilters[] =
+    "settings.a11y.chromevox.event_stream_filters";
 // A boolean pref which determines whether language switching for ChromeVox is
 // enabled.
 const char kAccessibilityChromeVoxLanguageSwitching[] =
@@ -552,6 +556,11 @@ const char kContextualTooltips[] = "settings.contextual_tooltip.shown_info";
 // name will appear in this list as an empty string. The desk names are stored
 // as UTF8 strings.
 const char kDesksNamesList[] = "ash.desks.desks_names_list";
+// A list containing the stored virtual desks guids in the same order of the
+// desks in the overview desks bar. This list will be used to restore desk guids
+// for the primary user on first sign-in. The guids are stored as lowercase
+// strings.
+const char kDesksGuidsList[] = "ash.desks.desks_guids_list";
 // This list stores the metrics of virtual desks. Like |kDesksNamesList|, this
 // list stores entries in the same order of the desks in the overview desks bar.
 // Values are stored as dictionaries.
@@ -588,6 +597,26 @@ const char kScreenMagnifierAcceleratorDialogHasBeenAccepted[] =
 // ever been shown.
 const char kDictationAcceleratorDialogHasBeenAccepted[] =
     "settings.a11y.dictation_accelerator_dialog_has_been_accepted";
+// A boolean pref which indicates whether the Dictation DLC success notification
+// has ever been shown.
+const char kDictationDlcSuccessNotificationHasBeenShown[] =
+    "settings.a11y.dictation_dlc_success_notification_has_been_shown";
+// A boolean pref which indicates whether the Dictation DLC only Pumpkin
+// downloaded notification has ever been shown.
+const char kDictationDlcOnlyPumpkinDownloadedNotificationHasBeenShown[] =
+    "settings.a11y.dictation_dlc_only_pumpkin_downloaded_notification_has_been_"
+    "shown";
+// A boolean pref which indicates whether the Dictation DLC only SODA
+// downloaded notification has ever been shown.
+const char kDictationDlcOnlySodaDownloadedNotificationHasBeenShown[] =
+    "settings.a11y.dictation_dlc_only_soda_downloaded_notification_has_been_"
+    "shown";
+// A boolean pref which indicates whether the Dictation No DLCs downloaded
+// notification has ever been shown.
+const char kDictationNoDlcsDownloadedNotificationHasBeenShown[] =
+    "settings.a11y.dictation_dlc_no_dlcs_downloaded_notification_has_been_"
+    "shown";
+
 // A boolean pref which indicates whether the display rotation confirmation
 // dialog has ever been shown.
 // Renamed 10/2019 to force reset the pref to false.
@@ -967,6 +996,11 @@ const char kTapDraggingEnabled[] = "settings.touchpad.enable_tap_dragging";
 const char kTouchpadEnabled[] = "events.touch_pad.enabled";
 const char kTouchscreenEnabled[] = "events.touch_screen.enabled";
 
+// Boolean value indicating that the touchpad scroll direction screen should be
+// shown to the user during oobe.
+const char kShowTouchpadScrollScreenEnabled[] =
+    "ash.touchpad_scroll_screen_oobe_enabled";
+
 // Integer prefs indicating the minimum and maximum lengths of the lock screen
 // pin.
 const char kPinUnlockMaximumLength[] = "pin_unlock_maximum_length";
@@ -1299,6 +1333,56 @@ const char kPortraitRelighting[] = "ash.camera.portrait_relighting";
 // initial session after sync consent screen.
 const char kRecordArcAppSyncMetrics[] =
     "ash.should_record_arc_app_sync_metrics";
+
+// A boolean pref set to true if primary mouse button is the left button.
+const char kPrimaryMouseButtonRight[] = "settings.mouse.primary_right";
+
+// A integer pref for the touchpad sensitivity.
+const char kMouseSensitivity[] = "settings.mouse.sensitivity2";
+
+// A boolean pref set to true if mouse acceleration is enabled. When disabled
+// only simple linear scaling is applied based on sensitivity.
+const char kMouseAcceleration[] = "settings.mouse.acceleration";
+
+// A integer pref for the touchpad scroll sensitivity, in the range
+// [PointerSensitivity::kLowest, PointerSensitivity::kHighest].
+const char kMouseScrollSensitivity[] = "settings.mouse.scroll_sensitivity";
+
+// A boolean pref set to true if mouse scroll acceleration is enabled. When
+// disabled, only simple linear scaling is applied based on sensitivity.
+const char kMouseScrollAcceleration[] = "settings.mouse.scroll_acceleration";
+
+// A integer pref for the touchpad sensitivity.
+const char kTouchpadSensitivity[] = "settings.touchpad.sensitivity2";
+
+// A boolean pref set to true if touchpad acceleration is enabled. When
+// disabled only simple linear scaling is applied based on sensitivity.
+const char kTouchpadAcceleration[] = "settings.touchpad.acceleration";
+
+// A boolean pref set to true if touchpad three-finger-click is enabled.
+const char kEnableTouchpadThreeFingerClick[] =
+    "settings.touchpad.enable_three_finger_click";
+
+// A boolean pref set to true if touchpad tap-to-click is enabled.
+const char kTapToClickEnabled[] = "settings.touchpad.enable_tap_to_click";
+
+// A integer pref for the touchpad scroll sensitivity, in the range
+// [PointerSensitivity::kLowest, PointerSensitivity::kHighest].
+const char kTouchpadScrollSensitivity[] =
+    "settings.touchpad.scroll_sensitivity";
+
+// A boolean pref set to true if touchpad scroll acceleration is enabled. When
+// disabled only simple linear scaling is applied based on sensitivity.
+const char kTouchpadScrollAcceleration[] =
+    "settings.touchpad.scroll_acceleration";
+
+// A boolean pref set to true if touchpad haptic feedback is enabled.
+const char kTouchpadHapticFeedback[] = "settings.touchpad.haptic_feedback";
+
+// A integer pref for the touchpad haptic click sensitivity ranging from Soft
+// feedback to Firm feedback [1, 3, 5].
+const char kTouchpadHapticClickSensitivity[] =
+    "settings.touchpad.haptic_click_sensitivity";
 
 // NOTE: New prefs should start with the "ash." prefix. Existing prefs moved
 // into this file should not be renamed, since they may be synced.

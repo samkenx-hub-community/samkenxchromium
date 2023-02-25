@@ -1789,16 +1789,16 @@ NGOutOfFlowLayoutPart::TryCalculateOffset(
         node_info.node.GetLayoutBox()->Container();
     DCHECK(css_containing_block);
     anchor_evaluator_storage.emplace(
-        *anchor_queries, implicit_anchor, *css_containing_block,
-        container_converter, candidate_writing_direction,
+        *anchor_queries, candidate_style.AnchorDefault(), implicit_anchor,
+        *css_containing_block, container_converter, candidate_writing_direction,
         container_converter.ToPhysical(node_info.container_info.rect).offset,
         node_info.node.IsInTopLayer());
   } else if (const NGLogicalAnchorQuery* anchor_query =
                  container_builder_->AnchorQuery()) {
     // Otherwise the |container_builder_| is the containing block.
     anchor_evaluator_storage.emplace(
-        *anchor_query, implicit_anchor, container_converter,
-        candidate_writing_direction,
+        *anchor_query, candidate_style.AnchorDefault(), implicit_anchor,
+        container_converter, candidate_writing_direction,
         container_converter.ToPhysical(node_info.container_info.rect).offset,
         node_info.node.IsInTopLayer());
   } else {
@@ -1903,11 +1903,14 @@ const NGLayoutResult* NGOutOfFlowLayoutPart::Layout(
   const NodeInfo& node_info = oof_node_to_layout.node_info;
   const OffsetInfo& offset_info = oof_node_to_layout.offset_info;
 
-  // Reset the |layout_result| computed earlier to allow fragmentation in the
-  // next layout pass, if needed.
-  const NGLayoutResult* layout_result = !fragmentainer_constraint_space
-                                            ? offset_info.initial_layout_result
-                                            : nullptr;
+  const NGLayoutResult* layout_result = offset_info.initial_layout_result;
+  // Reset the layout result computed earlier to allow fragmentation in the next
+  // layout pass, if needed. Also do this if we're inside repeatable content, as
+  // the pre-computed layout result is unusable then.
+  if (fragmentainer_constraint_space ||
+      ConstraintSpace().IsInsideRepeatableContent()) {
+    layout_result = nullptr;
+  }
 
   // Skip this step if we produced a fragment that can be reused when
   // estimating the block-size.

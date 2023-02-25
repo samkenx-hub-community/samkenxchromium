@@ -117,9 +117,9 @@ TEST_P(WrappedSkImageBackingFactoryTest, Basic) {
   auto mailbox = Mailbox::GenerateForSharedImage();
   gfx::Size size(100, 100);
 
-  bool supported =
-      backing_factory_->IsSupported(kUsage, format, size, /*thread_safe=*/false,
-                                    gfx::EMPTY_BUFFER, GrContextType::kGL, {});
+  bool supported = backing_factory_->CanCreateSharedImage(
+      kUsage, format, size, /*thread_safe=*/false, gfx::EMPTY_BUFFER,
+      GrContextType::kGL, {});
   ASSERT_TRUE(supported);
 
   auto backing = backing_factory_->CreateSharedImage(
@@ -243,7 +243,7 @@ std::string TestParamToString(
 // TODO(kylechar): Add RGBA_F16 where it works.
 const auto kFormats =
     ::testing::Values(viz::SinglePlaneFormat::kALPHA_8,
-                      viz::SinglePlaneFormat::kRED_8,
+                      viz::SinglePlaneFormat::kR_8,
                       viz::SinglePlaneFormat::kRG_88,
                       viz::SinglePlaneFormat::kRGBA_4444,
                       viz::SinglePlaneFormat::kRGB_565,

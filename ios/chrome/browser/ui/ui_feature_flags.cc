@@ -51,6 +51,17 @@ BASE_FEATURE(kDefaultBrowserIntentsShowSettings,
              "DefaultBrowserIntentsShowSettings",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
+BASE_FEATURE(kIOSCustomBrowserEditMenu,
+             "IOSCustomBrowserEditMenu",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+const char kIOSEditMenuPartialTranslateNoIncognitoParam[] =
+    "IOSEditMenuPartialTranslateNoIncognitoParam";
+
+BASE_FEATURE(kIOSEditMenuPartialTranslate,
+             "IOSEditMenuPartialTranslate",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 BASE_FEATURE(kIOSNewOmniboxImplementation,
              "kIOSNewOmniboxImplementation",
              base::FEATURE_DISABLED_BY_DEFAULT);
@@ -109,12 +120,6 @@ BASE_FEATURE(kEnableExpKitAppleCalendar,
              "EnableExpKitAppleCalendar",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-BASE_FEATURE(kEnableEmails, "EnableEmails", base::FEATURE_DISABLED_BY_DEFAULT);
-
-BASE_FEATURE(kEnablePhoneNumbers,
-             "EnablePhoneNumbers",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-
 const char kExperienceKitMapsVariationName[] = "ExperienceKitMapsVariant";
 extern const char kEnableExperienceKitMapsVariationSrp[] = "with SRP";
 
@@ -138,14 +143,54 @@ BASE_FEATURE(kMultilineFadeTruncatingLabel,
              "MultilineFadeTruncatingLabel",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-BASE_FEATURE(kTabStripContextMenu,
-             "TabStripContextMenu",
+BASE_FEATURE(kNotificationSettingsMenuItem,
+             "NotificationSettingsMenuItem",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-BASE_FEATURE(kCloseAllTabsConfirmation,
-             "CloseAllTabsConfirmation",
+BASE_FEATURE(kSpotlightReadingListSource,
+             "SpotlightReadingListSource",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-bool IsCloseAllTabsConfirmationEnabled() {
-  return base::FeatureList::IsEnabled(kCloseAllTabsConfirmation);
+BASE_FEATURE(kConsistencyNewAccountInterface,
+             "ConsistencyNewAccountInterface",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+bool IsConsistencyNewAccountInterfaceEnabled() {
+  return base::FeatureList::IsEnabled(kConsistencyNewAccountInterface);
+}
+
+BASE_FEATURE(kAddToHomeScreen,
+             "AddToHomeScreen",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+const char kAddToHomeScreenDisableIncognitoParam[] =
+    "AddToHomeScreenDisableIncognitoParam";
+
+bool ShouldAddToHomeScreen(bool in_incognito) {
+  if (!base::FeatureList::IsEnabled(kAddToHomeScreen)) {
+    return false;
+  }
+  if (!in_incognito) {
+    return true;
+  }
+  return !base::GetFieldTrialParamByFeatureAsBool(
+      kAddToHomeScreen, kAddToHomeScreenDisableIncognitoParam, false);
+}
+
+bool ShouldShowPartialTranslateInIncognito() {
+  if (!base::FeatureList::IsEnabled(kIOSEditMenuPartialTranslate)) {
+    return false;
+  }
+  return !base::GetFieldTrialParamByFeatureAsBool(
+      kIOSEditMenuPartialTranslate,
+      kIOSEditMenuPartialTranslateNoIncognitoParam, false);
+}
+
+BASE_FEATURE(kIndicateAccountStorageErrorInAccountCell,
+             "IndicatePassphraseErrorForSignedInUser",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+bool IsIndicateAccountStorageErrorInAccountCellEnabled() {
+  return base::FeatureList::IsEnabled(
+      kIndicateAccountStorageErrorInAccountCell);
 }

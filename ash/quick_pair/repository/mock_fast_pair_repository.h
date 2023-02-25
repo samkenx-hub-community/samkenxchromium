@@ -45,6 +45,12 @@ class MockFastPairRepository : public FastPairRepository {
                DeleteAssociatedDeviceCallback callback),
               (override));
   MOCK_METHOD(void,
+              UpdateAssociatedDeviceFootprintsName,
+              (const std::string& mac_address,
+               const std::string& display_name,
+               bool retry),
+              (override));
+  MOCK_METHOD(void,
               FetchDeviceImages,
               (scoped_refptr<Device> device),
               (override));
@@ -58,11 +64,11 @@ class MockFastPairRepository : public FastPairRepository {
               (override));
   MOCK_METHOD(bool,
               EvictDeviceImages,
-              (const device::BluetoothDevice* device),
+              (const std::string& mac_address),
               (override));
   MOCK_METHOD(absl::optional<bluetooth_config::DeviceImageInfo>,
               GetImagesForDevice,
-              (const std::string& device_id),
+              (const std::string& mac_address),
               (override));
   MOCK_METHOD(void,
               CheckOptInStatus,

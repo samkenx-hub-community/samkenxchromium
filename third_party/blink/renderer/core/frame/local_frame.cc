@@ -66,7 +66,6 @@
 #include "third_party/blink/public/mojom/scroll/scrollbar_mode.mojom-blink.h"
 #include "third_party/blink/public/platform/interface_registry.h"
 #include "third_party/blink/public/platform/platform.h"
-#include "third_party/blink/public/platform/scheduler/web_resource_loading_task_runner_handle.h"
 #include "third_party/blink/public/platform/url_conversion.h"
 #include "third_party/blink/public/platform/web_content_settings_client.h"
 #include "third_party/blink/public/platform/web_string.h"
@@ -1528,6 +1527,10 @@ String LocalFrame::SelectedText() const {
   return Selection().SelectedText();
 }
 
+String LocalFrame::SelectedText(const TextIteratorBehavior& behavior) const {
+  return Selection().SelectedText(behavior);
+}
+
 String LocalFrame::SelectedTextForClipboard() const {
   if (!GetDocument())
     return g_empty_string;
@@ -2039,10 +2042,13 @@ LocalFrame::LazyLoadImageSetting LocalFrame::GetLazyLoadImageSetting() const {
   return LocalFrame::LazyLoadImageSetting::kEnabledExplicit;
 }
 
-WebURLLoaderFactory* LocalFrame::GetURLLoaderFactory() {
-  if (!url_loader_factory_)
-    url_loader_factory_ = Client()->CreateURLLoaderFactory();
-  return url_loader_factory_.get();
+scoped_refptr<network::SharedURLLoaderFactory>
+LocalFrame::GetURLLoaderFactory() {
+  return Client()->GetURLLoaderFactory();
+}
+
+std::unique_ptr<URLLoader> LocalFrame::CreateURLLoaderForTesting() {
+  return Client()->CreateURLLoaderForTesting();
 }
 
 WebPluginContainerImpl* LocalFrame::GetWebPluginContainer(Node* node) const {
@@ -2435,7 +2441,6 @@ void LocalFrame::NotifyUserActivation(
                                                       notification_type);
   Client()->NotifyUserActivation();
   NotifyUserActivationInFrameTree(notification_type);
-  DomWindow()->history_user_activation_state().Activate();
 }
 
 bool LocalFrame::ConsumeTransientUserActivation(
@@ -2446,6 +2451,17 @@ bool LocalFrame::ConsumeTransientUserActivation(
         mojom::blink::UserActivationNotificationType::kNone);
   }
   return ConsumeTransientUserActivationInFrameTree();
+}
+
+void LocalFrame::ConsumeHistoryUserActivation() {
+  // Notify the frame in the browser process, which will consume the activation
+  // in all frames of the page (consistent with the loop below).
+  GetLocalFrameHostRemote().DidConsumeHistoryUserActivation();
+  for (Frame* node = &Tree().Top(); node; node = node->Tree().TraverseNext()) {
+    if (LocalFrame* local_frame_node = DynamicTo<LocalFrame>(node)) {
+      local_frame_node->history_user_activation_state_.Consume();
+    }
+  }
 }
 
 namespace {
@@ -3167,8 +3183,8 @@ void LocalFrame::AdvanceFocusForIME(mojom::blink::FocusType focus_type) {
     return;
 
   Element* next_element =
-      GetPage()->GetFocusController().NextFocusableElementForIME(element,
-                                                                 focus_type);
+      GetPage()->GetFocusController().NextFocusableElementForImeAndAutofill(
+          element, focus_type);
   if (!next_element)
     return;
 

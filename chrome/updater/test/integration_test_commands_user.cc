@@ -176,21 +176,12 @@ class IntegrationTestCommandsUser : public IntegrationTestCommands {
     updater::test::RunWakeActive(updater_scope_, exit_code);
   }
 
-// TODO(crbug.com/1396103): remove this `#if` once mojo interface changes are
-// done in separate CL.
-#if BUILDFLAG(IS_WIN)
   void Update(const std::string& app_id,
               const std::string& install_data_index,
               bool do_update_check_only) const override {
     updater::test::Update(updater_scope_, app_id, install_data_index,
                           do_update_check_only);
   }
-#else   // BUILDFLAG(IS_WIN)
-  void Update(const std::string& app_id,
-              const std::string& install_data_index) const override {
-    updater::test::Update(updater_scope_, app_id, install_data_index);
-  }
-#endif  // BUILDFLAG(IS_WIN)
 
   void UpdateAll() const override { updater::test::UpdateAll(updater_scope_); }
 
@@ -276,12 +267,12 @@ class IntegrationTestCommandsUser : public IntegrationTestCommands {
             UpdateService::PolicySameVersionUpdate::kAllowed);
   }
 
-  void SetupFakeLegacyUpdaterData() const override {
-    updater::test::SetupFakeLegacyUpdaterData(updater_scope_);
+  void SetupFakeLegacyUpdater() const override {
+    updater::test::SetupFakeLegacyUpdater(updater_scope_);
   }
 
-  void ExpectLegacyUpdaterDataMigrated() const override {
-    updater::test::ExpectLegacyUpdaterDataMigrated(updater_scope_);
+  void ExpectLegacyUpdaterMigrated() const override {
+    updater::test::ExpectLegacyUpdaterMigrated(updater_scope_);
   }
 
   void RunRecoveryComponent(const std::string& app_id,

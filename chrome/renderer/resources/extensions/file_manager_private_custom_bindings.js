@@ -249,6 +249,12 @@ apiBridge.registerCustomHook(function(bindingsAPI) {
             sourceUrls, callback);
       });
 
+  apiFunctions.setHandleRequest('getDriveQuotaMetadata', function(
+        entry, callback) {
+    var url = getEntryURL(entry);
+    fileManagerPrivateInternal.getDriveQuotaMetadata(url, callback);
+  });
+
   apiFunctions.setHandleRequest(
       'zipSelection',
       (entries, parentEntry, destName, callback) =>
@@ -407,12 +413,10 @@ apiBridge.registerCustomHook(function(bindingsAPI) {
         const urls = entries.map(entry => getEntryURL(entry));
         fileManagerPrivateInternal.parseTrashInfoFiles(
             urls, function(entryDescriptions) {
-              // Convert the restoreEntry to a DirectoryEntry and the deletion
-              // date to a JS Date.
+              // Convert the restoreEntry to a DirectoryEntry.
               callback(entryDescriptions.map(description => {
                 description.restoreEntry =
                     GetExternalFileEntry(description.restoreEntry);
-                description.deletionDate = new Date(description.deletionDate);
                 return description;
               }));
             });

@@ -63,6 +63,8 @@
   E_CPONLY(kColorDownloadShelfForeground) \
   E_CPONLY(kColorDownloadStartedAnimationForeground) \
   E_CPONLY(kColorDownloadToolbarButtonActive) \
+  E_CPONLY(kColorDownloadToolbarButtonAnimationBackground) \
+  E_CPONLY(kColorDownloadToolbarButtonAnimationForeground) \
   E_CPONLY(kColorDownloadToolbarButtonInactive) \
   E_CPONLY(kColorDownloadToolbarButtonRingBackground) \
   /* Extension colors. */ \
@@ -311,6 +313,7 @@
   E_CPONLY(kColorSidePanelBadgeBackgroundUpdated) \
   E_CPONLY(kColorSidePanelBadgeForeground) \
   E_CPONLY(kColorSidePanelBadgeForegroundUpdated) \
+  E_CPONLY(kColorSidePanelCardBackground) \
   E_CPONLY(kColorSidePanelContentAreaSeparator) \
   E_CPONLY(kColorSidePanelContentBackground) \
   E_CPONLY(kColorSidePanelFilterChipBorder) \
@@ -319,6 +322,7 @@
   E_CPONLY(kColorSidePanelFilterChipIcon) \
   E_CPONLY(kColorSidePanelFilterChipIconSelected) \
   E_CPONLY(kColorSidePanelFilterChipBackgroundSelected) \
+  E_CPONLY(kColorSidePanelTextfieldBorder) \
   /* Status bubble colors. */ \
   E_CPONLY(kColorStatusBubbleBackgroundFrameActive) \
   E_CPONLY(kColorStatusBubbleBackgroundFrameInactive) \
@@ -482,7 +486,23 @@
   E_CPONLY(kColorWebUiTabStripTabWaitingSpinning) \
   /* Window control button background colors. */ \
   E_CPONLY(kColorWindowControlButtonBackgroundActive) \
-  E_CPONLY(kColorWindowControlButtonBackgroundInactive)
+  E_CPONLY(kColorWindowControlButtonBackgroundInactive) \
+  /* Read Anything colors. */ \
+  E_CPONLY(kColorReadAnythingBackground) \
+  E_CPONLY(kColorReadAnythingBackgroundBlue) \
+  E_CPONLY(kColorReadAnythingBackgroundDark) \
+  E_CPONLY(kColorReadAnythingBackgroundLight) \
+  E_CPONLY(kColorReadAnythingBackgroundYellow) \
+  E_CPONLY(kColorReadAnythingForeground) \
+  E_CPONLY(kColorReadAnythingForegroundBlue) \
+  E_CPONLY(kColorReadAnythingForegroundDark) \
+  E_CPONLY(kColorReadAnythingForegroundLight) \
+  E_CPONLY(kColorReadAnythingForegroundYellow) \
+  E_CPONLY(kColorReadAnythingSeparator) \
+  E_CPONLY(kColorReadAnythingSeparatorBlue) \
+  E_CPONLY(kColorReadAnythingSeparatorDark) \
+  E_CPONLY(kColorReadAnythingSeparatorLight) \
+  E_CPONLY(kColorReadAnythingSeparatorYellow) \
 
 #if BUILDFLAG(IS_CHROMEOS)
 #define CHROME_PLATFORM_SPECIFIC_COLOR_IDS \

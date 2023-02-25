@@ -108,6 +108,7 @@
 #include "services/network/public/cpp/network_switches.h"
 #include "services/network/public/cpp/parsed_headers.h"
 #include "services/network/public/cpp/simple_host_resolver.h"
+#include "services/network/public/mojom/clear_data_filter.mojom.h"
 #include "services/network/public/mojom/network_context.mojom-forward.h"
 #include "services/network/public/mojom/network_context.mojom.h"
 #include "services/network/public/mojom/reporting_service.mojom.h"
@@ -777,7 +778,8 @@ void NetworkContext::OnComputedFirstPartySetMetadata(
       std::make_unique<RestrictedCookieManager>(
           role, url_request_context_->cookie_store(),
           cookie_manager_->cookie_settings(), origin, isolation_info,
-          std::move(cookie_observer), std::move(first_party_set_metadata)),
+          std::move(cookie_observer), std::move(first_party_set_metadata),
+          network_service_->metrics_updater()),
       std::move(receiver));
 }
 

@@ -27,12 +27,12 @@
 <translation id="1201402288615127009">Дараагийнх</translation>
 <translation id="1209796539517632982">Автомат нэрийн серверүүд</translation>
 <translation id="1210831758834677569">Лао</translation>
+<translation id="1221555006497674479">Хадгалах сан бага байна. Таны <ph name="TOTAL_SPACE" />-н дундын драйвын хадгалах сангаас <ph name="REMAINING_PERCENTAGE" />% үлдсэн байна.</translation>
 <translation id="1243314992276662751">Байршуул</translation>
 <translation id="1249250836236328755">Төрөл</translation>
 <translation id="1254593899333212300">Интернетийн шууд холболт</translation>
 <translation id="1272293450992660632">ПИН кодын утга таарахгүй байна.</translation>
 <translation id="1280820357415527819">Мобайл сүлжээг хайж байна</translation>
-<translation id="1291603679744561561">SIM-г түгжсэн</translation>
 <translation id="1293556467332435079">Файлууд</translation>
 <translation id="1297922636971898492">Google Drive одоогоор боломжгүй байна. Google Drive ажиллаж эхлэхэд байршуулалт автоматиар эхэлнэ.</translation>
 <translation id="1307931752636661898">Linux-н файлуудыг харах боломжгүй байна</translation>
@@ -59,7 +59,6 @@
 <translation id="1499943022354839699">Dvorak гартай англи (АНУ)</translation>
 <translation id="1515909359182093592"><ph name="INPUT_LABEL" /> - хост</translation>
 <translation id="1521655867290435174">Google Хүснэгт</translation>
-<translation id="1521795806314479294"><ph name="FILE_NAME" />-г бэлтгэж байна...</translation>
 <translation id="1538729222189715449">Linux-н файлуудыг нээж байна...</translation>
 <translation id="1547964879613821194">Канадын Англи хэл</translation>
 <translation id="1556189134700913550">Бүгдэд хамааруулах</translation>
@@ -75,6 +74,7 @@
 <translation id="1641780993263690097">Хятад пиньинь</translation>
 <translation id="1646019627374511909"><ph name="NUMBER_OF_ITEMS" /> файлыг офлайнаар ашиглах боломжтой болгож байна</translation>
 <translation id="164969095109328410">Chrome төхөөрөмж</translation>
+<translation id="1661207570040737402">Та Google Workspace-н дундын драйвын хадгалах сангаа бүгдийг нь ашигласан байна.</translation>
 <translation id="1661867754829461514">ПИН байхгүй байна</translation>
 <translation id="166439687370499867">Хуваалцсан сүлжээний тохиргоог өөрчлөх боломжгүй</translation>
 <translation id="1665611772925418501">Энэ файлыг өөрчилж чадсангүй.</translation>
@@ -84,7 +84,6 @@
 <translation id="1722487484194605434"><ph name="NUMBER_OF_ITEMS" /> зүйлийг zip хийж байна...</translation>
 <translation id="1722687688096767818">Профайл нэмж байна...</translation>
 <translation id="1726100011689679555">Нэрийн сервер</translation>
-<translation id="1727562178154619254">Синк хийхэд бэлэн</translation>
 <translation id="1729953886957086472">Герман (Герман)</translation>
 <translation id="1730235522912993863">Хятад Цанцзе</translation>
 <translation id="1731889557567069540"><ph name="NUMBER_OF_ITEMS" /> зүйлийг хуулсан.</translation>
@@ -194,6 +193,7 @@
 <translation id="2574327434504608656">Bruschetta-тай 1 фолдер хуваалцсан</translation>
 <translation id="2578394532502990878">Тамил авиа зүй</translation>
 <translation id="2579959351793446050">Одиа</translation>
+<translation id="2587195714949534472"><ph name="FILE_NAME" />-г синк хийхээр бэлтгэж байна...</translation>
 <translation id="2602810353103180630"><ph name="NETWORK_COUNT" />-н <ph name="NETWORK_INDEX" />-р сүлжээ, <ph name="NETWORK_NAME" />, <ph name="CONNECTION_STATUS" />, Дохионы хүч <ph name="SIGNAL_STRENGTH" />%, Танай администратор блоклосон, Дэлгэрэнгүй</translation>
 <translation id="2614589611416690597"><ph name="VIDEO_TYPE" /> видео</translation>
 <translation id="2620090360073999360">Google Drive-д одоогоор хандаж болохгүй байна.</translation>
@@ -295,6 +295,7 @@
 <translation id="3486821258960016770">Монгол</translation>
 <translation id="3495304270784461826"><ph name="COUNT" /> алдаа.</translation>
 <translation id="3509680540198371098">Сүлжээ: <ph name="NETWORK_COUNT" />-н <ph name="NETWORK_INDEX" />, <ph name="NETWORK_NAME" />, <ph name="SECURITY_STATUS" />, <ph name="CONNECTION_STATUS" />, дохионы хүч <ph name="SIGNAL_STRENGTH" />%, дэлгэрэнгүй мэдээлэл</translation>
+<translation id="3511705761158917664"><ph name="NUMBER_OF_ITEMS" /> зүйлийг синк хийхээр бэлтгэж байна...</translation>
 <translation id="3522708245912499433">Португал</translation>
 <translation id="3524311639100184459">Анхааруулга: Эдгээр файл нь түр зуурын файлууд бөгөөд дискийн зайг чөлөөлөхийн тулд автоматаар устгаж болно.  <ph name="BEGIN_LINK" />Нэмэлт мэдээлэл авах<ph name="END_LINK" /></translation>
 <translation id="3527085408025491307">Хавтас</translation>
@@ -350,11 +351,11 @@
 <translation id="3924145049010392604">Мета</translation>
 <translation id="3943857333388298514">Хуулан буулгах</translation>
 <translation id="3952872973865944257">Тэлүгү авиа зүй</translation>
-<translation id="3954354850384043518">Боловсруулж байна</translation>
 <translation id="3958548648197196644">Киви</translation>
 <translation id="3971140002794351170">Мобайл профайл татах, <ph name="NETWORK_COUNT" />-н <ph name="NETWORK_INDEX" /> сүлжээ, <ph name="NETWORK_NAME" />, <ph name="NETWORK_PROVIDER_NAME" /></translation>
 <translation id="3973925058222872294">Англи (UK)</translation>
 <translation id="3975895378829046965">Бенгал авиа зүй</translation>
+<translation id="3999574733850440202">Саяхан нээсэн Microsoft файлуудыг OneDrive руу зөөсөн</translation>
 <translation id="4002066346123236978">Гарчиг</translation>
 <translation id="4017788180641807848">Workman гартай англи (АНУ)</translation>
 <translation id="4019998208269143058">Шуурхай файлуудад бэхлэх</translation>
@@ -511,7 +512,6 @@
 <translation id="5159383109919732130"><ph name="BEGIN_BOLD" /> Та өөрийн төхөөрөмжийг бүү салгана уу! <ph name="END_BOLD" /> <ph name="LINE_BREAKS" /> Хэрэв та өөрийн төхөөрөмжийг ашиглаж байхдаа гэнэт салгасан тохиолдолд төхөөрөмж дээр хадгалагдаж буй мэдээллийнхээ тодорхой хэсгийг алдах магадлалтай. Тиймээс холбогдох үйлдлийг хийж дуусах хүртэл түр хүлээнэ үү. Файлтай холбоотой апп ашигласны дараагаар төхөөрөмжийг салгана уу.</translation>
 <translation id="5163869187418756376">Хуваалцах ажиллагаа амжилтгүй боллоо. Холболтоо шалгаад, дараа дахин оролдож үзнэ үү.</translation>
 <translation id="516592729076796170">US Programmer Dvorak</translation>
-<translation id="5167102019886320507"><ph name="NUMBER_OF_ITEMS" /> зүйлийг бэлтгэж байна...</translation>
 <translation id="5177526793333269655">Хажуугийн талбарт жижгээр харах</translation>
 <translation id="5181896909298187506">Саяхны файл байхгүй байна</translation>
 <translation id="5194713942430106590">Баганыг өсөх дарааллаар эрэмбэлэхийн тулд товшино уу.</translation>
@@ -790,6 +790,7 @@
 <translation id="7458955835361612701">Саяхны зураг байхгүй байна</translation>
 <translation id="7460898608667578234">Украйн</translation>
 <translation id="7469894403370665791">Автоматаар энэ сүлжээ рүү холбогдох</translation>
+<translation id="7481358317100446445">Бэлэн</translation>
 <translation id="7486315294984620427">Parallels Desktop-д файлууд буулгахын тулд файлыг Windows-н файлуудад хуулсан байх ёстой.</translation>
 <translation id="749452993132003881">Хирагана</translation>
 <translation id="7495372004724182530">Малайлам авиа зүй</translation>
@@ -827,6 +828,7 @@
 <translation id="7724603315864178912">Хайчлах</translation>
 <translation id="7732111077498238432">Сүлжээг удирдамжаар хянадаг</translation>
 <translation id="7736003208887389532">Эдгээр файлыг бүрмөсөн устгах уу?</translation>
+<translation id="7740287852186792672">Хайлтын үр дүн</translation>
 <translation id="7748626145866214022">Үйлдлийн талбар хэсэгт илүү их сонголт боломжтой байна. Үйлдлийн талбарыг чиглүүлэхийн тулд Alt + A дарна уу.</translation>
 <translation id="7760449188139285140">Хятад вуби</translation>
 <translation id="7765158879357617694">Зөөх</translation>
@@ -878,6 +880,7 @@
 <translation id="8116072619078571545">Мөстэй ус</translation>
 <translation id="8128733386027980860">Dvorak гартай англи (ИБ)</translation>
 <translation id="8137331602592933310">"<ph name="FILENAME" />" Тантай хуваалцагдсан байна. Та энэ файлыг эзэмшдэггүй учраас устгах боломжгүй.</translation>
+<translation id="8138705869659070104">Төхөөрөмж тохируулаад идэвхжүүл</translation>
 <translation id="813913629614996137">Эхлүүлж байна…</translation>
 <translation id="8147028810663464959">Тэмдэгтүүдийн өргөн бүтэн байна</translation>
 <translation id="8151638057146502721">Тохируулах</translation>
@@ -903,6 +906,7 @@
 <translation id="8300849813060516376">OTASP амжилтгүй болсон</translation>
 <translation id="8312871300878166382">Хавтас руу наах</translation>
 <translation id="8329978297633540474">Энгийн текст</translation>
+<translation id="8332007959299458842">Саяхан нээсэн Microsoft файлуудыг Google Драйв руу зөөсөн</translation>
 <translation id="8335587457941836791">Програмын жагсаалтын эхэнд байрлуулахыг болих</translation>
 <translation id="8335837413233998004">Беларусь</translation>
 <translation id="8336153091935557858">Өчигдөр <ph name="YESTERDAY_DAYTIME" /></translation>
@@ -990,6 +994,7 @@
 <translation id="9046895021617826162">Холболт амжилтгүй боллоо</translation>
 <translation id="9065512565307033593">Хэрэв та баталгаажуулж чадаагүй бол таны сүлжээний хандалтыг идэвхгүй болгоно.</translation>
 <translation id="908378762078012445">AATSEEL авиа зүйн гартай орос</translation>
+<translation id="9086302186042011942">Sync хийж байна.</translation>
 <translation id="9099674669267916096">Хуудасны тоо</translation>
 <translation id="9100610230175265781">Нэвтрэх үг шаардлагатай</translation>
 <translation id="9110990317705400362">Бид таны веб хөтчийг илүү аюулгүй болгох аргыг үргэлж хайж байдаг. Өмнө нь ямар ч вебсайт таны веб хөтчид өргөтгөл нэмэхийг таниас хүсэж болдог байсан. Google Chrome-ийн сүүлийн үеийн хувилбаруудын тусламжтай та эдгээр өргөтгөлүүдийг Өргөтгөлийн хуудсанд нэмсэнээр суурьлуулж болох сонголтыг Chrome-д хийж болно. <ph name="BEGIN_LINK" />Дэлгэрэнгүй мэдээллийг<ph name="END_LINK" /></translation>

@@ -44,6 +44,8 @@ class COMPONENT_EXPORT(CC_SLIM) SurfaceLayer : public Layer {
   void SetOldestAcceptableFallback(const viz::SurfaceId& surface_id);
   const absl::optional<viz::SurfaceId>& oldest_acceptable_fallback() const;
 
+  void SetLayerTree(LayerTree* layer_tree) override;
+
  private:
   explicit SurfaceLayer(scoped_refptr<cc::SurfaceLayer> cc_layer);
   ~SurfaceLayer() override;
@@ -52,7 +54,10 @@ class COMPONENT_EXPORT(CC_SLIM) SurfaceLayer : public Layer {
   void SetSurfaceRange(const viz::SurfaceRange& surface_range);
 
   // Layer implementation.
-  bool HasDrawableContent() const override;
+  void AppendQuads(viz::CompositorRenderPass& render_pass,
+                   FrameData& data,
+                   const gfx::Transform& transform,
+                   const gfx::Rect* clip) override;
 
   bool stretch_content_to_fill_bounds_ = false;
   viz::SurfaceRange surface_range_;

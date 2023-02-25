@@ -8,6 +8,9 @@
 #include <XInput.h>
 #include <winerror.h>
 
+#include <utility>
+#include <vector>
+
 #include "base/containers/fixed_flat_map.h"
 #include "base/containers/flat_map.h"
 #include "base/containers/span.h"
@@ -168,12 +171,6 @@ class WgiDataFetcherWinTest : public DeviceServiceTestBase {
             []() { return &MockXInputGetCapabilitiesFunc; }));
     XInputDataFetcherWin::OverrideXInputGetStateExFuncForTesting(
         base::BindLambdaForTesting([]() { return &MockXInputGetStateExFunc; }));
-    // Given that the XInputEnable function has been deprecated in Win10, let's
-    // make it return a nullptr.
-    XInputDataFetcherWin::OverrideXInputEnableFuncForTesting(
-        base::BindLambdaForTesting(
-            []() { return (XInputDataFetcherWin::XInputEnableFunc) nullptr; }));
-
     // The callbacks should return a nullptr for each point of failure.
     switch (error_code) {
       case WgiTestErrorCode::kNullXInputGetCapabilitiesPointer:
@@ -194,7 +191,6 @@ class WgiDataFetcherWinTest : public DeviceServiceTestBase {
   }
 
   void SetUpTestEnv(WgiTestErrorCode error_code = WgiTestErrorCode::kOk) {
-    EXPECT_TRUE(base::win::ScopedHString::ResolveCoreWinRTStringDelayload());
     wgi_environment_ = std::make_unique<FakeWinrtWgiEnvironment>(error_code);
     SetUpXInputEnv(error_code);
     auto fetcher = std::make_unique<WgiDataFetcherWin>();

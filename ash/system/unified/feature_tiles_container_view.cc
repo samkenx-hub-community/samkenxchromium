@@ -242,7 +242,7 @@ void FeatureTilesContainerView::OnWillChangeFocus(views::View* before,
 
 void FeatureTilesContainerView::OnDidChangeFocus(views::View* before,
                                                  views::View* now) {
-  if (!now || !views::IsViewClass<FeatureTile>(now)) {
+  if (!now || !views::IsViewClass<FeatureTile>(now) || !Contains(now)) {
     return;
   }
 
@@ -275,6 +275,21 @@ void FeatureTilesContainerView::UpdateTotalPages() {
                     (total_rows % displayable_rows_ ? 1 : 0);
   pagination_model_->SetTotalPages(total_pages);
   pagination_model_->SelectPage(0, false /*animate*/);
+}
+
+int FeatureTilesContainerView::GetVisibleFeatureTileCount() const {
+  int count = 0;
+  for (PageContainer* page : pages_) {
+    for (auto* row : page->children()) {
+      for (views::View* child : row->children()) {
+        DCHECK(views::IsViewClass<FeatureTile>(child));
+        if (child->GetVisible()) {
+          ++count;
+        }
+      }
+    }
+  }
+  return count;
 }
 
 BEGIN_METADATA(FeatureTilesContainerView, views::View)

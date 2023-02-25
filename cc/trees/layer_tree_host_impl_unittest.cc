@@ -5761,6 +5761,9 @@ TEST_P(ScrollUnifiedLayerTreeHostImplTest, ScrollHitTestOnScrollbar) {
   UpdateDrawProperties(host_impl_->active_tree());
   host_impl_->active_tree()->DidBecomeActive();
 
+  bool unification_enabled =
+      base::FeatureList::IsEnabled(features::kScrollUnification);
+
   // Wheel scroll on root scrollbar should process on impl thread.
   {
     InputHandler::ScrollStatus status = GetInputHandler().ScrollBegin(
@@ -5772,15 +5775,20 @@ TEST_P(ScrollUnifiedLayerTreeHostImplTest, ScrollHitTestOnScrollbar) {
     GetInputHandler().ScrollEnd();
   }
 
-  // Touch scroll on root scrollbar should process on main thread.
+  // Touch scroll on root scrollbar should process on impl thread
+  // (main thread pre-unification).
   {
     InputHandler::ScrollStatus status = GetInputHandler().ScrollBegin(
         BeginState(gfx::Point(1, 1), gfx::Vector2dF(),
                    ui::ScrollInputType::kTouchscreen)
             .get(),
         ui::ScrollInputType::kTouchscreen);
-    EXPECT_EQ(ScrollThread::SCROLL_ON_MAIN_THREAD, status.thread);
-    EXPECT_EQ(MainThreadScrollingReason::kScrollbarScrolling,
+    EXPECT_EQ(unification_enabled ? ScrollThread::SCROLL_ON_IMPL_THREAD
+                                  : ScrollThread::SCROLL_ON_MAIN_THREAD,
+              status.thread);
+    EXPECT_EQ(unification_enabled
+                  ? MainThreadScrollingReason::kNotScrollingOnMain
+                  : MainThreadScrollingReason::kScrollbarScrolling,
               status.main_thread_scrolling_reasons);
   }
 
@@ -5797,15 +5805,20 @@ TEST_P(ScrollUnifiedLayerTreeHostImplTest, ScrollHitTestOnScrollbar) {
     GetInputHandler().ScrollEnd();
   }
 
-  // Touch scroll on scrollbar should process on main thread.
+  // Touch scroll on scrollbar should process on impl thread
+  // (main thread pre-unification).
   {
     InputHandler::ScrollStatus status = GetInputHandler().ScrollBegin(
         BeginState(gfx::Point(51, 51), gfx::Vector2dF(),
                    ui::ScrollInputType::kTouchscreen)
             .get(),
         ui::ScrollInputType::kTouchscreen);
-    EXPECT_EQ(ScrollThread::SCROLL_ON_MAIN_THREAD, status.thread);
-    EXPECT_EQ(MainThreadScrollingReason::kScrollbarScrolling,
+    EXPECT_EQ(unification_enabled ? ScrollThread::SCROLL_ON_IMPL_THREAD
+                                  : ScrollThread::SCROLL_ON_MAIN_THREAD,
+              status.thread);
+    EXPECT_EQ(unification_enabled
+                  ? MainThreadScrollingReason::kNotScrollingOnMain
+                  : MainThreadScrollingReason::kScrollbarScrolling,
               status.main_thread_scrolling_reasons);
   }
 }
@@ -13819,7 +13832,6 @@ TEST_P(ScrollUnifiedLayerTreeHostImplTest, ScrollAnimatedUpdateInnerViewport) {
 TEST_P(ScrollUnifiedLayerTreeHostImplTest,
        FadedOutPaintedOverlayScrollbarHitTest) {
   LayerTreeSettings settings = DefaultSettings();
-  settings.compositor_threaded_scrollbar_scrolling = true;
   CreateHostImpl(settings, CreateLayerTreeFrameSink());
 
   // Setup the viewport.
@@ -13885,7 +13897,6 @@ TEST_P(ScrollUnifiedLayerTreeHostImplTest,
 // Tests that no scrolls occur when thumb_len equals track_len.
 TEST_P(ScrollUnifiedLayerTreeHostImplTest, ScrollOnLargeThumb) {
   LayerTreeSettings settings = DefaultSettings();
-  settings.compositor_threaded_scrollbar_scrolling = true;
   CreateHostImpl(settings, CreateLayerTreeFrameSink());
 
   // Setup the viewport.
@@ -13945,7 +13956,6 @@ TEST_P(ScrollUnifiedLayerTreeHostImplTest, ScrollOnLargeThumb) {
 // for the vertical scrollbar.
 TEST_P(ScrollUnifiedLayerTreeHostImplTest, AutoscrollOnDeletedScrollbar) {
   LayerTreeSettings settings = DefaultSettings();
-  settings.compositor_threaded_scrollbar_scrolling = true;
   CreateHostImpl(settings, CreateLayerTreeFrameSink());
 
   // Setup the viewport.
@@ -14045,7 +14055,6 @@ TEST_P(ScrollUnifiedLayerTreeHostImplTest, AutoscrollOnDeletedScrollbar) {
 // ScrollbarController.
 TEST_P(ScrollUnifiedLayerTreeHostImplTest, PointerMoveOutOfSequence) {
   LayerTreeSettings settings = DefaultSettings();
-  settings.compositor_threaded_scrollbar_scrolling = true;
   CreateHostImpl(settings, CreateLayerTreeFrameSink());
 
   // Setup the viewport.
@@ -14119,7 +14128,6 @@ TEST_P(ScrollUnifiedLayerTreeHostImplTest, PointerMoveOutOfSequence) {
 // This tests that faded-out Mac scrollbars can't be interacted with.
 TEST_P(ScrollUnifiedLayerTreeHostImplTest, FadedOutPaintedScrollbarHitTest) {
   LayerTreeSettings settings = DefaultSettings();
-  settings.compositor_threaded_scrollbar_scrolling = true;
   CreateHostImpl(settings, CreateLayerTreeFrameSink());
 
   // Setup the viewport.
@@ -14169,7 +14177,6 @@ TEST_P(ScrollUnifiedLayerTreeHostImplTest, FadedOutPaintedScrollbarHitTest) {
 TEST_P(ScrollUnifiedLayerTreeHostImplTest,
        SingleGSUForScrollbarThumbDragPerFrame) {
   LayerTreeSettings settings = DefaultSettings();
-  settings.compositor_threaded_scrollbar_scrolling = true;
   CreateHostImpl(settings, CreateLayerTreeFrameSink());
 
   // Setup the viewport.
@@ -14389,7 +14396,6 @@ TEST_F(LayerTreeHostImplTest, FrameCounterNotReset) {
 // the same frame.
 TEST_F(LayerTreeHostImplTest, AutoscrollTaskAbort) {
   LayerTreeSettings settings = DefaultSettings();
-  settings.compositor_threaded_scrollbar_scrolling = true;
   CreateHostImpl(settings, CreateLayerTreeFrameSink());
 
   // Setup the viewport.
@@ -14462,7 +14468,6 @@ TEST_F(LayerTreeHostImplTest, AutoscrollTaskAbort) {
 // Tests that the ScrollbarController handles jump clicks.
 TEST_F(LayerTreeHostImplTest, JumpOnScrollbarClick) {
   LayerTreeSettings settings = DefaultSettings();
-  settings.compositor_threaded_scrollbar_scrolling = true;
   CreateHostImpl(settings, CreateLayerTreeFrameSink());
 
   // Setup the viewport.
@@ -14562,7 +14567,6 @@ TEST_F(LayerTreeHostImplTest, JumpOnScrollbarClick) {
 // populated.
 TEST_P(ScrollUnifiedLayerTreeHostImplTest, ThumbDragAfterJumpClick) {
   LayerTreeSettings settings = DefaultSettings();
-  settings.compositor_threaded_scrollbar_scrolling = true;
   CreateHostImpl(settings, CreateLayerTreeFrameSink());
 
   // Setup the viewport.
@@ -14642,7 +14646,6 @@ TEST_P(ScrollUnifiedLayerTreeHostImplTest, ThumbDragAfterJumpClick) {
 TEST_P(ScrollUnifiedLayerTreeHostImplTest,
        AbortAnimatedScrollBeforeStartingAutoscroll) {
   LayerTreeSettings settings = DefaultSettings();
-  settings.compositor_threaded_scrollbar_scrolling = true;
   CreateHostImpl(settings, CreateLayerTreeFrameSink());
 
   // Setup the viewport.
@@ -14730,7 +14733,6 @@ TEST_P(ScrollUnifiedLayerTreeHostImplTest,
 // a mousewheel) wants to animate the scroll offset.
 TEST_P(ScrollUnifiedLayerTreeHostImplTest, AnimatedScrollYielding) {
   LayerTreeSettings settings = DefaultSettings();
-  settings.compositor_threaded_scrollbar_scrolling = true;
   CreateHostImpl(settings, CreateLayerTreeFrameSink());
 
   // Setup the viewport.
@@ -14836,7 +14838,6 @@ TEST_P(ScrollUnifiedLayerTreeHostImplTest, AnimatedScrollYielding) {
 // cause the scroller to jump.
 TEST_P(ScrollUnifiedLayerTreeHostImplTest, ThumbDragScrollerLengthIncrease) {
   LayerTreeSettings settings = DefaultSettings();
-  settings.compositor_threaded_scrollbar_scrolling = true;
   CreateHostImpl(settings, CreateLayerTreeFrameSink());
 
   // Setup the viewport.
@@ -14934,7 +14935,6 @@ TEST_P(ScrollUnifiedLayerTreeHostImplTest, ThumbDragScrollerLengthIncrease) {
 
 TEST_P(ScrollUnifiedLayerTreeHostImplTest, MainThreadFallback) {
   LayerTreeSettings settings = DefaultSettings();
-  settings.compositor_threaded_scrollbar_scrolling = true;
   CreateHostImpl(settings, CreateLayerTreeFrameSink());
 
   // Setup the viewport.
@@ -14974,15 +14974,22 @@ TEST_P(ScrollUnifiedLayerTreeHostImplTest, MainThreadFallback) {
   EXPECT_EQ(compositor_threaded_scrolling_result.scroll_delta.y(), 525u);
   EXPECT_FALSE(GetScrollNode(scroll_layer)->main_thread_scrolling_reasons);
 
-  // If the scroll_node has a main_thread_scrolling_reason, the
-  // InputHandlerPointerResult should return a zero offset. This will cause the
-  // main thread to handle the scroll.
+  // Assign a main_thread_scrolling_reason to the scroll node.
   GetScrollNode(scroll_layer)->main_thread_scrolling_reasons =
       MainThreadScrollingReason::kThreadedScrollingDisabled;
   compositor_threaded_scrolling_result = GetInputHandler().MouseDown(
       gfx::PointF(350, 500), /*jump_key_modifier*/ false);
   GetInputHandler().MouseUp(gfx::PointF(350, 500));
-  EXPECT_EQ(compositor_threaded_scrolling_result.scroll_delta.y(), 0u);
+  if (base::FeatureList::IsEnabled(features::kScrollUnification)) {
+    // After unification, a scrollbar layer track click applies the scroll on
+    // the compositor thread even though it has a main thread scrolling reason.
+    EXPECT_EQ(compositor_threaded_scrolling_result.scroll_delta.y(), 525u);
+  } else {
+    // If the scroll_node has a main_thread_scrolling_reason, the
+    // InputHandlerPointerResult should return a zero offset. This will cause
+    // the main thread to handle the scroll.
+    EXPECT_EQ(compositor_threaded_scrolling_result.scroll_delta.y(), 0u);
+  }
 
   // Tear down the LayerTreeHostImpl before the InputHandlerClient.
   host_impl_->ReleaseLayerTreeFrameSink();

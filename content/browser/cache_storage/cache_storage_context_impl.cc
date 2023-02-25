@@ -125,7 +125,8 @@ void CacheStorageContextImpl::AddReceiver(
         bucket_locator.id, base::SequencedTaskRunner::GetCurrentDefault(),
         std::move(add_receiver));
   } else {
-    std::move(add_receiver).Run(storage::QuotaError::kNotFound);
+    std::move(add_receiver)
+        .Run(base::unexpected(storage::QuotaError::kNotFound));
   }
 }
 
@@ -156,10 +157,10 @@ void CacheStorageContextImpl::ApplyPolicyUpdates(
   for (const auto& update : policy_updates) {
     if (!update->purge_on_shutdown)
       storage_keys_to_purge_on_shutdown_.erase(
-          blink::StorageKey(update->origin));
+          blink::StorageKey::CreateFirstParty(update->origin));
     else
       storage_keys_to_purge_on_shutdown_.insert(
-          blink::StorageKey(std::move(update->origin)));
+          blink::StorageKey::CreateFirstParty(std::move(update->origin)));
   }
 }
 
@@ -174,8 +175,8 @@ void CacheStorageContextImpl::AddReceiverWithBucketInfo(
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
 
   const absl::optional<storage::BucketLocator> bucket =
-      result.ok() ? absl::make_optional(result->ToBucketLocator())
-                  : absl::nullopt;
+      result.has_value() ? absl::make_optional(result->ToBucketLocator())
+                         : absl::nullopt;
 
   dispatcher_host_->AddReceiver(cross_origin_embedder_policy,
                                 std::move(coep_reporter), storage_key, bucket,

@@ -123,6 +123,11 @@ if (toolchain_has_rust) {
       # related to the Rust standard library, we ensure libstd.rlib is first.
       "--depfile-target",
       stdlib_files[0],
+
+      # Create a dependency on the rustc version so this action is re-run when
+      # it changes. This argument is not actually read by the script.
+      "--rustc-revision",
+      rustc_revision,
     ]
 
     if (!use_unverified_rust_toolchain) {
@@ -223,6 +228,14 @@ if (toolchain_has_rust) {
     foreach(lib, stdlib_files) {
       this_file = "$out_libdir/lib$lib.rlib"
       ldflags += [ this_file ]
+    }
+    if (is_win) {
+      # Our C++ builds already link against a wide variety of Windows API import libraries,
+      # but the Rust stdlib requires a few extra.
+      ldflags += [
+        "bcrypt.lib",
+        "userenv.lib",
+      ]
     }
   }
 

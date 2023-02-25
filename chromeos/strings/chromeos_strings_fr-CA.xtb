@@ -16,6 +16,7 @@
 <translation id="1128128132059598906">EAP-TTLS</translation>
 <translation id="1145018782460575098">La fenêtre de mise à jour du micrologiciel pour les appareils externes est ouverte. <ph name="NUM_UPDATES" /> mises à jour disponibles.</translation>
 <translation id="1145516343487477149">Trouvez des articles d'aide et des réponses aux questions courantes relatives au Chromebook</translation>
+<translation id="1167755866710282443">Ouvrez le menu pour personnaliser les clés. Faites glisser le menu pour le déplacer.</translation>
 <translation id="1175697296044146566">Ce <ph name="DEVICE_TYPE" /> est géré par <ph name="MANAGER" />.</translation>
 <translation id="1175951029573070619">Moyen (<ph name="SIGNAL_STRENGTH" />)</translation>
 <translation id="1181037720776840403">Supprimer</translation>
@@ -326,6 +327,7 @@
 <translation id="4110686435123617899">Sélectionner un album <ph name="TITLE" /> <ph name="DESC" /></translation>
 <translation id="4111761024568264522">Pavé tactile USB</translation>
 <translation id="4117637339509843559">Mode sombre</translation>
+<translation id="4130035430755296270">Continuez à pointer pour plus d'options de mise en page</translation>
 <translation id="4131410914670010031">Noir et blanc</translation>
 <translation id="4145784616224233563">Pare-feu HTTP</translation>
 <translation id="4147897805161313378">Google Photos</translation>
@@ -414,6 +416,7 @@
 <translation id="484790837831576105">Résolution DNS (Android)</translation>
 <translation id="4848429997038228357">EXÉCUTION EN COURS…</translation>
 <translation id="4854586501323951986">Écran tactile intégré</translation>
+<translation id="4855250849489639581">Balayer vers le bas pour plus d'options de mise en page</translation>
 <translation id="4861758251032006121">{ATTEMPTS_LEFT,plural, =1{<ph name="ERROR_MESSAGE" /> Il reste {0} tentative}one{<ph name="ERROR_MESSAGE" /> Il reste {0} tentative}other{<ph name="ERROR_MESSAGE" /> Il reste {0} tentatives}}</translation>
 <translation id="4873827928179867585">Algorithme d'authentification</translation>
 <translation id="4880328057631981605">Nom du point d'accès</translation>
@@ -517,6 +520,7 @@
 <translation id="576835345334454681">Augmenter la luminosité de l'écran</translation>
 <translation id="57838592816432529">Désactiver le son</translation>
 <translation id="5784136236926853061">Latence HTTP élevée</translation>
+<translation id="5826644637650799838">À propos du fond d'écran</translation>
 <translation id="5832805196449965646">Ajouter une personne</translation>
 <translation id="583281660410589416">Inconnu</translation>
 <translation id="5843706793424741864">Fahrenheit</translation>
@@ -673,6 +677,7 @@
 <translation id="7172721935181587524">1 image</translation>
 <translation id="7177485034254901881">Ce <ph name="DEVICE_TYPE" /> est géré par <ph name="MANAGER" />. Les administrateurs peuvent configurer l'appareil à distance.</translation>
 <translation id="7180611975245234373">Actualiser</translation>
+<translation id="7180865173735832675">Personnaliser</translation>
 <translation id="7212734716605298123">Mises à jour du micrologiciel pour les appareils externes</translation>
 <translation id="7216409898977639127">Fournisseur cellulaire</translation>
 <translation id="725133483556299729">Sélectionner un courriel</translation>
@@ -744,6 +749,7 @@
 <translation id="7881066108824108340">DNS</translation>
 <translation id="7882358943899516840">Type de fournisseur</translation>
 <translation id="7882501334836096755">Clé publique</translation>
+<translation id="78957024357676568">gauche</translation>
 <translation id="7915220255123750251">Gérez les paramètres de NPA du réseau. Les NPA établissent une connexion entre un réseau cellulaire et Internet.</translation>
 <translation id="7936303884198020182">Aucun serveur de nom n'a été trouvé</translation>
 <translation id="7942349550061667556">Rouge</translation>
@@ -775,6 +781,7 @@
 <translation id="8226628635270268143">Sélectionner vos photos et vos albums préférés</translation>
 <translation id="8227119283605456246">Joindre un fichier</translation>
 <translation id="8230672074305416752">Impossible d'effectuer un ping avec la passerelle réseau par défaut</translation>
+<translation id="8242426110754782860">Continuer</translation>
 <translation id="8246209727385807362">Opérateur inconnu</translation>
 <translation id="827422111966801947">Indigo</translation>
 <translation id="8286154143153872371">Veuillez vous connecter au réseau et actualiser la page pour afficher le fond d'écran.</translation>
@@ -852,6 +859,7 @@
 <translation id="8930622219860340959">Sans fil</translation>
 <translation id="8936793075252196307">Adresse IP du client</translation>
 <translation id="894617464444543719">L'appareil est un téléphone.</translation>
+<translation id="8957423540740801332">droite</translation>
 <translation id="8968751544471797276">Vitesse de recharge</translation>
 <translation id="8970109610781093811">Exécuter de nouveau</translation>
 <translation id="8983038754672563810">HSPA</translation>

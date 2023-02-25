@@ -51,7 +51,14 @@ class DeskApiExtensionManagerFactory : public ProfileKeyedServiceFactory {
 };
 
 DeskApiExtensionManagerFactory::DeskApiExtensionManagerFactory()
-    : ProfileKeyedServiceFactory("DeskApiExtensionManager") {}
+    : ProfileKeyedServiceFactory(
+          "DeskApiExtensionManager",
+          ProfileSelections::Builder()
+              .WithRegular(ProfileSelection::kOriginalOnly)
+              // TODO(crbug.com/1418376): Check if this service is needed in
+              // Guest mode.
+              .WithGuest(ProfileSelection::kOriginalOnly)
+              .Build()) {}
 
 DeskApiExtensionManagerFactory::~DeskApiExtensionManagerFactory() = default;
 
@@ -220,6 +227,11 @@ void DeskApiExtensionManager::RemoveExtensionIfInstalled() {
   if (delegate_->IsExtensionInstalled(component_loader_)) {
     delegate_->UninstallExtension(component_loader_);
   }
+}
+
+// static
+void DeskApiExtensionManager::EnsureFactoryBuilt() {
+  DeskApiExtensionManager::GetFactory();
 }
 
 }  // namespace chromeos

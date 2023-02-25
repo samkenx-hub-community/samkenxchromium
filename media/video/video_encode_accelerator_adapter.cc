@@ -19,7 +19,6 @@
 #include "base/trace_event/trace_event.h"
 #include "build/build_config.h"
 #include "gpu/ipc/common/gpu_memory_buffer_support.h"
-#include "media/base/bind_to_current_loop.h"
 #include "media/base/bitstream_buffer.h"
 #include "media/base/media_log.h"
 #include "media/base/svc_scalability_mode.h"
@@ -190,8 +189,9 @@ class VideoEncodeAcceleratorAdapter::GpuMemoryBufferVideoFramePool
     auto gmb = std::move(available_gmbs_.back());
     available_gmbs_.pop_back();
 
-    VideoFrame::ReleaseMailboxAndGpuMemoryBufferCB reuse_cb = BindToCurrentLoop(
-        base::BindOnce(&GpuMemoryBufferVideoFramePool::ReuseFrame, this));
+    VideoFrame::ReleaseMailboxAndGpuMemoryBufferCB reuse_cb =
+        base::BindPostTaskToCurrentDefault(
+            base::BindOnce(&GpuMemoryBufferVideoFramePool::ReuseFrame, this));
     const gpu::MailboxHolder kEmptyMailBoxes[media::VideoFrame::kMaxPlanes] =
         {};
     return VideoFrame::WrapExternalGpuMemoryBuffer(
@@ -279,8 +279,9 @@ class VideoEncodeAcceleratorAdapter::ReadOnlyRegionPool
     DCHECK(mapped_region->IsValid());
 
     return std::make_unique<Handle>(
-        std::move(mapped_region), BindToCurrentLoop(base::BindOnce(
-                                      &ReadOnlyRegionPool::ReuseBuffer, this)));
+        std::move(mapped_region),
+        base::BindPostTaskToCurrentDefault(
+            base::BindOnce(&ReadOnlyRegionPool::ReuseBuffer, this)));
   }
 
  private:
@@ -490,19 +491,19 @@ void VideoEncodeAcceleratorAdapter::InitializeInternalOnAcceleratorThread() {
 }
 
 void VideoEncodeAcceleratorAdapter::Encode(scoped_refptr<VideoFrame> frame,
-                                           bool key_frame,
+                                           const EncodeOptions& encode_options,
                                            EncoderStatusCB done_cb) {
   DCHECK(!accelerator_task_runner_->RunsTasksInCurrentSequence());
   accelerator_task_runner_->PostTask(
       FROM_HERE,
       base::BindOnce(&VideoEncodeAcceleratorAdapter::EncodeOnAcceleratorThread,
-                     base::Unretained(this), std::move(frame), key_frame,
+                     base::Unretained(this), std::move(frame), encode_options,
                      WrapCallback(std::move(done_cb))));
 }
 
 void VideoEncodeAcceleratorAdapter::EncodeOnAcceleratorThread(
     scoped_refptr<VideoFrame> frame,
-    bool key_frame,
+    const EncodeOptions& encode_options,
     EncoderStatusCB done_cb) {
   TRACE_EVENT1("media",
                "VideoEncodeAcceleratorAdapter::EncodeOnAcceleratorThread",
@@ -514,7 +515,7 @@ void VideoEncodeAcceleratorAdapter::EncodeOnAcceleratorThread(
     auto pending_encode = std::make_unique<PendingEncode>();
     pending_encode->done_callback = std::move(done_cb);
     pending_encode->frame = std::move(frame);
-    pending_encode->key_frame = key_frame;
+    pending_encode->options = encode_options;
     pending_encodes_.push_back(std::move(pending_encode));
     if (state_ == State::kWaitingForFirstFrame)
       InitializeInternalOnAcceleratorThread();
@@ -562,6 +563,7 @@ void VideoEncodeAcceleratorAdapter::EncodeOnAcceleratorThread(
 
   frame = std::move(result).value();
 
+  bool key_frame = encode_options.key_frame;
   if (last_frame_color_space_ != frame->ColorSpace()) {
     last_frame_color_space_ = frame->ColorSpace();
     key_frame = true;
@@ -913,7 +915,7 @@ void VideoEncodeAcceleratorAdapter::InitCompleted(EncoderStatus status) {
 
   // Send off the encodes that came in while we were waiting for initialization.
   for (auto& encode : pending_encodes_) {
-    EncodeOnAcceleratorThread(std::move(encode->frame), encode->key_frame,
+    EncodeOnAcceleratorThread(std::move(encode->frame), encode->options,
                               std::move(encode->done_callback));
   }
   pending_encodes_.clear();

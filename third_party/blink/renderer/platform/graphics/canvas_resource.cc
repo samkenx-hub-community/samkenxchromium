@@ -13,6 +13,7 @@
 #include "build/build_config.h"
 #include "components/viz/common/resources/bitmap_allocation.h"
 #include "components/viz/common/resources/resource_format_utils.h"
+#include "components/viz/common/resources/shared_image_format.h"
 #include "components/viz/common/resources/transferable_resource.h"
 #include "gpu/GLES2/gl2extchromium.h"
 #include "gpu/command_buffer/client/gpu_memory_buffer_manager.h"
@@ -452,8 +453,9 @@ CanvasResourceRasterSharedImage::CanvasResourceRasterSharedImage(
         surface_origin, surface_alpha_type, shared_image_usage_flags);
   } else {
     shared_image_mailbox = shared_image_interface->CreateSharedImage(
-        GetResourceFormat(), Size(), GetColorSpace(), surface_origin,
-        surface_alpha_type, shared_image_usage_flags, gpu::kNullSurfaceHandle);
+        viz::SharedImageFormat::SinglePlane(GetResourceFormat()), Size(),
+        GetColorSpace(), surface_origin, surface_alpha_type,
+        shared_image_usage_flags, gpu::kNullSurfaceHandle);
   }
 
   // Wait for the mailbox to be ready to be used.
@@ -1086,9 +1088,10 @@ CanvasResourceSwapChain::CanvasResourceSwapChain(
       context_provider_wrapper_->ContextProvider()->SharedImageInterface();
   DCHECK(sii);
   gpu::SharedImageInterface::SwapChainMailboxes mailboxes =
-      sii->CreateSwapChain(GetResourceFormat(), Size(), GetColorSpace(),
-                           kTopLeft_GrSurfaceOrigin, kPremul_SkAlphaType,
-                           usage);
+      sii->CreateSwapChain(
+          viz::SharedImageFormat::SinglePlane(GetResourceFormat()), Size(),
+          GetColorSpace(), kTopLeft_GrSurfaceOrigin, kPremul_SkAlphaType,
+          usage);
   back_buffer_mailbox_ = mailboxes.back_buffer;
   front_buffer_mailbox_ = mailboxes.front_buffer;
   sync_token_ = sii->GenVerifiedSyncToken();

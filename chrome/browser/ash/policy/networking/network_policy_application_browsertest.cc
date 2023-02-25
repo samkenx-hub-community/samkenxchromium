@@ -1299,6 +1299,9 @@ IN_PROC_BROWSER_TEST_F(NetworkPolicyApplicationTest,
                                   /*issuer_common_name=*/kCertIssuerCommonName,
                                   /*identity=*/kIdentityPolicyValue),
       /*wait_applied=*/true);
+  ServicePropertyValueWatcher(shill_service_client_test_, kServiceWifi1,
+                              shill::kEapCertIdProperty)
+      .WaitForNonEmptyValue();
 
   {
     const base::Value::Dict* wifi_service_properties =
@@ -1329,6 +1332,9 @@ IN_PROC_BROWSER_TEST_F(NetworkPolicyApplicationTest,
                                     ->username_hash();
   shill_profile_client_test_->AddProfile(kUserProfilePath, user_hash);
 
+  // Note that while a policy is used here that uses a ClientCertPattern, no
+  // client certificate is resolved (because no such certificate was imported).
+  // Still, the "user-specific variable" should be expanded.
   SetUserOpenNetworkConfiguration(
       user_hash,
       OncPolicyToSelectClientCert("{UserLevelWifiGuid}", "UserLevelWifiSsid",

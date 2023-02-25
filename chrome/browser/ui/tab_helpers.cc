@@ -80,7 +80,6 @@
 #include "chrome/browser/sync/sync_encryption_keys_tab_helper.h"
 #include "chrome/browser/tab_contents/navigation_metrics_recorder.h"
 #include "chrome/browser/translate/chrome_translate_client.h"
-#include "chrome/browser/ui/ash/google_one_offer_iph_tab_helper.h"
 #include "chrome/browser/ui/autofill/chrome_autofill_client.h"
 #include "chrome/browser/ui/find_bar/find_bar_state.h"
 #include "chrome/browser/ui/focus_tab_after_navigation_helper.h"
@@ -168,10 +167,14 @@
 #include "chrome/browser/preloading/prefetch/zero_suggest_prefetch/zero_suggest_prefetch_tab_helper.h"
 #include "chrome/browser/tab_contents/form_interaction_tab_helper.h"
 #include "chrome/browser/ui/bookmarks/bookmark_tab_helper.h"
+#include "chrome/browser/ui/commerce/price_tracking/shopping_list_ui_tab_helper.h"
 #include "chrome/browser/ui/intent_picker_tab_helper.h"
 #include "chrome/browser/ui/javascript_dialogs/javascript_tab_modal_dialog_manager_delegate_desktop.h"
 #include "chrome/browser/ui/sad_tab_helper.h"
 #include "chrome/browser/ui/search/search_tab_helper.h"
+#include "chrome/browser/ui/side_panel/customize_chrome/customize_chrome_tab_helper.h"
+#include "chrome/browser/ui/side_panel/customize_chrome/customize_chrome_utils.h"
+#include "chrome/browser/ui/side_panel/history_clusters/history_clusters_tab_helper.h"
 #include "chrome/browser/ui/sync/browser_synced_tab_delegate.h"
 #include "chrome/browser/ui/ui_features.h"
 #include "components/commerce/content/browser/hint/commerce_hint_tab_helper.h"
@@ -180,17 +183,15 @@
 #include "components/zoom/zoom_controller.h"
 #endif  // BUILDFLAG(IS_ANDROID)
 
-#if !BUILDFLAG(IS_ANDROID)
-#include "chrome/browser/ui/commerce/price_tracking/shopping_list_ui_tab_helper.h"
-#include "chrome/browser/ui/side_panel/customize_chrome/customize_chrome_tab_helper.h"
-#include "chrome/browser/ui/side_panel/customize_chrome/customize_chrome_utils.h"
-#endif  // !BUILDFLAG(IS_ANDROID)
-
 #if defined(TOOLKIT_VIEWS)
 #include "chrome/browser/page_info/about_this_site_service_factory.h"
 #include "chrome/browser/page_info/about_this_site_tab_helper.h"
 #include "chrome/browser/ui/side_search/side_search_tab_contents_helper.h"
 #include "chrome/browser/ui/side_search/side_search_utils.h"
+#endif
+
+#if BUILDFLAG(IS_CHROMEOS_ASH)
+#include "chrome/browser/ui/ash/google_one_offer_iph_tab_helper.h"
 #endif
 
 #if BUILDFLAG(IS_CHROMEOS_LACROS)
@@ -309,13 +310,6 @@ void TabHelpers::AttachTabHelpers(WebContents* web_contents) {
   }
 #endif
   autofill::ChromeAutofillClient::CreateForWebContents(web_contents);
-  autofill::ContentAutofillDriverFactory::CreateForWebContentsAndDelegate(
-      web_contents,
-      autofill::ChromeAutofillClient::FromWebContents(web_contents),
-      base::BindRepeating(
-          &autofill::BrowserDriverInitHook,
-          autofill::ChromeAutofillClient::FromWebContents(web_contents),
-          g_browser_process->GetApplicationLocale()));
   if (breadcrumbs::IsEnabled())
     BreadcrumbManagerTabHelper::CreateForWebContents(web_contents);
   chrome_browser_net::NetErrorTabHelper::CreateForWebContents(web_contents);
@@ -512,6 +506,9 @@ void TabHelpers::AttachTabHelpers(WebContents* web_contents) {
       permissions::UnusedSitePermissionsService::TabHelper::
           CreateForWebContents(web_contents, service);
     }
+  }
+  if (base::FeatureList::IsEnabled(ntp_features::kNtpHistoryClustersModule)) {
+    side_panel::HistoryClustersTabHelper::CreateForWebContents(web_contents);
   }
 #endif
 

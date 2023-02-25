@@ -28,12 +28,12 @@
 #include "components/attribution_reporting/filters.h"
 #include "components/attribution_reporting/source_registration.h"
 #include "components/attribution_reporting/source_registration_error.mojom.h"
+#include "components/attribution_reporting/source_type.mojom.h"
 #include "components/attribution_reporting/suitable_origin.h"
 #include "components/attribution_reporting/trigger_registration.h"
 #include "content/browser/attribution_reporting/attribution_config.h"
 #include "content/browser/attribution_reporting/attribution_data_host_manager.h"
 #include "content/browser/attribution_reporting/attribution_observer.h"
-#include "content/browser/attribution_reporting/attribution_source_type.h"
 #include "content/browser/attribution_reporting/attribution_trigger.h"
 #include "content/browser/attribution_reporting/rate_limit_result.h"
 #include "content/public/browser/attribution_data_model.h"
@@ -54,7 +54,9 @@ namespace content {
 
 namespace {
 
+using ::attribution_reporting::FilterPair;
 using ::attribution_reporting::SuitableOrigin;
+using ::attribution_reporting::mojom::SourceType;
 
 using ::testing::AllOf;
 using ::testing::Field;
@@ -396,11 +398,13 @@ void MockAttributionManager::NotifySourceRegistrationFailure(
     const std::string& header_value,
     const SuitableOrigin& source_origin,
     const SuitableOrigin& reporting_origin,
+    SourceType source_type,
     attribution_reporting::mojom::SourceRegistrationError error) {
   base::Time source_time = base::Time::Now();
   for (auto& observer : observers_) {
     observer.OnFailedSourceRegistration(header_value, source_time,
-                                        source_origin, reporting_origin, error);
+                                        source_origin, reporting_origin,
+                                        source_type, error);
   }
 }
 
@@ -530,7 +534,7 @@ SourceBuilder& SourceBuilder::SetReportingOrigin(SuitableOrigin origin) {
   return *this;
 }
 
-SourceBuilder& SourceBuilder::SetSourceType(AttributionSourceType source_type) {
+SourceBuilder& SourceBuilder::SetSourceType(SourceType source_type) {
   source_type_ = source_type;
   return *this;
 }
@@ -738,25 +742,24 @@ AttributionTrigger TriggerBuilder::Build(
   if (generate_event_trigger_data) {
     event_triggers.emplace_back(
         trigger_data_, priority_, dedup_key_,
-        /*filters=*/
-        attribution_reporting::Filters::ForSourceTypeForTesting(
-            AttributionSourceType::kNavigation),
-        /*not_filters=*/attribution_reporting::Filters());
+        FilterPair{.positive =
+                       attribution_reporting::Filters::ForSourceTypeForTesting(
+                           SourceType::kNavigation)});
 
     event_triggers.emplace_back(
         event_source_trigger_data_, priority_, dedup_key_,
-        /*filters=*/
-        attribution_reporting::Filters::ForSourceTypeForTesting(
-            AttributionSourceType::kEvent),
-        /*not_filters=*/attribution_reporting::Filters());
+        attribution_reporting::FilterPair{
+            .positive = attribution_reporting::Filters::ForSourceTypeForTesting(
+                SourceType::kEvent)});
   }
 
   return AttributionTrigger(
       reporting_origin_,
       attribution_reporting::TriggerRegistration(
-          /*filters=*/attribution_reporting::Filters(),
-          /*not_filters=*/attribution_reporting::Filters(), debug_key_,
-          aggregatable_dedup_key_,
+          FilterPair(), debug_key_,
+          *attribution_reporting::AggregatableDedupKeyList::Create(
+              {attribution_reporting::AggregatableDedupKey(
+                  /*dedup_key=*/aggregatable_dedup_key_, FilterPair())}),
           *attribution_reporting::EventTriggerDataList::Create(
               std::move(event_triggers)),
           *attribution_reporting::AggregatableTriggerDataList::Create(
@@ -1270,25 +1273,6 @@ std::ostream& operator<<(std::ostream& out, const SendResult& info) {
              << ",http_response_code=" << info.http_response_code << "}";
 }
 
-std::ostream& operator<<(std::ostream& out, StorableSource::Result status) {
-  switch (status) {
-    case StorableSource::Result::kSuccess:
-      return out << "success";
-    case StorableSource::Result::kInternalError:
-      return out << "internalError";
-    case StorableSource::Result::kInsufficientSourceCapacity:
-      return out << "insufficientSourceCapacity";
-    case StorableSource::Result::kInsufficientUniqueDestinationCapacity:
-      return out << "insufficientUniqueDestinationCapacity";
-    case StorableSource::Result::kExcessiveReportingOrigins:
-      return out << "excessiveReportingOrigins";
-    case StorableSource::Result::kProhibitedByBrowserPolicy:
-      return out << "prohibitedByBrowserPolicy";
-    case StorableSource::Result::kSuccessNoised:
-      return out << "successNoised";
-  }
-}
-
 std::ostream& operator<<(std::ostream& out,
                          const AttributionDataModel::DataKey& key) {
   return out << "{reporting_origin=" << key.reporting_origin() << "}";
@@ -1298,13 +1282,11 @@ EventTriggerDataMatcherConfig::EventTriggerDataMatcherConfig(
     ::testing::Matcher<uint64_t> data,
     ::testing::Matcher<int64_t> priority,
     ::testing::Matcher<absl::optional<uint64_t>> dedup_key,
-    ::testing::Matcher<const attribution_reporting::Filters&> filters,
-    ::testing::Matcher<const attribution_reporting::Filters&> not_filters)
+    ::testing::Matcher<const FilterPair&> filters)
     : data(std::move(data)),
       priority(std::move(priority)),
       dedup_key(std::move(dedup_key)),
-      filters(std::move(filters)),
-      not_filters(std::move(not_filters)) {}
+      filters(std::move(filters)) {}
 
 EventTriggerDataMatcherConfig::~EventTriggerDataMatcherConfig() = default;
 
@@ -1317,19 +1299,16 @@ EventTriggerDataMatches(const EventTriggerDataMatcherConfig& cfg) {
       Field("dedup_key", &attribution_reporting::EventTriggerData::dedup_key,
             cfg.dedup_key),
       Field("filters", &attribution_reporting::EventTriggerData::filters,
-            cfg.filters),
-      Field("not_filters",
-            &attribution_reporting::EventTriggerData::not_filters,
-            cfg.not_filters));
+            cfg.filters));
 }
 
 TriggerRegistrationMatcherConfig::TriggerRegistrationMatcherConfig(
-    ::testing::Matcher<const attribution_reporting::Filters&> filters,
-    ::testing::Matcher<const attribution_reporting::Filters&> not_filters,
+    ::testing::Matcher<const FilterPair&> filters,
     ::testing::Matcher<absl::optional<uint64_t>> debug_key,
     ::testing::Matcher<const attribution_reporting::EventTriggerDataList&>
         event_triggers,
-    ::testing::Matcher<absl::optional<uint64_t>> aggregatable_dedup_key,
+    ::testing::Matcher<const attribution_reporting::AggregatableDedupKeyList&>
+        aggregatable_dedup_keys,
     ::testing::Matcher<bool> debug_reporting,
     ::testing::Matcher<
         const attribution_reporting::AggregatableTriggerDataList&>
@@ -1339,10 +1318,9 @@ TriggerRegistrationMatcherConfig::TriggerRegistrationMatcherConfig(
     ::testing::Matcher<::aggregation_service::mojom::AggregationCoordinator>
         aggregation_coordinator)
     : filters(std::move(filters)),
-      not_filters(std::move(not_filters)),
       debug_key(std::move(debug_key)),
       event_triggers(std::move(event_triggers)),
-      aggregatable_dedup_key(std::move(aggregatable_dedup_key)),
+      aggregatable_dedup_keys(std::move(aggregatable_dedup_keys)),
       debug_reporting(std::move(debug_reporting)),
       aggregatable_trigger_data(std::move(aggregatable_trigger_data)),
       aggregatable_values(std::move(aggregatable_values)),
@@ -1355,17 +1333,15 @@ TriggerRegistrationMatches(const TriggerRegistrationMatcherConfig& cfg) {
   return AllOf(
       Field("filters", &attribution_reporting::TriggerRegistration::filters,
             cfg.filters),
-      Field("not_filters",
-            &attribution_reporting::TriggerRegistration::not_filters,
-            cfg.not_filters),
       Field("debug_key", &attribution_reporting::TriggerRegistration::debug_key,
             cfg.debug_key),
       Field("event_triggers",
             &attribution_reporting::TriggerRegistration::event_triggers,
             cfg.event_triggers),
-      Field("aggregatable_dedup_key",
-            &attribution_reporting::TriggerRegistration::aggregatable_dedup_key,
-            cfg.aggregatable_dedup_key),
+      Field(
+          "aggregatable_dedup_keys",
+          &attribution_reporting::TriggerRegistration::aggregatable_dedup_keys,
+          cfg.aggregatable_dedup_keys),
       Field("debug_reporting",
             &attribution_reporting::TriggerRegistration::debug_reporting,
             cfg.debug_reporting),
@@ -1465,9 +1441,7 @@ TriggerBuilder DefaultAggregatableTriggerBuilder(
     aggregatable_trigger_data.push_back(
         *attribution_reporting::AggregatableTriggerData::Create(
             absl::MakeUint128(/*high=*/i, /*low=*/0),
-            /*source_keys=*/{key_id},
-            /*filters=*/attribution_reporting::Filters(),
-            /*not_filters=*/attribution_reporting::Filters()));
+            /*source_keys=*/{key_id}, FilterPair()));
     aggregatable_values.emplace(std::move(key_id), histogram_values[i]);
   }
 

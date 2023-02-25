@@ -4,11 +4,12 @@
 
 import 'chrome://password-manager/password_manager.js';
 
-import {CheckupSubpage, CrExpandButtonElement, Page, PasswordManagerImpl, PrefsBrowserProxyImpl, Router} from 'chrome://password-manager/password_manager.js';
+import {CheckupSubpage, CrExpandButtonElement, OpenWindowProxyImpl, Page, PasswordCheckInteraction, PasswordManagerImpl, PrefsBrowserProxyImpl, Router} from 'chrome://password-manager/password_manager.js';
 import {loadTimeData} from 'chrome://resources/js/load_time_data.js';
 import {PluralStringProxyImpl} from 'chrome://resources/js/plural_string_proxy.js';
 import {assertEquals, assertFalse, assertTrue} from 'chrome://webui-test/chai_assert.js';
 import {flushTasks} from 'chrome://webui-test/polymer_test_util.js';
+import {TestOpenWindowProxy} from 'chrome://webui-test/test_open_window_proxy.js';
 import {TestPluralStringProxy} from 'chrome://webui-test/test_plural_string_proxy.js';
 import {isVisible} from 'chrome://webui-test/test_util.js';
 
@@ -19,12 +20,15 @@ import {createCredentialGroup, makeInsecureCredential, makePasswordManagerPrefs}
 suite('CheckupDetailsSectionTest', function() {
   const CompromiseType = chrome.passwordsPrivate.CompromiseType;
 
+  let openWindowProxy: TestOpenWindowProxy;
   let passwordManager: TestPasswordManagerProxy;
   let pluralString: TestPluralStringProxy;
   let prefsProxy: TestPrefsBrowserProxy;
 
   setup(function() {
     document.body.innerHTML = window.trustedTypes!.emptyHTML;
+    openWindowProxy = new TestOpenWindowProxy();
+    OpenWindowProxyImpl.setInstance(openWindowProxy);
     passwordManager = new TestPasswordManagerProxy();
     PasswordManagerImpl.setInstance(passwordManager);
     pluralString = new TestPluralStringProxy();
@@ -502,5 +506,291 @@ suite('CheckupDetailsSectionTest', function() {
     assertTrue(!!muteButton);
     assertTrue(isVisible(muteButton));
     assertTrue(muteButton.disabled);
+  });
+
+  [CheckupSubpage.COMPROMISED, CheckupSubpage.REUSED, CheckupSubpage.WEAK]
+      .forEach(
+          type => test(`Change password click for ${type}`, async function() {
+            Router.getInstance().navigateTo(Page.CHECKUP_DETAILS, type);
+
+            const insecureCredential = makeInsecureCredential({
+              id: Math.floor(Math.random() * 1000),
+              url: 'test.com',
+              username: 'viking',
+              types: [
+                CompromiseType.LEAKED,
+                CompromiseType.WEAK,
+                CompromiseType.REUSED,
+              ],
+            });
+            passwordManager.data.insecureCredentials = [insecureCredential];
+            passwordManager.data.credentialWithReusedPassword =
+                [{entries: [insecureCredential]}];
+
+            const section = document.createElement('checkup-details-section');
+            document.body.appendChild(section);
+            await passwordManager.whenCalled('getInsecureCredentials');
+            if (type === CheckupSubpage.REUSED) {
+              await passwordManager.whenCalled(
+                  'getCredentialsWithReusedPassword');
+            }
+            await pluralString.whenCalled('getPluralString');
+            await flushTasks();
+
+            const listItemElements =
+                section.shadowRoot!.querySelectorAll('checkup-list-item');
+            assertEquals(1, listItemElements.length);
+            assertTrue(!!listItemElements[0]);
+            assertTrue(isVisible(listItemElements[0]));
+
+
+            // Verify that 'Already change password?' link is hidden.
+            const alreadyChange =
+                listItemElements[0].shadowRoot!.querySelector<HTMLElement>(
+                    '#alreadyChanged');
+            assertTrue(!!alreadyChange);
+            assertTrue(alreadyChange.hidden);
+
+            const changePassword =
+                listItemElements[0].shadowRoot!.querySelector<HTMLElement>(
+                    '#changePasswordButton');
+            assertTrue(!!changePassword);
+
+            changePassword.click();
+            const url = await openWindowProxy.whenCalled('openUrl');
+            assertEquals(url, insecureCredential.changePasswordUrl);
+            await flushTasks();
+
+            // Verify that 'Already change password?' link is visible.
+            assertFalse(alreadyChange.hidden);
+          }));
+
+  [CheckupSubpage.COMPROMISED, CheckupSubpage.REUSED, CheckupSubpage.WEAK]
+      .forEach(
+          type => test(`Change password in app for ${type}`, async function() {
+            Router.getInstance().navigateTo(Page.CHECKUP_DETAILS, type);
+
+            const insecureCredential = makeInsecureCredential({
+              url: 'test.com',
+              username: 'viking',
+              types: [
+                CompromiseType.LEAKED,
+                CompromiseType.WEAK,
+                CompromiseType.REUSED,
+              ],
+            });
+            insecureCredential.changePasswordUrl = undefined;
+            passwordManager.data.insecureCredentials = [insecureCredential];
+            passwordManager.data.credentialWithReusedPassword =
+                [{entries: [insecureCredential]}];
+
+            const section = document.createElement('checkup-details-section');
+            document.body.appendChild(section);
+            await passwordManager.whenCalled('getInsecureCredentials');
+            if (type === CheckupSubpage.REUSED) {
+              await passwordManager.whenCalled(
+                  'getCredentialsWithReusedPassword');
+            }
+            await pluralString.whenCalled('getPluralString');
+            await flushTasks();
+
+            const listItemElements =
+                section.shadowRoot!.querySelectorAll('checkup-list-item');
+            assertEquals(1, listItemElements.length);
+            assertTrue(!!listItemElements[0]);
+            assertTrue(isVisible(listItemElements[0]));
+
+            // Verify that 'Change password' button is hidden.
+            const changePassword =
+                listItemElements[0].shadowRoot!.querySelector(
+                    '#changePasswordButton');
+            assertFalse(!!changePassword);
+
+            const changeInAppString =
+                listItemElements[0].shadowRoot!.querySelector(
+                    '#changePasswordInApp');
+            assertTrue(!!changeInAppString);
+            assertTrue(isVisible(changeInAppString));
+            assertEquals(
+                loadTimeData.getString('changePasswordInApp'),
+                changeInAppString.textContent?.trim());
+          }));
+
+  test('Edit action button works', async function() {
+    Router.getInstance().navigateTo(
+        Page.CHECKUP_DETAILS, CheckupSubpage.COMPROMISED);
+    const credential = makeInsecureCredential({
+      id: 0,
+      url: 'test.com',
+      username: 'viking',
+      types: [
+        CompromiseType.LEAKED,
+      ],
+    });
+    credential.affiliatedDomains =
+        [{name: 'test.com', url: 'https://test.com/'}];
+    passwordManager.data.insecureCredentials = [credential];
+
+    const section = document.createElement('checkup-details-section');
+    document.body.appendChild(section);
+    await passwordManager.whenCalled('getInsecureCredentials');
+    await flushTasks();
+
+    const listItem = section.shadowRoot!.querySelector('checkup-list-item');
+    assertTrue(!!listItem);
+
+    // Click more actions button.
+    listItem.$.more.click();
+    // Set up response for requestCredentialsDetails() to simulate successful
+    // reauth.
+    passwordManager.setRequestCredentialsDetailsResponse([credential]);
+
+    section.$.menuEditPassword.click();
+    await passwordManager.whenCalled('requestCredentialsDetails');
+    await flushTasks();
+
+    const editDialog =
+        listItem.shadowRoot!.querySelector('edit-password-dialog');
+    assertTrue(!!editDialog);
+    assertTrue(editDialog.$.dialog.open);
+  });
+
+  test('No edit if auth failed', async function() {
+    Router.getInstance().navigateTo(
+        Page.CHECKUP_DETAILS, CheckupSubpage.COMPROMISED);
+    const credential = makeInsecureCredential({
+      id: 0,
+      url: 'test.com',
+      username: 'viking',
+      types: [
+        CompromiseType.LEAKED,
+      ],
+    });
+    credential.affiliatedDomains =
+        [{name: 'test.com', url: 'https://test.com/'}];
+    passwordManager.data.insecureCredentials = [credential];
+
+    const section = document.createElement('checkup-details-section');
+    document.body.appendChild(section);
+    await passwordManager.whenCalled('getInsecureCredentials');
+    await flushTasks();
+
+    const listItem = section.shadowRoot!.querySelector('checkup-list-item');
+    assertTrue(!!listItem);
+
+    // Click more actions button.
+    listItem.$.more.click();
+
+    section.$.menuEditPassword.click();
+    await passwordManager.whenCalled('requestCredentialsDetails');
+    await flushTasks();
+
+    const editDialog =
+        listItem.shadowRoot!.querySelector('edit-password-dialog');
+    assertFalse(!!editDialog);
+  });
+
+  test('Edit dialog shown during already change flow', async function() {
+    Router.getInstance().navigateTo(
+        Page.CHECKUP_DETAILS, CheckupSubpage.COMPROMISED);
+    const credential = makeInsecureCredential({
+      id: 0,
+      url: 'test.com',
+      username: 'viking',
+      types: [
+        CompromiseType.LEAKED,
+      ],
+    });
+    credential.affiliatedDomains =
+        [{name: 'test.com', url: 'https://test.com/'}];
+    passwordManager.data.insecureCredentials = [credential];
+
+    const section = document.createElement('checkup-details-section');
+    document.body.appendChild(section);
+    await passwordManager.whenCalled('getInsecureCredentials');
+    await flushTasks();
+
+    const listItem = section.shadowRoot!.querySelector('checkup-list-item');
+    assertTrue(!!listItem);
+
+    // Click 'Change password'
+    const changePassword = listItem.shadowRoot!.querySelector<HTMLElement>(
+        '#changePasswordButton');
+    assertTrue(!!changePassword);
+    changePassword.click();
+
+    // Click 'Already change password?'
+    const alreadyChange =
+        listItem.shadowRoot!.querySelector<HTMLElement>('#alreadyChanged');
+    assertTrue(!!alreadyChange);
+    alreadyChange.click();
+    await flushTasks();
+
+    // Verify edit disclaimer dialog is shown.
+    const editDisclaimer =
+        listItem.shadowRoot!.querySelector('edit-password-disclaimer-dialog');
+    assertTrue(!!editDisclaimer);
+    assertTrue(editDisclaimer.$.dialog.open);
+
+    // Set up response for requestCredentialsDetails() to simulate successful
+    // reauth and click 'Edit'.
+    passwordManager.setRequestCredentialsDetailsResponse([credential]);
+    editDisclaimer.$.edit.click();
+
+    await passwordManager.whenCalled('requestCredentialsDetails');
+    await flushTasks();
+
+    const editDialog =
+        listItem.shadowRoot!.querySelector('edit-password-dialog');
+    assertTrue(!!editDialog);
+    assertTrue(editDialog.$.dialog.open);
+  });
+
+  test('Delete insecure password', async function() {
+    Router.getInstance().navigateTo(
+        Page.CHECKUP_DETAILS, CheckupSubpage.COMPROMISED);
+    const credential = makeInsecureCredential({
+      id: 0,
+      url: 'test.com',
+      username: 'viking',
+      types: [
+        CompromiseType.LEAKED,
+      ],
+    });
+    credential.affiliatedDomains =
+        [{name: 'test.com', url: 'https://test.com/'}];
+    passwordManager.data.insecureCredentials = [credential];
+
+    const section = document.createElement('checkup-details-section');
+    document.body.appendChild(section);
+    await passwordManager.whenCalled('getInsecureCredentials');
+    await flushTasks();
+
+    const listItem = section.shadowRoot!.querySelector('checkup-list-item');
+    assertTrue(!!listItem);
+
+    // Click more actions button.
+    listItem.$.more.click();
+
+    section.$.menuDeletePassword.click();
+    await flushTasks();
+
+    const deleteDialog =
+        listItem.shadowRoot!.querySelector('delete-password-disclaimer-dialog');
+    assertTrue(!!deleteDialog);
+    assertTrue(deleteDialog.$.dialog.open);
+
+    // Change password URL gets linkified.
+    assertTrue(isVisible(deleteDialog.$.link));
+    assertFalse(isVisible(deleteDialog.$.text));
+
+    // Click 'Delete password'.
+    deleteDialog.$.delete.click();
+    const interaction =
+        await passwordManager.whenCalled('recordPasswordCheckInteraction');
+    const params = await passwordManager.whenCalled('removeSavedPassword');
+    assertEquals(params.id, credential.id);
+    assertEquals(params.fromStores, credential.storedIn);
+    assertEquals(PasswordCheckInteraction.REMOVE_PASSWORD, interaction);
   });
 });

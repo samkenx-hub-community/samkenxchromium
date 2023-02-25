@@ -33,10 +33,23 @@ bool ShellFederatedPermissionContext::ShouldCompleteRequestImmediately() const {
   return switches::IsRunWebTestsSwitchPresent();
 }
 
-// FederatedIdentityAutoSigninPermissionContextDelegate
-bool ShellFederatedPermissionContext::HasAutoSigninPermission() {
-  return auto_signin_permission_;
+// FederatedIdentityAutoReauthnPermissionContextDelegate
+bool ShellFederatedPermissionContext::HasAutoReauthnContentSetting() {
+  return auto_reauthn_permission_;
 }
+
+bool ShellFederatedPermissionContext::IsAutoReauthnEmbargoed(
+    const url::Origin& relying_party_embedder) {
+  return false;
+}
+
+base::Time ShellFederatedPermissionContext::GetAutoReauthnEmbargoStartTime(
+    const url::Origin& relying_party_embedder) {
+  return base::Time();
+}
+
+void ShellFederatedPermissionContext::RecordDisplayAndEmbargo(
+    const url::Origin& relying_party_embedder) {}
 
 void ShellFederatedPermissionContext::AddIdpSigninStatusObserver(
     IdpSigninStatusObserver* observer) {}

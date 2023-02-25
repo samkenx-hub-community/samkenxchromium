@@ -287,6 +287,7 @@ void SetFlags(IsolateHolder::ScriptMode mode,
   SetV8FlagsIfOverridden(features::kV8Maglev, "--maglev", "--no-maglev");
   SetV8FlagsIfOverridden(features::kV8Sparkplug, "--sparkplug",
                          "--no-sparkplug");
+  SetV8FlagsIfOverridden(features::kV8Turbofan, "--turbofan", "--no-turbofan");
   SetV8FlagsIfOverridden(features::kV8ConcurrentSparkplug,
                          "--concurrent-sparkplug", "--no-concurrent-sparkplug");
   SetV8FlagsIfOverridden(features::kV8SparkplugNeedsShortBuiltinCalls,
@@ -321,7 +322,9 @@ void SetFlags(IsolateHolder::ScriptMode mode,
       base::FeatureList::IsEnabled(
           features::kV8SlowHistogramsCodeMemoryWriteProtection) ||
       base::FeatureList::IsEnabled(features::kV8SlowHistogramsSparkplug) ||
-      base::FeatureList::IsEnabled(features::kV8SlowHistogramsSparkplugAndroid);
+      base::FeatureList::IsEnabled(
+          features::kV8SlowHistogramsSparkplugAndroid) ||
+      base::FeatureList::IsEnabled(features::kV8SlowHistogramsNoTurbofan);
   if (any_slow_histograms_alias) {
     SetV8Flags("--slow-histograms");
   } else {
@@ -344,6 +347,9 @@ void SetFlags(IsolateHolder::ScriptMode mode,
   SetV8FlagsIfOverridden(features::kJavaScriptStringIsWellFormed,
                          "--harmony-string-is-well-formed",
                          "--no-harmony-string-is-well-formed");
+  SetV8FlagsIfOverridden(features::kJavaScriptRegExpUnicodeSets,
+                         "--harmony-regexp-unicode-sets",
+                         "--no-harmony-regexp-unicode-sets");
 
   if (IsolateHolder::kStrictMode == mode) {
     SetV8Flags("--use_strict");

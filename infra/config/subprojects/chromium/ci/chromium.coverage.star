@@ -22,16 +22,16 @@ luci.gitiles_poller(
 )
 
 ci.defaults.set(
-    builder_group = "chromium.coverage",
     executable = ci.DEFAULT_EXECUTABLE,
-    cores = 32,
+    builder_group = "chromium.coverage",
     pool = ci.DEFAULT_POOL,
-    service_account = ci.DEFAULT_SERVICE_ACCOUNT,
+    cores = 32,
+    ssd = True,
     execution_timeout = 20 * time.hour,
     priority = ci.DEFAULT_FYI_PRIORITY,
-    ssd = True,
     reclient_instance = reclient.instance.DEFAULT_TRUSTED,
     reclient_jobs = reclient.jobs.DEFAULT,
+    service_account = ci.DEFAULT_SERVICE_ACCOUNT,
 )
 
 consoles.console_view(
@@ -148,7 +148,7 @@ coverage_builder(
             short_name = "x64",
         ),
         consoles.console_view_entry(
-            branch_selector = branches.MAIN,
+            branch_selector = branches.selector.MAIN,
             console_view = "sheriff.fuchsia",
             category = "fyi|x64",
             short_name = "cov",
@@ -179,7 +179,6 @@ coverage_builder(
     ),
     cores = None,
     os = os.MAC_DEFAULT,
-    xcode = xcode.x14main,
     console_view_entry = [
         consoles.console_view_entry(
             category = "ios",
@@ -190,6 +189,7 @@ coverage_builder(
     coverage_test_types = ["overall", "unit"],
     export_coverage_to_zoss = True,
     use_clang_coverage = True,
+    xcode = xcode.x14main,
 )
 
 coverage_builder(
@@ -224,7 +224,6 @@ coverage_builder(
     use_clang_coverage = True,
 )
 
-# this builder is still experimental, so we do not export_coverage_to_zoss.
 coverage_builder(
     name = "linux-js-code-coverage",
     builder_spec = builder_config.builder_spec(
@@ -249,8 +248,23 @@ coverage_builder(
             short_name = "js",
         ),
     ],
+    export_coverage_to_zoss = True,
     reclient_jobs = reclient.jobs.HIGH_JOBS_FOR_CI,
     use_javascript_coverage = True,
+)
+
+# Experimental builder. Does not export_coverage_to_zoss.
+coverage_builder(
+    name = "linux-fuzz-coverage",
+    executable = "recipe:chromium_fuzz_coverage",
+    builderless = True,
+    os = os.LINUX_DEFAULT,
+    console_view_entry = [
+        consoles.console_view_entry(
+            category = "linux-fuzz",
+            short_name = "lnx-fuzz",
+        ),
+    ],
 )
 
 coverage_builder(

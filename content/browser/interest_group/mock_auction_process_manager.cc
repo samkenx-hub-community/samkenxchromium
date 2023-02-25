@@ -148,7 +148,9 @@ void MockBidderWorklet::ConnectDevToolsAgent(
 void MockBidderWorklet::FinishGenerateBid(
     const absl::optional<std::string>& auction_signals_json,
     const absl::optional<std::string>& per_buyer_signals_json,
-    const absl::optional<base::TimeDelta> per_buyer_timeout) {
+    const absl::optional<base::TimeDelta> per_buyer_timeout,
+    const absl::optional<GURL>& direct_from_seller_per_buyer_signals,
+    const absl::optional<GURL>& direct_from_seller_auction_signals) {
   // per_buyer_timeout passed to GenerateBid() should not be empty, because
   // auction_config's all_buyers_timeout (which is the key of '*' in
   // perBuyerTimeouts) is set in the AuctionRunnerTest.
@@ -173,6 +175,15 @@ void MockBidderWorklet::WaitForGenerateBid() {
   }
 }
 
+void MockBidderWorklet::SetBidderTrustedSignalsFetchLatency(
+    base::TimeDelta delta) {
+  trusted_signals_fetch_latency_ = delta;
+}
+
+void MockBidderWorklet::SetBiddingLatency(base::TimeDelta delta) {
+  bidding_latency_ = delta;
+}
+
 void MockBidderWorklet::InvokeGenerateBidCallback(
     absl::optional<double> bid,
     const GURL& render_url,
@@ -189,7 +200,7 @@ void MockBidderWorklet::InvokeGenerateBidCallback(
   base::RunLoop run_loop;
   generate_bid_client_->OnBiddingSignalsReceived(
       /*priority_vector=*/{},
-      /*trusted_signals_fetch_duration=*/base::TimeDelta(),
+      /*trusted_signals_fetch_latency=*/trusted_signals_fetch_latency_,
       run_loop.QuitClosure());
   run_loop.Run();
 
@@ -206,7 +217,7 @@ void MockBidderWorklet::InvokeGenerateBidCallback(
         base::flat_map<std::string,
                        auction_worklet::mojom::PrioritySignalsDoublePtr>(),
         /*pa_requests=*/std::move(pa_requests),
-        /*bidding_duration=*/base::TimeDelta(),
+        /*bidding_latency=*/bidding_latency_,
         /*errors=*/std::vector<std::string>());
     return;
   }
@@ -224,7 +235,7 @@ void MockBidderWorklet::InvokeGenerateBidCallback(
       base::flat_map<std::string,
                      auction_worklet::mojom::PrioritySignalsDoublePtr>(),
       /*pa_requests=*/std::move(pa_requests),
-      /*bidding_duration=*/base::TimeDelta(),
+      /*bidding_latency=*/bidding_latency_,
       /*errors=*/std::vector<std::string>());
 }
 

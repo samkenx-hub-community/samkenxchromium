@@ -24,7 +24,6 @@
 #include "base/time/time.h"
 #include "chrome/browser/ash/accessibility/accessibility_manager.h"
 #include "chrome/browser/ash/authpolicy/authpolicy_helper.h"
-#include "chrome/browser/ash/login/easy_unlock/easy_unlock_service.h"
 #include "chrome/browser/ash/login/hats_unlock_survey_trigger.h"
 #include "chrome/browser/ash/login/helper.h"
 #include "chrome/browser/ash/login/lock/views_screen_locker.h"
@@ -331,8 +330,6 @@ void ScreenLocker::OnAuthSuccess(const UserContext& user_context) {
       quick_unlock_storage->pin_storage_prefs()->ResetUnlockAttemptCount();
       quick_unlock_storage->fingerprint_storage()->ResetUnlockAttemptCount();
     }
-
-    UserSessionManager::GetInstance()->UpdateEasyUnlockKeys(user_context);
   } else {
     NOTREACHED() << "Logged in user not found.";
   }
@@ -847,10 +844,7 @@ bool ScreenLocker::IsUserLoggedIn(const AccountId& account_id) const {
   return false;
 }
 
-void ScreenLocker::OnRestarted() {
-  StartFingerprintAuthSession(
-      user_manager::UserManager::Get()->GetPrimaryUser());
-}
+void ScreenLocker::OnRestarted() {}
 
 void ScreenLocker::OnStatusChanged(
     device::mojom::BiometricsManagerStatus status) {

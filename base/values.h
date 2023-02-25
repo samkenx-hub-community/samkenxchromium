@@ -747,14 +747,6 @@ class BASE_EXPORT GSL_OWNER Value {
   // Deprecated: Prefer `Value::Dict::Remove()`.
   bool RemoveKey(StringPiece key);
 
-  // This attempts to extract the value associated with `key`. In case of
-  // failure, e.g. the key does not exist, nullopt is returned and the
-  // underlying dictionary is not changed. In case of success, `key` is deleted
-  // from the dictionary and the method returns the extracted Value.
-  //
-  // DEPRECATED: Prefer `Value::Dict::Extract()`.
-  absl::optional<Value> ExtractKey(StringPiece key);
-
   // Searches a hierarchy of dictionary values for a given value. If a path
   // of dictionaries exist, returns the item at that path. If any of the path
   // components do not exist or if any but the last path components are not
@@ -844,18 +836,6 @@ class BASE_EXPORT GSL_OWNER Value {
   // DEPRECATED: Use `Value::Dict::SetByDottedPath()`.
   Value* SetPath(std::initializer_list<StringPiece> path, Value&& value);
   Value* SetPath(span<const StringPiece> path, Value&& value);
-
-  // Tries to remove a Value at the given path.
-  //
-  // If the current value is not a dictionary or any path component does not
-  // exist, this operation fails, leaves underlying Values untouched and returns
-  // `false`. In case intermediate dictionaries become empty as a result of this
-  // path removal, they will be removed as well.
-  // Note: If there is only one component in the path, use `RemoveKey()`
-  // instead.
-  //
-  // DEPRECATED: Use `Value::Dict::RemoveByDottedPath()`.
-  bool RemovePath(StringPiece path);
 
   using dict_iterator_proxy = detail::dict_iterator_proxy;
   using const_dict_iterator_proxy = detail::const_dict_iterator_proxy;

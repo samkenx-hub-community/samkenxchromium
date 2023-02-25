@@ -414,8 +414,6 @@ void WebFrameWidgetImpl::DragTargetDragOver(
 void WebFrameWidgetImpl::DragTargetDragLeave(
     const gfx::PointF& point_in_viewport,
     const gfx::PointF& screen_point) {
-  DCHECK(current_drag_data_);
-
   // TODO(paulmeyer): It shouldn't be possible for |current_drag_data_| to be
   // null here, but this is somehow happening (rarely). This suggests that in
   // some cases drag-leave is happening before drag-enter, which should be
@@ -1364,7 +1362,7 @@ void WebFrameWidgetImpl::WillBeginMainFrame() {
 
         if (auto* transition =
                 ViewTransitionUtils::GetActiveTransition(*document)) {
-          transition->WillBeginMainFrame();
+          transition->NotifyRenderingHasBegun();
         }
       });
 }
@@ -3895,7 +3893,6 @@ void WebFrameWidgetImpl::MoveCaret(const gfx::Point& point_in_dips) {
       widget_base_->DIPsToRoundedBlinkSpace(point_in_dips));
 }
 
-#if BUILDFLAG(IS_ANDROID)
 void WebFrameWidgetImpl::SelectAroundCaret(
     mojom::blink::SelectionGranularity granularity,
     bool should_show_handle,
@@ -3960,7 +3957,6 @@ void WebFrameWidgetImpl::SelectAroundCaret(
   result->word_end_adjust = word_end_adjust;
   std::move(callback).Run(std::move(result));
 }
-#endif
 
 void WebFrameWidgetImpl::ForEachRemoteFrameControlledByWidget(
     base::FunctionRef<void(RemoteFrame*)> callback) {

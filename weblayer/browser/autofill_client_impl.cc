@@ -7,6 +7,8 @@
 #include <utility>
 
 #include "build/build_config.h"
+#include "components/android_autofill/browser/android_autofill_manager.h"
+#include "components/autofill/core/browser/autofill_download_manager.h"
 #include "components/autofill/core/browser/data_model/autofill_profile.h"
 #include "components/autofill/core/browser/ui/suggestion.h"
 #include "content/public/browser/browser_context.h"
@@ -34,8 +36,12 @@ AutofillClientImpl::GetURLLoaderFactory() {
 }
 
 autofill::AutofillDownloadManager* AutofillClientImpl::GetDownloadManager() {
-  NOTREACHED();
-  return nullptr;
+  if (!download_manager_) {
+    // Lazy initialization to avoid virtual function calls in the constructor.
+    download_manager_ = std::make_unique<autofill::AutofillDownloadManager>(
+        this, GetChannel(), GetLogManager());
+  }
+  return download_manager_.get();
 }
 
 autofill::PersonalDataManager* AutofillClientImpl::GetPersonalDataManager() {
@@ -127,7 +133,7 @@ translate::TranslateDriver* AutofillClientImpl::GetTranslateDriver() {
   return nullptr;
 }
 
-void AutofillClientImpl::ShowAutofillSettings(bool show_credit_card_settings) {
+void AutofillClientImpl::ShowAutofillSettings(autofill::PopupType popup_type) {
   NOTREACHED();
 }
 
@@ -386,9 +392,9 @@ void AutofillClientImpl::LoadRiskData(
 }
 
 AutofillClientImpl::AutofillClientImpl(content::WebContents* web_contents)
-    : content::WebContentsUserData<AutofillClientImpl>(*web_contents),
+    : autofill::ContentAutofillClient(
+          web_contents,
+          base::BindRepeating(&autofill::AndroidDriverInitHook, this)),
       content::WebContentsObserver(web_contents) {}
-
-WEB_CONTENTS_USER_DATA_KEY_IMPL(AutofillClientImpl);
 
 }  // namespace weblayer

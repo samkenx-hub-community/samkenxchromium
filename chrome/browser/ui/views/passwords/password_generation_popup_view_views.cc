@@ -75,9 +75,9 @@ std::unique_ptr<views::View> CreatePasswordStrengthView(
 
   auto warning_icon = std::make_unique<views::ImageView>();
   warning_icon->SetCanProcessEventsWithinSubtree(false);
-  warning_icon->SetImage(
-      ui::ImageModel::FromVectorIcon(vector_icons::kNotificationWarningIcon,
-                                     ui::kColorAlertMediumSeverity, kIconSize));
+  warning_icon->SetImage(ui::ImageModel::FromVectorIcon(
+      vector_icons::kNotificationWarningIcon, ui::kColorAlertMediumSeverityIcon,
+      kIconSize));
   password_strength_view->AddChildView(std::move(warning_icon));
 
   auto* layout = password_strength_view->SetLayoutManager(
@@ -289,8 +289,10 @@ bool PasswordGenerationPopupViewViews::UpdateBoundsAndRedrawPopup() {
 void PasswordGenerationPopupViewViews::PasswordSelectionUpdated() {
   DCHECK(FullPopupVisible());
 
-  if (controller_->password_selected())
-    NotifyAXSelection(this->password_view_);
+  if (controller_->password_selected()) {
+    DCHECK(this->password_view_);
+    NotifyAXSelection(*this->password_view_);
+  }
 
   if (!GetWidget())
     return;
@@ -308,8 +310,8 @@ void PasswordGenerationPopupViewViews::CreateLayoutAndChildren() {
     SetLayoutManager(std::make_unique<views::FillLayout>());
     auto warning_icon = std::make_unique<views::ImageView>();
     warning_icon->SetImage(ui::ImageModel::FromVectorIcon(
-        vector_icons::kNotificationWarningIcon, ui::kColorAlertMediumSeverity,
-        kIconSize));
+        vector_icons::kNotificationWarningIcon,
+        ui::kColorAlertMediumSeverityIcon, kIconSize));
     AddChildView(std::move(warning_icon));
     return;
   }

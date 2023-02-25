@@ -83,17 +83,8 @@ void AddShieldAndBaseColors(ui::ColorMixer& mixer,
   mixer[kColorAshShieldAndBaseOpaque] = {
       SkColorSetA(background_color, SK_AlphaOPAQUE)};
 
-  // TODO(conniekxu): Remove these colorIds when the DarkLightModeEnabled flag
-  // is removed.
-  mixer[kColorAshShieldAndBase20Light] = {SkColorSetA(SK_ColorWHITE, kAlpha20)};
-  mixer[kColorAshShieldAndBase40Light] = {SkColorSetA(SK_ColorWHITE, kAlpha40)};
-  mixer[kColorAshShieldAndBase60Light] = {SkColorSetA(SK_ColorWHITE, kAlpha60)};
+  // TODO(b/270468758): Remove when the last caller has been deleted.
   mixer[kColorAshShieldAndBase80Light] = {SkColorSetA(SK_ColorWHITE, kAlpha80)};
-  mixer[kColorAshInvertedShieldAndBase80Light] = {
-      SkColorSetA(color_utils::InvertColor(SK_ColorWHITE), kAlpha80)};
-  mixer[kColorAshShieldAndBase95Light] = {SkColorSetA(SK_ColorWHITE, kAlpha95)};
-  mixer[kColorAshShieldAndBaseOpaqueLight] = {
-      SkColorSetA(SK_ColorWHITE, SK_AlphaOPAQUE)};
 }
 
 // Mappings of Controls Colors for Material 2.
@@ -263,6 +254,86 @@ void RemapLegacySemanticColors(ui::ColorMixer& mixer) {
       cros_tokens::kCrosSysAppBaseShaded};
   mixer[cros_tokens::kBgColorDroppedElevation2] = {
       cros_tokens::kCrosSysAppBaseShaded};
+
+  mixer[cros_tokens::kRippleColorDark] = {cros_tokens::kCrosSysHoverOnSubtle};
+  mixer[cros_tokens::kRippleColorLight] = {
+      cros_tokens::kCrosSysHoverOnProminent};
+  mixer[cros_tokens::kRippleColorProminent] = {
+      cros_tokens::kCrosSysRipplePrimary};
+
+  mixer[cros_tokens::kSeparatorColor] = {cros_tokens::kCrosSysSeparator};
+  mixer[cros_tokens::kLinkColor] = {cros_tokens::kCrosSysPrimary};
+  mixer[cros_tokens::kAppScrollbarColor] = {cros_tokens::kCrosSysScrollbar};
+  mixer[cros_tokens::kAppScrollbarColorHover] = {
+      cros_tokens::kCrosSysScrollbarHover};
+
+  mixer[cros_tokens::kAppShieldColor] = {cros_tokens::kCrosSysScrim};
+  mixer[cros_tokens::kAppShield20] = {cros_tokens::kCrosSysScrim};
+  mixer[cros_tokens::kAppShield40] = {cros_tokens::kCrosSysScrim};
+  mixer[cros_tokens::kAppShield60] = {cros_tokens::kCrosSysScrim};
+  mixer[cros_tokens::kAppShield80] = {cros_tokens::kCrosSysScrim};
+
+  mixer[cros_tokens::kHighlightColor] = {cros_tokens::kCrosSysHighlightShape};
+  mixer[cros_tokens::kHighlightColorHover] = {
+      cros_tokens::kCrosSysHoverOnSubtle};
+  mixer[cros_tokens::kHighlightColorFocus] = {
+      cros_tokens::kCrosSysRippleNeutralOnSubtle};
+  mixer[cros_tokens::kHighlightColorError] = {
+      cros_tokens::kCrosSysErrorContainer};
+  mixer[cros_tokens::kHighlightColorGreen] = {
+      cros_tokens::kCrosSysPositiveContainer};
+  mixer[cros_tokens::kHighlightColorRed] = {
+      cros_tokens::kCrosSysErrorContainer};
+  mixer[cros_tokens::kHighlightColorYellow] = {
+      cros_tokens::kCrosSysWarningContainer};
+  mixer[cros_tokens::kTextHighlightColor] = {
+      cros_tokens::kCrosSysHighlightText};
+
+  mixer[cros_tokens::kButtonLabelColorSecondary] = {
+      cros_tokens::kCrosSysOnPrimaryContainer};
+  mixer[cros_tokens::kButtonRippleColorSecondary] = {
+      cros_tokens::kCrosSysRipplePrimary};
+  mixer[cros_tokens::kHighlightColor] = {cros_tokens::kCrosSysPrimary};
+  mixer[cros_tokens::kTextfieldBackgroundColor] = {
+      cros_tokens::kCrosSysInputFieldLight};
+  mixer[cros_tokens::kTextfieldLabelColor] = {cros_tokens::kCrosSysOnSurface};
+
+  mixer[cros_tokens::kSliderColorActive] = {cros_tokens::kCrosSysPrimary};
+  mixer[cros_tokens::kSliderTrackColorActive] =
+      ui::SetAlpha(cros_tokens::kCrosSysPrimaryContainer,
+                   0x4C);  // cros.sys.primary-container @ 30%
+  mixer[cros_tokens::kSliderTrackColorInactive] = ui::SetAlpha(
+      cros_tokens::kCrosSysDisabled, 0x4C);  // cros.sys.disabled @ 30%
+  mixer[cros_tokens::kSliderLabelTextColor] = {cros_tokens::kCrosSysOnPrimary};
+  mixer[cros_tokens::kSliderColorInactive] = {cros_tokens::kCrosSysDisabled};
+
+  mixer[cros_tokens::kSwitchKnobColorActive] = {cros_tokens::kCrosSysOnPrimary};
+  mixer[cros_tokens::kSwitchKnobColorInactive] = {
+      cros_tokens::kCrosSysOnSecondary};
+
+  mixer[cros_tokens::kSwitchTrackColorActive] = {cros_tokens::kCrosSysPrimary};
+  mixer[cros_tokens::kSwitchTrackColorInactive] = {
+      cros_tokens::kCrosSysSecondary};
+
+  mixer[cros_tokens::kTooltipLabelColor] = {
+      cros_tokens::kCrosSysInverseOnSurface};
+  mixer[cros_tokens::kTooltipBackgroundColor] = {
+      cros_tokens::kCrosSysOnSurface};
+
+  mixer[cros_tokens::kNudgeLabelColor] = {cros_tokens::kCrosSysOnPrimary};
+  mixer[cros_tokens::kNudgeIconColor] = {cros_tokens::kCrosSysOnPrimary};
+  mixer[cros_tokens::kNudgeBackgroundColor] = {cros_tokens::kCrosSysPrimary};
+
+  mixer[cros_tokens::kMenuLabelColor] = {cros_tokens::kCrosSysOnSurface};
+  mixer[cros_tokens::kMenuIconColor] = {cros_tokens::kCrosSysOnSurface};
+  mixer[cros_tokens::kMenuShortcutColor] = {cros_tokens::kCrosSysSecondary};
+  mixer[cros_tokens::kMenuItemBackgroundHover] = {
+      cros_tokens::kCrosSysHoverOnSubtle};
+
+  // Harmonized Colors
+  mixer[cros_tokens::kColorPositive] = {cros_tokens::kCrosSysPositive};
+  mixer[cros_tokens::kColorWarning] = {cros_tokens::kCrosSysWarning};
+  mixer[cros_tokens::kColorAlert] = {cros_tokens::kCrosSysError};
 }
 
 // Adds the dynamic color palette tokens based on user_color. This is the base
@@ -288,6 +359,7 @@ void AddRefPalette(ui::ColorMixer& mixer,
 
   mixer[cros_tokens::kCrosRefSecondary0] = {ui::kColorRefSecondary0};
   mixer[cros_tokens::kCrosRefSecondary10] = {ui::kColorRefSecondary10};
+  mixer[cros_tokens::kCrosRefSecondary15] = {ui::kColorRefSecondary15};
   mixer[cros_tokens::kCrosRefSecondary20] = {ui::kColorRefSecondary20};
   mixer[cros_tokens::kCrosRefSecondary30] = {ui::kColorRefSecondary30};
   mixer[cros_tokens::kCrosRefSecondary40] = {ui::kColorRefSecondary40};
@@ -376,8 +448,7 @@ void ReverseMapSysColors(ui::ColorMixer& mixer, bool dark_mode) {
                                                    : gfx::kGoogleBlue600};
   mixer[cros_tokens::kCrosSysOnPrimary] = {dark_mode ? gfx::kGoogleGrey900
                                                      : gfx::kGoogleGrey200};
-  mixer[cros_tokens::kCrosSysSecondary] = {dark_mode ? gfx::kGoogleGrey400
-                                                     : gfx::kGoogleGrey200};
+  mixer[cros_tokens::kCrosSysSecondary] = {cros_tokens::kColorSecondary};
   mixer[cros_tokens::kCrosSysOnSecondary] = {dark_mode ? gfx::kGoogleGrey800
                                                        : gfx::kGoogleGrey600};
 
@@ -391,9 +462,6 @@ void ReverseMapSysColors(ui::ColorMixer& mixer, bool dark_mode) {
         SK_ColorWHITE, StyleUtil::kDarkInkDropOpacity * SK_AlphaOPAQUE);
   }
 
-  mixer[cros_tokens::kCrosSysHighlightShape] =
-      ui::SetAlpha(gfx::kGoogleBlue600, 31);  // 12%
-                                              // opacity
   mixer[cros_tokens::kCrosSysHoverOnSubtle] = {SK_ColorTRANSPARENT};
   mixer[cros_tokens::kCrosSysSystemBaseElevated] = {kColorAshShieldAndBase80};
   mixer[cros_tokens::kCrosSysSystemOnBase] = {
@@ -401,13 +469,19 @@ void ReverseMapSysColors(ui::ColorMixer& mixer, bool dark_mode) {
   mixer[cros_tokens::kCrosSysSystemOnNegativeContainer] = {
       kColorAshTextColorPrimary};
   mixer[cros_tokens::kCrosSysSystemOnPrimaryContainer] = {
-      kColorAshTextColorPrimary};
+      dark_mode ? ui::ColorTransform(gfx::kGoogleGrey900)
+                : ui::ColorTransform(kColorAshTextColorPrimary)};
 
   mixer[cros_tokens::kCrosSysSystemNegativeContainer] = {gfx::kGoogleRed300};
   mixer[cros_tokens::kCrosSysPositive] = {cros_tokens::kColorPositive};
 
   mixer[cros_tokens::kCrosSysSystemPrimaryContainer] = {
       dark_mode ? gfx::kGoogleBlue200 : gfx::kGoogleBlue300};
+
+  // Colors for feature tile that differ from sys token mappings.
+  mixer[kColorAshTileSmallCircle] =
+      dark_mode ? ui::ColorTransform(cros_tokens::kCrosSysHighlightShape)
+                : ui::SetAlpha(gfx::kGoogleBlue600, 31);  // 12% opacity
 }
 
 }  // namespace

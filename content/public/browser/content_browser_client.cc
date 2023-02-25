@@ -301,6 +301,10 @@ bool ContentBrowserClient::OverridesAudioManager() {
   return false;
 }
 
+bool ContentBrowserClient::EnforceSystemAudioEchoCancellation() {
+  return false;
+}
+
 bool ContentBrowserClient::ShouldAssignSiteForURL(const GURL& url) {
   return true;
 }
@@ -503,6 +507,7 @@ bool ContentBrowserClient::IsInterestGroupAPIAllowed(
 bool ContentBrowserClient::IsAttributionReportingOperationAllowed(
     content::BrowserContext* browser_context,
     AttributionReportingOperation operation,
+    content::RenderFrameHost* rfh,
     const url::Origin* source_origin,
     const url::Origin* destination_origin,
     const url::Origin* reporting_origin) {
@@ -1227,7 +1232,7 @@ bool ContentBrowserClient::HandleTopicsWebApi(
     bool get_topics,
     bool observe,
     std::vector<blink::mojom::EpochTopicPtr>& topics) {
-  return false;
+  return true;
 }
 
 bool ContentBrowserClient::IsBluetoothScanningBlocked(

@@ -131,25 +131,23 @@ base::span<CSSSelector> CSSSelectorParser::ConsumeSelector(
 }
 
 // static
-CSSSelectorList* CSSSelectorParser::ParseScopeBoundary(
+absl::optional<base::span<CSSSelector>> CSSSelectorParser::ParseScopeBoundary(
     CSSParserTokenRange range,
     const CSSParserContext* context,
-    StyleSheetContents* style_sheet) {
-  HeapVector<CSSSelector> arena;
+    StyleSheetContents* style_sheet,
+    HeapVector<CSSSelector>& arena) {
   CSSSelectorParser parser(context, /*parent_rule_for_nesting=*/nullptr,
                            style_sheet, arena);
   DisallowPseudoElementsScope disallow_pseudo_elements(&parser);
 
   range.ConsumeWhitespace();
-  CSSSelectorList* result = parser.ConsumeForgivingComplexSelectorList(range);
-  DCHECK(result);
+  absl::optional<base::span<CSSSelector>> result =
+      parser.ConsumeForgivingComplexSelectorList(range);
+  DCHECK(result.has_value());
   if (!range.AtEnd()) {
-    return nullptr;
+    return absl::nullopt;
   }
-  for (const CSSSelector* current = result->First(); current;
-       current = current->TagHistory()) {
-    RecordUsageAndDeprecationsOneSelector(current, context);
-  }
+  parser.RecordUsageAndDeprecations(result.value());
   return result;
 }
 
@@ -379,23 +377,30 @@ CSSSelectorList* CSSSelectorParser::ConsumeForgivingNestedSelectorList(
   if (inside_compound_pseudo_) {
     return ConsumeForgivingCompoundSelectorList(range);
   }
-  return ConsumeForgivingComplexSelectorList(range);
+  ResetVectorAfterScope reset_vector(output_);
+  absl::optional<base::span<CSSSelector>> forgiving_list =
+      ConsumeForgivingComplexSelectorList(range);
+  if (!forgiving_list.has_value()) {
+    return nullptr;
+  }
+  return CSSSelectorList::AdoptSelectorVector(forgiving_list.value());
 }
 
-CSSSelectorList* CSSSelectorParser::ConsumeForgivingComplexSelectorList(
+absl::optional<base::span<CSSSelector>>
+CSSSelectorParser::ConsumeForgivingComplexSelectorList(
     CSSParserTokenRange& range) {
-  ResetVectorAfterScope reset_vector(output_);
-
   if (RuntimeEnabledFeatures::CSSAtSupportsAlwaysNonForgivingParsingEnabled() &&
       in_supports_parsing_) {
     base::span<CSSSelector> selectors =
         ConsumeComplexSelectorList(range, /*in_nested_style_rule=*/false);
     if (selectors.empty()) {
-      return nullptr;
+      return absl::nullopt;
     } else {
-      return CSSSelectorList::AdoptSelectorVector(selectors);
+      return selectors;
     }
   }
+
+  ResetVectorAfterScope reset_vector(output_);
 
   CSSAtSupportsDropInvalidWhileForgivingParsingCounter
       at_supports_drop_invalid_counter(context_);
@@ -434,10 +439,10 @@ CSSSelectorList* CSSSelectorParser::ConsumeForgivingComplexSelectorList(
     if (in_supports_parsing_) {
       at_supports_drop_invalid_counter.Count();
     }
-    return CSSSelectorList::Empty();
+    return base::span<CSSSelector>();
   }
 
-  return CSSSelectorList::AdoptSelectorVector(reset_vector.AddedElements());
+  return reset_vector.CommitAddedElements();
 }
 
 // If the argument was unparsable but contained a & token,
@@ -978,6 +983,11 @@ bool IsPseudoClassValidAfterPseudoElement(
     CSSSelector::PseudoType pseudo_class,
     CSSSelector::PseudoType compound_pseudo_element) {
   switch (compound_pseudo_element) {
+    case CSSSelector::kPseudoBefore:
+    case CSSSelector::kPseudoAfter:
+    case CSSSelector::kPseudoMarker:
+    case CSSSelector::kPseudoPlaceholder:
+      return pseudo_class == CSSSelector::kPseudoInitial;
     case CSSSelector::kPseudoResizer:
     case CSSSelector::kPseudoScrollbar:
     case CSSSelector::kPseudoScrollbarCorner:
@@ -990,11 +1000,13 @@ bool IsPseudoClassValidAfterPseudoElement(
       return pseudo_class == CSSSelector::kPseudoWindowInactive;
     case CSSSelector::kPseudoPart:
       return IsUserActionPseudoClass(pseudo_class) ||
-             pseudo_class == CSSSelector::kPseudoState;
+             pseudo_class == CSSSelector::kPseudoState ||
+             pseudo_class == CSSSelector::kPseudoInitial;
     case CSSSelector::kPseudoWebKitCustomElement:
     case CSSSelector::kPseudoBlinkInternalElement:
     case CSSSelector::kPseudoFileSelectorButton:
-      return IsUserActionPseudoClass(pseudo_class);
+      return IsUserActionPseudoClass(pseudo_class) ||
+             pseudo_class == CSSSelector::kPseudoInitial;
     case CSSSelector::kPseudoViewTransitionGroup:
     case CSSSelector::kPseudoViewTransitionImagePair:
     case CSSSelector::kPseudoViewTransitionOld:

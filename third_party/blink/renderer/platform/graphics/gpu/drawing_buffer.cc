@@ -44,6 +44,7 @@
 #include "components/viz/common/resources/bitmap_allocation.h"
 #include "components/viz/common/resources/resource_sizes.h"
 #include "components/viz/common/resources/shared_bitmap.h"
+#include "components/viz/common/resources/shared_image_format.h"
 #include "components/viz/common/resources/transferable_resource.h"
 #include "gpu/command_buffer/client/context_support.h"
 #include "gpu/command_buffer/client/gpu_memory_buffer_manager.h"
@@ -1850,9 +1851,10 @@ scoped_refptr<DrawingBuffer::ColorBuffer> DrawingBuffer::CreateColorBuffer(
   SkAlphaType back_buffer_alpha_type = kPremul_SkAlphaType;
   if (using_swap_chain_) {
     gpu::SharedImageInterface::SwapChainMailboxes mailboxes =
-        sii->CreateSwapChain(color_buffer_format_, size, color_space_, origin,
-                             back_buffer_alpha_type,
-                             usage | gpu::SHARED_IMAGE_USAGE_SCANOUT);
+        sii->CreateSwapChain(
+            viz::SharedImageFormat::SinglePlane(color_buffer_format_), size,
+            color_space_, origin, back_buffer_alpha_type,
+            usage | gpu::SHARED_IMAGE_USAGE_SCANOUT);
     back_buffer_mailbox = mailboxes.back_buffer;
     front_buffer_mailbox = mailboxes.front_buffer;
   } else {
@@ -1906,8 +1908,9 @@ scoped_refptr<DrawingBuffer::ColorBuffer> DrawingBuffer::CreateColorBuffer(
       }
 
       back_buffer_mailbox = sii->CreateSharedImage(
-          color_buffer_format_, size, color_space_, origin,
-          back_buffer_alpha_type, usage, gpu::kNullSurfaceHandle);
+          viz::SharedImageFormat::SinglePlane(color_buffer_format_), size,
+          color_space_, origin, back_buffer_alpha_type, usage,
+          gpu::kNullSurfaceHandle);
     }
   }
 

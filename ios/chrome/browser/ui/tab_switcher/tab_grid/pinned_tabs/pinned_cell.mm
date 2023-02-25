@@ -4,6 +4,7 @@
 
 #import "ios/chrome/browser/ui/tab_switcher/tab_grid/pinned_tabs/pinned_cell.h"
 
+#import <MaterialComponents/MaterialActivityIndicator.h>
 #import <ostream>
 
 #import "base/check.h"
@@ -12,7 +13,10 @@
 #import "ios/chrome/browser/ui/icons/symbols.h"
 #import "ios/chrome/browser/ui/tab_switcher/tab_grid/pinned_tabs/pinned_tabs_constants.h"
 #import "ios/chrome/browser/ui/tab_switcher/tab_grid/transitions/grid_transition_animation.h"
+#import "ios/chrome/browser/ui/util/rtl_geometry.h"
 #import "ios/chrome/common/ui/colors/semantic_color_names.h"
+#import "ios/chrome/common/ui/elements/gradient_view.h"
+#import "ui/gfx/ios/uikit_util.h"
 
 #if !defined(__has_feature) || !__has_feature(objc_arc)
 #error "This file requires ARC support."
@@ -76,10 +80,15 @@ UIColor* GetInterfaceStyleDarkColor(UIColor* dynamicColor) {
 // a `header` since there are no top and bottom parts (bars) in the pinned
 // cell.
 @property(nonatomic, weak) UIView* headerView;
+// Gradient view that fades out the trailing part of the title label.
+@property(nonatomic, weak) UIView* titleLabelFader;
 // Snapshot view's top constraint.
 @property(nonatomic, strong) NSLayoutConstraint* snapshotViewTopConstraint;
 // Header view's height constraint.
 @property(nonatomic, strong) NSLayoutConstraint* headerViewHeightConstraint;
+// Favicon container view's center Y constraint.
+@property(nonatomic, strong)
+    NSLayoutConstraint* faviconContainerViewCenterYConstraint;
 @end
 
 @implementation PinnedCell {
@@ -87,10 +96,29 @@ UIColor* GetInterfaceStyleDarkColor(UIColor* dynamicColor) {
   UIView* _faviconContainerView;
   // View for displaying the favicon.
   UIImageView* _faviconView;
+  // Activity Indicator view that animates while WebState is loading.
+  MDCActivityIndicator* _activityIndicator;
+  // Title label's fader leading constraint.
+  NSLayoutConstraint* _titleLabelFaderLeadingConstraint;
+  // Title label's fader trailing constraint.
+  NSLayoutConstraint* _titleLabelFaderTrailingConstraint;
+}
+
++ (instancetype)transitionSelectionCellFromCell:(PinnedCell*)cell {
+  PinnedCell* transitionSelectionCell =
+      [[self alloc] initWithFrame:cell.bounds];
+  transitionSelectionCell.selected = YES;
+  transitionSelectionCell.contentView.hidden = YES;
+  return transitionSelectionCell;
 }
 
 - (instancetype)initWithFrame:(CGRect)frame {
   if ((self = [super initWithFrame:frame])) {
+    self.backgroundColor = GetInterfaceStyleDarkColor(
+        [UIColor colorNamed:kSecondaryBackgroundColor]);
+    self.layer.cornerRadius = kPinnedCellCornerRadius;
+    self.layer.masksToBounds = NO;
+
     self.contentView.layer.cornerRadius = kPinnedCellCornerRadius;
     self.contentView.layer.masksToBounds = YES;
     self.contentView.backgroundColor = GetInterfaceStyleDarkColor(
@@ -101,7 +129,9 @@ UIColor* GetInterfaceStyleDarkColor(UIColor* dynamicColor) {
     [self setupHeaderView];
     [self setupFaviconContainerView];
     [self setupFaviconView];
+    [self setupActivityIndicator];
     [self setupTitleLabel];
+    [self setupTitleLabelFader];
   }
   return self;
 }
@@ -117,12 +147,21 @@ UIColor* GetInterfaceStyleDarkColor(UIColor* dynamicColor) {
 
 #pragma mark - Public
 
+- (void)setHighlighted:(BOOL)highlighted {
+  // NO-OP to disable highlighting and only allow selection.
+}
+
 - (UIImage*)icon {
   return _faviconView.image;
 }
 
 - (void)setIcon:(UIImage*)icon {
-  _faviconView.image = icon;
+  if (icon) {
+    _faviconView.image = icon;
+  } else {
+    _faviconView.image = CustomSymbolWithPointSize(
+        kChromeProductSymbol, kPinnedCellFaviconSymbolPointSize);
+  }
 }
 
 - (UIImage*)snapshot {
@@ -140,6 +179,8 @@ UIColor* GetInterfaceStyleDarkColor(UIColor* dynamicColor) {
 - (void)setTitle:(NSString*)title {
   _titleLabel.text = [title copy];
   self.accessibilityLabel = [title copy];
+
+  [self updateTitleLabelFaderAppearance];
 }
 
 - (UIDragPreviewParameters*)dragPreviewParameters {
@@ -149,6 +190,18 @@ UIColor* GetInterfaceStyleDarkColor(UIColor* dynamicColor) {
   UIDragPreviewParameters* params = [[UIDragPreviewParameters alloc] init];
   params.visiblePath = visiblePath;
   return params;
+}
+
+- (void)showActivityIndicator {
+  [_activityIndicator startAnimating];
+  [_activityIndicator setHidden:NO];
+  [_faviconContainerView setHidden:YES];
+}
+
+- (void)hideActivityIndicator {
+  [_activityIndicator stopAnimating];
+  [_activityIndicator setHidden:YES];
+  [_faviconContainerView setHidden:NO];
 }
 
 #pragma mark - Private
@@ -212,7 +265,7 @@ UIColor* GetInterfaceStyleDarkColor(UIColor* dynamicColor) {
     [snapshotView.trailingAnchor
         constraintEqualToAnchor:contentView.trailingAnchor],
     [snapshotView.bottomAnchor
-        constraintEqualToAnchor:contentView.bottomAnchor],
+        constraintGreaterThanOrEqualToAnchor:contentView.bottomAnchor],
   ];
   [NSLayoutConstraint activateConstraints:constraints];
 }
@@ -246,19 +299,15 @@ UIColor* GetInterfaceStyleDarkColor(UIColor* dynamicColor) {
 // Sets up the `_faviconContainerView` view.
 - (void)setupFaviconContainerView {
   UIView* faviconContainerView = [[UIView alloc] init];
-  [self.contentView addSubview:faviconContainerView];
-
   faviconContainerView.translatesAutoresizingMaskIntoConstraints = NO;
-  faviconContainerView.backgroundColor = UIColor.whiteColor;
+  [_headerView addSubview:faviconContainerView];
 
-  faviconContainerView.layer.borderColor =
-      GetInterfaceStyleDarkColor([UIColor colorNamed:kSeparatorColor]).CGColor;
-  faviconContainerView.layer.borderWidth = kPinnedCellFaviconBorderWidth;
-  faviconContainerView.layer.cornerRadius =
-      kPinnedCellFaviconContainerCornerRadius;
-  faviconContainerView.layer.masksToBounds = YES;
+  _faviconContainerViewCenterYConstraint = [faviconContainerView.centerYAnchor
+      constraintEqualToAnchor:_headerView.topAnchor
+                     constant:kPinnedCellHeight / 2];
 
   [NSLayoutConstraint activateConstraints:@[
+    _faviconContainerViewCenterYConstraint,
     [faviconContainerView.leadingAnchor
         constraintEqualToAnchor:_headerView.leadingAnchor
                        constant:kPinnedCellHorizontalPadding],
@@ -266,8 +315,6 @@ UIColor* GetInterfaceStyleDarkColor(UIColor* dynamicColor) {
         constraintEqualToConstant:kPinnedCellFaviconContainerWidth],
     [faviconContainerView.heightAnchor
         constraintEqualToAnchor:faviconContainerView.widthAnchor],
-    [faviconContainerView.centerYAnchor
-        constraintEqualToAnchor:_headerView.centerYAnchor]
   ]];
 
   _faviconContainerView = faviconContainerView;
@@ -278,10 +325,12 @@ UIColor* GetInterfaceStyleDarkColor(UIColor* dynamicColor) {
   UIImageView* faviconView = [[UIImageView alloc] init];
   [_faviconContainerView addSubview:faviconView];
 
-  faviconView.layer.cornerRadius = kPinnedCellFaviconCornerRadius;
   faviconView.translatesAutoresizingMaskIntoConstraints = NO;
-  faviconView.contentMode = UIViewContentModeScaleAspectFit;
+  faviconView.contentMode = UIViewContentModeScaleAspectFill;
   faviconView.clipsToBounds = YES;
+  faviconView.layer.cornerRadius = kPinnedCellFaviconCornerRadius;
+  faviconView.layer.masksToBounds = YES;
+  faviconView.tintColor = [UIColor colorNamed:kTextPrimaryColor];
 
   [NSLayoutConstraint activateConstraints:@[
     [faviconView.widthAnchor constraintEqualToConstant:kPinnedCellFaviconWidth],
@@ -295,27 +344,134 @@ UIColor* GetInterfaceStyleDarkColor(UIColor* dynamicColor) {
   _faviconView = faviconView;
 }
 
+- (void)setupActivityIndicator {
+  CGRect indicatorFrame =
+      CGRectMake(0, 0, kPinnedCellFaviconWidth, kPinnedCellFaviconWidth);
+  MDCActivityIndicator* activityIndicator =
+      [[MDCActivityIndicator alloc] initWithFrame:indicatorFrame];
+  activityIndicator.translatesAutoresizingMaskIntoConstraints = NO;
+  activityIndicator.cycleColors = @[ [UIColor colorNamed:kBlueColor] ];
+  activityIndicator.radius =
+      ui::AlignValueToUpperPixel(kPinnedCellFaviconWidth / 2);
+  [_headerView addSubview:activityIndicator];
+
+  [NSLayoutConstraint activateConstraints:@[
+    [activityIndicator.centerYAnchor
+        constraintEqualToAnchor:_faviconView.centerYAnchor],
+    [activityIndicator.centerXAnchor
+        constraintEqualToAnchor:_faviconView.centerXAnchor],
+  ]];
+
+  _activityIndicator = activityIndicator;
+}
+
 // Sets up the title label.
 - (void)setupTitleLabel {
   UILabel* titleLabel = [[UILabel alloc] init];
+  titleLabel.translatesAutoresizingMaskIntoConstraints = NO;
+  titleLabel.lineBreakMode = NSLineBreakByClipping;
   titleLabel.font = [UIFont preferredFontForTextStyle:UIFontTextStyleFootnote];
   titleLabel.textColor =
       GetInterfaceStyleDarkColor([UIColor colorNamed:kTextPrimaryColor]);
-  [self.contentView addSubview:titleLabel];
 
-  titleLabel.translatesAutoresizingMaskIntoConstraints = NO;
+  [_headerView addSubview:titleLabel];
+
   [NSLayoutConstraint activateConstraints:@[
     [titleLabel.leadingAnchor
         constraintEqualToAnchor:_faviconContainerView.trailingAnchor
                        constant:kPinnedCellTitleLeadingPadding],
     [titleLabel.trailingAnchor
-        constraintLessThanOrEqualToAnchor:_headerView.trailingAnchor
-                                 constant:-kPinnedCellHorizontalPadding],
+        constraintEqualToAnchor:_headerView.trailingAnchor
+                       constant:-kPinnedCellHorizontalPadding],
+    [titleLabel.heightAnchor
+        constraintLessThanOrEqualToAnchor:_headerView.heightAnchor],
     [titleLabel.centerYAnchor
         constraintEqualToAnchor:_faviconContainerView.centerYAnchor],
   ]];
 
   _titleLabel = titleLabel;
+}
+
+// Sets up the gradient view that fades out the title label.
+- (void)setupTitleLabelFader {
+  UIColor* backgroundColor = GetInterfaceStyleDarkColor(
+      [UIColor colorNamed:kSecondaryBackgroundColor]);
+
+  UIColor* transparentColor = [backgroundColor colorWithAlphaComponent:0.0f];
+  UIColor* opaqueColor = [backgroundColor colorWithAlphaComponent:1.0f];
+
+  GradientView* gradientView =
+      [[GradientView alloc] initWithStartColor:transparentColor
+                                      endColor:opaqueColor
+                                    startPoint:CGPointMake(0.0f, 0.5f)
+                                      endPoint:CGPointMake(1.0f, 0.5f)];
+  gradientView.translatesAutoresizingMaskIntoConstraints = NO;
+  [_headerView addSubview:gradientView];
+
+  [NSLayoutConstraint activateConstraints:@[
+    [gradientView.widthAnchor
+        constraintEqualToConstant:kPinnedCellFaderGradientWidth],
+    [gradientView.heightAnchor
+        constraintEqualToAnchor:_titleLabel.heightAnchor],
+    [gradientView.centerYAnchor
+        constraintEqualToAnchor:_titleLabel.centerYAnchor],
+  ]];
+
+  _titleLabelFaderLeadingConstraint = [gradientView.leadingAnchor
+      constraintEqualToAnchor:_titleLabel.leadingAnchor];
+  _titleLabelFaderTrailingConstraint = [gradientView.trailingAnchor
+      constraintEqualToAnchor:_titleLabel.trailingAnchor];
+
+  _titleLabelFader = gradientView;
+
+  [self updateTitleLabelFaderAppearance];
+}
+
+// Updates the position and direction of the gradient view that fades out the
+// title label.
+- (void)updateTitleLabelFaderAppearance {
+  NSTextAlignment titleTextAligment = [self determineTitleTextAlignment];
+
+  if (UseRTLLayout()) {
+    if (titleTextAligment == NSTextAlignmentLeft) {
+      [_titleLabelFader setTransform:CGAffineTransformMakeScale(1, 1)];
+      _titleLabelFaderTrailingConstraint.active = NO;
+      _titleLabelFaderLeadingConstraint.active = YES;
+    } else {
+      [_titleLabelFader setTransform:CGAffineTransformMakeScale(-1, 1)];
+      _titleLabelFaderLeadingConstraint.active = NO;
+      _titleLabelFaderTrailingConstraint.active = YES;
+    }
+  } else {
+    if (titleTextAligment == NSTextAlignmentLeft) {
+      [_titleLabelFader setTransform:CGAffineTransformMakeScale(1, 1)];
+      _titleLabelFaderLeadingConstraint.active = NO;
+      _titleLabelFaderTrailingConstraint.active = YES;
+    } else {
+      [_titleLabelFader setTransform:CGAffineTransformMakeScale(-1, 1)];
+      _titleLabelFaderTrailingConstraint.active = NO;
+      _titleLabelFaderLeadingConstraint.active = YES;
+    }
+  }
+}
+
+// Determines the aligment of the title text.
+- (NSTextAlignment)determineTitleTextAlignment {
+  return [self bestAlignmentForText:_titleLabel.text];
+}
+
+// Returns the aligment of the provided `text`.
+- (NSTextAlignment)bestAlignmentForText:(NSString*)text {
+  if (text.length) {
+    NSString* lang = CFBridgingRelease(CFStringTokenizerCopyBestStringLanguage(
+        (CFStringRef)text, CFRangeMake(0, text.length)));
+
+    if ([NSLocale characterDirectionForLanguage:lang] ==
+        NSLocaleLanguageDirectionRightToLeft) {
+      return NSTextAlignmentRight;
+    }
+  }
+  return NSTextAlignmentLeft;
 }
 
 @end
@@ -413,6 +569,8 @@ UIColor* GetInterfaceStyleDarkColor(UIColor* dynamicColor) {
 
   self.snapshotViewTopConstraint.constant = self.topTabView.frame.size.height;
   self.headerViewHeightConstraint.constant = self.topTabView.frame.size.height;
+  self.faviconContainerViewCenterYConstraint.constant =
+      self.topTabView.frame.size.height / 2;
 
   [self setNeedsUpdateConstraints];
   [self layoutIfNeeded];
@@ -435,7 +593,7 @@ UIColor* GetInterfaceStyleDarkColor(UIColor* dynamicColor) {
   [self scaleTabViews];
 
   self.snapshotViewTopConstraint.constant = kPinnedCellSnapshotTopPadding;
-  self.headerViewHeightConstraint.constant = kPinnedCellHeight;
+  self.faviconContainerViewCenterYConstraint.constant = kPinnedCellHeight / 2;
 
   [self setNeedsUpdateConstraints];
   [self layoutIfNeeded];
@@ -474,6 +632,8 @@ UIColor* GetInterfaceStyleDarkColor(UIColor* dynamicColor) {
   self.headerView.backgroundColor =
       [UIColor colorNamed:kSecondaryBackgroundColor];
   self.titleLabel.textColor = [UIColor colorNamed:kTextPrimaryColor];
+
+  self.titleLabelFader.hidden = YES;
 }
 
 // Common logic for the cell animation preparation.

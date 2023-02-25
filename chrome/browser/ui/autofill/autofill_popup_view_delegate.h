@@ -5,20 +5,17 @@
 #ifndef CHROME_BROWSER_UI_AUTOFILL_AUTOFILL_POPUP_VIEW_DELEGATE_H_
 #define CHROME_BROWSER_UI_AUTOFILL_AUTOFILL_POPUP_VIEW_DELEGATE_H_
 
-#include <stddef.h>
-
 #include "components/autofill/core/browser/ui/popup_types.h"
 #include "ui/gfx/native_widget_types.h"
-
-namespace gfx {
-class Point;
-class Rect;
-class RectF;
-}  // namespace gfx
 
 namespace content {
 class WebContents;
 }  // namespace content
+
+namespace gfx {
+class RectF;
+}  // namespace gfx
+
 namespace autofill {
 
 // Base class for Controllers of Autofill-style popups. This interface is
@@ -32,10 +29,6 @@ class AutofillPopupViewDelegate {
 
   // Called when the popup view was destroyed.
   virtual void ViewDestroyed() = 0;
-
-  // The user cleared the current selection, e.g. by moving the mouse cursor
-  // out of the popup bounds.
-  virtual void SelectionCleared() = 0;
 
   // The view that the form field element sits in.
   virtual gfx::NativeView container_view() const = 0;

@@ -12,6 +12,7 @@
 #include "base/guid.h"
 #include "base/time/time.h"
 #include "components/aggregation_service/aggregation_service.mojom-shared.h"
+#include "components/attribution_reporting/aggregatable_dedup_key.h"
 #include "components/attribution_reporting/aggregatable_trigger_data.h"
 #include "components/attribution_reporting/aggregatable_values.h"
 #include "components/attribution_reporting/aggregation_keys.h"
@@ -153,6 +154,14 @@ bool StructTraits<attribution_reporting::mojom::FiltersDataView,
 }
 
 // static
+bool StructTraits<attribution_reporting::mojom::FilterPairDataView,
+                  attribution_reporting::FilterPair>::
+    Read(attribution_reporting::mojom::FilterPairDataView data,
+         attribution_reporting::FilterPair* out) {
+  return data.ReadPositive(&out->positive) && data.ReadNegative(&out->negative);
+}
+
+// static
 bool StructTraits<attribution_reporting::mojom::EventTriggerDataDataView,
                   attribution_reporting::EventTriggerData>::
     Read(attribution_reporting::mojom::EventTriggerDataDataView data,
@@ -162,10 +171,6 @@ bool StructTraits<attribution_reporting::mojom::EventTriggerDataDataView,
   }
 
   if (!data.ReadFilters(&out->filters)) {
-    return false;
-  }
-
-  if (!data.ReadNotFilters(&out->not_filters)) {
     return false;
   }
 
@@ -189,25 +194,35 @@ bool StructTraits<attribution_reporting::mojom::AggregatableTriggerDataDataView,
     return false;
   }
 
-  attribution_reporting::Filters filters;
+  attribution_reporting::FilterPair filters;
   if (!data.ReadFilters(&filters)) {
-    return false;
-  }
-
-  attribution_reporting::Filters not_filters;
-  if (!data.ReadNotFilters(&not_filters)) {
     return false;
   }
 
   auto aggregatable_trigger_data =
       attribution_reporting::AggregatableTriggerData::Create(
-          key_piece, std::move(source_keys), std::move(filters),
-          std::move(not_filters));
+          key_piece, std::move(source_keys), std::move(filters));
   if (!aggregatable_trigger_data) {
     return false;
   }
 
   *out = std::move(*aggregatable_trigger_data);
+  return true;
+}
+
+// static
+bool StructTraits<attribution_reporting::mojom::AggregatableDedupKeyDataView,
+                  attribution_reporting::AggregatableDedupKey>::
+    Read(attribution_reporting::mojom::AggregatableDedupKeyDataView data,
+         attribution_reporting::AggregatableDedupKey* out) {
+  if (!data.ReadDedupKey(&out->dedup_key)) {
+    return false;
+  }
+
+  if (!data.ReadFilters(&out->filters)) {
+    return false;
+  }
+
   return true;
 }
 
@@ -231,10 +246,6 @@ bool StructTraits<attribution_reporting::mojom::TriggerRegistrationDataView,
   out->event_triggers = std::move(*event_triggers_list);
 
   if (!data.ReadFilters(&out->filters)) {
-    return false;
-  }
-
-  if (!data.ReadNotFilters(&out->not_filters)) {
     return false;
   }
 
@@ -266,11 +277,22 @@ bool StructTraits<attribution_reporting::mojom::TriggerRegistrationDataView,
 
   out->aggregatable_values = std::move(*aggregatable_values);
 
-  if (!data.ReadDebugKey(&out->debug_key)) {
+  std::vector<attribution_reporting::AggregatableDedupKey>
+      aggregatable_dedup_keys;
+  if (!data.ReadAggregatableDedupKeys(&aggregatable_dedup_keys)) {
     return false;
   }
 
-  if (!data.ReadAggregatableDedupKey(&out->aggregatable_dedup_key)) {
+  auto aggregatable_dedup_key_list =
+      attribution_reporting::AggregatableDedupKeyList::Create(
+          std::move(aggregatable_dedup_keys));
+  if (!aggregatable_dedup_key_list) {
+    return false;
+  }
+
+  out->aggregatable_dedup_keys = std::move(*aggregatable_dedup_key_list);
+
+  if (!data.ReadDebugKey(&out->debug_key)) {
     return false;
   }
 

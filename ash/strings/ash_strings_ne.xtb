@@ -133,11 +133,13 @@
 <translation id="163517899691012366">Do Not Disturb अन हुँदा सूचनाहरू म्युट गरिन्छन्</translation>
 <translation id="1637505162081889933"><ph name="NUM_DEVICES" /> वटा डिभाइस</translation>
 <translation id="1639239467298939599">लोड गर्दै</translation>
+<translation id="1647986356840967552">अघिल्लो पेज</translation>
 <translation id="1654477262762802994">आवाजमार्फत गरिने क्वेरी सुरु गर्नुहोस्</translation>
 <translation id="1668469839109562275">अन्तर्निर्मित VPN</translation>
 <translation id="1677472565718498478"><ph name="TIME" /> बाँकी छ</translation>
 <translation id="1677507110654891115"><ph name="FEATURE_NAME" /> कनेक्ट गरिएको छैन।</translation>
 <translation id="1677582821739292812">कुनै व्यक्तिले तपाईंको स्क्रिनमा हेरिरहनुभएको छ</translation>
+<translation id="1683399938733266832">CPU को हालको प्रयोग: <ph name="CPU_USEAGE" />%</translation>
 <translation id="169515659049020177">सिफ्ट</translation>
 <translation id="1698080062160024910"><ph name="TOTAL_TIME" /> टाइमर · <ph name="LABEL" /></translation>
 <translation id="1698760176351776263">IPv6 ठेगाना: <ph name="ADDRESS" /></translation>
@@ -286,6 +288,7 @@
 <translation id="2475982808118771221">त्रुटि भयो</translation>
 <translation id="2482878487686419369">सूचनाहरू</translation>
 <translation id="2484513351006226581">किबोर्डको लेआउट स्विच गर्न <ph name="KEYBOARD_SHORTCUT" /> मा थिच्नुहोस्।</translation>
+<translation id="2487915095798731898">सामेल हुनुहोस्</translation>
 <translation id="2501920221385095727">स्टिकी कुञ्जीहरू</translation>
 <translation id="2509468283778169019">CAPS LOCK खुला छ</translation>
 <translation id="2515586267016047495">Alt</translation>
@@ -380,6 +383,7 @@
 <translation id="3051189971848907985">प्रोफाइलको नाम बदलिँदै छ। केही मिनेट पर्खनुहोस्।</translation>
 <translation id="3055162170959710888">तपाईंले आज यो डिभाइस <ph name="USED_TIME" /> प्रयोग गर्नुभयो</translation>
 <translation id="3062298103034426069">यसमा काम गर्दैन</translation>
+<translation id="3068622547379332530">संस्करण <ph name="VERSION_NAME" /> (<ph name="OFFICIAL_STATUS" />) <ph name="CHANNEL_NAME" /> <ph name="PROCESSOR_VARIATION" /></translation>
 <translation id="3068711042108640621">सेल्फ बायाँतिर छ</translation>
 <translation id="3077734595579995578">शिफ्ट</translation>
 <translation id="3081696990447829002">मेनु विस्तृत गर्नुहोस्</translation>
@@ -555,6 +559,7 @@
 <translation id="397105322502079400">हिसाब गर्दै...</translation>
 <translation id="397726367135689299">ब्याट्री राम्रोसँग चार्ज नहुन सक्छ।</translation>
 <translation id="3977512764614765090">ब्याट्री <ph name="PERCENTAGE" />% छ र चार्ज हुँदै छ।</translation>
+<translation id="3984536049089846927">अर्को पेज</translation>
 <translation id="3986082989454912832">कल उठाउनुहोस्</translation>
 <translation id="3995138139523574647">USB-C यन्त्र (दायाँ भागको पछाडिको पोर्ट)</translation>
 <translation id="40062176907008878">हस्तलेखन</translation>
@@ -577,7 +582,7 @@
 <translation id="4123259114412175274">तपाईं आफ्नो Chromebook अनलक गर्न चाहनुहुन्छ भने आफ्नो फोनको ब्लुटुथ अन छ भन्ने कुरा सुनिश्चित गर्नुहोस्</translation>
 <translation id="4125970834901680537">ट्याब्लेट मोडमा एपहरूमा भएको सामग्री स्ट्रिम गर्न सकिँदैन। ल्यापटप मोडमा गई फेरि प्रयास गर्नुहोस्।</translation>
 <translation id="4129129681837227511">आफ्नो लक स्क्रिनमा सूचनाहरू हेर्नका लागि सेटिङहरू परिवर्तन गर्न अनलक गर्नुहोस्</translation>
-<translation id="4130035430755296270">लेआउटसम्बन्धी थप विकल्पहरू प्राप्त गर्न होभर गरिराख्नुहोस्</translation>
+<translation id="4131973331381812765">तापक्रम: <ph name="TEMPERATURE" />°C - हालको गति: <ph name="CPU_AVERAGE_CURRENT_FREQUENCY_GHZ" />GHz</translation>
 <translation id="4136724716305260864">सूर्योदय नहुँदासम्म अन रहने छ</translation>
 <translation id="4146833061457621061">सङ्गीत प्ले गर्नुहोस्</translation>
 <translation id="4150201353443180367">प्रदर्शन</translation>
@@ -732,6 +737,7 @@
 <translation id="4895488851634969361">ब्याटरी पूर्ण भयो।</translation>
 <translation id="490375751687810070">ठाडो</translation>
 <translation id="490788395437447240">ब्याट्री <ph name="BATTERY_PERCENTAGE" />% छ</translation>
+<translation id="491504982845934899">डिभाइस सेटअप गरेपछि <ph name="NETWORK_NAME" /> एक्टिभेट गर्नुहोस्</translation>
 <translation id="4917385247580444890">बलियो</translation>
 <translation id="4918086044614829423">स्वीकार्नुहोस्</translation>
 <translation id="4919841137949306064"><ph name="APP_NAME" /> ले हाल तपाईंको क्यामेरा प्रयोग गरिरहेको छ</translation>
@@ -1328,6 +1334,7 @@
 <translation id="8131740175452115882">निश्चित</translation>
 <translation id="8131994907636310308">एप क्रमबद्ध गर्ने टोस्ट बन्द गर्नुहोस्</translation>
 <translation id="8132793192354020517"><ph name="NAME" /> मा जडित</translation>
+<translation id="8138705869659070104">डिभाइस सेटअप गरेपछि एक्टिभेट गर्नुहोस्</translation>
 <translation id="813913629614996137">सुरुवात गर्दै...</translation>
 <translation id="8142441511840089262">दुई पटक क्लिक गर्नुहोस्</translation>
 <translation id="8142699993796781067">निजी नेटवर्क</translation>
@@ -1459,6 +1466,7 @@
 <translation id="8850991929411075241">Search+Esc</translation>
 <translation id="8853703225951107899">तपाईंको PIN वा पासवर्ड अझै पनि पुष्टि गर्न सकिएन। याद राख्नुहोस्: तपाईंले हालसालै आफ्नो पासवर्ड बदल्नुभएको छ भने आफ्नो पुरानो पासवर्ड प्रयोग गरी साइन इन गर्नुहोस्। तपाईं साइन आउट हुनेबित्तिकै तपाईंको नयाँ पासवर्डले काम गर्न थाल्ने छ।</translation>
 <translation id="8855885154700222542">फुल स्क्रिन नामक कुञ्जी</translation>
+<translation id="8858369206579825206">गोपनीयतासम्बन्धी सेटिङ</translation>
 <translation id="8870509716567206129">अनुप्रयोगले विभाजित-स्क्रिनलाई समर्थन गर्दैन।</translation>
 <translation id="8874184842967597500">जडित छैन</translation>
 <translation id="8876661425082386199">आफ्नो यन्त्रको ब्लुटुथ वा Wi-Fi कनेक्सन जाँच्नुहोस्</translation>

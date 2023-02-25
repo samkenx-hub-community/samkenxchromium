@@ -215,7 +215,8 @@ void ValidateAndAddUsageFromPath(
     // a storage key yet. For now, fall back to creating the storage key
     // from the origin. Once enough time has passed it should be safe to treat
     // this case as an index validation error.
-    storage_key = blink::StorageKey(url::Origin::Create(GURL(index.origin())));
+    storage_key = blink::StorageKey::CreateFirstParty(
+        url::Origin::Create(GURL(index.origin())));
   }
   DCHECK(!storage_key.origin().GetURL().is_empty());
 
@@ -287,7 +288,7 @@ void GetStorageKeyAndLastModifiedGotBucket(
         callback,
     storage::QuotaErrorOr<storage::BucketInfo> result) {
   storage::BucketLocator bucket_locator{};
-  if (result.ok()) {
+  if (result.has_value()) {
     bucket_locator = result->ToBucketLocator();
     DCHECK_EQ(info->storage_key, result->storage_key);
   }

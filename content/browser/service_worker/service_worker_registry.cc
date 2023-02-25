@@ -223,7 +223,7 @@ void ServiceWorkerRegistry::CreateNewRegistrationWithBucketInfo(
     NewRegistrationCallback callback,
     storage::QuotaErrorOr<storage::BucketInfo> result) {
   // Return nullptr if `UpdateOrCreateBucket` fails.
-  if (!result.ok()) {
+  if (!result.has_value()) {
     std::move(callback).Run(nullptr);
     return;
   }
@@ -648,6 +648,21 @@ void ServiceWorkerRegistry::UpdateFetchHandlerType(
       static_cast<const int64_t>(registration_id), key,
       static_cast<const blink::mojom::ServiceWorkerFetchHandlerType>(
           fetch_handler_type));
+}
+
+void ServiceWorkerRegistry::UpdateResourceSha256Checksums(
+    int64_t registration_id,
+    const blink::StorageKey& key,
+    const base::flat_map<int64_t, std::string>& updated_sha256_checksums,
+    StatusCallback callback) {
+  DCHECK_CURRENTLY_ON(BrowserThread::UI);
+  CreateInvokerAndStartRemoteCall(
+      &storage::mojom::ServiceWorkerStorageControl::
+          UpdateResourceSha256Checksums,
+      base::BindOnce(&ServiceWorkerRegistry::DidUpdateRegistration,
+                     weak_factory_.GetWeakPtr(), std::move(callback)),
+      static_cast<const int64_t>(registration_id), key,
+      updated_sha256_checksums);
 }
 
 void ServiceWorkerRegistry::StoreUncommittedResourceId(

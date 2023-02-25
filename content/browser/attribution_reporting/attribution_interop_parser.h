@@ -6,23 +6,50 @@
 #define CONTENT_BROWSER_ATTRIBUTION_REPORTING_ATTRIBUTION_INTEROP_PARSER_H_
 
 #include <string>
+#include <vector>
 
+#include "base/time/time.h"
 #include "base/types/expected.h"
 #include "base/values.h"
+#include "content/browser/attribution_reporting/attribution_trigger.h"
+#include "content/browser/attribution_reporting/storable_source.h"
+#include "third_party/abseil-cpp/absl/types/optional.h"
+#include "third_party/abseil-cpp/absl/types/variant.h"
 
 namespace content {
 
 struct AttributionConfig;
 
-// See //content/test/data/attribution_reporting/simulator/README.md and
-// //content/test/data/attribution_reporting/interop/README.md for the input
-// and output JSON schema.
+struct AttributionTriggerAndTime {
+  AttributionTrigger trigger;
+  base::Time time;
+};
 
-base::expected<base::Value::Dict, std::string>
-    AttributionSimulatorInputFromInteropInput(base::Value::Dict);
+struct AttributionSimulationEvent {
+  absl::variant<StorableSource, AttributionTriggerAndTime> event;
+  bool debug_permission;
 
-base::expected<base::Value::Dict, std::string>
-    AttributionInteropOutputFromSimulatorOutput(base::Value::Dict);
+  AttributionSimulationEvent(
+      absl::variant<StorableSource, AttributionTriggerAndTime> event,
+      bool debug_permission);
+
+  ~AttributionSimulationEvent();
+
+  AttributionSimulationEvent(const AttributionSimulationEvent&) = delete;
+  AttributionSimulationEvent& operator=(const AttributionSimulationEvent&) =
+      delete;
+
+  AttributionSimulationEvent(AttributionSimulationEvent&&);
+  AttributionSimulationEvent& operator=(AttributionSimulationEvent&&);
+};
+
+using AttributionSimulationEvents = std::vector<AttributionSimulationEvent>;
+
+// See //content/test/data/attribution_reporting/interop/README.md for the
+// schema.
+
+base::expected<AttributionSimulationEvents, std::string>
+ParseAttributionInteropInput(base::Value::Dict input, base::Time offset_time);
 
 base::expected<AttributionConfig, std::string> ParseAttributionConfig(
     const base::Value::Dict&);
@@ -30,6 +57,8 @@ base::expected<AttributionConfig, std::string> ParseAttributionConfig(
 // Returns a non-empty string on failure.
 [[nodiscard]] std::string MergeAttributionConfig(const base::Value::Dict&,
                                                  AttributionConfig&);
+
+base::Time GetEventTime(const AttributionSimulationEvent&);
 
 }  // namespace content
 

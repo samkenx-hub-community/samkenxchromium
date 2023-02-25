@@ -133,11 +133,13 @@
 <translation id="163517899691012366">ಅಡಚಣೆ ಮಾಡಬೇಡಿ ಆನ್ ಆಗಿರುವಾಗ ಅಧಿಸೂಚನೆಗಳನ್ನು ಮ್ಯೂಟ್ ಮಾಡಲಾಗುತ್ತದೆ</translation>
 <translation id="1637505162081889933"><ph name="NUM_DEVICES" /> ಸಾಧನಗಳು</translation>
 <translation id="1639239467298939599">ಲೋಡ್ ಆಗುತ್ತಿದೆ</translation>
+<translation id="1647986356840967552">ಹಿಂದಿನ ಪುಟ</translation>
 <translation id="1654477262762802994">ಧ್ವನಿ ಪ್ರಶ್ನೆಯನ್ನು ಕೇಳಲು ಪ್ರಾರಂಭಿಸಿ</translation>
 <translation id="1668469839109562275">ಬಿಲ್ಟ್-ಇನ್ VPN</translation>
 <translation id="1677472565718498478"><ph name="TIME" /> ಬಾಕಿ ಉಳಿದಿದೆ</translation>
 <translation id="1677507110654891115"><ph name="FEATURE_NAME" /> ಅನ್ನು ಕನೆಕ್ಟ್ ಮಾಡಲಾಗಿಲ್ಲ.</translation>
 <translation id="1677582821739292812">ನಿಮ್ಮ ಸ್ಕ್ರೀನ್ ಅನ್ನು ಯಾರೋ ನೋಡುತ್ತಿದ್ದಾರೆ</translation>
+<translation id="1683399938733266832">CPU ಪ್ರಸ್ತುತ ಬಳಕೆ: <ph name="CPU_USEAGE" />%</translation>
 <translation id="169515659049020177">Shift</translation>
 <translation id="1698080062160024910"><ph name="TOTAL_TIME" /> ಟೈಮರ್ · <ph name="LABEL" /></translation>
 <translation id="1698760176351776263">IPv6 ವಿಳಾಸ: <ph name="ADDRESS" /></translation>
@@ -286,6 +288,7 @@
 <translation id="2475982808118771221">ದೋಷವೊಂದು ಕಾಣಿಸಿಕೊಂಡಿದೆ</translation>
 <translation id="2482878487686419369">ಸೂಚನೆಗಳು</translation>
 <translation id="2484513351006226581">ಕೀಬೋರ್ಡ್ ಲೇಔಟ್ ಬದಲಾಯಿಸಲು <ph name="KEYBOARD_SHORTCUT" /> ಒತ್ತಿರಿ.</translation>
+<translation id="2487915095798731898">ಸೇರ್ಪಡೆಗೊಳ್ಳು</translation>
 <translation id="2501920221385095727">ಸ್ಟಿಕಿ ಕೀಗಳು</translation>
 <translation id="2509468283778169019">CAPS LOCK ಆನ್ ಆಗಿದೆ</translation>
 <translation id="2515586267016047495">Alt</translation>
@@ -380,6 +383,7 @@
 <translation id="3051189971848907985">ಪ್ರೊಫೈಲ್ ಅನ್ನು ಮರುಹೆಸರಿಸಲಾಗುತ್ತಿದೆ. ಕೆಲವು ನಿಮಿಷಗಳು ಕಾಯಿರಿ.</translation>
 <translation id="3055162170959710888">ನೀವು ಇಂದು <ph name="USED_TIME" /> ರಷ್ಟು ಸಮಯ ಈ ಸಾಧನವನ್ನು ಬಳಸಿದ್ದೀರಿ</translation>
 <translation id="3062298103034426069">ಬೆಂಬಲಿತವಾಗಿಲ್ಲ</translation>
+<translation id="3068622547379332530">ಆವೃತ್ತಿ <ph name="VERSION_NAME" /> (<ph name="OFFICIAL_STATUS" />) <ph name="CHANNEL_NAME" /> <ph name="PROCESSOR_VARIATION" /></translation>
 <translation id="3068711042108640621">ಪರದೆಯ ಎಡಭಾಗದಲ್ಲಿ ಶೆಲ್ಫ್ ಇದೆ</translation>
 <translation id="3077734595579995578">shift</translation>
 <translation id="3081696990447829002">ಮೆನುವನ್ನು ವಿಸ್ತರಿಸಿ</translation>
@@ -545,6 +549,7 @@
 <translation id="3925540965556789199"><ph name="DATE" />, ಈವೆಂಟ್‌ಗಳನ್ನು ಲೋಡ್ ಮಾಡಲಾಗುತ್ತಿದೆ.</translation>
 <translation id="3932043219784172185">ಯಾವುದೇ ಸಾಧನವನ್ನು ಕನೆಕ್ಟ್ ಮಾಡಲಾಗಿಲ್ಲ</translation>
 <translation id="3934456833412894880">ಅಡಾಪ್ಟಿವ್ ಚಾರ್ಜಿಂಗ್ ಆನ್ ಆಗಿದೆ. ಬ್ಯಾಟರಿ ಅವಧಿಯನ್ನು ವಿಸ್ತರಿಸಲು ನಿಮ್ಮ ಬ್ಯಾಟರಿಯು ಶೇಕಡಾ 80 ರಷ್ಟು ಇರುತ್ತದೆ ಮತ್ತು ನಿಮಗೆ ಅಗತ್ಯವಿರುವಾಗ ಸಂಪೂರ್ಣವಾಗಿ ಚಾರ್ಜ್ ಆಗುತ್ತದೆ.</translation>
+<translation id="3936620957945677513"><ph name="EVENT_SUMMARY" /> ಈವೆಂಟ್‌ಗೆ ಸೇರಿಕೊಳ್ಳಲು Enter ಬಟನ್ ಒತ್ತಿ</translation>
 <translation id="3943857333388298514">ಅಂಟಿಸು</translation>
 <translation id="394485226368336402">ಆಡಿಯೋ ಸೆಟ್ಟಿಂಗ್‌ಗಳು</translation>
 <translation id="3945319193631853098">ಸೆಟಪ್ ಪೂರ್ಣಗೊಳಿಸಲು ಟ್ಯಾಪ್ ಮಾಡಿ</translation>
@@ -555,6 +560,7 @@
 <translation id="397105322502079400">ಎಣಿಸಲಾಗುತ್ತಿದೆ...</translation>
 <translation id="397726367135689299">ಬ್ಯಾಟರಿ ಚಾರ್ಜಿಂಗ್ ವಿಶ್ವಾಸಾರ್ಹವಾಗಿಲ್ಲ.</translation>
 <translation id="3977512764614765090">ಬ್ಯಾಟರಿ <ph name="PERCENTAGE" />% ಇದೆ ಮತ್ತು ಚಾರ್ಜ್ ಆಗುತ್ತಿದೆ.</translation>
+<translation id="3984536049089846927">ಮುಂದಿನ ಪುಟ</translation>
 <translation id="3986082989454912832">ಉತ್ತರ</translation>
 <translation id="3995138139523574647">USB-C ಸಾಧನ (ಬಲ ಭಾಗದ ಹಿಂದಿನ ಪೋರ್ಟ್‌)</translation>
 <translation id="40062176907008878">ಕೈಬರಹ</translation>
@@ -577,7 +583,7 @@
 <translation id="4123259114412175274">ನಿಮ್ಮ Chromebook ಅನ್‌ಲಾಕ್ ಮಾಡಲು, ನಿಮ್ಮ ಫೋನ್‌ನ ಬ್ಲೂಟೂತ್ ಆನ್ ಆಗಿದೆ ಎಂಬುದನ್ನು ಖಚಿತಪಡಿಸಿಕೊಳ್ಳಿ</translation>
 <translation id="4125970834901680537">ಟ್ಯಾಬ್ಲೆಟ್ ಮೋಡ್‌ನಲ್ಲಿ ಆ್ಯಪ್‌ಗಳನ್ನು ಸ್ಟ್ರೀಮ್ ಮಾಡಲಾಗದು. ಲ್ಯಾಪ್‌ಟಾಪ್ ಮೋಡ್‌ ನಲ್ಲಿ ಪುನಃ ಪ್ರಯತ್ನಿಸಿ.</translation>
 <translation id="4129129681837227511">ನಿಮ್ಮ ಲಾಕ್ ಸ್ಕ್ರೀನ್‌ನಲ್ಲಿ ಅಧಿಸೂಚನೆಗಳನ್ನು ನೋಡಲು, ಸೆಟ್ಟಿಂಗ್ ಬದಲಾಯಿಸಲು ಅನ್‌ಲಾಕ್ ಮಾಡಿ</translation>
-<translation id="4130035430755296270">ಇನ್ನಷ್ಟು ಲೇಔಟ್ ಆಯ್ಕೆಗಳಿಗಾಗಿ ಹೋವರ್ ಮಾಡುತ್ತಿರಿ</translation>
+<translation id="4131973331381812765">ತಾಪಮಾನ: <ph name="TEMPERATURE" />°C - ಪ್ರಸ್ತುತ ವೇಗ: <ph name="CPU_AVERAGE_CURRENT_FREQUENCY_GHZ" />GHz</translation>
 <translation id="4136724716305260864">ಸೂರ್ಯೋದಯದವರೆಗೆ ಆನ್</translation>
 <translation id="4146833061457621061">ಸಂಗೀತ ಪ್ಲೇ ಮಾಡಿ</translation>
 <translation id="4150201353443180367">ಡಿಸ್‌ಪ್ಲೇ</translation>
@@ -732,6 +738,7 @@
 <translation id="4895488851634969361">ಬ್ಯಾಟರಿ ತುಂಬಿದೆ.</translation>
 <translation id="490375751687810070">ಲಂಬ</translation>
 <translation id="490788395437447240"><ph name="BATTERY_PERCENTAGE" />% ರಷ್ಟು ಬ್ಯಾಟರಿ</translation>
+<translation id="491504982845934899">ಸಾಧನದ ಸೆಟಪ್ ನಂತರ <ph name="NETWORK_NAME" /> ಸಕ್ರಿಯಗೊಳಿಸಿ</translation>
 <translation id="4917385247580444890">ಪ್ರಬಲ</translation>
 <translation id="4918086044614829423">ಸಮ್ಮತಿಸು</translation>
 <translation id="4919841137949306064">ಪ್ರಸ್ತುತ <ph name="APP_NAME" /> ನಿಮ್ಮ ಕ್ಯಾಮರಾವನ್ನು ಬಳಸುತ್ತಿದೆ</translation>
@@ -1328,6 +1335,7 @@
 <translation id="8131740175452115882">ದೃಢೀಕರಿಸು</translation>
 <translation id="8131994907636310308">ವಿಂಗಡಿಸುವ ಟೋಸ್ಟ್ ಅನ್ನು ಮುಚ್ಚಿರಿ</translation>
 <translation id="8132793192354020517"><ph name="NAME" /> ಗೆ ಸಂಪರ್ಕಗೊಂಡಿದೆ</translation>
+<translation id="8138705869659070104">ಸಾಧನದ ಸೆಟಪ್ ನಂತರ ಸಕ್ರಿಯಗೊಳಿಸಿ</translation>
 <translation id="813913629614996137">ಪ್ರಾರಂಭಿಸಲಾಗುತ್ತಿದೆ...</translation>
 <translation id="8142441511840089262">ಡಬಲ್‌ ಕ್ಲಿಕ್</translation>
 <translation id="8142699993796781067">ಖಾಸಗಿ ನೆಟ್‌ವರ್ಕ್‌</translation>
@@ -1459,6 +1467,7 @@
 <translation id="8850991929411075241">ಹುಡುಕಾಟ+Esc</translation>
 <translation id="8853703225951107899">ನಿಮ್ಮ ಪಿನ್ ಅಥವಾ ಪಾಸ್‌ವರ್ಡ್ ಅನ್ನು ಇನ್ನೂ ಪರಿಶೀಲಿಸಲು ಸಾಧ್ಯವಿಲ್ಲ. ಗಮನಿಸಿ: ನೀವು ಇತ್ತೀಚೆಗೆ ಪಾಸ್‌ವರ್ಡ್ ಅನ್ನು ಬದಲಾಯಿಸಿದ್ದರೆ, ನಿಮ್ಮ ಹಳೆಯ ಪಾಸ್‌ವರ್ಡ್ ಅನ್ನು ಬಳಸಿ. ನೀವು ಸೈನ್ ಔಟ್ ಮಾಡಿದ ನಂತರ ನಿಮ್ಮ ಹೊಸ ಪಾಸ್‌ವರ್ಡ್ ಅನ್ನು ಅನ್ವಯಿಸಲಾಗುತ್ತದೆ.</translation>
 <translation id="8855885154700222542">ಪೂರ್ಣಪರದೆ ಕೀ</translation>
+<translation id="8858369206579825206">ಗೌಪ್ಯತೆ ನಿಯಂತ್ರಣಗಳು</translation>
 <translation id="8870509716567206129">ಅಪ್ಲಿಕೇಶನ್ ಸ್ಪ್ಲಿಟ್ ಸ್ಕ್ರೀನ್ ಅನ್ನು ಬೆಂಬಲಿಸುವುದಿಲ್ಲ.</translation>
 <translation id="8874184842967597500">ಕನೆಕ್ಟ್ ಆಗಿಲ್ಲ</translation>
 <translation id="8876661425082386199">ನಿಮ್ಮ ಕನೆಕ್ಷನ್ ಪರಿಶೀಲಿಸಿ</translation>

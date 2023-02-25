@@ -23,7 +23,6 @@ class DeviceImageInfo;
 
 namespace device {
 class BluetoothAdapter;
-class BluetoothDevice;
 }  // namespace device
 
 namespace nearby {
@@ -76,6 +75,9 @@ class FastPairRepositoryImpl : public FastPairRepository,
       scoped_refptr<Device> device) override;
   void DeleteAssociatedDevice(const std::string& mac_address,
                               DeleteAssociatedDeviceCallback callback) override;
+  void UpdateAssociatedDeviceFootprintsName(const std::string& mac_address,
+                                            const std::string& display_name,
+                                            bool cache_may_be_stale) override;
   void DeleteAssociatedDeviceByAccountKey(
       const std::vector<uint8_t>& account_key,
       DeleteAssociatedDeviceByAccountKeyCallback callback) override;
@@ -83,9 +85,9 @@ class FastPairRepositoryImpl : public FastPairRepository,
   absl::optional<std::string> GetDeviceDisplayNameFromCache(
       std::vector<uint8_t> account_key) override;
   bool PersistDeviceImages(scoped_refptr<Device> device) override;
-  bool EvictDeviceImages(const device::BluetoothDevice* device) override;
+  bool EvictDeviceImages(const std::string& mac_address) override;
   absl::optional<bluetooth_config::DeviceImageInfo> GetImagesForDevice(
-      const std::string& device_id) override;
+      const std::string& mac_address) override;
   void CheckOptInStatus(CheckOptInStatusCallback callback) override;
   void UpdateOptInStatus(nearby::fastpair::OptInStatus opt_in_status,
                          UpdateOptInStatusCallback callback) override;
@@ -117,6 +119,12 @@ class FastPairRepositoryImpl : public FastPairRepository,
       const AccountKeyFilter& account_key_filter,
       CheckAccountKeysCallback callback,
       absl::optional<nearby::fastpair::UserReadDevicesResponse> user_devices);
+
+  void UpdateCacheAndRetryChangeDisplayName(
+      const std::string& mac_address,
+      const std::string& display_name,
+      absl::optional<nearby::fastpair::UserReadDevicesResponse> user_devices);
+
   void UpdateUserDevicesCache(
       absl::optional<nearby::fastpair::UserReadDevicesResponse> user_devices);
   void CompleteAccountKeyLookup(CheckAccountKeysCallback callback,
@@ -126,6 +134,7 @@ class FastPairRepositoryImpl : public FastPairRepository,
   void WriteAccountAssociationToFootprintsWithMetadata(
       const std::string& hex_model_id,
       const std::string& mac_address,
+      const absl::optional<std::string>& display_name,
       const std::vector<uint8_t>& account_key,
       absl::optional<Protocol> device_protocol,
       DeviceMetadata* metadata,
@@ -135,7 +144,6 @@ class FastPairRepositoryImpl : public FastPairRepository,
       const std::vector<uint8_t>& account_key,
       absl::optional<Protocol> device_protocol,
       bool success);
-
   void OnCheckOptInStatus(
       CheckOptInStatusCallback callback,
       absl::optional<nearby::fastpair::UserReadDevicesResponse> user_devices);

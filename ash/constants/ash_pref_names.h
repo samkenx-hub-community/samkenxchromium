@@ -134,6 +134,8 @@ extern const char kAccessibilityChromeVoxEnableEventStreamLogging[];
 COMPONENT_EXPORT(ASH_CONSTANTS)
 extern const char kAccessibilityChromeVoxEnableSpeechLogging[];
 COMPONENT_EXPORT(ASH_CONSTANTS)
+extern const char kAccessibilityChromeVoxEventStreamFilters[];
+COMPONENT_EXPORT(ASH_CONSTANTS)
 extern const char kAccessibilityChromeVoxLanguageSwitching[];
 COMPONENT_EXPORT(ASH_CONSTANTS)
 extern const char kAccessibilityChromeVoxMenuBrailleCommands[];
@@ -266,6 +268,7 @@ COMPONENT_EXPORT(ASH_CONSTANTS) extern const char kAltTabPerDesk[];
 COMPONENT_EXPORT(ASH_CONSTANTS) extern const char kContextualTooltips[];
 
 COMPONENT_EXPORT(ASH_CONSTANTS) extern const char kDesksNamesList[];
+COMPONENT_EXPORT(ASH_CONSTANTS) extern const char kDesksGuidsList[];
 COMPONENT_EXPORT(ASH_CONSTANTS) extern const char kDesksMetricsList[];
 COMPONENT_EXPORT(ASH_CONSTANTS)
 extern const char kDesksWeeklyActiveDesksMetrics[];
@@ -283,6 +286,14 @@ COMPONENT_EXPORT(ASH_CONSTANTS)
 extern const char kScreenMagnifierAcceleratorDialogHasBeenAccepted[];
 COMPONENT_EXPORT(ASH_CONSTANTS)
 extern const char kDictationAcceleratorDialogHasBeenAccepted[];
+COMPONENT_EXPORT(ASH_CONSTANTS)
+extern const char kDictationDlcSuccessNotificationHasBeenShown[];
+COMPONENT_EXPORT(ASH_CONSTANTS)
+extern const char kDictationDlcOnlyPumpkinDownloadedNotificationHasBeenShown[];
+COMPONENT_EXPORT(ASH_CONSTANTS)
+extern const char kDictationDlcOnlySodaDownloadedNotificationHasBeenShown[];
+COMPONENT_EXPORT(ASH_CONSTANTS)
+extern const char kDictationNoDlcsDownloadedNotificationHasBeenShown[];
 COMPONENT_EXPORT(ASH_CONSTANTS)
 extern const char kDisplayRotationAcceleratorDialogHasBeenAccepted[];
 COMPONENT_EXPORT(ASH_CONSTANTS)
@@ -590,6 +601,9 @@ extern const char kPersonalizationKeyboardBacklightColor[];
 COMPONENT_EXPORT(ASH_CONSTANTS)
 extern const char kPersonalizationKeyboardBacklightZoneColors[];
 
+COMPONENT_EXPORT(ASH_CONSTANTS)
+extern const char kShowTouchpadScrollScreenEnabled[];
+
 COMPONENT_EXPORT(ASH_CONSTANTS) extern const char kAutozoomState[];
 
 COMPONENT_EXPORT(ASH_CONSTANTS) extern const char kAutozoomNudges[];
@@ -605,6 +619,35 @@ COMPONENT_EXPORT(ASH_CONSTANTS) extern const char kBackgroundReplace[];
 COMPONENT_EXPORT(ASH_CONSTANTS) extern const char kPortraitRelighting[];
 
 COMPONENT_EXPORT(ASH_CONSTANTS) extern const char kRecordArcAppSyncMetrics[];
+
+// Input device settings.
+COMPONENT_EXPORT(ASH_CONSTANTS) extern const char kPrimaryMouseButtonRight[];
+
+COMPONENT_EXPORT(ASH_CONSTANTS) extern const char kMouseSensitivity[];
+
+COMPONENT_EXPORT(ASH_CONSTANTS) extern const char kMouseAcceleration[];
+
+COMPONENT_EXPORT(ASH_CONSTANTS) extern const char kMouseScrollSensitivity[];
+
+COMPONENT_EXPORT(ASH_CONSTANTS) extern const char kMouseScrollAcceleration[];
+
+COMPONENT_EXPORT(ASH_CONSTANTS) extern const char kTouchpadSensitivity[];
+
+COMPONENT_EXPORT(ASH_CONSTANTS) extern const char kTouchpadAcceleration[];
+
+COMPONENT_EXPORT(ASH_CONSTANTS)
+extern const char kEnableTouchpadThreeFingerClick[];
+
+COMPONENT_EXPORT(ASH_CONSTANTS) extern const char kTapToClickEnabled[];
+
+COMPONENT_EXPORT(ASH_CONSTANTS) extern const char kTouchpadScrollSensitivity[];
+
+COMPONENT_EXPORT(ASH_CONSTANTS) extern const char kTouchpadScrollAcceleration[];
+
+COMPONENT_EXPORT(ASH_CONSTANTS) extern const char kTouchpadHapticFeedback[];
+
+COMPONENT_EXPORT(ASH_CONSTANTS)
+extern const char kTouchpadHapticClickSensitivity[];
 
 }  // namespace prefs
 }  // namespace ash

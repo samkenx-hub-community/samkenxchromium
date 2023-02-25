@@ -44,7 +44,17 @@ DeviceActiveUseCase::DeviceActiveUseCase(
 
 DeviceActiveUseCase::~DeviceActiveUseCase() = default;
 
+std::string DeviceActiveUseCase::GetObservationPeriod(int period) {
+  LOG(ERROR) << "Method should only be called for Churn Observation use case."
+             << "Called for use case = "
+             << psm_rlwe::RlweUseCase_Name(GetPsmUseCase()) << std::endl
+             << "Called with parameter period = " << period;
+  return std::string();
+}
+
 void DeviceActiveUseCase::ClearSavedState() {
+  active_ts_ = base::Time();
+
   window_id_ = absl::nullopt;
 
   psm_id_ = absl::nullopt;
@@ -102,6 +112,7 @@ bool DeviceActiveUseCase::SetWindowIdentifier(base::Time ts) {
     return false;
   }
 
+  active_ts_ = ts;
   window_id_ = window_id;
   return true;
 }
@@ -127,6 +138,13 @@ ChurnActiveStatus* DeviceActiveUseCase::GetChurnActiveStatus() {
   DCHECK(churn_active_status_);
 
   return churn_active_status_;
+}
+
+base::Time DeviceActiveUseCase::GetActiveTs() const {
+  if (active_ts_.is_null()) {
+    LOG(ERROR) << "active_ts is currently unset.";
+  }
+  return active_ts_;
 }
 
 bool DeviceActiveUseCase::SavePsmIdToDateMap(base::Time ts) {

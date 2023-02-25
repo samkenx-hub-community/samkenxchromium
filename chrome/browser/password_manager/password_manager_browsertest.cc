@@ -161,7 +161,7 @@ class PasswordManagerVotingBrowserTest : public PasswordManagerBrowserTest {
 
  private:
   base::test::ScopedFeatureList scoped_feature_list_{
-      autofill::features::kAutofillServerCommunication};
+      autofill::features::test::kAutofillServerCommunication};
   std::unique_ptr<content::URLLoaderInterceptor> url_loader_interceptor_;
 };
 
@@ -2053,7 +2053,7 @@ IN_PROC_BROWSER_TEST_F(PasswordManagerBrowserTest,
       ObservingAutofillClient::FromWebContents(WebContents());
   password_manager::ContentPasswordManagerDriver* driver =
       driver_factory->GetDriverForFrame(WebContents()->GetPrimaryMainFrame());
-  driver->GetPasswordAutofillManager()->set_autofill_client(
+  driver->GetPasswordAutofillManager()->set_autofill_client_for_test(
       observing_autofill_client);
 
   // Trigger in page navigation.

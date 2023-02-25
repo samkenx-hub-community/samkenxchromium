@@ -305,7 +305,7 @@ class POLICY_EXPORT CloudPolicyClient {
   // will be called when the operation completes.
   virtual void UploadEnterpriseMachineCertificate(
       const std::string& certificate_data,
-      StatusCallback callback);
+      ResultCallback callback);
 
   // Upload an enrollment certificate to the server.  Like FetchPolicy, this
   // method requires that the client is in a registered state.
@@ -313,14 +313,14 @@ class POLICY_EXPORT CloudPolicyClient {
   // server.  The |callback| will be called when the operation completes.
   virtual void UploadEnterpriseEnrollmentCertificate(
       const std::string& certificate_data,
-      StatusCallback callback);
+      ResultCallback callback);
 
   // Upload an enrollment identifier to the server. Like FetchPolicy, this
   // method requires that the client is in a registered state.
   // |enrollment_id| must hold an enrollment identifier. The |callback| will be
   // called when the operation completes.
   virtual void UploadEnterpriseEnrollmentId(const std::string& enrollment_id,
-                                            StatusCallback callback);
+                                            ResultCallback callback);
 
   // Uploads status to the server. The client must be in a registered state.
   // Only non-null statuses will be included in the upload status request. The
@@ -363,7 +363,7 @@ class POLICY_EXPORT CloudPolicyClient {
   virtual void UploadSecurityEventReport(content::BrowserContext* context,
                                          bool include_device_info,
                                          base::Value::Dict report,
-                                         StatusCallback callback);
+                                         ResultCallback callback);
 
   // Uploads a report containing |merging_payload| (merged into the default
   // payload of the job). The client must be in a registered state. The
@@ -379,7 +379,7 @@ class POLICY_EXPORT CloudPolicyClient {
   // In case the new push-installs report upload is started, the previous one
   // will be canceled.
   virtual void UploadAppInstallReport(base::Value::Dict report,
-                                      StatusCallback callback);
+                                      ResultCallback callback);
 
   // Cancels the pending app push-install status report upload, if exists.
   virtual void CancelAppInstallReportUpload();
@@ -391,7 +391,7 @@ class POLICY_EXPORT CloudPolicyClient {
   // In case the new installs report upload is started, the previous one
   // will be canceled.
   virtual void UploadExtensionInstallReport(base::Value::Dict report,
-                                            StatusCallback callback);
+                                            ResultCallback callback);
 
   // Cancels the pending extension install status report upload, if exists.
   virtual void CancelExtensionInstallReportUpload();
@@ -604,7 +604,7 @@ class POLICY_EXPORT CloudPolicyClient {
       const std::string& certificate_data,
       enterprise_management::DeviceCertUploadRequest::CertificateType
           certificate_type,
-      StatusCallback callback);
+      ResultCallback callback);
 
   // This is called when a RegisterWithCertiifcate request has been signed.
   void OnRegisterWithCertificateRequestSigned(
@@ -623,7 +623,7 @@ class POLICY_EXPORT CloudPolicyClient {
                                       DMServerJobResult result);
 
   // Callback for certificate upload requests.
-  void OnCertificateUploadCompleted(StatusCallback callback,
+  void OnCertificateUploadCompleted(ResultCallback callback,
                                     DMServerJobResult result);
 
   // Callback for several types of status/report upload requests.
@@ -632,7 +632,7 @@ class POLICY_EXPORT CloudPolicyClient {
 
   // Callback for realtime report upload requests.
   void OnRealtimeReportUploadCompleted(
-      StatusCallback callback,
+      ResultCallback callback,
       DeviceManagementService::Job* job,
       DeviceManagementStatus status,
       int net_error,
@@ -759,7 +759,7 @@ class POLICY_EXPORT CloudPolicyClient {
       const std::string& server_url,
       bool include_device_info,
       bool add_connector_url_params,
-      StatusCallback callback);
+      ResultCallback callback);
 
   void SetClientId(const std::string& client_id);
   // Fills in the common fields of a DeviceRegisterRequest for |Register| and
@@ -778,7 +778,7 @@ class POLICY_EXPORT CloudPolicyClient {
 
   // Creates a job config to upload a certificate.
   std::unique_ptr<DMServerJobConfiguration> CreateCertUploadJobConfiguration(
-      CloudPolicyClient::StatusCallback callback);
+      CloudPolicyClient::ResultCallback callback);
 
   // Creates a job config to upload a report.
   std::unique_ptr<DMServerJobConfiguration> CreateReportUploadJobConfiguration(

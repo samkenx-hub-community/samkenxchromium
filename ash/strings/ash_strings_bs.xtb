@@ -133,11 +133,13 @@ Možete isprobati ovih nekoliko stvari da započnete.</translation>
 <translation id="163517899691012366">Obavještenja su isključena kada je funkcija Ne ometaj uključena</translation>
 <translation id="1637505162081889933"><ph name="NUM_DEVICES" /> uređaj(a)</translation>
 <translation id="1639239467298939599">Učitavanje</translation>
+<translation id="1647986356840967552">Prethodna stranica</translation>
 <translation id="1654477262762802994">Započni glasovni upit</translation>
 <translation id="1668469839109562275">Ugrađeni VPN</translation>
 <translation id="1677472565718498478">Još <ph name="TIME" /></translation>
 <translation id="1677507110654891115">Funkcija <ph name="FEATURE_NAME" /> nije povezana.</translation>
 <translation id="1677582821739292812">Neko gleda u vaš ekran</translation>
+<translation id="1683399938733266832">Trenutno korištenje CPU-a: <ph name="CPU_USEAGE" />%</translation>
 <translation id="169515659049020177">Gornji red</translation>
 <translation id="1698080062160024910">Tajmer od <ph name="TOTAL_TIME" /> · <ph name="LABEL" /></translation>
 <translation id="1698760176351776263">IPv6 adresa: <ph name="ADDRESS" /></translation>
@@ -286,6 +288,7 @@ Možete isprobati ovih nekoliko stvari da započnete.</translation>
 <translation id="2475982808118771221">Došlo je do greške</translation>
 <translation id="2482878487686419369">Obavještenja</translation>
 <translation id="2484513351006226581">Pritisnite <ph name="KEYBOARD_SHORTCUT" /> da promijenite raspored tastature.</translation>
+<translation id="2487915095798731898">Pridruži se</translation>
 <translation id="2501920221385095727">Ljepljive tipke</translation>
 <translation id="2509468283778169019">Uključena su velika slova</translation>
 <translation id="2515586267016047495">Alt</translation>
@@ -380,6 +383,7 @@ Možete isprobati ovih nekoliko stvari da započnete.</translation>
 <translation id="3051189971848907985">Promjena naziva profila. Pričekajte nekoliko minuta.</translation>
 <translation id="3055162170959710888">Danas je uređaj korišten <ph name="USED_TIME" /></translation>
 <translation id="3062298103034426069">Nije podržano</translation>
+<translation id="3068622547379332530">Verzija <ph name="VERSION_NAME" /> (<ph name="OFFICIAL_STATUS" />) <ph name="CHANNEL_NAME" /> <ph name="PROCESSOR_VARIATION" /></translation>
 <translation id="3068711042108640621">Polica je na lijevoj strani</translation>
 <translation id="3077734595579995578">shift</translation>
 <translation id="3081696990447829002">Proširivanje menija</translation>
@@ -545,6 +549,7 @@ Povežite uređaj na napajanje.</translation>
 <translation id="3925540965556789199"><ph name="DATE" />, učitavanje događaja.</translation>
 <translation id="3932043219784172185">Nije povezan nijedan uređaj</translation>
 <translation id="3934456833412894880">Prilagodljivo punjenje je uključeno. Vaša baterija će ostati na 80% radi produžavanja vijeka trajanja baterije, a potpuno će se napuniti kada vam to bude potrebno.</translation>
+<translation id="3936620957945677513">Pritisnite Enter da se pridružite događaju <ph name="EVENT_SUMMARY" /></translation>
 <translation id="3943857333388298514">Zalijepi</translation>
 <translation id="394485226368336402">Postavke zvuka</translation>
 <translation id="3945319193631853098">Dodirnite da završite postavljanje</translation>
@@ -555,6 +560,7 @@ Povežite uređaj na napajanje.</translation>
 <translation id="397105322502079400">Računanje…</translation>
 <translation id="397726367135689299">Punjenje baterije može biti nepouzdano.</translation>
 <translation id="3977512764614765090">Baterija je napunjena <ph name="PERCENTAGE" />% i puni se.</translation>
+<translation id="3984536049089846927">Sljedeća stranica</translation>
 <translation id="3986082989454912832">Odgovori</translation>
 <translation id="3995138139523574647">USB-C uređaj (stražnji desni priključak)</translation>
 <translation id="40062176907008878">Rukopis</translation>
@@ -577,7 +583,7 @@ Povežite uređaj na napajanje.</translation>
 <translation id="4123259114412175274">Da otključate Chromebook, provjerite je li Bluetooth na telefonu uključen</translation>
 <translation id="4125970834901680537">Nije moguće prenositi aplikacije u načinu rada tableta. Pokušajte ponovo u načinu rada laptopa.</translation>
 <translation id="4129129681837227511">Za prikaz obavještenja na zaključanom ekranu, otključajte ga da izmijenite postavke</translation>
-<translation id="4130035430755296270">Postavite i zadržite pokazivač miša iznad za više opcija rasporeda</translation>
+<translation id="4131973331381812765">Temperatura: <ph name="TEMPERATURE" /> °C – trenutna brzina: <ph name="CPU_AVERAGE_CURRENT_FREQUENCY_GHZ" /> GHz</translation>
 <translation id="4136724716305260864">Uključeno do izlaska sunca</translation>
 <translation id="4146833061457621061">Pokreni muziku</translation>
 <translation id="4150201353443180367">Ekran</translation>
@@ -732,6 +738,7 @@ Povežite uređaj na napajanje.</translation>
 <translation id="4895488851634969361">Baterija je napunjena.</translation>
 <translation id="490375751687810070">Vertikalno</translation>
 <translation id="490788395437447240"><ph name="BATTERY_PERCENTAGE" />% baterije</translation>
+<translation id="491504982845934899">Aktivirajte nakon što postavite uređaj – <ph name="NETWORK_NAME" /></translation>
 <translation id="4917385247580444890">Jako</translation>
 <translation id="4918086044614829423">Prihvati</translation>
 <translation id="4919841137949306064">Aplikacija <ph name="APP_NAME" /> trenutno koristi vašu kameru</translation>
@@ -1328,6 +1335,7 @@ Nova instalacija</translation>
 <translation id="8131740175452115882">Potvrdi</translation>
 <translation id="8131994907636310308">Zatvaranje toast poruke o sortiranju</translation>
 <translation id="8132793192354020517">Povezano na <ph name="NAME" /></translation>
+<translation id="8138705869659070104">Aktivir. nakon što post. uređaj</translation>
 <translation id="813913629614996137">Pokretanje…</translation>
 <translation id="8142441511840089262">Dvostruki klik</translation>
 <translation id="8142699993796781067">Privatna mreža</translation>
@@ -1459,6 +1467,7 @@ Nova instalacija</translation>
 <translation id="8850991929411075241">Search+Esc</translation>
 <translation id="8853703225951107899">Potvrđivanje PIN-a ili lozinke i dalje nije uspjelo. Napomena: Ako ste nedavno promijenili lozinku, koristite staru. Nova lozinka će se primijeniti nakon što se odjavite.</translation>
 <translation id="8855885154700222542">Tipka za prikaz preko cijelog ekrana</translation>
+<translation id="8858369206579825206">Kontrole privatnosti</translation>
 <translation id="8870509716567206129">Aplikacija ne podržava dijeljenje ekrana.</translation>
 <translation id="8874184842967597500">Nije povezano</translation>
 <translation id="8876661425082386199">Provjerite stanje veze</translation>

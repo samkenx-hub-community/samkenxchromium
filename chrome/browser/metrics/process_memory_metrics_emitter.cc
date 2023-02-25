@@ -47,6 +47,7 @@
 
 #if BUILDFLAG(IS_ANDROID)
 #include "base/android/child_process_binding_types.h"
+#include "base/android/meminfo_dump_provider.h"
 #endif
 
 #if BUILDFLAG(ENABLE_EXTENSIONS)
@@ -219,6 +220,8 @@ const Metric kAllocatorDumpNamesForMetrics[] = {
     // of it being claimed by renderers.
     {"gpu/shared_images", "SharedImages", MetricSize::kLarge, kSize,
      EmitTo::kSizeInUmaOnly, nullptr},
+    {"gpu/shared_images", "SharedImages.Purgeable", MetricSize::kLarge,
+     "purgeable_size", EmitTo::kSizeInUmaOnly, nullptr},
     {"gpu/transfer_cache", "ServiceTransferCache", MetricSize::kCustom, kSize,
      EmitTo::kSizeInUmaOnly, nullptr, ImageSizeMetricRange},
     {"gpu/transfer_cache", "ServiceTransferCache.AvgImageSize",
@@ -532,6 +535,15 @@ const Metric kAllocatorDumpNamesForMetrics[] = {
     {"web_cache/Other_resources", "WebCache.OtherResources", MetricSize::kSmall,
      kEffectiveSize, EmitTo::kSizeInUkmAndUma,
      &Memory_Experimental::SetWebCache_OtherResources},
+#if BUILDFLAG(IS_ANDROID)
+    {base::android::MeminfoDumpProvider::kDumpName, "AndroidOtherPss",
+     MetricSize::kLarge, base::android::MeminfoDumpProvider::kPssMetricName,
+     EmitTo::kSizeInUmaOnly, nullptr},
+    {base::android::MeminfoDumpProvider::kDumpName, "AndroidOtherPrivateDirty",
+     MetricSize::kLarge,
+     base::android::MeminfoDumpProvider::kPrivateDirtyMetricName,
+     EmitTo::kSizeInUmaOnly, nullptr},
+#endif
 };
 
 #if BUILDFLAG(USE_PARTITION_ALLOC_AS_MALLOC)

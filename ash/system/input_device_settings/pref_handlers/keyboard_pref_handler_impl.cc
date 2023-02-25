@@ -3,19 +3,48 @@
 // found in the LICENSE file.
 
 #include "ash/system/input_device_settings/pref_handlers/keyboard_pref_handler_impl.h"
-#include "ash/constants/ash_pref_names.h"
 
+#include "ash/constants/ash_pref_names.h"
+#include "ash/public/mojom/input_device_settings.mojom-shared.h"
 #include "ash/public/mojom/input_device_settings.mojom.h"
 #include "ash/shell.h"
 #include "ash/system/input_device_settings/input_device_settings_defaults.h"
 #include "ash/system/input_device_settings/input_device_settings_pref_names.h"
 #include "ash/system/input_device_settings/input_device_settings_utils.h"
+#include "ash/system/input_device_settings/input_device_tracker.h"
+#include "base/containers/fixed_flat_map.h"
+#include "base/containers/flat_map.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/time/time.h"
 #include "components/prefs/pref_service.h"
+#include "ui/chromeos/events/mojom/modifier_key.mojom-shared.h"
+#include "ui/chromeos/events/mojom/modifier_key.mojom.h"
+#include "ui/chromeos/events/pref_names.h"
 
 namespace ash {
 namespace {
+static constexpr auto kKeyboardModifierMappings =
+    base::MakeFixedFlatMap<ui::mojom::ModifierKey, const char*>(
+        {{ui::mojom::ModifierKey::kAlt, ::prefs::kLanguageRemapAltKeyTo},
+         {ui::mojom::ModifierKey::kControl,
+          ::prefs::kLanguageRemapControlKeyTo},
+         {ui::mojom::ModifierKey::kEscape, ::prefs::kLanguageRemapEscapeKeyTo},
+         {ui::mojom::ModifierKey::kBackspace,
+          ::prefs::kLanguageRemapBackspaceKeyTo},
+         {ui::mojom::ModifierKey::kAssistant,
+          ::prefs::kLanguageRemapAssistantKeyTo},
+         {ui::mojom::ModifierKey::kCapsLock,
+          ::prefs::kLanguageRemapCapsLockKeyTo}});
+
+static constexpr auto kMetaKeyMapping =
+    base::MakeFixedFlatMap<mojom::MetaKey, const char*>(
+        {{mojom::MetaKey::kSearch, ::prefs::kLanguageRemapSearchKeyTo},
+         {mojom::MetaKey::kLauncher, ::prefs::kLanguageRemapSearchKeyTo},
+         {mojom::MetaKey::kExternalMeta,
+          ::prefs::kLanguageRemapExternalMetaKeyTo},
+         {mojom::MetaKey::kCommand,
+          ::prefs::kLanguageRemapExternalCommandKeyTo}});
+
 mojom::KeyboardSettingsPtr GetDefaultKeyboardSettings() {
   mojom::KeyboardSettingsPtr settings = mojom::KeyboardSettings::New();
   settings->auto_repeat_delay = kDefaultAutoRepeatDelay;
@@ -27,8 +56,35 @@ mojom::KeyboardSettingsPtr GetDefaultKeyboardSettings() {
   return settings;
 }
 
+base::flat_map<ui::mojom::ModifierKey, ui::mojom::ModifierKey>
+GetModifierRemappings(PrefService* prefs, const mojom::Keyboard& keyboard) {
+  base::flat_map<ui::mojom::ModifierKey, ui::mojom::ModifierKey> remappings;
+
+  for (const auto& modifier_key : keyboard.modifier_keys) {
+    if (modifier_key == ui::mojom::ModifierKey::kMeta) {
+      // The meta key is handled separately.
+      continue;
+    }
+    auto* it = kKeyboardModifierMappings.find(modifier_key);
+    DCHECK(it != kKeyboardModifierMappings.end());
+    const auto pref_modifier_key =
+        static_cast<ui::mojom::ModifierKey>(prefs->GetInteger(it->second));
+    if (modifier_key != pref_modifier_key) {
+      remappings.emplace(modifier_key, pref_modifier_key);
+    }
+  }
+
+  const auto meta_key_pref_value = static_cast<ui::mojom::ModifierKey>(
+      prefs->GetInteger(kMetaKeyMapping.at(keyboard.meta_key)));
+  if (ui::mojom::ModifierKey::kMeta != meta_key_pref_value) {
+    remappings.emplace(ui::mojom::ModifierKey::kMeta, meta_key_pref_value);
+  }
+  return remappings;
+}
+
 mojom::KeyboardSettingsPtr GetKeyboardSettingsFromGlobalPrefs(
-    PrefService* prefs) {
+    PrefService* prefs,
+    const mojom::Keyboard& keyboard) {
   mojom::KeyboardSettingsPtr settings = mojom::KeyboardSettings::New();
   settings->auto_repeat_delay =
       base::Milliseconds(prefs->GetInteger(prefs::kXkbAutoRepeatDelay));
@@ -38,6 +94,7 @@ mojom::KeyboardSettingsPtr GetKeyboardSettingsFromGlobalPrefs(
       prefs->GetBoolean(prefs::kXkbAutoRepeatEnabled);
   settings->top_row_are_fkeys = prefs->GetBoolean(prefs::kSendFunctionKeys);
   settings->suppress_meta_fkey_rewrites = kDefaultSuppressMetaFKeyRewrites;
+  settings->modifier_remappings = GetModifierRemappings(prefs, keyboard);
   return settings;
 }
 
@@ -101,15 +158,16 @@ mojom::KeyboardSettingsPtr KeyboardPrefHandlerImpl::RetreiveKeyboardSettings(
     }
     to_int = to.GetInt();
 
-    // Validate the ints can be cast to `mojom::ModifierKey` and cast them.
+    // Validate the ints can be cast to `ui::mojom::ModifierKey` and cast them.
     if (!IsValidModifier(from_int) || !IsValidModifier(to_int)) {
       LOG(ERROR) << "Read invalid modifier keys from pref. From: " << from_int
                  << " To: " << to_int;
       continue;
     }
-    const mojom::ModifierKey from_key =
-        static_cast<mojom::ModifierKey>(from_int);
-    const mojom::ModifierKey to_key = static_cast<mojom::ModifierKey>(to_int);
+    const ui::mojom::ModifierKey from_key =
+        static_cast<ui::mojom::ModifierKey>(from_int);
+    const ui::mojom::ModifierKey to_key =
+        static_cast<ui::mojom::ModifierKey>(to_int);
 
     settings->modifier_remappings[from_key] = to_key;
   }
@@ -124,7 +182,7 @@ mojom::KeyboardSettingsPtr KeyboardPrefHandlerImpl::GetNewKeyboardSettings(
   if (Shell::Get()->input_device_tracker()->WasDevicePreviouslyConnected(
           InputDeviceTracker::InputDeviceCategory::kKeyboard,
           keyboard.device_key)) {
-    return GetKeyboardSettingsFromGlobalPrefs(prefs);
+    return GetKeyboardSettingsFromGlobalPrefs(prefs, keyboard);
   }
 
   return GetDefaultKeyboardSettings();
@@ -152,8 +210,8 @@ void KeyboardPrefHandlerImpl::UpdateKeyboardSettings(
                     settings.top_row_are_fkeys);
 
   // Modifier remappings get stored in a dict by casting the
-  // `mojom::ModifierKey` enum to ints. Since `base::Value::Dict` only supports
-  // strings as keys, this is then converted into a string.
+  // `ui::mojom::ModifierKey` enum to ints. Since `base::Value::Dict` only
+  // supports strings as keys, this is then converted into a string.
   base::Value::Dict modifier_remappings;
   for (const auto& [from, to] : settings.modifier_remappings) {
     modifier_remappings.Set(base::NumberToString(static_cast<int>(from)),

@@ -327,6 +327,7 @@
 <translation id="4110686435123617899">"<ph name="TITLE" />" альбомын таңдаңыз (<ph name="DESC" />).</translation>
 <translation id="4111761024568264522">USB сенсорлық тақтасы</translation>
 <translation id="4117637339509843559">Қараңғы режим</translation>
+<translation id="4130035430755296270">Тағы басқа формат опцияларын көру үшін курсорды апарыңыз.</translation>
 <translation id="4131410914670010031">Қара мен ақ</translation>
 <translation id="4145784616224233563">HTTP брандмауэрі</translation>
 <translation id="4147897805161313378">Google Photos</translation>
@@ -415,6 +416,7 @@
 <translation id="484790837831576105">DNS ажыратымдылығы (Android)</translation>
 <translation id="4848429997038228357">ТЕКСЕРІЛУДЕ</translation>
 <translation id="4854586501323951986">Ендірілген сенсорлық экран</translation>
+<translation id="4855250849489639581">Тағы басқа формат опциялары үшін төмен қарай сырғыту</translation>
 <translation id="4861758251032006121">{ATTEMPTS_LEFT,plural, =1{<ph name="ERROR_MESSAGE" /> {0} әрекет қалды.}other{<ph name="ERROR_MESSAGE" /> {0} әрекет қалды.}}</translation>
 <translation id="4873827928179867585">Аутентификация алгоритмі</translation>
 <translation id="4880328057631981605">Кіру нүктесінің атауы</translation>
@@ -518,6 +520,7 @@
 <translation id="576835345334454681">Дисплей жарықтығын арттыру</translation>
 <translation id="57838592816432529">Дыбысын өшіру</translation>
 <translation id="5784136236926853061">HTTP кідірісі жоғары.</translation>
+<translation id="5826644637650799838">Өнер туралы</translation>
 <translation id="5832805196449965646">Адам қосу</translation>
 <translation id="583281660410589416">Белгісіз</translation>
 <translation id="5843706793424741864">Фаренгейт</translation>
@@ -674,6 +677,7 @@
 <translation id="7172721935181587524">1 сурет</translation>
 <translation id="7177485034254901881"><ph name="DEVICE_TYPE" /> құрылғысын <ph name="MANAGER" /> басқарады. Әкімшілер құрылғыны қашықтан конфигурациялай алады.</translation>
 <translation id="7180611975245234373">Жаңарту</translation>
+<translation id="7180865173735832675">Реттеу</translation>
 <translation id="7212734716605298123">Сыртқы құрылғыларға арналған микробағдарламаның жаңа нұсқалары</translation>
 <translation id="7216409898977639127">Ұялы байланыс провайдері</translation>
 <translation id="725133483556299729">Электрондық поштаны таңдау</translation>
@@ -745,6 +749,7 @@
 <translation id="7881066108824108340">DNS</translation>
 <translation id="7882358943899516840">Провайдер түрі</translation>
 <translation id="7882501334836096755">Ашық кілт</translation>
+<translation id="78957024357676568">сол</translation>
 <translation id="7915220255123750251">Желінің APN параметрлерін басқарыңыз. APN аттары ұялы желі мен интернет арасында байланыс орнатады.</translation>
 <translation id="7936303884198020182">Атау серверлері табылмады.</translation>
 <translation id="7942349550061667556">Қызыл</translation>
@@ -776,6 +781,7 @@
 <translation id="8226628635270268143">Өзіңізге ұнайтын фотосуреттер мен альбомдарды таңдау</translation>
 <translation id="8227119283605456246">Файл тіркеу</translation>
 <translation id="8230672074305416752">Әдепкі желі шлюзінің байланысы тексерілмеді.</translation>
+<translation id="8242426110754782860">Жалғастыру</translation>
 <translation id="8246209727385807362">Белгісіз оператор</translation>
 <translation id="827422111966801947">Индиго</translation>
 <translation id="8286154143153872371">Тұсқағазды көру үшін желіге қосылып, бетті қайта жүктеңіз.</translation>
@@ -853,6 +859,7 @@
 <translation id="8930622219860340959">Сымсыз</translation>
 <translation id="8936793075252196307">Клиенттің IP мекенжайы</translation>
 <translation id="894617464444543719">Бұл — телефон.</translation>
+<translation id="8957423540740801332">оң</translation>
 <translation id="8968751544471797276">Зарядталу жылдамдығы</translation>
 <translation id="8970109610781093811">Қайта тексеру</translation>
 <translation id="8983038754672563810">HSPA</translation>

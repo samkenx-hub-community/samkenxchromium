@@ -275,20 +275,11 @@ class IntegrationTest : public ::testing::Test {
     test_commands_->RunWakeActive(exit_code);
   }
 
-// TODO(crbug.com/1396103): remove this `#if` once mojo interface changes are
-// done in separate CL.
-#if BUILDFLAG(IS_WIN)
   void Update(const std::string& app_id,
               const std::string& install_data_index,
               bool do_update_check_only) {
     test_commands_->Update(app_id, install_data_index, do_update_check_only);
   }
-#else   // BUILDFLAG(IS_WIN)
-  void Update(const std::string& app_id,
-              const std::string& install_data_index) {
-    test_commands_->Update(app_id, install_data_index);
-  }
-#endif  // BUILDFLAG(IS_WIN)
 
   void UpdateAll() { test_commands_->UpdateAll(); }
 
@@ -355,12 +346,10 @@ class IntegrationTest : public ::testing::Test {
                                       policy_same_version_update);
   }
 
-  void SetupFakeLegacyUpdaterData() {
-    test_commands_->SetupFakeLegacyUpdaterData();
-  }
+  void SetupFakeLegacyUpdater() { test_commands_->SetupFakeLegacyUpdater(); }
 
-  void ExpectLegacyUpdaterDataMigrated() {
-    test_commands_->ExpectLegacyUpdaterDataMigrated();
+  void ExpectLegacyUpdaterMigrated() {
+    test_commands_->ExpectLegacyUpdaterMigrated();
   }
 
   void RunRecoveryComponent(const std::string& app_id,
@@ -408,9 +397,7 @@ TEST_F(IntegrationTest, Install) {
 
 // TODO(crbug.com/1398845) Enable test once SetupRealUpdaterLowerVersion
 // is implemented.
-// TODO(crbug.com/1339108): Re-enable once the CIPD build is rolled to a version
-// that uses mojo for IPC.
-#if !BUILDFLAG(IS_LINUX) && !BUILDFLAG(IS_MAC)
+#if !BUILDFLAG(IS_LINUX)
 TEST_F(IntegrationTest, OverinstallWorking) {
   ASSERT_NO_FATAL_FAILURE(SetupRealUpdaterLowerVersion());
   ASSERT_TRUE(WaitForUpdaterExit());
@@ -436,6 +423,13 @@ TEST_F(IntegrationTest, OverinstallBroken) {
   ASSERT_TRUE(WaitForUpdaterExit());
   ASSERT_NO_FATAL_FAILURE(ExpectVersionActive(kUpdaterVersion));
 
+  ASSERT_NO_FATAL_FAILURE(Uninstall());
+
+  // Cleanup the older version by reinstalling and uninstalling.
+  ASSERT_NO_FATAL_FAILURE(SetupRealUpdaterLowerVersion());
+  ASSERT_TRUE(WaitForUpdaterExit());
+  ASSERT_NO_FATAL_FAILURE(Install());
+  ASSERT_TRUE(WaitForUpdaterExit());
   ASSERT_NO_FATAL_FAILURE(Uninstall());
 }
 #endif  // !BUILDFLAG(IS_LINUX)
@@ -566,9 +560,6 @@ TEST_F(IntegrationTest, ReportsActive) {
   ASSERT_NO_FATAL_FAILURE(Uninstall());
 }
 
-// TODO(crbug.com/1396103): remove this `#if` once mojo interface changes are
-// done in separate CL.
-#if BUILDFLAG(IS_WIN)
 TEST_F(IntegrationTest, CheckForUpdate) {
   ScopedServer test_server(test_commands_);
   ASSERT_NO_FATAL_FAILURE(Install());
@@ -581,7 +572,6 @@ TEST_F(IntegrationTest, CheckForUpdate) {
 
   ASSERT_NO_FATAL_FAILURE(Uninstall());
 }
-#endif  // BUILDFLAG(IS_WIN)
 
 TEST_F(IntegrationTest, UpdateApp) {
   ScopedServer test_server(test_commands_);
@@ -598,15 +588,8 @@ TEST_F(IntegrationTest, UpdateApp) {
   const std::string kInstallDataIndex("test_install_data_index");
   ASSERT_NO_FATAL_FAILURE(
       ExpectUpdateSequence(&test_server, kAppId, kInstallDataIndex, v1, v2));
-
-// TODO(crbug.com/1396103): remove this `#if` once mojo interface changes are
-// done in separate CL.
-#if BUILDFLAG(IS_WIN)
   ASSERT_NO_FATAL_FAILURE(Update(kAppId, kInstallDataIndex,
                                  /*do_update_check_only=*/false));
-#else   // BUILDFLAG(IS_WIN)
-  ASSERT_NO_FATAL_FAILURE(Update(kAppId, kInstallDataIndex));
-#endif  // BUILDFLAG(IS_WIN)
 
   ASSERT_TRUE(WaitForUpdaterExit());
   ASSERT_NO_FATAL_FAILURE(ExpectAppVersion(kAppId, v2));
@@ -830,9 +813,6 @@ TEST_F(IntegrationTest, UnregisterUnownedApp) {
 // TODO(crbug.com/1398845): Enable test once SetupRealUpdaterLowerVersion
 // is implemented.
 #if !BUILDFLAG(IS_LINUX)
-// TODO(crbug.com/1412450): Enable test once CIPD has rolled to pick up the
-// test override path change.
-#if !BUILDFLAG(IS_MAC) && !BUILDFLAG(IS_WIN)
 TEST_F(IntegrationTest, SelfUpdateFromOldReal) {
   ScopedServer test_server(test_commands_);
 
@@ -858,6 +838,36 @@ TEST_F(IntegrationTest, SelfUpdateFromOldReal) {
   ASSERT_NO_FATAL_FAILURE(Uninstall());
 }
 
+TEST_F(IntegrationTest, UninstallIfUnusedSelfAndOldReal) {
+  ScopedServer test_server(test_commands_);
+
+  ASSERT_NO_FATAL_FAILURE(SetupRealUpdaterLowerVersion());
+  ASSERT_NO_FATAL_FAILURE(ExpectVersionNotActive(kUpdaterVersion));
+
+  // Trigger an old instance update check.
+  ASSERT_NO_FATAL_FAILURE(ExpectSelfUpdateSequence(&test_server));
+  ASSERT_NO_FATAL_FAILURE(RunWakeActive(0));
+
+  // Qualify the new instance.
+  ASSERT_NO_FATAL_FAILURE(
+      ExpectUpdateSequence(&test_server, kQualificationAppId, "",
+                           base::Version("0.1"), base::Version("0.2")));
+  ASSERT_NO_FATAL_FAILURE(RunWake(0));
+  ASSERT_TRUE(WaitForUpdaterExit());
+
+  // Activate the new instance. (It should not check itself for updates.)
+  ASSERT_NO_FATAL_FAILURE(RunWake(0));
+  ASSERT_TRUE(WaitForUpdaterExit());
+
+  ASSERT_NO_FATAL_FAILURE(ExpectVersionActive(kUpdaterVersion));
+
+  ASSERT_NO_FATAL_FAILURE(SetServerStarts(24));
+  ASSERT_NO_FATAL_FAILURE(RunWake(0));
+  ASSERT_TRUE(WaitForUpdaterExit());
+
+  // Expect that the updater uninstalled itself as well as the lower version.
+}
+
 // Tests that installing and uninstalling an old version of the updater from
 // CIPD is possible.
 TEST_F(IntegrationTest, InstallLowerVersion) {
@@ -877,7 +887,6 @@ TEST_F(IntegrationTest, InstallLowerVersion) {
 #endif  // IS_WIN
 }
 
-#endif  // !BUILDFLAG(IS_MAC) && !BUILDFLAG(IS_WIN)
 #endif  // !BUILDFLAG(IS_LINUX)
 #endif
 #endif
@@ -971,10 +980,11 @@ TEST_F(IntegrationTest, InstallDataIndex) {
 }
 
 TEST_F(IntegrationTest, MigrateLegacyUpdater) {
-  ASSERT_NO_FATAL_FAILURE(SetupFakeLegacyUpdaterData());
+  ASSERT_NO_FATAL_FAILURE(SetupFakeLegacyUpdater());
   ASSERT_NO_FATAL_FAILURE(Install());
+  ASSERT_TRUE(WaitForUpdaterExit());
   ASSERT_NO_FATAL_FAILURE(ExpectInstalled());
-  ASSERT_NO_FATAL_FAILURE(ExpectLegacyUpdaterDataMigrated());
+  ASSERT_NO_FATAL_FAILURE(ExpectLegacyUpdaterMigrated());
   ASSERT_NO_FATAL_FAILURE(Uninstall());
 }
 
@@ -1059,7 +1069,8 @@ TEST_F(IntegrationTestLegacyUpdate3Web, DisabledPolicy) {
                                  GOOPDATE_E_APP_UPDATE_DISABLED_BY_POLICY);
 }
 
-TEST_F(IntegrationTestLegacyUpdate3Web, CheckForUpdate) {
+// TODO(crbug.com/1396103): Re-enable after implementing `checkForUpdate`.
+TEST_F(IntegrationTestLegacyUpdate3Web, DISABLED_CheckForUpdate) {
   ASSERT_NO_FATAL_FAILURE(ExpectUpdateCheckSequence(test_server_.get(), kAppId,
                                                     "", base::Version("0.1"),
                                                     base::Version("0.2")));
@@ -1068,9 +1079,13 @@ TEST_F(IntegrationTestLegacyUpdate3Web, CheckForUpdate) {
 }
 
 TEST_F(IntegrationTestLegacyUpdate3Web, Update) {
+// TODO(crbug.com/1396103): Re-enable after implementing `checkForUpdate`.
+#if 0
   ASSERT_NO_FATAL_FAILURE(ExpectUpdateCheckSequence(test_server_.get(), kAppId,
                                                     "", base::Version("0.1"),
                                                     base::Version("0.2")));
+#endif  // #if 0
+
   ASSERT_NO_FATAL_FAILURE(ExpectUpdateSequence(test_server_.get(), kAppId, "",
                                                base::Version("0.1"),
                                                base::Version("0.2")));

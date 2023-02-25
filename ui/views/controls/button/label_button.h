@@ -73,10 +73,6 @@ class VIEWS_EXPORT LabelButton : public Button, public NativeThemeDelegate {
   // Sets the text colors shown for the non-disabled states to |color|.
   virtual void SetEnabledTextColors(absl::optional<SkColor> color);
 
-  // Enable the text colors to auto adjust for readability for the non-disabled
-  // states. Default to false.
-  void SetEnabledTextColorReadabilityAdjustment(bool enabled);
-
   // Gets the current state text color.
   SkColor GetCurrentTextColor() const;
 
@@ -129,8 +125,9 @@ class VIEWS_EXPORT LabelButton : public Button, public NativeThemeDelegate {
   int GetHeightForWidth(int w) const override;
   void Layout() override;
   void GetAccessibleNodeData(ui::AXNodeData* node_data) override;
-  void AddLayerBeneathView(ui::Layer* new_layer) override;
-  void RemoveLayerBeneathView(ui::Layer* old_layer) override;
+  void AddLayerToRegion(ui::Layer* new_layer,
+                        views::LayerRegion region) override;
+  void RemoveLayerFromRegions(ui::Layer* old_layer) override;
 
   // NativeThemeDelegate:
   ui::NativeTheme::Part GetThemePart() const override;

@@ -56,7 +56,11 @@ class CORE_EXPORT DocumentSpeculationRules
   void DocumentReferrerPolicyChanged();
   void DocumentBaseURLChanged();
   void LinkMatchedSelectorsUpdated(HTMLAnchorElement* link);
+  void LinkGainedOrLostComputedStyle(HTMLAnchorElement* link);
   void DocumentStyleUpdated();
+  void ChildStyleRecalcBlocked(Element* root);
+  void DidStyleChildren(Element* root);
+  void DisplayLockedElementDisconnected(Element* root);
 
   const HeapVector<Member<StyleRule>>& selectors() { return selectors_; }
 
@@ -109,6 +113,11 @@ class CORE_EXPORT DocumentSpeculationRules
   };
   void SetPendingUpdateState(PendingUpdateState state);
 
+  // Checks the RuntimeEnabledFeature to see if the feature is enabled. If the
+  // feature is found to be enabled once, it is considered to be enabled for the
+  // rest of the document's lifetime.
+  bool SelectorMatchesEnabled();
+
   HeapVector<Member<SpeculationRuleSet>> rule_sets_;
   HeapMojoRemote<mojom::blink::SpeculationHost> host_;
   HeapHashSet<Member<SpeculationRuleLoader>> speculation_rule_loaders_;
@@ -128,12 +137,18 @@ class CORE_EXPORT DocumentSpeculationRules
   HeapHashSet<Member<HTMLAnchorElement>> unmatched_links_;
   HeapHashSet<Member<HTMLAnchorElement>> pending_links_;
 
+  // Links with ComputedStyle that wasn't updated after the most recent style
+  // update (due to having a display-locked ancestor).
+  HeapHashSet<Member<HTMLAnchorElement>> stale_links_;
+  HeapHashSet<Member<Element>> elements_blocking_child_style_recalc_;
+
   // Collects every CSS selector from every CSS selector document rule predicate
   // in this document's speculation rules.
   HeapVector<Member<StyleRule>> selectors_;
 
   bool initialized_ = false;
   bool sent_is_part_of_no_vary_search_trial_ = false;
+  bool was_selector_matches_enabled_ = false;
   PendingUpdateState pending_update_state_ =
       PendingUpdateState::kNoUpdatePending;
 };

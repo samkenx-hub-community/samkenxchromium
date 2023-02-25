@@ -166,9 +166,12 @@ user_manager::User* FakeChromeUserManager::AddGuestUser() {
 }
 
 user_manager::User* FakeChromeUserManager::AddPublicAccountUser(
-    const AccountId& account_id) {
+    const AccountId& account_id,
+    bool with_saml) {
   user_manager::User* user =
-      user_manager::User::CreatePublicAccountUser(account_id);
+      with_saml ? user_manager::User::CreatePublicAccountUserForTestingWithSAML(
+                      account_id)
+                : user_manager::User::CreatePublicAccountUser(account_id);
   user->set_username_hash(
       user_manager::FakeUserManager::GetFakeUsernameHash(account_id));
   user->SetStubImage(
@@ -291,7 +294,7 @@ void FakeChromeUserManager::RemoveUserFromList(const AccountId& account_id) {
       WallpaperControllerClientImpl::Get();
   // `wallpaper_client` could be nullptr in tests.
   if (wallpaper_client)
-    wallpaper_client->RemoveUserWallpaper(account_id);
+    wallpaper_client->RemoveUserWallpaper(account_id, base::DoNothing());
   ProfileHelper::Get()->RemoveUserFromListForTesting(account_id);
 
   const user_manager::UserList::iterator it =
@@ -677,7 +680,10 @@ void FakeChromeUserManager::SimulateUserProfileLoad(
 }
 
 PrefService* FakeChromeUserManager::GetLocalState() const {
-  return local_state_.get();
+  if (local_state_.get()) {
+    return local_state_.get();
+  }
+  return g_browser_process ? g_browser_process->local_state() : nullptr;
 }
 
 void FakeChromeUserManager::SetIsCurrentUserNew(bool is_new) {

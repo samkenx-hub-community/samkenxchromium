@@ -13,7 +13,6 @@
 #include "base/trace_event/common/trace_event_common.h"
 #include "base/trace_event/trace_event.h"
 #include "build/build_config.h"
-#include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_finder.h"
 #include "chrome/browser/ui/browser_window.h"
@@ -191,6 +190,10 @@ gfx::Size BrowserViewLayout::GetMinimumSize(const views::View* host) const {
   // to resize the window as small as possible without introducing bugs.
   // https://crbug.com/847179.
   constexpr gfx::Size kContentsMinimumSize(1, 1);
+  if (delegate_->GetBorderlessModeEnabled()) {
+    // The minimum size of a window is unrestricted for a borderless mode app.
+    return kContentsMinimumSize;
+  }
 
   // The minimum height for the normal (tabbed) browser window's contents area.
   constexpr int kMainBrowserContentsMinimumHeight = 1;

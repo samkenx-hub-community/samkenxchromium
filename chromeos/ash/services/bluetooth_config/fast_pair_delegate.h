@@ -21,8 +21,10 @@ class FastPairDelegate {
   virtual ~FastPairDelegate() = default;
 
   virtual absl::optional<DeviceImageInfo> GetDeviceImageInfo(
-      const std::string& device_id) = 0;
+      const std::string& mac_address) = 0;
   virtual void ForgetDevice(const std::string& mac_address) = 0;
+  virtual void UpdateDeviceNickname(const std::string& mac_address,
+                                    const std::string& nickname) = 0;
   virtual void SetAdapterStateController(
       AdapterStateController* adapter_state_controller) = 0;
   virtual void SetDeviceNameManager(DeviceNameManager* device_name_manager) = 0;

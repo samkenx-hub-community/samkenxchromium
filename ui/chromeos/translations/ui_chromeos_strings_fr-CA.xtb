@@ -27,12 +27,12 @@
 <translation id="1201402288615127009">Suivant</translation>
 <translation id="1209796539517632982">Serveurs de noms automatiques</translation>
 <translation id="1210831758834677569">Laotien</translation>
+<translation id="1221555006497674479">Il ne reste plus que <ph name="REMAINING_PERCENTAGE" /> % dans votre espace de stockage Disque partagé de <ph name="TOTAL_SPACE" />.</translation>
 <translation id="1243314992276662751">Téléverser</translation>
 <translation id="1249250836236328755">Genre</translation>
 <translation id="1254593899333212300">Connexion directe à Internet</translation>
 <translation id="1272293450992660632">Les NIP ne correspondent pas.</translation>
 <translation id="1280820357415527819">Recherche de réseaux mobiles en cours…</translation>
-<translation id="1291603679744561561">Carte SIM verrouillée</translation>
 <translation id="1293556467332435079">Fichiers</translation>
 <translation id="1297922636971898492">Google Disque n'est pas accessible pour le moment. Le téléversement reprendra lorsque Google Disque sera de nouveau fonctionnel.</translation>
 <translation id="1307931752636661898">Impossible d'afficher les fichiers Linux</translation>
@@ -59,7 +59,6 @@
 <translation id="1499943022354839699">Anglais (É.-U.) avec clavier Dvorak</translation>
 <translation id="1515909359182093592"><ph name="INPUT_LABEL" /> – Hôte</translation>
 <translation id="1521655867290435174">Google Feuilles de calcul</translation>
-<translation id="1521795806314479294">Préparation de <ph name="FILE_NAME" /> en cours…</translation>
 <translation id="1538729222189715449">Ouverture des fichiers Linux en cours…</translation>
 <translation id="1547964879613821194">Anglais canadien</translation>
 <translation id="1556189134700913550">Appliquer à tout</translation>
@@ -75,6 +74,7 @@
 <translation id="1641780993263690097">Pinyin chinois</translation>
 <translation id="1646019627374511909">Mise à disposition hors ligne de <ph name="NUMBER_OF_ITEMS" /> fichiers en cours…</translation>
 <translation id="164969095109328410">Appareil Google Chrome</translation>
+<translation id="1661207570040737402">Vous avez utilisé tout l'espace de stockage Google Workspace de votre espace de stockage Disque partagé.</translation>
 <translation id="1661867754829461514">NIP manquant</translation>
 <translation id="166439687370499867">La modification de configurations de réseau partagé n'est pas autorisée</translation>
 <translation id="1665611772925418501">Le fichier n'a pas pu être modifié.</translation>
@@ -84,7 +84,6 @@
 <translation id="1722487484194605434">Compression de <ph name="NUMBER_OF_ITEMS" /> éléments en cours…</translation>
 <translation id="1722687688096767818">Ajout du profil en cours…</translation>
 <translation id="1726100011689679555">Serveurs de noms</translation>
-<translation id="1727562178154619254">Prêt à synchroniser</translation>
 <translation id="1729953886957086472">Allemand (Allemagne)</translation>
 <translation id="1730235522912993863">Chinois (cangjie)</translation>
 <translation id="1731889557567069540"><ph name="NUMBER_OF_ITEMS" /> éléments copiés</translation>
@@ -194,6 +193,7 @@
 <translation id="2574327434504608656">1 dossier partagé avec Bruschetta</translation>
 <translation id="2578394532502990878">Tamoul (phonétique)</translation>
 <translation id="2579959351793446050">Odia</translation>
+<translation id="2587195714949534472">Préparation de la synchronisation de <ph name="FILE_NAME" />…</translation>
 <translation id="2602810353103180630">Réseau <ph name="NETWORK_INDEX" /> sur <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, <ph name="CONNECTION_STATUS" />, puissance du signal <ph name="SIGNAL_STRENGTH" /> %, bloqué par votre administrateur, détails</translation>
 <translation id="2614589611416690597">Vidéo <ph name="VIDEO_TYPE" /></translation>
 <translation id="2620090360073999360">Google Disque est temporairement inaccessible.</translation>
@@ -295,6 +295,7 @@
 <translation id="3486821258960016770">Mongol</translation>
 <translation id="3495304270784461826"><ph name="COUNT" /> erreurs.</translation>
 <translation id="3509680540198371098">Réseau <ph name="NETWORK_INDEX" /> sur <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, <ph name="SECURITY_STATUS" />, <ph name="CONNECTION_STATUS" />, force du signal : <ph name="SIGNAL_STRENGTH" /> %, détails</translation>
+<translation id="3511705761158917664">Préparation de la synchronisation de <ph name="NUMBER_OF_ITEMS" /> éléments…</translation>
 <translation id="3522708245912499433">Portugais</translation>
 <translation id="3524311639100184459">Attention : Ces fichiers sont temporaires et peuvent être automatiquement supprimés pour libérer de l'espace disque.  <ph name="BEGIN_LINK" />En savoir plus<ph name="END_LINK" /></translation>
 <translation id="3527085408025491307">Dossier</translation>
@@ -350,11 +351,11 @@
 <translation id="3924145049010392604">Méta</translation>
 <translation id="3943857333388298514">Coller</translation>
 <translation id="3952872973865944257">Télougou (phonétique)</translation>
-<translation id="3954354850384043518">En cours</translation>
 <translation id="3958548648197196644">Kiwi</translation>
 <translation id="3971140002794351170">Télécharger le profil cellulaire, réseau <ph name="NETWORK_INDEX" /> sur <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, <ph name="NETWORK_PROVIDER_NAME" /></translation>
 <translation id="3973925058222872294">Anglais (R.-U.)</translation>
 <translation id="3975895378829046965">Bangla (phonétique)</translation>
+<translation id="3999574733850440202">Les fichiers Microsoft récemment ouverts ont été déplacés vers OneDrive</translation>
 <translation id="4002066346123236978">Titre</translation>
 <translation id="4017788180641807848">Anglais (É.-U.) avec clavier Workman</translation>
 <translation id="4019998208269143058">Épingler à l'accès rapide aux fichiers</translation>
@@ -515,7 +516,6 @@
    en utilisant l'application Fichiers.</translation>
 <translation id="5163869187418756376">Échec du partage. Veuillez vérifier votre connexion et réessayer plus tard.</translation>
 <translation id="516592729076796170">Dvorak programmeur américain</translation>
-<translation id="5167102019886320507">Préparation de <ph name="NUMBER_OF_ITEMS" /> éléments en cours…</translation>
 <translation id="5177526793333269655">Affichage de miniatures</translation>
 <translation id="5181896909298187506">Aucun fichier récent</translation>
 <translation id="5194713942430106590">Cliquez ici pour trier la colonne par ordre croissant.</translation>
@@ -794,6 +794,7 @@
 <translation id="7458955835361612701">Aucune image récente</translation>
 <translation id="7460898608667578234">Ukrainien</translation>
 <translation id="7469894403370665791">Se connecter automatiquement à ce réseau</translation>
+<translation id="7481358317100446445">Prêt</translation>
 <translation id="7486315294984620427">Pour déposer des fichiers dans Parallels Desktop, le fichier doit être copié dans le dossier Fichiers Windows.</translation>
 <translation id="749452993132003881">Hiragana</translation>
 <translation id="7495372004724182530">Malayalam (phonétique)</translation>
@@ -831,6 +832,7 @@
 <translation id="7724603315864178912">Couper</translation>
 <translation id="7732111077498238432">Le réseau est contrôlé par une politique</translation>
 <translation id="7736003208887389532">Supprimer définitivement ces fichiers?</translation>
+<translation id="7740287852186792672">Résultats de recherche</translation>
 <translation id="7748626145866214022">Vous trouverez d'autres options dans la barre d'action. Appuyez sur Alt + A pour mettre en évidence la barre d'action.</translation>
 <translation id="7760449188139285140">Chinois (Wubi)</translation>
 <translation id="7765158879357617694">Déplacer</translation>
@@ -882,6 +884,7 @@
 <translation id="8116072619078571545">Eau glacée</translation>
 <translation id="8128733386027980860">Anglais (R.-U.) avec clavier Dvorak</translation>
 <translation id="8137331602592933310">Le fichier « <ph name="FILENAME" /> » a été partagé avec vous. Vous ne pouvez pas le supprimer, car vous n'en êtes pas le propriétaire.</translation>
+<translation id="8138705869659070104">Activer après config. app.</translation>
 <translation id="813913629614996137">Initialisation en cours...</translation>
 <translation id="8147028810663464959">Largeur de caractères : pleine</translation>
 <translation id="8151638057146502721">Configurer</translation>
@@ -907,6 +910,7 @@
 <translation id="8300849813060516376">Échec de l'opération OTASP</translation>
 <translation id="8312871300878166382">Coller dans le dossier</translation>
 <translation id="8329978297633540474">Texte brut</translation>
+<translation id="8332007959299458842">Les fichiers Microsoft récemment ouverts ont été déplacés vers Google Disque</translation>
 <translation id="8335587457941836791">Retirer de l'étagère</translation>
 <translation id="8335837413233998004">Biélorusse</translation>
 <translation id="8336153091935557858">Hier à <ph name="YESTERDAY_DAYTIME" /></translation>
@@ -994,6 +998,7 @@
 <translation id="9046895021617826162">Échec de la connexion</translation>
 <translation id="9065512565307033593">Si vous n'effectuez pas la vérification, votre accès réseau sera désactivé.</translation>
 <translation id="908378762078012445">Russe avec clavier phonétique AATSEEL</translation>
+<translation id="9086302186042011942">Synchronisation en cours...</translation>
 <translation id="9099674669267916096">Nombre de pages</translation>
 <translation id="9100610230175265781">Une phrase de passe est requise</translation>
 <translation id="9110990317705400362">Nous recherchons sans cesse à sécuriser voter navigation. Avant, n'importe quel site Web pouvait vous inviter à ajouter une extension à votre navigateur. Avec les dernières versions de Google Chrome, vous devez préciser explicitement à Chrome que vous souhaitez installer ces extensions en les ajoutant depuis la page Extensions. <ph name="BEGIN_LINK" />En savoir plus<ph name="END_LINK" /></translation>

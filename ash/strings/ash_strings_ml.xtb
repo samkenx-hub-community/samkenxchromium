@@ -133,11 +133,13 @@
 <translation id="163517899691012366">'ശല്യപ്പെടുത്തരുത്' ഓണായിരിക്കുമ്പോൾ അറിയിപ്പുകൾ മ്യൂട്ട് ചെയ്യുന്നു</translation>
 <translation id="1637505162081889933"><ph name="NUM_DEVICES" /> ഉപകരണങ്ങൾ</translation>
 <translation id="1639239467298939599">ലോഡുചെയ്യുന്നു</translation>
+<translation id="1647986356840967552">മുമ്പത്തെ പേജ്</translation>
 <translation id="1654477262762802994">ഒരു ശബ്‌ദ ചോദ്യം ആരംഭിക്കുക</translation>
 <translation id="1668469839109562275">ബിൽറ്റ് ഇൻ VPN</translation>
 <translation id="1677472565718498478"><ph name="TIME" /> ശേഷിക്കുന്നു</translation>
 <translation id="1677507110654891115"><ph name="FEATURE_NAME" /> കണക്‌റ്റ് ചെയ്‌തിട്ടില്ല.</translation>
 <translation id="1677582821739292812">ആരോ നിങ്ങളുടെ സ്ക്രീനിലേക്ക് നോക്കുന്നു</translation>
+<translation id="1683399938733266832">CPU-ന്റെ നിലവിലെ ഉപയോഗം: <ph name="CPU_USEAGE" />%</translation>
 <translation id="169515659049020177">Shift</translation>
 <translation id="1698080062160024910"><ph name="TOTAL_TIME" /> ടൈമർ · <ph name="LABEL" /></translation>
 <translation id="1698760176351776263">IPv6 വിലാസം: <ph name="ADDRESS" /></translation>
@@ -286,6 +288,7 @@
 <translation id="2475982808118771221">ഒരു പിശക് സംഭവിച്ചു</translation>
 <translation id="2482878487686419369">അറിയിപ്പുകൾ</translation>
 <translation id="2484513351006226581">കീബോര്‍‌ഡ് ലേഔട്ട് മാറാൻ <ph name="KEYBOARD_SHORTCUT" /> അമർത്തുക.</translation>
+<translation id="2487915095798731898">ചേരുക</translation>
 <translation id="2501920221385095727">സ്‌റ്റിക്കി കീകൾ</translation>
 <translation id="2509468283778169019">CAPS LOCK ഓൺ ആണ്</translation>
 <translation id="2515586267016047495">Alt</translation>
@@ -380,6 +383,7 @@
 <translation id="3051189971848907985">പ്രൊഫൈലിന്റെ പേര് മാറ്റുന്നു. അൽപ്പസമയം കാത്തിരിക്കുക.</translation>
 <translation id="3055162170959710888">നിങ്ങൾ ഇന്ന് <ph name="USED_TIME" />, ഈ ഉപകരണം ഉപയോഗിച്ചു</translation>
 <translation id="3062298103034426069">പിന്തുണയ്ക്കുന്നില്ല</translation>
+<translation id="3068622547379332530"><ph name="VERSION_NAME" /> പതിപ്പ് (<ph name="OFFICIAL_STATUS" />) <ph name="CHANNEL_NAME" /> <ph name="PROCESSOR_VARIATION" /></translation>
 <translation id="3068711042108640621">സ്‌ക്രീനിൻ്റെ ഇടതുഭാഗത്താണ് ഷെൽഫ്</translation>
 <translation id="3077734595579995578">shift</translation>
 <translation id="3081696990447829002">മെനു വികസിപ്പിക്കുക</translation>
@@ -545,6 +549,7 @@
 <translation id="3925540965556789199"><ph name="DATE" />, ഇവന്റുകൾ ലോഡ് ചെയ്യുന്നു.</translation>
 <translation id="3932043219784172185">ഉപകരണമൊന്നും കണക്റ്റ് ചെയ്‌തിട്ടില്ല</translation>
 <translation id="3934456833412894880">അഡാപ്റ്റീവ് ചാർജിംഗ് ഓണാണ്. ബാറ്ററി ലൈഫ് വർദ്ധിപ്പിക്കുന്നതിന് നിങ്ങളുടെ ബാറ്ററി ചാർജ് 80% എന്ന നിലയിൽ തുടരും, നിങ്ങൾക്ക് ആവശ്യമുള്ളപ്പോൾ അത് പൂർണ്ണമായി ചാർജ് ചെയ്യും.</translation>
+<translation id="3936620957945677513"><ph name="EVENT_SUMMARY" /> എന്ന ഇവന്റിൽ ചേരാൻ Enter അമർത്തുക</translation>
 <translation id="3943857333388298514">ഒട്ടിക്കുക</translation>
 <translation id="394485226368336402">ഓഡിയോ ക്രമീകരണം</translation>
 <translation id="3945319193631853098">സജ്ജീകരണം പൂർത്തിയാക്കാൻ ടാപ്പ് ചെയ്യുക</translation>
@@ -555,6 +560,7 @@
 <translation id="397105322502079400">കണക്കാക്കുന്നു...</translation>
 <translation id="397726367135689299">ബാറ്ററി ശരിയായി ചാർജ് ആകുന്നുണ്ടാകില്ല.</translation>
 <translation id="3977512764614765090">ബാറ്ററി <ph name="PERCENTAGE" />% ഉണ്ട്, ചാർജ് ചെയ്യുകയുമാണ്.</translation>
+<translation id="3984536049089846927">അടുത്ത പേജ്</translation>
 <translation id="3986082989454912832">കോൾ സ്വീകരിക്കുക</translation>
 <translation id="3995138139523574647">USB-C ഉപകരണം (വലതുവശത്ത് പിന്നിലെ പോർട്ട്)</translation>
 <translation id="40062176907008878">കൈയ്യെഴുത്ത്</translation>
@@ -577,7 +583,7 @@
 <translation id="4123259114412175274">നിങ്ങളുടെ Chromebook അൺലോക്ക് ചെയ്യാൻ നിങ്ങളുടെ ഫോണിന്റെ Bluetooth ഓണാണെന്ന് ഉറപ്പാക്കുക</translation>
 <translation id="4125970834901680537">ടാബ്‌ലെറ്റ് മോഡിൽ ആപ്പുകൾ സ്ട്രീം ചെയ്യാനാകില്ല. ലാപ്ടോപ്പ് മോഡിൽ വീണ്ടും ശ്രമിക്കുക.</translation>
 <translation id="4129129681837227511">നിങ്ങളുടെ ലോക്ക് സ്‌ക്രീനിൽ അറിയിപ്പുകൾ കാണാൻ, ക്രമീകരണം മാറ്റാനായി അൺലോക്ക് ചെയ്യുക</translation>
-<translation id="4130035430755296270">കൂടുതൽ ലേഔട്ട് ഓപ്ഷനുകൾക്ക് ഹോവർ ചെയ്യുന്നത് തുടരുക</translation>
+<translation id="4131973331381812765">താപനില: <ph name="TEMPERATURE" />°C - നിലവിലെ വേഗത: <ph name="CPU_AVERAGE_CURRENT_FREQUENCY_GHZ" />GHz</translation>
 <translation id="4136724716305260864">സൂര്യോദയം വരെ ഓണാണ്</translation>
 <translation id="4146833061457621061">സംഗീതം പ്ലേ ചെയ്യുക</translation>
 <translation id="4150201353443180367">ഡിസ്‌പ്ലേ</translation>
@@ -732,6 +738,7 @@
 <translation id="4895488851634969361">ബാറ്ററി ചാർജുചെയ്യൽ പൂർണ്ണമായി.</translation>
 <translation id="490375751687810070">ലംബം</translation>
 <translation id="490788395437447240"><ph name="BATTERY_PERCENTAGE" />% ബാറ്ററി</translation>
+<translation id="491504982845934899">ഉപകരണം സജ്ജീകരിച്ച് <ph name="NETWORK_NAME" /> സജീവമാക്കൂ</translation>
 <translation id="4917385247580444890">ശക്തം</translation>
 <translation id="4918086044614829423">സ്വീകരിക്കുക</translation>
 <translation id="4919841137949306064"><ph name="APP_NAME" /> നിലവിൽ നിങ്ങളുടെ ക്യാമറ ഉപയോഗിക്കുന്നു</translation>
@@ -913,6 +920,7 @@
 <translation id="5867606971598166637">നിങ്ങളുടെ സിസ്റ്റം അഡ്മിൻ സ്ക്രീനുകൾ നിരീക്ഷിക്കുന്നു</translation>
 <translation id="5876666360658629066">രക്ഷാകർതൃ കോഡ് നൽകുക</translation>
 <translation id="5881540930187678962">ഫോൺ ഹബ് പിന്നീട് സജ്ജീകരിക്കുക</translation>
+<translation id="5881663018261910378">ഓഫാണ്</translation>
 <translation id="5887954372087850114"><ph name="DESK_TITLE" /> എന്നതിലേക്ക് <ph name="WINDOW_TITLE" /> വിൻഡോ അസൈൻ ചെയ്യുകയും മറ്റ് എല്ലാ ഡെസ്ക്കുകളിൽ നിന്നും അസൈൻ ചെയ്തത് മാറ്റുകയും ചെയ്തു</translation>
 <translation id="5895138241574237353">പുനരാരംഭിക്കുക</translation>
 <translation id="589817443623831496">പോയിന്റ് സ്കാൻ ചെയ്യൽ</translation>
@@ -1327,6 +1335,7 @@
 <translation id="8131740175452115882">സ്ഥിരീകരിക്കുക</translation>
 <translation id="8131994907636310308">അടുക്കൽ ടോസ്റ്റ് അടയ്ക്കുക</translation>
 <translation id="8132793192354020517"><ph name="NAME" /> എന്നതിലേക്ക് ബന്ധിപ്പിച്ചു</translation>
+<translation id="8138705869659070104">ഉപകരണം സജ്ജീകരിച്ച് സജീവമാക്കൂ</translation>
 <translation id="813913629614996137">ആരംഭിക്കുന്നു...</translation>
 <translation id="8142441511840089262">ഡബിൾ ക്ലിക്ക് ചെയ്യുക</translation>
 <translation id="8142699993796781067">സ്വകാര്യനെറ്റ്‌വര്‍ക്ക്</translation>
@@ -1458,6 +1467,7 @@
 <translation id="8850991929411075241">തിരയൽ+Esc</translation>
 <translation id="8853703225951107899">നിങ്ങളുടെ പിൻ അല്ലെങ്കിൽ പാസ്‌വേഡ് ഇപ്പോഴും പരിശോധിച്ചുറപ്പിക്കാനായില്ല. ശ്രദ്ധിക്കുക: നിങ്ങൾ അടുത്തിടെ പാസ്‌വേഡ് മാറ്റിയിട്ടുണ്ടെങ്കിൽ, നിങ്ങളുടെ പഴയ പാസ്‌വേഡ് ഉപയോഗിക്കുക. സൈൻ ഔട്ട് ചെയ്‌തുകഴിഞ്ഞാൽ നിങ്ങളുടെ പുതിയ പാസ്‍വേഡ് ബാധകമാകും.</translation>
 <translation id="8855885154700222542">പൂർണ്ണ സ്‌ക്രീൻ കീ</translation>
+<translation id="8858369206579825206">സ്വകാര്യതാ നിയന്ത്രണങ്ങൾ</translation>
 <translation id="8870509716567206129">സ്പ്ലിറ്റ്-സ്ക്രീനിനെ ആപ്പ് പിന്തുണയ്ക്കുന്നില്ല.</translation>
 <translation id="8874184842967597500">കണക്റ്റല്ല</translation>
 <translation id="8876661425082386199">നിങ്ങളുടെ കണക്ഷൻ പരിശോധിക്കുക</translation>

@@ -486,12 +486,8 @@ class MODULES_EXPORT AXObject : public GarbageCollected<AXObject> {
   // elements are, etc.
   bool AccessibilityIsIncludedInTree() const;
   typedef HeapVector<IgnoredReason> IgnoredReasons;
-  virtual bool ComputeAccessibilityIsIgnored(IgnoredReasons* = nullptr) const {
-    return true;
-  }
-  bool AccessibilityIsIgnoredByDefault(IgnoredReasons* = nullptr) const;
-  virtual AXObjectInclusion DefaultObjectInclusion(
-      IgnoredReasons* = nullptr) const;
+  virtual bool ComputeAccessibilityIsIgnored(IgnoredReasons* = nullptr) const;
+  bool ShouldIgnoreForHiddenOrInert(IgnoredReasons* = nullptr) const;
   bool IsInert() const;
   bool IsAriaHidden() const;
   bool CachedIsAriaHidden() { return cached_is_aria_hidden_; }
@@ -737,8 +733,6 @@ class MODULES_EXPORT AXObject : public GarbageCollected<AXObject> {
   virtual ax::mojom::blink::InvalidState GetInvalidState() const {
     return ax::mojom::blink::InvalidState::kNone;
   }
-  // Only used when invalidState() returns InvalidStateOther.
-  virtual String AriaInvalidValue() const { return String(); }
   virtual bool ValueForRange(float* out_value) const { return false; }
   virtual bool MaxValueForRange(float* out_value) const { return false; }
   virtual bool MinValueForRange(float* out_value) const { return false; }
@@ -785,6 +779,9 @@ class MODULES_EXPORT AXObject : public GarbageCollected<AXObject> {
 
   // Determines whether this object is a popup, and what type.
   virtual ax::mojom::blink::IsPopup IsPopup() const;
+
+  // Heuristic to get the target popover for an invoking element.
+  AXObject* GetTargetPopoverForInvoker();
 
   // Heuristic to get the listbox for an <input role="combobox">.
   AXObject* GetControlsListboxForTextfieldCombobox();
@@ -1465,7 +1462,7 @@ class MODULES_EXPORT AXObject : public GarbageCollected<AXObject> {
   mutable bool cached_is_ignored_but_included_in_tree_ : 1;
   mutable bool cached_is_inert_ : 1;
   mutable bool cached_is_aria_hidden_ : 1;
-  mutable bool cached_is_hidden_via_style : 1;
+  mutable bool cached_is_hidden_via_style_ : 1;
   mutable bool cached_is_descendant_of_disabled_node_ : 1;
   mutable bool cached_can_set_focus_attribute_ : 1;
 

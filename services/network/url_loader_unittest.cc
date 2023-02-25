@@ -25,6 +25,7 @@
 #include "base/run_loop.h"
 #include "base/strings/escape.h"
 #include "base/strings/strcat.h"
+#include "base/strings/string_util.h"
 #include "base/strings/stringprintf.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/task/sequenced_task_runner.h"
@@ -84,11 +85,14 @@
 #include "net/url_request/url_request_job.h"
 #include "net/url_request/url_request_test_job.h"
 #include "net/url_request/url_request_test_util.h"
+#include "services/network/attribution/attribution_request_helper.h"
+#include "services/network/attribution/attribution_test_utils.h"
 #include "services/network/cache_transparency_settings.h"
 #include "services/network/public/cpp/cors/origin_access_list.h"
 #include "services/network/public/cpp/features.h"
 #include "services/network/public/cpp/ip_address_space_util.h"
 #include "services/network/public/cpp/resource_request.h"
+#include "services/network/public/cpp/trust_token_http_headers.h"
 #include "services/network/public/mojom/cookie_access_observer.mojom-forward.h"
 #include "services/network/public/mojom/cookie_access_observer.mojom.h"
 #include "services/network/public/mojom/early_hints.mojom.h"
@@ -647,7 +651,7 @@ struct URLLoaderOptions {
         std::move(trust_token_observer), std::move(url_loader_network_observer),
         std::move(devtools_observer), std::move(accept_ch_frame_observer),
         third_party_cookies_enabled, cookie_setting_overrides,
-        cache_transparency_settings);
+        cache_transparency_settings, std::move(attribution_request_helper));
   }
 
   int32_t options = mojom::kURLLoadOptionNone;
@@ -658,6 +662,7 @@ struct URLLoaderOptions {
   int keepalive_request_size = 0;
   base::WeakPtr<KeepaliveStatisticsRecorder> keepalive_statistics_recorder;
   std::unique_ptr<TrustTokenRequestHelperFactory> trust_token_helper_factory;
+  std::unique_ptr<AttributionRequestHelper> attribution_request_helper;
   mojo::PendingRemote<mojom::CookieAccessObserver> cookie_observer =
       mojo::NullRemote();
   mojo::PendingRemote<mojom::TrustTokenAccessObserver> trust_token_observer =
@@ -764,6 +769,8 @@ class URLLoaderTest : public testing::Test {
 
     test_server_.AddDefaultHandlers(
         base::FilePath(FILE_PATH_LITERAL("services/test/data")));
+    test_server_.RegisterRequestHandler(
+        base::BindRepeating(&HandleAttestationRequest));
     // This Unretained is safe because test_server_ is owned by |this|.
     test_server_.RegisterRequestMonitor(
         base::BindRepeating(&URLLoaderTest::Monitor, base::Unretained(this)));
@@ -1939,16 +1946,14 @@ TEST_F(URLLoaderTest, AddsNetLogEntryForPrivateNetworkAccessCheckSuccess) {
 
   ASSERT_THAT(entries, SizeIs(1));
 
-  const base::Value& params = entries[0].params;
-  ASSERT_EQ(params.type(), base::Value::Type::DICT);
+  const base::Value::Dict& params = entries[0].params;
 
-  EXPECT_THAT(params.GetDict().FindString("client_address_space"),
+  EXPECT_THAT(params.FindString("client_address_space"), Pointee(Eq("local")));
+
+  EXPECT_THAT(params.FindString("resource_address_space"),
               Pointee(Eq("local")));
 
-  EXPECT_THAT(params.GetDict().FindString("resource_address_space"),
-              Pointee(Eq("local")));
-
-  EXPECT_THAT(params.GetDict().FindString("result"),
+  EXPECT_THAT(params.FindString("result"),
               Pointee(Eq("allowed-no-less-public")));
 }
 
@@ -1968,16 +1973,14 @@ TEST_F(URLLoaderTest, AddsNetLogEntryForPrivateNetworkAccessCheckFailure) {
 
   ASSERT_THAT(entries, SizeIs(1));
 
-  const base::Value& params = entries[0].params;
-  ASSERT_EQ(params.type(), base::Value::Type::DICT);
+  const base::Value::Dict params = std::move(entries[0].params);
 
-  EXPECT_THAT(params.GetDict().FindString("client_address_space"),
-              Pointee(Eq("public")));
+  EXPECT_THAT(params.FindString("client_address_space"), Pointee(Eq("public")));
 
-  EXPECT_THAT(params.GetDict().FindString("resource_address_space"),
+  EXPECT_THAT(params.FindString("resource_address_space"),
               Pointee(Eq("local")));
 
-  EXPECT_THAT(params.GetDict().FindString("result"),
+  EXPECT_THAT(params.FindString("result"),
               Pointee(Eq("blocked-by-policy-preflight-block")));
 }
 
@@ -4756,7 +4759,7 @@ TEST_F(URLLoaderTest, AllowAllCookies) {
 
 class URLLoaderCookieSettingOverridesTest
     : public URLLoaderTest,
-      public ::testing::WithParamInterface<std::tuple<bool, bool>> {
+      public ::testing::WithParamInterface<std::tuple<bool, bool, bool, bool>> {
  public:
   ~URLLoaderCookieSettingOverridesTest() override = default;
 
@@ -4768,22 +4771,40 @@ class URLLoaderCookieSettingOverridesTest
       EXPECT_EQ(request.mode, network::mojom::RequestMode::kNoCors);
     }
     request.is_outermost_main_frame = IsOuterMostFrame();
+    request.has_storage_access = HasStorageAccess();
+    if (!InitiatorIsOtherOrigin()) {
+      request.request_initiator =
+          url::Origin::Create(GURL("http://other-origin.test/"));
+    }
   }
 
-  net::CookieSettingOverrides GetCookieSettingOverrides() const {
+  net::CookieSettingOverrides ExpectedCookieSettingOverrides() const {
+    net::CookieSettingOverrides overrides;
     if (IsCors() && IsOuterMostFrame()) {
-      return net::CookieSettingOverrides(
+      overrides.Put(
           net::CookieSettingOverride::kTopLevelStorageAccessGrantEligible);
     }
-    return net::CookieSettingOverrides();
+    if (HasStorageAccess() && InitiatorIsOtherOrigin()) {
+      overrides.Put(net::CookieSettingOverride::kStorageAccessGrantEligible);
+    }
+    return overrides;
+  }
+
+  net::CookieSettingOverrides
+  ExpectedCookieSettingOverridesForCrossSiteRedirect() const {
+    net::CookieSettingOverrides overrides = ExpectedCookieSettingOverrides();
+    overrides.Remove(net::CookieSettingOverride::kStorageAccessGrantEligible);
+    return overrides;
   }
 
  private:
   bool IsCors() const { return std::get<0>(GetParam()); }
   bool IsOuterMostFrame() const { return std::get<1>(GetParam()); }
+  bool HasStorageAccess() const { return std::get<2>(GetParam()); }
+  bool InitiatorIsOtherOrigin() const { return std::get<3>(GetParam()); }
 };
 
-TEST_P(URLLoaderCookieSettingOverridesTest, TopLevelStorageAccessOverride) {
+TEST_P(URLLoaderCookieSettingOverridesTest, CookieSettingOverrides) {
   GURL url("http://www.example.com.test/");
   base::RunLoop delete_run_loop;
   ResourceRequest request = CreateResourceRequest("GET", url);
@@ -4802,12 +4823,42 @@ TEST_P(URLLoaderCookieSettingOverridesTest, TopLevelStorageAccessOverride) {
 
   const std::vector<net::CookieSettingOverrides> records =
       test_network_delegate()->cookie_setting_overrides_records();
-  EXPECT_THAT(records, ElementsAre(GetCookieSettingOverrides(),
-                                   GetCookieSettingOverrides()));
+  EXPECT_THAT(records, ElementsAre(ExpectedCookieSettingOverrides(),
+                                   ExpectedCookieSettingOverrides()));
 }
 
 TEST_P(URLLoaderCookieSettingOverridesTest,
-       TopLevelStorageAccessOverride_UnchangedOnRedirects) {
+       CookieSettingOverrides_OnSameSiteRedirects) {
+  GURL redirecting_url = test_server()->GetURL(
+      "/server-redirect?" + test_server()->GetURL("/simple_page.html").spec());
+
+  base::RunLoop delete_run_loop;
+  ResourceRequest request = CreateResourceRequest("GET", redirecting_url);
+  SetUpRequest(request);
+
+  mojo::Remote<mojom::URLLoader> loader;
+  std::unique_ptr<URLLoader> url_loader;
+  context().mutable_factory_params().process_id = mojom::kBrowserProcessId;
+  url_loader = URLLoaderOptions().MakeURLLoader(
+      context(), DeleteLoaderCallback(&delete_run_loop, &url_loader),
+      loader.BindNewPipeAndPassReceiver(), request, client()->CreateRemote());
+
+  client()->RunUntilRedirectReceived();
+  loader->FollowRedirect({}, {}, {}, absl::nullopt);
+  client()->RunUntilComplete();
+  delete_run_loop.Run();
+
+  const std::vector<net::CookieSettingOverrides> records =
+      test_network_delegate()->cookie_setting_overrides_records();
+
+  EXPECT_THAT(records, ElementsAre(ExpectedCookieSettingOverrides(),
+                                   ExpectedCookieSettingOverrides(),
+                                   ExpectedCookieSettingOverrides(),
+                                   ExpectedCookieSettingOverrides()));
+}
+
+TEST_P(URLLoaderCookieSettingOverridesTest,
+       CookieSettingOverrides_OnCrossSiteRedirects) {
   GURL dest_url("http://www.example.com.test/");
   GURL redirecting_url =
       test_server()->GetURL("/server-redirect?" + dest_url.spec());
@@ -4830,16 +4881,25 @@ TEST_P(URLLoaderCookieSettingOverridesTest,
 
   const std::vector<net::CookieSettingOverrides> records =
       test_network_delegate()->cookie_setting_overrides_records();
-  EXPECT_EQ(records.size(), 4u);
-  for (size_t i = 0; i < records.size(); i++) {
-    EXPECT_EQ(records[i], GetCookieSettingOverrides())
-        << "element at index " << i << " mismatched.";
-  }
+
+  EXPECT_THAT(
+      records,
+      ElementsAre(ExpectedCookieSettingOverrides(),
+                  ExpectedCookieSettingOverrides(),
+                  ExpectedCookieSettingOverridesForCrossSiteRedirect(),
+                  ExpectedCookieSettingOverridesForCrossSiteRedirect()));
 }
+
+// TODO(crbug.com/1401089): Add test case for two-time redirects with the first
+// redirect cross-site and the second redirect same-site, to verify the enum
+// gets removed for the first redirect and added for the second.
 
 INSTANTIATE_TEST_SUITE_P(All,
                          URLLoaderCookieSettingOverridesTest,
-                         testing::Combine(testing::Bool(), testing::Bool()));
+                         testing::Combine(testing::Bool(),
+                                          testing::Bool(),
+                                          testing::Bool(),
+                                          testing::Bool()));
 
 namespace {
 
@@ -5968,7 +6028,7 @@ class ExpectCookieSettingOverridesURLRequestInterceptor
 
  private:
   const net::CookieSettingOverrides cookie_setting_overrides_;
-  bool* const was_intercepted_;
+  const raw_ptr<bool> was_intercepted_;
 };
 
 }  // namespace
@@ -5984,6 +6044,10 @@ class URLLoaderSyncOrAsyncTrustTokenOperationTest
  protected:
   ResourceRequest CreateTrustTokenResourceRequest() {
     GURL request_url = test_server()->GetURL("/simple_page.html");
+    return CreateTrustTokenResourceRequest(request_url);
+  }
+
+  ResourceRequest CreateTrustTokenResourceRequest(const GURL& request_url) {
     ResourceRequest request = CreateResourceRequest("GET", request_url);
     request.trust_token_params =
         OptionalTrustTokenParams(mojom::TrustTokenParams::New());
@@ -6113,6 +6177,54 @@ TEST_P(URLLoaderSyncOrAsyncTrustTokenOperationTest,
   EXPECT_THAT(trust_token_observer.observed_tokens(),
               testing::ElementsAre(
                   MatchesTrustTokenDetails(test_server()->GetOrigin(), false)));
+}
+
+TEST_P(URLLoaderSyncOrAsyncTrustTokenOperationTest,
+       HandlesTrustTokenFollowedByAttribution) {
+  GURL request_url = test_server_.GetURL(
+      base::JoinString({kAttestationHandlerPathPrefix, "some-path"}, "/"));
+
+  ResourceRequest request = CreateTrustTokenResourceRequest(request_url);
+
+  base::RunLoop delete_run_loop;
+
+  mojo::PendingRemote<mojom::URLLoader> loader_remote;
+  std::unique_ptr<URLLoader> url_loader;
+
+  // Request must come from a valid origin for attestation operation to run.
+  context().mutable_factory_params().isolation_info =
+      net::IsolationInfo::CreateForInternalRequest(url::Origin::Create(
+          GURL("https://valid-destination-origin.example")));
+
+  URLLoaderOptions url_loader_options;
+
+  // Hook trust token helper
+  url_loader_options.trust_token_helper_factory =
+      std::make_unique<MockTrustTokenRequestHelperFactory>(
+          /*on_begin=*/mojom::TrustTokenOperationStatus::kOk,
+          /*on_finalize=*/mojom::TrustTokenOperationStatus::kOk, GetParam(),
+          &outbound_trust_token_operation_was_successful_);
+
+  // Hook attribution helper
+  auto trust_token_key_commitments = CreateTestTrustTokenKeyCommitments(
+      /*key=*/"any-key",
+      /*protocol_version=*/mojom::TrustTokenProtocolVersion::kTrustTokenV3Pmb,
+      /*issuer_url=*/request_url);
+  url_loader_options.attribution_request_helper =
+      CreateTestAttributionRequestHelper(trust_token_key_commitments.get());
+
+  url_loader = url_loader_options.MakeURLLoader(
+      context(), DeleteLoaderCallback(&delete_run_loop, &url_loader),
+      loader_remote.InitWithNewPipeAndPassReceiver(), request,
+      client()->CreateRemote());
+
+  client()->RunUntilComplete();
+  delete_run_loop.Run();
+
+  ASSERT_TRUE(client()->response_head()->trigger_attestation);
+  EXPECT_TRUE(FakeCryptographer::IsToken(
+      client()->response_head()->trigger_attestation->token(),
+      kTestBlindToken));
 }
 
 // When a request's associated Trust Tokens operation's Begin step fails, the
@@ -6291,6 +6403,102 @@ TEST_P(URLLoaderSyncOrAsyncTrustTokenOperationTest,
   EXPECT_THAT(trust_token_observer.observed_tokens(),
               testing::ElementsAre(
                   MatchesTrustTokenDetails(test_server()->GetOrigin(), true)));
+}
+
+TEST_F(URLLoaderTest, HandlesTriggerAttestationRequest) {
+  GURL request_url = test_server_.GetURL(
+      base::JoinString({kAttestationHandlerPathPrefix, "some-path"}, "/"));
+  ResourceRequest request = CreateResourceRequest("GET", request_url);
+
+  base::RunLoop delete_run_loop;
+
+  mojo::PendingRemote<mojom::URLLoader> loader_remote;
+  std::unique_ptr<URLLoader> url_loader;
+
+  // Request must come from a valid origin for attestation operation to run.
+  context().mutable_factory_params().isolation_info =
+      net::IsolationInfo::CreateForInternalRequest(url::Origin::Create(
+          GURL("https://valid-destination-origin.example")));
+
+  URLLoaderOptions url_loader_options;
+
+  // Hook attribution helper
+  auto trust_token_key_commitments = CreateTestTrustTokenKeyCommitments(
+      /*key=*/"any-key",
+      /*protocol_version=*/mojom::TrustTokenProtocolVersion::kTrustTokenV3Pmb,
+      /*issuer_url=*/request_url);
+  url_loader_options.attribution_request_helper =
+      CreateTestAttributionRequestHelper(trust_token_key_commitments.get());
+
+  url_loader = url_loader_options.MakeURLLoader(
+      context(), DeleteLoaderCallback(&delete_run_loop, &url_loader),
+      loader_remote.InitWithNewPipeAndPassReceiver(), request,
+      client()->CreateRemote());
+
+  client()->RunUntilComplete();
+  delete_run_loop.Run();
+
+  absl::optional<::network::TriggerAttestation> response_attestation =
+      client()->response_head()->trigger_attestation;
+  ASSERT_TRUE(response_attestation.has_value());
+  EXPECT_TRUE(FakeCryptographer::IsToken(response_attestation->token(),
+                                         kTestBlindToken));
+}
+
+TEST_F(URLLoaderTest, HandlesTriggerAttestationRequestWithRedirect) {
+  GURL request_url = test_server_.GetURL(kRedirectAttestationRequestPath);
+  ResourceRequest request = CreateResourceRequest("GET", request_url);
+
+  base::RunLoop delete_run_loop;
+
+  mojo::PendingRemote<mojom::URLLoader> loader_remote;
+  std::unique_ptr<URLLoader> url_loader;
+
+  // Request must come from a valid origin for attestation operation to run.
+  context().mutable_factory_params().isolation_info =
+      net::IsolationInfo::CreateForInternalRequest(url::Origin::Create(
+          GURL("https://valid-destination-origin.example")));
+  URLLoaderOptions url_loader_options;
+
+  // Hook attribution helper
+  auto trust_token_key_commitments = CreateTestTrustTokenKeyCommitments(
+      /*key=*/"any-key",
+      /*protocol_version=*/
+      mojom::TrustTokenProtocolVersion::kTrustTokenV3Pmb,
+      /*issuer_url=*/request_url);
+  url_loader_options.attribution_request_helper =
+      CreateTestAttributionRequestHelper(trust_token_key_commitments.get());
+
+  url_loader = url_loader_options.MakeURLLoader(
+      context(), DeleteLoaderCallback(&delete_run_loop, &url_loader),
+      loader_remote.InitWithNewPipeAndPassReceiver(), request,
+      client()->CreateRemote());
+
+  client()->RunUntilRedirectReceived();
+  ASSERT_TRUE(client()->has_received_redirect());
+
+  absl::optional<TriggerAttestation> redirect_attestation =
+      client()->response_head()->trigger_attestation;
+  ASSERT_TRUE(redirect_attestation.has_value());
+  EXPECT_TRUE(FakeCryptographer::IsToken(redirect_attestation->token(),
+                                         kTestBlindToken));
+  // Follow redirect is called by the client. Even if the attribution request
+  // helper adds/remove headers follow redirect would/can still be called by the
+  // client without headers changes.
+  url_loader->FollowRedirect(/*removed_headers=*/{}, /*modified_headers=*/{},
+                             /*modified_cors_exempt_headers=*/{},
+                             absl::nullopt);
+
+  client()->RunUntilComplete();
+  delete_run_loop.Run();
+  absl::optional<TriggerAttestation> response_attestation =
+      client()->response_head()->trigger_attestation;
+  ASSERT_TRUE(response_attestation.has_value());
+  EXPECT_TRUE(FakeCryptographer::IsToken(response_attestation->token(),
+                                         kTestBlindToken));
+
+  EXPECT_NE(redirect_attestation->aggregatable_report_id(),
+            response_attestation->aggregatable_report_id());
 }
 
 TEST_F(URLLoaderTest, OnRawRequestClientSecurityStateFactory) {

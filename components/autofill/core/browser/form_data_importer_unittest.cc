@@ -35,7 +35,7 @@
 #include "components/autofill/core/browser/data_model/credit_card.h"
 #include "components/autofill/core/browser/field_types.h"
 #include "components/autofill/core/browser/form_structure.h"
-#include "components/autofill/core/browser/metrics/autofill_metrics.h"
+#include "components/autofill/core/browser/metrics/autofill_metrics_utils.h"
 #include "components/autofill/core/browser/payments/test_virtual_card_enrollment_manager.h"
 #include "components/autofill/core/browser/personal_data_manager.h"
 #include "components/autofill/core/browser/personal_data_manager_observer.h"
@@ -3216,6 +3216,44 @@ TEST_P(FormDataImporterTest, ExtractFormData_ImportIbanRecordType_NoIban) {
   ASSERT_FALSE(extracted_data.iban_import_candidate);
 }
 
+TEST_P(FormDataImporterTest, ExtractFormData_SubmittingIbanFormUpdatesPref) {
+  // Simulate a form submission with a new IBAN.
+  FormData form;
+  form.url = GURL("https://www.foo.com");
+  // The pref should always start disabled.
+  ASSERT_FALSE(personal_data_manager_->IsAutofillHasSeenIbanPrefEnabled());
+
+  AddIBANForm(&form, kIbanValue);
+
+  FormStructure form_structure(form);
+  form_structure.DetermineHeuristicTypes(nullptr, nullptr);
+  ExtractFormDataAndProcessAddressCandidates(
+      form_structure, /*profile_autofill_enabled=*/true,
+      /*payment_methods_autofill_enabled=*/true);
+  if (base::FeatureList::IsEnabled(features::kAutofillFillIbanFields)) {
+    // Submitting the IBAN form permanently enables the pref.
+    EXPECT_TRUE(personal_data_manager_->IsAutofillHasSeenIbanPrefEnabled());
+  } else {
+    // With the IBAN feature disabled, its form submission is not detected, and
+    // the pref remains unchanged.
+    EXPECT_FALSE(personal_data_manager_->IsAutofillHasSeenIbanPrefEnabled());
+  }
+}
+
+TEST_P(FormDataImporterTest,
+       ExtractFormData_SubmittingCreditCardFormDoesNotUpdateIbanPref) {
+  ASSERT_FALSE(personal_data_manager_->IsAutofillHasSeenIbanPrefEnabled());
+  std::unique_ptr<FormStructure> form_structure =
+      ConstructDefaultCreditCardFormStructure();
+  ExtractFormDataAndProcessAddressCandidates(
+      *form_structure, /*profile_autofill_enabled=*/true,
+      /*payment_methods_autofill_enabled=*/true);
+
+  // Submitting the credit card form won't enable the pref, even if the flag is
+  // on.
+  EXPECT_FALSE(personal_data_manager_->IsAutofillHasSeenIbanPrefEnabled());
+}
+
 TEST_P(FormDataImporterTest,
        ExtractFormData_ImportIbanRecordType_IbanAutofill_NewIban) {
   // Simulate a form submission with a new IBAN.
@@ -4149,8 +4187,7 @@ TEST_P(FormDataImporterTest, RemoveInaccessibleProfileValuesMetrics) {
       "Autofill.ProfileImport.InaccessibleFieldsRemoved.";
   histogram_tester.ExpectUniqueSample(metric + "Total", true, 1);
   histogram_tester.ExpectUniqueSample(
-      metric + "ByFieldType",
-      AutofillMetrics::SettingsVisibleFieldTypeForMetrics::kState, 1);
+      metric + "ByFieldType", SettingsVisibleFieldTypeForMetrics::kState, 1);
 }
 
 // Tests a 2-page multi-step extraction.

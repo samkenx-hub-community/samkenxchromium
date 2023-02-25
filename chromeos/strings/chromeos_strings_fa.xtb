@@ -16,6 +16,7 @@
 <translation id="1128128132059598906">EAP-TTLS</translation>
 <translation id="1145018782460575098">پنجره به‌روزرسانی سفت‌افزار برای دستگاه‌های خارجی باز است. <ph name="NUM_UPDATES" /> به‌روزرسانی دردسترس است</translation>
 <translation id="1145516343487477149">‏برای سؤالات متداول Chromebook، مقاله راهنما و پاسخ پیدا کنید</translation>
+<translation id="1167755866710282443">منو را برای سفارشی کردن کلیدها باز کنید. برای جابه‌جایی، منو را بکشید.</translation>
 <translation id="1175697296044146566"><ph name="MANAGER" /> این <ph name="DEVICE_TYPE" /> را مدیریت می‌کند.</translation>
 <translation id="1175951029573070619">متوسط (<ph name="SIGNAL_STRENGTH" />)</translation>
 <translation id="1181037720776840403">حذف</translation>
@@ -326,6 +327,7 @@
 <translation id="4110686435123617899">انتخاب آلبوم <ph name="TITLE" /> <ph name="DESC" /></translation>
 <translation id="4111761024568264522">‏تاچ‌پد USB</translation>
 <translation id="4117637339509843559">حالت تاریک</translation>
+<translation id="4130035430755296270">برای گزینه‌های طرح‌بندی بیشتر، همچنان نشانگر را نگه دارید</translation>
 <translation id="4131410914670010031">سیاه و سفید</translation>
 <translation id="4145784616224233563">‏دیوار آتش HTTPS</translation>
 <translation id="4147897805161313378">Google Photos</translation>
@@ -414,6 +416,7 @@
 <translation id="484790837831576105">‏(Android) حل‌وفصل ساناد</translation>
 <translation id="4848429997038228357">درحال اجرا</translation>
 <translation id="4854586501323951986">صفحه‌نمایش لمسی داخلی</translation>
+<translation id="4855250849489639581">برای گزینه‌های طرح‌بندی بیشتر، به‌پایین بکشید</translation>
 <translation id="4861758251032006121">{ATTEMPTS_LEFT,plural, =1{<ph name="ERROR_MESSAGE" /> {0} فرصت باقی مانده است}one{<ph name="ERROR_MESSAGE" /> {0} فرصت باقی مانده است}other{<ph name="ERROR_MESSAGE" /> {0} فرصت باقی مانده است}}</translation>
 <translation id="4873827928179867585">الگوریتم اصالت‌سنجی</translation>
 <translation id="4880328057631981605">نام نقطه دسترسی</translation>
@@ -517,6 +520,7 @@
 <translation id="576835345334454681">افزایش روشنایی نمایشگر</translation>
 <translation id="57838592816432529">بی‌صدا کردن</translation>
 <translation id="5784136236926853061">‏تأخیر زیاد HTTP</translation>
+<translation id="5826644637650799838">درباره اثر هنری</translation>
 <translation id="5832805196449965646">افزودن شخص</translation>
 <translation id="583281660410589416">ناشناس</translation>
 <translation id="5843706793424741864">فارنهایت</translation>
@@ -673,6 +677,7 @@
 <translation id="7172721935181587524">یک تصویر</translation>
 <translation id="7177485034254901881">این <ph name="DEVICE_TYPE" /> توسط <ph name="MANAGER" /> مدیریت می‌شود. سرپرستان می‌توانند این دستگاه را ازراه‌دور پیکربندی کنند.</translation>
 <translation id="7180611975245234373">بازآوری</translation>
+<translation id="7180865173735832675">سفارشی کردن</translation>
 <translation id="7212734716605298123">به‌روزرسانی‌های سفت‌افزار برای دستگاه‌های خارجی</translation>
 <translation id="7216409898977639127">ارائه‌دهنده شبکه تلفن همراه</translation>
 <translation id="725133483556299729">انتخاب ایمیل</translation>
@@ -744,6 +749,7 @@
 <translation id="7881066108824108340">DNS</translation>
 <translation id="7882358943899516840">نوع ارائه‌دهنده</translation>
 <translation id="7882501334836096755">کلید عمومی</translation>
+<translation id="78957024357676568">چپ</translation>
 <translation id="7915220255123750251">‏مدیریت تنظیمات APN شبکه. APN اتصالی میان شبکه تلفن همراه و اینترنت برقرار می‌کند.</translation>
 <translation id="7936303884198020182">سرور نام دامنه پیدا نشد</translation>
 <translation id="7942349550061667556">قرمز</translation>
@@ -775,6 +781,7 @@
 <translation id="8226628635270268143">انتخاب عکس‌ها و آلبوم‌های دلخواه</translation>
 <translation id="8227119283605456246">پیوست کردن فایل</translation>
 <translation id="8230672074305416752">پینگ کردن دروازه شبکه پیش‌فرض انجام نشد</translation>
+<translation id="8242426110754782860">ادامه دادن</translation>
 <translation id="8246209727385807362">شرکت مخابراتی ناشناس</translation>
 <translation id="827422111966801947">نیلی سیر</translation>
 <translation id="8286154143153872371">لطفاً برای مشاهده کاغذدیواری، به شبکه متصل شوید و صفحه را بار کردن مجدد کنید.</translation>
@@ -852,6 +859,7 @@
 <translation id="8930622219860340959">بی سیم</translation>
 <translation id="8936793075252196307">‏نشانی IP کارخواه</translation>
 <translation id="894617464444543719">دستگاه تلفن است.</translation>
+<translation id="8957423540740801332">راست</translation>
 <translation id="8968751544471797276">سرعت شارژ کردن</translation>
 <translation id="8970109610781093811">اجرای دوباره</translation>
 <translation id="8983038754672563810">HSPA</translation>

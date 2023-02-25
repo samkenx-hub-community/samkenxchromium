@@ -170,7 +170,7 @@ bool SharedImageInterfaceInProcess::LazyCreateSharedImageFactory() {
 }
 
 Mailbox SharedImageInterfaceInProcess::CreateSharedImage(
-    viz::ResourceFormat format,
+    viz::SharedImageFormat format,
     const gfx::Size& size,
     const gfx::ColorSpace& color_space,
     GrSurfaceOrigin surface_origin,
@@ -198,7 +198,7 @@ Mailbox SharedImageInterfaceInProcess::CreateSharedImage(
 
 void SharedImageInterfaceInProcess::CreateSharedImageOnGpuThread(
     const Mailbox& mailbox,
-    viz::ResourceFormat format,
+    viz::SharedImageFormat format,
     gpu::SurfaceHandle surface_handle,
     const gfx::Size& size,
     const gfx::ColorSpace& color_space,
@@ -214,9 +214,8 @@ void SharedImageInterfaceInProcess::CreateSharedImageOnGpuThread(
     return;
 
   DCHECK(shared_image_factory_);
-  auto si_format = viz::SharedImageFormat::SinglePlane(format);
   if (!shared_image_factory_->CreateSharedImage(
-          mailbox, si_format, size, color_space, surface_origin, alpha_type,
+          mailbox, format, size, color_space, surface_origin, alpha_type,
           surface_handle, usage)) {
     context_state_->MarkContextLost();
     return;
@@ -225,7 +224,7 @@ void SharedImageInterfaceInProcess::CreateSharedImageOnGpuThread(
 }
 
 Mailbox SharedImageInterfaceInProcess::CreateSharedImage(
-    viz::ResourceFormat format,
+    viz::SharedImageFormat format,
     const gfx::Size& size,
     const gfx::ColorSpace& color_space,
     GrSurfaceOrigin surface_origin,
@@ -255,7 +254,7 @@ Mailbox SharedImageInterfaceInProcess::CreateSharedImage(
 
 void SharedImageInterfaceInProcess::CreateSharedImageWithDataOnGpuThread(
     const Mailbox& mailbox,
-    viz::ResourceFormat format,
+    viz::SharedImageFormat format,
     const gfx::Size& size,
     const gfx::ColorSpace& color_space,
     GrSurfaceOrigin surface_origin,
@@ -271,10 +270,9 @@ void SharedImageInterfaceInProcess::CreateSharedImageWithDataOnGpuThread(
     return;
 
   DCHECK(shared_image_factory_);
-  auto si_format = viz::SharedImageFormat::SinglePlane(format);
   if (!shared_image_factory_->CreateSharedImage(
-          mailbox, si_format, size, color_space, surface_origin, alpha_type,
-          usage, pixel_data)) {
+          mailbox, format, size, color_space, surface_origin, alpha_type, usage,
+          pixel_data)) {
     context_state_->MarkContextLost();
     return;
   }
@@ -359,7 +357,7 @@ void SharedImageInterfaceInProcess::CreateGMBSharedImageOnGpuThread(
 
 SharedImageInterface::SwapChainMailboxes
 SharedImageInterfaceInProcess::CreateSwapChain(
-    viz::ResourceFormat format,
+    viz::SharedImageFormat format,
     const gfx::Size& size,
     const gfx::ColorSpace& color_space,
     GrSurfaceOrigin surface_origin,

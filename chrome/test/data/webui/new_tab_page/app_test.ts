@@ -5,7 +5,7 @@
 import 'chrome://webui-test/mojo_webui_test_support.js';
 
 import {counterfactualLoad, LensUploadDialogElement, Module, ModuleDescriptor, ModuleRegistry} from 'chrome://new-tab-page/lazy_load.js';
-import {$$, AppElement, BackgroundManager, BrowserCommandProxy, CustomizeDialogPage, NewTabPageProxy, NtpCustomizeChromeEntryPoint, NtpElement, VoiceAction, WindowProxy} from 'chrome://new-tab-page/new_tab_page.js';
+import {$$, AppElement, BackgroundManager, BrowserCommandProxy, CUSTOMIZE_CHROME_BUTTON_ELEMENT_ID, CustomizeDialogPage, NewTabPageProxy, NtpCustomizeChromeEntryPoint, NtpElement, VoiceAction, WindowProxy} from 'chrome://new-tab-page/new_tab_page.js';
 import {CustomizeChromeSection, NtpBackgroundImageSource, PageCallbackRouter, PageHandlerRemote, PageRemote} from 'chrome://new-tab-page/new_tab_page.mojom-webui.js';
 import {Command, CommandHandlerRemote} from 'chrome://resources/js/browser_command.mojom-webui.js';
 import {loadTimeData} from 'chrome://resources/js/load_time_data.js';
@@ -14,19 +14,19 @@ import {PromiseResolver} from 'chrome://resources/js/promise_resolver.js';
 import {assertDeepEquals, assertEquals, assertFalse, assertTrue} from 'chrome://webui-test/chai_assert.js';
 import {fakeMetricsPrivate, MetricsTracker} from 'chrome://webui-test/metrics_test_support.js';
 import {flushTasks} from 'chrome://webui-test/polymer_test_util.js';
-import {TestBrowserProxy} from 'chrome://webui-test/test_browser_proxy.js';
+import {TestMock} from 'chrome://webui-test/test_mock.js';
 import {eventToPromise} from 'chrome://webui-test/test_util.js';
 
 import {assertNotStyle, assertStyle, createBackgroundImage, createTheme, installMock} from './test_support.js';
 
 suite('NewTabPageAppTest', () => {
   let app: AppElement;
-  let windowProxy: TestBrowserProxy<WindowProxy>;
-  let handler: TestBrowserProxy<PageHandlerRemote>;
+  let windowProxy: TestMock<WindowProxy>;
+  let handler: TestMock<PageHandlerRemote>;
   let callbackRouterRemote: PageRemote;
   let metrics: MetricsTracker;
-  let moduleRegistry: TestBrowserProxy<ModuleRegistry>;
-  let backgroundManager: TestBrowserProxy<BackgroundManager>;
+  let moduleRegistry: TestMock<ModuleRegistry>;
+  let backgroundManager: TestMock<BackgroundManager>;
   let moduleResolver: PromiseResolver<Module[]>;
 
   const url: URL = new URL(location.href);
@@ -85,6 +85,10 @@ suite('NewTabPageAppTest', () => {
 
       // Assert.
       assertTrue(!!app.shadowRoot!.querySelector('ntp-customize-dialog'));
+      assertEquals(
+          'true',
+          $$<HTMLElement>(
+              app, '#customizeButton')!.getAttribute('aria-pressed'));
     });
 
     test('logs height', async () => {
@@ -156,6 +160,15 @@ suite('NewTabPageAppTest', () => {
         assertTrue(!!app.shadowRoot!.querySelector('ntp-voice-search-overlay'));
       });
     }
+
+    test('help bubble can correctly find anchor elements', async () => {
+      assertDeepEquals(
+          app.getSortedAnchorStatusesForTesting(),
+          [
+            [CUSTOMIZE_CHROME_BUTTON_ELEMENT_ID, true],
+          ],
+      );
+    });
   });
 
   [true, false].forEach((removeScrim) => {
@@ -222,6 +235,10 @@ suite('NewTabPageAppTest', () => {
       // Assert.
       assertDeepEquals(
           theme, app.shadowRoot!.querySelector('ntp-customize-dialog')!.theme);
+      assertEquals(
+          'true',
+          $$<HTMLElement>(
+              app, '#customizeButton')!.getAttribute('aria-pressed'));
     });
 
     test('setting theme updates ntp', async () => {
@@ -618,6 +635,10 @@ suite('NewTabPageAppTest', () => {
           1, metrics.count('NewTabPage.Click', NtpElement.CUSTOMIZE_BUTTON));
       assertEquals(
           1, metrics.count('NewTabPage.Click', NtpElement.CUSTOMIZE_DIALOG));
+      assertEquals(
+          'true',
+          $$<HTMLElement>(
+              app, '#customizeButton')!.getAttribute('aria-pressed'));
     });
 
     test('clicking OGB records click', () => {
@@ -823,6 +844,21 @@ suite('NewTabPageAppTest', () => {
               NtpCustomizeChromeEntryPoint.CUSTOMIZE_BUTTON));
       assertEquals(
           0, handler.getCallCount('incrementCustomizeChromeButtonOpenCount'));
+    });
+
+    test('clicking customize button is accessible', async () => {
+      callbackRouterRemote.setCustomizeChromeSidePanelVisibility(true);
+      await callbackRouterRemote.$.flushForTesting();
+      assertEquals(
+          'true',
+          $$<HTMLElement>(
+              app, '#customizeButton')!.getAttribute('aria-pressed'));
+      callbackRouterRemote.setCustomizeChromeSidePanelVisibility(false);
+      await callbackRouterRemote.$.flushForTesting();
+      assertEquals(
+          'false',
+          $$<HTMLElement>(
+              app, '#customizeButton')!.getAttribute('aria-pressed'));
     });
 
     suite('modules', () => {

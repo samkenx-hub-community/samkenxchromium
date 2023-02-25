@@ -9,6 +9,7 @@
 #include "components/autofill/core/browser/data_model/credit_card.h"
 #include "components/autofill/core/browser/form_structure.h"
 #include "components/autofill/core/browser/test_autofill_client.h"
+#include "components/autofill/core/browser/test_autofill_clock.h"
 #include "components/autofill/core/browser/test_autofill_driver.h"
 #include "components/autofill/core/browser/test_browser_autofill_manager.h"
 #include "components/autofill/core/common/autofill_clock.h"
@@ -41,10 +42,7 @@ class MockAutofillClient : public TestAutofillClient {
               (CreditCardScanCallback callback),
               (override));
   MOCK_METHOD(bool, IsTouchToFillCreditCardSupported, (), (override));
-  MOCK_METHOD(void,
-              ShowAutofillSettings,
-              (bool show_credit_card_settings),
-              (override));
+  MOCK_METHOD(void, ShowAutofillSettings, (PopupType popup_type), (override));
   MOCK_METHOD(bool,
               ShowTouchToFillCreditCard,
               (base::WeakPtr<autofill::TouchToFillDelegate> delegate,
@@ -98,22 +96,25 @@ class MockBrowserAutofillManager : public TestBrowserAutofillManager {
                const FormFieldData& field,
                const CreditCard* credit_card));
   MOCK_METHOD(void,
-              SetAutofillSuggestionMethod,
-              (AutofillSuggestionMethod state),
-              (override));
-  MOCK_METHOD(void,
               DidShowSuggestions,
               (bool has_autofill_suggestions,
                const FormData& form,
                const FormFieldData& field),
               (override));
   MOCK_METHOD(bool, CanShowAutofillUi, (), (const, override));
+  MOCK_METHOD(void, SetShouldSuppressKeyboard, (bool suppress), (override));
 };
 
 }  // namespace
 
 class TouchToFillDelegateImplUnitTest : public testing::Test {
- protected:
+ public:
+  TouchToFillDelegateImplUnitTest() {
+    // Some date after in the 2000s because Autofill doesn't allow expiration
+    // dates before 2000.
+    task_environment_.AdvanceClock(base::Days(365 * 50));
+  }
+
   void SetUp() override {
     autofill_client_.SetPrefs(test::PrefServiceForTesting());
     autofill_client_.GetPersonalDataManager()->SetPrefService(
@@ -132,7 +133,6 @@ class TouchToFillDelegateImplUnitTest : public testing::Test {
         std::move(touch_to_fill_delegate));
 
     // Default setup for successful `TryToShowTouchToFill`.
-    field_.is_focusable = true;
     autofill_client_.GetPersonalDataManager()->AddCreditCard(
         test::GetCreditCard());
     ON_CALL(*browser_autofill_manager_, GetPopupType(_, _))
@@ -156,7 +156,7 @@ class TouchToFillDelegateImplUnitTest : public testing::Test {
 
     test::CreateTestCreditCardFormData(&form_, /*is_https=*/true,
                                        /*use_month_type=*/false);
-    browser_autofill_manager_->OnFormsSeen({form_}, {});
+    form_.fields[0].is_focusable = true;
   }
 
   void TryToShowTouchToFill(bool expected_success) {
@@ -165,16 +165,25 @@ class TouchToFillDelegateImplUnitTest : public testing::Test {
                     PopupHidingReason::kOverlappingWithTouchToFillSurface))
         .Times(expected_success ? 1 : 0);
 
-    EXPECT_EQ(expected_success,
-              touch_to_fill_delegate_->TryToShowTouchToFill(form_, field_));
+    if (!browser_autofill_manager_->FindCachedFormById(form_.global_id())) {
+      browser_autofill_manager_->OnFormsSeen({form_}, {});
+    }
+    touch_to_fill_delegate_->OnBeforeAskForValuesToFill(
+        *browser_autofill_manager_, form_.global_id(),
+        form_.fields[0].global_id());
+    EXPECT_EQ(expected_success, touch_to_fill_delegate_->TryToShowTouchToFill(
+                                    form_, form_.fields[0]));
+    touch_to_fill_delegate_->OnAfterAskForValuesToFill(
+        *browser_autofill_manager_, form_.global_id(),
+        form_.fields[0].global_id());
     EXPECT_EQ(expected_success,
               touch_to_fill_delegate_->IsShowingTouchToFill());
   }
 
   FormData form_;
-  FormFieldData field_;
 
-  base::test::TaskEnvironment task_environment_;
+  base::test::TaskEnvironment task_environment_{
+      base::test::TaskEnvironment::TimeSource::MOCK_TIME};
   test::AutofillEnvironment autofill_environment_;
   NiceMock<MockAutofillClient> autofill_client_;
   std::unique_ptr<TestAutofillDriver> autofill_driver_;
@@ -195,22 +204,23 @@ TEST_F(TouchToFillDelegateImplUnitTest, TryToShowTouchToFillSucceeds) {
 
 TEST_F(TouchToFillDelegateImplUnitTest,
        TryToShowTouchToFillFailsIfNotCreditCardField) {
+  {
+    FormFieldData field;
+    test::CreateTestFormField("Arbitrary", "arbitrary", "", "text", &field);
+    form_.fields.insert(form_.fields.begin(), field);
+  }
   ASSERT_FALSE(touch_to_fill_delegate_->IsShowingTouchToFill());
-  EXPECT_CALL(*browser_autofill_manager_, GetPopupType(Ref(form_), Ref(field_)))
-      .WillOnce(Return(PopupType::kAddresses));
 
   TryToShowTouchToFill(/*expected_success=*/false);
 }
 
 TEST_F(TouchToFillDelegateImplUnitTest,
        TryToShowTouchToFillFailsForIncompleteForm) {
-  form_.fields.clear();
-  FormFieldData field;
-  test::CreateTestFormField("Card Number", "cardnumber", "", "text", &field);
-  form_.fields.push_back(field);
-
-  browser_autofill_manager_->OnFormsSeen({form_}, {});
-
+  // Erase expiration month and expiration year fields.
+  ASSERT_EQ(form_.fields[2].name, u"ccmonth");
+  form_.fields.erase(form_.fields.begin() + 2);
+  ASSERT_EQ(form_.fields[2].name, u"ccyear");
+  form_.fields.erase(form_.fields.begin() + 2);
   ASSERT_FALSE(touch_to_fill_delegate_->IsShowingTouchToFill());
 
   TryToShowTouchToFill(/*expected_success=*/false);
@@ -224,7 +234,7 @@ TEST_F(TouchToFillDelegateImplUnitTest,
        TryToShowTouchToFillFailsIfNotSupported) {
   ASSERT_FALSE(touch_to_fill_delegate_->IsShowingTouchToFill());
   EXPECT_CALL(autofill_client_, IsTouchToFillCreditCardSupported)
-      .WillOnce(Return(false));
+      .WillRepeatedly(Return(false));
 
   TryToShowTouchToFill(/*expected_success=*/false);
 }
@@ -234,8 +244,6 @@ TEST_F(TouchToFillDelegateImplUnitTest,
   // Simulate non-secure form.
   test::CreateTestCreditCardFormData(&form_, /*is_https=*/false,
                                      /*use_month_type=*/false);
-
-  browser_autofill_manager_->OnFormsSeen({form_}, {});
 
   ASSERT_FALSE(touch_to_fill_delegate_->IsShowingTouchToFill());
 
@@ -260,15 +268,33 @@ TEST_F(TouchToFillDelegateImplUnitTest,
 }
 
 TEST_F(TouchToFillDelegateImplUnitTest,
-       TryToShowTouchToFillFailsIfAlreadyShown) {
+       TryToShowTouchToFillFailsIfShownBefore) {
+  TryToShowTouchToFill(/*expected_success=*/true);
+  touch_to_fill_delegate_->OnDismissed(/*dismissed_by_user=*/true);
+
+  EXPECT_CALL(
+      autofill_client_,
+      HideAutofillPopup(PopupHidingReason::kOverlappingWithTouchToFillSurface))
+      .Times(0);
+  TryToShowTouchToFill(/*expected_success=*/false);
+}
+
+TEST_F(TouchToFillDelegateImplUnitTest,
+       TryToShowTouchToFillFailsIfShownCurrently) {
   TryToShowTouchToFill(/*expected_success=*/true);
 
   EXPECT_CALL(
       autofill_client_,
       HideAutofillPopup(PopupHidingReason::kOverlappingWithTouchToFillSurface))
       .Times(0);
-  EXPECT_FALSE(touch_to_fill_delegate_->TryToShowTouchToFill(form_, field_));
-  EXPECT_TRUE(touch_to_fill_delegate_->IsShowingTouchToFill());
+  touch_to_fill_delegate_->OnBeforeAskForValuesToFill(
+      *browser_autofill_manager_, form_.global_id(),
+      form_.fields[0].global_id());
+  EXPECT_FALSE(
+      touch_to_fill_delegate_->TryToShowTouchToFill(form_, form_.fields[0]));
+  touch_to_fill_delegate_->OnAfterAskForValuesToFill(
+      *browser_autofill_manager_, form_.global_id(),
+      form_.fields[0].global_id());
 }
 
 TEST_F(TouchToFillDelegateImplUnitTest, TryToShowTouchToFillFailsIfWasShown) {
@@ -284,7 +310,7 @@ TEST_F(TouchToFillDelegateImplUnitTest, TryToShowTouchToFillFailsIfWasShown) {
 TEST_F(TouchToFillDelegateImplUnitTest,
        TryToShowTouchToFillFailsIfFieldIsNotFocusable) {
   ASSERT_FALSE(touch_to_fill_delegate_->IsShowingTouchToFill());
-  field_.is_focusable = false;
+  form_.fields[0].is_focusable = false;
 
   TryToShowTouchToFill(/*expected_success=*/false);
   histogram_tester_.ExpectUniqueSample(
@@ -295,15 +321,17 @@ TEST_F(TouchToFillDelegateImplUnitTest,
 TEST_F(TouchToFillDelegateImplUnitTest,
        TryToShowTouchToFillFailsIfFieldHasValue) {
   ASSERT_FALSE(touch_to_fill_delegate_->IsShowingTouchToFill());
-  field_.value = u"Initial value";
+  form_.fields[0].value = u"Initial value";
 
   TryToShowTouchToFill(/*expected_success=*/false);
   histogram_tester_.ExpectUniqueSample(
       kUmaTouchToFillCreditCardTriggerOutcome,
       TouchToFillCreditCardTriggerOutcome::kFieldNotEmptyOrNotFocusable, 1);
+}
 
-  // But should ignore formatting characters.
-  field_.value = u"____-____-____-____";
+TEST_F(TouchToFillDelegateImplUnitTest,
+       TryToShowTouchToFillToleratesFormattingCharacters) {
+  form_.fields[0].value = u"____-____-____-____";
 
   TryToShowTouchToFill(/*expected_success=*/true);
   histogram_tester_.ExpectBucketCount(
@@ -389,7 +417,7 @@ TEST_F(TouchToFillDelegateImplUnitTest,
        TryToShowTouchToFillFailsIfCanNotShowUi) {
   ASSERT_FALSE(touch_to_fill_delegate_->IsShowingTouchToFill());
   EXPECT_CALL(*browser_autofill_manager_, CanShowAutofillUi)
-      .WillOnce(Return(false));
+      .WillRepeatedly(Return(false));
 
   TryToShowTouchToFill(/*expected_success=*/false);
   histogram_tester_.ExpectUniqueSample(
@@ -438,14 +466,15 @@ TEST_F(TouchToFillDelegateImplUnitTest,
        TryToShowTouchToFillDoesNotShowDisusedExpiredCards) {
   autofill_client_.GetPersonalDataManager()->ClearCreditCards();
   CreditCard credit_card = autofill::test::GetCreditCard();
-  credit_card.set_use_date(AutofillClock::Now());
   CreditCard disused_expired_card = test::GetExpiredCreditCard();
-  const base::Time last_used =
-      AutofillClock::Now() - kDisusedDataModelTimeDelta * 2;
-  disused_expired_card.set_use_date(last_used);
+  credit_card.set_use_date(AutofillClock::Now());
+  disused_expired_card.set_use_date(AutofillClock::Now() -
+                                    kDisusedDataModelTimeDelta * 2);
   autofill_client_.GetPersonalDataManager()->AddCreditCard(credit_card);
   autofill_client_.GetPersonalDataManager()->AddCreditCard(
       disused_expired_card);
+  ASSERT_TRUE(credit_card.IsCompleteValidCard());
+  ASSERT_FALSE(disused_expired_card.IsCompleteValidCard());
   ASSERT_FALSE(touch_to_fill_delegate_->IsShowingTouchToFill());
   EXPECT_CALL(autofill_client_,
               ShowTouchToFillCreditCard(_, ElementsAre(Pointee(credit_card))));
@@ -532,10 +561,11 @@ TEST_F(TouchToFillDelegateImplUnitTest, ScanCreditCardIsCalled) {
 TEST_F(TouchToFillDelegateImplUnitTest, ShowCreditCardSettingsIsCalled) {
   TryToShowTouchToFill(/*expected_success=*/true);
 
-  EXPECT_CALL(autofill_client_, ShowAutofillSettings(testing::Eq(true)));
+  EXPECT_CALL(autofill_client_,
+              ShowAutofillSettings(testing::Eq(PopupType::kCreditCards)));
   touch_to_fill_delegate_->ShowCreditCardSettings();
 
-  ASSERT_EQ(touch_to_fill_delegate_->IsShowingTouchToFill(), false);
+  ASSERT_EQ(touch_to_fill_delegate_->IsShowingTouchToFill(), true);
 }
 
 TEST_F(TouchToFillDelegateImplUnitTest, CardSelectionClosesTheSheet) {
@@ -557,11 +587,10 @@ TEST_F(TouchToFillDelegateImplUnitTest, CardSelectionFillsCardForm) {
   TryToShowTouchToFill(/*expected_success=*/true);
 
   EXPECT_CALL(*browser_autofill_manager_, FillOrPreviewCreditCardForm);
-  EXPECT_CALL(*browser_autofill_manager_, SetAutofillSuggestionMethod);
   touch_to_fill_delegate_->SuggestionSelected(credit_card.server_id());
 }
 
-TEST_F(TouchToFillDelegateImplUnitTest, SubmissionMetricsAreTracked) {
+TEST_F(TouchToFillDelegateImplUnitTest, AutofillUsedAfterTouchToFillDismissal) {
   TryToShowTouchToFill(/*expected_success=*/true);
   touch_to_fill_delegate_->OnDismissed(/*dismissed_by_user=*/true);
 
@@ -575,6 +604,90 @@ TEST_F(TouchToFillDelegateImplUnitTest, SubmissionMetricsAreTracked) {
   histogram_tester_.ExpectUniqueSample(
       "Autofill.TouchToFill.CreditCard.AutofillUsedAfterTouchToFillDismissal",
       true, 1);
+}
+
+class TouchToFillDelegateImplUnitTest_KeyboardSuppression
+    : public TouchToFillDelegateImplUnitTest {
+ public:
+  // Parses a form and triggers the On{Before,After}AskForValuesToFill() events
+  // and runs TryToShowTouchToFill() in between. Before TryToShowTouchToFill(),
+  // the simulated parse takes `parse_duration`.
+  void TriggerTouchToFill(
+      const FormData& form,
+      base::TimeDelta parsing_duration,
+      base::OnceCallback<void(FormStructure*)> mutate_form) {
+    browser_autofill_manager_->OnFormsSeen({form}, {});
+    FormStructure* form_structure =
+        browser_autofill_manager_->FindCachedFormById(form.global_id());
+    ASSERT_TRUE(form_structure);
+
+    touch_to_fill_delegate_->OnBeforeAskForValuesToFill(
+        *browser_autofill_manager_, form.global_id(),
+        form.fields[0].global_id());
+    task_environment_.FastForwardBy(parsing_duration);
+    std::move(mutate_form).Run(form_structure);
+    touch_to_fill_delegate_->TryToShowTouchToFill(form, form.fields[0]);
+    touch_to_fill_delegate_->OnAfterAskForValuesToFill(
+        *browser_autofill_manager_, form.global_id(),
+        form.fields[0].global_id());
+    task_environment_.RunUntilIdle();
+  }
+};
+
+TEST_F(TouchToFillDelegateImplUnitTest_KeyboardSuppression,
+       SuppressedIfAllGoesWell) {
+  EXPECT_CALL(*browser_autofill_manager_, SetShouldSuppressKeyboard(true));
+  EXPECT_CALL(autofill_client_, ShowTouchToFillCreditCard);
+  EXPECT_CALL(*browser_autofill_manager_, SetShouldSuppressKeyboard(false))
+      .Times(0);
+  TriggerTouchToFill(form_, base::Milliseconds(30), base::DoNothing());
+}
+
+TEST_F(TouchToFillDelegateImplUnitTest_KeyboardSuppression,
+       UnsuppressedIfFormIsNonCreditCard) {
+  EXPECT_CALL(*browser_autofill_manager_, SetShouldSuppressKeyboard(true))
+      .Times(0);
+  EXPECT_CALL(autofill_client_, ShowTouchToFillCreditCard).Times(0);
+  EXPECT_CALL(*browser_autofill_manager_, SetShouldSuppressKeyboard(false))
+      .Times(0);
+  FormData address_form;
+  test::CreateTestAddressFormData(&address_form);
+  TriggerTouchToFill(address_form, base::Milliseconds(30), base::DoNothing());
+}
+
+TEST_F(TouchToFillDelegateImplUnitTest_KeyboardSuppression,
+       UnsuppressedIfFormBecomesNonCreditCard) {
+  EXPECT_CALL(*browser_autofill_manager_, SetShouldSuppressKeyboard(true))
+      .Times(1);
+  EXPECT_CALL(autofill_client_, ShowTouchToFillCreditCard).Times(0);
+  EXPECT_CALL(*browser_autofill_manager_, SetShouldSuppressKeyboard(false))
+      .Times(1);
+  TriggerTouchToFill(form_, base::Milliseconds(30),
+                     base::BindOnce([](FormStructure* form_structure) {
+                       for (auto& field : *form_structure) {
+                         field->SetTypeTo(AutofillType(NAME_FIRST));
+                       }
+                     }));
+}
+
+TEST_F(TouchToFillDelegateImplUnitTest_KeyboardSuppression,
+       UnsuppressedIfControllerFails) {
+  EXPECT_CALL(*browser_autofill_manager_, SetShouldSuppressKeyboard(true));
+  EXPECT_CALL(autofill_client_, ShowTouchToFillCreditCard)
+      .Times(1)
+      .WillOnce(Return(false));
+  EXPECT_CALL(*browser_autofill_manager_, SetShouldSuppressKeyboard(false));
+  TriggerTouchToFill(form_, base::Milliseconds(30), base::DoNothing());
+}
+
+TEST_F(TouchToFillDelegateImplUnitTest_KeyboardSuppression,
+       UnsuppressedIfParseIsSlow) {
+  EXPECT_CALL(*browser_autofill_manager_, SetShouldSuppressKeyboard(true))
+      .Times(1);
+  EXPECT_CALL(autofill_client_, ShowTouchToFillCreditCard).Times(0);
+  EXPECT_CALL(*browser_autofill_manager_, SetShouldSuppressKeyboard(false))
+      .Times(1);
+  TriggerTouchToFill(form_, base::Seconds(2), base::DoNothing());
 }
 
 }  // namespace autofill

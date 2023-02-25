@@ -34,7 +34,7 @@ chromium-metrics-reviews@google.com.
 </variants>
 
 <histogram name="IOS.Allocator.ShimInstalled" enum="Boolean"
-    expires_after="2023-06-04">
+    expires_after="2023-08-08">
   <owner>rohitrao@chromium.org</owner>
   <owner>justincohen@chromium.org</owner>
   <summary>
@@ -194,35 +194,8 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
-<histogram name="IOS.Cookies.GetCookiesForURLCallResult"
-    enum="IOSGetCookiesForURLCallResult" expires_after="2021-08-01">
-  <owner>mrefaat@chromium.org</owner>
-  <owner>bling-team@google.com</owner>
-  <summary>
-    Recorded to indicate whether the GetCookiesForURL call found cookies or not
-    when called on a specific system cookie store implementation. Most of the
-    cookies fetching on iOS Chromium is done by the WKWebView and doesn't
-    involve calling GetCookiesForURL. The method is only called when a request
-    is made by the UrlRequestFetcher for cases that are not handled by WKWebView
-    (eg. Downloads, Auto Suggestions and NTP tiles).
-  </summary>
-</histogram>
-
-<histogram name="IOS.Cookies.GetCookiesForURLCallStoreType"
-    enum="IOSGetCookiesForURLCallCookieStoreType" expires_after="2021-08-01">
-  <owner>mrefaat@chromium.org</owner>
-  <owner>bling-team@google.com</owner>
-  <summary>
-    The system cookie store type used when GetCookiesForURL method is called.
-    Most of the cookies fetching on iOS Chromium is done by the WKWebView and
-    doesn't involve calling GetCookiesForURL. The method is only called when a
-    request is made by the UrlRequestFetcher for cases that are not handled by
-    WKWebView (eg. Downloads, Auto Suggestions and NTP tiles).
-  </summary>
-</histogram>
-
 <histogram name="IOS.CredentialExtension.ConsentVerifiedCount" units="count"
-    expires_after="2023-06-11">
+    expires_after="2023-08-13">
   <owner>ginnyhuang@chromium.org</owner>
   <owner>bling-team@google.com</owner>
   <summary>
@@ -266,7 +239,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="IOS.CredentialExtension.DisplayCount" units="count"
-    expires_after="2023-06-11">
+    expires_after="2023-08-13">
   <owner>rkgibson@chromium.org</owner>
   <owner>djean@chromium.org</owner>
   <summary>
@@ -342,7 +315,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="IOS.CredentialExtension.PasswordUseCount" units="count"
-    expires_after="2023-06-11">
+    expires_after="2023-08-13">
   <owner>rkgibson@chromium.org</owner>
   <owner>djean@chromium.org</owner>
   <summary>
@@ -353,7 +326,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="IOS.CredentialExtension.QuickPasswordUseCount" units="count"
-    expires_after="2023-06-11">
+    expires_after="2023-08-13">
   <owner>rkgibson@chromium.org</owner>
   <owner>djean@chromium.org</owner>
   <summary>
@@ -386,7 +359,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="IOS.CredentialExtension.SearchCount" units="count"
-    expires_after="2023-06-11">
+    expires_after="2023-08-13">
   <owner>rkgibson@chromium.org</owner>
   <owner>djean@chromium.org</owner>
   <summary>
@@ -428,6 +401,44 @@ chromium-metrics-reviews@google.com.
     value (enabled/disabled) of the credential provider in the user's iOS
     settings on startup.
   </summary>
+</histogram>
+
+<histogram name="IOS.CredentialProviderExtension.Promo.Impression{IsReminder}"
+    enum="IOSCredentialProviderPromoSource" expires_after="2023-09-01">
+  <owner>huitingyu@google.com</owner>
+  <owner>hiramahmood@google.com</owner>
+  <summary>
+    The impression count for the credential provider extention promo
+    corresponding to a source of the promo.
+  </summary>
+  <token key="IsReminder">
+    <variant name="" summary="default impression of promo"/>
+    <variant name=".IsReminder"
+        summary="impression of promo shown as reminder"/>
+  </token>
+</histogram>
+
+<histogram
+    name="IOS.CredentialProviderExtension.Promo.{PromoSource}{IsReminder}"
+    enum="IOSCredentialProviderPromoAction" expires_after="2023-09-01">
+  <owner>huitingyu@google.com</owner>
+  <owner>hiramahmood@google.com</owner>
+  <summary>
+    The action taken in the credential provider extention promo displayed for
+    the user event {PromoSource}. If the promo is as a reminder, the histogram
+    name is suffixed with &quot;IsReminder&quot;.
+  </summary>
+  <token key="PromoSource">
+    <variant name="OnPasswordCopied" summary="the user copies the password"/>
+    <variant name="OnPasswordSaved" summary="the user saves the password"/>
+    <variant name="OnSuccessfulLoginWithAutofilledPassword"
+        summary="the user logs in with autofilled password"/>
+  </token>
+  <token key="IsReminder">
+    <variant name="" summary="default impression of promo"/>
+    <variant name=".IsReminder"
+        summary="impression of promo shown as reminder"/>
+  </token>
 </histogram>
 
 <histogram name="IOS.CRWWKNavigationStatesRemoveOldPending" enum="Boolean"
@@ -599,7 +610,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="IOS.ExperienceKitCalendar.TextClassifierModelAvailable"
-    enum="BooleanAvailable" expires_after="2023-06-04">
+    enum="BooleanAvailable" expires_after="2023-08-08">
   <owner>rajendrant@chromium.org</owner>
   <owner>sophiechang@chromium.org</owner>
   <summary>
@@ -1233,6 +1244,21 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
+<histogram name="IOS.NavigationStateNotFinishedInLoadCancelled" enum="Boolean"
+    expires_after="2023-09-24">
+  <owner>ajuma@chromium.org</owner>
+  <owner>michaeldo@chromium.org</owner>
+  <summary>
+    The method -[CRWWKNavigationHandler loadCancelled] updates the navigation
+    state to finished if it is any other state. Additionally, if
+    `beingDestroyed` is false, the webstate's loading state is set to false.
+    There is a long standing TODO in this method with the comment: &quot;Check
+    if this function should be removed.&quot; This metric is logged when the
+    logic in this method is triggered. The results will be reviewed to see if
+    this logic is still ever called or if it can now be removed.
+  </summary>
+</histogram>
+
 <histogram name="IOS.NSString.stringByReplacingCharactersInRange.NilArgument"
     enum="Boolean" expires_after="2022-12-11">
   <owner>rohitrao@chromium.org</owner>
@@ -1289,14 +1315,14 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="IOS.OverflowMenu.ActionType" enum="IOSOverflowMenuActionType"
-    expires_after="2023-06-04">
+    expires_after="2023-08-08">
   <owner>rkgibson@google.com</owner>
   <owner>bling-team@google.com</owner>
   <summary>The type of action the user took in the overflow/tools menu</summary>
 </histogram>
 
 <histogram name="IOS.OverflowMenu.TimeOpen" units="ms"
-    expires_after="2023-06-04">
+    expires_after="2023-08-08">
   <owner>rkgibson@google.com</owner>
   <owner>bling-team@google.com</owner>
   <summary>The amount of time the overflow/tools menu is open.</summary>
@@ -1349,6 +1375,13 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
+<histogram name="IOS.PartialTranslate.Outcome" enum="PartialTranslateOutcome"
+    expires_after="2024-02-23">
+  <owner>olivierrobin@chromium.org</owner>
+  <owner>djean@chromium.org</owner>
+  <summary>The outcome of the partial translate feature.</summary>
+</histogram>
+
 <histogram name="IOS.PasswordManager.Favicons.Count" units="count"
     expires_after="2023-07-01">
   <owner>veronguyen@google.com</owner>
@@ -1380,7 +1413,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="IOS.PasswordsInOtherApps.AutoFillStatusChange"
-    enum="PasswordAutoFillEnrollmentStatus" expires_after="2023-03-11">
+    enum="PasswordAutoFillEnrollmentStatus" expires_after="2023-09-01">
   <owner>ginnyhuang@chromium.org</owner>
   <owner>bling-team@google.com</owner>
   <summary>
@@ -1391,7 +1424,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="IOS.PasswordsInOtherApps.Dismiss"
-    enum="PasswordAutoFillEnrollmentStatus" expires_after="2023-03-11">
+    enum="PasswordAutoFillEnrollmentStatus" expires_after="2023-09-01">
   <owner>ginnyhuang@chromium.org</owner>
   <owner>bling-team@google.com</owner>
   <summary>
@@ -1628,16 +1661,6 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
-<histogram name="IOS.RepeatedExternalAppPromptResponse"
-    enum="IOSRepeatedExternalAppPromptResponse" expires_after="2021-08-01">
-  <owner>mrefaat@chromium.org</owner>
-  <owner>bling-team@google.com</owner>
-  <summary>
-    The user reaction to the prompt that appears when a website tries to open an
-    external application repeatedly.
-  </summary>
-</histogram>
-
 <histogram name="IOS.RestoreNavigationItemCount" units="rank"
     expires_after="2023-09-12">
   <owner>gambard@chromium.org</owner>
@@ -1864,15 +1887,6 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
-<histogram name="IOS.StoreKitLoadedSuccessfully" enum="BooleanSuccess"
-    expires_after="2021-08-01">
-  <owner>mrefaat@chromium.org</owner>
-  <owner>bling-team@google.com</owner>
-  <summary>
-    Whether the StoreKit loaded the required iTunes product successfully or not.
-  </summary>
-</histogram>
-
 <histogram name="IOS.TabGrid.CloseTabs" units="Tabs" expires_after="2023-11-01">
   <owner>ewannpv@chromium.org</owner>
   <owner>gambard@chromium.org</owner>
@@ -1938,6 +1952,28 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
+<histogram name="IOS.TabStrip.DragInteraction" enum="Boolean"
+    expires_after="2024-02-08">
+  <owner>ewannpv@chromium.org</owner>
+  <owner>gambard@chromium.org</owner>
+  <owner>bling-team@google.com</owner>
+  <summary>
+    Tracks whether the user moved a tabStrip tab to a new index. Recorded when
+    the user stops the drag interaction.
+  </summary>
+</histogram>
+
+<histogram name="IOS.TabStrip.TapInteraction" enum="Boolean"
+    expires_after="2024-02-08">
+  <owner>ewannpv@chromium.org</owner>
+  <owner>gambard@chromium.org</owner>
+  <owner>bling-team@google.com</owner>
+  <summary>
+    Tracks whether the user tapped on a tabStrip tab that is not the active one.
+    Recorded when the tabStrip tab is tapped.
+  </summary>
+</histogram>
+
 <histogram name="IOS.TabSwitcher.DragDropTabs"
     enum="IOSTabSwitcherDragDropTabs" expires_after="2023-11-16">
   <owner>ewannpv@chromium.org</owner>
@@ -1955,6 +1991,42 @@ chromium-metrics-reviews@google.com.
   <owner>pakzhygitov@google.com</owner>
   <owner>bling-team@google.com</owner>
   <summary>Records the origin of dropped items in the tab switcher.</summary>
+</histogram>
+
+<histogram name="IOS.TabSwitcher.Idle.IncognitoTabGridPage" enum="Boolean"
+    expires_after="2024-02-08">
+  <owner>ewannpv@chromium.org</owner>
+  <owner>gambard@chromium.org</owner>
+  <owner>bling-team@google.com</owner>
+  <summary>
+    Tracks whether the user closed the incognito tab grid page without doing any
+    meaningful action. Meaningful actions are creating, moving, deleting or
+    switching tab. Recorded when the user closed the incognito tab grid page.
+  </summary>
+</histogram>
+
+<histogram name="IOS.TabSwitcher.Idle.RecentTabs" enum="Boolean"
+    expires_after="2024-02-08">
+  <owner>ewannpv@chromium.org</owner>
+  <owner>gambard@chromium.org</owner>
+  <owner>bling-team@google.com</owner>
+  <summary>
+    Tracks whether the user closed the recent tabs page without doing any
+    meaningful action. Meaningful action is opening a tab. Recorded when the
+    user closed the recent tabs page or switched to a tab grid page.
+  </summary>
+</histogram>
+
+<histogram name="IOS.TabSwitcher.Idle.RegularTabGridPage" enum="Boolean"
+    expires_after="2024-02-08">
+  <owner>ewannpv@chromium.org</owner>
+  <owner>gambard@chromium.org</owner>
+  <owner>bling-team@google.com</owner>
+  <summary>
+    Tracks whether the user closed the regular tab grid page without doing any
+    meaningful action. Meaningful actions are creating, moving, deleting or
+    switching tab. Recorded when the user closed the regular tab grid page.
+  </summary>
 </histogram>
 
 <histogram name="IOS.TabSwitcher.PageChangeInteraction"
@@ -1999,7 +2071,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="IOS.TextSelection.EntityDetection.DetectedEntityType"
-    enum="TextSelectionDetectedEntityType" expires_after="2023-06-04">
+    enum="TextSelectionDetectedEntityType" expires_after="2023-08-08">
   <owner>rajendrant@chromium.org</owner>
   <owner>sophiechang@chromium.org</owner>
   <summary>
@@ -2023,7 +2095,7 @@ chromium-metrics-reviews@google.com.
 
 <histogram
     name="IOS.TextSelection.EntityDetection.TFLiteModelEvaluationDuration"
-    units="ms" expires_after="2023-06-04">
+    units="ms" expires_after="2023-08-08">
   <owner>rajendrant@chromium.org</owner>
   <owner>sophiechang@chromium.org</owner>
   <summary>
@@ -2248,7 +2320,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="ManualFallback.PresentedOptions.Profiles" units="Profiles"
-    expires_after="2023-05-01">
+    expires_after="2023-08-13">
   <owner>tmartino@chromium.org</owner>
   <owner>djean@chromium.org</owner>
   <summary>

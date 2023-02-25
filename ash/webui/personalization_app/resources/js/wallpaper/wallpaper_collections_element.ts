@@ -20,8 +20,8 @@ import {FilePath} from 'chrome://resources/mojo/mojo/public/mojom/base/file_path
 import {Url} from 'chrome://resources/mojo/url/mojom/url.mojom-webui.js';
 import {afterNextRender} from 'chrome://resources/polymer/v3_0/polymer/polymer_bundled.min.js';
 
+import {GooglePhotosEnablementState, WallpaperCollection, WallpaperImage} from '../../personalization_app.mojom-webui.js';
 import {isDarkLightModeEnabled, isGooglePhotosIntegrationEnabled} from '../load_time_booleans.js';
-import {GooglePhotosEnablementState, WallpaperCollection, WallpaperImage} from '../personalization_app.mojom-webui.js';
 import {Paths, PersonalizationRouter} from '../personalization_router_element.js';
 import {WithPersonalizationStore} from '../personalization_store.js';
 import {getCountText, isImageDataUrl, isNonEmptyArray, isSelectionEvent} from '../utils.js';
@@ -68,6 +68,7 @@ interface OnlineTile {
   count: string;
   disabled: boolean;
   id: string;
+  info: string;
   name: string;
   preview: Url[];
   type: TileType.IMAGE_ONLINE;
@@ -400,6 +401,7 @@ export class WallpaperCollections extends WithPersonalizationStore {
           // load and the user cannot select it.
           disabled: imageCounts[collection.id] === null,
           id: collection.id,
+          info: collection.description,
           name: collection.name,
           preview,
           type: TileType.IMAGE_ONLINE,

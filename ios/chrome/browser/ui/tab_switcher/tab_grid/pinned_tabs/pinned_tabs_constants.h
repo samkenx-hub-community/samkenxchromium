@@ -16,7 +16,6 @@ extern const CGFloat kPinnedViewMaxWidthInPercent;
 // Pinned view constraints.
 extern const CGFloat kPinnedViewHorizontalPadding;
 extern const CGFloat kPinnedViewBottomPadding;
-extern const CGFloat kPinnedViewTopPadding;
 
 // Pinned view animations.
 extern const NSTimeInterval kPinnedViewFadeInTime;
@@ -39,6 +38,7 @@ extern const CGFloat kPinnedCellHorizontalPadding;
 extern const CGFloat kPinnedCellTitleLeadingPadding;
 extern const CGFloat kPinnedCellSnapshotTopPadding;
 extern const CGFloat kPinnedCellFaviconWidth;
+extern const CGFloat kPinnedCellFaviconSymbolPointSize;
 extern const CGFloat kPinnedCellFaviconContainerWidth;
 extern const CGFloat kPinnedCellFaviconBorderWidth;
 extern const CGFloat kPinnedCellFaviconContainerCornerRadius;
@@ -50,5 +50,8 @@ extern const CGFloat kPinnedCellSelectionRingPadding;
 // Pinned cell collection view layout constraints.
 extern const CGFloat kPinnedCellVerticalLayoutInsets;
 extern const CGFloat kPinnedCellHorizontalLayoutInsets;
+
+// Pinned cell title label fader dimensions.
+extern const CGFloat kPinnedCellFaderGradientWidth;
 
 #endif  // IOS_CHROME_BROWSER_UI_TAB_SWITCHER_TAB_GRID_PINNED_TABS_PINNED_TABS_CONSTANTS_H_

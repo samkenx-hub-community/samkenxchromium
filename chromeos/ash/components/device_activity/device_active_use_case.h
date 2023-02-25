@@ -85,6 +85,10 @@ class COMPONENT_EXPORT(CHROMEOS_ASH_COMPONENTS_DEVICE_ACTIVITY)
   // Generate status storing the last ping pacific date.
   virtual private_computing::ActiveStatus GenerateActiveStatus() = 0;
 
+  // Define churn observation use case method in parent class with default
+  // return value of empty string for all other use cases.
+  virtual std::string GetObservationPeriod(int period);
+
   // Method used to reset the non constant saved state of the device active use
   // case. The state should be cleared after reporting device actives.
   void ClearSavedState();
@@ -188,6 +192,9 @@ class COMPONENT_EXPORT(CHROMEOS_ASH_COMPONENTS_DEVICE_ACTIVITY)
   // metadata.
   ChurnActiveStatus* GetChurnActiveStatus();
 
+  // Retrieve the timestamp when the device came active.
+  base::Time GetActiveTs() const;
+
  protected:
   // Retrieve full hardware class from MachineStatistics.
   // |DeviceActivityController| waits for object to finish loading, to avoid
@@ -228,6 +235,11 @@ class COMPONENT_EXPORT(CHROMEOS_ASH_COMPONENTS_DEVICE_ACTIVITY)
   std::vector<FresnelImportData> new_import_data_;
 
  private:
+  // Stores the timestamp passed to |SetWindowIdentifier| method.
+  // In production, this represents the timestamp when the device
+  // first because active.
+  base::Time active_ts_;
+
   // The ChromeOS platform code will provide a derived PSM device active secret
   // via callback.
   //

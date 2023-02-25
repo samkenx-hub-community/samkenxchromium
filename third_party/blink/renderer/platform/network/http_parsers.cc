@@ -228,6 +228,7 @@ blink::LinkHeaderPtr ConvertToBlink(const LinkHeaderPtr& in) {
       static_cast<blink::LinkRelAttribute>(in->rel),
       static_cast<blink::LinkAsAttribute>(in->as),
       static_cast<blink::CrossOriginAttribute>(in->cross_origin),
+      static_cast<blink::FetchPriorityAttribute>(in->fetch_priority),
       ConvertToBlink(in->mime_type));
 }
 
@@ -251,21 +252,31 @@ blink::VariantsHeaderPtr ConvertToBlink(const VariantsHeaderPtr& in) {
                                     ConvertToBlink(in->available_values));
 }
 
-blink::NoVarySearchPtr ConvertToBlink(const NoVarySearchPtr& in) {
+blink::NoVarySearchWithParseErrorPtr ConvertToBlink(
+    const NoVarySearchWithParseErrorPtr& in) {
   if (!in)
     return nullptr;
 
-  DCHECK(in->search_variance);
-  if (in->search_variance->is_no_vary_params()) {
-    return blink::NoVarySearch::New(
-        blink::SearchParamsVariance::NewNoVaryParams(
-            ConvertToBlink(in->search_variance->get_no_vary_params())),
-        in->vary_on_key_order);
+  if (in->is_parse_error()) {
+    return blink::NoVarySearchWithParseError::NewParseError(
+        in->get_parse_error());
   }
-  return blink::NoVarySearch::New(
-      blink::SearchParamsVariance::NewVaryParams(
-          ConvertToBlink(in->search_variance->get_vary_params())),
-      in->vary_on_key_order);
+
+  const NoVarySearchPtr& no_vary_search = in->get_no_vary_search();
+  DCHECK(no_vary_search->search_variance);
+  if (no_vary_search->search_variance->is_no_vary_params()) {
+    return blink::NoVarySearchWithParseError::NewNoVarySearch(
+        blink::NoVarySearch::New(
+            blink::SearchParamsVariance::NewNoVaryParams(ConvertToBlink(
+                no_vary_search->search_variance->get_no_vary_params())),
+            no_vary_search->vary_on_key_order));
+  }
+
+  return blink::NoVarySearchWithParseError::NewNoVarySearch(
+      blink::NoVarySearch::New(
+          blink::SearchParamsVariance::NewVaryParams(ConvertToBlink(
+              no_vary_search->search_variance->get_vary_params())),
+          no_vary_search->vary_on_key_order));
 }
 
 blink::ParsedHeadersPtr ConvertToBlink(const ParsedHeadersPtr& in) {
@@ -292,7 +303,7 @@ blink::ParsedHeadersPtr ConvertToBlink(const ParsedHeadersPtr& in) {
       in->content_language.has_value()
           ? absl::make_optional(ConvertToBlink(in->content_language.value()))
           : absl::nullopt,
-      ConvertToBlink(in->no_vary_search));
+      ConvertToBlink(in->no_vary_search_with_parse_error));
 }
 
 }  // namespace mojom

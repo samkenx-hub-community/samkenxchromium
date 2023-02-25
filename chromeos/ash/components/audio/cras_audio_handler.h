@@ -8,6 +8,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include <cstdint>
 #include <queue>
 #include <string>
 #include <vector>
@@ -114,6 +115,9 @@ class COMPONENT_EXPORT(CHROMEOS_ASH_COMPONENTS_AUDIO) CrasAudioHandler
     // Called when output channel remixing changed.
     virtual void OnOutputChannelRemixingChanged(bool mono_on);
 
+    // Called when noise cancellation state changed.
+    virtual void OnNoiseCancellationStateChanged();
+
     // Called when hotword is detected.
     virtual void OnHotwordTriggered(uint64_t tv_sec, uint64_t tv_nsec);
 
@@ -168,6 +172,7 @@ class COMPONENT_EXPORT(CHROMEOS_ASH_COMPONENTS_AUDIO) CrasAudioHandler
     VM_TERMINA,
     VM_PLUGIN,
     VM_BOREALIS,
+    LACROS,
     UNKNOWN,
   };
 
@@ -270,7 +275,15 @@ class COMPONENT_EXPORT(CHROMEOS_ASH_COMPONENTS_AUDIO) CrasAudioHandler
   // Gets the audio devices back in |device_list|.
   void GetAudioDevices(AudioDeviceList* device_list) const;
 
+  // Gets the primary active output device in |device|.
+  // Returns true if the primary active output device is successfully obtained.
+  // Returns false if no active device is obtained or |device| is null.
   bool GetPrimaryActiveOutputDevice(AudioDevice* device) const;
+
+  // Gets the primary active input device in |device|.
+  // Returns true if the primary active input device is successfully obtained.
+  // Returns false if no active device is obtained or |device| is null.
+  bool GetPrimaryActiveInputDevice(AudioDevice* device) const;
 
   // Returns the device matched with |type|. Assuming there is only one device
   // matched the |type|, if there is more than one matched devices, it will
@@ -285,17 +298,20 @@ class COMPONENT_EXPORT(CHROMEOS_ASH_COMPONENTS_AUDIO) CrasAudioHandler
   // Gets the default output buffer size in frames.
   void GetDefaultOutputBufferSize(int32_t* buffer_size) const;
 
-  // Gets the state of input noise cancellation.
+  // Returns noise cancellation supported if:
+  // - Overall board/device supports noise cancellation
+  // - Audio device has bit for Noise Cancellation set in `audio_effect`.
+  bool IsNoiseCancellationSupportedForDevice(uint64_t device_id);
+
+  // Gets the pref state of input noise cancellation.
   bool GetNoiseCancellationState() const;
 
   // Refreshes the input device noise cancellation state.
   void RefreshNoiseCancellationState();
 
-  // Sends a DBus signal to set the state of input noise cancellation.
-  void SetNoiseCancellationState(bool state);
-
-  // Sets the state of input noise cancellation in preferences.
-  void SetNoiseCancellationPrefState(bool state);
+  // Updates noise cancellation state in `CrasAudioClient` and
+  // `AudioDevicesPrefHandler` to the provided value.
+  void SetNoiseCancellationState(bool noise_cancellation_on);
 
   // Get if noise cancellation is supported by the board.
   void RequestNoiseCancellationSupported(
@@ -476,6 +492,7 @@ class COMPONENT_EXPORT(CHROMEOS_ASH_COMPONENTS_AUDIO) CrasAudioHandler
   void ActiveOutputNodeChanged(uint64_t node_id) override;
   void ActiveInputNodeChanged(uint64_t node_id) override;
   void OutputNodeVolumeChanged(uint64_t node_id, int volume) override;
+  void InputNodeGainChanged(uint64_t node_id, int gain) override;
   void HotwordTriggered(uint64_t tv_sec, uint64_t tv_nsec) override;
   void BluetoothBatteryChanged(const std::string& address,
                                uint32_t level) override;

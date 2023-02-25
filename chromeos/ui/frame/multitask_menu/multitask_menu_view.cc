@@ -19,13 +19,21 @@
 #include "chromeos/ui/frame/multitask_menu/multitask_button.h"
 #include "chromeos/ui/frame/multitask_menu/multitask_menu_metrics.h"
 #include "chromeos/ui/frame/multitask_menu/split_button_view.h"
-#include "chromeos/ui/wm/features.h"
+#include "chromeos/ui/vector_icons/vector_icons.h"
 #include "ui/aura/window.h"
 #include "ui/base/default_style.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
 #include "ui/display/screen.h"
+#include "ui/gfx/geometry/insets.h"
+#include "ui/gfx/paint_vector_icon.h"
+#include "ui/gfx/text_constants.h"
+#include "ui/views/animation/ink_drop.h"
+#include "ui/views/animation/ink_drop_host.h"
 #include "ui/views/background.h"
+#include "ui/views/border.h"
+#include "ui/views/controls/button/button.h"
+#include "ui/views/controls/highlight_path_generator.h"
 #include "ui/views/controls/label.h"
 #include "ui/views/widget/widget.h"
 
@@ -35,6 +43,14 @@ namespace {
 
 constexpr int kCenterPadding = 4;
 constexpr int kLabelFontSize = 13;
+
+// Dogfood feedback button layout values.
+constexpr int kButtonHeight = 28;
+// The space between the text and image in the feedback button.
+constexpr int kButtonImageSpacing = 4;
+// Divisor to determine the radius of the rounded corners for the button.
+constexpr float kButtonRadDivisor = 2.f;
+constexpr gfx::Insets kButtonInsets = gfx::Insets::TLBR(0, 6, 0, 8);
 
 // Creates multitask button with label.
 std::unique_ptr<views::View> CreateButtonContainer(
@@ -125,9 +141,48 @@ MultitaskMenuView::MultitaskMenuView(
     float_button_for_testing_ = float_button.get();
     AddChildView(CreateButtonContainer(std::move(float_button), message_id));
   }
+
+  // Dogfood feedback button. This button is added as a child view as it
+  // prevents having to create separate instances in `MultitaskMenu` and
+  // `TabletModeMultitaskMenuView`, and does not require a separate
+  // `LayoutManager`.
+  feedback_button_ = AddChildView(std::make_unique<views::LabelButton>(
+      views::Button::PressedCallback(),
+      l10n_util::GetStringUTF16(IDS_MULTITASK_MENU_FEEDBACK_BUTTON_NAME)));
+
+  feedback_button_->SetImageLabelSpacing(kButtonImageSpacing);
+  feedback_button_->SetBorder(views::CreateEmptyBorder(kButtonInsets));
+  feedback_button_->SetHorizontalAlignment(
+      gfx::HorizontalAlignment::ALIGN_CENTER);
+  feedback_button_->SetBackground(views::CreateThemedRoundedRectBackground(
+      ui::kColorMultitaskFeedbackButtonLabelBackground,
+      kButtonHeight / kButtonRadDivisor));
+
+  views::InkDropHost* const ink_drop = views::InkDrop::Get(feedback_button_);
+  ink_drop->SetMode(views::InkDropHost::InkDropMode::ON);
+  ink_drop->SetBaseColor(SK_ColorGRAY);
+  views::InstallRoundRectHighlightPathGenerator(
+      feedback_button_, gfx::Insets(), kButtonHeight / kButtonRadDivisor);
 }
 
 MultitaskMenuView::~MultitaskMenuView() = default;
+
+void MultitaskMenuView::OnThemeChanged() {
+  // Must be called at the beginning of the function.
+  views::View::OnThemeChanged();
+
+  auto* color_provider = GetColorProvider();
+  feedback_button_->SetTextColor(
+      views::Button::STATE_NORMAL,
+      color_provider->GetColor(
+          ui::kColorMultitaskFeedbackButtonLabelForeground));
+  feedback_button_->SetImage(
+      views::Button::STATE_NORMAL,
+      gfx::CreateVectorIcon(
+          kDogfoodPawIcon,
+          color_provider->GetColor(
+              ui::kColorMultitaskFeedbackButtonLabelForeground)));
+}
 
 void MultitaskMenuView::SplitButtonPressed(SnapDirection direction) {
   SnapController::Get()->CommitSnap(window_, direction, kDefaultSnapRatio);

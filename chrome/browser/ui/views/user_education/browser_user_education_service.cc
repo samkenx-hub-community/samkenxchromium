@@ -19,6 +19,8 @@
 #include "chrome/browser/ui/performance_controls/performance_controls_metrics.h"
 #include "chrome/browser/ui/views/chrome_typography.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
+#include "chrome/browser/ui/webui/new_tab_page/new_tab_page_ui.h"
+#include "chrome/browser/ui/webui/side_panel/customize_chrome/customize_chrome_ui.h"
 #include "chrome/common/webui_url_constants.h"
 #include "chrome/grit/chromium_strings.h"
 #include "chrome/grit/generated_resources.h"
@@ -59,8 +61,11 @@ namespace {
 const char kTabGroupTutorialMetricPrefix[] = "TabGroup";
 const char kTabGroupWithGroupTutorialMetricPrefix[] = "TabGroupWithGroup";
 const char kSidePanelReadingListTutorialMetricPrefix[] = "SidePanelReadingList";
+const char kCustomizeChromeTutorialMetricPrefix[] = "CustomizeChromeSidePanel";
+const char kSideSearchTutorialMetricPrefix[] = "SideSearch";
 constexpr char kTabGroupHeaderElementName[] = "TabGroupHeader";
 constexpr char kReadingListItemElementName[] = "ReadingListItem";
+constexpr char kChangeChromeThemeElementName[] = "ChangeChromeTheme";
 
 class BrowserHelpBubbleDelegate : public user_education::HelpBubbleDelegate {
  public:
@@ -162,11 +167,15 @@ DEFINE_FRAMEWORK_SPECIFIC_METADATA(FloatingWebUIHelpBubbleFactoryBrowser)
 
 }  // namespace
 
+const char kSidePanelCustomizeChromeTutorialId[] =
+    "Side Panel Customize Chrome Tutorial";
 const char kTabGroupTutorialId[] = "Tab Group Tutorial";
 const char kTabGroupWithExistingGroupTutorialId[] =
     "Tab Group With Existing Group Tutorial";
 const char kSidePanelReadingListTutorialId[] =
     "Side Panel Reading List Tutorial";
+
+const char kSideSearchTutorialId[] = "Side Search Tutorial";
 
 user_education::HelpBubbleDelegate* GetHelpBubbleDelegate() {
   static base::NoDestructor<BrowserHelpBubbleDelegate> delegate;
@@ -292,9 +301,12 @@ void MaybeRegisterChromeFeaturePromos(
       FeaturePromoSpecification::AcceleratorInfo(IDC_RESTORE_TAB)));
 
   // kIPHSideSearchFeature:
-  registry.RegisterFeature(FeaturePromoSpecification::CreateForLegacyPromo(
-      &feature_engagement::kIPHSideSearchFeature, kSideSearchButtonElementId,
-      IDS_SIDE_SEARCH_PROMO));
+  registry.RegisterFeature(std::move(
+      FeaturePromoSpecification::CreateForTutorialPromo(
+          feature_engagement::kIPHSideSearchFeature, kSideSearchButtonElementId,
+          IDS_SIDE_SEARCH_PROMO, kSideSearchTutorialId)
+          .SetBubbleArrow(HelpBubbleArrow::kBottomCenter)
+          .SetBubbleIcon(&vector_icons::kLightbulbOutlineIcon)));
 
   // kIPHTabSearchFeature:
   registry.RegisterFeature(FeaturePromoSpecification::CreateForLegacyPromo(
@@ -323,7 +335,7 @@ void MaybeRegisterChromeFeaturePromos(
           IDS_PASSWORD_MANAGER_IPH_BODY_SAVE_TO_ACCOUNT)
           .SetBubbleTitleText(IDS_PASSWORD_MANAGER_IPH_TITLE_SAVE_TO_ACCOUNT)
           .SetInAnyContext(true)
-          .SetBubbleArrow(HelpBubbleArrow::kBottomLeft)
+          .SetBubbleArrow(HelpBubbleArrow::kBottomRight)
           .SetBubbleIcon(&vector_icons::kCelebrationIcon)));
 
   // kIPHBatterySaverModeFeature:
@@ -487,7 +499,7 @@ void MaybeRegisterChromeTutorials(
 
     // Completion of the tutorial.
     TutorialDescription::Step success_step(
-        IDS_TUTORIAL_TAB_GROUP_SUCCESS_TITLE,
+        IDS_TUTORIAL_GENERIC_SUCCESS_TITLE,
         IDS_TUTORIAL_TAB_GROUP_SUCCESS_DESCRIPTION,
         ui::InteractionSequence::StepType::kShown, kTabStripRegionElementId,
         std::string(), HelpBubbleArrow::kNone);
@@ -505,6 +517,105 @@ void MaybeRegisterChromeTutorials(
         with_group_description.steps.size());
     tutorial_registry.AddTutorial(kTabGroupWithExistingGroupTutorialId,
                                   std::move(with_group_description));
+  }
+
+  {  // Side panel customize chrome
+
+    // The Description for kSidePanelCustomizeChromeTutorialId
+    TutorialDescription customize_chrome_description;
+
+    // Bubble step - customize chrome button
+    TutorialDescription::Step open_customize_chrome_step(
+        0, IDS_TUTORIAL_CUSTOMIZE_CHROME_OPEN_SIDE_PANEL,
+        ui::InteractionSequence::StepType::kShown,
+        NewTabPageUI::kCustomizeChromeButtonElementId, std::string(),
+        HelpBubbleArrow::kBottomRight, ui::CustomElementEventType(),
+        absl::nullopt,
+        /* transition_only_on_event =*/false,
+        user_education::TutorialDescription::NameElementsCallback(),
+        TutorialDescription::ContextMode::kAny);
+    customize_chrome_description.steps.emplace_back(open_customize_chrome_step);
+
+    // Bubble step - change theme button
+    TutorialDescription::Step change_chrome_theme_step(
+        0, IDS_TUTORIAL_CUSTOMIZE_CHROME_CHANGE_THEME,
+        ui::InteractionSequence::StepType::kShown,
+        CustomizeChromeUI::kChangeChromeThemeButtonElementId, std::string(),
+        HelpBubbleArrow::kRightCenter, ui::CustomElementEventType(),
+        /* must_remain_visible =*/false,
+        /* transition_only_on_event =*/false,
+        user_education::TutorialDescription::NameElementsCallback(),
+        TutorialDescription::ContextMode::kAny);
+    customize_chrome_description.steps.emplace_back(change_chrome_theme_step);
+
+    // Bubble step - select collection
+    TutorialDescription::Step select_collection_step(
+        0, IDS_TUTORIAL_CUSTOMIZE_CHROME_SELECT_COLLECTION,
+        ui::InteractionSequence::StepType::kShown,
+        CustomizeChromeUI::kChromeThemeCollectionElementId, std::string(),
+        HelpBubbleArrow::kRightCenter, ui::CustomElementEventType(),
+        /* must_remain_visible =*/false,
+        /* transition_only_on_event =*/false,
+        user_education::TutorialDescription::NameElementsCallback(),
+        TutorialDescription::ContextMode::kAny);
+    customize_chrome_description.steps.emplace_back(select_collection_step);
+
+    // Bubble step - select theme
+    TutorialDescription::Step select_theme_step(
+        0, IDS_TUTORIAL_CUSTOMIZE_CHROME_APPLY_THEME,
+        ui::InteractionSequence::StepType::kShown,
+        CustomizeChromeUI::kChromeThemeElementId, std::string(),
+        HelpBubbleArrow::kRightCenter, ui::CustomElementEventType(),
+        /* must_remain_visible =*/false,
+        /* transition_only_on_event =*/false,
+        base::BindRepeating(
+            [](ui::InteractionSequence* sequence, ui::TrackedElement* element) {
+              sequence->NameElement(
+                  element, base::StringPiece(kChangeChromeThemeElementName));
+              return true;
+            }),
+        TutorialDescription::ContextMode::kAny);
+    customize_chrome_description.steps.emplace_back(select_theme_step);
+
+    // Event step - select theme event
+    TutorialDescription::Step select_theme_event_step(
+        0, 0, ui::InteractionSequence::StepType::kCustomEvent,
+        ui::ElementIdentifier(), kChangeChromeThemeElementName,
+        HelpBubbleArrow::kNone, kChromeThemeSelectedCustomEventId);
+    customize_chrome_description.steps.emplace_back(select_theme_event_step);
+
+    // Bubble step - back button
+    TutorialDescription::Step back_button_step(
+        0, IDS_TUTORIAL_CUSTOMIZE_CHROME_CLICK_BACK_ARROW,
+        ui::InteractionSequence::StepType::kShown,
+        CustomizeChromeUI::kChromeThemeBackElementId, std::string(),
+        HelpBubbleArrow::kRightCenter, ui::CustomElementEventType(),
+        /* must_remain_visible =*/false,
+        /* transition_only_on_event =*/false,
+        user_education::TutorialDescription::NameElementsCallback(),
+        TutorialDescription::ContextMode::kAny);
+    customize_chrome_description.steps.emplace_back(back_button_step);
+
+    // Completion of the tutorial.
+    TutorialDescription::Step success_step(
+        IDS_TUTORIAL_GENERIC_SUCCESS_TITLE,
+        IDS_TUTORIAL_CUSTOMIZE_CHROME_SUCCESS_BODY,
+        ui::InteractionSequence::StepType::kShown,
+        CustomizeChromeUI::kChangeChromeThemeClassicElementId, std::string(),
+        HelpBubbleArrow::kRightCenter, ui::CustomElementEventType(),
+        /* must_remain_visible =*/false,
+        /* transition_only_on_event =*/false,
+        user_education::TutorialDescription::NameElementsCallback(),
+        TutorialDescription::ContextMode::kAny);
+    customize_chrome_description.steps.emplace_back(success_step);
+
+    customize_chrome_description.histograms =
+        user_education::MakeTutorialHistograms<
+            kCustomizeChromeTutorialMetricPrefix>(
+            customize_chrome_description.steps.size());
+
+    tutorial_registry.AddTutorial(kSidePanelCustomizeChromeTutorialId,
+                                  std::move(customize_chrome_description));
   }
 
   {  // Side panel reading list tutorial
@@ -585,5 +696,53 @@ void MaybeRegisterChromeTutorials(
         side_panel_description.steps.size());
     tutorial_registry.AddTutorial(kSidePanelReadingListTutorialId,
                                   std::move(side_panel_description));
+  }
+
+  {
+    TutorialDescription side_search_description;
+
+    // 1st bubble appears and prompts users to open side search
+    TutorialDescription::Step open_side_search_in_panel_step(
+        0, IDS_SIDE_SEARCH_TUTORIAL_OPEN_SIDE_PANEL,
+        ui::InteractionSequence::StepType::kShown, kSideSearchButtonElementId,
+        std::string(), HelpBubbleArrow::kBottomCenter);
+    side_search_description.steps.emplace_back(open_side_search_in_panel_step);
+
+    // 2nd bubble appears and prompts users to open a link
+    TutorialDescription::Step see_side_search(
+        0, IDS_SIDE_SEARCH_TUTORIAL_OPEN_A_LINK_TO_TAB,
+        ui::InteractionSequence::StepType::kShown, kSideSearchWebViewElementId,
+        std::string(), HelpBubbleArrow::kLeftCenter);
+    side_search_description.steps.emplace_back(see_side_search);
+
+    // Hidden step that detects a link is pressed
+    TutorialDescription::Step detect_side_search_result_clicked(
+        0, 0, ui::InteractionSequence::StepType::kCustomEvent,
+        kSideSearchWebViewElementId, std::string(), HelpBubbleArrow::kNone,
+        kSideSearchResultsClickedCustomEventId);
+    side_search_description.steps.emplace_back(
+        detect_side_search_result_clicked);
+
+    // 3rd bubble appears and prompts users to press close button
+    TutorialDescription::Step click_close(
+        0, IDS_SIDE_SEARCH_TUTORIAL_CLOSE_SIDE_PANEL,
+        ui::InteractionSequence::StepType::kShown,
+        kSidePanelCloseButtonElementId, std::string(),
+        HelpBubbleArrow::kTopRight);
+    side_search_description.steps.emplace_back(click_close);
+
+    // Completion of the tutorial.
+    TutorialDescription::Step success_step(
+        IDS_TUTORIAL_GENERIC_SUCCESS_TITLE, IDS_SIDE_SEARCH_PROMO,
+        ui::InteractionSequence::StepType::kShown, kSideSearchButtonElementId,
+        std::string(), HelpBubbleArrow::kTopRight);
+    side_search_description.steps.emplace_back(success_step);
+
+    side_search_description.histograms =
+        user_education::MakeTutorialHistograms<kSideSearchTutorialMetricPrefix>(
+            side_search_description.steps.size());
+    side_search_description.can_be_restarted = true;
+    tutorial_registry.AddTutorial(kSideSearchTutorialId,
+                                  std::move(side_search_description));
   }
 }

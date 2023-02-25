@@ -4,35 +4,26 @@
 
 import 'chrome://webui-test/mojo_webui_test_support.js';
 
+import {Cluster, RawVisitData, URLVisit} from 'chrome://new-tab-page/history_cluster_types.mojom-webui.js';
+import {PageHandlerRemote} from 'chrome://new-tab-page/history_clusters.mojom-webui.js';
 import {historyClustersDescriptor, HistoryClustersModuleElement, HistoryClustersProxyImpl} from 'chrome://new-tab-page/lazy_load.js';
-import {Cluster, PageCallbackRouter, PageHandlerRemote, PageRemote, QueryResult, RawVisitData, URLVisit} from 'chrome://resources/cr_components/history_clusters/history_clusters.mojom-webui.js';
+import {$$} from 'chrome://new-tab-page/new_tab_page.js';
 import {assertEquals, assertTrue} from 'chrome://webui-test/chai_assert.js';
-import {TestBrowserProxy} from 'chrome://webui-test/test_browser_proxy.js';
+import {waitAfterNextRender} from 'chrome://webui-test/polymer_test_util.js';
+import {TestMock} from 'chrome://webui-test/test_mock.js';
 
 import {installMock} from '../../test_support.js';
 
 suite('NewTabPageModulesHistoryClustersModuleTest', () => {
-  let handler: TestBrowserProxy<PageHandlerRemote>;
-  let callbackRouter: PageRemote;
+  let handler: TestMock<PageHandlerRemote>;
 
   setup(() => {
     document.body.innerHTML = window.trustedTypes!.emptyHTML;
     handler = installMock(
         PageHandlerRemote,
         mock => HistoryClustersProxyImpl.setInstance(
-            new HistoryClustersProxyImpl(mock, new PageCallbackRouter())));
-    callbackRouter = HistoryClustersProxyImpl.getInstance()
-                         .callbackRouter.$.bindNewPipeAndPassRemote();
+            new HistoryClustersProxyImpl(mock)));
   });
-
-  function createQueryResult(clusters: Cluster[]): QueryResult {
-    return {
-      clusters,
-      query: '',
-      canLoadMore: false,
-      isContinuation: false,
-    };
-  }
 
   function createSampleCluster(overrides?: Partial<Cluster>): Cluster {
     const rawVisitData: RawVisitData = {
@@ -44,7 +35,7 @@ suite('NewTabPageModulesHistoryClustersModuleTest', () => {
       visitId: BigInt(1),
       normalizedUrl: {url: 'https://www.google.com'},
       urlForDisplay: 'https://www.google.com',
-      pageTitle: '',
+      pageTitle: 'Test Title',
       titleMatchPositions: [],
       urlForDisplayMatchPositions: [],
       duplicates: [],
@@ -52,6 +43,7 @@ suite('NewTabPageModulesHistoryClustersModuleTest', () => {
       annotations: [],
       debugInfo: {},
       rawVisitData: rawVisitData,
+      imageUrl: undefined,
       isKnownToSync: false,
     };
 
@@ -59,9 +51,12 @@ suite('NewTabPageModulesHistoryClustersModuleTest', () => {
         {
           id: BigInt(111),
           visits: [urlVisit1],
+          label: undefined,
           labelMatchPositions: [],
           relatedSearches: [],
+          imageUrl: undefined,
           fromPersistence: false,
+          debugInfo: undefined,
         },
         overrides);
 
@@ -70,28 +65,46 @@ suite('NewTabPageModulesHistoryClustersModuleTest', () => {
 
   test('No module created if no history cluster data', async () => {
     // Arrange.
-    callbackRouter.onClustersQueryResult(createQueryResult([]));
+    handler.setResultFor('getCluster', Promise.resolve({cluster: null}));
 
     // Act.
     const moduleElement = await historyClustersDescriptor.initialize(0) as
         HistoryClustersModuleElement;
 
     // Assert.
-    await handler.whenCalled('startQueryClusters');
+    await handler.whenCalled('getCluster');
     assertEquals(null, moduleElement);
   });
 
   test('Module created when history cluster data available', async () => {
     // Arrange.
-    callbackRouter.onClustersQueryResult(
-        createQueryResult([createSampleCluster()]));
+    handler.setResultFor(
+        'getCluster', Promise.resolve({cluster: createSampleCluster()}));
 
     // Act.
     const moduleElement = await historyClustersDescriptor.initialize(0) as
         HistoryClustersModuleElement;
 
     // Assert.
-    await handler.whenCalled('startQueryClusters');
+    await handler.whenCalled('getCluster');
     assertTrue(!!moduleElement);
+  });
+
+  test('Tile element populated with correct data', async () => {
+    handler.setResultFor(
+        'getCluster', Promise.resolve({cluster: createSampleCluster()}));
+
+    const moduleElement = await historyClustersDescriptor.initialize(0) as
+        HistoryClustersModuleElement;
+
+    document.body.append(moduleElement);
+    assertTrue(!!moduleElement);
+    await handler.whenCalled('getCluster');
+    await waitAfterNextRender(moduleElement);
+
+    const tileElement = $$(moduleElement, 'ntp-history-clusters-tile');
+    assertTrue(!!tileElement);
+
+    assertEquals($$(tileElement, '#title')!.innerHTML, 'Test Title');
   });
 });

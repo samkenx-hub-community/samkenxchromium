@@ -56,6 +56,7 @@ constexpr auto kUserVerified = autofill::VerificationStatus::kUserVerified;
 constexpr char kFieldTypeKey[] = "field";
 constexpr char kFieldLengthKey[] = "isLongField";
 constexpr char kFieldNameKey[] = "fieldName";
+constexpr char kFieldRequired[] = "isRequired";
 
 // Field names for the address components.
 constexpr char kFullNameField[] = "FULL_NAME";
@@ -99,7 +100,7 @@ const char* GetStringFromAddressField(i18n::addressinput::AddressField type) {
 
 // Serializes the AddressUiComponent a map from string to base::Value().
 base::Value::Dict AddressUiComponentAsValueMap(
-    const i18n::addressinput::AddressUiComponent& address_ui_component) {
+    const autofill::ExtendedAddressUiComponent& address_ui_component) {
   base::Value::Dict info;
   info.Set(kFieldNameKey, address_ui_component.name);
   info.Set(kFieldTypeKey,
@@ -107,6 +108,7 @@ base::Value::Dict AddressUiComponentAsValueMap(
   info.Set(kFieldLengthKey,
            address_ui_component.length_hint ==
                i18n::addressinput::AddressUiComponent::HINT_LONG);
+  info.Set(kFieldRequired, address_ui_component.is_required);
   return info;
 }
 
@@ -150,6 +152,22 @@ autofill::AutofillManager* GetAutofillManager(
   if (!autofill_driver)
     return nullptr;
   return autofill_driver->autofill_manager();
+}
+
+autofill::AutofillProfile CreateNewAutofillProfile() {
+  if (!base::FeatureList::IsEnabled(
+          autofill::features::test::
+              kAutofillCreateAccountProfilesFromSettings)) {
+    return autofill::AutofillProfile(base::GenerateGUID(), kSettingsOrigin);
+  }
+  autofill::AutofillProfile profile(
+      base::GenerateGUID(), kSettingsOrigin,
+      autofill::AutofillProfile::Source::kAccount);
+  profile.set_initial_creator_id(
+      autofill::AutofillProfile::kInitialCreatorOrModifierChrome);
+  profile.set_last_modifier_id(
+      autofill::AutofillProfile::kInitialCreatorOrModifierChrome);
+  return profile;
 }
 
 }  // namespace
@@ -204,9 +222,7 @@ ExtensionFunction::ResponseAction AutofillPrivateSaveAddressFunction::Run() {
       return RespondNow(Error(kErrorDataUnavailable));
   }
   autofill::AutofillProfile profile =
-      existing_profile
-          ? *existing_profile
-          : autofill::AutofillProfile(base::GenerateGUID(), kSettingsOrigin);
+      existing_profile ? *existing_profile : CreateNewAutofillProfile();
 
   if (address->full_names) {
     std::string full_name;
@@ -335,7 +351,7 @@ AutofillPrivateGetAddressComponentsFunction::Run() {
           api::autofill_private::GetAddressComponents::Params::Create(args());
   EXTENSION_FUNCTION_VALIDATE(parameters.get());
 
-  std::vector<std::vector<::i18n::addressinput::AddressUiComponent>> lines;
+  std::vector<std::vector<autofill::ExtendedAddressUiComponent>> lines;
   std::string language_code;
 
   autofill::GetAddressComponents(
@@ -348,7 +364,7 @@ AutofillPrivateGetAddressComponentsFunction::Run() {
 
   for (auto& line : lines) {
     base::Value::List row_values;
-    for (const ::i18n::addressinput::AddressUiComponent& component : line) {
+    for (const autofill::ExtendedAddressUiComponent& component : line) {
       row_values.Append(AddressUiComponentAsValueMap(component));
     }
     base::Value::Dict row;

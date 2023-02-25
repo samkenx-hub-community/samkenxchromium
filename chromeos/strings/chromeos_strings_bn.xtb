@@ -16,6 +16,7 @@
 <translation id="1128128132059598906">EAP-TTLS</translation>
 <translation id="1145018782460575098">এক্সটার্নাল ডিভাইসের জন্য ফার্মওয়্যার আপডেট করে এমন উইন্ডো খোলা আছে। <ph name="NUM_UPDATES" />টি আপডেট উপলভ্য।</translation>
 <translation id="1145516343487477149">সহায়তা নিবন্ধ এবং Chromebook সংক্রান্ত সাধারণ প্রশ্নের উত্তর খুঁজুন</translation>
+<translation id="1167755866710282443">কী কাস্টমাইজ করার জন্য মেনু খুলুন। সরানোর জন্য মেনু টেনে আনুন।</translation>
 <translation id="1175697296044146566"><ph name="MANAGER" /> এই <ph name="DEVICE_TYPE" /> ম্যানেজ করে।</translation>
 <translation id="1175951029573070619">গড় (<ph name="SIGNAL_STRENGTH" />)</translation>
 <translation id="1181037720776840403">সরান</translation>
@@ -326,6 +327,7 @@
 <translation id="4110686435123617899"><ph name="TITLE" /> <ph name="DESC" /> অ্যালবাম বেছে নিন</translation>
 <translation id="4111761024568264522">ইউএসবি টাচপ্যাড</translation>
 <translation id="4117637339509843559">'ডার্ক মোড'</translation>
+<translation id="4130035430755296270">আরও লেআউট বিকল্পের জন্য ঘোরাতে থাকুন</translation>
 <translation id="4131410914670010031">সাদা ও কালো</translation>
 <translation id="4145784616224233563">HTTP ফায়ারওয়াল</translation>
 <translation id="4147897805161313378">Google Photos</translation>
@@ -414,6 +416,7 @@
 <translation id="484790837831576105">(Android) DNS রেজোলিউশন</translation>
 <translation id="4848429997038228357">টেস্ট করা হচ্ছে</translation>
 <translation id="4854586501323951986">বিল্ট-ইন টাচস্ক্রিন</translation>
+<translation id="4855250849489639581">আরও লেআউট বিকল্পের জন্য নিচে সোয়াইপ করুন</translation>
 <translation id="4861758251032006121">{ATTEMPTS_LEFT,plural, =1{<ph name="ERROR_MESSAGE" /> আর {0} বার চেষ্টা করতে পারবেন}one{<ph name="ERROR_MESSAGE" /> আর {0} বার চেষ্টা করতে পারবেন}other{<ph name="ERROR_MESSAGE" /> আর {0} বার চেষ্টা করতে পারবেন}}</translation>
 <translation id="4873827928179867585">যাচাইকরণ অ্যালগরিদম</translation>
 <translation id="4880328057631981605">অ্যাক্সেস পয়েন্ট নাম</translation>
@@ -517,6 +520,7 @@
 <translation id="576835345334454681">ডিসপ্লের উজ্জ্বলতা বাড়ানোর বোতাম</translation>
 <translation id="57838592816432529">মিউট করুন</translation>
 <translation id="5784136236926853061">HTTP লেটেন্সি বেশি</translation>
+<translation id="5826644637650799838">আর্ট সম্পর্কে</translation>
 <translation id="5832805196449965646">একজন ব্যক্তিকে যোগ করুন</translation>
 <translation id="583281660410589416">অজানা</translation>
 <translation id="5843706793424741864">ফারেনহাইট</translation>
@@ -673,6 +677,7 @@
 <translation id="7172721935181587524">১টি ছবি</translation>
 <translation id="7177485034254901881"><ph name="MANAGER" />-এর মাধ্যমে এই <ph name="DEVICE_TYPE" /> ম্যানেজ করা হয়। অ্যাডমিনিস্ট্রেটর অন্য জায়গা থেকে ডিভাইসটি কনফিগার করতে পারেন।</translation>
 <translation id="7180611975245234373">রিফ্রেশ করুন</translation>
+<translation id="7180865173735832675">কাস্টমাইজ করুন</translation>
 <translation id="7212734716605298123">এক্সটার্নাল ডিভাইসের জন্য ফার্মওয়্যার আপডেট</translation>
 <translation id="7216409898977639127">মোবাইল পরিষেবা প্রদানকারী</translation>
 <translation id="725133483556299729">ইমেল বেছে নিন</translation>
@@ -744,6 +749,7 @@
 <translation id="7881066108824108340">DNS</translation>
 <translation id="7882358943899516840">পরিষেবা প্রদানকারীর ধরন</translation>
 <translation id="7882501334836096755">সর্বজনীন 'কী'</translation>
+<translation id="78957024357676568">বাঁ</translation>
 <translation id="7915220255123750251">নেটওয়ার্ক APN সেটিংস ম্যানেজ করুন। APN একটি সেলুলার নেটওয়ার্ক এবং ইন্টারনেটের মধ্যে কানেকশন তৈরি করে।</translation>
 <translation id="7936303884198020182">ডোমেন নেম সার্ভার খুঁজে পাওয়া যায়নি</translation>
 <translation id="7942349550061667556">লাল</translation>
@@ -775,6 +781,7 @@
 <translation id="8226628635270268143">আপনার পছন্দের ফটো ও অ্যালবাম বাছুন</translation>
 <translation id="8227119283605456246">ফাইল সংযুক্ত করুন</translation>
 <translation id="8230672074305416752">ডিফল্ট নেটওয়ার্ক গেটওয়েতে পিং করা যায়নি</translation>
+<translation id="8242426110754782860">এগিয়ে যান</translation>
 <translation id="8246209727385807362">অজানা পরিষেবা প্রদানকারী</translation>
 <translation id="827422111966801947">নীল</translation>
 <translation id="8286154143153872371">ওয়ালপেপার দেখার জন্য কোনও নেটওয়ার্কে কানেক্ট করে পৃষ্ঠা আবার লোড করুন।</translation>
@@ -852,6 +859,7 @@
 <translation id="8930622219860340959">ওয়্যারলেস</translation>
 <translation id="8936793075252196307">ক্লায়েন্ট IP অ্যাড্রেস</translation>
 <translation id="894617464444543719">ডিভাইস একটি ফোন।</translation>
+<translation id="8957423540740801332">ডান</translation>
 <translation id="8968751544471797276">চর্জিং রেট</translation>
 <translation id="8970109610781093811">আবার চালান</translation>
 <translation id="8983038754672563810">HSPA</translation>

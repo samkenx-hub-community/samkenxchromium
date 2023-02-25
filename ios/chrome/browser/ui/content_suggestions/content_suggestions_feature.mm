@@ -47,9 +47,8 @@ const char kContentSuggestionsUIModuleRefreshMinimizeSpacingParam[] =
 const char kContentSuggestionsUIModuleRefreshRemoveHeadersParam[] =
     "remove_headers";
 
-BASE_FEATURE(kHideMVTAndShortcutsForNewUsers,
-             "HideMostVisitedAndShortcutsForNewUsers",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+const char kTileAblationMVTOnlyParam[] = "TileAblationMVTOnlyParam";
+BASE_FEATURE(kTileAblation, "TileAblation", base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Feature disabled by default.
 BASE_FEATURE(kTrendingQueriesModule,
@@ -75,9 +74,30 @@ const char kDiscoverFeedIsNativeUIEnabled[] = "DiscoverFeedIsNativeUIEnabled";
 bool IsDiscoverFeedEnabled() {
   return base::FeatureList::IsEnabled(kDiscoverFeedInNtp);
 }
+TileAblationBehavior GetTileAblationBehavior() {
+  if (IsTileAblationEnabled()) {
+    return base::GetFieldTrialParamByFeatureAsBool(kTileAblation,
+                                                   kTileAblationMVTOnlyParam,
+                                                   /*default_value=*/false)
+               ? TileAblationBehavior::kTileAblationMVTOnly
+               : TileAblationBehavior::kTileAblationMVTAndShortcuts;
+  }
 
-bool IsHideMVTAndShortcutsEnabled() {
-  return base::FeatureList::IsEnabled(kHideMVTAndShortcutsForNewUsers);
+  return TileAblationBehavior::kDisabled;
+}
+
+bool IsTileAblationEnabled() {
+  return base::FeatureList::IsEnabled(kTileAblation);
+}
+bool ShouldHideShortcuts() {
+  return GetTileAblationBehavior() ==
+         TileAblationBehavior::kTileAblationMVTAndShortcuts;
+}
+bool ShouldHideMostVisited() {
+  return (GetTileAblationBehavior() ==
+              TileAblationBehavior::kTileAblationMVTAndShortcuts ||
+          GetTileAblationBehavior() ==
+              TileAblationBehavior::kTileAblationMVTOnly);
 }
 
 // Returns true if the client is bucketed into an enabled experiment group of

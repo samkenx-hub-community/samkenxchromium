@@ -30,7 +30,7 @@ class DISPLAY_MANAGER_EXPORT ContentProtectionKeyManager {
  public:
   using ProvisionedKeyRequest = base::RepeatingCallback<void(
       base::OnceCallback<void(const std::string&)>)>;
-  using KeySetCallback = base::OnceCallback<void()>;
+  using KeySetCallback = base::OnceCallback<void(bool)>;
 
   ContentProtectionKeyManager();
 
@@ -40,9 +40,12 @@ class DISPLAY_MANAGER_EXPORT ContentProtectionKeyManager {
 
   ~ContentProtectionKeyManager();
 
-  void set_provisioned_key_request(
-      ContentProtectionKeyManager::ProvisionedKeyRequest request) {
+  void set_provisioned_key_request(ProvisionedKeyRequest request) {
     provisioned_key_request_ = std::move(request);
+  }
+
+  void set_native_display_delegate(NativeDisplayDelegate* delegate) {
+    native_display_delegate_ = delegate;
   }
 
   // Check for the key prop of |displays_states|, request the key by calling
@@ -53,7 +56,11 @@ class DISPLAY_MANAGER_EXPORT ContentProtectionKeyManager {
                         KeySetCallback on_key_set);
 
  private:
-  void TriggerPendingCallbacks(int64_t callback_id);
+  void FetchKeyFromServer();
+  void OnKeyFetchedFromServer(const std::string& key);
+  void InjectKeyToKernel(int64_t display_id);
+  void OnKeyInjectedToKernel(int64_t display_id, bool success);
+  void TriggerPendingCallbacks(int64_t callback_id, bool is_key_set);
 
   // Function to request the provisioned key from the server.
   ProvisionedKeyRequest provisioned_key_request_;
@@ -61,9 +68,10 @@ class DISPLAY_MANAGER_EXPORT ContentProtectionKeyManager {
   // change throughout the life of the process.
   std::string cached_provisioned_key_;
 
-  // Displays that have already been handled and we know do not require keys.
-  base::flat_set<int64_t> displays_not_require_keys_;
+  NativeDisplayDelegate* native_display_delegate_ = nullptr;  // Not owned.
+
   base::flat_map<int64_t, KeySetCallback> pending_display_callbacks_;
+  base::flat_set<int64_t> displays_pending_set_key_;
 
   base::WeakPtrFactory<ContentProtectionKeyManager> weak_ptr_factory_{this};
 };

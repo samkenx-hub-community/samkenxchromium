@@ -10,6 +10,7 @@
 
 #include "base/strings/string_util.h"
 #include "ui/base/models/image_model.h"
+#include "ui/message_center/public/cpp/notification.h"
 #include "ui/message_center/public/cpp/notification_types.h"
 #include "ui/message_center/public/cpp/notifier_id.h"
 
@@ -27,6 +28,7 @@ class ImageModel;
 }  // namespace ui
 
 namespace views {
+class FocusRing;
 class View;
 class Widget;
 }  // namespace views
@@ -64,8 +66,8 @@ class NotificationCenterTestApi {
       const GURL& url = GURL(),
       const message_center::NotifierId& notifier_id =
           message_center::NotifierId(),
-      const message_center::NotificationPriority =
-          message_center::NotificationPriority::DEFAULT_PRIORITY);
+      const message_center::RichNotificationData& optional_fields =
+          message_center::RichNotificationData());
 
   // Adds a notification and returns the associated id.
   std::string AddNotification();
@@ -73,6 +75,9 @@ class NotificationCenterTestApi {
   // Adds a notification with the source url and notifier id corresponding to
   // the provided url as a string. Useful for testing notification grouping.
   std::string AddNotificationWithSourceUrl(const std::string& url);
+
+  // Adds a pinned notification and return the associated id.
+  std::string AddPinnedNotification();
 
   // Adds a notification with the system component notifier and system priority
   // level.
@@ -86,6 +91,9 @@ class NotificationCenterTestApi {
 
   // Returns true if `NotificationCenterBubble` is shown, false otherwise.
   bool IsBubbleShown();
+
+  // Returns true if a pinned icons is shown in the `NotificationCenterTray`.
+  bool IsPinnedIconShown();
 
   // Returns true if a popup associated with the provided `id` exists, false
   // otherwise.
@@ -142,6 +150,12 @@ class NotificationCenterTestApi {
   // `NotificationGroupingController` to create a parent notification.
   std::string NotificationIdToParentNotificationId(const std::string& id);
 
+  // Returns the notification center tray's focus ring.
+  views::FocusRing* GetFocusRing() const;
+
+  // Focuses the notification center tray.
+  void FocusTray();
+
  private:
   std::string GenerateNotificationId();
 
@@ -154,7 +168,8 @@ class NotificationCenterTestApi {
       const ui::ImageModel& icon,
       const std::u16string& display_source,
       const GURL& url,
-      const message_center::NotifierId& notifier_id);
+      const message_center::NotifierId& notifier_id,
+      const message_center::RichNotificationData& optional_fields);
 
   int notification_id_ = 0;
   NotificationCenterTray* const notification_center_tray_;

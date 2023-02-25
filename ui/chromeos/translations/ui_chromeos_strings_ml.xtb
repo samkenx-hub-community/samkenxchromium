@@ -27,12 +27,12 @@
 <translation id="1201402288615127009">അടുത്തത്</translation>
 <translation id="1209796539517632982">യാന്ത്രിക നാമ സെർവറുകൾ</translation>
 <translation id="1210831758834677569">ലാവോ</translation>
+<translation id="1221555006497674479">സ്റ്റോറേജ് കുറവാണ്, നിങ്ങളുടെ <ph name="TOTAL_SPACE" /> പങ്കിട്ട സ്റ്റോറേജിൽ <ph name="REMAINING_PERCENTAGE" />% ശേഷിക്കുന്നു.</translation>
 <translation id="1243314992276662751">അപ്‌ലോഡ് ചെയ്യുക</translation>
 <translation id="1249250836236328755">വിഭാഗം</translation>
 <translation id="1254593899333212300">നേരിട്ടുള്ള ഇന്‍റര്‍നെറ്റ് കണക്ഷന്‍</translation>
 <translation id="1272293450992660632">പിൻ മൂല്യങ്ങൾ പൊരുത്തപ്പെടുന്നില്ല.</translation>
 <translation id="1280820357415527819">മൊബൈൽ നെറ്റ്‌വർക്കുകൾ തിരയുന്നു</translation>
-<translation id="1291603679744561561">സിം ലോക്ക് ചെയ്‌തു</translation>
 <translation id="1293556467332435079">Files</translation>
 <translation id="1297922636971898492">Google ഡ്രൈവ് ഇപ്പോൾ ലഭ്യമല്ല. ലഭ്യമായിക്കഴിഞ്ഞാൽ, അപ്‌ലോഡ് ചെയ്യുന്നത് സ്വമേധയാ പുനരാരംഭിക്കും.</translation>
 <translation id="1307931752636661898">Linux ഫയലുകൾ കാണാനാവുന്നില്ല</translation>
@@ -59,7 +59,6 @@
 <translation id="1499943022354839699">Dvorak കീബോർഡ് ഉള്ള ഇംഗ്ലീഷ് (യുഎസ്)</translation>
 <translation id="1515909359182093592"><ph name="INPUT_LABEL" /> - ഹോസ്റ്റ്</translation>
 <translation id="1521655867290435174">Google Sheets</translation>
-<translation id="1521795806314479294"><ph name="FILE_NAME" /> തയ്യാറാക്കുന്നു...</translation>
 <translation id="1538729222189715449">Linux ഫയലുകൾ തുറക്കുന്നു...</translation>
 <translation id="1547964879613821194">കനേഡിയന്‍ ഇംഗ്ലീഷ്</translation>
 <translation id="1556189134700913550">എല്ലാത്തിലും പ്രയോഗിക്കുക</translation>
@@ -75,6 +74,7 @@
 <translation id="1641780993263690097">ചൈനീസ് പിൻയിൻ</translation>
 <translation id="1646019627374511909"><ph name="NUMBER_OF_ITEMS" /> ഫയലുകൾ ഓഫ്‌ലൈനിൽ ലഭ്യമാക്കുന്നു</translation>
 <translation id="164969095109328410">Chrome ഉപകരണം</translation>
+<translation id="1661207570040737402">പങ്കിട്ട ഡ്രൈവിന്റെ Google Workspace സ്റ്റോറേജ് മുഴുവൻ നിങ്ങൾ ഉപയോഗിച്ചു.</translation>
 <translation id="1661867754829461514">PIN കാണാനില്ല</translation>
 <translation id="166439687370499867">പങ്കിട്ട നെറ്റ്‍വര്‍ക്ക് കോൺഫിഗറേഷനുകൾ മാറ്റാനാകില്ല</translation>
 <translation id="1665611772925418501">ഫയൽ പരിഷ്‌ക്കരിക്കാൻ കഴിഞ്ഞില്ല.</translation>
@@ -84,7 +84,6 @@
 <translation id="1722487484194605434"><ph name="NUMBER_OF_ITEMS" /> ഇനങ്ങൾ സിപ്പ് ചെയ്യുന്നു...</translation>
 <translation id="1722687688096767818">പ്രൊഫെെൽ ചേർക്കുന്നു...</translation>
 <translation id="1726100011689679555">നെയിം സെർവറുകൾ</translation>
-<translation id="1727562178154619254">സമന്വയിപ്പിക്കാൻ തയ്യാറാണ്</translation>
 <translation id="1729953886957086472">ജർമ്മൻ (ജർമ്മനി)</translation>
 <translation id="1730235522912993863">ചൈനീസ് സാങ്‌ചി</translation>
 <translation id="1731889557567069540"><ph name="NUMBER_OF_ITEMS" /> ഇനങ്ങൾ പകർത്തി.</translation>
@@ -194,6 +193,7 @@
 <translation id="2574327434504608656">Bruschetta ഉപയോഗിച്ച് ഒരു ഫോൾഡർ പങ്കിട്ടു</translation>
 <translation id="2578394532502990878">തമിഴ് ഉച്ചാരണ ശബ്‌ദം</translation>
 <translation id="2579959351793446050">ഒഡിയ</translation>
+<translation id="2587195714949534472"><ph name="FILE_NAME" /> സമന്വയിപ്പിക്കാൻ തയ്യാറെടുക്കുന്നു...</translation>
 <translation id="2602810353103180630"><ph name="NETWORK_INDEX" />-ൽ <ph name="NETWORK_COUNT" /> നെറ്റ്‌വർക്ക്, <ph name="NETWORK_NAME" />, <ph name="CONNECTION_STATUS" />, സിഗ്‌നൽ ശക്തി <ph name="SIGNAL_STRENGTH" />%, നിങ്ങളുടെ അഡ്‌മിൻ ബ്ലോക്ക് ചെയ്തിരിക്കുന്നു, വിശദാംശങ്ങൾ</translation>
 <translation id="2614589611416690597"><ph name="VIDEO_TYPE" /> വീഡിയോ</translation>
 <translation id="2620090360073999360">Google ഡ്രൈവിൽ ഇപ്പോൾ എത്തിച്ചേരാൻ കഴിയില്ല.</translation>
@@ -295,6 +295,7 @@
 <translation id="3486821258960016770">മംഗോളിയൻ</translation>
 <translation id="3495304270784461826"><ph name="COUNT" /> പിശകുകൾ.</translation>
 <translation id="3509680540198371098"><ph name="NETWORK_COUNT" />-ൽ <ph name="NETWORK_INDEX" /> നെറ്റ്‌വർക്ക്, <ph name="NETWORK_NAME" />, <ph name="SECURITY_STATUS" />, <ph name="CONNECTION_STATUS" />, സിഗ്‌നൽ ശക്തി <ph name="SIGNAL_STRENGTH" />%, വിശദാംശങ്ങൾ</translation>
+<translation id="3511705761158917664"><ph name="NUMBER_OF_ITEMS" /> ഇനങ്ങൾ സമന്വയിപ്പിക്കാൻ തയ്യാറെടുക്കുന്നു...</translation>
 <translation id="3522708245912499433">പോര്‍ച്ചുഗീസ്</translation>
 <translation id="3524311639100184459">മുന്നറിയിപ്പ്: ഇവ താൽക്കാലിക ഫയലുകളാണ് ഡിസ്ക്കിൽ ഇടമുണ്ടാക്കാൻ സ്വയമേവ ഇല്ലാതാക്കിയേക്കാം.  <ph name="BEGIN_LINK" />കൂടുതലറിയുക<ph name="END_LINK" /></translation>
 <translation id="3527085408025491307">ഫോൾഡർ</translation>
@@ -350,11 +351,11 @@
 <translation id="3924145049010392604">Meta</translation>
 <translation id="3943857333388298514">ഒട്ടിക്കുക</translation>
 <translation id="3952872973865944257">തെലുങ്ക് ഉച്ചാരണശബ്‌ദം</translation>
-<translation id="3954354850384043518">പുരോഗതിയിലാണ്</translation>
 <translation id="3958548648197196644">കിവി</translation>
 <translation id="3971140002794351170">മൊബൈൽ പ്രൊഫൈൽ ഡൗൺലോഡ് ചെയ്യുക, <ph name="NETWORK_COUNT" /> എണ്ണത്തിൽ <ph name="NETWORK_INDEX" />-ാമത്തെ നെറ്റ്‌വർക്ക്, <ph name="NETWORK_NAME" />, <ph name="NETWORK_PROVIDER_NAME" /></translation>
 <translation id="3973925058222872294">ഇംഗ്ലീഷ് (യുകെ)</translation>
 <translation id="3975895378829046965">ബംഗ്ലാ ഉച്ചാരണ ശബ്‌ദം</translation>
+<translation id="3999574733850440202">അടുത്തിടെ തുറന്ന Microsoft ഫയലുകൾ OneDrive-ലേക്ക് നീക്കി</translation>
 <translation id="4002066346123236978">ശീർഷകം</translation>
 <translation id="4017788180641807848">Workman കീബോർഡ് ഉള്ള ഇംഗ്ലീഷ് (യുഎസ്)</translation>
 <translation id="4019998208269143058">പെട്ടെന്ന് ആക്‌സസ് ചെയ്യാവുന്ന ഫയലുകളിലേക്ക് പിൻ ചെയ്യുക</translation>
@@ -363,6 +364,7 @@
 <translation id="4092890906744441904">ഐറിഷ്</translation>
 <translation id="4124935795427217608">യൂണികോൺ</translation>
 <translation id="4131235941541910880">നിങ്ങൾക്ക് ആവശ്യമില്ലാത്ത ഇനങ്ങൾ ട്രാഷിലേക്ക് നീക്കുക</translation>
+<translation id="4134804435730168042"><ph name="NETWORK_COUNT" /> നെറ്റ്‌വർക്കുകളിൽ <ph name="NETWORK_INDEX" />-ാമത്തേത്, <ph name="NETWORK_NAME" />, <ph name="NETWORK_PROVIDER_NAME" />, ഉപകരണം സജ്ജീകരിച്ചതിന് ശേഷം സജീവമാക്കുക</translation>
 <translation id="4153015322587141338">ഷെൽഫിലെ നിങ്ങളുടെ ഫയലുകളിലേക്ക് അതിവേഗ ആക്‌സസ് ലഭിക്കാൻ, ഒരു ഫയലിൽ വലത് ക്ലിക്ക് ചെയ്‌ത് "<ph name="PIN_COMMAND" />" തിരഞ്ഞെടുക്കുക.</translation>
 <translation id="4157569377477607576">അഡ്‌മിൻ നയം ഇവ നിർദ്ദേശിക്കുന്നില്ല:</translation>
 <translation id="4159731583141908892"><ph name="FILE_NAME" /> നീക്കി.</translation>
@@ -405,11 +407,13 @@
 <translation id="4414834425328380570">"<ph name="FILE_NAME" />" ഇല്ലാതാക്കും, നിങ്ങൾക്ക് അത് പുനഃസ്ഥാപിക്കാനാകില്ല.</translation>
 <translation id="4418686080762064601">നിങ്ങളുടെ ഫയലുകൾക്കുള്ള കുറുക്കുവഴി സൃഷ്ടിക്കുക</translation>
 <translation id="4425149324548788773">എന്റെ ഡ്രൈവ്</translation>
+<translation id="4432921877815220091"><ph name="NETWORK_COUNT" /> നെറ്റ്‌വർക്കുകളിൽ <ph name="NETWORK_INDEX" />-ാമത്തേത്, <ph name="NETWORK_NAME" />, ഉപകരണം സജ്ജീകരിച്ചതിന് ശേഷം സജീവമാക്കുക, നിങ്ങളുടെ അഡ്‌മിൻ മാനേജ് ചെയ്യുന്നത്</translation>
 <translation id="4439427728133035643"><ph name="NETWORK_COUNT" />-ൽ <ph name="NETWORK_INDEX" /> നെറ്റ്‌വർക്ക്, <ph name="NETWORK_NAME" />, സിഗ്‌നൽ ശക്തി <ph name="SIGNAL_STRENGTH" />%, കണക്‌റ്റ് ചെയ്യുക</translation>
 <translation id="4442424173763614572">DNS തിരയൽ പരാജയപ്പെട്ടു</translation>
 <translation id="4462159676511157176">ഇഷ്‌ടാനുസൃത നാമ സെർവറുകൾ</translation>
 <translation id="4465725236958772856"><ph name="NETWORK_COUNT" />-ൽ <ph name="NETWORK_INDEX" /> നെറ്റ്‌വർക്ക്, <ph name="NETWORK_NAME" />, നിങ്ങളുടെ അഡ്‌മിൻ മാനേജ് ചെയ്യുന്നത്, കണക്‌റ്റ് ചെയ്യുക</translation>
 <translation id="4470564870223067757">ഹാംഗുൽ 2 സെറ്റ് മോഡ്</translation>
+<translation id="4474142134969976028">പൊരുത്തപ്പെടുന്ന ഫലങ്ങളൊന്നുമില്ല</translation>
 <translation id="4477002475007461989">റുമാനിയൻ</translation>
 <translation id="4477219268485577442">ബൾഗേറിയൻ സ്വരസൂചകം</translation>
 <translation id="4508265954913339219">സജീവമാക്കല്‍ പരാജയപ്പെട്ടു</translation>
@@ -512,7 +516,6 @@
    ഉപയോഗത്തിലിരിക്കുന്ന നിങ്ങളുടെ ഉപകരണം നീക്കംചെയ്യുന്നത് ഡാറ്റ നഷ്‌ടത്തിന് കാരണമാകാം. പ്രവർത്തനം പൂർത്തിയാകുന്നതുവരെ കാത്തിരിക്കുക, തുടർന്ന് Files ആപ്പ് ഉപയോഗിച്ച് ഉപകരണം ഒഴിവാക്കുക.</translation>
 <translation id="5163869187418756376">പങ്കിടൽ പരാജയപ്പെട്ടു. നിങ്ങളുടെ കണക്ഷൻ പരിശോധിച്ച് പിന്നീട് വീണ്ടും ശ്രമിക്കുക.</translation>
 <translation id="516592729076796170">യുഎസ് പ്രോഗ്രാമർ ഡൊറാക്ക്</translation>
-<translation id="5167102019886320507"><ph name="NUMBER_OF_ITEMS" /> ഇനങ്ങൾ തയ്യാറാക്കുന്നു...</translation>
 <translation id="5177526793333269655">ലഘുചിത്ര കാഴ്‌ച</translation>
 <translation id="5181896909298187506">അടുത്തിടെയുള്ള ഫയലുകളൊന്നുമില്ല</translation>
 <translation id="5194713942430106590">കോളം ആരോഹണക്രമത്തിൽ അടുക്കാൻ ക്ലിക്ക് ചെയ്യുക</translation>
@@ -614,6 +617,7 @@
 <translation id="5913638992615760742">അപ്രതീക്ഷിത പിശക് കാരണം പകർത്താനായില്ല: <ph name="ERROR_MESSAGE" /></translation>
 <translation id="5926082595146149752">യുഎസ് അന്താരാഷ്ട്ര PC കീബോർഡ് ഉള്ള ഡച്ച് (നെതർലാൻഡ്‌സ്)</translation>
 <translation id="5932901536148835538">Chromebit</translation>
+<translation id="5948255720516436063"><ph name="NETWORK_COUNT" /> നെറ്റ്‌വർക്കുകളിൽ <ph name="NETWORK_INDEX" />-ാമത്തേത്, <ph name="NETWORK_NAME" />, ഉപകരണം സജ്ജീകരിച്ചതിന് ശേഷം സജീവമാക്കുക</translation>
 <translation id="5955954492236143329"><ph name="NUMBER_OF_ITEMS" /> ഇനങ്ങൾ</translation>
 <translation id="5957366693331451795">Chromebox-കൾ</translation>
 <translation id="5982621672636444458">അടുക്കൽ ഓപ്‌ഷനുകൾ</translation>
@@ -792,6 +796,7 @@
 <translation id="7458955835361612701">അടുത്തിടെയുള്ള ചിത്രങ്ങളൊന്നുമില്ല</translation>
 <translation id="7460898608667578234">ഉക്രേനിയന്‍</translation>
 <translation id="7469894403370665791">ഈ നെറ്റ്‍വര്‍ക്കിലേക്ക് സ്വപ്രേരിതമായി ബന്ധിപ്പിക്കുന്നു</translation>
+<translation id="7481358317100446445">തയ്യാര്‍‌</translation>
 <translation id="7486315294984620427">Parallels Desktop-ലേക്ക് ഫയലുകൾ ചേർക്കാൻ അവയെ Windows ഫയലുകൾ എന്ന ഫോൾഡറിലേക്ക് പകർത്തണം.</translation>
 <translation id="749452993132003881">ഹിരാഗാന</translation>
 <translation id="7495372004724182530">മലയാള ഉച്ചാരണശബ്‌ദം</translation>
@@ -817,6 +822,7 @@
 <translation id="7655441028674523381">Google Photos എളുപ്പത്തിൽ ആക്‌സസ് ചെയ്യുക</translation>
 <translation id="7658239707568436148">റദ്ദാക്കൂ</translation>
 <translation id="7663224033570512922">ഹിന്ദി</translation>
+<translation id="7665680517722058469">മറ്റൊരു തിരയൽ പരീക്ഷിക്കൂ</translation>
 <translation id="7689532716264131859"><ph name="NUMBER_OF_ITEMS" /> ഇനങ്ങൾ ട്രാഷിലേക്ക് നീക്കി</translation>
 <translation id="7693909743393669729">ഡ്രൈവ് ഫോർമാറ്റ് ചെയ്യുന്നത് അതിൽ സംഭരിച്ചിരിക്കുന്ന എല്ലാ ഡാറ്റയും മായ്‌ക്കും, ദൃശ്യമാകാത്ത ഭാഗങ്ങൾ ഉൾപ്പെടെ നിലവിലുള്ള എല്ലാ ഭാഗങ്ങളും നീക്കം ചെയ്യും. ഈ പ്രവർത്തനം പഴയപടിയാക്കാനാകില്ല.</translation>
 <translation id="7695430100978772476"><ph name="DRIVE_NAME" /> ഫോർമാറ്റ് ചെയ്യാനായില്ല</translation>
@@ -828,6 +834,7 @@
 <translation id="7724603315864178912">മുറിക്കുക</translation>
 <translation id="7732111077498238432">നെറ്റ്‌വർക്ക് നയത്തിനാൽ നിയന്ത്രിതമാണ്</translation>
 <translation id="7736003208887389532">ഈ ഫയലുകൾ ശാശ്വതമായി ഇല്ലാതാക്കണോ?</translation>
+<translation id="7740287852186792672">തിരയൽ ഫലങ്ങള്‍</translation>
 <translation id="7748626145866214022">കൂടുതൽ ഓപ്ഷനുകൾ പ്രവർത്തന ബാറിൽ ലഭ്യമാണ്. പ്രവർത്തന ബാർ ഫോക്കസ് ചെയ്യുന്നതിന് Alt + A അമർത്തുക.</translation>
 <translation id="7760449188139285140">ചൈനീസ് വുബി</translation>
 <translation id="7765158879357617694">നീക്കുക</translation>
@@ -879,6 +886,7 @@
 <translation id="8116072619078571545">ഐസ് വെള്ളം</translation>
 <translation id="8128733386027980860">Dvorak കീബോർഡ് ഉള്ള ഇംഗ്ലീഷ് (യുകെ)</translation>
 <translation id="8137331602592933310">നിങ്ങളുമായി "<ph name="FILENAME" />" എന്നത് പങ്കിട്ടിരിക്കുന്നു. ഇത് നിങ്ങളുടേതല്ലാത്തതിനാൽ നിങ്ങൾക്ക് അത് ഇല്ലാതാക്കാനാകില്ല.</translation>
+<translation id="8138705869659070104">ഉപകരണം സജ്ജീകരിച്ച് സജീവമാക്കൂ</translation>
 <translation id="813913629614996137">ആരംഭിക്കുന്നു...</translation>
 <translation id="8147028810663464959">പ്രതീകം പൂർണ്ണ വീതിയിലാണ്</translation>
 <translation id="8151638057146502721">കോൺഫിഗർ ചെയ്യുക</translation>
@@ -904,6 +912,7 @@
 <translation id="8300849813060516376">OTASP പരാജയപ്പെട്ടു</translation>
 <translation id="8312871300878166382">ഫോൾഡറിൽ ഒട്ടിക്കുക</translation>
 <translation id="8329978297633540474">പ്ലെയിന്‍ വാചകം</translation>
+<translation id="8332007959299458842">അടുത്തിടെ തുറന്ന Microsoft ഫയലുകൾ Google Drive-ലേക്ക് നീക്കി</translation>
 <translation id="8335587457941836791">ഷെൽഫിൽ നിന്ന് അൺപിൻ ചെയ്യുക</translation>
 <translation id="8335837413233998004">ബെലാറുഷ്യൻ</translation>
 <translation id="8336153091935557858">ഇന്നലെ <ph name="YESTERDAY_DAYTIME" /></translation>
@@ -930,6 +939,7 @@
 <translation id="8487700953926739672">ഓഫ്‌ലൈനില്‍ ലഭ്യമാണ്</translation>
 <translation id="8492972329130824181">വീട്ടിലെ നെറ്റ്‌വർക്ക് ലഭ്യമല്ല. കണക്റ്റ് ചെയ്യാൻ മൊബൈൽ ഡാറ്റ റോമിംഗ് പ്രവർത്തനക്ഷമമാക്കണം.</translation>
 <translation id="8499098729323186194"><ph name="NUMBER_OF_ITEMS" /> ഇനങ്ങൾ എക്‌സ്‌ട്രാക്റ്റ് ചെയ്യുന്നു...</translation>
+<translation id="8502913769543567768"><ph name="NETWORK_COUNT" /> നെറ്റ്‌വർക്കുകളിൽ <ph name="NETWORK_INDEX" />-ാമത്തേത്, <ph name="NETWORK_NAME" />, <ph name="NETWORK_PROVIDER_NAME" />, ഉപകരണം സജ്ജീകരിച്ചതിന് ശേഷം സജീവമാക്കുക, നിങ്ങളുടെ അഡ്‌മിൻ മാനേജ് ചെയ്യുന്നത്</translation>
 <translation id="8521441079177373948">യുകെ</translation>
 <translation id="853494022971700746">ഫ്രഞ്ച് (ഫ്രാൻസ്)</translation>
 <translation id="8540608333167683902"><ph name="NETWORK_COUNT" />-ൽ <ph name="NETWORK_INDEX" /> നെറ്റ്‌വർക്ക്, <ph name="NETWORK_NAME" />, <ph name="CONNECTION_STATUS" />, സിഗ്‌നൽ ശക്തി <ph name="SIGNAL_STRENGTH" />%, വിശദാംശങ്ങൾ</translation>
@@ -991,6 +1001,7 @@
 <translation id="9046895021617826162">ബന്ധിപ്പിക്കല്‍ പരാജയപ്പെട്ടു</translation>
 <translation id="9065512565307033593">പരിശോധിച്ചുറപ്പിക്കാനായില്ലെങ്കിൽ, നിങ്ങളുടെ നെറ്റ്‌വർക്ക് ആക്‌സസ് പ്രവർത്തനരഹിതമാക്കും.</translation>
 <translation id="908378762078012445">ഫൊണറ്റിക് AATSEEL കീബോർഡ് ഉള്ള റഷ്യൻ</translation>
+<translation id="9086302186042011942">സമന്വയിപ്പിക്കുന്നു</translation>
 <translation id="9099674669267916096">പേജിന്റെ എണ്ണം</translation>
 <translation id="9100610230175265781">പാസ്‌ഫ്രെയ്‌സ് ആവശ്യമാണ്</translation>
 <translation id="9110990317705400362">നിങ്ങളുടെ ബ്രൗസിംഗ് സുരക്ഷിതമാക്കുന്നതിനുള്ള മാർഗങ്ങൾക്കായി ഞങ്ങൾ സ്ഥിരമായി തിരയുന്നു. മുമ്പ്, എല്ലാ വെബ്‌സൈറ്റും നിങ്ങളുടെ ബ്രൗസറിൽ ഒരു വിപുലീകരണം ചേർക്കുന്നതിന് ആവശ്യപ്പെടുമായിരുന്നു. Google Chrome-ന്റെ ഏറ്റവും പുതിയ പതിപ്പുകളിൽ, വിപുലീകരണങ്ങളുടെ പേജ് മുഖേന ഈ വിപുലീകരണങ്ങൾ ചേർത്ത് അവ ഇൻസ്റ്റാൾ ചെയ്യണമെന്ന് നിങ്ങൾ Chrome-നോട് സ്പഷ്‌ടമായി പറയേണ്ടതുണ്ട്. <ph name="BEGIN_LINK" />കൂടുതലറിയുക<ph name="END_LINK" /></translation>

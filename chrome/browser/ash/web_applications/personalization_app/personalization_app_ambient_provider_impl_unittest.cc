@@ -8,7 +8,7 @@
 #include <vector>
 #include "ash/ambient/ambient_controller.h"
 #include "ash/ambient/test/ambient_ash_test_helper.h"
-#include "ash/constants/ambient_animation_theme.h"
+#include "ash/constants/ambient_theme.h"
 #include "ash/public/cpp/ambient/ambient_prefs.h"
 #include "ash/public/cpp/ambient/common/ambient_settings.h"
 #include "ash/public/cpp/ambient/fake_ambient_backend_controller_impl.h"
@@ -45,8 +45,7 @@ class TestAmbientObserver
     ambient_mode_enabled_ = ambient_mode_enabled;
   }
 
-  void OnAnimationThemeChanged(
-      ash::AmbientAnimationTheme animation_theme) override {
+  void OnAnimationThemeChanged(ash::AmbientTheme animation_theme) override {
     animation_theme_ = animation_theme;
   }
 
@@ -65,8 +64,7 @@ class TestAmbientObserver
     temperature_unit_ = temperature_unit;
   }
 
-  void OnGooglePhotosAlbumsPreviewsFetched(
-      const std::vector<GURL>& previews) override {
+  void OnPreviewsFetched(const std::vector<GURL>& previews) override {
     previews_ = std::move(previews);
   }
 
@@ -89,7 +87,7 @@ class TestAmbientObserver
     return ambient_mode_enabled_;
   }
 
-  ash::AmbientAnimationTheme animation_theme() {
+  ash::AmbientTheme animation_theme() {
     ambient_observer_receiver_.FlushForTesting();
     return animation_theme_;
   }
@@ -114,7 +112,7 @@ class TestAmbientObserver
     return ambient_ui_visibility_;
   }
 
-  std::vector<GURL> google_photos_albums_previews() {
+  std::vector<GURL> previews() {
     ambient_observer_receiver_.FlushForTesting();
     return previews_;
   }
@@ -125,8 +123,7 @@ class TestAmbientObserver
 
   bool ambient_mode_enabled_ = false;
 
-  ash::AmbientAnimationTheme animation_theme_ =
-      ash::AmbientAnimationTheme::kSlideshow;
+  ash::AmbientTheme animation_theme_ = ash::AmbientTheme::kSlideshow;
   ash::AmbientModeTopicSource topic_source_ =
       ash::AmbientModeTopicSource::kArtGallery;
   ash::AmbientModeTemperatureUnit temperature_unit_ =
@@ -211,7 +208,7 @@ class PersonalizationAppAmbientProviderImplTest : public ash::AshTestBase {
     return test_ambient_observer_.is_ambient_mode_enabled();
   }
 
-  ash::AmbientAnimationTheme ObservedAnimationTheme() {
+  ash::AmbientTheme ObservedAnimationTheme() {
     ambient_provider_remote_.FlushForTesting();
     return test_ambient_observer_.animation_theme();
   }
@@ -237,9 +234,9 @@ class PersonalizationAppAmbientProviderImplTest : public ash::AshTestBase {
     return test_ambient_observer_.visibility();
   }
 
-  std::vector<GURL> ObservedGooglePhotosAlbumsPreviews() {
+  std::vector<GURL> ObservedPreviews() {
     ambient_provider_remote_.FlushForTesting();
-    return test_ambient_observer_.google_photos_albums_previews();
+    return test_ambient_observer_.previews();
   }
 
   absl::optional<ash::AmbientSettings>& settings() {
@@ -251,7 +248,7 @@ class PersonalizationAppAmbientProviderImplTest : public ash::AshTestBase {
                                       enabled);
   }
 
-  void SetAnimationTheme(ash::AmbientAnimationTheme animation_theme) {
+  void SetAnimationTheme(ash::AmbientTheme animation_theme) {
     ambient_provider_->SetAnimationTheme(animation_theme);
   }
 
@@ -276,6 +273,8 @@ class PersonalizationAppAmbientProviderImplTest : public ash::AshTestBase {
                         bool selected) {
     ambient_provider_->SetAlbumSelected(id, topic_source, selected);
   }
+
+  void FetchPreviewImages() { ambient_provider_->FetchPreviewImages(); }
 
   ash::AmbientModeTopicSource TopicSource() {
     return ambient_provider_->settings_->topic_source;
@@ -421,18 +420,22 @@ TEST_F(PersonalizationAppAmbientProviderImplTest,
        ShouldCallOnAnimationThemeChanged) {
   SetAmbientObserver();
   FetchSettings();
-  SetAnimationTheme(ash::AmbientAnimationTheme::kSlideshow);
-  EXPECT_EQ(ash::AmbientAnimationTheme::kSlideshow, ObservedAnimationTheme());
+  SetAnimationTheme(ash::AmbientTheme::kSlideshow);
+  EXPECT_EQ(ash::AmbientTheme::kSlideshow, ObservedAnimationTheme());
   histogram_tester().ExpectBucketCount(kAmbientModeAnimationThemeHistogramName,
-                                       ash::AmbientAnimationTheme::kSlideshow,
-                                       1);
+                                       ash::AmbientTheme::kSlideshow, 1);
 
-  SetAnimationTheme(ash::AmbientAnimationTheme::kFeelTheBreeze);
-  EXPECT_EQ(ash::AmbientAnimationTheme::kFeelTheBreeze,
-            ObservedAnimationTheme());
-  histogram_tester().ExpectBucketCount(
-      kAmbientModeAnimationThemeHistogramName,
-      ash::AmbientAnimationTheme::kFeelTheBreeze, 1);
+  SetAnimationTheme(ash::AmbientTheme::kFeelTheBreeze);
+  EXPECT_EQ(ash::AmbientTheme::kFeelTheBreeze, ObservedAnimationTheme());
+  histogram_tester().ExpectBucketCount(kAmbientModeAnimationThemeHistogramName,
+                                       ash::AmbientTheme::kFeelTheBreeze, 1);
+}
+
+TEST_F(PersonalizationAppAmbientProviderImplTest, FetchPreviewImages) {
+  SetAmbientObserver();
+  EXPECT_TRUE(ObservedPreviews().empty());
+  FetchPreviewImages();
+  EXPECT_FALSE(ObservedPreviews().empty());
 }
 
 TEST_F(PersonalizationAppAmbientProviderImplTest,
@@ -441,7 +444,7 @@ TEST_F(PersonalizationAppAmbientProviderImplTest,
   FetchSettings();
   ReplyFetchSettingsAndAlbums(/*success=*/true);
   EXPECT_EQ(ash::AmbientModeTopicSource::kGooglePhotos, ObservedTopicSource());
-  EXPECT_FALSE(ObservedGooglePhotosAlbumsPreviews().empty());
+  EXPECT_FALSE(ObservedPreviews().empty());
 
   SetTopicSource(ash::AmbientModeTopicSource::kArtGallery);
   EXPECT_EQ(ash::AmbientModeTopicSource::kArtGallery, ObservedTopicSource());
@@ -455,7 +458,7 @@ TEST_F(PersonalizationAppAmbientProviderImplTest, ShouldCallOnAlbumsChanged) {
   // The fake albums are set in FakeAmbientBackendControllerImpl. Hidden setting
   // will be sent to JS side.
   EXPECT_EQ(4u, albums.size());
-  EXPECT_FALSE(ObservedGooglePhotosAlbumsPreviews().empty());
+  EXPECT_FALSE(ObservedPreviews().empty());
 }
 
 TEST_F(PersonalizationAppAmbientProviderImplTest,

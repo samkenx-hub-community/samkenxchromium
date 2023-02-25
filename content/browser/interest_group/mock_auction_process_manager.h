@@ -99,10 +99,18 @@ class MockBidderWorklet : public auction_worklet::mojom::BidderWorklet,
   void FinishGenerateBid(
       const absl::optional<std::string>& auction_signals_json,
       const absl::optional<std::string>& per_buyer_signals_json,
-      const absl::optional<base::TimeDelta> per_buyer_timeout) override;
+      const absl::optional<base::TimeDelta> per_buyer_timeout,
+      const absl::optional<GURL>& direct_from_seller_per_buyer_signals,
+      const absl::optional<GURL>& direct_from_seller_auction_signals) override;
 
   // Waits for GenerateBid() to be invoked.
   void WaitForGenerateBid();
+
+  // The below functions alter `trusted_signals_fetch_latency` (from
+  // OnBiddingSignalsReceived()) and `bidding_latency` (from
+  // OnGenerateBidComplete()), respectively, to return `delta`.
+  void SetBidderTrustedSignalsFetchLatency(base::TimeDelta delta);
+  void SetBiddingLatency(base::TimeDelta delta);
 
   // Invokes the GenerateBid callback. A bid of base::nullopt means no bid
   // should be offered. Waits for the GenerateBid() call first, if needed.
@@ -158,6 +166,12 @@ class MockBidderWorklet : public auction_worklet::mojom::BidderWorklet,
 
   // Expected per-bidder timeout values, indexed by interest group name.
   std::map<std::string, base::TimeDelta> expected_per_buyer_timeouts_;
+
+  // To be fed as `trusted_signals_fetch_latency` (from
+  // OnBiddingSignalsReceived()) and `bidding_latency` (from
+  // OnGenerateBidComplete()), respectively,
+  base::TimeDelta trusted_signals_fetch_latency_;
+  base::TimeDelta bidding_latency_;
 
   // Receiver is last so that destroying `this` while there's a pending callback
   // over the pipe will not DCHECK.

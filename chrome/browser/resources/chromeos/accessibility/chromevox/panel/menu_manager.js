@@ -6,9 +6,11 @@
  * @fileoverview Class to manage the ChromeVox menus.
  */
 import {Command, CommandStore} from '../common/command_store.js';
+import {Msgs} from '../common/msgs.js';
+import {PanelNodeMenuData, PanelNodeMenuId, PanelNodeMenuItemData} from '../common/panel_menu_data.js';
 
 import {PanelInterface} from './panel_interface.js';
-import {PanelMenu, PanelSearchMenu} from './panel_menu.js';
+import {PanelMenu, PanelNodeMenu, PanelSearchMenu} from './panel_menu.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -28,6 +30,9 @@ export class MenuManager {
      * @private {!Array<!PanelMenu>}
      */
     this.menus_ = [];
+
+    /** @private {!Object<!PanelNodeMenuId, !PanelNodeMenu>} */
+    this.nodeMenuDictionary_ = {};
 
     /** @private {?PanelSearchMenu} */
     this.searchMenu_ = null;
@@ -57,6 +62,45 @@ export class MenuManager {
     }
   }
 
+  /**
+   * Create a new menu with the given name and add it to the menu bar.
+   * @param {string} menuMsg The msg id of the new menu to add.
+   * @return {!PanelMenu} The menu just created.
+   */
+  addMenu(menuMsg) {
+    const menu = new PanelMenu(menuMsg);
+    $('menu-bar').appendChild(menu.menuBarItemElement);
+    menu.menuBarItemElement.addEventListener(
+        'mouseover',
+        () => this.activateMenu(menu, true /* activateFirstItem */), false);
+    menu.menuBarItemElement.addEventListener(
+        'mouseup', event => this.onMouseUpOnMenuTitle(menu, event), false);
+    $('menus_background').appendChild(menu.menuContainerElement);
+    this.menus_.push(menu);
+    return menu;
+  }
+
+  /**
+   * Create a new node menu with the given name and add it to the menu bar.
+   * @param {!PanelNodeMenuData} menuData The title/predicate for the new menu.
+   */
+  addNodeMenu(menuData) {
+    const menu = new PanelNodeMenu(menuData.titleId);
+    $('menu-bar').appendChild(menu.menuBarItemElement);
+    menu.menuBarItemElement.addEventListener(
+        'mouseover',
+        () => this.activateMenu(menu, true /* activateFirstItem */));
+    menu.menuBarItemElement.addEventListener(
+        'mouseup', event => this.onMouseUpOnMenuTitle(menu, event));
+    $('menus_background').appendChild(menu.menuContainerElement);
+    this.menus_.push(menu);
+    this.nodeMenuDictionary_[menuData.menuId] = menu;
+  }
+
+  /** @param {!PanelNodeMenuItemData} itemData */
+  addNodeMenuItem(itemData) {
+    this.nodeMenuDictionary_[itemData.menuId].addItemFromData(itemData);
+  }
 
   /**
    * Clear any previous menus. The menus are all regenerated each time the
@@ -96,6 +140,62 @@ export class MenuManager {
     return specifiedMenu || this.searchMenu_ || this.menus_[0];
   }
 
+  /**
+   * Activate a menu whose title has been clicked. Stop event propagation at
+   * this point so we don't close the ChromeVox menus and restore focus.
+   * @param {PanelMenu} menu The menu we would like to activate.
+   * @param {Event} mouseUpEvent The mouseup event.
+   */
+  onMouseUpOnMenuTitle(menu, mouseUpEvent) {
+    this.activateMenu(menu, true /* activateFirstItem */);
+    mouseUpEvent.preventDefault();
+    mouseUpEvent.stopPropagation();
+  }
+
+  /**
+   * Listens to changes in the menu search bar. Populates the search menu
+   * with items that match the search bar's contents.
+   * Note: we ignore PanelNodeMenu items and items without shortcuts.
+   * @param {Event} event The input event.
+   */
+  onSearchBarQuery(event) {
+    if (!this.searchMenu_) {
+      throw Error('MenuManager.searchMenu_ must be defined');
+    }
+    const query = event.target.value.toLowerCase();
+    this.searchMenu_.clear();
+    // Show the search results menu.
+    this.activateMenu(this.searchMenu_, false /* activateFirstItem */);
+    // Populate.
+    if (query) {
+      for (const menu of this.menus_) {
+        if (menu === this.searchMenu_ || menu instanceof PanelNodeMenu) {
+          continue;
+        }
+        for (const item of menu.items) {
+          if (!item.menuItemShortcut) {
+            // Only add menu items that have shortcuts.
+            continue;
+          }
+          const itemText = item.text.toLowerCase();
+          const match = itemText.includes(query) &&
+              (itemText !==
+               Msgs.getMsg('panel_menu_item_none').toLowerCase()) &&
+              item.enabled;
+          if (match) {
+            this.searchMenu_.copyAndAddMenuItem(item);
+          }
+        }
+      }
+    }
+
+    if (this.searchMenu_.items.length === 0) {
+      this.searchMenu_.addMenuItem(
+          Msgs.getMsg('panel_menu_item_none'), '', '', '', function() {});
+    }
+    this.searchMenu_.activateItem(0);
+  }
+
   // The following getters and setters are temporary during the migration from
   // panel.js.
 
@@ -120,6 +220,11 @@ export class MenuManager {
   /** @return {!Array<!PanelMenu>} */
   get menus() {
     return this.menus_;
+  }
+
+  /** @return {!Object<!PanelNodeMenuId, !PanelNodeMenu>} */
+  get nodeMenuDictionary() {
+    return this.nodeMenuDictionary_;
   }
 
   /** @return {?PanelSearchMenu} */

@@ -16,6 +16,7 @@
 <translation id="1128128132059598906">EAP-TTLS</translation>
 <translation id="1145018782460575098">Kemaskinian perisian tegar untuk tetingkap peranti luaran dibuka. <ph name="NUM_UPDATES" /> kemaskinian tersedia.</translation>
 <translation id="1145516343487477149">Cari artikel bantuan dan jawapan kepada soalan lazim Chromebook</translation>
+<translation id="1167755866710282443">Buka menu untuk menyesuaikan kunci. Seret menu untuk bergerak.</translation>
 <translation id="1175697296044146566"><ph name="DEVICE_TYPE" /> ini diurus oleh <ph name="MANAGER" />.</translation>
 <translation id="1175951029573070619">Biasa (<ph name="SIGNAL_STRENGTH" />)</translation>
 <translation id="1181037720776840403">Alih keluar</translation>
@@ -326,6 +327,7 @@
 <translation id="4110686435123617899">Pilih album <ph name="TITLE" /> <ph name="DESC" /></translation>
 <translation id="4111761024568264522">Pad sentuh USB</translation>
 <translation id="4117637339509843559">Mod gelap</translation>
+<translation id="4130035430755296270">Teruskan menuding untuk mendapatkan lagi pilihan reka letak</translation>
 <translation id="4131410914670010031">Hitam putih</translation>
 <translation id="4145784616224233563">Tembok Api HTTP</translation>
 <translation id="4147897805161313378">Google Photos</translation>
@@ -414,6 +416,7 @@
 <translation id="484790837831576105">Peleraian DNS (Android)</translation>
 <translation id="4848429997038228357">BERJALAN</translation>
 <translation id="4854586501323951986">Skrin sentuh terbina dalam</translation>
+<translation id="4855250849489639581">Leret ke bawah untuk mendapatkan lagi pilihan reka letak</translation>
 <translation id="4861758251032006121">{ATTEMPTS_LEFT,plural, =1{<ph name="ERROR_MESSAGE" /> {0} percubaan lagi}other{<ph name="ERROR_MESSAGE" /> {0} percubaan lagi}}</translation>
 <translation id="4873827928179867585">Algoritma pengesahan</translation>
 <translation id="4880328057631981605">Nama titik capaian</translation>
@@ -517,6 +520,7 @@
 <translation id="576835345334454681">Tingkatkan kecerahan paparan</translation>
 <translation id="57838592816432529">Redam</translation>
 <translation id="5784136236926853061">Kependaman HTTP tinggi</translation>
+<translation id="5826644637650799838">Perihal seni</translation>
 <translation id="5832805196449965646">Tambah Orang</translation>
 <translation id="583281660410589416">Tidak diketahui</translation>
 <translation id="5843706793424741864">Fahrenheit</translation>
@@ -673,6 +677,7 @@
 <translation id="7172721935181587524">1 Imej</translation>
 <translation id="7177485034254901881"><ph name="DEVICE_TYPE" /> ini diurus oleh <ph name="MANAGER" />. Pentadbir boleh mengkonfigurasikan peranti dari jauh.</translation>
 <translation id="7180611975245234373">Muat semula</translation>
+<translation id="7180865173735832675">Peribadikan</translation>
 <translation id="7212734716605298123">Kemaskinian perisian tegar untuk peranti luaran</translation>
 <translation id="7216409898977639127">Penyedia selular</translation>
 <translation id="725133483556299729">Pilih e-mel</translation>
@@ -744,6 +749,7 @@
 <translation id="7881066108824108340">DNS</translation>
 <translation id="7882358943899516840">Jenis penyedia</translation>
 <translation id="7882501334836096755">Kunci awam</translation>
+<translation id="78957024357676568">kiri</translation>
 <translation id="7915220255123750251">Urus tetapan APN rangkaian. APN mewujudkan sambungan antara rangkaian selular dan Internet.</translation>
 <translation id="7936303884198020182">Pelayan tanpa nama ditemukan</translation>
 <translation id="7942349550061667556">Merah</translation>
@@ -775,6 +781,7 @@
 <translation id="8226628635270268143">Pilih foto dan album kegemaran anda</translation>
 <translation id="8227119283605456246">Lampirkan fail</translation>
 <translation id="8230672074305416752">Gagal untuk ping get laluan rangkaian lalai</translation>
+<translation id="8242426110754782860">Teruskan</translation>
 <translation id="8246209727385807362">Pembawa tidak diketahui</translation>
 <translation id="827422111966801947">Biru Nila</translation>
 <translation id="8286154143153872371">Sila sambung kepada rangkaian dan muatkan semula halaman untuk melihat kertas dinding.</translation>
@@ -852,6 +859,7 @@
 <translation id="8930622219860340959">Wayarles</translation>
 <translation id="8936793075252196307">Alamat IP klien</translation>
 <translation id="894617464444543719">Peranti ialah telefon.</translation>
+<translation id="8957423540740801332">kanan</translation>
 <translation id="8968751544471797276">Kadar pengecasan</translation>
 <translation id="8970109610781093811">Jalankan sekali lagi</translation>
 <translation id="8983038754672563810">HSPA</translation>

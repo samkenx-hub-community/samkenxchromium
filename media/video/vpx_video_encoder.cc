@@ -4,6 +4,8 @@
 
 #include "media/video/vpx_video_encoder.h"
 
+#include <algorithm>
+
 #include "base/cxx17_backports.h"
 #include "base/logging.h"
 #include "base/numerics/checked_math.h"
@@ -120,6 +122,15 @@ EncoderStatus SetUpVpxConfig(const VideoEncoder::Options& opts,
         break;
       case Bitrate::Mode::kConstant:
         config->rc_end_usage = VPX_CBR;
+        break;
+      case Bitrate::Mode::kExternal:
+        // libvpx doesn't have a special rate control mode for per-frame
+        // quantizer. Instead we just set CBR and set
+        // VP9E_SET_QUANTIZER_ONE_PASS before each frame.
+        config->rc_end_usage = VPX_CBR;
+        // Let the whole AV1 quantizer range to be used.
+        config->rc_max_quantizer = 63;
+        config->rc_min_quantizer = 0;
         break;
     }
   } else {
@@ -275,6 +286,14 @@ void VpxVideoEncoder::Initialize(VideoCodecProfile profile,
     return;
   }
 
+  if (options.bitrate.has_value() &&
+      options.bitrate->mode() == Bitrate::Mode::kExternal && !is_vp9) {
+    std::move(done_cb).Run(
+        EncoderStatus(EncoderStatus::Codes::kEncoderInitializationError,
+                      "Unsupported bitrate mode"));
+    return;
+  }
+
   auto vpx_error = vpx_codec_enc_config_default(iface, &codec_config_, 0);
   if (vpx_error != VPX_CODEC_OK) {
     auto status =
@@ -382,8 +401,9 @@ void VpxVideoEncoder::Initialize(VideoCodecProfile profile,
     }
 
     // In CBR mode use aq-mode=3 is enabled for quality improvement
-    if (codec_config_.rc_end_usage == VPX_CBR)
+    if (codec_config_.rc_end_usage == VPX_CBR) {
       vpx_codec_control(codec.get(), VP9E_SET_AQ_MODE, 3);
+    }
   }
 
   options_ = options;
@@ -400,7 +420,7 @@ void VpxVideoEncoder::Initialize(VideoCodecProfile profile,
 }
 
 void VpxVideoEncoder::Encode(scoped_refptr<VideoFrame> frame,
-                             bool key_frame,
+                             const EncodeOptions& encode_options,
                              EncoderStatusCB done_cb) {
   done_cb = BindCallbackToCurrentLoopIfNeeded(std::move(done_cb));
   if (!codec_) {
@@ -409,6 +429,7 @@ void VpxVideoEncoder::Encode(scoped_refptr<VideoFrame> frame,
     return;
   }
 
+  bool key_frame = encode_options.key_frame;
   if (!frame) {
     std::move(done_cb).Run(
         EncoderStatus(EncoderStatus::Codes::kEncoderFailedEncode,
@@ -441,12 +462,20 @@ void VpxVideoEncoder::Encode(scoped_refptr<VideoFrame> frame,
     }
   }
 
-  const bool is_yuv = IsYuvPlanar(frame->format());
-  if (frame->visible_rect().size() != options_.frame_size || !is_yuv) {
+  // Unfortunately libyuv lacks direct NV12 to I010 conversion, and we
+  // have to do an extra conversion to I420.
+  // TODO(https://crbug.com/libyuv/954) Use NV12ToI010() when implemented
+  const bool vp9_p2_needs_nv12_to_i420 =
+      frame->format() == PIXEL_FORMAT_NV12 && profile_ == VP9PROFILE_PROFILE2;
+  const bool needs_conversion_to_i420 =
+      !IsYuvPlanar(frame->format()) || vp9_p2_needs_nv12_to_i420;
+  if (frame->visible_rect().size() != options_.frame_size ||
+      needs_conversion_to_i420) {
+    auto new_pixel_format =
+        needs_conversion_to_i420 ? PIXEL_FORMAT_I420 : frame->format();
     auto resized_frame = frame_pool_.CreateFrame(
-        is_yuv ? frame->format() : PIXEL_FORMAT_I420, options_.frame_size,
-        gfx::Rect(options_.frame_size), options_.frame_size,
-        frame->timestamp());
+        new_pixel_format, options_.frame_size, gfx::Rect(options_.frame_size),
+        options_.frame_size, frame->timestamp());
 
     if (!resized_frame) {
       std::move(done_cb).Run(
@@ -468,6 +497,7 @@ void VpxVideoEncoder::Encode(scoped_refptr<VideoFrame> frame,
 
   switch (profile_) {
     case VP9PROFILE_PROFILE2:
+      DCHECK_EQ(frame->format(), PIXEL_FORMAT_I420);
       // Profile 2 uses 10bit color,
       libyuv::I420ToI010(
           frame->visible_data(VideoFrame::kYPlane),
@@ -553,6 +583,15 @@ void VpxVideoEncoder::Encode(scoped_refptr<VideoFrame> frame,
       flags |= vp8_layers_flags[index_in_temp_cycle];
       vpx_codec_control(codec_.get(), VP8E_SET_TEMPORAL_LAYER_ID, temporal_id);
     }
+  }
+
+  if (encode_options.quantizer.has_value()) {
+    DCHECK_EQ(options_.bitrate->mode(), Bitrate::Mode::kExternal);
+    // Convert double quantizer to an integer within codec's supported range.
+    int qp = static_cast<int>(std::lround(encode_options.quantizer.value()));
+    qp = std::clamp(qp, static_cast<int>(codec_config_.rc_min_quantizer),
+                    static_cast<int>(codec_config_.rc_max_quantizer));
+    vpx_codec_control(codec_.get(), VP9E_SET_QUANTIZER_ONE_PASS, qp);
   }
 
   TRACE_EVENT1("media", "vpx_codec_encode", "timestamp", frame->timestamp());

@@ -219,10 +219,6 @@
 #include "chrome/browser/pdf/pdf_pref_names.h"
 #endif  // BUILDFLAG(ENABLE_PDF)
 
-#if BUILDFLAG(ENABLE_PLUGINS)
-#include "chrome/browser/plugins/plugin_info_host_impl.h"
-#endif
-
 #if BUILDFLAG(ENABLE_SCREEN_AI_SERVICE)
 #include "components/services/screen_ai/public/cpp/pref_names.h"  // nogncheck
 #endif
@@ -287,6 +283,7 @@
 #include "components/live_caption/live_caption_controller.h"
 #include "components/live_caption/live_translate_controller.h"
 #include "components/ntp_tiles/custom_links_manager_impl.h"
+#include "components/user_notes/user_notes_prefs.h"
 #endif  // BUILDFLAG(IS_ANDROID)
 
 #if BUILDFLAG(IS_CHROMEOS)
@@ -309,6 +306,7 @@
 #include "ash/components/arc/arc_prefs.h"
 #include "ash/constants/ash_pref_names.h"
 #include "ash/public/cpp/ash_prefs.h"
+#include "chrome/browser/apps/app_deduplication_service/app_deduplication_service.h"
 #include "chrome/browser/apps/app_preload_service/app_preload_service.h"
 #include "chrome/browser/apps/app_service/metrics/app_platform_metrics_service.h"
 #include "chrome/browser/apps/app_service/webapk/webapk_prefs.h"
@@ -461,7 +459,6 @@
 #endif
 
 #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
-#include "chrome/browser/web_applications/url_handler_prefs.h"
 #include "components/device_signals/core/browser/pref_names.h"
 #endif
 
@@ -777,6 +774,32 @@ const char kEventSequenceResetCounter[] =
 const char kArcTermsShownInOobe[] = "arc.terms.shown_in_oobe";
 #endif  // !BUILDFLAG(IS_CHROMEOS_ASH)
 
+// Deprecated 02/2023
+const char kSyncInvalidationVersions[] = "sync.invalidation_versions";
+const char kSyncInvalidationVersions2[] = "sync.invalidation_versions2";
+
+// Deprecated 02/2023.
+const char kClearPluginLSODataEnabled[] = "browser.clear_lso_data_enabled";
+const char kContentSettingsPluginAllowlist[] =
+    "profile.content_settings.plugin_whitelist";
+const char kPepperFlashSettingsEnabled[] =
+    "browser.pepper_flash_settings_enabled";
+const char kPluginsAllowOutdated[] = "plugins.allow_outdated";
+const char kPluginsLastInternalDirectory[] = "plugins.last_internal_directory";
+const char kPluginsPluginsList[] = "plugins.plugins_list";
+const char kPluginsShowDetails[] = "plugins.show_details";
+
+// Deprecated 02/2023.
+#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
+const char kWebAppsUrlHandlerInfo[] = "web_apps.url_handler_info";
+#endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
+
+// Deprecated 02/2023.
+#if BUILDFLAG(IS_CHROMEOS_ASH)
+const char kHasSeenSmartLockSignInRemovedNotification[] =
+    "easy_unlock.has_seen_smart_lock_sign_in_removed_notification";
+#endif  // BUILDFLAG(IS_CHROMEOS_ASH)
+
 // Register local state used only for migration (clearing or moving to a new
 // key).
 void RegisterLocalStatePrefsForMigration(PrefRegistrySimple* registry) {
@@ -853,6 +876,11 @@ void RegisterLocalStatePrefsForMigration(PrefRegistrySimple* registry) {
   registry->RegisterIntegerPref(kEventSequenceResetCounter, 0);
   registry->RegisterInt64Pref(kEventSequenceLastSystemUptime, 0);
 #endif  // BUILDFLAG(IS_CHROMEOS_ASH)
+
+  // Deprecated 02/2023.
+#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
+  registry->RegisterDictionaryPref(kWebAppsUrlHandlerInfo);
+#endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
 }
 
 // Register prefs used only for migration (clearing or moving to a new key).
@@ -1025,7 +1053,28 @@ void RegisterProfilePrefsForMigration(
 #if BUILDFLAG(IS_CHROMEOS_ASH)
   registry->RegisterBooleanPref(kArcTermsShownInOobe, false);
 #endif  // BUILDFLAG(IS_CHROMEOS_ASH)
+
+  // Deprecated 02/2023.
+  registry->RegisterDictionaryPref(kSyncInvalidationVersions);
+  registry->RegisterDictionaryPref(kSyncInvalidationVersions2);
+
+  // Deprecated 02/2023.
+  registry->RegisterBooleanPref(kClearPluginLSODataEnabled, false);
+  registry->RegisterDictionaryPref(kContentSettingsPluginAllowlist);
+  registry->RegisterBooleanPref(kPepperFlashSettingsEnabled, false);
+  registry->RegisterBooleanPref(kPluginsAllowOutdated, false);
+  registry->RegisterFilePathPref(kPluginsLastInternalDirectory,
+                                 base::FilePath());
+  registry->RegisterListPref(kPluginsPluginsList);
+  registry->RegisterBooleanPref(kPluginsShowDetails, false);
+
+// Deprecated 02/2023.
+#if BUILDFLAG(IS_CHROMEOS_ASH)
+  registry->RegisterBooleanPref(kHasSeenSmartLockSignInRemovedNotification,
+                                false);
+#endif  // BUILDFLAG(IS_CHROMEOS_ASH)
 }
+
 }  // namespace
 
 void RegisterLocalState(PrefRegistrySimple* registry) {
@@ -1252,10 +1301,6 @@ void RegisterLocalState(PrefRegistrySimple* registry) {
 #endif  // BUILDFLAG(GOOGLE_CHROME_BRANDING)
 #endif  // BUILDFLAG(IS_WIN)
 
-#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
-  web_app::url_handler_prefs::RegisterLocalStatePrefs(registry);
-#endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
-
 #if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_CHROMEOS_ASH)
   RegisterDefaultBrowserPromptPrefs(registry);
   downgrade::RegisterPrefs(registry);
@@ -1395,10 +1440,6 @@ void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry,
                              base::Value::List());
 #endif  // BUILDFLAG(ENABLE_PDF)
 
-#if BUILDFLAG(ENABLE_PLUGINS)
-  PluginInfoHostImpl::RegisterUserPrefs(registry);
-#endif
-
 #if BUILDFLAG(ENABLE_PRINT_PREVIEW)
   printing::PolicySettings::RegisterProfilePrefs(registry);
   printing::PrintPreviewStickySettings::RegisterProfilePrefs(registry);
@@ -1471,6 +1512,7 @@ void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry,
   UnifiedAutoplayConfig::RegisterProfilePrefs(registry);
   CartService::RegisterProfilePrefs(registry);
   commerce::ShoppingListUiTabHelper::RegisterProfilePrefs(registry);
+  user_notes::RegisterProfilePrefs(registry);
 #if !BUILDFLAG(IS_CHROMEOS_LACROS)
   captions::LiveCaptionController::RegisterProfilePrefs(registry);
 #endif  // !BUILDFLAG(IS_CHROMEOS_LACROS)
@@ -1499,6 +1541,7 @@ void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry,
   app_list::AppListSyncableService::RegisterProfilePrefs(registry);
   apps::AppPlatformMetricsService::RegisterProfilePrefs(registry);
   apps::AppPreloadService::RegisterProfilePrefs(registry);
+  apps::deduplication::AppDeduplicationService::RegisterProfilePrefs(registry);
   apps::webapk_prefs::RegisterProfilePrefs(registry);
   arc::prefs::RegisterProfilePrefs(registry);
   ArcAppListPrefs::RegisterProfilePrefs(registry);
@@ -1659,6 +1702,10 @@ void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry,
       prefs::kAccessibilityPdfOcrAlwaysActive, false,
       user_prefs::PrefRegistrySyncable::SYNCABLE_PREF);
 #endif  // BUILDFLAG(ENABLE_SCREEN_AI_SERVICE)
+
+#if BUILDFLAG(IS_ANDROID)
+  registry->RegisterBooleanPref(prefs::kQuickDeleteDialogSuppressed, false);
+#endif
 }
 
 void RegisterUserProfilePrefs(user_prefs::PrefRegistrySyncable* registry) {
@@ -1786,6 +1833,11 @@ void MigrateObsoleteLocalStatePrefs(PrefService* local_state) {
   local_state->ClearPref(kEventSequenceLastSystemUptime);
   local_state->ClearPref(kEventSequenceResetCounter);
 #endif  // BUILDFLAG(IS_CHROMEOS_ASH)
+
+  // Added 02/2023
+#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
+  local_state->ClearPref(kWebAppsUrlHandlerInfo);
+#endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
 
   // Please don't delete the following line. It is used by PRESUBMIT.py.
   // END_MIGRATE_OBSOLETE_LOCAL_STATE_PREFS
@@ -2034,6 +2086,24 @@ void MigrateObsoleteProfilePrefs(Profile* profile) {
   // Added 02/2023.
 #if BUILDFLAG(IS_CHROMEOS_ASH)
   profile_prefs->ClearPref(kArcTermsShownInOobe);
+#endif  // BUILDFLAG(IS_CHROMEOS_ASH)
+
+  // Added 02/2023.
+  profile_prefs->ClearPref(kSyncInvalidationVersions);
+  profile_prefs->ClearPref(kSyncInvalidationVersions2);
+
+  // Added 02/2023.
+  profile_prefs->ClearPref(kClearPluginLSODataEnabled);
+  profile_prefs->ClearPref(kContentSettingsPluginAllowlist);
+  profile_prefs->ClearPref(kPepperFlashSettingsEnabled);
+  profile_prefs->ClearPref(kPluginsAllowOutdated);
+  profile_prefs->ClearPref(kPluginsLastInternalDirectory);
+  profile_prefs->ClearPref(kPluginsPluginsList);
+  profile_prefs->ClearPref(kPluginsShowDetails);
+
+// Added 02/2023.
+#if BUILDFLAG(IS_CHROMEOS_ASH)
+  profile_prefs->ClearPref(kHasSeenSmartLockSignInRemovedNotification);
 #endif  // BUILDFLAG(IS_CHROMEOS_ASH)
 
   // Please don't delete the following line. It is used by PRESUBMIT.py.

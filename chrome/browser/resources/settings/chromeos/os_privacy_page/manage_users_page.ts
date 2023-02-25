@@ -24,7 +24,7 @@ import {Setting} from '../../mojom-webui/setting.mojom-webui.js';
 import {castExists} from '../assert_extras.js';
 import {DeepLinkingMixin} from '../deep_linking_mixin.js';
 import {SettingsUsersAddUserDialogElement} from '../os_people_page/users_add_user_dialog.js';
-import {routes} from '../os_route.js';
+import {routes} from '../os_settings_routes.js';
 import {RouteObserverMixin} from '../route_observer_mixin.js';
 import {Route} from '../router.js';
 
@@ -73,11 +73,11 @@ class SettingsUsersPageElement extends SettingsUsersPageElementBase {
       },
 
       /**
-       * Used by DeepLinkingBehavior to focus this page's deep links.
+       * Used by DeepLinkingMixin to focus this page's deep links.
        */
       supportedSettingIds: {
         type: Object,
-        value: () => new Set([
+        value: () => new Set<Setting>([
           Setting.kGuestBrowsingV2,
           Setting.kShowUsernamesAndPhotosAtSignInV2,
           Setting.kRestrictSignInV2,

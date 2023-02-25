@@ -34,7 +34,7 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
-<histogram name="Chrome.KAnonymityService.JoinSetLatency" units="ms"
+<histogram name="Chrome.KAnonymityService.JoinSet.Latency" units="ms"
     expires_after="M113">
   <owner>behamilton@google.com</owner>
   <owner>pauljensen@chromium.org</owner>
@@ -47,7 +47,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Chrome.KAnonymityService.QuerySet.Action"
-    enum="KAnonymityServiceQuerySetAction" expires_after="2023-06-04">
+    enum="KAnonymityServiceQuerySetAction" expires_after="2023-08-08">
   <owner>behamilton@google.com</owner>
   <owner>pauljensen@chromium.org</owner>
   <summary>
@@ -58,16 +58,7 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
-<histogram name="Chrome.KAnonymityService.QuerySet.Size" units="count"
-    expires_after="2023-06-04">
-  <owner>behamilton@google.com</owner>
-  <owner>pauljensen@chromium.org</owner>
-  <summary>
-    Records the number of elements queried per call for each call to QuerySet.
-  </summary>
-</histogram>
-
-<histogram name="Chrome.KAnonymityService.QuerySetsLatency" units="ms"
+<histogram name="Chrome.KAnonymityService.QuerySet.Latency" units="ms"
     expires_after="M113">
   <owner>behamilton@google.com</owner>
   <owner>pauljensen@chromium.org</owner>
@@ -77,6 +68,15 @@ chromium-metrics-reviews@google.com.
     formatting the request, performing the request, waiting for the response,
     and parsing the response. This metric is only measured for successful
     requests.
+  </summary>
+</histogram>
+
+<histogram name="Chrome.KAnonymityService.QuerySet.Size" units="count"
+    expires_after="2023-08-08">
+  <owner>behamilton@google.com</owner>
+  <owner>pauljensen@chromium.org</owner>
+  <summary>
+    Records the number of elements queried per call for each call to QuerySet.
   </summary>
 </histogram>
 
@@ -93,7 +93,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Chrome.KAnonymityService.TrustTokenGetter.Latency" units="ms"
-    expires_after="2023-06-04">
+    expires_after="2023-08-08">
   <owner>behamilton@google.com</owner>
   <owner>pauljensen@chromium.org</owner>
   <summary>
@@ -106,10 +106,25 @@ chromium-metrics-reviews@google.com.
 
 <histogram name="Chrome.Lacros.Smoothness.PercentDroppedFrames_1sWindow"
     units="%" expires_after="2023-07-25">
+  <obsolete>
+    This metric is reported on every dropped frame instead of every frame. It is
+    deprecated in favor of
+    Chrome.Lacros.Smoothness.PercentDroppedFrames_1sWindow2
+  </obsolete>
   <owner>xiyuan@chromium.org</owner>
   <owner>chromeos-perfmetrics-eng@google.com</owner>
   <summary>
     Similar to Ash.Smoothness.PercentDroppedFrames_1sWindow but emitted for the
+    browser UI of lacros-chrome.
+  </summary>
+</histogram>
+
+<histogram name="Chrome.Lacros.Smoothness.PercentDroppedFrames_1sWindow2"
+    units="%" expires_after="2024-01-29">
+  <owner>xiyuan@chromium.org</owner>
+  <owner>chromeos-perfmetrics-eng@google.com</owner>
+  <summary>
+    Similar to Ash.Smoothness.PercentDroppedFrames_1sWindow2 but emitted for the
     browser UI of lacros-chrome.
   </summary>
 </histogram>
@@ -281,7 +296,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="ChromeColors.ColorOnLoad" enum="ChromeColorsInfo"
-    expires_after="2023-06-18">
+    expires_after="2023-08-20">
   <owner>gayane@chromium.org</owner>
   <owner>yyushkina@chromium.org</owner>
   <summary>

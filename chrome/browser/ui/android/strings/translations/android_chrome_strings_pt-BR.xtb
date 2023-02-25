@@ -304,7 +304,6 @@ Os tokens de estado particular melhoram a privacidade na Web e não podem ser us
 <translation id="2669454659051515572">Qualquer pessoa que use este dispositivo pode ver os arquivos transferidos por download</translation>
 <translation id="2702516483241149200">Novo: compartilhe um link para este texto</translation>
 <translation id="2707726405694321444">Atualizar página</translation>
-<translation id="2709516037105925701">Preenchimento automático</translation>
 <translation id="271033894570825754">Novo</translation>
 <translation id="2711073837061989559">Testes</translation>
 <translation id="2718352093833049315">Apenas com Wi-Fi</translation>
@@ -396,7 +395,6 @@ Os tokens de estado particular melhoram a privacidade na Web e não podem ser us
 <translation id="3114507951000454849">Leia as notícias de hoje <ph name="NEWS_ICON" /></translation>
 <translation id="311958134571892113">vinculado a</translation>
 <translation id="3123734510202723619">Anúncios</translation>
-<translation id="3130863904455712965">Histórico e mais</translation>
 <translation id="3134784203083076891">"</translation>
 <translation id="314939179385989105">Página inicial do Chrome</translation>
 <translation id="3157931365184549694">Restaurar</translation>
@@ -453,6 +451,7 @@ Os tokens de estado particular melhoram a privacidade na Web e não podem ser us
 <translation id="3421726884497337397">Defina quando bloquear cookies de terceiros</translation>
 <translation id="3428747202529429621">Protege você no Chrome e pode ser usado para melhorar a segurança em outros apps do Google quando sua conta está conectada</translation>
 <translation id="3429160811076349561">Os recursos de teste estão desativados</translation>
+<translation id="3432973700170747422">Excluir últimos 15 minutos</translation>
 <translation id="3435465986463792564">Muitas janelas? Gerencie aqui.</translation>
 <translation id="3435738964857648380">Segurança</translation>
 <translation id="3443221991560634068">Atualizar a página atual</translation>
@@ -519,7 +518,6 @@ Os tokens de estado particular melhoram a privacidade na Web e não podem ser us
 <translation id="3830886834687455630">Atualize o Google Play Services para verificar suas senhas</translation>
 <translation id="3845098929839618392">Abrir em guia anônima</translation>
 <translation id="3856096718352044181">Verifique se o provedor é válido ou tente novamente mais tarde</translation>
-<translation id="3858127568696903256">O conteúdo que você segue aparece aqui</translation>
 <translation id="3858860766373142691">Nome</translation>
 <translation id="3861633093716975811">Vídeos mais acessados</translation>
 <translation id="3874520961715512166">Site removido</translation>
@@ -991,7 +989,6 @@ Por exemplo, alguns sites podem responder a esse pedido mostrando anúncios que 
 <translation id="6397616442223433927">Conectado novamente</translation>
 <translation id="6401458660421980302">Para enviar esta guia a outro dispositivo, faça login no Chrome no outro aparelho</translation>
 <translation id="6402652558933147609"><ph name="ERROR_CODE" /> em <ph name="VIOLATED_URL" /></translation>
-<translation id="6403371459378431832">Sincronize seus dados em todos os dispositivos</translation>
 <translation id="6404511346730675251">Editar favorito</translation>
 <translation id="6406506848690869874">Sincronizar</translation>
 <translation id="6407224748847589805">Não foi possível se conectar ao seu computador. Tente outra opção de verificação.</translation>
@@ -1229,6 +1226,7 @@ Por exemplo, alguns sites podem responder a esse pedido mostrando anúncios que 
 <translation id="7596558890252710462">Sistema operacional</translation>
 <translation id="7605594153474022051">A sincronização não está funcionando</translation>
 <translation id="7612619742409846846">Conectado ao Google como</translation>
+<translation id="7612989789287281429">Fazendo login…</translation>
 <translation id="7616551326690708776">Selecione um modelo para seu destaque.</translation>
 <translation id="7619072057915878432">Falha no download do arquivo <ph name="FILE_NAME" /> devido a falhas na rede.</translation>
 <translation id="7626032353295482388">Bem-vindo ao Google Chrome</translation>
@@ -1247,6 +1245,7 @@ Por exemplo, alguns sites podem responder a esse pedido mostrando anúncios que 
 <translation id="7682724950699840886">Experimente as seguintes dicas: verifique se há espaço suficiente no dispositivo e tente exportar novamente.</translation>
 <translation id="7686086654630106285">Mais informações sobre anúncios sugeridos por sites</translation>
 <translation id="768618399695552958">Algumas das páginas que você visita serão pré-carregadas. As páginas podem ser pré-carregadas por servidores do Google quando o link for de um site do Google.</translation>
+<translation id="7691043218961417207">Encontre conteúdo para seguir</translation>
 <translation id="7698359219371678927">Criar e-mail no <ph name="APP_NAME" /></translation>
 <translation id="7707922173985738739">Usar dados móveis</translation>
 <translation id="7709094866268987903">Os interesses que você removeu vão aparecer aqui</translation>
@@ -1320,7 +1319,6 @@ Por exemplo, alguns sites podem responder a esse pedido mostrando anúncios que 
 <translation id="8037801708772278989">Verificado agora mesmo</translation>
 <translation id="804335162455518893">Cartão SD não encontrado</translation>
 <translation id="8048533522416101084">{TAB_COUNT,plural, =1{<ph name="TAB_COUNT_ONE" /> guia anônima}one{<ph name="TAB_COUNT_NORMAL" /> guia anônima}other{<ph name="TAB_COUNT_NORMAL" /> guias anônimas}}</translation>
-<translation id="8048728378294435881">Faça backup e use seus dados em qualquer dispositivo</translation>
 <translation id="8051695050440594747"><ph name="MEGABYTES" /> MB disponíveis</translation>
 <translation id="8058655154417507695">Ano de expiração</translation>
 <translation id="8058746566562539958">Abrir em nova guia do Chrome</translation>
@@ -1498,6 +1496,7 @@ Por exemplo, alguns sites podem responder a esse pedido mostrando anúncios que 
 <translation id="8970887620466824814">Algo deu errado.</translation>
 <translation id="8972098258593396643">Fazer o download para a pasta padrão?</translation>
 <translation id="8987641763863173640">Gerenciar configurações de prévia de vídeos</translation>
+<translation id="8987736167266086032">Recomece de onde você parou</translation>
 <translation id="8989968390305463310">Seu histórico de navegação afeta os anúncios que você vê e os interesses estimados abaixo. Para proteger sua privacidade, o Chrome exclui automaticamente seus interesses mais antigos do que um mês. Os interesses podem ser atualizados, a menos que você os remova.</translation>
 <translation id="8993760627012879038">Abrir uma nova guia no modo de navegação anônima</translation>
 <translation id="8996847606757455498">Escolha outro provedor</translation>

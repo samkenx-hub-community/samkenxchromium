@@ -138,6 +138,7 @@
 #include "services/viz/public/cpp/gpu/gpu.h"
 #include "skia/ext/skia_memory_dump_provider.h"
 #include "third_party/blink/public/common/features.h"
+#include "third_party/blink/public/common/page/launching_process_state.h"
 #include "third_party/blink/public/common/privacy_budget/active_sampling.h"
 #include "third_party/blink/public/common/privacy_budget/identifiability_study_settings.h"
 #include "third_party/blink/public/common/switches.h"
@@ -211,7 +212,7 @@
 
 #if BUILDFLAG(IS_FUCHSIA)
 #include "content/renderer/media/codec_factory_fuchsia.h"
-#include "media/fuchsia/mojom/fuchsia_media.mojom.h"
+#include "media/mojo/mojom/fuchsia_media.mojom.h"
 #endif
 
 #if BUILDFLAG(CLANG_PROFILING_INSIDE_SANDBOX)
@@ -305,6 +306,13 @@ void AddCrashKey(v8::CrashKeyId id, const std::string& value) {
       // to introduce new CrashKeyId's without triggering a build break.
       break;
   }
+}
+
+// Updates the crash key for whether this renderer is foregrounded.
+void UpdateForegroundCrashKey(bool foreground) {
+  static auto* const crash_key = base::debug::AllocateCrashKeyString(
+      "renderer_foreground", base::debug::CrashKeySize::Size32);
+  base::debug::SetCrashKeyString(crash_key, foreground ? "true" : "false");
 }
 
 scoped_refptr<viz::ContextProviderCommandBuffer> CreateOffscreenContext(
@@ -731,6 +739,8 @@ void RenderThreadImpl::Init() {
             },
             std::move(recorder)));
   }
+  UpdateForegroundCrashKey(
+      /*foreground=*/!blink::kLaunchingProcessIsBackgrounded);
 }
 
 RenderThreadImpl::~RenderThreadImpl() {
@@ -849,11 +859,6 @@ void RenderThreadImpl::RemoveObserver(RenderThreadObserver* observer) {
   observers_.RemoveObserver(observer);
 }
 
-void RenderThreadImpl::SetResourceRequestSenderDelegate(
-    blink::WebResourceRequestSenderDelegate* delegate) {
-  resource_request_sender_delegate_ = delegate;
-}
-
 void RenderThreadImpl::InitializeCompositorThread() {
   blink_platform_impl_->CreateAndSetCompositorThread();
   compositor_task_runner_ = blink_platform_impl_->CompositorThreadTaskRunner();
@@ -935,6 +940,14 @@ void RenderThreadImpl::InitializeRenderer(
   user_agent_metadata_ = user_agent_metadata;
   cors_exempt_header_list_ = cors_exempt_header_list;
   attribution_os_support_ = attribution_os_support;
+
+  blink::WebVector<blink::WebString> web_cors_exempt_header_list(
+      cors_exempt_header_list.size());
+  std::transform(cors_exempt_header_list.begin(), cors_exempt_header_list.end(),
+                 web_cors_exempt_header_list.begin(), [](const std::string& h) {
+                   return blink::WebString::FromLatin1(h);
+                 });
+  blink::SetCorsExemptHeaderList(web_cors_exempt_header_list);
 }
 
 void RenderThreadImpl::RegisterSchemes() {
@@ -1755,12 +1768,14 @@ bool RenderThreadImpl::RendererIsBackgrounded() const {
 }
 
 void RenderThreadImpl::OnRendererBackgrounded() {
+  UpdateForegroundCrashKey(/*foreground=*/false);
   main_thread_scheduler_->SetRendererBackgrounded(true);
   discardable_memory_allocator_->OnBackgrounded();
   base::allocator::PartitionAllocSupport::Get()->OnBackgrounded();
 }
 
 void RenderThreadImpl::OnRendererForegrounded() {
+  UpdateForegroundCrashKey(/*foreground=*/true);
   main_thread_scheduler_->SetRendererBackgrounded(false);
   discardable_memory_allocator_->OnForegrounded();
   base::allocator::PartitionAllocSupport::Get()->OnForegrounded(
@@ -1830,11 +1845,6 @@ gfx::ColorSpace RenderThreadImpl::GetRenderingColorSpace() {
 attribution_reporting::mojom::OsSupport
 RenderThreadImpl::GetOsSupportForAttributionReporting() {
   return attribution_os_support_;
-}
-
-void RenderThreadImpl::SetOsSupportForAttributionReporting(
-    attribution_reporting::mojom::OsSupport attribution_os_support) {
-  attribution_os_support_ = attribution_os_support;
 }
 
 std::unique_ptr<CodecFactory> RenderThreadImpl::CreateMediaCodecFactory(

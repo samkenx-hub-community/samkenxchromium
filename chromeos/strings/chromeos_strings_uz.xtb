@@ -16,6 +16,7 @@
 <translation id="1128128132059598906">EAP-TTLS</translation>
 <translation id="1145018782460575098">Tashqi qurilmalar uchun mikrodasturni yangilash oynasi ochiq. <ph name="NUM_UPDATES" /> ta yangilanish chiqdi.</translation>
 <translation id="1145516343487477149">Yordam maqolalari va umumiy Chromebook savollariga javoblar toping</translation>
+<translation id="1167755866710282443">Tugmalarni moslash uchun menyuni oching. Menyuni surish uchun torting.</translation>
 <translation id="1175697296044146566">Bu <ph name="DEVICE_TYPE" /> qurilmasi <ph name="MANAGER" /> domenida boshqariladi.</translation>
 <translation id="1175951029573070619">Oʻrtacha (<ph name="SIGNAL_STRENGTH" />)</translation>
 <translation id="1181037720776840403">Olib tashlash</translation>
@@ -326,6 +327,7 @@
 <translation id="4110686435123617899"><ph name="TITLE" /> <ph name="DESC" /> nomli albomni tanlang</translation>
 <translation id="4111761024568264522">USB sensorli panel</translation>
 <translation id="4117637339509843559">Tungi rejim</translation>
+<translation id="4130035430755296270">Boshqa dizayn variantlari uchun kursorni shu joyda ushlab turing</translation>
 <translation id="4131410914670010031">Oq-qora</translation>
 <translation id="4145784616224233563">HTTP Fayrvol</translation>
 <translation id="4147897805161313378">Google Photos</translation>
@@ -414,6 +416,7 @@
 <translation id="484790837831576105">(Android) DNS parametrlari</translation>
 <translation id="4848429997038228357">BAJARILMOQDA</translation>
 <translation id="4854586501323951986">Ichki sensorli ekran</translation>
+<translation id="4855250849489639581">Boshqa dizayn variantlari uchun pastga suring</translation>
 <translation id="4861758251032006121">{ATTEMPTS_LEFT,plural, =1{<ph name="ERROR_MESSAGE" /> {0} ta urinish qoldi}other{<ph name="ERROR_MESSAGE" /> {0} ta urinish qoldi}}</translation>
 <translation id="4873827928179867585">Autentifikatsiya algoritmi</translation>
 <translation id="4880328057631981605">Internetga ulanish nuqtasi (APN)</translation>
@@ -517,6 +520,7 @@
 <translation id="576835345334454681">Displey yorqinligini oshirish</translation>
 <translation id="57838592816432529">Ovozni o‘chirib qo‘yish</translation>
 <translation id="5784136236926853061">HTTP kechikishi yuqori</translation>
+<translation id="5826644637650799838">Asar haqida</translation>
 <translation id="5832805196449965646">Foydalanuvchi qo‘shish</translation>
 <translation id="583281660410589416">Noma’lum</translation>
 <translation id="5843706793424741864">Farengeyt</translation>
@@ -673,6 +677,7 @@
 <translation id="7172721935181587524">1 ta rasm</translation>
 <translation id="7177485034254901881">Bu <ph name="DEVICE_TYPE" /> qurilmasi <ph name="MANAGER" /> domenida boshqariladi. Administratorlar qurilmani masofadan sozlashi mumkin.</translation>
 <translation id="7180611975245234373">Yangilash</translation>
+<translation id="7180865173735832675">Sozlash</translation>
 <translation id="7212734716605298123">Tashqi qurilmalar uchun mikrodastur yangilanishi</translation>
 <translation id="7216409898977639127">Mobil tarmoq</translation>
 <translation id="725133483556299729">Emailni tanlang</translation>
@@ -744,6 +749,7 @@
 <translation id="7881066108824108340">DNS</translation>
 <translation id="7882358943899516840">Ta’minot turi</translation>
 <translation id="7882501334836096755">Ochiq kalit</translation>
+<translation id="78957024357676568">chapga</translation>
 <translation id="7915220255123750251">Tarmoq APN sozlamalarini boshqarish. APN sozlamalari mobil tarmoq va internet orasida aloqani taʼminlaydi.</translation>
 <translation id="7936303884198020182">Nom serverlari topilmadi</translation>
 <translation id="7942349550061667556">Qizil</translation>
@@ -775,6 +781,7 @@
 <translation id="8226628635270268143">Sevimli suratlar va albomlaringizni tanlang</translation>
 <translation id="8227119283605456246">Fayl biriktirish</translation>
 <translation id="8230672074305416752">Birlamchi tarmoq shlyuzi ping qilinmadi</translation>
+<translation id="8242426110754782860">Davom etish</translation>
 <translation id="8246209727385807362">Noma’lum provayder</translation>
 <translation id="827422111966801947">Toʻq siyohrang</translation>
 <translation id="8286154143153872371">Fon rasmini koʻrish uchun tarmoqqa ulaning va sahifani yangilang.</translation>
@@ -852,6 +859,7 @@
 <translation id="8930622219860340959">Simsiz</translation>
 <translation id="8936793075252196307">Mijoz IP manzili</translation>
 <translation id="894617464444543719">Qurilma — telefon.</translation>
+<translation id="8957423540740801332">o‘ngga</translation>
 <translation id="8968751544471797276">Quvvatlash tezligi</translation>
 <translation id="8970109610781093811">Qayta tekshirish</translation>
 <translation id="8983038754672563810">HSPA</translation>

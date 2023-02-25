@@ -1122,10 +1122,6 @@ bool Value::RemoveKey(StringPiece key) {
   return GetDict().Remove(key);
 }
 
-absl::optional<Value> Value::ExtractKey(StringPiece key) {
-  return GetDict().Extract(key);
-}
-
 Value* Value::FindPath(StringPiece path) {
   return GetDict().FindByDottedPath(path);
 }
@@ -1207,10 +1203,6 @@ Value* Value::SetStringPath(StringPiece path, const char* value) {
 
 Value* Value::SetStringPath(StringPiece path, StringPiece16 value) {
   return GetDict().SetByDottedPath(path, value);
-}
-
-bool Value::RemovePath(StringPiece path) {
-  return GetDict().RemoveByDottedPath(path);
 }
 
 Value* Value::SetPath(std::initializer_list<StringPiece> path, Value&& value) {

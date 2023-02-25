@@ -7,6 +7,7 @@
 #include <memory>
 #include <vector>
 
+#include "base/base64.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback.h"
 #include "base/logging.h"
@@ -28,11 +29,10 @@ namespace {
 // Endpoint Info version number, currently version 1.
 constexpr uint8_t kEndpointInfoVersion = 1;
 
-// Smart Setup verification style, e.g. shapes, pin, etc.
-// 0 = "Default", since there isn't yet a QR code option.
-// Values come from this enum:
-// http://google3/logs/proto/wireless/android/smartsetup/smart_setup_extension.proto;l=876;rcl=458110957
-constexpr uint8_t kEndpointInfoVerificationStyle = 0;
+// Smart Setup verification style, e.g. QR code, pin, etc.
+// 6 = "DIGITS", which tells the phone to display a code for the user to match.
+// Values come from the TargetConnectionInfo VerificationStyle enum:
+constexpr uint8_t kEndpointInfoVerificationStyle = 6;
 
 // Device Type for Smart Setup, e.g. phone, tablet.  8 = "Chrome"
 // Values come from the DiscoveryEvent DeviceType enum:
@@ -44,15 +44,13 @@ constexpr uint8_t kEndpointInfoIsQuickStart = 1;
 
 constexpr size_t kMaxEndpointInfoDisplayNameLength = 18;
 
-// Derive three decimal digits from the RandomSessionId.
-std::string GetDisplayNameSessionIdDigits(const RandomSessionId& session_id) {
-  base::span<const uint8_t, RandomSessionId::kLength> session_id_bytes =
-      session_id.AsBytes();
-  uint32_t high = session_id_bytes[0];
-  uint32_t low = session_id_bytes[1];
-  uint32_t x = (high << 8) + low;
-  return base::NumberToString(x % 1000);
-}
+// The Advertising Id field has a fixed width of 10 bytes, but contains a
+// base64-encoded UTF-8 string that will be null-terminated if less than 10
+// characters.
+constexpr size_t kEndpointInfoAdvertisingIdLength = 10;
+
+// Base64 padding character
+constexpr char kBase64PaddingChar = '=';
 
 // The display name must:
 // - Be a variable-length string of utf-8 bytes
@@ -61,7 +59,7 @@ std::string GetDisplayNameSessionIdDigits(const RandomSessionId& session_id) {
 std::vector<uint8_t> GetEndpointInfoDisplayNameBytes(
     const RandomSessionId& session_id) {
   std::string display_name = base::UTF16ToUTF8(ui::GetChromeOSDeviceName());
-  std::string suffix = " (" + GetDisplayNameSessionIdDigits(session_id) + ")";
+  std::string suffix = " (" + session_id.GetDisplayCode() + ")";
 
   base::TruncateUTF8ToByteSize(
       display_name, kMaxEndpointInfoDisplayNameLength - suffix.size(),
@@ -75,6 +73,22 @@ std::vector<uint8_t> GetEndpointInfoDisplayNameBytes(
   }
 
   return display_name_bytes;
+}
+
+std::vector<uint8_t> Base64EncodeOmitPadding(
+    const std::vector<uint8_t>& bytes) {
+  std::string input(bytes.begin(), bytes.end());
+  std::string output;
+  base::Base64Encode(input, &output);
+
+  // Strip padding characters from end.
+  const size_t last_non_padding_pos =
+      output.find_last_not_of(kBase64PaddingChar);
+  if (last_non_padding_pos != std::string::npos) {
+    output.resize(last_non_padding_pos + 1);
+  }
+
+  return std::vector<uint8_t>(output.begin(), output.end());
 }
 
 }  // namespace
@@ -186,7 +200,7 @@ void TargetDeviceConnectionBrokerImpl::StartFastPairAdvertising(
     ResultCallback callback) {
   QS_LOG(INFO) << "Starting Fast Pair advertising with session id "
                << random_session_id_ << " ("
-               << GetDisplayNameSessionIdDigits(random_session_id_) << ")";
+               << random_session_id_.GetDisplayCode() << ")";
 
   fast_pair_advertiser_ =
       FastPairAdvertiser::Factory::Create(bluetooth_adapter_);
@@ -243,28 +257,38 @@ void TargetDeviceConnectionBrokerImpl::OnStopFastPairAdvertising(
 // The EndpointInfo consists of the following fields:
 // - EndpointInfo version number, 1 byte
 // - Display name, max 18 bytes (see GetEndpointInfoDisplayNameBytes())
-// - Advertisement data, 13 bytes:
+// - Advertisement data, 13 bytes, base64 encoded:
 //   - Verification Style, byte[0]
 //   - Device Type, byte[1]
-//   - Advertising Id, byte[2-11], 10 bytes. (See RandomSessionId)
+//   - Advertising Id, byte[2-11], 10 UTF-8 bytes. (See RandomSessionId)
 //   - isQuickStart, byte[12], =1 for Quick Start.
 std::vector<uint8_t> TargetDeviceConnectionBrokerImpl::GenerateEndpointInfo() {
-  base::span<const uint8_t, RandomSessionId::kLength> session_id_bytes =
-      random_session_id_.AsBytes();
+  std::string session_id = random_session_id_.ToString();
   std::vector<uint8_t> display_name_bytes =
       GetEndpointInfoDisplayNameBytes(random_session_id_);
 
-  std::vector<uint8_t> endpoint_info;
-  endpoint_info.reserve(32);
+  std::vector<uint8_t> advertisement_data;
+  advertisement_data.reserve(13);
+  advertisement_data.push_back(kEndpointInfoVerificationStyle);
+  advertisement_data.push_back(kEndpointInfoDeviceType);
+  advertisement_data.insert(advertisement_data.end(), session_id.begin(),
+                            session_id.end());
+  for (size_t i = 0; i < kEndpointInfoAdvertisingIdLength - session_id.size();
+       i++) {
+    // Pad out the advertising id to the correct field length using null
+    // terminators.
+    advertisement_data.push_back(0);
+  }
+  advertisement_data.push_back(kEndpointInfoIsQuickStart);
+  std::vector<uint8_t> advertisement_data_b64 =
+      Base64EncodeOmitPadding(advertisement_data);
 
+  std::vector<uint8_t> endpoint_info;
   endpoint_info.push_back(kEndpointInfoVersion);
   endpoint_info.insert(endpoint_info.end(), display_name_bytes.begin(),
                        display_name_bytes.end());
-  endpoint_info.push_back(kEndpointInfoVerificationStyle);
-  endpoint_info.push_back(kEndpointInfoDeviceType);
-  endpoint_info.insert(endpoint_info.end(), session_id_bytes.begin(),
-                       session_id_bytes.end());
-  endpoint_info.push_back(kEndpointInfoIsQuickStart);
+  endpoint_info.insert(endpoint_info.end(), advertisement_data_b64.begin(),
+                       advertisement_data_b64.end());
 
   return endpoint_info;
 }

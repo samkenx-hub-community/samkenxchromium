@@ -9,6 +9,7 @@
 #include "base/logging.h"
 #include "components/viz/common/gpu/raster_context_provider.h"
 #include "components/viz/common/resources/resource_format_utils.h"
+#include "components/viz/common/resources/shared_image_format.h"
 #include "gpu/GLES2/gl2extchromium.h"
 #include "gpu/command_buffer/client/raster_interface.h"
 #include "gpu/command_buffer/client/shared_image_interface.h"
@@ -24,26 +25,27 @@ namespace media {
 
 namespace {
 
-viz::ResourceFormat PlaneResourceFormat(int num_channels, bool for_surface) {
+viz::SharedImageFormat PlaneSharedImageFormat(int num_channels,
+                                              bool supports_red) {
   switch (num_channels) {
     case 1:
-      return for_surface ? viz::RED_8 : viz::LUMINANCE_8;
+      return supports_red ? viz::SinglePlaneFormat::kR_8
+                          : viz::SinglePlaneFormat::kLUMINANCE_8;
     case 2:
-      return viz::RG_88;
+      return viz::SinglePlaneFormat::kRG_88;
     case 3:
-      return viz::RGBX_8888;
+      return viz::SinglePlaneFormat::kRGBX_8888;
     case 4:
-      return viz::RGBA_8888;
+      return viz::SinglePlaneFormat::kRGBA_8888;
   }
   NOTREACHED();
-  return viz::RGBA_8888;
+  return viz::SinglePlaneFormat::kRGBA_8888;
 }
 
-GLenum PlaneGLFormat(int num_channels,
-                     bool for_surface,
-                     const gpu::Capabilities& capabilities) {
+GLenum PlaneGLFormat(int num_channels, const gpu::Capabilities& capabilities) {
   return viz::TextureStorageFormat(
-      PlaneResourceFormat(num_channels, for_surface),
+      PlaneSharedImageFormat(num_channels, capabilities.texture_rg)
+          .resource_format(),
       capabilities.angle_rgbx_internal_format);
 }
 
@@ -121,7 +123,8 @@ void VideoFrameYUVMailboxesHolder::VideoFrameToMailboxes(
     auto* sii = provider_->SharedImageInterface();
     DCHECK(sii);
     uint32_t mailbox_usage;
-    if (provider_->ContextCapabilities().supports_oop_raster) {
+    auto& caps = provider_->ContextCapabilities();
+    if (caps.supports_oop_raster) {
       mailbox_usage = gpu::SHARED_IMAGE_USAGE_RASTER |
                       gpu::SHARED_IMAGE_USAGE_OOP_RASTERIZATION;
     } else {
@@ -131,7 +134,8 @@ void VideoFrameYUVMailboxesHolder::VideoFrameToMailboxes(
       gfx::Size tex_size = {plane_sizes_[plane].width(),
                             plane_sizes_[plane].height()};
       int num_channels = yuva_info_.numChannelsInPlane(plane);
-      viz::ResourceFormat format = PlaneResourceFormat(num_channels, false);
+      viz::SharedImageFormat format =
+          PlaneSharedImageFormat(num_channels, caps.texture_rg);
       holders_[plane].mailbox = sii->CreateSharedImage(
           format, tex_size, video_frame->ColorSpace(), kTopLeft_GrSurfaceOrigin,
           kPremul_SkAlphaType, mailbox_usage, gpu::kNullSurfaceHandle);
@@ -267,8 +271,8 @@ void VideoFrameYUVMailboxesHolder::ImportTextures(bool for_surface) {
 
     int num_channels = yuva_info_.numChannelsInPlane(plane);
     textures_[plane].texture.fTarget = holders_[plane].texture_target;
-    textures_[plane].texture.fFormat = PlaneGLFormat(
-        num_channels, for_surface, provider_->ContextCapabilities());
+    textures_[plane].texture.fFormat =
+        PlaneGLFormat(num_channels, provider_->ContextCapabilities());
   }
 
   imported_textures_ = true;

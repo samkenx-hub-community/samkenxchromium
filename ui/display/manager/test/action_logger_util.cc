@@ -20,12 +20,13 @@ namespace display::test {
 std::string GetCrtcAction(
     const display::DisplayConfigurationParams& display_config_params) {
   return base::StringPrintf(
-      "crtc(display_id=[%" PRId64 "],x=%d,y=%d,mode=[%s])",
+      "crtc(display_id=[%" PRId64 "],x=%d,y=%d,mode=[%s],enable_vrr=%d)",
       display_config_params.id, display_config_params.origin.x(),
       display_config_params.origin.y(),
       display_config_params.mode.has_value()
           ? display_config_params.mode.value()->ToString().c_str()
-          : "NULL");
+          : "NULL",
+      display_config_params.enable_vrr);
 }
 
 std::string GetSetHDCPStateAction(int64_t display_id,
@@ -33,6 +34,11 @@ std::string GetSetHDCPStateAction(int64_t display_id,
                                   ContentProtectionMethod protection_method) {
   return base::StringPrintf("set_hdcp(id=%" PRId64 ",state=%d,method=%d)",
                             display_id, state, protection_method);
+}
+
+std::string GetSetHdcpKeyPropAction(int64_t display_id, bool success) {
+  return base::StringPrintf("set_hdcp_key_prop(id=%" PRId64 ",success=%d)",
+                            display_id, success);
 }
 
 std::string SetColorMatrixAction(int64_t display_id,

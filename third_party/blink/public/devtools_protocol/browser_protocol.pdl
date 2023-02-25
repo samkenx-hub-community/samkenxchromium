@@ -752,6 +752,7 @@ experimental domain Audits
       FormInputAssignedAutocompleteValueToIdOrNameAttributeError
       FormLabelHasNeitherForNorNestedInput
       FormLabelForMatchesNonExistingIdError
+      FormHasPasswordFieldWithoutUsernameFieldError
 
   # Depending on the concrete errorType, different properties are set.
   type GenericIssueDetails extends object
@@ -8555,6 +8556,36 @@ domain Page
       # that is incompatible with prerender and has caused the cancellation of the attempt
       optional string disallowedApiMethod
 
+  # Preloading status values, see also PreloadingTriggeringOutcome. This
+  # status is shared by prefetchStatusUpdated and prerenderStatusUpdated.
+  type PreloadingStatus extends string
+    enum
+      Pending
+      Running
+      Ready
+      Success
+      Failure
+      # PreloadingTriggeringOutcome which not used by prefetch nor prerender.
+      NotSupported
+
+  # TODO(crbug/1384419): Create a dedicated domain for preloading.
+  # Fired when a prefetch attempt is updated.
+  experimental event prefetchStatusUpdated
+    parameters
+      # The frame id of the frame initiating prefetch.
+      FrameId initiatingFrameId
+      string prefetchUrl
+      PreloadingStatus status
+
+  # TODO(crbug/1384419): Create a dedicated domain for preloading.
+  # Fired when a prerender attempt is updated.
+  experimental event prerenderStatusUpdated
+    parameters
+      # The frame id of the frame initiating prerender.
+      FrameId initiatingFrameId
+      string prerenderingUrl
+      PreloadingStatus status
+
   event loadEventFired
     parameters
       Network.MonotonicTime timestamp
@@ -10757,3 +10788,73 @@ experimental domain Media
 
   # Disables the Media domain.
   command disable
+
+experimental domain DeviceAccess
+  # Device request id.
+  type RequestId extends string
+
+  # A device id.
+  type DeviceId extends string
+
+  # Device information displayed in a user prompt to select a device.
+  type PromptDevice extends object
+    properties
+      DeviceId id
+      # Display name as it appears in a device request user prompt.
+      string name
+
+  # Enable events in this domain.
+  command enable
+
+  # Disable events in this domain.
+  command disable
+
+  # Select a device in response to a DeviceAccess.deviceRequestPrompted event.
+  command selectPrompt
+    parameters
+      RequestId id
+      DeviceId deviceId
+
+  # Cancel a prompt in response to a DeviceAccess.deviceRequestPrompted event.
+  command cancelPrompt
+    parameters
+      RequestId id
+
+  # A device request opened a user prompt to select a device. Respond with the
+  # selectPrompt or cancelPrompt command.
+  event deviceRequestPrompted
+    parameters
+      RequestId id
+      array of PromptDevice devices
+
+experimental domain Preload
+  # Unique id
+  type RuleSetId extends string
+
+  # Corresponds to SpeculationRuleSet
+  type RuleSet extends object
+    properties
+      RuleSetId id
+      # Identifies a document which the rule set is associated with.
+      Network.LoaderId loaderId
+      # Source text of JSON representing the rule set. If it comes from
+      # <script> tag, it is the textContent of the node. Note that it is
+      # a JSON for valid case.
+      #
+      # See also:
+      # - https://wicg.github.io/nav-speculation/speculation-rules.html
+      # - https://github.com/WICG/nav-speculation/blob/main/triggers.md
+      string sourceText
+
+  command enable
+
+  command disable
+
+  # Upsert. Currently, it is only emitted when a rule set added.
+  event ruleSetUpdated
+    parameters
+      RuleSet ruleSet
+
+  event ruleSetRemoved
+    parameters
+      RuleSetId id

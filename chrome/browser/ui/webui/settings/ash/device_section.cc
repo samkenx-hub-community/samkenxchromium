@@ -48,6 +48,7 @@ using ::chromeos::settings::mojom::kDeviceSectionPath;
 using ::chromeos::settings::mojom::kDisplaySubpagePath;
 using ::chromeos::settings::mojom::kExternalStorageSubpagePath;
 using ::chromeos::settings::mojom::kKeyboardSubpagePath;
+using ::chromeos::settings::mojom::kPerDeviceKeyboardRemapKeysSubpagePath;
 using ::chromeos::settings::mojom::kPerDeviceKeyboardSubpagePath;
 using ::chromeos::settings::mojom::kPerDeviceMouseSubpagePath;
 using ::chromeos::settings::mojom::kPerDevicePointingStickSubpagePath;
@@ -615,8 +616,14 @@ void AddDeviceKeyboardStrings(content::WebUIDataSource* html_source) {
       {"keyRepeatRateSlow", IDS_SETTINGS_KEYBOARD_AUTO_REPEAT_RATE_SLOW},
       {"perDeviceKeyboardTitle", IDS_SETTINGS_PER_DEVICE_KEYBOARD_TITLE},
       {"remapKeyboardKeysRowLabel", IDS_SETTINGS_KEYBOARD_REMAP_KEYS_ROW_LABEL},
+      {"remapKeyboardKeysDescription",
+       IDS_SETTINGS_KEYBOARD_REMAP_KEYS_DESCRIPTION},
       {"showKeyboardShortcutViewer",
        IDS_SETTINGS_KEYBOARD_SHOW_SHORTCUT_VIEWER},
+      {"keyboardKeyLauncher", IDS_SETTINGS_KEYBOARD_KEY_LAUNCHER},
+      {"keyboardKeySearch", IDS_SETTINGS_KEYBOARD_KEY_SEARCH},
+      {"keyboardRemapRestoreDefaultsLabel",
+       IDS_SETTINGS_KEYBOARD_REMAP_RESTORE_BUTTON_LABEL},
   };
   html_source->AddLocalizedStrings(keyboard_strings);
 
@@ -814,14 +821,41 @@ void AddDeviceStorageStrings(content::WebUIDataSource* html_source,
 
 void AddDeviceAudioStrings(content::WebUIDataSource* html_source) {
   static constexpr webui::LocalizedString kAudioStrings[] = {
+      {"audioDeviceBluetoothLabel", IDS_SETTINGS_AUDIO_DEVICE_BLUETOOTH_LABEL},
+      {"audioDeviceFrontMicLabel", IDS_SETTINGS_AUDIO_DEVICE_FRONT_MIC_LABEL},
+      {"audioDeviceHdmiLabel", IDS_SETTINGS_AUDIO_DEVICE_HDMI_LABEL},
+      {"audioDeviceHeadphoneLabel", IDS_SETTINGS_AUDIO_DEVICE_HEADPHONE_LABEL},
+      {"audioDeviceInternalMicLabel",
+       IDS_SETTINGS_AUDIO_DEVICE_INTERNAL_MIC_LABEL},
+      {"audioDeviceInternalSpeakersLabel",
+       IDS_SETTINGS_AUDIO_DEVICE_INTERNAL_SPEAKERS_LABEL},
+      {"audioDeviceMicJackLabel", IDS_SETTINGS_AUDIO_DEVICE_MIC_JACK_LABEL},
+      {"audioDeviceRearMicLabel", IDS_SETTINGS_AUDIO_DEVICE_REAR_MIC_LABEL},
+      {"audioDeviceUsbLabel", IDS_SETTINGS_AUDIO_DEVICE_USB_LABEL},
       {"audioInputDeviceTitle", IDS_SETTINGS_AUDIO_INPUT_DEVICE_TITLE},
       {"audioInputGainTitle", IDS_SETTINGS_AUDIO_INPUT_GAIN_TITLE},
+      {"audioInputMuteButtonAriaLabelMuted",
+       IDS_SETTINGS_AUDIO_INPUT_MUTE_BUTTON_ARIA_LABEL_MUTED},
+      {"audioInputMuteButtonAriaLabelMutedByHardwareSwitch",
+       IDS_SETTINGS_AUDIO_INPUT_MUTE_BUTTON_ARIA_LABEL_MUTED_BY_HARDWARE_SWITCH},
+      {"audioInputMuteButtonAriaLabelNotMuted",
+       IDS_SETTINGS_AUDIO_INPUT_MUTE_BUTTON_ARIA_LABEL_NOT_MUTED},
       {"audioInputNoiseCancellationTitle",
        IDS_SETTINGS_AUDIO_INPUT_NOISE_CANCELLATION_TITLE},
       {"audioInputTitle", IDS_SETTINGS_AUDIO_INPUT_TITLE},
+      {"audioMutedByPolicyTooltip", IDS_SETTINGS_AUDIO_MUTED_BY_POLICY_TOOLTIP},
+      {"audioMutedExternallyTooltip",
+       IDS_SETTINGS_AUDIO_MUTED_EXTERNALLY_TOOLTIP},
       {"audioOutputDeviceTitle", IDS_SETTINGS_AUDIO_OUTPUT_DEVICE_TITLE},
       {"audioOutputTitle", IDS_SETTINGS_AUDIO_OUTPUT_TITLE},
+      {"audioOutputMuteButtonAriaLabelMuted",
+       IDS_SETTINGS_AUDIO_OUTPUT_MUTE_BUTTON_ARIA_LABEL_MUTED},
+      {"audioOutputMuteButtonAriaLabelNotMuted",
+       IDS_SETTINGS_AUDIO_OUTPUT_MUTE_BUTTON_ARIA_LABEL_NOT_MUTED},
       {"audioTitle", IDS_SETTINGS_AUDIO_TITLE},
+      {"audioToggleToMuteTooltip", IDS_SETTINGS_AUDIO_TOGGLE_TO_MUTE_TOOLTIP},
+      {"audioToggleToUnmuteTooltip",
+       IDS_SETTINGS_AUDIO_TOGGLE_TO_UNMUTE_TOOLTIP},
       {"audioVolumeTitle", IDS_SETTINGS_AUDIO_VOLUME_TITLE},
   };
 
@@ -1055,6 +1089,14 @@ void DeviceSection::RegisterHierarchy(HierarchyGenerator* generator) const {
                                        mojom::SearchResultIcon::kKeyboard,
                                        mojom::SearchResultDefaultRank::kMedium,
                                        mojom::kPerDeviceKeyboardSubpagePath);
+
+    generator->RegisterNestedSubpage(
+        IDS_SETTINGS_KEYBOARD_REMAP_KEYS_ROW_LABEL,
+        mojom::Subpage::kPerDeviceKeyboardRemapKeys,
+        mojom::Subpage::kPerDeviceKeyboard, mojom::SearchResultIcon::kKeyboard,
+        mojom::SearchResultDefaultRank::kMedium,
+        mojom::kPerDeviceKeyboardRemapKeysSubpagePath);
+
     // Per-device Mouse.
     generator->RegisterTopLevelSubpage(IDS_SETTINGS_MOUSE_TITLE,
                                        mojom::Subpage::kPerDeviceMouse,

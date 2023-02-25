@@ -27,6 +27,7 @@
 #include "base/values.h"
 #include "chrome/browser/ash/app_list/arc/arc_app_utils.h"
 #include "chrome/browser/ash/arc/arc_util.h"
+#include "chrome/browser/ash/arc/intent_helper/chrome_arc_settings_app_delegate.h"
 #include "chrome/browser/ash/arc/policy/arc_policy_util.h"
 #include "chrome/browser/ash/arc/session/arc_session_manager.h"
 #include "chrome/browser/ash/settings/stats_reporting_controller.h"
@@ -102,8 +103,9 @@ bool GetHttpProxyServer(const ProxyConfigDictionary* proxy_config_dict,
   return !host->empty() && *port;
 }
 
-bool IsProxyAutoDetectionConfigured(const base::Value& proxy_config_dict) {
-  ProxyConfigDictionary dict(proxy_config_dict.GetDict().Clone());
+bool IsProxyAutoDetectionConfigured(
+    const base::Value::Dict& proxy_config_dict) {
+  ProxyConfigDictionary dict(proxy_config_dict.Clone());
   ProxyPrefs::ProxyMode mode;
   dict.GetMode(&mode);
   return mode == ProxyPrefs::MODE_AUTO_DETECT;
@@ -176,6 +178,9 @@ class ArcSettingsServiceImpl : public TimezoneSettings::Observer,
   // Retrieves Chrome's state for the settings that need to be synced on each
   // Android boot and send it to Android.
   void SyncBootTimeSettings() const;
+  // Sync delegates. To avoid dependency issue we use delegate design pattern
+  // to access chrome from ash.
+  void SyncAppDelegates() const;
   // Retrieves Chrome's state for the settings that need to be synced on each
   // Android boot after AppInstance is ready and send it to Android.
   void SyncAppTimeSettings();
@@ -202,6 +207,7 @@ class ArcSettingsServiceImpl : public TimezoneSettings::Observer,
   void SyncTimeZone() const;
   void SyncTimeZoneByGeolocation() const;
   void SyncUse24HourClock() const;
+  void SyncUserGeolocation() const;
 
   // Resets Android's font scale to the default value.
   void ResetFontScaleToDefault() const;
@@ -263,8 +269,10 @@ class ArcSettingsServiceImpl : public TimezoneSettings::Observer,
   // Name of the default network. Used to keep track of whether the default
   // network has changed.
   std::string default_network_name_;
+
   // Proxy configuration of the default network.
-  base::Value default_proxy_config_;
+  absl::optional<base::Value::Dict> default_proxy_config_;
+
   // The PAC URL associated with `default_network_name_`, received via the DHCP
   // discovery method.
   GURL dhcp_wpad_url_;
@@ -280,6 +288,8 @@ ArcSettingsServiceImpl::ArcSettingsServiceImpl(
   // Note: if App connection is already established, OnConnectionReady()
   // is synchronously called, so that initial sync is done in the method.
   arc_bridge_service_->app()->AddObserver(this);
+
+  SyncAppDelegates();
 }
 
 ArcSettingsServiceImpl::~ArcSettingsServiceImpl() {
@@ -316,6 +326,8 @@ void ArcSettingsServiceImpl::OnPrefChanged(const std::string& pref_name) const {
     SyncAccessibilityVirtualKeyboardEnabled();
   } else if (pref_name == ash::prefs::kDockedMagnifierEnabled) {
     SyncDockedMagnifierEnabled();
+  } else if (pref_name == ash::prefs::kUserGeolocationAllowed) {
+    SyncUserGeolocation();
   } else if (pref_name == ::language::prefs::kApplicationLocale ||
              pref_name == ::language::prefs::kPreferredLanguages) {
     SyncLocale();
@@ -343,7 +355,7 @@ void ArcSettingsServiceImpl::TimezoneChanged(const icu::TimeZone& timezone) {
 // settings with ARC. Proxy changes on the default network are triggered by:
 // - a user changing the proxy in the Network Settings UI;
 // - ONC policy changes;
-// - DHCP settings the WPAD URL via  option 252.
+// - DHCP settings the WPAD URL via option 252.
 void ArcSettingsServiceImpl::DefaultNetworkChanged(
     const ash::NetworkState* network) {
   if (!network)
@@ -354,15 +366,17 @@ void ArcSettingsServiceImpl::DefaultNetworkChanged(
   dhcp_wpad_url_ = network->GetWebProxyAutoDiscoveryUrl();
 
   if (IsPrefProxyConfigApplied()) {
-    //  Normally, we would ignore proxy changes coming from the default
-    //  network because the kProxy pref has priority. If the proxy is
-    //  configured to use the Web Proxy Auto-Discovery (WPAD) Protocol via the
-    //  DHCP discovery method, the PAC URL will be propagated to Chrome via the
-    //  default network properties.
-    if (dhcp_wpad_url_changed &&
-        IsProxyAutoDetectionConfigured(
-            GetPrefs()->GetValue(proxy_config::prefs::kProxy))) {
-      SyncProxySettings();
+    //  Normally, we would ignore proxy changes coming from the default network
+    //  because the kProxy pref has priority. If the proxy is configured to use
+    //  the Web Proxy Auto-Discovery (WPAD) Protocol via the DHCP discovery
+    //  method, the PAC URL will be propagated to Chrome via the default network
+    //  properties.
+    if (dhcp_wpad_url_changed) {
+      const base::Value& proxy =
+          GetPrefs()->GetValue(proxy_config::prefs::kProxy);
+      if (proxy.is_dict() && IsProxyAutoDetectionConfigured(proxy.GetDict())) {
+        SyncProxySettings();
+      }
     }
     return;
   }
@@ -371,21 +385,25 @@ void ArcSettingsServiceImpl::DefaultNetworkChanged(
   // Trigger a proxy settings sync to ARC if the default network changes.
   if (default_network_name_ != network->name()) {
     default_network_name_ = network->name();
-    default_proxy_config_ = base::Value();
+    default_proxy_config_.reset();
     sync_proxy = true;
   }
   // Trigger a proxy settings sync to ARC if the proxy configuration of the
   // default network changes. Note: this code is only called if kProxy pref is
   // not set.
   if (default_proxy_config_ != network->proxy_config()) {
-    default_proxy_config_ = network->proxy_config().Clone();
+    if (network->proxy_config()) {
+      default_proxy_config_ = network->proxy_config()->Clone();
+    } else {
+      default_proxy_config_.reset();
+    }
     sync_proxy = true;
   }
 
   // Check if proxy auto detection is enabled. If yes, and the PAC URL set via
   // DHCP has changed, propagate the change to ARC.
-  if (!default_proxy_config_.is_none() && dhcp_wpad_url_changed &&
-      IsProxyAutoDetectionConfigured(default_proxy_config_)) {
+  if (default_proxy_config_.has_value() && dhcp_wpad_url_changed &&
+      IsProxyAutoDetectionConfigured(default_proxy_config_.value())) {
     sync_proxy = true;
   }
 
@@ -414,6 +432,7 @@ void ArcSettingsServiceImpl::StartObservingSettingsChanges() {
   AddPrefToObserve(ash::prefs::kAccessibilitySwitchAccessEnabled);
   AddPrefToObserve(ash::prefs::kAccessibilityVirtualKeyboardEnabled);
   AddPrefToObserve(ash::prefs::kDockedMagnifierEnabled);
+  AddPrefToObserve(ash::prefs::kUserGeolocationAllowed);
   AddPrefToObserve(::prefs::kResolveTimezoneByGeolocationMethod);
   AddPrefToObserve(::prefs::kSystemProxyUserTrafficHostAndPort);
   AddPrefToObserve(::prefs::kUse24HourClock);
@@ -478,6 +497,11 @@ void ArcSettingsServiceImpl::SyncBootTimeSettings() const {
   // https://crbug.com/955071
   ResetFontScaleToDefault();
   ResetPageZoomToDefault();
+}
+
+void ArcSettingsServiceImpl::SyncAppDelegates() const {
+  ArcIntentHelperBridge::SetArcSettingsAppDelegate(
+      std::make_unique<ChromeArcSettingsAppDelegate>(profile_));
 }
 
 void ArcSettingsServiceImpl::SyncAppTimeSettings() {
@@ -762,6 +786,16 @@ void ArcSettingsServiceImpl::SyncGIOBetaEnabled() const {
       "org.chromium.arc.intent_helper.ACTION_SET_GIO_BETA_ENABLED");
 }
 
+void ArcSettingsServiceImpl::SyncUserGeolocation() const {
+  // We are purposefully not calling SyncUserGeolocation() at boot,
+  // as we sync this property from Android. We might need to sync
+  // in case of disable but not in case of enable (default).
+
+  SendBoolPrefSettingsBroadcast(
+      ash::prefs::kUserGeolocationAllowed,
+      "org.chromium.arc.intent_helper.SET_USER_GEOLOCATION");
+}
+
 void ArcSettingsServiceImpl::SyncConsumerAutoUpdateToggle() const {
   SendBoolLocalStatePrefSettingsBroadcast(
       ::prefs::kConsumerAutoUpdateToggle,
@@ -927,6 +961,11 @@ void ArcSettingsService::SetInitialSettingsPending(bool pending) {
 
 bool ArcSettingsService::IsInitialSettingsPending() const {
   return profile_->GetPrefs()->GetBoolean(prefs::kArcInitialSettingsPending);
+}
+
+// static
+void ArcSettingsService::EnsureFactoryBuilt() {
+  ArcSettingsServiceFactory::GetInstance();
 }
 
 }  // namespace arc

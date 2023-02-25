@@ -90,8 +90,7 @@ class UpdateServiceInternalQualifyingImpl : public UpdateServiceInternal {
 
   void RegisterQualificationAppDone(base::OnceCallback<void(bool)> callback,
                                     int result) {
-    if (result != kRegistrationSuccess &&
-        result != kRegistrationAlreadyRegistered) {
+    if (result != kRegistrationSuccess) {
       VLOG(1) << "Registration failed: " << result;
       std::move(callback).Run(false);
       return;
@@ -109,12 +108,7 @@ class UpdateServiceInternalQualifyingImpl : public UpdateServiceInternal {
                        kQualificationAppId, "",
                        UpdateService::Priority::kBackground,
                        UpdateService::PolicySameVersionUpdate::kNotAllowed,
-// TODO(crbug.com/1396103): remove this `#if` once mojo interface changes are
-// done in separate CL.
-#if BUILDFLAG(IS_WIN)
-                       /*do_update_check_only=*/false,
-#endif  // BUILDFLAG(IS_WIN)
-                       base::DoNothing()))
+                       /*do_update_check_only=*/false, base::DoNothing()))
         ->Run(base::BindOnce(
             &UpdateServiceInternalQualifyingImpl::UpdateCheckDone, this,
             std::move(callback)));

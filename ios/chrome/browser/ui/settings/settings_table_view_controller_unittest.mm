@@ -4,7 +4,9 @@
 
 #import "ios/chrome/browser/ui/settings/settings_table_view_controller.h"
 
+#import "base/mac/foundation_util.h"
 #import "base/strings/sys_string_conversions.h"
+#import "base/test/scoped_feature_list.h"
 #import "base/test/task_environment.h"
 #import "components/keyed_service/core/service_access_type.h"
 #import "components/password_manager/core/browser/password_manager_test_utils.h"
@@ -27,9 +29,7 @@
 #import "ios/chrome/browser/signin/fake_system_identity_manager.h"
 #import "ios/chrome/browser/sync/mock_sync_service_utils.h"
 #import "ios/chrome/browser/sync/sync_service_factory.h"
-#import "ios/chrome/browser/sync/sync_setup_service.h"
-#import "ios/chrome/browser/sync/sync_setup_service_factory.h"
-#import "ios/chrome/browser/sync/sync_setup_service_mock.h"
+#import "ios/chrome/browser/ui/authentication/cells/table_view_account_item.h"
 #import "ios/chrome/browser/ui/commands/application_commands.h"
 #import "ios/chrome/browser/ui/commands/browsing_data_commands.h"
 #import "ios/chrome/browser/ui/commands/command_dispatcher.h"
@@ -41,6 +41,7 @@
 #import "ios/chrome/browser/ui/table_view/cells/table_view_image_item.h"
 #import "ios/chrome/browser/ui/table_view/cells/table_view_info_button_item.h"
 #import "ios/chrome/browser/ui/table_view/chrome_table_view_controller_test.h"
+#import "ios/chrome/browser/ui/ui_feature_flags.h"
 #import "ios/chrome/grit/ios_chromium_strings.h"
 #import "ios/chrome/grit/ios_strings.h"
 #import "ios/chrome/test/ios_chrome_scoped_testing_local_state.h"
@@ -68,9 +69,6 @@ class SettingsTableViewControllerTest : public ChromeTableViewControllerTest {
     builder.AddTestingFactory(SyncServiceFactory::GetInstance(),
                               base::BindRepeating(&CreateMockSyncService));
     builder.AddTestingFactory(
-        SyncSetupServiceFactory::GetInstance(),
-        base::BindRepeating(&SyncSetupServiceMock::CreateKeyedService));
-    builder.AddTestingFactory(
         ios::TemplateURLServiceFactory::GetInstance(),
         ios::TemplateURLServiceFactory::GetDefaultFactory());
     builder.AddTestingFactory(
@@ -92,9 +90,6 @@ class SettingsTableViewControllerTest : public ChromeTableViewControllerTest {
     AuthenticationServiceFactory::CreateAndInitializeForBrowserState(
         chrome_browser_state_.get(),
         std::make_unique<FakeAuthenticationServiceDelegate>());
-    sync_setup_service_mock_ = static_cast<SyncSetupServiceMock*>(
-        SyncSetupServiceFactory::GetForBrowserState(
-            chrome_browser_state_.get()));
     sync_service_mock_ = static_cast<syncer::MockSyncService*>(
         SyncServiceFactory::GetForBrowserState(chrome_browser_state_.get()));
 
@@ -165,12 +160,6 @@ class SettingsTableViewControllerTest : public ChromeTableViewControllerTest {
   }
 
   void SetupSyncServiceEnabledExpectations() {
-    ON_CALL(*sync_setup_service_mock_, CanSyncFeatureStart())
-        .WillByDefault(Return(true));
-    ON_CALL(*sync_setup_service_mock_, IsSyncingAllDataTypes())
-        .WillByDefault(Return(true));
-    ON_CALL(*sync_setup_service_mock_, IsInitialSetupOngoing())
-        .WillByDefault(Return(true));
     ON_CALL(*sync_service_mock_, GetTransportState())
         .WillByDefault(Return(syncer::SyncService::TransportState::ACTIVE));
     ON_CALL(*sync_service_mock_->GetMockUserSettings(), IsFirstSetupComplete())
@@ -201,7 +190,6 @@ class SettingsTableViewControllerTest : public ChromeTableViewControllerTest {
   FakeSystemIdentity* fake_identity_ = nullptr;
   AuthenticationService* auth_service_ = nullptr;
   syncer::MockSyncService* sync_service_mock_ = nullptr;
-  SyncSetupServiceMock* sync_setup_service_mock_ = nullptr;
   scoped_refptr<password_manager::TestPasswordStore> password_store_mock_;
 
   std::unique_ptr<TestChromeBrowserState> chrome_browser_state_;
@@ -216,8 +204,6 @@ class SettingsTableViewControllerTest : public ChromeTableViewControllerTest {
 // on sync during sign-in.
 TEST_F(SettingsTableViewControllerTest, SyncOn) {
   SetupSyncServiceEnabledExpectations();
-  ON_CALL(*sync_setup_service_mock_, GetSyncServiceState())
-      .WillByDefault(Return(SyncSetupService::kNoSyncServiceError));
   auth_service_->SignIn(fake_identity_);
 
   CreateController();
@@ -243,8 +229,9 @@ TEST_F(SettingsTableViewControllerTest, SyncOn) {
 TEST_F(SettingsTableViewControllerTest, SyncPasswordError) {
   SetupSyncServiceEnabledExpectations();
   // Set missing password error in Sync service.
-  ON_CALL(*sync_setup_service_mock_, GetSyncServiceState())
-      .WillByDefault(Return(SyncSetupService::kSyncServiceNeedsPassphrase));
+  ON_CALL(*sync_service_mock_, GetUserActionableError())
+      .WillByDefault(
+          Return(syncer::SyncService::UserActionableError::kNeedsPassphrase));
   auth_service_->SignIn(fake_identity_);
 
   CreateController();
@@ -263,6 +250,12 @@ TEST_F(SettingsTableViewControllerTest, SyncPasswordError) {
               l10n_util::GetNSString(IDS_IOS_SYNC_ENCRYPTION_DESCRIPTION));
   ASSERT_EQ(UILayoutConstraintAxisVertical, sync_item.textLayoutConstraintAxis);
 
+  // Verify that the account item does not hold the error when done through the
+  // sync item.
+  TableViewAccountItem* identityAccountItem =
+      base::mac::ObjCCast<TableViewAccountItem>(account_items[0]);
+  EXPECT_FALSE(identityAccountItem.shouldDisplayError);
+
   // Check that there is no sign-in promo when there is a sync error.
   ASSERT_FALSE([controller().tableViewModel
       hasSectionForSectionIdentifier:SettingsSectionIdentifier::
@@ -275,8 +268,7 @@ TEST_F(SettingsTableViewControllerTest, SyncPasswordError) {
 TEST_F(SettingsTableViewControllerTest, TurnsSyncOffAfterFirstSetup) {
   ON_CALL(*sync_service_mock_->GetMockUserSettings(), IsFirstSetupComplete())
       .WillByDefault(Return(true));
-  ON_CALL(*sync_setup_service_mock_, CanSyncFeatureStart())
-      .WillByDefault(Return(false));
+  ON_CALL(*sync_service_mock_, HasSyncConsent()).WillByDefault(Return(false));
   auth_service_->SignIn(fake_identity_);
 
   CreateController();
@@ -308,8 +300,7 @@ TEST_F(SettingsTableViewControllerTest,
       .WillByDefault(Return(syncer::UserSelectableTypeSet()));
   ON_CALL(*sync_service_mock_->GetMockUserSettings(), IsFirstSetupComplete())
       .WillByDefault(Return(true));
-  ON_CALL(*sync_setup_service_mock_, CanSyncFeatureStart())
-      .WillByDefault(Return(true));
+  ON_CALL(*sync_service_mock_, HasSyncConsent()).WillByDefault(Return(true));
   auth_service_->SignIn(fake_identity_);
 
   CreateController();
@@ -383,4 +374,136 @@ TEST_F(SettingsTableViewControllerTest, SigninDisabledByPolicy) {
               l10n_util::GetNSString(IDS_IOS_SIGN_IN_TO_CHROME_SETTING_TITLE));
   ASSERT_NSEQ(signin_item.statusText,
               l10n_util::GetNSString(IDS_IOS_SETTING_OFF));
+}
+
+// Verifies that when eligible the account item model holds the Account Storage
+// error.
+TEST_F(SettingsTableViewControllerTest, HoldAccountStorageErrorWhenEligible) {
+  base::test::ScopedFeatureList scoped_feature_list;
+  scoped_feature_list.InitAndEnableFeature(
+      kIndicateAccountStorageErrorInAccountCell);
+
+  // Set account error.
+  ON_CALL(*sync_service_mock_, GetUserActionableError())
+      .WillByDefault(
+          Return(syncer::SyncService::UserActionableError::kNeedsPassphrase));
+
+  auth_service_->SignIn(fake_identity_);
+
+  CreateController();
+  CheckController();
+
+  NSArray* account_items = [controller().tableViewModel
+      itemsInSectionWithIdentifier:SettingsSectionIdentifier::
+                                       SettingsSectionIdentifierAccount];
+  ASSERT_EQ(3U, account_items.count);
+
+  // Verify that the account item is in an error state.
+  TableViewAccountItem* identityAccountItem =
+      base::mac::ObjCCast<TableViewAccountItem>(account_items[0]);
+  EXPECT_TRUE(identityAccountItem.shouldDisplayError);
+}
+
+// Verifies that the error is removed from the model when the Account Storage
+// error is resolved. Triggers the model update by firing a Sync State change.
+TEST_F(SettingsTableViewControllerTest, ClearAccountStorageErrorWhenResolved) {
+  base::test::ScopedFeatureList scoped_feature_list;
+  scoped_feature_list.InitAndEnableFeature(
+      kIndicateAccountStorageErrorInAccountCell);
+
+  // Set account error to resolve.
+  ON_CALL(*sync_service_mock_, GetUserActionableError())
+      .WillByDefault(
+          Return(syncer::SyncService::UserActionableError::kNeedsPassphrase));
+
+  auth_service_->SignIn(fake_identity_);
+
+  CreateController();
+  CheckController();
+
+  NSArray* account_items = [controller().tableViewModel
+      itemsInSectionWithIdentifier:SettingsSectionIdentifier::
+                                       SettingsSectionIdentifierAccount];
+  ASSERT_EQ(3U, account_items.count);
+
+  // Verify that the account item is in an error state.
+  TableViewAccountItem* identityAccountItem =
+      base::mac::ObjCCast<TableViewAccountItem>(account_items[0]);
+  ASSERT_TRUE(identityAccountItem.shouldDisplayError);
+
+  // Resolve the account error.
+  ON_CALL(*sync_service_mock_, GetUserActionableError())
+      .WillByDefault(Return(syncer::SyncService::UserActionableError::kNone));
+
+  // Verify that the account item is not in an error state when the error was
+  // resolved and the data model reloaded.
+  [controller() loadModel];
+  account_items = [controller().tableViewModel
+      itemsInSectionWithIdentifier:SettingsSectionIdentifier::
+                                       SettingsSectionIdentifierAccount];
+  ASSERT_EQ(3U, account_items.count);
+  identityAccountItem =
+      base::mac::ObjCCast<TableViewAccountItem>(account_items[0]);
+  ASSERT_TRUE(identityAccountItem != nil);
+  EXPECT_FALSE(identityAccountItem.shouldDisplayError);
+}
+
+// Verifies that when ineligible the account item model doesn't hold the Account
+// Storage error.
+TEST_F(SettingsTableViewControllerTest, DontHoldAccountErrorWhenIneligible) {
+  base::test::ScopedFeatureList scoped_feature_list;
+  scoped_feature_list.InitAndEnableFeature(
+      kIndicateAccountStorageErrorInAccountCell);
+
+  // Enable Sync to make the account item ineligible to indicate errors.
+  SetupSyncServiceEnabledExpectations();
+
+  // Set account error that would be in the model when eligible.
+  ON_CALL(*sync_service_mock_, GetUserActionableError())
+      .WillByDefault(
+          Return(syncer::SyncService::UserActionableError::kNeedsPassphrase));
+
+  auth_service_->SignIn(fake_identity_);
+
+  CreateController();
+  CheckController();
+
+  NSArray* account_items = [controller().tableViewModel
+      itemsInSectionWithIdentifier:SettingsSectionIdentifier::
+                                       SettingsSectionIdentifierAccount];
+  ASSERT_EQ(3U, account_items.count);
+
+  // Verify that the account item is not in an error state.
+  TableViewAccountItem* identityAccountItem =
+      base::mac::ObjCCast<TableViewAccountItem>(account_items[0]);
+  ASSERT_TRUE(identityAccountItem != nil);
+  EXPECT_FALSE(identityAccountItem.shouldDisplayError);
+}
+
+// Verifies that when eligible the account item model doesn't have the Account
+// Storage error when there is no error.
+TEST_F(SettingsTableViewControllerTest, DontHoldAccountErrorWhenNoError) {
+  base::test::ScopedFeatureList scoped_feature_list;
+  scoped_feature_list.InitAndEnableFeature(
+      kIndicateAccountStorageErrorInAccountCell);
+
+  // Set no account error state.
+  ON_CALL(*sync_service_mock_, GetUserActionableError())
+      .WillByDefault(Return(syncer::SyncService::UserActionableError::kNone));
+
+  auth_service_->SignIn(fake_identity_);
+
+  CreateController();
+  CheckController();
+
+  NSArray* account_items = [controller().tableViewModel
+      itemsInSectionWithIdentifier:SettingsSectionIdentifier::
+                                       SettingsSectionIdentifierAccount];
+  ASSERT_EQ(3U, account_items.count);
+
+  // Verify that the account item is not in an error state.
+  TableViewAccountItem* identityAccountItem =
+      base::mac::ObjCCast<TableViewAccountItem>(account_items[0]);
+  ASSERT_TRUE(identityAccountItem != nil);
+  EXPECT_FALSE(identityAccountItem.shouldDisplayError);
 }

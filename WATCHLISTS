@@ -1234,9 +1234,6 @@
                   '|chrome/browser/ui/messages/android/java/src/org/chromium/chrome/browser/ui/messages/infobar/'\
                   '|chrome/browser/ui/android/infobars/',
     },
-    'infra_docs': {
-      'filepath': 'docs/infra',
-    },
     'input': {
       'filepath': 'content/browser/renderer_host/input|'\
                   'content/renderer/input|'\
@@ -1277,6 +1274,9 @@
       'filepath': 'ios/chrome/browser/about_flags\.(h|mm)|'\
                   'ios/chrome/browser/experimental_flags\.(h|mm)|'\
                   'ios/chrome/browser/resources/Settings.bundle/Experimental\.plist',
+    },
+    'ios_ntp': {
+      'filepath': 'ios/chrome/browser/ui/ntp/',
     },
     'ios_showcase': {
       'filepath': 'ios/showcase/',
@@ -1434,6 +1434,15 @@
     },
     'minidump_tests': {
       'filepath': 'tools/perf/core/minidump_unittest.py',
+    },
+    'multi_apps': {
+      'filepath': 'chrome/test/data/webapps_integration/has_sub_apps/'\
+                  '|third_party/blink/renderer/modules/subapps/'\
+                  '|chrome/browser/ui/web_applications/.*sub_app'\
+                  '|third_party/blink/public/mojom/subapps/'\
+                  '|chrome/browser/web_applications/commands/.*sub_app'\
+                  '|third_party/blink/web_tests/external/wpt/resources/chromium/mock-subapps.js'\
+                  '|third_party/blink/web_tests/external/wpt/subapps/',
     },
     'multidevice': {
       'filepath': 'ash/multi_device_setup/'\
@@ -2591,7 +2600,9 @@
     'clipboard': ['dcheng@chromium.org'],
     'components_deps': ['droger+watchlist@chromium.org'],
     'compositor_animator': ['mdjones+watch@chromium.org'],
-    'compute_pressure': ['raphael.kubo.da.costa@intel.com'],
+    'compute_pressure': ['raphael.kubo.da.costa@intel.com',
+                         'arnaud.mandy@intel.com',
+                         'wei4.wang@intel.com'],
     'content_bluetooth': ['mattreynolds+watch@chromium.org'],
     'content_index': ['rayankans+watch@chromium.org'],
     'content_loader': ['loading-reviews@chromium.org'],
@@ -2732,7 +2743,6 @@
                    'dmurph+watching-idb@chromium.org',
                    'enne+idb@chromium.org'],
     'infobars_for_weblayer': ['blundell+infobars-watch@chromium.org'],
-    'infra_docs': ['martiniss+watch@chromium.org'],
     'input': ['dtapuska+chromiumwatch@chromium.org'],
     'input_devices': ['spang+watch@chromium.org'],
     'installable': ['dominickn+watch-installable@chromium.org',
@@ -2749,6 +2759,7 @@
                   'marq+scrutinize@chromium.org'],
     'ios_credential_provider': ['rkgibson+watch@chromium.org'],
     'ios_flags': ['noyau+watch@chromium.org'],
+    'ios_ntp': ['thegreenfrog+watch@chromium.org'],
     'ios_showcase': ['ios-reviews+showcase@chromium.org',
                      'marq+watch@chromium.org'],
     'ios_web': ['ios-reviews+web@chromium.org'],
@@ -2805,6 +2816,9 @@
     'metrics_perf': ['cwp-reviews+chromium@google.com'],
     'midi': ['toyoshim+midi@chromium.org'],
     'minidump_tests': ['bsheedy@chromium.org'],
+    'multi_apps': ['samicolon+watch@google.com',
+                   'isandrk+watch@chromium.org',
+                   'phweiss+watch@chromium.org'],
     'multidevice': ['danlee+watch-multidevice@google.com',
                     'hansberry+watch-multidevice@chromium.org',
                     'joeantonetti+watch-multidevice@google.com',

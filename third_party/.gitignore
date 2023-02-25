@@ -63,6 +63,7 @@
 /cast_web_runtime
 /catapult
 /ced/src
+/centipede/src
 /checkstyle/*.jar
 /chromeos_login_manager
 /chromeos_text_input
@@ -133,7 +134,11 @@
 /icu4j/lib/
 /instrumented_libraries/scripts/*.tgz
 /instrumented_libraries/scripts/out/*
+/jacoco/coverage/
+/jacoco/doc/
+/jacoco/index.html
 /jacoco/lib/
+/jacoco/test/
 /javalang/src/
 /javax_inject/lib/
 /jdk/current

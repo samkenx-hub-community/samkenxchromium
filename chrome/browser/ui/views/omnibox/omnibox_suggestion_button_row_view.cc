@@ -121,7 +121,7 @@ class OmniboxSuggestionRowButton : public views::MdTextButton {
         color_provider->GetColor(GetOmniboxBackgroundColorId(theme_state_));
     SetBackground(CreateBackgroundFromPainter(
         views::Painter::CreateRoundRectWith1PxBorderPainter(
-            fill_color, stroke_color, GetCornerRadius())));
+            fill_color, stroke_color, GetCornerRadiusValue())));
   }
 
   void GetAccessibleNodeData(ui::AXNodeData* node_data) override {
@@ -177,6 +177,7 @@ void OmniboxSuggestionButtonRowView::BuildViews() {
     keyword_button_ = nullptr;
     tab_switch_button_ = nullptr;
     action_buttons_.clear();
+    previous_active_button_ = nullptr;
   }
 
   // For all of these buttons, the visibility set from UpdateFromModel().
@@ -279,12 +280,15 @@ void OmniboxSuggestionButtonRowView::UpdateFromModel() {
 
 void OmniboxSuggestionButtonRowView::SelectionStateChanged() {
   auto* const active_button = GetActiveButton();
-  if (active_button == previous_active_button_)
+  if (active_button == previous_active_button_) {
     return;
-  if (previous_active_button_)
+  }
+  if (previous_active_button_) {
     views::FocusRing::Get(previous_active_button_)->SchedulePaint();
-  if (active_button)
+  }
+  if (active_button) {
     views::FocusRing::Get(active_button)->SchedulePaint();
+  }
   previous_active_button_ = active_button;
 }
 

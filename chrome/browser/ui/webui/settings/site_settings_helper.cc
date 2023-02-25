@@ -124,6 +124,7 @@ const ContentSettingsTypeNameEntry kContentSettingsTypeGroupNames[] = {
     {ContentSettingsType::PRIVATE_NETWORK_GUARD, "private-network-devices"},
     {ContentSettingsType::PRIVATE_NETWORK_CHOOSER_DATA,
      "private-network-devices-data"},
+    {ContentSettingsType::ANTI_ABUSE, "anti-abuse"},
 
     // Add new content settings here if a corresponding Javascript string
     // representation for it is not required, for example if the content setting
@@ -180,7 +181,7 @@ const ContentSettingsTypeNameEntry kContentSettingsTypeGroupNames[] = {
     {ContentSettingsType::TOP_LEVEL_STORAGE_ACCESS, nullptr},
     // TODO(crbug.com/1408520): Update JavaScript string representation when
     // desktop UI is implemented.
-    {ContentSettingsType::FEDERATED_IDENTITY_AUTO_SIGNIN_PERMISSION, nullptr},
+    {ContentSettingsType::FEDERATED_IDENTITY_AUTO_REAUTHN_PERMISSION, nullptr},
     {ContentSettingsType::FEDERATED_IDENTITY_IDENTITY_PROVIDER_REGISTRATION,
      nullptr},
 };

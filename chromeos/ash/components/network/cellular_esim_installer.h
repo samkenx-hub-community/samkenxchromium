@@ -25,14 +25,14 @@ class NetworkConnectionHandler;
 class NetworkProfileHandler;
 class NetworkStateHandler;
 
-// Handles installation of an eSIM profile and it's corresponding network.
+// Handles installation of an eSIM profile and its corresponding network.
 //
 // Installing an eSIM profile involves the following operations:
 // 1. Inhibit cellular scans.
 // 2. Install eSIM profile in Hermes with activation code.
 // 3. Create cellular Shill service configuration.
 // 4. Prepare newly installed cellular network for connection (ie. profile
-// enable).
+//    enable).
 // 5. Connect to network with the new profile.
 class COMPONENT_EXPORT(CHROMEOS_NETWORK) CellularESimInstaller {
  public:
@@ -74,7 +74,7 @@ class COMPONENT_EXPORT(CHROMEOS_NETWORK) CellularESimInstaller {
       const std::string& activation_code,
       const std::string& confirmation_code,
       const dbus::ObjectPath& euicc_path,
-      base::Value new_shill_properties,
+      base::Value::Dict new_shill_properties,
       InstallProfileFromActivationCodeCallback callback,
       bool is_initial_install = true,
       bool is_install_via_qr_code = false);
@@ -127,7 +127,7 @@ class COMPONENT_EXPORT(CHROMEOS_NETWORK) CellularESimInstaller {
       const std::string& activation_code,
       const std::string& confirmation_code,
       const dbus::ObjectPath& euicc_path,
-      base::Value new_shill_properties,
+      base::Value::Dict new_shill_properties,
       bool is_initial_install,
       bool is_install_via_qr_code,
       InstallProfileFromActivationCodeCallback callback,
@@ -136,7 +136,7 @@ class COMPONENT_EXPORT(CHROMEOS_NETWORK) CellularESimInstaller {
       InstallProfileFromActivationCodeCallback callback,
       std::unique_ptr<CellularInhibitor::InhibitLock> inhibit_lock,
       const dbus::ObjectPath& euicc_path,
-      const base::Value& new_shill_properties,
+      const base::Value::Dict& new_shill_properties,
       bool is_initial_install,
       bool is_install_via_qr_code,
       HermesResponseStatus status,

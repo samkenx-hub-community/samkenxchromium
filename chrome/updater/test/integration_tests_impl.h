@@ -101,19 +101,10 @@ void RunWakeAll(UpdaterScope scope);
 void RunWakeActive(UpdaterScope scope, int exit_code);
 
 // Invokes the active instance's UpdateService::Update (via RPC) for an app.
-// TODO(crbug.com/1396103): remove this `#if` once mojo interface changes are
-// done in separate CL.
-#if BUILDFLAG(IS_WIN)
 void Update(UpdaterScope scope,
             const std::string& app_id,
             const std::string& install_data_index,
             bool do_update_check_only);
-
-#else   // BUILDFLAG(IS_WIN)
-void Update(UpdaterScope scope,
-            const std::string& app_id,
-            const std::string& install_data_index);
-#endif  // BUILDFLAG(IS_WIN)
 
 // Invokes the active instance's UpdateService::UpdateAll (via RPC).
 void UpdateAll(UpdaterScope scope);
@@ -246,8 +237,8 @@ void CallServiceUpdate(UpdaterScope updater_scope,
                        const std::string& install_data_index,
                        bool same_version_update_allowed);
 
-void SetupFakeLegacyUpdaterData(UpdaterScope scope);
-void ExpectLegacyUpdaterDataMigrated(UpdaterScope scope);
+void SetupFakeLegacyUpdater(UpdaterScope scope);
+void ExpectLegacyUpdaterMigrated(UpdaterScope scope);
 
 void RunRecoveryComponent(UpdaterScope scope,
                           const std::string& app_id,

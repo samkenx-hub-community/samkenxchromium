@@ -304,7 +304,6 @@
 <translation id="2669454659051515572">આ ડિવાઇસનો ઉપયોગ કરનારી કોઈપણ વ્યક્તિ ડાઉનલોડ કરેલી ફાઇલો જોઈ શકે છે</translation>
 <translation id="2702516483241149200">નવું: આ ટેક્સ્ટ પર સ્ક્રોલ કરતી હોય એવી કોઈ લિંક શેર કરો</translation>
 <translation id="2707726405694321444">પેજ રિફ્રેશ કરો</translation>
-<translation id="2709516037105925701">સ્વતઃભરો</translation>
 <translation id="271033894570825754">નવું</translation>
 <translation id="2711073837061989559">અજમાયશો</translation>
 <translation id="2718352093833049315">ફક્ત વાઇ-ફાઇ પર</translation>
@@ -396,7 +395,6 @@
 <translation id="3114507951000454849">આજના સમાચાર વાંચો <ph name="NEWS_ICON" /></translation>
 <translation id="311958134571892113">આની સાથે લિંક કર્યું</translation>
 <translation id="3123734510202723619">ઘોષણાઓ</translation>
-<translation id="3130863904455712965">ઇતિહાસ અને વધુ</translation>
 <translation id="3134784203083076891">”</translation>
 <translation id="314939179385989105">Chromeનું હોમપેજ</translation>
 <translation id="3157931365184549694">રિસ્ટોર કરો</translation>
@@ -453,6 +451,7 @@
 <translation id="3421726884497337397">ત્રીજા પક્ષની કુકી ક્યારે બ્લૉક કરવી તે પસંદ કરો</translation>
 <translation id="3428747202529429621">તમને Chrome પર સલામત રાખે છે અને જ્યારે તમે સાઇન ઇન થયા હો, ત્યારે Googleની અન્ય ઍપમાં તમારી સુરક્ષા બહેતર બનાવવામાં ઉપયોગમાં લેવાઈ શકે છે</translation>
 <translation id="3429160811076349561">અજમાયશની સુવિધાઓ બંધ છે</translation>
+<translation id="3432973700170747422">છેલ્લી 15 મિનિટનો ડિલીટ કરો</translation>
 <translation id="3435465986463792564">શું ઘણી વિન્ડો ખોલી છે? તમે તેમને અહીંથી મેનેજ કરી શકો છો</translation>
 <translation id="3435738964857648380">સુરક્ષા</translation>
 <translation id="3443221991560634068">હાલનું પેજ ફરીથી લોડ કરો</translation>
@@ -519,7 +518,6 @@
 <translation id="3830886834687455630">તમારા પાસવર્ડ ચેક કરવા માટે Google Play સેવાઓ અપડેટ કરો</translation>
 <translation id="3845098929839618392">છૂપી ટૅબમાં ખોલો</translation>
 <translation id="3856096718352044181">કૃપા કરીને ચકાસણી કરો કે આ માન્ય પ્રદાતા છે અથવા પછીથી ફરી પ્રયાસ કરો</translation>
-<translation id="3858127568696903256">તમે ફૉલો કરો છો તે કન્ટેન્ટ અહીં જુઓ</translation>
 <translation id="3858860766373142691">નામ</translation>
 <translation id="3861633093716975811">લોકપ્રિય વીડિયો</translation>
 <translation id="3874520961715512166">સાઇટ કાઢી નાખી</translation>
@@ -922,6 +920,7 @@
 <translation id="6000203700195075278">ફરીથી ફૉલો કરો</translation>
 <translation id="6002122790816966947">તમારા ડિવાઇસ</translation>
 <translation id="6005538289190791541">સૂચવેલ પાસવર્ડ</translation>
+<translation id="6011308810877101166">શોધ સંબંધિત સૂચનો બહેતર બનાવો</translation>
 <translation id="6039379616847168523">આગલા ટૅબ પર જાઓ</translation>
 <translation id="6040143037577758943">બંધ કરો</translation>
 <translation id="604124094241169006">સ્વચલિત</translation>
@@ -989,7 +988,6 @@
 <translation id="6397616442223433927">પાછા ઑનલાઇન થયા</translation>
 <translation id="6401458660421980302">આ ટૅબને અન્ય ડિવાઇસ પર મોકલવા માટે, એ ડિવાઇસના Chromeમાં સાઇન ઇન કરો</translation>
 <translation id="6402652558933147609"><ph name="VIOLATED_URL" /> પર <ph name="ERROR_CODE" /></translation>
-<translation id="6403371459378431832">બધા ડિવાઇસ પર તમારો ડેટા સિંક કરો</translation>
 <translation id="6404511346730675251">બુકમાર્કમાં ફેરફાર કરો</translation>
 <translation id="6406506848690869874">સમન્વયન</translation>
 <translation id="6407224748847589805">તમારા કમ્પ્યુટર સાથે કનેક્ટ કરી શકાતું નથી. ચકાસણી માટે બીજો કોઈ વિકલ્પ અજમાવો.</translation>
@@ -1227,6 +1225,7 @@
 <translation id="7596558890252710462">ઓપરેટિંગ સિસ્ટમ</translation>
 <translation id="7605594153474022051">સમન્વયન કામ કરતું નથી</translation>
 <translation id="7612619742409846846">Google પર આ તરીકે સાઇન ઇન કરો</translation>
+<translation id="7612989789287281429">તમને સાઇન ઇન કરી રહ્યાં છીએ…</translation>
 <translation id="7616551326690708776">તમારી હાઇલાઇટ માટે કોઈ નમૂનો પસંદ કરો.</translation>
 <translation id="7619072057915878432">નેટવર્ક નિષ્ફળતાને કારણે <ph name="FILE_NAME" /> ડાઉનલોડ નિષ્ફળ થયું.</translation>
 <translation id="7626032353295482388">Chrome પર આપનું સ્વાગત છે</translation>
@@ -1245,6 +1244,7 @@
 <translation id="7682724950699840886">નીચેની ટિપ અજમાવી જુઓ: ખાતરી કરો કે તમારા ઉપકરણ પર પૂરતી સ્પેસ છે, ફરીથી નિકાસ કરવાનો પ્રયાસ કરો.</translation>
 <translation id="7686086654630106285">સાઇટ દ્વારા સૂચિત જાહેરાતો વિશે વધુ વિગતો</translation>
 <translation id="768618399695552958">તમે મુલાકાત લો છો તે કેટલાક પેજ પહેલેથી લોડ કરેલા છે. જ્યારે પેજ Google site પરથી લિંક કરવામાં આવેલા હોય, ત્યારે તેમને Googleના સર્વર મારફતે પહેલેથી લોડ કરી શકાય છે.</translation>
+<translation id="7691043218961417207">ફૉલો કરવા માટેના કન્ટેન્ટ વિશે જાણકારી મેળવો</translation>
 <translation id="7698359219371678927"><ph name="APP_NAME" /> માં ઇમેઇલ બનાવો</translation>
 <translation id="7707922173985738739">મોબાઇલ ડેટાનો ઉપયોગ કરો</translation>
 <translation id="7709094866268987903">તમે કાઢી નાખેલી રુચિઓ અહીં દેખાશે</translation>
@@ -1318,7 +1318,6 @@
 <translation id="8037801708772278989">હમણાં જ ચેક કર્યું</translation>
 <translation id="804335162455518893">SD કાર્ડ મળ્યું નથી</translation>
 <translation id="8048533522416101084">{TAB_COUNT,plural, =1{<ph name="TAB_COUNT_ONE" /> છૂપી ટૅબ}one{<ph name="TAB_COUNT_NORMAL" /> છૂપી ટૅબ}other{<ph name="TAB_COUNT_NORMAL" /> છૂપી ટૅબ}}</translation>
-<translation id="8048728378294435881">તમારી સામગ્રીનું બૅકઅપ લો અને કોઈપણ ડિવાઇસ પર તેનો ઉપયોગ કરો</translation>
 <translation id="8051695050440594747"><ph name="MEGABYTES" /> MB ઉપલબ્ધ</translation>
 <translation id="8058655154417507695">સમાપ્તિ વર્ષ</translation>
 <translation id="8058746566562539958">નવા Chrome ટૅબમાં ખોલો</translation>
@@ -1452,6 +1451,7 @@
 <translation id="8746155870861185046">હાઇલાઇટ કરેલી ટેક્સ્ટ શેર કરો</translation>
 <translation id="8748850008226585750">સામગ્રીઓ છુપાવેલ છે</translation>
 <translation id="8756969031206844760">પાસવર્ડ અપડેટ કરીએ?</translation>
+<translation id="8765470054473112089">જ્યારે તમે ઍડ્રેસ બાર અથવા શોધ બૉક્સમાં ટાઇપ કરો છો, ત્યારે બહેતર સૂચનો મેળવવા માટે Chrome તમે જે ટાઇપ કરો છો તેને તમારા ડિફૉલ્ટ શોધ એન્જિનને મોકલે છે. આ સુવિધા છૂપા મોડમાં કામ કરતી નથી.</translation>
 <translation id="8766529642647037772">શું આના જેવી હાઇલાઇટ કરેલી લિંક બનાવીએ?</translation>
 <translation id="8773160212632396039">વિનંતી પર પ્રક્રિયા ચાલુ છે</translation>
 <translation id="8788265440806329501">નૅવિગેશન ઇતિહાસ બંધ છે</translation>
@@ -1495,6 +1495,7 @@
 <translation id="8970887620466824814">કંઈક ખોટું થયું.</translation>
 <translation id="8972098258593396643">ડિફૉલ્ટ ફોલ્ડરમાં ડાઉનલોડ કરીએ?</translation>
 <translation id="8987641763863173640">વીડિયોના પ્રીવ્યૂના સેટિંગ મેનેજ કરો</translation>
+<translation id="8987736167266086032">તમે જ્યાંથી છોડેલું ત્યાંથી ચૂંટો</translation>
 <translation id="8989968390305463310">તમારો બ્રાઉઝિંગ ઇતિહાસ તમે જુઓ છો તે જાહેરાતોને અને નીચે જણાવેલી અનુમાનિત રુચિઓને અસર કરે છે. તમારી પ્રાઇવસીની સુરક્ષા કરવા માટે Chrome નવા વિષયો આવતા જાય, તેના આધારે દર મહિને તમારી રુચિના વિષયોને ઑટોમૅટિક રીતે ડિલીટ કરે છે. જો તમે રુચિઓને કાઢી ન નાખો, તો તે રિફ્રેશ થઈ શકે છે.</translation>
 <translation id="8993760627012879038">છુપા મોડમાં એક નવું ટૅબ ખોલો</translation>
 <translation id="8996847606757455498">કોઈ અન્ય પ્રદાતા પસંદ કરો</translation>

@@ -24,6 +24,7 @@ aggregate_vector_icons("views_vector_icons") {
 
   sources = [
     "checkbox_active.icon",
+    "checkbox_active_cr2023.icon",
     "checkbox_normal.icon",
     "close.icon",
     "drag_general_selection.icon",
@@ -1429,13 +1430,6 @@ test("views_unittests") {
     if (is_win) {
       sources +=
           [ "widget/desktop_aura/desktop_window_tree_host_win_unittest.cc" ]
-    }
-
-    if (is_chromeos_lacros) {
-      # TODO(crbug.com/1394914): Tooltip is handled on server side for Lacros,
-      # so it requires TooltipLacros's test API instead of TooltipAura's one and
-      # tests need to support async operation.
-      sources -= [ "corewm/tooltip_controller_unittest.cc" ]
     }
 
     if (enable_desktop_aura) {

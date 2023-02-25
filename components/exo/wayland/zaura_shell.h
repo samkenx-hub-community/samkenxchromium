@@ -31,7 +31,7 @@ class ShellSurfaceBase;
 namespace wayland {
 class SerialTracker;
 
-constexpr uint32_t kZAuraShellVersion = 48;
+constexpr uint32_t kZAuraShellVersion = 51;
 
 // Adds bindings to the Aura Shell. Normally this implies Ash on ChromeOS
 // builds. On non-ChromeOS builds the protocol provides access to Aura windowing
@@ -83,6 +83,7 @@ class AuraSurface : public SurfaceObserver,
                    const base::TimeDelta& show_delay,
                    const base::TimeDelta& hide_delay);
   void HideTooltip();
+  void SetAccessibilityId(int id);
 
   // Overridden from SurfaceObserver:
   void OnSurfaceDestroying(Surface* surface) override;
@@ -153,7 +154,8 @@ class AuraToplevel {
   void OnConfigure(const gfx::Rect& bounds,
                    chromeos::WindowStateType state_type,
                    bool resizing,
-                   bool activated);
+                   bool activated,
+                   float raster_scale);
   virtual void OnOriginChange(const gfx::Point& origin);
   void SetDecoration(SurfaceFrameType type);
   void SetZOrder(ui::ZOrderLevel z_order);

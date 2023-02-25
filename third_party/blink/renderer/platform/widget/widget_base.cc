@@ -526,9 +526,9 @@ void WidgetBase::OnDeferMainFrameUpdatesChanged(bool defer) {
   // LayerTreeHost::CreateThreaded() will defer main frame updates immediately
   // until it gets a LocalSurfaceId. That's before the
   // |widget_input_handler_manager_| is created, so it can be null here.
-  // TODO(schenney): To avoid ping-ponging between defer main frame states
-  // during initialization, and requiring null checks here, we should probably
-  // pass the LocalSurfaceId to the compositor while it is
+  // TODO(rendering-core): To avoid ping-ponging between defer main frame
+  // states during initialization, and requiring null checks here, we should
+  // probably pass the LocalSurfaceId to the compositor while it is
   // initialized so that it doesn't have to immediately switch into deferred
   // mode without being requested to.
   if (!widget_input_handler_manager_)
@@ -1399,13 +1399,17 @@ void WidgetBase::QueueSyntheticEvent(
     std::unique_ptr<WebCoalescedInputEvent> event) {
   client_->WillQueueSyntheticEvent(*event);
 
+  // Popups, which don't have a threaded input handler, are allowed to queue up
+  // main thread gesture scroll events.
+  bool uses_input_handler = client_->FrameWidget();
+
   // TODO(acomminos): If/when we add support for gesture event attribution on
   //                  the impl thread, have the caller provide attribution.
   WebInputEventAttribution attribution;
   widget_input_handler_manager_->input_event_queue()->HandleEvent(
       std::move(event), MainThreadEventQueue::DispatchType::kNonBlocking,
       mojom::blink::InputEventResultState::kNotConsumed, attribution, nullptr,
-      HandledEventCallback());
+      HandledEventCallback(), !uses_input_handler);
 }
 
 bool WidgetBase::IsForProvisionalFrame() {

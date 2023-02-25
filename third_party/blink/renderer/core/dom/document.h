@@ -50,6 +50,7 @@
 #include "third_party/blink/public/mojom/input/focus_type.mojom-blink-forward.h"
 #include "third_party/blink/public/mojom/page/page.mojom-blink-forward.h"
 #include "third_party/blink/public/mojom/permissions/permission.mojom-blink-forward.h"
+#include "third_party/blink/public/mojom/permissions/permission_status.mojom-blink-forward.h"
 #include "third_party/blink/public/mojom/permissions_policy/document_policy_feature.mojom-blink-forward.h"
 #include "third_party/blink/public/mojom/scroll/scrollbar_mode.mojom-blink-forward.h"
 #include "third_party/blink/renderer/bindings/core/v8/v8_typedefs.h"
@@ -131,6 +132,7 @@ class Attr;
 class BeforeUnloadEventListener;
 class CDATASection;
 class CSSStyleSheet;
+class CSSToggleInference;
 class CanvasFontCache;
 class ChromeClient;
 class Comment;
@@ -216,6 +218,7 @@ class SVGDocumentExtensions;
 class SVGUseElement;
 class ScriptElementBase;
 class ScriptPromise;
+class ScriptPromiseResolver;
 class ScriptRegexp;
 class ScriptRunner;
 class ScriptRunnerDelayer;
@@ -882,8 +885,6 @@ class CORE_EXPORT Document : public ContainerNode,
   KURL CompleteURLWithOverride(const String&,
                                const KURL& base_url_override) const;
 
-  const KURL& WebBundleClaimedUrl() const { return web_bundle_claimed_url_; }
-
   // Determines whether a new document should take on the same origin as that of
   // the document which created it.
   static bool ShouldInheritSecurityOriginFromOwner(const KURL&);
@@ -1198,6 +1199,9 @@ class CORE_EXPORT Document : public ContainerNode,
   ScriptPromise requestStorageAccess(ScriptState* script_state);
   ScriptPromise requestStorageAccessForOrigin(ScriptState* script_state,
                                               const AtomicString& site);
+  // Returns whether the window has obtained storage access. Must be called on
+  // active documents.
+  bool HasStorageAccess() const;
 
   // Fragment directive API, currently used to feature detect text-fragments.
   // https://wicg.github.io/scroll-to-text-fragment/#feature-detectability
@@ -1539,7 +1543,7 @@ class CORE_EXPORT Document : public ContainerNode,
     return top_layer_elements_;
   }
   void ScheduleForTopLayerRemoval(Element*);
-  bool RemoveFinishedTopLayerElements();
+  void RemoveFinishedTopLayerElements();
 
   HTMLDialogElement* ActiveModalDialog() const;
 
@@ -1566,6 +1570,8 @@ class CORE_EXPORT Document : public ContainerNode,
   // Call SetNeedsStyleRecalc for elements from AddToRecalcStyleForToggle;
   // return whether any calls were made.
   bool SetNeedsStyleRecalcForToggles();
+  CSSToggleInference* GetCSSToggleInference() { return css_toggle_inference_; }
+  CSSToggleInference& EnsureCSSToggleInference();
 
   // A non-null template_document_host_ implies that |this| was created by
   // EnsureTemplateDocument().
@@ -1935,8 +1941,6 @@ class CORE_EXPORT Document : public ContainerNode,
 
   void ResetAgent(Agent& agent);
 
-  bool PendingTopLayerUpdate() const { return pending_top_layer_update_; }
-
  protected:
   void ClearXMLVersion() { xml_version_ = String(); }
 
@@ -2137,6 +2141,27 @@ class CORE_EXPORT Document : public ContainerNode,
 
   void RunPostPrerenderingActivationSteps();
 
+  // Resolves/rejects the promise if an existing permission grant can
+  // approve/deny; otherwise rejects if without user gesture, or
+  // resolves/rejects based on the requested status.
+  void OnGotExistingStorageAccessPermissionState(
+      ScriptPromiseResolver* resolver,
+      bool has_user_gesture,
+      mojom::blink::PermissionStatus previous_status);
+
+  // Wraps `ProcessStorageAccessPermissionState` to handle the requested
+  // permission status.
+  void OnRequestedStorageAccessPermissionState(
+      ScriptPromiseResolver* resolver,
+      mojom::blink::PermissionStatus status);
+
+  // Resolves the promise if the `status` can approve; rejects the promise
+  // otherwise, and consumes user activation.
+  void ProcessStorageAccessPermissionState(
+      ScriptPromiseResolver* resolver,
+      bool use_existing_status,
+      mojom::blink::PermissionStatus status);
+
   const DocumentToken token_;
 
   // Bitfield used for tracking UKM sampling of media features such that each
@@ -2207,8 +2232,6 @@ class CORE_EXPORT Document : public ContainerNode,
 
   KURL base_element_url_;   // The URL set by the <base> element.
   KURL cookie_url_;         // The URL to use for cookie access.
-
-  KURL web_bundle_claimed_url_;
 
   AtomicString base_target_;
 
@@ -2415,6 +2438,8 @@ class CORE_EXPORT Document : public ContainerNode,
   // Elements that need to be restyled because a toggle was created on them,
   // or a prior sibling, during the previous restyle.
   HeapHashSet<Member<Element>> elements_needing_style_recalc_for_toggle_;
+  // The inference engine for CSS toggles.
+  Member<CSSToggleInference> css_toggle_inference_;
 
   int load_event_delay_count_;
 
@@ -2563,11 +2588,6 @@ class CORE_EXPORT Document : public ContainerNode,
 
   bool dir_attribute_dirty_ = false;
 
-  // To reduce the API noisiness an explicit deny decision will set a
-  // flag that auto rejects the promise without the need for an IPC
-  // call or potential user prompt.
-  bool expressly_denied_storage_access_ = false;
-
   // True if the developer supplied a media query indicating that
   // the site has support for reduced motion.
   bool supports_reduced_motion_ = false;
@@ -2575,11 +2595,6 @@ class CORE_EXPORT Document : public ContainerNode,
   Member<RenderBlockingResourceManager> render_blocking_resource_manager_;
 
   bool rendering_has_begun_ = false;
-
-  // Set to true if we are in awaiting an UpdateStyleAndLayoutTree() that is
-  // after removing an element from the top layer. Only used for sanity checking
-  // pending animation updates in StyleForLayoutObject().
-  bool pending_top_layer_update_ = false;
 
   DeclarativeShadowRootAllowState declarative_shadow_root_allow_state_ =
       DeclarativeShadowRootAllowState::kNotSet;

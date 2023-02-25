@@ -17,8 +17,6 @@
 #include "base/values.h"
 #include "chrome/test/base/chrome_ash_test_base.h"
 #include "components/policy/proto/device_management_backend.pb.h"
-#include "content/public/browser/browser_thread.h"
-#include "content/public/test/browser_task_environment.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "third_party/skia/include/core/SkBitmap.h"
 #include "ui/gfx/codec/png_codec.h"
@@ -88,7 +86,7 @@ MockUploadJob::MockUploadJob(const GURL& upload_url,
       delegate_(delegate),
       error_code_(std::move(error_code)) {}
 
-MockUploadJob::~MockUploadJob() {}
+MockUploadJob::~MockUploadJob() = default;
 
 void MockUploadJob::AddDataSegment(
     const std::string& name,
@@ -116,8 +114,9 @@ scoped_refptr<base::RefCountedBytes> GenerateTestPNG(const int& width,
   SkBitmap bmp;
   bmp.allocN32Pixels(width, height);
   for (int y = 0; y < height; ++y) {
-    for (int x = 0; x < width; ++x)
+    for (int x = 0; x < width; ++x) {
       *bmp.getAddr32(x, y) = background_color;
+    }
   }
   scoped_refptr<base::RefCountedBytes> png_bytes(new base::RefCountedBytes());
   gfx::PNGCodec::ColorFormat color_format = gfx::PNGCodec::FORMAT_RGBA;
@@ -156,7 +155,7 @@ MockScreenshotDelegate::MockScreenshotDelegate(
     : upload_job_error_code_(std::move(upload_job_error_code)),
       screenshot_allowed_(screenshot_allowed) {}
 
-MockScreenshotDelegate::~MockScreenshotDelegate() {}
+MockScreenshotDelegate::~MockScreenshotDelegate() = default;
 
 bool MockScreenshotDelegate::IsScreenshotAllowed() {
   return screenshot_allowed_;
@@ -238,8 +237,9 @@ std::string DeviceCommandScreenshotTest::CreatePayloadFromResultCode(
     DeviceCommandScreenshotJob::ResultCode result_code) {
   std::string payload;
   base::Value::Dict root_dict;
-  if (result_code != DeviceCommandScreenshotJob::SUCCESS)
+  if (result_code != DeviceCommandScreenshotJob::SUCCESS) {
     root_dict.Set(kResultFieldName, result_code);
+  }
   base::JSONWriter::Write(root_dict, &payload);
   return payload;
 }

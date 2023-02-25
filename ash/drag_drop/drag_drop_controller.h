@@ -57,6 +57,13 @@ class ASH_EXPORT DragDropController : public aura::client::DragDropClient,
     toplevel_window_drag_delegate_ = delegate;
   }
 
+  // Returns if the drag drop operation has been fully completed.  This is
+  // similar to IsDragDropInProgress, but returns true even after the drop_data
+  // is passed to the target, and keep returning true until the drag drop states
+  // are callbacks are called), so that the callback receive the proper
+  // state.
+  bool IsDragDropCompleted();
+
   // Overridden from aura::client::DragDropClient:
   ui::mojom::DragOperation StartDragAndDrop(
       std::unique_ptr<ui::OSExchangeData> data,
@@ -159,14 +166,16 @@ class ASH_EXPORT DragDropController : public aura::client::DragDropClient,
                    ui::DropTargetEvent event,
                    std::unique_ptr<ui::OSExchangeData> drag_data,
                    aura::client::DragDropDelegate::DropCallback drop_cb,
+                   aura::client::DragDropDelegate::DropCallbackWithAnimation
+                       drop_cb_animation,
                    std::unique_ptr<TabDragDropDelegate> tab_drag_drop_delegate,
                    base::ScopedClosureRunner drag_cancel);
 
   void CancelIfInProgress();
 
   bool enabled_ = false;
-  bool drag_drop_in_progress_ = false;
-  views::UniqueWidgetPtr drag_image_widget_;
+  bool drag_drop_completed_ = true;
+  std::unique_ptr<views::Widget> drag_image_widget_;
   gfx::Vector2d drag_image_offset_;
   std::unique_ptr<ui::OSExchangeData> drag_data_;
   int allowed_operations_ = 0;

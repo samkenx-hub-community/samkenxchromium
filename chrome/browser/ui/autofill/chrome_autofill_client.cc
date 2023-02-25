@@ -39,7 +39,7 @@
 #include "chrome/browser/ui/autofill/payments/card_unmask_otp_input_dialog_controller_impl.h"
 #include "chrome/browser/ui/autofill/payments/create_card_unmask_prompt_view.h"
 #include "chrome/browser/ui/autofill/payments/credit_card_scanner_controller.h"
-#include "chrome/browser/ui/autofill/payments/save_iban_bubble_controller_impl.h"
+#include "chrome/browser/ui/autofill/payments/iban_bubble_controller_impl.h"
 #include "chrome/browser/ui/autofill/payments/virtual_card_enroll_bubble_controller_impl.h"
 #include "chrome/browser/ui/autofill/risk_util.h"
 #include "chrome/browser/ui/autofill/save_update_address_profile_bubble_controller_impl.h"
@@ -358,21 +358,35 @@ ChromeAutofillClient::CreateCreditCardInternalAuthenticator(
 #endif
 }
 
-void ChromeAutofillClient::ShowAutofillSettings(
-    bool show_credit_card_settings) {
+void ChromeAutofillClient::ShowAutofillSettings(PopupType popup_type) {
+  DCHECK(popup_type != PopupType::kPasswords);
 #if BUILDFLAG(IS_ANDROID)
-  if (show_credit_card_settings) {
-    ShowAutofillCreditCardSettings(web_contents());
-  } else {
-    ShowAutofillProfileSettings(web_contents());
+  switch (popup_type) {
+    case PopupType::kCreditCards:
+      ShowAutofillCreditCardSettings(web_contents());
+      return;
+    case PopupType::kPersonalInformation:
+    case PopupType::kAddresses:
+      ShowAutofillProfileSettings(web_contents());
+      return;
+    case PopupType::kUnspecified:
+    case PopupType::kPasswords:
+      NOTREACHED();
   }
 #else
   Browser* browser = chrome::FindBrowserWithWebContents(web_contents());
   if (browser) {
-    if (show_credit_card_settings) {
-      chrome::ShowSettingsSubPage(browser, chrome::kPaymentsSubPage);
-    } else {
-      chrome::ShowSettingsSubPage(browser, chrome::kAddressesSubPage);
+    switch (popup_type) {
+      case PopupType::kCreditCards:
+        chrome::ShowSettingsSubPage(browser, chrome::kPaymentsSubPage);
+        return;
+      case PopupType::kPersonalInformation:
+      case PopupType::kAddresses:
+        chrome::ShowSettingsSubPage(browser, chrome::kAddressesSubPage);
+        return;
+      case PopupType::kUnspecified:
+      case PopupType::kPasswords:
+        NOTREACHED();
     }
   }
 #endif  // BUILDFLAG(IS_ANDROID)
@@ -545,9 +559,9 @@ void ChromeAutofillClient::ConfirmSaveIBANLocally(
     const IBAN& iban,
     bool should_show_prompt,
     LocalSaveIBANPromptCallback callback) {
-  // Do lazy initialization of SaveIbanBubbleControllerImpl.
-  SaveIbanBubbleControllerImpl::CreateForWebContents(web_contents());
-  SaveIbanBubbleControllerImpl::FromWebContents(web_contents())
+  // Do lazy initialization of IbanBubbleControllerImpl.
+  IbanBubbleControllerImpl::CreateForWebContents(web_contents());
+  IbanBubbleControllerImpl::FromWebContents(web_contents())
       ->OfferLocalSave(iban, should_show_prompt, std::move(callback));
 }
 
@@ -1110,7 +1124,11 @@ void ChromeAutofillClient::OnZoomChanged(
 #endif  // !BUILDFLAG(IS_ANDROID)
 
 ChromeAutofillClient::ChromeAutofillClient(content::WebContents* web_contents)
-    : content::WebContentsUserData<ChromeAutofillClient>(*web_contents),
+    : ContentAutofillClient(
+          web_contents,
+          base::BindRepeating(&BrowserDriverInitHook,
+                              this,
+                              g_browser_process->GetApplicationLocale())),
       content::WebContentsObserver(web_contents),
       log_manager_(
           // TODO(crbug.com/928595): Replace the closure with a callback to the
@@ -1175,7 +1193,5 @@ std::u16string ChromeAutofillClient::GetAccountHolderEmail() {
       identity_manager->GetPrimaryAccountInfo(signin::ConsentLevel::kSync));
   return base::UTF8ToUTF16(primary_account_info.email);
 }
-
-WEB_CONTENTS_USER_DATA_KEY_IMPL(ChromeAutofillClient);
 
 }  // namespace autofill

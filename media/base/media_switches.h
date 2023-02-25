@@ -65,6 +65,7 @@ MEDIA_EXPORT extern const char kAudioCapturerWithEchoCancellation[];
 
 #if defined(USE_CRAS)
 MEDIA_EXPORT extern const char kUseCras[];
+MEDIA_EXPORT extern const char kSystemAecEnabled[];
 #endif
 
 MEDIA_EXPORT extern const char
@@ -216,6 +217,8 @@ MEDIA_EXPORT extern const base::FeatureParam<int>
     kHardwareSecureDecryptionFallbackMinDisablingDays;
 MEDIA_EXPORT extern const base::FeatureParam<int>
     kHardwareSecureDecryptionFallbackMaxDisablingDays;
+MEDIA_EXPORT extern const base::FeatureParam<bool>
+    kHardwareSecureDecryptionFallbackOnHardwareContextReset;
 MEDIA_EXPORT BASE_DECLARE_FEATURE(kInternalMediaSession);
 MEDIA_EXPORT BASE_DECLARE_FEATURE(kKeepRvfcFrameAlive);
 MEDIA_EXPORT BASE_DECLARE_FEATURE(kKeyPressMonitoring);
@@ -230,6 +233,10 @@ MEDIA_EXPORT BASE_DECLARE_FEATURE(kMediaCapabilitiesWithParameters);
 MEDIA_EXPORT BASE_DECLARE_FEATURE(kMediaCastOverlayButton);
 MEDIA_EXPORT BASE_DECLARE_FEATURE(kMediaEngagementBypassAutoplayPolicies);
 MEDIA_EXPORT BASE_DECLARE_FEATURE(kMediaEngagementHTTPSOnly);
+#if BUILDFLAG(IS_WIN)
+MEDIA_EXPORT extern const base::FeatureParam<std::string>
+    kMediaFoundationClearKeyCdmPathForTesting;
+#endif  // BUILDFLAG(IS_WIN)
 MEDIA_EXPORT BASE_DECLARE_FEATURE(kMediaLearningExperiment);
 MEDIA_EXPORT BASE_DECLARE_FEATURE(kMediaLearningFramework);
 MEDIA_EXPORT BASE_DECLARE_FEATURE(kMediaLearningSmoothnessExperiment);
@@ -400,6 +407,7 @@ MEDIA_EXPORT BASE_DECLARE_FEATURE(kUseOutOfProcessVideoEncoding);
 MEDIA_EXPORT BASE_DECLARE_FEATURE(kUseMojoVideoDecoderForPepper);
 MEDIA_EXPORT BASE_DECLARE_FEATURE(kUseSequencedTaskRunnerForMediaService);
 MEDIA_EXPORT BASE_DECLARE_FEATURE(kUseSequencedTaskRunnerForMojoVEAProvider);
+MEDIA_EXPORT BASE_DECLARE_FEATURE(kUseSequencedTaskRunnerForMojoVEAService);
 
 #if BUILDFLAG(IS_FUCHSIA)
 MEDIA_EXPORT BASE_DECLARE_FEATURE(kFuchsiaMediacodecVideoEncoder);

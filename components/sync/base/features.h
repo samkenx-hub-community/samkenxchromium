@@ -102,17 +102,6 @@ inline constexpr base::FeatureParam<base::TimeDelta>
 // being registered is consistent with the server-side state.
 BASE_DECLARE_FEATURE(kSyncTrustedVaultVerifyDeviceRegistration);
 
-// Triggers another device registration attempt if the device was registered
-// before this feature was introduced.
-BASE_DECLARE_FEATURE(kSyncTrustedVaultRedoDeviceRegistration);
-
-// Triggers one-off reset of `keys_are_stale`, allowing another device
-// registration attempt if previous was failed.
-BASE_DECLARE_FEATURE(kSyncTrustedVaultResetKeysAreStale);
-
-// Enables storing MD5 hashed trusted vault file instead of OSCrypt encrypted.
-BASE_DECLARE_FEATURE(kSyncTrustedVaultUseMD5HashedFile);
-
 // If enabled, the device will register with FCM and listen to new
 // invalidations. Also, FCM token will be set in DeviceInfo, which signals to
 // the server that device listens to new invalidations.
@@ -151,10 +140,6 @@ BASE_DECLARE_FEATURE(kSyncEnableContactInfoDataTypeForCustomPassphraseUsers);
 
 // If enabled, issues error and disables bookmarks sync when limit is crossed.
 BASE_DECLARE_FEATURE(kSyncEnforceBookmarksCountLimit);
-
-// If enabled, Sync will not use a primary account that doesn't have a refresh
-// token. (This state should only ever occur temporarily during signout.)
-BASE_DECLARE_FEATURE(kSyncIgnoreAccountWithoutRefreshToken);
 
 // Enabled by default, it acts as a kill switch for a newly-introduced logic,
 // which implies that DataTypeManager (and hence individual datatypes) won't be

@@ -44,6 +44,7 @@ bool IsFormatSupported(viz::ResourceFormat resource_format) {
     case viz::ResourceFormat::BGRX_8888:
     case viz::ResourceFormat::RGBA_F16:
     case viz::ResourceFormat::RED_8:
+    case viz::ResourceFormat::RG_88:
     case viz::ResourceFormat::BGRA_1010102:
     case viz::ResourceFormat::RGBA_1010102:
       return true;
@@ -101,6 +102,17 @@ bool IsPixelDataValid(viz::SharedImageFormat format,
   return true;
 }
 
+constexpr uint32_t kSupportedUsage =
+    SHARED_IMAGE_USAGE_GLES2 | SHARED_IMAGE_USAGE_GLES2_FRAMEBUFFER_HINT |
+    SHARED_IMAGE_USAGE_DISPLAY_WRITE | SHARED_IMAGE_USAGE_DISPLAY_READ |
+    SHARED_IMAGE_USAGE_RASTER | SHARED_IMAGE_USAGE_OOP_RASTERIZATION |
+    SHARED_IMAGE_USAGE_SCANOUT | SHARED_IMAGE_USAGE_WEBGPU |
+    SHARED_IMAGE_USAGE_CONCURRENT_READ_WRITE | SHARED_IMAGE_USAGE_VIDEO_DECODE |
+    SHARED_IMAGE_USAGE_WEBGPU_SWAP_CHAIN_TEXTURE |
+    SHARED_IMAGE_USAGE_MACOS_VIDEO_TOOLBOX |
+    SHARED_IMAGE_USAGE_RASTER_DELEGATED_COMPOSITING |
+    SHARED_IMAGE_USAGE_HIGH_PERFORMANCE_GPU;
+
 }  // anonymous namespace
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -111,7 +123,8 @@ IOSurfaceImageBackingFactory::IOSurfaceImageBackingFactory(
     const GpuDriverBugWorkarounds& workarounds,
     const gles2::FeatureInfo* feature_info,
     gl::ProgressReporter* progress_reporter)
-    : progress_reporter_(progress_reporter),
+    : SharedImageBackingFactory(kSupportedUsage),
+      progress_reporter_(progress_reporter),
       gpu_memory_buffer_formats_(
           feature_info->feature_flags().gpu_memory_buffer_formats),
       angle_texture_usage_(feature_info->feature_flags().angle_texture_usage) {
@@ -213,9 +226,6 @@ bool IOSurfaceImageBackingFactory::IsSupported(
     gfx::GpuMemoryBufferType gmb_type,
     GrContextType gr_context_type,
     base::span<const uint8_t> pixel_data) {
-  if (format.is_multi_plane() && !pixel_data.empty()) {
-    return false;
-  }
   if (!pixel_data.empty() && gr_context_type != GrContextType::kGL) {
     return false;
   }
@@ -226,9 +236,7 @@ bool IOSurfaceImageBackingFactory::IsSupported(
   if (gmb_type == gfx::SHARED_MEMORY_BUFFER) {
     return false;
   }
-  if (usage & SHARED_IMAGE_USAGE_CPU_UPLOAD) {
-    return false;
-  }
+
   // On macOS, there is no separate interop factory. Any GpuMemoryBuffer-backed
   // image can be used with both OpenGL and Metal
 

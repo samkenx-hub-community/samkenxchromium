@@ -8,6 +8,7 @@
 
 #include "ash/constants/ash_features.h"
 #include "ash/constants/ash_pref_names.h"
+#include "ash/focus_cycler.h"
 #include "ash/session/session_controller_impl.h"
 #include "ash/shell.h"
 #include "ash/system/message_center/ash_message_center_lock_screen_controller.h"
@@ -20,14 +21,17 @@
 #include "ash/test/ash_test_base.h"
 #include "base/memory/scoped_refptr.h"
 #include "base/run_loop.h"
+#include "base/strings/string_util.h"
 #include "base/test/scoped_feature_list.h"
 #include "components/prefs/pref_service.h"
 #include "ui/compositor/layer.h"
 #include "ui/compositor/layer_animator.h"
 #include "ui/compositor/scoped_animation_duration_scale_mode.h"
+#include "ui/message_center/public/cpp/notification.h"
 #include "ui/message_center/views/message_view.h"
 #include "ui/views/controls/scroll_view.h"
 #include "ui/views/test/views_test_utils.h"
+#include "url/gurl.h"
 
 using message_center::MessageCenter;
 using message_center::MessageView;
@@ -186,6 +190,13 @@ class NotificationCenterViewTest : public AshTestBase,
     auto* focused_message_view = test_api()->GetNotificationViewForId(id);
     focus_manager->SetFocusedView(focused_message_view);
     return focused_message_view;
+  }
+
+  void FocusClearAllButton() {
+    auto* widget = GetNotificationBarClearAllButton()->GetWidget();
+    widget->widget_delegate()->SetCanActivate(true);
+    Shell::Get()->focus_cycler()->FocusWidget(widget);
+    GetNotificationBarClearAllButton()->RequestFocus();
   }
 
   void RelayoutMessageCenterViewForTest() {
@@ -725,6 +736,23 @@ TEST_P(NotificationCenterViewTest, ClearAllButtonHeight) {
             GetNotificationBarClearAllButton()->height());
 }
 
+// Tests that the "Clear all" button is not focusable when it is disabled.
+TEST_P(NotificationCenterViewTest, ClearAllNotFocusableWhenDisabled) {
+  // Add a pinned notification and toggle the bubble.
+  test_api()->AddPinnedNotification();
+  test_api()->ToggleBubble();
+
+  // Verify that the "Clear all" button is visible but disabled.
+  ASSERT_TRUE(GetNotificationBarClearAllButton()->GetVisible());
+  ASSERT_FALSE(GetNotificationBarClearAllButton()->GetEnabled());
+
+  // Attempt to focus the "Clear all" button.
+  FocusClearAllButton();
+
+  // Verify that the "Clear all" button did not receive focus.
+  EXPECT_FALSE(GetNotificationBarClearAllButton()->HasFocus());
+}
+
 TEST_P(NotificationCenterViewTest, StackedNotificationCount) {
   // There should not be any stacked notifications in the expanded message
   // center with just one notification added.
@@ -742,6 +770,40 @@ TEST_P(NotificationCenterViewTest, StackedNotificationCount) {
   UpdateNotificationBarForTest();
   EXPECT_EQ(11, total_notification_count());
   EXPECT_LT(0, stacked_notification_count());
+}
+
+// Test for notification swipe control visibility.
+TEST_P(NotificationCenterViewTest, NotificationPartialSwipe) {
+  auto id1 = test_api()->AddNotification();
+  test_api()->ToggleBubble();
+  auto* view = test_api()->GetNotificationViewForId(id1);
+
+  int x_start = view->GetBoundsInScreen().x();
+  GetEventGenerator()->GestureScrollSequence(
+      view->GetBoundsInScreen().CenterPoint(),
+      view->GetBoundsInScreen().right_center(), base::Milliseconds(1000), 1000);
+
+  // The notification view should go back to it's original location after a
+  // partial swipe when there is no settings button.
+  EXPECT_EQ(x_start, view->GetBoundsInScreen().x());
+
+  message_center::RichNotificationData optional_fields;
+  optional_fields.settings_button_handler =
+      message_center::SettingsButtonHandler::INLINE;
+  auto id2 = test_api()->AddCustomNotification(
+      u"title", u"message", ui::ImageModel(), base::EmptyString16(), GURL(),
+      message_center::NotifierId(), optional_fields);
+
+  view = test_api()->GetNotificationViewForId(id2);
+
+  x_start = view->GetBoundsInScreen().x();
+  GetEventGenerator()->GestureScrollSequence(
+      view->GetBoundsInScreen().CenterPoint(),
+      view->GetBoundsInScreen().right_center(), base::Milliseconds(1000), 1000);
+
+  // The notification view should be offset forwards from it's start position to
+  // make space for the settings button at the end of a swipe.
+  EXPECT_LT(x_start, view->GetBoundsInScreen().x());
 }
 
 }  // namespace ash

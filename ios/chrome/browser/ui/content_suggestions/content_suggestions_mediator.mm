@@ -21,6 +21,7 @@
 #import "components/pref_registry/pref_registry_syncable.h"
 #import "components/reading_list/core/reading_list_model.h"
 #import "components/reading_list/ios/reading_list_model_bridge_observer.h"
+#import "components/search_engines/search_terms_data.h"
 #import "components/search_engines/template_url.h"
 #import "components/strings/grit/components_strings.h"
 #import "ios/chrome/app/application_delegate/app_state.h"
@@ -77,6 +78,7 @@
 namespace {
 
 using CSCollectionViewItem = CollectionViewItem<SuggestedContent>;
+using RequestSource = SearchTermsData::RequestSource;
 
 // Maximum number of most visited tiles fetched.
 const NSInteger kMaxNumMostVisitedTiles = 4;
@@ -205,6 +207,7 @@ const NSInteger kMaxNumMostVisitedTiles = 4;
 
 + (void)registerBrowserStatePrefs:(user_prefs::PrefRegistrySyncable*)registry {
   registry->RegisterInt64Pref(prefs::kIosDiscoverFeedLastRefreshTime, 0);
+  registry->RegisterInt64Pref(prefs::kIosDiscoverFeedLastUnseenRefreshTime, 0);
 }
 
 - (void)disconnect {
@@ -219,6 +222,7 @@ const NSInteger kMaxNumMostVisitedTiles = 4;
 }
 
 - (void)reloadAllData {
+  BOOL isTileAblationComplete = [self isTileAblationComplete];
   if (!self.consumer) {
     return;
   }
@@ -226,11 +230,12 @@ const NSInteger kMaxNumMostVisitedTiles = 4;
     [self.consumer
         showReturnToRecentTabTileWithConfig:self.returnToRecentTabItem];
   }
-  if ([self.mostVisitedItems count] && !IsHideMVTAndShortcutsEnabled()) {
+  if ([self.mostVisitedItems count] &&
+      (!ShouldHideMostVisited() || isTileAblationComplete)) {
     [self.consumer setMostVisitedTilesWithConfigs:self.mostVisitedItems];
   }
   if (!ShouldHideShortcutsForTrendingQueries() &&
-      !IsHideMVTAndShortcutsEnabled()) {
+      (!ShouldHideShortcuts() || isTileAblationComplete)) {
     [self.consumer setShortcutTilesWithConfigs:self.actionButtonItems];
   }
   if (IsTrendingQueriesModuleEnabled()) {
@@ -477,7 +482,7 @@ const NSInteger kMaxNumMostVisitedTiles = 4;
 
 - (void)onMostVisitedURLsAvailable:
     (const ntp_tiles::NTPTilesVector&)mostVisited {
-  if (IsHideMVTAndShortcutsEnabled()) {
+  if (ShouldHideMostVisited() && ![self isTileAblationComplete]) {
     return;
   }
 
@@ -527,12 +532,11 @@ const NSInteger kMaxNumMostVisitedTiles = 4;
 
 // Replaces the Most Visited items currently displayed by the most recent ones.
 - (void)useFreshMostVisited {
-  if (IsHideMVTAndShortcutsEnabled()) {
+  if (ShouldHideMostVisited() && ![self isTileAblationComplete]) {
     return;
   }
   self.mostVisitedItems = self.freshMostVisitedItems;
   [self.consumer setMostVisitedTilesWithConfigs:self.mostVisitedItems];
-
   [self.feedDelegate contentSuggestionsWasUpdated];
 }
 
@@ -612,7 +616,7 @@ const NSInteger kMaxNumMostVisitedTiles = 4;
 
   // Fetch Trending Queries
   TemplateURLRef::SearchTermsArgs args;
-  args.request_source = TemplateURLRef::NON_SEARCHBOX_NTP;
+  args.request_source = RequestSource::NTP_MODULE;
   _startSuggestService->FetchSuggestions(
       args,
       base::BindOnce(&StartSuggestServiceResponseBridge::OnSuggestionsReceived,
@@ -638,6 +642,52 @@ const NSInteger kMaxNumMostVisitedTiles = 4;
       authService->HasPrimaryIdentity(signin::ConsentLevel::kSignin);
 
   return !isSignedIn;
+}
+
+// Checks if users have met conditions to drop from the experiment to hide the
+// Most Visited Tiles and Shortcuts from the NTP.
+- (BOOL)isTileAblationComplete {
+  // Conditions:
+  // MVT/Shortcuts Should be shown again if:
+  // 1. User has used Bling < `kTileAblationMinimumUseThresholdInDays` days AND
+  // NTP Impressions > `kMinimumImpressionThresholdTileAblation`; or
+  // 2. User has used Bling >= `kTileAblationMaximumUseThresholdInDays` days
+  // or
+  // 3. NTP Impressions > `kMaximumImpressionThresholdTileAblation`;
+  // NTP impression time threshold is >=
+  // `kTileAblationImpressionThresholdMinutes` minutes per impression.
+  // (eg. 2 NTP impressions within <5 minutes of each other will count as 1 NTP
+  // impression for the purposes of this test.
+
+  // Return early if ablation was already complete.
+  NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
+  if ([defaults boolForKey:kDoneWithTileAblationKey]) {
+    return YES;
+  }
+
+  int impressions = [defaults integerForKey:kNumberOfNTPImpressionsRecordedKey];
+  NSDate* firstImpressionDate = base::mac::ObjCCast<NSDate>(
+      [defaults objectForKey:kFirstImpressionRecordedTileAblationKey]);
+  // Return early if no NTP impression has been recorded.
+  if (firstImpressionDate == nil) {
+    return NO;
+  }
+  base::Time firstImpressionTime = base::Time::FromNSDate(firstImpressionDate);
+
+  if (  // User has used Bling < `kTileAblationMinimumUseThresholdInDays` days
+        // AND NTP Impressions > `kMinimumImpressionThresholdTileAblation`; or
+      (base::Time::Now() - firstImpressionTime >=
+           base::Days(kTileAblationMinimumUseThresholdInDays) &&
+       impressions >= kMinimumImpressionThresholdTileAblation) ||
+      // User has used Bling >= `kTileAblationMaximumUseThresholdInDays` days
+      (base::Time::Now() - firstImpressionTime >=
+       base::Days(kTileAblationMaximumUseThresholdInDays)) ||
+      // NTP Impressions >= `kMaximumImpressionThresholdTileAblation`;
+      (impressions >= kMaximumImpressionThresholdTileAblation)) {
+    [defaults setBool:YES forKey:kDoneWithTileAblationKey];
+    return YES;
+  }
+  return NO;
 }
 
 #pragma mark - Properties

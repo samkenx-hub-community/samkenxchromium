@@ -19,6 +19,7 @@
 #include "base/threading/thread_checker.h"
 #include "base/time/time.h"
 #include "base/types/pass_key.h"
+#include "base/values.h"
 #include "net/base/auth.h"
 #include "net/base/completion_repeating_callback.h"
 #include "net/base/idempotency.h"
@@ -56,10 +57,6 @@
 #include "third_party/abseil-cpp/absl/types/optional.h"
 #include "url/gurl.h"
 #include "url/origin.h"
-
-namespace base {
-class Value;
-}  // namespace base
 
 namespace net {
 
@@ -472,7 +469,7 @@ class NET_EXPORT URLRequest : public base::SupportsUserData {
 
   // Returns a partial representation of the request's state as a value, for
   // debugging.
-  base::Value GetStateAsValue() const;
+  base::Value::Dict GetStateAsValue() const;
 
   // Logs information about the what external object currently blocking the
   // request.  LogUnblocked must be called before resuming the request.  This
@@ -846,6 +843,13 @@ class NET_EXPORT URLRequest : public base::SupportsUserData {
     expected_response_checksum_ = std::string(checksum);
   }
 
+  void set_has_storage_access(bool has_storage_access) {
+    DCHECK(!is_pending_);
+    DCHECK(!has_notified_completion_);
+    has_storage_access_ = has_storage_access;
+  }
+  bool has_storage_access() const { return has_storage_access_; }
+
   static bool DefaultCanUseCookies();
 
   base::WeakPtr<URLRequest> GetWeakPtr();
@@ -991,6 +995,10 @@ class NET_EXPORT URLRequest : public base::SupportsUserData {
   // Whether the request is allowed to send credentials in general. Set by
   // caller.
   bool allow_credentials_ = true;
+  // Whether the request is eligible for using storage access permission grant
+  // if one exists. Only set by caller when constructed and will not change
+  // during redirects.
+  bool has_storage_access_ = false;
   SecureDnsPolicy secure_dns_policy_ = SecureDnsPolicy::kAllow;
 
   CookieAccessResultList maybe_sent_cookies_;

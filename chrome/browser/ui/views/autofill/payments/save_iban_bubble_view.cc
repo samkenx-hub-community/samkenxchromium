@@ -49,7 +49,7 @@ std::unique_ptr<views::ToggleImageButton> CreateIbanMaskingToggle(
 
 SaveIbanBubbleView::SaveIbanBubbleView(views::View* anchor_view,
                                        content::WebContents* web_contents,
-                                       SaveIbanBubbleController* controller)
+                                       IbanBubbleController* controller)
     : LocationBarBubbleDelegateView(anchor_view, web_contents),
       controller_(controller) {
   DCHECK(controller);
@@ -201,12 +201,16 @@ void SaveIbanBubbleView::AssignIdsToDialogButtonsForTesting() {
 
   DCHECK(iban_value_);
   iban_value_->SetID(DialogViewId::IBAN_VALUE_LABEL);
+
+  if (nickname_textfield_) {
+    nickname_textfield_->SetID(DialogViewId::NICKNAME_TEXTFIELD);
+  }
 }
 
 void SaveIbanBubbleView::OnDialogAccepted() {
   if (controller_) {
     DCHECK(nickname_textfield_);
-    controller_->OnSaveButton(nickname_textfield_->GetText());
+    controller_->OnAcceptButton(nickname_textfield_->GetText());
   }
 }
 

@@ -4,6 +4,7 @@
 
 #include "chrome/updater/app/server/win/server.h"
 
+#include <regstr.h>
 #include <wrl/module.h>
 
 #include <memory>
@@ -12,14 +13,13 @@
 
 #include "base/check.h"
 #include "base/command_line.h"
+#include "base/files/file_enumerator.h"
 #include "base/files/file_path.h"
 #include "base/files/scoped_temp_dir.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback.h"
 #include "base/functional/callback_helpers.h"
 #include "base/logging.h"
-#include "base/memory/ref_counted.h"
-#include "base/path_service.h"
 #include "base/strings/strcat.h"
 #include "base/strings/sys_string_conversions.h"
 #include "base/strings/utf_string_conversions.h"
@@ -28,8 +28,6 @@
 #include "base/win/registry.h"
 #include "base/win/windows_types.h"
 #include "chrome/installer/util/work_item_list.h"
-#include "chrome/updater/app/server/win/com_classes.h"
-#include "chrome/updater/app/server/win/com_classes_legacy.h"
 #include "chrome/updater/constants.h"
 #include "chrome/updater/registration_data.h"
 #include "chrome/updater/update_service.h"
@@ -40,6 +38,7 @@
 #include "chrome/updater/util/win_util.h"
 #include "chrome/updater/win/setup/setup_util.h"
 #include "chrome/updater/win/setup/uninstall.h"
+#include "chrome/updater/win/task_scheduler.h"
 #include "chrome/updater/win/win_constants.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
 
@@ -70,8 +69,9 @@ bool SwapUninstallCmdLine(UpdaterScope scope,
   // TODO(crbug.com/1270520) - use a switch that can uninstall immediately if
   // unused, instead of requiring server starts.
   uninstall_if_unused_command.AppendSwitch(kWakeSwitch);
-  if (IsSystemInstall(scope))
+  if (IsSystemInstall(scope)) {
     uninstall_if_unused_command.AppendSwitch(kSystemSwitch);
+  }
   uninstall_if_unused_command.AppendSwitch(kEnableLoggingSwitch);
   uninstall_if_unused_command.AppendSwitchASCII(kLoggingModuleSwitch,
                                                 kLoggingModuleSwitchValue);
@@ -149,13 +149,14 @@ bool SwapGoogleUpdate(UpdaterScope scope,
 
   const absl::optional<base::FilePath> target_path =
       GetGoogleUpdateExePath(scope);
-  if (!target_path)
+  if (!target_path) {
     return false;
+  }
   list->AddCopyTreeWorkItem(updater_path, *target_path, temp_path,
                             WorkItem::ALWAYS);
 
   const std::wstring google_update_appid_key =
-      GetAppClientsKey(L"{430FD4D0-B729-4F61-AA34-91526481799D}");
+      GetAppClientsKey(kLegacyGoogleUpdateAppID);
   list->AddCreateRegKeyWorkItem(root, COMPANY_KEY, KEY_WOW64_32KEY);
   list->AddCreateRegKeyWorkItem(root, UPDATER_KEY, KEY_WOW64_32KEY);
   list->AddCreateRegKeyWorkItem(root, CLIENTS_KEY, KEY_WOW64_32KEY);
@@ -167,6 +168,61 @@ bool SwapGoogleUpdate(UpdaterScope scope,
       base::ASCIIToWide(PRODUCT_FULLNAME_STRING), true);
 
   return SwapUninstallCmdLine(scope, updater_path, root, list);
+}
+
+// Uninstall the GoogleUpdate services, run values, scheduled tasks, and files.
+bool UninstallGoogleUpdate(UpdaterScope scope,
+                           const base::FilePath& updater_path,
+                           const base::FilePath& temp_path,
+                           HKEY root) {
+  if (IsSystemInstall(scope)) {
+    // Delete the GoogleUpdate services.
+    ForEachServiceWithPrefix(
+        kLegacyServiceNamePrefix, kLegacyServiceDisplayNamePrefix,
+        base::BindRepeating([](const std::wstring& service_name) {
+          if (!DeleteService(service_name)) {
+            VLOG(1) << __func__
+                    << ": failed to delete service: " << service_name;
+          }
+        }));
+  } else {
+    // Delete the GoogleUpdate run values.
+    ForEachRegistryRunValueWithPrefix(
+        kLegacyRunValuePrefix,
+        base::BindRepeating([](const std::wstring& run_name) {
+          base::win::RegKey(HKEY_CURRENT_USER, REGSTR_PATH_RUN, KEY_WRITE)
+              .DeleteValue(run_name.c_str());
+        }));
+  }
+
+  // Delete the GoogleUpdate tasks.
+  scoped_refptr<TaskScheduler> task_scheduler(
+      TaskScheduler::CreateInstance(scope, /*use_task_subfolders=*/false));
+  task_scheduler->ForEachTaskWithPrefix(
+      IsSystemInstall(scope) ? kLegacyTaskNamePrefixSystem
+                             : kLegacyTaskNamePrefixUser,
+      base::BindRepeating(
+          [](scoped_refptr<TaskScheduler> task_scheduler,
+             const std::wstring& task_name) {
+            task_scheduler->DeleteTask(task_name.c_str());
+          },
+          task_scheduler));
+
+  // Delete the GoogleUpdate subdirectories.
+  const absl::optional<base::FilePath> target_path =
+      GetGoogleUpdateExePath(scope);
+  if (!target_path) {
+    return false;
+  }
+
+  base::FileEnumerator it(*target_path, false,
+                          base::FileEnumerator::DIRECTORIES);
+  std::unique_ptr<WorkItemList> list(WorkItem::CreateWorkItemList());
+  for (base::FilePath name = it.Next(); !name.empty(); name = it.Next()) {
+    list->AddDeleteTreeWorkItem(name, temp_path);
+  }
+
+  return list->Do();
 }
 
 }  // namespace
@@ -236,8 +292,9 @@ void ComServerApp::Start(base::OnceCallback<HRESULT()> register_callback) {
   main_task_runner_ = base::SequencedTaskRunner::GetCurrentDefault();
   CreateWRLModule();
   HRESULT hr = std::move(register_callback).Run();
-  if (FAILED(hr))
+  if (FAILED(hr)) {
     Shutdown(hr);
+  }
 }
 
 void ComServerApp::UninstallSelf() {
@@ -249,8 +306,9 @@ bool ComServerApp::SwapInNewVersion() {
 
   const absl::optional<base::FilePath> versioned_directory =
       GetVersionedInstallDirectory(updater_scope());
-  if (!versioned_directory)
+  if (!versioned_directory) {
     return false;
+  }
 
   const base::FilePath updater_path =
       versioned_directory->Append(GetExecutableRelativePath());
@@ -260,8 +318,9 @@ bool ComServerApp::SwapInNewVersion() {
   }
 
   absl::optional<base::ScopedTempDir> temp_dir = CreateSecureTempDir();
-  if (!temp_dir)
+  if (!temp_dir) {
     return false;
+  }
 
   if (!SwapGoogleUpdate(updater_scope(), updater_path, temp_dir->GetPath(),
                         UpdaterScopeToHKeyRoot(updater_scope()), list.get())) {
@@ -278,7 +337,14 @@ bool ComServerApp::SwapInNewVersion() {
       SignalShutdownEvent(updater_scope()));
   StopGoogleUpdateProcesses(updater_scope());
 
-  return list->Do();
+  const bool succeeded = list->Do();
+  if (succeeded) {
+    LOG_IF(ERROR, UninstallGoogleUpdate(
+                      updater_scope(), updater_path, temp_dir->GetPath(),
+                      UpdaterScopeToHKeyRoot(updater_scope())));
+  }
+
+  return succeeded;
 }
 
 bool ComServerApp::MigrateLegacyUpdaters(
@@ -290,8 +356,9 @@ bool ComServerApp::MigrateLegacyUpdaters(
     const std::wstring app_id = it.Name();
 
     // Skip importing legacy updater.
-    if (base::EqualsCaseInsensitiveASCII(app_id, kLegacyGoogleUpdaterAppID))
+    if (base::EqualsCaseInsensitiveASCII(app_id, kLegacyGoogleUpdateAppID)) {
       continue;
+    }
 
     base::win::RegKey key;
     if (key.Open(root, GetAppClientsKey(app_id).c_str(), Wow6432(KEY_READ)) !=
@@ -302,20 +369,24 @@ bool ComServerApp::MigrateLegacyUpdaters(
     RegistrationRequest registration;
     registration.app_id = base::SysWideToUTF8(app_id);
     std::wstring pv;
-    if (key.ReadValue(kRegValuePV, &pv) != ERROR_SUCCESS)
+    if (key.ReadValue(kRegValuePV, &pv) != ERROR_SUCCESS) {
       continue;
+    }
 
     registration.version = base::Version(base::SysWideToUTF8(pv));
-    if (!registration.version.IsValid())
+    if (!registration.version.IsValid()) {
       continue;
+    }
 
     std::wstring brand_code;
-    if (key.ReadValue(kRegValueBrandCode, &brand_code) == ERROR_SUCCESS)
+    if (key.ReadValue(kRegValueBrandCode, &brand_code) == ERROR_SUCCESS) {
       registration.brand_code = base::SysWideToUTF8(brand_code);
+    }
 
     std::wstring ap;
-    if (key.ReadValue(kRegValueAP, &ap) == ERROR_SUCCESS)
+    if (key.ReadValue(kRegValueAP, &ap) == ERROR_SUCCESS) {
       registration.ap = base::SysWideToUTF8(ap);
+    }
 
     register_callback.Run(registration);
   }

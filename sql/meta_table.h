@@ -77,9 +77,7 @@ class COMPONENT_EXPORT(SQL) MetaTable {
   // Versions must be greater than 0 to distinguish missing versions (see
   // GetVersionNumber()). If there was no meta table (proxy for a fresh
   // database), mmap status is set to `kMmapSuccess`.
-  // TODO(apaseltiner): Mark this [[nodiscard]] once all callers have been
-  // updated.
-  bool Init(Database* db, int version, int compatible_version);
+  [[nodiscard]] bool Init(Database* db, int version, int compatible_version);
 
   // Resets this MetaTable object, making another call to Init() possible.
   void Reset();
@@ -89,7 +87,7 @@ class COMPONENT_EXPORT(SQL) MetaTable {
   // previously set version number.
   //
   // See also Get/SetCompatibleVersionNumber().
-  bool SetVersionNumber(int version);
+  [[nodiscard]] bool SetVersionNumber(int version);
   int GetVersionNumber();
 
   // The compatible version number is the lowest current version embedded in
@@ -108,7 +106,7 @@ class COMPONENT_EXPORT(SQL) MetaTable {
   //
   // The compatible version number will be 0 if there is no previously set
   // compatible version number.
-  bool SetCompatibleVersionNumber(int version);
+  [[nodiscard]] bool SetCompatibleVersionNumber(int version);
   int GetCompatibleVersionNumber();
 
   // Set the given arbitrary key with the given data. Returns true on success.

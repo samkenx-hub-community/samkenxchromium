@@ -1,5 +1,5 @@
 This is a testharness.js-based test.
-Found 407 tests; 239 PASS, 168 FAIL, 0 TIMEOUT, 0 NOTRUN.
+Found 415 tests; 245 PASS, 170 FAIL, 0 TIMEOUT, 0 NOTRUN.
 PASS Loading data…
 FAIL <a>: Setting <a://example.net>.protocol = '' The empty string is not a valid scheme. Setter leaves the URL unchanged. assert_equals: expected "a://example.net" but got "file:///A://example.net"
 FAIL <area>: Setting <a://example.net>.protocol = '' The empty string is not a valid scheme. Setter leaves the URL unchanged. assert_equals: expected "a://example.net" but got "file:///A://example.net"
@@ -293,6 +293,8 @@ PASS <a>: Setting <http://example.net/path>.port = '65535' Port numbers are 16 b
 PASS <area>: Setting <http://example.net/path>.port = '65535' Port numbers are 16 bit integers
 FAIL <a>: Setting <http://example.net:8080/path>.port = '65536' Port numbers are 16 bit integers, overflowing is an error assert_equals: expected "http://example.net:8080/path" but got "http://example.net:0/path"
 FAIL <area>: Setting <http://example.net:8080/path>.port = '65536' Port numbers are 16 bit integers, overflowing is an error assert_equals: expected "http://example.net:8080/path" but got "http://example.net:0/path"
+PASS <a>: Setting <http://example.net:8080/path>.port = 'randomstring' Setting port to a string that doesn't parse as a number
+PASS <area>: Setting <http://example.net:8080/path>.port = 'randomstring' Setting port to a string that doesn't parse as a number
 FAIL <a>: Setting <non-special://example.net:8080/path>.port = '65536' Port numbers are 16 bit integers, overflowing is an error assert_equals: expected "example.net:8080" but got ""
 FAIL <area>: Setting <non-special://example.net:8080/path>.port = '65536' Port numbers are 16 bit integers, overflowing is an error assert_equals: expected "example.net:8080" but got ""
 PASS <a>: Setting <non-base:value>.port = '12'
@@ -301,6 +303,12 @@ PASS <a>: Setting <sc:///>.port = '12'
 PASS <area>: Setting <sc:///>.port = '12'
 FAIL <a>: Setting <sc://x/>.port = '12' assert_equals: expected "sc://x:12/" but got "sc://x/"
 FAIL <area>: Setting <sc://x/>.port = '12' assert_equals: expected "sc://x:12/" but got "sc://x/"
+PASS <a>: Setting <https://domain.com:443>.port = '	8080' Leading u0009 on special scheme
+PASS <area>: Setting <https://domain.com:443>.port = '	8080' Leading u0009 on special scheme
+FAIL <a>: Setting <wpt++://domain.com:443>.port = '	8080' Leading u0009 on non-special scheme assert_equals: expected "8080" but got ""
+FAIL <area>: Setting <wpt++://domain.com:443>.port = '	8080' Leading u0009 on non-special scheme assert_equals: expected "8080" but got ""
+PASS <a>: Setting <https://www.google.com:4343>.port = '4wpt' Should use all ascii prefixed characters as port
+PASS <area>: Setting <https://www.google.com:4343>.port = '4wpt' Should use all ascii prefixed characters as port
 PASS <a>: Setting <data:original>.pathname = 'new value'
 PASS <area>: Setting <data:original>.pathname = 'new value'
 PASS <a>: Setting <sc:original>.pathname = 'new value'

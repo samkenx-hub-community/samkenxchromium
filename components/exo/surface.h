@@ -107,6 +107,10 @@ class Surface final : public ui::PropertyHandler {
     leave_enter_callback_ = callback;
   }
 
+  void set_legacy_buffer_release_skippable(bool skippable) {
+    legacy_buffer_release_skippable_ = skippable;
+  }
+
   // Called when the display the surface is on has changed.
   // Returns true if successful, and false if it fails.
   bool UpdateDisplay(int64_t old_id, int64_t new_id);
@@ -304,6 +308,7 @@ class Surface final : public ui::PropertyHandler {
   void AppendSurfaceHierarchyContentsToFrame(
       const gfx::PointF& origin,
       float device_scale_factor,
+      bool client_submits_in_pixel_coords,
       FrameSinkResourceManager* resource_manager,
       viz::CompositorFrame* frame);
 
@@ -445,6 +450,10 @@ class Surface final : public ui::PropertyHandler {
   // if one can not be determined. See go/secure-exo-ids for more details.
   SecurityDelegate* GetSecurityDelegate();
 
+  // Sets the accessibility window ID sent from the shell client to the window.
+  // A negative number removes it.
+  void SetClientAccessibilityId(int id);
+
  private:
   struct State {
     State();
@@ -570,6 +579,7 @@ class Surface final : public ui::PropertyHandler {
   // the |frame|.
   void AppendContentsToFrame(const gfx::PointF& origin,
                              float device_scale_factor,
+                             bool client_submits_in_pixel_coords,
                              viz::CompositorFrame* frame);
 
   // Update surface content size base on current buffer size.
@@ -659,6 +669,7 @@ class Surface final : public ui::PropertyHandler {
   LeaveEnterCallback leave_enter_callback_;
 
   bool keyboard_shortcuts_inhibited_ = false;
+  bool legacy_buffer_release_skippable_ = false;
 };
 
 class ScopedSurface {

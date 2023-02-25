@@ -19,7 +19,6 @@
 
 namespace features {
 
-VIZ_COMMON_EXPORT BASE_DECLARE_FEATURE(kEnableOverlayPrioritization);
 VIZ_COMMON_EXPORT BASE_DECLARE_FEATURE(kDelegatedCompositing);
 VIZ_COMMON_EXPORT BASE_DECLARE_FEATURE(kRecordSkPicture);
 VIZ_COMMON_EXPORT BASE_DECLARE_FEATURE(kUseMultipleOverlays);
@@ -61,9 +60,8 @@ VIZ_COMMON_EXPORT BASE_DECLARE_FEATURE(kEagerSurfaceGarbageCollection);
 VIZ_COMMON_EXPORT BASE_DECLARE_FEATURE(kOverrideThrottledFrameRateParams);
 VIZ_COMMON_EXPORT BASE_DECLARE_FEATURE(kRendererAllocatesImages);
 VIZ_COMMON_EXPORT BASE_DECLARE_FEATURE(kBufferQueueImageSetPurgeable);
-#if BUILDFLAG(IS_ANDROID)
 VIZ_COMMON_EXPORT BASE_DECLARE_FEATURE(kEvictSubtree);
-#endif
+VIZ_COMMON_EXPORT BASE_DECLARE_FEATURE(kOnBeginFrameAcks);
 
 VIZ_COMMON_EXPORT extern const char kDraw1Point12Ms[];
 VIZ_COMMON_EXPORT extern const char kDraw2Points6Ms[];
@@ -79,7 +77,6 @@ VIZ_COMMON_EXPORT bool IsSimpleFrameRateThrottlingEnabled();
 #if BUILDFLAG(IS_ANDROID)
 VIZ_COMMON_EXPORT bool IsDynamicColorGamutEnabled();
 #endif
-VIZ_COMMON_EXPORT bool IsOverlayPrioritizationEnabled();
 VIZ_COMMON_EXPORT bool IsDelegatedCompositingEnabled();
 VIZ_COMMON_EXPORT bool IsUsingVizFrameSubmissionForWebView();
 VIZ_COMMON_EXPORT bool IsUsingPreferredIntervalForVideo();
@@ -101,6 +98,7 @@ VIZ_COMMON_EXPORT int MaxOverlaysConsidered();
 VIZ_COMMON_EXPORT bool ShouldVideoDetectorIgnoreNonVideoFrames();
 VIZ_COMMON_EXPORT bool ShouldOverrideThrottledFrameRateParams();
 VIZ_COMMON_EXPORT bool ShouldRendererAllocateImages();
+VIZ_COMMON_EXPORT bool IsOnBeginFrameAcksEnabled();
 
 }  // namespace features
 

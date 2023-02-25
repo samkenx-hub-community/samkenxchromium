@@ -99,6 +99,8 @@ static_library("browser") {
     "autofill_manager.h",
     "autofill_observer.cc",
     "autofill_observer.h",
+    "autofill_optimization_guide.cc",
+    "autofill_optimization_guide.h",
     "autofill_profile_import_process.cc",
     "autofill_profile_import_process.h",
     "autofill_profile_sync_util.cc",
@@ -250,6 +252,8 @@ static_library("browser") {
     "logging/log_receiver.h",
     "logging/log_router.cc",
     "logging/log_router.h",
+    "manual_testing_profile_import.cc",
+    "manual_testing_profile_import.h",
     "merchant_promo_code_manager.cc",
     "merchant_promo_code_manager.h",
     "metrics/autofill_metrics.cc",
@@ -287,6 +291,10 @@ static_library("browser") {
     "metrics/payments/virtual_card_enrollment_metrics.h",
     "metrics/payments/virtual_card_manual_fallback_bubble_metrics.cc",
     "metrics/payments/virtual_card_manual_fallback_bubble_metrics.h",
+    "metrics/payments/wallet_usage_data_metrics.cc",
+    "metrics/payments/wallet_usage_data_metrics.h",
+    "metrics/profile_import_metrics.cc",
+    "metrics/profile_import_metrics.h",
     "metrics/shadow_prediction_metrics.cc",
     "metrics/shadow_prediction_metrics.h",
     "metrics/stored_profile_metrics.cc",
@@ -563,6 +571,7 @@ static_library("browser") {
     "//components/infobars/core",
     "//components/keyed_service/core",
     "//components/language/core/browser",
+    "//components/optimization_guide/core",
     "//components/os_crypt",
     "//components/policy/core/browser",
     "//components/policy/core/common",
@@ -627,22 +636,6 @@ static_library("browser") {
   }
 }
 
-if (is_android) {
-  java_cpp_enum("java_enum_srcjar") {
-    # External code should depend on ":card_unmask_challenge_option_type_java" instead.
-    visibility = [ ":*" ]
-    sources = [ "payments/card_unmask_challenge_option.h" ]
-  }
-
-  android_library("card_unmask_challenge_option_type_java") {
-    srcjar_deps = [ ":java_enum_srcjar" ]
-
-    # Important: the generated enum uses the @IntDef annotation provided by
-    # this dependency.
-    deps = [ "//third_party/androidx:androidx_annotation_annotation_java" ]
-  }
-}
-
 static_library("test_support") {
   testonly = true
   sources = [
@@ -668,6 +661,8 @@ static_library("test_support") {
     "logging/text_log_receiver.h",
     "metrics/autofill_metrics_test_base.cc",
     "metrics/autofill_metrics_test_base.h",
+    "metrics/ukm_metrics_test_utils.cc",
+    "metrics/ukm_metrics_test_utils.h",
     "mock_autocomplete_history_manager.cc",
     "mock_autocomplete_history_manager.h",
     "mock_iban_manager.cc",
@@ -697,7 +692,6 @@ static_library("test_support") {
     "test_address_normalizer.h",
     "test_autofill_async_observer.cc",
     "test_autofill_async_observer.h",
-    "test_autofill_client.cc",
     "test_autofill_client.h",
     "test_autofill_clock.cc",
     "test_autofill_clock.h",
@@ -841,6 +835,7 @@ source_set("unit_tests") {
     "autofill_feedback_data_unittest.cc",
     "autofill_manager_unittest.cc",
     "autofill_merge_unittest.cc",
+    "autofill_optimization_guide_unittest.cc",
     "autofill_profile_import_process_unittest.cc",
     "autofill_profile_sync_util_unittest.cc",
     "autofill_subject_unittest.cc",
@@ -902,12 +897,19 @@ source_set("unit_tests") {
     "logging/log_manager_unittest.cc",
     "logging/log_router_unittest.cc",
     "logging/text_log_receiver_unittest.cc",
+    "manual_testing_profile_import_unittest.cc",
     "merchant_promo_code_manager_unittest.cc",
     "metrics/autofill_metrics_unittest.cc",
+    "metrics/form_events/address_form_event_logger_unittest.cc",
+    "metrics/form_events/form_event_logger_base_unittest.cc",
+    "metrics/payments/iban_metrics_unittest.cc",
     "metrics/payments/offers_metrics_unittest.cc",
+    "metrics/payments/wallet_usage_data_metrics_unittest.cc",
+    "metrics/profile_import_metrics_unittest.cc",
     "metrics/shadow_prediction_metrics_unittest.cc",
     "metrics/stored_profile_metrics_unittest.cc",
     "metrics/suggestions_list_metrics_unittest.cc",
+    "metrics/touch_to_fill_credit_card_quality_metrics_unittest.cc",
     "payments/autofill_offer_manager_unittest.cc",
     "payments/credit_card_access_manager_unittest.cc",
     "payments/credit_card_cvc_authenticator_unittest.cc",
@@ -1009,6 +1011,7 @@ source_set("unit_tests") {
     "//components/image_fetcher/core:core",
     "//components/image_fetcher/core:test_support",
     "//components/leveldb_proto",
+    "//components/optimization_guide/core",
     "//components/os_crypt",
     "//components/os_crypt:test_support",
     "//components/policy/core/common",

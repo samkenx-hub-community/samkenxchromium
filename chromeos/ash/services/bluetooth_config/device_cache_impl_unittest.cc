@@ -119,7 +119,7 @@ class DeviceCacheImplTest : public testing::Test {
         .WillByDefault(testing::Return(device_type));
 
     if (image_info)
-      fake_fast_pair_delegate_.SetDeviceImageInfo(*id_out, *image_info);
+      fake_fast_pair_delegate_.SetDeviceImageInfo(address, *image_info);
 
     device::BluetoothDevice* device = mock_device.get();
     mock_devices_.push_back(std::move(mock_device));
@@ -180,6 +180,10 @@ class DeviceCacheImplTest : public testing::Test {
   void SetDeviceNickname(const std::string& device_id,
                          const std::string& nickname) {
     fake_device_name_manager_.SetDeviceNickname(device_id, nickname);
+  }
+
+  absl::optional<std::string> GetDeviceNickname(std::string address) {
+    return fake_fast_pair_delegate_.GetDeviceNickname(address);
   }
 
   void ForgetDevice(const std::string& device_id) {
@@ -446,6 +450,14 @@ TEST_F(DeviceCacheImplTest, PairedDeviceNicknameChanges) {
   SetDeviceNickname(paired_device_id, kTestBluetoothNickname);
   EXPECT_EQ(2u, GetNumPairedDeviceListObserverEvents());
   list = GetPairedDevices();
+
+  // In this test file, AddDevice() uses |num_devices_created_| converted to a
+  // string  as the address for each device. Only one device is created in this
+  // test so "0" is the address of the device we want to check.
+  auto nickname = GetDeviceNickname("0");
+
+  EXPECT_TRUE(nickname.has_value());
+  EXPECT_TRUE(nickname.value() == kTestBluetoothNickname);
   EXPECT_EQ(1u, list.size());
   EXPECT_EQ(paired_device_id, list[0]->device_properties->id);
   EXPECT_EQ(kTestBluetoothNickname, list[0]->nickname);

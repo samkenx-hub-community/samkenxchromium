@@ -70,6 +70,8 @@ public class MainActivity
     private static final String SHARED_PREF_CCT = "Cct";
     private static final String SHARED_PREF_CLOSE_ICON = "CloseIcon";
     private static final String SHARED_PREF_CLOSE_POSITION = "ClosePosition";
+    private static final String SHARED_PREF_SIDE_SHEET_POSITION = "SideSheetPosition";
+    private static final String SHARED_PREF_SIDE_SHEET_ANIMATION = "SideSheetAnimation";
     private static final String SHARED_PREF_COLOR = "Color";
     private static final String SHARED_PREF_HEIGHT = "Height";
     private static final String SHARED_PREF_WIDTH = "Width";
@@ -81,6 +83,7 @@ public class MainActivity
     private static final String SHARED_PREF_THEME = "Theme";
     private static final String SHARED_PREF_URL_HIDING = "UrlHiding";
     private static final String SHARED_PREF_FORCE_ENGAGEMENT_SIGNALS = "ForceEngagementSignals";
+    private static final String SHARED_PREF_SIDE_SHEET_MAX_BUTTON = "SideSheetMaxButton";
     private static final int CLOSE_ICON_X = 0;
     private static final int CLOSE_ICON_BACK = 1;
     private static final int CLOSE_ICON_CHECK = 2;
@@ -88,6 +91,11 @@ public class MainActivity
     private static final int CHECKED = 1;
     private static final int ACTIVITY_HEIGHT_FIXED = 2;
     private static final int BACKGROUND_INTERACT_OFF_VALUE = 2;
+
+    /** Extra that enables the maximization button on the side sheet Custom Tab toolbar. */
+    public static final String EXTRA_ACTIVITY_SIDE_SHEET_ENABLE_MAXIMIZATION =
+            "androix.browser.customtabs.extra.EXTRA_ACTIVITY_SIDE_SHEET_ENABLE_MAXIMIZATION";
+
     /**
      * Minimal height the bottom sheet CCT should show is half of the display height.
      */
@@ -115,6 +123,8 @@ public class MainActivity
     private MaterialButtonToggleGroup mCloseButtonPositionToggle;
     private MaterialButtonToggleGroup mCloseButtonIcon;
     private MaterialButtonToggleGroup mThemeButton;
+    private MaterialButtonToggleGroup mSideSheetPositionToggle;
+    private MaterialButtonToggleGroup mSideSheetAnimationToggle;
     private TextView mToolbarCornerRadiusLabel;
     private SeekBar mToolbarCornerRadiusSlider;
     private CheckBox mBottomToolbarCheckbox;
@@ -123,6 +133,7 @@ public class MainActivity
     private CheckBox mUrlHidingCheckbox;
     private CheckBox mBackgroundInteractCheckbox;
     private CheckBox mForceEngagementSignalsCheckbox;
+    private CheckBox mSideSheetMaxButtonCheckbox;
     private TextView mPcctBreakpointLabel;
     private SeekBar mPcctBreakpointSlider;
     private TextView mPcctInitialHeightLabel;
@@ -135,6 +146,20 @@ public class MainActivity
     private @Px int mInitialHeight;
     private @Px int mMaxWidth;
     private @Px int mInitialWidth;
+
+    public static final int ACTIVITY_SIDE_SHEET_POSITION_DEFAULT = 0;
+    public static final int ACTIVITY_SIDE_SHEET_POSITION_START = 1;
+    public static final int ACTIVITY_SIDE_SHEET_POSITION_END = 2;
+
+    public static final String EXTRA_ACTIVITY_SIDE_SHEET_POSITION =
+            "androidx.browser.customtabs.extra.EXTRA_ACTIVITY_SIDE_SHEET_POSITION";
+
+    public static final int ACTIVITY_SIDE_SHEET_SLIDE_IN_DEFAULT = 0;
+    public static final int ACTIVITY_SIDE_SHEET_SLIDE_IN_FROM_BOTTOM = 1;
+    public static final int ACTIVITY_SIDE_SHEET_SLIDE_IN_FROM_SIDE = 2;
+
+    public static final String EXTRA_ACTIVITY_SIDE_SHEET_SLIDE_IN_BEHAVIOR =
+            "androidx.browser.customtabs.extra.EXTRA_ACTIVITY_SIDE_SHEET_SLIDE_IN_BEHAVIOR";
 
     /**
      * Once per second, asks the framework for the process importance, and logs any change.
@@ -367,6 +392,21 @@ public class MainActivity
         } else {
             mCloseButtonIcon.check(R.id.check_button);
         }
+
+        mSideSheetPositionToggle = findViewById(R.id.side_sheet_position_toggle);
+        int sideSheetPositionType = mSharedPref.getInt(SHARED_PREF_SIDE_SHEET_POSITION,
+                                            ACTIVITY_SIDE_SHEET_POSITION_END)
+                        == ACTIVITY_SIDE_SHEET_POSITION_START
+                ? R.id.side_sheet_start_button
+                : R.id.side_sheet_end_button;
+        mSideSheetPositionToggle.check(sideSheetPositionType);
+        mSideSheetAnimationToggle = findViewById(R.id.side_sheet_animation_toggle);
+        int sideSheetAnimationType = mSharedPref.getInt(SHARED_PREF_SIDE_SHEET_ANIMATION,
+                                             ACTIVITY_SIDE_SHEET_SLIDE_IN_FROM_SIDE)
+                        == ACTIVITY_SIDE_SHEET_SLIDE_IN_FROM_SIDE
+                ? R.id.side_sheet_side_button
+                : R.id.side_sheet_bottom_button;
+        mSideSheetAnimationToggle.check(sideSheetAnimationType);
     }
 
     private void initializeCornerRadiusSlider() {
@@ -409,6 +449,9 @@ public class MainActivity
         mForceEngagementSignalsCheckbox = findViewById(R.id.force_engagement_signals_checkbox);
         mForceEngagementSignalsCheckbox.setChecked(
                 mSharedPref.getInt(SHARED_PREF_FORCE_ENGAGEMENT_SIGNALS, CHECKED) == CHECKED);
+        mSideSheetMaxButtonCheckbox = findViewById(R.id.side_sheet_max_button_checkbox);
+        mSideSheetMaxButtonCheckbox.setChecked(
+                mSharedPref.getInt(SHARED_PREF_SIDE_SHEET_MAX_BUTTON, CHECKED) == CHECKED);
     }
 
     private void initializeCctSpinner() {
@@ -605,6 +648,14 @@ public class MainActivity
         int closeButtonPosition = mCloseButtonPositionToggle.getCheckedButtonId()
                 == R.id.end_button ? CustomTabsIntent.CLOSE_BUTTON_POSITION_END
                 : CustomTabsIntent.CLOSE_BUTTON_POSITION_START;
+        int sideSheetPosition =
+                mSideSheetPositionToggle.getCheckedButtonId() == R.id.side_sheet_end_button
+                ? ACTIVITY_SIDE_SHEET_POSITION_END
+                : ACTIVITY_SIDE_SHEET_POSITION_START;
+        int sideSheetAnimation =
+                mSideSheetAnimationToggle.getCheckedButtonId() == R.id.side_sheet_side_button
+                ? ACTIVITY_SIDE_SHEET_SLIDE_IN_FROM_SIDE
+                : ACTIVITY_SIDE_SHEET_SLIDE_IN_FROM_BOTTOM;
 
         if (viewId == R.id.connect_button) {
             if (mSharedPref.getStringSet(SHARED_PREF_SITES, null) != null) {
@@ -699,6 +750,10 @@ public class MainActivity
                 customTabsIntent.intent.putExtra(
                         "androidx.browser.customtabs.extra.ACTIVITY_SIDE_SHEET_BREAKPOINT_DP",
                         pcctBreakpointDp);
+                if (mSideSheetMaxButtonCheckbox.isChecked()) {
+                    customTabsIntent.intent.putExtra(
+                            EXTRA_ACTIVITY_SIDE_SHEET_ENABLE_MAXIMIZATION, true);
+                }
                 if (!mPcctHeightResizableCheckbox.isChecked()) {
                     customTabsIntent.intent.putExtra(
                             "androidx.browser.customtabs.extra.ACTIVITY_HEIGHT_RESIZE_BEHAVIOR",
@@ -709,11 +764,23 @@ public class MainActivity
                             "androix.browser.customtabs.extra.ENABLE_BACKGROUND_INTERACTION",
                             BACKGROUND_INTERACT_OFF_VALUE);
                 }
+
+                customTabsIntent.intent.putExtra(
+                        EXTRA_ACTIVITY_SIDE_SHEET_POSITION, sideSheetPosition);
+                customTabsIntent.intent.putExtra(
+                        EXTRA_ACTIVITY_SIDE_SHEET_SLIDE_IN_BEHAVIOR, sideSheetAnimation);
             } else {
                 editor.putString(SHARED_PREF_CCT,
                         mCctType.equals("Incognito CCT") ? "Incognito CCT" : "CCT");
                 if (session != null && mBottomToolbarCheckbox.isChecked()) {
                     prepareBottombar(builder);
+                    Intent broadcastIntent =
+                            new Intent(this, BottomBarManager.SwipeUpReceiver.class);
+                    PendingIntent pi = PendingIntent.getBroadcast(
+                            this, 0, broadcastIntent, PendingIntent.FLAG_MUTABLE);
+                    customTabsIntent.intent.putExtra(
+                            "androidx.browser.customtabs.extra.SECONDARY_TOOLBAR_SWIPE_UP_ACTION",
+                            pi);
                 }
                 // NOTE: opening in incognito may be restricted. This assumes it is not.
                 customTabsIntent.intent.putExtra(
@@ -743,8 +810,12 @@ public class MainActivity
                     session != null && mBottomToolbarCheckbox.isChecked() ? CHECKED : UNCHECKED;
             editor.putInt(SHARED_PREF_BOTTOM_TOOLBAR, toolbarCheck);
             editor.putInt(SHARED_PREF_CLOSE_POSITION, closeButtonPosition);
+            editor.putInt(SHARED_PREF_SIDE_SHEET_POSITION, sideSheetPosition);
+            editor.putInt(SHARED_PREF_SIDE_SHEET_ANIMATION, sideSheetAnimation);
             editor.putInt(SHARED_PREF_HEIGHT_RESIZABLE,
                     mPcctHeightResizableCheckbox.isChecked() ? CHECKED : UNCHECKED);
+            editor.putInt(SHARED_PREF_SIDE_SHEET_MAX_BUTTON,
+                    mSideSheetMaxButtonCheckbox.isChecked() ? CHECKED : UNCHECKED);
             editor.apply();
         }
     }

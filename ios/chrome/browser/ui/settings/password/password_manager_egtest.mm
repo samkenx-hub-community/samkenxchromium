@@ -19,6 +19,7 @@
 #import "ios/chrome/browser/signin/fake_system_identity.h"
 #import "ios/chrome/browser/ui/authentication/signin_earl_grey_ui_test_util.h"
 #import "ios/chrome/browser/ui/settings/google_services/manage_sync_settings_constants.h"
+#import "ios/chrome/browser/ui/settings/password/password_details/password_details_table_view_constants.h"
 #import "ios/chrome/browser/ui/settings/password/password_settings/password_settings_constants.h"
 #import "ios/chrome/browser/ui/settings/password/password_settings_app_interface.h"
 #import "ios/chrome/browser/ui/settings/password/passwords_in_other_apps/passwords_in_other_apps_app_interface.h"
@@ -173,6 +174,13 @@ id<GREYMatcher> PasswordDetailUsername() {
 // Matcher for the password in Password Details view.
 id<GREYMatcher> PasswordDetailPassword() {
   return TextFieldForCellWithLabelId(IDS_IOS_SHOW_PASSWORD_VIEW_PASSWORD);
+}
+
+// Matcher for the note in Password Details view.
+id<GREYMatcher> PasswordDetailNote() {
+  return grey_allOf(
+      grey_accessibilityID(GetTextFieldForID(IDS_IOS_SHOW_PASSWORD_VIEW_NOTE)),
+      grey_kindOfClassName(@"UITextView"), nil);
 }
 
 // Matcher for the federation details in Password Details view.
@@ -359,6 +367,13 @@ id<GREYMatcher> ToolbarSettingsSubmenuButton() {
   return grey_accessibilityID(kSettingsToolbarSettingsButtonId);
 }
 
+// Returns matcher for the password details / add password view footer displayed
+// when the note length is approaching max limit.
+id<GREYMatcher> TooLongNoteFooter() {
+  return grey_text(l10n_util::GetNSString(
+      IDS_IOS_SETTINGS_PASSWORDS_TOO_LONG_NOTE_DESCRIPTION));
+}
+
 // Saves an example form in the store.
 void SaveExamplePasswordForm() {
   GREYAssert(
@@ -380,6 +395,16 @@ void SaveExamplePasswordForms() {
                             userName:@"user2"
                               origin:@"https://example12.com"],
              @"Stored form was not found in the PasswordStore results.");
+}
+
+// Saves an example form with note in the store.
+void SaveExamplePasswordFormWithNote() {
+  GREYAssert(
+      [PasswordSettingsAppInterface saveExampleNote:@"concrete note"
+                                           password:@"concrete password"
+                                           userName:@"concrete username"
+                                             origin:@"https://example.com"],
+      @"Stored form was not found in the PasswordStore results.");
 }
 
 // Saves two example blocked forms in the store.
@@ -529,6 +554,16 @@ id<GREYMatcher> EditDoneButton() {
             (testAccountStorageSwitchShownIfSignedInAndFlagEnabled)]) {
     config.features_enabled.push_back(
         password_manager::features::kEnablePasswordsAccountStorage);
+  }
+
+  if ([self isRunningTest:@selector(testLayoutWithNotesDisabled)]) {
+    config.features_disabled.push_back(syncer::kPasswordNotesWithBackup);
+  }
+  if ([self isRunningTest:@selector(testLayoutWithNotesEnabled)] ||
+      [self isRunningTest:@selector(testAddPasswordLayoutWithLongNotes)] ||
+      [self isRunningTest:@selector
+            (testAddPasswordSaveButtonStateOnFieldChanges)]) {
+    config.features_enabled.push_back(syncer::kPasswordNotesWithBackup);
   }
 
   return config;
@@ -1257,6 +1292,86 @@ id<GREYMatcher> EditDoneButton() {
                             @[ Below() ],
                             [self matcherForPasswordDetailCellWithWebsites:
                                       @"https://example.com/"])];
+
+  [[EarlGrey selectElementWithMatcher:SettingsMenuBackButton()]
+      performAction:grey_tap()];
+  [[EarlGrey selectElementWithMatcher:SettingsMenuBackButton()]
+      performAction:grey_tap()];
+  [[EarlGrey selectElementWithMatcher:SettingsDoneButton()]
+      performAction:grey_tap()];
+}
+
+// Checks the order of the elements in the detail view layout for a
+// non-federated, non-blocked credential with notes feature disabled.
+- (void)testLayoutWithNotesDisabled {
+  SaveExamplePasswordForm();
+
+  OpenPasswordManager();
+
+  [[self interactionForSinglePasswordEntryWithDomain:@"example.com"
+                                            username:@"concrete username"]
+      performAction:grey_tap()];
+
+  [[EarlGrey
+      selectElementWithMatcher:[self matcherForPasswordDetailCellWithWebsites:
+                                         @"https://example.com/"]]
+      assertWithMatcher:grey_notNil()];
+  [[EarlGrey selectElementWithMatcher:PasswordDetailUsername()]
+      assertWithMatcher:grey_textFieldValue(@"concrete username")];
+  [[EarlGrey selectElementWithMatcher:PasswordDetailPassword()]
+      assertWithMatcher:grey_textFieldValue(kMaskedPassword)];
+  [[EarlGrey selectElementWithMatcher:PasswordDetailNote()]
+      assertWithMatcher:grey_nil()];
+
+  [[EarlGrey selectElementWithMatcher:PasswordDetailFederation()]
+      assertWithMatcher:grey_nil()];
+  [GetInteractionForPasswordDetailItem(PasswordDetailUsername())
+      assertWithMatcher:grey_layout(
+                            @[ Below() ],
+                            [self matcherForPasswordDetailCellWithWebsites:
+                                      @"https://example.com/"])];
+  [GetInteractionForPasswordDetailItem(PasswordDetailPassword())
+      assertWithMatcher:grey_layout(@[ Below() ], PasswordDetailUsername())];
+
+  [[EarlGrey selectElementWithMatcher:SettingsMenuBackButton()]
+      performAction:grey_tap()];
+  [[EarlGrey selectElementWithMatcher:SettingsMenuBackButton()]
+      performAction:grey_tap()];
+  [[EarlGrey selectElementWithMatcher:SettingsDoneButton()]
+      performAction:grey_tap()];
+}
+
+// Checks the order of the elements in the detail view layout for a
+// non-federated, non-blocked credential with notes feature enabled.
+- (void)testLayoutWithNotesEnabled {
+  SaveExamplePasswordFormWithNote();
+
+  OpenPasswordManager();
+
+  [[self interactionForSinglePasswordEntryWithDomain:@"example.com"
+                                            username:@"concrete username"]
+      performAction:grey_tap()];
+
+  [[EarlGrey
+      selectElementWithMatcher:[self matcherForPasswordDetailCellWithWebsites:
+                                         @"https://example.com/"]]
+      assertWithMatcher:grey_notNil()];
+  [[EarlGrey selectElementWithMatcher:PasswordDetailUsername()]
+      assertWithMatcher:grey_textFieldValue(@"concrete username")];
+  [[EarlGrey selectElementWithMatcher:PasswordDetailPassword()]
+      assertWithMatcher:grey_textFieldValue(kMaskedPassword)];
+  [[EarlGrey selectElementWithMatcher:PasswordDetailNote()]
+      assertWithMatcher:grey_text(@"concrete note")];
+
+  [[EarlGrey selectElementWithMatcher:PasswordDetailFederation()]
+      assertWithMatcher:grey_nil()];
+  [GetInteractionForPasswordDetailItem(PasswordDetailUsername())
+      assertWithMatcher:grey_layout(
+                            @[ Below() ],
+                            [self matcherForPasswordDetailCellWithWebsites:
+                                      @"https://example.com/"])];
+  [GetInteractionForPasswordDetailItem(PasswordDetailPassword())
+      assertWithMatcher:grey_layout(@[ Below() ], PasswordDetailUsername())];
 
   [[EarlGrey selectElementWithMatcher:SettingsMenuBackButton()]
       performAction:grey_tap()];
@@ -2198,6 +2313,57 @@ id<GREYMatcher> EditDoneButton() {
       assertWithMatcher:grey_textFieldValue(@"new password")];
 }
 
+// Checks that entering too long note while adding passwords blocks the save
+// button and displays a footer explanation.
+- (void)testAddPasswordLayoutWithLongNotes {
+  OpenPasswordManager();
+
+  [[EarlGrey selectElementWithMatcher:AddPasswordToolbarButton()]
+      performAction:grey_tap()];
+
+  // Fill form.
+  [[EarlGrey selectElementWithMatcher:AddPasswordWebsite()]
+      performAction:grey_replaceText(@"https://example.com/")];
+  [[EarlGrey selectElementWithMatcher:PasswordDetailUsername()]
+      performAction:grey_replaceText(@"new username")];
+  [[EarlGrey selectElementWithMatcher:PasswordDetailPassword()]
+      performAction:grey_replaceText(@"new password")];
+
+  // Entering too long note results in "Add" password being disabled and footer
+  // displayed.
+  NSString* note = [@"" stringByPaddingToLength:1001
+                                     withString:@"a"
+                                startingAtIndex:0];
+  [[EarlGrey selectElementWithMatcher:PasswordDetailNote()]
+      performAction:grey_replaceText(note)];
+  [[EarlGrey selectElementWithMatcher:AddPasswordSaveButton()]
+      assertWithMatcher:grey_not(grey_enabled())];
+  [[EarlGrey selectElementWithMatcher:grey_accessibilityID(
+                                          kPasswordDetailsViewControllerId)]
+      performAction:grey_scrollToContentEdge(kGREYContentEdgeBottom)];
+  [[EarlGrey selectElementWithMatcher:TooLongNoteFooter()]
+      assertWithMatcher:grey_sufficientlyVisible()];
+
+  // Entering note with length close to the limit should result in displaying
+  // footer only ("add" button should be enabled).
+  note = [@"" stringByPaddingToLength:1000 withString:@"a" startingAtIndex:0];
+  [[EarlGrey selectElementWithMatcher:PasswordDetailNote()]
+      performAction:grey_replaceText(note)];
+  [[EarlGrey selectElementWithMatcher:AddPasswordSaveButton()]
+      assertWithMatcher:grey_enabled()];
+  [[EarlGrey selectElementWithMatcher:TooLongNoteFooter()]
+      assertWithMatcher:grey_sufficientlyVisible()];
+
+  // For shorter notes there should be no footer and "add" button enabled.
+  note = [@"" stringByPaddingToLength:100 withString:@"a" startingAtIndex:0];
+  [[EarlGrey selectElementWithMatcher:PasswordDetailNote()]
+      performAction:grey_replaceText(note)];
+  [[EarlGrey selectElementWithMatcher:AddPasswordSaveButton()]
+      assertWithMatcher:grey_enabled()];
+  [[EarlGrey selectElementWithMatcher:TooLongNoteFooter()]
+      assertWithMatcher:grey_nil()];
+}
+
 // Tests that when a new credential is saved or an existing one is updated via
 // the add credential flow, the VC auto scrolls to the newly created or the
 // updated entry.
@@ -2303,6 +2469,70 @@ id<GREYMatcher> EditDoneButton() {
       performAction:grey_tap()];
   [[EarlGrey selectElementWithMatcher:SettingsDoneButton()]
       performAction:grey_tap()];
+}
+
+// Tests that save button in add password view remains disabled when we switch
+// from invalid to valid input in any of the fields (website, password, note),
+// when there are still other fields with invalid input.
+- (void)testAddPasswordSaveButtonStateOnFieldChanges {
+  OpenPasswordManager();
+  [[EarlGrey selectElementWithMatcher:AddPasswordToolbarButton()]
+      performAction:grey_tap()];
+
+  NSString* long_note = [@"" stringByPaddingToLength:1001
+                                          withString:@"a"
+                                     startingAtIndex:0];
+  [[EarlGrey selectElementWithMatcher:PasswordDetailUsername()]
+      performAction:grey_replaceText(@"username")];
+
+  // Make sure that switching from invalid to valid note doesn't enable the save
+  // button when website is invalid.
+  [[EarlGrey selectElementWithMatcher:AddPasswordWebsite()]
+      performAction:grey_replaceText(@"example")];
+  [[EarlGrey selectElementWithMatcher:PasswordDetailPassword()]
+      performAction:grey_replaceText(@"password")];
+  [[EarlGrey selectElementWithMatcher:PasswordDetailNote()]
+      performAction:grey_replaceText(long_note)];
+  [[EarlGrey selectElementWithMatcher:AddPasswordSaveButton()]
+      assertWithMatcher:grey_not(grey_enabled())];
+  [[EarlGrey selectElementWithMatcher:PasswordDetailNote()]
+      performAction:grey_replaceText(@"note")];
+  [[EarlGrey selectElementWithMatcher:AddPasswordSaveButton()]
+      assertWithMatcher:grey_not(grey_enabled())];
+
+  // Make sure that switching from invalid to valid note doesn't enable the save
+  // button when password is invalid.
+  [[EarlGrey selectElementWithMatcher:AddPasswordWebsite()]
+      performAction:grey_replaceText(@"https://example.com/")];
+  [[EarlGrey selectElementWithMatcher:PasswordDetailPassword()]
+      performAction:grey_replaceText(@"")];
+  [[EarlGrey selectElementWithMatcher:PasswordDetailNote()]
+      performAction:grey_replaceText(long_note)];
+  [[EarlGrey selectElementWithMatcher:AddPasswordSaveButton()]
+      assertWithMatcher:grey_not(grey_enabled())];
+  [[EarlGrey selectElementWithMatcher:PasswordDetailNote()]
+      performAction:grey_replaceText(@"note")];
+  [[EarlGrey selectElementWithMatcher:AddPasswordSaveButton()]
+      assertWithMatcher:grey_not(grey_enabled())];
+
+  // Make sure that from invalid to valid website and password doesn't enable
+  // the save button when note is too long.
+  [[EarlGrey selectElementWithMatcher:AddPasswordWebsite()]
+      performAction:grey_replaceText(@"example")];
+  [[EarlGrey selectElementWithMatcher:PasswordDetailPassword()]
+      performAction:grey_replaceText(@"")];
+  [[EarlGrey selectElementWithMatcher:PasswordDetailNote()]
+      performAction:grey_replaceText(long_note)];
+  [[EarlGrey selectElementWithMatcher:AddPasswordSaveButton()]
+      assertWithMatcher:grey_not(grey_enabled())];
+  [[EarlGrey selectElementWithMatcher:AddPasswordWebsite()]
+      performAction:grey_replaceText(@"https://example.com/")];
+  [[EarlGrey selectElementWithMatcher:AddPasswordSaveButton()]
+      assertWithMatcher:grey_not(grey_enabled())];
+  [[EarlGrey selectElementWithMatcher:PasswordDetailPassword()]
+      performAction:grey_replaceText(@"password")];
+  [[EarlGrey selectElementWithMatcher:AddPasswordSaveButton()]
+      assertWithMatcher:grey_not(grey_enabled())];
 }
 
 // Tests that the duplicate credential section alert is shown when the user adds
@@ -2751,11 +2981,10 @@ id<GREYMatcher> EditDoneButton() {
   OpenPasswordManager();
   OpenSettingsSubmenu();
 
-  [EarlGrey
-      selectElementWithMatcher:
-          grey_allOf(grey_accessibilityID(
-                         kPasswordSettingsAccountStorageSwitchTableViewId),
-                     grey_notVisible(), nil)];
+  [[EarlGrey selectElementWithMatcher:
+                 grey_accessibilityID(
+                     kPasswordSettingsAccountStorageSwitchTableViewId)]
+      assertWithMatcher:grey_nil()];
 }
 
 - (void)testAccountStorageSwitchShownIfSignedInAndFlagEnabled {
@@ -2771,32 +3000,32 @@ id<GREYMatcher> EditDoneButton() {
                     chrome_test_util::TableViewSwitchCell(
                         kPasswordSettingsAccountStorageSwitchTableViewId,
                         /*is_toggled_on=*/YES)];
+  [accountStorageSwitch assertWithMatcher:grey_sufficientlyVisible()];
   // The toggle text must contain the signed-in account.
-  [EarlGrey
-      selectElementWithMatcher:
-          grey_allOf(
-              grey_descendant(grey_accessibilityID(
-                  kPasswordSettingsAccountStorageSwitchTableViewId)),
-              ElementWithAccessibilityLabelSubstring(fakeIdentity.userEmail),
-              nil)];
+  [[EarlGrey
+      selectElementWithMatcher:grey_accessibilityLabel(l10n_util::GetNSStringF(
+                                   IDS_IOS_ACCOUNT_STORAGE_OPT_IN_SUBLABEL,
+                                   base::SysNSStringToUTF16(
+                                       fakeIdentity.userEmail)))]
+      assertWithMatcher:grey_sufficientlyVisible()];
 
   [accountStorageSwitch performAction:TurnTableViewSwitchOn(NO)];
 
-  [EarlGrey selectElementWithMatcher:
-                chrome_test_util::TableViewSwitchCell(
-                    kPasswordSettingsAccountStorageSwitchTableViewId,
-                    /*is_toggled_on=*/NO)];
+  [[EarlGrey selectElementWithMatcher:
+                 chrome_test_util::TableViewSwitchCell(
+                     kPasswordSettingsAccountStorageSwitchTableViewId,
+                     /*is_toggled_on=*/NO)]
+      assertWithMatcher:grey_sufficientlyVisible()];
 }
 
 - (void)testAccountStorageSwitchHiddenIfSignedOut {
   OpenPasswordManager();
   OpenSettingsSubmenu();
 
-  [EarlGrey
-      selectElementWithMatcher:
-          grey_allOf(grey_accessibilityID(
-                         kPasswordSettingsAccountStorageSwitchTableViewId),
-                     grey_notVisible(), nil)];
+  [[EarlGrey selectElementWithMatcher:
+                 grey_accessibilityID(
+                     kPasswordSettingsAccountStorageSwitchTableViewId)]
+      assertWithMatcher:grey_nil()];
 }
 
 - (void)testAccountStorageSwitchHiddenIfSyncing {
@@ -2808,11 +3037,10 @@ id<GREYMatcher> EditDoneButton() {
   OpenPasswordManager();
   OpenSettingsSubmenu();
 
-  [EarlGrey
-      selectElementWithMatcher:
-          grey_allOf(grey_accessibilityID(
-                         kPasswordSettingsAccountStorageSwitchTableViewId),
-                     grey_notVisible(), nil)];
+  [[EarlGrey selectElementWithMatcher:
+                 grey_accessibilityID(
+                     kPasswordSettingsAccountStorageSwitchTableViewId)]
+      assertWithMatcher:grey_nil()];
 }
 
 @end

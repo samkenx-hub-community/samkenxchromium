@@ -1642,7 +1642,7 @@ void LayoutMultiColumnFlowThread::RestoreMultiColumnLayoutState(
 LayoutSize LayoutMultiColumnFlowThread::Size() const {
   NOT_DESTROYED();
   if (RuntimeEnabledFeatures::LayoutNGNoCopyBackEnabled() &&
-      !HasValidCachedGeometry()) {
+      !HasValidCachedGeometry() && EverHadLayout()) {
     // const_cast in order to update the cached value.
     auto* mutable_this = const_cast<LayoutMultiColumnFlowThread*>(this);
     mutable_this->SetHasValidCachedGeometry(true);
@@ -1667,21 +1667,7 @@ LayoutSize LayoutMultiColumnFlowThread::ComputeSize() const {
       if (!child_fragment.IsFragmentainerBox()) {
         continue;
       }
-      LogicalSize logical_size = converter.ToLogical(child_fragment.Size());
-
-      // TODO(layout-dev): This should really be checking if there are any
-      // descendants that take up block space rather than if it has overflow. In
-      // other words, we would still want to clamp a zero height fragmentainer
-      // if it had content with zero inline size and non-zero block size. This
-      // would likely require us to store an extra flag on
-      // NGPhysicalBoxFragment.
-      if (child_fragment.HasLayoutOverflow()) {
-        // Don't clamp the fragmentainer to a block size of 1 if it is truly a
-        // zero-height column.
-        logical_size.block_size =
-            ClampedToValidFragmentainerCapacity(logical_size.block_size);
-      }
-
+      LogicalSize logical_size = FragmentainerLogicalCapacity(child_fragment);
       thread_size.block_size += logical_size.block_size;
       if (!has_processed_first_column_in_flow_thread) {
         thread_size.inline_size = logical_size.inline_size;

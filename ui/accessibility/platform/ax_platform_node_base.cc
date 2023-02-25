@@ -1256,8 +1256,7 @@ void AXPlatformNodeBase::ComputeAttributes(PlatformAttributeList* attributes) {
       case ax::mojom::DescriptionFrom::kPopoverAttribute:
         // The following types of markup are mapped to "tooltip":
         // * The title attribute.
-        // * A related popover=something related via popovertoggletarget /
-        // popovershowtarget / popoverhidetarget.
+        // * A popover=something related via the `popovertarget` attribute.
         // * A tooltip related via aria-describedby (see kRelatedElement above).
         from = "tooltip";
         break;
@@ -2538,8 +2537,15 @@ std::string AXPlatformNodeBase::ComputeDetailsRoles() const {
         [[fallthrough]];
       }
       default:
-        // Use * to indicate some other role.
-        details_roles_set.insert("*");
+        // If a popover of any kind, use "popover" -- technically this is not a
+        // role, and therefore, details-roles is more of a hints field. Use * to
+        // indicate some other role.
+        if (detail_object->GetDelegate()->node()->HasIntAttribute(
+                ax::mojom::IntAttribute::kIsPopup)) {
+          details_roles_set.insert("popover");
+        } else {
+          details_roles_set.insert("*");
+        }
         break;
     }
   }

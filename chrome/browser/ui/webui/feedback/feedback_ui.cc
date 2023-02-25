@@ -6,11 +6,13 @@
 
 #include "build/chromeos_buildflags.h"
 #include "chrome/browser/profiles/profile.h"
+#include "chrome/common/pref_names.h"
 #include "chrome/common/webui_url_constants.h"
 #include "chrome/grit/browser_resources.h"
 #include "chrome/grit/feedback_resources.h"
 #include "chrome/grit/feedback_resources_map.h"
 #include "chrome/grit/generated_resources.h"
+#include "components/prefs/pref_service.h"
 #include "components/strings/grit/components_strings.h"
 #include "content/public/browser/web_ui.h"
 #include "content/public/browser/web_ui_data_source.h"
@@ -30,6 +32,8 @@ void AddStringResources(content::WebUIDataSource* source,
       {"attachFileLabel", IDS_FEEDBACK_ATTACH_FILE_LABEL},
       {"attachFileNote", IDS_FEEDBACK_ATTACH_FILE_NOTE},
       {"attachFileToBig", IDS_FEEDBACK_ATTACH_FILE_TO_BIG},
+      {"autofillMetadataPageTitle", IDS_FEEDBACK_AUTOFILL_METADATA_PAGE_TITLE},
+      {"autofillMetadataInfo", IDS_FEEDBACK_INCLUDE_AUTOFILL_METADATA_CHECKBOX},
       {"bluetoothLogsInfo", IDS_FEEDBACK_BLUETOOTH_LOGS_CHECKBOX},
       {"bluetoothLogsMessage", IDS_FEEDBACK_BLUETOOTH_LOGS_MESSAGE},
       {"cancel", IDS_CANCEL},
@@ -89,3 +93,7 @@ FeedbackUI::FeedbackUI(content::WebUI* web_ui) : WebDialogUI(web_ui) {
 }
 
 FeedbackUI::~FeedbackUI() = default;
+
+bool FeedbackUI::IsFeedbackEnabled(Profile* profile) {
+  return profile->GetPrefs()->GetBoolean(prefs::kUserFeedbackAllowed);
+}

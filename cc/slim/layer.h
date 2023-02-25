@@ -12,6 +12,7 @@
 #include "base/memory/ref_counted.h"
 #include "base/memory/scoped_refptr.h"
 #include "cc/slim/filter.h"
+#include "cc/slim/frame_data.h"
 #include "third_party/skia/include/core/SkColor.h"
 #include "ui/gfx/geometry/point3_f.h"
 #include "ui/gfx/geometry/point_f.h"
@@ -23,10 +24,16 @@ namespace cc {
 class Layer;
 }
 
+namespace viz {
+class CompositorRenderPass;
+class SharedQuadState;
+}  // namespace viz
+
 namespace cc::slim {
 
 class LayerTree;
 class LayerTreeCcWrapper;
+class LayerTreeImpl;
 
 // Base class for composited layers. Special layer types are derived from
 // this class. Each layer is an independent unit in the compositor, be that
@@ -178,15 +185,25 @@ class COMPONENT_EXPORT(CC_SLIM) Layer : public base::RefCounted<Layer> {
 
  protected:
   friend class LayerTreeCcWrapper;
+  friend class LayerTreeImpl;
 
   explicit Layer(scoped_refptr<cc::Layer> cc_layer);
   virtual ~Layer();
 
   // Called by LayerTree.
+  gfx::Transform ComputeTransformToParent();
   virtual bool HasDrawableContent() const;
+  virtual void AppendQuads(viz::CompositorRenderPass& render_pass,
+                           FrameData& data,
+                           const gfx::Transform& transform,
+                           const gfx::Rect* clip);
 
   void NotifyTreeChanged();
   void NotifyPropertyChanged();
+  virtual viz::SharedQuadState* CreateAndAppendSharedQuadState(
+      viz::CompositorRenderPass& render_pass,
+      const gfx::Transform& transform,
+      const gfx::Rect* clip);
 
   const scoped_refptr<cc::Layer> cc_layer_;
 

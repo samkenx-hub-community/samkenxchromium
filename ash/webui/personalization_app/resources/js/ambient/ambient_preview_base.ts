@@ -11,9 +11,9 @@
 import {Url} from 'chrome://resources/mojo/url/mojom/url.mojom-webui.js';
 import {PolymerElementProperties} from 'chrome://resources/polymer/v3_0/polymer/interfaces.js';
 
+import {AmbientModeAlbum, TopicSource} from '../../personalization_app.mojom-webui.js';
 import {isAmbientModeAllowed, isPersonalizationJellyEnabled} from '../load_time_booleans.js';
 import {setErrorAction} from '../personalization_actions.js';
-import {AmbientModeAlbum, TopicSource} from '../personalization_app.mojom-webui.js';
 import {WithPersonalizationStore} from '../personalization_store.js';
 import {isNonEmptyArray} from '../utils.js';
 
@@ -45,16 +45,16 @@ export class AmbientPreviewBase extends WithPersonalizationStore {
         computed: 'computePreviewAlbums_(albums_, topicSource_)',
       },
       firstPreviewAlbum_: {
-        type: AmbientModeAlbum,
+        type: Object,
         computed: 'computeFirstPreviewAlbum_(previewAlbums_)',
       },
       loading_: {
         type: Boolean,
         computed:
-            'computeLoading_(isAmbientModeAllowed_, ambientModeEnabled_, albums_, topicSource_, googlePhotosAlbumsPreviews_)',
+            'computeLoading_(isAmbientModeAllowed_, ambientModeEnabled_, albums_, topicSource_, previewImages_)',
         observer: 'onLoadingChanged_',
       },
-      googlePhotosAlbumsPreviews_: {
+      previewImages_: {
         type: Array,
         value: null,
       },
@@ -74,7 +74,7 @@ export class AmbientPreviewBase extends WithPersonalizationStore {
   }
 
   protected ambientModeEnabled_: boolean|null;
-  protected googlePhotosAlbumsPreviews_: Url[]|null;
+  protected previewImages_: Url[]|null;
   protected isPersonalizationJellyEnabled_: boolean;
   protected previewAlbums_: AmbientModeAlbum[]|null;
   protected topicSource_: TopicSource|null;
@@ -96,9 +96,7 @@ export class AmbientPreviewBase extends WithPersonalizationStore {
     this.watch(
         'ambientModeEnabled_', state => state.ambient.ambientModeEnabled);
     this.watch('albums_', state => state.ambient.albums);
-    this.watch(
-        'googlePhotosAlbumsPreviews_',
-        state => state.ambient.googlePhotosAlbumsPreviews);
+    this.watch('previewImages_', state => state.ambient.previews);
     this.watch('topicSource_', state => state.ambient.topicSource);
     this.updateFromStore();
   }
@@ -106,8 +104,7 @@ export class AmbientPreviewBase extends WithPersonalizationStore {
   private computeLoading_(): boolean {
     return this.isAmbientModeAllowed_ &&
         (this.ambientModeEnabled_ === null || this.albums_ === null ||
-         this.topicSource_ === null ||
-         this.googlePhotosAlbumsPreviews_ === null);
+         this.topicSource_ === null || this.previewImages_ === null);
   }
 
   private onLoadingChanged_(value: boolean) {

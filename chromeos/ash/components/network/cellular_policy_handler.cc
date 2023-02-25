@@ -45,7 +45,7 @@ constexpr base::TimeDelta kCellularDeviceWaitTime = base::Seconds(30);
 
 CellularPolicyHandler::InstallPolicyESimRequest::InstallPolicyESimRequest(
     const std::string& smdp_address,
-    const base::Value& onc_config)
+    const base::Value::Dict& onc_config)
     : smdp_address(smdp_address),
       onc_config(onc_config.Clone()),
       retry_backoff(&kRetryBackoffPolicy) {}
@@ -81,7 +81,7 @@ void CellularPolicyHandler::Init(
 }
 
 void CellularPolicyHandler::InstallESim(const std::string& smdp_address,
-                                        const base::Value& onc_config) {
+                                        const base::Value::Dict& onc_config) {
   PushRequestAndProcess(
       std::make_unique<InstallPolicyESimRequest>(smdp_address, onc_config));
 }
@@ -227,7 +227,7 @@ void CellularPolicyHandler::SetupESim(const dbus::ObjectPath& euicc_path) {
   // require confirmation code.
   cellular_esim_installer_->InstallProfileFromActivationCode(
       GetCurrentSmdpAddress(), /*confirmation_code=*/std::string(), euicc_path,
-      base::Value(std::move(new_shill_properties)),
+      std::move(new_shill_properties),
       base::BindOnce(
           &CellularPolicyHandler::OnESimProfileInstallAttemptComplete,
           weak_ptr_factory_.GetWeakPtr()),
@@ -239,15 +239,14 @@ base::Value::Dict CellularPolicyHandler::GetNewShillProperties() {
       network_profile_handler_->GetProfileForUserhash(
           /*userhash=*/std::string());
   const std::string* guid =
-      remaining_install_requests_.front()->onc_config.FindStringKey(
+      remaining_install_requests_.front()->onc_config.FindString(
           ::onc::network_config::kGUID);
   DCHECK(guid);
 
-  return std::move(policy_util::CreateShillConfiguration(
-                       *profile, *guid, /*global_policy=*/nullptr,
-                       &(remaining_install_requests_.front()->onc_config),
-                       /*user_settings=*/nullptr)
-                       .GetDict());
+  return policy_util::CreateShillConfiguration(
+      *profile, *guid, /*global_policy=*/nullptr,
+      &(remaining_install_requests_.front()->onc_config),
+      /*user_settings=*/nullptr);
 }
 
 const std::string& CellularPolicyHandler::GetCurrentSmdpAddress() const {

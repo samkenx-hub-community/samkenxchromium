@@ -915,6 +915,18 @@ TEST_F(PersonalDataManagerTest, NoIBANsAddedIfDisabled) {
   EXPECT_EQ(0U, personal_data_->GetLocalIBANs().size());
 }
 
+TEST_F(PersonalDataManagerTest, AddingIbanUpdatesPref) {
+  prefs::SetAutofillIBANEnabled(prefs_.get(), true);
+  // The pref should always start disabled.
+  ASSERT_FALSE(personal_data_->IsAutofillHasSeenIbanPrefEnabled());
+  IBAN iban = test::GetIBAN();
+
+  personal_data_->AddIBAN(iban);
+  WaitForOnPersonalDataChanged();
+  // Adding an IBAN permanently enables the pref.
+  EXPECT_TRUE(personal_data_->IsAutofillHasSeenIbanPrefEnabled());
+}
+
 TEST_F(PersonalDataManagerTest, AddUpdateRemoveIBANs) {
   prefs::SetAutofillIBANEnabled(prefs_.get(), true);
   IBAN iban0(base::GenerateGUID());
@@ -4820,7 +4832,7 @@ TEST_F(PersonalDataManagerTest, CreateDataForTest) {
 
   // Turn on test data creation for the rest of this scope.
   base::test::ScopedFeatureList enabled;
-  enabled.InitAndEnableFeature(features::kAutofillCreateDataForTest);
+  enabled.InitAndEnableFeature(features::test::kAutofillCreateDataForTest);
 
   // Reloading the test profile should result in test data being created.
   ResetPersonalDataManager(USER_MODE_NORMAL);

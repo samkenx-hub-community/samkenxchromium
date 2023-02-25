@@ -27,16 +27,23 @@ class WebView;
 
 class ProfilePicker {
  public:
+  // This is used for logging, so do not remove or reorder existing entries.
   enum class FirstRunExitStatus {
     // The user completed the FRE and is continuing to launch the browser.
     kCompleted = 0,
 
+#if BUILDFLAG(IS_CHROMEOS_LACROS)
+    // The user exited the FRE before going through the mandatory steps.
+    kQuitEarly = 1,
+#endif
+
     // The user finished the mandatory FRE steps but abandoned their task
     // (closed the browser app).
-    kQuitAtEnd = 1,
+    kQuitAtEnd = 2,
 
-    // The user exited the FRE before going through the mandatory steps.
-    kQuitEarly = 2,
+    // Add any new values above this one, and update kMaxValue to the highest
+    // enumerator value.
+    kMaxValue = kQuitAtEnd
   };
   using FirstRunExitedCallback =
       base::OnceCallback<void(FirstRunExitStatus status)>;

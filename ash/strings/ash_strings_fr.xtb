@@ -133,11 +133,13 @@ Pour commencer, voici des exemples de ce que vous pouvez me demander.</translati
 <translation id="163517899691012366">Les notifications sont désactivées lorsque le mode Ne pas déranger est activé</translation>
 <translation id="1637505162081889933"><ph name="NUM_DEVICES" /> appareils</translation>
 <translation id="1639239467298939599">Chargement en cours…</translation>
+<translation id="1647986356840967552">Page précédente</translation>
 <translation id="1654477262762802994">Soumettre une requête vocale</translation>
 <translation id="1668469839109562275">VPN intégré</translation>
 <translation id="1677472565718498478">Temps restant : <ph name="TIME" /></translation>
 <translation id="1677507110654891115">La fonctionnalité <ph name="FEATURE_NAME" /> n'est pas connectée.</translation>
 <translation id="1677582821739292812">Quelqu'un regarde votre écran</translation>
+<translation id="1683399938733266832">Utilisation actuelle du processeur : <ph name="CPU_USEAGE" /> %</translation>
 <translation id="169515659049020177">Maj</translation>
 <translation id="1698080062160024910">Minuteur de <ph name="TOTAL_TIME" /> – <ph name="LABEL" /></translation>
 <translation id="1698760176351776263">Adresse IPv6 : <ph name="ADDRESS" /></translation>
@@ -286,6 +288,7 @@ Pour commencer, voici des exemples de ce que vous pouvez me demander.</translati
 <translation id="2475982808118771221">Une erreur s'est produite.</translation>
 <translation id="2482878487686419369">Notifications</translation>
 <translation id="2484513351006226581">Appuyez sur <ph name="KEYBOARD_SHORTCUT" /> pour changer la disposition du clavier.</translation>
+<translation id="2487915095798731898">Rejoindre</translation>
 <translation id="2501920221385095727">Touches persistantes</translation>
 <translation id="2509468283778169019">Touche VERR MAJ activée</translation>
 <translation id="2515586267016047495">Alt</translation>
@@ -380,6 +383,7 @@ Pour commencer, voici des exemples de ce que vous pouvez me demander.</translati
 <translation id="3051189971848907985">Changement de nom du profil… Attendez quelques minutes.</translation>
 <translation id="3055162170959710888">Vous avez utilisé l'appareil pendant <ph name="USED_TIME" /> aujourd'hui</translation>
 <translation id="3062298103034426069">Non compatible</translation>
+<translation id="3068622547379332530">Version <ph name="VERSION_NAME" /> (<ph name="OFFICIAL_STATUS" />) <ph name="CHANNEL_NAME" /> <ph name="PROCESSOR_VARIATION" /></translation>
 <translation id="3068711042108640621">Étagère à gauche</translation>
 <translation id="3077734595579995578">maj</translation>
 <translation id="3081696990447829002">Développer le menu</translation>
@@ -554,6 +558,7 @@ Branchez votre appareil sur une source d'alimentation.</translation>
 <translation id="397105322502079400">Calcul en cours…</translation>
 <translation id="397726367135689299">La recharge de la batterie n'est peut-être pas fiable.</translation>
 <translation id="3977512764614765090">La batterie est en charge, avec un niveau de <ph name="PERCENTAGE" /> % pour l'instant.</translation>
+<translation id="3984536049089846927">Page suivante</translation>
 <translation id="3986082989454912832">Répondre</translation>
 <translation id="3995138139523574647">Appareil USB de type C (port situé sur la droite de l'appareil, à l'arrière)</translation>
 <translation id="40062176907008878">Écriture manuscrite</translation>
@@ -576,7 +581,7 @@ Branchez votre appareil sur une source d'alimentation.</translation>
 <translation id="4123259114412175274">Pour déverrouiller votre Chromebook, assurez-vous que le Bluetooth est activé sur votre téléphone</translation>
 <translation id="4125970834901680537">Impossible de diffuser des applis en streaming en mode tablette. Réessayez en mode ordinateur portable.</translation>
 <translation id="4129129681837227511">Pour afficher les notifications sur l'écran de verrouillage, déverrouillez votre appareil afin de modifier ce paramètre</translation>
-<translation id="4130035430755296270">Continuez à pointer pour plus d'options de mise en page</translation>
+<translation id="4131973331381812765">Température : <ph name="TEMPERATURE" /> °C – Vitesse actuelle : <ph name="CPU_AVERAGE_CURRENT_FREQUENCY_GHZ" /> GHz</translation>
 <translation id="4136724716305260864">Activé jusqu'au lever du soleil</translation>
 <translation id="4146833061457621061">Joue de la musique</translation>
 <translation id="4150201353443180367">Écran</translation>
@@ -731,6 +736,7 @@ Branchez votre appareil sur une source d'alimentation.</translation>
 <translation id="4895488851634969361">La batterie est pleine.</translation>
 <translation id="490375751687810070">Vertical</translation>
 <translation id="490788395437447240">Niveau de la batterie : <ph name="BATTERY_PERCENTAGE" /> %</translation>
+<translation id="491504982845934899">Activer <ph name="NETWORK_NAME" /> après la configuration de l'appareil</translation>
 <translation id="4917385247580444890">Très bon</translation>
 <translation id="4918086044614829423">Accepter</translation>
 <translation id="4919841137949306064"><ph name="APP_NAME" /> utilise actuellement votre caméra</translation>
@@ -912,6 +918,7 @@ Branchez votre appareil sur une source d'alimentation.</translation>
 <translation id="5867606971598166637">Votre administrateur système surveille vos écrans</translation>
 <translation id="5876666360658629066">Saisir le code parental</translation>
 <translation id="5881540930187678962">Configurer Phone Hub plus tard</translation>
+<translation id="5881663018261910378">Désactivé</translation>
 <translation id="5887954372087850114">La fenêtre <ph name="WINDOW_TITLE" /> est associée à <ph name="DESK_TITLE" /> et dissociée de tous les autres bureaux</translation>
 <translation id="5895138241574237353">Redémarrer</translation>
 <translation id="589817443623831496">Exploration par position</translation>
@@ -1326,6 +1333,7 @@ Nouvelle installation</translation>
 <translation id="8131740175452115882">Confirmer</translation>
 <translation id="8131994907636310308">Fermer le toast de tri</translation>
 <translation id="8132793192354020517">Connecté à <ph name="NAME" /></translation>
+<translation id="8138705869659070104">Activer après config. appareil</translation>
 <translation id="813913629614996137">Initialisation…</translation>
 <translation id="8142441511840089262">Double-clic</translation>
 <translation id="8142699993796781067">Réseau privé</translation>
@@ -1456,6 +1464,7 @@ Nouvelle installation</translation>
 <translation id="8850991929411075241">Recherche+Échap</translation>
 <translation id="8853703225951107899">Impossible de valider votre code ou votre mot de passe pour la deuxième fois. Remarque : si vous avez modifié votre mot de passe récemment, utilisez l'ancien. Votre nouveau mot de passe ne sera appliqué qu'une fois que vous serez déconnecté.</translation>
 <translation id="8855885154700222542">Touche de plein écran</translation>
+<translation id="8858369206579825206">Paramètres de confidentialité</translation>
 <translation id="8870509716567206129">Application incompatible avec l'écran partagé.</translation>
 <translation id="8874184842967597500">Non connecté</translation>
 <translation id="8876661425082386199">Vérifier votre connexion</translation>

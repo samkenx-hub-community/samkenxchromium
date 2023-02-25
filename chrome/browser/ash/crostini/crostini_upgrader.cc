@@ -42,7 +42,14 @@ class CrostiniUpgraderFactory : public ProfileKeyedServiceFactory {
   friend class base::NoDestructor<CrostiniUpgraderFactory>;
 
   CrostiniUpgraderFactory()
-      : ProfileKeyedServiceFactory("CrostiniUpgraderService") {
+      : ProfileKeyedServiceFactory(
+            "CrostiniUpgraderService",
+            ProfileSelections::Builder()
+                .WithRegular(ProfileSelection::kOriginalOnly)
+                // TODO(crbug.com/1418376): Check if this service is needed in
+                // Guest mode.
+                .WithGuest(ProfileSelection::kOriginalOnly)
+                .Build()) {
     DependsOn(CrostiniManagerFactory::GetInstance());
   }
 
@@ -481,6 +488,11 @@ CrostiniExportImport::OnceTrackerFactory CrostiniUpgrader::MakeFactory() {
                                                std::move(path));
       },
       weak_ptr_factory_.GetWeakPtr());
+}
+
+// static
+void CrostiniUpgrader::EnsureFactoryBuilt() {
+  CrostiniUpgraderFactory::GetInstance();
 }
 
 }  // namespace crostini

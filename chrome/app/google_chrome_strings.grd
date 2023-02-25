@@ -616,7 +616,7 @@ Permissions you've already given to websites and apps may apply to this account.
           Installation failed due to unspecified error. Please download Google Chrome again.
         </message>
         <message name="IDS_INSTALL_OS_NOT_SUPPORTED" desc="Error displayed if OS is not supported">
-          Google Chrome requires Windows 7 or higher.
+          Google Chrome requires Windows 10 or higher.
         </message>
         <message name="IDS_INSTALL_OS_ERROR" desc="Error displayed when any Windows API call fails and we do not have more specific information.">
           An operating system error occurred during installation. Please download Google Chrome again.
@@ -1551,8 +1551,17 @@ Permissions you've already given to websites and apps may apply to this account.
           </message>
         </if>
         <if expr="not chromeos_lacros">
-          <message name="IDS_FRE_SIGN_IN_SUBTITLE" desc="The subtitle for the sign in page explaining to the users the benefits of signing in to Chrome">
-            You can enjoy the most out of Chrome
+          <message name="IDS_FRE_SIGN_IN_TITLE_0"
+            desc="This string appears as a heading on a full-page screen that asks the user to sign in to Chrome with their Google Account. It appears when the user launches Chrome for the first time. When they sign in, they can personalize and customize Chrome and remember their settings in their Google Account. The tone should be inviting and alluring.">
+            Sign in to Chrome
+          </message>
+          <message name="IDS_FRE_SIGN_IN_TITLE_1"
+            desc="This string appears as a heading on a full-page screen that asks the user to sign in to Chrome with their Google Account. It appears when the user launches Chrome for the first time. When they sign in, they can personalize and customize Chrome and remember their settings in their Google Account. The tone should be inviting and alluring.">
+            Make Chrome your own
+          </message>
+          <message name="IDS_FRE_SIGN_IN_TITLE_2"
+            desc="This string appears as a heading on a full-page screen that tells users the benefits of signing in to Chrome. It appears when the user launches Chrome for the first time. When they sign in, they can personalize and customize Chrome and remember their settings in their Google Account. The tone should be inviting and alluring.">
+            Do more with Chrome
           </message>
         </if>
 

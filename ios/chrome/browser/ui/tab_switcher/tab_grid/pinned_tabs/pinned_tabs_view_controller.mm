@@ -117,7 +117,6 @@ NSIndexPath* CreateIndexPath(NSInteger index) {
 
 - (void)contentWillAppearAnimated:(BOOL)animated {
   [self.collectionView reloadData];
-  [self updateEmptyCollectionViewLabelVisibility];
 
   [self selectCollectionViewItemWithID:_selectedItemID animated:NO];
 
@@ -160,6 +159,7 @@ NSIndexPath* CreateIndexPath(NSInteger index) {
 
   // Show the view if `visible` is true to ensure smooth animation.
   if (visible) {
+    [self updateEmptyCollectionViewLabelVisibility];
     self.view.hidden = NO;
   }
 
@@ -209,7 +209,7 @@ NSIndexPath* CreateIndexPath(NSInteger index) {
       }
 
       selectionItem = [GridTransitionItem
-          itemWithCell:[PinnedTransitionCell transitionCellFromCell:cell]
+          itemWithCell:[PinnedCell transitionSelectionCellFromCell:cell]
                 center:attributes.center];
     } else {
       UIView* cellSnapshot = [cell snapshotViewAfterScreenUpdates:YES];
@@ -223,6 +223,10 @@ NSIndexPath* CreateIndexPath(NSInteger index) {
   return [GridTransitionLayout layoutWithInactiveItems:items
                                             activeItem:activeItem
                                          selectionItem:selectionItem];
+}
+
+- (BOOL)isCollectionEmpty {
+  return _items.count == 0;
 }
 
 - (BOOL)isSelectedCellVisible {
@@ -302,6 +306,8 @@ NSIndexPath* CreateIndexPath(NSInteger index) {
       }
       completion:^(BOOL completed) {
         [weakSelf handleItemRemovalCompletion];
+        [weakSelf.delegate pinnedTabsViewController:weakSelf
+                                didRemoveItemWIthID:removedItemID];
       }];
 }
 
@@ -349,6 +355,8 @@ NSIndexPath* CreateIndexPath(NSInteger index) {
   __weak __typeof(self) weakSelf = self;
   ProceduralBlock collectionViewUpdatesCompletion = ^{
     [weakSelf updateCollectionViewAfterMovingItemToIndex:toIndex];
+    [weakSelf.delegate pinnedTabsViewController:weakSelf
+                              didMoveItemWithID:itemID];
   };
 
   [self.collectionView
@@ -359,6 +367,11 @@ NSIndexPath* CreateIndexPath(NSInteger index) {
       completion:^(BOOL completed) {
         collectionViewUpdatesCompletion();
       }];
+}
+
+- (void)advertizeInactiveTabsWithCount:(NSUInteger)count {
+  // Should never be called for this class.
+  NOTREACHED();
 }
 
 - (void)dismissModals {
@@ -425,6 +438,18 @@ NSIndexPath* CreateIndexPath(NSInteger index) {
       contextMenuConfigurationForTabCell:cell
                             menuScenario:MenuScenarioHistogram::
                                              kPinnedTabsEntry];
+}
+
+- (void)collectionView:(UICollectionView*)collectionView
+    didEndDisplayingCell:(UICollectionViewCell*)cell
+      forItemAtIndexPath:(NSIndexPath*)indexPath {
+  if ([cell isKindOfClass:[PinnedCell class]]) {
+    // Stop animation of PinnedCells when removing them from the collection
+    // view. This is important to prevent cells from animating indefinitely.
+    // This is safe because the animation state of GridCells is set in
+    // `configureCell:withItem:` whenever a cell is used.
+    [base::mac::ObjCCastStrict<PinnedCell>(cell) hideActivityIndicator];
+  }
 }
 
 #pragma mark - UICollectionViewDragDelegate
@@ -596,7 +621,6 @@ NSIndexPath* CreateIndexPath(NSInteger index) {
   [self.delegate pinnedTabsViewController:self didChangeItemCount:_items.count];
 
   [self.collectionView deleteItemsAtIndexPaths:@[ CreateIndexPath(index) ]];
-  [self updateEmptyCollectionViewLabelVisibility];
 }
 
 // Handles the completion of item insertion into the collection view.
@@ -674,8 +698,6 @@ NSIndexPath* CreateIndexPath(NSInteger index) {
     [_emptyCollectionViewLabel.centerXAnchor
         constraintEqualToAnchor:self.view.centerXAnchor],
   ]];
-
-  [self updateEmptyCollectionViewLabelVisibility];
 }
 
 // Configures `cell`'s identifier and title synchronously, favicon and snapshot
@@ -700,6 +722,12 @@ NSIndexPath* CreateIndexPath(NSInteger index) {
                        cell.snapshot = snapshot;
                      }
                    }];
+  }
+
+  if (item.showsActivity) {
+    [cell showActivityIndicator];
+  } else {
+    [cell hideActivityIndicator];
   }
 }
 

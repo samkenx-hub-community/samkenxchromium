@@ -104,6 +104,14 @@ id<GREYMatcher> OmniboxWidthBetween(CGFloat width, CGFloat margin) {
   return [[GREYElementMatcherBlock alloc] initWithMatchesBlock:matches
                                               descriptionBlock:describe];
 }
+
+// Returns a matcher which is true if the view is not practically visible.
+// Sometimes grey_notVisible() fails because the view is 0.0000XYZ percent
+// visible, but not actually zero, probably due to some sort of floating
+// point calculation.
+id<GREYMatcher> notPracticallyVisible() {
+  return grey_not(grey_minimumVisiblePercent(0.01));
+}
 }
 
 // Test case for the NTP home UI. More precisely, this tests the positions of
@@ -142,6 +150,10 @@ id<GREYMatcher> OmniboxWidthBetween(CGFloat width, CGFloat margin) {
   AppLaunchConfiguration config = [super appConfigurationForTestCase];
   config.additional_args.push_back(std::string("--") +
                                    switches::kEnableDiscoverFeed);
+  // Show doodle to make sure tests cover async callback logic updating logo.
+  config.additional_args.push_back(
+      std::string("-google-doodle-url=https://www.gstatic.com/chrome/ntp/"
+                  "doodle_test/ddljson_android0.json"));
   config.features_disabled.push_back(kEnableFeedAblation);
   // TODO(crbug.com/1403077): Scrolling issues when promo is enabled.
   config.features_disabled.push_back(kEnableDiscoverFeedTopSyncPromo);
@@ -912,7 +924,7 @@ id<GREYMatcher> OmniboxWidthBetween(CGFloat width, CGFloat margin) {
 
   // Ensures that logo/doodle is no longer visible when scrolled down.
   [[EarlGrey selectElementWithMatcher:chrome_test_util::NTPLogo()]
-      assertWithMatcher:grey_notVisible()];
+      assertWithMatcher:notPracticallyVisible()];
 }
 
 // Test to ensure that initial position and content are maintained when rotating
@@ -1039,6 +1051,44 @@ id<GREYMatcher> OmniboxWidthBetween(CGFloat width, CGFloat margin) {
         performAction:grey_tap()];
   }
   [[EarlGrey selectElementWithMatcher:chrome_test_util::NTPIncognitoView()]
+      assertWithMatcher:grey_sufficientlyVisible()];
+}
+
+// Test that signing in and signing out results in the NTP scrolled to the top
+// and not in some unexpected layout state.
+- (void)testSignInSignOutScrolledToTop {
+  [[EarlGrey selectElementWithMatcher:chrome_test_util::NTPLogo()]
+      assertWithMatcher:grey_sufficientlyVisible()];
+  [[EarlGrey selectElementWithMatcher:chrome_test_util::FakeOmnibox()]
+      assertWithMatcher:grey_sufficientlyVisible()];
+
+  FakeSystemIdentity* identity = [FakeSystemIdentity fakeIdentity1];
+  [SigninEarlGrey addFakeIdentity:identity];
+  [SigninEarlGreyUI signinWithFakeIdentity:identity];
+  GREYWaitForAppToIdle(@"App failed to idle");
+
+  // Verify Identity Disc is visible since it is the top-most element and should
+  // be showing now.
+  [[EarlGrey
+      selectElementWithMatcher:grey_accessibilityLabel(l10n_util::GetNSStringF(
+                                   IDS_IOS_IDENTITY_DISC_WITH_NAME_AND_EMAIL,
+                                   base::SysNSStringToUTF16(
+                                       identity.userFullName),
+                                   base::SysNSStringToUTF16(
+                                       identity.userEmail)))]
+      assertWithMatcher:grey_sufficientlyVisible()];
+  [[EarlGrey selectElementWithMatcher:chrome_test_util::NTPLogo()]
+      assertWithMatcher:grey_sufficientlyVisible()];
+  [[EarlGrey selectElementWithMatcher:chrome_test_util::FakeOmnibox()]
+      assertWithMatcher:grey_sufficientlyVisible()];
+
+  // Sign out
+  [SigninEarlGreyUI
+      signOutWithConfirmationChoice:SignOutConfirmationChoiceClearData];
+
+  [[EarlGrey selectElementWithMatcher:chrome_test_util::NTPLogo()]
+      assertWithMatcher:grey_sufficientlyVisible()];
+  [[EarlGrey selectElementWithMatcher:chrome_test_util::FakeOmnibox()]
       assertWithMatcher:grey_sufficientlyVisible()];
 }
 

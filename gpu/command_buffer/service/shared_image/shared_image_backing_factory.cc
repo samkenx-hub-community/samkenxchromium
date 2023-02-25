@@ -7,7 +7,8 @@
 
 namespace gpu {
 
-SharedImageBackingFactory::SharedImageBackingFactory() = default;
+SharedImageBackingFactory::SharedImageBackingFactory(uint32_t valid_usages)
+    : invalid_usages_(~valid_usages) {}
 
 SharedImageBackingFactory::~SharedImageBackingFactory() = default;
 
@@ -27,6 +28,23 @@ SharedImageBackingFactory::CreateSharedImage(
 base::WeakPtr<SharedImageBackingFactory>
 SharedImageBackingFactory::GetWeakPtr() {
   return weak_ptr_factory_.GetWeakPtr();
+}
+
+bool SharedImageBackingFactory::CanCreateSharedImage(
+    uint32_t usage,
+    viz::SharedImageFormat format,
+    const gfx::Size& size,
+    bool thread_safe,
+    gfx::GpuMemoryBufferType gmb_type,
+    GrContextType gr_context_type,
+    base::span<const uint8_t> pixel_data) {
+  if (invalid_usages_ & usage) {
+    // This factory doesn't support all the usages.
+    return false;
+  }
+
+  return IsSupported(usage, format, size, thread_safe, gmb_type,
+                     gr_context_type, pixel_data);
 }
 
 void SharedImageBackingFactory::InvalidateWeakPtrsForTesting() {

@@ -11,7 +11,7 @@
 #include "base/types/pass_key.h"
 #include "chrome/browser/password_manager/chrome_password_manager_client.h"
 #include "chrome/browser/touch_to_fill/touch_to_fill_controller.h"
-#include "components/device_reauth/biometric_authenticator.h"
+#include "components/device_reauth/device_authenticator.h"
 #include "components/password_manager/core/browser/affiliation/affiliation_utils.h"
 #include "components/password_manager/core/browser/origin_credential_store.h"
 #include "components/password_manager/core/browser/passkey_credential.h"
@@ -33,8 +33,7 @@ using password_manager::UiCredential;
 
 // Infers whether a form should be submitted based on the feature's state and
 // the form's structure (submission_readiness).
-bool ShouldTriggerSubmission(SubmissionReadinessState submission_readiness,
-                             bool* ready_for_submission) {
+bool ShouldTriggerSubmission(SubmissionReadinessState submission_readiness) {
   switch (submission_readiness) {
     case SubmissionReadinessState::kNoInformation:
     case SubmissionReadinessState::kError:
@@ -42,13 +41,11 @@ bool ShouldTriggerSubmission(SubmissionReadinessState submission_readiness,
     case SubmissionReadinessState::kNoPasswordField:
     case SubmissionReadinessState::kFieldBetweenUsernameAndPassword:
     case SubmissionReadinessState::kFieldAfterPasswordField:
-      *ready_for_submission = false;
       return false;
 
     case SubmissionReadinessState::kEmptyFields:
     case SubmissionReadinessState::kMoreThanTwoFields:
     case SubmissionReadinessState::kTwoFields:
-      *ready_for_submission = true;
       return true;
   }
 }
@@ -66,7 +63,7 @@ bool ContainsNonEmptyUsername(
 TouchToFillControllerAutofillDelegate::TouchToFillControllerAutofillDelegate(
     base::PassKey<TouchToFillControllerAutofillTest>,
     password_manager::PasswordManagerClient* password_client,
-    scoped_refptr<device_reauth::BiometricAuthenticator> authenticator,
+    scoped_refptr<device_reauth::DeviceAuthenticator> authenticator,
     base::WeakPtr<password_manager::PasswordManagerDriver> driver,
     autofill::mojom::SubmissionReadinessState submission_readiness)
     : password_client_(password_client),
@@ -76,7 +73,7 @@ TouchToFillControllerAutofillDelegate::TouchToFillControllerAutofillDelegate(
 
 TouchToFillControllerAutofillDelegate::TouchToFillControllerAutofillDelegate(
     ChromePasswordManagerClient* password_client,
-    scoped_refptr<device_reauth::BiometricAuthenticator> authenticator,
+    scoped_refptr<device_reauth::DeviceAuthenticator> authenticator,
     base::WeakPtr<password_manager::PasswordManagerDriver> driver,
     autofill::mojom::SubmissionReadinessState submission_readiness)
     : password_client_(password_client),
@@ -91,7 +88,7 @@ TouchToFillControllerAutofillDelegate::
     ~TouchToFillControllerAutofillDelegate() {
   if (authenticator_) {
     // This is a noop if no auth triggered by Touch To Fill is in progress.
-    authenticator_->Cancel(device_reauth::BiometricAuthRequester::kTouchToFill);
+    authenticator_->Cancel(device_reauth::DeviceAuthRequester::kTouchToFill);
   }
 }
 
@@ -100,10 +97,8 @@ void TouchToFillControllerAutofillDelegate::OnShow(
     base::span<password_manager::PasskeyCredential> passkey_credentials) {
   DCHECK(driver_);
 
-  trigger_submission_ = ::ShouldTriggerSubmission(submission_readiness_,
-                                                  &ready_for_submission_) &&
+  trigger_submission_ = ::ShouldTriggerSubmission(submission_readiness_) &&
                         ContainsNonEmptyUsername(credentials);
-  ready_for_submission_ &= ContainsNonEmptyUsername(credentials);
 
   base::UmaHistogramEnumeration(
       "PasswordManager.TouchToFill.SubmissionReadiness", submission_readiness_);
@@ -124,8 +119,7 @@ void TouchToFillControllerAutofillDelegate::OnCredentialSelected(
       .Record(ukm::UkmRecorder::Get());
   if (!password_manager_util::CanUseBiometricAuth(
           authenticator_.get(),
-          device_reauth::BiometricAuthRequester::kTouchToFill,
-          password_client_)) {
+          device_reauth::DeviceAuthRequester::kTouchToFill, password_client_)) {
     FillCredential(credential);
     return;
   }
@@ -133,7 +127,7 @@ void TouchToFillControllerAutofillDelegate::OnCredentialSelected(
   // the callback being reset by the authenticator. Therefore, it is safe
   // to use base::Unretained.
   authenticator_->Authenticate(
-      device_reauth::BiometricAuthRequester::kTouchToFill,
+      device_reauth::DeviceAuthRequester::kTouchToFill,
       base::BindOnce(&TouchToFillControllerAutofillDelegate::OnReauthCompleted,
                      base::Unretained(this), credential),
       /*use_last_valid_auth=*/true);
@@ -228,15 +222,14 @@ void TouchToFillControllerAutofillDelegate::FillCredential(
   driver_->FillSuggestion(credential.username(), credential.password());
 
   trigger_submission_ &= !credential.username().empty();
-  ready_for_submission_ &= !credential.username().empty();
-  if (ready_for_submission_) {
+  if (trigger_submission_) {
+    // TODO(crbug.com/1283004): As auto-submission has been launched, measuring
+    // the time between filling by TTF and submisionn is not crucial. Remove
+    // this call, the method itself and the metrics if we are not going to use
+    // all that for new launches, e.g. crbug.com/1393043.
     password_client_->StartSubmissionTrackingAfterTouchToFill(
         credential.username());
-    if (trigger_submission_)
-      driver_->TriggerFormSubmission();
-  } else {
-    DCHECK(!trigger_submission_) << "Form is not ready for submission. "
-                                    "|trigger_submission_| cannot be true";
+    driver_->TriggerFormSubmission();
   }
   driver_ = nullptr;
 

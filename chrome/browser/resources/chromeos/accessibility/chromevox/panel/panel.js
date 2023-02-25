@@ -45,9 +45,6 @@ export class Panel extends PanelInterface {
     /** @private {!MenuManager} */
     this.menuManager_ = new MenuManager();
 
-    /** @private {!Object<!PanelNodeMenuId, !PanelNodeMenu>} */
-    this.nodeMenuDictionary_ = {};
-
     /** @private {boolean} */
     this.originalStickyState_ = false;
 
@@ -113,7 +110,7 @@ export class Panel extends PanelInterface {
     BridgeHelper.registerHandler(
         BridgeConstants.Panel.TARGET,
         BridgeConstants.Panel.Action.ADD_MENU_ITEM,
-        itemData => this.addNodeMenuItem_(itemData));
+        itemData => this.menuManager_.addNodeMenuItem(itemData));
     BridgeHelper.registerHandler(
         BridgeConstants.Panel.TARGET,
         BridgeConstants.Panel.Action.ON_CURRENT_RANGE_CHANGED,
@@ -320,13 +317,14 @@ export class Panel extends PanelInterface {
 
       // Build the top-level menus.
       const searchMenu = this.addSearchMenu_('panel_search_menu');
-      const jumpMenu = this.addMenu_('panel_menu_jump');
-      const speechMenu = this.addMenu_('panel_menu_speech');
-      const touchMenu =
-          touchScreen ? this.addMenu_('panel_menu_touchgestures') : null;
-      const tabsMenu = this.addMenu_('panel_menu_tabs');
-      const chromevoxMenu = this.addMenu_('panel_menu_chromevox');
-      const actionsMenu = this.addMenu_('panel_menu_actions');
+      const jumpMenu = this.menuManager_.addMenu('panel_menu_jump');
+      const speechMenu = this.menuManager_.addMenu('panel_menu_speech');
+      const touchMenu = touchScreen ?
+          this.menuManager_.addMenu('panel_menu_touchgestures') :
+          null;
+      const tabsMenu = this.menuManager_.addMenu('panel_menu_tabs');
+      const chromevoxMenu = this.menuManager_.addMenu('panel_menu_chromevox');
+      const actionsMenu = this.menuManager_.addMenu('panel_menu_actions');
 
       // Add a menu item that opens the full list of ChromeBook keyboard
       // shortcuts. We want this to be at the top of the ChromeVox menu.
@@ -481,7 +479,7 @@ export class Panel extends PanelInterface {
           async () => this.onClose_());
 
       for (const menuData of ALL_PANEL_MENU_NODE_DATA) {
-        this.addNodeMenu_(menuData);
+        this.menuManager_.addNodeMenu(menuData);
       }
       await BackgroundBridge.PanelBackground.createAllNodeMenuBackgrounds(
           opt_activateMenuTitle);
@@ -540,27 +538,6 @@ export class Panel extends PanelInterface {
     this.pendingCallback_ = null;
     this.updateFromPrefs_();
     await ISearchUI.init(this.searchInput_);
-  }
-
-  /**
-   * Create a new menu with the given name and add it to the menu bar.
-   * @param {string} menuMsg The msg id of the new menu to add.
-   * @return {!PanelMenu} The menu just created.
-   * @private
-   */
-  addMenu_(menuMsg) {
-    const menu = new PanelMenu(menuMsg);
-    $('menu-bar').appendChild(menu.menuBarItemElement);
-    menu.menuBarItemElement.addEventListener(
-        'mouseover',
-        () =>
-            this.menuManager_.activateMenu(menu, true /* activateFirstItem */),
-        false);
-    menu.menuBarItemElement.addEventListener(
-        'mouseup', event => this.onMouseUpOnMenuTitle_(menu, event), false);
-    $('menus_background').appendChild(menu.menuContainerElement);
-    this.menuManager_.menus.push(menu);
-    return menu;
   }
 
   /**
@@ -705,33 +682,6 @@ export class Panel extends PanelInterface {
   }
 
   /**
-   * Create a new node menu with the given name and add it to the menu bar.
-   * @param {!PanelNodeMenuData} menuData The title/predicate for the new menu.
-   * @private
-   */
-  addNodeMenu_(menuData) {
-    const menu = new PanelNodeMenu(menuData.titleId);
-    $('menu-bar').appendChild(menu.menuBarItemElement);
-    menu.menuBarItemElement.addEventListener(
-        'mouseover',
-        () =>
-            this.menuManager_.activateMenu(menu, true /* activateFirstItem */));
-    menu.menuBarItemElement.addEventListener(
-        'mouseup', event => this.onMouseUpOnMenuTitle_(menu, event));
-    $('menus_background').appendChild(menu.menuContainerElement);
-    this.menuManager_.menus.push(menu);
-    this.nodeMenuDictionary_[menuData.menuId] = menu;
-  }
-
-  /**
-   * @param {!PanelNodeMenuItemData} itemData
-   * @private
-   */
-  addNodeMenuItem_(itemData) {
-    this.nodeMenuDictionary_[itemData.menuId].addItemFromData(itemData);
-  }
-
-  /**
    * Create a new search menu with the given name and add it to the menu bar.
    * @param {string} menuMsg The msg id of the new menu to add.
    * @return {!PanelMenu} The menu just created.
@@ -741,7 +691,7 @@ export class Panel extends PanelInterface {
     this.menuManager_.searchMenu = new PanelSearchMenu(menuMsg);
     // Add event listeners to search bar.
     this.menuManager_.searchMenu.searchBar.addEventListener(
-        'input', event => this.onSearchBarQuery_(event), false);
+        'input', event => this.menuManager_.onSearchBarQuery(event), false);
     this.menuManager_.searchMenu.searchBar.addEventListener(
         'mouseup', event => {
           // Clicking in the panel causes us to either activate an item or close
@@ -759,8 +709,8 @@ export class Panel extends PanelInterface {
         false);
     this.menuManager_.searchMenu.menuBarItemElement.addEventListener(
         'mouseup',
-        event =>
-            this.onMouseUpOnMenuTitle_(this.menuManager_.searchMenu, event),
+        event => this.menuManager_.onMouseUpOnMenuTitle(
+            this.menuManager_.searchMenu, event),
         false);
     $('menus_background')
         .appendChild(this.menuManager_.searchMenu.menuContainerElement);
@@ -877,19 +827,6 @@ export class Panel extends PanelInterface {
           this.menuManager_.activeMenu.getCallbackForElement(target);
     }
     this.closeMenusAndRestoreFocus();
-  }
-
-  /**
-   * Activate a menu whose title has been clicked. Stop event propagation at
-   * this point so we don't close the ChromeVox menus and restore focus.
-   * @param {PanelMenu} menu The menu we would like to activate.
-   * @param {Event} mouseUpEvent The mouseup event.
-   * @private
-   */
-  onMouseUpOnMenuTitle_(menu, mouseUpEvent) {
-    this.menuManager_.activateMenu(menu, true /* activateFirstItem */);
-    mouseUpEvent.preventDefault();
-    mouseUpEvent.stopPropagation();
   }
 
   /**
@@ -1165,56 +1102,6 @@ export class Panel extends PanelInterface {
     this.setMode_(PanelMode.COLLAPSED);
   }
 
-  /**
-   * Listens to changes in the menu search bar. Populates the search menu
-   * with items that match the search bar's contents.
-   * Note: we ignore PanelNodeMenu items and items without shortcuts.
-   * @param {Event} event The input event.
-   * @private
-   */
-  onSearchBarQuery_(event) {
-    if (!this.menuManager_.searchMenu) {
-      throw Error('MenuManager.searchMenu_ must be defined');
-    }
-    const query = event.target.value.toLowerCase();
-    this.menuManager_.searchMenu.clear();
-    // Show the search results menu.
-    this.menuManager_.activateMenu(
-        this.menuManager_.searchMenu, false /* activateFirstItem */);
-    // Populate.
-    if (query) {
-      for (let i = 0; i < this.menuManager_.menus.length; ++i) {
-        const menu = this.menuManager_.menus[i];
-        if (menu === this.menuManager_.searchMenu ||
-            menu instanceof PanelNodeMenu) {
-          continue;
-        }
-        const items = menu.items;
-        for (let j = 0; j < items.length; ++j) {
-          const item = items[j];
-          if (!item.menuItemShortcut) {
-            // Only add menu items that have shortcuts.
-            continue;
-          }
-          const itemText = item.text.toLowerCase();
-          const match = itemText.includes(query) &&
-              (itemText !==
-               Msgs.getMsg('panel_menu_item_none').toLowerCase()) &&
-              item.enabled;
-          if (match) {
-            this.menuManager_.searchMenu.copyAndAddMenuItem(item);
-          }
-        }
-      }
-    }
-
-    if (this.menuManager_.searchMenu.items.length === 0) {
-      this.menuManager_.searchMenu.addMenuItem(
-          Msgs.getMsg('panel_menu_item_none'), '', '', '', function() {});
-    }
-    this.menuManager_.searchMenu.activateItem(0);
-  }
-
   /** @private */
   onCurrentRangeChanged_() {
     if (this.mode_ === PanelMode.FULLSCREEN_TUTORIAL) {
@@ -1256,13 +1143,13 @@ export class Panel extends PanelInterface {
   }
 
   /** @private */
-  onPanLeft_() {
-    chrome.extension.getBackgroundPage()['ChromeVox'].braille.panLeft();
+  async onPanLeft_() {
+    await BackgroundBridge.Braille.panLeft();
   }
 
   /** @private */
-  onPanRight_() {
-    chrome.extension.getBackgroundPage()['ChromeVox'].braille.panRight();
+  async onPanRight_() {
+    await BackgroundBridge.Braille.panRight();
   }
 
   /** @private */

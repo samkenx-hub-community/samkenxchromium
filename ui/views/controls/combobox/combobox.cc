@@ -57,9 +57,8 @@ namespace {
 constexpr int kBorderThickness = 1;
 
 float GetCornerRadius() {
-  return features::IsChromeRefresh2023()
-             ? LayoutProvider::Get()->GetCornerRadiusMetric(Emphasis::kHigh)
-             : FocusRing::kDefaultCornerRadiusDp;
+  return LayoutProvider::Get()->GetCornerRadiusMetric(
+      ShapeContextTokens::kComboboxRadius);
 }
 
 SkColor GetTextColorForEnableState(const Combobox& combobox, bool enabled) {
@@ -76,6 +75,10 @@ class TransparentButton : public Button {
     button_controller()->set_notify_action(
         ButtonController::NotifyAction::kOnPress);
 
+    if (features::IsChromeRefresh2023()) {
+      views::InstallRoundRectHighlightPathGenerator(this, gfx::Insets(),
+                                                    GetCornerRadius());
+    }
     InkDrop::Get(this)->SetMode(views::InkDropHost::InkDropMode::ON);
     SetHasInkDropActionOnClick(true);
     InkDrop::UseInkDropForSquareRipple(InkDrop::Get(this),
@@ -154,8 +157,19 @@ Combobox::Combobox(ui::ComboboxModel* model, int text_context, int text_style)
   SetFocusBehavior(FocusBehavior::ALWAYS);
 #endif
 
-  SetBackgroundColorId(ui::kColorTextfieldBackground);
+  SetBackgroundColorId(features::IsChromeRefresh2023()
+                           ? ui::kColorComboboxBackground
+                           : ui::kColorTextfieldBackground);
+
   UpdateBorder();
+
+  // The combobox uses the ink drop on the TransparentButton, but the focus ring
+  // needs to be set on the combobox itself. To ensure that the ink drop fills
+  // the entire bounds of the combobox including the portion of the combobox
+  // bounds that the focus ring paints over, we need to install the focus ring
+  // first so that the focus ring is added as a child before the
+  // TransparentButton and therefore painted before the ink drop.
+  FocusRing::Install(this);
 
   arrow_button_ =
       AddChildView(std::make_unique<TransparentButton>(base::BindRepeating(
@@ -165,6 +179,16 @@ Combobox::Combobox(ui::ComboboxModel* model, int text_context, int text_style)
     // TODO(crbug.com/1400024): This setter should be removed and the behavior
     // made default when ChromeRefresh2023 is finalized.
     SetEventHighlighting(true);
+    enabled_changed_subscription_ =
+        AddEnabledChangedCallback(base::BindRepeating(
+            [](Combobox* combobox) {
+              combobox->SetBackgroundColorId(
+                  combobox->GetEnabled()
+                      ? ui::kColorComboboxBackground
+                      : ui::kColorComboboxBackgroundDisabled);
+              combobox->UpdateBorder();
+            },
+            base::Unretained(this)));
   }
 
   // A layer is applied to make sure that canvas bounds are snapped to pixel
@@ -176,7 +200,6 @@ Combobox::Combobox(ui::ComboboxModel* model, int text_context, int text_style)
     views::InstallRoundRectHighlightPathGenerator(this, gfx::Insets(),
                                                   GetCornerRadius());
   }
-  FocusRing::Install(this);
 }
 
 Combobox::~Combobox() {
@@ -542,6 +565,10 @@ const std::unique_ptr<ui::ComboboxModel>& Combobox::GetOwnedModel() const {
 
 void Combobox::UpdateBorder() {
   if (features::IsChromeRefresh2023()) {
+    if (!GetEnabled()) {
+      SetBorder(nullptr);
+      return;
+    }
     SetBorder(CreateThemedRoundedRectBorder(
         kBorderThickness, GetCornerRadius(),
         invalid_

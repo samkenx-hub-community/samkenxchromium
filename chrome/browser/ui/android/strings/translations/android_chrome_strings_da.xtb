@@ -304,7 +304,6 @@ Private state tokens forbedrer beskyttelsen af personlige oplysninger på nettet
 <translation id="2669454659051515572">Alle, der bruger denne enhed, kan se downloadede filer</translation>
 <translation id="2702516483241149200">Nyhed: Del et link, der ruller til denne tekst</translation>
 <translation id="2707726405694321444">Opdater siden</translation>
-<translation id="2709516037105925701">AutoFyld</translation>
 <translation id="271033894570825754">Nyt</translation>
 <translation id="2711073837061989559">Prøveperioder</translation>
 <translation id="2718352093833049315">Kun på Wi-Fi</translation>
@@ -396,7 +395,6 @@ Private state tokens forbedrer beskyttelsen af personlige oplysninger på nettet
 <translation id="3114507951000454849">Læs dagens nyheder <ph name="NEWS_ICON" /></translation>
 <translation id="311958134571892113">tilknyttet</translation>
 <translation id="3123734510202723619">Meddelelser</translation>
-<translation id="3130863904455712965">Historik m.m.</translation>
 <translation id="3134784203083076891">"</translation>
 <translation id="314939179385989105">Chromes startside</translation>
 <translation id="3157931365184549694">Gendan</translation>
@@ -453,6 +451,7 @@ Private state tokens forbedrer beskyttelsen af personlige oplysninger på nettet
 <translation id="3421726884497337397">Vælg, hvornår tredjepartscookies skal blokeres</translation>
 <translation id="3428747202529429621">Beskytter dig i Chrome og kan bruges til at forbedre din sikkerhed i andre Google-apps, når du er logget ind</translation>
 <translation id="3429160811076349561">Prøvefunktioner er slået fra</translation>
+<translation id="3432973700170747422">Slet de seneste 15 minutter</translation>
 <translation id="3435465986463792564">Har du mange åbne vinduer? Du kan administrere dem herfra</translation>
 <translation id="3435738964857648380">Sikkerhed</translation>
 <translation id="3443221991560634068">Genindlæs den aktuelle side</translation>
@@ -519,7 +518,6 @@ Private state tokens forbedrer beskyttelsen af personlige oplysninger på nettet
 <translation id="3830886834687455630">Opdater Google Play-tjenester for at tjekke dine adgangskoder</translation>
 <translation id="3845098929839618392">Åbn i inkognitofane</translation>
 <translation id="3856096718352044181">Bekræft, at dette er en gyldig udbyder, eller prøv igen senere</translation>
-<translation id="3858127568696903256">Se indhold, du følger, her</translation>
 <translation id="3858860766373142691">Navn</translation>
 <translation id="3861633093716975811">Populære videoer</translation>
 <translation id="3874520961715512166">Websitet er fjernet</translation>
@@ -922,6 +920,7 @@ Hvis du vil ændre denne indstilling, skal du <ph name="BEGIN_LINK" />nulstille 
 <translation id="6000203700195075278">Følg igen</translation>
 <translation id="6002122790816966947">Dine enheder</translation>
 <translation id="6005538289190791541">Foreslået adgangskode</translation>
+<translation id="6011308810877101166">Gør søgeforslag bedre</translation>
 <translation id="6039379616847168523">Gå til den næste fane</translation>
 <translation id="6040143037577758943">Luk</translation>
 <translation id="604124094241169006">Automatisk</translation>
@@ -989,7 +988,6 @@ Nogle websites kan f.eks. reagere på denne anmodning ved at vise dig annoncer, 
 <translation id="6397616442223433927">Online igen</translation>
 <translation id="6401458660421980302">Hvis du vil sende denne fane til en anden enhed, skal du logge ind på Chrome på den pågældende enhed</translation>
 <translation id="6402652558933147609"><ph name="ERROR_CODE" /> på <ph name="VIOLATED_URL" /></translation>
-<translation id="6403371459378431832">Synkroniser dine data på alle enheder</translation>
 <translation id="6404511346730675251">Rediger bogmærke</translation>
 <translation id="6406506848690869874">Synkronisering</translation>
 <translation id="6407224748847589805">Der kan ikke oprettes forbindelse til din computer. Prøv en anden bekræftelsesmetode.</translation>
@@ -1227,6 +1225,7 @@ Nogle websites kan f.eks. reagere på denne anmodning ved at vise dig annoncer, 
 <translation id="7596558890252710462">Operativsystem</translation>
 <translation id="7605594153474022051">Synkronisering fungerer ikke</translation>
 <translation id="7612619742409846846">Du er logget ind på Google som</translation>
+<translation id="7612989789287281429">Logger dig ind…</translation>
 <translation id="7616551326690708776">Vælg en skabelon til din fremhævning.</translation>
 <translation id="7619072057915878432">Download af <ph name="FILE_NAME" /> mislykkedes på grund af netværksfejl.</translation>
 <translation id="7626032353295482388">Velkommen til Chrome</translation>
@@ -1245,6 +1244,7 @@ Nogle websites kan f.eks. reagere på denne anmodning ved at vise dig annoncer, 
 <translation id="7682724950699840886">Prøv følgende tips: Sørg for, at der er nok ledig plads på din enhed, og prøv at eksportere igen.</translation>
 <translation id="7686086654630106285">Mere om foreslåede annoncer fra websites</translation>
 <translation id="768618399695552958">Nogle af de sider, du besøger, forudindlæses. Nogle sider forudindlæses muligvis via Google-servere, når de er linket fra et Google-website.</translation>
+<translation id="7691043218961417207">Gennemse indhold, du vil følge</translation>
 <translation id="7698359219371678927">Opret mail i <ph name="APP_NAME" /></translation>
 <translation id="7707922173985738739">Brug mobildata</translation>
 <translation id="7709094866268987903">Interesser, du har fjernet, vises her</translation>
@@ -1318,7 +1318,6 @@ Nogle websites kan f.eks. reagere på denne anmodning ved at vise dig annoncer, 
 <translation id="8037801708772278989">Tjekket lige nu</translation>
 <translation id="804335162455518893">SD-kortet blev ikke fundet</translation>
 <translation id="8048533522416101084">{TAB_COUNT,plural, =1{<ph name="TAB_COUNT_ONE" /> inkognitofane}one{<ph name="TAB_COUNT_NORMAL" /> inkognitofane}other{<ph name="TAB_COUNT_NORMAL" /> inkognitofaner}}</translation>
-<translation id="8048728378294435881">Sikkerhedskopiér dit indhold, og få adgang til det på enhver enhed</translation>
 <translation id="8051695050440594747"><ph name="MEGABYTES" /> MB er ledig</translation>
 <translation id="8058655154417507695">Udløbsår</translation>
 <translation id="8058746566562539958">Åbn på ny fane i Chrome</translation>
@@ -1452,6 +1451,7 @@ Nogle websites kan f.eks. reagere på denne anmodning ved at vise dig annoncer, 
 <translation id="8746155870861185046">Del fremhævet</translation>
 <translation id="8748850008226585750">Indholdet er skjult</translation>
 <translation id="8756969031206844760">Vil du opdatere adgangskoden?</translation>
+<translation id="8765470054473112089">Når du indtaster noget i adresselinjen eller søgefeltet, sender Chrome det, du skriver, til din standardsøgemaskine for at få bedre forslag. Dette er deaktiveret i inkognitotilstand.</translation>
 <translation id="8766529642647037772">Vil du oprette et fremhævet link som dette?</translation>
 <translation id="8773160212632396039">Behandler anmodning</translation>
 <translation id="8788265440806329501">Navigationsoversigt er lukket</translation>
@@ -1495,6 +1495,7 @@ Nogle websites kan f.eks. reagere på denne anmodning ved at vise dig annoncer, 
 <translation id="8970887620466824814">Noget gik galt.</translation>
 <translation id="8972098258593396643">Vil du downloade til standardmappen?</translation>
 <translation id="8987641763863173640">Administrer indstillinger for forhåndsvisning af video</translation>
+<translation id="8987736167266086032">Fortsæt, hvor du slap</translation>
 <translation id="8989968390305463310">Din browserhistorik påvirker de annoncer, som du ser, og de interesser, som er estimeret nedenfor. Af hensyn til beskyttelsen af dine personlige oplysninger sletter Chrome automatisk dine interesser en gang om måneden. Interesserne kan blive opdateret, medmindre du fjerner dem.</translation>
 <translation id="8993760627012879038">Åbn en ny fane i inkognitotilstand</translation>
 <translation id="8996847606757455498">Vælg en anden udbyder</translation>

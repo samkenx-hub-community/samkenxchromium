@@ -11,14 +11,14 @@ import {ChromeColor, CustomizeChromePageCallbackRouter, CustomizeChromePageHandl
 import {CustomizeChromeApiProxy} from 'chrome://customize-chrome-side-panel.top-chrome/customize_chrome_api_proxy.js';
 import {assertDeepEquals, assertEquals, assertGE, assertTrue} from 'chrome://webui-test/chai_assert.js';
 import {waitAfterNextRender} from 'chrome://webui-test/polymer_test_util.js';
-import {TestBrowserProxy} from 'chrome://webui-test/test_browser_proxy.js';
+import {TestMock} from 'chrome://webui-test/test_mock.js';
 import {eventToPromise} from 'chrome://webui-test/test_util.js';
 
 import {createTheme, installMock} from './test_support.js';
 
 suite('ChromeColorsTest', () => {
   let chromeColorsElement: ChromeColorsElement;
-  let handler: TestBrowserProxy<CustomizeChromePageHandlerRemote>;
+  let handler: TestMock<CustomizeChromePageHandlerRemote>;
   let callbackRouter: CustomizeChromePageRemote;
 
   setup(async () => {
@@ -122,6 +122,7 @@ suite('ChromeColorsTest', () => {
         chromeColorsElement.shadowRoot!.querySelectorAll('[checked]');
     assertEquals(1, checkedColors.length);
     assertEquals(defaultColorElement, checkedColors[0]);
+    assertEquals('true', checkedColors[0]!.getAttribute('aria-current'));
 
     // Set Chrome color.
     theme.seedColor = {value: 1};
@@ -136,6 +137,7 @@ suite('ChromeColorsTest', () => {
     assertEquals(1, checkedColors.length);
     assertEquals('chrome-color tile', checkedColors[0]!.className);
     assertEquals(3, (checkedColors[0]! as ColorElement).foregroundColor.value);
+    assertEquals('true', checkedColors[0]!.getAttribute('aria-current'));
 
     // Set custom color.
     theme.seedColor = {value: 10};
@@ -149,6 +151,8 @@ suite('ChromeColorsTest', () => {
         chromeColorsElement.shadowRoot!.querySelectorAll('[checked]');
     assertEquals(1, checkedColors.length);
     assertEquals(chromeColorsElement.$.customColor, checkedColors[0]);
+    assertEquals(
+        'true', checkedColors[0]!.parentElement!.getAttribute('aria-current'));
 
     // Set a CWS theme.
     theme.thirdPartyThemeInfo = {

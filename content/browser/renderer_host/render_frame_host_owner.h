@@ -37,7 +37,6 @@ class Navigator;
 class RenderFrameHostManager;
 class RenderFrameHostImpl;
 class SubresourceWebBundleNavigationInfo;
-class WebBundleNavigationInfo;
 
 // An interface for RenderFrameHostImpl to communicate with FrameTreeNode owning
 // it (e.g. to initiate or cancel a navigation in the frame).
@@ -97,6 +96,10 @@ class RenderFrameHostOwner {
       blink::mojom::UserActivationUpdateType update_type,
       blink::mojom::UserActivationNotificationType notification_type) = 0;
 
+  // Called to notify all frames of a page that the history user activation
+  // has been consumed, in response to an event in the renderer process.
+  virtual void DidConsumeHistoryUserActivation() = 0;
+
   // Creates a NavigationRequest  for a synchronous navigation that has
   // committed in the renderer process. Those are:
   // - same-document renderer-initiated navigations.
@@ -118,7 +121,6 @@ class RenderFrameHostOwner {
       const std::vector<GURL>& redirects,
       const GURL& original_url,
       std::unique_ptr<CrossOriginEmbedderPolicyReporter> coep_reporter,
-      std::unique_ptr<WebBundleNavigationInfo> web_bundle_navigation_info,
       std::unique_ptr<SubresourceWebBundleNavigationInfo>
           subresource_web_bundle_navigation_info,
       int http_response_code) = 0;

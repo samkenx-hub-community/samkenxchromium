@@ -3,6 +3,12 @@
     margin-inline-end: 8px;
   }
 
+  /* Allows the mute button tooltips to be visible even when disabled. */
+  .audio-mute-button[disabled] {
+    background-color: transparent;
+    pointer-events: auto;
+  }
+
   .audio-options-container {
     align-items: center;
     display: flex;
@@ -78,7 +84,7 @@
           <template is="dom-repeat"
               items="[[audioSystemProperties_.outputDevices]]">
             <option value="[[item.id]]" selected="[[item.isActive]]">
-              [[item.displayName]]
+              [[getDeviceName_(item)]]
             </option>
           </template>
         </select>
@@ -101,12 +107,22 @@
               on-click="onOutputMuteButtonClicked"
               disabled="[[isOutputMutedByPolicy_(
                   audioSystemProperties_.outputMuteState
-                )]]">
+                )]]"
+              aria-description="[[getOutputMuteButtonAriaLabel(
+                  isOutputMuted_
+                )]]"
+              aria-labelledby="audioOutputVolumeLabel"
+              aria-pressed="[[isOutputMuted_]]">
           </cr-icon-button>
+          <paper-tooltip id="audioOutputMuteButtonTooltip" aria-hidden="true"
+              for="audioOutputMuteButton">
+            [[getMuteTooltip_(audioSystemProperties_.outputMuteState)]]
+          </paper-tooltip>
           <cr-slider class="audio-slider"
               id ="outputVolumeSlider"
               min="0"
               max="100"
+              key-press-slider-increment="10"
               disabled="[[isOutputMutedByPolicy_(
                   audioSystemProperties_.outputMuteState
                 )]]"
@@ -134,7 +150,7 @@
           <template is="dom-repeat"
               items="[[audioSystemProperties_.inputDevices]]">
             <option value="[[item.id]]" selected="[[item.isActive]]">
-              [[item.displayName]]
+              [[getDeviceName_(item)]]
             </option>
           </template>
         </select>
@@ -148,9 +164,20 @@
               iron-icon="[[getInputIcon_(isInputMuted_)]]"
               on-click="onInputMuteClicked"
               class="audio-mute-button"
-              disabled="[[shouldDisableInputGainControls(isInputMuted_)]]">
+              disabled="[[shouldDisableInputGainControls(isInputMuted_)]]"
+              aria-description$="[[getInputMuteButtonAriaLabel(
+                  audioSystemProperties_.inputMuteState,
+                  isInputMuted_
+                )]]"
+              aria-labelledby="audioInputGainLabel"
+              aria-pressed="[[isInputMuted_]]">
           </cr-icon-button>
+          <paper-tooltip id="audioInputMuteButtonTooltip" aria-hidden="true"
+              for="audioInputGainMuteButton">
+            [[getMuteTooltip_(audioSystemProperties_.inputMuteState)]]
+          </paper-tooltip>
           <cr-slider id="audioInputGainVolumeSlider" min="0" max="100"
+              key-press-slider-increment="10"
               iron-icon="[[getInputIcon_(isInputMuted_)]]"
               value="[[audioSystemProperties_.inputGainPercent]]"
               on-cr-slider-value-changed="onInputVolumeSliderChanged"

@@ -9,7 +9,7 @@ import {AmbientObserver, AmbientPreviewLarge, Paths, PersonalizationRouter, Topi
 import {loadTimeData} from 'chrome://resources/js/load_time_data.js';
 import {assertDeepEquals, assertEquals, assertTrue} from 'chrome://webui-test/chai_assert.js';
 import {waitAfterNextRender} from 'chrome://webui-test/polymer_test_util.js';
-import {TestBrowserProxy} from 'chrome://webui-test/test_browser_proxy.js';
+import {TestMock} from 'chrome://webui-test/test_mock.js';
 
 import {baseSetup, initElement, teardownElement} from './personalization_app_test_utils.js';
 import {TestAmbientProvider} from './test_ambient_interface_provider.js';
@@ -21,7 +21,7 @@ suite('AmbientPreviewLargeTest', function() {
   let ambientProvider: TestAmbientProvider;
   let personalizationStore: TestPersonalizationStore;
   const routerOriginal = PersonalizationRouter.instance;
-  const routerMock = TestBrowserProxy.fromClass(PersonalizationRouter);
+  const routerMock = TestMock.fromClass(PersonalizationRouter);
 
   setup(() => {
     const mocks = baseSetup();
@@ -45,8 +45,7 @@ suite('AmbientPreviewLargeTest', function() {
         personalizationStore.data.ambient.albums = ambientProvider.albums;
         personalizationStore.data.ambient.topicSource = TopicSource.kArtGallery;
         personalizationStore.data.ambient.ambientModeEnabled = false;
-        personalizationStore.data.ambient.googlePhotosAlbumsPreviews =
-            ambientProvider.googlePhotosAlbumsPreviews;
+        personalizationStore.data.ambient.previews = ambientProvider.previews;
         ambientPreviewLargeElement = initElement(AmbientPreviewLarge);
         personalizationStore.notifyObservers();
         await waitAfterNextRender(ambientPreviewLargeElement);
@@ -70,8 +69,7 @@ suite('AmbientPreviewLargeTest', function() {
         personalizationStore.data.ambient.albums = ambientProvider.albums;
         personalizationStore.data.ambient.topicSource = TopicSource.kArtGallery;
         personalizationStore.data.ambient.ambientModeEnabled = false;
-        personalizationStore.data.ambient.googlePhotosAlbumsPreviews =
-            ambientProvider.googlePhotosAlbumsPreviews;
+        personalizationStore.data.ambient.previews = ambientProvider.previews;
         ambientPreviewLargeElement = initElement(AmbientPreviewLarge);
         personalizationStore.notifyObservers();
         await waitAfterNextRender(ambientPreviewLargeElement);
@@ -109,7 +107,7 @@ suite('AmbientPreviewLargeTest', function() {
       albums: ambientProvider.albums,
       topicSource: TopicSource.kArtGallery,
       ambientModeEnabled: true,
-      googlePhotosAlbumsPreviews: ambientProvider.googlePhotosAlbumsPreviews,
+      previews: ambientProvider.previews,
     };
     ambientPreviewLargeElement = initElement(AmbientPreviewLarge);
     personalizationStore.notifyObservers();
@@ -145,7 +143,7 @@ suite('AmbientPreviewLargeTest', function() {
       albums: ambientProvider.albums,
       topicSource: TopicSource.kArtGallery,
       ambientModeEnabled: true,
-      googlePhotosAlbumsPreviews: ambientProvider.googlePhotosAlbumsPreviews,
+      previews: ambientProvider.previews,
     };
     ambientPreviewLargeElement = initElement(AmbientPreviewLarge);
     personalizationStore.notifyObservers();
@@ -198,7 +196,7 @@ suite('AmbientPreviewLargeTest', function() {
       albums: ambientProvider.albums,
       topicSource: TopicSource.kArtGallery,
       ambientModeEnabled: true,
-      googlePhotosAlbumsPreviews: ambientProvider.googlePhotosAlbumsPreviews,
+      previews: ambientProvider.previews,
     };
     ambientPreviewLargeElement = initElement(AmbientPreviewLarge);
     personalizationStore.notifyObservers();
@@ -250,8 +248,7 @@ suite('AmbientPreviewLargeTest', function() {
     personalizationStore.data.ambient.albums = ambientProvider.albums;
     personalizationStore.data.ambient.topicSource = TopicSource.kArtGallery;
     personalizationStore.data.ambient.ambientModeEnabled = false;
-    personalizationStore.data.ambient.googlePhotosAlbumsPreviews =
-        ambientProvider.googlePhotosAlbumsPreviews;
+    personalizationStore.data.ambient.previews = ambientProvider.previews;
     ambientPreviewLargeElement = initElement(AmbientPreviewLarge);
     personalizationStore.notifyObservers();
     await waitAfterNextRender(ambientPreviewLargeElement);
@@ -278,8 +275,7 @@ suite('AmbientPreviewLargeTest', function() {
     personalizationStore.data.ambient.albums = ambientProvider.albums;
     personalizationStore.data.ambient.topicSource = TopicSource.kArtGallery;
     personalizationStore.data.ambient.ambientModeEnabled = false;
-    personalizationStore.data.ambient.googlePhotosAlbumsPreviews =
-        ambientProvider.googlePhotosAlbumsPreviews;
+    personalizationStore.data.ambient.previews = ambientProvider.previews;
     ambientPreviewLargeElement = initElement(AmbientPreviewLarge);
     personalizationStore.notifyObservers();
     await waitAfterNextRender(ambientPreviewLargeElement);

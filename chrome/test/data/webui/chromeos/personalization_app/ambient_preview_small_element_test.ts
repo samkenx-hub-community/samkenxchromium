@@ -9,7 +9,7 @@ import {AmbientObserver, AmbientPreviewSmall, PersonalizationRouter, TopicSource
 import {loadTimeData} from 'chrome://resources/js/load_time_data.js';
 import {assertEquals, assertTrue} from 'chrome://webui-test/chai_assert.js';
 import {waitAfterNextRender} from 'chrome://webui-test/polymer_test_util.js';
-import {TestBrowserProxy} from 'chrome://webui-test/test_browser_proxy.js';
+import {TestMock} from 'chrome://webui-test/test_mock.js';
 
 import {baseSetup, initElement, teardownElement} from './personalization_app_test_utils.js';
 import {TestAmbientProvider} from './test_ambient_interface_provider.js';
@@ -21,7 +21,7 @@ suite('AmbientPreviewSmallTest', function() {
   let ambientProvider: TestAmbientProvider;
   let personalizationStore: TestPersonalizationStore;
   const routerOriginal = PersonalizationRouter.instance;
-  const routerMock = TestBrowserProxy.fromClass(PersonalizationRouter);
+  const routerMock = TestMock.fromClass(PersonalizationRouter);
 
   setup(() => {
     loadTimeData.overrideValues({isAmbientModeAllowed: true});
@@ -44,8 +44,7 @@ suite('AmbientPreviewSmallTest', function() {
         personalizationStore.data.ambient.albums = ambientProvider.albums;
         personalizationStore.data.ambient.topicSource = TopicSource.kArtGallery;
         personalizationStore.data.ambient.ambientModeEnabled = false;
-        personalizationStore.data.ambient.googlePhotosAlbumsPreviews =
-            ambientProvider.googlePhotosAlbumsPreviews;
+        personalizationStore.data.ambient.previews = ambientProvider.previews;
         ambientPreviewSmallElement = initElement(AmbientPreviewSmall);
         personalizationStore.notifyObservers();
         await waitAfterNextRender(ambientPreviewSmallElement);
@@ -89,8 +88,7 @@ suite('AmbientPreviewSmallTest', function() {
     personalizationStore.data.ambient.albums = ambientProvider.albums;
     personalizationStore.data.ambient.topicSource = TopicSource.kArtGallery;
     personalizationStore.data.ambient.ambientModeEnabled = true;
-    personalizationStore.data.ambient.googlePhotosAlbumsPreviews =
-        ambientProvider.googlePhotosAlbumsPreviews;
+    personalizationStore.data.ambient.previews = ambientProvider.previews;
     ambientPreviewSmallElement = initElement(AmbientPreviewSmall);
     personalizationStore.notifyObservers();
     await waitAfterNextRender(ambientPreviewSmallElement);

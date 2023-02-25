@@ -304,7 +304,6 @@ Private Stake Tokens verbessern den Datenschutz im Web und können nicht dazu ve
 <translation id="2669454659051515572">Alle Personen, die dieses Gerät nutzen, können heruntergeladene Dateien sehen</translation>
 <translation id="2702516483241149200">Neu: Link teilen, der direkt zu diesem Text führt</translation>
 <translation id="2707726405694321444">Seite aktualisieren</translation>
-<translation id="2709516037105925701">Autofill</translation>
 <translation id="271033894570825754">Neu</translation>
 <translation id="2711073837061989559">Tests</translation>
 <translation id="2718352093833049315">Nur bei WLAN</translation>
@@ -396,7 +395,6 @@ Private Stake Tokens verbessern den Datenschutz im Web und können nicht dazu ve
 <translation id="3114507951000454849">Nachrichten von heute lesen <ph name="NEWS_ICON" /></translation>
 <translation id="311958134571892113">verknüpft mit</translation>
 <translation id="3123734510202723619">Ankündigungen</translation>
-<translation id="3130863904455712965">Verlauf und mehr</translation>
 <translation id="3134784203083076891">“</translation>
 <translation id="314939179385989105">Chrome-Startseite</translation>
 <translation id="3157931365184549694">Wieder­her­stellen</translation>
@@ -453,6 +451,7 @@ Private Stake Tokens verbessern den Datenschutz im Web und können nicht dazu ve
 <translation id="3421726884497337397">Lege fest, wann Drittanbieter-Cookies blockiert werden sollen</translation>
 <translation id="3428747202529429621">Schützt dich in Chrome und erhöht möglicherweise die Sicherheit in anderen Google-Apps, wenn du angemeldet bist</translation>
 <translation id="3429160811076349561">Testfunktionen sind deaktiviert</translation>
+<translation id="3432973700170747422">Letzte 15 Minuten löschen</translation>
 <translation id="3435465986463792564">Du verwendest viele Fenster? Du kannst sie hier verwalten.</translation>
 <translation id="3435738964857648380">Sicherheit</translation>
 <translation id="3443221991560634068">Aktuelle Seite neu laden</translation>
@@ -519,7 +518,6 @@ Private Stake Tokens verbessern den Datenschutz im Web und können nicht dazu ve
 <translation id="3830886834687455630">Aktualisiere die Google Play-Dienste, um deine Passwörter zu prüfen</translation>
 <translation id="3845098929839618392">In Inkognitotab öffnen</translation>
 <translation id="3856096718352044181">Vergewissere dich, dass dies ein gültiger Provider ist, oder versuche es später noch einmal</translation>
-<translation id="3858127568696903256">Hier siehst du Inhalte, denen du folgst</translation>
 <translation id="3858860766373142691">Name</translation>
 <translation id="3861633093716975811">Beliebte Videos</translation>
 <translation id="3874520961715512166">Website entfernt</translation>
@@ -990,7 +988,6 @@ Einige Websites schalten möglicherweise Werbeanzeigen, deren Auswahl nicht dara
 <translation id="6397616442223433927">Wieder online</translation>
 <translation id="6401458660421980302">Wenn du diesen Tab an ein anderes Gerät senden möchtest, melde dich dort in Chrome an</translation>
 <translation id="6402652558933147609"><ph name="ERROR_CODE" /> auf <ph name="VIOLATED_URL" /></translation>
-<translation id="6403371459378431832">Daten auf allen Geräten synchronisieren</translation>
 <translation id="6404511346730675251">Lesezeichen bearbeiten</translation>
 <translation id="6406506848690869874">Synchronisierung</translation>
 <translation id="6407224748847589805">Verbindung zum Computer nicht möglich. Versuche es mit einer anderen Bestätigungsoption.</translation>
@@ -1118,7 +1115,7 @@ Einige Websites schalten möglicherweise Werbeanzeigen, deren Auswahl nicht dara
 <translation id="6978717888677691380">Von dir blockierte Websites</translation>
 <translation id="6979737339423435258">Gesamte Zeit</translation>
 <translation id="6987047470128880212">Der Inkognitomodus ist auf diesem Gerät nicht verfügbar</translation>
-<translation id="6995899638241819463">Warnen, wenn Passwörter durch eine Datenpanne preisgegeben werden</translation>
+<translation id="6995899638241819463">Warnen, wenn Passwörter durch eine Datenpanne preisgegeben wurden</translation>
 <translation id="7020741890149022655">Zur Leseliste hinzufügen <ph name="BEGIN_NEW" />Neu<ph name="END_NEW" /></translation>
 <translation id="7022756207310403729">Im Browser öffnen</translation>
 <translation id="7027549951530753705">Wiederhergestellt: <ph name="ITEM_TITLE" /></translation>
@@ -1246,6 +1243,7 @@ Einige Websites schalten möglicherweise Werbeanzeigen, deren Auswahl nicht dara
 <translation id="7682724950699840886">Probiere folgende Tipps aus: Sorge dafür, dass auf deinem Gerät ausreichend Speicherplatz vorhanden ist, und wiederhole den Export.</translation>
 <translation id="7686086654630106285">Weitere Informationen zu Werbung, die von Websites vorgeschlagen wird</translation>
 <translation id="768618399695552958">Einige der Seiten, die du besuchst, werden vorab geladen. Diese Seiten werden über Google-Server geladen, wenn sie von einer Google Sites-Website verlinkt sind.</translation>
+<translation id="7691043218961417207">Inhalte, denen du folgen kannst</translation>
 <translation id="7698359219371678927">E-Mail in <ph name="APP_NAME" /> erstellen</translation>
 <translation id="7707922173985738739">Mobile Daten verwenden</translation>
 <translation id="7709094866268987903">Die von dir entfernten Interessen werden hier angezeigt</translation>
@@ -1319,7 +1317,6 @@ Einige Websites schalten möglicherweise Werbeanzeigen, deren Auswahl nicht dara
 <translation id="8037801708772278989">Zuletzt geprüft: gerade eben</translation>
 <translation id="804335162455518893">SD-Karte nicht gefunden</translation>
 <translation id="8048533522416101084">{TAB_COUNT,plural, =1{<ph name="TAB_COUNT_ONE" /> Inkognitotab}other{<ph name="TAB_COUNT_NORMAL" /> Inkognitotabs}}</translation>
-<translation id="8048728378294435881">Möchtest du deine Daten sichern und auf jedem Gerät verwenden?</translation>
 <translation id="8051695050440594747"><ph name="MEGABYTES" /> MB verfügbar</translation>
 <translation id="8058655154417507695">Ablaufjahr</translation>
 <translation id="8058746566562539958">In neuem Chrome-Tab öffnen</translation>
@@ -1497,6 +1494,7 @@ Einige Websites schalten möglicherweise Werbeanzeigen, deren Auswahl nicht dara
 <translation id="8970887620466824814">Es gab ein Problem.</translation>
 <translation id="8972098258593396643">In Standardordner herunterladen?</translation>
 <translation id="8987641763863173640">Einstellungen für die Videovorschau verwalten</translation>
+<translation id="8987736167266086032">Da weitermachen, wo Sie aufgehört haben</translation>
 <translation id="8989968390305463310">Dein Browserverlauf hat Einfluss auf die unten stehenden, geschätzten Interessen und darauf, welche Werbung dir gezeigt wird. Zum Schutz deiner Daten löscht Chrome automatisch jeden Monat deine Interessen. Solange du deine Interessen nicht entfernst, können sie aktualisiert werden.</translation>
 <translation id="8993760627012879038">Neuen Tab im Inkognitomodus öffnen</translation>
 <translation id="8996847606757455498">Anderen Anbieter auswählen</translation>

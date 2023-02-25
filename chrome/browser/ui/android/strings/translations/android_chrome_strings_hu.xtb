@@ -304,7 +304,6 @@ A privát állapottokenek nagyobb fokú adatvédelmet biztosítanak az internete
 <translation id="2669454659051515572">A letöltött fájlokat bárki láthatja, aki az eszközt használja</translation>
 <translation id="2702516483241149200">Új: az ehhez a szöveghez gördülő linket oszthat meg</translation>
 <translation id="2707726405694321444">Oldal frissítése</translation>
-<translation id="2709516037105925701">Automatikus kitöltés</translation>
 <translation id="271033894570825754">Új</translation>
 <translation id="2711073837061989559">Próbaidőszakok</translation>
 <translation id="2718352093833049315">Csak Wi-Fi-n</translation>
@@ -396,7 +395,6 @@ A privát állapottokenek nagyobb fokú adatvédelmet biztosítanak az internete
 <translation id="3114507951000454849">Olvassa el a mai híreket <ph name="NEWS_ICON" /></translation>
 <translation id="311958134571892113">összekapcsolva a következővel:</translation>
 <translation id="3123734510202723619">Hirdetmények</translation>
-<translation id="3130863904455712965">Előzmények és egyebek</translation>
 <translation id="3134784203083076891">”</translation>
 <translation id="314939179385989105">A Chrome kezdőlapja</translation>
 <translation id="3157931365184549694">Helyreállítás</translation>
@@ -453,6 +451,7 @@ A privát állapottokenek nagyobb fokú adatvédelmet biztosítanak az internete
 <translation id="3421726884497337397">Annak eldöntése, hogy mikor tiltja le a harmadik féltől származó cookie-kat</translation>
 <translation id="3428747202529429621">Gondoskodik a biztonságáról a Chrome-ban, és használható a biztonság növelésére más Google-alkalmazásokban olyankor, amikor Ön be van jelentkezve.</translation>
 <translation id="3429160811076349561">A próbafunkciók ki vannak kapcsolva</translation>
+<translation id="3432973700170747422">Előző 15 perc törlése</translation>
 <translation id="3435465986463792564">Több ablak is meg van nyitva Önnél? Itt kezelheti őket.</translation>
 <translation id="3435738964857648380">Biztonság</translation>
 <translation id="3443221991560634068">Az aktuális oldal újratöltése</translation>
@@ -519,7 +518,6 @@ A privát állapottokenek nagyobb fokú adatvédelmet biztosítanak az internete
 <translation id="3830886834687455630">Jelszavai ellenőrzéséhez frissítse a Google Play-szolgáltatásokat</translation>
 <translation id="3845098929839618392">Megnyitás inkognitó lapon</translation>
 <translation id="3856096718352044181">Ellenőrizze a szolgáltató érvényességét, vagy próbálkozzon újra.</translation>
-<translation id="3858127568696903256">Az Ön által követett tartalmakat tekintheti meg itt</translation>
 <translation id="3858860766373142691">Név</translation>
 <translation id="3861633093716975811">Népszerű videók</translation>
 <translation id="3874520961715512166">Webhely eltávolítva</translation>
@@ -990,7 +988,6 @@ Egyes webhelyek például válaszolhatnak rá úgy, hogy olyan hirdetéseket jel
 <translation id="6397616442223433927">Ismét online</translation>
 <translation id="6401458660421980302">Ha szeretné elküldeni ezt a lapot másik eszközre, jelentkezzen be a Chrome-ba az adott eszközön</translation>
 <translation id="6402652558933147609"><ph name="ERROR_CODE" />, <ph name="VIOLATED_URL" /></translation>
-<translation id="6403371459378431832">Az összes eszközén szinkronizálhatja adatait</translation>
 <translation id="6404511346730675251">Könyvjelző szerkesztése</translation>
 <translation id="6406506848690869874">Szinkronizálás</translation>
 <translation id="6407224748847589805">Nem lehet csatlakozni a számítógépéhez. Próbálkozzon másik ellenőrzési módszerrel.</translation>
@@ -1228,6 +1225,7 @@ Egyes webhelyek például válaszolhatnak rá úgy, hogy olyan hirdetéseket jel
 <translation id="7596558890252710462">Operációs rendszer</translation>
 <translation id="7605594153474022051">A szinkronizálás nem működik.</translation>
 <translation id="7612619742409846846">Bejelentkezve a Google rendszerébe mint</translation>
+<translation id="7612989789287281429">Bejelentkezés…</translation>
 <translation id="7616551326690708776">Válasszon sablont a kiemeléshez.</translation>
 <translation id="7619072057915878432">A következő fájl letöltése hálózati hibák miatt nem sikerült: <ph name="FILE_NAME" />.</translation>
 <translation id="7626032353295482388">A Chrome üdvözli Önt!</translation>
@@ -1246,6 +1244,7 @@ Egyes webhelyek például válaszolhatnak rá úgy, hogy olyan hirdetéseket jel
 <translation id="7682724950699840886">Próbálkozzon a következő tippekkel: Győződjön meg arról, hogy elegendő tárhely áll rendelkezésre az eszközön, majd próbálja újra az exportálást.</translation>
 <translation id="7686086654630106285">További információ a webhelyek által javasolt hirdetésekről</translation>
 <translation id="768618399695552958">Az Ön által felkeresett oldalak némelyikét előre betölti a rendszer. Az oldalakat előre betöltheti a rendszer a Google szerverein keresztül, ha Google-webhellyel vannak összekapcsolva.</translation>
+<translation id="7691043218961417207">Követni kívánt tartalmak felfedezése</translation>
 <translation id="7698359219371678927">E-mail létrehozása a(z) <ph name="APP_NAME" /> alkalmazásban</translation>
 <translation id="7707922173985738739">Mobiladat-kapcsolat használata</translation>
 <translation id="7709094866268987903">Az eltávolított érdeklődési körök itt jelennek meg</translation>
@@ -1319,7 +1318,6 @@ Egyes webhelyek például válaszolhatnak rá úgy, hogy olyan hirdetéseket jel
 <translation id="8037801708772278989">Most volt ellenőrizve</translation>
 <translation id="804335162455518893">Az SD-kártya nem található</translation>
 <translation id="8048533522416101084">{TAB_COUNT,plural, =1{<ph name="TAB_COUNT_ONE" /> inkognitó lap}other{<ph name="TAB_COUNT_NORMAL" /> inkognitó lap}}</translation>
-<translation id="8048728378294435881">Biztonsági másolatot készíthet adatairól, és bármely eszközön használatja őket.</translation>
 <translation id="8051695050440594747"><ph name="MEGABYTES" /> MB áll rendelkezésre</translation>
 <translation id="8058655154417507695">Lejárat éve</translation>
 <translation id="8058746566562539958">Megnyitás új Chrome-lapon</translation>
@@ -1497,6 +1495,7 @@ Egyes webhelyek például válaszolhatnak rá úgy, hogy olyan hirdetéseket jel
 <translation id="8970887620466824814">Hiba történt.</translation>
 <translation id="8972098258593396643">Letölti az alapértelmezett mappába?</translation>
 <translation id="8987641763863173640">Videó-előnézeti beállítások kezelése</translation>
+<translation id="8987736167266086032">Ott folytathatja, ahol abbahagyta</translation>
 <translation id="8989968390305463310">Böngészési előzményei határozzák meg az Ön számára megjelenő hirdetéseket és az alább látható módon felmért érdeklődési köröket. Adatai védelme érdekében a Chrome havi rendszerességgel automatikusan törli az Ön érdeklődési köreit. Az érdeklődési körök frissülhetnek, kivéve, ha eltávolítja őket.</translation>
 <translation id="8993760627012879038">Új lap megnyitása inkognitó módban</translation>
 <translation id="8996847606757455498">Másik szolgáltató választása</translation>

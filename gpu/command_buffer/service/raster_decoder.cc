@@ -646,6 +646,7 @@ class RasterDecoderImpl final : public RasterDecoder,
       size_t row_bytes);
   void DoReadbackARGBImagePixelsINTERNAL(GLint src_x,
                                          GLint src_y,
+                                         GLint plane_index,
                                          GLuint dst_width,
                                          GLuint dst_height,
                                          GLuint row_bytes,
@@ -1138,6 +1139,7 @@ Capabilities RasterDecoderImpl::GetCapabilities() {
       gpu_preferences_.texture_target_exception_list;
   caps.texture_format_bgra8888 =
       feature_info()->feature_flags().ext_texture_format_bgra8888;
+  caps.texture_rg = feature_info()->feature_flags().ext_texture_rg;
   caps.supports_scanout_shared_images =
       SharedImageManager::SupportsScanoutImages();
   // TODO(piman): have a consistent limit in shared image backings.
@@ -2101,6 +2103,7 @@ bool RasterDecoderImpl::DoWritePixelsINTERNALDirectTextureUpload(
 void RasterDecoderImpl::DoReadbackARGBImagePixelsINTERNAL(
     GLint src_x,
     GLint src_y,
+    GLint plane_index,
     GLuint dst_width,
     GLuint dst_height,
     GLuint row_bytes,
@@ -2135,6 +2138,8 @@ void RasterDecoderImpl::DoReadbackARGBImagePixelsINTERNAL(
     return;
   }
 
+  viz::SharedImageFormat source_format = source_shared_image->format();
+
   // If present, the color space is serialized into shared memory after the
   // result and before the pixel data.
   if (color_space_offset > pixels_offset) {
@@ -2146,6 +2151,13 @@ void RasterDecoderImpl::DoReadbackARGBImagePixelsINTERNAL(
 
   sk_sp<SkColorSpace> dst_color_space;
   if (color_space_size) {
+    // For multiplanar formats readback is per plane, and destination color
+    // space must be nullptr to allow letting Skia assume srgb color space.
+    if (source_format.is_multi_plane()) {
+      LOCAL_SET_GL_ERROR(GL_INVALID_OPERATION, "glReadbackImagePixels",
+                         "Unexpected color space for multiplanar shared image");
+      return;
+    }
     void* color_space_bytes = GetSharedMemoryAs<void*>(
         shm_id, shm_offset + color_space_offset, color_space_size);
     if (!color_space_bytes) {
@@ -2198,6 +2210,12 @@ void RasterDecoderImpl::DoReadbackARGBImagePixelsINTERNAL(
     return;
   }
 
+  if (!source_format.IsValidPlaneIndex(plane_index)) {
+    LOCAL_SET_GL_ERROR(GL_INVALID_OPERATION, "glReadbackImagePixels",
+                       "Invalid plane_index");
+    return;
+  }
+
   std::vector<GrBackendSemaphore> begin_semaphores;
   std::vector<GrBackendSemaphore> end_semaphores;
 
@@ -2218,8 +2236,18 @@ void RasterDecoderImpl::DoReadbackARGBImagePixelsINTERNAL(
     DCHECK(wait_result);
   }
 
-  auto sk_image =
-      source_scoped_access->CreateSkImage(shared_context_state_->gr_context());
+  sk_sp<SkImage> sk_image;
+  if (source_format.is_single_plane()) {
+    // Create SkImage without plane index for single planar formats or legacy
+    // multiplanar formats with external sampler.
+    sk_image = source_scoped_access->CreateSkImage(
+        shared_context_state_->gr_context());
+  } else {
+    // Pass plane index for creating an SkImage for multiplanar formats.
+    sk_image = source_scoped_access->CreateSkImageForPlane(
+        plane_index, shared_context_state_->gr_context());
+  }
+
   if (sk_image) {
     bool success =
         sk_image->readPixels(dst_info, pixel_address, row_bytes, src_x, src_y);
@@ -2236,7 +2264,8 @@ void RasterDecoderImpl::DoReadbackARGBImagePixelsINTERNAL(
 
   if (auto end_state = source_scoped_access->TakeEndState()) {
     gr_context()->setBackendTextureState(
-        source_scoped_access->promise_image_texture()->backendTexture(),
+        source_scoped_access->promise_image_texture(plane_index)
+            ->backendTexture(),
         *end_state);
   }
 
@@ -2820,17 +2849,17 @@ void RasterDecoderImpl::DoRasterCHROMIUM(GLuint raster_shm_id,
     return;
   }
 
-  alignas(
-      cc::PaintOpBuffer::kPaintOpAlign) char data[sizeof(cc::LargestPaintOp)];
+  alignas(cc::PaintOpBuffer::kPaintOpAlign) char
+      data[cc::kLargestPaintOpAlignedSize];
 
   size_t paint_buffer_size = raster_shm_size;
   gl::ScopedProgressReporter report_progress(
       shared_context_state_->progress_reporter());
   while (paint_buffer_size > 0) {
     size_t skip = 0;
-    cc::PaintOp* deserialized_op = cc::PaintOp::Deserialize(
-        paint_buffer_memory, paint_buffer_size, &data[0],
-        sizeof(cc::LargestPaintOp), &skip, options);
+    cc::PaintOp* deserialized_op =
+        cc::PaintOp::Deserialize(paint_buffer_memory, paint_buffer_size, data,
+                                 std::size(data), &skip, options);
     if (!deserialized_op) {
       LOCAL_SET_GL_ERROR(GL_INVALID_OPERATION, "glRasterCHROMIUM",
                          "RasterCHROMIUM: serialization failure");

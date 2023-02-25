@@ -327,6 +327,7 @@
 <translation id="4110686435123617899">Pasirinkti albumą „<ph name="TITLE" />“ (<ph name="DESC" />)</translation>
 <translation id="4111761024568264522">USB jutiklinė dalis</translation>
 <translation id="4117637339509843559">Tamsus režimas</translation>
+<translation id="4130035430755296270">Laikykite pelės žymeklį, kad būtų parodyta daugiau išdėstymo parinkčių</translation>
 <translation id="4131410914670010031">Nespalvotai</translation>
 <translation id="4145784616224233563">HTTP užkarda</translation>
 <translation id="4147897805161313378">„Google“ nuotraukos</translation>
@@ -415,6 +416,7 @@
 <translation id="484790837831576105">(„Android“) DNS pavadinimų konvertavimas</translation>
 <translation id="4848429997038228357">VYKDOMA</translation>
 <translation id="4854586501323951986">Įtaisytas jutiklinis ekranas</translation>
+<translation id="4855250849489639581">Perbraukite žemyn, kad būtų rodoma daugiau išdėstymo parinkčių</translation>
 <translation id="4861758251032006121">{ATTEMPTS_LEFT,plural, =1{<ph name="ERROR_MESSAGE" /> Liko {0} bandymas}one{<ph name="ERROR_MESSAGE" /> Liko {0} bandymas}few{<ph name="ERROR_MESSAGE" /> Liko {0} bandymai}many{<ph name="ERROR_MESSAGE" /> Liko {0} bandymo}other{<ph name="ERROR_MESSAGE" /> Liko {0} bandymų}}</translation>
 <translation id="4873827928179867585">Autentifikavimo algoritmas</translation>
 <translation id="4880328057631981605">Prieigos taško pavadinimas</translation>
@@ -518,6 +520,7 @@
 <translation id="576835345334454681">Padidinti ekrano šviesumą</translation>
 <translation id="57838592816432529">Nutildyti</translation>
 <translation id="5784136236926853061">Didelė HTTP delsa</translation>
+<translation id="5826644637650799838">Apie meną</translation>
 <translation id="5832805196449965646">Pridėti asmenį</translation>
 <translation id="583281660410589416">Nežinoma</translation>
 <translation id="5843706793424741864">Farenheito laipsniai</translation>
@@ -674,6 +677,7 @@
 <translation id="7172721935181587524">Vienas vaizdas</translation>
 <translation id="7177485034254901881">Šį „<ph name="DEVICE_TYPE" />“ valdo <ph name="MANAGER" />. Administratoriai gali nuotoliniu būdu konfigūruoti įrenginį.</translation>
 <translation id="7180611975245234373">Atnaujinti</translation>
+<translation id="7180865173735832675">Tinkinti</translation>
 <translation id="7212734716605298123">Išorinių įrenginių programinės aparatinės įrangos naujiniai</translation>
 <translation id="7216409898977639127">Mobiliojo ryšio teikėjas</translation>
 <translation id="725133483556299729">El. pašto adreso pasirinkimas</translation>
@@ -745,6 +749,7 @@
 <translation id="7881066108824108340">DNS</translation>
 <translation id="7882358943899516840">Teikėjo tipas</translation>
 <translation id="7882501334836096755">Viešasis raktas</translation>
+<translation id="78957024357676568">kairėn</translation>
 <translation id="7915220255123750251">Tvarkyti tinklo APN nustatymus. APN užmezga ryšį tarp mobiliojo ryšio tinklo ir interneto.</translation>
 <translation id="7936303884198020182">Domenų pavadinimų serverių nerasta</translation>
 <translation id="7942349550061667556">Raudona</translation>
@@ -776,6 +781,7 @@
 <translation id="8226628635270268143">Pasirinkite mėgstamiausias nuotraukas ir albumus</translation>
 <translation id="8227119283605456246">Pridėtas failas</translation>
 <translation id="8230672074305416752">Nepavyko patikrinti ryšio su numatytuoju tinklų sietuvu</translation>
+<translation id="8242426110754782860">Tęsti</translation>
 <translation id="8246209727385807362">Nežinomas operatorius</translation>
 <translation id="827422111966801947">Indigo spalva</translation>
 <translation id="8286154143153872371">Jei norite peržiūrėti ekrano foną, prisijunkite prie tinklo ir iš naujo įkelkite puslapį.</translation>
@@ -853,6 +859,7 @@
 <translation id="8930622219860340959">Belaidis</translation>
 <translation id="8936793075252196307">Kliento IP adresas</translation>
 <translation id="894617464444543719">Įrenginys yra telefonas.</translation>
+<translation id="8957423540740801332">dešinėn</translation>
 <translation id="8968751544471797276">Įkrovimo rodiklis</translation>
 <translation id="8970109610781093811">Paleisti dar kartą</translation>
 <translation id="8983038754672563810">HSPA</translation>

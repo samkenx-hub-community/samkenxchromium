@@ -27,12 +27,12 @@
 <translation id="1201402288615127009">Para</translation>
 <translation id="1209796539517632982">Serverët automatikë të emrave</translation>
 <translation id="1210831758834677569">Laosisht</translation>
+<translation id="1221555006497674479">Hapësira ruajtëse në nivel të ulët: <ph name="REMAINING_PERCENTAGE" />% e mbetur nga hapësira ruajtëse e diskut të ndarë prej <ph name="TOTAL_SPACE" />.</translation>
 <translation id="1243314992276662751">Ngarko</translation>
 <translation id="1249250836236328755">Zhanri</translation>
 <translation id="1254593899333212300">Lidhje direkte e internetit</translation>
 <translation id="1272293450992660632">Vlerat e kodit PIN nuk përputhen.</translation>
 <translation id="1280820357415527819">Po kërkon për rrjete celulare</translation>
-<translation id="1291603679744561561">Karta SIM e kyçur</translation>
 <translation id="1293556467332435079">Skedarët</translation>
 <translation id="1297922636971898492">"Disku i Google" nuk ofrohet tani. Ngarkimi do të rifillojë automatikisht pasi të kthehet "Disku i Google".</translation>
 <translation id="1307931752636661898">Nuk mund të shihen skedarët e Linux</translation>
@@ -74,6 +74,7 @@
 <translation id="1641780993263690097">Kinezisht Pinyin</translation>
 <translation id="1646019627374511909">Po i bën të disponueshëm jashtë linje <ph name="NUMBER_OF_ITEMS" /> skedarë</translation>
 <translation id="164969095109328410">Pajisje Chrome</translation>
+<translation id="1661207570040737402">E ke përdorur të gjithë hapësirën ruajtëse të Google Workspace për diskun e ndarë.</translation>
 <translation id="1661867754829461514">Kodi PIN mungon</translation>
 <translation id="166439687370499867">Nuk lejohet ndryshimi i konfigurimeve të rrjetit</translation>
 <translation id="1665611772925418501">Ky skedar nuk mund të modifikohej.</translation>
@@ -192,6 +193,7 @@
 <translation id="2574327434504608656">1 dosje është ndarë me Bruschetta</translation>
 <translation id="2578394532502990878">Tamilisht fonetike</translation>
 <translation id="2579959351793446050">Odiaisht</translation>
+<translation id="2587195714949534472">Po përgatitet për të sinkronizuar <ph name="FILE_NAME" />...</translation>
 <translation id="2602810353103180630">Rrjeti <ph name="NETWORK_INDEX" /> nga <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, <ph name="CONNECTION_STATUS" />, fuqia e sinjalit <ph name="SIGNAL_STRENGTH" />%, bllokuar nga administratori yt, detajet</translation>
 <translation id="2614589611416690597">Video <ph name="VIDEO_TYPE" /></translation>
 <translation id="2620090360073999360">"Disku i Google" nuk mund të arrihet në këtë moment.</translation>
@@ -293,6 +295,7 @@
 <translation id="3486821258960016770">Mongolisht</translation>
 <translation id="3495304270784461826"><ph name="COUNT" /> gabime.</translation>
 <translation id="3509680540198371098">Rrjeti <ph name="NETWORK_INDEX" /> nga <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, <ph name="SECURITY_STATUS" />, <ph name="CONNECTION_STATUS" />, fuqia e sinjalit <ph name="SIGNAL_STRENGTH" />%, detaje</translation>
+<translation id="3511705761158917664">Po përgatitet për të sinkronizuar <ph name="NUMBER_OF_ITEMS" /> artikuj...</translation>
 <translation id="3522708245912499433">Portugalisht</translation>
 <translation id="3524311639100184459">Kujdes! Këta skedarë janë të përkohshëm dhe mund të fshihen automatikisht për të liruar hapësirën në disk.  <ph name="BEGIN_LINK" />Mëso më shumë<ph name="END_LINK" /></translation>
 <translation id="3527085408025491307">Dosje</translation>
@@ -348,11 +351,11 @@
 <translation id="3924145049010392604">Meta</translation>
 <translation id="3943857333388298514">Ngjite</translation>
 <translation id="3952872973865944257">Teluguisht fonetike</translation>
-<translation id="3954354850384043518">Në vazhdim</translation>
 <translation id="3958548648197196644">Kivi</translation>
 <translation id="3971140002794351170">Shkarko profilin e celularit, rrjeti <ph name="NETWORK_INDEX" /> nga <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, <ph name="NETWORK_PROVIDER_NAME" /></translation>
 <translation id="3973925058222872294">Anglisht (Mbretëria e Bashkuar)</translation>
 <translation id="3975895378829046965">Bengalisht fonetike</translation>
+<translation id="3999574733850440202">Skedarët e Microsoft të hapur së fundi janë zhvendosur tek OneDrive</translation>
 <translation id="4002066346123236978">Titulli</translation>
 <translation id="4017788180641807848">Anglisht (SHBA) me tastierën Workman</translation>
 <translation id="4019998208269143058">Gozhdo te skedarët e shpejtë</translation>
@@ -408,6 +411,7 @@
 <translation id="4462159676511157176">Serverët e personalizuar të emrit</translation>
 <translation id="4465725236958772856">Rrjeti <ph name="NETWORK_INDEX" /> nga <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, menaxhuar nga administratori yt, lidhu</translation>
 <translation id="4470564870223067757">Paketa hangul 2</translation>
+<translation id="4474142134969976028">Nuk përputhet asnjë rezultat</translation>
 <translation id="4477002475007461989">Rumanisht</translation>
 <translation id="4477219268485577442">Tastierë fonetike bullgare</translation>
 <translation id="4508265954913339219">Aktivizimi dështoi</translation>
@@ -479,6 +483,7 @@
 <translation id="4973523518332075481">Përdor një emër që është <ph name="MAX_LENGTH" /> karaktere i gjatë ose më pak</translation>
 <translation id="4973970068702235170">Ngjeshja dështoi, gabim i papritur: <ph name="ERROR_MESSAGE" /></translation>
 <translation id="4984616446166309645">Japonisht</translation>
+<translation id="4987699874727873250">Anglisht (Indi)</translation>
 <translation id="4988205478593450158">Je i sigurt se dëshiron të fshish "<ph name="FILE_NAME" />"?</translation>
 <translation id="498902553138568924">Flutur e kuqe</translation>
 <translation id="4992066212339426712">Aktivizo zërin</translation>
@@ -787,6 +792,7 @@
 <translation id="7458955835361612701">Nuk ka imazhe të fundit</translation>
 <translation id="7460898608667578234">Ukrainisht</translation>
 <translation id="7469894403370665791">Lidhu automatikisht me këtë rrjet</translation>
+<translation id="7481358317100446445">Gati</translation>
 <translation id="7486315294984620427">Për t'i lëshuar skedarët në Parallels Desktop, skedari duhet të kopjohet te dosja e skedarëve të Windows.</translation>
 <translation id="749452993132003881">Hiragana</translation>
 <translation id="7495372004724182530">Malajalamisht fonetike</translation>
@@ -812,6 +818,7 @@
 <translation id="7655441028674523381">Qasu me lehtësi në "Fotografitë e Google"</translation>
 <translation id="7658239707568436148">Anulo</translation>
 <translation id="7663224033570512922">Hindisht</translation>
+<translation id="7665680517722058469">Provo një kërkim tjetër</translation>
 <translation id="7689532716264131859"><ph name="NUMBER_OF_ITEMS" /> artikuj u zhvendosën te koshi</translation>
 <translation id="7693909743393669729">Formatimi i një disku do të spastrojë të gjitha të dhënat e ruajtura në të dhe do të heqë të gjitha ndarjet ekzistuese, duke përfshirë ndarjet që mund të mos jenë të dukshme. Ky veprim nuk mund të zhbëhet.</translation>
 <translation id="7695430100978772476"><ph name="DRIVE_NAME" /> nuk mund të formatohej</translation>
@@ -823,6 +830,7 @@
 <translation id="7724603315864178912">Prite</translation>
 <translation id="7732111077498238432">Rrjeti kontrollohet nga një politikë</translation>
 <translation id="7736003208887389532">Të fshihen përgjithmonë këta skedarë?</translation>
+<translation id="7740287852186792672">Rezultatet e kërkimit</translation>
 <translation id="7748626145866214022">Më shumë opsione ofrohen në shiritin e veprimeve. Shtyp Alt + A për t'u fokusuar te shiriti e veprimeve.</translation>
 <translation id="7760449188139285140">Kinezisht Wubi</translation>
 <translation id="7765158879357617694">Zhvendos</translation>
@@ -874,6 +882,7 @@
 <translation id="8116072619078571545">Ujë me akull</translation>
 <translation id="8128733386027980860">Anglisht (MB) me tastierë Dvorak</translation>
 <translation id="8137331602592933310">"<ph name="FILENAME" />" është ndarë me ty. Nuk mund ta fshish sepse nuk je zotëruesi i saj.</translation>
+<translation id="8138705869659070104">Aktivizoje pas konfigurimit të pajisjes</translation>
 <translation id="813913629614996137">Po fillon...</translation>
 <translation id="8147028810663464959">Gjerësia e karaktereve është e plotë</translation>
 <translation id="8151638057146502721">Konfiguro</translation>
@@ -899,6 +908,7 @@
 <translation id="8300849813060516376">OTASP dështoi</translation>
 <translation id="8312871300878166382">Ngjite në dosje</translation>
 <translation id="8329978297633540474">Tekst i thjeshtë</translation>
+<translation id="8332007959299458842">Skedarët e Microsoft të hapur së fundi janë zhvendosur te "Disku i Google"</translation>
 <translation id="8335587457941836791">Zhgozhdo nga rafti</translation>
 <translation id="8335837413233998004">Bjellorusisht</translation>
 <translation id="8336153091935557858">Dje <ph name="YESTERDAY_DAYTIME" /></translation>
@@ -986,6 +996,7 @@
 <translation id="9046895021617826162">Lidhja dështoi</translation>
 <translation id="9065512565307033593">Nëse nuk e verifikon, qasja jote në rrjet do të çaktivizohet.</translation>
 <translation id="908378762078012445">Rusisht me tastierë fonetike AATSEEL</translation>
+<translation id="9086302186042011942">Po sinkronizon</translation>
 <translation id="9099674669267916096">Numri i faqeve</translation>
 <translation id="9100610230175265781">Kërkohet shprehja e kalimit</translation>
 <translation id="9110990317705400362">Ne kërkojmë vazhdimisht mënyra për ta bërë shfletimin tënd më të sigurt. Më parë, çdo uebsajt mund të të kërkonte të shtoje një shtesë në shfletues. Në versioniet e fundit të Google Chrome, duhet t'i tregosh ti vetë posaçërisht Chrome se dëshiron t'i instalosh këto shtesa duke i shtuar ato përmes faqes "Shtesat". <ph name="BEGIN_LINK" />Mëso më shumë<ph name="END_LINK" /></translation>

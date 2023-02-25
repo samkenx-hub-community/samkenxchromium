@@ -37,9 +37,6 @@ namespace ash::onc {
 
 namespace {
 
-// TODO(b/162365553) Remove when shill constants are added.
-constexpr char kShillCellularUserApnList[] = "Cellular.UserAPNList";
-
 // Converts values to JSON strings. This will turn booleans into "true" or
 // "false" which is what Shill expects for VPN values (including L2TP).
 base::Value ConvertVpnValueToString(const base::Value& value) {
@@ -414,6 +411,20 @@ void LocalTranslator::TranslateEAP() {
   }
 
   CopyFieldsAccordingToSignature();
+
+  // Set value or an empty list for ServerCAPEMs if it is not provided by onc.
+  // It will override the previous known list during properties merge.
+  if (onc_object_->contains(::onc::eap::kServerCAPEMs)) {
+    CopyFieldFromONCToShill(::onc::eap::kServerCAPEMs,
+                            shill::kEapCaCertPemProperty);
+  } else {
+    bool is_supported_ca_pem_protocols =
+        (outer == ::onc::eap::kEAP_TLS || outer == ::onc::eap::kEAP_TTLS ||
+         outer == ::onc::eap::kPEAP);
+    if (is_supported_ca_pem_protocols) {
+      shill_dictionary_->Set(shill::kEapCaCertPemProperty, base::Value::List());
+    }
+  }
 }
 
 void LocalTranslator::TranslateStaticIPConfig() {
@@ -471,7 +482,8 @@ void LocalTranslator::TranslateNetworkConfiguration() {
       onc_object_->FindDict(::onc::network_config::kProxySettings);
   if (proxy_settings) {
     base::Value::Dict proxy_config =
-        ConvertOncProxySettingsToProxyConfig(*proxy_settings);
+        ConvertOncProxySettingsToProxyConfig(*proxy_settings)
+            .value_or(base::Value::Dict());
     std::string proxy_config_str;
     base::JSONWriter::Write(proxy_config, &proxy_config_str);
     shill_dictionary_->Set(shill::kProxyConfigProperty, proxy_config_str);
@@ -498,7 +510,7 @@ void LocalTranslator::TranslateCellular() {
       translator.TranslateFields();
       enabled_apns.Append(std::move(shill_apn));
     }
-    shill_dictionary_->Set(kShillCellularUserApnList,
+    shill_dictionary_->Set(shill::kCellularUserApnListProperty,
                            base::Value(std::move(enabled_apns)));
   }
 
@@ -662,13 +674,13 @@ void TranslateONCHierarchy(const chromeos::onc::OncValueSignature& signature,
 
 }  // namespace
 
-base::Value TranslateONCObjectToShill(
+base::Value::Dict TranslateONCObjectToShill(
     const chromeos::onc::OncValueSignature* onc_signature,
-    const base::Value& onc_object) {
-  CHECK(onc_signature != NULL);
+    const base::Value::Dict& onc_object) {
+  CHECK(onc_signature != nullptr);
   base::Value::Dict shill_dictionary;
-  TranslateONCHierarchy(*onc_signature, onc_object.GetDict(), shill_dictionary);
-  return base::Value(std::move(shill_dictionary));
+  TranslateONCHierarchy(*onc_signature, onc_object, shill_dictionary);
+  return shill_dictionary;
 }
 
 }  // namespace ash::onc

@@ -16,6 +16,7 @@
 <translation id="1128128132059598906">EAP-TTLS</translation>
 <translation id="1145018782460575098">Прозор за ажурирање фирмвера за спољне уређаје је отворен. Доступних ажурирања: <ph name="NUM_UPDATES" />.</translation>
 <translation id="1145516343487477149">Пронађите чланке помоћи и одговоре на честа питања о Chromebook-у</translation>
+<translation id="1167755866710282443">Отворите мени да бисте прилагодили тастере. Превуците мени да бисте га преместили.</translation>
 <translation id="1175697296044146566"><ph name="MANAGER" /> управља овим <ph name="DEVICE_TYPE" /> уређајем.</translation>
 <translation id="1175951029573070619">Просечан (<ph name="SIGNAL_STRENGTH" />)</translation>
 <translation id="1181037720776840403">Уклони</translation>
@@ -326,6 +327,7 @@
 <translation id="4110686435123617899">Изаберите албум <ph name="TITLE" /> <ph name="DESC" /></translation>
 <translation id="4111761024568264522">USB тачпед</translation>
 <translation id="4117637339509843559">Тамни режим</translation>
+<translation id="4130035430755296270">Наставите да прелазите курсором за још опција изгледа</translation>
 <translation id="4131410914670010031">Црно-бело</translation>
 <translation id="4145784616224233563">HTTP заштитни зид</translation>
 <translation id="4147897805161313378">Google слике</translation>
@@ -414,6 +416,7 @@
 <translation id="484790837831576105">(Android) DNS разрешавање</translation>
 <translation id="4848429997038228357">У ТОКУ</translation>
 <translation id="4854586501323951986">Уграђени додирни екран</translation>
+<translation id="4855250849489639581">Превуците надоле за још опција изгледа</translation>
 <translation id="4861758251032006121">{ATTEMPTS_LEFT,plural, =1{<ph name="ERROR_MESSAGE" /> Преостаје {0} покушај}one{<ph name="ERROR_MESSAGE" /> Преостаје {0} покушај}few{<ph name="ERROR_MESSAGE" /> Преостају {0} покушаја}other{<ph name="ERROR_MESSAGE" /> Преостаје {0} покушаја}}</translation>
 <translation id="4873827928179867585">Алгоритам потврде идентитета</translation>
 <translation id="4880328057631981605">Назив приступне тачке</translation>
@@ -517,6 +520,7 @@
 <translation id="576835345334454681">Повећајте осветљеност екрана</translation>
 <translation id="57838592816432529">Искључи звук</translation>
 <translation id="5784136236926853061">Велико HTTP кашњење</translation>
+<translation id="5826644637650799838">О позадини</translation>
 <translation id="5832805196449965646">Додај особу</translation>
 <translation id="583281660410589416">Непознато</translation>
 <translation id="5843706793424741864">Фаренхајт</translation>
@@ -673,6 +677,7 @@
 <translation id="7172721935181587524">1 слика</translation>
 <translation id="7177485034254901881"><ph name="MANAGER" /> управља овим <ph name="DEVICE_TYPE" /> уређајем. Администратори могу да конфигуришу уређај даљински.</translation>
 <translation id="7180611975245234373">Освежи</translation>
+<translation id="7180865173735832675">Прилагоди</translation>
 <translation id="7212734716605298123">Ажурирања фирмвера за екстерне уређаје</translation>
 <translation id="7216409898977639127">Мобилни оператер</translation>
 <translation id="725133483556299729">Изаберите имејл</translation>
@@ -744,6 +749,7 @@
 <translation id="7881066108824108340">DNS</translation>
 <translation id="7882358943899516840">Тип добављача</translation>
 <translation id="7882501334836096755">Јавни кључ</translation>
+<translation id="78957024357676568">лево</translation>
 <translation id="7915220255123750251">Управљајте подешавањима назива приступне тачке мреже. Називи приступних тачака успостављају везу између мобилне мреже и интернета.</translation>
 <translation id="7936303884198020182">Није пронађен ниједан сервер за имена</translation>
 <translation id="7942349550061667556">Црвена</translation>
@@ -775,6 +781,7 @@
 <translation id="8226628635270268143">Одаберите омиљене слике и албуме</translation>
 <translation id="8227119283605456246">Приложи датотеку</translation>
 <translation id="8230672074305416752">Пинговање подразумеваног мрежног пролаза није успело</translation>
+<translation id="8242426110754782860">Настави</translation>
 <translation id="8246209727385807362">Непознат мобилни оператер</translation>
 <translation id="827422111966801947">Тамноплава</translation>
 <translation id="8286154143153872371">Повежите се на мрежу и поново учитајте страницу да бисте видели позадину.</translation>
@@ -852,6 +859,7 @@
 <translation id="8930622219860340959">Бежично</translation>
 <translation id="8936793075252196307">IP адреса клијента</translation>
 <translation id="894617464444543719">Уређај је телефон.</translation>
+<translation id="8957423540740801332">десно</translation>
 <translation id="8968751544471797276">Брзина пуњења</translation>
 <translation id="8970109610781093811">Поново покрени</translation>
 <translation id="8983038754672563810">HSPA</translation>

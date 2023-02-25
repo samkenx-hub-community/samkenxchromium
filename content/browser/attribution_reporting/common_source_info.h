@@ -7,13 +7,12 @@
 
 #include <stdint.h>
 
-#include "base/check_op.h"
 #include "base/containers/flat_set.h"
 #include "base/time/time.h"
 #include "components/attribution_reporting/aggregation_keys.h"
 #include "components/attribution_reporting/filters.h"
+#include "components/attribution_reporting/source_type.mojom-forward.h"
 #include "components/attribution_reporting/suitable_origin.h"
-#include "content/browser/attribution_reporting/attribution_source_type.h"
 #include "content/common/content_export.h"
 #include "net/base/schemeful_site.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
@@ -32,23 +31,11 @@ class CONTENT_EXPORT CommonSourceInfo {
   static base::Time GetExpiryTime(
       absl::optional<base::TimeDelta> declared_expiry,
       base::Time source_time,
-      AttributionSourceType source_type);
+      attribution_reporting::mojom::SourceType);
 
-  // TODO(crbug.com/1382389): Remove this constructor once all callers pass
-  // a destination set.
-  CommonSourceInfo(uint64_t source_event_id,
-                   attribution_reporting::SuitableOrigin source_origin,
-                   net::SchemefulSite destination_site,
-                   attribution_reporting::SuitableOrigin reporting_origin,
-                   base::Time source_time,
-                   base::Time expiry_time,
-                   absl::optional<base::Time> event_report_window_time,
-                   absl::optional<base::Time> aggregatable_report_window_time,
-                   AttributionSourceType source_type,
-                   int64_t priority,
-                   attribution_reporting::FilterData filter_data,
-                   absl::optional<uint64_t> debug_key,
-                   attribution_reporting::AggregationKeys aggregation_keys);
+  static absl::optional<base::Time> GetReportWindowTime(
+      absl::optional<base::TimeDelta> declared_window,
+      base::Time source_time);
 
   CommonSourceInfo(uint64_t source_event_id,
                    attribution_reporting::SuitableOrigin source_origin,
@@ -58,7 +45,7 @@ class CONTENT_EXPORT CommonSourceInfo {
                    base::Time expiry_time,
                    absl::optional<base::Time> event_report_window_time,
                    absl::optional<base::Time> aggregatable_report_window_time,
-                   AttributionSourceType source_type,
+                   attribution_reporting::mojom::SourceType,
                    int64_t priority,
                    attribution_reporting::FilterData filter_data,
                    absl::optional<uint64_t> debug_key,
@@ -82,11 +69,6 @@ class CONTENT_EXPORT CommonSourceInfo {
     return destination_sites_;
   }
 
-  const net::SchemefulSite& destination_site() const {
-    DCHECK_EQ(destination_sites_.size(), 1u);
-    return *destination_sites_.begin();
-  }
-
   const attribution_reporting::SuitableOrigin& reporting_origin() const {
     return reporting_origin_;
   }
@@ -103,7 +85,9 @@ class CONTENT_EXPORT CommonSourceInfo {
     return aggregatable_report_window_time_;
   }
 
-  AttributionSourceType source_type() const { return source_type_; }
+  attribution_reporting::mojom::SourceType source_type() const {
+    return source_type_;
+  }
 
   int64_t priority() const { return priority_; }
 
@@ -139,7 +123,7 @@ class CONTENT_EXPORT CommonSourceInfo {
   base::Time expiry_time_;
   base::Time event_report_window_time_;
   base::Time aggregatable_report_window_time_;
-  AttributionSourceType source_type_;
+  attribution_reporting::mojom::SourceType source_type_;
   int64_t priority_;
   attribution_reporting::FilterData filter_data_;
   absl::optional<uint64_t> debug_key_;

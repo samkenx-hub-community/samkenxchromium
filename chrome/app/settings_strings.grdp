@@ -16,6 +16,9 @@
   <message name="IDS_SETTINGS_OPENS_IN_NEW_TAB" desc="ARIA (accessibility) label describing a link which opens in a new tab.">
     Opens in new tab
   </message>
+  <message name="IDS_SETTINGS_SEND_FEEDBACK_ROLE_DESCRIPTION" desc="Accessibility role description for the send feedback button at the top right of a settings section. Spoken by screen readers when focusing the button but not visually rendered.">
+    Send feedback button
+  </message>
 
   <if expr="not chromeos_ash">
     <message name="IDS_RELAUNCH_CONFIRMATION_DIALOG_BODY" desc="The body of the modal dialog that we show when users click on relaunch and they have open Incognito windows. The dialog serves to warn the users about losing their Incognito windows if they proceed with the relaunch.">
@@ -393,14 +396,17 @@
   <message name="IDS_SETTINGS_ADDRESS_REMOVED_MESSAGE" desc="Hidden text that is read to screen readers to confirm that an address was removed.">
     Address deleted
   </message>
-  <message name="IDS_SETTINGS_CREDIT_CARD_REMOVE" desc="Label for a context menu item that removes the selected credit card." meaning="Remove selected credit card.">
-    Remove
-  </message>
   <message name="IDS_SETTINGS_CREDIT_CARD_CLEAR" desc="Label for a context menu item clears the locally cached credit card that is also saved on Google Payments. Clicking this will NOT remove the credit card from Google Payments.">
     Clear copy
   </message>
   <message name="IDS_SETTINGS_EDIT_CREDIT_CARD_TITLE" desc="The title for the dialog that's shown when editing a card. This can be either credit, debit, or prepaid card..">
     Edit card
+  </message>
+  <message name="IDS_SETTINGS_LOCAL_CARD_REMOVE_CONFIRMATION_TITLE" desc="Local card remove dialog confirmation title.">
+    Delete card
+  </message>
+  <message name="IDS_SETTINGS_LOCAL_CARD_REMOVE_CONFIRMATION_DESCRIPTION" desc="The notice/warning for the user before the card deletion.">
+    This payment method will be deleted from this device
   </message>
   <message name="IDS_SETTINGS_PAYMENTS_MANAGE_CREDIT_CARDS" desc="Shown in the payments section of settings. Descriptive text to inform the user that credit cards can be accessed online. Has a link.">
    To add or manage Google Pay payment methods, visit your <ph name="BEGIN_LINK">&lt;a href="$1" target="_blank"&gt;</ph>Google Account<ph name="END_LINK">&lt;/a&gt;</ph>
@@ -938,7 +944,9 @@
     A password for this account is already saved on this device
   </message>
   <message name="IDS_SETTINGS_PASSWORDS_IMPORT_FAILURES_SUMMARY" desc="Message is shown on the dialog for importing passwords if some passwords weren't imported.">
-    Passwords not imported (<ph name="COUNT"><ex>42</ex>$1</ph>)
+    {NUM_PASSWORDS, plural,
+     =1 {1 password not imported}
+     other {{NUM_PASSWORDS} passwords not imported}}
   </message>
   <message name="IDS_SETTINGS_PASSWORDS_IMPORT_ALREADY_ACTIVE" desc="Message is shown on the dialog for importing passwords if there is the import process is already running in another tab.">
     You're already importing passwords in another tab
@@ -1457,12 +1465,6 @@
   <message name="IDS_SETTINGS_PERFORMANCE_HIGH_EFFICIENCY_MODE_SETTING" desc="Memory saver mode setting label. This mode allows the browser to save memory from background tabs">
     Memory Saver
   </message>
-  <message name="IDS_SETTINGS_PERFORMANCE_HIGH_EFFICIENCY_LEARN_MORE_ARIA_LABEL" desc="Accessibility label for the learn more link that allows the user to learn about memory saver mode.">
-    Learn more about memory saver
-  </message>
-  <message name="IDS_SETTINGS_PERFORMANCE_HIGH_EFFICIENCY_SEND_FEEDBACK_ARIA_LABEL" desc="Accessibility label for the send feedback link that allows the user to send feedback about memory saver mode.">
-    Send feedback about memory saver
-  </message>
   <message name="IDS_SETTINGS_PERFORMANCE_TAB_DISCARDING_EXCEPTIONS_ADD_BUTTON_ARIA_LABEL" desc="Accessibility label which will be read by screen readers when focusing the tab discarding exceptions list add button. Sites added to the list will not be discarded by memory saver.">
     Add to the "always keep these sites active" list
   </message>
@@ -1471,6 +1473,9 @@
   </message>
   <message name="IDS_SETTINGS_PERFORMANCE_TAB_DISCARDING_EXCEPTIONS_HEADER" desc="Heading for the exceptions list for tab discarding in the performance settings. Tabs will not be discarded by memory saver mode if on a site matching a rule in this list.">
     Always keep these sites active
+  </message>
+  <message name="IDS_SETTINGS_PERFORMANCE_TAB_DISCARDING_EXCEPTIONS_ADDITIONAL_SITES" desc="Label for button that expands the tab discarding exceptions list to show all entries. Sites added to the list will not be discarded by memory saver.">
+    Additional sites
   </message>
   <message name="IDS_SETTINGS_BATTERY_PAGE_TITLE" desc="Title of the power section of the performance settings page">
     Power
@@ -1486,12 +1491,6 @@
   </message>
   <message name="IDS_SETTINGS_PERFORMANCE_BATTERY_SAVER_MODE_RADIO_GROUP_ARIA_LABEL" desc="Accessibility label which will be read by screen readers when focus enters the energy saver mode radio group. When energy saver mode is enabled, this radio group will be expanded and allow the user to choose between different triggering options.">
     Energy saver options
-  </message>
-  <message name="IDS_SETTINGS_PERFORMANCE_BATTERY_SAVER_LEARN_MORE_ARIA_LABEL" desc="Accessibility label for the learn more link that allows the user to learn about energy saver mode.">
-    Learn more about energy saver
-  </message>
-  <message name="IDS_SETTINGS_PERFORMANCE_BATTERY_SAVER_SEND_FEEDBACK_ARIA_LABEL" desc="Accessibility label for the send feedback link that allows the user to send feedback about energy saver mode.">
-    Send feedback about energy saver
   </message>
 
   <!-- Languages Page -->
@@ -1718,6 +1717,32 @@
       </message>
     </if>
   </if>
+
+  <!-- Anti-abuse Page -->
+  <message name="IDS_SETTINGS_ANTI_ABUSE_ENABLED_SUB_LABEL" desc="The label used for the anti-abuse site settings sub-label when the anti-abuse setting is turned on.">
+    Spam and fraud reduction is on
+  </message>
+  <message name="IDS_SETTINGS_ANTI_ABUSE_DISABLED_SUB_LABEL" desc="The label used for the anti-abuse site settings sub-label when the anti-abuse setting is turned off.">
+    Spam and fraud reduction is off
+  </message>
+  <message name="IDS_SETTINGS_ANTI_ABUSE_DESCRIPTION" desc="The label used for the anti-abuse site settings description.">
+    Sites you visit can validate that you're a real user and not a bot.
+  </message>
+  <message name="IDS_SETTINGS_ANTI_ABUSE_WHEN_ON_HEADER" desc="The header used for the section that informs users of the anti-abuse features.">
+    When on
+  </message>
+  <message name="IDS_SETTINGS_ANTI_ABUSE_WHEN_ON_SECTION_ONE" desc="A description that informs users how their browsing could be helped by the anti-abuse features.">
+    Browsing is smoother, as you're more likely trusted from one site to the next.
+  </message>
+  <message name="IDS_SETTINGS_ANTI_ABUSE_WHEN_ON_SECTION_TWO" desc="A description that informs users that the anti-abuse features do not reveal their browsing history.">
+    This setting works without identifying you or allowing sites to see your browsing history.
+  </message>
+  <message name="IDS_SETTINGS_ANTI_ABUSE_THINGS_TO_CONSIDER_HEADER" desc="The header used for the section that informs users of additional things to consider when the anti-abuse features are enabled.">
+    Things to consider
+  </message>
+  <message name="IDS_SETTINGS_ANTI_ABUSE_THINGS_TO_CONSIDER_SECTION_ONE" desc="A description that informs users that site can save info with Chrome when the anti-abuse features are enabled.">
+    A site you visit can save info with Chrome that validates that you're a real user. As you keep browsing, sites can check with Chrome and verify from the first site that you're likely a trusted user.
+  </message>
 
   <!-- Privacy Sandbox -->
   <message name="IDS_SETTINGS_PRIVACY_SANDBOX_TITLE" desc="The title of the Privacy Sandbox page. 'Privacy Sandbox' is a noun phrase (title case).">

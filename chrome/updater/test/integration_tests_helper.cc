@@ -286,21 +286,11 @@ void AppTestHelper::FirstTaskRun() {
     {"run_wake_all", WithSystemScope(Wrap(&RunWakeAll))},
     {"run_wake_active",
      WithSwitch("exit_code", WithSystemScope(Wrap(&RunWakeActive)))},
-
-// TODO(crbug.com/1396103): remove this `#if` once mojo interface changes are
-// done in separate CL.
-#if BUILDFLAG(IS_WIN)
     {"update",
      WithSwitch(
          "do_update_check_only",
          WithSwitch("install_data_index",
                     (WithSwitch("app_id", WithSystemScope(Wrap(&Update))))))},
-#else   // BUILDFLAG(IS_WIN)
-    {"update",
-     WithSwitch("install_data_index",
-                (WithSwitch("app_id", WithSystemScope(Wrap(&Update)))))},
-#endif  // BUILDFLAG(IS_WIN)
-
     {"update_all", WithSystemScope(Wrap(&UpdateAll))},
     {"delete_updater_directory",
      WithSystemScope(Wrap(&DeleteUpdaterDirectory))},
@@ -326,10 +316,10 @@ void AppTestHelper::FirstTaskRun() {
                 WithSwitch("install_data_index",
                            WithSwitch("app_id", WithSystemScope(Wrap(
                                                     &CallServiceUpdate)))))},
-    {"setup_fake_legacy_updater_data",
-     WithSystemScope(Wrap(&SetupFakeLegacyUpdaterData))},
-    {"expect_legacy_updater_data_migrated",
-     WithSystemScope(Wrap(&ExpectLegacyUpdaterDataMigrated))},
+    {"setup_fake_legacy_updater",
+     WithSystemScope(Wrap(&SetupFakeLegacyUpdater))},
+    {"expect_legacy_updater_migrated",
+     WithSystemScope(Wrap(&ExpectLegacyUpdaterMigrated))},
     {"run_recovery_component",
      WithSwitch("version", WithSwitch("app_id", WithSystemScope(Wrap(
                                                     &RunRecoveryComponent))))},

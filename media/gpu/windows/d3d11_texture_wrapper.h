@@ -44,9 +44,6 @@ using GetCommandBufferHelperCB =
 // processed image is no longer needed.
 class MEDIA_GPU_EXPORT Texture2DWrapper {
  public:
-  using SharedImageRep = gpu::VideoDecodeImageRepresentation;
-  using SharedImageAccess =
-      gpu::VideoDecodeImageRepresentation::ScopedWriteAccess;
   using PictureBufferGPUResourceInitDoneCB =
       base::OnceCallback<void(scoped_refptr<media::D3D11PictureBuffer>)>;
 
@@ -153,7 +150,9 @@ class MEDIA_GPU_EXPORT DefaultTexture2DWrapper : public Texture2DWrapper {
     ~GpuResources();
 
    private:
-    void Destroy(bool have_context);
+    void OnWillDestroyStub(bool have_context);
+
+    bool is_stub_destroyed_ = false;
 
     scoped_refptr<CommandBufferHelper> helper_;
 
@@ -174,8 +173,10 @@ class MEDIA_GPU_EXPORT DefaultTexture2DWrapper : public Texture2DWrapper {
   MailboxHolderArray mailbox_holders_;
   DXGI_FORMAT dxgi_format_;
 
-  std::unique_ptr<Texture2DWrapper::SharedImageRep> shared_image_rep_;
-  std::unique_ptr<Texture2DWrapper::SharedImageAccess> shared_image_access_;
+  std::unique_ptr<gpu::VideoDecodeImageRepresentation> shared_image_rep_;
+  std::unique_ptr<gpu::VideoDecodeImageRepresentation::ScopedWriteAccess>
+      shared_image_access_;
+
   ComD3D11Device video_device_;
 
   Texture2DWrapper::PictureBufferGPUResourceInitDoneCB

@@ -7,9 +7,12 @@
 #include <memory>
 #include <utility>
 
+#include "ash/constants/ash_features.h"
 #include "ash/webui/grit/ash_shortcut_customization_app_resources.h"
 #include "ash/webui/grit/ash_shortcut_customization_app_resources_map.h"
 #include "ash/webui/shortcut_customization_ui/backend/accelerator_configuration_provider.h"
+#include "ash/webui/shortcut_customization_ui/backend/search/search.mojom.h"
+#include "ash/webui/shortcut_customization_ui/backend/search/search_handler.h"
 #include "ash/webui/shortcut_customization_ui/mojom/shortcut_customization.mojom.h"
 #include "ash/webui/shortcut_customization_ui/url_constants.h"
 #include "chromeos/strings/grit/chromeos_strings.h"
@@ -52,13 +55,12 @@ void AddLocalizedStrings(content::WebUIDataSource* source) {
        IDS_SHORTCUT_CUSTOMIZATION_CONFIRM_RESET_ALL_SHORTCUTS_TITLE},
       {"confirmResetAllShortcutsButton",
        IDS_SHORTCUT_CUSTOMIZATION_CONFIRM_RESET_SHORTCUTS_BUTTON},
-      {"categoryTabsAndWindows",
-       IDS_SHORTCUT_CUSTOMIZATION_CATEGORY_TABS_AND_WINDOWS},
-      {"categoryPageAndWebBrowser",
-       IDS_SHORTCUT_CUSTOMIZATION_CATEGORY_PAGE_AND_WEB_BROWSER},
-      {"categorySystemAndDisplaySettings",
-       IDS_SHORTCUT_CUSTOMIZATION_CATEGORY_SYSTEM_AND_DISPLAY_SETTINGS},
-      {"categoryTextEditing", IDS_SHORTCUT_CUSTOMIZATION_CATEGORY_TEXT_EDITING},
+      {"categoryGeneral", IDS_SHORTCUT_CUSTOMIZATION_CATEGORY_GENERAL},
+      {"categoryDevice", IDS_SHORTCUT_CUSTOMIZATION_CATEGORY_DEVICE},
+      {"categoryBrowser", IDS_SHORTCUT_CUSTOMIZATION_CATEGORY_BROWSER},
+      {"categoryText", IDS_SHORTCUT_CUSTOMIZATION_CATEGORY_TEXT},
+      {"categoryWindowsAndDesks",
+       IDS_SHORTCUT_CUSTOMIZATION_CATEGORY_WINDOWS_AND_DESKS},
       {"categoryAccessibility",
        IDS_SHORTCUT_CUSTOMIZATION_CATEGORY_ACCESSIBILITY},
       {"categoryDebug", IDS_SHORTCUT_CUSTOMIZATION_CATEGORY_DEBUG},
@@ -69,11 +71,33 @@ void AddLocalizedStrings(content::WebUIDataSource* source) {
        IDS_SHORTCUT_CUSTOMIZATION_SHORTCUT_WITH_CONFILICT_STATUS_MESSAGE},
       {"lockedShortcutStatusMessage",
        IDS_SHORTCUT_CUSTOMIZATION_LOCKED_SHORTCUT_STATUS_MESSAGE},
+      {"subcategoryGeneralControls",
+       IDS_SHORTCUT_CUSTOMIZATION_SUBCATEGORY_GENERAL_CONTROLS},
+      {"subcategoryApps", IDS_SHORTCUT_CUSTOMIZATION_SUBCATEGORY_APPS},
+      {"subcategoryMedia", IDS_SHORTCUT_CUSTOMIZATION_SUBCATEGORY_MEDIA},
+      {"subcategoryInputs", IDS_SHORTCUT_CUSTOMIZATION_SUBCATEGORY_INPUTS},
+      {"subcategoryDisplay", IDS_SHORTCUT_CUSTOMIZATION_SUBCATEGORY_DISPLAY},
       {"subcategoryGeneral", IDS_SHORTCUT_CUSTOMIZATION_SUBCATEGORY_GENERAL},
-      {"subcategorySystemApps",
-       IDS_SHORTCUT_CUSTOMIZATION_SUBCATEGORY_SYSTEM_APPS},
-      {"subcategorySystemControls",
-       IDS_SHORTCUT_CUSTOMIZATION_SUBCATEGORY_SYSTEM_CONTROLS},
+      {"subcategoryBrowserNavigation",
+       IDS_SHORTCUT_CUSTOMIZATION_SUBCATEGORY_BROWSER_NAVIGATION},
+      {"subcategoryPages", IDS_SHORTCUT_CUSTOMIZATION_SUBCATEGORY_PAGES},
+      {"subcategoryTabs", IDS_SHORTCUT_CUSTOMIZATION_SUBCATEGORY_TABS},
+      {"subcategoryBookmarks",
+       IDS_SHORTCUT_CUSTOMIZATION_SUBCATEGORY_BOOKMARKS},
+      {"subcategoryDeveloperTools",
+       IDS_SHORTCUT_CUSTOMIZATION_SUBCATEGORY_DEVELOPER_TOOLS},
+      {"subcategoryTextNavigation",
+       IDS_SHORTCUT_CUSTOMIZATION_SUBCATEGORY_TEXT_NAVIGATION},
+      {"subcategoryTextEditing",
+       IDS_SHORTCUT_CUSTOMIZATION_SUBCATEGORY_TEXT_EDITING},
+      {"subcategoryWindows", IDS_SHORTCUT_CUSTOMIZATION_SUBCATEGORY_WINDOWS},
+      {"subcategoryDesks", IDS_SHORTCUT_CUSTOMIZATION_SUBCATEGORY_DESKS},
+      {"subcategoryChromeVox",
+       IDS_SHORTCUT_CUSTOMIZATION_SUBCATEGORY_CHROMEVOX},
+      {"subcategoryVisibility",
+       IDS_SHORTCUT_CUSTOMIZATION_SUBCATEGORY_VISIBILITY},
+      {"subcategoryAccessibilityNavigation",
+       IDS_SHORTCUT_CUSTOMIZATION_SUBCATEGORY_ACCESSIBILITY_NAVIGATION},
       {"subcategorySixPackKeys",
        IDS_SHORTCUT_CUSTOMIZATION_SUBCATEGORY_SIX_PACK},
       {"iconLabelArrowDown", IDS_SHORTCUT_CUSTOMIZATION_ICON_LABEL_ARROW_DOWN},
@@ -142,7 +166,9 @@ void AddLocalizedStrings(content::WebUIDataSource* source) {
 
 void AddFeatureFlags(content::WebUIDataSource* html_source) {
   html_source->AddBoolean("isCustomizationEnabled",
-                          features::IsShortcutCustomizationEnabled());
+                          ::features::IsShortcutCustomizationEnabled());
+  html_source->AddBoolean("isSearchEnabled",
+                          features::IsSearchInShortcutsAppEnabled());
 }
 
 }  // namespace
@@ -169,6 +195,7 @@ ShortcutCustomizationAppUI::ShortcutCustomizationAppUI(content::WebUI* web_ui)
   AddFeatureFlags(source);
 
   provider_ = std::make_unique<shortcut_ui::AcceleratorConfigurationProvider>();
+  search_handler_ = std::make_unique<shortcut_ui::SearchHandler>();
 }
 
 ShortcutCustomizationAppUI::~ShortcutCustomizationAppUI() = default;
@@ -178,6 +205,12 @@ void ShortcutCustomizationAppUI::BindInterface(
         shortcut_customization::mojom::AcceleratorConfigurationProvider>
         receiver) {
   provider_->BindInterface(std::move(receiver));
+}
+
+void ShortcutCustomizationAppUI::BindInterface(
+    mojo::PendingReceiver<shortcut_customization::mojom::SearchHandler>
+        receiver) {
+  search_handler_->BindInterface(std::move(receiver));
 }
 
 WEB_UI_CONTROLLER_TYPE_IMPL(ShortcutCustomizationAppUI)

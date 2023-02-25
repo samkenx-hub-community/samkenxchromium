@@ -9,6 +9,7 @@
 #include <utility>
 #include <vector>
 
+#include "base/task/bind_post_task.h"
 #include "base/task/single_thread_task_runner.h"
 #include "components/viz/common/resources/resource_format_utils.h"
 #include "gpu/command_buffer/common/constants.h"
@@ -16,7 +17,6 @@
 #include "gpu/command_buffer/service/dxgi_shared_handle_manager.h"
 #include "gpu/command_buffer/service/mailbox_manager.h"
 #include "gpu/command_buffer/service/shared_image/d3d_image_backing.h"
-#include "media/base/bind_to_current_loop.h"
 #include "media/base/win/mf_helpers.h"
 #include "media/gpu/windows/d3d11_picture_buffer.h"
 #include "mojo/public/cpp/bindings/callback_helpers.h"
@@ -148,10 +148,10 @@ D3D11Status DefaultTexture2DWrapper::Init(
   // device for decoding.  Sharing seems not to work very well.  Otherwise, we
   // would create the texture with KEYED_MUTEX and NTHANDLE, then send along
   // a handle that we get from |texture| as an IDXGIResource1.
-  auto on_error_cb = BindToCurrentLoop(base::BindOnce(
+  auto on_error_cb = base::BindPostTaskToCurrentDefault(base::BindOnce(
       &DefaultTexture2DWrapper::OnError, weak_factory_.GetWeakPtr()));
 
-  auto gpu_resource_init_cb = BindToCurrentLoop(
+  auto gpu_resource_init_cb = base::BindPostTaskToCurrentDefault(
       base::BindOnce(&DefaultTexture2DWrapper::OnGPUResourceInitDone,
                      weak_factory_.GetWeakPtr()));
   gpu_resources_ = base::SequenceBound<GpuResources>(
@@ -202,8 +202,8 @@ DefaultTexture2DWrapper::GpuResources::GpuResources(
     return;
   }
 
-  helper_->AddWillDestroyStubCB(
-      base::BindOnce(&GpuResources::Destroy, weak_factory_.GetWeakPtr()));
+  helper_->AddWillDestroyStubCB(base::BindOnce(&GpuResources::OnWillDestroyStub,
+                                               weak_factory_.GetWeakPtr()));
 
   // Usage flags to allow the display compositor to draw from it, video to
   // decode, and allow webgl/canvas access.
@@ -262,7 +262,7 @@ DefaultTexture2DWrapper::GpuResources::GpuResources(
         std::move(backing), memory_type_tracker));
   }
 
-  std::unique_ptr<SharedImageRep> shared_image_rep =
+  std::unique_ptr<gpu::VideoDecodeImageRepresentation> shared_image_rep =
       shared_image_manager->ProduceVideoDecode(video_device.Get(), mailboxes[0],
                                                memory_type_tracker);
   if (!shared_image_rep) {
@@ -278,17 +278,27 @@ DefaultTexture2DWrapper::GpuResources::GpuResources(
 
 DefaultTexture2DWrapper::GpuResources::~GpuResources() {
   // Destroy shared images with a current context, otherwise mark context lost.
-  const bool have_context = helper_ && helper_->MakeContextCurrent();
-  Destroy(have_context);
+  // Check that stub is not destroyed since MakeContextCurrent will fail after
+  // that and we should've already propagated context loss in OnWillDestroyStub.
+  if (!is_stub_destroyed_ && (!helper_ || !helper_->MakeContextCurrent())) {
+    for (auto& shared_image_rep : shared_images_) {
+      shared_image_rep->OnContextLost();
+    }
+  }
+  // Destroy helper after shared image since the shared image has a raw pointer
+  // to the helper's memory tracker.
+  shared_images_.clear();
+  helper_.reset();
 }
 
-void DefaultTexture2DWrapper::GpuResources::Destroy(bool have_context) {
+void DefaultTexture2DWrapper::GpuResources::OnWillDestroyStub(
+    bool have_context) {
   if (!have_context) {
     for (auto& shared_image_rep : shared_images_) {
       shared_image_rep->OnContextLost();
     }
   }
-  shared_images_.clear();
+  is_stub_destroyed_ = true;
 }
 
 }  // namespace media

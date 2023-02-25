@@ -16,7 +16,7 @@
 #include "components/autofill/core/browser/payments/test_credit_card_fido_authenticator.h"
 #endif
 
-namespace autofill::metrics {
+namespace autofill::autofill_metrics {
 
 namespace {
 void SetProfileTestData(AutofillProfile* profile) {
@@ -80,7 +80,7 @@ void AutofillMetricsBaseTest::SetUpHelper() {
 
   auto touch_to_fill_delegate_uptr =
       std::make_unique<TouchToFillDelegateImpl>(&autofill_manager());
-  touch_to_fill_delgate_ = touch_to_fill_delegate_uptr.get();
+  touch_to_fill_delegate_ = touch_to_fill_delegate_uptr.get();
   autofill_manager().SetTouchToFillDelegateImplForTest(
       std::move(touch_to_fill_delegate_uptr));
 
@@ -333,4 +333,4 @@ void AutofillMetricsBaseTest::CreateTestAutofillProfiles() {
   personal_data().AddProfile(profile2);
 }
 
-}  // namespace autofill::metrics
+}  // namespace autofill::autofill_metrics

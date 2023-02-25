@@ -45,6 +45,7 @@ export class TestPasswordManagerProxy extends TestBrowserProxy implements
       'getInsecureCredentials',
       'getPasswordCheckStatus',
       'getSavedPasswordList',
+      'getUrlCollection',
       'muteInsecureCredential',
       'recordPasswordCheckInteraction',
       'removeBlockedSite',
@@ -53,6 +54,7 @@ export class TestPasswordManagerProxy extends TestBrowserProxy implements
       'requestExportProgressStatus',
       'requestPlaintextPassword',
       'showAddShortcutDialog',
+      'showExportedFileInShell',
       'startBulkPasswordCheck',
       'switchBiometricAuthBeforeFillingState',
       'undoRemoveSavedPasswordOrException',
@@ -231,5 +233,22 @@ export class TestPasswordManagerProxy extends TestBrowserProxy implements
 
   undoRemoveSavedPasswordOrException() {
     this.methodCalled('undoRemoveSavedPasswordOrException');
+  }
+
+  showExportedFileInShell() {
+    this.methodCalled('showExportedFileInShell');
+  }
+
+  getUrlCollection(url: string) {
+    this.methodCalled('getUrlCollection', url);
+    if (url.includes('www')) {
+      return Promise.resolve({
+        signonRealm: `https://${url}/login`,
+        shown: url,
+        link: `https://${url}/login`,
+      });
+    } else {
+      return Promise.reject();
+    }
   }
 }

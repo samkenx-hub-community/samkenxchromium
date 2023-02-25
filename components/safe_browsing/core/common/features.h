@@ -18,6 +18,9 @@ namespace safe_browsing {
 // for example to control how often collection should occur.
 BASE_DECLARE_FEATURE(kAdSamplerTriggerFeature);
 
+// Adds page load token to client safe browsing report.
+BASE_DECLARE_FEATURE(kAddPageLoadTokenToClientSafeBrowsingReport);
+
 // Killswitch for client side phishing detection. Since client side models are
 // run on a large fraction of navigations, crashes due to the model are very
 // impactful, even if only a small fraction of users have a bad version of the
@@ -112,6 +115,16 @@ extern const base::FeatureParam<int>
 extern const base::FeatureParam<int>
     kExtensionTelemetryFileDataMaxFileSizeBytes;
 
+// Specifies the interval for extension telemetry to collect offstore extension
+// file data.
+extern const base::FeatureParam<int>
+    kExtensionTelemetryFileDataCollectionIntervalSeconds;
+
+// Specifies the initial delay for extension telemetry to start collecting
+// offstore extension file data.
+extern const base::FeatureParam<int>
+    kExtensionTelemetryFileDataStartupDelaySeconds;
+
 // Enables data collected by the kExtensionTelemetry to be written and read to
 // disk. This data will be uploaded for analysis.
 BASE_DECLARE_FEATURE(kExtensionTelemetryPersistence);
@@ -205,6 +218,13 @@ BASE_DECLARE_FEATURE(kSevenZipEvaluationEnabled);
 // default and control groups of the experiment.
 BASE_DECLARE_FEATURE(kSimplifiedUrlDisplay);
 
+// Controls whether the download inspection timeout is applied over the entire
+// request, or just the network communication.
+BASE_DECLARE_FEATURE(kStrictDownloadTimeout);
+
+// Specifies the duration of the timeout, in milliseconds.
+extern const base::FeatureParam<int> kStrictDownloadTimeoutMilliseconds;
+
 // Controls the daily quota for the suspicious site trigger.
 BASE_DECLARE_FEATURE(kSuspiciousSiteTriggerQuotaFeature);
 
@@ -213,6 +233,10 @@ BASE_DECLARE_FEATURE(kSuspiciousSiteTriggerQuotaFeature);
 // notified that they can enable Enhanced Protection through an operating system
 // notification.
 BASE_DECLARE_FEATURE(kTailoredSecurityDesktopNotice);
+
+// Enable a retry for the tailored security dialogs when the dialog
+// fails to show for a user whose google account has sync turned on.
+BASE_DECLARE_FEATURE(kTailoredSecurityDialogRetryMechanism);
 
 // Controls whether the integration of tailored security settings is enabled.
 BASE_DECLARE_FEATURE(kTailoredSecurityIntegration);
@@ -242,6 +266,10 @@ std::string GetClientSideDetectionTag();
 // Returns the tag used for file type policies, as computed from the current
 // feature flag.
 std::string GetFileTypePoliciesTag();
+
+// Enables OptimizationGuide to deliver the client side phishing model instead
+// of through component updater.
+BASE_DECLARE_FEATURE(kClientSideDetectionModelOptimizationGuide);
 
 }  // namespace safe_browsing
 #endif  // COMPONENTS_SAFE_BROWSING_CORE_COMMON_FEATURES_H_

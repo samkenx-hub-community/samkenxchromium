@@ -36,7 +36,7 @@ namespace autofill {
 class BrowserAutofillManager;
 enum class WebauthnDialogCallbackType;
 
-namespace metrics {
+namespace autofill_metrics {
 class AutofillMetricsBaseTest;
 }
 
@@ -176,6 +176,11 @@ class CreditCardAccessManager : public CreditCardCvcAuthenticator::Requester,
     unmask_details_request_in_progress_ = unmask_details_request_in_progress;
   }
 
+  bool ShouldOfferFidoOptInDialogForTesting(
+      const CreditCardCvcAuthenticator::CvcAuthenticationResponse& response) {
+    return ShouldOfferFidoOptInDialog(response);
+  }
+
  private:
   // TODO(crbug.com/1249665): Remove FRIEND and change everything to _ForTesting
   // or public.
@@ -219,7 +224,7 @@ class CreditCardAccessManager : public CreditCardCvcAuthenticator::Requester,
       RiskBasedVirtualCardUnmasking_Failure_VirtualCardRetrievalError);
   FRIEND_TEST_ALL_PREFIXES(CreditCardAccessManagerTest,
                            RiskBasedVirtualCardUnmasking_FlowCancelled);
-  friend class metrics::AutofillMetricsBaseTest;
+  friend class autofill_metrics::AutofillMetricsBaseTest;
   friend class CreditCardAccessManagerTest;
 
 #if !BUILDFLAG(IS_IOS)

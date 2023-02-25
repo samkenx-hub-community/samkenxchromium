@@ -17,7 +17,6 @@
 #include "chrome/browser/ash/app_mode/kiosk_app_data_delegate.h"
 #include "chrome/browser/ash/app_mode/kiosk_app_manager.h"
 #include "chrome/browser/browser_process.h"
-#include "chrome/browser/extensions/extension_util.h"
 #include "chrome/browser/extensions/webstore_data_fetcher.h"
 #include "chrome/browser/extensions/webstore_install_helper.h"
 #include "chrome/browser/net/system_network_context_manager.h"
@@ -27,6 +26,7 @@
 #include "content/public/browser/browser_task_traits.h"
 #include "content/public/browser/browser_thread.h"
 #include "extensions/browser/extension_registry.h"
+#include "extensions/browser/extension_util.h"
 #include "extensions/browser/image_loader.h"
 #include "extensions/browser/sandboxed_unpacker.h"
 #include "extensions/common/constants.h"
@@ -73,7 +73,6 @@ class KioskAppData::CrxLoader : public extensions::SandboxedUnpackerClient {
             const base::FilePath& crx_file)
       : client_(client),
         crx_file_(crx_file),
-        success_(false),
         task_runner_(base::ThreadPool::CreateSequencedTaskRunner(
             {base::MayBlock(), base::TaskPriority::BEST_EFFORT,
              base::TaskShutdownBehavior::SKIP_ON_SHUTDOWN})) {}
@@ -165,7 +164,7 @@ class KioskAppData::CrxLoader : public extensions::SandboxedUnpackerClient {
 
   base::WeakPtr<KioskAppData> client_;
   base::FilePath crx_file_;
-  bool success_;
+  bool success_ = false;
 
   const scoped_refptr<base::SequencedTaskRunner> task_runner_;
   base::ScopedTempDir temp_dir_;

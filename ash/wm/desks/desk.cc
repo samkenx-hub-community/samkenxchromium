@@ -141,7 +141,7 @@ void FixWindowStackingAccordingToGlobalMru(aura::Window* window_to_fix) {
 class ScopedWindowPositionerDisabler {
  public:
   ScopedWindowPositionerDisabler() {
-    WindowPositioner::DisableAutoPositioning(true);
+    window_positioner::DisableAutoPositioning(true);
   }
 
   ScopedWindowPositionerDisabler(const ScopedWindowPositionerDisabler&) =
@@ -150,7 +150,7 @@ class ScopedWindowPositionerDisabler {
       const ScopedWindowPositionerDisabler&) = delete;
 
   ~ScopedWindowPositionerDisabler() {
-    WindowPositioner::DisableAutoPositioning(false);
+    window_positioner::DisableAutoPositioning(false);
   }
 };
 
@@ -467,6 +467,12 @@ void Desk::SetName(std::u16string new_name, bool set_by_user) {
   DesksController::Get()->NotifyDeskNameChanged(this, name_);
 }
 
+void Desk::SetGuid(base::GUID new_guid) {
+  if (new_guid.is_valid()) {
+    uuid_ = std::move(new_guid);
+  }
+}
+
 void Desk::PrepareForActivationAnimation() {
   DCHECK(!is_active_);
 
@@ -532,7 +538,8 @@ void Desk::Activate(bool update_window_activation) {
       auto& adw_data = all_desk_window_stacking_[root];
 
       if (!adw_data.empty() && adw_data.front().window == window &&
-          adw_data.front().order == 0) {
+          adw_data.front().order == 0 &&
+          !WindowState::Get(window)->IsMinimized()) {
         wm::ActivateWindow(window);
         return;
       }

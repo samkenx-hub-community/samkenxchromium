@@ -14,6 +14,7 @@
 #include "base/metrics/histogram_macros.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/threading/thread_restrictions.h"
+#include "base/time/time.h"
 #include "base/trace_event/trace_event.h"
 #include "base/values.h"
 #include "build/chromeos_buildflags.h"
@@ -371,19 +372,16 @@ void InstalledLoader::LoadAllExtensions(Profile* profile) {
   DCHECK_CURRENTLY_ON(BrowserThread::UI);
   TRACE_EVENT0("browser,startup", "InstalledLoader::LoadAllExtensions");
 
-  bool should_record_incremented_metrics =
+  bool is_user_profile =
       profile_util::ProfileCanUseNonComponentExtensions(profile);
+  const base::TimeTicks load_start_time = base::TimeTicks::Now();
 
-  SCOPED_UMA_HISTOGRAM_TIMER("Extensions.LoadAllTime2");
-
-  std::unique_ptr<ExtensionPrefs::ExtensionsInfo> extensions_info(
-      extension_prefs_->GetInstalledExtensionsInfo());
+  const ExtensionPrefs::ExtensionsInfo extensions_info =
+      extension_prefs_->GetInstalledExtensionsInfo();
 
   bool should_write_prefs = false;
 
-  for (size_t i = 0; i < extensions_info->size(); ++i) {
-    ExtensionInfo* info = extensions_info->at(i).get();
-
+  for (const auto& info : extensions_info) {
     // Skip extensions that were loaded from the command-line because we don't
     // want those to persist across browser restart.
     if (info->extension_location == mojom::ManifestLocation::kCommandLine)
@@ -401,7 +399,7 @@ void InstalledLoader::LoadAllExtensions(Profile* profile) {
       std::string error;
       scoped_refptr<const Extension> extension(file_util::LoadExtension(
           info->extension_path, info->extension_location,
-          GetCreationFlags(info), &error));
+          GetCreationFlags(info.get()), &error));
 
       if (!extension.get() || extension->id() != info->extension_id) {
         invalid_extensions_.insert(info->extension_path);
@@ -411,31 +409,39 @@ void InstalledLoader::LoadAllExtensions(Profile* profile) {
         continue;
       }
 
-      extensions_info->at(i)->extension_manifest =
-          std::make_unique<base::Value::Dict>(
-              extension->manifest()->value()->Clone());
+      info->extension_manifest = std::make_unique<base::Value::Dict>(
+          extension->manifest()->value()->Clone());
       should_write_prefs = true;
     }
   }
 
-  for (size_t i = 0; i < extensions_info->size(); ++i) {
-    if (extensions_info->at(i)->extension_location !=
-        mojom::ManifestLocation::kCommandLine)
-      Load(*extensions_info->at(i), should_write_prefs);
+  for (const auto& info : extensions_info) {
+    if (info->extension_location != mojom::ManifestLocation::kCommandLine) {
+      Load(*info, should_write_prefs);
+    }
   }
 
   UMA_HISTOGRAM_COUNTS_100("Extensions.LoadAll",
                            extension_registry_->enabled_extensions().size());
   UMA_HISTOGRAM_COUNTS_100("Extensions.Disabled",
                            extension_registry_->disabled_extensions().size());
-  if (should_record_incremented_metrics) {
+  if (is_user_profile) {
     UMA_HISTOGRAM_COUNTS_100("Extensions.LoadAll2",
                              extension_registry_->enabled_extensions().size());
     UMA_HISTOGRAM_COUNTS_100("Extensions.Disabled2",
                              extension_registry_->disabled_extensions().size());
   }
 
-  RecordExtensionsMetrics(profile, should_record_incremented_metrics);
+  RecordExtensionsMetrics(profile, is_user_profile);
+
+  const base::TimeDelta load_all_time =
+      base::TimeTicks::Now() - load_start_time;
+  UMA_HISTOGRAM_TIMES("Extensions.LoadAllTime2", load_all_time);
+  if (is_user_profile) {
+    UMA_HISTOGRAM_TIMES("Extensions.LoadAllTime2.User", load_all_time);
+  } else {
+    UMA_HISTOGRAM_TIMES("Extensions.LoadAllTime2.NonUser", load_all_time);
+  }
 }
 
 void InstalledLoader::RecordExtensionsMetricsForTesting() {

@@ -589,8 +589,8 @@ class Browser : public TabStripModelObserver,
   // Invoked at the end of a fullscreen transition.
   void WindowFullscreenStateChanged();
 
-  // Only used on Mac. Called when the top ui style has been changed since this
-  // may trigger bookmark bar state change.
+  // Only used on Mac and Lacros. Called when the top ui style has been changed
+  // since this may trigger bookmark bar state change.
   void FullscreenTopUIStateChanged();
 
   void OnFindBarVisibilityChanged();
@@ -986,6 +986,8 @@ class Browser : public TabStripModelObserver,
                          bool starred) override;
 
   // Overridden from ZoomObserver:
+  void OnZoomControllerDestroyed(
+      zoom::ZoomController* zoom_controller) override;
   void OnZoomChanged(
       const zoom::ZoomController::ZoomChangedEventData& data) override;
 
@@ -1182,10 +1184,7 @@ class Browser : public TabStripModelObserver,
   std::unique_ptr<ScopedProfileKeepAlive> profile_keep_alive_;
 
   // This Browser's window.
-  //
-  // TODO(crbug.com/1298696): pixel_browser_tests breaks with MTECheckedPtr
-  // enabled. Triage.
-  raw_ptr<BrowserWindow, DegradeToNoOpWhenMTE> window_;
+  raw_ptr<BrowserWindow> window_;
 
   std::unique_ptr<TabStripModelDelegate> const tab_strip_model_delegate_;
   std::unique_ptr<TabStripModel> const tab_strip_model_;

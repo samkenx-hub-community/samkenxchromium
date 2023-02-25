@@ -118,7 +118,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Startup.Android.Cold.TimeToFirstNavigationCommit2.Tabbed"
-    units="ms" expires_after="2023-06-04">
+    units="ms" expires_after="2023-08-08">
   <owner>pasko@chromium.org</owner>
   <owner>agrieve@chromium.org</owner>
   <summary>
@@ -192,7 +192,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Startup.Android.Cold.TimeToVisibleContent" units="ms"
-    expires_after="2023-06-18">
+    expires_after="2023-08-20">
   <owner>ckitagawa@chromium.org</owner>
   <summary>
     Android: The time from the activity creation point to the moment the content
@@ -324,20 +324,6 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
-<histogram name="Startup.Android.NewInstance.LaunchedFromDraggedLinkViewIntent"
-    enum="Boolean" expires_after="2023-07-09">
-  <owner>twellington@chromium.org</owner>
-  <owner>aishwaryarj@google.com</owner>
-  <summary>
-    Recorded when a VIEW intent to launch ChromeTabbedActivity contained the
-    FLAG_ACTIVITY_MULTIPLE_TASK flag. Records 'true' if the intent came from
-    dragging a link out of Chrome, and false otherwise. Note that some OEMs
-    currently do not use the full ClipData.Item intent when propagating a drag
-    event, in which case 'false' will be recorded regardless of whether the drag
-    event / VIEW intent originated from Chrome.
-  </summary>
-</histogram>
-
 <histogram name="Startup.Android.ShowChromeStartSegmentationResult"
     enum="ShowChromeStartSegmentationResult" expires_after="2023-04-09">
   <owner>hanxi@chromium.org</owner>
@@ -374,7 +360,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Startup.Android.StartSurfaceShownAtStartup" enum="Boolean"
-    expires_after="2023-06-18">
+    expires_after="2023-08-20">
   <owner>hanxi@chromium.org</owner>
   <owner>wychen@chromium.org</owner>
   <summary>
@@ -395,7 +381,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Startup.BringToForegroundReason"
-    enum="BooleanBringToForegroundReason" expires_after="2023-06-18">
+    enum="BooleanBringToForegroundReason" expires_after="2023-08-20">
   <owner>peter@chromium.org</owner>
   <summary>
     Records the cause, each time Chrome is brought to the foreground. Currently
@@ -409,24 +395,6 @@ chromium-metrics-reviews@google.com.
   <owner>robliao@chromium.org</owner>
   <summary>
     The amount of time that elapsed during BrowserMainRunnerImpl::Initialize.
-  </summary>
-</histogram>
-
-<histogram name="Startup.BrowserMainRunnerImplInitializeStep1Time" units="ms"
-    expires_after="M77">
-  <owner>robliao@chromium.org</owner>
-  <summary>
-    The amount of time that elapsed during the first section of
-    BrowserMainRunnerImpl::Initialize.
-  </summary>
-</histogram>
-
-<histogram name="Startup.BrowserMainRunnerImplInitializeStep2Time" units="ms"
-    expires_after="M77">
-  <owner>robliao@chromium.org</owner>
-  <summary>
-    The amount of time that elapsed during the second section of
-    BrowserMainRunnerImpl::Initialize.
   </summary>
 </histogram>
 
@@ -696,6 +664,7 @@ chromium-metrics-reviews@google.com.
   <owner>fdoray@chromium.org</owner>
   <owner>gab@chromium.org</owner>
   <owner>chrome-analysis-team@google.com</owner>
+  <improvement direction="LOWER_IS_BETTER"/>
   <summary>
     [Desktop] Measure the elapsed time from the application start to the first
     non empty paint of the first web contents. Only comprised of cases where the
@@ -850,7 +819,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Startup.PreMainMessageLoopRunImplLongTime" units="ms"
-    expires_after="2023-06-04">
+    expires_after="2023-08-08">
   <owner>rkaplow@chromium.org</owner>
   <summary>
     The amount of time that elapsed during

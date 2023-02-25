@@ -47,9 +47,6 @@
 namespace blink {
 namespace {
 
-const char* kContainmentNotSatisfied =
-    "Aborting transition. Element must contain paint or layout for "
-    "view-transition-name : ";
 const char* kDuplicateTagBaseError =
     "Unexpected duplicate view-transition-name: ";
 
@@ -65,11 +62,6 @@ const String& AnimationUAStyles() {
       String, kAnimationUAStyles,
       (UncompressResourceAsASCIIString(IDR_UASTYLE_TRANSITION_ANIMATIONS_CSS)));
   return kAnimationUAStyles;
-}
-
-bool SatisfiesContainment(const LayoutObject& object) {
-  return object.ShouldApplyPaintContainment() ||
-         object.ShouldApplyLayoutContainment();
 }
 
 absl::optional<String> ComputeInsetDifference(PhysicalRect reference_rect,
@@ -116,6 +108,7 @@ gfx::Transform ComputeViewportTransform(const LayoutObject& object) {
   if (!transform.HasPerspective()) {
     transform.Round2dTranslationComponents();
   }
+
   return transform;
 }
 
@@ -372,23 +365,11 @@ bool ViewTransitionStyleTracker::FlattenAndVerifyElements(
     VectorOf<Element>& elements,
     VectorOf<AtomicString>& transition_names,
     absl::optional<RootData>& root_data) {
-  for (const auto& element : ViewTransitionSupplement::From(*document_)
-                                 ->ElementsWithViewTransitionName()) {
-    DCHECK(element->ComputedStyleRef().ViewTransitionName());
-
-    // Ignore elements which are not rendered.
-    if (!element->GetLayoutObject())
-      continue;
-
-    // Skip the transition if containment is not satisfied.
-    if (!element->IsDocumentElement() &&
-        !SatisfiesContainment(*element->GetLayoutObject())) {
-      StringBuilder message;
-      message.Append(kContainmentNotSatisfied);
-      message.Append(element->ComputedStyleRef().ViewTransitionName());
-      AddConsoleError(message.ReleaseString());
-      return false;
-    }
+  // If the root element doesn't generate a layout object then there can't be
+  // any elements participating in the transition since no element can generate
+  // a box. This is a valid state for things like entry or exit animations.
+  if (!document_->documentElement()->GetLayoutObject()) {
+    return true;
   }
 
   // We need to flatten the data first, and sort it by ordering which reflects
@@ -503,6 +484,7 @@ bool ViewTransitionStyleTracker::Capture() {
   if (old_root_data_) {
     old_root_data_->snapshot_id =
         viz::ViewTransitionElementResourceId::Generate();
+    capture_resource_ids_.push_back(old_root_data_->snapshot_id);
   }
   for (const auto& root_name : AllRootTags())
     transition_names.push_front(root_name);
@@ -814,6 +796,25 @@ PseudoElement* ViewTransitionStyleTracker::CreatePseudoElement(
 bool ViewTransitionStyleTracker::RunPostPrePaintSteps() {
   DCHECK_GE(document_->Lifecycle().GetState(),
             DocumentLifecycle::kPrePaintClean);
+
+  if (!document_->documentElement()->GetLayoutObject()) {
+    // If we have any view transition elements, while having no
+    // documentElement->GetLayoutObject(), we should abort. Target elements are
+    // only set on the current phase of the animation, so it means that the
+    // documentElement's layout object disappeared in this phase.
+    if (new_root_data_) {
+      return false;
+    }
+
+    for (auto& entry : element_data_map_) {
+      auto& element_data = entry.value;
+      if (element_data->target_element) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   bool needs_style_invalidation = false;
 
   // Use the document element's effective zoom, since that's what the parent
@@ -838,14 +839,19 @@ bool ViewTransitionStyleTracker::RunPostPrePaintSteps() {
 
     DCHECK_NE(element_data->target_element, document_->documentElement());
     auto* layout_object = element_data->target_element->GetLayoutObject();
-    if (!layout_object || !SatisfiesContainment(*layout_object)) {
-      StringBuilder message;
-      message.Append(kContainmentNotSatisfied);
-      message.Append(entry.key);
-      AddConsoleError(message.ReleaseString());
+    // TODO(khushalsagar): Verify that skipping a transition when things become
+    // display none is aligned with spec.
+    if (!layout_object) {
       return false;
     }
 
+    // TODO(bokan): This doesn't account for the local offset of an inline
+    // element within its container. The object-view-box inset will ensure the
+    // snapshot is rendered in the correct place but the pseudo is positioned
+    // w.r.t. to the container. This can look awkward since the opposing
+    // snapshot may have a different object-view-box. Inline positioning and
+    // scaling more generally might use some improvements.
+    // https://crbug.com/1416951.
     auto snapshot_matrix = ComputeViewportTransform(*layout_object);
 
     if (document_->GetLayoutView()
@@ -866,17 +872,27 @@ bool ViewTransitionStyleTracker::RunPostPrePaintSteps() {
 
     snapshot_matrix.Zoom(1.0 / device_pixel_ratio_);
 
-    // ResizeObserverEntry is created to reuse the logic for parsing object size
-    // for different types of LayoutObjects.
-    auto* resize_observer_entry =
-        MakeGarbageCollected<ResizeObserverEntry>(element_data->target_element);
-    auto entry_size = resize_observer_entry->borderBoxSize()[0];
-    LayoutSize border_box_size_in_css_space =
-        layout_object->IsHorizontalWritingMode()
-            ? LayoutSize(LayoutUnit(entry_size->inlineSize()),
-                         LayoutUnit(entry_size->blockSize()))
-            : LayoutSize(LayoutUnit(entry_size->blockSize()),
-                         LayoutUnit(entry_size->inlineSize()));
+    LayoutSize border_box_size_in_css_space;
+
+    if (layout_object->IsSVGChild() || IsA<LayoutBox>(layout_object)) {
+      // ResizeObserverEntry is created to reuse the logic for parsing object
+      // size for different types of LayoutObjects. However, this works only
+      // for SVGChild and LayoutBox.
+      auto* resize_observer_entry = MakeGarbageCollected<ResizeObserverEntry>(
+          element_data->target_element);
+      auto entry_size = resize_observer_entry->borderBoxSize()[0];
+      border_box_size_in_css_space =
+          layout_object->IsHorizontalWritingMode()
+              ? LayoutSize(LayoutUnit(entry_size->inlineSize()),
+                           LayoutUnit(entry_size->blockSize()))
+              : LayoutSize(LayoutUnit(entry_size->blockSize()),
+                           LayoutUnit(entry_size->inlineSize()));
+    } else if (auto* box_model =
+                   DynamicTo<LayoutBoxModelObject>(layout_object)) {
+      border_box_size_in_css_space =
+          LayoutSize(box_model->BorderBoundingBox().size());
+    }
+
     if (float effective_zoom = layout_object->StyleRef().EffectiveZoom();
         std::abs(effective_zoom - device_pixel_ratio_) >=
         std::numeric_limits<float>::epsilon()) {
@@ -884,8 +900,9 @@ bool ViewTransitionStyleTracker::RunPostPrePaintSteps() {
     }
 
     PhysicalRect visual_overflow_rect_in_layout_space;
-    if (auto* box = DynamicTo<LayoutBox>(layout_object))
+    if (auto* box = DynamicTo<LayoutBoxModelObject>(layout_object)) {
       visual_overflow_rect_in_layout_space = ComputeVisualOverflowRect(*box);
+    }
 
     WritingMode writing_mode = layout_object->StyleRef().GetWritingMode();
 

@@ -55,6 +55,7 @@
 #include "chrome/browser/extensions/omaha_attributes_handler.h"
 #include "chrome/browser/extensions/pending_extension_manager.h"
 #include "chrome/browser/extensions/permissions_updater.h"
+#include "chrome/browser/extensions/profile_util.h"
 #include "chrome/browser/extensions/shared_module_service.h"
 #include "chrome/browser/extensions/unpacked_installer.h"
 #include "chrome/browser/extensions/updater/chrome_extension_downloader_factory.h"
@@ -341,14 +342,16 @@ void ExtensionService::OnExternalProviderUpdateComplete(
   external_install_manager_->UpdateExternalExtensionAlert();
 }
 
-ExtensionService::ExtensionService(Profile* profile,
-                                   const base::CommandLine* command_line,
-                                   const base::FilePath& install_directory,
-                                   ExtensionPrefs* extension_prefs,
-                                   Blocklist* blocklist,
-                                   bool autoupdate_enabled,
-                                   bool extensions_enabled,
-                                   base::OneShotEvent* ready)
+ExtensionService::ExtensionService(
+    Profile* profile,
+    const base::CommandLine* command_line,
+    const base::FilePath& install_directory,
+    const base::FilePath& unpacked_install_directory,
+    ExtensionPrefs* extension_prefs,
+    Blocklist* blocklist,
+    bool autoupdate_enabled,
+    bool extensions_enabled,
+    base::OneShotEvent* ready)
     : Blocklist::Observer(blocklist),
       command_line_(command_line),
       profile_(profile),
@@ -365,6 +368,7 @@ ExtensionService::ExtensionService(Profile* profile,
       registry_(ExtensionRegistry::Get(profile)),
       pending_extension_manager_(profile),
       install_directory_(install_directory),
+      unpacked_install_directory_(unpacked_install_directory),
       extensions_enabled_(extensions_enabled),
       ready_(ready),
       shared_module_service_(new SharedModuleService(profile_)),
@@ -388,8 +392,6 @@ ExtensionService::ExtensionService(Profile* profile,
   on_app_terminating_subscription_ =
       browser_shutdown::AddAppTerminatingCallback(base::BindOnce(
           &ExtensionService::OnAppTerminating, base::Unretained(this)));
-  registrar_.Add(this, content::NOTIFICATION_RENDERER_PROCESS_TERMINATED,
-                 content::NotificationService::AllBrowserContextsAndSources());
 
   host_registry_observation_.Observe(ExtensionHostRegistry::Get(profile));
 
@@ -541,11 +543,10 @@ void ExtensionService::MaybeFinishShutdownDelayed() {
   TRACE_EVENT0("browser,startup",
                "ExtensionService::MaybeFinishShutdownDelayed");
 
-  std::unique_ptr<ExtensionPrefs::ExtensionsInfo> delayed_info(
-      extension_prefs_->GetAllDelayedInstallInfo());
-  for (size_t i = 0; i < delayed_info->size(); ++i) {
-    ExtensionInfo* info = delayed_info->at(i).get();
-    scoped_refptr<const Extension> extension(nullptr);
+  const ExtensionPrefs::ExtensionsInfo delayed_info =
+      extension_prefs_->GetAllDelayedInstallInfo();
+  for (const auto& info : delayed_info) {
+    scoped_refptr<const Extension> extension;
     if (info->extension_manifest) {
       std::string error;
       extension = Extension::Create(
@@ -553,8 +554,9 @@ void ExtensionService::MaybeFinishShutdownDelayed() {
           *info->extension_manifest,
           extension_prefs_->GetDelayedInstallCreationFlags(info->extension_id),
           info->extension_id, &error);
-      if (extension.get())
+      if (extension.get()) {
         delayed_installs_.Insert(extension);
+      }
     }
   }
   MaybeFinishDelayedInstallations();
@@ -1367,12 +1369,12 @@ void ExtensionService::OnAllExternalProvidersReady() {
   }
 
   // Uninstall all the unclaimed extensions.
-  std::unique_ptr<ExtensionPrefs::ExtensionsInfo> extensions_info(
-      extension_prefs_->GetInstalledExtensionsInfo());
-  for (size_t i = 0; i < extensions_info->size(); ++i) {
-    ExtensionInfo* info = extensions_info->at(i).get();
-    if (Manifest::IsExternalLocation(info->extension_location))
+  ExtensionPrefs::ExtensionsInfo extensions_info =
+      extension_prefs_->GetInstalledExtensionsInfo();
+  for (const auto& info : extensions_info) {
+    if (Manifest::IsExternalLocation(info->extension_location)) {
       CheckExternalUninstall(info->extension_id);
+    }
   }
 
   error_controller_->ShowErrorIfNeeded();
@@ -1696,13 +1698,30 @@ void ExtensionService::OnExtensionInstalled(
                               extension->location());
   }
 
+  bool is_user_profile =
+      extensions::profile_util::ProfileCanUseNonComponentExtensions(profile_);
+
   if (!registry_->GetInstalledExtension(extension->id())) {
     UMA_HISTOGRAM_ENUMERATION("Extensions.InstallType", extension->GetType(),
                               100);
+    if (is_user_profile) {
+      UMA_HISTOGRAM_ENUMERATION("Extensions.InstallType.User",
+                                extension->GetType(), 100);
+    } else {
+      UMA_HISTOGRAM_ENUMERATION("Extensions.InstallType.NonUser",
+                                extension->GetType(), 100);
+    }
     UMA_HISTOGRAM_ENUMERATION("Extensions.InstallSource",
                               extension->location());
+    if (is_user_profile) {
+      UMA_HISTOGRAM_ENUMERATION("Extensions.InstallSource.User",
+                                extension->GetType(), 100);
+    } else {
+      UMA_HISTOGRAM_ENUMERATION("Extensions.InstallSource.NonUser",
+                                extension->GetType(), 100);
+    }
     // TODO(crbug.com/1383740): Address Install metrics below in a follow-up CL.
-    RecordPermissionMessagesHistogram(extension, "Install", false);
+    RecordPermissionMessagesHistogram(extension, "Install", is_user_profile);
   }
 
   const Extension::State initial_state =
@@ -1994,23 +2013,28 @@ void ExtensionService::OnAppTerminating() {
   browser_terminating_ = true;
 }
 
-void ExtensionService::Observe(int type,
-                               const content::NotificationSource& source,
-                               const content::NotificationDetails& details) {
-  DCHECK(type == content::NOTIFICATION_RENDERER_PROCESS_TERMINATED);
-  content::RenderProcessHost* process =
-      content::Source<content::RenderProcessHost>(source).ptr();
+void ExtensionService::OnRenderProcessHostCreated(
+    content::RenderProcessHost* host) {
+  if (!host_observation_.IsObservingSource(host)) {
+    host_observation_.AddObservation(host);
+  }
+}
+
+void ExtensionService::RenderProcessHostDestroyed(
+    content::RenderProcessHost* host) {
+  host_observation_.RemoveObservation(host);
+
   Profile* host_profile =
-      Profile::FromBrowserContext(process->GetBrowserContext());
+      Profile::FromBrowserContext(host->GetBrowserContext());
   if (!profile_->IsSameOrParent(host_profile->GetOriginalProfile()))
     return;
 
   ProcessMap* process_map = ProcessMap::Get(profile_);
-  if (process_map->Contains(process->GetID())) {
+  if (process_map->Contains(host->GetID())) {
     // An extension process was terminated, this might have resulted in an
     // app or extension becoming idle.
     std::set<std::string> extension_ids =
-        process_map->GetExtensionsInProcess(process->GetID());
+        process_map->GetExtensionsInProcess(host->GetID());
     // In addition to the extensions listed in the process map, one of those
     // extensions could be referencing a shared module which is waiting for
     // idle to update. Check all imports of these extensions, too.
@@ -2041,7 +2065,7 @@ void ExtensionService::Observe(int type,
       }
     }
   }
-  process_map->RemoveAllFromProcess(process->GetID());
+  process_map->RemoveAllFromProcess(host->GetID());
 }
 
 int ExtensionService::GetDisableReasonsOnInstalled(const Extension* extension) {

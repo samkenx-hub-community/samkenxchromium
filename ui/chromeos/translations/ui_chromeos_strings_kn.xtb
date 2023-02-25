@@ -27,12 +27,12 @@
 <translation id="1201402288615127009">ಮುಂದೆ</translation>
 <translation id="1209796539517632982">ಸ್ವಯಂಚಾಲಿತ ಹೆಸರು ಸರ್ವರ್‌ಗಳು</translation>
 <translation id="1210831758834677569">ಲಾವೋ</translation>
+<translation id="1221555006497674479">ಸಂಗ್ರಹಣೆ ಕಡಿಮೆಯಿದೆ, ನಿಮ್ಮ <ph name="TOTAL_SPACE" />ಹಂಚಿಕೊಂಡ ಡ್ರೈವ್‌ನ ಸಂಗ್ರಹಣೆಯಲ್ಲಿ <ph name="REMAINING_PERCENTAGE" />% ಉಳಿದಿದೆ.</translation>
 <translation id="1243314992276662751">ಅಪ್‌ಲೋಡ್</translation>
 <translation id="1249250836236328755">ಪ್ರಕಾರ</translation>
 <translation id="1254593899333212300">ನೇರ ಇಂಟರ್ನೆಟ್ ಸಂಪರ್ಕ</translation>
 <translation id="1272293450992660632">ಪಿನ್ ಮೌಲ್ಯಗಳು ಹೊಂದಾಣಿಕೆಯಾಗುತ್ತಿಲ್ಲ.</translation>
 <translation id="1280820357415527819">ಮೊಬೈಲ್ ನೆಟ್‌ವರ್ಕ್‌ಗಳಿಗಾಗಿ ಹುಡುಕಲಾಗುತ್ತಿದೆ</translation>
-<translation id="1291603679744561561">ಸಿಮ್ ಲಾಕ್ ಆಗಿದೆ</translation>
 <translation id="1293556467332435079">Files</translation>
 <translation id="1297922636971898492">Google ಡ್ರೈವ್‌ ಇದೀಗ ಲಭ್ಯವಿಲ್ಲ. Google ಡ್ರೈವ್‌ ಒಮ್ಮೆ ಹಿಂತಿರುಗಿದರೆ ಅಪ್‌ಲೋಡ್‌ ಆಗುವುದು ಸ್ವಯಂಚಾಲಿತವಾಗಿ ಮರುಪ್ರಾರಂಭಗೊಳ್ಳುತ್ತದೆ.</translation>
 <translation id="1307931752636661898">Linux ಫೈಲ್‌ಗಳನ್ನು ವೀಕ್ಷಿಸಲು ಸಾಧ್ಯವಾಗುತ್ತಿಲ್ಲ</translation>
@@ -59,7 +59,6 @@
 <translation id="1499943022354839699">ಡ್ವೊರಾಕ್ ಕೀಬೋರ್ಡ್‌ನಲ್ಲಿ ಇಂಗ್ಲಿಷ್ (ಯುಎಸ್)</translation>
 <translation id="1515909359182093592"><ph name="INPUT_LABEL" /> - ಹೋಸ್ಟ್</translation>
 <translation id="1521655867290435174">Google Sheets</translation>
-<translation id="1521795806314479294"><ph name="FILE_NAME" /> ಅನ್ನು ಸಿದ್ಧಪಡಿಸಲಾಗುತ್ತಿದೆ...</translation>
 <translation id="1538729222189715449">Linux ಫೈಲ್‌ಗಳನ್ನು ತೆರೆಯಲಾಗುತ್ತಿದೆ...</translation>
 <translation id="1547964879613821194">ಕೆನೆಡಿಯನ್ ಇಂಗ್ಲಿಷ್</translation>
 <translation id="1556189134700913550">ಎಲ್ಲಕ್ಕೂ ಅನ್ವಯಿಸು</translation>
@@ -75,6 +74,7 @@
 <translation id="1641780993263690097">ಚೈನೀಸ್ ಪಿನ್‌ಯಿನ್</translation>
 <translation id="1646019627374511909"><ph name="NUMBER_OF_ITEMS" /> ಫೈಲ್‌ಗಳನ್ನು ಆಫ್‌ಲೈನ್‌ನಲ್ಲಿ ಲಭ್ಯಗೊಳಿಸಲಾಗುತ್ತಿದೆ</translation>
 <translation id="164969095109328410">Chrome ಸಾಧನ</translation>
+<translation id="1661207570040737402">ನಿಮ್ಮ ಎಲ್ಲಾ ಹಂಚಿಕೊಂಡ ಡ್ರೈವ್‌ನ Google Workspace ಸಂಗ್ರಹಣೆಯನ್ನು ನೀವು ಬಳಸಿದ್ದೀರಿ.</translation>
 <translation id="1661867754829461514">PIN ಕಾಣೆಯಾಗಿದೆ</translation>
 <translation id="166439687370499867">ಹಂಚಿದ ನೆಟ್‌ವರ್ಕ್‌ ಕಾನ್ಫಿಗರ್‌ಗಳನ್ನು ಬದಲಾಯಿಸಲು ಅನುಮತಿಸುವುದಿಲ್ಲ</translation>
 <translation id="1665611772925418501">ಫೈಲ್ ಅನ್ನು ಮಾರ್ಪಡಿಸಲಾಗಲಿಲ್ಲ.</translation>
@@ -84,7 +84,6 @@
 <translation id="1722487484194605434"><ph name="NUMBER_OF_ITEMS" /> ಐಟಂಗಳನ್ನು ಝಿಪ್ ಮಾಡಲಾಗುತ್ತಿದೆ...</translation>
 <translation id="1722687688096767818">ಪ್ರೊಫೈಲ್ ಅನ್ನು ಸೇರಿಸಲಾಗುತ್ತಿದೆ...</translation>
 <translation id="1726100011689679555">ಹೆಸರಿನ ಸರ್ವರ್‌ಗಳು</translation>
-<translation id="1727562178154619254">ಸಿಂಕ್ ಮಾಡಲು ಸಿದ್ಧವಾಗಿದೆ</translation>
 <translation id="1729953886957086472">ಜರ್ಮನ್ (ಜರ್ಮನಿ)</translation>
 <translation id="1730235522912993863">ಚೈನೀಸ್ ಕಾಂಗ್‌ಜೀ</translation>
 <translation id="1731889557567069540"><ph name="NUMBER_OF_ITEMS" /> ಐಟಂಗಳನ್ನು ನಕಲಿಸಲಾಗಿದೆ.</translation>
@@ -194,6 +193,7 @@
 <translation id="2574327434504608656">Bruschetta ಜೊತೆಗೆ 1 ಫೋಲ್ಡರ್ ಹಂಚಿಕೊಳ್ಳಲಾಗಿದೆ</translation>
 <translation id="2578394532502990878">ತಮಿಳು ಫೋನೆಟಿಕ್</translation>
 <translation id="2579959351793446050">ಒಡಿಯಾ</translation>
+<translation id="2587195714949534472"><ph name="FILE_NAME" /> ಅನ್ನು ಸಿಂಕ್ ಮಾಡಲು ಸಿದ್ಧಗೊಳಿಸಲಾಗುತ್ತಿದೆ...</translation>
 <translation id="2602810353103180630"><ph name="NETWORK_COUNT" /> ರಲ್ಲಿ <ph name="NETWORK_INDEX" /> ನೆಟ್‌ವರ್ಕ್,<ph name="NETWORK_NAME" />, <ph name="CONNECTION_STATUS" />, ಸಿಗ್ನಲ್ ಸಾಮರ್ಥ್ಯ <ph name="SIGNAL_STRENGTH" />%, ನಿಮ್ಮ ನಿರ್ವಾಹಕರು ನಿರ್ಬಂಧಿಸಿದ್ದಾರೆ, ವಿವರಗಳು</translation>
 <translation id="2614589611416690597"><ph name="VIDEO_TYPE" /> ವೀಡಿಯೊ</translation>
 <translation id="2620090360073999360">ಈ ಸಮಯದಲ್ಲಿ Google ಡ್ರೈವ್‌ ಅನ್ನು ತಲುಪಲು ಸಾಧ್ಯವಿಲ್ಲ.</translation>
@@ -295,6 +295,7 @@
 <translation id="3486821258960016770">ಮಂಗೋಲಿಯನ್</translation>
 <translation id="3495304270784461826"><ph name="COUNT" /> ದೋಷಗಳು.</translation>
 <translation id="3509680540198371098"><ph name="NETWORK_COUNT" /> ರಲ್ಲಿ <ph name="NETWORK_INDEX" /> ನೆಟ್‌ವರ್ಕ್, <ph name="NETWORK_NAME" />, <ph name="SECURITY_STATUS" />, <ph name="CONNECTION_STATUS" />, ಸಿಗ್ನಲ್ ಸಾಮರ್ಥ್ಯ <ph name="SIGNAL_STRENGTH" />%, ವಿವರಗಳು</translation>
+<translation id="3511705761158917664"><ph name="NUMBER_OF_ITEMS" /> ಐಟಂಗಳನ್ನು ಸಿಂಕ್ ಮಾಡಲು ಸಿದ್ಧಗೊಳಿಸಲಾಗುತ್ತಿದೆ...</translation>
 <translation id="3522708245912499433">ಪೋರ್ಚುಗೀಸ್</translation>
 <translation id="3524311639100184459">ಎಚ್ಚರಿಕೆ: ಈ ಫೈಲ್‌ಗಳು ತಾತ್ಕಾಲಿಕವಾಗಿರುತ್ತವೆ ಹಾಗೂ ಡಿಸ್ಕ್ ಸ್ಥಳವನ್ನು ಮುಕ್ತಗೊಳಿಸಲು ಸ್ವಯಂಚಾಲಿತವಾಗಿ ಅವುಗಳನ್ನು ಅಳಿಸಬಹುದು.  <ph name="BEGIN_LINK" />ಇನ್ನಷ್ಟು ತಿಳಿಯಿರಿ<ph name="END_LINK" /></translation>
 <translation id="3527085408025491307">ಫೋಲ್ಡರ್</translation>
@@ -350,11 +351,11 @@
 <translation id="3924145049010392604">Meta</translation>
 <translation id="3943857333388298514">ಅಂಟಿಸು</translation>
 <translation id="3952872973865944257">ತೆಲುಗು ಫೋನೆಟಿಕ್</translation>
-<translation id="3954354850384043518">ಪ್ರಗತಿಯಲ್ಲಿದೆ</translation>
 <translation id="3958548648197196644">ಕಿವಿ</translation>
 <translation id="3971140002794351170">ಮೊಬೈಲ್ ಪ್ರೊಫೈಲ್ ಡೌನ್‌ಲೋಡ್ ಮಾಡಿ, ನೆಟ್‌ವರ್ಕ್ <ph name="NETWORK_COUNT" /> ರಲ್ಲಿ <ph name="NETWORK_INDEX" />, <ph name="NETWORK_NAME" />, <ph name="NETWORK_PROVIDER_NAME" /></translation>
 <translation id="3973925058222872294">ಇಂಗ್ಲಿಷ್ (ಯುಕೆ)</translation>
 <translation id="3975895378829046965">ಬಾಂಗ್ಲಾ ಫೋನೆಟಿಕ್</translation>
+<translation id="3999574733850440202">ಇತ್ತೀಚೆಗೆ ತೆರೆದಿರುವ Microsoft ಫೈಲ್‌ಗಳನ್ನು OneDrive ಗೆ ಸರಿಸಲಾಗಿದೆ</translation>
 <translation id="4002066346123236978">ಶೀರ್ಷಿಕೆ</translation>
 <translation id="4017788180641807848">ವರ್ಕ್‌ಮ್ಯಾನ್ ಕೀಬೋರ್ಡ್‌ನಲ್ಲಿ ಇಂಗ್ಲಿಷ್ (ಯುಎಸ್)</translation>
 <translation id="4019998208269143058">ತ್ವರಿತ ಫೈಲ್‌ಗಳಿಗೆ ಪಿನ್ ಮಾಡಿ</translation>
@@ -363,6 +364,7 @@
 <translation id="4092890906744441904">ಐರಿಷ್</translation>
 <translation id="4124935795427217608">ಯುನಿಕಾರ್ನ್</translation>
 <translation id="4131235941541910880">ನಿಮಗೆ ಬೇಡದ ಐಟಂಗಳನ್ನು ಅನುಪಯುಕ್ತಕ್ಕೆ ಸರಿಸಿ</translation>
+<translation id="4134804435730168042"><ph name="NETWORK_COUNT" /> ರಲ್ಲಿ <ph name="NETWORK_INDEX" /> ನೆಟ್‌ವರ್ಕ್, <ph name="NETWORK_NAME" />, <ph name="NETWORK_PROVIDER_NAME" />, ಸಾಧನದ ಸೆಟಪ್ ನಂತರ ಸಕ್ರಿಯಗೊಳಿಸಿ</translation>
 <translation id="4153015322587141338">ಶೆಲ್ಫ್‌ನಲ್ಲಿರುವ ನಿಮ್ಮ ಫೈಲ್‌ಗಳಿಗೆ ತ್ವರಿತ ಆ್ಯಕ್ಸೆಸ್ ಪಡೆಯಲು, ಫೈಲ್ ಮೇಲೆ ಬಲ-ಕ್ಲಿಕ್ ಮಾಡಿ ಮತ್ತು "<ph name="PIN_COMMAND" />" ಅನ್ನು ಆಯ್ಕೆಮಾಡಿ.</translation>
 <translation id="4157569377477607576">ನಿರ್ವಾಹಕರ ನೀತಿ ಇವುಗಳನ್ನು ಶಿಫಾರಸು ಮಾಡುವುದಿಲ್ಲ:</translation>
 <translation id="4159731583141908892"><ph name="FILE_NAME" /> ಐಟಂಗಳನ್ನು ಸರಿಸಲಾಗಿದೆ.</translation>
@@ -405,6 +407,7 @@
 <translation id="4414834425328380570">"<ph name="FILE_NAME" />" ಅನ್ನು ಅಳಿಸಲಾಗುತ್ತದೆ ಮತ್ತು ಅದನ್ನು ಮರುಸ್ಥಾಪಿಸಲು ನಿಮಗೆ ಸಾಧ್ಯವಾಗುವುದಿಲ್ಲ.</translation>
 <translation id="4418686080762064601">ನಿಮ್ಮ ಫೈಲ್‌ಗಳಿಗಾಗಿ ಶಾರ್ಟ್‌ಕಟ್ ಅನ್ನು ರಚಿಸಿ</translation>
 <translation id="4425149324548788773">ನನ್ನ ಡ್ರೈವ್</translation>
+<translation id="4432921877815220091"><ph name="NETWORK_COUNT" /> ರಲ್ಲಿ <ph name="NETWORK_INDEX" /> ನೆಟ್‌ವರ್ಕ್, <ph name="NETWORK_NAME" />, ಸಾಧನದ ಸೆಟಪ್ ನಂತರ ಸಕ್ರಿಯಗೊಳಿಸಿ, ನಿಮ್ಮ ನಿರ್ವಾಹಕರು ನಿರ್ವಹಿಸುತ್ತಿದ್ದಾರೆ</translation>
 <translation id="4439427728133035643"><ph name="NETWORK_COUNT" /> ರಲ್ಲಿ <ph name="NETWORK_INDEX" /> ನೆಟ್‌ವರ್ಕ್, <ph name="NETWORK_NAME" />, ಸಿಗ್ನಲ್ ಸಾಮರ್ಥ್ಯ <ph name="SIGNAL_STRENGTH" />%, ಕನೆಕ್ಟ್</translation>
 <translation id="4442424173763614572">DNS ಲುಕಪ್ ವಿಫಲವಾಗಿದೆ</translation>
 <translation id="4462159676511157176">ಕಸ್ಟಮ್ ಹೆಸರು ಸರ್ವರ್‌ಗಳು</translation>
@@ -513,7 +516,6 @@
        ಬಳಕೆಯಲ್ಲಿರುವ ಸಂದರ್ಭದಲ್ಲಿಯೇ ನಿಮ್ಮ ಸಾಧನವನ್ನು ತೆಗೆಯುವುದರಿಂದ ಡೇಟಾ ನಾಶವಾಗಲು ಕಾರಣವಾಗಬಹುದು.  ದಯವಿಟ್ಟು ಕಾರ್ಯಾಚರಣೆ ಮುಗಿಯುವವರೆಗೂ ನಿರೀಕ್ಷಿಸಿ, ನಂತರ ಫೈಲ್‌ಗಳ ಅಪ್ಲಿಕೇಶನ್ ಬಳಸಿಕೊಂಡು ಸಾಧನವನ್ನು ಹೊರಹಾಕಿ.</translation>
 <translation id="5163869187418756376">ಹಂಚಿಕೆ ವಿಫಲಗೊಂಡಿದೆ. ನಿಮ್ಮ ಸಂಪರ್ಕವನ್ನು ಪರಿಶೀಲಿಸಿ ಹಾಗೂ ನಂತರ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.</translation>
 <translation id="516592729076796170">US ಪ್ರೊಗ್ರಾಮರ್ ಡಿವೊರಾಕ್</translation>
-<translation id="5167102019886320507"><ph name="NUMBER_OF_ITEMS" /> ಐಟಂಗಳನ್ನು ಸಿದ್ಧಪಡಿಸಲಾಗುತ್ತಿದೆ...</translation>
 <translation id="5177526793333269655">ಚಿಕ್ಕಚಿತ್ರ ವೀಕ್ಷಣೆ</translation>
 <translation id="5181896909298187506">ಯಾವುದೇ ಇತ್ತೀಚಿನ ಫೈಲ್‌ಗಳಿಲ್ಲ</translation>
 <translation id="5194713942430106590">ಕಾಲಮ್ ಅನ್ನು ಮೇಲಿನಿಂದ ಕೆಳಗೆ ಕ್ರಮದಲ್ಲಿ ವಿಂಗಡಿಸಲು ಕ್ಲಿಕ್ ಮಾಡಿ.</translation>
@@ -615,6 +617,7 @@
 <translation id="5913638992615760742">ನಕಲಿಸುವಿಕೆ ಕಾರ್ಯಾಚರಣೆ ವಿಫಲವಾಗಿದೆ, ಅನಿರೀಕ್ಷಿತ ದೋಷ: <ph name="ERROR_MESSAGE" /></translation>
 <translation id="5926082595146149752">ಯುಎಸ್ ಅಂತರರಾಷ್ಟ್ರೀಯ PC ಕೀಬೋರ್ಡ್‌ನಲ್ಲಿ ಡಚ್ (ನೆದರ್‌ಲ್ಯಾಂಡ್ಸ್)</translation>
 <translation id="5932901536148835538">Chromebit</translation>
+<translation id="5948255720516436063"><ph name="NETWORK_COUNT" /> ರಲ್ಲಿ <ph name="NETWORK_INDEX" /> ನೆಟ್‌ವರ್ಕ್, <ph name="NETWORK_NAME" />, ಸಾಧನದ ಸೆಟಪ್ ನಂತರ ಸಕ್ರಿಯಗೊಳಿಸಿ</translation>
 <translation id="5955954492236143329"><ph name="NUMBER_OF_ITEMS" /> ಐಟಂಗಳು</translation>
 <translation id="5957366693331451795">Chromeboxes</translation>
 <translation id="5982621672636444458">ಆಯ್ಕೆಗಳನ್ನು ವಿಂಗಡಿಸು</translation>
@@ -793,6 +796,7 @@
 <translation id="7458955835361612701">ಯಾವುದೇ ಇತ್ತೀಚಿನ ಚಿತ್ರಗಳಿಲ್ಲ</translation>
 <translation id="7460898608667578234">ಉಕ್ರೇನಿಯನ್</translation>
 <translation id="7469894403370665791">ಸ್ವಯಂಚಾಲಿತವಾಗಿ ಈ ನೆಟ್‌ವರ್ಕ್‌ಗೆ ಸಂಪರ್ಕಿಸಿ</translation>
+<translation id="7481358317100446445">ಸಿದ್ಧ</translation>
 <translation id="7486315294984620427">‌Parallels Desktop ನಲ್ಲಿ ಫೈಲ್‌ಗಳನ್ನು ಡ್ರಾಪ್ ಮಾಡಲು, ಫೈಲ್ ಅನ್ನು Windows ಫೈಲ್‌ಗಳಿಗೆ ನಕಲಿಸಬೇಕು.</translation>
 <translation id="749452993132003881">ಹಿರಾಗನ</translation>
 <translation id="7495372004724182530">ಮಲಯಾಳಂ ಫೋನೆಟಿಕ್</translation>
@@ -830,6 +834,7 @@
 <translation id="7724603315864178912">ಕತ್ತರಿಸು</translation>
 <translation id="7732111077498238432">ನೆಟ್‌ವರ್ಕ್‌ ನೀತಿಯ ನಿಯಂತ್ರಣದಲ್ಲಿದೆ</translation>
 <translation id="7736003208887389532">ಈ ಫೈಲ್‌ಗಳನ್ನು ಶಾಶ್ವತವಾಗಿ ಅಳಿಸಬೇಕೇ?</translation>
+<translation id="7740287852186792672">ಹುಡುಕಾಟ ಫಲಿತಾಂಶಗಳು</translation>
 <translation id="7748626145866214022">ಕ್ರಿಯೆಯ ಬಾರ್‌ನಲ್ಲಿ ಹೆಚ್ಚಿನ ಆಯ್ಕೆಗಳು ಲಭ್ಯವಿವೆ. ಕ್ರಿಯೆಯ ಬಾರ್ ಅನ್ನು ಫೋಕಸ್ ಮಾಡಲು Alt + A ಒತ್ತಿರಿ.</translation>
 <translation id="7760449188139285140">ಚೈನೀಸ್ ವುಬಿ</translation>
 <translation id="7765158879357617694">ಸರಿಸು</translation>
@@ -881,6 +886,7 @@
 <translation id="8116072619078571545">ಮಂಜುಗಡ್ಡೆ ನೀರು</translation>
 <translation id="8128733386027980860">ಡ್ವೊರಾಕ್ ಕೀಬೋರ್ಡ್‌ನಲ್ಲಿ ಇಂಗ್ಲಿಷ್ (ಯುಕೆ)</translation>
 <translation id="8137331602592933310">"<ph name="FILENAME" />" ಅನ್ನು ನಿಮ್ಮೊಂದಿಗೆ ಹಂಚಿಕೊಳ್ಳಲಾಗಿದೆ. ನೀವು ಅದನ್ನು ಹೊಂದಿಲ್ಲದಿರುವ ಕಾರಣ ನಿಮಗೆ ಅದನ್ನು ಅಳಿಸಲಾಗುವುದಿಲ್ಲ.</translation>
+<translation id="8138705869659070104">ಸಾಧನದ ಸೆಟಪ್ ನಂತರ ಸಕ್ರಿಯಗೊಳಿಸಿ</translation>
 <translation id="813913629614996137">ಪ್ರಾರಂಭಿಸಲಾಗುತ್ತಿದೆ...</translation>
 <translation id="8147028810663464959">ಅಕ್ಷರದ ಅಗಲವು ಪೂರ್ಣವಾಗಿದೆ</translation>
 <translation id="8151638057146502721">ಕಾನ್ಫಿಗರ್ ಮಾಡಿ</translation>
@@ -906,6 +912,7 @@
 <translation id="8300849813060516376">OTASP ವಿಫಲವಾಗಿದೆ</translation>
 <translation id="8312871300878166382">ಫೋಲ್ಡರ್‌ಗೆ ಅಂಟಿಸಿ</translation>
 <translation id="8329978297633540474">ಸರಳ ಪಠ್ಯ</translation>
+<translation id="8332007959299458842">ಇತ್ತೀಚೆಗೆ ತೆರೆದಿರುವ Microsoft ಫೈಲ್‌ಗಳನ್ನು Google Drive ಗೆ ಸರಿಸಲಾಗಿದೆ</translation>
 <translation id="8335587457941836791">ಶೆಲ್ಫ್‌ನಿಂದ ಅನ್‌ಪಿನ್‌ ಮಾಡು</translation>
 <translation id="8335837413233998004">ಬೆಲರೂಸಿಯನ್</translation>
 <translation id="8336153091935557858">ನಿನ್ನೆ <ph name="YESTERDAY_DAYTIME" /></translation>
@@ -932,6 +939,7 @@
 <translation id="8487700953926739672">ಆಫ್‌ಲೈನ್ ಲಭ್ಯವಿದೆ</translation>
 <translation id="8492972329130824181">ಗೃಹ ನೆಟ್‌ವರ್ಕ್ ಲಭ್ಯವಿಲ್ಲ. ಕನೆಕ್ಟ್ ಮಾಡಲು ಮೊಬೈಲ್ ಡೇಟಾ ರೋಮಿಂಗ್ ಅನ್ನು ಸಕ್ರಿಯಗೊಳಿಸಬೇಕಾಗುತ್ತದೆ.</translation>
 <translation id="8499098729323186194"><ph name="NUMBER_OF_ITEMS" /> ಐಟಂಗಳನ್ನು ಬೇರ್ಪಡಿಸಲಾಗುತ್ತಿದೆ...</translation>
+<translation id="8502913769543567768"><ph name="NETWORK_COUNT" /> ರಲ್ಲಿ <ph name="NETWORK_INDEX" /> ನೆಟ್‌ವರ್ಕ್, <ph name="NETWORK_NAME" />, <ph name="NETWORK_PROVIDER_NAME" />, ಸಾಧನದ ಸೆಟಪ್ ನಂತರ ಸಕ್ರಿಯಗೊಳಿಸಿ, ನಿಮ್ಮ ನಿರ್ವಾಹಕರು ನಿರ್ವಹಿಸಿಸುತ್ತಿದ್ದಾರೆ</translation>
 <translation id="8521441079177373948">UK</translation>
 <translation id="853494022971700746">ಫ್ರೆಂಚ್ (ಫ್ರಾನ್ಸ್)</translation>
 <translation id="8540608333167683902"><ph name="NETWORK_COUNT" /> ರಲ್ಲಿ <ph name="NETWORK_INDEX" /> ನೆಟ್‌ವರ್ಕ್, <ph name="NETWORK_NAME" />, <ph name="CONNECTION_STATUS" />, ಸಿಗ್ನಲ್ ಸಾಮರ್ಥ್ಯ <ph name="SIGNAL_STRENGTH" />%, ವಿವರಗಳು</translation>
@@ -993,6 +1001,7 @@
 <translation id="9046895021617826162">ಸಂಪರ್ಕವು ವಿಫಲವಾಗಿದೆ</translation>
 <translation id="9065512565307033593">ನೀವು ಪರಿಶೀಲಿಸಲು ವಿಫಲವಾದರೆ, ನಿಮ್ಮ ನೆಟ್‌ವರ್ಕ್ ಪ್ರವೇಶವನ್ನು ನಿಷ್ಕ್ರಿಯಗೊಳಿಸಲಾಗುತ್ತದೆ.</translation>
 <translation id="908378762078012445">ಫೋನೆಟಿಕ್ AATSEEL ಕೀಬೋರ್ಡ್‌ನಲ್ಲಿ ರಷ್ಯನ್</translation>
+<translation id="9086302186042011942">ಸಿಂಕ್ ಮಾಡಲಾಗುತ್ತಿದೆ</translation>
 <translation id="9099674669267916096">ಪುಟ ಎಣಿಕೆ</translation>
 <translation id="9100610230175265781">ಪಾಸ್‌ಫ್ರೇಸ್ ಅಗತ್ಯವಿದೆ</translation>
 <translation id="9110990317705400362">ನಿಮ್ಮ ಬ್ರೌಸಿಂಗ್ ಸುರಕ್ಷಿತವಾಗಿರಿಸಲು ನಾವು ನಿರಂತರವಾಗಿ ಪ್ರಯತ್ನಿಸುತ್ತಿರುತ್ತೇವೆ. ಹಿಂದೆ, ನಿಮ್ಮ ಬ್ರೌಸರ್‌ನಲ್ಲಿ ವಿಸ್ತರಣೆಯನ್ನು ಸೇರಿಸಲು ನಿಮಗೆ ಯಾವುದೇ ವೆಬ್‌ಸೈಟ್‌‌ ಕಾರ್ಯನಿರ್ವಹಿಸಿರಬಹುದು. ಇತ್ತೀಚಿನ Google Chrome ಆವೃತ್ತಿಗಳಲ್ಲಿ, ವಿಸ್ತರಣೆಗಳ ಪುಟದಿಂದ ಅವುಗಳನ್ನು ಸೇರಿಸುವ ಮೂಲಕ ಈ ವಿಸ್ತರಣೆಗಳನ್ನು ಇನ್‌ಸ್ಟಾಲ್ ಮಾಡಲು ಬಯಸುವುದಾಗಿ ನೀವು Chrome ಗೆ ಸ್ಪಷ್ಟವಾಗಿ ತಿಳಿಸಬೇಕು. <ph name="BEGIN_LINK" />ಇನ್ನಷ್ಟು ತಿಳಿಯಿರಿ<ph name="END_LINK" /></translation>

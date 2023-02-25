@@ -13,6 +13,7 @@ declare global {
 
       export interface AccountInfo {
         email: string;
+        isSyncEnabledForAutofillProfiles: boolean;
       }
 
       export enum AddressField {
@@ -71,6 +72,7 @@ declare global {
         field: AddressField;
         fieldName: string;
         isLongField: boolean;
+        isRequired: boolean;
         placeholder?: string;
       }
 

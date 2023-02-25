@@ -45,20 +45,17 @@ BASE_FEATURE(kSharedSandboxPolicies,
              "SharedSandboxPolicies",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
-// Emergency "off switch" for pipe security changes, which apply more
-// restrictions to sandboxed processes from opening or creating pipes. This
-// feature can be removed around the M112 timeline. See
-// https://crbug.com/1378724.
-BASE_FEATURE(kChromePipeLockdown,
-             "ChromePipeLockdown",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
 // Emergency "off switch" for renderer environment filtering, this feature can
 // be removed around the M113 timeline. See https://crbug.com/1403087.
 BASE_FEATURE(kRendererFilterEnvironment,
              "RendererFilterEnvironment",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
+// Emergency "off switch" for removal of direct system font access from
+// sandboxed processes.
+BASE_FEATURE(kWinSboxAllowSystemFonts,
+             "WinSboxAllowSystemFonts",
+             base::FEATURE_DISABLED_BY_DEFAULT);
 #endif  // BUILDFLAG(IS_WIN)
 
 #if BUILDFLAG(IS_CHROMEOS_ASH)
@@ -82,7 +79,7 @@ BASE_FEATURE(kForceSpectreVariant2Mitigation,
 // as controlled by CanCacheSandboxPolicy().
 BASE_FEATURE(kCacheMacSandboxProfiles,
              "CacheMacSandboxProfiles",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 #endif  // BUILDFLAG(IS_MAC)
 
 bool IsNetworkSandboxEnabled() {

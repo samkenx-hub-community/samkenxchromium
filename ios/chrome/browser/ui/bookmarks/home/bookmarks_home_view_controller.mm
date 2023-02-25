@@ -136,13 +136,7 @@ std::vector<GURL> GetUrlsToOpen(const std::vector<const BookmarkNode*>& nodes) {
     UISearchControllerDelegate,
     UISearchResultsUpdating,
     UITableViewDataSource,
-    UITableViewDelegate> {
-  // Bridge to register for bookmark changes.
-  std::unique_ptr<BookmarkModelBridge> _bridge;
-
-  // The root node, whose child nodes are shown in the bookmark table view.
-  const bookmarks::BookmarkNode* _rootNode;
-}
+    UITableViewDelegate>
 
 // Shared state between BookmarksHome classes.  Used as a temporary refactoring
 // aid.
@@ -219,9 +213,16 @@ std::vector<GURL> GetUrlsToOpen(const std::vector<const BookmarkNode*>& nodes) {
 
 @end
 
-@implementation BookmarksHomeViewController
+@implementation BookmarksHomeViewController {
+  // Bridge to register for bookmark changes.
+  std::unique_ptr<BookmarkModelBridge> _bridge;
 
-#pragma mark - Initializer
+  // The root node, whose child nodes are shown in the bookmark table view.
+  const bookmarks::BookmarkNode* _rootNode;
+  // The bookmark node that was choosen by an entity outside of the Bookmarks UI
+  // and is selected when the view is loaded.
+  const bookmarks::BookmarkNode* _externalBookmark;
+}
 
 - (instancetype)initWithBrowser:(Browser*)browser {
   DCHECK(browser);
@@ -261,6 +262,10 @@ std::vector<GURL> GetUrlsToOpen(const std::vector<const BookmarkNode*>& nodes) {
 
 - (void)setRootNode:(const bookmarks::BookmarkNode*)rootNode {
   _rootNode = rootNode;
+}
+
+- (void)setExternalBookmark:(const bookmarks::BookmarkNode*)node {
+  _externalBookmark = node;
 }
 
 - (BOOL)canDismiss {
@@ -334,6 +339,14 @@ std::vector<GURL> GetUrlsToOpen(const std::vector<const BookmarkNode*>& nodes) {
     [stack addObject:controller];
   }
   return stack;
+}
+
+- (void)willDismissBySwipeDown {
+  if (self.searchController.active) {
+    // Dismiss the keyboard if trying to dismiss the VC so the keyboard doesn't
+    // linger until the VC dismissal has completed.
+    [self.searchController.searchBar endEditing:YES];
+  }
 }
 
 #pragma mark - UIViewController
@@ -505,6 +518,8 @@ std::vector<GURL> GetUrlsToOpen(const std::vector<const BookmarkNode*>& nodes) {
   }
 
   self.searchController.searchBar.userInteractionEnabled = YES;
+
+  [self editExternalBookmarkIfSet];
 
   DCHECK(self.bookmarks->loaded());
   DCHECK([self isViewLoaded]);
@@ -678,12 +693,16 @@ std::vector<GURL> GetUrlsToOpen(const std::vector<const BookmarkNode*>& nodes) {
 - (void)editNodeURL:(const BookmarkNode*)node {
   DCHECK(node);
   DCHECK_EQ(node->type(), BookmarkNode::URL);
+  base::RecordAction(
+      base::UserMetricsAction("MobileBookmarkManagerEditBookmark"));
   [self ensureBookmarksCoordinator];
   [self.bookmarksCoordinator presentEditorForURLNode:node];
 }
 
 // Opens the editor on the given Folder node.
 - (void)editNodeFolder:(const BookmarkNode*)node {
+  base::RecordAction(
+      base::UserMetricsAction("MobileBookmarkManagerEditFolder"));
   DCHECK(node);
   DCHECK_EQ(node->type(), BookmarkNode::FOLDER);
   [self ensureBookmarksCoordinator];
@@ -912,8 +931,12 @@ std::vector<GURL> GetUrlsToOpen(const std::vector<const BookmarkNode*>& nodes) {
   DCHECK(_folderChooserCoordinator);
   DCHECK(folder);
 
-  std::set<const bookmarks::BookmarkNode*>& editedNodes =
+  // Copy the list of edited nodes from BookmarksFolderChooserCoordinator
+  // as the reference may become invalid when `_folderChooserCoordinator`
+  // is set to nil (if `self` holds the last reference to the object).
+  std::set<const bookmarks::BookmarkNode*> editedNodes =
       _folderChooserCoordinator.editedNodes;
+
   [_folderChooserCoordinator stop];
   _folderChooserCoordinator.delegate = nil;
   _folderChooserCoordinator = nil;
@@ -924,7 +947,7 @@ std::vector<GURL> GetUrlsToOpen(const std::vector<const BookmarkNode*>& nodes) {
   [self setTableViewEditing:NO];
   [self.snackbarCommandsHandler
       showSnackbarMessage:bookmark_utils_ios::MoveBookmarksWithUndoToast(
-                              editedNodes, self.bookmarks, folder,
+                              std::move(editedNodes), self.bookmarks, folder,
                               self.browserState)];
 }
 
@@ -1623,6 +1646,30 @@ std::vector<GURL> GetUrlsToOpen(const std::vector<const BookmarkNode*>& nodes) {
   [self setTableViewEditing:!self.sharedState.currentlyInEditMode];
 }
 
+// Displays the UITableView edit mode and selects the row containing the
+// `_externalBookmark`.
+- (void)editExternalBookmarkIfSet {
+  if (!_externalBookmark) {
+    return;
+  }
+
+  [self setTableViewEditing:YES];
+  NSArray<NSIndexPath*>* paths = [self.tableViewModel
+      indexPathsForItemType:BookmarksHomeItemTypeBookmark
+          sectionIdentifier:BookmarksHomeSectionIdentifierBookmarks];
+  for (id path in paths) {
+    BookmarksHomeNodeItem* node =
+        base::mac::ObjCCastStrict<BookmarksHomeNodeItem>(
+            [self.tableViewModel itemAtIndexPath:path]);
+    if (node.bookmarkNode == _externalBookmark) {
+      [self.tableView selectRowAtIndexPath:path
+                                  animated:NO
+                            scrollPosition:UITableViewScrollPositionMiddle];
+      break;
+    }
+  }
+}
+
 #pragma mark - ContextBarStates
 
 // Customizes the context bar buttons based the `state` passed in.
@@ -1800,6 +1847,8 @@ std::vector<GURL> GetUrlsToOpen(const std::vector<const BookmarkNode*>& nodes) {
                       bookmark_utils_ios::FindNodesByIds(strongSelf.bookmarks,
                                                          nodeIds);
                   if (nodesFromIds) {
+                    base::RecordAction(base::UserMetricsAction(
+                        "MobileBookmarkManagerMoveToFolderBulk"));
                     [strongSelf moveNodes:*nodesFromIds];
                   }
                 }
@@ -1935,6 +1984,8 @@ std::vector<GURL> GetUrlsToOpen(const std::vector<const BookmarkNode*>& nodes) {
                                bookmark_utils_ios::FindNodeById(
                                    strongSelf.bookmarks, nodeId);
                            if (nodeFromId) {
+                             base::RecordAction(base::UserMetricsAction(
+                                 "MobileBookmarkManagerMoveToFolder"));
                              std::set<const BookmarkNode*> nodes{nodeFromId};
                              [strongSelf moveNodes:nodes];
                            }
@@ -1967,6 +2018,8 @@ std::vector<GURL> GetUrlsToOpen(const std::vector<const BookmarkNode*>& nodes) {
                       nodesFromIds = bookmark_utils_ios::FindNodesByIds(
                           strongSelf.bookmarks, nodeIds);
                   if (nodesFromIds) {
+                    base::RecordAction(base::UserMetricsAction(
+                        "MobileBookmarkManagerMoveToFolderBulk"));
                     [strongSelf moveNodes:*nodesFromIds];
                   }
                 }
@@ -2271,6 +2324,8 @@ std::vector<GURL> GetUrlsToOpen(const std::vector<const BookmarkNode*>& nodes) {
     }
     [self.sharedState.editingFolderCell stopEdit];
     if (node->is_folder()) {
+      base::RecordAction(
+          base::UserMetricsAction("MobileBookmarkManagerOpenFolder"));
       [self handleSelectFolderForNavigation:node];
     } else {
       if (self.sharedState.currentlyShowingSearchResults) {
@@ -2462,6 +2517,8 @@ std::vector<GURL> GetUrlsToOpen(const std::vector<const BookmarkNode*>& nodes) {
         const bookmarks::BookmarkNode* nodeFromId =
             bookmark_utils_ios::FindNodeById(innerStrongSelf.bookmarks, nodeId);
         if (nodeFromId) {
+          base::RecordAction(
+              base::UserMetricsAction("MobileBookmarkManagerMoveToFolder"));
           std::set<const BookmarkNode*> nodes{nodeFromId};
           [innerStrongSelf moveNodes:nodes];
         }
@@ -2483,25 +2540,6 @@ std::vector<GURL> GetUrlsToOpen(const std::vector<const BookmarkNode*>& nodes) {
       [UIContextMenuConfiguration configurationWithIdentifier:nil
                                               previewProvider:nil
                                                actionProvider:actionProvider];
-}
-
-#pragma mark UIAdaptivePresentationControllerDelegate
-
-- (void)presentationControllerWillDismiss:
-    (UIPresentationController*)presentationController {
-  if (self.searchController.active) {
-    // Dismiss the keyboard if trying to dismiss the VC so the keyboard doesn't
-    // linger until the VC dismissal has completed.
-    [self.searchController.searchBar endEditing:YES];
-  }
-}
-
-- (void)presentationControllerDidDismiss:
-    (UIPresentationController*)presentationController {
-  base::RecordAction(
-      base::UserMetricsAction("IOSBookmarkManagerCloseWithSwipe"));
-  // Cleanup once the dismissal is complete.
-  [self dismissWithURL:GURL()];
 }
 
 #pragma mark - TableViewURLDragDataSource

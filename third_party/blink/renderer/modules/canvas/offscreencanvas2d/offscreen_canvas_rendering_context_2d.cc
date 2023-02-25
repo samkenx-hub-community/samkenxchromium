@@ -130,28 +130,33 @@ void OffscreenCanvasRenderingContext2D::commit() {
   // TODO(fserb): consolidate this with PushFrame
   SkIRect damage_rect(dirty_rect_for_commit_);
   dirty_rect_for_commit_.setEmpty();
-  FinalizeFrame();
-  Host()->Commit(ProduceCanvasResource(), damage_rect);
+  FinalizeFrame(CanvasResourceProvider::FlushReason::kOffscreenCanvasCommit);
+  Host()->Commit(
+      ProduceCanvasResource(
+          CanvasResourceProvider::FlushReason::kOffscreenCanvasCommit),
+      damage_rect);
   GetOffscreenFontCache().PruneLocalFontCache(kMaxCachedFonts);
 }
 
-void OffscreenCanvasRenderingContext2D::FlushRecording() {
+void OffscreenCanvasRenderingContext2D::FlushRecording(
+    CanvasResourceProvider::FlushReason reason) {
   if (!GetCanvasResourceProvider() ||
       !GetCanvasResourceProvider()->HasRecordedDrawOps())
     return;
 
-  GetCanvasResourceProvider()->FlushCanvas();
+  GetCanvasResourceProvider()->FlushCanvas(reason);
   GetCanvasResourceProvider()->ReleaseLockedImages();
 }
 
-void OffscreenCanvasRenderingContext2D::FinalizeFrame(bool /*printing*/) {
+void OffscreenCanvasRenderingContext2D::FinalizeFrame(
+    CanvasResourceProvider::FlushReason reason) {
   TRACE_EVENT0("blink", "OffscreenCanvasRenderingContext2D::FinalizeFrame");
 
   // Make sure surface is ready for painting: fix the rendering mode now
   // because it will be too late during the paint invalidation phase.
   if (!GetOrCreateCanvasResourceProvider())
     return;
-  FlushRecording();
+  FlushRecording(reason);
 }
 
 // BaseRenderingContext2D implementation
@@ -205,11 +210,12 @@ void OffscreenCanvasRenderingContext2D::Reset() {
 }
 
 scoped_refptr<CanvasResource>
-OffscreenCanvasRenderingContext2D::ProduceCanvasResource() {
+OffscreenCanvasRenderingContext2D::ProduceCanvasResource(
+    CanvasResourceProvider::FlushReason reason) {
   if (!GetOrCreateCanvasResourceProvider())
     return nullptr;
   scoped_refptr<CanvasResource> frame =
-      GetCanvasResourceProvider()->ProduceCanvasResource();
+      GetCanvasResourceProvider()->ProduceCanvasResource(reason);
   if (!frame)
     return nullptr;
 
@@ -222,8 +228,11 @@ bool OffscreenCanvasRenderingContext2D::PushFrame() {
     return false;
 
   SkIRect damage_rect(dirty_rect_for_commit_);
-  FinalizeFrame();
-  bool ret = Host()->PushFrame(ProduceCanvasResource(), damage_rect);
+  FinalizeFrame(CanvasResourceProvider::FlushReason::kOffscreenCanvasPushFrame);
+  bool ret = Host()->PushFrame(
+      ProduceCanvasResource(
+          CanvasResourceProvider::FlushReason::kOffscreenCanvasPushFrame),
+      damage_rect);
   dirty_rect_for_commit_.setEmpty();
   GetOffscreenFontCache().PruneLocalFontCache(kMaxCachedFonts);
   return ret;
@@ -245,7 +254,8 @@ ImageBitmap* OffscreenCanvasRenderingContext2D::TransferToImageBitmap(
 
   if (!GetOrCreateCanvasResourceProvider())
     return nullptr;
-  scoped_refptr<StaticBitmapImage> image = GetImage();
+  scoped_refptr<StaticBitmapImage> image =
+      GetImage(CanvasResourceProvider::FlushReason::kTransfer);
   if (!image)
     return nullptr;
   image->SetOriginClean(OriginClean());
@@ -258,12 +268,13 @@ ImageBitmap* OffscreenCanvasRenderingContext2D::TransferToImageBitmap(
   return MakeGarbageCollected<ImageBitmap>(std::move(image));
 }
 
-scoped_refptr<StaticBitmapImage> OffscreenCanvasRenderingContext2D::GetImage() {
-  FinalizeFrame();
+scoped_refptr<StaticBitmapImage> OffscreenCanvasRenderingContext2D::GetImage(
+    CanvasResourceProvider::FlushReason reason) {
+  FinalizeFrame(reason);
   if (!IsPaintable())
     return nullptr;
   scoped_refptr<StaticBitmapImage> image =
-      GetCanvasResourceProvider()->Snapshot();
+      GetCanvasResourceProvider()->Snapshot(reason);
 
   return image;
 }
@@ -298,11 +309,12 @@ cc::PaintCanvas* OffscreenCanvasRenderingContext2D::GetPaintCanvas() {
   return GetCanvasResourceProvider()->Canvas();
 }
 
-cc::PaintCanvas* OffscreenCanvasRenderingContext2D::GetPaintCanvasForDraw(
+void OffscreenCanvasRenderingContext2D::WillDraw(
     const SkIRect& dirty_rect,
     CanvasPerformanceMonitor::DrawType draw_type) {
-  if (!is_valid_size_ || !GetCanvasResourceProvider())
-    return nullptr;
+  // Call sites should ensure GetPaintCanvas() returns non-null before calling
+  // this.
+  DCHECK(GetPaintCanvas());
   dirty_rect_for_commit_.join(dirty_rect);
   GetCanvasPerformanceMonitor().DidDraw(draw_type);
   Host()->DidDraw(dirty_rect_for_commit_);
@@ -310,7 +322,6 @@ cc::PaintCanvas* OffscreenCanvasRenderingContext2D::GetPaintCanvasForDraw(
     // TODO(crbug.com/1246486): Make auto-flushing layer friendly.
     GetCanvasResourceProvider()->FlushIfRecordingLimitExceeded();
   }
-  return GetCanvasResourceProvider()->Canvas();
 }
 
 sk_sp<PaintFilter> OffscreenCanvasRenderingContext2D::StateGetFilter() {
@@ -361,7 +372,7 @@ bool OffscreenCanvasRenderingContext2D::WritePixels(
     return false;
 
   DCHECK(IsPaintable());
-  FinalizeFrame();
+  FinalizeFrame(CanvasResourceProvider::FlushReason::kWritePixels);
 
   return offscreenCanvasForBinding()->ResourceProvider()->WritePixels(
       orig_info, pixels, row_bytes, x, y);
@@ -735,8 +746,7 @@ void OffscreenCanvasRenderingContext2D::DrawTextInternal(
       },
       [](const SkIRect& rect)  // overdraw test lambda
       { return false; },
-      gfx::RectFToSkRect(bounds), paint_type,
-      CanvasRenderingContext2DState::kNoImage,
+      bounds, paint_type, CanvasRenderingContext2DState::kNoImage,
       CanvasPerformanceMonitor::DrawType::kText);
 
   // |paint_canvas| maybe rese during Draw. If that happens,
@@ -815,9 +825,10 @@ void OffscreenCanvasRenderingContext2D::TryRestoreContextEvent(
     DispatchContextRestoredEvent(nullptr);
 }
 
-void OffscreenCanvasRenderingContext2D::FlushCanvas() {
+void OffscreenCanvasRenderingContext2D::FlushCanvas(
+    CanvasResourceProvider::FlushReason reason) {
   if (GetCanvasResourceProvider()) {
-    GetCanvasResourceProvider()->FlushCanvas();
+    GetCanvasResourceProvider()->FlushCanvas(reason);
   }
 }
 

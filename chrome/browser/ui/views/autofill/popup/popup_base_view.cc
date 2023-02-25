@@ -9,6 +9,7 @@
 #include <utility>
 
 #include "base/dcheck_is_on.h"
+#include "base/feature_list.h"
 #include "base/functional/bind.h"
 #include "base/location.h"
 #include "base/task/single_thread_task_runner.h"
@@ -37,6 +38,7 @@
 #include "ui/views/controls/menu/menu_config.h"
 #include "ui/views/focus/focus_manager.h"
 #include "ui/views/layout/fill_layout.h"
+#include "ui/views/layout/layout_provider.h"
 #include "ui/views/widget/widget.h"
 
 #if DCHECK_IS_ON()
@@ -45,6 +47,38 @@
 #endif
 
 namespace autofill {
+
+namespace {
+
+// The maximum number of pixels the suggestions dialog is shifted towards the
+// center the focused field.
+constexpr int kMaximumPixelsToMoveSuggestionToCenter = 120;
+
+// The maximum width percentage the suggestion dialog is shifted towards the
+// center of the focused field.
+constexpr int kMaximumWidthPercentageToMoveTheSuggestionToCenter = 50;
+
+}  // namespace
+
+// static
+int PopupBaseView::GetCornerRadius() {
+  return ChromeLayoutProvider::Get()->GetCornerRadiusMetric(
+      base::FeatureList::IsEnabled(
+          features::kAutofillShowAutocompleteDeleteButton)
+          ? views::Emphasis::kHigh
+          : views::Emphasis::kMedium);
+}
+
+// static
+int PopupBaseView::GetHorizontalMargin() {
+  return views::MenuConfig::instance().item_horizontal_padding +
+         GetCornerRadius();
+}
+
+// static
+int PopupBaseView::GetHorizontalPadding() {
+  return GetHorizontalMargin();
+}
 
 // The widget that the PopupBaseView will be attached to.
 class PopupBaseView::Widget : public views::Widget {
@@ -68,21 +102,23 @@ class PopupBaseView::Widget : public views::Widget {
 
   // views::Widget:
   const ui::ThemeProvider* GetThemeProvider() const override {
-    if (!autofill_popup_base_view_ || !autofill_popup_base_view_->browser()) {
+    if (!autofill_popup_base_view_ ||
+        !autofill_popup_base_view_->GetBrowser()) {
       return nullptr;
     }
 
     return &ThemeService::GetThemeProviderForProfile(
-        autofill_popup_base_view_->browser()->profile());
+        autofill_popup_base_view_->GetBrowser()->profile());
   }
 
   views::Widget* GetPrimaryWindowWidget() override {
-    if (!autofill_popup_base_view_ || !autofill_popup_base_view_->browser()) {
+    if (!autofill_popup_base_view_ ||
+        !autofill_popup_base_view_->GetBrowser()) {
       return nullptr;
     }
 
     BrowserView* browser_view = BrowserView::GetBrowserViewForBrowser(
-        autofill_popup_base_view_->browser());
+        autofill_popup_base_view_->GetBrowser());
     if (!browser_view) {
       return nullptr;
     }
@@ -94,31 +130,9 @@ class PopupBaseView::Widget : public views::Widget {
   const raw_ptr<PopupBaseView, DanglingUntriaged> autofill_popup_base_view_;
 };
 
-// static
-int PopupBaseView::GetCornerRadius() {
-  return ChromeLayoutProvider::Get()->GetCornerRadiusMetric(
-      views::Emphasis::kMedium);
-}
-
-// static
-int PopupBaseView::GetHorizontalMargin() {
-  return views::MenuConfig::instance().item_horizontal_padding +
-         GetCornerRadius();
-}
-
-// static
-int PopupBaseView::GetHorizontalPadding() {
-  return GetHorizontalMargin();
-}
-
 PopupBaseView::PopupBaseView(base::WeakPtr<AutofillPopupViewDelegate> delegate,
                              views::Widget* parent_widget)
-    : delegate_(delegate), parent_widget_(parent_widget) {
-  // GetWebContents() may return nullptr in some tests.
-  if (GetWebContents()) {
-    browser_ = chrome::FindBrowserWithWebContents(GetWebContents());
-  }
-}
+    : delegate_(delegate), parent_widget_(parent_widget) {}
 
 PopupBaseView::~PopupBaseView() {
   if (delegate_) {
@@ -128,6 +142,13 @@ PopupBaseView::~PopupBaseView() {
   }
 
   CHECK(!IsInObserverList());
+}
+
+Browser* PopupBaseView::GetBrowser() {
+  if (content::WebContents* web_contents = GetWebContents()) {
+    return chrome::FindBrowserWithWebContents(web_contents);
+  }
+  return nullptr;
 }
 
 bool PopupBaseView::DoShow() {
@@ -143,8 +164,6 @@ bool PopupBaseView::DoShow() {
     // The widget is destroyed by the corresponding NativeWidget, so we don't
     // have to worry about deletion.
     new PopupBaseView::Widget(this);
-
-    show_time_ = base::Time::Now();
   }
 
   GetWidget()->GetRootView()->SetBorder(CreateBorder());
@@ -204,8 +223,7 @@ void PopupBaseView::DoHide() {
   }
 }
 
-void PopupBaseView::NotifyAXSelection(View* selected_view) {
-  DCHECK(selected_view);
+void PopupBaseView::NotifyAXSelection(views::View& selected_view) {
   if (!is_ax_menu_start_event_fired_) {
     // Fire the menu start event once, right before the first item is selected.
     // By firing these and the matching kMenuEnd events, we are telling screen
@@ -217,21 +235,22 @@ void PopupBaseView::NotifyAXSelection(View* selected_view) {
 
     is_ax_menu_start_event_fired_ = true;
   }
-  selected_view->GetViewAccessibility().SetPopupFocusOverride();
+  selected_view.GetViewAccessibility().SetPopupFocusOverride();
 #if DCHECK_IS_ON()
   constexpr auto kDerivedClasses = base::MakeFixedFlatSet<base::StringPiece>(
       {"PopupSuggestionView", "PopupPasswordSuggestionView", "PopupFooterView",
        "PopupSeparatorView", "PopupWarningView", "PopupBaseView",
-       "PasswordGenerationPopupViewViews::GeneratedPasswordBox"});
-  DCHECK(kDerivedClasses.contains(selected_view->GetClassName()))
+       "PasswordGenerationPopupViewViews::GeneratedPasswordBox",
+       "PopupCellView"});
+  DCHECK(kDerivedClasses.contains(selected_view.GetClassName()))
       << "If you add a new derived class from AutofillPopupRowView, add it "
          "here and to onSelection(evt) in "
          "chrome/browser/resources/chromeos/accessibility/chromevox/background/"
          "desktop_automation_handler.js to ensure that ChromeVox announces "
          "the item when selected. Missing class: "
-      << selected_view->GetClassName();
+      << selected_view.GetClassName();
 #endif
-  selected_view->NotifyAccessibilityEvent(ax::mojom::Event::kSelection, true);
+  selected_view.NotifyAccessibilityEvent(ax::mojom::Event::kSelection, true);
 }
 
 void PopupBaseView::OnWidgetBoundsChanged(views::Widget* widget,
@@ -323,7 +342,7 @@ gfx::Rect PopupBaseView::GetOptionalPositionAndPlaceArrowOnPopup(
   int maximum_pixel_offset_to_center =
       base::FeatureList::IsEnabled(features::kAutofillMoreProminentPopup)
           ? features::kAutofillMoreProminentPopupMaxOffsetToCenterParam.Get()
-          : kMaximumPixelsToMoveSuggstionToCenter;
+          : kMaximumPixelsToMoveSuggestionToCenter;
 
   // Deduce the arrow and the position.
   views::BubbleBorder::Arrow arrow = GetOptimalPopupPlacement(

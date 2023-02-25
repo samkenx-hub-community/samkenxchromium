@@ -14,25 +14,19 @@
 #include <string>
 #include <vector>
 
-#include "base/check.h"
 #include "base/command_line.h"
 #include "base/containers/contains.h"
 #include "base/files/file_path.h"
-#include "base/files/file_util.h"
-#include "base/functional/callback_helpers.h"
 #include "base/logging.h"
-#include "base/path_service.h"
+#include "base/memory/scoped_refptr.h"
 #include "base/strings/strcat.h"
-#include "base/strings/string_number_conversions.h"
 #include "base/strings/string_util.h"
+#include "base/strings/utf_string_conversions.h"
 #include "base/synchronization/waitable_event.h"
 #include "base/test/bind.h"
 #include "base/test/test_timeouts.h"
 #include "base/time/time.h"
 #include "base/win/scoped_bstr.h"
-#include "base/win/scoped_variant.h"
-#include "base/win/windows_version.h"
-#include "chrome/updater/constants.h"
 #include "chrome/updater/test/integration_tests_impl.h"
 #include "chrome/updater/test_scope.h"
 #include "chrome/updater/updater_branding.h"
@@ -42,7 +36,6 @@
 #include "chrome/updater/win/test/test_executables.h"
 #include "chrome/updater/win/test/test_strings.h"
 #include "testing/gtest/include/gtest/gtest.h"
-#include "third_party/abseil-cpp/absl/types/optional.h"
 
 namespace updater {
 namespace {
@@ -68,6 +61,8 @@ class TaskSchedulerTests : public ::testing::Test {
  public:
   void SetUp() override {
     task_scheduler_ = TaskScheduler::CreateInstance(GetTestScope());
+    ASSERT_TRUE(task_scheduler_);
+
     EXPECT_TRUE(IsServiceRunning(SERVICE_SCHEDULE));
     ASSERT_TRUE(test::KillProcesses(kTestProcessExecutableName, 0))
         << test::PrintProcesses(kTestProcessExecutableName);
@@ -158,7 +153,7 @@ class TaskSchedulerTests : public ::testing::Test {
   }
 
  protected:
-  std::unique_ptr<TaskScheduler> task_scheduler_;
+  scoped_refptr<TaskScheduler> task_scheduler_;
 };
 
 }  // namespace
@@ -443,8 +438,9 @@ TEST_F(TaskSchedulerTests, GetTaskInfoUserId) {
   EXPECT_TRUE(task_scheduler_->GetTaskInfo(kTaskName1, &info));
 
   const std::wstring expected_user_id = [&is_system]() -> std::wstring {
-    if (is_system)
+    if (is_system) {
       return L"SYSTEM";
+    }
 
     base::win::ScopedBstr user_name_bstr;
     ULONG user_name_size = 256;
@@ -473,6 +469,77 @@ TEST_F(TaskSchedulerTests, GetTaskInfoTriggerType) {
     }
 
     RunGetTaskInfoTriggerTypeTest(expected_trigger_type);
+  }
+}
+
+TEST(TaskSchedulerTest, NoSubfolders) {
+  scoped_refptr<TaskScheduler> task_scheduler = TaskScheduler::CreateInstance(
+      GetTestScope(), /*use_task_subfolders=*/false);
+  ASSERT_TRUE(task_scheduler);
+
+  constexpr int kNumTasks = 6;
+  const std::wstring kTaskNamePrefix(base::ASCIIToWide(test::GetTestName()));
+
+  for (int count = 0; count < kNumTasks; ++count) {
+    std::wstring task_name(kTaskNamePrefix);
+    task_name.push_back(L'0' + count);
+
+    ASSERT_TRUE(task_scheduler->RegisterTask(
+        task_name.c_str(), task_name.c_str(),
+        base::CommandLine::FromString(L"C:\\temp\\temp.exe"),
+        TaskScheduler::TriggerType::TRIGGER_TYPE_HOURLY, false));
+
+    ASSERT_TRUE(task_scheduler->DeleteTask(task_name.c_str()));
+  }
+}
+
+TEST(TaskSchedulerTest, ForEachTaskWithPrefix) {
+  for (bool use_task_subfolders : {true, false}) {
+    scoped_refptr<TaskScheduler> task_scheduler =
+        TaskScheduler::CreateInstance(GetTestScope(), use_task_subfolders);
+    ASSERT_TRUE(task_scheduler);
+
+    constexpr int kNumTasks = 6;
+    const std::wstring kTaskNamePrefix(base::ASCIIToWide(test::GetTestName()));
+
+    for (int count = 0; count < kNumTasks; ++count) {
+      std::wstring task_name(kTaskNamePrefix);
+      task_name.push_back(L'0' + count);
+
+      EXPECT_TRUE(task_scheduler->RegisterTask(
+          task_name.c_str(), task_name.c_str(),
+          base::CommandLine::FromString(L"C:\\temp\\temp.exe"),
+          TaskScheduler::TriggerType::TRIGGER_TYPE_HOURLY, false));
+    }
+
+    scoped_refptr<TaskScheduler> task_scheduler_different_namespace =
+        TaskScheduler::CreateInstance(GetTestScope(), !use_task_subfolders);
+    ASSERT_TRUE(task_scheduler_different_namespace);
+
+    int count_entries = 0;
+
+    task_scheduler_different_namespace->ForEachTaskWithPrefix(
+        kTaskNamePrefix,
+        base::BindLambdaForTesting(
+            [&count_entries](const std::wstring& /*task_name*/) {
+              ++count_entries;
+            }));
+
+    EXPECT_EQ(count_entries, 0);
+
+    count_entries = 0;
+
+    task_scheduler->ForEachTaskWithPrefix(
+        kTaskNamePrefix,
+        base::BindLambdaForTesting(
+            [&count_entries, &task_scheduler,
+             kTaskNamePrefix](const std::wstring& task_name) {
+              EXPECT_TRUE(base::StartsWith(task_name, kTaskNamePrefix));
+              ++count_entries;
+              task_scheduler->DeleteTask(task_name.c_str());
+            }));
+
+    EXPECT_EQ(count_entries, kNumTasks);
   }
 }
 

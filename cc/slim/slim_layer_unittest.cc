@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <memory>
 #include <utility>
 #include <vector>
 
@@ -9,13 +10,20 @@
 #include "base/test/scoped_feature_list.h"
 #include "base/unguessable_token.h"
 #include "cc/layers/deadline_policy.h"
+#include "cc/resources/ui_resource_manager.h"
 #include "cc/slim/features.h"
 #include "cc/slim/filter.h"
 #include "cc/slim/layer.h"
+#include "cc/slim/layer_tree.h"
+#include "cc/slim/nine_patch_layer.h"
 #include "cc/slim/surface_layer.h"
+#include "cc/slim/test_layer_tree_client.h"
+#include "cc/slim/ui_resource_layer.h"
 #include "components/viz/common/surfaces/surface_id.h"
 #include "testing/gtest/include/gtest/gtest.h"
+#include "third_party/skia/include/core/SkBitmap.h"
 #include "third_party/skia/include/core/SkColor.h"
+#include "third_party/skia/include/core/SkImageInfo.h"
 #include "ui/gfx/geometry/point3_f.h"
 #include "ui/gfx/geometry/point_f.h"
 #include "ui/gfx/geometry/rect.h"
@@ -23,8 +31,6 @@
 #include "ui/gfx/geometry/transform.h"
 
 namespace cc::slim {
-
-namespace {
 
 class SlimLayerTest : public testing::TestWithParam<bool> {
  public:
@@ -166,8 +172,67 @@ TEST_P(SlimLayerTest, SurfaceLayerProperties) {
   EXPECT_EQ(layer->surface_id(), end);
 }
 
-INSTANTIATE_TEST_SUITE_P(All, SlimLayerTest, testing::Bool());
+TEST_P(SlimLayerTest, UIResourceLayerProperties) {
+  scoped_refptr<UIResourceLayer> layer = UIResourceLayer::Create();
 
-}  // namespace
+  layer->SetUIResourceId(1);
+  layer->SetUIResourceId(0);
+
+  auto image_info =
+      SkImageInfo::Make(1, 1, kN32_SkColorType, kPremul_SkAlphaType);
+  SkBitmap bitmap;
+  bitmap.allocPixels(image_info);
+  bitmap.setImmutable();
+  layer->SetBitmap(bitmap);
+
+  layer->SetUV(gfx::PointF(0.25f, 0.25f), gfx::PointF(0.75f, 0.75f));
+
+  layer->SetVertexOpacity(0.1f, 0.2f, 0.3f, 0.4f);
+
+  if (!base::FeatureList::IsEnabled(features::kSlimCompositor)) {
+    return;
+  }
+  TestLayerTreeClient client;
+  LayerTree::InitParams params;
+  params.client = &client;
+  auto layer_tree = LayerTree::Create(std::move(params));
+  layer_tree->SetRoot(layer);
+
+  EXPECT_NE(layer->resource_id(), 0);
+  EXPECT_EQ(layer_tree->GetUIResourceManager()
+                ->owned_shared_resources_size_for_test(),
+            1u);
+}
+
+TEST_P(SlimLayerTest, NinePatchLayerProperties) {
+  scoped_refptr<NinePatchLayer> layer = NinePatchLayer::Create();
+
+  auto image_info =
+      SkImageInfo::Make(10, 10, kN32_SkColorType, kPremul_SkAlphaType);
+  SkBitmap bitmap;
+  bitmap.allocPixels(image_info);
+  bitmap.setImmutable();
+  layer->SetBitmap(bitmap);
+
+  layer->SetBorder(gfx::Rect(1, 1, 8, 8));
+  layer->SetAperture(gfx::Rect(4, 4, 2, 2));
+  layer->SetFillCenter(true);
+  layer->SetNearestNeighbor(true);
+
+  if (!base::FeatureList::IsEnabled(features::kSlimCompositor)) {
+    return;
+  }
+  TestLayerTreeClient client;
+  LayerTree::InitParams params;
+  params.client = &client;
+  auto layer_tree = LayerTree::Create(std::move(params));
+  layer_tree->SetRoot(layer);
+
+  EXPECT_EQ(layer_tree->GetUIResourceManager()
+                ->owned_shared_resources_size_for_test(),
+            1u);
+}
+
+INSTANTIATE_TEST_SUITE_P(All, SlimLayerTest, testing::Bool());
 
 }  // namespace cc::slim

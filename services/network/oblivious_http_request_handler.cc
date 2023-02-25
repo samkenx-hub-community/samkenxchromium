@@ -24,6 +24,7 @@
 #include "services/network/network_context.h"
 #include "services/network/network_service.h"
 #include "services/network/public/cpp/simple_url_loader.h"
+#include "services/network/public/mojom/clear_data_filter.mojom.h"
 #include "services/network/public/mojom/oblivious_http_request.mojom.h"
 #include "services/network/public/mojom/url_loader_factory.mojom.h"
 #include "services/network/trust_tokens/trust_token_request_helper_factory.h"
@@ -291,7 +292,7 @@ void ObliviousHttpRequestHandler::ContinueHandlingRequest(
           dict.Set("bytes", net::NetLogBinaryValue(bhttp_payload.data(),
                                                    bhttp_payload.size()));
         }
-        return base::Value(std::move(dict));
+        return dict;
       });
 
   // Padding
@@ -407,7 +408,7 @@ void ObliviousHttpRequestHandler::OnRequestComplete(
           dict.Set("bytes", net::NetLogBinaryValue(maybe_payload->data(),
                                                    maybe_payload->size()));
         }
-        return base::Value(std::move(dict));
+        return dict;
       });
 
   auto bhttp_response = quiche::BinaryHttpResponse::Create(*maybe_payload);

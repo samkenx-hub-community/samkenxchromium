@@ -263,6 +263,10 @@ class GPU_GLES2_EXPORT GLTexturePassthroughImageRepresentation
 
   gpu::TextureBase* GetTextureBase(int plane_index) override;
 
+  // Returns true if access must be suspended in between GL decoder tasks due to
+  // DXGI keyed mutex. Only implemented for D3D GL representation.
+  virtual bool NeedsSuspendAccessForDXGIKeyedMutex() const;
+
  private:
   friend class WrappedGLTexturePassthroughCompoundImageRepresentation;
 };
@@ -329,10 +333,17 @@ class GPU_GLES2_EXPORT SkiaImageRepresentation
     SkPromiseImageTexture* promise_image_texture(int plane_index) const {
       return promise_image_textures_[plane_index].get();
     }
+    // Creates an SkImage from GrBackendTexture for single planar formats or if
+    // format prefers external sampler. Creates an SkImage from
+    // GrYUVABackendTexture for multiplanar formats.
     sk_sp<SkImage> CreateSkImage(
         GrDirectContext* context,
         SkImage::TextureReleaseProc texture_release_proc = nullptr,
         SkImage::ReleaseContext release_context = nullptr) const;
+    // Creates an SkImage for the given `plane_index` from GrBackendTexture for
+    // multiplanar formats.
+    sk_sp<SkImage> CreateSkImageForPlane(int plane_index,
+                                         GrDirectContext* context) const;
     [[nodiscard]] std::unique_ptr<GrBackendSurfaceMutableState> TakeEndState();
 
    private:

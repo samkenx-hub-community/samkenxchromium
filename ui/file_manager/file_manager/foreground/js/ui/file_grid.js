@@ -12,6 +12,7 @@ import {FileType} from '../../../common/js/file_type.js';
 import {str, util} from '../../../common/js/util.js';
 import {FilesAppEntry} from '../../../externs/files_app_entry_interfaces.js';
 import {VolumeManager} from '../../../externs/volume_manager.js';
+import {FilesTooltip} from '../../elements/files_tooltip.js';
 import {FileListModel, GROUP_BY_FIELD_DIRECTORY, GROUP_BY_FIELD_MODIFICATION_TIME, GroupValue} from '../file_list_model.js';
 import {ListThumbnailLoader} from '../list_thumbnail_loader.js';
 import {MetadataModel} from '../metadata/metadata_model.js';
@@ -843,6 +844,10 @@ export class FileGrid extends Grid {
       inlineStatus.appendChild(syncProgress);
     }
 
+    /** @type {!FilesTooltip} */ (
+        li.ownerDocument.querySelector('files-tooltip'))
+        .addTarget(/** @type {!HTMLElement} */ (inlineStatus));
+
     frame.appendChild(inlineStatus);
 
     li.classList.toggle('dim-offline', availableOffline === false);
@@ -932,7 +937,8 @@ export class FileGrid extends Grid {
       return;
     }
 
-    const {syncStatus, progress} = metadata;
+    const {syncStatus} = metadata;
+    let progress = metadata.progress ?? 0;
     const inlineStatus = li.querySelector('.inline-status');
 
     if (!syncStatus || !inlineStatus) {
@@ -941,12 +947,14 @@ export class FileGrid extends Grid {
 
     switch (syncStatus) {
       case chrome.fileManagerPrivate.SyncStatus.QUEUED:
+      case chrome.fileManagerPrivate.SyncStatus.ERROR:
+        progress = 0;
         inlineStatus.setAttribute('aria-label', str('QUEUED_LABEL'));
         break;
       case chrome.fileManagerPrivate.SyncStatus.IN_PROGRESS:
         inlineStatus.setAttribute(
             'aria-label',
-            `${str('IN_PROGRESS_LABEL')} - %${(progress * 100).toFixed()}`);
+            `${str('IN_PROGRESS_LABEL')} - ${(progress * 100).toFixed(0)}%`);
         break;
       default:
         break;
@@ -954,7 +962,7 @@ export class FileGrid extends Grid {
 
     li.setAttribute('data-sync-status', syncStatus);
     inlineStatus.querySelector('.progress')
-        .setAttribute('progress', (progress || 0).toFixed(2));
+        .setAttribute('progress', progress.toFixed(2));
   }
 
   /**

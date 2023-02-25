@@ -23,21 +23,22 @@
 namespace gpu {
 namespace {
 
+constexpr uint32_t kSupportedUsage =
+    SHARED_IMAGE_USAGE_DISPLAY_READ | SHARED_IMAGE_USAGE_DISPLAY_WRITE |
+    SHARED_IMAGE_USAGE_RASTER | SHARED_IMAGE_USAGE_OOP_RASTERIZATION |
+    SHARED_IMAGE_USAGE_CPU_UPLOAD | SHARED_IMAGE_USAGE_MIPMAP;
+
 bool IsUsageSupported(uint32_t usage) {
-  // Ignore for mipmap usage.
-  usage &= ~SHARED_IMAGE_USAGE_MIPMAP;
-  constexpr uint32_t kWrappedSkImageUsage =
-      SHARED_IMAGE_USAGE_DISPLAY_READ | SHARED_IMAGE_USAGE_DISPLAY_WRITE |
-      SHARED_IMAGE_USAGE_RASTER | SHARED_IMAGE_USAGE_OOP_RASTERIZATION |
-      SHARED_IMAGE_USAGE_CPU_UPLOAD;
-  return (usage & kWrappedSkImageUsage) && !(usage & ~kWrappedSkImageUsage);
+  // Must have at least one of the supported usage flags.
+  return usage & kSupportedUsage;
 }
 
 }  // namespace
 
 WrappedSkImageBackingFactory::WrappedSkImageBackingFactory(
     scoped_refptr<SharedContextState> context_state)
-    : context_state_(std::move(context_state)),
+    : SharedImageBackingFactory(kSupportedUsage),
+      context_state_(std::move(context_state)),
       is_drdc_enabled_(
           features::IsDrDcEnabled() &&
           !context_state_->feature_info()->workarounds().disable_drdc) {}
@@ -119,10 +120,6 @@ bool WrappedSkImageBackingFactory::IsSupported(
     gfx::GpuMemoryBufferType gmb_type,
     GrContextType gr_context_type,
     base::span<const uint8_t> pixel_data) {
-  if (format.is_multi_plane() && !pixel_data.empty()) {
-    return false;
-  }
-
   if (gmb_type != gfx::EMPTY_BUFFER) {
     return false;
   }

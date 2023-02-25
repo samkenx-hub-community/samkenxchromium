@@ -29,6 +29,7 @@
 #include "content/public/test/test_navigation_observer.h"
 #include "net/dns/mock_host_resolver.h"
 #include "net/test/embedded_test_server/embedded_test_server.h"
+#include "third_party/blink/public/common/features.h"
 
 using content::BrowserThread;
 
@@ -124,6 +125,10 @@ class UnloadResults {
 
 class UnloadTest : public InProcessBrowserTest {
  public:
+  UnloadTest() {
+    scoped_feature_list.InitAndEnableFeature(
+        blink::features::kBeforeunloadEventCancelByPreventDefault);
+  }
   void SetUpCommandLine(base::CommandLine* command_line) override {
     const testing::TestInfo* const test_info =
         testing::UnitTest::GetInstance()->current_test_info();
@@ -246,6 +251,9 @@ class UnloadTest : public InProcessBrowserTest {
         "</body></html>";
     return result;
   }
+
+ private:
+  base::test::ScopedFeatureList scoped_feature_list;
 };
 
 // Navigate to a page with an infinite unload handler.
@@ -885,6 +893,31 @@ IN_PROC_BROWSER_TEST_F(UnloadTest, BeforeUnloadListenerCancelByReturnValue) {
 IN_PROC_BROWSER_TEST_F(UnloadTest, BeforeUnloadListenerCancelByReturn) {
   std::string html =
       GenerateDataURL("return 'hello world'", /*is_onbeforeunload=*/false);
+  NavigateToDataURL(html.c_str(), "beforeunload");
+
+  CloseBrowsersVerifyUnloadSuccess(false);
+}
+
+// TODO(crbug/866818): Remove below test when feature
+// BeforeunloadEventCancelByPreventDefault is fully stable.
+class UnloadTestCancelByPreventDefaultDisabled : public UnloadTest {
+ public:
+  UnloadTestCancelByPreventDefaultDisabled() {
+    scoped_feature_list.InitAndDisableFeature(
+        blink::features::kBeforeunloadEventCancelByPreventDefault);
+  }
+
+ private:
+  base::test::ScopedFeatureList scoped_feature_list;
+};
+
+// Tests closing the browser with onbeforeunload handler and
+// event.preventDefault() will not prompt confirmation dialog when
+// BeforeunloadEventCancelByPreventDefault is disabled.
+IN_PROC_BROWSER_TEST_F(UnloadTestCancelByPreventDefaultDisabled,
+                       OnBeforeUnload) {
+  std::string html =
+      GenerateDataURL("event.preventDefault()", /*is_onbeforeunload=*/true);
   NavigateToDataURL(html.c_str(), "beforeunload");
 
   CloseBrowsersVerifyUnloadSuccess(false);

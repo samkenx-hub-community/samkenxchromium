@@ -29,14 +29,6 @@ class PrivacySandboxSettings : public KeyedService {
    public:
     virtual void OnTopicsDataAccessibleSinceUpdated() {}
 
-    // Fired when Trust Token blocking has changed because of a change to the
-    // Privacy Sandbox preference. Does not account for changes to third-party
-    // cookie blocking, which may result in the Privacy Sandbox being disabled.
-    // Trust tokens thus additionally independently consult Cookie settings.
-    // TODO(crbug.com/1304132): Unify this so Trust Tokens only need to consult
-    // a single source of truth.
-    virtual void OnTrustTokenBlockingChanged(bool blocked) {}
-
     // Fired when the First-Party Sets changes to being `enabled` as a result of
     // the kPrivacySandboxFirstPartySets preference changing.
     virtual void OnFirstPartySetsEnabledChanged(bool enabled) {}
@@ -95,6 +87,12 @@ class PrivacySandboxSettings : public KeyedService {
   // returned time will have been fuzzed for local privacy, and so may be in the
   // future, in which case no history is eligible.
   virtual base::Time TopicsDataAccessibleSince() const = 0;
+
+  // Returns whether any Attribution Rerpoting operation would ever be allowed.
+  // If false, no attribution reporting operation is allowed (e.g. because the
+  // user has disabled the setting). If true, the appropriate context specific
+  // check must also be made.
+  virtual bool IsAttributionReportingEverAllowed() const = 0;
 
   // Determines whether Attribution Reporting is allowable in a particular
   // context. Should be called at both source and trigger registration. At each
@@ -184,11 +182,6 @@ class PrivacySandboxSettings : public KeyedService {
   // DEPRECATED: Use `SetAllPrivacySandboxAllowedForTesting()` to allow all
   // Privacy Sandbox prefs or per-API block-for-testing functions.
   virtual void SetPrivacySandboxEnabled(bool enabled) = 0;
-
-  // Returns whether Trust Tokens are "generally" available. A return value of
-  // false is authoritative, while a value of true must be followed by the
-  // appropriate context specific check.
-  virtual bool IsTrustTokensAllowed() = 0;
 
   // Returns whether the Privacy Sandbox is being restricted by the associated
   // delegate. Forwards directly to the corresponding delegate function.

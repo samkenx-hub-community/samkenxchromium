@@ -16,6 +16,7 @@
 <translation id="1128128132059598906">EAP-TTLS</translation>
 <translation id="1145018782460575098">बाह्य डिव्हाइससाठी फर्मवेअर अपडेट करण्याची विंडो खुली आहे. <ph name="NUM_UPDATES" /> अपडेट उपलब्ध आहेत.</translation>
 <translation id="1145516343487477149">मदतपर लेख आणि Chromebook शी संबंधित सामान्य प्रश्नांची उत्तरे पहा</translation>
+<translation id="1167755866710282443">की कस्टमाइझ करण्यासाठी मेनू उघडा. हलवण्यासाठी मेनू ड्रॅग करा.</translation>
 <translation id="1175697296044146566">हे <ph name="DEVICE_TYPE" /> <ph name="MANAGER" /> द्वारे व्यवस्थापित केले आहे.</translation>
 <translation id="1175951029573070619">सरासरी (<ph name="SIGNAL_STRENGTH" />)</translation>
 <translation id="1181037720776840403">काढून टाका</translation>
@@ -326,6 +327,7 @@
 <translation id="4110686435123617899"><ph name="TITLE" /><ph name="DESC" /> अल्बम निवडा</translation>
 <translation id="4111761024568264522">USB टचपॅड</translation>
 <translation id="4117637339509843559">गडद मोड</translation>
+<translation id="4130035430755296270">आणखी लेआउट पर्यायांसाठी फिरवत रहा</translation>
 <translation id="4131410914670010031">कृष्ण धवल</translation>
 <translation id="4145784616224233563">HTTP फायरवॉल</translation>
 <translation id="4147897805161313378">Google Photos</translation>
@@ -414,6 +416,7 @@
 <translation id="484790837831576105">(Android) DNS रिझोल्यूशन</translation>
 <translation id="4848429997038228357">रन होत आहे</translation>
 <translation id="4854586501323951986">बिल्ट-इन टचस्क्रीन</translation>
+<translation id="4855250849489639581">आणखी लेआउट पर्यायांसाठी खाली स्वाइप करा</translation>
 <translation id="4861758251032006121">{ATTEMPTS_LEFT,plural, =1{<ph name="ERROR_MESSAGE" /> {0} प्रयत्न शिल्लक}other{<ph name="ERROR_MESSAGE" /> {0} प्रयत्न शिल्लक}}</translation>
 <translation id="4873827928179867585">ऑथेंटिकेशन अल्गोरिदम</translation>
 <translation id="4880328057631981605">ॲक्सेसबिंदूचे नाव</translation>
@@ -517,6 +520,7 @@
 <translation id="576835345334454681">डिस्प्लेचा ब्राइटनेस वाढवा</translation>
 <translation id="57838592816432529">म्यूट करा</translation>
 <translation id="5784136236926853061">उच्च HTTP लेटन्सी</translation>
+<translation id="5826644637650799838">आर्टविषयी</translation>
 <translation id="5832805196449965646">व्यक्ती जोडा</translation>
 <translation id="583281660410589416">अज्ञात</translation>
 <translation id="5843706793424741864">फॅरेनहाइट</translation>
@@ -673,6 +677,7 @@
 <translation id="7172721935181587524">एक इमेज</translation>
 <translation id="7177485034254901881">हे <ph name="DEVICE_TYPE" /> <ph name="MANAGER" /> द्वारे व्यवस्थापित केले आहे. अ‍ॅडमिनिस्ट्रेटर रिमोट पद्धतीने डिव्हाइस काँफिगर करू शकतात.</translation>
 <translation id="7180611975245234373">रिफ्रेश करा</translation>
+<translation id="7180865173735832675">कस्टमाइझ करा</translation>
 <translation id="7212734716605298123">बाह्य डिव्हाइससाठी फर्मवेअर अपडेट</translation>
 <translation id="7216409898977639127">सेल्युलर सेवा देणारा</translation>
 <translation id="725133483556299729">ईमेल निवडा</translation>
@@ -744,6 +749,7 @@
 <translation id="7881066108824108340">DNS</translation>
 <translation id="7882358943899516840">प्रदाता प्रकार</translation>
 <translation id="7882501334836096755">सार्वजनिक की</translation>
+<translation id="78957024357676568">डावे</translation>
 <translation id="7915220255123750251">नेटवर्क APN सेटिंग्ज व्यवस्थापित करा. APNs ही मोबाइल नेटवर्क आणि इंटरनेट यांदरम्यान कनेक्शन जोडतात.</translation>
 <translation id="7936303884198020182">नेम सर्व्हर आढळले नाहीत</translation>
 <translation id="7942349550061667556">लाल</translation>
@@ -775,6 +781,7 @@
 <translation id="8226628635270268143">तुमचे आवडते फोटो आणि अल्बम निवडा</translation>
 <translation id="8227119283605456246">फाईल संलग्न करा</translation>
 <translation id="8230672074305416752">डीफॉल्ट नेटवर्क गेटवे पिंग करता आला नाही</translation>
+<translation id="8242426110754782860">पुढे जा</translation>
 <translation id="8246209727385807362">माहीत नसलेला वाहक</translation>
 <translation id="827422111966801947">नीळ</translation>
 <translation id="8286154143153872371">कृपया वॉलपेपर पाहण्यासाठी नेटवर्कशी कनेक्ट करा आणि पेज रीलोड करा.</translation>
@@ -852,6 +859,7 @@
 <translation id="8930622219860340959">बिनतारी</translation>
 <translation id="8936793075252196307">क्लायंटचा आयपी अ‍ॅड्रेस</translation>
 <translation id="894617464444543719">डिव्हाइस हे फोन आहे.</translation>
+<translation id="8957423540740801332">उजवे</translation>
 <translation id="8968751544471797276">चार्ज करण्याचा रेट</translation>
 <translation id="8970109610781093811">पुन्हा चालवा</translation>
 <translation id="8983038754672563810">HSPA</translation>

@@ -145,7 +145,6 @@ class GaiaPasswordChanged extends GaiaPasswordChangedBase {
     this.email = data && 'email' in data && data.email;
     this.passwordInvalid_ = data && 'showError' in data && data.showError;
     if (this.isCryptohomeRecoveryUIFlowEnabled_) {
-      this.$.cancel.textKey = 'continueWithoutLocalDataButton';
       this.$.tryAgain.textKey = 'oldPasswordHint';
       this.$.proceedAnyway.textKey = 'continueAndDeleteDataButton';
     }
@@ -187,6 +186,17 @@ class GaiaPasswordChanged extends GaiaPasswordChangedBase {
   }
 
   /**
+   * Returns the subtitle message for the data loss warning screen.
+   * @param {string} locale The i18n locale.
+   * @param {string} email The email address that the user is trying to recover.
+   * @returns {string} The translated subtitle message.
+   */
+  getDataLossWarningSubtitleMessage_(locale, email) {
+    return this.i18nAdvancedDynamic(
+        locale, 'dataLossWarningSubtitle', {substitutions: [email]});
+  }
+
+  /**
    * @private
    */
   submit_() {
@@ -203,12 +213,20 @@ class GaiaPasswordChanged extends GaiaPasswordChangedBase {
 
   /** @private */
   onForgotPasswordClicked_() {
+    if (this.disabled) {
+      return;
+    }
     this.setUIStep(GaiaPasswordChangedUIState.FORGOT);
     this.clearPassword();
   }
 
   /** @private */
   onTryAgainClicked_() {
+    this.setUIStep(GaiaPasswordChangedUIState.PASSWORD);
+  }
+
+  /** @private */
+  onBackButtonClicked_() {
     this.setUIStep(GaiaPasswordChangedUIState.PASSWORD);
   }
 
@@ -231,18 +249,6 @@ class GaiaPasswordChanged extends GaiaPasswordChangedBase {
     this.disabled = true;
     this.clearPassword();
     this.userActed('resync');
-  }
-
-  /** @private */
-  onSecondaryButton_() {
-    if (this.disabled) {
-      return;
-    }
-    if (this.isCryptohomeRecoveryUIFlowEnabled_) {
-      this.onForgotPasswordClicked_();
-    } else {
-      this.onCancel_();
-    }
   }
 
   onNoRecovery_() {

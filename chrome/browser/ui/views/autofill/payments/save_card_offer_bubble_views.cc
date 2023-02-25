@@ -59,8 +59,7 @@ ui::ImageModel GetProfileAvatar(AccountInfo account_info) {
   // Get the user avatar icon.
   gfx::Image account_avatar = account_info.account_image;
 
-  // Check for avatar being empty and replacing it with a
-  // placeholder if that is the case.
+  // Check if the avatar is empty, and if so, replace it with a placeholder.
   if (account_avatar.IsEmpty()) {
     account_avatar = ui::ResourceBundle::GetSharedInstance().GetImageNamed(
         profiles::GetPlaceholderAvatarIconResourceID());
@@ -86,11 +85,10 @@ SaveCardOfferBubbleViews::SaveCardOfferBubbleViews(
   const LegalMessageLines message_lines = controller->GetLegalMessageLines();
 
   if (!message_lines.empty()) {
-    if (IsSaveCardUiExperimentEnabled()) {
-      std::string user_email = controller->GetAccountInfo().email;
-      // Display TOS with user avatar and email present in the footer.
+    if (base::FeatureList::IsEnabled(
+            features::kAutofillEnableNewSaveCardBubbleUi)) {
       legal_message_view_ = SetFootnoteView(std::make_unique<LegalMessageView>(
-          message_lines, base::UTF8ToUTF16(user_email),
+          message_lines, base::UTF8ToUTF16(controller->GetAccountInfo().email),
           GetProfileAvatar(controller->GetAccountInfo()),
           base::BindRepeating(&SaveCardOfferBubbleViews::LinkClicked,
                               base::Unretained(this))));
@@ -180,24 +178,17 @@ void SaveCardOfferBubbleViews::AddedToWidget() {
   // Set the header image.
   ui::ResourceBundle& bundle = ui::ResourceBundle::GetSharedInstance();
 
-  // Boolean to show the shield image for save card bubble. It is
-  // active/shown only when save card ui experiment is enabled and when the
-  // active experiment selected != 3 (existing option with user information
-  // view).
-  bool show_shield_header_image =
-      IsSaveCardUiExperimentEnabled() &&
-      features::kAutofillSaveCardUiExperimentSelectorInNumber.Get() != 3;
-
-  // Ternary operator added for the save card ui experiment where the feature
-  // flag and the experiment selected would determine if the experiment is
-  // active or not. Currently, any option != 0 and experiment flag enabled
-  // should trigger the experiment.
   auto image_view = std::make_unique<ThemeTrackingNonAccessibleImageView>(
       *bundle.GetImageSkiaNamed(
-          show_shield_header_image ? IDR_SAVE_CARD_SECURELY : IDR_SAVE_CARD),
-      *bundle.GetImageSkiaNamed(show_shield_header_image
-                                    ? IDR_SAVE_CARD_SECURELY_DARK
-                                    : IDR_SAVE_CARD_DARK),
+          base::FeatureList::IsEnabled(
+              features::kAutofillEnableNewSaveCardBubbleUi)
+              ? IDR_SAVE_CARD_SECURELY
+              : IDR_SAVE_CARD),
+      *bundle.GetImageSkiaNamed(
+          base::FeatureList::IsEnabled(
+              features ::kAutofillEnableNewSaveCardBubbleUi)
+              ? IDR_SAVE_CARD_SECURELY_DARK
+              : IDR_SAVE_CARD_DARK),
       base::BindRepeating(&views::BubbleDialogDelegate::GetBackgroundColor,
                           base::Unretained(this)));
   GetBubbleFrameView()->SetHeaderView(std::move(image_view));
@@ -382,12 +373,6 @@ SaveCardOfferBubbleViews::CreateUploadExplanationView() {
       views::BubbleBorder::Arrow::TOP_RIGHT);
   upload_explanation_tooltip->SetID(DialogViewId::UPLOAD_EXPLANATION_TOOLTIP);
   return upload_explanation_tooltip;
-}
-
-bool SaveCardOfferBubbleViews::IsSaveCardUiExperimentEnabled() {
-  return (
-      base::FeatureList::IsEnabled(features::kAutofillSaveCardUiExperiment) &&
-      features::kAutofillSaveCardUiExperimentSelectorInNumber.Get() != 0);
 }
 
 void SaveCardOfferBubbleViews::LinkClicked(const GURL& url) {

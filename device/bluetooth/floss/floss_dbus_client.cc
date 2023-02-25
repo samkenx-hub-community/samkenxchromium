@@ -159,6 +159,8 @@ const char kConfigureMtu[] = "ConfigureMtu";
 const char kConnectionParameterUpdate[] = "ConnectionParameterUpdate";
 const char kCallbackInterface[] =
     "org.chromium.bluetooth.BluetoothGattCallback";
+const char kServerCallbackInterface[] =
+    "org.chromium.bluetooth.BluetoothGattServerCallback";
 
 const char kOnClientRegistered[] = "OnClientRegistered";
 const char kOnClientConnectionState[] = "OnClientConnectionState";
@@ -180,13 +182,25 @@ const char kRegisterServer[] = "RegisterServer";
 const char kUnregisterServer[] = "UnregisterServer";
 const char kServerConnect[] = "ServerConnect";
 const char kServerDisconnect[] = "ServerDisconnect";
+const char kServerSetPreferredPhy[] = "ServerSetPreferredPhy";
+const char kServerReadPhy[] = "ServerReadPhy";
 const char kAddService[] = "AddService";
 const char kRemoveService[] = "RemoveService";
 const char kClearServices[] = "ClearServices";
+const char kSendResponse[] = "SendResponse";
+const char kServerSendNotification[] = "SendNotification";
 
 const char kOnServerRegistered[] = "OnServerRegistered";
 const char kOnServerConnectionState[] = "OnServerConnectionState";
-const char kOnServerServiceAdded[] = "OnServerServiceAdded";
+const char kOnServerServiceAdded[] = "OnServiceAdded";
+const char kOnServerCharacteristicReadRequest[] = "OnCharacteristicReadRequest";
+const char kOnServerDescriptorReadRequest[] = "OnDescriptorReadRequest";
+const char kOnServerCharacteristicWriteRequest[] =
+    "OnCharacteristicWriteRequest";
+const char kOnServerDescriptorWriteRequest[] = "OnDescriptorWriteRequest";
+const char kOnServerNotificationSent[] = "OnNotificationSent";
+const char kOnServerMtuChanged[] = "OnMtuChanged";
+const char kOnServerSubrateChange[] = "OnSubrateChange";
 }  // namespace gatt
 
 namespace advertiser {
@@ -245,6 +259,7 @@ const char kSetDebugLogging[] = "SetDebugLogging";
 
 namespace experimental {
 const char kSetLLPrivacy[] = "SetLLPrivacy";
+const char kSetDevCoredump[] = "SetDevCoredump";
 }  // namespace experimental
 
 namespace {

@@ -20,7 +20,6 @@
 #include "base/observer_list.h"
 #include "base/ranges/algorithm.h"
 #include "base/task/sequenced_task_runner.h"
-#include "components/password_manager/core/browser/affiliation/affiliation_service.h"
 #include "components/password_manager/core/browser/form_parsing/form_parser.h"
 #include "components/password_manager/core/browser/import/csv_password.h"
 #include "components/password_manager/core/browser/password_form.h"
@@ -29,6 +28,7 @@
 #include "components/password_manager/core/browser/password_manager_util.h"
 #include "components/password_manager/core/browser/ui/credential_ui_entry.h"
 #include "components/password_manager/core/browser/ui/password_undo_helper.h"
+#include "components/password_manager/core/browser/ui/passwords_grouper.h"
 #include "components/password_manager/core/common/password_manager_features.h"
 #include "components/sync/base/features.h"
 #include "url/gurl.h"
@@ -100,11 +100,11 @@ SavedPasswordsPresenter::SavedPasswordsPresenter(
     scoped_refptr<PasswordStoreInterface> account_store)
     : profile_store_(std::move(profile_store)),
       account_store_(std::move(account_store)),
-      affiliation_service_(affiliation_service),
       undo_helper_(std::make_unique<PasswordUndoHelper>(profile_store_.get(),
-                                                        account_store_.get())) {
+                                                        account_store_.get())),
+      passwords_grouper_(
+          std::make_unique<PasswordsGrouper>(affiliation_service)) {
   DCHECK(profile_store_);
-  DCHECK(affiliation_service_);
 }
 
 SavedPasswordsPresenter::~SavedPasswordsPresenter() {
@@ -114,23 +114,23 @@ SavedPasswordsPresenter::~SavedPasswordsPresenter() {
 void SavedPasswordsPresenter::Init() {
   // Clear old cache.
   sort_key_to_password_forms_.clear();
-  password_grouping_info_.clear();
+  passwords_grouper_->ClearCache();
 
   profile_store_->AddObserver(this);
   if (account_store_)
     account_store_->AddObserver(this);
-  pending_store_updates++;
+  pending_store_updates_++;
   profile_store_->GetAllLoginsWithAffiliationAndBrandingInformation(
       weak_ptr_factory_.GetWeakPtr());
   if (account_store_) {
-    pending_store_updates++;
+    pending_store_updates_++;
     account_store_->GetAllLoginsWithAffiliationAndBrandingInformation(
         weak_ptr_factory_.GetWeakPtr());
   }
 }
 
 bool SavedPasswordsPresenter::IsWaitingForPasswordStore() const {
-  return pending_store_updates != 0;
+  return pending_store_updates_ != 0;
 }
 
 void SavedPasswordsPresenter::RemoveObservers() {
@@ -386,40 +386,28 @@ SavedPasswordsPresenter::EditSavedCredentials(
 
 std::vector<CredentialUIEntry> SavedPasswordsPresenter::GetSavedCredentials()
     const {
-  std::vector<CredentialUIEntry> credentials;
-
-  if (!base::FeatureList::IsEnabled(features::kPasswordsGrouping)) {
-    auto it = sort_key_to_password_forms_.begin();
-    while (it != sort_key_to_password_forms_.end()) {
-      auto current_key = it->first;
-      // Aggregate all passwords for the current key.
-      std::vector<PasswordForm> current_passwords_group;
-      while (it != sort_key_to_password_forms_.end() &&
-             it->first == current_key) {
-        current_passwords_group.push_back(it->second);
-        ++it;
-      }
-      credentials.emplace_back(current_passwords_group);
-    }
-    return credentials;
+  if (base::FeatureList::IsEnabled(features::kPasswordsGrouping)) {
+    return passwords_grouper_->GetAllCredentials();
   }
 
-  for (const auto& [group_id, affiliated_credentials] :
-       password_grouping_info_.map_group_id_to_forms) {
-    for (const auto& [username_password_key, forms] : affiliated_credentials) {
-      credentials.emplace_back(forms);
+  std::vector<CredentialUIEntry> credentials;
+  auto it = sort_key_to_password_forms_.begin();
+  while (it != sort_key_to_password_forms_.end()) {
+    auto current_key = it->first;
+    // Aggregate all passwords for the current key.
+    std::vector<PasswordForm> current_passwords_group;
+    while (it != sort_key_to_password_forms_.end() &&
+           it->first == current_key) {
+      current_passwords_group.push_back(it->second);
+      ++it;
     }
+    credentials.emplace_back(current_passwords_group);
   }
   return credentials;
 }
 
 std::vector<AffiliatedGroup> SavedPasswordsPresenter::GetAffiliatedGroups() {
-  // Sort affiliated groups.
-  std::sort(affiliated_groups_.begin(), affiliated_groups_.end(),
-            [](const AffiliatedGroup& lhs, const AffiliatedGroup& rhs) {
-              return lhs.GetDisplayName() < rhs.GetDisplayName();
-            });
-  return affiliated_groups_;
+  return passwords_grouper_->GetAffiliatedGroupsWithGroupingInfo();
 }
 
 std::vector<CredentialUIEntry> SavedPasswordsPresenter::GetSavedPasswords()
@@ -433,7 +421,7 @@ std::vector<CredentialUIEntry> SavedPasswordsPresenter::GetSavedPasswords()
 
 std::vector<CredentialUIEntry> SavedPasswordsPresenter::GetBlockedSites() {
   DCHECK(base::FeatureList::IsEnabled(features::kPasswordsGrouping));
-  return password_grouping_info_.GetBlockedSites();
+  return passwords_grouper_->GetBlockedSites();
 }
 
 std::vector<PasswordForm>
@@ -442,7 +430,7 @@ SavedPasswordsPresenter::GetCorrespondingPasswordForms(
   std::vector<PasswordForm> forms;
   if (base::FeatureList::IsEnabled(
           password_manager::features::kPasswordsGrouping)) {
-    forms = password_grouping_info_.GetPasswordFormsVector(credential);
+    forms = passwords_grouper_->GetPasswordFormsFor(credential);
   } else {
     const auto range =
         sort_key_to_password_forms_.equal_range(CreateSortKey(credential));
@@ -468,6 +456,10 @@ void SavedPasswordsPresenter::NotifyEdited(
 }
 
 void SavedPasswordsPresenter::NotifySavedPasswordsChanged() {
+  // Notify observers when there are no pending password store updates.
+  if (pending_store_updates_ > 0) {
+    return;
+  }
   for (auto& observer : observers_)
     observer.OnSavedPasswordsChanged();
 }
@@ -525,26 +517,14 @@ void SavedPasswordsPresenter::OnGetPasswordStoreResults(
 void SavedPasswordsPresenter::OnGetPasswordStoreResultsFrom(
     PasswordStoreInterface* store,
     std::vector<std::unique_ptr<PasswordForm>> results) {
-  pending_store_updates--;
-  DCHECK_GE(pending_store_updates, 0);
+  pending_store_updates_--;
+  DCHECK_GE(pending_store_updates_, 0);
 
   std::vector<PasswordForm> forms;
   for (auto& form : results) {
     forms.push_back(std::move(*form));
   }
   AddForms(forms);
-}
-
-void SavedPasswordsPresenter::OnGetAllGroupsResultsFrom(
-    const std::vector<GroupedFacets>& groups) {
-  // Call grouping algorithm.
-  password_grouping_info_ = GroupPasswords(groups, sort_key_to_password_forms_);
-
-  // Update affiliated groups cache.
-  affiliated_groups_ =
-      GetAffiliatedGroupsWithGroupingInfo(password_grouping_info_);
-
-  NotifySavedPasswordsChanged();
 }
 
 PasswordStoreInterface& SavedPasswordsPresenter::GetStoreFor(
@@ -583,11 +563,18 @@ void SavedPasswordsPresenter::AddForms(const std::vector<PasswordForm>& forms) {
     return;
   }
 
-  // Don't notify observers about changes until we group credentials.
-  AffiliationService::GroupsCallback groups_callback =
-      base::BindOnce(&SavedPasswordsPresenter::OnGetAllGroupsResultsFrom,
-                     weak_ptr_factory_.GetWeakPtr());
-  affiliation_service_->GetAllGroups(std::move(groups_callback));
+  // TODO(crbug.com/1354196): Pass only added forms to |passwords_grouper_|.
+  std::vector<PasswordForm> all_forms;
+  all_forms.reserve(sort_key_to_password_forms_.size());
+  for (auto const& [key, form] : sort_key_to_password_forms_) {
+    all_forms.push_back(form);
+  }
+
+  // Notify observers after grouping is complete.
+  passwords_grouper_->GroupPasswords(
+      std::move(all_forms),
+      base::BindOnce(&SavedPasswordsPresenter::NotifySavedPasswordsChanged,
+                     weak_ptr_factory_.GetWeakPtr()));
 }
 
 }  // namespace password_manager

@@ -46,27 +46,6 @@
 #include "content/public/browser/navigation_handle.h"
 #include "ui/base/l10n/l10n_util.h"
 
-namespace {
-
-autofill::SaveCardUiExperiment GetSaveCardUiExperimentArm() {
-  if (!base::FeatureList::IsEnabled(
-          autofill::features::kAutofillSaveCardUiExperiment)) {
-    return autofill::SaveCardUiExperiment::DEFAULT;
-  }
-
-  switch (
-      autofill::features::kAutofillSaveCardUiExperimentSelectorInNumber.Get()) {
-    case 1:
-      return autofill::SaveCardUiExperiment::FASTER_AND_PROTECTED;
-    case 2:
-      return autofill::SaveCardUiExperiment::ENCRYPTED_AND_SECURE;
-    default:
-      return autofill::SaveCardUiExperiment::DEFAULT;
-  }
-}
-
-}  // namespace
-
 namespace autofill {
 
 SaveCardBubbleControllerImpl::SaveCardBubbleControllerImpl(
@@ -187,15 +166,10 @@ std::u16string SaveCardBubbleControllerImpl::GetWindowTitle() const {
       return l10n_util::GetStringUTF16(
           IDS_AUTOFILL_SAVE_CARD_PROMPT_TITLE_LOCAL);
     case BubbleType::UPLOAD_SAVE:
-      if (GetSaveCardUiExperimentArm() ==
-          SaveCardUiExperiment::FASTER_AND_PROTECTED) {
+      if (base::FeatureList::IsEnabled(
+              features::kAutofillEnableNewSaveCardBubbleUi)) {
         return l10n_util::GetStringUTF16(
-            IDS_AUTOFILL_SAVE_CARD_PROMPT_TITLE_EXPERIMENT_FASTER_AND_PROTECTED);
-      }
-      if (GetSaveCardUiExperimentArm() ==
-          SaveCardUiExperiment::ENCRYPTED_AND_SECURE) {
-        return l10n_util::GetStringUTF16(
-            IDS_AUTOFILL_SAVE_CARD_PROMPT_TITLE_EXPERIMENT_ENCRYPTED_AND_SECURE);
+            IDS_AUTOFILL_SAVE_CARD_PROMPT_TITLE_TO_CLOUD_V5);
       }
       return features::ShouldShowImprovedUserConsentForCreditCardSave()
                  ? l10n_util::GetStringUTF16(
@@ -220,22 +194,19 @@ std::u16string SaveCardBubbleControllerImpl::GetExplanatoryMessage() const {
   if (current_bubble_type_ != BubbleType::UPLOAD_SAVE)
     return std::u16string();
 
+  if (base::FeatureList::IsEnabled(
+          features::kAutofillEnableNewSaveCardBubbleUi)) {
+    return l10n_util::GetStringUTF16(
+        IDS_AUTOFILL_SAVE_CARD_PROMPT_UPLOAD_EXPLANATION_V4);
+  }
+
   if (options_.should_request_name_from_user) {
     return l10n_util::GetStringUTF16(
         IDS_AUTOFILL_SAVE_CARD_PROMPT_UPLOAD_EXPLANATION_V3_WITH_NAME);
   }
 
-  switch (GetSaveCardUiExperimentArm()) {
-    case SaveCardUiExperiment::FASTER_AND_PROTECTED:
-      return l10n_util::GetStringUTF16(
-          IDS_AUTOFILL_SAVE_CARD_PROMPT_UPLOAD_EXPLANATION_EXPERIMENT_FASTER_AND_PROTECTED);
-    case SaveCardUiExperiment::ENCRYPTED_AND_SECURE:
-      return l10n_util::GetStringUTF16(
-          IDS_AUTOFILL_SAVE_CARD_PROMPT_UPLOAD_EXPLANATION_EXPERIMENT_ENCRYPTED_AND_SECURE);
-    default:
-      return l10n_util::GetStringUTF16(
-          IDS_AUTOFILL_SAVE_CARD_PROMPT_UPLOAD_EXPLANATION_V3);
-  }
+  return l10n_util::GetStringUTF16(
+      IDS_AUTOFILL_SAVE_CARD_PROMPT_UPLOAD_EXPLANATION_V3);
 }
 
 std::u16string SaveCardBubbleControllerImpl::GetAcceptButtonText() const {
@@ -291,6 +262,11 @@ const CreditCard& SaveCardBubbleControllerImpl::GetCard() const {
 AutofillBubbleBase* SaveCardBubbleControllerImpl::GetSaveCardBubbleView()
     const {
   return bubble_view();
+}
+
+SavePaymentIconController::PaymentBubbleType
+SaveCardBubbleControllerImpl::GetPaymentBubbleType() const {
+  return PaymentBubbleType::kCreditCard;
 }
 
 bool SaveCardBubbleControllerImpl::ShouldRequestNameFromUser() const {
@@ -494,7 +470,7 @@ bool SaveCardBubbleControllerImpl::IsIconVisible() const {
   return current_bubble_type_ != BubbleType::INACTIVE;
 }
 
-AutofillBubbleBase* SaveCardBubbleControllerImpl::GetSaveBubbleView() const {
+AutofillBubbleBase* SaveCardBubbleControllerImpl::GetPaymentBubbleView() const {
   return GetSaveCardBubbleView();
 }
 

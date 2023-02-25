@@ -45,16 +45,12 @@ constexpr int kCombinedViewMargin =
     kCalendarUpNextViewStartEndMargin * 2 +
     calendar_utils::kEventListItemViewStartEndMargin * 2;
 // At full width (displaying a single event) the label should be the tray width
-// minus `kCombinedViewMargin`, otherwise it'll become scrollable.
-// TODO(b/266537227): When adding the join button, also reduce this off the
-// size.
-constexpr int kLabelFullWidth = kTrayMenuWidth - kCombinedViewMargin;
+// and so have no max applied.
+constexpr int kLabelFullWidth = 0;
 // UI spec is a fixed 240 width for the whole up next event list item view, if
 // there's more than 1 being shown. Given we're achieving this using
 // `SizeToFit()` on a label, the label will need to account for the
 // `kCombinedViewMargin` so we reduce those off the size.
-// TODO (b/266537227): When adding the join button, also reduce this off the
-// size.
 constexpr int kLabelCappedWidth = 240 - kCombinedViewMargin;
 constexpr gfx::Insets kHeaderInsets = gfx::Insets::TLBR(0, 0, 6, 0);
 constexpr int kHeaderBetweenChildSpacing = 14;
@@ -112,7 +108,7 @@ std::unique_ptr<views::Button> CreateTodaysEventsButton(
     views::Button::PressedCallback callback) {
   return views::Builder<views::Button>(
              std::make_unique<IconButton>(
-                 std::move(callback), IconButton::Type::kXSmall,
+                 std::move(callback), IconButton::Type::kXSmallFloating,
                  &kCalendarUpNextTodaysEventsButtonIcon,
                  IDS_ASH_CALENDAR_UP_NEXT_TODAYS_EVENTS_BUTTON))
       .Build();
@@ -211,12 +207,14 @@ CalendarUpNextView::CalendarUpNextView(
                               base::Unretained(this)),
           IconButton::Type::kXSmallFloating, &kCaretLeftIcon,
           IDS_ASH_CALENDAR_UP_NEXT_SCROLL_LEFT_BUTTON));
+  left_scroll_button_->SetFocusBehavior(FocusBehavior::NEVER);
   right_scroll_button_ =
       button_container->AddChildView(std::make_unique<IconButton>(
           base::BindRepeating(&CalendarUpNextView::OnScrollRightButtonPressed,
                               base::Unretained(this)),
           IconButton::Type::kXSmallFloating, &kCaretRightIcon,
           IDS_ASH_CALENDAR_UP_NEXT_SCROLL_RIGHT_BUTTON));
+  right_scroll_button_->SetFocusBehavior(FocusBehavior::NEVER);
   header_view_->AddChildView(std::move(button_container));
 
   // Scroll view.
@@ -226,6 +224,9 @@ CalendarUpNextView::CalendarUpNextView(
   scroll_view_->SetHorizontalScrollBarMode(
       views::ScrollView::ScrollBarMode::kHiddenButEnabled);
   scroll_view_->SetTreatAllScrollEventsAsHorizontal(true);
+  // Set the `scroll_view_` contents to receive focus first, followed by the
+  // todays events button.
+  scroll_view_->InsertBeforeInFocusList(todays_events_button_container_);
 
   // Contents.
   const auto events = calendar_view_controller_->UpcomingEvents();
@@ -284,10 +285,13 @@ void CalendarUpNextView::UpdateEvents(
             calendar_view_controller_,
             SelectedDateParams{now, selected_date_midnight,
                                selected_date_midnight_utc},
-            /*event=*/event, /*round_top_corners=*/true,
-            /*round_bottom_corners=*/true,
-            /*show_event_list_dot=*/false,
-            /*fixed_width=*/kLabelFullWidth));
+            /*event=*/event, /*ui_params=*/
+            UIParams{/*round_top_corners=*/true, /*round_bottom_corners=*/true,
+                     /*show_event_list_dot=*/false,
+                     /*fixed_width=*/kLabelFullWidth},
+            /*event_list_item_index=*/
+            EventListItemIndex{/*item_index=*/1,
+                               /*total_count_of_events=*/1}));
 
     content_layout_manager->SetFlexForView(child_view, 1);
 
@@ -300,16 +304,22 @@ void CalendarUpNextView::UpdateEvents(
 
   // Multiple events are displayed in a scroll view of events with a max item
   // width. Longer event names will have an ellipsis applied.
-  for (auto& event : events) {
+  const int events_size = events.size();
+  for (auto it = events.begin(); it != events.end(); ++it) {
+    const int event_index = std::distance(events.begin(), it) + 1;
     content_view_->AddChildView(
         std::make_unique<CalendarEventListItemViewJelly>(
             calendar_view_controller_,
             SelectedDateParams{now, selected_date_midnight,
                                selected_date_midnight_utc},
-            /*event=*/event, /*round_top_corners=*/true,
-            /*round_bottom_corners=*/true,
-            /*show_event_list_dot=*/false,
-            /*fixed_width=*/kLabelCappedWidth));
+            /*event=*/*it,
+            /*ui_params=*/
+            UIParams{/*round_top_corners=*/true, /*round_bottom_corners=*/true,
+                     /*show_event_list_dot=*/false,
+                     /*fixed_width=*/kLabelCappedWidth},
+            /*event_list_item_index=*/
+            EventListItemIndex{/*item_index=*/event_index,
+                               /*total_count_of_events=*/events_size}));
   }
 
   // Show scroll buttons if we have multiple events.

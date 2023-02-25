@@ -1241,7 +1241,7 @@ int HttpCache::Transaction::DoOpenOrCreateEntryComplete(int result) {
     } else {
       params.Set("net_error", result);
     }
-    return base::Value(std::move(params));
+    return params;
   });
 
   cache_pending_ = false;
@@ -3977,7 +3977,6 @@ void HttpCache::Transaction::RecordHistograms() {
 
   // TODO(ricea): Understand why this DCHECK is failing in the wild, fix it, and
   // remove it. See https://crbug.com/1409150.
-  // TODO(ricea): Change this to a CHECK on HEAD after merging this fix to M111.
   if (did_send_request) {
     DCHECK_NE(cache_entry_status_, CacheEntryStatus::ENTRY_USED);
   }

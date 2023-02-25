@@ -331,7 +331,6 @@ test("gl_tests") {
     "command_buffer/tests/gl_manager.h",
     "command_buffer/tests/gl_map_buffer_range_unittest.cc",
     "command_buffer/tests/gl_object_bindings_unittest.cc",
-    "command_buffer/tests/gl_oes_egl_image_unittest.cc",
     "command_buffer/tests/gl_offscreen_surface_unittest.cc",
     "command_buffer/tests/gl_oob_attrib_unittest.cc",
     "command_buffer/tests/gl_pointcoord_unittest.cc",
@@ -423,7 +422,7 @@ test("gl_tests") {
     libs += [ "android" ]
     deps += [ "//ui/android:ui_java" ]
     sources += [ "command_buffer/service/shared_image/ahardwarebuffer_image_backing_factory_unittest.cc" ]
-  } else if (is_mac) {
+  } else if (is_apple) {
     frameworks = [ "IOSurface.framework" ]
     sources += [ "command_buffer/service/shared_image/iosurface_image_backing_factory_unittest.cc" ]
   } else if (is_win) {
@@ -613,7 +612,7 @@ test("gpu_unittests") {
     sources += [ "ipc/service/image_decode_accelerator_stub_unittest.cc" ]
   }
 
-  if (is_mac) {
+  if (is_apple) {
     sources += [
       "ipc/common/gpu_memory_buffer_impl_io_surface_unittest.cc",
       "ipc/service/gpu_memory_buffer_factory_io_surface_unittest.cc",

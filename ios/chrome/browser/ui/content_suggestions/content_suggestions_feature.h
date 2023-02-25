@@ -40,8 +40,20 @@ extern const char
 extern const char kContentSuggestionsUIModuleRefreshMinimizeSpacingParam[];
 extern const char kContentSuggestionsUIModuleRefreshRemoveHeadersParam[];
 
+// Experiment behavior options for Tile Ablation.
+enum class TileAblationBehavior {
+  // Hide only MVT.
+  kTileAblationMVTOnly = 0,
+  // Hide MVT and Shortcuts.
+  kTileAblationMVTAndShortcuts = 1,
+  // Hide MVT and Shortcuts (kDisabled).
+  kDisabled = 2,
+};
+
+// Feature param to only hide the MVT tiles in tile ablation.
+extern const char kTileAblationMVTOnlyParam[];
 // Feature to hide the MVT and Shortcuts tiles for new users.
-BASE_DECLARE_FEATURE(kHideMVTAndShortcutsForNewUsers);
+BASE_DECLARE_FEATURE(kTileAblation);
 
 // Feature to show the Trending Queries module.
 BASE_DECLARE_FEATURE(kTrendingQueriesModule);
@@ -68,7 +80,10 @@ extern const char kDiscoverFeedIsNativeUIEnabled[];
 bool IsDiscoverFeedEnabled();
 
 // Whether the MVTs and Shortcuts should be hidden or not.
-bool IsHideMVTAndShortcutsEnabled();
+TileAblationBehavior GetTileAblationBehavior();
+bool IsTileAblationEnabled();
+bool ShouldHideShortcuts();
+bool ShouldHideMostVisited();
 
 // Whether the Content Suggestions UI Module Refresh feature is enabled.
 bool IsContentSuggestionsUIModuleRefreshEnabled();

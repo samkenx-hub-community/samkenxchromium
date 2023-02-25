@@ -70,6 +70,7 @@ class CTPolicyEnforcer;
 class CertVerifier;
 class ClientSocketFactory;
 class HostResolver;
+struct HostResolverEndpointResult;
 class HttpServerProperties;
 class NetLog;
 class NetworkAnonymizationKey;
@@ -364,10 +365,10 @@ class NET_EXPORT_PRIVATE QuicStreamFactory
   // Helper method that configures a DatagramClientSocket once
   // DatagramClientSocket::ConnectAsync completes. Posts a task to run
   // `callback` with a net_error code.
-  void FinishConnectAndConfigureSocket(CompletionOnceCallback callback,
-                                       DatagramClientSocket* socket,
-                                       const SocketTag& socket_tag,
-                                       int rv);
+  virtual void FinishConnectAndConfigureSocket(CompletionOnceCallback callback,
+                                               DatagramClientSocket* socket,
+                                               const SocketTag& socket_tag,
+                                               int rv);
 
   void OnFinishConnectAndConfigureSocketError(CompletionOnceCallback callback,
                                               enum CreateSessionFailure error,
@@ -451,6 +452,7 @@ class NET_EXPORT_PRIVATE QuicStreamFactory
   class Job;
   class QuicCryptoClientConfigOwner;
   class CryptoClientConfigHandle;
+  friend class MockQuicStreamFactory;
   friend class test::QuicStreamFactoryPeer;
 
   using SessionMap = std::map<QuicSessionKey, QuicChromiumClientSession*>;
@@ -480,7 +482,7 @@ class NET_EXPORT_PRIVATE QuicStreamFactory
                     quic::ParsedQuicVersion quic_version,
                     int cert_verify_flags,
                     bool require_confirmation,
-                    const AddressList& address_list,
+                    const HostResolverEndpointResult& endpoint_result,
                     base::TimeTicks dns_resolution_start_time,
                     base::TimeTicks dns_resolution_end_time,
                     const NetLogWithSource& net_log,
@@ -491,7 +493,7 @@ class NET_EXPORT_PRIVATE QuicStreamFactory
                            quic::ParsedQuicVersion quic_version,
                            int cert_verify_flags,
                            bool require_confirmation,
-                           const AddressList& address_list,
+                           const HostResolverEndpointResult& endpoint_result,
                            base::TimeTicks dns_resolution_start_time,
                            base::TimeTicks dns_resolution_end_time,
                            const NetLogWithSource& net_log,

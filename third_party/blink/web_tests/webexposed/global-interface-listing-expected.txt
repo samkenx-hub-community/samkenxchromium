@@ -639,21 +639,6 @@ interface ByteLengthQueuingStrategy
 interface CDATASection : Text
     attribute @@toStringTag
     method constructor
-interface CSPViolationReportBody : ReportBody
-    attribute @@toStringTag
-    getter blockedURL
-    getter columnNumber
-    getter disposition
-    getter documentURL
-    getter effectiveDirective
-    getter lineNumber
-    getter originalPolicy
-    getter referrer
-    getter sample
-    getter sourceFile
-    getter statusCode
-    method constructor
-    method toJSON
 interface CSSAnimation : Animation
     attribute @@toStringTag
     getter animationName
@@ -1391,18 +1376,6 @@ interface CookieStoreManager
     method getSubscriptions
     method subscribe
     method unsubscribe
-interface CoopAccessViolationReportBody : ReportBody
-    attribute @@toStringTag
-    getter columnNumber
-    getter lineNumber
-    getter openeeURL
-    getter openerURL
-    getter otherDocumentURL
-    getter property
-    getter sourceFile
-    getter type
-    method constructor
-    method toJSON
 interface CountQueuingStrategy
     attribute @@toStringTag
     getter highWaterMark
@@ -1753,16 +1726,6 @@ interface DelegatedInkTrailPresenter
     getter presentationArea
     method constructor
     method updateInkTrailStartPoint
-interface DeprecationReportBody : ReportBody
-    attribute @@toStringTag
-    getter anticipatedRemoval
-    getter columnNumber
-    getter id
-    getter lineNumber
-    getter message
-    getter sourceFile
-    method constructor
-    method toJSON
 interface DeviceMotionEvent : Event
     static method requestPermission
     attribute @@toStringTag
@@ -2210,16 +2173,6 @@ interface DocumentPictureInPictureEvent : Event
     attribute @@toStringTag
     getter window
     method constructor
-interface DocumentPolicyViolationReportBody : ReportBody
-    attribute @@toStringTag
-    getter columnNumber
-    getter disposition
-    getter featureId
-    getter lineNumber
-    getter message
-    getter sourceFile
-    method constructor
-    method toJSON
 interface DocumentTimeline : AnimationTimeline
     attribute @@toStringTag
     method constructor
@@ -3184,9 +3137,8 @@ interface HTMLButtonElement : HTMLElement
     getter formTarget
     getter labels
     getter name
-    getter popoverHideTargetElement
-    getter popoverShowTargetElement
-    getter popoverToggleTargetElement
+    getter popoverTargetAction
+    getter popoverTargetElement
     getter type
     getter validationMessage
     getter validity
@@ -3203,9 +3155,8 @@ interface HTMLButtonElement : HTMLElement
     setter formNoValidate
     setter formTarget
     setter name
-    setter popoverHideTargetElement
-    setter popoverShowTargetElement
-    setter popoverToggleTargetElement
+    setter popoverTargetAction
+    setter popoverTargetElement
     setter type
     setter value
 interface HTMLCanvasElement : HTMLElement
@@ -3851,9 +3802,8 @@ interface HTMLInputElement : HTMLElement
     getter name
     getter pattern
     getter placeholder
-    getter popoverHideTargetElement
-    getter popoverShowTargetElement
-    getter popoverToggleTargetElement
+    getter popoverTargetAction
+    getter popoverTargetElement
     getter readOnly
     getter required
     getter selectionDirection
@@ -3909,9 +3859,8 @@ interface HTMLInputElement : HTMLElement
     setter name
     setter pattern
     setter placeholder
-    setter popoverHideTargetElement
-    setter popoverShowTargetElement
-    setter popoverToggleTargetElement
+    setter popoverTargetAction
+    setter popoverTargetElement
     setter readOnly
     setter required
     setter selectionDirection
@@ -5055,15 +5004,6 @@ interface IntersectionObserverEntry
     getter target
     getter time
     method constructor
-interface InterventionReportBody : ReportBody
-    attribute @@toStringTag
-    getter columnNumber
-    getter id
-    getter lineNumber
-    getter message
-    getter sourceFile
-    method constructor
-    method toJSON
 interface Keyboard
     attribute @@toStringTag
     method constructor
@@ -5230,6 +5170,7 @@ interface ML
     method createContext
 interface MLContext
     attribute @@toStringTag
+    method compute
     method constructor
 interface MLGraph
     attribute @@toStringTag
@@ -5238,7 +5179,7 @@ interface MLGraphBuilder
     attribute @@toStringTag
     method add
     method averagePool2d
-    method buildAsync
+    method build
     method clamp
     method constant
     method constructor
@@ -6732,16 +6673,6 @@ interface Permissions
     method request
     method requestAll
     method revoke
-interface PermissionsPolicyViolationReportBody : ReportBody
-    attribute @@toStringTag
-    getter columnNumber
-    getter disposition
-    getter featureId
-    getter lineNumber
-    getter message
-    getter sourceFile
-    method constructor
-    method toJSON
 interface PictureInPictureEvent : Event
     attribute @@toStringTag
     getter pictureInPictureWindow
@@ -7303,17 +7234,6 @@ interface RemotePlayback : EventTarget
     setter onconnect
     setter onconnecting
     setter ondisconnect
-interface Report
-    attribute @@toStringTag
-    getter body
-    getter type
-    getter url
-    method constructor
-    method toJSON
-interface ReportBody
-    attribute @@toStringTag
-    method constructor
-    method toJSON
 interface ReportingObserver
     attribute @@toStringTag
     method constructor
@@ -12068,7 +11988,6 @@ namespace console
     getter top
     getter trustedTypes
     getter visualViewport
-    getter webkitStorageInfo
     getter window
     method NodeFilter
     method alert

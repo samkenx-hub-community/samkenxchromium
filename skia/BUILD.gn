@@ -127,13 +127,17 @@ config("skia_library_config") {
     "SKIA_IMPLEMENTATION=1",
   ]
 
-  # Skia uses C++17 language features in its internal code. Previously Skia was built with
-  # "-std=c++17". See http://crbug.com/1257145 for why this was a bad idea.
-  cflags_cc = [ "-Wno-c++17-extensions" ]
-  cflags_objcc = [ "-Wno-c++17-extensions" ]
-
   if (use_blink && !use_system_freetype) {
     defines += [ "SK_FREETYPE_MINIMUM_RUNTIME_VERSION=(((FREETYPE_MAJOR) * 0x01000000) | ((FREETYPE_MINOR) * 0x00010000) | ((FREETYPE_PATCH) * 0x00000100))" ]
+  }
+  if (use_blink) {
+    defines += [ "SK_TYPEFACE_FACTORY_FREETYPE" ]
+  }
+  if (is_win) {
+    defines += [ "SK_TYPEFACE_FACTORY_DIRECTWRITE" ]
+  }
+  if (is_apple) {
+    defines += [ "SK_TYPEFACE_FACTORY_CORETEXT" ]
   }
 
   if (current_cpu == "arm") {
@@ -314,18 +318,19 @@ component("skia") {
   public += skia_effects_public
   public += skia_effects_imagefilter_public
   public += skia_utils_chromium
+  public += skia_discardable_memory_chromium
 
   # The imported Skia gni source paths are made absolute by gn.
   defines = []
   sources += skia_sksl_sources
   sources += skia_utils_private
   sources += skia_xps_sources
+  sources += skia_encode_srcs
+  sources += skia_encode_png_srcs
+  sources += skia_encode_webp_srcs
   sources += [
     "//third_party/skia/src/fonts/SkFontMgr_indirect.cpp",
     "//third_party/skia/src/fonts/SkRemotableFontMgr.cpp",
-    "//third_party/skia/src/images/SkImageEncoder.cpp",
-    "//third_party/skia/src/images/SkPngEncoder.cpp",
-    "//third_party/skia/src/images/SkWebpEncoder.cpp",
     "//third_party/skia/src/ports/SkGlobalInitialization_default.cpp",
     "//third_party/skia/src/ports/SkImageGenerator_none.cpp",
     "//third_party/skia/src/ports/SkOSFile_stdio.cpp",
@@ -336,6 +341,7 @@ component("skia") {
     sources -= [ "//third_party/skia/src/ports/SkImageGenerator_none.cpp" ]
     sources += skia_codec_core
     sources += skia_codec_decode_bmp
+    sources += skia_encode_jpeg_srcs
     sources += [
       "//third_party/skia/src/codec/SkEncodedInfo.cpp",
       "//third_party/skia/src/codec/SkIcoCodec.cpp",
@@ -348,8 +354,6 @@ component("skia") {
       "//third_party/skia/src/codec/SkPngCodec.cpp",
       "//third_party/skia/src/codec/SkWebpCodec.cpp",
       "//third_party/skia/src/codec/SkWuffsCodec.cpp",
-      "//third_party/skia/src/images/SkJPEGWriteUtility.cpp",
-      "//third_party/skia/src/images/SkJpegEncoder.cpp",
       "//third_party/skia/src/ports/SkImageGenerator_skia.cpp",
     ]
     deps += [ "//third_party/wuffs" ]
@@ -376,6 +380,7 @@ component("skia") {
   # FreeType is needed everywhere where blink is used, on Linux and Android as main
   # font backend, on Windows and Mac as fallback backend for Variations.
   if (use_blink) {
+    # See SK_TYPEFACE_FACTORY_FREETYPE
     sources += [
       "//third_party/skia/src/ports/SkFontHost_FreeType.cpp",
       "//third_party/skia/src/ports/SkFontHost_FreeType_common.cpp",
@@ -383,6 +388,7 @@ component("skia") {
   }
 
   if (is_win) {
+    # See SK_TYPEFACE_FACTORY_DIRECTWRITE
     sources += [
       "//third_party/skia/src/ports/SkFontHost_win.cpp",
       "//third_party/skia/src/ports/SkFontMgr_win_dw.cpp",
@@ -396,6 +402,7 @@ component("skia") {
   }
 
   if (is_apple) {
+    # See SK_TYPEFACE_FACTORY_CORETEXT
     sources += [
       "//third_party/skia/include/ports/SkFontMgr_mac_ct.h",
       "//third_party/skia/src/ports/SkFontMgr_mac_ct.cpp",
@@ -529,7 +536,10 @@ component("skia") {
       frameworks += [ "AppKit.framework" ]
     }
     if (is_ios) {
-      frameworks += [ "ImageIO.framework" ]
+      frameworks += [
+        "ImageIO.framework",
+        "IOSurface.framework",
+      ]
     }
   } else if (is_ios) {
     frameworks = [ "ImageIO.framework" ]
@@ -622,12 +632,9 @@ template("skia_source_set") {
     }
     if (is_win) {
       cflags_cc = [
-        "/std:c++17",
         "/wd5041",  # out-of-line definition for constexpr static data member is
                     # not needed and is deprecated in C++17
       ]
-    } else {
-      cflags_cc = [ "-std=c++17" ]
     }
   }
 }

@@ -144,6 +144,9 @@ class LocationBarMediator
                 @Override
                 public void setValue(LocationBarMediator object, float value) {
                     ((LocationBarTablet) mLocationBarLayout).setWidthChangeAnimationFraction(value);
+                    if (OmniboxFeatures.shouldShowModernizeVisualUpdate(mContext) && mUrlHasFocus) {
+                        mEmbedderImpl.recalculateOmniboxAlignment();
+                    }
                 }
             };
 
@@ -175,6 +178,7 @@ class LocationBarMediator
     private final SearchEngineLogoUtils mSearchEngineLogoUtils;
     private final SaveOfflineButtonState mSaveOfflineButtonState;
     private final OmniboxUma mOmniboxUma;
+    private final OmniboxSuggestionsDropdownEmbedderImpl mEmbedderImpl;
 
     private boolean mNativeInitialized;
     private boolean mUrlFocusedFromFakebox;
@@ -209,7 +213,8 @@ class LocationBarMediator
             @NonNull LensController lensController,
             @NonNull Runnable launchAssistanceSettingsAction,
             @NonNull SaveOfflineButtonState saveOfflineButtonState, @NonNull OmniboxUma omniboxUma,
-            @NonNull BooleanSupplier isToolbarMicEnabledSupplier) {
+            @NonNull BooleanSupplier isToolbarMicEnabledSupplier,
+            @NonNull OmniboxSuggestionsDropdownEmbedderImpl dropdownEmbedder) {
         mContext = context;
         mLocationBarLayout = locationBarLayout;
         mLocationBarDataProvider = locationBarDataProvider;
@@ -233,6 +238,7 @@ class LocationBarMediator
         mSaveOfflineButtonState = saveOfflineButtonState;
         mOmniboxUma = omniboxUma;
         mIsToolbarMicEnabledSupplier = isToolbarMicEnabledSupplier;
+        mEmbedderImpl = dropdownEmbedder;
     }
 
     /**
@@ -297,15 +303,16 @@ class LocationBarMediator
 
         if (hasFocus && mLocationBarDataProvider.hasTab()
                 && !mLocationBarDataProvider.isIncognito()) {
-            if (mNativeInitialized
-                    && mTemplateUrlServiceSupplier.get().isDefaultSearchEngineGoogle()) {
-                GeolocationHeader.primeLocationForGeoHeaderIfEnabled(
-                        mProfileSupplier.get(), mTemplateUrlServiceSupplier.get());
+            if (mTemplateUrlServiceSupplier.hasValue()) {
+                if (mTemplateUrlServiceSupplier.get().isDefaultSearchEngineGoogle()) {
+                    GeolocationHeader.primeLocationForGeoHeaderIfEnabled(
+                            mProfileSupplier.get(), mTemplateUrlServiceSupplier.get());
+                }
             } else {
-                mDeferredNativeRunnables.add(() -> {
-                    if (mTemplateUrlServiceSupplier.get().isDefaultSearchEngineGoogle()) {
+                mTemplateUrlServiceSupplier.onAvailable((templateUrlService) -> {
+                    if (templateUrlService.isDefaultSearchEngineGoogle()) {
                         GeolocationHeader.primeLocationForGeoHeaderIfEnabled(
-                                mProfileSupplier.get(), mTemplateUrlServiceSupplier.get());
+                                mProfileSupplier.get(), templateUrlService);
                     }
                 });
             }
@@ -319,17 +326,17 @@ class LocationBarMediator
     /*package */ void onFinishNativeInitialization() {
         mNativeInitialized = true;
         mOmniboxPrerender = new OmniboxPrerender();
-        TemplateUrlService templateUrlService = mTemplateUrlServiceSupplier.get();
-        if (templateUrlService != null) {
+        mTemplateUrlServiceSupplier.onAvailable((templateUrlService) -> {
             templateUrlService.addObserver(this);
-        }
-        mAssistantVoiceSearchServiceSupplier.set(new AssistantVoiceSearchService(mContext,
-                ExternalAuthUtils.getInstance(), templateUrlService, GSAState.getInstance(), this,
-                SharedPreferencesManager.getInstance(),
-                IdentityServicesProvider.get().getIdentityManager(
-                        Profile.getLastUsedRegularProfile()),
-                AccountManagerFacadeProvider.getInstance()));
-        onAssistantVoiceSearchServiceChanged();
+            mAssistantVoiceSearchServiceSupplier.set(new AssistantVoiceSearchService(mContext,
+                    ExternalAuthUtils.getInstance(), templateUrlService, GSAState.getInstance(),
+                    LocationBarMediator.this, SharedPreferencesManager.getInstance(),
+                    IdentityServicesProvider.get().getIdentityManager(
+                            Profile.getLastUsedRegularProfile()),
+                    AccountManagerFacadeProvider.getInstance()));
+            onAssistantVoiceSearchServiceChanged();
+        });
+
         mLocationBarLayout.onFinishNativeInitialization();
         setProfile(mProfileSupplier.get());
         onPrimaryColorChanged();
@@ -1455,8 +1462,10 @@ class LocationBarMediator
     // BackPressHandler implementation.
     // Modern way to intercept back press starting from T.
     @Override
-    public void handleBackPress() {
+    public @BackPressResult int handleBackPress() {
+        int res = mUrlHasFocus ? BackPressResult.SUCCESS : BackPressResult.FAILURE;
         backKeyPressed();
+        return res;
     }
 
     @Override

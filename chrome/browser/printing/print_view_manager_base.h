@@ -60,6 +60,9 @@ class PrintViewManagerBase : public PrintManager, public PrintJob::Observer {
     // This method is never called unless `ENABLE_PRINT_PREVIEW`.
     virtual void OnPrintPreview(const content::RenderFrameHost* rfh) {}
 
+    // This method is never called unless `ENABLE_OOP_PRINTING`.
+    virtual void OnRegisterSystemPrintClient(bool succeeded) {}
+
     virtual void OnDidPrintDocument() {}
   };
 
@@ -124,7 +127,6 @@ class PrintViewManagerBase : public PrintManager, public PrintJob::Observer {
   void IsPrintingEnabled(IsPrintingEnabledCallback callback) override;
   void ScriptedPrint(mojom::ScriptedPrintParamsPtr params,
                      ScriptedPrintCallback callback) override;
-  void ShowInvalidPrinterSettingsError() override;
   void PrintingFailed(int32_t cookie,
                       mojom::PrintFailureReason reason) override;
 

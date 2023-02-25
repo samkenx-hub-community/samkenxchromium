@@ -11,10 +11,8 @@
 #include "base/metrics/histogram_macros.h"
 #include "build/build_config.h"
 #include "cc/base/math_util.h"
-#include "components/viz/common/display/renderer_settings.h"
 #include "components/viz/common/overlay_state/win/overlay_state_service.h"
 #include "components/viz/common/quads/aggregated_render_pass_draw_quad.h"
-#include "components/viz/common/quads/debug_border_draw_quad.h"
 #include "components/viz/common/quads/solid_color_draw_quad.h"
 #include "components/viz/common/quads/texture_draw_quad.h"
 #include "components/viz/common/quads/yuv_video_draw_quad.h"
@@ -34,8 +32,6 @@ namespace viz {
 
 namespace {
 
-constexpr int kDCLayerDebugBorderWidth = 4;
-constexpr gfx::Insets kDCLayerDebugBorderInsets = gfx::Insets(-2);
 // This is the number of frames we should wait before actual overlay promotion
 // under multi-video cases.
 constexpr int kDCLayerFramesDelayedBeforeOverlay = 5;
@@ -131,15 +127,20 @@ DCLayerResult ValidateYUVQuad(
 
 void FromYUVQuad(const YUVVideoDrawQuad* quad,
                  const gfx::Transform& transform_to_root_target,
-                 DCLayerOverlayCandidate* dc_layer) {
+                 OverlayCandidate* dc_layer) {
   // Direct composition path only supports a single NV12 buffer.
   DCHECK(quad->y_plane_resource_id() && quad->u_plane_resource_id());
   DCHECK_EQ(quad->u_plane_resource_id(), quad->v_plane_resource_id());
   dc_layer->resource_id = quad->y_plane_resource_id();
 
-  dc_layer->z_order = 1;
-  dc_layer->content_rect = gfx::ToNearestRect(quad->ya_tex_coord_rect());
-  dc_layer->quad_rect = quad->rect;
+  dc_layer->plane_z_order = 1;
+  dc_layer->display_rect = gfx::RectF(quad->rect);
+  dc_layer->resource_size_in_pixels = quad->ya_tex_size();
+  dc_layer->uv_rect =
+      gfx::ScaleRect(quad->ya_tex_coord_rect(),
+                     1.f / dc_layer->resource_size_in_pixels.width(),
+                     1.f / dc_layer->resource_size_in_pixels.height());
+
   // Quad rect is in quad content space so both quad to target, and target to
   // root transforms must be applied to it.
   gfx::Transform quad_to_root_transform(
@@ -191,17 +192,20 @@ DCLayerResult ValidateTextureQuad(
 
 void FromTextureQuad(const TextureDrawQuad* quad,
                      const gfx::Transform& transform_to_root_target,
-                     DCLayerOverlayCandidate* dc_layer) {
+                     OverlayCandidate* dc_layer) {
   dc_layer->resource_id = quad->resource_id();
-  dc_layer->z_order = 1;
-  dc_layer->content_rect = gfx::Rect(quad->resource_size_in_pixels());
-  dc_layer->quad_rect = quad->rect;
+  dc_layer->plane_z_order = 1;
+  dc_layer->resource_size_in_pixels = quad->resource_size_in_pixels();
+  dc_layer->uv_rect =
+      gfx::BoundingRect(quad->uv_top_left, quad->uv_bottom_right);
+  dc_layer->display_rect = gfx::RectF(quad->rect);
   // Quad rect is in quad content space so both quad to target, and target to
   // root transforms must be applied to it.
   gfx::Transform quad_to_root_transform;
   if (quad->y_flipped) {
     quad_to_root_transform.Scale(1.0, -1.0);
-    quad_to_root_transform.PostTranslate(0.0, dc_layer->content_rect.height());
+    quad_to_root_transform.PostTranslate(
+        0.0, dc_layer->resource_size_in_pixels.height());
   }
   quad_to_root_transform.PostConcat(
       quad->shared_quad_state->quad_to_target_transform);
@@ -413,15 +417,14 @@ void RecordDCLayerResult(DCLayerResult result, QuadList::ConstIterator it) {
 }
 
 // This function records the damage rect rect of the current frame.
-void RecordOverlayHistograms(
-    std::vector<DCLayerOverlayCandidate>* dc_layer_overlays,
-    bool has_occluding_surface_damage,
-    const gfx::Rect* damage_rect) {
+void RecordOverlayHistograms(OverlayCandidateList* dc_layer_overlays,
+                             bool has_occluding_surface_damage,
+                             const gfx::Rect* damage_rect) {
   // If an underlay is found, we record the damage rect of this frame as an
   // underlay.
   bool is_overlay = true;
   for (const auto& dc_layer : *dc_layer_overlays) {
-    if (dc_layer.z_order != 1) {
+    if (dc_layer.plane_z_order != 1) {
       is_overlay = false;
       break;
     }
@@ -464,20 +467,11 @@ bool IsClearVideoQuad(const QuadList::ConstIterator& it) {
 
 }  // namespace
 
-DCLayerOverlayCandidate::DCLayerOverlayCandidate() = default;
-DCLayerOverlayCandidate::DCLayerOverlayCandidate(
-    const DCLayerOverlayCandidate& other) = default;
-DCLayerOverlayCandidate& DCLayerOverlayCandidate::operator=(
-    const DCLayerOverlayCandidate& other) = default;
-DCLayerOverlayCandidate::~DCLayerOverlayCandidate() = default;
-
 DCLayerOverlayProcessor::DCLayerOverlayProcessor(
-    const DebugRendererSettings* debug_settings,
     int allowed_yuv_overlay_count,
     bool skip_initialization_for_testing)
     : has_overlay_support_(skip_initialization_for_testing),
       allowed_yuv_overlay_count_(allowed_yuv_overlay_count),
-      debug_settings_(debug_settings),
       no_undamaged_overlay_promotion_(base::FeatureList::IsEnabled(
           features::kNoUndamagedOverlayPromotion)) {
   if (!skip_initialization_for_testing) {
@@ -603,54 +597,6 @@ void DCLayerOverlayProcessor::UpdateRootDamageRect(
   damages_to_be_removed_.clear();
 }
 
-void DCLayerOverlayProcessor::InsertDebugBorderDrawQuad(
-    const std::vector<DCLayerOverlayCandidate>* dc_layer_overlays,
-    AggregatedRenderPass* render_pass,
-    const gfx::RectF& display_rect,
-    gfx::Rect* damage_rect) {
-  auto* shared_quad_state = render_pass->CreateAndAppendSharedQuadState();
-  auto& quad_list = render_pass->quad_list;
-
-  // Add debug borders for the root damage rect after overlay promotion.
-  {
-    SkColor4f border_color = SkColors::kGreen;
-    auto it =
-        quad_list.InsertBeforeAndInvalidateAllPointers<DebugBorderDrawQuad>(
-            quad_list.begin(), 1u);
-    auto* debug_quad = static_cast<DebugBorderDrawQuad*>(*it);
-
-    gfx::Rect rect = *damage_rect;
-    rect.Inset(kDCLayerDebugBorderInsets);
-    debug_quad->SetNew(shared_quad_state, rect, rect, border_color,
-                       kDCLayerDebugBorderWidth);
-  }
-
-  // Add debug borders for overlays/underlays
-  for (const auto& dc_layer : *dc_layer_overlays) {
-    gfx::Rect overlay_rect = dc_layer.transform.MapRect(dc_layer.quad_rect);
-    if (dc_layer.clip_rect)
-      overlay_rect.Intersect(*dc_layer.clip_rect);
-
-    // Overlay:red, Underlay:blue.
-    SkColor4f border_color =
-        dc_layer.z_order > 0 ? SkColors::kRed : SkColors::kBlue;
-    auto it =
-        quad_list.InsertBeforeAndInvalidateAllPointers<DebugBorderDrawQuad>(
-            quad_list.begin(), 1u);
-    auto* debug_quad = static_cast<DebugBorderDrawQuad*>(*it);
-
-    overlay_rect.Inset(kDCLayerDebugBorderInsets);
-    debug_quad->SetNew(shared_quad_state, overlay_rect, overlay_rect,
-                       border_color, kDCLayerDebugBorderWidth);
-  }
-
-  // Mark the entire output as damaged because the border quads might not be
-  // inside the current damage rect.  It's far simpler to mark the entire output
-  // as damaged instead of accounting for individual border quads which can
-  // change positions across frames.
-  damage_rect->Union(gfx::ToEnclosingRect(display_rect));
-}
-
 bool DCLayerOverlayProcessor::IsPreviousFrameUnderlayRect(
     const gfx::Rect& quad_rectangle,
     size_t index) {
@@ -722,7 +668,7 @@ void DCLayerOverlayProcessor::Process(
     AggregatedRenderPass* render_pass,
     gfx::Rect* damage_rect,
     SurfaceDamageRectList surface_damage_rect_list,
-    std::vector<DCLayerOverlayCandidate>* dc_layer_overlays,
+    OverlayCandidateList* dc_layer_overlays,
     bool is_video_capture_enabled,
     bool is_page_fullscreen_mode) {
   bool this_frame_has_occluding_damage_rect = false;
@@ -976,11 +922,6 @@ void DCLayerOverlayProcessor::Process(
     RecordOverlayHistograms(dc_layer_overlays,
                             this_frame_has_occluding_damage_rect, damage_rect);
   }
-
-  if (debug_settings_->show_dc_layer_debug_borders) {
-    InsertDebugBorderDrawQuad(dc_layer_overlays, render_pass, display_rect,
-                              damage_rect);
-  }
 }
 
 bool DCLayerOverlayProcessor::ShouldSkipOverlay(
@@ -1043,12 +984,12 @@ void DCLayerOverlayProcessor::UpdateDCLayerOverlays(
     QuadList::Iterator* new_it,
     size_t* new_index,
     gfx::Rect* damage_rect,
-    std::vector<DCLayerOverlayCandidate>* dc_layer_overlays,
+    OverlayCandidateList* dc_layer_overlays,
     bool is_page_fullscreen_mode) {
   // Record the result first before ProcessForOverlay().
   RecordDCLayerResult(DC_LAYER_SUCCESS, it);
 
-  DCLayerOverlayCandidate dc_layer;
+  OverlayCandidate dc_layer;
   dc_layer.is_video_fullscreen_letterboxing =
       is_page_fullscreen_mode
           ? IsFullScreenLetterboxing(it, render_pass->quad_list.end(),
@@ -1112,11 +1053,11 @@ void DCLayerOverlayProcessor::ProcessForUnderlay(
     const QuadList::Iterator& it,
     size_t processed_overlay_count,
     gfx::Rect* damage_rect,
-    DCLayerOverlayCandidate* dc_layer) {
+    OverlayCandidate* dc_layer) {
   // Assign decreasing z-order so that underlays processed earlier, and hence
   // which are above the subsequent underlays, are placed above in the direct
   // composition visual tree.
-  dc_layer->z_order = -1 - processed_overlay_count;
+  dc_layer->plane_z_order = -1 - processed_overlay_count;
 
   // If the video is translucent and uses SrcOver blend mode, we can achieve the
   // same result as compositing with video on top if we replace video quad with

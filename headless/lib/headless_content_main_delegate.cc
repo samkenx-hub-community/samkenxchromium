@@ -179,7 +179,8 @@ absl::optional<int> HeadlessContentMainDelegate::BasicStartupComplete() {
   // Use software rendering by default, but don't mess with gl and angle
   // switches if user is overriding them.
   if (!command_line->HasSwitch(::switches::kUseGL) &&
-      !command_line->HasSwitch(::switches::kUseANGLE)) {
+      !command_line->HasSwitch(::switches::kUseANGLE) &&
+      !command_line->HasSwitch(switches::kEnableGPU)) {
     command_line->AppendSwitchASCII(::switches::kUseGL,
                                     gl::kGLImplementationANGLEName);
     command_line->AppendSwitchASCII(
@@ -375,16 +376,20 @@ HeadlessContentMainDelegate::RunProcess(
   std::unique_ptr<content::BrowserMainRunner> browser_runner =
       content::BrowserMainRunner::Create();
 
-  int exit_code = browser_runner->Initialize(std::move(main_function_params));
-  DCHECK_LT(exit_code, 0) << "content::BrowserMainRunner::Initialize failed in "
-                             "HeadlessContentMainDelegate::RunProcess";
+  int result_code = browser_runner->Initialize(std::move(main_function_params));
+  DCHECK_LT(result_code, 0)
+      << "content::BrowserMainRunner::Initialize failed in "
+         "HeadlessContentMainDelegate::RunProcess";
 
   browser_runner->Run();
   browser_runner->Shutdown();
+
+  int exit_code = browser_->exit_code();
+
   browser_.reset();
 
   // Return an int here to disable calling content::BrowserMain.
-  return 0;
+  return exit_code;
 }
 
 #if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS)

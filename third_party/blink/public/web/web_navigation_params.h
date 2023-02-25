@@ -188,6 +188,9 @@ struct BLINK_EXPORT WebNavigationInfo {
   // alive until we create the NavigationRequest.
   CrossVariantMojoRemote<mojom::PolicyContainerHostKeepAliveHandleInterfaceBase>
       initiator_policy_container_keep_alive_handle;
+
+  // The initiator frame's LocalDOMWindow's has_storage_access state.
+  bool has_storage_access = false;
 };
 
 // This structure holds all information provided by the embedder that is
@@ -425,15 +428,6 @@ struct BLINK_EXPORT WebNavigationParams {
   // navigation that should be applied in the document being navigated to.
   WebVector<int> initiator_origin_trial_features;
 
-  // The physical URL of Web Bundle from which the document is loaded.
-  // Used as an additional identifier for MemoryCache.
-  WebURL web_bundle_physical_url;
-
-  // The claimed URL inside Web Bundle file from which the document is loaded.
-  // This URL is used for window.location and document.URL and relative path
-  // computation in the document.
-  WebURL web_bundle_claimed_url;
-
   // UKM source id to be associated with the Document that will be installed
   // in the current frame.
   ukm::SourceId document_ukm_source_id = ukm::kInvalidSourceId;
@@ -537,6 +531,9 @@ struct BLINK_EXPORT WebNavigationParams {
   // <enum_representing_runtime_enabled_feature, enabled/disabled>
   base::flat_map<::blink::mojom::RuntimeFeatureState, bool>
       modified_runtime_features;
+
+  // Whether the document should be loaded with the has_storage_access bit set.
+  bool has_storage_access = false;
 };
 
 }  // namespace blink

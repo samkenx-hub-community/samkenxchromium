@@ -27,12 +27,12 @@
 <translation id="1201402288615127009">Seguinte</translation>
 <translation id="1209796539517632982">Servidores de nome automático</translation>
 <translation id="1210831758834677569">Laosiano</translation>
+<translation id="1221555006497674479">Armazenamento quase cheio. Resta(m)<ph name="REMAINING_PERCENTAGE" />% do seu armazenamento do disco partilhado de <ph name="TOTAL_SPACE" />.</translation>
 <translation id="1243314992276662751">Carregar</translation>
 <translation id="1249250836236328755">Género</translation>
 <translation id="1254593899333212300">Ligação direta à Internet</translation>
 <translation id="1272293450992660632">Os valores de PIN não correspondem.</translation>
 <translation id="1280820357415527819">A pesquisar redes móveis…</translation>
-<translation id="1291603679744561561">SIM bloqueado</translation>
 <translation id="1293556467332435079">Ficheiros</translation>
 <translation id="1297922636971898492">De momento, o Google Drive não está disponível. O carregamento será reiniciado automaticamente assim que o Google Drive voltar a estar disponível.</translation>
 <translation id="1307931752636661898">Não é possível ver os ficheiros Linux.</translation>
@@ -59,7 +59,6 @@
 <translation id="1499943022354839699">Inglês (EUA) com teclado Dvorak</translation>
 <translation id="1515909359182093592"><ph name="INPUT_LABEL" /> – Anfitrião</translation>
 <translation id="1521655867290435174">Google Sheets</translation>
-<translation id="1521795806314479294">A preparar <ph name="FILE_NAME" />…</translation>
 <translation id="1538729222189715449">A abrir ficheiros Linux…</translation>
 <translation id="1547964879613821194">Inglês canadiano</translation>
 <translation id="1556189134700913550">Aplicar a todas</translation>
@@ -75,6 +74,7 @@
 <translation id="1641780993263690097">Chinês pinyin</translation>
 <translation id="1646019627374511909">A disponibilizar <ph name="NUMBER_OF_ITEMS" /> ficheiros offline…</translation>
 <translation id="164969095109328410">Dispositivo Chrome</translation>
+<translation id="1661207570040737402">Usou todo o armazenamento do Google Workspace do disco partilhado.</translation>
 <translation id="1661867754829461514">Falta o PIN</translation>
 <translation id="166439687370499867">Não é permitido alterar as configurações de rede partilhadas.</translation>
 <translation id="1665611772925418501">Não foi possível modificar o ficheiro.</translation>
@@ -84,7 +84,6 @@
 <translation id="1722487484194605434">A comprimir <ph name="NUMBER_OF_ITEMS" /> itens…</translation>
 <translation id="1722687688096767818">A adicionar o perfil…</translation>
 <translation id="1726100011689679555">Servidores de nomes</translation>
-<translation id="1727562178154619254">Tudo pronto para sincronizar</translation>
 <translation id="1729953886957086472">Alemão (Alemanha)</translation>
 <translation id="1730235522912993863">Chinês cangjie</translation>
 <translation id="1731889557567069540"><ph name="NUMBER_OF_ITEMS" /> itens copiados.</translation>
@@ -194,6 +193,7 @@
 <translation id="2574327434504608656">1 pasta partilhada com a Bruschetta</translation>
 <translation id="2578394532502990878">Fonética de tâmil</translation>
 <translation id="2579959351793446050">Oriá</translation>
+<translation id="2587195714949534472">A preparar a sincronização de <ph name="FILE_NAME" />…</translation>
 <translation id="2602810353103180630">Rede <ph name="NETWORK_INDEX" /> de <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, <ph name="CONNECTION_STATUS" />, Intensidade do sinal <ph name="SIGNAL_STRENGTH" />%, Bloqueada pelo administrador, Detalhes</translation>
 <translation id="2614589611416690597">Vídeo <ph name="VIDEO_TYPE" /></translation>
 <translation id="2620090360073999360">Não é possível aceder ao Google Drive neste momento.</translation>
@@ -295,6 +295,7 @@
 <translation id="3486821258960016770">Mongol</translation>
 <translation id="3495304270784461826"><ph name="COUNT" /> erros.</translation>
 <translation id="3509680540198371098">Rede <ph name="NETWORK_INDEX" /> de <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, <ph name="SECURITY_STATUS" />, <ph name="CONNECTION_STATUS" />, intensidade do sinal: <ph name="SIGNAL_STRENGTH" />%, detalhes</translation>
+<translation id="3511705761158917664">A preparar a sincronização de <ph name="NUMBER_OF_ITEMS" /> itens…</translation>
 <translation id="3522708245912499433">Português</translation>
 <translation id="3524311639100184459">Cuidado: estes ficheiros são temporários e podem ser automaticamente eliminados para libertar espaço em disco.  <ph name="BEGIN_LINK" />Saber mais<ph name="END_LINK" /></translation>
 <translation id="3527085408025491307">Pasta</translation>
@@ -350,11 +351,11 @@
 <translation id="3924145049010392604">Meta</translation>
 <translation id="3943857333388298514">Colar</translation>
 <translation id="3952872973865944257">Fonética de telugu</translation>
-<translation id="3954354850384043518">Em curso</translation>
 <translation id="3958548648197196644">Quivi</translation>
 <translation id="3971140002794351170">Transferir perfil móvel, rede <ph name="NETWORK_INDEX" /> de <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, <ph name="NETWORK_PROVIDER_NAME" /></translation>
 <translation id="3973925058222872294">Inglês (RU)</translation>
 <translation id="3975895378829046965">Fonética de bengali</translation>
+<translation id="3999574733850440202">Os ficheiros da Microsoft abertos recentemente foram movidos para o OneDrive</translation>
 <translation id="4002066346123236978">Título</translation>
 <translation id="4017788180641807848">Inglês (EUA) com teclado Workman</translation>
 <translation id="4019998208269143058">Fixar nos ficheiros rápidos</translation>
@@ -363,6 +364,7 @@
 <translation id="4092890906744441904">Irlandês</translation>
 <translation id="4124935795427217608">Unicórnio</translation>
 <translation id="4131235941541910880">Mova os itens de que não precisa para o lixo</translation>
+<translation id="4134804435730168042">Rede <ph name="NETWORK_INDEX" /> de <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, <ph name="NETWORK_PROVIDER_NAME" />, Ativar após a configuração do dispositivo</translation>
 <translation id="4153015322587141338">Clique com o botão direito do rato num ficheiro e selecione "<ph name="PIN_COMMAND" />" para um acesso rápido aos seus ficheiros na prateleira.</translation>
 <translation id="4157569377477607576">A política do administrador não recomenda:</translation>
 <translation id="4159731583141908892"><ph name="FILE_NAME" /> movido.</translation>
@@ -405,6 +407,7 @@
 <translation id="4414834425328380570">O ficheiro "<ph name="FILE_NAME" />" vai ser apagado e não vai ser possível restaurá-lo.</translation>
 <translation id="4418686080762064601">Crie um atalho para os seus ficheiros</translation>
 <translation id="4425149324548788773">O meu disco</translation>
+<translation id="4432921877815220091">Rede <ph name="NETWORK_INDEX" /> de <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, Ativar após a configuração do dispositivo, Gerida pelo administrador</translation>
 <translation id="4439427728133035643">Rede <ph name="NETWORK_INDEX" /> de <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, intensidade do sinal: <ph name="SIGNAL_STRENGTH" />%, ligar</translation>
 <translation id="4442424173763614572">A procura de DNS falhou</translation>
 <translation id="4462159676511157176">Servidores de nome personalizado</translation>
@@ -513,7 +516,6 @@
    Remover o dispositivo enquanto está a ser utilizado pode provocar perda de dados. Aguarde pela conclusão da operação e, em seguida, ejete o dispositivo através da aplicação Ficheiros.</translation>
 <translation id="5163869187418756376">Falha ao partilhar. Verifique a ligação e tente novamente mais tarde.</translation>
 <translation id="516592729076796170">Dvorak de programador americano</translation>
-<translation id="5167102019886320507">A preparar <ph name="NUMBER_OF_ITEMS" /> itens…</translation>
 <translation id="5177526793333269655">Vista de miniatura</translation>
 <translation id="5181896909298187506">Sem ficheiros recentes</translation>
 <translation id="5194713942430106590">Clique para ordenar a coluna por ordem ascendente.</translation>
@@ -615,6 +617,7 @@
 <translation id="5913638992615760742">Falha na operação de cópia, erro inesperado: <ph name="ERROR_MESSAGE" />.</translation>
 <translation id="5926082595146149752">Neerlandês (Países Baixos) com o teclado de PC americano internacional</translation>
 <translation id="5932901536148835538">Chromebit</translation>
+<translation id="5948255720516436063">Rede <ph name="NETWORK_INDEX" /> de <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, Ativar após a configuração do dispositivo</translation>
 <translation id="5955954492236143329"><ph name="NUMBER_OF_ITEMS" /> itens</translation>
 <translation id="5957366693331451795">Chromeboxes</translation>
 <translation id="5982621672636444458">Opções de ordenação</translation>
@@ -793,6 +796,7 @@
 <translation id="7458955835361612701">Sem imagens recentes</translation>
 <translation id="7460898608667578234">Ucraniano</translation>
 <translation id="7469894403370665791">Ligar automaticamente a esta rede</translation>
+<translation id="7481358317100446445">Pronta</translation>
 <translation id="7486315294984620427">Para largar ficheiros no Parallels Desktop, o ficheiro tem de ser copiado para os ficheiros do Windows.</translation>
 <translation id="749452993132003881">Hiragana</translation>
 <translation id="7495372004724182530">Fonética malaiala</translation>
@@ -830,6 +834,7 @@
 <translation id="7724603315864178912">Cortar</translation>
 <translation id="7732111077498238432">A rede é controlada por políticas.</translation>
 <translation id="7736003208887389532">Eliminar definitivamente estes ficheiros?</translation>
+<translation id="7740287852186792672">Resultados de pesquisa</translation>
 <translation id="7748626145866214022">Há mais opções disponíveis na barra de ação. Prima Alt + A para focar a barra de ação.</translation>
 <translation id="7760449188139285140">Wubi chinês</translation>
 <translation id="7765158879357617694">Mover</translation>
@@ -881,6 +886,7 @@
 <translation id="8116072619078571545">Água gelada</translation>
 <translation id="8128733386027980860">Inglês (EUA) com teclado Dvorak</translation>
 <translation id="8137331602592933310">"<ph name="FILENAME" />" foi partilhado consigo. Não o pode eliminar porque não lhe pertence.</translation>
+<translation id="8138705869659070104">Ativar após conf. dispositivo</translation>
 <translation id="813913629614996137">A inicializar...</translation>
 <translation id="8147028810663464959">A largura de carateres é Completa</translation>
 <translation id="8151638057146502721">Configurar</translation>
@@ -906,6 +912,7 @@
 <translation id="8300849813060516376">O OTASP falhou</translation>
 <translation id="8312871300878166382">Colar numa pasta</translation>
 <translation id="8329978297633540474">Texto simples</translation>
+<translation id="8332007959299458842">Os ficheiros da Microsoft abertos recentemente foram movidos para o Google Drive</translation>
 <translation id="8335587457941836791">Soltar da prateleira</translation>
 <translation id="8335837413233998004">Bielorrusso</translation>
 <translation id="8336153091935557858">Ontem <ph name="YESTERDAY_DAYTIME" /></translation>
@@ -932,6 +939,7 @@
 <translation id="8487700953926739672">Disponível offline</translation>
 <translation id="8492972329130824181">A rede doméstica não está disponível. O roaming de dados móveis tem de estar ativado para estabelecer a ligação.</translation>
 <translation id="8499098729323186194">A extrair <ph name="NUMBER_OF_ITEMS" /> itens…</translation>
+<translation id="8502913769543567768">Rede <ph name="NETWORK_INDEX" /> de <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, <ph name="NETWORK_PROVIDER_NAME" />, Ativar após a configuração do dispositivo, Gerida pelo administrador</translation>
 <translation id="8521441079177373948">Reino Unido</translation>
 <translation id="853494022971700746">Francês (França)</translation>
 <translation id="8540608333167683902">Rede <ph name="NETWORK_INDEX" /> de <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, <ph name="CONNECTION_STATUS" />, intensidade do sinal: <ph name="SIGNAL_STRENGTH" />%, detalhes</translation>
@@ -993,6 +1001,7 @@
 <translation id="9046895021617826162">A ligação falhou</translation>
 <translation id="9065512565307033593">Se não validar, o seu acesso à rede será desativado.</translation>
 <translation id="908378762078012445">Russo com teclado AATSEEL fonético</translation>
+<translation id="9086302186042011942">A sincronizar</translation>
 <translation id="9099674669267916096">Contagem de páginas</translation>
 <translation id="9100610230175265781">Frase de acesso obrigatória</translation>
 <translation id="9110990317705400362">Estamos constantemente a procurar formas de tornar a navegação mais segura. Anteriormente, qualquer Website poderia pedir-lhe para adicionar uma extensão ao navegador. Nas versões mais recentes do Google Chrome, tem de definir explicitamente no Chrome que pretende instalar estas extensões adicionando-as através da página Extensões. <ph name="BEGIN_LINK" />Saiba mais<ph name="END_LINK" /></translation>

@@ -61,7 +61,7 @@ LabelButton::LabelButton(PressedCallback callback,
 
 LabelButton::~LabelButton() {
   // TODO(pbos): Revisit explicit removal of InkDrop for classes that override
-  // Add/RemoveLayerBeneathView(). This is done so that the InkDrop doesn't
+  // Add/RemoveLayerFromRegions(). This is done so that the InkDrop doesn't
   // access the non-override versions in ~View.
   views::InkDrop::Remove(this);
 }
@@ -145,10 +145,6 @@ void LabelButton::SetEnabledTextColors(absl::optional<SkColor> color) {
   for (auto state : states)
     explicitly_set_colors_[state] = false;
   ResetColorsFromNativeTheme();
-}
-
-void LabelButton::SetEnabledTextColorReadabilityAdjustment(bool enabled) {
-  label_->SetAutoColorReadabilityEnabled(enabled);
 }
 
 SkColor LabelButton::GetCurrentTextColor() const {
@@ -428,7 +424,7 @@ ui::NativeTheme::State LabelButton::GetThemeState(
     case STATE_DISABLED:
       return ui::NativeTheme::kDisabled;
     case STATE_COUNT:
-      NOTREACHED();
+      NOTREACHED_NORETURN();
   }
   return ui::NativeTheme::kNormal;
 }
@@ -454,15 +450,16 @@ void LabelButton::UpdateImage() {
     image_->SetImage(GetImage(GetVisualState()));
 }
 
-void LabelButton::AddLayerBeneathView(ui::Layer* new_layer) {
+void LabelButton::AddLayerToRegion(ui::Layer* new_layer,
+                                   views::LayerRegion region) {
   image()->SetPaintToLayer();
   image()->layer()->SetFillsBoundsOpaquely(false);
   ink_drop_container()->SetVisible(true);
-  ink_drop_container()->AddLayerBeneathView(new_layer);
+  ink_drop_container()->AddLayerToRegion(new_layer, region);
 }
 
-void LabelButton::RemoveLayerBeneathView(ui::Layer* old_layer) {
-  ink_drop_container()->RemoveLayerBeneathView(old_layer);
+void LabelButton::RemoveLayerFromRegions(ui::Layer* old_layer) {
+  ink_drop_container()->RemoveLayerFromRegions(old_layer);
   ink_drop_container()->SetVisible(false);
   image()->DestroyLayer();
 }

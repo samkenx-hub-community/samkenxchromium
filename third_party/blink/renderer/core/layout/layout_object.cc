@@ -42,6 +42,7 @@
 #include "third_party/blink/renderer/core/css/style_change_reason.h"
 #include "third_party/blink/renderer/core/css/style_engine.h"
 #include "third_party/blink/renderer/core/display_lock/display_lock_utilities.h"
+#include "third_party/blink/renderer/core/dom/css_toggle_inference.h"
 #include "third_party/blink/renderer/core/dom/css_toggle_map.h"
 #include "third_party/blink/renderer/core/dom/element_traversal.h"
 #include "third_party/blink/renderer/core/dom/first_letter_pseudo_element.h"
@@ -3114,6 +3115,12 @@ void LayoutObject::StyleDidChange(StyleDifference diff,
     }
   }
 
+  if (old_style &&
+      (old_style->ToggleTrigger() != StyleRef().ToggleTrigger() ||
+       old_style->ToggleVisibility() != StyleRef().ToggleVisibility())) {
+    GetDocument().EnsureCSSToggleInference().MarkNeedsRebuild();
+  }
+
   if (StyleRef().AnchorName())
     MarkMayHaveAnchorQuery();
 }
@@ -3865,15 +3872,6 @@ void LayoutObject::SetDescendantNeedsPaintPropertyUpdate() {
   }
 }
 
-void LayoutObject::ForceAllAncestorsNeedPaintPropertyUpdate() {
-  NOT_DESTROYED();
-  LayoutObject* ancestor = Parent();
-  while (ancestor) {
-    ancestor->SetNeedsPaintPropertyUpdate();
-    ancestor = ancestor->Parent();
-  }
-}
-
 void LayoutObject::MaybeClearIsScrollAnchorObject() {
   NOT_DESTROYED();
   if (!bitfields_.IsScrollAnchorObject())
@@ -4168,7 +4166,7 @@ const ComputedStyle* LayoutObject::FirstLineStyleWithoutFallback() const {
       // it's based on first_line_block's style. We need to get the uncached
       // first line style based on this object's style and cache the result in
       // it.
-      if (scoped_refptr<ComputedStyle> first_line_style =
+      if (scoped_refptr<const ComputedStyle> first_line_style =
               first_line_block->GetUncachedPseudoElementStyle(
                   StyleRequest(kPseudoIdFirstLine, Style()))) {
         return StyleRef().ReplaceCachedPseudoElementStyle(
@@ -4185,7 +4183,7 @@ const ComputedStyle* LayoutObject::FirstLineStyleWithoutFallback() const {
             Parent()->FirstLineStyleWithoutFallback()) {
       // A first-line style is in effect. Get uncached first line style based on
       // parent_first_line_style and cache the result in this object's style.
-      if (scoped_refptr<ComputedStyle> first_line_style =
+      if (scoped_refptr<const ComputedStyle> first_line_style =
               GetUncachedPseudoElementStyle(StyleRequest(
                   kPseudoIdFirstLineInherited, parent_first_line_style))) {
         return StyleRef().AddCachedPseudoElementStyle(
@@ -4212,7 +4210,7 @@ const ComputedStyle* LayoutObject::GetCachedPseudoElementStyle(
   return element->CachedStyleForPseudoElement(pseudo);
 }
 
-scoped_refptr<ComputedStyle> LayoutObject::GetUncachedPseudoElementStyle(
+scoped_refptr<const ComputedStyle> LayoutObject::GetUncachedPseudoElementStyle(
     const StyleRequest& request) const {
   NOT_DESTROYED();
   DCHECK_NE(request.pseudo_id, kPseudoIdBefore);

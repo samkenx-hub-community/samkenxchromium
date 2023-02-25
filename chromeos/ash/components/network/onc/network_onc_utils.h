@@ -17,6 +17,7 @@
 #include "chromeos/components/onc/variable_expander.h"
 #include "components/onc/onc_constants.h"
 #include "net/cert/scoped_nss_types.h"
+#include "third_party/abseil-cpp/absl/types/optional.h"
 
 class PrefService;
 
@@ -41,13 +42,13 @@ NetworkTypePattern NetworkTypePatternFromOncType(const std::string& type);
 // Translates |onc_proxy_settings|, which must be a valid ONC ProxySettings
 // dictionary, to a ProxyConfig dictionary (see proxy_config_dictionary.h).
 COMPONENT_EXPORT(CHROMEOS_NETWORK)
-base::Value::Dict ConvertOncProxySettingsToProxyConfig(
+absl::optional<base::Value::Dict> ConvertOncProxySettingsToProxyConfig(
     const base::Value::Dict& onc_proxy_settings);
 
 // Translates |proxy_config_dict|, which must be a valid ProxyConfig dictionary
 // (see proxy_config_dictionary.h) to an ONC ProxySettings dictionary.
 COMPONENT_EXPORT(CHROMEOS_NETWORK)
-base::Value ConvertProxyConfigToOncProxySettings(
+absl::optional<base::Value::Dict> ConvertProxyConfigToOncProxySettings(
     const base::Value::Dict& proxy_config_dict);
 
 COMPONENT_EXPORT(CHROMEOS_NETWORK)
@@ -60,7 +61,7 @@ int ImportNetworksForUser(const user_manager::User* user,
                           const base::Value::List& network_configs,
                           std::string* error);
 
-// Convenvience function to retrieve the "AllowOnlyPolicyNetworksToAutoconnect"
+// Convenience function to retrieve the "AllowOnlyPolicyNetworksToAutoconnect"
 // setting from the global network configuration (see
 // GetGlobalConfigFromPolicy).
 COMPONENT_EXPORT(CHROMEOS_NETWORK)
@@ -70,10 +71,11 @@ bool PolicyAllowsOnlyPolicyNetworksToAutoconnect(bool for_active_user);
 // |profile_prefs| and |local_state_prefs| might be NULL. Returns NULL if no
 // applicable policy is found. Sets |onc_source| accordingly.
 COMPONENT_EXPORT(CHROMEOS_NETWORK)
-const base::Value* GetPolicyForNetwork(const PrefService* profile_prefs,
-                                       const PrefService* local_state_prefs,
-                                       const NetworkState& network,
-                                       ::onc::ONCSource* onc_source);
+const base::Value::Dict* GetPolicyForNetwork(
+    const PrefService* profile_prefs,
+    const PrefService* local_state_prefs,
+    const NetworkState& network,
+    ::onc::ONCSource* onc_source);
 
 // Convenience function to check only whether a policy for a network exists.
 COMPONENT_EXPORT(CHROMEOS_NETWORK)
@@ -84,14 +86,14 @@ bool HasPolicyForNetwork(const PrefService* profile_prefs,
 // Checks whether a WiFi dictionary object has the ${PASSWORD} substitution
 // variable set as the password.
 COMPONENT_EXPORT(CHROMEOS_NETWORK)
-bool HasUserPasswordSubsitutionVariable(
+bool HasUserPasswordSubstitutionVariable(
     const chromeos::onc::OncValueSignature& signature,
     const base::Value::Dict& onc_object);
 
 // Checks whether a list of network objects has at least one network with the
 // ${PASSWORD} substitution variable set as the password.
 COMPONENT_EXPORT(CHROMEOS_NETWORK)
-bool HasUserPasswordSubsitutionVariable(
+bool HasUserPasswordSubstitutionVariable(
     const base::Value::List& network_configs);
 
 }  // namespace onc

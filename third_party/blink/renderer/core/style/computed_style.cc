@@ -51,7 +51,6 @@
 #include "third_party/blink/renderer/core/html/html_body_element.h"
 #include "third_party/blink/renderer/core/html/html_html_element.h"
 #include "third_party/blink/renderer/core/html/html_progress_element.h"
-#include "third_party/blink/renderer/core/layout/layout_box.h"
 #include "third_party/blink/renderer/core/layout/layout_theme.h"
 #include "third_party/blink/renderer/core/layout/ng/custom/layout_worklet.h"
 #include "third_party/blink/renderer/core/layout/text_autosizer.h"
@@ -368,6 +367,9 @@ bool ComputedStyle::NeedsReattachLayoutTree(const Element& element,
     return true;
   }
 
+  if (old_style->TopLayer() != new_style->TopLayer()) {
+    return true;
+  }
   return false;
 }
 
@@ -425,6 +427,10 @@ ComputedStyle::ComputeDifferenceIgnoringInheritedFirstLineStyle(
     return Difference::kInherited;
   }
   if (old_style.JustifyItems() != new_style.JustifyItems()) {
+    return Difference::kInherited;
+  }
+  if (old_style.AppliedTextDecorations() !=
+      new_style.AppliedTextDecorations()) {
     return Difference::kInherited;
   }
   bool non_inherited_equal = old_style.NonInheritedEqual(new_style);
@@ -1341,21 +1347,19 @@ void ComputedStyle::LoadDeferredImages(Document& document) const {
 
 void ComputedStyle::ApplyTransform(
     gfx::Transform& result,
-    const LayoutBox* box,
     const LayoutSize& border_box_size,
     ApplyTransformOperations apply_operations,
     ApplyTransformOrigin apply_origin,
     ApplyMotionPath apply_motion_path,
     ApplyIndependentTransformProperties apply_independent_transform_properties)
     const {
-  ApplyTransform(result, box, gfx::RectF(gfx::SizeF(border_box_size)),
+  ApplyTransform(result, gfx::RectF(gfx::SizeF(border_box_size)),
                  apply_operations, apply_origin, apply_motion_path,
                  apply_independent_transform_properties);
 }
 
 void ComputedStyle::ApplyTransform(
     gfx::Transform& result,
-    const LayoutBox* box,
     const gfx::RectF& bounding_box,
     ApplyTransformOperations apply_operations,
     ApplyTransformOrigin apply_origin,
@@ -1403,7 +1407,7 @@ void ComputedStyle::ApplyTransform(
   }
 
   if (apply_motion_path == kIncludeMotionPath) {
-    ApplyMotionPathTransform(origin_x, origin_y, box, bounding_box, result);
+    ApplyMotionPathTransform(origin_x, origin_y, bounding_box, result);
   }
 
   if (apply_operations == kIncludeTransformOperations) {
@@ -1421,110 +1425,55 @@ bool ComputedStyle::HasFilters() const {
   return FilterInternal().Get() && !FilterInternal()->operations_.IsEmpty();
 }
 
-static const LayoutBox* GetContainingBox(const LayoutBox* box,
-                                         const EPosition& position) {
-  if (!box) {
-    return nullptr;
-  }
-  if (position == EPosition::kStatic || position == EPosition::kRelative) {
-    return box->ParentBox();
-  }
-  if (position == EPosition::kSticky) {
-    return box->ContainingScrollContainer();
-  }
-  LayoutObject* container = nullptr;
-  if (position == EPosition::kAbsolute) {
-    container = box->ContainerForAbsolutePosition();
-  }
-  if (position == EPosition::kFixed) {
-    container = box->ContainerForFixedPosition();
-  }
-  if (container) {
-    return container->EnclosingBox();
-  }
-  return nullptr;
-}
-
-static gfx::SizeF GetContainingBoxSize(const LayoutBox* box,
-                                       const EPosition& position,
-                                       const gfx::RectF& bounding_box) {
-  const auto* containing_box = GetContainingBox(box, position);
-  if (containing_box) {
-    // FIXME(sakhapov): return based <coord-box> once the spec is clarified.
-    return gfx::SizeF(containing_box->ContentSize());
-  }
-  return bounding_box.size();
-}
-
-static gfx::PointF GetOffsetFromContainingBox(const LayoutBox* box) {
-  if (box && box->ParentBox()) {
-    if (Element* element = DynamicTo<Element>(box->ParentBox()->GetNode())) {
-      const auto& offset = box->OffsetPoint(element);
-      return {offset.left, offset.top};
-    }
-  }
-  return {0, 0};
-}
-
-static gfx::PointF GetInitialPositionForMotionPath(
-    const LayoutBox* box,
-    const LengthPoint& offset_position,
-    const gfx::SizeF& containing_box_size) {
-  if (offset_position.X().IsAuto()) {
-    return GetOffsetFromContainingBox(box);
-  }
-  return PointForLengthPoint(offset_position, containing_box_size);
-}
-
-PointAndTangent ComputedStyle::CalculatePointAndTangentOnRay(
-    const LayoutBox* box,
-    const gfx::RectF& bounding_box,
-    const gfx::PointF& anchor_point) const {
-  const auto& ray = To<StyleRay>(*OffsetPath());
-  const gfx::SizeF containing_box_size =
-      GetContainingBoxSize(box, PositionInternal(), bounding_box);
-  const gfx::PointF initial_position = GetInitialPositionForMotionPath(
-      box, OffsetPosition(), containing_box_size);
-  const float path_length =
-      ray.CalculateLength(anchor_point, OffsetDistance(), OffsetRotate(),
-                          initial_position, bounding_box, containing_box_size);
-  return ray.PointAndNormalAtLength(path_length);
-}
-
-PointAndTangent ComputedStyle::CalculatePointAndTangentOnPath() const {
-  float zoom = EffectiveZoom();
-  const StylePath& path = To<StylePath>(*OffsetPath());
-  float path_length = path.length();
-  float float_distance =
-      FloatValueForLength(OffsetDistance(), path_length * zoom) / zoom;
-  float computed_distance;
-  if (path.IsClosed() && path_length > 0) {
-    computed_distance = fmod(float_distance, path_length);
-    if (computed_distance < 0) {
-      computed_distance += path_length;
-    }
-  } else {
-    computed_distance = ClampTo<float>(float_distance, 0, path_length);
-  }
-  PointAndTangent path_position =
-      path.GetPath().PointAndNormalAtLength(computed_distance);
-  path_position.point.Scale(zoom, zoom);
-  return path_position;
-}
-
 void ComputedStyle::ApplyMotionPathTransform(float origin_x,
                                              float origin_y,
-                                             const LayoutBox* box,
                                              const gfx::RectF& bounding_box,
                                              gfx::Transform& transform) const {
   // TODO(ericwilligers): crbug.com/638055 Apply offset-position.
-  const BasicShape* path = OffsetPath();
-  if (!path) {
+  if (!OffsetPath()) {
     return;
   }
   const LengthPoint& position = OffsetPosition();
   const LengthPoint& anchor = OffsetAnchor();
+  const Length& distance = OffsetDistance();
+  const BasicShape* path = OffsetPath();
   const StyleOffsetRotation& rotate = OffsetRotate();
+
+  PointAndTangent path_position;
+  if (path->GetType() == BasicShape::kStyleRayType) {
+    // TODO(ericwilligers): crbug.com/641245 Support <size> for ray paths.
+    float float_distance = FloatValueForLength(distance, 0);
+
+    // Use ClampTo() to convert infinite values to min/max finite ones.
+    path_position.tangent_in_degrees =
+        ClampTo<float, float>(To<StyleRay>(*path).Angle() - 90);
+    float tangent_in_radians = Deg2rad(path_position.tangent_in_degrees);
+    path_position.point.set_x(float_distance * cos(tangent_in_radians));
+    path_position.point.set_y(float_distance * sin(tangent_in_radians));
+  } else {
+    float zoom = EffectiveZoom();
+    const StylePath& motion_path = To<StylePath>(*path);
+    float path_length = motion_path.length();
+    float float_distance =
+        FloatValueForLength(distance, path_length * zoom) / zoom;
+    float computed_distance;
+    if (motion_path.IsClosed() && path_length > 0) {
+      computed_distance = fmod(float_distance, path_length);
+      if (computed_distance < 0) {
+        computed_distance += path_length;
+      }
+    } else {
+      computed_distance = ClampTo<float>(float_distance, 0, path_length);
+    }
+
+    path_position =
+        motion_path.GetPath().PointAndNormalAtLength(computed_distance);
+    path_position.point.Scale(zoom, zoom);
+  }
+
+  if (rotate.type == OffsetRotationType::kFixed) {
+    path_position.tangent_in_degrees = 0;
+  }
 
   float origin_shift_x = 0;
   float origin_shift_y = 0;
@@ -1538,18 +1487,6 @@ void ComputedStyle::ApplyMotionPathTransform(float origin_x,
     // Shift the origin from transform-origin to offset-anchor.
     origin_shift_x = anchor_point.x() - origin_x;
     origin_shift_y = anchor_point.y() - origin_y;
-  }
-
-  PointAndTangent path_position;
-  if (path->GetType() == BasicShape::kStyleRayType) {
-    path_position =
-        CalculatePointAndTangentOnRay(box, bounding_box, anchor_point);
-  } else {
-    path_position = CalculatePointAndTangentOnPath();
-  }
-
-  if (rotate.type == OffsetRotationType::kFixed) {
-    path_position.tangent_in_degrees = 0;
   }
 
   transform.Translate(
@@ -1882,9 +1819,9 @@ FontHeight ComputedStyle::GetFontHeight(FontBaseline baseline) const {
 
 bool ComputedStyle::TextDecorationVisualOverflowEqual(
     const ComputedStyle& o) const {
-  const Vector<AppliedTextDecoration>& applied_with_this =
+  const Vector<AppliedTextDecoration, 1>& applied_with_this =
       AppliedTextDecorations();
-  const Vector<AppliedTextDecoration>& applied_with_other =
+  const Vector<AppliedTextDecoration, 1>& applied_with_other =
       o.AppliedTextDecorations();
   if (applied_with_this.size() != applied_with_other.size()) {
     return false;
@@ -1903,7 +1840,7 @@ bool ComputedStyle::TextDecorationVisualOverflowEqual(
       return false;
     }
   }
-  if (TextUnderlinePosition() != o.TextUnderlinePosition()) {
+  if (GetTextUnderlinePosition() != o.GetTextUnderlinePosition()) {
     return false;
   }
 
@@ -1911,45 +1848,54 @@ bool ComputedStyle::TextDecorationVisualOverflowEqual(
 }
 
 TextDecorationLine ComputedStyle::TextDecorationsInEffect() const {
-  if (HasSimpleUnderlineInternal()) {
-    return TextDecorationLine::kUnderline;
+  TextDecorationLine decorations = GetTextDecorationLine();
+  if (const auto& base_decorations = BaseTextDecorationDataInternal()) {
+    for (const AppliedTextDecoration& decoration : base_decorations->data) {
+      decorations |= decoration.Lines();
+    }
   }
-  if (!AppliedTextDecorationsInternal()) {
-    return TextDecorationLine::kNone;
-  }
-
-  TextDecorationLine decorations = TextDecorationLine::kNone;
-
-  const Vector<AppliedTextDecoration>& applied = AppliedTextDecorations();
-
-  for (const AppliedTextDecoration& decoration : applied) {
-    decorations |= decoration.Lines();
-  }
-
   return decorations;
 }
 
-const Vector<AppliedTextDecoration>& ComputedStyle::AppliedTextDecorations()
-    const {
-  if (HasSimpleUnderlineInternal()) {
-    DEFINE_STATIC_LOCAL(
-        Vector<AppliedTextDecoration>, underline,
-        (1, AppliedTextDecoration(
-                TextDecorationLine::kUnderline, ETextDecorationStyle::kSolid,
-                VisitedDependentColor(GetCSSPropertyTextDecorationColor()),
-                TextDecorationThickness(), Length::Auto())));
-    // Since we only have one of these in memory, just update the color before
-    // returning.
-    underline.at(0).SetColor(
-        VisitedDependentColor(GetCSSPropertyTextDecorationColor()));
-    return underline;
+base::RefCountedData<Vector<AppliedTextDecoration, 1>>*
+ComputedStyle::EnsureAppliedTextDecorationsCache() const {
+  DCHECK(IsDecoratingBox());
+
+  if (!cached_data_ || !cached_data_->applied_text_decorations_) {
+    using DecorationsVector = Vector<AppliedTextDecoration, 1>;
+    DecorationsVector decorations;
+    if (const auto& base_decorations = BaseTextDecorationDataInternal()) {
+      decorations.ReserveInitialCapacity(base_decorations->data.size() + 1u);
+      decorations = base_decorations->data;
+    }
+    decorations.emplace_back(
+        GetTextDecorationLine(), TextDecorationStyle(),
+        VisitedDependentColor(GetCSSPropertyTextDecorationColor()),
+        GetTextDecorationThickness(), TextUnderlineOffset());
+    EnsureCachedData().applied_text_decorations_ =
+        base::MakeRefCounted<base::RefCountedData<DecorationsVector>>(
+            std::move(decorations));
   }
-  if (!AppliedTextDecorationsInternal()) {
-    DEFINE_STATIC_LOCAL(Vector<AppliedTextDecoration>, empty, ());
+
+  return cached_data_->applied_text_decorations_.get();
+}
+
+const Vector<AppliedTextDecoration, 1>& ComputedStyle::AppliedTextDecorations()
+    const {
+  if (!HasAppliedTextDecorations()) {
+    using DecorationsVector = Vector<AppliedTextDecoration, 1>;
+    DEFINE_STATIC_LOCAL(DecorationsVector, empty, ());
     return empty;
   }
 
-  return AppliedTextDecorationsInternal()->data;
+  if (!IsDecoratingBox()) {
+    const auto& base_decorations = BaseTextDecorationDataInternal();
+    DCHECK(base_decorations);
+    DCHECK_GE(base_decorations->data.size(), 1u);
+    return base_decorations->data;
+  }
+
+  return EnsureAppliedTextDecorationsCache()->data;
 }
 
 static bool HasInitialVariables(const StyleInitialData* initial_data) {
@@ -2333,7 +2279,8 @@ void ComputedStyle::GetBorderEdgeInfo(BorderEdge edges[],
                  BorderLeftStyle(), sides_to_include.left);
 }
 
-void ComputedStyle::CopyChildDependentFlagsFrom(const ComputedStyle& other) {
+void ComputedStyle::CopyChildDependentFlagsFrom(
+    const ComputedStyle& other) const {
   if (other.ChildHasExplicitInheritance()) {
     SetChildHasExplicitInheritance();
   }
@@ -2521,6 +2468,10 @@ bool ComputedStyle::CalculateIsStackingContextWithoutContainment() const {
   return false;
 }
 
+bool ComputedStyle::IsInTopLayer(const Element& element) const {
+  return element.IsInTopLayer() && TopLayer() == ETopLayer::kBrowser;
+}
+
 void ComputedStyleBuilder::PropagateIndependentInheritedProperties(
     const ComputedStyle& parent_style) {
   ComputedStyleBuilderBase::PropagateIndependentInheritedProperties(
@@ -2698,109 +2649,6 @@ ComputedStyleBuilder::MutableNonInheritedVariables() {
     variables = std::make_unique<StyleNonInheritedVariables>();
   }
   return *variables;
-}
-
-void ComputedStyleBuilder::AddAppliedTextDecoration(
-    const AppliedTextDecoration& decoration) {
-  scoped_refptr<AppliedTextDecorationList>& list =
-      MutableAppliedTextDecorationsInternal();
-
-  if (!list) {
-    list = base::MakeRefCounted<AppliedTextDecorationList>();
-  } else if (!list->HasOneRef()) {
-    list = base::MakeRefCounted<AppliedTextDecorationList>(list->data);
-  }
-
-  list->data.push_back(decoration);
-
-  // Most of the time, this vector will only have a single element,
-  // and thus, the default Vector initial size of 4 is wasteful.
-  //
-  // In the rare case, AddAppliedTextDecoration() might be called twice
-  // for a single element (if it has both a simple underline and another
-  // decoration), and so this will cause two allocations instead of one,
-  // but that is an edge case we're willing to live with.
-  list->data.shrink_to_fit();
-}
-
-void ComputedStyleBuilder::OverrideTextDecorationColors(
-    blink::Color override_color) {
-  scoped_refptr<AppliedTextDecorationList>& list =
-      MutableAppliedTextDecorationsInternal();
-  DCHECK(list);
-  if (!list->HasOneRef()) {
-    list = base::MakeRefCounted<AppliedTextDecorationList>(list->data);
-  }
-
-  for (AppliedTextDecoration& decoration : list->data) {
-    decoration.SetColor(override_color);
-  }
-}
-
-void ComputedStyleBuilder::ApplyTextDecorations(
-    const blink::Color& parent_text_decoration_color,
-    bool override_existing_colors) {
-  if (GetTextDecorationLine() == TextDecorationLine::kNone &&
-      !HasSimpleUnderlineInternal() && !AppliedTextDecorationsInternal()) {
-    return;
-  }
-
-  // If there are any color changes or decorations set by this element, stop
-  // using m_hasSimpleUnderline.
-  // TODO(crbug.com/1377295): Eliminate this dependency on `style_`.
-  blink::Color current_text_decoration_color =
-      style_->VisitedDependentColor(GetCSSPropertyTextDecorationColor());
-  if (HasSimpleUnderlineInternal() &&
-      (GetTextDecorationLine() != TextDecorationLine::kNone ||
-       current_text_decoration_color != parent_text_decoration_color)) {
-    SetHasSimpleUnderlineInternal(false);
-    AddAppliedTextDecoration(AppliedTextDecoration(
-        TextDecorationLine::kUnderline, ETextDecorationStyle::kSolid,
-        parent_text_decoration_color, TextDecorationThickness(),
-        Length::Auto()));
-  }
-  if (override_existing_colors && AppliedTextDecorationsInternal()) {
-    OverrideTextDecorationColors(current_text_decoration_color);
-  }
-  if (GetTextDecorationLine() == TextDecorationLine::kNone) {
-    return;
-  }
-  DCHECK(!HasSimpleUnderlineInternal());
-  // To save memory, we don't use AppliedTextDecoration objects in the common
-  // case of a single simple underline of currentColor.
-  TextDecorationLine decoration_lines = GetTextDecorationLine();
-  ETextDecorationStyle decoration_style = TextDecorationStyle();
-  bool is_simple_underline =
-      decoration_lines == TextDecorationLine::kUnderline &&
-      decoration_style == ETextDecorationStyle::kSolid &&
-      TextDecorationColor().IsCurrentColor() &&
-      TextUnderlineOffset().IsAuto() && GetTextDecorationThickness().IsAuto();
-  if (is_simple_underline && !AppliedTextDecorationsInternal()) {
-    SetHasSimpleUnderlineInternal(true);
-    return;
-  }
-
-  AddAppliedTextDecoration(AppliedTextDecoration(
-      decoration_lines, decoration_style, current_text_decoration_color,
-      GetTextDecorationThickness(), TextUnderlineOffset()));
-}
-
-void ComputedStyleBuilder::ClearAppliedTextDecorations() {
-  SetHasSimpleUnderlineInternal(false);
-
-  if (AppliedTextDecorationsInternal()) {
-    SetAppliedTextDecorationsInternal(nullptr);
-  }
-}
-
-void ComputedStyleBuilder::RestoreParentTextDecorations(
-    const ComputedStyle& parent_style) {
-  SetHasSimpleUnderlineInternal(parent_style.HasSimpleUnderlineInternal());
-  if (AppliedTextDecorationsInternal() !=
-      parent_style.AppliedTextDecorationsInternal()) {
-    SetAppliedTextDecorationsInternal(scoped_refptr<AppliedTextDecorationList>(
-        parent_style.AppliedTextDecorationsInternal()));
-  }
 }
 
 STATIC_ASSERT_ENUM(cc::OverscrollBehavior::Type::kAuto,

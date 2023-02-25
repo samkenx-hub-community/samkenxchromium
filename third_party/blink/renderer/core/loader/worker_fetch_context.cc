@@ -7,7 +7,6 @@
 #include "base/task/single_thread_task_runner.h"
 #include "third_party/blink/public/mojom/fetch/fetch_api_request.mojom-blink.h"
 #include "third_party/blink/public/platform/web_content_settings_client.h"
-#include "third_party/blink/public/platform/web_url_loader_factory.h"
 #include "third_party/blink/public/platform/web_url_request.h"
 #include "third_party/blink/public/platform/web_worker_fetch_context.h"
 #include "third_party/blink/renderer/core/frame/deprecation/deprecation.h"
@@ -23,9 +22,11 @@
 #include "third_party/blink/renderer/platform/loader/fetch/resource_fetcher.h"
 #include "third_party/blink/renderer/platform/loader/fetch/resource_fetcher_properties.h"
 #include "third_party/blink/renderer/platform/loader/fetch/resource_timing_utils.h"
+#include "third_party/blink/renderer/platform/loader/fetch/url_loader/url_loader_factory.h"
 #include "third_party/blink/renderer/platform/loader/fetch/worker_resource_timing_notifier.h"
 #include "third_party/blink/renderer/platform/network/network_state_notifier.h"
 #include "third_party/blink/renderer/platform/runtime_enabled_features.h"
+#include "third_party/blink/renderer/platform/scheduler/public/virtual_time_controller.h"
 #include "third_party/blink/renderer/platform/supplementable.h"
 #include "third_party/blink/renderer/platform/weborigin/security_policy.h"
 
@@ -183,10 +184,11 @@ ContentSecurityPolicy* WorkerFetchContext::GetContentSecurityPolicy() const {
   return content_security_policy_;
 }
 
-void WorkerFetchContext::PrepareRequest(ResourceRequest& request,
-                                        ResourceLoaderOptions& options,
-                                        WebScopedVirtualTimePauser&,
-                                        ResourceType resource_type) {
+void WorkerFetchContext::PrepareRequest(
+    ResourceRequest& request,
+    ResourceLoaderOptions& options,
+    WebScopedVirtualTimePauser& virtual_time_pauser,
+    ResourceType resource_type) {
   request.SetUkmSourceId(GetExecutionContext()->UkmSourceID());
 
   String user_agent = global_scope_->UserAgent();
@@ -196,6 +198,14 @@ void WorkerFetchContext::PrepareRequest(ResourceRequest& request,
 
   WrappedResourceRequest webreq(request);
   web_context_->WillSendRequest(webreq);
+  if (auto* worker_scope = DynamicTo<WorkerGlobalScope>(*global_scope_)) {
+    virtual_time_pauser =
+        worker_scope->GetScheduler()
+            ->GetVirtualTimeController()
+            ->CreateWebScopedVirtualTimePauser(
+                request.Url().GetString(),
+                WebScopedVirtualTimePauser::VirtualTaskDuration::kNonInstant);
+  }
 
   probe::PrepareRequest(Probe(), nullptr, request, options, resource_type);
 }

@@ -18,10 +18,6 @@ BASE_DECLARE_FEATURE(kMessagesForAndroidAdsBlocked);
 // implementations also fallback to Infobar implementations.
 BASE_DECLARE_FEATURE(kMessagesForAndroidInfrastructure);
 
-// Feature that controls whether notifiation blocked prompts use Messages or
-// Infobars infrastructure.
-BASE_DECLARE_FEATURE(kMessagesForAndroidNotificationBlocked);
-
 // Feature that controls whether offer notifications use Messages or Infobars
 // infrastructure.
 BASE_DECLARE_FEATURE(kMessagesForAndroidOfferNotification);
@@ -44,8 +40,6 @@ BASE_DECLARE_FEATURE(kMessagesForAndroidStackingAnimation);
 
 bool IsAdsBlockedMessagesUiEnabled();
 
-bool IsNotificationBlockedMessagesUiEnabled();
-
 bool IsOfferNotificationMessagesUiEnabled();
 
 bool IsPermissionUpdateMessagesUiEnabled();
@@ -61,6 +55,8 @@ bool UseFollowupButtonTextForSaveCardMessage();
 bool UseGPayIconForSaveCardMessage();
 
 bool UseDialogV2ForSaveCardMessage();
+
+bool IsStackingAnimationEnabled();
 
 }  // namespace messages
 

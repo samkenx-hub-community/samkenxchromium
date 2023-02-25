@@ -36,6 +36,7 @@
 #import "ios/chrome/browser/snapshots/snapshot_cache_observer.h"
 #import "ios/chrome/browser/snapshots/snapshot_tab_helper.h"
 #import "ios/chrome/browser/tabs/features.h"
+#import "ios/chrome/browser/tabs/inactive_tabs/features.h"
 #import "ios/chrome/browser/tabs/tab_title_util.h"
 #import "ios/chrome/browser/tabs_search/tabs_search_service.h"
 #import "ios/chrome/browser/tabs_search/tabs_search_service_factory.h"
@@ -250,6 +251,12 @@ void RecordTabGridCloseTabsCount(int count) {
     if (self.webStateList->count() > 0) {
       [self populateConsumerItems];
     }
+  }
+
+  if (IsInactiveTabsEnabled() && !self.browserState->IsOffTheRecord()) {
+    // TODO(crbug.com/1408053): Use the count of tabs in the inactive browser
+    // instead.
+    [self.consumer advertizeInactiveTabsWithCount:10];
   }
 }
 
@@ -623,8 +630,7 @@ void RecordTabGridCloseTabsCount(int count) {
     return;
   }
 
-  self.closedSessionWindow =
-      SerializeWebStateList(self.webStateList, [self nonPinnedWebStates]);
+  self.closedSessionWindow = SerializeWebStateList(self.webStateList);
   int oldSize =
       self.tabRestoreService ? self.tabRestoreService->entries().size() : 0;
 
@@ -644,7 +650,7 @@ void RecordTabGridCloseTabsCount(int count) {
 
   if (self.webStateList->empty())
     return;
-  self.closedSessionWindow = SerializeWebStateList(self.webStateList, nil);
+  self.closedSessionWindow = SerializeWebStateList(self.webStateList);
   int old_size =
       self.tabRestoreService ? self.tabRestoreService->entries().size() : 0;
   self.webStateList->CloseAllWebStates(WebStateList::CLOSE_USER_ACTION);
@@ -999,16 +1005,25 @@ void RecordTabGridCloseTabsCount(int count) {
   }
 }
 
-- (void)preloadSnapshotsForVisibleGridSize:(int)gridSize {
-  int startIndex = std::max(self.webStateList->active_index() - gridSize, 0);
-  int endIndex = std::min(self.webStateList->active_index() + gridSize,
-                          self.webStateList->count() - 1);
+- (void)preloadSnapshotsForVisibleGridItems:
+    (NSSet<NSString*>*)visibleGridItems {
+  int startIndex = self.webStateList->GetIndexOfFirstNonPinnedWebState();
+  int endIndex = self.webStateList->count() - 1;
+
   for (int i = startIndex; i <= endIndex; i++) {
     web::WebState* web_state = self.webStateList->GetWebStateAt(i);
     NSString* identifier = web_state->GetStableIdentifier();
+
+    BOOL isWebStateHidden = ![visibleGridItems containsObject:identifier];
+    if (isWebStateHidden) {
+      continue;
+    }
+
+    __weak __typeof(self) weakSelf = self;
     auto cacheImage = ^(UIImage* image) {
-      self.appearanceCache[identifier] = image;
+      weakSelf.appearanceCache[identifier] = image;
     };
+
     [self snapshotForIdentifier:identifier completion:cacheImage];
   }
 }
@@ -1095,7 +1110,8 @@ void RecordTabGridCloseTabsCount(int count) {
     return;
   }
   [self.delegate dismissPopovers];
-
+  base::RecordAction(
+      base::UserMetricsAction("MobileTabGridAddedMultipleNewBookmarks"));
   base::UmaHistogramCounts100("IOS.TabGrid.Selection.AddToBookmarks",
                               items.count);
 

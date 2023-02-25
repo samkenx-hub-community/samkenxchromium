@@ -133,11 +133,13 @@
 <translation id="163517899691012366">ปิดเสียงการแจ้งเตือนเมื่อฟีเจอร์ห้ามรบกวนเปิดอยู่</translation>
 <translation id="1637505162081889933"><ph name="NUM_DEVICES" /> อุปกรณ์</translation>
 <translation id="1639239467298939599">กำลังโหลด</translation>
+<translation id="1647986356840967552">หน้าที่แล้ว</translation>
 <translation id="1654477262762802994">เริ่มการค้นหาด้วยเสียง</translation>
 <translation id="1668469839109562275">VPN ในตัว</translation>
 <translation id="1677472565718498478">ใช้ได้อีก <ph name="TIME" /></translation>
 <translation id="1677507110654891115"><ph name="FEATURE_NAME" /> ไม่เชื่อมต่อ</translation>
 <translation id="1677582821739292812">มีคนกำลังดูหน้าจอของคุณอยู่</translation>
+<translation id="1683399938733266832">การใช้งานปัจจุบันของ CPU: <ph name="CPU_USEAGE" />%</translation>
 <translation id="169515659049020177">Shift</translation>
 <translation id="1698080062160024910">ตัวจับเวลา <ph name="TOTAL_TIME" /> · <ph name="LABEL" /></translation>
 <translation id="1698760176351776263">ที่อยู่ IPv6: <ph name="ADDRESS" /></translation>
@@ -286,6 +288,7 @@
 <translation id="2475982808118771221">มีข้อผิดพลาดเกิดขึ้น</translation>
 <translation id="2482878487686419369">การแจ้งเตือน</translation>
 <translation id="2484513351006226581">กด <ph name="KEYBOARD_SHORTCUT" /> เพื่อสลับรูปแบบแป้นพิมพ์</translation>
+<translation id="2487915095798731898">เข้าร่วม</translation>
 <translation id="2501920221385095727">คีย์ติดหนึบ</translation>
 <translation id="2509468283778169019">Caps Lock เปิดอยู่</translation>
 <translation id="2515586267016047495">Alt</translation>
@@ -380,6 +383,7 @@
 <translation id="3051189971848907985">กำลังเปลี่ยนชื่อโปรไฟล์ รอสักครู่</translation>
 <translation id="3055162170959710888">วันนี้คุณใช้อุปกรณ์เครื่องนี้ไป <ph name="USED_TIME" /></translation>
 <translation id="3062298103034426069">ไม่รองรับ</translation>
+<translation id="3068622547379332530">เวอร์ชัน <ph name="VERSION_NAME" /> (<ph name="OFFICIAL_STATUS" />) <ph name="CHANNEL_NAME" /> <ph name="PROCESSOR_VARIATION" /></translation>
 <translation id="3068711042108640621">ชั้นวางอยู่ทางซ้าย</translation>
 <translation id="3077734595579995578">shift</translation>
 <translation id="3081696990447829002">ขยายเมนู</translation>
@@ -545,6 +549,7 @@
 <translation id="3925540965556789199"><ph name="DATE" />, กำลังโหลดกิจกรรม</translation>
 <translation id="3932043219784172185">ไม่มีอุปกรณ์ที่เชื่อมต่ออยู่</translation>
 <translation id="3934456833412894880">การชาร์จแบบปรับอัตโนมัติเปิดอยู่ แบตเตอรี่จะหยุดชาร์จที่ 80% เพื่อยืดอายุการใช้งาน และจะชาร์จจนเต็มเมื่อคุณต้องการ</translation>
+<translation id="3936620957945677513">กด Enter เพื่อเข้าร่วมกิจกรรม <ph name="EVENT_SUMMARY" /></translation>
 <translation id="3943857333388298514">วาง</translation>
 <translation id="394485226368336402">การตั้งค่าเสียง</translation>
 <translation id="3945319193631853098">แตะเพื่อตั้งค่าให้เสร็จสิ้น</translation>
@@ -555,6 +560,7 @@
 <translation id="397105322502079400">กำลังคำนวณ...</translation>
 <translation id="397726367135689299">การชาร์จแบตเตอรี่อาจไม่ทำงานอย่างที่ควร</translation>
 <translation id="3977512764614765090">แบตเตอรี่เหลือ <ph name="PERCENTAGE" />% และกำลังชาร์จ</translation>
+<translation id="3984536049089846927">หน้าถัดไป</translation>
 <translation id="3986082989454912832">ตอบ</translation>
 <translation id="3995138139523574647">อุปกรณ์ USB-C (พอร์ตด้านหลังขวา)</translation>
 <translation id="40062176907008878">การเขียนด้วยลายมือ</translation>
@@ -577,7 +583,7 @@
 <translation id="4123259114412175274">หากต้องการปลดล็อก Chromebook ให้ตรวจสอบว่าบลูทูธของโทรศัพท์เปิดอยู่</translation>
 <translation id="4125970834901680537">สตรีมแอปในโหมดแท็บเล็ตไม่ได้ โปรดลองอีกครั้งในโหมดแล็ปท็อป</translation>
 <translation id="4129129681837227511">หากต้องการดูการแจ้งเตือนในหน้าจอล็อก ให้ปลดล็อกเพื่อเปลี่ยนการตั้งค่า</translation>
-<translation id="4130035430755296270">ลากเมาส์ไปเรื่อยๆ เพื่อดูตัวเลือกเลย์เอาต์เพิ่มเติม</translation>
+<translation id="4131973331381812765">อุณหภูมิ: <ph name="TEMPERATURE" />°C - ความเร็วในปัจจุบัน: <ph name="CPU_AVERAGE_CURRENT_FREQUENCY_GHZ" />GHz</translation>
 <translation id="4136724716305260864">เปิดจนถึงพระอาทิตย์ขึ้น</translation>
 <translation id="4146833061457621061">เปิดเพลง</translation>
 <translation id="4150201353443180367">การแสดงผล</translation>
@@ -732,6 +738,7 @@
 <translation id="4895488851634969361">แบตเตอรี่เต็ม</translation>
 <translation id="490375751687810070">แนวตั้ง</translation>
 <translation id="490788395437447240">แบตเตอรี่ <ph name="BATTERY_PERCENTAGE" />%</translation>
+<translation id="491504982845934899">เปิดใช้งานหลังจากตั้งค่าอุปกรณ์ <ph name="NETWORK_NAME" /></translation>
 <translation id="4917385247580444890">แรง</translation>
 <translation id="4918086044614829423">ยอมรับ</translation>
 <translation id="4919841137949306064">"<ph name="APP_NAME" />" กำลังใช้กล้อง</translation>
@@ -1328,6 +1335,7 @@
 <translation id="8131740175452115882">ยืนยัน</translation>
 <translation id="8131994907636310308">ปิดข้อความโทสต์การจัดเรียง</translation>
 <translation id="8132793192354020517">เชื่อมต่อกับ <ph name="NAME" /></translation>
+<translation id="8138705869659070104">เปิดใช้งานหลังตั้งค่าอุปกรณ์</translation>
 <translation id="813913629614996137">กำลังเริ่มดำเนินการ...</translation>
 <translation id="8142441511840089262">ดับเบิลคลิก</translation>
 <translation id="8142699993796781067">เครือข่ายส่วนบุคคล</translation>
@@ -1459,6 +1467,7 @@
 <translation id="8850991929411075241">Search+Esc</translation>
 <translation id="8853703225951107899">ยังคงยืนยัน PIN หรือรหัสผ่านของคุณไม่ได้ หากคุณเพิ่งเปลี่ยนรหัสผ่านไปไม่นาน ให้ใช้รหัสผ่านเก่า รหัสผ่านใหม่จะมีผลเมื่อคุณออกจากระบบ</translation>
 <translation id="8855885154700222542">แป้นแสดงเต็มหน้าจอ</translation>
+<translation id="8858369206579825206">การควบคุมความเป็นส่วนตัว</translation>
 <translation id="8870509716567206129">แอปไม่สนับสนุนการแยกหน้าจอ</translation>
 <translation id="8874184842967597500">ไม่เชื่อมต่อ</translation>
 <translation id="8876661425082386199">ตรวจสอบการเชื่อมต่อของคุณ</translation>

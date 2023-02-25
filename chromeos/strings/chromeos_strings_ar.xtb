@@ -16,6 +16,7 @@
 <translation id="1128128132059598906">EAP-TTLS</translation>
 <translation id="1145018782460575098">نافذة تحديث البرامج الثابتة للأجهزة الخارجية مفتوحة. عدد التحديثات المتاحة: <ph name="NUM_UPDATES" />.</translation>
 <translation id="1145516343487477149">‏البحث عن مقالات مساعدة وإجابات عن الأسئلة الشائعة حول أجهزة Chromebook</translation>
+<translation id="1167755866710282443">افتح القائمة لتخصيص المفاتيح. اسحب القائمة لنقلها.</translation>
 <translation id="1175697296044146566">تتم إدارة جهاز <ph name="DEVICE_TYPE" /> هذا من خلال <ph name="MANAGER" />.</translation>
 <translation id="1175951029573070619">إشارة متوسطة (<ph name="SIGNAL_STRENGTH" />)</translation>
 <translation id="1181037720776840403">إزالة</translation>
@@ -27,7 +28,7 @@
 <translation id="1207734034680156868">تستند الاقتراحات إلى الوصف الذي أضفته.</translation>
 <translation id="123124571410524056">تم الاشتباه في مدخل.</translation>
 <translation id="1238612778414822719">‏وقت استجابة بروتوكول HTTPS</translation>
-<translation id="1264369926465113395">‏اطّلِع على المجلة الرقمية الجديدة المخصّصة لمنشئي المحتوى على أجهزة Chromebook.</translation>
+<translation id="1264369926465113395">‏اطّلِع على المجلة الرقمية الجديدة المخصّصة لصنّاع المحتوى على أجهزة Chromebook.</translation>
 <translation id="1270369111467284986">اشتباه في مدخل مشروط الوصول إليه</translation>
 <translation id="1290331692326790741">إشارة ضعيفة</translation>
 <translation id="1301069673413256657">‏بروتوكول GSM</translation>
@@ -326,6 +327,7 @@
 <translation id="4110686435123617899">اختيار ألبوم <ph name="TITLE" /> <ph name="DESC" /></translation>
 <translation id="4111761024568264522">‏لوحة لمس USB</translation>
 <translation id="4117637339509843559">الوضع الداكن</translation>
+<translation id="4130035430755296270">استمِر في تمرير مؤشر الماوس هنا للاطّلاع على المزيد من خيارات التنسيق.</translation>
 <translation id="4131410914670010031">أبيض وأسود</translation>
 <translation id="4145784616224233563">‏الجدار الناري لبروتوكل HTTP</translation>
 <translation id="4147897805161313378">‏صور Google‏‏</translation>
@@ -414,6 +416,7 @@
 <translation id="484790837831576105">‏(نظام التشغيل Android) اختبار التحويل باستخدام نظام أسماء النطاقات (DNS)</translation>
 <translation id="4848429997038228357">قيد التشغيل</translation>
 <translation id="4854586501323951986">شاشة مُدمَجة تعمل باللمس</translation>
+<translation id="4855250849489639581">مرِّر سريعًا للأسفل لعرض المزيد من خيارات التنسيق.</translation>
 <translation id="4861758251032006121">{ATTEMPTS_LEFT,plural, =1{<ph name="ERROR_MESSAGE" /> تتبقّى محاولة واحدة ({0}).}zero{<ph name="ERROR_MESSAGE" /> تتبقّى {0} محاولة.}two{<ph name="ERROR_MESSAGE" /> تتبقّى محاولتان ({0}).}few{<ph name="ERROR_MESSAGE" /> تتبقّى {0} محاولات.}many{<ph name="ERROR_MESSAGE" /> تتبقّى {0} محاولة.}other{<ph name="ERROR_MESSAGE" /> تتبقّى {0} محاولة.}}</translation>
 <translation id="4873827928179867585">خوارزمية المصادقة</translation>
 <translation id="4880328057631981605">اسم نقطة الوصول</translation>
@@ -517,6 +520,7 @@
 <translation id="576835345334454681">زيادة سطوع الشاشة</translation>
 <translation id="57838592816432529">كتم الصوت</translation>
 <translation id="5784136236926853061">‏وقت استجابة بروتوكول HTTP طويل.</translation>
+<translation id="5826644637650799838">لمحة عن العمل الفني</translation>
 <translation id="5832805196449965646">إضافة شخص</translation>
 <translation id="583281660410589416">غير معروف</translation>
 <translation id="5843706793424741864">فهرنهايت</translation>
@@ -673,6 +677,7 @@
 <translation id="7172721935181587524">صورة واحدة</translation>
 <translation id="7177485034254901881">يدير <ph name="MANAGER" /> جهاز <ph name="DEVICE_TYPE" /> هذا. ويمكن للمشرفين إعداد هذا الجهاز عن بُعد.</translation>
 <translation id="7180611975245234373">إعادة التحميل</translation>
+<translation id="7180865173735832675">تخصيص</translation>
 <translation id="7212734716605298123">تحديثات البرامج الثابتة للأجهزة الخارجية</translation>
 <translation id="7216409898977639127">موفر شبكة الجوّال</translation>
 <translation id="725133483556299729">اختيار عنوان البريد الإلكتروني</translation>
@@ -744,6 +749,7 @@
 <translation id="7881066108824108340">نظام أسماء النطاقات</translation>
 <translation id="7882358943899516840">نوع مقدم الخدمة</translation>
 <translation id="7882501334836096755">مفتاح عام</translation>
+<translation id="78957024357676568">لليسار</translation>
 <translation id="7915220255123750251">‏يمكنك إدارة إعدادات اسم نقطة الوصول (APN) للشبكة. تنشئ أسماء APN اتصالاً بين شبكة الجوّال والإنترنت.</translation>
 <translation id="7936303884198020182">لم يتم العثور على خوادم الأسماء.</translation>
 <translation id="7942349550061667556">أحمر</translation>
@@ -775,6 +781,7 @@
 <translation id="8226628635270268143">اختيار صورك وألبوماتك المفضَّلة</translation>
 <translation id="8227119283605456246">إرفاق ملف</translation>
 <translation id="8230672074305416752">تعذَّر فحص اتصال بوابة الشبكة التلقائية.</translation>
+<translation id="8242426110754782860">متابعة</translation>
 <translation id="8246209727385807362">مشغل شبكة جوّال غير معروف</translation>
 <translation id="827422111966801947">نيلي</translation>
 <translation id="8286154143153872371">يُرجى الاتصال بإحدى الشبكات وإعادة تحميل الصفحة لعرض الخلفية.</translation>
@@ -852,6 +859,7 @@
 <translation id="8930622219860340959">شبكة لاسلكية</translation>
 <translation id="8936793075252196307">‏عنوان IP للعميل</translation>
 <translation id="894617464444543719">الجهاز هو هاتف.</translation>
+<translation id="8957423540740801332">لليمين</translation>
 <translation id="8968751544471797276">معدّل الشحن</translation>
 <translation id="8970109610781093811">إعادة التشغيل مرة أخرى</translation>
 <translation id="8983038754672563810">HSPA</translation>

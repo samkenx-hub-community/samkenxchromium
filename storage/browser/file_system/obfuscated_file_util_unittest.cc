@@ -194,8 +194,8 @@ class ObfuscatedFileUtilTest : public testing::Test,
       // Once we enable third-party storage partitioning, we can create a
       // third-party StorageKey and re-assign the StorageKey value in the
       // SandboxFileSystem with this value in SetUp for default buckets.
-      storage_key_ = blink::StorageKey::CreateWithOptionalNonce(
-          storage_key_.origin(), storage_key_.top_level_site(), nullptr,
+      storage_key_ = blink::StorageKey::Create(
+          storage_key_.origin(), storage_key_.top_level_site(),
           blink::mojom::AncestorChainBit::kCrossSite);
     }
   }
@@ -270,7 +270,7 @@ class ObfuscatedFileUtilTest : public testing::Test,
         base::SequencedTaskRunner::GetCurrentDefault(),
         default_future.GetCallback());
     QuotaErrorOr<BucketInfo> default_bucket = default_future.Take();
-    CHECK(default_bucket.ok());
+    CHECK(default_bucket.has_value());
     default_bucket_ = default_bucket.value().ToBucketLocator();
 
     // Create a non-default bucket member corresponding to the StorageKey
@@ -282,7 +282,7 @@ class ObfuscatedFileUtilTest : public testing::Test,
         params, base::SequencedTaskRunner::GetCurrentDefault(),
         custom_future.GetCallback());
     QuotaErrorOr<BucketInfo> custom_bucket = custom_future.Take();
-    CHECK(custom_bucket.ok());
+    CHECK(custom_bucket.has_value());
     custom_bucket_ = custom_bucket.value().ToBucketLocator();
 
     // Create an alternate non-default bucket member corresponding to the
@@ -293,7 +293,7 @@ class ObfuscatedFileUtilTest : public testing::Test,
         params, base::SequencedTaskRunner::GetCurrentDefault(),
         alternate_future.GetCallback());
     QuotaErrorOr<BucketInfo> alternate_bucket = alternate_future.Take();
-    CHECK(alternate_bucket.ok());
+    CHECK(alternate_bucket.has_value());
     alternate_custom_bucket_ = alternate_bucket.value().ToBucketLocator();
 
     is_non_default_bucket()
@@ -886,8 +886,8 @@ class ObfuscatedFileUtilTest : public testing::Test,
   void GetDirectoryDatabase_IsolatedTestBody() {
     storage_policy_->AddIsolated(origin().GetURL());
     FileSystemURL url = FileSystemURL::CreateForTest(
-        blink::StorageKey(origin()), kFileSystemTypePersistent,
-        base::FilePath());
+        blink::StorageKey::CreateFirstParty(origin()),
+        kFileSystemTypePersistent, base::FilePath());
     if (is_non_default_bucket())
       url.SetBucket(custom_bucket_);
 

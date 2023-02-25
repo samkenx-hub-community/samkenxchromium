@@ -375,7 +375,6 @@ source_set("connections_implementation_mediums_webrtc") {
   public_deps = [
     ":connections_implementation_mediums_utils",
     ":connections_implementation_mediums_webrtc_data_types",
-    ":connections_local_credential_proto",
     ":connections_types",
     ":platform_base",
     ":platform_public_comm",
@@ -403,6 +402,8 @@ source_set("platform_api_comm") {
     "src/internal/platform/implementation/ble_v2.h",
     "src/internal/platform/implementation/bluetooth_adapter.h",
     "src/internal/platform/implementation/bluetooth_classic.h",
+    "src/internal/platform/implementation/credential_callbacks.h",
+    "src/internal/platform/implementation/credential_storage.h",
     "src/internal/platform/implementation/server_sync.h",
     "src/internal/platform/implementation/webrtc.h",
     "src/internal/platform/implementation/wifi.h",
@@ -412,6 +413,7 @@ source_set("platform_api_comm") {
   ]
   public_deps = [
     ":connections_credential_proto",
+    ":connections_local_credential_proto",
     ":offline_wire_formats_proto",
     ":platform_base",
     ":platform_base_cancellation_flag",
@@ -518,7 +520,6 @@ source_set("platform_base_error_code_recorder") {
     "src/internal/platform/error_code_recorder.h",
   ]
   public_deps = [
-    ":connections_local_credential_proto",
     ":connections_enums_proto",
     ":error_code_enums_proto",
     ":platform_base_logging",
@@ -663,7 +664,6 @@ source_set("platform_public_types") {
     "src/internal/platform/system_clock.h",
   ]
   public_deps = [
-    ":connections_local_credential_proto",
     ":platform_api_platform",
     ":platform_api_types",
     ":platform_base",
@@ -821,10 +821,7 @@ source_set("presence_internal") {
     "src/presence/implementation/service_controller_impl.h",
   ]
   public_deps = [
-    ":connections_credential_proto",
     ":connections_enums_proto",
-    ":connections_metadata_proto",
-    ":connections_local_credential_proto",
     ":platform_base",
     ":platform_base_uuid",
     ":platform_public_comm",

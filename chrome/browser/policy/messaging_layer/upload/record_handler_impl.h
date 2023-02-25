@@ -5,15 +5,22 @@
 #ifndef CHROME_BROWSER_POLICY_MESSAGING_LAYER_UPLOAD_RECORD_HANDLER_IMPL_H_
 #define CHROME_BROWSER_POLICY_MESSAGING_LAYER_UPLOAD_RECORD_HANDLER_IMPL_H_
 
+#include <memory>
 #include <utility>
+#include <vector>
 
+#include "base/functional/bind.h"
 #include "base/functional/callback.h"
-#include "base/memory/ref_counted.h"
+#include "base/functional/callback_forward.h"
+#include "base/memory/raw_ptr.h"
+#include "base/memory/scoped_refptr.h"
 #include "base/task/sequenced_task_runner.h"
 #include "base/task/task_runner.h"
 #include "chrome/browser/policy/messaging_layer/upload/dm_server_uploader.h"
+#include "chrome/browser/policy/messaging_layer/upload/file_upload_job.h"
 #include "components/reporting/proto/synced/record.pb.h"
 #include "components/reporting/resources/resource_manager.h"
+#include "components/reporting/storage/storage_module_interface.h"
 #include "components/reporting/util/status.h"
 #include "components/reporting/util/statusor.h"
 
@@ -25,8 +32,11 @@ namespace reporting {
 // processed at one time by forming a queue.
 class RecordHandlerImpl : public RecordHandler {
  public:
-  explicit RecordHandlerImpl(
-      scoped_refptr<base::SequencedTaskRunner> sequenced_task_runner);
+  RecordHandlerImpl(
+      scoped_refptr<base::SequencedTaskRunner> sequenced_task_runner,
+      std::unique_ptr<FileUploadJob::Delegate> delegate,
+      base::RepeatingCallback<scoped_refptr<StorageModuleInterface>()>
+          storage_getter);
   ~RecordHandlerImpl() override;
 
   // Base class RecordHandler method implementation.
@@ -42,6 +52,11 @@ class RecordHandlerImpl : public RecordHandler {
   class ReportUploader;
 
   const scoped_refptr<base::SequencedTaskRunner> sequenced_task_runner_;
+
+  // The next two fields are only used for LOG_UPLOAD events.
+  const std::unique_ptr<FileUploadJob::Delegate> delegate_;
+  const base::RepeatingCallback<scoped_refptr<StorageModuleInterface>()>
+      storage_getter_;
 };
 
 }  // namespace reporting

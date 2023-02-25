@@ -16,7 +16,9 @@
 #include "components/keyed_service/content/browser_context_dependency_manager.h"
 #include "components/keyed_service/core/dependency_graph.h"
 #include "components/keyed_service/core/keyed_service_base_factory.h"
+#include "components/supervised_user/core/common/buildflags.h"
 #include "content/public/test/browser_test.h"
+#include "pdf/buildflags.h"
 #include "printing/buildflags/buildflags.h"
 #include "third_party/blink/public/common/features.h"
 
@@ -216,7 +218,10 @@ IN_PROC_BROWSER_TEST_F(ProfileKeyedServiceBrowserTest,
     "AlarmManager",
     "BackgroundContentsService",
     "BackgroundSyncService",
+    "BluetoothApiAdvertisementManager",
     "BluetoothApiSocketManager",
+    "BluetoothLowEnergyConnectionManager",
+    "BluetoothLowEnergyNotifySessionManager",
     "BluetoothSocketEventDispatcher",
     "BrowsingDataLifetimeManager",
     "CookieSettings",
@@ -232,6 +237,9 @@ IN_PROC_BROWSER_TEST_F(ProfileKeyedServiceBrowserTest,
     "MediaRouterUIService",
     "NotificationDisplayService",
     "OptimizationGuideKeyedService",
+#if BUILDFLAG(ENABLE_PDF)
+    "PdfViewerPrivateEventRouter",
+#endif  // BUILDFLAG(ENABLE_PDF)
     "PlatformNotificationService",
     "PrefWatcher",
     "PrivacySandboxSettings",
@@ -245,6 +253,7 @@ IN_PROC_BROWSER_TEST_F(ProfileKeyedServiceBrowserTest,
     "RulesRegistryService",
     "SafeBrowsingPrivateEventRouter",
     "SerialConnectionManager",
+    "SerialPortManager",
     "SettingsPrivateEventRouter",
     "SiteDataCacheFacadeFactory",
     "SiteEngagementService",
@@ -276,13 +285,11 @@ IN_PROC_BROWSER_TEST_F(ProfileKeyedServiceBrowserTest,
   // clang-format off
   std::set<std::string> guest_active_services {
 #if BUILDFLAG(IS_CHROMEOS_LACROS)
-    "ChildAccountService",
     "CleanupManagerLacros",
     "ClipboardAPI",
     "ExternalLogoutRequestEventHandler",
     "ManualTestHeartbeatEvent",
     "SessionStateChangedEventDispatcher",
-    "SupervisedUserService",
 #else // !BUILDFLAG(IS_CHROMEOS_LACROS)
     "SystemIndicatorManager",
     "WebAppAdjustments",
@@ -322,7 +329,10 @@ IN_PROC_BROWSER_TEST_F(ProfileKeyedServiceBrowserTest,
     "Blocklist",
     "BluetoothAPI",
     "BluetoothApiSocketManager",
+    "BluetoothApiAdvertisementManager",
     "BluetoothLowEnergyAPI",
+    "BluetoothLowEnergyConnectionManager",
+    "BluetoothLowEnergyNotifySessionManager",
     "BluetoothPrivateAPI",
     "BluetoothSocketEventDispatcher",
     "BookmarkManagerPrivateAPI",
@@ -334,6 +344,9 @@ IN_PROC_BROWSER_TEST_F(ProfileKeyedServiceBrowserTest,
     "BrailleDisplayPrivateAPI",
     "BreadcrumbManagerService",
     "BrowsingTopicsService",
+#if BUILDFLAG(ENABLE_SUPERVISED_USERS)
+    "ChildAccountService",
+#endif  // BUILDFLAG(ENABLE_SUPERVISED_USERS)
     "ChromeSigninClient",
     "ClosedTabCacheService",
     "CommandService",
@@ -402,9 +415,13 @@ IN_PROC_BROWSER_TEST_F(ProfileKeyedServiceBrowserTest,
     "NotificationDisplayService",
     "NotifierStateTracker",
     "OmniboxAPI",
+    "OperationManager",
     "OptimizationGuideKeyedService",
     "PageContentAnnotationsService",
     "PasswordsPrivateEventRouter",
+#if BUILDFLAG(ENABLE_PDF)
+    "PdfViewerPrivateEventRouter",
+#endif  // BUILDFLAG(ENABLE_PDF)
     "PermissionHelper",
     "PermissionsManager",
     "PermissionsUpdaterShutdownFactory",
@@ -421,6 +438,7 @@ IN_PROC_BROWSER_TEST_F(ProfileKeyedServiceBrowserTest,
   #if BUILDFLAG(IS_CHROMEOS) && BUILDFLAG(USE_CUPS)
     "PrintingMetricsService",
   #endif // BUILDFLAG(IS_CHROMEOS) && BUILDFLAG(USE_CUPS)
+    "PrinterProviderInternal",
     "PrivacySandboxService",
     "PrivacySandboxSettings",
     "ProcessManager",
@@ -446,6 +464,7 @@ IN_PROC_BROWSER_TEST_F(ProfileKeyedServiceBrowserTest,
     "SendTabToSelfClientService",
     "SendTabToSelfSyncService",
     "SerialConnectionManager",
+    "SerialPortManager",
     "SessionDataService",
     "SessionProtoDBFactory",
     "SessionSyncService",
@@ -464,6 +483,9 @@ IN_PROC_BROWSER_TEST_F(ProfileKeyedServiceBrowserTest,
     "SocketManager",
     "StorageFrontend",
     "StorageNotificationService",
+#if BUILDFLAG(ENABLE_SUPERVISED_USERS)
+    "SupervisedUserService",
+#endif  // BUILDFLAG(ENABLE_SUPERVISED_USERS)
     "SyncInvalidationsService",
     "SyncService",
     "SyncSessionsWebContentsRouter",

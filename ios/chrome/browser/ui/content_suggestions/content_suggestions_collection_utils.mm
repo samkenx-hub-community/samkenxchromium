@@ -157,6 +157,28 @@ CGFloat HeaderBottomPadding() {
              : kNTPSearchFieldBottomPadding;
 }
 
+UIImageView* CreateMagnifyingGlassView() {
+  UIImageView* image_view = [[UIImageView alloc] init];
+  image_view.translatesAutoresizingMaskIntoConstraints = NO;
+  image_view.contentMode = UIViewContentModeScaleAspectFit;
+  image_view.userInteractionEnabled = NO;
+
+  UIImage* magnifying_glass_image;
+  if (UseSymbols()) {
+    magnifying_glass_image = DefaultSymbolWithPointSize(
+        kMagnifyingglassSymbol, kSymbolContentSuggestionsPointSize);
+    image_view.tintColor = [UIColor colorNamed:kGrey500Color];
+  } else {
+    magnifying_glass_image =
+        [[UIImage imageNamed:@"location_bar_magnifyingglass"]
+            imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+    image_view.tintColor = [UIColor colorNamed:kGrey500Color];
+  }
+
+  [image_view setImage:magnifying_glass_image];
+  return image_view;
+}
+
 void ConfigureSearchHintLabel(UILabel* search_hint_label,
                               UIView* search_tab_target) {
   [search_hint_label setTranslatesAutoresizingMaskIntoConstraints:NO];
@@ -176,7 +198,11 @@ void ConfigureVoiceSearchButton(UIButton* voice_search_button,
   [voice_search_button setTranslatesAutoresizingMaskIntoConstraints:NO];
   [search_tab_target addSubview:voice_search_button];
 
+  // TODO(crbug.com/1418068): Remove after minimum version required is >=
+  // iOS 15.
+#if __IPHONE_OS_VERSION_MIN_REQUIRED < __IPHONE_15_0
   [voice_search_button setAdjustsImageWhenHighlighted:NO];
+#endif  // __IPHONE_OS_VERSION_MIN_REQUIRED < __IPHONE_15_0
 
   UIImage* mic_image;
   if (UseSymbols()) {
@@ -204,11 +230,12 @@ void ConfigureLensButton(UIButton* lens_button, UIView* search_tap_target) {
   lens_button.translatesAutoresizingMaskIntoConstraints = NO;
   [search_tap_target addSubview:lens_button];
 
-  if (@available(iOS 16, *)) {
-  } else {
-    // Set adjustsImageWhenHighlighted on ios 15 and lower.
-    lens_button.adjustsImageWhenHighlighted = NO;
-  }
+  // TODO(crbug.com/1418068): Remove after minimum version required is >=
+  // iOS 15.
+#if __IPHONE_OS_VERSION_MIN_REQUIRED < __IPHONE_15_0
+  // Set adjustsImageWhenHighlighted on ios 14 and lower.
+  lens_button.adjustsImageWhenHighlighted = NO;
+#endif  // __IPHONE_OS_VERSION_MIN_REQUIRED < __IPHONE_15_0
 
   UIImage* camera_image =
       UseSymbols() ? CustomSymbolWithPointSize(
@@ -218,7 +245,7 @@ void ConfigureLensButton(UIButton* lens_button, UIView* search_tap_target) {
       [camera_image imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
 
   [lens_button setImage:camera_image forState:UIControlStateNormal];
-  lens_button.tintColor = [UIColor colorNamed:kGrey500Color];
+  lens_button.tintColor = [UIColor colorNamed:kGrey600Color];
   lens_button.accessibilityLabel = l10n_util::GetNSString(IDS_IOS_ACCNAME_LENS);
   lens_button.accessibilityIdentifier = @"Lens";
 

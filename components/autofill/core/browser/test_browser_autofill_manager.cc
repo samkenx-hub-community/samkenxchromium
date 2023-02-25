@@ -32,21 +32,16 @@ FormStructureTestApi test_api(FormStructure* form_structure) {
 }  // namespace
 
 TestBrowserAutofillManager::TestBrowserAutofillManager(
-    TestAutofillDriver* driver,
+    AutofillDriver* driver,
     TestAutofillClient* client)
-    : BrowserAutofillManager(driver,
-                             client,
-                             "en-US",
-                             EnableDownloadManager(false)),
-      client_(client),
-      driver_(driver) {}
+    : BrowserAutofillManager(driver, client, "en-US"), client_(client) {}
 
 TestBrowserAutofillManager::~TestBrowserAutofillManager() = default;
 
 void TestBrowserAutofillManager::OnLanguageDetermined(
     const translate::LanguageDetectionDetails& details) {
-  TestAutofillManagerWaiter waiter(
-      *this, {&AutofillManager::Observer::OnAfterLanguageDetermined});
+  TestAutofillManagerWaiter waiter(*this,
+                                   {AutofillManagerEvent::kLanguageDetermined});
   AutofillManager::OnLanguageDetermined(details);
   ASSERT_TRUE(waiter.Wait());
 }
@@ -54,7 +49,7 @@ void TestBrowserAutofillManager::OnLanguageDetermined(
 void TestBrowserAutofillManager::OnFormsSeen(
     const std::vector<FormData>& updated_forms,
     const std::vector<FormGlobalId>& removed_forms) {
-  TestAutofillManagerWaiter waiter(*this, {&Observer::OnAfterFormsSeen});
+  TestAutofillManagerWaiter waiter(*this, {AutofillManagerEvent::kFormsSeen});
   AutofillManager::OnFormsSeen(updated_forms, removed_forms);
   ASSERT_TRUE(waiter.Wait());
 }
@@ -65,7 +60,7 @@ void TestBrowserAutofillManager::OnTextFieldDidChange(
     const gfx::RectF& bounding_box,
     const base::TimeTicks timestamp) {
   TestAutofillManagerWaiter waiter(*this,
-                                   {&Observer::OnAfterTextFieldDidChange});
+                                   {AutofillManagerEvent::kTextFieldDidChange});
   AutofillManager::OnTextFieldDidChange(form, field, bounding_box, timestamp);
   ASSERT_TRUE(waiter.Wait());
 }
@@ -73,8 +68,8 @@ void TestBrowserAutofillManager::OnTextFieldDidChange(
 void TestBrowserAutofillManager::OnDidFillAutofillFormData(
     const FormData& form,
     const base::TimeTicks timestamp) {
-  TestAutofillManagerWaiter waiter(*this,
-                                   {&Observer::OnAfterDidFillAutofillFormData});
+  TestAutofillManagerWaiter waiter(
+      *this, {AutofillManagerEvent::kDidFillAutofillFormData});
   AutofillManager::OnDidFillAutofillFormData(form, timestamp);
   ASSERT_TRUE(waiter.Wait());
 }
@@ -86,7 +81,7 @@ void TestBrowserAutofillManager::OnAskForValuesToFill(
     AutoselectFirstSuggestion autoselect_first_suggestion,
     FormElementWasClicked form_element_was_clicked) {
   TestAutofillManagerWaiter waiter(*this,
-                                   {&Observer::OnAfterAskForValuesToFill});
+                                   {AutofillManagerEvent::kAskForValuesToFill});
   AutofillManager::OnAskForValuesToFill(form, field, bounding_box,
                                         autoselect_first_suggestion,
                                         form_element_was_clicked);
@@ -98,7 +93,7 @@ void TestBrowserAutofillManager::OnJavaScriptChangedAutofilledValue(
     const FormFieldData& field,
     const std::u16string& old_value) {
   TestAutofillManagerWaiter waiter(
-      *this, {&Observer::OnAfterJavaScriptChangedAutofilledValue});
+      *this, {AutofillManagerEvent::kJavaScriptChangedAutofilledValue});
   AutofillManager::OnJavaScriptChangedAutofilledValue(form, field, old_value);
   ASSERT_TRUE(waiter.Wait());
 }
@@ -107,7 +102,7 @@ void TestBrowserAutofillManager::OnFormSubmitted(
     const FormData& form,
     const bool known_success,
     const mojom::SubmissionSource source) {
-  TestAutofillManagerWaiter waiter(*this, {&Observer::OnAfterFormsSeen});
+  TestAutofillManagerWaiter waiter(*this, {AutofillManagerEvent::kFormsSeen});
   AutofillManager::OnFormSubmitted(form, known_success, source);
   ASSERT_TRUE(waiter.Wait());
 }
@@ -259,8 +254,8 @@ void TestBrowserAutofillManager::OnAskForValuesToFillTest(
     const gfx::RectF& bounding_box,
     AutoselectFirstSuggestion autoselect_first_suggestion,
     FormElementWasClicked form_element_was_clicked) {
-  TestAutofillManagerWaiter waiter(
-      *this, {&AutofillManager::Observer::OnAfterAskForValuesToFill});
+  TestAutofillManagerWaiter waiter(*this,
+                                   {AutofillManagerEvent::kAskForValuesToFill});
   BrowserAutofillManager::OnAskForValuesToFill(form, field, bounding_box,
                                                autoselect_first_suggestion,
                                                form_element_was_clicked);

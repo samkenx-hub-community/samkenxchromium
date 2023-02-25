@@ -9,13 +9,13 @@ import {AppElement} from 'chrome://customize-chrome-side-panel.top-chrome/app.js
 import {BackgroundCollection, CustomizeChromePageCallbackRouter, CustomizeChromePageHandlerRemote, CustomizeChromePageRemote, CustomizeChromeSection} from 'chrome://customize-chrome-side-panel.top-chrome/customize_chrome.mojom-webui.js';
 import {CustomizeChromeApiProxy} from 'chrome://customize-chrome-side-panel.top-chrome/customize_chrome_api_proxy.js';
 import {assertEquals, assertGE, assertTrue} from 'chrome://webui-test/chai_assert.js';
-import {TestBrowserProxy} from 'chrome://webui-test/test_browser_proxy.js';
+import {TestMock} from 'chrome://webui-test/test_mock.js';
 
 import {installMock} from './test_support.js';
 
 suite('AppTest', () => {
   let customizeChromeApp: AppElement;
-  let handler: TestBrowserProxy<CustomizeChromePageHandlerRemote>;
+  let handler: TestMock<CustomizeChromePageHandlerRemote>;
   let callbackRouter: CustomizeChromePageRemote;
 
   setup(async () => {
@@ -45,6 +45,7 @@ suite('AppTest', () => {
     // Test initial page state.
     assertTrue(
         customizeChromeApp.$.overviewPage.classList.contains('iron-selected'));
+    assertEquals(document.body, document.activeElement);
 
     // Send event for edit theme being clicked.
     customizeChromeApp.$.appearanceElement.dispatchEvent(
@@ -52,6 +53,7 @@ suite('AppTest', () => {
     // Current page should now be categories.
     assertTrue(customizeChromeApp.$.categoriesPage.classList.contains(
         'iron-selected'));
+    assertEquals(customizeChromeApp, document.activeElement);
 
     // Send event for category selected.
     customizeChromeApp.$.categoriesPage.dispatchEvent(
@@ -60,12 +62,14 @@ suite('AppTest', () => {
     // Current page should now be themes.
     assertTrue(
         customizeChromeApp.$.themesPage.classList.contains('iron-selected'));
+    assertEquals(customizeChromeApp, document.activeElement);
 
     // Send event for back click.
     customizeChromeApp.$.themesPage.dispatchEvent(new Event('back-click'));
     // Current page should now be categories.
     assertTrue(customizeChromeApp.$.categoriesPage.classList.contains(
         'iron-selected'));
+    assertEquals(customizeChromeApp, document.activeElement);
 
     // Send event for upload image.
     customizeChromeApp.$.categoriesPage.dispatchEvent(
@@ -73,10 +77,12 @@ suite('AppTest', () => {
     // Current page should now be overview.
     assertTrue(
         customizeChromeApp.$.overviewPage.classList.contains('iron-selected'));
+    assertEquals(customizeChromeApp, document.activeElement);
 
     // Set page back to categories.
     customizeChromeApp.$.appearanceElement.dispatchEvent(
         new Event('edit-theme-click'));
+    assertEquals(customizeChromeApp, document.activeElement);
 
     // Send event for chrome colors select.
     customizeChromeApp.$.categoriesPage.dispatchEvent(
@@ -84,6 +90,7 @@ suite('AppTest', () => {
     // Current page should now be chrome colors.
     assertTrue(customizeChromeApp.$.chromeColorsPage.classList.contains(
         'iron-selected'));
+    assertEquals(customizeChromeApp, document.activeElement);
 
     // Send event for back click.
     customizeChromeApp.$.chromeColorsPage.dispatchEvent(
@@ -91,12 +98,14 @@ suite('AppTest', () => {
     // Current page should now be categories.
     assertTrue(customizeChromeApp.$.categoriesPage.classList.contains(
         'iron-selected'));
+    assertEquals(customizeChromeApp, document.activeElement);
 
     // Send event for back click.
     customizeChromeApp.$.categoriesPage.dispatchEvent(new Event('back-click'));
     // Current page should now be overview.
     assertTrue(
         customizeChromeApp.$.overviewPage.classList.contains('iron-selected'));
+    assertEquals(customizeChromeApp, document.activeElement);
   });
 
   test('app requests scroll to section update', () => {

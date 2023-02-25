@@ -304,7 +304,6 @@ Kodet e gjendjes private përmirësojnë privatësinë në ueb dhe nuk mund të 
 <translation id="2669454659051515572">Çdo person që e përdor këtë pajisje mund t'i shikojë skedarët e shkarkuar</translation>
 <translation id="2702516483241149200">E re: Ndaj një lidhje që të drejton te ky tekst</translation>
 <translation id="2707726405694321444">Rifresko faqen</translation>
-<translation id="2709516037105925701">Plotëso automatikisht</translation>
 <translation id="271033894570825754">E re</translation>
 <translation id="2711073837061989559">Provat</translation>
 <translation id="2718352093833049315">Vetëm me Wi-Fi</translation>
@@ -396,7 +395,6 @@ Kodet e gjendjes private përmirësojnë privatësinë në ueb dhe nuk mund të 
 <translation id="3114507951000454849">Lexo lajmet e sotme <ph name="NEWS_ICON" /></translation>
 <translation id="311958134571892113">lidhur me</translation>
 <translation id="3123734510202723619">Njoftime</translation>
-<translation id="3130863904455712965">Historiku etj.</translation>
 <translation id="3134784203083076891">”</translation>
 <translation id="314939179385989105">Faqja kryesore e Chrome</translation>
 <translation id="3157931365184549694">Restauro</translation>
@@ -453,6 +451,7 @@ Kodet e gjendjes private përmirësojnë privatësinë në ueb dhe nuk mund të 
 <translation id="3421726884497337397">Zgjidh se kur do t'i bllokosh kukit e palëve të treta</translation>
 <translation id="3428747202529429621">Të mban të sigurt në Chrome dhe mund të përdoret për të përmirësuar sigurinë tënde në aplikacionet e tjera të Google kur je i identifikuar</translation>
 <translation id="3429160811076349561">Veçoritë e provës janë joaktive</translation>
+<translation id="3432973700170747422">Fshi 15 minutat e fundit</translation>
 <translation id="3435465986463792564">Ke shumë dritare? Mund t'i menaxhosh ato nga këtu</translation>
 <translation id="3435738964857648380">Siguria</translation>
 <translation id="3443221991560634068">Ringarko faqen aktuale</translation>
@@ -519,7 +518,6 @@ Kodet e gjendjes private përmirësojnë privatësinë në ueb dhe nuk mund të 
 <translation id="3830886834687455630">Përditëso shërbimet e Google Play për të kontrolluar fjalëkalimet e tua</translation>
 <translation id="3845098929839618392">Hape në skedë "të fshehtë"</translation>
 <translation id="3856096718352044181">Verifiko që ky është një ofrues i vlefshëm ose provo përsëri më vonë</translation>
-<translation id="3858127568696903256">Shiko përmbajtjet që ndjek këtu</translation>
 <translation id="3858860766373142691">Emri</translation>
 <translation id="3861633093716975811">Video të njohura</translation>
 <translation id="3874520961715512166">Sajti u hoq</translation>
@@ -922,6 +920,7 @@ Për të ndryshuar këtë cilësim, <ph name="BEGIN_LINK" />rivendos sinkronizim
 <translation id="6000203700195075278">Ndiqe përsëri</translation>
 <translation id="6002122790816966947">Pajisjet e tua</translation>
 <translation id="6005538289190791541">Fjalëkalimi i sugjeruar</translation>
+<translation id="6011308810877101166">Përmirëso sugjerimet për kërkimin</translation>
 <translation id="6039379616847168523">Kalo te skeda tjetër</translation>
 <translation id="6040143037577758943">Mbyll</translation>
 <translation id="604124094241169006">Automatike</translation>
@@ -989,7 +988,6 @@ Për shembull, disa sajte uebi mund t'i përgjigjen kësaj kërkese duke të tre
 <translation id="6397616442223433927">Përsëri në linjë</translation>
 <translation id="6401458660421980302">Për ta dërguar këtë skedë te një pajisje tjetër, identifikohu në Chrome në të</translation>
 <translation id="6402652558933147609"><ph name="ERROR_CODE" /> në <ph name="VIOLATED_URL" /></translation>
-<translation id="6403371459378431832">Sinkronizo të dhënat e tua në të gjitha pajisjet</translation>
 <translation id="6404511346730675251">Redakto faqeshënuesin</translation>
 <translation id="6406506848690869874">Sinkronizo</translation>
 <translation id="6407224748847589805">Nuk mund të lidhet me kompjuterin tënd. Provo një opsion tjetër verifikimi.</translation>
@@ -1227,6 +1225,7 @@ Për shembull, disa sajte uebi mund t'i përgjigjen kësaj kërkese duke të tre
 <translation id="7596558890252710462">Sistemi operativ</translation>
 <translation id="7605594153474022051">Sinkronizimi nuk po funksionon.</translation>
 <translation id="7612619742409846846">U identifikove te Google si</translation>
+<translation id="7612989789287281429">Po identifikohesh…</translation>
 <translation id="7616551326690708776">Zgjidh një shabllon për theksimin.</translation>
 <translation id="7619072057915878432">Shkarkimi i <ph name="FILE_NAME" /> dështoi për shkak të problemeve të rrjetit.</translation>
 <translation id="7626032353295482388">Mirë se vjen në Chrome</translation>
@@ -1245,6 +1244,7 @@ Për shembull, disa sajte uebi mund t'i përgjigjen kësaj kërkese duke të tre
 <translation id="7682724950699840886">Provoni këshillat e mëposhtme: sigurohu që ka hapësirë ​​të mjaftueshme në pajisjen tënde dhe provo të eksportosh përsëri.</translation>
 <translation id="7686086654630106285">Më shumë rreth reklamave të sugjeruara nga sajtet</translation>
 <translation id="768618399695552958">Disa nga faqet që ti viziton janë të ngarkuara paraprakisht. Faqet mund të ngarkohen paraprakisht nëpërmjet serverëve të Google kur lidhen nga një sajt i Google.</translation>
+<translation id="7691043218961417207">Eksploro përmbajtje për t'i ndjekur</translation>
 <translation id="7698359219371678927">Krijo mail në <ph name="APP_NAME" /></translation>
 <translation id="7707922173985738739">Përdor të dhënat celulare</translation>
 <translation id="7709094866268987903">Interesat që hoqe do të shfaqen këtu</translation>
@@ -1318,7 +1318,6 @@ Për shembull, disa sajte uebi mund t'i përgjigjen kësaj kërkese duke të tre
 <translation id="8037801708772278989">Kontrolluar pikërisht tani</translation>
 <translation id="804335162455518893">Karta SD nuk u gjet</translation>
 <translation id="8048533522416101084">{TAB_COUNT,plural, =1{<ph name="TAB_COUNT_ONE" /> skedë e fshehtë}other{<ph name="TAB_COUNT_NORMAL" /> skeda të fshehta}}</translation>
-<translation id="8048728378294435881">Rezervo gjërat e tua dhe përdori në çdo pajisje</translation>
 <translation id="8051695050440594747"><ph name="MEGABYTES" /> MB në dispozicion</translation>
 <translation id="8058655154417507695">Viti i skadimit</translation>
 <translation id="8058746566562539958">Hape në një skedë të re të Chrome</translation>
@@ -1452,6 +1451,7 @@ Për shembull, disa sajte uebi mund t'i përgjigjen kësaj kërkese duke të tre
 <translation id="8746155870861185046">Shpërndaj theksimin</translation>
 <translation id="8748850008226585750">Përmbajtjet janë të fshehura</translation>
 <translation id="8756969031206844760">Të përditësohet fjalëkalimi?</translation>
+<translation id="8765470054473112089">Kur shkruan në shiritin e adresës ose në kutinë e kërkimit, Chrome i dërgon ato që shkruan te motori i parazgjedhur i kërkimit për të marrë sugjerime më të mira. Kjo është joaktive në modalitetin "e fshehtë".</translation>
 <translation id="8766529642647037772">Të krijohet një lidhje e theksuar si kjo?</translation>
 <translation id="8773160212632396039">Po përpunon kërkesën</translation>
 <translation id="8788265440806329501">Historiku i navigimit është mbyllur</translation>
@@ -1495,6 +1495,7 @@ Për shembull, disa sajte uebi mund t'i përgjigjen kësaj kërkese duke të tre
 <translation id="8970887620466824814">Ndodhi një gabim.</translation>
 <translation id="8972098258593396643">Të shkarkohet në dosjen e parazgjedhur?</translation>
 <translation id="8987641763863173640">Menaxho cilësimet e pamjes paraprake të videos</translation>
+<translation id="8987736167266086032">Vazhdo ku e ke lënë</translation>
 <translation id="8989968390305463310">Historiku yt i shfletimit ndikon te reklamat që shikon dhe tek interesat sipas përllogaritjes më poshtë. Për të mbrojtur privatësinë tënde, Chrome fshin automatikisht interesat e tua në vazhdimësi çdo muaj. Interesat mund të rifreskohen, përveçse nëse ti i heq ato.</translation>
 <translation id="8993760627012879038">Hap një skedë të re në "Modalitetin e fshehtë"</translation>
 <translation id="8996847606757455498">Zgjidh një ofrues tjetër</translation>

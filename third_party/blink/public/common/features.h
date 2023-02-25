@@ -217,6 +217,7 @@ BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kResourceLoadViaDataPipe);
 BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kServiceWorkerUpdateDelay);
 BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kStopInBackground);
 BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kDropInputEventsBeforeFirstPaint);
+BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kDroppedTouchSequenceIncludesTouchEnd);
 BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kFileHandlingIcons);
 BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kAllowSyncXHRInPageDismissal);
 BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kPrefetchPrivacyChanges);
@@ -269,6 +270,10 @@ BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kLowLatencyCanvas2dImageChromium);
 
 BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kWebviewAccelerateSmallCanvases);
 
+BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kCanvas2DHibernation);
+
+BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kCanvasCompressHibernatedImage);
+
 BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kCanvasFreeMemoryWhenHidden);
 
 BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kCreateImageBitmapOrientationNone);
@@ -280,6 +285,12 @@ BLINK_COMMON_EXPORT extern const base::FeatureParam<int>
     kCacheCodeOnIdleDelayParam;
 BLINK_COMMON_EXPORT extern const base::FeatureParam<bool>
     kCacheCodeOnIdleDelayServiceWorkerOnlyParam;
+
+BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kProduceCompileHints);
+BLINK_COMMON_EXPORT extern const base::FeatureParam<int>
+    kProduceCompileHintsOnIdleDelayParam;
+BLINK_COMMON_EXPORT extern const base::FeatureParam<double>
+    kProduceCompileHintsNoiseLevel;
 
 BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(
     kAlignFontDisplayAutoTimeoutWithLCPGoal);
@@ -711,13 +722,6 @@ BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kPrefetchFontLookupTables);
 // scanner.
 BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kPrecompileInlineScripts);
 
-// If enabled, CSS will be tokenized in a background thread when possible.
-BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kPretokenizeCSS);
-BLINK_COMMON_EXPORT extern const base::FeatureParam<bool>
-    kPretokenizeInlineSheets;
-BLINK_COMMON_EXPORT extern const base::FeatureParam<bool>
-    kPretokenizeExternalSheets;
-
 // TODO(accessibility): This flag is set to accommodate JAWS on Windows so they
 // can adjust to us not simulating click events on a focus action. It should be
 // disabled by default (and removed) before 5/17/2023.
@@ -748,6 +752,9 @@ BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(
 // Early exit when the style or class attribute of an element is set to the same
 // value as before.
 BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kEarlyExitOnNoopClassOrStyleChange);
+
+// Stylus gestures for editable web content.
+BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kStylusRichGestures);
 
 // Stylus handwriting recognition to text input feature.
 BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kStylusWritingToInput);
@@ -975,6 +982,61 @@ BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(
 // Extend ScriptResource's lifetime to match its payload's lifetime.
 // See https://crbug.com/1393246.
 BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kExtendScriptResourceLifetime);
+
+// Use WebIDL instead of iteration to populate RTCStatsReport.
+BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kWebRtcStatsReportIdl);
+
+// Makes preloaded fonts render-blocking up to the limits below.
+// See https://crbug.com/1412861
+BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kRenderBlockingFonts);
+
+// Max milliseconds from navigation start that fonts can block rendering.
+BLINK_COMMON_EXPORT extern const base::FeatureParam<int>
+    kMaxBlockingTimeMsForRenderBlockingFonts;
+
+// Max milliseconds that font are allowed to delay of FCP.
+BLINK_COMMON_EXPORT extern const base::FeatureParam<int>
+    kMaxFCPDelayMsForRenderBlockingFonts;
+
+// Whether Sec-CH-UA headers on subresource fetches that contain an empty
+// string should be quoted (`""`) as they are for navigation fetches. See
+// https://crbug.com/1416925.
+BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(
+    kQuoteEmptySecChUaStringHeadersConsistently);
+
+// The number of "automatic" implicit storage access grants per third-party
+// origin that can be granted.
+//
+// Note that if `kStorageAccessAPIAutoGrantInFPS` and
+// `kStorageAccessAPIAutoDenyOutsideFPS` are both true, then this parameter has
+// no effect.
+BLINK_COMMON_EXPORT extern const base::FeatureParam<int>
+    kStorageAccessAPIImplicitGrantLimit;
+// Whether to auto-grant storage access requests when the top level origin and
+// the requesting origin are in the same First-Party Set.
+BLINK_COMMON_EXPORT extern const base::FeatureParam<bool>
+    kStorageAccessAPIAutoGrantInFPS;
+// Whether to auto-deny storage access requests when the top level origin and
+// the requesting origin are not in the same First-Party Set.
+BLINK_COMMON_EXPORT extern const base::FeatureParam<bool>
+    kStorageAccessAPIAutoDenyOutsideFPS;
+
+// Kill-switch for a deprecation trial that unpartitions storage in third-party
+// contexts under the registered top-level site. If
+// `kDisableThirdPartyStoragePartitioningDeprecationTrial` is enabled, the
+// deprecation trial information can be sent to and enabled in the browser
+// process (i.e. when the base::Feature is enabled, the deprecation trial is
+// enabled in the browser process too).
+BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(
+    kDisableThirdPartyStoragePartitioningDeprecationTrial);
+
+// Kill-switch for any calls to the  mojo interface
+// RuntimeFeatureStateController in the RuntimeFeatureStateOverrideContext
+// class. If `kRuntimeFeatureStateControllerApplyFeatureDiff` is disabled,
+// origin/deprecation trial token information is not sent to the browser
+// process.
+BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(
+    kRuntimeFeatureStateControllerApplyFeatureDiff);
 
 }  // namespace features
 }  // namespace blink

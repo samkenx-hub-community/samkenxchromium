@@ -166,6 +166,7 @@
 #include "third_party/blink/public/mojom/frame/frame.mojom.h"
 #include "third_party/blink/public/mojom/frame/fullscreen.mojom.h"
 #include "third_party/blink/public/mojom/image_downloader/image_downloader.mojom.h"
+#include "third_party/blink/public/mojom/input/input_handler.mojom-shared.h"
 #include "third_party/blink/public/mojom/mediastream/media_stream.mojom-shared.h"
 #include "third_party/blink/public/mojom/mediastream/media_stream.mojom.h"
 #include "third_party/blink/public/mojom/window_features/window_features.mojom.h"
@@ -1635,7 +1636,8 @@ void WebContentsImpl::CancelActiveAndPendingDialogs() {
 
 void WebContentsImpl::ClosePage() {
   OPTIONAL_TRACE_EVENT0("content", "WebContentsImpl::ClosePage");
-  GetPrimaryMainFrame()->ClosePage();
+  GetPrimaryMainFrame()->ClosePage(
+      RenderFrameHostImpl::ClosePageSource::kBrowser);
 }
 
 RenderWidgetHostView* WebContentsImpl::GetRenderWidgetHostView() {
@@ -1727,6 +1729,7 @@ void WebContentsImpl::SetAccessibilityMode(ui::AXMode mode) {
     return;
 
   accessibility_mode_ = mode;
+
   // Update state for all frames in this tree and inner trees. Should also
   // include speculative frame hosts.
   GetPrimaryMainFrame()->ForEachRenderFrameHostIncludingSpeculative(
@@ -1762,7 +1765,7 @@ class AXTreeSnapshotCombiner : public base::RefCounted<AXTreeSnapshotCombiner> {
   void AXTreeSnapshotOnFrame(RenderFrameHostImpl* rfhi) {
     OPTIONAL_TRACE_EVENT0("content",
                           "AXTreeSnapshotCombiner::AXTreeSnapshotOnFrame");
-    bool is_root = !rfhi->GetParentOrOuterDocumentOrEmbedder();
+    bool is_root = rfhi->AccessibilityIsRootFrame();
     rfhi->RequestAXTreeSnapshot(AddFrame(is_root), params_.Clone());
   }
 
@@ -4595,13 +4598,6 @@ std::string WebContentsImpl::DumpAccessibilityTree(
     std::vector<ui::AXPropertyFilter> property_filters) {
   OPTIONAL_TRACE_EVENT0("content", "WebContentsImpl::DumpAccessibilityTree");
   auto* ax_mgr = GetOrCreateRootBrowserAccessibilityManager();
-  DCHECK(ax_mgr);
-
-  // Developer mode: crash immediately on any accessibility fatal error.
-  // This only runs during integration tests, or if a developer is
-  // using an inspection tool, e.g. chrome://accessibility.
-  BrowserAccessibilityManager::AlwaysFailFast();
-
   // Since for Web Content we get the AXTree updates through the renderer at a
   // point after the manager is created, there are cases where at this point in
   // the lifecycle the AXTree associated with `ax_mgr` does not have a valid
@@ -4609,8 +4605,13 @@ std::string WebContentsImpl::DumpAccessibilityTree(
   // we don't have this check, there will be a scenario where we then try to get
   // the manager using the ID (which at this point is invalid) which leads to a
   // crash. See https://crbug.com/1405036.
-  if (!ax_mgr->HasValidTreeID())
+  if (!ax_mgr || !ax_mgr->HasValidTreeID())
     return "-";
+
+  // Developer mode: crash immediately on any accessibility fatal error.
+  // This only runs during integration tests, or if a developer is
+  // using an inspection tool, e.g. chrome://accessibility.
+  BrowserAccessibilityManager::AlwaysFailFast();
 
   std::unique_ptr<ui::AXTreeFormatter> formatter =
       internal ? AXInspectFactory::CreateBlinkFormatter()
@@ -4630,7 +4631,7 @@ void WebContentsImpl::RecordAccessibilityEvents(
   DCHECK_EQ(start_recording, callback.has_value());
   if (start_recording) {
     BrowserAccessibilityStateImpl::GetInstance()->AddAccessibilityModeFlags(
-        ui::kAXModeBasic.flags());
+        ui::kAXModeBasic);
     auto* ax_mgr = GetOrCreateRootBrowserAccessibilityManager();
     CHECK(ax_mgr);
     base::ProcessId pid = base::Process::Current().Pid();
@@ -4770,6 +4771,21 @@ void WebContentsImpl::SelectRange(const gfx::Point& base,
     return;
 
   input_handler->SelectRange(base, extent);
+}
+
+void WebContentsImpl::SelectAroundCaret(
+    blink::mojom::SelectionGranularity granularity,
+    bool should_show_handle,
+    bool should_show_context_menu) {
+  OPTIONAL_TRACE_EVENT0("content", "WebContentsImpl::SelectAroundCaret");
+  auto* input_handler = GetFocusedFrameWidgetInputHandler();
+  if (!input_handler) {
+    return;
+  }
+
+  last_interaction_time_ = ui::EventTimeForNow();
+  input_handler->SelectAroundCaret(granularity, should_show_handle,
+                                   should_show_context_menu, base::DoNothing());
 }
 
 void WebContentsImpl::MoveCaret(const gfx::Point& extent) {
@@ -7328,17 +7344,8 @@ std::vector<WebContents*> WebContentsImpl::GetInnerWebContents() {
 }
 
 WebContentsImpl* WebContentsImpl::GetResponsibleWebContents() {
-  // Iteratively ask delegates which other contents is responsible until a fixed
-  // point is found.
-  WebContentsImpl* contents = this;
-  while (WebContentsDelegate* delegate = contents->GetDelegate()) {
-    auto* responsible_contents = static_cast<WebContentsImpl*>(
-        delegate->GetResponsibleWebContents(contents));
-    if (responsible_contents == contents)
-      break;
-    contents = responsible_contents;
-  }
-  return contents;
+  return FromRenderFrameHostImpl(
+      GetPrimaryMainFrame()->GetOutermostMainFrameOrEmbedder());
 }
 
 WebContentsImpl* WebContentsImpl::GetFocusedWebContents() {
@@ -8156,12 +8163,10 @@ void WebContentsImpl::RendererResponsive(
 
 void WebContentsImpl::BeforeUnloadFiredFromRenderManager(
     bool proceed,
-    const base::TimeTicks& proceed_time,
     bool* proceed_to_fire_unload) {
   OPTIONAL_TRACE_EVENT0("content",
                         "WebContentsImpl::BeforeUnloadFiredFromRenderManager");
-  observers_.NotifyObservers(&WebContentsObserver::BeforeUnloadFired, proceed,
-                             proceed_time);
+  observers_.NotifyObservers(&WebContentsObserver::BeforeUnloadFired, proceed);
   if (delegate_)
     delegate_->BeforeUnloadFired(this, proceed, proceed_to_fire_unload);
   // Note: |this| might be deleted at this point.
@@ -9126,6 +9131,8 @@ WebContentsImpl::GetRecordAggregateWatchTimeCallback(
       delegate_->GetDelegateWeakPtr(), page_main_frame_last_committed_url);
 }
 
+// Cf. `GetProspectiveOuterDocument` which applies to the same situation, but is
+// for ascending.
 std::vector<FrameTreeNode*> WebContentsImpl::GetUnattachedOwnedNodes(
     RenderFrameHostImpl* owner) {
   std::vector<FrameTreeNode*> unattached_owned_nodes;
@@ -9475,6 +9482,30 @@ int WebContentsImpl::GetOuterDelegateFrameTreeNodeId() {
   return node_.outer_contents_frame_tree_node_id();
 }
 
+// Cf. `GetUnattachedOwnedNodes` which applies to the same situation, but is for
+// descending.
+RenderFrameHostImpl* WebContentsImpl::GetProspectiveOuterDocument() {
+  // If the outer WebContents is already known, then there was no need to call
+  // this method.
+  DCHECK(!GetOuterWebContents());
+
+  RenderFrameHostImpl* unattached_guest_owner =
+      browser_plugin_guest_
+          ? browser_plugin_guest_->GetProspectiveOuterDocument()
+          : nullptr;
+  if (unattached_guest_owner) {
+    return unattached_guest_owner;
+  }
+
+  RenderFrameHostImpl* orphaned_portal_owner =
+      portal() ? portal()->owner_render_frame_host() : nullptr;
+  if (orphaned_portal_owner) {
+    return orphaned_portal_owner;
+  }
+
+  return nullptr;
+}
+
 void WebContentsImpl::RenderFrameHostStateChanged(
     RenderFrameHost* render_frame_host,
     LifecycleState old_state,
@@ -9585,7 +9616,7 @@ std::unique_ptr<PrerenderHandle> WebContentsImpl::StartPrerendering(
         url_match_predicate) {
   PrerenderAttributes attributes(
       prerendering_url, trigger_type, embedder_histogram_suffix,
-      content::Referrer(), /*initiator_origin=*/absl::nullopt, prerendering_url,
+      content::Referrer(), /*initiator_origin=*/absl::nullopt,
       content::ChildProcessHost::kInvalidUniqueID, GetWeakPtr(),
       /*initiator_frame_token=*/absl::nullopt,
       /*initiator_frame_tree_node_id=*/RenderFrameHost::kNoFrameTreeNodeId,

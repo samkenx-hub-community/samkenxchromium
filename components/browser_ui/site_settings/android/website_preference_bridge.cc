@@ -504,8 +504,8 @@ static void JNI_WebsitePreferenceBridge_RevokeObjectPermission(
     const JavaParamRef<jstring>& jobject) {
   GURL origin(ConvertJavaStringToUTF8(env, jorigin));
   DCHECK(origin.is_valid());
-  std::unique_ptr<base::Value> object =
-      base::JSONReader::ReadDeprecated(ConvertJavaStringToUTF8(env, jobject));
+  absl::optional<base::Value> object =
+      base::JSONReader::Read(ConvertJavaStringToUTF8(env, jobject));
   DCHECK(object && object->is_dict());
   permissions::ObjectPermissionContextBase* context = GetChooserContext(
       jbrowser_context_handle,
@@ -816,6 +816,7 @@ static void JNI_WebsitePreferenceBridge_SetContentSettingEnabled(
         value = CONTENT_SETTING_ASK;
         break;
       case ContentSettingsType::ADS:
+      case ContentSettingsType::ANTI_ABUSE:
       case ContentSettingsType::AUTO_DARK_WEB_CONTENT:
       case ContentSettingsType::BACKGROUND_SYNC:
       case ContentSettingsType::COOKIES:

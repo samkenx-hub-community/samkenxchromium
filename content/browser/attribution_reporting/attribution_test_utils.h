@@ -12,6 +12,7 @@
 #include <string>
 #include <vector>
 
+#include "base/containers/enum_set.h"
 #include "base/containers/flat_set.h"
 #include "base/guid.h"
 #include "base/observer_list.h"
@@ -19,6 +20,7 @@
 #include "base/thread_annotations.h"
 #include "base/time/time.h"
 #include "components/aggregation_service/aggregation_service.mojom.h"
+#include "components/attribution_reporting/aggregatable_dedup_key.h"
 #include "components/attribution_reporting/aggregatable_trigger_data.h"
 #include "components/attribution_reporting/aggregatable_values.h"
 #include "components/attribution_reporting/aggregation_keys.h"
@@ -29,6 +31,7 @@
 #include "components/attribution_reporting/registration_type.mojom-forward.h"
 #include "components/attribution_reporting/source_registration.h"
 #include "components/attribution_reporting/source_registration_error.mojom-forward.h"
+#include "components/attribution_reporting/source_type.mojom.h"
 #include "components/attribution_reporting/suitable_origin.h"
 #include "components/attribution_reporting/test_utils.h"
 #include "components/attribution_reporting/trigger_registration.h"
@@ -41,7 +44,6 @@
 #include "content/browser/attribution_reporting/attribution_observer.h"
 #include "content/browser/attribution_reporting/attribution_observer_types.h"
 #include "content/browser/attribution_reporting/attribution_report.h"
-#include "content/browser/attribution_reporting/attribution_source_type.h"
 #include "content/browser/attribution_reporting/attribution_storage.h"
 #include "content/browser/attribution_reporting/attribution_storage_delegate.h"
 #include "content/browser/attribution_reporting/attribution_trigger.h"
@@ -85,10 +87,10 @@ class AttributionTrigger;
 
 enum class RateLimitResult : int;
 
-const AttributionSourceType kSourceTypes[] = {
-    AttributionSourceType::kNavigation,
-    AttributionSourceType::kEvent,
-};
+constexpr auto kSourceTypes =
+    base::EnumSet<attribution_reporting::mojom::SourceType,
+                  attribution_reporting::mojom::SourceType::kMinValue,
+                  attribution_reporting::mojom::SourceType::kMaxValue>::All();
 
 template <class SuperClass>
 class MockAttributionReportingContentBrowserClientBase : public SuperClass {
@@ -98,6 +100,7 @@ class MockAttributionReportingContentBrowserClientBase : public SuperClass {
               IsAttributionReportingOperationAllowed,
               (content::BrowserContext * browser_context,
                ContentBrowserClient::AttributionReportingOperation operation,
+               content::RenderFrameHost* rfh,
                const url::Origin* source_origin,
                const url::Origin* destination_origin,
                const url::Origin* reporting_origin),
@@ -258,9 +261,16 @@ class MockAttributionManager : public AttributionManager {
   ~MockAttributionManager() override;
 
   // AttributionManager:
-  MOCK_METHOD(void, HandleSource, (StorableSource source), (override));
+  MOCK_METHOD(void,
+              HandleSource,
+              (StorableSource source, GlobalRenderFrameHostId render_frame_id),
+              (override));
 
-  MOCK_METHOD(void, HandleTrigger, (AttributionTrigger trigger), (override));
+  MOCK_METHOD(void,
+              HandleTrigger,
+              (AttributionTrigger trigger,
+               GlobalRenderFrameHostId render_frame_id),
+              (override));
 
   MOCK_METHOD(void,
               GetActiveSourcesForWebUI,
@@ -296,6 +306,7 @@ class MockAttributionManager : public AttributionManager {
               (const std::string& header_value,
                const attribution_reporting::SuitableOrigin& source_origin,
                const attribution_reporting::SuitableOrigin& reporting_origin,
+               attribution_reporting::mojom::SourceType,
                attribution_reporting::mojom::SourceRegistrationError),
               (override));
 
@@ -309,6 +320,11 @@ class MockAttributionManager : public AttributionManager {
               RemoveAttributionDataByDataKey,
               (const AttributionManager::DataKey& data_key,
                base::OnceClosure callback),
+              (override));
+
+  MOCK_METHOD(attribution_reporting::mojom::OsSupport,
+              GetOsSupport,
+              (),
               (override));
 
   void AddObserver(AttributionObserver* observer) override;
@@ -332,6 +348,7 @@ class MockAttributionManager : public AttributionManager {
       const std::string& header_value,
       const attribution_reporting::SuitableOrigin& source_origin,
       const attribution_reporting::SuitableOrigin& reporting_origin,
+      attribution_reporting::mojom::SourceType,
       attribution_reporting::mojom::SourceRegistrationError);
   void NotifyDebugReportSent(const AttributionDebugReport&,
                              int status,
@@ -447,7 +464,7 @@ class SourceBuilder {
 
   SourceBuilder& SetReportingOrigin(attribution_reporting::SuitableOrigin);
 
-  SourceBuilder& SetSourceType(AttributionSourceType source_type);
+  SourceBuilder& SetSourceType(attribution_reporting::mojom::SourceType);
 
   SourceBuilder& SetPriority(int64_t priority);
 
@@ -492,7 +509,8 @@ class SourceBuilder {
   attribution_reporting::SuitableOrigin source_origin_;
   base::flat_set<net::SchemefulSite> destination_sites_;
   attribution_reporting::SuitableOrigin reporting_origin_;
-  AttributionSourceType source_type_ = AttributionSourceType::kNavigation;
+  attribution_reporting::mojom::SourceType source_type_ =
+      attribution_reporting::mojom::SourceType::kNavigation;
   int64_t priority_ = 0;
   StoredSource::AttributionLogic attribution_logic_ =
       StoredSource::AttributionLogic::kTruthfully;
@@ -591,7 +609,7 @@ class AttributionInfoBuilder {
       // For most tests, the context origin is irrelevant.
       attribution_reporting::SuitableOrigin context_origin =
           *attribution_reporting::SuitableOrigin::Deserialize(
-              "https://context.test"));
+              "https://conversion.test"));
   ~AttributionInfoBuilder();
 
   AttributionInfoBuilder& SetTime(base::Time time);
@@ -736,8 +754,6 @@ std::ostream& operator<<(std::ostream& out,
 std::ostream& operator<<(std::ostream& out,
                          StoredSource::ActiveState active_state);
 
-std::ostream& operator<<(std::ostream& out, StorableSource::Result status);
-
 // TODO: Move to test-only public header to be reused by other test code
 // that rely on DataKey
 std::ostream& operator<<(std::ostream& out,
@@ -766,7 +782,8 @@ MATCHER_P(ImpressionOriginIs, matcher, "") {
 }
 
 MATCHER_P(DestinationSiteIs, matcher, "") {
-  return ExplainMatchResult(matcher, arg.common_info().destination_site(),
+  return ExplainMatchResult(::testing::ElementsAre(matcher),
+                            arg.common_info().destination_sites(),
                             result_listener);
 }
 
@@ -932,17 +949,14 @@ struct EventTriggerDataMatcherConfig {
   ::testing::Matcher<uint64_t> data;
   ::testing::Matcher<int64_t> priority;
   ::testing::Matcher<absl::optional<uint64_t>> dedup_key;
-  ::testing::Matcher<const attribution_reporting::Filters&> filters;
-  ::testing::Matcher<const attribution_reporting::Filters&> not_filters;
+  ::testing::Matcher<const attribution_reporting::FilterPair&> filters;
 
   EventTriggerDataMatcherConfig() = delete;
   explicit EventTriggerDataMatcherConfig(
       ::testing::Matcher<uint64_t> data = ::testing::_,
       ::testing::Matcher<int64_t> priority = ::testing::_,
       ::testing::Matcher<absl::optional<uint64_t>> dedup_key = ::testing::_,
-      ::testing::Matcher<const attribution_reporting::Filters&> filters =
-          ::testing::_,
-      ::testing::Matcher<const attribution_reporting::Filters&> not_filters =
+      ::testing::Matcher<const attribution_reporting::FilterPair&> filters =
           ::testing::_);
   ~EventTriggerDataMatcherConfig();
 };
@@ -977,15 +991,13 @@ constexpr auto EventTriggerDataListMatches =
                        attribution_reporting::kMaxEventTriggerData>;
 
 struct TriggerRegistrationMatcherConfig {
-  ::testing::Matcher<const attribution_reporting::Filters&> filters =
-      ::testing::_;
-  ::testing::Matcher<const attribution_reporting::Filters&> not_filters =
+  ::testing::Matcher<const attribution_reporting::FilterPair&> filters =
       ::testing::_;
   ::testing::Matcher<absl::optional<uint64_t>> debug_key = ::testing::_;
   ::testing::Matcher<const attribution_reporting::EventTriggerDataList&>
       event_triggers = ::testing::_;
-  ::testing::Matcher<absl::optional<uint64_t>> aggregatable_dedup_key =
-      ::testing::_;
+  ::testing::Matcher<const attribution_reporting::AggregatableDedupKeyList&>
+      aggregatable_dedup_keys = ::testing::_;
   ::testing::Matcher<bool> debug_reporting = ::testing::_;
   ::testing::Matcher<const attribution_reporting::AggregatableTriggerDataList&>
       aggregatable_trigger_data = ::testing::_;
@@ -996,15 +1008,13 @@ struct TriggerRegistrationMatcherConfig {
 
   TriggerRegistrationMatcherConfig() = delete;
   explicit TriggerRegistrationMatcherConfig(
-      ::testing::Matcher<const attribution_reporting::Filters&> filters =
-          ::testing::_,
-      ::testing::Matcher<const attribution_reporting::Filters&> not_filters =
+      ::testing::Matcher<const attribution_reporting::FilterPair&> filters =
           ::testing::_,
       ::testing::Matcher<absl::optional<uint64_t>> debug_key = ::testing::_,
       ::testing::Matcher<const attribution_reporting::EventTriggerDataList&>
           event_triggers = ::testing::_,
-      ::testing::Matcher<absl::optional<uint64_t>> aggregatable_dedup_key =
-          ::testing::_,
+      ::testing::Matcher<const attribution_reporting::AggregatableDedupKeyList&>
+          aggregatable_dedup_keys = ::testing::_,
       ::testing::Matcher<bool> debug_reporting = ::testing::_,
       ::testing::Matcher<
           const attribution_reporting::AggregatableTriggerDataList&>

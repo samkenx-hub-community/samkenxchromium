@@ -86,9 +86,8 @@ ChromeVoxBackgroundTest = class extends ChromeVoxE2ETest {
   }
 
   simulateHitTestResult(node) {
-    return () => {
-      GestureCommandHandler.instance.pointerHandler_.handleHitTestResult(node);
-    };
+    return () => GestureCommandHandler.instance.pointerHandler_
+                     .handleHitTestResult_(node);
   }
 
   press(keyCode, modifiers) {
@@ -566,20 +565,6 @@ AX_TEST_F('ChromeVoxBackgroundTest', 'EarconsForControls', async function() {
   await mockFeedback.replay();
 });
 
-TEST_F('ChromeVoxBackgroundTest', 'GlobsToRegExp', function() {
-  this.newCallback(async () => {
-    const module = await import('./background.js');
-    const Background = module.Background;
-    assertEquals('/^()$/', Background.globsToRegExp_([]).toString());
-    assertEquals(
-        '/^(http:\\/\\/host\\/path\\+here)$/',
-        Background.globsToRegExp_(['http://host/path+here']).toString());
-    assertEquals(
-        '/^(url1.*|u.l2|.*url3)$/',
-        Background.globsToRegExp_(['url1*', 'u?l2', '*url3']).toString());
-  })();
-});
-
 AX_TEST_F('ChromeVoxBackgroundTest', 'ShouldNotFocusIframe', async function() {
   const site = `
     <iframe tabindex=0 src="data:text/html,<p>Inside</p>"></iframe>
@@ -1038,12 +1023,8 @@ AX_TEST_F(
     </div>
   `;
       const root = await this.runWithLoadedTree(site);
-      const assertRangeHasText = function(text) {
-        return function() {
-          assertEquals(
-              text, ChromeVoxState.instance.getCurrentRange().start.node.name);
-        };
-      };
+      const assertRangeHasText = (text) => () =>
+          assertEquals(text, ChromeVoxRange.current.start.node.name);
 
       mockFeedback.call(doCmd('nextEditText'))
           .expectSpeech('Top News Most Popular Sports')
@@ -3535,11 +3516,9 @@ AX_TEST_F('ChromeVoxBackgroundTest', 'FocusAfterClick', async function() {
       .expectSpeech('Click me')
       .call(doCmd('forceClickOnCurrentItem'))
       .expectSpeech('Focus me')
-      .call(() => {
-        assertEquals(
-            'Focus me',
-            ChromeVoxState.instance.getCurrentRange().start.node.name);
-      });
+      .call(
+          () =>
+              assertEquals('Focus me', ChromeVoxRange.current.start.node.name));
   await mockFeedback.replay();
 });
 

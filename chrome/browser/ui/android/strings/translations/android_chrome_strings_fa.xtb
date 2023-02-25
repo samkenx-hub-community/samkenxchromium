@@ -304,7 +304,6 @@
 <translation id="2669454659051515572">همه افرادی که از این دستگاه استفاده می‌کنند می‌توانند فایل‌های بارگیری‌شده را ببینند</translation>
 <translation id="2702516483241149200">جدید: هم‌رسانی پیوندی که به این نوشتار پیمایش می‌کند</translation>
 <translation id="2707726405694321444">بازآوری صفحه</translation>
-<translation id="2709516037105925701">تکمیل خودکار</translation>
 <translation id="271033894570825754">جدید</translation>
 <translation id="2711073837061989559">دوره‌های آزمایشی</translation>
 <translation id="2718352093833049315">‏فقط در Wi-Fi</translation>
@@ -396,7 +395,6 @@
 <translation id="3114507951000454849">اخبار <ph name="NEWS_ICON" /> امروز را بخوانید</translation>
 <translation id="311958134571892113">پیوندداده‌شده با</translation>
 <translation id="3123734510202723619">اطلاعیه‌ها</translation>
-<translation id="3130863904455712965">سابقه و موارد بیشتر</translation>
 <translation id="3134784203083076891">»</translation>
 <translation id="314939179385989105">‏صفحه اصلی Chrome</translation>
 <translation id="3157931365184549694">بازیابی</translation>
@@ -453,6 +451,7 @@
 <translation id="3421726884497337397">انتخاب مواقعی که کوکی‌های شخص ثالث باید مسدود شوند</translation>
 <translation id="3428747202529429621">‏وقتی به سیستم وارد شده باشید، امنیت شما را در Chrome حفظ می‌کند و ممکن است برای بهبود امنیت شما در برنامه‌های دیگر Google استفاده شود</translation>
 <translation id="3429160811076349561">ویژگی‌های آزمایشی خاموش است</translation>
+<translation id="3432973700170747422">حذف ۱۵ دقیقه آخر</translation>
 <translation id="3435465986463792564">پنجره‌های زیادی دارید؟ می‌توانید از اینجا مدیریتشان کنید</translation>
 <translation id="3435738964857648380">امنیت</translation>
 <translation id="3443221991560634068">بار کردن مجدد صفحه کنونی</translation>
@@ -519,7 +518,6 @@
 <translation id="3830886834687455630">‏برای بررسی گذرواژه‌ها، «خدمات Google Play» را به‌روز کنید</translation>
 <translation id="3845098929839618392">بازکردن در برگه ناشناس</translation>
 <translation id="3856096718352044181">لطفاً تأیید کنید این ارائه‌دهندهْ معتبر است یا بعداً دوباره امتحان کنید</translation>
-<translation id="3858127568696903256">محتوایی را که دنبال می‌کنید در اینجا ببینید</translation>
 <translation id="3858860766373142691">نام</translation>
 <translation id="3861633093716975811">ویدیوهای پرطرفدار</translation>
 <translation id="3874520961715512166">سایت برداشته شد</translation>
@@ -990,7 +988,6 @@
 <translation id="6397616442223433927">دوباره آنلاین شدید</translation>
 <translation id="6401458660421980302">‏برای ارسال این برگه به دستگاهی دیگر، در آنجا به سیستم Chrome وارد شوید</translation>
 <translation id="6402652558933147609"><ph name="ERROR_CODE" /> در <ph name="VIOLATED_URL" /></translation>
-<translation id="6403371459378431832">داده‌هایتان را در همه دستگاه‌ها همگام‌سازی کنید</translation>
 <translation id="6404511346730675251">ویرایش نشانک</translation>
 <translation id="6406506848690869874">همگام‌سازی</translation>
 <translation id="6407224748847589805">اتصال به رایانه ممکن نیست. گزینه تأیید دیگری را امتحان کنید.</translation>
@@ -1071,7 +1068,7 @@
 <translation id="6737612727720318154">اگر فکر می‌کنید آگهی‌های مربوط به علاقه یا سایتی خاص برایتان مفید خواهد بود، آن را مجاز کنید</translation>
 <translation id="6738516213925468394">داده‌ها با  <ph name="BEGIN_LINK" />گذرعبارت همگام‌سازی<ph name="END_LINK" /> شما در <ph name="TIME" /> رمز می‌شود. برای شروع همگام‌سازی، آن را وارد کنید.</translation>
 <translation id="6738867403308150051">در حال بارگیری…</translation>
-<translation id="674388916582496364">‏طبیعی است اگر سایت‌هایی که بازدید می‌کنید برای شخصی کردن تجربه‌تان، علایق شما را به‌خاطر آورند. به‌علاوه، سایت‌ها می‌توانند بااستفاده از Chrome اطلاعاتی درباره علایقتان ذخیره کنند.</translation>
+<translation id="674388916582496364">‏طبیعی است اگر سایت‌هایی که بازدید می‌کنید برای شخصی‌سازی تجربه‌تان، علایق شما را به‌خاطر آورند. به‌علاوه، سایت‌ها می‌توانند بااستفاده از Chrome اطلاعاتی درباره علایقتان ذخیره کنند.</translation>
 <translation id="6751521182688001123">به‌سرعت برگه جدیدی باز کنید. برای ویرایش این میان‌بر، لمس کنید و نگه دارید.</translation>
 <translation id="6756507620369789050">هم‌رسانی بازخورد</translation>
 <translation id="6767294960381293877">فهرست نیمه‌باز دستگاه‌هایی که می‌توان با آن‌ها برگه هم‌رسانی کرد.</translation>
@@ -1228,6 +1225,7 @@
 <translation id="7596558890252710462">سیستم‌عامل</translation>
 <translation id="7605594153474022051">همگام‌سازی کار نمی‌کند</translation>
 <translation id="7612619742409846846">‏ثبت ورودشده در Google به‌عنوان</translation>
+<translation id="7612989789287281429">درحال وارد کردن شما به سیستم…</translation>
 <translation id="7616551326690708776">الگویی برای برجسته‌سازی‌تان انتخاب کنید.</translation>
 <translation id="7619072057915878432">به‌دلیل نقص‌هایی در شبکه، بارگیری <ph name="FILE_NAME" /> انجام نشد.</translation>
 <translation id="7626032353295482388">‏به Chrome خوش آمدید</translation>
@@ -1246,6 +1244,7 @@
 <translation id="7682724950699840886">نکات زیر را امتحان کنید: مطمئن شوید که در دستگاهتان فضای کافی وجود داشته باشد، سعی کنید دوباره صادر کنید.</translation>
 <translation id="7686086654630106285">اطلاعات بیشتر درباره آگهی‌های پیشنهادی سایت</translation>
 <translation id="768618399695552958">‏برخی‌از صفحاتی که بازدید می‌کنید پیش‌بارگیری شده‌اند وقتی صفحات از سایت Google پیوند داده شده باشند، ممکن است ازطریق سرورهای Google پیش‌بارگیری شوند.</translation>
+<translation id="7691043218961417207">کاوش محتوا برای دنبال کردن</translation>
 <translation id="7698359219371678927">ایجاد ایمیل در <ph name="APP_NAME" /></translation>
 <translation id="7707922173985738739">استفاده از داده تلفن همراه</translation>
 <translation id="7709094866268987903">علایقی که برداشتید اینجا نشان داده خواهد شد</translation>
@@ -1319,7 +1318,6 @@
 <translation id="8037801708772278989">آخرین بررسی: همین‌حالا</translation>
 <translation id="804335162455518893">‏کارت SD پیدا نشد</translation>
 <translation id="8048533522416101084">{TAB_COUNT,plural, =1{<ph name="TAB_COUNT_ONE" /> برگه ناشناس}one{<ph name="TAB_COUNT_NORMAL" /> برگه ناشناس}other{<ph name="TAB_COUNT_NORMAL" /> برگه ناشناس}}</translation>
-<translation id="8048728378294435881">از داده‌هایتان پشتیبان بگیرید و در هر دستگاهی از آن استفاده کنید</translation>
 <translation id="8051695050440594747"><ph name="MEGABYTES" /> مگابایت موجود است</translation>
 <translation id="8058655154417507695">سال انقضا</translation>
 <translation id="8058746566562539958">‏باز کردن در برگه جدید Chrome</translation>
@@ -1497,6 +1495,7 @@
 <translation id="8970887620466824814">مشکلی پیش آمد.</translation>
 <translation id="8972098258593396643">در پوشه پیش‌فرض بارگیری شود؟</translation>
 <translation id="8987641763863173640">مدیریت تنظیمات پیش‌دید ویدیو</translation>
+<translation id="8987736167266086032">ادامه دادن از جایی که ترک کرده‌اید</translation>
 <translation id="8989968390305463310">‏سابقه مرور شما بر آگهی‌هایی که می‌بینید و علایقتان که در زیر برآورد شده است تأثیر می‌گذارد. برای محافظت از حریم خصوصی شما، Chrome علایقتان را هر ماه به‌طور خودکار و چرخشی حذف می‌کند. ممکن است علایق بازآوری شود، مگر اینکه آن‌ها را بردارید.</translation>
 <translation id="8993760627012879038">باز کردن برگه جدیدی در حالت ناشناس</translation>
 <translation id="8996847606757455498">انتخاب ارائه‌دهنده دیگر</translation>

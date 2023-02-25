@@ -67,7 +67,7 @@
 #include "third_party/blink/renderer/core/css_value_keywords.h"
 #include "third_party/blink/renderer/core/frame/local_frame.h"
 #include "third_party/blink/renderer/core/frame/web_feature.h"
-#include "third_party/blink/renderer/core/style/anchor_scroll_value.h"
+#include "third_party/blink/renderer/core/style/anchor_specifier_value.h"
 #include "third_party/blink/renderer/core/style/reference_clip_path_operation.h"
 #include "third_party/blink/renderer/core/style/scoped_css_name.h"
 #include "third_party/blink/renderer/core/style/shape_clip_path_operation.h"
@@ -1306,6 +1306,7 @@ void StyleBuilderConverter::ConvertGridTrackList(
     if (identifier_value &&
         identifier_value->GetValueID() == CSSValueID::kSubgrid) {
       computed_grid_track_list.axis_type = GridAxisType::kSubgriddedAxis;
+      track_sizes.NGTrackList().SetAxisType(GridAxisType::kSubgriddedAxis);
       ++curr_value;
     }
   }
@@ -1337,8 +1338,11 @@ void StyleBuilderConverter::ConvertGridTrackList(
             ConvertGridTrackSize(state, *auto_repeat_value));
       }
       track_sizes.NGTrackList().AddRepeater(
-          repeated_track_sizes, static_cast<NGGridTrackRepeater::RepeatType>(
-                                    computed_grid_track_list.auto_repeat_type));
+          repeated_track_sizes,
+          static_cast<NGGridTrackRepeater::RepeatType>(
+              computed_grid_track_list.auto_repeat_type),
+          /* repeat_count */ 1,
+          /* repeat_number_of_lines */ auto_repeat_index);
       DCHECK(auto_repeat_track_sizes.empty());
       auto_repeat_track_sizes = std::move(repeated_track_sizes);
       computed_grid_track_list.auto_repeat_insertion_point =
@@ -1678,7 +1682,20 @@ ScopedCSSName* StyleBuilderConverter::ConvertNoneOrCustomIdent(
                                              custom_ident.GetTreeScope());
 }
 
-AnchorScrollValue* StyleBuilderConverter::ConvertAnchorScroll(
+ScopedCSSName* StyleBuilderConverter::ConvertAnchorDefault(
+    StyleResolverState& state,
+    const CSSValue& value) {
+  DCHECK(value.IsScopedValue());
+  if (const auto* identifier_value = DynamicTo<CSSIdentifierValue>(value)) {
+    DCHECK_EQ(identifier_value->GetValueID(), CSSValueID::kImplicit);
+    return nullptr;
+  }
+  const CSSCustomIdentValue& custom_ident = To<CSSCustomIdentValue>(value);
+  return MakeGarbageCollected<ScopedCSSName>(custom_ident.Value(),
+                                             custom_ident.GetTreeScope());
+}
+
+AnchorSpecifierValue* StyleBuilderConverter::ConvertAnchorScroll(
     StyleResolverState& state,
     const CSSValue& value) {
   DCHECK(value.IsScopedValue());
@@ -1686,15 +1703,17 @@ AnchorScrollValue* StyleBuilderConverter::ConvertAnchorScroll(
     switch (identifier_value->GetValueID()) {
       case CSSValueID::kNone:
         return nullptr;
+      case CSSValueID::kDefault:
+        return AnchorSpecifierValue::Default();
       case CSSValueID::kImplicit:
-        return AnchorScrollValue::Implicit();
+        return AnchorSpecifierValue::Implicit();
       default:
         NOTREACHED();
         return nullptr;
     }
   }
   const CSSCustomIdentValue& custom_ident = To<CSSCustomIdentValue>(value);
-  return MakeGarbageCollected<AnchorScrollValue>(
+  return MakeGarbageCollected<AnchorSpecifierValue>(
       *MakeGarbageCollected<ScopedCSSName>(custom_ident.Value(),
                                            custom_ident.GetTreeScope()));
 }
@@ -2177,7 +2196,7 @@ TextSizeAdjust StyleBuilderConverter::ConvertTextSizeAdjust(
 TextUnderlinePosition StyleBuilderConverter::ConvertTextUnderlinePosition(
     StyleResolverState& state,
     const CSSValue& value) {
-  TextUnderlinePosition flags = kTextUnderlinePositionAuto;
+  TextUnderlinePosition flags = TextUnderlinePosition::kAuto;
 
   auto process = [&flags](const CSSValue& identifier) {
     flags |=
@@ -2492,7 +2511,7 @@ static const CSSValue& ComputeRegisteredPropertyValue(
     const KURL& base_url = context ? context->BaseURL() : KURL();
     const WTF::TextEncoding& charset =
         context ? context->Charset() : WTF::TextEncoding();
-    return *uri_value->ValueWithURLMadeAbsolute(base_url, charset);
+    return *uri_value->ComputedCSSValue(base_url, charset);
   }
 
   return value;

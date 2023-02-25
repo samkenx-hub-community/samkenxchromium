@@ -945,11 +945,7 @@ CSSStyleSheet* StyleEngine::ParseSheet(
   style_sheet = CSSStyleSheet::CreateInline(element, NullURL(), start_position,
                                             GetDocument().Encoding());
   style_sheet->Contents()->SetRenderBlocking(render_blocking_behavior);
-  std::unique_ptr<CachedCSSTokenizer> tokenizer;
-  if (auto* parser = GetDocument().GetScriptableDocumentParser()) {
-    tokenizer = parser->TakeCSSTokenizer(text);
-  }
-  style_sheet->Contents()->ParseString(text, true, std::move(tokenizer));
+  style_sheet->Contents()->ParseString(text);
   return style_sheet;
 }
 
@@ -3698,7 +3694,8 @@ void StyleEngine::UpdateViewportStyle() {
     return;
   }
 
-  scoped_refptr<ComputedStyle> viewport_style = resolver_->StyleForViewport();
+  scoped_refptr<const ComputedStyle> viewport_style =
+      resolver_->StyleForViewport();
   if (ComputedStyle::ComputeDifference(
           viewport_style.get(), GetDocument().GetLayoutView()->Style()) !=
       ComputedStyle::Difference::kEqual) {

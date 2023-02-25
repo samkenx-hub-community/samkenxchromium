@@ -860,7 +860,7 @@ TEST_F(TextfieldTest, Scroll) {
   render_text_test_api.SetGlyphWidth(kGlyphWidth);
   constexpr int kCursorWidth = 1;
   test_api_->GetRenderText()->SetDisplayRect(
-      gfx::Rect(0, 0, kGlyphWidth * 10 + kCursorWidth, 20));
+      gfx::Rect(kGlyphWidth * 10 + kCursorWidth, 20));
   textfield_->SetTextWithoutCaretBoundsChangeNotification(
       u"0123456789_123456789_123456789", 0);
   test_api_->SetDisplayOffsetX(0);
@@ -1471,6 +1471,22 @@ TEST_F(TextfieldTest, PasswordTest) {
   SendAlternatePaste();
   EXPECT_EQ(u"foo", GetClipboardText(ui::ClipboardBuffer::kCopyPaste));
   EXPECT_EQ(u"foofoofoo", textfield_->GetText());
+}
+
+TEST_F(TextfieldTest, PasswordSelectWordTest) {
+  InitTextfield();
+  textfield_->SetTextInputType(ui::TEXT_INPUT_TYPE_PASSWORD);
+  textfield_->SetText(u"password word test");
+
+  // Select word command should be disabled.
+  textfield_->SetEditableSelectionRange(gfx::Range(2));
+  EXPECT_FALSE(textfield_->IsCommandIdEnabled(Textfield::kSelectWord));
+  textfield_->ExecuteCommand(Textfield::kPaste, 0);
+  EXPECT_EQ(u"", textfield_->GetSelectedText());
+
+  // Select word should select whole text instead of the nearest word.
+  textfield_->SelectWord();
+  EXPECT_EQ(u"password word test", textfield_->GetSelectedText());
 }
 
 // Check that text insertion works appropriately for password and read-only
@@ -2715,29 +2731,25 @@ TEST_F(TextfieldTest, SelectWordFromEmptySelection) {
 
   // Place the cursor at the beginning of the text.
   textfield_->SetEditableSelectionRange(gfx::Range(0));
-  EXPECT_TRUE(textfield_->IsCommandIdEnabled(Textfield::kSelectWord));
-  textfield_->ExecuteCommand(Textfield::kSelectWord, 0);
+  textfield_->SelectWord();
   EXPECT_EQ(u"ab", textfield_->GetSelectedText());
   EXPECT_EQ(gfx::Range(0, 2), textfield_->GetSelectedRange());
 
   // Place the cursor after "c".
   textfield_->SetEditableSelectionRange(gfx::Range(4));
-  EXPECT_TRUE(textfield_->IsCommandIdEnabled(Textfield::kSelectWord));
-  textfield_->ExecuteCommand(Textfield::kSelectWord, 0);
+  textfield_->SelectWord();
   EXPECT_EQ(u"cde", textfield_->GetSelectedText());
   EXPECT_EQ(gfx::Range(3, 6), textfield_->GetSelectedRange());
 
   // Place the cursor after "2".
   textfield_->SetEditableSelectionRange(gfx::Range(9));
-  EXPECT_TRUE(textfield_->IsCommandIdEnabled(Textfield::kSelectWord));
-  textfield_->ExecuteCommand(Textfield::kSelectWord, 0);
+  textfield_->SelectWord();
   EXPECT_EQ(u"123", textfield_->GetSelectedText());
   EXPECT_EQ(gfx::Range(7, 10), textfield_->GetSelectedRange());
 
   // Place the cursor at the end of the text.
   textfield_->SetEditableSelectionRange(gfx::Range(12));
-  EXPECT_TRUE(textfield_->IsCommandIdEnabled(Textfield::kSelectWord));
-  textfield_->ExecuteCommand(Textfield::kSelectWord, 0);
+  textfield_->SelectWord();
   EXPECT_EQ(u"4", textfield_->GetSelectedText());
   EXPECT_EQ(gfx::Range(11, 12), textfield_->GetSelectedRange());
 }
@@ -2748,29 +2760,25 @@ TEST_F(TextfieldTest, SelectWordFromNonEmptySelection) {
 
   // Select "b".
   textfield_->SetEditableSelectionRange(gfx::Range(1, 2));
-  EXPECT_TRUE(textfield_->IsCommandIdEnabled(Textfield::kSelectWord));
-  textfield_->ExecuteCommand(Textfield::kSelectWord, 0);
+  textfield_->SelectWord();
   EXPECT_EQ(u"ab", textfield_->GetSelectedText());
   EXPECT_EQ(gfx::Range(0, 2), textfield_->GetSelectedRange());
 
   // Select "b c"
   textfield_->SetEditableSelectionRange(gfx::Range(1, 4));
-  EXPECT_TRUE(textfield_->IsCommandIdEnabled(Textfield::kSelectWord));
-  textfield_->ExecuteCommand(Textfield::kSelectWord, 0);
+  textfield_->SelectWord();
   EXPECT_EQ(u"ab cde", textfield_->GetSelectedText());
   EXPECT_EQ(gfx::Range(0, 6), textfield_->GetSelectedRange());
 
   // Select "e."
   textfield_->SetEditableSelectionRange(gfx::Range(5, 7));
-  EXPECT_TRUE(textfield_->IsCommandIdEnabled(Textfield::kSelectWord));
-  textfield_->ExecuteCommand(Textfield::kSelectWord, 0);
+  textfield_->SelectWord();
   EXPECT_EQ(u"cde.", textfield_->GetSelectedText());
   EXPECT_EQ(gfx::Range(3, 7), textfield_->GetSelectedRange());
 
   // Select "e.1"
   textfield_->SetEditableSelectionRange(gfx::Range(5, 8));
-  EXPECT_TRUE(textfield_->IsCommandIdEnabled(Textfield::kSelectWord));
-  textfield_->ExecuteCommand(Textfield::kSelectWord, 0);
+  textfield_->SelectWord();
   EXPECT_EQ(u"cde.123", textfield_->GetSelectedText());
   EXPECT_EQ(gfx::Range(3, 10), textfield_->GetSelectedRange());
 }
@@ -2781,14 +2789,12 @@ TEST_F(TextfieldTest, SelectWordFromNonAlphaNumericFragment) {
 
   // Place the cursor within "  !!  ".
   textfield_->SetEditableSelectionRange(gfx::Range(8));
-  EXPECT_TRUE(textfield_->IsCommandIdEnabled(Textfield::kSelectWord));
-  textfield_->ExecuteCommand(Textfield::kSelectWord, 0);
+  textfield_->SelectWord();
   EXPECT_EQ(u"  !!  ", textfield_->GetSelectedText());
   EXPECT_EQ(gfx::Range(7, 13), textfield_->GetSelectedRange());
 
   textfield_->SetEditableSelectionRange(gfx::Range(10));
-  EXPECT_TRUE(textfield_->IsCommandIdEnabled(Textfield::kSelectWord));
-  textfield_->ExecuteCommand(Textfield::kSelectWord, 0);
+  textfield_->SelectWord();
   EXPECT_EQ(u"  !!  ", textfield_->GetSelectedText());
   EXPECT_EQ(gfx::Range(7, 13), textfield_->GetSelectedRange());
 }
@@ -2797,11 +2803,77 @@ TEST_F(TextfieldTest, SelectWordFromWhitespaceFragment) {
   InitTextfield();
   textfield_->SetText(u"  HELLO  !!  WO     RLD");
   textfield_->SetEditableSelectionRange(gfx::Range(17));
-  EXPECT_TRUE(textfield_->IsCommandIdEnabled(Textfield::kSelectWord));
-  textfield_->ExecuteCommand(Textfield::kSelectWord, 0);
+  textfield_->SelectWord();
   EXPECT_EQ(u"     ", textfield_->GetSelectedText());
   EXPECT_EQ(gfx::Range(15, 20), textfield_->GetSelectedRange());
 }
+
+TEST_F(TextfieldTest, SelectCommands) {
+  InitTextfield();
+  textfield_->SetText(u"hello string world");
+
+  // Select all and select word commands should both be enabled when there is no
+  // selection.
+  textfield_->SetEditableSelectionRange(gfx::Range(8));
+  EXPECT_TRUE(textfield_->IsCommandIdEnabled(Textfield::kSelectAll));
+  EXPECT_TRUE(textfield_->IsCommandIdEnabled(Textfield::kSelectWord));
+  EXPECT_FALSE(test_api_->touch_selection_controller());
+
+  // Select word at current position. Select word command should now be disabled
+  // since there is already a selection.
+  textfield_->ExecuteCommand(Textfield::kSelectWord, 0);
+  EXPECT_EQ(u"string", textfield_->GetSelectedText());
+  EXPECT_EQ(gfx::Range(6, 12), textfield_->GetSelectedRange());
+  EXPECT_TRUE(textfield_->IsCommandIdEnabled(Textfield::kSelectAll));
+  EXPECT_FALSE(textfield_->IsCommandIdEnabled(Textfield::kSelectWord));
+  EXPECT_FALSE(test_api_->touch_selection_controller());
+
+  // Select all text. Select all and select word commands should now both be
+  // disabled.
+  textfield_->ExecuteCommand(Textfield::kSelectAll, 0);
+  EXPECT_EQ(u"hello string world", textfield_->GetSelectedText());
+  EXPECT_EQ(gfx::Range(0, 18), textfield_->GetSelectedRange());
+  EXPECT_FALSE(textfield_->IsCommandIdEnabled(Textfield::kSelectAll));
+  EXPECT_FALSE(textfield_->IsCommandIdEnabled(Textfield::kSelectWord));
+  EXPECT_FALSE(test_api_->touch_selection_controller());
+}
+
+#if BUILDFLAG(IS_CHROMEOS)
+TEST_F(TextfieldTest, SelectCommandsFromTouchEvent) {
+  base::test::ScopedFeatureList feature_list;
+  feature_list.InitWithFeatures(
+      /*enabled_features=*/{::features::kTouchTextEditingRedesign},
+      /*disabled_features=*/{});
+
+  InitTextfield();
+  textfield_->SetText(u"hello string world");
+
+  // Select all and select word commands should both be enabled when there is no
+  // selection.
+  textfield_->SetEditableSelectionRange(gfx::Range(8));
+  EXPECT_TRUE(textfield_->IsCommandIdEnabled(Textfield::kSelectAll));
+  EXPECT_TRUE(textfield_->IsCommandIdEnabled(Textfield::kSelectWord));
+  EXPECT_FALSE(test_api_->touch_selection_controller());
+
+  // Select word at current position. Select word command should now be disabled
+  // since there is already a selection.
+  textfield_->ExecuteCommand(Textfield::kSelectWord, ui::EF_FROM_TOUCH);
+  EXPECT_EQ(u"string", textfield_->GetSelectedText());
+  EXPECT_EQ(gfx::Range(6, 12), textfield_->GetSelectedRange());
+  EXPECT_TRUE(textfield_->IsCommandIdEnabled(Textfield::kSelectAll));
+  EXPECT_FALSE(textfield_->IsCommandIdEnabled(Textfield::kSelectWord));
+  EXPECT_TRUE(test_api_->touch_selection_controller());
+
+  // Select all text. Select all and select word commands should now both be
+  // disabled.
+  textfield_->ExecuteCommand(Textfield::kSelectAll, ui::EF_FROM_TOUCH);
+  EXPECT_EQ(u"hello string world", textfield_->GetSelectedText());
+  EXPECT_EQ(gfx::Range(0, 18), textfield_->GetSelectedRange());
+  EXPECT_FALSE(textfield_->IsCommandIdEnabled(Textfield::kSelectAll));
+  EXPECT_FALSE(textfield_->IsCommandIdEnabled(Textfield::kSelectWord));
+  EXPECT_TRUE(test_api_->touch_selection_controller());
+}
+#endif
 
 TEST_F(TextfieldTest, OvertypeMode) {
   InitTextfield();
@@ -3565,6 +3637,388 @@ TEST_F(TextfieldTest, TestLongPressInitiatesDragDrop) {
       textfield_->CanStartDragForView(nullptr, kStringPoint, kStringPoint));
 }
 
+TEST_F(TextfieldTest, ScrollToAdjustDisplayOffset) {
+  InitTextfield();
+
+  // Size the textfield wide enough to hold 10 characters.
+  gfx::test::RenderTextTestApi render_text_test_api(test_api_->GetRenderText());
+  constexpr int kGlyphWidth = 10;
+  render_text_test_api.SetGlyphWidth(kGlyphWidth);
+  constexpr int kCursorWidth = 1;
+  test_api_->GetRenderText()->SetDisplayRect(
+      gfx::Rect(kGlyphWidth * 10 + kCursorWidth, 20));
+  textfield_->SetTextWithoutCaretBoundsChangeNotification(
+      u"0123456789_123456789_123456789", 0);
+  test_api_->SetDisplayOffsetX(0);
+  EXPECT_FALSE(test_api_->touch_selection_controller());
+
+  // A scroll which begins in a vertical direction should adjust the display
+  // offset.
+  ui::GestureEvent scroll_begin = CreateTestGestureEvent(
+      GetCursorPositionX(5), GetCursorYForTesting(),
+      ui::GestureEventDetails(ui::ET_GESTURE_SCROLL_BEGIN, 0, 1));
+  textfield_->OnGestureEvent(&scroll_begin);
+  EXPECT_EQ(test_api_->GetDisplayOffsetX(), 0);
+
+  ui::GestureEvent scroll_update = CreateTestGestureEvent(
+      GetCursorPositionX(5) - 30, GetCursorYForTesting(),
+      ui::GestureEventDetails(ui::ET_GESTURE_SCROLL_UPDATE));
+  textfield_->OnGestureEvent(&scroll_update);
+  EXPECT_EQ(test_api_->GetDisplayOffsetX(), -30);
+
+  ui::GestureEvent scroll_end = CreateTestGestureEvent(
+      GetCursorPositionX(5) - 30, GetCursorYForTesting(),
+      ui::GestureEventDetails(ui::ET_GESTURE_SCROLL_END));
+  textfield_->OnGestureEvent(&scroll_end);
+  EXPECT_EQ(test_api_->GetDisplayOffsetX(), -30);
+  // Touch handles shouldn't be shown since they weren't shown initially.
+  EXPECT_FALSE(test_api_->touch_selection_controller());
+}
+
+TEST_F(TextfieldTest, TwoFingerScroll) {
+  InitTextfield();
+
+  // Size the textfield wide enough to hold 10 characters.
+  gfx::test::RenderTextTestApi render_text_test_api(test_api_->GetRenderText());
+  constexpr int kGlyphWidth = 10;
+  render_text_test_api.SetGlyphWidth(kGlyphWidth);
+  constexpr int kCursorWidth = 1;
+  test_api_->GetRenderText()->SetDisplayRect(
+      gfx::Rect(kGlyphWidth * 10 + kCursorWidth, 20));
+  textfield_->SetTextWithoutCaretBoundsChangeNotification(
+      u"0123456789_123456789_123456789", 0);
+  test_api_->SetDisplayOffsetX(0);
+  EXPECT_FALSE(test_api_->touch_selection_controller());
+
+  // Two finger scroll should adjust the display offset.
+  ui::GestureEventDetails scroll_begin_details(ui::ET_GESTURE_SCROLL_BEGIN);
+  scroll_begin_details.set_touch_points(2);
+  ui::GestureEvent scroll_begin = CreateTestGestureEvent(
+      GetCursorPositionX(5), GetCursorYForTesting(), scroll_begin_details);
+  textfield_->OnGestureEvent(&scroll_begin);
+  EXPECT_EQ(test_api_->GetDisplayOffsetX(), 0);
+
+  ui::GestureEventDetails scroll_update_details(ui::ET_GESTURE_SCROLL_UPDATE);
+  scroll_update_details.set_touch_points(2);
+  ui::GestureEvent scroll_update =
+      CreateTestGestureEvent(GetCursorPositionX(5) - 30, GetCursorYForTesting(),
+                             scroll_update_details);
+  textfield_->OnGestureEvent(&scroll_update);
+  EXPECT_EQ(test_api_->GetDisplayOffsetX(), -30);
+
+  ui::GestureEvent scroll_end = CreateTestGestureEvent(
+      GetCursorPositionX(5) - 30, GetCursorYForTesting(),
+      ui::GestureEventDetails(ui::ET_GESTURE_SCROLL_END));
+  textfield_->OnGestureEvent(&scroll_end);
+  EXPECT_EQ(test_api_->GetDisplayOffsetX(), -30);
+  // Touch handles shouldn't be shown since they weren't shown initially.
+  EXPECT_FALSE(test_api_->touch_selection_controller());
+}
+
+#if BUILDFLAG(IS_CHROMEOS)
+TEST_F(TextfieldTest, ScrollToPlaceCursor) {
+  base::test::ScopedFeatureList feature_list;
+  feature_list.InitWithFeatures(
+      /*enabled_features=*/{::features::kTouchTextEditingRedesign},
+      /*disabled_features=*/{});
+
+  InitTextfield();
+  textfield_->SetText(u"Hello string world");
+  gfx::Range range;
+
+  // A scroll which begins in a horizontal direction should move the cursor.
+  ui::GestureEvent scroll_begin = CreateTestGestureEvent(
+      GetCursorPositionX(2), GetCursorYForTesting(),
+      ui::GestureEventDetails(ui::ET_GESTURE_SCROLL_BEGIN, 1, 0));
+  textfield_->OnGestureEvent(&scroll_begin);
+
+  ui::GestureEvent scroll_update_1 = CreateTestGestureEvent(
+      GetCursorPositionX(5), GetCursorYForTesting(),
+      ui::GestureEventDetails(ui::ET_GESTURE_SCROLL_UPDATE));
+  textfield_->OnGestureEvent(&scroll_update_1);
+  textfield_->GetEditableSelectionRange(&range);
+  EXPECT_EQ(range, gfx::Range(5));
+
+  ui::GestureEvent scroll_update_2 = CreateTestGestureEvent(
+      GetCursorPositionX(7), GetCursorYForTesting(),
+      ui::GestureEventDetails(ui::ET_GESTURE_SCROLL_UPDATE));
+  textfield_->OnGestureEvent(&scroll_update_2);
+  textfield_->GetEditableSelectionRange(&range);
+  EXPECT_EQ(range, gfx::Range(7));
+}
+
+TEST_F(TextfieldTest, ScrollToPlaceCursorShowsTouchHandles) {
+  base::test::ScopedFeatureList feature_list;
+  feature_list.InitWithFeatures(
+      /*enabled_features=*/{::features::kTouchTextEditingRedesign},
+      /*disabled_features=*/{});
+
+  InitTextfield();
+  textfield_->SetText(u"Hello string world");
+
+  // A scroll which begins in a horizontal direction should move the cursor.
+  ui::GestureEvent scroll_begin = CreateTestGestureEvent(
+      GetCursorPositionX(2), GetCursorYForTesting(),
+      ui::GestureEventDetails(ui::ET_GESTURE_SCROLL_BEGIN, 1, 0));
+  textfield_->OnGestureEvent(&scroll_begin);
+
+  ui::GestureEvent scroll_update = CreateTestGestureEvent(
+      GetCursorPositionX(5), GetCursorYForTesting(),
+      ui::GestureEventDetails(ui::ET_GESTURE_SCROLL_UPDATE));
+  textfield_->OnGestureEvent(&scroll_update);
+  // Touch handles should be hidden during scroll.
+  EXPECT_FALSE(test_api_->touch_selection_controller());
+
+  ui::GestureEvent scroll_end = CreateTestGestureEvent(
+      GetCursorPositionX(7), GetCursorYForTesting(),
+      ui::GestureEventDetails(ui::ET_GESTURE_SCROLL_END));
+  textfield_->OnGestureEvent(&scroll_end);
+  // Touch handles should be shown when scroll ends.
+  EXPECT_TRUE(test_api_->touch_selection_controller());
+}
+
+TEST_F(TextfieldTest, ScrollToPlaceCursorAdjustsDisplayOffset) {
+  base::test::ScopedFeatureList feature_list;
+  feature_list.InitWithFeatures(
+      /*enabled_features=*/{::features::kTouchTextEditingRedesign},
+      /*disabled_features=*/{});
+
+  InitTextfield();
+
+  // Size the textfield wide enough to hold 10 characters.
+  gfx::test::RenderTextTestApi render_text_test_api(test_api_->GetRenderText());
+  constexpr int kGlyphWidth = 10;
+  render_text_test_api.SetGlyphWidth(kGlyphWidth);
+  constexpr int kCursorWidth = 1;
+  test_api_->GetRenderText()->SetDisplayRect(
+      gfx::Rect(kGlyphWidth * 10 + kCursorWidth, 20));
+  textfield_->SetTextWithoutCaretBoundsChangeNotification(
+      u"0123456789_123456789_123456789", 0);
+  test_api_->SetDisplayOffsetX(0);
+  gfx::Range range;
+
+  // A scroll which begins in a horizontal direction should move the cursor.
+  ui::GestureEvent scroll_begin = CreateTestGestureEvent(
+      GetCursorPositionX(2), GetCursorYForTesting(),
+      ui::GestureEventDetails(ui::ET_GESTURE_SCROLL_BEGIN, 1, 0));
+  textfield_->OnGestureEvent(&scroll_begin);
+  EXPECT_EQ(test_api_->GetDisplayOffsetX(), 0);
+
+  ui::GestureEvent scroll_update = CreateTestGestureEvent(
+      GetCursorPositionX(30), GetCursorYForTesting(),
+      ui::GestureEventDetails(ui::ET_GESTURE_SCROLL_UPDATE));
+  textfield_->OnGestureEvent(&scroll_update);
+  textfield_->GetEditableSelectionRange(&range);
+  EXPECT_EQ(range, gfx::Range(30));
+  // Display should be offset so that the cursor is visible in the textfield.
+  EXPECT_EQ(test_api_->GetDisplayOffsetX(), -200);
+}
+
+TEST_F(TextfieldTest, TwoFingerScrollUpdate) {
+  base::test::ScopedFeatureList feature_list;
+  feature_list.InitWithFeatures(
+      /*enabled_features=*/{::features::kTouchTextEditingRedesign},
+      /*disabled_features=*/{});
+
+  InitTextfield();
+
+  // Size the textfield wide enough to hold 10 characters.
+  gfx::test::RenderTextTestApi render_text_test_api(test_api_->GetRenderText());
+  constexpr int kGlyphWidth = 10;
+  render_text_test_api.SetGlyphWidth(kGlyphWidth);
+  constexpr int kCursorWidth = 1;
+  test_api_->GetRenderText()->SetDisplayRect(
+      gfx::Rect(kGlyphWidth * 10 + kCursorWidth, 20));
+  textfield_->SetTextWithoutCaretBoundsChangeNotification(
+      u"0123456789_123456789_123456789", 0);
+  test_api_->SetDisplayOffsetX(0);
+  gfx::Range range;
+
+  // Start scrolling with one touch point in a horizontal direction.
+  ui::GestureEventDetails scroll_begin_details(ui::ET_GESTURE_SCROLL_BEGIN, 1,
+                                               0);
+  ui::GestureEvent scroll_begin = CreateTestGestureEvent(
+      GetCursorPositionX(5), GetCursorYForTesting(), scroll_begin_details);
+  textfield_->OnGestureEvent(&scroll_begin);
+  EXPECT_EQ(test_api_->GetDisplayOffsetX(), 0);
+
+  // Scroll update should move the cursor.
+  ui::GestureEvent scroll_update_1 = CreateTestGestureEvent(
+      GetCursorPositionX(5), GetCursorYForTesting(),
+      ui::GestureEventDetails(ui::ET_GESTURE_SCROLL_UPDATE));
+  textfield_->OnGestureEvent(&scroll_update_1);
+  textfield_->GetEditableSelectionRange(&range);
+  EXPECT_EQ(range, gfx::Range(5));
+  EXPECT_EQ(test_api_->GetDisplayOffsetX(), 0);
+
+  // Add second touch point to scroll sequence.
+  ui::GestureEventDetails scroll_update_details_2(ui::ET_GESTURE_SCROLL_UPDATE);
+  scroll_update_details_2.set_touch_points(2);
+  ui::GestureEvent scroll_update_2 = CreateTestGestureEvent(
+      GetCursorPositionX(5), GetCursorYForTesting(), scroll_update_details_2);
+  textfield_->OnGestureEvent(&scroll_update_2);
+  EXPECT_EQ(range, gfx::Range(5));
+  EXPECT_EQ(test_api_->GetDisplayOffsetX(), 0);
+
+  // Scroll update should adjust display offset without moving cursor.
+  ui::GestureEventDetails scroll_update_details_3(ui::ET_GESTURE_SCROLL_UPDATE);
+  scroll_update_details_3.set_touch_points(2);
+  ui::GestureEvent scroll_update_3 =
+      CreateTestGestureEvent(GetCursorPositionX(5) - 30, GetCursorYForTesting(),
+                             scroll_update_details_3);
+  textfield_->OnGestureEvent(&scroll_update_3);
+  EXPECT_EQ(range, gfx::Range(5));
+  EXPECT_EQ(test_api_->GetDisplayOffsetX(), -30);
+
+  ui::GestureEvent scroll_end = CreateTestGestureEvent(
+      GetCursorPositionX(5) - 30, GetCursorYForTesting(),
+      ui::GestureEventDetails(ui::ET_GESTURE_SCROLL_END));
+  textfield_->OnGestureEvent(&scroll_end);
+  EXPECT_EQ(test_api_->GetDisplayOffsetX(), -30);
+  // Touch handles should be shown when scroll ends since the scroll sequence
+  // was initially used for cursor placement.
+  EXPECT_TRUE(test_api_->touch_selection_controller());
+}
+
+TEST_F(TextfieldTest, LongPressDragLTR_Forward) {
+  base::test::ScopedFeatureList feature_list;
+  feature_list.InitWithFeatures(
+      /*enabled_features=*/{::features::kTouchTextEditingRedesign},
+      /*disabled_features=*/{});
+
+  InitTextfield();
+  textfield_->SetText(u"Hello string world");
+  gfx::Range range;
+
+  // Long press should select the word at the pressed location.
+  ui::GestureEvent long_press = CreateTestGestureEvent(
+      GetCursorPositionX(9), GetCursorYForTesting(),
+      ui::GestureEventDetails(ui::ET_GESTURE_LONG_PRESS));
+  textfield_->OnGestureEvent(&long_press);
+  textfield_->GetEditableSelectionRange(&range);
+  EXPECT_EQ(range, gfx::Range(6, 12));
+
+  // Dragging right while long pressing should expand the selection forwards.
+  ui::GestureEvent scroll_begin = CreateTestGestureEvent(
+      GetCursorPositionX(9), GetCursorYForTesting(),
+      ui::GestureEventDetails(ui::ET_GESTURE_SCROLL_BEGIN, 1, 0));
+  textfield_->OnGestureEvent(&scroll_begin);
+  EXPECT_EQ(range, gfx::Range(6, 12));
+
+  ui::GestureEvent scroll_update = CreateTestGestureEvent(
+      GetCursorPositionX(16), GetCursorYForTesting(),
+      ui::GestureEventDetails(ui::ET_GESTURE_SCROLL_UPDATE));
+  textfield_->OnGestureEvent(&scroll_update);
+  textfield_->GetEditableSelectionRange(&range);
+  EXPECT_EQ(range, gfx::Range(6, 18));
+}
+
+TEST_F(TextfieldTest, LongPressDragLTR_Backward) {
+  base::test::ScopedFeatureList feature_list;
+  feature_list.InitWithFeatures(
+      /*enabled_features=*/{::features::kTouchTextEditingRedesign},
+      /*disabled_features=*/{});
+
+  InitTextfield();
+  textfield_->SetText(u"Hello string world");
+  gfx::Range range;
+
+  // Long press should select the word at the pressed location.
+  ui::GestureEvent long_press = CreateTestGestureEvent(
+      GetCursorPositionX(9), GetCursorYForTesting(),
+      ui::GestureEventDetails(ui::ET_GESTURE_LONG_PRESS));
+  textfield_->OnGestureEvent(&long_press);
+  textfield_->GetEditableSelectionRange(&range);
+  EXPECT_EQ(range, gfx::Range(6, 12));
+
+  // Dragging left while long pressing should expand the selection backwards.
+  ui::GestureEvent scroll_begin = CreateTestGestureEvent(
+      GetCursorPositionX(9), GetCursorYForTesting(),
+      ui::GestureEventDetails(ui::ET_GESTURE_SCROLL_BEGIN, -1, 0));
+  textfield_->OnGestureEvent(&scroll_begin);
+  textfield_->GetEditableSelectionRange(&range);
+  // Selection range is reversed since the left endpoint should move while the
+  // right endpoint should stay fixed.
+  EXPECT_EQ(range, gfx::Range(12, 6));
+
+  ui::GestureEvent scroll_update = CreateTestGestureEvent(
+      GetCursorPositionX(3), GetCursorYForTesting(),
+      ui::GestureEventDetails(ui::ET_GESTURE_SCROLL_UPDATE));
+  textfield_->OnGestureEvent(&scroll_update);
+  textfield_->GetEditableSelectionRange(&range);
+  EXPECT_EQ(range, gfx::Range(12, 0));
+}
+
+TEST_F(TextfieldTest, LongPressDragRTL_Forward) {
+  base::test::ScopedFeatureList feature_list;
+  feature_list.InitWithFeatures(
+      /*enabled_features=*/{::features::kTouchTextEditingRedesign},
+      /*disabled_features=*/{});
+
+  InitTextfield();
+  textfield_->SetText(u"مرحبا بالعالم مرحبا");
+  gfx::Range range;
+
+  // Long press should select the word at the pressed location.
+  ui::GestureEvent long_press = CreateTestGestureEvent(
+      GetCursorPositionX(9), GetCursorYForTesting(),
+      ui::GestureEventDetails(ui::ET_GESTURE_LONG_PRESS));
+  textfield_->OnGestureEvent(&long_press);
+  textfield_->GetEditableSelectionRange(&range);
+  EXPECT_EQ(range, gfx::Range(6, 13));
+
+  // Dragging left while long pressing should expand the selection forwards.
+  ui::GestureEvent scroll_begin = CreateTestGestureEvent(
+      GetCursorPositionX(9), GetCursorYForTesting(),
+      ui::GestureEventDetails(ui::ET_GESTURE_SCROLL_BEGIN, -1, 0));
+  textfield_->OnGestureEvent(&scroll_begin);
+  EXPECT_EQ(range, gfx::Range(6, 13));
+
+  ui::GestureEvent scroll_update = CreateTestGestureEvent(
+      GetCursorPositionX(18), GetCursorYForTesting(),
+      ui::GestureEventDetails(ui::ET_GESTURE_SCROLL_UPDATE));
+  textfield_->OnGestureEvent(&scroll_update);
+  textfield_->GetEditableSelectionRange(&range);
+  EXPECT_EQ(range, gfx::Range(6, 19));
+}
+
+TEST_F(TextfieldTest, LongPressDragRTL_Backward) {
+  base::test::ScopedFeatureList feature_list;
+  feature_list.InitWithFeatures(
+      /*enabled_features=*/{::features::kTouchTextEditingRedesign},
+      /*disabled_features=*/{});
+
+  InitTextfield();
+  textfield_->SetText(u"مرحبا بالعالم مرحبا");
+  gfx::Range range;
+
+  // Long press should select the word at the pressed location.
+  ui::GestureEvent long_press = CreateTestGestureEvent(
+      GetCursorPositionX(9), GetCursorYForTesting(),
+      ui::GestureEventDetails(ui::ET_GESTURE_LONG_PRESS));
+  textfield_->OnGestureEvent(&long_press);
+  textfield_->GetEditableSelectionRange(&range);
+  EXPECT_EQ(range, gfx::Range(6, 13));
+
+  // Dragging right while long pressing should expand the selection backwards.
+  ui::GestureEvent scroll_begin = CreateTestGestureEvent(
+      GetCursorPositionX(9), GetCursorYForTesting(),
+      ui::GestureEventDetails(ui::ET_GESTURE_SCROLL_BEGIN, 1, 0));
+  textfield_->OnGestureEvent(&scroll_begin);
+  textfield_->GetEditableSelectionRange(&range);
+  // Selection range is reversed since the right endpoint should move while the
+  // left endpoint should stay fixed.
+  EXPECT_EQ(range, gfx::Range(13, 6));
+
+  ui::GestureEvent scroll_update = CreateTestGestureEvent(
+      GetCursorPositionX(3), GetCursorYForTesting(),
+      ui::GestureEventDetails(ui::ET_GESTURE_SCROLL_UPDATE));
+  textfield_->OnGestureEvent(&scroll_update);
+  textfield_->GetEditableSelectionRange(&range);
+  EXPECT_EQ(range, gfx::Range(13, 0));
+}
+#endif
+
 TEST_F(TextfieldTest, GetTextfieldBaseline_FontFallbackTest) {
   InitTextfield();
   textfield_->SetText(u"abc");
@@ -4033,7 +4487,7 @@ TEST_F(TextfieldTest, FitToLocalBounds) {
   InitTextfield();
   textfield_->SetBounds(0, 0, kDisplayRectWidth, 100);
   textfield_->SetBorder(views::CreateEmptyBorder(kBorderWidth));
-  test_api_->GetRenderText()->SetDisplayRect(gfx::Rect(0, 0, 20, 20));
+  test_api_->GetRenderText()->SetDisplayRect(gfx::Rect(20, 20));
   ASSERT_EQ(20, test_api_->GetRenderText()->display_rect().width());
   textfield_->FitToLocalBounds();
   EXPECT_EQ(kDisplayRectWidth - 2 * kBorderWidth,

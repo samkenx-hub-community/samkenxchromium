@@ -405,6 +405,8 @@ struct PA_ALIGNAS(64) PA_COMPONENT_EXPORT(PARTITION_ALLOC) PartitionRoot {
   PartitionRoot()
       : flags{QuarantineMode::kAlwaysDisabled, ScanMode::kDisabled} {}
   explicit PartitionRoot(PartitionOptions opts) : flags() { Init(opts); }
+  // TODO(tasak): remove ~PartitionRoot() after confirming all tests
+  // don't need ~PartitionRoot().
   ~PartitionRoot();
 
   // This will unreserve any space in the pool that the PartitionRoot is
@@ -584,6 +586,7 @@ struct PA_ALIGNAS(64) PA_COMPONENT_EXPORT(PARTITION_ALLOC) PartitionRoot {
                  PartitionStatsDumper* partition_stats_dumper);
 
   static void DeleteForTesting(PartitionRoot* partition_root);
+  void ResetForTesting(bool allow_leaks);
   void ResetBookkeepingForTesting();
 
   PA_ALWAYS_INLINE BucketDistribution GetBucketDistribution() const {
@@ -919,6 +922,7 @@ struct PA_ALIGNAS(64) PA_COMPONENT_EXPORT(PARTITION_ALLOC) PartitionRoot {
 
   // May return an invalid thread cache.
   PA_ALWAYS_INLINE ThreadCache* GetOrCreateThreadCache();
+  PA_ALWAYS_INLINE ThreadCache* GetThreadCache();
 
 #if PA_CONFIG(USE_PARTITION_ROOT_ENUMERATOR)
   static internal::Lock& GetEnumeratorLock();
@@ -1397,8 +1401,13 @@ PA_ALWAYS_INLINE void PartitionRoot<thread_safe>::FreeNoHooksImmediate(
     // potential use-after-free issues into unexploitable crashes.
     if (PA_UNLIKELY(!ref_count->IsAliveWithNoKnownRefs() &&
                     brp_zapping_enabled())) {
-      internal::SecureMemset(object, internal::kQuarantinedByte,
-                             slot_span->GetUsableSize(this));
+      auto usable_size = slot_span->GetUsableSize(this);
+      auto hook = PartitionAllocHooks::GetQuarantineOverrideHook();
+      if (PA_UNLIKELY(hook)) {
+        hook(object, usable_size);
+      } else {
+        internal::SecureMemset(object, internal::kQuarantinedByte, usable_size);
+      }
     }
 
     if (PA_UNLIKELY(!(ref_count->ReleaseFromAllocator()))) {
@@ -1539,7 +1548,7 @@ PA_ALWAYS_INLINE void PartitionRoot<thread_safe>::RawFreeWithThreadCache(
     SlotSpan* slot_span) {
   // PA_LIKELY: performance-sensitive partitions have a thread cache,
   // direct-mapped allocations are uncommon.
-  ThreadCache* thread_cache = GetOrCreateThreadCache();
+  ThreadCache* thread_cache = GetThreadCache();
   if (PA_LIKELY(ThreadCache::IsValid(thread_cache) &&
                 !IsDirectMappedBucket(slot_span->bucket))) {
     size_t bucket_index =
@@ -2264,6 +2273,11 @@ ThreadCache* PartitionRoot<thread_safe>::GetOrCreateThreadCache() {
     }
   }
   return thread_cache;
+}
+
+template <bool thread_safe>
+ThreadCache* PartitionRoot<thread_safe>::GetThreadCache() {
+  return PA_LIKELY(flags.with_thread_cache) ? ThreadCache::Get() : nullptr;
 }
 
 using ThreadSafePartitionRoot = PartitionRoot<internal::ThreadSafe>;

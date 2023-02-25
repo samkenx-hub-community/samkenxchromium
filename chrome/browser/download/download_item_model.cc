@@ -33,8 +33,6 @@
 #include "chrome/browser/enterprise/connectors/common.h"
 #include "chrome/browser/enterprise/connectors/connectors_manager.h"
 #include "chrome/browser/profiles/profile.h"
-#include "chrome/browser/safe_browsing/download_protection/deep_scanning_request.h"
-#include "chrome/browser/safe_browsing/download_protection/download_feedback_service.h"
 #include "chrome/browser/safe_browsing/download_protection/download_protection_util.h"
 #include "chrome/browser/safe_browsing/safe_browsing_service.h"
 #include "chrome/browser/signin/identity_manager_factory.h"
@@ -58,10 +56,16 @@
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/l10n/time_format.h"
 #include "ui/base/text/bytes_formatting.h"
+#include "ui/color/color_id.h"
 
 #if !BUILDFLAG(IS_ANDROID)
 #include "chrome/browser/ui/browser.h"
 #include "ui/views/vector_icons.h"
+#endif
+
+#if BUILDFLAG(FULL_SAFE_BROWSING)
+#include "chrome/browser/safe_browsing/download_protection/deep_scanning_request.h"
+#include "chrome/browser/safe_browsing/download_protection/download_feedback_service.h"
 #endif
 
 using download::DownloadItem;
@@ -932,7 +936,8 @@ DownloadItemModel::GetBubbleUIInfoForTailoredWarning() const {
                l10n_util::GetStringUTF16(
                    IDS_DOWNLOAD_BUBBLE_SUBPAGE_SUMMARY_SUSPICIOUS_ARCHIVE))
         .AddIconAndColor(vector_icons::kNotSecureWarningIcon,
-                         ui::kColorAlertMediumSeverity)
+                         ui::kColorAlertMediumSeverityIcon)
+        .AddSecondaryTextColor(ui::kColorAlertMediumSeverityText)
         .AddPrimaryButton(DownloadCommands::Command::DISCARD)
         .AddSubpageButton(l10n_util::GetStringUTF16(IDS_DOWNLOAD_BUBBLE_DELETE),
                           DownloadCommands::Command::DISCARD,

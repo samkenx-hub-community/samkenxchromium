@@ -56,12 +56,12 @@ class NetworkingPrivateServiceClient
                 DictionaryCallback success_callback,
                 FailureCallback failure_callback) override;
   void SetProperties(const std::string& guid,
-                     base::Value properties_dict,
+                     base::Value::Dict properties_dict,
                      bool allow_set_shared_config,
                      VoidCallback success_callback,
                      FailureCallback failure_callback) override;
   void CreateNetwork(bool shared,
-                     base::Value properties_dict,
+                     base::Value::Dict properties_dict,
                      StringCallback success_callback,
                      FailureCallback failure_callback) override;
   void ForgetNetwork(const std::string& guid,

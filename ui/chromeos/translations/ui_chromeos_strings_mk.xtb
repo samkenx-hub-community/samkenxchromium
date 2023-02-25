@@ -27,12 +27,12 @@
 <translation id="1201402288615127009">Следно</translation>
 <translation id="1209796539517632982">Сервери за автоматско име</translation>
 <translation id="1210831758834677569">лаошки</translation>
+<translation id="1221555006497674479">Просторот е речиси полн. Преостануваат <ph name="REMAINING_PERCENTAGE" /> % од вашиот капацитет во споделениот простор на <ph name="TOTAL_SPACE" />.</translation>
 <translation id="1243314992276662751">Постави</translation>
 <translation id="1249250836236328755">Жанр</translation>
 <translation id="1254593899333212300">Директна интернет-врска</translation>
 <translation id="1272293450992660632">PIN-вредностите не се совпаѓаат.</translation>
 <translation id="1280820357415527819">Се пребаруваат мобилни мрежи</translation>
-<translation id="1291603679744561561">SIM-картичката е заклучена</translation>
 <translation id="1293556467332435079">Датотеки</translation>
 <translation id="1297922636971898492">Google Диск не е достапен во моментов. Поставувањето автоматски ќе се рестартира штом ќе се активира Google Диск.</translation>
 <translation id="1307931752636661898">Не може да се прикажат датотеките на Linux</translation>
@@ -59,7 +59,6 @@
 <translation id="1499943022354839699">англиски (САД) со тастатура Dvorak</translation>
 <translation id="1515909359182093592"><ph name="INPUT_LABEL" /> - домаќин</translation>
 <translation id="1521655867290435174">Табели на Google</translation>
-<translation id="1521795806314479294">Се подготвува <ph name="FILE_NAME" />…</translation>
 <translation id="1538729222189715449">Се отвораат датотеките на Linux…</translation>
 <translation id="1547964879613821194">канадско англиска</translation>
 <translation id="1556189134700913550">Примени на сите</translation>
@@ -75,6 +74,7 @@
 <translation id="1641780993263690097">кинески пинјин</translation>
 <translation id="1646019627374511909"><ph name="NUMBER_OF_ITEMS" /> датотеки се прават достапни офлајн</translation>
 <translation id="164969095109328410">Уред со Chrome</translation>
+<translation id="1661207570040737402">Го искористивте целиот ваш капацитет во споделениот простор на Google Workspace.</translation>
 <translation id="1661867754829461514">Недостасува PIN</translation>
 <translation id="166439687370499867">Не е дозволено да се менуваат конфигурациите на споделената мрежа</translation>
 <translation id="1665611772925418501">Оваа датотека не може да се менува.</translation>
@@ -84,7 +84,6 @@
 <translation id="1722487484194605434">Се пакуваат <ph name="NUMBER_OF_ITEMS" /> ставки…</translation>
 <translation id="1722687688096767818">Се додава профил…</translation>
 <translation id="1726100011689679555">DNS-сервери</translation>
-<translation id="1727562178154619254">Спремно за синхронизација</translation>
 <translation id="1729953886957086472">германски (Германија)</translation>
 <translation id="1730235522912993863">кинески цанцзе</translation>
 <translation id="1731889557567069540"><ph name="NUMBER_OF_ITEMS" /> ставки се копирани.</translation>
@@ -194,6 +193,7 @@
 <translation id="2574327434504608656">Се споделува 1 папка со Bruschetta</translation>
 <translation id="2578394532502990878">фонетски тамилски</translation>
 <translation id="2579959351793446050">одија</translation>
+<translation id="2587195714949534472">Се подготвува синхронизација на <ph name="FILE_NAME" />…</translation>
 <translation id="2602810353103180630">Мрежа <ph name="NETWORK_INDEX" /> од <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, <ph name="CONNECTION_STATUS" />, јачина на сигналот: <ph name="SIGNAL_STRENGTH" /> %, блокирано од администраторот, детали</translation>
 <translation id="2614589611416690597">Видео: <ph name="VIDEO_TYPE" /></translation>
 <translation id="2620090360073999360">Не може да се достапи до Google Диск во моментов.</translation>
@@ -295,6 +295,7 @@
 <translation id="3486821258960016770">монголски</translation>
 <translation id="3495304270784461826"><ph name="COUNT" /> грешки.</translation>
 <translation id="3509680540198371098">Мрежа <ph name="NETWORK_INDEX" /> од <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, <ph name="SECURITY_STATUS" />, <ph name="CONNECTION_STATUS" />, јачина на сигналот: <ph name="SIGNAL_STRENGTH" /> %, детали</translation>
+<translation id="3511705761158917664">Се подготвува синхронизација на <ph name="NUMBER_OF_ITEMS" /> ставки…</translation>
 <translation id="3522708245912499433">португалски</translation>
 <translation id="3524311639100184459">Внимание: датотекиве се привремени и може да се бришат автоматски за да се ослободи простор на дискот.  <ph name="BEGIN_LINK" />Дознајте повеќе<ph name="END_LINK" /></translation>
 <translation id="3527085408025491307">Папка</translation>
@@ -350,11 +351,11 @@
 <translation id="3924145049010392604">Meta</translation>
 <translation id="3943857333388298514">Залепи</translation>
 <translation id="3952872973865944257">фонетски телугу</translation>
-<translation id="3954354850384043518">Во тек</translation>
 <translation id="3958548648197196644">Киви</translation>
 <translation id="3971140002794351170">Преземи го профилот на мобилниот уред, мрежа <ph name="NETWORK_INDEX" /> од <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, <ph name="NETWORK_PROVIDER_NAME" /></translation>
 <translation id="3973925058222872294">англиски (ОК)</translation>
 <translation id="3975895378829046965">фонетски бангла</translation>
+<translation id="3999574733850440202">Неодамна отворените датотеки на Microsoft се преместени на OneDrive</translation>
 <translation id="4002066346123236978">Наслов</translation>
 <translation id="4017788180641807848">англиски (САД) со тастатура Workman</translation>
 <translation id="4019998208269143058">Закачи на „Брзи датотеки“</translation>
@@ -513,7 +514,6 @@
    Со отстранување на уредот додека се користи може да се предизвика загуба на податоци. Почекајте додека да заврши операцијата, па исфрлете го уредот со помош на апликацијата Датотеки.</translation>
 <translation id="5163869187418756376">Споделувањето не успеа. Проверете ја врската и обидете се повторно подоцна.</translation>
 <translation id="516592729076796170">US Programmer Dvorak</translation>
-<translation id="5167102019886320507">Се подготвуваат <ph name="NUMBER_OF_ITEMS" /> ставки...</translation>
 <translation id="5177526793333269655">Приказ на сликичка</translation>
 <translation id="5181896909298187506">Нема неодамнешни датотеки</translation>
 <translation id="5194713942430106590">Кликнете за подредување на колоната по растечки редослед.</translation>
@@ -792,6 +792,7 @@
 <translation id="7458955835361612701">Нема неодамнешни слики</translation>
 <translation id="7460898608667578234">украинска</translation>
 <translation id="7469894403370665791">Автоматски поврзи се на мрежава</translation>
+<translation id="7481358317100446445">Подготвен</translation>
 <translation id="7486315294984620427">За да пуштите датотеки во Parallels Desktop, датотеката мора да се копира во датотеките на Windows.</translation>
 <translation id="749452993132003881">хирагана</translation>
 <translation id="7495372004724182530">фонетски малајалски</translation>
@@ -829,6 +830,7 @@
 <translation id="7724603315864178912">Исечи</translation>
 <translation id="7732111077498238432">Мрежата се контролира со правило</translation>
 <translation id="7736003208887389532">Трајно да се избришат датотекиве?</translation>
+<translation id="7740287852186792672">Резултати од пребарувањето</translation>
 <translation id="7748626145866214022">Повеќе опции се достапни на лентата со дејства. Притиснете Alt + A за да се нагласи лентата со дејства.</translation>
 <translation id="7760449188139285140">кинески вуби</translation>
 <translation id="7765158879357617694">Премести</translation>
@@ -880,6 +882,7 @@
 <translation id="8116072619078571545">Вода со мраз</translation>
 <translation id="8128733386027980860">англиски (САД) со тастатура Dvorak</translation>
 <translation id="8137331602592933310">„<ph name="FILENAME" />“ е споделен со вас. Не може да го избришете затоа што не го поседувате.</translation>
+<translation id="8138705869659070104">Активирајте по поставувањето</translation>
 <translation id="813913629614996137">Се иницијализира…</translation>
 <translation id="8147028810663464959">Ширината на знакот е полна</translation>
 <translation id="8151638057146502721">Конфигурирај</translation>
@@ -905,6 +908,7 @@
 <translation id="8300849813060516376">OTASP не успеа</translation>
 <translation id="8312871300878166382">Залепи во папка</translation>
 <translation id="8329978297633540474">Обичен текст</translation>
+<translation id="8332007959299458842">Неодамна отворените датотеки на Microsoft се преместени на Google Drive</translation>
 <translation id="8335587457941836791">Откачи од полица</translation>
 <translation id="8335837413233998004">белоруски</translation>
 <translation id="8336153091935557858">Вчера <ph name="YESTERDAY_DAYTIME" /></translation>
@@ -992,6 +996,7 @@
 <translation id="9046895021617826162">Поврзувањето не успеа</translation>
 <translation id="9065512565307033593">Ако не успеете да потврдите, пристапот до мрежата ќе ви биде оневозможен.</translation>
 <translation id="908378762078012445">руски со фонетска тастатура AATSEEL</translation>
+<translation id="9086302186042011942">Синхронизирање</translation>
 <translation id="9099674669267916096">Број на страници</translation>
 <translation id="9100610230175265781">Потребна е лозинка-фраза</translation>
 <translation id="9110990317705400362">Ние постојано бараме начини да го направиме вашето прелистување побезбедно. Порано, која било веб-локација можеше да побара од вас да додадете наставка на прелистувачот. Во најновите верзии на Google Chrome, мора јасно да му кажете на Chrome дека сакате да ги инсталирате овие наставки со нивно додавање преку страницата Наставки. <ph name="BEGIN_LINK" />Дознајте повеќе<ph name="END_LINK" /></translation>

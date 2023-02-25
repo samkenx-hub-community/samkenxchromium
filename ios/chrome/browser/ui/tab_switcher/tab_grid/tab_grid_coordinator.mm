@@ -22,6 +22,7 @@
 #import "ios/chrome/browser/search_engines/template_url_service_factory.h"
 #import "ios/chrome/browser/sessions/ios_chrome_tab_restore_service_factory.h"
 #import "ios/chrome/browser/tabs/features.h"
+#import "ios/chrome/browser/tabs/inactive_tabs/features.h"
 #import "ios/chrome/browser/ui/alert_coordinator/action_sheet_coordinator.h"
 #import "ios/chrome/browser/ui/bookmarks/bookmarks_coordinator.h"
 #import "ios/chrome/browser/ui/commands/application_commands.h"
@@ -54,6 +55,7 @@
 #import "ios/chrome/browser/ui/sharing/sharing_params.h"
 #import "ios/chrome/browser/ui/snackbar/snackbar_coordinator.h"
 #import "ios/chrome/browser/ui/tab_switcher/tab_grid/grid/grid_commands.h"
+#import "ios/chrome/browser/ui/tab_switcher/tab_grid/inactive_tabs/inactive_tabs_coordinator.h"
 #import "ios/chrome/browser/ui/tab_switcher/tab_grid/pinned_tabs/pinned_tabs_mediator.h"
 #import "ios/chrome/browser/ui/tab_switcher/tab_grid/tab_context_menu/tab_context_menu_helper.h"
 #import "ios/chrome/browser/ui/tab_switcher/tab_grid/tab_context_menu/tab_item.h"
@@ -82,6 +84,7 @@
 
 @interface TabGridCoordinator () <RecentTabsPresentationDelegate,
                                   HistoryPresentationDelegate,
+                                  InactiveTabsCoordinatorDelegate,
                                   SceneStateObserver,
                                   SnackbarCoordinatorDelegate,
                                   TabContextMenuDelegate,
@@ -93,11 +96,17 @@
   // ivar.
   Browser* _incognitoBrowser;
 
+  // Browser that contain tabs, from the regular browser, that have not been
+  // open since a certain amount of time.
+  Browser* _inactiveBrowser;
+
   // The coordinator that shows the bookmarking UI after the user taps the Add
   // to Bookmarks button.
   BookmarksCoordinator* _bookmarksCoordinator;
 }
 
+// Browser that contain tabs from the main pane (i.e. non-incognito).
+// TODO(crbug.com/1416934): Make regular ivar as incognito and inactive.
 @property(nonatomic, assign, readonly) Browser* regularBrowser;
 // Superclass property specialized for the class that this coordinator uses.
 @property(nonatomic, weak) TabGridViewController* baseViewController;
@@ -135,6 +144,8 @@
 @property(nonatomic, strong) SnackbarCoordinator* snackbarCoordinator;
 // Coordinator for snackbar presentation on `_incognitoBrowser`.
 @property(nonatomic, strong) SnackbarCoordinator* incognitoSnackbarCoordinator;
+// Coordinator for inactive tabs.
+@property(nonatomic, strong) InactiveTabsCoordinator* inactiveTabsCoordinator;
 // The timestamp of the user entering the tab grid.
 @property(nonatomic, assign) base::TimeTicks tabGridEnterTime;
 // The timestamp of the user exiting the tab grid.
@@ -165,6 +176,7 @@
     browsingDataCommandEndpoint:
         (id<BrowsingDataCommands>)browsingDataCommandEndpoint
                  regularBrowser:(Browser*)regularBrowser
+                inactiveBrowser:(Browser*)inactiveBrowser
                incognitoBrowser:(Browser*)incognitoBrowser {
   if ((self = [super initWithBaseViewController:nil browser:nullptr])) {
     _window = window;
@@ -181,6 +193,7 @@
                               forProtocol:@protocol(BrowsingDataCommands)];
 
     _regularBrowser = regularBrowser;
+    _inactiveBrowser = inactiveBrowser;
     _incognitoBrowser = incognitoBrowser;
 
     if (IsIncognitoModeDisabled(
@@ -1041,6 +1054,28 @@
   [self.historyCoordinator start];
 }
 
+- (void)showInactiveTabs {
+  DCHECK(IsInactiveTabsEnabled());
+  if (self.inactiveTabsCoordinator) {
+    return;
+  }
+
+  self.inactiveTabsCoordinator = [[InactiveTabsCoordinator alloc]
+      initWithBaseViewController:self.baseViewController
+                         browser:_inactiveBrowser];
+  self.inactiveTabsCoordinator.delegate = self;
+  [self.inactiveTabsCoordinator start];
+}
+
+#pragma mark - InactiveTabsCoordinatorDelegate
+
+- (void)inactiveTabsCoordinatorDidFinish:
+    (InactiveTabsCoordinator*)inactiveTabsCoordinator {
+  DCHECK(IsInactiveTabsEnabled());
+  [self.inactiveTabsCoordinator stop];
+  self.inactiveTabsCoordinator = nil;
+}
+
 #pragma mark - RecentTabsPresentationDelegate
 
 - (void)showHistoryFromRecentTabsFilteredBySearchTerms:(NSString*)searchTerms {
@@ -1133,11 +1168,15 @@
   if (currentlyBookmarked) {
     [self editBookmarkWithURL:URL];
   } else {
+    base::RecordAction(base::UserMetricsAction(
+        "MobileTabGridOpenedBookmarkEditorForNewBookmark"));
     [self.bookmarksCoordinator bookmarkURL:URL title:title];
   }
 }
 
 - (void)editBookmarkWithURL:(const GURL&)URL {
+  base::RecordAction(base::UserMetricsAction(
+      "MobileTabGridOpenedBookmarkEditorForExistingBookmark"));
   [self.bookmarksCoordinator presentBookmarkEditorForURL:URL];
 }
 

@@ -16,6 +16,7 @@
 <translation id="1128128132059598906">EAP-TTLS</translation>
 <translation id="1145018782460575098">È aperta la finestra per aggiornare il firmware dei dispositivi esterni. <ph name="NUM_UPDATES" /> aggiornamenti disponibili.</translation>
 <translation id="1145516343487477149">Trova articoli del Centro assistenza e risposte a domande comuni sui Chromebook</translation>
+<translation id="1167755866710282443">Apri il menu per personalizzare i tasti. Trascina il menu per spostarlo.</translation>
 <translation id="1175697296044146566">Questo dispositivo <ph name="DEVICE_TYPE" /> è gestito da <ph name="MANAGER" />.</translation>
 <translation id="1175951029573070619">Nella media (<ph name="SIGNAL_STRENGTH" />)</translation>
 <translation id="1181037720776840403">Rimuovi</translation>
@@ -326,6 +327,7 @@
 <translation id="4110686435123617899">Seleziona l'album <ph name="TITLE" /> <ph name="DESC" /></translation>
 <translation id="4111761024568264522">Touchpad USB</translation>
 <translation id="4117637339509843559">Modalità Buio</translation>
+<translation id="4130035430755296270">Continua a passare il mouse sopra per altre opzioni di layout</translation>
 <translation id="4131410914670010031">In bianco e nero</translation>
 <translation id="4145784616224233563">Firewall HTTP</translation>
 <translation id="4147897805161313378">Google Foto</translation>
@@ -345,7 +347,7 @@
 <translation id="4258281355379922695">Latenza HTTP</translation>
 <translation id="4271957103967917607">Visualizza a schermo intero</translation>
 <translation id="4289540628985791613">Panoramica</translation>
-<translation id="4289849978083912975">Slideshow</translation>
+<translation id="4289849978083912975">Presentazione</translation>
 <translation id="4297501883039923494">Operazione interrotta - Errore sconosciuto</translation>
 <translation id="4300073214558989"><ph name="IMAGE_COUNT" /> immagini</translation>
 <translation id="4311195029067684288">Completo</translation>
@@ -414,6 +416,7 @@
 <translation id="484790837831576105">(Android) risoluzione DNS</translation>
 <translation id="4848429997038228357">IN ESECUZIONE</translation>
 <translation id="4854586501323951986">Touchscreen integrato</translation>
+<translation id="4855250849489639581">Scorri verso il basso per visualizzare altre opzioni di layout</translation>
 <translation id="4861758251032006121">{ATTEMPTS_LEFT,plural, =1{<ph name="ERROR_MESSAGE" /> {0} tentativo rimanente}other{<ph name="ERROR_MESSAGE" /> {0} tentativi rimanenti}}</translation>
 <translation id="4873827928179867585">Algoritmo di autenticazione</translation>
 <translation id="4880328057631981605">Nome punto di accesso</translation>
@@ -517,6 +520,7 @@
 <translation id="576835345334454681">Aumenta la luminosità del display</translation>
 <translation id="57838592816432529">Disattiva audio</translation>
 <translation id="5784136236926853061">Latenza HTTP elevata</translation>
+<translation id="5826644637650799838">Informazioni sullo sfondo</translation>
 <translation id="5832805196449965646">Aggiungi persona</translation>
 <translation id="583281660410589416">Sconosciuto</translation>
 <translation id="5843706793424741864">Fahrenheit</translation>
@@ -673,6 +677,7 @@
 <translation id="7172721935181587524">1 immagine</translation>
 <translation id="7177485034254901881">Questo dispositivo <ph name="DEVICE_TYPE" /> è gestito da <ph name="MANAGER" />. Gli amministratori possono configurarlo da remoto.</translation>
 <translation id="7180611975245234373">Aggiorna</translation>
+<translation id="7180865173735832675">Personalizza</translation>
 <translation id="7212734716605298123">Aggiornamenti del firmware per dispositivi esterni</translation>
 <translation id="7216409898977639127">Fornitore del servizio di telefonia mobile</translation>
 <translation id="725133483556299729">Seleziona email</translation>
@@ -744,6 +749,7 @@
 <translation id="7881066108824108340">DNS</translation>
 <translation id="7882358943899516840">Tipo di provider</translation>
 <translation id="7882501334836096755">Chiave pubblica</translation>
+<translation id="78957024357676568">sinistra</translation>
 <translation id="7915220255123750251">Gestisci le impostazioni APN di rete. Gli APN stabiliscono una connessione tra una rete mobile e Internet.</translation>
 <translation id="7936303884198020182">nessun server dei nomi trovato</translation>
 <translation id="7942349550061667556">Rosso</translation>
@@ -775,6 +781,7 @@
 <translation id="8226628635270268143">Scegli le tue foto e i tuoi album preferiti</translation>
 <translation id="8227119283605456246">Allega file</translation>
 <translation id="8230672074305416752">impossibile eseguire il ping del gateway di rete predefinito</translation>
+<translation id="8242426110754782860">Procedi</translation>
 <translation id="8246209727385807362">Operatore sconosciuto</translation>
 <translation id="827422111966801947">Indaco</translation>
 <translation id="8286154143153872371">Connettiti a una rete e ricarica la pagina per visualizzare lo sfondo.</translation>
@@ -852,6 +859,7 @@
 <translation id="8930622219860340959">Wireless</translation>
 <translation id="8936793075252196307">Indirizzo IP client</translation>
 <translation id="894617464444543719">Il dispositivo è un telefono.</translation>
+<translation id="8957423540740801332">destra</translation>
 <translation id="8968751544471797276">Velocità di ricarica</translation>
 <translation id="8970109610781093811">Esegui di nuovo</translation>
 <translation id="8983038754672563810">HSPA</translation>

@@ -304,7 +304,6 @@
 <translation id="2669454659051515572">이 기기를 사용하는 누구나 다운로드된 파일을 볼 수 있습니다.</translation>
 <translation id="2702516483241149200">신규: 이 텍스트로 스크롤하는 링크 공유하기</translation>
 <translation id="2707726405694321444">페이지 새로고침</translation>
-<translation id="2709516037105925701">자동 완성</translation>
 <translation id="271033894570825754">New</translation>
 <translation id="2711073837061989559">무료 체험</translation>
 <translation id="2718352093833049315">Wi-Fi 연결 시</translation>
@@ -396,7 +395,6 @@
 <translation id="3114507951000454849">오늘의 뉴스 읽기 <ph name="NEWS_ICON" /></translation>
 <translation id="311958134571892113">다음 카드와 연결됨</translation>
 <translation id="3123734510202723619">공지사항</translation>
-<translation id="3130863904455712965">방문 기록 및 기타 정보</translation>
 <translation id="3134784203083076891">”</translation>
 <translation id="314939179385989105">Chrome 홈페이지</translation>
 <translation id="3157931365184549694">복구</translation>
@@ -453,6 +451,7 @@
 <translation id="3421726884497337397">타사 쿠키를 차단하는 경우 선택</translation>
 <translation id="3428747202529429621">로그인 상태일 때 Chrome에서 사용자를 보호하고 기타 Google 앱에서 사용자의 보안을 개선하는 데 사용될 수 있습니다.</translation>
 <translation id="3429160811076349561">무료 체험 기능 사용 안함</translation>
+<translation id="3432973700170747422">지난 15분 데이터 삭제</translation>
 <translation id="3435465986463792564">창이 많이 열렸나요? 여기에서 관리할 수 있습니다.</translation>
 <translation id="3435738964857648380">보안</translation>
 <translation id="3443221991560634068">현재 페이지 새로고침</translation>
@@ -519,7 +518,6 @@
 <translation id="3830886834687455630">비밀번호를 확인하려면 Google Play 서비스를 업데이트하세요.</translation>
 <translation id="3845098929839618392">시크릿 탭에서 열기</translation>
 <translation id="3856096718352044181">유효한 제공업체인지 확인하거나 나중에 다시 시도하세요.</translation>
-<translation id="3858127568696903256">여기에서 내가 팔로우하는 콘텐츠 보기</translation>
 <translation id="3858860766373142691">이름</translation>
 <translation id="3861633093716975811">인기 동영상</translation>
 <translation id="3874520961715512166">사이트 삭제됨</translation>
@@ -990,7 +988,6 @@
 <translation id="6397616442223433927">인터넷에 다시 연결됨</translation>
 <translation id="6401458660421980302">이 탭을 다른 기기로 보내려면 해당 기기에서 Chrome에 로그인하세요.</translation>
 <translation id="6402652558933147609"><ph name="VIOLATED_URL" />에 <ph name="ERROR_CODE" /> 오류 발생</translation>
-<translation id="6403371459378431832">모든 기기에서 데이터를 동기화해 보세요</translation>
 <translation id="6404511346730675251">북마크 수정</translation>
 <translation id="6406506848690869874">동기화</translation>
 <translation id="6407224748847589805">컴퓨터에 연결할 수 없습니다. 다른 인증 수단을 사용해 보세요.</translation>
@@ -1228,6 +1225,7 @@
 <translation id="7596558890252710462">운영체제</translation>
 <translation id="7605594153474022051">동기화가 작동하지 않음</translation>
 <translation id="7612619742409846846">다음 계정으로 Google에 로그인함:</translation>
+<translation id="7612989789287281429">로그인하는 중…</translation>
 <translation id="7616551326690708776">강조표시에 사용할 템플릿을 선택하세요.</translation>
 <translation id="7619072057915878432">네트워크에 문제가 발생하여 <ph name="FILE_NAME" />을(를) 다운로드할 수 없습니다.</translation>
 <translation id="7626032353295482388">Chrome에 오신 것을 환영합니다</translation>
@@ -1246,6 +1244,7 @@
 <translation id="7682724950699840886">다음 방법을 시도해 보세요. 기기 저장용량이 충분한지 확인하고 다시 내보내 봅니다.</translation>
 <translation id="7686086654630106285">사이트 추천 광고에 관해 자세히 알아보기</translation>
 <translation id="768618399695552958">방문한 페이지 중 일부가 미리 로드되었습니다. Google 사이트에서 페이지에 연결하는 경우 Google 서버를 통해 페이지가 미리 로드될 수 있습니다.</translation>
+<translation id="7691043218961417207">팔로우할 콘텐츠 살펴보기</translation>
 <translation id="7698359219371678927"><ph name="APP_NAME" />에서 이메일 만들기</translation>
 <translation id="7707922173985738739">모바일 데이터 사용</translation>
 <translation id="7709094866268987903">삭제한 관심분야가 여기에 표시됩니다.</translation>
@@ -1319,7 +1318,6 @@
 <translation id="8037801708772278989">조금 전에 확인됨</translation>
 <translation id="804335162455518893">SD 카드가 없음</translation>
 <translation id="8048533522416101084">{TAB_COUNT,plural, =1{시크릿 탭 <ph name="TAB_COUNT_ONE" />개}other{시크릿 탭 <ph name="TAB_COUNT_NORMAL" />개}}</translation>
-<translation id="8048728378294435881">콘텐츠를 백업하고 어느 기기에서나 사용하세요.</translation>
 <translation id="8051695050440594747"><ph name="MEGABYTES" />MB 사용 가능</translation>
 <translation id="8058655154417507695">유효기간 연도</translation>
 <translation id="8058746566562539958">새 Chrome 탭에서 열기</translation>
@@ -1497,6 +1495,7 @@
 <translation id="8970887620466824814">문제 발생</translation>
 <translation id="8972098258593396643">기본 폴더에 다운로드하시겠습니까?</translation>
 <translation id="8987641763863173640">동영상 미리보기 설정 관리</translation>
+<translation id="8987736167266086032">멈춘 부분에서 계속</translation>
 <translation id="8989968390305463310">방문 기록에 따라 표시되는 광고 및 아래의 예측 관심분야가 달라집니다. 개인 정보를 보호하기 위해 Chrome에서는 매월 최소 한 번씩 수시로 관심분야를 자동 삭제합니다. 관심분야는 직접 삭제하지 않는 한 새로고침될 수 있습니다.</translation>
 <translation id="8993760627012879038">시크릿 모드로 새 탭 열기</translation>
 <translation id="8996847606757455498">다른 제공업체 선택</translation>

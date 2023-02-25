@@ -13,6 +13,7 @@
 #include "gpu/command_buffer/service/shared_image/gl_texture_image_backing_helper.h"
 #include "gpu/command_buffer/service/shared_image/shared_image_format_utils.h"
 #include "gpu/command_buffer/service/shared_image/shared_image_representation.h"
+#include "gpu/command_buffer/service/shared_image/skia_gl_image_representation.h"
 #include "gpu/command_buffer/service/skia_utils.h"
 #include "gpu/vulkan/vulkan_device_queue.h"
 #include "gpu/vulkan/vulkan_fence_helper.h"
@@ -201,6 +202,11 @@ AngleVulkanImageBacking::~AngleVulkanImageBacking() {
 
     passthrough_texture_.reset();
     egl_image_.reset();
+
+    if (need_gl_finish_before_destroy_ && have_context()) {
+      gl::GLApi* api = gl::g_current_gl_context;
+      api->glFinishFn();
+    }
   }
 
   if (vulkan_image_) {
@@ -323,9 +329,21 @@ std::unique_ptr<SkiaImageRepresentation> AngleVulkanImageBacking::ProduceSkia(
     SharedImageManager* manager,
     MemoryTypeTracker* tracker,
     scoped_refptr<SharedContextState> context_state) {
-  DCHECK_EQ(context_state_, context_state.get());
-  return std::make_unique<SkiaAngleVulkanImageRepresentation>(manager, this,
-                                                              tracker);
+  if (context_state->GrContextIsVulkan()) {
+    DCHECK_EQ(context_state_, context_state.get());
+    return std::make_unique<SkiaAngleVulkanImageRepresentation>(manager, this,
+                                                                tracker);
+  }
+  // If it is not vulkan context, it must be GL context being used with Skia
+  // over passthrough command decoder.
+  DCHECK(context_state->GrContextIsGL());
+  auto gl_representation = ProduceGLTexturePassthrough(manager, tracker);
+  if (!gl_representation) {
+    return nullptr;
+  }
+  return SkiaGLImageRepresentation::Create(std::move(gl_representation),
+                                           std::move(context_state), manager,
+                                           this, tracker);
 }
 
 bool AngleVulkanImageBacking::GLTextureImageRepresentationBeginAccess(
@@ -399,8 +417,9 @@ void AngleVulkanImageBacking::GLTextureImageRepresentationEndAccess(
     --gl_reads_in_process_;
 
     // For the last GL read access, release texture from ANGLE.
-    if (gl_reads_in_process_ == 0)
+    if (gl_reads_in_process_ == 0) {
       ReleaseTextureANGLE();
+    }
 
     return;
   }
@@ -427,6 +446,9 @@ void AngleVulkanImageBacking::ReleaseTextureANGLE() {
   GLuint texture = passthrough_texture_->service_id();
   // Release the texture from ANGLE, so it can be used elsewhere.
   api->glReleaseTexturesANGLEFn(1, &texture, &layout_);
+  // Releasing the texture will submit all related works to queue, so to be
+  // safe, glFinish() should be called before releasing the VkImage.
+  need_gl_finish_before_destroy_ = true;
 }
 
 void AngleVulkanImageBacking::PrepareBackendTexture() {
@@ -505,6 +527,11 @@ void AngleVulkanImageBacking::EndAccessSkia() {
     if (skia_reads_in_process_ > 0)
       return;
   }
+
+  // The backing is used by skia, so skia should submit related work to the
+  // queue, and we can use vulkan fence helper to release the VkImage.
+  // glFinish() is not necessary anymore.
+  need_gl_finish_before_destroy_ = false;
 
   SyncImageLayoutFromBackendTexture();
 

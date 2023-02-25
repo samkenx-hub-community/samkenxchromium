@@ -27,12 +27,12 @@
 <translation id="1201402288615127009">Berikutnya</translation>
 <translation id="1209796539517632982">Server nama otomatis</translation>
 <translation id="1210831758834677569">Lao</translation>
+<translation id="1221555006497674479">Penyimpanan hampir habis. Tersisa <ph name="REMAINING_PERCENTAGE" />% dari <ph name="TOTAL_SPACE" /> penyimpanan drive bersama Anda.</translation>
 <translation id="1243314992276662751">Upload</translation>
 <translation id="1249250836236328755">Genre</translation>
 <translation id="1254593899333212300">Koneksi internet langsung</translation>
 <translation id="1272293450992660632">Nilai PIN tidak cocok.</translation>
 <translation id="1280820357415527819">Menelusuri jaringan seluler</translation>
-<translation id="1291603679744561561">SIM Dikunci</translation>
 <translation id="1293556467332435079">File</translation>
 <translation id="1297922636971898492">Saat ini Google Drive tidak tersedia. Upload akan dimulai ulang secara otomatis setelah Google Drive aktif kembali.</translation>
 <translation id="1307931752636661898">Tidak dapat melihat file Linux</translation>
@@ -59,7 +59,6 @@
 <translation id="1499943022354839699">Inggris (AS) dengan keyboard Dvorak</translation>
 <translation id="1515909359182093592"><ph name="INPUT_LABEL" /> - Host</translation>
 <translation id="1521655867290435174">Google Spreadsheet</translation>
-<translation id="1521795806314479294">Menyiapkan <ph name="FILE_NAME" /> ...</translation>
 <translation id="1538729222189715449">Membuka file Linux...</translation>
 <translation id="1547964879613821194">Inggris Kanada</translation>
 <translation id="1556189134700913550">Terapkan untuk semua</translation>
@@ -75,6 +74,7 @@
 <translation id="1641780993263690097">Pinyin China</translation>
 <translation id="1646019627374511909">Membuat <ph name="NUMBER_OF_ITEMS" /> file tersedia secara offline</translation>
 <translation id="164969095109328410">Perangkat Chrome</translation>
+<translation id="1661207570040737402">Anda telah menggunakan seluruh penyimpanan Drive Bersama Google Workspace.</translation>
 <translation id="1661867754829461514">PIN hilang</translation>
 <translation id="166439687370499867">Mengubah konfigurasi jaringan bersama tidak diizinkan</translation>
 <translation id="1665611772925418501">File tidak dapat diubah.</translation>
@@ -84,7 +84,6 @@
 <translation id="1722487484194605434">Membuat file zip <ph name="NUMBER_OF_ITEMS" /> item...</translation>
 <translation id="1722687688096767818">Menambahkan Profil ...</translation>
 <translation id="1726100011689679555">Nama server</translation>
-<translation id="1727562178154619254">Siap disinkronkan</translation>
 <translation id="1729953886957086472">Jerman (Jerman)</translation>
 <translation id="1730235522912993863">Cangjie China</translation>
 <translation id="1731889557567069540"><ph name="NUMBER_OF_ITEMS" /> item disalin.</translation>
@@ -194,6 +193,7 @@
 <translation id="2574327434504608656">1 folder dibagikan ke Bruschetta</translation>
 <translation id="2578394532502990878">Fonetik Tamil</translation>
 <translation id="2579959351793446050">Odia</translation>
+<translation id="2587195714949534472">Menyiapkan sinkronisasi <ph name="FILE_NAME" />...</translation>
 <translation id="2602810353103180630">Jaringan <ph name="NETWORK_INDEX" /> dari <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, <ph name="CONNECTION_STATUS" />, Kekuatan Sinyal <ph name="SIGNAL_STRENGTH" />%, Diblokir oleh Administrator Anda, Detail</translation>
 <translation id="2614589611416690597">Video <ph name="VIDEO_TYPE" /></translation>
 <translation id="2620090360073999360">Google Drive tidak dapat dijangkau saat ini.</translation>
@@ -295,6 +295,7 @@
 <translation id="3486821258960016770">Mongolia</translation>
 <translation id="3495304270784461826"><ph name="COUNT" /> kesalahan.</translation>
 <translation id="3509680540198371098">Jaringan <ph name="NETWORK_INDEX" /> dari <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, <ph name="SECURITY_STATUS" />, <ph name="CONNECTION_STATUS" />, Kekuatan Sinyal <ph name="SIGNAL_STRENGTH" />%, Detail</translation>
+<translation id="3511705761158917664">Menyiapkan sinkronisasi <ph name="NUMBER_OF_ITEMS" /> item...</translation>
 <translation id="3522708245912499433">Portugis</translation>
 <translation id="3524311639100184459">Perhatian: File ini bersifat sementara dan dapat dihapus secara otomatis untuk mengosongkan ruang disk.  <ph name="BEGIN_LINK" />Pelajari Lebih Lanjut<ph name="END_LINK" /></translation>
 <translation id="3527085408025491307">Folder</translation>
@@ -350,11 +351,11 @@
 <translation id="3924145049010392604">Meta</translation>
 <translation id="3943857333388298514">Sisipkan</translation>
 <translation id="3952872973865944257">Fonetik Telugu</translation>
-<translation id="3954354850384043518">Dalam proses</translation>
 <translation id="3958548648197196644">Burung Kiwi</translation>
 <translation id="3971140002794351170">Download profil seluler, Jaringan <ph name="NETWORK_INDEX" /> dari <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, <ph name="NETWORK_PROVIDER_NAME" /></translation>
 <translation id="3973925058222872294">Inggris (Inggris Raya)</translation>
 <translation id="3975895378829046965">Fonetik Bengali</translation>
+<translation id="3999574733850440202">File Microsoft yang baru saja dibuka telah dipindahkan ke OneDrive</translation>
 <translation id="4002066346123236978">Judul</translation>
 <translation id="4017788180641807848">Inggris (AS) dengan keyboard Workman</translation>
 <translation id="4019998208269143058">Sematkan ke file cepat</translation>
@@ -513,7 +514,6 @@
        Menghapus perangkat Anda saat digunakan dapat menyebabkan hilangnya data.  Tunggu hingga operasi berakhir, lalu keluarkan perangkat menggunakan aplikasi File.</translation>
 <translation id="5163869187418756376">Gagal berbagi. Periksa sambungan Anda dan coba lagi nanti.</translation>
 <translation id="516592729076796170">Programmer Dvorak AS</translation>
-<translation id="5167102019886320507">Menyiapkan <ph name="NUMBER_OF_ITEMS" /> item ...</translation>
 <translation id="5177526793333269655">Tampilan thumbnail</translation>
 <translation id="5181896909298187506">Tidak ada file terbaru</translation>
 <translation id="5194713942430106590">Klik untuk mengurutkan kolom dari atas ke bawah.</translation>
@@ -793,6 +793,7 @@
 <translation id="7458955835361612701">Tidak ada gambar terbaru</translation>
 <translation id="7460898608667578234">Ukraina</translation>
 <translation id="7469894403370665791">Otomatis hubungkan ke jaringan ini</translation>
+<translation id="7481358317100446445">Siap</translation>
 <translation id="7486315294984620427">Untuk melepaskan file di Parallels Desktop, file harus disalin ke file Windows.</translation>
 <translation id="749452993132003881">Hiragana</translation>
 <translation id="7495372004724182530">Fonetik Malayalam</translation>
@@ -830,6 +831,7 @@
 <translation id="7724603315864178912">Potong</translation>
 <translation id="7732111077498238432">Jaringan dikontrol oleh kebijakan</translation>
 <translation id="7736003208887389532">Hapus permanen file ini?</translation>
+<translation id="7740287852186792672">Hasil penelusuran</translation>
 <translation id="7748626145866214022">Opsi lainnya tersedia di menu tindakan. Tekan Alt + A untuk memindahkan menu tindakan ke posisi tengah.</translation>
 <translation id="7760449188139285140">Wubi China</translation>
 <translation id="7765158879357617694">Pindahkan</translation>
@@ -881,6 +883,7 @@
 <translation id="8116072619078571545">Air es</translation>
 <translation id="8128733386027980860">Inggris (Inggris Raya) dengan keyboard Dvorak</translation>
 <translation id="8137331602592933310">"<ph name="FILENAME" />" telah dibagikan dengan Anda. Namun Anda tidak dapat menghapusnya karena bukan milik Anda.</translation>
+<translation id="8138705869659070104">Aktifkan setelah penyiapan perangkat</translation>
 <translation id="813913629614996137">Memulai...</translation>
 <translation id="8147028810663464959">Lebar karakter Penuh</translation>
 <translation id="8151638057146502721">Konfigurasi</translation>
@@ -906,6 +909,7 @@
 <translation id="8300849813060516376">OTASP gagal</translation>
 <translation id="8312871300878166382">Tempelkan ke folder</translation>
 <translation id="8329978297633540474">Teks biasa</translation>
+<translation id="8332007959299458842">File Microsoft yang baru saja dibuka telah dipindahkan ke Google Drive</translation>
 <translation id="8335587457941836791">Lepaskan pin dari rak</translation>
 <translation id="8335837413233998004">Belarusia</translation>
 <translation id="8336153091935557858"><ph name="YESTERDAY_DAYTIME" /> kemarin</translation>
@@ -993,6 +997,7 @@
 <translation id="9046895021617826162">Gagal menyambung</translation>
 <translation id="9065512565307033593">Jika gagal memverifikasi, akses jaringan Anda akan dinonaktifkan.</translation>
 <translation id="908378762078012445">Rusia dengan keyboard AATSEEL Fonetik</translation>
+<translation id="9086302186042011942">Menyinkronkan</translation>
 <translation id="9099674669267916096">Hitungan halaman</translation>
 <translation id="9100610230175265781">Frasa sandi diwajibkan</translation>
 <translation id="9110990317705400362">Kami terus mencari cara agar penjelajahan Anda lebih aman. Sebelumnya, situs web apa pun dapat meminta Anda untuk menambahkan ekstensi ke browser. Pada versi terbaru Google Chrome, Anda harus memberitahukan dengan jelas kepada Chrome bahwa Anda ingin memasang ekstensi ini dengan menambahkannya melalui halaman Ekstensi. <ph name="BEGIN_LINK" />Pelajari lebih lanjut<ph name="END_LINK" /></translation>

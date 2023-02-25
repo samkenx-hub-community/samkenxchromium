@@ -269,9 +269,11 @@ class MODULES_EXPORT BaseRenderingContext2D : public CanvasPath {
     return const_cast<BaseRenderingContext2D*>(this)->GetPaintCanvas();
   }
   virtual cc::PaintCanvas* GetPaintCanvas() = 0;
-  virtual cc::PaintCanvas* GetPaintCanvasForDraw(
-      const SkIRect& dirty_rect,
-      CanvasPerformanceMonitor::DrawType) = 0;
+
+  // Called when about to draw. When this is called GetPaintCanvas() has already
+  // been called and returned a non-null value.
+  virtual void WillDraw(const SkIRect& dirty_rect,
+                        CanvasPerformanceMonitor::DrawType) = 0;
 
   virtual sk_sp<PaintFilter> StateGetFilter() = 0;
   virtual void SnapshotStateForFilter() = 0;
@@ -428,7 +430,7 @@ class MODULES_EXPORT BaseRenderingContext2D : public CanvasPath {
             typename DrawCoversClipBoundsFunc>
   void Draw(const DrawFunc&,
             const DrawCoversClipBoundsFunc&,
-            const SkRect& bounds,
+            const gfx::RectF& bounds,
             CanvasRenderingContext2DState::PaintType,
             CanvasRenderingContext2DState::ImageType,
             CanvasPerformanceMonitor::DrawType);
@@ -449,13 +451,13 @@ class MODULES_EXPORT BaseRenderingContext2D : public CanvasPath {
     NOTREACHED();
     return false;
   }
-  virtual scoped_refptr<StaticBitmapImage> GetImage() {
+  virtual scoped_refptr<StaticBitmapImage> GetImage(
+      CanvasResourceProvider::FlushReason) {
     NOTREACHED();
     return nullptr;
   }
 
-  void CheckOverdraw(const SkRect&,
-                     const cc::PaintFlags*,
+  void CheckOverdraw(const cc::PaintFlags*,
                      CanvasRenderingContext2DState::ImageType,
                      BaseRenderingContext2D::OverdrawOp overdraw_op);
 
@@ -465,7 +467,7 @@ class MODULES_EXPORT BaseRenderingContext2D : public CanvasPath {
   int layer_count_ = 0;
   AntiAliasingMode clip_antialiasing_;
 
-  virtual void FinalizeFrame(bool printing = false) {}
+  virtual void FinalizeFrame(CanvasResourceProvider::FlushReason) {}
 
   float GetFontBaseline(const SimpleFontData&) const;
   virtual void DispatchContextLostEvent(TimerBase*);
@@ -530,6 +532,7 @@ class MODULES_EXPORT BaseRenderingContext2D : public CanvasPath {
   // PaintCanvas, and validates the state stack. Helper for Restore and
   // EndLayer.
   void PopAndRestore();
+  void pushLayerStack(CanvasRenderingContext2DState::SaveType save_type);
 
   bool ShouldDrawImageAntialiased(const gfx::RectF& dest_rect) const;
 
@@ -597,12 +600,14 @@ class MODULES_EXPORT BaseRenderingContext2D : public CanvasPath {
     return false;
   }
 
+  // `paint_canvas` is null if this function is called asynchronously.
   template <OverdrawOp CurrentOverdrawOp,
             typename DrawFunc,
             typename DrawCoversClipBoundsFunc>
-  void DrawInternal(const DrawFunc&,
+  void DrawInternal(cc::PaintCanvas* paint_canvas,
+                    const DrawFunc&,
                     const DrawCoversClipBoundsFunc&,
-                    const SkRect& bounds,
+                    const gfx::RectF& bounds,
                     CanvasRenderingContext2DState::PaintType,
                     CanvasRenderingContext2DState::ImageType,
                     const SkIRect& clip_bounds,
@@ -643,7 +648,6 @@ class MODULES_EXPORT BaseRenderingContext2D : public CanvasPath {
   template <typename T>
   void AdjustRectForCanvas(T& x, T& y, T& width, T& height);
 
-  void ClearCanvasForSrcCompositeOp();
   bool RectContainsTransformedRect(const gfx::RectF&, const SkIRect&) const;
   // Sets the origin to be tainted by the content of the canvas, such
   // as a cross-origin image. This is as opposed to some other reason
@@ -658,7 +662,7 @@ class MODULES_EXPORT BaseRenderingContext2D : public CanvasPath {
     return false;
   }
 
-  virtual void FlushCanvas() = 0;
+  virtual void FlushCanvas(CanvasResourceProvider::FlushReason) = 0;
 
   // Only call if identifiability_study_helper_.ShouldUpdateBuilder() returns
   // true.
@@ -685,7 +689,6 @@ class MODULES_EXPORT BaseRenderingContext2D : public CanvasPath {
 };
 
 ALWAYS_INLINE void BaseRenderingContext2D::CheckOverdraw(
-    const SkRect& rect,
     const cc::PaintFlags* flags,
     CanvasRenderingContext2DState::ImageType image_type,
     BaseRenderingContext2D::OverdrawOp overdraw_op) {
@@ -730,27 +733,36 @@ template <BaseRenderingContext2D::OverdrawOp CurrentOverdrawOp,
           typename DrawFunc,
           typename DrawCoversClipBoundsFunc>
 void BaseRenderingContext2D::DrawInternal(
+    cc::PaintCanvas* paint_canvas,
     const DrawFunc& draw_func,
     const DrawCoversClipBoundsFunc& draw_covers_clip_bounds,
-    const SkRect& bounds,
+    const gfx::RectF& bounds,
     CanvasRenderingContext2DState::PaintType paint_type,
     CanvasRenderingContext2DState::ImageType image_type,
     const SkIRect& clip_bounds,
     CanvasPerformanceMonitor::DrawType draw_type) {
+  if (UNLIKELY(!paint_canvas)) {
+    // This is the async draw case.
+    paint_canvas = GetPaintCanvas();
+    if (!paint_canvas) {
+      return;
+    }
+  }
   const CanvasRenderingContext2DState& state = GetState();
   SkBlendMode global_composite = state.GlobalComposite();
   if (ShouldUseCompositedDraw(paint_type, image_type)) {
-    CompositedDraw(draw_func, GetPaintCanvasForDraw(clip_bounds, draw_type),
-                   paint_type, image_type);
+    WillDraw(clip_bounds, draw_type);
+    CompositedDraw(draw_func, paint_canvas, paint_type, image_type);
   } else if (global_composite == SkBlendMode::kSrc) {
-    ClearCanvasForSrcCompositeOp();  // Takes care of CheckOverdraw()
+    // Takes care of CheckOverdraw()
+    paint_canvas->clear(HasAlpha() ? SkColors::kTransparent : SkColors::kBlack);
     const cc::PaintFlags* flags =
         state.GetFlags(paint_type, kDrawForegroundOnly, image_type);
-    draw_func(GetPaintCanvasForDraw(clip_bounds, draw_type), flags);
+    WillDraw(clip_bounds, draw_type);
+    draw_func(paint_canvas, flags);
   } else {
     SkIRect dirty_rect;
-    if (ComputeDirtyRect(gfx::SkRectToRectF(bounds), clip_bounds,
-                         &dirty_rect)) {
+    if (ComputeDirtyRect(bounds, clip_bounds, &dirty_rect)) {
       const cc::PaintFlags* flags =
           state.GetFlags(paint_type, kDrawShadowAndForeground, image_type);
       if (paint_type != CanvasRenderingContext2DState::kStrokePaintType &&
@@ -758,17 +770,18 @@ void BaseRenderingContext2D::DrawInternal(
         // Because CurrentOverdrawOp is a template argument the following branch
         // is optimized-out at compile time.
         if (CurrentOverdrawOp != OverdrawOp::kNone) {
-          CheckOverdraw(bounds, flags, image_type, CurrentOverdrawOp);
+          CheckOverdraw(flags, image_type, CurrentOverdrawOp);
         }
       }
-      draw_func(GetPaintCanvasForDraw(dirty_rect, draw_type), flags);
+      WillDraw(dirty_rect, draw_type);
+      draw_func(paint_canvas, flags);
     }
   }
-  if (UNLIKELY(GetPaintCanvas()->NeedsFlush())) {
+  if (UNLIKELY(paint_canvas->NeedsFlush())) {
     // This happens if draw_func called flush() on the PaintCanvas. The flush
     // cannot be performed inside the scope of draw_func because it would break
     // the logic of CompositedDraw.
-    FlushCanvas();
+    FlushCanvas(CanvasResourceProvider::FlushReason::kVolatileSourceImage);
   }
 }
 
@@ -778,7 +791,7 @@ template <BaseRenderingContext2D::OverdrawOp CurrentOverdrawOp,
 void BaseRenderingContext2D::Draw(
     const DrawFunc& draw_func,
     const DrawCoversClipBoundsFunc& draw_covers_clip_bounds,
-    const SkRect& bounds,
+    const gfx::RectF& bounds,
     CanvasRenderingContext2DState::PaintType paint_type,
     CanvasRenderingContext2DState::ImageType image_type,
     CanvasPerformanceMonitor::DrawType draw_type) {
@@ -795,12 +808,12 @@ void BaseRenderingContext2D::Draw(
     PostDeferrableAction(WTF::BindOnce(
         &BaseRenderingContext2D::DrawInternal<CurrentOverdrawOp, DrawFunc,
                                               DrawCoversClipBoundsFunc>,
-        WrapPersistent(this), draw_func, draw_covers_clip_bounds, bounds,
-        paint_type, image_type, clip_bounds, draw_type));
+        WrapPersistent(this), nullptr, draw_func, draw_covers_clip_bounds,
+        bounds, paint_type, image_type, clip_bounds, draw_type));
   } else {
     DrawInternal<CurrentOverdrawOp, DrawFunc, DrawCoversClipBoundsFunc>(
-        draw_func, draw_covers_clip_bounds, bounds, paint_type, image_type,
-        clip_bounds, draw_type);
+        paint_canvas, draw_func, draw_covers_clip_bounds, bounds, paint_type,
+        image_type, clip_bounds, draw_type);
   }
 }
 

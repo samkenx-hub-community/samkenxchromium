@@ -752,6 +752,7 @@ static_library("test_support") {
     "interaction/element_test_util.cc",
     "interaction/element_test_util.h",
     "interaction/expect_call_in_scope.h",
+    "interaction/interaction_sequence_test_util.h",
     "interaction/interaction_test_util.cc",
     "interaction/interaction_test_util.h",
     "interaction/interactive_test.cc",
@@ -804,6 +805,7 @@ static_library("test_support") {
       "test/mock_base_window.h",
       "test/test_dialog_model_host.cc",
       "test/test_dialog_model_host.h",
+      "test/ui_controls.cc",
       "test/ui_controls.h",
       "test/view_tree_validator.h",
     ]

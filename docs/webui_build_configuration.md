@@ -206,6 +206,9 @@ path_mappings: Additional non-default path mappings for absolute imports. The
                flaky build errors.
 manifest_excludes: List of input files to exclude from the output
                    the manifest file.
+enable_source_maps: Defaults to "false". Setting it to "true" turns on TS
+                    compiler's 'inlineSourceMap' and 'inlineSources' flags.
+                    Non-inlined source maps are currently not supported.
 ```
 
 #### **Example**
@@ -270,11 +273,21 @@ deps: Targets generating any files being bundled. Note that this should include
 excludes: Paths of files that are not bundled. Often used for large mojo files
           that would otherwise be in many bundles, and for cr.js which relies
           on global variables.
+external_paths: Mappings between absolute URLs and paths where files imported
+                from these URLs can be found. Used for files that are not in
+                |input|. For example, the following external_path is
+                automatically added for all targets:
+                "chrome://resources/|$resources_path" where resources_path is
+                the path to where ts_library()s within ui/webui/resources place
+                their output (e.g. gen/ui/webui/resources/tsc).
+                Note: all absolute URLs must either be listed in |excludes| or
+                be mapped in |external_paths|, otherwise a build time error is
+                raised.
 ```
 
 #### **Example**
 ```
-import("//chrome/browser/resources/tools/optimize_webui.gni")
+import("//ui/webui/resources/tools/optimize_webui.gni")
 import ("//chrome/common/features.gni")
 
 # optimize_webui should generally only be called when the optimize_webui
@@ -416,11 +429,14 @@ rules described earlier.
 
 Under the cover, build_webui() defines the following targets
 
-preprocess_if_expr("preprocess")
+preprocess_if_expr("preprocess_ts_files")
+preprocess_if_expr("preprocess_html_css_files")
+create_js_source_maps("create_source_maps")
 html_to_wrapper("html_wrapper_files")
 css_to_wrapper("css_wrapper_files")
 copy("copy_mojo")
 ts_library("build_ts")
+merge_js_source_maps("merge_source_maps")
 optimize_webui("build_bundle")
 generate_grd("build_grd")
 grit("resources")
@@ -497,11 +513,15 @@ extra_grdp_files: Output .grdp files of external generate_grd() targets. Must be
                   defined if |extra_grdp_deps| is defined.
 grit_output_dir: See |output_dir| in grit(). Optional parameter, defaults to
                  "$root_gen_dir/chrome"
+enable_source_maps: Defaults to "false". Incompatible with |optimize=true|.
+                    Setting it to "true" turns on source map generation for a
+                    few underlying targets. See ts_library()'s
+                    |enable_source_maps| for more details.
 ```
 
 #### **Example**
 ```
-import("//chrome/browser/resources/tools/build_webui.gni")
+import("//ui/webui/resources/tools/build_webui.gni")
 
 build_webui("build") {
   grd_prefix = "dummy-webui"

@@ -10,14 +10,18 @@
 #include "base/functional/callback.h"
 #include "base/memory/ptr_util.h"
 #include "base/strings/utf_string_conversions.h"
+#include "chrome/browser/bookmarks/bookmark_model_factory.h"
 #include "chrome/browser/power_bookmarks/power_bookmark_service_factory.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/webui/side_panel/user_notes/user_notes_side_panel_ui.h"
+#include "components/bookmarks/browser/bookmark_model.h"
 #include "components/power_bookmarks/common/power.h"
 #include "components/power_bookmarks/common/power_overview.h"
 #include "components/power_bookmarks/core/power_bookmark_service.h"
+#include "components/prefs/pref_service.h"
 #include "components/sync/protocol/power_bookmark_specifics.pb.h"
+#include "components/user_notes/user_notes_prefs.h"
 #include "ui/base/l10n/time_format.h"
 #include "ui/base/mojom/window_open_disposition.mojom.h"
 #include "ui/base/window_open_disposition.h"
@@ -29,15 +33,27 @@ const int kCurrentVersionNumber = 1;
 
 side_panel::mojom::NoteOverviewPtr PowerOverviewToMojo(
     const power_bookmarks::PowerOverview& power_overview,
-    const GURL& current_tab_url) {
+    const GURL& current_tab_url,
+    bookmarks::BookmarkModel* bookmark_model) {
   auto* power = power_overview.power();
   DCHECK(power->power_type() ==
          sync_pb::PowerBookmarkSpecifics::POWER_TYPE_NOTE);
   DCHECK(power->power_entity()->has_note_entity());
   auto result = side_panel::mojom::NoteOverview::New();
   result->url = power->url();
-  // TODO(crbug.com/1378131): Get title from the corresponding bookmark.
-  result->title = power->url().spec();
+
+  // Set title to the first bookmark with the same URL, otherwise fall back to
+  // url.
+  std::vector<const bookmarks::BookmarkNode*> nodes;
+  if (bookmark_model) {
+    bookmark_model->GetNodesByURL(power->url(), &nodes);
+  }
+  if (nodes.size() > 0) {
+    result->title = base::UTF16ToUTF8(nodes[0]->GetTitle());
+  } else {
+    result->title = power->url().spec();
+  }
+
   result->text = power->power_entity()->note_entity().plain_text();
   result->num_notes = power_overview.count();
   result->is_current_tab = (power->url() == current_tab_url);
@@ -98,18 +114,28 @@ UserNotesPageHandler::UserNotesPageHandler(
     mojo::PendingRemote<side_panel::mojom::UserNotesPage> page,
     Profile* profile,
     Browser* browser,
+    bool start_creation_flow,
     UserNotesSidePanelUI* user_notes_ui)
     : receiver_(this, std::move(receiver)),
       page_(std::move(page)),
       profile_(profile),
       service_(PowerBookmarkServiceFactory::GetForBrowserContext(profile_)),
+      bookmark_model_(BookmarkModelFactory::GetForBrowserContext(profile_)),
       browser_(browser),
       user_notes_ui_(user_notes_ui) {
+  pref_change_registrar_.Init(profile_->GetPrefs());
+  pref_change_registrar_.Add(
+      prefs::kUserNotesSortByNewest,
+      base::BindRepeating(&UserNotesPageHandler::OnSortByNewestPrefChanged,
+                          base::Unretained(this)));
   service_->AddObserver(this);
   DCHECK(browser_);
   browser_->tab_strip_model()->AddObserver(this);
   Observe(browser_->tab_strip_model()->GetActiveWebContents());
   UpdateCurrentTabUrl();
+  if (start_creation_flow) {
+    StartNoteCreation(false);
+  }
 }
 
 UserNotesPageHandler::~UserNotesPageHandler() {
@@ -131,16 +157,17 @@ void UserNotesPageHandler::GetNoteOverviews(const std::string& user_input,
       sync_pb::PowerBookmarkSpecifics::POWER_TYPE_NOTE,
       base::BindOnce(
           [](GetNoteOverviewsCallback callback, const GURL& current_tab_url,
+             bookmarks::BookmarkModel* bookmark_model,
              std::vector<std::unique_ptr<power_bookmarks::PowerOverview>>
                  power_overviews) {
             std::vector<side_panel::mojom::NoteOverviewPtr> results;
             for (auto& power_overview : power_overviews) {
-              results.push_back(
-                  PowerOverviewToMojo(*power_overview, current_tab_url));
+              results.push_back(PowerOverviewToMojo(
+                  *power_overview, current_tab_url, bookmark_model));
             }
             std::move(callback).Run(std::move(results));
           },
-          std::move(callback), current_tab_url_));
+          std::move(callback), current_tab_url_, bookmark_model_));
 }
 
 void UserNotesPageHandler::GetNotesForCurrentTab(
@@ -222,6 +249,30 @@ void UserNotesPageHandler::NoteOverviewSelected(
   browser_->OpenURL(params);
 }
 
+void UserNotesPageHandler::SetSortOrder(bool sort_by_newest) {
+  PrefService* pref_service = profile_->GetPrefs();
+  if (pref_service && pref_service->GetBoolean(prefs::kUserNotesSortByNewest) !=
+                          sort_by_newest) {
+    pref_service->SetBoolean(prefs::kUserNotesSortByNewest, sort_by_newest);
+  }
+}
+
+void UserNotesPageHandler::OnSortByNewestPrefChanged() {
+  PrefService* pref_service = profile_->GetPrefs();
+  if (pref_service) {
+    page_->SortByNewestPrefChanged(
+        pref_service->GetBoolean(prefs::kUserNotesSortByNewest));
+  }
+}
+
+void UserNotesPageHandler::StartNoteCreation(bool wait_for_tab_change) {
+  if (wait_for_tab_change) {
+    start_creation_after_tab_change_ = true;
+  } else {
+    page_->StartNoteCreation();
+  }
+}
+
 void UserNotesPageHandler::OnPowersChanged() {
   page_->NotesChanged();
 }
@@ -246,6 +297,7 @@ void UserNotesPageHandler::UpdateCurrentTabUrl() {
       browser_->tab_strip_model()->GetActiveWebContents();
   if (web_contents && current_tab_url_ != web_contents->GetLastCommittedURL()) {
     current_tab_url_ = web_contents->GetLastCommittedURL();
-    page_->CurrentTabUrlChanged();
+    page_->CurrentTabUrlChanged(start_creation_after_tab_change_);
+    start_creation_after_tab_change_ = false;
   }
 }

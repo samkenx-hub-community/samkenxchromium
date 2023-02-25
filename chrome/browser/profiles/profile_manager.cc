@@ -127,7 +127,6 @@
 #endif
 
 #if BUILDFLAG(IS_CHROMEOS_ASH)
-#include "ash/components/arc/arc_features.h"
 #include "ash/components/arc/arc_prefs.h"
 #include "ash/components/arc/session/arc_management_transition.h"
 #include "ash/constants/ash_switches.h"
@@ -330,7 +329,7 @@ void UpdateSupervisedUserPref(Profile* profile, bool is_child) {
   DCHECK(profile);
   if (is_child) {
     profile->GetPrefs()->SetString(prefs::kSupervisedUserId,
-                                   supervised_users::kChildAccountSUID);
+                                   supervised_user::kChildAccountSUID);
   } else {
     profile->GetPrefs()->ClearPref(prefs::kSupervisedUserId);
   }

@@ -23,6 +23,7 @@ import './ambient/topic_source_item_element.js';
 import './ambient/topic_source_list_element.js';
 import './ambient/zero_state_element.js';
 import './keyboard_backlight/keyboard_backlight_element.js';
+import './keyboard_backlight/zone_customization_element.js';
 import './personalization_router_element.js';
 import './personalization_test_api.js';
 import './personalization_toast_element.js';
@@ -52,7 +53,7 @@ import {PersonalizationStore} from './personalization_store.js';
  */
 export {AlbumList} from './ambient/album_list_element.js';
 export {AlbumsSubpage} from './ambient/albums_subpage_element.js';
-export {AmbientActionName, AmbientActions, SetAlbumsAction, setAlbumsAction, SetAlbumSelectedAction, setAlbumSelectedAction, SetAmbientModeEnabledAction, setAmbientModeEnabledAction, SetAnimationThemeAction, setAnimationThemeAction, SetGooglePhotosAlbumsPreviewsAction, setGooglePhotosAlbumsPreviewsAction, SetTemperatureUnitAction, setTemperatureUnitAction, SetTopicSourceAction, setTopicSourceAction} from './ambient/ambient_actions.js';
+export {AmbientActionName, AmbientActions, SetAlbumsAction, setAlbumsAction, SetAlbumSelectedAction, setAlbumSelectedAction, SetAmbientModeEnabledAction, setAmbientModeEnabledAction, SetAnimationThemeAction, setAnimationThemeAction, SetPreviewsAction, setPreviewsAction, SetTemperatureUnitAction, setTemperatureUnitAction, SetTopicSourceAction, setTopicSourceAction} from './ambient/ambient_actions.js';
 export {setAmbientProviderForTesting} from './ambient/ambient_interface_provider.js';
 export {AmbientObserver} from './ambient/ambient_observer.js';
 export {AmbientPreviewLarge} from './ambient/ambient_preview_large_element.js';
@@ -70,9 +71,10 @@ export {KeyboardBacklightActionName, KeyboardBacklightActions, SetBacklightColor
 export {KeyboardBacklight} from './keyboard_backlight/keyboard_backlight_element.js';
 export {setKeyboardBacklightProviderForTesting} from './keyboard_backlight/keyboard_backlight_interface_provider.js';
 export {KeyboardBacklightObserver} from './keyboard_backlight/keyboard_backlight_observer.js';
+export {ZoneCustomizationElement} from './keyboard_backlight/zone_customization_element.js';
 export {Actions, DismissErrorAction, dismissErrorAction, PersonalizationActionName, SetErrorAction} from './personalization_actions.js';
 
-export * from './personalization_app.mojom-webui.js';
+export * from './../personalization_app.mojom-webui.js';
 export {PersonalizationBreadcrumb} from './personalization_breadcrumb_element.js';
 export {PersonalizationMain} from './personalization_main_element.js';
 export {reduce} from './personalization_reducers.js';
@@ -100,6 +102,7 @@ export {GooglePhotosAlbums} from './wallpaper/google_photos_albums_element.js';
 export {GooglePhotosCollection} from './wallpaper/google_photos_collection_element.js';
 export {GooglePhotosPhotosByAlbumId} from './wallpaper/google_photos_photos_by_album_id_element.js';
 export {GooglePhotosPhotos, GooglePhotosPhotosRow, GooglePhotosPhotosSection} from './wallpaper/google_photos_photos_element.js';
+export {GooglePhotosSharedAlbumDialog, AcceptEvent} from './wallpaper/google_photos_shared_album_dialog_element.js';
 export {GooglePhotosZeroState} from './wallpaper/google_photos_zero_state_element.js';
 export {LocalImages} from './wallpaper/local_images_element.js';
 export {isDefaultImage, isFilePath, isGooglePhotosPhoto, isWallpaperImage} from './wallpaper/utils.js';

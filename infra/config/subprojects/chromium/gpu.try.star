@@ -8,24 +8,18 @@ load("//lib/try.star", "try_")
 try_.defaults.set(
     bucket = "try",
     executable = "recipe:chromium_trybot",
+    pool = "luci.chromium.try",
     cores = 8,
     os = os.LINUX_DEFAULT,
     cpu = cpu.X86_64,
-    pool = "luci.chromium.try",
-    service_account = "chromium-try-gpu-builder@chops-service-accounts.iam.gserviceaccount.com",
     build_numbers = True,
-    caches = [
-        swarming.cache(
-            name = "win_toolchain",
-            path = "win_toolchain",
-        ),
-    ],
     cq_group = "cq",
     execution_timeout = 6 * time.hour,
     # Max. pending time for builds. CQ considers builds pending >2h as timed
     # out: http://shortn/_8PaHsdYmlq. Keep this in sync.
     expiration_timeout = 2 * time.hour,
     reclient_instance = reclient.instance.DEFAULT_UNTRUSTED,
+    service_account = "chromium-try-gpu-builder@chops-service-accounts.iam.gserviceaccount.com",
     subproject_list_view = "luci.chromium.try",
     task_template_canary_percentage = 5,
 )
@@ -103,7 +97,6 @@ gpu_android_builder(
         "ci/Android Release (Nexus 5X)",
     ],
     pool = "luci.chromium.gpu.android.nexus5x.try",
-    goma_backend = goma.backend.RBE_PROD,
 )
 
 def gpu_chromeos_builder(*, name, **kwargs):
@@ -125,33 +118,11 @@ gpu_chromeos_builder(
 )
 
 gpu_chromeos_builder(
-    name = "gpu-fyi-try-chromeos-jacuzzi-exp",
-    mirrors = [
-        "ci/gpu-fyi-chromeos-jacuzzi-exp",
-    ],
-    pool = "luci.chromium.gpu.chromeos.jacuzzi.try",
-)
-
-gpu_chromeos_builder(
     name = "gpu-fyi-try-chromeos-kevin",
     mirrors = [
         "ci/ChromeOS FYI Release (kevin)",
     ],
     pool = "luci.chromium.gpu.chromeos.kevin.try",
-)
-
-gpu_chromeos_builder(
-    name = "gpu-fyi-try-chromeos-octopus-exp",
-    mirrors = [
-        "ci/gpu-fyi-chromeos-octopus-exp",
-    ],
-    pool = "luci.chromium.gpu.chromeos.octopus.try",
-)
-
-gpu_chromeos_builder(
-    name = "gpu-fyi-try-chromeos-zork-exp",
-    mirrors = ["ci/gpu-fyi-chromeos-zork-exp"],
-    pool = "luci.chromium.gpu.chromeos.zork.try",
 )
 
 def gpu_linux_builder(*, name, **kwargs):
@@ -251,7 +222,6 @@ gpu_linux_builder(
         "ci/Linux Debug (NVIDIA)",
     ],
     pool = "luci.chromium.gpu.linux.nvidia.try",
-    goma_backend = goma.backend.RBE_PROD,
 )
 
 gpu_linux_builder(
@@ -261,7 +231,6 @@ gpu_linux_builder(
         "ci/Linux Release (NVIDIA)",
     ],
     pool = "luci.chromium.gpu.linux.nvidia.try",
-    goma_backend = goma.backend.RBE_PROD,
 )
 
 def gpu_mac_builder(*, name, **kwargs):
@@ -327,7 +296,7 @@ gpu_mac_builder(
         "ci/Mac FYI Experimental Release (Apple M1)",
     ],
     pool = "luci.chromium.gpu.mac.arm64.apple.m1.try",
-    goma_backend = goma.backend.RBE_PROD,
+    reclient_jobs = reclient.jobs.LOW_JOBS_FOR_CQ,
 )
 
 gpu_mac_builder(

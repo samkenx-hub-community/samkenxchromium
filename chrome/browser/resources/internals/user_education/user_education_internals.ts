@@ -4,23 +4,32 @@
 
 import 'chrome://resources/cr_components/help_bubble/help_bubble.js';
 import 'chrome://resources/cr_elements/cr_hidden_style.css.js';
+import 'chrome://resources/cr_elements/cr_shared_style.css.js';
 import 'chrome://resources/cr_elements/cr_shared_vars.css.js';
+import 'chrome://resources/cr_elements/cr_toast/cr_toast.js';
 import 'chrome://resources/cr_elements/cr_toolbar/cr_toolbar.js';
 import 'chrome://resources/cr_elements/cr_toolbar/cr_toolbar_search_field.js';
+import 'chrome://resources/polymer/v3_0/iron-icon/iron-icon.js';
+import './user_education_internals_card.js';
 
 import {HelpBubbleMixin, HelpBubbleMixinInterface} from 'chrome://resources/cr_components/help_bubble/help_bubble_mixin.js';
+import {CrContainerShadowMixin, CrContainerShadowMixinInterface} from 'chrome://resources/cr_elements/cr_container_shadow_mixin.js';
+import {CrToastElement} from 'chrome://resources/cr_elements/cr_toast/cr_toast.js';
 import {CrToolbarElement} from 'chrome://resources/cr_elements/cr_toolbar/cr_toolbar.js';
-import {DomRepeat, DomRepeatEvent, PolymerElement} from 'chrome://resources/polymer/v3_0/polymer/polymer_bundled.min.js';
+import {DomRepeat, PolymerElement} from 'chrome://resources/polymer/v3_0/polymer/polymer_bundled.min.js';
 
 import {getTemplate} from './user_education_internals.html.js';
 import {FeaturePromoDemoPageInfo, UserEducationInternalsPageHandler, UserEducationInternalsPageHandlerInterface} from './user_education_internals.mojom-webui.js';
 
-const UserEducationInternalsElementBase = HelpBubbleMixin(PolymerElement) as {
-  new (): PolymerElement & HelpBubbleMixinInterface,
-};
+const UserEducationInternalsElementBase =
+    CrContainerShadowMixin(HelpBubbleMixin(PolymerElement)) as {
+      new (): PolymerElement & HelpBubbleMixinInterface &
+          CrContainerShadowMixinInterface,
+    };
 
 interface UserEducationInternalsElement {
   $: {
+    errorMessageToast: CrToastElement,
     promos: DomRepeat,
     toolbar: CrToolbarElement,
     tutorials: DomRepeat,
@@ -50,13 +59,15 @@ class UserEducationInternalsElement extends UserEducationInternalsElementBase {
       tutorials_: Array,
       featurePromos_: Array,
       featurePromoErrorMessage_: String,
+      narrow_: Boolean,
     };
   }
 
   filter: string = '';
-  private tutorials_: string[];
+  private tutorials_: FeaturePromoDemoPageInfo[];
   private featurePromos_: FeaturePromoDemoPageInfo[];
   private featurePromoErrorMessage_: string;
+  private narrow_: boolean = false;
 
   private handler_: UserEducationInternalsPageHandlerInterface;
 
@@ -68,8 +79,8 @@ class UserEducationInternalsElement extends UserEducationInternalsElementBase {
   override ready() {
     super.ready();
 
-    this.handler_.getTutorials().then(({tutorialIds}) => {
-      this.tutorials_ = tutorialIds;
+    this.handler_.getTutorials().then(({tutorialInfos}) => {
+      this.tutorials_ = tutorialInfos;
     });
 
     // There is a self-referential demo IPH for showing a help bubble in a
@@ -82,7 +93,8 @@ class UserEducationInternalsElement extends UserEducationInternalsElementBase {
     this.$.promos.addEventListener(
         'rendered-item-count-changed', (_: Event) => {
           this.registerHelpBubble(
-              'kWebUIIPHDemoElementIdentifier', '#IPH_WebUiHelpBubbleTest');
+              'kWebUIIPHDemoElementIdentifier',
+              ['#IPH_WebUiHelpBubbleTest', '#launch']);
         }, {
           once: true,
         });
@@ -96,27 +108,38 @@ class UserEducationInternalsElement extends UserEducationInternalsElementBase {
     this.filter = (e.detail as string).toLowerCase();
   }
 
-  private startTutorial_(e: DomRepeatEvent<string>) {
-    const id = e.model.item;
-    this.handler_.startTutorial(id);
+  private startTutorial_(e: CustomEvent) {
+    const id = e.detail;
+    this.featurePromoErrorMessage_ = '';
+
+    this.handler_.startTutorial(id).then(({errorMessage}) => {
+      this.featurePromoErrorMessage_ = errorMessage;
+      if (errorMessage !== '') {
+        this.$.errorMessageToast.show();
+      }
+    });
   }
 
-  private showFeaturePromo_(e: DomRepeatEvent<FeaturePromoDemoPageInfo>) {
-    const id = e.model.item.displayTitle;
+  private showFeaturePromo_(e: CustomEvent) {
+    const id = e.detail;
     this.featurePromoErrorMessage_ = '';
 
     this.handler_.showFeaturePromo(id).then(({errorMessage}) => {
       this.featurePromoErrorMessage_ = errorMessage;
+      if (errorMessage !== '') {
+        this.$.errorMessageToast.show();
+      }
     });
   }
 
-  private iphFilter_(iph: FeaturePromoDemoPageInfo, filter: string) {
-    return filter === '' || iph.displayTitle.toLowerCase().includes(filter) ||
-        iph.displayDescription.toLowerCase().includes(filter);
-  }
-
-  private tutorialFilter_(tutorial: string, filter: string) {
-    return filter === '' || tutorial.toLowerCase().includes(filter);
+  private promoFilter_(promo: FeaturePromoDemoPageInfo, filter: string) {
+    return filter === '' || promo.displayTitle.toLowerCase().includes(filter) ||
+        promo.displayDescription.toLowerCase().includes(filter) ||
+        promo.instructions.find(
+            (instruction: string) =>
+                instruction.toLowerCase().includes(filter)) ||
+        promo.supportedPlatforms.find(
+            (platform: string) => platform.toLowerCase().includes(filter));
   }
 }
 

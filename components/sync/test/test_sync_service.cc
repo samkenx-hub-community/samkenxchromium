@@ -165,6 +165,17 @@ SyncService::TransportState TestSyncService::GetTransportState() const {
   return transport_state_;
 }
 
+SyncService::UserActionableError TestSyncService::GetUserActionableError()
+    const {
+  if (auth_error_.IsPersistentError()) {
+    return UserActionableError::kSignInNeedsUpdate;
+  }
+  if (user_settings_.IsPassphraseRequiredForPreferredDataTypes()) {
+    return UserActionableError::kNeedsPassphrase;
+  }
+  return UserActionableError::kNone;
+}
+
 bool TestSyncService::IsLocalSyncEnabled() const {
   return local_sync_enabled_;
 }

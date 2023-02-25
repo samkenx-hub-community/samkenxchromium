@@ -293,6 +293,9 @@ const PolicyToPreferenceMapEntry kSimplePolicyMap[] = {
   { key::kNewBaseUrlInheritanceBehaviorAllowed,
     prefs::kNewBaseUrlInheritanceBehaviorAllowed,
     base::Value::Type::BOOLEAN },
+  { key::kHttpAllowlist,
+    prefs::kHttpAllowlist,
+    base::Value::Type::LIST },
 // Policies for all platforms - End
 #if BUILDFLAG(IS_ANDROID)
   { key::kAuthAndroidNegotiateAccountType,
@@ -687,6 +690,9 @@ const PolicyToPreferenceMapEntry kSimplePolicyMap[] = {
   { key::kWebRtcLocalIpsAllowedUrls,
     prefs::kWebRtcLocalIpsAllowedUrls,
     base::Value::Type::LIST },
+  { key::kWebRtcTextLogCollectionAllowed,
+    prefs::kWebRtcTextLogCollectionAllowed,
+    base::Value::Type::BOOLEAN },
   { key::kWindowCaptureAllowedByOrigins,
     prefs::kWindowCaptureAllowedByOrigins,
     base::Value::Type::LIST },
@@ -837,6 +843,9 @@ const PolicyToPreferenceMapEntry kSimplePolicyMap[] = {
     base::Value::Type::BOOLEAN },
 
 #if !BUILDFLAG(IS_CHROMEOS)
+  { key::kChromeVariations,
+    variations::prefs::kVariationsRestrictionsByPolicy,
+    base::Value::Type::INTEGER },
   { key::kMetricsReportingEnabled,
     metrics::prefs::kMetricsReportingEnabled,
     base::Value::Type::BOOLEAN },
@@ -931,7 +940,7 @@ const PolicyToPreferenceMapEntry kSimplePolicyMap[] = {
     ash::prefs::kAccessibilityDictationEnabled,
     base::Value::Type::BOOLEAN },
   { key::kPrimaryMouseButtonSwitch,
-    prefs::kPrimaryMouseButtonRight,
+    ash::prefs::kPrimaryMouseButtonRight,
     base::Value::Type::BOOLEAN },
   { key::kKeyboardFocusHighlightEnabled,
     ash::prefs::kAccessibilityFocusHighlightEnabled,
@@ -1381,6 +1390,10 @@ const PolicyToPreferenceMapEntry kSimplePolicyMap[] = {
   { key::kUsbDetectorNotificationEnabled,
     ash::prefs::kUsbDetectorNotificationEnabled,
     base::Value::Type::BOOLEAN },
+  { key::kShowTouchpadScrollScreenEnabled,
+    ash::prefs::kShowTouchpadScrollScreenEnabled,
+    base::Value::Type::BOOLEAN },
+
 #endif // BUILDFLAG(IS_CHROMEOS_ASH)
 
 #if BUILDFLAG(IS_LINUX)
@@ -1576,9 +1589,6 @@ const PolicyToPreferenceMapEntry kSimplePolicyMap[] = {
   { key::kBrowserGuestModeEnforced,
     prefs::kBrowserGuestModeEnforced,
     base::Value::Type::BOOLEAN },
-  { key::kChromeVariations,
-    variations::prefs::kVariationsRestrictionsByPolicy,
-    base::Value::Type::INTEGER },
   { key::kSigninInterceptionEnabled,
     prefs::kSigninInterceptionEnabled,
     base::Value::Type::BOOLEAN },
@@ -1706,6 +1716,13 @@ const PolicyToPreferenceMapEntry kSimplePolicyMap[] = {
     prefs::kChromeRootStoreEnabled,
     base::Value::Type::BOOLEAN },
 #endif  // BUILDFLAG(CHROME_ROOT_STORE_POLICY_SUPPORTED)
+
+#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) || \
+    BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_ANDROID)
+  { key::kEnforceLocalAnchorConstraintsEnabled,
+    prefs::kEnforceLocalAnchorConstraintsEnabled,
+    base::Value::Type::BOOLEAN },
+#endif
 
   { key::kScrollToTextFragmentEnabled,
     prefs::kScrollToTextFragmentEnabled,
@@ -1860,7 +1877,7 @@ void GetExtensionAllowedTypesMap(
 #endif  // BUILDFLAG(ENABLE_EXTENSIONS)
 
 // Future policies are not supported on Stable and Beta by default.
-bool AreFuturePoliciesSupported() {
+bool AreFuturePoliciesEnabledByDefault() {
   // Enable future policies for branded browser tests.
   if (base::CommandLine::ForCurrentProcess()->HasSwitch(switches::kTestType))
     return true;
@@ -1888,11 +1905,10 @@ std::unique_ptr<ConfigurationPolicyHandlerList> BuildHandlerList(
       new ConfigurationPolicyHandlerList(
           base::BindRepeating(&PopulatePolicyHandlerParameters),
           base::BindRepeating(&GetChromePolicyDetails),
-          AreFuturePoliciesSupported()));
-  for (size_t i = 0; i < std::size(kSimplePolicyMap); ++i) {
+          AreFuturePoliciesEnabledByDefault()));
+  for (PolicyToPreferenceMapEntry entry : kSimplePolicyMap) {
     handlers->AddHandler(std::make_unique<SimplePolicyHandler>(
-        kSimplePolicyMap[i].policy_name, kSimplePolicyMap[i].preference_path,
-        kSimplePolicyMap[i].value_type));
+        entry.policy_name, entry.preference_path, entry.value_type));
   }
 
   // Policies for all platforms - Start
@@ -2161,12 +2177,6 @@ std::unique_ptr<ConfigurationPolicyHandlerList> BuildHandlerList(
 #if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_WIN)
   handlers->AddHandler(std::make_unique<LocalSyncPolicyHandler>());
   handlers->AddHandler(std::make_unique<ThemeColorPolicyHandler>());
-  handlers->AddHandler(
-      std::make_unique<
-          enterprise_connectors::EnterpriseConnectorsPolicyHandler>(
-          key::kAutomatedKeyRotationEnabled,
-          enterprise_connectors::kAutomatedKeyRotationEnabledPref,
-          chrome_schema));
 #endif  // BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_WIN)
 
 #if BUILDFLAG(IS_CHROMEOS)
@@ -2539,7 +2549,7 @@ std::unique_ptr<ConfigurationPolicyHandlerList> BuildHandlerList(
   handlers->AddHandler(std::make_unique<IntRangePolicyHandler>(
       key::kExtensionUnpublishedAvailability,
       extensions::pref_names::kExtensionUnpublishedAvailability,
-      /*min=*/0, /*max=*/2, /*clamp=*/false));
+      /*min=*/0, /*max=*/1, /*clamp=*/false));
 #endif  // !BUILDFLAG(IS_FUCHSIA)
   handlers->AddHandler(std::make_unique<IntRangePolicyHandler>(
       key::kExtensionManifestV2Availability,

@@ -17,6 +17,7 @@ def GetDepToPathMappings(root_gen_dir):
       "cr_components/customize_themes",
       "cr_components/help_bubble",
       "cr_components/history_clusters",
+      "cr_components/image_service",
       "cr_components/localized_link",
       "cr_components/managed_dialog",
       "cr_components/managed_footnote",
@@ -26,11 +27,7 @@ def GetDepToPathMappings(root_gen_dir):
 
   path_mappings = {}
   for c in shared_ts_folders:
-    # TODO(dpapad): Rename //ui/webui/resources/mojo:library to
-    # //ui/webui/resources/mojo:build_ts and remove this special casing.
-    target_name = 'library' if c == "mojo" else 'build_ts'
-
-    path_mappings[f'//ui/webui/resources/{c}:{target_name}'] = [(
+    path_mappings[f'//ui/webui/resources/{c}:build_ts'] = [(
         f'//resources/{c}/*',
         f'{root_gen_dir}/ui/webui/resources/tsc/{c}/*',
     )]

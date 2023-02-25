@@ -48,8 +48,6 @@
 #include "chrome/browser/ash/guest_os/public/guest_os_service.h"
 #include "chrome/browser/ash/login/lock/screen_locker.h"
 #include "chrome/browser/ash/login/ui/login_display_host.h"
-#include "chrome/browser/ash/plugin_vm/plugin_vm_features.h"
-#include "chrome/browser/ash/plugin_vm/plugin_vm_pref_names.h"
 #include "chrome/browser/ash/plugin_vm/plugin_vm_util.h"
 #include "chrome/browser/extensions/api/file_system/chrome_file_system_delegate_ash.h"
 #include "chrome/browser/extensions/extension_service.h"
@@ -674,6 +672,10 @@ void EventRouter::ObserveEvents() {
   pref_change_registrar_->Add(arc::prefs::kArcHasAccessToRemovableMedia,
                               file_manager_prefs_callback);
   pref_change_registrar_->Add(ash::prefs::kFilesAppFolderShortcuts,
+                              file_manager_prefs_callback);
+  pref_change_registrar_->Add(prefs::kOfficeFileMovedToOneDrive,
+                              file_manager_prefs_callback);
+  pref_change_registrar_->Add(prefs::kOfficeFileMovedToGoogleDrive,
                               file_manager_prefs_callback);
 
   auto on_apps_update_callback = base::BindRepeating(

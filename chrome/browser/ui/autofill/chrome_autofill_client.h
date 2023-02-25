@@ -18,7 +18,7 @@
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/autofill/payments/autofill_error_dialog_controller_impl.h"
 #include "chrome/browser/ui/autofill/payments/autofill_progress_dialog_controller_impl.h"
-#include "components/autofill/core/browser/autofill_client.h"
+#include "components/autofill/content/browser/content_autofill_client.h"
 #include "components/autofill/core/browser/autofill_download_manager.h"
 #include "components/autofill/core/browser/autofill_driver.h"
 #include "components/autofill/core/browser/logging/log_manager.h"
@@ -28,7 +28,6 @@
 #include "components/signin/public/identity_manager/account_info.h"
 #include "content/public/browser/visibility.h"
 #include "content/public/browser/web_contents_observer.h"
-#include "content/public/browser/web_contents_user_data.h"
 
 #if BUILDFLAG(IS_ANDROID)
 #include "chrome/browser/fast_checkout/fast_checkout_client.h"
@@ -56,16 +55,28 @@ struct VirtualCardManualFallbackBubbleOptions;
 // primary main frame.
 // TODO(crbug.com/1351388): During prerendering in MPArch, the autofill client
 // should be attached not to the web contents but the outer-most main frame.
-class ChromeAutofillClient
-    : public AutofillClient,
-      public content::WebContentsUserData<ChromeAutofillClient>,
-      public content::WebContentsObserver
+class ChromeAutofillClient : public ContentAutofillClient,
+                             public content::WebContentsObserver
 #if !BUILDFLAG(IS_ANDROID)
     ,
-      public zoom::ZoomObserver
+                             public zoom::ZoomObserver
 #endif  // !BUILDFLAG(IS_ANDROID)
 {
  public:
+  static ChromeAutofillClient* FromWebContents(
+      content::WebContents* web_contents) {
+    return static_cast<ChromeAutofillClient*>(
+        ContentAutofillClient::FromWebContents(web_contents));
+  }
+
+  static void CreateForWebContents(content::WebContents* contents) {
+    DCHECK(contents);
+    if (!FromWebContents(contents)) {
+      contents->SetUserData(
+          UserDataKey(), base::WrapUnique(new ChromeAutofillClient(contents)));
+    }
+  }
+
   ChromeAutofillClient(const ChromeAutofillClient&) = delete;
   ChromeAutofillClient& operator=(const ChromeAutofillClient&) = delete;
   ~ChromeAutofillClient() override;
@@ -102,7 +113,7 @@ class ChromeAutofillClient
   std::unique_ptr<webauthn::InternalAuthenticator>
   CreateCreditCardInternalAuthenticator(AutofillDriver* driver) override;
 
-  void ShowAutofillSettings(bool show_credit_card_settings) override;
+  void ShowAutofillSettings(PopupType popup_type) override;
   void ShowCardUnmaskOtpInputDialog(
       const size_t& otp_length,
       base::WeakPtr<OtpUnmaskDelegate> delegate) override;
@@ -265,13 +276,13 @@ class ChromeAutofillClient
   explicit ChromeAutofillClient(content::WebContents* web_contents);
 
  private:
-  friend class content::WebContentsUserData<ChromeAutofillClient>;
-
   Profile* GetProfile() const;
   bool IsMultipleAccountUser();
   std::u16string GetAccountHolderName();
   std::u16string GetAccountHolderEmail();
   bool SupportsConsentlessExecution(const url::Origin& origin);
+
+  std::unique_ptr<LogManager> log_manager_;
 
   // These members are initialized lazily in their respective getters.
   // Therefore, do not access the members directly.
@@ -282,7 +293,6 @@ class ChromeAutofillClient
   std::unique_ptr<FormDataImporter> form_data_importer_;
 
   base::WeakPtr<AutofillPopupControllerImpl> popup_controller_;
-  std::unique_ptr<LogManager> log_manager_;
   FormInteractionsFlowId flow_id_{};
   base::Time flow_id_date_;
   // If set to true, the popup will stay open regardless of external changes on
@@ -307,8 +317,6 @@ class ChromeAutofillClient
 
   // True if and only if the associated web_contents() is currently focused.
   bool has_focus_ = false;
-
-  WEB_CONTENTS_USER_DATA_KEY_DECL();
 };
 
 }  // namespace autofill

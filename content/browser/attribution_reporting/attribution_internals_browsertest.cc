@@ -16,19 +16,20 @@
 #include "base/test/gmock_callback_support.h"
 #include "base/time/time.h"
 #include "components/aggregation_service/aggregation_service.mojom.h"
+#include "components/attribution_reporting/aggregatable_dedup_key.h"
 #include "components/attribution_reporting/aggregatable_trigger_data.h"
 #include "components/attribution_reporting/aggregatable_values.h"
 #include "components/attribution_reporting/aggregation_keys.h"
 #include "components/attribution_reporting/event_trigger_data.h"
 #include "components/attribution_reporting/filters.h"
 #include "components/attribution_reporting/source_registration_error.mojom.h"
+#include "components/attribution_reporting/source_type.mojom.h"
 #include "components/attribution_reporting/suitable_origin.h"
 #include "components/attribution_reporting/trigger_registration.h"
 #include "content/browser/attribution_reporting/attribution_debug_report.h"
 #include "content/browser/attribution_reporting/attribution_manager.h"
 #include "content/browser/attribution_reporting/attribution_observer_types.h"
 #include "content/browser/attribution_reporting/attribution_report.h"
-#include "content/browser/attribution_reporting/attribution_source_type.h"
 #include "content/browser/attribution_reporting/attribution_test_utils.h"
 #include "content/browser/attribution_reporting/attribution_trigger.h"
 #include "content/browser/attribution_reporting/send_result.h"
@@ -56,8 +57,10 @@ namespace content {
 
 namespace {
 
+using ::attribution_reporting::FilterPair;
 using ::attribution_reporting::SuitableOrigin;
 using ::attribution_reporting::mojom::SourceRegistrationError;
+using ::attribution_reporting::mojom::SourceType;
 
 using AttributionFilters = ::attribution_reporting::Filters;
 
@@ -206,7 +209,7 @@ IN_PROC_BROWSER_TEST_F(AttributionInternalsWebUiBrowserTest,
   EXPECT_CALL(browser_client,
               IsAttributionReportingOperationAllowed(
                   _, ContentBrowserClient::AttributionReportingOperation::kAny,
-                  IsNull(), IsNull(), IsNull()))
+                  _, IsNull(), IsNull(), IsNull()))
       .WillRepeatedly(Return(false));
 
   ASSERT_TRUE(NavigateToURL(shell(), GURL(kAttributionInternalsUrl)));
@@ -277,7 +280,7 @@ IN_PROC_BROWSER_TEST_F(AttributionInternalsWebUiBrowserTest,
               })
               .BuildStored(),
           SourceBuilder(now + base::Hours(1))
-              .SetSourceType(AttributionSourceType::kEvent)
+              .SetSourceType(SourceType::kEvent)
               .SetPriority(std::numeric_limits<int64_t>::max())
               .SetDedupKeys({13, 17})
               .SetAggregatableBudgetConsumed(1300)
@@ -295,7 +298,6 @@ IN_PROC_BROWSER_TEST_F(AttributionInternalsWebUiBrowserTest,
               .SetAttributionLogic(StoredSource::AttributionLogic::kFalsely)
               .BuildStored()}));
 
-  // This shouldn't result in a row, as registration succeeded.
   manager()->NotifySourceHandled(SourceBuilder(now).Build(),
                                  StorableSource::Result::kSuccess);
 
@@ -312,14 +314,19 @@ IN_PROC_BROWSER_TEST_F(AttributionInternalsWebUiBrowserTest,
       StorableSource::Result::kInsufficientUniqueDestinationCapacity);
 
   manager()->NotifySourceHandled(
-      SourceBuilder(now + base::Hours(7)).SetDebugReporting(true).Build(),
+      SourceBuilder(now + base::Hours(7))
+          .SetSourceType(SourceType::kEvent)
+          .Build(),
       StorableSource::Result::kExcessiveReportingOrigins);
 
   static constexpr char kScript[] = R"(
     const table = document.querySelector('#sourceTable')
         .shadowRoot.querySelector('tbody');
+    const regTable = document.querySelector('#sourceRegistrationTable')
+        .shadowRoot.querySelector('tbody');
     const obs = new MutationObserver((_, obs) => {
-      if (table.children.length === 8 &&
+      if (table.children.length === 4 &&
+          regTable.children.length === 5 &&
           table.children[0].children[3]?.children[0]?.children.length === 2 &&
           table.children[0].children[3]?.children[0]?.children[0]?.innerText === 'https://a.test' &&
           table.children[0].children[3]?.children[0]?.children[1]?.innerText === 'https://b.test' &&
@@ -337,7 +344,6 @@ IN_PROC_BROWSER_TEST_F(AttributionInternalsWebUiBrowserTest,
           table.children[1].children[13]?.innerText === '1300 / 65536' &&
           table.children[0].children[14]?.innerText === '19' &&
           table.children[1].children[14]?.innerText === '' &&
-          table.children[4].children[14]?.innerText === 'Cleared (was 987)' &&
           table.children[0].children[15]?.innerText === '' &&
           table.children[1].children[15]?.children[0]?.children[0]?.innerText === '13' &&
           table.children[1].children[15]?.children[0]?.children[1]?.innerText === '17' &&
@@ -347,14 +353,16 @@ IN_PROC_BROWSER_TEST_F(AttributionInternalsWebUiBrowserTest,
           table.children[0].children[1]?.innerText === 'Unattributable: noised with no reports' &&
           table.children[1].children[1]?.innerText === 'Attributable' &&
           table.children[2].children[1]?.innerText === 'Attributable: reached event-level attribution limit' &&
-          table.children[3].children[1]?.innerText === 'Rejected: internal error' &&
-          table.children[4].children[1]?.innerText === 'Rejected: insufficient source capacity' &&
-          table.children[5].children[1]?.innerText === 'Rejected: insufficient unique destination capacity' &&
-          table.children[6].children[1]?.innerText === 'Rejected: excessive reporting origins' &&
-          table.children[7].children[1]?.innerText === 'Unattributable: noised with fake reports' &&
-          table.children[0].children[17]?.innerText === 'N/A' &&
-          table.children[5].children[17]?.innerText === 'Disabled' &&
-          table.children[6].children[17]?.innerText === 'Enabled') {
+          table.children[3].children[1]?.innerText === 'Unattributable: noised with fake reports' &&
+          regTable.children[0].children[4]?.innerText === '' &&
+          regTable.children[0].children[6]?.innerText === 'Success' &&
+          regTable.children[1].children[6]?.innerText === 'Rejected: internal error' &&
+          regTable.children[2].children[6]?.innerText === 'Rejected: insufficient source capacity' &&
+          regTable.children[2].children[4]?.innerText === '987' &&
+          regTable.children[3].children[5]?.innerText === 'Navigation' &&
+          regTable.children[3].children[6]?.innerText === 'Rejected: insufficient unique destination capacity' &&
+          regTable.children[4].children[5]?.innerText === 'Event' &&
+          regTable.children[4].children[6]?.innerText === 'Rejected: excessive reporting origins') {
         obs.disconnect();
         document.title = $3;
       }
@@ -374,24 +382,17 @@ IN_PROC_BROWSER_TEST_F(AttributionInternalsWebUiBrowserTest,
   ASSERT_TRUE(NavigateToURL(shell(), GURL(kAttributionInternalsUrl)));
 
   static constexpr char kScript[] = R"(
-    const table = document.querySelector('#logTable')
+    const table = document.querySelector('#sourceRegistrationTable')
         .shadowRoot.querySelector('tbody');
-
-    const description = '<a href="https://github.com/WICG/attribution-report' +
-                        'ing-api/blob/main/EVENT.md#registering-attribution-' +
-                        'sources" target="_blank">Failed Source Registration' +
-                        '</a>';
-    const metadata = '<dl><dt>Failure Reason</dt><dd>invalid JSON</dd>' +
-                     '<dt>Source Origin</dt><dd>https://b.test</dd>' +
-                     '<dt>Reporting Origin</dt><dd>https://a.test</dd>' +
-                     '<dt>Attribution-Reporting-Register-Source Header</dt>'+
-                     '<dd><pre><code>!</code></pre></dd></dl>';
 
     const obs = new MutationObserver((_, obs) => {
       if (table.children.length === 1 &&
-          table.children[0].children[1]?.innerHTML === description &&
-          table.children[0].children[2]?.innerHTML === metadata
-      ) {
+          table.children[0].children[1]?.innerText === 'https://b.test' &&
+          table.children[0].children[2]?.innerText === 'https://a.test' &&
+          table.children[0].children[3]?.innerText === '!' &&
+          table.children[0].children[4]?.innerText === '' &&
+          table.children[0].children[5]?.innerText === 'Event' &&
+          table.children[0].children[6]?.innerText === 'Rejected: invalid JSON: invalid syntax') {
         obs.disconnect();
         document.title = $1;
       }
@@ -404,7 +405,7 @@ IN_PROC_BROWSER_TEST_F(AttributionInternalsWebUiBrowserTest,
 
   manager()->NotifySourceRegistrationFailure(
       "!", *SuitableOrigin::Deserialize("https://b.test"),
-      *SuitableOrigin::Deserialize("https://a.test"),
+      *SuitableOrigin::Deserialize("https://a.test"), SourceType::kEvent,
       SourceRegistrationError::kInvalidJson);
   EXPECT_EQ(kCompleteTitle, title_watcher.WaitAndGetTitle());
 }
@@ -512,7 +513,7 @@ IN_PROC_BROWSER_TEST_F(AttributionInternalsWebUiBrowserTest,
       .WillByDefault(RunOnceCallback<2>(std::vector<AttributionReport>{
           ReportBuilder(AttributionInfoBuilder(
                             SourceBuilder(now)
-                                .SetSourceType(AttributionSourceType::kEvent)
+                                .SetSourceType(SourceType::kEvent)
                                 .SetAttributionLogic(
                                     StoredSource::AttributionLogic::kFalsely)
                                 .BuildStored())
@@ -761,15 +762,19 @@ IN_PROC_BROWSER_TEST_F(AttributionInternalsWebUiBrowserTest,
   static constexpr char kScript[] = R"(
     const table = document.querySelector('#sourceTable')
         .shadowRoot.querySelector('tbody');
+    const regTable = document.querySelector('#sourceRegistrationTable')
+        .shadowRoot.querySelector('tbody');
     const obs = new MutationObserver((_, obs) => {
-      if (table.children.length === 2 &&
+      if (table.children.length === 1 &&
+          regTable.children.length === 1 &&
           table.children[0].children[0]?.innerText === '5' &&
-          table.children[1].children[0]?.innerText === '6') {
+          regTable.children[0].children[6]?.innerText === 'Rejected: internal error') {
         obs.disconnect();
         document.title = $1;
       }
     });
     obs.observe(table, {childList: true, subtree: true, characterData: true});
+    obs.observe(regTable, {childList: true, subtree: true, characterData: true});
   )";
   ASSERT_TRUE(ExecJsInWebUI(JsReplace(kScript, kCompleteTitle)));
 
@@ -784,14 +789,19 @@ IN_PROC_BROWSER_TEST_F(AttributionInternalsWebUiBrowserTest,
   static constexpr char kObserveEmptySourcesTableScript[] = R"(
     const table = document.querySelector('#sourceTable')
         .shadowRoot.querySelector('tbody');
+    const regTable = document.querySelector('#sourceRegistrationTable')
+        .shadowRoot.querySelector('tbody');
     const obs = new MutationObserver((_, obs) => {
       if (table.children.length === 1 &&
-          table.children[0].children[0]?.innerText === 'No sources.') {
+          regTable.children.length === 1 &&
+          table.children[0].children[0]?.innerText === 'No sources.' &&
+          regTable.children[0].children[0]?.innerText === 'No registrations.') {
         obs.disconnect();
         document.title = $1;
       }
     });
     obs.observe(table, {childList: true, subtree: true, characterData: true});
+    obs.observe(regTable, {childList: true, subtree: true, characterData: true});
   )";
   ASSERT_TRUE(
       ExecJsInWebUI(JsReplace(kObserveEmptySourcesTableScript, kDeleteTitle)));
@@ -945,11 +955,11 @@ IN_PROC_BROWSER_TEST_F(
                  net::ERR_INTERNET_DISCONNECTED));
   ON_CALL(*manager(), GetPendingReportsForInternalUse)
       .WillByDefault(RunOnceCallback<2>(std::vector<AttributionReport>{
-          ReportBuilder(AttributionInfoBuilder(
-                            SourceBuilder(now)
-                                .SetSourceType(AttributionSourceType::kEvent)
-                                .BuildStored())
-                            .Build())
+          ReportBuilder(
+              AttributionInfoBuilder(SourceBuilder(now)
+                                         .SetSourceType(SourceType::kEvent)
+                                         .BuildStored())
+                  .Build())
               .SetReportTime(now)
               .SetAggregatableHistogramContributions(contributions)
               .BuildAggregatableAttribution()}));
@@ -997,39 +1007,38 @@ IN_PROC_BROWSER_TEST_F(AttributionInternalsWebUiBrowserTest,
         return AttributionTrigger(
             /*reporting_origin=*/*SuitableOrigin::Deserialize("https://r.test"),
             attribution_reporting::TriggerRegistration(
-                /*filters=*/*AttributionFilters::Create({{"a", {"b"}}}),
-                /*not_filters=*/*AttributionFilters::Create({{"g", {"h"}}}),
+                FilterPair{
+                    .positive = *AttributionFilters::Create({{"a", {"b"}}}),
+                    .negative = *AttributionFilters::Create({{"g", {"h"}}})},
                 /*debug_key=*/1,
-                /*aggregatable_dedup_key=*/18,
+                *attribution_reporting::AggregatableDedupKeyList::Create(
+                    {attribution_reporting::AggregatableDedupKey(
+                        /*dedup_key=*/18, FilterPair())}),
                 *attribution_reporting::EventTriggerDataList::Create({
                     attribution_reporting::EventTriggerData(
                         /*data=*/2,
                         /*priority=*/3,
                         /*dedup_key=*/absl::nullopt,
-                        /*filters=*/
-                        *AttributionFilters::Create({{"c", {"d"}}}),
-                        /*not_filters=*/AttributionFilters()),
+                        FilterPair{.positive = *AttributionFilters::Create(
+                                       {{"c", {"d"}}})}),
                     attribution_reporting::EventTriggerData(
                         /*data=*/4,
                         /*priority=*/5,
                         /*dedup_key=*/6,
-                        /*filters=*/AttributionFilters(),
-                        /*not_filters=*/
-                        *AttributionFilters::Create({{"e", {"f"}}})),
+                        FilterPair{.negative = *AttributionFilters::Create(
+                                       {{"e", {"f"}}})}),
                 }),
                 *attribution_reporting::AggregatableTriggerDataList::Create(
                     {*attribution_reporting::AggregatableTriggerData::Create(
                          /*key_piece=*/345,
                          /*source_keys=*/{"a"},
-                         /*filters=*/
-                         *AttributionFilters::Create({{"c", {"d"}}}),
-                         /*not_filters=*/AttributionFilters()),
+                         FilterPair{.positive = *AttributionFilters::Create(
+                                        {{"c", {"d"}}})}),
                      *attribution_reporting::AggregatableTriggerData::Create(
                          /*key_piece=*/678,
                          /*source_keys=*/{"b"},
-                         /*filters=*/AttributionFilters(),
-                         /*not_filters=*/
-                         *AttributionFilters::Create({{"e", {"f"}}}))}),
+                         FilterPair{.negative = *AttributionFilters::Create(
+                                        {{"e", {"f"}}})})}),
                 /*aggregatable_values=*/
                 *attribution_reporting::AggregatableValues::Create(
                     {{"a", 123}, {"b", 456}}),
@@ -1049,14 +1058,13 @@ IN_PROC_BROWSER_TEST_F(AttributionInternalsWebUiBrowserTest,
         .shadowRoot.querySelector('tbody');
     const obs = new MutationObserver((_, obs) => {
       if (table.children.length === 2 &&
-          table.children[0].children[1]?.innerText === 'Success: Report stored' &&
-          table.children[0].children[2]?.innerText === 'Success: Report stored' &&
-          table.children[0].children[3]?.innerText === 'https://d.test' &&
-          table.children[0].children[4]?.innerText === 'https://r.test' &&
-          table.children[0].children[5]?.innerText.includes('{') &&
-          table.children[0].children[6]?.innerText === '' &&
-          table.children[0].children[7]?.innerText === '' &&
-          table.children[1].children[6]?.innerText === '123' &&
+          table.children[0].children[5]?.innerText === 'Success: Report stored' &&
+          table.children[0].children[6]?.innerText === 'Success: Report stored' &&
+          table.children[0].children[1]?.innerText === 'https://d.test' &&
+          table.children[0].children[2]?.innerText === 'https://r.test' &&
+          table.children[0].children[3]?.innerText.includes('{') &&
+          table.children[0].children[4]?.innerText === '' &&
+          table.children[1].children[4]?.innerText === '123' &&
           table.children[1].children[7]?.innerHTML === expectedAttestation) {
         obs.disconnect();
         document.title = $1;

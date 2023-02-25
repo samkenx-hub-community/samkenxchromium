@@ -158,6 +158,7 @@ extern DEVICE_BLUETOOTH_EXPORT const char kReadRemoteRssi[];
 extern DEVICE_BLUETOOTH_EXPORT const char kConfigureMtu[];
 extern DEVICE_BLUETOOTH_EXPORT const char kConnectionParameterUpdate[];
 extern DEVICE_BLUETOOTH_EXPORT const char kCallbackInterface[];
+extern DEVICE_BLUETOOTH_EXPORT const char kServerCallbackInterface[];
 
 extern DEVICE_BLUETOOTH_EXPORT const char kOnClientRegistered[];
 extern DEVICE_BLUETOOTH_EXPORT const char kOnClientConnectionState[];
@@ -179,13 +180,24 @@ extern DEVICE_BLUETOOTH_EXPORT const char kRegisterServer[];
 extern DEVICE_BLUETOOTH_EXPORT const char kUnregisterServer[];
 extern DEVICE_BLUETOOTH_EXPORT const char kServerConnect[];
 extern DEVICE_BLUETOOTH_EXPORT const char kServerDisconnect[];
+extern DEVICE_BLUETOOTH_EXPORT const char kServerSetPreferredPhy[];
+extern DEVICE_BLUETOOTH_EXPORT const char kServerReadPhy[];
 extern DEVICE_BLUETOOTH_EXPORT const char kAddService[];
 extern DEVICE_BLUETOOTH_EXPORT const char kRemoveService[];
 extern DEVICE_BLUETOOTH_EXPORT const char kClearServices[];
+extern DEVICE_BLUETOOTH_EXPORT const char kSendResponse[];
+extern DEVICE_BLUETOOTH_EXPORT const char kServerSendNotification[];
 
 extern DEVICE_BLUETOOTH_EXPORT const char kOnServerRegistered[];
 extern DEVICE_BLUETOOTH_EXPORT const char kOnServerConnectionState[];
 extern DEVICE_BLUETOOTH_EXPORT const char kOnServerServiceAdded[];
+extern DEVICE_BLUETOOTH_EXPORT const char kOnServerCharacteristicReadRequest[];
+extern DEVICE_BLUETOOTH_EXPORT const char kOnServerDescriptorReadRequest[];
+extern DEVICE_BLUETOOTH_EXPORT const char kOnServerCharacteristicWriteRequest[];
+extern DEVICE_BLUETOOTH_EXPORT const char kOnServerDescriptorWriteRequest[];
+extern DEVICE_BLUETOOTH_EXPORT const char kOnServerNotificationSent[];
+extern DEVICE_BLUETOOTH_EXPORT const char kOnServerMtuChanged[];
+extern DEVICE_BLUETOOTH_EXPORT const char kOnServerSubrateChange[];
 }  // namespace gatt
    //
 namespace advertiser {
@@ -225,6 +237,7 @@ extern DEVICE_BLUETOOTH_EXPORT const char kOnBatteryInfoUpdated[];
 
 namespace experimental {
 extern DEVICE_BLUETOOTH_EXPORT const char kSetLLPrivacy[];
+extern DEVICE_BLUETOOTH_EXPORT const char kSetDevCoredump[];
 }  // namespace experimental
 
 namespace admin {

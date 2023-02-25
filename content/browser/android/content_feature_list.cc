@@ -23,12 +23,12 @@ namespace {
 // this array may either refer to features defined in the header of this file or
 // in other locations in the code base (e.g. content_features.h).
 const base::Feature* const kFeaturesExposedToJava[] = {
+    &blink::features::kStylusRichGestures,
     &features::kAccessibilityPageZoom,
     &features::kAutoDisableAccessibility,
     &features::kAutoDisableAccessibilityV2,
     &features::kBackgroundMediaRendererHasModerateBinding,
     &features::kBindingManagerConnectionLimit,
-    &features::kBindingManagerUseNotPerceptibleBinding,
     &features::kComputeAXMode,
     &features::kFedCm,
     &features::kOnDemandAccessibilityEvents,
@@ -45,8 +45,9 @@ const base::Feature* const kFeaturesExposedToJava[] = {
 
 const base::Feature* FindFeatureExposedToJava(const std::string& feature_name) {
   for (const base::Feature* feature : kFeaturesExposedToJava) {
-    if (feature->name == feature_name)
+    if (feature->name == feature_name) {
       return feature;
+    }
   }
   NOTREACHED() << "Queried feature cannot be found in ContentFeatureList: "
                << feature_name;

@@ -199,12 +199,6 @@ void DownloadBubbleRowView::RemovedFromWidget() {
   }
 }
 
-void DownloadBubbleRowView::OnThemeChanged() {
-  views::View::OnThemeChanged();
-  secondary_label_->SetEnabledColor(
-      GetColorProvider()->GetColor(ui_info_.secondary_color));
-}
-
 void DownloadBubbleRowView::OnDeviceScaleFactorChanged(
     float old_device_scale_factor,
     float new_device_scale_factor) {
@@ -297,7 +291,7 @@ void DownloadBubbleRowView::LoadIcon() {
 
 DownloadBubbleRowView::~DownloadBubbleRowView() {
   // Explicit removal of InkDrop for classes that override
-  // Add/RemoveLayerBeneathView(). This is done so that the InkDrop doesn't
+  // Add/RemoveLayerFromRegions(). This is done so that the InkDrop doesn't
   // access the non-override versions in ~View.
   views::InkDrop::Remove(this);
 }
@@ -561,12 +555,13 @@ gfx::Size DownloadBubbleRowView::CalculatePreferredSize() const {
   return {fixed_width, GetHeightForWidth(fixed_width)};
 }
 
-void DownloadBubbleRowView::AddLayerBeneathView(ui::Layer* layer) {
-  inkdrop_container_->AddLayerBeneathView(layer);
+void DownloadBubbleRowView::AddLayerToRegion(ui::Layer* layer,
+                                             views::LayerRegion region) {
+  inkdrop_container_->AddLayerToRegion(layer, region);
 }
 
-void DownloadBubbleRowView::RemoveLayerBeneathView(ui::Layer* layer) {
-  inkdrop_container_->RemoveLayerBeneathView(layer);
+void DownloadBubbleRowView::RemoveLayerFromRegions(ui::Layer* layer) {
+  inkdrop_container_->RemoveLayerFromRegions(layer);
 }
 
 void DownloadBubbleRowView::OnWillChangeFocus(views::View* before,
@@ -697,8 +692,7 @@ void DownloadBubbleRowView::UpdateLabels() {
   }
 
   if (GetWidget()) {
-    secondary_label_->SetEnabledColor(
-        GetColorProvider()->GetColor(ui_info_.secondary_color));
+    secondary_label_->SetEnabledColorId(ui_info_.GetColorForSecondaryText());
   }
 }
 

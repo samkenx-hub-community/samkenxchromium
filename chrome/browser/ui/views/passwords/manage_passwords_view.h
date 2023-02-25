@@ -5,11 +5,14 @@
 #ifndef CHROME_BROWSER_UI_VIEWS_PASSWORDS_MANAGE_PASSWORDS_VIEW_H_
 #define CHROME_BROWSER_UI_VIEWS_PASSWORDS_MANAGE_PASSWORDS_VIEW_H_
 
+#include "base/memory/raw_ptr.h"
 #include "chrome/browser/ui/passwords/bubble_controllers/items_bubble_controller.h"
 #include "chrome/browser/ui/views/passwords/password_bubble_view_base.h"
 #include "components/password_manager/core/browser/password_form.h"
 
 class PageSwitcherView;
+class ManagePasswordsListView;
+class ManagePasswordsDetailsView;
 
 // A dialog for managing stored password and federated login information for a
 // specific site. A user can see the details of the passwords, and edit the
@@ -30,17 +33,19 @@ class ManagePasswordsView : public PasswordBubbleViewBase {
   const PasswordBubbleControllerBase* GetController() const override;
   ui::ImageModel GetWindowIcon() override;
   void AddedToWidget() override;
+  bool Cancel() override;
+  bool Accept() override;
 
-  std::unique_ptr<views::View> CreatePasswordListTitleView() const;
-  std::unique_ptr<views::View> CreatePasswordListView();
-  std::unique_ptr<views::View> CreatePasswordDetailsView() const;
-  std::unique_ptr<views::View> CreatePasswordDetailsTitleView();
+  std::unique_ptr<ManagePasswordsListView> CreatePasswordListView();
+  std::unique_ptr<ManagePasswordsDetailsView> CreatePasswordDetailsView();
   std::unique_ptr<views::View> CreateFooterView();
 
   // Changes the contents of the page to either display the details of
   // `currently_selected_password_` or the list of passwords when
   // `currently_selected_password_` isn't set.
   void RecreateLayout();
+
+  void SwitchToReadingMode();
 
   // Called when the favicon is loaded. If |favicon| isn't empty, it sets
   // |favicon_| and invokes RecreateLayout().
@@ -57,6 +62,8 @@ class ManagePasswordsView : public PasswordBubbleViewBase {
   // current domain. When set, the bubble displays the password details of the
   // currently selected password.
   absl::optional<password_manager::PasswordForm> currently_selected_password_;
+
+  ManagePasswordsDetailsView* password_details_view_ = nullptr;
 
   ItemsBubbleController controller_;
   raw_ptr<PageSwitcherView> page_container_ = nullptr;

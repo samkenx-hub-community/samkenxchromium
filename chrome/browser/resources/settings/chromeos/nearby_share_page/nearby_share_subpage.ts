@@ -19,18 +19,19 @@ import './nearby_share_device_name_dialog.js';
 import './nearby_share_data_usage_dialog.js';
 import './nearby_share_receive_dialog.js';
 
-import {ReceiveObserverReceiver, ShareTarget, TransferMetadata} from '/mojo/nearby_share.mojom-webui.js';
+import {ReceiveObserverReceiver, ShareTarget, TransferMetadata} from '/shared/mojo/nearby_share.mojom-webui.js';
+import {getContactManager} from '/shared/nearby_contact_manager.js';
+import {NearbySettings} from '/shared/nearby_share_settings_mixin.js';
 import {I18nMixin} from 'chrome://resources/cr_elements/i18n_mixin.js';
+import {assertNotReached} from 'chrome://resources/js/assert_ts.js';
 import {loadTimeData} from 'chrome://resources/js/load_time_data.js';
 import {FastInitiationNotificationState, Visibility} from 'chrome://resources/mojo/chromeos/ash/services/nearby/public/mojom/nearby_share_settings.mojom-webui.js';
 import {flush, PolymerElement} from 'chrome://resources/polymer/v3_0/polymer/polymer_bundled.min.js';
 
 import {Setting} from '../../mojom-webui/setting.mojom-webui.js';
 import {PrefsMixin} from '../../prefs/prefs_mixin.js';
-import {getContactManager} from '../../shared/nearby_contact_manager.js';
-import {NearbySettings} from '../../shared/nearby_share_settings_behavior.js';
 import {DeepLinkingMixin} from '../deep_linking_mixin.js';
-import {routes} from '../os_route.js';
+import {routes} from '../os_settings_routes.js';
 import {RouteObserverMixin} from '../route_observer_mixin.js';
 import {Route, Router} from '../router.js';
 
@@ -109,7 +110,7 @@ class SettingsNearbyShareSubpageElement extends
       },
 
       /**
-       * Used by DeepLinkingBehavior to focus this page's deep links.
+       * Used by DeepLinkingMixin to focus this page's deep links.
        */
       supportedSettingIds: {
         type: Object,
@@ -279,7 +280,10 @@ class SettingsNearbyShareSubpageElement extends
     return this.i18n('nearbyShareDeviceNameAriaDescription', name);
   }
 
-  private getVisibilityText_(visibility: Visibility): string {
+  private getVisibilityText_(visibility: Visibility|undefined): string {
+    if (visibility === undefined) {
+      return '';
+    }
     switch (visibility) {
       case Visibility.kAllContacts:
         return this.i18n('nearbyShareContactVisibilityAll');
@@ -290,11 +294,14 @@ class SettingsNearbyShareSubpageElement extends
       case Visibility.kUnknown:
         return this.i18n('nearbyShareContactVisibilityUnknown');
       default:
-        return '';  // Make closure happy.
+        assertNotReached();
     }
   }
 
-  private getVisibilityDescription_(visibility: Visibility): string {
+  private getVisibilityDescription_(visibility: Visibility|undefined): string {
+    if (visibility === undefined) {
+      return '';
+    }
     switch (visibility) {
       case Visibility.kAllContacts:
         return this.i18n('nearbyShareContactVisibilityAllDescription');
@@ -305,7 +312,7 @@ class SettingsNearbyShareSubpageElement extends
       case Visibility.kUnknown:
         return this.i18n('nearbyShareContactVisibilityUnknownDescription');
       default:
-        return '';  // Make closure happy.
+        assertNotReached();
     }
   }
 

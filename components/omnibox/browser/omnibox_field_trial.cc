@@ -613,6 +613,11 @@ bool OmniboxFieldTrial::IsDefaultBrowserPedalEnabled() {
   return base::FeatureList::IsEnabled(omnibox::kOmniboxDefaultBrowserPedal);
 }
 
+const base::FeatureParam<bool> OmniboxFieldTrial::kDefaultBrowserPedalImmediate(
+    &omnibox::kOmniboxDefaultBrowserPedal,
+    "DefaultBrowserPedalImmediate",
+    false);
+
 const base::FeatureParam<bool>
     OmniboxFieldTrial::kDefaultBrowserPedalInteractive(
         &omnibox::kOmniboxDefaultBrowserPedal,
@@ -647,6 +652,12 @@ bool OmniboxFieldTrial::IsOnDeviceTailSuggestEnabled() {
   // Tail model will only be enabled when head provider is also enabled.
   return base::FeatureList::IsEnabled(omnibox::kOnDeviceTailModel) &&
          IsOnDeviceHeadSuggestEnabledForAnyMode();
+}
+
+bool OmniboxFieldTrial::ShouldEncodeLeadingSpaceForOnDeviceTailSuggest() {
+  return base::GetFieldTrialParamByFeatureAsBool(omnibox::kOnDeviceTailModel,
+                                                 "ShouldEncodeLeadingSpace",
+                                                 /*default_value=*/false);
 }
 
 std::string OmniboxFieldTrial::OnDeviceHeadModelLocaleConstraint(
@@ -769,17 +780,17 @@ const base::FeatureParam<bool>
     kAutocompleteStabilityPreserveDefaultExcludeKeywordInputs(
         &omnibox::kPreserveDefault,
         "AutocompleteStabilityPreserveDefaultExcludeKeywordInputs",
-        false);
+        true);
 const base::FeatureParam<bool>
     kAutocompleteStabilityPreserveDefaultAfterTransfer(
         &omnibox::kPreserveDefault,
         "AutocompleteStabilityPreserveDefaultAfterTransfer",
-        false);
+        true);
 const base::FeatureParam<int>
     kAutocompleteStabilityPreserveDefaultForSyncUpdatesMinInputLength(
         &omnibox::kPreserveDefault,
         "AutocompleteStabilityPreserveDefaultForSyncUpdatesMinInputLength",
-        -1);
+        3);
 const base::FeatureParam<bool>
     kAutocompleteStabilityPreserveDefaultForAsyncUpdates(
         &omnibox::kPreserveDefault,
@@ -789,15 +800,7 @@ const base::FeatureParam<bool>
     kAutocompleteStabilityPreventDefaultPreviousMatches(
         &omnibox::kPreserveDefault,
         "AutocompleteStabilityPreventDefaultPreviousMatches",
-        false);
-const base::FeatureParam<bool> kAutocompleteStabilityDontCopyDoneProviders(
-    &omnibox::kAutocompleteStability,
-    "AutocompleteStabilityDontCopyDoneProviders",
-    true);
-const base::FeatureParam<bool> kAutocompleteStabilityAsyncProvidersFirst(
-    &omnibox::kAutocompleteStability,
-    "AutocompleteStabilityAsyncProvidersFirst",
-    true);
+        true);
 const base::FeatureParam<bool>
     kAutocompleteStabilityUpdateResultDebounceFromLastRun(
         &omnibox::kUpdateResultDebounce,

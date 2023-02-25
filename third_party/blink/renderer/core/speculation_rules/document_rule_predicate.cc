@@ -9,6 +9,7 @@
 #include "third_party/blink/renderer/bindings/core/v8/v8_url_pattern_init.h"
 #include "third_party/blink/renderer/core/css/parser/css_parser.h"
 #include "third_party/blink/renderer/core/css/style_rule.h"
+#include "third_party/blink/renderer/core/display_lock/display_lock_utilities.h"
 #include "third_party/blink/renderer/core/dom/element.h"
 #include "third_party/blink/renderer/core/dom/node_computed_style.h"
 #include "third_party/blink/renderer/core/execution_context/execution_context.h"
@@ -227,12 +228,9 @@ class CSSSelectorPredicate : public DocumentRulePredicate {
 
   bool Matches(const HTMLAnchorElement& link) const override {
     DCHECK(!link.GetDocument().NeedsLayoutTreeUpdate());
-    // TODO(crbug.com/1371522): We need to deal with "display: none" elements,
-    // they will not have a ComputedStyle (even if style is clean).
     const ComputedStyle* computed_style = link.GetComputedStyle();
-    if (!computed_style) {
-      return false;
-    }
+    DCHECK(computed_style);
+    DCHECK(!DisplayLockUtilities::LockedAncestorPreventingStyle(link));
     const Persistent<HeapHashSet<WeakMember<StyleRule>>>& matched_selectors =
         computed_style->DocumentRulesSelectors();
     if (!matched_selectors) {

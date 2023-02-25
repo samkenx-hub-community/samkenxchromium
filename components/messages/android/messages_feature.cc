@@ -40,10 +40,6 @@ BASE_FEATURE(kMessagesForAndroidInfrastructure,
              "MessagesForAndroidInfrastructure",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
-BASE_FEATURE(kMessagesForAndroidNotificationBlocked,
-             "MessagesForAndroidNotificationBlocked",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
 BASE_FEATURE(kMessagesForAndroidOfferNotification,
              "MessagesForAndroidOfferNotification",
              base::FEATURE_DISABLED_BY_DEFAULT);
@@ -84,14 +80,14 @@ bool IsSaveCardMessagesUiEnabled() {
          base::FeatureList::IsEnabled(kMessagesForAndroidSaveCard);
 }
 
-bool IsNotificationBlockedMessagesUiEnabled() {
-  return base::FeatureList::IsEnabled(kMessagesForAndroidInfrastructure) &&
-         base::FeatureList::IsEnabled(kMessagesForAndroidNotificationBlocked);
-}
-
 bool IsPermissionUpdateMessagesUiEnabled() {
   return base::FeatureList::IsEnabled(kMessagesForAndroidInfrastructure) &&
          base::FeatureList::IsEnabled(kMessagesForAndroidPermissionUpdate);
+}
+
+bool IsStackingAnimationEnabled() {
+  return base::FeatureList::IsEnabled(kMessagesForAndroidInfrastructure) &&
+         base::FeatureList::IsEnabled(kMessagesForAndroidStackingAnimation);
 }
 
 static jboolean JNI_MessageFeatureList_IsEnabled(

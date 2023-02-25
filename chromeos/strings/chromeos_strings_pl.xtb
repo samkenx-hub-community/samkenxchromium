@@ -16,6 +16,7 @@
 <translation id="1128128132059598906">EAP-TTLS</translation>
 <translation id="1145018782460575098">Okno aktualizowania oprogramowania układowego urządzeń zewnętrznych jest otwarte. Dostępne są aktualizacje (<ph name="NUM_UPDATES" />).</translation>
 <translation id="1145516343487477149">Znajdź artykuły pomocy i odpowiedzi na najczęstsze pytania dotyczące Chromebooka</translation>
+<translation id="1167755866710282443">Otwórz menu, aby dostosować klawisze. Menu możesz przeciągnąć w inne miejsce.</translation>
 <translation id="1175697296044146566">Tym urządzeniem <ph name="DEVICE_TYPE" /> zarządza <ph name="MANAGER" />.</translation>
 <translation id="1175951029573070619">Przeciętna (<ph name="SIGNAL_STRENGTH" />)</translation>
 <translation id="1181037720776840403">Usuń</translation>
@@ -326,6 +327,7 @@
 <translation id="4110686435123617899">Wybierz album <ph name="TITLE" /> <ph name="DESC" /></translation>
 <translation id="4111761024568264522">Touchpad USB</translation>
 <translation id="4117637339509843559">Tryb ciemny</translation>
+<translation id="4130035430755296270">Najedź kursorem, aby zobaczyć więcej opcji układu</translation>
 <translation id="4131410914670010031">Czarno-biały</translation>
 <translation id="4145784616224233563">Zapora sieciowa HTTP</translation>
 <translation id="4147897805161313378">Zdjęcia Google</translation>
@@ -414,6 +416,7 @@
 <translation id="484790837831576105">(Android) Rozpoznawanie nazw DNS</translation>
 <translation id="4848429997038228357">W TOKU</translation>
 <translation id="4854586501323951986">Wbudowany ekran dotykowy</translation>
+<translation id="4855250849489639581">Aby zobaczyć więcej opcji układu, przesuń w dół</translation>
 <translation id="4861758251032006121">{ATTEMPTS_LEFT,plural, =1{<ph name="ERROR_MESSAGE" /> Pozostała {0} próba.}few{<ph name="ERROR_MESSAGE" /> Pozostały {0} próby.}many{<ph name="ERROR_MESSAGE" /> Pozostało {0} prób.}other{<ph name="ERROR_MESSAGE" /> Pozostało {0} próby.}}</translation>
 <translation id="4873827928179867585">Algorytm uwierzytelniania</translation>
 <translation id="4880328057631981605">Nazwa punktu dostępu</translation>
@@ -517,6 +520,7 @@
 <translation id="576835345334454681">Zwiększ jasność wyświetlacza</translation>
 <translation id="57838592816432529">Wycisz</translation>
 <translation id="5784136236926853061">Duże opóźnienie HTTP</translation>
+<translation id="5826644637650799838">Informacje o grafice</translation>
 <translation id="5832805196449965646">Dodaj osobę</translation>
 <translation id="583281660410589416">Nieznany</translation>
 <translation id="5843706793424741864">Stopnie Fahrenheita</translation>
@@ -673,6 +677,7 @@
 <translation id="7172721935181587524">1 obraz</translation>
 <translation id="7177485034254901881">Tym urządzeniem <ph name="DEVICE_TYPE" /> zarządza <ph name="MANAGER" />. Administratorzy mogą je zdalnie konfigurować.</translation>
 <translation id="7180611975245234373">Odśwież</translation>
+<translation id="7180865173735832675">Dostosuj</translation>
 <translation id="7212734716605298123">Aktualizacje oprogramowania urządzeń zewnętrznych</translation>
 <translation id="7216409898977639127">Operator komórkowy</translation>
 <translation id="725133483556299729">Wybierz adres e-mail</translation>
@@ -744,6 +749,7 @@
 <translation id="7881066108824108340">DNS</translation>
 <translation id="7882358943899516840">Typ dostawcy</translation>
 <translation id="7882501334836096755">Klucz publiczny</translation>
+<translation id="78957024357676568">w lewo</translation>
 <translation id="7915220255123750251">Zarządzaj ustawieniami APN sieci. Punkty APN nawiązują połączenie między siecią komórkową a internetem.</translation>
 <translation id="7936303884198020182">Nie znaleziono serwerów nazw</translation>
 <translation id="7942349550061667556">Czerwony</translation>
@@ -775,6 +781,7 @@
 <translation id="8226628635270268143">Wybierz ulubione zdjęcia i albumy</translation>
 <translation id="8227119283605456246">Załącz plik</translation>
 <translation id="8230672074305416752">Nie udało się sprawdzić pingiem domyślnej bramy sieciowej</translation>
+<translation id="8242426110754782860">Dalej</translation>
 <translation id="8246209727385807362">Nieznany operator</translation>
 <translation id="827422111966801947">Indygo</translation>
 <translation id="8286154143153872371">Aby wyświetlić tapetę, połącz się z siecią i załaduj ponownie stronę.</translation>
@@ -852,6 +859,7 @@
 <translation id="8930622219860340959">Sieć bezprzewodowa</translation>
 <translation id="8936793075252196307">Adres IP klienta</translation>
 <translation id="894617464444543719">Urządzenie to telefon.</translation>
+<translation id="8957423540740801332">w prawo</translation>
 <translation id="8968751544471797276">Szybkość ładowania</translation>
 <translation id="8970109610781093811">Uruchom ponownie</translation>
 <translation id="8983038754672563810">HSPA</translation>

@@ -17,6 +17,15 @@
 #include "ui/gl/progress_reporter.h"
 
 namespace gpu {
+namespace {
+
+constexpr uint32_t kSupportedUsage =
+    SHARED_IMAGE_USAGE_GLES2 | SHARED_IMAGE_USAGE_GLES2_FRAMEBUFFER_HINT |
+    SHARED_IMAGE_USAGE_DISPLAY_WRITE | SHARED_IMAGE_USAGE_DISPLAY_READ |
+    SHARED_IMAGE_USAGE_RASTER | SHARED_IMAGE_USAGE_OOP_RASTERIZATION |
+    SHARED_IMAGE_USAGE_SCANOUT | SHARED_IMAGE_USAGE_CONCURRENT_READ_WRITE |
+    SHARED_IMAGE_USAGE_HIGH_PERFORMANCE_GPU | SHARED_IMAGE_USAGE_CPU_UPLOAD;
+}
 
 ///////////////////////////////////////////////////////////////////////////////
 // GLTextureImageBackingFactory
@@ -27,7 +36,8 @@ GLTextureImageBackingFactory::GLTextureImageBackingFactory(
     const gles2::FeatureInfo* feature_info,
     gl::ProgressReporter* progress_reporter,
     bool for_cpu_upload_usage)
-    : GLCommonImageBackingFactory(gpu_preferences,
+    : GLCommonImageBackingFactory(kSupportedUsage,
+                                  gpu_preferences,
                                   workarounds,
                                   feature_info,
                                   progress_reporter),
@@ -35,7 +45,7 @@ GLTextureImageBackingFactory::GLTextureImageBackingFactory(
   // If RED_8 and RG_88 are supported then YUV formats should also work.
   // TODO(crbug.com/1406253): Verify if P010 support is also needed here for
   // software GpuMemoryBuffers.
-  auto r_iter = supported_formats_.find(viz::SinglePlaneFormat::kRED_8);
+  auto r_iter = supported_formats_.find(viz::SinglePlaneFormat::kR_8);
   auto rg_iter = supported_formats_.find(viz::SinglePlaneFormat::kRG_88);
   if (r_iter != supported_formats_.end() &&
       rg_iter != supported_formats_.end()) {
@@ -126,27 +136,23 @@ bool GLTextureImageBackingFactory::IsSupported(
     return false;
 
   if (has_cpu_upload_usage) {
-    if (!GLTextureImageBacking::SupportsPixelUploadWithFormat(format))
+    if (!GLTextureImageBacking::SupportsPixelUploadWithFormat(format)) {
       return false;
+    }
 
-    // Drop scanout usage for shared memory GMBs to match legacy behaviour
-    // from GLImageBackingFactory.
-    usage = usage & ~SHARED_IMAGE_USAGE_SCANOUT;
-  }
-
-  constexpr uint32_t kInvalidUsages = SHARED_IMAGE_USAGE_VIDEO_DECODE |
-                                      SHARED_IMAGE_USAGE_SCANOUT |
-                                      SHARED_IMAGE_USAGE_WEBGPU;
-  if (usage & kInvalidUsages) {
-    return false;
+    // Don't reject scanout usage for shared memory GMBs to match legacy
+    // behaviour from GLImageBackingFactory.
+  } else {
+    if (usage & SHARED_IMAGE_USAGE_SCANOUT) {
+      return false;
+    }
   }
 
   if (gl::GetGLImplementation() == gl::kGLImplementationEGLANGLE &&
       gl::GetANGLEImplementation() == gl::ANGLEImplementation::kMetal) {
     constexpr uint32_t kMetalInvalidUsages =
         SHARED_IMAGE_USAGE_DISPLAY_READ | SHARED_IMAGE_USAGE_SCANOUT |
-        SHARED_IMAGE_USAGE_VIDEO_DECODE | SHARED_IMAGE_USAGE_GLES2 |
-        SHARED_IMAGE_USAGE_GLES2_FRAMEBUFFER_HINT | SHARED_IMAGE_USAGE_WEBGPU;
+        SHARED_IMAGE_USAGE_GLES2 | SHARED_IMAGE_USAGE_GLES2_FRAMEBUFFER_HINT;
     if (usage & kMetalInvalidUsages) {
       return false;
     }
@@ -160,7 +166,7 @@ bool GLTextureImageBackingFactory::IsSupported(
     return false;
   }
 
-  return CanCreateSharedImage(format, size, pixel_data, GL_TEXTURE_2D);
+  return CanCreateTexture(format, size, pixel_data, GL_TEXTURE_2D);
 }
 
 std::unique_ptr<SharedImageBacking>
@@ -174,7 +180,7 @@ GLTextureImageBackingFactory::CreateSharedImageInternal(
     SkAlphaType alpha_type,
     uint32_t usage,
     base::span<const uint8_t> pixel_data) {
-  DCHECK(CanCreateSharedImage(format, size, pixel_data, GL_TEXTURE_2D));
+  DCHECK(CanCreateTexture(format, size, pixel_data, GL_TEXTURE_2D));
 
   const bool for_framebuffer_attachment =
       (usage & (SHARED_IMAGE_USAGE_RASTER |

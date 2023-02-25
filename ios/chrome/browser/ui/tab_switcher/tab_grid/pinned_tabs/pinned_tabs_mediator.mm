@@ -323,10 +323,6 @@ NSArray* CreatePinnedTabConsumerItems(WebStateList* web_state_list) {
     return;
   }
 
-  UIImage* defaultFavicon =
-      [UIImage imageNamed:@"default_world_favicon_regular"];
-  completion(defaultFavicon);
-
   favicon::FaviconDriver* faviconDriver =
       favicon::WebFaviconDriver::FromWebState(webState);
 
@@ -338,7 +334,8 @@ NSArray* CreatePinnedTabConsumerItems(WebStateList* web_state_list) {
   }
 }
 
-- (void)preloadSnapshotsForVisibleGridSize:(int)gridSize {
+- (void)preloadSnapshotsForVisibleGridItems:
+    (NSSet<NSString*>*)visibleGridItems {
   // TODO (crbug.com/1406524): Implement or remove.
 }
 

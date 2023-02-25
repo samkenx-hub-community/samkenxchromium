@@ -425,8 +425,8 @@ chrome.fileManagerPrivate.MountPointSizeStats;
 /**
  * @typedef {{
  *   userType: !chrome.fileManagerPrivate.UserType,
- *   usedUserBytes: number,
- *   totalUserBytes: number,
+ *   usedBytes: number,
+ *   totalBytes: number,
  *   organizationLimitExceeded: boolean,
  *   organizationName: string
  * }}
@@ -473,7 +473,8 @@ chrome.fileManagerPrivate.IconSet;
  *   diskFileSystemType: (string|undefined),
  *   iconSet: !chrome.fileManagerPrivate.IconSet,
  *   driveLabel: (string|undefined),
- *   remoteMountPath: (string|undefined)
+ *   remoteMountPath: (string|undefined),
+ *   vmType: (!chrome.fileManagerPrivate.VmType|undefined),
  * }}
  */
 chrome.fileManagerPrivate.VolumeMetadata;
@@ -555,7 +556,9 @@ chrome.fileManagerPrivate.FileWatchEvent;
  *   arcEnabled: boolean,
  *   arcRemovableMediaAccessEnabled: boolean,
  *   folderShortcuts: !Array<string>,
- *   trashEnabled: boolean
+ *   trashEnabled: boolean,
+ *   officeFileMovedOneDrive: number,
+ *   officeFileMovedGoogleDrive: number,
  * }}
  */
 chrome.fileManagerPrivate.Preferences;
@@ -825,7 +828,7 @@ chrome.fileManagerPrivate.DialogCallerInformation;
  * @typedef {{
  *   restoreEntry: !Entry,
  *   trashInfoFileName: string,
- *   deletionDate: Date,
+ *   deletionDate: number,
  * }}
  */
 chrome.fileManagerPrivate.ParsedTrashInfoFile;
@@ -1096,11 +1099,12 @@ chrome.fileManagerPrivate.getSizeStats = function(volumeId, callback) {};
 
 /**
  * Retrieves drive quota metadata.
+ * @param {!Entry} entry
  * @param {function((!chrome.fileManagerPrivate.DriveQuotaMetadata|undefined))}
  *     callback Name/value pairs of drive quota metadata. Will be undefined if
  *     quota metadata could not be determined.
  */
-chrome.fileManagerPrivate.getDriveQuotaMetadata = function(callback) {};
+chrome.fileManagerPrivate.getDriveQuotaMetadata = function(entry, callback) {};
 
 /**
  * Formats a mounted volume. |volumeId| ID of the volume to be formatted.
@@ -1582,8 +1586,8 @@ chrome.fileManagerPrivate.cancelIOTask = function (taskId) { };
 chrome.fileManagerPrivate.resumeIOTask = function (taskId, params) {};
 
 /**
- * Makes all I/O tasks in state::PAUSED emit (broadcast) their current I/O
- * task progress status.
+ * Makes I/O tasks in state::PAUSED emit (broadcast) their current I/O task
+ * progress status.
  */
 chrome.fileManagerPrivate.progressPausedTasks = function () {};
 

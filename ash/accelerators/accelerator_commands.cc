@@ -62,6 +62,8 @@
 #include "ash/wm/overview/overview_controller.h"
 #include "ash/wm/overview/overview_session.h"
 #include "ash/wm/screen_pinning_controller.h"
+#include "ash/wm/tablet_mode/tablet_mode_multitask_menu_event_handler.h"
+#include "ash/wm/tablet_mode/tablet_mode_window_manager.h"
 #include "ash/wm/window_cycle/window_cycle_controller.h"
 #include "ash/wm/window_state.h"
 #include "ash/wm/window_util.h"
@@ -93,6 +95,7 @@
 #include "ui/gfx/geometry/point.h"
 #include "ui/views/widget/widget.h"
 #include "ui/views/window/frame_caption_button.h"
+#include "ui/wm/core/window_animations.h"
 #include "ui/wm/core/window_util.h"
 
 // Keep the functions in this file in alphabetical order.
@@ -505,8 +508,7 @@ bool CanToggleFloatingWindow() {
   if (!chromeos::wm::features::IsWindowLayoutMenuEnabled()) {
     return false;
   }
-  aura::Window* window = window_util::GetActiveWindow();
-  return window && chromeos::wm::CanFloatWindow(window);
+  return window_util::GetActiveWindow() != nullptr;
 }
 
 bool CanToggleGameDashboard() {
@@ -518,13 +520,16 @@ bool CanToggleGameDashboard() {
 }
 
 bool CanToggleMultitaskMenu() {
-  if (!chromeos::wm::features::IsWindowLayoutMenuEnabled() ||
-      Shell::Get()->tablet_mode_controller()->InTabletMode()) {
+  if (!chromeos::wm::features::IsWindowLayoutMenuEnabled()) {
     return false;
   }
   aura::Window* window = window_util::GetActiveWindow();
   if (!window) {
     return false;
+  }
+  if (Shell::Get()->tablet_mode_controller()->InTabletMode()) {
+    // In tablet mode, the window just has to be able to maximize.
+    return WindowState::Get(window)->CanMaximize();
   }
   // If the active window has a visible size button, the menu can be opened.
   if (auto* size_button = GetFrameSizeButton(window);
@@ -1254,7 +1259,13 @@ void ToggleFloating() {
   DCHECK(chromeos::wm::features::IsWindowLayoutMenuEnabled());
   aura::Window* window = window_util::GetActiveWindow();
   DCHECK(window);
-  DCHECK(chromeos::wm::CanFloatWindow(window));
+  // `CanFloatWindow` check is placed here rather than
+  // `CanToggleFloatingWindow` as otherwise the bounce would not behave
+  // properly.
+  if (!chromeos::wm::CanFloatWindow(window)) {
+    wm::AnimateWindow(window, wm::WINDOW_ANIMATION_TYPE_BOUNCE);
+    return;
+  }
   Shell::Get()->float_controller()->ToggleFloat(window);
   base::RecordAction(base::UserMetricsAction("Accel_Toggle_Floating"));
 }
@@ -1476,6 +1487,15 @@ void ToggleMultitaskMenu() {
   DCHECK(chromeos::wm::features::IsWindowLayoutMenuEnabled());
   aura::Window* window = window_util::GetActiveWindow();
   DCHECK(window);
+  if (auto* tablet_mode_controller = Shell::Get()->tablet_mode_controller();
+      tablet_mode_controller->InTabletMode()) {
+    auto* tablet_mode_event_handler =
+        tablet_mode_controller->tablet_mode_window_manager()
+            ->tablet_mode_multitask_menu_event_handler();
+    // Does nothing if the menu is already shown.
+    tablet_mode_event_handler->ShowMultitaskMenu(window);
+    return;
+  }
   auto* frame_view = NonClientFrameViewAsh::Get(window);
   if (!frame_view) {
     // If `window` doesn't have a frame, it must be the multitask menu and have

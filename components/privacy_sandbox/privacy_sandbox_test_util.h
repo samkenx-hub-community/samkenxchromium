@@ -47,7 +47,6 @@ class MockPrivacySandboxObserver
   MockPrivacySandboxObserver();
   ~MockPrivacySandboxObserver();
   MOCK_METHOD(void, OnTopicsDataAccessibleSinceUpdated, (), (override));
-  MOCK_METHOD1(OnTrustTokenBlockingChanged, void(bool));
   MOCK_METHOD1(OnFirstPartySetsEnabledChanged, void(bool));
 };
 
@@ -155,6 +154,8 @@ enum class OutputKey {
   kM1TopicsEnabled = 26,
   kM1FledgeEnabled = 27,
   kM1AdMeasurementEnabled = 28,
+  kIsAttributionReportingEverAllowed = 29,
+  kIsAttributionReportingEverAllowedMetric = 30,
 };
 
 // To allow multiple input keys to map to the same value, without having to

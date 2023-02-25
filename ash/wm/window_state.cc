@@ -513,6 +513,13 @@ void WindowState::RestoreZOrdering() {
 }
 
 void WindowState::OnWMEvent(const WMEvent* event) {
+  // A float/unfloat may trigger another event. If that's the case, we don't
+  // want to handle the nested event and let the original event take care of
+  // things.
+  if (is_handling_float_event_) {
+    return;
+  }
+
   if (event->IsSnapEvent()) {
     // Save `event` requested snap ratio.
     const float target_snap_ratio = event->snap_ratio();
@@ -523,6 +530,14 @@ void WindowState::OnWMEvent(const WMEvent* event) {
       // If a different snap ratio was requested, partial may have just ended.
       MaybeRecordPartialDuration();
     }
+  }
+
+  std::unique_ptr<base::AutoReset<bool>> auto_reset;
+  if (event->type() == WM_EVENT_FLOAT ||
+      (current_state_->GetType() == chromeos::WindowStateType::kFloated &&
+       event->IsTransitionEvent())) {
+    auto_reset = std::make_unique<base::AutoReset<bool>>(
+        &is_handling_float_event_, true);
   }
 
   current_state_->OnWMEvent(this, event);
@@ -1022,7 +1037,8 @@ void WindowState::SetBoundsDirectAnimated(const gfx::Rect& bounds,
   SetBoundsDirect(bounds);
 }
 
-void WindowState::SetBoundsDirectCrossFade(const gfx::Rect& new_bounds) {
+void WindowState::SetBoundsDirectCrossFade(const gfx::Rect& new_bounds,
+                                           absl::optional<bool> float_state) {
   // Some test results in invoking CrossFadeToBounds when window is not visible.
   // No animation is necessary in that case, thus just change the bounds and
   // quit.
@@ -1049,6 +1065,12 @@ void WindowState::SetBoundsDirectCrossFade(const gfx::Rect& new_bounds) {
 
   // Resize the window to the new size, which will force a layout and paint.
   SetBoundsDirect(new_bounds);
+
+  if (float_state) {
+    CrossFadeAnimationForFloatUnfloat(window_, std::move(old_layer_owner),
+                                      *float_state);
+    return;
+  }
 
   CrossFadeAnimation(window_, std::move(old_layer_owner));
 }

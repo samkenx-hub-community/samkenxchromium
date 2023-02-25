@@ -61,8 +61,8 @@ class FakeWebState : public WebState {
   void Stop() override {}
   const NavigationManager* GetNavigationManager() const override;
   NavigationManager* GetNavigationManager() override;
-  const WebFramesManager* GetWebFramesManager() const override;
-  WebFramesManager* GetWebFramesManager() override;
+  const WebFramesManager* GetPageWorldWebFramesManager() const override;
+  WebFramesManager* GetPageWorldWebFramesManager() override;
   const SessionCertificatePolicyCache* GetSessionCertificatePolicyCache()
       const override;
   SessionCertificatePolicyCache* GetSessionCertificatePolicyCache() override;
@@ -112,6 +112,7 @@ class FakeWebState : public WebState {
   bool IsFindInteractionEnabled() final;
   void SetFindInteractionEnabled(bool enabled) final;
   id<CRWFindInteraction> GetFindInteraction() final API_AVAILABLE(ios(16));
+  id GetActivityItem() API_AVAILABLE(ios(16.4)) final;
 
   void AddPolicyDecider(WebStatePolicyDecider* decider) override;
   void RemovePolicyDecider(WebStatePolicyDecider* decider) override;

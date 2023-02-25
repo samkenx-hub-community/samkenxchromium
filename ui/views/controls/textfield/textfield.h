@@ -663,6 +663,15 @@ class VIEWS_EXPORT Textfield : public View,
   // Returns the corner radius of the text field.
   float GetCornerRadius();
 
+#if BUILDFLAG(IS_CHROMEOS)
+  // Checks and updates the selection dragging state for the upcoming scroll
+  // sequence, if required. If the scroll sequence starts while long pressing,
+  // it will be used for adjusting the text selection. Otherwise, if the scroll
+  // begins horizontally it will be used for cursor placement. Otherwise, the
+  // scroll sequence won't be used for selection dragging.
+  void MaybeStartSelectionDragging(ui::GestureEvent* event);
+#endif
+
   // The text model.
   std::unique_ptr<TextfieldModel> model_;
 
@@ -749,9 +758,23 @@ class VIEWS_EXPORT Textfield : public View,
 
   SelectionController selection_controller_;
 
+  // Tracks when the current scroll sequence should be used for cursor placement
+  // or adjusting the text selection.
+  enum class SelectionDraggingState {
+    kNone,
+    kDraggingCursor,
+    kDraggingSelectionExtent
+  };
+  SelectionDraggingState selection_dragging_state_ =
+      SelectionDraggingState::kNone;
+
+  // The offset applied to the touch drag location when determining selection
+  // updates.
+  gfx::Vector2d selection_dragging_offset_;
+
   // Used to track touch drag starting location and offset to enable touch
   // scrolling.
-  gfx::Point drag_start_location_;
+  int drag_start_location_x_;
   int drag_start_display_offset_ = 0;
 
   // Tracks the selection extent, which is used to determine the logical end of
@@ -769,9 +792,11 @@ class VIEWS_EXPORT Textfield : public View,
   // shrinking.
   gfx::BreakType break_type_ = gfx::CHARACTER_BREAK;
 
-  // Tracks if touch editing handles are hidden because user has started
-  // scrolling. If |true|, handles are shown after scrolling ends.
-  bool touch_handles_hidden_due_to_scroll_ = false;
+  // Whether touch selection handles should be shown once the current scroll
+  // sequence ends. Handles should be shown if touch editing handles were hidden
+  // while scrolling or if part of the scroll sequence was used for cursor
+  // placement or adjusting the text selection.
+  bool show_touch_handles_after_scroll_ = false;
 
   // Whether the user should be notified if the clipboard is restricted.
   bool show_rejection_ui_if_any_ = false;

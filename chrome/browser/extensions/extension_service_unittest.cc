@@ -34,6 +34,7 @@
 #include "base/strings/utf_string_conversions.h"
 #include "base/task/single_thread_task_runner.h"
 #include "base/test/bind.h"
+#include "base/test/metrics/histogram_tester.h"
 #include "base/test/test_future.h"
 #include "base/time/time.h"
 #include "base/values.h"
@@ -292,8 +293,7 @@ void PersistExtensionWithPaths(
 
   std::string data = "file_data";
   for (const auto& file : file_paths) {
-    EXPECT_EQ(static_cast<int>(data.size()),
-              base::WriteFile(file, data.c_str(), data.size()));
+    EXPECT_TRUE(base::WriteFile(file, data));
   }
 
   base::Value::Dict manifest = DictionaryBuilder()
@@ -733,6 +733,35 @@ class ExtensionServiceTest : public ExtensionServiceTestWithInstall {
     task_environment()->RunUntilIdle();
 
     ASSERT_FALSE(IsBlocked(extension_id));
+  }
+
+  // Test that certain histograms are emitted for user and non-user profiles
+  // (users for ChromeOS Ash).
+  void RunEmitUserHistogramsTest(int nonuser_expected_total_count,
+                                 int user_expected_total_count) {
+    base::HistogramTester histograms;
+    TestExtensionDir good_extension_dir;
+    good_extension_dir.WriteManifest(
+        R"({
+           "name": "Good Extension",
+           "version": "0.1",
+           "manifest_version": 2
+         })");
+
+    ChromeTestExtensionLoader loader(testing_profile());
+    loader.set_pack_extension(false);
+    loader.LoadExtension(good_extension_dir.UnpackedPath());
+
+    histograms.ExpectTotalCount("Extensions.InstallType", 1);
+    histograms.ExpectTotalCount("Extensions.InstallSource", 1);
+    histograms.ExpectTotalCount("Extensions.InstallType.NonUser",
+                                nonuser_expected_total_count);
+    histograms.ExpectTotalCount("Extensions.InstallType.User",
+                                user_expected_total_count);
+    histograms.ExpectTotalCount("Extensions.InstallSource.NonUser",
+                                nonuser_expected_total_count);
+    histograms.ExpectTotalCount("Extensions.InstallSource.User",
+                                user_expected_total_count);
   }
 
   const base::Value::Dict* GetExtensionPref(const std::string& extension_id) {
@@ -1269,6 +1298,26 @@ TEST_F(ExtensionServiceTest, InstallExtension) {
 
   // TODO(erikkay): add more tests for many of the failure cases.
   // TODO(erikkay): add tests for upgrade cases.
+}
+
+TEST_F(ExtensionServiceTest, InstallExtension_EmitUserHistograms) {
+  InitializeEmptyExtensionService();
+
+  ASSERT_NO_FATAL_FAILURE(MaybeSetUpTestUser(
+      /*is_guest=*/false));
+  RunEmitUserHistogramsTest(
+      /*nonuser_expected_total_count=*/0,
+      /*user_expected_total_count=*/1);
+}
+
+TEST_F(ExtensionServiceTest, InstallExtension_NonUserEmitHistograms) {
+  InitializeEmptyExtensionService();
+
+  ASSERT_NO_FATAL_FAILURE(MaybeSetUpTestUser(
+      /*is_guest=*/true));
+  RunEmitUserHistogramsTest(
+      /*nonuser_expected_total_count=*/1,
+      /*user_expected_total_count=*/0);
 }
 
 // Test that correct notifications are sent to ExtensionRegistryObserver on
@@ -2199,10 +2248,8 @@ TEST_F(ExtensionServiceTest, PackExtension) {
 
   // Try packing with an invalid manifest.
   std::string invalid_manifest_content = "I am not a manifest.";
-  ASSERT_EQ(static_cast<int>(invalid_manifest_content.size()),
-            base::WriteFile(temp_dir2.GetPath().Append(kManifestFilename),
-                            invalid_manifest_content.c_str(),
-                            invalid_manifest_content.size()));
+  ASSERT_TRUE(base::WriteFile(temp_dir2.GetPath().Append(kManifestFilename),
+                              invalid_manifest_content));
   creator = std::make_unique<ExtensionCreator>();
   ASSERT_FALSE(creator->Run(temp_dir2.GetPath(), crx_path, privkey_path,
                             base::FilePath(), ExtensionCreator::kOverwriteCRX));
@@ -5202,7 +5249,7 @@ TEST_F(ExtensionServiceTest, ClearExtensionData) {
       profile()->GetDefaultStoragePartition()->GetLocalStorageControl();
   mojo::Remote<blink::mojom::StorageArea> area;
   local_storage_control->BindStorageArea(
-      blink::StorageKey(url::Origin::Create(ext_url)),
+      blink::StorageKey::CreateFirstParty(url::Origin::Create(ext_url)),
       area.BindNewPipeAndPassReceiver());
   {
     base::test::TestFuture<bool> future;
@@ -5225,7 +5272,7 @@ TEST_F(ExtensionServiceTest, ClearExtensionData) {
     auto bucket_locator = storage::BucketLocator();
     bucket_locator.id = storage::BucketId::FromUnsafeValue(1);
     bucket_locator.storage_key =
-        blink::StorageKey(url::Origin::Create(ext_url));
+        blink::StorageKey::CreateFirstParty(url::Origin::Create(ext_url));
     idb_control_test->GetFilePathForTesting(
         bucket_locator,
         base::BindLambdaForTesting([&](const base::FilePath& path) {
@@ -5364,7 +5411,7 @@ TEST_F(ExtensionServiceTest, ClearAppData) {
       profile()->GetDefaultStoragePartition()->GetLocalStorageControl();
   mojo::Remote<blink::mojom::StorageArea> area;
   local_storage_control->BindStorageArea(
-      blink::StorageKey(url::Origin::Create(origin1)),
+      blink::StorageKey::CreateFirstParty(url::Origin::Create(origin1)),
       area.BindNewPipeAndPassReceiver());
   {
     base::test::TestFuture<bool> future;
@@ -5387,7 +5434,7 @@ TEST_F(ExtensionServiceTest, ClearAppData) {
     auto bucket_locator = storage::BucketLocator();
     bucket_locator.id = storage::BucketId::FromUnsafeValue(1);
     bucket_locator.storage_key =
-        blink::StorageKey(url::Origin::Create(origin1));
+        blink::StorageKey::CreateFirstParty(url::Origin::Create(origin1));
     idb_control_test->GetFilePathForTesting(
         bucket_locator,
         base::BindLambdaForTesting([&](const base::FilePath& path) {
@@ -5465,7 +5512,7 @@ TEST_F(ExtensionServiceTest, LoadExtension) {
       R"({
            "name": "Good Extension",
            "version": "0.1",
-           "manifest_version": 2
+           "manifest_version": 3
          })");
 
   {

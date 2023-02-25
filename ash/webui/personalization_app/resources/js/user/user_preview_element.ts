@@ -15,7 +15,8 @@ import {assert} from 'chrome://resources/js/assert_ts.js';
 import {Url} from 'chrome://resources/mojo/url/mojom/url.mojom-webui.js';
 import {IronA11yAnnouncer} from 'chrome://resources/polymer/v3_0/iron-a11y-announcer/iron-a11y-announcer.js';
 
-import {UserImage, UserInfo} from '../personalization_app.mojom-webui.js';
+import {UserImage, UserInfo} from '../../personalization_app.mojom-webui.js';
+import {isPersonalizationJellyEnabled} from '../load_time_booleans.js';
 import {Paths, PersonalizationRouter} from '../personalization_router_element.js';
 import {WithPersonalizationStore} from '../personalization_store.js';
 import {decodeString16, isNonEmptyArray, isNonEmptyString} from '../utils.js';
@@ -62,6 +63,12 @@ export class UserPreview extends WithPersonalizationStore {
         type: Boolean,
         value: null,
       },
+      isPersonalizationJellyEnabled_: {
+        type: Boolean,
+        value() {
+          return isPersonalizationJellyEnabled();
+        },
+      },
     };
   }
 
@@ -70,6 +77,7 @@ export class UserPreview extends WithPersonalizationStore {
   private image_: UserImage|null;
   private imageUrl_: Url|null;
   private imageIsEnterpriseManaged_: boolean|null;
+  private isPersonalizationJellyEnabled_: boolean;
 
   override ready() {
     super.ready();
@@ -97,6 +105,11 @@ export class UserPreview extends WithPersonalizationStore {
     if (value && old) {
       this.dispatchEvent(new AvatarChangedEvent());
     }
+  }
+
+  private onImgError_(e: Event) {
+    const divElement = e.currentTarget as HTMLDivElement;
+    divElement.setAttribute('hidden', 'true');
   }
 
   private shouldShowMainPageView_(path: string, isEnterpriseManaged: boolean):
@@ -145,7 +158,7 @@ export class UserPreview extends WithPersonalizationStore {
    * images . Static image loads faster and will provide a smooth experience
    * when the animated image complete loading.
    */
-  private getImgBackgroudStyle_(url: Url|null): string {
+  private getImgBackgroundStyle_(url: Url|null): string {
     // Only add background image for default user images.
     if (!this.image_ || this.image_.invalidImage || !this.image_.defaultImage) {
       return '';

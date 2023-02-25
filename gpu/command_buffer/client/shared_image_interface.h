@@ -9,7 +9,6 @@
 #include "base/containers/span.h"
 #include "base/memory/scoped_refptr.h"
 #include "build/build_config.h"
-#include "components/viz/common/resources/resource_format.h"
 #include "components/viz/common/resources/shared_image_format.h"
 #include "gpu/command_buffer/common/mailbox.h"
 #include "gpu/command_buffer/common/sync_token.h"
@@ -59,7 +58,7 @@ class GPU_EXPORT SharedImageInterface {
   // The |SharedImageInterface| keeps ownership of the image until
   // |DestroySharedImage| is called or the interface itself is destroyed (e.g.
   // the GPU channel is lost).
-  virtual Mailbox CreateSharedImage(viz::ResourceFormat format,
+  virtual Mailbox CreateSharedImage(viz::SharedImageFormat format,
                                     const gfx::Size& size,
                                     const gfx::ColorSpace& color_space,
                                     GrSurfaceOrigin surface_origin,
@@ -71,7 +70,7 @@ class GPU_EXPORT SharedImageInterface {
   // which is used to populate the SharedImage.  |pixel_data| should have the
   // same format which would be passed to glTexImage2D to populate a similarly
   // specified texture.
-  virtual Mailbox CreateSharedImage(viz::ResourceFormat format,
+  virtual Mailbox CreateSharedImage(viz::SharedImageFormat format,
                                     const gfx::Size& size,
                                     const gfx::ColorSpace& color_space,
                                     GrSurfaceOrigin surface_origin,
@@ -171,7 +170,7 @@ class GPU_EXPORT SharedImageInterface {
   // be imported into GL command buffer using shared image functions (e.g.
   // GLES2Interface::CreateAndTexStorage2DSharedImageCHROMIUM) or (deprecated)
   // mailbox functions (e.g. GLES2Interface::CreateAndConsumeTextureCHROMIUM).
-  virtual SwapChainMailboxes CreateSwapChain(viz::ResourceFormat format,
+  virtual SwapChainMailboxes CreateSwapChain(viz::SharedImageFormat format,
                                              const gfx::Size& size,
                                              const gfx::ColorSpace& color_space,
                                              GrSurfaceOrigin surface_origin,

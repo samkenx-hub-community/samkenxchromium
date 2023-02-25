@@ -156,10 +156,6 @@ class PropertyTreeManager {
       const Vector<const TransformPaintPropertyNode*>&
           scroll_translation_nodes);
 
-  // Sets the cc::ScrollNode::is_composited bit to true for the node with ID
-  // |cc_node_id|.
-  void SetCcScrollNodeIsComposited(int cc_node_id);
-
   // Updates conditional render surface reasons for all effect nodes in
   // |GetEffectTree|. Every effect is supposed to have render surface enabled
   // for grouping, but we can omit a conditional render surface if it controls
@@ -276,8 +272,7 @@ class PropertyTreeManager {
   void CloseCcEffect();
   void PopulateCcEffectNode(cc::EffectNode&,
                             const EffectPaintPropertyNode& effect,
-                            int output_clip_id,
-                            bool can_be_shared_element_resource);
+                            int output_clip_id);
 
   bool IsCurrentCcEffectSynthetic() const { return current_.effect_type; }
   bool IsCurrentCcEffectSyntheticForNonTrivialClip() const {

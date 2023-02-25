@@ -13,6 +13,7 @@
 #include "base/functional/callback_helpers.h"
 #include "base/run_loop.h"
 #include "base/strings/string_util.h"
+#include "base/strings/stringprintf.h"
 #include "chrome/browser/ash/accessibility/accessibility_test_utils.h"
 #include "chrome/browser/ash/accessibility/magnification_manager.h"
 #include "chrome/browser/ash/login/session/user_session_manager.h"
@@ -926,39 +927,33 @@ IN_PROC_BROWSER_TEST_F(AccessibilityManagerTest,
 }
 
 IN_PROC_BROWSER_TEST_F(AccessibilityManagerTest, TtsDlcTypeToPath) {
-  EXPECT_EQ(
-      base::FilePath("/run/imageloader/tts-de-de/package/root/voice.zvoice"),
-      TtsDlcTypeToPath(DlcType::DLC_TYPE_TTSDEDE));
-  EXPECT_EQ(
-      base::FilePath("/run/imageloader/tts-en-us/package/root/voice.zvoice"),
-      TtsDlcTypeToPath(DlcType::DLC_TYPE_TTSENUS));
-  EXPECT_EQ(
-      base::FilePath("/run/imageloader/tts-es-es/package/root/voice.zvoice"),
-      TtsDlcTypeToPath(DlcType::DLC_TYPE_TTSESES));
-  EXPECT_EQ(
-      base::FilePath("/run/imageloader/tts-es-us/package/root/voice.zvoice"),
-      TtsDlcTypeToPath(DlcType::DLC_TYPE_TTSESUS));
-  EXPECT_EQ(
-      base::FilePath("/run/imageloader/tts-fr-fr/package/root/voice.zvoice"),
-      TtsDlcTypeToPath(DlcType::DLC_TYPE_TTSFRFR));
-  EXPECT_EQ(
-      base::FilePath("/run/imageloader/tts-hi-in/package/root/voice.zvoice"),
-      TtsDlcTypeToPath(DlcType::DLC_TYPE_TTSHIIN));
-  EXPECT_EQ(
-      base::FilePath("/run/imageloader/tts-it-it/package/root/voice.zvoice"),
-      TtsDlcTypeToPath(DlcType::DLC_TYPE_TTSITIT));
-  EXPECT_EQ(
-      base::FilePath("/run/imageloader/tts-ja-jp/package/root/voice.zvoice"),
-      TtsDlcTypeToPath(DlcType::DLC_TYPE_TTSJAJP));
-  EXPECT_EQ(
-      base::FilePath("/run/imageloader/tts-nl-nl/package/root/voice.zvoice"),
-      TtsDlcTypeToPath(DlcType::DLC_TYPE_TTSNLNL));
-  EXPECT_EQ(
-      base::FilePath("/run/imageloader/tts-pt-br/package/root/voice.zvoice"),
-      TtsDlcTypeToPath(DlcType::DLC_TYPE_TTSPTBR));
-  EXPECT_EQ(
-      base::FilePath("/run/imageloader/tts-sv-se/package/root/voice.zvoice"),
-      TtsDlcTypeToPath(DlcType::DLC_TYPE_TTSSVSE));
+  auto get_full_path = [](const std::string& locale) -> std::string {
+    return base::StringPrintf(
+        "/run/imageloader/tts-%s/package/root/voice.zvoice", locale.c_str());
+  };
+
+  EXPECT_EQ(base::FilePath(get_full_path("de-de")),
+            TtsDlcTypeToPath(DlcType::DLC_TYPE_TTSDEDE));
+  EXPECT_EQ(base::FilePath(get_full_path("en-us")),
+            TtsDlcTypeToPath(DlcType::DLC_TYPE_TTSENUS));
+  EXPECT_EQ(base::FilePath(get_full_path("es-es")),
+            TtsDlcTypeToPath(DlcType::DLC_TYPE_TTSESES));
+  EXPECT_EQ(base::FilePath(get_full_path("es-us")),
+            TtsDlcTypeToPath(DlcType::DLC_TYPE_TTSESUS));
+  EXPECT_EQ(base::FilePath(get_full_path("fr-fr")),
+            TtsDlcTypeToPath(DlcType::DLC_TYPE_TTSFRFR));
+  EXPECT_EQ(base::FilePath(get_full_path("hi-in")),
+            TtsDlcTypeToPath(DlcType::DLC_TYPE_TTSHIIN));
+  EXPECT_EQ(base::FilePath(get_full_path("it-it")),
+            TtsDlcTypeToPath(DlcType::DLC_TYPE_TTSITIT));
+  EXPECT_EQ(base::FilePath(get_full_path("ja-jp")),
+            TtsDlcTypeToPath(DlcType::DLC_TYPE_TTSJAJP));
+  EXPECT_EQ(base::FilePath(get_full_path("nl-nl")),
+            TtsDlcTypeToPath(DlcType::DLC_TYPE_TTSNLNL));
+  EXPECT_EQ(base::FilePath(get_full_path("pt-br")),
+            TtsDlcTypeToPath(DlcType::DLC_TYPE_TTSPTBR));
+  EXPECT_EQ(base::FilePath(get_full_path("sv-se")),
+            TtsDlcTypeToPath(DlcType::DLC_TYPE_TTSSVSE));
 }
 
 class AccessibilityManagerDlcTest : public AccessibilityManagerTest {
@@ -1004,6 +999,16 @@ class AccessibilityManagerDlcTest : public AccessibilityManagerTest {
     // can be called.
     manager->install_pumpkin_callback_ = base::DoNothing();
     AccessibilityManager::Get()->OnPumpkinError("Error");
+  }
+
+  void OnPumpkinInstalled(bool success) {
+    AccessibilityManager::Get()->OnPumpkinInstalled(success);
+  }
+
+  void OnPumpkinDataCreated(
+      std::unique_ptr<extensions::api::accessibility_private::PumpkinData>
+          data) {
+    AccessibilityManager::Get()->OnPumpkinDataCreated(std::move(data));
   }
 
   speech::SodaInstaller* soda_installer() {
@@ -1228,10 +1233,9 @@ IN_PROC_BROWSER_TEST_F(AccessibilityManagerDlcTest,
   AssertMessageCenterEmpty();
 }
 
-// Ensures that SODA failed notification could be shown each time Dictation
-// is toggled on.
+// Ensures that SODA failed notification is only shown once.
 IN_PROC_BROWSER_TEST_F(AccessibilityManagerDlcTest,
-                       SodaFailedNotificationShownOncePerDownload) {
+                       SodaFailedNotificationShownOnlyOnce) {
   SetDictationEnabled(true);
   soda_installer()->NotifySodaErrorForTesting(en_us());
   AssertDictationNoDlcsNotifcation(en_us_display_name());
@@ -1244,7 +1248,7 @@ IN_PROC_BROWSER_TEST_F(AccessibilityManagerDlcTest,
   // A fresh attempt at Dictation means another chance to show an error message.
   SetDictationEnabled(true);
   soda_installer()->NotifySodaErrorForTesting(en_us());
-  AssertDictationNoDlcsNotifcation(en_us_display_name());
+  AssertMessageCenterEmpty();
 }
 
 // Tests that the SODA download notification for Dictation is NOT given if
@@ -1359,6 +1363,151 @@ IN_PROC_BROWSER_TEST_F(AccessibilityManagerDlcTest, SodaFailPumpkinFail) {
   AssertDictationNoDlcsNotifcation(en_us_display_name());
   OnPumpkinError();
   AssertDictationNoDlcsNotifcation(en_us_display_name());
+}
+
+IN_PROC_BROWSER_TEST_F(AccessibilityManagerDlcTest,
+                       SuccessNotificationOnlyShownOnce) {
+  // Show the success message for the first time.
+  ASSERT_FALSE(GetActiveUserPrefs()->GetBoolean(
+      prefs::kDictationDlcSuccessNotificationHasBeenShown));
+  SetDictationLocale("en-US");
+  SetDictationEnabled(true);
+  soda_installer()->NotifySodaInstalledForTesting(en_us());
+  AssertMessageCenterEmpty();
+  soda_installer()->NotifySodaInstalledForTesting();
+  AssertDictationOnlySodaNotifcation(en_us_display_name());
+  InstallPumpkinAndWait();
+  AssertDictationAllDlcsNotifcation(en_us_display_name());
+  ASSERT_TRUE(GetActiveUserPrefs()->GetBoolean(
+      prefs::kDictationDlcSuccessNotificationHasBeenShown));
+
+  ClearMessageCenter();
+
+  // Recreate the conditions for the notification and ensure it's not shown
+  // again.
+  InstallPumpkinAndWait();
+  AssertMessageCenterEmpty();
+  soda_installer()->NotifySodaInstalledForTesting();
+  AssertMessageCenterEmpty();
+  soda_installer()->NotifySodaInstalledForTesting(en_us());
+  AssertMessageCenterEmpty();
+}
+
+IN_PROC_BROWSER_TEST_F(AccessibilityManagerDlcTest,
+                       PumpkinNotificationOnlyShownOnce) {
+  ASSERT_FALSE(GetActiveUserPrefs()->GetBoolean(
+      prefs::kDictationDlcOnlyPumpkinDownloadedNotificationHasBeenShown));
+  // Calling `InstallPumpkinAndWait()` will run the message loop and cause SODA
+  // to be installed. Avoid this scenario for the purposes of this test.
+  soda_installer()->NeverDownloadSodaForTesting();
+  SetDictationLocale("en-US");
+  SetDictationEnabled(true);
+  soda_installer()->NotifySodaErrorForTesting(en_us());
+  AssertDictationNoDlcsNotifcation(en_us_display_name());
+  InstallPumpkinAndWait();
+  AssertDictationOnlyPumpkinNotifcation(en_us_display_name());
+  ASSERT_TRUE(GetActiveUserPrefs()->GetBoolean(
+      prefs::kDictationDlcOnlyPumpkinDownloadedNotificationHasBeenShown));
+
+  ClearMessageCenter();
+
+  // Recreate the conditions for the notification and ensure it's not shown
+  // again.
+  InstallPumpkinAndWait();
+  AssertMessageCenterEmpty();
+  soda_installer()->NotifySodaErrorForTesting(en_us());
+  AssertMessageCenterEmpty();
+}
+
+IN_PROC_BROWSER_TEST_F(AccessibilityManagerDlcTest,
+                       SodaNotificationOnlyShownOnce) {
+  ASSERT_FALSE(GetActiveUserPrefs()->GetBoolean(
+      prefs::kDictationDlcOnlySodaDownloadedNotificationHasBeenShown));
+  SetDictationLocale("en-US");
+  SetDictationEnabled(true);
+  soda_installer()->NotifySodaInstalledForTesting(en_us());
+  AssertMessageCenterEmpty();
+  soda_installer()->NotifySodaInstalledForTesting();
+  AssertDictationOnlySodaNotifcation(en_us_display_name());
+  OnPumpkinError();
+  AssertDictationOnlySodaNotifcation(en_us_display_name());
+  ASSERT_TRUE(GetActiveUserPrefs()->GetBoolean(
+      prefs::kDictationDlcOnlySodaDownloadedNotificationHasBeenShown));
+
+  ClearMessageCenter();
+
+  // Recreate the conditions for the notification and ensure it's not shown
+  // again.
+  OnPumpkinError();
+  AssertMessageCenterEmpty();
+  soda_installer()->NotifySodaInstalledForTesting(en_us());
+  AssertMessageCenterEmpty();
+  soda_installer()->NotifySodaInstalledForTesting();
+  AssertMessageCenterEmpty();
+}
+
+IN_PROC_BROWSER_TEST_F(AccessibilityManagerDlcTest,
+                       NoDlcsNotificationOnlyShownOnce) {
+  ASSERT_FALSE(GetActiveUserPrefs()->GetBoolean(
+      prefs::kDictationNoDlcsDownloadedNotificationHasBeenShown));
+  SetDictationLocale("en-US");
+  SetDictationEnabled(true);
+  soda_installer()->NotifySodaErrorForTesting(en_us());
+  AssertDictationNoDlcsNotifcation(en_us_display_name());
+  OnPumpkinError();
+  AssertDictationNoDlcsNotifcation(en_us_display_name());
+  ASSERT_TRUE(GetActiveUserPrefs()->GetBoolean(
+      prefs::kDictationNoDlcsDownloadedNotificationHasBeenShown));
+
+  ClearMessageCenter();
+
+  // Recreate the conditions for the notification and ensure it's not shown
+  // again.
+  soda_installer()->NotifySodaErrorForTesting(en_us());
+  AssertMessageCenterEmpty();
+  OnPumpkinError();
+  AssertMessageCenterEmpty();
+}
+
+IN_PROC_BROWSER_TEST_F(AccessibilityManagerDlcTest,
+                       PumpkinNotificationOnlyShownOnceFrench) {
+  ASSERT_FALSE(GetActiveUserPrefs()->GetBoolean(
+      prefs::kDictationDlcOnlyPumpkinDownloadedNotificationHasBeenShown));
+  g_browser_process->SetApplicationLocale("fr-FR");
+  SetDictationLocale("fr-FR");
+  SetDictationEnabled(true);
+  AssertMessageCenterEmpty();
+  InstallPumpkinAndWait();
+  AssertDictationOnlyPumpkinNotifcation(u"français (France)");
+  ASSERT_TRUE(GetActiveUserPrefs()->GetBoolean(
+      prefs::kDictationDlcOnlyPumpkinDownloadedNotificationHasBeenShown));
+
+  ClearMessageCenter();
+
+  // Recreate the conditions for the notification and ensure it's not shown
+  // again.
+  InstallPumpkinAndWait();
+  AssertMessageCenterEmpty();
+}
+
+// Ensures that AccessibilityManager can handle when OnPumpkinInstalled is
+// called multiple times, which can happen in production.
+IN_PROC_BROWSER_TEST_F(AccessibilityManagerDlcTest,
+                       OnPumpkinInstalledMultiple) {
+  SetDictationLocale("en-US");
+  SetDictationEnabled(true);
+  InstallPumpkinAndWait();
+  OnPumpkinInstalled(true);
+}
+
+// Ensures that AccessibilityManager can handle when OnPumpkinDataCreated is
+// called multiple times, which can happen in production.
+IN_PROC_BROWSER_TEST_F(AccessibilityManagerDlcTest,
+                       OnPumpkinDataCreatedMultiple) {
+  SetDictationLocale("en-US");
+  SetDictationEnabled(true);
+  InstallPumpkinAndWait();
+  OnPumpkinDataCreated(nullptr);
 }
 
 enum DictationDialogTestVariant {

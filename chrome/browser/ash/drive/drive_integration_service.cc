@@ -56,6 +56,8 @@
 #include "components/drive/drive_notification_manager.h"
 #include "components/drive/drive_pref_names.h"
 #include "components/drive/event_logger.h"
+#include "components/drive/file_errors.h"
+#include "components/drive/file_system_core_util.h"
 #include "components/drive/resource_metadata_storage.h"
 #include "components/metrics/metrics_pref_names.h"
 #include "components/prefs/pref_change_registrar.h"
@@ -80,11 +82,12 @@
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/chromeos/strings/grit/ui_chromeos_strings.h"
 
-using content::BrowserContext;
-using content::BrowserThread;
-
 namespace drive {
 namespace {
+
+using content::BrowserContext;
+using content::BrowserThread;
+using drivefs::pinning::PinManager;
 
 // Name of the directory used to store metadata.
 const base::FilePath::CharType kMetadataDirectory[] = FILE_PATH_LITERAL("meta");
@@ -610,12 +613,14 @@ class DriveIntegrationService::DriveFsHolder
         prefs::kDriveFsEnableVerboseLogging);
   }
 
-  drivefs::mojom::ExtensionConnectionStatus ConnectToExtension(
+  void ConnectToExtension(
       drivefs::mojom::ExtensionConnectionParamsPtr params,
       mojo::PendingReceiver<drivefs::mojom::NativeMessagingPort> port,
-      mojo::PendingRemote<drivefs::mojom::NativeMessagingHost> host) override {
-    return ConnectToDriveFsNativeMessageExtension(
-        profile_, params->extension_id, std::move(port), std::move(host));
+      mojo::PendingRemote<drivefs::mojom::NativeMessagingHost> host,
+      drivefs::mojom::DriveFsDelegate::ConnectToExtensionCallback callback)
+      override {
+    std::move(callback).Run(ConnectToDriveFsNativeMessageExtension(
+        profile_, params->extension_id, std::move(port), std::move(host)));
   }
 
   const std::string GetMachineRootID() override {
@@ -788,6 +793,13 @@ bool DriveIntegrationService::GetRelativeDrivePath(
     *drive_path = relative;
   }
   return true;
+}
+
+bool DriveIntegrationService::IsSharedDrive(
+    const base::FilePath& local_path) const {
+  return GetMountPointPath()
+      .Append(drive::util::kDriveTeamDrivesDirName)
+      .IsParent(local_path);
 }
 
 void DriveIntegrationService::AddObserver(
@@ -1076,8 +1088,9 @@ void DriveIntegrationService::OnMounted(const base::FilePath& mount_path) {
   }
 
   if (ash::features::IsDriveFsBulkPinningEnabled()) {
-    pin_manager_ = std::make_unique<drivefs::pinning::PinManager>(
-        profile_->GetPath(), GetDriveFsInterface());
+    DCHECK_CURRENTLY_ON(BrowserThread::UI);
+    pin_manager_ = std::make_unique<PinManager>(profile_->GetPath(),
+                                                GetDriveFsInterface());
     pin_manager_->ShouldCheckStalledFiles(true);
     GetDriveFsHost()->AddObserver(pin_manager_.get());
     ToggleBulkPinning();
@@ -1188,6 +1201,7 @@ void DriveIntegrationService::PinFiles(
 }
 
 void DriveIntegrationService::ToggleBulkPinning() {
+  DCHECK_CURRENTLY_ON(BrowserThread::UI);
   if (!pin_manager_) {
     VLOG(1) << "No bulk-pinning manager";
     return;
@@ -1208,8 +1222,7 @@ void DriveIntegrationService::GetTotalPinnedSize(
   }
 
   auto query_params = drivefs::mojom::QueryParameters::New();
-  query_params->query_source =
-      drivefs::mojom::QueryParameters::QuerySource::kLocalOnly;
+  query_params->page_size = 1000;
   query_params->available_offline = true;
 
   int64_t total_size = 0;
@@ -1232,13 +1245,25 @@ void DriveIntegrationService::OnGetOfflineItemsPage(
     drive::FileError error,
     absl::optional<std::vector<drivefs::mojom::QueryItemPtr>> results) {
   if (!ash::features::IsDriveFsBulkPinningEnabled() ||
-      error != drive::FILE_ERROR_OK || results->empty()) {
+      error != drive::FILE_ERROR_OK || results->empty() ||
+      callback.IsCancelled()) {
+    LOG_IF(ERROR, error != drive::FILE_ERROR_OK)
+        << "Failed to get offline size: " << drive::FileErrorToString(error);
     std::move(callback).Run(total_size);
     return;
   }
 
   for (auto& result : *results) {
-    total_size += result->metadata->size;
+    if (!result->metadata) {
+      continue;
+    }
+    // We only want to show storage used by Drive that a user can action (i.e.
+    // files that can be unpinned). This should exclude files that DriveFS
+    // implicitly caches as users can't remove these files.
+    const drivefs::mojom::FileMetadata& metadata = *result->metadata;
+    if (metadata.available_offline && metadata.pinned) {
+      total_size += result->metadata->size;
+    }
   }
 
   auto* raw_search_query = search_query.get();
@@ -1578,6 +1603,11 @@ void DriveIntegrationService::GetReadOnlyAuthenticationToken(
   }
 
   auth_service_->StartAuthentication(std::move(callback));
+}
+
+PinManager* DriveIntegrationService::GetPinManager() const {
+  DCHECK_CURRENTLY_ON(BrowserThread::UI);
+  return pin_manager_.get();
 }
 
 //===================== DriveIntegrationServiceFactory =======================

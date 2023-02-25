@@ -130,6 +130,7 @@ import org.chromium.chrome.browser.preferences.SharedPreferencesManager;
 import org.chromium.chrome.browser.profiles.OTRProfileID;
 import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.chrome.browser.profiles.ProfileManager;
+import org.chromium.chrome.browser.quick_delete.QuickDeleteController;
 import org.chromium.chrome.browser.read_later.ReadingListBackPressHandler;
 import org.chromium.chrome.browser.read_later.ReadingListUtils;
 import org.chromium.chrome.browser.reengagement.ReengagementNotificationController;
@@ -205,13 +206,13 @@ import org.chromium.components.feature_engagement.EventConstants;
 import org.chromium.components.feature_engagement.Tracker;
 import org.chromium.components.messages.MessageDispatcherProvider;
 import org.chromium.components.profile_metrics.BrowserProfileType;
+import org.chromium.components.user_prefs.UserPrefs;
 import org.chromium.components.webapps.ShortcutSource;
 import org.chromium.content_public.browser.LoadUrlParams;
 import org.chromium.content_public.browser.NavigationHandle;
 import org.chromium.content_public.browser.RenderFrameHost;
 import org.chromium.content_public.browser.UiThreadTaskTraits;
 import org.chromium.content_public.browser.WebContents;
-import org.chromium.content_public.browser.WebContentsAccessibility;
 import org.chromium.content_public.common.ContentSwitches;
 import org.chromium.ui.base.DeviceFormFactor;
 import org.chromium.ui.base.PageTransition;
@@ -1791,7 +1792,11 @@ public class ChromeTabbedActivity extends ChromeActivity<ChromeActivityComponent
         if (TabUiFeatureUtilities.isTabGroupsAndroidEnabled(this)) {
             dialogVisibilitySupplier = () -> {
                 if (isStartSurfaceRefactorEnabled()) {
-                    assert mTabSwitcherSupplier.get() != null;
+                    // The grid tab switcher is lazily initialized on tablet.
+                    if (!mTabSwitcherSupplier.hasValue()) {
+                        assert isTablet();
+                        return false;
+                    }
                 }
                 // Return true if dialog from either tab switcher or tab strip is visible.
 
@@ -1942,11 +1947,6 @@ public class ChromeTabbedActivity extends ChromeActivity<ChromeActivityComponent
                 try (TraceEvent te = TraceEvent.scoped("updateActiveWebContents")) {
                     SendTabToSelfAndroidBridge.updateActiveWebContents(tab.getWebContents());
                 }
-            }
-
-            @Override
-            public void onDidFinishNavigationNoop(Tab tab, NavigationHandle navigation) {
-                if (!navigation.isInPrimaryMainFrame()) return;
             }
         };
         mAppIndexingUtil = new AppIndexingUtil(mTabModelSelector);
@@ -2242,6 +2242,15 @@ public class ChromeTabbedActivity extends ChromeActivity<ChromeActivityComponent
             TabModel currentModel = mTabModelSelector.getCurrentModel();
             if (!currentModel.isIncognito()) currentModel.openMostRecentlyClosedEntry();
             RecordUserAction.record("MobileTabClosedUndoShortCut");
+        } else if (id == R.id.quick_delete_menu_id
+                && QuickDeleteController.isQuickDeleteEnabled()) {
+            assert !mTabModelSelector.getCurrentModel().isIncognito()
+                : "Quick delete is not supported in Incognito.";
+
+            QuickDeleteController
+                    .create(getModalDialogManager(), getSnackbarManager(),
+                            UserPrefs.get(mTabModelProfileSupplier.get()))
+                    .triggerQuickDeleteFlow();
         } else {
             return super.onMenuOrKeyboardAction(id, fromMenu);
         }
@@ -2288,10 +2297,14 @@ public class ChromeTabbedActivity extends ChromeActivity<ChromeActivityComponent
             return true;
         }
 
-        final Tab currentTab = getActivityTab();
+        // crbug.com/1416719: back press on start surface should close the app.
+        final boolean isStartSurfaceHomepageShowing =
+                mStartSurfaceSupplier.hasValue() && mStartSurfaceSupplier.get().isHomepageShown();
+        final Tab currentTab = isStartSurfaceHomepageShowing ? null : getActivityTab();
         if (currentTab == null) {
             BackPressManager.record(BackPressHandler.Type.MINIMIZE_APP_AND_CLOSE_TAB);
             MinimizeAppAndCloseTabBackPressHandler.record(MinimizeAppAndCloseTabType.MINIMIZE_APP);
+            assertOnLastBackPress();
             moveTaskToBack(true);
             return true;
         }
@@ -2342,7 +2355,10 @@ public class ChromeTabbedActivity extends ChromeActivity<ChromeActivityComponent
         //   exit Chrome on top of closing the tab
         final boolean minimizeApp =
                 !shouldCloseTab || TabAssociatedApp.isOpenedFromExternalApp(currentTab);
+
         BackPressManager.record(BackPressHandler.Type.MINIMIZE_APP_AND_CLOSE_TAB);
+        assertOnLastBackPress();
+
         if (minimizeApp) {
             if (shouldCloseTab) {
                 MinimizeAppAndCloseTabBackPressHandler.record(
@@ -2365,6 +2381,16 @@ public class ChromeTabbedActivity extends ChromeActivity<ChromeActivityComponent
         return false;
     }
 
+    private void assertOnLastBackPress() {
+        final boolean isStartSurfaceHomepageShowing =
+                mStartSurfaceSupplier.hasValue() && mStartSurfaceSupplier.get().isHomepageShown();
+        final Tab currentTab = isStartSurfaceHomepageShowing ? null : getActivityTab();
+        var activityTab = getActivityTabProvider().get();
+        MinimizeAppAndCloseTabBackPressHandler.assertOnLastBackPress(currentTab, activityTab,
+                this::backShouldCloseTab, mLayoutStateProviderSupplier,
+                isActivityFinishingOrDestroyed());
+    }
+
     private void initializeBackPressHandlers() {
         if (mReturnToChromeBackPressHandler == null && !isTablet()) {
             mReturnToChromeBackPressHandler = new ReturnToChromeBackPressHandler(
@@ -2380,7 +2406,8 @@ public class ChromeTabbedActivity extends ChromeActivity<ChromeActivityComponent
         }
         if (mMinimizeAppAndCloseTabBackPressHandler == null) {
             mMinimizeAppAndCloseTabBackPressHandler = new MinimizeAppAndCloseTabBackPressHandler(
-                    getActivityTabProvider(), this::backShouldCloseTab, this::sendToBackground);
+                    getActivityTabProvider(), this::backShouldCloseTab, this::sendToBackground,
+                    this::assertOnLastBackPress);
             mBackPressManager.addHandler(mMinimizeAppAndCloseTabBackPressHandler,
                     BackPressHandler.Type.MINIMIZE_APP_AND_CLOSE_TAB);
         }
@@ -2597,7 +2624,6 @@ public class ChromeTabbedActivity extends ChromeActivity<ChromeActivityComponent
             final int layoutTypeToShowFinal = layoutTypeToShow;
             getCompositorViewHolderSupplier().get().hideKeyboard(
                     () -> mLayoutManager.showLayout(layoutTypeToShowFinal, true));
-            updateAccessibilityState(false);
             TasksUma.recordTabLaunchType(getCurrentTabModel());
         }
     }
@@ -2607,7 +2633,6 @@ public class ChromeTabbedActivity extends ChromeActivity<ChromeActivityComponent
         if (getCurrentTabModel().getCount() != 0) {
             // Don't hide overview if current tab stack is empty()
             mLayoutManager.showLayout(LayoutType.BROWSING, false);
-            updateAccessibilityState(true);
         }
     }
 
@@ -2628,14 +2653,6 @@ public class ChromeTabbedActivity extends ChromeActivity<ChromeActivityComponent
             showOverview(StartSurfaceState.SHOWING_HOMEPAGE, launchOrigin);
         }
         return true;
-    }
-
-    private void updateAccessibilityState(boolean enabled) {
-        Tab currentTab = getActivityTab();
-        WebContents webContents = currentTab != null ? currentTab.getWebContents() : null;
-        if (webContents != null) {
-            WebContentsAccessibility.fromWebContents(webContents).setState(enabled);
-        }
     }
 
     @Override
@@ -2821,6 +2838,10 @@ public class ChromeTabbedActivity extends ChromeActivity<ChromeActivityComponent
     @VisibleForTesting
     public StartSurface getStartSurface() {
         return mStartSurfaceSupplier.get();
+    }
+
+    public TabSwitcher getTabSwitcherForTesting() {
+        return mTabSwitcherSupplier.get();
     }
 
     private ComposedBrowserControlsVisibilityDelegate getAppBrowserControlsVisibilityDelegate() {

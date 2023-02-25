@@ -12,6 +12,7 @@
 #include "base/test/gtest_tags.h"
 #include "base/test/scoped_chromeos_version_info.h"
 #include "chrome/browser/ash/app_mode/kiosk_app_manager.h"
+#include "chrome/browser/ash/app_mode/test_kiosk_extension_builder.h"
 #include "chrome/browser/ash/file_manager/fake_disk_mount_manager.h"
 #include "chrome/browser/ash/login/app_mode/test/kiosk_base_test.h"
 #include "chrome/browser/ash/login/app_mode/test/test_app_data_load_waiter.h"
@@ -105,6 +106,9 @@ const char kFakeUsbMountPathLowerCrxVersion[] =
     "chromeos/app_mode/external_update/lower_crx_version";
 const char kFakeUsbMountPathBadCrx[] =
     "chromeos/app_mode/external_update/bad_crx";
+
+// Placeholder for an icon, as the icon is required by the kiosk app manager.
+const char kFakeIconURL[] = "/chromeos/app_mode/red16x16.png";
 
 bool IsAppInstalled(const std::string& app_id, const std::string& version) {
   Profile* app_profile = ProfileManager::GetPrimaryUserProfile();
@@ -219,10 +223,11 @@ class KioskUpdateTest : public KioskBaseTest {
     KioskAppManager* manager = KioskAppManager::Get();
     TestAppDataLoadWaiter waiter(manager, app_id, version);
     ReloadKioskApps();
-    if (wait_for_app_data)
+    if (wait_for_app_data) {
       waiter.WaitForAppData();
-    else
+    } else {
       waiter.Wait();
+    }
     EXPECT_TRUE(waiter.loaded());
     std::string cached_version;
     base::FilePath file_path;
@@ -295,7 +300,7 @@ class KioskUpdateTest : public KioskBaseTest {
 
     // Launch the primary app.
     SimulateNetworkOnline();
-    EXPECT_TRUE(LaunchApp(test_app_id()));
+    ASSERT_TRUE(LaunchApp(test_app_id()));
     WaitForAppLaunchWithOptions(false, true);
 
     // Verify the primary app and the secondary apps are all installed.
@@ -392,10 +397,16 @@ class KioskUpdateTest : public KioskBaseTest {
   }
 
   void SetupAppDetailInFakeCws(const TestAppInfo& app) {
-    // In these tests we need to provide any app detail, not necessary correct
+    TestKioskExtensionBuilder app_builder(
+        extensions::Manifest::TYPE_PLATFORM_APP, app.id);
+    app_builder.set_version(app.version);
+    std::string manifest_json;
+    base::JSONWriter::Write(*app_builder.Build()->manifest()->value(),
+                            &manifest_json);
+    // In these tests we need to provide basic app detail, not necessary correct
     // one, just to prevent KioskAppData to remove the app.
-    fake_cws()->SetAppDetails(app.id, /*localized_name*/ "Test App",
-                              /*manifest_json*/ "");
+    fake_cws()->SetAppDetails(app.id, /*localized_name=*/"Test App",
+                              /*icon_url=*/kFakeIconURL, manifest_json);
   }
 
  private:
@@ -414,8 +425,9 @@ class KioskUpdateTest : public KioskBaseTest {
     ~KioskAppExternalUpdateWaiter() override { manager_->RemoveObserver(this); }
 
     void Wait() {
-      if (quit_)
+      if (quit_) {
         return;
+      }
       runner_ = std::make_unique<base::RunLoop>();
       runner_->Run();
     }
@@ -427,16 +439,18 @@ class KioskUpdateTest : public KioskBaseTest {
    private:
     // KioskAppManagerObserver overrides:
     void OnKioskAppCacheUpdated(const std::string& app_id) override {
-      if (app_id_ != app_id)
+      if (app_id_ != app_id) {
         return;
+      }
       app_update_notified_ = true;
     }
 
     void OnKioskAppExternalUpdateComplete(bool success) override {
       quit_ = true;
       update_success_ = success;
-      if (runner_.get())
+      if (runner_.get()) {
         runner_->Quit();
+      }
     }
 
     std::unique_ptr<base::RunLoop> runner_;

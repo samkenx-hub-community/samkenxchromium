@@ -134,9 +134,19 @@ class GLTextureImageBackingFactoryTestBase : public testing::Test {
     scoped_refptr<gles2::FeatureInfo> feature_info;
     CreateSharedContext(workarounds, surface_, context_, context_state_,
                         feature_info);
+
+    // Check if platform should support various formats.
     supports_r_rg_ =
         feature_info->validators()->texture_format.IsValid(GL_RED_EXT) &&
         feature_info->validators()->texture_format.IsValid(GL_RG_EXT);
+    supports_rg16_ =
+        supports_r_rg_ &&
+        feature_info->validators()->texture_internal_format.IsValid(
+            GL_R16_EXT) &&
+        feature_info->validators()->texture_internal_format.IsValid(
+            GL_RG16_EXT);
+    supports_rgba_f16_ =
+        feature_info->validators()->pixel_type.IsValid(GL_HALF_FLOAT_OES);
     supports_etc1_ =
         feature_info->validators()->compressed_texture_format.IsValid(
             GL_ETC1_RGB8_OES);
@@ -168,9 +178,14 @@ class GLTextureImageBackingFactoryTestBase : public testing::Test {
         return false;
       }
       return supports_r_rg_;
-    } else if (format == viz::SinglePlaneFormat::kRED_8 ||
+    } else if (format == viz::SinglePlaneFormat::kR_8 ||
                format == viz::SinglePlaneFormat::kRG_88) {
       return supports_r_rg_;
+    } else if (format == viz::SinglePlaneFormat::kR_16 ||
+               format == viz::SinglePlaneFormat::kRG_1616) {
+      return supports_rg16_;
+    } else if (format == viz::SinglePlaneFormat::kRGBA_F16) {
+      return supports_rgba_f16_;
     } else if (format == viz::SinglePlaneFormat::kBGRA_1010102 ||
                format == viz::SinglePlaneFormat::kRGBA_1010102) {
       return supports_ar30_ || supports_ab30_;
@@ -191,6 +206,8 @@ class GLTextureImageBackingFactoryTestBase : public testing::Test {
   std::unique_ptr<SharedImageRepresentationFactory>
       shared_image_representation_factory_;
   bool supports_r_rg_ = false;
+  bool supports_rg16_ = false;
+  bool supports_rgba_f16_ = false;
   bool supports_etc1_ = false;
   bool supports_ar30_ = false;
   bool supports_ab30_ = false;
@@ -244,9 +261,9 @@ TEST_F(GLTextureImageBackingFactoryTest, InvalidFormat) {
       viz::ResourceFormat::YUV_420_BIPLANAR);
   gfx::Size size(256, 256);
   uint32_t usage = SHARED_IMAGE_USAGE_GLES2;
-  bool supported =
-      backing_factory_->IsSupported(usage, format, size, /*thread_safe=*/false,
-                                    gfx::EMPTY_BUFFER, GrContextType::kGL, {});
+  bool supported = backing_factory_->CanCreateSharedImage(
+      usage, format, size, /*thread_safe=*/false, gfx::EMPTY_BUFFER,
+      GrContextType::kGL, {});
   EXPECT_FALSE(supported);
 }
 
@@ -262,9 +279,9 @@ TEST_F(GLTextureImageBackingFactoryTest, EstimatedSize) {
   gpu::SurfaceHandle surface_handle = gpu::kNullSurfaceHandle;
   uint32_t usage = SHARED_IMAGE_USAGE_GLES2;
 
-  bool supported =
-      backing_factory_->IsSupported(usage, format, size, /*thread_safe=*/false,
-                                    gfx::EMPTY_BUFFER, GrContextType::kGL, {});
+  bool supported = backing_factory_->CanCreateSharedImage(
+      usage, format, size, /*thread_safe=*/false, gfx::EMPTY_BUFFER,
+      GrContextType::kGL, {});
   ASSERT_TRUE(supported);
 
   auto backing = backing_factory_->CreateSharedImage(
@@ -336,9 +353,9 @@ TEST_P(GLTextureImageBackingFactoryWithFormatTest, IsSupported) {
   gfx::Size size(256, 256);
   uint32_t usage = SHARED_IMAGE_USAGE_GLES2;
 
-  bool supported =
-      backing_factory_->IsSupported(usage, format, size, /*thread_safe=*/false,
-                                    gfx::EMPTY_BUFFER, GrContextType::kGL, {});
+  bool supported = backing_factory_->CanCreateSharedImage(
+      usage, format, size, /*thread_safe=*/false, gfx::EMPTY_BUFFER,
+      GrContextType::kGL, {});
   EXPECT_EQ(IsFormatSupport(format), supported);
 }
 
@@ -365,9 +382,9 @@ TEST_P(GLTextureImageBackingFactoryWithFormatTest, Basic) {
   uint32_t usage = SHARED_IMAGE_USAGE_GLES2;
   gpu::SurfaceHandle surface_handle = gpu::kNullSurfaceHandle;
 
-  bool supported =
-      backing_factory_->IsSupported(usage, format, size, /*thread_safe=*/false,
-                                    gfx::EMPTY_BUFFER, GrContextType::kGL, {});
+  bool supported = backing_factory_->CanCreateSharedImage(
+      usage, format, size, /*thread_safe=*/false, gfx::EMPTY_BUFFER,
+      GrContextType::kGL, {});
   ASSERT_TRUE(supported);
 
   auto backing = backing_factory_->CreateSharedImage(
@@ -470,15 +487,15 @@ TEST_P(GLTextureImageBackingFactoryWithFormatTest, InvalidSize) {
 
   gfx::Size size(0, 0);
   uint32_t usage = SHARED_IMAGE_USAGE_GLES2;
-  bool supported =
-      backing_factory_->IsSupported(usage, format, size, /*thread_safe=*/false,
-                                    gfx::EMPTY_BUFFER, GrContextType::kGL, {});
+  bool supported = backing_factory_->CanCreateSharedImage(
+      usage, format, size, /*thread_safe=*/false, gfx::EMPTY_BUFFER,
+      GrContextType::kGL, {});
   EXPECT_FALSE(supported);
 
   size = gfx::Size(INT_MAX, INT_MAX);
-  supported =
-      backing_factory_->IsSupported(usage, format, size, /*thread_safe=*/false,
-                                    gfx::EMPTY_BUFFER, GrContextType::kGL, {});
+  supported = backing_factory_->CanCreateSharedImage(
+      usage, format, size, /*thread_safe=*/false, gfx::EMPTY_BUFFER,
+      GrContextType::kGL, {});
   EXPECT_FALSE(supported);
 }
 
@@ -497,7 +514,7 @@ TEST_P(GLTextureImageBackingFactoryInitialDataTest, InitialData) {
   std::vector<uint8_t> initial_data(
       viz::ResourceSizes::CheckedSizeInBytes<unsigned int>(size, format));
 
-  bool supported = backing_factory_->IsSupported(
+  bool supported = backing_factory_->CanCreateSharedImage(
       usage, format, size, /*thread_safe=*/false, gfx::EMPTY_BUFFER,
       GrContextType::kGL, initial_data);
   ASSERT_TRUE(supported);
@@ -553,15 +570,15 @@ TEST_P(GLTextureImageBackingFactoryInitialDataTest, InitialDataWrongSize) {
       viz::ResourceSizes::CheckedSizeInBytes<size_t>(size, format);
   std::vector<uint8_t> initial_data_small(required_size / 2);
   std::vector<uint8_t> initial_data_large(required_size * 2);
-  bool supported =
-      backing_factory_->IsSupported(usage, format, size,
-                                    /*thread_safe=*/false, gfx::EMPTY_BUFFER,
-                                    GrContextType::kGL, initial_data_small);
+  bool supported = backing_factory_->CanCreateSharedImage(
+      usage, format, size,
+      /*thread_safe=*/false, gfx::EMPTY_BUFFER, GrContextType::kGL,
+      initial_data_small);
   EXPECT_FALSE(supported);
-  supported =
-      backing_factory_->IsSupported(usage, format, size,
-                                    /*thread_safe=*/false, gfx::EMPTY_BUFFER,
-                                    GrContextType::kGL, initial_data_large);
+  supported = backing_factory_->CanCreateSharedImage(
+      usage, format, size,
+      /*thread_safe=*/false, gfx::EMPTY_BUFFER, GrContextType::kGL,
+      initial_data_large);
   EXPECT_FALSE(supported);
 }
 
@@ -579,9 +596,9 @@ TEST_P(GLTextureImageBackingFactoryWithUploadTest, UploadFromMemory) {
   uint32_t usage = SHARED_IMAGE_USAGE_GLES2 | SHARED_IMAGE_USAGE_CPU_UPLOAD;
   gpu::SurfaceHandle surface_handle = gpu::kNullSurfaceHandle;
 
-  bool supported =
-      backing_factory_->IsSupported(usage, format, size, /*thread_safe=*/false,
-                                    gfx::EMPTY_BUFFER, GrContextType::kGL, {});
+  bool supported = backing_factory_->CanCreateSharedImage(
+      usage, format, size, /*thread_safe=*/false, gfx::EMPTY_BUFFER,
+      GrContextType::kGL, {});
   ASSERT_TRUE(supported);
 
   auto backing = backing_factory_->CreateSharedImage(
@@ -619,9 +636,9 @@ TEST_P(GLTextureImageBackingFactoryWithReadbackTest, ReadbackToMemory) {
   uint32_t usage = SHARED_IMAGE_USAGE_GLES2 | SHARED_IMAGE_USAGE_CPU_UPLOAD;
   gpu::SurfaceHandle surface_handle = gpu::kNullSurfaceHandle;
 
-  bool supported =
-      backing_factory_->IsSupported(usage, format, size, /*thread_safe=*/false,
-                                    gfx::EMPTY_BUFFER, GrContextType::kGL, {});
+  bool supported = backing_factory_->CanCreateSharedImage(
+      usage, format, size, /*thread_safe=*/false, gfx::EMPTY_BUFFER,
+      GrContextType::kGL, {});
   ASSERT_TRUE(supported);
 
   auto backing = backing_factory_->CreateSharedImage(
@@ -688,7 +705,7 @@ const auto kInitialDataFormats =
                       viz::SinglePlaneFormat::kRGBA_8888,
                       viz::SinglePlaneFormat::kBGRA_8888,
                       viz::SinglePlaneFormat::kRGBA_4444,
-                      viz::SinglePlaneFormat::kRED_8,
+                      viz::SinglePlaneFormat::kR_8,
                       viz::SinglePlaneFormat::kRG_88,
                       viz::SinglePlaneFormat::kBGRA_1010102,
                       viz::SinglePlaneFormat::kRGBA_1010102);
@@ -702,12 +719,15 @@ const auto kSharedImageFormats =
     ::testing::Values(viz::SinglePlaneFormat::kRGBA_8888,
                       viz::SinglePlaneFormat::kBGRA_8888,
                       viz::SinglePlaneFormat::kRGBA_4444,
-                      viz::SinglePlaneFormat::kRED_8,
+                      viz::SinglePlaneFormat::kR_8,
                       viz::SinglePlaneFormat::kRG_88,
                       viz::SinglePlaneFormat::kBGRA_1010102,
                       viz::SinglePlaneFormat::kRGBA_1010102,
                       viz::SinglePlaneFormat::kRGBX_8888,
                       viz::SinglePlaneFormat::kBGRX_8888,
+                      viz::SinglePlaneFormat::kR_16,
+                      viz::SinglePlaneFormat::kRG_1616,
+                      viz::SinglePlaneFormat::kRGBA_F16,
                       viz::MultiPlaneFormat::kYUV_420_BIPLANAR,
                       viz::MultiPlaneFormat::kYVU_420);
 
@@ -715,7 +735,6 @@ INSTANTIATE_TEST_SUITE_P(,
                          GLTextureImageBackingFactoryWithFormatTest,
                          kSharedImageFormats,
                          TestParamToString);
-
 INSTANTIATE_TEST_SUITE_P(,
                          GLTextureImageBackingFactoryWithUploadTest,
                          kSharedImageFormats,
@@ -724,7 +743,7 @@ INSTANTIATE_TEST_SUITE_P(,
 const auto kReadbackFormats =
     ::testing::Values(viz::SinglePlaneFormat::kRGBA_8888,
                       viz::SinglePlaneFormat::kBGRA_8888,
-                      viz::SinglePlaneFormat::kRED_8,
+                      viz::SinglePlaneFormat::kR_8,
                       viz::SinglePlaneFormat::kRG_88,
                       viz::SinglePlaneFormat::kRGBX_8888,
                       viz::SinglePlaneFormat::kBGRX_8888,

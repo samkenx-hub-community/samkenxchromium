@@ -18,8 +18,8 @@ import './topic_source_list_element.js';
 import {assert} from 'chrome://resources/js/assert_ts.js';
 import {afterNextRender} from 'chrome://resources/polymer/v3_0/polymer/polymer_bundled.min.js';
 
+import {AmbientModeAlbum, AnimationTheme, TemperatureUnit, TopicSource} from '../../personalization_app.mojom-webui.js';
 import {isAmbientModeAllowed, isPersonalizationJellyEnabled} from '../load_time_booleans.js';
-import {AmbientModeAlbum, AnimationTheme, TemperatureUnit, TopicSource} from '../personalization_app.mojom-webui.js';
 import {Paths} from '../personalization_router_element.js';
 import {WithPersonalizationStore} from '../personalization_store.js';
 
@@ -63,10 +63,10 @@ export class AmbientSubpage extends WithPersonalizationStore {
         type: Number,
         value: null,
       },
-      loadingSettings_: {
+      loading_: {
         type: Boolean,
         computed:
-            'computeLoadingSettings_(albums_, temperatureUnit_, topicSource_)',
+            'computeLoading_(ambientModeEnabled_, albums_, temperatureUnit_, topicSource_)',
       },
       isPersonalizationJellyEnabled_: {
         type: Boolean,
@@ -201,9 +201,9 @@ export class AmbientSubpage extends WithPersonalizationStore {
     return this.ambientModeEnabled_ === null;
   }
 
-  private computeLoadingSettings_(): boolean {
-    return this.albums_ === null || this.topicSource_ === null ||
-        this.temperatureUnit_ === null;
+  private computeLoading_(): boolean {
+    return this.ambientModeEnabled_ === null || this.albums_ === null ||
+        this.topicSource_ === null || this.temperatureUnit_ === null;
   }
 
   private getPlaceholders_(x: number): number[] {

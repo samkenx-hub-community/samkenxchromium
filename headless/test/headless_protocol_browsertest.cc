@@ -168,9 +168,8 @@ void HeadlessProtocolBrowserTest::ProcessTestResult(
   if (base::CommandLine::ForCurrentProcess()->HasSwitch(
           switches::kResetResults)) {
     LOG(INFO) << "Updating expectations at " << expectation_path;
-    int result = base::WriteFile(expectation_path, test_result.data(),
-                                 static_cast<int>(test_result.size()));
-    CHECK(test_result.size() == static_cast<size_t>(result));
+    bool succcess = base::WriteFile(expectation_path, test_result);
+    CHECK(succcess);
   }
 
   std::string expectation;
@@ -267,6 +266,12 @@ HEADLESS_PROTOCOL_TEST(VirtualTimeHistoryNavigation,
                        "emulation/virtual-time-history-navigation.js")
 HEADLESS_PROTOCOL_TEST(VirtualTimeHistoryNavigationSameDoc,
                        "emulation/virtual-time-history-navigation-same-doc.js")
+HEADLESS_PROTOCOL_TEST(VirtualTimeWorkerBasic,
+                       "emulation/virtual-time-worker-basic.js")
+HEADLESS_PROTOCOL_TEST(VirtualTimeWorkerLockstep,
+                       "emulation/virtual-time-worker-lockstep.js")
+HEADLESS_PROTOCOL_TEST(VirtualTimeWorkerFetch,
+                       "emulation/virtual-time-worker-fetch.js")
 
 // Flaky on Mac. TODO(crbug.com/1164173): Re-enable.
 #if BUILDFLAG(IS_MAC)
@@ -302,8 +307,8 @@ HEADLESS_PROTOCOL_TEST(Geolocation, "emulation/geolocation-crash.js")
 
 HEADLESS_PROTOCOL_TEST(DragStarted, "input/dragIntercepted.js")
 
-// https://crbug.com/1204620
-#if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_WIN)
+// https://crbug.com/1414190
+#if BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
 #define MAYBE_InputClipboardOps DISABLED_InputClipboardOps
 #else
 #define MAYBE_InputClipboardOps InputClipboardOps

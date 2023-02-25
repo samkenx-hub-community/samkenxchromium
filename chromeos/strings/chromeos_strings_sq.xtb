@@ -16,6 +16,7 @@
 <translation id="1128128132059598906">EAP-TTLS</translation>
 <translation id="1145018782460575098">Përditëso firmuerin për pajisjet e jashtme kur dritarja është e hapur. Ofrohen <ph name="NUM_UPDATES" /> përditësime.</translation>
 <translation id="1145516343487477149">Gjej artikuj të ndihmës dhe përgjigje për pyetjet e zakonshme për Chromebook</translation>
+<translation id="1167755866710282443">Hap menynë për të personalizuar tastet. Zvarrite menynë për ta zhvendosur.</translation>
 <translation id="1175697296044146566">Kjo pajisje <ph name="DEVICE_TYPE" /> menaxhohet nga <ph name="MANAGER" />.</translation>
 <translation id="1175951029573070619">Mesatar (<ph name="SIGNAL_STRENGTH" />)</translation>
 <translation id="1181037720776840403">Hiq</translation>
@@ -326,6 +327,7 @@
 <translation id="4110686435123617899">Zgjidh albumin <ph name="TITLE" /> <ph name="DESC" /></translation>
 <translation id="4111761024568264522">Blloku me prekje USB</translation>
 <translation id="4117637339509843559">Modaliteti i errët</translation>
+<translation id="4130035430755296270">Vazhdo të mbash kursorin mbi të për opsione të tjera të strukturës</translation>
 <translation id="4131410914670010031">Bardhezi</translation>
 <translation id="4145784616224233563">Mur mbrojtës HTTP</translation>
 <translation id="4147897805161313378">Fotografitë e Google</translation>
@@ -414,6 +416,7 @@
 <translation id="484790837831576105">(Android) Zgjidhja e DNS-së</translation>
 <translation id="4848429997038228357">NË EKZEKUTIM</translation>
 <translation id="4854586501323951986">Ekrani me prekje i integruar</translation>
+<translation id="4855250849489639581">Rrëshqit shpejt poshtë për opsione të tjera të strukturës</translation>
 <translation id="4861758251032006121">{ATTEMPTS_LEFT,plural, =1{<ph name="ERROR_MESSAGE" /> {0} përpjekje e mbetur}other{<ph name="ERROR_MESSAGE" /> {0} përpjekje të mbetura}}</translation>
 <translation id="4873827928179867585">Algoritmi i vërtetimit</translation>
 <translation id="4880328057631981605">Emri i pikës së qasjes</translation>
@@ -517,6 +520,7 @@
 <translation id="576835345334454681">Ngritja e ndriçimit të ekranit</translation>
 <translation id="57838592816432529">Hiqi zërin</translation>
 <translation id="5784136236926853061">Vonesë shumë e lartë e HTTP-së</translation>
+<translation id="5826644637650799838">Rreth artit</translation>
 <translation id="5832805196449965646">Shto person</translation>
 <translation id="583281660410589416">E panjohur</translation>
 <translation id="5843706793424741864">Farenhait</translation>
@@ -673,6 +677,7 @@
 <translation id="7172721935181587524">1 imazh</translation>
 <translation id="7177485034254901881">Kjo pajisje <ph name="DEVICE_TYPE" /> menaxhohet nga <ph name="MANAGER" />. Administratorët mund ta konfigurojnë në distancë pajisjen.</translation>
 <translation id="7180611975245234373">Rifresko</translation>
+<translation id="7180865173735832675">Personalizo</translation>
 <translation id="7212734716605298123">Përditësimet e firmuerit për pajisjet e jashtme</translation>
 <translation id="7216409898977639127">Operatori celular</translation>
 <translation id="725133483556299729">Zgjidh email-in</translation>
@@ -744,6 +749,7 @@
 <translation id="7881066108824108340">DNS</translation>
 <translation id="7882358943899516840">Lloji i ofruesit</translation>
 <translation id="7882501334836096755">Çelës publik</translation>
+<translation id="78957024357676568">majtas</translation>
 <translation id="7915220255123750251">Menaxho cilësimet e APN-së së rrjetit. APN-të vendosin një lidhje mes një rrjeti celular dhe internetit.</translation>
 <translation id="7936303884198020182">Nuk u gjetën serverë DNS</translation>
 <translation id="7942349550061667556">E kuqe</translation>
@@ -775,6 +781,7 @@
 <translation id="8226628635270268143">Zgjidh fotografitë dhe albumet e tua të preferuara</translation>
 <translation id="8227119283605456246">Bashkëngjit skedarin</translation>
 <translation id="8230672074305416752">Dështoi verifikimi "ping" për portën e parazgjedhur të kalimit</translation>
+<translation id="8242426110754782860">Vazhdo</translation>
 <translation id="8246209727385807362">Operator celular i panjohur</translation>
 <translation id="827422111966801947">Indigo</translation>
 <translation id="8286154143153872371">Lidhu në një rrjet dhe ringarko faqen për të parë imazhin e sfondit.</translation>
@@ -852,6 +859,7 @@
 <translation id="8930622219860340959">Me valë</translation>
 <translation id="8936793075252196307">Adresa IP e klientit</translation>
 <translation id="894617464444543719">Pajisja është një telefon.</translation>
+<translation id="8957423540740801332">djathtas</translation>
 <translation id="8968751544471797276">Shpejtësia e karikimit</translation>
 <translation id="8970109610781093811">Ekzekuto përsëri</translation>
 <translation id="8983038754672563810">HSPA</translation>

@@ -45,6 +45,8 @@ default_chrome_public_jinja_variables = [
 
 monochrome_android_manifest_jinja_variables = [
   "sandboxed_service_exported=true",
+
+  # TODO(crbug.com/1411557): Remove.
   use_32bit_abi_jinja_variable,
 ]
 
@@ -211,7 +213,14 @@ template("chrome_public_common_apk_or_module_tmpl") {
         input = "//chrome/android/java/AndroidManifest.xml"
       }
       if (_is_monochrome || _is_trichrome) {
-        variables += [ "include_arcore_manifest_flag=$enable_arcore" ]
+        _force_32_bit = _include_32_bit_webview && _include_64_bit_webview &&
+                        !_is_64_bit_browser
+        variables += [
+          "force_32_bit=$_force_32_bit",
+          "include_arcore_manifest_flag=$enable_arcore",
+        ]
+
+        # TODO(crbug.com/1411557): Remove block.
         if (_is_64_bit_browser) {
           variables -= [ use_32bit_abi_jinja_variable ]
         }
@@ -231,6 +240,17 @@ template("chrome_public_common_apk_or_module_tmpl") {
   target(_target_type, target_name) {
     forward_variables_from(invoker, "*", TESTONLY_AND_VISIBILITY)
     forward_variables_from(invoker, TESTONLY_AND_VISIBILITY)
+
+    if (!defined(assert_no_deps)) {
+      assert_no_deps = []
+    }
+
+    # https://crbug.com/1415351
+    assert_no_deps += [
+      "//third_party/androidx:androidx_window_extensions_core_core_java",
+      "//third_party/androidx:androidx_window_sidecar_sidecar_java",
+      "//third_party/androidx:androidx_window_window_java_java",
+    ]
 
     # TODO(crbug.com/1411557): Do not allows custom manifest dep.
     if (defined(_android_manifest_target_name)) {

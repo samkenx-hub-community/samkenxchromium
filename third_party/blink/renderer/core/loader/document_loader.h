@@ -66,7 +66,6 @@
 #include "third_party/blink/renderer/core/frame/frame_types.h"
 #include "third_party/blink/renderer/core/frame/policy_container.h"
 #include "third_party/blink/renderer/core/frame/use_counter_impl.h"
-#include "third_party/blink/renderer/core/html/fenced_frame/fenced_frame_reporting.h"
 #include "third_party/blink/renderer/core/html/parser/parser_synchronization_policy.h"
 #include "third_party/blink/renderer/core/loader/document_load_timing.h"
 #include "third_party/blink/renderer/core/loader/frame_loader_types.h"
@@ -370,14 +369,17 @@ class CORE_EXPORT DocumentLoader : public GarbageCollected<DocumentLoader>,
                                     HistoryNavigationType,
                                     CommitReason commit_reason);
 
-  const KURL& WebBundlePhysicalUrl() const { return web_bundle_physical_url_; }
-
   bool NavigationScrollAllowed() const { return navigation_scroll_allowed_; }
 
   // We want to make sure that the largest content is painted before the "LCP
   // limit", so that we get a good LCP value. This returns the remaining time to
   // the LCP limit. See crbug.com/1065508 for details.
   base::TimeDelta RemainingTimeToLCPLimit() const;
+
+  // We are experimenting the idea of making preloaded fonts render-blocking up
+  // to a certain amount of time after navigation starts. This returns the
+  // remaining time to that time limit. See crbug.com/1412861 for details.
+  base::TimeDelta RemainingTimeToRenderBlockingFontMaxBlockingTime() const;
 
   mojom::blink::ContentSecurityNotifier& GetContentSecurityNotifier();
 
@@ -754,8 +756,6 @@ class CORE_EXPORT DocumentLoader : public GarbageCollected<DocumentLoader>,
   base::TimeTicks redirect_end_time_;
   WebScopedVirtualTimePauser virtual_time_pauser_;
   Member<PrefetchedSignedExchangeManager> prefetched_signed_exchange_manager_;
-  const KURL web_bundle_physical_url_;
-  const KURL web_bundle_claimed_url_;
   ukm::SourceId ukm_source_id_;
 
   // This UseCounter tracks feature usage associated with the lifetime of
@@ -813,6 +813,10 @@ class CORE_EXPORT DocumentLoader : public GarbageCollected<DocumentLoader>,
 
   absl::optional<FencedFrame::RedactedFencedFrameProperties>
       fenced_frame_properties_;
+
+  // Indicates whether the document should be loaded with its has_storage_access
+  // bit set.
+  const bool has_storage_access_;
 };
 
 DECLARE_WEAK_IDENTIFIER_MAP(DocumentLoader);

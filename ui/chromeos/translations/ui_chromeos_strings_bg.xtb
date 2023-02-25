@@ -27,12 +27,12 @@
 <translation id="1201402288615127009">Напред</translation>
 <translation id="1209796539517632982">Автоматично избиране на сървъри за имена</translation>
 <translation id="1210831758834677569">Лаоски</translation>
+<translation id="1221555006497674479">Хранилището е почти пълно. Имате още <ph name="REMAINING_PERCENTAGE" />% от хранилището за споделения ви диск от <ph name="TOTAL_SPACE" />.</translation>
 <translation id="1243314992276662751">Качване</translation>
 <translation id="1249250836236328755">Жанр</translation>
 <translation id="1254593899333212300">Директна връзка с интернет</translation>
 <translation id="1272293450992660632">ПИН кодовете не са идентични.</translation>
 <translation id="1280820357415527819">Търсят се мобилни мрежи</translation>
-<translation id="1291603679744561561">SIM картата е заключена</translation>
 <translation id="1293556467332435079">Файлове</translation>
 <translation id="1297922636971898492">В момента няма достъп до Google Диск. Качването ще се рестартира автоматично, щом услугата отново е налице.</translation>
 <translation id="1307931752636661898">Файловете за Linux не могат да бъдат показани</translation>
@@ -59,7 +59,6 @@
 <translation id="1499943022354839699">Английски (САЩ) с клавиатура „Дворак“</translation>
 <translation id="1515909359182093592"><ph name="INPUT_LABEL" /> – Хост</translation>
 <translation id="1521655867290435174">Google Таблици</translation>
-<translation id="1521795806314479294"><ph name="FILE_NAME" /> се подготвя…</translation>
 <translation id="1538729222189715449">Файловете за Linux се отварят...</translation>
 <translation id="1547964879613821194">Канадска (английски) клавиатура</translation>
 <translation id="1556189134700913550">Прилагане за всички</translation>
@@ -75,6 +74,7 @@
 <translation id="1641780993263690097">Китайски (пинин)</translation>
 <translation id="1646019627374511909"><ph name="NUMBER_OF_ITEMS" /> файла се правят налични офлайн</translation>
 <translation id="164969095109328410">Устройство с Chrome</translation>
+<translation id="1661207570040737402">Използвахте цялото хранилище за споделения си диск в Google Workspace.</translation>
 <translation id="1661867754829461514">Липсва PIN</translation>
 <translation id="166439687370499867">Промените в конфигурациите за споделени мрежи не са разрешени</translation>
 <translation id="1665611772925418501">Файлът не можа да бъде променен.</translation>
@@ -84,7 +84,6 @@
 <translation id="1722487484194605434"><ph name="NUMBER_OF_ITEMS" /> елемента се компресират...</translation>
 <translation id="1722687688096767818">Потребителският профил се добавя...</translation>
 <translation id="1726100011689679555">Сървъри за имена</translation>
-<translation id="1727562178154619254">Готово за синхронизиране</translation>
 <translation id="1729953886957086472">Немски (Германия)</translation>
 <translation id="1730235522912993863">Китайски (цандзие)</translation>
 <translation id="1731889557567069540">Копирахте <ph name="NUMBER_OF_ITEMS" /> елемента.</translation>
@@ -194,6 +193,7 @@
 <translation id="2574327434504608656">Споделихте 1 папка с Bruschetta</translation>
 <translation id="2578394532502990878">Тамилски (фонетична клавиатура)</translation>
 <translation id="2579959351793446050">Одия</translation>
+<translation id="2587195714949534472">„<ph name="FILE_NAME" />“ се подготвя за синхронизиране...</translation>
 <translation id="2602810353103180630">Мрежа <ph name="NETWORK_INDEX" /> от <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, <ph name="CONNECTION_STATUS" />, сила на сигнала <ph name="SIGNAL_STRENGTH" />%, блокирана от администратора ви, подробности</translation>
 <translation id="2614589611416690597">Видеоклип във формат <ph name="VIDEO_TYPE" /></translation>
 <translation id="2620090360073999360">В момента няма връзка с Google Диск.</translation>
@@ -295,6 +295,7 @@
 <translation id="3486821258960016770">Монголски</translation>
 <translation id="3495304270784461826"><ph name="COUNT" /> грешки.</translation>
 <translation id="3509680540198371098">Мрежа <ph name="NETWORK_INDEX" /> от <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, <ph name="SECURITY_STATUS" />, <ph name="CONNECTION_STATUS" />, сила на сигнала <ph name="SIGNAL_STRENGTH" />%, подробности</translation>
+<translation id="3511705761158917664"><ph name="NUMBER_OF_ITEMS" /> елемента се подготвят за синхронизиране...</translation>
 <translation id="3522708245912499433">португалски</translation>
 <translation id="3524311639100184459">Внимание: Тези файлове са временни и може да бъдат изтрити автоматично, за да се освободи място на диска.  <ph name="BEGIN_LINK" />Научете повече<ph name="END_LINK" /></translation>
 <translation id="3527085408025491307">Папка</translation>
@@ -350,11 +351,11 @@
 <translation id="3924145049010392604">Meta</translation>
 <translation id="3943857333388298514">Поставяне</translation>
 <translation id="3952872973865944257">Телугу (фонетична клавиатура)</translation>
-<translation id="3954354850384043518">В ход</translation>
 <translation id="3958548648197196644">Киви</translation>
 <translation id="3971140002794351170">Изтегляне на мобилния потребителски профил, мрежа <ph name="NETWORK_INDEX" /> от <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, <ph name="NETWORK_PROVIDER_NAME" /></translation>
 <translation id="3973925058222872294">Английски (ОК)</translation>
 <translation id="3975895378829046965">Бенгалски (фонетична клавиатура)</translation>
+<translation id="3999574733850440202">Наскоро отворените файлове в Microsoft са преместени в OneDrive</translation>
 <translation id="4002066346123236978">Заглавие</translation>
 <translation id="4017788180641807848">Английски (САЩ) с клавиатура „Уъркман“</translation>
 <translation id="4019998208269143058">Фиксиране в пространството за бърз достъп до файловете</translation>
@@ -513,7 +514,6 @@
    Премахването на устройството, докато се използва, може да доведе до загуба на данни. Моля, изчакайте завършването на операцията, след което го извадете посредством приложението Файлове.</translation>
 <translation id="5163869187418756376">Споделянето не бе успешно. Проверете връзката си и опитайте отново по-късно.</translation>
 <translation id="516592729076796170">Американска (Дворак) клавиатура за програмисти</translation>
-<translation id="5167102019886320507">Подготвят се <ph name="NUMBER_OF_ITEMS" /> елемента…</translation>
 <translation id="5177526793333269655">Изглед с миниизображения</translation>
 <translation id="5181896909298187506">Няма скорошни файлове</translation>
 <translation id="5194713942430106590">Кликнете, за да сортирате колоната във възходящ ред.</translation>
@@ -793,6 +793,7 @@
 <translation id="7458955835361612701">Няма скорошни изображения</translation>
 <translation id="7460898608667578234">украински</translation>
 <translation id="7469894403370665791">Автоматично свързване с тази мрежа</translation>
+<translation id="7481358317100446445">Готова</translation>
 <translation id="7486315294984620427">За да хванете и преместите файлове в Parallels Desktop, те трябва да бъдат копирани в папката с файлове на Windows.</translation>
 <translation id="749452993132003881">хирагана</translation>
 <translation id="7495372004724182530">Малаялам (фонетична клавиатура)</translation>
@@ -830,6 +831,7 @@
 <translation id="7724603315864178912">Изрязване</translation>
 <translation id="7732111077498238432">Мрежата се контролира чрез правила</translation>
 <translation id="7736003208887389532">Да се изтрият ли за постоянно тези файлове?</translation>
+<translation id="7740287852186792672">Резултати от търсенето</translation>
 <translation id="7748626145866214022">В лентата за действия има още опции. Натиснете Alt + A, за да поставите фокуса върху нея.</translation>
 <translation id="7760449188139285140">Китайски (уби)</translation>
 <translation id="7765158879357617694">Преместване</translation>
@@ -881,6 +883,7 @@
 <translation id="8116072619078571545">Вода с лед</translation>
 <translation id="8128733386027980860">Английски (САЩ) с клавиатура „Дворак“</translation>
 <translation id="8137331602592933310">Файлът „<ph name="FILENAME" />“ е споделен с вас. Не можете да го изтриете, защото не го притежавате.</translation>
+<translation id="8138705869659070104">Актив. след настр. на у-вото</translation>
 <translation id="813913629614996137">Подготвя се за работа...</translation>
 <translation id="8147028810663464959">Ширината на знаците е пълна</translation>
 <translation id="8151638057146502721">Конфигуриране</translation>
@@ -906,6 +909,7 @@
 <translation id="8300849813060516376">Безжичното осигуряване на услуга не бе успешно</translation>
 <translation id="8312871300878166382">Поставяне в папка</translation>
 <translation id="8329978297633540474">Неформатиран текст</translation>
+<translation id="8332007959299458842">Наскоро отворените файлове в Microsoft са преместени в Google Диск</translation>
 <translation id="8335587457941836791">Освобождаване от лавицата</translation>
 <translation id="8335837413233998004">Беларуски</translation>
 <translation id="8336153091935557858">Вчера, <ph name="YESTERDAY_DAYTIME" /></translation>
@@ -993,6 +997,7 @@
 <translation id="9046895021617826162">Свързването не бе успешно</translation>
 <translation id="9065512565307033593">Ако не успеете да потвърдите самоличността си, достъпът ви до мрежата ще бъде прекратен.</translation>
 <translation id="908378762078012445">Руски с фонетична клавиатура AATSEEL</translation>
+<translation id="9086302186042011942">Синхронизира се</translation>
 <translation id="9099674669267916096">Брой страници</translation>
 <translation id="9100610230175265781">Изисква се пропуск</translation>
 <translation id="9110990317705400362">Непрекъснато търсим начини да правим сърфирането ви по-безопасно. По-рано всеки уебсайт можеше да ви подкани да добавите разширение в браузъра си. В най-новите версии на Google Chrome трябва изрично да укажете на браузъра, че искате да инсталирате съответния софтуер, като го добавите чрез страницата „Разширения“. <ph name="BEGIN_LINK" />Научете повече<ph name="END_LINK" /></translation>

@@ -38,6 +38,7 @@ chromium-metrics-reviews@google.com.
   <variant name="Auto-enrollment-check"/>
   <variant name="Autolaunch"/>
   <variant name="Consolidated-consent"/>
+  <variant name="Cryptohome-recovery"/>
   <variant name="Cryptohome-recovery-setup"/>
   <variant name="Debugging"/>
   <variant name="Demo-preferences"/>
@@ -124,6 +125,11 @@ chromium-metrics-reviews@google.com.
   <variant name="Consolidated-consent.BackDemo"/>
   <variant name="Cryptohome-recovery-setup.Done"/>
   <variant name="Cryptohome-recovery-setup.Skipped"/>
+  <variant name="Cryptohome-recovery.GaiaLogin"/>
+  <variant name="Cryptohome-recovery.ManualRecovery"/>
+  <variant name="Cryptohome-recovery.NoRecoveryFactor"/>
+  <variant name="Cryptohome-recovery.Retry"/>
+  <variant name="Cryptohome-recovery.Succeeded"/>
   <variant name="Debugging.Next"/>
   <variant name="Demo-preferences.Canceled"/>
   <variant name="Demo-preferences.Completed"/>
@@ -298,7 +304,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="OOBE.FingerprintSetupScreen.UserActions"
-    enum="FingerprintSetupScreenUserAction" expires_after="2023-06-04">
+    enum="FingerprintSetupScreenUserAction" expires_after="2023-08-08">
   <owner>dkuzmin@google.com</owner>
   <owner>cros-oac@google.com</owner>
   <summary>
@@ -307,7 +313,7 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
-<histogram name="OOBE.GaiaLoginTime" units="ms" expires_after="2023-06-18">
+<histogram name="OOBE.GaiaLoginTime" units="ms" expires_after="2023-08-20">
   <owner>dkuzmin@google.com</owner>
   <owner>cros-oac@google.com</owner>
   <summary>
@@ -318,7 +324,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="OOBE.GaiaPasswordChangedScreen.UserActions"
-    enum="GaiaPasswordChangedScreenUserAction" expires_after="2023-06-04">
+    enum="GaiaPasswordChangedScreenUserAction" expires_after="2023-08-08">
   <owner>dkuzmin@google.com</owner>
   <owner>cros-oac@google.com</owner>
   <summary>
@@ -343,7 +349,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="OOBE.GaiaScreen.PasswordIgnoredChars" enum="Boolean"
-    expires_after="2023-06-01">
+    expires_after="2023-08-08">
   <owner>anastasiian@chromium.org</owner>
   <owner>cros-lurs@google.com</owner>
   <summary>
@@ -445,7 +451,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="OOBE.HidDetectionScreen.HidDisconnected" enum="HidType"
-    expires_after="2023-05-06">
+    expires_after="2023-08-08">
   <owner>gordonseto@google.com</owner>
   <owner>cros-connectivity@google.com</owner>
   <summary>
@@ -514,7 +520,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="OOBE.PinSetupScreen.UserActions"
-    enum="PinSetupScreenUserAction" expires_after="2023-06-04">
+    enum="PinSetupScreenUserAction" expires_after="2023-08-08">
   <owner>dkuzmin@google.com</owner>
   <owner>cros-oac@google.com</owner>
   <summary>
@@ -581,7 +587,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="OOBE.RecommendApps.Screen.Action"
-    enum="RecommendAppsScreenAction" expires_after="2023-06-04">
+    enum="RecommendAppsScreenAction" expires_after="2023-08-08">
   <owner>dkuzmin@google.com</owner>
   <owner>cros-oac@google.com</owner>
   <owner>chromesky-eng@google.com</owner>
@@ -589,7 +595,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="OOBE.RecommendApps.Screen.SelectedAppCount" units="apps"
-    expires_after="2023-06-04">
+    expires_after="2023-08-08">
   <owner>dkuzmin@google.com</owner>
   <owner>cros-oac@google.com</owner>
   <owner>chromesky-eng@google.com</owner>
@@ -605,7 +611,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="OOBE.RecommendApps.Screen.State"
-    enum="RecommendAppsScreenState" expires_after="2023-06-04">
+    enum="RecommendAppsScreenState" expires_after="2023-08-08">
   <owner>dkuzmin@google.com</owner>
   <owner>cros-oac@google.com</owner>
   <owner>chromesky-eng@google.com</owner>
@@ -671,7 +677,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="OOBE.SyncConsentScreen.IsCapabilityKnown" enum="BooleanKnown"
-    expires_after="2023-06-11">
+    expires_after="2023-08-13">
   <owner>osamafathy@google.com</owner>
   <owner>cros-oac@google.com</owner>
   <summary>
@@ -692,7 +698,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="OOBE.SyncConsentScreen.LoadingTime" units="ms"
-    expires_after="2023-06-11">
+    expires_after="2023-08-13">
   <owner>osamafathy@google.com</owner>
   <owner>cros-oac@google.com</owner>
   <summary>
@@ -702,7 +708,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="OOBE.SyncConsentScreen.ReviewFollowingSetup"
-    enum="BooleanChecked" expires_after="2023-06-04">
+    enum="BooleanChecked" expires_after="2023-08-08">
   <owner>dkuzmin@google.com</owner>
   <owner>cros-oac@google.com</owner>
   <summary>
@@ -723,7 +729,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="OOBE.SyncConsentScreen.UserChoice"
-    enum="SyncConsentUserChoice" expires_after="2023-06-11">
+    enum="SyncConsentUserChoice" expires_after="2023-08-13">
   <owner>osamafathy@google.com</owner>
   <owner>cros-oac@google.com</owner>
   <summary>
@@ -827,7 +833,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="OOBE.WelcomeScreen.UserChangedLocale" enum="Boolean"
-    expires_after="2023-06-04">
+    expires_after="2023-08-08">
   <owner>bohdanty@google.com</owner>
   <owner>cros-oobe@google.com</owner>
   <summary>

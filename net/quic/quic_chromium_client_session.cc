@@ -188,23 +188,23 @@ void RecordConnectionCloseErrorCode(const quic::QuicConnectionCloseFrame& frame,
   }
 }
 
-base::Value NetLogQuicMigrationFailureParams(
+base::Value::Dict NetLogQuicMigrationFailureParams(
     quic::QuicConnectionId connection_id,
     base::StringPiece reason) {
   base::Value::Dict dict;
   dict.Set("connection_id", connection_id.ToString());
   dict.Set("reason", reason);
-  return base::Value(std::move(dict));
+  return dict;
 }
 
-base::Value NetLogQuicMigrationSuccessParams(
+base::Value::Dict NetLogQuicMigrationSuccessParams(
     quic::QuicConnectionId connection_id) {
   base::Value::Dict dict;
   dict.Set("connection_id", connection_id.ToString());
-  return base::Value(std::move(dict));
+  return dict;
 }
 
-base::Value NetLogProbingResultParams(
+base::Value::Dict NetLogProbingResultParams(
     handles::NetworkHandle network,
     const quic::QuicSocketAddress* peer_address,
     bool is_success) {
@@ -212,15 +212,15 @@ base::Value NetLogProbingResultParams(
   dict.Set("network", base::NumberToString(network));
   dict.Set("peer address", peer_address->ToString());
   dict.Set("is_success", is_success);
-  return base::Value(std::move(dict));
+  return dict;
 }
 
-base::Value NetLogAcceptChFrameReceivedParams(
+base::Value::Dict NetLogAcceptChFrameReceivedParams(
     spdy::AcceptChOriginValuePair entry) {
   base::Value::Dict dict;
   dict.Set("origin", entry.origin);
   dict.Set("accept_ch", entry.value);
-  return base::Value(std::move(dict));
+  return dict;
 }
 
 // Histogram for recording the different reasons that a QUIC session is unable
@@ -289,7 +289,7 @@ std::string MigrationCauseToString(MigrationCause cause) {
   return "InvalidCause";
 }
 
-base::Value NetLogQuicClientSessionParams(
+base::Value::Dict NetLogQuicClientSessionParams(
     const QuicSessionKey* session_key,
     const quic::QuicConnectionId& connection_id,
     const quic::QuicConnectionId& client_connection_id,
@@ -310,10 +310,10 @@ base::Value NetLogQuicClientSessionParams(
     dict.Set("client_connection_id", client_connection_id.ToString());
   }
   dict.Set("versions", ParsedQuicVersionVectorToString(supported_versions));
-  return base::Value(std::move(dict));
+  return dict;
 }
 
-base::Value NetLogQuicPushPromiseReceivedParams(
+base::Value::Dict NetLogQuicPushPromiseReceivedParams(
     const spdy::Http2HeaderBlock* headers,
     spdy::SpdyStreamId stream_id,
     spdy::SpdyStreamId promised_stream_id,
@@ -322,7 +322,7 @@ base::Value NetLogQuicPushPromiseReceivedParams(
   dict.Set("headers", ElideHttp2HeaderBlockForNetLog(*headers, capture_mode));
   dict.Set("id", static_cast<int>(stream_id));
   dict.Set("promised_stream_id", static_cast<int>(promised_stream_id));
-  return base::Value(std::move(dict));
+  return dict;
 }
 
 // TODO(fayang): Remove this when necessary data is collected.
@@ -1037,9 +1037,7 @@ QuicChromiumClientSession::QuicChromiumClientSession(
           connection_description,
           std::move(socket_performance_watcher),
           net_log_)),
-      http3_logger_(VersionUsesHttp3(connection->transport_version())
-                        ? std::make_unique<QuicHttp3Logger>(net_log_)
-                        : nullptr),
+      http3_logger_(std::make_unique<QuicHttp3Logger>(net_log_)),
       push_delegate_(push_delegate),
       push_promise_index_(std::move(push_promise_index)),
       path_validation_writer_delegate_(this, task_runner_) {
@@ -1054,8 +1052,7 @@ QuicChromiumClientSession::QuicChromiumClientSession(
       session_key.server_id(), this,
       std::make_unique<ProofVerifyContextChromium>(cert_verify_flags, net_log_),
       crypto_config_->GetConfig());
-  if (VersionUsesHttp3(transport_version()))
-    set_debug_visitor(http3_logger_.get());
+  set_debug_visitor(http3_logger_.get());
   connection->set_debug_visitor(logger_.get());
   connection->set_creator_debug_delegate(logger_.get());
   migrate_back_to_default_timer_.SetTaskRunner(task_runner_.get());
@@ -1432,68 +1429,17 @@ bool QuicChromiumClientSession::GetSSLInfo(SSLInfo* ssl_info) const {
   ssl_info->signed_certificate_timestamps = cert_verify_result_->scts;
   ssl_info->ct_policy_compliance = cert_verify_result_->policy_compliance;
 
+  DCHECK(connection()->version().UsesTls());
   const auto& crypto_params = crypto_stream_->crypto_negotiated_params();
-  uint16_t cipher_suite;
-  if (connection()->version().UsesTls()) {
-    cipher_suite = crypto_params.cipher_suite;
-  } else {
-    // Map QUIC AEADs to the corresponding TLS 1.3 cipher. OpenSSL's cipher
-    // suite numbers begin with a stray 0x03, so mask them off.
-    quic::QuicTag aead = crypto_params.aead;
-    switch (aead) {
-      case quic::kAESG:
-        cipher_suite = TLS1_CK_AES_128_GCM_SHA256 & 0xffff;
-        break;
-      case quic::kCC20:
-        cipher_suite = TLS1_CK_CHACHA20_POLY1305_SHA256 & 0xffff;
-        break;
-      default:
-        NOTREACHED();
-        return false;
-    }
-  }
+  uint16_t cipher_suite = crypto_params.cipher_suite;
   int ssl_connection_status = 0;
   SSLConnectionStatusSetCipherSuite(cipher_suite, &ssl_connection_status);
   SSLConnectionStatusSetVersion(SSL_CONNECTION_VERSION_QUIC,
                                 &ssl_connection_status);
   ssl_info->connection_status = ssl_connection_status;
 
-  if (connection()->version().UsesTls()) {
-    ssl_info->key_exchange_group = crypto_params.key_exchange_group;
-    ssl_info->peer_signature_algorithm = crypto_params.peer_signature_algorithm;
-    return true;
-  }
-
-  // Report the QUIC key exchange as the corresponding TLS curve.
-  switch (crypto_stream_->crypto_negotiated_params().key_exchange) {
-    case quic::kP256:
-      ssl_info->key_exchange_group = SSL_CURVE_SECP256R1;
-      break;
-    case quic::kC255:
-      ssl_info->key_exchange_group = SSL_CURVE_X25519;
-      break;
-    default:
-      NOTREACHED();
-      return false;
-  }
-
-  // QUIC-Crypto always uses RSA-PSS or ECDSA with SHA-256.
-  size_t unused;
-  X509Certificate::PublicKeyType key_type;
-  X509Certificate::GetPublicKeyInfo(ssl_info->cert->cert_buffer(), &unused,
-                                    &key_type);
-  switch (key_type) {
-    case X509Certificate::kPublicKeyTypeRSA:
-      ssl_info->peer_signature_algorithm = SSL_SIGN_RSA_PSS_RSAE_SHA256;
-      break;
-    case X509Certificate::kPublicKeyTypeECDSA:
-      ssl_info->peer_signature_algorithm = SSL_SIGN_ECDSA_SECP256R1_SHA256;
-      break;
-    default:
-      NOTREACHED();
-      return false;
-  }
-
+  ssl_info->key_exchange_group = crypto_params.key_exchange_group;
+  ssl_info->peer_signature_algorithm = crypto_params.peer_signature_algorithm;
   return true;
 }
 
@@ -1568,8 +1514,7 @@ bool QuicChromiumClientSession::ShouldCreateIncomingStream(
   }
   if (quic::QuicUtils::IsClientInitiatedStreamId(
           connection()->transport_version(), id) ||
-      (connection()->version().HasIetfQuicFrames() &&
-       quic::QuicUtils::IsBidirectionalStreamId(id, connection()->version()))) {
+      quic::QuicUtils::IsBidirectionalStreamId(id, connection()->version())) {
     LOG(WARNING) << "Received invalid push stream id " << id;
     connection()->CloseConnection(
         quic::QUIC_INVALID_STREAM_ID,
@@ -2074,38 +2019,39 @@ void QuicChromiumClientSession::OnConnectionClosed(
         "Net.QuicSession.ConnectionDuration",
         tick_clock_->NowTicks() - connect_timing_.connect_end);
     UMA_HISTOGRAM_COUNTS_100("Net.QuicSession.NumMigrations", num_migrations_);
-    if (connection()->version().UsesTls()) {
-      base::UmaHistogramCounts100("Net.QuicSession.KeyUpdate.PerConnection2",
-                                  connection()->GetStats().key_update_count);
-      base::UmaHistogramCounts100(
-          "Net.QuicSession.KeyUpdate.PotentialPeerKeyUpdateAttemptCount",
-          connection()->PotentialPeerKeyUpdateAttemptCount());
-      if (last_key_update_reason_ != quic::KeyUpdateReason::kInvalid) {
-        std::string suffix =
-            last_key_update_reason_ == quic::KeyUpdateReason::kRemote ? "Remote"
-                                                                      : "Local";
-        // These values are persisted to logs. Entries should not be renumbered
-        // and numeric values should never be reused.
-        enum class KeyUpdateSuccess {
-          kInvalid = 0,
-          kSuccess = 1,
-          kFailedInitial = 2,
-          kFailedNonInitial = 3,
-          kMaxValue = kFailedNonInitial,
-        };
-        KeyUpdateSuccess value = KeyUpdateSuccess::kInvalid;
-        if (connection()->HaveSentPacketsInCurrentKeyPhaseButNoneAcked()) {
-          if (connection()->GetStats().key_update_count >= 2) {
-            value = KeyUpdateSuccess::kFailedNonInitial;
-          } else {
-            value = KeyUpdateSuccess::kFailedInitial;
-          }
+
+    // KeyUpdates are used in TLS, but we no longer support pre-TLS QUIC.
+    DCHECK(connection()->version().UsesTls());
+    base::UmaHistogramCounts100("Net.QuicSession.KeyUpdate.PerConnection2",
+                                connection()->GetStats().key_update_count);
+    base::UmaHistogramCounts100(
+        "Net.QuicSession.KeyUpdate.PotentialPeerKeyUpdateAttemptCount",
+        connection()->PotentialPeerKeyUpdateAttemptCount());
+    if (last_key_update_reason_ != quic::KeyUpdateReason::kInvalid) {
+      std::string suffix =
+          last_key_update_reason_ == quic::KeyUpdateReason::kRemote ? "Remote"
+                                                                    : "Local";
+      // These values are persisted to logs. Entries should not be renumbered
+      // and numeric values should never be reused.
+      enum class KeyUpdateSuccess {
+        kInvalid = 0,
+        kSuccess = 1,
+        kFailedInitial = 2,
+        kFailedNonInitial = 3,
+        kMaxValue = kFailedNonInitial,
+      };
+      KeyUpdateSuccess value = KeyUpdateSuccess::kInvalid;
+      if (connection()->HaveSentPacketsInCurrentKeyPhaseButNoneAcked()) {
+        if (connection()->GetStats().key_update_count >= 2) {
+          value = KeyUpdateSuccess::kFailedNonInitial;
         } else {
-          value = KeyUpdateSuccess::kSuccess;
+          value = KeyUpdateSuccess::kFailedInitial;
         }
-        base::UmaHistogramEnumeration(
-            "Net.QuicSession.KeyUpdate.Success." + suffix, value);
+      } else {
+        value = KeyUpdateSuccess::kSuccess;
       }
+      base::UmaHistogramEnumeration(
+          "Net.QuicSession.KeyUpdate.Success." + suffix, value);
     }
   } else {
     if (error == quic::QUIC_PUBLIC_RESET) {
@@ -2178,8 +2124,7 @@ int QuicChromiumClientSession::HandleWriteError(
   }
 
   if (error_code == ERR_MSG_TOO_BIG || stream_factory_ == nullptr ||
-      !migrate_session_on_network_change_v2_ || !OneRttKeysAvailable() ||
-      !version().UsesHttp3()) {
+      !migrate_session_on_network_change_v2_ || !OneRttKeysAvailable()) {
     return error_code;
   }
 
@@ -2584,8 +2529,9 @@ void QuicChromiumClientSession::OnNetworkConnected(
                                duration, base::Milliseconds(1),
                                base::Minutes(10), 50);
   }
-  if (!migrate_session_on_network_change_v2_ || !version().UsesHttp3())
+  if (!migrate_session_on_network_change_v2_) {
     return;
+  }
 
   net_log_.AddEventWithInt64Params(
       NetLogEventType::QUIC_CONNECTION_MIGRATION_ON_NETWORK_CONNECTED,
@@ -2615,8 +2561,9 @@ void QuicChromiumClientSession::OnNetworkConnected(
 void QuicChromiumClientSession::OnNetworkDisconnectedV2(
     handles::NetworkHandle disconnected_network) {
   LogMetricsOnNetworkDisconnected();
-  if (!migrate_session_on_network_change_v2_ || !version().UsesHttp3())
+  if (!migrate_session_on_network_change_v2_) {
     return;
+  }
   net_log_.AddEventWithInt64Params(
       NetLogEventType::QUIC_CONNECTION_MIGRATION_ON_NETWORK_DISCONNECTED,
       "disconnected_network", disconnected_network);
@@ -2674,8 +2621,9 @@ void QuicChromiumClientSession::OnNetworkMadeDefault(
     handles::NetworkHandle new_network) {
   LogMetricsOnNetworkMadeDefault();
 
-  if (!migrate_session_on_network_change_v2_ || !version().UsesHttp3())
+  if (!migrate_session_on_network_change_v2_) {
     return;
+  }
 
   DCHECK_NE(handles::kInvalidNetworkHandle, new_network);
   net_log_.AddEventWithInt64Params(
@@ -2715,7 +2663,7 @@ void QuicChromiumClientSession::MigrateNetworkImmediately(
   // - otherwise, it's brought to default network, cancel the running timer to
   //   migrate back.
 
-  DCHECK(migrate_session_on_network_change_v2_ && version().UsesHttp3());
+  DCHECK(migrate_session_on_network_change_v2_);
 
   if (!migrate_idle_session_ && !HasActiveRequestStreams()) {
     HistogramAndLogMigrationFailure(MIGRATION_STATUS_NO_MIGRATABLE_STREAMS,
@@ -2977,9 +2925,6 @@ void QuicChromiumClientSession::MaybeMigrateToDifferentPortOnPathDegrading() {
 
   current_migration_cause_ = CHANGE_PORT_ON_PATH_DEGRADING;
 
-  if (!version().UsesHttp3())
-    return;
-
   // Migration before handshake confirmed is not allowed.
   if (!connection()->IsHandshakeConfirmed()) {
     HistogramAndLogMigrationFailure(
@@ -3015,7 +2960,7 @@ void QuicChromiumClientSession::
 
   current_migration_cause_ = CHANGE_NETWORK_ON_PATH_DEGRADING;
 
-  if (!migrate_session_early_v2_ || !version().UsesHttp3()) {
+  if (!migrate_session_early_v2_) {
     HistogramAndLogMigrationFailure(MIGRATION_STATUS_PATH_DEGRADING_NOT_ENABLED,
                                     connection_id(),
                                     "Migration on path degrading not enabled");
@@ -3513,7 +3458,7 @@ void QuicChromiumClientSession::HistogramAndLogMigrationSuccess(
   LogMigrationResultToHistogram(MIGRATION_STATUS_SUCCESS);
 }
 
-base::Value QuicChromiumClientSession::GetInfoAsValue(
+base::Value::Dict QuicChromiumClientSession::GetInfoAsValue(
     const std::set<HostPortPair>& aliases) {
   base::Value::Dict dict;
   dict.Set("version", ParsedQuicVersionToString(connection()->version()));
@@ -3553,7 +3498,7 @@ base::Value QuicChromiumClientSession::GetInfoAsValue(
   }
   dict.Set("aliases", std::move(alias_list));
 
-  return base::Value(std::move(dict));
+  return dict;
 }
 
 bool QuicChromiumClientSession::gquic_zero_rtt_disabled() const {
@@ -3674,7 +3619,7 @@ void QuicChromiumClientSession::OnCryptoHandshakeComplete() {
   // confirmed if the session is not created on the default network.
   if (migrate_session_on_network_change_v2_ &&
       default_network_ != handles::kInvalidNetworkHandle &&
-      GetCurrentNetwork() != default_network_ && version().UsesHttp3()) {
+      GetCurrentNetwork() != default_network_) {
     current_migration_cause_ = ON_MIGRATE_BACK_TO_DEFAULT_NETWORK;
     StartMigrateBackToDefaultNetworkTimer(
         base::Seconds(kMinRetryTimeForDefaultNetworkSecs));

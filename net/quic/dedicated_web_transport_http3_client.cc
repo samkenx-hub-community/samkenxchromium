@@ -109,7 +109,7 @@ void RecordNetLogQuicSessionClientStateChanged(
           error_dict.Set("details", error->details);
           dict.Set("error", std::move(error_dict));
         }
-        return base::Value(std::move(dict));
+        return dict;
       });
 }
 
@@ -288,7 +288,7 @@ DedicatedWebTransportHttp3Client::DedicatedWebTransportHttp3Client(
         dict.Set("url", url.possibly_invalid_spec());
         dict.Set("network_anonymization_key",
                  anonymization_key.ToDebugString());
-        return base::Value(std::move(dict));
+        return dict;
       });
 }
 
@@ -409,8 +409,6 @@ int DedicatedWebTransportHttp3Client::DoInit() {
   // Add other supported versions if available.
   for (quic::ParsedQuicVersion& version :
        quic_context_->params()->supported_versions) {
-    if (!version.UsesHttp3())
-      continue;
     if (base::Contains(supported_versions_, version))
       continue;  // Skip as we've already added it above.
     supported_versions_.push_back(version);

@@ -8,6 +8,7 @@
 
 #include "base/base_paths.h"
 #include "base/command_line.h"
+#include "base/files/file_enumerator.h"
 #include "base/files/file_path.h"
 #include "base/files/file_util.h"
 #include "base/logging.h"
@@ -17,6 +18,7 @@
 #include "base/run_loop.h"
 #include "base/strings/strcat.h"
 #include "base/strings/string_split.h"
+#include "base/strings/string_util.h"
 #include "base/strings/sys_string_conversions.h"
 #include "base/test/bind.h"
 #include "base/test/test_timeouts.h"
@@ -161,11 +163,28 @@ void ExpectClean(UpdaterScope scope) {
   absl::optional<base::FilePath> path = GetInstallDirectory(scope);
   EXPECT_TRUE(path);
   if (path && base::PathExists(*path)) {
-    // If the path exists, then expect only the log file to be present.
+    // If the path exists, then expect only the log and json files to be
+    // present.
     int count = CountDirectoryFiles(*path);
-    EXPECT_LT(count, 2);
-    if (count == 1)
+    EXPECT_LE(count, 2) << base::JoinString(
+        [](const base::FilePath& dir) {
+          base::FileEnumerator it(dir, false, base::FileEnumerator::FILES);
+          std::vector<base::FilePath::StringType> files;
+          for (base::FilePath name = it.Next(); !name.empty();
+               name = it.Next()) {
+            files.push_back(name.value());
+          }
+
+          return files;
+        }(*path),
+        FILE_PATH_LITERAL(","));
+
+    if (count >= 1) {
       EXPECT_TRUE(base::PathExists(path->AppendASCII("updater.log")));
+    }
+    if (count == 2) {
+      EXPECT_TRUE(base::PathExists(path->AppendASCII("prefs.json")));
+    }
   }
   // Keystone must not exist on the file system.
   absl::optional<base::FilePath> keystone_path = GetKeystoneFolderPath(scope);
@@ -179,11 +198,20 @@ void ExpectInstalled(UpdaterScope scope) {
   Launchd::Domain launchd_domain = LaunchdDomain(scope);
   Launchd::Type launchd_type = LaunchdType(scope);
 
+  absl::optional<base::FilePath> keystone_path = GetKeystoneFolderPath(scope);
+  ASSERT_TRUE(keystone_path);
+  absl::optional<base::FilePath> ksadmin_symlink =
+      keystone_path->Append(FILE_PATH_LITERAL(KEYSTONE_NAME ".bundle"))
+          .Append(FILE_PATH_LITERAL("Contents"))
+          .Append(FILE_PATH_LITERAL("MacOS"))
+          .Append(FILE_PATH_LITERAL("ksadmin"));
+
   // Files must exist on the file system.
-  absl::optional<base::FilePath> path = GetInstallDirectory(scope);
-  EXPECT_TRUE(path);
-  if (path)
-    EXPECT_TRUE(base::PathExists(*path));
+  for (const auto& path : {GetInstallDirectory(scope), keystone_path,
+                           GetKSAdminPath(scope), ksadmin_symlink}) {
+    ASSERT_TRUE(path) << path;
+    EXPECT_TRUE(base::PathExists(*path)) << path;
+  }
 
   EXPECT_TRUE(Launchd::GetInstance()->PlistExists(launchd_domain, launchd_type,
                                                   CopyWakeLaunchdName(scope)));
@@ -274,7 +302,7 @@ void SetupRealUpdaterLowerVersion(UpdaterScope scope) {
   ASSERT_EQ(exit_code, 0);
 }
 
-void SetupFakeLegacyUpdaterData(UpdaterScope scope) {
+void SetupFakeLegacyUpdater(UpdaterScope scope) {
   base::FilePath test_ticket_store_path;
   ASSERT_TRUE(
       base::PathService::Get(chrome::DIR_TEST_DATA, &test_ticket_store_path));
@@ -290,7 +318,7 @@ void SetupFakeLegacyUpdaterData(UpdaterScope scope) {
                                  FILE_PATH_LITERAL("Keystone.ticketstore"))));
 }
 
-void ExpectLegacyUpdaterDataMigrated(UpdaterScope scope) {
+void ExpectLegacyUpdaterMigrated(UpdaterScope scope) {
   scoped_refptr<GlobalPrefs> global_prefs = CreateGlobalPrefs(scope);
   auto persisted_data = base::MakeRefCounted<PersistedData>(
       scope, global_prefs->GetPrefService());

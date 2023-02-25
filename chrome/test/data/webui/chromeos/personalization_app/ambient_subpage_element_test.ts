@@ -5,13 +5,13 @@
 import 'chrome://personalization/strings.m.js';
 import 'chrome://webui-test/mojo_webui_test_support.js';
 
-import {AlbumsSubpage, AmbientActionName, AmbientModeAlbum, AmbientObserver, AmbientSubpage, AnimationTheme, AnimationThemeItem, emptyState, Paths, PersonalizationRouter, SetAlbumsAction, SetAmbientModeEnabledAction, SetAnimationThemeAction, SetTemperatureUnitAction, SetTopicSourceAction, TemperatureUnit, TopicSource, TopicSourceItem, WallpaperGridItem} from 'chrome://personalization/js/personalization_app.js';
+import {AlbumsSubpage, AmbientActionName, AmbientModeAlbum, AmbientObserver, AmbientSubpage, AmbientUiVisibility, AnimationTheme, AnimationThemeItem, emptyState, Paths, PersonalizationRouter, SetAlbumsAction, SetAmbientModeEnabledAction, SetAnimationThemeAction, SetTemperatureUnitAction, SetTopicSourceAction, TemperatureUnit, TopicSource, TopicSourceItem, WallpaperGridItem} from 'chrome://personalization/js/personalization_app.js';
 import {CrRadioButtonElement} from 'chrome://resources/cr_elements/cr_radio_button/cr_radio_button.js';
 import {loadTimeData} from 'chrome://resources/js/load_time_data.js';
 import {Url} from 'chrome://resources/mojo/url/mojom/url.mojom-webui.js';
 import {assertDeepEquals, assertEquals, assertFalse, assertNotEquals, assertTrue} from 'chrome://webui-test/chai_assert.js';
 import {waitAfterNextRender} from 'chrome://webui-test/polymer_test_util.js';
-import {TestBrowserProxy} from 'chrome://webui-test/test_browser_proxy.js';
+import {TestMock} from 'chrome://webui-test/test_mock.js';
 
 import {baseSetup, initElement, teardownElement} from './personalization_app_test_utils.js';
 import {TestAmbientProvider} from './test_ambient_interface_provider.js';
@@ -29,12 +29,13 @@ suite('AmbientSubpageTest', function() {
   let ambientProvider: TestAmbientProvider;
   let personalizationStore: TestPersonalizationStore;
   const routerOriginal = PersonalizationRouter.instance;
-  const routerMock = TestBrowserProxy.fromClass(PersonalizationRouter);
+  const routerMock = TestMock.fromClass(PersonalizationRouter);
 
   setup(() => {
     loadTimeData.overrideValues({
       isAmbientModeAllowed: true,
       isPersonalizationJellyEnabled: true,
+      isScreenSaverPreviewEnabled: true,
     });
     const mocks = baseSetup();
     ambientProvider = mocks.ambientProvider;
@@ -54,14 +55,13 @@ suite('AmbientSubpageTest', function() {
       topicSource: TopicSource|null, temperatureUnit: TemperatureUnit|null,
       ambientModeEnabled: boolean|null,
       animationTheme = AnimationTheme.kSlideshow,
-      googlePhotosAlbumsPreviews: Url[] = []): Promise<AmbientSubpage> {
+      previews: Url[] = []): Promise<AmbientSubpage> {
     personalizationStore.data.ambient.albums = ambientProvider.albums;
     personalizationStore.data.ambient.animationTheme = animationTheme;
     personalizationStore.data.ambient.topicSource = topicSource;
     personalizationStore.data.ambient.temperatureUnit = temperatureUnit;
     personalizationStore.data.ambient.ambientModeEnabled = ambientModeEnabled;
-    personalizationStore.data.ambient.googlePhotosAlbumsPreviews =
-        googlePhotosAlbumsPreviews;
+    personalizationStore.data.ambient.previews = previews;
     const ambientSubpage =
         initElement(AmbientSubpage, {path: Paths.AMBIENT, queryParams: {}});
     personalizationStore.notifyObservers();
@@ -79,25 +79,6 @@ suite('AmbientSubpageTest', function() {
         ambientSubpageElement.shadowRoot!.querySelector(
             '#toggleRowPlaceholder');
     assertTrue(!!toggleRowPlaceholder);
-
-    personalizationStore.data.ambient.ambientModeEnabled = false;
-    personalizationStore.notifyObservers();
-    await waitAfterNextRender(ambientSubpageElement);
-
-    // Ambient mode is loaded, should not show toggle row placeholder.
-    assertTrue(!!toggleRowPlaceholder);
-    assertEquals(getComputedStyle(toggleRowPlaceholder).display, 'none');
-
-    const toggleRow =
-        ambientSubpageElement.shadowRoot!.querySelector('toggle-row');
-    assertTrue(!!toggleRow, 'toggle-row element exists');
-    const toggleButton = toggleRow!.shadowRoot!.querySelector('cr-toggle');
-    assertTrue(!!toggleButton, 'cr-toggle element exists');
-    assertFalse(toggleButton!.checked);
-
-    personalizationStore.data.ambient.ambientModeEnabled = true;
-    personalizationStore.notifyObservers();
-    await waitAfterNextRender(ambientSubpageElement);
 
     // Preview element should show placeholders for preview images, preview
     // album info and preview album collage.
@@ -138,12 +119,25 @@ suite('AmbientSubpageTest', function() {
             '#weatherUnitTextPlaceholder:not([hidden])');
     assertEquals(2, weatherUnitItemPlaceholders!.length);
 
+    personalizationStore.data.ambient.ambientModeEnabled = false;
     personalizationStore.data.ambient.albums = ambientProvider.albums;
     personalizationStore.data.ambient.topicSource = TopicSource.kGooglePhotos;
     personalizationStore.data.ambient.temperatureUnit =
         TemperatureUnit.kFahrenheit;
     personalizationStore.notifyObservers();
     await waitAfterNextRender(ambientSubpageElement);
+
+    // Loading finished, should not show toggle row placeholder.
+    assertTrue(!!toggleRowPlaceholder);
+    assertEquals(getComputedStyle(toggleRowPlaceholder).display, 'none');
+
+    // Toggle row is shown but in off status (the button is unchecked).
+    const toggleRow =
+        ambientSubpageElement.shadowRoot!.querySelector('toggle-row');
+    assertTrue(!!toggleRow, 'toggle-row element exists');
+    const toggleButton = toggleRow!.shadowRoot!.querySelector('cr-toggle');
+    assertTrue(!!toggleButton, 'cr-toggle element exists');
+    assertFalse(toggleButton!.checked);
 
     // Placeholders will be hidden for animation theme, topic source
     // and temperature unit elements.
@@ -741,5 +735,27 @@ suite('AmbientSubpageTest', function() {
         null,
         ambientSubpageElement.shadowRoot!.querySelector('ambient-zero-state'),
         'zero state should not be present');
+  });
+
+  test('preview and downloading buttons should be present', async () => {
+    ambientSubpageElement = await displayMainSettings(
+        TopicSource.kArtGallery, TemperatureUnit.kFahrenheit,
+        /*ambientModeEnabled=*/ true);
+
+    const ambientPreview = ambientSubpageElement.shadowRoot!.querySelector(
+        'ambient-preview-small');
+    assertTrue(!!ambientPreview, 'ambient-preview element exists');
+
+    const previewButton =
+        ambientPreview.shadowRoot!.querySelector('.preview-button');
+    assertTrue(!!previewButton, 'preview button should be present');
+
+    personalizationStore.data.ambient.ambientUiVisibility =
+        AmbientUiVisibility.kPreview;
+    personalizationStore.notifyObservers();
+    await waitAfterNextRender(ambientSubpageElement);
+    const downloadingButton =
+        ambientPreview.shadowRoot!.querySelector('.preview-button-disabled');
+    assertTrue(!!downloadingButton, 'downloading button should be present');
   });
 });

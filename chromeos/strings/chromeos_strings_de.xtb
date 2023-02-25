@@ -16,6 +16,7 @@
 <translation id="1128128132059598906">EAP-TTLS</translation>
 <translation id="1145018782460575098">Das Fenster für Firmwareupdates für externe Geräte ist geöffnet. Es sind <ph name="NUM_UPDATES" /> Updates verfügbar.</translation>
 <translation id="1145516343487477149">Hier findest du Hilfeartikel und Antworten auf häufig gestellte Fragen zu Chromebooks</translation>
+<translation id="1167755866710282443">Öffne das Menü, um die Schlüssel anzupassen. Ziehe das Menü zum Verschieben.</translation>
 <translation id="1175697296044146566">Dieses Gerät (<ph name="DEVICE_TYPE" />) wird von <ph name="MANAGER" /> verwaltet.</translation>
 <translation id="1175951029573070619">Durchschnittlich (<ph name="SIGNAL_STRENGTH" />)</translation>
 <translation id="1181037720776840403">Entfernen</translation>
@@ -326,6 +327,7 @@
 <translation id="4110686435123617899">Album <ph name="TITLE" /> <ph name="DESC" /> auswählen</translation>
 <translation id="4111761024568264522">USB-Touchpad</translation>
 <translation id="4117637339509843559">Dunkler Modus</translation>
+<translation id="4130035430755296270">Für weitere Layoutoptionen Mauszeiger weiter darauf halten</translation>
 <translation id="4131410914670010031">Schwarz-Weiß</translation>
 <translation id="4145784616224233563">HTTP-Firewall</translation>
 <translation id="4147897805161313378">Google Fotos</translation>
@@ -414,6 +416,7 @@
 <translation id="484790837831576105">(Android) DNS-Auflösung</translation>
 <translation id="4848429997038228357">LÄUFT</translation>
 <translation id="4854586501323951986">Eingebauter Touchscreen</translation>
+<translation id="4855250849489639581">Für weitere Layoutoptionen nach unten wischen</translation>
 <translation id="4861758251032006121">{ATTEMPTS_LEFT,plural, =1{<ph name="ERROR_MESSAGE" /> Noch {0} Versuch}other{<ph name="ERROR_MESSAGE" /> Noch {0} Versuche}}</translation>
 <translation id="4873827928179867585">Authentifizierungsalgorithmus</translation>
 <translation id="4880328057631981605">Name des Zugangspunkts</translation>
@@ -517,6 +520,7 @@
 <translation id="576835345334454681">Displayhelligkeit erhöhen</translation>
 <translation id="57838592816432529">Stummschalten</translation>
 <translation id="5784136236926853061">Hohe HTTP-Latenz</translation>
+<translation id="5826644637650799838">Informationen zum Bild</translation>
 <translation id="5832805196449965646">Person hinzufügen</translation>
 <translation id="583281660410589416">Unbekannt</translation>
 <translation id="5843706793424741864">Fahrenheit</translation>
@@ -673,6 +677,7 @@
 <translation id="7172721935181587524">1 Bild</translation>
 <translation id="7177485034254901881">Dieses <ph name="DEVICE_TYPE" /> wird von <ph name="MANAGER" /> verwaltet. Administratoren können das Gerät per Remotezugriff konfigurieren.</translation>
 <translation id="7180611975245234373">Aktualisieren</translation>
+<translation id="7180865173735832675">Anpassen</translation>
 <translation id="7212734716605298123">Firmwareupdates für externe Geräte</translation>
 <translation id="7216409898977639127">Mobilfunkanbieter</translation>
 <translation id="725133483556299729">E-Mail-Adresse auswählen</translation>
@@ -744,6 +749,7 @@
 <translation id="7881066108824108340">DNS</translation>
 <translation id="7882358943899516840">Providertyp</translation>
 <translation id="7882501334836096755">Öffentlicher Schlüssel</translation>
+<translation id="78957024357676568">Links</translation>
 <translation id="7915220255123750251">Hier kannst du die APN-Netzwerkeinstellungen verwalten. APNs stellen eine Verbindung zwischen einem Mobilfunknetz und dem Internet her.</translation>
 <translation id="7936303884198020182">Es wurden keine Nameserver gefunden</translation>
 <translation id="7942349550061667556">Rot</translation>
@@ -775,6 +781,7 @@
 <translation id="8226628635270268143">Hier kannst du deine bevorzugten Fotos und Alben auswählen</translation>
 <translation id="8227119283605456246">Datei anhängen</translation>
 <translation id="8230672074305416752">Das standardmäßige Netzwerk-Gateway konnte nicht kontaktiert werden</translation>
+<translation id="8242426110754782860">Fortfahren</translation>
 <translation id="8246209727385807362">Unbekannter Mobilfunkanbieter</translation>
 <translation id="827422111966801947">Indigo</translation>
 <translation id="8286154143153872371">Stelle bitte eine Verbindung zu einem Netzwerk her und lade die Seite neu, um den Hintergrund anzusehen.</translation>
@@ -852,6 +859,7 @@
 <translation id="8930622219860340959">Drahtlos</translation>
 <translation id="8936793075252196307">IP-Adresse des Clients</translation>
 <translation id="894617464444543719">Das Gerät ist ein Smartphone.</translation>
+<translation id="8957423540740801332">Rechts</translation>
 <translation id="8968751544471797276">Ladestrom</translation>
 <translation id="8970109610781093811">Erneut ausführen</translation>
 <translation id="8983038754672563810">HSPA</translation>

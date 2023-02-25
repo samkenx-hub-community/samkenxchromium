@@ -260,6 +260,7 @@ namespace wifi {
 COMPONENT_EXPORT(ONC) extern const char kAllowGatewayARPPolling[];
 COMPONENT_EXPORT(ONC) extern const char kAutoConnect[];
 COMPONENT_EXPORT(ONC) extern const char kBSSID[];
+COMPONENT_EXPORT(ONC) extern const char kBSSIDAllowlist[];
 COMPONENT_EXPORT(ONC) extern const char kEAP[];
 COMPONENT_EXPORT(ONC) extern const char kFrequency[];
 COMPONENT_EXPORT(ONC) extern const char kFrequencyList[];
@@ -460,9 +461,9 @@ COMPONENT_EXPORT(ONC) extern const char kVerifyX509[];
 }  // namespace openvpn
 
 namespace wireguard {
-COMPONENT_EXPORT(ONC) extern const char kAddress[];
 COMPONENT_EXPORT(ONC) extern const char kAllowedIPs[];
 COMPONENT_EXPORT(ONC) extern const char kEndpoint[];
+COMPONENT_EXPORT(ONC) extern const char kIPAddresses[];
 COMPONENT_EXPORT(ONC) extern const char kPeers[];
 COMPONENT_EXPORT(ONC) extern const char kPersistentKeepalive[];
 COMPONENT_EXPORT(ONC) extern const char kPresharedKey[];

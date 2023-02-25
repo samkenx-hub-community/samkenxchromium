@@ -29,6 +29,8 @@
 #import "ios/chrome/browser/web_state_list/web_state_list.h"
 #import "ios/chrome/browser/web_state_list/web_state_opener.h"
 #import "ios/chrome/test/ios_chrome_scoped_testing_chrome_browser_state_manager.h"
+#import "ios/web/public/test/fakes/fake_navigation_context.h"
+#import "ios/web/public/test/fakes/fake_navigation_manager.h"
 #import "ios/web/public/test/fakes/fake_web_state.h"
 #import "ios/web/public/test/web_task_environment.h"
 #import "testing/gtest/include/gtest/gtest.h"
@@ -99,9 +101,14 @@ class NewTabPageCoordinatorTest : public PlatformTest {
         std::make_unique<web::FakeWebState>();
     NewTabPageTabHelper::CreateForWebState(web_state.get());
     web_state->SetVisibleURL(url);
-    // Force the DidStopLoading callback.
-    web_state->SetLoading(true);
-    web_state->SetLoading(false);
+    auto navigation_manager = std::make_unique<web::FakeNavigationManager>();
+    navigation_manager->AddItem(url, ui::PAGE_TRANSITION_LINK);
+    web_state->SetNavigationManager(std::move(navigation_manager));
+
+    // Force the URL load callbacks.
+    web::FakeNavigationContext navigation_context;
+    web_state->OnNavigationStarted(&navigation_context);
+    web_state->OnPageLoaded(web::PageLoadCompletionStatus::SUCCESS);
     return std::move(web_state);
   }
 
@@ -119,6 +126,39 @@ class NewTabPageCoordinatorTest : public PlatformTest {
     [browser_.get()->GetCommandDispatcher()
         startDispatchingToTarget:fakebox_focuser_handler_mock
                      forProtocol:@protocol(FakeboxFocuser)];
+  }
+
+  // Dynamically calls a selector on an object.
+  void DynamicallyCallSelector(id object, SEL selector, Class klass) {
+    NSMethodSignature* signature =
+        [klass instanceMethodSignatureForSelector:selector];
+    // Note: numberOfArguments is always at least 2 (self and _cmd).
+    ASSERT_EQ(int(signature.numberOfArguments), 2);
+    NSInvocation* invocation =
+        [NSInvocation invocationWithMethodSignature:signature];
+    invocation.selector = selector;
+    [invocation invokeWithTarget:object];
+  }
+
+  // Expects a coordinator method call to call a view controller method.
+  void ExpectMethodToProxyToVC(SEL coordinator_selector,
+                               SEL view_controller_selector) {
+    NewTabPageViewController* original_vc = coordinator_.NTPViewController;
+    id view_controller_mock = OCMClassMock([NewTabPageViewController class]);
+    coordinator_.NTPViewController =
+        (NewTabPageViewController*)view_controller_mock;
+
+    // Expect the call on the view controller.
+    DynamicallyCallSelector([view_controller_mock expect],
+                            view_controller_selector,
+                            [NewTabPageViewController class]);
+
+    // Call the method on the coordinator.
+    DynamicallyCallSelector(coordinator_, coordinator_selector,
+                            [coordinator_ class]);
+
+    [view_controller_mock verify];
+    coordinator_.NTPViewController = original_vc;
   }
 
   web::WebState* web_state_;
@@ -244,4 +284,23 @@ TEST_F(NewTabPageCoordinatorTest, DidChangeActiveWebState) {
     EXPECT_EQ(coordinator_.webState, nullptr);
     coordinator_ = nil;
   }
+}
+
+// Tests that various NTPCoordinator methods correctly proxy method calls to
+// the NTPViewController.
+TEST_F(NewTabPageCoordinatorTest, ProxiesNTPViewControllerMethods) {
+  CreateCoordinator(/*off_the_record=*/false);
+  SetupCommandHandlerMocks();
+  [coordinator_ start];
+
+  ExpectMethodToProxyToVC(@selector(stopScrolling), @selector(stopScrolling));
+  ExpectMethodToProxyToVC(@selector(isScrolledToTop),
+                          @selector(isNTPScrolledToTop));
+  ExpectMethodToProxyToVC(@selector(willUpdateSnapshot),
+                          @selector(willUpdateSnapshot));
+  ExpectMethodToProxyToVC(@selector(focusFakebox), @selector(focusFakebox));
+  ExpectMethodToProxyToVC(@selector(locationBarDidResignFirstResponder),
+                          @selector(omniboxDidResignFirstResponder));
+
+  [coordinator_ stop];
 }

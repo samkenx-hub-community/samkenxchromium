@@ -13,6 +13,7 @@
 #include "base/task/single_thread_task_runner.h"
 #include "base/time/time.h"
 #include "chromeos/ash/components/login/login_state/login_state.h"
+#include "chromeos/ash/components/login/session/session_termination_manager.h"
 #include "chromeos/dbus/power/power_manager_client.h"
 #include "components/policy/proto/device_management_backend.pb.h"
 #include "third_party/cros_system_api/dbus/power_manager/dbus-constants.h"
@@ -34,14 +35,17 @@ base::TimeTicks GetBootTime() {
 DeviceCommandRebootJob::DeviceCommandRebootJob()
     : DeviceCommandRebootJob(chromeos::PowerManagerClient::Get(),
                              ash::LoginState::Get(),
+                             ash::SessionTerminationManager::Get(),
                              base::BindRepeating(GetBootTime)) {}
 
 DeviceCommandRebootJob::DeviceCommandRebootJob(
     chromeos::PowerManagerClient* power_manager_client,
     ash::LoginState* loging_state,
+    ash::SessionTerminationManager* session_termination_manager,
     GetBootTimeCallback get_boot_time_callback)
     : power_manager_client_(power_manager_client),
       login_state_(loging_state),
+      session_termination_manager_(session_termination_manager),
       get_boot_time_callback_(std::move(get_boot_time_callback)) {
   DCHECK(get_boot_time_callback_);
 }
@@ -53,9 +57,8 @@ enterprise_management::RemoteCommand_Type DeviceCommandRebootJob::GetType()
   return enterprise_management::RemoteCommand_Type_DEVICE_REBOOT;
 }
 
-void DeviceCommandRebootJob::RunImpl(CallbackWithResult succeeded_callback,
-                                     CallbackWithResult failed_callback) {
-  succeeded_callback_ = std::move(succeeded_callback);
+void DeviceCommandRebootJob::RunImpl(CallbackWithResult result_callback) {
+  result_callback_ = std::move(result_callback);
 
   // Determines the time delta between the command having been issued and the
   // boot time of the system.
@@ -66,7 +69,7 @@ void DeviceCommandRebootJob::RunImpl(CallbackWithResult succeeded_callback,
   if (delta.is_positive()) {
     LOG(WARNING) << "Ignoring reboot command issued " << delta
                  << " before current boot time";
-    RunAsyncCallback(std::move(succeeded_callback_), FROM_HERE);
+    RunAsyncCallback(std::move(result_callback_), FROM_HERE);
     return;
   }
 
@@ -82,12 +85,26 @@ void DeviceCommandRebootJob::RunImpl(CallbackWithResult succeeded_callback,
     return;
   }
 
-  LOG(ERROR) << "Reboot in user session is not implemented";
-  RunAsyncCallback(std::move(failed_callback), FROM_HERE);
+  RebootUserSession();
+}
+
+void DeviceCommandRebootJob::RebootUserSession() {
+  // TODO(b/265784089): Make reboot on user logout robust. If the browser
+  // crashes, all the reboot information is gone while it should be preserved.
+
+  session_termination_manager_->SetDeviceRebootOnSignoutForRemoteCommand(
+      base::BindOnce(&DeviceCommandRebootJob::OnSignout,
+                     weak_factory_.GetWeakPtr()));
+}
+
+void DeviceCommandRebootJob::OnSignout() {
+  // `session_termination_manager_` will initiate the reboot, just report the
+  // command finished.
+  RunAsyncCallback(std::move(result_callback_), FROM_HERE);
 }
 
 void DeviceCommandRebootJob::DoReboot(const std::string& reason) {
-  DCHECK(succeeded_callback_);
+  DCHECK(result_callback_);
 
   // Posting the task with a callback just before reboot request does not
   // guarantee the callback reaching `RemoteCommandsService` and is very
@@ -95,7 +112,7 @@ void DeviceCommandRebootJob::DoReboot(const std::string& reason) {
   // testing purposes.
   // TODO(b/252980103): Come up with a mechanism to deliver the execution result
   // to DMServer.
-  RunAsyncCallback(std::move(succeeded_callback_), FROM_HERE);
+  RunAsyncCallback(std::move(result_callback_), FROM_HERE);
   power_manager_client_->RequestRestart(
       power_manager::REQUEST_RESTART_REMOTE_ACTION_REBOOT, reason);
 }
@@ -104,7 +121,8 @@ void DeviceCommandRebootJob::DoReboot(const std::string& reason) {
 void DeviceCommandRebootJob::RunAsyncCallback(CallbackWithResult callback,
                                               base::Location from_where) {
   base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
-      from_where, base::BindOnce(std::move(callback), absl::nullopt));
+      from_where,
+      base::BindOnce(std::move(callback), ResultType::kSuccess, absl::nullopt));
 }
 
 }  // namespace policy

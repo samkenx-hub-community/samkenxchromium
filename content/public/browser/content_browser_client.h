@@ -875,6 +875,7 @@ class CONTENT_EXPORT ContentBrowserClient {
   virtual bool IsAttributionReportingOperationAllowed(
       content::BrowserContext* browser_context,
       AttributionReportingOperation operation,
+      content::RenderFrameHost* rfh,
       const url::Origin* source_origin,
       const url::Origin* destination_origin,
       const url::Origin* reporting_origin);
@@ -1342,6 +1343,9 @@ class CONTENT_EXPORT ContentBrowserClient {
   // Returns true if (and only if) CreateAudioManager() is implemented and
   // returns a non-null value.
   virtual bool OverridesAudioManager();
+
+  // Returns true if the system audio echo cancellation shall be enforced.
+  virtual bool EnforceSystemAudioEchoCancellation();
 
   // Populates |mappings| with all files that need to be mapped before launching
   // a child process.

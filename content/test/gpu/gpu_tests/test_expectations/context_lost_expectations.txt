@@ -59,6 +59,8 @@
 # tags: [ oop-c no-oop-c ]
 # WebGPU Backend Validation
 # tags: [ dawn-backend-validation dawn-no-backend-validation ]
+# Clang coverage
+# tags: [ clang-coverage no-clang-coverage ]
 # results: [ Failure RetryOnFailure Skip Slow ]
 # END TAG HEADER
 
@@ -134,6 +136,9 @@ crbug.com/1399895 [ mac amd release asan ] GpuCrash_InfoForDualHardwareGpus [ Sk
 # Vulkan enabled on linux, the crash fallback logic is different.
 crbug.com/1334650 [ linux ] GpuCrash_InfoForHardwareGpu [ Skip ]
 
+# Windows debug causes render process hangs due to slow gpu process restart.
+crbug.com/1416920 [ win debug ] GpuCrash_InfoForHardwareGpu [ Skip ]
+
 ###############################
 # Temporary Skip Expectations #
 ###############################
@@ -154,6 +159,14 @@ crbug.com/923134 [ android ] ContextLost_WebGL2Blocked [ Skip ]
 # Failures/Flakes #
 ###################
 # Non-"Skip" expectations go here to suppress regular flakes/failures.
+
+# Fails on Linux AMD RX 5500 XT with RADV 20.0.8
+crbug.com/1418987 [ linux amd-0x7340 angle-vulkan ] ContextLost_WebGL2UnpackImageHeight [ Failure ]
+crbug.com/1418987 [ linux amd-0x7340 angle-vulkan ] ContextLost_WebGLContextLostFromGPUProcessExit [ Failure ]
+crbug.com/1418987 [ linux amd-0x7340 angle-vulkan ] ContextLost_WebGLContextLostFromQuantity [ Failure ]
+crbug.com/1418987 [ linux amd-0x7340 angle-vulkan ] GpuCrash_GPUProcessCrashesExactlyOncePerVisitToAboutGpuCrash [ Failure ]
+crbug.com/1418987 [ linux amd-0x7340 angle-vulkan ] GpuNormalTermination_NewWebGLNotBlocked [ Failure ]
+crbug.com/1418987 [ linux amd-0x7340 angle-vulkan ] GpuNormalTermination_OriginalWebGLNotBlocked [ Failure ]
 
 #######################################################################
 # Automated Entries After This Point - Do Not Manually Add Below Here #

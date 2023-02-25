@@ -96,7 +96,6 @@ class GpuVideoAcceleratorFactories;
 namespace network {
 namespace mojom {
 class URLLoaderFactory;
-class URLLoaderFactoryInterfaceBase;
 }
 class PendingSharedURLLoaderFactory;
 }
@@ -132,11 +131,9 @@ class WebDedicatedWorker;
 class WebDedicatedWorkerHostFactoryClient;
 class WebGraphicsContext3DProvider;
 class WebLocalFrame;
-class WebResourceRequestSenderDelegate;
 class WebSandboxSupport;
 class WebSecurityOrigin;
 class WebThemeEngine;
-class WebURLLoaderFactory;
 class WebVideoCaptureImplManager;
 struct WebContentSecurityPolicyHeader;
 
@@ -258,12 +255,6 @@ class BLINK_PLATFORM_EXPORT Platform {
 
   // Network -------------------------------------------------------------
 
-  // Returns a new WebURLLoaderFactory that wraps the given
-  // network::mojom::URLLoaderFactory.
-  virtual std::unique_ptr<WebURLLoaderFactory> WrapURLLoaderFactory(
-      CrossVariantMojoRemote<network::mojom::URLLoaderFactoryInterfaceBase>
-          url_loader_factory);
-
   // Returns the default User-Agent string, it can either full User-Agent string
   // or reduced User-Agent string based on policy setting.
   virtual WebString UserAgent() { return WebString(); }
@@ -281,11 +272,6 @@ class BLINK_PLATFORM_EXPORT Platform {
   // Determines whether it is safe to redirect from |from_url| to |to_url|.
   virtual bool IsRedirectSafe(const GURL& from_url, const GURL& to_url) {
     return false;
-  }
-
-  // Returns the WebResourceRequestSenderDelegate of this renderer.
-  virtual WebResourceRequestSenderDelegate* GetResourceRequestSenderDelegate() {
-    return nullptr;
   }
 
   // Appends throttles if the browser has sent a variations header to the

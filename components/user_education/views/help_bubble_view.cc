@@ -68,6 +68,8 @@ namespace user_education {
 
 namespace {
 
+// Minimum width of the bubble.
+constexpr int kBubbleMinWidthDip = 200;
 // Maximum width of the bubble. Longer strings will cause wrapping.
 constexpr int kBubbleMaxWidthDip = 340;
 
@@ -146,7 +148,7 @@ class MdIPHBubbleButton : public views::MdTextButton {
             : delegate_->GetHelpBubbleButtonBorderColorId());
     SetBackground(CreateBackgroundFromPainter(
         views::Painter::CreateRoundRectWith1PxBorderPainter(
-            background_color, stroke_color, GetCornerRadius())));
+            background_color, stroke_color, GetCornerRadiusValue())));
   }
 
   void OnThemeChanged() override {
@@ -286,6 +288,8 @@ DEFINE_CLASS_ELEMENT_IDENTIFIER_VALUE(HelpBubbleView,
 DEFINE_CLASS_ELEMENT_IDENTIFIER_VALUE(HelpBubbleView,
                                       kFirstNonDefaultButtonIdForTesting);
 
+DEFINE_CLASS_ELEMENT_IDENTIFIER_VALUE(HelpBubbleView, kBodyTextIdForTesting);
+
 // Explicitly don't use the default DIALOG_SHADOW as it will show a black
 // outline in dark mode on Mac. Use our own shadow instead. The shadow type is
 // the same for all other platforms.
@@ -379,14 +383,18 @@ HelpBubbleView::HelpBubbleView(const HelpBubbleDelegate* delegate,
     labels_.push_back(
         top_text_container->AddChildView(std::make_unique<views::Label>(
             params.title_text, delegate->GetTitleTextContext())));
-    labels_.push_back(
+    views::Label* label =
         AddChildViewAt(std::make_unique<views::Label>(
                            params.body_text, delegate->GetBodyTextContext()),
-                       GetIndexOf(button_container).value()));
+                       GetIndexOf(button_container).value());
+    labels_.push_back(label);
+    label->SetProperty(views::kElementIdentifierKey, kBodyTextIdForTesting);
   } else {
-    labels_.push_back(
+    views::Label* label =
         top_text_container->AddChildView(std::make_unique<views::Label>(
-            params.body_text, delegate->GetBodyTextContext())));
+            params.body_text, delegate->GetBodyTextContext()));
+    labels_.push_back(label);
+    label->SetProperty(views::kElementIdentifierKey, kBodyTextIdForTesting);
   }
 
   // Set common label properties.
@@ -699,6 +707,11 @@ gfx::Size HelpBubbleView::CalculatePreferredSize() const {
   // Wrap if the width is larger than |kBubbleMaxWidthDip|.
   if (layout_manager_preferred_size.width() > kBubbleMaxWidthDip) {
     return gfx::Size(kBubbleMaxWidthDip, GetHeightForWidth(kBubbleMaxWidthDip));
+  }
+
+  if (layout_manager_preferred_size.width() < kBubbleMinWidthDip) {
+    return gfx::Size(kBubbleMinWidthDip,
+                     layout_manager_preferred_size.height());
   }
 
   return layout_manager_preferred_size;
