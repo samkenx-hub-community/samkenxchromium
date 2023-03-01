@@ -1031,20 +1031,12 @@ bool operator>=(const Value::List& lhs, const Value::List& rhs) {
   return !(lhs < rhs);
 }
 
-Value* Value::FindKey(StringPiece key) {
-  return GetDict().Find(key);
-}
-
-const Value* Value::FindKey(StringPiece key) const {
-  return GetDict().Find(key);
-}
-
 Value* Value::FindKeyOfType(StringPiece key, Type type) {
   return const_cast<Value*>(std::as_const(*this).FindKeyOfType(key, type));
 }
 
 const Value* Value::FindKeyOfType(StringPiece key, Type type) const {
-  const Value* result = FindKey(key);
+  const Value* result = GetDict().Find(key);
   if (!result || result->type() != type)
     return nullptr;
   return result;
@@ -1255,10 +1247,6 @@ size_t Value::DictSize() const {
 
 bool Value::DictEmpty() const {
   return GetDict().empty();
-}
-
-void Value::MergeDictionary(const Value* dictionary) {
-  return GetDict().Merge(dictionary->GetDict().Clone());
 }
 
 bool operator==(const Value& lhs, const Value& rhs) {

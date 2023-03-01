@@ -66,7 +66,7 @@ BASE_FEATURE(kChromeOSSyncedSessionSharing,
 
 BASE_FEATURE(kSyncTrustedVaultPeriodicDegradedRecoverabilityPolling,
              "SyncTrustedVaultDegradedRecoverabilityHandler",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // Keep this entry in sync with the equivalent name in
 // ChromeFeatureList.java.
@@ -99,11 +99,11 @@ BASE_FEATURE(kSyncEnableContactInfoDataType,
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 BASE_FEATURE(kSyncEnableContactInfoDataTypeInTransportMode,
-             "kSyncEnableContactInfoDataTypeInTransportMode",
+             "SyncEnableContactInfoDataTypeInTransportMode",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 BASE_FEATURE(kSyncEnableContactInfoDataTypeForCustomPassphraseUsers,
-             "kSyncEnableContactInfoDataTypeForCustomPassphraseUsers",
+             "SyncEnableContactInfoDataTypeForCustomPassphraseUsers",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 BASE_FEATURE(kSyncEnforceBookmarksCountLimit,

@@ -9,9 +9,7 @@
 #include <utility>
 #include <vector>
 
-#include "base/functional/bind.h"
 #include "base/functional/callback.h"
-#include "base/functional/callback_forward.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/scoped_refptr.h"
 #include "base/task/sequenced_task_runner.h"
@@ -20,7 +18,6 @@
 #include "chrome/browser/policy/messaging_layer/upload/file_upload_job.h"
 #include "components/reporting/proto/synced/record.pb.h"
 #include "components/reporting/resources/resource_manager.h"
-#include "components/reporting/storage/storage_module_interface.h"
 #include "components/reporting/util/status.h"
 #include "components/reporting/util/statusor.h"
 
@@ -34,9 +31,7 @@ class RecordHandlerImpl : public RecordHandler {
  public:
   RecordHandlerImpl(
       scoped_refptr<base::SequencedTaskRunner> sequenced_task_runner,
-      std::unique_ptr<FileUploadJob::Delegate> delegate,
-      base::RepeatingCallback<scoped_refptr<StorageModuleInterface>()>
-          storage_getter);
+      std::unique_ptr<FileUploadJob::Delegate> delegate);
   ~RecordHandlerImpl() override;
 
   // Base class RecordHandler method implementation.
@@ -47,6 +42,12 @@ class RecordHandlerImpl : public RecordHandler {
       CompletionCallback upload_complete,
       EncryptionKeyAttachedCallback encryption_key_attached_cb) override;
 
+  // Helper method adds a record to the default storage on ReportClient task
+  // runner and calls `done_cb` with the result..
+  static void AddRecordToStorage(Priority priority,
+                                 Record record_copy,
+                                 base::OnceCallback<void(Status)> done_cb);
+
  private:
   // Helper `ReportUploader` class handles events being uploaded.
   class ReportUploader;
@@ -55,8 +56,6 @@ class RecordHandlerImpl : public RecordHandler {
 
   // The next two fields are only used for LOG_UPLOAD events.
   const std::unique_ptr<FileUploadJob::Delegate> delegate_;
-  const base::RepeatingCallback<scoped_refptr<StorageModuleInterface>()>
-      storage_getter_;
 };
 
 }  // namespace reporting

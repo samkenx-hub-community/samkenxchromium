@@ -7,7 +7,6 @@
 #include <utility>
 
 #include "base/base64.h"
-#include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
 #include "base/json/json_writer.h"
 #include "base/memory/scoped_refptr.h"
@@ -18,6 +17,8 @@
 #include "base/task/thread_pool.h"
 #include "base/test/task_environment.h"
 #include "base/values.h"
+#include "chrome/browser/policy/messaging_layer/public/report_client.h"
+#include "chrome/browser/policy/messaging_layer/public/report_client_test_util.h"
 #include "chrome/browser/policy/messaging_layer/upload/dm_server_uploader.h"
 #include "chrome/browser/policy/messaging_layer/upload/file_upload_job.h"
 #include "chrome/browser/policy/messaging_layer/upload/record_upload_request_builder.h"
@@ -30,7 +31,6 @@
 #include "components/reporting/proto/synced/record.pb.h"
 #include "components/reporting/proto/synced/record_constants.pb.h"
 #include "components/reporting/resources/resource_manager.h"
-#include "components/reporting/storage/storage_module_interface.h"
 #include "components/reporting/storage/test_storage_module.h"
 #include "components/reporting/util/status.h"
 #include "components/reporting/util/status_macros.h"
@@ -108,14 +108,11 @@ class RecordHandlerImplTest : public ::testing::TestWithParam<
                                                    /*force_confirm*/ bool>> {
  protected:
   void SetUp() override {
-    storage_ = base::MakeRefCounted<test::TestStorageModule>();
     handler_ = std::make_unique<RecordHandlerImpl>(
-        sequenced_task_runner_, std::make_unique<MockFileUploadDelegate>(),
-        base::BindRepeating(
-            [](scoped_refptr<StorageModuleInterface> storage) {
-              return storage;
-            },
-            storage_));
+        sequenced_task_runner_, std::make_unique<MockFileUploadDelegate>());
+    test_storage_ = base::MakeRefCounted<test::TestStorageModule>();
+    test_reporting_ = ReportingClient::TestEnvironment::CreateWithStorageModule(
+        test_storage_);
 
     memory_resource_ =
         base::MakeRefCounted<ResourceManager>(4u * 1024LLu * 1024LLu);  // 4 MiB
@@ -123,7 +120,8 @@ class RecordHandlerImplTest : public ::testing::TestWithParam<
 
   void TearDown() override {
     handler_.reset();
-    storage_.reset();
+    test_reporting_.reset();
+    test_storage_.reset();
     EXPECT_THAT(memory_resource_->GetUsed(), Eq(0uL));
   }
 
@@ -137,7 +135,8 @@ class RecordHandlerImplTest : public ::testing::TestWithParam<
 
   ReportingServerConnector::TestEnvironment test_env_;
 
-  scoped_refptr<StorageModuleInterface> storage_;
+  scoped_refptr<test::TestStorageModule> test_storage_;
+  std::unique_ptr<ReportingClient::TestEnvironment> test_reporting_;
 
   std::unique_ptr<RecordHandlerImpl> handler_;
 

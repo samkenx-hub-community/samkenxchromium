@@ -120,12 +120,6 @@
 #include "third_party/abseil-cpp/absl/types/optional.h"
 #include "url/gurl.h"
 
-#if BUILDFLAG(IS_ANDROID)
-#include "base/android/radio_utils.h"
-#include "net/android/radio_activity_tracker.h"
-#include "services/network/radio_monitor_android.h"
-#endif
-
 namespace network {
 
 namespace {
@@ -734,10 +728,7 @@ class URLLoaderTest : public testing::Test {
     net::QuicSimpleTestServer::Start();
     net::URLRequestFailedJob::AddUrlHandler();
 
-    scoped_feature_list_.InitWithFeatures(
-        /*enabled_features=*/{features::kAcceptCHFrame,
-                              net::features::kRecordRadioWakeupTrigger},
-        /*disabled_features=*/{});
+    scoped_feature_list_.InitAndEnableFeature(features::kAcceptCHFrame);
   }
   ~URLLoaderTest() override {
     net::URLRequestFilter::GetInstance()->ClearHandlers();
@@ -7132,88 +7123,15 @@ TEST_F(URLLoaderFakeTransportInfoTest, AcceptCHFrameIgnoreMalformed) {
   EXPECT_FALSE(accept_ch_frame_observer.called());
 }
 
-#if BUILDFLAG(IS_ANDROID)
-
-namespace {
-
-void CheckRadioWakeupTriggerHistograms(base::HistogramTester& histograms,
-                                       size_t expected_count) {
-  histograms.ExpectTotalCount(
-      kUmaNamePossibleWakeupTriggerURLLoaderRequestDestination, expected_count);
-  histograms.ExpectTotalCount(
-      kUmaNamePossibleWakeupTriggerURLLoaderRequestPriority, expected_count);
-  histograms.ExpectTotalCount(
-      kUmaNamePossibleWakeupTriggerURLLoaderRequestIsPrefetch, expected_count);
-  histograms.ExpectTotalCount(
-      kUmaNamePossibleWakeupTriggerURLLoaderAnnotationId, expected_count);
-}
-
-}  // namespace
-
-TEST_F(URLLoaderTest, RecordRadioWakeupTrigger_Record) {
-  base::HistogramTester histograms;
-
-  net::android::RadioActivityTracker::GetInstance()
-      .OverrideRadioActivityForTesting(
-          base::android::RadioDataActivity::kDormant);
-  net::android::RadioActivityTracker::GetInstance().OverrideRadioTypeForTesting(
-      base::android::RadioConnectionType::kCell);
-
-  LoadAndCompareFile("simple_page.html");
-
-  CheckRadioWakeupTriggerHistograms(histograms, /*expected_count=*/1);
-}
-
-TEST_F(URLLoaderTest, RecordRadioWakeupTrigger_RadioTypeIsNotCell) {
-  base::HistogramTester histograms;
-
-  net::android::RadioActivityTracker::GetInstance()
-      .OverrideRadioActivityForTesting(
-          base::android::RadioDataActivity::kDormant);
-  net::android::RadioActivityTracker::GetInstance().OverrideRadioTypeForTesting(
-      base::android::RadioConnectionType::kWifi);
-
-  LoadAndCompareFile("simple_page.html");
-
-  CheckRadioWakeupTriggerHistograms(histograms, /*expected_count=*/0);
-}
-
-TEST_F(URLLoaderTest, RecordRadioWakeupTrigger_RadioActivityIsNotDormant) {
-  base::HistogramTester histograms;
-
-  net::android::RadioActivityTracker::GetInstance()
-      .OverrideRadioActivityForTesting(
-          base::android::RadioDataActivity::kInOut);
-  net::android::RadioActivityTracker::GetInstance().OverrideRadioTypeForTesting(
-      base::android::RadioConnectionType::kCell);
-
-  LoadAndCompareFile("simple_page.html");
-
-  CheckRadioWakeupTriggerHistograms(histograms, /*expected_count=*/0);
-}
-
-TEST_F(URLLoaderTest, RecordRadioWakeupTrigger_IntervalTooShort) {
-  base::HistogramTester histograms;
-
-  net::android::RadioActivityTracker::GetInstance()
-      .OverrideRadioActivityForTesting(
-          base::android::RadioDataActivity::kDormant);
-  net::android::RadioActivityTracker::GetInstance().OverrideRadioTypeForTesting(
-      base::android::RadioConnectionType::kCell);
-  net::android::RadioActivityTracker::GetInstance()
-      .OverrideLastCheckTimeForTesting(base::TimeTicks::Now());
-
-  LoadAndCompareFile("simple_page.html");
-
-  CheckRadioWakeupTriggerHistograms(histograms, /*expected_count=*/0);
-}
-
-#endif  // BUILDFLAG(IS_ANDROID)
-
 TEST_F(URLLoaderTest, CookieSettingOverridesCopiedToURLRequest) {
   GURL url = test_server()->GetURL("/simple_page.html");
   net::CookieSettingOverrides cookie_setting_overrides =
       net::CookieSettingOverrides::All();
+  // The overrides are not allowed to start out with the
+  // `kStorageAccessGrantEligible` override present.
+  cookie_setting_overrides.Remove(
+      net::CookieSettingOverride::kStorageAccessGrantEligible);
+
   set_cookie_setting_overrides(cookie_setting_overrides);
   bool was_intercepted = false;
   net::URLRequestFilter::GetInstance()->AddUrlInterceptor(

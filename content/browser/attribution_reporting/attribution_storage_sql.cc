@@ -31,6 +31,7 @@
 #include "components/aggregation_service/aggregation_service.mojom.h"
 #include "components/attribution_reporting/aggregatable_dedup_key.h"
 #include "components/attribution_reporting/aggregation_keys.h"
+#include "components/attribution_reporting/destination_set.h"
 #include "components/attribution_reporting/event_trigger_data.h"
 #include "components/attribution_reporting/filters.h"
 #include "components/attribution_reporting/source_type.mojom.h"
@@ -392,12 +393,15 @@ absl::optional<StoredSourceData> ReadSourceFromStatement(
   while (destination_sites_statement.Step()) {
     auto destination_site = net::SchemefulSite::Deserialize(
         destination_sites_statement.ColumnString(0));
-    if (!attribution_reporting::IsSitePotentiallySuitable(destination_site)) {
-      return absl::nullopt;
-    }
     destination_sites.push_back(std::move(destination_site));
   }
-  if (!destination_sites_statement.Succeeded() || destination_sites.empty()) {
+  if (!destination_sites_statement.Succeeded()) {
+    return absl::nullopt;
+  }
+
+  auto destination_set = attribution_reporting::DestinationSet::Create(
+      std::move(destination_sites));
+  if (!destination_set.has_value()) {
     return absl::nullopt;
   }
 
@@ -405,7 +409,7 @@ absl::optional<StoredSourceData> ReadSourceFromStatement(
       .source = StoredSource(
           CommonSourceInfo(
               source_event_id, std::move(*source_origin),
-              std::move(destination_sites), std::move(*reporting_origin),
+              std::move(*destination_set), std::move(*reporting_origin),
               source_time,
               /*expiry_time=*/expiry_time,
               /*event_report_window_time=*/event_report_window_time,
@@ -572,8 +576,7 @@ AttributionStorage::StoreSourceResult AttributionStorageSql::StoreSource(
       "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,0,?,?)";
   sql::Statement statement(
       db_->GetCachedStatement(SQL_FROM_HERE, kInsertImpressionSql));
-  statement.BindInt64(0, SerializeUint64(delegate_->SanitizeSourceEventId(
-                             common_info.source_event_id())));
+  statement.BindInt64(0, SerializeUint64(common_info.source_event_id()));
   statement.BindString(1, serialized_source_origin);
   statement.BindString(2, common_info.reporting_origin().Serialize());
   statement.BindTime(3, common_info.source_time());
@@ -610,7 +613,7 @@ AttributionStorage::StoreSourceResult AttributionStorageSql::StoreSource(
   sql::Statement insert_destination_statement(
       db_->GetCachedStatement(SQL_FROM_HERE, kInsertDestinationSql));
   insert_destination_statement.BindInt64(0, *source_id);
-  for (const auto& site : common_info.destination_sites()) {
+  for (const auto& site : common_info.destination_sites().destinations()) {
     insert_destination_statement.Reset(/*clear_bound_vars=*/false);
     insert_destination_statement.BindString(1, site.Serialize());
     if (!insert_destination_statement.Run()) {
@@ -1371,37 +1374,21 @@ AttributionStorageSql::ReadReportFromStatement(sql::Statement& statement) {
 
 std::vector<AttributionReport> AttributionStorageSql::GetAttributionReports(
     base::Time max_report_time,
-    int limit,
-    AttributionReport::Types report_types) {
+    int limit) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-  DCHECK(!report_types.Empty());
 
   if (!LazyInit(DbCreationPolicy::kIgnoreIfAbsent)) {
     return {};
   }
 
-  std::vector<AttributionReport> reports;
+  std::vector<AttributionReport> reports =
+      GetEventLevelReportsInternal(max_report_time, limit);
 
-  for (AttributionReport::Type report_type : report_types) {
-    switch (report_type) {
-      case AttributionReport::Type::kEventLevel: {
-        std::vector<AttributionReport> event_level_reports =
-            GetEventLevelReportsInternal(max_report_time, limit);
-        reports.insert(reports.end(),
-                       std::make_move_iterator(event_level_reports.begin()),
-                       std::make_move_iterator(event_level_reports.end()));
-        break;
-      }
-      case AttributionReport::Type::kAggregatableAttribution: {
-        std::vector<AttributionReport> aggregatable_reports =
-            GetAggregatableAttributionReportsInternal(max_report_time, limit);
-        reports.insert(reports.end(),
-                       std::make_move_iterator(aggregatable_reports.begin()),
-                       std::make_move_iterator(aggregatable_reports.end()));
-        break;
-      }
-    }
-  }
+  std::vector<AttributionReport> aggregatable_reports =
+      GetAggregatableAttributionReportsInternal(max_report_time, limit);
+  reports.insert(reports.end(),
+                 std::make_move_iterator(aggregatable_reports.begin()),
+                 std::make_move_iterator(aggregatable_reports.end()));
 
   if (limit >= 0 && reports.size() > static_cast<size_t>(limit)) {
     base::ranges::partial_sort(reports, reports.begin() + limit, /*comp=*/{},

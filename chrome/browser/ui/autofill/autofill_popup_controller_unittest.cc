@@ -157,6 +157,13 @@ class MockAutofillPopupView : public AutofillPopupView {
   MOCK_METHOD(void, OnSuggestionsChanged, (), (override));
   MOCK_METHOD(absl::optional<int32_t>, GetAxUniqueId, (), (override));
   MOCK_METHOD(void, AxAnnounce, (const std::u16string&), (override));
+
+  base::WeakPtr<AutofillPopupView> GetWeakPtr() override {
+    return weak_ptr_factory_.GetWeakPtr();
+  }
+
+ private:
+  base::WeakPtrFactory<AutofillPopupView> weak_ptr_factory_{this};
 };
 
 class TestAutofillPopupController : public AutofillPopupControllerImpl {
@@ -261,7 +268,8 @@ class AutofillPopupControllerUnitTest : public ChromeRenderViewHostTestHarness {
     autofill_popup_view_ = std::make_unique<NiceMock<MockAutofillPopupView>>();
     autofill_popup_controller_ = new NiceMock<TestAutofillPopupController>(
         external_delegate_->GetWeakPtr(), gfx::RectF());
-    autofill_popup_controller_->SetViewForTesting(autofill_popup_view());
+    autofill_popup_controller_->SetViewForTesting(
+        autofill_popup_view()->GetWeakPtr());
   }
 
   void TearDown() override {
@@ -744,6 +752,34 @@ TEST_F(AutofillPopupControllerUnitTest, AcceptSuggestionRespectsTimeout) {
 
   EXPECT_CALL(*delegate(), DidAcceptSuggestion);
   task_environment()->FastForwardBy(base::Milliseconds(400));
+  popup_controller().AcceptSuggestion(
+      0, /*show_threshold=*/base::Milliseconds(500));
+}
+
+TEST_F(AutofillPopupControllerUnitTest,
+       AcceptSuggestionTimeoutIsUpdatedOnPopupMove) {
+  ShowSuggestions({1});
+
+  // Calls before the threshold are ignored.
+  EXPECT_CALL(*delegate(), DidAcceptSuggestion).Times(0);
+  popup_controller().AcceptSuggestion(
+      0, /*show_threshold=*/base::Milliseconds(500));
+  task_environment()->FastForwardBy(base::Milliseconds(100));
+  popup_controller().AcceptSuggestion(
+      0, /*show_threshold=*/base::Milliseconds(500));
+
+  task_environment()->FastForwardBy(base::Milliseconds(400));
+  // Show the suggestions again (simulating, e.g., a click somewhere slightly
+  // different).
+  ShowSuggestions({1});
+
+  EXPECT_CALL(*delegate(), DidAcceptSuggestion).Times(0);
+  popup_controller().AcceptSuggestion(
+      0, /*show_threshold=*/base::Milliseconds(500));
+
+  EXPECT_CALL(*delegate(), DidAcceptSuggestion);
+  // After waiting, suggestions are accepted again.
+  task_environment()->FastForwardBy(base::Milliseconds(500));
   popup_controller().AcceptSuggestion(
       0, /*show_threshold=*/base::Milliseconds(500));
 }

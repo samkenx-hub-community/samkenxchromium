@@ -438,22 +438,9 @@ const char kEnableSyncConsent[] = "sync_consent.enabled";
 #endif
 
 #if BUILDFLAG(IS_CHROMEOS_ASH)
-// A boolean pref set to true if primary pointing stick button is the left
-// button.
-const char kPrimaryPointingStickButtonRight[] =
-    "settings.pointing_stick.primary_right";
-
 // Copy of the primary pointing stick buttons option to use on login screen.
 const char kOwnerPrimaryPointingStickButtonRight[] =
     "owner.pointing_stick.primary_right";
-
-// A boolean pref set to true if pointing stick acceleration is enabled. When
-// disabled only simple linear scaling is applied based on sensitivity.
-const char kPointingStickAcceleration[] =
-    "settings.pointing_stick.acceleration";
-
-// A integer pref for pointing stick sensitivity.
-const char kPointingStickSensitivity[] = "settings.pointing_stick.sensitivity";
 
 // A boolean pref set to true if time should be displayed in 24-hour clock.
 const char kUse24HourClock[] = "settings.clock.use_24hour_clock";
@@ -1839,6 +1826,10 @@ const char kOfficeSetupComplete[] = "filebrowser.office.setup_complete";
 
 // Whether we should always move office files without prompting the user first.
 const char kOfficeFilesAlwaysMove[] = "filebrowser.office.always_move";
+
+// Whether the move confirmation dialog has been shown before.
+const char kOfficeMoveConfirmationShown[] =
+    "filebrowser.office.move_confirmation_shown";
 
 // Whether at least one file has been moved to OneDrive.
 const char kOfficeFileMovedToOneDrive[] =

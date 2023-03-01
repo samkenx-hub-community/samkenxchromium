@@ -377,7 +377,6 @@ ios_builder(
     mirrors = ["ci/ios-m1-simulator"],
     os = os.MAC_DEFAULT,
     cpu = cpu.ARM64,
-    goma_backend = goma.backend.RBE_PROD,
 )
 
 ios_builder(
@@ -489,7 +488,7 @@ ios_builder(
 ios_builder(
     name = "ios15-sdk-simulator",
     mirrors = ["ci/ios15-sdk-simulator"],
-    os = os.MAC_12,
+    os = os.MAC_13,
 )
 
 ios_builder(
@@ -506,7 +505,7 @@ ios_builder(
     mirrors = [
         "ci/ios16-sdk-simulator",
     ],
-    os = os.MAC_DEFAULT,
+    os = os.MAC_13,
     xcode = xcode.x14betabots,
 )
 

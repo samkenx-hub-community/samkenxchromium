@@ -10,6 +10,8 @@
 #include "base/android/jni_android.h"
 #include "base/android/jni_string.h"
 #include "base/command_line.h"
+#include "base/i18n/rtl.h"
+#include "base/memory/weak_ptr.h"
 #include "base/strings/strcat.h"
 #include "base/time/time.h"
 #include "chrome/android/chrome_jni_headers/AutofillPopupBridge_jni.h"
@@ -143,7 +145,7 @@ void AutofillPopupViewAndroid::OnSuggestionsChanged() {
   }
 
   Java_AutofillPopupBridge_show(env, java_object_, data_array,
-                                controller_->IsRTL());
+                                base::i18n::IsRTL());
 }
 
 void AutofillPopupViewAndroid::AxAnnounce(const std::u16string& text) {
@@ -153,6 +155,10 @@ void AutofillPopupViewAndroid::AxAnnounce(const std::u16string& text) {
 absl::optional<int32_t> AutofillPopupViewAndroid::GetAxUniqueId() {
   NOTIMPLEMENTED() << "See https://crbug.com/985927";
   return absl::nullopt;
+}
+
+base::WeakPtr<AutofillPopupView> AutofillPopupViewAndroid::GetWeakPtr() {
+  return weak_ptr_factory_.GetWeakPtr();
 }
 
 void AutofillPopupViewAndroid::SuggestionSelected(
@@ -233,23 +239,23 @@ bool AutofillPopupViewAndroid::WasSuppressed() {
 }
 
 // static
-AutofillPopupView* AutofillPopupView::Create(
+base::WeakPtr<AutofillPopupView> AutofillPopupView::Create(
     base::WeakPtr<AutofillPopupController> controller) {
   if (IsKeyboardAccessoryEnabled()) {
     auto adapter =
         std::make_unique<AutofillKeyboardAccessoryAdapter>(controller);
-    auto accessory_view =
-        std::make_unique<AutofillKeyboardAccessoryView>(adapter->GetWeakPtr());
+    auto accessory_view = std::make_unique<AutofillKeyboardAccessoryView>(
+        adapter->GetWeakPtrToAdapter());
     if (!accessory_view->Initialize())
       return nullptr;  // Don't create an adapter without initialized view.
     adapter->SetAccessoryView(std::move(accessory_view));
-    return adapter.release();
+    return adapter.release()->GetWeakPtr();
   }
 
   auto popup_view = std::make_unique<AutofillPopupViewAndroid>(controller);
   if (!popup_view->Init() || popup_view->WasSuppressed())
     return nullptr;
-  return popup_view.release();
+  return popup_view.release()->GetWeakPtr();
 }
 
 }  // namespace autofill

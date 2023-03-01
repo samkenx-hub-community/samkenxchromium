@@ -13,7 +13,7 @@
 
   cr-icon-button {
     --cr-icon-button-icon-size: 16px;
-    --cr-icon-button-size: 20px;
+    --cr-icon-button-size: 24px;
     margin: 0;
   }
 
@@ -82,6 +82,10 @@
     margin: 8px 14px;
   }
 
+  :host-context([chrome-refresh-2023]) sp-heading {
+    margin: 8px 16px;
+  }
+
   .icon-button-row {
     align-items: center;
     color: var(--cr-secondary-text-color);
@@ -142,19 +146,22 @@
 
   <div class="sp-card">
     <sp-heading hidden$="[[guestMode_]]"
-        back-button-label="Test test test"
+        back-button-label="[[getBackButtonLabel_(activeFolderPath_.*)]]"
         on-back-button-click="onBackClicked_"
         hide-back-button="[[!activeFolderPath_.length]]"
         disable-back-button="[[disableBackButton_(
             activeFolderPath_.*, editing_)]]">
       <h1 slot="heading">[[getActiveFolderLabel_(activeFolderPath_.*)]]</h1>
 
-      <cr-button slot="buttons" class="sort-menu-button"
-          aria-label="$i18n{sortMenuA11yLabel}"
-          on-click="onShowSortMenuClicked_">
+      <div aria-hidden="true" slot="metadata">
         [[getSortLabel_(activeSortIndex_)]]
-        <iron-icon icon="sp:filter-list"></iron-icon>
-      </cr-button>
+      </div>
+      <cr-icon-button slot="buttons" class="sort-menu-button"
+          iron-icon="sp:filter-list"
+          aria-label="$i18n{sortMenuA11yLabel}"
+          aria-description="[[getSortLabel_(activeSortIndex_)]]"
+          on-click="onShowSortMenuClicked_">
+      </cr-icon-button>
       <cr-icon-button slot="buttons" iron-icon="bookmarks:create-new-folder"
           disabled="[[editing_]]"
           aria-label="$i18n{createNewFolderA11yLabel}"
@@ -178,7 +185,7 @@
                               compactDescriptions_.*, expandedDescriptions_.*,
                               compact_)]]"
               compact="[[compact_]]" trailing-icon="cr:more-vert"
-              trailing-icon-aria-label="TODO"
+              trailing-icon-aria-label="$i18n{bookmarkOptionsA11yLabel}"
               has-checkbox="[[editing_]]"
               checkbox-disabled="[[!canEdit_(item)]]"
               has-input="[[renamingItem_(item.id, renamingId_)]]"
@@ -186,7 +193,10 @@
               on-context-menu="onShowContextMenuClicked_"
               on-trailing-icon-clicked="onShowContextMenuClicked_"
               on-checkbox-change="onRowSelectedChange_"
-              on-input-change="onRename_">
+              on-input-change="onRename_"
+              row-aria-label="[[getBookmarkAllyLabel_(item)]]"
+              row-aria-description="[[getBookmarkA11yDescription_(item)]]"
+              tabindex$="[[tabIndex]]">
             <div slot="badges">
               <template is="dom-if" restamp
                   if="[[isPriceTracked(item, trackedProductInfos_.*)]]">

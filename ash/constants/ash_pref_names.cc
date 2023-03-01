@@ -130,6 +130,20 @@ const char kDeviceWiFiFastTransitionEnabled[] =
 const char kInputNoiseCancellationEnabled[] =
     "ash.input_noise_cancellation_enabled";
 
+// The name of an integer pref that counts the number of times we have shown
+// the multitask menu education nudge.
+const char kMultitaskMenuNudgeClamshellShownCount[] =
+    "ash.wm_nudge.multitask_nudge_count";
+const char kMultitaskMenuNudgeTabletShownCount[] =
+    "cros.wm_nudge.tablet_multitask_nudge_count";
+
+// The name of a time pref that stores the time we last showed the multitask
+// menu education nudge.
+const char kMultitaskMenuNudgeClamshellLastShown[] =
+    "ash.wm_nudge.multitask_menu_nudge_last_shown";
+const char kMultitaskMenuNudgeTabletLastShown[] =
+    "cros.wm_nudge.tablet_multitask_nudge_last_shown";
+
 // The following SAML-related prefs are not settings that the domain admin can
 // set, but information that the SAML Identity Provider can send us:
 
@@ -1383,6 +1397,19 @@ const char kTouchpadHapticFeedback[] = "settings.touchpad.haptic_feedback";
 // feedback to Firm feedback [1, 3, 5].
 const char kTouchpadHapticClickSensitivity[] =
     "settings.touchpad.haptic_click_sensitivity";
+
+// A integer pref for pointing stick sensitivity.
+const char kPointingStickSensitivity[] = "settings.pointing_stick.sensitivity";
+
+// A boolean pref set to true if primary pointing stick button is the left
+// button.
+const char kPrimaryPointingStickButtonRight[] =
+    "settings.pointing_stick.primary_right";
+
+// A boolean pref set to true if pointing stick acceleration is enabled. When
+// disabled only simple linear scaling is applied based on sensitivity.
+const char kPointingStickAcceleration[] =
+    "settings.pointing_stick.acceleration";
 
 // NOTE: New prefs should start with the "ash." prefix. Existing prefs moved
 // into this file should not be renamed, since they may be synced.

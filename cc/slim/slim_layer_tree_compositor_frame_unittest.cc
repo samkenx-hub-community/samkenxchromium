@@ -500,6 +500,10 @@ TEST_F(SlimLayerTreeCompositorFrameTest, CopyOutputRequest) {
   auto solid_color_layer =
       CreateSolidColorLayer(viewport_.size(), SkColors::kGray);
   layer_tree_->SetRoot(solid_color_layer);
+  {
+    viz::CompositorFrame frame = ProduceFrame();
+    EXPECT_FALSE(layer_tree_->NeedsBeginFrames());
+  }
 
   auto copy_request_no_source_1 = std::make_unique<viz::CopyOutputRequest>(
       viz::CopyOutputRequest::ResultFormat::RGBA,
@@ -531,6 +535,7 @@ TEST_F(SlimLayerTreeCompositorFrameTest, CopyOutputRequest) {
   copy_request_with_difference_source->set_source(token2);
 
   layer_tree_->RequestCopyOfOutput(std::move(copy_request_no_source_1));
+  EXPECT_TRUE(layer_tree_->NeedsBeginFrames());
   layer_tree_->RequestCopyOfOutput(std::move(copy_request_no_source_2));
   layer_tree_->RequestCopyOfOutput(std::move(copy_request_with_source));
   layer_tree_->RequestCopyOfOutput(std::move(copy_request_with_same_source));
@@ -632,6 +637,50 @@ TEST_F(SlimLayerTreeCompositorFrameTest, UIResourceLayerAppendQuads) {
     EXPECT_EQ(frame.resource_list[0].id, texture_quad->resource_id());
     EXPECT_EQ(frame.resource_list[0].size, gfx::Size(2, 2));
     EXPECT_NE(first_resource_id, texture_quad->resource_id());
+  }
+}
+
+TEST_F(SlimLayerTreeCompositorFrameTest, ReclaimResources) {
+  constexpr size_t kNumLayers = 6;
+  std::vector<scoped_refptr<UIResourceLayer>> layers;
+  for (size_t i = 0; i < kNumLayers; ++i) {
+    layers.push_back(UIResourceLayer::Create());
+    layers[i]->SetBounds(viewport_.size());
+    layers[i]->SetIsDrawable(true);
+    if (i == 0u) {
+      layer_tree_->SetRoot(layers[i]);
+    } else {
+      layers[i - 1]->AddChild(layers[i]);
+    }
+
+    auto image_info =
+        SkImageInfo::Make(1, 1, kN32_SkColorType, kPremul_SkAlphaType);
+    SkBitmap bitmap;
+    bitmap.allocPixels(image_info);
+    bitmap.setImmutable();
+    layers[i]->SetBitmap(bitmap);
+  }
+
+  viz::CompositorFrame frame = ProduceFrame();
+  EXPECT_EQ(frame.resource_list.size(), kNumLayers);
+  for (size_t i = 0; i < kNumLayers; ++i) {
+    EXPECT_TRUE(frame_sink_->client_resource_provider()->InUseByConsumer(
+        frame.resource_list[i].id));
+  }
+
+  // Return every other resource.
+  std::vector<viz::ReturnedResource> returned_resources;
+  for (size_t i = 0; i < kNumLayers; i += 2) {
+    returned_resources.push_back(frame.resource_list[i].ToReturnedResource());
+  }
+  frame_sink_->ReclaimResources(std::move(returned_resources));
+  for (size_t i = 0; i < kNumLayers; i += 2) {
+    EXPECT_FALSE(frame_sink_->client_resource_provider()->InUseByConsumer(
+        frame.resource_list[i].id));
+  }
+  for (size_t i = 1; i < kNumLayers; i += 2) {
+    EXPECT_TRUE(frame_sink_->client_resource_provider()->InUseByConsumer(
+        frame.resource_list[i].id));
   }
 }
 

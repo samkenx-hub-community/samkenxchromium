@@ -5,7 +5,7 @@
 
 load("//lib/branches.star", "branches")
 load("//lib/builder_config.star", "builder_config")
-load("//lib/builders.star", "builders", "cpu", "goma", "os", "reclient", "xcode")
+load("//lib/builders.star", "builders", "cpu", "os", "reclient", "xcode")
 load("//lib/ci.star", "ci")
 load("//lib/consoles.star", "consoles")
 load("//lib/structs.star", "structs")
@@ -522,7 +522,6 @@ ci.builder(
     console_view_entry = consoles.console_view_entry(
         category = "android",
     ),
-    goma_backend = goma.backend.RBE_PROD,
 )
 
 fyi_ios_builder(
@@ -857,6 +856,7 @@ fyi_ios_builder(
         ),
     ),
     builderless = False,
+    os = os.MAC_12,
     console_view_entry = consoles.console_view_entry(
         category = "mac",
     ),
@@ -1119,8 +1119,6 @@ The bot specs should be in sync with <a href="https://ci.chromium.org/p/chromium
         short_name = "cmp",
     ),
     execution_timeout = 15 * time.hour,
-    goma_backend = goma.backend.RBE_PROD,
-    goma_jobs = 250,
     reclient_bootstrap_env = {
         "RBE_ip_reset_min_delay": "-1s",
         "RBE_experimental_goma_deps_cache": "true",
@@ -1145,8 +1143,6 @@ The bot specs should be in sync with <a href="https://ci.chromium.org/p/chromium
         short_name = "cmp",
     ),
     execution_timeout = 15 * time.hour,
-    goma_backend = goma.backend.RBE_PROD,
-    goma_jobs = 250,
     reclient_bootstrap_env = {
         "RBE_ip_reset_min_delay": "-1s",
         "RBE_experimental_goma_deps_cache": "true",
@@ -1164,8 +1160,6 @@ ci.builder(
         short_name = "cmp",
     ),
     execution_timeout = 6 * time.hour,
-    goma_backend = goma.backend.RBE_PROD,
-    goma_jobs = 250,
     reclient_bootstrap_env = {
         "RBE_ip_reset_min_delay": "-1s",
         "RBE_experimental_goma_deps_cache": "true",
@@ -1184,8 +1178,6 @@ fyi_mac_builder(
         short_name = "cmp",
     ),
     execution_timeout = 10 * time.hour,
-    goma_backend = goma.backend.RBE_PROD,
-    goma_jobs = 250,
     reclient_bootstrap_env = {
         "RBE_ip_reset_min_delay": "-1s",
         "GLOG_vmodule": "bridge*=2",
@@ -1206,8 +1198,6 @@ fyi_mac_builder(
         short_name = "cmp",
     ),
     execution_timeout = 10 * time.hour,
-    goma_backend = goma.backend.RBE_PROD,
-    goma_jobs = 250,
     reclient_bootstrap_env = {
         "RBE_ip_reset_min_delay": "-1s",
         "GLOG_vmodule": "bridge*=2",
@@ -1229,8 +1219,6 @@ fyi_mac_builder(
         short_name = "cmp",
     ),
     execution_timeout = 10 * time.hour,
-    goma_backend = goma.backend.RBE_PROD,
-    goma_jobs = 250,
     reclient_bootstrap_env = {
         "RBE_ip_reset_min_delay": "-1s",
         "GLOG_vmodule": "bridge*=2",
@@ -1252,8 +1240,6 @@ ci.builder(
         category = "win",
         short_name = "re",
     ),
-    goma_backend = goma.backend.RBE_PROD,
-    goma_jobs = 80,
     reclient_bootstrap_env = {
         "RBE_ip_reset_min_delay": "-1s",
         "RBE_experimental_goma_deps_cache": "true",
@@ -1275,8 +1261,6 @@ ci.builder(
         short_name = "re",
     ),
     execution_timeout = 6 * time.hour,
-    goma_backend = goma.backend.RBE_PROD,
-    goma_jobs = 250,
     reclient_bootstrap_env = {
         "RBE_ip_reset_min_delay": "-1s",
         "RBE_experimental_goma_deps_cache": "true",
@@ -1295,8 +1279,6 @@ ci.builder(
         short_name = "cmp",
     ),
     execution_timeout = 10 * time.hour,
-    goma_backend = goma.backend.RBE_PROD,
-    goma_jobs = 250,
     reclient_bootstrap_env = {
         "RBE_ip_reset_min_delay": "-1s",
         "RBE_experimental_goma_deps_cache": "true",
@@ -1315,8 +1297,6 @@ fyi_mac_builder(
         short_name = "cmp",
     ),
     execution_timeout = 10 * time.hour,
-    goma_backend = goma.backend.RBE_PROD,
-    goma_jobs = 250,
     reclient_bootstrap_env = {
         "RBE_ip_reset_min_delay": "-1s",
         "RBE_experimental_goma_deps_cache": "true",
@@ -1342,8 +1322,6 @@ The bot specs should be in sync with <a href="https://ci.chromium.org/p/chromium
         short_name = "cmp",
     ),
     execution_timeout = 15 * time.hour,
-    goma_backend = goma.backend.RBE_PROD,
-    goma_jobs = goma.jobs.J300,
     reclient_bootstrap_env = {
         "RBE_ip_reset_min_delay": "-1s",
         "RBE_experimental_goma_deps_cache": "true",
@@ -1369,8 +1347,6 @@ The bot specs should be in sync with <a href="https://ci.chromium.org/p/chromium
         short_name = "cmp",
     ),
     execution_timeout = 6 * time.hour,
-    goma_backend = goma.backend.RBE_PROD,
-    goma_jobs = 150,
     reclient_bootstrap_env = {
         "RBE_ip_reset_min_delay": "-1s",
         "RBE_experimental_goma_deps_cache": "true",
@@ -1396,8 +1372,6 @@ The bot specs should be in sync with <a href="https://ci.chromium.org/p/chromium
         short_name = "cmp",
     ),
     execution_timeout = 10 * time.hour,
-    goma_backend = goma.backend.RBE_PROD,
-    goma_jobs = 150,
     reclient_bootstrap_env = {
         "GLOG_vmodule": "bridge*=2",
         "RBE_ip_reset_min_delay": "-1s",
@@ -1425,9 +1399,7 @@ The bot specs should be in sync with <a href="https://ci.chromium.org/p/chromium
         short_name = "re",
     ),
     execution_timeout = 6 * time.hour,
-    goma_backend = goma.backend.RBE_PROD,
     goma_enable_ats = False,
-    goma_jobs = 300,
     reclient_bootstrap_env = {
         "RBE_ip_reset_min_delay": "-1s",
         "RBE_experimental_goma_deps_cache": "true",
@@ -1454,8 +1426,6 @@ The bot specs should be in sync with <a href="https://ci.chromium.org/p/chromium
         short_name = "cmp",
     ),
     execution_timeout = 10 * time.hour,
-    goma_backend = goma.backend.RBE_PROD,
-    goma_jobs = 300,
     reclient_bootstrap_env = {
         "RBE_ip_reset_min_delay": "-1s",
         "RBE_experimental_goma_deps_cache": "true",
@@ -1481,8 +1451,6 @@ The bot specs should be in sync with <a href="https://ci.chromium.org/p/chromium
         short_name = "cmp",
     ),
     execution_timeout = 10 * time.hour,
-    goma_backend = goma.backend.RBE_PROD,
-    goma_jobs = 150,
     reclient_bootstrap_env = {
         "RBE_ip_reset_min_delay": "-1s",
         "RBE_experimental_goma_deps_cache": "true",
@@ -1535,7 +1503,6 @@ The build configs and the bot specs should be in sync with <a href="https://ci.c
         short_name = "and",
     ),
     execution_timeout = 10 * time.hour,
-    goma_backend = goma.backend.RBE_PROD,
     reclient_instance = reclient.instance.DEFAULT_UNTRUSTED,
     reclient_jobs = reclient.jobs.HIGH_JOBS_FOR_CQ,
     service_account = "chromium-build-perf-ci-builder@chops-service-accounts.iam.gserviceaccount.com",
@@ -1572,7 +1539,6 @@ The build configs and the bot specs should be in sync with <a href="https://ci.c
         short_name = "lnx",
     ),
     execution_timeout = 6 * time.hour,
-    goma_backend = goma.backend.RBE_PROD,
     reclient_instance = reclient.instance.DEFAULT_UNTRUSTED,
     reclient_jobs = reclient.jobs.HIGH_JOBS_FOR_CQ,
     service_account = "chromium-build-perf-ci-builder@chops-service-accounts.iam.gserviceaccount.com",
@@ -1610,7 +1576,6 @@ The build configs and the bot specs should be in sync with <a href="https://ci.c
         short_name = "win",
     ),
     execution_timeout = 6 * time.hour,
-    goma_backend = goma.backend.RBE_PROD,
     reclient_instance = reclient.instance.DEFAULT_UNTRUSTED,
     reclient_jobs = reclient.jobs.HIGH_JOBS_FOR_CQ,
     service_account = "chromium-build-perf-ci-builder@chops-service-accounts.iam.gserviceaccount.com",
@@ -2227,7 +2192,7 @@ fyi_ios_builder(
         ),
         build_gs_bucket = "chromium-fyi-archive",
     ),
-    os = os.MAC_12,
+    os = os.MAC_DEFAULT,
     console_view_entry = [
         consoles.console_view_entry(
             category = "iOS|iOS15",
@@ -2252,7 +2217,7 @@ fyi_ios_builder(
         ),
         build_gs_bucket = "chromium-fyi-archive",
     ),
-    os = os.MAC_12,
+    os = os.MAC_13,
     console_view_entry = [
         consoles.console_view_entry(
             category = "iOS|iOS15",
@@ -2306,7 +2271,7 @@ fyi_ios_builder(
         ),
         build_gs_bucket = "chromium-fyi-archive",
     ),
-    os = os.MAC_DEFAULT,
+    os = os.MAC_13,
     console_view_entry = [
         consoles.console_view_entry(
             category = "iOS|iOS16",
@@ -2335,7 +2300,7 @@ fyi_ios_builder(
         ),
         build_gs_bucket = "chromium-fyi-archive",
     ),
-    os = os.MAC_DEFAULT,
+    os = os.MAC_13,
     console_view_entry = consoles.console_view_entry(
         category = "iOS|iOS16",
         short_name = "sdk16",
@@ -2471,7 +2436,6 @@ ci.builder(
         category = "win11",
     ),
     experimental = True,
-    goma_backend = None,
     reclient_instance = reclient.instance.DEFAULT_TRUSTED,
     reclient_jobs = reclient.jobs.DEFAULT,
 )
@@ -2519,7 +2483,6 @@ ci.builder(
     console_view_entry = consoles.console_view_entry(
         category = "win",
     ),
-    goma_backend = goma.backend.RBE_PROD,
     reclient_jobs = reclient.jobs.LOW_JOBS_FOR_CI,
 )
 

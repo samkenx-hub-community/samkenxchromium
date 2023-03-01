@@ -730,10 +730,14 @@
     },
 
     'chromium.rust': {
-      'android-rust-arm-dbg': 'debug_bot_rust_android_arm_reclient',
-      'android-rust-arm-rel': 'release_rust_android_arm_reclient',
-      'linux-rust-x64-dbg': 'debug_bot_rust_linux_x64_reclient',
-      'linux-rust-x64-rel': 'release_rust_linux_x64_reclient',
+      'android-rust-arm32-rel': 'release_rust_android_arm32_reclient',
+      'android-rust-arm64-dbg': 'debug_bot_rust_android_arm64_reclient',
+      'android-rust-arm64-rel': 'release_rust_android_arm64_reclient',
+      'linux-rust-x64-dbg': 'debug_bot_rust_desktop_x64_reclient',
+      'linux-rust-x64-rel': 'release_rust_desktop_x64_reclient',
+      'mac-rust-x64-rel': 'release_rust_desktop_x64_reclient',
+      'win-rust-x64-dbg': 'debug_bot_rust_desktop_x64_reclient',
+      'win-rust-x64-rel': 'release_rust_desktop_x64_reclient',
     },
 
     'chromium.swangle': {
@@ -845,6 +849,7 @@
     },
 
     'internal.chrome.fyi': {
+      'android-buildspeed-dbg': 'android_debug_bot_reclient_fastbuild',
       'chromeos-arm-generic-cfi-thin-lto-chrome-reclient': 'chromeos_arm-generic_cfi_thin_lto_official_reclient',
       'lacros-arm-generic-chrome-fyi-reclient': 'chromeos_arm-generic_lacros_official_skylab_reclient',
       'linux-finch-smoke-chrome': 'official_reclient',
@@ -937,9 +942,7 @@
       'chromeos-trogdor64-chrome-skylab': 'chromeos_trogdor64_include_unwind_tables_official_dchecks_skylab',
       'lacros-amd64-generic-chrome': 'chromeos_amd64-generic_lacros_official_no_symbols',
       'lacros-amd64-generic-chrome-skylab': 'chromeos_amd64-generic_lacros_official_skylab',
-      'lacros-arm-generic-chrome': 'chromeos_arm-generic_lacros_official',
       'lacros-arm-generic-chrome-skylab': 'chromeos_arm-generic_lacros_official_skylab',
-      'lacros-arm64-generic-chrome': 'chromeos_arm64-generic_lacros_official',
       'lacros-arm64-generic-chrome-skylab': 'chromeos_arm64-generic_lacros_official_skylab',
       'linux-chrome': 'official_goma',
       'linux-chrome-beta': 'official_goma',
@@ -1324,11 +1327,15 @@
     },
 
     'tryserver.chromium.rust': {
-      'android-rust-arm-dbg': 'debug_bot_rust_android_arm_reclient',
-      'android-rust-arm-rel': 'release_rust_android_arm_reclient',
-      'linux-rust-x64-dbg': 'debug_bot_rust_linux_x64_reclient',
-      'linux-rust-x64-rel': 'release_rust_linux_x64_reclient',
+      'android-rust-arm32-rel': 'release_rust_android_arm32_reclient',
+      'android-rust-arm64-dbg': 'debug_bot_rust_android_arm64_reclient',
+      'android-rust-arm64-rel': 'release_rust_android_arm64_reclient',
+      'linux-rust-x64-dbg': 'debug_bot_rust_desktop_x64_reclient',
+      'linux-rust-x64-rel': 'release_rust_desktop_x64_reclient',
       'linux-rust-x64-rel-android-toolchain': 'release_rust_linux_x64_android_toolchain_reclient',
+      'mac-rust-x64-rel': 'release_rust_desktop_x64_reclient',
+      'win-rust-x64-dbg': 'debug_bot_rust_desktop_x64_reclient',
+      'win-rust-x64-rel': 'release_rust_desktop_x64_reclient',
     },
 
     'tryserver.chromium.swangle': {
@@ -1558,6 +1565,10 @@
 
     'android_debug_bot_reclient_external_fastbuild': [
       'android', 'debug_bot_reclient', 'android_external', 'android_fastbuild',
+    ],
+
+    'android_debug_bot_reclient_fastbuild': [
+      'android', 'debug_bot_reclient', 'android_fastbuild',
     ],
 
     'android_debug_static_bot_arm64_reclient': [
@@ -2053,9 +2064,6 @@
       'chromeos_device_reclient', 'arm-generic', 'dcheck_always_on', 'ozone_headless'
     ],
 
-    'chromeos_arm-generic_lacros_official': [
-      'chromeos_arm-generic-crostoolchain', 'lacros', 'official', 'minimal_symbols', 'cfi', 'thin_lto',
-    ],
     'chromeos_arm-generic_lacros_official_reclient': [
       'chromeos_arm-generic-crostoolchain_reclient', 'lacros', 'official', 'minimal_symbols', 'cfi', 'thin_lto',
     ],
@@ -2094,9 +2102,6 @@
       'chromeos_device_reclient', 'arm64-generic', 'dcheck_always_on', 'ozone_headless'
     ],
 
-    'chromeos_arm64-generic_lacros_official': [
-      'chromeos_arm64-generic-crostoolchain', 'lacros', 'official', 'minimal_symbols', 'cfi', 'thin_lto',
-    ],
     'chromeos_arm64-generic_lacros_official_reclient': [
       'chromeos_arm64-generic-crostoolchain_reclient', 'lacros', 'official', 'minimal_symbols', 'cfi', 'thin_lto',
     ],
@@ -2473,11 +2478,11 @@
       'debug_bot_reclient',
     ],
 
-    'debug_bot_rust_android_arm_reclient': [
-      'debug_bot_reclient', 'enable_rust', 'android', 'arm',
+    'debug_bot_rust_android_arm64_reclient': [
+      'debug_bot_reclient', 'enable_rust', 'android', 'arm64',
     ],
 
-    'debug_bot_rust_linux_x64_reclient': [
+    'debug_bot_rust_desktop_x64_reclient': [
       'debug_bot_reclient', 'enable_rust', 'x64',
     ],
 
@@ -2966,7 +2971,7 @@
     ],
 
     # Meant for local development of fuzzers where no reclient/goma is needed.
-	'libfuzzer_chromeos_asan_local': [
+    'libfuzzer_chromeos_asan_local': [
       'libfuzzer', 'asan', 'no_reclient', 'release', 'chromeos_with_codecs', 'pdf_xfa', 'disable_nacl', 'optimize_for_fuzzing', 'disable_seed_corpus',
     ],
 
@@ -3458,16 +3463,19 @@
       'release', 'official_optimize_reclient', 'fuchsia', 'arm64', 'cast_receiver_size_optimized',
     ],
 
-    'release_rust_android_arm_reclient': [
+    'release_rust_android_arm32_reclient': [
       'release_trybot_minimal_symbols_reclient', 'enable_rust', 'android', 'arm',
+    ],
+    'release_rust_android_arm64_reclient': [
+      'release_trybot_minimal_symbols_reclient', 'enable_rust', 'android', 'arm64',
+    ],
+
+    'release_rust_desktop_x64_reclient': [
+      'release_trybot_minimal_symbols_reclient', 'enable_rust', 'x64',
     ],
 
     'release_rust_linux_x64_android_toolchain_reclient': [
       'release_trybot_minimal_symbols_reclient', 'enable_rust', 'use_android_rust_toolchain', 'x64',
-    ],
-
-    'release_rust_linux_x64_reclient': [
-      'release_trybot_minimal_symbols_reclient', 'enable_rust', 'x64',
     ],
 
     'release_trybot': [

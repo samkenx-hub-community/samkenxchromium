@@ -59,6 +59,7 @@ class BuildConfigGenerator extends DefaultTask {
     static final Map<String, String> EXISTING_LIBS = [
         com_ibm_icu_icu4j: '//third_party/icu4j:icu4j_java',
         com_almworks_sqlite4java_sqlite4java: '//third_party/sqlite4java:sqlite4java_java',
+        com_jakewharton_android_repackaged_dalvik_dx: '//third_party/aosp_dalvik:aosp_dalvik_dx_java',
         junit_junit: '//third_party/junit:junit',
         org_hamcrest_hamcrest_core: '//third_party/hamcrest:hamcrest_core_java',
         org_hamcrest_hamcrest_integration: '//third_party/hamcrest:hamcrest_integration_java',
@@ -638,6 +639,10 @@ class BuildConfigGenerator extends DefaultTask {
             case 'androidx_annotation_annotation_jvm':
                 sb.append('  # https://crbug.com/989505\n')
                 sb.append('  jar_excluded_patterns = ["META-INF/proguard/*"]\n')
+                break
+            case 'androidx_benchmark_benchmark_macro':
+                // Manually add dep onto DISALLOWED_DEP androidx.profileinstaller.
+                sb.append('  deps += [ ":androidx_profileinstaller_profileinstaller_java" ]\n')
                 break
             case 'androidx_core_core':
                 sb.with {

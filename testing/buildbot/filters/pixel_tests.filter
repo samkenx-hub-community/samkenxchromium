@@ -9,7 +9,6 @@
 AccessCodeCastDialogBrowserTest.*
 AppInfoDialogBrowserTest.*
 AskGoogleForSuggestionsDialogTest.*
-*PopupViewViewsBrowsertest*
 BookmarkBubbleViewBrowserTest.*
 BookmarkEditorViewBrowserTest.*
 BubbleFrameViewBrowserTest.*
@@ -54,10 +53,12 @@ PageInfoBubbleViewHistoryDialogBrowserTest.*
 PageInfoBubbleViewCookiesSubpageBrowserTest.*
 PageInfoBubbleViewIsolatedWebAppBrowserTest.*
 *PasswordBubbleBrowserTest.*
+*PasswordGenerationPopupViewBrowsertest.*
 PasswordReuseModalWarningTest.*
 *PasswordRevampedManagementBubbleBrowserTest.*
 PermissionRequestChipDialogBrowserTest.*
 *PermissionPromptBubbleViewBrowserTest.*
+*PopupViewViewsBrowsertest*
 PrivacySandboxDialogViewBrowserTest.*
 PrivacySandboxNoticeBubbleBrowserTest.*
 ProfilePickerUIPixelTest.*
@@ -86,8 +87,5 @@ ZoomBubbleDialogTest.*
 #
 # # TODO(crbug.com/xxx): Fix xyz and re-enable.
 # -MyTestSuite.InvokeUi_MyTestCase
-
-# This test uses random network port and shows it on ui.
--ContentSettingBubbleDialogTest.InvokeUi_popups
 
 -OutdatedUpgradeBubbleTest.InvokeUi_Critical

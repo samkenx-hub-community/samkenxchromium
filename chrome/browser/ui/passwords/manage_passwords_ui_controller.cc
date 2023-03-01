@@ -725,9 +725,8 @@ void ManagePasswordsUIController::AuthenticateUser(
 #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC)
   base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
       FROM_HERE,
-      base::BindOnce(
-          &ManagePasswordsUIController::RequestAuthenticationAndReopenBubble,
-          weak_ptr_factory_.GetWeakPtr(), std::move(callback)));
+      base::BindOnce(&ManagePasswordsUIController::RequestAuthentication,
+                     weak_ptr_factory_.GetWeakPtr(), std::move(callback)));
 #else
   std::move(callback).Run(true);
 #endif
@@ -747,8 +746,7 @@ void ManagePasswordsUIController::AuthenticateUserWithMessage(
   CancelAnyOngoingBiometricAuth();
   biometric_authenticator_ = passwords_data_.client()->GetDeviceAuthenticator();
   biometric_authenticator_->AuthenticateWithMessage(
-      device_reauth::DeviceAuthRequester::kTouchToFill, message,
-      std::move(callback).Then(std::move(on_reauth_completed)));
+      message, std::move(callback).Then(std::move(on_reauth_completed)));
 #endif  // !BUILDFLAG(IS_MAC) && !BUILDFLAG(IS_WIN)
 }
 
@@ -895,10 +893,8 @@ void ManagePasswordsUIController::WebContentsDestroyed() {
   HidePasswordBubble();
 }
 
-void ManagePasswordsUIController::RequestAuthenticationAndReopenBubble(
+void ManagePasswordsUIController::RequestAuthentication(
     AvailabilityCallback callback) {
-  base::WeakPtr<ManagePasswordsUIController> weak_ptr =
-      weak_ptr_factory_.GetWeakPtr();
   bool auth_is_successful = ShowAuthenticationDialog();
   std::move(callback).Run(auth_is_successful);
 }

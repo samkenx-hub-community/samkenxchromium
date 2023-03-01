@@ -31,6 +31,7 @@ import './device_page/per_device_touchpad.js';
 import './device_page/per_device_touchpad_subsection.js';
 import './device_page/pointers.js';
 import './device_page/power.js';
+import './device_page/keyboard_remap_modifier_key_row.js';
 import './device_page/storage.js';
 import './device_page/storage_external.js';
 import './device_page/storage_external_entry.js';
@@ -127,12 +128,12 @@ import {loadTimeData} from 'chrome://resources/js/load_time_data.js';
 
 import * as appNotificationHandlerMojom from '../mojom-webui/app_notification_handler.mojom-webui.js';
 import * as crosAudioConfigMojom from '../mojom-webui/cros_audio_config.mojom-webui.js';
-import * as routesMojomWebui from '../mojom-webui/routes.mojom-webui.js';
+import * as routesMojom from '../mojom-webui/routes.mojom-webui.js';
 import * as personalizationSearchMojom from '../mojom-webui/search/personalization_search.mojom-webui.js';
 import * as searchMojomWebui from '../mojom-webui/search/search.mojom-webui.js';
 import * as searchResultIconMojomWebui from '../mojom-webui/search/search_result_icon.mojom-webui.js';
 import * as userActionRecorderMojomWebui from '../mojom-webui/search/user_action_recorder.mojom-webui.js';
-import * as settingMojomWebui from '../mojom-webui/setting.mojom-webui.js';
+import * as settingMojom from '../mojom-webui/setting.mojom-webui.js';
 
 import * as fakeCrosAudioConfig from './device_page/fake_cros_audio_config.js';
 
@@ -161,6 +162,7 @@ export {fakeKeyboards, fakeMice, fakePointingSticks, fakeTouchpads} from './devi
 export {FakeInputDeviceSettingsProvider} from './device_page/fake_input_device_settings_provider.js';
 export {getInputDeviceSettingsProvider, setInputDeviceSettingsProviderForTesting, setupFakeInputDeviceSettingsProvider} from './device_page/input_device_mojo_interface_provider.js';
 export {MetaKey, ModifierKey} from './device_page/input_device_settings_types.js';
+export {KeyboardRemapModifierKeyRowElement} from './device_page/keyboard_remap_modifier_key_row.js';
 export {SettingsPerDeviceKeyboardElement} from './device_page/per_device_keyboard.js';
 export {SettingsPerDeviceKeyboardRemapKeysElement} from './device_page/per_device_keyboard_remap_keys.js';
 export {SettingsPerDeviceKeyboardSubsectionElement} from './device_page/per_device_keyboard_subsection.js';
@@ -201,6 +203,7 @@ export {OsBluetoothDevicesSubpageBrowserProxyImpl} from './os_bluetooth_page/os_
 export {FastPairSavedDevicesOptInStatus} from './os_bluetooth_page/settings_fast_pair_constants.js';
 export {osPageVisibility} from './os_page_visibility.js';
 export {AccountManagerBrowserProxy, AccountManagerBrowserProxyImpl} from './os_people_page/account_manager_browser_proxy.js';
+export {SettingsUsersAddUserDialogElement} from './os_people_page/add_user_dialog.js';
 export {FingerprintBrowserProxyImpl, FingerprintResultType} from './os_people_page/fingerprint_browser_proxy.js';
 export {OsSyncBrowserProxyImpl} from './os_people_page/os_sync_browser_proxy.js';
 export {FingerprintSetupStep} from './os_people_page/setup_fingerprint_dialog.js';
@@ -221,10 +224,10 @@ export {
   fakeCrosAudioConfig,
   nearbyShareMojom,
   personalizationSearchMojom,
-  routesMojomWebui,
+  routesMojom,
   searchMojomWebui,
   searchResultIconMojomWebui,
-  settingMojomWebui,
+  settingMojom,
   userActionRecorderMojomWebui,
 };
 

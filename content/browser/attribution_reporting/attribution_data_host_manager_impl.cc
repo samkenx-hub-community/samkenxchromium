@@ -478,7 +478,6 @@ void AttributionDataHostManagerImpl::SourceDataAvailable(
     attribution_reporting::SourceRegistration data) {
   // This is validated by the Mojo typemapping.
   DCHECK(reporting_origin.IsValid());
-  DCHECK(attribution_reporting::IsSitePotentiallySuitable(data.destination));
 
   ReceiverContext& context = receivers_.current_context();
 
@@ -513,7 +512,6 @@ void AttributionDataHostManagerImpl::SourceDataAvailable(
 void AttributionDataHostManagerImpl::TriggerDataAvailable(
     attribution_reporting::SuitableOrigin reporting_origin,
     attribution_reporting::TriggerRegistration data,
-    // TODO(crbug.com/1401347): Propagate `attestation` to storage.
     absl::optional<network::TriggerAttestation> attestation) {
   // This is validated by the Mojo typemapping.
   DCHECK(reporting_origin.IsValid());

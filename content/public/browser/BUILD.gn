@@ -191,6 +191,7 @@ source_set("browser_sources") {
     "frame_accept_header.h",
     "frame_rate_throttling.h",
     "frame_type.h",
+    "fullscreen_types.h",
     "generated_code_cache_settings.h",
     "global_request_id.cc",
     "global_request_id.h",
@@ -632,6 +633,8 @@ source_set("browser_sources") {
       "chromeos/multi_capture_service.h",
       "firewall_hole_proxy.h",
       "lock_screen_storage.h",
+      "smart_card_delegate.cc",
+      "smart_card_delegate.h",
     ]
   }
 
@@ -643,12 +646,6 @@ source_set("browser_sources") {
       # Android provides its own native implementation of that API.
       "web_authentication_request_proxy.h",
     ]
-    if (!is_fuchsia) {
-      sources += [
-        "smart_card_delegate.cc",
-        "smart_card_delegate.h",
-      ]
-    }
   }
 
   if (is_chromeos_ash) {

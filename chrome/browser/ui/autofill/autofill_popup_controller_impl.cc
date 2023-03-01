@@ -138,12 +138,11 @@ void AutofillPopupControllerImpl::Show(
       return;
     }
 
-    time_view_shown_ = base::TimeTicks::Now();
-
     // We only fire the event when a new popup shows. We do not fire the
     // event when suggestions changed.
     FireControlsChangedEvent(true);
   }
+  time_view_shown_ = base::TimeTicks::Now();
 
   absl::visit(
       [&](auto* driver) {
@@ -340,8 +339,9 @@ void AutofillPopupControllerImpl::SetElementBounds(const gfx::RectF& bounds) {
   controller_common_.element_bounds.set_size(bounds.size());
 }
 
-bool AutofillPopupControllerImpl::IsRTL() const {
-  return controller_common_.text_direction == base::i18n::RIGHT_TO_LEFT;
+base::i18n::TextDirection AutofillPopupControllerImpl::GetElementTextDirection()
+    const {
+  return controller_common_.text_direction;
 }
 
 std::vector<Suggestion> AutofillPopupControllerImpl::GetSuggestions() const {
@@ -524,8 +524,9 @@ AutofillPopupControllerImpl::GetDriver() {
   }
 }
 
-void AutofillPopupControllerImpl::SetViewForTesting(AutofillPopupView* view) {
-  view_ = view;
+void AutofillPopupControllerImpl::SetViewForTesting(
+    base::WeakPtr<AutofillPopupView> view) {
+  view_ = std::move(view);
   time_view_shown_ = base::TimeTicks::Now();
 }
 
@@ -589,5 +590,11 @@ AutofillPopupControllerImpl::GetRootAXPlatformNodeForWebContents() {
   // NativeViewAccessible corresponds to an AXPlatformNode.
   return ui::AXPlatformNode::FromNativeViewAccessible(native_view_accessible);
 }
+
+AutofillPopupControllerImpl::AutofillPopupViewPtr::AutofillPopupViewPtr() =
+    default;
+
+AutofillPopupControllerImpl::AutofillPopupViewPtr::~AutofillPopupViewPtr() =
+    default;
 
 }  // namespace autofill

@@ -9,7 +9,6 @@
 #include "base/functional/callback_helpers.h"
 #include "base/json/json_writer.h"
 #include "base/memory/ptr_util.h"
-#include "base/memory/raw_ptr.h"
 #include "base/memory/scoped_refptr.h"
 #include "base/memory/weak_ptr.h"
 #include "base/strings/strcat.h"
@@ -21,6 +20,7 @@
 #include "base/test/task_environment.h"
 #include "base/values.h"
 #include "chrome/browser/policy/messaging_layer/proto/synced/log_upload_event.pb.h"
+#include "chrome/browser/policy/messaging_layer/public/report_client_test_util.h"
 #include "chrome/browser/policy/messaging_layer/upload/dm_server_uploader.h"
 #include "chrome/browser/policy/messaging_layer/upload/file_upload_job.h"
 #include "chrome/browser/policy/messaging_layer/upload/file_upload_job_test_util.h"
@@ -118,25 +118,46 @@ class MockFileUploadDelegate : public FileUploadJob::Delegate {
 class RecordHandlerUploadTest : public ::testing::Test {
  protected:
   void SetUp() override {
-    storage_ = base::MakeRefCounted<test::TestStorageModule>();
+    test_storage_ = base::MakeRefCounted<test::TestStorageModule>();
+    test_reporting_ = ReportingClient::TestEnvironment::CreateWithStorageModule(
+        test_storage_);
     auto delegate = std::make_unique<MockFileUploadDelegate>();
     delegate_ = delegate.get();
-    handler_ = std::make_unique<RecordHandlerImpl>(
-        sequenced_task_runner_, std::move(delegate),
-        base::BindRepeating(
-            [](scoped_refptr<StorageModuleInterface> storage) {
-              return storage;
-            },
-            storage_));
+    handler_ = std::make_unique<RecordHandlerImpl>(sequenced_task_runner_,
+                                                   std::move(delegate));
 
     memory_resource_ =
         base::MakeRefCounted<ResourceManager>(4u * 1024LLu * 1024LLu);  // 4 MiB
+
+    // Create a queue and post event, in order to let ReportClient set storage.
+    auto config_result = ReportQueueConfiguration::Create(
+        EventType::kDevice, LOG_UPLOAD,
+        /*policy_check_callback=*/base::BindRepeating([]() {
+          return Status::StatusOK();
+        }));
+    EXPECT_OK(config_result) << config_result.status();
+    test::TestEvent<StatusOr<std::unique_ptr<ReportQueue>>> create_queue_event;
+    ReportQueueProvider::CreateQueue(std::move(config_result.ValueOrDie()),
+                                     create_queue_event.cb());
+    auto report_queue_result = create_queue_event.result();
+    // Let everything ongoing to finish.
+    task_environment_.RunUntilIdle();
+    ASSERT_OK(report_queue_result) << report_queue_result.status();
+
+    // Enqueue event.
+    test::TestEvent<Status> enqueue_record_event;
+    std::move(report_queue_result.ValueOrDie())
+        ->Enqueue("Record", FAST_BATCH, enqueue_record_event.cb());
+    const auto enqueue_record_result = enqueue_record_event.result();
+    EXPECT_OK(enqueue_record_result) << enqueue_record_result;
   }
 
   void TearDown() override {
     delegate_ = nullptr;
     handler_.reset();
-    storage_.reset();
+    test_storage_.reset();
+    test_reporting_.reset();
+
     EXPECT_THAT(memory_resource_->GetUsed(), Eq(0uL));
   }
 
@@ -148,7 +169,8 @@ class RecordHandlerUploadTest : public ::testing::Test {
   FileUploadJob::TestEnvironment manager_test_env_;
   ReportingServerConnector::TestEnvironment test_env_;
 
-  scoped_refptr<test::TestStorageModule> storage_;
+  scoped_refptr<test::TestStorageModule> test_storage_;
+  std::unique_ptr<ReportingClient::TestEnvironment> test_reporting_;
 
   raw_ptr<MockFileUploadDelegate> delegate_;
 
@@ -275,7 +297,7 @@ TEST_F(RecordHandlerUploadTest, SuccessfulInitiation) {
   EXPECT_CALL(*delegate_, DoNextStep).Times(0);
   EXPECT_CALL(*delegate_, DoFinalize).Times(0);
 
-  EXPECT_CALL(*storage_, AddRecord(Eq(Priority::IMMEDIATE), _, _))
+  EXPECT_CALL(*test_storage_, AddRecord(Eq(Priority::IMMEDIATE), _, _))
       .WillOnce(Invoke([](Priority priority, Record record,
                           StorageModuleInterface::EnqueueCallback callback) {
         EXPECT_TRUE(record.needs_local_unencrypted_copy());
@@ -327,7 +349,7 @@ TEST_F(RecordHandlerUploadTest, SuccessfulNextStep) {
           });
   EXPECT_CALL(*delegate_, DoFinalize).Times(0);
 
-  EXPECT_CALL(*storage_, AddRecord(Eq(Priority::IMMEDIATE), _, _))
+  EXPECT_CALL(*test_storage_, AddRecord(Eq(Priority::IMMEDIATE), _, _))
       .WillOnce(Invoke([](Priority priority, Record record,
                           StorageModuleInterface::EnqueueCallback callback) {
         EXPECT_TRUE(record.needs_local_unencrypted_copy());
@@ -376,7 +398,7 @@ TEST_F(RecordHandlerUploadTest, SuccessfulFinalize) {
             std::move(cb).Run("http://destination");
           }));
 
-  EXPECT_CALL(*storage_, AddRecord(Eq(Priority::IMMEDIATE), _, _))
+  EXPECT_CALL(*test_storage_, AddRecord(Eq(Priority::IMMEDIATE), _, _))
       .WillOnce(Invoke([](Priority priority, Record record,
                           StorageModuleInterface::EnqueueCallback callback) {
         EXPECT_FALSE(record.needs_local_unencrypted_copy());
@@ -419,19 +441,7 @@ TEST_F(RecordHandlerUploadTest, AlreadyFinalized) {
   EXPECT_CALL(*delegate_, DoNextStep).Times(0);
   EXPECT_CALL(*delegate_, DoFinalize).Times(0);
 
-  EXPECT_CALL(*storage_, AddRecord(Eq(Priority::IMMEDIATE), _, _))
-      .WillOnce(Invoke([](Priority priority, Record record,
-                          StorageModuleInterface::EnqueueCallback callback) {
-        EXPECT_FALSE(record.needs_local_unencrypted_copy());
-        LogUploadEvent log_upload_event;
-        EXPECT_TRUE(log_upload_event.ParseFromArray(record.data().data(),
-                                                    record.data().size()));
-        EXPECT_THAT(log_upload_event,
-                    AllOf(MatchSettings(),
-                          MatchTrackerFinished(300L, "http://destination")));
-        EXPECT_FALSE(log_upload_event.upload_tracker().has_status());
-        std::move(callback).Run(Status::StatusOK());
-      }));
+  EXPECT_CALL(*test_storage_, AddRecord).Times(0);
 
   handler_->HandleRecords(/*need_encryption_key=*/false,
                           std::vector(1, std::move(fin_encrypted_record)),
@@ -470,7 +480,7 @@ TEST_F(RecordHandlerUploadTest, FailedProcessing) {
           });
   EXPECT_CALL(*delegate_, DoFinalize).Times(0);
 
-  EXPECT_CALL(*storage_, AddRecord(Eq(Priority::IMMEDIATE), _, _))
+  EXPECT_CALL(*test_storage_, AddRecord(Eq(Priority::IMMEDIATE), _, _))
       .WillOnce(Invoke([](Priority priority, Record record,
                           StorageModuleInterface::EnqueueCallback callback) {
         EXPECT_FALSE(record.needs_local_unencrypted_copy());
@@ -517,7 +527,7 @@ TEST_F(RecordHandlerUploadTest, RepeatedInitiationAttempts) {
   EXPECT_CALL(*delegate_, DoNextStep).Times(0);
   EXPECT_CALL(*delegate_, DoFinalize).Times(0);
 
-  EXPECT_CALL(*storage_, AddRecord(Eq(Priority::IMMEDIATE), _, _))
+  EXPECT_CALL(*test_storage_, AddRecord(Eq(Priority::IMMEDIATE), _, _))
       .Times(kNumTestRecords)
       .WillRepeatedly(
           Invoke([](Priority priority, Record record,
@@ -579,7 +589,7 @@ TEST_F(RecordHandlerUploadTest, RepeatedNextStepAttempts) {
           });
   EXPECT_CALL(*delegate_, DoFinalize).Times(0);
 
-  EXPECT_CALL(*storage_, AddRecord(Eq(Priority::IMMEDIATE), _, _))
+  EXPECT_CALL(*test_storage_, AddRecord(Eq(Priority::IMMEDIATE), _, _))
       .Times(kNumTestRecords)
       .WillRepeatedly(
           Invoke([](Priority priority, Record record,
@@ -641,22 +651,20 @@ TEST_F(RecordHandlerUploadTest, RepeatedFinalizeAttempts) {
             std::move(cb).Run("http://destination");
           }));
 
-  EXPECT_CALL(*storage_, AddRecord(Eq(Priority::IMMEDIATE), _, _))
-      .Times(kNumTestRecords)
-      .WillRepeatedly(
-          Invoke([](Priority priority, Record record,
-                    StorageModuleInterface::EnqueueCallback callback) {
-            EXPECT_FALSE(record.needs_local_unencrypted_copy());
-            LogUploadEvent log_upload_event;
-            EXPECT_TRUE(log_upload_event.ParseFromArray(record.data().data(),
-                                                        record.data().size()));
-            EXPECT_THAT(
-                log_upload_event,
-                AllOf(MatchSettings(),
-                      MatchTrackerFinished(300L, "http://destination")));
-            EXPECT_FALSE(log_upload_event.upload_tracker().has_status());
-            std::move(callback).Run(Status::StatusOK());
-          }));
+  // Record added only once!
+  EXPECT_CALL(*test_storage_, AddRecord(Eq(Priority::IMMEDIATE), _, _))
+      .WillOnce(Invoke([](Priority priority, Record record,
+                          StorageModuleInterface::EnqueueCallback callback) {
+        EXPECT_FALSE(record.needs_local_unencrypted_copy());
+        LogUploadEvent log_upload_event;
+        EXPECT_TRUE(log_upload_event.ParseFromArray(record.data().data(),
+                                                    record.data().size()));
+        EXPECT_THAT(log_upload_event,
+                    AllOf(MatchSettings(),
+                          MatchTrackerFinished(300L, "http://destination")));
+        EXPECT_FALSE(log_upload_event.upload_tracker().has_status());
+        std::move(callback).Run(Status::StatusOK());
+      }));
 
   for (size_t i = 0; i < kNumTestRecords; ++i) {
     ScopedReservation record_reservation(fin_encrypted_record.ByteSizeLong(),

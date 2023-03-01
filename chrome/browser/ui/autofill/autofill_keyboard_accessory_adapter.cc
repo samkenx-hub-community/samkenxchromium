@@ -106,6 +106,11 @@ absl::optional<int32_t> AutofillKeyboardAccessoryAdapter::GetAxUniqueId() {
   return absl::nullopt;
 }
 
+base::WeakPtr<AutofillPopupView>
+AutofillKeyboardAccessoryAdapter::GetWeakPtr() {
+  return weak_ptr_factory_.GetWeakPtr();
+}
+
 // AutofillPopupController implementation.
 
 void AutofillKeyboardAccessoryAdapter::AcceptSuggestion(
@@ -211,8 +216,10 @@ const gfx::RectF& AutofillKeyboardAccessoryAdapter::element_bounds() const {
   return controller_->element_bounds();
 }
 
-bool AutofillKeyboardAccessoryAdapter::IsRTL() const {
-  return controller_ && controller_->IsRTL();
+base::i18n::TextDirection
+AutofillKeyboardAccessoryAdapter::GetElementTextDirection() const {
+  DCHECK(controller_);
+  return controller_->GetElementTextDirection();
 }
 
 std::vector<Suggestion> AutofillKeyboardAccessoryAdapter::GetSuggestions()
