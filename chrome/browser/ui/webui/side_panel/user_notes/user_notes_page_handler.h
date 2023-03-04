@@ -63,6 +63,9 @@ class UserNotesPageHandler : public side_panel::mojom::UserNotesPageHandler,
       ui::mojom::ClickModifiersPtr click_modifiers) override;
   void SetSortOrder(bool sort_by_newest) override;
   void HasNotesInAnyPages(HasNotesInAnyPagesCallback callback) override;
+  void OpenInNewTab(const ::GURL& url) override;
+  void OpenInNewWindow(const ::GURL& url) override;
+  void OpenInIncognitoWindow(const ::GURL& url) override;
 
   void OnSortByNewestPrefChanged();
 
@@ -86,15 +89,21 @@ class UserNotesPageHandler : public side_panel::mojom::UserNotesPageHandler,
   void PrimaryPageChanged(content::Page& page) override;
 
   void UpdateCurrentTabUrl();
+  void OpenUrl(const ::GURL& url, WindowOpenDisposition open_location);
 
   mojo::Receiver<side_panel::mojom::UserNotesPageHandler> receiver_;
   mojo::Remote<side_panel::mojom::UserNotesPage> page_;
   const raw_ptr<Profile> profile_;
   PrefChangeRegistrar pref_change_registrar_;
   const raw_ptr<power_bookmarks::PowerBookmarkService> service_;
-  const raw_ptr<bookmarks::BookmarkModel> bookmark_model_;
   const raw_ptr<Browser> browser_;
+
   raw_ptr<UserNotesSidePanelUI> user_notes_ui_ = nullptr;
+
+  // Use a week pointer here because BookmarkModel may outlive the callback in
+  // `GetNoteOverviews`.
+  base::WeakPtr<bookmarks::BookmarkModel> bookmark_model_;
+
   bool start_creation_after_tab_change_ = false;
   GURL current_tab_url_;
 };

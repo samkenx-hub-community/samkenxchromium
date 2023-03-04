@@ -264,6 +264,8 @@ void SavedPasswordsPresenter::AddCredentials(
   std::vector<CredentialUIEntry> valid_credentials;
   valid_credentials.reserve(credentials.size());
 
+  // TODO(crbug/1417650): Remove validation from this method. Validation needs
+  // to be carried out by the caller.
   base::ranges::transform(credentials, std::back_inserter(results),
                           [&](const CredentialUIEntry& credential) {
                             AddResult result = GetExpectedAddResult(credential);
@@ -563,6 +565,10 @@ void SavedPasswordsPresenter::AddForms(const std::vector<PasswordForm>& forms) {
     return;
   }
 
+  // Group passwords once we received forms from all password stores.
+  if (pending_store_updates_ > 0) {
+    return;
+  }
   // TODO(crbug.com/1354196): Pass only added forms to |passwords_grouper_|.
   std::vector<PasswordForm> all_forms;
   all_forms.reserve(sort_key_to_password_forms_.size());

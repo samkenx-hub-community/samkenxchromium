@@ -13,6 +13,7 @@
 #include "chrome/browser/ash/arc/input_overlay/display_overlay_controller.h"
 #include "chrome/browser/ash/arc/input_overlay/util.h"
 #include "chrome/grit/generated_resources.h"
+#include "chromeos/strings/grit/chromeos_strings.h"
 #include "third_party/skia/include/core/SkColor.h"
 #include "ui/accessibility/ax_enums.mojom-shared.h"
 #include "ui/base/cursor/cursor.h"
@@ -154,14 +155,16 @@ class EditFinishView::ChildButton : public views::LabelButton {
   ~ChildButton() override = default;
 
   bool OnMousePressed(const ui::MouseEvent& event) override {
-    if (AllowReposition())
+    if (AllowReposition()) {
       on_mouse_pressed_callback_.Run(event);
+    }
     return LabelButton::OnMousePressed(event);
   }
 
   bool OnMouseDragged(const ui::MouseEvent& event) override {
-    if (!AllowReposition())
+    if (!AllowReposition()) {
       return LabelButton::OnMouseDragged(event);
+    }
 
     is_dragging_ = true;
     on_mouse_dragged_callback_.Run(event);
@@ -276,8 +279,8 @@ void EditFinishView::Init(const gfx::Size& parent_size) {
 void EditFinishView::SetFocusRing() {
   SetFocusBehavior(FocusBehavior::ALWAYS);
   GetViewAccessibility().OverrideRole(ax::mojom::Role::kGroup);
-  // TODO(b/260868602): Update the name.
-  GetViewAccessibility().OverrideName(GetClassName());
+  GetViewAccessibility().OverrideName(
+      l10n_util::GetStringUTF16(IDS_INPUT_OVERLAY_LAYOUT_ACCTIONS_MENU));
   views::FocusRing::Install(this);
   views::InstallRoundRectHighlightPathGenerator(this, gfx::Insets(),
                                                 kButtonCornerRadius);
@@ -295,14 +298,16 @@ int EditFinishView::CalculateWidth() {
 }
 
 bool EditFinishView::OnMousePressed(const ui::MouseEvent& event) {
-  if (AllowReposition())
+  if (AllowReposition()) {
     OnDragStart(event);
+  }
   return views::View::OnMousePressed(event);
 }
 
 bool EditFinishView::OnMouseDragged(const ui::MouseEvent& event) {
-  if (AllowReposition())
+  if (AllowReposition()) {
     OnDragUpdate(event);
+  }
   return views::View::OnMouseDragged(event);
 }
 
@@ -364,8 +369,9 @@ bool EditFinishView::OnKeyPressed(const ui::KeyEvent& event) {
 }
 
 bool EditFinishView::OnKeyReleased(const ui::KeyEvent& event) {
-  if (!AllowReposition() || !ash::IsArrowKeyEvent(event) || !HasFocus())
+  if (!AllowReposition() || !ash::IsArrowKeyEvent(event) || !HasFocus()) {
     return views::View::OnKeyReleased(event);
+  }
 
   RecordInputOverlayButtonGroupReposition(
       RepositionType::kKeyboardArrowKeyReposition);
@@ -392,25 +398,29 @@ void EditFinishView::OnDragEnd() {
 
 void EditFinishView::OnResetButtonPressed() {
   DCHECK(display_overlay_controller_);
-  if (!display_overlay_controller_)
+  if (!display_overlay_controller_) {
     return;
+  }
   display_overlay_controller_->OnCustomizeRestore();
-  if (reset_button_->HasFocus() || !parent())
+  if (reset_button_->HasFocus() || !parent()) {
     return;
+  }
   ResetFocusTo(parent());
 }
 
 void EditFinishView::OnSaveButtonPressed() {
   DCHECK(display_overlay_controller_);
-  if (!display_overlay_controller_)
+  if (!display_overlay_controller_) {
     return;
+  }
   display_overlay_controller_->OnCustomizeSave();
 }
 
 void EditFinishView::OnCancelButtonPressed() {
   DCHECK(display_overlay_controller_);
-  if (!display_overlay_controller_)
+  if (!display_overlay_controller_) {
     return;
+  }
   display_overlay_controller_->OnCustomizeCancel();
 }
 

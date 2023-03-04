@@ -22,6 +22,7 @@ BASE_DECLARE_FEATURE(kAutofillEnableCvcForVcnYellowPath);
 BASE_DECLARE_FEATURE(kAutofillEnableFIDOProgressDialog);
 BASE_DECLARE_FEATURE(kAutofillEnableIbanClientSideUrlFiltering);
 BASE_DECLARE_FEATURE(kAutofillEnableManualFallbackForVirtualCards);
+BASE_DECLARE_FEATURE(kAutofillEnableMerchantOptOutClientSideUrlFiltering);
 BASE_DECLARE_FEATURE(kAutofillEnableNewCardArtAndNetworkImages);
 BASE_DECLARE_FEATURE(kAutofillEnableNewSaveCardBubbleUi);
 BASE_DECLARE_FEATURE(kAutofillEnableOfferNotificationForPromoCodes);
@@ -47,6 +48,7 @@ BASE_DECLARE_FEATURE(kAutofillUpstream);
 BASE_DECLARE_FEATURE(kAutofillUpstreamAllowAdditionalEmailDomains);
 BASE_DECLARE_FEATURE(kAutofillUpstreamAllowAllEmailDomains);
 BASE_DECLARE_FEATURE(kAutofillUpstreamUseAlternateSecureDataType);
+BASE_DECLARE_FEATURE(kAutofillUseEloRegexForBinMatching);
 extern const base::FeatureParam<int>
     kAutofillVirtualCardEnrollDelayInStrikeDatabaseInDays;
 

@@ -126,9 +126,10 @@ def validateJavaScriptAllowed(source_dir, out_dir, is_ios):
       'chrome/browser/resources/chromeos/emoji_picker',
       'chrome/browser/resources/nearby_share/shared',
       'chrome/browser/resources/ntp4',
-      'chrome/browser/resources/settings/chromeos/tsc_input',
       'chrome/test/data/webui',
       'chrome/test/data/webui/chromeos',
+      #TODO(b/270220102): Remove when fully migrated to TS.
+      'chrome/test/data/webui/chromeos/emoji_picker',
       'chrome/test/data/webui/settings/chromeos',
       'components/policy/resources/webui',
       'ui/webui/resources/js',

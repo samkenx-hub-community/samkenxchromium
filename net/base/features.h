@@ -194,9 +194,6 @@ NET_EXPORT BASE_DECLARE_FEATURE(kSameSiteDefaultChecksMethodRigorously);
 
 #if BUILDFLAG(TRIAL_COMPARISON_CERT_VERIFIER_SUPPORTED)
 NET_EXPORT BASE_DECLARE_FEATURE(kCertDualVerificationTrialFeature);
-#if BUILDFLAG(IS_MAC)
-NET_EXPORT extern const base::FeatureParam<int> kCertDualVerificationTrialImpl;
-#endif /* BUILDFLAG(IS_MAC) */
 #endif /* BUILDFLAG(TRIAL_COMPARISON_CERT_VERIFIER_SUPPORTED) */
 
 #if BUILDFLAG(CHROME_ROOT_STORE_SUPPORTED)
@@ -350,6 +347,13 @@ NET_EXPORT BASE_DECLARE_FEATURE(kPriorityIncremental);
 // Prefetch to follow normal semantics instead of 5-minute rule
 // https://crbug.com/1345207
 NET_EXPORT BASE_DECLARE_FEATURE(kPrefetchFollowsNormalCacheSemantics);
+
+// A flag for new Kerberos feature, that suggests new UI
+// when Kerberos authentication in browser fails on ChromeOS.
+// b/260522530
+#if BUILDFLAG(IS_CHROMEOS)
+NET_EXPORT BASE_DECLARE_FEATURE(kKerberosInBrowserRedirect);
+#endif
 
 }  // namespace net::features
 

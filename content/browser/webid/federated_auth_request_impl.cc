@@ -15,6 +15,7 @@
 #include "base/time/time.h"
 #include "components/url_formatter/elide_url.h"
 #include "content/browser/bad_message.h"
+#include "content/browser/devtools/devtools_instrumentation.h"
 #include "content/browser/renderer_host/render_frame_host_impl.h"
 #include "content/browser/web_contents/web_contents_impl.h"
 #include "content/browser/webid/fake_identity_request_dialog_controller.h"
@@ -901,7 +902,16 @@ void FederatedAuthRequestImpl::MaybeShowAccountsDialog() {
 
   fetch_data_ = FetchData();
 
-  std::string rp_url_for_display = FormatOriginForDisplay(GetEmbeddingOrigin());
+  // TODO(crbug.com/1418719): Replace exclude_iframe based on client metadata
+  // response.
+  bool exclude_iframe = true;
+  absl::optional<std::string> iframe_url_for_display = absl::nullopt;
+  std::string top_frame_url_for_display =
+      FormatOriginForDisplay(GetEmbeddingOrigin());
+
+  if (!exclude_iframe && GetEmbeddingOrigin() != origin()) {
+    iframe_url_for_display = FormatOriginForDisplay(origin());
+  }
 
   // TODO(crbug.com/1383384): Handle auto_reauthn for multi IDP.
   bool idp_enabled_auto_reauthn = true;
@@ -972,13 +982,14 @@ void FederatedAuthRequestImpl::MaybeShowAccountsDialog() {
   // IDPs are failing in the multi IDP case.
   request_dialog_controller_->ShowAccountsDialog(
       WebContents::FromRenderFrameHost(&render_frame_host()),
-      rp_url_for_display, idp_data_for_display,
+      top_frame_url_for_display, iframe_url_for_display, idp_data_for_display,
       auto_reauthn ? SignInMode::kAuto : SignInMode::kExplicit,
       show_auto_reauthn_checkbox,
       base::BindOnce(&FederatedAuthRequestImpl::OnAccountSelected,
                      weak_ptr_factory_.GetWeakPtr(), auto_reauthn),
       base::BindOnce(&FederatedAuthRequestImpl::OnDialogDismissed,
                      weak_ptr_factory_.GetWeakPtr()));
+  devtools_instrumentation::OnFedCmAccountsDialogShown(&render_frame_host());
 
   if (auto_reauthn_enabled) {
     fedcm_metrics_->RecordAutoReauthnMetrics(

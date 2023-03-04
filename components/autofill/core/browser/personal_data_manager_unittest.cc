@@ -569,6 +569,32 @@ TEST_F(PersonalDataManagerTest, GetProfiles) {
               ElementsAre(Pointee(kLocalProfile)));
 }
 
+// Tests that `GetProfilesForSettings()` orders by descending modification
+// dates.
+// TODO(crbug.com/1420547): The modification date is set in AutofillTable.
+// Setting it on the test profiles directly doesn't suffice.
+TEST_F(PersonalDataManagerTest, GetProfilesForSettings) {
+  // Enable UnionView to test the ordering of profiles from different sources.
+  base::test::ScopedFeatureList feature;
+  feature.InitAndEnableFeature(features::kAutofillAccountProfilesUnionView);
+
+  TestAutofillClock test_clock;
+
+  AutofillProfile kAccountProfile = test::GetFullProfile();
+  kAccountProfile.set_source_for_testing(AutofillProfile::Source::kAccount);
+  AddProfileToPersonalDataManager(kAccountProfile);
+
+  AutofillProfile kLocalOrSyncableProfile = test::GetFullProfile2();
+  kLocalOrSyncableProfile.set_source_for_testing(
+      AutofillProfile::Source::kLocalOrSyncable);
+  test_clock.Advance(base::Minutes(123));
+  AddProfileToPersonalDataManager(kLocalOrSyncableProfile);
+
+  EXPECT_THAT(
+      personal_data_->GetProfilesForSettings(),
+      ElementsAre(Pointee(kLocalOrSyncableProfile), Pointee(kAccountProfile)));
+}
+
 // Tests that `SetProfilesForAllSources()` overwrites profiles with the correct
 // source.
 TEST_F(PersonalDataManagerTest, SetProfiles) {
@@ -1455,6 +1481,7 @@ TEST_F(PersonalDataManagerTest, KeepExistingLocalDataOnSignIn) {
 
   // Sign out.
   identity_test_env_.ClearPrimaryAccount();
+  sync_service_.SetAccountInfo(CoreAccountInfo());
   EXPECT_EQ(AutofillSyncSigninState::kSignedOut,
             personal_data_->GetSyncSigninState());
   EXPECT_EQ(0U, personal_data_->GetCreditCards().size());
@@ -1474,6 +1501,9 @@ TEST_F(PersonalDataManagerTest, KeepExistingLocalDataOnSignIn) {
   // Sign in.
   identity_test_env_.MakePrimaryAccountAvailable("test@gmail.com",
                                                  signin::ConsentLevel::kSync);
+  sync_service_.SetAccountInfo(
+      identity_test_env_.identity_manager()->GetPrimaryAccountInfo(
+          signin::ConsentLevel::kSync));
   sync_service_.SetHasSyncConsent(true);
   sync_service_.GetUserSettings()->SetSelectedTypes(
       /*sync_everything=*/false,
@@ -5650,6 +5680,8 @@ TEST_F(PersonalDataManagerSyncTransportModeTest, GetSyncSigninState) {
   // Check that the sync state is |SignedOut| when the account info is empty.
   {
     identity_test_env_.ClearPrimaryAccount();
+    sync_service_.SetAccountInfo(CoreAccountInfo());
+    sync_service_.SetHasSyncConsent(false);
     EXPECT_EQ(AutofillSyncSigninState::kSignedOut,
               personal_data_->GetSyncSigninState());
   }
@@ -5760,6 +5792,8 @@ TEST_F(PersonalDataManagerSyncTransportModeTest, OnUserAcceptedUpstreamOffer) {
   // kSignedOut
   ///////////////////////////////////////////////////////////
   identity_test_env_.ClearPrimaryAccount();
+  sync_service_.SetAccountInfo(CoreAccountInfo());
+  sync_service_.SetHasSyncConsent(false);
   {
     EXPECT_EQ(AutofillSyncSigninState::kSignedOut,
               personal_data_->GetSyncSigninState());
@@ -5777,6 +5811,7 @@ TEST_F(PersonalDataManagerSyncTransportModeTest, OnUserAcceptedUpstreamOffer) {
   ///////////////////////////////////////////////////////////
   identity_test_env_.MakePrimaryAccountAvailable(active_info.email,
                                                  signin::ConsentLevel::kSync);
+  sync_service_.SetAccountInfo(active_info);
   sync_service_.SetHasSyncConsent(true);
   {
     EXPECT_EQ(AutofillSyncSigninState::kSignedInAndSyncFeatureEnabled,

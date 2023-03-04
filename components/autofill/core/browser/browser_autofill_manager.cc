@@ -52,6 +52,7 @@
 #include "components/autofill/core/browser/autofill_experiments.h"
 #include "components/autofill/core/browser/autofill_external_delegate.h"
 #include "components/autofill/core/browser/autofill_field.h"
+#include "components/autofill/core/browser/autofill_optimization_guide.h"
 #include "components/autofill/core/browser/autofill_suggestion_generator.h"
 #include "components/autofill/core/browser/autofill_type.h"
 #include "components/autofill/core/browser/browser_autofill_manager_test_delegate.h"
@@ -71,6 +72,7 @@
 #include "components/autofill/core/browser/metrics/form_events/form_events.h"
 #include "components/autofill/core/browser/metrics/log_event.h"
 #include "components/autofill/core/browser/metrics/payments/card_metadata_metrics.h"
+#include "components/autofill/core/browser/metrics/quality_metrics.h"
 #include "components/autofill/core/browser/payments/autofill_offer_manager.h"
 #include "components/autofill/core/browser/payments/credit_card_access_manager.h"
 #include "components/autofill/core/browser/payments/payments_client.h"
@@ -1976,10 +1978,10 @@ void BrowserAutofillManager::UploadVotesAndLogQuality(
       }
     }
 
-    submitted_form->LogQualityMetrics(
-        submitted_form->form_parsed_timestamp(), interaction_time,
-        submission_time, form_interactions_ukm_logger(), did_show_suggestions_,
-        observed_submission, form_interaction_counts);
+    autofill_metrics::LogQualityMetrics(
+        *submitted_form, submitted_form->form_parsed_timestamp(),
+        interaction_time, submission_time, form_interactions_ukm_logger(),
+        did_show_suggestions_, observed_submission, form_interaction_counts);
 
     if (observed_submission) {
       // Ensure that callbacks for blur votes get sent as well here because
@@ -2396,9 +2398,9 @@ void BrowserAutofillManager::FillOrPreviewDataModelForm(
       filling_context->type_groups_originally_filled.insert(field_group_type);
 
     // Must match ForEachMatchingFormField() in form_autofill_util.cc.
-    // Only notify autofilling of empty fields and the field that initiated
-    // the filling (note that "select-one" controls may not be empty but will
-    // still be autofilled).
+    // Only notify autofilling of empty fields and the field that initiated the
+    // filling (note that "select-one" controls may not be empty but will still
+    // be autofilled).
     bool should_notify = !is_credit_card &&
                          (result.fields[i].SameFieldAs(field) ||
                           result.fields[i].form_control_type == "select-one" ||
@@ -2696,6 +2698,14 @@ void BrowserAutofillManager::OnFormProcessed(
   }
   if (address_form) {
     address_form_event_logger_->OnDidParseForm(form_structure);
+  }
+
+  // `autofill_optimization_guide_` is not present on unsupported platforms.
+  if (auto* autofill_optimization_guide =
+          client()->GetAutofillOptimizationGuide()) {
+    // Initiate necessary pre-processing based on the forms and fields that are
+    // parsed.
+    autofill_optimization_guide->OnDidParseForm(form_structure);
   }
 
   // If a form with the same name was previously filled, and there has not

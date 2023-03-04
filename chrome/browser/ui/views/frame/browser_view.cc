@@ -69,7 +69,7 @@
 #include "chrome/browser/ui/find_bar/find_bar.h"
 #include "chrome/browser/ui/find_bar/find_bar_controller.h"
 #include "chrome/browser/ui/layout_constants.h"
-#include "chrome/browser/ui/performance_controls/high_efficiency_iph_controller.h"
+#include "chrome/browser/ui/performance_controls/high_efficiency_opt_in_iph_controller.h"
 #include "chrome/browser/ui/qrcode_generator/qrcode_generator_bubble_controller.h"
 #include "chrome/browser/ui/recently_audible_helper.h"
 #include "chrome/browser/ui/sad_tab_helper.h"
@@ -1071,8 +1071,8 @@ BrowserView::BrowserView(std::unique_ptr<Browser> browser)
   if (!performance_manager::features::kHighEfficiencyModeDefaultState.Get() &&
       base::FeatureList::IsEnabled(
           performance_manager::features::kHighEfficiencyModeAvailable)) {
-    high_efficiency_iph_controller_ =
-        std::make_unique<HighEfficiencyIPHController>(browser_.get());
+    high_efficiency_opt_in_iph_controller_ =
+        std::make_unique<HighEfficiencyOptInIPHController>(browser_.get());
   }
 }
 
@@ -2969,13 +2969,14 @@ bool BrowserView::HandleKeyboardEvent(const NativeWebKeyboardEvent& event) {
 namespace {
 remote_cocoa::mojom::CutCopyPasteCommand CommandFromBrowserCommand(
     int command_id) {
-  if (command_id == IDC_CUT)
+  if (command_id == IDC_CUT) {
     return remote_cocoa::mojom::CutCopyPasteCommand::kCut;
-  else if (command_id == IDC_COPY)
+  }
+  if (command_id == IDC_COPY) {
     return remote_cocoa::mojom::CutCopyPasteCommand::kCopy;
-  else if (command_id == IDC_PASTE)
-    return remote_cocoa::mojom::CutCopyPasteCommand::kPaste;
-  NOTREACHED_NORETURN();
+  }
+  CHECK_EQ(command_id, IDC_PASTE);
+  return remote_cocoa::mojom::CutCopyPasteCommand::kPaste;
 }
 }  // namespace
 #endif

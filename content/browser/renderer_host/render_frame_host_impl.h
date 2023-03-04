@@ -2116,6 +2116,8 @@ class CONTENT_EXPORT RenderFrameHostImpl
 
   bool IsCredentialless() const override;
 
+  bool IsLastCrossDocumentNavigationStartedByUser() const override;
+
   bool is_fenced_frame_root_originating_from_opaque_url() const {
     return is_fenced_frame_root_originating_from_opaque_url_;
   }
@@ -2671,7 +2673,8 @@ class CONTENT_EXPORT RenderFrameHostImpl
   void SetOriginDependentStateOfNewFrame(RenderFrameHostImpl* creator_frame);
 
   // Returns the value of `this`'s main frame's
-  // RuntimeFeatureStateReadContext::IsThirdPartyStoragePartitioningEnabled()
+  // RuntimeFeatureStateReadContext::
+  // IsDisableThirdPartyStoragePartitioningEnabled()
   bool IsMainFrameThirdPartyStoragePartitioningEnabled();
 
   // Calculates the storage key for this RenderFrameHostImpl using the passed
@@ -4042,6 +4045,11 @@ class CONTENT_EXPORT RenderFrameHostImpl
   // activation state, get the value from RenderFrameHostImpl's
   // HasStickyUserActivation() or HasTransientUserActivation() instead.
   bool last_committed_common_params_has_user_gesture_ = false;
+
+  // Whether the last cross-document committed navigation was initiated from the
+  // browser (e.g. typing on the location bar) or from the renderer while having
+  // transient user activation
+  bool last_cross_document_navigation_started_by_user_ = false;
 
   // Whether the last committed navigation is to an error document.
   bool is_error_document_ = false;

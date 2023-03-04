@@ -177,6 +177,7 @@ group("gn_all") {
       "//components/viz:viz_unittests",
       "//content/shell:content_shell",
       "//gpu:gpu_unittests",
+      "//mojo:mojo_unittests",
       "//storage:storage_unittests",
       "//ui/gl:gl_unittests",
     ]
@@ -1030,11 +1031,6 @@ if (is_chromeos_ash) {
       }
     }
   }
-}
-
-# TODO(crbug.com/1311306) - Remove this target once all references to
-# it have been removed from this and other repos.
-group("gn_visibility") {
 }
 
 if (!is_ios) {

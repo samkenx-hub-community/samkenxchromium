@@ -25,7 +25,6 @@ CONTENT_EXPORT BASE_DECLARE_FEATURE(kAudioServiceLaunchOnStartup);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kAudioServiceOutOfProcess);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kAudioServiceSandbox);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kAvoidUnnecessaryBeforeUnloadCheckSync);
-CONTENT_EXPORT BASE_DECLARE_FEATURE(kAvoidUnnecessaryNavigationCancellations);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kBackgroundFetch);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kBackForwardCache);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(
@@ -252,8 +251,11 @@ enum class ServiceWorkerBypassFetchHandlerTarget {
   // handlers will be bypassed regardless of the current ServiceWorker running
   // status.
   kMainResource,
-  // TODO(crbug.com/1371756) We will add following enum values.
-  // kMainResourceOnlyIfServiceWorkerNotStarted,
+  // If the ServiceWorker is not started yet when the main resource request
+  // happens, it bypasses fetch handlers for the main resource and subsequent
+  // subresources. If the ServiceWorker is running, it invokes fetch handlers as
+  // usual.
+  kAllOnlyIfServiceWorkerNotStarted,
   // kSubResource,
   // kBoth
 };

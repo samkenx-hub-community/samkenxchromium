@@ -53,29 +53,6 @@ using testing::Pair;
 
 namespace {
 
-class UserActivationObserver : public content::WebContentsObserver {
- public:
-  explicit UserActivationObserver(content::WebContents* web_contents,
-                                  content::RenderFrameHost* render_frame_host)
-      : WebContentsObserver(web_contents),
-        render_frame_host_(render_frame_host) {}
-
-  // Wait until the frame receives user activation.
-  void Wait() { run_loop_.Run(); }
-
-  // WebContentsObserver override
-  void FrameReceivedUserActivation(
-      content::RenderFrameHost* render_frame_host) override {
-    if (render_frame_host_ == render_frame_host) {
-      run_loop_.Quit();
-    }
-  }
-
- private:
-  raw_ptr<content::RenderFrameHost> const render_frame_host_;
-  base::RunLoop run_loop_;
-};
-
 class FrameCookieAccessObserver : public content::WebContentsObserver {
  public:
   explicit FrameCookieAccessObserver(WebContents* web_contents,
@@ -771,8 +748,8 @@ class DIPSPrepopulateTest : public PlatformBrowserTest {
         ->FlushLossyWebsiteSettings();
   }
 
-  raw_ptr<DIPSService> dips_service;
-  raw_ptr<base::SequenceBound<DIPSStorage>> storage;
+  raw_ptr<DIPSService, DanglingUntriaged> dips_service;
+  raw_ptr<base::SequenceBound<DIPSStorage>, DanglingUntriaged> storage;
 
  private:
   base::test::ScopedFeatureList feature_list_;

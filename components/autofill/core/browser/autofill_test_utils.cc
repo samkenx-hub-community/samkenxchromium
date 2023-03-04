@@ -414,6 +414,12 @@ void CreateTestCreditCardFormData(FormData* form,
   form->fields.push_back(field);
 }
 
+void CreateTestIbanFormData(FormData* form_data, const char* value) {
+  FormFieldData field;
+  test::CreateTestFormField("IBAN Value:", "iban_value", value, "text", &field);
+  form_data->fields.push_back(field);
+}
+
 FormData WithoutUnserializedData(FormData form) {
   form.url = {};
   form.main_frame_origin = {};
@@ -651,6 +657,13 @@ CreditCard GetMaskedServerCardWithNickname() {
                           NextMonth().c_str(), NextYear().c_str(), "1");
   credit_card.SetNetworkForMaskedCard(kVisaCard);
   credit_card.SetNickname(u"Test nickname");
+  return credit_card;
+}
+
+CreditCard GetMaskedServerCardEnrolledIntoVirtualCardNumber() {
+  CreditCard credit_card = GetMaskedServerCard();
+  credit_card.set_virtual_card_enrollment_state(
+      CreditCard::VirtualCardEnrollmentState::ENROLLED);
   return credit_card;
 }
 

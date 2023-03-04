@@ -430,11 +430,6 @@ bool IsAccessibilitySelectToSpeakPageMigrationEnabled() {
   return ::features::IsAccessibilitySelectToSpeakPageMigrationEnabled();
 }
 
-bool IsExperimentalAccessibilitySelectToSpeakVoiceSwitchingEnabled() {
-  return ::features::
-      IsExperimentalAccessibilitySelectToSpeakVoiceSwitchingEnabled();
-}
-
 bool AreExperimentalAccessibilityColorEnhancementSettingsEnabled() {
   return ::features::
       AreExperimentalAccessibilityColorEnhancementSettingsEnabled();
@@ -568,6 +563,10 @@ void AccessibilitySection::AddLoadTimeData(
       {"chromeVoxLabel", IDS_SETTINGS_CHROMEVOX_LABEL},
       {"chromeVoxOptionsLabel", IDS_SETTINGS_CHROMEVOX_OPTIONS_LABEL},
       {"chromeVoxGeneralLabel", IDS_SETTINGS_CHROMEVOX_GENERAL_LABEL},
+      {"chromeVoxVoicesLabel", IDS_SETTINGS_CHROMEVOX_VOICES_LABEL},
+      {"chromeVoxBrailleLabel", IDS_SETTINGS_CHROMEVOX_BRAILLE_LABEL},
+      {"chromeVoxDeveloperOptionsLabel",
+       IDS_SETTINGS_CHROMEVOX_DEVELOPER_OPTIONS_LABEL},
       {"chromeVoxUseVerboseMode", IDS_SETTINGS_CHROMEVOX_USE_VERBOSE_MODE},
       {"chromeVoxAutoRead", IDS_SETTINGS_CHROMEVOX_AUTO_READ},
       {"chromeVoxSpeakTextUnderMouse",
@@ -981,10 +980,6 @@ void AccessibilitySection::AddLoadTimeData(
 
   html_source->AddBoolean("isAccessibilitySelectToSpeakPageMigrationEnabled",
                           IsAccessibilitySelectToSpeakPageMigrationEnabled());
-
-  html_source->AddBoolean(
-      "isExperimentalAccessibilitySelectToSpeakVoiceSwitchingEnabled",
-      IsExperimentalAccessibilitySelectToSpeakVoiceSwitchingEnabled());
 
   html_source->AddBoolean(
       "areExperimentalAccessibilityColorEnhancementSettingsEnabled",

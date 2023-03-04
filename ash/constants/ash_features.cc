@@ -1258,9 +1258,6 @@ BASE_FEATURE(kInternalServerSideSpeechRecognitionControl,
 // Enables sending `client-info` values to IPP printers on ChromeOS.
 BASE_FEATURE(kIppClientInfo, "IppClientInfo", base::FEATURE_ENABLED_BY_DEFAULT);
 
-// Enables Jelly features.
-BASE_FEATURE(kJelly, "Jelly", base::FEATURE_DISABLED_BY_DEFAULT);
-
 // Enables IME button in the floating accessibility menu for the Kiosk session.
 BASE_FEATURE(kKioskEnableImeButton,
              "KioskEnableImeButton",
@@ -1529,6 +1526,12 @@ BASE_FEATURE(kOsFeedback, "OsFeedback", base::FEATURE_DISABLED_BY_DEFAULT);
 BASE_FEATURE(kOsSettingsAppNotificationsPage,
              "OsSettingsAppNotificationsPage",
              base::FEATURE_ENABLED_BY_DEFAULT);
+
+// If enabled, OsSyncConsent Revamp will be shown.
+// enabling this without enabling Lacros flag will have no effect
+BASE_FEATURE(kOsSyncConsentRevamp,
+             "OsSyncConsentRevamp",
+             base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Enables app badging toggle to be displayed in app notification page in
 // ChromeOS Settings.
@@ -2024,12 +2027,12 @@ BASE_FEATURE(kTerminalTmuxIntegration,
 
 // Enables time of day screen saver.
 BASE_FEATURE(kTimeOfDayScreenSaver,
-             "TimeOfDayScreenSaver",
+             "FeatureManagementTimeOfDayScreenSaver",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Enables time of day wallpaper.
 BASE_FEATURE(kTimeOfDayWallpaper,
-             "TimeOfDayWallpaper",
+             "FeatureManagementTimeOfDayWallpaper",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Enables the TrafficCountersHandler class to auto-reset traffic counters
@@ -2763,7 +2766,9 @@ bool IsIppClientInfoEnabled() {
 }
 
 bool IsJellyEnabled() {
-  return base::FeatureList::IsEnabled(kJelly);
+  // TODO(b/270741618): Callers are being migrated to
+  // chromeos::features::IsJellyEnabled(). Do not use.
+  return chromeos::features::IsJellyEnabled();
 }
 
 bool IsKeyboardBacklightToggleEnabled() {
@@ -2939,6 +2944,10 @@ bool IsOsSettingsAppBadgingToggleEnabled() {
 
 bool IsOsSettingsSearchFeedbackEnabled() {
   return base::FeatureList::IsEnabled(kOsSettingsSearchFeedback);
+}
+
+bool IsOsSyncConsentRevampEnabled() {
+  return base::FeatureList::IsEnabled(kOsSyncConsentRevamp);
 }
 
 bool IsOverviewDeskNavigationEnabled() {

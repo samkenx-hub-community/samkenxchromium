@@ -61,7 +61,7 @@ class IBAN : public AutofillDataModel {
 
   // Returns the value (the actual bank account number) of IBAN.
   const std::u16string& value() const { return value_; }
-  void set_value(const std::u16string& value) { value_ = value; }
+  void set_value(const std::u16string& value);
 
   const std::u16string& nickname() const { return nickname_; }
   // Set the |nickname_| with the processed input (replace all tabs and newlines
@@ -84,11 +84,11 @@ class IBAN : public AutofillDataModel {
   std::u16string GetIdentifierStringForAutofillDisplay(
       bool is_value_masked = true) const;
 
- private:
   // Returns a version of |value_| which does not have any separator characters
   // (e.g., '-' and ' ').
   std::u16string GetStrippedValue() const;
 
+ private:
   // This is the ID assigned by the server to uniquely identify this IBAN.
   // Note: server_id is empty for now as only local IBAN is supported.
   std::string server_id_;

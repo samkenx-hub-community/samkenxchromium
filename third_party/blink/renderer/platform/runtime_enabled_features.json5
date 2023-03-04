@@ -1739,7 +1739,6 @@
       name: "GetDisplayMediaRequiresUserActivation",
       depends_on: ["GetDisplayMedia"],
       status: "experimental",
-      base_feature: "none",
     },
     {
       // Enables the getDisplayMediaSet API for multi surface capture.
@@ -2005,7 +2004,11 @@
     },
     {
       name: "MachineLearningNeuralNetwork",
-      status: {"Win": "experimental", "default": "test"},
+      status: {
+        "Win": "experimental",
+        "Linux": "experimental",
+        "default": "test"
+      },
       base_feature: "none",
     },
     {
@@ -2799,6 +2802,15 @@
       status: "experimental",
       base_feature: "none",
     },
+    // Legacy callback-based getStats() has limited availability unless this
+    // Deprecation Trial is enabled.
+    // TODO(https://crbug.com/822696): Remove when origin trial ends.
+    {
+      name: "RTCLegacyCallbackBasedGetStats",
+      origin_trial_feature_name: "RTCLegacyCallbackBasedGetStats",
+      status: "experimental",
+      base_feature: "none",
+    },
     // getStats() no longer return the legacy "track" or "stream" stats objects
     // unless this Deprecation Trial is enabled.
     // TODO(https://crbug.com/1374215): Remove when origin trial ends.
@@ -2954,7 +2966,7 @@
     },
     {
       name: "SendMouseEventsDisabledFormControls",
-      status: "experimental",
+      status: "stable",
       public: true,
     },
     {
@@ -3302,12 +3314,6 @@
       origin_trial_feature_name: "PrivacySandboxAdsAPIs",
       origin_trial_allows_third_party: true,
       public: true,
-    },
-    // https://crbug.com/1314739
-    {
-      name: "TouchActionEffectiveAtPointerDown",
-      status: "stable",
-      base_feature: "none",
     },
     // This feature allows touch dragging and a context menu to occur
     // simultaneously, with the assumption that the menu is non-modal.  Without
@@ -3734,6 +3740,8 @@
       base_feature: "none",
       origin_trial_feature_name: "WebGPUWebCodecs",
       public: true,
+      // Make the WebGPUDeveloperFeatures also enabled this OT feature.
+      implied_by: ["WebGPUDeveloperFeatures"],
     },
     {
       name: "WebHID",

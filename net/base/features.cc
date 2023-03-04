@@ -152,10 +152,6 @@ BASE_FEATURE(kSameSiteDefaultChecksMethodRigorously,
 BASE_FEATURE(kCertDualVerificationTrialFeature,
              "CertDualVerificationTrial",
              base::FEATURE_DISABLED_BY_DEFAULT);
-#if BUILDFLAG(IS_MAC)
-const base::FeatureParam<int> kCertDualVerificationTrialImpl{
-    &kCertDualVerificationTrialFeature, "impl", 0};
-#endif /* BUILDFLAG(IS_MAC) */
 #endif
 
 #if BUILDFLAG(CHROME_ROOT_STORE_SUPPORTED)
@@ -325,5 +321,14 @@ BASE_FEATURE(kPriorityIncremental,
 BASE_FEATURE(kPrefetchFollowsNormalCacheSemantics,
              "PrefetchFollowsNormalCacheSemantics",
              base::FEATURE_DISABLED_BY_DEFAULT);
+
+// A flag for new Kerberos feature, that suggests new UI
+// when Kerberos authentication in browser fails on ChromeOS.
+// b/260522530
+#if BUILDFLAG(IS_CHROMEOS)
+BASE_FEATURE(kKerberosInBrowserRedirect,
+             "KerberosInBrowserRedirect",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+#endif
 
 }  // namespace net::features

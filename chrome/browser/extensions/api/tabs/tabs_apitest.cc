@@ -122,9 +122,10 @@ IN_PROC_BROWSER_TEST_F(ExtensionApiTabTest, TabAudible) {
       << message_;
 }
 
-IN_PROC_BROWSER_TEST_F(ExtensionApiTabTest, TabMuted) {
-  ASSERT_TRUE(RunExtensionTest("tabs/basics", {.extension_url = "muted.html"}))
-      << message_;
+// TODO(crbug.com/521410): Flaky on Wayland. Disabled for now on all platforms
+// pending further testing.
+IN_PROC_BROWSER_TEST_P(ExtensionApiTabTestWithContextType, DISABLED_Muted) {
+  ASSERT_TRUE(RunExtensionTest("tabs/basics/muted")) << message_;
 }
 
 IN_PROC_BROWSER_TEST_F(ExtensionApiTabTest, Tabs2) {
@@ -132,10 +133,8 @@ IN_PROC_BROWSER_TEST_F(ExtensionApiTabTest, Tabs2) {
       << message_;
 }
 
-IN_PROC_BROWSER_TEST_F(ExtensionApiTabTest, TabDuplicate) {
-  ASSERT_TRUE(
-      RunExtensionTest("tabs/basics", {.extension_url = "duplicate.html"}))
-      << message_;
+IN_PROC_BROWSER_TEST_P(ExtensionApiTabTestWithContextType, Duplicate) {
+  ASSERT_TRUE(RunExtensionTest("tabs/basics/duplicate")) << message_;
 }
 
 IN_PROC_BROWSER_TEST_P(ExtensionApiTabTestWithContextType, Size) {
@@ -164,10 +163,8 @@ IN_PROC_BROWSER_TEST_P(ExtensionApiTabTestWithContextType, Events) {
   ASSERT_TRUE(RunExtensionTest("tabs/basics/events")) << message_;
 }
 
-IN_PROC_BROWSER_TEST_F(ExtensionApiTabTest, TabRelativeURLs) {
-  ASSERT_TRUE(
-      RunExtensionTest("tabs/basics", {.extension_url = "relative_urls.html"}))
-      << message_;
+IN_PROC_BROWSER_TEST_P(ExtensionApiTabTestWithContextType, RelativeURLs) {
+  ASSERT_TRUE(RunExtensionTest("tabs/basics/relative_urls")) << message_;
 }
 
 IN_PROC_BROWSER_TEST_P(ExtensionApiTabTestWithContextType, Query) {
@@ -190,15 +187,12 @@ IN_PROC_BROWSER_TEST_P(ExtensionApiTabTestWithContextType, Opener) {
   ASSERT_TRUE(RunExtensionTest("tabs/basics/opener")) << message_;
 }
 
-IN_PROC_BROWSER_TEST_F(ExtensionApiTabTest, TabRemove) {
-  ASSERT_TRUE(RunExtensionTest("tabs/basics", {.extension_url = "remove.html"}))
-      << message_;
+IN_PROC_BROWSER_TEST_P(ExtensionApiTabTestWithContextType, Remove) {
+  ASSERT_TRUE(RunExtensionTest("tabs/basics/remove")) << message_;
 }
 
-IN_PROC_BROWSER_TEST_F(ExtensionApiTabTest, TabRemoveMultiple) {
-  ASSERT_TRUE(RunExtensionTest("tabs/basics",
-                               {.extension_url = "remove-multiple.html"}))
-      << message_;
+IN_PROC_BROWSER_TEST_P(ExtensionApiTabTestWithContextType, RemoveMultiple) {
+  ASSERT_TRUE(RunExtensionTest("tabs/basics/remove_multiple")) << message_;
 }
 
 IN_PROC_BROWSER_TEST_F(ExtensionApiTabTest, TabGetCurrent) {
@@ -305,13 +299,7 @@ IN_PROC_BROWSER_TEST_F(ExtensionApiTabBackForwardCacheTest, TabsOnUpdated) {
   ASSERT_TRUE(RunExtensionTest("tabs/backForwardCache/on_updated")) << message_;
 }
 
-// Flaky on Linux. http://crbug.com/657376.
-#if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS)
-#define MAYBE_TabsNoPermissions DISABLED_TabsNoPermissions
-#else
-#define MAYBE_TabsNoPermissions TabsNoPermissions
-#endif
-IN_PROC_BROWSER_TEST_F(ExtensionApiTabTest, MAYBE_TabsNoPermissions) {
+IN_PROC_BROWSER_TEST_F(ExtensionApiTabTest, TabsNoPermissions) {
   ASSERT_TRUE(RunExtensionTest("tabs/no_permissions")) << message_;
 }
 
@@ -362,25 +350,13 @@ IN_PROC_BROWSER_TEST_F(ExtensionApiTabTest, IncognitoDisabledByPref) {
   ASSERT_TRUE(RunExtensionTest("tabs/incognito_disabled")) << message_;
 }
 
-// Failed run on ChromeOS CI builder. https://crbug.com/1245240
-#if BUILDFLAG(IS_CHROMEOS)
-#define MAYBE_GetViewsOfCreatedPopup DISABLED_GetViewsOfCreatedPopup
-#else
-#define MAYBE_GetViewsOfCreatedPopup GetViewsOfCreatedPopup
-#endif
-IN_PROC_BROWSER_TEST_F(ExtensionApiTabTest, MAYBE_GetViewsOfCreatedPopup) {
+IN_PROC_BROWSER_TEST_F(ExtensionApiTabTest, GetViewsOfCreatedPopup) {
   ASSERT_TRUE(RunExtensionTest("tabs/basics",
                                {.extension_url = "get_views_popup.html"}))
       << message_;
 }
 
-// Failed run on ChromeOS CI builder. https://crbug.com/1245240
-#if BUILDFLAG(IS_CHROMEOS)
-#define MAYBE_GetViewsOfCreatedWindow DISABLED_GetViewsOfCreatedWindow
-#else
-#define MAYBE_GetViewsOfCreatedWindow GetViewsOfCreatedWindow
-#endif
-IN_PROC_BROWSER_TEST_F(ExtensionApiTabTest, MAYBE_GetViewsOfCreatedWindow) {
+IN_PROC_BROWSER_TEST_F(ExtensionApiTabTest, GetViewsOfCreatedWindow) {
   ASSERT_TRUE(RunExtensionTest("tabs/basics",
                                {.extension_url = "get_views_window.html"}))
       << message_;

@@ -75,7 +75,7 @@ test_files = [
   "kerberos_page_test.js",
   "keyboard_and_text_input_page_tests.js",
   "keyboard_shortcut_banner_test.js",
-  "lock_screen_tests.js",
+  "lock_screen_tests.ts",
   "manage_accessibility_page_tests.js",
   "manage_users_page_tests.js",
   "multidevice_combined_setup_item_tests.js",
@@ -98,8 +98,7 @@ test_files = [
   "network_proxy_section_test.js",
   "network_summary_item_test.js",
   "network_summary_test.js",
-  "office_page_test.js",
-  "onc_mojo_test.js",
+  "onc_mojo_test.ts",
   "os_a11y_page_tests.js",
   "os_about_page_tests.js",
   "os_bluetooth_change_device_name_dialog_tests.js",
@@ -221,6 +220,8 @@ test_files = [
   "app_management/test_util.js",
   "app_management/toggle_row_test.js",
 
+  "os_files_page/office_page_test.ts",
+
   "os_people_page/add_user_dialog_tests.ts",
 ]
 
@@ -243,7 +244,7 @@ ts_library("build_ts") {
   out_dir = "$target_gen_dir/$tsc_folder"
   in_files = test_files + [ "test_api.test-mojom-webui.js" ]
   deps = [
-    "//ash/webui/common/resources/hotspot:build_ts",
+    "//ash/webui/common/resources:build_ts",
     "//chrome/browser/resources/settings/chromeos:build_ts",
     "//chrome/test/data/webui:build_ts",
     "//ui/webui/resources/cr_components/app_management:build_ts",

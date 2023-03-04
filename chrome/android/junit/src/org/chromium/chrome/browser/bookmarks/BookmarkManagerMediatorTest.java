@@ -23,7 +23,6 @@ import org.robolectric.annotation.Config;
 import org.chromium.base.supplier.ObservableSupplierImpl;
 import org.chromium.base.test.BaseRobolectricTestRunner;
 import org.chromium.base.test.util.Batch;
-import org.chromium.chrome.browser.bookmarks.BookmarkItemsAdapter.ViewFactory;
 import org.chromium.components.bookmarks.BookmarkId;
 import org.chromium.components.bookmarks.BookmarkType;
 import org.chromium.components.browser_ui.widget.selectable_list.SelectableListLayout;
@@ -59,11 +58,9 @@ public class BookmarkManagerMediatorTest {
     @Mock
     LargeIconBridge mLargeIconBridge;
     @Mock
-    ViewFactory mViewFactory;
-    @Mock
     AccessibilityManager mAccessibilityManager;
     @Mock
-    BookmarkUIObserver mBookmarkUIObserver;
+    BookmarkUiObserver mBookmarkUiObserver;
 
     final ObservableSupplierImpl<Boolean> mBackPressStateSupplier =
             new ObservableSupplierImpl<Boolean>();
@@ -93,17 +90,17 @@ public class BookmarkManagerMediatorTest {
 
         // Setup BookmarkUIObserver
         Mockito.doAnswer((invocation) -> {
-                   mMediator.removeUIObserver(mBookmarkUIObserver);
+                   mMediator.removeUiObserver(mBookmarkUiObserver);
                    return null;
                })
-                .when(mBookmarkUIObserver)
+                .when(mBookmarkUiObserver)
                 .onDestroy();
 
         mMediator = new BookmarkManagerMediator(mContext, mBookmarkModel, mBookmarkOpener,
                 mSelectableListLayout, mSelectionDelegate, mRecyclerView, mBookmarkItemsAdapter,
                 mLargeIconBridge, /*isDialogUi=*/true, /*isIncognito=*/false,
-                mBackPressStateSupplier, mViewFactory);
-        mMediator.addUIObserver(mBookmarkUIObserver);
+                mBackPressStateSupplier);
+        mMediator.addUiObserver(mBookmarkUiObserver);
     }
 
     void finishLoading() {
@@ -113,7 +110,7 @@ public class BookmarkManagerMediatorTest {
     @Test
     public void initAndLoadBookmarkModel() {
         finishLoading();
-        Assert.assertEquals(BookmarkUIState.STATE_LOADING, mMediator.getCurrentState());
+        Assert.assertEquals(BookmarkUiState.STATE_LOADING, mMediator.getCurrentState());
     }
 
     @Test
@@ -122,7 +119,7 @@ public class BookmarkManagerMediatorTest {
         mMediator.updateForUrl("chrome-native://bookmarks/folder/" + mFolderId.getId());
 
         finishLoading();
-        Assert.assertEquals(BookmarkUIState.STATE_FOLDER, mMediator.getCurrentState());
+        Assert.assertEquals(BookmarkUiState.STATE_FOLDER, mMediator.getCurrentState());
     }
 
     @Test
@@ -130,7 +127,7 @@ public class BookmarkManagerMediatorTest {
         finishLoading();
 
         mMediator.onDestroy();
-        Mockito.verify(mBookmarkUIObserver).onDestroy();
+        Mockito.verify(mBookmarkUiObserver).onDestroy();
     }
 
     @Test
