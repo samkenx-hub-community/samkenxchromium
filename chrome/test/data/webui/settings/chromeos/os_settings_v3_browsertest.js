@@ -53,8 +53,16 @@ var OSSettingsDevicePageV3Test = class extends OSSettingsV3BrowserTest {
   }
 };
 
-TEST_F(
-    'OSSettingsDevicePageV3Test', 'All',
+// TODO(https://crbug.com/1422799): The test is flaky on ChromeOS debug.
+TEST_F_WITH_PREAMBLE(
+    `
+#if !defined(NDEBUG)
+#define MAYBE_All DISABLED_All
+#else
+#define MAYBE_All All
+#endif
+    `,
+    'OSSettingsDevicePageV3Test', 'MAYBE_All',
     () => mocha.grep('/^((?!arrow_key_arrangement_disabled).)*$/').run());
 
 // TODO(crbug.com/1347746): move this to the generic test lists below after the
@@ -116,7 +124,7 @@ var OSSettingsOsBluetoothDevicesSubpageV3Test =
     class extends OSSettingsV3BrowserTest {
   /** @override */
   get browsePreload() {
-    return 'chrome://os-settings/test_loader.html?module=settings/chromeos/os_bluetooth_devices_subpage_tests.js';
+    return 'chrome://os-settings/test_loader.html?module=settings/chromeos/os_bluetooth_page/os_bluetooth_devices_subpage_tests.js';
   }
 
   /** @override */
@@ -203,66 +211,6 @@ var OSSettingsAppManagementAppDetailsV3Test =
   }
 };
 
-// TODO(b/162365553) Move this test back into the list of tests below once
-// APN revamp is launched.
-var OSSettingsApnSubpageV3Test = class extends OSSettingsV3BrowserTest {
-  /** @override */
-  get browsePreload() {
-    return 'chrome://os-settings/test_loader.html?module=settings/chromeos/apn_subpage_tests.js';
-  }
-
-  /** @override */
-  get featureList() {
-    return {
-      enabled: super.featureList.enabled.concat(['ash::features::kApnRevamp'])
-    };
-  }
-};
-
-TEST_F('OSSettingsApnSubpageV3Test', 'AllJsTests', () => {
-  mocha.run();
-});
-
-// TODO(b/162365553) Move this test back into the list of tests below once
-// APN revamp is launched.
-var OSSettingsInternetDetailPageV3Test = class extends OSSettingsV3BrowserTest {
-  /** @override */
-  get browsePreload() {
-    return 'chrome://os-settings/test_loader.html?module=settings/chromeos/internet_detail_page_tests.js';
-  }
-
-  /** @override */
-  get featureList() {
-    return {
-      enabled: super.featureList.enabled.concat(['ash::features::kApnRevamp'])
-    };
-  }
-};
-
-TEST_F('OSSettingsInternetDetailPageV3Test', 'AllJsTests', () => {
-  mocha.run();
-});
-
-// TODO(b/162365553) Move this test back into the list of tests below once
-// APN revamp is launched.
-var OSSettingsInternetPageV3Test = class extends OSSettingsV3BrowserTest {
-  /** @override */
-  get browsePreload() {
-    return 'chrome://os-settings/test_loader.html?module=settings/chromeos/internet_page_tests.js';
-  }
-
-  /** @override */
-  get featureList() {
-    return {
-      enabled: super.featureList.enabled.concat(['ash::features::kApnRevamp'])
-    };
-  }
-};
-
-TEST_F('OSSettingsInternetPageV3Test', 'AllJsTests', () => {
-  mocha.run();
-});
-
 function crostiniTestGenPreamble() {
   GEN('crostini::FakeCrostiniFeatures fake_crostini_features;');
   GEN('fake_crostini_features.SetAll(true);');
@@ -308,6 +256,10 @@ TEST_F('OSSettingsCrostiniExtraContainerPageV3Test', 'AllJsTests', () => {
 [['AccessibilityPage', 'os_a11y_page_tests.js'],
  ['AboutPage', 'os_about_page_tests.js'],
  ['ApnDetailDialog', 'apn_detail_dialog_tests.js'],
+ [
+   'ApnSubpage', 'apn_subpage_tests.js',
+   {enabled: ['ash::features::kApnRevamp']}
+ ],
  ['AppsPage', 'apps_page_test.js'],
  ['AppNotificationsSubpage', 'app_notifications_subpage_tests.js'],
  ['AppManagementAppDetailsItem', 'app_management/app_details_item_test.js'],
@@ -340,10 +292,6 @@ TEST_F('OSSettingsCrostiniExtraContainerPageV3Test', 'AllJsTests', () => {
    'app_management/supported_links_item_test.js',
  ],
  ['AppManagementToggleRow', 'app_management/toggle_row_test.js'],
- [
-   'AudioAndCaptionsPage',
-   'audio_and_captions_page_tests.js',
- ],
  ['CellularNetworksList', 'cellular_networks_list_test.js'],
  ['CellularRoamingToggleButton', 'cellular_roaming_toggle_button_test.js'],
  ['CellularSetupDialog', 'cellular_setup_dialog_test.js'],
@@ -370,7 +318,7 @@ TEST_F('OSSettingsCrostiniExtraContainerPageV3Test', 'AllJsTests', () => {
  ['FakeInputDeviceSettings', 'fake_input_device_settings_provider_test.js'],
  ['FilesPage', 'os_files_page_test.js'],
  ['FingerprintPage', 'fingerprint_browsertest_chromeos.js'],
- ['GoogleAssistantPage', 'google_assistant_page_test.js'],
+ ['GoogleAssistantSubpage', 'google_assistant_subpage_test.js'],
  ['GuestOsSharedPaths', 'guest_os_shared_paths_test.js'],
  ['GuestOsSharedUsbDevices', 'guest_os_shared_usb_devices_test.js'],
  [
@@ -396,7 +344,15 @@ TEST_F('OSSettingsCrostiniExtraContainerPageV3Test', 'AllJsTests', () => {
  ['InputPage', 'input_page_test.js'],
  ['InternetConfig', 'internet_config_test.js'],
  ['InternetDetailMenu', 'internet_detail_menu_test.js'],
- ['InternetKnownNetworksPage', 'internet_known_networks_page_tests.js'],
+ [
+   'InternetDetailSubpage', 'internet_detail_subpage_tests.js',
+   {enabled: ['ash::features::kApnRevamp']}
+ ],
+ ['InternetKnownNetworksSubpage', 'internet_known_networks_subpage_tests.js'],
+ [
+   'InternetPage', 'internet_page_tests.js',
+   {enabled: ['ash::features::kApnRevamp']}
+ ],
  ['InternetSubpage', 'internet_subpage_tests.js'],
  ['KerberosAccounts', 'kerberos_accounts_test.js'],
  ['KerberosPage', 'kerberos_page_test.js'],
@@ -449,12 +405,31 @@ TEST_F('OSSettingsCrostiniExtraContainerPageV3Test', 'AllJsTests', () => {
  ['NetworkSummary', 'network_summary_test.js'],
  ['NetworkSummaryItem', 'network_summary_item_test.js'],
  ['OncMojoTest', 'onc_mojo_test.js'],
- ['OsBluetoothPage', 'os_bluetooth_page_tests.js'],
- ['OsBluetoothPairingDialog', 'os_bluetooth_pairing_dialog_tests.js'],
- ['OsBluetoothSummary', 'os_bluetooth_summary_tests.js'],
  [
-   'OsBluetoothChangeDeviceNameDialog',
-   'os_bluetooth_change_device_name_dialog_tests.js',
+   'OsA11yPageAudioAndCaptionsPage',
+   'os_a11y_page/audio_and_captions_page_tests.js',
+ ],
+ ['OsA11yPageTtsSubpage', 'os_a11y_page/tts_subpage_test.js'],
+ ['OsBluetoothPage', 'os_bluetooth_page/os_bluetooth_page_tests.js'],
+ [
+   'OsBluetoothPageOsBluetoothChangeDeviceNameDialog',
+   'os_bluetooth_page/os_bluetooth_change_device_name_dialog_tests.js',
+ ],
+ [
+   'OsBluetoothPageOsBluetoothDeviceDetailSubpage',
+   'os_bluetooth_page/os_bluetooth_device_detail_subpage_tests.js',
+ ],
+ [
+   'OsBluetoothPageOsBluetoothPairingDialog',
+   'os_bluetooth_page/os_bluetooth_pairing_dialog_tests.js'
+ ],
+ [
+   'OsBluetoothPageOsBluetoothSummary',
+   'os_bluetooth_page/os_bluetooth_summary_tests.js'
+ ],
+ [
+   'OsBluetoothPageOsBluetoothTrueWirelessImages',
+   'os_bluetooth_page/os_bluetooth_true_wireless_images_tests.js',
  ],
  ['OsEditDictionaryPage', 'os_edit_dictionary_page_test.js'],
  [
@@ -464,14 +439,6 @@ TEST_F('OSSettingsCrostiniExtraContainerPageV3Test', 'AllJsTests', () => {
  ['OsFilesPageOfficePage', 'os_files_page/office_page_test.js'],
  ['OsLanguagesPageV2', 'os_languages_page_v2_tests.js'],
  ['OsPairedBluetoothList', 'os_paired_bluetooth_list_tests.js'],
- [
-   'OsBluetoothDeviceDetailSubpage',
-   'os_bluetooth_device_detail_subpage_tests.js',
- ],
- [
-   'OsBluetoothTrueWirelessImages',
-   'os_bluetooth_true_wireless_images_tests.js',
- ],
  ['OsPairedBluetoothListItem', 'os_paired_bluetooth_list_item_tests.js'],
  ['OsPeoplePageAddUserDialog', 'os_people_page/add_user_dialog_tests.js'],
  ['OsSettingsPage', 'os_settings_page_test.js'],
@@ -484,7 +451,10 @@ TEST_F('OSSettingsCrostiniExtraContainerPageV3Test', 'AllJsTests', () => {
  ['OsSearchPage', 'os_search_page_test.js'],
  ['OsSettingsSearchBox', 'os_settings_search_box_test.js'],
  ['OSSettingsMenu', 'os_settings_menu_test.js'],
- ['ParentalControlsPage', 'parental_controls_page_test.js'],
+ [
+   'ParentalControlsPage',
+   'parental_controls_page/parental_controls_page_test.js'
+ ],
  ['PeoplePage', 'os_people_page_test.js'],
  ['PeoplePageQuickUnlock', 'quick_unlock_authenticate_browsertest_chromeos.js'],
  [
@@ -543,7 +513,6 @@ TEST_F('OSSettingsCrostiniExtraContainerPageV3Test', 'AllJsTests', () => {
  ['TextToSpeechSubpage', 'text_to_speech_subpage_tests.js'],
  ['TimezoneSelector', 'timezone_selector_test.js'],
  ['TimezoneSubpage', 'timezone_subpage_test.js'],
- ['TtsSubpage', 'tts_subpage_test.js'],
 ].forEach(test => registerTest(...test));
 
 function registerTest(testName, module, featureList) {

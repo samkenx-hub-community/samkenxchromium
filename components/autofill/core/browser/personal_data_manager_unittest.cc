@@ -1032,7 +1032,7 @@ TEST_F(PersonalDataManagerTest, OnAcceptedLocalIBANSave) {
 
   // Start with a new IBAN.
   IBAN iban0(base::GenerateGUID());
-  iban0.set_value(u"IE12 BOFI 9000 0112 3456 78");
+  iban0.set_value(u"IE64 IRCE 9205 0112 3456 78");
   iban0.set_nickname(u"Nickname 0");
   // Add the IBAN to the database.
   personal_data_->OnAcceptedLocalIBANSave(iban0);
@@ -1061,7 +1061,7 @@ TEST_F(PersonalDataManagerTest, OnAcceptedLocalIBANSave) {
   // Creates a new `iban2` which has the same value as `iban0` but with
   // different nickname and call `OnAcceptedLocalIBANSave()`.
   IBAN iban2(base::GenerateGUID());
-  iban2.set_value(u"IE12 BOFI 9000 0112 3456 78");
+  iban2.set_value(u"IE64 IRCE 9205 0112 3456 78");
   iban2.set_nickname(u"Nickname 2");
   personal_data_->OnAcceptedLocalIBANSave(iban2);
   WaitForOnPersonalDataChanged();
@@ -1099,7 +1099,7 @@ TEST_F(PersonalDataManagerTest, OnAcceptedLocalIBANSave_IsOffTheRecordTrue) {
 
   // Start with a new IBAN.
   IBAN iban0(base::GenerateGUID());
-  iban0.set_value(u"IE12 BOFI 9000 0112 3456 78");
+  iban0.set_value(u"IE64 IRCE 9205 0112 3456 78");
   iban0.set_nickname(u"Nickname 0");
 
   // Add the IBAN to the database.
@@ -4847,89 +4847,6 @@ TEST_F(PersonalDataManagerTest, LogStoredCreditCardMetrics) {
       "Autofill.StoredCreditCardCount.Server.WithVirtualCardMetadata", 1);
   histogram_tester.ExpectBucketCount(
       "Autofill.StoredCreditCardCount.Server.WithCardArtImage", 3, 1);
-}
-
-TEST_F(PersonalDataManagerTest, CreateDataForTest) {
-  // Disable sync so the data gets created.
-  sync_service_.GetUserSettings()->SetSelectedTypes(
-      /*sync_everything=*/false,
-      /*types=*/{});
-
-  // By default, the creation of test data is disabled.
-  ResetPersonalDataManager(USER_MODE_NORMAL);
-  ASSERT_EQ(0U, personal_data_->GetProfiles().size());
-  ASSERT_EQ(0U, personal_data_->GetCreditCards().size());
-
-  // Turn on test data creation for the rest of this scope.
-  base::test::ScopedFeatureList enabled;
-  enabled.InitAndEnableFeature(features::test::kAutofillCreateDataForTest);
-
-  // Reloading the test profile should result in test data being created.
-  ResetPersonalDataManager(USER_MODE_NORMAL);
-
-  const std::vector<AutofillProfile*> addresses = personal_data_->GetProfiles();
-  const std::vector<CreditCard*> credit_cards =
-      personal_data_->GetCreditCards();
-  ASSERT_EQ(3U, addresses.size());
-  ASSERT_EQ(3U, credit_cards.size());
-
-  const base::Time disused_threshold = AutofillClock::Now() - base::Days(180);
-  const base::Time deletion_threshold = AutofillClock::Now() - base::Days(395);
-
-  // Verify that there was a valid address created.
-  const auto profile_to_name = [this](const AutofillProfile* p) {
-    return p->GetInfo(NAME_FULL, this->personal_data_->app_locale());
-  };
-  {
-    auto it = base::ranges::find(addresses, u"John McTester", profile_to_name);
-    ASSERT_TRUE(it != addresses.end());
-    EXPECT_GT((*it)->use_date(), disused_threshold);
-  }
-
-  // Verify that there was a disused address created.
-  {
-    auto it = base::ranges::find(addresses, u"Polly Disused", profile_to_name);
-    ASSERT_TRUE(it != addresses.end());
-    EXPECT_LT((*it)->use_date(), disused_threshold);
-  }
-
-  // Verify that there was a disused deletable address created.
-  {
-    auto it =
-        base::ranges::find(addresses, u"Polly Deletable", profile_to_name);
-    ASSERT_TRUE(it != addresses.end());
-    EXPECT_LT((*it)->use_date(), deletion_threshold);
-    EXPECT_FALSE((*it)->IsVerified());
-  }
-
-  // Verify that there was a valid credit card created.
-  const auto profile_to_cc_name = [this](const CreditCard* cc) {
-    return cc->GetInfo(CREDIT_CARD_NAME_FULL,
-                       this->personal_data_->app_locale());
-  };
-  {
-    auto it = base::ranges::find(credit_cards, u"Alice Testerson",
-                                 profile_to_cc_name);
-    ASSERT_TRUE(it != credit_cards.end());
-    EXPECT_GT((*it)->use_date(), disused_threshold);
-  }
-
-  // Verify that there was a disused credit card created.
-  {
-    auto it =
-        base::ranges::find(credit_cards, u"Bob Disused", profile_to_cc_name);
-    ASSERT_TRUE(it != credit_cards.end());
-    EXPECT_LT((*it)->use_date(), disused_threshold);
-  }
-
-  // Verify that there was a disused deletable credit card created.
-  {
-    auto it = base::ranges::find(credit_cards, u"Charlie Deletable",
-                                 profile_to_cc_name);
-    ASSERT_TRUE(it != credit_cards.end());
-    EXPECT_LT((*it)->use_date(), deletion_threshold);
-    EXPECT_TRUE((*it)->IsExpired(deletion_threshold));
-  }
 }
 
 // These tests are not applicable on Linux since it does not support full server

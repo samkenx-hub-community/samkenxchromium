@@ -266,7 +266,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Arc.AndroidData.PerApp.Size" units="KB"
-    expires_after="2023-07-01">
+    expires_after="2023-09-03">
   <owner>momohatt@google.com</owner>
   <owner>arc-storage@google.com</owner>
   <summary>
@@ -318,7 +318,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Arc.AndroidData.TraversalDuration" units="ms"
-    expires_after="2023-07-01">
+    expires_after="2023-09-03">
   <owner>momohatt@google.com</owner>
   <owner>arc-storage@google.com</owner>
   <summary>
@@ -696,7 +696,7 @@ chromium-metrics-reviews@google.com.
   <token key="ArcUserTypes" variants="ArcUserTypes"/>
 </histogram>
 
-<histogram name="Arc.Auth.NumAccounts" units="count" expires_after="2023-07-01">
+<histogram name="Arc.Auth.NumAccounts" units="count" expires_after="2023-09-03">
   <owner>anastasiian@google.com</owner>
   <owner>mhasank@google.com</owner>
   <owner>arc-core@google.com</owner>
@@ -706,7 +706,7 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
-<histogram name="Arc.Auth.PercentAccounts" units="%" expires_after="2023-07-01">
+<histogram name="Arc.Auth.PercentAccounts" units="%" expires_after="2023-09-03">
   <owner>anastasiian@google.com</owner>
   <owner>mhasank@google.com</owner>
   <owner>arc-core@google.com</owner>
@@ -826,7 +826,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Arc.ClipboardDragDrop" enum="ArcClipboardDragDropEvent"
-    expires_after="2023-07-02">
+    expires_after="2023-09-03">
   <owner>yhanada@google.com</owner>
   <owner>arc-framework@google.com</owner>
   <summary>The number of clipboard and drag-and-drop events.</summary>
@@ -1070,7 +1070,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Arc.DataRestore.Status" enum="ArcDataRestoreStatus"
-    expires_after="2023-07-02">
+    expires_after="2023-09-03">
   <owner>khmel@google.com</owner>
   <owner>arc-core@google.com</owner>
   <summary>
@@ -1405,6 +1405,21 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
+<histogram name="Arc.InputOverlay.{UI}RepositionWindowStateType"
+    enum="ArcInputOverlayWindowStateType" expires_after="2023-08-28">
+  <owner>cuicuiruan@google.com</owner>
+  <owner>arc-gaming@google.com</owner>
+  <summary>
+    Records the window state type when {UI} reposition happens. Records the
+    events when users release touch, mouse or key.
+  </summary>
+  <token key="UI">
+    <variant name="Action"/>
+    <variant name="ButtonGroup"/>
+    <variant name="MenuEntry"/>
+  </token>
+</histogram>
+
 <histogram name="Arc.IntentHelper.OpenAppWithIntentAction"
     enum="ArcIntentHelperIntentAction" expires_after="2023-07-30">
   <owner>tsergeant@chromium.org</owner>
@@ -1414,16 +1429,6 @@ chromium-metrics-reviews@google.com.
     Sharing from an Android app to a Web App installed through the Play Store).
     Records the action being handled by the Chrome OS app, like Viewing a URL or
     Sending content.
-  </summary>
-</histogram>
-
-<histogram name="Arc.IntentHelper.OpenType" enum="ArcIntentHelperOpenType"
-    expires_after="2020-08-16">
-  <owner>hashimoto@google.com</owner>
-  <owner>arc-core@google.com</owner>
-  <summary>
-    Types of things opened via ARC IntentHelperHost interface. Recorded when one
-    of the &quot;open&quot; methods of the interface is called.
   </summary>
 </histogram>
 
@@ -1967,12 +1972,13 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Arc.Provisioning.TimeDelta.Failure{ArcUserTypes}" units="ms"
-    expires_after="2022-11-01">
-  <owner>alexchau@google.com</owner>
-  <owner>phweiss@google.com</owner>
+    expires_after="2024-03-08">
+  <owner>mhasank@google.com</owner>
+  <owner>arc-core@google.com</owner>
   <summary>
     Elapsed time from the signing in process start to call to onSignInFailed.
-    {ArcUserTypes}
+    Warning: this histogram was expired from 2022-11-01 to 2023-03-08; data may
+    be missing. {ArcUserTypes}
   </summary>
   <token key="ArcUserTypes" variants="ArcUserTypes">
     <variant name=""/>
@@ -1980,12 +1986,13 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Arc.Provisioning.TimeDelta.Success{ArcUserTypes}" units="ms"
-    expires_after="2022-11-01">
-  <owner>alexchau@google.com</owner>
-  <owner>phweiss@google.com</owner>
+    expires_after="2024-03-08">
+  <owner>mhasank@google.com</owner>
+  <owner>arc-core@google.com</owner>
   <summary>
     Elapsed time from the signing in process start to successful call to
-    onSignInComplete. {ArcUserTypes}
+    onSignInComplete. Warning: this histogram was expired from 2022-11-01 to
+    2023-03-08; data may be missing. {ArcUserTypes}
   </summary>
   <token key="ArcUserTypes" variants="ArcUserTypes">
     <variant name=""/>
@@ -2280,6 +2287,56 @@ chromium-metrics-reviews@google.com.
   <summary>
     Counts user interactions with ARC by type, such as ARC app launches via the
     shelf or launcher.
+  </summary>
+</histogram>
+
+<histogram name="Arc.VmDataMigration.Duration" units="seconds"
+    expires_after="2024-01-01">
+  <owner>momohatt@google.com</owner>
+  <owner>youkichihosoi@google.com</owner>
+  <summary>
+    Duration of the ARCVM /data migration. This is reported once when a newly
+    started migration is completed.
+  </summary>
+</histogram>
+
+<histogram name="Arc.VmDataMigration.EndStatus"
+    enum="CrOSFileSystemMigrationEndStatus" expires_after="2024-01-01">
+  <owner>momohatt@google.com</owner>
+  <owner>youkichihosoi@google.com</owner>
+  <summary>
+    The status of ARCVM /data migration when it ends. This is reported when a
+    migration finishes successfully, fails, or gets cancelled halfway.
+  </summary>
+</histogram>
+
+<histogram name="Arc.VmDataMigration.StartStatus"
+    enum="CrOSFileSystemMigrationStartStatus" expires_after="2024-01-01">
+  <owner>momohatt@google.com</owner>
+  <owner>youkichihosoi@google.com</owner>
+  <summary>
+    The status of ARCVM /data migration when it starts. This is reported when a
+    new migration or a resumed migration is started.
+  </summary>
+</histogram>
+
+<histogram name="Arc.VmDataMigration.TotalFiles" units="files"
+    expires_after="2024-01-01">
+  <owner>momohatt@google.com</owner>
+  <owner>youkichihosoi@google.com</owner>
+  <summary>
+    Total number of files to be migrated in ARCVM /data migration. Reported once
+    at the beginning of a new migration.
+  </summary>
+</histogram>
+
+<histogram name="Arc.VmDataMigration.TotalSizeMB" units="MB"
+    expires_after="2024-01-01">
+  <owner>momohatt@google.com</owner>
+  <owner>youkichihosoi@google.com</owner>
+  <summary>
+    Total bytes to be migrated in ARCVM /data migration. Reported once at the
+    beginning of a new migration.
   </summary>
 </histogram>
 

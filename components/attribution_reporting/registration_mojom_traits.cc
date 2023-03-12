@@ -95,20 +95,33 @@ bool StructTraits<attribution_reporting::mojom::AggregationKeysDataView,
 }
 
 // static
-bool StructTraits<attribution_reporting::mojom::SourceRegistrationDataView,
-                  attribution_reporting::SourceRegistration>::
-    Read(attribution_reporting::mojom::SourceRegistrationDataView data,
-         attribution_reporting::SourceRegistration* out) {
+bool StructTraits<attribution_reporting::mojom::DestinationSetDataView,
+                  attribution_reporting::DestinationSet>::
+    Read(attribution_reporting::mojom::DestinationSetDataView data,
+         attribution_reporting::DestinationSet* out) {
   std::vector<net::SchemefulSite> destinations;
   if (!data.ReadDestinations(&destinations)) {
     return false;
   }
+
   auto destination_set =
       attribution_reporting::DestinationSet::Create(std::move(destinations));
   if (!destination_set.has_value()) {
     return false;
   }
-  out->destination_set = std::move(*destination_set);
+
+  *out = std::move(*destination_set);
+  return true;
+}
+
+// static
+bool StructTraits<attribution_reporting::mojom::SourceRegistrationDataView,
+                  attribution_reporting::SourceRegistration>::
+    Read(attribution_reporting::mojom::SourceRegistrationDataView data,
+         attribution_reporting::SourceRegistration* out) {
+  if (!data.ReadDestinations(&out->destination_set)) {
+    return false;
+  }
 
   if (!data.ReadExpiry(&out->expiry)) {
     return false;
@@ -137,20 +150,6 @@ bool StructTraits<attribution_reporting::mojom::SourceRegistrationDataView,
   out->source_event_id = data.source_event_id();
   out->priority = data.priority();
   out->debug_reporting = data.debug_reporting();
-  return true;
-}
-
-// static
-bool StructTraits<attribution_reporting::mojom::FiltersDataView,
-                  attribution_reporting::Filters>::
-    Read(attribution_reporting::mojom::FiltersDataView data,
-         attribution_reporting::Filters* out) {
-  attribution_reporting::Filters::Disjunction disjunction;
-  if (!data.ReadDisjunction(&disjunction)) {
-    return false;
-  }
-
-  *out = attribution_reporting::Filters(std::move(disjunction));
   return true;
 }
 

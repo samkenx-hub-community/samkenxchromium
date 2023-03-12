@@ -203,6 +203,8 @@ static_library("test_support") {
     "../public/test/javascript_test_observer.h",
     "../public/test/local_frame_host_interceptor.cc",
     "../public/test/local_frame_host_interceptor.h",
+    "../public/test/local_network_access_util.cc",
+    "../public/test/local_network_access_util.h",
     "../public/test/media_start_stop_observer.cc",
     "../public/test/media_start_stop_observer.h",
     "../public/test/mock_browsing_data_remover_delegate.cc",
@@ -249,8 +251,6 @@ static_library("test_support") {
     "../public/test/preloading_test_util.h",
     "../public/test/prerender_test_util.cc",
     "../public/test/prerender_test_util.h",
-    "../public/test/private_network_access_util.cc",
-    "../public/test/private_network_access_util.h",
     "../public/test/render_frame_host_test_support.cc",
     "../public/test/render_frame_host_test_support.h",
     "../public/test/render_view_test.cc",
@@ -1967,6 +1967,7 @@ test("content_browsertests") {
       "../browser/accessibility/hit_testing_mac_browsertest.mm",
       "../browser/form_controls_browsertest_mac.h",
       "../browser/form_controls_browsertest_mac.mm",
+      "../browser/gpu/browser_child_process_backgrounded_bridge_browsertest.mm",
       "../browser/keyboard_lock_browsertest_mac.mm",
       "../browser/pointer_lock_browsertest_mac.mm",
       "../browser/renderer_host/render_frame_host_impl_mac_browsertest.mm",
@@ -1985,6 +1986,7 @@ test("content_browsertests") {
       "../browser/keyboard_lock_browsertest_ios.mm",
       "../browser/pointer_lock_browsertest_ios.mm",
     ]
+    bundle_deps = [ ":content_shell_pak_bundle_data" ]
   }
 
   if (is_chromeos_ash) {
@@ -2453,6 +2455,7 @@ test("content_unittests") {
     "../browser/renderer_host/input/touchpad_pinch_event_queue_unittest.cc",
     "../browser/renderer_host/input/web_input_event_util_unittest.cc",
     "../browser/renderer_host/isolated_web_app_throttle_unittest.cc",
+    "../browser/renderer_host/local_network_access_util_unittest.cc",
     "../browser/renderer_host/media/audio_input_device_manager_unittest.cc",
     "../browser/renderer_host/media/audio_input_stream_handle_unittest.cc",
     "../browser/renderer_host/media/audio_output_authorization_handler_unittest.cc",
@@ -2487,7 +2490,6 @@ test("content_unittests") {
     "../browser/renderer_host/overscroll_controller_unittest.cc",
     "../browser/renderer_host/pending_beacon_host_unittest.cc",
     "../browser/renderer_host/policy_container_host_unittest.cc",
-    "../browser/renderer_host/private_network_access_util_unittest.cc",
     "../browser/renderer_host/recently_destroyed_hosts_unittest.cc",
     "../browser/renderer_host/render_frame_host_csp_context_unittest.cc",
     "../browser/renderer_host/render_frame_host_impl_unittest.cc",
@@ -2731,8 +2733,8 @@ test("content_unittests") {
   }
   if (is_ios) {
     bundle_deps = [
+      ":content_shell_pak_bundle_data",
       ":content_unittests_bundle_data",
-      ":content_unittests_pak_bundle_data",
       "//media/test:media_bundle_data",
     ]
   }
@@ -3190,7 +3192,7 @@ test("content_unittests") {
 }
 
 if (is_ios) {
-  bundle_data("content_unittests_pak_bundle_data") {
+  bundle_data("content_shell_pak_bundle_data") {
     testonly = true
     public_deps = [ "//content/shell:pak" ]
     sources = [ "$root_out_dir/content_shell.pak" ]

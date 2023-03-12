@@ -29,10 +29,10 @@
 #import "components/strings/grit/components_strings.h"
 #import "ios/chrome/browser/bookmarks/bookmarks_utils.h"
 #import "ios/chrome/browser/flags/system_flags.h"
+#import "ios/chrome/browser/shared/ui/util/uikit_ui_util.h"
 #import "ios/chrome/browser/sync/sync_setup_service.h"
 #import "ios/chrome/browser/ui/bookmarks/undo_manager_wrapper.h"
 #import "ios/chrome/browser/ui/icons/symbols.h"
-#import "ios/chrome/browser/ui/util/uikit_ui_util.h"
 #import "ios/chrome/common/ui/colors/semantic_color_names.h"
 #import "ios/chrome/grit/ios_strings.h"
 #import "third_party/skia/include/core/SkColor.h"
@@ -576,8 +576,8 @@ std::vector<NodeVector::size_type> MissingNodesIndices(
 
 #pragma mark - Cache position in table view.
 
-NSArray* CreateBookmarkPath(bookmarks::BookmarkModel* model,
-                            int64_t folder_id) {
+NSArray<NSNumber*>* CreateBookmarkPath(bookmarks::BookmarkModel* model,
+                                       int64_t folder_id) {
   // Create an array with root node id, if folder_id == root node.
   if (model->root_node()->id() == folder_id) {
     return @[ [NSNumber numberWithLongLong:model->root_node()->id()] ];
@@ -588,7 +588,7 @@ NSArray* CreateBookmarkPath(bookmarks::BookmarkModel* model,
     return nil;
   }
 
-  NSMutableArray* bookmarkPath = [NSMutableArray array];
+  NSMutableArray<NSNumber*>* bookmarkPath = [NSMutableArray array];
   [bookmarkPath addObject:[NSNumber numberWithLongLong:folder_id]];
   while (model->root_node()->id() != bookmark->id()) {
     bookmark = bookmark->parent();

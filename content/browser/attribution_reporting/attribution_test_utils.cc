@@ -125,11 +125,6 @@ SourceBuilder& SourceBuilder::SetSourceOrigin(SuitableOrigin origin) {
   return *this;
 }
 
-SourceBuilder& SourceBuilder::SetDestinationOrigin(
-    const SuitableOrigin& origin) {
-  return SetDestinationSites({net::SchemefulSite(origin)});
-}
-
 SourceBuilder& SourceBuilder::SetDestinationSites(
     base::flat_set<net::SchemefulSite> sites) {
   destination_sites_ =
@@ -360,14 +355,16 @@ AttributionTrigger TriggerBuilder::Build(
   if (generate_event_trigger_data) {
     event_triggers.emplace_back(
         trigger_data_, priority_, dedup_key_,
-        FilterPair{.positive = attribution_reporting::FiltersForSourceType(
-                       SourceType::kNavigation)});
+        FilterPair(/*positive=*/attribution_reporting::FiltersForSourceType(
+                       SourceType::kNavigation),
+                   /*negative=*/{}));
 
     event_triggers.emplace_back(
         event_source_trigger_data_, priority_, dedup_key_,
-        attribution_reporting::FilterPair{
-            .positive = attribution_reporting::FiltersForSourceType(
-                SourceType::kEvent)});
+        attribution_reporting::FilterPair(
+            /*positive=*/attribution_reporting::FiltersForSourceType(
+                SourceType::kEvent),
+            /*negative=*/{}));
   }
 
   return AttributionTrigger(

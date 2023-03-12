@@ -178,7 +178,6 @@ public class TabGridDialogTest {
     @BeforeClass
     public static void setUpBeforeActivityLaunched() {
         ChromeNightModeTestUtils.setUpNightModeBeforeChromeActivityLaunched();
-        TabUiFeatureUtilities.setTabletGridTabSwitcherPolishEnabledForTesting(true);
         TabUiFeatureUtilities.setGtsDelayCreationEnabledForTesting(false);
     }
 
@@ -209,7 +208,6 @@ public class TabGridDialogTest {
 
     @AfterClass
     public static void tearDownAfterActivityDestroyed() {
-        TabUiFeatureUtilities.setTabletGridTabSwitcherPolishEnabledForTesting(null);
         TabUiFeatureUtilities.setGtsDelayCreationEnabledForTesting(null);
     }
 
@@ -434,56 +432,6 @@ public class TabGridDialogTest {
     @Test
     @MediumTest
     // clang-format off
-    @Features.EnableFeatures({ChromeFeatureList.TAB_GROUPS_CONTINUATION_ANDROID + "<Study"})
-    @CommandLineFlags.Add({"force-fieldtrials=Study/Group",
-            "force-fieldtrial-params=Study.Group:enable_tab_group_sharing/true"})
-    public void testDialogToolbarMenuShareGroup() {
-        // clang-format on
-        final ChromeTabbedActivity cta = mActivityTestRule.getActivity();
-        createTabs(cta, false, 2);
-        enterTabSwitcher(cta);
-        verifyTabSwitcherCardCount(cta, 2);
-
-        // Create a tab group.
-        mergeAllNormalTabsToAGroup(cta);
-        verifyTabSwitcherCardCount(cta, 1);
-
-        // Open dialog and verify dialog is showing correct content.
-        openDialogFromTabSwitcherAndVerify(cta, 2, null);
-
-        // Click to show the menu and verify it.
-        openDialogToolbarMenuAndVerify(cta);
-
-        // Trigger the share sheet by clicking the share button and verify it.
-        triggerShareGroupAndVerify(cta);
-    }
-
-    @Test
-    @MediumTest
-    // clang-format off
-    @Features.EnableFeatures({ChromeFeatureList.TAB_GROUPS_CONTINUATION_ANDROID + "<Study"})
-    @CommandLineFlags.Add({"force-fieldtrials=Study/Group",
-        "force-fieldtrial-params=Study.Group:enable_tab_group_sharing/true"})
-    public void testDialogToolbarMenuShareGroup_WithSharingHub() {
-        // clang-format on
-        final ChromeTabbedActivity cta = mActivityTestRule.getActivity();
-        createTabs(cta, false, 2);
-        enterTabSwitcher(cta);
-        verifyTabSwitcherCardCount(cta, 2);
-
-        // Create a tab group.
-        mergeAllNormalTabsToAGroup(cta);
-        verifyTabSwitcherCardCount(cta, 1);
-        openDialogFromTabSwitcherAndVerify(cta, 2, null);
-        openDialogToolbarMenuAndVerify(cta);
-
-        // We should still show Android share sheet even with sharing hub enabled.
-        triggerShareGroupAndVerify(cta);
-    }
-
-    @Test
-    @MediumTest
-    // clang-format off
     @EnableFeatures({ChromeFeatureList.TAB_GROUPS_CONTINUATION_ANDROID + "<Study"})
     @CommandLineFlags.Add({"force-fieldtrials=Study/Group",
         "force-fieldtrial-params=Study.Group:enable_launch_polish/true"})
@@ -500,7 +448,7 @@ public class TabGridDialogTest {
 
         // Open dialog and open selection editor.
         openDialogFromTabSwitcherAndVerify(cta, 2, null);
-        openSelectionEditorAndVerify(cta, 2);
+        openSelectionEditorV2AndVerify(cta, 2);
 
         // Click navigation button should close selection editor but not tab grid dialog.
         mSelectionEditorRobot.actionRobot.clickToolbarNavigationButton();
@@ -508,7 +456,7 @@ public class TabGridDialogTest {
         assertTrue(isDialogShowing(cta));
 
         // Back press should close both the dialog and selection editor.
-        openSelectionEditorAndVerify(cta, 2);
+        openSelectionEditorV2AndVerify(cta, 2);
         Espresso.pressBack();
         mSelectionEditorRobot.resultRobot.verifyTabSelectionEditorIsHidden();
         waitForDialogHidingAnimationInTabSwitcher(cta);
@@ -516,7 +464,7 @@ public class TabGridDialogTest {
 
         // Clicking ScrimView should close both the dialog and selection editor.
         openDialogFromTabSwitcherAndVerify(cta, 2, null);
-        openSelectionEditorAndVerify(cta, 2);
+        openSelectionEditorV2AndVerify(cta, 2);
         clickScrimToExitDialog(cta);
         mSelectionEditorRobot.resultRobot.verifyTabSelectionEditorIsHidden();
         waitForDialogHidingAnimationInTabSwitcher(cta);
@@ -1011,7 +959,7 @@ public class TabGridDialogTest {
         checkPosition(cta, true, true);
 
         // Verify the size and position of TabSelectionEditor in portrait mode.
-        openSelectionEditorAndVerify(cta, 3);
+        openSelectionEditorV2AndVerify(cta, 3);
         checkPosition(cta, false, true);
 
         // Verify the size and position of TabSelectionEditor in landscape mode.
@@ -1037,7 +985,7 @@ public class TabGridDialogTest {
             rootView.setLayoutParams(params);
         });
         checkPosition(cta, true, true);
-        openSelectionEditorAndVerify(cta, 3);
+        openSelectionEditorV2AndVerify(cta, 3);
         checkPosition(cta, false, true);
 
         TestThreadUtils.runOnUiThreadBlocking(() -> {
@@ -1755,13 +1703,8 @@ public class TabGridDialogTest {
                     } else {
                         verifyTabGridDialogToolbarMenuItem(listView, 0,
                                 cta.getString(R.string.tab_grid_dialog_toolbar_remove_from_group));
-                        if (TabUiFeatureUtilities.ENABLE_TAB_GROUP_SHARING.getValue()) {
-                            menuItemCount += 1;
-                            verifyTabGridDialogToolbarMenuItem(listView, menuItemCount - 1,
-                                    cta.getString(R.string.tab_grid_dialog_toolbar_share_group));
-                        }
                     }
-                    if (TabUiFeatureUtilities.isLaunchPolishEnabled()) {
+                    if (TabUiFeatureUtilities.isTabGroupsAndroidContinuationEnabled(cta)) {
                         menuItemCount += 1;
                         verifyTabGridDialogToolbarMenuItem(listView, menuItemCount - 1,
                                 cta.getString(R.string.tab_grid_dialog_toolbar_edit_group_name));

@@ -6,8 +6,6 @@ package org.chromium.chrome.browser;
 
 import static org.chromium.chrome.browser.ui.IncognitoRestoreAppLaunchDrawBlocker.IS_INCOGNITO_SELECTED;
 
-import android.app.ActivityManager;
-import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.ShortcutManager;
@@ -131,12 +129,12 @@ import org.chromium.chrome.browser.profiles.OTRProfileID;
 import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.chrome.browser.profiles.ProfileManager;
 import org.chromium.chrome.browser.quick_delete.QuickDeleteController;
+import org.chromium.chrome.browser.quick_delete.QuickDeleteMetricsDelegate;
 import org.chromium.chrome.browser.read_later.ReadingListBackPressHandler;
 import org.chromium.chrome.browser.read_later.ReadingListUtils;
 import org.chromium.chrome.browser.reengagement.ReengagementNotificationController;
 import org.chromium.chrome.browser.search_engines.SearchEngineChoiceNotification;
 import org.chromium.chrome.browser.settings.SettingsLauncherImpl;
-import org.chromium.chrome.browser.share.crow.CrowButtonDelegateImpl;
 import org.chromium.chrome.browser.share.send_tab_to_self.SendTabToSelfAndroidBridge;
 import org.chromium.chrome.browser.suggestions.SuggestionsMetrics;
 import org.chromium.chrome.browser.survey.ChromeSurveyController;
@@ -206,7 +204,6 @@ import org.chromium.components.feature_engagement.EventConstants;
 import org.chromium.components.feature_engagement.Tracker;
 import org.chromium.components.messages.MessageDispatcherProvider;
 import org.chromium.components.profile_metrics.BrowserProfileType;
-import org.chromium.components.user_prefs.UserPrefs;
 import org.chromium.components.webapps.ShortcutSource;
 import org.chromium.content_public.browser.LoadUrlParams;
 import org.chromium.content_public.browser.NavigationHandle;
@@ -275,8 +272,6 @@ public class ChromeTabbedActivity extends ChromeActivity<ChromeActivityComponent
         int ON_NEW_INTENT = 2;
     }
 
-    // Count histogram used to track number of tabs when we show the Overview on Return to Chrome.
-    private static final String TAB_COUNT_ON_RETURN = "Tabs.TabCountOnStartScreenShown";
     // Time histogram used to track time to inflate tab switcher views.
     private static final String TAB_SWITCHER_CREATION_TIME = "Android.TabSwitcher.CreationTime";
 
@@ -510,15 +505,7 @@ public class ChromeTabbedActivity extends ChromeActivity<ChromeActivityComponent
             int action = LaunchIntentDispatcher.dispatchToCustomTabActivity(this, intent);
             switch (dispatchedBy) {
                 case DispatchedBy.ON_CREATE:
-                    RecordHistogram.recordBooleanHistogram(
-                            "Android.MainActivity.ExplicitMainViewIntentDispatched.OnCreate",
-                            action != LaunchIntentDispatcher.Action.CONTINUE);
-                    break;
                 case DispatchedBy.ON_NEW_INTENT:
-
-                    RecordHistogram.recordBooleanHistogram(
-                            "Android.MainActivity.ExplicitMainViewIntentDispatched.OnNewIntent",
-                            action != LaunchIntentDispatcher.Action.CONTINUE);
                     break;
                 default:
                     assert false : "Unknown dispatchedBy value " + dispatchedBy;
@@ -527,9 +514,6 @@ public class ChromeTabbedActivity extends ChromeActivity<ChromeActivityComponent
                 // Intent was not dispatched, record its source.
                 @IntentHandler.ExternalAppId
                 int externalId = IntentHandler.determineExternalIntentSource(intent);
-                RecordHistogram.recordEnumeratedHistogram(
-                        "Android.MainActivity.UndispatchedExplicitMainViewIntentSource", externalId,
-                        IntentHandler.ExternalAppId.NUM_ENTRIES);
 
                 // Crash if intent came from us, but only in debug builds and only if we weren't
                 // explicitly told not to. Hopefully we'll get enough reports to find where
@@ -759,8 +743,7 @@ public class ChromeTabbedActivity extends ChromeActivity<ChromeActivityComponent
                 /* chromeActivityNativeDelegate= */ this, getLifecycleDispatcher(),
                 getTabCreatorManagerSupplier().get(), getMenuOrKeyboardActionController(),
                 getMultiWindowModeStateDispatcher(), mJankTracker, getToolbarManager()::getToolbar,
-                new CrowButtonDelegateImpl(), mBackPressManager,
-                mRootUiCoordinator.getIncognitoReauthControllerSupplier(),
+                mBackPressManager, mRootUiCoordinator.getIncognitoReauthControllerSupplier(),
                 v -> onTabSwitcherClicked());
     }
 
@@ -770,8 +753,7 @@ public class ChromeTabbedActivity extends ChromeActivity<ChromeActivityComponent
                 this, getLifecycleDispatcher(), getTabModelSelector(), getTabContentManager(),
                 getBrowserControlsManager(), getTabCreatorManagerSupplier().get(),
                 getMenuOrKeyboardActionController(), tabSwitcherContainer,
-                getShareDelegateSupplier(), getMultiWindowModeStateDispatcher(),
-                mRootUiCoordinator.getScrimCoordinator(),
+                getMultiWindowModeStateDispatcher(), mRootUiCoordinator.getScrimCoordinator(),
                 /* rootView= */ tabSwitcherContainer,
                 compositorViewHolder::getDynamicResourceLoader, getSnackbarManager(),
                 getModalDialogManager(), mRootUiCoordinator.getIncognitoReauthControllerSupplier(),
@@ -880,14 +862,12 @@ public class ChromeTabbedActivity extends ChromeActivity<ChromeActivityComponent
         final long startTimeMs = SystemClock.uptimeMillis();
         CompositorViewHolder compositorViewHolder = getCompositorViewHolderSupplier().get();
         ViewGroup containerView = compositorViewHolder;
-        if (TabUiFeatureUtilities.isTabletGridTabSwitcherPolishEnabled(this)) {
-            // Inflate view holder for polish GTS.
-            containerView =
-                    (ViewGroup) ((ViewStub) findViewById(R.id.grid_tab_switcher_view_holder_stub))
-                            .inflate();
-            // Set view in toolbar manager to set toolbar stub.
-            getToolbarManager().setTabSwitcherFullScreenView(containerView);
-        }
+        // Inflate view holder for polish GTS.
+        containerView =
+                (ViewGroup) ((ViewStub) findViewById(R.id.grid_tab_switcher_view_holder_stub))
+                        .inflate();
+        // Set view in toolbar manager to set toolbar stub.
+        getToolbarManager().setTabSwitcherFullScreenView(containerView);
 
         // create start surface.
         createTabSwitcherOrStartSurface(compositorViewHolder, containerView);
@@ -1210,11 +1190,6 @@ public class ChromeTabbedActivity extends ChromeActivity<ChromeActivityComponent
         boolean isOverviewVisible = isInOverviewMode();
 
         if (shouldShowOverviewPageOnStart && !isOverviewVisible) {
-            if (getCurrentTabModel() != null) {
-                RecordHistogram.recordCount1MHistogram(
-                        TAB_COUNT_ON_RETURN, getCurrentTabModel().getCount());
-            }
-
             mOverviewShownOnStart = true;
             // Cancel recording cold startup metrics if an overview is shown as they expect a tab to
             // be the first thing shown after startup.
@@ -1472,12 +1447,6 @@ public class ChromeTabbedActivity extends ChromeActivity<ChromeActivityComponent
             }
         }
         mIsAccessibilityTabSwitcherEnabled = accessibilityTabSwitcherEnabled;
-
-        if (ChromeAccessibilityUtil.get().isAccessibilityEnabled()) {
-            RecordHistogram.recordBooleanHistogram(
-                    "Accessibility.Android.TabSwitcherPreferenceEnabled",
-                    mIsAccessibilityTabSwitcherEnabled);
-        }
     }
 
     /**
@@ -1991,8 +1960,7 @@ public class ChromeTabbedActivity extends ChromeActivity<ChromeActivityComponent
                     getCompositorViewHolderSupplier(), getModalDialogManagerSupplier(),
                     this::getSnackbarManager, getBrowserControlsManager(), getActivityTabProvider(),
                     getLifecycleDispatcher(), getWindowAndroid(), this::getLastUserInteractionTime,
-                    this::hadWarmStart, mJankTracker, getToolbarManager()::getToolbar,
-                    new CrowButtonDelegateImpl());
+                    this::hadWarmStart, mJankTracker, getToolbarManager()::getToolbar);
         }
         return mTabDelegateFactory;
     }
@@ -2029,10 +1997,6 @@ public class ChromeTabbedActivity extends ChromeActivity<ChromeActivityComponent
         super.initDeferredStartupForActivity();
         DeferredStartupHandler.getInstance().addDeferredTask(() -> {
             if (isActivityFinishingOrDestroyed()) return;
-
-            ActivityManager am = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
-            RecordHistogram.recordSparseHistogram(
-                    "MemoryAndroid.DeviceMemoryClass", am.getMemoryClass());
 
             LauncherShortcutActivity.updateIncognitoShortcut(ChromeTabbedActivity.this);
 
@@ -2250,9 +2214,10 @@ public class ChromeTabbedActivity extends ChromeActivity<ChromeActivityComponent
             assert !mTabModelSelector.getCurrentModel().isIncognito()
                 : "Quick delete is not supported in Incognito.";
 
-            QuickDeleteController
-                    .create(getModalDialogManager(), getSnackbarManager(),
-                            UserPrefs.get(mTabModelProfileSupplier.get()))
+            QuickDeleteMetricsDelegate.recordHistogram(
+                    QuickDeleteMetricsDelegate.PrivacyQuickDelete.MENU_ITEM_CLICKED);
+
+            QuickDeleteController.create(getModalDialogManager(), getSnackbarManager())
                     .triggerQuickDeleteFlow();
         } else {
             return super.onMenuOrKeyboardAction(id, fromMenu);

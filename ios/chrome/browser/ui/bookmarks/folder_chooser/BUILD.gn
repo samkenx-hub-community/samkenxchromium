@@ -22,7 +22,7 @@ source_set("coordinator_headers") {
     "bookmarks_folder_chooser_coordinator.h",
     "bookmarks_folder_chooser_coordinator_delegate.h",
   ]
-  public_deps = [ "//ios/chrome/browser/ui/coordinators:chrome_coordinators" ]
+  public_deps = [ "//ios/chrome/browser/shared/coordinator/chrome_coordinator" ]
 }
 
 # Do not include this target. Prefer :folder_chooser instead.
@@ -51,6 +51,11 @@ source_set("ui") {
   configs += [ "//build/config/compiler:enable_arc" ]
   visibility = [ ":coordinator_impl" ]
   sources = [
+    "bookmarks_folder_chooser_consumer.h",
+    "bookmarks_folder_chooser_mediator.h",
+    "bookmarks_folder_chooser_mediator.mm",
+    "bookmarks_folder_chooser_mediator_delegate.h",
+    "bookmarks_folder_chooser_mutator.h",
     "bookmarks_folder_chooser_view_controller.h",
     "bookmarks_folder_chooser_view_controller.mm",
     "bookmarks_folder_chooser_view_controller_presentation_delegate.h",

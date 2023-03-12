@@ -30,6 +30,7 @@
 #include "base/task/thread_pool.h"
 #include "base/test/bind.h"
 #include "base/test/gtest_util.h"
+#include "base/test/memory/dangling_ptr_instrumentation.h"
 #include "base/test/scoped_feature_list.h"
 #include "base/test/task_environment.h"
 #include "build/build_config.h"
@@ -91,6 +92,65 @@ static_assert(
     "raw_ptr should be trivially default constructible");
 #endif  // !BUILDFLAG(ENABLE_BACKUP_REF_PTR_SUPPORT) &&
         // !BUILDFLAG(USE_ASAN_UNOWNED_PTR) && !BUILDFLAG(USE_HOOKABLE_RAW_PTR)
+
+// Verify that raw_ptr is a literal type, and its entire interface is constexpr.
+//
+// Constexpr destructors were introduced in C++20. PartitionAlloc's minimum
+// supported C++ version is C++17, so raw_ptr is not a literal type in C++17.
+// Thus we only test for constexpr in C++20.
+#if defined(__cpp_constexpr) && __cpp_constexpr >= 201907L
+static_assert([]() constexpr {
+  struct IntBase {};
+  struct Int : public IntBase {
+    int i = 0;
+  };
+
+  Int* i = new Int();
+  {
+    raw_ptr<Int> r(i);              // raw_ptr(T*)
+    raw_ptr<Int> r2(r);             // raw_ptr(const raw_ptr&)
+    raw_ptr<Int> r3(std::move(r));  // raw_ptr(raw_ptr&&)
+    r = r2;                         // operator=(const raw_ptr&)
+    r = std::move(r3);              // operator=(raw_ptr&&)
+    raw_ptr<Int, base::RawPtrTraits::kMayDangle> r4(
+        r);   // raw_ptr(const raw_ptr<DifferentTraits>&)
+    r4 = r2;  // operator=(const raw_ptr<DifferentTraits>&)
+    // (There is no move-version of DifferentTraits.)
+    [[maybe_unused]] raw_ptr<IntBase> r5(
+        r2);  // raw_ptr(const raw_ptr<Convertible>&)
+    [[maybe_unused]] raw_ptr<IntBase> r6(
+        std::move(r2));  // raw_ptr(raw_ptr<Convertible>&&)
+    r2 = r;              // Reset after move...
+    r5 = r2;             // operator=(const raw_ptr<Convertible>&)
+    r5 = std::move(r2);  // operator=(raw_ptr<Convertible>&&)
+    [[maybe_unused]] raw_ptr<Int> r7(nullptr);  // raw_ptr(nullptr)
+    r4 = nullptr;                               // operator=(nullptr)
+    r4 = i;                                     // operator=(T*)
+    r5 = r4;                                    // operator=(const Upcast&)
+    r5 = std::move(r4);                         // operator=(Upcast&&)
+    r.get()->i += 1;                            // get()
+    [[maybe_unused]] bool b = r;                // operator bool
+    (*r).i += 1;                                // operator*()
+    r->i += 1;                                  // operator->()
+    [[maybe_unused]] Int* i2 = r;               // operator T*()
+    [[maybe_unused]] IntBase* i3 = r;           // operator Convertible*()
+
+    Int* array = new Int[3]();
+    {
+      raw_ptr<Int, base::RawPtrTraits::kAllowPtrArithmetic> ra(array);
+      ++ra;      // operator++()
+      --ra;      // operator--()
+      ra++;      // operator++(int)
+      ra--;      // operator--(int)
+      ra += 1u;  // operator+=()
+      ra -= 1u;  // operator-=()
+    }
+    delete[] array;
+  }
+  delete i;
+  return true;
+}());
+#endif
 
 // Don't use base::internal for testing raw_ptr API, to test if code outside
 // this namespace calls the correct functions from this namespace.
@@ -1564,7 +1624,7 @@ void RunBackupRefPtrImplAdvanceTest(
   // end-of-allocation address should not cause an error immediately, but it may
   // result in the pointer being poisoned.
   protected_ptr = protected_ptr + requested_size / 2;
-#if PA_CONFIG(USE_OOB_POISON)
+#if BUILDFLAG(BACKUP_REF_PTR_POISON_OOB_PTR)
   EXPECT_DEATH_IF_SUPPORTED(*protected_ptr = ' ', "");
   protected_ptr -= 1;  // This brings the pointer back within
                        // bounds, which causes the poison to be removed.
@@ -1585,7 +1645,7 @@ void RunBackupRefPtrImplAdvanceTest(
   EXPECT_CHECK_DEATH(protected_ptr -= 1);
   EXPECT_CHECK_DEATH(--protected_ptr);
 
-#if PA_CONFIG(USE_OOB_POISON)
+#if BUILDFLAG(BACKUP_REF_PTR_POISON_OOB_PTR)
   // An array type that should be more than a third the size of the available
   // memory for the allocation such that incrementing a pointer to this type
   // twice causes it to point to a memory location that is too small to fit a
@@ -1598,7 +1658,7 @@ void RunBackupRefPtrImplAdvanceTest(
   **protected_arr_ptr = 4;
   protected_arr_ptr++;
   EXPECT_DEATH_IF_SUPPORTED(** protected_arr_ptr = 4, "");
-#endif
+#endif  // BUILDFLAG(BACKUP_REF_PTR_POISON_OOB_PTR)
 
   allocator.root()->Free(ptr);
 }
@@ -1677,6 +1737,7 @@ TEST_F(BackupRefPtrTest, GetDeltaElems) {
             checked_cast<ptrdiff_t>(requested_size));
   EXPECT_EQ(protected_ptr1 - protected_ptr1_4,
             -checked_cast<ptrdiff_t>(requested_size));
+#if BUILDFLAG(ENABLE_POINTER_SUBTRACTION_CHECK)
   EXPECT_CHECK_DEATH(protected_ptr2 - protected_ptr1);
   EXPECT_CHECK_DEATH(protected_ptr1 - protected_ptr2);
   EXPECT_CHECK_DEATH(protected_ptr2 - protected_ptr1_4);
@@ -1685,6 +1746,7 @@ TEST_F(BackupRefPtrTest, GetDeltaElems) {
   EXPECT_CHECK_DEATH(protected_ptr1 - protected_ptr2_2);
   EXPECT_CHECK_DEATH(protected_ptr2_2 - protected_ptr1_4);
   EXPECT_CHECK_DEATH(protected_ptr1_4 - protected_ptr2_2);
+#endif  // BUILDFLAG(ENABLE_POINTER_SUBTRACTION_CHECK)
   EXPECT_EQ(protected_ptr2_2 - protected_ptr2, 1);
   EXPECT_EQ(protected_ptr2 - protected_ptr2_2, -1);
 
@@ -1914,7 +1976,8 @@ TEST_F(BackupRefPtrTest, RawPtrDeleteWithoutExtractAsDangling) {
 #else
   allocator_.root()->Free(ptr.get());
   ptr = nullptr;
-#endif
+#endif  // BUILDFLAG(ENABLE_DANGLING_RAW_PTR_CHECKS) && \
+        // !BUILDFLAG(ENABLE_DANGLING_RAW_PTR_PERF_EXPERIMENT)
 }
 
 TEST_F(BackupRefPtrTest, SpatialAlgoCompat) {
@@ -1931,14 +1994,14 @@ TEST_F(BackupRefPtrTest, SpatialAlgoCompat) {
       reinterpret_cast<int*>(allocator_.root()->Alloc(requested_size, ""));
   int* ptr_end = ptr + requested_elements;
 
-  RawPtrCountingImpl::ClearCounters();
-
   CountingRawPtr<int> protected_ptr = ptr;
   CountingRawPtr<int> protected_ptr_end = protected_ptr + requested_elements;
 
-#if PA_CONFIG(USE_OOB_POISON)
+#if BUILDFLAG(BACKUP_REF_PTR_POISON_OOB_PTR)
   EXPECT_DEATH_IF_SUPPORTED(*protected_ptr_end = 1, "");
 #endif
+
+  RawPtrCountingImpl::ClearCounters();
 
   int gen_val = 1;
   std::generate(protected_ptr, protected_ptr_end, [&gen_val]() {
@@ -2014,7 +2077,7 @@ TEST_F(BackupRefPtrTest, SpatialAlgoCompat) {
   allocator_.root()->Free(ptr);
 }
 
-#if PA_CONFIG(USE_OOB_POISON)
+#if BUILDFLAG(BACKUP_REF_PTR_POISON_OOB_PTR)
 TEST_F(BackupRefPtrTest, Duplicate) {
   size_t requested_size = allocator_.root()->AdjustSizeForExtrasSubtract(512);
   char* ptr = static_cast<char*>(allocator_.root()->Alloc(requested_size, ""));
@@ -2038,7 +2101,7 @@ TEST_F(BackupRefPtrTest, Duplicate) {
 
   allocator_.root()->Free(ptr);
 }
-#endif  // PA_USE_OOB_POISON
+#endif  // BUILDFLAG(BACKUP_REF_PTR_POISON_OOB_PTR)
 
 namespace {
 constexpr uint8_t kCustomQuarantineByte = 0xff;
@@ -2076,7 +2139,7 @@ static constexpr size_t kTagOffsetForTest = 2;
 struct MTECheckedPtrImplPartitionAllocSupportForTest {
   static bool EnabledForPtr(void* ptr) { return !!ptr; }
 
-  static ALWAYS_INLINE void* TagPointer(uintptr_t ptr) {
+  ALWAYS_INLINE static void* TagPointer(uintptr_t ptr) {
     return reinterpret_cast<void*>(ptr - kTagOffsetForTest);
   }
 };
@@ -2449,6 +2512,65 @@ TEST_F(HookableRawPtrImplTest, Duplicate) {
 }
 
 #endif  // BUILDFLAG(USE_HOOKABLE_RAW_PTR)
+
+TEST(DanglingPtrTest, DetectAndReset) {
+  auto instrumentation = test::DanglingPtrInstrumentation::Create();
+  if (!instrumentation.has_value()) {
+    GTEST_SKIP() << instrumentation.error();
+  }
+
+  auto owned_ptr = std::make_unique<int>(42);
+  raw_ptr<int> dangling_ptr = owned_ptr.get();
+  EXPECT_EQ(instrumentation->dangling_ptr_detected(), 0u);
+  EXPECT_EQ(instrumentation->dangling_ptr_released(), 0u);
+  owned_ptr.reset();
+  EXPECT_EQ(instrumentation->dangling_ptr_detected(), 1u);
+  EXPECT_EQ(instrumentation->dangling_ptr_released(), 0u);
+  dangling_ptr = nullptr;
+  EXPECT_EQ(instrumentation->dangling_ptr_detected(), 1u);
+  EXPECT_EQ(instrumentation->dangling_ptr_released(), 1u);
+}
+
+TEST(DanglingPtrTest, DetectAndDestructor) {
+  auto instrumentation = test::DanglingPtrInstrumentation::Create();
+  if (!instrumentation.has_value()) {
+    GTEST_SKIP() << instrumentation.error();
+  }
+
+  auto owned_ptr = std::make_unique<int>(42);
+  {
+    [[maybe_unused]] raw_ptr<int> dangling_ptr = owned_ptr.get();
+    EXPECT_EQ(instrumentation->dangling_ptr_detected(), 0u);
+    EXPECT_EQ(instrumentation->dangling_ptr_released(), 0u);
+    owned_ptr.reset();
+    EXPECT_EQ(instrumentation->dangling_ptr_detected(), 1u);
+    EXPECT_EQ(instrumentation->dangling_ptr_released(), 0u);
+  }
+  EXPECT_EQ(instrumentation->dangling_ptr_detected(), 1u);
+  EXPECT_EQ(instrumentation->dangling_ptr_released(), 1u);
+}
+
+TEST(DanglingPtrTest, DetectResetAndDestructor) {
+  auto instrumentation = test::DanglingPtrInstrumentation::Create();
+  if (!instrumentation.has_value()) {
+    GTEST_SKIP() << instrumentation.error();
+  }
+
+  auto owned_ptr = std::make_unique<int>(42);
+  {
+    raw_ptr<int> dangling_ptr = owned_ptr.get();
+    EXPECT_EQ(instrumentation->dangling_ptr_detected(), 0u);
+    EXPECT_EQ(instrumentation->dangling_ptr_released(), 0u);
+    owned_ptr.reset();
+    EXPECT_EQ(instrumentation->dangling_ptr_detected(), 1u);
+    EXPECT_EQ(instrumentation->dangling_ptr_released(), 0u);
+    dangling_ptr = nullptr;
+    EXPECT_EQ(instrumentation->dangling_ptr_detected(), 1u);
+    EXPECT_EQ(instrumentation->dangling_ptr_released(), 1u);
+  }
+  EXPECT_EQ(instrumentation->dangling_ptr_detected(), 1u);
+  EXPECT_EQ(instrumentation->dangling_ptr_released(), 1u);
+}
 
 }  // namespace internal
 }  // namespace base

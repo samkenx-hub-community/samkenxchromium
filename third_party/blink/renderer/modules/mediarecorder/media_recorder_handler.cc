@@ -23,6 +23,7 @@
 #include "third_party/blink/renderer/modules/mediarecorder/buildflags.h"
 #include "third_party/blink/renderer/modules/mediarecorder/media_recorder.h"
 #include "third_party/blink/renderer/modules/mediastream/media_stream_video_track.h"
+#include "third_party/blink/renderer/platform/bindings/exception_code.h"
 #include "third_party/blink/renderer/platform/heap/garbage_collected.h"
 #include "third_party/blink/renderer/platform/media_capabilities/web_media_capabilities_info.h"
 #include "third_party/blink/renderer/platform/media_capabilities/web_media_configuration.h"
@@ -253,6 +254,10 @@ bool MediaRecorderHandler::Start(int timeslice) {
   DCHECK(timeslice_.is_zero());
   DCHECK(!muxer_);
 
+  DCHECK(!is_media_stream_observer_);
+  media_stream_->AddObserver(this);
+  is_media_stream_observer_ = true;
+
   invalidated_ = false;
 
   timeslice_ = base::Milliseconds(timeslice);
@@ -361,6 +366,12 @@ void MediaRecorderHandler::Stop() {
 
   // TODO(crbug.com/719023): The video recorder needs to be flushed to retrieve
   // the last N frames with some codecs.
+
+  // Unregister from media stream notifications.
+  if (media_stream_ && is_media_stream_observer_) {
+    media_stream_->RemoveObserver(this);
+  }
+  is_media_stream_observer_ = false;
 
   // Ensure any stored data inside the muxer is flushed out before invalidation.
   muxer_ = nullptr;
@@ -526,6 +537,16 @@ String MediaRecorderHandler::ActualMimeType() {
   return mime_type.ToString();
 }
 
+void MediaRecorderHandler::TrackAdded(const WebString& track_id) {
+  recorder_->OnError(DOMExceptionCode::kInvalidModificationError,
+                     "Tracks in MediaStream were added.");
+}
+
+void MediaRecorderHandler::TrackRemoved(const WebString& track_id) {
+  recorder_->OnError(DOMExceptionCode::kInvalidModificationError,
+                     "Tracks in MediaStream were removed.");
+}
+
 void MediaRecorderHandler::OnEncodedVideo(
     const media::Muxer::VideoParameters& params,
     std::string encoded_data,
@@ -566,28 +587,23 @@ void MediaRecorderHandler::HandleEncodedVideo(
     bool is_key_frame) {
   DCHECK(IsMainThread());
 
-  if (UpdateTracksAndCheckIfChanged()) {
-    recorder_->OnError("Amount of tracks in MediaStream has changed.");
-    return;
-  }
-
   if (!last_seen_codec_.has_value())
     last_seen_codec_ = params.codec;
   if (*last_seen_codec_ != params.codec) {
     recorder_->OnError(
+        DOMExceptionCode::kUnknownError,
         String::Format("Video codec changed from %s to %s",
                        media::GetCodecName(*last_seen_codec_).c_str(),
                        media::GetCodecName(params.codec).c_str()));
     return;
   }
-
   if (!muxer_)
     return;
   if (!muxer_->OnEncodedVideo(params, std::move(encoded_data),
                               std::move(encoded_alpha), timestamp,
                               is_key_frame)) {
-    DLOG(ERROR) << "Error muxing video data";
-    recorder_->OnError("Error muxing video data");
+    recorder_->OnError(DOMExceptionCode::kUnknownError,
+                       "Error muxing video data");
   }
 }
 
@@ -598,16 +614,11 @@ void MediaRecorderHandler::OnEncodedAudio(const media::AudioParameters& params,
 
   if (invalidated_)
     return;
-
-  if (UpdateTracksAndCheckIfChanged()) {
-    recorder_->OnError("Amount of tracks in MediaStream has changed.");
-    return;
-  }
   if (!muxer_)
     return;
   if (!muxer_->OnEncodedAudio(params, std::move(encoded_data), timestamp)) {
-    DLOG(ERROR) << "Error muxing audio data";
-    recorder_->OnError("Error muxing audio data");
+    recorder_->OnError(DOMExceptionCode::kUnknownError,
+                       "Error muxing audio data");
   }
 }
 
@@ -634,43 +645,18 @@ void MediaRecorderHandler::WriteData(base::StringPiece data) {
                        (now - base::TimeTicks::UnixEpoch()).InMillisecondsF());
 }
 
-bool MediaRecorderHandler::UpdateTracksAndCheckIfChanged() {
+void MediaRecorderHandler::UpdateTracksLiveAndEnabled() {
   DCHECK(IsMainThread());
 
   const auto video_tracks = media_stream_->VideoComponents();
   const auto audio_tracks = media_stream_->AudioComponents();
 
-  bool video_tracks_changed = video_tracks_.size() != video_tracks.size();
-  bool audio_tracks_changed = audio_tracks_.size() != audio_tracks.size();
-
-  if (!video_tracks_changed) {
-    for (wtf_size_t i = 0; i < video_tracks.size(); ++i) {
-      if (video_tracks_[i]->Id() != video_tracks[i]->Id()) {
-        video_tracks_changed = true;
-        break;
-      }
-    }
-  }
-  if (!video_tracks_changed && !audio_tracks_changed) {
-    for (wtf_size_t i = 0; i < audio_tracks.size(); ++i) {
-      if (audio_tracks_[i]->Id() != audio_tracks[i]->Id()) {
-        audio_tracks_changed = true;
-        break;
-      }
-    }
-  }
-
-  if (video_tracks_changed)
-    video_tracks_ = video_tracks;
-  if (audio_tracks_changed)
-    audio_tracks_ = audio_tracks;
-
-  if (video_tracks_.size())
+  if (!video_tracks_.empty()) {
     UpdateTrackLiveAndEnabled(*video_tracks_[0], /*is_video=*/true);
-  if (audio_tracks_.size())
+  }
+  if (!audio_tracks_.empty()) {
     UpdateTrackLiveAndEnabled(*audio_tracks_[0], /*is_video=*/false);
-
-  return video_tracks_changed || audio_tracks_changed;
+  }
 }
 
 void MediaRecorderHandler::UpdateTrackLiveAndEnabled(
@@ -735,7 +721,8 @@ void MediaRecorderHandler::Trace(Visitor* visitor) const {
 
 void MediaRecorderHandler::OnVideoEncodingError() {
   if (recorder_) {
-    recorder_->OnError("Video encoding failed.");
+    recorder_->OnError(DOMExceptionCode::kUnknownError,
+                       "Video encoding failed.");
   }
 }
 

@@ -6,7 +6,6 @@
 
 #include <stddef.h>
 
-#include <algorithm>
 #include <memory>
 #include <string>
 #include <tuple>
@@ -21,6 +20,7 @@
 #include "base/memory/ref_counted.h"
 #include "base/metrics/field_trial.h"
 #include "base/metrics/metrics_hashes.h"
+#include "base/ranges/algorithm.h"
 #include "base/strings/strcat.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_piece.h"
@@ -36,7 +36,6 @@
 #include "components/autofill/core/browser/autocomplete_history_manager.h"
 #include "components/autofill/core/browser/autofill_download_manager.h"
 #include "components/autofill/core/browser/autofill_form_test_utils.h"
-#include "components/autofill/core/browser/autofill_optimization_guide.h"
 #include "components/autofill/core/browser/autofill_suggestion_generator.h"
 #include "components/autofill/core/browser/autofill_test_utils.h"
 #include "components/autofill/core/browser/data_model/autofill_profile.h"
@@ -46,6 +45,7 @@
 #include "components/autofill/core/browser/metrics/form_events/form_events.h"
 #include "components/autofill/core/browser/metrics/log_event.h"
 #include "components/autofill/core/browser/mock_autocomplete_history_manager.h"
+#include "components/autofill/core/browser/mock_autofill_optimization_guide.h"
 #include "components/autofill/core/browser/mock_iban_manager.h"
 #include "components/autofill/core/browser/mock_merchant_promo_code_manager.h"
 #include "components/autofill/core/browser/mock_single_field_form_fill_router.h"
@@ -200,17 +200,6 @@ class MockAutofillDownloadManager : public AutofillDownloadManager {
 
  private:
   std::vector<FormStructure*> last_queried_forms_;
-};
-
-class MockAutofillOptimizationGuide : public AutofillOptimizationGuide {
- public:
-  MockAutofillOptimizationGuide() : AutofillOptimizationGuide(nullptr) {}
-  MockAutofillOptimizationGuide(const MockAutofillOptimizationGuide&) = delete;
-  MockAutofillOptimizationGuide& operator=(
-      const MockAutofillOptimizationGuide&) = delete;
-  ~MockAutofillOptimizationGuide() override = default;
-
-  MOCK_METHOD(void, OnDidParseForm, (const FormStructure&), (override));
 };
 
 class MockTouchToFillDelegateImpl : public TouchToFillDelegateImpl {
@@ -576,9 +565,9 @@ class BrowserAutofillManagerTest : public testing::Test {
       FieldGlobalId field_id,
       const std::vector<std::u16string>& results) {
     std::vector<Suggestion> suggestions;
-    std::transform(results.begin(), results.end(),
-                   std::back_inserter(suggestions),
-                   [](auto result) { return Suggestion(result); });
+    base::ranges::transform(
+        results, std::back_inserter(suggestions),
+        [](const auto& result) { return Suggestion(result); });
 
     browser_autofill_manager_->OnSuggestionsReturned(
         field_id, AutoselectFirstSuggestion(false), suggestions);
@@ -961,7 +950,7 @@ class BrowserAutofillManagerTest : public testing::Test {
   }
 
   base::test::TaskEnvironment task_environment_;
-  test::AutofillEnvironment autofill_environment_;
+  test::AutofillUnitTestEnvironment autofill_test_environment_;
   NiceMock<MockAutofillClient> autofill_client_;
   std::unique_ptr<MockAutofillDriver> autofill_driver_;
   std::unique_ptr<TestBrowserAutofillManager> browser_autofill_manager_;
@@ -9783,7 +9772,7 @@ TEST_F(BrowserAutofillManagerTest, GetSuggestions_MixedForm) {
 }
 
 // Test that if a form is mixed content we do not show a warning if the opt out
-// polcy is set.
+// policy is set.
 TEST_F(BrowserAutofillManagerTest, GetSuggestions_MixedFormOptoutPolicy) {
   // Set pref to disabled.
   autofill_client_.GetPrefs()->SetBoolean(::prefs::kMixedFormsWarningsEnabled,
@@ -10196,7 +10185,7 @@ class BrowserAutofillManagerTestForVirtualCardOption
   void SetUp() override {
     BrowserAutofillManagerTest::SetUp();
 
-    // The URL should always matche the form URL in
+    // The URL should always match the form URL in
     // CreateTestCreditCardFormData() to have the allowlist work correctly.
     autofill_client_.set_allowed_merchants({"https://myform.com/form.html"});
 
@@ -11081,7 +11070,7 @@ TEST_P(BrowserAutofillManagerVotingTest, DynamicFormSubmission) {
   browser_autofill_manager_->OnTextFieldDidChange(
       form_, form_.fields[1], gfx::RectF(), AutofillTickClock::NowTicks());
 
-  // 4. Simulate removing the focus from the form, which generaets a second blur
+  // 4. Simulate removing the focus from the form, which generates a second blur
   // vote which should be sent.
   std::map<std::u16string, ServerFieldTypeSet> expected_vote_types = {
       {u"firstname",

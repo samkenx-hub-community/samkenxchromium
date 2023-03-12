@@ -32,9 +32,9 @@ public class OmniboxFeatures {
 
     private static final MutableFlagWithSafeDefault sOmniboxConsumesImeInsets =
             new MutableFlagWithSafeDefault(ChromeFeatureList.OMNIBOX_CONSUMERS_IME_INSETS, false);
-
-    private static final MutableFlagWithSafeDefault sOmniboxScrimOnTablets =
-            new MutableFlagWithSafeDefault(ChromeFeatureList.OMNIBOX_SCRIM_ON_TABLETS, false);
+    private static final MutableFlagWithSafeDefault sShouldAdaptToNarrowTabletWindows =
+            new MutableFlagWithSafeDefault(
+                    ChromeFeatureList.OMNIBOX_ADAPT_NARROW_TABLET_WINDOWS, false);
 
     /**
      * @param context The activity context.
@@ -43,6 +43,14 @@ public class OmniboxFeatures {
     public static boolean shouldShowModernizeVisualUpdate(Context context) {
         return ChromeFeatureList.sOmniboxModernizeVisualUpdate.isEnabled()
                 && (!isTablet(context) || enabledModernizeVisualUpdateOnTablet());
+    }
+
+    /**
+     * Returns whether the omnibox dropdown should be switched to a phone-like appearance when the
+     * window width is <600dp.
+     */
+    public static boolean shouldAdaptToNarrowTabletWindows() {
+        return sShouldAdaptToNarrowTabletWindows.isEnabled();
     }
 
     /**
@@ -99,13 +107,5 @@ public class OmniboxFeatures {
      */
     public static boolean shouldAddMostVisitedTilesRecycledViewPool() {
         return ChromeFeatureList.sOmniboxMostVisitedTilesAddRecycledViewPool.isEnabled();
-    }
-
-    /**
-     * Returns whether the tablet omnibox should show a scrim on either side of the suggestions
-     * list instead of padding.
-     */
-    public static boolean shouldShowTabletScrim() {
-        return sOmniboxScrimOnTablets.isEnabled();
     }
 }

@@ -3,10 +3,11 @@
 // found in the LICENSE file.
 
 import 'chrome://resources/cr_components/history_clusters/history_clusters_shared_style.css.js';
+import './page_favicon.js';
 
 import {PolymerElement} from 'chrome://resources/polymer/v3_0/polymer/polymer_bundled.min.js';
 
-import {Cluster, URLVisit} from '../../history_cluster_types.mojom-webui.js';
+import {URLVisit} from '../../history_cluster_types.mojom-webui.js';
 import {I18nMixin} from '../../i18n_setup.js';
 
 import {getTemplate} from './tile.html.js';
@@ -39,22 +40,15 @@ export class TileModuleElement extends I18nMixin
   }
 
   visit: URLVisit;
-  cluster: Cluster;
 
-  constructor() {
-    super();
-  }
-
-  override connectedCallback() {
-    super.connectedCallback();
-  }
-
-  override disconnectedCallback() {
-    super.disconnectedCallback();
+  private onClick_(e: Event) {
+    e.stopPropagation();
   }
 
   private computeLabel_(): string {
-    return this.visit.urlForDisplay;
+    let domain = (new URL(this.visit.normalizedUrl.url)).hostname;
+    domain = domain.replace('www.', '');
+    return domain;
   }
 }
 

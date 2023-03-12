@@ -154,8 +154,12 @@ void AddStrings(content::WebUIDataSource* source) {
       {"screensaverLabel", IDS_PERSONALIZATION_APP_SCREENSAVER_LABEL},
       {"screenSaverPreviewButton",
        IDS_PERSONALIZATION_APP_SCREENSAVER_PREVIEW_BUTTON},
+      {"screenSaverPreviewButtonAriaLabel",
+       IDS_PERSONALIZATION_APP_SCREENSAVER_PREVIEW_BUTTON_ARIA_LABEL},
       {"screenSaverPreviewDownloading",
        IDS_PERSONALIZATION_APP_SCREENSAVER_PREVIEW_DOWNLOADING},
+      {"screenSaverPreviewDownloadingAriaLabel",
+       IDS_PERSONALIZATION_APP_SCREENSAVER_PREVIEW_DOWNLOADING_ARIA_LABEL},
       {"ambientModePageDescription",
        IDS_PERSONALIZATION_APP_AMBIENT_MODE_PAGE_DESCRIPTION},
       {"ambientModeOn", IDS_PERSONALIZATION_APP_AMBIENT_MODE_ON},
@@ -255,6 +259,7 @@ void AddStrings(content::WebUIDataSource* source) {
        IDS_PERSONALIZATION_APP_KEYBOARD_BACKLIGHT_ZONE_CUSTOMIZATION_DISMISS_BUTTON},
       {"wallpaperColorDescription",
        IDS_PERSONALIZATION_APP_KEYBOARD_BACKLIGHT_WALLPAPER_COLOR_DESCRIPTION},
+      {"zoneTitle", IDS_PERSONALIZATION_APP_KEYBOARD_BACKLIGHT_ZONE_TITLE},
 
       // Google Photos strings
       // TODO(b/229149314): Finalize error and retry strings.
@@ -338,6 +343,7 @@ PersonalizationAppUI::PersonalizationAppUI(
   AddResources(source);
   AddStrings(source);
   AddBooleans(source);
+  AddIntegers(source);
 }
 
 PersonalizationAppUI::~PersonalizationAppUI() = default;
@@ -399,11 +405,13 @@ void PersonalizationAppUI::AddBooleans(content::WebUIDataSource* source) {
 
   source->AddBoolean("isPersonalizationJellyEnabled",
                      features::IsPersonalizationJellyEnabled());
+}
 
-  source->AddBoolean(
-      "isMultiZoneRgbKeyboardSupported",
-      features::IsMultiZoneRgbKeyboardEnabled() &&
-          Shell::Get()->rgb_keyboard_manager()->GetZoneCount() > 1);
+void PersonalizationAppUI::AddIntegers(content::WebUIDataSource* source) {
+  source->AddInteger("keyboardBacklightZoneCount",
+                     features::IsMultiZoneRgbKeyboardEnabled()
+                         ? Shell::Get()->rgb_keyboard_manager()->GetZoneCount()
+                         : 0);
 }
 
 void PersonalizationAppUI::HandleWebUIRequest(

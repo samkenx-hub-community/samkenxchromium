@@ -163,6 +163,7 @@
 <translation id="2346474577291266260">Одличан (<ph name="SIGNAL_STRENGTH" />)</translation>
 <translation id="2359808026110333948">Настави</translation>
 <translation id="2364498172489649528">Прошло</translation>
+<translation id="2367335866686097760">Тастер за мапирање тастера</translation>
 <translation id="2380886658946992094">Legal</translation>
 <translation id="2391082728065870591">Пошаљи извештај са повратним информацијама</translation>
 <translation id="2407209115954268704">Статус закључавања SIM картице</translation>
@@ -235,10 +236,11 @@
 <translation id="319101249942218879">Слика аватара је промењена</translation>
 <translation id="3192947282887913208">Аудио датотеке</translation>
 <translation id="3199982728237701504">Увлачење документа (двострано)</translation>
+<translation id="3211671540163313381">D-pad за мапирање тастера</translation>
 <translation id="3226405216343213872">Траже се скенери</translation>
+<translation id="3226657629376379887">Мени са радњама за распоред</translation>
 <translation id="3246869037381808805">Задаци штампања старији од 1 дана се уклањају</translation>
 <translation id="3268178239013324452">Није успело – врата су отворена</translation>
-<translation id="3275506277319227640">Фиксирај у смеру <ph name="DIRECTION" /></translation>
 <translation id="3275729367986477355">Слика аватара</translation>
 <translation id="3283504360622356314">{0,plural, =1{Измени фајл}one{Измени фајлове}few{Измени фајлове}other{Измени фајлове}}</translation>
 <translation id="3286515922899063534"><ph name="CURRENT" /> GHz</translation>
@@ -357,7 +359,6 @@
 <translation id="4311195029067684288">Потпуно</translation>
 <translation id="4333390807948134856">Тастер <ph name="KEY_NAME" /> је притиснут</translation>
 <translation id="435692326371619097">Управљајте подешавањима назива приступне тачке мреже. Називи приступних тачака успостављају везу између мобилне мреже и интернета. <ph name="BEGIN_LINK" />Сазнајте више<ph name="END_LINK" /></translation>
-<translation id="4370033095251616914">Фиксирај на мањој страни</translation>
 <translation id="4378373042927530923">Није покренуто</translation>
 <translation id="4378551569595875038">Повезује се...</translation>
 <translation id="4382484599443659549">PDF</translation>
@@ -616,6 +617,7 @@
 <translation id="650266656685499220">Да бисте направили албуме, идите у Google слике</translation>
 <translation id="6516990319416533844">Да бисте тестирали брзину пуњења батерије, дозволите да се батерија мало испразни</translation>
 <translation id="6517239166834772319">Истражите</translation>
+<translation id="6526200165918397681">Препознај позадину</translation>
 <translation id="6527081081771465939">Непознат безбедносни протокол за WiFi</translation>
 <translation id="6535178685492749208">Офлајн сте. Повратне информације ће бити послате касније.</translation>
 <translation id="65587193855025101">Положено</translation>
@@ -802,6 +804,7 @@
 <translation id="8318753676953949627">Нема слика</translation>
 <translation id="8336739000755212683">Промените слику налога на уређају</translation>
 <translation id="8347227221149377169">Задаци штампања</translation>
+<translation id="8351855506390808906">Тачка контакта за мапирање тастера</translation>
 <translation id="8352772353338965963">Додајте налог за вишеструко пријављивање. Свим пријављеним налозима се може приступити без лозинке, па ову функцију треба користити само са поузданим налозима.</translation>
 <translation id="8364946094152050673">Празни сервери за имена</translation>
 <translation id="8372477600026034341">Додатни хостови</translation>
@@ -898,7 +901,7 @@
 <translation id="9137526406337347448">Google услуге</translation>
 <translation id="9138630967333032450">Леви тастер shift</translation>
 <translation id="9149391708638971077">Покрени тест меморије</translation>
-<translation id="9157515863513902090">Фиксирај на већој страни</translation>
+<translation id="9161276708550942948">размак</translation>
 <translation id="9173638680043580060">Преостало је мање од минута</translation>
 <translation id="917720651393141712">Тестирај</translation>
 <translation id="9188992814426075118">Тастатура може аутоматски да се подудара са позадином</translation>

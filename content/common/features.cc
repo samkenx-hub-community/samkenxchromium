@@ -26,7 +26,7 @@ BASE_FEATURE(kOptimizeImmHideCalls,
 #endif  // BUILDFLAG(IS_ANDROID)
 
 BASE_FEATURE(kQueueNavigationsWhileWaitingForCommit,
-             "QueueNavigationsWhileWaitingForPendingCommit",
+             "QueueNavigationsWhileWaitingForCommit",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 static constexpr base::FeatureParam<NavigationQueueingFeatureLevel>::Option
@@ -46,6 +46,16 @@ NavigationQueueingFeatureLevel GetNavigationQueueingFeatureLevel() {
     return kNavigationQueueingFeatureLevelParam.Get();
   }
   return NavigationQueueingFeatureLevel::kNone;
+}
+
+bool ShouldAvoidRedundantNavigationCancellations() {
+  return GetNavigationQueueingFeatureLevel() >=
+         NavigationQueueingFeatureLevel::kAvoidRedundantCancellations;
+}
+
+bool ShouldQueueNavigationsWhenPendingCommitRFHExists() {
+  return GetNavigationQueueingFeatureLevel() ==
+         NavigationQueueingFeatureLevel::kFull;
 }
 
 BASE_FEATURE(kRestrictCanAccessDataForOriginToUIThread,

@@ -317,7 +317,7 @@ TEST_F(ContextRecyclerTest, SetBidBindings) {
     ASSERT_TRUE(context_recycler.set_bid_bindings()->has_bid());
     mojom::BidderWorkletBidPtr bid =
         context_recycler.set_bid_bindings()->TakeBid();
-    EXPECT_EQ("https://example.com/ad1", bid->render_url);
+    EXPECT_EQ("https://example.com/ad1", bid->ad_descriptor.url);
     EXPECT_EQ(10.0, bid->bid);
     EXPECT_EQ(base::Milliseconds(500), bid->bid_duration);
   }
@@ -436,13 +436,14 @@ TEST_F(ContextRecyclerTest, SetBidBindings) {
     ASSERT_TRUE(context_recycler.set_bid_bindings()->has_bid());
     mojom::BidderWorkletBidPtr bid =
         context_recycler.set_bid_bindings()->TakeBid();
-    EXPECT_EQ("https://example.com/ad5", bid->render_url);
+    EXPECT_EQ("https://example.com/ad5", bid->ad_descriptor.url);
     EXPECT_EQ(15.0, bid->bid);
     EXPECT_EQ(base::Milliseconds(200), bid->bid_duration);
-    ASSERT_TRUE(bid->ad_components.has_value());
-    EXPECT_THAT(bid->ad_components.value(),
-                ElementsAre(GURL("https://example.com/portion3"),
-                            GURL("https://example.com/portion5")));
+    ASSERT_TRUE(bid->ad_component_descriptors.has_value());
+    EXPECT_THAT(
+        bid->ad_component_descriptors.value(),
+        ElementsAre(blink::AdDescriptor(GURL("https://example.com/portion3")),
+                    blink::AdDescriptor(GURL("https://example.com/portion5"))));
   }
 
   {
@@ -554,7 +555,7 @@ TEST_F(ContextRecyclerTest, SetBidBindings) {
     ASSERT_TRUE(context_recycler.set_bid_bindings()->has_bid());
     mojom::BidderWorkletBidPtr bid =
         context_recycler.set_bid_bindings()->TakeBid();
-    EXPECT_EQ("https://example.com/ad2", bid->render_url);
+    EXPECT_EQ("https://example.com/ad2", bid->ad_descriptor.url);
     EXPECT_EQ(10.0, bid->bid);
     EXPECT_EQ(base::Milliseconds(500), bid->bid_duration);
   }
@@ -2318,6 +2319,56 @@ TEST_F(ContextRecyclerPrivateAggregationExtensionsEnabledTest,
         gin::Dictionary::CreateEmpty(helper_->isolate());
     bucket_dict.Set("baseValue", std::string("winning-bid"));
     bucket_dict.Set("scale", std::string("255"));
+
+    gin::Dictionary dict = gin::Dictionary::CreateEmpty(helper_->isolate());
+    dict.Set("bucket", bucket_dict);
+    dict.Set("value", 1);
+
+    Run(scope, script, "test", error_msgs,
+        gin::ConvertToV8(helper_->isolate(), dict));
+    EXPECT_THAT(error_msgs,
+                ElementsAre("https://example.org/script.js:12 Uncaught "
+                            "TypeError: Invalid bucket dictionary."));
+
+    EXPECT_TRUE(context_recycler.private_aggregation_bindings()
+                    ->TakePrivateAggregationRequests()
+                    .empty());
+  }
+
+  // Invalid bucket dictionary, whose scale is NaN.
+  {
+    ContextRecyclerScope scope(context_recycler);
+    std::vector<std::string> error_msgs;
+
+    gin::Dictionary bucket_dict =
+        gin::Dictionary::CreateEmpty(helper_->isolate());
+    bucket_dict.Set("baseValue", std::string("winningBid"));
+    bucket_dict.Set("scale", std::numeric_limits<double>::quiet_NaN());
+
+    gin::Dictionary dict = gin::Dictionary::CreateEmpty(helper_->isolate());
+    dict.Set("bucket", bucket_dict);
+    dict.Set("value", 1);
+
+    Run(scope, script, "test", error_msgs,
+        gin::ConvertToV8(helper_->isolate(), dict));
+    EXPECT_THAT(error_msgs,
+                ElementsAre("https://example.org/script.js:12 Uncaught "
+                            "TypeError: Invalid bucket dictionary."));
+
+    EXPECT_TRUE(context_recycler.private_aggregation_bindings()
+                    ->TakePrivateAggregationRequests()
+                    .empty());
+  }
+
+  // Invalid bucket dictionary, whose scale is infinity.
+  {
+    ContextRecyclerScope scope(context_recycler);
+    std::vector<std::string> error_msgs;
+
+    gin::Dictionary bucket_dict =
+        gin::Dictionary::CreateEmpty(helper_->isolate());
+    bucket_dict.Set("baseValue", std::string("winningBid"));
+    bucket_dict.Set("scale", std::numeric_limits<double>::infinity());
 
     gin::Dictionary dict = gin::Dictionary::CreateEmpty(helper_->isolate());
     dict.Set("bucket", bucket_dict);

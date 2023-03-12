@@ -67,13 +67,15 @@ class PLATFORM_EXPORT FrameWidgetInputHandlerImpl
                                          int32_t after) override;
   void SetEditableSelectionOffsets(int32_t start, int32_t end) override;
   void HandleStylusWritingGestureAction(
-      mojom::blink::StylusWritingGestureDataPtr gesture_data) override;
+      mojom::blink::StylusWritingGestureDataPtr gesture_data,
+      HandleStylusWritingGestureActionCallback callback) override;
   void ExecuteEditCommand(const String& command, const String& value) override;
   void Undo() override;
   void Redo() override;
   void Cut() override;
   void Copy() override;
   void CopyToFindPboard() override;
+  void CenterSelection() override;
   void Paste() override;
   void PasteAndMatchStyle() override;
   void Replace(const String& word) override;

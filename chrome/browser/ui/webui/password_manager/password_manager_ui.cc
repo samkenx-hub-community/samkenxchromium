@@ -146,6 +146,7 @@ content::WebUIDataSource* CreateAndAddPasswordsUIHTMLSource(
      IDS_PASSWORD_MANAGER_UI_MUTED_COMPROMISED_PASSWORDS},
     {"notValidWebsite", IDS_PASSWORD_MANAGER_UI_NOT_VALID_WEB_ADDRESS},
     {"notesLabel", IDS_PASSWORD_MANAGER_UI_NOTES_LABEL},
+    {"opensInNewTab", IDS_PASSWORD_MANAGER_UI_OPENS_IN_NEW_TAB},
     {"passwordCopiedToClipboard",
      IDS_PASSWORD_MANAGER_UI_PASSWORD_COPIED_TO_CLIPBOARD},
     {"passwordDeleted", IDS_PASSWORD_MANAGER_UI_PASSWORD_DELETED},
@@ -160,10 +161,14 @@ content::WebUIDataSource* CreateAndAddPasswordsUIHTMLSource(
     {"phishedAndLeakedPassword",
      IDS_PASSWORD_MANAGER_UI_PASSWORD_PHISHED_AND_LEAKED},
     {"phishedPassword", IDS_PASSWORD_MANAGER_UI_PASSWORD_PHISHED},
+    {"removeBlockedAriaDescription",
+     IDS_PASSWORD_MANAGER_UI_REMOVE_BLOCKED_SITE_ARIA_DESCRIPTION},
     {"reusedPasswordsDescription",
      IDS_PASSWORD_MANAGER_UI_REUSED_PASSWORDS_DESCRIPTION},
     {"reusedPasswordsEmpty", IDS_PASSWORD_MANAGER_UI_NO_REUSED_PASSWORDS},
     {"reusedPasswordsTitle", IDS_PASSWORD_MANAGER_UI_HAS_REUSED_PASSWORDS},
+    {"runCheckupAriaDescription",
+     IDS_PASSWORD_MANAGER_UI_RUN_CHECKUP_ARIA_DESCRIPTION},
     {"save", IDS_SAVE},
     {"savePasswordsLabel", IDS_PASSWORD_MANAGER_UI_SAVE_PASSWORDS_TOGGLE_LABEL},
     {"searchPrompt", IDS_PASSWORD_MANAGER_UI_SEARCH_PROMPT},
@@ -175,7 +180,11 @@ content::WebUIDataSource* CreateAndAddPasswordsUIHTMLSource(
     {"trustedVaultBannerLabelOfferOptIn",
      IDS_PASSWORD_MANAGER_UI_TRUSTED_VAULT_OPT_IN_TITLE},
     {"trustedVaultBannerSubLabelOfferOptIn",
-     IDS_PASSWORD_MANAGER_UI_RUSTED_VAULT_OPT_IN_DESCRIPTION},
+     IDS_PASSWORD_MANAGER_UI_TRUSTED_VAULT_OPT_IN_DESCRIPTION},
+    {"trustedVaultBannerLabelOptedIn",
+     IDS_PASSWORD_MANAGER_UI_TRUSTED_VAULT_OPTED_IN_TITLE},
+    {"trustedVaultBannerSubLabelOptedIn",
+     IDS_PASSWORD_MANAGER_UI_TRUSTED_VAULT_OPTED_IN_DESCRIPTION},
     {"tryAgain", IDS_PASSWORD_MANAGER_UI_CHECK_PASSWORDS_AFTER_ERROR},
     {"undoRemovePassword", IDS_PASSWORD_MANAGER_UI_UNDO},
     {"unmuteCompromisedPassword", IDS_PASSWORD_MANAGER_UI_UNMUTE_ISSUE},
@@ -186,6 +195,8 @@ content::WebUIDataSource* CreateAndAddPasswordsUIHTMLSource(
     {"viewExistingPassword", IDS_PASSWORD_MANAGER_UI_VIEW_EXISTING_PASSWORD},
     {"viewExistingPasswordAriaDescription",
      IDS_PASSWORD_MANAGER_UI_VIEW_EXISTING_PASSWORD_ARIA_DESCRIPTION},
+    {"viewPasswordAriaDescription",
+     IDS_PASSWORD_MANAGER_UI_VIEW_PASSWORD_ARIA_DESCRIPTION},
     {"weakPasswordsDescription",
      IDS_PASSWORD_MANAGER_UI_WEAK_PASSWORDS_DESCRIPTION},
     {"weakPasswordsEmpty", IDS_PASSWORD_MANAGER_UI_NO_WEAK_PASSWORDS},
@@ -260,6 +271,10 @@ content::WebUIDataSource* CreateAndAddPasswordsUIHTMLSource(
   source->AddResourcePath("images/password_manager_pwa_icon.svg",
                           IDR_CHROME_PASSWORD_MANAGER_PWA_ICON);
 #endif
+
+  source->AddString("trustedVaultOptInUrl", chrome::kSyncTrustedVaultOptInURL);
+  source->AddString("trustedVaultLearnMoreUrl",
+                    chrome::kSyncTrustedVaultLearnMoreURL);
 
   content::URLDataSource::Add(
       profile, std::make_unique<FaviconSource>(

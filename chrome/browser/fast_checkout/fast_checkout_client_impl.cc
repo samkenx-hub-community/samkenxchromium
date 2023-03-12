@@ -200,10 +200,10 @@ void FastCheckoutClientImpl::OnRunComplete(FastCheckoutRunOutcome run_outcome,
     }
   }
 
-  Stop(allow_further_runs);
+  InternalStop(allow_further_runs);
 }
 
-void FastCheckoutClientImpl::Stop(bool allow_further_runs) {
+void FastCheckoutClientImpl::InternalStop(bool allow_further_runs) {
   // `OnHidden` is not called if the bottom sheet never managed to show,
   // e.g. due to a failed onboarding. This ensures that keyboard suppression
   // stops.
@@ -214,7 +214,7 @@ void FastCheckoutClientImpl::Stop(bool allow_further_runs) {
   form_filling_states_.clear();
   form_signatures_to_fill_.clear();
   selected_autofill_profile_guid_ = absl::nullopt;
-  selected_credit_card_guid_ = absl::nullopt;
+  selected_credit_card_id_ = absl::nullopt;
   timeout_timer_.AbandonAndStop();
   credit_card_form_global_id_ = absl::nullopt;
   run_id_ = 0;
@@ -227,11 +227,15 @@ void FastCheckoutClientImpl::Stop(bool allow_further_runs) {
   autofill_manager_observation_.Reset();
   autofill_manager_.reset();
 
-  if (!allow_further_runs && IsShowing()) {
+  if (!allow_further_runs) {
     fast_checkout_ui_state_ = FastCheckoutUIState::kWasShown;
   } else {
     fast_checkout_ui_state_ = FastCheckoutUIState::kNotShownYet;
   }
+}
+
+void FastCheckoutClientImpl::Stop(bool allow_further_runs) {
+  InternalStop(allow_further_runs || !IsShowing());
 }
 
 bool FastCheckoutClientImpl::IsShowing() const {
@@ -257,7 +261,13 @@ void FastCheckoutClientImpl::OnOptionsSelected(
     std::unique_ptr<autofill::CreditCard> selected_credit_card) {
   OnHidden();
   selected_autofill_profile_guid_ = selected_profile->guid();
-  selected_credit_card_guid_ = selected_credit_card->guid();
+  if (autofill::CreditCard::IsLocalCard(selected_credit_card.get())) {
+    selected_credit_card_id_ = selected_credit_card->guid();
+    selected_credit_card_is_local_ = true;
+  } else {
+    selected_credit_card_id_ = selected_credit_card->server_id();
+    selected_credit_card_is_local_ = false;
+  }
   timeout_timer_.Start(FROM_HERE, kTimeout,
                        base::BindOnce(&FastCheckoutClientImpl::OnRunComplete,
                                       weak_ptr_factory_.GetWeakPtr(),
@@ -314,7 +324,7 @@ bool FastCheckoutClientImpl::AllFormsAreFilled() const {
 
 bool FastCheckoutClientImpl::IsFilling() const {
   return IsRunning() && selected_autofill_profile_guid_ &&
-         selected_credit_card_guid_;
+         selected_credit_card_id_;
 }
 
 void FastCheckoutClientImpl::OnAfterLoadedServerPredictions(
@@ -369,12 +379,7 @@ void FastCheckoutClientImpl::TryToFillForms() {
       autofill::CreditCard* credit_card = GetSelectedCreditCard();
       if (field && !credit_card_form_global_id_ && credit_card) {
         if (autofill::CreditCard::IsLocalCard(credit_card)) {
-          static_cast<autofill::BrowserAutofillManager*>(
-              autofill_manager_.get())
-              ->SetFastCheckoutRunId(autofill::FieldTypeGroup::kCreditCard,
-                                     run_id_);
-          autofill_manager_->FillCreditCardForm(form->ToFormData(), *field,
-                                                *credit_card, u"");
+          FillCreditCardForm(*form, *field, *credit_card, u"");
         } else {
           autofill::CreditCardCvcAuthenticator* cvc_authenticator =
               autofill_client_->GetCvcAuthenticator();
@@ -391,6 +396,20 @@ void FastCheckoutClientImpl::TryToFillForms() {
   }
 }
 
+void FastCheckoutClientImpl::FillCreditCardForm(
+    const autofill::FormStructure& form,
+    const autofill::FormFieldData& field,
+    const autofill::CreditCard& credit_card,
+    const std::u16string& cvc) {
+  form_filling_states_[std::make_pair(form.form_signature(),
+                                      autofill::FormType::kCreditCardForm)] =
+      FillingState::kFilling;
+  static_cast<autofill::BrowserAutofillManager*>(autofill_manager_.get())
+      ->SetFastCheckoutRunId(autofill::FieldTypeGroup::kCreditCard, run_id_);
+  autofill_manager_->FillCreditCardForm(form.ToFormData(), field, credit_card,
+                                        cvc);
+}
+
 autofill::AutofillProfile*
 FastCheckoutClientImpl::GetSelectedAutofillProfile() {
   autofill::AutofillProfile* autofill_profile =
@@ -403,9 +422,16 @@ FastCheckoutClientImpl::GetSelectedAutofillProfile() {
 }
 
 autofill::CreditCard* FastCheckoutClientImpl::GetSelectedCreditCard() {
-  autofill::CreditCard* credit_card =
-      personal_data_helper_->GetPersonalDataManager()->GetCreditCardByGUID(
-          selected_credit_card_guid_.value());
+  autofill::CreditCard* credit_card = nullptr;
+  if (selected_credit_card_is_local_) {
+    credit_card =
+        personal_data_helper_->GetPersonalDataManager()->GetCreditCardByGUID(
+            selected_credit_card_id_.value());
+  } else {
+    credit_card =
+        personal_data_helper_->GetPersonalDataManager()
+            ->GetCreditCardByServerId(selected_credit_card_id_.value());
+  }
   if (!credit_card) {
     OnRunComplete(FastCheckoutRunOutcome::kCreditCardDeleted);
   }
@@ -450,13 +476,7 @@ void FastCheckoutClientImpl::OnFullCardRequestSucceeded(
           credit_card_form_global_id_.value());
   if (autofill::AutofillField* field =
           GetFieldToFill(form->fields(), /*is_credit_card_form=*/true)) {
-    form_filling_states_[std::make_pair(form->form_signature(),
-                                        autofill::FormType::kCreditCardForm)] =
-        FillingState::kFilling;
-    static_cast<autofill::BrowserAutofillManager*>(autofill_manager_.get())
-        ->SetFastCheckoutRunId(autofill::FieldTypeGroup::kCreditCard, run_id_);
-    autofill_manager_->FillCreditCardForm(form->ToFormData(), *field, card,
-                                          cvc);
+    FillCreditCardForm(*form, *field, card, cvc);
   }
   credit_card_form_global_id_ = absl::nullopt;
 }
@@ -485,7 +505,8 @@ void FastCheckoutClientImpl::OnAfterDidFillAutofillFormData(
   }
   UpdateFillingStates();
   if (AllFormsAreFilled()) {
-    OnRunComplete(FastCheckoutRunOutcome::kSuccess);
+    OnRunComplete(FastCheckoutRunOutcome::kSuccess,
+                  /*allow_further_runs=*/false);
   }
 }
 
@@ -555,13 +576,15 @@ void FastCheckoutClientImpl::OnAutofillManagerDestroyed(
     }
     return;
   }
-  Stop(/*allow_further_runs=*/true);
+  InternalStop(/*allow_further_runs=*/true);
 }
 
 void FastCheckoutClientImpl::OnAutofillManagerReset(
     autofill::AutofillManager& manager) {
   if (IsShowing()) {
     OnRunComplete(FastCheckoutRunOutcome::kNavigationWhileBottomsheetWasShown);
+  } else {
+    OnRunComplete(FastCheckoutRunOutcome::kPageRefreshed);
   }
 }
 

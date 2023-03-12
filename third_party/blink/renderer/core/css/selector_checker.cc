@@ -1840,7 +1840,7 @@ bool SelectorChecker::CheckPseudoClass(const SelectorCheckingContext& context,
         return !toggle->ValueMatches(State(0));
       }
     }
-    case CSSSelector::kPseudoParentUnparsed:
+    case CSSSelector::kPseudoUnparsed:
       // Only kept around for parsing; can never match anything
       // (because we don't know what it's supposed to mean).
       return false;
@@ -2384,20 +2384,18 @@ bool SelectorChecker::ElementIsScopingLimit(
 
 bool SelectorChecker::CheckInStyleScope(const SelectorCheckingContext& context,
                                         MatchResult& result) const {
-  SelectorCheckingContext local_context(context);
+  const StyleScopeActivations& activations =
+      EnsureActivations(context, *context.style_scope);
 
-  // TODO(crbug.com/1280240): We can probably skip this if the main selector
-  // contained :scope.
-
-  for (; local_context.element;
-       local_context.element = ParentElement(local_context)) {
-    if (CheckPseudoScope(local_context, result)) {
-      return true;
-    }
-    // TODO(crbug.com/1280240): Early-out if there are no activations.
+  if (activations.empty()) {
+    return false;
   }
 
-  return false;
+  for (const StyleScopeActivation& activation : activations) {
+    result.proximity = std::min(activation.proximity, result.proximity);
+  }
+
+  return true;
 }
 
 }  // namespace blink

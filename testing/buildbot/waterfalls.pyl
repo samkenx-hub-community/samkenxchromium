@@ -503,6 +503,24 @@
     'name': 'chromium.accessibility',
     'mixins': ['chromium-tester-service-account'],
     'machines': {
+      'fuchsia-x64-accessibility-rel': {
+        'additional_compile_targets': [
+          'content_browsertests',
+        ],
+        'mixins': [
+          'linux-bionic',
+        ],
+        'test_suites': {
+          'gtest_tests': 'fuchsia_accessibility_browsertests',
+        },
+        'swarming': {
+          'dimension_sets': [
+            {
+              'kvm': '1',
+            },
+          ],
+        },
+      },
       'linux-blink-web-tests-force-accessibility-rel': {
         'additional_compile_targets': [
           'blink_tests',
@@ -2108,6 +2126,29 @@
         },
         'os_type': 'android',
       },
+      'android-x86-code-coverage': {
+        'mixins': [
+          'has_native_resultdb_integration',
+          'isolate_profile_data',
+          'nougat-x86-emulator',
+          'emulator-4-cores',
+          'linux-bionic',
+          'x86-64',
+        ],
+        'additional_compile_targets': [
+          'cronet_test_instrumentation_apk',
+          'chrome_nocompile_tests',
+        ],
+        'args': [
+          '--use-persistent-shell',
+        ],
+        'os_type': 'android',
+        'test_suites': {
+          'gtest_tests': 'android_nougat_emulator_gtests',
+          'isolated_scripts': 'nougat_isolated_scripts',
+          'scripts': 'chromium_android_scripts',
+        },
+      },
       'fuchsia-code-coverage': {
         'additional_compile_targets': [
           'chrome_pkg',
@@ -3526,6 +3567,14 @@
           'gtest_tests': 'linux_lacros_version_skew_tests',
         },
       },
+      'linux-network-sandbox-rel': {
+        'mixins': [
+          'linux-bionic',
+        ],
+        'test_suites': {
+          'gtest_tests': 'network_sandbox_browser_tests',
+        },
+      },
       'linux-perfetto-rel': {
         'additional_compile_targets': [ 'all' ],
         'mixins': [
@@ -4573,7 +4622,8 @@
         # the gpu_noop_sleep_telemetry_test test should be used. Otherwise, this
         # should have the same test_suites as 'Mac FYI Retina Release (AMD)'.
         'test_suites': {
-          'gpu_telemetry_tests': 'gpu_noop_sleep_telemetry_test',
+          'gtest_tests': 'gpu_fyi_mac_release_gtests',
+          'gpu_telemetry_tests': 'gpu_fyi_mac_release_telemetry_tests',
         },
       },
       'Mac FYI Experimental Retina Release (NVIDIA)': {

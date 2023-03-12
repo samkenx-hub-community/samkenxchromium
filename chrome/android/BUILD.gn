@@ -504,7 +504,7 @@ if (current_toolchain == default_toolchain) {
       "//components/webapps/common/android:webapk_install_java",
       "//components/webauthn/android:java",
       "//components/webrtc/android:java",
-      "//components/webxr/android:ar_java_interfaces",
+      "//components/webxr/android:xr_java",
       "//components/zoom/android:java",
       "//content/public/android:content_java",
       "//content/public/common:common_java",
@@ -581,7 +581,6 @@ if (current_toolchain == default_toolchain) {
       ":resource_id_javagen",
       "//chrome:offline_pages_enum_javagen",
       "//chrome:partner_bookmarks_javagen",
-      "//chrome:supervised_user_url_filter_enum_javagen",
       "//chrome/browser:screenshot_mode_enum",
       "//chrome/browser:sharing_dialog_type_generated_enum",
       "//chrome/browser:sharing_send_message_result_generated_enum",
@@ -593,6 +592,7 @@ if (current_toolchain == default_toolchain) {
       "//components/dom_distiller/core:distiller_type_java",
       "//components/ntp_tiles:ntp_tiles_enums_java",
       "//components/offline_pages/core:offline_page_model_enums_java",
+      "//components/supervised_user/core/browser:supervised_user_url_filter_enum_javagen",
       "//net:effective_connection_type_java",
     ]
 
@@ -608,16 +608,8 @@ if (current_toolchain == default_toolchain) {
     # Include sources from public_tab_management_java_sources.gni.
     sources += public_tab_management_java_sources
     sources += start_surface_java_sources
-
     if (enable_arcore) {
-      deps += [
-        "//components/webxr/android:ar_java_base",
-        "//components/webxr/android:webxr_android_enums_java",
-      ]
-    }
-
-    if (enable_cardboard) {
-      deps += [ "//third_party/cardboard:cardboard_java" ]
+      deps += [ "//third_party/arcore-android-sdk-client:com_google_ar_core_java__ignored_manifest" ]
     }
 
     if (enable_vr) {
@@ -925,6 +917,9 @@ if (current_toolchain == default_toolchain) {
       "//chrome/browser/privacy_guide/android:java",
       "//chrome/browser/privacy_guide/android:junit",
       "//chrome/browser/profiles/android:java",
+      "//chrome/browser/profiles/android:junit",
+      "//chrome/browser/quick_delete:java",
+      "//chrome/browser/quick_delete:junit",
       "//chrome/browser/safety_check/android:java",
       "//chrome/browser/safety_check/android:junit",
       "//chrome/browser/search_engines/android:java",
@@ -1486,6 +1481,7 @@ if (current_toolchain == default_toolchain) {
       "//chrome/browser/privacy_sandbox/android:java",
       "//chrome/browser/privacy_sandbox/android:javatests",
       "//chrome/browser/profiles/android:java",
+      "//chrome/browser/quick_delete:java",
       "//chrome/browser/safe_browsing/android:java",
       "//chrome/browser/safe_browsing/android:javatests",
       "//chrome/browser/safety_check/android:java",
@@ -2743,7 +2739,6 @@ if (current_toolchain == default_toolchain) {
   # TODO(crbug.com/1238057): Set clear rules for what tests can be added here.
   chrome_test_apk_tmpl("chrome_public_unit_test_apk") {
     apk_name = "ChromePublicUnitTest"
-    shared_libraries = [ ":libchromefortest" ]
     deps = [
       ":chrome_unit_test_java",
       "//build/config/android/test/resource_overlay:unit_device_javatests",
@@ -2806,7 +2801,6 @@ if (current_toolchain == default_toolchain) {
     #enable_lint = true
 
     apk_name = "ChromePublicTest"
-    shared_libraries = [ ":libchromefortest" ]
     deps = [
       ":chrome_test_apk_template_resources",
       ":chrome_test_java",
@@ -2851,7 +2845,6 @@ if (current_toolchain == default_toolchain) {
   if (enable_vr) {
     chrome_test_apk_tmpl("chrome_public_test_vr_apk") {
       apk_name = "ChromePublicTestVr"
-      shared_libraries = [ ":libchromefortest" ]
       manifest_package = chrome_public_manifest_package
 
       deps = [
@@ -2894,9 +2887,12 @@ if (current_toolchain == default_toolchain) {
         "//third_party/android_sdk:android_test_mock_java",
       ]
 
-      # Include ArCore files directly instead of using bundles.
+      # Include ArCore files directly instead of using bundles. This does
+      # require us to explicitly re-declare our dependency on ARCore, which
+      # otherwise should have already been included, since the native libraries
+      # need to know that it is available. Though we'd always need to forcibly
+      # include the manifest DEP here as well
       deps += [
-        "//components/webxr/android:ar_java",
         "//third_party/arcore-android-sdk-client:com_google_ar_core_java",
         "//third_party/arcore-android-sdk-client:com_google_ar_core_java__ignored_manifest",
       ]

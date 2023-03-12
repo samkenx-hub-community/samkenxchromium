@@ -354,6 +354,9 @@ class CanvasResourceProviderSharedImage : public CanvasResourceProvider {
     // provider has the only ref to the resource, to ensure there are no other
     // readers.
     EndWriteAccess();
+    if (!resource_) {
+      return nullptr;
+    }
     scoped_refptr<CanvasResource> resource = resource_;
     resource->SetFilterQuality(FilterQuality());
     if (ContextProviderWrapper()
@@ -629,8 +632,11 @@ class CanvasResourceProviderSharedImage : public CanvasResourceProvider {
       DCHECK(!use_oop_rasterization_);
       if (ShouldReplaceTargetBuffer())
         resource_ = NewOrRecycledResource();
+      if (!resource() || !GetSkSurface()) {
+        return;
+      }
       resource()->CopyRenderingResultsToGpuMemoryBuffer(
-          surface_->makeImageSnapshot());
+          GetSkSurface()->makeImageSnapshot());
     }
 
     current_resource_has_write_access_ = false;

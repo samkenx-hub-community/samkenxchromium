@@ -11,9 +11,7 @@
 #include "cc/slim/features.h"
 #include "cc/slim/layer_tree_impl.h"
 #include "components/viz/common/quads/compositor_render_pass.h"
-#include "components/viz/common/quads/texture_draw_quad.h"
 #include "components/viz/common/resources/resource_id.h"
-#include "ui/gfx/geometry/rect_conversions.h"
 
 namespace cc::slim {
 
@@ -104,13 +102,13 @@ void NinePatchLayer::AppendQuads(viz::CompositorRenderPass& render_pass,
   quad_generator_.SetLayout(image_bounds, bounds(), aperture_, border_,
                             kOcclusion, fill_center_, nearest_neighbor_);
   const bool opaque = layer_tree_impl->IsUIResourceOpaque(resource_id());
-  // Select the int instead of float version.
-  auto IntersectRects =
-      static_cast<gfx::Rect (*)(const gfx::Rect&, const gfx::Rect&)>(
-          gfx::IntersectRects);
   quad_generator_.AppendQuads(
       viz_resource_id, opaque,
-      base::BindRepeating(IntersectRects, quad_state->visible_quad_layer_rect),
+      base::BindRepeating(
+          // Select the int instead of float version.
+          static_cast<gfx::Rect (*)(const gfx::Rect&, const gfx::Rect&)>(
+              gfx::IntersectRects),
+          quad_state->visible_quad_layer_rect),
       layer_tree_impl->GetClientResourceProvider(), &render_pass, quad_state,
       quad_generator_.GeneratePatches());
 }

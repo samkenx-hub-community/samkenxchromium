@@ -509,10 +509,30 @@ ci.thin_tester(
             target_bits = 64,
         ),
     ),
-    cores = None,
     console_view_entry = consoles.console_view_entry(
         category = "network|sandbox",
         short_name = "win",
+    ),
+)
+
+ci.builder(
+    name = "linux-network-sandbox-rel",
+    builder_spec = builder_config.builder_spec(
+        gclient_config = builder_config.gclient_config(
+            config = "chromium",
+        ),
+        chromium_config = builder_config.chromium_config(
+            config = "chromium",
+            apply_configs = ["mb"],
+            build_config = builder_config.build_config.RELEASE,
+            target_bits = 64,
+        ),
+        build_gs_bucket = "chromium-fyi-archive",
+    ),
+    os = os.LINUX_DEFAULT,
+    console_view_entry = consoles.console_view_entry(
+        category = "network|sandbox",
+        short_name = "lnx",
     ),
 )
 
@@ -878,7 +898,7 @@ fyi_ios_builder(
         ),
     ),
     builderless = False,
-    os = os.MAC_12,
+    os = os.MAC_DEFAULT,
     console_view_entry = consoles.console_view_entry(
         category = "mac",
     ),
@@ -1652,9 +1672,11 @@ ci.builder(
     ),
     execution_timeout = 14 * time.hour,
     reclient_ensure_verified = True,
+    reclient_instance = reclient.instance.TEST_TRUSTED,
     reclient_jobs = None,
     reclient_rewrapper_env = {
         "RBE_compare": "true",
+        "RBE_compression_threshold": "4000000",
     },
 )
 
@@ -1683,7 +1705,11 @@ ci.builder(
         category = "win",
         short_name = "re",
     ),
+    reclient_instance = reclient.instance.TEST_TRUSTED,
     reclient_jobs = None,
+    reclient_rewrapper_env = {
+        "RBE_compression_threshold": "4000000",
+    },
 )
 
 ci.builder(
@@ -1709,8 +1735,12 @@ ci.builder(
         short_name = "re",
     ),
     reclient_ensure_verified = True,
+    reclient_instance = reclient.instance.TEST_TRUSTED,
     reclient_jobs = None,
-    reclient_rewrapper_env = {"RBE_compare": "true"},
+    reclient_rewrapper_env = {
+        "RBE_compare": "true",
+        "RBE_compression_threshold": "4000000",
+    },
 )
 
 fyi_mac_builder(
@@ -1738,7 +1768,11 @@ fyi_mac_builder(
         category = "mac",
         short_name = "re",
     ),
+    reclient_instance = reclient.instance.TEST_TRUSTED,
     reclient_jobs = None,
+    reclient_rewrapper_env = {
+        "RBE_compression_threshold": "4000000",
+    },
 )
 
 fyi_mac_builder(
@@ -1768,8 +1802,12 @@ fyi_mac_builder(
     ),
     execution_timeout = 14 * time.hour,
     reclient_ensure_verified = True,
+    reclient_instance = reclient.instance.TEST_TRUSTED,
     reclient_jobs = None,
-    reclient_rewrapper_env = {"RBE_compare": "true"},
+    reclient_rewrapper_env = {
+        "RBE_compare": "true",
+        "RBE_compression_threshold": "4000000",
+    },
 )
 
 fyi_mac_builder(
@@ -2092,6 +2130,7 @@ fyi_ios_builder(
         ),
         build_gs_bucket = "chromium-fyi-archive",
     ),
+    cpu = cpu.ARM64,
     console_view_entry = consoles.console_view_entry(
         category = "iOS",
         short_name = "ios-blk",
@@ -2140,7 +2179,7 @@ fyi_ios_builder(
             target_platform = builder_config.target_platform.IOS,
         ),
     ),
-    os = os.MAC_12,
+    os = os.MAC_DEFAULT,
     cpu = cpu.ARM64,
     console_view_entry = consoles.console_view_entry(
         category = "cronet",

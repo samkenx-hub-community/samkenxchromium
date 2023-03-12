@@ -12,10 +12,10 @@
 #import "ios/chrome/browser/main/browser.h"
 #import "ios/chrome/browser/passwords/ios_chrome_password_check_manager.h"
 #import "ios/chrome/browser/passwords/ios_chrome_password_check_manager_factory.h"
+#import "ios/chrome/browser/shared/public/commands/application_commands.h"
+#import "ios/chrome/browser/shared/public/commands/command_dispatcher.h"
+#import "ios/chrome/browser/shared/public/commands/open_new_tab_command.h"
 #import "ios/chrome/browser/sync/sync_service_factory.h"
-#import "ios/chrome/browser/ui/commands/application_commands.h"
-#import "ios/chrome/browser/ui/commands/command_dispatcher.h"
-#import "ios/chrome/browser/ui/commands/open_new_tab_command.h"
 #import "ios/chrome/browser/ui/settings/password/password_checkup/password_checkup_utils.h"
 #import "ios/chrome/browser/ui/settings/password/password_details/password_details_coordinator.h"
 #import "ios/chrome/browser/ui/settings/password/password_details/password_details_coordinator_delegate.h"
@@ -38,7 +38,7 @@
   IOSChromePasswordCheckManager* _manager;
 
   // Type of insecure credentials issues to display.
-  WarningType _warningType;
+  password_manager::WarningType _warningType;
 }
 
 // Main view controller for this coordinator.
@@ -56,7 +56,7 @@
 
 @synthesize baseNavigationController = _baseNavigationController;
 
-- (instancetype)initForWarningType:(WarningType)warningType
+- (instancetype)initForWarningType:(password_manager::WarningType)warningType
           baseNavigationController:(UINavigationController*)navigationController
                            browser:(Browser*)browser {
   self = [super initWithBaseViewController:navigationController

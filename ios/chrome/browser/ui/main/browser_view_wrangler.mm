@@ -17,14 +17,14 @@
 #import "ios/chrome/browser/main/browser_list.h"
 #import "ios/chrome/browser/main/browser_list_factory.h"
 #import "ios/chrome/browser/sessions/session_restoration_browser_agent.h"
+#import "ios/chrome/browser/shared/public/commands/application_commands.h"
+#import "ios/chrome/browser/shared/public/commands/browsing_data_commands.h"
+#import "ios/chrome/browser/shared/public/commands/command_dispatcher.h"
 #import "ios/chrome/browser/snapshots/snapshot_browser_agent.h"
 #import "ios/chrome/browser/tabs/inactive_tabs/features.h"
 #import "ios/chrome/browser/tabs/inactive_tabs/utils.h"
 #import "ios/chrome/browser/ui/browser_view/browser_coordinator.h"
 #import "ios/chrome/browser/ui/browser_view/browser_view_controller.h"
-#import "ios/chrome/browser/ui/commands/application_commands.h"
-#import "ios/chrome/browser/ui/commands/browsing_data_commands.h"
-#import "ios/chrome/browser/ui/commands/command_dispatcher.h"
 #import "ios/chrome/browser/ui/incognito_reauth/incognito_reauth_scene_agent.h"
 #import "ios/chrome/browser/ui/main/scene_state.h"
 #import "ios/chrome/browser/ui/main/scene_state_browser_agent.h"
@@ -246,28 +246,37 @@ NSString* kInactiveSessionIDSuffix = @"-Inactive";
   if (!_mainInterface)
     return nil;
   if (!_incognitoInterface) {
-    // The backing coordinator should not have been created yet.
-    DCHECK(!_incognitoBrowserCoordinator);
-    ChromeBrowserState* otrBrowserState =
-        _browserState->GetOffTheRecordChromeBrowserState();
-    DCHECK(otrBrowserState);
-    Browser* otrBrowser = self.otrBrowser;
-
-    _incognitoBrowserCoordinator = [self coordinatorForBrowser:otrBrowser];
-    [_incognitoBrowserCoordinator start];
-
-    // Restore the session after creating the coordinator.
-    SessionRestorationBrowserAgent::FromBrowser(otrBrowser)->RestoreSession();
-
-    DCHECK(_incognitoBrowserCoordinator.viewController);
-    _incognitoInterface = [[WrangledBrowser alloc]
-        initWithCoordinator:_incognitoBrowserCoordinator];
+    _incognitoInterface = [self createOTRInterfaceAfterClosingAllTabs:NO];
   }
   return _incognitoInterface;
 }
 
 - (BOOL)hasIncognitoInterface {
   return _incognitoInterface;
+}
+
+- (WrangledBrowser*)createOTRInterfaceAfterClosingAllTabs:(BOOL)allTabsClosed {
+  DCHECK(!_incognitoInterface);
+
+  // The backing coordinator should not have been created yet.
+  DCHECK(!_incognitoBrowserCoordinator);
+  ChromeBrowserState* otrBrowserState =
+      _browserState->GetOffTheRecordChromeBrowserState();
+  DCHECK(otrBrowserState);
+  Browser* otrBrowser = self.otrBrowser;
+
+  _incognitoBrowserCoordinator = [self coordinatorForBrowser:otrBrowser];
+  [_incognitoBrowserCoordinator start];
+
+  if (!allTabsClosed) {
+    // Restore the session after creating the coordinator, but only if not
+    // recreating the Off-The-Record UI after closing all the tabs.
+    SessionRestorationBrowserAgent::FromBrowser(otrBrowser)->RestoreSession();
+  }
+
+  DCHECK(_incognitoBrowserCoordinator.viewController);
+  return [[WrangledBrowser alloc]
+      initWithCoordinator:_incognitoBrowserCoordinator];
 }
 
 - (Browser*)mainBrowser {
@@ -401,6 +410,10 @@ NSString* kInactiveSessionIDSuffix = @"-Inactive";
   [self setOtrBrowser:[self buildBrowserForBrowserState:incognitoBrowserState
                                                inactive:NO]];
   DCHECK(self.otrBrowser->GetWebStateList()->empty());
+
+  // Recreate the off-the-record interface, but do not load the session as
+  // we had just closed all the tabs.
+  _incognitoInterface = [self createOTRInterfaceAfterClosingAllTabs:YES];
 
   if (_currentInterface == nil) {
     self.currentInterface = self.incognitoInterface;

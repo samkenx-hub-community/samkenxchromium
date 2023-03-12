@@ -3,15 +3,10 @@
     width: 100%;
   }
 
-  ntp-module-header::part(module-icon) {
-    height: var(--cr-icon-size);
-    width: var(--cr-icon-size);
-  }
-
   #showAllButton {
-    background-color: white;
+    background-color: var(--color-new-tab-page-module-background);
     border: none;
-    color: var(--google-blue-700);
+    color: var(--color-new-tab-page-link);
     cursor: pointer;
     font-size: 13px;
   }
@@ -19,9 +14,9 @@
   .small-tiles {
     display: flex;
     flex-direction: row;
+    gap: 16px;
     grid-column: 2 / 3;
     grid-row: 1 / 2;
-    justify-content: space-between;
   }
 
   .layout {
@@ -55,16 +50,19 @@
 </style>
 <div id="content">
   <ntp-module-header
-    disable-text="[[i18n('modulesDisableButtonText', cluster.label)]]"
-    show-dismiss-button
-    dismiss-text="[[i18n('modulesDismissButtonText', cluster.label)]]"
+    disable-text="[[i18nRecursive('',
+                                  'modulesDisableButtonText',
+                                  'modulesJourneyDisable')]]"
+    dismiss-text="[[i18n('modulesDismissButtonText', title_)]]"
+    show-info-button show-dismiss-button
     on-disable-button-click="onDisableButtonClick_"
-    show-info-button on-info-button-click="onInfoButtonClick_"
+    on-dismiss-button-click="onDismissButtonClick_"
+    on-info-button-click="onInfoButtonClick_"
     icon-src="chrome://resources/images/icon_journeys.svg">
-    [[i18n('modulesJourneysResumeJourney', cluster.label)]]
+    [[i18n('modulesJourneysResumeJourney', title_)]]
     <button id="showAllButton" type="button" on-click="onShowAllClick_"
             slot="title-actions">
-        [[i18n('modulesJourneyShowAll')]]
+        [[i18n('modulesJourneysShowAll')]]
     </button>
   </ntp-module-header>
   <template is="dom-if" if="[[isLayout_(1, layoutType)]]" restamp>
@@ -122,3 +120,9 @@
     </div>
   </template>
 </div>
+<cr-lazy-render id="infoDialogRender">
+  <template>
+    <ntp-info-dialog inner-h-t-m-l="[[i18nAdvanced('modulesJourneysInfo')]]">
+    </ntp-info-dialog>
+  </template>
+</cr-lazy-render>

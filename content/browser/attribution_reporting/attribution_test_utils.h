@@ -27,7 +27,6 @@
 #include "content/browser/attribution_reporting/aggregatable_histogram_contribution.h"
 #include "content/browser/attribution_reporting/attribution_info.h"
 #include "content/browser/attribution_reporting/attribution_report.h"
-#include "content/browser/attribution_reporting/attribution_storage.h"
 #include "content/browser/attribution_reporting/attribution_storage_delegate.h"
 #include "content/browser/attribution_reporting/attribution_trigger.h"
 #include "content/browser/attribution_reporting/common_source_info.h"
@@ -90,11 +89,6 @@ class SourceBuilder {
   SourceBuilder& SetSourceEventId(uint64_t source_event_id);
 
   SourceBuilder& SetSourceOrigin(attribution_reporting::SuitableOrigin);
-
-  // TODO(apaseltiner): Rename this to `SetDestination()`, since the origin
-  // itself is no longer used.
-  SourceBuilder& SetDestinationOrigin(
-      const attribution_reporting::SuitableOrigin&);
 
   SourceBuilder& SetDestinationSites(base::flat_set<net::SchemefulSite>);
 

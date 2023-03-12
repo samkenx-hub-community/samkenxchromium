@@ -5,8 +5,8 @@
 #import "ios/chrome/browser/ui/table_view/cells/table_view_text_button_item.h"
 
 #import "base/mac/foundation_util.h"
+#import "ios/chrome/browser/shared/ui/util/uikit_ui_util.h"
 #import "ios/chrome/browser/ui/table_view/chrome_table_view_styler.h"
-#import "ios/chrome/browser/ui/util/uikit_ui_util.h"
 #import "ios/chrome/common/ui/colors/semantic_color_names.h"
 #import "ios/chrome/common/ui/table_view/table_view_cells_constants.h"
 #import "ios/chrome/common/ui/util/pointer_interaction_util.h"
@@ -32,9 +32,6 @@ const CGFloat kButtonTitleVerticalContentInset = 8.0;
 const CGFloat kButtonCornerRadius = 8;
 // Default Text alignment.
 const NSTextAlignment kDefaultTextAlignment = NSTextAlignmentCenter;
-// Default Text alignment.
-const UIControlContentHorizontalAlignment kDefaultContentHorizontalAlignment =
-    UIControlContentHorizontalAlignmentCenter;
 }  // namespace
 
 @implementation TableViewTextButtonItem
@@ -49,7 +46,6 @@ const UIControlContentHorizontalAlignment kDefaultContentHorizontalAlignment =
     self.cellClass = [TableViewTextButtonCell class];
     _enabled = YES;
     _textAlignment = kDefaultTextAlignment;
-    _buttonContentHorizontalAlignment = kDefaultContentHorizontalAlignment;
     _boldButtonText = YES;
     _dimBackgroundWhenDisabled = YES;
   }
@@ -76,7 +72,15 @@ const UIControlContentHorizontalAlignment kDefaultContentHorizontalAlignment =
   [cell disableButtonIntrinsicWidth:self.disableButtonIntrinsicWidth];
   cell.textLabel.textAlignment = self.textAlignment;
 
-  [cell.button setTitle:self.buttonText forState:UIControlStateNormal];
+  // TODO(crbug.com/1418068): Simplify after minimum version required is >=
+  // iOS 15.
+  if (@available(iOS 15, *)) {
+    UIButtonConfiguration* buttonConfiguration = cell.button.configuration;
+    buttonConfiguration.title = self.buttonText;
+    cell.button.configuration = buttonConfiguration;
+  } else {
+    [cell.button setTitle:self.buttonText forState:UIControlStateNormal];
+  }
   [cell disableButtonIntrinsicWidth:self.disableButtonIntrinsicWidth];
   // Decide cell.button titleColor in order:
   //   1. self.buttonTextColor;
@@ -87,14 +91,6 @@ const UIControlContentHorizontalAlignment kDefaultContentHorizontalAlignment =
   } else {
     [cell.button setTitleColor:[UIColor colorNamed:kSolidButtonTextColor]
                       forState:UIControlStateNormal];
-  }
-  cell.button.contentHorizontalAlignment =
-      self.buttonContentHorizontalAlignment;
-  if (self.buttonContentHorizontalAlignment ==
-      UIControlContentHorizontalAlignmentLeft) {
-    cell.button.contentEdgeInsets = UIEdgeInsetsMake(
-        kButtonTitleVerticalContentInset, 0, kButtonTitleVerticalContentInset,
-        kButtonTitleHorizontalContentInset);
   }
   cell.button.accessibilityIdentifier = self.buttonAccessibilityIdentifier;
   // Decide cell.button.backgroundColor in order:
@@ -154,9 +150,24 @@ const UIControlContentHorizontalAlignment kDefaultContentHorizontalAlignment =
     self.button.titleLabel.textAlignment = NSTextAlignmentCenter;
     self.button.layer.cornerRadius = kButtonCornerRadius;
     self.button.clipsToBounds = YES;
-    self.button.contentEdgeInsets = UIEdgeInsetsMake(
-        kButtonTitleVerticalContentInset, kButtonTitleHorizontalContentInset,
-        kButtonTitleVerticalContentInset, kButtonTitleHorizontalContentInset);
+
+    // TODO(crbug.com/1418068): Simplify after minimum version required is >=
+    // iOS 15.
+    if (@available(iOS 15, *)) {
+      UIButtonConfiguration* buttonConfiguration =
+          [UIButtonConfiguration plainButtonConfiguration];
+      buttonConfiguration.contentInsets = NSDirectionalEdgeInsetsMake(
+          kButtonTitleVerticalContentInset, kButtonTitleHorizontalContentInset,
+          kButtonTitleVerticalContentInset, kButtonTitleHorizontalContentInset);
+      self.button.configuration = buttonConfiguration;
+    }
+#if __IPHONE_OS_VERSION_MIN_REQUIRED < __IPHONE_15_0
+    else {
+      self.button.contentEdgeInsets = UIEdgeInsetsMake(
+          kButtonTitleVerticalContentInset, kButtonTitleHorizontalContentInset,
+          kButtonTitleVerticalContentInset, kButtonTitleHorizontalContentInset);
+    }
+#endif  // __IPHONE_OS_VERSION_MIN_REQUIRED < __IPHONE_15_0
 
     self.button.pointerInteractionEnabled = YES;
     // This button's background color is configured whenever the cell is
@@ -222,7 +233,6 @@ const UIControlContentHorizontalAlignment kDefaultContentHorizontalAlignment =
   [super prepareForReuse];
   [self.button setTitleColor:[UIColor colorNamed:kSolidButtonTextColor]
                     forState:UIControlStateNormal];
-  self.button.contentHorizontalAlignment = kDefaultContentHorizontalAlignment;
   self.textLabel.textAlignment = kDefaultTextAlignment;
   [self disableButtonIntrinsicWidth:NO];
 }

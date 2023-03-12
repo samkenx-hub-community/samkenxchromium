@@ -42,12 +42,6 @@ const char kAutofillCreditCardUploadDescription[] =
     "Offers uploading Autofilled credit cards to Google Payments after form "
     "submission.";
 
-const char kAutofillEnableNewCardUnmaskPromptViewName[] =
-    "Enable the new Card Unmask Prompt View for Autofill.";
-const char kAutofillEnableNewCardUnmaskPromptViewDescription[] =
-    "Displays the new autofill prompt for entering a credit card's CVC and "
-    "(optional) expiration date.";
-
 const char kAutofillEnableRankingFormulaAddressProfilesName[] =
     "Enable new Autofill suggestion ranking formula for address profiles";
 const char kAutofillEnableRankingFormulaAddressProfilesDescription[] =
@@ -132,6 +126,13 @@ const char kAutofillUpstreamAllowAllEmailDomainsName[] =
 const char kAutofillUpstreamAllowAllEmailDomainsDescription[] =
     "When enabled, credit card upload is offered without regard to the user's "
     "logged-in account's domain.";
+
+const char kAutofillUpstreamAuthenticatePreflightCallName[] =
+    "Set authentication token in credit card upload preflight call";
+const char kAutofillUpstreamAuthenticatePreflightCallDescription[] =
+    "When enabled, sets the OAuth2 token in GetUploadDetails requests to "
+    "Google Payments, in order to provide a better experience for users with "
+    "server-side features disabled but not client-side features.";
 
 const char kAutofillUseMobileLabelDisambiguationName[] =
     "Autofill Uses Mobile Label Disambiguation";
@@ -253,7 +254,7 @@ const char kDetectMainThreadFreezeDescription[] =
     "the time specified by this flag.";
 
 const char kEnableDiscoverFeedTopSyncPromoName[] =
-    "Enable the sync promo on top of the feed.";
+    "Enables the top of feed sync promo.";
 const char kEnableDiscoverFeedTopSyncPromoDescription[] =
     "When enabled, a sync promotion will be presented to eligible users on top "
     "of the feed cards.";
@@ -311,6 +312,12 @@ const char kTileAblationName[] = "Enables tile ablation";
 const char kTileAblationDescription[] =
     "Hides the shortcuts and most visited tiles on the NTP for new users.";
 
+const char kEnableEmailInBookmarksReadingListSnackbarName[] =
+    "Enable Email In Bookmark/Reading List Snackbar";
+const char kEnableEmailInBookmarksReadingListSnackbarDescription[] =
+    "Enable the display of the signed-in account email in the snackbar which "
+    "indicates that an item is added to the bookmarks/reading list.";
+
 const char kEnableFeedAblationName[] = "Enables Feed Ablation";
 const char kEnableFeedAblationDescription[] =
     "If Enabled the Feed will be removed from the NTP";
@@ -341,6 +348,11 @@ const char kEnableFeedSyntheticCapabilitiesDescription[] =
 const char kEnableFullscreenAPIName[] = "Enable Fullscreen API";
 const char kEnableFullscreenAPIDescription[] =
     "Enable the Fullscreen API for web content (iOS 16.0+).";
+
+const char kEnableFollowManagementInstantReloadName[] =
+    "Enable Follow Management Instant Reload";
+const char kEnableFollowManagementInstantReloadDescription[] =
+    "Enable follow management page instant reloading when being opened.";
 
 const char kPasswordsGroupingName[] =
     "Enable password grouping for the Password Manager";
@@ -377,6 +389,11 @@ const char kEnableSuggestionsScrollingOnIPadName[] =
 const char kEnableSuggestionsScrollingOnIPadDescription[] =
     "Enable omnibox suggestions scrolling on iPad and disable suggestions "
     "hiding on keyboard dismissal.";
+
+const char kEnableUIButtonConfigurationName[] =
+    "Enable UIButtonConfiguration Usage";
+const char kEnableUIButtonConfigurationDescription[] =
+    "Enable UIButtonConfiguration usage for UIButtons.";
 
 const char kEnableUserPolicyName[] = "Enable user policies";
 const char kEnableUserPolicyDescription[] =
@@ -501,11 +518,15 @@ const char kIOSPasswordManagerCrossOriginIframeSupportName[] =
 const char kIOSPasswordManagerCrossOriginIframeSupportDescription[] =
     "Enables password saving and filling in cross-origin iframes on IOS.";
 
-const char kIOSPopularSitesImprovedSuggestionsName[] =
-    "Most Visited Tiles (Improved Default Suggestions)";
-const char kIOSPopularSitesImprovedSuggestionsDescription[] =
-    "Enables improved default suggestions for the most visited tiles, by using "
-    "only Chrome iOS usage data to generate its suggestions.";
+const char kIOSPasswordBottomSheetName[] = "IOS Password Manager Bottom Sheet";
+const char kIOSPasswordBottomSheetDescription[] =
+    "Enables the display of the password bottom sheet on IOS.";
+
+const char kNewTabPageRetentionName[] =
+    "New tab page features that target new users";
+const char kNewTabPageRetentionDescription[] =
+    "Enables new tab page features that are available on first run for new "
+    "Chrome iOS users.";
 
 const char kIOSSharedHighlightingColorChangeName[] =
     "IOS Shared Highlighting color change";
@@ -551,6 +572,10 @@ const char kMetrickitNonCrashReportName[] = "Metrickit non-crash reports";
 const char kMetrickitNonCrashReportDescription[] =
     "Enables sending Metrickit reports for non crash type (hang, "
     "cpu-exception, diskwrite-exception)";
+
+const char kMixedContentAutoupgradeName[] = "Auto-upgrade mixed content";
+const char kMixedContentAutoupgradeDescription[] =
+    "Enables auto-upgrading of mixed content images, audio and video";
 
 const char kModernTabStripName[] = "Modern TabStrip";
 const char kModernTabStripDescription[] =

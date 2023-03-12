@@ -208,7 +208,7 @@ void ManifestUpdateManager::MaybeUpdate(const GURL& url,
 
   auto load_observer = std::make_unique<PreUpdateWebContentsObserver>(
       base::BindOnce(&ManifestUpdateManager::StartManifestCheckAfterPageLoad,
-                     base::Unretained(this), *app_id,
+                     weak_factory_.GetWeakPtr(), *app_id,
                      web_contents->GetWeakPtr()),
       web_contents, hang_update_checks_for_testing_);
 
@@ -253,7 +253,7 @@ void ManifestUpdateManager::StartManifestCheckAfterPageLoad(
   command_scheduler_->ScheduleManifestUpdateCheck(
       url, app_id, web_contents,
       base::BindOnce(&ManifestUpdateManager::OnManifestCheckAwaitAppWindowClose,
-                     base::Unretained(this), web_contents, url, app_id));
+                     weak_factory_.GetWeakPtr(), web_contents, url, app_id));
 }
 
 void ManifestUpdateManager::OnManifestCheckAwaitAppWindowClose(
@@ -266,6 +266,12 @@ void ManifestUpdateManager::OnManifestCheckAwaitAppWindowClose(
   if (update_stage_it == update_stages_.end()) {
     // If the web_app already has already been uninstalled after the
     // manifest update data fetch has happened, then we can early exit.
+    return;
+  }
+
+  if (!contents) {
+    update_stages_.erase(app_id);
+    NotifyResult(url, app_id, ManifestUpdateResult::kWebContentsDestroyed);
     return;
   }
 
@@ -302,7 +308,7 @@ void ManifestUpdateManager::OnManifestCheckAwaitAppWindowClose(
         app_id,
         base::BindOnce(
             &ManifestUpdateManager::StartManifestWriteAfterWindowsClosed,
-            base::Unretained(this), url, app_id, std::move(keep_alive),
+            weak_factory_.GetWeakPtr(), url, app_id, std::move(keep_alive),
             std::move(profile_keep_alive), std::move(install_info.value())));
     UpdatePendingCallback* callback =
         GetUpdatePendingCallbackMutableForTesting();  // IN-TEST
@@ -331,7 +337,7 @@ void ManifestUpdateManager::StartManifestWriteAfterWindowsClosed(
       url, app_id, std::move(install_info), std::move(keep_alive),
       std::move(profile_keep_alive),
       base::BindOnce(&ManifestUpdateManager::OnUpdateStopped,
-                     base::Unretained(this)));
+                     weak_factory_.GetWeakPtr()));
 }
 
 bool ManifestUpdateManager::IsUpdateConsumed(const AppId& app_id) {
@@ -401,7 +407,6 @@ void ManifestUpdateManager::OnUpdateStopped(const GURL& url,
   if (update_stage_it == update_stages_.end())
     return;
   update_stages_.erase(app_id);
-  // apps_with_no_windows_for_testing_.erase(app_id);
   NotifyResult(url, app_id, result);
 }
 

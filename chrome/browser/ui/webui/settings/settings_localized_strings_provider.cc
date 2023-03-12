@@ -1145,6 +1145,11 @@ void AddAutofillStrings(content::WebUIDataSource* html_source,
      IDS_SETTINGS_PASSWORD_ROW_PASSWORD_DETAIL_PAGE},
     {"importMenuItem", IDS_SETTINGS_PASSWORDS_IMPORT_MENU_ITEM},
     {"importPasswordsTitle", IDS_SETTINGS_PASSWORDS_IMPORT_TITLE},
+    {"importPasswordsErrorTitle", IDS_SETTINGS_PASSWORDS_IMPORT_ERROR_TITLE},
+    {"importPasswordsCompleteTitle",
+     IDS_SETTINGS_PASSWORDS_IMPORT_COMPLETE_TITLE},
+    {"importPasswordsSuccessTitle",
+     IDS_SETTINGS_PASSWORDS_IMPORT_SUCCESS_TITLE},
     {"importPasswordsChooseFile", IDS_SETTINGS_PASSWORDS_IMPORT_CHOOSE_FILE},
     {"importPasswordsSuccessTip", IDS_SETTINGS_PASSWORDS_IMPORT_SUCCESS_TIP},
     {"importPasswordsDeleteFileOption",
@@ -1836,8 +1841,13 @@ void AddPrivacyStrings(content::WebUIDataSource* html_source,
 #if BUILDFLAG(CHROME_ROOT_STORE_SUPPORTED)
   html_source->AddBoolean(
       "showChromeRootStoreCertificates",
-      GetChromeCertVerifierServiceParams(/*localstate=*/nullptr)
-          ->use_chrome_root_store);
+#if BUILDFLAG(CHROME_ROOT_STORE_OPTIONAL)
+      GetChromeCertVerifierServiceParams(/*local_state=*/nullptr)
+          ->use_chrome_root_store
+#else
+      true
+#endif
+  );
 
   html_source->AddString("chromeRootStoreHelpCenterURL",
                          chrome::kChromeRootStoreSettingsHelpCenterURL);

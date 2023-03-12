@@ -10,7 +10,8 @@
 /** Necessary imports to load the app */
 import '../strings.m.js';
 import './os_settings_ui/os_settings_ui.js';
-/** Other imports */
+// TODO(b/263414034) Determine if these imports are needed here at all,
+// or should be moved to lazy_load.ts
 import '../prefs/prefs.js';
 import './device_page/audio.js';
 import './device_page/cros_audio_config.js';
@@ -39,24 +40,6 @@ import './device_page/storage.js';
 import './device_page/storage_external.js';
 import './device_page/storage_external_entry.js';
 import './device_page/stylus.js';
-import './google_assistant_page/google_assistant_page.js';
-import './internet_page/apn_subpage.js';
-import './internet_page/cellular_roaming_toggle_button.js';
-import './internet_page/cellular_setup_dialog.js';
-import './internet_page/esim_remove_profile_dialog.js';
-import './internet_page/hotspot_subpage.js';
-import './internet_page/hotspot_summary_item.js';
-import './internet_page/internet_config.js';
-import './internet_page/internet_detail_page.js';
-import './internet_page/internet_known_networks_page.js';
-import './internet_page/internet_page.js';
-import './internet_page/internet_subpage.js';
-import './internet_page/network_always_on_vpn.js';
-import './internet_page/network_proxy_section.js';
-import './internet_page/network_summary.js';
-import './internet_page/network_summary_item.js';
-import './internet_page/settings_traffic_counters.js';
-import './internet_page/tether_connection_dialog.js';
 import './kerberos_page/kerberos_accounts.js';
 import './kerberos_page/kerberos_page.js';
 import './multidevice_page/multidevice_page.js';
@@ -65,10 +48,6 @@ import './nearby_share_page/nearby_share_subpage.js';
 import './personalization_page/personalization_page.js';
 import './os_a11y_page/change_dictation_locale_dialog.js';
 import './os_a11y_page/os_a11y_page.js';
-import './os_about_page/channel_switcher_dialog.js';
-import './os_about_page/detailed_build_info.js';
-import './os_about_page/os_about_page.js';
-import './os_about_page/update_warning_dialog.js';
 import './os_apps_page/android_apps_subpage.js';
 import './os_apps_page/app_notifications_page/app_notifications_subpage.js';
 import './os_apps_page/app_management_page/app_detail_view.js';
@@ -105,48 +84,34 @@ import './os_bluetooth_page/os_paired_bluetooth_list_item.js';
 import './os_bluetooth_page/os_saved_devices_list.js';
 import './os_bluetooth_page/os_saved_devices_list_item.js';
 import './os_bluetooth_page/settings_fast_pair_constants.js';
-import './os_settings_icons.html.js';
 import './os_people_page/account_manager.js';
 import './os_people_page/os_people_page.js';
 import './os_people_page/os_sync_controls.js';
-import './os_search_page/os_search_page.js';
-import './os_settings_main/os_settings_main.js';
-import './os_settings_page/os_settings_page.js';
-import './os_settings_page/settings_idle_load.js';
-import './os_settings_menu/os_settings_menu.js';
-import './os_settings_icons.css.js';
-import './os_settings_search_box/os_search_result_row.js';
-import './os_settings_search_box/os_settings_search_box.js';
-import './os_toolbar/os_toolbar.js';
 import './parental_controls_page/parental_controls_page.js';
-import './settings_scheduler_slider/settings_scheduler_slider.js';
 
-import * as nearbyShareMojom from '/shared/mojo/nearby_share.mojom-webui.js';
 import {startColorChangeUpdater} from 'chrome://resources/cr_components/color_change_listener/colors_css_updater.js';
 import {loadTimeData} from 'chrome://resources/js/load_time_data.js';
-
-import * as appNotificationHandlerMojom from '../mojom-webui/app_notification_handler.mojom-webui.js';
-import * as crosAudioConfigMojom from '../mojom-webui/cros_audio_config.mojom-webui.js';
-import * as routesMojom from '../mojom-webui/routes.mojom-webui.js';
-import * as personalizationSearchMojom from '../mojom-webui/search/personalization_search.mojom-webui.js';
-import * as searchMojom from '../mojom-webui/search/search.mojom-webui.js';
-import * as searchResultIconMojom from '../mojom-webui/search/search_result_icon.mojom-webui.js';
-import * as userActionRecorderMojom from '../mojom-webui/search/user_action_recorder.mojom-webui.js';
-import * as settingMojom from '../mojom-webui/setting.mojom-webui.js';
-
-import * as fakeCrosAudioConfig from './device_page/fake_cros_audio_config.js';
 
 /**
  * With the optimize_webui() build step, the generated JS files are bundled
  * into a single JS file. The exports below are necessary so they can be
  * imported into browser tests.
  */
+export * as nearbyShareMojom from '/shared/mojo/nearby_share.mojom-webui.js';
 export {getContactManager, observeContactManager, setContactManagerForTesting} from '/shared/nearby_contact_manager.js';
 export {getNearbyShareSettings, observeNearbyShareSettings, setNearbyShareSettingsForTesting} from '/shared/nearby_share_settings.js';
 export {NearbySettings, NearbyShareSettingsMixin} from '/shared/nearby_share_settings_mixin.js';
 export {OpenWindowProxyImpl} from 'chrome://resources/js/open_window_proxy.js';
 export {SettingsToggleButtonElement} from '../controls/settings_toggle_button.js';
 export {LifetimeBrowserProxyImpl} from '../lifetime_browser_proxy.js';
+export * as appNotificationHandlerMojom from '../mojom-webui/app_notification_handler.mojom-webui.js';
+export * as crosAudioConfigMojom from '../mojom-webui/cros_audio_config.mojom-webui.js';
+export * as routesMojom from '../mojom-webui/routes.mojom-webui.js';
+export * as personalizationSearchMojom from '../mojom-webui/search/personalization_search.mojom-webui.js';
+export * as searchMojom from '../mojom-webui/search/search.mojom-webui.js';
+export * as searchResultIconMojom from '../mojom-webui/search/search_result_icon.mojom-webui.js';
+export * as userActionRecorderMojom from '../mojom-webui/search/user_action_recorder.mojom-webui.js';
+export * as settingMojom from '../mojom-webui/setting.mojom-webui.js';
 export {ProfileInfoBrowserProxyImpl} from '../people_page/profile_info_browser_proxy.js';
 export {PageStatus, StatusAction, SyncBrowserProxyImpl} from '../people_page/sync_browser_proxy.js';
 export {SettingsPrefsElement} from '../prefs/prefs.js';
@@ -154,6 +119,7 @@ export {CrSettingsPrefs} from '../prefs/prefs_types.js';
 export {PrivacyPageBrowserProxyImpl, SecureDnsMode, SecureDnsUiManagementMode} from '../privacy_page/privacy_page_browser_proxy.js';
 export {setCrosAudioConfigForTesting} from './device_page/cros_audio_config.js';
 export {DevicePageBrowserProxy, DevicePageBrowserProxyImpl, IdleBehavior, LidClosedBehavior, NoteAppLockScreenSupport, setDisplayApiForTesting, StorageSpaceState} from './device_page/device_page_browser_proxy.js';
+export * as fakeCrosAudioConfig from './device_page/fake_cros_audio_config.js';
 export {fakeKeyboards, fakeMice, fakePointingSticks, fakeTouchpads} from './device_page/fake_input_device_data.js';
 export {FakeInputDeviceSettingsProvider} from './device_page/fake_input_device_settings_provider.js';
 export {getInputDeviceSettingsProvider, setInputDeviceSettingsProviderForTesting, setupFakeInputDeviceSettingsProvider} from './device_page/input_device_mojo_interface_provider.js';
@@ -165,8 +131,6 @@ export {SettingsPerDeviceKeyboardSubsectionElement} from './device_page/per_devi
 export {SettingsPerDeviceMouseSubsectionElement} from './device_page/per_device_mouse_subsection.js';
 export {SettingsPerDevicePointingStickSubsectionElement} from './device_page/per_device_pointing_stick_subsection.js';
 export {SettingsPerDeviceTouchpadSubsectionElement} from './device_page/per_device_touchpad_subsection.js';
-export {GoogleAssistantBrowserProxyImpl} from './google_assistant_page/google_assistant_browser_proxy.js';
-export {ConsentStatus, DspHotwordState} from './google_assistant_page/google_assistant_page.js';
 export {InternetPageBrowserProxy, InternetPageBrowserProxyImpl} from './internet_page/internet_page_browser_proxy.js';
 export {KerberosAccountsBrowserProxyImpl, KerberosConfigErrorCode, KerberosErrorType} from './kerberos_page/kerberos_accounts_browser_proxy.js';
 export {recordClick, recordNavigation, recordPageBlur, recordPageFocus, recordSearch, recordSettingChange, setUserActionRecorderForTesting} from './metrics_recorder.js';
@@ -195,8 +159,8 @@ export {reduceAction, updateApps} from './os_apps_page/app_management_page/reduc
 export {AppManagementStore} from './os_apps_page/app_management_page/store.js';
 export {AppManagementStoreMixin} from './os_apps_page/app_management_page/store_mixin.js';
 export {setAppNotificationProviderForTesting} from './os_apps_page/app_notifications_page/mojo_interface_provider.js';
-export {OsBluetoothDevicesSubpageBrowserProxyImpl} from './os_bluetooth_page/os_bluetooth_devices_subpage_browser_proxy.js';
-export {FastPairSavedDevicesOptInStatus} from './os_bluetooth_page/settings_fast_pair_constants.js';
+export {OsBluetoothDevicesSubpageBrowserProxy, OsBluetoothDevicesSubpageBrowserProxyImpl} from './os_bluetooth_page/os_bluetooth_devices_subpage_browser_proxy.js';
+export {FastPairSavedDevice, FastPairSavedDevicesOptInStatus} from './os_bluetooth_page/settings_fast_pair_constants.js';
 export {osPageVisibility} from './os_page_visibility.js';
 export {AccountManagerBrowserProxy, AccountManagerBrowserProxyImpl} from './os_people_page/account_manager_browser_proxy.js';
 export {SettingsUsersAddUserDialogElement} from './os_people_page/add_user_dialog.js';
@@ -210,22 +174,11 @@ export {SearchEngine, SearchEnginesBrowserProxy, SearchEnginesBrowserProxyImpl, 
 export {routes} from './os_settings_routes.js';
 export {OsSettingsSearchBoxBrowserProxyImpl} from './os_settings_search_box/os_settings_search_box_browser_proxy.js';
 export {ParentalControlsBrowserProxy, ParentalControlsBrowserProxyImpl} from './parental_controls_page/parental_controls_browser_proxy.js';
+export {SettingsParentalControlsPageElement} from './parental_controls_page/parental_controls_page.js';
 export {PersonalizationHubBrowserProxy, PersonalizationHubBrowserProxyImpl} from './personalization_page/personalization_hub_browser_proxy.js';
 export {Route, Router} from './router.js';
 export {getPersonalizationSearchHandler, setPersonalizationSearchHandlerForTesting} from './search/personalization_search_handler.js';
 export {getSettingsSearchHandler, setSettingsSearchHandlerForTesting} from './search/settings_search_handler.js';
-export {
-  appNotificationHandlerMojom,
-  crosAudioConfigMojom,
-  fakeCrosAudioConfig,
-  nearbyShareMojom,
-  personalizationSearchMojom,
-  routesMojom,
-  searchMojom,
-  searchResultIconMojom,
-  settingMojom,
-  userActionRecorderMojom,
-};
 
 // TODO(b/257329722) After the Jelly experiment is launched, add the CSS link
 // element directly to the HTML.

@@ -67,11 +67,11 @@
 #include "content/browser/renderer_host/debug_urls.h"
 #include "content/browser/renderer_host/frame_tree.h"
 #include "content/browser/renderer_host/frame_tree_node.h"
+#include "content/browser/renderer_host/local_network_access_util.h"
 #include "content/browser/renderer_host/navigation_controller_impl.h"
 #include "content/browser/renderer_host/navigation_request_info.h"
 #include "content/browser/renderer_host/navigator.h"
 #include "content/browser/renderer_host/navigator_delegate.h"
-#include "content/browser/renderer_host/private_network_access_util.h"
 #include "content/browser/renderer_host/render_frame_host_csp_context.h"
 #include "content/browser/renderer_host/render_frame_host_delegate.h"
 #include "content/browser/renderer_host/render_frame_host_impl.h"
@@ -461,12 +461,9 @@ void AddAdditionalRequestHeaders(
 
     if (base::FeatureList::IsEnabled(
             blink::features::kAttributionReportingCrossAppWeb)) {
-      if (auto* attribution_manager =
-              AttributionManager::FromBrowserContext(browser_context)) {
-        headers->SetHeader("Attribution-Reporting-Support",
-                           attribution_reporting::GetSupportHeader(
-                               attribution_manager->GetOsSupport()));
-      }
+      headers->SetHeader("Attribution-Reporting-Support",
+                         attribution_reporting::GetSupportHeader(
+                             AttributionManager::GetOsSupport()));
     }
   }
 }
@@ -1994,8 +1991,7 @@ NavigationRequest::~NavigationRequest() {
   // NavigationRequest's attempt to commit "too soon" will just re-queue the
   // request, whereas accidentally forgetting to resume it sometimes will lead
   // to a navigation just silently not working.
-  if (GetNavigationQueueingFeatureLevel() >=
-          NavigationQueueingFeatureLevel::kFull &&
+  if (ShouldQueueNavigationsWhenPendingCommitRFHExists() &&
       frame_tree_node_->navigation_request()) {
     frame_tree_node_->navigation_request()->ResumeCommitIfNeeded();
   }
@@ -4766,6 +4762,10 @@ void NavigationRequest::OnServiceWorkerAccessed(
     const GURL& scope,
     AllowServiceWorkerResult allowed) {
   GetDelegate()->OnServiceWorkerAccessed(this, scope, allowed);
+}
+
+network::mojom::WebSandboxFlags NavigationRequest::SandboxFlagsInherited() {
+  return commit_params_->frame_policy.sandbox_flags;
 }
 
 network::mojom::WebSandboxFlags NavigationRequest::SandboxFlagsToCommit() {
@@ -8954,8 +8954,7 @@ void NavigationRequest::ComputeDownloadPolicy() {
 }
 
 void NavigationRequest::ResumeCommitIfNeeded() {
-  DCHECK_GE(GetNavigationQueueingFeatureLevel(),
-            NavigationQueueingFeatureLevel::kFull);
+  DCHECK(ShouldQueueNavigationsWhenPendingCommitRFHExists());
   // TODO(crbug.com/1220337): Add some metrics for how often:
   // - this is run
   // - how often it ends up having to simply re-queue itself

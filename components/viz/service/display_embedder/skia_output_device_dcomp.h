@@ -16,12 +16,12 @@
 #include "components/viz/service/display_embedder/skia_output_device.h"
 #include "gpu/command_buffer/service/shared_image/shared_image_representation.h"
 #include "ui/gfx/frame_data.h"
+#include "ui/gl/gl_surface.h"
 #include "ui/gl/presenter.h"
 
 namespace gl {
 class DCLayerOverlayImage;
 struct DCLayerOverlayParams;
-class GLSurface;
 }  // namespace gl
 
 namespace gpu {
@@ -45,11 +45,9 @@ class SkiaOutputDeviceDComp : public SkiaOutputDevice {
   ~SkiaOutputDeviceDComp() override;
 
   // SkiaOutputDevice implementation:
-  void SwapBuffers(BufferPresentedCallback feedback,
-                   OutputSurfaceFrame frame) override;
-  void PostSubBuffer(const gfx::Rect& rect,
-                     BufferPresentedCallback feedback,
-                     OutputSurfaceFrame frame) override;
+  void Present(const absl::optional<gfx::Rect>& update_rect,
+               BufferPresentedCallback feedback,
+               OutputSurfaceFrame frame) override;
   void ScheduleOverlays(SkiaOutputSurface::OverlayList overlays) override;
 
  protected:
@@ -180,7 +178,7 @@ class VIZ_SERVICE_EXPORT SkiaOutputDeviceDCompPresenter final
   bool ScheduleDCLayer(
       std::unique_ptr<gl::DCLayerOverlayParams> params) override;
   void DoPresent(const gfx::Rect& rect,
-                 gl::GLSurface::SwapCompletionCallback completion_callback,
+                 gl::Presenter::SwapCompletionCallback completion_callback,
                  BufferPresentedCallback feedback,
                  gfx::FrameData data) override;
 

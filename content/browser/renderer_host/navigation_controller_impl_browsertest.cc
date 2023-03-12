@@ -21529,14 +21529,12 @@ IN_PROC_BROWSER_TEST_P(NavigationControllerBrowserTest,
   EXPECT_TRUE(NavigateToURL(contents(), url1));
   EXPECT_TRUE(NavigateToURL(contents(), url2));
 
-  EXPECT_TRUE(ExecJs(contents(),
-                     "navigation.onnavigateerror = e => document.title ="
-                     "e.error.name === 'InvalidStateError'"
-                     "    ? 'PASS' : 'WRONG_ERROR_TYPE';"));
-
   // Request navigation.back() in the renderer.
   ExecuteScriptAsync(contents()->GetPrimaryFrameTree().root(),
-                     "navigation.back()");
+                     "navigation.back().committed.then("
+                     "() => document.title = 'FAIL',"
+                     "e => document.title = e.name === 'InvalidStateError'"
+                     "   ? 'PASS' : 'WRONG_ERROR_TYPE');");
 
   // Before the navigation.back() is processed and sent to the browser, remove
   // the NavigationEntry that navigation.back() will request to be navigated to.
@@ -22495,8 +22493,7 @@ IN_PROC_BROWSER_TEST_P(NavigationControllerBrowserTest,
   EXPECT_TRUE(b1_navigation.WaitForResponse());
   StartNavigationOnReadyToCommit(shell(), b1_navigation, url_a3);
 
-  if (GetNavigationQueueingFeatureLevel() >=
-      NavigationQueueingFeatureLevel::kAvoidRedundantCancellations) {
+  if (ShouldAvoidRedundantNavigationCancellations()) {
     // Assert that the navigation to B1 didn't get cancelled, and finish
     // committing B1. This shouldn't cancel the navigation to A3.
     ASSERT_TRUE(b1_navigation.WaitForNavigationFinished());
@@ -22605,8 +22602,7 @@ IN_PROC_BROWSER_TEST_P(NavigationControllerBrowserTest,
 // cancel other navigations happening in the same FrameTreeNode.
 IN_PROC_BROWSER_TEST_P(NavigationControllerBrowserTest,
                        UnloadingPreviousRFHOnCommitWontCancelNavigation) {
-  if (GetNavigationQueueingFeatureLevel() <
-      NavigationQueueingFeatureLevel::kAvoidRedundantCancellations) {
+  if (!ShouldAvoidRedundantNavigationCancellations()) {
     return;
   }
   GURL main_url(embedded_test_server()->GetURL("a.com", "/title1.html"));

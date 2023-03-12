@@ -477,7 +477,7 @@ chromium-metrics-reviews@google.com.
   <summary>
     True if the browser can reuse an existing context when calling generateBid()
     whose corresponding interest group has the executionMode set to
-    groupByOrigin.
+    group-by-origin.
 
     See https://github.com/WICG/turtledove/blob/main/FLEDGE.md for the latest
     version of the FLEDGE explainer.
@@ -770,6 +770,32 @@ chromium-metrics-reviews@google.com.
     See https://github.com/WICG/turtledove/blob/main/FLEDGE.md for the latest
     version of the FLEDGE explainer.
   </summary>
+</histogram>
+
+<histogram name="Ads.InterestGroup.EnumNaming.{When}.{Type}"
+    enum="BooleanDeprecatedJSEnumName" expires_after="2023-07-31">
+  <owner>caraitto@chromium.org</owner>
+  <owner>pauljensen@chromium.org</owner>
+  <owner>privacy-sandbox-dev@chromium.org</owner>
+  <summary>
+    For each time a JavaScript enum of {Type} is provided during {When}, records
+    whether or not the enum was in the deprecated &quot;camelCase&quot; form.
+    (The correct form is the &quot;words-separated-by-dashes&quot; form).
+    Unknown enum values are ignored and not reported.
+
+    Reported at each enum usage during {When}.
+
+    See https://github.com/WICG/turtledove/blob/main/FLEDGE.md for the latest
+    version of the FLEDGE explainer.
+  </summary>
+  <token key="When">
+    <variant name="Renderer" summary="a FLEDGE API call in the renderer"/>
+    <variant name="Update" summary="an interest group update"/>
+  </token>
+  <token key="Type">
+    <variant name="SellerCapabilities" summary="SellerCapabilities"/>
+    <variant name="WorkletExecutionMode" summary="WorkletExecutionMode"/>
+  </token>
 </histogram>
 
 <histogram name="Ads.InterestGroup.Net.DownloadTime.{Type}" units="ms"
@@ -1191,15 +1217,6 @@ chromium-metrics-reviews@google.com.
   <summary>
     Trackes the number of times something is added, removed, or deleted from the
     AutocompleteActionPredictor backing database.
-  </summary>
-</histogram>
-
-<histogram name="AutocompleteActionPredictor.DatabaseRowCount" units="units"
-    expires_after="M85">
-  <owner>tbansal@chromium.org</owner>
-  <summary>
-    The distribution of row counts for the AutocompleteActionPredictorDatabase.
-    Each row contains information regarding the user's Omnibox use history.
   </summary>
 </histogram>
 
@@ -3408,6 +3425,21 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
+<histogram
+    name="Conversions.AggregatableReport.ExtraReportDelayForSuccessfulSend"
+    units="ms" expires_after="M117">
+  <owner>tquintanilla@chromium.org</owner>
+  <owner>johnidel@chromium.org</owner>
+  <owner>measurement-api-dev+metrics@google.com</owner>
+  <summary>
+    Records the &quot;extra&quot; non-scheduled time it took to confirm the
+    aggregatable attribution report was sent. This is primarily due to a
+    report's scheduled report time taking place while the browser is closed or
+    there is network issue. Recorded when an aggregatable report is successfully
+    sent.
+  </summary>
+</histogram>
+
 <histogram name="Conversions.AggregatableReport.FilteredTriggerDataPercentage"
     units="%" expires_after="M117">
   <owner>linnan@chromium.org</owner>
@@ -3431,6 +3463,38 @@ chromium-metrics-reviews@google.com.
     Measures the number of aggregatable histogram contributions per report.
     Recorded when creating the aggregatable histogram.
   </summary>
+</histogram>
+
+<histogram
+    name="Conversions.AggregatableReport.PendingAndBrowserWentOffline.{TimeSpan}"
+    units="ms" expires_after="M117">
+  <owner>anthonygarant@chromium.org</owner>
+  <owner>measurement-api-dev+metrics@google.com</owner>
+  <summary>
+    Upon storing an Aggregatable Report at `creation_time`, it is scheduled with
+    a `reporting_delay` to send at time `report_time` and is pending until then.
+
+    If the browser closes or the device goes offline, and until it re-opens or
+    re-connects, we are unable to send reports. On such events, for each pending
+    reports, we record two {TimeSpan}s: [1] TimeSinceCreation: The time elapsed
+    since the report was created (creation_time - now). [2] TimeUntilReportTime:
+    The time remaining for the report to be sent (report_time - now).
+
+    The metrics will enable us to quantify the extent to which reducing
+    `reporting_delay` would increase the number of reports sent before an
+    unavailability event.
+
+    [Limitation] To limit memory usage, a maximum of 50 pending reports timings
+    are handled. Past this number, reports are dropped (until reports get sent
+    or an unavailability event occurs). Given that the most recent reports can
+    be dropped, we can expect the `TimeSinceCreation` to be biased down slightly
+    and `TimeUntilReportTime` to be biased up slightly. We expect this situation
+    to be infrequent given the 10-60 minutes reporting window.
+  </summary>
+  <token key="TimeSpan">
+    <variant name="TimeSinceCreation"/>
+    <variant name="TimeUntilReportTime"/>
+  </token>
 </histogram>
 
 <histogram name="Conversions.AggregatableReport.ReportSendOutcome2"
@@ -3626,7 +3690,20 @@ chromium-metrics-reviews@google.com.
     Records the &quot;extra&quot; non-scheduled time it took to send a
     particular conversion report. This is primarily due to a report's scheduled
     report time taking place while the browser is closed. Recorded when a
-    conversion report is sent.
+    conversion report is to be sent.
+  </summary>
+</histogram>
+
+<histogram name="Conversions.ExtraReportDelayForSuccessfulSend" units="ms"
+    expires_after="M117">
+  <owner>tquintanilla@chromium.org</owner>
+  <owner>johnidel@chromium.org</owner>
+  <owner>measurement-api-dev+metrics@google.com</owner>
+  <summary>
+    Records the &quot;extra&quot; non-scheduled time it took to confirm the
+    particular attribution report was sent. This is primarily due to a report's
+    scheduled report time taking place while the browser is closed. Recorded
+    when an attribution report is successfully sent.
   </summary>
 </histogram>
 
@@ -4347,60 +4424,6 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
-<histogram name="Crypto.TPMDuration.{Operation}{SignatureAlgorithm}" units="ms"
-    expires_after="2023-12-01">
-  <owner>kristianm@chromium.org</owner>
-  <owner>wfh@chromium.org</owner>
-  <summary>
-    Collected on Windows at startup. Records status for various TPM operations
-    that Chrome artificially triggers on startup for measurement purposes. Note
-    that if new key creation fails, wrapped key creation and message signing
-    will not take place.
-  </summary>
-  <token key="Operation">
-    <variant name="MessageSigning"/>
-    <variant name="NewKeyCreation"/>
-    <variant name="WrappedKeyCreation"/>
-  </token>
-  <token key="SignatureAlgorithm">
-    <variant name="ECDSA"/>
-    <variant name="RSA"/>
-  </token>
-</histogram>
-
-<histogram name="Crypto.TPMOperation.{Operation}{SignatureAlgorithm}"
-    enum="BooleanSuccess" expires_after="2023-12-01">
-  <owner>kristianm@chromium.org</owner>
-  <owner>wfh@chromium.org</owner>
-  <summary>
-    Collected on Windows at startup. Records status for various TPM actions that
-    Chrome artificially triggers on startup for measurement purposes. Note that
-    if new key creation fails, wrapped key creation and message signing will not
-    take place.
-  </summary>
-  <token key="Operation">
-    <variant name="MessageSigning"/>
-    <variant name="MessageVerify"/>
-    <variant name="NewKeyCreation"/>
-    <variant name="WrappedKeyCreation"/>
-  </token>
-  <token key="SignatureAlgorithm">
-    <variant name="ECDSA"/>
-    <variant name="RSA"/>
-  </token>
-</histogram>
-
-<histogram name="Crypto.TPMSupport2" enum="TPMSupport"
-    expires_after="2023-08-20">
-  <owner>agl@chromium.org</owner>
-  <owner>davidben@chromium.org</owner>
-  <owner>wfh@chromium.org</owner>
-  <summary>
-    Collected on Windows at startup. Records whether a TPM is present and, if
-    so, what the best supported algorithm is.
-  </summary>
-</histogram>
-
 <histogram name="DataPack.Load" enum="DataPackLoadErrors" expires_after="M87">
   <owner>grt@chromium.org</owner>
   <owner>sky@chromium.org</owner>
@@ -4984,7 +5007,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="DocumentScan.ScanFailed" enum="DocumentScanSaneBackend"
-    expires_after="2023-07-02">
+    expires_after="2023-09-03">
   <owner>bmgordon@chromium.org</owner>
   <owner>project-bolton@google.com</owner>
   <summary>
@@ -5023,7 +5046,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="DocumentScan.ScanSucceeded" enum="DocumentScanSaneBackend"
-    expires_after="2023-07-02">
+    expires_after="2023-09-03">
   <owner>bmgordon@chromium.org</owner>
   <owner>project-bolton@google.com</owner>
   <summary>
@@ -5406,7 +5429,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Eche.Onboarding.UserAction" enum="OnboardingUserActionMetric"
-    expires_after="2023-06-25">
+    expires_after="2023-09-03">
   <owner>paulzchen@google.com</owner>
   <owner>andychou@google.com</owner>
   <owner>samchiu@google.com</owner>
@@ -5439,7 +5462,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Eche.StreamEvent.Duration.FromInitializeToClose" units="ms"
-    expires_after="2023-07-02">
+    expires_after="2023-09-03">
   <owner>paulzchen@google.com</owner>
   <owner>andychou@google.com</owner>
   <owner>exo-core-eng@google.com</owner>
@@ -5677,7 +5700,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="ExploreSites.MonthlyHostCount" units="hosts"
-    expires_after="2023-07-02">
+    expires_after="2023-09-03">
   <owner>dimich@chromium.org</owner>
   <summary>
     Number of unique hosts visited by the user during the last 30 days. Reported
@@ -5819,7 +5842,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Feedback.ChromeOSApp.Duration.GetBigFeedbackLogs" units="ms"
-    expires_after="2023-06-30">
+    expires_after="2023-09-03">
   <owner>xiangdongkong@google.com</owner>
   <owner>cros-feedback-app@google.com</owner>
   <summary>
@@ -5849,7 +5872,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Feedback.ChromeOSApp.GetBigFeedbackLogs.Success"
-    units="boolean" expires_after="2023-06-30">
+    units="boolean" expires_after="2023-09-03">
   <owner>xiangdongkong@google.com</owner>
   <owner>cros-feedback-app@google.com</owner>
   <summary>
@@ -6164,7 +6187,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Feedback.TrustSafetySentiment.TriggerOccurred"
-    enum="TrustSafetySentimentFeatureArea" expires_after="2023-07-02">
+    enum="TrustSafetySentimentFeatureArea" expires_after="2023-09-03">
   <owner>sauski@google.com</owner>
   <owner>chrome-hats-eng@google.com</owner>
   <summary>
@@ -6777,7 +6800,7 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
-<histogram name="Hardware.TotalDiskSpace" units="GB" expires_after="2023-07-02">
+<histogram name="Hardware.TotalDiskSpace" units="GB" expires_after="2023-09-03">
   <owner>zmo@chromium.org</owner>
   <owner>graphics-dev@chromium.org</owner>
   <summary>
@@ -7149,7 +7172,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="InstanceID.GetToken.RequestStatus.SyncInvalidations"
-    enum="GCMRegistrationRequestStatus" expires_after="2023-07-02">
+    enum="GCMRegistrationRequestStatus" expires_after="2023-09-03">
   <owner>peter@chromium.org</owner>
   <owner>rushans@chromium.org</owner>
   <owner>treib@chromium.org</owner>
@@ -8217,7 +8240,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Mojo.Channel.WriteMessageSize" units="bytes"
-    expires_after="2023-07-02">
+    expires_after="2023-09-03">
   <owner>amistry@chromium.org</owner>
   <owner>bgeffon@chromium.org</owner>
   <owner>rockot@google.com</owner>
@@ -8308,12 +8331,14 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Mouse.PointerSensitivity.Started" enum="PointerSensitivity"
-    expires_after="2022-12-04">
-  <owner>zentaro@chromium.org</owner>
+    expires_after="2023-08-08">
+  <owner>dpad@google.com</owner>
   <owner>cros-peripherals@google.com</owner>
   <summary>
     Tracks mouse sensitivity setting on startup. This replaces the old
     Mouse.Sensitivity.Started metric. Only reported on Chrome OS.
+
+    Expired from 2022-12-04 to M113. May be missing some data.
   </summary>
 </histogram>
 
@@ -9293,7 +9318,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Ozone.TouchEventConverterEvdev.HoldCountAtCancel"
-    units="touch event" expires_after="2023-06-30">
+    units="touch event" expires_after="2023-09-03">
   <owner>robsc@chromium.org</owner>
   <summary>
     The count of the number of held events cancelled when we decide to finally
@@ -9303,7 +9328,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Ozone.TouchEventConverterEvdev.HoldCountAtRelease"
-    units="touch event" expires_after="2023-06-30">
+    units="touch event" expires_after="2023-09-03">
   <owner>robsc@chromium.org</owner>
   <summary>
     The count of the number of held events released at once for a stroke when we
@@ -9639,7 +9664,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="PeriodicBackgroundSync.Event.Time" units="ms"
-    expires_after="2023-07-02">
+    expires_after="2023-09-03">
   <owner>nator@chromium.org</owner>
   <owner>rayankans@chromium.org</owner>
   <summary>
@@ -9897,52 +9922,40 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram base="true" name="PointingStick.Acceleration" enum="BooleanEnabled"
-    expires_after="2021-04-01">
-  <obsolete>
-    Removed in 2021-03.
-  </obsolete>
-<!-- Name completed by histogram_suffixes name="PreferenceChangeType" -->
-
-  <owner>hcutts@chromium.org</owner>
-  <owner>khorimoto@chromium.org</owner>
+    expires_after="2023-08-08">
+  <owner>dpad@google.com</owner>
   <owner>cros-peripherals@google.com</owner>
   <summary>
     Acceleration setting for pointing sticks (typically TrackPoints, the
     miniature red joysticks found in some laptop keyboards). Only reported on
     Chrome OS.
+
+    Expired from 2021-04-01 to M113. May be missing some data.
   </summary>
 </histogram>
 
 <histogram base="true" name="PointingStick.PointerSensitivity"
-    enum="PointerSensitivity" expires_after="2021-04-01">
-  <obsolete>
-    Removed in 2021-03.
-  </obsolete>
-<!-- Name completed by histogram_suffixes name="PreferenceChangeType" -->
-
-  <owner>hcutts@chromium.org</owner>
-  <owner>khorimoto@chromium.org</owner>
+    enum="PointerSensitivity" expires_after="2023-08-08">
+  <owner>dpad@google.com</owner>
   <owner>cros-peripherals@google.com</owner>
   <summary>
     Sensitivity value for pointing sticks (typically TrackPoints, the miniature
     red joysticks found in some laptop keyboards). Only reported on Chrome OS.
+
+    Expired from 2021-04-01 to M113. May be missing some data.
   </summary>
 </histogram>
 
 <histogram base="true" name="PointingStick.PrimaryButtonRight"
-    enum="PointerPrimaryButton" expires_after="2021-04-01">
-  <obsolete>
-    Removed in 2021-03.
-  </obsolete>
-<!-- Name completed by histogram_suffixes name="PreferenceChangeType" -->
-
-  <owner>hcutts@chromium.org</owner>
-  <owner>khorimoto@chromium.org</owner>
+    enum="PointerPrimaryButton" expires_after="2023-08-08">
+  <owner>dpad@google.com</owner>
   <owner>cros-peripherals@google.com</owner>
   <summary>
     Setting for the primary button of pointing sticks (typically TrackPoints,
     the miniature red joysticks found in some laptop keyboards). Only reported
     on Chrome OS.
+
+    Expired from 2021-04-01 to M113. May be missing some data.
   </summary>
 </histogram>
 
@@ -10653,7 +10666,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="ReadingList.WebUI.LoadCompletedTime" units="ms"
-    expires_after="2023-07-02">
+    expires_after="2023-09-03">
   <owner>corising@chromium.org</owner>
   <owner>chrome-desktop-ui-sea@google.com</owner>
   <summary>
@@ -11494,7 +11507,7 @@ Safe Browsing lookups, which is critical for security. -->
 </histogram>
 
 <histogram base="true" name="SB2.RequestDestination" enum="RequestDestination"
-    expires_after="2023-07-02">
+    expires_after="2023-09-03">
   <owner>xinghuilu@chromium.org</owner>
   <owner>chrome-counter-abuse-alerts@google.com</owner>
   <summary>
@@ -12152,7 +12165,7 @@ should be kept until we remove incident reporting. -->
 </histogram>
 
 <histogram name="Shutdown.OtherExit.Time2" units="ms"
-    expires_after="2023-07-02">
+    expires_after="2023-09-03">
   <owner>etienneb@chromium.org</owner>
   <owner>gab@chromium.org</owner>
   <summary>
@@ -12768,7 +12781,7 @@ should be kept until we remove incident reporting. -->
 </histogram>
 
 <histogram name="SpellCheck.SuggestionHitRatio" units="%"
-    expires_after="2023-07-02">
+    expires_after="2023-09-03">
   <owner>gujen@google.com</owner>
   <owner>chrome-language@google.com</owner>
   <summary>
@@ -13065,7 +13078,7 @@ should be kept until we remove incident reporting. -->
 </histogram>
 
 <histogram name="SubresourceWebBundles.OriginType"
-    enum="SubresourceWebBundleOriginType" expires_after="2023-07-01">
+    enum="SubresourceWebBundleOriginType" expires_after="2023-09-03">
   <owner>hayato@chromium.org</owner>
   <owner>webpackage-dev@chromium.org</owner>
   <summary>
@@ -14362,30 +14375,6 @@ regressions. -->
   </summary>
 </histogram>
 
-<histogram name="VirtualKeyboard.InitLatency.FirstLoad" units="ms"
-    expires_after="M85">
-  <owner>oka@chromium.org</owner>
-  <summary>Latency of the keyboard being loaded for the first time.</summary>
-</histogram>
-
-<histogram name="VirtualKeyboard.KeyboardControlEvent"
-    enum="KeyboardControlEvent" expires_after="M85">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
-  <summary>
-    A count of various control events that can occur on the virtual keyboard,
-    such as showing and hiding.
-  </summary>
-</histogram>
-
-<histogram name="VirtualKeyboard.LingeringIntermediateState"
-    enum="VirtualKeyboardControllerState" expires_after="M85">
-  <owner>oka@chromium.org</owner>
-  <summary>
-    Records whenever an intermediate keyboard state has been active for longer
-    than a fixed timeout.
-  </summary>
-</histogram>
-
 <histogram name="VoiceInteraction.AssistantActionPerformed{Source}"
     enum="AssistantActionPerformed" expires_after="2023-07-05">
   <owner>basiaz@google.com</owner>
@@ -14609,7 +14598,7 @@ regressions. -->
 </histogram>
 
 <histogram name="VoiceInteraction.VoiceResultConfidenceValue" units="%"
-    expires_after="2023-07-16">
+    expires_after="2023-09-03">
   <owner>basiaz@google.com</owner>
   <owner>chrome-language@google.com</owner>
   <summary>

@@ -5,7 +5,9 @@
 #include "ash/system/video_conference/video_conference_tray.h"
 
 #include "ash/constants/ash_features.h"
+#include "ash/constants/ash_switches.h"
 #include "ash/root_window_controller.h"
+#include "ash/session/session_controller_impl.h"
 #include "ash/shelf/shelf.h"
 #include "ash/shell.h"
 #include "ash/style/icon_button.h"
@@ -14,9 +16,22 @@
 #include "ash/system/tray/system_tray_notifier.h"
 #include "ash/system/unified/unified_system_tray.h"
 #include "ash/system/video_conference/fake_video_conference_tray_controller.h"
-#include "ash/system/video_conference/video_conference_media_state.h"
+#include "ash/system/video_conference/video_conference_common.h"
 #include "ash/test/ash_test_base.h"
+#include "base/command_line.h"
 #include "base/test/scoped_feature_list.h"
+#include "ui/views/animation/ink_drop.h"
+#include "ui/views/animation/ink_drop_state.h"
+
+namespace {
+
+void SetSessionState(session_manager::SessionState state) {
+  ash::SessionInfo info;
+  info.state = state;
+  ash::Shell::Get()->session_controller()->SetSessionInfo(info);
+}
+
+}  // namespace
 
 namespace ash {
 
@@ -30,6 +45,8 @@ class VideoConferenceTrayTest : public AshTestBase {
   // AshTestBase:
   void SetUp() override {
     scoped_feature_list_.InitAndEnableFeature(features::kVideoConference);
+    base::CommandLine::ForCurrentProcess()->AppendSwitch(
+        switches::kCameraEffectsSupportedByHardware);
 
     // Instantiates a fake controller (the real one is created in
     // ChromeBrowserMainExtraPartsAsh::PreProfileInit() which is not called in
@@ -165,6 +182,23 @@ TEST_F(VideoConferenceTrayTest, ToggleBubbleButtonRotation) {
             video_conference_tray()->GetRotationValueForToggleBubbleButton());
 }
 
+// Makes sure that the tray does not animate to new inkdrop state when
+// activated, which is the default behavior of `TrayBackgroundView`.
+TEST_F(VideoConferenceTrayTest, ToggleBubbleInkdrop) {
+  auto* ink_drop = views::InkDrop::Get(video_conference_tray())->GetInkDrop();
+
+  SetTrayAndButtonsVisible();
+  EXPECT_EQ(views::InkDropState::HIDDEN, ink_drop->GetTargetInkDropState());
+
+  // Open bubble, the tray should not install inkdrop.
+  LeftClickOn(toggle_bubble_button());
+  EXPECT_EQ(views::InkDropState::HIDDEN, ink_drop->GetTargetInkDropState());
+
+  // Close the bubble, inkdrop should still be hidden.
+  LeftClickOn(toggle_bubble_button());
+  EXPECT_EQ(views::InkDropState::HIDDEN, ink_drop->GetTargetInkDropState());
+}
+
 TEST_F(VideoConferenceTrayTest, TrayVisibility) {
   // We only show the tray when there are any running media app(s).
   VideoConferenceMediaState state;
@@ -264,12 +298,12 @@ TEST_F(VideoConferenceTrayTest, ToggleCameraButton) {
 
   // Click the button should mute the camera.
   LeftClickOn(camera_icon());
-  EXPECT_TRUE(controller()->camera_muted());
+  EXPECT_TRUE(controller()->GetCameraMuted());
   EXPECT_TRUE(camera_icon()->toggled());
 
   // Toggle again, should be unmuted.
   LeftClickOn(camera_icon());
-  EXPECT_FALSE(controller()->camera_muted());
+  EXPECT_FALSE(controller()->GetCameraMuted());
   EXPECT_FALSE(camera_icon()->toggled());
 }
 
@@ -280,12 +314,12 @@ TEST_F(VideoConferenceTrayTest, ToggleMicrophoneButton) {
 
   // Click the button should mute the microphone.
   LeftClickOn(audio_icon());
-  EXPECT_TRUE(controller()->microphone_muted());
+  EXPECT_TRUE(controller()->GetMicrophoneMuted());
   EXPECT_TRUE(audio_icon()->toggled());
 
   // Toggle again, should be unmuted.
   LeftClickOn(audio_icon());
-  EXPECT_FALSE(controller()->microphone_muted());
+  EXPECT_FALSE(controller()->GetMicrophoneMuted());
   EXPECT_FALSE(audio_icon()->toggled());
 }
 
@@ -420,7 +454,7 @@ TEST_F(VideoConferenceTrayTest, CameraButtonToggleAcrossDisplays) {
 
   // Mute the camera on the primary display.
   LeftClickOn(camera_icon());
-  ASSERT_TRUE(controller()->camera_muted());
+  ASSERT_TRUE(controller()->GetCameraMuted());
   ASSERT_TRUE(camera_icon()->toggled());
 
   // The secondary display camera icon should be toggled.
@@ -436,7 +470,7 @@ TEST_F(VideoConferenceTrayTest, CameraButtonToggleAcrossDisplays) {
 
   // The primary display camera icon should also not be toggled and the camera
   // should not be muted.
-  EXPECT_FALSE(controller()->camera_muted());
+  EXPECT_FALSE(controller()->GetCameraMuted());
   EXPECT_FALSE(camera_icon()->toggled());
 }
 
@@ -449,7 +483,7 @@ TEST_F(VideoConferenceTrayTest, AudioButtonToggleAcrossDisplays) {
 
   // Mute the audio on the primary display.
   LeftClickOn(audio_icon());
-  ASSERT_TRUE(controller()->microphone_muted());
+  ASSERT_TRUE(controller()->GetMicrophoneMuted());
   ASSERT_TRUE(audio_icon()->toggled());
 
   // The secondary display audio icon should be toggled.
@@ -464,7 +498,7 @@ TEST_F(VideoConferenceTrayTest, AudioButtonToggleAcrossDisplays) {
 
   // The primary display audio icon should also not be toggled and the audio
   // should not be muted.
-  EXPECT_FALSE(controller()->microphone_muted());
+  EXPECT_FALSE(controller()->GetMicrophoneMuted());
   EXPECT_FALSE(audio_icon()->toggled());
 }
 
@@ -520,6 +554,28 @@ TEST_F(VideoConferenceTrayTest, PrivacyIndicatorToggleAudioOnSecondaryDisplay) {
   LeftClickOn(secondary_audio_icon);
   ASSERT_TRUE(secondary_audio_icon->show_privacy_indicator());
   EXPECT_TRUE(audio_icon()->show_privacy_indicator());
+}
+
+// Tests that the tray is visible only in an active session.
+TEST_F(VideoConferenceTrayTest, SessionChanged) {
+  SetTrayAndButtonsVisible();
+
+  SetSessionState(session_manager::SessionState::OOBE);
+  EXPECT_FALSE(video_conference_tray()->GetVisible());
+
+  SetSessionState(session_manager::SessionState::LOGIN_PRIMARY);
+  EXPECT_FALSE(video_conference_tray()->GetVisible());
+
+  SetSessionState(session_manager::SessionState::ACTIVE);
+  EXPECT_TRUE(video_conference_tray()->GetVisible());
+
+  // Locks screen. The tray should be hidden.
+  SetSessionState(session_manager::SessionState::LOCKED);
+  EXPECT_FALSE(video_conference_tray()->GetVisible());
+
+  // Switches back to active. The tray should show.
+  SetSessionState(session_manager::SessionState::ACTIVE);
+  EXPECT_TRUE(video_conference_tray()->GetVisible());
 }
 
 }  // namespace ash

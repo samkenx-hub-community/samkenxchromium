@@ -163,6 +163,7 @@
 <translation id="2346474577291266260">Excellent (<ph name="SIGNAL_STRENGTH" />)</translation>
 <translation id="2359808026110333948">Continuer</translation>
 <translation id="2364498172489649528">Vérification réussie</translation>
+<translation id="2367335866686097760">Clé d'affectation des touches</translation>
 <translation id="2380886658946992094">Légal</translation>
 <translation id="2391082728065870591">Envoyer un rapport de commentaires</translation>
 <translation id="2407209115954268704">État de verrouillage de la carte SIM</translation>
@@ -235,10 +236,11 @@
 <translation id="319101249942218879">Image d'avatar changée</translation>
 <translation id="3192947282887913208">Fichiers audio</translation>
 <translation id="3199982728237701504">Chargeur de document (recto verso)</translation>
+<translation id="3211671540163313381">Pavé directionnel d'affectation des touches</translation>
 <translation id="3226405216343213872">Recherche de numériseurs en cours…</translation>
+<translation id="3226657629376379887">Menu des actions de mise en page</translation>
 <translation id="3246869037381808805">Les tâches d'impression de plus d'un jour seront retirées</translation>
 <translation id="3268178239013324452">Échec : porte de l'imprimante ouverte</translation>
-<translation id="3275506277319227640">Ancrer sur la <ph name="DIRECTION" /></translation>
 <translation id="3275729367986477355">Image d'avatar</translation>
 <translation id="3283504360622356314">{0,plural, =1{Modifier le fichier}one{Modifier le fichier}other{Modifier les fichiers}}</translation>
 <translation id="3286515922899063534"><ph name="CURRENT" /> GHz</translation>
@@ -357,7 +359,6 @@
 <translation id="4311195029067684288">Complet</translation>
 <translation id="4333390807948134856">Touche <ph name="KEY_NAME" /> enfoncée</translation>
 <translation id="435692326371619097">Gérez les paramètres de NPA du réseau. Les NPA établissent une connexion entre un réseau cellulaire et Internet. <ph name="BEGIN_LINK" />En savoir plus<ph name="END_LINK" /></translation>
-<translation id="4370033095251616914">Ancrer sur le plus petit côté</translation>
 <translation id="4378373042927530923">Routine non exécutée</translation>
 <translation id="4378551569595875038">Connexion...</translation>
 <translation id="4382484599443659549">PDF</translation>
@@ -616,6 +617,7 @@
 <translation id="650266656685499220">Pour créer des albums, servez-vous de Google Photos</translation>
 <translation id="6516990319416533844">Pour évaluer la vitesse de recharge de la pile, laissez votre pile se décharger pendant une courte période</translation>
 <translation id="6517239166834772319">Explorer</translation>
+<translation id="6526200165918397681">Fond d'écran assorti</translation>
 <translation id="6527081081771465939">Protocole de sécurité Wi-Fi inconnu</translation>
 <translation id="6535178685492749208">Vous êtes hors ligne. Les commentaires seront envoyés plus tard.</translation>
 <translation id="65587193855025101">À plat</translation>
@@ -802,6 +804,7 @@
 <translation id="8318753676953949627">Aucune image</translation>
 <translation id="8336739000755212683">Changer l'image du compte sur l'appareil</translation>
 <translation id="8347227221149377169">Tâches d'impression</translation>
+<translation id="8351855506390808906">Point de contact d'affectation des touches</translation>
 <translation id="8352772353338965963">Ajouter un compte à la connexion multicompte. Tous les comptes connectés sont accessibles sans mot de passe. Nous vous recommandons donc de n'utiliser cette fonctionnalité qu'avec des comptes fiables.</translation>
 <translation id="8364946094152050673">Le champ des serveurs de nom est vide</translation>
 <translation id="8372477600026034341">Hôtes supplémentaires</translation>
@@ -898,7 +901,7 @@
 <translation id="9137526406337347448">Services Google</translation>
 <translation id="9138630967333032450">Majuscule gauche</translation>
 <translation id="9149391708638971077">Exécuter le test de mémoire</translation>
-<translation id="9157515863513902090">Ancrer sur le plus grand côté</translation>
+<translation id="9161276708550942948">espace</translation>
 <translation id="9173638680043580060">Il reste moins d'une minute</translation>
 <translation id="917720651393141712">Test</translation>
 <translation id="9188992814426075118">Votre clavier peut automatiquement s'agencer à votre fond d'écran</translation>

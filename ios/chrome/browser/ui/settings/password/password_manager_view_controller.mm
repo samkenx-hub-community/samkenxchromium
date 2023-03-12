@@ -28,6 +28,7 @@
 #import "components/password_manager/core/common/password_manager_pref_names.h"
 #import "components/prefs/pref_service.h"
 #import "components/strings/grit/components_strings.h"
+#import "components/sync/base/features.h"
 #import "components/sync/driver/sync_service.h"
 #import "components/sync/driver/sync_service_utils.h"
 #import "components/sync/driver/sync_user_settings.h"
@@ -36,6 +37,7 @@
 #import "ios/chrome/browser/flags/system_flags.h"
 #import "ios/chrome/browser/main/browser.h"
 #import "ios/chrome/browser/net/crurl.h"
+#import "ios/chrome/browser/shared/ui/util/uikit_ui_util.h"
 #import "ios/chrome/browser/signin/chrome_account_manager_service_factory.h"
 #import "ios/chrome/browser/signin/chrome_account_manager_service_observer_bridge.h"
 #import "ios/chrome/browser/ui/elements/home_waiting_view.h"
@@ -74,7 +76,6 @@
 #import "ios/chrome/browser/ui/table_view/table_view_illustrated_empty_view.h"
 #import "ios/chrome/browser/ui/table_view/table_view_navigation_controller_constants.h"
 #import "ios/chrome/browser/ui/table_view/table_view_utils.h"
-#import "ios/chrome/browser/ui/util/uikit_ui_util.h"
 #import "ios/chrome/browser/url/chrome_url_constants.h"
 #import "ios/chrome/common/string_util.h"
 #import "ios/chrome/common/ui/colors/semantic_color_names.h"
@@ -146,6 +147,10 @@ bool IsPasswordCheckupEnabled() {
       password_manager::features::kIOSPasswordCheckup);
 }
 
+bool IsPasswordNotesWithBackupEnabled() {
+  return base::FeatureList::IsEnabled(syncer::kPasswordNotesWithBackup);
+}
+
 // Helper method to determine whether the Password Check cell is tappable or
 // not.
 bool IsPasswordCheckTappable(PasswordCheckUIState passwordCheckState) {
@@ -212,7 +217,8 @@ UIColor* GetPasswordCheckStatusTrailingImageTintColor(
     PasswordCheckUIState passwordCheckState) {
   switch (passwordCheckState) {
     case PasswordCheckStateUnmutedCompromisedPasswords:
-      return [UIColor colorNamed:kRedColor];
+      return [UIColor
+          colorNamed:IsPasswordGroupingEnabled() ? kRed500Color : kRedColor];
     case PasswordCheckStateReusedPasswords:
     case PasswordCheckStateWeakPasswords:
     case PasswordCheckStateDismissedWarnings:
@@ -329,12 +335,11 @@ UIColor* GetPasswordCheckStatusTrailingImageTintColor(
   // Shared password auto-fill status manager that contains the most updated
   // status of password auto-fill for Chrome.
   PasswordAutoFillStatusManager* _sharedPasswordAutoFillStatusManager;
-  // Boolean containing whether `self` should be updated after dismissing
-  // the Search Controller.
-  BOOL _shouldUpdateAfterSearchControllerDismissed;
   // Whether the table view is in search mode. That is, it only has the search
   // bar potentially saved passwords and blocked sites.
   BOOL _tableIsInSearchMode;
+  // Whether the favicon metric was already logged.
+  BOOL _faviconMetricLogged;
 }
 
 // Object handling passwords export operations.
@@ -519,8 +524,12 @@ UIColor* GetPasswordCheckStatusTrailingImageTintColor(
 - (void)viewWillDisappear:(BOOL)animated {
   [super viewWillDisappear:animated];
 
-  // Record favicons metrics only if the feature is enabled.
-  [self logMetricsForFavicons];
+  // viewWillDisappear is also called if you drag the sheet down then release
+  // without actually closing.
+  if (!_faviconMetricLogged) {
+    [self logMetricsForFavicons];
+    _faviconMetricLogged = YES;
+  }
 
   // Dismiss the search bar if presented; otherwise UIKit may retain it and
   // cause a memory leak. If this dismissal happens before viewWillDisappear
@@ -585,8 +594,7 @@ UIColor* GetPasswordCheckStatusTrailingImageTintColor(
   TableViewModel* model = self.tableViewModel;
 
   if (ShouldShowSettingsUI()) {
-    // Save passwords switch and manage account message. Only show this section
-    // when the searchController is not active.
+    // Don't show sections hidden when search controller is displayed.
     if (!_tableIsInSearchMode) {
       [model addSectionWithIdentifier:SectionIdentifierSavePasswordsSwitch];
 
@@ -602,61 +610,64 @@ UIColor* GetPasswordCheckStatusTrailingImageTintColor(
         [model addItem:_savePasswordsItem
             toSectionWithIdentifier:SectionIdentifierSavePasswordsSwitch];
       }
+
+      // Passwords in other apps.
+      [model addSectionWithIdentifier:SectionIdentifierPasswordsInOtherApps];
+      if (!_passwordsInOtherAppsItem) {
+        _passwordsInOtherAppsItem = [self passwordsInOtherAppsItem];
+      }
+      [model addItem:_passwordsInOtherAppsItem
+          toSectionWithIdentifier:SectionIdentifierPasswordsInOtherApps];
+    }
+  }
+
+  // Don't show sections hidden when search controller is displayed.
+  if (!_tableIsInSearchMode) {
+    // Password check.
+    [model addSectionWithIdentifier:SectionIdentifierPasswordCheck];
+    if (!_passwordProblemsItem) {
+      _passwordProblemsItem = [self passwordProblemsItem];
     }
 
-    // Passwords in other apps.
-    [model addSectionWithIdentifier:SectionIdentifierPasswordsInOtherApps];
-    if (!_passwordsInOtherAppsItem) {
-      _passwordsInOtherAppsItem = [self passwordsInOtherAppsItem];
-    }
-    [model addItem:_passwordsInOtherAppsItem
-        toSectionWithIdentifier:SectionIdentifierPasswordsInOtherApps];
-  }
-
-  // Password check.
-  [model addSectionWithIdentifier:SectionIdentifierPasswordCheck];
-  if (!_passwordProblemsItem) {
-    _passwordProblemsItem = [self passwordProblemsItem];
-  }
-
-  [self updatePasswordCheckStatusLabelWithState:_passwordCheckState];
-  [model addItem:_passwordProblemsItem
-      toSectionWithIdentifier:SectionIdentifierPasswordCheck];
-
-  if (!_checkForProblemsItem) {
-    _checkForProblemsItem = [self checkForProblemsItem];
-  }
-
-  [self updatePasswordCheckButtonWithState:_passwordCheckState];
-
-  // Only add check button if kIOSPasswordCheckup is disabled, or if it is
-  // enabled and the current PasswordCheckUIState requires the button to be
-  // shown.
-  if (!IsPasswordCheckupEnabled() || self.shouldShowCheckButton) {
-    [model addItem:_checkForProblemsItem
+    [self updatePasswordCheckStatusLabelWithState:_passwordCheckState];
+    [model addItem:_passwordProblemsItem
         toSectionWithIdentifier:SectionIdentifierPasswordCheck];
-  }
 
-  // When the Password Checkup feature is enabled, this timestamp only appears
-  // in the detail text of the Password Checkup status cell. It is therefore
-  // managed in `updatePasswordCheckStatusLabelWithState`.
-  if (!IsPasswordCheckupEnabled()) {
-    [self updateLastCheckTimestampWithState:_passwordCheckState
-                                  fromState:_passwordCheckState
-                                     update:NO];
-  }
+    if (!_checkForProblemsItem) {
+      _checkForProblemsItem = [self checkForProblemsItem];
+    }
 
-  // On-device encryption.
-  [self updateOnDeviceEncryptionSessionWithUpdateTableView:NO
-                                          withRowAnimation:
-                                              UITableViewRowAnimationNone];
+    [self updatePasswordCheckButtonWithState:_passwordCheckState];
 
-  // Add Password button.
-  if (!ShouldShowSettingsUI() && [self allowsAddPassword]) {
-    [model addSectionWithIdentifier:SectionIdentifierAddPasswordButton];
-    _addPasswordItem = [self addPasswordItem];
-    [model addItem:_addPasswordItem
-        toSectionWithIdentifier:SectionIdentifierAddPasswordButton];
+    // Only add check button if kIOSPasswordCheckup is disabled, or if it is
+    // enabled and the current PasswordCheckUIState requires the button to be
+    // shown.
+    if (!IsPasswordCheckupEnabled() || self.shouldShowCheckButton) {
+      [model addItem:_checkForProblemsItem
+          toSectionWithIdentifier:SectionIdentifierPasswordCheck];
+    }
+
+    // When the Password Checkup feature is enabled, this timestamp only appears
+    // in the detail text of the Password Checkup status cell. It is therefore
+    // managed in `updatePasswordCheckStatusLabelWithState`.
+    if (!IsPasswordCheckupEnabled()) {
+      [self updateLastCheckTimestampWithState:_passwordCheckState
+                                    fromState:_passwordCheckState
+                                       update:NO];
+    }
+
+    // On-device encryption.
+    [self updateOnDeviceEncryptionSessionWithUpdateTableView:NO
+                                            withRowAnimation:
+                                                UITableViewRowAnimationNone];
+
+    // Add Password button.
+    if (!ShouldShowSettingsUI() && [self allowsAddPassword]) {
+      [model addSectionWithIdentifier:SectionIdentifierAddPasswordButton];
+      _addPasswordItem = [self addPasswordItem];
+      [model addItem:_addPasswordItem
+          toSectionWithIdentifier:SectionIdentifierAddPasswordButton];
+    }
   }
 
   // Saved passwords.
@@ -689,14 +700,16 @@ UIColor* GetPasswordCheckStatusTrailingImageTintColor(
         toSectionWithIdentifier:SectionIdentifierExportPasswordsButton];
   }
 
-  // Add the descriptive text at the top of the screen. Do this at the end to
-  // ensure the section to which it's being attached already exists.
+  // Add the descriptive text at the top of the screen. The section for this
+  // header is not visible in while in search mode. Adding it to the model only
+  // when not in search mode.
   _manageAccountLinkItem = [self manageAccountLinkItem];
-  [model setHeader:_manageAccountLinkItem
-      forSectionWithIdentifier:[self sectionForManageAccountLinkHeader]];
+  if (!_tableIsInSearchMode) {
+    [model setHeader:_manageAccountLinkItem
+        forSectionWithIdentifier:[self sectionForManageAccountLinkHeader]];
+  }
 
   [self filterItems:self.searchTerm];
-  _tableIsInSearchMode = NO;
 }
 
 // Returns YES if the array of index path contains a saved password. This is to
@@ -1013,7 +1026,7 @@ UIColor* GetPasswordCheckStatusTrailingImageTintColor(
   TableViewLinkHeaderFooterItem* footerItem =
       [[TableViewLinkHeaderFooterItem alloc]
           initWithType:ItemTypeLastCheckTimestampFooter];
-  footerItem.text = [self.delegate formatElapsedTimeSinceLastCheck];
+  footerItem.text = [self.delegate formattedElapsedTimeSinceLastCheck];
   return footerItem;
 }
 
@@ -1359,8 +1372,13 @@ UIColor* GetPasswordCheckStatusTrailingImageTintColor(
         _sharedPasswordAutoFillStatusManager.autoFillEnabled
             ? l10n_util::GetNSString(IDS_IOS_SETTING_ON)
             : l10n_util::GetNSString(IDS_IOS_SETTING_OFF);
-    [self reloadCellsForItems:@[ _passwordsInOtherAppsItem ]
-             withRowAnimation:UITableViewRowAnimationNone];
+
+    // Item is only visible when search is not active.
+    // Only update corresponding cell when visible.
+    if (!_tableIsInSearchMode) {
+      [self reloadCellsForItems:@[ _passwordsInOtherAppsItem ]
+               withRowAnimation:UITableViewRowAnimationNone];
+    }
   }
 }
 
@@ -1388,7 +1406,6 @@ UIColor* GetPasswordCheckStatusTrailingImageTintColor(
   self.navigationController.navigationBar.backgroundColor =
       [UIColor colorNamed:kGroupedPrimaryBackgroundColor];
 
-  _shouldUpdateAfterSearchControllerDismissed = YES;
   [self showScrim];
   // Remove save passwords switch section, password check section and
   // on device encryption.
@@ -1426,14 +1443,9 @@ UIColor* GetPasswordCheckStatusTrailingImageTintColor(
 
   // No need to restore UI if the Password Manager is being dismissed or if a
   // previous call to `willDismissSearchController` already restored the UI.
-  if (self.navigationController.isBeingDismissed ||
-      !_shouldUpdateAfterSearchControllerDismissed) {
+  if (self.navigationController.isBeingDismissed || !_tableIsInSearchMode) {
     return;
   }
-  // If `willDismissSearchController` is invoked again before the search
-  // controller is presented, we don't want to do any updates because they are
-  // only needed once the search controller is presented and dismissed again.
-  _shouldUpdateAfterSearchControllerDismissed = NO;
 
   [self hideScrim];
   [self searchForTerm:@""];
@@ -1769,11 +1781,13 @@ UIColor* GetPasswordCheckStatusTrailingImageTintColor(
       [self.tableViewModel setFooter:nil
             forSectionWithIdentifier:SectionIdentifierPasswordCheck];
       break;
-    // TODO(crbug.com/1406540): Handle weak/reused/dismissed states
+    // These states only occur when the kIOSPasswordCheckup feature is enabled
+    // and the last check timestamp footer item is only shown when
+    // kIOSPasswordCheckup feature is disabled. These should never be reached.
     case PasswordCheckStateReusedPasswords:
     case PasswordCheckStateWeakPasswords:
     case PasswordCheckStateDismissedWarnings:
-      break;
+      NOTREACHED_NORETURN();
   }
   if (update) {
     [self.tableView
@@ -1932,7 +1946,7 @@ UIColor* GetPasswordCheckStatusTrailingImageTintColor(
     case PasswordCheckStateSafe: {
       _passwordProblemsItem.detailText =
           IsPasswordCheckupEnabled()
-              ? [self.delegate formatElapsedTimeSinceLastCheck]
+              ? [self.delegate formattedElapsedTimeSinceLastCheck]
               : base::SysUTF16ToNSString(l10n_util::GetPluralStringFUTF16(
                     IDS_IOS_CHECK_PASSWORDS_COMPROMISED_COUNT, 0));
       break;
@@ -2219,6 +2233,8 @@ UIColor* GetPasswordCheckStatusTrailingImageTintColor(
 
 // Logs metrics related to favicons for the Password Manager.
 - (void)logMetricsForFavicons {
+  DCHECK(!_faviconMetricLogged);
+
   int n_monograms = 0;
   int n_images = 0;
   std::vector sections_and_types = {
@@ -2412,6 +2428,21 @@ UIColor* GetPasswordCheckStatusTrailingImageTintColor(
                               sectionIdentifier:SectionIdentifierPasswordCheck];
 }
 
+- (void)showDetailedViewPageForItem:(TableViewItem*)item {
+  if (IsPasswordGroupingEnabled()) {
+    [self.handler
+        showDetailedViewForAffiliatedGroup:base::mac::ObjCCastStrict<
+                                               AffiliatedGroupTableViewItem>(
+                                               item)
+                                               .affiliatedGroup];
+  } else {
+    [self.handler
+        showDetailedViewForCredential:base::mac::ObjCCastStrict<
+                                          CredentialTableViewItem>(item)
+                                          .credential];
+  }
+}
+
 #pragma mark - UITableViewDelegate
 
 - (void)tableView:(UITableView*)tableView
@@ -2439,17 +2470,30 @@ UIColor* GetPasswordCheckStatusTrailingImageTintColor(
       DCHECK_EQ(SectionIdentifierSavedPasswords,
                 [model sectionIdentifierForSectionIndex:indexPath.section]);
       TableViewItem* item = [model itemAtIndexPath:indexPath];
-      if (IsPasswordGroupingEnabled()) {
-        [self.handler
-            showDetailedViewForAffiliatedGroup:
-                base::mac::ObjCCastStrict<AffiliatedGroupTableViewItem>(item)
-                    .affiliatedGroup];
+
+      if (!IsPasswordNotesWithBackupEnabled()) {
+        [self showDetailedViewPageForItem:item];
+      } else if ([self.reauthenticationModule canAttemptReauth]) {
+        void (^showPasswordDetailsHandler)(ReauthenticationResult) =
+            ^(ReauthenticationResult result) {
+              if (result == ReauthenticationResult::kFailure) {
+                return;
+              }
+
+              [self showDetailedViewPageForItem:item];
+            };
+
+        [self.reauthenticationModule
+            attemptReauthWithLocalizedReason:
+                l10n_util::GetNSString(
+                    IDS_IOS_SETTINGS_PASSWORD_REAUTH_REASON_SHOW)
+                        canReusePreviousAuth:YES
+                                     handler:showPasswordDetailsHandler];
       } else {
-        [self.handler
-            showDetailedViewForCredential:base::mac::ObjCCastStrict<
-                                              CredentialTableViewItem>(item)
-                                              .credential];
+        DCHECK(self.handler);
+        [self.handler showSetupPasscodeDialog];
       }
+
       break;
     }
     case ItemTypeBlocked: {

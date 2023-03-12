@@ -12,6 +12,7 @@
 
 #include "base/check.h"
 #include "base/containers/contains.h"
+#include "base/functional/bind.h"
 #include "base/memory/raw_ptr.h"
 #include "base/ranges/algorithm.h"
 #include "base/strings/strcat.h"
@@ -249,7 +250,7 @@ void AdAuctionServiceImpl::RunAdAuction(
       // Unlike other callbacks, this needs to be safe to call after destruction
       // of the AdAuctionServiceImpl, so that the reporter can outlive it.
       base::BindRepeating(
-          &AdAuctionServiceImpl::MaybeLogPrivateAggregationFeature,
+          &AdAuctionServiceImpl::MaybeLogPrivateAggregationFeatures,
           weak_ptr_factory_.GetWeakPtr()),
       config, main_frame_origin_, origin(), GetClientSecurityState(),
       GetRefCountedTrustedURLLoaderFactory(),
@@ -258,7 +259,8 @@ void AdAuctionServiceImpl::RunAdAuction(
       std::move(abort_receiver),
       base::BindOnce(&AdAuctionServiceImpl::OnAuctionComplete,
                      base::Unretained(this), std::move(callback),
-                     std::move(urn_uuid.value())));
+                     std::move(urn_uuid.value()),
+                     base::Unretained(&fenced_frame_urls_map)));
   AuctionRunner* raw_auction = auction.get();
   auctions_.emplace(raw_auction, std::move(auction));
 }
@@ -521,11 +523,12 @@ bool AdAuctionServiceImpl::IsInterestGroupAPIAllowed(
 void AdAuctionServiceImpl::OnAuctionComplete(
     RunAdAuctionCallback callback,
     GURL urn_uuid,
+    const FencedFrameURLMapping* fenced_frame_urls_map,
     AuctionRunner* auction,
     bool manually_aborted,
     absl::optional<blink::InterestGroupKey> winning_group_key,
-    absl::optional<GURL> render_url,
-    std::vector<GURL> ad_component_urls,
+    absl::optional<blink::AdDescriptor> ad_descriptor,
+    std::vector<blink::AdDescriptor> ad_component_descriptors,
     std::vector<std::string> errors,
     std::unique_ptr<InterestGroupAuctionReporter> reporter) {
   // Remove `auction` from `auctions_` but temporarily keep it alive - on
@@ -547,7 +550,7 @@ void AdAuctionServiceImpl::OnAuctionComplete(
   auto* auction_result_metrics =
       AdAuctionResultMetrics::GetForPage(render_frame_host().GetPage());
 
-  if (!render_url) {
+  if (!ad_descriptor) {
     DCHECK(!reporter);
 
     std::move(callback).Run(manually_aborted, /*config=*/absl::nullopt);
@@ -565,15 +568,17 @@ void AdAuctionServiceImpl::OnAuctionComplete(
   }
 
   DCHECK(reporter);
-  // Should always be present with a render_url.
+  // Should always be present with a ad_descriptor->url.
   DCHECK(winning_group_key);
-  DCHECK(blink::IsValidFencedFrameURL(*render_url));
+  DCHECK(blink::IsValidFencedFrameURL(ad_descriptor->url));
   DCHECK(urn_uuid.is_valid());
 
   content::AdAuctionData ad_auction_data{winning_group_key->owner,
                                          winning_group_key->name};
-  FencedFrameURLMapping& fenced_frame_urls_map =
+  FencedFrameURLMapping& current_fenced_frame_urls_map =
       GetFrame()->GetPage().fenced_frame_urls_map();
+  // The auction must operate on the same fenced frame mapping.
+  CHECK_EQ(fenced_frame_urls_map, &current_fenced_frame_urls_map);
 
   // Set up reporting for any fenced frame that's navigated to the winning bid's
   // URL. Use a URLLoaderFactory that will automatically reconnect on network
@@ -584,9 +589,9 @@ void AdAuctionServiceImpl::OnAuctionComplete(
           ->GetURLLoaderFactoryForBrowserProcess();
 
   blink::FencedFrame::RedactedFencedFrameConfig config =
-      fenced_frame_urls_map.AssignFencedFrameURLAndInterestGroupInfo(
-          urn_uuid, *render_url, std::move(ad_auction_data),
-          reporter->OnNavigateToWinningAdCallback(), ad_component_urls,
+      current_fenced_frame_urls_map.AssignFencedFrameURLAndInterestGroupInfo(
+          urn_uuid, *ad_descriptor, std::move(ad_auction_data),
+          reporter->OnNavigateToWinningAdCallback(), ad_component_descriptors,
           reporter->fenced_frame_reporter());
   std::move(callback).Run(/*manually_aborted=*/false, std::move(config));
 
@@ -621,16 +626,28 @@ void AdAuctionServiceImpl::OnReporterComplete(
   reporters_.erase(reporter_it);
 }
 
-void AdAuctionServiceImpl::MaybeLogPrivateAggregationFeature(
-    const std::map<
-        url::Origin,
-        std::vector<auction_worklet::mojom::PrivateAggregationRequestPtr>>&
+void AdAuctionServiceImpl::MaybeLogPrivateAggregationFeatures(
+    const std::vector<auction_worklet::mojom::PrivateAggregationRequestPtr>&
         private_aggregation_requests) {
   // TODO(crbug.com/1356654): Improve coverage of these use counters, i.e.
   // for API usage that does not result in a successful request.
-  // TODO(crbug.com/1410322): Use separate use counters for SendHistogram() and
-  // reportContributionForEvent().
-  if (!private_aggregation_requests.empty()) {
+  if (private_aggregation_requests.empty()) {
+    return;
+  }
+
+  if (!has_logged_extended_private_aggregation_web_feature_ &&
+      base::ranges::any_of(
+          private_aggregation_requests, [](const auto& request) {
+            return request->contribution->is_for_event_contribution();
+          })) {
+    has_logged_extended_private_aggregation_web_feature_ = true;
+    GetContentClient()->browser()->LogWebFeatureForCurrentPage(
+        &render_frame_host(),
+        blink::mojom::WebFeature::kPrivateAggregationApiFledgeExtensions);
+  }
+
+  if (!has_logged_private_aggregation_web_features_) {
+    has_logged_private_aggregation_web_features_ = true;
     GetContentClient()->browser()->LogWebFeatureForCurrentPage(
         &render_frame_host(),
         blink::mojom::WebFeature::kPrivateAggregationApiAll);

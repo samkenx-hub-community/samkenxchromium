@@ -31,7 +31,7 @@ import logging
 import optparse
 import re
 from collections import defaultdict
-from typing import ClassVar
+from typing import ClassVar, List, Optional
 
 from blinkpy.common import message_pool
 from blinkpy.common.path_finder import WEB_TESTS_LAST_COMPONENT
@@ -457,8 +457,10 @@ class AbstractParallelRebaselineCommand(AbstractRebaseliningCommand):
 
         return copy_baseline_commands, rebaseline_commands, lines_to_remove
 
-    def _optimize_command(self, test_baseline_set, verbose=False):
-        """Returns a list of commands to run in parallel to de-duplicate baselines."""
+    def _optimize_command(self,
+                          test_baseline_set,
+                          verbose=False) -> Optional[List[str]]:
+        """Return a command to de-duplicate baselines, if possible."""
         test_set = set()
         baseline_subset = self._filter_baseline_set_builders(test_baseline_set)
         for test, build, step_name, _ in baseline_subset:
@@ -478,6 +480,8 @@ class AbstractParallelRebaselineCommand(AbstractRebaseliningCommand):
             if port.lookup_virtual_test_base(test) in test_set
         ])
         test_set -= virtual_tests_to_exclude
+        if not test_set:
+            return None
 
         command = [
             self._tool.path(),
@@ -591,7 +595,8 @@ class AbstractParallelRebaselineCommand(AbstractRebaseliningCommand):
             else:
                 optimize_command = self._optimize_command(
                     test_baseline_set, options.verbose)
-                exit_code = exit_code or self._tool.main(optimize_command)
+                if optimize_command:
+                    exit_code = exit_code or self._tool.main(optimize_command)
 
         if not self._dry_run:
             self._tool.git().add_list(self.unstaged_baselines())
@@ -605,26 +610,6 @@ class AbstractParallelRebaselineCommand(AbstractRebaseliningCommand):
         return sorted(self._tool.git().absolute_path(path)
                       for path in unstaged_changes
                       if re.match(baseline_re, path))
-
-    def _generic_baseline_paths(self, test_baseline_set):
-        """Returns absolute paths for generic baselines for the given tests.
-
-        Even when a test does not have a generic baseline, the path where it
-        would be is still included in the return value.
-        """
-        filesystem = self._tool.filesystem
-        baseline_paths = []
-        for test in test_baseline_set.all_tests():
-            filenames = [
-                self._file_name_for_expected_result(test, suffix)
-                for suffix in BASELINE_SUFFIX_LIST
-            ]
-            baseline_paths += [
-                filesystem.join(self._web_tests_dir(), filename)
-                for filename in filenames
-            ]
-        baseline_paths.sort()
-        return baseline_paths
 
     def _web_tests_dir(self):
         return self._tool.port_factory.get().web_tests_dir()

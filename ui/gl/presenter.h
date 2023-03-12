@@ -17,14 +17,11 @@
 #include "ui/gfx/swap_result.h"
 #include "ui/gl/gl_export.h"
 
-// This temporary for OverlayImage and FrameData.
-#include "ui/gl/gl_surface.h"
-
 #if BUILDFLAG(IS_OZONE)
 #include "ui/gfx/native_pixmap.h"
 #endif
 
-#if BUILDFLAG(IS_MAC)
+#if BUILDFLAG(IS_APPLE)
 #include "ui/gfx/mac/io_surface.h"
 #endif
 
@@ -33,6 +30,9 @@
 #endif
 
 namespace gfx {
+namespace mojom {
+class DelegatedInkPointRenderer;
+}  // namespace mojom
 class ColorSpace;
 class GpuFence;
 struct OverlayPlaneData;
@@ -43,6 +43,19 @@ struct CARendererLayerParams;
 }  // namespace ui
 
 namespace gl {
+struct DCLayerOverlayParams;
+
+// OverlayImage is a platform specific type for overlay plane image data.
+#if BUILDFLAG(IS_OZONE)
+using OverlayImage = scoped_refptr<gfx::NativePixmap>;
+#elif BUILDFLAG(IS_APPLE)
+using OverlayImage = gfx::ScopedIOSurface;
+#elif BUILDFLAG(IS_ANDROID)
+using OverlayImage =
+    std::unique_ptr<base::android::ScopedHardwareBufferFenceSync>;
+#else
+struct OverlayImage {};
+#endif
 
 // Provides an abstraction around system api for presentation of the overlay
 // planes and control presentations parameters (e.g frame rate). Temporarily is
@@ -63,7 +76,6 @@ class GL_EXPORT Presenter : public base::RefCounted<Presenter> {
 
   Presenter();
 
-  virtual bool SupportsCommitOverlayPlanes();
   virtual bool SupportsOverridePlatformSize() const;
   virtual bool SupportsViewporter() const;
   virtual bool SupportsPlaneGpuFences() const;
@@ -71,8 +83,6 @@ class GL_EXPORT Presenter : public base::RefCounted<Presenter> {
   virtual bool SupportsGpuVSync() const;
   virtual void SetGpuVSyncEnabled(bool enabled) {}
   virtual void SetVSyncDisplayID(int64_t display_id) {}
-
-  virtual bool OnMakeCurrent(GLContext* context);
 
   // Resizes the presenter, returning success.
   virtual bool Resize(const gfx::Size& size,

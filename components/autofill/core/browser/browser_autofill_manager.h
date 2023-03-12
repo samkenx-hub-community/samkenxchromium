@@ -721,6 +721,11 @@ class BrowserAutofillManager : public AutofillManager,
   // destruction time (whatever comes first).
   void LogEventCountsUMAMetric(const FormStructure& form_structure);
 
+  // When the forms that meet certain criteria are identified as useless to
+  // Autofill, the function should return false and the forms are not recorded
+  // into UKM.
+  bool ShouldUploadUKM(const FormStructure& form_structure);
+
   // Delegates to perform external processing (display, selection) on
   // our behalf.
   std::unique_ptr<AutofillExternalDelegate> external_delegate_;
@@ -729,9 +734,13 @@ class BrowserAutofillManager : public AutofillManager,
   std::string app_locale_;
 
   // The personal data manager, used to save and load personal data to/from the
-  // web database.  This is overridden by the BrowserAutofillManagerTest.
+  // web database. Set when this BrowserAutofillManager is initialized. This is
+  // overridden by the BrowserAutofillManagerTest.
   // Weak reference.
-  // May be NULL.  NULL indicates OTR.
+  // May be nullptr. Nullptr indicates that we are on an unsupported platform,
+  // for example android webview.
+  // In OTR mode, on supported platforms, `personal_data_` will represent the
+  // original profile's PersonalDataManager.
   raw_ptr<PersonalDataManager> personal_data_;
 
   // Used to help fill data into fields.

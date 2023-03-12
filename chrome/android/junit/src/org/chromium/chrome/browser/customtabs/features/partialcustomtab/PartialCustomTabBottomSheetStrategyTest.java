@@ -19,6 +19,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.robolectric.Shadows.shadowOf;
 
+import static org.chromium.chrome.browser.customtabs.features.partialcustomtab.PartialCustomTabBottomSheetStrategy.BOTTOM_SHEET_MAX_WIDTH_DP_LANDSCAPE;
 import static org.chromium.chrome.browser.customtabs.features.partialcustomtab.PartialCustomTabTestRule.DEVICE_HEIGHT;
 import static org.chromium.chrome.browser.customtabs.features.partialcustomtab.PartialCustomTabTestRule.DEVICE_WIDTH;
 import static org.chromium.chrome.browser.customtabs.features.partialcustomtab.PartialCustomTabTestRule.FULL_HEIGHT;
@@ -52,7 +53,7 @@ import org.robolectric.shadows.ShadowLooper;
 
 import org.chromium.base.test.BaseRobolectricTestRunner;
 import org.chromium.base.test.util.DisableIf;
-import org.chromium.base.test.util.MetricsUtils.HistogramDelta;
+import org.chromium.base.test.util.HistogramWatcher;
 import org.chromium.chrome.R;
 import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.multiwindow.MultiWindowUtils;
@@ -582,7 +583,8 @@ public class PartialCustomTabBottomSheetStrategyTest {
         assertEquals(1, mPCCTTestRule.mAttributeResults.size());
         assertTabIsAtInitialPos(mPCCTTestRule.mAttributeResults.get(0));
         int expected = PartialCustomTabBottomSheetStrategy.ResizeType.AUTO_EXPANSION;
-        HistogramDelta histogramExpansion = new HistogramDelta("CustomTabs.ResizeType2", expected);
+        var histogramExpansion =
+                HistogramWatcher.newSingleRecordWatcher("CustomTabs.ResizeType2", expected);
 
         strategy.onShowSoftInput(() -> {});
         shadowOf(Looper.getMainLooper()).idle();
@@ -593,8 +595,7 @@ public class PartialCustomTabBottomSheetStrategyTest {
 
         // Verify that the tab expands to full height.
         assertTabIsFullHeight(mPCCTTestRule.mAttributeResults.get(length - 1));
-        assertEquals("ResizeType.AUTO_EXPANSION should be recorded once.", 1,
-                histogramExpansion.getDelta());
+        histogramExpansion.assertExpected("ResizeType.AUTO_EXPANSION should be recorded once.");
         PartialCustomTabTestRule.waitForAnimationToFinish();
         verify(mPCCTTestRule.mOnResizedCallback).onResized(eq(FULL_HEIGHT), anyInt());
     }
@@ -773,14 +774,14 @@ public class PartialCustomTabBottomSheetStrategyTest {
         PartialCustomTabHandleStrategy handleStrategy = strategy.createHandleStrategyForTesting();
 
         int expected = PartialCustomTabBottomSheetStrategy.ResizeType.MANUAL_EXPANSION;
-        HistogramDelta histogramExpansion = new HistogramDelta("CustomTabs.ResizeType2", expected);
+        var histogramExpansion =
+                HistogramWatcher.newSingleRecordWatcher("CustomTabs.ResizeType2", expected);
 
         // Drag to the top.
         assertTabIsFullHeight(dragTab(handleStrategy, 1500, 1000, 0));
 
         // invokeResizeCallback() should have been called and MANUAL_EXPANSION logged once.
-        assertEquals("ResizeType.MANUAL_EXPANSION should be recorded once.", 1,
-                histogramExpansion.getDelta());
+        histogramExpansion.assertExpected("ResizeType.MANUAL_EXPANSION should be recorded once.");
     }
 
     @Test
@@ -798,15 +799,15 @@ public class PartialCustomTabBottomSheetStrategyTest {
         assertTabIsFullHeight(dragTab(handleStrategy, 1500, 1000, 0));
 
         int expected = PartialCustomTabBottomSheetStrategy.ResizeType.MANUAL_MINIMIZATION;
-        HistogramDelta histogramMinimization =
-                new HistogramDelta("CustomTabs.ResizeType2", expected);
+        var histogramExpansion =
+                HistogramWatcher.newSingleRecordWatcher("CustomTabs.ResizeType2", expected);
 
         // Drag down enough -> slide to the initial position.
         assertTabIsAtInitialPos(dragTab(handleStrategy, 50, 650, 1300));
 
         // invokeResizeCallback() should have been called and MANUAL_MINIMIZATION logged once.
-        assertEquals("ResizeType.MANUAL_MINIMIZATION should be recorded once.", 1,
-                histogramMinimization.getDelta());
+        histogramExpansion.assertExpected(
+                "ResizeType.MANUAL_MINIMIZATION should be recorded once.");
     }
 
     @Test
@@ -1002,7 +1003,7 @@ public class PartialCustomTabBottomSheetStrategyTest {
 
     @Test
     @Features.EnableFeatures({ChromeFeatureList.CCT_RESIZABLE_SIDE_SHEET})
-    public void sideShadowsWithMaxWidthBottomSheet() {
+    public void sideShadowsWith900dpBottomSheet() {
         doReturn(8)
                 .when(mPCCTTestRule.mResources)
                 .getDimensionPixelSize(eq(R.dimen.custom_tabs_shadow_offset));
@@ -1027,29 +1028,85 @@ public class PartialCustomTabBottomSheetStrategyTest {
     }
 
     @Test
+    @Features.EnableFeatures({ChromeFeatureList.CCT_RESIZABLE_SIDE_SHEET})
+    public void noTopShadowFullHeightBottomSheet() {
+        doReturn(8)
+                .when(mPCCTTestRule.mResources)
+                .getDimensionPixelSize(eq(R.dimen.custom_tabs_shadow_offset));
+
+        mPCCTTestRule.configPortraitMode();
+        PartialCustomTabBottomSheetStrategy strategy = createPcctAtHeight(3000);
+        PartialCustomTabHandleStrategy handleStrategy = strategy.createHandleStrategyForTesting();
+        assertEquals("Top margin should be zero because there is no shadow", 0,
+                mPCCTTestRule.mLayoutParams.topMargin);
+
+        mPCCTTestRule.configLandscapeMode();
+        strategy = createPcctAtHeight(3000);
+        handleStrategy = strategy.createHandleStrategyForTesting();
+        assertEquals("Top margin should be zero because there is no shadow", 0,
+                mPCCTTestRule.mLayoutParams.topMargin);
+    }
+
+    @Test
+    @Features.EnableFeatures({ChromeFeatureList.CCT_RESIZABLE_SIDE_SHEET})
+    public void largeDeviceInPortrait_screenWidth() {
+        doReturn(8)
+                .when(mPCCTTestRule.mResources)
+                .getDimensionPixelSize(eq(R.dimen.custom_tabs_shadow_offset));
+        mPCCTTestRule.configPortraitMode();
+        mPCCTTestRule.mRealMetrics.widthPixels = 6000;
+        mPCCTTestRule.mRealMetrics.heightPixels = 9500;
+        createPcctAtHeight(5000);
+        assertEquals("Left margin should be zero because there is no shadow", 0,
+                mPCCTTestRule.mLayoutParams.leftMargin);
+        assertEquals("Right margin should be zero because there is no shadow", 0,
+                mPCCTTestRule.mLayoutParams.rightMargin);
+        assertEquals(
+                "Bottom sheet width should be the screen width", 6000, getWindowAttributes().width);
+    }
+
+    @Test
+    @Features.EnableFeatures({ChromeFeatureList.CCT_RESIZABLE_SIDE_SHEET})
+    public void largeDeviceInLandscape_900dpWidth() {
+        doReturn(8)
+                .when(mPCCTTestRule.mResources)
+                .getDimensionPixelSize(eq(R.dimen.custom_tabs_shadow_offset));
+        mPCCTTestRule.configLandscapeMode();
+        mPCCTTestRule.mRealMetrics.widthPixels = 9500;
+        mPCCTTestRule.mRealMetrics.heightPixels = 6000;
+        createPcctAtHeight(5000);
+        assertNotEquals("Left margin should not be zero because there is a shadow", 0,
+                mPCCTTestRule.mLayoutParams.leftMargin);
+        assertNotEquals("Right margin should not be zero because there is a shadow", 0,
+                mPCCTTestRule.mLayoutParams.rightMargin);
+        assertEquals("Bottom sheet width should be 900dp", BOTTOM_SHEET_MAX_WIDTH_DP_LANDSCAPE,
+                getWindowAttributes().width);
+    }
+
+    @Test
     public void expandToFullHeightOnFindInPage() {
         PartialCustomTabBottomSheetStrategy strategy = createPcctAtHeight(800);
         doReturn(mPCCTTestRule.mDragBarBackground).when(mPCCTTestRule.mDragBar).getBackground();
         int expected = PartialCustomTabBottomSheetStrategy.ResizeType.AUTO_EXPANSION;
-        HistogramDelta histogramExpansion = new HistogramDelta("CustomTabs.ResizeType2", expected);
+        var histogramExpansion =
+                HistogramWatcher.newSingleRecordWatcher("CustomTabs.ResizeType2", expected);
         strategy.onFindToolbarShown();
         PartialCustomTabTestRule.waitForAnimationToFinish();
 
         assertTabIsFullHeight(getWindowAttributes());
-        assertEquals("ResizeType.AUTO_EXPANSION should be recorded once.", 1,
-                histogramExpansion.getDelta());
+        histogramExpansion.assertExpected("ResizeType.AUTO_EXPANSION should be recorded once.");
         verify(mPCCTTestRule.mOnResizedCallback).onResized(eq(FULL_HEIGHT), anyInt());
         clearInvocations(mPCCTTestRule.mOnResizedCallback);
 
         expected = PartialCustomTabBottomSheetStrategy.ResizeType.AUTO_MINIMIZATION;
-        HistogramDelta histogramMinimization =
-                new HistogramDelta("CustomTabs.ResizeType2", expected);
+        var histogramMinimization =
+                HistogramWatcher.newSingleRecordWatcher("CustomTabs.ResizeType2", expected);
         strategy.onFindToolbarHidden();
         PartialCustomTabTestRule.waitForAnimationToFinish();
 
         assertTabIsAtInitialPos(getWindowAttributes());
-        assertEquals("ResizeType.AUTO_MINIMIZATION should be recorded once.", 1,
-                histogramMinimization.getDelta());
+        histogramMinimization.assertExpected(
+                "ResizeType.AUTO_MINIMIZATION should be recorded once.");
         verify(mPCCTTestRule.mOnResizedCallback).onResized(eq(INITIAL_HEIGHT), anyInt());
     }
 }

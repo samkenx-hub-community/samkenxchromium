@@ -6,6 +6,7 @@
 
 #include <string>
 
+#include "base/time/time.h"
 #include "base/trace_event/trace_event.h"
 #include "build/branding_buildflags.h"
 #include "build/build_config.h"
@@ -502,6 +503,10 @@
 #include "ui/color/system_theme.h"
 #endif
 
+#if BUILDFLAG(IS_CHROMEOS_ASH)
+#include "chrome/browser/ash/wallpaper_handlers/wallpaper_prefs.h"
+#endif
+
 namespace {
 
 // Please keep the list of deprecated prefs in chronological order. i.e. Add to
@@ -806,6 +811,12 @@ const char kEasyUnlockLocalStateTpmKeys[] = "easy_unlock.public_tpm_keys";
 const char kGoogleSearchDomainMixingMetricsEmitterLastMetricsTime[] =
     "browser.last_google_search_domain_mixing_metrics_time";
 
+// Deprecated 03/2023
+#if BUILDFLAG(IS_CHROMEOS_ASH)
+const char kGlanceablesSignoutScreenshotDuration[] =
+    "ash.signout_screenshot.duration";
+#endif  // BUILDFLAG(IS_CHROMEOS_ASH)
+
 // Register local state used only for migration (clearing or moving to a new
 // key).
 void RegisterLocalStatePrefsForMigration(PrefRegistrySimple* registry) {
@@ -891,6 +902,12 @@ void RegisterLocalStatePrefsForMigration(PrefRegistrySimple* registry) {
 // Deprecated 02/2023.
 #if BUILDFLAG(IS_CHROMEOS_ASH)
   registry->RegisterDictionaryPref(kEasyUnlockLocalStateTpmKeys);
+#endif  // BUILDFLAG(IS_CHROMEOS_ASH)
+
+// Deprecated 03/2023.
+#if BUILDFLAG(IS_CHROMEOS_ASH)
+  registry->RegisterTimeDeltaPref(kGlanceablesSignoutScreenshotDuration,
+                                  base::TimeDelta());
 #endif  // BUILDFLAG(IS_CHROMEOS_ASH)
 }
 
@@ -1631,6 +1648,7 @@ void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry,
   file_manager::file_tasks::RegisterProfilePrefs(registry);
   file_manager::prefs::RegisterProfilePrefs(registry);
   bruschetta::prefs::RegisterProfilePrefs(registry);
+  wallpaper_handlers::prefs::RegisterProfilePrefs(registry);
 #endif  // BUILDFLAG(IS_CHROMEOS_ASH)
 
 #if BUILDFLAG(IS_CHROMEOS_LACROS)
@@ -1719,10 +1737,6 @@ void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry,
       prefs::kAccessibilityPdfOcrAlwaysActive, false,
       user_prefs::PrefRegistrySyncable::SYNCABLE_PREF);
 #endif  // BUILDFLAG(ENABLE_SCREEN_AI_SERVICE)
-
-#if BUILDFLAG(IS_ANDROID)
-  registry->RegisterBooleanPref(prefs::kQuickDeleteDialogSuppressed, false);
-#endif
 }
 
 void RegisterUserProfilePrefs(user_prefs::PrefRegistrySyncable* registry) {
@@ -1859,6 +1873,11 @@ void MigrateObsoleteLocalStatePrefs(PrefService* local_state) {
 // Added 02/2023.
 #if BUILDFLAG(IS_CHROMEOS_ASH)
   local_state->ClearPref(kEasyUnlockLocalStateTpmKeys);
+#endif  // BUILDFLAG(IS_CHROMEOS_ASH)
+
+// Added 03/2023.
+#if BUILDFLAG(IS_CHROMEOS_ASH)
+  local_state->ClearPref(kGlanceablesSignoutScreenshotDuration);
 #endif  // BUILDFLAG(IS_CHROMEOS_ASH)
 
   // Please don't delete the following line. It is used by PRESUBMIT.py.

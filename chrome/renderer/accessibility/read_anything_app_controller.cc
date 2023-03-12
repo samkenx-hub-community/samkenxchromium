@@ -33,7 +33,6 @@
 #include "ui/accessibility/ax_tree.h"
 #include "ui/accessibility/ax_tree_serializer.h"
 #include "ui/accessibility/ax_tree_update.h"
-#include "ui/accessibility/ax_tree_update_util.h"
 #include "v8/include/v8-context.h"
 #include "v8/include/v8-microtask-queue.h"
 
@@ -315,55 +314,7 @@ void ReadAnythingAppController::AccessibilityEventReceived(
     const ui::AXTreeID& tree_id,
     const std::vector<ui::AXTreeUpdate>& updates,
     const std::vector<ui::AXEvent>& events) {
-  DCHECK_NE(tree_id, ui::AXTreeIDUnknown());
-  // Create a new tree if an event is received for a tree that is not yet in
-  // the tree list.
-  if (!model_.ContainsTree(tree_id)) {
-    std::unique_ptr<ui::AXSerializableTree> new_tree =
-        std::make_unique<ui::AXSerializableTree>();
-    new_tree->AddObserver(this);
-    model_.AddTree(tree_id, std::move(new_tree));
-  }
-  // If a tree update on the active tree is received while distillation is in
-  // progress, cache updates that are received but do not yet unserialize them.
-  // Drawing must be done on the same tree that was sent to the distiller,
-  // so it’s critical that updates are not unserialized until drawing is
-  // complete.
-  if (tree_id == model_.active_tree_id() && model_.distillation_in_progress()) {
-#if DCHECK_IS_ON()
-    DCHECK(pending_updates_.empty() ||
-           tree_id == model_.pending_updates_bundle_id());
-    model_.SetPendingUpdatesBundleId(tree_id);
-#endif
-    pending_updates_.insert(pending_updates_.end(),
-                            std::make_move_iterator(updates.begin()),
-                            std::make_move_iterator(updates.end()));
-    return;
-  }
-  UnserializeUpdates(std::move(updates), tree_id);
-}
-
-void ReadAnythingAppController::UnserializeUpdates(
-    std::vector<ui::AXTreeUpdate> updates,
-    const ui::AXTreeID& tree_id) {
-  if (updates.empty()) {
-    return;
-  }
-  ui::AXSerializableTree* tree = model_.GetTreeFromId(tree_id).get();
-  DCHECK(tree);
-  // Try to merge updates. If the updates are mergeable, MergeAXTreeUpdates will
-  // return true and merge_updates_out will contain the updates. Otherwise, if
-  // the updates are not mergeable, merge_updates_out will be empty.
-  const std::vector<ui::AXTreeUpdate>* merged_updates = &updates;
-  std::vector<ui::AXTreeUpdate> merge_updates_out;
-  if (ui::MergeAXTreeUpdates(updates, &merge_updates_out)) {
-    merged_updates = &merge_updates_out;
-  }
-
-  // Unserialize the updates.
-  for (const ui::AXTreeUpdate& update : *merged_updates) {
-    tree->Unserialize(update);
-  }
+  model_.AccessibilityEventReceived(tree_id, updates, this);
 }
 
 void ReadAnythingAppController::OnActiveAXTreeIDChanged(
@@ -379,10 +330,10 @@ void ReadAnythingAppController::OnActiveAXTreeIDChanged(
   // TODO(crbug.com/1266555): If distillation is in progress, cancel the
   // distillation request.
 #if DCHECK_IS_ON()
-  DCHECK(pending_updates_.empty() ||
+  DCHECK(model_.pending_updates().empty() ||
          model_.pending_updates_bundle_id() == previous_active_tree_id);
 #endif
-  pending_updates_.clear();
+  model_.ClearPendingUpdates();
 #if DCHECK_IS_ON()
   model_.SetPendingUpdatesBundleId(ui::AXTreeIDUnknown());
 #endif
@@ -398,21 +349,17 @@ void ReadAnythingAppController::OnActiveAXTreeIDChanged(
 }
 
 void ReadAnythingAppController::OnAXTreeDestroyed(const ui::AXTreeID& tree_id) {
+  // OnAXTreeDestroyed is called whenever the AXActionHandler in the browser
+  // learns that an AXTree was destroyed. This could be from any tab, not just
+  // the active one; therefore many tree_ids will not be found in trees_.
+  if (!model_.ContainsTree(tree_id)) {
+    return;
+  }
   if (model_.active_tree_id() == tree_id) {
     // TODO(crbug.com/1266555): If distillation is in progress, cancel the
     // distillation request.
     model_.SetActiveTreeId(ui::AXTreeIDUnknown());
     model_.SetActiveUkmSourceId(ukm::kInvalidSourceId);
-  }
-  // Under rare circumstances, an accessibility tree is not constructed in a
-  // tab. For example, after a browser restart, old tabs are only laid out after
-  // they are activated, which means that an unactivated old tab would not have
-  // an accessibility tree. This means that it would never call
-  // AccessibilityEventsReceived(), meaning its RFH's AXTreeID would not be in
-  // trees. When that tab was destroyed, this function will be called with a
-  // tree_id not in the tree list, so we return early.
-  if (!model_.ContainsTree(tree_id)) {
-    return;
   }
   std::set<ui::AXTreeID> child_tree_ids =
       model_.GetTreeFromId(tree_id)->GetAllChildTreeIds();
@@ -468,6 +415,10 @@ void ReadAnythingAppController::Distill() {
   ui::AXTreeSerializer<const ui::AXNode*> serializer(tree_source.get());
   ui::AXTreeUpdate snapshot;
   CHECK(serializer.SerializeChanges(tree->root(), &snapshot));
+  // TODO(b/1266555): Use v8::Function rather than javascript. If possible,
+  // replace this function call with firing an event.
+  std::string script = "chrome.readAnything.showLoading();";
+  render_frame_->ExecuteJavaScript(base::ASCIIToUTF16(script));
   model_.SetDistillationInProgress(true);
   distiller_->Distill(*tree, snapshot, model_.active_ukm_source_id());
 }
@@ -509,11 +460,7 @@ void ReadAnythingAppController::OnAXTreeDistilled(
   Draw();
   // Once drawing is complete, unserialize all of the pending updates on the
   // active tree and send out a new distillation request.
-#if DCHECK_IS_ON()
-  DCHECK(pending_updates_.empty() ||
-         model_.pending_updates_bundle_id() == model_.active_tree_id());
-#endif
-  UnserializeUpdates(std::move(pending_updates_), model_.active_tree_id());
+  model_.UnserializePendingUpdates();
 #if DCHECK_IS_ON()
   model_.SetPendingUpdatesBundleId(ui::AXTreeIDUnknown());
 #endif

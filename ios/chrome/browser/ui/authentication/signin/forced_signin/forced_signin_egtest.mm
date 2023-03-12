@@ -12,6 +12,7 @@
 #import "ios/chrome/browser/policy/policy_earl_grey_utils.h"
 #import "ios/chrome/browser/policy/policy_util.h"
 #import "ios/chrome/browser/prefs/pref_names.h"
+#import "ios/chrome/browser/shared/public/features/features.h"
 #import "ios/chrome/browser/signin/fake_system_identity.h"
 #import "ios/chrome/browser/signin/test_constants.h"
 #import "ios/chrome/browser/ui/authentication/signin/signin_constants.h"
@@ -23,7 +24,6 @@
 #import "ios/chrome/browser/ui/first_run/first_run_constants.h"
 #import "ios/chrome/browser/ui/settings/google_services/google_services_settings_constants.h"
 #import "ios/chrome/browser/ui/settings/google_services/manage_sync_settings_constants.h"
-#import "ios/chrome/browser/ui/ui_feature_flags.h"
 #import "ios/chrome/common/string_util.h"
 #import "ios/chrome/common/ui/promo_style/constants.h"
 #import "ios/chrome/grit/ios_chromium_strings.h"
@@ -67,8 +67,16 @@ id<GREYMatcher> GetContinueButtonWithIdentityMatcher(
       IDS_IOS_FIRST_RUN_SIGNIN_CONTINUE_AS,
       base::SysNSStringToUTF16(fakeIdentity.userGivenName));
 
-  return grey_allOf(grey_accessibilityLabel(buttonTitle),
-                    grey_sufficientlyVisible(), nil);
+  id<GREYMatcher> matcher = nil;
+  if (@available(iOS 15.0, *)) {
+    matcher = grey_allOf(grey_kindOfClassName(@"UILabel"),
+                         grey_accessibilityLabel(buttonTitle),
+                         grey_sufficientlyVisible(), nil);
+  } else {
+    matcher = grey_allOf(grey_accessibilityLabel(buttonTitle),
+                         grey_sufficientlyVisible(), nil);
+  }
+  return matcher;
 }
 
 // Returns a matcher for the whole forced sign-in screen.

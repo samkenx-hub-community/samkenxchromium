@@ -14,6 +14,8 @@
 #include "ash/webui/shortcut_customization_ui/backend/search/search.mojom.h"
 #include "ash/webui/shortcut_customization_ui/backend/search/search_handler.h"
 #include "ash/webui/shortcut_customization_ui/mojom/shortcut_customization.mojom.h"
+#include "ash/webui/shortcut_customization_ui/shortcuts_app_manager.h"
+#include "ash/webui/shortcut_customization_ui/shortcuts_app_manager_factory.h"
 #include "ash/webui/shortcut_customization_ui/url_constants.h"
 #include "chromeos/strings/grit/chromeos_strings.h"
 #include "content/public/browser/web_contents.h"
@@ -119,8 +121,8 @@ void AddLocalizedStrings(content::WebUIDataSource* source) {
        IDS_SHORTCUT_CUSTOMIZATION_ICON_LABEL_BROWSER_REFRESH},
       {"iconLabelBrowserSearch",
        IDS_SHORTCUT_CUSTOMIZATION_ICON_LABEL_BROWSER_SEARCH},
-      {"iconLabelDictationToggle",
-       IDS_SHORTCUT_CUSTOMIZATION_ICON_LABEL_DICTATION_TOGGLE},
+      {"iconLabelToggleDictation",
+       IDS_SHORTCUT_CUSTOMIZATION_ICON_LABEL_TOGGLE_DICTATION},
       {"iconLabelEmojiPicker",
        IDS_SHORTCUT_CUSTOMIZATION_ICON_LABEL_EMOJI_PICKER},
       {"iconLabelKeyboardBacklightToggle",
@@ -133,6 +135,11 @@ void AddLocalizedStrings(content::WebUIDataSource* source) {
        IDS_SHORTCUT_CUSTOMIZATION_ICON_LABEL_LAUNCH_APPLICATION1},
       {"iconLabelLaunchAssistant",
        IDS_SHORTCUT_CUSTOMIZATION_ICON_LABEL_LAUNCH_ASSISTANT},
+      {"iconLabelMediaFastForward",
+       IDS_SHORTCUT_CUSTOMIZATION_ICON_LABEL_MEDIA_FAST_FORWARD},
+      {"iconLabelMediaPause",
+       IDS_SHORTCUT_CUSTOMIZATION_ICON_LABEL_MEDIA_PAUSE},
+      {"iconLabelMediaPlay", IDS_SHORTCUT_CUSTOMIZATION_ICON_LABEL_MEDIA_PLAY},
       {"iconLabelMediaPlayPause",
        IDS_SHORTCUT_CUSTOMIZATION_ICON_LABEL_MEDIA_PLAY_PAUSE},
       {"iconLabelMediaTrackNext",
@@ -151,7 +158,6 @@ void AddLocalizedStrings(content::WebUIDataSource* source) {
       {"iconLabelPrivacyScreenToggle",
        IDS_SHORTCUT_CUSTOMIZATION_ICON_LABEL_PRIVACY_SCREEN_TOGGLE},
       {"iconLabelSettings", IDS_SHORTCUT_CUSTOMIZATION_ICON_LABEL_SETTINGS},
-      {"iconLabelSpace", IDS_SHORTCUT_CUSTOMIZATION_ICON_LABEL_SPACE},
       {"iconLabelZoomToggle",
        IDS_SHORTCUT_CUSTOMIZATION_ICON_LABEL_ZOOM_TOGGLE},
   };
@@ -189,9 +195,6 @@ ShortcutCustomizationAppUI::ShortcutCustomizationAppUI(content::WebUI* web_ui)
   AddLocalizedStrings(source);
 
   AddFeatureFlags(source);
-
-  provider_ = std::make_unique<shortcut_ui::AcceleratorConfigurationProvider>();
-  search_handler_ = std::make_unique<shortcut_ui::SearchHandler>();
 }
 
 ShortcutCustomizationAppUI::~ShortcutCustomizationAppUI() = default;
@@ -200,13 +203,27 @@ void ShortcutCustomizationAppUI::BindInterface(
     mojo::PendingReceiver<
         shortcut_customization::mojom::AcceleratorConfigurationProvider>
         receiver) {
-  provider_->BindInterface(std::move(receiver));
+  shortcut_ui::ShortcutsAppManagerFactory::GetForBrowserContext(
+      web_ui()->GetWebContents()->GetBrowserContext())
+      ->accelerator_configuration_provider()
+      ->BindInterface(std::move(receiver));
 }
 
 void ShortcutCustomizationAppUI::BindInterface(
     mojo::PendingReceiver<shortcut_customization::mojom::SearchHandler>
         receiver) {
-  search_handler_->BindInterface(std::move(receiver));
+  // BindInterface should not be called unless the search flag is enabled.
+  DCHECK(features::IsSearchInShortcutsAppEnabled());
+
+  shortcut_ui::SearchHandler* search_handler =
+      shortcut_ui::ShortcutsAppManagerFactory::GetForBrowserContext(
+          web_ui()->GetWebContents()->GetBrowserContext())
+          ->search_handler();
+
+  // SearchHandler should not be a nullptr.
+  DCHECK(search_handler);
+
+  search_handler->BindInterface(std::move(receiver));
 }
 
 WEB_UI_CONTROLLER_TYPE_IMPL(ShortcutCustomizationAppUI)

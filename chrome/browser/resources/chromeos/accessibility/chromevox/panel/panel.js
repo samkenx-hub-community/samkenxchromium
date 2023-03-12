@@ -723,31 +723,14 @@ export class Panel extends PanelInterface {
       }
     }
 
-    activeIndex = this.findEnabledMenuIndex_(activeIndex, delta > 0 ? 1 : -1);
+    activeIndex =
+        this.menuManager_.findEnabledMenuIndex(activeIndex, delta > 0 ? 1 : -1);
     if (activeIndex === -1) {
       return;
     }
 
     this.menuManager_.activateMenu(
         this.menuManager_.menus[activeIndex], true /* activateFirstItem */);
-  }
-
-  /**
-   * Starting at |startIndex|, looks for an enabled menu.
-   * @param {number} startIndex
-   * @param {number} delta
-   * @return {number} The index of the enabled menu. -1 if not found.
-   * @private
-   */
-  findEnabledMenuIndex_(startIndex, delta) {
-    const endIndex = (delta > 0) ? this.menuManager_.menus.length : -1;
-    while (startIndex !== endIndex) {
-      if (this.menuManager_.menus[startIndex].enabled) {
-        return startIndex;
-      }
-      startIndex += delta;
-    }
-    return -1;
   }
 
   /**
@@ -917,7 +900,7 @@ export class Panel extends PanelInterface {
 
     // Prepare the watcher before close the panel so that the watcher won't miss
     // panel collapse signal.
-    await BackgroundBridge.PanelBackground.setPanelCollapseWatcher;
+    await BackgroundBridge.PanelBackground.setPanelCollapseWatcher();
 
     // Make sure all menus are cleared to avoid bogus output when we re-open.
     this.menuManager_.clearMenus();

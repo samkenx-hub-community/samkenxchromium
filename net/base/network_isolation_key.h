@@ -13,10 +13,6 @@
 #include "net/base/schemeful_site.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
 
-namespace base {
-class Value;
-}
-
 namespace url {
 class Origin;
 }
@@ -83,11 +79,6 @@ class NET_EXPORT NetworkIsolationKey {
 
   // Compare keys for equality, true if all enabled fields are equal.
   bool operator==(const NetworkIsolationKey& other) const {
-    if (!IsFrameSiteEnabled()) {
-      return std::tie(top_frame_site_, nonce_) ==
-             std::tie(other.top_frame_site_, other.nonce_);
-    }
-
     return std::tie(top_frame_site_, frame_site_, nonce_) ==
            std::tie(other.top_frame_site_, other.frame_site_, other.nonce_);
   }
@@ -99,10 +90,6 @@ class NET_EXPORT NetworkIsolationKey {
 
   // Provide an ordering for keys based on all enabled fields.
   bool operator<(const NetworkIsolationKey& other) const {
-    if (!IsFrameSiteEnabled()) {
-      return std::tie(top_frame_site_, nonce_) <
-             std::tie(other.top_frame_site_, other.nonce_);
-    }
     return std::tie(top_frame_site_, frame_site_, nonce_) <
            std::tie(other.top_frame_site_, other.frame_site_, other.nonce_);
   }
@@ -132,15 +119,25 @@ class NET_EXPORT NetworkIsolationKey {
     return top_frame_site_;
   }
 
-  // Note: This will CHECK if `IsFrameSiteEnabled()` returns false.
+  enum class Mode {
+    // This scheme indicates that "triple-key" NetworkIsolationKeys are used to
+    // partition the HTTP cache. This key will have the following properties:
+    // `top_frame_site` -> the schemeful site of the top level page.
+    // `frame_site ` -> the schemeful site of the frame.
+    // `is_cross_site` -> absl::nullopt.
+    kFrameSiteEnabled,
+    // TODO(awillia): Add `kIsCrossSiteEnabled` here to experiment with
+    // 2.5-keying.
+  };
+
+  // Returns the cache key scheme currently in use.
+  static Mode GetMode();
+
+  // Note: This will CHECK if `GetScheme()` does not return `kFrameSiteEnabled`.
   const absl::optional<SchemefulSite>& GetFrameSite() const;
 
-  // Do not use outside of testing. Returns the `frame_site_` if
-  // `IsFrameSiteEnabled()` returns true. Else it returns nullopt.
-  const absl::optional<SchemefulSite> GetFrameSiteForTesting() const {
-    if (!IsFrameSiteEnabled()) {
-      return absl::nullopt;
-    }
+  // Do not use outside of testing. Returns the `frame_site_`.
+  const absl::optional<SchemefulSite>& GetFrameSiteForTesting() const {
     return frame_site_;
   }
 
@@ -153,9 +150,9 @@ class NET_EXPORT NetworkIsolationKey {
     ~SerializationPasskey() = default;
   };
 
-  // When serializing a NIK for sending via mojo we want to always use the frame
-  // site regardless of whether general use of it is enabled. We don't want to
-  // expose this broadly, though, hence the passkey.
+  // When serializing a NIK for sending via mojo we want to access the frame
+  // site (or absl::nullopt) regardless of flags. We don't want to expose this
+  // broadly, though, hence the passkey.
   const absl::optional<SchemefulSite>& GetFrameSiteForSerialization(
       SerializationPasskey) const {
     return frame_site_;
@@ -169,23 +166,6 @@ class NET_EXPORT NetworkIsolationKey {
   // Returns true if all parts of the key are empty.
   bool IsEmpty() const;
 
-  // Returns true if the NetworkIsolationKey has a triple keyed scheme. This
-  // means both `frame_site_` and `top_frame_site_` will be used.
-  static bool IsFrameSiteEnabled();
-
-  // Returns a representation of |this| as a base::Value. Returns false on
-  // failure. Succeeds if either IsEmpty() or !IsTransient().
-  [[nodiscard]] bool ToValue(base::Value* out_value) const;
-
-  // Inverse of ToValue(). Writes the result to |network_isolation_key|. Returns
-  // false on failure. Fails on values that could not have been produced by
-  // ToValue(), like transient origins. If the value of
-  // net::features::kAppendFrameOriginToNetworkIsolationKey has changed between
-  // saving and loading the data, fails.
-  [[nodiscard]] static bool FromValue(
-      const base::Value& value,
-      NetworkIsolationKey* out_network_isolation_key);
-
  private:
   // Whether this key has opaque origins or a nonce.
   bool IsOpaque() const;
@@ -198,9 +178,7 @@ class NET_EXPORT NetworkIsolationKey {
   // The origin/etld+1 of the top frame of the page making the request.
   absl::optional<SchemefulSite> top_frame_site_;
 
-  // The origin/etld+1 of the frame that initiates the request. Note that this
-  // value, if set, won't be returned by `GetFrameSite()` if
-  // `IsFrameSiteEnabled()` returns false.
+  // The origin/etld+1 of the frame that initiates the request.
   absl::optional<SchemefulSite> frame_site_;
 
   // Having a nonce is a way to force a transient opaque `NetworkIsolationKey`

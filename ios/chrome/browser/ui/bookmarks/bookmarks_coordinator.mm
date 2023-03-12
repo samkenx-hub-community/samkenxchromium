@@ -21,6 +21,11 @@
 #import "ios/chrome/browser/browser_state/chrome_browser_state.h"
 #import "ios/chrome/browser/main/browser.h"
 #import "ios/chrome/browser/metrics/new_tab_page_uma.h"
+#import "ios/chrome/browser/shared/public/commands/application_commands.h"
+#import "ios/chrome/browser/shared/public/commands/command_dispatcher.h"
+#import "ios/chrome/browser/shared/public/commands/snackbar_commands.h"
+#import "ios/chrome/browser/shared/ui/util/uikit_ui_util.h"
+#import "ios/chrome/browser/shared/ui/util/url_with_title.h"
 #import "ios/chrome/browser/tabs/tab_title_util.h"
 #import "ios/chrome/browser/ui/bookmarks/bookmark_mediator.h"
 #import "ios/chrome/browser/ui/bookmarks/bookmark_navigation_controller.h"
@@ -34,13 +39,8 @@
 #import "ios/chrome/browser/ui/bookmarks/folder_editor/bookmarks_folder_editor_coordinator.h"
 #import "ios/chrome/browser/ui/bookmarks/folder_editor/bookmarks_folder_editor_coordinator_delegate.h"
 #import "ios/chrome/browser/ui/bookmarks/home/bookmarks_home_view_controller.h"
-#import "ios/chrome/browser/ui/commands/application_commands.h"
-#import "ios/chrome/browser/ui/commands/command_dispatcher.h"
-#import "ios/chrome/browser/ui/commands/snackbar_commands.h"
 #import "ios/chrome/browser/ui/default_promo/default_browser_utils.h"
 #import "ios/chrome/browser/ui/table_view/table_view_navigation_controller.h"
-#import "ios/chrome/browser/ui/util/uikit_ui_util.h"
-#import "ios/chrome/browser/ui/util/url_with_title.h"
 #import "ios/chrome/browser/url_loading/url_loading_browser_agent.h"
 #import "ios/chrome/browser/url_loading/url_loading_params.h"
 #import "ios/chrome/browser/url_loading/url_loading_util.h"
@@ -247,8 +247,8 @@ enum class PresentedState {
 }
 
 - (void)presentBookmarks {
-  [self presentBookmarksAtRootNode:self.bookmarkModel->root_node()
-                 selectingBookmark:nil];
+  [self presentBookmarksAtDisplayedFolderNode:self.bookmarkModel->root_node()
+                            selectingBookmark:nil];
 }
 
 - (void)presentFolderChooser {
@@ -555,8 +555,8 @@ enum class PresentedState {
   const BookmarkNode* existingBookmark =
       self.bookmarkModel->GetMostRecentlyAddedUserNodeForURL(
           command.URLs.firstObject.URL);
-  [self presentBookmarksAtRootNode:self.bookmarkModel->mobile_node()
-                 selectingBookmark:existingBookmark];
+  [self presentBookmarksAtDisplayedFolderNode:self.bookmarkModel->mobile_node()
+                            selectingBookmark:existingBookmark];
 }
 
 #pragma mark - Private
@@ -645,8 +645,10 @@ enum class PresentedState {
 // Presents the bookmarks browser modally. If `selectingBookmark` is non-nil,
 // then the bookmarks modal is changed to edit mode and `selectingBookmark` is
 // identified in the list of bookmarks and selected.
-- (void)presentBookmarksAtRootNode:(const BookmarkNode*)rootNode
-                 selectingBookmark:(const BookmarkNode*)bookmarkNode {
+- (void)presentBookmarksAtDisplayedFolderNode:
+            (const BookmarkNode*)displayedFolderNode
+                            selectingBookmark:
+                                (const BookmarkNode*)bookmarkNode {
   DCHECK_EQ(PresentedState::NONE, self.currentPresentedState);
   DCHECK(!self.bookmarkNavigationController);
 
@@ -662,9 +664,9 @@ enum class PresentedState {
     // Set the root node if the model has been loaded. If the model has not been
     // loaded yet, the root node will be set in BookmarksHomeViewController
     // after the model is finished loading.
-    [self.bookmarkBrowser setRootNode:rootNode];
+    self.bookmarkBrowser.displayedFolderNode = displayedFolderNode;
     [self.bookmarkBrowser setExternalBookmark:bookmarkNode];
-    if (rootNode == self.bookmarkModel->root_node()) {
+    if (displayedFolderNode == self.bookmarkModel->root_node()) {
       replacementViewControllers =
           [self.bookmarkBrowser cachedViewControllerStack];
     }

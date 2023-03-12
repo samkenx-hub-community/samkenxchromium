@@ -41,10 +41,6 @@ BASE_FEATURE(kClientSideDetectionModelTag,
              "ClientSideDetectionTag",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-BASE_FEATURE(kClientSideDetectionReferrerChain,
-             "ClientSideDetectionReferrerChain",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
 BASE_FEATURE(kClientSideDetectionTypeForceRequest,
              "ClientSideDetectionTypeForceRequest",
              base::FEATURE_DISABLED_BY_DEFAULT);
@@ -52,14 +48,6 @@ BASE_FEATURE(kClientSideDetectionTypeForceRequest,
 BASE_FEATURE(kComponentUpdaterAndroidProtegoAllowlist,
              "SafeBrowsingComponentUpdaterAndroidProtegoAllowlist",
              base::FEATURE_DISABLED_BY_DEFAULT);
-
-BASE_FEATURE(kConnectorsScanningAccessToken,
-             "ConnectorsScanningAccessToken",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
-BASE_FEATURE(kConnectorsScanningReportOnlyUI,
-             "ConnectorsScanningReportOnlyUI",
-             base::FEATURE_ENABLED_BY_DEFAULT);
 
 BASE_FEATURE(kDelayedWarnings,
              "SafeBrowsingDelayedWarnings",
@@ -183,32 +171,35 @@ BASE_FEATURE(kNestedArchives,
              "SafeBrowsingArchiveImprovements",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-BASE_FEATURE(kOmitNonUserGesturesFromReferrerChain,
-             "SafeBrowsingOmitNonUserGesturesFromReferrerChain",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
 BASE_FEATURE(kRealTimeUrlFilteringForEnterprise,
              "RealTimeUrlFilteringForEnterprise",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 BASE_FEATURE(kRealTimeUrlLookupForEnterpriseAllowlistBypass,
              "SafeBrowsingRealTimeUrlLookupForEnterpriseAllowlistBypass",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
+BASE_FEATURE(kReferrerChainParameters,
+             "SafeBrowsingReferrerChainParameters",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+constexpr base::FeatureParam<int> kReferrerChainEventMaximumAgeSeconds{
+    &kReferrerChainParameters, "MaximumEventAgeSeconds", /*default_value=*/120};
+
+constexpr base::FeatureParam<int> kReferrerChainEventMaximumCount{
+    &kReferrerChainParameters, "MaximumEventCount",
+    /*default_value=*/100};
+
 BASE_FEATURE(kSafeBrowsingCsbrrNewDownloadTrigger,
              "SafeBrowsingCsbrrNewDownloadTrigger",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-BASE_FEATURE(kSafeBrowsingDisableConsumerCsdForEnterprise,
-             "SafeBrowsingDisableConsumerCsdForEnterprise",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
-BASE_FEATURE(kSafeBrowsingEnterpriseCsd,
-             "SafeBrowsingEnterpriseCsd",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
 BASE_FEATURE(kSafeBrowsingLookupMechanismExperiment,
              "SafeBrowsingLookupMechanismExperiment",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+BASE_FEATURE(kSafeBrowsingOnUIThread,
+             "SafeBrowsingOnUIThread",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 BASE_FEATURE(kSafeBrowsingRemoveCookiesInAuthRequests,
@@ -239,10 +230,6 @@ BASE_FEATURE(kSuspiciousSiteTriggerQuotaFeature,
              "SafeBrowsingSuspiciousSiteTriggerQuota",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
-BASE_FEATURE(kTailoredSecurityDesktopNotice,
-             "TailoredSecurityDesktopNotice",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
 #if BUILDFLAG(IS_ANDROID)
 BASE_FEATURE(kTailoredSecurityDialogRetryMechanism,
              "TailoredSecurityDialogRetryMechanism",
@@ -261,10 +248,6 @@ BASE_FEATURE(kTailoredSecurityIntegration,
 BASE_FEATURE(kThreatDomDetailsTagAndAttributeFeature,
              "ThreatDomDetailsTagAttributes",
              base::FEATURE_DISABLED_BY_DEFAULT);
-
-BASE_FEATURE(kVisualFeaturesForReusePings,
-             "VisualFeaturesInReusePings",
-             base::FEATURE_ENABLED_BY_DEFAULT);
 
 BASE_FEATURE(kVisualFeaturesSizes,
              "VisualFeaturesSizes",
@@ -300,11 +283,8 @@ constexpr struct {
     {&kClientSideDetectionKillswitch, true},
     {&kClientSideDetectionModelOptimizationGuide, true},
     {&kClientSideDetectionModelIsFlatBuffer, true},
-    {&kClientSideDetectionReferrerChain, true},
     {&kClientSideDetectionTypeForceRequest, true},
     {&kComponentUpdaterAndroidProtegoAllowlist, true},
-    {&kConnectorsScanningAccessToken, true},
-    {&kConnectorsScanningReportOnlyUI, true},
     {&kDelayedWarnings, true},
     {&kDownloadBubble, true},
     {&kDownloadBubbleV2, true},
@@ -321,22 +301,17 @@ constexpr struct {
     {&kLogAccountEnhancedProtectionStateInProtegoPings, true},
     {&kMmapSafeBrowsingDatabase, true},
     {&kNestedArchives, true},
-    {&kOmitNonUserGesturesFromReferrerChain, true},
     {&kRealTimeUrlFilteringForEnterprise, true},
     {&kRealTimeUrlLookupForEnterpriseAllowlistBypass, true},
     {&kSafeBrowsingCsbrrNewDownloadTrigger, true},
-    {&kSafeBrowsingDisableConsumerCsdForEnterprise, true},
-    {&kSafeBrowsingEnterpriseCsd, true},
     {&kSafeBrowsingLookupMechanismExperiment, true},
     {&kSafeBrowsingRemoveCookiesInAuthRequests, true},
     {&kSevenZipEvaluationEnabled, true},
     {&kSimplifiedUrlDisplay, true},
     {&kStrictDownloadTimeout, true},
     {&kSuspiciousSiteTriggerQuotaFeature, true},
-    {&kTailoredSecurityDesktopNotice, true},
     {&kTailoredSecurityIntegration, true},
     {&kThreatDomDetailsTagAndAttributeFeature, false},
-    {&kVisualFeaturesForReusePings, true},
     {&kVisualFeaturesSizes, true},
 };
 

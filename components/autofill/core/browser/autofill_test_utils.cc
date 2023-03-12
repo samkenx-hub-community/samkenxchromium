@@ -14,6 +14,7 @@
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/stringprintf.h"
 #include "base/strings/utf_string_conversions.h"
+#include "base/test/scoped_feature_list.h"
 #include "base/time/time.h"
 #include "build/build_config.h"
 #include "components/autofill/core/browser/autofill_external_delegate.h"
@@ -81,46 +82,54 @@ std::string GetRandomCardNumber() {
 
 }  // namespace
 
-AutofillEnvironment* AutofillEnvironment::current_instance_ = nullptr;
+AutofillTestEnvironment* AutofillTestEnvironment::current_instance_ = nullptr;
 
-AutofillEnvironment& AutofillEnvironment::GetCurrent(
+AutofillTestEnvironment& AutofillTestEnvironment::GetCurrent(
     const base::Location& location) {
   CHECK(current_instance_)
       << location.ToString() << " "
-      << "tried to access the current AutofillEnvironment, but none "
-         "exists. Add an autofill::test::AutofillEnvironment member to "
-         "test your test fixture.";
+      << "tried to access the current AutofillTestEnvironment, but none "
+         "exists. Add an autofill::test::Autofill(Browser|Unit)TestEnvironment "
+         "member to test your test fixture.";
   return *current_instance_;
 }
 
-AutofillEnvironment::AutofillEnvironment() {
-  CHECK(!current_instance_) << "An autofill::test::AutofillEnvironment has "
+AutofillTestEnvironment::AutofillTestEnvironment(const Options& options) {
+  CHECK(!current_instance_) << "An autofill::test::AutofillTestEnvironment has "
                                "already been registered.";
   current_instance_ = this;
+  if (options.disable_server_communication) {
+    scoped_feature_list_.InitAndDisableFeature(
+        features::test::kAutofillServerCommunication);
+  }
 }
 
-AutofillEnvironment::~AutofillEnvironment() {
+AutofillTestEnvironment::~AutofillTestEnvironment() {
   CHECK_EQ(current_instance_, this);
   current_instance_ = nullptr;
 }
 
-LocalFrameToken AutofillEnvironment::NextLocalFrameToken() {
+LocalFrameToken AutofillTestEnvironment::NextLocalFrameToken() {
   return LocalFrameToken(base::UnguessableToken::CreateForTesting(
       ++local_frame_token_counter_high_, ++local_frame_token_counter_low_));
 }
 
-FormRendererId AutofillEnvironment::NextFormRendererId() {
+FormRendererId AutofillTestEnvironment::NextFormRendererId() {
   return FormRendererId(++form_renderer_id_counter_);
 }
 
-FieldRendererId AutofillEnvironment::NextFieldRendererId() {
+FieldRendererId AutofillTestEnvironment::NextFieldRendererId() {
   return FieldRendererId(++field_renderer_id_counter_);
 }
+
+AutofillBrowserTestEnvironment::AutofillBrowserTestEnvironment(
+    const Options& options)
+    : AutofillTestEnvironment(options) {}
 
 LocalFrameToken MakeLocalFrameToken(RandomizeFrame randomize) {
   if (*randomize) {
     return LocalFrameToken(
-        AutofillEnvironment::GetCurrent().NextLocalFrameToken());
+        AutofillTestEnvironment::GetCurrent().NextLocalFrameToken());
   } else {
     return LocalFrameToken(
         base::UnguessableToken::CreateForTesting(98765, 43210));
@@ -640,6 +649,14 @@ CreditCard GetMaskedServerCardWithNonLegacyId() {
                           "2109" /* Mastercard */, NextMonth().c_str(),
                           NextYear().c_str(), "1");
   credit_card.SetNetworkForMaskedCard(kMasterCard);
+  return credit_card;
+}
+
+CreditCard GetMaskedServerCardVisa() {
+  CreditCard credit_card(CreditCard::MASKED_SERVER_CARD, "a123");
+  test::SetCreditCardInfo(&credit_card, "Bonnie Parker", "1111" /* Visa */,
+                          NextMonth().c_str(), NextYear().c_str(), "1");
+  credit_card.SetNetworkForMaskedCard(kVisaCard);
   return credit_card;
 }
 
@@ -1169,8 +1186,9 @@ void AddFieldPredictionsToForm(
   std::vector<FieldPrediction> field_predictions;
   field_predictions.reserve(field_types.size());
   base::ranges::transform(field_types, std::back_inserter(field_predictions),
-                          static_cast<FieldPrediction (*)(ServerFieldType)>(
-                              &CreateFieldPrediction));
+                          [](ServerFieldType field_type) {
+                            return CreateFieldPrediction(field_type);
+                          });
   return AddFieldPredictionsToForm(field_data, field_predictions,
                                    form_suggestion);
 }

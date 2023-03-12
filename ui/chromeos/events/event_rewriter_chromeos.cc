@@ -24,6 +24,7 @@
 #include "ui/base/ime/ash/ime_keyboard.h"
 #include "ui/base/ime/ash/input_method_manager.h"
 #include "ui/base/ui_base_features.h"
+#include "ui/chromeos/events/keyboard_capability.h"
 #include "ui/chromeos/events/mojom/modifier_key.mojom-shared.h"
 #include "ui/chromeos/events/pref_names.h"
 #include "ui/events/devices/device_data_manager.h"
@@ -948,28 +949,13 @@ EventRewriterChromeOS::GetKeyboardTopRowLayout(
 bool EventRewriterChromeOS::HasAssistantKeyOnKeyboard(
     const InputDevice& keyboard_device,
     bool* has_assistant_key) {
-  const char kDevNameProperty[] = "DEVNAME";
-  std::string dev_name;
-  if (!GetDeviceProperty(keyboard_device.sys_path, kDevNameProperty,
-                         &dev_name) ||
-      dev_name.empty()) {
+  std::unique_ptr<EventDeviceInfo> devinfo =
+      KeyboardCapability::CreateEventDeviceInfoFromInputDevice(keyboard_device);
+  if (!devinfo) {
     return false;
   }
 
-  base::ScopedFD fd(open(dev_name.c_str(), O_RDONLY));
-  if (fd.get() < 0) {
-    LOG(ERROR) << "Cannot open " << dev_name.c_str() << " : " << errno;
-    return false;
-  }
-
-  EventDeviceInfo devinfo;
-  if (!devinfo.Initialize(fd.get(), keyboard_device.sys_path)) {
-    LOG(ERROR) << "Failed to get device information for "
-               << keyboard_device.sys_path.value();
-    return false;
-  }
-
-  *has_assistant_key = devinfo.HasKeyEvent(KEY_ASSISTANT);
+  *has_assistant_key = devinfo->HasKeyEvent(KEY_ASSISTANT);
   return true;
 }
 
@@ -1874,7 +1860,8 @@ void EventRewriterChromeOS::RewriteFunctionKeys(const KeyEvent& key_event,
     //  No      System   No                 Fn -> System
     //  Yes     Fn       No                 Unchanged
     //  Yes     System   No                 Unchanged
-    if (ForceTopRowAsFunctionKeys() == flip_remapping) {
+    if (ForceTopRowAsFunctionKeys(key_event.source_device_id()) ==
+        flip_remapping) {
       // Rewrite the F1-F12 keys on a Chromebook keyboard to system keys.
       // This is the original Chrome OS layout.
       static const KeyboardRemapping kFkeysToSystemKeys1[] = {
@@ -2270,7 +2257,8 @@ bool EventRewriterChromeOS::RewriteTopRowKeysForCustomLayout(
   // If the scan code appears in the top row mapping it is an action key.
   const bool is_action_key = (key_iter != scan_code_map.end());
   if (is_action_key) {
-    if (flip_remapping != ForceTopRowAsFunctionKeys()) {
+    if (flip_remapping !=
+        ForceTopRowAsFunctionKeys(key_event.source_device_id())) {
       ApplyRemapping(key_iter->second, state);
     }
 
@@ -2419,7 +2407,8 @@ bool EventRewriterChromeOS::RewriteTopRowKeysForLayoutWilco(
                                  std::size(kActionToFnKeys))) {
     // Incoming key code is an action key. Check if it needs to be mapped back
     // to its corresponding function key.
-    if (flip_remapping != ForceTopRowAsFunctionKeys()) {
+    if (flip_remapping !=
+        ForceTopRowAsFunctionKeys(key_event.source_device_id())) {
       // On Drallion, mirror mode toggle is on its own key so don't remap it.
       if (layout == KeyboardCapability::KeyboardTopRowLayout::
                         kKbdTopRowLayoutDrallion &&
@@ -2445,20 +2434,19 @@ bool EventRewriterChromeOS::RewriteTopRowKeysForLayoutWilco(
       state->code = DomCode::F12;
       state->key = DomKey::F12;
     }
-    // At this point, the search modifier flag should be cleared if the
-    // remapping was supposed to be flipped.
+    // If the mapping should be flipped when command is down, the flag needs to
+    // be cleared.
     if (flip_remapping) {
       state->flags &= ~EF_COMMAND_DOWN;
     }
-
     return true;
   }
 
   return false;
 }
 
-bool EventRewriterChromeOS::ForceTopRowAsFunctionKeys() const {
-  return delegate_ && delegate_->TopRowKeysAreFunctionKeys();
+bool EventRewriterChromeOS::ForceTopRowAsFunctionKeys(int device_id) const {
+  return delegate_ && delegate_->TopRowKeysAreFunctionKeys(device_id);
 }
 
 KeyboardCapability::DeviceType EventRewriterChromeOS::KeyboardDeviceAdded(

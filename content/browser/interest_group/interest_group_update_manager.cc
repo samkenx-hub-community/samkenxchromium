@@ -187,6 +187,9 @@ constexpr net::NetworkTrafficAnnotationTag kTrafficAnnotation =
       if (!maybe_capability.is_string())
         return false;
       const std::string& capability = maybe_capability.GetString();
+      base::UmaHistogramBoolean(
+          "Ads.InterestGroup.EnumNaming.Update.SellerCapabilities",
+          capability == "interestGroupCounts" || capability == "latencyStats");
       if (capability == "interest-group-counts" ||
           capability == "interestGroupCounts") {
         capabilities.Put(blink::SellerCapabilities::kInterestGroupCounts);
@@ -217,14 +220,16 @@ constexpr net::NetworkTrafficAnnotationTag kTrafficAnnotation =
   const std::string* maybe_execution_mode = dict.FindString("executionMode");
   if (!maybe_execution_mode)
     return true;
+  base::UmaHistogramBoolean(
+      "Ads.InterestGroup.EnumNaming.Update.WorkletExecutionMode",
+      *maybe_execution_mode == "groupByOrigin");
   if (*maybe_execution_mode == "compatibility") {
     interest_group_update.execution_mode =
         blink::InterestGroup::ExecutionMode::kCompatibilityMode;
-  } else if (*maybe_execution_mode == "groupByOrigin") {
+  } else if (*maybe_execution_mode == "group-by-origin" ||
+             *maybe_execution_mode == "groupByOrigin") {
     interest_group_update.execution_mode =
         blink::InterestGroup::ExecutionMode::kGroupedByOriginMode;
-  } else {
-    return false;
   }
   return true;
 }
@@ -579,16 +584,17 @@ void InterestGroupUpdateManager::DidUpdateInterestGroupsOfOwnerDbLoad(
 
   for (auto& storage_group : storage_groups) {
     manager_->QueueKAnonymityUpdateForInterestGroup(storage_group);
-    if (!storage_group.interest_group.daily_update_url)
+    if (!storage_group.interest_group.update_url) {
       continue;
+    }
     // TODO(behamilton): Don't update unless daily update url is k-anonymous
     ++num_in_flight_updates_;
     base::UmaHistogramCounts100000(
         "Ads.InterestGroup.Net.RequestUrlSizeBytes.Update",
-        storage_group.interest_group.daily_update_url->spec().size());
+        storage_group.interest_group.update_url->spec().size());
     auto resource_request = std::make_unique<network::ResourceRequest>();
     resource_request->url =
-        std::move(storage_group.interest_group.daily_update_url).value();
+        std::move(storage_group.interest_group.update_url).value();
     resource_request->redirect_mode = network::mojom::RedirectMode::kError;
     resource_request->credentials_mode = network::mojom::CredentialsMode::kOmit;
     resource_request->request_initiator = owner;

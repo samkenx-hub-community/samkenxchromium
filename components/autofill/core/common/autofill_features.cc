@@ -249,7 +249,7 @@ BASE_FEATURE(kAutofillEnableLabelPrecedenceForTurkishAddresses,
 // startup, once per chrome version.
 BASE_FEATURE(kAutofillEnableProfileDeduplication,
              "AutofillEnableProfileDeduplication",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // Controls if Autofill supports merging subset names.
 // TODO(crbug.com/1098943): Remove once launched.
@@ -516,7 +516,7 @@ BASE_FEATURE(kAutofillSkipComparingInferredLabels,
 // TODO(crbug.com/1396374): Remove when launched.
 BASE_FEATURE(kAutofillSupportPoorMansPlaceholder,
              "AutofillSupportPoorMansPlaceholder",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // Controls whether Autofill should search prefixes of all words/tokens when
 // filtering profiles, or only on prefixes of the whole string.
@@ -701,11 +701,6 @@ BASE_FEATURE(kAutofillDisableSilentProfileUpdates,
 // TODO(crbug.com/1348294): Remove once the migration UI exists.
 BASE_FEATURE(kAutofillCreateAccountProfilesFromSettings,
              "AutofillCreateAccountProfilesFromSettings",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-
-// If enabled, three address profiles are created for testing.
-BASE_FEATURE(kAutofillCreateDataForTest,
-             "AutofillCreateDataForTest",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Enables or Disables (mostly for hermetic testing) autofill server

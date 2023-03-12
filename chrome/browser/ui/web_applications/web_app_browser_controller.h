@@ -102,8 +102,12 @@ class WebAppBrowserController : public AppBrowserController,
       base::OnceClosure on_complete) override;
   bool AppUsesBorderlessMode() const override;
   bool IsIsolatedWebApp() const override;
+  void SetIsolatedWebAppTrueForTesting() override;
   gfx::Rect GetDefaultBounds() const override;
   bool HasReloadButton() const override;
+#if !BUILDFLAG(IS_CHROMEOS)
+  bool HasProfileMenuButton() const override;
+#endif  // !BUILDFLAG(IS_CHROMEOS)
 #if BUILDFLAG(IS_CHROMEOS_ASH)
   const ash::SystemWebAppDelegate* system_app() const override;
 #endif  // BUILDFLAG(IS_CHROMEOS_ASH)
@@ -172,6 +176,7 @@ class WebAppBrowserController : public AppBrowserController,
   // whatever it was launched with.
   DisplayMode manifest_display_mode_ = DisplayMode::kUndefined;
   DisplayMode effective_display_mode_ = DisplayMode::kUndefined;
+  bool is_isolated_web_app_for_testing_ = false;
 
 #if BUILDFLAG(IS_CHROMEOS_ASH)
   raw_ptr<const ash::SystemWebAppDelegate> system_app_;

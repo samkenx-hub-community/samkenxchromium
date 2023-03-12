@@ -92,7 +92,7 @@ class OmniboxSuggestionsDropdownEmbedderImpl implements OmniboxSuggestionsDropdo
 
     @Override
     public boolean isTablet() {
-        if (OmniboxFeatures.shouldShowModernizeVisualUpdate(mContext)) {
+        if (OmniboxFeatures.shouldAdaptToNarrowTabletWindows()) {
             return mWindowWidthDp >= DeviceFormFactor.MINIMUM_TABLET_WIDTH_DP;
         } else {
             return DeviceFormFactor.isWindowOnTablet(mWindowAndroid);
@@ -149,13 +149,13 @@ class OmniboxSuggestionsDropdownEmbedderImpl implements OmniboxSuggestionsDropdo
     // ComponentCallbacks
     @Override
     public void onConfigurationChanged(@NonNull Configuration newConfig) {
-        int windowWidth = newConfig.smallestScreenWidthDp;
+        int windowWidth = newConfig.screenWidthDp;
         int windowHeight = newConfig.screenHeightDp;
         if (windowWidth == mWindowWidthDp && mWindowHeightDp == windowHeight) return;
         mWindowWidthDp = windowWidth;
         mWindowHeightDp = windowHeight;
 
-        if (OmniboxFeatures.shouldShowModernizeVisualUpdate(mContext)
+        if (OmniboxFeatures.shouldAdaptToNarrowTabletWindows()
                 || OmniboxFeatures.omniboxConsumesImeInsets()) {
             recalculateOmniboxAlignment();
         }
@@ -191,15 +191,15 @@ class OmniboxSuggestionsDropdownEmbedderImpl implements OmniboxSuggestionsDropdo
         if (isTablet()) {
             ViewUtils.getRelativeLayoutPosition(
                     mAnchorView, mHorizontalAlignmentView, mPositionArray);
-            if (OmniboxFeatures.shouldShowTabletScrim()) {
-                // Case 1: tablets with scrim enabled. Width equal to alignment view and left
+            if (OmniboxFeatures.shouldShowModernizeVisualUpdate(mContext)) {
+                // Case 1: tablets with revamp enabled. Width equal to alignment view and left
                 // equivalent to left of alignment view.
                 left = mPositionArray[0];
                 width = mHorizontalAlignmentView.getMeasuredWidth();
                 paddingLeft = 0;
                 paddingRight = 0;
             } else {
-                // Case 2: tablets with scrim disabled. Full bleed width with padding to align
+                // Case 2: tablets with revamp disabled. Full bleed width with padding to align
                 // suggestions to the alignment view.
                 left = 0;
                 width = mAnchorView.getMeasuredWidth();

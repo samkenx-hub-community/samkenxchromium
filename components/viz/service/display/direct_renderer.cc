@@ -99,9 +99,6 @@ DirectRenderer::~DirectRenderer() = default;
 
 void DirectRenderer::Initialize() {
   use_partial_swap_ = settings_->partial_swap_enabled && CanPartialSwap();
-  allow_empty_swap_ =
-      use_partial_swap_ ||
-      output_surface_->capabilities().supports_commit_overlay_planes;
 
   initialized_ = true;
 }
@@ -403,7 +400,7 @@ void DirectRenderer::DrawFrame(
   }
 
   bool skip_drawing_root_render_pass =
-      current_frame()->root_damage_rect.IsEmpty() && allow_empty_swap_ &&
+      current_frame()->root_damage_rect.IsEmpty() && use_partial_swap_ &&
       !needs_full_frame_redraw;
 
   // If partial swap is not used, and the frame can not be skipped, the whole
@@ -865,9 +862,7 @@ gfx::Rect DirectRenderer::ComputeScissorRectForRenderPass(
           // Sanity check: we should not have a Compositor
           // CompositorRenderPassDrawQuad here.
           DCHECK_NE(quad->material, DrawQuad::Material::kCompositorRenderPass);
-          if (quad->material == DrawQuad::Material::kAggregatedRenderPass) {
-            const auto* rpdq = AggregatedRenderPassDrawQuad::MaterialCast(quad);
-
+          if (auto* rpdq = quad->DynamicCast<AggregatedRenderPassDrawQuad>()) {
             // For render pass with pixel moving backdrop filters.
             if (auto iter =
                     backdrop_filter_output_rects_.find(rpdq->render_pass_id);

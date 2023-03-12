@@ -19,6 +19,7 @@
 #include "ash/public/ash_interfaces.h"
 #include "ash/public/cpp/event_rewriter_controller.h"
 #include "ash/public/cpp/keyboard/keyboard_controller.h"
+#include "ash/public/cpp/session/session_controller.h"
 #include "ash/shell.h"
 #include "ash/system/diagnostics/diagnostics_log_controller.h"
 #include "ash/system/pcie_peripheral/pcie_peripheral_notification_controller.h"
@@ -219,6 +220,7 @@
 #include "chromeos/ash/components/network/network_handler.h"
 #include "chromeos/ash/components/network/portal_detector/network_portal_detector_stub.h"
 #include "chromeos/ash/components/network/system_token_cert_db_storage.h"
+#include "chromeos/ash/components/osauth/public/auth_parts.h"
 #include "chromeos/ash/components/peripheral_notification/peripheral_notification_manager.h"
 #include "chromeos/ash/components/power/dark_resume_controller.h"
 #include "chromeos/ash/components/settings/cros_settings_names.h"
@@ -833,6 +835,8 @@ int ChromeBrowserMainPartsAsh::PreMainMessageLoopRun() {
   auth_metrics_recorder_ =
       base::WrapUnique<AuthMetricsRecorder>(new AuthMetricsRecorder());
 
+  auth_parts_ = AuthParts::Create();
+
   return ChromeBrowserMainPartsLinux::PreMainMessageLoopRun();
 }
 
@@ -1007,12 +1011,6 @@ void ChromeBrowserMainPartsAsh::PreProfileInit() {
       std::make_unique<crosapi::LacrosAvailabilityPolicyObserver>();
   lacros_data_backward_migration_mode_policy_observer_ = std::make_unique<
       crosapi::LacrosDataBackwardMigrationModePolicyObserver>();
-
-  // Only creates VideoConferenceAppServiceClient if VcControlsUi is enabled.
-  if (features::IsVideoConferenceEnabled()) {
-    vc_app_service_client_ =
-        std::make_unique<VideoConferenceAppServiceClient>();
-  }
 
   chromeos::machine_learning::ServiceConnection::GetInstance()->Initialize();
 
@@ -1220,6 +1218,11 @@ void ChromeBrowserMainPartsAsh::PostProfileInit(Profile* profile,
 
     manager->SetState(session_manager->GetDefaultIMEState(profile));
 
+    misconfigured_user_cleaner_ = std::make_unique<MisconfiguredUserCleaner>(
+        g_browser_process->local_state(), ash::SessionController::Get());
+
+    misconfigured_user_cleaner_->ScheduleCleanup();
+
     g_browser_process->platform_part()->session_manager()->Initialize(
         *base::CommandLine::ForCurrentProcess(), profile,
         is_integration_test());
@@ -1393,6 +1396,8 @@ void ChromeBrowserMainPartsAsh::PostBrowserStart() {
   if (features::IsVideoConferenceEnabled()) {
     video_conference_manager_client_ =
         std::make_unique<video_conference::VideoConferenceManagerClientImpl>();
+    vc_app_service_client_ =
+        std::make_unique<VideoConferenceAppServiceClient>();
   }
 
   ChromeBrowserMainPartsLinux::PostBrowserStart();

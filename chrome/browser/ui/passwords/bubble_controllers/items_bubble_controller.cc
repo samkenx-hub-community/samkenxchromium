@@ -44,6 +44,12 @@ ItemsBubbleController::~ItemsBubbleController() {
   OnBubbleClosing();
 }
 
+std::u16string ItemsBubbleController::GetTitle() const {
+  return GetManagePasswordsDialogTitleText(
+      GetWebContents()->GetVisibleURL(), delegate_->GetOrigin(),
+      !delegate_->GetCurrentForms().empty());
+}
+
 void ItemsBubbleController::OnManageClicked(
     password_manager::ManagePasswordsReferrer referrer) {
   dismissal_reason_ = metrics_util::CLICKED_MANAGE;
@@ -122,6 +128,7 @@ void ItemsBubbleController::UpdateSelectedCredentialInPasswordStore(
   if (currently_selected_password_.value().username_value ==
       updated_form.username_value) {
     password_store->UpdateLogin(updated_form);
+    currently_selected_password_ = updated_form;
     return;
   }
   if (updated_form.username_value.empty()) {
@@ -140,6 +147,9 @@ void ItemsBubbleController::UpdateSelectedCredentialInPasswordStore(
   password_store->UpdateLoginWithPrimaryKey(
       updated_form, currently_selected_password_.value());
   currently_selected_password_ = updated_form;
+
+  metrics_util::LogUserInteractionsInPasswordManagementBubble(
+      metrics_util::PasswordManagementBubbleInteractions::kUsernameAdded);
 }
 
 void ItemsBubbleController::AuthenticateUserAndDisplayDetailsOf(
@@ -175,12 +185,6 @@ void ItemsBubbleController::ReportInteractions() {
   // Record UKM statistics on dismissal reason.
   if (metrics_recorder_)
     metrics_recorder_->RecordUIDismissalReason(dismissal_reason_);
-}
-
-std::u16string ItemsBubbleController::GetTitle() const {
-  return GetManagePasswordsDialogTitleText(
-      GetWebContents()->GetVisibleURL(), delegate_->GetOrigin(),
-      !delegate_->GetCurrentForms().empty());
 }
 
 scoped_refptr<password_manager::PasswordStoreInterface>

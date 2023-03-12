@@ -305,6 +305,40 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram
+    name="Network.Ash.Hotspot.Upstream.Cellular.Usage.Config.AutoDisable"
+    enum="BooleanEnabled" expires_after="2023-10-01">
+  <owner>jiajunz@google.com</owner>
+  <owner>cros-connectivity@google.com</owner>
+  <summary>
+    Measures and tracks the number of whether the hotspot auto disable
+    configuration is set for usage. Emitted each time the hotspot starts
+    successfully.
+  </summary>
+</histogram>
+
+<histogram
+    name="Network.Ash.Hotspot.Upstream.Cellular.Usage.Config.CompatibilityMode"
+    enum="BooleanEnabled" expires_after="2023-10-01">
+  <owner>jiajunz@google.com</owner>
+  <owner>cros-connectivity@google.com</owner>
+  <summary>
+    Measures and tracks the number of whether the hotspot extend compatibility
+    mode is set for usage. Emitted each time the hotspot starts successfully.
+  </summary>
+</histogram>
+
+<histogram name="Network.Ash.Hotspot.Upstream.Cellular.Usage.Config.MAR"
+    enum="BooleanEnabled" expires_after="2023-10-01">
+  <owner>jiajunz@google.com</owner>
+  <owner>cros-connectivity@google.com</owner>
+  <summary>
+    Measures and tracks the number of whether the hotspot BSSID randomization
+    configuration is set for usage. Emitted each time the hotspot starts
+    successfully.
+  </summary>
+</histogram>
+
+<histogram
     name="Network.Ash.Hotspot.Upstream.Cellular.{Operation}.OperationResult"
     enum="HotspotSetEnabledResult" expires_after="2023-10-01">
   <owner>jiajunz@google.com</owner>
@@ -1313,6 +1347,67 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
+<histogram name="Network.DnsProxy.PlainTextProbe.{Family}.Errors"
+    enum="DnsProxy.QueryResult" expires_after="2023-05-07">
+  <owner>jasongustaman@chromium.org</owner>
+  <owner>cros-network-metrics@google.com</owner>
+  <summary>
+    Diagnostic metric for ChromeOS DNS proxy that records any errors that occur
+    during DNS probes made by the service. A value will be recorded whenever the
+    probe completes in error.
+  </summary>
+  <token key="Family">
+    <variant name="IPv4"/>
+    <variant name="IPv6"/>
+  </token>
+</histogram>
+
+<histogram name="Network.DnsProxy.PlainTextProbe.{Family}.FailedRetries"
+    units="count" expires_after="2023-05-07">
+  <owner>jasongustaman@chromium.org</owner>
+  <owner>cros-network-metrics@google.com</owner>
+  <summary>
+    Diagnostic metric for ChromeOS DNS proxy that records number of retries for
+    failing probes. A value will be recorded whenever the probe completes in
+    error.
+  </summary>
+  <token key="Family">
+    <variant name="IPv4"/>
+    <variant name="IPv6"/>
+  </token>
+</histogram>
+
+<histogram name="Network.DnsProxy.PlainTextProbe.{Family}.Results"
+    enum="DnsProxy.QueryResult" expires_after="2023-05-07">
+  <owner>jasongustaman@chromium.org</owner>
+  <owner>cros-network-metrics@google.com</owner>
+  <summary>
+    Diagnostic metric for ChromeOS DNS proxy that records the results of the DNS
+    probes made by the service. A value will be recorded whenever the probe
+    completes.
+  </summary>
+  <token key="Family">
+    <variant name="IPv4"/>
+    <variant name="IPv6"/>
+  </token>
+</histogram>
+
+<histogram name="Network.DnsProxy.PlainTextProbe.{Family}.ResultsWithRetries"
+    enum="DnsProxy.QueryResult" expires_after="2023-05-07">
+  <owner>jasongustaman@chromium.org</owner>
+  <owner>cros-network-metrics@google.com</owner>
+  <summary>
+    Diagnostic metric for ChromeOS DNS proxy that records the results of the DNS
+    probes made by the service. A value will be recorded whenever the probe
+    completes. However, on error it is only recorded if it is a consistent
+    error, meaning if it fails even after certain amount of retries.
+  </summary>
+  <token key="Family">
+    <variant name="IPv4"/>
+    <variant name="IPv6"/>
+  </token>
+</histogram>
+
 <histogram name="Network.DnsProxy.Query.Failed{Stage}Duration" units="ms"
     expires_after="2023-05-07">
   <owner>garrick@chromium.org</owner>
@@ -1503,16 +1598,6 @@ chromium-metrics-reviews@google.com.
     <variant name="DnsOverHttps"/>
     <variant name="PlainText"/>
   </token>
-</histogram>
-
-<histogram name="Network.EarlyHints.Preload.RequestDestination"
-    enum="RequestDestination" expires_after="2023-04-15">
-  <owner>bashi@chromium.org</owner>
-  <owner>blink-network-stack@google.com</owner>
-  <summary>
-    Records a request destination when a preload initiated by an Early Hints is
-    loaded from the network.
-  </summary>
 </histogram>
 
 <histogram name="Network.NetworkPortalDetectorHasProxy" enum="Boolean"
@@ -3205,7 +3290,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Network.Shill.WiFi.TimeFromRekeyToFailureSeconds"
-    units="seconds" expires_after="2023-07-02">
+    units="seconds" expires_after="2023-09-03">
   <owner>billyzhao@chromium.org</owner>
   <owner>cros-network-metrics@google.com</owner>
   <summary>
@@ -3526,7 +3611,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="NetworkService.ClearStaleDataDirectoryResult"
-    enum="DeleteStaleCookiesResult" expires_after="2023-07-02">
+    enum="DeleteStaleCookiesResult" expires_after="2023-09-03">
   <owner>wfh@chromium.org</owner>
   <owner>pasko@chromium.org</owner>
   <summary>
@@ -3570,7 +3655,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="NetworkService.DeletedOldCacheData" enum="Boolean"
-    expires_after="2023-06-30">
+    expires_after="2023-09-03">
   <owner>wfh@chromium.org</owner>
   <owner>mmenke@chromium.org</owner>
   <summary>
@@ -3582,7 +3667,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="NetworkService.GrantSandboxResult"
-    enum="NetworkServiceSandboxGrantResult" expires_after="2023-04-30">
+    enum="NetworkServiceSandboxGrantResult" expires_after="2023-09-03">
   <owner>wfh@chromium.org</owner>
   <owner>mmenke@chromium.org</owner>
   <summary>
@@ -3680,37 +3765,6 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
-<histogram name="NetworkService.TimeToFirstResponse" units="ms"
-    expires_after="M82">
-  <owner>cduvall@chromium.org</owner>
-  <owner>cmumford@chromium.org</owner>
-  <summary>
-    How long it takes the network service to respond to the first mojo call.
-    This will be used to debug http://crbug.com/934317.
-  </summary>
-</histogram>
-
-<histogram name="NetworkService.TimeToFirstResponse.AfterCrash" units="ms"
-    expires_after="M82">
-  <owner>cduvall@chromium.org</owner>
-  <owner>cmumford@chromium.org</owner>
-  <summary>
-    How long it takes the network service to respond to the first mojo call
-    after a network service crash. This will be used to debug
-    http://crbug.com/934317.
-  </summary>
-</histogram>
-
-<histogram name="NetworkService.TimeToFirstResponse.OnStartup" units="ms"
-    expires_after="M82">
-  <owner>cduvall@chromium.org</owner>
-  <owner>cmumford@chromium.org</owner>
-  <summary>
-    How long it takes the network service to respond to the first mojo call on
-    startup. This will be used to debug http://crbug.com/934317.
-  </summary>
-</histogram>
-
 <histogram name="NetworkService.TimeToGrantCacheAccess" units="ms"
     expires_after="2023-08-08">
   <owner>wfh@chromium.org</owner>
@@ -3741,7 +3795,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="NetworkService.TimeToMigrateData" units="ms"
-    expires_after="2023-07-02">
+    expires_after="2023-09-03">
   <owner>wfh@chromium.org</owner>
   <owner>mmenke@chromium.org</owner>
   <summary>

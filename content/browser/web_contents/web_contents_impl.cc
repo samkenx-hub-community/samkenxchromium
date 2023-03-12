@@ -4983,6 +4983,19 @@ void WebContentsImpl::CopyToFindPboard() {
 #endif
 }
 
+void WebContentsImpl::CenterSelection() {
+  OPTIONAL_TRACE_EVENT0("content", "WebContentsImpl::CenterSelection");
+#if BUILDFLAG(IS_MAC)
+  auto* input_handler = GetFocusedFrameWidgetInputHandler();
+  if (!input_handler) {
+    return;
+  }
+
+  last_interaction_time_ = ui::EventTimeForNow();
+  input_handler->CenterSelection();
+#endif
+}
+
 void WebContentsImpl::Paste() {
   OPTIONAL_TRACE_EVENT0("content", "WebContentsImpl::Paste");
   auto* input_handler = GetFocusedFrameWidgetInputHandler();
@@ -9635,11 +9648,19 @@ void WebContentsImpl::AboutToBeDiscarded(WebContents* new_contents) {
 }
 
 base::ScopedClosureRunner WebContentsImpl::CreateDisallowCustomCursorScope() {
-  CursorManager* manager = GetPrimaryMainFrame()
-                               ->GetRenderWidgetHost()
-                               ->GetRenderWidgetHostViewBase()
-                               ->GetCursorManager();
-  return manager->CreateDisallowCustomCursorScope();
+  auto* render_widget_host_base = GetPrimaryMainFrame()
+                                      ->GetRenderWidgetHost()
+                                      ->GetRenderWidgetHostViewBase();
+
+  // It's possible for |render_widget_host_base| to be null if the renderer
+  // crashed. To avoid race conditions, null-check here. See crbug.com/1421552
+  // as well.
+  if (!render_widget_host_base) {
+    return base::ScopedClosureRunner();
+  }
+
+  auto* cursor_manager = render_widget_host_base->GetCursorManager();
+  return cursor_manager->CreateDisallowCustomCursorScope();
 }
 
 bool WebContentsImpl::CancelPrerendering(FrameTreeNode* frame_tree_node,

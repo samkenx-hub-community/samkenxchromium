@@ -112,6 +112,7 @@
 #endif
 
 #if BUILDFLAG(IS_MAC)
+#include "content/browser/gpu/browser_child_process_backgrounded_bridge.h"
 #include "content/browser/gpu/ca_transaction_gpu_coordinator.h"
 #endif
 
@@ -261,6 +262,7 @@ static const char* const kSwitchNames[] = {
     switches::kRunAllCompositorStagesBeforeDraw,
     switches::kSkiaFontCacheLimitMb,
     switches::kSkiaResourceCacheLimitMb,
+    switches::kForceSkiaAnalyticAntialiasing,
     switches::kTestGLLib,
     switches::kTraceToConsole,
     switches::kUseFakeMjpegDecodeAccelerator,
@@ -927,6 +929,14 @@ void GpuProcessHost::OnProcessLaunched() {
     process_id_ = process_->GetProcess().Pid();
     DCHECK_NE(base::kNullProcessId, process_id_);
     gpu_host_->SetProcessId(process_id_);
+
+#if BUILDFLAG(IS_MAC)
+    if (base::FeatureList::IsEnabled(features::kAdjustGpuProcessPriority)) {
+      browser_child_process_backgrounded_bridge_ =
+          std::make_unique<BrowserChildProcessBackgroundedBridge>(
+              process_.get());
+    }
+#endif
   }
 }
 

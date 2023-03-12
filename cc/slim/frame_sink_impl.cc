@@ -14,12 +14,15 @@
 #include "base/threading/platform_thread.h"
 #include "base/trace_event/trace_event.h"
 #include "build/build_config.h"
+#include "cc/slim/constants.h"
 #include "cc/slim/frame_sink_impl_client.h"
 #include "components/viz/common/features.h"
+#include "components/viz/common/quads/compositor_frame.h"
 #include "components/viz/common/resources/platform_color.h"
 #include "components/viz/common/resources/resource_format_utils.h"
 #include "components/viz/common/resources/resource_id.h"
 #include "components/viz/common/resources/shared_image_format.h"
+#include "components/viz/common/resources/transferable_resource.h"
 #include "gpu/command_buffer/client/shared_image_interface.h"
 #include "gpu/command_buffer/common/gpu_memory_buffer_support.h"
 #include "gpu/command_buffer/common/shared_image_usage.h"
@@ -208,6 +211,13 @@ gfx::Size FrameSinkImpl::GetUIResourceSize(cc::UIResourceId resource_id) {
   }
 
   return it->second.size;
+}
+
+int FrameSinkImpl::GetMaxTextureSize() const {
+  if (context_provider_) {
+    return context_provider_->ContextCapabilities().max_texture_size;
+  }
+  return kSoftwareMaxTextureSize;
 }
 
 void FrameSinkImpl::DidReceiveCompositorFrameAck(

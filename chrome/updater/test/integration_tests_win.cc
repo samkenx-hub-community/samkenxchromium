@@ -15,6 +15,7 @@
 
 #include "base/base_paths.h"
 #include "base/command_line.h"
+#include "base/containers/adapters.h"
 #include "base/containers/contains.h"
 #include "base/files/file_path.h"
 #include "base/files/file_util.h"
@@ -475,9 +476,9 @@ void CallDispatchMethod(
   params.reserve(variant_params.size());
 
   // IDispatch::Invoke() expects the parameters in reverse order.
-  std::transform(variant_params.rbegin(), variant_params.rend(),
-                 std::back_inserter(params),
-                 [](const auto& param) { return param.Copy(); });
+  base::ranges::transform(base::Reversed(variant_params),
+                          std::back_inserter(params),
+                          &base::win::ScopedVariant::Copy);
 
   DISPPARAMS dp = {};
   if (!params.empty()) {
@@ -1077,6 +1078,9 @@ HRESULT DoLoopUntilDone(Microsoft::WRL::ComPtr<IAppBundleWeb> bundle,
   return S_OK;
 }
 
+// TODO(crbug.com/1396103): fix after implementing `CheckForUpdate`. This
+// implementation seems wrong because it calls `CheckForUpdate` to do an
+// update.
 HRESULT DoUpdate(UpdaterScope scope,
                  const base::win::ScopedBstr& appid,
                  int expected_final_state,
@@ -1455,6 +1459,14 @@ void SetupFakeLegacyUpdater(UpdaterScope scope) {
           Wow6432(KEY_WRITE)),
       ERROR_SUCCESS);
   ASSERT_EQ(key.WriteValue(kRegValuePV, L"99.0.0.1"), ERROR_SUCCESS);
+  key.Close();
+
+  ASSERT_EQ(
+      key.Create(root,
+                 GetAppClientStateKey(L"{8A69D345-D564-463C-AFF1-A69D9E530F96}")
+                     .c_str(),
+                 Wow6432(KEY_WRITE)),
+      ERROR_SUCCESS);
   ASSERT_EQ(key.WriteValue(kRegValueBrandCode, L"GGLS"), ERROR_SUCCESS);
   ASSERT_EQ(key.WriteValue(kRegValueAP, L"TestAP"), ERROR_SUCCESS);
   key.Close();
@@ -1589,12 +1601,13 @@ void RunOfflineInstall(UpdaterScope scope,
                        bool is_legacy_install,
                        bool is_silent_install) {
   constexpr wchar_t kTestAppID[] = L"{CDABE316-39CD-43BA-8440-6D1E0547AEE6}";
+  const base::Version kTestPV("1.2.3.4");
   constexpr char kManifestFormat[] =
       "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
       "<response protocol=\"3.0\">\n"
       "  <app appid=\"%ls\" status=\"ok\">\n"
       "    <updatecheck status=\"ok\">\n"
-      "      <manifest version=\"1.2.3.4\">\n"
+      "      <manifest version=\"%s\">\n"
       "        <packages>\n"
       "          <package hash_sha256=\"sha256hash_foobar\"\n"
       "            name=\"cmd.exe\" required=\"true\" size=\"%lld\"/>\n"
@@ -1687,7 +1700,8 @@ void RunOfflineInstall(UpdaterScope scope,
   int64_t exe_size = 0;
   EXPECT_TRUE(base::GetFileSize(cmd_exe_path, &exe_size));
   const std::string manifest = base::StringPrintf(
-      kManifestFormat, kTestAppID, exe_size, batch_script_path.value().c_str());
+      kManifestFormat, kTestAppID, kTestPV.GetString().c_str(), exe_size,
+      batch_script_path.value().c_str());
   EXPECT_TRUE(base::WriteFile(manifest_path, manifest));
 
   // Trigger offline install.
@@ -1735,6 +1749,12 @@ void RunOfflineInstall(UpdaterScope scope,
         base::BindLambdaForTesting(
             []() { VLOG(0) << "Still waiting for the process exit."; })));
   }
+
+  // Updater should have written "pv".
+  EXPECT_EQ(base::MakeRefCounted<PersistedData>(
+                scope, CreateGlobalPrefs(scope)->GetPrefService())
+                ->GetProductVersion(base::WideToASCII(kTestAppID)),
+            kTestPV);
 
   // App installer should have created the expected reg value.
   base::win::RegKey key;

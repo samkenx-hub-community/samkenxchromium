@@ -101,6 +101,11 @@ UserPerformanceTuningManager::PreDiscardResourceUsage::
     ~PreDiscardResourceUsage() = default;
 
 // static
+bool UserPerformanceTuningManager::HasInstance() {
+  return g_user_performance_tuning_manager;
+}
+
+// static
 UserPerformanceTuningManager* UserPerformanceTuningManager::GetInstance() {
   DCHECK(g_user_performance_tuning_manager);
   return g_user_performance_tuning_manager;
@@ -143,6 +148,24 @@ bool UserPerformanceTuningManager::IsBatterySaverModeDisabledForSession()
 bool UserPerformanceTuningManager::IsHighEfficiencyModeActive() const {
   return pref_change_registrar_.prefs()->GetBoolean(
       performance_manager::user_tuning::prefs::kHighEfficiencyModeEnabled);
+}
+
+bool UserPerformanceTuningManager::IsHighEfficiencyModeManaged() const {
+  auto* pref = pref_change_registrar_.prefs()->FindPreference(
+      performance_manager::user_tuning::prefs::kHighEfficiencyModeEnabled);
+  return pref->IsManaged();
+}
+
+bool UserPerformanceTuningManager::IsHighEfficiencyModeDefault() const {
+  auto* pref = pref_change_registrar_.prefs()->FindPreference(
+      performance_manager::user_tuning::prefs::kHighEfficiencyModeEnabled);
+  return pref->IsDefaultValue();
+}
+
+void UserPerformanceTuningManager::SetHighEfficiencyModeEnabled(bool enabled) {
+  pref_change_registrar_.prefs()->SetBoolean(
+      performance_manager::user_tuning::prefs::kHighEfficiencyModeEnabled,
+      enabled);
 }
 
 bool UserPerformanceTuningManager::IsBatterySaverActive() const {
@@ -287,6 +310,10 @@ void UserPerformanceTuningManager::OnHighEfficiencyModePrefChanged() {
   bool enabled = pref_change_registrar_.prefs()->GetBoolean(
       performance_manager::user_tuning::prefs::kHighEfficiencyModeEnabled);
   high_efficiency_mode_toggle_delegate_->ToggleHighEfficiencyMode(enabled);
+
+  for (auto& obs : observers_) {
+    obs.OnHighEfficiencyModeChanged();
+  }
 }
 
 void UserPerformanceTuningManager::OnBatterySaverModePrefChanged() {

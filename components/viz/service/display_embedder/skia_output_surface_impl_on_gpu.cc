@@ -1958,9 +1958,6 @@ bool SkiaOutputSurfaceImplOnGpu::MakeCurrent(bool need_framebuffer) {
     if (gl_surface_) {
       gl_surface_->OnMakeCurrent(context_state_->context());
     }
-    if (presenter_) {
-      presenter_->OnMakeCurrent(context_state_->context());
-    }
   }
 
   context_state_->set_need_context_state_reset(true);
@@ -1981,8 +1978,6 @@ void SkiaOutputSurfaceImplOnGpu::SwapBuffersInternal(
 
   if (frame) {
     if (gl_surface_) {
-      gl_surface_->SetChoreographerVsyncIdForNextFrame(
-          frame->choreographer_vsync_id);
       if (frame->delegated_ink_metadata) {
         gl_surface_->SetDelegatedInkTrailStartPoint(
             std::move(frame->delegated_ink_metadata));
@@ -2097,24 +2092,9 @@ void SkiaOutputSurfaceImplOnGpu::PostSubmit(
     output_device_->SetViewportSize(frame->size);
     output_device_->SchedulePrimaryPlane(output_surface_plane_);
 
-    if (frame->sub_buffer_rect) {
-      if (capabilities().supports_post_sub_buffer) {
-        output_device_->PostSubBuffer(*frame->sub_buffer_rect,
-                                      buffer_presented_callback_,
-                                      std::move(*frame));
-
-      } else if (capabilities().supports_commit_overlay_planes) {
-        // CommitOverlayPlanes() can only be used for empty swap.
-        DCHECK(frame->sub_buffer_rect->IsEmpty());
-        output_device_->CommitOverlayPlanes(buffer_presented_callback_,
-                                            std::move(*frame));
-      } else {
-        NOTREACHED();
-      }
-    } else {
-      output_device_->SwapBuffers(buffer_presented_callback_,
-                                  std::move(*frame));
-    }
+    DCHECK(!frame->sub_buffer_rect || capabilities().supports_post_sub_buffer);
+    output_device_->Present(frame->sub_buffer_rect, buffer_presented_callback_,
+                            std::move(*frame));
   }
 
   // Reset the overlay plane information even on skipped swap.
@@ -2239,8 +2219,6 @@ void SkiaOutputSurfaceImplOnGpu::CheckReadbackCompletion() {
 }
 
 void SkiaOutputSurfaceImplOnGpu::PreserveChildSurfaceControls() {
-  if (gl_surface_)
-    gl_surface_->PreserveChildSurfaceControls();
   if (presenter_) {
     presenter_->PreserveChildSurfaceControls();
   }

@@ -623,18 +623,6 @@
       },
     },
   },
-  'ios_runtime_cache_15_0': {
-    '$mixin_append': {
-      'swarming': {
-        'named_caches': [
-          {
-            'name': 'runtime_ios_15_0',
-            'path': 'Runtime-ios-15.0',
-          },
-        ],
-      },
-    },
-  },
   'ios_runtime_cache_15_5': {
     '$mixin_append': {
       'swarming': {
@@ -974,9 +962,9 @@
     'swarming': {
       'dimensions': {
         'cpu': 'x86-64',
-        'gpu': '1002:6821',
+        'gpu': '1002:67ef',
         'hidpi': '1',
-        'os': 'Mac-12.1',
+        'os': 'Mac-13.2.1',
         'pool': 'chromium.tests.gpu',
         'display_attached': '1',
       },

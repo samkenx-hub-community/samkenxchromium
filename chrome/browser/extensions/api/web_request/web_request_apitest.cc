@@ -1042,7 +1042,8 @@ IN_PROC_BROWSER_TEST_P(ExtensionWebRequestApiTestWithContextType,
 // Tests redirects around workers. To test service workers, the HTTPS test
 // server is used.
 // TODO(crbug.com/1413434): test is flaky on linux-chromeos-rel.
-#if BUILDFLAG(IS_CHROMEOS)
+// TODO(crbug.com/1422191): test is flaky on Mac10.14.
+#if BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_MAC)
 #define MAYBE_WebRequestRedirectsWorkers DISABLED_WebRequestRedirectsWorkers
 #else
 #define MAYBE_WebRequestRedirectsWorkers WebRequestRedirectsWorkers
@@ -1267,8 +1268,14 @@ IN_PROC_BROWSER_TEST_P(ExtensionWebRequestApiTestWithContextType,
 // Check that reloading an extension that runs in incognito split mode and
 // has two active background pages with registered events does not crash the
 // browser. Regression test for http://crbug.com/224094
+// Flaky on linux-lacros. See http://crbug.com/1423252
+#if BUILDFLAG(IS_CHROMEOS_LACROS)
+#define MAYBE_IncognitoSplitModeReload DISABLED_IncognitoSplitModeReload
+#else
+#define MAYBE_IncognitoSplitModeReload IncognitoSplitModeReload
+#endif
 IN_PROC_BROWSER_TEST_P(ExtensionWebRequestApiTestWithContextType,
-                       IncognitoSplitModeReload) {
+                       MAYBE_IncognitoSplitModeReload) {
   ASSERT_TRUE(StartEmbeddedTestServer());
   // Wait for rules to be set up.
   ExtensionTestMessageListener listener("done");
@@ -6177,7 +6184,14 @@ IN_PROC_BROWSER_TEST_F(ManifestV3WebRequestApiTest, TestOnAuthRequired) {
 // Tests the behavior of an extension that registers an event listener
 // asynchronously.
 // Regression test for https://crbug.com/1397879.
-IN_PROC_BROWSER_TEST_F(ManifestV3WebRequestApiTest, AsyncListenerRegistration) {
+// Flaky on linux-lacros. See https://crbug.com/1423241
+#if BUILDFLAG(IS_CHROMEOS_LACROS)
+#define MAYBE_AsyncListenerRegistration DISABLED_AsyncListenerRegistration
+#else
+#define MAYBE_AsyncListenerRegistration AsyncListenerRegistration
+#endif
+IN_PROC_BROWSER_TEST_F(ManifestV3WebRequestApiTest,
+                       MAYBE_AsyncListenerRegistration) {
   ASSERT_TRUE(StartEmbeddedTestServer());
   static constexpr char kManifest[] =
       R"({

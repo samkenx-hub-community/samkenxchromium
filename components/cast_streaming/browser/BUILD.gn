@@ -31,9 +31,6 @@ source_set("browser") {
     "//base",
     "//components/cast_streaming/common:mojom",
     "//mojo/public/cpp/bindings",
-
-    # TODO(crbug.com/1220176): Move this deps elsewhere once include is removed.
-    "//third_party/openscreen/src/cast/streaming:receiver",
   ]
   deps = [
     "//base",
@@ -45,6 +42,8 @@ source_set("browser") {
     "//components/cast_streaming/common:conversions",
     "//components/openscreen_platform",
     "//media",
+    "//media/cast/openscreen:config_conversions",
+    "//media/cast/openscreen:remoting_utils",
     "//media/mojo/common",
     "//media/mojo/mojom",
     "//mojo/public/cpp/system",

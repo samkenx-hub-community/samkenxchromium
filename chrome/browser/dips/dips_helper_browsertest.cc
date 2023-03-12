@@ -76,8 +76,6 @@ class FrameCookieAccessObserver : public content::WebContentsObserver {
   base::RunLoop run_loop_;
 };
 
-using StateForURLCallback = base::OnceCallback<void(const DIPSState&)>;
-
 // Histogram names
 constexpr char kTimeToInteraction[] =
     "Privacy.DIPS.TimeFromStorageToInteraction.Standard";
@@ -151,8 +149,7 @@ class DIPSTabHelperBrowserTest : public PlatformBrowserTest,
   absl::optional<StateValue> GetDIPSState(const GURL& url) {
     absl::optional<StateValue> state;
 
-    StateForURL(url,
-                base::BindLambdaForTesting([&](const DIPSState& loaded_state) {
+    StateForURL(url, base::BindLambdaForTesting([&](DIPSState loaded_state) {
                   if (loaded_state.was_loaded()) {
                     state = loaded_state.ToStateValue();
                   }
@@ -241,7 +238,7 @@ IN_PROC_BROWSER_TEST_P(DIPSTabHelperBrowserTest,
 
   // Click on the b.test iframe.
   base::Time frame_interaction_time =
-      time + DIPSBounceDetector::kInteractionUpdateInterval;
+      time + DIPSBounceDetector::kTimestampUpdateInterval;
   SetDIPSTime(frame_interaction_time);
   UserActivationObserver observer_b(web_contents, iframe);
 
@@ -293,7 +290,7 @@ IN_PROC_BROWSER_TEST_P(DIPSTabHelperBrowserTest,
   EXPECT_EQ(state_1->user_interaction_times->first,
             state_1->user_interaction_times->second);
 
-  SetDIPSTime(time + DIPSBounceDetector::kInteractionUpdateInterval +
+  SetDIPSTime(time + DIPSBounceDetector::kTimestampUpdateInterval +
               base::Seconds(10));
   UserActivationObserver observer_2(web_contents, frame);
   SimulateMouseClick(web_contents, 0, blink::WebMouseEvent::Button::kLeft);
@@ -307,10 +304,10 @@ IN_PROC_BROWSER_TEST_P(DIPSTabHelperBrowserTest,
   EXPECT_NE(state_2->user_interaction_times->second,
             state_2->user_interaction_times->first);
   EXPECT_EQ(absl::make_optional(time), state_2->user_interaction_times->first);
-  EXPECT_EQ(absl::make_optional(time +
-                                DIPSBounceDetector::kInteractionUpdateInterval +
-                                base::Seconds(10)),
-            state_2->user_interaction_times->second);
+  EXPECT_EQ(
+      absl::make_optional(time + DIPSBounceDetector::kTimestampUpdateInterval +
+                          base::Seconds(10)),
+      state_2->user_interaction_times->second);
 }
 
 IN_PROC_BROWSER_TEST_P(DIPSTabHelperBrowserTest, StorageRecordedInSingleFrame) {
@@ -607,7 +604,7 @@ IN_PROC_BROWSER_TEST_P(DIPSTabHelperBrowserTest,
   BlockUntilHelperProcessesPendingRequests();
 
   // Click a second time.
-  SetDIPSTime(time + DIPSBounceDetector::kInteractionUpdateInterval +
+  SetDIPSTime(time + DIPSBounceDetector::kTimestampUpdateInterval +
               base::Seconds(3));
   UserActivationObserver click_observer_2(web_contents, frame);
   SimulateMouseClick(web_contents, 0, blink::WebMouseEvent::Button::kLeft);
@@ -620,17 +617,17 @@ IN_PROC_BROWSER_TEST_P(DIPSTabHelperBrowserTest,
   EXPECT_NE(state->user_interaction_times->first,
             state->user_interaction_times->second);
   EXPECT_EQ(absl::make_optional(time), state->user_interaction_times->first);
-  EXPECT_EQ(absl::make_optional(time +
-                                DIPSBounceDetector::kInteractionUpdateInterval +
-                                base::Seconds(3)),
-            state->user_interaction_times->second);
+  EXPECT_EQ(
+      absl::make_optional(time + DIPSBounceDetector::kTimestampUpdateInterval +
+                          base::Seconds(3)),
+      state->user_interaction_times->second);
   EXPECT_FALSE(state->site_storage_times.has_value());
 
   histograms.ExpectTotalCount(kTimeToInteraction, 0);
   histograms.ExpectTotalCount(kTimeToStorage, 0);
 
   // Write a cookie now that both clicks have been handled.
-  SetDIPSTime(time + DIPSBounceDetector::kInteractionUpdateInterval +
+  SetDIPSTime(time + DIPSBounceDetector::kTimestampUpdateInterval +
               base::Seconds(10));
   FrameCookieAccessObserver cookie_observer(web_contents, frame);
   ASSERT_TRUE(content::ExecJs(frame, "document.cookie = 'foo=bar';",
@@ -797,7 +794,10 @@ IN_PROC_BROWSER_TEST_F(DIPSPrepopulateTest, PRE_PrepopulateExactlyOnce) {
   FlushLossyWebsiteSettings();
 }
 
-IN_PROC_BROWSER_TEST_F(DIPSPrepopulateTest, PrepopulateExactlyOnce) {
+// TODO (crbug.com/1418692): Rework this test to work without enabling and
+// disabling the DIPS feature, as opening a profile with the feature disabled
+// now causes any existing db files it has to be removed.
+IN_PROC_BROWSER_TEST_F(DIPSPrepopulateTest, DISABLED_PrepopulateExactlyOnce) {
   ASSERT_NE(dips_service, nullptr);  // Verify that DIPS is on.
   // Only the sites that were prepopulated the first time is in the database.
   auto a_state = GetDIPSState(GURL("http://a.test"));

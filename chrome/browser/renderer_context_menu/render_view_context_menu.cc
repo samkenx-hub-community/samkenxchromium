@@ -248,7 +248,7 @@
 #if BUILDFLAG(ENABLE_SUPERVISED_USERS)
 #include "chrome/browser/supervised_user/supervised_user_service.h"
 #include "chrome/browser/supervised_user/supervised_user_service_factory.h"
-#include "chrome/browser/supervised_user/supervised_user_url_filter.h"
+#include "components/supervised_user/core/browser/supervised_user_url_filter.h"
 #endif
 
 #if BUILDFLAG(ENABLE_LENS_DESKTOP_GOOGLE_BRANDED_FEATURES)
@@ -1930,9 +1930,7 @@ void RenderViewContextMenu::AppendLinkToTextItems() {
 
   link_to_text_menu_observer_ = LinkToTextMenuObserver::Create(
       this,
-      content::GlobalRenderFrameHostId(render_process_id_, render_frame_id_),
-      base::BindOnce(&RenderViewContextMenu::OnLinkToTextMenuCompleted,
-                     weak_pointer_factory_.GetWeakPtr()));
+      content::GlobalRenderFrameHostId(render_process_id_, render_frame_id_));
   if (link_to_text_menu_observer_) {
     observers_.AddObserver(link_to_text_menu_observer_.get());
     link_to_text_menu_observer_->InitMenu(params_);
@@ -3258,14 +3256,16 @@ bool RenderViewContextMenu::IsSaveLinkAsEnabled() const {
 
 #if BUILDFLAG(ENABLE_SUPERVISED_USERS)
   Profile* const profile = Profile::FromBrowserContext(browser_context_);
-  if (profile->IsChild()) {
-    SupervisedUserService* supervised_user_service =
-        SupervisedUserServiceFactory::GetForProfile(profile);
-    SupervisedUserURLFilter* url_filter =
+  SupervisedUserService* supervised_user_service =
+      SupervisedUserServiceFactory::GetForProfile(profile);
+  if (supervised_user_service &&
+      supervised_user_service->IsURLFilteringEnabled()) {
+    supervised_user::SupervisedUserURLFilter* url_filter =
         supervised_user_service->GetURLFilter();
     if (url_filter->GetFilteringBehaviorForURL(params_.link_url) !=
-        SupervisedUserURLFilter::FilteringBehavior::ALLOW)
+        supervised_user::SupervisedUserURLFilter::FilteringBehavior::ALLOW) {
       return false;
+    }
   }
 #endif
 
@@ -4004,11 +4004,6 @@ void RenderViewContextMenu::PluginActionAt(
 
 Browser* RenderViewContextMenu::GetBrowser() const {
   return chrome::FindBrowserWithWebContents(embedder_web_contents_);
-}
-
-void RenderViewContextMenu::OnLinkToTextMenuCompleted() {
-  observers_.RemoveObserver(link_to_text_menu_observer_.get());
-  link_to_text_menu_observer_.reset();
 }
 
 bool RenderViewContextMenu::CanTranslate(bool menu_logging) {

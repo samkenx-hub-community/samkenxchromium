@@ -431,6 +431,12 @@ BASE_FEATURE(kOmniboxAssistantVoiceSearch,
              "OmniboxAssistantVoiceSearch",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
+// If enabled, Omnibox "steady state" background color is updated to match GM3
+// guidelines.
+BASE_FEATURE(kOmniboxSteadyStateBackgroundColor,
+             "OmniboxSteadyStateBackgroundColor",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 // If enabled, Omnibox "steady state" height is increased from 28 dp to 34 dp to
 // match GM3 guidelines.
 BASE_FEATURE(kOmniboxSteadyStateHeight,
@@ -501,6 +507,12 @@ BASE_FEATURE(kRedoCurrentMatch,
 // see comments in `OmniboxView::RevertAll()`.
 BASE_FEATURE(kRevertModelBeforeClosingPopup,
              "OmniboxRevertModelBeforeClosingPopup",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+// If enabled, an existing `AutocompleteClient` will be used instead of
+// generating a new one in `OmniboxEditModel`.
+BASE_FEATURE(kUseExistingAutocompleteClient,
+             "OmniboxUseExistingAutocompleteClient",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 // If enabled, Omnibox reports the Searchbox Stats in the gs_lcrp= param in the

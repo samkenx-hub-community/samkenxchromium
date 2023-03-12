@@ -25,6 +25,21 @@ class IBAN : public AutofillDataModel {
 
   IBAN& operator=(const IBAN& iban);
 
+  // Returns true if IBAN value is valid. This method is case-insensitive.
+  // The validation follows the below steps:
+  // 1. The IBAN consists of 16 to 33 alphanumeric characters, the first two
+  //    letters are country code.
+  // 2. Check that the total IBAN length is correct as per the country.
+  // 3. Move the four initial characters to the end of the string and replace
+  //    each letter in the rearranged string with two digits, thereby expanding
+  //    the string, where 'A' = 10, 'B' = 11, ..., 'Z' = 35.
+  // 4. Interpret the string as a decimal integer and compute the remainder of
+  //    the number on division by 97, returning true if the remainder is 1.
+  //
+  // The validation algorithm is from:
+  // https://en.wikipedia.org/wiki/International_Bank_Account_Number#Algorithms
+  static bool IsValid(const std::u16string& value);
+
   // AutofillDataModel:
   AutofillMetadata GetMetadata() const override;
   bool SetMetadata(const AutofillMetadata& metadata) override;
@@ -86,6 +101,7 @@ class IBAN : public AutofillDataModel {
 
   // Returns a version of |value_| which does not have any separator characters
   // (e.g., '-' and ' ').
+  // TODO(crbug.com/1422672): Cleanup and use value().
   std::u16string GetStrippedValue() const;
 
  private:

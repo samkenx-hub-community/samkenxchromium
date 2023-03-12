@@ -6,9 +6,9 @@
 
 #import "ios/chrome/browser/ntp/new_tab_page_tab_helper.h"
 #import "ios/chrome/browser/sessions/session_restoration_browser_agent.h"
+#import "ios/chrome/browser/shared/ui/util/uikit_ui_util.h"
 #import "ios/chrome/browser/ui/browser_view/tab_consumer.h"
 #import "ios/chrome/browser/ui/ntp/new_tab_page_coordinator.h"
-#import "ios/chrome/browser/ui/util/uikit_ui_util.h"
 #import "ios/chrome/browser/url_loading/new_tab_animation_tab_helper.h"
 #import "ios/chrome/browser/web_state_list/all_web_state_observation_forwarder.h"
 #import "ios/chrome/browser/web_state_list/web_state_list.h"
@@ -137,6 +137,21 @@
   // non-null WebState.
   if (newWebState) {
     [self.consumer webStateSelected:newWebState];
+  }
+}
+
+// Observer method, WebState replaced in `webStateList`.
+- (void)webStateList:(WebStateList*)webStateList
+    didReplaceWebState:(web::WebState*)oldWebState
+          withWebState:(web::WebState*)newWebState
+               atIndex:(int)atIndex {
+  web::WebState* currentWebState = _webStateList->GetActiveWebState();
+  // Add `newTab`'s view to the hierarchy if it's the current Tab.
+  if (currentWebState == newWebState) {
+    // Set this before triggering any of the possible page loads in
+    // displayWebStateIfActive.
+    newWebState->SetKeepRenderProcessAlive(true);
+    [self.consumer displayWebStateIfActive:newWebState];
   }
 }
 

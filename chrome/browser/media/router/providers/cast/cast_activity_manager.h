@@ -119,9 +119,10 @@ class CastActivityManager : public CastActivityManagerBase,
   void OnMediaStatusUpdated(const MediaSinkInternal& sink,
                             const base::Value::Dict& media_status,
                             absl::optional<int> request_id) override;
+
   void OnSourceChanged(const std::string& media_route_id,
                        int old_frame_tree_node_id,
-                       int frame_tree_node_id) override;
+                       int frame_tree_node_id);
 
   static void SetActitityFactoryForTest(CastActivityFactoryForTest* factory) {
     cast_activity_factory_for_test_ = factory;
@@ -301,6 +302,9 @@ class CastActivityManager : public CastActivityManagerBase,
                           const MediaSinkInternal& sink) const;
 
   void TerminateAllLocalMirroringActivities();
+
+  void MaybeShowIssueAtLaunch(const MediaSource& media_source,
+                              const MediaSink::Id& sink_id);
 
   static CastActivityFactoryForTest* cast_activity_factory_for_test_;
 

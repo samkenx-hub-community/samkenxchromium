@@ -18,7 +18,6 @@
 #include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "base/time/time.h"
-#include "content/browser/fenced_frame/fenced_frame_url_mapping.h"
 #include "content/browser/interest_group/auction_worklet_manager.h"
 #include "content/browser/interest_group/interest_group_auction_reporter.h"
 #include "content/browser/interest_group/interest_group_storage.h"
@@ -305,8 +304,9 @@ class CONTENT_EXPORT InterestGroupAuction
     Bid(BidRole bid_role,
         std::string ad_metadata,
         double bid,
-        GURL render_url,
-        std::vector<GURL> ad_components,
+        absl::optional<double> ad_cost,
+        blink::AdDescriptor ad_descriptor,
+        std::vector<blink::AdDescriptor> ad_component_descriptors,
         base::TimeDelta bid_duration,
         absl::optional<uint32_t> bidding_signals_data_version,
         const blink::InterestGroup::Ad* bid_ad,
@@ -324,6 +324,11 @@ class CONTENT_EXPORT InterestGroupAuction
                  : *bid_state->trace_id;
     }
 
+    // Get a vector of ad component urls. For compatible with functions
+    // expecting a vector of `GURL` instead of a vector of
+    // `blink::AdDescriptor`.
+    std::vector<GURL> GetAdComponentUrls() const;
+
     // Which auctions the bid participates in.
     BidRole bid_role;
 
@@ -331,8 +336,9 @@ class CONTENT_EXPORT InterestGroupAuction
     // auction_worklet::mojom::BidderWorkletBid.
     const std::string ad_metadata;
     const double bid;
-    const GURL render_url;
-    const std::vector<GURL> ad_components;
+    const absl::optional<double> ad_cost;
+    const blink::AdDescriptor ad_descriptor;
+    const std::vector<blink::AdDescriptor> ad_component_descriptors;
     const base::TimeDelta bid_duration;
     const absl::optional<uint32_t> bidding_signals_data_version;
 
@@ -394,12 +400,16 @@ class CONTENT_EXPORT InterestGroupAuction
   // is destroyed. `config` is typically owned by the AuctionRunner's
   // `owned_auction_config_` field. `parent` should be the parent
   // InterestGroupAuction if this is a component auction, and null, otherwise.
-  InterestGroupAuction(auction_worklet::mojom::KAnonymityBidMode kanon_mode,
-                       const blink::AuctionConfig* config,
-                       const InterestGroupAuction* parent,
-                       AuctionWorkletManager* auction_worklet_manager,
-                       InterestGroupManagerImpl* interest_group_manager,
-                       base::Time auction_start_time);
+  InterestGroupAuction(
+      auction_worklet::mojom::KAnonymityBidMode kanon_mode,
+      const blink::AuctionConfig* config,
+      const InterestGroupAuction* parent,
+      AuctionWorkletManager* auction_worklet_manager,
+      InterestGroupManagerImpl* interest_group_manager,
+      base::Time auction_start_time,
+      base::RepeatingCallback<
+          void(const PrivateAggregationRequests& private_aggregation_requests)>
+          maybe_log_private_aggregation_web_features_callback);
 
   InterestGroupAuction(const InterestGroupAuction&) = delete;
   InterestGroupAuction& operator=(const InterestGroupAuction&) = delete;
@@ -446,8 +456,6 @@ class CONTENT_EXPORT InterestGroupAuction
   std::unique_ptr<InterestGroupAuctionReporter> CreateReporter(
       AttributionManager* attribution_manager,
       PrivateAggregationManager* private_aggregation_manager,
-      InterestGroupAuctionReporter::LogPrivateAggregationRequestsCallback
-          log_private_aggregation_requests_callback,
       scoped_refptr<network::SharedURLLoaderFactory> url_loader_factory,
       std::unique_ptr<blink::AuctionConfig> auction_config,
       const url::Origin& main_frame_origin,
@@ -572,6 +580,13 @@ class CONTENT_EXPORT InterestGroupAuction
   // join the k-anon sets if it's informed the winning ad has been navigated to,
   // so there's no need for anything else to invoke this method.
   base::flat_set<std::string> GetKAnonKeysToJoin() const;
+
+  // Depending on the requests present and whether the features have already
+  // been logged for this page, may log one or more Private Aggregation API web
+  // features.
+  void MaybeLogPrivateAggregationWebFeatures(
+      const std::vector<auction_worklet::mojom::PrivateAggregationRequestPtr>&
+          private_aggregation_requests);
 
   // Returns the top bid of whichever auction (k-anon or not, depending on the
   // configuration) is actually to be used for the user-facing results. May only
@@ -1015,6 +1030,12 @@ class CONTENT_EXPORT InterestGroupAuction
   // request's event type.
   std::map<std::string, PrivateAggregationRequests>
       private_aggregation_requests_non_reserved_;
+
+  // Callback for passing encountered PrivateAggregationRequests up in order to
+  // maybe trigger Private Aggregation web features, as appropriate.
+  base::RepeatingCallback<void(
+      const PrivateAggregationRequests& private_aggregation_requests)>
+      maybe_log_private_aggregation_web_features_callback_;
 
   // All errors reported by worklets thus far.
   std::vector<std::string> errors_;

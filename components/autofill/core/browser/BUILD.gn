@@ -162,8 +162,6 @@ static_library("browser") {
     "data_model/iban.h",
     "data_model/phone_number.cc",
     "data_model/phone_number.h",
-    "data_model/test_data_creator.cc",
-    "data_model/test_data_creator.h",
     "field_filler.cc",
     "field_filler.h",
     "field_type_utils.cc",
@@ -316,6 +314,7 @@ static_library("browser") {
     "payments/card_unmask_challenge_option.h",
     "payments/card_unmask_delegate.cc",
     "payments/card_unmask_delegate.h",
+    "payments/client_behavior_constants.h",
     "payments/credit_card_access_manager.cc",
     "payments/credit_card_access_manager.h",
     "payments/credit_card_cvc_authenticator.cc",
@@ -677,6 +676,8 @@ static_library("test_support") {
     "metrics/ukm_metrics_test_utils.h",
     "mock_autocomplete_history_manager.cc",
     "mock_autocomplete_history_manager.h",
+    "mock_autofill_optimization_guide.cc",
+    "mock_autofill_optimization_guide.h",
     "mock_iban_manager.cc",
     "mock_iban_manager.h",
     "mock_merchant_promo_code_manager.cc",
@@ -994,8 +995,11 @@ source_set("unit_tests") {
   }
 
   if (!is_ios) {
+    sources += [ "autofill_policy_handler_unittest.cc" ]
+  }
+
+  if (is_win || is_mac || is_android) {
     sources += [
-      "autofill_policy_handler_unittest.cc",
       "metrics/payments/better_auth_metrics_unittest.cc",
       "payments/credit_card_fido_authenticator_unittest.cc",
     ]
@@ -1095,7 +1099,7 @@ fuzzer_test("form_structure_fuzzer") {
   dict = "form_structure_fuzzer.dict"
 }
 
-if (use_libfuzzer) {
+if (use_fuzzing_engine_with_lpm) {
   fuzzer_test("form_structure_process_query_response_fuzzer") {
     sources = [ "form_structure_process_query_response_fuzzer.cc" ]
     deps = [

@@ -692,8 +692,14 @@ TEST_F(AudioRendererMixerManagerTest, MixerParamsLatencyPlaybackFakeAudio) {
   ReturnMixer(mixer);
 }
 
+#if BUILDFLAG(IS_IOS)
+// TODO(crbug.com/1141478)
+#define MAYBE_MixerParamsLatencyRtc DISABLED_MixerParamsLatencyRtc
+#else
+#define MAYBE_MixerParamsLatencyRtc MixerParamsLatencyRtc
+#endif  // BUILDFLAG(IS_IOS)
 // Verify output bufer size of the mixer is correctly adjusted for RTC latency.
-TEST_F(AudioRendererMixerManagerTest, MixerParamsLatencyRtc) {
+TEST_F(AudioRendererMixerManagerTest, MAYBE_MixerParamsLatencyRtc) {
   mock_sink_ = CreateNormalSink();
 
   // Expecting hardware buffer size of 128 frames
@@ -721,7 +727,7 @@ TEST_F(AudioRendererMixerManagerTest, MixerParamsLatencyRtc) {
   EXPECT_EQ(output_sample_rate,
             mixer->get_output_params_for_testing().sample_rate());
 
-#if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_MAC) || \
+#if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_APPLE) || \
     BUILDFLAG(IS_FUCHSIA)
   // Use 10 ms buffer (441 frames per buffer).
   EXPECT_EQ(output_sample_rate / 100,

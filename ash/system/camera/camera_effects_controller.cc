@@ -135,19 +135,6 @@ CameraEffectsController::~CameraEffectsController() {
       this);
 }
 
-// TODO(b/265586822): this should be eventually detected from hardware support.
-bool CameraEffectsController::IsCameraEffectsSupported(
-    cros::mojom::CameraEffect effect) {
-  switch (effect) {
-    case cros::mojom::CameraEffect::kNone:
-    case cros::mojom::CameraEffect::kBackgroundBlur:
-    case cros::mojom::CameraEffect::kPortraitRelight:
-      return features::IsVideoConferenceEnabled();
-    case cros::mojom::CameraEffect::kBackgroundReplace:
-      return features::IsVcBackgroundReplaceEnabled();
-  }
-}
-
 cros::mojom::EffectsConfigPtr CameraEffectsController::GetCameraEffects() {
   return current_effects_.Clone();
 }
@@ -155,7 +142,7 @@ cros::mojom::EffectsConfigPtr CameraEffectsController::GetCameraEffects() {
 // static
 void CameraEffectsController::RegisterProfilePrefs(
     PrefRegistrySimple* registry) {
-  if (!IsCameraEffectsSupported()) {
+  if (!features::IsVideoConferenceEnabled()) {
     return;
   }
 
@@ -352,28 +339,9 @@ void CameraEffectsController::SetEffectsConfigToPref(
 
 bool CameraEffectsController::IsEffectControlAvailable(
     cros::mojom::CameraEffect effect /* = cros::mojom::CameraEffect::kNone*/) {
-  if (!ash::features::IsVideoConferenceEnabled()) {
-    return false;
-  }
-
-  switch (effect) {
-    case cros::mojom::CameraEffect::kNone:
-      // Return 'true' if any effect is available.
-      return IsCameraEffectsSupported(
-                 cros::mojom::CameraEffect::kBackgroundBlur) ||
-             IsCameraEffectsSupported(
-                 cros::mojom::CameraEffect::kPortraitRelight);
-    case cros::mojom::CameraEffect::kBackgroundBlur:
-      return IsCameraEffectsSupported(
-          cros::mojom::CameraEffect::kBackgroundBlur);
-    case cros::mojom::CameraEffect::kPortraitRelight:
-      return IsCameraEffectsSupported(
-          cros::mojom::CameraEffect::kPortraitRelight);
-    case cros::mojom::CameraEffect::kBackgroundReplace:
-      return false;
-  }
-
-  return false;
+  // UI is not ready to serve the BackgroundReplace effect.
+  return features::IsVideoConferenceEnabled() &&
+         effect != cros::mojom::CameraEffect::kBackgroundReplace;
 }
 
 void CameraEffectsController::InitializeEffectControls() {
@@ -408,6 +376,7 @@ void CameraEffectsController::InitializeEffectControls() {
         /*state_value=*/BackgroundBlurEffectState::kMaximum,
         /*string_id=*/
         IDS_ASH_VIDEO_CONFERENCE_BUBBLE_BACKGROUND_BLUR_FULL);
+    effect->set_dependency_flags(VcHostedEffect::ResourceDependency::kCamera);
     AddEffect(std::move(effect));
   }
 
@@ -422,7 +391,7 @@ void CameraEffectsController::InitializeEffectControls() {
     effect->set_id(
         static_cast<int>(cros::mojom::CameraEffect::kPortraitRelight));
     effect->AddState(std::make_unique<VcEffectState>(
-        /*icon=*/&kPrivacyIndicatorsCameraIcon,
+        /*icon=*/&kVideoConferencePortraitRelightOnIcon,
         /*label_text=*/
         l10n_util::GetStringUTF16(
             IDS_ASH_VIDEO_CONFERENCE_BUBBLE_PORTRAIT_RELIGHT_NAME),
@@ -435,6 +404,7 @@ void CameraEffectsController::InitializeEffectControls() {
             /*effect_id=*/
             static_cast<int>(cros::mojom::CameraEffect::kPortraitRelight),
             /*value=*/absl::nullopt)));
+    effect->set_dependency_flags(VcHostedEffect::ResourceDependency::kCamera);
     AddEffect(std::move(effect));
   }
 

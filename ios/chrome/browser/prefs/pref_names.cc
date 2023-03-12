@@ -62,6 +62,12 @@ const char kFeaturePushNotificationPermissions[] =
 // Prefs for persisting HttpServerProperties.
 const char kHttpServerProperties[] = "net.http_server_properties";
 
+// User preferred time for inactivity delay:
+// * if == -1: Disabled by user.
+// * if >= 1: Inactivity days threshold.
+// * Otherwise: Default value driven by Finch config.
+const char kInactiveTabsTimeThreshold[] = "ios.inactive_tabs.time_threshold";
+
 // Integer that specifies whether Incognito mode is:
 // 0 - Enabled. Default behaviour. Default mode is available on demand.
 // 1 - Disabled. User cannot browse pages in Incognito mode.
@@ -95,6 +101,11 @@ const char kIosBookmarkPromoAlreadySeen[] = "ios.bookmark.promo_already_seen";
 // in the bookmark view.
 const char kIosBookmarkSigninPromoDisplayedCount[] =
     "ios.bookmark.signin_promo_displayed_count";
+
+// Boolean that is true when the CredentialProviderPromoEnabled policy is
+// enabled.
+const char kIosCredentialProviderPromoPolicyEnabled[] =
+    "ios.credential_provider_promo_policy";
 
 // Boolean to represent if the Credential Provider Promo should stop displaying
 // the promo for the user.

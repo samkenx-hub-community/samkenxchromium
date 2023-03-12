@@ -712,7 +712,7 @@ struct PA_ALIGNAS(64) PA_COMPONENT_EXPORT(PARTITION_ALLOC) PartitionRoot {
     return flags.scan_mode == ScanMode::kEnabled;
   }
 
-  static PAGE_ALLOCATOR_CONSTANTS_DECLARE_CONSTEXPR PA_ALWAYS_INLINE size_t
+  PA_ALWAYS_INLINE static PAGE_ALLOCATOR_CONSTANTS_DECLARE_CONSTEXPR size_t
   GetDirectMapMetadataAndGuardPagesSize() {
     // Because we need to fake a direct-map region to look like a super page, we
     // need to allocate more pages around the payload:
@@ -725,7 +725,7 @@ struct PA_ALIGNAS(64) PA_COMPONENT_EXPORT(PARTITION_ALLOC) PartitionRoot {
     return 2 * internal::PartitionPageSize();
   }
 
-  static PAGE_ALLOCATOR_CONSTANTS_DECLARE_CONSTEXPR PA_ALWAYS_INLINE size_t
+  PA_ALWAYS_INLINE static PAGE_ALLOCATOR_CONSTANTS_DECLARE_CONSTEXPR size_t
   GetDirectMapSlotSize(size_t raw_size) {
     // Caller must check that the size is not above the MaxDirectMapped()
     // limit before calling. This also guards against integer overflow in the
@@ -735,8 +735,8 @@ struct PA_ALIGNAS(64) PA_COMPONENT_EXPORT(PARTITION_ALLOC) PartitionRoot {
         raw_size, internal::SystemPageSize());
   }
 
-  static PA_ALWAYS_INLINE size_t
-  GetDirectMapReservationSize(size_t padded_raw_size) {
+  PA_ALWAYS_INLINE static size_t GetDirectMapReservationSize(
+      size_t padded_raw_size) {
     // Caller must check that the size is not above the MaxDirectMapped()
     // limit before calling. This also guards against integer overflow in the
     // calculation here.
@@ -946,9 +946,11 @@ class ScopedSyscallTimer {
   ~ScopedSyscallTimer() {
     root_->syscall_count.fetch_add(1, std::memory_order_relaxed);
 
-    uint64_t elapsed_nanos = (base::TimeTicks::Now() - tick_).InNanoseconds();
-    root_->syscall_total_time_ns.fetch_add(elapsed_nanos,
-                                           std::memory_order_relaxed);
+    int64_t elapsed_nanos = (base::TimeTicks::Now() - tick_).InNanoseconds();
+    if (elapsed_nanos > 0) {
+      root_->syscall_total_time_ns.fetch_add(
+          static_cast<uint64_t>(elapsed_nanos), std::memory_order_relaxed);
+    }
   }
 
  private:
@@ -1047,10 +1049,10 @@ PartitionAllocGetSlotStartInBRPPool(uintptr_t address) {
 // Return values to indicate where a pointer is pointing relative to the bounds
 // of an allocation.
 enum class PtrPosWithinAlloc {
-  // When PA_USE_OOB_POISON is disabled, end-of-allocation pointers are also
-  // considered in-bounds.
+  // When BACKUP_REF_PTR_POISON_OOB_PTR is disabled, end-of-allocation pointers
+  // are also considered in-bounds.
   kInBounds,
-#if PA_CONFIG(USE_OOB_POISON)
+#if BUILDFLAG(BACKUP_REF_PTR_POISON_OOB_PTR)
   kAllocEnd,
 #endif
   kFarOOB

@@ -21,8 +21,12 @@ bool StructTraits<network::mojom::NetworkIsolationKeyDataView,
   }
 
   // A key is either fully empty or fully populated.
-  if (top_frame_site.has_value() != frame_site.has_value()) {
-    return false;
+  switch (net::NetworkIsolationKey::GetMode()) {
+    case net::NetworkIsolationKey::Mode::kFrameSiteEnabled:
+      if (top_frame_site.has_value() != frame_site.has_value()) {
+        return false;
+      }
+      break;
   }
 
   absl::optional<base::UnguessableToken> nonce;

@@ -49,7 +49,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Session.IsActive" enum="BooleanActive"
-    expires_after="2023-07-02">
+    expires_after="2023-09-03">
   <owner>rogerm@chromium.org</owner>
   <owner>src/base/metrics/OWNERS</owner>
   <summary>
@@ -851,7 +851,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Session.WebStates.NativeRestoreSessionFromCache"
-    enum="BooleanSuccess" expires_after="2023-05-14">
+    enum="BooleanSuccess" expires_after="2023-09-03">
   <owner>justincohen@chromium.org</owner>
   <owner>ajuma@chromium.org</owner>
   <summary>
@@ -967,19 +967,6 @@ chromium-metrics-reviews@google.com.
     The reason for which attempt to record
     SessionRestore.ForegroundTabFirstPaint4 was deemed complete. Logged once per
     session restore.
-  </summary>
-</histogram>
-
-<histogram name="SessionRestore.RestoredTab.TimeSinceActive" units="ms"
-    expires_after="M85">
-  <owner>chrisha@chromium.org</owner>
-  <summary>
-    The time since a restored tab was last active. This is the cumulative amount
-    of time that has passed since the tab was last visible. Time accrues while a
-    browser is active and the tab remains inactive. If the tab is restored and
-    remains inactive in a subsequent browsing session the time continues to
-    accrue. Visible tabs report a value of 0 for this. This is recorded at the
-    moment the tab is restored during a session restore.
   </summary>
 </histogram>
 

@@ -15,7 +15,6 @@ namespace features {
 // All features in alphabetical order.
 BASE_DECLARE_FEATURE(kAutofillAlwaysReturnCloudTokenizedCard);
 BASE_DECLARE_FEATURE(kAutofillAutoTriggerManualFallbackForCards);
-BASE_DECLARE_FEATURE(kAutofillCreditCardAuthentication);
 BASE_DECLARE_FEATURE(kAutofillEnableCardArtImage);
 BASE_DECLARE_FEATURE(kAutofillEnableCardProductName);
 BASE_DECLARE_FEATURE(kAutofillEnableCvcForVcnYellowPath);
@@ -47,6 +46,7 @@ BASE_DECLARE_FEATURE(kAutofillSuggestServerCardInsteadOfLocalCard);
 BASE_DECLARE_FEATURE(kAutofillUpstream);
 BASE_DECLARE_FEATURE(kAutofillUpstreamAllowAdditionalEmailDomains);
 BASE_DECLARE_FEATURE(kAutofillUpstreamAllowAllEmailDomains);
+BASE_DECLARE_FEATURE(kAutofillUpstreamAuthenticatePreflightCall);
 BASE_DECLARE_FEATURE(kAutofillUpstreamUseAlternateSecureDataType);
 BASE_DECLARE_FEATURE(kAutofillUseEloRegexForBinMatching);
 extern const base::FeatureParam<int>

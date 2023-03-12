@@ -38,6 +38,7 @@
 #include "ui/views/controls/focus_ring.h"
 #include "ui/views/controls/highlight_path_generator.h"
 #include "ui/views/widget/widget.h"
+#include "util.h"
 
 namespace arc::input_overlay {
 
@@ -227,7 +228,8 @@ void DisplayOverlayController::AddMenuEntryView(views::Widget* overlay_widget) {
       base::BindRepeating(&DisplayOverlayController::OnMenuEntryPressed,
                           base::Unretained(this)),
       base::BindRepeating(&DisplayOverlayController::OnMenuEntryPositionChanged,
-                          base::Unretained(this)));
+                          base::Unretained(this)),
+      this);
   menu_entry->SetPosition(CalculateMenuEntryPosition());
   menu_entry->SetAccessibleName(
       l10n_util::GetStringUTF16(IDS_INPUT_OVERLAY_GAME_CONTROLS_ALPHA));
@@ -301,15 +303,13 @@ void DisplayOverlayController::RemoveInputMenuView() {
 
 void DisplayOverlayController::AddInputMappingView(
     views::Widget* overlay_widget) {
-  if (input_mapping_view_) {
-    return;
+  if (!input_mapping_view_) {
+    DCHECK(overlay_widget);
+    auto input_mapping_view = std::make_unique<InputMappingView>(this);
+    input_mapping_view->SetPosition(gfx::Point());
+    input_mapping_view_ = overlay_widget->GetContentsView()->AddChildView(
+        std::move(input_mapping_view));
   }
-  DCHECK(overlay_widget);
-  auto input_mapping_view = std::make_unique<InputMappingView>(this);
-  input_mapping_view->SetPosition(gfx::Point());
-  input_mapping_view_ = overlay_widget->GetContentsView()->AddChildView(
-      std::move(input_mapping_view));
-
   // Set input mapping view visibility according to the saved status.
   DCHECK(touch_injector_);
   if (touch_injector_) {
@@ -331,16 +331,7 @@ void DisplayOverlayController::AddEditFinishView(
   auto* parent_view = overlay_widget->GetContentsView();
   DCHECK(parent_view);
 
-  edit_finish_view_ = parent_view->AddChildView(
-      EditFinishView::BuildView(this, parent_view->size()));
-
-  // Since |input_menu_view_| is removed when adding |edit_finish_view_| and
-  // |FocusManager| lost the focused view. Set |edit_finish_view_| explicitly
-  // as the focused view so Tab traversal key can work as expected.
-  auto* focus_manager = edit_finish_view_->GetFocusManager();
-  if (focus_manager) {
-    focus_manager->SetFocusedView(edit_finish_view_);
-  }
+  edit_finish_view_ = EditFinishView::BuildView(this, parent_view);
 }
 
 void DisplayOverlayController::RemoveEditFinishView() {
@@ -544,6 +535,9 @@ void DisplayOverlayController::SetDisplayMode(DisplayMode mode) {
       SetEventTarget(overlay_widget, /*on_overlay=*/false);
       break;
     case DisplayMode::kEdit:
+      // When using Tab to traverse views and enter into the edit mode, it needs
+      // to reset the focus before removing the menu.
+      ResetFocusTo(overlay_widget->GetContentsView());
       RemoveInputMenuView();
       RemoveMenuEntryView();
       RemoveEducationalView();
@@ -676,6 +670,27 @@ void DisplayOverlayController::OnApplyMenuState() {
                          GetInputMappingViewVisible());
 }
 
+InputOverlayWindowStateType DisplayOverlayController::GetWindowStateType()
+    const {
+  DCHECK(touch_injector_);
+  auto* window = touch_injector_->window();
+  DCHECK(window);
+  auto* state = ash::WindowState::Get(window);
+  InputOverlayWindowStateType type = InputOverlayWindowStateType::kInvalid;
+  if (state) {
+    if (state->IsNormalStateType()) {
+      type = InputOverlayWindowStateType::kNormal;
+    } else if (state->IsMaximized()) {
+      type = InputOverlayWindowStateType::kMaximized;
+    } else if (state->IsFullscreen()) {
+      type = InputOverlayWindowStateType::kFullscreen;
+    } else if (state->IsSnapped()) {
+      type = InputOverlayWindowStateType::kSnapped;
+    }
+  }
+  return type;
+}
+
 void DisplayOverlayController::OnActionAdded(Action* action) {
   input_mapping_view_->OnActionAdded(action);
 }
@@ -747,10 +762,14 @@ void DisplayOverlayController::SetInputMappingVisible(bool visible) {
   }
   input_mapping_view_->SetVisible(visible);
   DCHECK(touch_injector_);
-  if (!touch_injector_) {
+  touch_injector_->store_input_mapping_visible(visible);
+}
+
+void DisplayOverlayController::SetInputMappingVisibleTemporary() {
+  if (!input_mapping_view_) {
     return;
   }
-  touch_injector_->store_input_mapping_visible(visible);
+  input_mapping_view_->SetVisible(true);
 }
 
 bool DisplayOverlayController::GetInputMappingViewVisible() const {

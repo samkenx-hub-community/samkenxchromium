@@ -146,15 +146,15 @@ class MockInputMethod : public ime::mojom::InputMethod {
 void SetInputMethodOptions(Profile& profile,
                            bool autocorrect_enabled,
                            bool predictive_writing_enabled) {
-  base::Value input_method_setting(base::Value::Type::DICT);
-  input_method_setting.SetPath(
+  base::Value::Dict input_method_setting;
+  input_method_setting.SetByDottedPath(
       std::string(kEngineIdUs) + ".physicalKeyboardAutoCorrectionLevel",
-      base::Value(autocorrect_enabled ? 1 : 0));
-  input_method_setting.SetPath(
+      autocorrect_enabled ? 1 : 0);
+  input_method_setting.SetByDottedPath(
       std::string(kEngineIdUs) + ".physicalKeyboardEnablePredictiveWriting",
-      base::Value(predictive_writing_enabled));
-  profile.GetPrefs()->Set(::prefs::kLanguageInputMethodSpecificSettings,
-                          input_method_setting);
+      predictive_writing_enabled);
+  profile.GetPrefs()->SetDict(::prefs::kLanguageInputMethodSpecificSettings,
+                              std::move(input_method_setting));
 }
 
 // TODO - support setting Japanese InputMethodOptions too.
@@ -166,10 +166,10 @@ void SetInputMethodOptionsJapaneseMigrationCompleted(
 }
 
 void SetPinyinLayoutPrefs(Profile& profile, const std::string& layout) {
-  base::Value input_method_setting(base::Value::Type::DICT);
-  input_method_setting.SetStringPath("zh-t-i0-pinyin.xkbLayout", layout);
-  profile.GetPrefs()->Set(::prefs::kLanguageInputMethodSpecificSettings,
-                          input_method_setting);
+  base::Value::Dict input_method_setting;
+  input_method_setting.SetByDottedPath("zh-t-i0-pinyin.xkbLayout", layout);
+  profile.GetPrefs()->SetDict(::prefs::kLanguageInputMethodSpecificSettings,
+                              std::move(input_method_setting));
 }
 
 ime::mojom::InputMethodMetadataPtr EmptyInputMethodMetadata() {
@@ -282,12 +282,7 @@ class NativeInputMethodEngineTest : public ::testing::Test {
   void EnableDefaultFeatureList() {
     feature_list_.Reset();
     feature_list_.InitWithFeatures(
-        /*enabled_features=*/
-        {
-            features::kAssistPersonalInfo,
-            features::kAssistPersonalInfoEmail,
-            features::kAssistPersonalInfoName,
-        },
+        /*enabled_features=*/{},
         /*disabled_features=*/DisabledFeatures());
   }
 
@@ -296,9 +291,6 @@ class NativeInputMethodEngineTest : public ::testing::Test {
     feature_list_.InitWithFeatures(
         /*enabled_features=*/
         {
-            features::kAssistPersonalInfo,
-            features::kAssistPersonalInfoEmail,
-            features::kAssistPersonalInfoName,
             features::kAssistMultiWord,
         },
         /*disabled_features=*/DisabledFeatures());
@@ -309,9 +301,6 @@ class NativeInputMethodEngineTest : public ::testing::Test {
     feature_list_.InitWithFeatures(
         /*enabled_features=*/
         {
-            features::kAssistPersonalInfo,
-            features::kAssistPersonalInfoEmail,
-            features::kAssistPersonalInfoName,
             features::kSystemJapanesePhysicalTyping,
         },
         /*disabled_features=*/DisabledFeatures());
@@ -839,8 +828,9 @@ TEST_P(AutocorrectByDefaultDisabledByInputMethodMetadata,
        DisablesAutocorrectInInputFieldSettingsWhenInvalidModelActivated) {
   const InputMethodMetadataCase& test_case = GetParam();
   feature_list_.Reset();
-  feature_list_.InitWithFeatures({features::kAutocorrectByDefault},
-                                 DisabledFeatures());
+  feature_list_.InitWithFeatures(
+      {features::kAutocorrectByDefault, features::kImeFstDecoderParamsUpdate},
+      DisabledFeatures());
   TestingProfile testing_profile;
   SetPhysicalKeyboardAutocorrectAsEnabledByDefault(testing_profile.GetPrefs(),
                                                    kEngineIdUs);
@@ -1175,12 +1165,6 @@ class NativeInputMethodEngineWithRenderViewHostTest
     content::RenderViewHostTestHarness::SetUp();
     ukm::InitializeSourceUrlRecorderForWebContents(web_contents());
 
-    feature_list_.InitWithFeatures(
-        /*enabled_features=*/{features::kAssistPersonalInfo,
-                              features::kAssistPersonalInfoEmail,
-                              features::kAssistPersonalInfoName},
-        /*disabled_features=*/{});
-
     // Needed by NativeInputMethodEngine for the virtual keyboard.
     keyboard_controller_client_test_helper_ =
         ChromeKeyboardControllerClientTestHelper::InitializeWithFake();
@@ -1264,6 +1248,9 @@ TEST_F(NativeInputMethodEngineWithRenderViewHostTest,
   NativeInputMethodEngine engine;
   engine.Initialize(std::make_unique<StubInputMethodEngineObserver>(),
                     /*extension_id=*/"", testing_profile);
+  engine.get_assistive_suggester_for_testing()
+      ->get_emoji_suggester_for_testing()
+      ->LoadEmojiMapForTesting("happy,😀;😃;😄");
 
   ui::FakeTextInputClient fake_text_input_client(ui::TEXT_INPUT_TYPE_TEXT);
   fake_text_input_client.set_source_id(main_rfh()->GetPageUkmSourceId());
@@ -1282,13 +1269,13 @@ TEST_F(NativeInputMethodEngineWithRenderViewHostTest,
   EXPECT_EQ(0u, test_recorder.entries_count());
 
   // Should record when match is triggered.
-  engine.SetSurroundingText(u"my email is ", gfx::Range(12), 0);
+  engine.SetSurroundingText(u"happy ", gfx::Range(6), 0);
   EXPECT_EQ(0u, test_recorder.sources_count());
   EXPECT_EQ(1u, test_recorder.entries_count());
   const auto entries =
       test_recorder.GetEntriesByName("InputMethod.Assistive.Match");
-  ukm::TestAutoSetUkmRecorder::ExpectEntryMetric(
-      entries[0], "Type", (int)AssistiveType::kPersonalEmail);
+  ukm::TestAutoSetUkmRecorder::ExpectEntryMetric(entries[0], "Type",
+                                                 (int)AssistiveType::kEmoji);
 
   InputMethodManager::Shutdown();
 }

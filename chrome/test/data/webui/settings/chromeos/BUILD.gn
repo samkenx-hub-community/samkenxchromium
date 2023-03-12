@@ -22,7 +22,6 @@ test_files = [
   "apn_detail_dialog_tests.js",
   "app_notifications_subpage_tests.js",
   "apps_page_test.js",
-  "audio_and_captions_page_tests.ts",
   "cellular_networks_list_test.js",
   "cellular_roaming_toggle_button_test.js",
   "cellular_setup_dialog_test.js",
@@ -59,7 +58,7 @@ test_files = [
   "hotspot_config_dialog_tests.js",
   "hotspot_subpage_tests.js",
   "hotspot_summary_item_tests.js",
-  "google_assistant_page_test.js",
+  "google_assistant_subpage_test.js",
   "guest_os_shared_paths_test.js",
   "guest_os_shared_usb_devices_test.js",
   "input_device_mojo_interface_provider_test.js",
@@ -67,8 +66,8 @@ test_files = [
   "input_page_test.js",
   "internet_config_test.js",
   "internet_detail_menu_test.js",
-  "internet_detail_page_tests.js",
-  "internet_known_networks_page_tests.js",
+  "internet_detail_subpage_tests.js",
+  "internet_known_networks_subpage_tests.js",
   "internet_page_tests.js",
   "internet_subpage_tests.js",
   "kerberos_accounts_test.js",
@@ -101,13 +100,6 @@ test_files = [
   "onc_mojo_test.ts",
   "os_a11y_page_tests.js",
   "os_about_page_tests.js",
-  "os_bluetooth_change_device_name_dialog_tests.js",
-  "os_bluetooth_device_detail_subpage_tests.js",
-  "os_bluetooth_devices_subpage_tests.js",
-  "os_bluetooth_page_tests.js",
-  "os_bluetooth_pairing_dialog_tests.js",
-  "os_bluetooth_summary_tests.js",
-  "os_bluetooth_true_wireless_images_tests.js",
   "os_clear_personalization_data_page_test.js",
   "os_edit_dictionary_page_test.js",
   "os_files_page_test.js",
@@ -128,7 +120,6 @@ test_files = [
   "os_settings_ui_test_2.js",
   "os_settings_ui_test.js",
   "os_sync_controls_test.js",
-  "parental_controls_page_test.js",
   "people_page_account_manager_test.js",
   "per_device_keyboard_subsection_test.js",
   "per_device_keyboard_remap_keys_test.js",
@@ -164,14 +155,12 @@ test_files = [
   "test_metrics_consent_browser_proxy.js",
   "test_multidevice_browser_proxy.js",
   "test_os_a11y_page_browser_proxy.js",
-  "test_os_bluetooth_subpage_browser_proxy.js",
   "test_os_languages_browser_proxy.js",
   "test_os_languages_metrics_proxy.js",
   "test_os_lifetime_browser_proxy.js",
   "test_os_reset_browser_proxy.js",
   "test_os_settings_search_box_browser_proxy.js",
   "test_os_sync_browser_proxy.js",
-  "test_parental_controls_browser_proxy.js",
   "test_personalization_hub_browser_proxy.js",
   "test_privacy_hub_browser_proxy.js",
   "test_profile_info_browser_proxy.js",
@@ -181,7 +170,6 @@ test_files = [
   "text_to_speech_subpage_tests.js",
   "timezone_selector_test.js",
   "timezone_subpage_test.js",
-  "tts_subpage_test.js",
   "utils.ts",
 
   # Subfolder files.
@@ -220,9 +208,24 @@ test_files = [
   "app_management/test_util.js",
   "app_management/toggle_row_test.js",
 
+  "os_a11y_page/audio_and_captions_page_tests.ts",
+  "os_a11y_page/tts_subpage_test.ts",
+
+  "os_bluetooth_page/os_bluetooth_change_device_name_dialog_tests.js",
+  "os_bluetooth_page/os_bluetooth_device_detail_subpage_tests.js",
+  "os_bluetooth_page/os_bluetooth_devices_subpage_tests.js",
+  "os_bluetooth_page/os_bluetooth_page_tests.js",
+  "os_bluetooth_page/os_bluetooth_pairing_dialog_tests.js",
+  "os_bluetooth_page/os_bluetooth_summary_tests.js",
+  "os_bluetooth_page/os_bluetooth_true_wireless_images_tests.js",
+  "os_bluetooth_page/test_os_bluetooth_subpage_browser_proxy.ts",
+
   "os_files_page/office_page_test.ts",
 
   "os_people_page/add_user_dialog_tests.ts",
+
+  "parental_controls_page/parental_controls_page_test.ts",
+  "parental_controls_page/test_parental_controls_browser_proxy.ts",
 ]
 
 preprocess_if_expr("preprocess") {
@@ -238,7 +241,6 @@ copy("copy_mojom") {
 }
 
 ts_library("build_ts") {
-  allow_js = true
   tsconfig_base = "tsconfig_base.json"
   root_dir = "$target_gen_dir/$preprocessed_folder"
   out_dir = "$target_gen_dir/$tsc_folder"

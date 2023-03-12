@@ -10,6 +10,7 @@
 
 #include "base/check.h"
 #include "base/memory/scoped_refptr.h"
+#include "base/metrics/histogram_functions.h"
 #include "base/time/time.h"
 #include "base/types/expected.h"
 #include "base/types/pass_key.h"
@@ -407,6 +408,10 @@ mojom::blink::SellerCapabilitiesPtr ConvertSellerCapabilitiesTypeFromIdlToMojo(
     const Vector<String>& capabilities_vector) {
   auto seller_capabilities = mojom::blink::SellerCapabilities::New();
   for (const String& capability_str : capabilities_vector) {
+    base::UmaHistogramBoolean(
+        "Ads.InterestGroup.EnumNaming.Renderer.SellerCapabilities",
+        capability_str == "interestGroupCounts" ||
+            capability_str == "latencyStats");
     if (capability_str == "interest-group-counts" ||
         capability_str == "interestGroupCounts") {
       seller_capabilities->allows_interest_group_counts = true;
@@ -414,7 +419,7 @@ mojom::blink::SellerCapabilitiesPtr ConvertSellerCapabilitiesTypeFromIdlToMojo(
                capability_str == "latencyStats") {
       seller_capabilities->allows_latency_stats = true;
     } else {
-      // For forward compatibility with new fields, don't throw.
+      // For forward compatibility with new values, don't throw.
       continue;
     }
   }
@@ -452,22 +457,21 @@ bool CopyExecutionModeFromIdlToMojo(const ExecutionContext& execution_context,
                                     mojom::blink::InterestGroup& output) {
   if (!input.hasExecutionMode())
     return true;
+  base::UmaHistogramBoolean(
+      "Ads.InterestGroup.EnumNaming.Renderer.WorkletExecutionMode",
+      input.executionMode() == "groupByOrigin");
 
-  switch (input.executionMode().AsEnum()) {
-    case V8WorkletExecutionMode::Enum::kCompatibility:
-      output.execution_mode =
-          mojom::blink::InterestGroup::ExecutionMode::kCompatibilityMode;
-      break;
-    case V8WorkletExecutionMode::Enum::kGroupByOrigin:
-      output.execution_mode =
-          mojom::blink::InterestGroup::ExecutionMode::kGroupedByOriginMode;
-      break;
-    default:
-      exception_state.ThrowTypeError(ErrorInvalidInterestGroup(
-          input, "executionMode", input.executionMode().AsString(),
-          "is not a supported execution mode."));
-      return false;
+  // TODO(crbug.com/1330341): Support "frozen-context".
+  if (input.executionMode() == "compatibility") {
+    output.execution_mode =
+        mojom::blink::InterestGroup::ExecutionMode::kCompatibilityMode;
+  } else if (input.executionMode() == "group-by-origin" ||
+             input.executionMode() == "groupByOrigin") {
+    output.execution_mode =
+        mojom::blink::InterestGroup::ExecutionMode::kGroupedByOriginMode;
   }
+  // For forward compatibility with new values, don't throw if unrecognized enum
+  // values encountered.
   return true;
 }
 
@@ -484,8 +488,6 @@ bool CopyBiddingLogicUrlFromIdlToMojo(const ExecutionContext& context,
         "cannot be resolved to a valid URL."));
     return false;
   }
-  // TODO(https://crbug.com/1271540): Validate against interest group owner
-  // origin.
   output.bidding_url = bidding_url;
   return true;
 }
@@ -508,22 +510,38 @@ bool CopyWasmHelperUrlFromIdlToMojo(const ExecutionContext& context,
   return true;
 }
 
-bool CopyDailyUpdateUrlFromIdlToMojo(const ExecutionContext& context,
-                                     ExceptionState& exception_state,
-                                     const AuctionAdInterestGroup& input,
-                                     mojom::blink::InterestGroup& output) {
-  if (!input.hasDailyUpdateUrl())
+bool CopyUpdateUrlFromIdlToMojo(const ExecutionContext& context,
+                                ExceptionState& exception_state,
+                                const AuctionAdInterestGroup& input,
+                                mojom::blink::InterestGroup& output) {
+  if (input.hasUpdateUrl()) {
+    if (input.hasDailyUpdateUrl() &&
+        input.updateUrl() != input.dailyUpdateUrl()) {
+      exception_state.ThrowTypeError(ErrorInvalidInterestGroup(
+          input, "updateUrl", input.updateUrl(),
+          "must match dailyUpdateUrl, when both are present."));
+      return false;
+    }
+    KURL update_url = context.CompleteURL(input.updateUrl());
+    if (!update_url.IsValid()) {
+      exception_state.ThrowTypeError(
+          ErrorInvalidInterestGroup(input, "updateUrl", input.updateUrl(),
+                                    "cannot be resolved to a valid URL."));
+      return false;
+    }
+    output.update_url = update_url;
     return true;
-  KURL daily_update_url = context.CompleteURL(input.dailyUpdateUrl());
-  if (!daily_update_url.IsValid()) {
-    exception_state.ThrowTypeError(ErrorInvalidInterestGroup(
-        input, "dailyUpdateUrl", input.dailyUpdateUrl(),
-        "cannot be resolved to a valid URL."));
-    return false;
   }
-  // TODO(https://crbug.com/1271540): Validate against interest group owner
-  // origin.
-  output.daily_update_url = daily_update_url;
+  if (input.hasDailyUpdateUrl()) {
+    KURL daily_update_url = context.CompleteURL(input.dailyUpdateUrl());
+    if (!daily_update_url.IsValid()) {
+      exception_state.ThrowTypeError(ErrorInvalidInterestGroup(
+          input, "dailyUpdateUrl", input.dailyUpdateUrl(),
+          "cannot be resolved to a valid URL."));
+      return false;
+    }
+    output.update_url = daily_update_url;
+  }
   return true;
 }
 
@@ -542,8 +560,6 @@ bool CopyTrustedBiddingSignalsUrlFromIdlToMojo(
         "cannot be resolved to a valid URL."));
     return false;
   }
-  // TODO(https://crbug.com/1271540): Validate against interest group owner
-  // origin.
   output.trusted_bidding_signals_url = trusted_bidding_signals_url;
   return true;
 }
@@ -2087,8 +2103,8 @@ ScriptPromise NavigatorAuction::joinAdInterestGroup(
                                       *mojo_group)) {
     return ScriptPromise();
   }
-  if (!CopyDailyUpdateUrlFromIdlToMojo(*context, exception_state, *group,
-                                       *mojo_group)) {
+  if (!CopyUpdateUrlFromIdlToMojo(*context, exception_state, *group,
+                                  *mojo_group)) {
     return ScriptPromise();
   }
   if (!CopyTrustedBiddingSignalsUrlFromIdlToMojo(*context, exception_state,
@@ -2131,7 +2147,8 @@ ScriptPromise NavigatorAuction::joinAdInterestGroup(
   bool is_cross_origin =
       !context->GetSecurityOrigin()->IsSameOriginWith(mojo_group->owner.get());
 
-  auto* resolver = MakeGarbageCollected<ScriptPromiseResolver>(script_state);
+  auto* resolver = MakeGarbageCollected<ScriptPromiseResolver>(
+      script_state, exception_state.GetContext());
   ScriptPromise promise = resolver->Promise();
   mojom::blink::AdAuctionService::JoinInterestGroupCallback callback =
       resolver->WrapCallbackInScriptScope(
@@ -2193,7 +2210,8 @@ ScriptPromise NavigatorAuction::leaveAdInterestGroup(
                               ->GetSecurityOrigin()
                               ->IsSameOriginWith(owner.get());
 
-  auto* resolver = MakeGarbageCollected<ScriptPromiseResolver>(script_state);
+  auto* resolver = MakeGarbageCollected<ScriptPromiseResolver>(
+      script_state, exception_state.GetContext());
   ScriptPromise promise = resolver->Promise();
   mojom::blink::AdAuctionService::LeaveInterestGroupCallback callback =
       resolver->WrapCallbackInScriptScope(
@@ -2320,7 +2338,8 @@ ScriptPromise NavigatorAuction::runAdAuction(ScriptState* script_state,
   if (!mojo_config)
     return ScriptPromise();
 
-  auto* resolver = MakeGarbageCollected<ScriptPromiseResolver>(script_state);
+  auto* resolver = MakeGarbageCollected<ScriptPromiseResolver>(
+      script_state, exception_state.GetContext());
   ScriptPromise promise = resolver->Promise();
   std::unique_ptr<ScopedAbortState> scoped_abort_state = nullptr;
   if (auto* signal = config->getSignalOr(nullptr)) {
@@ -2411,7 +2430,8 @@ ScriptPromise NavigatorAuction::deprecatedURNToURL(
     return ScriptPromise();
   }
 
-  auto* resolver = MakeGarbageCollected<ScriptPromiseResolver>(script_state);
+  auto* resolver = MakeGarbageCollected<ScriptPromiseResolver>(
+      script_state, exception_state.GetContext());
   ScriptPromise promise = resolver->Promise();
   ad_auction_service_->DeprecatedGetURLFromURN(
       std::move(uuid_url), send_reports,
@@ -2470,7 +2490,8 @@ ScriptPromise NavigatorAuction::deprecatedReplaceInURN(
     replacements_list.push_back(mojom::blink::AdKeywordReplacement::New(
         replacement.first, replacement.second));
   }
-  auto* resolver = MakeGarbageCollected<ScriptPromiseResolver>(script_state);
+  auto* resolver = MakeGarbageCollected<ScriptPromiseResolver>(
+      script_state, exception_state.GetContext());
   ScriptPromise promise = resolver->Promise();
   ad_auction_service_->DeprecatedReplaceInURN(
       std::move(uuid_url), std::move(replacements_list),
@@ -2537,7 +2558,8 @@ ScriptPromise NavigatorAuction::createAdRequest(
                                        *mojo_config))
     return ScriptPromise();
 
-  auto* resolver = MakeGarbageCollected<ScriptPromiseResolver>(script_state);
+  auto* resolver = MakeGarbageCollected<ScriptPromiseResolver>(
+      script_state, exception_state.GetContext());
   ScriptPromise promise = resolver->Promise();
   ad_auction_service_->CreateAdRequest(
       std::move(mojo_config),
@@ -2596,7 +2618,8 @@ ScriptPromise NavigatorAuction::finalizeAd(ScriptState* script_state,
   if (!ValidateAdsObject(exception_state, ads))
     return ScriptPromise();
 
-  auto* resolver = MakeGarbageCollected<ScriptPromiseResolver>(script_state);
+  auto* resolver = MakeGarbageCollected<ScriptPromiseResolver>(
+      script_state, exception_state.GetContext());
   ScriptPromise promise = resolver->Promise();
   ad_auction_service_->FinalizeAd(
       ads->GetGuid(), std::move(mojo_config),

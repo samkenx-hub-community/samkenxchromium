@@ -22,7 +22,6 @@ class InputDeviceSettingsProvider
       delete;
   InputDeviceSettingsProvider& operator=(
       const InputDeviceSettingsProvider& other) = delete;
-
   ~InputDeviceSettingsProvider() override;
 
   void BindInterface(
@@ -34,19 +33,44 @@ class InputDeviceSettingsProvider
       mojo::PendingRemote<mojom::KeyboardSettingsObserver> observer) override;
   void ObserveTouchpadSettings(
       mojo::PendingRemote<mojom::TouchpadSettingsObserver> observer) override;
+  void ObservePointingStickSettings(
+      mojo::PendingRemote<mojom::PointingStickSettingsObserver> observer)
+      override;
+  void ObserveMouseSettings(
+      mojo::PendingRemote<mojom::MouseSettingsObserver> observer) override;
+  void SetKeyboardSettings(uint32_t device_id,
+                           ::ash::mojom::KeyboardSettingsPtr settings) override;
+  void SetPointingStickSettings(
+      uint32_t device_id,
+      ::ash::mojom::PointingStickSettingsPtr settings) override;
+  void SetMouseSettings(uint32_t device_id,
+                        ::ash::mojom::MouseSettingsPtr settings) override;
+  void SetTouchpadSettings(uint32_t device_id,
+                           ::ash::mojom::TouchpadSettingsPtr settings) override;
 
   // InputDeviceSettingsController::Observer:
   void OnKeyboardConnected(const ::ash::mojom::Keyboard& keyboard) override;
   void OnKeyboardDisconnected(const ::ash::mojom::Keyboard& keyboard) override;
   void OnTouchpadConnected(const ::ash::mojom::Touchpad& touchpad) override;
   void OnTouchpadDisconnected(const ::ash::mojom::Touchpad& touchpad) override;
+  void OnPointingStickConnected(
+      const ::ash::mojom::PointingStick& pointing_stick) override;
+  void OnPointingStickDisconnected(
+      const ::ash::mojom::PointingStick& pointing_stick) override;
+  void OnMouseConnected(const ::ash::mojom::Mouse& mouse) override;
+  void OnMouseDisconnected(const ::ash::mojom::Mouse& mouse) override;
 
  private:
   void NotifyKeyboardsUpdated();
   void NotifyTouchpadsUpdated();
+  void NotifyPointingSticksUpdated();
+  void NotifyMiceUpdated();
 
   mojo::RemoteSet<mojom::KeyboardSettingsObserver> keyboard_settings_observers_;
   mojo::RemoteSet<mojom::TouchpadSettingsObserver> touchpad_settings_observers_;
+  mojo::RemoteSet<mojom::PointingStickSettingsObserver>
+      pointing_stick_settings_observers_;
+  mojo::RemoteSet<mojom::MouseSettingsObserver> mouse_settings_observers_;
 
   mojo::Receiver<mojom::InputDeviceSettingsProvider> receiver_{this};
 };

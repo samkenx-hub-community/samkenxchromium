@@ -4,7 +4,6 @@
 
 #include "chrome/browser/chrome_content_browser_client.h"
 
-#include <algorithm>
 #include <iterator>
 #include <map>
 #include <memory>
@@ -26,6 +25,7 @@
 #include "base/metrics/histogram_macros.h"
 #include "base/no_destructor.h"
 #include "base/path_service.h"
+#include "base/ranges/algorithm.h"
 #include "base/strings/strcat.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_piece.h"
@@ -44,6 +44,7 @@
 #include "chrome/browser/browser_about_handler.h"
 #include "chrome/browser/browser_features.h"
 #include "chrome/browser/browser_process.h"
+#include "chrome/browser/browsing_data/chrome_browsing_data_model_delegate.h"
 #include "chrome/browser/browsing_topics/browsing_topics_service_factory.h"
 #include "chrome/browser/captive_portal/captive_portal_service_factory.h"
 #include "chrome/browser/child_process_host_flags.h"
@@ -95,6 +96,7 @@
 #include "chrome/browser/performance_monitor/chrome_browser_main_extra_parts_performance_monitor.h"
 #include "chrome/browser/plugins/pdf_iframe_navigation_throttle.h"
 #include "chrome/browser/plugins/plugin_utils.h"
+#include "chrome/browser/policy/policy_util.h"
 #include "chrome/browser/policy/profile_policy_connector.h"
 #include "chrome/browser/prefetch/prefetch_prefs.h"
 #include "chrome/browser/preloading/navigation_ablation_throttle.h"
@@ -400,6 +402,7 @@
 #include "chrome/browser/ash/login/startup_utils.h"
 #include "chrome/browser/ash/net/network_health/network_health_manager.h"
 #include "chrome/browser/ash/net/system_proxy_manager.h"
+#include "chrome/browser/ash/os_url_handler.h"
 #include "chrome/browser/ash/profiles/profile_helper.h"
 #include "chrome/browser/ash/smb_client/fileapi/smbfs_file_system_backend_delegate.h"
 #include "chrome/browser/ash/system/input_device_settings.h"
@@ -417,7 +420,6 @@
 #include "components/user_manager/user_manager.h"
 #include "services/service_manager/public/mojom/interface_provider_spec.mojom.h"
 #include "storage/browser/file_system/external_mount_points.h"
-#include "ui/display/screen.h"
 #elif BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS_LACROS)
 #include "chrome/browser/chrome_browser_main_linux.h"
 #elif BUILDFLAG(IS_ANDROID)
@@ -775,32 +777,6 @@ class ChromeBrowserMainExtraPartsThreadNotifier final
   base::OnceClosure threads_ready_closure_;
 };
 
-bool IsSSLErrorOverrideAllowedForOrigin(const GURL& request_url,
-                                        PrefService* prefs) {
-  DCHECK(request_url.SchemeIsCryptographic());
-
-  if (prefs->GetBoolean(prefs::kSSLErrorOverrideAllowed))
-    return true;
-
-  const base::Value::List& allow_list_urls =
-      prefs->GetList(prefs::kSSLErrorOverrideAllowedForOrigins);
-  if (allow_list_urls.empty())
-    return false;
-
-  for (auto const& value : allow_list_urls) {
-    ContentSettingsPattern pattern =
-        ContentSettingsPattern::FromString(value.GetString());
-    if (pattern == ContentSettingsPattern::Wildcard() || !pattern.IsValid())
-      continue;
-
-    // Despite |request_url| being a GURL, the path is ignored when matching.
-    if (pattern.Matches(request_url))
-      return true;
-  }
-
-  return false;
-}
-
 // Wrapper for SSLErrorHandler::HandleSSLError() that supplies //chrome-level
 // parameters.
 void HandleSSLErrorWrapper(
@@ -810,6 +786,8 @@ void HandleSSLErrorWrapper(
     const GURL& request_url,
     std::unique_ptr<SSLCertReporter> ssl_cert_reporter,
     SSLErrorHandler::BlockingPageReadyCallback blocking_page_ready_callback) {
+  DCHECK(request_url.SchemeIsCryptographic());
+
   Profile* profile =
       Profile::FromBrowserContext(web_contents->GetBrowserContext());
   // Profile should always outlive a WebContents
@@ -821,12 +799,17 @@ void HandleSSLErrorWrapper(
   captive_portal_service = CaptivePortalServiceFactory::GetForProfile(profile);
 #endif
 
+  const bool is_ssl_error_override_allowed_for_origin =
+      policy::IsOriginInAllowlist(request_url, profile->GetPrefs(),
+                                  prefs::kSSLErrorOverrideAllowedForOrigins,
+                                  prefs::kSSLErrorOverrideAllowed);
+
   SSLErrorHandler::HandleSSLError(
       web_contents, cert_error, ssl_info, request_url,
       std::move(ssl_cert_reporter), std::move(blocking_page_ready_callback),
       g_browser_process->network_time_tracker(), captive_portal_service,
       std::make_unique<ChromeSecurityBlockingPageFactory>(),
-      IsSSLErrorOverrideAllowedForOrigin(request_url, profile->GetPrefs()));
+      is_ssl_error_override_allowed_for_origin);
 }
 
 enum AppLoadedInTabSource {
@@ -895,46 +878,18 @@ bool HandleNewTabPageLocationOverride(
 }
 
 #if !BUILDFLAG(IS_ANDROID)
-// Check if the current url is allowlisted based on a list of allowlisted urls.
-bool IsURLAllowlisted(const GURL& current_url,
-                      const base::Value::List& allowlisted_urls) {
-  // Only check on HTTP and HTTPS pages.
-  if (!current_url.SchemeIsHTTPOrHTTPS())
-    return false;
-
-  for (auto const& value : allowlisted_urls) {
-    ContentSettingsPattern pattern =
-        ContentSettingsPattern::FromString(value.GetString());
-    if (pattern == ContentSettingsPattern::Wildcard() || !pattern.IsValid())
-      continue;
-    if (pattern.Matches(current_url))
-      return true;
-  }
-
-  return false;
-}
-
 // Check if autoplay is allowed by policy configuration.
 bool IsAutoplayAllowedByPolicy(content::WebContents* contents,
                                PrefService* prefs) {
-  DCHECK(prefs);
-
-  // Check if we have globally allowed autoplay by policy.
-  if (prefs->GetBoolean(prefs::kAutoplayAllowed) &&
-      prefs->IsManagedPreference(prefs::kAutoplayAllowed)) {
-    return true;
+  if (!contents) {
+    return false;
   }
 
-  if (!contents)
-    return false;
-
-  // Check if the current URL matches a URL pattern on the allowlist.
-  const base::Value::List& autoplay_allowlist =
-      prefs->GetList(prefs::kAutoplayAllowlist);
-  return prefs->IsManagedPreference(prefs::kAutoplayAllowlist) &&
-         IsURLAllowlisted(contents->GetURL(), autoplay_allowlist);
+  return policy::IsOriginInAllowlist(contents->GetURL(), prefs,
+                                     prefs::kAutoplayAllowlist,
+                                     prefs::kAutoplayAllowed);
 }
-#endif
+#endif  // !BUILDFLAG(IS_ANDROID)
 
 blink::mojom::AutoplayPolicy GetAutoplayPolicyForWebContents(
     WebContents* web_contents) {
@@ -2167,12 +2122,12 @@ void ChromeContentBrowserClient::GetAdditionalViewSourceSchemes(
 network::mojom::IPAddressSpace
 ChromeContentBrowserClient::DetermineAddressSpaceFromURL(const GURL& url) {
   if (url.SchemeIs(chrome::kChromeSearchScheme))
-    return network::mojom::IPAddressSpace::kLocal;
+    return network::mojom::IPAddressSpace::kLoopback;
   if (url.SchemeIs(dom_distiller::kDomDistillerScheme))
     return network::mojom::IPAddressSpace::kPublic;
 #if BUILDFLAG(ENABLE_EXTENSIONS)
   if (url.SchemeIs(extensions::kExtensionScheme))
-    return network::mojom::IPAddressSpace::kLocal;
+    return network::mojom::IPAddressSpace::kLoopback;
 #endif
 
   return network::mojom::IPAddressSpace::kUnknown;
@@ -6021,21 +5976,10 @@ ChromeContentBrowserClient::
     CreateURLLoaderHandlerForServiceWorkerNavigationPreload(
         int frame_tree_node_id,
         const network::ResourceRequest& resource_request) {
-  content::ContentBrowserClient::URLLoaderRequestHandler callback;
-
-  std::unique_ptr<SearchPrefetchURLLoader> loader =
+  SearchPrefetchURLLoader::RequestHandler prefetch_handler =
       SearchPrefetchURLLoaderInterceptor::MaybeCreateLoaderForRequest(
           resource_request, frame_tree_node_id);
-  if (!loader) {
-    return callback;
-  }
-
-  auto* raw_loader = loader.get();
-
-  // Hand ownership of the loader to the callback, when it runs, mojo will
-  // manage it. If the callback is deleted, the loader will be deleted.
-  callback = raw_loader->ServingResponseHandler(std::move(loader));
-  return callback;
+  return prefetch_handler;
 }
 
 bool ChromeContentBrowserClient::WillInterceptWebSocket(
@@ -6601,7 +6545,10 @@ ChromeContentBrowserClient::GetSafeBrowsingUrlCheckerDelegate(
     bool safe_browsing_enabled_for_profile,
     bool should_check_on_sb_disabled,
     const std::vector<std::string>& allowlist_domains) {
-  DCHECK_CURRENTLY_ON(BrowserThread::IO);
+  DCHECK_CURRENTLY_ON(
+      base::FeatureList::IsEnabled(safe_browsing::kSafeBrowsingOnUIThread)
+          ? content::BrowserThread::UI
+          : content::BrowserThread::IO);
 
   // Should not bypass safe browsing check if the check is for enterprise
   // lookup.
@@ -6899,8 +6846,16 @@ bool ChromeContentBrowserClient::HandleTopicsWebApi(
   if (!browsing_topics_service)
     return {};
 
-  return browsing_topics_service->HandleTopicsWebApi(
+  bool allowed = browsing_topics_service->HandleTopicsWebApi(
       context_origin, main_frame, caller_source, get_topics, observe, topics);
+
+  if (main_frame) {
+    ChromeBrowsingDataModelDelegate::BrowsingDataAccessed(
+        main_frame, context_origin,
+        ChromeBrowsingDataModelDelegate::StorageType::kTopics, !allowed);
+  }
+
+  return allowed;
 }
 
 bool ChromeContentBrowserClient::IsBluetoothScanningBlocked(
@@ -7047,8 +7002,8 @@ void ChromeContentBrowserClient::IsClipboardPasteContentAllowed(
                                           base::SPLIT_WANT_NONEMPTY);
     std::vector<base::FilePath> paths;
     paths.reserve(string_paths.size());
-    std::transform(string_paths.cbegin(), string_paths.cend(),
-                   std::back_inserter(paths), base::FilePath::FromASCII);
+    base::ranges::transform(string_paths, std::back_inserter(paths),
+                            base::FilePath::FromASCII);
     auto fsd = std::make_unique<enterprise_connectors::FilesScanData>(paths);
     auto* fsd_ptr = fsd.get();
     fsd_ptr->ExpandPaths(base::BindOnce(&HandleExpandedPaths, std::move(fsd),
@@ -7432,6 +7387,9 @@ bool ChromeContentBrowserClient::OpenExternally(
     WindowOpenDisposition disposition) {
 #if BUILDFLAG(IS_CHROMEOS_ASH)
   const bool from_webui = opener->GetWebUI() != nullptr;
+  const bool is_lacros_primary =
+      crosapi::lacros_startup_state::IsLacrosPrimaryEnabled();
+  const bool is_lacros_only = !crosapi::browser_util::IsAshWebBrowserEnabled();
 
   // If Lacros is the primary browser, we intercept requests from Ash WebUIs and
   // redirect them to Lacros via crosapi. This is to make window.open and <a
@@ -7442,9 +7400,9 @@ bool ChromeContentBrowserClient::OpenExternally(
   // window.open that make use of the return value (these will have to be dealt
   // with separately) as well as some existing links that currently must remain
   // in Ash.
+  // If Lacros is the only browser, we do this even for non-WebUI sources.
   bool should_open_in_lacros =
-      from_webui && crosapi::lacros_startup_state::IsLacrosEnabled() &&
-      crosapi::lacros_startup_state::IsLacrosPrimaryEnabled() &&
+      (is_lacros_only || (is_lacros_primary && from_webui)) &&
       disposition != WindowOpenDisposition::NEW_POPUP &&
       !url.SchemeIs(content::kChromeDevToolsScheme) &&
       !url.SchemeIs(content::kChromeUIScheme) &&
@@ -7477,24 +7435,12 @@ bool ChromeContentBrowserClient::OpenExternally(
   // If Lacros is the only browser, we intercept any WebUI URLs that would be
   // opened in a regular browser window. We open these with the OsUrlHandler SWA
   // instead, which will load them in an app window (no navigation bar).
-  bool open_with_os_url_handler =
-      from_webui && !crosapi::browser_util::IsAshWebBrowserEnabled() &&
+  if (from_webui && is_lacros_only &&
       // Kiosk sessions don't support SWA and already hide the navigation bar.
       !profiles::IsKioskSession() &&
       // Terminal's tabs must remain in the Terminal SWA.
-      !url.SchemeIs(content::kChromeUIUntrustedScheme) &&
-      ChromeWebUIControllerFactory::GetInstance()->CanHandleUrl(url) &&
-      !ash::GetCapturingSystemAppForURL(profile, url);
-  if (open_with_os_url_handler) {
-    ash::SystemAppLaunchParams launch_params;
-    launch_params.url = url;
-    int64_t display_id =
-        display::Screen::GetScreen()->GetDisplayForNewWindows().id();
-    ash::LaunchSystemWebAppAsync(
-        ProfileManager::GetPrimaryUserProfile(),
-        ash::SystemWebAppType::OS_URL_HANDLER, launch_params,
-        std::make_unique<apps::WindowInfo>(display_id));
-    return true;
+      !url.SchemeIs(content::kChromeUIUntrustedScheme)) {
+    return ash::TryLaunchOsUrlHandler(url);
   }
 #endif  // BUILDFLAG(IS_CHROMEOS_ASH)
 
@@ -7562,6 +7508,21 @@ bool ChromeContentBrowserClient::AreIsolatedWebAppsEnabled(
   }
 #endif
   return base::FeatureList::IsEnabled(features::kIsolatedWebApps);
+}
+
+bool ChromeContentBrowserClient::IsThirdPartyStoragePartitioningAllowed(
+    content::BrowserContext* browser_context) {
+  const HostContentSettingsMap* const content_settings =
+      HostContentSettingsMapFactory::GetForProfile(
+          Profile::FromBrowserContext(browser_context));
+  if (!content_settings) {
+    // We fail permissive as this function is used to check whether partitioning
+    // should be blocked, but isn't the final word on if it's allowed.
+    return true;
+  }
+  return content_settings->GetDefaultContentSetting(
+             ContentSettingsType::THIRD_PARTY_STORAGE_PARTITIONING, nullptr) ==
+         CONTENT_SETTING_ALLOW;
 }
 
 #if BUILDFLAG(IS_MAC)

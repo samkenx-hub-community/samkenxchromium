@@ -274,7 +274,7 @@ chromium-metrics-reviews@google.com.
   </token>
 </histogram>
 
-<histogram name="Tab.Count.Guest" units="units" expires_after="2023-07-02">
+<histogram name="Tab.Count.Guest" units="units" expires_after="2023-09-03">
   <owner>rhalavati@chromium.org</owner>
   <owner>chrome-incognito@google.com</owner>
   <summary>
@@ -357,7 +357,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Tab.PerceivedRestoreTime" units="ms"
-    expires_after="2023-07-02">
+    expires_after="2023-09-03">
   <owner>ckitagawa@chromium.org</owner>
   <owner>dtrainor@chromium.org</owner>
   <owner>yfriedman@chromium.org</owner>
@@ -506,21 +506,6 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
-<histogram name="Tab.RestoreResult" enum="TabRestoreResult" expires_after="M88">
-  <owner>dtrainor@chromium.org</owner>
-  <owner>marq@chromium.org</owner>
-  <summary>
-    [Android and iOS] When the browser restores a tab, whether the load was
-    successful. Loads can fail for instance when there is no connectivity.
-  </summary>
-</histogram>
-
-<histogram name="Tab.RestoreTime" units="ms" expires_after="M88">
-  <owner>dtrainor@chromium.org</owner>
-  <owner>marq@chromium.org</owner>
-  <summary>[Android and iOS] Load time for a successful tab restore.</summary>
-</histogram>
-
 <histogram name="Tab.RestoreUserPersistence" enum="TabRestoreUserAction"
     expires_after="M85">
   <owner>dtrainor@chromium.org</owner>
@@ -563,7 +548,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Tab.StatusWhenSwitchedBackToForeground" enum="TabStatus"
-    expires_after="2023-07-02">
+    expires_after="2023-09-03">
   <owner>ckitagawa@chromium.org</owner>
   <owner>marq@chromium.org</owner>
   <summary>
@@ -697,7 +682,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="TabGroups.UserCustomizedGroupCountPerLoad" units="groups"
-    expires_after="2023-07-02">
+    expires_after="2023-09-03">
   <owner>dpenning@chromium.org</owner>
   <owner>chrome-desktop-ui-sea@google.com</owner>
   <summary>
@@ -1020,7 +1005,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="TabManager.Discarding.DiscardCount" units="Discards"
-    expires_after="2023-07-02">
+    expires_after="2023-09-03">
   <owner>chrisha@chromium.org</owner>
   <owner>catan-team@chromium.org</owner>
   <summary>
@@ -1079,7 +1064,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="TabManager.Discarding.ReloadCount" units="Reloads"
-    expires_after="2023-07-02">
+    expires_after="2023-09-03">
   <owner>chrisha@chromium.org</owner>
   <owner>catan-team@chromium.org</owner>
   <summary>
@@ -1285,18 +1270,6 @@ chromium-metrics-reviews@google.com.
   <summary>
     [Android] Age (time since the last display in previous sessions) of the
     foreground tab being restored on the browser cold start.
-  </summary>
-</histogram>
-
-<histogram name="Tabs.IndependentTabCountInSwitcher" units="tabs"
-    expires_after="2020-07-31">
-  <owner>mattsimmons@chromium.org</owner>
-  <owner>memex-team@google.com</owner>
-  <summary>
-    The number of entries/cards shown in the grid tab switcher.
-
-    When the user is shown the grid tab switcher, logs the number of entries
-    (tabs or tab groups) open in the grid tab switcher.
   </summary>
 </histogram>
 
@@ -1638,6 +1611,17 @@ chromium-metrics-reviews@google.com.
   <token key="RecentlyClosedType" variants="RecentlyClosedType"/>
 </histogram>
 
+<histogram name="Tabs.RestoredFromInactiveCount" units="tabs"
+    expires_after="2024-02-23">
+  <owner>lpromero@google.com</owner>
+  <owner>chromeleon@google.com</owner>
+  <summary>
+    Recorded on disabling Inactive Tabs (for example in case of an unlaunch).
+    The number of tabs rescued from the orphan inactive tabs browser after the
+    Inactive Tabs experimental flag has been disabled.
+  </summary>
+</histogram>
+
 <histogram name="Tabs.RestoreTabStateException" enum="RestoreTabStateException"
     expires_after="2023-08-27">
   <owner>ckitagawa@chromium.org</owner>
@@ -1663,7 +1647,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Tabs.SadTab.Reload.Event" enum="SadTabEvent"
-    expires_after="2023-07-02">
+    expires_after="2023-09-03">
   <owner>sonnyrao@chromium.org</owner>
   <owner>jamescook@chromium.org</owner>
   <summary>
@@ -1897,31 +1881,6 @@ chromium-metrics-reviews@google.com.
   <summary>
     The number of tabs in the current active group when a load completes.
     Records 0 if the active tab is not in a group.
-  </summary>
-</histogram>
-
-<histogram name="Tabs.TabCountInSwitcher" units="tabs"
-    expires_after="2020-07-31">
-  <owner>mattsimmons@chromium.org</owner>
-  <owner>memex-team@google.com</owner>
-  <summary>
-    The number of tabs open when the grid tab switcher is shown.
-
-    When the user is shown the tab switcher, logs the total number of individual
-    open tabs. Android only.
-  </summary>
-</histogram>
-
-<histogram name="Tabs.TabCountOnStartScreenShown" units="tabs"
-    expires_after="2020-07-31">
-  <owner>mattsimmons@chromium.org</owner>
-  <owner>memex-team@google.com</owner>
-  <summary>
-    The number of tabs open when the user is returned to the tab switcher on
-    start.
-
-    When the user is returned to the tab switcher on starting Chrome due to
-    inactivity, logs the overall number of tabs open. Android only.
   </summary>
 </histogram>
 
@@ -2483,32 +2442,6 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
-<histogram
-    name="Tabs.Tasks.HubAndSpokeNavigationUsage{HubAndSpokeNavigationUsageType}"
-    units="spokes" expires_after="2020-06-01">
-  <owner>yusufo@chromium.org</owner>
-  <owner>wychen@chromium.org</owner>
-  <summary>
-    The cumulative number of &quot;spokes&quot; from any &quot;hub&quot; page in
-    every tab. A &quot;hub&quot; is any page that the user navigates away from,
-    and a &quot;spoke&quot; is a page that's navigated to. The
-    &quot;spokes&quot; count is incremented and recorded each time the user
-    navigates back to a &quot;hub&quot; page via navigation back button and then
-    navigates to a new &quot;spoke&quot;. {HubAndSpokeNavigationUsageType}
-  </summary>
-  <token key="HubAndSpokeNavigationUsageType">
-    <variant name=""/>
-    <variant name=".FromDefaultSearchEngine"
-        summary="User navigates to a new page from default search engine
-                 result page"/>
-    <variant name=".FromFormSubmit"
-        summary="User navigates to a new page from a form submit page"/>
-    <variant name=".FromOther"
-        summary="User navigates to a new page from a page other than a
-                 default search engine result page or a form submit page"/>
-  </token>
-</histogram>
-
 <histogram name="Tabs.Tasks.OrderValidOnStartup" units="boolean"
     expires_after="2023-07-16">
   <owner>ckitagawa@chromium.org</owner>
@@ -2683,7 +2616,7 @@ chromium-metrics-reviews@google.com.
   <token key="BatteryState" variants="BatteryState"/>
 </histogram>
 
-<histogram name="Tabs.WindowWidth" units="DIPs" expires_after="2023-07-02">
+<histogram name="Tabs.WindowWidth" units="DIPs" expires_after="2023-09-03">
   <owner>collinbaker@chromium.org</owner>
   <owner>chrome-desktop-ui-sea@google.com</owner>
   <summary>

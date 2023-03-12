@@ -351,20 +351,8 @@ chromium-metrics-reviews@google.com.
   </token>
 </histogram>
 
-<histogram name="Accessibility.Android.TabSwitcherPreferenceEnabled"
-    enum="BooleanEnabled" expires_after="M81">
-  <owner>twellington@chromium.org</owner>
-  <owner>tedchoc@chromium.org</owner>
-  <summary>
-    Tracks whether the accessibility tab switcher is enabled when an
-    accessibility service (e.g. TalkBack or Switch Access) is enabled that would
-    typically cause the accessibility tab switcher to be used. Recorded when the
-    activity is resumed or accessibility services are turned on.
-  </summary>
-</histogram>
-
 <histogram name="Accessibility.Android.UserFontSizePref.Change" units="%"
-    expires_after="2023-07-01">
+    expires_after="2023-09-03">
   <owner>twellington@chromium.org</owner>
   <owner>skym@chromium.org</owner>
   <summary>
@@ -375,7 +363,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Accessibility.Android.UserFontSizePref.OnStartup" units="%"
-    expires_after="2023-07-01">
+    expires_after="2023-09-03">
   <owner>twellington@chromium.org</owner>
   <owner>skym@chromium.org</owner>
   <summary>
@@ -1186,10 +1174,10 @@ chromium-metrics-reviews@google.com.
     This metric is related to the Preferred Content Size chosen by the user. It
     is only recorded once per session. This is hit if the chosen category is not
     listed in the map defined in
-    /ios/chrome/browser/ui/util/dynamic_type_util.mm. In that case, we should
-    update the code by adding an entry for the new category in that map. This is
-    logged when the helper to returning the multiplier associated with the
-    current preferred content size is called.
+    /ios/chrome/browser/shared/ui/util/dynamic_type_util.mm. In that case, we
+    should update the code by adding an entry for the new category in that map.
+    This is logged when the helper to returning the multiplier associated with
+    the current preferred content size is called.
   </summary>
 </histogram>
 
@@ -1475,6 +1463,20 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
+<histogram
+    name="Accessibility.LiveCaption.{SodaLanguageCode}.SessionContainsRecognizedSpeech"
+    enum="BooleanEnabled" expires_after="2023-06-01">
+  <owner>evliu@google.com</owner>
+  <owner>chrome-media-ux@google.com</owner>
+  <owner>chrome-a11y-core@google.com</owner>
+  <summary>
+    Whether the speech recognition session contains any recognized speech. This
+    is logged once per media stream upon the destruction of the
+    SpeechRecognitionRecognizerImpl.
+  </summary>
+  <token key="SodaLanguageCode" variants="SodaLanguageCode"/>
+</histogram>
+
 <histogram name="Accessibility.LiveCaption2" enum="BooleanEnabled"
     expires_after="2023-11-30">
   <owner>katie@chromium.org</owner>
@@ -1693,6 +1695,24 @@ chromium-metrics-reviews@google.com.
     <variant name="UMA_API_TEXTRANGE_MOVEENPOINTBYRANGE"
         summary="moves endpoint by the given range."/>
   </token>
+</histogram>
+
+<histogram name="Accessibility.ReadAnything.Color" enum="ReadAnythingColor"
+    expires_after="2023-11-30">
+  <owner>abigailbklein@google.com</owner>
+  <owner>chrome-a11y-core@google.com</owner>
+  <summary>
+    Records the user-chosen color theme for the Read Anything panel.
+  </summary>
+</histogram>
+
+<histogram name="Accessibility.ReadAnything.FontScale" units="em"
+    expires_after="2023-11-30">
+  <owner>abigailbklein@google.com</owner>
+  <owner>chrome-a11y-core@google.com</owner>
+  <summary>
+    Records the user-chosen font scale for the Read Anything panel.
+  </summary>
 </histogram>
 
 <histogram name="Accessibility.ReadAnything.LetterSpacing"
@@ -2179,7 +2199,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="DomDistiller.Time.ViewingReaderModePage" units="ms"
-    expires_after="2023-07-02">
+    expires_after="2023-09-03">
   <owner>mdjones@chromium.org</owner>
   <summary>
     Records the amount of time a user spent on a Reader Mode Page.

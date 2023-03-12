@@ -672,7 +672,7 @@ void AUAudioInputStream::Stop() {
   DCHECK_CALLED_ON_VALID_THREAD(thread_checker_);
   deferred_start_cb_.Cancel();
   DVLOG(1) << __FUNCTION__ << " this " << this;
-  ;
+
   StopAgc();
   if (noise_reduction_suppressed_) {
     manager_->UnsuppressNoiseReduction(input_device_id_);
@@ -710,7 +710,6 @@ void AUAudioInputStream::Stop() {
 void AUAudioInputStream::Close() {
   DCHECK_CALLED_ON_VALID_THREAD(thread_checker_);
   DVLOG(1) << __FUNCTION__ << " this " << this;
-  ;
 
   // It is valid to call Close() before calling open or Start().
   // It is also valid to call Close() after Start() has been called.
@@ -1159,7 +1158,7 @@ int AUAudioInputStream::HardwareSampleRate() {
                                                &default_input_device_address, 0,
                                                0, &info_size, &device_id);
   if (result != noErr)
-    return 0.0;
+    return 0;
 
   Float64 nominal_sample_rate;
   info_size = sizeof(nominal_sample_rate);
@@ -1170,7 +1169,7 @@ int AUAudioInputStream::HardwareSampleRate() {
   result = AudioObjectGetPropertyData(device_id, &nominal_sample_rate_address,
                                       0, 0, &info_size, &nominal_sample_rate);
   if (result != noErr)
-    return 0.0;
+    return 0;
 
   return static_cast<int>(nominal_sample_rate);
 }

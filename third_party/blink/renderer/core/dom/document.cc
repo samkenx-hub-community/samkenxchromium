@@ -4903,15 +4903,15 @@ void Document::SetActiveElement(Element* new_active_element) {
 
 void Document::RemoveFocusedElementOfSubtree(Node& node,
                                              bool among_children_only) {
-  if (!focused_element_)
+  if (!node.isConnected() || !focused_element_ ||
+      !node.IsShadowIncludingInclusiveAncestorOf(*focused_element_)) {
     return;
-
-  // We can't be focused if we're not in the document.
-  if (!node.isConnected())
-    return;
-  bool contains = node.IsShadowIncludingInclusiveAncestorOf(*focused_element_);
-  if (contains && (focused_element_ != &node || !among_children_only))
+  }
+  const auto& focused_element = *node.GetTreeScope().AdjustedFocusedElement();
+  if (focused_element.IsDescendantOf(&node) ||
+      (!among_children_only && node == focused_element)) {
     ClearFocusedElement();
+  }
 }
 
 static Element* SkipDisplayNoneAncestors(Element* element) {
@@ -6361,6 +6361,27 @@ ScriptPromise Document::requestStorageAccess(ScriptState* script_state) {
 
     // If this frame is same-origin with the outermost frame we no longer need
     // to make a request and can resolve the promise.
+
+    // Deviation from spec: we set the has_storage_access bool here, so that
+    // downstream cookie accesses will know that this frame opted into storage
+    // access. This knowledge is necessary since Chromium considers the entire
+    // frame hierarchy when deciding if a context is first-party or third-party;
+    // rather than just considering the current frame and top frame.
+    //
+    // As a concrete example, consider an A(B(A)) embedding context. The inner A
+    // iframe is same-origin with the top-level A document. However, because
+    // Chromium's block-third-party-cookies behavior considers the whole frame
+    // hierarchy, block-third-party-cookies would still prevent the inner A
+    // iframe from accessing its cookies, even though document.hasStorageAccess
+    // and document.requestStorageAccess are written (in the spec) with early
+    // returns to imply that access should be granted in such a same-origin
+    // scenario. If we set the has_storage_access bool here, and modify
+    // consumers of the storage-access permission such that they do not require
+    // an explicit permission for contexts in which the frame and the top-level
+    // frame are same-origin, then the "actual" cookie access will match the
+    // "implied" cookie access in the spec.
+    dom_window_->SetHasStorageAccess();
+
     resolver->Resolve();
     return promise;
   }
@@ -6503,8 +6524,8 @@ ScriptPromise Document::hasPrivateToken(ScriptState* script_state,
                                         const String& issuer,
                                         const String& type,
                                         ExceptionState& exception_state) {
-  ScriptPromiseResolver* resolver =
-      MakeGarbageCollected<ScriptPromiseResolver>(script_state);
+  ScriptPromiseResolver* resolver = MakeGarbageCollected<ScriptPromiseResolver>(
+      script_state, exception_state.GetContext());
 
   ScriptPromise promise = resolver->Promise();
 
@@ -6627,8 +6648,8 @@ ScriptPromise Document::hasRedemptionRecord(ScriptState* script_state,
                                             const String& issuer,
                                             const String& type,
                                             ExceptionState& exception_state) {
-  ScriptPromiseResolver* resolver =
-      MakeGarbageCollected<ScriptPromiseResolver>(script_state);
+  ScriptPromiseResolver* resolver = MakeGarbageCollected<ScriptPromiseResolver>(
+      script_state, exception_state.GetContext());
 
   ScriptPromise promise = resolver->Promise();
 

@@ -163,6 +163,7 @@
 <translation id="2346474577291266260">Vynikajúce (<ph name="SIGNAL_STRENGTH" />)</translation>
 <translation id="2359808026110333948">Pokračovať</translation>
 <translation id="2364498172489649528">Úspešné</translation>
+<translation id="2367335866686097760">Priradený kláves</translation>
 <translation id="2380886658946992094">Legal</translation>
 <translation id="2391082728065870591">Odoslať správu so spätnou väzbou</translation>
 <translation id="2407209115954268704">Stav uzamknutia SIM karty</translation>
@@ -235,10 +236,11 @@
 <translation id="319101249942218879">Obrázok avatara bol zmenený</translation>
 <translation id="3192947282887913208">Zvukové súbory</translation>
 <translation id="3199982728237701504">Podávač dokumentov (obojstranný)</translation>
+<translation id="3211671540163313381">Priradený krížový ovládač</translation>
 <translation id="3226405216343213872">Hľadajú sa skenery</translation>
+<translation id="3226657629376379887">Ponuka akcií rozloženia</translation>
 <translation id="3246869037381808805">Tlačové úlohy staršie ako deň budú odstránené</translation>
 <translation id="3268178239013324452">Nepodarilo sa – dvierka sú otvorené</translation>
-<translation id="3275506277319227640">Ukotviť na <ph name="DIRECTION" /> strane</translation>
 <translation id="3275729367986477355">Obrázok avatara</translation>
 <translation id="3283504360622356314">{0,plural, =1{Upraviť súbor}few{Upraviť súbory}many{Upraviť súbory}other{Upraviť súbory}}</translation>
 <translation id="3286515922899063534"><ph name="CURRENT" /> GHz</translation>
@@ -357,7 +359,6 @@
 <translation id="4311195029067684288">Úplné</translation>
 <translation id="4333390807948134856">Bol stlačený kláves <ph name="KEY_NAME" /></translation>
 <translation id="435692326371619097">Spravujte nastavenia názvov prístupových bodov (APN) siete. Názvy prístupových bodov umožňujú nadviazať pripojenie medzi mobilnou sieťou a internetom. <ph name="BEGIN_LINK" />Ďalšie informácie<ph name="END_LINK" /></translation>
-<translation id="4370033095251616914">Ukotviť na menšej strane</translation>
 <translation id="4378373042927530923">Nebolo spustené</translation>
 <translation id="4378551569595875038">Pripája sa...</translation>
 <translation id="4382484599443659549">PDF</translation>
@@ -616,6 +617,7 @@
 <translation id="650266656685499220">Ak chcete vytvoriť albumy, prejdite do Fotiek Google</translation>
 <translation id="6516990319416533844">Ak chcete otestovať rýchlosť nabíjania batérie, nechajte batériu chvíľu vybíjať.</translation>
 <translation id="6517239166834772319">Preskúmať</translation>
+<translation id="6526200165918397681">Prispôsobiť tapetu</translation>
 <translation id="6527081081771465939">Neznámy protokol zabezpečenia siete Wi‑Fi</translation>
 <translation id="6535178685492749208">Ste offline. Spätná väzba bude odoslaná neskôr.</translation>
 <translation id="65587193855025101">Reflektívny skener</translation>
@@ -802,6 +804,7 @@
 <translation id="8318753676953949627">Žiadne obrázky</translation>
 <translation id="8336739000755212683">Zmeniť obrázok účtu zariadenia</translation>
 <translation id="8347227221149377169">Tlačové úlohy</translation>
+<translation id="8351855506390808906">Priradený dotykový bod</translation>
 <translation id="8352772353338965963">Pridanie účtu pre viacnásobné prihlásenie. Ku všetkým prihláseným účtom môžete pristupovať bez hesla, takže táto funkcia by mala byť použitá iba s dôveryhodnými účtami.</translation>
 <translation id="8364946094152050673">Prázdne DNS servery</translation>
 <translation id="8372477600026034341">Ďalší hostitelia</translation>
@@ -898,7 +901,7 @@
 <translation id="9137526406337347448">Služby Google</translation>
 <translation id="9138630967333032450">Ľavý kláves Shift</translation>
 <translation id="9149391708638971077">Spustiť test pamäte</translation>
-<translation id="9157515863513902090">Ukotviť na väčšej strane</translation>
+<translation id="9161276708550942948">medzera</translation>
 <translation id="9173638680043580060">Zostáva menej ako minúta</translation>
 <translation id="917720651393141712">Testovať</translation>
 <translation id="9188992814426075118">Klávesnica sa môže automaticky prispôsobiť tapete</translation>

@@ -37,7 +37,6 @@ const base::Feature* const kAllFeatures[] = {
     &kIPHChromeReengagementNotification3Feature,
     &kIPHContextualPageActionsQuietVariantFeature,
     &kIPHContextualPageActionsActionChipFeature,
-    &kIPHCrowFeature,
     &kIPHDownloadSettingsFeature,
     &kIPHDownloadInfoBarDownloadContinuingFeature,
     &kIPHDownloadInfoBarDownloadsAreFasterFeature,
@@ -126,11 +125,13 @@ const base::Feature* const kAllFeatures[] = {
     &kIPHiOSDefaultBrowserOverflowMenuBadgeFeature,
     &kIPHiOSDefaultBrowserSettingsBadgeFeature,
     &kIPHiOSAppStorePromoFeature,
+    &kIPHTabPinnedFeature,
 #endif  // BUILDFLAG(IS_IOS)
 #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_APPLE) || BUILDFLAG(IS_LINUX) || \
     BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_FUCHSIA)
     &kIPHBatterySaverModeFeature,
     &kIPHDesktopTabGroupsNewGroupFeature,
+    &kIPHDesktopCustomizeChromeFeature,
     &kIPHExtensionsMenuFeature,
     &kIPHFocusHelpBubbleScreenReaderPromoFeature,
     &kIPHGMCCastStartStopFeature,

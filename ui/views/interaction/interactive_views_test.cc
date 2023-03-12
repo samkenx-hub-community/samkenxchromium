@@ -196,7 +196,7 @@ InteractiveViewsTestApi::StepBuilder InteractiveViewsTestApi::ReleaseMouse(
 }
 
 // static
-InteractiveViewsTestApi::FindViewCallback<View>
+InteractiveViewsTestApi::FindViewCallback
 InteractiveViewsTestApi::GetFindViewCallback(AbsoluteViewSpecifier spec) {
   if (View** view = absl::get_if<View*>(&spec)) {
     CHECK(*view) << "NameView(View*): view must be set.";
@@ -220,12 +220,12 @@ InteractiveViewsTestApi::GetFindViewCallback(AbsoluteViewSpecifier spec) {
         *view);
   }
 
-  return base::RectifyCallback<FindViewCallback<View>>(
+  return base::RectifyCallback<FindViewCallback>(
       std::move(absl::get<base::OnceCallback<View*()>>(spec)));
 }
 
 // static
-InteractiveViewsTestApi::FindViewCallback<View>
+InteractiveViewsTestApi::FindViewCallback
 InteractiveViewsTestApi::GetFindViewCallback(ChildViewSpecifier spec) {
   if (size_t* index = absl::get_if<size_t>(&spec)) {
     return base::BindOnce(
@@ -307,6 +307,7 @@ InteractiveViewsTestApi::GetPositionCallback(RelativePositionSpecifier spec) {
 
   CHECK(absl::holds_alternative<CenterPoint>(spec));
   return base::BindOnce([](ui::TrackedElement* el) {
+    CHECK(el->IsA<views::TrackedElementViews>());
     return el->AsA<views::TrackedElementViews>()
         ->view()
         ->GetBoundsInScreen()

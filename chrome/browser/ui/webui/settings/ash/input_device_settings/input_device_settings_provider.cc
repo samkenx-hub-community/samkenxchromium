@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include "chrome/browser/ui/webui/settings/ash/input_device_settings/input_device_settings_provider.h"
+
 #include "ash/constants/ash_features.h"
 #include "ash/public/cpp/input_device_settings_controller.h"
 #include "ash/public/mojom/input_device_settings.mojom.h"
@@ -32,6 +33,42 @@ void InputDeviceSettingsProvider::BindInterface(
   receiver_.Bind(std::move(receiver));
 }
 
+void InputDeviceSettingsProvider::SetKeyboardSettings(
+    uint32_t device_id,
+    ::ash::mojom::KeyboardSettingsPtr settings) {
+  DCHECK(features::IsInputDeviceSettingsSplitEnabled());
+  DCHECK(InputDeviceSettingsController::Get());
+  InputDeviceSettingsController::Get()->SetKeyboardSettings(
+      device_id, std::move(settings));
+}
+
+void InputDeviceSettingsProvider::SetPointingStickSettings(
+    uint32_t device_id,
+    ::ash::mojom::PointingStickSettingsPtr settings) {
+  DCHECK(features::IsInputDeviceSettingsSplitEnabled());
+  DCHECK(InputDeviceSettingsController::Get());
+  InputDeviceSettingsController::Get()->SetPointingStickSettings(
+      device_id, std::move(settings));
+}
+
+void InputDeviceSettingsProvider::SetMouseSettings(
+    uint32_t device_id,
+    ::ash::mojom::MouseSettingsPtr settings) {
+  DCHECK(features::IsInputDeviceSettingsSplitEnabled());
+  DCHECK(InputDeviceSettingsController::Get());
+  InputDeviceSettingsController::Get()->SetMouseSettings(device_id,
+                                                         std::move(settings));
+}
+
+void InputDeviceSettingsProvider::SetTouchpadSettings(
+    uint32_t device_id,
+    ::ash::mojom::TouchpadSettingsPtr settings) {
+  DCHECK(features::IsInputDeviceSettingsSplitEnabled());
+  DCHECK(InputDeviceSettingsController::Get());
+  InputDeviceSettingsController::Get()->SetTouchpadSettings(
+      device_id, std::move(settings));
+}
+
 void InputDeviceSettingsProvider::GetConnectedKeyboards(
     GetConnectedKeyboardsCallback callback) {
   DCHECK(features::IsInputDeviceSettingsSplitEnabled());
@@ -58,6 +95,24 @@ void InputDeviceSettingsProvider::ObserveTouchpadSettings(
       InputDeviceSettingsController::Get()->GetConnectedTouchpads());
 }
 
+void InputDeviceSettingsProvider::ObservePointingStickSettings(
+    mojo::PendingRemote<mojom::PointingStickSettingsObserver> observer) {
+  DCHECK(features::IsInputDeviceSettingsSplitEnabled());
+  DCHECK(InputDeviceSettingsController::Get());
+  const auto id = pointing_stick_settings_observers_.Add(std::move(observer));
+  pointing_stick_settings_observers_.Get(id)->OnPointingStickListUpdated(
+      InputDeviceSettingsController::Get()->GetConnectedPointingSticks());
+}
+
+void InputDeviceSettingsProvider::ObserveMouseSettings(
+    mojo::PendingRemote<mojom::MouseSettingsObserver> observer) {
+  DCHECK(features::IsInputDeviceSettingsSplitEnabled());
+  DCHECK(InputDeviceSettingsController::Get());
+  const auto id = mouse_settings_observers_.Add(std::move(observer));
+  mouse_settings_observers_.Get(id)->OnMouseListUpdated(
+      InputDeviceSettingsController::Get()->GetConnectedMice());
+}
+
 void InputDeviceSettingsProvider::OnKeyboardConnected(
     const ::ash::mojom::Keyboard& keyboard) {
   NotifyKeyboardsUpdated();
@@ -78,6 +133,26 @@ void InputDeviceSettingsProvider::OnTouchpadDisconnected(
   NotifyTouchpadsUpdated();
 }
 
+void InputDeviceSettingsProvider::OnPointingStickConnected(
+    const ::ash::mojom::PointingStick& pointing_stick) {
+  NotifyPointingSticksUpdated();
+}
+
+void InputDeviceSettingsProvider::OnPointingStickDisconnected(
+    const ::ash::mojom::PointingStick& pointing_stick) {
+  NotifyPointingSticksUpdated();
+}
+
+void InputDeviceSettingsProvider::OnMouseConnected(
+    const ::ash::mojom::Mouse& mouse) {
+  NotifyMiceUpdated();
+}
+
+void InputDeviceSettingsProvider::OnMouseDisconnected(
+    const ::ash::mojom::Mouse& mouse) {
+  NotifyMiceUpdated();
+}
+
 void InputDeviceSettingsProvider::NotifyKeyboardsUpdated() {
   DCHECK(InputDeviceSettingsController::Get());
   for (const auto& observer : keyboard_settings_observers_) {
@@ -91,6 +166,22 @@ void InputDeviceSettingsProvider::NotifyTouchpadsUpdated() {
   for (const auto& observer : touchpad_settings_observers_) {
     observer->OnTouchpadListUpdated(
         InputDeviceSettingsController::Get()->GetConnectedTouchpads());
+  }
+}
+
+void InputDeviceSettingsProvider::NotifyPointingSticksUpdated() {
+  DCHECK(InputDeviceSettingsController::Get());
+  for (const auto& observer : pointing_stick_settings_observers_) {
+    observer->OnPointingStickListUpdated(
+        InputDeviceSettingsController::Get()->GetConnectedPointingSticks());
+  }
+}
+
+void InputDeviceSettingsProvider::NotifyMiceUpdated() {
+  DCHECK(InputDeviceSettingsController::Get());
+  for (const auto& observer : mouse_settings_observers_) {
+    observer->OnMouseListUpdated(
+        InputDeviceSettingsController::Get()->GetConnectedMice());
   }
 }
 

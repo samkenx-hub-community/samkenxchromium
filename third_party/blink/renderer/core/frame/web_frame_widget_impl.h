@@ -319,6 +319,7 @@ class CORE_EXPORT WebFrameWidgetImpl
 
   void OnTaskCompletedForFrame(base::TimeTicks start_time,
                                base::TimeTicks end_time,
+                               base::TimeTicks desired_execution_time,
                                LocalFrame*) override;
   void SetVirtualKeyboardResizeHeightForTesting(int);
   bool GetMayThrottleIfUndrawnFramesForTesting();
@@ -438,7 +439,8 @@ class CORE_EXPORT WebFrameWidgetImpl
 
   // mojom::blink::FrameWidgetInputHandler overrides:
   void HandleStylusWritingGestureAction(
-      mojom::blink::StylusWritingGestureDataPtr gesture_data) override;
+      mojom::blink::StylusWritingGestureDataPtr gesture_data,
+      HandleStylusWritingGestureActionCallback callback) override;
 
   // Sets the display mode, which comes from the top-level browsing context and
   // is applied to all widgets.
@@ -794,6 +796,7 @@ class CORE_EXPORT WebFrameWidgetImpl
   void Cut() override;
   void Copy() override;
   void CopyToFindPboard() override;
+  void CenterSelection() override;
   void Paste() override;
   void PasteAndMatchStyle() override;
   void Delete() override;

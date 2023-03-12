@@ -4,6 +4,7 @@
 
 #include "quick_start_decoder.h"
 
+#include "base/base64.h"
 #include "base/containers/fixed_flat_set.h"
 #include "base/containers/flat_tree.h"
 #include "base/functional/callback.h"
@@ -31,6 +32,8 @@ constexpr uint8_t kCtapDeviceResponseSuccess = 0x00;
 constexpr int kCborDecoderNoError = 0;
 constexpr int kCborDecoderUnknownError = 14;
 constexpr uint8_t kCtap2ErrInvalidCBOR = 0x12;
+constexpr char kSecondDeviceAuthPayloadKey[] = "secondDeviceAuthPayload";
+constexpr char kFidoMessageKey[] = "fidoMessage";
 
 std::pair<int, absl::optional<cbor::Value>> CborDecodeGetAssertionResponse(
     base::span<const uint8_t> response) {
@@ -124,16 +127,26 @@ QuickStartDecoder::~QuickStartDecoder() = default;
 
 mojom::GetAssertionResponsePtr QuickStartDecoder::DoDecodeGetAssertionResponse(
     const std::vector<uint8_t>& data) {
-  if (data.size() < 2) {
+  absl::optional<std::vector<uint8_t>> parsed_response_bytes =
+      ExtractFidoDataFromJsonResponse(data);
+  if (!parsed_response_bytes.has_value()) {
+    LOG(ERROR) << "Failed to extract Fido data from JSON response.";
+    return BuildGetAssertionResponseError(
+        GetAssertionStatus::kMessagePayloadParseError, kCtap2ErrInvalidCBOR,
+        kCborDecoderUnknownError);
+  }
+
+  std::vector<unsigned char>& response_bytes = parsed_response_bytes.value();
+  if (response_bytes.size() < 2) {
     LOG(ERROR) << "GetAssertionResponse requires a status code byte and "
                   "response bytes. Data in size: "
-               << data.size();
+               << response_bytes.size();
     return BuildGetAssertionResponseError(
         GetAssertionStatus::kCtapResponseError, kCtap2ErrInvalidCBOR,
         kCborDecoderUnknownError);
   }
-  uint8_t ctap_status = data[0];
-  base::span<const uint8_t> cbor_bytes(data);
+  uint8_t ctap_status = response_bytes[0];
+  base::span<const uint8_t> cbor_bytes(response_bytes);
   cbor_bytes = cbor_bytes.subspan(1);
   if (ctap_status != kCtapDeviceResponseSuccess) {
     LOG(ERROR) << "Ctap Device Response Status Code is not Success(0x00). Got: "
@@ -204,6 +217,40 @@ void QuickStartDecoder::DecodeGetAssertionResponse(
     DecodeGetAssertionResponseCallback callback) {
   DCHECK(sandbox::policy::Sandbox::IsProcessSandboxed());
   std::move(callback).Run(DoDecodeGetAssertionResponse(data));
+}
+
+absl::optional<std::vector<uint8_t>>
+QuickStartDecoder::ExtractFidoDataFromJsonResponse(
+    const std::vector<uint8_t>& data) {
+  std::string raw_message_payload(data.begin(), data.end());
+  absl::optional<base::Value> message_payload_json =
+      base::JSONReader::Read(raw_message_payload);
+  if (!message_payload_json.has_value()) {
+    LOG(ERROR) << "MessagePayload cannot be parsed as JSON";
+    return absl::nullopt;
+  }
+
+  base::Value::Dict* message_json = message_payload_json->GetIfDict();
+  if (!message_json) {
+    LOG(ERROR) << "MessagePayload cannot be parsed as a JSON Dictionary.";
+    return absl::nullopt;
+  }
+
+  base::Value::Dict* second_device_auth_payload =
+      message_json->FindDict(kSecondDeviceAuthPayloadKey);
+  if (!second_device_auth_payload) {
+    LOG(ERROR) << "secondDeviceAuthPayload cannot be found within Message.";
+    return absl::nullopt;
+  }
+
+  std::string* fido_message =
+      second_device_auth_payload->FindString(kFidoMessageKey);
+  if (!fido_message) {
+    LOG(ERROR) << "fidoMessage cannot be found within secondDeviceAuthPayload.";
+    return absl::nullopt;
+  }
+
+  return base::Base64Decode(*fido_message);
 }
 
 }  // namespace ash::quick_start

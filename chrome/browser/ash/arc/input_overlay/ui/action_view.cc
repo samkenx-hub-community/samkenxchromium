@@ -148,12 +148,11 @@ void ActionView::ShowInfoMsg(const base::StringPiece& message,
   display_overlay_controller_->AddEditMessage(message, MessageType::kInfo);
 }
 
-void ActionView::ShowLabelFocusInfoMsg(const base::StringPiece& message,
-                                       ActionLabel* editing_label) {
+void ActionView::ShowFocusInfoMsg(const base::StringPiece& message,
+                                  views::View* view) {
   display_overlay_controller_->AddEditMessage(message,
                                               MessageType::kInfoLabelFocus);
-  editing_label->GetViewAccessibility().OverrideDescription(
-      base::UTF8ToUTF16(message));
+  view->GetViewAccessibility().OverrideDescription(base::UTF8ToUTF16(message));
 }
 
 void ActionView::RemoveMessage() {
@@ -225,7 +224,10 @@ void ActionView::ApplyMouseReleased(const ui::MouseEvent& event) {
     return;
   }
   OnDragEnd();
-  RecordInputOverlayActionReposition(RepositionType::kMouseDragRepostion);
+  RecordInputOverlayActionReposition(
+      display_overlay_controller_->GetPackageName(),
+      RepositionType::kMouseDragRepostion,
+      display_overlay_controller_->GetWindowStateType());
 }
 
 void ActionView::ApplyGestureEvent(ui::GestureEvent* event) {
@@ -247,7 +249,9 @@ void ActionView::ApplyGestureEvent(ui::GestureEvent* event) {
       OnDragEnd();
       event->SetHandled();
       RecordInputOverlayActionReposition(
-          RepositionType::kTouchscreenDragRepostion);
+          display_overlay_controller_->GetPackageName(),
+          RepositionType::kTouchscreenDragRepostion,
+          display_overlay_controller_->GetWindowStateType());
       break;
     default:
       break;
@@ -274,7 +278,9 @@ bool ActionView::ApplyKeyReleased(const ui::KeyEvent& event) {
   ChangePositionBinding(gfx::Point(origin().x() + touch_point_center_->x(),
                                    origin().y() + touch_point_center_->y()));
   RecordInputOverlayActionReposition(
-      RepositionType::kKeyboardArrowKeyReposition);
+      display_overlay_controller_->GetPackageName(),
+      RepositionType::kKeyboardArrowKeyReposition,
+      display_overlay_controller_->GetWindowStateType());
   return true;
 }
 

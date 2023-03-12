@@ -27,21 +27,18 @@ export class SuggestTileModuleElement extends I18nMixin
       relatedSearches: {
         type: Object,
       },
+
+      searchUrl_: {
+        type: Object,
+        computed: `computeSearchUrl_(query)`,
+      },
     };
   }
 
   relatedSearches: SearchQuery[];
 
-  constructor() {
-    super();
-  }
-
-  override connectedCallback() {
-    super.connectedCallback();
-  }
-
-  override disconnectedCallback() {
-    super.disconnectedCallback();
+  private computeSearchUrl_(query: string) {
+    return `https://www.google.com/search?q=${encodeURIComponent(query)}`;
   }
 
   private filterRelatedSearches_(item: SearchQuery, index: number): boolean {

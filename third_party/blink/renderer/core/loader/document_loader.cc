@@ -359,7 +359,7 @@ void WarnIfSandboxIneffective(LocalDOMWindow* window) {
         mojom::blink::ConsoleMessageSource::kSecurity,
         mojom::blink::ConsoleMessageLevel::kWarning,
         "An iframe which has both allow-scripts and allow-same-origin for its "
-        "sandbox attribute can remove its sandboxing."));
+        "sandbox attribute can escape its sandboxing."));
     window->CountUse(WebFeature::kSandboxIneffectiveAllowOriginAllowScript);
   }
 
@@ -2448,8 +2448,8 @@ void DocumentLoader::CommitNavigation() {
   // since the latter isn't populated in unit tests.
   if (frame_->IsOutermostMainFrame()) {
     auto address_space = response_.AddressSpace();
-    if ((address_space == network::mojom::blink::IPAddressSpace::kPrivate ||
-         address_space == network::mojom::blink::IPAddressSpace::kLocal) &&
+    if ((address_space == network::mojom::blink::IPAddressSpace::kLocal ||
+         address_space == network::mojom::blink::IPAddressSpace::kLoopback) &&
         !frame_->DomWindow()->IsSecureContext()) {
       CountUse(WebFeature::kMainFrameNonSecurePrivateAddressSpace);
     }

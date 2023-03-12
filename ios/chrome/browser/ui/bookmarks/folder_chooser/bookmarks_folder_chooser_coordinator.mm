@@ -16,6 +16,8 @@
 #import "ios/chrome/browser/main/browser.h"
 #import "ios/chrome/browser/ui/bookmarks/bookmark_navigation_controller.h"
 #import "ios/chrome/browser/ui/bookmarks/folder_chooser/bookmarks_folder_chooser_coordinator_delegate.h"
+#import "ios/chrome/browser/ui/bookmarks/folder_chooser/bookmarks_folder_chooser_mediator.h"
+#import "ios/chrome/browser/ui/bookmarks/folder_chooser/bookmarks_folder_chooser_mediator_delegate.h"
 #import "ios/chrome/browser/ui/bookmarks/folder_chooser/bookmarks_folder_chooser_view_controller.h"
 #import "ios/chrome/browser/ui/bookmarks/folder_chooser/bookmarks_folder_chooser_view_controller_presentation_delegate.h"
 #import "ios/chrome/browser/ui/bookmarks/folder_editor/bookmarks_folder_editor_coordinator.h"
@@ -26,9 +28,14 @@
 #endif
 
 @interface BookmarksFolderChooserCoordinator () <
+    BookmarksFolderChooserMediatorDelegate,
     BookmarksFolderChooserViewControllerPresentationDelegate,
     BookmarksFolderEditorCoordinatorDelegate,
-    UIAdaptivePresentationControllerDelegate> {
+    UIAdaptivePresentationControllerDelegate>
+@end
+
+@implementation BookmarksFolderChooserCoordinator {
+  BookmarksFolderChooserMediator* _mediator;
   // If folder chooser is created with a base view controller then folder
   // chooser will create and own `_navigationController` that should be deleted
   // in the end.
@@ -41,13 +48,12 @@
   // List of nodes to hide when displaying folders. This is to avoid to move a
   // folder inside a child folder.
   std::set<const bookmarks::BookmarkNode*> _hiddenNodes;
-  // The current nodes that are considered for a move.
-  std::set<const bookmarks::BookmarkNode*> _editedNodes;
+  // The folder that has a blue check mark beside it in the UI.
+  // This is only used for clients of this coordinator to update the UI. This
+  // does not reflect the folder users chose by clicking. For that information
+  // use `bookmarksFolderChooserCoordinatorDidConfirm:withSelectedFolder:`.
+  const bookmarks::BookmarkNode* _selectedFolder;
 }
-
-@end
-
-@implementation BookmarksFolderChooserCoordinator
 
 @synthesize baseNavigationController = _baseNavigationController;
 
@@ -80,20 +86,44 @@
   return self;
 }
 
+- (BOOL)canDismiss {
+  if (_folderEditorCoordinator) {
+    return [_folderEditorCoordinator canDismiss];
+  }
+  return YES;
+}
+
+- (const std::set<const bookmarks::BookmarkNode*>&)editedNodes {
+  return [_mediator editedNodes];
+}
+
+- (void)setSelectedFolder:(const bookmarks::BookmarkNode*)folder {
+  DCHECK(folder);
+  DCHECK(folder->is_folder());
+  _selectedFolder = folder;
+  _mediator.selectedFolder = _selectedFolder;
+}
+
+#pragma mark - ChromeCoordinator
+
 - (void)start {
   [super start];
-  // TODO(crbug.com/1402758): Create a mediator.
   bookmarks::BookmarkModel* model =
       ios::BookmarkModelFactory::GetForBrowserState(
           self.browser->GetBrowserState());
-  _viewController = [[BookmarksFolderChooserViewController alloc]
+  _mediator = [[BookmarksFolderChooserMediator alloc]
       initWithBookmarkModel:model
-           allowsNewFolders:_allowsNewFolders
-                editedNodes:_hiddenNodes
-               allowsCancel:_navigationController != nil
-             selectedFolder:_selectedFolder
-                    browser:self.browser];
+                editedNodes:std::move(_hiddenNodes)];
+  _hiddenNodes.clear();
+  _mediator.delegate = self;
+  _mediator.selectedFolder = _selectedFolder;
+  _viewController = [[BookmarksFolderChooserViewController alloc]
+      initWithAllowsCancel:!_baseNavigationController
+          allowsNewFolders:_allowsNewFolders];
   _viewController.delegate = self;
+  _viewController.dataSource = _mediator;
+  _viewController.mutator = _mediator;
+  _mediator.consumer = _viewController;
 
   if (_baseNavigationController) {
     _viewController.navigationItem.largeTitleDisplayMode =
@@ -115,7 +145,12 @@
   // Stop child coordinator before stopping `self`.
   [self stopBookmarksFolderEditorCoordinator];
 
+  DCHECK(_mediator);
   DCHECK(_viewController);
+  [_mediator disconnect];
+  _mediator.consumer = nil;
+  _mediator.delegate = nil;
+  _mediator = nil;
   if (_baseNavigationController) {
     DCHECK_EQ(_baseNavigationController.topViewController, _viewController);
     [_baseNavigationController popViewControllerAnimated:YES];
@@ -131,39 +166,30 @@
     // `nullptr`.
     DCHECK(!self.baseViewController.presentedViewController);
   }
+  _viewController.delegate = nil;
+  _viewController.dataSource = nil;
+  _viewController.mutator = nil;
   _viewController = nil;
 }
 
-- (void)setSelectedFolder:(const bookmarks::BookmarkNode*)folder {
-  DCHECK(folder);
-  DCHECK(folder->is_folder());
-  _selectedFolder = folder;
-  if (_viewController) {
-    [_viewController changeSelectedFolder:_selectedFolder];
-  }
-}
+#pragma mark - BookmarksFolderChooserMediatorDelegate
 
-- (void)changeSelectedFolder:(const bookmarks::BookmarkNode*)folder {
-  [_viewController changeSelectedFolder:folder];
-}
-
-- (BOOL)canDismiss {
-  if (_folderEditorCoordinator) {
-    return [_folderEditorCoordinator canDismiss];
-  }
-  return YES;
+- (void)bookmarksFolderChooserMediatorWantsDismissal:
+    (BookmarksFolderChooserMediator*)mediator {
+  [_delegate bookmarksFolderChooserCoordinatorDidCancel:self];
 }
 
 #pragma mark - BookmarksFolderChooserViewControllerPresentationDelegate
 
-- (void)showBookmarksFolderEditor {
+- (void)showBookmarksFolderEditorWithParentFolder:
+    (const bookmarks::BookmarkNode*)parent {
   DCHECK(!_folderEditorCoordinator);
   _folderEditorCoordinator = [[BookmarksFolderEditorCoordinator alloc]
       initWithBaseNavigationController:(_baseNavigationController
                                             ? _baseNavigationController
                                             : _navigationController)
                                browser:self.browser
-                      parentFolderNode:_selectedFolder];
+                      parentFolderNode:parent];
   _folderEditorCoordinator.delegate = self;
   [_folderEditorCoordinator start];
 }
@@ -172,7 +198,6 @@
             (BookmarksFolderChooserViewController*)viewController
                          didFinishWithFolder:
                              (const bookmarks::BookmarkNode*)folder {
-  _editedNodes = _viewController.editedNodes;
   [_delegate bookmarksFolderChooserCoordinatorDidConfirm:self
                                       withSelectedFolder:folder];
 }
@@ -198,8 +223,8 @@
   DCHECK(folder);
   DCHECK(_folderEditorCoordinator);
   [self stopBookmarksFolderEditorCoordinator];
-
-  [_viewController notifyFolderNodeAdded:folder];
+  [_delegate bookmarksFolderChooserCoordinatorDidConfirm:self
+                                      withSelectedFolder:folder];
 }
 
 - (void)bookmarksFolderEditorCoordinatorShouldStop:
@@ -227,12 +252,6 @@
 - (BOOL)presentationControllerShouldDismiss:
     (UIPresentationController*)presentationController {
   return [self canDismiss];
-}
-
-#pragma mark - Properties
-
-- (const std::set<const bookmarks::BookmarkNode*>&)editedNodes {
-  return _editedNodes;
 }
 
 #pragma mark - Private

@@ -588,7 +588,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Apps.AppList.GameProvider.SearchStatus"
-    enum="GameProviderSearchStatus" expires_after="2023-07-02">
+    enum="GameProviderSearchStatus" expires_after="2023-09-03">
   <owner>wrong@chromium.org</owner>
   <owner>amandadeacon@chromium.org</owner>
   <summary>
@@ -668,7 +668,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Apps.AppList.ItemSuggestCache.UpdateCacheLatency" units="ms"
-    expires_after="2023-07-02">
+    expires_after="2023-09-03">
   <owner>wrong@chromium.org</owner>
   <owner>tby@chromium.org</owner>
   <owner>thanhdng@chromium.org</owner>
@@ -868,7 +868,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Apps.AppList.Search.ContinueResultCount.{Type}" units="count"
-    expires_after="2023-02-14">
+    expires_after="2023-09-14">
   <owner>amandadeacon@chromium.org</owner>
   <owner>tby@chromium.org</owner>
   <owner>thanhdng@chromium.org</owner>
@@ -986,6 +986,27 @@ chromium-metrics-reviews@google.com.
   <summary>
     Records status in reporting of federated analytics examples. These are
     expected to be rare, and the bucket proportion is not meaningful.
+  </summary>
+</histogram>
+
+<histogram name="Apps.AppList.Search.Federated.SearchSessionConclusion"
+    enum="AppListFederatedSearchSessionConclusion" expires_after="2023-09-01">
+  <owner>amandadeacon@chromium.org</owner>
+  <owner>tby@chromium.org</owner>
+  <summary>
+    Tracks the conclusion of each search session starting from the search box.
+    Records launcher dismissals (&quot;quit&quot;), launches, and viewings of
+    answer card results, for the query list view when federated analytics is
+    enabled.
+
+    Quit. Emitted if the user dismisses search without launching a result or
+    seeing an answer card.
+
+    Launch. Emitted if the user launches a search result.
+
+    AnswerCardSeen. Emitted if an answer card is displayed for some threshold
+    period of time, and the user then dismisses the launcher without launching a
+    result.
   </summary>
 </histogram>
 
@@ -1110,7 +1131,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Apps.AppList.SearchResultRemovalDecision"
-    enum="AppListResultRemovalConfirmation" expires_after="2023-06-30">
+    enum="AppListResultRemovalConfirmation" expires_after="2023-09-03">
   <owner>tbarzic@chromium.org</owner>
   <owner>gzadina@google.com</owner>
   <summary>
@@ -1626,7 +1647,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Apps.AppListLauncherClickedSearchQueryLength"
-    units="characters" expires_after="2023-07-02">
+    units="characters" expires_after="2023-09-03">
   <owner>wrong@chromium.org</owner>
   <owner>tby@chromium.org</owner>
   <summary>
@@ -2785,15 +2806,6 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
-<histogram name="Apps.RestoreNoGhostWindowReason" enum="ArcNoWindowReason"
-    expires_after="2023-04-16">
-  <owner>nancylingwang@chromium.org</owner>
-  <owner>sstan@chromium.org</owner>
-  <summary>
-    Records the reason of ARC app launched without ghost window on ARC VM.
-  </summary>
-</histogram>
-
 <histogram name="Apps.RestoreNotification" enum="RestoreAction"
     expires_after="2023-08-20">
   <owner>nancylingwang@chromium.org</owner>
@@ -2907,7 +2919,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Apps.StateTransition.AnimationSmoothness" units="%"
-    expires_after="2023-06-30">
+    expires_after="2023-09-03">
   <owner>tbarzic@chromium.org</owner>
   <owner>newcomer@chromium.org</owner>
   <owner>src/ash/app_list/OWNERS</owner>

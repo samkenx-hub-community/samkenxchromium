@@ -453,7 +453,6 @@ source_set("browser") {
     "attribution_reporting/attribution_report_network_sender.cc",
     "attribution_reporting/attribution_report_network_sender.h",
     "attribution_reporting/attribution_report_sender.h",
-    "attribution_reporting/attribution_storage.cc",
     "attribution_reporting/attribution_storage.h",
     "attribution_reporting/attribution_storage_delegate.cc",
     "attribution_reporting/attribution_storage_delegate.h",
@@ -482,6 +481,8 @@ source_set("browser") {
     "attribution_reporting/sql_utils.h",
     "attribution_reporting/storable_source.cc",
     "attribution_reporting/storable_source.h",
+    "attribution_reporting/store_source_result.cc",
+    "attribution_reporting/store_source_result.h",
     "attribution_reporting/stored_source.cc",
     "attribution_reporting/stored_source.h",
     "audio/audio_service.cc",
@@ -1706,6 +1707,8 @@ source_set("browser") {
     "renderer_host/isolated_web_app_throttle.h",
     "renderer_host/keep_alive_handle_factory.cc",
     "renderer_host/keep_alive_handle_factory.h",
+    "renderer_host/local_network_access_util.cc",
+    "renderer_host/local_network_access_util.h",
     "renderer_host/media/aec_dump_manager_impl.cc",
     "renderer_host/media/aec_dump_manager_impl.h",
     "renderer_host/media/audio_input_device_manager.cc",
@@ -1812,8 +1815,6 @@ source_set("browser") {
     "renderer_host/pending_beacon_service.h",
     "renderer_host/policy_container_host.cc",
     "renderer_host/policy_container_host.h",
-    "renderer_host/private_network_access_util.cc",
-    "renderer_host/private_network_access_util.h",
     "renderer_host/recently_destroyed_hosts.cc",
     "renderer_host/recently_destroyed_hosts.h",
     "renderer_host/render_frame_host_csp_context.cc",
@@ -2468,6 +2469,13 @@ source_set("browser") {
     ]
   }
 
+  if (is_apple) {
+    sources += [
+      "child_process_task_port_provider_mac.cc",
+      "child_process_task_port_provider_mac.h",
+    ]
+  }
+
   if (is_mac) {
     sources += [
       "../app_shim_remote_cocoa/ns_view_bridge_factory_impl.mm",
@@ -2496,8 +2504,6 @@ source_set("browser") {
       "accessibility/browser_accessibility_manager_mac.mm",
       "accessibility/browser_accessibility_state_impl_mac.mm",
       "child_process_launcher_helper_mac.cc",
-      "child_process_task_port_provider_mac.cc",
-      "child_process_task_port_provider_mac.h",
       "cocoa/system_hotkey_helper_mac.h",
       "cocoa/system_hotkey_helper_mac.mm",
       "cocoa/system_hotkey_map.h",
@@ -2505,6 +2511,8 @@ source_set("browser") {
       "devtools/protocol/native_input_event_builder_mac.mm",
       "font_access/font_enumeration_data_source_mac.h",
       "font_access/font_enumeration_data_source_mac.mm",
+      "gpu/browser_child_process_backgrounded_bridge.h",
+      "gpu/browser_child_process_backgrounded_bridge.mm",
       "gpu/ca_transaction_gpu_coordinator.cc",
       "gpu/ca_transaction_gpu_coordinator.h",
       "media/desktop_media_window_registry_mac.mm",

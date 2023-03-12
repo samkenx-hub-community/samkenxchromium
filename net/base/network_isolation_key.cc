@@ -6,7 +6,6 @@
 #include <string>
 
 #include "base/unguessable_token.h"
-#include "base/values.h"
 #include "net/base/features.h"
 #include "net/base/network_isolation_key.h"
 #include "net/base/registry_controlled_domains/registry_controlled_domain.h"
@@ -37,7 +36,9 @@ NetworkIsolationKey::NetworkIsolationKey(SchemefulSite&& top_frame_site,
                                          SchemefulSite&& frame_site,
                                          const base::UnguessableToken* nonce)
     : top_frame_site_(std::move(top_frame_site)),
-      frame_site_(std::move(frame_site)),
+      frame_site_((GetMode() == Mode::kFrameSiteEnabled)
+                      ? absl::make_optional(std::move(frame_site))
+                      : absl::nullopt),
       nonce_(nonce ? absl::make_optional(*nonce) : absl::nullopt) {
   DCHECK(!nonce || !nonce->is_empty());
 }
@@ -81,9 +82,9 @@ absl::optional<std::string> NetworkIsolationKey::ToCacheKeyString() const {
   if (IsTransient())
     return absl::nullopt;
 
-  std::string frame_site_str =
-      " " + (IsFrameSiteEnabled() ? frame_site_->Serialize()
-                                  : top_frame_site_->Serialize());
+  std::string frame_site_str = " " + ((GetMode() == Mode::kFrameSiteEnabled)
+                                          ? frame_site_->Serialize()
+                                          : top_frame_site_->Serialize());
   return top_frame_site_->Serialize() + frame_site_str;
 }
 
@@ -91,11 +92,7 @@ std::string NetworkIsolationKey::ToDebugString() const {
   // The space-separated serialization of |top_frame_site_| and
   // |frame_site_|.
   std::string return_string = GetSiteDebugString(top_frame_site_);
-  if (IsFrameSiteEnabled()) {
-    return_string += " " + GetSiteDebugString(frame_site_);
-  } else {
-    return_string += " null";
-  }
+  return_string += " " + GetSiteDebugString(frame_site_);
 
   if (nonce_.has_value()) {
     return_string += " (with nonce " + nonce_->ToString() + ")";
@@ -105,8 +102,13 @@ std::string NetworkIsolationKey::ToDebugString() const {
 }
 
 bool NetworkIsolationKey::IsFullyPopulated() const {
-  return top_frame_site_.has_value() &&
-         (!IsFrameSiteEnabled() || frame_site_.has_value());
+  if (!top_frame_site_.has_value()) {
+    return false;
+  }
+  if (GetMode() == Mode::kFrameSiteEnabled && !frame_site_.has_value()) {
+    return false;
+  }
+  return true;
 }
 
 bool NetworkIsolationKey::IsTransient() const {
@@ -115,79 +117,16 @@ bool NetworkIsolationKey::IsTransient() const {
   return IsOpaque();
 }
 
-bool NetworkIsolationKey::ToValue(base::Value* out_value) const {
-  if (IsEmpty()) {
-    *out_value = base::Value(base::Value::Type::LIST);
-    return true;
-  }
-
-  if (IsTransient())
-    return false;
-
-  // NetworkIsolationKeys with nonces are now always transient, so serializing
-  // with nonces isn't strictly needed, but it's used for backwards
-  // compatibility, Origin::Deserialize() is not compatible with
-  // SerializeWithNonce().
-  absl::optional<std::string> top_frame_value =
-      SerializeSiteWithNonce(*top_frame_site_);
-  if (!top_frame_value)
-    return false;
-  base::Value::List list;
-  list.Append(std::move(top_frame_value).value());
-
-  absl::optional<std::string> frame_value =
-      SerializeSiteWithNonce(*frame_site_);
-
-  if (!frame_value) {
-    return false;
-  }
-  list.Append(std::move(frame_value).value());
-
-  *out_value = base::Value(std::move(list));
-  return true;
-}
-
-bool NetworkIsolationKey::FromValue(
-    const base::Value& value,
-    NetworkIsolationKey* network_isolation_key) {
-  if (!value.is_list())
-    return false;
-
-  const base::Value::List& list = value.GetList();
-  if (list.empty()) {
-    *network_isolation_key = NetworkIsolationKey();
-    return true;
-  }
-
-  // If there is only one string, it corresponds to a NIK created by a
-  // previous implementation with the double-key experiment enabled. Return
-  // false in this case since there's not enough information to reconstruct
-  // the frame site correctly. Otherwise, we expect there to be two strings
-  // that we should use for the top frame site and frame site respectively.
-  if (list.size() != 2 || !list[0].is_string() || !list[1].is_string()) {
-    return false;
-  }
-
-  absl::optional<SchemefulSite> top_frame_site =
-      SchemefulSite::DeserializeWithNonce(list[0].GetString());
-  // Opaque origins are currently never serialized to disk, but they used to be.
-  if (!top_frame_site || top_frame_site->opaque())
-    return false;
-
-  absl::optional<SchemefulSite> frame_site =
-      SchemefulSite::DeserializeWithNonce(list[1].GetString());
-  // Opaque origins are currently never serialized to disk, but they used to be.
-  if (!frame_site || frame_site->opaque())
-    return false;
-
-  *network_isolation_key =
-      NetworkIsolationKey(std::move(*top_frame_site), std::move(*frame_site));
-  return true;
+// static
+NetworkIsolationKey::Mode NetworkIsolationKey::GetMode() {
+  // NIKs are currently always triple-keyed, but we will experiment with
+  // 2.5-keying in crbug.com/1414808.
+  return Mode::kFrameSiteEnabled;
 }
 
 const absl::optional<SchemefulSite>& NetworkIsolationKey::GetFrameSite() const {
-  // Frame site should not be used if it's not enabled.
-  CHECK(NetworkIsolationKey::IsFrameSiteEnabled());
+  // Frame site will be empty if double-keying is enabled.
+  CHECK(GetMode() == Mode::kFrameSiteEnabled);
   return frame_site_;
 }
 
@@ -195,20 +134,10 @@ bool NetworkIsolationKey::IsEmpty() const {
   return !top_frame_site_.has_value() && !frame_site_.has_value();
 }
 
-bool NetworkIsolationKey::IsFrameSiteEnabled() {
-  // NIKs are currently always triple-keyed, but we will experiment with
-  // 2.5-keying in crbug.com/1414808.
-  return true;
-}
-
 bool NetworkIsolationKey::IsOpaque() const {
   return top_frame_site_->opaque() ||
-         (IsFrameSiteEnabled() && frame_site_->opaque()) || nonce_.has_value();
-}
-
-absl::optional<std::string> NetworkIsolationKey::SerializeSiteWithNonce(
-    const SchemefulSite& site) {
-  return *(const_cast<SchemefulSite&>(site).SerializeWithNonce());
+         (GetMode() == Mode::kFrameSiteEnabled && frame_site_->opaque()) ||
+         nonce_.has_value();
 }
 
 }  // namespace net

@@ -30,23 +30,23 @@
     "expires": "Jul 1, 2023"
   },
   {
-    "prefix": "pna-permission",
+    "prefix": "lna-permission",
     "platforms": ["Linux", "Mac", "Win"],
-    "bases": ["external/wpt/fetch/private-network-access"],
+    "bases": ["external/wpt/fetch/local-network-access"],
     "args": ["--enable-features=PrivateNetworkAccessPermissionPrompt"],
     "expires": "Jul 1, 2023"
   },
   {
-    "prefix": "pna-workers-disabled",
+    "prefix": "lna-workers-disabled",
     "platforms": ["Linux", "Mac", "Win"],
-    "bases": ["external/wpt/fetch/private-network-access"],
+    "bases": ["external/wpt/fetch/local-network-access"],
     "args": ["--disable-features=PrivateNetworkAccessForWorkers"],
     "expires": "Jul 1, 2023"
   },
   {
-    "prefix": "pna-workers-enabled",
+    "prefix": "lna-workers-enabled",
     "platforms": ["Linux", "Mac", "Win"],
-    "bases": ["external/wpt/fetch/private-network-access"],
+    "bases": ["external/wpt/fetch/local-network-access"],
     "args": [
       "--enable-features=PrivateNetworkAccessForWorkers",
       "--disable-features=PrivateNetworkAccessForWorkersWarningOnly"
@@ -56,7 +56,7 @@
   {
     "prefix": "lna-allow-potentially-trustworthy-same-origin",
     "platforms": ["Linux", "Mac", "Win"],
-    "bases": ["external/wpt/fetch/private-network-access"],
+    "bases": ["external/wpt/fetch/local-network-access"],
     "args": [
       "--enable-features=LocalNetworkAccessAllowPotentiallyTrustworthySameOrigin"
     ],
@@ -105,6 +105,7 @@
               "external/wpt/css/css-transforms/animation",
               "external/wpt/css/css-transforms/individual-transform/animation",
               "external/wpt/feature-policy/experimental-features",
+              "external/wpt/long-animation-frame/tentative",
               "external/wpt/permissions-policy/experimental-features",
               "external/wpt/html/canvas/offscreen/manual/convert-to-blob",
               "external/wpt/pointerevents/pointerlock/pointerevent_getPredictedEvents_when_pointerlocked-manual.html",
@@ -984,6 +985,9 @@
       "wpt_internal/storage/quota/partitioned-webkitTemporaryStorage-usage-details.tentative.sub.html",
       "wpt_internal/storage/quota/partitioned-webkitPersistentStorage-quota-usage-details.tentative.sub.html",
       "wpt_internal/web-locks/storage-deprecation-trial-enabled.https.html",
+      "wpt_internal/service-worker/storage-deprecation-trial-enabled.https.html",
+      "wpt_internal/webstorage/general-storage-deprecation-trial-enabled-local.sub.https.html",
+      "wpt_internal/webstorage/general-storage-deprecation-trial-enabled-session.sub.https.html",
       "wpt_internal/webstorage/storage-cross-origin-redirect-local.sub.https.html",
       "wpt_internal/webstorage/storage-cross-origin-redirect-session.sub.https.html",
       "wpt_internal/webstorage/storage-deprecation-trial-disabled-local.sub.https.html",
@@ -1627,6 +1631,20 @@
     "expires": "Jul 1, 2023"
   },
   {
+    "prefix": "preload-devtools",
+    "platforms": ["Linux", "Mac", "Win"],
+    "bases": [
+      "http/tests/inspector-protocol/preload"
+    ],
+    "exclusive_tests": [
+      "http/tests/inspector-protocol/preload/preloading-attempt-sources-updated.js"
+    ],
+    "args": [
+      "--enable-blink-features=SpeculationRulesDocumentRules,SpeculationRulesDocumentRulesSelectorMatches"
+    ],
+    "expires": "Jul 1, 2023"
+  },
+  {
     "prefix": "cookie-reject-domain-non-ascii",
     "platforms": ["Linux", "Mac", "Win"],
     "bases": [ "http/tests/inspector-protocol/issues/cookie-domain-non-ascii.js" ],
@@ -1768,6 +1786,16 @@
     ],
     "exclusive_tests": "ALL",
     "args": ["--enable-features=ExtendScriptResourceLifetime"],
+    "expires": "Jul 1, 2023"
+  },
+  {
+    "prefix": "solid-color-layers",
+    "platforms": ["Linux"],
+    "bases": [
+      "compositing",
+      "paint/invalidation/compositing"
+    ],
+    "args": ["--enable-blink-features=SolidColorLayers"],
     "expires": "Jul 1, 2023"
   },
   {

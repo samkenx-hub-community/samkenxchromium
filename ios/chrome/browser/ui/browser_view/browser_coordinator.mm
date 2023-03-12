@@ -31,6 +31,7 @@
 #import "ios/chrome/browser/follow/follow_browser_agent.h"
 #import "ios/chrome/browser/follow/followed_web_site.h"
 #import "ios/chrome/browser/main/browser.h"
+#import "ios/chrome/browser/metrics/tab_usage_recorder_browser_agent.h"
 #import "ios/chrome/browser/ntp/features.h"
 #import "ios/chrome/browser/ntp/new_tab_page_tab_helper.h"
 #import "ios/chrome/browser/ntp/new_tab_page_tab_helper_delegate.h"
@@ -40,6 +41,34 @@
 #import "ios/chrome/browser/prerender/prerender_service_factory.h"
 #import "ios/chrome/browser/promos_manager/features.h"
 #import "ios/chrome/browser/sessions/session_restoration_browser_agent.h"
+#import "ios/chrome/browser/shared/public/commands/activity_service_commands.h"
+#import "ios/chrome/browser/shared/public/commands/application_commands.h"
+#import "ios/chrome/browser/shared/public/commands/browser_coordinator_commands.h"
+#import "ios/chrome/browser/shared/public/commands/command_dispatcher.h"
+#import "ios/chrome/browser/shared/public/commands/feed_commands.h"
+#import "ios/chrome/browser/shared/public/commands/find_in_page_commands.h"
+#import "ios/chrome/browser/shared/public/commands/load_query_commands.h"
+#import "ios/chrome/browser/shared/public/commands/new_tab_page_commands.h"
+#import "ios/chrome/browser/shared/public/commands/page_info_commands.h"
+#import "ios/chrome/browser/shared/public/commands/password_breach_commands.h"
+#import "ios/chrome/browser/shared/public/commands/password_protection_commands.h"
+#import "ios/chrome/browser/shared/public/commands/password_suggestion_commands.h"
+#import "ios/chrome/browser/shared/public/commands/passwords_account_storage_notice_commands.h"
+#import "ios/chrome/browser/shared/public/commands/policy_change_commands.h"
+#import "ios/chrome/browser/shared/public/commands/price_notifications_commands.h"
+#import "ios/chrome/browser/shared/public/commands/promos_manager_commands.h"
+#import "ios/chrome/browser/shared/public/commands/qr_generation_commands.h"
+#import "ios/chrome/browser/shared/public/commands/share_highlight_command.h"
+#import "ios/chrome/browser/shared/public/commands/show_signin_command.h"
+#import "ios/chrome/browser/shared/public/commands/snackbar_commands.h"
+#import "ios/chrome/browser/shared/public/commands/text_zoom_commands.h"
+#import "ios/chrome/browser/shared/public/commands/web_content_commands.h"
+#import "ios/chrome/browser/shared/public/commands/whats_new_commands.h"
+#import "ios/chrome/browser/shared/public/features/features.h"
+#import "ios/chrome/browser/shared/ui/util/layout_guide_names.h"
+#import "ios/chrome/browser/shared/ui/util/page_animation_util.h"
+#import "ios/chrome/browser/shared/ui/util/uikit_ui_util.h"
+#import "ios/chrome/browser/shared/ui/util/util_swift.h"
 #import "ios/chrome/browser/signin/account_consistency_browser_agent.h"
 #import "ios/chrome/browser/signin/account_consistency_service_factory.h"
 #import "ios/chrome/browser/store_kit/store_kit_coordinator.h"
@@ -64,29 +93,6 @@
 #import "ios/chrome/browser/ui/browser_view/tab_events_mediator.h"
 #import "ios/chrome/browser/ui/browser_view/tab_lifecycle_mediator.h"
 #import "ios/chrome/browser/ui/bubble/bubble_presenter.h"
-#import "ios/chrome/browser/ui/commands/activity_service_commands.h"
-#import "ios/chrome/browser/ui/commands/application_commands.h"
-#import "ios/chrome/browser/ui/commands/browser_coordinator_commands.h"
-#import "ios/chrome/browser/ui/commands/command_dispatcher.h"
-#import "ios/chrome/browser/ui/commands/feed_commands.h"
-#import "ios/chrome/browser/ui/commands/find_in_page_commands.h"
-#import "ios/chrome/browser/ui/commands/load_query_commands.h"
-#import "ios/chrome/browser/ui/commands/new_tab_page_commands.h"
-#import "ios/chrome/browser/ui/commands/page_info_commands.h"
-#import "ios/chrome/browser/ui/commands/password_breach_commands.h"
-#import "ios/chrome/browser/ui/commands/password_protection_commands.h"
-#import "ios/chrome/browser/ui/commands/password_suggestion_commands.h"
-#import "ios/chrome/browser/ui/commands/passwords_account_storage_notice_commands.h"
-#import "ios/chrome/browser/ui/commands/policy_change_commands.h"
-#import "ios/chrome/browser/ui/commands/price_notifications_commands.h"
-#import "ios/chrome/browser/ui/commands/promos_manager_commands.h"
-#import "ios/chrome/browser/ui/commands/qr_generation_commands.h"
-#import "ios/chrome/browser/ui/commands/share_highlight_command.h"
-#import "ios/chrome/browser/ui/commands/show_signin_command.h"
-#import "ios/chrome/browser/ui/commands/snackbar_commands.h"
-#import "ios/chrome/browser/ui/commands/text_zoom_commands.h"
-#import "ios/chrome/browser/ui/commands/web_content_commands.h"
-#import "ios/chrome/browser/ui/commands/whats_new_commands.h"
 #import "ios/chrome/browser/ui/context_menu/context_menu_configuration_provider.h"
 #import "ios/chrome/browser/ui/credential_provider_promo/credential_provider_promo_coordinator.h"
 #import "ios/chrome/browser/ui/default_promo/default_browser_promo_coordinator.h"
@@ -153,11 +159,6 @@
 #import "ios/chrome/browser/ui/toolbar/public/toolbar_coordinating.h"
 #import "ios/chrome/browser/ui/toolbar/secondary_toolbar_coordinator.h"
 #import "ios/chrome/browser/ui/toolbar/toolbar_coordinator_adaptor.h"
-#import "ios/chrome/browser/ui/ui_feature_flags.h"
-#import "ios/chrome/browser/ui/util/layout_guide_names.h"
-#import "ios/chrome/browser/ui/util/page_animation_util.h"
-#import "ios/chrome/browser/ui/util/uikit_ui_util.h"
-#import "ios/chrome/browser/ui/util/util_swift.h"
 #import "ios/chrome/browser/ui/voice/text_to_speech_playback_controller.h"
 #import "ios/chrome/browser/ui/voice/text_to_speech_playback_controller_factory.h"
 #import "ios/chrome/browser/ui/webui/net_export_coordinator.h"
@@ -165,6 +166,7 @@
 #import "ios/chrome/browser/ui/whats_new/whats_new_util.h"
 #import "ios/chrome/browser/url/chrome_url_constants.h"
 #import "ios/chrome/browser/url_loading/url_loading_browser_agent.h"
+#import "ios/chrome/browser/url_loading/url_loading_notifier_browser_agent.h"
 #import "ios/chrome/browser/url_loading/url_loading_params.h"
 #import "ios/chrome/browser/web/font_size/font_size_tab_helper.h"
 #import "ios/chrome/browser/web/page_placeholder_tab_helper.h"
@@ -235,6 +237,9 @@ enum class ToolbarKind {
 
 // Whether the coordinator is started.
 @property(nonatomic, assign, getter=isStarted) BOOL started;
+
+// Whether web usage is enabled for the WebStates in `self.browser`.
+@property(nonatomic, assign, getter=isWebUsageEnabled) BOOL webUsageEnabled;
 
 // Handles command dispatching, provided by the Browser instance.
 @property(nonatomic, weak) CommandDispatcher* dispatcher;
@@ -477,8 +482,9 @@ enum class ToolbarKind {
 - (void)stop {
   if (!self.started)
     return;
-  [super stop];
 
+  self.started = NO;
+  [super stop];
   self.active = NO;
   [self uninstallDelegatesForBrowserState];
   [self uninstallDelegatesForBrowser];
@@ -488,7 +494,6 @@ enum class ToolbarKind {
   [self stopChildCoordinators];
   [self destroyViewController];
   [self destroyViewControllerDependencies];
-  self.started = NO;
 }
 
 #pragma mark - Public
@@ -519,9 +524,7 @@ enum class ToolbarKind {
         ->GetForBrowserState(browserState)
         ->SetEnabled(active);
   }
-
-  // TODO(crbug.com/1272516): Update the WebUsageEnablerBrowserAgent as part of
-  // setting active/inactive.
+  self.webUsageEnabled = active;
   self.viewController.active = active;
 
   // Stop the NTP on web usage toggle. This happens when clearing browser
@@ -585,6 +588,16 @@ enum class ToolbarKind {
 
 #pragma mark - Private
 
+- (void)setWebUsageEnabled:(BOOL)webUsageEnabled {
+  if (!self.browser->GetBrowserState() || !self.started) {
+    return;
+  }
+  WebUsageEnablerBrowserAgent::FromBrowser(self.browser)
+      ->SetWebUsageEnabled(webUsageEnabled);
+  _webUsageEnabled = webUsageEnabled;
+  self.viewController.webUsageEnabled = webUsageEnabled;
+}
+
 // Displays activity overlay.
 - (void)showActivityOverlay {
   self.activityOverlayCoordinator = [[ActivityOverlayCoordinator alloc]
@@ -636,8 +649,8 @@ enum class ToolbarKind {
 
 // Shuts down the BrowserViewController.
 - (void)destroyViewController {
-  // TODO(crbug.com/1272516): Set the WebUsageEnablerBrowserAgent to disabled.
   self.viewController.active = NO;
+  self.viewController.webUsageEnabled = NO;
 
   // TODO(crbug.com/1415244): Remove when BVC will no longer handle commands.
   [self.dispatcher stopDispatchingToTarget:self.viewController];
@@ -852,6 +865,14 @@ enum class ToolbarKind {
       self.browser->GetBrowserState()->IsOffTheRecord();
   _viewControllerDependencies.urlLoadingBrowserAgent =
       UrlLoadingBrowserAgent::FromBrowser(self.browser);
+  _viewControllerDependencies.urlLoadingNotifierBrowserAgent =
+      UrlLoadingNotifierBrowserAgent::FromBrowser(self.browser);
+  _viewControllerDependencies.tabUsageRecorderBrowserAgent =
+      TabUsageRecorderBrowserAgent::FromBrowser(self.browser);
+  _viewControllerDependencies.webNavigationBrowserAgent =
+      WebNavigationBrowserAgent::FromBrowser(self.browser);
+  _viewControllerDependencies.layoutGuideCenter =
+      LayoutGuideCenterForBrowser(self.browser);
 }
 
 - (void)updateViewControllerDependencies {
@@ -1271,7 +1292,7 @@ enum class ToolbarKind {
 
 #pragma mark - ActivityServiceCommands
 
-- (void)sharePage {
+- (void)stopAndStartSharingCoordinator {
   SharingParams* params =
       [[SharingParams alloc] initWithScenario:SharingScenario::TabShareButton];
 
@@ -1285,6 +1306,8 @@ enum class ToolbarKind {
     anchor = positioner.barButtonItem;
   }
 
+  [self.sharingCoordinator stop];
+  self.sharingCoordinator = nil;
   self.sharingCoordinator = [[SharingCoordinator alloc]
       initWithBaseViewController:self.viewController
                          browser:self.browser
@@ -1292,7 +1315,17 @@ enum class ToolbarKind {
                       originView:positioner.sourceView
                       originRect:positioner.sourceRect
                           anchor:anchor];
+  self.sharingCoordinator.activityHandler =
+      HandlerForProtocol(self.dispatcher, ActivityServiceCommands);
   [self.sharingCoordinator start];
+}
+
+- (void)sharePage {
+  if (!self.sharingCoordinator) {
+    [self stopAndStartSharingCoordinator];
+  } else {
+    [self.sharingCoordinator cancelIfNecessaryAndCreateNewCoordinator];
+  }
 }
 
 - (void)shareChromeApp {
@@ -1438,7 +1471,7 @@ enum class ToolbarKind {
 - (void)showHelpPage {
   GURL helpUrl(l10n_util::GetStringUTF16(IDS_IOS_TOOLS_MENU_HELP_URL));
   UrlLoadParams params = UrlLoadParams::InNewTab(helpUrl);
-  params.append_to = kCurrentTab;
+  params.append_to = OpenPosition::kCurrentTab;
   params.user_initiated = NO;
   params.in_incognito = self.browser->GetBrowserState()->IsOffTheRecord();
   UrlLoadingBrowserAgent::FromBrowser(self.browser)->Load(params);
@@ -2364,13 +2397,10 @@ enum class ToolbarKind {
   WebStateList* webStateList = self.browser->GetWebStateList();
   DCHECK_NE(webStateList->GetIndexOfWebState(webState),
             WebStateList::kInvalidIndex);
-  BOOL isWebUsageEnabled =
-      self.browser->GetBrowserState() && self.started &&
-      WebUsageEnablerBrowserAgent::FromBrowser(self.browser)
-          ->IsWebUsageEnabled();
 
-  if (!isWebUsageEnabled || webState != webStateList->GetActiveWebState())
+  if (!self.webUsageEnabled || webState != webStateList->GetActiveWebState()) {
     return @[];
+  }
 
   NSMutableArray<UIView*>* overlays = [NSMutableArray array];
 
@@ -2547,8 +2577,13 @@ enum class ToolbarKind {
   NewTabPageCoordinator* NTPCoordinator = self.NTPCoordinator;
   DCHECK(NTPCoordinator);
   if (NTPHelper->IsActive()) {
-    [NTPCoordinator start];
-    [NTPCoordinator didNavigateToNTP];
+    // Starting the NTPCoordinator triggers its visibility, so we only
+    // explicitly call `didNavigateToNTP` if the NTP was already started.
+    if (NTPCoordinator.started) {
+      [NTPCoordinator didNavigateToNTP];
+    } else {
+      [NTPCoordinator start];
+    }
   } else {
     [NTPCoordinator didNavigateAwayFromNTP];
   }

@@ -195,7 +195,33 @@ void ApnMigrator::OnGetManagedProperties(
   }
 
   if (network->IsManagedByPolicy()) {
-    // TODO(b/162365553): Implement this case.
+    chromeos::network_config::mojom::ApnPropertiesPtr pre_revamp_custom_apn =
+        chromeos::network_config::GetApnProperties(
+            custom_apn_list->front().GetDict(),
+            /*is_apn_revamp_enabled=*/false);
+    const base::Value::Dict* cellular_dict =
+        chromeos::network_config::GetDictionary(
+            &properties.value(), ::onc::network_config::kCellular);
+    chromeos::network_config::mojom::ManagedApnPropertiesPtr selected_apn =
+        chromeos::network_config::GetManagedApnProperties(
+            cellular_dict, ::onc::cellular::kAPN);
+    if (selected_apn && pre_revamp_custom_apn->access_point_name ==
+                            selected_apn->access_point_name->active_value) {
+      NET_LOG(EVENT) << "Managed network's selected APN matches the saved "
+                     << "custom APN, migrating APN: " << guid;
+      // Ensure the network is enabled when it's migrated so that it's attempted
+      // to be used by the new UI.
+      pre_revamp_custom_apn->state =
+          chromeos::network_config::mojom::ApnState::kEnabled;
+      remote_cros_network_config_->CreateCustomApn(
+          guid, std::move(pre_revamp_custom_apn));
+    } else {
+      NET_LOG(EVENT)
+          << "Managed network's selected APN doesn't match the saved custom "
+          << "APN, setting Shill with empty list for network: " << guid;
+      base::Value::List empty_apn_list;
+      SetShillUserApnListForNetwork(*network, &empty_apn_list);
+    }
   } else {
     // TODO(b/162365553): Implement this case.
   }

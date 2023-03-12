@@ -25,6 +25,7 @@
 #include "components/autofill/core/browser/logging/text_log_receiver.h"
 #include "components/autofill/core/browser/metrics/autofill_metrics.h"
 #include "components/autofill/core/browser/mock_autocomplete_history_manager.h"
+#include "components/autofill/core/browser/mock_autofill_optimization_guide.h"
 #include "components/autofill/core/browser/mock_iban_manager.h"
 #include "components/autofill/core/browser/mock_merchant_promo_code_manager.h"
 #include "components/autofill/core/browser/payments/autofill_error_dialog_context.h"
@@ -73,8 +74,7 @@ namespace autofill {
 template <typename T>
 class TestAutofillClientTemplate : public T {
  public:
-  static_assert(std::is_same_v<AutofillClient, T> ||
-                std::is_base_of_v<AutofillClient, T>);
+  static_assert(std::is_base_of_v<AutofillClient, T>);
 
   using T::T;
   TestAutofillClientTemplate(const TestAutofillClientTemplate&) = delete;
@@ -111,6 +111,14 @@ class TestAutofillClientTemplate : public T {
     return test_personal_data_manager_.get();
   }
 
+  AutofillOptimizationGuide* GetAutofillOptimizationGuide() const override {
+    return mock_autofill_optimization_guide_.get();
+  }
+
+  void ResetAutofillOptimizationGuide() {
+    mock_autofill_optimization_guide_.reset();
+  }
+
   AutocompleteHistoryManager* GetAutocompleteHistoryManager() override {
     return &mock_autocomplete_history_manager_;
   }
@@ -136,10 +144,15 @@ class TestAutofillClientTemplate : public T {
   }
 
   PrefService* GetPrefs() override {
-    return const_cast<PrefService*>(std::as_const(*this).GetPrefs());
+    if (!prefs_) {
+      prefs_ = autofill::test::PrefServiceForTesting();
+    }
+    return prefs_.get();
   }
 
-  const PrefService* GetPrefs() const override { return prefs_.get(); }
+  const PrefService* GetPrefs() const override {
+    return const_cast<TestAutofillClientTemplate*>(this)->GetPrefs();
+  }
 
   syncer::SyncService* GetSyncService() override { return test_sync_service_; }
 
@@ -609,6 +622,9 @@ class TestAutofillClientTemplate : public T {
   signin::IdentityTestEnvironment identity_test_env_;
   raw_ptr<syncer::SyncService> test_sync_service_ = nullptr;
   TestAddressNormalizer test_address_normalizer_;
+  std::unique_ptr<::testing::NiceMock<MockAutofillOptimizationGuide>>
+      mock_autofill_optimization_guide_ =
+          std::make_unique<testing::NiceMock<MockAutofillOptimizationGuide>>();
   ::testing::NiceMock<MockAutocompleteHistoryManager>
       mock_autocomplete_history_manager_;
   std::unique_ptr<testing::NiceMock<MockIBANManager>> mock_iban_manager_;
@@ -716,6 +732,8 @@ class TestAutofillClientTemplate : public T {
 
 // A simple `AutofillClient` for tests. Consider `TestContentAutofillClient` as
 // an alternative for tests where the content layer is visible.
+//
+// Consider using TestAutofillClientInjector in browser tests.
 using TestAutofillClient = TestAutofillClientTemplate<AutofillClient>;
 
 }  // namespace autofill

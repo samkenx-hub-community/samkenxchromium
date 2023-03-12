@@ -38,6 +38,8 @@ class MODULES_EXPORT ImageCapture final
   DEFINE_WRAPPERTYPEINFO();
 
  public:
+  enum class MediaTrackConstraintSetType;
+
   static ImageCapture* Create(ExecutionContext*,
                               MediaStreamTrack*,
                               ExceptionState&);
@@ -84,9 +86,20 @@ class MODULES_EXPORT ImageCapture final
 
   void Trace(Visitor*) const override;
 
+  void SetCapabilitiesForTesting(MediaTrackCapabilities* capabilities) {
+    capabilities_ = capabilities;
+  }
+  void SetSettingsForTesting(MediaTrackSettings* settings) {
+    settings_ = settings;
+  }
+
  private:
   using PromiseResolverFunction =
       base::OnceCallback<void(ScriptPromiseResolver*)>;
+
+  bool CheckMediaTrackConstraintSet(const MediaTrackConstraintSet*,
+                                    MediaTrackConstraintSetType,
+                                    ScriptPromiseResolver*) const;
 
   // mojom::blink::PermissionObserver implementation.
   // Called when we get an updated PTZ permission value from the browser.
@@ -121,6 +134,9 @@ class MODULES_EXPORT ImageCapture final
 
   void OnServiceConnectionError();
 
+  void MaybeRejectWithOverconstrainedError(ScriptPromiseResolver*,
+                                           const char* constraint,
+                                           const char* message) const;
   void ResolveWithNothing(ScriptPromiseResolver*);
   void ResolveWithPhotoSettings(ScriptPromiseResolver*);
   void ResolveWithPhotoCapabilities(ScriptPromiseResolver*);
@@ -136,10 +152,12 @@ class MODULES_EXPORT ImageCapture final
 
   const String& SourceId() const;
 
-  // Get the name a constraint for which there are no corresponding
-  // capabilities or permission to access them.
-  const absl::optional<String> GetConstraintWithNonExistingCapability(
-      const MediaTrackConstraintSet* constraint_set);
+  // Get the name a constraint for which the existence of the capability or
+  // the permission to access the capability does not match the constraint.
+  const absl::optional<const char*>
+  GetConstraintWithCapabilityExistenceMismatch(
+      const MediaTrackConstraintSet* constraint_set,
+      MediaTrackConstraintSetType) const;
 
   Member<MediaStreamTrack> stream_track_;
   std::unique_ptr<ImageCaptureFrameGrabber> frame_grabber_;

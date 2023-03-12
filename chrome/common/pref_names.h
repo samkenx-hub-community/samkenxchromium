@@ -31,6 +31,7 @@ extern const char kSafeBrowsingForTrustedSourcesEnabled[];
 extern const char kDisableScreenshots[];
 extern const char kDownloadRestrictions[];
 extern const char kDownloadBubbleEnabled[];
+extern const char kDownloadBubbleIphSuppression[];
 extern const char kDownloadDuplicateFilePromptEnabled[];
 extern const char kForceEphemeralProfiles[];
 extern const char kHomePageIsNewTabPage[];
@@ -297,6 +298,9 @@ extern const char kEndOfLifeDate[];
 extern const char kEolNotificationDismissed[];
 extern const char kFirstEolWarningDismissed[];
 extern const char kSecondEolWarningDismissed[];
+extern const char kEolApproachingIncentiveNotificationDismissed[];
+extern const char kEolPassedFinalIncentiveDismissed[];
+extern const char kEolIncentiveNotificationSilenced[];
 extern const char kPinUnlockFeatureNotificationShown[];
 extern const char kFingerprintUnlockFeatureNotificationShown[];
 extern const char kPinUnlockAutosubmitEnabled[];
@@ -1290,10 +1294,6 @@ extern const char kNewBaseUrlInheritanceBehaviorAllowed[];
 #if BUILDFLAG(IS_ANDROID) || BUILDFLAG(IS_LINUX)
 extern const char kOutOfProcessSystemDnsResolutionEnabled[];
 #endif  // BUILDFLAG(IS_ANDROID) || BUILDFLAG(IS_LINUX)
-
-#if BUILDFLAG(IS_ANDROID)
-extern const char kQuickDeleteDialogSuppressed[];
-#endif
 
 extern const char kHttpAllowlist[];
 extern const char kHttpsUpgradesEnabled[];

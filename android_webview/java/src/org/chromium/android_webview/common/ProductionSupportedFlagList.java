@@ -180,9 +180,6 @@ public final class ProductionSupportedFlagList {
             Flag.baseFeature(AutofillFeatures.AUTOFILL_SERVER_BEHAVIORS,
                     "When enabled, Autofill will request experimental "
                             + "predictions from the Autofill API."),
-            Flag.baseFeature(AutofillFeatures.AUTOFILL_SUPPORT_POOR_MANS_PLACEHOLDER,
-                    "When enabled, Autofill will infer labels from artificial placeholders, "
-                            + "placed on top of input fields using CSS."),
             Flag.baseFeature(FeatureConstants.KEYBOARD_ACCESSORY_PAYMENT_VIRTUAL_CARD_FEATURE,
                     "When enabled, merchant bound virtual cards will be offered in the keyboard "
                             + "accessory."),
@@ -328,6 +325,7 @@ public final class ProductionSupportedFlagList {
                             + "viewport."),
             Flag.baseFeature(BlinkFeatures.SCROLL_OVERLAP_OPTIMIZATION,
                     "Enables scroll overlap optimization. See https://crbug.com/1401086#c29."),
+            Flag.baseFeature(BlinkFeatures.SVG_RASTER_OPTIMIZATIONS),
             Flag.baseFeature("PreconnectOnRedirect"),
             Flag.baseFeature("PreconnectInNetworkService"), Flag.baseFeature("PrefetchDNSWithURL"),
             Flag.baseFeature(BlinkFeatures.SEND_MOUSE_EVENTS_DISABLED_FORM_CONTROLS,
@@ -349,9 +347,6 @@ public final class ProductionSupportedFlagList {
             Flag.baseFeature(MetricsFeatures.METRICS_SERVICE_ALLOW_EARLY_LOG_CLOSE,
                     "Controls whether a log is allowed to be closed when Chrome"
                             + " is backgrounded/foregrounded early."),
-            Flag.baseFeature(MetricsFeatures.METRICS_SERVICE_ASYNC_COLLECTION,
-                    "Controls whether the metrics service creates periodic logs"
-                            + " in a background thread or on the main thread."),
             Flag.baseFeature(MetricsFeatures.METRICS_CLEAR_LOGS_ON_CLONED_INSTALL,
                     "Controls whether UMA logs are cleared when a cloned "
                             + "install is detected."),
@@ -386,9 +381,10 @@ public final class ProductionSupportedFlagList {
             Flag.baseFeature(BlinkFeatures.RENDER_BLOCKING_FONTS,
                     "When enabled, blocks rendering on font preloads to reduce CLS. "
                             + "See go/critical-font-analysis"),
-            Flag.baseFeature(AwFeatures.WEBVIEW_CLIENT_SIDE_SAMPLING,
-                    "If disabled, the client side sampling for user metrics will be turned off."
-                            + " This have no effect if metrics reporting is disabled"),
+            Flag.baseFeature(AwFeatures.WEBVIEW_SERVER_SIDE_SAMPLING,
+                    "If enabled, the client side sampling for user metrics will be turned off."
+                            + " This has no effect if metrics reporting is disabled"),
+            Flag.baseFeature("SafeBrowsingOnUIThread"),
             // Add new commandline switches and features above. The final entry should have a
             // trailing comma for cleaner diffs.
     };

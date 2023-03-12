@@ -139,11 +139,6 @@ public class FeedStream implements Stream {
                             FeedUserActionType.TAPPED_ADD_TO_READING_LIST);
                     mActionDelegate.addToReadingList(options.getTitle(), url);
                     break;
-                case OpenMode.THANK_CREATOR:
-                    FeedStreamJni.get().reportOtherUserAction(mNativeFeedStream, FeedStream.this,
-                            FeedUserActionType.TAPPED_CROW_BUTTON);
-                    mActionDelegate.openCrow(url);
-                    break;
                 case OpenMode.NEW_TAB_IN_GROUP:
                     FeedStreamJni.get().reportOpenAction(mNativeFeedStream, FeedStream.this,
                             mMakeGURL.apply(url), getSliceIdFromView(options.actionSourceView()),
@@ -161,57 +156,6 @@ public class FeedStream implements Stream {
         @Override
         public void navigateTab(String url, View actionSourceView) {
             openUrl(OpenMode.SAME_TAB, url, new OpenUrlOptions() {
-                @Override
-                public View actionSourceView() {
-                    return actionSourceView;
-                }
-            });
-        }
-
-        // Deprecated in favor of openUrl(), will be removed once internal references are removed.
-        @Override
-        public void navigateNewTab(String url, View actionSourceView) {
-            openUrl(OpenMode.NEW_TAB, url, new OpenUrlOptions() {
-                @Override
-                public View actionSourceView() {
-                    return actionSourceView;
-                }
-            });
-        }
-
-        // Deprecated in favor of openUrl(), will be removed once internal references are removed.
-        @Override
-        public void navigateIncognitoTab(String url) {
-            openUrl(OpenMode.INCOGNITO_TAB, url, new OpenUrlOptions() {});
-        }
-
-        // Deprecated in favor of openUrl(), will be removed once internal references are removed.
-        @Override
-        public void downloadLink(String url) {
-            openUrl(OpenMode.DOWNLOAD_LINK, url, new OpenUrlOptions() {});
-        }
-
-        // Deprecated in favor of openUrl(), will be removed once internal references are removed.
-        @Override
-        public void addToReadingList(String title, String url) {
-            openUrl(OpenMode.READ_LATER, url, new OpenUrlOptions() {
-                @Override
-                public String getTitle() {
-                    return title;
-                }
-            });
-        }
-
-        // Deprecated in favor of openUrl(), will be removed once internal references are removed.
-        @Override
-        public void navigateCrow(String url) {
-            openUrl(OpenMode.THANK_CREATOR, url, new OpenUrlOptions() {});
-        }
-
-        // Deprecated in favor of openUrl(), will be removed once internal references are removed.
-        @Override
-        public void navigateNewTabInGroup(String url, View actionSourceView) {
-            openUrl(OpenMode.NEW_TAB_IN_GROUP, url, new OpenUrlOptions() {
                 @Override
                 public View actionSourceView() {
                     return actionSourceView;

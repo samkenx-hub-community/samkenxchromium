@@ -153,35 +153,6 @@ BASE_FEATURE(kAssistMultiWordExpanded,
              "AssistMultiWordExpanded",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-// Controls whether to enable assistive personal information.
-BASE_FEATURE(kAssistPersonalInfo,
-             "AssistPersonalInfo",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-
-// Controls whether to suggest addresses in assistive personal information. This
-// is only effective when AssistPersonalInfo flag is enabled.
-BASE_FEATURE(kAssistPersonalInfoAddress,
-             "AssistPersonalInfoAddress",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
-// Controls whether to suggest emails in assistive personal information. This is
-// only effective when AssistPersonalInfo flag is enabled.
-BASE_FEATURE(kAssistPersonalInfoEmail,
-             "AssistPersonalInfoEmail",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
-// Controls whether to suggest names in assistive personal information. This is
-// only effective when AssistPersonalInfo flag is enabled.
-BASE_FEATURE(kAssistPersonalInfoName,
-             "AssistPersonalInfoName",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
-// Controls whether to suggest phone numbers in assistive personal information.
-// This is only effective when AssistPersonalInfo flag is enabled.
-BASE_FEATURE(kAssistPersonalInfoPhoneNumber,
-             "AssistPersonalInfoPhoneNumber",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
 BASE_FEATURE(kAssistantNativeIcons,
              "AssistantNativeIcons",
              base::FEATURE_ENABLED_BY_DEFAULT);
@@ -314,10 +285,6 @@ BASE_FEATURE(kBorealisLinuxMode,
 BASE_FEATURE(kBorealisStorageBallooning,
              "BorealisStorageBallooning",
              base::FEATURE_ENABLED_BY_DEFAULT);
-
-// Enable or disable calendar view from the system tray. Also enables the system
-// tray to show date in the shelf when the screen is sufficiently large.
-BASE_FEATURE(kCalendarView, "CalendarView", base::FEATURE_ENABLED_BY_DEFAULT);
 
 // Enable or disable debug mode for CalendarModel.
 BASE_FEATURE(kCalendarModelDebugMode,
@@ -574,11 +541,6 @@ BASE_FEATURE(kDockedMagnifier,
              "DockedMagnifier",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
-// Enables dragging an unpinned open app to pinned app side to pin.
-BASE_FEATURE(kDragUnpinnedAppToPin,
-             "DragUnpinnedAppToPin",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
 // If enabled, DriveFS will be used for Drive sync.
 BASE_FEATURE(kDriveFs, "DriveFS", base::FEATURE_ENABLED_BY_DEFAULT);
 
@@ -765,6 +727,13 @@ BASE_FEATURE(kEnableViewPpd, "EnableViewPpd", base::FEATURE_ENABLED_BY_DEFAULT);
 BASE_FEATURE(kEnforceAshExtensionKeeplist,
              "EnforceAshExtensionKeeplist",
              base::FEATURE_ENABLED_BY_DEFAULT);
+
+// Enforces enrollment nudging for managed users during OOBE. This is a
+// temporary flag for WIP feature to until we implement required DM server
+// controls.
+BASE_FEATURE(kEnrollmentNudgingForTesting,
+             "EnrollmentNudgingForTesting",
+             base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Enables access to the chrome://enterprise-reporting WebUI.
 BASE_FEATURE(kEnterpriseReportingUI,
@@ -1413,6 +1382,12 @@ BASE_FEATURE(kEcheLauncherIconsInMoreAppsButton,
              "EcheLauncherIconsInMoreAppsButton",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
+// Enables the Phone Hub recent apps loading and error views based on the
+// connection status with the phone.
+BASE_FEATURE(kEcheNetworkConnectionState,
+             "EcheNetworkConnectionState",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 // Enables multi-zone rgb keyboard customization.
 BASE_FEATURE(kMultiZoneRgbKeyboard,
              "MultiZoneRgbKeyboard",
@@ -1543,7 +1518,7 @@ BASE_FEATURE(kOsSettingsAppBadgingToggle,
 // are returned.
 BASE_FEATURE(kOsSettingsSearchFeedback,
              "OsSettingsSearchFeedback",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 BASE_FEATURE(kOverviewButton,
              "OverviewButton",
@@ -1628,21 +1603,6 @@ BASE_FEATURE(kPolicyProvidedTrustAnchorsAllowedAtLockScreen,
 BASE_FEATURE(kPreferConstantFrameRate,
              "PreferConstantFrameRate",
              base::FEATURE_DISABLED_BY_DEFAULT);
-
-// Set the channel from which the PPD files are loaded.
-BASE_FEATURE(kPrintingPpdChannel,
-             "PrintingPpdChannel",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-
-const base::FeatureParam<PrintingPpdChannel>::Option
-    printing_ppd_channel_options[] = {
-        {PrintingPpdChannel::kProduction, "production"},
-        {PrintingPpdChannel::kStaging, "staging"},
-        {PrintingPpdChannel::kDev, "dev"},
-        {PrintingPpdChannel::kLocalhost, "localhost"}};
-const base::FeatureParam<PrintingPpdChannel> kPrintingPpdChannelParam{
-    &kPrintingPpdChannel, "channel", PrintingPpdChannel::kProduction,
-    &printing_ppd_channel_options};
 
 // Enables to allocate more video capture buffers.
 BASE_FEATURE(kMoreVideoCaptureBuffers,
@@ -1937,6 +1897,10 @@ BASE_FEATURE(kSmartLockSignInRemoved,
 BASE_FEATURE(kSmartLockUIRevamp,
              "SmartLockUIRevamp",
              base::FEATURE_ENABLED_BY_DEFAULT);
+
+BASE_FEATURE(kSmdsDbusMigration,
+             "SmdsDbusMigration",
+             base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Controls whether the snap group feature is enabled or not.
 BASE_FEATURE(kSnapGroup, "SnapGroup", base::FEATURE_DISABLED_BY_DEFAULT);
@@ -2408,10 +2372,6 @@ bool IsBluetoothQualityReportEnabled() {
   return base::FeatureList::IsEnabled(kBluetoothQualityReport);
 }
 
-bool IsCalendarViewEnabled() {
-  return base::FeatureList::IsEnabled(kCalendarView);
-}
-
 bool IsCalendarModelDebugModeEnabled() {
   return base::FeatureList::IsEnabled(kCalendarModelDebugMode);
 }
@@ -2498,10 +2458,6 @@ bool IsInputDeviceSettingsSplitEnabled() {
 
 bool IsDisplayAlignmentAssistanceEnabled() {
   return base::FeatureList::IsEnabled(kDisplayAlignAssist);
-}
-
-bool IsDragUnpinnedAppToPinEnabled() {
-  return base::FeatureList::IsEnabled(kDragUnpinnedAppToPin);
 }
 
 bool IsDriveFsMirroringEnabled() {
@@ -2765,12 +2721,6 @@ bool IsIppClientInfoEnabled() {
   return base::FeatureList::IsEnabled(kIppClientInfo);
 }
 
-bool IsJellyEnabled() {
-  // TODO(b/270741618): Callers are being migrated to
-  // chromeos::features::IsJellyEnabled(). Do not use.
-  return chromeos::features::IsJellyEnabled();
-}
-
 bool IsKeyboardBacklightToggleEnabled() {
   return base::FeatureList::IsEnabled(kEnableKeyboardBacklightToggle);
 }
@@ -2803,6 +2753,10 @@ bool IsLogControllerForDiagnosticsAppEnabled() {
 
 bool IsEducationEnrollmentOobeFlowEnabled() {
   return base::FeatureList::IsEnabled(kEducationEnrollmentOobeFlow);
+}
+
+bool IsEnrollmentNudgingForTestingEnabled() {
+  return base::FeatureList::IsEnabled(kEnrollmentNudgingForTesting);
 }
 
 bool IsGameDashboardEnabled() {
@@ -2862,6 +2816,11 @@ bool IsEcheLauncherListViewEnabled() {
          base::FeatureList::IsEnabled(kEcheLauncherListView);
 }
 
+bool IsEcheNetworkConnectionStateEnabled() {
+  return base::FeatureList::IsEnabled(kEcheNetworkConnectionState) &&
+         base::FeatureList::IsEnabled(kEcheSWA);
+}
+
 bool IsNearbyKeepAliveFixEnabled() {
   return base::FeatureList::IsEnabled(kNearbyKeepAliveFix);
 }
@@ -2915,7 +2874,8 @@ bool IsKioskLoginScreenEnabled() {
 }
 
 bool IsOobeJellyEnabled() {
-  return IsJellyEnabled() && base::FeatureList::IsEnabled(kOobeJelly);
+  return chromeos::features::IsJellyEnabled() &&
+         base::FeatureList::IsEnabled(kOobeJelly);
 }
 
 bool IsOobeNetworkScreenSkipEnabled() {
@@ -2968,7 +2928,7 @@ bool IsPerDeskShelfEnabled() {
 
 bool IsPersonalizationJellyEnabled() {
   return base::FeatureList::IsEnabled(kPersonalizationJelly) &&
-         IsJellyEnabled();
+         chromeos::features::IsJellyEnabled();
 }
 
 bool IsPhoneHubCameraRollEnabled() {
@@ -3155,6 +3115,10 @@ bool IsShimlessRMADarkModeDisabled() {
   return base::FeatureList::IsEnabled(kShimlessRMADisableDarkMode);
 }
 
+bool IsSmdsDbusMigrationEnabled() {
+  return base::FeatureList::IsEnabled(kSmdsDbusMigration);
+}
+
 bool IsSimLockPolicyEnabled() {
   return base::FeatureList::IsEnabled(kSimLockPolicy);
 }
@@ -3227,7 +3191,8 @@ bool IsUseStorkSmdsServerAddressEnabled() {
 }
 
 bool IsVideoConferenceEnabled() {
-  return base::FeatureList::IsEnabled(kVideoConference);
+  return base::FeatureList::IsEnabled(kVideoConference) &&
+         switches::IsCameraEffectsSupportedByHardware();
 }
 
 bool IsVcBackgroundReplaceEnabled() {

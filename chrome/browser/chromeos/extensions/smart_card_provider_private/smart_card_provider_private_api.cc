@@ -19,6 +19,7 @@
 
 namespace scard_api = extensions::api::smart_card_provider_private;
 
+using device::mojom::SmartCardConnectResult;
 using device::mojom::SmartCardCreateContextResult;
 using device::mojom::SmartCardCreateContextResultPtr;
 using device::mojom::SmartCardError;
@@ -181,6 +182,83 @@ base::Value::Dict ToValue(
   return to_value_result;
 }
 
+scard_api::ShareMode ToApiShareMode(
+    device::mojom::SmartCardShareMode share_mode) {
+  switch (share_mode) {
+    case device::mojom::SmartCardShareMode::kShared:
+      return scard_api::SHARE_MODE_SHARED;
+    case device::mojom::SmartCardShareMode::kExclusive:
+      return scard_api::SHARE_MODE_EXCLUSIVE;
+    case device::mojom::SmartCardShareMode::kDirect:
+      return scard_api::SHARE_MODE_DIRECT;
+  }
+}
+
+base::Value ToValue(device::mojom::SmartCardShareMode share_mode) {
+  return base::Value(scard_api::ToString(ToApiShareMode(share_mode)));
+}
+
+base::Value::Dict ToValue(const device::mojom::SmartCardProtocols& protocols) {
+  scard_api::Protocols result;
+
+  result.t0 = protocols.t0;
+  result.t1 = protocols.t1;
+  result.raw = protocols.raw;
+
+  return result.ToValue();
+}
+
+scard_api::Disposition ToApiDisposition(
+    device::mojom::SmartCardDisposition disposition) {
+  switch (disposition) {
+    case device::mojom::SmartCardDisposition::kLeave:
+      return scard_api::DISPOSITION_LEAVE_CARD;
+    case device::mojom::SmartCardDisposition::kReset:
+      return scard_api::DISPOSITION_RESET_CARD;
+    case device::mojom::SmartCardDisposition::kUnpower:
+      return scard_api::DISPOSITION_UNPOWER_CARD;
+    case device::mojom::SmartCardDisposition::kEject:
+      return scard_api::DISPOSITION_EJECT_CARD;
+  }
+}
+
+base::Value ToValue(device::mojom::SmartCardDisposition disposition) {
+  return base::Value(scard_api::ToString(ToApiDisposition(disposition)));
+}
+
+device::mojom::SmartCardProtocol ToDeviceMojomSmartCardProtocol(
+    scard_api::Protocol protocol) {
+  switch (protocol) {
+    case scard_api::PROTOCOL_NONE:
+    case scard_api::PROTOCOL_UNDEFINED:
+      return device::mojom::SmartCardProtocol::kUndefined;
+    case scard_api::PROTOCOL_T0:
+      return device::mojom::SmartCardProtocol::kT0;
+    case scard_api::PROTOCOL_T1:
+      return device::mojom::SmartCardProtocol::kT1;
+    case scard_api::PROTOCOL_RAW:
+      return device::mojom::SmartCardProtocol::kRaw;
+  }
+}
+
+template <class PendingType>
+std::unique_ptr<PendingType> Extract(
+    std::map<extensions::SmartCardProviderPrivateAPI::RequestId,
+             std::unique_ptr<PendingType>>& pending_map,
+    extensions::SmartCardProviderPrivateAPI::RequestId request_id) {
+  auto it = pending_map.find(request_id);
+  if (it == pending_map.end()) {
+    return nullptr;
+  }
+
+  std::unique_ptr<PendingType> pending = std::move(it->second);
+  CHECK(pending);
+
+  pending_map.erase(it);
+
+  return pending;
+}
+
 }  // namespace
 
 namespace extensions {
@@ -202,6 +280,16 @@ struct SmartCardProviderPrivateAPI::PendingListReaders {
 struct SmartCardProviderPrivateAPI::PendingGetStatusChange {
   base::OneShotTimer timer;
   device::mojom::SmartCardContext::GetStatusChangeCallback callback;
+};
+
+struct SmartCardProviderPrivateAPI::PendingConnect {
+  base::OneShotTimer timer;
+  device::mojom::SmartCardContext::ConnectCallback callback;
+};
+
+struct SmartCardProviderPrivateAPI::PendingDisconnect {
+  base::OneShotTimer timer;
+  DisconnectCallback callback;
 };
 
 // static
@@ -226,6 +314,10 @@ SmartCardProviderPrivateAPI::SmartCardProviderPrivateAPI(
           EventRouterFactory::GetForBrowserContext(context))) {
   context_receivers_.set_disconnect_handler(base::BindRepeating(
       &SmartCardProviderPrivateAPI::OnMojoContextDisconnected,
+      weak_ptr_factory_.GetWeakPtr()));
+
+  connection_receivers_.set_disconnect_handler(base::BindRepeating(
+      &SmartCardProviderPrivateAPI::OnMojoConnectionDisconnected,
       weak_ptr_factory_.GetWeakPtr()));
 }
 
@@ -276,6 +368,26 @@ void SmartCardProviderPrivateAPI::OnMojoContextDisconnected() {
   ProviderReleaseContext(scard_context);
 }
 
+void SmartCardProviderPrivateAPI::OnMojoConnectionDisconnected() {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+
+  const Handle scard_handle = connection_receivers_.current_context();
+  CHECK(!scard_handle.is_null());
+
+  ProviderDisconnect(
+      scard_handle, device::mojom::SmartCardDisposition::kLeave,
+      base::BindOnce(&SmartCardProviderPrivateAPI::OnScardHandleDisconnected,
+                     weak_ptr_factory_.GetWeakPtr()));
+}
+
+void SmartCardProviderPrivateAPI::OnScardHandleDisconnected(
+    device::mojom::SmartCardResultPtr result) {
+  if (result->is_error()) {
+    LOG(WARNING) << "Failed to disconnect SCard Handle: "
+                 << result->get_error();
+  }
+}
+
 void SmartCardProviderPrivateAPI::ProviderReleaseContext(
     ContextId scard_context) {
   RequestId request_id = request_id_generator_.GenerateNextId();
@@ -309,24 +421,62 @@ void SmartCardProviderPrivateAPI::ProviderReleaseContext(
                                           std::move(event));
 }
 
+void SmartCardProviderPrivateAPI::ProviderDisconnect(
+    Handle scard_handle,
+    device::mojom::SmartCardDisposition disposition,
+    DisconnectCallback callback) {
+  RequestId request_id = request_id_generator_.GenerateNextId();
+
+  base::Value::List event_args;
+  event_args.Append(request_id.GetUnsafeValue());
+  event_args.Append(scard_handle.GetUnsafeValue());
+  event_args.Append(ToValue(disposition));
+
+  auto event = std::make_unique<extensions::Event>(
+      extensions::events::SMART_CARD_PROVIDER_PRIVATE_ON_DISCONNECT_REQUESTED,
+      scard_api::OnDisconnectRequested::kEventName, std::move(event_args),
+      base::to_address(browser_context_));
+
+  const std::string provider_extension_id = GetListenerExtensionId(*event);
+
+  if (provider_extension_id.empty()) {
+    base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
+        FROM_HERE,
+        base::BindOnce(std::move(callback),
+                       SmartCardResult::NewError(SmartCardError::kNoService)));
+    return;
+  }
+
+  auto pending = std::make_unique<PendingDisconnect>();
+  pending->callback = std::move(callback);
+  pending->timer.Start(
+      FROM_HERE, response_time_limit_,
+      base::BindOnce(&SmartCardProviderPrivateAPI::OnDisconnectTimeout,
+                     weak_ptr_factory_.GetWeakPtr(), provider_extension_id,
+                     request_id));
+
+  pending_disconnect_[request_id] = std::move(pending);
+
+  event_router_->DispatchEventToExtension(provider_extension_id,
+                                          std::move(event));
+}
+
 void SmartCardProviderPrivateAPI::ReportEstablishContextResult(
     RequestId request_id,
     ContextId scard_context,
     SmartCardResultPtr result) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
 
-  auto it = pending_establish_context_.find(request_id);
-  if (it == pending_establish_context_.end()) {
-    if (result->is_success() && !scard_context.is_null()) {
+  std::unique_ptr<PendingEstablishContext> pending =
+      Extract(pending_establish_context_, request_id);
+  if (!pending) {
+    if (result->is_success() && scard_context) {
       LOG(WARNING) << "Releasing scard_context from an unknown "
                       "EstablishContext request.";
       ProviderReleaseContext(scard_context);
     }
     return;
   }
-
-  std::unique_ptr<PendingEstablishContext> pending = std::move(it->second);
-  pending_establish_context_.erase(it);
 
   SmartCardCreateContextResultPtr context_result;
 
@@ -357,13 +507,11 @@ void SmartCardProviderPrivateAPI::ReportReleaseContextResult(
     SmartCardResultPtr result) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
 
-  auto it = pending_release_context_.find(request_id);
-  if (it == pending_release_context_.end()) {
+  std::unique_ptr<PendingReleaseContext> pending =
+      Extract(pending_release_context_, request_id);
+  if (!pending) {
     return;
   }
-
-  std::unique_ptr<PendingReleaseContext> pending = std::move(it->second);
-  pending_release_context_.erase(it);
 
   if (result->is_error()) {
     // There's nothing really to be done about it.
@@ -377,13 +525,11 @@ void SmartCardProviderPrivateAPI::ReportListReadersResult(
     SmartCardResultPtr result) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
 
-  auto it = pending_list_readers_.find(request_id);
-  if (it == pending_list_readers_.end()) {
+  std::unique_ptr<PendingListReaders> pending =
+      Extract(pending_list_readers_, request_id);
+  if (!pending) {
     return;
   }
-
-  std::unique_ptr<PendingListReaders> pending = std::move(it->second);
-  pending_list_readers_.erase(it);
 
   std::move(pending->callback)
       .Run(result->is_success()
@@ -397,13 +543,11 @@ void SmartCardProviderPrivateAPI::ReportGetStatusChangeResult(
     SmartCardResultPtr result) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
 
-  auto it = pending_get_status_change_.find(request_id);
-  if (it == pending_get_status_change_.end()) {
+  std::unique_ptr<PendingGetStatusChange> pending =
+      Extract(pending_get_status_change_, request_id);
+  if (!pending) {
     return;
   }
-
-  std::unique_ptr<PendingGetStatusChange> pending = std::move(it->second);
-  pending_get_status_change_.erase(it);
 
   device::mojom::SmartCardStatusChangeResultPtr status_change_result;
 
@@ -416,6 +560,67 @@ void SmartCardProviderPrivateAPI::ReportGetStatusChangeResult(
   }
 
   std::move(pending->callback).Run(std::move(status_change_result));
+}
+
+device::mojom::SmartCardConnectResultPtr
+SmartCardProviderPrivateAPI::CreateSmartCardConnection(
+    Handle handle,
+    device::mojom::SmartCardProtocol active_protocol) {
+  if (handle.is_null()) {
+    LOG(ERROR) << "Provider reported an invalid handle value: "
+               << handle.GetUnsafeValue();
+    // Just ignore this result.
+    return SmartCardConnectResult::NewError(SmartCardError::kInternalError);
+  }
+
+  mojo::PendingRemote<device::mojom::SmartCardConnection> connection_remote;
+  connection_receivers_.Add(
+      this, connection_remote.InitWithNewPipeAndPassReceiver(), handle);
+
+  return SmartCardConnectResult::NewSuccess(
+      device::mojom::SmartCardConnectSuccess::New(std::move(connection_remote),
+                                                  active_protocol));
+}
+
+void SmartCardProviderPrivateAPI::ReportConnectResult(
+    RequestId request_id,
+    Handle handle,
+    device::mojom::SmartCardProtocol active_protocol,
+    SmartCardResultPtr result) {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+
+  std::unique_ptr<PendingConnect> pending =
+      Extract(pending_connect_, request_id);
+  if (!pending) {
+    // TODO(crbug.com/1386175): Send disconnect request to PC/SC provider
+    // if the handle is valid and the result is success to avoid leaking
+    // this seemingly unrequested connection.
+    return;
+  }
+
+  device::mojom::SmartCardConnectResultPtr connect_result;
+
+  if (result->is_success()) {
+    connect_result = CreateSmartCardConnection(handle, active_protocol);
+  } else {
+    connect_result = SmartCardConnectResult::NewError(result->get_error());
+  }
+
+  std::move(pending->callback).Run(std::move(connect_result));
+}
+
+void SmartCardProviderPrivateAPI::ReportDisconnectResult(
+    RequestId request_id,
+    device::mojom::SmartCardResultPtr result) {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+
+  std::unique_ptr<PendingDisconnect> pending =
+      Extract(pending_disconnect_, request_id);
+  if (!pending) {
+    return;
+  }
+
+  std::move(pending->callback).Run(std::move(result));
 }
 
 void SmartCardProviderPrivateAPI::SetResponseTimeLimitForTesting(
@@ -540,6 +745,64 @@ void SmartCardProviderPrivateAPI::GetStatusChange(
                                           std::move(event));
 }
 
+void SmartCardProviderPrivateAPI::Connect(
+    const std::string& reader,
+    device::mojom::SmartCardShareMode share_mode,
+    device::mojom::SmartCardProtocolsPtr preferred_protocols,
+    ConnectCallback callback) {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+
+  const ContextId scard_context = context_receivers_.current_context();
+  CHECK(!scard_context.is_null());
+
+  RequestId request_id = request_id_generator_.GenerateNextId();
+
+  base::Value::List event_args;
+  event_args.Append(request_id.GetUnsafeValue());
+  event_args.Append(scard_context.GetUnsafeValue());
+  event_args.Append(reader);
+  event_args.Append(ToValue(share_mode));
+  event_args.Append(ToValue(*preferred_protocols.get()));
+
+  auto event = std::make_unique<extensions::Event>(
+      extensions::events::SMART_CARD_PROVIDER_PRIVATE_ON_CONNECT_REQUESTED,
+      scard_api::OnConnectRequested::kEventName, std::move(event_args),
+      &*browser_context_);
+
+  const std::string provider_extension_id = GetListenerExtensionId(*event);
+  if (provider_extension_id.empty()) {
+    base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
+        FROM_HERE,
+        base::BindOnce(std::move(callback), SmartCardConnectResult::NewError(
+                                                SmartCardError::kNoService)));
+    return;
+  }
+
+  auto pending = std::make_unique<PendingConnect>();
+  pending->callback = std::move(callback);
+  pending->timer.Start(
+      FROM_HERE, response_time_limit_,
+      base::BindOnce(&SmartCardProviderPrivateAPI::OnConnectTimeout,
+                     weak_ptr_factory_.GetWeakPtr(), provider_extension_id,
+                     request_id));
+
+  pending_connect_[request_id] = std::move(pending);
+
+  event_router_->DispatchEventToExtension(provider_extension_id,
+                                          std::move(event));
+}
+
+void SmartCardProviderPrivateAPI::Disconnect(
+    device::mojom::SmartCardDisposition disposition,
+    DisconnectCallback callback) {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+
+  const Handle scard_handle = connection_receivers_.current_context();
+  CHECK(!scard_handle.is_null());
+
+  ProviderDisconnect(scard_handle, disposition, std::move(callback));
+}
+
 #define ON_TIMEOUT_IMPL(FunctionName, ...)                                \
   void SmartCardProviderPrivateAPI::On##FunctionName##Timeout(            \
       const std::string& provider_extension_id, RequestId request_id) {   \
@@ -562,6 +825,14 @@ ON_TIMEOUT_IMPL(ListReaders,
 
 ON_TIMEOUT_IMPL(GetStatusChange,
                 std::vector<device::mojom::SmartCardReaderStateOutPtr>(),
+                SmartCardResult::NewError(SmartCardError::kNoService))
+
+ON_TIMEOUT_IMPL(Connect,
+                Handle(),
+                device::mojom::SmartCardProtocol::kUndefined,
+                SmartCardResult::NewError(SmartCardError::kNoService))
+
+ON_TIMEOUT_IMPL(Disconnect,
                 SmartCardResult::NewError(SmartCardError::kNoService))
 
 #undef ON_TIMEOUT_IMPL
@@ -604,6 +875,16 @@ REPORT_RESULT_FUNCTION_IMPL(
 REPORT_RESULT_FUNCTION_IMPL(
     GetStatusChange,
     ToSmartCardProviderReaderStateOutVector(params->reader_states),
+    ProviderResultCodeToSmartCardResult(params->result_code))
+
+REPORT_RESULT_FUNCTION_IMPL(
+    Connect,
+    SmartCardProviderPrivateAPI::Handle(params->scard_handle),
+    ToDeviceMojomSmartCardProtocol(params->active_protocol),
+    ProviderResultCodeToSmartCardResult(params->result_code))
+
+REPORT_RESULT_FUNCTION_IMPL(
+    Disconnect,
     ProviderResultCodeToSmartCardResult(params->result_code))
 
 #undef REPORT_RESULT_FUNCTION_IMPL

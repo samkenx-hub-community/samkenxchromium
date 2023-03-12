@@ -9,10 +9,10 @@
 #import "base/metrics/user_metrics_action.h"
 #import "base/time/time.h"
 #import "ios/chrome/browser/infobars/infobar_metrics_recorder.h"
+#import "ios/chrome/browser/shared/ui/util/uikit_ui_util.h"
 #import "ios/chrome/browser/ui/icons/symbols.h"
 #import "ios/chrome/browser/ui/infobars/banners/infobar_banner_constants.h"
 #import "ios/chrome/browser/ui/infobars/banners/infobar_banner_delegate.h"
-#import "ios/chrome/browser/ui/util/uikit_ui_util.h"
 #import "ios/chrome/common/ui/colors/semantic_color_names.h"
 #import "ios/chrome/common/ui/util/pointer_interaction_util.h"
 #import "ios/chrome/grit/ios_strings.h"
@@ -141,8 +141,6 @@ constexpr base::TimeDelta kLongPressTimeDuration = base::Milliseconds(400);
         setShadowColor:[UIColor colorNamed:kToolbarShadowColor].CGColor];
   }];
   self.view.accessibilityIdentifier = kInfobarBannerViewIdentifier;
-  self.view.isAccessibilityElement = YES;
-  self.view.accessibilityLabel = [self accessibilityLabel];
   self.view.accessibilityCustomActions = [self accessibilityActions];
 
   // Icon setup.
@@ -225,6 +223,10 @@ constexpr base::TimeDelta kLongPressTimeDuration = base::Milliseconds(400);
   labelsStackView.layoutMarginsRelativeArrangement = YES;
   labelsStackView.directionalLayoutMargins = NSDirectionalEdgeInsetsMake(
       kContainerStackVerticalPadding, 0, kContainerStackVerticalPadding, 0);
+  labelsStackView.accessibilityIdentifier =
+      kInfobarBannerLabelsStackViewIdentifier;
+  labelsStackView.isAccessibilityElement = YES;
+  labelsStackView.accessibilityLabel = [self accessibilityLabel];
 
   // Button setup.
   self.infobarButton = [UIButton buttonWithType:UIButtonTypeSystem];
@@ -286,6 +288,8 @@ constexpr base::TimeDelta kLongPressTimeDuration = base::Milliseconds(400);
                                       forAxis:UILayoutConstraintAxisHorizontal];
   self.openModalButton.accessibilityIdentifier =
       kInfobarBannerOpenModalButtonIdentifier;
+  self.openModalButton.accessibilityLabel =
+      l10n_util::GetNSString(IDS_IOS_INFOBAR_BANNER_OPTIONS_HINT);
   [containerStack addArrangedSubview:self.openModalButton];
   // Hide open modal button if user shouldn't be allowed to open the modal.
   self.openModalButton.hidden = !self.presentsModal;

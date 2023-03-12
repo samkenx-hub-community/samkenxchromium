@@ -37,6 +37,7 @@
 #include "content/browser/attribution_reporting/attribution_test_utils.h"
 #include "content/browser/attribution_reporting/attribution_trigger.h"
 #include "content/browser/attribution_reporting/storable_source.h"
+#include "content/browser/attribution_reporting/store_source_result.h"
 #include "content/browser/attribution_reporting/stored_source.h"
 #include "content/browser/attribution_reporting/test/configurable_storage_delegate.h"
 #include "net/base/schemeful_site.h"
@@ -1243,8 +1244,8 @@ TEST_F(AttributionStorageSqlTest, ReportTablesStoreDestinationOrigin) {
   StorableSource source =
       TestAggregatableSourceProvider()
           .GetBuilder()
-          .SetDestinationOrigin(
-              *SuitableOrigin::Deserialize(kDestinationOriginA))
+          .SetDestinationSites(
+              {net::SchemefulSite::Deserialize(kDestinationOriginA)})
           .SetExpiry(base::Days(30))
           .Build();
   storage()->StoreSource(source);
@@ -1292,8 +1293,8 @@ TEST_F(AttributionStorageSqlTest, FakeReportUsesSourceOriginAsContext) {
   storage()->StoreSource(
       SourceBuilder()
           .SetSourceOrigin(*SuitableOrigin::Deserialize("https://a.s.test"))
-          .SetDestinationOrigin(
-              *SuitableOrigin::Deserialize("https://b.d.test"))
+          .SetDestinationSites(
+              {net::SchemefulSite::Deserialize("https://b.d.test")})
           .SetReportingOrigin(*SuitableOrigin::Deserialize("https://r.test"))
           .Build());
 

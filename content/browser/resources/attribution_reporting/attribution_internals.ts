@@ -250,7 +250,7 @@ class Source {
     this.sourceEventId = mojo.sourceEventId;
     this.sourceOrigin = originToText(mojo.sourceOrigin);
     this.destinations =
-        mojo.destinations.map(d => originToText(d.siteAsOrigin));
+        mojo.destinations.destinations.map(d => originToText(d.siteAsOrigin));
     this.reportingOrigin = originToText(mojo.reportingOrigin);
     this.sourceTime = new Date(mojo.sourceTime);
     this.expiryTime = new Date(mojo.expiryTime);
@@ -525,9 +525,7 @@ class AggregatableAttributionReport extends Report {
         ' ');
 
     this.attestationToken =
-        mojo.data.aggregatableAttributionData!.attestationToken ?
-        `${mojo.data.aggregatableAttributionData!.attestationToken.value}` :
-        '';
+        mojo.data.aggregatableAttributionData!.attestationToken || '';
 
     this.aggregationCoordinator =
         mojo.data.aggregatableAttributionData!.aggregationCoordinator;

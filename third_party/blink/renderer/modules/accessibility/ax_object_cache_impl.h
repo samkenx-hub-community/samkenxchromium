@@ -56,7 +56,6 @@
 #include "third_party/blink/renderer/platform/heap/garbage_collected.h"
 #include "third_party/blink/renderer/platform/mojo/heap_mojo_receiver.h"
 #include "third_party/blink/renderer/platform/mojo/heap_mojo_remote.h"
-#include "third_party/blink/renderer/platform/wtf/gc_plugin.h"
 #include "third_party/blink/renderer/platform/wtf/hash_map.h"
 #include "third_party/blink/renderer/platform/wtf/hash_set.h"
 #include "third_party/blink/renderer/platform/wtf/vector.h"
@@ -166,8 +165,14 @@ class MODULES_EXPORT AXObjectCacheImpl
   // Remove an AXObject or its subtree, and if |notify_parent| is true,
   // recompute the parent's children and reserialize the parent.
   void Remove(AXObject*, bool notify_parent);
-  void RemoveSubtree(AXObject*, bool notify_parent);
-  void RemoveSubtree(Node*, bool notify_parent);
+  void Remove(Node*, bool notify_parent);
+  // This will remove all AXObjects in the subtree, whether they or not they are
+  // marked as included for serialization. They can only be called while flat
+  // tree traversal is safe and there are no slot assignments pending.
+  // To remove only included nodes, use RemoveIncludedSubtree(), which can be
+  // called at any time.
+  void RemoveSubtreeWithFlatTraversal(Node* node);
+  void RemoveSubtreeWithFlatTraversal(AXObject*, bool notify_parent);
 
   // For any ancestor that could contain the passed-in AXObject* in their cached
   // children, clear their children and set needs to update children on them.
@@ -505,6 +510,7 @@ class MODULES_EXPORT AXObjectCacheImpl
   static constexpr int kDataTableHeuristicMinRows = 20;
 
   void UpdateAXForAllDocuments() override;
+  void MarkElementDirty(const Node*) override;
 
  protected:
   void PostPlatformNotification(
@@ -575,8 +581,12 @@ class MODULES_EXPORT AXObjectCacheImpl
   // |notify_parent| is passed in as false.
   void Remove(AccessibleNode*, bool notify_parent);
   void Remove(LayoutObject*, bool notify_parent);
-  void Remove(Node*, bool notify_parent);
   void Remove(AbstractInlineTextBox*, bool notify_parent);
+
+  // Remove the cached subtree of included AXObjects. If |remove_root| is false,
+  // then only descendants will be removed. To remove unincluded AXObjects as
+  // well, call RemoveSubtreeWithFlatTraversal().
+  void RemoveIncludedSubtree(AXObject* object, bool remove_root);
 
   // Helper to remove the object from the cache.
   // Most callers should be using Remove(AXObject) instead.
@@ -584,7 +594,7 @@ class MODULES_EXPORT AXObjectCacheImpl
   // Helper to clean up any references to the AXObject's AXID.
   void RemoveReferencesToAXID(AXID);
 
-  mojo::Remote<mojom::blink::RenderAccessibilityHost>&
+  HeapMojoRemote<mojom::blink::RenderAccessibilityHost>&
   GetOrCreateRemoteRenderAccessibilityHost();
   WebLocalFrameClient* GetWebLocalFrameClient() const;
   void ProcessDeferredAccessibilityEventsImpl(Document&);
@@ -653,7 +663,6 @@ class MODULES_EXPORT AXObjectCacheImpl
       ax::mojom::blink::EventFrom event_from,
       ax::mojom::blink::Action event_from_action);
   void MarkAXSubtreeDirty(AXObject*);
-  void MarkElementDirty(const Node*);
   void MarkElementDirtyWithCleanLayout(const Node*);
 
   // Given an object to mark dirty or fire an event on, return an object
@@ -914,8 +923,7 @@ class MODULES_EXPORT AXObjectCacheImpl
   // instead.
   static bool use_ax_menu_list_;
 
-  GC_PLUGIN_IGNORE("https://crbug.com/1381979")
-  mojo::Remote<mojom::blink::RenderAccessibilityHost>
+  HeapMojoRemote<mojom::blink::RenderAccessibilityHost>
       render_accessibility_host_;
 
   Member<BlinkAXTreeSource> ax_tree_source_;

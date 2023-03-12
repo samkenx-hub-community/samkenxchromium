@@ -2121,20 +2121,14 @@ bool BrowserAutofillManager::RefreshDataModels() {
 }
 
 CreditCard* BrowserAutofillManager::GetCreditCard(int unique_id) {
-  // Unpack the |unique_id| into component parts.
-  Suggestion::BackendId credit_card_id;
-  Suggestion::BackendId profile_id;
-  suggestion_generator_->SplitFrontendId(unique_id, &credit_card_id,
-                                         &profile_id);
+  Suggestion::BackendId credit_card_id =
+      suggestion_generator_->GetBackendIdFromFrontendId(unique_id);
   return personal_data_->GetCreditCardByGUID(credit_card_id.value());
 }
 
 AutofillProfile* BrowserAutofillManager::GetProfile(int unique_id) {
-  // Unpack the |unique_id| into component parts.
-  Suggestion::BackendId credit_card_id;
-  Suggestion::BackendId profile_id;
-  suggestion_generator_->SplitFrontendId(unique_id, &credit_card_id,
-                                         &profile_id);
+  Suggestion::BackendId profile_id =
+      suggestion_generator_->GetBackendIdFromFrontendId(unique_id);
 
   std::string guid = profile_id.value();
   if (base::IsValidGUID(guid))
@@ -2704,8 +2698,9 @@ void BrowserAutofillManager::OnFormProcessed(
   if (auto* autofill_optimization_guide =
           client()->GetAutofillOptimizationGuide()) {
     // Initiate necessary pre-processing based on the forms and fields that are
-    // parsed.
-    autofill_optimization_guide->OnDidParseForm(form_structure);
+    // parsed, as well as the information that the user has saved in the web
+    // database based on `personal_data_`.
+    autofill_optimization_guide->OnDidParseForm(form_structure, personal_data_);
   }
 
   // If a form with the same name was previously filled, and there has not
@@ -3441,7 +3436,7 @@ void BrowserAutofillManager::ProcessFieldLogEventsInForm(
     // This reduces the UKM load by ignoring e.g. search boxes at best effort.
     if (base::FeatureList::IsEnabled(
             features::kAutofillLogUKMEventsWithSampleRate) &&
-        form_structure.ShouldBeParsed()) {
+        ShouldUploadUKM(form_structure)) {
       form_interactions_ukm_logger()->LogAutofillFieldInfoAtFormRemove(
           form_structure, *autofill_field);
     }
@@ -3454,7 +3449,8 @@ void BrowserAutofillManager::ProcessFieldLogEventsInForm(
 
   // Log FormSummary UKM event.
   if (base::FeatureList::IsEnabled(
-          features::kAutofillLogUKMEventsWithSampleRate)) {
+          features::kAutofillLogUKMEventsWithSampleRate) &&
+      ShouldUploadUKM(form_structure)) {
     AutofillMetrics::FormEventSet form_events;
     form_events.insert_all(
         address_form_event_logger_->GetFormEvents(form_structure.global_id()));
@@ -3465,6 +3461,30 @@ void BrowserAutofillManager::ProcessFieldLogEventsInForm(
         form_structure, form_events, is_in_any_main_frame,
         initial_interaction_timestamp_, form_submitted_timestamp_);
   }
+}
+
+bool BrowserAutofillManager::ShouldUploadUKM(
+    const FormStructure& form_structure) {
+  if (!form_structure.ShouldBeParsed()) {
+    return false;
+  }
+
+  // If the form contains a single field which contains the string "search" in
+  // its name/id/placeholder, the function return false and the form is not
+  // recorded into UKM.
+  if (form_structure.field_count() == 1 &&
+      (base::ToLowerASCII(form_structure.field(0)->placeholder)
+               .find(u"search") != std::string::npos ||
+       base::ToLowerASCII(form_structure.field(0)->name).find(u"search") !=
+           std::string::npos ||
+       base::ToLowerASCII(form_structure.field(0)->label).find(u"search") !=
+           std::string::npos ||
+       base::ToLowerASCII(form_structure.field(0)->aria_label)
+               .find(u"search") != std::string::npos)) {
+    return false;
+  }
+
+  return true;
 }
 
 void BrowserAutofillManager::LogEventCountsUMAMetric(

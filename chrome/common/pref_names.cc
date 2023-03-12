@@ -54,6 +54,12 @@ const char kDownloadRestrictions[] = "download_restrictions";
 // set to false, the old download shelf UI will be shown instead.
 const char kDownloadBubbleEnabled[] = "download_bubble_enabled";
 
+// A boolean specifying whether the download bubble IPH should be suppressed.
+// This will be set to true for users who are using the download bubble prior
+// to the addition of the IPH, so that the IPH will not be shown to users who
+// have already used the download bubble.
+const char kDownloadBubbleIphSuppression[] = "suppress_download_bubble_iph";
+
 // Whether the user wants to be prompted upon downloading a duplicate file. Only
 // used when the new download bubble UI is enabled.
 const char kDownloadDuplicateFilePromptEnabled[] =
@@ -839,6 +845,13 @@ const char kSecondEolWarningDismissed[] = "second_eol_warning_dismissed";
 // Boolean pref indicating that the End Of Life final update notification was
 // dismissed by the user.
 const char kEolNotificationDismissed[] = "eol_notification_dismissed";
+
+const char kEolApproachingIncentiveNotificationDismissed[] =
+    "approaching_eol_incentive_dismissed";
+const char kEolPassedFinalIncentiveDismissed[] =
+    "passed_eol_incentive_dismissed";
+const char kEolIncentiveNotificationSilenced[] =
+    "eol_incentive_dont_show_notification";
 
 // A boolean pref that controls whether the PIN autosubmit feature is enabled.
 // This feature, when enabled, exposes the user's PIN length by showing how many
@@ -3614,10 +3627,6 @@ const char kNewBaseUrlInheritanceBehaviorAllowed[] =
 const char kOutOfProcessSystemDnsResolutionEnabled[] =
     "net.out_of_process_system_dns_resolution_enabled";
 #endif  // BUILDFLAG(IS_ANDROID) || BUILDFLAG(IS_LINUX)
-
-#if BUILDFLAG(IS_ANDROID)
-const char kQuickDeleteDialogSuppressed[] = "quick_delete.dialog_suppressed";
-#endif
 
 // A list of hostnames to disable HTTPS Upgrades / HTTPS-First Mode warnings on.
 const char kHttpAllowlist[] = "https_upgrades.policy.http_allowlist";

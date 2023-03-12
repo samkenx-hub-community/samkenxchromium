@@ -63,13 +63,13 @@
 #include "extensions/browser/info_map.h"
 #include "extensions/browser/process_map.h"
 #include "extensions/browser/renderer_startup_helper.h"
+#include "extensions/browser/service_worker/service_worker_host.h"
 #include "extensions/browser/url_loader_factory_manager.h"
 #include "extensions/browser/url_request_util.h"
 #include "extensions/browser/view_type_utils.h"
 #include "extensions/common/constants.h"
 #include "extensions/common/extension_urls.h"
 #include "extensions/common/manifest_constants.h"
-#include "extensions/common/manifest_handlers/app_isolation_info.h"
 #include "extensions/common/manifest_handlers/background_info.h"
 #include "extensions/common/manifest_handlers/web_accessible_resources_info.h"
 #include "extensions/common/mojom/event_router.mojom.h"
@@ -781,6 +781,8 @@ void ChromeContentBrowserClientExtensionsPart::ExposeInterfacesToRenderer(
       &ExtensionsGuestView::CreateForExtensions, host->GetID()));
   associated_registry->AddInterface<mojom::RendererHost>(base::BindRepeating(
       &RendererStartupHelper::BindForRenderer, host->GetID()));
+  associated_registry->AddInterface<mojom::ServiceWorkerHost>(
+      base::BindRepeating(&ServiceWorkerHost::BindReceiver, host->GetID()));
 }
 
 }  // namespace extensions

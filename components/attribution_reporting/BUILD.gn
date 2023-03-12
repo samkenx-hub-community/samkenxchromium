@@ -230,12 +230,6 @@ mojom("registration_mojom") {
           move_only = true
         },
         {
-          mojom = "attribution_reporting.mojom.Filters"
-          cpp = "::attribution_reporting::Filters"
-          forward_declaration =
-              "namespace attribution_reporting { class Filters; }"
-        },
-        {
           mojom = "attribution_reporting.mojom.FilterPair"
           cpp = "::attribution_reporting::FilterPair"
           forward_declaration =
@@ -267,6 +261,12 @@ mojom("registration_mojom") {
           # Avoid expensive copies by forcing Mojo methods to take the type by
           # value, not const ref
           move_only = true
+        },
+        {
+          mojom = "attribution_reporting.mojom.DestinationSet"
+          cpp = "::attribution_reporting::DestinationSet"
+          forward_declaration =
+              "namespace attribution_reporting { class DestinationSet; }"
         },
       ]
       traits_headers = [ "registration_mojom_traits.h" ]

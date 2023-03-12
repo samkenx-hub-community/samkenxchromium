@@ -24,10 +24,10 @@
 #import "ios/chrome/browser/link_to_text/link_to_text_java_script_feature.h"
 #import "ios/chrome/browser/link_to_text/link_to_text_payload.h"
 #import "ios/chrome/browser/link_to_text/link_to_text_tab_helper.h"
+#import "ios/chrome/browser/shared/public/commands/activity_service_commands.h"
+#import "ios/chrome/browser/shared/public/commands/share_highlight_command.h"
+#import "ios/chrome/browser/shared/public/features/features.h"
 #import "ios/chrome/browser/ui/browser_container/edit_menu_alert_delegate.h"
-#import "ios/chrome/browser/ui/commands/activity_service_commands.h"
-#import "ios/chrome/browser/ui/commands/share_highlight_command.h"
-#import "ios/chrome/browser/ui/ui_feature_flags.h"
 #import "ios/chrome/browser/web_state_list/web_state_list.h"
 #import "ios/chrome/browser/web_state_list/web_state_list_delegate.h"
 #import "ios/chrome/browser/web_state_list/web_state_opener.h"
@@ -233,14 +233,6 @@ class LinkToTextMediatorTest : public PlatformTest {
 // HTML.
 TEST_F(LinkToTextMediatorTest, ShouldNotOfferLinkToTextNotHTML) {
   web_state_->SetContentIsHTML(false);
-  EXPECT_FALSE([mediator_ shouldOfferLinkToText]);
-}
-
-// Tests that the mediator should not offer link to text when, for some reason,
-// the main frame cannot call JavaScript functions.
-TEST_F(LinkToTextMediatorTest,
-       ShouldNotOfferLinkToTextCannotExecuteJavaScript) {
-  main_frame_->set_can_call_function(false);
   EXPECT_FALSE([mediator_ shouldOfferLinkToText]);
 }
 

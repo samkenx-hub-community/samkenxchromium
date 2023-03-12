@@ -124,6 +124,10 @@ BASE_FEATURE(kSyncEnableLoadModelsTimeout,
 
 BASE_FEATURE(kSyncEnforcePreferencesAllowlist,
              "SyncEnforcePreferencesAllowlist",
+             base::FEATURE_ENABLED_BY_DEFAULT);
+
+BASE_FEATURE(kEnablePreferencesAccountStorage,
+             "EnablePreferencesAccountStorage",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 }  // namespace syncer

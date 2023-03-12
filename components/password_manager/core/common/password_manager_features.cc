@@ -114,6 +114,13 @@ BASE_FEATURE(kIOSPasswordCheckup,
 BASE_FEATURE(kIOSShowPasswordStorageInSaveInfobar,
              "IOSShowPasswordStorageInSaveInfobar",
              base::FEATURE_DISABLED_BY_DEFAULT);
+
+// Enables password bottom sheet to be displayed (on iOS) when a user is
+// signed-in and taps on a username or password field on a website that has at
+// least one credential saved in their password manager.
+BASE_FEATURE(kIOSPasswordBottomSheet,
+             "IOSPasswordBottomSheet",
+             base::FEATURE_DISABLED_BY_DEFAULT);
 #endif  // IS_IOS
 
 // Enables memory mapping the word lists used in the zxcvbn library employed
@@ -213,6 +220,11 @@ BASE_FEATURE(kPasskeyManagementUsingAccountSettingsAndroid,
 
 BASE_FEATURE(kPasswordEditDialogWithDetails,
              "PasswordEditDialogWithDetails",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+// Enables the Password generation bottom sheet.
+BASE_FEATURE(kPasswordGenerationBottomSheet,
+             "PasswordGenerationBottomSheet",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 BASE_FEATURE(kShowUPMErrorNotification,

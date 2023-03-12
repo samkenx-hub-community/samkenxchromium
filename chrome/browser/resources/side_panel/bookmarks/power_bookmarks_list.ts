@@ -189,6 +189,7 @@ export class PowerBookmarksListElement extends PolymerElement {
   private guestMode_: boolean;
   private renamingId_: string;
   private deletionDescription_: string;
+  private shownBookmarksResizeObserver_?: ResizeObserver;
 
   constructor() {
     super();
@@ -222,12 +223,24 @@ export class PowerBookmarksListElement extends PolymerElement {
             (bookmarkId: bigint) =>
                 this.onBookmarkPriceUntracked_(bookmarkId.toString())),
     );
+
+    if (document.documentElement.hasAttribute('chrome-refresh-2023')) {
+      this.shownBookmarksResizeObserver_ =
+          new ResizeObserver(this.resizeShownBookmarks_.bind(this));
+      this.shownBookmarksResizeObserver_.observe(
+          this.shadowRoot!.querySelector('#bookmarks')!);
+    }
   }
 
   override disconnectedCallback() {
     this.bookmarksService_.stopListening();
     this.shoppingListenerIds_.forEach(
         id => this.shoppingListApi_.getCallbackRouter().removeListener(id));
+
+    if (this.shownBookmarksResizeObserver_) {
+      this.shownBookmarksResizeObserver_.disconnect();
+      this.shownBookmarksResizeObserver_ = undefined;
+    }
   }
 
   setCurrentUrl(url: string) {
@@ -811,6 +824,13 @@ export class PowerBookmarksListElement extends PolymerElement {
 
   private shouldPinFooter_(): boolean {
     return this.shownBookmarks_.length > 0;
+  }
+
+  private resizeShownBookmarks_() {
+    // The iron-list of `shownBookmarks_` is in a dynamically sized card.
+    // Any time the size changes, let iron-list know so that iron-list can
+    // properly adjust to its possibly new height.
+    this.$.shownBookmarksIronList.notifyResize();
   }
 }
 
