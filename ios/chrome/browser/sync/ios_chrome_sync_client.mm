@@ -33,7 +33,8 @@
 #import "components/sync/driver/sync_service.h"
 #import "components/sync_sessions/session_sync_service.h"
 #import "components/sync_user_events/user_event_service.h"
-#import "ios/chrome/browser/bookmarks/bookmark_sync_service_factory.h"
+#import "ios/chrome/browser/bookmarks/account_bookmark_sync_service_factory.h"
+#import "ios/chrome/browser/bookmarks/local_or_syncable_bookmark_sync_service_factory.h"
 #import "ios/chrome/browser/browser_state/chrome_browser_state.h"
 #import "ios/chrome/browser/consent_auditor/consent_auditor_factory.h"
 #import "ios/chrome/browser/dom_distiller/dom_distiller_service_factory.h"
@@ -90,7 +91,10 @@ IOSChromeSyncClient::IOSChromeSyncClient(ChromeBrowserState* browser_state)
           this, ::GetChannel(), web::GetUIThreadTaskRunner({}), db_thread_,
           profile_web_data_service_, account_web_data_service_,
           profile_password_store_, account_password_store_,
-          ios::BookmarkSyncServiceFactory::GetForBrowserState(browser_state_),
+          ios::LocalOrSyncableBookmarkSyncServiceFactory::GetForBrowserState(
+              browser_state_),
+          ios::AccountBookmarkSyncServiceFactory::GetForBrowserState(
+              browser_state_),
           PowerBookmarkServiceFactory::GetForBrowserState(browser_state_));
 
   trusted_vault_client_ = std::make_unique<IOSTrustedVaultClient>(

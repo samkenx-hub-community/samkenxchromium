@@ -34,6 +34,7 @@
 #include "components/translate/core/browser/translate_pref_names.h"
 #include "components/translate/core/browser/translate_prefs.h"
 #include "components/translate/core/common/translate_constants.h"
+#include "components/translate/core/common/translate_util.h"
 #include "components/variations/scoped_variations_ids_provider.h"
 #include "components/variations/variations_associated_data.h"
 #include "net/base/mock_network_change_notifier.h"
@@ -954,8 +955,15 @@ TEST_F(TranslateManagerTest, CanManuallyTranslate_EmptySourceLanguage) {
 
   translate_manager_->GetLanguageState()->LanguageDetermined("", true);
 
-  EXPECT_FALSE(translate_manager_->CanManuallyTranslate());
-  EXPECT_FALSE(translate_manager_->CanManuallyTranslate(true));
+  // Manual translation when source language is empty is only supported on
+  // Android.
+  bool empty_source_supported = false;
+#if BUILDFLAG(IS_ANDROID)
+  empty_source_supported = true;
+#endif
+  EXPECT_EQ(translate_manager_->CanManuallyTranslate(), empty_source_supported);
+  EXPECT_EQ(translate_manager_->CanManuallyTranslate(true),
+            empty_source_supported);
 }
 
 TEST_F(TranslateManagerTest, CanManuallyTranslate_UndefinedSourceLanguage) {
@@ -971,12 +979,9 @@ TEST_F(TranslateManagerTest, CanManuallyTranslate_UndefinedSourceLanguage) {
   translate_manager_->GetLanguageState()->LanguageDetermined(
       kUnknownLanguageCode, true);
 
-  // Manual translation of unknown source language pages is not supported on
-  // iOS.
-  bool unknown_source_supported = true;
-#if BUILDFLAG(IS_IOS)
-  unknown_source_supported = false;
-#endif
+  // Manual translation of unknown source language pages is supported
+  // experimentally on iOS and is fully supported on all other platforms.
+  bool unknown_source_supported = translate::IsForceTranslateEnabled();
   EXPECT_EQ(translate_manager_->CanManuallyTranslate(),
             unknown_source_supported);
 }

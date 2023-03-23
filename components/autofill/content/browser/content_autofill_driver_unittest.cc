@@ -54,10 +54,15 @@
 namespace autofill {
 
 using ::testing::_;
+using ::testing::AllOf;
 using ::testing::DoAll;
 using ::testing::ElementsAre;
+using ::testing::Field;
+using ::testing::Gt;
+using ::testing::IsEmpty;
 using ::testing::Return;
 using ::testing::SaveArg;
+using ::testing::SizeIs;
 
 namespace {
 
@@ -288,7 +293,12 @@ class MockBrowserAutofillManager : public BrowserAutofillManager {
   ~MockBrowserAutofillManager() override = default;
 
   MOCK_METHOD(void, Reset, (), (override));
-  MOCK_METHOD(bool, ShouldParseForms, (const std::vector<FormData>&), ());
+  MOCK_METHOD(bool, ShouldParseForms, (), ());
+  MOCK_METHOD(void,
+              OnFormsSeen,
+              (const std::vector<FormData>& updated_forms,
+               const std::vector<FormGlobalId>& removed_forms),
+              ());
 };
 
 class ContentAutofillDriverTest : public content::RenderViewHostTestHarness,
@@ -347,8 +357,8 @@ class ContentAutofillDriverTest : public content::RenderViewHostTestHarness,
     FormData form;
     test::CreateTestAddressFormData(&form);
     std::vector<FormData> augmented_forms;
-    EXPECT_CALL(*manager(), ShouldParseForms(_))
-        .WillOnce(DoAll(SaveArg<0>(&augmented_forms), Return(false)));
+    EXPECT_CALL(*manager(), OnFormsSeen(_, _))
+        .WillOnce(DoAll(SaveArg<0>(&augmented_forms)));
     driver()->renderer_events().FormsSeen(/*updated_forms=*/{form},
                                           /*removed_forms=*/{});
     return augmented_forms.front();
@@ -373,6 +383,11 @@ class ContentAutofillDriverTest : public content::RenderViewHostTestHarness,
   MockBrowserAutofillManager* manager() {
     return static_cast<MockBrowserAutofillManager*>(
         driver()->autofill_manager());
+  }
+
+  LocalFrameToken frame_token() {
+    return LocalFrameToken(
+        web_contents()->GetPrimaryMainFrame()->GetFrameToken().value());
   }
 
   bool autofill_across_iframes_ = false;
@@ -414,10 +429,7 @@ TEST_P(ContentAutofillDriverTest, SetFrameAndFormMetaDataOfForm) {
   FormData form2 = test_api(driver()).GetFormWithFrameAndFormMetaData(form);
   test_api(driver()).SetFrameAndFormMetaData(form, nullptr);
 
-  EXPECT_EQ(
-      form.host_frame,
-      LocalFrameToken(
-          web_contents()->GetPrimaryMainFrame()->GetFrameToken().value()));
+  EXPECT_EQ(form.host_frame, frame_token());
   EXPECT_EQ(form.url, GURL("https://hostname/path"));
   EXPECT_EQ(form.full_url, GURL());
   EXPECT_EQ(form.main_frame_origin,
@@ -425,10 +437,7 @@ TEST_P(ContentAutofillDriverTest, SetFrameAndFormMetaDataOfForm) {
   EXPECT_EQ(form.main_frame_origin,
             url::Origin::CreateFromNormalizedTuple("https", "hostname", 443));
   ASSERT_EQ(form.fields.size(), 1u);
-  EXPECT_EQ(
-      form.fields.front().host_frame,
-      LocalFrameToken(
-          web_contents()->GetPrimaryMainFrame()->GetFrameToken().value()));
+  EXPECT_EQ(form.fields.front().host_frame, frame_token());
 
   EXPECT_EQ(form2.host_frame, form.host_frame);
   EXPECT_EQ(form2.url, form.url);
@@ -449,17 +458,25 @@ TEST_P(ContentAutofillDriverTest, SetFrameAndFormMetaDataOfForm_AboutScheme) {
   EXPECT_TRUE(form.url.is_empty());
 }
 
+// Tests that the FormData::version of forms passed to AutofillManager
+// increases.
 TEST_P(ContentAutofillDriverTest, SetFrameAndFormMetaDataOfForm_Version) {
-  NavigateAndCommit(GURL("about:blank"));
-  ASSERT_TRUE(main_rfh()->GetLastCommittedURL().IsAboutBlank());
+  FormData form;
+  test::CreateTestAddressFormData(&form);
 
-  FormData form1;
-  test_api(driver()).SetFrameAndFormMetaData(form1, nullptr);
-
-  FormData form2;
-  test_api(driver()).SetFrameAndFormMetaData(form2, nullptr);
-
-  EXPECT_LT(form1.version, form2.version);
+  std::vector<FormData> augmented_forms;
+  EXPECT_CALL(*manager(), OnFormsSeen(_, _))
+      .WillOnce(DoAll(SaveArg<0>(&augmented_forms)));
+  driver()->renderer_events().FormsSeen(/*updated_forms=*/{form},
+                                        /*removed_forms=*/{});
+  ASSERT_EQ(augmented_forms.size(), 1u);
+  FormVersion previous_version = augmented_forms[0].version;
+  EXPECT_CALL(*manager(), OnFormsSeen(ElementsAre(Field("FormData::version",
+                                                        &FormData::version,
+                                                        Gt(previous_version))),
+                                      _));
+  driver()->renderer_events().FormsSeen(/*updated_forms=*/{form},
+                                        /*removed_forms=*/{});
 }
 
 // Test that forms in "about:" subframes inherit the URL of their next
@@ -501,16 +518,70 @@ TEST_P(ContentAutofillDriverTest, SetFrameAndFormMetaDataOfField) {
   test_api(driver()).SetFrameAndFormMetaData(form, &field);
 
   EXPECT_NE(signature_without_meta_data, CalculateFormSignature(form));
-  EXPECT_EQ(
-      field.host_frame,
-      LocalFrameToken(
-          web_contents()->GetPrimaryMainFrame()->GetFrameToken().value()));
+  EXPECT_EQ(field.host_frame, frame_token());
   EXPECT_EQ(field.host_form_id, form.unique_renderer_id);
   EXPECT_EQ(field.host_form_signature, CalculateFormSignature(form));
 
   EXPECT_EQ(field.host_frame, form.fields.front().host_frame);
   EXPECT_EQ(field.host_form_id, form.fields.front().host_form_id);
   EXPECT_EQ(field.host_form_signature, form.fields.front().host_form_signature);
+}
+
+// Tests that FormsSeen() for an updated form arrives in the AutofillManager.
+// Does not test multiple frames.
+TEST_P(ContentAutofillDriverTest, FormsSeen_UpdatedForm) {
+  FormData form;
+  test::CreateTestAddressFormData(&form);
+  EXPECT_CALL(*manager(),
+              OnFormsSeen(ElementsAre(AllOf(
+                              // The received form has some frame-specific meta
+                              // data set, which we don't test here.
+                              Field("FormData::frame_token",
+                                    &FormData::host_frame, frame_token()),
+                              Field("FormData::unique_renderer_id",
+                                    &FormData::unique_renderer_id,
+                                    form.unique_renderer_id),
+                              Field("FormData::fields", &FormData::fields,
+                                    SizeIs(form.fields.size())))),
+                          IsEmpty()));
+  driver()->renderer_events().FormsSeen(/*updated_forms=*/{form},
+                                        /*removed_forms=*/{});
+}
+
+// Tests that FormsSeen() for a removed form arrives in the AutofillManager.
+// Does not test multiple frames.
+TEST_P(ContentAutofillDriverTest, FormsSeen_RemovedForm) {
+  FormRendererId form_renderer_id = test::MakeFormRendererId();
+  EXPECT_CALL(*manager(),
+              OnFormsSeen(IsEmpty(), ElementsAre(FormGlobalId(
+                                         frame_token(), form_renderer_id))));
+  driver()->renderer_events().FormsSeen(/*updated_forms=*/{},
+                                        /*removed_forms=*/{form_renderer_id});
+}
+
+// Tests that FormsSeen() for one updated and one removed form arrives in the
+// AutofillManager.
+// Does not test multiple frames.
+TEST_P(ContentAutofillDriverTest, FormsSeen_UpdatedAndRemovedForm) {
+  FormData form;
+  test::CreateTestAddressFormData(&form);
+  FormRendererId other_form_renderer_id = test::MakeFormRendererId();
+  EXPECT_CALL(
+      *manager(),
+      OnFormsSeen(
+          ElementsAre(AllOf(
+              // The received form has some frame-specific meta data set, which
+              // we don't test here.
+              Field("FormData::frame_token", &FormData::host_frame,
+                    frame_token()),
+              Field("FormData::unique_renderer_id",
+                    &FormData::unique_renderer_id, form.unique_renderer_id),
+              Field("FormData::fields", &FormData::fields,
+                    SizeIs(form.fields.size())))),
+          ElementsAre(FormGlobalId(frame_token(), other_form_renderer_id))));
+  driver()->renderer_events().FormsSeen(
+      /*updated_forms=*/{form},
+      /*removed_forms=*/{other_form_renderer_id});
 }
 
 TEST_P(ContentAutofillDriverTest, FormDataSentToRenderer_FillForm) {
@@ -568,8 +639,8 @@ TEST_P(ContentAutofillDriverTest, TypePredictionsSentToRendererWhenEnabled) {
   test::CreateTestAddressFormData(&form);
 
   std::vector<FormData> augmented_forms;
-  EXPECT_CALL(*manager(), ShouldParseForms(_))
-      .WillOnce(DoAll(SaveArg<0>(&augmented_forms), Return(false)));
+  EXPECT_CALL(*manager(), OnFormsSeen(_, _))
+      .WillOnce(DoAll(SaveArg<0>(&augmented_forms)));
   driver()->renderer_events().FormsSeen(/*updated_forms=*/{form},
                                         /*removed_forms=*/{});
 

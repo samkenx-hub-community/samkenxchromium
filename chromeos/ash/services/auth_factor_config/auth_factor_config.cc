@@ -41,22 +41,6 @@ void AuthFactorConfig::NotifyFactorObservers(mojom::AuthFactor changed_factor) {
 void AuthFactorConfig::IsSupported(const std::string& auth_token,
                                    mojom::AuthFactor factor,
                                    base::OnceCallback<void(bool)> callback) {
-  VLOG(1) << "AuthFactorConfig::IsSupported is a fake";
-  std::move(callback).Run(features::IsCryptohomeRecoveryEnabled());
-}
-
-void AuthFactorConfig::IsConfigured(const std::string& auth_token,
-                                    mojom::AuthFactor factor,
-                                    base::OnceCallback<void(bool)> callback) {
-  DCHECK(features::IsCryptohomeRecoveryEnabled());
-
-  if (factor != mojom::AuthFactor::kRecovery) {
-    LOG(ERROR) << "AuthFactorConfig::IsConfigured supports recovery only";
-    NOTIMPLEMENTED();
-    std::move(callback).Run(false);
-    return;
-  }
-
   const auto* user = ::user_manager::UserManager::Get()->GetPrimaryUser();
   auto* user_context = quick_unlock_storage_->GetUserContext(user, auth_token);
   if (!user_context) {
@@ -64,11 +48,57 @@ void AuthFactorConfig::IsConfigured(const std::string& auth_token,
     std::move(callback).Run(false);
     return;
   }
+  const cryptohome::AuthFactorsSet cryptohome_supported_factors =
+      user_context->GetAuthFactorsConfiguration().get_supported_factors();
 
+  switch (factor) {
+    case mojom::AuthFactor::kRecovery: {
+      if (!features::IsCryptohomeRecoveryEnabled()) {
+        std::move(callback).Run(false);
+        return;
+      }
+
+      std::move(callback).Run(cryptohome_supported_factors.Has(
+          cryptohome::AuthFactorType::kRecovery));
+      return;
+    }
+    case mojom::AuthFactor::kPin: {
+      std::move(callback).Run(
+          cryptohome_supported_factors.Has(cryptohome::AuthFactorType::kPin));
+      return;
+    }
+  }
+
+  NOTREACHED();
+}
+
+void AuthFactorConfig::IsConfigured(const std::string& auth_token,
+                                    mojom::AuthFactor factor,
+                                    base::OnceCallback<void(bool)> callback) {
+  const auto* user = ::user_manager::UserManager::Get()->GetPrimaryUser();
+  auto* user_context = quick_unlock_storage_->GetUserContext(user, auth_token);
+  if (!user_context) {
+    LOG(ERROR) << "Invalid auth token";
+    std::move(callback).Run(false);
+    return;
+  }
   const auto& config = user_context->GetAuthFactorsConfiguration();
-  const bool is_configured =
-      config.HasConfiguredFactor(cryptohome::AuthFactorType::kRecovery);
-  std::move(callback).Run(is_configured);
+
+  switch (factor) {
+    case mojom::AuthFactor::kRecovery: {
+      DCHECK(features::IsCryptohomeRecoveryEnabled());
+      std::move(callback).Run(
+          config.HasConfiguredFactor(cryptohome::AuthFactorType::kRecovery));
+      return;
+    }
+    case mojom::AuthFactor::kPin: {
+      std::move(callback).Run(
+          config.HasConfiguredFactor(cryptohome::AuthFactorType::kPin));
+      return;
+    }
+  }
+
+  NOTREACHED();
 }
 
 void AuthFactorConfig::GetManagementType(
@@ -82,6 +112,11 @@ void AuthFactorConfig::GetManagementType(
       CHECK(user);
       const PrefService* prefs = quick_unlock_storage_->GetPrefService(*user);
       CHECK(prefs);
+      // TODO(272474463): remove the child user check.
+      if (user->IsChild()) {
+        std::move(callback).Run(mojom::ManagementType::kChildRestriction);
+        return;
+      }
       const mojom::ManagementType result =
           prefs->IsManagedPreference(prefs::kRecoveryFactorBehavior)
               ? mojom::ManagementType::kUser
@@ -105,6 +140,8 @@ void AuthFactorConfig::GetManagementType(
       return;
     }
   }
+
+  NOTREACHED();
 }
 
 void AuthFactorConfig::IsEditable(const std::string& auth_token,
@@ -117,9 +154,12 @@ void AuthFactorConfig::IsEditable(const std::string& auth_token,
       CHECK(user);
       const PrefService* prefs = quick_unlock_storage_->GetPrefService(*user);
       CHECK(prefs);
+      // TODO(272474463): remove the child user check.
+      bool editable =
+          prefs->IsUserModifiablePreference(prefs::kRecoveryFactorBehavior) &&
+          !user->IsChild();
 
-      std::move(callback).Run(
-          prefs->IsUserModifiablePreference(prefs::kRecoveryFactorBehavior));
+      std::move(callback).Run(editable);
       return;
     }
     case mojom::AuthFactor::kPin: {
@@ -153,6 +193,8 @@ void AuthFactorConfig::IsEditable(const std::string& auth_token,
       return;
     }
   }
+
+  NOTREACHED();
 }
 
 }  // namespace ash::auth

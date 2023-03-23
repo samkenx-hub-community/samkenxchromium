@@ -11,6 +11,7 @@
 #include "build/chromeos_buildflags.h"
 #include "chrome/browser/bookmarks/bookmark_model_factory.h"
 #include "chrome/browser/commerce/shopping_service_factory.h"
+#include "chrome/browser/favicon/favicon_utils.h"
 #include "chrome/browser/feature_engagement/tracker_factory.h"
 #include "chrome/browser/platform_util.h"
 #include "chrome/browser/profiles/profile.h"
@@ -41,6 +42,8 @@
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/models/dialog_model.h"
 #include "ui/base/models/image_model.h"
+#include "ui/gfx/image/image_skia.h"
+#include "ui/gfx/image/image_skia_operations.h"
 #include "ui/views/bubble/bubble_dialog_model_host.h"
 
 #if !BUILDFLAG(IS_CHROMEOS_ASH)
@@ -76,7 +79,7 @@ class BookmarkBubbleView::BookmarkBubbleDelegate
     const bookmarks::BookmarkNode* node =
         model->GetMostRecentlyAddedUserNodeForURL(url_);
     if (node)
-      model->Remove(node);
+      model->Remove(node, bookmarks::metrics::BookmarkEditSource::kUser);
   }
 
   void OnWindowClosing() {
@@ -212,9 +215,27 @@ void BookmarkBubbleView::ShowBubble(
 
   auto dialog_model_builder =
       ui::DialogModel::Builder(std::move(bubble_delegate_unique));
-  if (base::FeatureList::IsEnabled(features::kPowerBookmarksSidePanel) &&
-      !product_image.IsEmpty()) {
-    dialog_model_builder.SetMainImage(ui::ImageModel::FromImage(product_image));
+  if (base::FeatureList::IsEnabled(features::kPowerBookmarksSidePanel)) {
+    gfx::ImageSkia main_image = product_image.AsImageSkia();
+
+    if (product_image.IsEmpty()) {
+      const gfx::Image url_favicon =
+          favicon::TabFaviconFromWebContents(web_contents);
+      const gfx::Image favicon =
+          url_favicon.IsEmpty() ? favicon::GetDefaultFavicon() : url_favicon;
+      const ui::NativeTheme* native_theme =
+          ui::NativeTheme::GetInstanceForNativeUi();
+      const bool is_dark = native_theme && native_theme->ShouldUseDarkColors();
+      constexpr int kMainImageDimension = 112;
+      gfx::ImageSkia centered_favicon =
+          gfx::ImageSkiaOperations::CreateImageWithRoundRectBackground(
+              kMainImageDimension, 0, is_dark ? SK_ColorBLACK : SK_ColorWHITE,
+              favicon.AsImageSkia());
+      main_image = centered_favicon;
+    }
+
+    dialog_model_builder.SetMainImage(
+        ui::ImageModel::FromImageSkia(main_image));
   }
   dialog_model_builder
       .SetTitle(l10n_util::GetStringUTF16(

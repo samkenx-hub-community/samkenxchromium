@@ -2135,54 +2135,6 @@
     "isolated_scripts": [
       {
         "args": [
-          "pixel",
-          "--show-stdout",
-          "--browser=android-webview-instrumentation",
-          "--passthrough",
-          "-v",
-          "--stable-jobs",
-          "--extra-browser-args=--enable-logging=stderr --js-flags=--expose-gc",
-          "--dont-restore-color-profile-after-test",
-          "--test-machine-name",
-          "${buildername}",
-          "--git-revision=${got_revision}"
-        ],
-        "isolate_name": "telemetry_gpu_integration_test_android_webview",
-        "merge": {
-          "args": [],
-          "script": "//testing/merge_scripts/standard_isolated_script_merge.py"
-        },
-        "name": "android_webview_pixel_skia_gold_test",
-        "precommit_args": [
-          "--gerrit-issue=${patch_issue}",
-          "--gerrit-patchset=${patch_set}",
-          "--buildbucket-id=${buildbucket_build_id}"
-        ],
-        "resultdb": {
-          "enable": true,
-          "has_native_resultdb_integration": true
-        },
-        "should_retry_with_patch": false,
-        "swarming": {
-          "can_use_on_swarming_builders": true,
-          "containment_type": "AUTO",
-          "dimension_sets": [
-            {
-              "device_os": "TP1A.220624.021",
-              "device_os_type": "userdebug",
-              "device_type": "oriole",
-              "os": "Android",
-              "pool": "chromium.tests.gpu"
-            }
-          ],
-          "expiration": 21600,
-          "idempotent": false,
-          "service_account": "chromium-tester@chops-service-accounts.iam.gserviceaccount.com"
-        },
-        "test_id_prefix": "ninja://chrome/test:telemetry_gpu_integration_test_android_webview/"
-      },
-      {
-        "args": [
           "context_lost",
           "--show-stdout",
           "--browser=android-chromium",
@@ -2214,7 +2166,6 @@
               "pool": "chromium.tests.gpu"
             }
           ],
-          "expiration": 21600,
           "idempotent": false,
           "service_account": "chromium-tester@chops-service-accounts.iam.gserviceaccount.com"
         },
@@ -2253,7 +2204,6 @@
               "pool": "chromium.tests.gpu"
             }
           ],
-          "expiration": 21600,
           "idempotent": false,
           "service_account": "chromium-tester@chops-service-accounts.iam.gserviceaccount.com"
         },
@@ -2292,7 +2242,6 @@
               "pool": "chromium.tests.gpu"
             }
           ],
-          "expiration": 21600,
           "idempotent": false,
           "service_account": "chromium-tester@chops-service-accounts.iam.gserviceaccount.com"
         },
@@ -2331,7 +2280,6 @@
               "pool": "chromium.tests.gpu"
             }
           ],
-          "expiration": 21600,
           "idempotent": false,
           "service_account": "chromium-tester@chops-service-accounts.iam.gserviceaccount.com"
         },
@@ -2374,7 +2322,6 @@
               "pool": "chromium.tests.gpu"
             }
           ],
-          "expiration": 21600,
           "idempotent": false,
           "service_account": "chromium-tester@chops-service-accounts.iam.gserviceaccount.com"
         },
@@ -2422,7 +2369,6 @@
               "pool": "chromium.tests.gpu"
             }
           ],
-          "expiration": 21600,
           "idempotent": false,
           "service_account": "chromium-tester@chops-service-accounts.iam.gserviceaccount.com"
         },
@@ -2470,7 +2416,6 @@
               "pool": "chromium.tests.gpu"
             }
           ],
-          "expiration": 21600,
           "idempotent": false,
           "service_account": "chromium-tester@chops-service-accounts.iam.gserviceaccount.com"
         },
@@ -2509,7 +2454,6 @@
               "pool": "chromium.tests.gpu"
             }
           ],
-          "expiration": 21600,
           "idempotent": false,
           "service_account": "chromium-tester@chops-service-accounts.iam.gserviceaccount.com"
         },
@@ -2548,7 +2492,6 @@
               "pool": "chromium.tests.gpu"
             }
           ],
-          "expiration": 21600,
           "idempotent": false,
           "service_account": "chromium-tester@chops-service-accounts.iam.gserviceaccount.com"
         },
@@ -2596,7 +2539,6 @@
               "pool": "chromium.tests.gpu"
             }
           ],
-          "expiration": 21600,
           "idempotent": false,
           "service_account": "chromium-tester@chops-service-accounts.iam.gserviceaccount.com"
         },
@@ -2644,7 +2586,6 @@
               "pool": "chromium.tests.gpu"
             }
           ],
-          "expiration": 21600,
           "idempotent": false,
           "service_account": "chromium-tester@chops-service-accounts.iam.gserviceaccount.com"
         },
@@ -2684,7 +2625,6 @@
               "pool": "chromium.tests.gpu"
             }
           ],
-          "expiration": 21600,
           "idempotent": false,
           "service_account": "chromium-tester@chops-service-accounts.iam.gserviceaccount.com"
         },
@@ -2724,7 +2664,6 @@
               "pool": "chromium.tests.gpu"
             }
           ],
-          "expiration": 21600,
           "idempotent": false,
           "service_account": "chromium-tester@chops-service-accounts.iam.gserviceaccount.com"
         },
@@ -2763,7 +2702,6 @@
               "pool": "chromium.tests.gpu"
             }
           ],
-          "expiration": 21600,
           "idempotent": false,
           "service_account": "chromium-tester@chops-service-accounts.iam.gserviceaccount.com"
         },
@@ -2802,7 +2740,6 @@
               "pool": "chromium.tests.gpu"
             }
           ],
-          "expiration": 21600,
           "idempotent": false,
           "service_account": "chromium-tester@chops-service-accounts.iam.gserviceaccount.com"
         },
@@ -2843,7 +2780,6 @@
               "pool": "chromium.tests.gpu"
             }
           ],
-          "expiration": 21600,
           "idempotent": false,
           "service_account": "chromium-tester@chops-service-accounts.iam.gserviceaccount.com",
           "shards": 6
@@ -2885,7 +2821,6 @@
               "pool": "chromium.tests.gpu"
             }
           ],
-          "expiration": 21600,
           "idempotent": false,
           "service_account": "chromium-tester@chops-service-accounts.iam.gserviceaccount.com",
           "shards": 6
@@ -5360,10 +5295,10 @@
           "-v",
           "--stable-jobs"
         ],
-        "autotest_name": "chromium_GPU",
+        "autotest_name": "chromium_Graphics",
         "bucket": "chromiumos-image-archive",
         "cros_board": "kevin",
-        "cros_img": "kevin-public/R110-15277.0.0",
+        "cros_img": "kevin-public/R113-15384.0.0",
         "extra_browser_args": "--log-level=0 --js-flags=--expose-gc --use-cmd-decoder=validating",
         "merge": {
           "args": [],
@@ -5391,10 +5326,10 @@
           "-v",
           "--stable-jobs"
         ],
-        "autotest_name": "chromium_GPU",
+        "autotest_name": "chromium_Graphics",
         "bucket": "chromiumos-image-archive",
         "cros_board": "kevin",
-        "cros_img": "kevin-public/R110-15277.0.0",
+        "cros_img": "kevin-public/R113-15384.0.0",
         "extra_browser_args": "--log-level=0 --js-flags=--expose-gc",
         "merge": {
           "args": [],
@@ -5422,10 +5357,10 @@
           "-v",
           "--stable-jobs"
         ],
-        "autotest_name": "chromium_GPU",
+        "autotest_name": "chromium_Graphics",
         "bucket": "chromiumos-image-archive",
         "cros_board": "kevin",
-        "cros_img": "kevin-public/R110-15277.0.0",
+        "cros_img": "kevin-public/R113-15384.0.0",
         "extra_browser_args": "--log-level=0 --js-flags=--expose-gc",
         "merge": {
           "args": [],
@@ -5457,10 +5392,10 @@
           "--expected-device-id",
           "0"
         ],
-        "autotest_name": "chromium_GPU",
+        "autotest_name": "chromium_Graphics",
         "bucket": "chromiumos-image-archive",
         "cros_board": "kevin",
-        "cros_img": "kevin-public/R110-15277.0.0",
+        "cros_img": "kevin-public/R113-15384.0.0",
         "extra_browser_args": "--log-level=0 --js-flags=--expose-gc --force_high_performance_gpu",
         "merge": {
           "args": [],
@@ -5493,10 +5428,10 @@
           "--git-revision=${got_revision}",
           "--service-account=/creds/service_accounts/skylab-drone.json"
         ],
-        "autotest_name": "chromium_GPU",
+        "autotest_name": "chromium_Graphics",
         "bucket": "chromiumos-image-archive",
         "cros_board": "kevin",
-        "cros_img": "kevin-public/R110-15277.0.0",
+        "cros_img": "kevin-public/R113-15384.0.0",
         "extra_browser_args": "--log-level=0 --js-flags=--expose-gc --use-cmd-decoder=validating",
         "merge": {
           "args": [],
@@ -5529,10 +5464,10 @@
           "-v",
           "--stable-jobs"
         ],
-        "autotest_name": "chromium_GPU",
+        "autotest_name": "chromium_Graphics",
         "bucket": "chromiumos-image-archive",
         "cros_board": "kevin",
-        "cros_img": "kevin-public/R110-15277.0.0",
+        "cros_img": "kevin-public/R113-15384.0.0",
         "extra_browser_args": "--log-level=0 --js-flags=--expose-gc --force_higher_performance_gpu --use-cmd-decoder=validating",
         "merge": {
           "args": [],
@@ -5565,10 +5500,10 @@
           "--git-revision=${got_revision}",
           "--service-account=/creds/service_accounts/skylab-drone.json"
         ],
-        "autotest_name": "chromium_GPU",
+        "autotest_name": "chromium_Graphics",
         "bucket": "chromiumos-image-archive",
         "cros_board": "kevin",
-        "cros_img": "kevin-public/R110-15277.0.0",
+        "cros_img": "kevin-public/R113-15384.0.0",
         "extra_browser_args": "--log-level=0 --js-flags=--expose-gc --use-cmd-decoder=validating",
         "merge": {
           "args": [],
@@ -5602,10 +5537,10 @@
           "--stable-jobs",
           "--dont-restore-color-profile-after-test"
         ],
-        "autotest_name": "chromium_GPU",
+        "autotest_name": "chromium_Graphics",
         "bucket": "chromiumos-image-archive",
         "cros_board": "kevin",
-        "cros_img": "kevin-public/R110-15277.0.0",
+        "cros_img": "kevin-public/R113-15384.0.0",
         "extra_browser_args": "--log-level=0 --js-flags=--expose-gc --use-cmd-decoder=validating",
         "merge": {
           "args": [],
@@ -5633,10 +5568,10 @@
           "-v",
           "--stable-jobs"
         ],
-        "autotest_name": "chromium_GPU",
+        "autotest_name": "chromium_Graphics",
         "bucket": "chromiumos-image-archive",
         "cros_board": "kevin",
-        "cros_img": "kevin-public/R110-15277.0.0",
+        "cros_img": "kevin-public/R113-15384.0.0",
         "extra_browser_args": "--log-level=0 --js-flags=--expose-gc",
         "merge": {
           "args": [],
@@ -5664,10 +5599,10 @@
           "-v",
           "--stable-jobs"
         ],
-        "autotest_name": "chromium_GPU",
+        "autotest_name": "chromium_Graphics",
         "bucket": "chromiumos-image-archive",
         "cros_board": "kevin",
-        "cros_img": "kevin-public/R110-15277.0.0",
+        "cros_img": "kevin-public/R113-15384.0.0",
         "extra_browser_args": "--log-level=0 --js-flags=--expose-gc --use-cmd-decoder=validating",
         "merge": {
           "args": [],
@@ -5698,10 +5633,10 @@
           "--read-abbreviated-json-results-from=../../content/test/data/gpu/webgl2_conformance_tests_output.json",
           "--jobs=1"
         ],
-        "autotest_name": "chromium_GPU",
+        "autotest_name": "chromium_Graphics",
         "bucket": "chromiumos-image-archive",
         "cros_board": "kevin",
-        "cros_img": "kevin-public/R110-15277.0.0",
+        "cros_img": "kevin-public/R113-15384.0.0",
         "extra_browser_args": "--log-level=0 --js-flags=--expose-gc --use-gl=angle --use-angle=gles --use-cmd-decoder=passthrough --force_high_performance_gpu",
         "merge": {
           "args": [],
@@ -5732,10 +5667,10 @@
           "--read-abbreviated-json-results-from=../../content/test/data/gpu/webgl2_conformance_tests_output.json",
           "--jobs=1"
         ],
-        "autotest_name": "chromium_GPU",
+        "autotest_name": "chromium_Graphics",
         "bucket": "chromiumos-image-archive",
         "cros_board": "kevin",
-        "cros_img": "kevin-public/R110-15277.0.0",
+        "cros_img": "kevin-public/R113-15384.0.0",
         "extra_browser_args": "--log-level=0 --js-flags=--expose-gc --use-cmd-decoder=validating --force_high_performance_gpu",
         "merge": {
           "args": [],
@@ -5765,10 +5700,10 @@
           "--read-abbreviated-json-results-from=../../content/test/data/gpu/webgl_conformance_tests_output.json",
           "--jobs=1"
         ],
-        "autotest_name": "chromium_GPU",
+        "autotest_name": "chromium_Graphics",
         "bucket": "chromiumos-image-archive",
         "cros_board": "kevin",
-        "cros_img": "kevin-public/R110-15277.0.0",
+        "cros_img": "kevin-public/R113-15384.0.0",
         "extra_browser_args": "--log-level=0 --js-flags=--expose-gc --use-cmd-decoder=validating --force_high_performance_gpu",
         "merge": {
           "args": [],
@@ -10092,7 +10027,7 @@
       },
       {
         "args": [
-          "--gtest_filter=*Detection*:-FaceDetectionImplMacTest.ScanOneFace*",
+          "--gtest_filter=*Detection*",
           "--use-gpu-in-tests"
         ],
         "merge": {
@@ -10595,7 +10530,7 @@
           "--passthrough",
           "-v",
           "--stable-jobs",
-          "--extra-browser-args=--enable-logging=stderr --js-flags=--expose-gc --use-gl=angle --use-angle=metal --use-cmd-decoder=passthrough --enable-features=EGLDualGPURendering,ForceHighPerformanceGPUForWebGL",
+          "--extra-browser-args=--enable-logging=stderr --js-flags=--expose-gc --use-gl=angle --use-angle=metal --use-cmd-decoder=passthrough --force_high_performance_gpu",
           "--webgl-conformance-version=2.0.1",
           "--read-abbreviated-json-results-from=../../content/test/data/gpu/webgl2_conformance_tests_output.json",
           "--jobs=4",
@@ -10683,7 +10618,7 @@
           "--passthrough",
           "-v",
           "--stable-jobs",
-          "--extra-browser-args=--enable-logging=stderr --js-flags=--expose-gc --use-gl=angle --use-angle=metal --use-cmd-decoder=passthrough --enable-features=EGLDualGPURendering,ForceHighPerformanceGPUForWebGL",
+          "--extra-browser-args=--enable-logging=stderr --js-flags=--expose-gc --use-gl=angle --use-angle=metal --use-cmd-decoder=passthrough --force_high_performance_gpu",
           "--read-abbreviated-json-results-from=../../content/test/data/gpu/webgl_conformance_tests_output.json",
           "--jobs=4",
           "--enable-metal-debug-layers"
@@ -14985,7 +14920,7 @@
           "--extra-browser-args=--enable-logging=stderr --js-flags=--expose-gc --use-gl=angle --use-angle=gl --use-cmd-decoder=passthrough --force_high_performance_gpu",
           "--webgl-conformance-version=2.0.1",
           "--read-abbreviated-json-results-from=../../content/test/data/gpu/webgl2_conformance_tests_output.json",
-          "--jobs=4"
+          "--jobs=3"
         ],
         "isolate_name": "telemetry_gpu_integration_test",
         "merge": {
@@ -15027,7 +14962,7 @@
           "--stable-jobs",
           "--extra-browser-args=--enable-logging=stderr --js-flags=--expose-gc --use-gl=angle --use-angle=gl --use-cmd-decoder=passthrough --force_high_performance_gpu",
           "--read-abbreviated-json-results-from=../../content/test/data/gpu/webgl_conformance_tests_output.json",
-          "--jobs=4"
+          "--jobs=3"
         ],
         "isolate_name": "telemetry_gpu_integration_test",
         "merge": {
@@ -15069,7 +15004,7 @@
           "--stable-jobs",
           "--extra-browser-args=--enable-logging=stderr --js-flags=--expose-gc --use-gl=angle --use-angle=swiftshader --use-cmd-decoder=passthrough --force_high_performance_gpu",
           "--test-filter=conformance/rendering/gl-drawelements.html",
-          "--jobs=4"
+          "--jobs=3"
         ],
         "isolate_name": "telemetry_gpu_integration_test",
         "merge": {

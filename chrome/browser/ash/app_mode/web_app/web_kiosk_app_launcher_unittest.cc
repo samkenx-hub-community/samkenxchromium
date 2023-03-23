@@ -34,6 +34,7 @@
 #include "content/public/test/browser_test_utils.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
+#include "third_party/abseil-cpp/absl/types/optional.h"
 #include "url/gurl.h"
 
 using ash::standalone_browser::BrowserSupport;
@@ -79,7 +80,7 @@ class MockAppLauncherObserver : public KioskAppLauncher::Observer {
   MOCK_METHOD0(OnAppInstalling, void());
   MOCK_METHOD0(OnAppPrepared, void());
   MOCK_METHOD0(OnAppLaunched, void());
-  MOCK_METHOD0(OnAppWindowCreated, void());
+  MOCK_METHOD(void, OnAppWindowCreated, (const absl::optional<std::string>&));
   MOCK_METHOD1(OnLaunchFailed, void(KioskAppLaunchError::Error));
 };
 
@@ -269,45 +270,6 @@ TEST_F(WebKioskAppLauncherTest, NormalFlowBadLaunchUrl) {
   EXPECT_NE(app_data()->status(), WebKioskAppData::Status::kInstalled);
 }
 
-TEST_F(WebKioskAppLauncherTest, InstallationRestarted) {
-  SetupAppData(/*installed*/ false);
-  // Freezes url requests until they are manually processed.
-  url_loader_->SaveLoadUrlRequests();
-
-  EXEC_AND_WAIT_FOR_CALL(launcher()->Initialize(), delegate(),
-                         InitializeNetwork());
-
-  SetupInstallData();
-
-  EXPECT_CALL(observer(), OnAppInstalling());
-  launcher()->ContinueWithNetworkReady();
-
-  EXPECT_CALL(delegate(), InitializeNetwork()).Times(1);
-  launcher()->RestartLauncher();
-
-  // App should not be installed yet.
-  EXPECT_NE(app_data()->status(), WebKioskAppData::Status::kInstalled);
-
-  // We should not receive any status updates now.
-  url_loader_->ProcessLoadUrlRequests();
-
-  SetupInstallData();
-
-  EXPECT_CALL(observer(), OnAppInstalling()).Times(1);
-  EXEC_AND_WAIT_FOR_CALL(
-      {
-        launcher()->ContinueWithNetworkReady();
-        url_loader_->ProcessLoadUrlRequests();
-      },
-      observer(), OnAppPrepared());
-
-  EXPECT_EQ(app_data()->status(), WebKioskAppData::Status::kInstalled);
-
-  EXEC_AND_WAIT_FOR_CALL(launcher()->LaunchApp(), observer(), OnAppLaunched());
-
-  CloseAppWindow();
-}
-
 TEST_F(WebKioskAppLauncherTest, UrlNotLoaded) {
   base::HistogramTester histogram;
 
@@ -407,7 +369,7 @@ TEST_F(WebKioskAppLauncherUsingLacrosTest, NormalFlow) {
   launcher()->LaunchApp();
 
   EXEC_AND_WAIT_FOR_CALL(CreateLacrosWindowAndNotify(), observer(),
-                         OnAppWindowCreated());
+                         OnAppWindowCreated);
   EXPECT_CALL(observer(), OnLaunchFailed(_)).Times(0);
 }
 
@@ -428,7 +390,7 @@ TEST_F(WebKioskAppLauncherUsingLacrosTest, WaitBrowserManagerToRun) {
   browser_manager()->StartRunning();
 
   EXEC_AND_WAIT_FOR_CALL(CreateLacrosWindowAndNotify(), observer(),
-                         OnAppWindowCreated());
+                         OnAppWindowCreated);
   EXPECT_CALL(observer(), OnLaunchFailed(_)).Times(0);
 }
 
@@ -444,7 +406,7 @@ TEST_F(WebKioskAppLauncherUsingLacrosTest, FailToLaunchApp) {
   // method will be called instead.
 
   EXPECT_CALL(observer(), OnAppLaunched()).Times(1);
-  EXPECT_CALL(observer(), OnAppWindowCreated()).Times(0);
+  EXPECT_CALL(observer(), OnAppWindowCreated).Times(0);
   browser_manager()->StartRunning();
 
   EXEC_AND_WAIT_FOR_CALL(launcher()->LaunchApp(), observer(),

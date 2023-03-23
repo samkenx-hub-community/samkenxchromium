@@ -124,6 +124,7 @@ gfx::CALayerResult FromSolidColorDrawQuad(const SolidColorDrawQuad* quad,
     return gfx::kCALayerSuccess;
   }
   ca_layer_overlay->color = quad->color;
+  ca_layer_overlay->is_solid_color = true;
   return gfx::kCALayerSuccess;
 }
 
@@ -364,12 +365,7 @@ BASE_FEATURE(kHDRUnderlays,
 }  // namespace
 
 CALayerOverlayProcessor::CALayerOverlayProcessor()
-    :
-#if BUILDFLAG(IS_MAC)
-      overlays_allowed_(ui::RemoteLayerAPISupported()),
-#else
-      overlays_allowed_(false),
-#endif
+    : overlays_allowed_(ui::RemoteLayerAPISupported()),
       enable_ca_renderer_(base::FeatureList::IsEnabled(kCARenderer)),
       enable_hdr_underlays_(base::FeatureList::IsEnabled(kHDRUnderlays)) {
   if (base::FeatureList::IsEnabled(features::kMacCAOverlayQuad)) {

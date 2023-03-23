@@ -832,6 +832,8 @@ void AddStringsGeneric(base::Value::Dict* dict) {
   SET_STRING("SEARCH_RESULTS_LABEL", IDS_FILE_BROWSER_SEARCH_RESULTS_LABEL);
   SET_STRING("SEARCH_V2_EDUCATION_NUDGE",
              IDS_FILE_BROWSER_SEARCH_V2_EDUCATION_NUDGE);
+  SET_STRING("SEARCH_RESULTS_MULTIPLE_SELECTION",
+             IDS_FILE_BROWSER_SEARCH_RESULTS_MULTIPLE_SELECTION);
 
   SET_STRING("SELECT_ALL_COMMAND_LABEL",
              IDS_FILE_BROWSER_SELECT_ALL_COMMAND_LABEL);
@@ -1194,6 +1196,8 @@ void AddFileManagerFeatureStrings(const std::string& locale,
             base::FeatureList::IsEnabled(ash::features::kFilesSearchV2));
   dict->Set("FILES_TRASH_ENABLED",
             base::FeatureList::IsEnabled(ash::features::kFilesTrash));
+  dict->Set("FILES_TRASH_DRIVE_ENABLED",
+            base::FeatureList::IsEnabled(ash::features::kFilesTrashDrive));
   dict->Set(
       "FILES_SINGLE_PARTITION_FORMAT_ENABLED",
       base::FeatureList::IsEnabled(ash::features::kFilesSinglePartitionFormat));

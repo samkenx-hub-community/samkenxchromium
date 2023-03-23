@@ -630,6 +630,12 @@ ExtensionFunction::ResponseAction FileManagerPrivateSearchDriveFunction::Run() {
 
   auto query = drivefs::mojom::QueryParameters::New();
   query->text_content = params->search_params.query;
+  if (params->search_params.modified_timestamp.has_value()) {
+    query->modified_time =
+        base::Time::FromJsTime(*params->search_params.modified_timestamp);
+    query->modified_time_operator =
+        drivefs::mojom::QueryParameters::DateComparisonOperator::kGreaterThan;
+  }
   ash::RecentSource::FileType file_type;
   if (!file_manager::util::ToRecentSourceFileType(
           params->search_params.category, &file_type)) {
@@ -988,17 +994,6 @@ FileManagerPrivatePollDriveHostedFilePinStatesFunction::Run() {
   if (integration_service) {
     integration_service->PollHostedFilePinStates();
   }
-  return RespondNow(WithArguments());
-}
-
-ExtensionFunction::ResponseAction
-FileManagerPrivateToggleBulkPinningFunction::Run() {
-  using api::file_manager_private::ToggleBulkPinning::Params;
-  const absl::optional<Params> params = Params::Create(args());
-
-  Profile* const profile = Profile::FromBrowserContext(browser_context());
-  profile->GetPrefs()->SetBoolean(drive::prefs::kDriveFsBulkPinningEnabled,
-                                  params.value().should_enable);
   return RespondNow(WithArguments());
 }
 

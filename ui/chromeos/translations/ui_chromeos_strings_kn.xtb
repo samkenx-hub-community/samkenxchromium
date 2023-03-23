@@ -42,7 +42,7 @@
 <translation id="1363028406613469049">ಟ್ರ್ಯಾಕ್</translation>
 <translation id="1378727793141957596">Google ಡ್ರೈವ್‌ಗೆ ಸುಸ್ವಾಗತ!</translation>
 <translation id="1379911846207762492">ನಿಮ್ಮ ಬಳಿ ಇಂಟರ್ನೆಟ್ ಕನೆಕ್ಷನ್ ಇಲ್ಲದಿದ್ದಾಗ, ಪ್ರವೇಶಕ್ಕಾಗಿ ಫೈಲ್‌ಗಳನ್ನು ಆಫ್‌ಲೈನ್‌ನಲ್ಲಿ ಲಭ್ಯವಾಗುವಂತೆ ನೀವು ಮಾಡಬಹುದು.</translation>
-<translation id="1383876407941801731">Search</translation>
+<translation id="1383876407941801731">ಹುಡುಕಿ</translation>
 <translation id="1388045380422025115">ಎಲ್ಲಾ ಪ್ರಕಾರಗಳು</translation>
 <translation id="1395262318152388157">ಸೀಕ್ ಸ್ಲೈಡರ್</translation>
 <translation id="1399511500114202393">ಯಾವುದೇ ಬಳಕೆದಾರ ಪ್ರಮಾಣಪತ್ರವಿಲ್ಲ</translation>
@@ -119,7 +119,6 @@
 <translation id="1942765061641586207">ಚಿತ್ರದ ರೆಸಲ್ಯೂಷನ್‌‌</translation>
 <translation id="1972984168337863910">ಫೈಲ್‌ಗಳ ಪ್ರತಿಕ್ರಿಯೆ ಫಲಕಗಳನ್ನು ವಿಸ್ತರಿಸಿ</translation>
 <translation id="1995337122023280937">ಫೈಲ್ ಸ್ಥಳಕ್ಕೆ ಹೋಗಿ</translation>
-<translation id="1999709132469742660">ಎಲ್ಲಾ URL ಗಳ ಮೂಲಕ ಫೈಲ್ ಅನ್ನು ಆ್ಯಕ್ಸೆಸ್ ಮಾಡುವುದು</translation>
 <translation id="2001796770603320721">ಡ್ರೈವ್‌ನಲ್ಲಿ ನಿರ್ವಹಿಸಿ</translation>
 <translation id="2009067268969781306">ಡ್ರೈವ್ ಅನ್ನು ಫಾರ್ಮ್ಯಾಟ್ ಮಾಡುವುದರಿಂದ, ಅದರಲ್ಲಿ ಸಂಗ್ರಣೆಯಾಗಿರುವ ಎಲ್ಲಾ ಡೇಟಾವನ್ನು ಅಳಿಸಲಾಗುತ್ತದೆ. ಈ ಕ್ರಿಯೆಯನ್ನು ರದ್ದುಪಡಿಸಲಾಗುವುದಿಲ್ಲ.</translation>
 <translation id="2025955442973426285">ಟಿಗ್ರಿನ್ಯಾ</translation>
@@ -151,6 +150,7 @@
 <translation id="2236732657580416950">ನಿಮ್ಮ Google Drive ಕ್ಯಾಷ್ ಅನ್ನು ತೆರವುಗೊಳಿಸಲಾಗಿದೆ.</translation>
 <translation id="2239068707900391003">ಕಾಫಿ ಕುಡಿಯುತ್ತಿರುವ ವ್ಯಕ್ತಿ</translation>
 <translation id="2251368349685848079">ಅನುಪಯುಕ್ತದಿಂದ ಮರುಸ್ಥಾಪಿಸಿ</translation>
+<translation id="2278133026967558505">ಎಲ್ಲಾ ವೆಬ್‌ಸೈಟ್‌ಗಳು ಹಾಗೂ URL ಗಳಿಂದ ಫೈಲ್ ಅನ್ನು ಆ್ಯಕ್ಸೆಸ್ ಮಾಡಿ</translation>
 <translation id="2282155092769082568">ಸ್ವಯಂ ಕಾನ್ಫಿಗರೇಶನ್ URL:</translation>
 <translation id="2284767815536050991">ತೆಗೆದುಹಾಕಬಹುದಾದ ಸಂಗ್ರಹಣೆ</translation>
 <translation id="2288278176040912387">ರೆಕಾರ್ಡ್ ಪ್ಲೇಯರ್</translation>
@@ -396,7 +396,7 @@
 <translation id="4348495354623233847">ಅರೇಬಿಕ್-ಆಧಾರಿತ ಕೀಬೋರ್ಡ್‌ನಲ್ಲಿ ಸೊರಾನಿ ಕುರ್ದಿಶ್</translation>
 <translation id="434941167647142660">ಮೂಲ ಸ್ಥಳ</translation>
 <translation id="4363958938297989186">ಫೋನೆಟಿಕ್ ಕೀಬೋರ್ಡ್‌ನಲ್ಲಿ ರಷ್ಯನ್</translation>
-<translation id="4364327530094270451">ಕರಬೂಜ ಹಣ್ಣು</translation>
+<translation id="4364327530094270451">ಕಲ್ಲಂಗಡಿ ಹಣ್ಣು</translation>
 <translation id="4378551569595875038">ಕನೆಕ್ಟ್...</translation>
 <translation id="4380245540200674032"><ph name="NETWORK_COUNT" /> ರಲ್ಲಿ <ph name="NETWORK_INDEX" /> ನೆಟ್‌ವರ್ಕ್, <ph name="NETWORK_NAME" />, <ph name="NETWORK_PROVIDER_NAME" />, <ph name="CONNECTION_STATUS" />, ಸಿಗ್ನಲ್ ಸಾಮರ್ಥ್ಯ <ph name="SIGNAL_STRENGTH" />%, ನಿಮ್ಮ ನಿರ್ವಾಹಕರು ನಿರ್ವಹಿಸುತ್ತಿದ್ದಾರೆ, ವಿವರಗಳು</translation>
 <translation id="4387004326333427325">ದೃಢೀಕರಣ ಪ್ರಮಾಣಪತ್ರವನ್ನು ರಿಮೋಟ್ ಆಗಿ ತಿರಸ್ಕರಿಸಲಾಗಿದೆ</translation>
@@ -545,7 +545,6 @@
 <translation id="5323213332664049067">ಲ್ಯಾಟಿನ್ ಅಮೇರಿಕನ್</translation>
 <translation id="5330145655348521461">ಈ ಫೈಲ್‍‍ಗಳನ್ನು ವಿವಿಧ ಡೆಸ್ಕ್‌ಟಾಪ್‍‍ಗಳಲ್ಲಿ ತೆರೆಯಲಾಗಿದೆ. ಅದನ್ನು ವೀಕ್ಷಿಸಲು <ph name="USER_NAME" /> (<ph name="MAIL_ADDRESS" />) ಗೆ ಸರಿಸಿ.</translation>
 <translation id="5330512191124428349">ಮಾಹಿತಿ ಪಡೆಯಿರಿ</translation>
-<translation id="5337538975554986899"><ph name="NON_RESTRICTED_DESTINATIONS" /> ಹೊರತುಪಡಿಸಿ ಎಲ್ಲಾ URL ಗಳ ಮೂಲಕ ಫೈಲ್ ಅನ್ನು ಆ್ಯಕ್ಸೆಸ್ ಮಾಡುವುದು</translation>
 <translation id="5344246330454251646">Bruschetta ಹಂಚಿಕೆಯನ್ನು ನಿರ್ವಹಿಸಿ</translation>
 <translation id="535792325654997756">ಬೆಕ್ಕುಗಳ ಜೊತೆಯಲ್ಲಿರುವ ವ್ಯಕ್ತಿ</translation>
 <translation id="5358764674931277">ಫ್ರೇಮ್‌ ರೇಟ್</translation>
@@ -629,6 +628,7 @@
 <translation id="603895874132768835">ಹೊಸ ಪಿನ್ ಅನ್ನು ಸೆಟಪ್ ಮಾಡುವವರೆಗೆ ಈ ನೆಟ್‌ವರ್ಕ್ ಅನ್ನು ಬಳಸಲು ನಿಮಗೆ ಸಾಧ್ಯವಾಗುವುದಿಲ್ಲ</translation>
 <translation id="6040143037577758943">ಮುಚ್ಚಿರಿ</translation>
 <translation id="6055907707645252013"><ph name="NETWORK_TYPE" /> ನೆಟ್‌ವರ್ಕ್, ಸಂಪರ್ಕಗೊಂಡಿಲ್ಲ</translation>
+<translation id="6073060579181816027">ಬಹು ಫೈಲ್ ಸ್ಥಳಗಳು</translation>
 <translation id="6074825444536523002">Google ಫಾರ್ಮ್</translation>
 <translation id="6079871810119356840">Qwerty ಕೀಬೋರ್ಡ್‌ನಲ್ಲಿ ಹಂಗೇರಿಯನ್</translation>
 <translation id="6096979789310008754">ಹುಡುಕಾಟ ಪಠ್ಯವನ್ನು ತೆರವುಗೊಳಿಸಲಾಗಿದೆ, ಎಲ್ಲಾ ಫೈಲ್‌ಗಳು ಮತ್ತು ಫೋಲ್ಡರ್‌ಗಳನ್ನು ತೋರಿಸಲಾಗುತ್ತಿದೆ.</translation>
@@ -769,6 +769,7 @@
 <translation id="7162080671816799010">ದೃಢೀಕರಣದ ಸರ್ವರ್ ಗುರುತನ್ನು ಮೌಲ್ಯೀಕರಿಸಲು 'ವಿಷಯ ಬದಲಿಯ ಹೆಸರಿನ ಹೊಂದಾಣಿಕೆ' ಅಥವಾ 'ಡೊಮೇನ್ ಸಫಿಕ್ಸ್ ಹೊಂದಾಣಿಕೆ' ಕಾಣೆಯಾಗಿದೆ</translation>
 <translation id="7165320105431587207">ನೆಟ್‌ವರ್ಕ್ ಕಾನ್ಫಿಗರ್ ಮಾಡಲು ವಿಫಲವಾಗಿದೆ</translation>
 <translation id="7170041865419449892">ವ್ಯಾಪ್ತಿಯ ಹೊರಗಿದೆ</translation>
+<translation id="7179579940054351344"><ph name="NON_RESTRICTED_DESTINATIONS" /> ಅನ್ನು ಹೊರತುಪಡಿಸಿ ಎಲ್ಲಾ ವೆಬ್‌ಸೈಟ್‌ಗಳು ಹಾಗೂ URL ಗಳಿಂದ ಫೈಲ್ ಅನ್ನು ಆ್ಯಕ್ಸೆಸ್ ಮಾಡಿ</translation>
 <translation id="7180611975245234373">ರಿಫ್ರೆಶ್ ಮಾಡಿ</translation>
 <translation id="7189874332498648577"><ph name="NUMBER_OF_GB" /> GB</translation>
 <translation id="7191454237977785534">ಇದರಂತೆ ಫೈಲ್ ಉಳಿಸಿ</translation>
@@ -942,6 +943,7 @@
 <translation id="8492972329130824181">ಗೃಹ ನೆಟ್‌ವರ್ಕ್ ಲಭ್ಯವಿಲ್ಲ. ಕನೆಕ್ಟ್ ಮಾಡಲು ಮೊಬೈಲ್ ಡೇಟಾ ರೋಮಿಂಗ್ ಅನ್ನು ಸಕ್ರಿಯಗೊಳಿಸಬೇಕಾಗುತ್ತದೆ.</translation>
 <translation id="8499098729323186194"><ph name="NUMBER_OF_ITEMS" /> ಐಟಂಗಳನ್ನು ಬೇರ್ಪಡಿಸಲಾಗುತ್ತಿದೆ...</translation>
 <translation id="8502913769543567768"><ph name="NETWORK_COUNT" /> ರಲ್ಲಿ <ph name="NETWORK_INDEX" /> ನೆಟ್‌ವರ್ಕ್, <ph name="NETWORK_NAME" />, <ph name="NETWORK_PROVIDER_NAME" />, ಸಾಧನದ ಸೆಟಪ್ ನಂತರ ಸಕ್ರಿಯಗೊಳಿಸಿ, ನಿಮ್ಮ ನಿರ್ವಾಹಕರು ನಿರ್ವಹಿಸಿಸುತ್ತಿದ್ದಾರೆ</translation>
+<translation id="8512483403832814140">ಯಾವುದೇ ಸಮಯದಲ್ಲಿ</translation>
 <translation id="8521441079177373948">UK</translation>
 <translation id="853494022971700746">ಫ್ರೆಂಚ್ (ಫ್ರಾನ್ಸ್)</translation>
 <translation id="8540608333167683902"><ph name="NETWORK_COUNT" /> ರಲ್ಲಿ <ph name="NETWORK_INDEX" /> ನೆಟ್‌ವರ್ಕ್, <ph name="NETWORK_NAME" />, <ph name="CONNECTION_STATUS" />, ಸಿಗ್ನಲ್ ಸಾಮರ್ಥ್ಯ <ph name="SIGNAL_STRENGTH" />%, ವಿವರಗಳು</translation>

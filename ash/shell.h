@@ -144,11 +144,13 @@ class FrameThrottlingController;
 class FullscreenMagnifierController;
 class GeolocationController;
 class GlanceablesController;
+class GlanceablesV2Controller;
 class ColorEnhancementController;
 class HoldingSpaceController;
 class HumanPresenceOrientationController;
 class ImeControllerImpl;
 class InputDeviceSettingsControllerImpl;
+class InputDeviceSettingsDispatcher;
 class InputDeviceTracker;
 class WebAuthNDialogControllerImpl;
 class KeyAccessibilityEnabler;
@@ -200,6 +202,7 @@ class RefreshRateThrottleController;
 class ResizeShadowController;
 class ResolutionNotificationController;
 class RootWindowController;
+class SavedDeskController;
 class SavedDeskDelegate;
 class ScreenLayoutObserver;
 class ScreenOrientationController;
@@ -231,6 +234,7 @@ class ClipboardHistoryControllerImpl;
 class TouchDevicesController;
 class TouchSelectionMagnifierRunnerAsh;
 class TrayAction;
+class UserEducationController;
 class UserMetricsRecorder;
 class VideoActivityNotifier;
 class VideoDetector;
@@ -438,6 +442,9 @@ class ASH_EXPORT Shell : public SessionObserver,
   PersistentDesksBarController* persistent_desks_bar_controller() {
     return persistent_desks_bar_controller_.get();
   }
+  SavedDeskController* saved_desk_controller() {
+    return saved_desk_controller_.get();
+  }
   SavedDeskDelegate* saved_desk_delegate() {
     return saved_desk_delegate_.get();
   }
@@ -520,6 +527,9 @@ class ASH_EXPORT Shell : public SessionObserver,
   }
   GlanceablesController* glanceables_controller() {
     return glanceables_controller_.get();
+  }
+  GlanceablesV2Controller* glanceables_v2_controller() {
+    return glanceables_v2_controller_.get();
   }
   ColorEnhancementController* color_enhancement_controller() {
     return color_enhancement_controller_.get();
@@ -871,7 +881,8 @@ class ASH_EXPORT Shell : public SessionObserver,
   std::unique_ptr<EventRewriterControllerImpl> event_rewriter_controller_;
   std::unique_ptr<InputDeviceSettingsControllerImpl>
       input_device_settings_controller_;
-
+  std::unique_ptr<InputDeviceSettingsDispatcher>
+      input_device_settings_dispatcher_;
   std::unique_ptr<InputDeviceTracker> input_device_tracker_;
   std::unique_ptr<KeyboardModifierMetricsRecorder>
       keyboard_modifier_metrics_recorder_;
@@ -902,6 +913,7 @@ class ASH_EXPORT Shell : public SessionObserver,
       security_curtain_controller_;
   std::unique_ptr<DarkLightModeControllerImpl> dark_light_mode_controller_;
   std::unique_ptr<DesksController> desks_controller_;
+  std::unique_ptr<SavedDeskController> saved_desk_controller_;
   std::unique_ptr<SavedDeskDelegate> saved_desk_delegate_;
   std::unique_ptr<DetachableBaseHandler> detachable_base_handler_;
   std::unique_ptr<DetachableBaseNotificationController>
@@ -919,6 +931,7 @@ class ASH_EXPORT Shell : public SessionObserver,
   std::unique_ptr<GameDashboardController> game_dashboard_controller_;
   std::unique_ptr<GeolocationController> geolocation_controller_;
   std::unique_ptr<GlanceablesController> glanceables_controller_;
+  std::unique_ptr<GlanceablesV2Controller> glanceables_v2_controller_;
   std::unique_ptr<HoldingSpaceController> holding_space_controller_;
   std::unique_ptr<PowerPrefs> power_prefs_;
   std::unique_ptr<SnapGroupController> snap_group_controller_;
@@ -988,6 +1001,7 @@ class ASH_EXPORT Shell : public SessionObserver,
   std::unique_ptr<ClipboardHistoryControllerImpl> clipboard_history_controller_;
   std::unique_ptr<TouchDevicesController> touch_devices_controller_;
   std::unique_ptr<TrayAction> tray_action_;
+  std::unique_ptr<UserEducationController> user_education_controller_;
   std::unique_ptr<WallpaperControllerImpl> wallpaper_controller_;
   std::unique_ptr<WindowCycleController> window_cycle_controller_;
   std::unique_ptr<WindowRestoreController> window_restore_controller_;

@@ -102,35 +102,40 @@ class BaselineOptimizer:
                  host: Host,
                  default_port: Port,
                  port_names,
-                 exp_cache: Optional[TestExpectationsCache] = None):
+                 exp_cache: Optional[TestExpectationsCache] = None,
+                 check: bool = False):
         self._filesystem = host.filesystem
         self._finder = PathFinder(self._filesystem)
         self._default_port = default_port
         self._host = host
         self._ports = []
         for port_name in port_names:
-            self._ports.append(host.port_factory.get(port_name))
-        for flag_specific in host.builders.all_flag_specific_options():
-            port_name = host.builders.port_name_for_flag_specific_option(
-                flag_specific)
-            if port_name in port_names:
-                self._ports.append(
-                    self._make_flag_spec_port(host, flag_specific))
+            self._ports.append(self.port(port_name))
+            flag_spec_options = (
+                host.builders.flag_specific_options_for_port_name(port_name))
+            self._ports.extend(
+                self.port(port_name, flag_specific)
+                for flag_specific in flag_spec_options)
         self._exp_cache = exp_cache or TestExpectationsCache()
+        self._check = check
 
-    def _make_flag_spec_port(self, host: Host,
-                             flag_specific_config: str) -> Port:
-        port_name = host.builders.port_name_for_flag_specific_option(
-            flag_specific_config)
-        port = host.port_factory.get(port_name)
-        port.set_option_default('flag_specific', flag_specific_config)
+    @memoized
+    def port(self,
+             port_name: str,
+             flag_specific: Optional[str] = None) -> Port:
+        port = self._host.port_factory.get(port_name)
+        if flag_specific:
+            port.set_option_default('flag_specific', flag_specific)
         return port
 
     def optimize(self, test_name: str, suffix: str) -> bool:
         # For CLI compatibility, "suffix" is an extension without the leading
         # dot. Yet we use dotted extension everywhere else in the codebase.
         # TODO(robertma): Investigate changing the CLI.
-        _log.debug('Optimizing %s (%s).', test_name, suffix)
+        if self._check:
+            _log.info('Checking %s (%s)', test_name, suffix)
+        else:
+            _log.info('Optimizing %s (%s)', test_name, suffix)
         assert not suffix.startswith('.')
         extension = '.' + suffix
 
@@ -148,19 +153,21 @@ class BaselineOptimizer:
                 return True
 
             predecessors_by_root = _predecessors_by_root(paths)
-            for root, predecessors in predecessors_by_root.items():
-                self._maybe_promote_root(root, predecessors, digests,
-                                         baseline_name)
-            for location in find_redundant_locations(paths, digests):
-                self._filesystem.remove(self.path(location, baseline_name))
-                _log.debug('Removed %s (redundant)', location)
+            can_optimize = any([
+                self._handle_root(root, predecessors, digests, baseline_name)
+                for root, predecessors in predecessors_by_root.items()
+            ])
+            redundant_locations = find_redundant_locations(paths, digests)
+            can_optimize = can_optimize or len(redundant_locations) > 0
+            for location in redundant_locations:
+                self._remove(location, baseline_name, 'redundant')
 
             _log.debug('Digests:')
             with _indent_log():
                 for location in sorted(digests):
                     if location != BaselineLocation.ALL_PASS:
                         _log.debug('%s -> %s', location, digests[location])
-        return True
+        return not self._check or not can_optimize
 
     def get_tests_to_optimize(self, test_name: str) -> Tuple[str, List[str]]:
         """Translate a test name into all associated tests to optimize.
@@ -269,13 +276,18 @@ class BaselineOptimizer:
                     self._filesystem, path, is_reftest)
         return digests
 
-    def _maybe_promote_root(
-            self,
-            root: BaselineLocation,
-            predecessors: FrozenSet[BaselineLocation],
-            digests: DigestMap,
-            baseline_name: str,
-    ) -> None:
+    def _handle_root(
+        self,
+        root: BaselineLocation,
+        predecessors: FrozenSet[BaselineLocation],
+        digests: DigestMap,
+        baseline_name: str,
+    ) -> bool:
+        """Determine whether to create or remove a generic baseline.
+
+        Returns:
+            Whether a change could be made on disk.
+        """
         predecessor_digest = _value_if_same(
             [digests.get(predecessor) for predecessor in predecessors])
         root_digest = digests.get(root)
@@ -284,23 +296,53 @@ class BaselineOptimizer:
             # any predecessor can be copied into the root's position. The
             # predecessors will be removed later in the redundant baseline
             # removal phase.
-            predecessor, *_ = predecessors
-            source = self.path(predecessor, baseline_name)
-            dest = self.path(root, baseline_name)
-            self._filesystem.maybe_make_directory(
-                self._filesystem.dirname(dest))
-            self._filesystem.copyfile(source, dest)
+            self._promote(root, predecessors, baseline_name)
             digests[root] = predecessor_digest
-            _log.debug('Promoted %s from %s', root,
-                       ', '.join(map(str, predecessors)))
+            return True
         elif root_digest and all(
                 digests.get(predecessor, root_digest) != root_digest
                 for predecessor in predecessors):
             # Remove the root if it can never (and should never) be reached.
-            # If at least one predecessor has the same digest, that
-            # predecessor will be deleted later instead of the root.
-            self._filesystem.remove(self.path(root, baseline_name))
-            _log.debug('Removed %s (unreachable)', root)
+            # If a predecessor has the same digest as the root, that predecessor
+            # will be deleted later instead of the root.
+            self._remove(root, baseline_name, 'unreachable')
+            return True
+        return False
+
+    def _promote(
+        self,
+        root: BaselineLocation,
+        predecessors: FrozenSet[BaselineLocation],
+        baseline_name: str,
+    ) -> None:
+        predecessor, *_ = predecessors
+        source = self.path(predecessor, baseline_name)
+        dest = self.path(root, baseline_name)
+        if self._check:
+            # Show the full path instead of the abbreviated representation so
+            # that the recommendation is actionable.
+            _log.info('Can promote %s from %s', dest,
+                      ', '.join(map(str, sorted(predecessors))))
+        else:
+            self._filesystem.maybe_make_directory(
+                self._filesystem.dirname(dest))
+            self._filesystem.copyfile(source, dest)
+            _log.info('Promoted %s from %s', root,
+                      ', '.join(map(str, sorted(predecessors))))
+
+    def _remove(
+        self,
+        location: BaselineLocation,
+        baseline_name: str,
+        explanation: str,
+    ) -> None:
+        path = self.path(location, baseline_name)
+        if self._check:
+            # As with `_promote(...)`, show the full path.
+            _log.info('Can remove %s (%s)', path, explanation)
+        else:
+            self._filesystem.remove(path)
+            _log.info('Removed %s (%s)', location, explanation)
 
     @memoized
     def path(self, location: BaselineLocation, baseline_name: str) -> str:

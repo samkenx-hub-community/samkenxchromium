@@ -119,7 +119,6 @@
 <translation id="1942765061641586207">Resolución de imagen</translation>
 <translation id="1972984168337863910">Ampliar paneles de comentarios de archivos</translation>
 <translation id="1995337122023280937">Ir a la ubicación del archivo</translation>
-<translation id="1999709132469742660">Acceso a los archivos mediante todas las URLs</translation>
 <translation id="2001796770603320721">Gestionar en Drive</translation>
 <translation id="2009067268969781306">Al formatear una unidad, se eliminarán todos los datos almacenados. Esta acción no se puede deshacer.</translation>
 <translation id="2025955442973426285">Tigriña</translation>
@@ -151,6 +150,7 @@
 <translation id="2236732657580416950">Se ha borrado la caché de tu Google Drive.</translation>
 <translation id="2239068707900391003">Persona con un café</translation>
 <translation id="2251368349685848079">Restaurar de la papelera</translation>
+<translation id="2278133026967558505">Acceso a los archivos mediante todos los sitios web y URLs</translation>
 <translation id="2282155092769082568">URL de configuración automática:</translation>
 <translation id="2284767815536050991">almacenamiento extraíble</translation>
 <translation id="2288278176040912387">Tocadiscos</translation>
@@ -543,7 +543,6 @@
 <translation id="5323213332664049067">español (Latinoamérica)</translation>
 <translation id="5330145655348521461">Estos archivos se han abierto en un escritorio diferente. Ve a <ph name="USER_NAME" /> (<ph name="MAIL_ADDRESS" />) para verlo.</translation>
 <translation id="5330512191124428349">Obtener información</translation>
-<translation id="5337538975554986899">Acceso a los archivos mediante todas las URLs, excepto <ph name="NON_RESTRICTED_DESTINATIONS" /></translation>
 <translation id="5344246330454251646">Gestionar el contenido compartido con Bruschetta</translation>
 <translation id="535792325654997756">Persona con gatos</translation>
 <translation id="5358764674931277">Velocidad de fotogramas</translation>
@@ -769,6 +768,7 @@
 <translation id="7162080671816799010">Faltan los campos "Coincidencia de nombre alternativo del sujeto" o "Coincidencia de sufijo de dominio" para validar la identidad del servidor de autenticación</translation>
 <translation id="7165320105431587207">Error al configurar la red</translation>
 <translation id="7170041865419449892">Fuera del alcance</translation>
+<translation id="7179579940054351344">Acceso a los archivos mediante todos los sitios web y URLs, excepto <ph name="NON_RESTRICTED_DESTINATIONS" /></translation>
 <translation id="7180611975245234373">Actualizar</translation>
 <translation id="7189874332498648577"><ph name="NUMBER_OF_GB" /> GB</translation>
 <translation id="7191454237977785534">Guardar archivo como</translation>
@@ -942,6 +942,7 @@
 <translation id="8492972329130824181">La red doméstica no está disponible. Para conectarte, debes habilitar el roaming de datos móviles.</translation>
 <translation id="8499098729323186194">Extrayendo <ph name="NUMBER_OF_ITEMS" /> elementos...</translation>
 <translation id="8502913769543567768">Red <ph name="NETWORK_INDEX" /> de <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, <ph name="NETWORK_PROVIDER_NAME" />, Activar tras la configuración del dispositivo, Gestionada por el administrador</translation>
+<translation id="8512483403832814140">Cualquier fecha</translation>
 <translation id="8521441079177373948">Reino Unido</translation>
 <translation id="853494022971700746">Francés (Francia)</translation>
 <translation id="8540608333167683902">Red <ph name="NETWORK_INDEX" /> de <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, <ph name="CONNECTION_STATUS" />, intensidad de la señal: <ph name="SIGNAL_STRENGTH" /> %, detalles</translation>

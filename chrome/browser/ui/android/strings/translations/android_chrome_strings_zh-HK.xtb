@@ -283,6 +283,7 @@ Private State Token 能夠改善網絡上的私隱，而且系統無法透過信
 <translation id="2581165646603367611">這會清除 Chrome 認為不重要的網站內的 Cookie、快取和其他資料。</translation>
 <translation id="2587052924345400782">全新版本現已推出</translation>
 <translation id="2593272815202181319">等寬</translation>
+<translation id="2603212228005142861">登入即可管理偏好設定</translation>
 <translation id="2604446170045642109">您可在設定中關閉網站深色主題背景。</translation>
 <translation id="2612676031748830579">信用卡號碼</translation>
 <translation id="2625189173221582860">已複製密碼</translation>
@@ -476,6 +477,7 @@ Private State Token 能夠改善網絡上的私隱，而且系統無法透過信
 <translation id="3587596251841506391">協助改善網絡安全</translation>
 <translation id="3597179440835065298">取得更貼近需要的建議</translation>
 <translation id="3602290021589620013">預覽</translation>
+<translation id="360901359071773787">要刪除過去 15 分鐘的瀏覽資料嗎？</translation>
 <translation id="3616113530831147358">音效檔案</translation>
 <translation id="3622349720008044802">管理視窗</translation>
 <translation id="3631987586758005671">正在分享至 <ph name="DEVICE_NAME" /></translation>
@@ -630,6 +632,7 @@ Private State Token 能夠改善網絡上的私隱，而且系統無法透過信
 
 不過，您仍可前往 <ph name="BEGIN_LINK" />history.google.com<ph name="END_LINK" /> 存取 Google 帳戶中保存的其他各種瀏覽紀錄，例如在其他 Google 服務中的搜尋和活動紀錄。</translation>
 <translation id="452750746583162491">查看您已同步的資料</translation>
+<translation id="4528638190900283934">登入即可使用額外的實用功能</translation>
 <translation id="4532845899244822526">選擇資料夾</translation>
 <translation id="4547551584605870320">{TAB_COUNT,plural, =1{<ph name="TAB_COUNT_ONE" /> 個分頁}other{<ph name="TAB_COUNT_MANY" /> 個分頁、<ph name="TAB_COUNT_INCOGNITO" /> 個無痕式分頁}}</translation>
 <translation id="4554077758708533499">已使用 USB 連接線連接</translation>
@@ -820,6 +823,7 @@ Private State Token 能夠改善網絡上的私隱，而且系統無法透過信
 <translation id="5517095782334947753">您有來自 <ph name="FROM_ACCOUNT" /> 的書籤、記錄、密碼和其他設定。</translation>
 <translation id="5524761631371622910">在試用期間，如果 Chrome 隨機將您加入試用行列，您的瀏覽記錄會影響所看到的廣告，以及系統推測的以下興趣。為保障您的私隱，Chrome 每個月都會自動刪除您的興趣。</translation>
 <translation id="5524843473235508879">已禁止重新導向。</translation>
+<translation id="554297709083131118">系統將刪除以下過去 15 分鐘的瀏覽資料</translation>
 <translation id="5548606607480005320">安全檢查</translation>
 <translation id="5555525474779371165">選取您的「安全瀏覽」功能</translation>
 <translation id="5556459405103347317">重新載入</translation>
@@ -1074,6 +1078,7 @@ Private State Token 能夠改善網絡上的私隱，而且系統無法透過信
 <translation id="6824899148643461612"><ph name="TAB_TITLE" />，分頁，已選取</translation>
 <translation id="6828070228333235514">停止追蹤價格</translation>
 <translation id="6830728435402077660">不安全</translation>
+<translation id="6831043979455480757">翻譯</translation>
 <translation id="6833996806551876956">私隱沙箱試用</translation>
 <translation id="6836206421467243968">還原分頁群組 <ph name="TITLE_OF_GROUP" /> 做新嘅背景分頁群組。</translation>
 <translation id="6846298663435243399">載入中…</translation>
@@ -1241,10 +1246,10 @@ Private State Token 能夠改善網絡上的私隱，而且系統無法透過信
 <translation id="7707922173985738739">使用流動數據</translation>
 <translation id="7709094866268987903">系統會在此處顯示您已移除的興趣</translation>
 <translation id="7709918231054955894">取得您所有的分頁</translation>
+<translation id="772434085369393266">將導覽升級為採用 HTTPS，並在載入不支援該協定的網站前發出警告。由於已啟用「進階保護」功能，因此您無法變更此設定。</translation>
 <translation id="7725024127233776428">加入書籤的網頁會在這裡顯示</translation>
 <translation id="7757787379047923882">透過 <ph name="DEVICE_NAME" /> 分享的文字</translation>
 <translation id="7762668264895820836">SD 卡 <ph name="SD_CARD_NUMBER" /></translation>
-<translation id="7762928140712606393">登入以使用其他功能並獲得 Chrome 最強大的安全防護</translation>
 <translation id="7764225426217299476">新增地址</translation>
 <translation id="7772032839648071052">確認複雜密碼</translation>
 <translation id="7772375229873196092">關閉 <ph name="APP_NAME" /></translation>
@@ -1260,6 +1265,7 @@ Private State Token 能夠改善網絡上的私隱，而且系統無法透過信
 <translation id="78270725016672455">您的電腦想註冊此裝置以登入網站</translation>
 <translation id="7844171778363018843">沒有選取要同步處理的資料</translation>
 <translation id="7846296061357476882">Google 服務</translation>
+<translation id="7847228556075070294">已刪除記錄、Cookie 和其他資料</translation>
 <translation id="784934925303690534">時間範圍</translation>
 <translation id="7851858861565204677">其他裝置</translation>
 <translation id="7853202427316060426">活動</translation>
@@ -1439,6 +1445,7 @@ Private State Token 能夠改善網絡上的私隱，而且系統無法透過信
 <translation id="869891660844655955">到期日</translation>
 <translation id="8699120352855309748">不要詢問是否翻譯這些語言</translation>
 <translation id="8712637175834984815">我知道了</translation>
+<translation id="8723453889042591629">快速翻譯此頁面。如要編輯此捷徑，請按住捷徑按鈕。</translation>
 <translation id="8725066075913043281">再試一次</translation>
 <translation id="8746155870861185046">分享突顯項目</translation>
 <translation id="874726034427945498">如要讓網址列顯示更貼近需要的建議，請同步分頁和記錄</translation>

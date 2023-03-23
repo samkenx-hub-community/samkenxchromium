@@ -38,6 +38,7 @@ namespace video_conference {
 class BubbleViewTest;
 class ReturnToAppPanelTest;
 class ResourceDependencyTest;
+class ToggleEffectsViewTest;
 }  // namespace video_conference
 
 class Shelf;
@@ -97,6 +98,7 @@ class ASH_EXPORT VideoConferenceTray
   VideoConferenceTrayButton* audio_icon() { return audio_icon_; }
   VideoConferenceTrayButton* camera_icon() { return camera_icon_; }
   VideoConferenceTrayButton* screen_share_icon() { return screen_share_icon_; }
+  IconButton* toggle_bubble_button() { return toggle_bubble_button_; }
 
   // TrayBackgroundView:
   void CloseBubble() override;
@@ -129,6 +131,7 @@ class ASH_EXPORT VideoConferenceTray
   friend class video_conference::BubbleViewTest;
   friend class video_conference::ReturnToAppPanelTest;
   friend class video_conference::ResourceDependencyTest;
+  friend class video_conference::ToggleEffectsViewTest;
   friend class VideoConferenceTrayTest;
 
   // SessionObserver:

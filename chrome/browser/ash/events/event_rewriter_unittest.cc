@@ -23,7 +23,6 @@
 #include "base/test/scoped_feature_list.h"
 #include "chrome/browser/ash/events/event_rewriter_delegate_impl.h"
 #include "chrome/browser/ash/input_method/input_method_configuration.h"
-#include "chrome/browser/ash/input_method/mock_input_method_manager_impl.h"
 #include "chrome/browser/ash/login/users/fake_chrome_user_manager.h"
 #include "chrome/browser/ash/notifications/deprecation_notification_controller.h"
 #include "chrome/browser/ash/preferences.h"
@@ -38,9 +37,11 @@
 #include "ui/aura/window_tree_host.h"
 #include "ui/base/accelerators/accelerator.h"
 #include "ui/base/ime/ash/fake_ime_keyboard.h"
+#include "ui/base/ime/ash/mock_input_method_manager_impl.h"
 #include "ui/base/ui_base_features.h"
 #include "ui/chromeos/events/event_rewriter_chromeos.h"
 #include "ui/chromeos/events/keyboard_capability.h"
+#include "ui/chromeos/events/mojom/modifier_key.mojom-shared.h"
 #include "ui/chromeos/events/mojom/modifier_key.mojom.h"
 #include "ui/chromeos/events/pref_names.h"
 #include "ui/events/devices/device_data_manager.h"
@@ -4581,6 +4582,37 @@ void EventRewriterTest::DontRewriteIfNotRewritten(int right_click_flags) {
     EXPECT_EQ(right_click_flags, right_click_flags & result.flags());
     EXPECT_EQ(ui::EF_LEFT_MOUSE_BUTTON, result.changed_button_flags());
   }
+
+  // Still rewrite to right button, even if the modifier key is already
+  // released when the mouse release event happens
+  // This is for regressions such as:
+  // https://crbug.com/1399284
+  // https://crbug.com/1417079
+  {
+    ui::MouseEvent press(ui::ET_MOUSE_PRESSED, gfx::Point(), gfx::Point(),
+                         ui::EventTimeForNow(), right_click_flags,
+                         ui::EF_LEFT_MOUSE_BUTTON);
+    ui::EventTestApi test_press(&press);
+    test_press.set_source_device_id(kTouchpadId1);
+    // Sanity check.
+    EXPECT_EQ(ui::ET_MOUSE_PRESSED, press.type());
+    EXPECT_EQ(right_click_flags, press.flags());
+    const ui::MouseEvent result = RewriteMouseButtonEvent(press);
+    EXPECT_TRUE(ui::EF_RIGHT_MOUSE_BUTTON & result.flags());
+    EXPECT_NE(right_click_flags, right_click_flags & result.flags());
+    EXPECT_EQ(ui::EF_RIGHT_MOUSE_BUTTON, result.changed_button_flags());
+  }
+  {
+    ui::MouseEvent release(ui::ET_MOUSE_RELEASED, gfx::Point(), gfx::Point(),
+                           ui::EventTimeForNow(), ui::EF_LEFT_MOUSE_BUTTON,
+                           ui::EF_LEFT_MOUSE_BUTTON);
+    ui::EventTestApi test_release(&release);
+    test_release.set_source_device_id(kTouchpadId1);
+    const ui::MouseEvent result = RewriteMouseButtonEvent(release);
+    EXPECT_TRUE(ui::EF_RIGHT_MOUSE_BUTTON & result.flags());
+    EXPECT_NE(right_click_flags, right_click_flags & result.flags());
+    EXPECT_EQ(ui::EF_RIGHT_MOUSE_BUTTON, result.changed_button_flags());
+  }
 }
 
 TEST_F(EventRewriterTest, DontRewriteIfNotRewritten_AltClickIsRightClick) {
@@ -5301,7 +5333,7 @@ class ExtensionRewriterInputTest : public EventRewriterAshTest,
 
   void SetModifierRemapping(const std::string& pref_name,
                             ui::mojom::ModifierKey value) {
-    modifier_remapping_[pref_name] = static_cast<int>(value);
+    modifier_remapping_[pref_name] = value;
   }
 
   void RegisterExtensionShortcut(ui::KeyboardCode key_code, int flags) {
@@ -5329,17 +5361,19 @@ class ExtensionRewriterInputTest : public EventRewriterAshTest,
  private:
   // ui::EventRewriterChromeOS::Delegate:
   bool RewriteModifierKeys() override { return true; }
-  bool RewriteMetaTopRowKeyComboEvents() const override { return true; }
+  bool RewriteMetaTopRowKeyComboEvents(int device_id) const override {
+    return true;
+  }
 
-  bool GetKeyboardRemappedPrefValue(const std::string& pref_name,
-                                    int* value) const override {
+  absl::optional<ui::mojom::ModifierKey> GetKeyboardRemappedModifierValue(
+      int device_id,
+      ui::mojom::ModifierKey modifier_key,
+      const std::string& pref_name) const override {
     auto it = modifier_remapping_.find(pref_name);
     if (it == modifier_remapping_.end()) {
-      return false;
+      return absl::nullopt;
     }
-
-    *value = it->second;
-    return true;
+    return it->second;
   }
 
   bool TopRowKeysAreFunctionKeys(int device_id) const override { return false; }
@@ -5358,7 +5392,7 @@ class ExtensionRewriterInputTest : public EventRewriterAshTest,
   void SuppressModifierKeyRewrites(bool should_suppress) override {}
   void SuppressMetaTopRowKeyComboRewrites(bool should_suppress) override {}
 
-  std::map<std::string, int> modifier_remapping_;
+  std::map<std::string, ui::mojom::ModifierKey> modifier_remapping_;
   base::flat_set<ui::Accelerator> registered_extension_shortcuts_;
 };
 
@@ -5770,6 +5804,7 @@ TEST_F(EventRewriterSettingsSplitTest, TopRowAreFKeys) {
       .WillRepeatedly(testing::Return(&settings));
 
   settings.top_row_are_fkeys = false;
+  settings.suppress_meta_fkey_rewrites = false;
   TestExternalGenericKeyboard(
       {{ui::ET_KEY_PRESSED,
         {ui::VKEY_F1, ui::DomCode::F1, ui::EF_NONE, ui::DomKey::F1},
@@ -5783,4 +5818,68 @@ TEST_F(EventRewriterSettingsSplitTest, TopRowAreFKeys) {
         {ui::VKEY_F1, ui::DomCode::F1, ui::EF_NONE, ui::DomKey::F1}}});
 }
 
+TEST_F(EventRewriterSettingsSplitTest, RewriteMetaTopRowKeyComboEvents) {
+  mojom::KeyboardSettings settings;
+  settings.top_row_are_fkeys = true;
+  EXPECT_CALL(*mock_controller_, GetKeyboardSettings(kKeyboardDeviceId))
+      .WillRepeatedly(testing::Return(&settings));
+
+  settings.suppress_meta_fkey_rewrites = false;
+  TestExternalGenericKeyboard(
+      {{ui::ET_KEY_PRESSED,
+        {ui::VKEY_F1, ui::DomCode::F1, ui::EF_COMMAND_DOWN, ui::DomKey::F1},
+        {ui::VKEY_BROWSER_BACK, ui::DomCode::BROWSER_BACK, ui::EF_NONE,
+         ui::DomKey::BROWSER_BACK}}});
+
+  settings.suppress_meta_fkey_rewrites = true;
+  TestExternalGenericKeyboard(
+      {{ui::ET_KEY_PRESSED,
+        {ui::VKEY_F1, ui::DomCode::F1, ui::EF_COMMAND_DOWN, ui::DomKey::F1},
+        {ui::VKEY_F1, ui::DomCode::F1, ui::EF_COMMAND_DOWN, ui::DomKey::F1}}});
+}
+
+TEST_F(EventRewriterSettingsSplitTest, ModifierRemapping) {
+  mojom::KeyboardSettings settings;
+  EXPECT_CALL(*mock_controller_, GetKeyboardSettings(kKeyboardDeviceId))
+      .WillRepeatedly(testing::Return(&settings));
+
+  settings.modifier_remappings = {
+      {ui::mojom::ModifierKey::kAlt, ui::mojom::ModifierKey::kControl},
+      {ui::mojom::ModifierKey::kMeta, ui::mojom::ModifierKey::kBackspace}};
+
+  // Test remapping modifier keys.
+  TestExternalGenericKeyboard({{ui::ET_KEY_PRESSED,
+                                {ui::VKEY_MENU, ui::DomCode::ALT_RIGHT,
+                                 ui::EF_ALT_DOWN, ui::DomKey::ALT},
+                                {ui::VKEY_CONTROL, ui::DomCode::CONTROL_RIGHT,
+                                 ui::EF_CONTROL_DOWN, ui::DomKey::CONTROL}},
+                               {ui::ET_KEY_PRESSED,
+                                {ui::VKEY_LWIN, ui::DomCode::META_LEFT,
+                                 ui::EF_COMMAND_DOWN, ui::DomKey::META},
+                                {ui::VKEY_BACK, ui::DomCode::BACKSPACE,
+                                 ui::EF_NONE, ui::DomKey::BACKSPACE}},
+                               {ui::ET_KEY_PRESSED,
+                                {ui::VKEY_CONTROL, ui::DomCode::CONTROL_LEFT,
+                                 ui::EF_CONTROL_DOWN, ui::DomKey::CONTROL},
+                                {ui::VKEY_CONTROL, ui::DomCode::CONTROL_LEFT,
+                                 ui::EF_CONTROL_DOWN, ui::DomKey::CONTROL}}});
+
+  // Test remapping modifier flags.
+  TestExternalGenericKeyboard(
+      {{ui::ET_KEY_PRESSED,
+        {ui::VKEY_A, ui::DomCode::US_A, ui::EF_ALT_DOWN,
+         ui::DomKey::Constant<'a'>::Character},
+        {ui::VKEY_A, ui::DomCode::US_A, ui::EF_CONTROL_DOWN,
+         ui::DomKey::Constant<'a'>::Character}},
+       {ui::ET_KEY_PRESSED,
+        {ui::VKEY_A, ui::DomCode::US_A, ui::EF_COMMAND_DOWN,
+         ui::DomKey::Constant<'a'>::Character},
+        {ui::VKEY_A, ui::DomCode::US_A, ui::EF_NONE,
+         ui::DomKey::Constant<'a'>::Character}},
+       {ui::ET_KEY_PRESSED,
+        {ui::VKEY_A, ui::DomCode::US_A, ui::EF_CONTROL_DOWN,
+         ui::DomKey::Constant<'a'>::Character},
+        {ui::VKEY_A, ui::DomCode::US_A, ui::EF_CONTROL_DOWN,
+         ui::DomKey::Constant<'a'>::Character}}});
+}
 }  // namespace ash

@@ -10930,6 +10930,20 @@ be describing additional metrics about the same event.
   </metric>
 </event>
 
+<event name="InputMethod.LongpressDiacritics">
+  <owner>jopalmer@google.com</owner>
+  <owner>essential-inputs-team@google.com</owner>
+  <summary>
+    Recorded when a user uses the long press diacritics feature to insert
+    diacritics via long press with a physical keyboard.
+  </summary>
+  <metric name="Actions" enum="IMEPKLongpressDiacriticAction">
+    <summary>
+      Action taken by the user to interact with this feature.
+    </summary>
+  </metric>
+</event>
+
 <event name="InputMethod.NonCompliantApi">
   <owner>shend@chromium.org</owner>
   <summary>
@@ -17648,10 +17662,16 @@ be describing additional metrics about the same event.
       True if this page is playing audio.
     </summary>
   </metric>
+  <metric name="PrivateFootprint">
+    <summary>
+      The total memory footprint of this page at the moment the sample was
+      recorded, in kilobytes.
+    </summary>
+  </metric>
   <metric name="ResidentSetSize">
     <summary>
-      The total resident set size footprint of this page at the moment the
-      sample was recorded, in kilobytes.
+      The total resident set size of this page at the moment the sample was
+      recorded, in kilobytes.
     </summary>
   </metric>
   <metric name="SliceId">
@@ -18785,6 +18805,17 @@ be describing additional metrics about the same event.
       only meaningful to these three types of preloading.
     </summary>
   </metric>
+  <metric name="SamplingLikelihood">
+    <summary>
+      The sampling rate of this particular event multiplied by 1,000,000
+      (because we cannot log floating point values in UKM). A value of 1,000,000
+      means that the event had a 100% chance of being sampled, whereas a value
+      of one means that the event had a one-in-a-millon chance of being sampled.
+      The sampling rate for preloading attempts is set via field trial through
+      the PreloadingConfig feature. The logged value just represents the
+      configuration used for that preloading attempt.
+    </summary>
+  </metric>
   <metric name="TimeToNextNavigation">
     <summary>
       The amount of time the attempt took to reach the next navigation, in
@@ -18859,6 +18890,17 @@ be describing additional metrics about the same event.
       to be used for the next navigation, in milliseconds. Note: currently only
       Prefetch, Prerender and NoStatePrefetch have a ready state. This field is
       only meaningful to these three types of preloading.
+    </summary>
+  </metric>
+  <metric name="SamplingLikelihood">
+    <summary>
+      The sampling rate of this particular event multiplied by 1,000,000
+      (because we cannot log floating point values in UKM). A value of 1,000,000
+      means that the event had a 100% chance of being sampled, whereas a value
+      of one means that the event had a one-in-a-millon chance of being sampled.
+      The sampling rate for preloading attempts is set via field trial through
+      the PreloadingConfig feature. The logged value just represents the
+      configuration used for that preloading attempt.
     </summary>
   </metric>
   <metric name="TimeToNextNavigation">
@@ -23989,14 +24031,14 @@ be describing additional metrics about the same event.
     Features of a web app recorded at most once per day if a user interacted
     with the web app. Recorded for installed and/or promotable (installable) web
     apps unless noted otherwise on the metric. Keyed by start_url of the app.
-    Note: Changed in Feb 2022 to only record when App sync is enabled.
+    Note: Changed in Feb 2023 to only record when App sync is enabled.
   </summary>
   <metric name="BackgroundDuration">
     <summary>
       Records the total duration (seconds, bucketed) that the app was open in
       the background in the last calendar day. Summed during the day and emitted
       if the date changes. Recorded only for installed web apps that are
-      currently open in a web app window.
+      currently open in a web app window, and all preinstalled web apps.
     </summary>
     <aggregation>
       <history>
@@ -24005,6 +24047,23 @@ be describing additional metrics about the same event.
         <index fields="profile.system_ram"/>
         <statistics>
           <quantiles type="std-percentiles"/>
+        </statistics>
+      </history>
+    </aggregation>
+  </metric>
+  <metric name="CapturesLinks" enum="Boolean">
+    <summary>
+      Whether the user has enabled link capturing to open in-scope links in the
+      app window. Recorded only for installed web apps that are currently open
+      in a web app window, and all preinstalled web apps.
+    </summary>
+    <aggregation>
+      <history>
+        <index fields="profile.country"/>
+        <index fields="profile.form_factor"/>
+        <index fields="profile.system_ram"/>
+        <statistics>
+          <enumeration/>
         </statistics>
       </history>
     </aggregation>
@@ -24030,7 +24089,7 @@ be describing additional metrics about the same event.
       Records the total duration (seconds, bucketed) that the app was open in
       the foreground in the last calendar day. Summed during the day and emitted
       if the date changes. Recorded only for installed web apps that are
-      currently open in a web app window.
+      currently open in a web app window, and all preinstalled web apps.
     </summary>
     <aggregation>
       <history>
@@ -24077,7 +24136,7 @@ be describing additional metrics about the same event.
     <summary>
       Records the total number of times the app was focused in the foreground in
       the last calendar day. Recorded only for installed web apps that are
-      currently open in a web app window.
+      currently open in a web app window, and all preinstalled web apps.
     </summary>
     <aggregation>
       <history>
@@ -24086,6 +24145,41 @@ be describing additional metrics about the same event.
         <index fields="profile.system_ram"/>
         <statistics>
           <quantiles type="std-percentiles"/>
+        </statistics>
+      </history>
+    </aggregation>
+  </metric>
+  <metric name="PreinstalledWindowExperimentHasLaunchedBefore" enum="Boolean">
+    <summary>
+      Records whether the user has launched this preinstalled app before the
+      preinstalled app window vs tab experiment started. Recorded only if the
+      user was eligible for the experiment, which is new Chrome OS users.
+    </summary>
+    <aggregation>
+      <history>
+        <index fields="profile.country"/>
+        <index fields="profile.form_factor"/>
+        <index fields="profile.system_ram"/>
+        <statistics>
+          <enumeration/>
+        </statistics>
+      </history>
+    </aggregation>
+  </metric>
+  <metric name="PreinstalledWindowExperimentUserGroup"
+      enum="WebAppPreinstalledWindowExperimentUserGroup">
+    <summary>
+      Records the user group that the user is in, for an experiment on opening
+      preinstalled apps in windows vs tabs. Recorded only if the user was
+      eligible for the experiment, which is new Chrome OS users.
+    </summary>
+    <aggregation>
+      <history>
+        <index fields="profile.country"/>
+        <index fields="profile.form_factor"/>
+        <index fields="profile.system_ram"/>
+        <statistics>
+          <enumeration/>
         </statistics>
       </history>
     </aggregation>

@@ -15,9 +15,9 @@ import {I18nMixin} from 'chrome://resources/cr_elements/i18n_mixin.js';
 import {loadTimeData} from 'chrome://resources/js/load_time_data.js';
 import {PolymerElement} from 'chrome://resources/polymer/v3_0/polymer/polymer_bundled.min.js';
 
-import {Setting} from '../../mojom-webui/setting.mojom-webui.js';
 import {PrefsMixin} from '../../prefs/prefs_mixin.js';
 import {DeepLinkingMixin} from '../deep_linking_mixin.js';
+import {Setting} from '../mojom-webui/setting.mojom-webui.js';
 import {routes} from '../os_settings_routes.js';
 import {RouteObserverMixin} from '../route_observer_mixin.js';
 import {Route} from '../router.js';
@@ -27,7 +27,7 @@ import {getTemplate} from './smart_inputs_page.html.js';
 const OsSettingsSmartInputsPageElementBase =
     RouteObserverMixin(PrefsMixin(I18nMixin(DeepLinkingMixin(PolymerElement))));
 
-class OsSettingsSmartInputsPageElement extends
+export class OsSettingsSmartInputsPageElement extends
     OsSettingsSmartInputsPageElementBase {
   static get is() {
     return 'os-settings-smart-inputs-page' as const;

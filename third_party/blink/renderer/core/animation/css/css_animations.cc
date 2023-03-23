@@ -424,7 +424,7 @@ StringKeyframeEffectModel* CreateKeyframeEffectModel(
                       WebFeature::kCSSAnimationsStackedNeutralKeyframe);
   }
   if (has_named_range_keyframes) {
-    model->SetViewTimeline(DynamicTo<ViewTimeline>(timeline));
+    model->SetViewTimelineIfRequired(DynamicTo<ViewTimeline>(timeline));
   }
 
   return model;
@@ -1601,11 +1601,11 @@ void CSSAnimations::MaybeApplyPendingUpdate(Element* element) {
       entry.animation->setTimeline(entry.timeline);
       To<CSSAnimation>(*entry.animation).ResetIgnoreCSSTimeline();
     }
-    if (entry.animation->GetRangeStart() != entry.range_start) {
-      entry.animation->SetRangeStart(entry.range_start);
+    if (entry.animation->GetRangeStartInternal() != entry.range_start) {
+      entry.animation->SetRangeStartInternal(entry.range_start);
     }
-    if (entry.animation->GetRangeEnd() != entry.range_end) {
-      entry.animation->SetRangeEnd(entry.range_end);
+    if (entry.animation->GetRangeEndInternal() != entry.range_end) {
+      entry.animation->SetRangeEndInternal(entry.range_end);
     }
 
     running_animations_[entry.index]->Update(entry);
@@ -1641,8 +1641,8 @@ void CSSAnimations::MaybeApplyPendingUpdate(Element* element) {
     if (inert_animation->Paused())
       animation->pause();
     animation->resetIgnoreCSSPlayState();
-    animation->SetRangeStart(entry.range_start);
-    animation->SetRangeEnd(entry.range_end);
+    animation->SetRangeStartInternal(entry.range_start);
+    animation->SetRangeEndInternal(entry.range_end);
     animation->Update(kTimingUpdateOnDemand);
 
     running_animations_.push_back(
@@ -1897,13 +1897,18 @@ void CSSAnimations::CalculateTransitionUpdateForPropertyHandle(
         AnimationUtils::KeyframeValueFromComputedStyle(
             property, state.old_style, document,
             state.animating_element.GetLayoutObject());
-    start = InterpolationValue(
-        std::make_unique<InterpolableList>(0),
-        CSSDefaultNonInterpolableValue::Create(start_css_value));
     const CSSValue* end_css_value =
         AnimationUtils::KeyframeValueFromComputedStyle(
             property, state.base_style, document,
             state.animating_element.GetLayoutObject());
+    if (!start_css_value || !end_css_value) {
+      // TODO(crbug.com/1425925): Handle newly registered custom properties
+      // correctly. If that bug is fixed, then this should never happen.
+      return;
+    }
+    start = InterpolationValue(
+        std::make_unique<InterpolableList>(0),
+        CSSDefaultNonInterpolableValue::Create(start_css_value));
     end = InterpolationValue(
         std::make_unique<InterpolableList>(0),
         CSSDefaultNonInterpolableValue::Create(end_css_value));

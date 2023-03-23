@@ -185,7 +185,9 @@ class PageLoadMetricsBrowserTest : public InProcessBrowserTest {
     scoped_feature_list_.InitWithFeatures(
         {ukm::kUkmFeature, blink::features::kPortals,
          blink::features::kPortalsCrossOrigin},
-        {});
+        // TODO(crbug.com/1394910): Use HTTPS URLs in tests to avoid having to
+        // disable this feature.
+        {features::kHttpsUpgrades});
   }
 
   PageLoadMetricsBrowserTest(const PageLoadMetricsBrowserTest&) = delete;
@@ -3691,6 +3693,37 @@ IN_PROC_BROWSER_TEST_F(PageLoadMetricsBrowserTestWithFencedFrames,
       web_contents(),
       "document.querySelector('fencedframe').src = './title2.html';"));
   observer.WaitForNavigationFinished();
+}
+
+IN_PROC_BROWSER_TEST_F(PageLoadMetricsBrowserTestWithFencedFrames,
+                       PageLoadPrivacySandboxAdsFencedFramesMetrics) {
+  ASSERT_TRUE(https_server().Start());
+
+  static constexpr char
+      kHistogramPrivacySandboxAdsNavigationToFirstContentfulPaint[] =
+          "PageLoad.Clients.PrivacySandboxAds.PaintTiming."
+          "NavigationToFirstContentfulPaint.FencedFrames";
+
+  // Not recorded as fenced frame is not created.
+  auto waiter1 = CreatePageLoadMetricsTestWaiter("waiter1");
+  waiter1->AddPageExpectation(TimingField::kFirstContentfulPaint);
+  ASSERT_TRUE(ui_test_utils::NavigateToURL(
+      browser(), https_server().GetURL("a.test", "/title1.html")));
+  waiter1->Wait();
+
+  histogram_tester_->ExpectTotalCount(
+      kHistogramPrivacySandboxAdsNavigationToFirstContentfulPaint, 0);
+
+  // Recorded as fenced frame is created.
+  auto waiter2 = CreatePageLoadMetricsTestWaiter("waiter2");
+  waiter2->AddPageExpectation(TimingField::kFirstContentfulPaint);
+  ASSERT_TRUE(ui_test_utils::NavigateToURL(
+      browser(),
+      https_server().GetURL("c.test", "/fenced_frames/basic_title.html")));
+  waiter2->Wait();
+
+  histogram_tester_->ExpectTotalCount(
+      kHistogramPrivacySandboxAdsNavigationToFirstContentfulPaint, 1);
 }
 
 class PageLoadMetricsBrowserTestWithBackForwardCache

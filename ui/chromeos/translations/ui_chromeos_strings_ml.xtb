@@ -119,7 +119,6 @@
 <translation id="1942765061641586207">ചിത്രത്തിന്റെ റെസല്യൂഷൻ</translation>
 <translation id="1972984168337863910">ഫയലുകളുടെ ഫീഡ്ബാക്ക് പാനലുകൾ വികസിപ്പിക്കുക</translation>
 <translation id="1995337122023280937">ഫയൽ ലൊക്കേഷനിലേക്ക് പോവുക</translation>
-<translation id="1999709132469742660">എല്ലാ URL-കളിലൂടെയും ഫയൽ ആക്‌സസ് ചെയ്യൽ</translation>
 <translation id="2001796770603320721">ഡ്രൈവിൽ മാനേജ് ചെയ്യുക</translation>
 <translation id="2009067268969781306">ഒരു ഡ്രൈവ് ഫോർമാറ്റ് ചെയ്‌താൽ അതിൽ സൂക്ഷിച്ചിരിക്കുന്ന മുഴുവൻ ഡാറ്റയും ഇല്ലാതാക്കപ്പെടും. ഈ പ്രവൃത്തി പഴയപടിയാക്കാനാകില്ല.</translation>
 <translation id="2025955442973426285">ടിഗ്രിന്യ</translation>
@@ -151,6 +150,7 @@
 <translation id="2236732657580416950">നിങ്ങളുടെ Google Drive കാഷെ മായ്‌ച്ചു.</translation>
 <translation id="2239068707900391003">കോഫി പിടിച്ചിരിക്കുന്ന വ്യക്തി</translation>
 <translation id="2251368349685848079">ട്രാഷിൽ നിന്നും പുനഃസ്ഥാപിക്കുക</translation>
+<translation id="2278133026967558505">എല്ലാ വെബ്സൈറ്റുകൾക്കും URL-കൾക്കും ഫയൽ ആക്‌സസ് ചെയ്യാം</translation>
 <translation id="2282155092769082568">സ്വയമേവ കോൺഫിഗറേഷൻ URL:</translation>
 <translation id="2284767815536050991">നീക്കം ചെയ്യാവുന്ന സ്റ്റോറേജ്</translation>
 <translation id="2288278176040912387">റെക്കോർഡ് പ്ലേയർ</translation>
@@ -543,7 +543,6 @@
 <translation id="5323213332664049067">ലാറ്റിന്‍ അമേരിക്കന്‍</translation>
 <translation id="5330145655348521461">ഈ ഫയലുകൾ മറ്റൊരു ഡെസ്‌ക്‌ടോപ്പിലാണ് തുറന്നിരിക്കുന്നത്. അത് കാണാൻ <ph name="USER_NAME" /> (<ph name="MAIL_ADDRESS" />) എന്നതിലേക്ക് നീക്കുക.</translation>
 <translation id="5330512191124428349">വിവരം സ്വീകരിക്കുക</translation>
-<translation id="5337538975554986899"><ph name="NON_RESTRICTED_DESTINATIONS" /> ഒഴികെയുള്ള എല്ലാ url-കളിലൂടെയും ഫയൽ ആക്‌സസ് ചെയ്യൽ</translation>
 <translation id="5344246330454251646">Bruschetta ഉപയോഗിച്ചുള്ള പങ്കിടൽ മാനേജ് ചെയ്യുക</translation>
 <translation id="535792325654997756">വ്യക്തിയും പൂച്ചകളും</translation>
 <translation id="5358764674931277">ഫ്രെയിം എണ്ണം</translation>
@@ -629,6 +628,7 @@
 <translation id="603895874132768835">പുതിയ പിൻ സജ്ജീകരിക്കുന്നത് വരെ നിങ്ങൾക്ക് ഈ നെറ്റ്‌വർക്ക് ഉപയോഗിക്കാനാകില്ല</translation>
 <translation id="6040143037577758943">അടയ്ക്കുക</translation>
 <translation id="6055907707645252013"><ph name="NETWORK_TYPE" /> നെറ്റ്‍വർക്ക്, കണക്റ്റ് ചെയ്തിട്ടില്ല</translation>
+<translation id="6073060579181816027">ഒന്നിലധികം ഫയൽ ലൊക്കേഷനുകൾ</translation>
 <translation id="6074825444536523002">Google ഫോം</translation>
 <translation id="6079871810119356840">Qwerty കീബോർഡ് ഉള്ള ഹംഗേറിയൻ</translation>
 <translation id="6096979789310008754">തിരയൽ ടെക്‌സ്‌റ്റ് മായ്ച്ചു, മുഴുവൻ ഫയലുകളും ഫോൾഡറുകളും കാണിക്കുന്നു.</translation>
@@ -769,6 +769,7 @@
 <translation id="7162080671816799010">പരിശോധിച്ചുറപ്പിക്കൽ സെർവർ ഐഡന്റിറ്റി സാധൂകരിക്കാനുള്ള 'വിഷയത്തിന്റെ മറ്റൊരു പേരുമായുള്ള പൊരുത്തം' അല്ലെങ്കിൽ 'ഡൊമെയ്‌ൻ സഫിക്സ് പൊരുത്തം' വിട്ടുപോയിരിക്കുന്നു</translation>
 <translation id="7165320105431587207">നെറ്റ്‌വർക്ക് കോൺഫിഗർ ചെയ്യുന്നതിൽ പരാജയപ്പെട്ടു</translation>
 <translation id="7170041865419449892">പരിധിക്ക് പുറത്താണ്</translation>
+<translation id="7179579940054351344"><ph name="NON_RESTRICTED_DESTINATIONS" /> ഒഴികെയുള്ള എല്ലാ വെബ്സൈറ്റുകൾക്കും URL-കൾക്കും ഫയൽ ആക്‌സസ് ചെയ്യാം</translation>
 <translation id="7180611975245234373">റീഫ്രഷ് ചെയ്യുക</translation>
 <translation id="7189874332498648577"><ph name="NUMBER_OF_GB" /> GB</translation>
 <translation id="7191454237977785534">ഇതായി ഫയൽ സംരക്ഷിക്കുക</translation>
@@ -942,6 +943,7 @@
 <translation id="8492972329130824181">വീട്ടിലെ നെറ്റ്‌വർക്ക് ലഭ്യമല്ല. കണക്റ്റ് ചെയ്യാൻ മൊബൈൽ ഡാറ്റ റോമിംഗ് പ്രവർത്തനക്ഷമമാക്കണം.</translation>
 <translation id="8499098729323186194"><ph name="NUMBER_OF_ITEMS" /> ഇനങ്ങൾ എക്‌സ്‌ട്രാക്റ്റ് ചെയ്യുന്നു...</translation>
 <translation id="8502913769543567768"><ph name="NETWORK_COUNT" /> നെറ്റ്‌വർക്കുകളിൽ <ph name="NETWORK_INDEX" />-ാമത്തേത്, <ph name="NETWORK_NAME" />, <ph name="NETWORK_PROVIDER_NAME" />, ഉപകരണം സജ്ജീകരിച്ചതിന് ശേഷം സജീവമാക്കുക, നിങ്ങളുടെ അഡ്‌മിൻ മാനേജ് ചെയ്യുന്നത്</translation>
+<translation id="8512483403832814140">ഏതുസമയത്തും</translation>
 <translation id="8521441079177373948">യുകെ</translation>
 <translation id="853494022971700746">ഫ്രഞ്ച് (ഫ്രാൻസ്)</translation>
 <translation id="8540608333167683902"><ph name="NETWORK_COUNT" />-ൽ <ph name="NETWORK_INDEX" /> നെറ്റ്‌വർക്ക്, <ph name="NETWORK_NAME" />, <ph name="CONNECTION_STATUS" />, സിഗ്‌നൽ ശക്തി <ph name="SIGNAL_STRENGTH" />%, വിശദാംശങ്ങൾ</translation>

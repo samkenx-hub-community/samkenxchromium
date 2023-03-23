@@ -16,12 +16,12 @@
 #include "base/metrics/histogram_macros.h"
 #include "base/synchronization/waitable_event.h"
 #include "base/trace_event/trace_event.h"
-#include "media/base/win/mf_helpers.h"
 #include "ui/gfx/color_space_win.h"
 #include "ui/gfx/geometry/rect_conversions.h"
 #include "ui/gfx/geometry/size_conversions.h"
 #include "ui/gl/dc_layer_overlay_image.h"
 #include "ui/gl/dc_layer_tree.h"
+#include "ui/gl/debug_utils.h"
 #include "ui/gl/direct_composition_support.h"
 #include "ui/gl/gl_features.h"
 #include "ui/gl/gl_switches.h"
@@ -487,8 +487,7 @@ Microsoft::WRL::ComPtr<ID3D11Texture2D> SwapChainPresenter::UploadVideoImage(
     }
     DCHECK(staging_texture_);
     staging_texture_size_ = texture_size;
-    hr = media::SetDebugName(staging_texture_.Get(),
-                             "SwapChainPresenter_Staging");
+    hr = SetDebugName(staging_texture_.Get(), "SwapChainPresenter_Staging");
     if (FAILED(hr)) {
       DLOG(ERROR) << "Failed to label D3D11 texture: " << std::hex << hr;
     }
@@ -544,7 +543,7 @@ Microsoft::WRL::ComPtr<ID3D11Texture2D> SwapChainPresenter::UploadVideoImage(
       return nullptr;
     }
     DCHECK(copy_texture_);
-    hr = media::SetDebugName(copy_texture_.Get(), "SwapChainPresenter_Copy");
+    hr = SetDebugName(copy_texture_.Get(), "SwapChainPresenter_Copy");
     if (FAILED(hr)) {
       DLOG(ERROR) << "Failed to label D3D11 texture: " << std::hex << hr;
     }
@@ -585,7 +584,7 @@ void SwapChainPresenter::AdjustTargetToOptimalSizeIfNeeded(
   bool size_adjusted = AdjustTargetToFullScreenSizeIfNeeded(
       monitor_size, params, overlay_onscreen_rect, swap_chain_size,
       visual_transform, visual_clip_rect);
-  if (!size_adjusted && params.is_video_fullscreen_letterboxing) {
+  if (!size_adjusted && params.maybe_video_fullscreen_letterboxing) {
     AdjustTargetForFullScreenLetterboxing(
         monitor_size, params, overlay_onscreen_rect, swap_chain_size,
         visual_transform, visual_clip_rect);
@@ -1618,25 +1617,34 @@ bool SwapChainPresenter::VideoProcessorBlt(
         hr);
 
     if (FAILED(hr)) {
-      DLOG(ERROR) << "VideoProcessorBlt failed with error 0x" << std::hex << hr;
-
+      // Retry VideoProcessorBlt with vp super resolution off if it was on.
       if (use_vp_super_resolution) {
-        // Retry with VpSuperResolution off.
+        DLOG(ERROR) << "Retry VideoProcessorBlt with VpSuperResolution off "
+                       "after it failed with error 0x"
+                    << std::hex << hr;
+
         ToggleVpSuperResolution(gpu_vendor_id_, video_context.Get(),
                                 video_processor.Get(), false);
-
         hr = video_context->VideoProcessorBlt(
             video_processor.Get(), output_view_.Get(), 0, 1, &stream);
-        if (FAILED(hr)) {
-          DLOG(ERROR) << "VideoProcessorBlt after retry with vp super "
-                         "resolution off failed with error 0x"
-                      << std::hex << hr;
-          return false;
+
+        base::UmaHistogramSparse(
+            "GPU.VideoProcessorBlt.VpSuperResolution.RetryOffAfterError", hr);
+
+        // We shouldn't use VpSuperResolution if it was the reason that caused
+        // the VideoProcessorBlt failure.
+        force_vp_super_resolution_off_ = SUCCEEDED(hr);
+      }
+
+      if (FAILED(hr)) {
+        DLOG(ERROR) << "VideoProcessorBlt failed with error 0x" << std::hex
+                    << hr;
+
+        // To prevent it from failing in all coming frames, disable overlay if
+        // VideoProcessorBlt is not implemented in the GPU driver.
+        if (hr == E_NOTIMPL) {
+          DisableDirectCompositionOverlays();
         }
-        // We shouldn't use VpSuperResolution if it previously caused the
-        // VideoProcessorBlt error.
-        force_vp_super_resolution_off_ = true;
-      } else {
         return false;
       }
     }

@@ -86,7 +86,6 @@
 #include "components/services/app_service/public/cpp/intent_util.h"
 #include "components/services/app_service/public/cpp/run_on_os_login_types.h"
 #include "components/services/app_service/public/cpp/share_target.h"
-#include "components/services/app_service/public/cpp/shortcut.h"
 #include "components/webapps/browser/installable/installable_metrics.h"
 #include "content/public/browser/clear_site_data_utils.h"
 #include "content/public/browser/render_frame_host.h"
@@ -729,12 +728,11 @@ apps::AppPtr WebAppPublisherHelper::CreateWebApp(const WebApp* web_app) {
 }
 
 apps::AppPtr WebAppPublisherHelper::ConvertUninstalledWebApp(
-    const WebApp* web_app) {
-  auto app = std::make_unique<apps::App>(app_type(), web_app->app_id());
-  // TODO(loyso): Plumb uninstall source (reason) here.
+    const AppId& app_id) {
+  auto app = std::make_unique<apps::App>(app_type(), app_id);
+  // TODO(crbug.com/1423775): Plumb uninstall source (reason) here.
   app->readiness = apps::Readiness::kUninstalledByUser;
 
-  SetWebAppShowInFields(web_app, *app);
   return app;
 }
 
@@ -774,16 +772,17 @@ void WebAppPublisherHelper::UninstallWebApp(
   constexpr bool kClearCache = true;
   constexpr bool kAvoidClosingConnections = false;
 
-  content::ClearSiteData(base::BindRepeating(
-                             [](content::BrowserContext* browser_context) {
-                               return browser_context;
-                             },
-                             base::Unretained(profile())),
-                         origin, kClearCookies, kClearStorage, kClearCache,
-                         /*storage_buckets_to_remove=*/{},
-                         kAvoidClosingConnections,
-                         /*cookie_partition_key=*/absl::nullopt,
-                         /*storage_key=*/absl::nullopt, base::DoNothing());
+  content::ClearSiteData(
+      base::BindRepeating(
+          [](content::BrowserContext* browser_context) {
+            return browser_context;
+          },
+          base::Unretained(profile())),
+      origin, kClearCookies, kClearStorage, kClearCache,
+      /*storage_buckets_to_remove=*/{}, kAvoidClosingConnections,
+      /*cookie_partition_key=*/absl::nullopt,
+      /*storage_key=*/absl::nullopt,
+      /*partitioned_state_allowed_only=*/false, base::DoNothing());
 }
 
 void WebAppPublisherHelper::SetIconEffect(const std::string& app_id) {
@@ -1292,12 +1291,7 @@ void WebAppPublisherHelper::OnWebAppManifestUpdated(
   }
 }
 
-void WebAppPublisherHelper::OnWebAppWillBeUninstalled(const AppId& app_id) {
-  const WebApp* web_app = GetWebApp(app_id);
-  if (!web_app) {
-    return;
-  }
-
+void WebAppPublisherHelper::OnWebAppUninstalled(const AppId& app_id) {
   paused_apps_.MaybeRemoveApp(app_id);
 
 #if BUILDFLAG(IS_CHROMEOS)
@@ -1308,7 +1302,7 @@ void WebAppPublisherHelper::OnWebAppWillBeUninstalled(const AppId& app_id) {
                                           result.microphone);
 #endif
 
-  delegate_->PublishWebApp(ConvertUninstalledWebApp(web_app));
+  delegate_->PublishWebApp(ConvertUninstalledWebApp(app_id));
 }
 
 void WebAppPublisherHelper::OnWebAppInstallManagerDestroyed() {

@@ -699,9 +699,15 @@ void AppListItemView::SetUIState(UIState ui_state) {
 }
 
 void AppListItemView::ScaleAppIcon(bool scale_up) {
-  if (!layer()) {
+  // If there is no layer and the icon will scale down, avoid creating an
+  // animation and just scale down.
+  if (!layer() && !scale_up) {
+    icon_scale_ = 1.0f;
+    SetIcon(icon_image_);
     return;
   }
+
+  EnsureLayer();
   if (!is_folder_) {
     if (scale_up) {
       icon_scale_ = kDragDropAppIconScale;
@@ -779,7 +785,6 @@ void AppListItemView::SetMouseDragging(bool mouse_dragging) {
 }
 
 void AppListItemView::OnMouseDragTimer() {
-  DCHECK(!app_list_features::IsDragAndDropRefactorEnabled());
   // Show scaled up app icon to indicate draggable state.
   SetMouseDragging(true);
 }
@@ -798,9 +803,8 @@ void AppListItemView::OnTouchDragTimer(
 
 bool AppListItemView::InitiateDrag(const gfx::Point& location,
                                    const gfx::Point& root_location) {
-  DCHECK(!app_list_features::IsDragAndDropRefactorEnabled());
-
-  if (!grid_delegate_->InitiateDrag(
+  if (!app_list_features::IsDragAndDropRefactorEnabled() &&
+      !grid_delegate_->InitiateDrag(
           this, location, root_location,
           base::BindOnce(&AppListItemView::OnDragStarted,
                          weak_ptr_factory_.GetWeakPtr()),
@@ -898,25 +902,46 @@ void AppListItemView::GetAccessibleNodeData(ui::AXNodeData* node_data) {
     return;
   }
 
+  // The list of descriptions to be announced.
+  std::vector<std::u16string> descriptions;
+
+  if (item_weak_->is_folder() &&
+      features::IsAppCollectionFolderRefreshEnabled()) {
+    // For folder items, announce the number of apps in the folder.
+    std::u16string app_count_announcement = l10n_util::GetPluralStringFUTF16(
+        IDS_APP_LIST_FOLDER_NUMBER_OF_APPS_ACCESSIBILE_DESCRIPTION,
+        item_weak_->AsFolderItem()->ChildItemCount());
+    descriptions.push_back(app_count_announcement);
+  }
+
   auto app_status = item_weak_->app_status();
+  std::u16string app_status_description;
   switch (app_status) {
     case AppStatus::kBlocked:
-      node_data->SetDescription(
+      app_status_description =
           ui::ResourceBundle::GetSharedInstance().GetLocalizedString(
-              IDS_APP_LIST_BLOCKED_APP));
+              IDS_APP_LIST_BLOCKED_APP);
       break;
     case AppStatus::kPaused:
-      node_data->SetDescription(
+      app_status_description =
           ui::ResourceBundle::GetSharedInstance().GetLocalizedString(
-              IDS_APP_LIST_PAUSED_APP));
+              IDS_APP_LIST_PAUSED_APP);
       break;
     default:
       if (item_weak_->is_new_install()) {
-        node_data->SetDescription(
+        app_status_description =
             ui::ResourceBundle::GetSharedInstance().GetLocalizedString(
-                IDS_APP_LIST_NEW_INSTALL_ACCESSIBILE_DESCRIPTION));
+                IDS_APP_LIST_NEW_INSTALL_ACCESSIBILE_DESCRIPTION);
       }
       break;
+  }
+  if (!app_status_description.empty()) {
+    descriptions.push_back(app_status_description);
+  }
+
+  // Set the concatenated descriptions.
+  if (!descriptions.empty()) {
+    node_data->SetDescription(base::JoinString(descriptions, u" "));
   }
 }
 
@@ -1041,12 +1066,7 @@ bool AppListItemView::ShouldEnterPushedState(const ui::Event& event) {
 }
 
 bool AppListItemView::OnMousePressed(const ui::MouseEvent& event) {
-  bool return_value = Button::OnMousePressed(event);
-
-  if (app_list_features::IsDragAndDropRefactorEnabled()) {
-    return return_value;
-  }
-
+  Button::OnMousePressed(event);
   if (!ShouldEnterPushedState(event)) {
     return true;
   }

@@ -40,6 +40,12 @@
 
 const size_t kReceiveBufferSizeForDevTools = 100 * 1024 * 1024;  // 100Mb
 const size_t kWritePacketSize = 1 << 16;
+
+// The following file descriptors are used by DevTools remote debugging pipe
+// handler to read and write protocol messages. These should be identical to
+// the ones specified in //components/devtools/devtools_pipe/devtools_pipe.h
+// which we cannot include here because //content should not depend on
+// components.
 const int kReadFD = 3;
 const int kWriteFD = 4;
 
@@ -100,10 +106,15 @@ class PipeIOBase {
 //  _get_osfhandle() to return INVALID_HANDLE_VALUE instead of crashing.
 class ScopedInvalidParameterHandlerOverride {
  public:
-  ScopedInvalidParameterHandlerOverride() {
-    prev_invalid_parameter_handler_ =
-        _set_thread_local_invalid_parameter_handler(InvalidParameterHandler);
-  }
+  ScopedInvalidParameterHandlerOverride()
+      : prev_invalid_parameter_handler_(
+            _set_thread_local_invalid_parameter_handler(
+                InvalidParameterHandler)) {}
+
+  ScopedInvalidParameterHandlerOverride(
+      const ScopedInvalidParameterHandlerOverride&) = delete;
+  ScopedInvalidParameterHandlerOverride& operator=(
+      const ScopedInvalidParameterHandlerOverride&) = delete;
 
   ~ScopedInvalidParameterHandlerOverride() {
     _set_thread_local_invalid_parameter_handler(
@@ -111,13 +122,15 @@ class ScopedInvalidParameterHandlerOverride {
   }
 
  private:
+  // A do nothing invalid parameter handler that causes CRT routine to return
+  // error to the caller.
   static void InvalidParameterHandler(const wchar_t* expression,
                                       const wchar_t* function,
                                       const wchar_t* file,
                                       unsigned int line,
                                       uintptr_t reserved) {}
 
-  _invalid_parameter_handler prev_invalid_parameter_handler_;
+  const _invalid_parameter_handler prev_invalid_parameter_handler_;
 };
 
 #endif  // BUILDFLAG(IS_WIN)
@@ -149,6 +162,7 @@ class PipeReaderBase : public PipeIOBase {
 #if BUILDFLAG(IS_WIN)
     // Cancel pending synchronous read.
     CancelIoEx(read_handle_, nullptr);
+    ScopedInvalidParameterHandlerOverride invalid_parameter_handler_override;
     _close(read_fd_);
     read_handle_ = INVALID_HANDLE_VALUE;
 #else
@@ -231,6 +245,7 @@ class PipeWriterBase : public PipeIOBase {
  protected:
   void ClosePipe() override {
 #if BUILDFLAG(IS_WIN)
+    ScopedInvalidParameterHandlerOverride invalid_parameter_handler_override;
     _close(write_fd_);
     write_handle_ = INVALID_HANDLE_VALUE;
 #else

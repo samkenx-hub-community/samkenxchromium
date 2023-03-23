@@ -121,7 +121,6 @@
 <translation id="1942765061641586207">Ανάλυση εικόνας</translation>
 <translation id="1972984168337863910">Ανάπτυξη πλαισίων σχολίων αρχείων</translation>
 <translation id="1995337122023280937">Μετάβαση στην τοποθεσία αρχείου</translation>
-<translation id="1999709132469742660">Πρόσβαση στο αρχείο για όλα τα URL</translation>
 <translation id="2001796770603320721">Διαχείριση στο Drive</translation>
 <translation id="2009067268969781306">Η διαμόρφωση ενός δίσκου θα διαγράψει όλα τα δεδομένα που έχουν αποθηκευτεί σε αυτόν. Δεν είναι δυνατή η αναίρεση αυτής της ενέργειας.</translation>
 <translation id="2025955442973426285">Τιγκρίνια</translation>
@@ -153,6 +152,7 @@
 <translation id="2236732657580416950">Η κρυφή μνήμη του Google Drive διαγράφηκε.</translation>
 <translation id="2239068707900391003">Άτομο με καφέ</translation>
 <translation id="2251368349685848079">Επαναφορά από τον κάδο</translation>
+<translation id="2278133026967558505">Πρόσβαση στο αρχείο από όλους τους ιστοτόπους και τα URL</translation>
 <translation id="2282155092769082568">Αυτόματη διαμόρφωση URL</translation>
 <translation id="2284767815536050991">αφαιρούμενος αποθηκευτικός χώρος</translation>
 <translation id="2288278176040912387">Πικάπ</translation>
@@ -555,7 +555,6 @@
 <translation id="5323213332664049067">Λατινικής Αμερικής</translation>
 <translation id="5330145655348521461">Αυτά τα αρχεία άνοιξαν σε διαφορετικό προφίλ. Μεταφερθείτε στο προφίλ <ph name="USER_NAME" /> (<ph name="MAIL_ADDRESS" />) για να τα δείτε.</translation>
 <translation id="5330512191124428349">Λήψη πληροφοριών</translation>
-<translation id="5337538975554986899">Πρόσβαση στο αρχείο για όλα τα URL εκτός από <ph name="NON_RESTRICTED_DESTINATIONS" /></translation>
 <translation id="5344246330454251646">Διαχείριση κοινοποίησης στο Bruschetta</translation>
 <translation id="535792325654997756">Άτομο με γάτες</translation>
 <translation id="5358764674931277">Ρυθμός καρέ</translation>
@@ -642,6 +641,7 @@
 <translation id="603895874132768835">Δεν θα μπορείτε να χρησιμοποιήσετε αυτό το δίκτυο μέχρι να ρυθμίσετε ένα νέο PIN.</translation>
 <translation id="6040143037577758943">Κλείσιμο</translation>
 <translation id="6055907707645252013">Δίκτυο <ph name="NETWORK_TYPE" />, δεν είναι συνδεδεμένο</translation>
+<translation id="6073060579181816027">Πολλές τοποθεσίες αρχείων</translation>
 <translation id="6074825444536523002">Φόρμα Google</translation>
 <translation id="6079871810119356840">Ουγγρικά με πληκτρολόγιο QWERTY</translation>
 <translation id="6096979789310008754">Έγινε κατάργηση του κειμένου αναζήτησης, εμφανίζονται όλα τα αρχεία και οι φάκελοι.</translation>
@@ -783,6 +783,7 @@
 <translation id="7162080671816799010">Λείπουν τα στοιχεία Αντιστοιχία εναλλακτικού ονόματος υποκειμένου ή Αντιστοιχία επιθήματος τομέα, για επικύρωση της ταυτότητας διακομιστή ελέγχου ταυτότητας.</translation>
 <translation id="7165320105431587207">Αποτυχία διαμόρφωσης δικτύου</translation>
 <translation id="7170041865419449892">Εκτός εύρους τιμών</translation>
+<translation id="7179579940054351344">Πρόσβαση στο αρχείο από όλους τους ιστοτόπους και τα URL εκτός από <ph name="NON_RESTRICTED_DESTINATIONS" /></translation>
 <translation id="7180611975245234373">Ανανέωση</translation>
 <translation id="7189874332498648577"><ph name="NUMBER_OF_GB" /> GB</translation>
 <translation id="7191454237977785534">Αποθήκευση αρχείου ως</translation>
@@ -961,6 +962,7 @@
 <translation id="8492972329130824181">Το οικιακό δίκτυο δεν είναι διαθέσιμο. Για να συνδεθείτε, πρέπει να ενεργοποιήσετε την περιαγωγή δεδομένων κινητής τηλεφωνίας.</translation>
 <translation id="8499098729323186194">Εξαγωγή <ph name="NUMBER_OF_ITEMS" /> στοιχείων…</translation>
 <translation id="8502913769543567768">Δίκτυο <ph name="NETWORK_INDEX" /> από <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, <ph name="NETWORK_PROVIDER_NAME" />, Ενεργοποίηση μετά τη ρύθμιση συσκευής, Διαχειριζόμενο από τον διαχειριστή σας</translation>
+<translation id="8512483403832814140">Οποιαδήποτε στιγμή</translation>
 <translation id="8521441079177373948">ΗΒ</translation>
 <translation id="853494022971700746">Γαλλικά (Γαλλίας)</translation>
 <translation id="8540608333167683902">Δίκτυο <ph name="NETWORK_INDEX" /> από <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, <ph name="CONNECTION_STATUS" />, Ισχύς σήματος <ph name="SIGNAL_STRENGTH" />%, Λεπτομέρειες</translation>

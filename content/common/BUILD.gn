@@ -95,8 +95,8 @@ source_set("common") {
     "content_switches_internal.h",
     "cursors/webcursor.cc",
     "cursors/webcursor.h",
+    "cursors/webcursor_ash.cc",
     "cursors/webcursor_aura.cc",
-    "cursors/webcursor_ozone.cc",
     "debug_utils.cc",
     "debug_utils.h",
     "features.cc",
@@ -143,8 +143,6 @@ source_set("common") {
     "navigation_gesture.h",
     "navigation_params_utils.h",
     "origin_util.cc",
-    "private_aggregation_features.cc",
-    "private_aggregation_features.h",
     "process_type.cc",
     "process_visibility_tracker.cc",
     "process_visibility_tracker.h",
@@ -350,8 +348,8 @@ source_set("common") {
     deps += [ "//ppapi/proxy:ipc_sources" ]
   }
 
-  if (!use_ozone) {
-    sources -= [ "cursors/webcursor_ozone.cc" ]
+  if (!is_chromeos_ash) {
+    sources -= [ "cursors/webcursor_ash.cc" ]
   }
 
   if (use_aura) {

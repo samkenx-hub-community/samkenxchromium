@@ -49,12 +49,12 @@
 #import "ios/chrome/browser/shared/public/commands/reading_list_add_command.h"
 #import "ios/chrome/browser/shared/public/commands/search_image_with_lens_command.h"
 #import "ios/chrome/browser/shared/public/features/features.h"
+#import "ios/chrome/browser/shared/ui/list_model/list_model.h"
 #import "ios/chrome/browser/shared/ui/util/uikit_ui_util.h"
 #import "ios/chrome/browser/translate/chrome_ios_translate_client.h"
 #import "ios/chrome/browser/ui/content_suggestions/cells/content_suggestions_tile_constants.h"
 #import "ios/chrome/browser/ui/icons/symbols.h"
 #import "ios/chrome/browser/ui/lens/lens_entrypoint.h"
-#import "ios/chrome/browser/ui/list_model/list_model.h"
 #import "ios/chrome/browser/ui/popup_menu/cells/popup_menu_navigation_item.h"
 #import "ios/chrome/browser/ui/popup_menu/cells/popup_menu_text_item.h"
 #import "ios/chrome/browser/ui/popup_menu/cells/popup_menu_tools_item.h"
@@ -968,17 +968,13 @@ PopupMenuTextItem* CreateEnterpriseInfoItem(NSString* imageName,
                                                        ->GetVirtualURL()]) {
       item.title = l10n_util::GetNSStringWithFixup(IDS_IOS_NEW_INCOGNITO_TAB);
       UIImage* image;
-      if (UseSymbols()) {
-        if (@available(iOS 15, *)) {
-          image = SymbolWithPalette(
-              CustomSymbolWithPointSize(kIncognitoCircleFillSymbol,
-                                        kSymbolActionPointSize),
-              SmallIncognitoPalette());
-        } else {
-          image = [UIImage imageNamed:@"incognito_badge_ios14"];
-        }
+      if (@available(iOS 15, *)) {
+        image = SymbolWithPalette(
+            CustomSymbolWithPointSize(kIncognitoCircleFillSymbol,
+                                      kSymbolActionPointSize),
+            SmallIncognitoPalette());
       } else {
-        image = [UIImage imageNamed:@"incognito_badge"];
+        image = [UIImage imageNamed:@"incognito_badge_ios14"];
       }
       item.favicon = image;
     } else {

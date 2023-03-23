@@ -8,6 +8,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include <cstdint>
 #include <list>
 #include <map>
 #include <memory>
@@ -46,7 +47,6 @@
 #include "content/browser/buckets/bucket_context.h"
 #include "content/browser/can_commit_status.h"
 #include "content/browser/network/cross_origin_opener_policy_reporter.h"
-#include "content/browser/renderer_host/agent_scheduling_group_host.h"
 #include "content/browser/renderer_host/back_forward_cache_impl.h"
 #include "content/browser/renderer_host/back_forward_cache_metrics.h"
 #include "content/browser/renderer_host/browsing_context_state.h"
@@ -109,6 +109,7 @@
 #include "services/network/public/mojom/cookie_access_observer.mojom.h"
 #include "services/network/public/mojom/fetch_api.mojom-forward.h"
 #include "services/network/public/mojom/mdns_responder.mojom.h"
+#include "services/network/public/mojom/trust_token_access_observer.mojom.h"
 #include "services/network/public/mojom/url_loader_network_service_observer.mojom-forward.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
 #include "third_party/blink/public/common/associated_interfaces/associated_interface_provider.h"
@@ -125,6 +126,7 @@
 #include "third_party/blink/public/mojom/blob/blob_url_store.mojom-forward.h"
 #include "third_party/blink/public/mojom/bluetooth/web_bluetooth.mojom-forward.h"
 #include "third_party/blink/public/mojom/broadcastchannel/broadcast_channel.mojom.h"
+#include "third_party/blink/public/mojom/buckets/bucket_manager_host.mojom.h"
 #include "third_party/blink/public/mojom/feature_observer/feature_observer.mojom-forward.h"
 #include "third_party/blink/public/mojom/file_system_access/file_system_access_manager.mojom-forward.h"
 #include "third_party/blink/public/mojom/filesystem/file_system.mojom-forward.h"
@@ -139,6 +141,7 @@
 #include "third_party/blink/public/mojom/image_downloader/image_downloader.mojom.h"
 #include "third_party/blink/public/mojom/input/focus_type.mojom-forward.h"
 #include "third_party/blink/public/mojom/installedapp/installed_app_provider.mojom-forward.h"
+#include "third_party/blink/public/mojom/loader/resource_cache.mojom-forward.h"
 #include "third_party/blink/public/mojom/loader/resource_load_info.mojom-forward.h"
 #include "third_party/blink/public/mojom/navigation/navigation_params.mojom-forward.h"
 #include "third_party/blink/public/mojom/navigation/navigation_params.mojom.h"
@@ -242,6 +245,7 @@ namespace internal {
 class DocumentServiceBase;
 }  // namespace internal
 
+class AgentSchedulingGroupHost;
 class BrowsingContextState;
 class CodeCacheHostImpl;
 class CrossOriginEmbedderPolicyReporter;
@@ -305,6 +309,7 @@ class CONTENT_EXPORT RenderFrameHostImpl
       public blink::mojom::LocalMainFrameHost,
       public ui::AXActionHandlerBase,
       public network::mojom::CookieAccessObserver,
+      public network::mojom::TrustTokenAccessObserver,
       public BucketContext {
  public:
   using JavaScriptDialogCallback =
@@ -374,7 +379,7 @@ class CONTENT_EXPORT RenderFrameHostImpl
   ~RenderFrameHostImpl() override;
 
   // RenderFrameHost
-  int GetRoutingID() const final;
+  int GetRoutingID() const override;
   const blink::LocalFrameToken& GetFrameToken() const override;
   const base::UnguessableToken& GetReportingSource() override;
 
@@ -1382,10 +1387,10 @@ class CONTENT_EXPORT RenderFrameHostImpl
   class CookieChangeListener : public network::mojom::CookieChangeListener {
    public:
     struct CookieChangeInfo {
-      // Indicates whether any cookie modification has been observed.
-      bool cookie_modified = false;
-      // Indicates whether any HTTPOnly cookie modification has been observed.
-      bool http_only_cookie_modified = false;
+      // The number of observed cookie modifications.
+      int64_t cookie_modification_count_ = 0;
+      // The number of observed HTTPOnly cookie modifications.
+      int64_t http_only_cookie_modification_count_ = 0;
     };
 
     CookieChangeListener(StoragePartition* storage_partition, GURL& url);
@@ -1395,6 +1400,21 @@ class CONTENT_EXPORT RenderFrameHostImpl
 
     // Returns a copy of the `cookie_change_info_`.
     CookieChangeInfo cookie_change_info() { return cookie_change_info_; }
+
+    // We don't want to count the cookie modification made by the
+    // `NavigationRequest` itself, so provide this function to allow the count
+    // adjustment.
+    // Passing the `base::PassKey` to restrict the caller of this method to
+    // `NavigationRequest` only.
+    void RemoveNavigationCookieModificationCount(
+        base::PassKey<content::NavigationRequest> navigation_request,
+        uint64_t cookie_modification_count_delta,
+        uint64_t http_only_cookie_modification_count_delta) {
+      cookie_change_info_.cookie_modification_count_ -=
+          cookie_modification_count_delta;
+      cookie_change_info_.http_only_cookie_modification_count_ -=
+          http_only_cookie_modification_count_delta;
+    }
 
    private:
     // network::mojom::CookieChangeListener
@@ -1500,7 +1520,7 @@ class CONTENT_EXPORT RenderFrameHostImpl
 
   // Returns the AgentSchedulingGroupHost associated with this
   // RenderFrameHostImpl.
-  AgentSchedulingGroupHost& GetAgentSchedulingGroup();
+  virtual AgentSchedulingGroupHost& GetAgentSchedulingGroup();
 
   // Returns associated remote for the blink::mojom::LocalMainFrame Mojo
   // interface. May be overridden by subclasses, e.g. tests which wish to
@@ -2383,7 +2403,6 @@ class CONTENT_EXPORT RenderFrameHostImpl
   void CreateFencedFrame(
       mojo::PendingAssociatedReceiver<blink::mojom::FencedFrameOwnerHost>
           pending_receiver,
-      blink::mojom::FencedFrameMode mode,
       blink::mojom::RemoteFrameInterfacesFromRendererPtr
           remote_frame_interfaces,
       const blink::RemoteFrameToken& frame_token,
@@ -2518,9 +2537,16 @@ class CONTENT_EXPORT RenderFrameHostImpl
   mojo::PendingRemote<network::mojom::CookieAccessObserver>
   CreateCookieAccessObserver();
 
+  mojo::PendingRemote<network::mojom::TrustTokenAccessObserver>
+  CreateTrustTokenAccessObserver();
+
   // network::mojom::CookieAccessObserver:
-  void OnCookiesAccessed(
-      network::mojom::CookieAccessDetailsPtr details) override;
+  void OnCookiesAccessed(std::vector<network::mojom::CookieAccessDetailsPtr>
+                             details_vector) override;
+
+  // network::mojom::TrustTokenAccessObserver:
+  void OnTrustTokensAccessed(
+      network::mojom::TrustTokenAccessDetailsPtr details) override;
 
   void GetSavableResourceLinksFromRenderer();
   void GetPendingBeaconHost(
@@ -2673,20 +2699,19 @@ class CONTENT_EXPORT RenderFrameHostImpl
   // opaque origin instead).
   void SetOriginDependentStateOfNewFrame(RenderFrameHostImpl* creator_frame);
 
-  // Indicates whether `this` main frame has third-party storage partitioning
-  // enabled. This depends on the deprecation trial (which can block), content
-  // browser client (which can block), and base feature (which can allow).
-  bool IsMainFrameThirdPartyStoragePartitioningEnabled();
-
   // Calculates the storage key for this RenderFrameHostImpl using the passed
-  // `new_rfh_origin`, and `nonce`, and
-  // `is_third_party_storage_partitioning_allowed` and deriving the storage
-  // key's top_level_site` and `ancestor_bit` parameters. This takes into
-  // account possible host permissions of the top_level RenderFrameHostImpl.
-  blink::StorageKey CalculateStorageKey(
-      const url::Origin& new_rfh_origin,
-      const base::UnguessableToken* nonce,
-      bool is_third_party_storage_partitioning_allowed);
+  // `new_rfh_origin`, and `nonce`, and deriving the storage key's
+  // top_level_site` and `ancestor_bit` parameters. If
+  // `is_third_party_storage_partitioning_allowed` is provided then that value
+  // is used for allowing third-party storage partitioning, if it is
+  // absl::nullopt then the value is calculated using the top frame's
+  // RuntimeFeatureStateReadContext, the enterprise policy, and the
+  // base::feature. This also takes into account special embedding cases, such
+  // as extensions embedding web iframes, where the top-level frame is not the
+  // same as the top-level site for the purposes of calculating the storage key.
+  // See the implementation for more details.
+  blink::StorageKey CalculateStorageKey(const url::Origin& new_rfh_origin,
+                                        const base::UnguessableToken* nonce);
 
   // Returns the BrowsingContextState associated with this RenderFrameHostImpl.
   // See class comments in BrowsingContextState for a more detailed description.
@@ -2866,6 +2891,14 @@ class CONTENT_EXPORT RenderFrameHostImpl
   // last committed document.
   CookieChangeListener::CookieChangeInfo GetCookieChangeInfo();
 
+  // Sets a ResourceCache in the renderer. `remote` must have the same process
+  // isolation policy.
+  // TODO(https://crbug.com/1414262): Add checks to ensure the preconditions.
+  void SetResourceCache(
+      mojo::PendingRemote<blink::mojom::ResourceCache> remote);
+
+  void FlushMojomFrameRemoteForTesting();
+
  protected:
   friend class RenderFrameHostFactory;
 
@@ -2954,6 +2987,7 @@ class CONTENT_EXPORT RenderFrameHostImpl
                                 bool for_legacy);
 
  private:
+  friend class ResumeCommitClosureSetObserver;
   friend class RenderFrameHostPermissionsPolicyTest;
   friend class TestRenderFrameHost;
   friend class TestRenderViewHost;
@@ -3183,6 +3217,10 @@ class CONTENT_EXPORT RenderFrameHostImpl
 
   // network::mojom::CookieAccessObserver
   void Clone(mojo::PendingReceiver<network::mojom::CookieAccessObserver>
+                 observer) override;
+
+  // network::mojom::TrustTokenAccessObserver
+  void Clone(mojo::PendingReceiver<network::mojom::TrustTokenAccessObserver>
                  observer) override;
 
   // Resets any waiting state of this RenderFrameHost that is no longer
@@ -3735,8 +3773,8 @@ class CONTENT_EXPORT RenderFrameHostImpl
   void SetPolicyContainerHost(
       scoped_refptr<PolicyContainerHost> policy_container_host);
 
-  // Initializes |private_network_request_policy_|. Constructor helper.
-  void InitializePrivateNetworkRequestPolicy();
+  // Initializes |local_network_request_policy_|. Constructor helper.
+  void InitializeLocalNetworkRequestPolicy();
 
   // Returns true if this frame requires a proxy to talk to its parent.
   // Note: Using a proxy to talk to a parent does not imply that the parent
@@ -3852,6 +3890,17 @@ class CONTENT_EXPORT RenderFrameHostImpl
       bool from_renderer,
       absl::optional<int64_t> navigation_id = absl::nullopt);
 
+  // Indicates whether this frame has third-party storage
+  // partitioning enabled. This depends on the deprecation trial (which can
+  // block), content browser client (which can block), and base feature (which
+  // can allow/block). `main_frame_for_storage_partitioning` indicates the top
+  // most frame that third-party storage partitioning is affected by (this can
+  // be the real main frame or it could be a subframe when taking into account
+  // special embedding cases, see CalculateStorageKey's implementation for more
+  // information.)
+  bool IsThirdPartyStoragePartitioningEnabled(
+      RenderFrameHostImpl* main_frame_for_storage_partitioning);
+
   // The RenderViewHost that this RenderFrameHost is associated with.
   //
   // It is kept alive as long as any RenderFrameHosts or RenderFrameProxyHosts
@@ -3866,8 +3915,6 @@ class CONTENT_EXPORT RenderFrameHostImpl
   scoped_refptr<RenderViewHostImpl> render_view_host_;
 
   const raw_ptr<RenderFrameHostDelegate> delegate_;
-
-  const int routing_id_;
 
   // The SiteInstance associated with this RenderFrameHost. All content drawn
   // in this RenderFrameHost is part of this SiteInstance. Cannot change over
@@ -3888,9 +3935,6 @@ class CONTENT_EXPORT RenderFrameHostImpl
   // to access it or its associated `AgentSchedulingGroupHost` (see
   // crbug.com/1297030).
   const base::SafeRef<AgentSchedulingGroupHost> agent_scheduling_group_;
-
-  const AgentSchedulingGroupHost::RouteOwner route_{
-      this, *agent_scheduling_group_, routing_id_};
 
   // Reference to the whole frame tree that this RenderFrameHost belongs to.
   // Allows this RenderFrameHost to add and remove nodes in response to
@@ -4003,7 +4047,7 @@ class CONTENT_EXPORT RenderFrameHostImpl
   // RenderFrameHostImpl.
   blink::StorageKey storage_key_;
 
-  // The policy to apply to private network requests issued by the last
+  // The policy to apply to local network requests issued by the last
   // committed document. Set to a default value until a document commits for the
   // first time. The default value depends on whether the
   // |BlockInsecurePrivateNetworkRequests| feature is enabled, see constructor.
@@ -4016,8 +4060,8 @@ class CONTENT_EXPORT RenderFrameHostImpl
   //
   // TODO(https://crbug.com/888079): Simplify the above comment when the
   // behavior it explains is fixed.
-  network::mojom::PrivateNetworkRequestPolicy private_network_request_policy_ =
-      network::mojom::PrivateNetworkRequestPolicy::kBlock;
+  network::mojom::LocalNetworkRequestPolicy local_network_request_policy_ =
+      network::mojom::LocalNetworkRequestPolicy::kBlock;
 
   // Track the SiteInfo of the last site we committed successfully, as obtained
   // from SiteInfo::CreateInternal() called on the last committed UrlInfo.
@@ -4065,6 +4109,8 @@ class CONTENT_EXPORT RenderFrameHostImpl
   // TODO(kenrb): Later this will also be used on the top-level frame, when
   // RenderFrameHost owns its RenderViewHost.
   std::unique_ptr<RenderWidgetHostImpl> owned_render_widget_host_;
+
+  const int routing_id_;
 
   // Boolean indicating whether this RenderFrameHost is being actively used or
   // is waiting for mojo::AgentSchedulingGroupHost::DidUnloadRenderFrame and
@@ -4742,6 +4788,16 @@ class CONTENT_EXPORT RenderFrameHostImpl
   // This problem should go away with RenderDocumentHost in any case.
   // TODO(crbug.com/936696): Remove this warning after the RDH ships.
   mojo::ReceiverSet<network::mojom::CookieAccessObserver> cookie_observers_;
+
+  // Observers listening to Trust Token access notifications for the current
+  // document in this RenderFrameHost. Note: at the moment this set is not
+  // cleared when a new document is created in this RenderFrameHost. This is
+  // done because the first observer is created before the navigation actually
+  // commits and because the old routing id-based behaved in the same way as
+  // well. This problem should go away with RenderDocumentHost in any case.
+  // TODO(crbug.com/936696): Remove this warning after the RDH ships.
+  mojo::ReceiverSet<network::mojom::TrustTokenAccessObserver>
+      trust_token_observers_;
 
   // Indicates whether this frame is an outer delegate frame for some other
   // RenderFrameHost. This will be a valid ID if so, and

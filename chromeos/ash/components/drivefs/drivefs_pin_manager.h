@@ -25,8 +25,6 @@
 #include "base/timer/elapsed_timer.h"
 #include "chromeos/ash/components/drivefs/drivefs_host_observer.h"
 #include "chromeos/ash/components/drivefs/mojom/drivefs.mojom.h"
-#include "chromeos/ash/components/network/network_state_handler.h"
-#include "chromeos/ash/components/network/network_state_handler_observer.h"
 #include "components/drive/file_errors.h"
 #include "mojo/public/cpp/bindings/remote.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
@@ -44,7 +42,7 @@ std::ostream& operator<<(std::ostream& out, HumanReadableSize size);
 // monitoring. This enum represents the various stages the setup goes through.
 enum class Stage {
   // Initial stage.
-  kNotStarted,
+  kStopped,
 
   // Paused because of unfavorable network conditions.
   kPaused,
@@ -58,7 +56,6 @@ enum class Stage {
   kSuccess,
 
   // Final error stages.
-  kStopped,
   kCannotGetFreeSpace,
   kCannotListFiles,
   kNotEnoughSpace,
@@ -115,7 +112,7 @@ struct COMPONENT_EXPORT(CHROMEOS_ASH_COMPONENTS_DRIVEFS) Progress {
   int duplicated_events = 0;
 
   // Stage of the setup process.
-  Stage stage = Stage::kNotStarted;
+  Stage stage = Stage::kStopped;
 
   // Has the PinManager ever emptied its set of tracking items?
   bool emptied_queue = false;
@@ -135,8 +132,7 @@ struct COMPONENT_EXPORT(CHROMEOS_ASH_COMPONENTS_DRIVEFS) Progress {
 //  - Rebuild the progress of bulk pinned items (if turned off mid way through a
 //    bulk pinning event).
 class COMPONENT_EXPORT(CHROMEOS_ASH_COMPONENTS_DRIVEFS) PinManager
-    : public DriveFsHostObserver,
-      ash::NetworkStateHandlerObserver {
+    : public DriveFsHostObserver {
  public:
   using Path = base::FilePath;
 
@@ -150,14 +146,12 @@ class COMPONENT_EXPORT(CHROMEOS_ASH_COMPONENTS_DRIVEFS) PinManager
   // Starts up the manager, which will first search for any unpinned items and
   // pin them (within the users My drive) then turn to a "monitoring" phase
   // which will ensure any new files created and switched to pinned state
-  // automatically.
+  // automatically. Does nothing if this pin manager is already started.
   void Start();
 
-  // Stops the syncing setup.
+  // Stops this pin manager. Does nothing if this pin manager is already
+  // stopped.
   void Stop();
-
-  // Starts or stops the syncing engine if necessary.
-  void Enable(bool enabled);
 
   // Gets the current progress status.
   Progress GetProgress() const {
@@ -230,13 +224,9 @@ class COMPONENT_EXPORT(CHROMEOS_ASH_COMPONENTS_DRIVEFS) PinManager
     should_pin_ = b;
   }
 
-  // Sets the flag controlling whether the feature should regularly check the
-  // status of files that have been pinned but that haven't seen any progress
-  // yet.
-  void ShouldCheckStalledFiles(const bool b) {
-    DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-    should_check_stalled_files_ = b;
-  }
+  // Sets the online or offline network status, and starts or pauses the Pin
+  // manager accordingly.
+  void SetOnline(bool online);
 
  private:
   // Progress of a file being synced or to be synced.
@@ -305,11 +295,17 @@ class COMPONENT_EXPORT(CHROMEOS_ASH_COMPONENTS_DRIVEFS) PinManager
   // Invoked on retrieval of free space during the periodic check.
   void OnFreeSpaceRetrieved2(int64_t free_space);
 
+  // Creates the Search Query.
+  void StartSearchQuery();
+
+  // Gets the next batch of items when listing files.
+  void GetNextPage();
+
   // Once the free disk space has been retrieved, this method will be invoked
   // after every batch of searches to Drive complete. This is required as the
   // user may already have files pinned (which the `GetQuotaUsage` will include
   // in it's calculation).
-  void OnSearchResultForSizeCalculation(
+  void OnSearchResult(
       drive::FileError error,
       absl::optional<std::vector<drivefs::mojom::QueryItemPtr>> items);
 
@@ -359,37 +355,11 @@ class COMPONENT_EXPORT(CHROMEOS_ASH_COMPONENTS_DRIVEFS) PinManager
         [](const Files::value_type& entry) { return entry.second.pinned; });
   }
 
-  // Types related to network state.
-  using NetworkStateHandler = ash::NetworkStateHandler;
-  using NetworkState = ash::NetworkState;
-  using PortalState = NetworkState::PortalState;
-
-  // If possible, registers this PinManager as a network observer.
-  void RegisterNetworkObserver();
-
-  // Called just before NetworkStateHandler is destroyed so that this observer
-  // can safely stop observing.
-  void OnShuttingDown() override;
-
-  // Called by the NetworkStateHandler to signal that the network conditions
-  // have changed.
-  void DefaultNetworkChanged(const NetworkState* network) override;
-
-  void PortalStateChanged(const NetworkState* default_network,
-                          PortalState portal_state) override;
-
-  void ActiveNetworksChanged(
-      const std::vector<const NetworkState*>& active_networks) override;
-
   SEQUENCE_CHECKER(sequence_checker_);
 
   const Path profile_path_ GUARDED_BY_CONTEXT(sequence_checker_);
   const raw_ptr<mojom::DriveFs, DanglingUntriaged> drivefs_
       GUARDED_BY_CONTEXT(sequence_checker_);
-
-  // Source of NetworkState events.
-  raw_ptr<NetworkStateHandler> network_state_handler_
-      GUARDED_BY_CONTEXT(sequence_checker_) = nullptr;
 
   // Is the device connected to a suitable network? Assume it is online for
   // tests.
@@ -398,11 +368,6 @@ class COMPONENT_EXPORT(CHROMEOS_ASH_COMPONENTS_DRIVEFS) PinManager
   // Should the feature actually pin files, or should it stop after checking the
   // space requirements?
   bool should_pin_ GUARDED_BY_CONTEXT(sequence_checker_) = true;
-
-  // Should the feature regularly check the status of files that have been
-  // pinned but that haven't seen any progress yet?
-  bool should_check_stalled_files_ GUARDED_BY_CONTEXT(sequence_checker_) =
-      false;
 
   // Interval at which the free space is periodically checked.
   base::TimeDelta space_check_interval_ GUARDED_BY_CONTEXT(sequence_checker_) =
@@ -417,6 +382,7 @@ class COMPONENT_EXPORT(CHROMEOS_ASH_COMPONENTS_DRIVEFS) PinManager
   mojo::Remote<mojom::SearchQuery> search_query_
       GUARDED_BY_CONTEXT(sequence_checker_);
   base::ElapsedTimer timer_ GUARDED_BY_CONTEXT(sequence_checker_);
+  base::ElapsedTimer progress_timer_ GUARDED_BY_CONTEXT(sequence_checker_);
 
   // Stable IDs of the files to pin, and which are not already marked as pinned.
   std::unordered_set<Id> files_to_pin_ GUARDED_BY_CONTEXT(sequence_checker_);
@@ -432,10 +398,13 @@ class COMPONENT_EXPORT(CHROMEOS_ASH_COMPONENTS_DRIVEFS) PinManager
   FRIEND_TEST_ALL_PREFIXES(DriveFsPinManagerTest, Update);
   FRIEND_TEST_ALL_PREFIXES(DriveFsPinManagerTest, Remove);
   FRIEND_TEST_ALL_PREFIXES(DriveFsPinManagerTest, OnSyncingEvent);
+  FRIEND_TEST_ALL_PREFIXES(DriveFsPinManagerTest, OnSyncingStatusUpdate);
   FRIEND_TEST_ALL_PREFIXES(DriveFsPinManagerTest, CanPin);
   FRIEND_TEST_ALL_PREFIXES(DriveFsPinManagerTest, OnFileCreated);
   FRIEND_TEST_ALL_PREFIXES(DriveFsPinManagerTest, OnFileModified);
   FRIEND_TEST_ALL_PREFIXES(DriveFsPinManagerTest, OnFileDeleted);
+  FRIEND_TEST_ALL_PREFIXES(DriveFsPinManagerTest, OnFilePinned);
+  FRIEND_TEST_ALL_PREFIXES(DriveFsPinManagerTest, OnFilesChanged);
   FRIEND_TEST_ALL_PREFIXES(DriveFsPinManagerTest, OnMetadataForCreatedFile);
   FRIEND_TEST_ALL_PREFIXES(DriveFsPinManagerTest, OnMetadataForModifiedFile);
   FRIEND_TEST_ALL_PREFIXES(DriveFsPinManagerTest, CheckFreeSpace);
@@ -443,6 +412,14 @@ class COMPONENT_EXPORT(CHROMEOS_ASH_COMPONENTS_DRIVEFS) PinManager
   FRIEND_TEST_ALL_PREFIXES(DriveFsPinManagerTest, NotEnoughSpace2);
   FRIEND_TEST_ALL_PREFIXES(DriveFsPinManagerTest, OnFreeSpaceRetrieved2);
   FRIEND_TEST_ALL_PREFIXES(DriveFsPinManagerTest, PeriodicSpaceCheck);
+  FRIEND_TEST_ALL_PREFIXES(DriveFsPinManagerTest, SetOnline);
+  FRIEND_TEST_ALL_PREFIXES(DriveFsPinManagerTest, OnTransientError);
+  FRIEND_TEST_ALL_PREFIXES(DriveFsPinManagerTest, OnError);
+  FRIEND_TEST_ALL_PREFIXES(DriveFsPinManagerTest, StartWhenInProgress);
+  FRIEND_TEST_ALL_PREFIXES(DriveFsPinManagerTest, StartPinning);
+  FRIEND_TEST_ALL_PREFIXES(DriveFsPinManagerTest, PinSomeFiles);
+  FRIEND_TEST_ALL_PREFIXES(DriveFsPinManagerTest, CheckStalledFiles);
+  FRIEND_TEST_ALL_PREFIXES(DriveFsPinManagerTest, NotifyProgress);
 };
 
 COMPONENT_EXPORT(CHROMEOS_ASH_COMPONENTS_DRIVEFS)

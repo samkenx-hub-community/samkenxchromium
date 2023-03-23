@@ -4,6 +4,7 @@
 
 #import "ios/chrome/credential_provider_extension/ui/new_password_view_controller.h"
 
+#import "base/mac/foundation_util.h"
 #import "base/notreached.h"
 #import "ios/chrome/common/app_group/app_group_metrics.h"
 #import "ios/chrome/common/credential_provider/archivable_credential.h"
@@ -12,8 +13,11 @@
 #import "ios/chrome/common/ui/elements/form_input_accessory_view.h"
 #import "ios/chrome/common/ui/elements/form_input_accessory_view_text_data.h"
 #import "ios/chrome/credential_provider_extension/metrics_util.h"
+#import "ios/chrome/credential_provider_extension/ui/feature_flags.h"
 #import "ios/chrome/credential_provider_extension/ui/new_password_footer_view.h"
 #import "ios/chrome/credential_provider_extension/ui/new_password_table_cell.h"
+#import "ios/chrome/credential_provider_extension/ui/password_note_cell.h"
+#import "ios/chrome/credential_provider_extension/ui/password_note_footer_view.h"
 #import "ios/chrome/credential_provider_extension/ui/ui_util.h"
 
 #if !defined(__has_feature) || !__has_feature(objc_arc)
@@ -26,10 +30,22 @@ namespace {
 // view.
 const CGFloat kTableViewTopSpace = 14;
 
+// Minimal amount of characters in password note to display the warning.
+const int kMinNoteCharAmountForWarning = 901;
+// Maximal amount of characters that a password note can contain.
+const int kMaxNoteCharAmount = 1000;
+
+typedef NS_ENUM(NSInteger, SectionIdentifier) {
+  SectionIdentifierPassword,
+  SectionIdentifierNote,
+  SectionIdentifierNumSections
+};
+
 }  // namespace
 
 @interface NewPasswordViewController () <FormInputAccessoryViewDelegate,
                                          NewPasswordTableCellDelegate,
+                                         PasswordNoteCellDelegate,
                                          UITableViewDataSource>
 
 // The current creation type of the entered password.
@@ -43,6 +59,12 @@ const CGFloat kTableViewTopSpace = 14;
 
 // The cell for password entry
 @property(nonatomic, readonly) NewPasswordTableCell* passwordCell;
+
+// The cell for note entry.
+@property(nonatomic, readonly) PasswordNoteCell* noteCell;
+
+// If yes, the footer informing about the max note length is shown.
+@property(nonatomic, assign) BOOL isNoteFooterShown;
 
 @end
 
@@ -92,12 +114,22 @@ const CGFloat kTableViewTopSpace = 14;
          forCellReuseIdentifier:NewPasswordTableCell.reuseID];
   [self.tableView registerClass:[NewPasswordFooterView class]
       forHeaderFooterViewReuseIdentifier:NewPasswordFooterView.reuseID];
+  if (IsPasswordNotesWithBackupEnabled()) {
+    [self.tableView registerClass:[PasswordNoteCell class]
+           forCellReuseIdentifier:PasswordNoteCell.reuseID];
+    [self.tableView registerClass:[PasswordNoteFooterView class]
+        forHeaderFooterViewReuseIdentifier:PasswordNoteFooterView.reuseID];
+  }
 }
 
 #pragma mark - UITableViewDataSource
 
 - (NSInteger)tableView:(UITableView*)tableView
     numberOfRowsInSection:(NSInteger)section {
+  if (section == SectionIdentifierNote) {
+    return 1;
+  }
+
   // If password sync is not on (represented by the user's email not being
   // available as used in the sync disclaimer), then don't show the "Suggest
   // Strong Password" button.
@@ -108,8 +140,27 @@ const CGFloat kTableViewTopSpace = 14;
                           : NewPasswordTableCellTypeNumRows - 1;
 }
 
+- (NSInteger)numberOfSectionsInTableView:(UITableView*)tableView {
+  if (IsPasswordNotesWithBackupEnabled()) {
+    return SectionIdentifierNumSections;
+  }
+
+  return SectionIdentifierNumSections - 1;
+}
+
 - (UITableViewCell*)tableView:(UITableView*)tableView
         cellForRowAtIndexPath:(NSIndexPath*)indexPath {
+  if (IsPasswordNotesWithBackupEnabled() &&
+      indexPath.section == SectionIdentifierNote) {
+    DCHECK(indexPath.row == 0);
+    PasswordNoteCell* cell =
+        [tableView dequeueReusableCellWithIdentifier:PasswordNoteCell.reuseID];
+    [cell configureCell];
+    cell.delegate = self;
+    cell.selectionStyle = UITableViewCellSelectionStyleNone;
+    return cell;
+  }
+
   NewPasswordTableCell* cell = [tableView
       dequeueReusableCellWithIdentifier:NewPasswordTableCell.reuseID];
   cell.textField.inputAccessoryView = self.accessoryView;
@@ -143,15 +194,44 @@ const CGFloat kTableViewTopSpace = 14;
 
 - (UIView*)tableView:(UITableView*)tableView
     viewForFooterInSection:(NSInteger)section {
-  return [tableView
-      dequeueReusableHeaderFooterViewWithIdentifier:NewPasswordFooterView
-                                                        .reuseID];
+  if (section == SectionIdentifierPassword) {
+    return [tableView
+        dequeueReusableHeaderFooterViewWithIdentifier:NewPasswordFooterView
+                                                          .reuseID];
+  }
+  if (section == SectionIdentifierNote) {
+    return [tableView
+        dequeueReusableHeaderFooterViewWithIdentifier:PasswordNoteFooterView
+                                                          .reuseID];
+  }
+
+  return nil;
 }
 
 #pragma mark - UITableViewDelegate
 
+// Makes sure that the note footer is displayed correctly when it is scrolled to
+// as it could be updated when it is not visible on screen with a long note.
+- (void)tableView:(UITableView*)tableView
+    willDisplayFooterView:(UIView*)view
+               forSection:(NSInteger)section {
+  if (section == SectionIdentifierNote &&
+      [view isKindOfClass:[PasswordNoteFooterView class]]) {
+    PasswordNoteFooterView* footer =
+        base::mac::ObjCCastStrict<PasswordNoteFooterView>(view);
+    footer.textLabel.text = [self noteFooterText];
+
+    [tableView beginUpdates];
+    [tableView endUpdates];
+  }
+}
+
 - (NSIndexPath*)tableView:(UITableView*)tableView
     willSelectRowAtIndexPath:(NSIndexPath*)indexPath {
+  if (indexPath.section == SectionIdentifierNote) {
+    return nil;
+  }
+
   switch (indexPath.row) {
     case NewPasswordTableCellTypeUsername:
     case NewPasswordTableCellTypePassword:
@@ -175,7 +255,7 @@ const CGFloat kTableViewTopSpace = 14;
 - (NewPasswordTableCell*)usernameCell {
   NSIndexPath* usernameIndexPath =
       [NSIndexPath indexPathForRow:NewPasswordTableCellTypeUsername
-                         inSection:0];
+                         inSection:SectionIdentifierPassword];
   NewPasswordTableCell* usernameCell =
       [self.tableView cellForRowAtIndexPath:usernameIndexPath];
 
@@ -185,11 +265,41 @@ const CGFloat kTableViewTopSpace = 14;
 - (NewPasswordTableCell*)passwordCell {
   NSIndexPath* passwordIndexPath =
       [NSIndexPath indexPathForRow:NewPasswordTableCellTypePassword
-                         inSection:0];
+                         inSection:SectionIdentifierPassword];
   NewPasswordTableCell* passwordCell =
       [self.tableView cellForRowAtIndexPath:passwordIndexPath];
 
   return passwordCell;
+}
+
+- (PasswordNoteCell*)noteCell {
+  NSIndexPath* noteIndexPath =
+      [NSIndexPath indexPathForRow:0 inSection:SectionIdentifierNote];
+  PasswordNoteCell* noteCell =
+      [self.tableView cellForRowAtIndexPath:noteIndexPath];
+
+  return noteCell;
+}
+
+#pragma mark - PasswordNoteCellDelegate
+
+- (void)textViewDidChangeInCell:(PasswordNoteCell*)cell {
+  int noteLength = cell.textView.text.length;
+  [cell setValid:(noteLength <= kMaxNoteCharAmount)];
+  [self updateSaveButtonState];
+
+  // Update note footer based on note's length.
+  self.isNoteFooterShown = noteLength >= kMinNoteCharAmountForWarning;
+  UITableViewHeaderFooterView* footerView =
+      [self.tableView footerViewForSection:SectionIdentifierNote];
+  PasswordNoteFooterView* noteFooter =
+      base::mac::ObjCCastStrict<PasswordNoteFooterView>(footerView);
+  noteFooter.textLabel.text = [self noteFooterText];
+
+  // Refresh the cell's height to make the note fully visible while typing or to
+  // clear unnecessary blank lines while removing characters.
+  [self.tableView beginUpdates];
+  [self.tableView endUpdates];
 }
 
 #pragma mark - NewPasswordTableCellDelegate
@@ -228,7 +338,8 @@ const CGFloat kTableViewTopSpace = 14;
 // cell.
 - (void)updateSaveButtonState {
   self.navigationItem.rightBarButtonItem.enabled =
-      self.passwordCell.textField.text.length > 0;
+      self.passwordCell.textField.text.length > 0 &&
+      self.noteCell.textView.text.length <= kMaxNoteCharAmount;
 }
 
 #pragma mark - Private
@@ -247,7 +358,7 @@ const CGFloat kTableViewTopSpace = 14;
 - (NSString*)currentUsername {
   NSIndexPath* usernameIndexPath =
       [NSIndexPath indexPathForRow:NewPasswordTableCellTypeUsername
-                         inSection:0];
+                         inSection:SectionIdentifierPassword];
   NewPasswordTableCell* usernameCell =
       [self.tableView cellForRowAtIndexPath:usernameIndexPath];
   return usernameCell.textField.text;
@@ -256,10 +367,18 @@ const CGFloat kTableViewTopSpace = 14;
 - (NSString*)currentPassword {
   NSIndexPath* passwordIndexPath =
       [NSIndexPath indexPathForRow:NewPasswordTableCellTypePassword
-                         inSection:0];
+                         inSection:SectionIdentifierPassword];
   NewPasswordTableCell* passwordCell =
       [self.tableView cellForRowAtIndexPath:passwordIndexPath];
   return passwordCell.textField.text;
+}
+
+- (NSString*)currentNote {
+  NSIndexPath* noteIndexPath =
+      [NSIndexPath indexPathForRow:0 inSection:SectionIdentifierNote];
+  PasswordNoteCell* noteCell =
+      [self.tableView cellForRowAtIndexPath:noteIndexPath];
+  return noteCell.textView.text;
 }
 
 // Saves the current data as a credential. If `shouldReplace` is YES, then the
@@ -268,10 +387,22 @@ const CGFloat kTableViewTopSpace = 14;
 - (void)saveCredential:(BOOL)shouldReplace {
   NSString* username = [self currentUsername];
   NSString* password = [self currentPassword];
+  NSString* note =
+      IsPasswordNotesWithBackupEnabled() ? [self currentNote] : @"";
 
   [self.credentialHandler saveCredentialWithUsername:username
                                             password:password
+                                                note:note
                                        shouldReplace:shouldReplace];
+}
+
+- (NSString*)noteFooterText {
+  if (self.isNoteFooterShown) {
+    return NSLocalizedString(@"IDS_IOS_CREDENTIAL_PROVIDER_TOO_LONG_NOTE",
+                             @"Notes can save up to 1000 characters.");
+  }
+
+  return @"";
 }
 
 #pragma mark - NewPasswordUIHandler

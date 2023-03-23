@@ -16,6 +16,8 @@
 #include "ash/system/eche/eche_icon_loading_indicator_view.h"
 #include "ash/system/screen_layout_observer.h"
 #include "ash/system/tray/tray_background_view.h"
+#include "ash/webui/eche_app_ui/eche_connection_status_handler.h"
+#include "ash/webui/eche_app_ui/mojom/eche_app.mojom-shared.h"
 #include "ash/webui/eche_app_ui/mojom/eche_app.mojom.h"
 #include "base/gtest_prod_util.h"
 #include "base/timer/timer.h"
@@ -59,13 +61,15 @@ class Shell;
 
 // This class represents the Eche tray button in the status area and
 // controls the bubble that is shown when the tray button is clicked.
-class ASH_EXPORT EcheTray : public TrayBackgroundView,
-                            public SessionObserver,
-                            public ScreenLayoutObserver,
-                            public ShelfObserver,
-                            public TabletModeObserver,
-                            public KeyboardControllerObserver,
-                            public ShellObserver {
+class ASH_EXPORT EcheTray
+    : public TrayBackgroundView,
+      public SessionObserver,
+      public ScreenLayoutObserver,
+      public ShelfObserver,
+      public TabletModeObserver,
+      public KeyboardControllerObserver,
+      public ShellObserver,
+      public eche_app::EcheConnectionStatusHandler::Observer {
  public:
   METADATA_HEADER(EcheTray);
 
@@ -148,6 +152,12 @@ class ASH_EXPORT EcheTray : public TrayBackgroundView,
   void OnKeyboardUIDestroyed() override;
   void OnKeyboardHidden(bool is_temporary_hide) override;
 
+  // eche_app::EcheConnectionStatusHandler::Observer:
+  void OnConnectionStatusChanged(
+      eche_app::mojom::ConnectionStatus connection_status) override;
+  void OnRequestBackgroundConnectionAttempt() override;
+  void OnPhoneHubDisconnected() override;
+
   // Sets the url that will be passed to the webview.
   // Setting a new value will cause the current bubble be destroyed.
   void SetUrl(const GURL& url);
@@ -192,7 +202,9 @@ class ASH_EXPORT EcheTray : public TrayBackgroundView,
   bool LoadBubble(const GURL& url,
                   const gfx::Image& icon,
                   const std::u16string& visible_name,
-                  const std::u16string& phone_name);
+                  const std::u16string& phone_name,
+                  eche_app::mojom::ConnectionStatus last_connection_status,
+                  eche_app::mojom::AppStreamLaunchEntryPoint entry_point);
 
   // Destroys the view inclusing the web view.
   // Note: `CloseBubble` only hides the view.
@@ -213,16 +225,24 @@ class ASH_EXPORT EcheTray : public TrayBackgroundView,
   // Set up the params and init the bubble.
   // Note: This function makes the bubble active and makes the
   // TrayBackgroundView's background inkdrop activate.
-  void InitBubble(const std::u16string& phone_name);
+  void InitBubble(const std::u16string& phone_name,
+                  eche_app::mojom::ConnectionStatus last_connection_status,
+                  eche_app::mojom::AppStreamLaunchEntryPoint entry_point);
 
   // Starts graceful close to ensure the connection resource is released before
   // the window is closed.
   void StartGracefulClose();
 
+  void SetEcheConnectionStatusHandler(
+      eche_app::EcheConnectionStatusHandler* eche_connection_status_handler);
+
   // Test helpers
   bool get_is_landscape_for_test() { return is_landscape_; }
   TrayBubbleWrapper* get_bubble_wrapper_for_test() { return bubble_.get(); }
   AshWebView* get_web_view_for_test() { return web_view_; }
+  AshWebView* get_initializer_webview_for_test() {
+    return initializer_webview_.get();
+  }
   views::ImageButton* GetIcon();
 
  private:
@@ -314,6 +334,13 @@ class ASH_EXPORT EcheTray : public TrayBackgroundView,
   // The webview shown in the bubble that contains the Eche SWA.
   // owned by `bubble_`
   AshWebView* web_view_ = nullptr;
+
+  // Webview used to create a prewarming channel, before we have a video to
+  // attach to.
+  std::unique_ptr<AshWebView> initializer_webview_{};
+
+  eche_app::EcheConnectionStatusHandler* eche_connection_status_handler_ =
+      nullptr;
 
   GracefulCloseCallback graceful_close_callback_;
   GracefulGoBackCallback graceful_go_back_callback_;

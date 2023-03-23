@@ -4,6 +4,8 @@
 
 #include "components/omnibox/common/omnibox_features.h"
 
+#include <string>
+
 #include "base/feature_list.h"
 #include "build/build_config.h"
 
@@ -37,13 +39,12 @@ constexpr auto enabled_by_default_desktop_android =
     base::FEATURE_ENABLED_BY_DEFAULT;
 #endif
 
-// Comment out this macro since it is currently not being used in this file.
-// const auto enabled_by_default_android_ios =
-// #if BUILDFLAG(IS_ANDROID) || BUILDFLAG(IS_IOS)
-//     base::FEATURE_ENABLED_BY_DEFAULT;
-// #else
-//     base::FEATURE_DISABLED_BY_DEFAULT;
-// #endif
+const auto enabled_by_default_android_ios =
+#if BUILDFLAG(IS_ANDROID) || BUILDFLAG(IS_IOS)
+    base::FEATURE_ENABLED_BY_DEFAULT;
+#else
+    base::FEATURE_DISABLED_BY_DEFAULT;
+#endif
 
 // Feature used to enable various experiments on keyword mode, UI and
 // suggestions.
@@ -62,10 +63,16 @@ BASE_FEATURE(kOmniboxRemoveSuggestionsFromClipboard,
              "OmniboxRemoveSuggestionsFromClipboard",
              enabled_by_default_android_only);
 
-// When enabled, uses the grouping framework (i.e.
+// When enabled, uses the grouping framework with zero prefix suggestions (i.e.
 // autocomplete_grouper_sections.h) to limit and group (but not sort) matches.
-BASE_FEATURE(kGroupingFramework,
-             "OmniboxGroupingFramework",
+BASE_FEATURE(kGroupingFrameworkForZPS,
+             "OmniboxGroupingFrameworkForZPS",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+// When enabled, uses the grouping framework with prefixed suggestions (i.e.
+// autocomplete_grouper_sections.h) to limit and group (but not sort) matches.
+BASE_FEATURE(kGroupingFrameworkForNonZPS,
+             "OmniboxGroupingFrameworkForNonZPS",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Demotes the relevance scores when comparing suggestions based on the
@@ -137,7 +144,7 @@ BASE_FEATURE(kUIExperimentMaxAutocompleteMatches,
 // desired number of URL-type matches.
 BASE_FEATURE(kOmniboxMaxURLMatches,
              "OmniboxMaxURLMatches",
-             enabled_by_default_desktop_android);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // Feature used to cap max suggestions to a dynamic limit based on how many URLs
 // would be shown. E.g., show up to 10 suggestions if doing so would display no
@@ -348,7 +355,7 @@ BASE_FEATURE(kDomainSuggestions,
 // shown will be no less than minimum for the platform (eg. 5 for Android).
 BASE_FEATURE(kAdaptiveSuggestionsCount,
              "OmniboxAdaptiveSuggestionsCount",
-             enabled_by_default_android_only);
+             enabled_by_default_android_ios);
 
 // If enabled, clipboard suggestion will not show the clipboard content until
 // the user clicks the reveal button.
@@ -389,9 +396,10 @@ BASE_FEATURE(kOmniboxFuzzyUrlSuggestions,
              enabled_by_default_desktop_only);
 
 // Feature used to enable the default browser pedal.
+// TODO(orinj): Enabled by default 2023-03-17; clean up after M113 settles.
 BASE_FEATURE(kOmniboxDefaultBrowserPedal,
              "OmniboxDefaultBrowserPedal",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // Feature used to synchronize the toolbar's and status bar's color.
 BASE_FEATURE(kOmniboxMatchToolbarAndStatusBarColor,
@@ -436,6 +444,30 @@ BASE_FEATURE(kOmniboxAssistantVoiceSearch,
 BASE_FEATURE(kOmniboxSteadyStateBackgroundColor,
              "OmniboxSteadyStateBackgroundColor",
              base::FEATURE_DISABLED_BY_DEFAULT);
+
+// Specifies the GM3 omnibox background color in Dark Mode.
+const base::FeatureParam<std::string> kOmniboxDarkBackgroundColor(
+    &omnibox::kOmniboxSteadyStateBackgroundColor,
+    "OmniboxDarkBackgroundColor",
+    "0x2A2A2A");
+
+// Specifies the GM3 omnibox background color in Dark Mode (on-hover).
+const base::FeatureParam<std::string> kOmniboxDarkBackgroundColorHovered(
+    &omnibox::kOmniboxSteadyStateBackgroundColor,
+    "OmniboxDarkBackgroundColorHovered",
+    "0x4C4C4B");
+
+// Specifies the GM3 omnibox background color in Light Mode.
+const base::FeatureParam<std::string> kOmniboxLightBackgroundColor(
+    &omnibox::kOmniboxSteadyStateBackgroundColor,
+    "OmniboxLightBackgroundColor",
+    "0xEBEFF7");
+
+// Specifies the GM3 omnibox background color in Light Mode (on-hover).
+const base::FeatureParam<std::string> kOmniboxLightBackgroundColorHovered(
+    &omnibox::kOmniboxSteadyStateBackgroundColor,
+    "OmniboxLightBackgroundColorHovered",
+    "0xE3E7F0");
 
 // If enabled, Omnibox "steady state" height is increased from 28 dp to 34 dp to
 // match GM3 guidelines.
@@ -538,5 +570,9 @@ BASE_FEATURE(kMlRelevanceScoring,
 BASE_FEATURE(kUrlScoringModel,
              "UrlScoringModel",
              base::FEATURE_DISABLED_BY_DEFAULT);
+
+// If enabled, appends additional Trending and Recent Search Related Queries to
+// the suggestion list on the NTP and SRP.
+BASE_FEATURE(kInspireMe, "OmniboxInspireMe", base::FEATURE_DISABLED_BY_DEFAULT);
 
 }  // namespace omnibox

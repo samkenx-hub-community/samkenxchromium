@@ -1820,6 +1820,7 @@
     },
     {
       name: "background-repeat-x",
+      property_methods: ["CSSValueFromComputedStyleInternal"],
       style_builder_template: "background_layer",
       style_builder_template_args: {
         fill_type: "RepeatX",
@@ -1832,6 +1833,7 @@
     },
     {
       name: "background-repeat-y",
+      property_methods: ["CSSValueFromComputedStyleInternal"],
       style_builder_template: "background_layer",
       style_builder_template_args: {
         fill_type: "RepeatY",
@@ -4689,6 +4691,16 @@
       keywords: ["start", "middle", "end"],
       default_value: "start",
       typedom_types: ["Keyword"],
+    },
+    {
+      name: "text-box-trim",
+      property_methods: ["CSSValueFromComputedStyleInternal"],
+      field_group: "box",
+      field_template: "keyword",
+      default_value: "normal",
+      keywords: ["normal", "start", "end", "both"],
+      typedom_types: ["Keyword"],
+      runtime_flag: "CSSTextBoxTrim",
     },
     {
       name: "text-combine-upright",

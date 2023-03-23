@@ -41,6 +41,7 @@ import org.chromium.chrome.browser.IntentHandler;
 import org.chromium.chrome.browser.app.omnibox.ActionChipsDelegateImpl;
 import org.chromium.chrome.browser.app.tab_activity_glue.TabReparentingController;
 import org.chromium.chrome.browser.back_press.BackPressManager;
+import org.chromium.chrome.browser.bookmarks.AddToBookmarksToolbarButtonController;
 import org.chromium.chrome.browser.bookmarks.BookmarkModel;
 import org.chromium.chrome.browser.bookmarks.TabBookmarker;
 import org.chromium.chrome.browser.browser_controls.BrowserControlsStateProvider;
@@ -124,6 +125,7 @@ import org.chromium.chrome.browser.toolbar.adaptive.AdaptiveButtonActionMenuCoor
 import org.chromium.chrome.browser.toolbar.adaptive.AdaptiveToolbarButtonController;
 import org.chromium.chrome.browser.toolbar.adaptive.AdaptiveToolbarButtonVariant;
 import org.chromium.chrome.browser.toolbar.adaptive.OptionalNewTabButtonController;
+import org.chromium.chrome.browser.toolbar.adaptive.TranslateToolbarButtonController;
 import org.chromium.chrome.browser.toolbar.top.ToolbarActionModeCallback;
 import org.chromium.chrome.browser.toolbar.top.ToolbarControlContainer;
 import org.chromium.chrome.browser.ui.appmenu.AppMenuBlocker;
@@ -1120,6 +1122,10 @@ public class RootUiCoordinator
                                     VoiceInteractionSource.TOOLBAR);
                         }
                     };
+            TranslateToolbarButtonController translateToolbarButtonController =
+                    new TranslateToolbarButtonController(mActivityTabProvider,
+                            AppCompatResources.getDrawable(mActivity, R.drawable.ic_translate),
+                            mActivity.getString(R.string.menu_translate), trackerSupplier);
             VoiceToolbarButtonController voiceToolbarButtonController =
                     new VoiceToolbarButtonController(mActivity,
                             AppCompatResources.getDrawable(mActivity, R.drawable.btn_mic),
@@ -1130,6 +1136,11 @@ public class RootUiCoordinator
                             AppCompatResources.getDrawable(mActivity, R.drawable.new_tab_icon),
                             mActivityLifecycleDispatcher, mTabCreatorManagerSupplier,
                             mActivityTabProvider, trackerSupplier);
+            AddToBookmarksToolbarButtonController addToBookmarksToolbarButtonController =
+                    new AddToBookmarksToolbarButtonController(mActivityTabProvider,
+                            AppCompatResources.getDrawable(mActivity, R.drawable.btn_star),
+                            mActivity.getString(R.string.menu_bookmark), mTabBookmarkerSupplier,
+                            trackerSupplier);
             AdaptiveToolbarButtonController adaptiveToolbarButtonController =
                     new AdaptiveToolbarButtonController(mActivity, new SettingsLauncherImpl(),
                             mActivityLifecycleDispatcher, new AdaptiveButtonActionMenuCoordinator(),
@@ -1140,6 +1151,11 @@ public class RootUiCoordinator
                     AdaptiveToolbarButtonVariant.SHARE, shareButtonController);
             adaptiveToolbarButtonController.addButtonVariant(
                     AdaptiveToolbarButtonVariant.VOICE, voiceToolbarButtonController);
+            adaptiveToolbarButtonController.addButtonVariant(
+                    AdaptiveToolbarButtonVariant.ADD_TO_BOOKMARKS,
+                    addToBookmarksToolbarButtonController);
+            adaptiveToolbarButtonController.addButtonVariant(
+                    AdaptiveToolbarButtonVariant.TRANSLATE, translateToolbarButtonController);
             adaptiveToolbarButtonController.addButtonVariant(
                     AdaptiveToolbarButtonVariant.PRICE_TRACKING, priceTrackingButtonController);
             adaptiveToolbarButtonController.addButtonVariant(

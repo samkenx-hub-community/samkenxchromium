@@ -119,7 +119,6 @@
 <translation id="1942765061641586207">Rozlišení obrázku</translation>
 <translation id="1972984168337863910">Rozbalit panely zpětné vazby k souborům</translation>
 <translation id="1995337122023280937">Přejít do umístění souboru</translation>
-<translation id="1999709132469742660">Přístup k souborům ze všech adres URL</translation>
 <translation id="2001796770603320721">Spravovat na Disku</translation>
 <translation id="2009067268969781306">Naformátováním jednotky smažete všechna na ní uložená data. Tuto akci nelze vrátit zpět.</translation>
 <translation id="2025955442973426285">tigrinijština</translation>
@@ -151,6 +150,7 @@
 <translation id="2236732657580416950">Mezipaměť Disku Google byla vymazána.</translation>
 <translation id="2239068707900391003">Člověk s kávou</translation>
 <translation id="2251368349685848079">Obnovit z koše</translation>
+<translation id="2278133026967558505">Přístup k souborům ze všech webů a adres URL</translation>
 <translation id="2282155092769082568">Adresa URL automatické konfigurace:</translation>
 <translation id="2284767815536050991">vyměnitelné úložiště</translation>
 <translation id="2288278176040912387">Gramofon</translation>
@@ -542,7 +542,6 @@
 <translation id="5323213332664049067">Latinská Amerika</translation>
 <translation id="5330145655348521461">Tyto soubory jsou otevřeny na jiné ploše. Chcete-li je zobrazit, přejděte do profilu <ph name="USER_NAME" /> (<ph name="MAIL_ADDRESS" />).</translation>
 <translation id="5330512191124428349">Zobrazit informace</translation>
-<translation id="5337538975554986899">Přístup k souborům ze všech adres URL kromě <ph name="NON_RESTRICTED_DESTINATIONS" /></translation>
 <translation id="5344246330454251646">Spravovat sdílení s Bruschettou</translation>
 <translation id="535792325654997756">Člověk s kočkami</translation>
 <translation id="5358764674931277">Snímková frekvence</translation>
@@ -768,6 +767,7 @@
 <translation id="7162080671816799010">Chybí údaj „Shoda alternativních názvů subjektu“ nebo „Shoda přípon domén“ k ověření identity ověřovacího serveru</translation>
 <translation id="7165320105431587207">Konfigurace sítě se nezdařila</translation>
 <translation id="7170041865419449892">Mimo dosah</translation>
+<translation id="7179579940054351344">Přístup k souborům ze všech webů a adres URL kromě <ph name="NON_RESTRICTED_DESTINATIONS" /></translation>
 <translation id="7180611975245234373">Obnovit</translation>
 <translation id="7189874332498648577"><ph name="NUMBER_OF_GB" /> GB</translation>
 <translation id="7191454237977785534">Uložit soubor jako</translation>
@@ -941,6 +941,7 @@
 <translation id="8492972329130824181">Domácí síť není k dispozici. K připojení musí být zapnutý roaming pro mobilní data.</translation>
 <translation id="8499098729323186194">Rozbalování položek (<ph name="NUMBER_OF_ITEMS" />)…</translation>
 <translation id="8502913769543567768">Síť <ph name="NETWORK_INDEX" /> z <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, <ph name="NETWORK_PROVIDER_NAME" />, aktivujte po nastavení zařízení, spravováno administrátorem</translation>
+<translation id="8512483403832814140">Kdykoli</translation>
 <translation id="8521441079177373948">Britská klávesnice</translation>
 <translation id="853494022971700746">francouzština (Francie)</translation>
 <translation id="8540608333167683902">Síť <ph name="NETWORK_INDEX" /> z <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, <ph name="CONNECTION_STATUS" />, síla signálu: <ph name="SIGNAL_STRENGTH" /> %, podrobnosti</translation>

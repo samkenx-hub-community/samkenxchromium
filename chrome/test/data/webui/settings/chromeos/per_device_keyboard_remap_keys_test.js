@@ -2,10 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import {FakeInputDeviceSettingsProvider, fakeKeyboards, getInputDeviceSettingsProvider, KeyboardRemapModifierKeyRowElement, MetaKey, ModifierKey, Router, routes, SettingsPerDeviceKeyboardRemapKeysElement} from 'chrome://os-settings/chromeos/os_settings.js';
+import {FakeInputDeviceSettingsProvider, fakeKeyboards, KeyboardRemapModifierKeyRowElement, MetaKey, ModifierKey, Router, routes, setInputDeviceSettingsProviderForTesting, SettingsPerDeviceKeyboardRemapKeysElement} from 'chrome://os-settings/chromeos/os_settings.js';
 import {assertFalse, assertTrue} from 'chrome://webui-test/chai_assert.js';
 import {flushTasks} from 'chrome://webui-test/polymer_test_util.js';
-import {isVisible} from 'chrome://webui-test/test_util.js';
 
 suite('PerDeviceKeyboardRemapKeys', function() {
   /**
@@ -18,7 +17,9 @@ suite('PerDeviceKeyboardRemapKeys', function() {
    */
   let provider = null;
   setup(() => {
-    provider = getInputDeviceSettingsProvider();
+    provider = new FakeInputDeviceSettingsProvider();
+    provider.setFakeKeyboards(fakeKeyboards);
+    setInputDeviceSettingsProviderForTesting(provider);
     PolymerTest.clearBody();
   });
 
@@ -60,6 +61,11 @@ suite('PerDeviceKeyboardRemapKeys', function() {
     assertEquals(page.fakeCtrlPref.value, ctrlDefaultMapping);
     assertEquals(page.fakeEscPref.value, ModifierKey.kEscape);
     assertEquals(page.fakeMetaPref.value, metaDefaultMapping);
+  }
+
+  async function getConnectedKeyboardSettings() {
+    const keyboards = await provider.getConnectedKeyboardSettings();
+    return keyboards;
   }
 
   /**
@@ -260,9 +266,9 @@ suite('PerDeviceKeyboardRemapKeys', function() {
     page.set('fakeEscPref.value', ModifierKey.kVoid);
 
     // Verify that the keyboard settings in the provider are updated.
-    const updatedKeyboards = await provider.getConnectedKeyboardSettings();
-    assertTrue(!!updatedKeyboards);
-    const updatedRemapping = updatedKeyboards[0].settings.modifierRemappings;
+    const keyboards = await getConnectedKeyboardSettings();
+    assertTrue(!!keyboards);
+    const updatedRemapping = keyboards[0].settings.modifierRemappings;
     assertTrue(!!updatedRemapping);
     assertEquals(Object.keys(updatedRemapping).length, 3);
     assertEquals(updatedRemapping[ModifierKey.kAlt], ModifierKey.kAssistant);

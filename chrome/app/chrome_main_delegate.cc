@@ -68,6 +68,7 @@
 #include "components/crash/core/app/crash_reporter_client.h"
 #include "components/crash/core/common/crash_key.h"
 #include "components/crash/core/common/crash_keys.h"
+#include "components/devtools/devtools_pipe/devtools_pipe.h"
 #include "components/memory_system/initializer.h"
 #include "components/memory_system/parameters.h"
 #include "components/metrics/persistent_histograms.h"
@@ -938,7 +939,6 @@ void ChromeMainDelegate::CommonEarlyInitialization() {
   }
   base::HangWatcher::InitializeOnMainThread(hang_watcher_process_type);
 
-  base::internal::TimerBase::InitializeFeatures();
   base::InitializeCpuReductionExperiment();
   base::sequence_manager::internal::SequenceManagerImpl::InitializeFeatures();
 #if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_ANDROID)
@@ -1034,9 +1034,17 @@ absl::optional<int> ChromeMainDelegate::BasicStartupComplete() {
     }
   }
 
+  // The DevTools remote debugging pipe file descriptors need to be checked
+  // before any other files are opened, see https://crbug.com/1423048.
+  const bool is_browser = !command_line.HasSwitch(switches::kProcessType);
+  if (is_browser && command_line.HasSwitch(::switches::kRemoteDebuggingPipe) &&
+      !devtools_pipe::AreFileDescriptorsOpen()) {
+    LOG(ERROR) << "Remote debugging pipe file descriptors are not open.";
+    return chrome::RESULT_CODE_UNSUPPORTED_PARAM;
+  }
+
 #if BUILDFLAG(IS_WIN)
   // Browser should not be sandboxed.
-  const bool is_browser = !command_line.HasSwitch(switches::kProcessType);
   if (is_browser && IsSandboxedProcess())
     return chrome::RESULT_CODE_INVALID_SANDBOX_STATE;
 #endif
@@ -1044,7 +1052,6 @@ absl::optional<int> ChromeMainDelegate::BasicStartupComplete() {
 #if BUILDFLAG(IS_MAC)
   // Give the browser process a longer treadmill, since crashes
   // there have more impact.
-  const bool is_browser = !command_line.HasSwitch(switches::kProcessType);
   ObjcEvilDoers::ZombieEnable(true, is_browser ? 10000 : 1000);
 #endif
 

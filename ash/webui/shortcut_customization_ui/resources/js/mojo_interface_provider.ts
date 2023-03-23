@@ -82,6 +82,10 @@ export class ShortcutProviderWrapper implements ShortcutProviderInterface {
     return this.remote.isMutable(source);
   }
 
+  hasLauncherButton(): Promise<{hasLauncherButton: boolean}> {
+    return this.remote.hasLauncherButton();
+  }
+
   removeAccelerator(
       source: AcceleratorSource, action: number,
       accelerator: Accelerator): Promise<{result: AcceleratorResultData}> {
@@ -105,6 +109,11 @@ export class ShortcutProviderWrapper implements ShortcutProviderInterface {
 
   addObserver(observer: AcceleratorsUpdatedObserverRemote): void {
     return this.remote.addObserver(observer);
+  }
+
+  restoreDefault(source: AcceleratorSource, actionId: number):
+      Promise<{result: AcceleratorResultData}> {
+    return this.remote.restoreDefault(source, actionId);
   }
 
   restoreAllDefaults(): Promise<{result: AcceleratorResultData}> {

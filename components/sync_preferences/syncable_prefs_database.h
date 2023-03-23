@@ -7,14 +7,24 @@
 
 #include <string>
 
-#include "base/notreached.h"
+#include "components/sync/base/model_type.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
 
 namespace sync_preferences {
 
-struct SyncablePrefMetadata {
-  // A unique ID corresponding to each syncable preference.
+// This class represents the metadata corresponding to a syncable preference.
+class SyncablePrefMetadata {
+ public:
+  SyncablePrefMetadata(int syncable_pref_id, syncer::ModelType model_type);
+  // Returns the unique ID corresponding to the syncable preference.
+  int syncable_pref_id() const { return syncable_pref_id_; }
+  // Returns the model type of the pref, i.e. PREFERENCES, PRIORITY_PREFERENCES,
+  // OS_PREFERENCES or OS_PRIORITY_PREFERENCES.
+  syncer::ModelType model_type() const { return model_type_; }
+
+ private:
   int syncable_pref_id_;
+  syncer::ModelType model_type_;
 };
 
 // This class provides an interface to define the list of syncable
@@ -34,18 +44,12 @@ class SyncablePrefsDatabase {
 
   // Returns the metadata associated to the pref and null if `pref_name` is not
   // syncable.
-  // TODO(crbug.com/1422534): Mark method as pure virtual once
-  // overridden in all implementations.
   virtual absl::optional<SyncablePrefMetadata> GetSyncablePrefMetadata(
-      const std::string& pref_name) const;
+      const std::string& pref_name) const = 0;
 
   // Returns true if `pref_name` is part of the allowlist of syncable
   // preferences.
-  // TODO(crbug.com/1422534): Unmark as virtual and use default implementation
-  // once GetSyncablePrefMetadata() has been implemented by all.
-  // Note: This is marked as pure virtual but still has implementation to not
-  // give the false impression that the default impl is ready for use.
-  virtual bool IsPreferenceSyncable(const std::string& pref_name) const = 0;
+  bool IsPreferenceSyncable(const std::string& pref_name) const;
 };
 
 }  // namespace sync_preferences

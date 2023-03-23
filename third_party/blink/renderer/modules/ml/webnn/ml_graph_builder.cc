@@ -11,6 +11,7 @@
 #include "third_party/blink/renderer/bindings/modules/v8/v8_ml_clamp_options.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_ml_conv_2d_options.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_ml_gemm_options.h"
+#include "third_party/blink/renderer/bindings/modules/v8/v8_ml_leaky_relu_options.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_ml_operand_descriptor.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_ml_pool_2d_options.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_ml_resample_2d_options.h"
@@ -455,6 +456,33 @@ MLOperand* BuildPool2d(MLGraphBuilder* builder,
   return output;
 }
 
+// The current WebNN spec doesn't define the calculation formula of the output
+// size for resample2d. An issue has been filed to track it -
+// https://github.com/webmachinelearning/webnn/issues/360.
+absl::optional<uint32_t> CalculateResample2dOutputSize(
+    const uint32_t input_size,
+    const float scale,
+    String& error_message) {
+  // Calculate the output size in double precision floating point number that
+  // ensures values of type uint32_t can be exactly represented.
+  // https://en.wikipedia.org/wiki/Double-precision_floating-point_format#Precision_limitations_on_integer_values
+  // The max value of checked_output_size should be 3 * UINT_MAX + 1,
+  // which is smaller than the max safe integer value for double type.
+  auto checked_output_size = base::MakeCheckedNum<double>(input_size) * scale;
+
+  // Check if the value is valid for rounding to uint32_t type.
+  if (!checked_output_size.IsValid<uint32_t>()) {
+    error_message = "The scale is too large.";
+    return absl::nullopt;
+  }
+  const uint32_t output_size =
+      base::ClampFloor<uint32_t>(double(checked_output_size.ValueOrDie()));
+  if (output_size == 0) {
+    error_message = "The scale is too small.";
+    return absl::nullopt;
+  }
+  return output_size;
+}
 }  // namespace
 
 // static
@@ -968,6 +996,34 @@ MLActivation* MLGraphBuilder::hardSwish(ExceptionState& exception_state) {
       this, MLOperator::OperatorKind::kHardSwish);
 }
 
+MLOperand* MLGraphBuilder::leakyRelu(const MLOperand* input,
+                                     const MLLeakyReluOptions* options,
+                                     ExceptionState& exception_state) {
+  auto* leaky_relu = MakeGarbageCollected<MLOperator>(
+      this, MLOperator::OperatorKind::kLeakyRelu, options);
+  // According to WebNN spec
+  // https://www.w3.org/TR/webnn/#api-mlgraphbuilder-relu, the output tensor of
+  // relu has the same type and dimensions as its input.
+  String error_message;
+  auto* output = MLOperand::ValidateAndCreateOutput(
+      this, input->Type(), input->Dimensions(), leaky_relu, error_message);
+  if (!output) {
+    exception_state.ThrowDOMException(DOMExceptionCode::kDataError,
+                                      error_message);
+    return nullptr;
+  }
+  leaky_relu->Connect({input}, {output});
+  return output;
+}
+
+MLActivation* MLGraphBuilder::leakyRelu(const MLLeakyReluOptions* options,
+                                        ExceptionState& exception_state) {
+  // Create the leakyRelu operator that would be used as an activation
+  // function.
+  return MakeGarbageCollected<MLActivation>(
+      this, MLOperator::OperatorKind::kLeakyRelu, options);
+}
+
 MLOperand* MLGraphBuilder::averagePool2d(const MLOperand* input,
                                          const MLPool2dOptions* options,
                                          ExceptionState& exception_state) {
@@ -1170,22 +1226,27 @@ MLOperand* MLGraphBuilder::resample2d(const MLOperand* input,
                                         "All scales should be greater than 0.");
       return nullptr;
     }
-    base::CheckedNumeric<uint32_t> checked_output_height =
-        input_shape[axes[0]] * scales[0];
-    if (!checked_output_height.AssignIfValid(&output_shape[axes[0]])) {
-      exception_state.ThrowDOMException(DOMExceptionCode::kDataError,
-                                        "The scale height is too large.");
+    String error_message;
+    auto output_height = CalculateResample2dOutputSize(
+        input_shape[axes[0]], scales[0], error_message);
+    if (!output_height) {
+      exception_state.ThrowDOMException(
+          DOMExceptionCode::kDataError,
+          "Failed to calculate the output height: " + error_message);
       return nullptr;
     }
-    base::CheckedNumeric<uint32_t> checked_output_width =
-        input_shape[axes[1]] * scales[1];
-    if (!checked_output_width.AssignIfValid(&output_shape[axes[1]])) {
-      exception_state.ThrowDOMException(DOMExceptionCode::kDataError,
-                                        "The scale width is too large.");
-      return nullptr;
-    }
-  }
+    output_shape[axes[0]] = output_height.value();
 
+    auto output_width = CalculateResample2dOutputSize(input_shape[axes[1]],
+                                                      scales[1], error_message);
+    if (!output_width) {
+      exception_state.ThrowDOMException(
+          DOMExceptionCode::kDataError,
+          "Failed to calculate the output width: " + error_message);
+      return nullptr;
+    }
+    output_shape[axes[1]] = output_width.value();
+  }
   auto* resample2d = MakeGarbageCollected<MLOperator>(
       this, MLOperator::OperatorKind::kResample2d, options);
   String error_message;
@@ -1272,14 +1333,14 @@ MLOperand* MLGraphBuilder::transpose(const MLOperand* input,
                                      ExceptionState& exception_state) {
   // According to WebNN spec:
   // https://www.w3.org/TR/webnn/#api-mlgraphbuilder-transpose,
-  // When permutation is not specified, it’s set to [N-1...0], where N is the
+  // When permutation is not specified, it’s set to [N-1, ..., 0], where N is the
   // rank of the input tensor.
   auto input_rank = input->Dimensions().size();
-  Vector<int32_t> default_permutation(input_rank);
+  Vector<uint32_t> default_permutation(input_rank);
   for (wtf_size_t i = 0; i < input_rank - 1; i++) {
     default_permutation[i] = input_rank - 1 - i;
   }
-  const Vector<int32_t> permutation =
+  const Vector<uint32_t> permutation =
       options->getPermutationOr(std::move(default_permutation));
   if (permutation.size() != input_rank) {
     exception_state.ThrowDOMException(
@@ -1289,12 +1350,8 @@ MLOperand* MLGraphBuilder::transpose(const MLOperand* input,
     return nullptr;
   }
 
-  // The current WebNN spec defines the value of permutation as signed
-  // integer: https://www.w3.org/TR/webnn/#dom-mltransposeoptions-permutation
-  // And an issue has been filed to track it:
-  // https://github.com/webmachinelearning/webnn/issues/317
-  if (base::ranges::any_of(permutation, [input_rank](int32_t axis) {
-        return axis < 0 || base::MakeStrictNum(axis) >= input_rank;
+  if (base::ranges::any_of(permutation, [input_rank](uint32_t axis) {
+        return base::MakeStrictNum(axis) >= input_rank;
       })) {
     exception_state.ThrowDOMException(
         DOMExceptionCode::kDataError,
@@ -1306,7 +1363,7 @@ MLOperand* MLGraphBuilder::transpose(const MLOperand* input,
   }
 
   if (permutation.size() !=
-      std::set<int32_t>(permutation.begin(), permutation.end()).size()) {
+      std::set<uint32_t>(permutation.begin(), permutation.end()).size()) {
     exception_state.ThrowDOMException(
         DOMExceptionCode::kDataError,
         "Two or more values are same in the permutation sequence.");

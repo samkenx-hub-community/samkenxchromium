@@ -174,9 +174,12 @@ void CustomProperty::ApplyValue(StyleResolverState& state,
   if (!registered_value) {
     DCHECK(declaration);
     CSSVariableData& data = declaration->Value();
+    CSSTokenizer tokenizer(data.OriginalText());
+    Vector<CSSParserToken, 32> tokens = tokenizer.TokenizeToEOF();
+    CSSTokenizedValue tokenized_value{CSSParserTokenRange(tokens),
+                                      data.OriginalText()};
     registered_value =
-        Parse(CSSTokenizedValue{data.TokenRange(), data.OriginalText()},
-              *context, CSSParserLocalContext());
+        Parse(tokenized_value, *context, CSSParserLocalContext());
   }
 
   if (!registered_value) {
@@ -260,6 +263,10 @@ bool CustomProperty::HasInitialValue() const {
 
 bool CustomProperty::SupportsGuaranteedInvalid() const {
   return !registration_ || registration_->Syntax().IsUniversal();
+}
+
+bool CustomProperty::HasUniversalSyntax() const {
+  return registration_ && registration_->Syntax().IsUniversal();
 }
 
 }  // namespace blink

@@ -7,6 +7,7 @@
 
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "base/debug/crash_logging.h"
@@ -51,6 +52,7 @@
 #include "services/network/public/cpp/content_security_policy/csp_context.h"
 #include "services/network/public/mojom/blocked_by_response_reason.mojom-shared.h"
 #include "services/network/public/mojom/content_security_policy.mojom.h"
+#include "services/network/public/mojom/trust_token_access_observer.mojom-shared.h"
 #include "services/network/public/mojom/web_sandbox_flags.mojom-shared.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
 #include "third_party/blink/public/common/runtime_feature_state/runtime_feature_state_context.h"
@@ -99,7 +101,8 @@ class CONTENT_EXPORT NavigationRequest
       public FencedFrameURLMapping::MappingResultObserver,
       public mojom::NavigationRendererCancellationListener,
       private RenderProcessHostObserver,
-      private network::mojom::CookieAccessObserver {
+      private network::mojom::CookieAccessObserver,
+      private network::mojom::TrustTokenAccessObserver {
  public:
   // Keeps track of the various stages of a NavigationRequest.
   // To see what state transitions are allowed, see |SetState|.
@@ -811,6 +814,13 @@ class CONTENT_EXPORT NavigationRequest
       mojo::PendingReceiver<network::mojom::CookieAccessObserver>>
   TakeCookieObservers();
 
+  // Take all Trust Token observers associated with this navigation.
+  // Typically this is called when navigation commits to move these observers to
+  // the committed document.
+  [[nodiscard]] std::vector<
+      mojo::PendingReceiver<network::mojom::TrustTokenAccessObserver>>
+  TakeTrustTokenObservers();
+
   // Returns the coop status information relevant to the current navigation.
   CrossOriginOpenerPolicyStatus& coop_status() { return coop_status_; }
 
@@ -897,9 +907,9 @@ class CONTENT_EXPORT NavigationRequest
   // separate callback, WillCommitWithoutUrlLoader().
   bool NeedsUrlLoader();
 
-  network::mojom::PrivateNetworkRequestPolicy private_network_request_policy()
+  network::mojom::LocalNetworkRequestPolicy local_network_request_policy()
       const {
-    return private_network_request_policy_;
+    return local_network_request_policy_;
   }
 
   // Whether this navigation request waits for the result of beforeunload before
@@ -979,6 +989,11 @@ class CONTENT_EXPORT NavigationRequest
     return prerender_frame_tree_node_id_.value();
   }
 
+  const absl::optional<FencedFrameProperties>& GetFencedFrameProperties()
+      const {
+    return fenced_frame_properties_;
+  }
+
   // Compute and return the `FencedFrameProperties` that this
   // `NavigationRequest` acts under, i.e. the properties attached to this
   // `NavigationRequest` if present, or the properties attached to the fenced
@@ -987,6 +1002,9 @@ class CONTENT_EXPORT NavigationRequest
       const;
 
   const absl::optional<base::UnguessableToken> ComputeFencedFrameNonce() const;
+
+  const absl::optional<blink::FencedFrame::DeprecatedFencedFrameMode>
+  ComputeDeprecatedFencedFrameMode() const;
 
   void RenderFallbackContentForObjectTag();
 
@@ -1135,6 +1153,10 @@ class CONTENT_EXPORT NavigationRequest
   // request and is instead pulled from the committed context on the main frame.
   bool GetIsThirdPartyCookiesUserBypassEnabled();
 
+  void set_resume_commit_closure_for_test(base::OnceClosure closure) {
+    resume_commit_closure_ = std::move(closure);
+  }
+
  private:
   friend class NavigationRequestTest;
 
@@ -1218,10 +1240,6 @@ class CONTENT_EXPORT NavigationRequest
   // AreOriginAgentClustersEnabledByDefault() is false.
   bool IsOriginAgentClusterOptOutRequested();
 
-  // Returns whether defaulting to origin-keyed agent cluster (without
-  // necessarily an origin-keyed process) is enabled.
-  bool AreOriginAgentClustersEnabledByDefault() const;
-
   // Returns whether this navigation request should use an origin-keyed
   // agent cluster (but not an origin-keyed process).
   bool IsIsolationImplied();
@@ -1253,6 +1271,20 @@ class CONTENT_EXPORT NavigationRequest
   absl::optional<NavigationEarlyHintsManagerParams>
   CreateNavigationEarlyHintsManagerParams(
       const network::mojom::EarlyHints& early_hints) override;
+
+  // Selecting a `RenderFrameHost` to commit a navigation may occasionally fail.
+  // When this happens, the navigation will bind a closure to continue the
+  // navigation and assign it to `resume_commit_closure_`. This closure may run
+  // even when it is still not possible to proceed; see the comment on the
+  // `resume_commit_closure_` field for the full details.
+
+  // Corresponds to navigations committing from `OnResponseStarted()`:
+  void SelectFrameHostForOnResponseStarted(
+      network::mojom::URLLoaderClientEndpointsPtr url_loader_client_endpoints,
+      bool is_download,
+      absl::optional<SubresourceLoaderParams> subresource_loader_params);
+  // TODO(https://crbug.com/1220337): Implement this logic for
+  // OnRequestFailedInternal() and BeginNavigationImpl() as well.
 
   // To be called whenever a navigation request fails. If |skip_throttles| is
   // true, the registered NavigationThrottle(s) won't get a chance to intercept
@@ -1422,15 +1454,17 @@ class CONTENT_EXPORT NavigationRequest
   // renderer process.
   void UpdateCommitNavigationParamsHistory();
 
-  // Called when the renderer requesting a navigation cancellation, or because
-  // the renderer crashed.
-  void OnRendererRequestedNavigationCancellation();
+  // The disconnect handler for the NavigationClient Mojo interface; used as a
+  // signal to potentially cancel navigations, e.g. when the renderer replaces
+  // an existing NavigationClient connection with a new one or when the renderer
+  // process crashes.
+  void OnNavigationClientDisconnected(uint32_t reason,
+                                      const std::string& description);
 
   // Binds the given error_handler to be called when an interface disconnection
   // happens on the renderer side.
   void HandleInterfaceDisconnection(
-      mojo::AssociatedRemote<mojom::NavigationClient>*,
-      base::OnceClosure error_handler);
+      mojo::AssociatedRemote<mojom::NavigationClient>&);
 
   // When called, this NavigationRequest will no longer interpret the interface
   // disconnection on the renderer side as an AbortNavigation.
@@ -1533,11 +1567,11 @@ class CONTENT_EXPORT NavigationRequest
   // redirect.
   void UpdateStateFollowingRedirect(const GURL& new_referrer_url);
 
-  // Updates |private_network_request_policy_| for ReadyToCommitNavigation().
+  // Updates |local_network_request_policy_| for ReadyToCommitNavigation().
   //
   // Must not be called for same-document navigation requests nor for requests
   // served from the back-forward cache or from prerendered pages.
-  void UpdatePrivateNetworkRequestPolicy();
+  void UpdateLocalNetworkRequestPolicy();
 
   // Called when the navigation is ready to be committed. This will update the
   // |state_| and inform the delegate.
@@ -1621,9 +1655,18 @@ class CONTENT_EXPORT NavigationRequest
   CreateCookieAccessObserver();
 
   // network::mojom::CookieAccessObserver:
-  void OnCookiesAccessed(
-      network::mojom::CookieAccessDetailsPtr details) override;
+  void OnCookiesAccessed(std::vector<network::mojom::CookieAccessDetailsPtr>
+                             details_vector) override;
   void Clone(mojo::PendingReceiver<network::mojom::CookieAccessObserver>
+                 observer) override;
+
+  mojo::PendingRemote<network::mojom::TrustTokenAccessObserver>
+  CreateTrustTokenAccessObserver();
+
+  // network::mojom::TrustTokenAccessObserver:
+  void OnTrustTokensAccessed(
+      network::mojom::TrustTokenAccessDetailsPtr details) override;
+  void Clone(mojo::PendingReceiver<network::mojom::TrustTokenAccessObserver>
                  observer) override;
 
   // Convenience function to return the NavigationControllerImpl this
@@ -2221,6 +2264,11 @@ class CONTENT_EXPORT NavigationRequest
   // made by this navigation.
   mojo::ReceiverSet<network::mojom::CookieAccessObserver> cookie_observers_;
 
+  // Observers listening to Trust Token access notifications for the network
+  // requests made by this navigation.
+  mojo::ReceiverSet<network::mojom::TrustTokenAccessObserver>
+      trust_token_observers_;
+
   OriginAgentClusterEndResult origin_agent_cluster_end_result_ =
       OriginAgentClusterEndResult::kNotRequestedAndNotOriginKeyed;
 
@@ -2281,8 +2329,8 @@ class CONTENT_EXPORT NavigationRequest
   // TODO(ahemery, titouan): Move some elements to the policy container or
   // rework inheritance.
   // https://crbug.com/1154729
-  network::mojom::PrivateNetworkRequestPolicy private_network_request_policy_ =
-      network::mojom::PrivateNetworkRequestPolicy::kWarn;
+  network::mojom::LocalNetworkRequestPolicy local_network_request_policy_ =
+      network::mojom::LocalNetworkRequestPolicy::kWarn;
 
   // The list of web features that were used by the new document during
   // navigation. These can only be logged once the document commits, so they are

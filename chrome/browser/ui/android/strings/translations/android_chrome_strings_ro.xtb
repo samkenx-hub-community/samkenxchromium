@@ -283,6 +283,7 @@ Indicativele de stare private îmbunătățesc confidențialitatea pe web și nu
 <translation id="2581165646603367611">Astfel, vor fi șterse cookie-urile, memoria cache și alte date ale site-urilor pe care Chrome nu le consideră importante.</translation>
 <translation id="2587052924345400782">Este disponibilă o versiune mai nouă</translation>
 <translation id="2593272815202181319">Un singur spațiu</translation>
+<translation id="2603212228005142861">Conectează-te pentru a-ți gestiona preferințele</translation>
 <translation id="2604446170045642109">Poți să dezactivezi tema întunecată pentru site-uri din setări.</translation>
 <translation id="2612676031748830579">Număr card</translation>
 <translation id="2625189173221582860">Parola a fost copiată</translation>
@@ -476,6 +477,7 @@ Indicativele de stare private îmbunătățesc confidențialitatea pe web și nu
 <translation id="3587596251841506391">Îmbunătățește securitatea pe web</translation>
 <translation id="3597179440835065298">Primește sugestii mai bune</translation>
 <translation id="3602290021589620013">Previzualizare</translation>
+<translation id="360901359071773787">Ștergi ultimele 15 minute?</translation>
 <translation id="3616113530831147358">Audio</translation>
 <translation id="3622349720008044802">Gestionează ferestrele</translation>
 <translation id="3631987586758005671">Se trimite la <ph name="DEVICE_NAME" /></translation>
@@ -630,6 +632,7 @@ Indicativele de stare private îmbunătățesc confidențialitatea pe web și nu
 
 Contul Google poate să ofere alte forme ale istoricului de navigare, cum ar fi căutările și activitatea din alte servicii Google, la <ph name="BEGIN_LINK" />myactivity.google.com<ph name="END_LINK" />.</translation>
 <translation id="452750746583162491">Examinează datele sincronizate</translation>
+<translation id="4528638190900283934">Conectează-te pentru funcții suplimentare</translation>
 <translation id="4532845899244822526">Alege dosarul</translation>
 <translation id="4547551584605870320">{TAB_COUNT,plural, =1{<ph name="TAB_COUNT_ONE" /> filă}few{<ph name="TAB_COUNT_MANY" /> file, <ph name="TAB_COUNT_INCOGNITO" /> incognito}other{<ph name="TAB_COUNT_MANY" /> de file, <ph name="TAB_COUNT_INCOGNITO" /> incognito}}</translation>
 <translation id="4554077758708533499">Conectat cu un cablu USB</translation>
@@ -820,6 +823,7 @@ Pentru a modifica această setare, <ph name="BEGIN_LINK" />resetează sincroniza
 <translation id="5517095782334947753">Ai marcajele, istoricul, parolele și alte setări din <ph name="FROM_ACCOUNT" />.</translation>
 <translation id="5524761631371622910">În versiunile de încercare și dacă Chrome te-a inclus în mod aleatoriu într-o versiune de încercare activă, istoricul tău de navigare influențează anunțurile pe care le vezi și categoriile de interese estimate de mai jos. Pentru a-ți proteja confidențialitatea, Chrome șterge categoriile de interese în permanență, în fiecare lună.</translation>
 <translation id="5524843473235508879">Redirecționarea a fost blocată.</translation>
+<translation id="554297709083131118">Următoarele date din ultimele 15 minute vor fi șterse</translation>
 <translation id="5548606607480005320">Verificare de siguranță</translation>
 <translation id="5555525474779371165">Alege protecția prin Navigarea sigură</translation>
 <translation id="5556459405103347317">Reîncarcă</translation>
@@ -1074,6 +1078,7 @@ De exemplu, unele site-uri pot răspunde la această solicitare afișând anunț
 <translation id="6824899148643461612"><ph name="TAB_TITLE" />, filă, selectată</translation>
 <translation id="6828070228333235514">Nu mai urmări prețul</translation>
 <translation id="6830728435402077660">Nesecurizată</translation>
+<translation id="6831043979455480757">Tradu</translation>
 <translation id="6833996806551876956">Perioada de încercare a Mediului de testare securizat pentru confidențialitate</translation>
 <translation id="6836206421467243968">Restabilește grupul de file <ph name="TITLE_OF_GROUP" /> ca pe un nou grup de file din fundal.</translation>
 <translation id="6846298663435243399">Se încarcă…</translation>
@@ -1241,10 +1246,10 @@ De exemplu, unele site-uri pot răspunde la această solicitare afișând anunț
 <translation id="7707922173985738739">va folosi datele mobile;</translation>
 <translation id="7709094866268987903">Interesele eliminate vor apărea aici</translation>
 <translation id="7709918231054955894">Accesează toate filele</translation>
+<translation id="772434085369393266">Doresc actualizarea navigărilor la HTTPS și un avertisment înainte de încărcarea site-urilor care nu acceptă acest protocol. Nu poți schimba această setare deoarece ai activată Protecția avansată.</translation>
 <translation id="7725024127233776428">Paginile pe care le marchezi apar aici</translation>
 <translation id="7757787379047923882">Text trimis de pe <ph name="DEVICE_NAME" /></translation>
 <translation id="7762668264895820836">Cardul SD <ph name="SD_CARD_NUMBER" /></translation>
-<translation id="7762928140712606393">Conectează-te pentru alte funcții și securitate eficientă de la Chrome</translation>
 <translation id="7764225426217299476">Adaugă o adresă</translation>
 <translation id="7772032839648071052">Confirmă expresia de acces</translation>
 <translation id="7772375229873196092">Închide <ph name="APP_NAME" /></translation>
@@ -1260,6 +1265,7 @@ De exemplu, unele site-uri pot răspunde la această solicitare afișând anunț
 <translation id="78270725016672455">Computerul solicită permisiunea de a înregistra dispozitivul pentru conectarea la un site</translation>
 <translation id="7844171778363018843">Nu s-au selectat date pentru sincronizare</translation>
 <translation id="7846296061357476882">Servicii Google</translation>
+<translation id="7847228556075070294">Ai șters istoricul, cookie-urile și alte date</translation>
 <translation id="784934925303690534">Interval de timp</translation>
 <translation id="7851858861565204677">Alte dispozitive</translation>
 <translation id="7853202427316060426">Activitate</translation>
@@ -1439,6 +1445,7 @@ De exemplu, unele site-uri pot răspunde la această solicitare afișând anunț
 <translation id="869891660844655955">Dată de expirare</translation>
 <translation id="8699120352855309748">Nu oferi traducerea pentru aceste limbi</translation>
 <translation id="8712637175834984815">Am înțeles</translation>
+<translation id="8723453889042591629">Tradu rapid această pagină. Pentru a edita comanda rapidă, atinge-o lung.</translation>
 <translation id="8725066075913043281">Încearcă din nou</translation>
 <translation id="8746155870861185046">Distribuie selecția</translation>
 <translation id="874726034427945498">Pentru a vedea sugestii mai bune în bara de adrese, sincronizează filele și istoricul</translation>

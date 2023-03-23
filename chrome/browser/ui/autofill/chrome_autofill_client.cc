@@ -394,6 +394,7 @@ void ChromeAutofillClient::ShowAutofillSettings(PopupType popup_type) {
       return;
     case PopupType::kUnspecified:
     case PopupType::kPasswords:
+    case PopupType::kIbans:
       NOTREACHED();
   }
 #else
@@ -401,6 +402,7 @@ void ChromeAutofillClient::ShowAutofillSettings(PopupType popup_type) {
   if (browser) {
     switch (popup_type) {
       case PopupType::kCreditCards:
+      case PopupType::kIbans:
         chrome::ShowSettingsSubPage(browser, chrome::kPaymentsSubPage);
         return;
       case PopupType::kPersonalInformation:
@@ -735,7 +737,8 @@ void ChromeAutofillClient::ConfirmSaveAddressProfile(
 #if BUILDFLAG(IS_ANDROID)
   // TODO(crbug.com/1167061): Respect SaveAddressProfilePromptOptions.
   save_update_address_profile_flow_manager_.OfferSave(
-      web_contents(), profile, original_profile, std::move(callback));
+      web_contents(), profile, original_profile,
+      options.is_migration_to_account, std::move(callback));
 #else
   SaveUpdateAddressProfileBubbleControllerImpl::CreateForWebContents(
       web_contents());
@@ -778,9 +781,14 @@ void ChromeAutofillClient::HideFastCheckout(bool allow_further_runs) {
 #endif
 }
 
-bool ChromeAutofillClient::IsFastCheckoutSupported() {
+bool ChromeAutofillClient::IsFastCheckoutSupported(
+    const FormData& form,
+    const FormFieldData& field,
+    const AutofillManager& autofill_manager) {
 #if BUILDFLAG(IS_ANDROID)
-  return base::FeatureList::IsEnabled(::features::kFastCheckout);
+  return base::FeatureList::IsEnabled(::features::kFastCheckout) &&
+         FastCheckoutClient::GetOrCreateForWebContents(web_contents())
+             ->IsSupported(form, field, autofill_manager);
 #else
   return false;
 #endif

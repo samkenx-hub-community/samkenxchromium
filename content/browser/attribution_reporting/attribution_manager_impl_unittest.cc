@@ -21,7 +21,7 @@
 #include "base/memory/scoped_refptr.h"
 #include "base/run_loop.h"
 #include "base/scoped_observation.h"
-#include "base/strings/string_util.h"
+#include "base/strings/strcat.h"
 #include "base/task/task_traits.h"
 #include "base/task/thread_pool.h"
 #include "base/task/updateable_sequenced_task_runner.h"
@@ -41,6 +41,7 @@
 #include "content/browser/attribution_reporting/aggregatable_histogram_contribution.h"
 #include "content/browser/attribution_reporting/attribution_cookie_checker.h"
 #include "content/browser/attribution_reporting/attribution_debug_report.h"
+#include "content/browser/attribution_reporting/attribution_features.h"
 #include "content/browser/attribution_reporting/attribution_observer.h"
 #include "content/browser/attribution_reporting/attribution_report.h"
 #include "content/browser/attribution_reporting/attribution_report_sender.h"
@@ -78,6 +79,7 @@
 #if BUILDFLAG(IS_ANDROID)
 #include "content/browser/attribution_reporting/attribution_input_event.h"
 #include "content/browser/attribution_reporting/attribution_os_level_manager.h"
+#include "content/browser/attribution_reporting/os_registration.h"
 #endif
 
 namespace content {
@@ -120,6 +122,13 @@ constexpr AttributionStorageDelegate::OfflineReportDelayConfig
         .min = base::Minutes(0),
         .max = base::Minutes(1),
     };
+
+constexpr char kPendingAndBrowserWentOfflineTimeSinceCreation[] =
+    "Conversions.AggregatableReport.PendingAndBrowserWentOffline."
+    "TimeSinceCreation";
+constexpr char kPendingAndBrowserWentOfflineTimeUntilReportTime[] =
+    "Conversions.AggregatableReport.PendingAndBrowserWentOffline."
+    "TimeUntilReportTime";
 
 auto InvokeReportSentCallback(SendResult::Status status) {
   return [=](AttributionReport report, bool is_debug_report,
@@ -217,18 +226,8 @@ class MockAttributionOsLevelManager : public AttributionOsLevelManager {
   ~MockAttributionOsLevelManager() override = default;
 
   MOCK_METHOD(void,
-              RegisterAttributionSource,
-              (const GURL& registration_url,
-               const url::Origin& top_level_origin,
-               bool is_debug_key_allowed,
-               const AttributionInputEvent&),
-              (override));
-
-  MOCK_METHOD(void,
-              RegisterAttributionTrigger,
-              (const GURL& registration_url,
-               const url::Origin& top_level_origin,
-               bool is_debug_key_allowed),
+              Register,
+              (const OsRegistration&, bool is_debug_key_allowed),
               (override));
 
   MOCK_METHOD(void,
@@ -330,11 +329,9 @@ class AttributionManagerImplTest : public testing::Test {
   }
 
   void RegisterAggregatableSourceAndMatchingTrigger(
-      const std::string& origin_prefix) {
-    const auto origin = *SuitableOrigin::Create(GURL(base::JoinString(
-        {"https://", origin_prefix,
-         ".example/.well-known/attribution-reporting/report-event-attribution"},
-        "")));
+      base::StringPiece origin_prefix) {
+    const auto origin = *SuitableOrigin::Deserialize(
+        base::StrCat({"https://", origin_prefix, ".example"}));
 
     attribution_manager_->HandleSource(TestAggregatableSourceProvider()
                                            .GetBuilder()
@@ -1138,32 +1135,42 @@ TEST_F(AttributionManagerImplTest, HandleOsSource) {
     InSequence seq;
 
     EXPECT_CALL(*os_level_manager_ptr,
-                RegisterAttributionSource(kRegistrationUrl1, kTopLevelOrigin1,
-                                          /*is_debug_key_allowed=*/true, _));
+                Register(OsRegistration(kRegistrationUrl1, kTopLevelOrigin1,
+                                        AttributionInputEvent()),
+                         /*is_debug_key_allowed=*/true));
 
     EXPECT_CALL(*os_level_manager_ptr,
-                RegisterAttributionSource(kRegistrationUrl2, kTopLevelOrigin2,
-                                          /*is_debug_key_allowed=*/false, _));
+                Register(OsRegistration(kRegistrationUrl2, kTopLevelOrigin2,
+                                        AttributionInputEvent()),
+                         /*is_debug_key_allowed=*/false));
   }
 
   // Dropped due to the URL being opaque.
-  EXPECT_CALL(
-      *os_level_manager_ptr,
-      RegisterAttributionSource(kRegistrationUrl3, kTopLevelOrigin3, _, _))
+  EXPECT_CALL(*os_level_manager_ptr,
+              Register(OsRegistration(kRegistrationUrl3, kTopLevelOrigin3,
+                                      AttributionInputEvent()),
+                       _))
       .Times(0);
 
   // Prohibited by policy below.
-  EXPECT_CALL(
-      *os_level_manager_ptr,
-      RegisterAttributionSource(kRegistrationUrl4, kTopLevelOrigin4, _, _))
+  EXPECT_CALL(*os_level_manager_ptr,
+              Register(OsRegistration(kRegistrationUrl4, kTopLevelOrigin4,
+                                      AttributionInputEvent()),
+                       _))
       .Times(0);
 
-  attribution_manager_->HandleOsSource(kRegistrationUrl1, kTopLevelOrigin1,
-                                       AttributionInputEvent(), kFrameId);
-  attribution_manager_->HandleOsSource(kRegistrationUrl2, kTopLevelOrigin2,
-                                       AttributionInputEvent(), kFrameId);
-  attribution_manager_->HandleOsSource(kRegistrationUrl3, kTopLevelOrigin3,
-                                       AttributionInputEvent(), kFrameId);
+  attribution_manager_->HandleOsRegistration(
+      OsRegistration(kRegistrationUrl1, kTopLevelOrigin1,
+                     AttributionInputEvent()),
+      kFrameId);
+  attribution_manager_->HandleOsRegistration(
+      OsRegistration(kRegistrationUrl2, kTopLevelOrigin2,
+                     AttributionInputEvent()),
+      kFrameId);
+  attribution_manager_->HandleOsRegistration(
+      OsRegistration(kRegistrationUrl3, kTopLevelOrigin3,
+                     AttributionInputEvent()),
+      kFrameId);
 
   MockAttributionReportingContentBrowserClient browser_client;
   EXPECT_CALL(
@@ -1175,8 +1182,10 @@ TEST_F(AttributionManagerImplTest, HandleOsSource) {
       .WillOnce(Return(false));
   ScopedContentBrowserClientSetting setting(&browser_client);
 
-  attribution_manager_->HandleOsSource(kRegistrationUrl4, kTopLevelOrigin4,
-                                       AttributionInputEvent(), kFrameId);
+  attribution_manager_->HandleOsRegistration(
+      OsRegistration(kRegistrationUrl4, kTopLevelOrigin4,
+                     AttributionInputEvent()),
+      kFrameId);
 }
 
 TEST_F(AttributionManagerImplTest, HandleOsTrigger) {
@@ -1201,32 +1210,42 @@ TEST_F(AttributionManagerImplTest, HandleOsTrigger) {
     InSequence seq;
 
     EXPECT_CALL(*os_level_manager_ptr,
-                RegisterAttributionTrigger(kRegistrationUrl1, kTopLevelOrigin1,
-                                           /*is_debug_key_allowed=*/true));
+                Register(OsRegistration(kRegistrationUrl1, kTopLevelOrigin1,
+                                        /*input_event=*/absl::nullopt),
+                         /*is_debug_key_allowed=*/true));
 
     EXPECT_CALL(*os_level_manager_ptr,
-                RegisterAttributionTrigger(kRegistrationUrl2, kTopLevelOrigin2,
-                                           /*is_debug_key_allowed=*/false));
+                Register(OsRegistration(kRegistrationUrl2, kTopLevelOrigin2,
+                                        /*input_event=*/absl::nullopt),
+                         /*is_debug_key_allowed=*/false));
   }
 
   // Dropped due to the URL being opaque.
-  EXPECT_CALL(
-      *os_level_manager_ptr,
-      RegisterAttributionTrigger(kRegistrationUrl3, kTopLevelOrigin3, _))
+  EXPECT_CALL(*os_level_manager_ptr,
+              Register(OsRegistration(kRegistrationUrl3, kTopLevelOrigin3,
+                                      /*input_event=*/absl::nullopt),
+                       _))
       .Times(0);
 
   // Prohibited by policy below.
-  EXPECT_CALL(
-      *os_level_manager_ptr,
-      RegisterAttributionTrigger(kRegistrationUrl4, kTopLevelOrigin4, _))
+  EXPECT_CALL(*os_level_manager_ptr,
+              Register(OsRegistration(kRegistrationUrl4, kTopLevelOrigin4,
+                                      /*input_event=*/absl::nullopt),
+                       _))
       .Times(0);
 
-  attribution_manager_->HandleOsTrigger(kRegistrationUrl1, kTopLevelOrigin1,
-                                        kFrameId);
-  attribution_manager_->HandleOsTrigger(kRegistrationUrl2, kTopLevelOrigin2,
-                                        kFrameId);
-  attribution_manager_->HandleOsTrigger(kRegistrationUrl3, kTopLevelOrigin3,
-                                        kFrameId);
+  attribution_manager_->HandleOsRegistration(
+      OsRegistration(kRegistrationUrl1, kTopLevelOrigin1,
+                     /*input_event=*/absl::nullopt),
+      kFrameId);
+  attribution_manager_->HandleOsRegistration(
+      OsRegistration(kRegistrationUrl2, kTopLevelOrigin2,
+                     /*input_event=*/absl::nullopt),
+      kFrameId);
+  attribution_manager_->HandleOsRegistration(
+      OsRegistration(kRegistrationUrl3, kTopLevelOrigin3,
+                     /*input_event=*/absl::nullopt),
+      kFrameId);
 
   MockAttributionReportingContentBrowserClient browser_client;
   EXPECT_CALL(
@@ -1238,8 +1257,10 @@ TEST_F(AttributionManagerImplTest, HandleOsTrigger) {
       .WillOnce(Return(false));
   ScopedContentBrowserClientSetting setting(&browser_client);
 
-  attribution_manager_->HandleOsTrigger(kRegistrationUrl4, kTopLevelOrigin4,
-                                        kFrameId);
+  attribution_manager_->HandleOsRegistration(
+      OsRegistration(kRegistrationUrl4, kTopLevelOrigin4,
+                     /*input_event=*/absl::nullopt),
+      kFrameId);
 }
 
 #endif  // BUILDFLAG(IS_ANDROID)
@@ -2709,26 +2730,20 @@ TEST_F(AttributionManagerImplTest, PendingReportsMetrics) {
 
   ShutdownManager();
 
-  histograms.ExpectTotalCount(
-      "Conversions.AggregatableReport.PendingAndBrowserWentOffline."
-      "TimeSinceCreation",
-      3);
+  histograms.ExpectTotalCount(kPendingAndBrowserWentOfflineTimeSinceCreation,
+                              3);
   EXPECT_EQ(
-      histograms.GetTotalSum("Conversions.AggregatableReport."
-                             "PendingAndBrowserWentOffline.TimeSinceCreation"),
+      histograms.GetTotalSum(kPendingAndBrowserWentOfflineTimeSinceCreation),
       base::Seconds(70 + 60 + 40).InMilliseconds());
 
-  histograms.ExpectTotalCount(
-      "Conversions.AggregatableReport.PendingAndBrowserWentOffline."
-      "TimeUntilReportTime",
-      3);
-  EXPECT_EQ(histograms.GetTotalSum(
-                "Conversions.AggregatableReport.PendingAndBrowserWentOffline."
-                "TimeUntilReportTime"),
-            ((kFirstReportingWindow - base::Seconds(70)) +
-             (kFirstReportingWindow - base::Seconds(60)) +
-             (kFirstReportingWindow - base::Seconds(40)))
-                .InMilliseconds());
+  histograms.ExpectTotalCount(kPendingAndBrowserWentOfflineTimeUntilReportTime,
+                              3);
+  EXPECT_EQ(
+      histograms.GetTotalSum(kPendingAndBrowserWentOfflineTimeUntilReportTime),
+      ((kFirstReportingWindow - base::Seconds(70)) +
+       (kFirstReportingWindow - base::Seconds(60)) +
+       (kFirstReportingWindow - base::Seconds(40)))
+          .InMilliseconds());
 }
 
 TEST_F(AttributionManagerImplTest,
@@ -2743,15 +2758,11 @@ TEST_F(AttributionManagerImplTest,
 
   ShutdownManager();
 
-  // Expect no histograms on shutdown as the report have already been sent.
-  histograms.ExpectTotalCount(
-      "Conversions.AggregatableReport.PendingAndBrowserWentOffline."
-      "TimeSinceCreation",
-      0);
-  histograms.ExpectTotalCount(
-      "Conversions.AggregatableReport.PendingAndBrowserWentOffline."
-      "TimeUntilReportTime",
-      0);
+  // Expect no histograms on shutdown as the reports have already been sent.
+  histograms.ExpectTotalCount(kPendingAndBrowserWentOfflineTimeSinceCreation,
+                              0);
+  histograms.ExpectTotalCount(kPendingAndBrowserWentOfflineTimeUntilReportTime,
+                              0);
 }
 
 TEST_F(AttributionManagerImplTest, PendingReportsMetrics_Offline) {
@@ -2777,14 +2788,10 @@ TEST_F(AttributionManagerImplTest, PendingReportsMetrics_Offline) {
 
   // Expect only one histogram as there was only one pending report when it
   // first went offline.
-  histograms.ExpectTotalCount(
-      "Conversions.AggregatableReport.PendingAndBrowserWentOffline."
-      "TimeSinceCreation",
-      1);
-  histograms.ExpectTotalCount(
-      "Conversions.AggregatableReport.PendingAndBrowserWentOffline."
-      "TimeUntilReportTime",
-      1);
+  histograms.ExpectTotalCount(kPendingAndBrowserWentOfflineTimeSinceCreation,
+                              1);
+  histograms.ExpectTotalCount(kPendingAndBrowserWentOfflineTimeUntilReportTime,
+                              1);
 }
 
 TEST_F(AttributionManagerImplTest, PendingReportsMetrics_OverLimits) {
@@ -2800,18 +2807,13 @@ TEST_F(AttributionManagerImplTest, PendingReportsMetrics_OverLimits) {
   ShutdownManager();
 
   // Expect that events registered past the limit should be dropped.
-  histograms.ExpectTotalCount(
-      "Conversions.AggregatableReport.PendingAndBrowserWentOffline."
-      "TimeSinceCreation",
-      kMaxPendingReportsTimings);
-  histograms.ExpectTotalCount(
-      "Conversions.AggregatableReport.PendingAndBrowserWentOffline."
-      "TimeUntilReportTime",
-      kMaxPendingReportsTimings);
+  histograms.ExpectTotalCount(kPendingAndBrowserWentOfflineTimeSinceCreation,
+                              kMaxPendingReportsTimings);
+  histograms.ExpectTotalCount(kPendingAndBrowserWentOfflineTimeUntilReportTime,
+                              kMaxPendingReportsTimings);
 
   EXPECT_EQ(
-      histograms.GetTotalSum("Conversions.AggregatableReport."
-                             "PendingAndBrowserWentOffline.TimeSinceCreation"),
+      histograms.GetTotalSum(kPendingAndBrowserWentOfflineTimeSinceCreation),
       (base::Seconds(10) * kMaxPendingReportsTimings).InMilliseconds());
 }
 

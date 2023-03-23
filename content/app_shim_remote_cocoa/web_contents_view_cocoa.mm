@@ -21,7 +21,6 @@
 #include "ui/base/clipboard/clipboard_constants.h"
 #include "ui/base/clipboard/clipboard_util_mac.h"
 #include "ui/base/clipboard/custom_data_helper.h"
-#include "ui/base/cocoa/cocoa_base_utils.h"
 #include "ui/base/dragdrop/drag_drop_types.h"
 #include "ui/gfx/image/image.h"
 #include "ui/resources/grit/ui_resources.h"
@@ -156,10 +155,8 @@ STATIC_ASSERT_ENUM(NSDragOperationMove, ui::DragDropTypes::DRAG_MOVE);
   info->location_in_view =
       gfx::PointF(viewPoint.x, viewFrame.size.height - viewPoint.y);
 
-  NSPoint screenPoint =
-      ui::ConvertPointFromWindowToScreen([self window], windowPoint);
-  NSScreen* screen = [[self window] screen];
-  NSRect screenFrame = [screen frame];
+  NSPoint screenPoint = [self.window convertPointToScreen:windowPoint];
+  NSRect screenFrame = self.window.screen.frame;
   info->location_in_screen =
       gfx::PointF(screenPoint.x, screenFrame.size.height - screenPoint.y);
 
@@ -244,6 +241,10 @@ STATIC_ASSERT_ENUM(NSDragOperationMove, ui::DragDropTypes::DRAG_MOVE);
                 .ToNSImage();
   }
 
+  // The frame given to -[NSDraggingItem setDraggingFrame:contents:] will be
+  // interpreted as being in the coordinate system of this view, so convert it
+  // from the coordinate system of the window.
+  mouseLocation = [self convertPoint:mouseLocation fromView:nil];
   NSRect imageRect = NSMakeRect(mouseLocation.x, mouseLocation.y,
                                 image.size.width, image.size.height);
   imageRect.origin.x -= offset.x;
@@ -252,8 +253,6 @@ STATIC_ASSERT_ENUM(NSDragOperationMove, ui::DragDropTypes::DRAG_MOVE);
   [draggingItem setDraggingFrame:imageRect contents:image];
 
   _dragOperation = operationMask;
-  _dragOffset = offset;
-  _dragImageHeight = image.size.height;
 
   // Run the drag operation.
   [self beginDraggingSessionWithItems:@[ draggingItem ]
@@ -276,16 +275,9 @@ STATIC_ASSERT_ENUM(NSDragOperationMove, ui::DragDropTypes::DRAG_MOVE);
     return;
   }
 
-  // Reconstruct the screen point by removing the offset. It seems like the
-  // underlying drag machinery is measuring from the corner of the dragged
-  // image.
-  screenPoint.x += _dragOffset.x;
-  screenPoint.y += _dragImageHeight - _dragOffset.y;
-
   NSPoint localPoint = NSZeroPoint;
   if (self.window) {
-    NSPoint basePoint =
-        ui::ConvertPointFromScreenToWindow(self.window, screenPoint);
+    NSPoint basePoint = [self.window convertPointFromScreen:screenPoint];
     localPoint = [self convertPoint:basePoint fromView:nil];
   }
 

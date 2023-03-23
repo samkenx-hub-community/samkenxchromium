@@ -202,13 +202,6 @@ source_set("unit_tests") {
   ]
 }
 
-optimize_js("language_detection_js") {
-  primary_script =
-      "//components/translate/ios/browser/resources/language_detection.js"
-  sources =
-      [ "//components/translate/ios/browser/resources/language_detection.js" ]
-}
-
 source_set("web_internal") {
   configs += [ "//build/config/compiler:enable_arc" ]
   sources = [
@@ -222,7 +215,6 @@ source_set("web_internal") {
     "ios_thread_profiler.h",
   ]
   deps = [
-    ":language_detection_js",
     ":web",
     "//base",
     "//base/allocator:buildflags",
@@ -414,7 +406,7 @@ source_set("eg_test_support+eg2") {
 
   deps = [
     "//ios/chrome/test/earl_grey:eg_test_support+eg2",
-    "//ios/third_party/earl_grey2:test_lib",
+    "//ios/testing/earl_grey:eg_test_support+eg2",
   ]
 }
 
@@ -501,7 +493,6 @@ source_set("eg2_tests") {
     "//ios/net:test_support",
     "//ios/testing:embedded_test_server_support",
     "//ios/testing/earl_grey:eg_test_support+eg2",
-    "//ios/third_party/earl_grey2:test_lib",
     "//ios/web/common:features",
     "//ios/web/public/test:element_selector",
     "//ios/web/public/test/http_server",

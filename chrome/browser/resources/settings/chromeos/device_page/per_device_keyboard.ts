@@ -19,22 +19,25 @@ import '../../controls/settings_toggle_button.js';
 import '../../settings_shared.css.js';
 import 'chrome://resources/cr_elements/cr_slider/cr_slider.js';
 
+import {I18nMixin, I18nMixinInterface} from 'chrome://resources/cr_elements/i18n_mixin.js';
 import {PolymerElementProperties} from 'chrome://resources/polymer/v3_0/polymer/interfaces.js';
 import {PolymerElement} from 'chrome://resources/polymer/v3_0/polymer/polymer_bundled.min.js';
 
-import {Setting} from '../../mojom-webui/setting.mojom-webui.js';
-import {DeepLinkingMixin} from '../deep_linking_mixin.js';
+import {DeepLinkingMixin, DeepLinkingMixinInterface} from '../deep_linking_mixin.js';
+import {Setting} from '../mojom-webui/setting.mojom-webui.js';
 import {routes} from '../os_settings_routes.js';
-import {RouteObserverMixin} from '../route_observer_mixin.js';
+import {RouteObserverMixin, RouteObserverMixinInterface} from '../route_observer_mixin.js';
 import {Route, Router} from '../router.js';
 
 import {DevicePageBrowserProxy, DevicePageBrowserProxyImpl} from './device_page_browser_proxy.js';
-import {getInputDeviceSettingsProvider} from './input_device_mojo_interface_provider.js';
-import {InputDeviceSettingsProviderInterface, Keyboard} from './input_device_settings_types.js';
+import {Keyboard} from './input_device_settings_types.js';
 import {getTemplate} from './per_device_keyboard.html.js';
 
 const SettingsPerDeviceKeyboardElementBase =
-    DeepLinkingMixin(RouteObserverMixin(PolymerElement));
+    DeepLinkingMixin(RouteObserverMixin(I18nMixin(PolymerElement))) as {
+      new (): PolymerElement & I18nMixinInterface &
+          RouteObserverMixinInterface & DeepLinkingMixinInterface,
+    };
 
 export class SettingsPerDeviceKeyboardElement extends
     SettingsPerDeviceKeyboardElementBase {
@@ -48,8 +51,36 @@ export class SettingsPerDeviceKeyboardElement extends
 
   static get properties(): PolymerElementProperties {
     return {
+      /** Preferences state. Used for auto repeat settings. */
+      prefs: {
+        type: Object,
+        notify: true,
+      },
+
       keyboards: {
         type: Array,
+      },
+
+      /**
+       * Auto-repeat delays (in ms) for the corresponding slider values, from
+       * long to short. The values were chosen to provide a large range while
+       * giving several options near the defaults.
+       */
+      autoRepeatDelays: {
+        type: Array,
+        value: [2000, 1500, 1000, 500, 300, 200, 150],
+        readOnly: true,
+      },
+
+      /**
+       * Auto-repeat intervals (in ms) for the corresponding slider values, from
+       * long to short. The slider itself is labeled "rate", the inverse of
+       * interval, and goes from slow (long interval) to fast (short interval).
+       */
+      autoRepeatIntervals: {
+        type: Array,
+        value: [2000, 1000, 500, 300, 200, 100, 50, 30, 20],
+        readOnly: true,
       },
 
       /**
@@ -58,6 +89,7 @@ export class SettingsPerDeviceKeyboardElement extends
       supportedSettingIds: {
         type: Object,
         value: () => new Set<Setting>([
+          Setting.kKeyboardAutoRepeat,
           Setting.kKeyboardShortcuts,
         ]),
       },
@@ -65,15 +97,11 @@ export class SettingsPerDeviceKeyboardElement extends
   }
 
   protected keyboards: Keyboard[];
-  private inputDeviceSettingsProvider: InputDeviceSettingsProviderInterface =
-      getInputDeviceSettingsProvider();
+  private prefs: chrome.settingsPrivate.PrefObject;
+  private autoRepeatDelays: number[];
+  private autoRepeatIntervals: number[];
   private browserProxy: DevicePageBrowserProxy =
       DevicePageBrowserProxyImpl.getInstance();
-
-  constructor() {
-    super();
-    this.fetchConnectedKeyboards();
-  }
 
   override connectedCallback() {
     super.connectedCallback();
@@ -90,11 +118,6 @@ export class SettingsPerDeviceKeyboardElement extends
     this.attemptDeepLink();
   }
 
-  private async fetchConnectedKeyboards(): Promise<void> {
-    this.keyboards =
-        await this.inputDeviceSettingsProvider.getConnectedKeyboardSettings();
-  }
-
   private onShowKeyboardShortcutViewerTap(): void {
     this.browserProxy.showKeyboardShortcutViewer();
   }
@@ -103,6 +126,10 @@ export class SettingsPerDeviceKeyboardElement extends
     Router.getInstance().navigateTo(
         routes.OS_LANGUAGES_INPUT,
         /*dynamicParams=*/ undefined, /*removeSearch=*/ true);
+  }
+
+  protected hasKeyboards(): boolean {
+    return this.keyboards.length > 0;
   }
 }
 

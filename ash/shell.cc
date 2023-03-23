@@ -74,6 +74,7 @@
 #include "ash/game_dashboard/game_dashboard_controller.h"
 #include "ash/glanceables/glanceables_controller.h"
 #include "ash/glanceables/glanceables_delegate.h"
+#include "ash/glanceables/glanceables_v2_controller.h"
 #include "ash/host/ash_window_tree_host_init_params.h"
 #include "ash/hud_display/hud_display.h"
 #include "ash/ime/ime_controller_impl.h"
@@ -115,6 +116,7 @@
 #include "ash/style/ash_color_mixer.h"
 #include "ash/style/ash_color_provider.h"
 #include "ash/style/dark_light_mode_controller_impl.h"
+#include "ash/style/style_util.h"
 #include "ash/system/audio/audio_effects_controller.h"
 #include "ash/system/audio/display_speaker_controller.h"
 #include "ash/system/bluetooth/bluetooth_device_status_ui_handler.h"
@@ -131,6 +133,7 @@
 #include "ash/system/human_presence/human_presence_orientation_controller.h"
 #include "ash/system/human_presence/snooping_protection_controller.h"
 #include "ash/system/input_device_settings/input_device_settings_controller_impl.h"
+#include "ash/system/input_device_settings/input_device_settings_dispatcher.h"
 #include "ash/system/input_device_settings/input_device_tracker.h"
 #include "ash/system/input_device_settings/keyboard_modifier_metrics_recorder.h"
 #include "ash/system/keyboard_brightness/keyboard_backlight_color_controller.h"
@@ -169,6 +172,8 @@
 #include "ash/touch/touch_devices_controller.h"
 #include "ash/touch/touch_selection_magnifier_runner_ash.h"
 #include "ash/tray_action/tray_action.h"
+#include "ash/user_education/user_education_controller.h"
+#include "ash/user_education/user_education_delegate.h"
 #include "ash/utility/occlusion_tracker_pauser.h"
 #include "ash/wallpaper/wallpaper_controller_impl.h"
 #include "ash/wm/ash_focus_rules.h"
@@ -176,6 +181,7 @@
 #include "ash/wm/cursor_manager_chromeos.h"
 #include "ash/wm/desks/desks_controller.h"
 #include "ash/wm/desks/persistent_desks_bar/persistent_desks_bar_controller.h"
+#include "ash/wm/desks/templates/saved_desk_controller.h"
 #include "ash/wm/event_client_impl.h"
 #include "ash/wm/float/float_controller.h"
 #include "ash/wm/gestures/back_gesture/back_gesture_event_handler.h"
@@ -686,6 +692,7 @@ Shell::~Shell() {
 
   ash_dbus_services_.reset();
 
+  saved_desk_controller_.reset();
   saved_desk_delegate_.reset();
   desks_controller_->Shutdown();
 
@@ -736,6 +743,7 @@ Shell::~Shell() {
 
   event_rewriter_controller_.reset();
   keyboard_modifier_metrics_recorder_.reset();
+  input_device_settings_dispatcher_.reset();
   input_device_tracker_.reset();
   input_device_settings_controller_.reset();
 
@@ -857,6 +865,7 @@ Shell::~Shell() {
   // Glanceables has a dependency on `tablet_mode_controller_`. Should be
   // destroyed first to remove the tablet mode observer.
   glanceables_controller_.reset();
+  glanceables_v2_controller_.reset();
 
   multitask_menu_nudge_delegate_.reset();
   tablet_mode_controller_.reset();
@@ -1245,12 +1254,18 @@ void Shell::Init(
   window_modality_controller_ =
       std::make_unique<::wm::WindowModalityController>(this, env);
 
-  // The `InputDeviceSettingsController` is a dependency of the
-  // `EventRewriterController`, `InputDeviceTracker` and
-  // `KeyboardModifierMetricsRecorder` so it must be initialized first.
+  // The `InputDeviceSettingsController` is a dependency of the following so it
+  // must be initialized first:
+  //  - `EventRewriterController`
+  //  - `InputDeviceTracker`
+  //  - `KeyboardModifierMetricsRecorder`
+  //  - `InputDeviceSettingsDispatcher`
   input_device_settings_controller_ =
       std::make_unique<InputDeviceSettingsControllerImpl>();
   input_device_tracker_ = std::make_unique<InputDeviceTracker>();
+  input_device_settings_dispatcher_ =
+      std::make_unique<InputDeviceSettingsDispatcher>(
+          ui::OzonePlatform::GetInstance()->GetInputController());
   keyboard_modifier_metrics_recorder_ =
       std::make_unique<KeyboardModifierMetricsRecorder>();
   event_rewriter_controller_ = std::make_unique<EventRewriterControllerImpl>();
@@ -1290,6 +1305,10 @@ void Shell::Init(
   // controller.
   desks_controller_ = std::make_unique<DesksController>();
   saved_desk_delegate_ = shell_delegate_->CreateSavedDeskDelegate();
+  // Initialized here since it depends on desks.
+  if (base::FeatureList::IsEnabled(features::kAppLaunchAutomation)) {
+    saved_desk_controller_ = std::make_unique<SavedDeskController>();
+  }
 
   Shell::SetRootWindowForNewWindows(GetPrimaryRootWindow());
 
@@ -1453,7 +1472,9 @@ void Shell::Init(
   video_detector_ = std::make_unique<VideoDetector>();
 
   tooltip_controller_ = std::make_unique<views::corewm::TooltipController>(
-      std::make_unique<views::corewm::TooltipAura>(), activation_client());
+      std::make_unique<views::corewm::TooltipAura>(
+          base::BindRepeating(&StyleUtil::CreateAshStyleTooltipView)),
+      activation_client());
   AddPreTargetHandler(tooltip_controller_.get());
 
   modality_filter_ = std::make_unique<SystemModalContainerEventFilter>(this);
@@ -1585,6 +1606,10 @@ void Shell::Init(
         glanceables_controller_.get()));
   }
 
+  if (features::AreGlanceablesV2Enabled()) {
+    glanceables_v2_controller_ = std::make_unique<GlanceablesV2Controller>();
+  }
+
   if (features::IsProjectorEnabled()) {
     projector_controller_ = std::make_unique<ProjectorControllerImpl>();
   }
@@ -1598,6 +1623,11 @@ void Shell::Init(
   if (features::IsFederatedServiceEnabled()) {
     federated_service_controller_ =
         std::make_unique<federated::FederatedServiceControllerImpl>();
+  }
+
+  if (features::IsUserEducationEnabled()) {
+    user_education_controller_ = std::make_unique<UserEducationController>(
+        shell_delegate_->CreateUserEducationDelegate());
   }
 
   // Injects the factory which fulfills the implementation of the text context

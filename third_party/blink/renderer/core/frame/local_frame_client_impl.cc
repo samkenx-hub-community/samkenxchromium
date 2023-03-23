@@ -343,6 +343,9 @@ void LocalFrameClientImpl::Detached(FrameDetachType type) {
   // place at this point since we are no longer associated with the Page.
   web_frame_->SetClient(nullptr);
 
+  if (type == FrameDetachType::kSwap) {
+    client->WillSwap();
+  }
   client->WillDetach();
 
   // We only notify the browser process when the frame is being detached for
@@ -906,9 +909,8 @@ RemoteFrame* LocalFrameClientImpl::AdoptPortal(HTMLPortalElement* portal) {
 RemoteFrame* LocalFrameClientImpl::CreateFencedFrame(
     HTMLFencedFrameElement* fenced_frame,
     mojo::PendingAssociatedReceiver<mojom::blink::FencedFrameOwnerHost>
-        receiver,
-    mojom::blink::FencedFrameMode mode) {
-  return web_frame_->CreateFencedFrame(fenced_frame, std::move(receiver), mode);
+        receiver) {
+  return web_frame_->CreateFencedFrame(fenced_frame, std::move(receiver));
 }
 
 WebPluginContainerImpl* LocalFrameClientImpl::CreatePlugin(

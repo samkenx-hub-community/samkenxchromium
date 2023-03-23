@@ -119,7 +119,6 @@
 <translation id="1942765061641586207">ပုံကြည်လင်ပြတ်သားမှု</translation>
 <translation id="1972984168337863910">ဖိုင်တုံ့ပြန်မှု အကန့်များ ချဲ့ပြရန်</translation>
 <translation id="1995337122023280937">ဖိုင်တည်နေရာသို့ သွားရန်</translation>
-<translation id="1999709132469742660">url အားလုံးက ဖိုင်အသုံးပြုနိုင်သည်</translation>
 <translation id="2001796770603320721">Drive တွင် စီမံပါ</translation>
 <translation id="2009067268969781306">ဒရိုက်ဗ်တစ်ခုကို ဖော်မက်ချခြင်းသည် ၎င်းပေါ်ရှိ ဒေတာများအားလုံးကို ဖျက်လိုက်ပါမည်။ ဤလုပ်ဆောင်ချက်ကို ပြန်ပြင်၍ မရပါ။</translation>
 <translation id="2025955442973426285">တီဂရင်းညာ</translation>
@@ -151,6 +150,7 @@
 <translation id="2236732657580416950">Your Google Drive cache was cleared.</translation>
 <translation id="2239068707900391003">ကော်ဖီသောက်နေသူ</translation>
 <translation id="2251368349685848079">အမှိုက်ပုံးမှ ပြန်ယူရန်</translation>
+<translation id="2278133026967558505">ဝဘ်ဆိုက်နှင့် URL အားလုံးက ဖိုင်သုံးနိုင်သည်</translation>
 <translation id="2282155092769082568">အလိုအလျောက် စီစဉ်သတ်မှတ်ခြင်း URL −</translation>
 <translation id="2284767815536050991">ဖယ်ရှားနိုင်သည့် သိုလှောင်ခန်း</translation>
 <translation id="2288278176040912387">ကစားသူ မှတ်တမ်းတင်</translation>
@@ -542,7 +542,6 @@
 <translation id="5323213332664049067">လက်တင် အမေရိက</translation>
 <translation id="5330145655348521461">ဤဖိုင်များကို အခြား ဒက်စ်တော့မှာ ဖွင့်ထားသည်။  ၎င်းကို ကြည့်ရန် <ph name="USER_NAME" /> (<ph name="MAIL_ADDRESS" />)သို့ သွားပါ။</translation>
 <translation id="5330512191124428349">အချက်အလက်ရယူရန်</translation>
-<translation id="5337538975554986899"><ph name="NON_RESTRICTED_DESTINATIONS" /> မှအပ url အားလုံးက ဖိုင်အသုံးပြုနိုင်သည်</translation>
 <translation id="5344246330454251646">Bruschetta မျှဝေခြင်းကို စီမံရန်</translation>
 <translation id="535792325654997756">ကြောင်များနှင့်လူ</translation>
 <translation id="5358764674931277">ဖရိမ်ပြနှုန်း</translation>
@@ -628,6 +627,7 @@
 <translation id="603895874132768835">ပင်နံပါတ်အသစ် မသတ်မှတ်မချင်း ဤကွန်ရက်ကို သုံးနိုင်မည်မဟုတ်ပါ</translation>
 <translation id="6040143037577758943">ပိတ်ရန်</translation>
 <translation id="6055907707645252013"><ph name="NETWORK_TYPE" /> ကွန်ရက်၊ ချိတ်ဆက်မထားပါ</translation>
+<translation id="6073060579181816027">ဖိုင်တည်နေရာ အများအပြား</translation>
 <translation id="6074825444536523002">Google ပုံစံ</translation>
 <translation id="6079871810119356840">Qwerty ကီးဘုတ်ဖြင့် ဟန်ဂေရီ</translation>
 <translation id="6096979789310008754">ရှာဖွေမှုစာသားကို ရှင်းလင်းထားသည်၊ ဖိုင်နှင့် ဖိုင်တွဲများအားလုံးကို ပြထားသည်</translation>
@@ -768,6 +768,7 @@
 <translation id="7162080671816799010">အထောက်အထားစိစစ်မှုဆိုင်ရာ ဆာဗာအထောက်အထားကို အတည်ပြုရန် ‘အကြောင်းအရာ၏ အခြားအမည်နှင့် ကိုက်ညီမှု’ (သို့) ‘ဒိုမိန်းနောက်ဆက်နှင့် ကိုက်ညီမှု’ တို့ မပါဝင်ပါ</translation>
 <translation id="7165320105431587207">ကွန်ရက်ပြုပြင်ရန် မအောင်မြင်ပါ</translation>
 <translation id="7170041865419449892">ဘောင်အပြင်မှာ ရှိနေ</translation>
+<translation id="7179579940054351344"><ph name="NON_RESTRICTED_DESTINATIONS" /> မှအပ ဝဘ်ဆိုက်နှင့် URL အားလုံးက ဖိုင်သုံးနိုင်သည်</translation>
 <translation id="7180611975245234373">ပြန်လည်စတင်ရန်</translation>
 <translation id="7189874332498648577"><ph name="NUMBER_OF_GB" /> GB</translation>
 <translation id="7191454237977785534">ဖိုင်ကို အဖြစ် သိမ်းရန်</translation>
@@ -941,6 +942,7 @@
 <translation id="8492972329130824181">အိမ်ကွန်ရက်ကို မရနိုင်ပါ။ ချိတ်ဆက်ရန် ကွန်ရက်ပြင်ပဒေတာ အသုံးပြုခြင်းကို ဖွင့်ထားရမည်။</translation>
 <translation id="8499098729323186194">ဖိုင် <ph name="NUMBER_OF_ITEMS" /> ခု ထုတ်ယူနေသည်…</translation>
 <translation id="8502913769543567768">ကွန်ရက် <ph name="NETWORK_COUNT" /> ခုအနက် <ph name="NETWORK_INDEX" /> ခုမြောက်၊ <ph name="NETWORK_NAME" />၊ <ph name="NETWORK_PROVIDER_NAME" />။ စက်ကို စနစ်ထည့်သွင်းပြီးနောက် စတင်ပါ။ သင့်စီမံခန့်ခွဲသူက စီမံသည်</translation>
+<translation id="8512483403832814140">အချိန်မရွေး</translation>
 <translation id="8521441079177373948">ယူကေ</translation>
 <translation id="853494022971700746">ပြင်သစ် (ပြင်သစ်)</translation>
 <translation id="8540608333167683902">ကွန်ရက် <ph name="NETWORK_COUNT" /> ခုအနက်မှ <ph name="NETWORK_INDEX" />၊ <ph name="NETWORK_NAME" />၊ <ph name="CONNECTION_STATUS" />၊ လိုင်းဆွဲအား <ph name="SIGNAL_STRENGTH" />%၊ အသေးစိတ်များ</translation>

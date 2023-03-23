@@ -98,6 +98,10 @@
 #include "third_party/blink/renderer/platform/media/web_media_source_impl.h"
 #include "ui/gfx/geometry/size.h"
 
+#if BUILDFLAG(ENABLE_HLS_DEMUXER)
+#include "third_party/blink/renderer/platform/media/hls_data_source_provider_impl.h"
+#endif  // BUILDFLAG(ENABLE_HLS_DEMUXER)
+
 #if BUILDFLAG(IS_ANDROID)
 #include "media/base/android/media_codec_util.h"
 #endif
@@ -517,7 +521,7 @@ WebMediaPlayerImpl::WebMediaPlayerImpl(
   renderer_factory_selector_->SetRemotePlayStateChangeCB(
       base::BindPostTaskToCurrentDefault(base::BindRepeating(
           &WebMediaPlayerImpl::OnRemotePlayStateChange, weak_this_)));
-#endif  // defined (OS_ANDROID)
+#endif  // defined (IS_ANDROID)
 }
 
 WebMediaPlayerImpl::~WebMediaPlayerImpl() {
@@ -1571,6 +1575,15 @@ void WebMediaPlayerImpl::AddVideoTrack(const std::string& id,
 }
 #endif  // BUILDFLAG(ENABLE_FFMPEG)
 
+#if BUILDFLAG(ENABLE_HLS_DEMUXER)
+base::SequenceBound<media::HlsDataSourceProvider>
+WebMediaPlayerImpl::GetHlsDataSourceProvider() {
+  return base::SequenceBound<HlsDataSourceProviderImpl>(
+      main_task_runner_, media_log_.get(), url_index_, main_task_runner_,
+      media_task_runner_, tick_clock_);
+}
+#endif
+
 void WebMediaPlayerImpl::SetCdmInternal(WebContentDecryptionModule* cdm) {
   DCHECK(main_task_runner_->BelongsToCurrentThread());
   DCHECK(cdm);
@@ -1807,20 +1820,26 @@ void WebMediaPlayerImpl::UpdateLoadedUrl(const GURL& url) {
   loaded_url_ = url;
 }
 
-bool WebMediaPlayerImpl::RestartForHls() {
+void WebMediaPlayerImpl::RestartForHls() {
   DCHECK(main_task_runner_->BelongsToCurrentThread());
-
   observer_->OnHlsManifestDetected();
-#if BUILDFLAG(IS_ANDROID)
-  // TODO: DCHECK that |pipeline_| is stopped.
+
+  // Use the media player renderer if the native hls demuxer isn't compiled in
+  // or if the feature is disabled.
+#if BUILDFLAG(ENABLE_HLS_DEMUXER)
+  if (!base::FeatureList::IsEnabled(media::kBuiltInHlsPlayer)) {
+    renderer_factory_selector_->SetBaseRendererType(
+        media::RendererType::kMediaPlayer);
+  }
+#elif BUILDFLAG(IS_ANDROID)
   renderer_factory_selector_->SetBaseRendererType(
       media::RendererType::kMediaPlayer);
+#else
+  // Shouldn't be reachable from desktop where hls is not enabled.
+  NOTREACHED();
+#endif
   SetMemoryReportingState(false);
   StartPipeline();
-  return true;
-#else
-  return false;
-#endif
 }
 
 void WebMediaPlayerImpl::OnError(media::PipelineStatus status) {
@@ -3741,7 +3760,8 @@ void WebMediaPlayerImpl::WriteSplitHistogram(
 
 void WebMediaPlayerImpl::RecordUnderflowDuration(base::TimeDelta duration) {
   DCHECK(demuxer_manager_->HasDataSource() ||
-         GetDemuxerType() == media::DemuxerType::kChunkDemuxer);
+         GetDemuxerType() == media::DemuxerType::kChunkDemuxer ||
+         GetDemuxerType() == media::DemuxerType::kHlsDemuxer);
   WriteSplitHistogram<kPlaybackType | kEncrypted>(
       &base::UmaHistogramTimes, "Media.UnderflowDuration2", duration);
 }

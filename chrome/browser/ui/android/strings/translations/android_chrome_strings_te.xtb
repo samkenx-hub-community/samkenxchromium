@@ -283,6 +283,7 @@
 <translation id="2581165646603367611">ఇది Chrome ముఖ్యమైనదిగా భావించని కుక్కీలు, కాష్, సైట్‌ల ఇతర డేటాను తీసివేస్తుంది.</translation>
 <translation id="2587052924345400782">సరికొత్త వెర్షన్ ఉంది</translation>
 <translation id="2593272815202181319">మోనోస్పేస్</translation>
+<translation id="2603212228005142861">మీ ప్రాధాన్యతలను మేనేజ్ చేయడానికి సైన్ ఇన్ చేయండి</translation>
 <translation id="2604446170045642109">మీరు మీ సెట్టింగ్‌లలో సైట్‌ల కోసం ముదురు రంగు రూపాన్ని ఆఫ్ చేయవచ్చు.</translation>
 <translation id="2612676031748830579">కార్డ్ నంబర్</translation>
 <translation id="2625189173221582860">పాస్‌వర్డ్ కాపీ చేయబడింది</translation>
@@ -476,6 +477,7 @@
 <translation id="3587596251841506391">వెబ్ భద్రతనుపెంచడంలో సాయపడుతుంది</translation>
 <translation id="3597179440835065298">మెరుగైన సూచనలను పొందండి</translation>
 <translation id="3602290021589620013">ప్రివ్యూ</translation>
+<translation id="360901359071773787">చివరి 15 నిమిషాలను తొలగించాలా?</translation>
 <translation id="3616113530831147358">ఆడియో</translation>
 <translation id="3622349720008044802">విండోలను మేనేజ్ చేయండి</translation>
 <translation id="3631987586758005671"><ph name="DEVICE_NAME" />తో షేర్ చేస్తోంది</translation>
@@ -630,6 +632,7 @@
 
 మీ Google ఖాతా <ph name="BEGIN_LINK" />myactivity.google.com<ph name="END_LINK" />లో ఇతర Google సేవలకు సంబంధించిన సెర్చ్‌లు, యాక్టివిటీ వంటి ఇతర రకాల బ్రౌజింగ్ హిస్టరీని కలిగి ఉండవచ్చు.</translation>
 <translation id="452750746583162491">సింక్ చేసిన మీ డేటాను రివ్యూ చేయండి</translation>
+<translation id="4528638190900283934">అదనపు ఫీచర్‌ల కోసం సైన్ ఇన్ చేయండి</translation>
 <translation id="4532845899244822526">ఫోల్డర్‌ను ఎంచుకోండి</translation>
 <translation id="4547551584605870320">{TAB_COUNT,plural, =1{<ph name="TAB_COUNT_ONE" /> ట్యాబ్}other{<ph name="TAB_COUNT_MANY" /> ట్యాబ్‌లు, <ph name="TAB_COUNT_INCOGNITO" /> అజ్ఞాత ట్యాబ్}}</translation>
 <translation id="4554077758708533499">USB కేబుల్‌తో కనెక్ట్ చేయబడింది</translation>
@@ -820,6 +823,7 @@
 <translation id="5517095782334947753">మీరు <ph name="FROM_ACCOUNT" /> నుండి బుక్‌మార్క్‌లు, హిస్టరీ, పాస్‌వర్డ్‌లు మరియు ఇతర సెట్టింగ్‌లను కలిగి ఉన్నారు.</translation>
 <translation id="5524761631371622910">ట్రయల్స్ ఆన్‌లో ఉన్నప్పుడు, Chrome ర్యాండమ్‌గా మిమ్మల్ని యాక్టివ్‌గా ఉన్న ఒక ట్రయల్‌లో ఉంచినట్లయితే, మీ బ్రౌజింగ్ హిస్టరీ మీరు చూసే యాడ్‌లను, దిగువున అంచనా వేసిన ఆసక్తులపై ప్రభావం చూపుతుంది. మీ గోప్యతను రక్షించడానికి, Chrome ప్రతి నెలా దశల వారీగా మీ ఆసక్తులను తొలగిస్తుంది.</translation>
 <translation id="5524843473235508879">మళ్లింపు బ్లాక్ చేయబడింది.</translation>
+<translation id="554297709083131118">చివరి 15 నిమిషాలలోని ఈ డేటాను తొలగించడం జరుగుతుంది</translation>
 <translation id="5548606607480005320">భద్రతా చెక్-అప్</translation>
 <translation id="5555525474779371165">మీ సురక్షిత బ్రౌజింగ్ రక్షణను ఎంచుకోండి</translation>
 <translation id="5556459405103347317">మళ్లీ లోడ్ చేయి</translation>
@@ -1074,6 +1078,7 @@
 <translation id="6824899148643461612"><ph name="TAB_TITLE" />, ట్యాబ్‌ను ఎంచుకున్నారు</translation>
 <translation id="6828070228333235514">ధరను ట్రాక్ చేయడాన్ని ఆపివేయండి</translation>
 <translation id="6830728435402077660">సురక్షితం కాదు</translation>
+<translation id="6831043979455480757">అనువదించు</translation>
 <translation id="6833996806551876956">గోప్యతా పరిరక్షణ టెక్నాలజీల సెట్ ట్రయల్</translation>
 <translation id="6836206421467243968"><ph name="TITLE_OF_GROUP" /> ట్యాబ్ గ్రూప్‌ను కొత్త బ్యాక్‌గ్రౌండ్ ట్యాబ్ గ్రూప్‌గా రీస్టోర్ చేయండి.</translation>
 <translation id="6846298663435243399">లోడ్ చేస్తున్నాము…</translation>
@@ -1241,10 +1246,10 @@
 <translation id="7707922173985738739">మొబైల్ డేటాను ఉపయోగిస్తుంది</translation>
 <translation id="7709094866268987903">మీరు తీసివేసిన ఆసక్తులు ఇక్కడ కనిపిస్తాయి</translation>
 <translation id="7709918231054955894">మీ అన్ని ట్యాబ్‌లనూ పొందండి</translation>
+<translation id="772434085369393266">నావిగేషన్‌లు HTTPSకు అప్‌గ్రేడ్ చేయబడతాయి, దాన్ని సపోర్ట్ చేయని సైట్‌లు లోడ్ కావడానికి ముందు మీకు హెచ్చరిక వస్తుంది. మీరు అడ్వాన్స్‌డ్ ప్రొటెక్షన్‌ను ఎనేబుల్ చేసినందున ఈ సెట్టింగ్‌ను మార్చలేరు.</translation>
 <translation id="7725024127233776428">మీరు బుక్‌మార్క్ చేసే పేజీలు ఇక్కడ కనిపిస్తాయి</translation>
 <translation id="7757787379047923882"><ph name="DEVICE_NAME" /> నుండి షేర్ చేయబడిన వచనం</translation>
 <translation id="7762668264895820836">SD కార్డ్ <ph name="SD_CARD_NUMBER" /></translation>
-<translation id="7762928140712606393">అదనపు ఫీచర్‌లు, Chrome అత్యంత శక్తివంతమైన రక్షణ కోసం సైన్ ఇన్ చేయండి</translation>
 <translation id="7764225426217299476">అడ్రస్‌ను జోడించండి</translation>
 <translation id="7772032839648071052">రహస్య పదబంధాన్ని నిర్ధారించండి</translation>
 <translation id="7772375229873196092"><ph name="APP_NAME" />ను మూసివేయి</translation>
@@ -1260,6 +1265,7 @@
 <translation id="78270725016672455">ఒక సైట్‌లోకి సైన్ ఇన్ చేయడానికి, మీ కంప్యూటర్ ఈ పరికరాన్ని రిజిస్టర్ చేయాలని కోరుతోంది</translation>
 <translation id="7844171778363018843">సింక్ చేయడానికి డేటా ఏదీ ఎంచుకోబడలేదు</translation>
 <translation id="7846296061357476882">Google సర్వీస్‌లు</translation>
+<translation id="7847228556075070294">హిస్టరీ, కుక్కీలు, ఇంకా ఇతర డేటా తొలగించబడ్డాయి</translation>
 <translation id="784934925303690534">సమయ పరిధి</translation>
 <translation id="7851858861565204677">ఇతర పరికరాలు</translation>
 <translation id="7853202427316060426">కార్యాచరణ</translation>

@@ -119,7 +119,6 @@
 <translation id="1942765061641586207">Résolution de l'image</translation>
 <translation id="1972984168337863910">Développer les panneaux de commentaires sur les fichiers</translation>
 <translation id="1995337122023280937">Accéder à l'emplacement du fichier</translation>
-<translation id="1999709132469742660">Accès au fichier pour toutes les URL</translation>
 <translation id="2001796770603320721">Gérer dans Drive</translation>
 <translation id="2009067268969781306">Le formatage d'une clé entraîne la suppression de toutes les données qui y sont stockées. Cette action est irréversible.</translation>
 <translation id="2025955442973426285">Tigrinya</translation>
@@ -151,6 +150,7 @@
 <translation id="2236732657580416950">Votre cache Google Drive a été vidé.</translation>
 <translation id="2239068707900391003">Personne avec un café</translation>
 <translation id="2251368349685848079">Restaurer à partir de la corbeille</translation>
+<translation id="2278133026967558505">Accès aux fichiers pour tous les sites Web et URL</translation>
 <translation id="2282155092769082568">URL de configuration automatique :</translation>
 <translation id="2284767815536050991">espace de stockage amovible</translation>
 <translation id="2288278176040912387">Tourne-disque</translation>
@@ -543,7 +543,6 @@
 <translation id="5323213332664049067">Espagnol d'Amérique latine</translation>
 <translation id="5330145655348521461">Ces fichiers sont ouverts sur un autre bureau. Utilisez le compte de <ph name="USER_NAME" /> (<ph name="MAIL_ADDRESS" />) pour les afficher.</translation>
 <translation id="5330512191124428349">Lire les informations</translation>
-<translation id="5337538975554986899">Accès au fichier pour toutes les URL, sauf <ph name="NON_RESTRICTED_DESTINATIONS" /></translation>
 <translation id="5344246330454251646">Gérer le partage avec Bruschetta</translation>
 <translation id="535792325654997756">Personne avec des chats</translation>
 <translation id="5358764674931277">Fréquence d'images</translation>
@@ -769,6 +768,7 @@
 <translation id="7162080671816799010">Il manque la valeur "Correspondance de l'autre nom de l'objet" ou "Correspondance du suffixe de domaine" pour valider l'identité du serveur d'authentification</translation>
 <translation id="7165320105431587207">Échec de la configuration du réseau.</translation>
 <translation id="7170041865419449892">Hors limite</translation>
+<translation id="7179579940054351344">Accès aux fichiers pour tous les sites Web et URL, sauf <ph name="NON_RESTRICTED_DESTINATIONS" /></translation>
 <translation id="7180611975245234373">Actualiser</translation>
 <translation id="7189874332498648577"><ph name="NUMBER_OF_GB" /> Go</translation>
 <translation id="7191454237977785534">Enregistrer le fichier sous</translation>
@@ -942,6 +942,7 @@
 <translation id="8492972329130824181">Le réseau domestique n'est pas disponible. Pour vous y connecter, vous devez activer l'itinérance des données mobiles.</translation>
 <translation id="8499098729323186194">Extraction de <ph name="NUMBER_OF_ITEMS" /> éléments...</translation>
 <translation id="8502913769543567768">Réseau <ph name="NETWORK_INDEX" /> sur <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, <ph name="NETWORK_PROVIDER_NAME" />, activer après la configuration de l'appareil, géré par votre administrateur</translation>
+<translation id="8512483403832814140">N'importe quand</translation>
 <translation id="8521441079177373948">Royaume-Uni</translation>
 <translation id="853494022971700746">Français (France)</translation>
 <translation id="8540608333167683902">Réseau <ph name="NETWORK_INDEX" /> sur <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, <ph name="CONNECTION_STATUS" />, force du signal : <ph name="SIGNAL_STRENGTH" /> %, détails</translation>

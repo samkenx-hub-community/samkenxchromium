@@ -14,7 +14,7 @@
 #import "components/feature_engagement/public/event_constants.h"
 #import "components/feature_engagement/public/tracker.h"
 #import "ios/chrome/browser/application_context/application_context.h"
-#import "ios/chrome/browser/bookmarks/bookmark_model_factory.h"
+#import "ios/chrome/browser/bookmarks/local_or_syncable_bookmark_model_factory.h"
 #import "ios/chrome/browser/browser_state/chrome_browser_state.h"
 #import "ios/chrome/browser/feature_engagement/tracker_factory.h"
 #import "ios/chrome/browser/follow/follow_action_state.h"
@@ -38,6 +38,7 @@
 #import "ios/chrome/browser/shared/ui/util/layout_guide_names.h"
 #import "ios/chrome/browser/shared/ui/util/uikit_ui_util.h"
 #import "ios/chrome/browser/shared/ui/util/util_swift.h"
+#import "ios/chrome/browser/sync/sync_service_factory.h"
 #import "ios/chrome/browser/tabs/features.h"
 #import "ios/chrome/browser/ui/browser_container/browser_container_mediator.h"
 #import "ios/chrome/browser/ui/bubble/bubble_presenter.h"
@@ -213,8 +214,6 @@ enum class IOSOverflowMenuActionType {
 }
 
 - (void)dismissPopupMenuAnimated:(BOOL)animated {
-  [self.UIUpdater updateUIForMenuDismissed];
-
   if (self.toolsMenuOpenTime != 0) {
     base::TimeDelta elapsed = base::Seconds(
         [NSDate timeIntervalSinceReferenceDate] - self.toolsMenuOpenTime);
@@ -333,16 +332,6 @@ enum class IOSOverflowMenuActionType {
 }
 
 #pragma mark - UIAdaptivePresentationControllerDelegate
-
-- (void)presentationControllerWillDismiss:
-    (UIPresentationController*)presentationController {
-  // Update the UI before dismissal starts. Technically, on iPhone, the user
-  // could be interactively dismissing a sheet, which they could then cancel
-  // (leading to state mismatch: visible menu, but UIUpdater with menu
-  // dismissed). However, the UIUpdater only modifies the toolbar, which is
-  // hidden behind the sheet anyway.
-  [self.UIUpdater updateUIForMenuDismissed];
-}
 
 - (void)presentationControllerDidDismiss:
     (UIPresentationController*)presentationController {
@@ -469,7 +458,7 @@ enum class IOSOverflowMenuActionType {
         self.overflowMenuMediator.isIncognito =
             self.browser->GetBrowserState()->IsOffTheRecord();
         self.overflowMenuMediator.bookmarkModel =
-            ios::BookmarkModelFactory::GetForBrowserState(
+            ios::LocalOrSyncableBookmarkModelFactory::GetForBrowserState(
                 self.browser->GetBrowserState());
         self.overflowMenuMediator.browserStatePrefs =
             self.browser->GetBrowserState()->GetPrefs();
@@ -482,6 +471,9 @@ enum class IOSOverflowMenuActionType {
             overlayPresenter;
         self.overflowMenuMediator.browserPolicyConnector =
             GetApplicationContext()->GetBrowserPolicyConnector();
+        self.overflowMenuMediator.syncService =
+            SyncServiceFactory::GetForBrowserState(
+                self.browser->GetBrowserState());
 
         if (IsWebChannelsEnabled()) {
           self.overflowMenuMediator.followBrowserAgent =
@@ -551,7 +543,6 @@ enum class IOSOverflowMenuActionType {
         }
 
         __weak __typeof(self) weakSelf = self;
-        [self.UIUpdater updateUIForMenuDisplayed:type];
         [self.baseViewController
             presentViewController:menu
                          animated:YES
@@ -581,8 +572,9 @@ enum class IOSOverflowMenuActionType {
       HandlerForProtocol(self.browser->GetCommandDispatcher(), BrowserCommands);
   self.mediator.lensCommandsHandler =
       HandlerForProtocol(self.browser->GetCommandDispatcher(), LensCommands);
-  self.mediator.bookmarkModel = ios::BookmarkModelFactory::GetForBrowserState(
-      self.browser->GetBrowserState());
+  self.mediator.bookmarkModel =
+      ios::LocalOrSyncableBookmarkModelFactory::GetForBrowserState(
+          self.browser->GetBrowserState());
   self.mediator.prefService = self.browser->GetBrowserState()->GetPrefs();
   self.mediator.templateURLService =
       ios::TemplateURLServiceFactory::GetForBrowserState(
@@ -629,8 +621,6 @@ enum class IOSOverflowMenuActionType {
   [self.baseViewController.view addLayoutGuide:layoutGuide];
   self.presenter.layoutGuide = layoutGuide;
   self.presenter.delegate = self;
-
-  [self.UIUpdater updateUIForMenuDisplayed:type];
 
   [self.presenter prepareForPresentation];
   [self.presenter presentAnimated:YES];

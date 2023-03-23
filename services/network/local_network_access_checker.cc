@@ -20,8 +20,8 @@
 namespace network {
 namespace {
 
-using Policy = mojom::PrivateNetworkRequestPolicy;
 using Result = LocalNetworkAccessCheckResult;
+using Policy = mojom::LocalNetworkRequestPolicy;
 
 mojom::ClientSecurityStatePtr GetRequestClientSecurityState(
     const ResourceRequest& request) {
@@ -83,8 +83,8 @@ LocalNetworkAccessChecker::LocalNetworkAccessChecker(
   SetRequestUrl(request.url);
 
   if (!client_security_state_ ||
-      client_security_state_->private_network_request_policy ==
-          mojom::PrivateNetworkRequestPolicy::kAllow) {
+      client_security_state_->local_network_request_policy ==
+          mojom::LocalNetworkRequestPolicy::kAllow) {
     // No client security state means PNA is implicitly disabled. A policy of
     // `kAllow` means PNA is explicitly disabled. In both cases, the target IP
     // address space should not be set on the request.
@@ -110,6 +110,17 @@ Result LocalNetworkAccessChecker::Check(
   mojom::IPAddressSpace resource_address_space =
       TransportInfoToIPAddressSpace(transport_info);
 
+  // If we are connecting to a local IP endpoint over HTTP without a target IP
+  // address space, record whether we could have successfully inferred the
+  // target IP address space from the request URL.
+  if (resource_address_space == mojom::IPAddressSpace::kLocal &&
+      is_request_url_scheme_http_ &&
+      target_address_space_ == mojom::IPAddressSpace::kUnknown) {
+    base::UmaHistogramBoolean(
+        "Security.PrivateNetworkAccess.PrivateIpInferrable",
+        request_url_local_ip_.has_value());
+  }
+
   auto result = CheckInternal(resource_address_space);
 
   base::UmaHistogramEnumeration("Security.PrivateNetworkAccess.CheckResult",
@@ -118,16 +129,6 @@ Result LocalNetworkAccessChecker::Check(
   if (transport_info.type == net::TransportType::kCached) {
     base::UmaHistogramEnumeration(
         "Security.PrivateNetworkAccess.CachedResourceCheckResult", result);
-  }
-
-  // If we are connecting to a local IP endpoint over HTTP, and have failed
-  // the check, record whether we could have avoided the failure by inferring
-  // the target IP address space from the request URL.
-  if (resource_address_space == mojom::IPAddressSpace::kLocal &&
-      is_request_url_scheme_http_ && result == Result::kBlockedByPolicyBlock) {
-    base::UmaHistogramBoolean(
-        "Security.PrivateNetworkAccess.PrivateIpInferrable",
-        request_url_local_ip_.has_value());
   }
 
   response_address_space_ = resource_address_space;
@@ -180,8 +181,8 @@ mojom::IPAddressSpace LocalNetworkAccessChecker::ClientAddressSpace() const {
 
 bool LocalNetworkAccessChecker::IsPolicyPreflightWarn() const {
   return client_security_state_ &&
-         client_security_state_->private_network_request_policy ==
-             mojom::PrivateNetworkRequestPolicy::kPreflightWarn;
+         client_security_state_->local_network_request_policy ==
+             mojom::LocalNetworkRequestPolicy::kPreflightWarn;
 }
 
 Result LocalNetworkAccessChecker::CheckInternal(
@@ -202,10 +203,10 @@ Result LocalNetworkAccessChecker::CheckInternal(
     return Result::kAllowedMissingClientSecurityState;
   }
 
-  mojom::PrivateNetworkRequestPolicy policy =
-      client_security_state_->private_network_request_policy;
+  mojom::LocalNetworkRequestPolicy policy =
+      client_security_state_->local_network_request_policy;
 
-  if (policy == mojom::PrivateNetworkRequestPolicy::kAllow) {
+  if (policy == mojom::LocalNetworkRequestPolicy::kAllow) {
     return Result::kAllowedByPolicyAllow;
   }
 
@@ -214,7 +215,7 @@ Result LocalNetworkAccessChecker::CheckInternal(
       return Result::kAllowedByTargetIpAddressSpace;
     }
 
-    if (policy == mojom::PrivateNetworkRequestPolicy::kPreflightWarn) {
+    if (policy == mojom::LocalNetworkRequestPolicy::kPreflightWarn) {
       return Result::kAllowedByPolicyPreflightWarn;
     }
 
@@ -237,12 +238,12 @@ Result LocalNetworkAccessChecker::CheckInternal(
     // for this request. Further checks should not be run, otherwise we might
     // return `kBlockedByPolicyPreflightWarn` and trigger a new preflight to be
     // sent, thus causing https://crbug.com/1279376 all over again.
-    if (policy == mojom::PrivateNetworkRequestPolicy::kPreflightWarn) {
+    if (policy == mojom::LocalNetworkRequestPolicy::kPreflightWarn) {
       return Result::kAllowedByPolicyPreflightWarn;
     }
 
     // See also https://crbug.com/1334689.
-    if (policy == mojom::PrivateNetworkRequestPolicy::kWarn) {
+    if (policy == mojom::LocalNetworkRequestPolicy::kWarn) {
       return Result::kAllowedByPolicyWarn;
     }
 
@@ -255,7 +256,7 @@ Result LocalNetworkAccessChecker::CheckInternal(
   }
 
   // We use a switch statement to force this code to be amended when values are
-  // added to the `PrivateNetworkRequestPolicy` enum.
+  // added to the `LocalNetworkRequestPolicy` enum.
   switch (policy) {
     case Policy::kAllow:
       NOTREACHED();  // Should have been handled by the if statement above.

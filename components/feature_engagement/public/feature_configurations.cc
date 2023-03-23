@@ -55,6 +55,26 @@ absl::optional<FeatureConfig> GetClientSideFeatureConfig(
     return config;
   }
 
+  if (kIPHPasswordsManagementBubbleAfterSaveFeature.name == feature->name) {
+    absl::optional<FeatureConfig> config = FeatureConfig();
+    config->valid = true;
+    config->trigger =
+        EventConfig("password_saved", Comparator(LESS_THAN, 1), 180, 180);
+    config->session_rate = Comparator(ANY, 0);
+    config->availability = Comparator(ANY, 0);
+    return config;
+  }
+
+  if (kIPHPasswordsManagementBubbleDuringSigninFeature.name == feature->name) {
+    absl::optional<FeatureConfig> config = FeatureConfig();
+    config->valid = true;
+    config->trigger =
+        EventConfig("signin_flow_detected", Comparator(LESS_THAN, 1), 180, 180);
+    config->session_rate = Comparator(ANY, 0);
+    config->availability = Comparator(ANY, 0);
+    return config;
+  }
+
   if (kIPHProfileSwitchFeature.name == feature->name) {
     absl::optional<FeatureConfig> config = FeatureConfig();
     config->valid = true;
@@ -240,6 +260,37 @@ absl::optional<FeatureConfig> GetClientSideFeatureConfig(
     config->trigger = EventConfig("iph_customize_chrome_triggered",
                                   Comparator(EQUAL, 0), 1, 360);
     config->snooze_params.max_limit = 4;
+    return config;
+  }
+
+  if (kIPHPasswordsWebAppProfileSwitchFeature.name == feature->name) {
+    absl::optional<FeatureConfig> config = FeatureConfig();
+    config->valid = true;
+    config->availability = Comparator(ANY, 0);
+    config->session_rate = Comparator(ANY, 0);
+    config->trigger =
+        EventConfig("iph_passwords_web_app_profile_switch_triggered",
+                    Comparator(EQUAL, 0), 360, 360);
+    config->used = EventConfig("web_app_profile_menu_shown",
+                               Comparator(EQUAL, 0), 360, 360);
+    return config;
+  }
+
+  if (kIPHDownloadToolbarButtonFeature.name == feature->name) {
+    absl::optional<FeatureConfig> config = FeatureConfig();
+    config->valid = true;
+    config->availability = Comparator(ANY, 0);
+    // Don't show if user has already seen an IPH this session.
+    config->session_rate = Comparator(EQUAL, 0);
+    // Show the promo max once a year if the user hasn't interacted with the
+    // download bubble within the last 21 days.
+    config->trigger = EventConfig("download_bubble_iph_trigger",
+                                  Comparator(EQUAL, 0), 360, 360);
+    config->used = EventConfig("download_bubble_interaction",
+                               Comparator(EQUAL, 0), 21, 360);
+    // Allow snoozing for 7 days, up to 3 times.
+    config->snooze_params.snooze_interval = 7;
+    config->snooze_params.max_limit = 3;
     return config;
   }
 
@@ -1199,13 +1250,14 @@ absl::optional<FeatureConfig> GetClientSideFeatureConfig(
     absl::optional<FeatureConfig> config = FeatureConfig();
     config->valid = true;
     config->availability = Comparator(ANY, 0);
-    config->session_rate = Comparator(EQUAL, 0);
+    config->session_rate = Comparator(ANY, 0);
+    config->session_rate_impact.type = SessionRateImpact::Type::NONE;
     config->trigger = EventConfig("blue_dot_promo_eligibility_met",
                                   Comparator(EQUAL, 0), 360, 360);
     config->used = EventConfig("blue_dot_promo_criterion_met",
                                Comparator(GREATER_THAN_OR_EQUAL, 1), 30, 360);
     config->event_configs.insert(EventConfig("default_browser_promo_shown",
-                                             Comparator(EQUAL, 0), 30, 360));
+                                             Comparator(EQUAL, 0), 14, 360));
     config->blocked_by.type = BlockedBy::Type::NONE;
     config->blocking.type = Blocking::Type::NONE;
     return config;
@@ -1223,6 +1275,7 @@ absl::optional<FeatureConfig> GetClientSideFeatureConfig(
     config->valid = true;
     config->availability = Comparator(ANY, 0);
     config->session_rate = Comparator(ANY, 0);
+    config->session_rate_impact.type = SessionRateImpact::Type::NONE;
     config->used = EventConfig("blue_dot_promo_overflow_menu_dismissed",
                                Comparator(EQUAL, 0), 30, 360);
     config->trigger = EventConfig("blue_dot_promo_overflow_menu_shown",
@@ -1234,7 +1287,7 @@ absl::optional<FeatureConfig> GetClientSideFeatureConfig(
         EventConfig("blue_dot_promo_eligibility_met",
                     Comparator(GREATER_THAN_OR_EQUAL, 1), 30, 360));
     config->event_configs.insert(EventConfig("default_browser_promo_shown",
-                                             Comparator(EQUAL, 0), 30, 360));
+                                             Comparator(EQUAL, 0), 14, 360));
     config->blocked_by.type = BlockedBy::Type::NONE;
     config->blocking.type = Blocking::Type::NONE;
     return config;
@@ -1253,6 +1306,7 @@ absl::optional<FeatureConfig> GetClientSideFeatureConfig(
     config->valid = true;
     config->availability = Comparator(ANY, 0);
     config->session_rate = Comparator(ANY, 0);
+    config->session_rate_impact.type = SessionRateImpact::Type::NONE;
     config->used = EventConfig("blue_dot_promo_settings_dismissed",
                                Comparator(EQUAL, 0), 30, 360);
     config->trigger = EventConfig("blue_dot_promo_settings_shown",
@@ -1264,7 +1318,7 @@ absl::optional<FeatureConfig> GetClientSideFeatureConfig(
         EventConfig("blue_dot_promo_eligibility_met",
                     Comparator(GREATER_THAN_OR_EQUAL, 1), 30, 360));
     config->event_configs.insert(EventConfig("default_browser_promo_shown",
-                                             Comparator(EQUAL, 0), 30, 360));
+                                             Comparator(EQUAL, 0), 14, 360));
     config->blocked_by.type = BlockedBy::Type::NONE;
     config->blocking.type = Blocking::Type::NONE;
     return config;

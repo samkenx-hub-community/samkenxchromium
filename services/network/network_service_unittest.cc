@@ -1180,8 +1180,9 @@ TEST_F(NetworkServiceTestWithService, SetsTrustTokenKeyCommitments) {
 
   base::RunLoop run_loop;
   network_service_->SetTrustTokenKeyCommitments(
-      R"( { "https://issuer.example": { "TrustTokenV3PMB": {
-        "protocol_version": "TrustTokenV3PMB", "id": 1, "batchsize": 5 } } } )",
+      R"( { "https://issuer.example": { "PrivateStateTokenV3PMB": {
+        "protocol_version": "PrivateStateTokenV3PMB", "id": 1,
+        "batchsize": 5 } } } )",
       run_loop.QuitClosure());
   run_loop.Run();
 
@@ -1470,6 +1471,7 @@ class ClearSiteDataAuthCertObserver : public TestURLLoaderNetworkObserver {
       const std::string& header_value,
       int load_flags,
       const absl::optional<net::CookiePartitionKey>& cookie_partition_key,
+      bool partitioned_state_allowed_only,
       OnClearSiteDataCallback callback) override {
     ++on_clear_site_data_counter_;
     last_on_clear_site_data_header_value_ = header_value;

@@ -283,6 +283,7 @@ Privatūs prieigos raktai pagerina privatumą žiniatinklyje ir negali būti nau
 <translation id="2581165646603367611">Bus išvalyti slapukai, talpykla ir kiti svetainių duomenys, kurių „Chrome“ nelaiko svarbiais.</translation>
 <translation id="2587052924345400782">Pasiekiama naujesnė versija</translation>
 <translation id="2593272815202181319">Lygiaplotis</translation>
+<translation id="2603212228005142861">Prisijunkite, kad galėtumėte tvarkyti nuostatas</translation>
 <translation id="2604446170045642109">Galite išjungti svetainių tamsiąją temą nustatymuose.</translation>
 <translation id="2612676031748830579">Kortelės numeris</translation>
 <translation id="2625189173221582860">Slaptažodis nukopijuotas</translation>
@@ -476,6 +477,7 @@ Privatūs prieigos raktai pagerina privatumą žiniatinklyje ir negali būti nau
 <translation id="3587596251841506391">Padėti gerinti saugą žiniatinkl.</translation>
 <translation id="3597179440835065298">Gaukite geresnių pasiūlymų</translation>
 <translation id="3602290021589620013">Peržiūra</translation>
+<translation id="360901359071773787">Ištrinti pastarųjų penkiolikos minučių duomenis?</translation>
 <translation id="3616113530831147358">Garsas</translation>
 <translation id="3622349720008044802">Langų tvarkymas</translation>
 <translation id="3631987586758005671">Bendrinama su „<ph name="DEVICE_NAME" />“</translation>
@@ -630,6 +632,7 @@ Privatūs prieigos raktai pagerina privatumą žiniatinklyje ir negali būti nau
 
 Adresu <ph name="BEGIN_LINK" />myactivity.google.com<ph name="END_LINK" /> gali būti pateikta kitų formų jūsų „Google“ paskyros naršymo istorija, pvz., paieškos ir veikla kitose „Google“ paslaugose.</translation>
 <translation id="452750746583162491">Peržiūrėti sinchronizuotus duomenis</translation>
+<translation id="4528638190900283934">Prisijunkite, kad galėtumėte naudoti papildomas funkcijas</translation>
 <translation id="4532845899244822526">Pasirinkti aplanką</translation>
 <translation id="4547551584605870320">{TAB_COUNT,plural, =1{<ph name="TAB_COUNT_ONE" /> skirtukas}one{Skirtukų: <ph name="TAB_COUNT_MANY" />, <ph name="TAB_COUNT_INCOGNITO" /> inkognito}few{Skirtukų: <ph name="TAB_COUNT_MANY" />, <ph name="TAB_COUNT_INCOGNITO" /> inkognito}many{Skirtukų: <ph name="TAB_COUNT_MANY" />, <ph name="TAB_COUNT_INCOGNITO" /> inkognito}other{Skirtukų: <ph name="TAB_COUNT_MANY" />, <ph name="TAB_COUNT_INCOGNITO" /> inkognito}}</translation>
 <translation id="4554077758708533499">Prijungta USB laidu</translation>
@@ -820,6 +823,7 @@ Jei norite pakeisti šį nustatymą, <ph name="BEGIN_LINK" />iš naujo nustatyki
 <translation id="5517095782334947753">Turite žymių, istorijos duomenų, slaptažodžių ir kitų nustatymų iš <ph name="FROM_ACCOUNT" />.</translation>
 <translation id="5524761631371622910">Naudojant šias bandomąsias versijas ir jei „Chrome“ atsitiktinai parenka jus naudoti bandomąją versiją, jūsų naršymo istorija lemia, kokius skelbimus matysite ir kokie jūsų pomėgiai bus numatomi toliau. Siekiant apsaugoti privatumą, „Chrome“ reguliariai kiekvieną mėnesį ištrina jūsų pomėgius.</translation>
 <translation id="5524843473235508879">Peradresavimas užblokuotas.</translation>
+<translation id="554297709083131118">Toliau nurodyti pastarųjų penkiolikos minučių duomenys bus ištrinti</translation>
 <translation id="5548606607480005320">Saugos patikra</translation>
 <translation id="5555525474779371165">Saugaus naršymo apsaugos lygio pasirinkimas</translation>
 <translation id="5556459405103347317">Įkelti iš naujo</translation>
@@ -1074,6 +1078,7 @@ Pavyzdžiui, kai kurios svetainės gali atsakyti į šią užklausą rodydamos j
 <translation id="6824899148643461612">„<ph name="TAB_TITLE" />“, skirtukas, pasirinktas</translation>
 <translation id="6828070228333235514">Stabdyti kainos stebėjimą</translation>
 <translation id="6830728435402077660">Nesaugu</translation>
+<translation id="6831043979455480757">Vertėjas</translation>
 <translation id="6833996806551876956">„Privacy Sandbox“ bandomasis laikotarpis</translation>
 <translation id="6836206421467243968">Atkurkite skirtukų grupę „<ph name="TITLE_OF_GROUP" />“ kaip naują foninę skirtukų grupę.</translation>
 <translation id="6846298663435243399">Įkeliama…</translation>
@@ -1241,10 +1246,10 @@ Pavyzdžiui, kai kurios svetainės gali atsakyti į šią užklausą rodydamos j
 <translation id="7707922173985738739">Naudoti mobiliojo ryšio duomenis</translation>
 <translation id="7709094866268987903">Čia bus rodomi jūsų pašalinti pomėgiai</translation>
 <translation id="7709918231054955894">Gaukite visus savo skirtukus</translation>
+<translation id="772434085369393266">Naršymai naujovinami į HTTPS ir esate įspėjami prieš įkeliant jo nepalaikančias svetaines. Šio nustatymo pakeisti negalima, nes esate įgalinę papildomą apsaugą.</translation>
 <translation id="7725024127233776428">Pažymėti puslapiai rodomi čia</translation>
 <translation id="7757787379047923882">Tekstas bendrinamas iš „<ph name="DEVICE_NAME" />“</translation>
 <translation id="7762668264895820836">SD kortelė Nr. <ph name="SD_CARD_NUMBER" /></translation>
-<translation id="7762928140712606393">Prisijunkite, kad galėtumėte naudoti papildomas funkcijas ir patikimiausias „Chrome“ saugos priemones</translation>
 <translation id="7764225426217299476">Pridėti adresą</translation>
 <translation id="7772032839648071052">Patvirtinti slaptafrazę</translation>
 <translation id="7772375229873196092">Uždaryti „<ph name="APP_NAME" />“</translation>
@@ -1260,6 +1265,7 @@ Pavyzdžiui, kai kurios svetainės gali atsakyti į šią užklausą rodydamos j
 <translation id="78270725016672455">Kompiuteris nori užregistruoti šį įrenginį, kad būtų galima prisijungti prie svetainės</translation>
 <translation id="7844171778363018843">Nepasirinkta sinchronizuotinų duomenų</translation>
 <translation id="7846296061357476882">„Google“ paslaugos</translation>
+<translation id="7847228556075070294">Ištrinta istorija, slapukai ir kiti duomenys</translation>
 <translation id="784934925303690534">Laikotarpis</translation>
 <translation id="7851858861565204677">Kiti įrenginiai</translation>
 <translation id="7853202427316060426">Veikla</translation>
@@ -1439,6 +1445,7 @@ Pavyzdžiui, kai kurios svetainės gali atsakyti į šią užklausą rodydamos j
 <translation id="869891660844655955">Galiojimo data</translation>
 <translation id="8699120352855309748">Nesiūlyti versti šių kalbų</translation>
 <translation id="8712637175834984815">Supratau</translation>
+<translation id="8723453889042591629">Sparčiai išverskite šį puslapį. Jei norite redaguoti šį spartųjį klavišą, palieskite ir palaikykite.</translation>
 <translation id="8725066075913043281">Bandyti dar kartą</translation>
 <translation id="8746155870861185046">Bendrinti paryškinimą</translation>
 <translation id="874726034427945498">Jei norite adreso juostoje matyti geresnius pasiūlymus, sinchronizuokite skirtukus ir istoriją</translation>

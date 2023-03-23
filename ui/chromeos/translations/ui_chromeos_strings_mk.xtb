@@ -119,7 +119,6 @@
 <translation id="1942765061641586207">Резолуција на слика</translation>
 <translation id="1972984168337863910">Проширете ги таблите со повратни информации за датотеките</translation>
 <translation id="1995337122023280937">Оди на локацијата на датотеката</translation>
-<translation id="1999709132469742660">Пристап до датотека од сите URL-адреси</translation>
 <translation id="2001796770603320721">Управување во Drive</translation>
 <translation id="2009067268969781306">Форматирањето на USB-дискот ќе ги избрише сите податоци складирани во него. Дејството не може да се врати.</translation>
 <translation id="2025955442973426285">тигрејски</translation>
@@ -151,6 +150,7 @@
 <translation id="2236732657580416950">Вашиот кеш на Google Drive е исчистен.</translation>
 <translation id="2239068707900391003">Човек со шолја кафе</translation>
 <translation id="2251368349685848079">Врати од корпа</translation>
+<translation id="2278133026967558505">Пристап до датотеки од сите веб-сајтови и URL-адреси</translation>
 <translation id="2282155092769082568">Линк за автоматско конфигурирање:</translation>
 <translation id="2284767815536050991">пренослива меморија</translation>
 <translation id="2288278176040912387">Грамофон</translation>
@@ -542,7 +542,6 @@
 <translation id="5323213332664049067">Латиноамерикански</translation>
 <translation id="5330145655348521461">Датотеките се отворија на друга работна површина. Поместете ја на <ph name="USER_NAME" /> (<ph name="MAIL_ADDRESS" />) за да се прикаже.</translation>
 <translation id="5330512191124428349">Земете информации</translation>
-<translation id="5337538975554986899">Пристап до датотеки од сите URL-адреси, освен <ph name="NON_RESTRICTED_DESTINATIONS" /></translation>
 <translation id="5344246330454251646">Управувајте со споделувањето со Bruschetta</translation>
 <translation id="535792325654997756">Човек со мачки</translation>
 <translation id="5358764674931277">Стапка на слики</translation>
@@ -768,6 +767,7 @@
 <translation id="7162080671816799010">Недостасува „Совпаѓање на алтернативно име за наслов“ или „Совпаѓање на суфикс на домен“ за да се потврди идентитетот на серверот за автентикација</translation>
 <translation id="7165320105431587207">Не успеа да се конфигурира мрежата</translation>
 <translation id="7170041865419449892">Надвор од опсег</translation>
+<translation id="7179579940054351344">Пристап до датотеки од сите веб-сајтови и URL-адреси, освен <ph name="NON_RESTRICTED_DESTINATIONS" /></translation>
 <translation id="7180611975245234373">Освежи</translation>
 <translation id="7189874332498648577"><ph name="NUMBER_OF_GB" /> GB</translation>
 <translation id="7191454237977785534">Сними ја датотеката како</translation>
@@ -941,6 +941,7 @@
 <translation id="8492972329130824181">Домашната мрежа не е достапна. Мора да се овозможи интернет-роаминг за да се поврзете.</translation>
 <translation id="8499098729323186194">Се извлекуваат <ph name="NUMBER_OF_ITEMS" /> ставки…</translation>
 <translation id="8502913769543567768">Мрежа <ph name="NETWORK_INDEX" /> од <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, <ph name="NETWORK_PROVIDER_NAME" />, Активирај по поставувањето на уредот, Управувано од вашиот администратор</translation>
+<translation id="8512483403832814140">Кога било</translation>
 <translation id="8521441079177373948">UK</translation>
 <translation id="853494022971700746">француски (Франција)</translation>
 <translation id="8540608333167683902">Мрежа <ph name="NETWORK_INDEX" /> од <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, <ph name="CONNECTION_STATUS" />, јачина на сигналот: <ph name="SIGNAL_STRENGTH" /> %, детали</translation>

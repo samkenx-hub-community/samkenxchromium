@@ -7,6 +7,11 @@
 
 #import <Foundation/Foundation.h>
 
+namespace password_manager {
+class AffiliatedGroup;
+struct CredentialUIEntry;
+}  // namespace password_manager
+
 // State of on-device encryption used for
 // ItemTypeOnDeviceEncryptionOptInDescription, ItemTypeOnDeviceEncryptionSetUp
 // and ItemTypeOnDeviceEncryptionSetUp.
@@ -54,8 +59,14 @@ struct CredentialUIEntry;
 // Returns the on-device encryption state according to the sync service.
 - (OnDeviceEncryptionState)onDeviceEncryptionState;
 
-// Returns whether or not passwords are currently syncing.
-- (BOOL)isSyncingPasswords;
+// Returns whether a special icon should be shown next to `credential` that
+// indicates it's not backed up to any account.
+- (BOOL)shouldShowLocalOnlyIconForCredential:
+    (const password_manager::CredentialUIEntry&)credential;
+
+// Similar to above but for an affiliated group.
+- (BOOL)shouldShowLocalOnlyIconForGroup:
+    (const password_manager::AffiliatedGroup&)group;
 
 @end
 

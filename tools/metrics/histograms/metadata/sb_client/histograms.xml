@@ -272,7 +272,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="SBClientDownload.DownloadRequestResponseCode"
-    enum="HttpResponseCode" expires_after="2023-05-07">
+    enum="HttpResponseCode" expires_after="2023-09-10">
   <owner>drubery@chromium.org</owner>
   <owner>chrome-counter-abuse-alerts@google.com</owner>
   <owner>mattm@chromium.org</owner>
@@ -616,7 +616,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="SBClientPhishing.ClassificationStart" enum="BooleanHit"
-    expires_after="2023-07-09">
+    expires_after="2023-09-10">
   <owner>drubery@chromium.org</owner>
   <owner>chrome-counter-abuse-alerts@google.com</owner>
   <summary>
@@ -630,12 +630,22 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="SBClientPhishing.Classifier.Event"
-    enum="SBPhishingClassifierEvent" expires_after="2023-07-09">
+    enum="SBPhishingClassifierEvent" expires_after="2023-09-10">
   <owner>drubery@chromium.org</owner>
   <owner>chrome-counter-abuse-alerts@google.com</owner>
   <summary>
     Records events in the phishing classifier including reasons that prevents
     phishing detection to complete on the renderer side.
+  </summary>
+</histogram>
+
+<histogram name="SBClientPhishing.ClassifyThresholdsResult"
+    enum="SBClientDetectionClassifyThresholdsResult" expires_after="2024-03-17">
+  <owner>andysjlim@chromium.org</owner>
+  <owner>chrome-counter-abuse-alerts@google.com</owner>
+  <summary>
+    Records the result of classification in visual TfLite model thresholds
+    comparison on the browser side
   </summary>
 </histogram>
 
@@ -739,7 +749,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="SBClientPhishing.PhishingDetectionDuration" units="ms"
-    expires_after="2023-07-09">
+    expires_after="2023-09-10">
   <owner>drubery@chromium.org</owner>
   <owner>chrome-counter-abuse-alerts@google.com</owner>
   <summary>

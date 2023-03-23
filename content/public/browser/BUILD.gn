@@ -39,7 +39,6 @@ source_set("browser_sources") {
     "audio_stream_broker.cc",
     "audio_stream_broker.h",
     "authenticator_common.h",
-    "authenticator_environment.h",
     "authenticator_request_client_delegate.cc",
     "authenticator_request_client_delegate.h",
     "ax_event_notification_details.cc",
@@ -344,6 +343,7 @@ source_set("browser_sources") {
     "resource_coordinator_service.h",
     "restore_type.h",
     "save_page_type.h",
+    "scoped_authenticator_environment_for_testing.h",
     "screen_orientation_delegate.h",
     "screenlock_observer.h",
     "serial_chooser.cc",
@@ -404,6 +404,8 @@ source_set("browser_sources") {
     "tracing_delegate.cc",
     "tracing_delegate.h",
     "tracing_service.h",
+    "trust_token_access_details.cc",
+    "trust_token_access_details.h",
     "tts_controller.h",
     "tts_platform.h",
     "tts_utterance.h",
@@ -634,7 +636,6 @@ source_set("browser_sources") {
       "chromeos/multi_capture_service.h",
       "firewall_hole_proxy.h",
       "lock_screen_storage.h",
-      "smart_card_delegate.cc",
       "smart_card_delegate.h",
     ]
   }

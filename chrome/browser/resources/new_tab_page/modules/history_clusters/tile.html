@@ -2,9 +2,9 @@
   :host {
     background:
         var(--color-new-tab-page-history-clusters-module-item-background);
-    border-radius: 25px;
+    border-radius: 12px;
     color: var(--color-new-tab-page-primary-foreground);
-    height: 100%;
+    display: inline-block;
     width: 100%;
   }
 
@@ -20,23 +20,32 @@
     outline: none;
   }
 
+  #content {
+    display: inline-block;
+    height: 100%;
+    width: 100%;
+  }
+
   :host([medium-format]) #content {
     display: flex;
     flex-direction: row;
   }
 
   #image {
-    background: red;
-    border-radius: 25px;
+    background: var(--color-new-tab-page-module-background);
+    overflow: hidden;
+    position: relative;
   }
 
   :host([large-format]) #image {
+    border-radius: 7px;
     height: 152px;
-    margin: 16px auto;
-    width: 320px;
+    margin: 16px;
+    width: calc(100% - 32px);
   }
 
   :host([medium-format]) #image {
+    border-radius: 6px;
     height: 128px;
     margin: 8px;
     width: 128px;
@@ -46,6 +55,19 @@
     display: none;
   }
 
+  #image img {
+    height: 100%;
+    object-fit: cover;
+    width: 100%;
+  }
+
+  #image page-favicon {
+    left: 50%;
+    position: absolute;
+    top: 50%;
+    transform: translate(-50%, -50%);
+  }
+
   #icon {
     height: 16px;
     margin-inline-end: 8px;
@@ -53,27 +75,34 @@
   }
 
   #title {
+    -webkit-box-orient: vertical;
     color: var(--color-new-tab-page-primary-foreground);
-    font-size: 16px;
+    display: -webkit-box;
+    font-size: var(--ntp-module-text-size);
+    margin: 16px;
+    max-width: calc(100% - 32px);
     white-space: initial;
   }
 
   :host([large-format]) #title {
+    -webkit-line-clamp: 2;
     height: 48px;
-    max-width: 298px;
-    padding: 16px 16px 24px;
+    line-height: 24px;
+    margin-bottom: 28px;
   }
 
   :host([medium-format]) #title {
-    height: 60px;
+    -webkit-line-clamp: 4;
+    height: 80px;
+    line-height: 20px;
+    margin-inline-start: 8px;
     max-width: 184px;
-    padding: 18px 16px 32px 8px;
   }
 
   :host([small-format]) #title {
-    height: 60px;
-    max-width: 136px;
-    padding: 18px 16px 32px 16px;
+    -webkit-line-clamp: 4;
+    height: 80px;
+    line-height: 20px;
   }
 
   #info-container {
@@ -81,16 +110,17 @@
     display: flex;
     flex-direction: row;
     font-size: 11px;
+    height: 20px;
     margin-inline: 16px;
   }
 
-  :host([medium-format]) #info-container {
-    margin-inline-start: 8px;
+  :host([large-format]) #info-container {
+    margin-bottom: 24px;
   }
 
-  :host([small-format]) #info-container {
-    height: 20px;
-    margin-bottom: 14px;
+  :host([medium-format]) #info-container {
+    margin-bottom: 12px;
+    margin-inline-start: 8px;
   }
 
   #label,
@@ -115,15 +145,40 @@
   #dot {
     line-height: 16px;
   }
+
+  /* Set styles for high contrast mode in Windows. */
+  @media (forced-colors: active) {
+    /* Set focus outline since box-shadow isn't visible in hcm */
+    :host-context(.focus-outline-visible) a:focus {
+      outline: var(--cr-focus-outline-hcm);
+    }
+
+    /* Set outline since background isn't visible in hcm */
+    a {
+      border-radius: 12px;
+      outline: var(--cr-border-hcm);
+    }
+  }
 </style>
-<a id="content" href="[[visit.normalizedUrl.url]]" on-click="onClick_"
-    on-auxclick="onClick_">
-  <div id="image"></div>
+<a id="content" href="[[visit.normalizedUrl.url]]"
+   aria-label$="[[visit.pageTitle]], [[label_]], [[visit.relativeDate]]">
+  <div id="image">
+    <template is="dom-if" if="[[hasImageUrl_(imageUrl_)]]" restamp>
+      <img is="cr-auto-img" auto-src="[[imageUrl_.url]]"
+          draggable="false">
+      </img>
+    </template>
+    <template is="dom-if" if="[[!hasImageUrl_(imageUrl_)]]" restamp>
+      <page-favicon url="[[visit.normalizedUrl]]"
+          is-known-to-sync="[[visit.isKnownToSync]]" size="24">
+      </page-favicon>
+    </template>
+  </div>
   <div id="text-container">
     <div id="title" class="truncate">[[visit.pageTitle]]</div>
     <div id="info-container">
       <page-favicon id="icon" url="[[visit.normalizedUrl]]"
-        is-known-to-sync="[[visit.isKnownToSync]]">
+          is-known-to-sync="[[visit.isKnownToSync]]">
       </page-favicon>
       <div id="label" class="truncate"> [[label_]]</div>
       <span id="dot">&nbsp&#8226&nbsp</span>

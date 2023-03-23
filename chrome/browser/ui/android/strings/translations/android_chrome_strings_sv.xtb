@@ -283,6 +283,7 @@ Med förtroendetoken förbättras integriteten på webben. De kan inte användas
 <translation id="2581165646603367611">Det här alternativet rensar cookies, cacheminnet och annan data från webbplatser som bedöms vara oviktiga.</translation>
 <translation id="2587052924345400782">Det finns en nyare version</translation>
 <translation id="2593272815202181319">Monospace</translation>
+<translation id="2603212228005142861">Logga in för att hantera inställningarna.</translation>
 <translation id="2604446170045642109">Du kan stänga av mörkt tema för webbplatser i inställningarna.</translation>
 <translation id="2612676031748830579">Kortnummer</translation>
 <translation id="2625189173221582860">Lösenordet har kopierats</translation>
@@ -476,6 +477,7 @@ Med förtroendetoken förbättras integriteten på webben. De kan inte användas
 <translation id="3587596251841506391">Förbättra säkerheten på webben</translation>
 <translation id="3597179440835065298">Få bättre förslag</translation>
 <translation id="3602290021589620013">Förhandsgranskning</translation>
+<translation id="360901359071773787">Vill du radera senaste 15 minuterna?</translation>
 <translation id="3616113530831147358">Ljud</translation>
 <translation id="3622349720008044802">Hantera fönster</translation>
 <translation id="3631987586758005671">Delas med <ph name="DEVICE_NAME" /></translation>
@@ -631,6 +633,7 @@ Med förtroendetoken förbättras integriteten på webben. De kan inte användas
 
 Det kan finnas andra former av webbhistorik i Google-kontot på <ph name="BEGIN_LINK" />myactivity.google.com<ph name="END_LINK" />, t.ex. sökningar och aktivitet på andra tjänster från Google.</translation>
 <translation id="452750746583162491">Granska din synkroniserade data</translation>
+<translation id="4528638190900283934">Logga in för fler funktioner</translation>
 <translation id="4532845899244822526">Välj mapp</translation>
 <translation id="4547551584605870320">{TAB_COUNT,plural, =1{<ph name="TAB_COUNT_ONE" /> flik}other{<ph name="TAB_COUNT_MANY" /> flikar, <ph name="TAB_COUNT_INCOGNITO" /> inkognitoflikar}}</translation>
 <translation id="4554077758708533499">Ansluten med USB-kabel</translation>
@@ -821,6 +824,7 @@ Det kan finnas andra former av webbhistorik i Google-kontot på <ph name="BEGIN_
 <translation id="5517095782334947753">Du har bokmärken, historik, lösenord och andra inställningar från <ph name="FROM_ACCOUNT" />.</translation>
 <translation id="5524761631371622910">Om provfunktioner är aktiverade och du slumpmässigt har valts ut för en aktiv provfunktion påverkar webbhistoriken vilka annonser som visas och vilka intressen som du uppskattas ha. Av integritetsskäl raderas dina intressen från Chrome löpande varje månad.</translation>
 <translation id="5524843473235508879">Omdirigeringen blockerades.</translation>
+<translation id="554297709083131118">Följande data från de senaste 15 minuterna raderas</translation>
 <translation id="5548606607480005320">Säkerhetskontroll</translation>
 <translation id="5555525474779371165">Välj ditt skydd med Säker webbsökning</translation>
 <translation id="5556459405103347317">Hämta igen</translation>
@@ -1075,6 +1079,7 @@ Vissa webbplatser kan till exempel svara på begäran genom att visa annonser so
 <translation id="6824899148643461612"><ph name="TAB_TITLE" />, flik, vald</translation>
 <translation id="6828070228333235514">Avbryt bevakningen av priset</translation>
 <translation id="6830728435402077660">Inte säkert</translation>
+<translation id="6831043979455480757">Översätt</translation>
 <translation id="6833996806551876956">Privacy Sandbox – provperiod</translation>
 <translation id="6836206421467243968">Återställ flikgruppen <ph name="TITLE_OF_GROUP" /> som en ny flikgrupp i bakgrunden.</translation>
 <translation id="6846298663435243399">Läser in …</translation>
@@ -1242,10 +1247,10 @@ Vissa webbplatser kan till exempel svara på begäran genom att visa annonser so
 <translation id="7707922173985738739">Mobildata används</translation>
 <translation id="7709094866268987903">Intressen du har tagit bort visas här</translation>
 <translation id="7709918231054955894">Få alla dina flikar</translation>
+<translation id="772434085369393266">Uppgradera anslutningar till HTTPS och visa en varning innan webbplatser som saknar stöd för HTTPS läses in. Det går inte att ändra den här inställningen eftersom Avancerat skydd är aktiverat.</translation>
 <translation id="7725024127233776428">Sidor som infogats som bokmärke visas här</translation>
 <translation id="7757787379047923882">Texten delades från <ph name="DEVICE_NAME" /></translation>
 <translation id="7762668264895820836">SD-kort <ph name="SD_CARD_NUMBER" /></translation>
-<translation id="7762928140712606393">Logga in för fler funktioner och Chromes starkaste skydd</translation>
 <translation id="7764225426217299476">Lägg till adress</translation>
 <translation id="7772032839648071052">Bekräfta lösenfras</translation>
 <translation id="7772375229873196092">Stäng <ph name="APP_NAME" /></translation>
@@ -1261,6 +1266,7 @@ Vissa webbplatser kan till exempel svara på begäran genom att visa annonser so
 <translation id="78270725016672455">Datorn vill registrera den här enheten för att logga in på en webbplats</translation>
 <translation id="7844171778363018843">Du har inte valt någon data att synkronisera</translation>
 <translation id="7846296061357476882">Googles tjänster</translation>
+<translation id="7847228556075070294">Raderad historik, cookies och annan data</translation>
 <translation id="784934925303690534">Tidsintervall</translation>
 <translation id="7851858861565204677">Andra enheter</translation>
 <translation id="7853202427316060426">Aktivitet</translation>

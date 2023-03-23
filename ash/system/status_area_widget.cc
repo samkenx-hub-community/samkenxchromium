@@ -15,6 +15,7 @@
 #include "ash/projector/projector_annotation_tray.h"
 #include "ash/public/cpp/shelf_config.h"
 #include "ash/session/session_controller_impl.h"
+#include "ash/shelf/drag_handle.h"
 #include "ash/shelf/shelf.h"
 #include "ash/shelf/shelf_layout_manager.h"
 #include "ash/shelf/shelf_widget.h"
@@ -114,6 +115,10 @@ void StatusAreaWidget::Initialize() {
   // Create the child views, left to right.
   overflow_button_tray_ =
       AddTrayButton(std::make_unique<StatusAreaOverflowButtonTray>(shelf_));
+  if (features::IsVideoConferenceEnabled()) {
+    video_conference_tray_ =
+        AddTrayButton(std::make_unique<VideoConferenceTray>(shelf_));
+  }
   holding_space_tray_ =
       AddTrayButton(std::make_unique<HoldingSpaceTray>(shelf_));
   logout_button_tray_ =
@@ -125,11 +130,6 @@ void StatusAreaWidget::Initialize() {
   ime_menu_tray_ = AddTrayButton(std::make_unique<ImeMenuTray>(shelf_));
   virtual_keyboard_tray_ = AddTrayButton(std::make_unique<VirtualKeyboardTray>(
       shelf_, TrayBackgroundViewCatalogName::kVirtualKeyboardStatusArea));
-
-  if (features::IsVideoConferenceEnabled()) {
-    video_conference_tray_ =
-        AddTrayButton(std::make_unique<VideoConferenceTray>(shelf_));
-  }
 
   stop_recording_button_tray_ =
       AddTrayButton(std::make_unique<StopRecordingButtonTray>(shelf_));
@@ -159,7 +159,7 @@ void StatusAreaWidget::Initialize() {
   if (features::IsQsRevampEnabled()) {
     notification_center_tray_ =
         AddTrayButton(std::make_unique<NotificationCenterTray>(shelf_));
-    notification_center_tray_->AddObserver(this);
+    notification_center_tray_->views::View::AddObserver(this);
   }
 
   auto unified_system_tray = std::make_unique<UnifiedSystemTray>(shelf_);
@@ -208,7 +208,7 @@ StatusAreaWidget::~StatusAreaWidget() {
   // some unittests. During the test environment tear-down, removing the
   // observer will lead to a crash.
   if (features::IsQsRevampEnabled() && notification_center_tray_) {
-    notification_center_tray_->RemoveObserver(this);
+    notification_center_tray_->views::View::RemoveObserver(this);
   }
 
   // If QsRevamp flag is enabled, reset `animation_controller_` before
@@ -277,6 +277,21 @@ void StatusAreaWidget::UpdateCollapseState() {
 
   status_area_widget_delegate_->OnStatusAreaCollapseStateChanged(
       collapse_state_);
+
+  bool overlap =
+      shelf_->shelf_widget()->GetDragHandle()->GetBoundsInScreen().Intersects(
+          status_area_widget_delegate_->GetBoundsInScreen());
+
+  if (collapse_state_ == CollapseState::EXPANDED && overlap) {
+    // Hide the drag handle if the status_area_widget_delegate_ overlaps
+    // expected drag handle bounds. Otherwise show the drag handle.
+    shelf_->shelf_widget()->GetDragHandle()->HideDragHandleNudge(
+        contextual_tooltip::DismissNudgeReason::kOther,
+        /*animate*/ false);
+    shelf_->shelf_widget()->GetDragHandle()->SetVisible(false);
+  } else if (collapse_state_ == CollapseState::COLLAPSED) {
+    shelf_->shelf_widget()->GetDragHandle()->SetVisible(true);
+  }
 }
 
 void StatusAreaWidget::LogVisiblePodCountMetric() {

@@ -117,6 +117,8 @@ class TestNetworkContext : public mojom::NetworkContext {
       ClearDomainReliabilityCallback callback) override {}
   void ClearTrustTokenData(mojom::ClearDataFilterPtr filter,
                            ClearTrustTokenDataCallback callback) override {}
+  void ClearTrustTokenSessionOnlyData(
+      ClearTrustTokenSessionOnlyDataCallback callback) override {}
   void SetDocumentReportingEndpoints(
       const base::UnguessableToken& reporting_source,
       const url::Origin& origin,
@@ -141,7 +143,6 @@ class TestNetworkContext : public mojom::NetworkContext {
                             mojom::NetworkConditionsPtr conditions) override {}
   void SetAcceptLanguage(const std::string& new_accept_language) override {}
   void SetEnableReferrers(bool enable_referrers) override {}
-  void SetEnablePreconnect(bool enable_preconnect) override {}
 #if BUILDFLAG(IS_CHROMEOS)
   void UpdateAdditionalCertificates(
       mojom::AdditionalCertificatesPtr additional_certificates) override {}
@@ -158,7 +159,7 @@ class TestNetworkContext : public mojom::NetworkContext {
       const net::IPEndPoint& addr,
       mojom::RestrictedUDPSocketMode mode,
       const net::MutableNetworkTrafficAnnotationTag& traffic_annotation,
-      mojom::UDPSocketOptionsPtr options,
+      mojom::RestrictedUDPSocketParamsPtr params,
       mojo::PendingReceiver<mojom::RestrictedUDPSocket> receiver,
       mojo::PendingRemote<mojom::UDPSocketListener> listener,
       mojom::NetworkContext::CreateRestrictedUDPSocketCallback callback)

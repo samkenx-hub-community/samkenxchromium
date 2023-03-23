@@ -16,6 +16,7 @@
 #include "base/synchronization/waitable_event.h"
 #include "base/test/bind.h"
 #include "base/threading/thread.h"
+#include "build/blink_buildflags.h"
 #include "mojo/core/embedder/embedder.h"
 #include "mojo/core/test/mojo_test_base.h"
 #include "mojo/public/cpp/bindings/associated_remote.h"
@@ -1027,7 +1028,7 @@ TEST_F(MultiprocessReceiverTest, MultiprocessReceiver) {
     }
   });
 }
-#endif  // !BUILDFLAG(IS_IOS)
+#endif  // BUILDFLAG(USE_BLINK)
 
 INSTANTIATE_MOJO_BINDINGS_TEST_SUITE_P(ReceiverTest);
 INSTANTIATE_MOJO_BINDINGS_TEST_SUITE_P(SelfOwnedReceiverTest);

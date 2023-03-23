@@ -119,7 +119,6 @@
 <translation id="1942765061641586207">Resolució de la imatge</translation>
 <translation id="1972984168337863910">Desplega els taulers amb informació dels fitxers</translation>
 <translation id="1995337122023280937">Ves a la ubicació del fitxer</translation>
-<translation id="1999709132469742660">Tots els URL poden accedir al fitxer</translation>
 <translation id="2001796770603320721">Gestiona a Drive</translation>
 <translation id="2009067268969781306">En formatar una unitat, se'n suprimeixen totes les dades que s'hi hagin emmagatzemat. Aquesta acció no es pot desfer.</translation>
 <translation id="2025955442973426285">Tigrinya</translation>
@@ -151,6 +150,7 @@
 <translation id="2236732657580416950">S'ha esborrat la memòria cau del teu Google Drive.</translation>
 <translation id="2239068707900391003">Persona amb un cafè</translation>
 <translation id="2251368349685848079">Restaura de la paperera</translation>
+<translation id="2278133026967558505">Tots els llocs web i tots els URL poden accedir al fitxer</translation>
 <translation id="2282155092769082568">URL de configuració automàtica:</translation>
 <translation id="2284767815536050991">emmagatzematge extraïble</translation>
 <translation id="2288278176040912387">Tocadiscos</translation>
@@ -543,7 +543,6 @@
 <translation id="5323213332664049067">Espanyol d'Amèrica Llatina</translation>
 <translation id="5330145655348521461">Aquests fitxers s'han obert en un altre escriptori. Aneu a <ph name="USER_NAME" /> (<ph name="MAIL_ADDRESS" />) per veure'l.</translation>
 <translation id="5330512191124428349">Mostra la informació</translation>
-<translation id="5337538975554986899">Tots els URL poden accedir al fitxer, excepte <ph name="NON_RESTRICTED_DESTINATIONS" /></translation>
 <translation id="5344246330454251646">Gestiona la compartició amb Bruschetta</translation>
 <translation id="535792325654997756">Persona amb gats</translation>
 <translation id="5358764674931277">Fotogrames per segon</translation>
@@ -769,6 +768,7 @@
 <translation id="7162080671816799010">Cal emplenar els camps "Nom alternatiu d'assumpte coincident" o "Sufix de domini coincident" per validar la identitat del servidor d'autenticació</translation>
 <translation id="7165320105431587207">No s'ha pogut configurar la xarxa</translation>
 <translation id="7170041865419449892">Fora de l'interval</translation>
+<translation id="7179579940054351344">Tots els llocs web i tots els URL poden accedir al fitxer, excepte <ph name="NON_RESTRICTED_DESTINATIONS" /></translation>
 <translation id="7180611975245234373">Actualitza</translation>
 <translation id="7189874332498648577"><ph name="NUMBER_OF_GB" /> GB</translation>
 <translation id="7191454237977785534">Anomena i desa</translation>
@@ -942,6 +942,7 @@
 <translation id="8492972329130824181">La xarxa domèstica no està disponible. La itinerància de dades mòbils ha d'estar activada per poder connectar-t'hi.</translation>
 <translation id="8499098729323186194">S'estan extraient <ph name="NUMBER_OF_ITEMS" /> elements...</translation>
 <translation id="8502913769543567768">Xarxa <ph name="NETWORK_INDEX" /> de <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, <ph name="NETWORK_PROVIDER_NAME" />, Activa després de la configuració del dispositiu, Gestionada pel teu administrador</translation>
+<translation id="8512483403832814140">En qualsevol moment</translation>
 <translation id="8521441079177373948">Regne Unit</translation>
 <translation id="853494022971700746">Francès (França)</translation>
 <translation id="8540608333167683902">Xarxa <ph name="NETWORK_INDEX" /> de <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, <ph name="CONNECTION_STATUS" />, <ph name="SIGNAL_STRENGTH" />% d'intensitat del senyal, detalls</translation>

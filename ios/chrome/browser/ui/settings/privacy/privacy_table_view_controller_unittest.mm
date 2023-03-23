@@ -13,6 +13,7 @@
 #import "base/test/scoped_feature_list.h"
 #import "components/content_settings/core/common/features.h"
 #import "components/handoff/pref_names_ios.h"
+#import "components/policy/core/common/policy_pref_names.h"
 #import "components/prefs/pref_service.h"
 #import "components/safe_browsing/core/common/features.h"
 #import "components/safe_browsing/core/common/safe_browsing_prefs.h"
@@ -29,9 +30,9 @@
 #import "ios/chrome/browser/prefs/browser_prefs.h"
 #import "ios/chrome/browser/prefs/pref_names.h"
 #import "ios/chrome/browser/shared/public/features/features.h"
+#import "ios/chrome/browser/shared/ui/table_view/chrome_table_view_controller_test.h"
 #import "ios/chrome/browser/sync/mock_sync_service_utils.h"
 #import "ios/chrome/browser/sync/sync_service_factory.h"
-#import "ios/chrome/browser/ui/table_view/chrome_table_view_controller_test.h"
 #import "ios/chrome/grit/ios_chromium_strings.h"
 #import "ios/chrome/grit/ios_strings.h"
 #import "ios/chrome/test/ios_chrome_scoped_testing_local_state.h"
@@ -86,7 +87,7 @@ class PrivacyTableViewControllerTest
 
     // Set Incognito Mode availability depending on test config.
     chrome_browser_state_->GetTestingPrefService()->SetManagedPref(
-        prefs::kIncognitoModeAvailability,
+        policy::policy_prefs::kIncognitoModeAvailability,
         std::make_unique<base::Value>(
             static_cast<int>(GetParam().incognitoModeAvailability)));
   }

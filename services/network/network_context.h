@@ -20,6 +20,7 @@
 #include "base/containers/unique_ptr_adapters.h"
 #include "base/functional/callback.h"
 #include "base/memory/raw_ptr.h"
+#include "base/sequence_checker.h"
 #include "base/time/time.h"
 #include "base/types/pass_key.h"
 #include "base/unguessable_token.h"
@@ -64,6 +65,8 @@
 #include "services/network/public/mojom/restricted_udp_socket.mojom.h"
 #include "services/network/public/mojom/tcp_socket.mojom.h"
 #include "services/network/public/mojom/udp_socket.mojom.h"
+#include "services/network/restricted_cookie_manager.h"
+
 #include "services/network/public/mojom/url_loader_factory.mojom.h"
 #include "services/network/public/mojom/websocket.mojom.h"
 #include "services/network/resource_scheduler/resource_scheduler.h"
@@ -210,10 +213,6 @@ class COMPONENT_EXPORT(NETWORK_SERVICE) NetworkContext
     return params_ && params_->allow_any_cors_exempt_header_for_browser;
   }
 
-  bool enable_preconnect() const {
-    return params_ && params_->enable_preconnect;
-  }
-
 #if BUILDFLAG(IS_ANDROID)
   base::android::ApplicationStatusListener* app_status_listener() const {
     return app_status_listener_.get();
@@ -264,6 +263,8 @@ class COMPONENT_EXPORT(NETWORK_SERVICE) NetworkContext
       const url::Origin& top_frame_origin) override;
   void ClearTrustTokenData(mojom::ClearDataFilterPtr filter,
                            base::OnceClosure done) override;
+  void ClearTrustTokenSessionOnlyData(
+      ClearTrustTokenSessionOnlyDataCallback callback) override;
   void GetStoredTrustTokenCounts(
       GetStoredTrustTokenCountsCallback callback) override;
   void DeleteStoredTrustTokens(
@@ -309,7 +310,6 @@ class COMPONENT_EXPORT(NETWORK_SERVICE) NetworkContext
                             mojom::NetworkConditionsPtr conditions) override;
   void SetAcceptLanguage(const std::string& new_accept_language) override;
   void SetEnableReferrers(bool enable_referrers) override;
-  void SetEnablePreconnect(bool enable_preconnect) override;
 #if BUILDFLAG(IS_CHROMEOS)
   void UpdateAdditionalCertificates(
       mojom::AdditionalCertificatesPtr additional_certificates) override;
@@ -339,7 +339,7 @@ class COMPONENT_EXPORT(NETWORK_SERVICE) NetworkContext
       const net::IPEndPoint& addr,
       mojom::RestrictedUDPSocketMode mode,
       const net::MutableNetworkTrafficAnnotationTag& traffic_annotation,
-      mojom::UDPSocketOptionsPtr options,
+      mojom::RestrictedUDPSocketParamsPtr params,
       mojo::PendingReceiver<mojom::RestrictedUDPSocket> receiver,
       mojo::PendingRemote<mojom::UDPSocketListener> listener,
       mojom::NetworkContext::CreateRestrictedUDPSocketCallback callback)
@@ -657,6 +657,9 @@ class COMPONENT_EXPORT(NETWORK_SERVICE) NetworkContext
   // On connection errors the NetworkContext destroys itself.
   void OnConnectionError();
 
+  // On disconnect of owned RCMs references need to be cleaned up.
+  void OnRCMDisconnect(const network::RestrictedCookieManager* rcm);
+
   // Invoked with the FirstPartySetMetadata to be associated with the given
   // RestrictedCookieManager that is being set up.
   void OnComputedFirstPartySetMetadata(
@@ -802,10 +805,11 @@ class COMPONENT_EXPORT(NETWORK_SERVICE) NetworkContext
 
   mojo::UniqueReceiverSet<mojom::NetLogExporter> net_log_exporter_receivers_;
 
-  // Ordering: this must be after |cookie_manager_| since it points to its
+  // Ordering: this must be after |cookie_manager_| since members point to its
   // CookieSettings object.
-  mojo::UniqueReceiverSet<mojom::RestrictedCookieManager>
-      restricted_cookie_manager_receivers_;
+  std::set<std::unique_ptr<network::RestrictedCookieManager>,
+           base::UniquePtrComparator>
+      restricted_cookie_managers_;
 
   ResourceScheduler::ClientId current_resource_scheduler_client_id_{0};
 
@@ -937,6 +941,8 @@ class COMPONENT_EXPORT(NETWORK_SERVICE) NetworkContext
       http_cache_file_operations_factory_;
 
   const CacheTransparencySettings cache_transparency_settings_;
+
+  SEQUENCE_CHECKER(sequence_checker_);
 
   base::WeakPtrFactory<NetworkContext> weak_factory_{this};
 };

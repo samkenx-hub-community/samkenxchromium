@@ -264,9 +264,8 @@ public class TabSwitcherCoordinator
                 int numRelatedTabs =
                         PseudoTab.getRelatedTabs(context, tab, tabModelSelector).size();
                 if (numRelatedTabs == 1) return tab.getTitle();
-                return activity.getResources().getQuantityString(
-                        R.plurals.bottom_tab_grid_title_placeholder, numRelatedTabs,
-                        numRelatedTabs);
+
+                return TabGroupTitleEditor.getDefaultTitle(context, numRelatedTabs);
             };
 
             long startTimeMs = SystemClock.uptimeMillis();
@@ -495,7 +494,9 @@ public class TabSwitcherCoordinator
                             MessageService.MessageType.INCOGNITO_REAUTH_PROMO_MESSAGE,
                             Profile.getLastUsedRegularProfile(), mActivity,
                             SharedPreferencesManager.getInstance(), mIncognitoReauthManager,
-                            mSnackbarManager, TabUiFeatureUtilities::isTabToGtsAnimationEnabled,
+                            mSnackbarManager,
+                            ()
+                                    -> TabUiFeatureUtilities.isTabToGtsAnimationEnabled(mActivity),
                             mLifecycleDispatcher);
                     mMessageCardProviderCoordinator.subscribeMessageService(
                             mIncognitoReauthPromoMessageService);

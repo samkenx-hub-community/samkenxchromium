@@ -419,7 +419,7 @@ class PLATFORM_EXPORT WebMediaPlayerImpl
   bool CouldPlayIfEnoughData() override;
   bool IsMediaPlayerRendererClient() override;
   void StopForDemuxerReset() override;
-  bool RestartForHls() override;
+  void RestartForHls() override;
   bool IsSecurityOriginCryptographic() const override;
   void UpdateLoadedUrl(const GURL& url) override;
 
@@ -433,6 +433,11 @@ class PLATFORM_EXPORT WebMediaPlayerImpl
                      const std::string& language,
                      bool is_first_track) override;
 #endif  // BUILDFLAG(ENABLE_FFMPEG)
+
+#if BUILDFLAG(ENABLE_HLS_DEMUXER)
+  base::SequenceBound<media::HlsDataSourceProvider> GetHlsDataSourceProvider()
+      override;
+#endif  // BUILDFLAG(ENABLE_HLS_DEMUXER)
 
   // Simplified watch time reporting.
   void OnSimpleWatchTimerTick();

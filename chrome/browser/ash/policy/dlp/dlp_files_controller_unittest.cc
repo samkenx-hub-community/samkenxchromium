@@ -256,9 +256,8 @@ class DlpFilesControllerTest : public testing::Test {
     event_storage_ = files_controller_->GetEventStorageForTesting();
     DCHECK(event_storage_);
 
-    scoped_refptr<base::TestMockTimeTaskRunner> task_runner =
-        base::MakeRefCounted<base::TestMockTimeTaskRunner>();
-    event_storage_->SetTaskRunnerForTesting(task_runner);
+    task_runner_ = base::MakeRefCounted<base::TestMockTimeTaskRunner>();
+    event_storage_->SetTaskRunnerForTesting(task_runner_);
 
     reporting_manager_ = std::make_unique<DlpReportingManager>();
     SetReportQueueForReportingManager(
@@ -308,6 +307,7 @@ class DlpFilesControllerTest : public testing::Test {
   std::unique_ptr<DlpReportingManager> reporting_manager_;
   std::vector<DlpPolicyEvent> events;
   DlpFilesEventStorage* event_storage_ = nullptr;
+  scoped_refptr<base::TestMockTimeTaskRunner> task_runner_;
 
   scoped_refptr<storage::FileSystemContext> file_system_context_;
 
@@ -1180,14 +1180,14 @@ TEST_F(DlpFilesControllerTest, CheckReportingOnIsDlpPolicyMatched) {
   ASSERT_FALSE(files_controller_->IsDlpPolicyMatched(file3));
   ASSERT_FALSE(files_controller_->IsDlpPolicyMatched(file4));
 
-  event_storage_->SimulateElapsedTimeForTesting(cooldown_time);
+  task_runner_->FastForwardBy(cooldown_time);
 
   // Report `event1`, `event2`, and `event3` after these calls.
   ASSERT_TRUE(files_controller_->IsDlpPolicyMatched(file1));
   ASSERT_FALSE(files_controller_->IsDlpPolicyMatched(file2));
   ASSERT_FALSE(files_controller_->IsDlpPolicyMatched(file3));
 
-  event_storage_->SimulateElapsedTimeForTesting(cooldown_time / 2);
+  task_runner_->FastForwardBy(cooldown_time / 2);
 
   // Do not report after these calls.
   ASSERT_TRUE(files_controller_->IsDlpPolicyMatched(file1));
@@ -1346,7 +1346,7 @@ TEST_F(DlpFilesControllerTest, CheckReportingOnIsFilesTransferRestricted) {
         DlpFilesController::DlpFileDestination(dst_path.path().value()),
         DlpFilesController::FileAction::kTransfer, cb.Get());
 
-    event_storage_->SimulateElapsedTimeForTesting(delay);
+    task_runner_->FastForwardBy(delay);
   }
 
   const auto expected_events =
@@ -1447,6 +1447,16 @@ TEST_F(DlpFilesControllerTest, CheckIfDropAllowed_ErrorResponse) {
                                         future.GetCallback());
 
   ASSERT_EQ(true, future.Get());
+
+  // Validate the request sent to the daemon.
+  ::dlp::CheckFilesTransferRequest request =
+      chromeos::DlpClient::Get()
+          ->GetTestInterface()
+          ->GetLastCheckFilesTransferRequest();
+  ASSERT_EQ(request.files_paths().size(), 1);
+  EXPECT_EQ(request.files_paths()[0], file_path1.value());
+  EXPECT_EQ(kExampleUrl1, request.destination_url());
+  EXPECT_EQ(::dlp::FileAction::MOVE, request.file_action());
 }
 
 // Tests dropping a mix of an external file and a local directory.
@@ -1499,6 +1509,8 @@ TEST_F(DlpFilesControllerTest, CheckIfDropAllowed) {
           ->GetLastCheckFilesTransferRequest();
   ASSERT_EQ(request.files_paths().size(), 1);
   EXPECT_EQ(request.files_paths()[0], file_path2.value());
+  EXPECT_EQ(kExampleUrl1, request.destination_url());
+  EXPECT_EQ(::dlp::FileAction::MOVE, request.file_action());
 }
 
 TEST_F(DlpFilesControllerTest, LocalFileCopyTest) {
@@ -2476,6 +2488,10 @@ TEST_F(DlpFilesAppServiceTest, CheckIfLaunchAllowed_ErrorResponse) {
   EXPECT_TRUE(last_check_files_transfer_request.has_file_action());
   EXPECT_EQ(last_check_files_transfer_request.file_action(),
             ::dlp::FileAction::OPEN);
+  ASSERT_EQ(last_check_files_transfer_request.files_paths().size(), 1);
+  EXPECT_EQ(last_check_files_transfer_request.files_paths()[0], path);
+  EXPECT_EQ(last_check_files_transfer_request.destination_component(),
+            ::dlp::DlpComponent::ARC);
 }
 
 TEST_F(DlpFilesAppServiceTest, CheckIfLaunchAllowed_EmptyIntent) {
@@ -2651,6 +2667,15 @@ TEST_P(DlpFilesAppLaunchTest, CheckIfAppLaunchAllowed) {
   EXPECT_TRUE(last_check_files_transfer_request.has_file_action());
   EXPECT_EQ(last_check_files_transfer_request.file_action(),
             ::dlp::FileAction::SHARE);
+
+  std::vector<std::string> expected_requested_files;
+  expected_requested_files.push_back(path1);
+  expected_requested_files.push_back(path2);
+  std::vector<std::string> requested_files(
+      last_check_files_transfer_request.files_paths().begin(),
+      last_check_files_transfer_request.files_paths().end());
+  EXPECT_THAT(requested_files,
+              testing::UnorderedElementsAreArray(expected_requested_files));
 
   EXPECT_TRUE(
       display_service_tester.GetNotification(kOpenBlockedNotificationId));

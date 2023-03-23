@@ -8,6 +8,7 @@
 #include "third_party/blink/renderer/core/core_probe_sink.h"
 #include "third_party/blink/renderer/core/execution_context/agent.h"
 #include "third_party/blink/renderer/core/execution_context/execution_context.h"
+#include "third_party/blink/renderer/core/html_names.h"
 #include "third_party/blink/renderer/core/script/script.h"
 #include "third_party/blink/renderer/core/timing/animation_frame_timing_info.h"
 #include "third_party/blink/renderer/core/timing/dom_window_performance.h"
@@ -28,9 +29,11 @@ AnimationFrameTimingMonitor::AnimationFrameTimingMonitor(Client& client,
     : client_(client) {
   Thread::Current()->AddTaskTimeObserver(this);
   sink->AddAnimationFrameTimingMonitor(this);
+  enabled_ = true;
 }
 
 void AnimationFrameTimingMonitor::Shutdown() {
+  enabled_ = false;
   Thread::Current()->RemoveTaskTimeObserver(this);
 }
 
@@ -72,10 +75,15 @@ void AnimationFrameTimingMonitor::DidBeginMainFrame() {
   if (current_frame_timing_info_->Duration() >= kLongAnimationFrameDuration) {
     current_frame_timing_info_->SetDesiredRenderStartTime(
         desired_render_start_time_);
+    if (!first_ui_event_timestamp_.is_null()) {
+      current_frame_timing_info_->SetFirstUIEventTime(
+          first_ui_event_timestamp_);
+    }
     client_.ReportLongAnimationFrameTiming(current_frame_timing_info_);
   }
 
   desired_render_start_time_ = base::TimeTicks();
+  first_ui_event_timestamp_ = base::TimeTicks();
   current_frame_timing_info_.Clear();
   current_scripts_.clear();
   state_ = State::kIdle;
@@ -177,7 +185,7 @@ ScriptTimingInfo* AnimationFrameTimingMonitor::MaybeAddScript(
 }
 
 bool AnimationFrameTimingMonitor::ShouldAddScript(ExecutionContext* context) {
-  return pending_script_info_ && context && context->IsWindow() &&
+  return enabled_ && pending_script_info_ && context && context->IsWindow() &&
          client_.ShouldReportLongAnimationFrameTiming() &&
          state_ != State::kIdle;
 }
@@ -230,8 +238,14 @@ void AnimationFrameTimingMonitor::WillHandlePromise(
   DCHECK(context->GetAgent());
   DCHECK(context->GetAgent()->event_loop());
   context->GetAgent()->event_loop()->EnqueueEndOfMicrotaskCheckpointTask(
-      WTF::BindOnce(&AnimationFrameTimingMonitor::OnMicrotasksCompleted,
-                    WrapPersistent(this), WrapPersistent(context)));
+      WTF::BindOnce(
+          [](WeakPersistent<AnimationFrameTimingMonitor> self,
+             WeakPersistent<ExecutionContext> context) {
+            if (self && context) {
+              self->OnMicrotasksCompleted(context);
+            }
+          },
+          WrapWeakPersistent(this), WrapWeakPersistent(context)));
 
   base::TimeTicks now = base::TimeTicks::Now();
   pending_script_info_ = PendingScriptInfo{
@@ -366,9 +380,20 @@ namespace {
 AtomicString GetClassLikeNameForEventTarget(EventTarget* event_target) {
   DCHECK(event_target);
   if (Node* node = event_target->ToNode()) {
-    // TODO: maybe use constructor name (e.g. HTMLImgElement) instead of node
-    // name (e.g. IMG)?
-    return AtomicString(node->nodeName());
+    StringBuilder builder;
+    builder.Append(node->nodeName());
+    if (Element* element = DynamicTo<Element>(node)) {
+      if (element->HasID()) {
+        builder.Append("#");
+        builder.Append(element->GetIdAttribute());
+      } else if (element->hasAttribute(html_names::kSrcAttr)) {
+        builder.Append("[src=");
+        builder.Append(element->getAttribute(html_names::kSrcAttr));
+        builder.Append("]");
+      }
+    }
+
+    return builder.ToAtomicString();
   } else {
     return event_target->InterfaceName();
   }
@@ -380,6 +405,12 @@ void AnimationFrameTimingMonitor::Did(const probe::UserCallback& probe_data) {
   if (user_callback_depth_) {
     return;
   }
+
+  if (probe_data.event && probe_data.event->IsUIEvent() &&
+      first_ui_event_timestamp_.is_null()) {
+    first_ui_event_timestamp_ = probe_data.event->PlatformTimeStamp();
+  }
+
   ScriptTimingInfo* info = DidExecuteScript(probe_data);
   if (!info) {
     return;
@@ -392,26 +423,27 @@ void AnimationFrameTimingMonitor::Did(const probe::UserCallback& probe_data) {
   info->SetPropertyLikeName(probe_data.name ? probe_data.name
                                             : probe_data.atomic_name);
   if (Event* event = probe_data.event) {
+    if (event->IsUIEvent() && first_ui_event_timestamp_.is_null()) {
+      first_ui_event_timestamp_ = event->PlatformTimeStamp();
+    }
     info->SetDesiredExecutionStartTime(event->PlatformTimeStamp());
   }
 }
 
+// Note that CallFunction in particular is very performance sensitive, we should
+// not perform any time captures for internal function calls, only top-level.
 void AnimationFrameTimingMonitor::Will(const probe::CallFunction& probe_data) {
-  base::TimeTicks start_time = probe_data.CaptureStartTime();
-  if (pending_script_info_ && probe_data.depth == 0 &&
-      pending_script_info_->execution_start_time.is_null()) {
-    pending_script_info_->execution_start_time = start_time;
+  if (probe_data.depth || !pending_script_info_) {
+    return;
+  }
+  if (pending_script_info_->execution_start_time.is_null()) {
+    pending_script_info_->execution_start_time = probe_data.CaptureStartTime();
   }
 }
 
 void AnimationFrameTimingMonitor::Did(const probe::CallFunction& probe_data) {
   // We use this probe callback only to capture source location.
   if (probe_data.depth || !pending_script_info_) {
-    return;
-  }
-
-  probe_data.CaptureEndTime();
-  if (probe_data.Duration() < kLongScriptDuration) {
     return;
   }
 

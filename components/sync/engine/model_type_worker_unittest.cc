@@ -170,7 +170,8 @@ class ModelTypeWorkerTest : public ::testing::Test {
     initial_state.mutable_progress_marker()->set_token(
         "some_saved_progress_token");
 
-    initial_state.set_initial_sync_done(true);
+    initial_state.set_initial_sync_state(
+        sync_pb::ModelTypeState_InitialSyncState_INITIAL_SYNC_DONE);
 
     InitializeWithState(model_type_, initial_state);
 
@@ -190,7 +191,8 @@ class ModelTypeWorkerTest : public ::testing::Test {
     loaded_invalidation->set_hint("loaded_hint_1");
     loaded_invalidation->set_version(1);
 
-    initial_state.set_initial_sync_done(true);
+    initial_state.set_initial_sync_state(
+        sync_pb::ModelTypeState_InitialSyncState_INITIAL_SYNC_DONE);
 
     InitializeWithState(model_type_, initial_state);
 
@@ -202,7 +204,8 @@ class ModelTypeWorkerTest : public ::testing::Test {
 
     // Don't set progress marker, commit only types don't use them.
     ModelTypeState initial_state;
-    initial_state.set_initial_sync_done(true);
+    initial_state.set_initial_sync_state(
+        sync_pb::ModelTypeState_InitialSyncState_INITIAL_SYNC_DONE);
 
     InitializeWithState(USER_EVENTS, initial_state);
   }
@@ -306,14 +309,14 @@ class ModelTypeWorkerTest : public ::testing::Test {
     worker()->ProcessGetUpdatesResponse(server()->GetProgress(),
                                         server()->GetContext(), {&entity},
                                         &status_controller_);
-    worker()->ApplyUpdates(&status_controller_);
+    worker()->ApplyUpdates(&status_controller_, /*cycle_done=*/true);
   }
 
   void TriggerEmptyUpdateFromServer() {
     worker()->ProcessGetUpdatesResponse(
         server()->GetProgress(), server()->GetContext(),
         /*applicable_updates=*/{}, &status_controller_);
-    worker()->ApplyUpdates(&status_controller_);
+    worker()->ApplyUpdates(&status_controller_, /*cycle_done=*/true);
   }
 
   void TriggerPartialUpdateFromServer(int64_t version_offset,
@@ -361,7 +364,7 @@ class ModelTypeWorkerTest : public ::testing::Test {
                                const std::string& tag,
                                const std::string& value) {
     TriggerPartialUpdateFromServer(version_offset, tag, value);
-    worker()->ApplyUpdates(&status_controller_);
+    worker()->ApplyUpdates(&status_controller_, /*cycle_done=*/true);
   }
 
   void TriggerTombstoneFromServer(int64_t version_offset,
@@ -377,12 +380,14 @@ class ModelTypeWorkerTest : public ::testing::Test {
     worker()->ProcessGetUpdatesResponse(server()->GetProgress(),
                                         server()->GetContext(), {&entity},
                                         &status_controller_);
-    worker()->ApplyUpdates(&status_controller_);
+    worker()->ApplyUpdates(&status_controller_, /*cycle_done=*/true);
   }
 
   // Simulates the end of a GU sync cycle and tells the worker to flush changes
   // to the processor.
-  void ApplyUpdates() { worker()->ApplyUpdates(&status_controller_); }
+  void ApplyUpdates() {
+    worker()->ApplyUpdates(&status_controller_, /*cycle_done=*/true);
+  }
 
   // Delivers specified protos as updates.
   //
@@ -393,7 +398,7 @@ class ModelTypeWorkerTest : public ::testing::Test {
     worker()->ProcessGetUpdatesResponse(server()->GetProgress(),
                                         server()->GetContext(), list,
                                         &status_controller_);
-    worker()->ApplyUpdates(&status_controller_);
+    worker()->ApplyUpdates(&status_controller_, /*cycle_done=*/true);
   }
 
   // By default, this harness behaves as if all tasks posted to the model
@@ -667,7 +672,8 @@ TEST_F(ModelTypeWorkerTest, SendInitialSyncDone) {
 
   const ModelTypeState& state = processor()->GetNthUpdateState(0);
   EXPECT_FALSE(state.progress_marker().token().empty());
-  EXPECT_TRUE(state.initial_sync_done());
+  EXPECT_EQ(state.initial_sync_state(),
+            sync_pb::ModelTypeState_InitialSyncState_INITIAL_SYNC_DONE);
   EXPECT_TRUE(worker()->IsInitialSyncEnded());
 }
 
@@ -1405,7 +1411,7 @@ TEST_F(ModelTypeWorkerTest, DecryptUpdateIfPossibleDespiteEncryptionDisabled) {
   worker()->ProcessGetUpdatesResponse(server()->GetProgress(),
                                       server()->GetContext(), {&update},
                                       status_controller());
-  worker()->ApplyUpdates(status_controller());
+  worker()->ApplyUpdates(status_controller(), /*cycle_done=*/true);
 
   // Even though encryption is disabled for this worker, it should decrypt the
   // update and pass it on to the processor.
@@ -1640,7 +1646,7 @@ TEST_F(ModelTypeWorkerTest, ShouldCleanUpPendingUpdatesOnGcDirective) {
 
   // Only the entities from the second GetUpdates should have made it to the
   // processor.
-  worker()->ApplyUpdates(status_controller());
+  worker()->ApplyUpdates(status_controller(), /*cycle_done=*/true);
   EXPECT_EQ(1u, processor()->GetNumUpdateResponses());
   EXPECT_THAT(processor()->GetNthUpdateResponse(0),
               UnorderedElementsAre(HasPreferenceClientTag(kTag2),
@@ -2050,7 +2056,7 @@ TEST_F(ModelTypeWorkerPasswordsTest, ReceiveDecryptablePasswordEntities) {
   worker()->ProcessGetUpdatesResponse(server()->GetProgress(),
                                       server()->GetContext(), {&entity},
                                       status_controller());
-  worker()->ApplyUpdates(status_controller());
+  worker()->ApplyUpdates(status_controller(), /*cycle_done=*/true);
 
   // Test its basic features and the value of encryption_key_name.
   ASSERT_TRUE(processor()->HasUpdateResponse(kHash1));
@@ -2081,7 +2087,7 @@ TEST_F(ModelTypeWorkerPasswordsTest,
   worker()->ProcessGetUpdatesResponse(server()->GetProgress(),
                                       server()->GetContext(), {&entity},
                                       status_controller());
-  worker()->ApplyUpdates(status_controller());
+  worker()->ApplyUpdates(status_controller(), /*cycle_done=*/true);
 
   // Worker cannot decrypt it.
   EXPECT_FALSE(processor()->HasUpdateResponse(kHash1));
@@ -2120,7 +2126,7 @@ TEST_F(ModelTypeWorkerPasswordsTest, ReceiveUndecryptablePasswordEntries) {
   worker()->ProcessGetUpdatesResponse(server()->GetProgress(),
                                       server()->GetContext(), {&entity},
                                       status_controller());
-  worker()->ApplyUpdates(status_controller());
+  worker()->ApplyUpdates(status_controller(), /*cycle_done=*/true);
 
   // At this point, the cryptographer does not have access to the key, so the
   // updates will be undecryptable. This will block all updates.
@@ -2160,7 +2166,7 @@ TEST_F(ModelTypeWorkerPasswordsTest, ReceiveCorruptedPasswordEntities) {
   worker()->ProcessGetUpdatesResponse(server()->GetProgress(),
                                       server()->GetContext(), {&entity},
                                       status_controller());
-  worker()->ApplyUpdates(status_controller());
+  worker()->ApplyUpdates(status_controller(), /*cycle_done=*/true);
 
   // No updates should have reached the processor and worker is blocked for
   // encryption because the cryptographer isn't ready yet.
@@ -2213,7 +2219,7 @@ TEST_F(ModelTypeWorkerBookmarksTest, CanDecryptUpdateWithMissingBookmarkGUID) {
   worker()->ProcessGetUpdatesResponse(server()->GetProgress(),
                                       server()->GetContext(), {&entity},
                                       status_controller());
-  worker()->ApplyUpdates(status_controller());
+  worker()->ApplyUpdates(status_controller(), /*cycle_done=*/true);
 
   EXPECT_EQ(2U, processor()->GetNumUpdateResponses());
 
@@ -2264,7 +2270,7 @@ TEST_F(ModelTypeWorkerBookmarksTest,
   worker()->ProcessGetUpdatesResponse(server()->GetProgress(),
                                       server()->GetContext(), {&entity},
                                       status_controller());
-  worker()->ApplyUpdates(status_controller());
+  worker()->ApplyUpdates(status_controller(), /*cycle_done=*/true);
 
   EXPECT_EQ(2U, processor()->GetNumUpdateResponses());
 
@@ -2309,7 +2315,7 @@ TEST_F(ModelTypeWorkerBookmarksTest,
   worker()->ProcessGetUpdatesResponse(server()->GetProgress(),
                                       server()->GetContext(), {&entity},
                                       status_controller());
-  worker()->ApplyUpdates(status_controller());
+  worker()->ApplyUpdates(status_controller(), /*cycle_done=*/true);
 
   DecryptPendingKey();
   EXPECT_EQ(1U, processor()->GetNumUpdateResponses());
@@ -2351,7 +2357,7 @@ TEST_F(ModelTypeWorkerBookmarksTest,
   worker()->ProcessGetUpdatesResponse(server()->GetProgress(),
                                       server()->GetContext(), {&entity},
                                       status_controller());
-  worker()->ApplyUpdates(status_controller());
+  worker()->ApplyUpdates(status_controller(), /*cycle_done=*/true);
 
   DecryptPendingKey();
   EXPECT_EQ(1U, processor()->GetNumUpdateResponses());
@@ -2533,7 +2539,7 @@ TEST_F(ModelTypeWorkerPasswordsTestWithNotes,
   worker()->ProcessGetUpdatesResponse(server()->GetProgress(),
                                       server()->GetContext(), {&entity},
                                       status_controller());
-  worker()->ApplyUpdates(status_controller());
+  worker()->ApplyUpdates(status_controller(), /*cycle_done=*/true);
 
   ASSERT_TRUE(processor()->HasUpdateResponse(kHash1));
   const UpdateResponseData& update = processor()->GetUpdateResponse(kHash1);
@@ -2578,7 +2584,7 @@ TEST_F(ModelTypeWorkerPasswordsTestWithNotes,
   worker()->ProcessGetUpdatesResponse(server()->GetProgress(),
                                       server()->GetContext(), {&entity},
                                       status_controller());
-  worker()->ApplyUpdates(status_controller());
+  worker()->ApplyUpdates(status_controller(), /*cycle_done=*/true);
 
   ASSERT_TRUE(processor()->HasUpdateResponse(kHash1));
   const UpdateResponseData& update = processor()->GetUpdateResponse(kHash1);
@@ -2614,7 +2620,7 @@ TEST_F(ModelTypeWorkerPasswordsTestWithNotes,
   worker()->ProcessGetUpdatesResponse(server()->GetProgress(),
                                       server()->GetContext(), {&entity},
                                       status_controller());
-  worker()->ApplyUpdates(status_controller());
+  worker()->ApplyUpdates(status_controller(), /*cycle_done=*/true);
 
   ASSERT_TRUE(processor()->HasUpdateResponse(kHash1));
   histogram_tester.ExpectUniqueSample("Sync.PasswordNotesStateInUpdate",
@@ -2656,7 +2662,7 @@ TEST_F(ModelTypeWorkerPasswordsTestWithNotes, ShouldEmitNotesBackupCorrupted) {
   worker()->ProcessGetUpdatesResponse(server()->GetProgress(),
                                       server()->GetContext(), {&entity},
                                       status_controller());
-  worker()->ApplyUpdates(status_controller());
+  worker()->ApplyUpdates(status_controller(), /*cycle_done=*/true);
 
   histogram_tester.ExpectUniqueSample(
       "Sync.PasswordNotesStateInUpdate",
@@ -2748,7 +2754,7 @@ TEST_F(ModelTypeWorkerTest, ModelTypeStateAfterApplyUpdates) {
 
   // The GetUpdates request finishes. This should delete the processed
   // invalidations.
-  worker()->ApplyUpdates(status_controller());
+  worker()->ApplyUpdates(status_controller(), /*cycle_done=*/true);
 
   // Unprocessed invalidations after ApplyUpdates are in ModelTypeState.
   EXPECT_EQ(2, processor()->GetNthUpdateState(0).invalidations_size());
@@ -2806,7 +2812,7 @@ TEST_F(ModelTypeWorkerTest, DropHintsAtServer_Alone) {
   }
 
   // Clear status then verify.
-  worker()->ApplyUpdates(status_controller());
+  worker()->ApplyUpdates(status_controller(), /*cycle_done=*/true);
   {
     sync_pb::GetUpdateTriggers gu_trigger;
     worker()->CollectPendingInvalidations(&gu_trigger);
@@ -2834,7 +2840,7 @@ TEST_F(ModelTypeWorkerTest, DropHintsAtServer_WithOtherInvalidations) {
   }
 
   // Clear status then verify.
-  worker()->ApplyUpdates(status_controller());
+  worker()->ApplyUpdates(status_controller(), /*cycle_done=*/true);
   {
     sync_pb::GetUpdateTriggers gu_trigger;
     worker()->CollectPendingInvalidations(&gu_trigger);
@@ -2906,7 +2912,7 @@ TEST_F(ModelTypeWorkerAckTrackingTest, SimpleAcknowledgement) {
   sync_pb::GetUpdateTriggers gu_trigger;
   worker()->CollectPendingInvalidations(&gu_trigger);
 
-  worker()->ApplyUpdates(status_controller());
+  worker()->ApplyUpdates(status_controller(), /*cycle_done=*/true);
   EXPECT_TRUE(IsInvalidationAcknowledged(inv_id));
 
   EXPECT_TRUE(AllInvalidationsAccountedFor());
@@ -2924,7 +2930,7 @@ TEST_F(ModelTypeWorkerAckTrackingTest, ManyAcknowledgements) {
   sync_pb::GetUpdateTriggers gu_trigger;
   worker()->CollectPendingInvalidations(&gu_trigger);
 
-  worker()->ApplyUpdates(status_controller());
+  worker()->ApplyUpdates(status_controller(), /*cycle_done=*/true);
   EXPECT_TRUE(IsInvalidationAcknowledged(inv1_id));
   EXPECT_TRUE(IsInvalidationAcknowledged(inv2_id));
 
@@ -2958,7 +2964,7 @@ TEST_F(ModelTypeWorkerAckTrackingTest, OverflowAndRecover) {
   worker()->CollectPendingInvalidations(&gu_trigger);
 
   // This should recover from the drop and bring us back into sync.
-  worker()->ApplyUpdates(status_controller());
+  worker()->ApplyUpdates(status_controller(), /*cycle_done=*/true);
 
   for (int id : invalidation_ids)
     EXPECT_TRUE(IsInvalidationAcknowledged(id));
@@ -2975,7 +2981,7 @@ TEST_F(ModelTypeWorkerAckTrackingTest, UnknownVersionFromServer_Simple) {
   EXPECT_TRUE(IsInvalidationUnacknowledged(inv_id));
   sync_pb::GetUpdateTriggers gu_trigger;
   worker()->CollectPendingInvalidations(&gu_trigger);
-  worker()->ApplyUpdates(status_controller());
+  worker()->ApplyUpdates(status_controller(), /*cycle_done=*/true);
   EXPECT_TRUE(IsInvalidationAcknowledged(inv_id));
   EXPECT_TRUE(AllInvalidationsAccountedFor());
 }
@@ -3002,7 +3008,7 @@ TEST_F(ModelTypeWorkerAckTrackingTest, UnknownVersionFromServer_Complex) {
   worker()->CollectPendingInvalidations(&gu_trigger);
 
   // Finish the sync cycle and expect all remaining invalidations to be acked.
-  worker()->ApplyUpdates(status_controller());
+  worker()->ApplyUpdates(status_controller(), /*cycle_done=*/true);
   EXPECT_TRUE(IsInvalidationAcknowledged(inv1_id));
   EXPECT_TRUE(IsInvalidationAcknowledged(inv2_id));
   EXPECT_TRUE(IsInvalidationAcknowledged(inv3_id));
@@ -3019,7 +3025,7 @@ TEST_F(ModelTypeWorkerAckTrackingTest, AckInvalidationsAddedDuringSyncCycle) {
   int inv1_id = SendInvalidation(10, "hint");
   int inv2_id = SendInvalidation(14, "hint2");
 
-  worker()->ApplyUpdates(status_controller());
+  worker()->ApplyUpdates(status_controller(), /*cycle_done=*/true);
 
   EXPECT_FALSE(IsInvalidationAcknowledged(inv1_id));
   EXPECT_FALSE(IsInvalidationAcknowledged(inv2_id));
@@ -3031,7 +3037,7 @@ TEST_F(ModelTypeWorkerAckTrackingTest, AckInvalidationsAddedDuringSyncCycle) {
 
   int inv3_id = SendInvalidation(100, "hint3");
 
-  worker()->ApplyUpdates(status_controller());
+  worker()->ApplyUpdates(status_controller(), /*cycle_done=*/true);
 
   EXPECT_TRUE(IsInvalidationAcknowledged(inv1_id));
   EXPECT_TRUE(IsInvalidationAcknowledged(inv2_id));
@@ -3045,7 +3051,7 @@ TEST_F(ModelTypeWorkerAckTrackingTest, AckInvalidationsAddedDuringSyncCycle) {
   worker()->CollectPendingInvalidations(&gu_trigger_2);
   ASSERT_EQ(1, gu_trigger_2.notification_hint_size());
 
-  worker()->ApplyUpdates(status_controller());
+  worker()->ApplyUpdates(status_controller(), /*cycle_done=*/true);
   EXPECT_TRUE(AllInvalidationsAccountedFor());
 }
 
@@ -3055,7 +3061,7 @@ TEST_F(ModelTypeWorkerAckTrackingTest, MultipleGetUpdates) {
   int inv1_id = SendInvalidation(1, "hint1");
   int inv2_id = SendInvalidation(2, "hint2");
 
-  worker()->ApplyUpdates(status_controller());
+  worker()->ApplyUpdates(status_controller(), /*cycle_done=*/true);
 
   EXPECT_FALSE(IsInvalidationAcknowledged(inv1_id));
   EXPECT_FALSE(IsInvalidationAcknowledged(inv2_id));
@@ -3075,7 +3081,7 @@ TEST_F(ModelTypeWorkerAckTrackingTest, MultipleGetUpdates) {
   worker()->CollectPendingInvalidations(&gu_trigger_2);
   ASSERT_EQ(3, gu_trigger_2.notification_hint_size());
 
-  worker()->ApplyUpdates(status_controller());
+  worker()->ApplyUpdates(status_controller(), /*cycle_done=*/true);
   EXPECT_TRUE(AllInvalidationsAccountedFor());
 }
 

@@ -7,6 +7,8 @@ import android.content.Context;
 import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.os.Build;
+import android.text.TextUtils;
+import android.view.Display;
 
 import androidx.annotation.IntDef;
 import androidx.annotation.NonNull;
@@ -50,6 +52,7 @@ import org.chromium.components.profile_metrics.BrowserProfileType;
 import org.chromium.components.ukm.UkmRecorder;
 import org.chromium.content_public.browser.ContentFeatureList;
 import org.chromium.ui.display.DisplayAndroid;
+import org.chromium.ui.display.DisplayAndroidManager;
 import org.chromium.ui.modaldialog.DialogDismissalCause;
 import org.chromium.ui.modaldialog.ModalDialogManager;
 import org.chromium.ui.modaldialog.ModalDialogManager.ModalDialogType;
@@ -61,8 +64,10 @@ import org.chromium.url.GURL;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Locale;
+import java.util.Set;
 
 /**
  * Utilities for requesting desktop sites support.
@@ -92,6 +97,8 @@ public class RequestDesktopUtils {
             "default_on_on_low_end_devices";
     static final String PARAM_GLOBAL_SETTING_DEFAULT_ON_ON_X86_DEVICES =
             "default_on_on_x86_devices";
+    static final String PARAM_GLOBAL_SETTING_DEFAULT_ON_ON_EXTERNAL_DISPLAY =
+            "default_on_on_external_display";
     static final String PARAM_GLOBAL_SETTING_DEFAULT_ON_SMALLEST_SCREEN_WIDTH =
             "default_on_smallest_screen_width";
     static final int DEFAULT_GLOBAL_SETTING_DEFAULT_ON_SMALLEST_SCREEN_WIDTH_THRESHOLD_DP = 600;
@@ -99,6 +106,8 @@ public class RequestDesktopUtils {
     static final int DEFAULT_GLOBAL_SETTING_DEFAULT_ON_MEMORY_LIMIT_THRESHOLD_MB = 0;
     static final String PARAM_SHOW_MESSAGE_ON_GLOBAL_SETTING_DEFAULT_ON =
             "show_message_on_default_on";
+    static final String PARAM_GLOBAL_SETTING_DEFAULT_ON_MANUFACTURER_LIST =
+            "default_on_manufacturer_list";
 
     static final String PARAM_GLOBAL_SETTING_OPT_IN_ENABLED = "show_opt_in_message";
     static final String PARAM_GLOBAL_SETTING_OPT_IN_DISPLAY_SIZE_MIN_THRESHOLD_INCHES =
@@ -114,6 +123,8 @@ public class RequestDesktopUtils {
     static final int DEFAULT_GLOBAL_SETTING_OPT_IN_SMALLEST_SCREEN_WIDTH_THRESHOLD_DP = 600;
     static final String PARAM_GLOBAL_SETTING_OPT_IN_MEMORY_LIMIT = "opt_in_memory_limit";
     static final int DEFAULT_GLOBAL_SETTING_OPT_IN_MEMORY_LIMIT_THRESHOLD_MB = 0;
+
+    static Set<String> sDefaultEnabledManufacturerAllowlist;
 
     // Note: these values must match the UserAgentRequestType enum in enums.xml.
     @IntDef({UserAgentRequestType.REQUEST_DESKTOP, UserAgentRequestType.REQUEST_MOBILE})
@@ -384,23 +395,41 @@ public class RequestDesktopUtils {
             return false;
         }
 
-        // TODO(shuyng): Add downgrade path support for smallestScreenWidthDp or displaySizeInInches
-        //  change.
         // If the smallest screen size in dp is below threshold, avoid default-enabling the setting.
         if (context.getResources().getConfiguration().smallestScreenWidthDp
                 < ChromeFeatureList.getFieldTrialParamByFeatureAsInt(feature,
                         PARAM_GLOBAL_SETTING_DEFAULT_ON_SMALLEST_SCREEN_WIDTH,
                         DEFAULT_GLOBAL_SETTING_DEFAULT_ON_SMALLEST_SCREEN_WIDTH_THRESHOLD_DP)) {
+            // TODO(shuyng): Add downgrade path support for smallestScreenWidthDp change.
+            return false;
+        }
+
+        if (sDefaultEnabledManufacturerAllowlist == null) {
+            sDefaultEnabledManufacturerAllowlist = new HashSet<>();
+            String allowListStr = ChromeFeatureList.getFieldTrialParamByFeature(
+                    feature, PARAM_GLOBAL_SETTING_DEFAULT_ON_MANUFACTURER_LIST);
+            if (!TextUtils.isEmpty(allowListStr)) {
+                Collections.addAll(sDefaultEnabledManufacturerAllowlist, allowListStr.split(","));
+            }
+        }
+        if (!sDefaultEnabledManufacturerAllowlist.isEmpty()
+                && !sDefaultEnabledManufacturerAllowlist.contains(
+                        Build.MANUFACTURER.toLowerCase(Locale.US))) {
             return false;
         }
 
         SharedPreferencesManager sharedPreferencesManager = SharedPreferencesManager.getInstance();
+        boolean isOnExternalDisplay =
+                !ChromeFeatureList.getFieldTrialParamByFeatureAsBoolean(
+                        feature, PARAM_GLOBAL_SETTING_DEFAULT_ON_ON_EXTERNAL_DISPLAY, false)
+                && isOnExternalDisplay(context);
         double screenSizeThreshold = ChromeFeatureList.getFieldTrialParamByFeatureAsDouble(feature,
                 PARAM_GLOBAL_SETTING_DEFAULT_ON_DISPLAY_SIZE_THRESHOLD_INCHES,
                 DEFAULT_GLOBAL_SETTING_DEFAULT_ON_DISPLAY_SIZE_THRESHOLD_INCHES);
-        if (displaySizeInInches < screenSizeThreshold
+        if (displaySizeInInches < screenSizeThreshold && !isOnExternalDisplay
                 && sharedPreferencesManager.contains(
                         ChromePreferenceKeys.DEFAULT_ENABLE_DESKTOP_SITE_GLOBAL_SETTING_COHORT)) {
+            // TODO(shuyng): Add downgrade path support for displaySizeInInches change.
             silentlyReportingCrashes(
                     context, displaySizeInInches, "Display size falls below threshold");
         }
@@ -411,7 +440,8 @@ public class RequestDesktopUtils {
                 SingleCategorySettingsConstants
                         .USER_ENABLED_DESKTOP_SITE_GLOBAL_SETTING_PREFERENCE_KEY);
 
-        boolean inCohort = !previouslyUpdatedByUser && displaySizeInInches >= screenSizeThreshold;
+        boolean inCohort = !previouslyUpdatedByUser && displaySizeInInches >= screenSizeThreshold
+                && !isOnExternalDisplay;
         boolean wouldEnable = !previouslyDefaultEnabled && inCohort;
         if (wouldEnable) {
             // Store a SharedPreferences key to tag the device as qualified for the feature
@@ -448,11 +478,11 @@ public class RequestDesktopUtils {
         Configuration config = context.getResources().getConfiguration();
         String logMessage = String.format(Locale.US,
                 message + ", silently reporting crashes for debugging, displaySizeInInches: %.1f "
-                        + "displayWidth: %d displayHeight: %d xdpi: %.1f ydpi: %.1f "
-                        + "densityDpi: %d screenWidthDp: %d screenHeightDp: %d",
+                        + "displayWidth: %d displayHeight: %d xdpi: %.1f ydpi: %.1f densityDpi: %d "
+                        + "screenWidthDp: %d screenHeightDp: %d onExternalDisplay: %b",
                 displaySizeInInches, display.getDisplayWidth(), display.getDisplayHeight(),
                 display.getXdpi(), display.getYdpi(), config.densityDpi, config.screenWidthDp,
-                config.screenHeightDp);
+                config.screenHeightDp, isOnExternalDisplay(context));
         SharedPreferencesManager sharedPreferencesManager = SharedPreferencesManager.getInstance();
         String previousDisplaySpec = sharedPreferencesManager.readString(
                 ChromePreferenceKeys.DESKTOP_SITE_GLOBAL_SETTING_DEFAULT_ON_COHORT_DISPLAY_SPEC,
@@ -473,10 +503,10 @@ public class RequestDesktopUtils {
         String displaySpec = String.format(Locale.US,
                 "lastDisplaySizeInInches: %.1f lastDisplayWidth: %d lastDisplayHeight: %d "
                         + "lastXdpi: %.1f lastYdpi: %.1f lastDensityDpi: %d "
-                        + "lastScreenWidthDp: %d lastScreenHeightDp: %d",
+                        + "lastScreenWidthDp: %d lastScreenHeightDp: %d lastOnExternalDisplay: %b",
                 displaySizeInInches, display.getDisplayWidth(), display.getDisplayHeight(),
                 display.getXdpi(), display.getYdpi(), config.densityDpi, config.screenWidthDp,
-                config.screenHeightDp);
+                config.screenHeightDp, isOnExternalDisplay(context));
         sharedPreferencesManager.writeString(
                 ChromePreferenceKeys.DESKTOP_SITE_GLOBAL_SETTING_DEFAULT_ON_COHORT_DISPLAY_SPEC,
                 displaySpec);
@@ -954,5 +984,10 @@ public class RequestDesktopUtils {
             return false;
         }
         return abiStrings[0].toLowerCase(Locale.ROOT).contains("arm");
+    }
+
+    private static boolean isOnExternalDisplay(Context context) {
+        Display display = DisplayAndroidManager.getDefaultDisplayForContext(context);
+        return display.getDisplayId() != Display.DEFAULT_DISPLAY;
     }
 }

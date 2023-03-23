@@ -119,7 +119,6 @@
 <translation id="1942765061641586207">Ubora wa picha</translation>
 <translation id="1972984168337863910">Panua vidirisha vya maoni ya faili</translation>
 <translation id="1995337122023280937">Nenda mahali faili ilipo</translation>
-<translation id="1999709132469742660">URL zote zinaweza kufikia faili</translation>
 <translation id="2001796770603320721">Dhibiti katika Hifadhi ya Google</translation>
 <translation id="2009067268969781306">Hatua ya kubadilisha muundo wa hifadhi itafuta data yote iliyomo. Kitendo hiki hakiwezi kutenduliwa.</translation>
 <translation id="2025955442973426285">Kitigrinya</translation>
@@ -151,6 +150,7 @@
 <translation id="2236732657580416950">Your Google Drive cache was cleared.</translation>
 <translation id="2239068707900391003">Mtu aliye na kahawa</translation>
 <translation id="2251368349685848079">Rejesha kutoka kwenye tupio</translation>
+<translation id="2278133026967558505">URL na tovuti zote zinaweza kufikia faili</translation>
 <translation id="2282155092769082568">URL ya kuweka mipangilio kiotomatiki:</translation>
 <translation id="2284767815536050991">nafasi ya hifadhi inayoweza kuondolewa</translation>
 <translation id="2288278176040912387">Kicheza rekodi</translation>
@@ -543,7 +543,6 @@
 <translation id="5323213332664049067">Amerika ya Kusini</translation>
 <translation id="5330145655348521461">Faili hizi zilifunguka kwenye eneo-kazi tofauti. Sogea kwenye <ph name="USER_NAME" /> ( <ph name="MAIL_ADDRESS" /> ) ili uzione.</translation>
 <translation id="5330512191124428349">Pata maelezo</translation>
-<translation id="5337538975554986899">URL zote zinaweza kufikia faili isipokuwa <ph name="NON_RESTRICTED_DESTINATIONS" /></translation>
 <translation id="5344246330454251646">Dhibiti hali ya kushiriki na Bruschetta</translation>
 <translation id="535792325654997756">Mtu aliye na paka</translation>
 <translation id="5358764674931277">Kasi ya picha</translation>
@@ -769,6 +768,7 @@
 <translation id="7162080671816799010">Hujaweka 'Jina mbadala la mada linalolingana' au 'Kiambishi cha kikoa kinacholingana' ili uthibitishe utambulisho wa seva ya uthibitishaji</translation>
 <translation id="7165320105431587207">Ilishindwa kusanidi mtandao</translation>
 <translation id="7170041865419449892">Nje ya eneo</translation>
+<translation id="7179579940054351344">URL na tovuti zote zinaweza kufikia faili isipokuwa <ph name="NON_RESTRICTED_DESTINATIONS" /></translation>
 <translation id="7180611975245234373">Onyesha upya</translation>
 <translation id="7189874332498648577">GB <ph name="NUMBER_OF_GB" /></translation>
 <translation id="7191454237977785534">Hifadhi faili kama</translation>
@@ -942,6 +942,7 @@
 <translation id="8492972329130824181">Mtandao wa nyumbani haupatikani. Ni lazima uwashe kipengele cha matumizi ya data kwenye mitandao ya simu ya ng'ambo ili uweze kuunganisha.</translation>
 <translation id="8499098729323186194">Inatoa vipengee <ph name="NUMBER_OF_ITEMS" /> ...</translation>
 <translation id="8502913769543567768">Mtandao wa <ph name="NETWORK_INDEX" /> kati ya <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, <ph name="NETWORK_PROVIDER_NAME" />, Washa baada ya kuweka mipangilio ya kifaa, Unadhibitiwa na Msimamizi wako</translation>
+<translation id="8512483403832814140">Wakati wowote</translation>
 <translation id="8521441079177373948">Kiingereza cha Uingereza</translation>
 <translation id="853494022971700746">Kifaransa (Ufaransa)</translation>
 <translation id="8540608333167683902">Mtandao wa <ph name="NETWORK_INDEX" /> kati ya <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, <ph name="CONNECTION_STATUS" />, Uthabiti wa Mtandao <ph name="SIGNAL_STRENGTH" />%, Maelezo</translation>

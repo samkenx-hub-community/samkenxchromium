@@ -12,8 +12,11 @@
 #include "ash/ambient/ambient_access_token_controller.h"
 #include "ash/ambient/ambient_constants.h"
 #include "ash/ambient/ambient_managed_photo_controller.h"
+#include "ash/ambient/ambient_managed_slideshow_ui_launcher.h"
 #include "ash/ambient/ambient_photo_cache.h"
 #include "ash/ambient/ambient_photo_controller.h"
+#include "ash/ambient/ambient_ui_launcher.h"
+#include "ash/ambient/ambient_ui_settings.h"
 #include "ash/ambient/test/ambient_ash_test_helper.h"
 #include "ash/ambient/ui/ambient_animation_view.h"
 #include "ash/ambient/ui/ambient_background_image_view.h"
@@ -32,8 +35,11 @@
 #include "ash/session/session_controller_impl.h"
 #include "ash/shell.h"
 #include "ash/test/ash_test_util.h"
+#include "base/files/file_path.h"
+#include "base/files/file_util.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback.h"
+#include "base/functional/callback_helpers.h"
 #include "base/location.h"
 #include "base/memory/ptr_util.h"
 #include "base/run_loop.h"
@@ -43,10 +49,12 @@
 #include "base/test/scoped_run_loop_timeout.h"
 #include "base/threading/scoped_blocking_call.h"
 #include "base/time/time.h"
+#include "base/values.h"
 #include "chromeos/ash/components/login/auth/auth_metrics_recorder.h"
 #include "chromeos/dbus/power/fake_power_manager_client.h"
 #include "chromeos/dbus/power/power_manager_client.h"
 #include "chromeos/dbus/power_manager/idle.pb.h"
+#include "ui/gfx/codec/jpeg_codec.h"
 #include "ui/gfx/image/image_skia.h"
 #include "ui/gfx/image/image_unittest_util.h"
 #include "ui/views/controls/label.h"
@@ -61,6 +69,10 @@ class TestAmbientPhotoCacheImpl : public AmbientPhotoCache {
  public:
   TestAmbientPhotoCacheImpl() = default;
   ~TestAmbientPhotoCacheImpl() override = default;
+
+  static std::unique_ptr<AmbientPhotoCache> Create() {
+    return std::make_unique<TestAmbientPhotoCacheImpl>();
+  }
 
   // AmbientPhotoCache:
   void DownloadPhoto(
@@ -189,6 +201,8 @@ AmbientAshTestBase::AmbientAshTestBase()
 AmbientAshTestBase::~AmbientAshTestBase() = default;
 
 void AmbientAshTestBase::SetUp() {
+  AmbientPhotoCache::SetFactoryForTesting(
+      base::BindRepeating(&TestAmbientPhotoCacheImpl::Create));
   AshTestBase::SetUp();
 
   // Need to reset first and then assign the TestPhotoClient because can only
@@ -203,32 +217,40 @@ void AmbientAshTestBase::SetUp() {
 
 void AmbientAshTestBase::TearDown() {
   AshTestBase::TearDown();
+  AmbientPhotoCache::SetFactoryForTesting(base::NullCallback());
 }
 
 void AmbientAshTestBase::SetAmbientModeEnabled(bool enabled) {
   Shell::Get()->session_controller()->GetActivePrefService()->SetBoolean(
       ambient::prefs::kAmbientModeEnabled, enabled);
 
-  // TODO (b/269576509) : Integrate with managed screensaver policy
-  if (ash::features::IsAmbientModeManagedScreensaverEnabled()) {
-    // We early return in case the managed screensaver is enabled, as
-    // the photo controller will not exist when the managed screensaver
-    // code path is being used.
-    return;
-  }
-
   if (enabled) {
-    photo_controller()->set_photo_cache_for_testing(
-        std::make_unique<TestAmbientPhotoCacheImpl>());
-    photo_controller()->set_backup_photo_cache_for_testing(
-        std::make_unique<TestAmbientPhotoCacheImpl>());
+    DisableBackupCacheDownloads();
+  }
+}
+
+void AmbientAshTestBase::SetAmbientUiSettings(
+    const AmbientUiSettings& settings) {
+  settings.WriteToPrefService(
+      *Shell::Get()->session_controller()->GetActivePrefService());
+  DisableBackupCacheDownloads();
+}
+
+void AmbientAshTestBase::DisableBackupCacheDownloads() {
+  // Some |AmbientUiSettings| legitimately don't use a photo controller, in
+  // which case backup photos are not downloaded anyways.
+  if (photo_controller()) {
     photo_controller()->backup_photo_refresh_timer_for_testing().Stop();
   }
 }
 
+void AmbientAshTestBase::SetAmbientModeManagedScreensaverEnabled(bool enabled) {
+  Shell::Get()->session_controller()->GetActivePrefService()->SetBoolean(
+      ambient::prefs::kAmbientModeManagedScreensaverEnabled, enabled);
+}
+
 void AmbientAshTestBase::SetAmbientTheme(AmbientTheme theme) {
-  Shell::Get()->session_controller()->GetActivePrefService()->SetInteger(
-      ambient::prefs::kAmbientTheme, static_cast<int>(theme));
+  SetAmbientUiSettings(AmbientUiSettings(theme));
 }
 
 void AmbientAshTestBase::DisableJitter() {
@@ -367,14 +389,14 @@ void AmbientAshTestBase::SimulateMediaPlaybackStateChanged(
 
 void AmbientAshTestBase::SetDecodedPhotoSize(int width, int height) {
   auto* photo_cache = static_cast<TestAmbientPhotoCacheImpl*>(
-      photo_controller()->get_photo_cache_for_testing());
+      ambient_controller()->ambient_photo_cache());
 
   photo_cache->SetDecodedPhotoSize(width, height);
 }
 
 void AmbientAshTestBase::SetDecodedPhotoColor(SkColor color) {
   auto* photo_cache = static_cast<TestAmbientPhotoCacheImpl*>(
-      photo_controller()->get_photo_cache_for_testing());
+      ambient_controller()->ambient_photo_cache());
 
   photo_cache->SetDecodedPhotoColor(color);
 }
@@ -542,7 +564,7 @@ base::TimeDelta AmbientAshTestBase::GetRefreshTokenDelay() {
 const std::map<int, ::ambient::PhotoCacheEntry>&
 AmbientAshTestBase::GetCachedFiles() {
   auto* photo_cache = static_cast<TestAmbientPhotoCacheImpl*>(
-      photo_controller()->get_photo_cache_for_testing());
+      ambient_controller()->ambient_photo_cache());
 
   return photo_cache->get_files();
 }
@@ -550,7 +572,7 @@ AmbientAshTestBase::GetCachedFiles() {
 const std::map<int, ::ambient::PhotoCacheEntry>&
 AmbientAshTestBase::GetBackupCachedFiles() {
   auto* photo_cache = static_cast<TestAmbientPhotoCacheImpl*>(
-      photo_controller()->get_backup_photo_cache_for_testing());
+      ambient_controller()->get_backup_photo_cache_for_testing());
 
   return photo_cache->get_files();
 }
@@ -564,11 +586,17 @@ AmbientPhotoController* AmbientAshTestBase::photo_controller() {
 }
 
 AmbientManagedPhotoController* AmbientAshTestBase::managed_photo_controller() {
-  return ambient_controller()->ambient_managed_photo_controller();
+  if (!ash::features::IsAmbientModeManagedScreensaverEnabled()) {
+    return nullptr;
+  }
+  AmbientManagedSlideshowUiLauncher* ui_launcher =
+      static_cast<AmbientManagedSlideshowUiLauncher*>(
+          ambient_controller()->ambient_ui_launcher());
+  return &ui_launcher->photo_controller_;
 }
 
 AmbientPhotoCache* AmbientAshTestBase::photo_cache() {
-  return photo_controller()->get_photo_cache_for_testing();
+  return ambient_controller()->ambient_photo_cache();
 }
 
 AmbientWeatherController* AmbientAshTestBase::weather_controller() {
@@ -624,44 +652,58 @@ void AmbientAshTestBase::FetchBackupImages() {
 
 void AmbientAshTestBase::SetDownloadPhotoData(std::string data) {
   auto* photo_cache = static_cast<TestAmbientPhotoCacheImpl*>(
-      photo_controller()->get_photo_cache_for_testing());
+      ambient_controller()->ambient_photo_cache());
 
   photo_cache->SetDownloadData(std::make_unique<std::string>(std::move(data)));
 }
 
 void AmbientAshTestBase::ClearDownloadPhotoData() {
   auto* photo_cache = static_cast<TestAmbientPhotoCacheImpl*>(
-      photo_controller()->get_photo_cache_for_testing());
+      ambient_controller()->ambient_photo_cache());
 
   photo_cache->SetDownloadData(nullptr);
 }
 
 void AmbientAshTestBase::SetBackupDownloadPhotoData(std::string data) {
   auto* backup_cache = static_cast<TestAmbientPhotoCacheImpl*>(
-      photo_controller()->get_backup_photo_cache_for_testing());
+      ambient_controller()->get_backup_photo_cache_for_testing());
 
   backup_cache->SetDownloadData(std::make_unique<std::string>(std::move(data)));
 }
 
 void AmbientAshTestBase::ClearBackupDownloadPhotoData() {
   auto* backup_cache = static_cast<TestAmbientPhotoCacheImpl*>(
-      photo_controller()->get_backup_photo_cache_for_testing());
+      ambient_controller()->get_backup_photo_cache_for_testing());
 
   backup_cache->SetDownloadData(nullptr);
 }
 
 void AmbientAshTestBase::SetDecodePhotoImage(const gfx::ImageSkia& image) {
   auto* photo_cache = static_cast<TestAmbientPhotoCacheImpl*>(
-      photo_controller()->get_photo_cache_for_testing());
+      ambient_controller()->ambient_photo_cache());
 
   photo_cache->SetDecodedPhoto(image);
 }
 
 void AmbientAshTestBase::SetPhotoDownloadDelay(base::TimeDelta delay) {
   auto* photo_cache = static_cast<TestAmbientPhotoCacheImpl*>(
-      photo_controller()->get_photo_cache_for_testing());
+      ambient_controller()->ambient_photo_cache());
 
   photo_cache->SetPhotoDownloadDelay(delay);
+}
+
+void AmbientAshTestBase::CreateTestImageJpegFile(base::FilePath path,
+                                                 size_t width,
+                                                 size_t height,
+                                                 SkColor color) {
+  SkBitmap bitmap;
+  bitmap.allocN32Pixels(width, height);
+  bitmap.eraseColor(color);
+  std::vector<unsigned char> data;
+  ASSERT_TRUE(gfx::JPEGCodec::Encode(bitmap, /*quality=*/50, &data));
+  size_t bytes_written = base::WriteFile(
+      path, reinterpret_cast<const char*>(data.data()), data.size());
+  ASSERT_EQ(data.size(), bytes_written);
 }
 
 }  // namespace ash

@@ -283,6 +283,7 @@ Private state tokens improve privacy on the web and can’t be used to find out 
 <translation id="2581165646603367611">This will clear cookies, cache and other data of sites Chrome doesn't think is important.</translation>
 <translation id="2587052924345400782">Newer version is available</translation>
 <translation id="2593272815202181319">Monospace</translation>
+<translation id="2603212228005142861">Sign in to manage your preferences</translation>
 <translation id="2604446170045642109">You can turn off Dark theme for sites in your settings.</translation>
 <translation id="2612676031748830579">Card number</translation>
 <translation id="2625189173221582860">Password copied</translation>
@@ -476,6 +477,7 @@ Private state tokens improve privacy on the web and can’t be used to find out 
 <translation id="3587596251841506391">Help improve security on the web</translation>
 <translation id="3597179440835065298">Get better suggestions</translation>
 <translation id="3602290021589620013">Preview</translation>
+<translation id="360901359071773787">Delete last 15 minutes?</translation>
 <translation id="3616113530831147358">Audio</translation>
 <translation id="3622349720008044802">Manage windows</translation>
 <translation id="3631987586758005671">Sharing to <ph name="DEVICE_NAME" /></translation>
@@ -630,6 +632,7 @@ Private state tokens improve privacy on the web and can’t be used to find out 
 
 Your Google Account may have other forms of browsing history such as searches and activity from other Google services at <ph name="BEGIN_LINK" />myactivity.google.com<ph name="END_LINK" />.</translation>
 <translation id="452750746583162491">Review your synced data</translation>
+<translation id="4528638190900283934">Sign in for additional features</translation>
 <translation id="4532845899244822526">Choose folder</translation>
 <translation id="4547551584605870320">{TAB_COUNT,plural, =1{<ph name="TAB_COUNT_ONE" /> tab}other{<ph name="TAB_COUNT_MANY" /> tabs, <ph name="TAB_COUNT_INCOGNITO" /> incognito}}</translation>
 <translation id="4554077758708533499">Connected with USB cable</translation>
@@ -820,6 +823,7 @@ To change this setting, <ph name="BEGIN_LINK" />reset sync<ph name="END_LINK" />
 <translation id="5517095782334947753">You have bookmarks, history, passwords and other settings from <ph name="FROM_ACCOUNT" />.</translation>
 <translation id="5524761631371622910">When trials are on and if Chrome has randomly placed you in an active trial, your browsing history affects the ads that you see and the interests as estimated below. To protect your privacy, Chrome deletes your interests on a rolling basis each month.</translation>
 <translation id="5524843473235508879">Redirect blocked.</translation>
+<translation id="554297709083131118">Following data from the last 15 minutes will be deleted</translation>
 <translation id="5548606607480005320">Safety check</translation>
 <translation id="5555525474779371165">Choose your Safe Browsing protection</translation>
 <translation id="5556459405103347317">Reload</translation>
@@ -1074,6 +1078,7 @@ For example, some websites may respond to this request by showing you ads that a
 <translation id="6824899148643461612"><ph name="TAB_TITLE" /> tab, selected</translation>
 <translation id="6828070228333235514">Stop tracking price</translation>
 <translation id="6830728435402077660">Not secure</translation>
+<translation id="6831043979455480757">Translate</translation>
 <translation id="6833996806551876956">Privacy sandbox trial</translation>
 <translation id="6836206421467243968">Restore tab group <ph name="TITLE_OF_GROUP" /> as a new background tab group.</translation>
 <translation id="6846298663435243399">Loading…</translation>
@@ -1241,10 +1246,10 @@ For example, some websites may respond to this request by showing you ads that a
 <translation id="7707922173985738739">Use mobile data</translation>
 <translation id="7709094866268987903">Interests that you removed will appear here</translation>
 <translation id="7709918231054955894">Get all your tabs</translation>
+<translation id="772434085369393266">Upgrade navigations to HTTPS and warn you before loading sites that don't support it. You can't change this setting because you have Advanced Protection enabled.</translation>
 <translation id="7725024127233776428">Pages that you bookmark appear here</translation>
 <translation id="7757787379047923882">Text shared from <ph name="DEVICE_NAME" /></translation>
 <translation id="7762668264895820836">SD Card <ph name="SD_CARD_NUMBER" /></translation>
-<translation id="7762928140712606393">Sign in for additional features and Chrome\u2019s strongest security</translation>
 <translation id="7764225426217299476">Add address</translation>
 <translation id="7772032839648071052">Confirm passphrase</translation>
 <translation id="7772375229873196092">Close <ph name="APP_NAME" /></translation>
@@ -1260,6 +1265,7 @@ For example, some websites may respond to this request by showing you ads that a
 <translation id="78270725016672455">Your computer wants to register this device for signing in to a site</translation>
 <translation id="7844171778363018843">No data selected to sync</translation>
 <translation id="7846296061357476882">Google services</translation>
+<translation id="7847228556075070294">Deleted history, cookies and other data</translation>
 <translation id="784934925303690534">Time range</translation>
 <translation id="7851858861565204677">Other devices</translation>
 <translation id="7853202427316060426">Activity</translation>
@@ -1439,6 +1445,7 @@ For example, some websites may respond to this request by showing you ads that a
 <translation id="869891660844655955">Expiry date</translation>
 <translation id="8699120352855309748">Don’t offer to translate these languages</translation>
 <translation id="8712637175834984815">Got it</translation>
+<translation id="8723453889042591629">Quickly translate this page. To edit this shortcut, touch and hold.</translation>
 <translation id="8725066075913043281">Try again</translation>
 <translation id="8746155870861185046">Share highlight</translation>
 <translation id="874726034427945498">To see better suggestions in your address bar, sync your tabs and history</translation>

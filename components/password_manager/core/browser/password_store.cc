@@ -103,18 +103,7 @@ void PasswordStore::Init(
 
 void PasswordStore::AddLogin(const PasswordForm& form,
                              base::OnceClosure completion) {
-  DCHECK(main_task_runner_->RunsTasksInCurrentSequence());
-  DCHECK(!form.blocked_by_user ||
-         (form.username_value.empty() && form.password_value.empty()));
-  if (!backend_) {
-    return;  // Once the shutdown started, ignore new requests.
-  }
-  backend_->AddLoginAsync(
-      form, base::BindOnce(&GetPasswordChangesOrEmptyListOnFailure)
-                .Then(base::BindOnce(
-                          &PasswordStore::NotifyLoginsChangedOnMainSequence,
-                          this, LoginsChangedTrigger::Addition)
-                          .Then(std::move(completion))));
+  AddLogins({form}, std::move(completion));
 }
 
 void PasswordStore::AddLogins(const std::vector<PasswordForm>& forms,
@@ -141,18 +130,29 @@ void PasswordStore::AddLogins(const std::vector<PasswordForm>& forms,
 
 void PasswordStore::UpdateLogin(const PasswordForm& form,
                                 base::OnceClosure completion) {
+  UpdateLogins({form}, std::move(completion));
+}
+
+void PasswordStore::UpdateLogins(const std::vector<PasswordForm>& forms,
+                                 base::OnceClosure completion) {
   DCHECK(main_task_runner_->RunsTasksInCurrentSequence());
-  DCHECK(!form.blocked_by_user ||
-         (form.username_value.empty() && form.password_value.empty()));
+
   if (!backend_) {
     return;  // Once the shutdown started, ignore new requests.
   }
-  backend_->UpdateLoginAsync(
-      form, base::BindOnce(&GetPasswordChangesOrEmptyListOnFailure)
-                .Then(base::BindOnce(
-                    &PasswordStore::NotifyLoginsChangedOnMainSequence, this,
-                    LoginsChangedTrigger::Update))
-                .Then(std::move(completion)));
+
+  auto barrier_callback = base::BarrierCallback<PasswordChangesOrError>(
+      forms.size(), base::BindOnce(&JoinPasswordStoreChanges)
+                        .Then(base::BindOnce(
+                            &PasswordStore::NotifyLoginsChangedOnMainSequence,
+                            this, LoginsChangedTrigger::Update))
+                        .Then(std::move(completion)));
+
+  for (const PasswordForm& form : forms) {
+    CHECK(!form.blocked_by_user ||
+          (form.username_value.empty() && form.password_value.empty()));
+    backend_->UpdateLoginAsync(form, barrier_callback);
+  }
 }
 
 void PasswordStore::UpdateLoginWithPrimaryKey(
@@ -198,7 +198,7 @@ void PasswordStore::RemoveLogin(const PasswordForm& form) {
     return;  // Once the shutdown started, ignore new requests.
   }
   backend_->RemoveLoginAsync(
-      form, base::BindOnce(&GetPasswordChangesOrEmptyListOnFailure)
+      form, base::BindOnce(&GetPasswordChangesOrNulloptOnFailure)
                 .Then(base::BindOnce(
                     &PasswordStore::NotifyLoginsChangedOnMainSequence, this,
                     LoginsChangedTrigger::Deletion)));
@@ -217,7 +217,7 @@ void PasswordStore::RemoveLoginsByURLAndTime(
   }
   backend_->RemoveLoginsByURLAndTimeAsync(
       url_filter, delete_begin, delete_end, std::move(sync_completion),
-      base::BindOnce(&GetPasswordChangesOrEmptyListOnFailure)
+      base::BindOnce(&GetPasswordChangesOrNulloptOnFailure)
           .Then(
               base::BindOnce(&PasswordStore::NotifyLoginsChangedOnMainSequence,
                              this, LoginsChangedTrigger::BatchDeletion))
@@ -238,7 +238,7 @@ void PasswordStore::RemoveLoginsCreatedBetween(
                      LoginsChangedTrigger::BatchDeletion);
   backend_->RemoveLoginsCreatedBetweenAsync(
       delete_begin, delete_end,
-      base::BindOnce(&GetPasswordChangesOrEmptyListOnFailure)
+      base::BindOnce(&GetPasswordChangesOrNulloptOnFailure)
           .Then(base::BindOnce(&InvokeCallbacksForSuspectedChanges,
                                std::move(callback), std::move(completion))));
 }
@@ -410,7 +410,6 @@ void PasswordStore::OnInitCompleted(bool success) {
   DCHECK(main_task_runner_->RunsTasksInCurrentSequence());
   init_status_ = success ? InitStatus::kSuccess : InitStatus::kFailure;
 
-  base::UmaHistogramBoolean("PasswordManager.PasswordStoreInitResult", success);
   TRACE_EVENT_NESTABLE_ASYNC_END0(
       "passwords", "PasswordStore::InitOnBackgroundSequence", this);
 }
@@ -440,8 +439,10 @@ void PasswordStore::NotifyLoginsChangedOnMainSequence(
     return;
   }
 #else
-  DCHECK(changes.has_value())
-      << "Non-Android platforms can always compute changes!";
+  if (!changes.has_value()) {
+    // TODO(crbug/1423425): Record the silent failure.
+    return;
+  }
 #endif
 
   if (changes->empty()) {

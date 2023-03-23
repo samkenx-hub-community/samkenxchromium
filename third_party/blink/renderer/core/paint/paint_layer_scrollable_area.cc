@@ -102,6 +102,7 @@
 #include "third_party/blink/renderer/core/paint/paint_layer_fragment.h"
 #include "third_party/blink/renderer/core/scroll/scroll_alignment.h"
 #include "third_party/blink/renderer/core/scroll/scroll_animator_base.h"
+#include "third_party/blink/renderer/core/scroll/scrollable_area.h"
 #include "third_party/blink/renderer/core/scroll/scrollbar_theme.h"
 #include "third_party/blink/renderer/core/scroll/smooth_scroll_sequencer.h"
 #include "third_party/blink/renderer/core/view_transition/view_transition.h"
@@ -227,7 +228,7 @@ void PaintLayerScrollableArea::DisposeImpl() {
   if (SmoothScrollSequencer* sequencer = GetSmoothScrollSequencer())
     sequencer->DidDisposeScrollableArea(*this);
 
-  RunScrollCompleteCallbacks();
+  RunScrollCompleteCallbacks(ScrollableArea::ScrollCompletionMode::kFinished);
 
   layer_ = nullptr;
 }
@@ -1102,10 +1103,16 @@ void PaintLayerScrollableArea::UpdateAfterLayout() {
     UpdateScrollbarProportions();
   }
 
-  hypothetical_horizontal_scrollbar_thickness_ =
-      ComputeHypotheticalScrollbarThickness(kHorizontalScrollbar, true);
-  hypothetical_vertical_scrollbar_thickness_ =
-      ComputeHypotheticalScrollbarThickness(kVerticalScrollbar, true);
+  hypothetical_horizontal_scrollbar_thickness_ = 0;
+  if (NeedsHypotheticalScrollbarThickness(kHorizontalScrollbar)) {
+    hypothetical_horizontal_scrollbar_thickness_ =
+        ComputeHypotheticalScrollbarThickness(kHorizontalScrollbar, true);
+  }
+  hypothetical_vertical_scrollbar_thickness_ = 0;
+  if (NeedsHypotheticalScrollbarThickness(kVerticalScrollbar)) {
+    hypothetical_vertical_scrollbar_thickness_ =
+        ComputeHypotheticalScrollbarThickness(kVerticalScrollbar, true);
+  }
 
   DelayableClampScrollOffsetAfterOverflowChange();
 
@@ -1458,6 +1465,7 @@ static inline const LayoutObject& ScrollbarStyleSource(
 int PaintLayerScrollableArea::HypotheticalScrollbarThickness(
     ScrollbarOrientation orientation,
     bool should_include_overlay_thickness) const {
+  DCHECK(NeedsHypotheticalScrollbarThickness(orientation));
   // The cached values are updated after layout, use them if we're layout clean.
   if (should_include_overlay_thickness &&
       GetLayoutBox()->GetDocument().Lifecycle().GetState() >=
@@ -1468,6 +1476,16 @@ int PaintLayerScrollableArea::HypotheticalScrollbarThickness(
   }
   return ComputeHypotheticalScrollbarThickness(
       orientation, should_include_overlay_thickness);
+}
+
+// Hypothetical scrollbar thickness is computed and cached during layout, but
+// only as needed to avoid a performance penalty. It is needed for every
+// LayoutView, to support frame view auto-sizing; and it's needed whenever CSS
+// scrollbar-gutter requires it.
+bool PaintLayerScrollableArea::NeedsHypotheticalScrollbarThickness(
+    ScrollbarOrientation orientation) const {
+  return GetLayoutBox()->IsLayoutView() ||
+         GetLayoutBox()->HasScrollbarGutters(orientation);
 }
 
 int PaintLayerScrollableArea::ComputeHypotheticalScrollbarThickness(
@@ -2495,9 +2513,8 @@ bool PaintLayerScrollableArea::ComputeNeedsCompositedScrollingInternal(
   const auto* box = GetLayoutBox();
   bool needs_composited_scrolling = true;
   if (!force_prefer_compositing_to_lcd_text &&
-      !box->GetDocument()
-           .GetSettings()
-           ->GetPreferCompositingToLCDTextEnabled()) {
+      box->GetDocument().GetSettings()->GetLCDTextPreference() ==
+          LCDTextPreference::kStronglyPreferred) {
     if (!box->TextIsKnownToBeOnOpaqueBackground()) {
       non_composited_main_thread_scrolling_reasons_ |=
           cc::MainThreadScrollingReason::kNotOpaqueForTextAndLCDText;

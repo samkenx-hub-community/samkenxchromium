@@ -119,7 +119,6 @@
 <translation id="1942765061641586207">Attēla izšķirtspēja</translation>
 <translation id="1972984168337863910">Notiek failu atsauksmju paneļu izvēršana</translation>
 <translation id="1995337122023280937">Pāriet uz faila atrašanās vietu</translation>
-<translation id="1999709132469742660">piekļuvi failiem visos URL</translation>
 <translation id="2001796770603320721">Pārvaldīt Diskā</translation>
 <translation id="2009067268969781306">Formatējot disku, tiks dzēsti visi tajā uzglabātie dati. Šo darbību nevar atsaukt.</translation>
 <translation id="2025955442973426285">Tigrinja</translation>
@@ -151,6 +150,7 @@
 <translation id="2236732657580416950">Jūsu Google diska kešatmiņa tika notīrīta.</translation>
 <translation id="2239068707900391003">Persona ar kafiju</translation>
 <translation id="2251368349685848079">Atjaunot no atkritnes</translation>
+<translation id="2278133026967558505">Piekļuve failiem visās vietnēs un vietrāžos URL</translation>
 <translation id="2282155092769082568">Automātiskās konfigurācijas vietrādis URL</translation>
 <translation id="2284767815536050991">noņemama atmiņas ierīce</translation>
 <translation id="2288278176040912387">Ierakstu atskaņotājs</translation>
@@ -543,7 +543,6 @@
 <translation id="5323213332664049067">Latīņamerikas</translation>
 <translation id="5330145655348521461">Šie faili tika atvērti citā darbvirsmā. Lai skatītu šo darbvirsmu, izmantojiet profilu <ph name="USER_NAME" /> (<ph name="MAIL_ADDRESS" />).</translation>
 <translation id="5330512191124428349">Iegūt informāciju</translation>
-<translation id="5337538975554986899">piekļuvi failiem visos URL, izņemot <ph name="NON_RESTRICTED_DESTINATIONS" /></translation>
 <translation id="5344246330454251646">Ar Bruschetta kopīgotā satura pārvaldība</translation>
 <translation id="535792325654997756">Persona ar kaķiem</translation>
 <translation id="5358764674931277">Kadri sekundē</translation>
@@ -769,6 +768,7 @@
 <translation id="7162080671816799010">Nevar apstiprināt autentifikācijas servera identitāti, jo nav aizpildīts lauks “Subjekta alternatīvā nosaukuma atbilstība” vai “Domēna sufiksa atbilstība”.</translation>
 <translation id="7165320105431587207">Neizdevās konfigurēt tīklu</translation>
 <translation id="7170041865419449892">Ārpus diapazona</translation>
+<translation id="7179579940054351344">Piekļuve failiem visās vietnēs un vietrāžos URL, izņemot <ph name="NON_RESTRICTED_DESTINATIONS" /></translation>
 <translation id="7180611975245234373">Atsvaidzināt</translation>
 <translation id="7189874332498648577"><ph name="NUMBER_OF_GB" /> GB</translation>
 <translation id="7191454237977785534">Saglabāt failu kā</translation>
@@ -942,6 +942,7 @@
 <translation id="8492972329130824181">Mājas tīkls nav pieejams. Lai izveidotu savienojumu, jāiespējo mobilo datu viesabonēšana.</translation>
 <translation id="8499098729323186194">Notiek <ph name="NUMBER_OF_ITEMS" /> vienumu izvilkšana...</translation>
 <translation id="8502913769543567768"><ph name="NETWORK_INDEX" />. no <ph name="NETWORK_COUNT" /> tīkliem, <ph name="NETWORK_NAME" />, <ph name="NETWORK_PROVIDER_NAME" />, jāaktivizē pēc ierīces iestatīšanas, pārvalda jūsu administrators</translation>
+<translation id="8512483403832814140">Jebkurā laikā</translation>
 <translation id="8521441079177373948">Lielbritānijas</translation>
 <translation id="853494022971700746">Franču (Francija)</translation>
 <translation id="8540608333167683902"><ph name="NETWORK_INDEX" />. tīkls no <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, <ph name="CONNECTION_STATUS" />, signāla stiprums: <ph name="SIGNAL_STRENGTH" />%, informācija</translation>

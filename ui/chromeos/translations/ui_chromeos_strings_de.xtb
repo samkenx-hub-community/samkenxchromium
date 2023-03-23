@@ -119,7 +119,6 @@
 <translation id="1942765061641586207">Bildauflösung</translation>
 <translation id="1972984168337863910">Erweiterte Dateiinformationen maximieren</translation>
 <translation id="1995337122023280937">Zum Dateispeicherort</translation>
-<translation id="1999709132469742660">Dateizugriff über alle URLs</translation>
 <translation id="2001796770603320721">In Drive verwalten</translation>
 <translation id="2009067268969781306">Durch die Formatierung eines Laufwerks werden alle darauf gespeicherten Daten gelöscht. Diese Aktion kann nicht rückgängig gemacht werden.</translation>
 <translation id="2025955442973426285">Tigrinya</translation>
@@ -151,6 +150,7 @@
 <translation id="2236732657580416950">Dein Google Drive-Cache wurde geleert.</translation>
 <translation id="2239068707900391003">Person mit Kaffee</translation>
 <translation id="2251368349685848079">Aus Papierkorb wiederherstellen</translation>
+<translation id="2278133026967558505">Dateizugriff durch alle Websites und URLs</translation>
 <translation id="2282155092769082568">URL für Autokonfiguration:</translation>
 <translation id="2284767815536050991">Wechselmedium</translation>
 <translation id="2288278176040912387">Plattenspieler</translation>
@@ -543,7 +543,6 @@
 <translation id="5323213332664049067">Lateinamerikanisch</translation>
 <translation id="5330145655348521461">Diese Dateien wurden auf einem anderen Desktop geöffnet. Wechsle zu <ph name="USER_NAME" /> (<ph name="MAIL_ADDRESS" />), um sie anzusehen.</translation>
 <translation id="5330512191124428349">Informationen ansehen</translation>
-<translation id="5337538975554986899">Dateizugriff über alle URLs außer <ph name="NON_RESTRICTED_DESTINATIONS" /></translation>
 <translation id="5344246330454251646">Bruschetta-Freigabe verwalten</translation>
 <translation id="535792325654997756">Person mit Katzen</translation>
 <translation id="5358764674931277">Framerate</translation>
@@ -769,6 +768,7 @@
 <translation id="7162080671816799010">Fehlende Angabe bei „Alternativer Name für Betreff stimmt überein“ oder „Domain-Suffix stimmt überein“ zur Bestätigung der Identität des Authentifizierungsservers</translation>
 <translation id="7165320105431587207">Fehler beim Konfigurieren des Netzwerks</translation>
 <translation id="7170041865419449892">Außer Reichweite</translation>
+<translation id="7179579940054351344">Dateizugriff durch alle Websites und URLs außer <ph name="NON_RESTRICTED_DESTINATIONS" /></translation>
 <translation id="7180611975245234373">Aktualisieren</translation>
 <translation id="7189874332498648577"><ph name="NUMBER_OF_GB" /> GB</translation>
 <translation id="7191454237977785534">Datei speichern unter</translation>
@@ -942,6 +942,7 @@
 <translation id="8492972329130824181">Heimnetzwerk ist nicht verfügbar. Mobiles Daten-Roaming muss aktiviert sein, um eine Verbindung herzustellen.</translation>
 <translation id="8499098729323186194"><ph name="NUMBER_OF_ITEMS" /> Elemente werden extrahiert...</translation>
 <translation id="8502913769543567768">Netzwerk <ph name="NETWORK_INDEX" /> von <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, <ph name="NETWORK_PROVIDER_NAME" />, Nach Geräteeinrichtung aktivieren, Von deinem Administrator verwaltet</translation>
+<translation id="8512483403832814140">Beliebiger Zeitraum</translation>
 <translation id="8521441079177373948">UK</translation>
 <translation id="853494022971700746">Französisch (Frankreich)</translation>
 <translation id="8540608333167683902">Netzwerk <ph name="NETWORK_INDEX" /> von <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, <ph name="CONNECTION_STATUS" />, Signalstärke bei <ph name="SIGNAL_STRENGTH" /> %, Details</translation>

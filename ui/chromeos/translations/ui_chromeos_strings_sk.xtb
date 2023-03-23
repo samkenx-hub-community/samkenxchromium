@@ -119,7 +119,6 @@
 <translation id="1942765061641586207">Rozlíšenie obrázka</translation>
 <translation id="1972984168337863910">Rozbaliť panely so spätnou väzbou týkajúcou sa súborov</translation>
 <translation id="1995337122023280937">Prejsť na umiestnenie súboru</translation>
-<translation id="1999709132469742660">Prístupu všetkých webových adries k súboru</translation>
 <translation id="2001796770603320721">Spravovať na Disku</translation>
 <translation id="2009067268969781306">Formátovaním kľúča odstránite všetky dáta, ktoré sú v ňom uložené. Túto akciu nie je možné vrátiť späť.</translation>
 <translation id="2025955442973426285">Tigrinská klávesnica</translation>
@@ -151,6 +150,7 @@
 <translation id="2236732657580416950">Vyrovnávacia pamäť Disku Google bola vymazaná.</translation>
 <translation id="2239068707900391003">Osoba s kávou</translation>
 <translation id="2251368349685848079">Obnoviť z koša</translation>
+<translation id="2278133026967558505">Prístup k súborom zo všetkých webov a webových adries</translation>
 <translation id="2282155092769082568">Webová adresa automatickej konfigurácie</translation>
 <translation id="2284767815536050991">vymeniteľné úložisko</translation>
 <translation id="2288278176040912387">Gramofón</translation>
@@ -543,7 +543,6 @@ s ostatnými, a to všetko na jednom mieste.<ph name="MARKUP_9" /></translatio
 <translation id="5323213332664049067">Latinskoamerická</translation>
 <translation id="5330145655348521461">Tieto súbory sú otvorené na inej pracovnej ploche. Ak ich chcete zobraziť, prejdite do profilu <ph name="USER_NAME" /> (<ph name="MAIL_ADDRESS" />).</translation>
 <translation id="5330512191124428349">Získať informácie</translation>
-<translation id="5337538975554986899">Prístupu všetkých webových adries okrem adresy <ph name="NON_RESTRICTED_DESTINATIONS" /> k súboru</translation>
 <translation id="5344246330454251646">Spravovať zdieľanie virtuálneho počítača Bruschetta</translation>
 <translation id="535792325654997756">Osoba s mačkami</translation>
 <translation id="5358764674931277">Snímková frekvencia</translation>
@@ -629,6 +628,7 @@ s ostatnými, a to všetko na jednom mieste.<ph name="MARKUP_9" /></translatio
 <translation id="603895874132768835">Túto sieť budete môcť používať, až keď nastavíte nový PIN</translation>
 <translation id="6040143037577758943">Zavrieť</translation>
 <translation id="6055907707645252013">Sieť <ph name="NETWORK_TYPE" /> nie je pripojená</translation>
+<translation id="6073060579181816027">Viaceré umiestnenia súborov</translation>
 <translation id="6074825444536523002">Formulár Google</translation>
 <translation id="6079871810119356840">Maďarská klávesnica s rozložením Qwerty</translation>
 <translation id="6096979789310008754">Text vyhľadávania bol vymazaný, zobrazujú sa všetky súbory a priečinky</translation>
@@ -769,6 +769,7 @@ s ostatnými, a to všetko na jednom mieste.<ph name="MARKUP_9" /></translatio
 <translation id="7162080671816799010">Na potvrdenie overenia identity servera chýba položka Zhoda alternatívneho názvu subjektu alebo Zhoda prípony domény.</translation>
 <translation id="7165320105431587207">Sieť sa nepodarilo nakonfigurovať</translation>
 <translation id="7170041865419449892">Mimo rozsah</translation>
+<translation id="7179579940054351344">Prístup k súborom zo všetkých webov a webových adries okrem <ph name="NON_RESTRICTED_DESTINATIONS" /></translation>
 <translation id="7180611975245234373">Obnoviť</translation>
 <translation id="7189874332498648577"><ph name="NUMBER_OF_GB" /> GB</translation>
 <translation id="7191454237977785534">Uložiť súbor ako</translation>
@@ -942,6 +943,7 @@ s ostatnými, a to všetko na jednom mieste.<ph name="MARKUP_9" /></translatio
 <translation id="8492972329130824181">Domáca sieť nie je k dispozícii. Ak sa chcete pripojiť, musíte zapnúť mobilný dátový roaming.</translation>
 <translation id="8499098729323186194">Extrahujú sa položky (<ph name="NUMBER_OF_ITEMS" />)…</translation>
 <translation id="8502913769543567768"><ph name="NETWORK_INDEX" />. sieť z <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, <ph name="NETWORK_PROVIDER_NAME" />, aktivovať po nastavení zariadenia, ovláda váš správca</translation>
+<translation id="8512483403832814140">Kedykoľvek</translation>
 <translation id="8521441079177373948">Anglická klávesnica</translation>
 <translation id="853494022971700746">Francúzska (Francúzsko) klávesnica</translation>
 <translation id="8540608333167683902"><ph name="NETWORK_INDEX" />. sieť z <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, <ph name="CONNECTION_STATUS" />, sila signálu <ph name="SIGNAL_STRENGTH" /> %, podrobnosti</translation>

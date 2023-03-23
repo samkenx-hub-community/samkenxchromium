@@ -393,7 +393,6 @@ class ScopedKioskAppManagerOverrides : public KioskAppManager::Overrides {
   }
 
   chromeos::TestExternalCache* external_cache() { return external_cache_; }
-  bool AppSessionInitialized() { return kiosk_app_session_initialized_; }
 
   void InitializePrimaryAppState() {
     // Inject test kiosk app data to prevent KioskAppManager from attempting to
@@ -414,6 +413,9 @@ class ScopedKioskAppManagerOverrides : public KioskAppManager::Overrides {
     account.Set(kAccountsPrefDeviceLocalAccountsKeyId, kTestUserAccount);
     account.Set(kAccountsPrefDeviceLocalAccountsKeyType,
                 policy::DeviceLocalAccount::TYPE_KIOSK_APP);
+    account.Set(
+        kAccountsPrefDeviceLocalAccountsKeyEphemeralMode,
+        static_cast<int>(policy::DeviceLocalAccount::EphemeralMode::kUnset));
     account.Set(kAccountsPrefDeviceLocalAccountsKeyKioskAppId,
                 kTestPrimaryAppId);
     base::Value::List accounts;
@@ -666,10 +668,6 @@ class StartupAppLauncherNoCreateTest
   }
 
  protected:
-  bool AppSessionInitialized() {
-    return kiosk_app_manager_overrides_.AppSessionInitialized();
-  }
-
   TestAppLaunchDelegate startup_launch_delegate_;
 
   std::unique_ptr<AppLaunchTracker> app_launch_tracker_;
@@ -757,7 +755,6 @@ TEST_F(StartupAppLauncherTest, PrimaryAppLaunchFlow) {
   EXPECT_EQ(startup_launch_delegate_.WaitForNextLaunchState(),
             LaunchState::kReadyToLaunch);
 
-  EXPECT_FALSE(AppSessionInitialized());
   startup_app_launcher_->LaunchApp();
   CreateAppWindow(profile(), primary_app_builder);
 
@@ -766,8 +763,6 @@ TEST_F(StartupAppLauncherTest, PrimaryAppLaunchFlow) {
   EXPECT_EQ(1, app_launch_tracker_->kiosk_launch_count());
 
   EXPECT_TRUE(registry()->enabled_extensions().Contains(kTestPrimaryAppId));
-
-  EXPECT_TRUE(AppSessionInitialized());
 }
 
 TEST_F(StartupAppLauncherTest, OfflineLaunchWithPrimaryAppPreInstalled) {
@@ -787,8 +782,6 @@ TEST_F(StartupAppLauncherTest, OfflineLaunchWithPrimaryAppPreInstalled) {
   EXPECT_EQ(startup_launch_delegate_.WaitForNextLaunchState(),
             LaunchState::kReadyToLaunch);
 
-  EXPECT_FALSE(AppSessionInitialized());
-
   // Primary app cache checks finished after the startup app launcher reports
   // it's ready should be ignored - i.e. startup app launcher should not attempt
   // to relaunch the app, nor request the update installation.
@@ -807,8 +800,6 @@ TEST_F(StartupAppLauncherTest, OfflineLaunchWithPrimaryAppPreInstalled) {
   EXPECT_EQ(1, app_launch_tracker_->kiosk_launch_count());
 
   EXPECT_TRUE(registry()->enabled_extensions().Contains(kTestPrimaryAppId));
-
-  EXPECT_TRUE(AppSessionInitialized());
 }
 
 TEST_F(StartupAppLauncherTest,
@@ -829,8 +820,6 @@ TEST_F(StartupAppLauncherTest,
   EXPECT_EQ(startup_launch_delegate_.WaitForNextLaunchState(),
             LaunchState::kReadyToLaunch);
 
-  EXPECT_FALSE(AppSessionInitialized());
-
   startup_app_launcher_->LaunchApp();
   CreateAppWindow(profile(), primary_app_builder);
 
@@ -840,8 +829,6 @@ TEST_F(StartupAppLauncherTest,
   EXPECT_EQ(1, app_launch_tracker_->kiosk_launch_count());
 
   EXPECT_TRUE(registry()->enabled_extensions().Contains(kTestPrimaryAppId));
-
-  EXPECT_TRUE(AppSessionInitialized());
 
   // Primary app cache checks finished after the app launch
   // it's ready should be ignored - i.e. startup app launcher should not attempt
@@ -874,8 +861,6 @@ TEST_F(StartupAppLauncherTest, PrimaryAppDownloadFailure) {
   EXPECT_EQ(KioskAppLaunchError::Error::kUnableToDownload,
             startup_launch_delegate_.launch_error());
 
-  EXPECT_FALSE(AppSessionInitialized());
-
   histogram.ExpectUniqueSample(
       kKioskPrimaryAppInstallErrorHistogram,
       KioskAppManager::PrimaryAppDownloadResult::kCrxFetchFailed,
@@ -896,8 +881,6 @@ TEST_F(StartupAppLauncherTest, PrimaryAppCrxInstallFailure) {
 
   EXPECT_EQ(KioskAppLaunchError::Error::kUnableToInstall,
             startup_launch_delegate_.launch_error());
-
-  EXPECT_FALSE(AppSessionInitialized());
 }
 
 TEST_F(StartupAppLauncherTest, PrimaryAppNotKioskEnabled) {
@@ -918,8 +901,6 @@ TEST_F(StartupAppLauncherTest, PrimaryAppNotKioskEnabled) {
 
   EXPECT_EQ(KioskAppLaunchError::Error::kNotKioskEnabled,
             startup_launch_delegate_.launch_error());
-
-  EXPECT_FALSE(AppSessionInitialized());
 }
 
 TEST_F(StartupAppLauncherTest, PrimaryAppIsExtension) {
@@ -939,8 +920,6 @@ TEST_F(StartupAppLauncherTest, PrimaryAppIsExtension) {
 
   EXPECT_EQ(KioskAppLaunchError::Error::kNotKioskEnabled,
             startup_launch_delegate_.launch_error());
-
-  EXPECT_FALSE(AppSessionInitialized());
 }
 
 TEST_F(StartupAppLauncherTest, LaunchWithSecondaryApps) {
@@ -971,8 +950,6 @@ TEST_F(StartupAppLauncherTest, LaunchWithSecondaryApps) {
   EXPECT_EQ(startup_launch_delegate_.WaitForNextLaunchState(),
             LaunchState::kReadyToLaunch);
 
-  EXPECT_FALSE(AppSessionInitialized());
-
   startup_app_launcher_->LaunchApp();
   CreateAppWindow(profile(), primary_app_builder);
 
@@ -986,8 +963,6 @@ TEST_F(StartupAppLauncherTest, LaunchWithSecondaryApps) {
   EXPECT_EQ(startup_launch_delegate_.WaitForNextLaunchState(),
             LaunchState::kLaunchSucceeded);
   EXPECT_EQ(1, app_launch_tracker_->kiosk_launch_count());
-
-  EXPECT_TRUE(AppSessionInitialized());
 
   EXPECT_TRUE(registry()->enabled_extensions().Contains(kTestPrimaryAppId));
   EXPECT_TRUE(registry()->enabled_extensions().Contains(kSecondaryAppId));
@@ -1018,16 +993,12 @@ TEST_F(StartupAppLauncherTest, LaunchWithSecondaryExtension) {
 
   EXPECT_EQ(startup_launch_delegate_.WaitForNextLaunchState(),
             LaunchState::kReadyToLaunch);
-
-  EXPECT_FALSE(AppSessionInitialized());
   startup_app_launcher_->LaunchApp();
   CreateAppWindow(profile(), primary_app_builder);
 
   EXPECT_EQ(startup_launch_delegate_.WaitForNextLaunchState(),
             LaunchState::kLaunchSucceeded);
   EXPECT_EQ(1, app_launch_tracker_->kiosk_launch_count());
-
-  EXPECT_TRUE(AppSessionInitialized());
 
   EXPECT_TRUE(registry()->enabled_extensions().Contains(kTestPrimaryAppId));
   EXPECT_TRUE(registry()->enabled_extensions().Contains(kSecondaryAppId));
@@ -1058,8 +1029,6 @@ TEST_F(StartupAppLauncherTest, OfflineWithPrimaryAndSecondaryAppInstalled) {
   EXPECT_EQ(startup_launch_delegate_.WaitForNextLaunchState(),
             LaunchState::kReadyToLaunch);
 
-  EXPECT_FALSE(AppSessionInitialized());
-
   // Primary app cache checks finished after the startup app launcher reports
   // it's ready should be ignored - i.e. startup app launcher should not attempt
   // to relaunch the app, nor request the update installation.
@@ -1079,8 +1048,6 @@ TEST_F(StartupAppLauncherTest, OfflineWithPrimaryAndSecondaryAppInstalled) {
 
   EXPECT_TRUE(registry()->enabled_extensions().Contains(kTestPrimaryAppId));
   EXPECT_TRUE(registry()->enabled_extensions().Contains(kSecondaryAppId));
-
-  EXPECT_TRUE(AppSessionInitialized());
 }
 
 TEST_F(StartupAppLauncherTest, OfflineInstallPreCachedExtension) {
@@ -1264,8 +1231,6 @@ TEST_F(StartupAppLauncherTest, IgnoreSecondaryAppsSecondaryApps) {
 
   EXPECT_EQ(startup_launch_delegate_.WaitForNextLaunchState(),
             LaunchState::kReadyToLaunch);
-
-  EXPECT_FALSE(AppSessionInitialized());
   startup_app_launcher_->LaunchApp();
   CreateAppWindow(profile(), primary_app_builder);
 
@@ -1276,8 +1241,6 @@ TEST_F(StartupAppLauncherTest, IgnoreSecondaryAppsSecondaryApps) {
   EXPECT_TRUE(registry()->enabled_extensions().Contains(kTestPrimaryAppId));
   EXPECT_TRUE(registry()->enabled_extensions().Contains(kSecondaryAppId));
   EXPECT_FALSE(registry()->GetInstalledExtension(kExtraSecondaryAppId));
-
-  EXPECT_TRUE(AppSessionInitialized());
 }
 
 TEST_F(StartupAppLauncherTest, SecondaryAppCrxInstallFailureTriggersRetry) {
@@ -1578,15 +1541,6 @@ TEST_F(StartupAppLauncherTest, SecondaryExtensionStateOnSessionRestore) {
   EXPECT_TRUE(registry()->enabled_extensions().Contains(kTestPrimaryAppId));
   EXPECT_TRUE(registry()->disabled_extensions().Contains(kSecondaryAppId));
   EXPECT_TRUE(registry()->enabled_extensions().Contains(kExtraSecondaryAppId));
-}
-
-TEST_F(StartupAppLauncherTest, RestartLauncherShouldNotCrash) {
-  InitializeLauncherWithNetworkReady();
-
-  startup_launch_delegate_.set_showing_network_config_screen(true);
-  startup_app_launcher_->RestartLauncher();
-
-  ASSERT_NO_FATAL_FAILURE(startup_app_launcher_->ContinueWithNetworkReady());
 }
 
 class FakeChromeKioskLaunchController : public ChromeKioskLaunchController {

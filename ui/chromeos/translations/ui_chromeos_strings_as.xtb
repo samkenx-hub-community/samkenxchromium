@@ -119,7 +119,6 @@
 <translation id="1942765061641586207">প্ৰতিচ্ছবিৰ ৰিজ’লিউছন</translation>
 <translation id="1972984168337863910">ফাইলসমূহৰ প্ৰতিক্ৰিয়াৰ পেনেলটো বিস্তাৰ কৰক</translation>
 <translation id="1995337122023280937">ফাইলৰ অৱস্থানলৈ যাওক</translation>
-<translation id="1999709132469742660">আটাইবোৰ URLএ ফাইল এক্সেছ কৰিব পাৰে</translation>
 <translation id="2001796770603320721">ড্ৰাইভত পৰিচালনা কৰক</translation>
 <translation id="2009067268969781306">এটা ড্ৰাইভ ফর্মেট কৰা কার্যই ড্ৰাইভটোত ষ্ট'ৰ কৰি ৰখা সকলো ডেটা মচিব। এই কাৰ্যটো আনডু কৰিব নোৱাৰি।</translation>
 <translation id="2025955442973426285">টিগ্ৰিনিয়া</translation>
@@ -151,6 +150,7 @@
 <translation id="2236732657580416950">আপোনাৰ Google Driveৰ কেশ্ব মচা হৈছে।</translation>
 <translation id="2239068707900391003">কফিৰ সৈতে ব্যক্তিৰ ছবি</translation>
 <translation id="2251368349685848079">ট্ৰেশ্বৰ পৰা পুনঃস্থাপন কৰক</translation>
+<translation id="2278133026967558505">আটাইবোৰ ৱেবছাইট আৰু URLএ ফাইলটো এক্সেছ কৰিব পাৰে</translation>
 <translation id="2282155092769082568">স্বয়ংক্ৰিয় কনফিগাৰেশ্বন URL:</translation>
 <translation id="2284767815536050991">আঁতৰাব পৰা ষ্ট’ৰেজ</translation>
 <translation id="2288278176040912387">ৰেকৰ্ড প্লেয়াৰ</translation>
@@ -542,7 +542,6 @@
 <translation id="5323213332664049067">লেটিন আমেৰিকান</translation>
 <translation id="5330145655348521461">এই ফাইলসমূহ বেলেগ এটা ডেস্কটপত খোল খালে। ফাইলটো চাবলৈ <ph name="USER_NAME" /> (<ph name="MAIL_ADDRESS" />)লৈ নিয়ক।</translation>
 <translation id="5330512191124428349">তথ্য পাওক</translation>
-<translation id="5337538975554986899"><ph name="NON_RESTRICTED_DESTINATIONS" />ৰ বাহিৰে আটাইবোৰ URLএ ফাইল এক্সেছ কৰিব পাৰে</translation>
 <translation id="5344246330454251646">Bruschettaৰ সৈতে শ্বেয়াৰ কৰাৰ সুবিধাটো পৰিচালনা কৰক</translation>
 <translation id="535792325654997756">মেকুৰীৰ সৈতে ব্যক্তিৰ ছবি</translation>
 <translation id="5358764674931277">ফ্ৰেমৰ হাৰ</translation>
@@ -768,6 +767,7 @@
 <translation id="7162080671816799010">বিশ্বাসযোগ্যতা প্ৰমাণীকৰণ ছাৰ্ভাৰৰ পৰিচয় সত্যাপন কৰিবলৈ 'বিষয়ৰ বৈকল্পিক নামৰ সৈতে মিলা' অথবা 'ডমেইন চাফিক্সৰ সৈতে মিলা' মান উপলব্ধ নহয়</translation>
 <translation id="7165320105431587207">নেটৱৰ্ক কনফিগাৰ কৰাত বিফল হ'ল</translation>
 <translation id="7170041865419449892">সীমাৰ বাহিৰত</translation>
+<translation id="7179579940054351344"><ph name="NON_RESTRICTED_DESTINATIONS" />ৰ বাহিৰে আটাইবোৰ ৱেবছাইট আৰু URLএ ফাইলটো এক্সেছ কৰিব পাৰে</translation>
 <translation id="7180611975245234373">ৰিফ্ৰেশ্ব কৰক</translation>
 <translation id="7189874332498648577"><ph name="NUMBER_OF_GB" /> জি.বি.</translation>
 <translation id="7191454237977785534">ফাইল ছেভ কৰাৰ বিকল্প</translation>
@@ -941,6 +941,7 @@
 <translation id="8492972329130824181">গৃহ নেটৱৰ্ক উপলব্ধ নহয়। সংযোগ কৰিবলৈ ম’বাইল ডেটা ৰ’মিং সক্ৰিয় কৰিবই লাগিব।</translation>
 <translation id="8499098729323186194"><ph name="NUMBER_OF_ITEMS" /> টা বস্তু আহৰণ কৰি থকা হৈছে...</translation>
 <translation id="8502913769543567768"><ph name="NETWORK_COUNT" /> টা নেটৱৰ্কৰ <ph name="NETWORK_INDEX" /> নম্বৰটো, <ph name="NETWORK_NAME" />, <ph name="NETWORK_PROVIDER_NAME" />, ডিভাইচ ছেট আপ কৰাৰ পাছত সক্ৰিয় কৰক, আপোনাৰ প্ৰশাসকে পৰিচালনা কৰে</translation>
+<translation id="8512483403832814140">যিকোনো সময়ৰ</translation>
 <translation id="8521441079177373948">ইউ.কে.</translation>
 <translation id="853494022971700746">ফৰাচী (ফ্ৰান্স)</translation>
 <translation id="8540608333167683902"><ph name="NETWORK_COUNT" />টা নেটৱৰ্কৰ <ph name="NETWORK_INDEX" />, <ph name="NETWORK_NAME" />, <ph name="CONNECTION_STATUS" />, ছিগনেলৰ ক্ষমতা <ph name="SIGNAL_STRENGTH" />%, সবিশেষ</translation>

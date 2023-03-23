@@ -495,7 +495,9 @@ class CanvasResourceProviderSharedImage : public CanvasResourceProvider {
     else
       EndWriteAccess();
 
-    resource()->WillDraw();
+    if (resource()) {
+      resource()->WillDraw();
+    }
   }
 
   void WillDraw() override { WillDrawInternal(true); }
@@ -1678,6 +1680,13 @@ void CanvasResourceProvider::OnMemoryDump(
     base::trace_event::ProcessMemoryDump* pmd) {
   if (!surface_)
     return;
+
+  for (const auto& resource : canvas_resources_) {
+    // Don't report, to avoid double-counting.
+    if (resource->HasDetailedMemoryDumpProvider()) {
+      return;
+    }
+  }
 
   std::string dump_name =
       base::StringPrintf("canvas/ResourceProvider/SkSurface/0x%" PRIXPTR,

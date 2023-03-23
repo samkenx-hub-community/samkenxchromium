@@ -114,6 +114,7 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &features::kGenericSensorExtraClasses,
     &features::kAsyncSensorCalls,
     &features::kBackForwardCache,
+    &features::kBackForwardTransitions,
     &features::kHttpsOnlyMode,
     &features::kMetricsSettingsAndroid,
     &features::kNetworkServiceInProcess,
@@ -157,6 +158,8 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &history::kOrganicRepeatableQueries,
     &history_clusters::internal::kJourneys,
     &kAdaptiveButtonInTopToolbar,
+    &kAdaptiveButtonInTopToolbarTranslate,
+    &kAdaptiveButtonInTopToolbarAddToBookmarks,
     &kAdaptiveButtonInTopToolbarCustomizationV2,
     &kAddEduAccountFromAccountSettingsForSupervisedUsers,
     &kAddToHomescreenIPH,
@@ -177,6 +180,7 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &kCloseTabSuggestions,
     &kCriticalPersistedTabData,
     &kCommerceCoupons,
+    &kCCTAllowCrossUidActivitySwitchFromBelow,
     &kCCTBackgroundTab,
     &kCCTBottomBarSwipeUpGesture,
     &kCCTBrandTransparency,
@@ -320,7 +324,6 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &kVoiceSearchAudioCapturePolicy,
     &kVoiceButtonInTopToolbar,
     &kWebOtpCrossDeviceSimpleString,
-    &content_creation::kWebNotesDynamicTemplates,
     &content_creation::kWebNotesStylizeEnabled,
     &kWebApkAllowIconUpdate,
     &kWebApkInstallService,
@@ -398,6 +401,7 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &webapps::features::kInstallableAmbientBadgeInfoBar,
     &webapps::features::kInstallableAmbientBadgeMessage,
     &webapps::features::kWebApkInstallFailureNotification,
+    &webapps::features::kWebApkInstallFailureRetry,
     &webapps::features::kWebApkUniqueId,
     &network::features::kPrivateStateTokens,
 };
@@ -427,6 +431,14 @@ const base::Feature* FindFeatureExposedToJava(const std::string& feature_name) {
 
 BASE_FEATURE(kAdaptiveButtonInTopToolbar,
              "AdaptiveButtonInTopToolbar",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+BASE_FEATURE(kAdaptiveButtonInTopToolbarTranslate,
+             "AdaptiveButtonInTopToolbarTranslate",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+BASE_FEATURE(kAdaptiveButtonInTopToolbarAddToBookmarks,
+             "AdaptiveButtonInTopToolbarAddToBookmarks",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 BASE_FEATURE(kAdaptiveButtonInTopToolbarCustomizationV2,
@@ -513,6 +525,10 @@ BASE_FEATURE(kCriticalPersistedTabData,
 BASE_FEATURE(kCommerceCoupons,
              "CommerceCoupons",
              base::FEATURE_DISABLED_BY_DEFAULT);
+
+BASE_FEATURE(kCCTAllowCrossUidActivitySwitchFromBelow,
+             "CCTAllowCrossUidActivitySwitchFromBelow",
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 BASE_FEATURE(kCCTBottomBarSwipeUpGesture,
              "CCTBottomBarSwipeUpGesture",

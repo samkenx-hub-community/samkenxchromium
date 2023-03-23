@@ -83,7 +83,7 @@ BASE_FEATURE(kNtpChromeCartModule,
 // on the New Tab Page, excluding the Realbox.
 BASE_FEATURE(kNtpComprehensiveTheming,
              "NtpComprehensiveTheming",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // If enabled, Comprehensive Theming color changes will be applied to the
 // Realbox on the New Tab Page.
@@ -115,6 +115,11 @@ BASE_FEATURE(kNtpHandleMostVisitedNavigationExplicitly,
 // If enabled, logo will be shown.
 BASE_FEATURE(kNtpLogo, "NtpLogo", base::FEATURE_ENABLED_BY_DEFAULT);
 
+// If enabled, logo will fill up less vertical space.
+BASE_FEATURE(kNtpReducedLogoSpace,
+             "NtpReducedLogoSpace",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 // If enabled, middle slot promo will be shown.
 BASE_FEATURE(kNtpMiddleSlotPromo,
              "NtpMiddleSlotPromo",
@@ -131,9 +136,9 @@ BASE_FEATURE(kNtpModulesLoadTimeoutMilliseconds,
              "NtpModulesLoadTimeoutMilliseconds",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-// Dummy feature to set param "NtpModulesMaxWidthParam".
-BASE_FEATURE(kNtpModulesParams,
-             "NtpModulesParams",
+// If true, extends width of modules if space allows.
+BASE_FEATURE(kNtpWideModules,
+             "NtpWideModules",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Dummy feature to set param "NtpModulesOrderParam".
@@ -228,6 +233,11 @@ BASE_FEATURE(kNtpSafeBrowsingModule,
 // If enabled, shortcuts will be shown.
 BASE_FEATURE(kNtpShortcuts, "NtpShortcuts", base::FEATURE_ENABLED_BY_DEFAULT);
 
+// If enabled, shortcuts will be shown in a wide single row.
+BASE_FEATURE(kNtpSingleRowShortcuts,
+             "NtpSingleRowShortcuts",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 // If enabled, the History clusters module will be shown.
 BASE_FEATURE(kNtpHistoryClustersModule,
              "NtpHistoryClustersModule",
@@ -255,6 +265,11 @@ BASE_FEATURE(kNtpHistoryClustersModuleLoad,
              "NtpHistoryClustersModuleLoad",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
+// Dummy feature to set kNtpHistoryClustersModuleMaxClustersParam.
+BASE_FEATURE(kNtpHistoryClustersModuleMaxClusters,
+             "NtpHistoryClustersMaxClusters",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 // If enabled, module headers will display an associated icon.
 BASE_FEATURE(kNtpModulesHeaderIcon,
              "NtpModulesHeaderIcon",
@@ -280,7 +295,6 @@ const char kNtpModulesEligibleForHappinessTrackingSurveyParam[] =
     "NtpModulesEligibleForHappinessTrackingSurveyParam";
 const char kNtpModulesLoadTimeoutMillisecondsParam[] =
     "NtpModulesLoadTimeoutMillisecondsParam";
-const char kNtpModulesMaxWidthParam[] = "NtpModulesMaxWidthParam";
 const char kNtpModulesOrderParam[] = "NtpModulesOrderParam";
 const char kNtpChromeCartModuleDataParam[] = "NtpChromeCartModuleDataParam";
 const char kNtpChromeCartModuleAbandonedCartDiscountParam[] =
@@ -320,8 +334,14 @@ const char kNtpHistoryClustersModuleBeginTimeDurationHoursParam[] =
     "NtpHistoryClustersModuleBeginTimeDurationHoursParam";
 const char kNtpHistoryClustersModuleMinimumImagesRequiredParam[] =
     "NtpHistoryClustersModuleMinimumImagesRequiredParam";
-const char kNtpHistoryClustersModuleCategoriesParam[] =
+const char kNtpHistoryClustersModuleCategoriesAllowlistParam[] =
     "NtpHistoryClustersModuleCategoriesParam";
+const char kNtpHistoryClustersModuleCategoriesBlocklistParam[] =
+    "NtpHistoryClustersModuleCategoriesBlocklistParam";
+const char kNtpHistoryClustersModuleCategoriesBoostlistParam[] =
+    "NtpHistoryClustersModuleCategoriesBoostlistParam";
+const char kNtpHistoryClustersModuleMaxClustersParam[] =
+    "NtpHistoryClustersModuleMaxClustersParam";
 
 base::TimeDelta GetModulesLoadTimeout() {
   std::string param_value = base::GetFieldTrialParamValueByFeature(
@@ -334,12 +354,6 @@ base::TimeDelta GetModulesLoadTimeout() {
     return base::Seconds(3);
   }
   return base::Milliseconds(param_value_as_int);
-}
-
-absl::optional<int> GetModulesMaxWidthPixels() {
-  int max_width_px = base::GetFieldTrialParamByFeatureAsInt(
-      kNtpModulesParams, kNtpModulesMaxWidthParam, -1);
-  return (max_width_px > 0) ? absl::optional<int>{max_width_px} : absl::nullopt;
 }
 
 std::vector<std::string> GetModulesOrder() {

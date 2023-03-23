@@ -86,6 +86,7 @@
 #include "ui/gfx/font_render_params.h"
 #include "ui/gfx/switches.h"
 #include "ui/gl/gl_switches.h"
+#include "ui/latency/janky_duration_tracker.h"
 #include "ui/latency/latency_info.h"
 
 #if !BUILDFLAG(IS_ANDROID)
@@ -265,11 +266,12 @@ static const char* const kSwitchNames[] = {
     switches::kForceSkiaAnalyticAntialiasing,
     switches::kTestGLLib,
     switches::kTraceToConsole,
+    switches::kUseAdapterLuid,
     switches::kUseFakeMjpegDecodeAccelerator,
     switches::kUseGpuInTests,
     switches::kV,
     switches::kVModule,
-    switches::kUseAdapterLuid,
+    switches::kWatchDirForScrollJankReport,
     switches::kWebViewDrawFunctorUsesVulkan,
 #if BUILDFLAG(IS_MAC)
     sandbox::policy::switches::kEnableSandboxLogging,
@@ -295,6 +297,7 @@ static const char* const kSwitchNames[] = {
 #if BUILDFLAG(IS_ANDROID)
     switches::kEnableReachedCodeProfiler,
     switches::kReachedCodeSamplingIntervalUs,
+    switches::kDisableAdpf,
 #endif
 #if BUILDFLAG(IS_CHROMEOS)
     switches::kPlatformDisallowsChromeOSDirectVideoDecoder,

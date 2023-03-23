@@ -5,7 +5,8 @@
 #include "chrome/renderer/accessibility/read_anything_app_model.h"
 
 #include "base/containers/contains.h"
-
+#include "ui/accessibility/ax_node.h"
+#include "ui/accessibility/ax_role_properties.h"
 #include "ui/accessibility/ax_serializable_tree.h"
 #include "ui/accessibility/ax_tree_update_util.h"
 
@@ -30,19 +31,25 @@ void ReadAnythingAppModel::Reset(
     const std::vector<ui::AXNodeID>& content_node_ids) {
   content_node_ids_ = content_node_ids;
   display_node_ids_.clear();
-  start_node_id_ = ui::kInvalidAXNodeID;
-  end_node_id_ = ui::kInvalidAXNodeID;
-  start_offset_ = -1;
-  end_offset_ = -1;
-  has_selection_ = false;
   distillation_in_progress_ = false;
-}
 
-void ReadAnythingAppModel::ResetSelection() {
+  if (active_tree_id_ == ui::AXTreeIDUnknown() ||
+      !ContainsTree(active_tree_id_)) {
+    return;
+  }
+
   ui::AXSelection selection =
       GetTreeFromId(active_tree_id_)->GetUnignoredSelection();
   has_selection_ = selection.anchor_object_id != ui::kInvalidAXNodeID &&
-                   selection.focus_object_id != ui::kInvalidAXNodeID;
+                   selection.focus_object_id != ui::kInvalidAXNodeID &&
+                   !selection.IsCollapsed();
+  if (!has_selection_) {
+    start_node_id_ = ui::kInvalidAXNodeID;
+    end_node_id_ = ui::kInvalidAXNodeID;
+    start_offset_ = -1;
+    end_offset_ = -1;
+    return;
+  }
 
   // Identify the start and end node ids and offsets. The start node comes
   // earlier than end node in the tree order.
@@ -87,33 +94,39 @@ void ReadAnythingAppModel::AddTree(
 
 void ReadAnythingAppModel::EraseTree(ui::AXTreeID tree_id) {
   trees_.erase(tree_id);
-}
 
-size_t ReadAnythingAppModel::NumTreesForTesting() const {
-  return trees_.size();
+  // Ensure any pending updates associated with the erased tree are removed.
+  pending_updates_map_.erase(tree_id);
 }
 
 void ReadAnythingAppModel::AddPendingUpdates(
+    const ui::AXTreeID tree_id,
     const std::vector<ui::AXTreeUpdate>& updates) {
-  pending_updates_.insert(pending_updates_.end(),
-                          std::make_move_iterator(updates.begin()),
-                          std::make_move_iterator(updates.end()));
+  std::vector<ui::AXTreeUpdate> update = GetOrCreatePendingUpdateAt(tree_id);
+  update.insert(update.end(), std::make_move_iterator(updates.begin()),
+                std::make_move_iterator(updates.end()));
+  pending_updates_map_[tree_id] = update;
 }
 
 void ReadAnythingAppModel::ClearPendingUpdates() {
-  pending_updates_.clear();
+  pending_updates_map_.clear();
 }
 
-void ReadAnythingAppModel::UnserializePendingUpdates() {
-#if DCHECK_IS_ON()
-  DCHECK(pending_updates_.empty() ||
-         pending_updates_bundle_id_ == active_tree_id_);
-#endif
-  UnserializeUpdates(std::move(pending_updates_), active_tree_id_);
+void ReadAnythingAppModel::UnserializePendingUpdates(ui::AXTreeID tree_id) {
+  if (!pending_updates_map_.contains(tree_id)) {
+    return;
+  }
+  // TODO(b/1266555): Ensure there are no crashes / unexpected behavior if
+  //  an accessibility event is received on the same tree after unserialization
+  //  has begun.
+  std::vector<ui::AXTreeUpdate> update =
+      pending_updates_map_.extract(tree_id).mapped();
+  DCHECK(update.empty() || tree_id == active_tree_id_);
+  UnserializeUpdates(update, tree_id);
 }
 
 void ReadAnythingAppModel::UnserializeUpdates(
-    std::vector<ui::AXTreeUpdate> updates,
+    const std::vector<ui::AXTreeUpdate>& updates,
     const ui::AXTreeID& tree_id) {
   if (updates.empty()) {
     return;
@@ -155,15 +168,44 @@ void ReadAnythingAppModel::AccessibilityEventReceived(
   // Drawing must be done on the same tree that was sent to the distiller,
   // so it’s critical that updates are not unserialized until drawing is
   // complete.
-  if (tree_id == active_tree_id_ && distillation_in_progress_) {
-#if DCHECK_IS_ON()
-    DCHECK(pending_updates_.empty() || tree_id == pending_updates_bundle_id_);
-    SetPendingUpdatesBundleId(tree_id);
-#endif
-    AddPendingUpdates(updates);
-    return;
+  if (tree_id == active_tree_id_) {
+    if (distillation_in_progress_) {
+      AddPendingUpdates(tree_id, updates);
+      return;
+    } else {
+      // We need to unserialize old updates before we can unserialize the new
+      // ones
+      UnserializePendingUpdates(tree_id);
+    }
   }
   UnserializeUpdates(std::move(updates), tree_id);
+}
+
+ui::AXNode* ReadAnythingAppModel::GetAXNode(ui::AXNodeID ax_node_id) const {
+  ui::AXSerializableTree* tree = GetTreeFromId(active_tree_id_).get();
+  return tree->GetFromId(ax_node_id);
+}
+
+bool ReadAnythingAppModel::IsNodeIgnoredForReadAnything(
+    ui::AXNodeID ax_node_id) const {
+  ui::AXNode* ax_node = GetAXNode(ax_node_id);
+  DCHECK(ax_node);
+  // Ignore interactive elements.
+  ax::mojom::Role role = ax_node->GetRole();
+  return ui::IsControl(role) || ui::IsSelect(role);
+}
+
+bool ReadAnythingAppModel::NodeIsContentNode(ui::AXNodeID ax_node_id) const {
+  return base::Contains(content_node_ids_, ax_node_id);
+}
+
+const std::vector<ui::AXTreeUpdate>&
+ReadAnythingAppModel::GetOrCreatePendingUpdateAt(ui::AXTreeID tree_id) {
+  if (!pending_updates_map_.contains(tree_id)) {
+    pending_updates_map_[tree_id] = std::vector<ui::AXTreeUpdate>();
+  }
+
+  return pending_updates_map_[tree_id];
 }
 
 double ReadAnythingAppModel::GetLetterSpacingValue(

@@ -1002,6 +1002,20 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
+<histogram name="Accessibility.ExperimentalModeFlag.FormControls"
+    enum="BooleanEnabled" expires_after="2023-11-30">
+  <owner>aldietz@google.com</owner>
+  <owner>chrome-a11y-core@google.com</owner>
+  <summary>
+    Records whether the experimental form controls mode flag is set for the
+    AXMode. Tracked when the experimental form controls mode flag is flipped to
+    true. This flag is flipped automatically when software communicates with
+    Chrome via accessibility APIs.
+
+    This is currently only used on Android OS.
+  </summary>
+</histogram>
+
 <histogram name="Accessibility.FocusHighlight.ToggleEnabled"
     enum="BooleanEnabled" expires_after="never">
   <owner>aleventhal@chromium.org</owner>
@@ -2015,7 +2029,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="DomDistiller.MessageDismissalCondition"
-    enum="ReaderModeMessageDismissalCondition" expires_after="2023-07-09">
+    enum="ReaderModeMessageDismissalCondition" expires_after="2023-09-10">
   <owner>twellington@chromium.org</owner>
   <owner>aishwaryarj@google.com</owner>
   <summary>
@@ -2081,7 +2095,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="DomDistiller.ReaderShownForPageLoad" enum="Boolean"
-    expires_after="2023-07-09">
+    expires_after="2023-09-10">
   <owner>mdjones@chromium.org</owner>
   <summary>
     Records if the panel became visible at any point after a page was navigated.
@@ -2232,7 +2246,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="SodaInstaller.BinaryInstallationResult" enum="BooleanSuccess"
-    expires_after="2023-06-01">
+    expires_after="2023-09-17">
   <owner>abigailbklein@google.com</owner>
   <owner>evliu@google.com</owner>
   <owner>yilkal@chromium.org</owner>

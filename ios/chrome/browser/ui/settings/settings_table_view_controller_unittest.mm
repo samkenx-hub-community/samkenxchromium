@@ -14,6 +14,7 @@
 #import "components/policy/core/common/policy_loader_ios_constants.h"
 #import "components/policy/policy_constants.h"
 #import "components/signin/public/base/signin_pref_names.h"
+#import "components/sync/base/features.h"
 #import "components/sync/test/mock_sync_service.h"
 #import "ios/chrome/browser/application_context/application_context.h"
 #import "ios/chrome/browser/browser_state/test_chrome_browser_state.h"
@@ -27,6 +28,10 @@
 #import "ios/chrome/browser/shared/public/commands/command_dispatcher.h"
 #import "ios/chrome/browser/shared/public/commands/snackbar_commands.h"
 #import "ios/chrome/browser/shared/public/features/features.h"
+#import "ios/chrome/browser/shared/ui/table_view/cells/table_view_detail_icon_item.h"
+#import "ios/chrome/browser/shared/ui/table_view/cells/table_view_image_item.h"
+#import "ios/chrome/browser/shared/ui/table_view/cells/table_view_info_button_item.h"
+#import "ios/chrome/browser/shared/ui/table_view/chrome_table_view_controller_test.h"
 #import "ios/chrome/browser/signin/authentication_service.h"
 #import "ios/chrome/browser/signin/authentication_service_factory.h"
 #import "ios/chrome/browser/signin/fake_authentication_service_delegate.h"
@@ -38,10 +43,6 @@
 #import "ios/chrome/browser/ui/main/scene_state.h"
 #import "ios/chrome/browser/ui/main/scene_state_browser_agent.h"
 #import "ios/chrome/browser/ui/settings/settings_table_view_controller_constants.h"
-#import "ios/chrome/browser/ui/table_view/cells/table_view_detail_icon_item.h"
-#import "ios/chrome/browser/ui/table_view/cells/table_view_image_item.h"
-#import "ios/chrome/browser/ui/table_view/cells/table_view_info_button_item.h"
-#import "ios/chrome/browser/ui/table_view/chrome_table_view_controller_test.h"
 #import "ios/chrome/grit/ios_chromium_strings.h"
 #import "ios/chrome/grit/ios_strings.h"
 #import "ios/chrome/test/ios_chrome_scoped_testing_local_state.h"
@@ -381,7 +382,7 @@ TEST_F(SettingsTableViewControllerTest, SigninDisabledByPolicy) {
 TEST_F(SettingsTableViewControllerTest, HoldAccountStorageErrorWhenEligible) {
   base::test::ScopedFeatureList scoped_feature_list;
   scoped_feature_list.InitAndEnableFeature(
-      kIndicateAccountStorageErrorInAccountCell);
+      syncer::kIndicateAccountStorageErrorInAccountCell);
 
   // Set account error.
   ON_CALL(*sync_service_mock_, GetUserActionableError())
@@ -409,7 +410,7 @@ TEST_F(SettingsTableViewControllerTest, HoldAccountStorageErrorWhenEligible) {
 TEST_F(SettingsTableViewControllerTest, ClearAccountStorageErrorWhenResolved) {
   base::test::ScopedFeatureList scoped_feature_list;
   scoped_feature_list.InitAndEnableFeature(
-      kIndicateAccountStorageErrorInAccountCell);
+      syncer::kIndicateAccountStorageErrorInAccountCell);
 
   // Set account error to resolve.
   ON_CALL(*sync_service_mock_, GetUserActionableError())
@@ -453,7 +454,7 @@ TEST_F(SettingsTableViewControllerTest, ClearAccountStorageErrorWhenResolved) {
 TEST_F(SettingsTableViewControllerTest, DontHoldAccountErrorWhenIneligible) {
   base::test::ScopedFeatureList scoped_feature_list;
   scoped_feature_list.InitAndEnableFeature(
-      kIndicateAccountStorageErrorInAccountCell);
+      syncer::kIndicateAccountStorageErrorInAccountCell);
 
   // Enable Sync to make the account item ineligible to indicate errors.
   SetupSyncServiceEnabledExpectations();
@@ -485,7 +486,7 @@ TEST_F(SettingsTableViewControllerTest, DontHoldAccountErrorWhenIneligible) {
 TEST_F(SettingsTableViewControllerTest, DontHoldAccountErrorWhenNoError) {
   base::test::ScopedFeatureList scoped_feature_list;
   scoped_feature_list.InitAndEnableFeature(
-      kIndicateAccountStorageErrorInAccountCell);
+      syncer::kIndicateAccountStorageErrorInAccountCell);
 
   // Set no account error state.
   ON_CALL(*sync_service_mock_, GetUserActionableError())

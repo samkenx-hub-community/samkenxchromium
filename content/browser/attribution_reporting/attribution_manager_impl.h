@@ -14,7 +14,6 @@
 #include "base/containers/circular_deque.h"
 #include "base/containers/flat_map.h"
 #include "base/containers/flat_set.h"
-#include "base/feature_list.h"
 #include "base/functional/callback_forward.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/scoped_refptr.h"
@@ -25,7 +24,6 @@
 #include "build/buildflag.h"
 #include "content/browser/aggregation_service/aggregation_service.h"
 #include "content/browser/aggregation_service/report_scheduler_timer.h"
-#include "content/browser/attribution_reporting/attribution_internals.mojom-forward.h"
 #include "content/browser/attribution_reporting/attribution_manager.h"
 #include "content/browser/attribution_reporting/attribution_report.h"
 #include "content/browser/attribution_reporting/attribution_report_sender.h"
@@ -33,8 +31,6 @@
 #include "content/public/browser/storage_partition.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
 #include "third_party/abseil-cpp/absl/types/variant.h"
-
-class GURL;
 
 namespace attribution_reporting {
 class SuitableOrigin;
@@ -49,10 +45,6 @@ class UpdateableSequencedTaskRunner;
 namespace storage {
 class SpecialStoragePolicy;
 }  // namespace storage
-
-namespace url {
-class Origin;
-}  // namespace url
 
 namespace content {
 
@@ -72,10 +64,8 @@ struct StoreSourceResult;
 
 #if BUILDFLAG(IS_ANDROID)
 class AttributionOsLevelManager;
-struct AttributionInputEvent;
+struct OsRegistration;
 #endif
-
-CONTENT_EXPORT BASE_DECLARE_FEATURE(kAttributionVerboseDebugReporting);
 
 // UI thread class that manages the lifetime of the underlying attribution
 // storage and coordinates sending attribution reports. Owned by the storage
@@ -168,18 +158,14 @@ class CONTENT_EXPORT AttributionManagerImpl : public AttributionManager {
 
 #if BUILDFLAG(IS_ANDROID)
 
-  void HandleOsSource(const GURL& registration_url,
-                      const url::Origin& top_level_origin,
-                      AttributionInputEvent,
-                      GlobalRenderFrameHostId render_frame_id) override;
-
-  void HandleOsTrigger(const GURL& registration_url,
-                       const url::Origin& top_level_origin,
-                       GlobalRenderFrameHostId render_frame_id) override;
+  void HandleOsRegistration(OsRegistration,
+                            GlobalRenderFrameHostId render_frame_id) override;
 
   AttributionOsLevelManager* GetOsLevelManager() {
     return attribution_os_level_manager_.get();
   }
+
+  void NotifyOsRegistration(const OsRegistration&, bool is_debug_key_allowed);
 
 #endif  // BUILDFLAG(IS_ANDROID)
 
@@ -205,12 +191,8 @@ class CONTENT_EXPORT AttributionManagerImpl : public AttributionManager {
   void MaybeEnqueueEvent(SourceOrTrigger);
   void ProcessEvents();
   void ProcessNextEvent(bool is_debug_cookie_set);
-  void StoreSource(StorableSource source,
-                   absl::optional<uint64_t> cleared_debug_key,
-                   bool is_debug_cookie_set);
-  void StoreTrigger(AttributionTrigger trigger,
-                    absl::optional<uint64_t> cleared_debug_key,
-                    bool is_debug_cookie_set);
+  void StoreSource(StorableSource source, bool is_debug_cookie_set);
+  void StoreTrigger(AttributionTrigger trigger, bool is_debug_cookie_set);
 
   void GetReportsToSend();
 
@@ -265,8 +247,7 @@ class CONTENT_EXPORT AttributionManagerImpl : public AttributionManager {
                                    bool is_debug_cookie_set,
                                    const CreateReportResult& result);
 
-  void AddPendingAggregatableReportTiming(const AttributionReport::Id& id,
-                                          const base::Time& report_time);
+  void AddPendingAggregatableReportTiming(const AttributionReport&);
   void RecordPendingAggregatableReportsTimings();
 
   void OnClearDataComplete();
@@ -274,10 +255,6 @@ class CONTENT_EXPORT AttributionManagerImpl : public AttributionManager {
 #if BUILDFLAG(IS_ANDROID)
   void OverrideOsLevelManagerForTesting(
       std::unique_ptr<AttributionOsLevelManager>);
-  void HandleOsRegistration(const GURL& registration_url,
-                            const url::Origin& top_level_origin,
-                            absl::optional<AttributionInputEvent>,
-                            GlobalRenderFrameHostId);
   void ProcessNextOsEvent();
 #endif  // BUILDFLAG(IS_ANDROID)
 
@@ -286,11 +263,9 @@ class CONTENT_EXPORT AttributionManagerImpl : public AttributionManager {
 
   // Holds pending sources and triggers in the order they were received by the
   // browser. For the time being, they must be processed in this order in order
-  // to ensure that behavioral requirements are met and to ensure that
-  // `AttributionObserver`s are notified in the correct order, which
-  // the simulator currently depends on. We may be able to loosen this
-  // requirement in the future so that there are conceptually separate queues
-  // per <source origin, destination origin, reporting origin>.
+  // to ensure that behavioral requirements are met. We may be able to loosen
+  // this requirement in the future so that there are conceptually separate
+  // queues per <source origin, destination origin, reporting origin>.
   base::circular_deque<SourceOrTrigger> pending_events_;
 
   // Controls the maximum size of `pending_events_` to avoid unbounded memory
@@ -325,10 +300,11 @@ class CONTENT_EXPORT AttributionManagerImpl : public AttributionManager {
   // is expected to be small, so a `flat_set` is used.
   base::flat_set<AttributionReport::Id> reports_being_sent_;
 
-  // We keep track of pending reports timings in memory to recordd metrics
+  // We keep track of pending reports timings in memory to record metrics
   // when the browser becomes unavailable to send reports due to becoming
   // offline or being shutdown.
-  base::flat_map<AttributionReport::Id, PendingReportTimings>
+  base::flat_map<AttributionReport::AggregatableAttributionData::Id,
+                 PendingReportTimings>
       pending_aggregatable_reports_;
 
   base::ObserverList<AttributionObserver> observers_;
@@ -336,7 +312,6 @@ class CONTENT_EXPORT AttributionManagerImpl : public AttributionManager {
 #if BUILDFLAG(IS_ANDROID)
   std::unique_ptr<AttributionOsLevelManager> attribution_os_level_manager_;
 
-  struct OsRegistration;
   base::circular_deque<OsRegistration> pending_os_events_;
 #endif  // BUILDFLAG(IS_ANDROID)
 

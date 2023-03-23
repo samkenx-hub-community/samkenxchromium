@@ -1242,7 +1242,7 @@
     'input_device_settings': {
       'filepath': 'ash/system/input_device_settings/|'\
                   'chrome/browser/resources/settings/chromeos/device_page/|'\
-                  'chrome/browser/ui/webui/settings/ash/device_section.*|'\
+                  'chrome/browser/ui/webui/settings/ash/device_section.(cc|h)$|'\
                   'chrome/browser/ui/webui/settings/ash/input_device_settings/',
     },
     'input_devices': {
@@ -1470,7 +1470,9 @@
                   '|chromeos/ash/services/secure_channel/',
     },
     'multipaste': {
-     'filepath': 'ash/clipboard/',
+     'filepath': 'ash/clipboard/|'\
+                 'ash/public/cpp/.*clipboard.*|'\
+                 'chrome/browser/ui/ash/clipboard.*',
     },
     'nacl': {
       'filepath': 'chrome/nacl/|chrome/test/nacl/|'\
@@ -1713,6 +1715,7 @@
     },
     'prerender': {
       'filepath': 'chrome/browser/chrome_content_browser_client_binder_policies' \
+                  '|chrome/browser/predictors/autocomplete_action_predictor\.(cc|h)$' \
                   '|chrome/browser/preloading/prefetch/search_prefetch/' \
                   '|chrome/browser/preloading/prerender/' \
                   '|content/browser/mojo_binder_policy' \
@@ -2094,6 +2097,10 @@
     },
     'usb': {
       'filepath': '/usb/',
+    },
+    'user_education': {
+      'filepath': 'ash/user_education/|'\
+                  'chrome/browser/ui/ash/user_education/',
     },
     'version_assembly': {
       'filepath': 'chrome/app/version_assembly',
@@ -2897,7 +2904,7 @@
                            'csharrison+watch@chromium.org',
                            'loading-reviews+metrics@chromium.org',
                            'speed-metrics-reviews@chromium.org',
-                           'tommckee+watch@chromium.org'],
+                           'haoliuk+watch@chromium.org'],
     'panels': ['dimich@chromium.org',
                'jennb@chromium.org',
                'jianli@chromium.org'],
@@ -3095,6 +3102,7 @@
     'unified_consent': ['wfh+watch@chromuium.org'],
     'usb': ['mattreynolds+watch@chromium.org',
             'odejesush+watch@chromium.org'],
+    'user_education': ['cros-system-ui-productivity-eng+reviews@google.com'],
     'version_assembly': ['caitkp+watch@chromium.org',
                          'gab+watch@chromium.org'],
     'video': ['posciak+watch@chromium.org'],
@@ -3137,7 +3145,8 @@
               'icer@chromium.org',
               'npm+watch@chromium.org'],
     'weblayer': ['cricke+watch@chromium.org',
-                 'rayankans+watch@chromium.org'],
+                 'rayankans+watch@chromium.org',
+                 'swestphal+watch@chromium.org'],
     'weblayer_safe_browsing' : ['carlosil+watch@chromium.org'],
     'weblayer_ssl' : ['carlosil+watch@chromium.org'],
     'webotp': ['yigu+watch@chromium.org'],

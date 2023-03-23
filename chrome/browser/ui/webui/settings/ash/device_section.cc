@@ -760,6 +760,7 @@ bool IsListAllDisplayModesEnabled() {
 
 void AddDeviceKeyboardStrings(content::WebUIDataSource* html_source) {
   static constexpr webui::LocalizedString keyboard_strings[] = {
+      {"builtInKeyboardName", IDS_SETTINGS_BUILT_IN_KEYBOARD_NAME},
       {"keyboardBlockMetaFunctionKeyRewrites",
        IDS_SETTINGS_KEYBOARD_BLOCK_META_FUNCTION_KEY_REWRITES},
       {"keyboardBlockMetaFunctionKeyRewritesDescription",
@@ -794,7 +795,6 @@ void AddDeviceKeyboardStrings(content::WebUIDataSource* html_source) {
       {"keyRepeatRate", IDS_SETTINGS_KEYBOARD_AUTO_REPEAT_RATE},
       {"keyRepeatRateFast", IDS_SETTINGS_KEYBOARD_AUTO_REPEAT_FAST},
       {"keyRepeatRateSlow", IDS_SETTINGS_KEYBOARD_AUTO_REPEAT_RATE_SLOW},
-      {"perDeviceKeyboardTitle", IDS_SETTINGS_PER_DEVICE_KEYBOARD_TITLE},
       {"remapKeyboardKeysRowLabel", IDS_SETTINGS_KEYBOARD_REMAP_KEYS_ROW_LABEL},
       {"remapKeyboardKeysDescription",
        IDS_SETTINGS_KEYBOARD_REMAP_KEYS_DESCRIPTION},
@@ -804,6 +804,7 @@ void AddDeviceKeyboardStrings(content::WebUIDataSource* html_source) {
       {"keyboardKeySearch", IDS_SETTINGS_KEYBOARD_KEY_SEARCH},
       {"keyboardRemapRestoreDefaultsLabel",
        IDS_SETTINGS_KEYBOARD_REMAP_RESTORE_BUTTON_LABEL},
+      {"noKeyboardsConnected", IDS_SETTINGS_KEYBOARD_NO_KEYBOARDS_HELP_MESSAGE},
   };
   html_source->AddLocalizedStrings(keyboard_strings);
 
@@ -1273,7 +1274,7 @@ void DeviceSection::RegisterHierarchy(HierarchyGenerator* generator) const {
 
   if (base::FeatureList::IsEnabled(ash::features::kInputDeviceSettingsSplit)) {
     // Per-device Keyboard.
-    generator->RegisterTopLevelSubpage(IDS_SETTINGS_PER_DEVICE_KEYBOARD_TITLE,
+    generator->RegisterTopLevelSubpage(IDS_SETTINGS_KEYBOARD_TITLE,
                                        mojom::Subpage::kPerDeviceKeyboard,
                                        mojom::SearchResultIcon::kKeyboard,
                                        mojom::SearchResultDefaultRank::kMedium,
@@ -1627,7 +1628,9 @@ void DeviceSection::AddDevicePointersStrings(
     content::WebUIDataSource* html_source) {
   static constexpr webui::LocalizedString kPointersStrings[] = {
       {"mouseTitle", IDS_SETTINGS_MOUSE_TITLE},
+      {"builtInPointingStickName", IDS_SETTINGS_BUILT_IN_POINTING_STICK_NAME},
       {"pointingStickTitle", IDS_SETTINGS_POINTING_STICK_TITLE},
+      {"builtInTouchpadName", IDS_SETTINGS_BUILT_IN_TOUCHPAD_NAME},
       {"touchpadTitle", IDS_SETTINGS_TOUCHPAD_TITLE},
       {"mouseAndTouchpadTitle", IDS_SETTINGS_MOUSE_AND_TOUCHPAD_TITLE},
       {"touchpadTapToClickEnabledLabel",

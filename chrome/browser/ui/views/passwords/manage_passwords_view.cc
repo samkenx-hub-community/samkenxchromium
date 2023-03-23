@@ -157,11 +157,14 @@ ManagePasswordsView::CreatePasswordDetailsView() {
   DCHECK(controller_.get_currently_selected_password().has_value());
   return std::make_unique<ManagePasswordsDetailsView>(
       controller_.get_currently_selected_password().value(),
+      base::BindRepeating(&ItemsBubbleController::UsernameExists,
+                          base::Unretained(&controller_)),
       base::BindRepeating(
           [](ManagePasswordsView* view) {
             view->SetButtons(ui::DIALOG_BUTTON_OK | ui::DIALOG_BUTTON_CANCEL);
-            // TODO(crbug.com/1408790): use internationalized string.
-            view->SetButtonLabel(ui::DIALOG_BUTTON_OK, u"Update");
+            view->SetButtonLabel(
+                ui::DIALOG_BUTTON_OK,
+                l10n_util::GetStringUTF16(IDS_MANAGE_PASSWORDS_UPDATE));
             view->PreferredSizeChanged();
             view->SizeToContents();
           },
@@ -212,6 +215,10 @@ std::unique_ptr<views::View> ManagePasswordsView::CreateFooterView() {
           /*link_message_id=*/
           IDS_PASSWORD_BUBBLES_PASSWORD_MANAGER_LINK_TEXT_SYNCED_TO_ACCOUNT,
           open_password_manager_closure);
+    case password_manager::SyncState::
+        kAccountPasswordsActiveWithCustomPassphrase:
+      // Unreachable on desktop platforms.
+      NOTREACHED_NORETURN();
   }
 }
 
@@ -239,7 +246,10 @@ void ManagePasswordsView::RecreateLayout() {
         ManagePasswordsListView::CreateTitleView(controller_.GetTitle()));
     frame_view->SetFootnoteView(CreateFooterView());
     page_container_->SwitchToPage(CreatePasswordListView());
-    page_container_->SetProperty(views::kMarginsKey, gfx::Insets());
+    page_container_->SetProperty(
+        views::kMarginsKey,
+        gfx::Insets().set_bottom(ChromeLayoutProvider::Get()->GetDistanceMetric(
+            DISTANCE_CONTENT_LIST_VERTICAL_SINGLE)));
     password_details_view_ = nullptr;
   }
   PreferredSizeChanged();

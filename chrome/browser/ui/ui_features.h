@@ -55,8 +55,6 @@ BASE_DECLARE_FEATURE(kLightweightExtensionOverrideConfirmations);
 
 BASE_DECLARE_FEATURE(kPowerBookmarksSidePanel);
 
-BASE_DECLARE_FEATURE(kProminentDarkModeActiveTabTitle);
-
 BASE_DECLARE_FEATURE(kQuickCommands);
 
 BASE_DECLARE_FEATURE(kScrollableTabStrip);
@@ -94,7 +92,7 @@ BASE_DECLARE_FEATURE(kTabGroupsCollapseFreezing);
 BASE_DECLARE_FEATURE(kTabGroupsNewBadgePromo);
 
 BASE_DECLARE_FEATURE(kTabGroupsSave);
-extern const base::FeatureParam<bool> kTabGroupsSaveSyncIntegration;
+BASE_DECLARE_FEATURE(kTabGroupsSaveSyncIntegration);
 
 BASE_DECLARE_FEATURE(kTabHoverCardImages);
 

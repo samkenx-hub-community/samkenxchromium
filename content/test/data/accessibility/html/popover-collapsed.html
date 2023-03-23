@@ -1,20 +1,39 @@
 <!--
-@WAIT-FOR:done
+@BLINK-ALLOW:expanded*
+@WAIT-FOR:PopoverNowClosed
 -->
 
 <!DOCTYPE html>
 
 <button id=toggle popovertarget="will-collapse">Will collapse</button>
-<div popover id="will-collapse">Popover</div>
+<div popover id="will-collapse">PopoverVisible</div>
 
 <script>
-  document.getElementById('toggle').click();  // Start expanded.
-  document.addEventListener('DOMContentLoaded', () => {
-    setTimeout(() => {
-      document.getElementById('toggle').click();
-      setTimeout(() => {
-        document.title = 'done';
-      }, 20);
-    }, 250);
-  });
+// This test could be written in the trivial way: with the HTML above, but
+// never showing or hiding the popover. Instead, it opens the popover, waits
+// for the a11y tree to get sync'd, and then closes the popover and waits again,
+// to make sure those updates are captured.
+
+document.addEventListener('DOMContentLoaded', () => {
+  const a11ySyncTimeMs = 500;
+  const popover = document.getElementById('will-collapse');
+  popover.showPopover(); // Start expanded.
+  const button = document.getElementById('toggle');
+  setTimeout(() => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        // A11y tree should be up to date now, with the popover visible.
+        button.click();
+        setTimeout(() => {
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              // Signal the end of the test.
+              document.title = 'PopoverNowClosed';
+            });
+          });
+        },a11ySyncTimeMs);
+      });
+    });
+  },a11ySyncTimeMs);
+});
 </script>

@@ -76,6 +76,12 @@ BASE_FEATURE(kFillOnAccountSelect,
              "fill-on-account-select",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
+// Enables logging the content of chrome://password-manager-internals to the
+// terminal.
+BASE_FEATURE(kPasswordManagerLogToTerminal,
+             "PasswordManagerLogToTerminal",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 #if BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
 // When enabled, initial sync will be forced during startup if the password
 // store has encryption service failures.
@@ -96,7 +102,7 @@ BASE_FEATURE(kInferConfirmationPasswordField,
 // Password Manager view.
 BASE_FEATURE(kIOSPasswordUISplit,
              "IOSPasswordUISplit",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // Enables password saving and filling in cross-origin iframes on IOS.
 BASE_FEATURE(kIOSPasswordManagerCrossOriginIframeSupport,
@@ -220,7 +226,7 @@ BASE_FEATURE(kPasskeyManagementUsingAccountSettingsAndroid,
 
 BASE_FEATURE(kPasswordEditDialogWithDetails,
              "PasswordEditDialogWithDetails",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // Enables the Password generation bottom sheet.
 BASE_FEATURE(kPasswordGenerationBottomSheet,
@@ -267,7 +273,7 @@ BASE_FEATURE(kUnifiedPasswordManagerReenrollment,
 // icon.
 BASE_FEATURE(kUnifiedPasswordManagerAndroidBranding,
              "UnifiedPasswordManagerAndroidBranding",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // Enables new exploratory strings for the save/update password prompts.
 BASE_FEATURE(kExploratorySaveUpdatePasswordStrings,
@@ -323,9 +329,10 @@ extern const base::FeatureParam<int> kMaxShownUPMErrorsBeforeEviction = {
     "max_shown_auth_errors_before_eviction", -1};
 
 // The string version to use for the save/update password prompts when the user
-// is syncing passwords. The only supported versions currently are 1 and 2.
+// is syncing passwords. Version 1 is outdated, so the only supported versions
+// currently are 2 and 3.
 extern const base::FeatureParam<int> kSaveUpdatePromptSyncingStringVersion = {
-    &kExploratorySaveUpdatePasswordStrings, "syncing_string_version", 1};
+    &kExploratorySaveUpdatePasswordStrings, "syncing_string_version", 2};
 #endif
 
 // Field trial identifier for password generation requirements.
@@ -403,5 +410,12 @@ bool ManagesLocalPasswordsInUnifiedPasswordManager() {
   return false;
 }
 #endif  // IS_ANDROID
+
+#if BUILDFLAG(IS_IOS)
+bool IsPasswordCheckupEnabled() {
+  return base::FeatureList::IsEnabled(
+      password_manager::features::kIOSPasswordCheckup);
+}
+#endif  // IS_IOS
 
 }  // namespace password_manager::features

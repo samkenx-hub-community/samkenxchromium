@@ -113,7 +113,6 @@
 #endif
 
 #if BUILDFLAG(IS_MAC)
-#include "chrome/browser/web_applications/os_integration/web_app_shortcut_mac.h"
 #include "ui/base/test/scoped_fake_nswindow_fullscreen.h"
 #endif
 
@@ -1658,13 +1657,10 @@ class WebAppBrowserTestUpdateShortcutResult
 };
 
 IN_PROC_BROWSER_TEST_P(WebAppBrowserTestUpdateShortcutResult, UpdateShortcut) {
-#if BUILDFLAG(IS_MAC)
-  base::AutoReset<bool> scope_shortcut_app_update(
-      &g_app_shims_allow_update_and_launch_in_tests, true);
-#endif
+  os_hooks_suppress_.reset();
   base::ScopedAllowBlockingForTesting allow_blocking;
   std::unique_ptr<OsIntegrationTestOverride::BlockingRegistration>
-      test_override =
+      blocking_registration =
           OsIntegrationTestOverride::OverrideForTesting(base::GetHomeDir());
 
   NavigateToURLAndWait(browser(), GetInstallableAppURL());
@@ -1732,6 +1728,9 @@ IN_PROC_BROWSER_TEST_P(WebAppBrowserTestUpdateShortcutResult, UpdateShortcut) {
   auto shortcut_info = shortcut_future.Take();
   EXPECT_NE(shortcut_info, nullptr);
   EXPECT_EQ(shortcut_info->title, u"test_app_2");
+
+  test::UninstallAllWebApps(profile());
+  EXPECT_FALSE(provider->registrar_unsafe().IsInstalled(app_id));
 }
 
 INSTANTIATE_TEST_SUITE_P(

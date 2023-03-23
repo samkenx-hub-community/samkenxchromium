@@ -43,6 +43,7 @@
 #include "gpu/command_buffer/service/skia_utils.h"
 #include "gpu/command_buffer/service/webgpu_decoder.h"
 #include "gpu/config/gpu_preferences.h"
+#include "gpu/config/webgpu_blocklist.h"
 #include "gpu/webgpu/callback.h"
 #include "third_party/abseil-cpp/absl/base/attributes.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
@@ -80,11 +81,12 @@ WGPUAdapterType PowerPreferenceToDawnAdapterType(
     WGPUPowerPreference power_preference) {
   switch (power_preference) {
     case WGPUPowerPreference_LowPower:
+    // Currently for simplicity we always choose integrated GPU as the device
+    // related to default power preference. This avoids websites starting
+    // WebGPU just for feature detection from powering up the discrete GPU.
+    case WGPUPowerPreference_Undefined:
       return WGPUAdapterType_IntegratedGPU;
     case WGPUPowerPreference_HighPerformance:
-    // Currently for simplicity we always choose discrete GPU as the device
-    // related to default power preference.
-    case WGPUPowerPreference_Undefined:
       return WGPUAdapterType_DiscreteGPU;
     default:
       NOTREACHED();
@@ -436,6 +438,8 @@ class WebGPUDecoderImpl final : public WebGPUDecoder {
 
   bool enable_unsafe_webgpu_ = false;
   WebGPUAdapterName use_webgpu_adapter_ = WebGPUAdapterName::kDefault;
+  WebGPUPowerPreference use_webgpu_power_preference_ =
+      WebGPUPowerPreference::kDefaultLowPower;
   std::vector<std::string> require_enabled_toggles_;
   std::vector<std::string> require_disabled_toggles_;
   bool allow_unsafe_apis_;
@@ -1097,6 +1101,7 @@ WebGPUDecoderImpl::WebGPUDecoderImpl(
       isolation_key_provider_(isolation_key_provider) {
   enable_unsafe_webgpu_ = gpu_preferences.enable_unsafe_webgpu;
   use_webgpu_adapter_ = gpu_preferences.use_webgpu_adapter;
+  use_webgpu_power_preference_ = gpu_preferences.use_webgpu_power_preference;
   require_enabled_toggles_ = gpu_preferences.enabled_dawn_features_list;
   require_disabled_toggles_ = gpu_preferences.disabled_dawn_features_list;
 
@@ -1109,13 +1114,6 @@ WebGPUDecoderImpl::WebGPUDecoderImpl(
   // adapter_limit_tiers toggle is explicitly disabled.
   tiered_adapter_limits_ =
       !base::Contains(require_disabled_toggles_, "tiered_adapter_limits");
-
-  // Enable the blocklist unless --enable-unsafe-webgpu or
-  // --disable-dawn-features=adapter_blocklist
-  bool disable_adapter_blocklist =
-      base::Contains(require_disabled_toggles_, "adapter_blocklist");
-  dawn_instance_->EnableAdapterBlocklist(
-      !(enable_unsafe_webgpu_ || disable_adapter_blocklist));
 
   DawnProcTable wire_procs = dawn::native::GetProcs();
   wire_procs.createInstance =
@@ -1249,16 +1247,6 @@ void WebGPUDecoderImpl::RequestAdapterImpl(
             dawn_adapters_.size());
   const dawn::native::Adapter& adapter =
       dawn_adapters_[requested_adapter_index];
-
-  // TODO(crbug.com/1266550): Hide CPU adapters until WebGPU fallback adapters
-  // are fully tested.
-  WGPUAdapterProperties properties = {};
-  adapter.GetProperties(&properties);
-  if (properties.adapterType == WGPUAdapterType_CPU && !enable_unsafe_webgpu_) {
-    callback(WGPURequestAdapterStatus_Unavailable, nullptr,
-             "No available adapters.", userdata);
-    return;
-  }
 
   // Callback takes ownership of the reference. Add a ref to pass to the
   // callback.
@@ -1509,6 +1497,13 @@ WebGPUDecoderImpl::CreateQueuedRequestDeviceCallback(
 }
 
 void WebGPUDecoderImpl::DiscoverAdapters() {
+  // Enable the blocklist unless --enable-unsafe-webgpu or
+  // --disable-dawn-features=adapter_blocklist
+  const bool use_blocklist =
+      !(enable_unsafe_webgpu_ ||
+        base::Contains(require_disabled_toggles_, "adapter_blocklist"));
+  dawn_instance_->EnableAdapterBlocklist(use_blocklist);
+
 #if BUILDFLAG(IS_WIN)
   Microsoft::WRL::ComPtr<ID3D11Device> d3d11_device =
       gl::QueryD3D11DeviceObjectFromANGLE();
@@ -1550,6 +1545,10 @@ void WebGPUDecoderImpl::DiscoverAdapters() {
     WGPUAdapterProperties adapterProperties = {};
     adapter.GetProperties(&adapterProperties);
 
+    if (use_blocklist && IsWebGPUAdapterBlocklisted(adapterProperties)) {
+      continue;
+    }
+
     const bool is_fallback_adapter =
         adapterProperties.adapterType == WGPUAdapterType_CPU &&
         adapterProperties.vendorID == 0x1AE0 &&
@@ -1576,8 +1575,37 @@ void WebGPUDecoderImpl::DiscoverAdapters() {
 int32_t WebGPUDecoderImpl::GetPreferredAdapterIndex(
     WGPUPowerPreference power_preference,
     bool force_fallback) const {
-  WGPUAdapterType preferred_adapter_type =
-      PowerPreferenceToDawnAdapterType(power_preference);
+  WGPUAdapterType preferred_adapter_type;
+  if (use_webgpu_adapter_ == WebGPUAdapterName::kSwiftShader) {
+    // When it is using SwiftShader, it is using CPU, so ignore webgpu power
+    // preference flag.
+    DCHECK(force_fallback);
+    preferred_adapter_type = WGPUAdapterType_CPU;
+  } else {
+    WGPUPowerPreference adjusted_power_preference = power_preference;
+    switch (use_webgpu_power_preference_) {
+      case WebGPUPowerPreference::kDefaultLowPower:
+        if (adjusted_power_preference == WGPUPowerPreference_Undefined) {
+          adjusted_power_preference = WGPUPowerPreference_LowPower;
+        }
+        break;
+      case WebGPUPowerPreference::kDefaultHighPerformance:
+        if (adjusted_power_preference == WGPUPowerPreference_Undefined) {
+          adjusted_power_preference = WGPUPowerPreference_HighPerformance;
+        }
+        break;
+      case WebGPUPowerPreference::kForceLowPower:
+        adjusted_power_preference = WGPUPowerPreference_LowPower;
+        break;
+      case WebGPUPowerPreference::kForceHighPerformance:
+        adjusted_power_preference = WGPUPowerPreference_HighPerformance;
+        break;
+      default:
+        break;
+    }
+    preferred_adapter_type =
+        PowerPreferenceToDawnAdapterType(adjusted_power_preference);
+  }
 
   int32_t discrete_gpu_adapter_index = -1;
   int32_t integrated_gpu_adapter_index = -1;
@@ -1617,12 +1645,22 @@ int32_t WebGPUDecoderImpl::GetPreferredAdapterIndex(
     }
   }
 
-  // For now, we always prefer the discrete GPU
-  if (discrete_gpu_adapter_index >= 0) {
+  // For now, we always prefer the integrated GPU
+  if (integrated_gpu_adapter_index >= 0 &&
+      use_webgpu_power_preference_ !=
+          WebGPUPowerPreference::kForceHighPerformance) {
+    return integrated_gpu_adapter_index;
+  }
+  if (discrete_gpu_adapter_index >= 0 &&
+      use_webgpu_power_preference_ != WebGPUPowerPreference::kForceLowPower) {
     return discrete_gpu_adapter_index;
   }
-  if (integrated_gpu_adapter_index >= 0) {
-    return integrated_gpu_adapter_index;
+  if (use_webgpu_power_preference_ == WebGPUPowerPreference::kForceLowPower ||
+      use_webgpu_power_preference_ ==
+          WebGPUPowerPreference::kForceHighPerformance) {
+    // If we cannot find the forced adapter type, early return here instead of
+    // returning any other adapter.
+    return -1;
   }
   if (cpu_adapter_index >= 0) {
     return cpu_adapter_index;

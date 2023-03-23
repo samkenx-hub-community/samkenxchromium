@@ -497,6 +497,13 @@ void AddStoreInfo(const DatabaseManagerInfo::DatabaseInfo::StoreInfo store_info,
     store_info_list.Append("State: " + state_base64);
   }
 
+  for (const auto& prefix_set : store_info.prefix_sets()) {
+    std::string size = base::UTF16ToUTF8(base::FormatNumber(prefix_set.size()));
+    std::string count =
+        base::UTF16ToUTF8(base::FormatNumber(prefix_set.count()));
+    store_info_list.Append(count + " prefixes of size " + size);
+  }
+
   database_info_list.Append(std::move(store_info_list));
 }
 
@@ -624,6 +631,16 @@ std::string AddFullHashCacheInfo(
 }
 
 #endif
+
+std::string SerializeClientSideDetectionType(ClientSideDetectionType csd_type) {
+  switch (csd_type) {
+    case ClientSideDetectionType::CLIENT_SIDE_DETECTION_TYPE_UNSPECIFIED:
+      return "CLIENT_SIDE_DETECTION_TYPE_UNSPECIFIED";
+    case ClientSideDetectionType::FORCE_REQUEST:
+      return "FORCE_REQUEST";
+  }
+  return "UNKNOWN_ENUM_SPECIFIED";
+}
 
 base::Value::Dict SerializeChromeUserPopulation(
     const ChromeUserPopulation& population) {
@@ -1066,6 +1083,11 @@ std::string SerializeClientPhishingRequest(
     dict.Set("model_version", cpr.model_version());
   if (cpr.has_dom_model_version())
     dict.Set("dom_model_version", cpr.dom_model_version());
+  if (cpr.has_client_side_detection_type()) {
+    dict.Set(
+        "client_side_detection_type",
+        SerializeClientSideDetectionType(cpr.client_side_detection_type()));
+  }
 
   base::Value::List features;
   for (const auto& feature : cpr.feature_map()) {
@@ -1367,6 +1389,9 @@ std::string SerializeCSBRR(const ClientSafeBrowsingReportRequest& report) {
         break;
       case ClientSafeBrowsingReportRequest::BLOCKED_AD_POPUP:
         report_type = "BLOCKED_AD_POPUP";
+        break;
+      case ClientSafeBrowsingReportRequest::HASH_PREFIX_REAL_TIME_EXPERIMENT:
+        report_type = "HASH_PREFIX_REAL_TIME_EXPERIMENT";
         break;
     }
     report_request.Set("type", report_type);

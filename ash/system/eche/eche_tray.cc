@@ -7,6 +7,7 @@
 #include <algorithm>
 
 #include "ash/accessibility/accessibility_controller_impl.h"
+#include "ash/constants/ash_features.h"
 #include "ash/constants/notifier_catalogs.h"
 #include "ash/constants/tray_background_view_catalog.h"
 #include "ash/keyboard/ui/keyboard_ui_controller.h"
@@ -34,6 +35,7 @@
 #include "ash/system/tray/tray_container.h"
 #include "ash/system/tray/tray_popup_utils.h"
 #include "ash/system/tray/tray_utils.h"
+#include "ash/webui/eche_app_ui/mojom/eche_app.mojom-shared.h"
 #include "ash/webui/eche_app_ui/mojom/eche_app.mojom.h"
 #include "ash/wm/tablet_mode/tablet_mode_controller.h"
 #include "ash/wm/window_state.h"
@@ -87,6 +89,8 @@
 namespace ash {
 
 namespace {
+
+const char kEchePrewarmConnectionUrl[] = "chrome://eche-app";
 
 // The icon size should be smaller than the tray item size to avoid the icon
 // padding becoming negative.
@@ -170,6 +174,12 @@ std::unique_ptr<views::Button> CreateButton(
   return button;
 }
 
+std::unique_ptr<AshWebView> CreateWebview() {
+  AshWebView::InitParams params;
+  params.can_record_media = true;
+  return AshWebViewFactory::Get()->Create(params);
+}
+
 void ConfigureLabelText(views::Label* title) {
   title->SetMultiLine(false);
   title->SetAllowCharacterBreak(true);
@@ -237,8 +247,13 @@ EcheTray::EcheTray(Shelf* shelf)
 }
 
 EcheTray::~EcheTray() {
-  if (bubble_)
+  if (bubble_) {
     bubble_->bubble_view()->ResetDelegate();
+  }
+  if (features::IsEcheNetworkConnectionStateEnabled() &&
+      eche_connection_status_handler_) {
+    eche_connection_status_handler_->RemoveObserver(this);
+  }
 }
 
 bool EcheTray::IsInitialized() const {
@@ -400,6 +415,46 @@ void EcheTray::OnKeyboardHidden(bool is_temporary_hide) {
   UpdateEcheSizeAndBubbleBounds();
 }
 
+void EcheTray::OnConnectionStatusChanged(
+    eche_app::mojom::ConnectionStatus connection_status) {
+  // TODO(b/274799846): Reintroduce timeout to conditional
+  if (!features::IsEcheNetworkConnectionStateEnabled() ||
+      !initializer_webview_) {
+    return;
+  }
+
+  switch (connection_status) {
+    case eche_app::mojom::ConnectionStatus::kConnectionStatusConnecting:
+      break;
+
+    case eche_app::mojom::ConnectionStatus::kConnectionStatusConnected:
+      eche_connection_status_handler_->SetConnectionStatusForUi(
+          connection_status);
+      break;
+    case eche_app::mojom::ConnectionStatus::kConnectionStatusFailed:
+      eche_connection_status_handler_->SetConnectionStatusForUi(
+          connection_status);
+      break;
+    case eche_app::mojom::ConnectionStatus::kConnectionStatusDisconnected:
+      // TODO(b/274799846): Cleanup shutdown
+      break;
+  }
+}
+
+void EcheTray::OnRequestBackgroundConnectionAttempt() {
+  if (!features::IsEcheNetworkConnectionStateEnabled() || IsInitialized()) {
+    return;
+  }
+
+  initializer_webview_ = CreateWebview();
+  initializer_webview_->Navigate(GURL(kEchePrewarmConnectionUrl));
+  SetIconVisibility(false);
+}
+
+void EcheTray::OnPhoneHubDisconnected() {
+  initializer_webview_.reset();
+}
+
 void EcheTray::SetUrl(const GURL& url) {
   if (web_view_ && url_ != url)
     web_view_->Navigate(url);
@@ -420,10 +475,13 @@ void EcheTray::SetIcon(const gfx::Image& icon,
   }
 }
 
-bool EcheTray::LoadBubble(const GURL& url,
-                          const gfx::Image& icon,
-                          const std::u16string& visible_name,
-                          const std::u16string& phone_name) {
+bool EcheTray::LoadBubble(
+    const GURL& url,
+    const gfx::Image& icon,
+    const std::u16string& visible_name,
+    const std::u16string& phone_name,
+    eche_app::mojom::ConnectionStatus last_connection_status,
+    eche_app::mojom::AppStreamLaunchEntryPoint entry_point) {
   if (Shell::Get()->IsInTabletMode()) {
     ash::ToastManager::Get()->Show(ash::ToastData(
         kEcheTrayTabletModeNotSupportedId,
@@ -445,7 +503,7 @@ bool EcheTray::LoadBubble(const GURL& url,
     ShowBubble();
     return true;
   }
-  InitBubble(phone_name);
+  InitBubble(phone_name, last_connection_status, entry_point);
   StartLoadingAnimation();
   auto* phone_hub_tray = GetPhoneHubTray();
   if (phone_hub_tray) {
@@ -506,10 +564,22 @@ void EcheTray::HideBubble() {
   shelf()->UpdateAutoHideState();
 }
 
-void EcheTray::InitBubble(const std::u16string& phone_name) {
-  base::UmaHistogramEnumeration(
-      "Eche.StreamEvent",
-      eche_app::mojom::StreamStatus::kStreamStatusInitializing);
+void EcheTray::InitBubble(
+    const std::u16string& phone_name,
+    eche_app::mojom::ConnectionStatus last_connection_status,
+    eche_app::mojom::AppStreamLaunchEntryPoint entry_point) {
+  if (features::IsEcheNetworkConnectionStateEnabled() &&
+      last_connection_status ==
+          eche_app::mojom::ConnectionStatus::kConnectionStatusFailed &&
+      entry_point == eche_app::mojom::AppStreamLaunchEntryPoint::NOTIFICATION) {
+    base::UmaHistogramEnumeration(
+        "Eche.StreamEvent.FromNotification.PreviousNetworkCheckFailed.Result",
+        eche_app::mojom::StreamStatus::kStreamStatusInitializing);
+  } else {
+    base::UmaHistogramEnumeration(
+        "Eche.StreamEvent",
+        eche_app::mojom::StreamStatus::kStreamStatusInitializing);
+  }
   init_stream_timestamp_ = base::TimeTicks::Now();
   TrayBubbleView::InitParams init_params;
   init_params.delegate = GetWeakPtr();
@@ -549,9 +619,14 @@ void EcheTray::InitBubble(const std::u16string& phone_name) {
     header_view_->layer()->SetFillsBoundsOpaquely(false);
   }
 
-  AshWebView::InitParams params;
-  params.can_record_media = true;
-  auto web_view = AshWebViewFactory::Get()->Create(params);
+  // Stop any in-progress prewearm channel operation.
+  if (initializer_webview_) {
+    initializer_webview_.reset();
+  }
+
+  // TODO(b/271478560): Re-use initializer_webview_ when available, once support
+  // launching apps on prewarmed connection is available.
+  auto web_view = CreateWebview();
   web_view->SetPreferredSize(eche_size);
   if (!url_.is_empty())
     web_view->Navigate(url_);
@@ -882,6 +957,14 @@ bool EcheTray::ProcessAcceleratorKeys(ui::KeyEvent* event) {
 bool EcheTray::IsBubbleVisible() {
   return bubble_ && bubble_->GetBubbleView() &&
          bubble_->GetBubbleView()->GetVisible();
+}
+
+void EcheTray::SetEcheConnectionStatusHandler(
+    eche_app::EcheConnectionStatusHandler* eche_connection_status_handler) {
+  if (features::IsEcheNetworkConnectionStateEnabled()) {
+    eche_connection_status_handler_ = eche_connection_status_handler;
+    eche_connection_status_handler_->AddObserver(this);
+  }
 }
 
 BEGIN_METADATA(EcheTray, TrayBackgroundView)

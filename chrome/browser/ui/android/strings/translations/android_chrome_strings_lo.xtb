@@ -283,6 +283,7 @@
 <translation id="2581165646603367611">ນີ້ຈະລຶບລ້າງຄຸກກີ້, ແຄສ ແລະ ຂໍ້ມູນອື່ນຂອງເວັບໄຊທີ່ Chrome ຄິດວ່າບໍ່ສຳຄັນ.</translation>
 <translation id="2587052924345400782">ມີເວີຊັນທີ່ໃໝ່ກວ່າ</translation>
 <translation id="2593272815202181319">Monospace</translation>
+<translation id="2603212228005142861">ເຂົ້າສູ່ລະບົບເພື່ອຈັດການການຕັ້ງຄ່າຂອງທ່ານ</translation>
 <translation id="2604446170045642109">ທ່ານສາມາດປິດຮູບແບບສີສັນມືດສຳລັບເວັບໄຊຕ່າງໆໄດ້ໃນການຕັ້ງຄ່າຂອງທ່ານ.</translation>
 <translation id="2612676031748830579">ເລກບັດ</translation>
 <translation id="2625189173221582860">ສຳເນົາລະຫັດຜ່ານແລ້ວ</translation>
@@ -476,6 +477,7 @@
 <translation id="3587596251841506391">ຊ່ວຍປັບປຸງຄວາມປອດໄພໃນເວັັບ</translation>
 <translation id="3597179440835065298">ຮັບການແນະນຳທີ່ດີຂຶ້ນ</translation>
 <translation id="3602290021589620013">ເບິ່ງຕົວຢ່າງ</translation>
+<translation id="360901359071773787">ລຶບ 15 ນາທີທີ່ຜ່ານມາບໍ?</translation>
 <translation id="3616113530831147358">ສຽງ</translation>
 <translation id="3622349720008044802">ຈັດການໜ້າຈໍ</translation>
 <translation id="3631987586758005671">ກຳລັງແບ່ງປັນໃສ່ <ph name="DEVICE_NAME" /></translation>
@@ -630,6 +632,7 @@
 
 ບັນຊີ Google ຂອງທ່ານອາດຈະມີປະຫວັດການທ່ອງເວັບຮູບແບບອື່ນ ເຊັ່ນວ່າ ການຊອກຫາ ແລະ ການເຄື່ອນໄຫວຈາກການບໍລິການອື່ນໆຂອງ Google ຢູ່ <ph name="BEGIN_LINK" />myactivity.google.com<ph name="END_LINK" />.</translation>
 <translation id="452750746583162491">ກວດເບິ່ງຂໍ້ມູນທີ່ຊິ້ງຂອງທ່ານ</translation>
+<translation id="4528638190900283934">ເຂົ້າສູ່ລະບົບເພື່ອຄຸນສົມບັດເພີ່ມເຕີມ</translation>
 <translation id="4532845899244822526">ເລືອກ​ໂຟລເດີ</translation>
 <translation id="4547551584605870320">{TAB_COUNT,plural, =1{<ph name="TAB_COUNT_ONE" /> ແຖບ}other{<ph name="TAB_COUNT_MANY" /> ແຖບ, <ph name="TAB_COUNT_INCOGNITO" /> ແຖບບໍ່ເປີດເຜີຍຕົວຕົນ}}</translation>
 <translation id="4554077758708533499">ເຊື່ອມຕໍ່ກັບສາຍ USB</translation>
@@ -820,6 +823,7 @@
 <translation id="5517095782334947753">ທ່ານມີບຸກມາກ, ປະຫວັດ, ລະຫັດຜ່ານ ແລະ ການຕັ້ງຄ່າອື່ນຈາກ <ph name="FROM_ACCOUNT" />.</translation>
 <translation id="5524761631371622910">ເມື່ອເປີດໃຊ້ການທົດລອງໃຊ້ ແລະ ຫາກ Chrome ຕັ້ງໃຫ້ທ່ານຢູ່ໃນການທົດລອງໃຊ້ທີ່ເຄື່ອນໄຫວຢູ່, ປະຫວັດການທ່ອງເວັບຂອງທ່ານຈະມີຜົນກັບໂຄສະນາທີ່ທ່ານເຫັນ ແລະ ຄວາມສົນໃຈຕາມທີ່ປະເມີນໄວ້ທາງລຸ່ມ. ເພື່ອປົກປ້ອງຄວາມເປັນສ່ວນຕົວຂອງທ່ານ, Chrome ຈະລຶບຄວາມສົນໃຈຂອງທ່ານອອກເປັນປະຈຳໃນແຕ່ລະເດືອນ.</translation>
 <translation id="5524843473235508879">ບລັອກການປ່ຽນເສັ້ນທາງແລ້ວ.</translation>
+<translation id="554297709083131118">ລະບົບຈະລຶບຂໍ້ມູນຕໍ່ໄປນີ້ຈາກ 15 ນາທີທີ່ຜ່ານມາ</translation>
 <translation id="5548606607480005320">ການກວດສອບຄວາມປອດໄພ</translation>
 <translation id="5555525474779371165">ເລືອກການປົກປ້ອງ Safe Browsing ຂອງທ່ານ</translation>
 <translation id="5556459405103347317">ໂຫຼດຄືນໃໝ່</translation>
@@ -1074,6 +1078,7 @@
 <translation id="6824899148643461612"><ph name="TAB_TITLE" />, ແຖບ, ເລືອກແລ້ວ</translation>
 <translation id="6828070228333235514">ຢຸດການຕິດຕາມລາຄາ</translation>
 <translation id="6830728435402077660">ບໍ່ປອດໄພ</translation>
+<translation id="6831043979455480757">ແປພາສາ</translation>
 <translation id="6833996806551876956">ການທົດລອງໃຊ້ກ່ອງຊາຍຄວາມເປັນສ່ວນຕົວ</translation>
 <translation id="6836206421467243968">ກູ້ຄືນກຸ່ມແຖບຂອງ <ph name="TITLE_OF_GROUP" /> ເປັນກຸ່ມແຖບໃນພື້ນຫຼັງໃໝ່.</translation>
 <translation id="6846298663435243399">ກໍາລັງໂຫຼດ ...</translation>
@@ -1241,10 +1246,10 @@
 <translation id="7707922173985738739">ໃຊ້ຂໍ້ມູນມືຖື</translation>
 <translation id="7709094866268987903">ຄວາມສົນໃຈທີ່ທ່ານລຶບອອກຈະປາກົດຢູ່ບ່ອນນີ້</translation>
 <translation id="7709918231054955894">ໃຊ້ແຖບທັງໝົດຂອງທ່ານ</translation>
+<translation id="772434085369393266">ອັບເກຣດການນຳທາງເປັນ HTTPS ແລະ ເຕືອນທ່ານກ່ອນໂຫຼດເວັບໄຊທີ່ບໍ່ຮອງຮັບມັນ. ທ່ານບໍ່ສາມາດປ່ຽນການຕັ້ງຄ່ານີ້ໄດ້ເນື່ອງຈາກທ່ານເປີດການນຳໃຊ້ການປົກປ້ອງຂັ້ນສູງໄວ້.</translation>
 <translation id="7725024127233776428">ໜ້າທີ່ທ່ານບຸກມາກໄວ້ປາກົດຢູ່ບ່ອນນີ້</translation>
 <translation id="7757787379047923882">ຂໍ້ຄວາມທີ່ແບ່ງປັນຈາກ <ph name="DEVICE_NAME" /></translation>
 <translation id="7762668264895820836">SD ກາດ <ph name="SD_CARD_NUMBER" /></translation>
-<translation id="7762928140712606393">ເຂົ້າສູ່ລະບົບສຳລັບຄຸນສົມບັດເພີ່ມເຕີມ ແລະ ຄວາມປອດໄພທີ່ແຂງແຮງທີ່ສຸດຂອງ Chrome</translation>
 <translation id="7764225426217299476">ເພີ່ມ​ທີ່​ຢູ່</translation>
 <translation id="7772032839648071052">ຢືນ​ຢັນວະລີຜ່ານ</translation>
 <translation id="7772375229873196092">ປິດ <ph name="APP_NAME" /></translation>
@@ -1260,6 +1265,7 @@
 <translation id="78270725016672455">ຄອມພິວເຕີຂອງທ່ານຕ້ອງການລົງທະບຽນອຸປະກອນນີ້ເພື່ອເຂົ້າສູ່ລະບົບຫາເວັບໄຊ</translation>
 <translation id="7844171778363018843">ບໍ່ໄດ້ເລືອກຂໍ້ມູນທີ່ຈະຊິ້ງ</translation>
 <translation id="7846296061357476882">ບໍລິການ Google</translation>
+<translation id="7847228556075070294">ລຶບປະຫວັດ, ຄຸກກີ້ ແລະ ຂໍ້ມູນອື່ນໆແລ້ວ</translation>
 <translation id="784934925303690534">ຂອບເຂດເວລາ</translation>
 <translation id="7851858861565204677">ອຸ​ປະ​ກອນ​ອື່ນໆ</translation>
 <translation id="7853202427316060426">ການເຄື່ອນໄຫວ</translation>
@@ -1439,6 +1445,7 @@
 <translation id="869891660844655955">ວັນ​ຫມົດ​ອາ​ຍຸ</translation>
 <translation id="8699120352855309748">ບໍ່ສະເໜີແປພາສາເຫຼົ່ານີ້</translation>
 <translation id="8712637175834984815">ເຂົ້າໃຈແລ້ວ</translation>
+<translation id="8723453889042591629">ແປພາສາໜ້ານີ້ຢ່າງວ່ອງໄວ. ເພື່ອແກ້ໄຂທາງລັດນີ້, ໃຫ້ແຕະຄ້າງໄວ້.</translation>
 <translation id="8725066075913043281">ລອງໃໝ່ອີກ</translation>
 <translation id="8746155870861185046">ແບ່ງປັນໄຮໄລ້</translation>
 <translation id="874726034427945498">ເພື່ອເບິ່ງການແນະນຳທີ່ດີຂຶ້ນໃນແຖບທີ່ຢູ່ຂອງທ່ານ, ໃຫ້ຊິ້ງແຖບ ແລະ ປະຫວັດຂອງທ່ານ</translation>

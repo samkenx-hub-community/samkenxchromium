@@ -36,7 +36,7 @@ void AddMaterialUiColorMixer(ColorProvider* provider,
       {kColorSysStateFocus}, {kColorButtonBackgroundProminent})};
   mixer[kColorButtonBorder] = {kColorSysOutline};
   mixer[kColorButtonBorderDisabled] = {kColorSysStateDisabled};
-  mixer[kColorButtonForeground] = {kColorSysOnSurfacePrimary};
+  mixer[kColorButtonForeground] = {kColorSysPrimary};
   mixer[kColorButtonForegroundDisabled] = {kColorSysStateDisabled};
   mixer[kColorButtonForegroundProminent] = {kColorSysOnPrimary};
   mixer[kColorCheckboxBackgroundDisabled] = {kColorSysStateDisabledContainer};
@@ -84,6 +84,7 @@ void AddMaterialUiColorMixer(ColorProvider* provider,
   mixer[kColorToggleButtonThumbOnDisabled] = {kColorSysSurface};
   mixer[kColorToggleButtonThumbOnHover] = {kColorSysPrimaryContainer};
   mixer[kColorToggleButtonTrackOff] = {kColorSysSurfaceVariant};
+  mixer[kColorToggleButtonTrackOffDisabled] = {kColorSysSurfaceVariant};
   mixer[kColorToggleButtonTrackOn] = {kColorSysPrimary};
   mixer[kColorToggleButtonTrackOnDisabled] = {kColorSysStateDisabledContainer};
   mixer[kColorToolbarSearchFieldBackground] = {kColorSysBaseContainerElevated};

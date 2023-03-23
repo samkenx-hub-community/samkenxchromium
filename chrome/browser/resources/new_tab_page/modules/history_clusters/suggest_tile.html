@@ -23,7 +23,7 @@
         var(--color-new-tab-page-history-clusters-module-item-background);
     display: flex;
     flex-direction: row;
-    height: 44px;
+    height: 100%;
     margin-bottom: 4px;
     width: 100%;
   }
@@ -34,6 +34,7 @@
 
   .related-search:last-of-type {
     border-radius: 0 0 12px 12px;
+    margin-bottom: 0;
   }
 
   .icon {
@@ -51,15 +52,33 @@
 
   .title {
     color: var(--color-new-tab-page-primary-foreground);
-    font-size: 14px;
+    font-size: var(--ntp-module-text-size);
     margin: auto 0;
+  }
+
+  /* Set styles for high contrast mode in Windows. */
+  @media (forced-colors: active) {
+    /* Set focus outline since box-shadow isn't visible in hcm */
+    :host-context(.focus-outline-visible) a:focus {
+      outline: var(--cr-focus-outline-hcm);
+    }
+
+    /* Set outline since background isn't visible in hcm. */
+    a {
+      outline: var(--cr-border-hcm);
+    }
+
+    /* Set magnifying class color for hcm. Otherwise, it isn't visible. */
+    .icon {
+      background-color: LinkText;
+    }
   }
 </style>
 <div id="content">
   <template is="dom-repeat" items="[[relatedSearches]]"
             filter="[[filterRelatedSearches_]]">
     <a class="related-search" href="[[computeSearchUrl_(item.query)]]"
-       on-click="onClick_" on-auxclick="onClick_">
+       aria-label$="[[i18n('modulesJourneysSearchSuggAcc', item.query)]]">
       <div class="icon"
            style="-webkit-mask-image:
            url(//resources/images/icon_search.svg);"></div>

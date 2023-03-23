@@ -119,7 +119,6 @@
 <translation id="1942765061641586207">ਚਿੱਤਰ ਰੈਜ਼ੋਲਿਊਸ਼ਨ</translation>
 <translation id="1972984168337863910">ਫ਼ਾਈਲਾਂ ਦੇ ਪ੍ਰਤੀਕਰਮ ਪੈਨਲਾਂ ਦਾ ਵਿਸਤਾਰ ਕਰੋ</translation>
 <translation id="1995337122023280937">ਫ਼ਾਈਲ ਟਿਕਾਣੇ 'ਤੇ ਜਾਓ</translation>
-<translation id="1999709132469742660">ਸਾਰੇ URL ਫ਼ਾਈਲ ਤੱਕ ਪਹੁੰਚ ਕਰ ਸਕਦੇ ਹਨ</translation>
 <translation id="2001796770603320721">'ਡਰਾਈਵ' ਵਿੱਚ ਪ੍ਰਬੰਧਨ ਕਰੋ</translation>
 <translation id="2009067268969781306">ਕਿਸੇ ਡਰਾਈਵ ਨੂੰ ਫਾਰਮੈਟ ਕਰਨ ਨਾਲ ਇਸ 'ਤੇ ਸਟੋਰ ਕੀਤਾ ਸਾਰਾ ਡਾਟਾ ਮਿਟ ਜਾਵੇਗਾ। ਇਸ ਕਾਰਵਾਈ ਨੂੰ ਅਣਕੀਤਾ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਦਾ।</translation>
 <translation id="2025955442973426285">ਟਿਗਰੀਨਿਆ</translation>
@@ -151,6 +150,7 @@
 <translation id="2236732657580416950">ਤੁਹਾਡੇ Google Drive ਕੈਸ਼ੇ ਨੂੰ ਕਲੀਅਰ ਕੀਤਾ ਗਿਆ।</translation>
 <translation id="2239068707900391003">ਕੌਫ਼ੀ ਪੀਂਦਾ ਹੋਇਆ ਵਿਅਕਤੀ</translation>
 <translation id="2251368349685848079">ਰੱਦੀ ਵਿੱਚੋਂ ਮੁੜ-ਬਹਾਲ ਕਰੋ</translation>
+<translation id="2278133026967558505">ਸਾਰੀਆਂ ਵੈੱਬਸਾਈਟਾਂ ਅਤੇ URL ਫ਼ਾਈਲ ਤੱਕ ਪਹੁੰਚ ਕਰ ਸਕਦੇ ਹਨ</translation>
 <translation id="2282155092769082568">ਸਵੈ-ਸੰਰੂਪਣ URL:</translation>
 <translation id="2284767815536050991">ਹਟਾਉਣਯੋਗ ਸਟੋਰੇਜ</translation>
 <translation id="2288278176040912387">ਰਿਕਾਰਡ ਪਲੇਅਰ</translation>
@@ -542,7 +542,6 @@
 <translation id="5323213332664049067">ਲਾਤੀਨੀ ਅਮਰੀਕੀ</translation>
 <translation id="5330145655348521461">ਇਹ ਫਾਈਲਾਂ ਇੱਕ ਵੱਖਰੇ ਡੈਸਕਟਾਪ ਤੇ ਖੁੱਲ੍ਹੀਆਂ ਹੋਈਆਂ ਹਨ। ਇਸਨੂੰ ਦੇਖਣ ਲਈ <ph name="USER_NAME" /> (<ph name="MAIL_ADDRESS" />) 'ਤੇ ਹਲਚਲ ਕਰੋ।</translation>
 <translation id="5330512191124428349">ਜਾਣਕਾਰੀ ਪ੍ਰਾਪਤ ਕਰੋ</translation>
-<translation id="5337538975554986899"><ph name="NON_RESTRICTED_DESTINATIONS" /> ਤੋਂ ਇਲਾਵਾ ਸਾਰੇ URL ਫ਼ਾਈਲ ਤੱਕ ਪਹੁੰਚ ਕਰ ਸਕਦੇ ਹਨ</translation>
 <translation id="5344246330454251646">Bruschetta ਸਾਂਝਾਕਰਨ ਦਾ ਪ੍ਰਬੰਧਨ ਕਰੋ</translation>
 <translation id="535792325654997756">ਬਿੱਲੀਆਂ ਨਾਲ ਵਿਅਕਤੀ</translation>
 <translation id="5358764674931277">ਫ੍ਰੇਮ ਰੇਟ</translation>
@@ -768,6 +767,7 @@
 <translation id="7162080671816799010">ਪ੍ਰਮਾਣੀਕਰਨ ਸਰਵਰ ਪਛਾਣ ਨੂੰ ਪ੍ਰਮਾਣਿਤ ਕਰਨ ਲਈ 'ਵਿਸ਼ੇ ਸੰਬੰਧੀ ਵਿਕਲਪਿਕ ਨਾਮ ਦਾ ਮਿਲਾਨ' ਜਾਂ 'ਡੋਮੇਨ ਪਿਛੇਤਰ ਦਾ ਮਿਲਾਨ' ਮੌਜੂਦ ਨਹੀਂ ਹੈ</translation>
 <translation id="7165320105431587207">ਨੈੱਟਵਰਕ ਨੂੰ ਸੰਰੂਪਿਤ ਕਰਨ ਨਹੀਂ ਕਰ ਸਕਿਆ</translation>
 <translation id="7170041865419449892">ਸੀਮਾ ਤੋਂ ਬਾਹਰ</translation>
+<translation id="7179579940054351344"><ph name="NON_RESTRICTED_DESTINATIONS" /> ਤੋਂ ਇਲਾਵਾ ਸਾਰੀਆਂ ਵੈੱਬਸਾਈਟਾਂ ਅਤੇ URL ਫ਼ਾਈਲ ਤੱਕ ਪਹੁੰਚ ਕਰ ਸਕਦੇ ਹਨ</translation>
 <translation id="7180611975245234373">ਰਿਫ੍ਰੈਸ਼ ਕਰੋ</translation>
 <translation id="7189874332498648577"><ph name="NUMBER_OF_GB" /> GB</translation>
 <translation id="7191454237977785534">ਫ਼ਾਈਲ ਨੂੰ ਇਸ ਵਜੋਂ ਰੱਖਿਅਤ ਕਰੋ</translation>
@@ -941,6 +941,7 @@
 <translation id="8492972329130824181">ਘਰੇਲੂ ਨੈੱਟਵਰਕ ਉਪਲਬਧ ਨਹੀਂ ਹੈ। ਕਨੈਕਟ ਕਰਨ ਲਈ ਮੋਬਾਈਲ ਡਾਟਾ ਰੋਮਿੰਗ ਦਾ ਚਾਲੂ ਹੋਣਾ ਲਾਜ਼ਮੀ ਹੈ।</translation>
 <translation id="8499098729323186194"><ph name="NUMBER_OF_ITEMS" /> ਆਈਟਮਾਂ ਨੂੰ ਐਕਸਟਰੈਕਟ ਕੀਤਾ ਜਾ ਰਿਹਾ ਹੈ...</translation>
 <translation id="8502913769543567768">ਨੈੱਟਵਰਕ <ph name="NETWORK_COUNT" /> ਵਿੱਚੋਂ <ph name="NETWORK_INDEX" />, <ph name="NETWORK_NAME" />, <ph name="NETWORK_PROVIDER_NAME" />, ਡੀਵਾਈਸ ਸੈੱਟਅੱਪ ਤੋਂ ਬਾਅਦ ਕਿਰਿਆਸ਼ੀਲ ਕਰੋ, ਤੁਹਾਡੇ ਪ੍ਰਸ਼ਾਸਕ ਵੱਲੋਂ ਪ੍ਰਬੰਧਿਤ ਕੀਤਾ ਜਾਂਦਾ ਹੈ</translation>
+<translation id="8512483403832814140">ਕਿਸੇ ਵੀ ਵੇਲੇ</translation>
 <translation id="8521441079177373948">ਯੂਕੇ</translation>
 <translation id="853494022971700746">ਫਰਾਂਸੀਸੀ (ਫ਼ਰਾਂਸ)</translation>
 <translation id="8540608333167683902">ਨੈੱਟਵਰਕ <ph name="NETWORK_COUNT" /> ਵਿੱਚੋਂ <ph name="NETWORK_INDEX" />, <ph name="NETWORK_NAME" />, <ph name="CONNECTION_STATUS" />, ਸਿਗਨਲ ਦੀ ਤੀਬਰਤਾ <ph name="SIGNAL_STRENGTH" />%, ਵੇਰਵੇ</translation>

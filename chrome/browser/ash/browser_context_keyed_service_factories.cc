@@ -34,8 +34,8 @@
 #include "chrome/browser/ash/crosapi/keystore_service_factory_ash.h"
 #include "chrome/browser/ash/crosapi/persistent_forced_extension_keep_alive.h"
 #include "chrome/browser/ash/crostini/ansible/ansible_management_service_factory.h"
-#include "chrome/browser/ash/crostini/crostini_engagement_metrics_service.h"
 #include "chrome/browser/ash/crostini/crostini_export_import.h"
+#include "chrome/browser/ash/crostini/crostini_metrics_service.h"
 #include "chrome/browser/ash/crostini/crostini_package_service.h"
 #include "chrome/browser/ash/crostini/crostini_port_forwarder.h"
 #include "chrome/browser/ash/crostini/crostini_upgrader.h"
@@ -91,6 +91,7 @@
 #include "chrome/browser/ash/secure_channel/nearby_connector_factory.h"
 #include "chrome/browser/ash/smb_client/smb_service_factory.h"
 #include "chrome/browser/ash/sync/sync_error_notifier_factory.h"
+#include "chrome/browser/ash/sync/sync_mojo_service_factory_ash.h"
 #include "chrome/browser/ash/tether/tether_service_factory.h"
 #include "chrome/browser/ash/web_applications/personalization_app/personalization_app_manager_factory.h"
 #include "chrome/browser/browser_process_platform_part_ash.h"
@@ -162,8 +163,8 @@ void EnsureBrowserContextKeyedServiceFactoriesBuilt() {
   crosapi::PersistentForcedExtensionKeepAliveFactory::GetInstance();
   CrosSpeechRecognitionServiceFactory::EnsureFactoryBuilt();
   crostini::AnsibleManagementServiceFactory::GetInstance();
-  crostini::CrostiniEngagementMetricsService::Factory::GetInstance();
   crostini::CrostiniExportImport::EnsureFactoryBuilt();
+  crostini::CrostiniMetricsService::Factory::GetInstance();
   crostini::CrostiniPackageService::EnsureFactoryBuilt();
   crostini::CrostiniPortForwarder::EnsureFactoryBuilt();
   crostini::CrostiniThrottle::EnsureFactoryBuilt();
@@ -214,6 +215,7 @@ void EnsureBrowserContextKeyedServiceFactoriesBuilt() {
   sharesheet::SharesheetServiceFactory::GetInstance();
   smb_client::SmbServiceFactory::GetInstance();
   SyncedPrintersManagerFactory::GetInstance();
+  SyncMojoServiceFactoryAsh::GetInstance();
   tether::TetherServiceFactory::GetInstance();
   TtsEngineExtensionObserverChromeOS::EnsureFactoryBuilt();
   GlanceablesKeyedServiceFactory::GetInstance();

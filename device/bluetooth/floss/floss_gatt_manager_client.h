@@ -383,6 +383,16 @@ class DEVICE_BLUETOOTH_EXPORT FlossGattManagerClient
   virtual void Disconnect(ResponseCallback<Void> callback,
                           const std::string& remote_device);
 
+  // Start a reliable write for the remote device.
+  virtual void BeginReliableWrite(ResponseCallback<Void> callback,
+                                  const std::string& remote_device);
+
+  // Execute or abort (depending on the value of |execute|) a reliable write for
+  // the remote device.
+  virtual void EndReliableWrite(ResponseCallback<Void> callback,
+                                const std::string& remote_device,
+                                bool execute);
+
   // Clears the attribute cache of a device.
   virtual void Refresh(ResponseCallback<Void> callback,
                        const std::string& remote_device);
@@ -509,11 +519,14 @@ class DEVICE_BLUETOOTH_EXPORT FlossGattManagerClient
                                       int32_t handle,
                                       bool confirm,
                                       std::vector<uint8_t> value);
+  // Get whether MSFT extension is supported.
+  bool GetMsftSupported() const { return property_msft_supported_.Get(); }
 
   // Initialize the gatt client for the given adapter.
   void Init(dbus::Bus* bus,
             const std::string& service_name,
-            const int adapter_index) override;
+            const int adapter_index,
+            base::OnceClosure on_ready) override;
 
  protected:
   friend class BluetoothGattFlossTest;
@@ -649,6 +662,9 @@ class DEVICE_BLUETOOTH_EXPORT FlossGattManagerClient
   void RegisterClient();
   void RegisterServer();
 
+  // Complete initialization and signal we're ready.
+  void CompleteInit();
+
   template <typename R, typename... Args>
   void CallGattMethod(ResponseCallback<R> callback,
                       const char* member,
@@ -662,11 +678,18 @@ class DEVICE_BLUETOOTH_EXPORT FlossGattManagerClient
   int32_t client_id_ = 0;
   int32_t server_id_ = 0;
 
+  // Signal when the client is ready to be used.
+  base::OnceClosure on_ready_;
+
   // Exported callbacks for interacting with daemon.
   ExportedCallbackManager<FlossGattClientObserver>
       gatt_client_exported_callback_manager_{gatt::kCallbackInterface};
   ExportedCallbackManager<FlossGattServerObserver>
       gatt_server_exported_callback_manager_{gatt::kServerCallbackInterface};
+
+  FlossProperty<bool> property_msft_supported_{
+      kGattInterface, gatt::kCallbackInterface, "IsMsftSupported",
+      nullptr /* property is not updateable */};
 
   base::WeakPtrFactory<FlossGattManagerClient> weak_ptr_factory_{this};
 };

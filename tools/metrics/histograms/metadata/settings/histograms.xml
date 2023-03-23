@@ -104,24 +104,6 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
-<histogram name="Settings.FilterOnLoadTime" units="ms"
-    expires_after="2018-08-30">
-  <owner>gab@chromium.org</owner>
-  <summary>
-    The amount of time it took to run PrefHashFilter::FilterOnLoad on startup.
-  </summary>
-</histogram>
-
-<histogram name="Settings.FilterSerializeDataTime" units="ms"
-    expires_after="2018-08-30">
-  <owner>gab@chromium.org</owner>
-  <summary>
-    The amount of time it took to run PrefHashFilter::FilterSerializeData on the
-    UI thread prior to writing the Preferences file to disk. Only logged when
-    PrefHashFilter::FilterSerializeData actually had work to do.
-  </summary>
-</histogram>
-
 <histogram name="Settings.FirstPartySets.State" enum="FirstPartySetsState"
     expires_after="M120">
   <owner>alimariam@google.com</owner>
@@ -154,7 +136,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Settings.Homepage.LocationType" enum="HomepageLocationType"
-    expires_after="2023-07-09">
+    expires_after="2023-09-10">
   <owner>bttk@chromium.org</owner>
   <owner>twellington@chromium.org</owner>
   <owner>wenyufu@chromium.org</owner>
@@ -174,15 +156,6 @@ chromium-metrics-reviews@google.com.
     those of the different known search engines. Recorded when a profile is
     opened, if a home page URL has been set. Note that at least one profile is
     opened on startup.
-  </summary>
-</histogram>
-
-<histogram name="Settings.JsonDataReadSizeKilobytes" units="KB"
-    expires_after="2018-07-30">
-  <owner>gab@chromium.org</owner>
-  <summary>
-    The size (in kilobytes) of the JSON settings read from disk on startup.
-    Suffixed with the name of the corresponding JSON file.
   </summary>
 </histogram>
 
@@ -393,7 +366,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Settings.PrivacySandbox.Enabled"
-    enum="SettingsPrivacySandboxEnabled" expires_after="2023-07-09">
+    enum="SettingsPrivacySandboxEnabled" expires_after="2023-09-10">
   <owner>harrisonsean@chromium.org</owner>
   <owner>msramek@chromium.org</owner>
   <owner>chrome-friendly-settings@google.com</owner>
@@ -680,7 +653,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Settings.ShowHomeButton" enum="BooleanEnabled"
-    expires_after="2023-07-09">
+    expires_after="2023-09-10">
   <owner>mpearson@chromium.org</owner>
   <owner>twellington@chromium.org</owner>
   <summary>
@@ -840,7 +813,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Settings.TrackedPreferenceWantedReset"
-    enum="TrackedPreference" expires_after="2023-05-14">
+    enum="TrackedPreference" expires_after="2023-09-17">
   <owner>proberge@chromium.org</owner>
   <owner>junhao.huang@microsoft.com</owner>
   <summary>

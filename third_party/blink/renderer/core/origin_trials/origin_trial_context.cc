@@ -506,7 +506,7 @@ bool OriginTrialContext::CanEnableTrialFromName(const StringView& trial_name) {
     return base::FeatureList::IsEnabled(features::kInterestGroupStorage);
 
   if (trial_name == "TrustTokens")
-    return base::FeatureList::IsEnabled(network::features::kPrivateStateTokens);
+    return base::FeatureList::IsEnabled(network::features::kFledgePst);
 
   if (trial_name == "SpeculationRulesPrefetch") {
     return base::FeatureList::IsEnabled(
@@ -550,11 +550,6 @@ Vector<OriginTrialFeature> OriginTrialContext::RestrictedFeaturesForTrial(
       restricted.push_back(OriginTrialFeature::kSharedStorageAPI);
     if (!base::FeatureList::IsEnabled(features::kFencedFramesAPIChanges))
       restricted.push_back(OriginTrialFeature::kFencedFramesAPIChanges);
-    if (!base::FeatureList::IsEnabled(
-            features::kPrivateAggregationApiFledgeExtensions)) {
-      restricted.push_back(
-          OriginTrialFeature::kPrivateAggregationApiFledgeExtensions);
-    }
     return restricted;
   }
 

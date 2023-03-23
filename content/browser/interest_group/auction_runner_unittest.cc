@@ -43,7 +43,6 @@
 #include "content/browser/interest_group/test_interest_group_manager_impl.h"
 #include "content/browser/interest_group/test_interest_group_private_aggregation_manager.h"
 #include "content/browser/renderer_host/render_frame_host_impl.h"
-#include "content/common/private_aggregation_features.h"
 #include "content/public/browser/site_instance.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/test/test_renderer_host.h"
@@ -87,6 +86,7 @@ using blink::FencedFrame::ReportingDestination;
 using PrivateAggregationRequests = AuctionRunner::PrivateAggregationRequests;
 
 const std::string kBidder1Name{"Ad Platform"};
+const std::string kBidder1NameAlt{"Ad Platform Alt"};
 const char kBidder1DebugLossReportUrl[] =
     "https://bidder1-debug-loss-reporting.com/";
 const char kBidder1DebugWinReportUrl[] =
@@ -1162,17 +1162,13 @@ class AuctionRunnerTest : public RenderViewHostTestHarness,
     std::vector<base::test::FeatureRef> disabled_features;
 
     if (should_enable_private_aggregation) {
-      if (should_enable_private_aggregation_fledge_extension) {
-        // Only makes sense to enable fledge extension when
-        // kPrivateAggregationApi is enabled.
-        enabled_features.push_back({content::kPrivateAggregationApi, {}});
-        enabled_features.push_back(
-            {blink::features::kPrivateAggregationApiFledgeExtensions, {}});
-      } else {
-        enabled_features.push_back({content::kPrivateAggregationApi, {}});
-      }
+      enabled_features.push_back(
+          {blink::features::kPrivateAggregationApi,
+           {{"fledge_extensions_enabled",
+             should_enable_private_aggregation_fledge_extension ? "true"
+                                                                : "false"}}});
     } else {
-      disabled_features.push_back(content::kPrivateAggregationApi);
+      disabled_features.push_back(blink::features::kPrivateAggregationApi);
     }
 
     switch (kanon_mode) {
@@ -1698,6 +1694,11 @@ class AuctionRunnerTest : public RenderViewHostTestHarness,
   //
   // `should_bid` For each worklet, true indicates that a bid should be
   // generated, and false indicates that a null bid should be returned.
+  //
+  // NOTE: This method isn't compatible with auction limits like
+  // `all_buyers_group_limit_`, since interest group load order isn't
+  // deterministic -- instead, use a non-mock based runner like
+  // RunAuctionAndWait().
   void RunExtendedPABuyersAuction(
       const std::vector<StorageInterestGroup>& bidders,
       const std::vector<base::TimeDelta> trusted_fetch_latency,
@@ -1816,6 +1817,8 @@ class AuctionRunnerTest : public RenderViewHostTestHarness,
     // auction_config so it should be 500 ms here.
     mock_auction_process_manager->SetExpectedBuyerBidTimeout(
         kBidder1Name, base::Milliseconds(500));
+    mock_auction_process_manager->SetExpectedBuyerBidTimeout(
+        kBidder1NameAlt, base::Milliseconds(500));
     // Bidder 2's per buyer timeout should be 150 ms, since `auction_config's`
     // `all_buyers_timeout` is set to 150 ms in all tests.
     mock_auction_process_manager->SetExpectedBuyerBidTimeout(
@@ -2034,6 +2037,7 @@ class AuctionRunnerTest : public RenderViewHostTestHarness,
       url::Origin::Create(kComponentSeller2Url);
 
   const GURL kBidder1Url{"https://adplatform.com/offers.js"};
+  const GURL kBidder1UrlAlt{"https://adplatform.com/offers_alt.js"};
   const url::Origin kBidder1 = url::Origin::Create(kBidder1Url);
   const InterestGroupKey kBidder1Key{kBidder1, kBidder1Name};
   const GURL kBidder1TrustedSignalsUrl{"https://adplatform.com/signals1"};
@@ -7860,79 +7864,116 @@ TEST_F(AuctionRunnerTest, BadBid) {
   const struct TestCase {
     const char* expected_error_message;
     double bid;
-    GURL render_url;
-    absl::optional<std::vector<blink::AdDescriptor>> ad_component_urls;
+    blink::AdDescriptor ad_descriptor;
+    absl::optional<std::vector<blink::AdDescriptor>> ad_component_descriptors;
     base::TimeDelta duration;
   } kTestCases[] = {
       // Bids that aren't positive integers.
       {
           "Invalid bid value",
           -10,
-          GURL("https://ad1.com"),
+          blink::AdDescriptor(GURL("https://ad1.com")),
           absl::nullopt,
           base::TimeDelta(),
       },
       {
           "Invalid bid value",
           0,
-          GURL("https://ad1.com"),
+          blink::AdDescriptor(GURL("https://ad1.com")),
           absl::nullopt,
           base::TimeDelta(),
       },
       {
           "Invalid bid value",
           std::numeric_limits<double>::infinity(),
-          GURL("https://ad1.com"),
+          blink::AdDescriptor(GURL("https://ad1.com")),
           absl::nullopt,
           base::TimeDelta(),
       },
       {
           "Invalid bid value",
           std::numeric_limits<double>::quiet_NaN(),
-          GURL("https://ad1.com"),
+          blink::AdDescriptor(GURL("https://ad1.com")),
           absl::nullopt,
           base::TimeDelta(),
       },
 
       // Invalid render URL.
       {
-          "Bid render URL must be a valid ad URL",
+          "Bid render ad must have a valid URL and size (if specified)",
           1,
-          GURL(":"),
+          blink::AdDescriptor(GURL(":")),
           absl::nullopt,
           base::TimeDelta(),
       },
 
       // Non-HTTPS render URLs.
       {
-          "Bid render URL must be a valid ad URL",
+          "Bid render ad must have a valid URL and size (if specified)",
           1,
-          GURL("data:,foo"),
+          blink::AdDescriptor(GURL("data:,foo")),
           absl::nullopt,
           base::TimeDelta(),
       },
       {
-          "Bid render URL must be a valid ad URL",
+          "Bid render ad must have a valid URL and size (if specified)",
           1,
-          GURL("http://ad1.com"),
+          blink::AdDescriptor(GURL("http://ad1.com")),
           absl::nullopt,
           base::TimeDelta(),
       },
 
       // HTTPS render URL that's not in the list of allowed renderUrls.
       {
-          "Bid render URL must be a valid ad URL",
+          "Bid render ad must have a valid URL and size (if specified)",
           1,
-          GURL("https://ad2.com"),
+          blink::AdDescriptor(GURL("https://ad2.com")),
+          absl::nullopt,
+          base::TimeDelta(),
+      },
+
+      // HTTPS render URL with an invalid size value.
+      {
+          "Bid render ad must have a valid URL and size (if specified)",
+          1,
+          blink::AdDescriptor(
+              GURL("https://ad1.com"),
+              blink::AdSize(0, blink::AdSize::LengthUnit::kPixels, 100,
+                            blink::AdSize::LengthUnit::kPixels)),
+          absl::nullopt,
+          base::TimeDelta(),
+      },
+
+      // HTTPS render URL with an invalid size unit.
+      {
+          "Bid render ad must have a valid URL and size (if specified)",
+          1,
+          blink::AdDescriptor(
+              GURL("https://ad1.com"),
+              blink::AdSize(100, blink::AdSize::LengthUnit::kInvalid, 100,
+                            blink::AdSize::LengthUnit::kPixels)),
+          absl::nullopt,
+          base::TimeDelta(),
+      },
+
+      // HTTPS render URL with a size specification that does not match any
+      // allowed ad descriptors.
+      {
+          "Bid render ad must have a valid URL and size (if specified)",
+          1,
+          blink::AdDescriptor(
+              GURL("https://ad1.com"),
+              blink::AdSize(100, blink::AdSize::LengthUnit::kPixels, 100,
+                            blink::AdSize::LengthUnit::kPixels)),
           absl::nullopt,
           base::TimeDelta(),
       },
 
       // Invalid component URL.
       {
-          "Bid ad components URL must match a valid ad component URL",
+          "Bid ad component must have a valid URL and size (if specified)",
           1,
-          GURL("https://ad1.com"),
+          blink::AdDescriptor(GURL("https://ad1.com")),
           std::vector<blink::AdDescriptor>{blink::AdDescriptor(GURL(":"))},
           base::TimeDelta(),
       },
@@ -7940,20 +7981,55 @@ TEST_F(AuctionRunnerTest, BadBid) {
       // HTTPS component URL that's not in the list of allowed ad component
       // URLs.
       {
-          "Bid ad components URL must match a valid ad component URL",
+          "Bid ad component must have a valid URL and size (if specified)",
           1,
-          GURL("https://ad1.com"),
+          blink::AdDescriptor(GURL("https://ad1.com")),
           std::vector<blink::AdDescriptor>{
               blink::AdDescriptor(GURL("https://ad2.com-component1.com"))},
           base::TimeDelta(),
       },
       {
-          "Bid ad components URL must match a valid ad component URL",
+          "Bid ad component must have a valid URL and size (if specified)",
           1,
-          GURL("https://ad1.com"),
+          blink::AdDescriptor(GURL("https://ad1.com")),
           std::vector<blink::AdDescriptor>{
               blink::AdDescriptor(GURL("https://ad1.com-component1.com")),
               blink::AdDescriptor(GURL("https://ad2.com-component1.com"))},
+          base::TimeDelta(),
+      },
+
+      // HTTPS component URL with an invalid size value.
+      {
+          "Bid ad component must have a valid URL and size (if specified)",
+          1,
+          blink::AdDescriptor(GURL("https://ad1.com")),
+          std::vector<blink::AdDescriptor>{blink::AdDescriptor(
+              GURL("https://ad1.com-component1.com"),
+              blink::AdSize(0, blink::AdSize::LengthUnit::kPixels, 100,
+                            blink::AdSize::LengthUnit::kPixels))},
+          base::TimeDelta(),
+      },
+      // HTTPS component URL with an invalid size unit.
+      {
+          "Bid ad component must have a valid URL and size (if specified)",
+          1,
+          blink::AdDescriptor(GURL("https://ad1.com")),
+          std::vector<blink::AdDescriptor>{blink::AdDescriptor(
+              GURL("https://ad1.com-component1.com"),
+              blink::AdSize(100, blink::AdSize::LengthUnit::kInvalid, 100,
+                            blink::AdSize::LengthUnit::kPixels))},
+          base::TimeDelta(),
+      },
+      // HTTPS component URL with a size specification that does not match any
+      // allowed ad descriptors.
+      {
+          "Bid ad component must have a valid URL and size (if specified)",
+          1,
+          blink::AdDescriptor(GURL("https://ad1.com")),
+          std::vector<blink::AdDescriptor>{blink::AdDescriptor(
+              GURL("https://ad1.com-component1.com"),
+              blink::AdSize(100, blink::AdSize::LengthUnit::kPixels, 100,
+                            blink::AdSize::LengthUnit::kPixels))},
           base::TimeDelta(),
       },
 
@@ -7961,7 +8037,7 @@ TEST_F(AuctionRunnerTest, BadBid) {
       {
           "Invalid bid duration",
           1,
-          GURL("https://ad2.com"),
+          blink::AdDescriptor(GURL("https://ad2.com")),
           absl::nullopt,
           base::Milliseconds(-1),
       },
@@ -7980,8 +8056,8 @@ TEST_F(AuctionRunnerTest, BadBid) {
     ASSERT_TRUE(bidder2_worklet);
 
     bidder1_worklet->InvokeGenerateBidCallback(
-        test_case.bid, blink::AdDescriptor(test_case.render_url),
-        /*mojo_kanon_bid=*/nullptr, test_case.ad_component_urls,
+        test_case.bid, test_case.ad_descriptor,
+        /*mojo_kanon_bid=*/nullptr, test_case.ad_component_descriptors,
         test_case.duration);
     // Bidder 2 doesn't bid.
     bidder2_worklet->InvokeGenerateBidCallback(/*bid=*/absl::nullopt);
@@ -10238,6 +10314,7 @@ TEST_F(AuctionRunnerTest,
 
 TEST_F(AuctionRunnerTest,
        PrivateAggregationRequestForEventContributionScaleAndOffset) {
+  // Only one bidder participating the auction, to keep things simple.
   interest_group_buyers_ = {{kBidder1}};
 
   const char kBidScript[] = R"(
@@ -10311,7 +10388,6 @@ TEST_F(AuctionRunnerTest,
   auction_worklet::AddJavascriptResponse(&url_loader_factory_, kSellerUrl,
                                          kSellerScript);
 
-  // Only one bidder, to keep things simple.
   RunStandardAuction(/*request_trusted_bidding_signals=*/false);
   EXPECT_THAT(result_.errors, testing::UnorderedElementsAre());
   EXPECT_FALSE(result_.manually_aborted);
@@ -10452,9 +10528,8 @@ TEST_F(AuctionRunnerTest,
 }
 
 TEST_F(AuctionRunnerTest,
-       PrivateAggregationBuyersReportTrustedSignalsFetchDuration) {
-  constexpr base::TimeDelta kTrustedSignalsFetchDuration =
-      base::Milliseconds(2);
+       PrivateAggregationBuyersReportTrustedSignalsFetchLatency) {
+  constexpr base::TimeDelta kTrustedSignalsFetchLatency = base::Milliseconds(2);
   constexpr absl::uint128 kBaseBucket = 100l;
   constexpr absl::uint128 kOffset = 0l;
   constexpr double kScale = 1.0;
@@ -10477,14 +10552,14 @@ TEST_F(AuctionRunnerTest,
                                     blink::SellerCapabilities::kLatencyStats}}})
           .Build()));
 
-  RunExtendedPABuyersAuction(bidders, {kTrustedSignalsFetchDuration});
+  RunExtendedPABuyersAuction(bidders, {kTrustedSignalsFetchLatency});
 
   EXPECT_THAT(private_aggregation_manager_.TakePrivateAggregationRequests(),
               testing::UnorderedElementsAre(testing::Pair(
                   url::Origin::Create(kSellerUrl),
                   ElementsAreRequests(BuildPrivateAggregationRequest(
                       /*bucket=*/kBaseBucket + kOffset,
-                      /*value=*/kTrustedSignalsFetchDuration.InMilliseconds() *
+                      /*value=*/kTrustedSignalsFetchLatency.InMilliseconds() *
                           kScale)))));
 }
 
@@ -10526,8 +10601,7 @@ TEST_F(AuctionRunnerTest, PrivateAggregationBuyersReportBiddingDuration) {
 
 TEST_F(AuctionRunnerTest,
        PrivateAggregationBuyersReportAllSellersCapabilities) {
-  constexpr base::TimeDelta kTrustedSignalsFetchDuration =
-      base::Milliseconds(2);
+  constexpr base::TimeDelta kTrustedSignalsFetchLatency = base::Milliseconds(2);
   constexpr absl::uint128 kBaseBucket = 100l;
   constexpr absl::uint128 kOffset = 0l;
   constexpr double kScale = 1.0;
@@ -10549,21 +10623,21 @@ TEST_F(AuctionRunnerTest,
           .SetAllSellerCapabilities(blink::SellerCapabilities::kLatencyStats)
           .Build()));
 
-  RunExtendedPABuyersAuction(bidders, {kTrustedSignalsFetchDuration});
+  RunExtendedPABuyersAuction(bidders, {kTrustedSignalsFetchLatency});
 
   EXPECT_THAT(private_aggregation_manager_.TakePrivateAggregationRequests(),
               testing::UnorderedElementsAre(testing::Pair(
                   url::Origin::Create(kSellerUrl),
                   ElementsAreRequests(BuildPrivateAggregationRequest(
                       /*bucket=*/kBaseBucket + kOffset,
-                      /*value=*/kTrustedSignalsFetchDuration.InMilliseconds() *
+                      /*value=*/kTrustedSignalsFetchLatency.InMilliseconds() *
                           kScale)))));
 }
 
 TEST_F(AuctionRunnerTest,
        PrivateAggregationBuyersReportDifferentDurationScaleAndOffset) {
   // Use a non-whole number of milliseconds to check truncation.
-  constexpr base::TimeDelta kTrustedSignalsFetchDuration =
+  constexpr base::TimeDelta kTrustedSignalsFetchLatency =
       base::Microseconds(2500);
   constexpr absl::uint128 kBaseBucket = 100l;
   constexpr absl::uint128 kOffset = 2l;
@@ -10587,7 +10661,7 @@ TEST_F(AuctionRunnerTest,
                                     blink::SellerCapabilities::kLatencyStats}}})
           .Build()));
 
-  RunExtendedPABuyersAuction(bidders, {kTrustedSignalsFetchDuration});
+  RunExtendedPABuyersAuction(bidders, {kTrustedSignalsFetchLatency});
 
   EXPECT_THAT(private_aggregation_manager_.TakePrivateAggregationRequests(),
               testing::UnorderedElementsAre(testing::Pair(
@@ -10601,8 +10675,7 @@ TEST_F(AuctionRunnerTest,
 }
 
 TEST_F(AuctionRunnerTest, PrivateAggregationBuyersReportInfiniteScale) {
-  constexpr base::TimeDelta kTrustedSignalsFetchDuration =
-      base::Milliseconds(2);
+  constexpr base::TimeDelta kTrustedSignalsFetchLatency = base::Milliseconds(2);
   constexpr absl::uint128 kBaseBucket = 100l;
   constexpr absl::uint128 kOffset = 2l;
   constexpr double kScale = std::numeric_limits<double>::infinity();
@@ -10625,7 +10698,7 @@ TEST_F(AuctionRunnerTest, PrivateAggregationBuyersReportInfiniteScale) {
                                     blink::SellerCapabilities::kLatencyStats}}})
           .Build()));
 
-  RunExtendedPABuyersAuction(bidders, {kTrustedSignalsFetchDuration});
+  RunExtendedPABuyersAuction(bidders, {kTrustedSignalsFetchLatency});
 
   EXPECT_THAT(private_aggregation_manager_.TakePrivateAggregationRequests(),
               testing::UnorderedElementsAre(testing::Pair(
@@ -10636,8 +10709,7 @@ TEST_F(AuctionRunnerTest, PrivateAggregationBuyersReportInfiniteScale) {
 }
 
 TEST_F(AuctionRunnerTest, PrivateAggregationBuyersReportNaNScale) {
-  constexpr base::TimeDelta kTrustedSignalsFetchDuration =
-      base::Milliseconds(2);
+  constexpr base::TimeDelta kTrustedSignalsFetchLatency = base::Milliseconds(2);
   constexpr absl::uint128 kBaseBucket = 100l;
   constexpr absl::uint128 kOffset = 2l;
   constexpr double kScale = std::numeric_limits<double>::quiet_NaN();
@@ -10660,7 +10732,7 @@ TEST_F(AuctionRunnerTest, PrivateAggregationBuyersReportNaNScale) {
                                     blink::SellerCapabilities::kLatencyStats}}})
           .Build()));
 
-  RunExtendedPABuyersAuction(bidders, {kTrustedSignalsFetchDuration});
+  RunExtendedPABuyersAuction(bidders, {kTrustedSignalsFetchLatency});
 
   EXPECT_THAT(private_aggregation_manager_.TakePrivateAggregationRequests(),
               testing::UnorderedElementsAre(testing::Pair(
@@ -10671,8 +10743,7 @@ TEST_F(AuctionRunnerTest, PrivateAggregationBuyersReportNaNScale) {
 }
 
 TEST_F(AuctionRunnerTest, PrivateAggregationBuyersReportNegativeScale) {
-  constexpr base::TimeDelta kTrustedSignalsFetchDuration =
-      base::Milliseconds(2);
+  constexpr base::TimeDelta kTrustedSignalsFetchLatency = base::Milliseconds(2);
   constexpr absl::uint128 kBaseBucket = 100l;
   constexpr absl::uint128 kOffset = 2l;
   constexpr double kScale = -1.0;
@@ -10695,7 +10766,7 @@ TEST_F(AuctionRunnerTest, PrivateAggregationBuyersReportNegativeScale) {
                                     blink::SellerCapabilities::kLatencyStats}}})
           .Build()));
 
-  RunExtendedPABuyersAuction(bidders, {kTrustedSignalsFetchDuration});
+  RunExtendedPABuyersAuction(bidders, {kTrustedSignalsFetchLatency});
 
   EXPECT_THAT(private_aggregation_manager_.TakePrivateAggregationRequests(),
               testing::UnorderedElementsAre(testing::Pair(
@@ -10707,8 +10778,7 @@ TEST_F(AuctionRunnerTest, PrivateAggregationBuyersReportNegativeScale) {
 
 TEST_F(AuctionRunnerTest,
        PrivateAggregationBuyersReportBucketOverflowDoesntCrash) {
-  constexpr base::TimeDelta kTrustedSignalsFetchDuration =
-      base::Milliseconds(2);
+  constexpr base::TimeDelta kTrustedSignalsFetchLatency = base::Milliseconds(2);
   constexpr absl::uint128 kBaseBucket = absl::Uint128Max();
   constexpr absl::uint128 kOffset = 1l;
   constexpr double kScale = 1.0;
@@ -10731,15 +10801,14 @@ TEST_F(AuctionRunnerTest,
                                     blink::SellerCapabilities::kLatencyStats}}})
           .Build()));
 
-  RunExtendedPABuyersAuction(bidders, {kTrustedSignalsFetchDuration});
+  RunExtendedPABuyersAuction(bidders, {kTrustedSignalsFetchLatency});
 
   // The actual report doesn't matter for this test -- we just want to ensure
   // that no crash occurs.
 }
 
 TEST_F(AuctionRunnerTest, PrivateAggregationBuyersNotAuthorized) {
-  constexpr base::TimeDelta kTrustedSignalsFetchDuration =
-      base::Milliseconds(2);
+  constexpr base::TimeDelta kTrustedSignalsFetchLatency = base::Milliseconds(2);
   constexpr absl::uint128 kBaseBucket = 100l;
   constexpr absl::uint128 kOffset = 0l;
   constexpr double kScale = 1.0;
@@ -10760,15 +10829,14 @@ TEST_F(AuctionRunnerTest, PrivateAggregationBuyersNotAuthorized) {
                                              absl::nullopt)}})
           .Build()));
 
-  RunExtendedPABuyersAuction(bidders, {kTrustedSignalsFetchDuration});
+  RunExtendedPABuyersAuction(bidders, {kTrustedSignalsFetchLatency});
 
   EXPECT_THAT(private_aggregation_manager_.TakePrivateAggregationRequests(),
               testing::UnorderedElementsAre());
 }
 
 TEST_F(AuctionRunnerTest, PrivateAggregationBuyersNoReportBuyerKeys) {
-  constexpr base::TimeDelta kTrustedSignalsFetchDuration =
-      base::Milliseconds(2);
+  constexpr base::TimeDelta kTrustedSignalsFetchLatency = base::Milliseconds(2);
   constexpr absl::uint128 kOffset = 0l;
   constexpr double kScale = 1.0;
 
@@ -10790,15 +10858,14 @@ TEST_F(AuctionRunnerTest, PrivateAggregationBuyersNoReportBuyerKeys) {
                                     blink::SellerCapabilities::kLatencyStats}}})
           .Build()));
 
-  RunExtendedPABuyersAuction(bidders, {kTrustedSignalsFetchDuration});
+  RunExtendedPABuyersAuction(bidders, {kTrustedSignalsFetchLatency});
 
   EXPECT_THAT(private_aggregation_manager_.TakePrivateAggregationRequests(),
               testing::UnorderedElementsAre());
 }
 
 TEST_F(AuctionRunnerTest, PrivateAggregationBuyersNoReportBuyers) {
-  constexpr base::TimeDelta kTrustedSignalsFetchDuration =
-      base::Milliseconds(2);
+  constexpr base::TimeDelta kTrustedSignalsFetchLatency = base::Milliseconds(2);
   constexpr absl::uint128 kBaseBucket = 100l;
 
   auction_report_buyer_keys_ = {{kBaseBucket}};
@@ -10816,7 +10883,7 @@ TEST_F(AuctionRunnerTest, PrivateAggregationBuyersNoReportBuyers) {
                                     blink::SellerCapabilities::kLatencyStats}}})
           .Build()));
 
-  RunExtendedPABuyersAuction(bidders, {kTrustedSignalsFetchDuration});
+  RunExtendedPABuyersAuction(bidders, {kTrustedSignalsFetchLatency});
 
   EXPECT_THAT(private_aggregation_manager_.TakePrivateAggregationRequests(),
               testing::UnorderedElementsAre());
@@ -10824,8 +10891,7 @@ TEST_F(AuctionRunnerTest, PrivateAggregationBuyersNoReportBuyers) {
 
 TEST_F(AuctionRunnerTest,
        PrivateAggregationBuyersReportBuyersDoesntMatchCapabilities) {
-  constexpr base::TimeDelta kTrustedSignalsFetchDuration =
-      base::Milliseconds(2);
+  constexpr base::TimeDelta kTrustedSignalsFetchLatency = base::Milliseconds(2);
   constexpr absl::uint128 kBaseBucket = 100l;
   constexpr absl::uint128 kOffset = 0l;
   constexpr double kScale = 1.0;
@@ -10848,16 +10914,16 @@ TEST_F(AuctionRunnerTest,
                                     blink::SellerCapabilities::kLatencyStats}}})
           .Build()));
 
-  RunExtendedPABuyersAuction(bidders, {kTrustedSignalsFetchDuration});
+  RunExtendedPABuyersAuction(bidders, {kTrustedSignalsFetchLatency});
 
   EXPECT_THAT(private_aggregation_manager_.TakePrivateAggregationRequests(),
               testing::UnorderedElementsAre());
 }
 
 TEST_F(AuctionRunnerTest, PrivateAggregationBuyersReportMultipleBidders) {
-  constexpr base::TimeDelta kTrustedSignalsFetchDuration1 =
+  constexpr base::TimeDelta kTrustedSignalsFetchLatency1 =
       base::Milliseconds(2);
-  constexpr base::TimeDelta kTrustedSignalsFetchDuration2 =
+  constexpr base::TimeDelta kTrustedSignalsFetchLatency2 =
       base::Milliseconds(4);
   constexpr absl::uint128 kBaseBucket1 = 100l;
   constexpr absl::uint128 kBaseBucket2 = 105l;
@@ -10894,7 +10960,7 @@ TEST_F(AuctionRunnerTest, PrivateAggregationBuyersReportMultipleBidders) {
 
   RunExtendedPABuyersAuction(
       bidders, /*trusted_fetch_latency=*/
-      {kTrustedSignalsFetchDuration1, kTrustedSignalsFetchDuration2},
+      {kTrustedSignalsFetchLatency1, kTrustedSignalsFetchLatency2},
       /*bidding_latency=*/{base::TimeDelta(), base::TimeDelta()},
       /*should_bid=*/{true, true});
 
@@ -10905,19 +10971,19 @@ TEST_F(AuctionRunnerTest, PrivateAggregationBuyersReportMultipleBidders) {
           ElementsAreRequests(
               BuildPrivateAggregationRequest(
                   /*bucket=*/kBaseBucket1 + kOffset,
-                  /*value=*/kTrustedSignalsFetchDuration1.InMilliseconds() *
+                  /*value=*/kTrustedSignalsFetchLatency1.InMilliseconds() *
                       kScale),
               BuildPrivateAggregationRequest(
                   /*bucket=*/kBaseBucket2 + kOffset,
-                  /*value=*/kTrustedSignalsFetchDuration2.InMilliseconds() *
+                  /*value=*/kTrustedSignalsFetchLatency2.InMilliseconds() *
                       kScale)))));
 }
 
 TEST_F(AuctionRunnerTest,
        PrivateAggregationBuyersReportMultipleBiddersIncompleteBuyerKeys) {
-  constexpr base::TimeDelta kTrustedSignalsFetchDuration1 =
+  constexpr base::TimeDelta kTrustedSignalsFetchLatency1 =
       base::Milliseconds(2);
-  constexpr base::TimeDelta kTrustedSignalsFetchDuration2 =
+  constexpr base::TimeDelta kTrustedSignalsFetchLatency2 =
       base::Milliseconds(4);
   constexpr absl::uint128 kBaseBucket = 100l;
   constexpr absl::uint128 kOffset = 0l;
@@ -10953,7 +11019,7 @@ TEST_F(AuctionRunnerTest,
 
   RunExtendedPABuyersAuction(
       bidders, /*trusted_fetch_latency=*/
-      {kTrustedSignalsFetchDuration1, kTrustedSignalsFetchDuration2},
+      {kTrustedSignalsFetchLatency1, kTrustedSignalsFetchLatency2},
       /*bidding_latency=*/{base::TimeDelta(), base::TimeDelta()},
       /*should_bid=*/{true, true});
 
@@ -10962,8 +11028,171 @@ TEST_F(AuctionRunnerTest,
                   url::Origin::Create(kSellerUrl),
                   ElementsAreRequests(BuildPrivateAggregationRequest(
                       /*bucket=*/kBaseBucket + kOffset,
-                      /*value=*/kTrustedSignalsFetchDuration1.InMilliseconds() *
+                      /*value=*/kTrustedSignalsFetchLatency1.InMilliseconds() *
                           kScale)))));
+}
+
+TEST_F(AuctionRunnerTest,
+       PrivateAggregationBuyersMultipleBiddersSameOwnerTrustedSignalsLatency) {
+  constexpr base::TimeDelta kTrustedSignalsFetchLatency1 =
+      base::Milliseconds(2);
+  constexpr base::TimeDelta kTrustedSignalsFetchLatency2 =
+      base::Milliseconds(3);
+  constexpr absl::uint128 kBaseBucket = 100l;
+  constexpr absl::uint128 kOffset = 0l;
+  constexpr double kScale = 1.0;
+
+  auction_report_buyer_keys_ = {{kBaseBucket}};
+  auction_report_buyers_ = {{{blink::AuctionConfig::NonSharedParams::
+                                  BuyerReportType::kTotalSignalsFetchLatency,
+                              {/*bucket=*/kOffset,
+                               /*scale=*/kScale}}}};
+  // Both interest groups belong to the same bidder.
+  std::vector<StorageInterestGroup> bidders;
+  bidders.emplace_back(MakeInterestGroup(
+      blink::TestInterestGroupBuilder(kBidder1, kBidder1Name)
+          .SetBiddingUrl(kBidder1Url)
+          .SetTrustedBiddingSignalsUrl(kBidder1TrustedSignalsUrl)
+          .SetTrustedBiddingSignalsKeys({{"k1", "k2"}})
+          .SetAds({{blink::InterestGroup::Ad(GURL("https://ad1.com"),
+                                             absl::nullopt)}})
+          .SetSellerCapabilities({{{url::Origin::Create(kSellerUrl),
+                                    blink::SellerCapabilities::kLatencyStats}}})
+          .Build()));
+  bidders.emplace_back(MakeInterestGroup(
+      blink::TestInterestGroupBuilder(kBidder1, kBidder1NameAlt)
+          .SetBiddingUrl(kBidder1UrlAlt)
+          .SetTrustedBiddingSignalsUrl(kBidder1TrustedSignalsUrl)
+          .SetTrustedBiddingSignalsKeys({{"k1", "k2"}})
+          .SetAds({{blink::InterestGroup::Ad(GURL("https://ad1.com"),
+                                             absl::nullopt)}})
+          .SetSellerCapabilities({{{url::Origin::Create(kSellerUrl),
+                                    blink::SellerCapabilities::kLatencyStats}}})
+          .Build()));
+
+  RunExtendedPABuyersAuction(
+      bidders, /*trusted_fetch_latency=*/
+      {kTrustedSignalsFetchLatency1, kTrustedSignalsFetchLatency2},
+      /*bidding_latency=*/{base::TimeDelta(), base::TimeDelta()},
+      /*should_bid=*/{true, true});
+
+  EXPECT_THAT(
+      private_aggregation_manager_.TakePrivateAggregationRequests(),
+      testing::UnorderedElementsAre(testing::Pair(
+          url::Origin::Create(kSellerUrl),
+          ElementsAreRequests(
+              BuildPrivateAggregationRequest(
+                  /*bucket=*/kBaseBucket + kOffset,
+                  /*value=*/kTrustedSignalsFetchLatency1.InMilliseconds() *
+                      kScale),
+              BuildPrivateAggregationRequest(
+                  /*bucket=*/kBaseBucket + kOffset,
+                  /*value=*/kTrustedSignalsFetchLatency2.InMilliseconds() *
+                      kScale)))));
+}
+
+TEST_F(AuctionRunnerTest,
+       PrivateAggregationBuyersMultipleBiddersSameOwnerBiddingLatency) {
+  constexpr base::TimeDelta kBiddingFetchLatency1 = base::Milliseconds(2);
+  constexpr base::TimeDelta kBiddingFetchLatency2 = base::Milliseconds(3);
+  constexpr absl::uint128 kBaseBucket = 100l;
+  constexpr absl::uint128 kOffset = 0l;
+  constexpr double kScale = 1.0;
+
+  auction_report_buyer_keys_ = {{kBaseBucket}};
+  auction_report_buyers_ = {{{blink::AuctionConfig::NonSharedParams::
+                                  BuyerReportType::kTotalGenerateBidLatency,
+                              {/*bucket=*/kOffset,
+                               /*scale=*/kScale}}}};
+  // Both interest groups belong to the same bidder.
+  std::vector<StorageInterestGroup> bidders;
+  bidders.emplace_back(MakeInterestGroup(
+      blink::TestInterestGroupBuilder(kBidder1, kBidder1Name)
+          .SetBiddingUrl(kBidder1Url)
+          .SetTrustedBiddingSignalsUrl(kBidder1TrustedSignalsUrl)
+          .SetTrustedBiddingSignalsKeys({{"k1", "k2"}})
+          .SetAds({{blink::InterestGroup::Ad(GURL("https://ad1.com"),
+                                             absl::nullopt)}})
+          .SetSellerCapabilities({{{url::Origin::Create(kSellerUrl),
+                                    blink::SellerCapabilities::kLatencyStats}}})
+          .Build()));
+  bidders.emplace_back(MakeInterestGroup(
+      blink::TestInterestGroupBuilder(kBidder1, kBidder1NameAlt)
+          .SetBiddingUrl(kBidder1UrlAlt)
+          .SetTrustedBiddingSignalsUrl(kBidder1TrustedSignalsUrl)
+          .SetTrustedBiddingSignalsKeys({{"k1", "k2"}})
+          .SetAds({{blink::InterestGroup::Ad(GURL("https://ad1.com"),
+                                             absl::nullopt)}})
+          .SetSellerCapabilities({{{url::Origin::Create(kSellerUrl),
+                                    blink::SellerCapabilities::kLatencyStats}}})
+          .Build()));
+
+  RunExtendedPABuyersAuction(
+      bidders, /*trusted_fetch_latency=*/
+      {base::TimeDelta(), base::TimeDelta()},
+      /*bidding_latency=*/{kBiddingFetchLatency1, kBiddingFetchLatency2},
+      /*should_bid=*/{true, true});
+
+  EXPECT_THAT(
+      private_aggregation_manager_.TakePrivateAggregationRequests(),
+      testing::UnorderedElementsAre(testing::Pair(
+          url::Origin::Create(kSellerUrl),
+          ElementsAreRequests(
+              BuildPrivateAggregationRequest(
+                  /*bucket=*/kBaseBucket + kOffset,
+                  /*value=*/kBiddingFetchLatency1.InMilliseconds() * kScale),
+              BuildPrivateAggregationRequest(
+                  /*bucket=*/kBaseBucket + kOffset,
+                  /*value=*/kBiddingFetchLatency2.InMilliseconds() *
+                      kScale)))));
+}
+
+TEST_F(AuctionRunnerTest, PrivateAggregationBuyersMultipleStats) {
+  constexpr base::TimeDelta kTrustedSignalsFetchLatency = base::Milliseconds(2);
+  constexpr base::TimeDelta kBiddingFetchLatency = base::Milliseconds(3);
+  constexpr absl::uint128 kBaseBucket = 100l;
+  constexpr absl::uint128 kOffset1 = 0l;
+  constexpr absl::uint128 kOffset2 = 1l;
+  constexpr double kScale = 1.0;
+
+  auction_report_buyer_keys_ = {{kBaseBucket}};
+  auction_report_buyers_ = {{{blink::AuctionConfig::NonSharedParams::
+                                  BuyerReportType::kTotalSignalsFetchLatency,
+                              {/*bucket=*/kOffset1,
+                               /*scale=*/kScale}},
+                             {blink::AuctionConfig::NonSharedParams::
+                                  BuyerReportType::kTotalGenerateBidLatency,
+                              {/*bucket=*/kOffset2,
+                               /*scale=*/kScale}}}};
+  std::vector<StorageInterestGroup> bidders;
+  bidders.emplace_back(MakeInterestGroup(
+      blink::TestInterestGroupBuilder(kBidder1, kBidder1Name)
+          .SetBiddingUrl(kBidder1Url)
+          .SetTrustedBiddingSignalsUrl(kBidder1TrustedSignalsUrl)
+          .SetTrustedBiddingSignalsKeys({{"k1", "k2"}})
+          .SetAds({{blink::InterestGroup::Ad(GURL("https://ad1.com"),
+                                             absl::nullopt)}})
+          .SetSellerCapabilities({{{url::Origin::Create(kSellerUrl),
+                                    blink::SellerCapabilities::kLatencyStats}}})
+          .Build()));
+
+  RunExtendedPABuyersAuction(bidders, /*trusted_fetch_latency=*/
+                             {kTrustedSignalsFetchLatency},
+                             /*bidding_latency=*/{kBiddingFetchLatency},
+                             /*should_bid=*/{true});
+
+  EXPECT_THAT(
+      private_aggregation_manager_.TakePrivateAggregationRequests(),
+      testing::UnorderedElementsAre(testing::Pair(
+          url::Origin::Create(kSellerUrl),
+          ElementsAreRequests(
+              BuildPrivateAggregationRequest(
+                  /*bucket=*/kBaseBucket + kOffset1,
+                  /*value=*/kTrustedSignalsFetchLatency.InMilliseconds() *
+                      kScale),
+              BuildPrivateAggregationRequest(
+                  /*bucket=*/kBaseBucket + kOffset2,
+                  /*value=*/kBiddingFetchLatency.InMilliseconds() * kScale)))));
 }
 
 TEST_F(AuctionRunnerTest, PrivateAggregationBuyersReportBidCount) {
@@ -11019,9 +11248,6 @@ TEST_F(AuctionRunnerTest, PrivateAggregationBuyersReportBidCount) {
                                           /*value=*/0 * kScale)))));
 }
 
-// TODO(caraitto): Add a test where InterestGroupCount is greater than
-// perBuyerGroupLimits of the buyer.
-
 TEST_F(AuctionRunnerTest, PrivateAggregationBuyersReportInterestGroupCount) {
   constexpr absl::uint128 kBaseBucket1 = 100l;
   constexpr absl::uint128 kBaseBucket2 = 105l;
@@ -11075,7 +11301,96 @@ TEST_F(AuctionRunnerTest, PrivateAggregationBuyersReportInterestGroupCount) {
                                           /*value=*/1 * kScale)))));
 }
 
-TEST_F(AuctionRunnerTest, AdCostPassed) {
+// Reported InterestGroupCount is unaffected by the group limit.
+TEST_F(AuctionRunnerTest,
+       PrivateAggregationBuyersInterestGroupCountUnconstrainedByLimits) {
+  constexpr absl::uint128 kBaseBucket = 100l;
+  constexpr absl::uint128 kOffset = 0l;
+  constexpr double kScale = 1.0;
+
+  auction_report_buyer_keys_ = {{kBaseBucket}};
+  auction_report_buyers_ = {{{blink::AuctionConfig::NonSharedParams::
+                                  BuyerReportType::kInterestGroupCount,
+                              {/*bucket=*/kOffset,
+                               /*scale=*/kScale}}}};
+  all_buyers_group_limit_ = 1;
+
+  // Both interest groups belong to the same bidder.
+  std::vector<StorageInterestGroup> bidders;
+  bidders.emplace_back(MakeInterestGroup(
+      blink::TestInterestGroupBuilder(kBidder1, kBidder1Name)
+          .SetBiddingUrl(kBidder1Url)
+          .SetTrustedBiddingSignalsUrl(kBidder1TrustedSignalsUrl)
+          .SetTrustedBiddingSignalsKeys({{"k1", "k2"}})
+          .SetAds({{blink::InterestGroup::Ad(GURL("https://ad1.com"),
+                                             absl::nullopt)}})
+          .SetSellerCapabilities(
+              {{{url::Origin::Create(kSellerUrl),
+                 blink::SellerCapabilities::kInterestGroupCounts}}})
+          .Build()));
+  bidders.emplace_back(MakeInterestGroup(
+      blink::TestInterestGroupBuilder(kBidder1, kBidder1NameAlt)
+          .SetBiddingUrl(kBidder1UrlAlt)
+          .SetTrustedBiddingSignalsUrl(kBidder1TrustedSignalsUrl)
+          .SetTrustedBiddingSignalsKeys({{"k1", "k2"}})
+          .SetAds({{blink::InterestGroup::Ad(GURL("https://ad1.com"),
+                                             absl::nullopt)}})
+          .SetSellerCapabilities(
+              {{{url::Origin::Create(kSellerUrl),
+                 blink::SellerCapabilities::kInterestGroupCounts}}})
+          .Build()));
+
+  RunAuctionAndWait(kSellerUrl, std::move(bidders));
+
+  // Only one report comes in, and it indicates there are 2 groups, even though
+  // we apply a group limit of 1.
+  EXPECT_THAT(private_aggregation_manager_.TakePrivateAggregationRequests(),
+              testing::UnorderedElementsAre(testing::Pair(
+                  url::Origin::Create(kSellerUrl),
+                  ElementsAreRequests(BuildPrivateAggregationRequest(
+                      /*bucket=*/kBaseBucket + kOffset,
+                      /*value=*/2 * kScale)))));
+}
+
+class RoundingTest : public AuctionRunnerTest,
+                     public ::testing::WithParamInterface<size_t> {
+ public:
+  RoundingTest(size_t bid_bits, size_t score_bits, size_t cost_bits)
+      : bid_bits_(bid_bits), score_bits_(score_bits), cost_bits_(cost_bits) {
+    scoped_feature_list_.InitWithFeaturesAndParameters(
+        {{kFledgeRounding,
+          {{kFledgeBidReportingBits.name, base::NumberToString(bid_bits_)},
+           {kFledgeScoreReportingBits.name, base::NumberToString(score_bits_)},
+           {kFledgeAdCostReportingBits.name,
+            base::NumberToString(cost_bits_)}}}},
+        {});
+  }
+
+  size_t bid_bits() { return bid_bits_; }
+  size_t score_bits() { return score_bits_; }
+  size_t cost_bits() { return cost_bits_; }
+
+ private:
+  base::test::ScopedFeatureList scoped_feature_list_;
+  size_t bid_bits_, score_bits_, cost_bits_;
+};
+
+class BidRoundingTest : public RoundingTest {
+ public:
+  BidRoundingTest() : RoundingTest(GetParam(), 8, 8) {}
+};
+
+class ScoreRoundingTest : public RoundingTest {
+ public:
+  ScoreRoundingTest() : RoundingTest(8, GetParam(), 8) {}
+};
+
+class CostRoundingTest : public RoundingTest {
+ public:
+  CostRoundingTest() : RoundingTest(8, 8, GetParam()) {}
+};
+
+TEST_P(CostRoundingTest, AdCostPassed) {
   const char kBidScript[] = R"(
     const bid = %d;
     function generateBid(
@@ -11108,6 +11423,7 @@ TEST_F(AuctionRunnerTest, AdCostPassed) {
                                          kSellerScript);
 
   // Only one bidder, to keep things simple.
+  interest_group_buyers_ = {{kBidder1}};
   RunStandardAuction(/*request_trusted_bidding_signals=*/false);
   EXPECT_FALSE(result_.manually_aborted);
   EXPECT_EQ(kBidder1Key, result_.winning_group_id);
@@ -11119,16 +11435,16 @@ TEST_F(AuctionRunnerTest, AdCostPassed) {
                   GURL("https://buyer-reporting.example.com/?adCost=2")));
 }
 
-TEST_F(AuctionRunnerTest, AdCostRounded) {
+TEST_P(CostRoundingTest, AdCostRounded) {
   const char kBidScript[] = R"(
-    const bid = %d;
+    const bid = %f;
     function generateBid(
         interestGroup, auctionSignals, perBuyerSignals, trustedBiddingSignals,
         browserSignals) {
       // Return an adCost that requires more bits of precision than allowed.
       return {bid: bid,
               render: interestGroup.ads[0].renderUrl,
-              adCost: 1.99609375};
+              adCost: bid};
     }
 
     function reportWin(
@@ -11148,25 +11464,46 @@ TEST_F(AuctionRunnerTest, AdCostRounded) {
   )";
 
   auction_worklet::AddJavascriptResponse(&url_loader_factory_, kBidder1Url,
-                                         base::StringPrintf(kBidScript, 1));
+                                         base::StringPrintf(kBidScript, 1.99));
   auction_worklet::AddJavascriptResponse(&url_loader_factory_, kSellerUrl,
                                          kSellerScript);
 
   // Only one bidder, to keep things simple.
+  interest_group_buyers_ = {{kBidder1}};
   RunStandardAuction(/*request_trusted_bidding_signals=*/false);
   EXPECT_FALSE(result_.manually_aborted);
   EXPECT_EQ(kBidder1Key, result_.winning_group_id);
   EXPECT_EQ(GURL("https://ad1.com/"), result_.ad_descriptor->url);
 
-  // adCost should be either 2 or 1.9921875 (randomly)
-  EXPECT_THAT(
-      result_.report_urls,
-      testing::ElementsAre(testing::AnyOf(
-          GURL("https://buyer-reporting.example.com/?adCost=2"),
-          GURL("https://buyer-reporting.example.com/?adCost=1.9921875"))));
+  switch (GetParam()) {
+    case 8:
+      EXPECT_THAT(
+          result_.report_urls,
+          testing::ElementsAre(testing::AnyOf(
+              GURL("https://buyer-reporting.example.com/?adCost=1.9921875"),
+              GURL("https://buyer-reporting.example.com/?adCost=1.984375"))));
+      break;
+    case 16:
+      EXPECT_THAT(
+          result_.report_urls,
+          testing::ElementsAre(testing::AnyOf(
+              GURL(
+                  "https://buyer-reporting.example.com/?adCost=1.990005493164"),
+              GURL("https://buyer-reporting.example.com/"
+                   "?adCost=1.989990234375"))));
+      break;
+    case 53:
+      EXPECT_THAT(result_.report_urls,
+                  testing::ElementsAre(GURL(
+                      "https://buyer-reporting.example.com/?adCost=1.99")));
+      break;
+    default:
+      // Not a supported test case.
+      ASSERT_TRUE(false);
+  }
 }
 
-TEST_F(AuctionRunnerTest, AdCostExponentTruncated) {
+TEST_P(CostRoundingTest, AdCostExponentTruncated) {
   const char kBidScript[] = R"(
     const bid = %d;
     function generateBid(
@@ -11198,6 +11535,7 @@ TEST_F(AuctionRunnerTest, AdCostExponentTruncated) {
                                          kSellerScript);
 
   // Only one bidder, to keep things simple.
+  interest_group_buyers_ = {{kBidder1}};
   RunStandardAuction(/*request_trusted_bidding_signals=*/false);
   EXPECT_FALSE(result_.manually_aborted);
   EXPECT_EQ(kBidder1Key, result_.winning_group_id);
@@ -11208,6 +11546,233 @@ TEST_F(AuctionRunnerTest, AdCostExponentTruncated) {
               testing::ElementsAre(GURL(
                   "https://buyer-reporting.example.com/?adCost=Infinity")));
 }
+
+INSTANTIATE_TEST_SUITE_P(
+    /* no label */,
+    CostRoundingTest,
+    testing::Values(8, 16, 53));
+
+TEST_P(BidRoundingTest, BidRounded) {
+  const char kBidScript[] = R"(
+    function generateBid(
+        interestGroup, auctionSignals, perBuyerSignals, trustedBiddingSignals,
+        browserSignals) {
+      // Return a bid that requires more bits of precision than allowed.
+      return {bid: %f,
+              render: interestGroup.ads[0].renderUrl};
+    }
+
+    function reportWin(
+        auctionSignals, perBuyerSignals, sellerSignals, browserSignals) {
+      sendReportTo("https://buyer-reporting.example.com/?bid=" +
+                   browserSignals.bid);
+    }
+  )";
+
+  const std::string kSellerScript = R"(
+    function scoreAd(adMetadata, bid, auctionConfig, browserSignals) {
+      return bid;
+    }
+
+    function reportResult(auctionConfig, browserSignals) {
+    }
+  )";
+
+  auction_worklet::AddJavascriptResponse(&url_loader_factory_, kBidder1Url,
+                                         base::StringPrintf(kBidScript, 1.99));
+  auction_worklet::AddJavascriptResponse(&url_loader_factory_, kSellerUrl,
+                                         kSellerScript);
+
+  // Only one bidder, to keep things simple.
+  interest_group_buyers_ = {{kBidder1}};
+  RunStandardAuction(/*request_trusted_bidding_signals=*/false);
+  EXPECT_FALSE(result_.manually_aborted);
+  EXPECT_EQ(kBidder1Key, result_.winning_group_id);
+  EXPECT_EQ(GURL("https://ad1.com/"), result_.ad_descriptor->url);
+
+  switch (GetParam()) {
+    case 8:
+      EXPECT_THAT(
+          result_.report_urls,
+          testing::ElementsAre(testing::AnyOf(
+              GURL("https://buyer-reporting.example.com/?bid=1.9921875"),
+              GURL("https://buyer-reporting.example.com/?bid=1.984375"))));
+      break;
+    case 16:
+      EXPECT_THAT(
+          result_.report_urls,
+          testing::ElementsAre(testing::AnyOf(
+              GURL("https://buyer-reporting.example.com/?bid=1.990005493164"),
+              GURL(
+                  "https://buyer-reporting.example.com/?bid=1.989990234375"))));
+      break;
+    case 53:
+      EXPECT_THAT(result_.report_urls,
+                  testing::ElementsAre(
+                      GURL("https://buyer-reporting.example.com/?bid=1.99")));
+      break;
+    default:
+      // Not a supported test case.
+      ASSERT_TRUE(false);
+  }
+}
+
+TEST_P(BidRoundingTest, HighestScoringOtherBidRounded) {
+  const char kBidScript[] = R"(
+    function generateBid(
+        interestGroup, auctionSignals, perBuyerSignals, trustedBiddingSignals,
+        browserSignals) {
+      // Return a bid that requires more bits of precision than allowed.
+      return {bid: %f,
+              render: interestGroup.ads[0].renderUrl};
+    }
+
+    function reportWin(
+        auctionSignals, perBuyerSignals, sellerSignals, browserSignals) {
+      sendReportTo("https://buyer-reporting.example.com/?"
+        + "highestScoringOtherBid=" + browserSignals.highestScoringOtherBid);
+    }
+  )";
+
+  const std::string kSellerScript = R"(
+    function scoreAd(adMetadata, bid, auctionConfig, browserSignals) {
+      return bid;
+    }
+
+    function reportResult(auctionConfig, browserSignals) {
+      sendReportTo("https://seller-reporting.example.com/?"
+        + "highestScoringOtherBid="
+        + browserSignals.highestScoringOtherBid);
+    }
+  )";
+  auction_worklet::AddJavascriptResponse(&url_loader_factory_, kBidder2Url,
+                                         base::StringPrintf(kBidScript, 3.0));
+
+  auction_worklet::AddJavascriptResponse(&url_loader_factory_, kBidder1Url,
+                                         base::StringPrintf(kBidScript, 1.99));
+  auction_worklet::AddJavascriptResponse(&url_loader_factory_, kSellerUrl,
+                                         kSellerScript);
+
+  RunStandardAuction(/*request_trusted_bidding_signals=*/false);
+  EXPECT_FALSE(result_.manually_aborted);
+  EXPECT_EQ(kBidder2Key, result_.winning_group_id);
+  EXPECT_EQ(GURL("https://ad2.com/"), result_.ad_descriptor->url);
+
+  switch (GetParam()) {
+    case 8:
+      EXPECT_THAT(
+          result_.report_urls,
+          testing::ElementsAre(
+              testing::AnyOf(GURL("https://seller-reporting.example.com/"
+                                  "?highestScoringOtherBid=1.9921875"),
+                             GURL("https://seller-reporting.example.com/"
+                                  "?highestScoringOtherBid=1.984375")),
+              testing::AnyOf(GURL("https://buyer-reporting.example.com/"
+                                  "?highestScoringOtherBid=1.9921875"),
+                             GURL("https://buyer-reporting.example.com/"
+                                  "?highestScoringOtherBid=1.984375"))));
+      break;
+    case 16:
+      EXPECT_THAT(
+          result_.report_urls,
+          testing::ElementsAre(
+              testing::AnyOf(GURL("https://seller-reporting.example.com/"
+                                  "?highestScoringOtherBid=1.990005493164"),
+                             GURL("https://seller-reporting.example.com/"
+                                  "?highestScoringOtherBid=1.989990234375")),
+              testing::AnyOf(GURL("https://buyer-reporting.example.com/"
+                                  "?highestScoringOtherBid=1.990005493164"),
+                             GURL("https://buyer-reporting.example.com/"
+                                  "?highestScoringOtherBid=1.989990234375"))));
+      break;
+    case 53:
+      EXPECT_THAT(
+          result_.report_urls,
+          testing::ElementsAre(GURL("https://seller-reporting.example.com/"
+                                    "?highestScoringOtherBid=1.99"),
+                               GURL("https://buyer-reporting.example.com/"
+                                    "?highestScoringOtherBid=1.99")));
+      break;
+    default:
+      // Not a supported test case.
+      ASSERT_TRUE(false);
+  }
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    /* no label */,
+    BidRoundingTest,
+    ::testing::Values(8, 16, 53));
+
+TEST_P(ScoreRoundingTest, ScoreRounded) {
+  const char kBidScript[] = R"(
+    function generateBid(
+        interestGroup, auctionSignals, perBuyerSignals, trustedBiddingSignals,
+        browserSignals) {
+      // Return an score that requires more bits of precision than allowed.
+      return {bid: %f,
+              render: interestGroup.ads[0].renderUrl};
+    }
+
+    function reportWin(
+        auctionSignals, perBuyerSignals, sellerSignals, browserSignals) {
+    }
+  )";
+
+  const std::string kSellerScript = R"(
+    function scoreAd(adMetadata, bid, auctionConfig, browserSignals) {
+      return 1.99;
+    }
+
+    function reportResult(auctionConfig, browserSignals) {
+      sendReportTo("https://seller-reporting.example.com/?score=" + browserSignals.desirability);
+    }
+  )";
+
+  auction_worklet::AddJavascriptResponse(&url_loader_factory_, kBidder1Url,
+                                         base::StringPrintf(kBidScript, 1.99));
+  auction_worklet::AddJavascriptResponse(&url_loader_factory_, kSellerUrl,
+                                         kSellerScript);
+
+  // Only one bidder, to keep things simple.
+  interest_group_buyers_ = {{kBidder1}};
+  RunStandardAuction(/*request_trusted_bidding_signals=*/false);
+  EXPECT_FALSE(result_.manually_aborted);
+  EXPECT_EQ(kBidder1Key, result_.winning_group_id);
+  EXPECT_EQ(GURL("https://ad1.com/"), result_.ad_descriptor->url);
+
+  switch (GetParam()) {
+    case 8:
+      EXPECT_THAT(
+          result_.report_urls,
+          testing::ElementsAre(testing::AnyOf(
+              GURL("https://seller-reporting.example.com/?score=1.9921875"),
+              GURL("https://seller-reporting.example.com/?score=1.984375"))));
+      break;
+    case 16:
+      EXPECT_THAT(
+          result_.report_urls,
+          testing::ElementsAre(testing::AnyOf(
+              GURL(
+                  "https://seller-reporting.example.com/?score=1.990005493164"),
+              GURL("https://seller-reporting.example.com/"
+                   "?score=1.989990234375"))));
+      break;
+    case 53:
+      EXPECT_THAT(result_.report_urls,
+                  testing::ElementsAre(GURL(
+                      "https://seller-reporting.example.com/?score=1.99")));
+      break;
+    default:
+      // Not a supported test case.
+      ASSERT_TRUE(false);
+  }
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    /* no label */,
+    ScoreRoundingTest,
+    ::testing::Values(8, 16, 53));
 
 // Enable and test forDebuggingOnly.reportAdAuctionLoss() and
 // forDebuggingOnly.reportAdAuctionWin() APIs.
@@ -13610,7 +14175,7 @@ TEST_P(AuctionRunnerKAnonTest, MojoValidation) {
   const struct TestCase {
     std::set<auction_worklet::mojom::KAnonymityBidMode> run_in_modes;
     const char* expected_error_message;
-    GURL render_url;
+    blink::AdDescriptor ad_descriptor;
     auction_worklet::mojom::BidderWorkletKAnonEnforcedBidPtr mojo_bid;
     bool expect_winner;
   } kTestCases[] = {
@@ -13619,7 +14184,7 @@ TEST_P(AuctionRunnerKAnonTest, MojoValidation) {
       {{auction_worklet::mojom::KAnonymityBidMode::kEnforce,
         auction_worklet::mojom::KAnonymityBidMode::kSimulate},
        "Received different k-anon bid when unenforced bid already k-anon",
-       GURL("https://ad1.com"),
+       blink::AdDescriptor(GURL("https://ad1.com")),
        auction_worklet::mojom::BidderWorkletKAnonEnforcedBid::NewBid(
            auction_worklet::mojom::BidderWorkletBid::New(
                "ad", 5.0, /*ad_cost=*/absl::nullopt,
@@ -13629,8 +14194,8 @@ TEST_P(AuctionRunnerKAnonTest, MojoValidation) {
       // A non-k-anon bid as k-anon one. Enforced, so auction fails.
       {
           {auction_worklet::mojom::KAnonymityBidMode::kEnforce},
-          "Bid render URL must be a valid ad URL",
-          GURL("https://ad2.com"),
+          "Bid render ad must have a valid URL and size (if specified)",
+          blink::AdDescriptor(GURL("https://ad2.com")),
           auction_worklet::mojom::BidderWorkletKAnonEnforcedBid::NewBid(
               auction_worklet::mojom::BidderWorkletBid::New(
                   "ad", 5.0, /*ad_cost=*/absl::nullopt,
@@ -13641,8 +14206,8 @@ TEST_P(AuctionRunnerKAnonTest, MojoValidation) {
       // A non-k-anon bid as k-anon one. Simulate, so auction succeeds.
       {
           {auction_worklet::mojom::KAnonymityBidMode::kSimulate},
-          "Bid render URL must be a valid ad URL",
-          GURL("https://ad2.com"),
+          "Bid render ad must have a valid URL and size (if specified)",
+          blink::AdDescriptor(GURL("https://ad2.com")),
           auction_worklet::mojom::BidderWorkletKAnonEnforcedBid::NewBid(
               auction_worklet::mojom::BidderWorkletBid::New(
                   "ad", 5.0, /*ad_cost=*/absl::nullopt,
@@ -13654,7 +14219,7 @@ TEST_P(AuctionRunnerKAnonTest, MojoValidation) {
       {
           {auction_worklet::mojom::KAnonymityBidMode::kNone},
           "Received k-anon bid data when not considering k-anon",
-          GURL("https://ad1.com"),
+          blink::AdDescriptor(GURL("https://ad1.com")),
           auction_worklet::mojom::BidderWorkletKAnonEnforcedBid::
               NewSameAsNonEnforced(nullptr),
           /*expect_winner=*/true,
@@ -13684,9 +14249,8 @@ TEST_P(AuctionRunnerKAnonTest, MojoValidation) {
     ASSERT_TRUE(seller_worklet);
     auto bidder1_worklet =
         mock_auction_process_manager_->TakeBidderWorklet(kBidder1Url);
-    bidder1_worklet->InvokeGenerateBidCallback(
-        1.0, blink::AdDescriptor(test_case.render_url),
-        test_case.mojo_bid.Clone());
+    bidder1_worklet->InvokeGenerateBidCallback(1.0, test_case.ad_descriptor,
+                                               test_case.mojo_bid.Clone());
 
     // All of these tests only get one scoreAd, since k-anon bid is invalid.
     auto score_ad_params = seller_worklet->WaitForScoreAd();

@@ -116,16 +116,6 @@ void GlanceablesController::DestroyUi() {
   delegate_->OnGlanceablesClosed();
 }
 
-void GlanceablesController::RestoreSession() {
-  delegate_->RestoreSession();
-  // Ensure glanceables are closed, even if the session had no windows.
-  DestroyUi();
-}
-
-bool GlanceablesController::ShouldTakeSignoutScreenshot() const {
-  return delegate_->ShouldTakeSignoutScreenshot();
-}
-
 void GlanceablesController::OnWindowActivated(
     wm::ActivationChangeObserver::ActivationReason reason,
     aura::Window* gained_focus,

@@ -362,6 +362,30 @@ TEST_F(WindowFloatTest, FloatOnOtherDisplay) {
       gfx::Rect(1200, 0, 1200, 800).Contains(window->GetBoundsInScreen()));
 }
 
+TEST_F(WindowFloatTest, FloatWindowBoundsWithZoomDisplay) {
+  UpdateDisplay("1600x1000");
+
+  // Create a floated window and position it on the top-right edge of the
+  // display.
+  std::unique_ptr<aura::Window> window =
+      CreateAppWindow(gfx::Rect(1200, 0, 400, 300));
+  PressAndReleaseKey(ui::VKEY_F, ui::EF_ALT_DOWN | ui::EF_COMMAND_DOWN);
+
+  // Use the accelerator to zoom the display up (ctrl + shift + "+") a couple
+  // times. The floated window bounds should still be within the work area
+  // bounds.
+  PressAndReleaseKey(ui::VKEY_OEM_PLUS,
+                     ui::EF_SHIFT_DOWN | ui::EF_CONTROL_DOWN);
+  PressAndReleaseKey(ui::VKEY_OEM_PLUS,
+                     ui::EF_SHIFT_DOWN | ui::EF_CONTROL_DOWN);
+  PressAndReleaseKey(ui::VKEY_OEM_PLUS,
+                     ui::EF_SHIFT_DOWN | ui::EF_CONTROL_DOWN);
+
+  EXPECT_TRUE(WorkAreaInsets::ForWindow(window.get())
+                  ->user_work_area_bounds()
+                  .Contains(window->GetBoundsInScreen()));
+}
+
 // Test float window per desk logic.
 TEST_F(WindowFloatTest, OneFloatWindowPerDeskLogic) {
   // Test one float window per desk is allowed.
@@ -1349,6 +1373,33 @@ TEST_F(TabletWindowFloatTest, UntuckWindowOnActivation) {
   EXPECT_TRUE(WindowState::Get(window.get())->IsFloated());
 }
 
+// Tests that when we switch desks, a tucked window gets untucked.
+TEST_F(TabletWindowFloatTest, UntuckWindowOnDeskChange) {
+  Shell::Get()->tablet_mode_controller()->SetEnabledForTest(true);
+
+  auto* desks_controller = DesksController::Get();
+  NewDesk();
+  ASSERT_EQ(2u, desks_controller->desks().size());
+  ActivateDesk(desks_controller->desks()[1].get());
+
+  // Create a floated window on the second desk and fling it.
+  std::unique_ptr<aura::Window> window = CreateFloatedWindow();
+  const gfx::Rect pre_tucked_bounds = window->bounds();
+  FlingWindow(window.get(), /*left=*/false, /*up=*/false);
+  ASSERT_TRUE(desks_util::BelongsToActiveDesk(window.get()));
+  ASSERT_TRUE(WindowState::Get(window.get())->IsFloated());
+  ASSERT_TRUE(Shell::Get()->float_controller()->IsFloatedWindowTuckedForTablet(
+      window.get()));
+
+  // Activate desk 1. The window is still floated but is hidden and not tucked.
+  ActivateDesk(desks_controller->desks()[0].get());
+  EXPECT_TRUE(WindowState::Get(window.get())->IsFloated());
+  EXPECT_FALSE(window->IsVisible());
+  EXPECT_EQ(pre_tucked_bounds, window->bounds());
+  EXPECT_FALSE(Shell::Get()->float_controller()->IsFloatedWindowTuckedForTablet(
+      window.get()));
+}
+
 // Tests that the tucked window is invisible while it is fully tucked.
 TEST_F(TabletWindowFloatTest, TuckedWindowVisibility) {
   Shell::Get()->tablet_mode_controller()->SetEnabledForTest(true);
@@ -1587,6 +1638,27 @@ TEST_F(TabletWindowFloatTest, TapOnEdgeDoesNotUntuck) {
   // Tests that we are still tucked after tapping that point.
   GetEventGenerator()->GestureTapAt(point);
   EXPECT_TRUE(float_controller->IsFloatedWindowTuckedForTablet(window.get()));
+}
+
+// Tests that the tuck handle tap target is larger than its bounds.
+TEST_F(TabletWindowFloatTest, TuckHandleTapTarget) {
+  Shell::Get()->tablet_mode_controller()->SetEnabledForTest(true);
+
+  std::unique_ptr<aura::Window> window = CreateFloatedWindow();
+  auto* float_controller = Shell::Get()->float_controller();
+
+  // Tuck the window in the bottom right.
+  FlingWindow(window.get(), /*left=*/false, /*up=*/false);
+  ASSERT_TRUE(float_controller->IsFloatedWindowTuckedForTablet(window.get()));
+
+  // Tap somewhere slightly outside the tuck handle widget. Verify that the
+  // tucked window is untucked.
+  const gfx::Rect tuck_handle_bounds =
+      float_controller->GetTuckHandleWidget(window.get())
+          ->GetWindowBoundsInScreen();
+  GetEventGenerator()->GestureTapAt(tuck_handle_bounds.origin() -
+                                    gfx::Vector2d(5, 5));
+  EXPECT_FALSE(float_controller->IsFloatedWindowTuckedForTablet(window.get()));
 }
 
 // Tests that the tuck handle is offscreen in overview mode.

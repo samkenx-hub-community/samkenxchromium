@@ -20,6 +20,8 @@ namespace features {
 
 BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kAnonymousIframeOriginTrial);
 BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kAttributionReportingCrossAppWeb);
+BLINK_COMMON_EXPORT
+BASE_DECLARE_FEATURE(kAutofillDetectRemovedFormControls);
 BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kAutomaticLazyFrameLoadingToAds);
 BLINK_COMMON_EXPORT extern const base::FeatureParam<int>
     kTimeoutMillisForLazyAds;
@@ -73,6 +75,24 @@ BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kFencedFrames);
 BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kFullUserAgent);
 BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kPath2DPaintCache);
 BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kPrivacySandboxAdsAPIs);
+
+BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kPrivateAggregationApi);
+BLINK_COMMON_EXPORT extern const base::FeatureParam<bool>
+    kPrivateAggregationApiEnabledInSharedStorage;
+BLINK_COMMON_EXPORT extern const base::FeatureParam<bool>
+    kPrivateAggregationApiEnabledInFledge;
+BLINK_COMMON_EXPORT extern const base::FeatureParam<bool>
+    kPrivateAggregationApiFledgeExtensionsEnabled;
+
+enum class SharedStorageWorkletImplementationType {
+  // The worklet thread is created via base::SequenceBound, and JS bindings are
+  // added with native v8 and/or Gin library.
+  kLegacy,
+
+  // Use the blink worklet pattern (i.e. blink::ThreadedWorkletMessagingProxy,
+  // blink::WorkerThread, IDL, etc.) to create the thread and add JS bindings.
+  kBlinkStyle,
+};
 
 BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kSharedStorageAPI);
 // Maximum number of URLs allowed to be included in the input parameter for
@@ -128,6 +148,10 @@ BLINK_COMMON_EXPORT extern const base::FeatureParam<base::TimeDelta>
 // main frame has fenced frame depth 1, etc).
 BLINK_COMMON_EXPORT extern const base::FeatureParam<int>
     kSharedStorageMaxAllowedFencedFrameDepthForSelectURL;
+// The implementation type of the worklet.
+BLINK_COMMON_EXPORT extern const base::FeatureParam<
+    SharedStorageWorkletImplementationType>
+    kSharedStorageWorkletImplementationType;
 
 // If enabled, limits the number of times per origin per pageload that
 // `sharedStorage.selectURL()` is allowed to be invoked.
@@ -271,8 +295,6 @@ BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kCanvasCompressHibernatedImage);
 BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kCanvasFreeMemoryWhenHidden);
 
 BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kCreateImageBitmapOrientationNone);
-
-BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kDiscardCodeCacheAfterFirstUse);
 
 BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kCacheCodeOnIdle);
 BLINK_COMMON_EXPORT extern const base::FeatureParam<int>
@@ -522,7 +544,6 @@ BLINK_COMMON_EXPORT bool IsSetTimeoutWithoutClampEnabled();
 BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kMaxUnthrottledTimeoutNestingLevel);
 BLINK_COMMON_EXPORT extern const base::FeatureParam<int>
     kMaxUnthrottledTimeoutNestingLevelParam;
-BLINK_COMMON_EXPORT void ClearUnthrottledNestedTimeoutOverrideCacheForTesting();
 BLINK_COMMON_EXPORT bool IsMaxUnthrottledTimeoutNestingLevelEnabled();
 BLINK_COMMON_EXPORT int GetMaxUnthrottledTimeoutNestingLevel();
 
@@ -768,6 +789,11 @@ BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(
 // If enabled, the HTMLDocumentParser will use a budget based on elapsed time
 // rather than token count.
 BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kTimedHTMLParserBudget);
+
+// If enabled, the HTMLDocumentParser will only check its budget after parsing a
+// commonly slow token or for one out of 10 fast tokens. Note that this feature
+// is a no-op if kTimedHTMLParserBudget is disabled.
+BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kCheckHTMLParserBudgetLessOften);
 
 // Allows reading/writing unsanitized content from/to the clipboard. Currently,
 // it is only applicable to HTML format. See crbug.com/1268679.
@@ -1030,6 +1056,30 @@ BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(
 // process.
 BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(
     kRuntimeFeatureStateControllerApplyFeatureDiff);
+
+// Disallow setting URL ports with a value that will overflow.
+// See https://crbug.com/1416017
+BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kURLSetPortCheckOverflow);
+
+// Keep strong references in the blink memory cache to maximize resource reuse.
+// See https://crbug.com/1409349.
+BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kMemoryCacheStrongReference);
+
+// Save only one unloaded page's resources in the memory cache.
+// See https://crbug.com/1409349.
+BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(
+    kMemoryCacheStrongReferenceSingleUnload);
+
+// Save strong references only for fonts, stylesheets and scripts
+// See https://crbug.com/1409349.
+BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(
+    kMemoryCacheStrongReferenceFilterImages);
+
+// If enabled, renderers look for cached resources from another renderer
+// that has the same process isolation policies. Note that renderers don't
+// use cached resources in other rendereres yet, just record histograms.
+// See https://crbug.com/1414262
+BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kRemoteResourceCache);
 
 }  // namespace features
 }  // namespace blink

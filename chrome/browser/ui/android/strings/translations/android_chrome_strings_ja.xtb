@@ -283,6 +283,7 @@
 <translation id="2581165646603367611">Chrome で重要度が低いと判断されるサイトの Cookie やキャッシュなどのデータを削除します。</translation>
 <translation id="2587052924345400782">新しいバージョンをご利用いただけます</translation>
 <translation id="2593272815202181319">等幅</translation>
+<translation id="2603212228005142861">設定を管理するにはログインしてください</translation>
 <translation id="2604446170045642109">このサイトのダークモードを設定でオフにできます。</translation>
 <translation id="2612676031748830579">カード番号</translation>
 <translation id="2625189173221582860">パスワードがコピーされました</translation>
@@ -630,6 +631,7 @@
 
 他の Google サービスでの検索や操作など、Google アカウントの他の形式の閲覧履歴が <ph name="BEGIN_LINK" />myactivity.google.com<ph name="END_LINK" /> に残ることがあります。</translation>
 <translation id="452750746583162491">同期したデータを確認する</translation>
+<translation id="4528638190900283934">ログインすると追加の機能を使用できます</translation>
 <translation id="4532845899244822526">フォルダの選択</translation>
 <translation id="4547551584605870320">{TAB_COUNT,plural, =1{<ph name="TAB_COUNT_ONE" /> 個のタブ}other{<ph name="TAB_COUNT_MANY" /> 個のタブ、<ph name="TAB_COUNT_INCOGNITO" /> 個のシークレット タブ}}</translation>
 <translation id="4554077758708533499">USB ケーブルで接続しました</translation>
@@ -1074,6 +1076,7 @@
 <translation id="6824899148643461612"><ph name="TAB_TITLE" />、タブ、選択中</translation>
 <translation id="6828070228333235514">価格のトラッキングを停止する</translation>
 <translation id="6830728435402077660">保護されていません</translation>
+<translation id="6831043979455480757">翻訳</translation>
 <translation id="6833996806551876956">プライバシー サンドボックス（試用版）</translation>
 <translation id="6836206421467243968">「<ph name="TITLE_OF_GROUP" />」タブグループを新しいバックグラウンドのタブグループとして復元します。</translation>
 <translation id="6846298663435243399">読み込んでいます…</translation>
@@ -1241,10 +1244,10 @@
 <translation id="7707922173985738739">モバイルデータを使用します</translation>
 <translation id="7709094866268987903">削除した興味 / 関心がここに表示されます</translation>
 <translation id="7709918231054955894">使用したすべてのタブを表示</translation>
+<translation id="772434085369393266">移動先を HTTPS にアップグレードし、HTTPS をサポートしていないサイトは読み込む前に警告を表示します。高度な保護機能が有効になっているため、この設定は変更できません。</translation>
 <translation id="7725024127233776428">ブックマークしたページがここに表示されます</translation>
 <translation id="7757787379047923882"><ph name="DEVICE_NAME" /> からテキストが共有されました</translation>
 <translation id="7762668264895820836">SD カード <ph name="SD_CARD_NUMBER" /></translation>
-<translation id="7762928140712606393">追加の機能と Chrome の最高水準のセキュリティを利用するにはログインしてください</translation>
 <translation id="7764225426217299476">住所を追加</translation>
 <translation id="7772032839648071052">パスフレーズの確認</translation>
 <translation id="7772375229873196092"><ph name="APP_NAME" /> を閉じる</translation>

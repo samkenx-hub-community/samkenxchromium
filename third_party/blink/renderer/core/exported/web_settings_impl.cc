@@ -138,6 +138,17 @@ void WebSettingsImpl::SetAutoplayPolicy(mojom::blink::AutoplayPolicy policy) {
       static_cast<blink::AutoplayPolicy::Type>(policy));
 }
 
+void WebSettingsImpl::SetRequireTransientActivationForGetDisplayMedia(
+    bool required) {
+  settings_->SetRequireTransientActivationForGetDisplayMedia(required);
+}
+
+void WebSettingsImpl::SetRequireTransientActivationForShowFileOrDirectoryPicker(
+    bool required) {
+  settings_->SetRequireTransientActivationForShowFileOrDirectoryPicker(
+      required);
+}
+
 void WebSettingsImpl::SetAutoZoomFocusedEditableToLegibleScale(
     bool auto_zoom_focused_editable_to_legible_scale) {
   auto_zoom_focused_editable_to_legible_scale_ =
@@ -486,8 +497,8 @@ void WebSettingsImpl::SetAntialiasedClips2dCanvasEnabled(bool enabled) {
   settings_->SetAntialiasedClips2dCanvasEnabled(enabled);
 }
 
-void WebSettingsImpl::SetPreferCompositingToLCDTextEnabled(bool enabled) {
-  dev_tools_emulator_->SetPreferCompositingToLCDTextEnabled(enabled);
+void WebSettingsImpl::SetLCDTextPreference(LCDTextPreference preference) {
+  dev_tools_emulator_->SetLCDTextPreference(preference);
 }
 
 void WebSettingsImpl::SetHideDownloadUI(bool hide) {

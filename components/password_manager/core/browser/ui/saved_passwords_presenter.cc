@@ -82,14 +82,6 @@ password_manager::PasswordForm GenerateFormFromCredential(
   return form;
 }
 
-// Check if notes was modified for a specified |form| with |new_note|.
-IsPasswordNoteChanged IsNoteChanged(const password_manager::PasswordForm& form,
-                                    const std::u16string& new_note) {
-  return IsPasswordNoteChanged(
-      form.GetNoteWithEmptyUniqueDisplayName().value_or(std::u16string()) !=
-      new_note);
-}
-
 }  // namespace
 
 namespace password_manager {
@@ -256,12 +248,29 @@ void SavedPasswordsPresenter::AddCredentials(
                             return GenerateFormFromCredential(credential, type);
                           });
 
-  for (const PasswordForm& form : password_forms) {
-    CHECK(form.in_store == password_forms[0].in_store);
-  }
+  CHECK(base::ranges::all_of(password_forms, [&](const PasswordForm& form) {
+    return password_forms[0].in_store == form.in_store;
+  }));
 
   GetStoreFor(password_forms[0])
       .AddLogins(password_forms, std::move(completion));
+}
+
+void SavedPasswordsPresenter::UpdatePasswordForms(
+    const std::vector<PasswordForm>& password_forms,
+    base::OnceClosure completion) {
+  if (password_forms.empty()) {
+    base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
+        FROM_HERE, std::move(completion));
+    return;
+  }
+
+  CHECK(base::ranges::all_of(password_forms, [&](const PasswordForm& form) {
+    return password_forms[0].in_store == form.in_store;
+  }));
+
+  GetStoreFor(password_forms[0])
+      .UpdateLogins(password_forms, std::move(completion));
 }
 
 SavedPasswordsPresenter::EditResult
@@ -277,9 +286,9 @@ SavedPasswordsPresenter::EditSavedCredentials(
                                      original_credential.username);
   IsPasswordChanged password_changed(updated_credential.password !=
                                      original_credential.password);
-  IsPasswordNoteChanged note_changed =
-      IsNoteChanged(forms_to_change[0], updated_credential.note);
-
+  IsPasswordNoteChanged note_changed(
+      forms_to_change[0].GetNoteWithEmptyUniqueDisplayName() !=
+      updated_credential.note);
   bool issues_changed =
       updated_credential.password_issues != forms_to_change[0].password_issues;
 

@@ -343,6 +343,21 @@ void ProfileAttributesStorage::RegisterPrefs(PrefRegistrySimple* registry) {
 #endif  // !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_CHROMEOS_ASH)
 }
 
+// static
+base::flat_set<std::string> ProfileAttributesStorage::GetAllProfilesKeys(
+    PrefService* local_prefs) {
+  base::flat_set<std::string> profile_keys;
+
+  const base::Value::Dict& attribute_storage =
+      local_prefs->GetDict(prefs::kProfileAttributes);
+  for (std::pair<const std::string&, const base::Value&> attribute_entry :
+       attribute_storage) {
+    profile_keys.insert(attribute_entry.first);
+  }
+
+  return profile_keys;
+}
+
 void ProfileAttributesStorage::AddProfile(ProfileAttributesInitParams params) {
   std::string key = StorageKeyFromProfilePath(params.profile_path);
   ScopedDictPrefUpdate update(prefs_, prefs::kProfileAttributes);
@@ -756,6 +771,20 @@ void ProfileAttributesStorage::NotifyProfileUserManagementAcceptanceChanged(
     const base::FilePath& profile_path) const {
   for (auto& observer : observer_list_)
     observer.OnProfileUserManagementAcceptanceChanged(profile_path);
+}
+
+void ProfileAttributesStorage::NotifyProfileManagementEnrollmentTokenChanged(
+    const base::FilePath& profile_path) const {
+  for (auto& observer : observer_list_) {
+    observer.OnProfileManagementEnrollmentTokenChanged(profile_path);
+  }
+}
+
+void ProfileAttributesStorage::NotifyProfileManagementIdChanged(
+    const base::FilePath& profile_path) const {
+  for (auto& observer : observer_list_) {
+    observer.OnProfileManagementIdChanged(profile_path);
+  }
 }
 
 std::string ProfileAttributesStorage::StorageKeyFromProfilePath(

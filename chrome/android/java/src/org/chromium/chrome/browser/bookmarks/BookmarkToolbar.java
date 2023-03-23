@@ -10,6 +10,7 @@ import android.util.AttributeSet;
 import android.view.MenuItem;
 import android.view.View.OnClickListener;
 
+import androidx.annotation.Nullable;
 import androidx.appcompat.widget.Toolbar.OnMenuItemClickListener;
 
 import org.chromium.base.Callback;
@@ -35,15 +36,18 @@ import java.util.List;
  */
 public class BookmarkToolbar extends SelectableListToolbar<BookmarkId>
         implements OnMenuItemClickListener, OnClickListener {
-    // TODO(crbug.com/1413463): Remove BookmarkModel reference.
+    // TODO(crbug.com/1425201): Remove BookmarkModel reference.
     private BookmarkModel mBookmarkModel;
     private BookmarkOpener mBookmarkOpener;
     private SelectionDelegate mSelectionDelegate;
 
-    // TODO(crbug.com/1413463): Remove BookmarkId reference.
-    private BookmarkId mCurrentFolderId;
-    private BookmarkItem mCurrentFolder;
+    // The current folder can be null before being set by the mediator.
+    private @Nullable BookmarkItem mCurrentFolder;
     private @BookmarkUiMode int mBookmarkUiMode;
+    private boolean mSoftKeyboardVisible;
+    // Whether the selection ui is currently showing. This isn't captured by an explicit
+    // BookmarkUiMode.
+    private boolean mIsSelectionUiShowing;
 
     private Runnable mOpenSearchUiRunnable;
     private Callback<BookmarkId> mOpenFolderCallback;
@@ -85,6 +89,7 @@ public class BookmarkToolbar extends SelectableListToolbar<BookmarkId>
 
     void setBookmarkUiMode(@BookmarkUiMode int mode) {
         mBookmarkUiMode = mode;
+        mIsSelectionUiShowing = false;
         if (mBookmarkUiMode == BookmarkUiMode.LOADING) {
             showLoadingUi();
         } else {
@@ -92,18 +97,19 @@ public class BookmarkToolbar extends SelectableListToolbar<BookmarkId>
         }
 
         if (mBookmarkUiMode == BookmarkUiMode.SEARCHING) {
-            showSearchView(/*showKeyboard=*/true);
+            showSearchView(mSoftKeyboardVisible);
         } else {
             hideSearchView(/*notify=*/false);
         }
 
         if (mBookmarkUiMode == BookmarkUiMode.FOLDER && mCurrentFolder != null) {
             // It's possible that the folder was renamed, so refresh the folder UI just in case.
-            setCurrentFolder(mCurrentFolder.getId());
+            setCurrentFolder(mCurrentFolder);
         }
     }
 
     void setSoftKeyboardVisible(boolean visible) {
+        mSoftKeyboardVisible = visible;
         if (!visible) hideKeyboard();
     }
 
@@ -121,23 +127,28 @@ public class BookmarkToolbar extends SelectableListToolbar<BookmarkId>
         setOnMenuItemClickListener(dragEnabled ? null : this);
     }
 
-    /** Set the current folder */
+    /** Sets the current folder as a BookmarkId. */
     // TODO(crbug.com/1413463): The individual title/nav state should be set manually instead of
     // being derived from the BookmarkId.
     void setCurrentFolder(BookmarkId folder) {
-        mCurrentFolder = mBookmarkModel.getBookmarkById(folder);
+        setCurrentFolder(mBookmarkModel.getBookmarkById(folder));
+    }
+
+    /** Sets the current folder as a BookmarkItem. */
+    void setCurrentFolder(BookmarkItem folder) {
+        mCurrentFolder = folder;
 
         getMenu().findItem(R.id.search_menu_id).setVisible(true);
         getMenu().findItem(R.id.edit_menu_id).setVisible(mCurrentFolder.isEditable());
 
         // If this is the root folder, we can't go up anymore.
-        if (folder.equals(mBookmarkModel.getRootFolderId())) {
+        if (folder.getId().equals(mBookmarkModel.getRootFolderId())) {
             setTitle(R.string.bookmarks);
             setNavigationButton(NAVIGATION_BUTTON_NONE);
             return;
         }
 
-        if (folder.equals(BookmarkId.SHOPPING_FOLDER)) {
+        if (folder.getId().equals(BookmarkId.SHOPPING_FOLDER)) {
             setTitle(R.string.price_tracking_bookmarks_filter_title);
         } else if (mBookmarkModel.getTopLevelFolderParentIDs().contains(
                            mCurrentFolder.getParentId())
@@ -259,8 +270,12 @@ public class BookmarkToolbar extends SelectableListToolbar<BookmarkId>
     protected void showNormalView() {
         super.showNormalView();
 
-        getMenu().findItem(R.id.search_menu_id).setVisible(false);
-        getMenu().findItem(R.id.edit_menu_id).setVisible(false);
+        if (mCurrentFolder == null) {
+            getMenu().findItem(R.id.search_menu_id).setVisible(false);
+            getMenu().findItem(R.id.edit_menu_id).setVisible(false);
+        } else {
+            setCurrentFolder(mCurrentFolder);
+        }
     }
 
     @Override
@@ -272,6 +287,7 @@ public class BookmarkToolbar extends SelectableListToolbar<BookmarkId>
         if (mBookmarkModel == null) return;
 
         if (mIsSelectionEnabled) {
+            mIsSelectionUiShowing = true;
             // Editing a bookmark action on multiple selected items doesn't make sense. So disable.
             getMenu()
                     .findItem(R.id.selection_mode_edit_menu_id)
@@ -339,6 +355,10 @@ public class BookmarkToolbar extends SelectableListToolbar<BookmarkId>
             getMenu()
                     .findItem(R.id.reading_list_mark_as_unread_id)
                     .setVisible(onlyReadingListSelected && numRead == selectedBookmarks.size());
+        } else if (mIsSelectionUiShowing) {
+            // When selection isn't enabled (e.g. we just de-selected the last item) but the
+            // selection UI is still showing we want to revert to the previous known mode.
+            setBookmarkUiMode(mBookmarkUiMode);
         }
     }
 }

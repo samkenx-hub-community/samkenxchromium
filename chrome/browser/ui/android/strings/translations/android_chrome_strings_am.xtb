@@ -283,6 +283,7 @@
 <translation id="2581165646603367611">ይሄ Chrome አስፈላጊ ናቸው ብሎ የማያስባቸውን ኩኪዎች፣ መሸጎጫ እና ሌሎች ጣቢያዎች ያጸዳል።</translation>
 <translation id="2587052924345400782">አዲስ ስሪት ይገኛል</translation>
 <translation id="2593272815202181319">ሞኖስፔስ</translation>
+<translation id="2603212228005142861">ምርጫዎችዎን ለማስተዳደር በመለያ ይግቡ</translation>
 <translation id="2604446170045642109">ለጣቢያዎች ጠቆር ያለ ገጽታን በቅንብሮችዎ ውስጥ ማጥፋት ይችላሉ።</translation>
 <translation id="2612676031748830579">የካርድ ቁጥር</translation>
 <translation id="2625189173221582860">የይለፍ ቃል ተቀድቷል።</translation>
@@ -630,6 +631,7 @@
 
 የእርስዎ Google መለያ በ<ph name="BEGIN_LINK" />myactivity.google.com<ph name="END_LINK" /> ላይ እንደ ፍለጋዎች እና የሌሎች Google አገልግሎቶች እንቅስቃሴ ያሉ ሌሎች የአሰሳ ታሪክ ዓይነቶች ሊኖሩት ይችላል።</translation>
 <translation id="452750746583162491">የሰመረ ውሂብዎን ይገምግሙ</translation>
+<translation id="4528638190900283934">ለተጨማሪ ባህሪያት ይመዝገቡ</translation>
 <translation id="4532845899244822526">አቃፊ ይምረጡ</translation>
 <translation id="4547551584605870320">{TAB_COUNT,plural, =1{<ph name="TAB_COUNT_ONE" /> ትር}one{<ph name="TAB_COUNT_MANY" /> ትሮች፣ <ph name="TAB_COUNT_INCOGNITO" /> ማንነት የማያሳውቅ}other{<ph name="TAB_COUNT_MANY" /> ትሮች፣ <ph name="TAB_COUNT_INCOGNITO" /> ማንነት የማያሳውቅ}}</translation>
 <translation id="4554077758708533499">በዩኤስቢ ገመድ ተገናኝቷል</translation>
@@ -1074,6 +1076,7 @@
 <translation id="6824899148643461612"><ph name="TAB_TITLE" />፣ ትር ተመርጧል</translation>
 <translation id="6828070228333235514">ዋጋ ተከታተልን ያቁሙ</translation>
 <translation id="6830728435402077660">ደህንነቱ አልተጠበቀም</translation>
+<translation id="6831043979455480757">መተርጎም</translation>
 <translation id="6833996806551876956">የግላዊነት Sandbox ሙከራ</translation>
 <translation id="6836206421467243968">የትር ቡድን <ph name="TITLE_OF_GROUP" />ን እንደ አዲስ የዳራ ትር ቡድን ወደነበረበት መልስ።</translation>
 <translation id="6846298663435243399">በመጫን ላይ…</translation>
@@ -1241,10 +1244,10 @@
 <translation id="7707922173985738739">የተንቀሳቃሽ ስልክ ውሂብ</translation>
 <translation id="7709094866268987903">ያስወገዷቸው ፍላጎቶች እዚህ ይታያሉ</translation>
 <translation id="7709918231054955894">ሁሉንም የእርስዎን ትሮች ያግኙ</translation>
+<translation id="772434085369393266">አሰሳዎችን ወደ ኤችቲቲፒኤስ ያሻሽሉ እና የማይደግፉ ጣቢያዎችን ከመጫንዎ በፊት ያስጠነቅቁዎታል። የላቀ ጥበቃን ስላነቁ ይህን ቅንብር መለወጥ አይችሉም።</translation>
 <translation id="7725024127233776428">እርስዎ ዕልባት ያደረጉባቸው ገጾች እዚህ ላይ ብቅ ይላሉ</translation>
 <translation id="7757787379047923882">ከ<ph name="DEVICE_NAME" /> የተጋራ ጽሁፍ</translation>
 <translation id="7762668264895820836">ኤስዲ ካርድ <ph name="SD_CARD_NUMBER" /></translation>
-<translation id="7762928140712606393">ተጨማሪ ባህሪያት እና የChrome\u2019 ከሁሉም በላይ ጠንካራ የሆነ ደህንነት ለማግኘት በመለያ ይግቡ</translation>
 <translation id="7764225426217299476">አድራሻ አክል</translation>
 <translation id="7772032839648071052">የይለፍ ሐረግ ያረጋግጡ</translation>
 <translation id="7772375229873196092"><ph name="APP_NAME" />ን ዝጋ</translation>

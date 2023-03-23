@@ -21,7 +21,7 @@
 #include "base/time/time.h"
 #include "build/build_config.h"
 #include "components/autofill/core/common/signatures.h"
-#include "components/os_crypt/os_crypt_mocker.h"
+#include "components/os_crypt/sync/os_crypt_mocker.h"
 #include "components/password_manager/core/browser/affiliation/mock_affiliated_match_helper.h"
 #include "components/password_manager/core/browser/affiliation/mock_affiliation_service.h"
 #include "components/password_manager/core/browser/fake_password_store_backend.h"
@@ -313,6 +313,58 @@ TEST_F(PasswordStoreTest, AddLogins) {
   EXPECT_CALL(mock_consumer,
               OnGetPasswordStoreResultsOrErrorFrom(
                   store.get(), LoginsResultsOrErrorAre(&all_credentials)));
+  store->GetAutofillableLogins(mock_consumer.GetWeakPtr());
+  WaitForPasswordStore();
+
+  store->RemoveObserver(&mock_observer);
+  store->ShutdownOnUIThread();
+}
+
+TEST_F(PasswordStoreTest, UpdateLogins) {
+  PasswordFormData form_data_1 =
+      CreateTestPasswordFormDataByOrigin(kTestWebRealm1);
+  PasswordFormData form_data_2 =
+      CreateTestPasswordFormDataByOrigin(kTestAndroidRealm1);
+  std::vector<PasswordForm> all_credentials = {
+      *FillPasswordFormWithData(form_data_1),
+      *FillPasswordFormWithData(form_data_2)};
+
+  scoped_refptr<PasswordStore> store = CreatePasswordStore();
+  store->Init(/*prefs=*/nullptr, /*affiliated_match_helper=*/nullptr);
+
+  store->AddLogins(all_credentials);
+
+  WaitForPasswordStore();
+
+  form_data_1.password_value = u"new_password1";
+  form_data_2.password_value = u"new_password2";
+
+  std::unique_ptr<PasswordForm> updated_form_1 =
+      FillPasswordFormWithData(form_data_1);
+  std::unique_ptr<PasswordForm> updated_form_2 =
+      FillPasswordFormWithData(form_data_2);
+
+  std::vector<PasswordForm> updated_credentials = {*updated_form_1,
+                                                   *updated_form_2};
+
+  MockPasswordStoreObserver mock_observer;
+  store->AddObserver(&mock_observer);
+
+  EXPECT_CALL(mock_observer, OnLoginsChanged(_, testing::SizeIs(2u)));
+  store->UpdateLogins(updated_credentials);
+  WaitForPasswordStore();
+
+  testing::Mock::VerifyAndClearExpectations(&mock_observer);
+
+  MockPasswordStoreConsumer mock_consumer;
+
+  std::vector<std::unique_ptr<PasswordForm>> expected_results;
+  expected_results.push_back(std::move(updated_form_1));
+  expected_results.push_back(std::move(updated_form_2));
+
+  EXPECT_CALL(mock_consumer,
+              OnGetPasswordStoreResultsOrErrorFrom(
+                  store.get(), LoginsResultsOrErrorAre(&expected_results)));
   store->GetAutofillableLogins(mock_consumer.GetWeakPtr());
   WaitForPasswordStore();
 

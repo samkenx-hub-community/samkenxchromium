@@ -15,7 +15,6 @@
 #include "ash/public/cpp/ambient/proto/photo_cache_entry.pb.h"
 #include "ash/public/cpp/test/in_process_image_decoder.h"
 #include "base/files/file_path.h"
-#include "base/files/file_util.h"
 #include "base/files/scoped_temp_dir.h"
 #include "base/functional/callback.h"
 #include "base/test/scoped_feature_list.h"
@@ -25,7 +24,6 @@
 #include "testing/gtest/include/gtest/gtest.h"
 #include "third_party/skia/include/core/SkBitmap.h"
 #include "third_party/skia/include/core/SkColor.h"
-#include "ui/gfx/codec/jpeg_codec.h"
 #include "ui/gfx/image/image.h"
 #include "ui/gfx/image/image_unittest_util.h"
 
@@ -50,20 +48,6 @@ MATCHER_P(BackedBySameImageAs, photo_with_details, "") {
 
 class AmbientManagedPhotoControllerTest : public AmbientAshTestBase {
  public:
-  void CreateTestImageJpegFile(base::FilePath path,
-                               size_t width,
-                               size_t height,
-                               SkColor color) {
-    SkBitmap bitmap;
-    bitmap.allocN32Pixels(8, 8);
-    bitmap.eraseColor(color);
-    std::vector<unsigned char> data;
-    ASSERT_TRUE(gfx::JPEGCodec::Encode(bitmap, /*quality=*/50, &data));
-    size_t bytes_written = base::WriteFile(
-        path, reinterpret_cast<const char*>(data.data()), data.size());
-    ASSERT_EQ(data.size(), bytes_written);
-  }
-
   void CreateTestData() {
     bool success = temp_dir_.CreateUniqueTempDir();
     ASSERT_TRUE(success);
@@ -90,14 +74,19 @@ class AmbientManagedPhotoControllerTest : public AmbientAshTestBase {
   void SetUp() override {
     scoped_feature_list_.InitAndEnableFeature(
         ash::features::kAmbientModeManagedScreensaver);
+
     AmbientAshTestBase::SetUp();
+    photo_controller_ = std::make_unique<AmbientManagedPhotoController>(
+        *ambient_controller()->ambient_view_delegate(),
+        CreateAmbientManagedSlideshowPhotoConfig());
     CreateTestData();
-    managed_photo_controller()->ambient_backend_model()->SetPhotoConfig(
-        CreateAmbientSlideshowPhotoConfig());
   }
 
   void TearDown() override {
     StopScreenUpdate();
+    // Call reset before calling tear down to make sure we aren't observing
+    // already freed resources
+    photo_controller_.reset();
     AmbientAshTestBase::TearDown();
     CleanUpTestData();
   }
@@ -153,11 +142,16 @@ class AmbientManagedPhotoControllerTest : public AmbientAshTestBase {
     EXPECT_TRUE(managed_photo_controller()->IsScreenUpdateActive());
   }
 
+  AmbientManagedPhotoController* managed_photo_controller() {
+    return photo_controller_.get();
+  }
+
  private:
   base::test::ScopedFeatureList scoped_feature_list_;
   InProcessImageDecoder decoder_;
   std::vector<base::FilePath> image_file_paths_;
   base::ScopedTempDir temp_dir_;
+  std::unique_ptr<AmbientManagedPhotoController> photo_controller_;
 };
 
 TEST_F(AmbientManagedPhotoControllerTest,
@@ -348,12 +342,93 @@ TEST_F(AmbientManagedPhotoControllerTest, CallingStartScreenAgainIsANoOp) {
 
 TEST_F(AmbientManagedPhotoControllerTest, InvalidFileTest) {
   managed_photo_controller()->UpdateImageFilePaths(
-      {base::FilePath(FILE_PATH_LITERAL("invalid_path"))});
+      {base::FilePath(FILE_PATH_LITERAL("invalid_path_1")),
+       base::FilePath(FILE_PATH_LITERAL("invalid_path_2"))});
   StartScreenUpdate();
   task_environment()->FastForwardBy(base::Minutes(1));
   EXPECT_THAT(
       managed_photo_controller()->ambient_backend_model()->all_decoded_topics(),
       IsEmpty());
+}
+
+TEST_F(AmbientManagedPhotoControllerTest, ValidFileNotLoadedTwice) {
+  const std::vector<base::FilePath>& image_file_paths = GetImageFilePaths();
+  managed_photo_controller()->UpdateImageFilePaths({
+      base::FilePath(FILE_PATH_LITERAL("invalid_path_1")),
+      image_file_paths[0],
+      base::FilePath(FILE_PATH_LITERAL("invalid_path_2")),
+  });
+  StartScreenUpdate();
+  RunUntilNextImagesAdded(/*expected_topics=*/1);
+  task_environment()->FastForwardBy(base::Minutes(1));
+
+  EXPECT_EQ(managed_photo_controller()
+                ->ambient_backend_model()
+                ->all_decoded_topics()
+                .size(),
+            1u);
+
+  // Case: Marker hit when max tries exceeded.
+  managed_photo_controller()->OnMarkerHit(
+      AmbientPhotoConfig::Marker::kUiCycleEnded);
+  task_environment()->FastForwardBy(base::Minutes(1));
+  EXPECT_EQ(managed_photo_controller()
+                ->ambient_backend_model()
+                ->all_decoded_topics()
+                .size(),
+            1u);
+
+  // Case: Updating image file paths resets retry limit
+  managed_photo_controller()->UpdateImageFilePaths(
+      {image_file_paths[0], image_file_paths[1]});
+  RunUntilNextImagesAdded(/*expected_topics=*/2);
+
+  EXPECT_EQ(managed_photo_controller()
+                ->ambient_backend_model()
+                ->all_decoded_topics()
+                .size(),
+            2u);
+}
+
+TEST_F(AmbientManagedPhotoControllerTest, InvalidAndValidFileTest) {
+  const std::vector<base::FilePath>& image_file_paths = GetImageFilePaths();
+  managed_photo_controller()->UpdateImageFilePaths(
+      {image_file_paths[0], base::FilePath(FILE_PATH_LITERAL("invalid_path_1")),
+       base::FilePath(FILE_PATH_LITERAL("invalid_path_2")),
+       base::FilePath(FILE_PATH_LITERAL("invalid_path_3")),
+       image_file_paths[1]});
+  StartScreenUpdate();
+  RunUntilImagesReady();
+  EXPECT_EQ(managed_photo_controller()
+                ->ambient_backend_model()
+                ->all_decoded_topics()
+                .size(),
+            2u);
+
+  PhotoWithDetails first_image, second_image;
+  managed_photo_controller()->ambient_backend_model()->GetCurrentAndNextImages(
+      &first_image, &second_image);
+  EXPECT_FALSE(AreImagesEqual(gfx::Image(first_image.photo),
+                              gfx::Image(second_image.photo)));
+  // Case: Marker hit in a mix of valid and invalid files.
+  managed_photo_controller()->OnMarkerHit(
+      AmbientPhotoConfig::Marker::kUiCycleEnded);
+  RunUntilNextImagesAdded(/*expected_topics=*/1);
+  PhotoWithDetails third_image, fourth_image;
+  managed_photo_controller()->ambient_backend_model()->GetCurrentAndNextImages(
+      &third_image, &fourth_image);
+  EXPECT_FALSE(AreImagesEqual(gfx::Image(third_image.photo),
+                              gfx::Image(fourth_image.photo)));
+}
+
+TEST_F(AmbientManagedPhotoControllerTest, PhotoConfigTest) {
+  const AmbientPhotoConfig& config =
+      managed_photo_controller()->ambient_backend_model()->photo_config();
+  EXPECT_EQ(2u, config.GetNumDecodedTopicsToBuffer());
+  EXPECT_TRUE(config.should_split_topics);
+  EXPECT_EQ(1u, config.refresh_topic_markers.size());
+  EXPECT_TRUE(config.refresh_topic_markers.contains(
+      AmbientPhotoConfig::Marker::kUiCycleEnded));
 }
 
 TEST_F(AmbientManagedPhotoControllerTest, AddingEmptyImagesIsANoOP) {

@@ -10,6 +10,7 @@
 #include "base/trace_event/trace_event.h"
 #include "content/common/content_constants_internal.h"
 #include "content/common/url_schemes.h"
+#include "content/public/browser/browser_task_traits.h"
 #include "services/tracing/public/cpp/trace_startup.h"
 
 namespace content {

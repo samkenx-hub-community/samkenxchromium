@@ -11,10 +11,13 @@
 
 #include "base/component_export.h"
 #include "base/containers/linked_list.h"
+#include "base/functional/callback_forward.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/raw_ref.h"
 #include "base/memory/weak_ptr.h"
 #include "base/sequence_checker.h"
+#include "base/timer/timer.h"
+#include "mojo/public/cpp/bindings/receiver.h"
 #include "mojo/public/cpp/bindings/remote.h"
 #include "net/base/isolation_info.h"
 #include "net/cookies/canonical_cookie.h"
@@ -153,6 +156,12 @@ class COMPONENT_EXPORT(NETWORK_SERVICE) RestrictedCookieManager
                          bool has_storage_access,
                          CookiesEnabledForCallback callback) override;
 
+  // If this instance owns its receiver bind and store it using
+  // |pending_receiver|.
+  void InstallReceiver(
+      mojo::PendingReceiver<mojom::RestrictedCookieManager> pending_receiver,
+      base::OnceClosure on_disconnect_callback);
+
   // Computes the First-Party Set metadata corresponding to the given `origin`,
   // `cookie_store`, and `isolation_info`.
   //
@@ -237,6 +246,10 @@ class COMPONENT_EXPORT(NETWORK_SERVICE) RestrictedCookieManager
   net::CookieSettingOverrides GetCookieSettingOverrides(
       bool has_storage_access) const;
 
+  void OnCookiesAccessed(network::mojom::CookieAccessDetailsPtr details);
+
+  void CallCookiesAccessed();
+
   const mojom::RestrictedCookieManagerRole role_;
   const raw_ptr<net::CookieStore> cookie_store_;
   const raw_ref<const CookieSettings> cookie_settings_;
@@ -279,7 +292,16 @@ class COMPONENT_EXPORT(NETWORK_SERVICE) RestrictedCookieManager
 
   bool same_party_attribute_enabled_;
 
+  // This class can optionally bind its Receiver. If that's the case it's stored
+  // done with this variable.
+  mojo::Receiver<mojom::RestrictedCookieManager> receiver_;
+
   const raw_ptr<UmaMetricsUpdater> metrics_updater_;
+
+  // Stores queued cookie access events that will be sent after a short delay, controlled by
+  // `cookies_access_timer_`.
+  std::vector<network::mojom::CookieAccessDetailsPtr> cookie_access_details_;
+  base::RetainingOneShotTimer cookies_access_timer_;
 
   base::WeakPtrFactory<RestrictedCookieManager> weak_ptr_factory_{this};
 };

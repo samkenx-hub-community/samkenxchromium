@@ -39,6 +39,7 @@
 #include "ui/events/base_event_utils.h"
 #include "ui/views/controls/editable_combobox/editable_combobox.h"
 #include "ui/views/controls/styled_label.h"
+#include "ui/views/controls/textarea/textarea.h"
 #include "ui/views/controls/textfield/textfield.h"
 #include "ui/views/focus/focus_manager.h"
 
@@ -607,26 +608,18 @@ IN_PROC_BROWSER_TEST_F(PasswordManagementRevampedBubbleInteractiveUiTest,
   static_cast<ManagePasswordsView*>(bubble)->DisplayDetailsOfPasswordForTesting(
       *test_form());
 
-  auto* edit_username_row = bubble->GetViewByID(static_cast<int>(
-      password_manager::ManagePasswordsViewIDs::kEditUsernameRow));
-  auto* read_username_row = bubble->GetViewByID(static_cast<int>(
-      password_manager::ManagePasswordsViewIDs::kReadUsernameRow));
-  ASSERT_FALSE(edit_username_row->GetVisible());
-  ASSERT_TRUE(read_username_row->GetVisible());
-  ASSERT_EQ(static_cast<views::Label*>(
-                bubble->GetViewByID(static_cast<int>(
-                    password_manager::ManagePasswordsViewIDs::kUsernameLabel)))
-                ->GetText(),
-            u"No username");
-
-  ClickOnView(bubble->GetViewByID(static_cast<int>(
-      password_manager::ManagePasswordsViewIDs::kEditUsernameButton)));
-  EXPECT_TRUE(edit_username_row->GetVisible());
-  EXPECT_FALSE(read_username_row->GetVisible());
-
+  auto* username_label =
+      static_cast<views::Label*>(bubble->GetViewByID(static_cast<int>(
+          password_manager::ManagePasswordsViewIDs::kUsernameLabel)));
   auto* username_textfield =
       static_cast<views::Textfield*>(bubble->GetViewByID(static_cast<int>(
           password_manager::ManagePasswordsViewIDs::kUsernameTextField)));
+  ASSERT_EQ(username_label->GetText(), u"No username");
+  ASSERT_FALSE(username_textfield->IsDrawn());
+
+  ClickOnView(bubble->GetViewByID(static_cast<int>(
+      password_manager::ManagePasswordsViewIDs::kEditUsernameButton)));
+  EXPECT_FALSE(username_label->IsDrawn());
   EXPECT_EQ(username_textfield->GetText(), u"");
 
   username_textfield->SetText(u"new_username");
@@ -636,6 +629,8 @@ IN_PROC_BROWSER_TEST_F(PasswordManagementRevampedBubbleInteractiveUiTest,
                     password_manager::ManagePasswordsViewIDs::kUsernameLabel)))
                 ->GetText(),
             u"new_username");
+  EXPECT_FALSE(bubble->GetViewByID(static_cast<int>(
+      password_manager::ManagePasswordsViewIDs::kUsernameTextField)));
 
   EXPECT_THAT(
       histogram_tester.GetAllSamples(
@@ -647,5 +642,160 @@ IN_PROC_BROWSER_TEST_F(PasswordManagementRevampedBubbleInteractiveUiTest,
                  1),
           Bucket(password_manager::metrics_util::
                      PasswordManagementBubbleInteractions::kUsernameAdded,
+                 1)));
+}
+
+IN_PROC_BROWSER_TEST_F(PasswordManagementRevampedBubbleInteractiveUiTest,
+                       DisplaysCorrectTextAfterAddingNote) {
+  base::HistogramTester histogram_tester;
+
+  SetupManagingPasswords();
+  EXPECT_FALSE(IsBubbleShowing());
+  ExecuteManagePasswordsCommand();
+  ASSERT_TRUE(IsBubbleShowing());
+
+  auto* bubble = PasswordBubbleViewBase::manage_password_bubble();
+  static_cast<ManagePasswordsView*>(bubble)->DisplayDetailsOfPasswordForTesting(
+      *test_form());
+
+  auto* note_label = static_cast<views::Label*>(bubble->GetViewByID(
+      static_cast<int>(password_manager::ManagePasswordsViewIDs::kNoteLabel)));
+  auto* note_textarea =
+      static_cast<views::Textarea*>(bubble->GetViewByID(static_cast<int>(
+          password_manager::ManagePasswordsViewIDs::kNoteTextarea)));
+  ASSERT_EQ(note_label->GetText(), u"No note added");
+  EXPECT_FALSE(note_textarea->IsDrawn());
+
+  ClickOnView(bubble->GetViewByID(static_cast<int>(
+      password_manager::ManagePasswordsViewIDs::kEditNoteButton)));
+  EXPECT_FALSE(note_label->IsDrawn());
+  EXPECT_EQ(note_textarea->GetText(), u"");
+
+  note_textarea->SetText(u"new note");
+  bubble->AcceptDialog();
+  EXPECT_EQ(static_cast<views::Label*>(
+                bubble->GetViewByID(static_cast<int>(
+                    password_manager::ManagePasswordsViewIDs::kNoteLabel)))
+                ->GetText(),
+            u"new note");
+  EXPECT_FALSE(bubble
+                   ->GetViewByID(static_cast<int>(
+                       password_manager::ManagePasswordsViewIDs::kNoteTextarea))
+                   ->IsDrawn());
+
+  EXPECT_THAT(
+      histogram_tester.GetAllSamples(
+          "PasswordManager.PasswordManagementBubble.UserAction"),
+      ElementsAre(
+          Bucket(
+              password_manager::metrics_util::
+                  PasswordManagementBubbleInteractions::kNoteEditButtonClicked,
+              1),
+          Bucket(password_manager::metrics_util::
+                     PasswordManagementBubbleInteractions::kNoteAdded,
+                 1)));
+}
+
+IN_PROC_BROWSER_TEST_F(PasswordManagementRevampedBubbleInteractiveUiTest,
+                       DisplaysCorrectTextAfterEditingNote) {
+  base::HistogramTester histogram_tester;
+
+  SetupManagingPasswords();
+  EXPECT_FALSE(IsBubbleShowing());
+  ExecuteManagePasswordsCommand();
+  ASSERT_TRUE(IsBubbleShowing());
+
+  auto* bubble = PasswordBubbleViewBase::manage_password_bubble();
+  test_form()->SetNoteWithEmptyUniqueDisplayName(u"current note");
+  static_cast<ManagePasswordsView*>(bubble)->DisplayDetailsOfPasswordForTesting(
+      *test_form());
+
+  auto* note_label = static_cast<views::Label*>(bubble->GetViewByID(
+      static_cast<int>(password_manager::ManagePasswordsViewIDs::kNoteLabel)));
+  auto* note_textarea =
+      static_cast<views::Textarea*>(bubble->GetViewByID(static_cast<int>(
+          password_manager::ManagePasswordsViewIDs::kNoteTextarea)));
+  ASSERT_EQ(note_label->GetText(), u"current note");
+  ASSERT_FALSE(note_textarea->IsDrawn());
+
+  ClickOnView(bubble->GetViewByID(static_cast<int>(
+      password_manager::ManagePasswordsViewIDs::kEditNoteButton)));
+  EXPECT_FALSE(note_label->IsDrawn());
+  EXPECT_EQ(note_textarea->GetText(), u"current note");
+
+  note_textarea->SetText(u"new note");
+  bubble->AcceptDialog();
+  EXPECT_EQ(static_cast<views::Label*>(
+                bubble->GetViewByID(static_cast<int>(
+                    password_manager::ManagePasswordsViewIDs::kNoteLabel)))
+                ->GetText(),
+            u"new note");
+  EXPECT_FALSE(bubble
+                   ->GetViewByID(static_cast<int>(
+                       password_manager::ManagePasswordsViewIDs::kNoteTextarea))
+                   ->IsDrawn());
+
+  EXPECT_THAT(
+      histogram_tester.GetAllSamples(
+          "PasswordManager.PasswordManagementBubble.UserAction"),
+      ElementsAre(
+          Bucket(
+              password_manager::metrics_util::
+                  PasswordManagementBubbleInteractions::kNoteEditButtonClicked,
+              1),
+          Bucket(password_manager::metrics_util::
+                     PasswordManagementBubbleInteractions::kNoteEdited,
+                 1)));
+}
+
+IN_PROC_BROWSER_TEST_F(PasswordManagementRevampedBubbleInteractiveUiTest,
+                       DisplaysCorrectTextAfterDeletingNote) {
+  base::HistogramTester histogram_tester;
+
+  SetupManagingPasswords();
+  EXPECT_FALSE(IsBubbleShowing());
+  ExecuteManagePasswordsCommand();
+  ASSERT_TRUE(IsBubbleShowing());
+
+  auto* bubble = PasswordBubbleViewBase::manage_password_bubble();
+  test_form()->SetNoteWithEmptyUniqueDisplayName(u"current note");
+  static_cast<ManagePasswordsView*>(bubble)->DisplayDetailsOfPasswordForTesting(
+      *test_form());
+
+  auto* note_label = static_cast<views::Label*>(bubble->GetViewByID(
+      static_cast<int>(password_manager::ManagePasswordsViewIDs::kNoteLabel)));
+  auto* note_textarea =
+      static_cast<views::Textarea*>(bubble->GetViewByID(static_cast<int>(
+          password_manager::ManagePasswordsViewIDs::kNoteTextarea)));
+  ASSERT_EQ(note_label->GetText(), u"current note");
+  ASSERT_FALSE(note_textarea->IsDrawn());
+
+  ClickOnView(bubble->GetViewByID(static_cast<int>(
+      password_manager::ManagePasswordsViewIDs::kEditNoteButton)));
+  EXPECT_EQ(note_textarea->GetText(), u"current note");
+  EXPECT_FALSE(note_label->IsDrawn());
+
+  note_textarea->SetText(u"");
+  bubble->AcceptDialog();
+  EXPECT_EQ(static_cast<views::Label*>(
+                bubble->GetViewByID(static_cast<int>(
+                    password_manager::ManagePasswordsViewIDs::kNoteLabel)))
+                ->GetText(),
+            u"No note added");
+  EXPECT_FALSE(bubble
+                   ->GetViewByID(static_cast<int>(
+                       password_manager::ManagePasswordsViewIDs::kNoteTextarea))
+                   ->IsDrawn());
+
+  EXPECT_THAT(
+      histogram_tester.GetAllSamples(
+          "PasswordManager.PasswordManagementBubble.UserAction"),
+      ElementsAre(
+          Bucket(
+              password_manager::metrics_util::
+                  PasswordManagementBubbleInteractions::kNoteEditButtonClicked,
+              1),
+          Bucket(password_manager::metrics_util::
+                     PasswordManagementBubbleInteractions::kNoteDeleted,
                  1)));
 }

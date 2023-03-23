@@ -12,10 +12,13 @@
 #import "base/test/ios/wait_util.h"
 #import "base/test/scoped_feature_list.h"
 #import "base/time/time.h"
+#import "components/password_manager/core/common/password_manager_constants.h"
 #import "components/password_manager/core/common/password_manager_features.h"
+#import "components/policy/policy_constants.h"
 #import "components/strings/grit/components_strings.h"
 #import "components/sync/base/features.h"
 #import "ios/chrome/browser/metrics/metrics_app_interface.h"
+#import "ios/chrome/browser/policy/policy_earl_grey_utils.h"
 #import "ios/chrome/browser/signin/fake_system_identity.h"
 #import "ios/chrome/browser/ui/authentication/signin_earl_grey_ui_test_util.h"
 #import "ios/chrome/browser/ui/settings/google_services/manage_sync_settings_constants.h"
@@ -67,6 +70,11 @@ constexpr int kScrollAmount = 150;
 
 constexpr base::TimeDelta kSyncInitializedTimeout = base::Seconds(5);
 
+id<GREYMatcher> ButtonWithAccessibilityID(NSString* id) {
+  return grey_allOf(grey_accessibilityID(id),
+                    grey_accessibilityTrait(UIAccessibilityTraitButton), nil);
+}
+
 NSString* GetTextFieldForID(int category_id) {
   return [NSString
       stringWithFormat:@"%@_textField", l10n_util::GetNSString(category_id)];
@@ -100,17 +108,22 @@ GREYElementInteraction* GetInteractionForIssuesListItem(
 // the given `username`. It scrolls down if necessary to ensure that the matched
 // cell is interactable.
 GREYElementInteraction* GetInteractionForPasswordEntry(NSString* username) {
-  return GetInteractionForListItem(ButtonWithAccessibilityLabel(username),
+  // ID, not label because the latter might contain an extra label for the
+  // "local password icon" and most tests don't care about it.
+  return GetInteractionForListItem(ButtonWithAccessibilityID(username),
                                    kGREYDirectionDown);
 }
 
 // Returns the GREYElementInteraction* for the cell on the password list with
-// the given `username`. It scrolls down if necessary to ensure that the matched
-// cell is interactable.
+// the given `username` and `domain`. It scrolls down if necessary to ensure
+// that the matched cell is interactable.
 GREYElementInteraction* GetInteractionForPasswordIssueEntry(
+    NSString* domain,
     NSString* username) {
-  return GetInteractionForIssuesListItem(ButtonWithAccessibilityLabel(username),
-                                         kGREYDirectionDown);
+  return GetInteractionForIssuesListItem(
+      ButtonWithAccessibilityLabel(
+          [NSString stringWithFormat:@"%@, %@", domain, username]),
+      kGREYDirectionDown);
 }
 
 // Returns the GREYElementInteraction* for the item on the detail view
@@ -370,8 +383,10 @@ id<GREYMatcher> ToolbarSettingsSubmenuButton() {
 // Returns matcher for the password details / add password view footer displayed
 // when the note length is approaching max limit.
 id<GREYMatcher> TooLongNoteFooter() {
-  return grey_text(l10n_util::GetNSString(
-      IDS_IOS_SETTINGS_PASSWORDS_TOO_LONG_NOTE_DESCRIPTION));
+  return grey_text(l10n_util::GetNSStringF(
+      IDS_IOS_SETTINGS_PASSWORDS_TOO_LONG_NOTE_DESCRIPTION,
+      base::NumberToString16(
+          password_manager::constants::kMaxPasswordNoteLength)));
 }
 
 // Saves an example form in the store.
@@ -498,7 +513,9 @@ id<GREYMatcher> EditDoneButton() {
                                        username:(NSString*)username {
   // With grouping enabled, discard the username; it's only shown on the details
   // page.
-  return GetInteractionForListItem(ButtonWithAccessibilityLabel(domain),
+  // ID, not label because the latter might contain an extra label for the
+  // "local password icon" and most tests don't care about it.
+  return GetInteractionForListItem(ButtonWithAccessibilityID(domain),
                                    kGREYDirectionDown);
 }
 
@@ -563,7 +580,11 @@ id<GREYMatcher> EditDoneButton() {
         password_manager::features::kEnablePasswordsAccountStorage);
   }
   if ([self isRunningTest:@selector
-            (testAccountStorageSwitchShownIfSignedInAndFlagEnabled)]) {
+            (testAccountStorageSwitchShownIfSignedInAndFlagEnabled)] ||
+      [self
+          isRunningTest:@selector
+          (testAccountStorageSwitchDisabledIfBlockedByPolicyAndFlagEnabled)] ||
+      [self isRunningTest:@selector(testMovePasswordToAccount)]) {
     config.features_enabled.push_back(
         password_manager::features::kEnablePasswordsAccountStorage);
   }
@@ -575,7 +596,8 @@ id<GREYMatcher> EditDoneButton() {
       [self isRunningTest:@selector(testAddPasswordLayoutWithLongNotes)] ||
       [self isRunningTest:@selector
             (testAddPasswordSaveButtonStateOnFieldChanges)] ||
-      [self isRunningTest:@selector(testLayoutWithLongNotes)]) {
+      [self isRunningTest:@selector(testLayoutWithLongNotes)] ||
+      [self isRunningTest:@selector(testShowHidePasswordWithNotesEnabled)]) {
     config.features_enabled.push_back(syncer::kPasswordNotesWithBackup);
   }
 
@@ -1407,10 +1429,6 @@ id<GREYMatcher> EditDoneButton() {
   [[self interactionForSinglePasswordEntryWithDomain:@"example.com"
                                             username:@"concrete username"]
       performAction:grey_tap()];
-
-  [PasswordSettingsAppInterface setUpMockReauthenticationModule];
-  [PasswordSettingsAppInterface mockReauthenticationModuleExpectedResult:
-                                    ReauthenticationResult::kSuccess];
 
   TapEdit();
   [[EarlGrey selectElementWithMatcher:TooLongNoteFooter()]
@@ -2512,11 +2530,8 @@ id<GREYMatcher> EditDoneButton() {
       performAction:grey_tap()];
 
   // The newly created credential exists.
-  [[EarlGrey
-      selectElementWithMatcher:grey_allOf(
-                                   ButtonWithAccessibilityLabel(
-                                       @"zexample.com, zconcrete username"),
-                                   grey_interactable(), nil)]
+  [[self interactionForSinglePasswordEntryWithDomain:@"zexample.com"
+                                            username:@"zconcrete username"]
       performAction:grey_tap()];
 
   [[EarlGrey selectElementWithMatcher:SettingsMenuBackButton()]
@@ -2759,10 +2774,12 @@ id<GREYMatcher> EditDoneButton() {
       base::SysUTF16ToNSString(l10n_util::GetPluralStringFUTF16(
           IDS_IOS_CHECK_PASSWORDS_COMPROMISED_COUNT, 1));
 
-  [GetInteractionForPasswordEntry([NSString
-      stringWithFormat:@"%@, %@", text, detailText]) performAction:grey_tap()];
+  [[EarlGrey selectElementWithMatcher:ButtonWithAccessibilityLabel([NSString
+                                          stringWithFormat:@"%@, %@", text,
+                                                           detailText])]
+      performAction:grey_tap()];
 
-  [GetInteractionForPasswordIssueEntry(@"example.com, concrete username")
+  [GetInteractionForPasswordIssueEntry(@"example.com", @"concrete username")
       performAction:grey_tap()];
 
   [PasswordSettingsAppInterface setUpMockReauthenticationModule];
@@ -2794,7 +2811,7 @@ id<GREYMatcher> EditDoneButton() {
       selectElementWithMatcher:grey_accessibilityID(kPasswordIssuesTableViewId)]
       assertWithMatcher:grey_notNil()];
 
-  [GetInteractionForPasswordIssueEntry(@"example.com, concrete username")
+  [GetInteractionForPasswordIssueEntry(@"example.com", @"concrete username")
       assertWithMatcher:grey_nil()];
 
   [[EarlGrey selectElementWithMatcher:SettingsDoneButton()]
@@ -2829,6 +2846,36 @@ id<GREYMatcher> EditDoneButton() {
       performAction:grey_tap()];
 }
 
+// Tests that reauthentication is not required to show password when notes are
+// enabled since the reauthentication happens before navigating to the details
+// view in this scenario.
+- (void)testShowHidePasswordWithNotesEnabled {
+  SaveExamplePasswordForm();
+
+  OpenPasswordManager();
+  [PasswordSettingsAppInterface
+      setUpMockReauthenticationModuleForPasswordManager];
+  [PasswordSettingsAppInterface mockReauthenticationModuleExpectedResult:
+                                    ReauthenticationResult::kSuccess];
+
+  [[self interactionForSinglePasswordEntryWithDomain:@"example.com"
+                                            username:@"concrete username"]
+      performAction:grey_tap()];
+
+  [GetInteractionForPasswordDetailItem(ShowPasswordButton())
+      assertWithMatcher:grey_sufficientlyVisible()];
+  [GetInteractionForPasswordDetailItem(ShowPasswordButton())
+      performAction:grey_tap()];
+  [GetInteractionForPasswordDetailItem(HidePasswordButton())
+      assertWithMatcher:grey_sufficientlyVisible()];
+  [GetInteractionForPasswordDetailItem(HidePasswordButton())
+      performAction:grey_tap()];
+  [[EarlGrey selectElementWithMatcher:SettingsMenuBackButton()]
+      performAction:grey_tap()];
+  [[EarlGrey selectElementWithMatcher:SettingsDoneButton()]
+      performAction:grey_tap()];
+}
+
 // Tests that the favicons for the password managers metrics are logged
 // properly when there are passwords with a favicon.
 // TODO(crbug.com/1348585): Fix to re-enable.
@@ -2847,15 +2894,9 @@ id<GREYMatcher> EditDoneButton() {
   // Make sure the cell is loaded properly before tapping on it.
   ConditionBlock condition = ^{
     NSError* error = nil;
-    NSString* label =
-        [self groupingEnabled] ? @"example12.com" : @"example12.com, user2";
-    [[[EarlGrey
-        selectElementWithMatcher:grey_allOf(ButtonWithAccessibilityLabel(label),
-                                            grey_sufficientlyVisible(), nil)]
-           usingSearchAction:grey_scrollInDirection(kGREYDirectionDown,
-                                                    kScrollAmount)
-        onElementWithMatcher:grey_accessibilityID(kPasswordsTableViewId)]
-        assertWithMatcher:grey_notNil()
+    [[self interactionForSinglePasswordEntryWithDomain:@"example12.com"
+                                              username:@"user2"]
+        assertWithMatcher:grey_sufficientlyVisible()
                     error:&error];
     return error == nil;
   };
@@ -3133,6 +3174,24 @@ id<GREYMatcher> EditDoneButton() {
       assertWithMatcher:grey_sufficientlyVisible()];
 }
 
+- (void)testAccountStorageSwitchDisabledIfBlockedByPolicyAndFlagEnabled {
+  policy_test_utils::SetPolicy(std::string("[\"passwords\"]"),
+                               policy::key::kSyncTypesListDisabled);
+
+  FakeSystemIdentity* fakeIdentity = [FakeSystemIdentity fakeIdentity1];
+  [SigninEarlGreyUI signinWithFakeIdentity:fakeIdentity enableSync:NO];
+
+  OpenPasswordManager();
+  OpenSettingsSubmenu();
+
+  [[EarlGrey selectElementWithMatcher:
+                 chrome_test_util::TableViewSwitchCell(
+                     kPasswordSettingsAccountStorageSwitchTableViewId,
+                     /*is_toggled_on=*/NO,
+                     /*is_enabled=*/NO)]
+      assertWithMatcher:grey_sufficientlyVisible()];
+}
+
 - (void)testAccountStorageSwitchHiddenIfSignedOut {
   OpenPasswordManager();
   OpenSettingsSubmenu();
@@ -3158,6 +3217,55 @@ id<GREYMatcher> EditDoneButton() {
       assertWithMatcher:grey_nil()];
 }
 
+- (void)testMovePasswordToAccount {
+  GREYAssert(
+      [PasswordSettingsAppInterface saveExamplePassword:@"localPassword"
+                                               userName:@"username"
+                                                 origin:@"https://local.com"],
+      @"Stored form was not found in the PasswordStore results.");
+  [SigninEarlGreyUI signinWithFakeIdentity:[FakeSystemIdentity fakeIdentity1]
+                                enableSync:NO];
+  OpenPasswordManager();
+
+  // `passwordMatcher` includes grey_sufficientlyVisible() because there are
+  // other invisible cells when password details is closed later.
+  id<GREYMatcher> passwordMatcher =
+      grey_allOf([self groupingEnabled]
+                     ? ButtonWithAccessibilityID(@"local.com")
+                     : ButtonWithAccessibilityID(@"local.com, username"),
+                 grey_sufficientlyVisible(), nil);
+  id<GREYMatcher> localIconMatcher =
+      grey_allOf(grey_accessibilityID(kLocalOnlyPasswordIconId),
+                 grey_ancestor(passwordMatcher), nil);
+  [GetInteractionForListItem(localIconMatcher, kGREYDirectionDown)
+      assertWithMatcher:grey_sufficientlyVisible()];
+
+  [[EarlGrey selectElementWithMatcher:passwordMatcher]
+      performAction:grey_tap()];
+
+  [PasswordSettingsAppInterface setUpMockReauthenticationModule];
+  [PasswordSettingsAppInterface mockReauthenticationModuleExpectedResult:
+                                    ReauthenticationResult::kSuccess];
+
+  [[EarlGrey selectElementWithMatcher:grey_accessibilityID(
+                                          kMovePasswordToAccountButtonId)]
+      assertWithMatcher:grey_sufficientlyVisible()];
+
+  [[EarlGrey selectElementWithMatcher:grey_accessibilityID(
+                                          kMovePasswordToAccountButtonId)]
+      performAction:grey_tap()];
+
+  [[EarlGrey selectElementWithMatcher:grey_accessibilityID(
+                                          kMovePasswordToAccountButtonId)]
+      assertWithMatcher:grey_notVisible()];
+
+  [[EarlGrey selectElementWithMatcher:SettingsMenuBackButton()]
+      performAction:grey_tap()];
+
+  [GetInteractionForListItem(localIconMatcher, kGREYDirectionDown)
+      assertWithMatcher:grey_notVisible()];
+}
+
 @end
 
 // Rerun all the tests in this file but with kPasswordsGrouping disabled. This
@@ -3177,7 +3285,9 @@ id<GREYMatcher> EditDoneButton() {
     interactionForSinglePasswordEntryWithDomain:(NSString*)domain
                                        username:(NSString*)username {
   NSString* label = [NSString stringWithFormat:@"%@, %@", domain, username];
-  return GetInteractionForListItem(ButtonWithAccessibilityLabel(label),
+  // ID, not label because the latter might contain an extra label for the
+  // "local password icon" and most tests don't care about it.
+  return GetInteractionForListItem(ButtonWithAccessibilityID(label),
                                    kGREYDirectionDown);
 }
 

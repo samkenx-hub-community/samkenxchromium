@@ -26,6 +26,8 @@
 #import "ios/chrome/browser/shared/public/commands/application_commands.h"
 #import "ios/chrome/browser/shared/public/commands/command_dispatcher.h"
 #import "ios/chrome/browser/shared/public/features/features.h"
+#import "ios/chrome/browser/shared/ui/table_view/table_view_navigation_controller.h"
+#import "ios/chrome/browser/shared/ui/table_view/table_view_navigation_controller_constants.h"
 #import "ios/chrome/browser/shared/ui/util/pasteboard_util.h"
 #import "ios/chrome/browser/ui/incognito_reauth/incognito_reauth_scene_agent.h"
 #import "ios/chrome/browser/ui/main/scene_state_browser_agent.h"
@@ -41,8 +43,6 @@
 #import "ios/chrome/browser/ui/reading_list/reading_list_table_view_controller.h"
 #import "ios/chrome/browser/ui/sharing/sharing_coordinator.h"
 #import "ios/chrome/browser/ui/sharing/sharing_params.h"
-#import "ios/chrome/browser/ui/table_view/table_view_navigation_controller.h"
-#import "ios/chrome/browser/ui/table_view/table_view_navigation_controller_constants.h"
 #import "ios/chrome/browser/url/chrome_url_constants.h"
 #import "ios/chrome/browser/url_loading/url_loading_browser_agent.h"
 #import "ios/chrome/browser/url_loading/url_loading_params.h"
@@ -274,7 +274,7 @@
   web::WebState* activeWebState =
       self.browser->GetWebStateList()->GetActiveWebState();
   new_tab_page_uma::RecordAction(
-      self.browser->GetBrowserState(), activeWebState,
+      self.browser->GetBrowserState()->IsOffTheRecord(), activeWebState,
       new_tab_page_uma::ACTION_OPENED_READING_LIST_ENTRY);
 
   // Load the offline URL if available.

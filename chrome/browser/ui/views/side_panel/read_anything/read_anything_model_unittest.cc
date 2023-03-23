@@ -43,6 +43,9 @@ class MockReadAnythingModelObserver : public ReadAnythingModel::Observer {
                read_anything::mojom::LineSpacing line_spacing,
                read_anything::mojom::LetterSpacing letter_spacing),
               (override));
+#if BUILDFLAG(ENABLE_SCREEN_AI_SERVICE)
+  MOCK_METHOD(void, ScreenAIServiceReady, (), (override));
+#endif
 };
 
 class ReadAnythingModelTest : public TestWithBrowserView {
@@ -207,6 +210,16 @@ TEST_F(ReadAnythingModelTest, NotificationsOnSetSelectedLetterSpacingIndex) {
   model_->SetSelectedLetterSpacingByIndex(2);
 }
 
+TEST_F(ReadAnythingModelTest, NotificationsOnSystemThemeChanged) {
+  model_->AddObserver(&model_observer_1_);
+
+  EXPECT_CALL(model_observer_1_,
+              OnReadAnythingThemeChanged(_, _, _, _, _, _, _, _))
+      .Times(1);
+
+  model_->OnSystemThemeChanged();
+}
+
 TEST_F(ReadAnythingModelTest, MinimumFontScaleIsEnforced) {
   std::string font_name;
   model_->Init(font_name, 0.5, read_anything::mojom::Colors::kDefaultValue,
@@ -248,6 +261,24 @@ TEST_F(ReadAnythingModelTest, DefaultIndexSetOnSetSelectedFontByIndex) {
   size_t testIndex = 2;
   model_->SetSelectedFontByIndex(testIndex);
   EXPECT_EQ(testIndex, GetFontModel()->GetDefaultIndexForTesting().value());
+}
+
+TEST_F(ReadAnythingModelTest, FontModelHasDefaultNullOptColors) {
+  EXPECT_FALSE(GetFontModel()->GetDropdownForegroundColorAt(0).has_value());
+  EXPECT_FALSE(GetFontModel()->GetDropdownBackgroundColorAt(0).has_value());
+}
+
+TEST_F(ReadAnythingModelTest, FontModelSetsDropdownAndForegroundColors) {
+  ReadAnythingColorsModel* color_model = model_->GetColorsModel();
+  ReadAnythingColorsModel::ColorInfo color_info = color_model->GetColorsAt(2);
+
+  GetFontModel()->SetForegroundColor(color_info.foreground_color_id);
+  GetFontModel()->SetBackgroundColor(color_info.dropdown_color_id);
+
+  EXPECT_EQ(color_info.foreground_color_id,
+            GetFontModel()->GetDropdownForegroundColorAt(0).value());
+  EXPECT_EQ(color_info.dropdown_color_id,
+            GetFontModel()->GetDropdownBackgroundColorAt(0).value());
 }
 
 #endif  // !defined(ADDRESS_SANITIZER)

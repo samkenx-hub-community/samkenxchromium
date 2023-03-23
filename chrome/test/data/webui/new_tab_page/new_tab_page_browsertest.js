@@ -8,6 +8,7 @@ GEN_INCLUDE(['//chrome/test/data/webui/polymer_browser_test_base.js']);
 
 GEN('#include "build/build_config.h"');
 GEN('#include "build/chromeos_buildflags.h"');
+GEN('#include "components/search/ntp_features.h"');
 GEN('#include "content/public/test/browser_test.h"');
 
 class NewTabPageBrowserTest extends PolymerTest {
@@ -397,11 +398,63 @@ var NewTabPageModulesHistoryClustersModuleTest =
   get browsePreload() {
     return 'chrome://new-tab-page/test_loader.html?module=new_tab_page/modules/history_clusters/module_test.js';
   }
+
+  /** @override */
+  get featureList() {
+    return {
+      enabled: [
+        'ntp_features::kNtpHistoryClustersModule',
+      ],
+    };
+  }
 };
 
 TEST_F('NewTabPageModulesHistoryClustersModuleTest', 'All', function() {
   mocha.run();
 });
+
+var NewTabPageModulesHistoryClustersModuleTileTest =
+    class extends NewTabPageBrowserTest {
+  /** @override */
+  get browsePreload() {
+    return 'chrome://new-tab-page/test_loader.html?module=new_tab_page/modules/history_clusters/tile_test.js';
+  }
+
+  /** @override */
+  get featureList() {
+    return {
+      enabled: [
+        'ntp_features::kNtpHistoryClustersModule',
+      ],
+    };
+  }
+};
+
+TEST_F('NewTabPageModulesHistoryClustersModuleTileTest', 'All', function() {
+  mocha.run();
+});
+
+var NewTabPageModulesHistoryClustersModuleSuggestTileTest =
+    class extends NewTabPageBrowserTest {
+  /** @override */
+  get browsePreload() {
+    return 'chrome://new-tab-page/test_loader.html?module=new_tab_page/modules/history_clusters/suggest_tile_test.js';
+  }
+
+  /** @override */
+  get featureList() {
+    return {
+      enabled: [
+        'ntp_features::kNtpHistoryClustersModule',
+      ],
+    };
+  }
+};
+
+TEST_F(
+    'NewTabPageModulesHistoryClustersModuleSuggestTileTest', 'All', function() {
+      mocha.run();
+    });
 
 // https://crbug.com/1227564: Flaky on Chrome OS.
 GEN('#if BUILDFLAG(IS_CHROMEOS)');

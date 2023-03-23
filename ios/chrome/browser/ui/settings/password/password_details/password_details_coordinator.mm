@@ -49,9 +49,6 @@
   password_manager::AffiliatedGroup _affiliatedGroup;
   password_manager::CredentialUIEntry _credential;
 
-  // The handler used for CredentialProviderPromoCommands.
-  id<CredentialProviderPromoCommands> _credentialProviderPromoHandler;
-
   // Tells whether or not to support move to account option. If YES, move option
   // will be supported, NO otherwise.
   BOOL _supportMoveToAccount;
@@ -97,10 +94,6 @@
     _credential = credential;
     _reauthenticationModule = reauthModule;
     _supportMoveToAccount = supportMoveToAccount;
-    if (IsCredentialProviderExtensionPromoEnabledOnPasswordCopied()) {
-      _credentialProviderPromoHandler = HandlerForProtocol(
-          browser->GetCommandDispatcher(), CredentialProviderPromoCommands);
-    }
   }
   return self;
 }
@@ -122,10 +115,6 @@
     _affiliatedGroup = affiliatedGroup;
     _reauthenticationModule = reauthModule;
     _supportMoveToAccount = supportMoveToAccount;
-    if (IsCredentialProviderExtensionPromoEnabledOnPasswordCopied()) {
-      _credentialProviderPromoHandler = HandlerForProtocol(
-          browser->GetCommandDispatcher(), CredentialProviderPromoCommands);
-    }
   }
   return self;
 }
@@ -307,10 +296,41 @@
   [self.actionSheetCoordinator start];
 }
 
-- (void)moveCredentialToAccountStore:(PasswordDetails*)password {
-  // TODO(crbug.com/1400217): Instantiate the coordinator for the confirmation
-  // dialog in case there are conflicting passwords.
-  [self.mediator moveCredentialToAccountStore:password];
+- (void)moveCredentialToAccountStore:(PasswordDetails*)password
+                          anchorView:(UIView*)anchorView
+                     movedCompletion:(void (^)())movedCompletion {
+  if (![self.mediator hasPasswordConflictInAccount:password]) {
+    [self.mediator moveCredentialToAccountStore:password];
+    movedCompletion();
+    return;
+  }
+  NSString* actionSheetTitle =
+      l10n_util::GetNSString(IDS_IOS_PASSWORD_MOVE_CONFLICT_ACTION_SHEET_TITLE);
+  NSString* actionSheetMessage = l10n_util::GetNSString(
+      IDS_IOS_PASSWORD_MOVE_CONFLICT_ACTION_SHEET_MESSAGE);
+  self.actionSheetCoordinator = [[ActionSheetCoordinator alloc]
+      initWithBaseViewController:self.viewController
+                         browser:self.browser
+                           title:actionSheetTitle
+                         message:actionSheetMessage
+                            rect:anchorView.frame
+                            view:anchorView];
+
+  __weak __typeof(self) weakSelf = self;
+  [self.actionSheetCoordinator
+      addItemWithTitle:l10n_util::GetNSString(IDS_IOS_KEEP_RECENT_PASSWORD)
+                action:^{
+                  [weakSelf.mediator
+                      moveCredentialToAccountStoreWithConflict:password];
+                  movedCompletion();
+                }
+                 style:UIAlertActionStyleDefault];
+
+  [self.actionSheetCoordinator
+      addItemWithTitle:l10n_util::GetNSString(IDS_IOS_CANCEL_PASSWORD_MOVE)
+                action:nil
+                 style:UIAlertActionStyleCancel];
+  [self.actionSheetCoordinator start];
 }
 
 - (void)showPasswordDetailsInEditModeWithoutAuthentication {
@@ -319,8 +339,10 @@
 
 - (void)onPasswordCopiedByUser {
   if (IsCredentialProviderExtensionPromoEnabledOnPasswordCopied()) {
-    DCHECK(_credentialProviderPromoHandler);
-    [_credentialProviderPromoHandler
+    id<CredentialProviderPromoCommands> credentialProviderPromoHandler =
+        HandlerForProtocol(self.browser->GetCommandDispatcher(),
+                           CredentialProviderPromoCommands);
+    [credentialProviderPromoHandler
         showCredentialProviderPromoWithTrigger:CredentialProviderPromoTrigger::
                                                    PasswordCopied];
   }

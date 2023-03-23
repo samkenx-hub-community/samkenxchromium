@@ -283,6 +283,7 @@
 <translation id="2581165646603367611">આ કુકી, કૅશ અને Chromeને લાગતું હોય કે આ મહત્વનું નથી એવા સાઇટના બીજા ડેટાને સાફ કરશે.</translation>
 <translation id="2587052924345400782">નવું વર્ઝન ઉપલબ્ધ છે</translation>
 <translation id="2593272815202181319">મોનોસ્પેસ</translation>
+<translation id="2603212228005142861">તમારી પસંદગીઓ મેનેજ કરવા માટે, સાઇન ઇન કરો</translation>
 <translation id="2604446170045642109">તમે સાઇટ માટેની ઘેરી થીમને તમારા સેટિંગમાંથી બંધ કરી શકો છો.</translation>
 <translation id="2612676031748830579">કાર્ડ નંબર</translation>
 <translation id="2625189173221582860">પાસવર્ડ કૉપિ કર્યો</translation>
@@ -630,6 +631,7 @@
 
 તમારા Google એકાઉન્ટમાં બ્રાઉઝિંગ ઇતિહાસના બીજા સ્વરૂપો જેમ કે શોધ અને બીજા Google સેવાઓ પરની પ્રવૃત્તિઓ <ph name="BEGIN_LINK" />myactivity.google.com<ph name="END_LINK" /> પર હોય શકે છે.</translation>
 <translation id="452750746583162491">તમારા સિંક કરેલા ડેટાનો રિવ્યૂ કરો</translation>
+<translation id="4528638190900283934">વધારાની સુવિધાઓ માટે સાઇન ઇન કરો</translation>
 <translation id="4532845899244822526">ફોલ્ડર પસંદ કરો</translation>
 <translation id="4547551584605870320">{TAB_COUNT,plural, =1{<ph name="TAB_COUNT_ONE" /> ટૅબ}one{<ph name="TAB_COUNT_MANY" /> ટૅબ, <ph name="TAB_COUNT_INCOGNITO" /> છૂપી}other{<ph name="TAB_COUNT_MANY" /> ટૅબ, <ph name="TAB_COUNT_INCOGNITO" /> છૂપી}}</translation>
 <translation id="4554077758708533499">USB કેબલ સાથે કનેક્ટ કરેલો છે</translation>
@@ -1074,6 +1076,7 @@
 <translation id="6824899148643461612"><ph name="TAB_TITLE" />, ટૅબ, પસંદ કરી</translation>
 <translation id="6828070228333235514">કિંમત ટ્રૅક કરવાનું બંધ કરો</translation>
 <translation id="6830728435402077660">સુરક્ષિત નથી</translation>
+<translation id="6831043979455480757">અનુવાદ કરો</translation>
 <translation id="6833996806551876956">પ્રાઇવસી સૅન્ડબૉક્સની અજમાયશ</translation>
 <translation id="6836206421467243968">ટૅબના ગ્રૂપ <ph name="TITLE_OF_GROUP" />ને નવા બૅકગ્રાઉન્ડ ટૅબના ગ્રૂપ તરીકે રિસ્ટોર કરો.</translation>
 <translation id="6846298663435243399">લોડ કરી રહ્યાં છે…</translation>
@@ -1241,10 +1244,10 @@
 <translation id="7707922173985738739">મોબાઇલ ડેટાનો ઉપયોગ કરો</translation>
 <translation id="7709094866268987903">તમે કાઢી નાખેલી રુચિઓ અહીં દેખાશે</translation>
 <translation id="7709918231054955894">તમારી બધી ટૅબ મેળવો</translation>
+<translation id="772434085369393266">નૅવિગેશનને HTTPS પર અપગ્રેડ કરો અને તેને સપોર્ટ ન કરતી સાઇટ લોડ કરતા પહેલાં ચેતવણી મેળવો. તમે વિગતવાર સુરક્ષાનું સેટિંગ ચાલુ કરેલું હોવાથી તમે આ સેટિંગ બદલી શકતા નથી.</translation>
 <translation id="7725024127233776428">બુકમાર્ક કરેલા પેજ અહીં દેખાય છે</translation>
 <translation id="7757787379047923882"><ph name="DEVICE_NAME" />માંથી ટેક્સ્ટ શેર કરી</translation>
 <translation id="7762668264895820836">SD કાર્ડ <ph name="SD_CARD_NUMBER" /></translation>
-<translation id="7762928140712606393">વધારાની સુવિધાઓ અને Chromeની સૌથી સશકત સુરક્ષા માટે સાઇન ઇન કરો</translation>
 <translation id="7764225426217299476">સરનામું ઉમેરો</translation>
 <translation id="7772032839648071052">પાસફ્રેઝની પુષ્ટિ કરો</translation>
 <translation id="7772375229873196092"><ph name="APP_NAME" />ને બંધ કરો</translation>
@@ -1260,6 +1263,7 @@
 <translation id="78270725016672455">કોઈ સાઇટમાં સાઇન ઇન કરવા માટે તમારું કમ્પ્યુટર આ ડિવાઇસને રજિસ્ટર કરવા માગે છે</translation>
 <translation id="7844171778363018843">સિંક કરવા માટે કોઈ ડેટા પસંદ કર્યો નથી</translation>
 <translation id="7846296061357476882">Googleની સેવાઓ</translation>
+<translation id="7847228556075070294">ઇતિહાસ, કુકી અને અન્ય ડેટા કર્યો</translation>
 <translation id="784934925303690534">સમય શ્રેણી</translation>
 <translation id="7851858861565204677">અન્ય ઉપકરણો</translation>
 <translation id="7853202427316060426">પ્રવૃત્તિ</translation>
@@ -1439,6 +1443,7 @@
 <translation id="869891660844655955">સમાપ્તિ તારીખ</translation>
 <translation id="8699120352855309748">આ ભાષાઓનો અનુવાદ કરવાનું ઑફર કરશો નહીં</translation>
 <translation id="8712637175834984815">સમજાઈ ગયું</translation>
+<translation id="8723453889042591629">આ પેજનો ઝડપથી અનુવાદ કરો. આ શૉર્ટકટમાં ફેરફાર કરવા માટે, ટચ કરીને થોડીવાર દબાવી રાખો.</translation>
 <translation id="8725066075913043281">ફરી પ્રયાસ કરો</translation>
 <translation id="8746155870861185046">હાઇલાઇટ કરેલી ટેક્સ્ટ શેર કરો</translation>
 <translation id="874726034427945498">તમારા ઍડ્રેસ બારમાં બહેતર સૂચનો જોવા માટે, તમારા ટૅબ અને ઇતિહાસ સિંક કરો</translation>

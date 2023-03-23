@@ -63,7 +63,7 @@
 
 // The view controller representing the Feed top section (between the feed
 // header and the feed collection).
-@property(nonatomic, strong) UIViewController* feedTopSectionViewController;
+@property(nonatomic, weak) UIViewController* feedTopSectionViewController;
 
 // Bubble presenter for displaying IPH bubbles relating to the NTP.
 @property(nonatomic, strong) BubblePresenter* bubblePresenter;
@@ -88,6 +88,9 @@
 - (instancetype)initWithNibName:(NSString*)name
                          bundle:(NSBundle*)bundle NS_UNAVAILABLE;
 - (instancetype)initWithCoder:(NSCoder*)coder NS_UNAVAILABLE;
+
+// Indicates to the receiver to update its state to focus the omnibox.
+- (void)focusOmnibox;
 
 // Called when a snapshot of the content will be taken.
 - (void)willUpdateSnapshot;

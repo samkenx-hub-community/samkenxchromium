@@ -151,26 +151,7 @@ void ReadingListModelImpl::MarkAllSeen() {
       BeginBatchUpdatesWithSyncMetadata();
 
   for (auto& iterator : entries_) {
-    ReadingListEntry& entry = *(iterator.second);
-    if (entry.HasBeenSeen()) {
-      continue;
-    }
-    for (auto& observer : observers_) {
-      observer.ReadingListWillUpdateEntry(this, iterator.first);
-    }
-    UpdateEntryStateCountersOnEntryRemoval(entry);
-    entry.SetRead(false, clock_->Now());
-    UpdateEntryStateCountersOnEntryInsertion(entry);
-
-    batch->GetStorageBatch()->SaveEntry(entry);
-    sync_bridge_.DidAddOrUpdateEntry(entry, batch->GetSyncMetadataChangeList());
-
-    for (ReadingListModelObserver& observer : observers_) {
-      observer.ReadingListDidUpdateEntry(this, iterator.first);
-    }
-    for (auto& observer : observers_) {
-      observer.ReadingListDidApplyChanges(this);
-    }
+    MarkEntrySeenImpl(iterator.second.get());
   }
   DCHECK(unseen_entry_count_ == 0);
 }
@@ -258,6 +239,10 @@ ReadingListEntry* ReadingListModelImpl::SyncMergeEntry(
   const GURL url = entry->URL();
   ReadingListEntry* existing_entry = GetMutableEntryFromURL(url);
   DCHECK(existing_entry);
+
+  // TODO(crbug.com/1424750): ReadingList(Will|Did)MoveEntry() in this context
+  // is quite meaningless and the observer API should merge it with
+  // ReadingList(Will|Did)UpdateEntry().
 
   for (auto& observer : observers_)
     observer.ReadingListWillMoveEntry(this, url);
@@ -394,7 +379,6 @@ void ReadingListModelImpl::SetReadStatusIfExists(const GURL& url, bool read) {
   }
   UpdateEntryStateCountersOnEntryRemoval(entry);
   entry.SetRead(read, clock_->Now());
-  entry.MarkEntryUpdated(clock_->Now());
   UpdateEntryStateCountersOnEntryInsertion(entry);
 
   std::unique_ptr<ReadingListModelStorage::ScopedBatchUpdate> batch =
@@ -569,6 +553,17 @@ ReadingListModelImpl::BeginBatchUpdatesWithSyncMetadata() {
   return token;
 }
 
+void ReadingListModelImpl::MarkEntrySeenIfExists(const GURL& url) {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  DCHECK(loaded());
+
+  auto iterator = entries_.find(url);
+  if (iterator == entries_.end()) {
+    return;
+  }
+  MarkEntrySeenImpl(iterator->second.get());
+}
+
 bool ReadingListModelImpl::IsTrackingSyncMetadata() const {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   return sync_bridge_.change_processor()->IsTrackingMetadata();
@@ -654,6 +649,37 @@ ReadingListModelImpl::GetSyncControllerDelegateForTransportMode() {
 
 ReadingListModelStorage* ReadingListModelImpl::StorageLayer() {
   return storage_layer_.get();
+}
+
+void ReadingListModelImpl::MarkEntrySeenImpl(ReadingListEntry* entry) {
+  DCHECK(entry);
+
+  if (entry->HasBeenSeen()) {
+    return;
+  }
+
+  for (auto& observer : observers_) {
+    observer.ReadingListWillUpdateEntry(this, entry->URL());
+  }
+
+  UpdateEntryStateCountersOnEntryRemoval(*entry);
+  DCHECK(!entry->IsRead());
+  // SetRead() is used to transition the entry from the UNSEEN state to the
+  // UNREAD state.
+  entry->SetRead(false, clock_->Now());
+  UpdateEntryStateCountersOnEntryInsertion(*entry);
+
+  std::unique_ptr<ReadingListModelStorage::ScopedBatchUpdate> batch =
+      storage_layer_->EnsureBatchCreated();
+  batch->SaveEntry(*entry);
+  sync_bridge_.DidAddOrUpdateEntry(*entry, batch->GetSyncMetadataChangeList());
+
+  for (ReadingListModelObserver& observer : observers_) {
+    observer.ReadingListDidUpdateEntry(this, entry->URL());
+  }
+  for (ReadingListModelObserver& observer : observers_) {
+    observer.ReadingListDidApplyChanges(this);
+  }
 }
 
 void ReadingListModelImpl::AddEntryImpl(scoped_refptr<ReadingListEntry> entry,

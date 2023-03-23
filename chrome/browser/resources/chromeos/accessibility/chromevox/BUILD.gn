@@ -32,6 +32,8 @@ chromevox_modules = [
 chromevox_es6_modules = [
   "../common/automation_predicate.js",
   "../common/automation_util.js",
+  "../common/async_util.js",
+  "../common/browser_util.js",
   "../common/constants.js",
   "../common/cursors/cursor.js",
   "../common/cursors/range.js",
@@ -441,6 +443,7 @@ if (is_chromeos_ash) {
       "background/logging/log_store_test.js",
       "background/output/output_test.js",
       "background/panel/i_search_test.js",
+      "background/panel/panel_background_test.js",
       "background/panel/panel_node_menu_background_test.js",
       "background/portals_test.js",
       "background/settings_test.js",

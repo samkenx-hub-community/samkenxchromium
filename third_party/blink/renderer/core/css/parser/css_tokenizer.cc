@@ -57,6 +57,27 @@ Vector<CSSParserToken, 32> CSSTokenizer::TokenizeToEOF() {
   }
 }
 
+std::pair<Vector<CSSParserToken, 32>, Vector<wtf_size_t, 32>>
+CSSTokenizer::TokenizeToEOFWithOffsets() {
+  wtf_size_t estimated_tokens =
+      (input_.length() - Offset()) / kEstimatedCharactersPerToken;
+  Vector<CSSParserToken, 32> tokens;
+  tokens.ReserveInitialCapacity(estimated_tokens);
+  Vector<wtf_size_t, 32> offsets;
+  offsets.ReserveInitialCapacity(estimated_tokens + 1);
+
+  while (true) {
+    offsets.push_back(input_.Offset());
+    const CSSParserToken token =
+        NextToken</*SkipComments=*/true, /*StoreOffset=*/false>();
+    if (token.GetType() == kEOFToken) {
+      return {tokens, offsets};
+    } else {
+      tokens.push_back(token);
+    }
+  }
+}
+
 StringView CSSTokenizer::StringRangeAt(wtf_size_t start,
                                        wtf_size_t length) const {
   return input_.RangeAt(start, length);
@@ -68,6 +89,12 @@ CSSParserToken CSSTokenizer::TokenizeSingle() {
 
 CSSParserToken CSSTokenizer::TokenizeSingleWithComments() {
   return NextToken</*SkipComments=*/false, /*StoreOffset=*/true>();
+}
+
+void CSSTokenizer::PersistStrings(CSSTokenizer& destination) {
+  for (String& s : string_pool_) {
+    destination.string_pool_.push_back(std::move(s));
+  }
 }
 
 wtf_size_t CSSTokenizer::TokenCount() {

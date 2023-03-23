@@ -5,6 +5,8 @@
 #import "ios/chrome/browser/ui/settings/password/passwords_coordinator.h"
 
 #import "base/metrics/histogram_functions.h"
+#import "base/metrics/user_metrics.h"
+#import "base/metrics/user_metrics_action.h"
 #import "components/keyed_service/core/service_access_type.h"
 #import "components/password_manager/core/browser/password_manager_metrics_util.h"
 #import "components/password_manager/core/browser/ui/credential_ui_entry.h"
@@ -29,7 +31,7 @@
 #import "ios/chrome/browser/ui/settings/password/password_details/add_password_coordinator_delegate.h"
 #import "ios/chrome/browser/ui/settings/password/password_details/password_details_coordinator.h"
 #import "ios/chrome/browser/ui/settings/password/password_details/password_details_coordinator_delegate.h"
-#import "ios/chrome/browser/ui/settings/password/password_issues_coordinator.h"
+#import "ios/chrome/browser/ui/settings/password/password_issues/password_issues_coordinator.h"
 #import "ios/chrome/browser/ui/settings/password/password_manager_view_controller.h"
 #import "ios/chrome/browser/ui/settings/password/password_manager_view_controller_presentation_delegate.h"
 #import "ios/chrome/browser/ui/settings/password/password_settings/password_settings_coordinator.h"
@@ -169,6 +171,11 @@ using password_manager::WarningType;
 
   [self.baseNavigationController pushViewController:self.passwordsViewController
                                            animated:YES];
+
+  // When kIOSPasswordCheckup is enabled, start a password check.
+  if (password_manager::features::IsPasswordCheckupEnabled()) {
+    [self checkSavedPasswords];
+  }
 }
 
 - (void)stop {
@@ -339,6 +346,8 @@ using password_manager::WarningType;
       initWithBaseViewController:self.viewController
                          browser:self.browser];
   self.passwordSettingsCoordinator.delegate = self;
+
+  base::RecordAction(base::UserMetricsAction("PasswordManager_OpenSettings"));
   [self.passwordSettingsCoordinator start];
 }
 

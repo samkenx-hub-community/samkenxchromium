@@ -56,14 +56,7 @@ class CONTENT_EXPORT AttributionOsLevelManagerAndroid
   AttributionOsLevelManagerAndroid& operator=(
       AttributionOsLevelManagerAndroid&&) = delete;
 
-  void RegisterAttributionSource(const GURL& registration_url,
-                                 const url::Origin& top_level_origin,
-                                 bool is_debug_key_allowed,
-                                 const AttributionInputEvent&) override;
-
-  void RegisterAttributionTrigger(const GURL& registration_url,
-                                  const url::Origin& top_level_origin,
-                                  bool is_debug_key_allowed) override;
+  void Register(const OsRegistration&, bool is_debug_key_allowed) override;
 
   void ClearData(base::Time delete_begin,
                  base::Time delete_end,
@@ -81,6 +74,9 @@ class CONTENT_EXPORT AttributionOsLevelManagerAndroid
 
   base::flat_map<int, base::OnceClosure> pending_data_deletion_callbacks_
       GUARDED_BY_CONTEXT(sequence_checker_);
+
+  int next_pending_data_deletion_callback_id_
+      GUARDED_BY_CONTEXT(sequence_checker_) = 0;
 
   base::android::ScopedJavaGlobalRef<jobject> jobj_
       GUARDED_BY_CONTEXT(sequence_checker_);

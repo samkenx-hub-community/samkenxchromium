@@ -119,7 +119,6 @@
 <translation id="1942765061641586207">Kujutise eraldusvõime</translation>
 <translation id="1972984168337863910">Laienda failide tagasisidepaneele</translation>
 <translation id="1995337122023280937">Ava faili asukoht</translation>
-<translation id="1999709132469742660">Failidele pääsevad juurde kõik URL-id</translation>
 <translation id="2001796770603320721">Halda Drive'is</translation>
 <translation id="2009067268969781306">Ketta vormindamisel kustutatakse kõik sellel olevad andmed. Seda toimingut ei saa tagasi võtta.</translation>
 <translation id="2025955442973426285">tigrinja</translation>
@@ -151,6 +150,7 @@
 <translation id="2236732657580416950">Teie Google Drive'i vahemälu tühjendati.</translation>
 <translation id="2239068707900391003">Inimene kohviga</translation>
 <translation id="2251368349685848079">Taasta prügikastist</translation>
+<translation id="2278133026967558505">Failidele pääsevad juurde kõik veebisaidid ja URL-id</translation>
 <translation id="2282155092769082568">Automaatse konfigureerimise URL:</translation>
 <translation id="2284767815536050991">eemaldatav salvestusruum</translation>
 <translation id="2288278176040912387">Grammofon</translation>
@@ -543,7 +543,6 @@
 <translation id="5323213332664049067">Ladina-Ameerika</translation>
 <translation id="5330145655348521461">Failid on avatud erinevatel töölaudadel. Faili vaatamiseks avage <ph name="USER_NAME" /> (<ph name="MAIL_ADDRESS" />).</translation>
 <translation id="5330512191124428349">Hangi teavet</translation>
-<translation id="5337538975554986899">Failidele pääsevad juurde kõik URL-id, välja arvatud <ph name="NON_RESTRICTED_DESTINATIONS" /></translation>
 <translation id="5344246330454251646">Bruschettaga jagamise haldamine</translation>
 <translation id="535792325654997756">Kassidega inimene</translation>
 <translation id="5358764674931277">Kaadrisagedus</translation>
@@ -769,6 +768,7 @@
 <translation id="7162080671816799010">Autentimisserveri identiteedi kinnitamiseks puudub „Teema alternatiivse nime vaste“ või „Domeenisufiksi vaste“.</translation>
 <translation id="7165320105431587207">Võrgu seadistamine ebaõnnestus</translation>
 <translation id="7170041865419449892">Vahemikust väljas</translation>
+<translation id="7179579940054351344">Failidele pääsevad juurde kõik veebisaidid ja URL-id, välja arvatud <ph name="NON_RESTRICTED_DESTINATIONS" /></translation>
 <translation id="7180611975245234373">Värskenda</translation>
 <translation id="7189874332498648577"><ph name="NUMBER_OF_GB" /> GB</translation>
 <translation id="7191454237977785534">Salvesta fail nimega</translation>
@@ -942,6 +942,7 @@
 <translation id="8492972329130824181">Kodune võrk pole saadaval. Ühenduse loomiseks tuleb lubada mobiilse andmeside rändlus.</translation>
 <translation id="8499098729323186194"><ph name="NUMBER_OF_ITEMS" /> üksuse ekstraktimine …</translation>
 <translation id="8502913769543567768">Võrk <ph name="NETWORK_INDEX" />, võrke kokku <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, <ph name="NETWORK_PROVIDER_NAME" />, aktiveerige pärast seadme seadistust, võrku haldab teie administraator</translation>
+<translation id="8512483403832814140">Mis tahes ajal</translation>
 <translation id="8521441079177373948">Ühendkuningriik</translation>
 <translation id="853494022971700746">prantsuse (Prantsusmaa)</translation>
 <translation id="8540608333167683902"><ph name="NETWORK_INDEX" />. võrk <ph name="NETWORK_COUNT" />-st, <ph name="NETWORK_NAME" />, <ph name="CONNECTION_STATUS" />, signaalitugevus: <ph name="SIGNAL_STRENGTH" />%, üksikasjad</translation>

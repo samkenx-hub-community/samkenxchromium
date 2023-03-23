@@ -10,12 +10,12 @@
 #import "base/strings/utf_string_conversions.h"
 #import "base/time/time.h"
 #import "components/url_formatter/elide_url.h"
+#import "ios/chrome/browser/shared/ui/table_view/cells/table_view_url_item.h"
+#import "ios/chrome/browser/shared/ui/table_view/chrome_table_view_styler.h"
 #import "ios/chrome/browser/shared/ui/util/pasteboard_util.h"
 #import "ios/chrome/browser/ui/icons/symbols.h"
 #import "ios/chrome/browser/ui/reading_list/reading_list_list_item_custom_action_factory.h"
 #import "ios/chrome/browser/ui/reading_list/reading_list_list_item_util.h"
-#import "ios/chrome/browser/ui/table_view/cells/table_view_url_item.h"
-#import "ios/chrome/browser/ui/table_view/chrome_table_view_styler.h"
 #import "ios/chrome/common/ui/colors/semantic_color_names.h"
 #import "ios/chrome/common/ui/favicon/favicon_view.h"
 #import "ios/chrome/common/ui/table_view/table_view_url_cell_favicon_badge_view.h"
@@ -33,9 +33,6 @@ namespace {
 
 // The size of the symbol badge image.
 constexpr CGFloat kSymbolBadgeImagePointSize = 13;
-
-// The size of the symbol for the metadata image.
-constexpr CGFloat kSymbolMetadataImagePointSize = 18;
 
 // The string format used to append the distillation date to the URL host.
 NSString* const kURLAndDistillationDateFormat = @"%@ • %@";
@@ -86,11 +83,8 @@ NSString* const kURLAndDistillationDateFormat = @"%@ • %@";
       self.distillationBadgeTintColor = [UIColor colorNamed:kGrey600Color];
       break;
     case ReadingListUIDistillationStatusSuccess:
-      self.distillationBadgeImage =
-          UseSymbols()
-              ? DefaultSymbolTemplateWithPointSize(kCheckmarkCircleFillSymbol,
-                                                   kSymbolBadgeImagePointSize)
-              : [UIImage imageNamed:@"table_view_cell_check_mark"];
+      self.distillationBadgeImage = DefaultSymbolTemplateWithPointSize(
+          kCheckmarkCircleFillSymbol, kSymbolBadgeImagePointSize);
       self.distillationBadgeTintColor = [UIColor colorNamed:kGreen500Color];
       break;
     case ReadingListUIDistillationStatusPending:
@@ -111,10 +105,10 @@ NSString* const kURLAndDistillationDateFormat = @"%@ • %@";
   URLCell.accessibilityTraits |= UIAccessibilityTraitButton;
   URLCell.metadataImage.image =
       self.showCloudSlashIcon
-          ? CustomSymbolTemplateWithPointSize(kCloudSlashSymbol,
-                                              kSymbolMetadataImagePointSize)
+          ? CustomSymbolWithPointSize(kCloudSlashSymbol,
+                                      kCloudSlashSymbolPointSize)
           : nil;
-  URLCell.metadataImage.tintColor = [UIColor colorNamed:kTextSecondaryColor];
+  URLCell.metadataImage.tintColor = CloudSlashTintColor();
   if (styler.cellTitleColor)
     URLCell.titleLabel.textColor = styler.cellTitleColor;
   [URLCell.faviconView configureWithAttributes:self.attributes];

@@ -81,6 +81,11 @@ std::unique_ptr<cc::ScopedPauseRendering> EmptyChromeClient::PauseRendering(
   return nullptr;
 }
 
+absl::optional<int> EmptyChromeClient::GetMaxRenderBufferBounds(
+    LocalFrame& frame) const {
+  return absl::nullopt;
+}
+
 void EmptyChromeClient::OpenTextDataListChooser(HTMLInputElement&) {}
 
 void EmptyChromeClient::OpenFileChooser(LocalFrame*,
@@ -144,8 +149,7 @@ RemoteFrame* EmptyLocalFrameClient::AdoptPortal(HTMLPortalElement*) {
 
 RemoteFrame* EmptyLocalFrameClient::CreateFencedFrame(
     HTMLFencedFrameElement*,
-    mojo::PendingAssociatedReceiver<mojom::blink::FencedFrameOwnerHost>,
-    mojom::blink::FencedFrameMode) {
+    mojo::PendingAssociatedReceiver<mojom::blink::FencedFrameOwnerHost>) {
   return nullptr;
 }
 

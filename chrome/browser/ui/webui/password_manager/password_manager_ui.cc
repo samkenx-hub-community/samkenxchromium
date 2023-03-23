@@ -44,6 +44,8 @@
 #endif
 
 #if BUILDFLAG(GOOGLE_CHROME_BRANDING)
+#include "chrome/browser/ui/webui/password_manager/promo_card.h"
+#include "chrome/browser/ui/webui/password_manager/promo_cards_handler.h"
 #include "chrome/grit/chrome_unscaled_resources.h"
 #endif
 
@@ -115,6 +117,7 @@ content::WebUIDataSource* CreateAndAddPasswordsUIHTMLSource(
     {"editPasswordFootnote", IDS_PASSWORD_MANAGER_UI_PASSWORD_EDIT_FOOTNOTE},
     {"editPasswordTitle", IDS_PASSWORD_MANAGER_UI_EDIT_PASSWORD},
     {"emptyNote", IDS_PASSWORD_MANAGER_UI_NO_NOTE_SAVED},
+    {"emptyState", IDS_PASSWORD_MANAGER_UI_EMPTY_STATE},
     {"exportPasswords", IDS_PASSWORD_MANAGER_UI_EXPORT_TITLE},
     {"exportPasswordsDescription",
      IDS_PASSWORD_MANAGER_UI_EXPORT_BANNER_DESCRIPTION},
@@ -320,6 +323,13 @@ PasswordManagerUI::PasswordManagerUI(content::WebUI* web_ui)
                                                                         true);
   web_ui->AddMessageHandler(
       std::make_unique<password_manager::SyncHandler>(profile));
+#if BUILDFLAG(GOOGLE_CHROME_BRANDING)
+  web_ui->AddMessageHandler(
+      std::make_unique<password_manager::PromoCardsHandler>(
+          profile,
+          password_manager::PromoCardInterface::GetAllPromoCardsForProfile(
+              profile)));
+#endif
   auto* source = CreateAndAddPasswordsUIHTMLSource(profile, web_ui);
   AddPluralStrings(web_ui);
   ManagedUIHandler::Initialize(web_ui, source);

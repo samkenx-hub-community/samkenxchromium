@@ -29,34 +29,6 @@ SitePermissionsHelper::SitePermissionsHelper(Profile* profile)
 
 SitePermissionsHelper::~SitePermissionsHelper() = default;
 
-SitePermissionsHelper::SiteAccess SitePermissionsHelper::GetSiteAccess(
-    const Extension& extension,
-    const GURL& gurl) const {
-  DCHECK(
-      !extension.permissions_data()->IsRestrictedUrl(gurl, /*error=*/nullptr));
-
-  PermissionsManager* permissions_manager = PermissionsManager::Get(profile_);
-
-  // Extension with no host permissions but with active tab permission has "on
-  // click" access.
-  if (!permissions_manager->CanAffectExtension(extension) &&
-      HasActiveTabAndCanAccess(extension, gurl)) {
-    return SiteAccess::kOnClick;
-  }
-
-  DCHECK(permissions_manager->CanAffectExtension(extension));
-
-  PermissionsManager::ExtensionSiteAccess site_access =
-      permissions_manager->GetSiteAccess(extension, gurl);
-  if (site_access.has_all_sites_access) {
-    return SiteAccess::kOnAllSites;
-  }
-  if (site_access.has_site_access) {
-    return SiteAccess::kOnSite;
-  }
-  return SiteAccess::kOnClick;
-}
-
 SitePermissionsHelper::SiteInteraction
 SitePermissionsHelper::GetSiteInteraction(
     const Extension& extension,
@@ -95,24 +67,26 @@ SitePermissionsHelper::GetSiteInteraction(
     return SiteInteraction::kWithheld;
   }
 
-  if (HasActiveTabAndCanAccess(extension, url)) {
+  if (PermissionsManager::Get(profile_)->HasActiveTabAndCanAccess(extension,
+                                                                  url)) {
     return SiteInteraction::kActiveTab;
   }
 
   return SiteInteraction::kNone;
 }
 
-void SitePermissionsHelper::UpdateSiteAccess(const Extension& extension,
-                                             content::WebContents* web_contents,
-                                             SiteAccess new_access) {
+void SitePermissionsHelper::UpdateSiteAccess(
+    const Extension& extension,
+    content::WebContents* web_contents,
+    PermissionsManager::UserSiteAccess new_access) {
   ExtensionActionRunner* runner =
       ExtensionActionRunner::GetForWebContents(web_contents);
   if (!runner) {
     return;
   }
 
-  auto current_access =
-      GetSiteAccess(extension, web_contents->GetLastCommittedURL());
+  auto current_access = PermissionsManager::Get(profile_)->GetUserSiteAccess(
+      extension, web_contents->GetLastCommittedURL());
   if (new_access == current_access) {
     return;
   }
@@ -137,65 +111,12 @@ void SitePermissionsHelper::UpdateUserSiteSettings(
       site_setting);
 }
 
-bool SitePermissionsHelper::CanSelectSiteAccess(const Extension& extension,
-                                                const GURL& url,
-                                                SiteAccess site_access) const {
-  // Extensions cannot run on sites restricted to them (ever), so no type of
-  // site access is selectable.
-  if (extension.permissions_data()->IsRestrictedUrl(url, /*error=*/nullptr)) {
-    return false;
-  }
-
-  // The "on click" option is enabled if the extension has active tab,
-  // regardless of its granted host permissions.
-  if (site_access == SiteAccess::kOnClick &&
-      HasActiveTabAndCanAccess(extension, url)) {
-    return true;
-  }
-
-  PermissionsManager* permissions_manager = PermissionsManager::Get(profile_);
-  if (!permissions_manager->CanAffectExtension(extension)) {
-    return false;
-  }
-
-  PermissionsManager::ExtensionSiteAccess extension_access =
-      permissions_manager->GetSiteAccess(extension, url);
-  switch (site_access) {
-    case SiteAccess::kOnClick:
-      // The "on click" option is only enabled if the extension has active tab,
-      // previously handled, or wants to always run on the site without user
-      // interaction.
-      return extension_access.has_site_access ||
-             extension_access.withheld_site_access;
-    case SiteAccess::kOnSite:
-      // The "on site" option is only enabled if the extension wants to
-      // always run on the site without user interaction.
-      return extension_access.has_site_access ||
-             extension_access.withheld_site_access;
-    case SiteAccess::kOnAllSites:
-      // The "on all sites" option is only enabled if the extension wants to be
-      // able to run everywhere.
-      return extension_access.has_all_sites_access ||
-             extension_access.withheld_all_sites_access;
-  }
-}
-
 bool SitePermissionsHelper::HasBeenBlocked(
     const Extension& extension,
     content::WebContents* web_contents) const {
   ExtensionActionRunner* action_runner =
       ExtensionActionRunner::GetForWebContents(web_contents);
   return action_runner && action_runner->WantsToRun(&extension);
-}
-
-bool SitePermissionsHelper::HasActiveTabAndCanAccess(const Extension& extension,
-                                                     const GURL& url) const {
-  return extension.permissions_data()->HasAPIPermission(
-             mojom::APIPermissionID::kActiveTab) &&
-         !extension.permissions_data()->IsRestrictedUrl(url,
-                                                        /*error=*/nullptr) &&
-         (!url.SchemeIsFile() ||
-          util::AllowFileAccess(extension.id(), profile_));
 }
 
 bool SitePermissionsHelper::ShowAccessRequestsInToolbar(
@@ -215,7 +136,8 @@ void SitePermissionsHelper::SetShowAccessRequestsInToolbar(
   ExtensionPrefs::Get(profile_)->UpdateExtensionPref(
       extension_id, kPrefShowAccessRequestsInToolbar,
       base::Value(show_access_requests_in_toolbar));
-  PermissionsManager::Get(profile_)->NotifyShowAccessRequestsInToolbarChanged();
+  PermissionsManager::Get(profile_)->NotifyShowAccessRequestsInToolbarChanged(
+      extension_id, show_access_requests_in_toolbar);
 }
 
 }  // namespace extensions

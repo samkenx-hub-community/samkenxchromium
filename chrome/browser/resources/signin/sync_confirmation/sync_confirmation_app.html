@@ -299,7 +299,7 @@
     max-width: 500px;
   }
 
-  .window-main-container {
+  .main-container.tangible-sync-style:not(.dialog) {
     --button-container-height: calc(2 * var(--action-container-padding) +
         var(--cr-button-height));
     display: flex;
@@ -307,7 +307,7 @@
     width: 100vw;
   }
 
-  .dialog-main-container.tangible-sync-style #contentContainer {
+  .tangible-sync-style.dialog #contentContainer {
     --cr-button-height: 32px;
     --sync-info-desc-bottom-margin: 48px;
     --container-bottom-padding: calc(var(--sync-info-desc-bottom-margin) +
@@ -332,17 +332,6 @@
     --work-icon-size: 14px;
   }
 
-  .dialog-main-container.tangible-sync-style #title {
-    font-size: 1.25rem;
-    line-height: 24px;
-    margin: 16px 0 12px
-  }
-
-  .dialog-main-container.tangible-sync-style #subtitle {
-    font-size: 0.94rem;
-    line-height: 24px;
-  }
-
   #syncBenefitsList {
     background: var(--sync-benefits-list-color);
     border-radius: 24px;
@@ -356,7 +345,7 @@
     row-gap: 16px;
   }
 
-  .dialog-main-container.tangible-sync-style #syncBenefitsList {
+  .tangible-sync-style.dialog #syncBenefitsList {
     margin: 16px 38px;
     padding: 20px 24px;
   }
@@ -380,28 +369,22 @@
     line-height: 20px;
   }
 
-  .dialog-main-container.tangible-sync-style #syncInfoDesc {
+  .tangible-sync-style.dialog #syncInfoDesc {
     margin: 0 38px;
   }
 
-  #tangible-sync-dialog-illustration {
+  .tangible-sync-style-dialog-illustration {
     content: url(./images/tangible_sync_dialog_illustration.svg);
-    height: 68px;
-    left: 50%;
-    position: absolute;
-    top: 40px;
-    transform: translateX(-50%);
-    width: 328px;
   }
 
-  #tangible-sync-style-left-banner {
+  .tangible-sync-style-left-banner {
     animation-duration: 500ms;
     animation-name: left-illustration-slide-animation, fade-in-animation;
     content: url(./images/tangible_sync_window_left_illustration.svg);
     transition-timing-function: ease-in-out;
   }
 
-  #tangible-sync-style-right-banner {
+  .tangible-sync-style-right-banner {
     animation-duration: 500ms;
     animation-name: right-illustration-slide-animation, fade-in-animation;
     content: url(./images/tangible_sync_window_right_illustration.svg);
@@ -410,11 +393,6 @@
 
   .fade-in {
     animation: 500ms ease-in-out fade-in-animation;
-  }
-
-  .tangible-sync-style.dialog-button-container cr-button {
-    --cr-button-height: 32px;
-    min-width: 111px;
   }
 
   @media (prefers-color-scheme: dark) {
@@ -429,7 +407,7 @@
           url(./images/sync_confirmation_illustration_dark.svg);
     }
 
-    #tangible-sync-dialog-illustration {
+    .tangible-sync-style-dialog-illustration {
       content: url(./images/tangible_sync_dialog_illustration_dark.svg);
     }
 
@@ -439,11 +417,11 @@
         url(images/sync_confirmation_refreshed_illustration_dark.svg);
     }
 
-    #tangible-sync-style-left-banner {
+    .tangible-sync-style-left-banner {
       content: url(./images/tangible_sync_window_left_illustration_dark.svg);
     }
 
-    #tangible-sync-style-right-banner {
+    .tangible-sync-style-right-banner {
       content: url(./images/tangible_sync_window_right_illustration_dark.svg);
     }
 
@@ -469,7 +447,8 @@
   which user clicks to indicate consent.
 -->
 
-<template is="dom-if" if="[[isModalDialogWithoutTangibleSync_()]]">
+<template is="dom-if" if="[[isModalDialogWithoutTangibleSync_(
+    isModalDialog_, isTangibleSync_)]]">
   <template is="dom-if" if="[[!isSigninInterceptFre_]]">
     <div id="illustration-container">
       <div id="grey-banner"></div>
@@ -487,7 +466,8 @@
       </div>
     </div>
   </template>
-  <div id="content-container" class$="[[getSigninInterceptDesignClass_(isSigninInterceptFre_)]]">
+  <div id="content-container" class$="[[getSigninInterceptDesignClass_(
+      isSigninInterceptFre_)]]">
     <h1 id="syncConfirmationHeading" class="heading" consent-description>
       $i18n{syncConfirmationTitle}
     </h1>
@@ -533,7 +513,8 @@
   </div>
 </template>
 
-<template is="dom-if" if="[[isWindowVersionWithoutTangibleSync_()]]">
+<template is="dom-if" if="[[isWindowVersionWithoutTangibleSync_(
+    isModalDialog_, isTangibleSync_)]]">
   <div id="confirmationContainer">
     <div id="headerContainer">
       <div id="syncPromoBanner"></div>
@@ -587,27 +568,31 @@
 </template>
 
 <template is="dom-if" if="[[isTangibleSync_]]">
-  <div class$="tangible-sync-style [[getMainContainerClass_()]]">
-    <img id="tangible-sync-dialog-illustration" hidden="[[!isModalDialog_]]">
-    <img id="tangible-sync-style-left-banner" hidden="[[isModalDialog_]]">
-    <img id="tangible-sync-style-right-banner" hidden="[[isModalDialog_]]">
+  <div class$="main-container [[tangibleSyncStyleClass]]">
+    <img class="tangible-sync-style-dialog-illustration" alt=""
+        hidden="[[!isModalDialog_]]">
+    <img class="tangible-sync-style-left-banner" alt=""
+        hidden="[[isModalDialog_]]">
+    <img class="tangible-sync-style-right-banner" alt=""
+        hidden="[[isModalDialog_]]">
     <div id="contentContainer" class$="[[getAnimationClass_()]]">
       <div id="avatarContainer">
         <img id="avatar" alt="" src="[[accountImageSrc_]]">
         <div id="badge" class="work-badge" hidden="[[!showEnterpriseBadge_]]">
-          <iron-icon icon="cr:domain"></iron-icon>
+          <iron-icon icon="cr:domain" alt=""></iron-icon>
         </div>
       </div>
-      <h1 id="title" consent-description>
+      <h1 class="title" consent-description>
         $i18n{syncConfirmationTitle}
       </h1>
-      <div id="subtitle" consent-description>
+      <div class="subtitle" consent-description>
         $i18n{syncConfirmationSyncInfoTitle}
       </div>
       <div id="syncBenefitsList">
         <template is="dom-repeat" items="[[syncBenefitsList_]]">
           <div class="sync-benefit">
-            <iron-icon class="sync-benefit-icon" icon="[[item.iconName]]">
+            <iron-icon class="sync-benefit-icon" icon="[[item.iconName]]"
+                alt="">
             </iron-icon>
             <div class="sync-benefit-text" consent-description>
               [[i18n(item.title)]]
@@ -622,7 +607,7 @@
   </div>
   <div class$="action-row [[getAnimationClass_()]]">
     <paper-spinner-lite active="[[anyButtonClicked_]]"></paper-spinner-lite>
-    <div class$="action-container tangible-sync-style [[getButtonContainerClass_()]]">
+    <div class$="action-container [[tangibleSyncStyleClass]]">
       <cr-button id="confirmButton" class="action-button" on-click="onConfirm_"
           disabled="[[anyButtonClicked_]]" consent-confirmation
           autofocus="[[isModalDialog_]]">
@@ -634,7 +619,8 @@
           $i18n{syncConfirmationSettingsLabel}
         </cr-button>
       </if>
-      <cr-button id="notNowButton" on-click="onUndo_" disabled="[[anyButtonClicked_]]">
+      <cr-button id="notNowButton" on-click="onUndo_"
+          disabled="[[anyButtonClicked_]]">
         $i18n{syncConfirmationUndoLabel}
       </cr-button>
       <if expr="not (is_macosx or is_linux or chromeos_ash or chromeos_lacros)">

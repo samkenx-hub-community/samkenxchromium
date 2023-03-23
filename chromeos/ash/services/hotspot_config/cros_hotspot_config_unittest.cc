@@ -60,10 +60,11 @@ class CrosHotspotConfigTest : public testing::Test {
     NetworkHandler* network_handler = NetworkHandler::Get();
     // Use base::WrapUnique(new CrosHotspotConfig(...)) instead of
     // std::make_unique<CrosHotspotConfig> to access a private constructor.
-    cros_hotspot_config_ = base::WrapUnique(
-        new CrosHotspotConfig(network_handler->hotspot_capabilities_provider(),
-                              network_handler->hotspot_state_handler(),
-                              network_handler->hotspot_controller()));
+    cros_hotspot_config_ = base::WrapUnique(new CrosHotspotConfig(
+        network_handler->hotspot_capabilities_provider(),
+        network_handler->hotspot_state_handler(),
+        network_handler->hotspot_controller(),
+        network_handler->hotspot_configuration_handler()));
     base::RunLoop().RunUntilIdle();
   }
 
@@ -136,9 +137,9 @@ class CrosHotspotConfigTest : public testing::Test {
     cros_hotspot_config_->GetHotspotInfo(
         base::BindLambdaForTesting([&](mojom::HotspotInfoPtr result) {
           out_result = std::move(result);
-          run_loop.QuitClosure();
+          run_loop.Quit();
         }));
-    run_loop.RunUntilIdle();
+    run_loop.Run();
     return out_result;
   }
 
@@ -150,9 +151,10 @@ class CrosHotspotConfigTest : public testing::Test {
         std::move(mojom_config),
         base::BindLambdaForTesting([&](mojom::SetHotspotConfigResult result) {
           out_result = result;
-          run_loop.QuitClosure();
+          run_loop.Quit();
         }));
-    run_loop.RunUntilIdle();
+    run_loop.Run();
+    FlushMojoCalls();
     return out_result;
   }
 
@@ -162,9 +164,10 @@ class CrosHotspotConfigTest : public testing::Test {
     cros_hotspot_config_->EnableHotspot(
         base::BindLambdaForTesting([&](mojom::HotspotControlResult result) {
           out_result = result;
-          run_loop.QuitClosure();
+          run_loop.Quit();
         }));
-    run_loop.RunUntilIdle();
+    run_loop.Run();
+    FlushMojoCalls();
     return out_result;
   }
 
@@ -174,9 +177,10 @@ class CrosHotspotConfigTest : public testing::Test {
     cros_hotspot_config_->DisableHotspot(
         base::BindLambdaForTesting([&](mojom::HotspotControlResult result) {
           out_result = result;
-          run_loop.QuitClosure();
+          run_loop.Quit();
         }));
-    run_loop.RunUntilIdle();
+    run_loop.Run();
+    FlushMojoCalls();
     return out_result;
   }
 
@@ -185,6 +189,8 @@ class CrosHotspotConfigTest : public testing::Test {
                                         LoginState::LOGGED_IN_USER_REGULAR);
     task_environment_.RunUntilIdle();
   }
+
+  void FlushMojoCalls() { base::RunLoop().RunUntilIdle(); }
 
   NetworkHandlerTestHelper* helper() {
     return network_handler_test_helper_.get();
@@ -294,6 +300,7 @@ TEST_F(CrosHotspotConfigTest, EnableHotspot) {
 
 TEST_F(CrosHotspotConfigTest, DisableHotspot) {
   SetupObserver();
+  SetHotspotStateInShill(shill::kTetheringStateActive);
   helper()->manager_test()->SetSimulateTetheringEnableResult(
       FakeShillSimulatedResult::kSuccess, shill::kTetheringEnableResultSuccess);
   base::RunLoop().RunUntilIdle();

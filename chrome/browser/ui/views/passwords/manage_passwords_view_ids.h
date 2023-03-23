@@ -16,8 +16,6 @@ enum class ManagePasswordsViewIDs {
   // The following ids are for username in the details views.
   kCopyUsernameButton,
   kEditUsernameButton,
-  kEditUsernameRow,
-  kReadUsernameRow,
   kUsernameTextField,
   kUsernameLabel,
 
@@ -28,6 +26,8 @@ enum class ManagePasswordsViewIDs {
 
   // The following ids are for note in the details views.
   kEditNoteButton,
+  kNoteTextarea,
+  kNoteLabel,
 };
 
 }  // namespace password_manager

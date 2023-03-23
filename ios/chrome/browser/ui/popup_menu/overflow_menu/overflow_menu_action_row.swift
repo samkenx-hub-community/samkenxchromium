@@ -32,6 +32,7 @@ struct OverflowMenuActionRow: View {
           Text(action.name).lineLimit(1)
           if action.displayNewLabelIcon {
             newLabelIconView()
+              .accessibilityIdentifier("overflowRowIPHBadgeIdentifier")
           }
           Spacer()
           imageBuilder().frame(
@@ -56,13 +57,9 @@ struct OverflowMenuActionRow: View {
   /// TODO(crbug.com/1315544): Remove this once only the symbols are present.
   @ViewBuilder
   func imageBuilder() -> some View {
-    if !action.symbolName.isEmpty {
-      actionSymbol().font(Font.system(size: OverflowMenuActionRow.symbolSize, weight: .medium))
-        .imageScale(
-          .medium)
-    } else {
-      action.image
-    }
+    actionSymbol().font(Font.system(size: OverflowMenuActionRow.symbolSize, weight: .medium))
+      .imageScale(
+        .medium)
   }
 
   func actionSymbol() -> Image {

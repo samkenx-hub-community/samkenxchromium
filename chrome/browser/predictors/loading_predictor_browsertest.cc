@@ -23,7 +23,6 @@
 #include "base/test/scoped_feature_list.h"
 #include "build/build_config.h"
 #include "chrome/browser/browser_features.h"
-#include "chrome/browser/chrome_content_browser_client.h"
 #include "chrome/browser/navigation_predictor/navigation_predictor_features.h"
 #include "chrome/browser/navigation_predictor/navigation_predictor_preconnect_client.h"
 #include "chrome/browser/optimization_guide/optimization_guide_keyed_service.h"
@@ -38,6 +37,7 @@
 #include "chrome/browser/preloading/prefetch/no_state_prefetch/no_state_prefetch_manager_factory.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_commands.h"
+#include "chrome/common/chrome_features.h"
 #include "chrome/common/chrome_switches.h"
 #include "chrome/test/base/in_process_browser_test.h"
 #include "chrome/test/base/ui_test_utils.h"
@@ -376,7 +376,9 @@ class LoadingPredictorBrowserTest : public InProcessBrowserTest {
         {features::kLoadingOnlyLearnHighPriorityResources,
          features::kLoadingPreconnectToRedirectTarget,
          features::kNavigationPredictorPreconnectHoldback},
-        {});
+        // TODO(crbug.com/1394910): Use HTTPS URLs in tests to avoid having to
+        // disable this feature.
+        {features::kHttpsUpgrades});
   }
 
   LoadingPredictorBrowserTest(const LoadingPredictorBrowserTest&) = delete;
@@ -1076,14 +1078,7 @@ IN_PROC_BROWSER_TEST_P(LoadingPredictorNetworkIsolationKeyBrowserTest,
 
   // Learn the redirects from initial navigation.
   ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), redirecting_url));
-  // If kPreconnectOnRedirect is enabled then the redirect will cause a
-  // preconnect.
-  if (base::FeatureList::IsEnabled(network::features::kPreconnectOnRedirect) &&
-      ChromeContentBrowserClient::ShouldPreconnect(browser()->profile())) {
-    EXPECT_EQ(1u, connection_tracker()->GetAcceptedSocketCount());
-  } else {
-    EXPECT_EQ(0u, connection_tracker()->GetAcceptedSocketCount());
-  }
+  EXPECT_EQ(0u, connection_tracker()->GetAcceptedSocketCount());
   EXPECT_EQ(0u, connection_tracker()->GetReadSocketCount());
 
   // The next navigation should preconnect. It won't use the preconnected

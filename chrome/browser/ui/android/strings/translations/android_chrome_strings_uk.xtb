@@ -283,6 +283,7 @@
 <translation id="2581165646603367611">Буде видалено файли cookie, кеш та інші дані сайтів, які Chrome визначив як неважливі.</translation>
 <translation id="2587052924345400782">Доступна новіша версія</translation>
 <translation id="2593272815202181319">Однакової ширини</translation>
+<translation id="2603212228005142861">Увійдіть, щоб керувати налаштуваннями</translation>
 <translation id="2604446170045642109">Ви можете вимкнути темну тему для сайтів у налаштуваннях.</translation>
 <translation id="2612676031748830579">Номер картки</translation>
 <translation id="2625189173221582860">Пароль скопійовано</translation>
@@ -476,6 +477,7 @@
 <translation id="3587596251841506391">Покращувати безпеку в Інтернеті</translation>
 <translation id="3597179440835065298">Отримуйте кращі пропозиції</translation>
 <translation id="3602290021589620013">Попередній перегляд</translation>
+<translation id="360901359071773787">Видалити дані за останні 15 хвилин?</translation>
 <translation id="3616113530831147358">Аудіо</translation>
 <translation id="3622349720008044802">Керувати вікнами</translation>
 <translation id="3631987586758005671">Надсилання на пристрій <ph name="DEVICE_NAME" /></translation>
@@ -630,6 +632,7 @@
 
 У вашому обліковому записі Google на сторінці <ph name="BEGIN_LINK" />myactivity.google.com<ph name="END_LINK" /> можуть бути додаткові форми історії веб-перегляду, як-от пошукові запити чи активність в інших сервісах Google.</translation>
 <translation id="452750746583162491">Переглянути синхронізовані дані</translation>
+<translation id="4528638190900283934">Увійдіть в обліковий запис, щоб користуватися додатковими функціями</translation>
 <translation id="4532845899244822526">Вибрати папку</translation>
 <translation id="4547551584605870320">{TAB_COUNT,plural, =1{<ph name="TAB_COUNT_ONE" /> вкладка}one{<ph name="TAB_COUNT_MANY" /> вкладка, <ph name="TAB_COUNT_INCOGNITO" /> анонімно}few{<ph name="TAB_COUNT_MANY" /> вкладки, <ph name="TAB_COUNT_INCOGNITO" /> анонімно}many{<ph name="TAB_COUNT_MANY" /> вкладок, <ph name="TAB_COUNT_INCOGNITO" /> анонімно}other{<ph name="TAB_COUNT_MANY" /> вкладки, <ph name="TAB_COUNT_INCOGNITO" /> анонімно}}</translation>
 <translation id="4554077758708533499">Підключено за допомогою кабелю USB</translation>
@@ -820,6 +823,7 @@
 <translation id="5517095782334947753">У вас є закладки, історія, паролі й інші налаштування з облікового запису <ph name="FROM_ACCOUNT" />.</translation>
 <translation id="5524761631371622910">Якщо пробні версії функцій увімкнено й Chrome у випадковому порядку вибере вас для участі в активному експерименті, ваша історія веб-перегляду впливатиме на оголошення, що вам показуються, а також на наведений нижче список інтересів. З міркувань конфіденційності Chrome щомісяця видаляє ваші інтереси.</translation>
 <translation id="5524843473235508879">Переспрямування заблоковано.</translation>
+<translation id="554297709083131118">Дані за останні 15 хвилин буде видалено</translation>
 <translation id="5548606607480005320">Перевірка безпеки</translation>
 <translation id="5555525474779371165">Виберіть вид захисту в Безпечному перегляді</translation>
 <translation id="5556459405103347317">Перезавантажити</translation>
@@ -1074,6 +1078,7 @@
 <translation id="6824899148643461612">Вибрано вкладку "<ph name="TAB_TITLE" />"</translation>
 <translation id="6828070228333235514">Зупинити відстеження ціни</translation>
 <translation id="6830728435402077660">Небезпечно</translation>
+<translation id="6831043979455480757">Перекласти</translation>
 <translation id="6833996806551876956">Пробна версія Privacy Sandbox</translation>
 <translation id="6836206421467243968">Відновити групу вкладок "<ph name="TITLE_OF_GROUP" />" як нову фонову групу вкладок.</translation>
 <translation id="6846298663435243399">Завантаження…</translation>
@@ -1241,10 +1246,10 @@
 <translation id="7707922173985738739">Використовувати мобільне передавання даних</translation>
 <translation id="7709094866268987903">Тут з’являтимуться вилучені вами інтереси</translation>
 <translation id="7709918231054955894">Переглядайте всі свої вкладки</translation>
+<translation id="772434085369393266">Увесь трафік переходить на HTTPS, а ви отримуєте сповіщення перед завантаженням сайтів, які не підтримують цей протокол. Ви не можете змінити це налаштування, оскільки ввімкнули Додатковий захист.</translation>
 <translation id="7725024127233776428">Сторінки, для яких ви робите закладки, з'являються тут</translation>
 <translation id="7757787379047923882">Текст, надісланий із пристрою <ph name="DEVICE_NAME" /></translation>
 <translation id="7762668264895820836">Карта SD <ph name="SD_CARD_NUMBER" /></translation>
-<translation id="7762928140712606393">Увійдіть, щоб увімкнути додаткові функції та найвищий рівень безпеки в Chrome</translation>
 <translation id="7764225426217299476">Додати адресу</translation>
 <translation id="7772032839648071052">Підтвердити парольну фразу</translation>
 <translation id="7772375229873196092">Закрити додаток <ph name="APP_NAME" /></translation>
@@ -1260,6 +1265,7 @@
 <translation id="78270725016672455">Ваш комп’ютер пропонує зареєструвати цей пристрій для входу на сайті</translation>
 <translation id="7844171778363018843">Дані не синхронізуються</translation>
 <translation id="7846296061357476882">Сервіси Google</translation>
+<translation id="7847228556075070294">Історію, файли cookie й інші дані видалено</translation>
 <translation id="784934925303690534">Період часу</translation>
 <translation id="7851858861565204677">Інші пристрої</translation>
 <translation id="7853202427316060426">Активність</translation>
@@ -1439,6 +1445,7 @@
 <translation id="869891660844655955">Діє до</translation>
 <translation id="8699120352855309748">Не пропонувати перекладати ці мови</translation>
 <translation id="8712637175834984815">OK</translation>
+<translation id="8723453889042591629">Швидко перекладайте цю сторінку. Щоб змінити функцію цієї кнопки, натисніть і утримуйте її.</translation>
 <translation id="8725066075913043281">Повторити спробу</translation>
 <translation id="8746155870861185046">Поділитися виділеним текстом</translation>
 <translation id="874726034427945498">Щоб в адресному рядку показувалися кращі пропозиції, увімкніть синхронізацію вкладок і історії</translation>

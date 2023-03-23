@@ -6,6 +6,7 @@
  * @fileoverview The ChromeVox panel and menus.
  */
 import {AsyncUtil} from '../../common/async_util.js';
+import {BrowserUtil} from '../../common/browser_util.js';
 import {constants} from '../../common/constants.js';
 import {EventGenerator} from '../../common/event_generator.js';
 import {KeyCode} from '../../common/key_code.js';
@@ -36,8 +37,11 @@ const $ = (id) => document.getElementById(id);
 
 /** Class to manage the panel. */
 export class Panel extends PanelInterface {
-  /** @private */
-  constructor() {
+  /**
+   * @param {boolean} deprecateTabsMenu Whether to deprecate the tabs menu.
+   * @private
+   */
+  constructor(deprecateTabsMenu) {
     super();
     /** @private {!PanelMode} */
     this.mode_ = PanelMode.COLLAPSED;
@@ -77,6 +81,9 @@ export class Panel extends PanelInterface {
 
     /** @private {boolean} */
     this.tutorialReadyForTesting_ = false;
+
+    /** @private {boolean} */
+    this.deprecateTabsMenu_ = deprecateTabsMenu;
 
     this.initListeners_();
   }
@@ -128,7 +135,14 @@ export class Panel extends PanelInterface {
     await SettingsManager.init();
     LocaleOutputHelper.init();
 
-    Panel.instance = new Panel();
+    const deprecateTabsMenu = await new Promise(resolve => {
+      chrome.accessibilityPrivate.isFeatureEnabled(
+          chrome.accessibilityPrivate.AccessibilityFeature
+              .CHROMEVOX_TABS_DEPRECATION,
+          resolve);
+    });
+
+    Panel.instance = new Panel(deprecateTabsMenu);
     PanelInterface.instance = Panel.instance;
 
     Msgs.addTranslatedMessagesToDom(document);
@@ -322,7 +336,9 @@ export class Panel extends PanelInterface {
       const touchMenu = touchScreen ?
           this.menuManager_.addMenu('panel_menu_touchgestures') :
           null;
-      const tabsMenu = this.menuManager_.addMenu('panel_menu_tabs');
+      const tabsMenu = this.deprecateTabsMenu_ ?
+          null :
+          this.menuManager_.addMenu('panel_menu_tabs');
       const chromevoxMenu = this.menuManager_.addMenu('panel_menu_chromevox');
       const actionsMenu = this.menuManager_.addMenu('panel_menu_actions');
 
@@ -355,6 +371,7 @@ export class Panel extends PanelInterface {
 
         [CommandCategory.BRAILLE]: null,
         [CommandCategory.DEVELOPER]: null,
+        [CommandCategory.NO_CATEGORY]: null,
       };
 
       // TODO(accessibility): Commands should be based off of CommandStore and
@@ -459,17 +476,11 @@ export class Panel extends PanelInterface {
         }
       }
 
-      // Add all open tabs to the Tabs menu.
-      const data = await BackgroundBridge.PanelBackground.getTabMenuData();
-      for (const menuInfo of data) {
-        tabsMenu.addMenuItem(menuInfo.title, '', '', '', async () => {
-          BackgroundBridge.PanelBackground.focusTab(
-              menuInfo.windowId, menuInfo.tabId);
-        });
+      if (!this.deprecateTabsMenu_) {
+        this.populateTabsMenu_(tabsMenu);
       }
 
       if (this.sessionState_ !== 'IN_SESSION') {
-        tabsMenu.disable();
         this.menuManager_.denySignedOut();
       }
 
@@ -525,6 +536,25 @@ export class Panel extends PanelInterface {
       onFocusDo();
     } else {
       window.addEventListener('focus', onFocusDo);
+    }
+  }
+
+  /**
+   * Creates and populates the Tabs menu.
+   * @private
+   */
+  async populateTabsMenu_(tabsMenu) {
+    // Add all open tabs to the Tabs menu.
+    const data = await BackgroundBridge.PanelBackground.getTabMenuData();
+    for (const menuInfo of data) {
+      tabsMenu.addMenuItem(menuInfo.title, '', '', '', async () => {
+        BackgroundBridge.PanelBackground.focusTab(
+            menuInfo.windowId, menuInfo.tabId);
+      });
+    }
+
+    if (this.sessionState_ !== 'IN_SESSION') {
+      tabsMenu.disable();
     }
   }
 
@@ -1036,7 +1066,7 @@ export class Panel extends PanelInterface {
       // Ensure UserActionMonitor is destroyed before closing tutorial.
       await BackgroundBridge.UserActionMonitor.destroy();
       this.onCloseTutorial_();
-      chrome.tabs.create({url});
+      BrowserUtil.openBrowserUrl(url);
     });
   }
 

@@ -292,6 +292,7 @@ if (current_toolchain == default_toolchain) {
       "//chrome/browser/first_run/android:java",
       "//chrome/browser/flags:java",
       "//chrome/browser/fullscreen/android:java",
+      "//chrome/browser/gesturenav/android:java",
       "//chrome/browser/gsa:java",
       "//chrome/browser/history_clusters:java",
       "//chrome/browser/history_clusters:java_resources",
@@ -324,6 +325,8 @@ if (current_toolchain == default_toolchain) {
       "//chrome/browser/privacy_sandbox/android:java",
       "//chrome/browser/profiles/android:java",
       "//chrome/browser/quick_delete:java",
+      "//chrome/browser/recent_tabs:factory_java",
+      "//chrome/browser/recent_tabs:java",
       "//chrome/browser/safe_browsing/android:java",
       "//chrome/browser/safety_check/android:java",
       "//chrome/browser/search_engines/android:java",
@@ -712,6 +715,7 @@ if (current_toolchain == default_toolchain) {
       "//chrome/browser/password_check:internal_java",
       "//chrome/browser/password_edit_dialog/android:java",
       "//chrome/browser/password_entry_edit/android/internal:java",
+      "//chrome/browser/recent_tabs/internal:java",
       "//chrome/browser/tabmodel/internal:java",
       "//chrome/browser/touch_to_fill/android/internal:java",
       "//chrome/browser/touch_to_fill/common/android:java",
@@ -920,6 +924,8 @@ if (current_toolchain == default_toolchain) {
       "//chrome/browser/profiles/android:junit",
       "//chrome/browser/quick_delete:java",
       "//chrome/browser/quick_delete:junit",
+      "//chrome/browser/recent_tabs:java",
+      "//chrome/browser/recent_tabs/internal:junit",
       "//chrome/browser/safety_check/android:java",
       "//chrome/browser/safety_check/android:junit",
       "//chrome/browser/search_engines/android:java",
@@ -1482,6 +1488,7 @@ if (current_toolchain == default_toolchain) {
       "//chrome/browser/privacy_sandbox/android:javatests",
       "//chrome/browser/profiles/android:java",
       "//chrome/browser/quick_delete:java",
+      "//chrome/browser/quick_delete:javatests",
       "//chrome/browser/safe_browsing/android:java",
       "//chrome/browser/safe_browsing/android:javatests",
       "//chrome/browser/safety_check/android:java",
@@ -2864,7 +2871,6 @@ if (current_toolchain == default_toolchain) {
   if (enable_arcore) {
     monochrome_test_apk_tmpl("monochrome_public_test_ar_apk") {
       apk_name = "MonochromePublicTestAr"
-      min_sdk_version = 24
       target_sdk_version = android_sdk_version
 
       if (android_64bit_target_cpu) {
@@ -3138,11 +3144,9 @@ if (current_toolchain == default_toolchain) {
 
     if (_is_trichrome) {
       _bundle_name = "TrichromeChrome${invoker.bundle_suffix}"
-      _min_sdk_version = 29
       _module_descs = trichrome_module_descs
     } else {
       _bundle_name = "MonochromePublic${invoker.bundle_suffix}"
-      _min_sdk_version = 24
       _module_descs = monochrome_module_descs
     }
 
@@ -3191,7 +3195,6 @@ if (current_toolchain == default_toolchain) {
       base_module_target = ":$_base_module_target_name"
       bundle_name = _bundle_name
       manifest_package = chrome_public_manifest_package
-      min_sdk_version = _min_sdk_version
       module_descs = _module_descs
       chrome_deps = [ ":delegate_public_impl_java" ]
       if (!_is_trichrome) {
@@ -3569,7 +3572,6 @@ generate_jni("chrome_jni_headers") {
     "java/src/org/chromium/chrome/browser/notifications/PushMessagingServiceBridge.java",
     "java/src/org/chromium/chrome/browser/notifications/scheduler/DisplayAgent.java",
     "java/src/org/chromium/chrome/browser/notifications/scheduler/NotificationSchedulerTask.java",
-    "java/src/org/chromium/chrome/browser/ntp/ForeignSessionHelper.java",
     "java/src/org/chromium/chrome/browser/ntp/RecentTabsPagePrefs.java",
     "java/src/org/chromium/chrome/browser/ntp/RecentlyClosedBridge.java",
     "java/src/org/chromium/chrome/browser/offlinepages/AutoFetchNotifier.java",

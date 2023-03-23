@@ -46,6 +46,19 @@ class ReadAnythingFontModel : public ui::ComboboxModel {
   std::string GetLabelFontListAt(size_t index);
   size_t GetSelectedIndex() { return selected_index_; }
 
+  absl::optional<ui::ColorId> GetDropdownForegroundColorAt(
+      size_t index) const override;
+  absl::optional<ui::ColorId> GetDropdownBackgroundColorAt(
+      size_t index) const override;
+
+  void SetForegroundColor(absl::optional<ui::ColorId> foreground_color) {
+    foreground_color_id_ = foreground_color;
+  }
+
+  void SetBackgroundColor(absl::optional<ui::ColorId> background_color) {
+    background_color_id_ = background_color;
+  }
+
   // Used by tests only.
   absl::optional<size_t> GetDefaultIndexForTesting();
 
@@ -61,6 +74,9 @@ class ReadAnythingFontModel : public ui::ComboboxModel {
   std::vector<std::u16string> font_choices_;
 
   size_t selected_index_ = 0;
+
+  absl::optional<ui::ColorId> foreground_color_id_;
+  absl::optional<ui::ColorId> background_color_id_;
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -258,6 +274,7 @@ class ReadAnythingModel {
   void SetSelectedColorsByIndex(size_t new_index);
   void SetSelectedLineSpacingByIndex(size_t new_index);
   void SetSelectedLetterSpacingByIndex(size_t new_index);
+  void OnSystemThemeChanged();
 
   ReadAnythingFontModel* GetFontModel() { return font_model_.get(); }
   double GetFontScale() { return font_scale_; }

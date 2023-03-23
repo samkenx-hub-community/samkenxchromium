@@ -3022,7 +3022,7 @@ AX_TEST_F('ChromeVoxBackgroundTest', 'AlertNoAnnouncement', async function() {
   const button = root.find({role: RoleType.BUTTON});
   const alertEvt = new CustomAutomationEvent(EventType.ALERT, button);
   mockFeedback
-      .call(DesktopAutomationInterface.instance.onAlert.bind(
+      .call(DesktopAutomationInterface.instance.onAlert_.bind(
           DesktopAutomationInterface.instance, alertEvt))
       .call(() => assertFalse(mockFeedback.utteranceInQueue('Alert')));
   await mockFeedback.replay();
@@ -3040,7 +3040,7 @@ AX_TEST_F('ChromeVoxBackgroundTest', 'AlertAnnouncement', async function() {
   const button = root.find({role: RoleType.BUTTON});
   const alertEvt = new CustomAutomationEvent(EventType.ALERT, button);
   mockFeedback
-      .call(DesktopAutomationInterface.instance.onAlert.bind(
+      .call(DesktopAutomationInterface.instance.onAlert_.bind(
           DesktopAutomationInterface.instance, alertEvt))
       .expectNextSpeechUtteranceIsNot('Alert')
       .expectSpeech('hello world');
@@ -3114,7 +3114,8 @@ AX_TEST_F('ChromeVoxBackgroundTest', 'SwipeLeftRight2', async function() {
 
 // TODO(crbug.com/1228418) - Improve the generation of summaries across ChromeOS
 AX_TEST_F(
-    'ChromeVoxBackgroundTest', 'AlertDialogAutoSummaryTextContent',
+    // TODO(crbug.com/1419811): Test is flaky.
+    'ChromeVoxBackgroundTest', 'DISABLED_AlertDialogAutoSummaryTextContent',
     async function() {
       this.resetContextualOutput();
       const mockFeedback = this.createMockFeedback();

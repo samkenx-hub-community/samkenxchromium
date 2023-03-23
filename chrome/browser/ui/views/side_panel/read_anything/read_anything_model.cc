@@ -189,6 +189,10 @@ void ReadAnythingModel::IncreaseTextSize() {
   NotifyThemeChanged();
 }
 
+void ReadAnythingModel::OnSystemThemeChanged() {
+  NotifyThemeChanged();
+}
+
 void ReadAnythingModel::NotifyThemeChanged() {
   for (Observer& obs : observers_) {
     obs.OnReadAnythingThemeChanged(font_name_, font_scale_,
@@ -270,6 +274,16 @@ std::string ReadAnythingFontModel::GetLabelFontListAt(size_t index) {
   base::StringAppendF(&font_label, "%s",
                       string_constants::kReadAnythingDefaultFontSyle);
   return font_label;
+}
+
+absl::optional<ui::ColorId> ReadAnythingFontModel::GetDropdownForegroundColorAt(
+    size_t index) const {
+  return foreground_color_id_;
+}
+
+absl::optional<ui::ColorId> ReadAnythingFontModel::GetDropdownBackgroundColorAt(
+    size_t index) const {
+  return background_color_id_;
 }
 
 ReadAnythingFontModel::~ReadAnythingFontModel() = default;

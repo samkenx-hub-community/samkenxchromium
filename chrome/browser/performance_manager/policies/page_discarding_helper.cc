@@ -5,12 +5,14 @@
 #include "chrome/browser/performance_manager/policies/page_discarding_helper.h"
 
 #include <memory>
+#include <utility>
 
 #include "base/containers/flat_map.h"
 #include "base/containers/flat_set.h"
 #include "base/feature_list.h"
 #include "base/metrics/histogram_macros.h"
 #include "base/sequence_checker.h"
+#include "base/strings/string_piece.h"
 #include "base/time/time.h"
 #include "build/build_config.h"
 #include "build/chromeos_buildflags.h"
@@ -22,6 +24,7 @@
 #include "components/performance_manager/public/graph/frame_node.h"
 #include "components/performance_manager/public/graph/graph_operations.h"
 #include "components/performance_manager/public/graph/node_data_describer_registry.h"
+#include "components/performance_manager/public/graph/node_data_describer_util.h"
 #include "components/performance_manager/public/graph/page_node.h"
 #include "components/performance_manager/public/graph/process_node.h"
 #include "components/url_matcher/url_matcher.h"
@@ -31,13 +34,6 @@
 namespace performance_manager {
 namespace policies {
 namespace {
-
-#if !BUILDFLAG(IS_CHROMEOS)
-// Time during which non visible pages are protected from urgent discarding
-// (not on ChromeOS).
-constexpr base::TimeDelta kNonVisiblePagesUrgentProtectionTime =
-    base::Minutes(10);
-#endif
 
 // Time during which a tab cannot be discarded after having played audio.
 constexpr base::TimeDelta kTabAudioProtectionTime = base::Minutes(1);
@@ -115,19 +111,23 @@ PageDiscardingHelper::PageDiscardingHelper()
     : page_discarder_(std::make_unique<mechanism::PageDiscarder>()) {}
 PageDiscardingHelper::~PageDiscardingHelper() = default;
 
-void PageDiscardingHelper::UrgentlyDiscardAPage(
-    base::OnceCallback<void(bool)> post_discard_cb) {
-  UrgentlyDiscardMultiplePages(absl::nullopt, false,
-                               std::move(post_discard_cb));
+void PageDiscardingHelper::DiscardAPage(
+    base::OnceCallback<void(bool)> post_discard_cb,
+    ::mojom::LifecycleUnitDiscardReason discard_reason,
+    base::TimeDelta minimum_time_in_background) {
+  DiscardMultiplePages(absl::nullopt, false, std::move(post_discard_cb),
+                       discard_reason, minimum_time_in_background);
 }
 
-void PageDiscardingHelper::UrgentlyDiscardMultiplePages(
+void PageDiscardingHelper::DiscardMultiplePages(
     absl::optional<uint64_t> reclaim_target_kb,
     bool discard_protected_tabs,
-    base::OnceCallback<void(bool)> post_discard_cb) {
+    base::OnceCallback<void(bool)> post_discard_cb,
+    ::mojom::LifecycleUnitDiscardReason discard_reason,
+    base::TimeDelta minimum_time_in_background) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
 
-  LOG(WARNING) << "Urgently discarding multiple pages with target (kb): "
+  LOG(WARNING) << "Discarding multiple pages with target (kb): "
                << (reclaim_target_kb ? *reclaim_target_kb : 0);
 
   // Ensures running post_discard_cb on early return.
@@ -139,7 +139,8 @@ void PageDiscardingHelper::UrgentlyDiscardMultiplePages(
 
   std::vector<PageNodeSortProxy> candidates;
   for (const auto* page_node : page_nodes) {
-    CanUrgentlyDiscardResult can_discard_result = CanUrgentlyDiscard(page_node);
+    CanUrgentlyDiscardResult can_discard_result =
+        CanUrgentlyDiscard(page_node, minimum_time_in_background);
     if (can_discard_result == CanUrgentlyDiscardResult::kMarked) {
       continue;
     }
@@ -158,7 +159,7 @@ void PageDiscardingHelper::UrgentlyDiscardMultiplePages(
                            candidates.size());
 
   // Returns early when candidate is empty to avoid infinite loop in
-  // UrgentlyDiscardMultiplePages and PostDiscardAttemptCallback.
+  // DiscardMultiplePages and PostDiscardAttemptCallback.
   if (candidates.empty()) {
     return;
   }
@@ -204,20 +205,25 @@ void PageDiscardingHelper::UrgentlyDiscardMultiplePages(
   LOG(WARNING) << "Discarding " << discard_attempts.size() << " pages";
 
   page_discarder_->DiscardPageNodes(
-      discard_attempts, ::mojom::LifecycleUnitDiscardReason::URGENT,
+      discard_attempts, discard_reason,
       base::BindOnce(&PageDiscardingHelper::PostDiscardAttemptCallback,
                      weak_factory_.GetWeakPtr(), reclaim_target_kb,
-                     discard_protected_tabs, std::move(split_callback.second)));
+                     discard_protected_tabs, std::move(split_callback.second),
+                     discard_reason, minimum_time_in_background));
 }
 
 void PageDiscardingHelper::ImmediatelyDiscardSpecificPage(
-    const PageNode* page_node) {
+    const PageNode* page_node,
+    ::mojom::LifecycleUnitDiscardReason discard_reason,
+    base::OnceCallback<void(bool)> post_discard_cb) {
+  // Pass 0 TimeDelta to bypass the minimum time in background check.
   if (CanUrgentlyDiscard(page_node,
-                         /* consider_minimum_protection_time */ false) ==
+                         /* minimum_time_in_background */ base::TimeDelta()) ==
       CanUrgentlyDiscardResult::kEligible) {
-    page_discarder_->DiscardPageNodes(
-        {page_node}, ::mojom::LifecycleUnitDiscardReason::PROACTIVE,
-        base::DoNothing());
+    page_discarder_->DiscardPageNodes({page_node}, discard_reason,
+                                      std::move(post_discard_cb));
+  } else {
+    std::move(post_discard_cb).Run(false);
   }
 }
 
@@ -290,7 +296,7 @@ PageDiscardingHelper::GetPageNodeLiveStateData(
 PageDiscardingHelper::CanUrgentlyDiscardResult
 PageDiscardingHelper::CanUrgentlyDiscard(
     const PageNode* page_node,
-    bool consider_minimum_protection_time) const {
+    base::TimeDelta minimum_time_in_background) const {
   if (DiscardAttemptMarker::Get(PageNodeImpl::FromNode(page_node))) {
     return CanUrgentlyDiscardResult::kMarked;
   }
@@ -310,13 +316,10 @@ PageDiscardingHelper::CanUrgentlyDiscard(
     }
   }
 
-#if !BUILDFLAG(IS_CHROMEOS)
-  if (consider_minimum_protection_time &&
-      page_node->GetTimeSinceLastVisibilityChange() <
-          kNonVisiblePagesUrgentProtectionTime) {
+  if (page_node->GetTimeSinceLastVisibilityChange() <
+      minimum_time_in_background) {
     return CanUrgentlyDiscardResult::kProtected;
   }
-#endif
 
   // Do not discard PDFs as they might contain entry that is not saved and they
   // don't remember their scrolling positions. See crbug.com/547286 and
@@ -391,6 +394,9 @@ PageDiscardingHelper::CanUrgentlyDiscard(
     if (live_state_data->IsDevToolsOpen()) {
       return CanUrgentlyDiscardResult::kProtected;
     }
+    if (live_state_data->UpdatedTitleOrFaviconInBackground()) {
+      return CanUrgentlyDiscardResult::kProtected;
+    }
 #if !BUILDFLAG(IS_CHROMEOS)
     // TODO(sebmarchand): Skip this check if the Entreprise memory limit is set.
     if (live_state_data->WasDiscarded()) {
@@ -434,14 +440,30 @@ bool PageDiscardingHelper::IsPageOptedOutOfDiscarding(
 
 base::Value::Dict PageDiscardingHelper::DescribePageNodeData(
     const PageNode* node) const {
-  auto* data = DiscardAttemptMarker::Get(PageNodeImpl::FromNode(node));
-  if (data == nullptr) {
-    return base::Value::Dict();
+  base::StringPiece can_discard;
+  switch (CanUrgentlyDiscard(node, base::TimeDelta())) {
+    case CanUrgentlyDiscardResult::kEligible:
+      can_discard = "eligible";
+      break;
+    case CanUrgentlyDiscardResult::kProtected:
+      can_discard = "protected";
+      break;
+    case CanUrgentlyDiscardResult::kMarked:
+      can_discard = "marked";
+      break;
   }
 
   base::Value::Dict ret;
-  ret.Set("has_discard_attempt_marker", base::Value("true"));
-
+  ret.Set("can_urgently_discard", can_discard);
+  auto it = last_change_to_non_audible_time_.find(node);
+  if (it != last_change_to_non_audible_time_.end()) {
+    ret.Set("non_audible_change_time", TimeDeltaFromNowToValue(it->second));
+  }
+  auto* main_frame = node->GetMainFrameNode();
+  if (main_frame) {
+    ret.Set("opted_out", IsPageOptedOutOfDiscarding(node->GetBrowserContextID(),
+                                                    main_frame->GetURL()));
+  }
   return ret;
 }
 
@@ -449,13 +471,16 @@ void PageDiscardingHelper::PostDiscardAttemptCallback(
     absl::optional<uint64_t> reclaim_target_kb,
     bool discard_protected_tabs,
     base::OnceCallback<void(bool)> post_discard_cb,
+    ::mojom::LifecycleUnitDiscardReason discard_reason,
+    base::TimeDelta minimum_time_in_background,
     bool success) {
-  // When there is no discard candidate, UrgentlyDiscardMultiplePages returns
+  // When there is no discard candidate, DiscardMultiplePages returns
   // early and PostDiscardAttemptCallback is not called.
   if (!success) {
     // DiscardAttemptMarker will force the retry to choose different pages.
-    UrgentlyDiscardMultiplePages(reclaim_target_kb, discard_protected_tabs,
-                                 std::move(post_discard_cb));
+    DiscardMultiplePages(reclaim_target_kb, discard_protected_tabs,
+                         std::move(post_discard_cb), discard_reason,
+                         minimum_time_in_background);
     return;
   }
 

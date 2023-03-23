@@ -1256,7 +1256,7 @@ TEST_P(ScrollUnifiedLayerTreeHostImplTest, ScrollBeforeRootLayerAttached) {
           .get(),
       ui::ScrollInputType::kWheel);
   EXPECT_EQ(ScrollThread::SCROLL_IGNORED, status.thread);
-  EXPECT_EQ(MainThreadScrollingReason::kNoScrollingLayer,
+  EXPECT_EQ(MainThreadScrollingReason::kNotScrollingOnMain,
             status.main_thread_scrolling_reasons);
 
   status = GetInputHandler().RootScrollBegin(
@@ -1265,7 +1265,7 @@ TEST_P(ScrollUnifiedLayerTreeHostImplTest, ScrollBeforeRootLayerAttached) {
           .get(),
       ui::ScrollInputType::kWheel);
   EXPECT_EQ(ScrollThread::SCROLL_IGNORED, status.thread);
-  EXPECT_EQ(MainThreadScrollingReason::kNoScrollingLayer,
+  EXPECT_EQ(MainThreadScrollingReason::kNotScrollingOnMain,
             status.main_thread_scrolling_reasons);
 }
 
@@ -1490,7 +1490,7 @@ TEST_P(ScrollUnifiedLayerTreeHostImplTest, ScrollWithoutRootLayer) {
           .get(),
       ui::ScrollInputType::kWheel);
   EXPECT_EQ(ScrollThread::SCROLL_IGNORED, status.thread);
-  EXPECT_EQ(MainThreadScrollingReason::kNoScrollingLayer,
+  EXPECT_EQ(MainThreadScrollingReason::kNotScrollingOnMain,
             status.main_thread_scrolling_reasons);
 }
 
@@ -6900,7 +6900,7 @@ TEST_P(ScrollUnifiedLayerTreeHostImplTest, ScrollRootIgnored) {
           .get(),
       ui::ScrollInputType::kWheel);
   EXPECT_EQ(ScrollThread::SCROLL_IGNORED, status.thread);
-  EXPECT_EQ(MainThreadScrollingReason::kNoScrollingLayer,
+  EXPECT_EQ(MainThreadScrollingReason::kNotScrollingOnMain,
             status.main_thread_scrolling_reasons);
   EXPECT_FALSE(did_request_redraw_);
   EXPECT_FALSE(did_request_commit_);
@@ -13069,7 +13069,7 @@ TEST_P(ScrollUnifiedLayerTreeHostImplTest, ExternalTransformSetNeedsRedraw) {
 
 TEST_P(ScrollUnifiedLayerTreeHostImplTest, OnMemoryPressure) {
   gfx::Size size(200, 200);
-  viz::ResourceFormat format = viz::RGBA_8888;
+  viz::SharedImageFormat format = viz::SinglePlaneFormat::kRGBA_8888;
   gfx::ColorSpace color_space = gfx::ColorSpace::CreateSRGB();
   ResourcePool::InUsePoolResource resource =
       host_impl_->resource_pool()->AcquireResource(size, format, color_space);
@@ -18083,7 +18083,7 @@ TEST_F(UnifiedScrollingTest, MainThreadHitTestScrollNodeNotFound) {
     ScrollStatus status = ScrollBegin(gfx::Vector2d(0, 10));
     status = ContinuedScrollBegin(kUnknown);
     EXPECT_EQ(ScrollThread::SCROLL_IGNORED, status.thread);
-    EXPECT_EQ(MainThreadScrollingReason::kNoScrollingLayer,
+    EXPECT_EQ(MainThreadScrollingReason::kNotScrollingOnMain,
               status.main_thread_scrolling_reasons);
   }
 }

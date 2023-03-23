@@ -119,7 +119,6 @@
 <translation id="1942765061641586207">የምስል ጥራት</translation>
 <translation id="1972984168337863910">የፋይሎች ግብረመልስ ፓነሎችን ዘርጋ</translation>
 <translation id="1995337122023280937">ወደ የፋይል ቦታ ሂድ</translation>
-<translation id="1999709132469742660">በሁሉም ዩአርኤሎች የፋይል መዳረሻ</translation>
 <translation id="2001796770603320721">በDrive ውስጥ ያስተዳድሩ</translation>
 <translation id="2009067268969781306">አንጻፊን መቅረጽ በላዩ ላይ ያለን ሁሉንም ውሂብ ይሰርዛል። ይህ እርምጃ ሊቀለበስ አይችልም።</translation>
 <translation id="2025955442973426285">ትግርኛ</translation>
@@ -151,6 +150,7 @@
 <translation id="2236732657580416950">የእርስዎ የGoogle Drive መሸጎጫ ጸድቷል።</translation>
 <translation id="2239068707900391003">ቡና የያዘ ሰው</translation>
 <translation id="2251368349685848079">ከመጣያ ወደነበረበት መልስ</translation>
+<translation id="2278133026967558505">በሁሉም የድር ጣቢያዎች እና ዩአርኤሎች የፋይል መዳረሻ</translation>
 <translation id="2282155092769082568">የራስ-ውቅር ዩአርኤል፦</translation>
 <translation id="2284767815536050991">መወገድ የሚችል ማከማቻ</translation>
 <translation id="2288278176040912387">የሙዚቃ ማጫወቻ</translation>
@@ -543,7 +543,6 @@
 <translation id="5323213332664049067">የላቲን አሜሪካ</translation>
 <translation id="5330145655348521461">እነዚህ ፋይሎች በተለየ ዴስክቶፕ ላይ ተከፍተዋል። ለማየት ወደ <ph name="USER_NAME" /> (<ph name="MAIL_ADDRESS" />) ይውሰዱት።</translation>
 <translation id="5330512191124428349">መረጃ ያግኙ</translation>
-<translation id="5337538975554986899">ከ<ph name="NON_RESTRICTED_DESTINATIONS" /> ውጪ በሁሉም ዩአርኤሎች የፋይል መዳረሻ</translation>
 <translation id="5344246330454251646">የBruschetta ማጋራትን ያስተዳድሩ</translation>
 <translation id="535792325654997756">ድመቶች ያሉት ሰው</translation>
 <translation id="5358764674931277">የክፈፍ ፍጥነት</translation>
@@ -769,6 +768,7 @@
 <translation id="7162080671816799010">የማረጋገጥ አገልጋይ ማንነትን ለማረጋገጥ የሚጎድል «የርዕሰ ጉዳይ አማራጭ ስም መመሳሰል» ወይም «የጎራ ተውሳክ መመሳሰል»</translation>
 <translation id="7165320105431587207">አውታረ መረቡን ማዋቀር አልተሳካም</translation>
 <translation id="7170041865419449892">ከክልል ውጭ</translation>
+<translation id="7179579940054351344">ከ<ph name="NON_RESTRICTED_DESTINATIONS" /> ውጪ በሁሉም የድር ጣቢያዎች እና ዩአርኤሎች የፋይል መዳረሻ</translation>
 <translation id="7180611975245234373">አድስ</translation>
 <translation id="7189874332498648577"><ph name="NUMBER_OF_GB" /> ጊባ</translation>
 <translation id="7191454237977785534">ፋይል አስቀምጥ እንደ</translation>
@@ -942,6 +942,7 @@
 <translation id="8492972329130824181">የቤት አውታረ መረብ አይገኝም። ለማገናኘት የተንቀሳቃሽ ስልክ የውሂብ ዝውውር መንቃት አለበት።</translation>
 <translation id="8499098729323186194"><ph name="NUMBER_OF_ITEMS" /> ንጥሎችን ሰርስሮ በማውጣት ላይ...</translation>
 <translation id="8502913769543567768">አውታረመረብ <ph name="NETWORK_INDEX" /> ከ<ph name="NETWORK_COUNT" />፣ <ph name="NETWORK_NAME" />፣ <ph name="NETWORK_PROVIDER_NAME" />፣ ከመሣሪያ ውቅረት በኋላ ያግብሩ፣ በአስተዳዳሪዎ የሚተዳደር</translation>
+<translation id="8512483403832814140">በማንኛውም ጊዜ</translation>
 <translation id="8521441079177373948">ዩኬ</translation>
 <translation id="853494022971700746">ፈረንሳይኛ (ፈረንሳይ)</translation>
 <translation id="8540608333167683902">አውታረመረብ <ph name="NETWORK_INDEX" /> ከ<ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />፣ <ph name="CONNECTION_STATUS" />፣ የሲግናል ጥንካሬ <ph name="SIGNAL_STRENGTH" />%፣ ዝርዝሮች</translation>

@@ -142,8 +142,9 @@ void AddGeneratedThemeComprehensiveColors(ui::ColorMixer& mixer) {
   mixer[kColorNewTabPageChipForeground] =
       select_topmost_element_foreground_color;
   mixer[kColorNewTabPageModuleItemBackground] = {kColorNewTabPageBackground};
-  mixer[kColorNewTabPageHistoryClustersModuleItemBackground] = {
-      kColorNewTabPageBackground};
+  mixer[kColorNewTabPageHistoryClustersModuleItemBackground] =
+      SelectBasedOnWhiteNtpBackground(gfx::kGoogleGrey100,
+                                      kColorNewTabPageBackground);
   mixer[kColorNewTabPageModuleControlBorder] = SelectBasedOnWhiteNtpBackground(
       gfx::kGoogleGrey300, kColorNewTabPageBackground);
   mixer[kColorNewTabPageMostVisitedForeground] = SelectBasedOnDarkInput(
@@ -437,7 +438,7 @@ void AddWebThemeNewTabPageColors(ui::ColorMixer& mixer, bool dark_mode) {
   mixer[kColorNewTabPageIconButtonBackgroundActive] = {
       dark_mode ? gfx::kGoogleGrey300 : gfx::kGoogleGrey700};
   mixer[kColorNewTabPageLink] = {dark_mode ? gfx::kGoogleBlue300
-                                           : SkColorSetRGB(0x06, 0x37, 0x74)};
+                                           : gfx::kGoogleBlue700};
   mixer[kColorNewTabPageMicBorderColor] = {dark_mode ? gfx::kGoogleGrey100
                                                      : gfx::kGoogleGrey300};
   mixer[kColorNewTabPageMicIconColor] = {dark_mode ? gfx::kGoogleGrey100
@@ -446,8 +447,13 @@ void AddWebThemeNewTabPageColors(ui::ColorMixer& mixer, bool dark_mode) {
       kColorNewTabPageBackgroundOverride};
   mixer[kColorNewTabPageModuleItemBackground] = {
       kColorNewTabPageBackgroundOverride};
-  mixer[kColorNewTabPageHistoryClustersModuleItemBackground] = {
-      dark_mode ? gfx::kGoogleGrey700 : gfx::kGoogleGrey100};
+  if (dark_mode) {
+    mixer[kColorNewTabPageHistoryClustersModuleItemBackground] = {
+        kColorNewTabPageBackground};
+  } else {
+    mixer[kColorNewTabPageHistoryClustersModuleItemBackground] = {
+        gfx::kGoogleGrey100};
+  }
   mixer[kColorNewTabPageModuleIconContainerBackground] =
       ui::SetAlpha(accent_color,
                    /* 24% opacity */ 0.24 * SK_AlphaOPAQUE);

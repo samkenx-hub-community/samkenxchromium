@@ -33,10 +33,12 @@
 #include "base/strings/string_piece.h"
 #include "base/task/single_thread_task_runner.h"
 #include "base/unguessable_token.h"
+#include "mojo/public/cpp/bindings/pending_remote.h"
 #include "services/metrics/public/cpp/mojo_ukm_recorder.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
 #include "third_party/blink/public/mojom/blob/blob_registry.mojom-blink.h"
 #include "third_party/blink/public/mojom/fetch/fetch_api_request.mojom-blink-forward.h"
+#include "third_party/blink/public/mojom/loader/resource_cache.mojom-blink.h"
 #include "third_party/blink/public/mojom/service_worker/controller_service_worker_mode.mojom-blink-forward.h"
 #include "third_party/blink/public/mojom/timing/resource_timing.mojom-blink-forward.h"
 #include "third_party/blink/renderer/platform/heap/collection_support/heap_hash_map.h"
@@ -92,7 +94,8 @@ struct ResourceLoaderOptions;
 // keep a ResourceFetcher alive past detach if scripts still reference the
 // Document.
 class PLATFORM_EXPORT ResourceFetcher
-    : public GarbageCollected<ResourceFetcher> {
+    : public GarbageCollected<ResourceFetcher>,
+      public MemoryPressureListener {
   USING_PRE_FINALIZER(ResourceFetcher, ClearPreloads);
 
  public:
@@ -122,8 +125,8 @@ class PLATFORM_EXPORT ResourceFetcher
   explicit ResourceFetcher(const ResourceFetcherInit&);
   ResourceFetcher(const ResourceFetcher&) = delete;
   ResourceFetcher& operator=(const ResourceFetcher&) = delete;
-  virtual ~ResourceFetcher();
-  virtual void Trace(Visitor*) const;
+  ~ResourceFetcher() override;
+  void Trace(Visitor*) const override;
 
   // - This function returns the same object throughout this fetcher's
   //   entire life.
@@ -183,6 +186,10 @@ class PLATFORM_EXPORT ResourceFetcher
   // non-inspector/non-tent-only contexts.
   const DocumentResourceMap& AllResources() const {
     return cached_resources_map_;
+  }
+
+  const HeapHashSet<Member<Resource>> MoveResourceStrongReferences() {
+    return std::move(document_resource_strong_refs_);
   }
 
   enum class ImageLoadBlockingPolicy {
@@ -339,6 +346,12 @@ class PLATFORM_EXPORT ResourceFetcher
   void CancelWebBundleSubresourceLoadersFor(
       const base::UnguessableToken& web_bundle_token);
 
+  void OnMemoryPressure(
+      base::MemoryPressureListener::MemoryPressureLevel) override;
+
+  void SetResourceCache(
+      mojo::PendingRemote<mojom::blink::ResourceCache> remote);
+
  private:
   friend class ResourceCacheValidationSuppressor;
   enum class StopFetchingTarget {
@@ -398,6 +411,8 @@ class PLATFORM_EXPORT ResourceFetcher
 
   void StopFetchingInternal(StopFetchingTarget);
   void StopFetchingIncludingKeepaliveLoaders();
+
+  void MaybeSaveResourceToStrongReference(Resource* resource);
 
   enum class RevalidationPolicy {
     kUse,
@@ -482,6 +497,8 @@ class PLATFORM_EXPORT ResourceFetcher
 
   void WarnUnusedPreloads();
 
+  void RemoveImageStrongReference(Resource* image_resource);
+
   // Information about a resource fetch that had started but not completed yet.
   // Would be added to the response data when the response arrives.
   struct PendingResourceTimingInfo {
@@ -508,6 +525,11 @@ class PLATFORM_EXPORT ResourceFetcher
                                ResourceType type,
                                RevalidationPolicyForMetrics policy) const;
 
+  void OnResourceCacheContainsFinished(
+      base::TimeTicks ipc_send_time,
+      network::mojom::RequestDestination,
+      mojom::blink::ResourceCacheContainsResultPtr);
+
   Member<DetachableResourceFetcherProperties> properties_;
   Member<ResourceLoadObserver> resource_load_observer_;
   Member<FetchContext> context_;
@@ -519,7 +541,12 @@ class PLATFORM_EXPORT ResourceFetcher
   const Member<ResourceLoadScheduler> scheduler_;
   Member<BackForwardCacheLoaderHelper> back_forward_cache_loader_helper_;
 
+  // Weak reference to all the fetched resources.
   DocumentResourceMap cached_resources_map_;
+
+  // document_resource_strong_refs_ keeps strong references for fonts, images,
+  // scripts and stylesheets within their freshness lifetime.
+  HeapHashSet<Member<Resource>> document_resource_strong_refs_;
 
   // |image_resources_| is the subset of all image resources for the document.
   HeapHashSet<WeakMember<Resource>> image_resources_;
@@ -562,6 +589,10 @@ class PLATFORM_EXPORT ResourceFetcher
 
   // Lazily initialized when the first <script type=webbundle> is inserted.
   Member<SubresourceWebBundleList> subresource_web_bundles_;
+
+  // Used to look for cached responses in a different renderer. Currently
+  // used only for histogram recordings.
+  HeapMojoRemote<mojom::blink::ResourceCache> resource_cache_remote_;
 
   // This is not in the bit field below because we want to use AutoReset.
   bool is_in_request_resource_ = false;
@@ -607,8 +638,9 @@ class ResourceCacheValidationSuppressor {
   ResourceCacheValidationSuppressor& operator=(
       const ResourceCacheValidationSuppressor&) = delete;
   ~ResourceCacheValidationSuppressor() {
-    if (loader_)
+    if (loader_) {
       loader_->allow_stale_resources_ = previous_state_;
+    }
   }
 
  private:

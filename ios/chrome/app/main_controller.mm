@@ -32,6 +32,7 @@
 #import "components/prefs/ios/pref_observer_bridge.h"
 #import "components/prefs/pref_change_registrar.h"
 #import "components/previous_session_info/previous_session_info.h"
+#import "components/sync/base/features.h"
 #import "components/sync/driver/sync_service.h"
 #import "components/web_resource/web_resource_pref_names.h"
 #import "ios/chrome/app/app_metrics_app_state_agent.h"
@@ -42,7 +43,6 @@
 #import "ios/chrome/app/fast_app_terminate_buildflags.h"
 #import "ios/chrome/app/feed_app_agent.h"
 #import "ios/chrome/app/first_run_app_state_agent.h"
-#import "ios/chrome/app/keyboard_shortcuts_menu_app_agent.h"
 #import "ios/chrome/app/memory_monitor.h"
 #import "ios/chrome/app/post_restore_app_agent.h"
 #import "ios/chrome/app/safe_mode_app_state_agent.h"
@@ -758,7 +758,6 @@ void MainControllerAuthenticationServiceDelegate::ClearBrowsingData(
   [appState addAgent:[[SafeModeAppAgent alloc] init]];
   [appState addAgent:[[FeedAppAgent alloc] init]];
   [appState addAgent:[[VariationsAppStateAgent alloc] init]];
-  [appState addAgent:[[KeyboardShortcutsMenuAppAgent alloc] init]];
 
   // Create the window accessibility agent only when multiple windows are
   // possible.
@@ -1100,6 +1099,12 @@ void MainControllerAuthenticationServiceDelegate::ClearBrowsingData(
 - (void)saveFieldTrialValuesForExtensions {
   NSUserDefaults* sharedDefaults = app_group::GetGroupUserDefaults();
 
+  NSNumber* credentialProviderExtensionPasswordNotesValue =
+      [NSNumber numberWithBool:base::FeatureList::IsEnabled(
+                                   syncer::kPasswordNotesWithBackup)];
+  NSNumber* credentialProviderExtensionPasswordNotesVersion =
+      [NSNumber numberWithInt:kCredentialProviderExtensionPasswordNotesVersion];
+
   // Add other field trial values here if they are needed by extensions.
   // The general format is
   // {
@@ -1108,7 +1113,12 @@ void MainControllerAuthenticationServiceDelegate::ClearBrowsingData(
   //     version: NSNumber int,
   //   }
   // }
-  NSDictionary* fieldTrialValues = @{};
+  NSDictionary* fieldTrialValues = @{
+    base::SysUTF8ToNSString(syncer::kPasswordNotesWithBackup.name) : @{
+      kFieldTrialValueKey : credentialProviderExtensionPasswordNotesValue,
+      kFieldTrialVersionKey : credentialProviderExtensionPasswordNotesVersion,
+    },
+  };
   [sharedDefaults setObject:fieldTrialValues
                      forKey:app_group::kChromeExtensionFieldTrialPreference];
 }

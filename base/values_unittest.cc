@@ -859,27 +859,6 @@ TEST(ValuesTest, FindIntKey) {
   EXPECT_EQ(absl::nullopt, dict.FindInt("dict"));
 }
 
-TEST(ValuesTest, FindDoubleKey) {
-  Value::Dict dict;
-  dict.Set("null", Value());
-  dict.Set("bool", false);
-  dict.Set("int", 0);
-  dict.Set("double", 0.0);
-  dict.Set("string", std::string());
-  dict.Set("blob", Value(Value::BlobStorage()));
-  dict.Set("list", Value::List());
-  dict.Set("dict", Value::Dict());
-
-  EXPECT_EQ(absl::nullopt, dict.FindDouble("null"));
-  EXPECT_EQ(absl::nullopt, dict.FindDouble("bool"));
-  EXPECT_NE(absl::nullopt, dict.FindDouble("int"));
-  EXPECT_NE(absl::nullopt, dict.FindDouble("double"));
-  EXPECT_EQ(absl::nullopt, dict.FindDouble("string"));
-  EXPECT_EQ(absl::nullopt, dict.FindDouble("blob"));
-  EXPECT_EQ(absl::nullopt, dict.FindDouble("list"));
-  EXPECT_EQ(absl::nullopt, dict.FindDouble("dict"));
-}
-
 TEST(ValuesTest, FindStringKey) {
   Value::Dict dict;
   dict.Set("null", Value());
@@ -1096,6 +1075,38 @@ TEST(ValuesTest, SetStringKey) {
   ASSERT_FALSE(value);
 }
 
+TEST(ValuesTest, RvalueSet) {
+  Value::Dict dict = Value::Dict()
+                         .Set("null", Value())
+                         .Set("bool", false)
+                         .Set("int", 42)
+                         .Set("double", 1.2)
+                         .Set("string", "value")
+                         .Set("u16-string", u"u16-value")
+                         .Set("std-string", std::string("std-value"))
+                         .Set("blob", Value::BlobStorage({1, 2}))
+                         .Set("list", Value::List().Append("value in list"))
+                         .Set("dict", Value::Dict().Set("key", "value"));
+
+  Value::Dict expected;
+  expected.Set("null", Value());
+  expected.Set("bool", false);
+  expected.Set("int", 42);
+  expected.Set("double", 1.2);
+  expected.Set("string", "value");
+  expected.Set("u16-string", u"u16-value");
+  expected.Set("std-string", std::string("std-value"));
+  expected.Set("blob", Value::BlobStorage({1, 2}));
+  Value::List nested_list;
+  nested_list.Append("value in list");
+  expected.Set("list", std::move(nested_list));
+  Value::Dict nested_dict;
+  nested_dict.Set("key", "value");
+  expected.Set("dict", std::move(nested_dict));
+
+  EXPECT_EQ(dict, expected);
+}
+
 TEST(ValuesTest, FindPath) {
   // Construct a dictionary path {root}.foo.bar = 123
   Value::Dict foo;
@@ -1142,26 +1153,6 @@ TEST(ValuesTest, SetPath) {
   // Can't change existing non-dictionary keys to dictionaries.
   found = root.SetByDottedPath("foo.bar.baz", Value(123));
   EXPECT_FALSE(found);
-}
-
-TEST(ValuesTest, SetBoolPath) {
-  Value::Dict root;
-  Value* inserted = root.SetByDottedPath("foo.bar", true);
-  Value* found = root.FindByDottedPath("foo.bar");
-  ASSERT_TRUE(found);
-  EXPECT_EQ(inserted, found);
-  ASSERT_TRUE(found->is_bool());
-  EXPECT_TRUE(found->GetBool());
-
-  // Overwrite with a different value.
-  root.SetByDottedPath("foo.bar", false);
-  found = root.FindByDottedPath("foo.bar");
-  ASSERT_TRUE(found);
-  ASSERT_TRUE(found->is_bool());
-  EXPECT_FALSE(found->GetBool());
-
-  // Can't change existing non-dictionary keys.
-  ASSERT_FALSE(root.SetByDottedPath("foo.bar.zoo", true));
 }
 
 TEST(ValuesTest, SetIntPath) {
@@ -1370,6 +1361,45 @@ TEST(ValuesTest, List) {
   // Try searching in the mixed list.
   ASSERT_TRUE(Contains(mixed_list, 42));
   ASSERT_FALSE(Contains(mixed_list, false));
+}
+
+TEST(ValuesTest, RvalueAppend) {
+  Value::List list = Value::List()
+                         .Append(Value())
+                         .Append(false)
+                         .Append(42)
+                         .Append(1.2)
+                         .Append("value")
+                         .Append(u"u16-value")
+                         .Append(std::string("std-value"))
+                         .Append(Value::BlobStorage({1, 2}))
+                         .Append(Value::List().Append("value in list"))
+                         .Append(Value::Dict().Set("key", "value"));
+
+  Value::List expected;
+  expected.Append(Value());
+  expected.Append(false);
+  expected.Append(42);
+  expected.Append(1.2);
+  expected.Append("value");
+  expected.Append(u"u16-value");
+  expected.Append(std::string("std-value"));
+  expected.Append(Value::BlobStorage({1, 2}));
+  Value::List nested_list;
+  nested_list.Append("value in list");
+  expected.Append(std::move(nested_list));
+  Value::Dict nested_dict;
+  nested_dict.Set("key", "value");
+  expected.Append(std::move(nested_dict));
+
+  EXPECT_EQ(list, expected);
+}
+
+TEST(ValuesTest, ListWithCapacity) {
+  Value::List list_with_capacity =
+      Value::List::with_capacity(3).Append(true).Append(42).Append(88.8);
+
+  ASSERT_EQ(3u, list_with_capacity.size());
 }
 
 TEST(ValuesTest, BinaryValue) {
@@ -1987,8 +2017,9 @@ TEST(ValuesTest, MutatingCopiedPairsInDictItemsMutatesUnderlyingValues) {
   // Because the non-const dict iterates over <const std::string&, Value&>
   // pairs, it's possible to alter iterated-over values in place even when
   // "copying" the key-value pair:
-  for (auto kv : dict)
+  for (auto kv : dict) {
     kv.second.GetString() = "replacement";
+  }
 
   std::string* found = dict.FindString("key");
   ASSERT_TRUE(found);

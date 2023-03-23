@@ -53,7 +53,7 @@ void ReadAnythingController::OnFontChoiceChanged(int new_index) {
       model_->GetFontModel()->GetFontNameAt(new_index));
 }
 
-ui::ComboboxModel* ReadAnythingController::GetFontComboboxModel() {
+ReadAnythingFontModel* ReadAnythingController::GetFontComboboxModel() {
   return model_->GetFontModel();
 }
 
@@ -124,6 +124,10 @@ ReadAnythingMenuModel* ReadAnythingController::GetLetterSpacingModel() {
   return model_->GetLetterSpacingModel();
 }
 
+void ReadAnythingController::OnSystemThemeChanged() {
+  model_->OnSystemThemeChanged();
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 // ReadAnythingPageHandler::Delegate:
 ///////////////////////////////////////////////////////////////////////////////
@@ -131,10 +135,16 @@ ReadAnythingMenuModel* ReadAnythingController::GetLetterSpacingModel() {
 void ReadAnythingController::OnUIReady() {
   ui_ready_ = true;
 #if BUILDFLAG(ENABLE_SCREEN_AI_SERVICE)
-  if (features::IsReadAnythingWithScreen2xEnabled() &&
-      !component_ready_observer_.IsObserving()) {
-    component_ready_observer_.Observe(
-        screen_ai::ScreenAIInstallState::GetInstance());
+  if (features::IsReadAnythingWithScreen2xEnabled()) {
+    if (screen_ai::ScreenAIInstallState::GetInstance()
+            ->IsComponentAvailable()) {
+      // Notify that the screen ai service is already ready so we can bind to
+      // the content extractor.
+      model_->ScreenAIServiceReady();
+    } else if (!component_ready_observer_.IsObserving()) {
+      component_ready_observer_.Observe(
+          screen_ai::ScreenAIInstallState::GetInstance());
+    }
   }
 #endif
   OnActiveWebContentsChanged();
@@ -210,6 +220,10 @@ void ReadAnythingController::TreeRemoved(ui::AXTreeID ax_tree_id) {
   model_->OnAXTreeDestroyed(ax_tree_id);
 }
 
+void ReadAnythingController::PrimaryPageChanged(content::Page& page) {
+  OnActiveAXTreeIDChanged();
+}
+
 void ReadAnythingController::OnActiveWebContentsChanged() {
   // TODO(crbug.com/1266555): Disable accessibility.and stop observing events
   // on the now inactive tab. But make sure that we don't disable it for
@@ -219,22 +233,10 @@ void ReadAnythingController::OnActiveWebContentsChanged() {
   //    inactive.
   // 2. Set an AXContext on the web contents with web contents only mode
   //    enabled.
-
-  ui::AXTreeID tree_id = ui::AXTreeIDUnknown();
-  ukm::SourceId ukm_source_id = ukm::kInvalidSourceId;
   content::WebContents* web_contents = nullptr;
   if (active_) {
     web_contents = browser_->tab_strip_model()->GetActiveWebContents();
-    if (web_contents) {
-      content::RenderFrameHost* render_frame_host =
-          web_contents->GetPrimaryMainFrame();
-      if (render_frame_host) {
-        tree_id = render_frame_host->GetAXTreeID();
-        ukm_source_id = render_frame_host->GetPageUkmSourceId();
-      }
-    }
   }
-
   Observe(web_contents);
   // Enable accessibility for the top level render frame and all descendants.
   // This causes AXTreeSerializer to reset and send accessibility events of
@@ -244,6 +246,21 @@ void ReadAnythingController::OnActiveWebContentsChanged() {
   if (web_contents) {
     web_contents->EnableWebContentsOnlyAccessibilityMode();
   }
+  OnActiveAXTreeIDChanged();
+}
+
+void ReadAnythingController::OnActiveAXTreeIDChanged() {
+  ui::AXTreeID tree_id = ui::AXTreeIDUnknown();
+  ukm::SourceId ukm_source_id = ukm::kInvalidSourceId;
+  if (active_ && web_contents()) {
+    content::RenderFrameHost* render_frame_host =
+        web_contents()->GetPrimaryMainFrame();
+    if (render_frame_host) {
+      tree_id = render_frame_host->GetAXTreeID();
+      ukm_source_id = render_frame_host->GetPageUkmSourceId();
+    }
+  }
+
   model_->OnActiveAXTreeIDChanged(tree_id, ukm_source_id);
 }
 

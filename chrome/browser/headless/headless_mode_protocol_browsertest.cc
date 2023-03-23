@@ -216,4 +216,7 @@ HEADLESS_MODE_PROTOCOL_TEST(MAYBE_InputClipboardOps,
 HEADLESS_MODE_PROTOCOL_TEST(MAYBE_ScreencastBasics,
                             "sanity/screencast-basics.js")
 
+HEADLESS_MODE_PROTOCOL_TEST(LargeBrowserWindowSize,
+                            "sanity/large-browser-window-size.js")
+
 }  // namespace headless

@@ -24,7 +24,18 @@
 #include "url/gurl.h"
 #include "url/origin.h"
 
+#if BUILDFLAG(ENABLE_HLS_DEMUXER)
+#include "base/threading/sequence_bound.h"
+#include "media/filters/hls_data_source_provider.h"
+#endif  // BUILDFLAG(ENABLE_HLS_DEMUXER)
+
 namespace media {
+
+enum class HlsFallbackImplementation {
+  kNone,
+  kMediaPlayer,
+  kBuiltinHlsPlayer,
+};
 
 // This class manages both an implementation of media::Demuxer and of
 // media::DataSource. DataSource, in particular may be null, since both MSE
@@ -60,7 +71,7 @@ class MEDIA_EXPORT DemuxerManager {
 
     // Used for controlling the client when a demuxer swap happens.
     virtual void StopForDemuxerReset() = 0;
-    virtual bool RestartForHls() = 0;
+    virtual void RestartForHls() = 0;
 
     virtual bool IsSecurityOriginCryptographic() const = 0;
 
@@ -74,6 +85,11 @@ class MEDIA_EXPORT DemuxerManager {
                                const std::string& language,
                                bool is_first_track) = 0;
 #endif  // BUILDFLAG(ENABLE_FFMPEG)
+
+#if BUILDFLAG(ENABLE_HLS_DEMUXER)
+    virtual base::SequenceBound<HlsDataSourceProvider>
+    GetHlsDataSourceProvider() = 0;
+#endif  // BUILDFLAG(ENABLE_HLS_DEMUXER)
 
     // Returns true if playback would be able to start if data is present.
     virtual bool CouldPlayIfEnoughData() = 0;
@@ -109,7 +125,10 @@ class MEDIA_EXPORT DemuxerManager {
 
   void OnPipelineError(PipelineStatus error);
   void SetLoadedUrl(GURL url);
-  PipelineStatus ResetAfterHlsDetected(bool cryptographic_url);
+#if BUILDFLAG(ENABLE_HLS_DEMUXER) || BUILDFLAG(IS_ANDROID)
+  void PopulateHlsHistograms(bool cryptographic_url);
+  PipelineStatus SelectHlsFallbackMechanism(bool cryptographic_url);
+#endif  // BUILDFLAG(ENABLE_HLS_DEMUXER) || BUILDFLAG(IS_ANDROID)
   void DisallowFallback();
 
   // Methods that help manage demuxers
@@ -151,12 +170,19 @@ class MEDIA_EXPORT DemuxerManager {
  private:
   // Demuxer creation and helper methods
   std::unique_ptr<media::Demuxer> CreateChunkDemuxer();
+
 #if BUILDFLAG(ENABLE_FFMPEG)
   std::unique_ptr<media::Demuxer> CreateFFmpegDemuxer();
 #endif  // BUILDFLAG(ENABLE_FFMPEG)
+
+#if BUILDFLAG(ENABLE_HLS_DEMUXER)
+  std::unique_ptr<Demuxer> CreateHlsDemuxer();
+#endif
+
 #if BUILDFLAG(IS_ANDROID)
   std::unique_ptr<media::Demuxer> CreateMediaUrlDemuxer(bool hls_content);
 #endif  // BUILDFLAG(IS_ANDROID)
+
   void SetDemuxer(std::unique_ptr<Demuxer> demuxer);
 
   // Memory pressure listener specifically for when using ChunkDemuxer.
@@ -220,7 +246,7 @@ class MEDIA_EXPORT DemuxerManager {
   bool allow_media_player_renderer_credentials_ = false;
 #endif  // BUILDFLAG(IS_ANDROID)
 
-  bool demuxer_found_hls_ = false;
+  HlsFallbackImplementation hls_fallback_ = HlsFallbackImplementation::kNone;
 
   // Are we allowed to switch demuxer mid-stream when fallback error codes
   // are encountered

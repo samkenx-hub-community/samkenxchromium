@@ -119,7 +119,6 @@
 <translation id="1942765061641586207">Раздзяляльнасць відарыса</translation>
 <translation id="1972984168337863910">Разгарнуць панэлі водгукаў для файлаў</translation>
 <translation id="1995337122023280937">Адкрыць месцазнаходжанне файла</translation>
-<translation id="1999709132469742660">Доступ да файла з усіх URL-адрасоў</translation>
 <translation id="2001796770603320721">Кіраваць на Дыску</translation>
 <translation id="2009067268969781306">Фармаціраванне дыска прывядзе да выдалення ўсіх захаваных на ім даных. Гэта дзеянне нельга адрабіць.</translation>
 <translation id="2025955442973426285">Тыгрынья</translation>
@@ -151,6 +150,7 @@
 <translation id="2236732657580416950">Кэш Google Дыска ачышчаны.</translation>
 <translation id="2239068707900391003">Чалавек з кубкам кавы</translation>
 <translation id="2251368349685848079">Аднавіць са сметніцы</translation>
+<translation id="2278133026967558505">Доступ да файла з усіх вэб-сайтаў і URL-адрасоў</translation>
 <translation id="2282155092769082568">URL-адрас аўтаматычнай канфігурацыі:</translation>
 <translation id="2284767815536050991">здымнае сховішча</translation>
 <translation id="2288278176040912387">Патэфон</translation>
@@ -542,7 +542,6 @@
 <translation id="5323213332664049067">Лацінаамерыканская</translation>
 <translation id="5330145655348521461">Гэтыя файлы адкрыты на іншым працоўным стале. Каб бачыць яго, перайдзіце на профіль <ph name="USER_NAME" /> (<ph name="MAIL_ADDRESS" />).</translation>
 <translation id="5330512191124428349">Атрымаць інфармацыю</translation>
-<translation id="5337538975554986899">Доступ да файла з усіх URL-адрасоў, акрамя <ph name="NON_RESTRICTED_DESTINATIONS" /></translation>
 <translation id="5344246330454251646">Кіраваць абагульваннем з Bruschetta</translation>
 <translation id="535792325654997756">Чалавек з катамі</translation>
 <translation id="5358764674931277">Частата кадраў</translation>
@@ -768,6 +767,7 @@
 <translation id="7162080671816799010">Каб пацвердзіць сапраўднасць сервера аўтэнтыфікацыі, неабходна запоўніць поле "Супадзенне з альтэрнатыўнай назвай суб'екта" або "Супадзенне з суфіксам дамена"</translation>
 <translation id="7165320105431587207">Не ўдалося наладзіць сетку</translation>
 <translation id="7170041865419449892">Па-за зонай доступу</translation>
+<translation id="7179579940054351344">Доступ да файла з усіх вэб-сайтаў і URL-адрасоў, акрамя <ph name="NON_RESTRICTED_DESTINATIONS" /></translation>
 <translation id="7180611975245234373">Абнавіць</translation>
 <translation id="7189874332498648577"><ph name="NUMBER_OF_GB" /> ГБ</translation>
 <translation id="7191454237977785534">Захаваць файл як</translation>
@@ -941,6 +941,7 @@
 <translation id="8492972329130824181">Хатняя сетка недаступная. Каб устанавіць падключэнне, трэба ўключыць роўмінг перадачы даных.</translation>
 <translation id="8499098729323186194">Вымаюцца элементы (<ph name="NUMBER_OF_ITEMS" />)...</translation>
 <translation id="8502913769543567768">Сетка <ph name="NETWORK_INDEX" /> з <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, <ph name="NETWORK_PROVIDER_NAME" />, актываваць пасля наладжвання прылады, знаходзіцца пад кіраваннем адміністратара</translation>
+<translation id="8512483403832814140">За любы час</translation>
 <translation id="8521441079177373948">Вялікабрытанія</translation>
 <translation id="853494022971700746">Французская (Францыя)</translation>
 <translation id="8540608333167683902">Сетка <ph name="NETWORK_INDEX" /> з <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, <ph name="CONNECTION_STATUS" />, магутнасць сігналу – <ph name="SIGNAL_STRENGTH" />%, падрабязныя звесткі</translation>

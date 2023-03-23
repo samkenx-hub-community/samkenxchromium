@@ -103,7 +103,7 @@ missing_new_fields,chrome/browser/devtools/device/android_device_manager.cc
 missing_new_fields,chrome/browser/devtools/device/android_web_socket.cc
 missing_new_fields,chrome/browser/devtools/device/port_forwarding_controller.cc
 missing_new_fields,chrome/browser/devtools/devtools_ui_bindings.cc
-missing_new_fields,chrome/browser/download/bubble/download_bubble_controller.cc
+missing_new_fields,chrome/browser/download/bubble/download_bubble_ui_controller.cc
 missing_new_fields,chrome/browser/extensions/api/downloads/downloads_api.cc
 missing_new_fields,chrome/browser/extensions/api/image_writer_private/write_from_url_operation.cc
 missing_new_fields,chrome/browser/extensions/blocklist_state_fetcher.cc
@@ -255,8 +255,8 @@ missing_new_fields,components/signin/internal/identity_manager/gaia_cookie_manag
 missing_new_fields,components/spellcheck/browser/spelling_service_client.cc
 missing_new_fields,components/sync/driver/sync_stopped_reporter.cc
 missing_new_fields,components/sync/engine/net/http_bridge.cc
-missing_new_fields,components/sync/trusted_vault/trusted_vault_request.cc
 missing_new_fields,components/translate/core/browser/translate_url_fetcher.cc
+missing_new_fields,components/trusted_vault/trusted_vault_request.cc
 missing_new_fields,components/ui_devtools/devtools_server.cc
 missing_new_fields,components/update_client/net/network_impl.cc
 missing_new_fields,components/variations/service/variations_service.cc

@@ -202,21 +202,37 @@ class MockAutofillDownloadManager : public AutofillDownloadManager {
   std::vector<FormStructure*> last_queried_forms_;
 };
 
-class MockTouchToFillDelegateImpl : public TouchToFillDelegateImpl {
+class MockTouchToFillDelegate : public TouchToFillDelegate {
  public:
-  explicit MockTouchToFillDelegateImpl(BrowserAutofillManager* manager)
-      : TouchToFillDelegateImpl(manager) {}
-  MockTouchToFillDelegateImpl(const MockTouchToFillDelegateImpl&) = delete;
-  MockTouchToFillDelegateImpl& operator=(const MockTouchToFillDelegateImpl&) =
-      delete;
-  ~MockTouchToFillDelegateImpl() override = default;
-
+  MockTouchToFillDelegate() = default;
+  MockTouchToFillDelegate(const MockTouchToFillDelegate&) = delete;
+  MockTouchToFillDelegate& operator=(const MockTouchToFillDelegate&) = delete;
+  ~MockTouchToFillDelegate() override = default;
+  MOCK_METHOD(AutofillManager*, GetManager, (), (override));
+  MOCK_METHOD(bool,
+              IntendsToShowTouchToFill,
+              (FormGlobalId, FieldGlobalId),
+              (override));
   MOCK_METHOD(bool,
               TryToShowTouchToFill,
-              (const FormData& form, const FormFieldData& field),
+              (const FormData&, const FormFieldData&),
               (override));
   MOCK_METHOD(bool, IsShowingTouchToFill, (), (override));
   MOCK_METHOD(void, HideTouchToFill, (), (override));
+  MOCK_METHOD(void, Reset, (), (override));
+  MOCK_METHOD(bool, ShouldShowScanCreditCard, (), (override));
+  MOCK_METHOD(void, ScanCreditCard, (), (override));
+  MOCK_METHOD(void, OnCreditCardScanned, (const CreditCard& card), (override));
+  MOCK_METHOD(void, ShowCreditCardSettings, (), (override));
+  MOCK_METHOD(void,
+              SuggestionSelected,
+              (std::string unique_id, bool is_virtual),
+              (override));
+  MOCK_METHOD(void, OnDismissed, (bool dismissed_by_user), (override));
+  MOCK_METHOD(void,
+              LogMetricsAfterSubmission,
+              (const FormStructure&),
+              (override));
 };
 
 void ExpectFilledField(const char* expected_label,
@@ -472,13 +488,12 @@ class BrowserAutofillManagerTest : public testing::Test {
     browser_autofill_manager_->SetExternalDelegateForTest(
         std::move(external_delegate));
 
-    auto touch_to_fill_delegate = std::make_unique<MockTouchToFillDelegateImpl>(
-        browser_autofill_manager_.get());
-    ON_CALL(*touch_to_fill_delegate, IsShowingTouchToFill())
+    browser_autofill_manager_->set_touch_to_fill_delegate(
+        std::make_unique<MockTouchToFillDelegate>());
+    ON_CALL(touch_to_fill_delegate(), GetManager())
+        .WillByDefault(Return(browser_autofill_manager_.get()));
+    ON_CALL(touch_to_fill_delegate(), IsShowingTouchToFill())
         .WillByDefault(Return(false));
-    touch_to_fill_delegate_ = touch_to_fill_delegate.get();
-    browser_autofill_manager_->SetTouchToFillDelegateImplForTest(
-        std::move(touch_to_fill_delegate));
 
     auto test_strike_database = std::make_unique<TestStrikeDatabase>();
     strike_database_ = test_strike_database.get();
@@ -544,6 +559,11 @@ class BrowserAutofillManagerTest : public testing::Test {
 
     personal_data().SetPrefService(nullptr);
     personal_data().ClearCreditCards();
+  }
+
+  MockTouchToFillDelegate& touch_to_fill_delegate() {
+    return *static_cast<MockTouchToFillDelegate*>(
+        browser_autofill_manager_->touch_to_fill_delegate());
   }
 
   void GetAutofillSuggestions(const FormData& form,
@@ -955,7 +975,6 @@ class BrowserAutofillManagerTest : public testing::Test {
   std::unique_ptr<MockAutofillDriver> autofill_driver_;
   std::unique_ptr<TestBrowserAutofillManager> browser_autofill_manager_;
   raw_ptr<TestAutofillExternalDelegate> external_delegate_;
-  raw_ptr<MockTouchToFillDelegateImpl> touch_to_fill_delegate_;
   scoped_refptr<AutofillWebDataService> database_;
   raw_ptr<MockAutofillDownloadManager> download_manager_;
   std::unique_ptr<MockAutocompleteHistoryManager> autocomplete_history_manager_;
@@ -1657,8 +1676,9 @@ TEST_F(BrowserAutofillManagerTest,
   FormsSeen({form});
 
   // Disable Autofill.
-  browser_autofill_manager_->SetAutofillProfileEnabled(false);
-  browser_autofill_manager_->SetAutofillCreditCardEnabled(false);
+  browser_autofill_manager_->SetAutofillProfileEnabled(autofill_client_, false);
+  browser_autofill_manager_->SetAutofillCreditCardEnabled(autofill_client_,
+                                                          false);
 
   GetAutofillSuggestions(form, form.fields[0]);
   EXPECT_FALSE(external_delegate_->on_suggestions_returned_seen());
@@ -3019,8 +3039,9 @@ TEST_F(BrowserAutofillManagerTest,
   test::CreateTestAddressFormData(&form);
 
   // Disable autofill and the password manager.
-  browser_autofill_manager_->SetAutofillCreditCardEnabled(false);
-  browser_autofill_manager_->SetAutofillProfileEnabled(false);
+  browser_autofill_manager_->SetAutofillCreditCardEnabled(autofill_client_,
+                                                          false);
+  browser_autofill_manager_->SetAutofillProfileEnabled(autofill_client_, false);
   ON_CALL(autofill_client_, IsPasswordManagerEnabled())
       .WillByDefault(Return(false));
 
@@ -5878,7 +5899,7 @@ TEST_F(BrowserAutofillManagerWithLogEventsTest,
   const FormFieldData& field = form.fields[0];
 
   // Touch the field of "Name on Card" and autofill suggestion is shown.
-  EXPECT_CALL(*touch_to_fill_delegate_, TryToShowTouchToFill(_, _))
+  EXPECT_CALL(touch_to_fill_delegate(), TryToShowTouchToFill(_, _))
       .WillOnce(Return(false));
   TryToShowTouchToFill(form, field, FormElementWasClicked(true));
   EXPECT_TRUE(external_delegate_->on_suggestions_returned_seen());
@@ -6228,8 +6249,9 @@ TEST_F(BrowserAutofillManagerWithLogEventsTest,
 // Test that when Autocomplete is enabled and Autofill is disabled, form
 // submissions are still received by the SingleFieldFormFillRouter.
 TEST_F(BrowserAutofillManagerTest, FormSubmittedAutocompleteEnabled) {
-  browser_autofill_manager_->SetAutofillProfileEnabled(false);
-  browser_autofill_manager_->SetAutofillCreditCardEnabled(false);
+  browser_autofill_manager_->SetAutofillProfileEnabled(autofill_client_, false);
+  browser_autofill_manager_->SetAutofillCreditCardEnabled(autofill_client_,
+                                                          false);
 
   // Set up our form data.
   FormData form;
@@ -6271,8 +6293,9 @@ TEST_F(BrowserAutofillManagerTest, ValuePatternsMetric) {
 // still queried as a fallback.
 TEST_F(BrowserAutofillManagerTest,
        SingleFieldFormFillSuggestions_SomeWhenAutofillDisabled) {
-  browser_autofill_manager_->SetAutofillProfileEnabled(false);
-  browser_autofill_manager_->SetAutofillCreditCardEnabled(false);
+  browser_autofill_manager_->SetAutofillProfileEnabled(autofill_client_, false);
+  browser_autofill_manager_->SetAutofillCreditCardEnabled(autofill_client_,
+                                                          false);
   auto external_delegate = std::make_unique<TestAutofillExternalDelegate>(
       browser_autofill_manager_.get(), autofill_driver_.get(),
       /*call_parent_methods=*/false);
@@ -6345,8 +6368,9 @@ TEST_F(BrowserAutofillManagerTest,
   replacements.SetSchemeStr(url::kHttpScheme);
   client.set_form_origin(client.form_origin().ReplaceComponents(replacements));
   ResetBrowserAutofillManager(&client);
-  browser_autofill_manager_->SetAutofillProfileEnabled(false);
-  browser_autofill_manager_->SetAutofillCreditCardEnabled(false);
+  browser_autofill_manager_->SetAutofillProfileEnabled(autofill_client_, false);
+  browser_autofill_manager_->SetAutofillCreditCardEnabled(autofill_client_,
+                                                          false);
   auto external_delegate = std::make_unique<TestAutofillExternalDelegate>(
       browser_autofill_manager_.get(), autofill_driver_.get(),
       /*call_parent_methods=*/false);
@@ -6379,8 +6403,9 @@ TEST_F(BrowserAutofillManagerTest,
   replacements.SetSchemeStr(url::kHttpScheme);
   client.set_form_origin(client.form_origin().ReplaceComponents(replacements));
   ResetBrowserAutofillManager(&client);
-  browser_autofill_manager_->SetAutofillProfileEnabled(false);
-  browser_autofill_manager_->SetAutofillCreditCardEnabled(false);
+  browser_autofill_manager_->SetAutofillProfileEnabled(autofill_client_, false);
+  browser_autofill_manager_->SetAutofillCreditCardEnabled(autofill_client_,
+                                                          false);
   auto external_delegate = std::make_unique<TestAutofillExternalDelegate>(
       browser_autofill_manager_.get(), autofill_driver_.get(),
       /*call_parent_methods=*/false);
@@ -6438,8 +6463,9 @@ TEST_F(
 TEST_F(
     BrowserAutofillManagerTest,
     SingleFieldFormFillSuggestions_NoneWhenSingleFieldFormFillConditionsNotMet) {
-  browser_autofill_manager_->SetAutofillProfileEnabled(false);
-  browser_autofill_manager_->SetAutofillCreditCardEnabled(false);
+  browser_autofill_manager_->SetAutofillProfileEnabled(autofill_client_, false);
+  browser_autofill_manager_->SetAutofillCreditCardEnabled(autofill_client_,
+                                                          false);
   auto external_delegate = std::make_unique<TestAutofillExternalDelegate>(
       browser_autofill_manager_.get(), autofill_driver_.get(),
       /*call_parent_methods=*/false);
@@ -6806,19 +6832,13 @@ TEST_F(BrowserAutofillManagerTest, FormSubmittedWithDefaultValues) {
   FillAutofillFormDataAndSaveResults(form, form.fields[3],
                                      MakeFrontendId({.profile_id = guid}),
                                      &response_data);
-
-  // Simulate form submission.  We should call into the PDM to try to save the
-  // filled data.
-  FormSubmitted(response_data);
-  EXPECT_EQ(1, personal_data().num_times_save_imported_profile_called());
-
   // Set the address field's value back to the default value.
   response_data.fields[3].value = u"Enter your address";
 
   // Simulate form submission.  We should not call into the PDM to try to save
   // the filled data, since the filled form is effectively missing an address.
   FormSubmitted(response_data);
-  EXPECT_EQ(1, personal_data().num_times_save_imported_profile_called());
+  EXPECT_EQ(0, personal_data().num_times_save_imported_profile_called());
 }
 
 struct ProfileMatchingTypesTestCase {
@@ -8011,7 +8031,7 @@ TEST_F(BrowserAutofillManagerTest, FillInUpdatedExpirationDate) {
 }
 
 TEST_F(BrowserAutofillManagerTest, ProfileDisabledDoesNotFillFormData) {
-  browser_autofill_manager_->SetAutofillProfileEnabled(false);
+  browser_autofill_manager_->SetAutofillProfileEnabled(autofill_client_, false);
 
   // Set up our form data.
   FormData form;
@@ -8028,7 +8048,7 @@ TEST_F(BrowserAutofillManagerTest, ProfileDisabledDoesNotFillFormData) {
 }
 
 TEST_F(BrowserAutofillManagerTest, ProfileDisabledDoesNotSuggest) {
-  browser_autofill_manager_->SetAutofillProfileEnabled(false);
+  browser_autofill_manager_->SetAutofillProfileEnabled(autofill_client_, false);
 
   // Set up our form data.
   FormData form;
@@ -8044,7 +8064,8 @@ TEST_F(BrowserAutofillManagerTest, ProfileDisabledDoesNotSuggest) {
 }
 
 TEST_F(BrowserAutofillManagerTest, CreditCardDisabledDoesNotFillFormData) {
-  browser_autofill_manager_->SetAutofillCreditCardEnabled(false);
+  browser_autofill_manager_->SetAutofillCreditCardEnabled(autofill_client_,
+                                                          false);
 
   // Set up our form data.
   FormData form = CreateTestCreditCardFormData(true, false);
@@ -8060,7 +8081,8 @@ TEST_F(BrowserAutofillManagerTest, CreditCardDisabledDoesNotFillFormData) {
 }
 
 TEST_F(BrowserAutofillManagerTest, CreditCardDisabledDoesNotSuggest) {
-  browser_autofill_manager_->SetAutofillCreditCardEnabled(false);
+  browser_autofill_manager_->SetAutofillCreditCardEnabled(autofill_client_,
+                                                          false);
 
   // Set up our form data.
   FormData form = CreateTestCreditCardFormData(true, false);
@@ -8400,8 +8422,9 @@ TEST_F(BrowserAutofillManagerTest, ShouldUploadForm) {
   EXPECT_TRUE(browser_autofill_manager_->ShouldUploadForm(FormStructure(form)));
 
   // Autofill disabled.
-  browser_autofill_manager_->SetAutofillProfileEnabled(false);
-  browser_autofill_manager_->SetAutofillCreditCardEnabled(false);
+  browser_autofill_manager_->SetAutofillProfileEnabled(autofill_client_, false);
+  browser_autofill_manager_->SetAutofillCreditCardEnabled(autofill_client_,
+                                                          false);
   EXPECT_FALSE(
       browser_autofill_manager_->ShouldUploadForm(FormStructure(form)));
 }
@@ -9990,7 +10013,7 @@ TEST_F(BrowserAutofillManagerTest, AutofillOverridePrefilledValue) {
 TEST_F(BrowserAutofillManagerTest, HideAutofillPopupAndOtherPopups) {
   EXPECT_CALL(autofill_client_,
               HideAutofillPopup(PopupHidingReason::kRendererEvent));
-  EXPECT_CALL(*touch_to_fill_delegate_, HideTouchToFill);
+  EXPECT_CALL(touch_to_fill_delegate(), HideTouchToFill);
   EXPECT_CALL(autofill_client_, HideFastCheckout(/*allow_further_runs=*/false));
   browser_autofill_manager_->OnHidePopup();
 }
@@ -9999,7 +10022,7 @@ TEST_F(BrowserAutofillManagerTest, HideAutofillPopupAndOtherPopups) {
 TEST_F(BrowserAutofillManagerTest, OnDidEndTextFieldEditing) {
   EXPECT_CALL(autofill_client_,
               HideAutofillPopup(PopupHidingReason::kEndEditing));
-  EXPECT_CALL(*touch_to_fill_delegate_, HideTouchToFill).Times(0);
+  EXPECT_CALL(touch_to_fill_delegate(), HideTouchToFill).Times(0);
   EXPECT_CALL(autofill_client_, HideFastCheckout(/*allow_further_runs=*/false))
       .Times(0);
   browser_autofill_manager_->OnDidEndTextFieldEditing();
@@ -10014,18 +10037,18 @@ TEST_F(BrowserAutofillManagerTest, AutofillSuggestionsOrTouchToFill) {
   const FormFieldData& field = form.fields[1];
 
   // Not a form element click, Autofill suggestions shown.
-  EXPECT_CALL(*touch_to_fill_delegate_, TryToShowTouchToFill(_, _)).Times(0);
+  EXPECT_CALL(touch_to_fill_delegate(), TryToShowTouchToFill(_, _)).Times(0);
   TryToShowTouchToFill(form, field, FormElementWasClicked(false));
   EXPECT_TRUE(external_delegate_->on_suggestions_returned_seen());
 
   // TTF not available, Autofill suggestions shown.
-  EXPECT_CALL(*touch_to_fill_delegate_, TryToShowTouchToFill(_, _))
+  EXPECT_CALL(touch_to_fill_delegate(), TryToShowTouchToFill(_, _))
       .WillOnce(Return(false));
   TryToShowTouchToFill(form, field, FormElementWasClicked(true));
   EXPECT_TRUE(external_delegate_->on_suggestions_returned_seen());
 
   // A form element click and TTF available, Autofill suggestions not shown.
-  EXPECT_CALL(*touch_to_fill_delegate_, TryToShowTouchToFill(_, _))
+  EXPECT_CALL(touch_to_fill_delegate(), TryToShowTouchToFill(_, _))
       .WillOnce(Return(true));
   TryToShowTouchToFill(form, field, FormElementWasClicked(true));
   EXPECT_FALSE(external_delegate_->on_suggestions_returned_seen());
@@ -10040,9 +10063,9 @@ TEST_F(BrowserAutofillManagerTest, ShowNothingIfTouchToFillAlreadyShown) {
   FormsSeen({form});
   const FormFieldData& field = form.fields[1];
 
-  EXPECT_CALL(*touch_to_fill_delegate_, IsShowingTouchToFill)
+  EXPECT_CALL(touch_to_fill_delegate(), IsShowingTouchToFill)
       .WillOnce(Return(true));
-  EXPECT_CALL(*touch_to_fill_delegate_, TryToShowTouchToFill(_, _)).Times(0);
+  EXPECT_CALL(touch_to_fill_delegate(), TryToShowTouchToFill(_, _)).Times(0);
   TryToShowTouchToFill(form, field, FormElementWasClicked(true));
   EXPECT_FALSE(external_delegate_->on_suggestions_returned_seen());
 }
@@ -10256,7 +10279,8 @@ TEST_F(BrowserAutofillManagerTestForVirtualCardOption,
 // preference for credit card upload is set to disabled.
 TEST_F(BrowserAutofillManagerTestForVirtualCardOption,
        ShouldNotShowDueToCreditCardUploadPrefDisabled) {
-  browser_autofill_manager_->SetAutofillCreditCardEnabled(false);
+  browser_autofill_manager_->SetAutofillCreditCardEnabled(autofill_client_,
+                                                          false);
   FieldGlobalId field_id = CreateCompleteFormAndGetSuggestions();
   external_delegate_->CheckSuggestionCount(field_id, 0);
 }

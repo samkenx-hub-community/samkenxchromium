@@ -12,6 +12,7 @@ import org.chromium.chrome.browser.compositor.layouts.content.TabContentManager;
 import org.chromium.chrome.browser.customtabs.CustomTabActivity;
 import org.chromium.chrome.browser.customtabs.CustomTabIntentDataProvider;
 import org.chromium.chrome.browser.customtabs.features.branding.BrandingController;
+import org.chromium.chrome.browser.device.DeviceClassManager;
 import org.chromium.chrome.browser.feed.FeedPlaceholderLayout;
 import org.chromium.chrome.browser.firstrun.FirstRunUtils;
 import org.chromium.chrome.browser.flags.CachedFeatureFlags;
@@ -92,7 +93,6 @@ public class ChromeCachedFlags {
                 ChromeFeatureList.sEarlyLibraryLoad,
                 ChromeFeatureList.sFeedLoadingPlaceholder,
                 ChromeFeatureList.sFoldableJankFix,
-                ChromeFeatureList.sGridTabSwitcherForTablets,
                 ChromeFeatureList.sHideNonDisplayableAccountEmail,
                 ChromeFeatureList.sIncognitoReauthenticationForAndroid,
                 ChromeFeatureList.sInstanceSwitcher,
@@ -136,7 +136,8 @@ public class ChromeCachedFlags {
                 BrandingController.USE_TEMPORARY_STORAGE,
                 BrandingController.ANIMATE_TOOLBAR_ICON_TRANSITION,
                 ChimeFeatures.ALWAYS_REGISTER,
-                StartSurfaceConfiguration.BEHAVIOURAL_TARGETING,
+                DeviceClassManager.GTS_ACCESSIBILITY_SUPPORT,
+                DeviceClassManager.GTS_LOW_END_SUPPORT,
                 FeedPlaceholderLayout.ENABLE_INSTANT_START_ANIMATION,
                 FilePersistedTabDataStorage.DELAY_SAVES_UNTIL_DEFERRED_STARTUP_PARAM,
                 OptimizationGuidePushNotificationManager.MAX_CACHE_SIZE,
@@ -152,8 +153,6 @@ public class ChromeCachedFlags {
                 StartSurfaceConfiguration.IS_DOODLE_SUPPORTED,
                 StartSurfaceConfiguration.START_SURFACE_RETURN_TIME_SECONDS,
                 StartSurfaceConfiguration.START_SURFACE_RETURN_TIME_USE_MODEL,
-                StartSurfaceConfiguration.NUM_DAYS_KEEP_SHOW_START_AT_STARTUP,
-                StartSurfaceConfiguration.NUM_DAYS_USER_CLICK_BELOW_THRESHOLD,
                 StartSurfaceConfiguration.SHOW_TABS_IN_MRU_ORDER,
                 StartSurfaceConfiguration.SIGNIN_PROMO_NTP_COUNT_LIMIT,
                 StartSurfaceConfiguration.SIGNIN_PROMO_NTP_SINCE_FIRST_TIME_SHOWN_LIMIT_HOURS,
@@ -162,13 +161,10 @@ public class ChromeCachedFlags {
                 StartSurfaceConfiguration.START_SURFACE_LAST_ACTIVE_TAB_ONLY,
                 StartSurfaceConfiguration.START_SURFACE_OPEN_NTP_INSTEAD_OF_START,
                 StartSurfaceConfiguration.START_SURFACE_OPEN_START_AS_HOMEPAGE,
-                StartSurfaceConfiguration.START_SURFACE_VARIATION,
-                StartSurfaceConfiguration.TAB_COUNT_BUTTON_ON_START_SURFACE,
-                StartSurfaceConfiguration.USER_CLICK_THRESHOLD,
                 TabContentManager.ALLOW_TO_REFETCH_TAB_THUMBNAIL_VARIATION,
                 TabPersistentStore.CRITICAL_PERSISTED_TAB_DATA_SAVE_ONLY_PARAM,
-                TabUiFeatureUtilities.DELAY_GTS_CREATION,
                 TabUiFeatureUtilities.ENABLE_TAB_GROUP_AUTO_CREATION,
+                TabUiFeatureUtilities.GTS_ACCESSIBILITY_LIST_MODE,
                 TabUiFeatureUtilities.SHOW_OPEN_IN_TAB_GROUP_MENU_ITEM_FIRST,
                 TabUiFeatureUtilities.ZOOMING_MIN_MEMORY,
                 TabUiFeatureUtilities.SKIP_SLOW_ZOOMING,

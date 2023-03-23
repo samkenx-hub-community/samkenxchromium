@@ -32,6 +32,9 @@ BASE_FEATURE(kIPHDesktopTabGroupsNewGroupFeature,
 BASE_FEATURE(kIPHDesktopCustomizeChromeFeature,
              "IPH_DesktopCustomizeChrome",
              base::FEATURE_DISABLED_BY_DEFAULT);
+BASE_FEATURE(kIPHDownloadToolbarButtonFeature,
+             "IPH_DownloadToolbarButton",
+             base::FEATURE_ENABLED_BY_DEFAULT);
 BASE_FEATURE(kIPHExtensionsMenuFeature,
              "IPH_ExtensionsMenu",
              base::FEATURE_DISABLED_BY_DEFAULT);
@@ -55,6 +58,15 @@ BASE_FEATURE(kIPHTabAudioMutingFeature,
              base::FEATURE_DISABLED_BY_DEFAULT);
 BASE_FEATURE(kIPHPasswordsAccountStorageFeature,
              "IPH_PasswordsAccountStorage",
+             base::FEATURE_ENABLED_BY_DEFAULT);
+BASE_FEATURE(kIPHPasswordsManagementBubbleAfterSaveFeature,
+             "IPH_PasswordsManagementBubbleAfterSave",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+BASE_FEATURE(kIPHPasswordsManagementBubbleDuringSigninFeature,
+             "IPH_PasswordsManagementBubbleDuringSignin",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+BASE_FEATURE(kIPHPasswordsWebAppProfileSwitchFeature,
+             "IPH_PasswordsWebAppProfileSwitch",
              base::FEATURE_ENABLED_BY_DEFAULT);
 BASE_FEATURE(kIPHPerformanceNewBadgeFeature,
              "IPH_PerformanceNewBadge",
@@ -122,6 +134,12 @@ BASE_FEATURE(kIPHAdaptiveButtonInTopToolbarCustomizationShareFeature,
              base::FEATURE_DISABLED_BY_DEFAULT);
 BASE_FEATURE(kIPHAdaptiveButtonInTopToolbarCustomizationVoiceSearchFeature,
              "IPH_AdaptiveButtonInTopToolbarCustomization_VoiceSearch",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+BASE_FEATURE(kIPHAdaptiveButtonInTopToolbarCustomizationTranslateFeature,
+             "IPH_AdaptiveButtonInTopToolbarCustomization_Translate",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+BASE_FEATURE(kIPHAdaptiveButtonInTopToolbarCustomizationAddToBookmarksFeature,
+             "IPH_AdaptiveButtonInTopToolbarCustomization_AddToBookmarks",
              base::FEATURE_DISABLED_BY_DEFAULT);
 BASE_FEATURE(kIPHAddToHomescreenMessageFeature,
              "IPH_AddToHomescreenMessage",
@@ -436,12 +454,21 @@ BASE_FEATURE(kIPHiOSDefaultBrowserOverflowMenuBadgeFeature,
 BASE_FEATURE(kIPHiOSDefaultBrowserSettingsBadgeFeature,
              "IPH_iOSDefaultBrowserSettingsBadge",
              base::FEATURE_ENABLED_BY_DEFAULT);
-BASE_FEATURE(kIPHiOSAppStorePromoFeature,
-             "IPH_iOSAppStorePromo",
+BASE_FEATURE(kIPHiOSPromoAppStoreFeature,
+             "IPH_iOSPromoAppStore",
              base::FEATURE_ENABLED_BY_DEFAULT);
 BASE_FEATURE(kIPHTabPinnedFeature,
              "IPH_TabPinnedFeature",
              base::FEATURE_DISABLED_BY_DEFAULT);
+BASE_FEATURE(kIPHiOSPromoWhatsNewFeature,
+             "IPH_iOSPromoWhatsNew",
+             base::FEATURE_ENABLED_BY_DEFAULT);
+BASE_FEATURE(kIPHiOSPromoPostRestoreFeature,
+             "IPH_iOSPromoPostRestore",
+             base::FEATURE_ENABLED_BY_DEFAULT);
+BASE_FEATURE(kIPHiOSPromoCredentialProviderExtensionFeature,
+             "IPH_iOSPromoCredentialProviderExtension",
+             base::FEATURE_ENABLED_BY_DEFAULT);
 #endif  // BUILDFLAG(IS_IOS)
 
 #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_APPLE) || BUILDFLAG(IS_LINUX) || \

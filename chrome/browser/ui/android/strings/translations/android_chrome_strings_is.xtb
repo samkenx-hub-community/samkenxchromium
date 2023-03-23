@@ -283,6 +283,7 @@ Traustslyklar bæta persónuvernd á netinu og ekki er hægt að nota þá til a
 <translation id="2581165646603367611">Þetta mun eyða fótsporum, skyndiminni og öðrum gögnum frá vefsvæðum sem Chrome telur ekki mikilvæg.</translation>
 <translation id="2587052924345400782">Nýrri útgáfa er í boði</translation>
 <translation id="2593272815202181319">Jafnbreitt</translation>
+<translation id="2603212228005142861">Skráðu þig inn til að stjórna kjörstillingum</translation>
 <translation id="2604446170045642109">Þú getur slökkt á dökku þema fyrir vefsvæði í stillingunum.</translation>
 <translation id="2612676031748830579">Kortanúmer</translation>
 <translation id="2625189173221582860">Aðgangsorð afritað</translation>
@@ -476,6 +477,7 @@ Traustslyklar bæta persónuvernd á netinu og ekki er hægt að nota þá til a
 <translation id="3587596251841506391">Hjálpaðu við að bæta netöryggi</translation>
 <translation id="3597179440835065298">Fáðu betri tillögur</translation>
 <translation id="3602290021589620013">Forskoða</translation>
+<translation id="360901359071773787">Eyða síðustu 15 mínútum?</translation>
 <translation id="3616113530831147358">Hljóð</translation>
 <translation id="3622349720008044802">Stjórna gluggum</translation>
 <translation id="3631987586758005671">Deilir í <ph name="DEVICE_NAME" /></translation>
@@ -630,6 +632,7 @@ Traustslyklar bæta persónuvernd á netinu og ekki er hægt að nota þá til a
 
 Google reikningurinn þinn kann að vera með annars konar vefskoðunarferil, svo sem yfir leit og virkni í annarri þjónustu Google, á <ph name="BEGIN_LINK" />myactivity.google.com<ph name="END_LINK" />.</translation>
 <translation id="452750746583162491">Fara yfir samstillt gögn</translation>
+<translation id="4528638190900283934">Skráðu þig inn til að fá fleiri eiginleika</translation>
 <translation id="4532845899244822526">Velja möppu</translation>
 <translation id="4547551584605870320">{TAB_COUNT,plural, =1{<ph name="TAB_COUNT_ONE" /> flipi}one{<ph name="TAB_COUNT_MANY" /> flipi, <ph name="TAB_COUNT_INCOGNITO" /> huliðsflipi}other{<ph name="TAB_COUNT_MANY" /> flipar, <ph name="TAB_COUNT_INCOGNITO" /> huliðsflipar}}</translation>
 <translation id="4554077758708533499">Tengt með USB-snúru</translation>
@@ -820,6 +823,7 @@ Til að breyta þessari stillingu skaltu <ph name="BEGIN_LINK" />endurstilla sam
 <translation id="5517095782334947753">Þú ert með bókamerki, feril, aðgangsorð og aðrar stillingar frá <ph name="FROM_ACCOUNT" />.</translation>
 <translation id="5524761631371622910">Þegar kveikt er á prufuútgáfum og Chrome hefur skráð þig af handahófi í virka prufuútgáfu hefur vafraferillinn þinn áhrif á auglýsingarnar sem þú sérð og áhugasviðin sem eru áætluð hér fyrir neðan. Til að gæta persónuverndar þinnar eyðir Chrome áhugamálunum þínum sjálfkrafa mánaðarlega.</translation>
 <translation id="5524843473235508879">Lokað á framsendingu.</translation>
+<translation id="554297709083131118">Eftirfarandi gögnum frá síðustu 15 mínútum verður eytt</translation>
 <translation id="5548606607480005320">Öryggisathugun</translation>
 <translation id="5555525474779371165">Veldu vernd öruggrar vefskoðunar</translation>
 <translation id="5556459405103347317">Endurhlaða</translation>
@@ -1074,6 +1078,7 @@ Sum vefsvæði kunna til dæmis að bregðast við beiðninni með því að bir
 <translation id="6824899148643461612"><ph name="TAB_TITLE" />, flipi, valinn</translation>
 <translation id="6828070228333235514">Hætta að vakta verð</translation>
 <translation id="6830728435402077660">Ekki öruggt</translation>
+<translation id="6831043979455480757">Þýða</translation>
 <translation id="6833996806551876956">Prufuútgáfa persónuverndarafmörkunar</translation>
 <translation id="6836206421467243968">Endurheimta flipahópinn <ph name="TITLE_OF_GROUP" /> sem nýjan flipahóp í bakgrunni.</translation>
 <translation id="6846298663435243399">Hleður…</translation>
@@ -1241,10 +1246,10 @@ Sum vefsvæði kunna til dæmis að bregðast við beiðninni með því að bir
 <translation id="7707922173985738739">Nota farsímagögn</translation>
 <translation id="7709094866268987903">Áhugamál sem þú fjarlægðir birtast hér</translation>
 <translation id="7709918231054955894">Skoðaðu alla flipana þína</translation>
+<translation id="772434085369393266">Uppfæra flettingar í HTTPS og vara þig við áður en vefsvæðum sem ekki styðja það er hlaðið. Þú getur ekki breytt þessari stillingu vegna þess að þú ert með kveikt á ítarlegri vernd.</translation>
 <translation id="7725024127233776428">Síður sem þú setur í bókamerki birtast hér</translation>
 <translation id="7757787379047923882">Texta deilt af <ph name="DEVICE_NAME" /></translation>
 <translation id="7762668264895820836">SD-kort <ph name="SD_CARD_NUMBER" /></translation>
-<translation id="7762928140712606393">Skráðu þig inn til að fá viðbótareiginleika og njóta hámarksöryggis Chrome</translation>
 <translation id="7764225426217299476">Bæta við heimilisfangi</translation>
 <translation id="7772032839648071052">Staðfestu aðgangsorðið</translation>
 <translation id="7772375229873196092">Loka <ph name="APP_NAME" /></translation>
@@ -1260,6 +1265,7 @@ Sum vefsvæði kunna til dæmis að bregðast við beiðninni með því að bir
 <translation id="78270725016672455">Tölvan biður um að skrá þetta tæki við skráningu inn á vefsvæði</translation>
 <translation id="7844171778363018843">Engin gögn valin fyrir samstillingu</translation>
 <translation id="7846296061357476882">Google þjónusta</translation>
+<translation id="7847228556075070294">Ferli, fótsporum og öðrum gögnum eytt</translation>
 <translation id="784934925303690534">Tímabil</translation>
 <translation id="7851858861565204677">Önnur tæki</translation>
 <translation id="7853202427316060426">Virkni</translation>

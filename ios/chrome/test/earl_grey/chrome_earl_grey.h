@@ -231,8 +231,11 @@ id<GREYAction> grey_longPressWithDuration(base::TimeDelta duration);
                      originator_client_item_id:
                          (const std::string&)originator_client_item_id;
 
-// Injects typed URL to sync FakeServer.
+// Injects a typed URL to the sync FakeServer.
 - (void)addFakeSyncServerTypedURL:(const GURL&)URL;
+
+// Injects a HISTORY visit to the sync FakeServer.
+- (void)addFakeSyncServerHistoryVisit:(const GURL&)URL;
 
 // Injects device info to sync FakeServer.
 - (void)addFakeSyncServerDeviceInfo:(NSString*)deviceName
@@ -263,11 +266,11 @@ id<GREYAction> grey_longPressWithDuration(base::TimeDelta duration);
 - (void)waitForSyncServerHistoryURLs:(NSArray<NSURL*>*)URLs
                              timeout:(base::TimeDelta)timeout;
 
-// Induces a GREYAssert if `expected_present` is YES and the provided `url` is
-// not present, or vice versa.
-- (void)waitForTypedURL:(const GURL&)URL
-          expectPresent:(BOOL)expectPresent
-                timeout:(base::TimeDelta)timeout;
+// Induces a GREYAssert if `expectPresent` is YES and the provided `URL` is
+// not present in the history DB, or vice versa.
+- (void)waitForHistoryURL:(const GURL&)URL
+            expectPresent:(BOOL)expectPresent
+                  timeout:(base::TimeDelta)timeout;
 
 // Waits for sync invalidation field presence in the DeviceInfo data type on the
 // server.
@@ -690,6 +693,9 @@ id<GREYAction> grey_longPressWithDuration(base::TimeDelta duration);
 // Returns whether SF Symbols are used.
 - (BOOL)isSFSymbolEnabled;
 
+// Returns whether UIButtonConfiguration changes are enabled.
+- (BOOL)isUIButtonConfigurationEnabled;
+
 #pragma mark - ContentSettings
 
 // Gets the current value of the popup content setting preference for the
@@ -715,6 +721,11 @@ id<GREYAction> grey_longPressWithDuration(base::TimeDelta duration);
 // UIKeyInputEscape constants as `input`.
 - (void)simulatePhysicalKeyboardEvent:(NSString*)input
                                 flags:(UIKeyModifierFlags)flags;
+
+#pragma mark - Default Utilities (EG2)
+
+// Stores a value for the provided key in NSUserDefaults.
+- (void)setUserDefaultObject:(id)value forKey:(NSString*)defaultName;
 
 #pragma mark - Pref Utilities (EG2)
 

@@ -119,7 +119,6 @@
 <translation id="1942765061641586207">Billedopløsning</translation>
 <translation id="1972984168337863910">Udvid paneler med feedback til filer</translation>
 <translation id="1995337122023280937">Gå til filplacering</translation>
-<translation id="1999709132469742660">Filadgang for alle webadresser</translation>
 <translation id="2001796770603320721">Administrer i Drev</translation>
 <translation id="2009067268969781306">Formatering af et drev sletter alle de data, der er gemt på det. Denne handling kan ikke fortrydes.</translation>
 <translation id="2025955442973426285">Tigrinsk</translation>
@@ -151,6 +150,7 @@
 <translation id="2236732657580416950">Din Google Drev-cache blev ryddet.</translation>
 <translation id="2239068707900391003">Person med kaffe</translation>
 <translation id="2251368349685848079">Gendan fra papirkurven</translation>
+<translation id="2278133026967558505">Filadgang for alle websites og webadresser</translation>
 <translation id="2282155092769082568">Webadresse til automatisk konfiguration:</translation>
 <translation id="2284767815536050991">flytbart lager</translation>
 <translation id="2288278176040912387">Pladespiller</translation>
@@ -543,7 +543,6 @@
 <translation id="5323213332664049067">Latinamerikansk</translation>
 <translation id="5330145655348521461">Disse filer blev åbnet på en anden computer. Skift til <ph name="USER_NAME" /> (<ph name="MAIL_ADDRESS" />) for at se dem.</translation>
 <translation id="5330512191124428349">Hent oplysninger</translation>
-<translation id="5337538975554986899">Filadgang for alle webadresser undtagen <ph name="NON_RESTRICTED_DESTINATIONS" /></translation>
 <translation id="5344246330454251646">Administrer deling med Bruschetta</translation>
 <translation id="535792325654997756">Person med katte</translation>
 <translation id="5358764674931277">Billedfrekvens</translation>
@@ -769,6 +768,7 @@
 <translation id="7162080671816799010">Der mangler et "Match af alternativt emnenavn" eller "Match af domænesuffiks" for at validere identiteten for godkendelsesserveren</translation>
 <translation id="7165320105431587207">Netværket kunne ikke konfigureres</translation>
 <translation id="7170041865419449892">Intet signal</translation>
+<translation id="7179579940054351344">Filadgang for alle websites og webadresser undtagen <ph name="NON_RESTRICTED_DESTINATIONS" /></translation>
 <translation id="7180611975245234373">Opdater</translation>
 <translation id="7189874332498648577"><ph name="NUMBER_OF_GB" /> GB</translation>
 <translation id="7191454237977785534">Gem fil som</translation>
@@ -942,6 +942,7 @@
 <translation id="8492972329130824181">Hjemmenetværket er ikke tilgængeligt. Dataroaming med mobildata skal være aktiveret, før du kan oprette forbindelse.</translation>
 <translation id="8499098729323186194">Udtrækker <ph name="NUMBER_OF_ITEMS" /> elementer…</translation>
 <translation id="8502913769543567768">Netværk <ph name="NETWORK_INDEX" /> af <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, <ph name="NETWORK_PROVIDER_NAME" />, aktivér efter konfiguration af enhed, administreret af din administrator</translation>
+<translation id="8512483403832814140">Når som helst</translation>
 <translation id="8521441079177373948">Britisk</translation>
 <translation id="853494022971700746">Fransk (Frankrig)</translation>
 <translation id="8540608333167683902">Netværk <ph name="NETWORK_INDEX" /> af <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, <ph name="CONNECTION_STATUS" />, signalstyrke <ph name="SIGNAL_STRENGTH" /> %, info</translation>

@@ -54,6 +54,7 @@ data/attribution_reporting/databases/version_44.sql
 data/attribution_reporting/databases/version_45.sql
 data/attribution_reporting/databases/version_46.sql
 data/attribution_reporting/databases/version_47.sql
+data/attribution_reporting/databases/version_48.sql
 data/attribution_reporting/interop/aggregatable_budget.json
 data/attribution_reporting/interop/aggregatable_contributions_creation.json
 data/attribution_reporting/interop/aggregatable_dedup_key.json
@@ -202,6 +203,7 @@ data/browsing_data/storage_accessor.html.mock-http-headers
 data/browsing_data/worker.js
 data/browsing_data/worker_setup.html
 data/browsing_data/worker_test.html
+data/browsing_topics/page_with_iframe.html
 data/browsing_topics/service_worker_factory.html
 data/browsing_topics/topics_service_worker.js
 data/browsing_topics/v0.init_too_old.sql
@@ -229,6 +231,8 @@ data/cache_transparency/pervasive.js.mock-http-headers
 data/cache_transparency/pervasive2.html
 data/cacheable-isolated.jpg
 data/cacheable-isolated.jpg.mock-http-headers
+data/cacheable.js
+data/cacheable.js.mock-http-headers
 data/cacheable.svg
 data/cacheable.svg.mock-http-headers
 data/click-nocontent-link.html
@@ -416,8 +420,6 @@ data/fenced_frames/in_iframe.html
 data/fenced_frames/in_iframe.html.mock-http-headers
 data/fenced_frames/nested.html
 data/fenced_frames/nested.html.mock-http-headers
-data/fenced_frames/opaque_ads.html
-data/fenced_frames/opaque_ads.html.mock-http-headers
 data/fenced_frames/outer_inner_frame_as_param.html
 data/fenced_frames/outer_inner_frame_as_param.html.mock-http-headers
 data/fenced_frames/page_with_script.html
@@ -997,6 +999,8 @@ data/interest_group/bidding_logic_use_wasm.js
 data/interest_group/bidding_logic_use_wasm.js.mock-http-headers
 data/interest_group/bidding_logic_with_debugging_report.js
 data/interest_group/bidding_logic_with_debugging_report.js.mock-http-headers
+data/interest_group/bidding_logic_with_size.js
+data/interest_group/bidding_logic_with_size.js.mock-http-headers
 data/interest_group/bidding_no_direct_from_seller_signals_validator.js
 data/interest_group/bidding_no_direct_from_seller_signals_validator.js.mock-http-headers
 data/interest_group/component_auction_bidding_argument_validator.js
@@ -1501,6 +1505,9 @@ data/service_worker/navigation_preload_worker.js
 data/service_worker/navigation_preload_worker.js.mock-http-headers
 data/service_worker/non_function_fetch_event.js
 data/service_worker/one_subframe.html
+data/service_worker/race_network_request.html
+data/service_worker/race_network_request.js
+data/service_worker/race_network_request_from_fetch_handler.html
 data/service_worker/request_navigate.html
 data/service_worker/request_origin_worker.js
 data/service_worker/skip_waiting_and_clients_claim_worker.js
@@ -1549,6 +1556,7 @@ data/set_cookie.html
 data/set_cookie.html.mock-http-headers
 data/set_document_cookie.html
 data/shared_storage/customizable_module.js
+data/shared_storage/customizable_script.js
 data/shared_storage/erroneous_function_module.js
 data/shared_storage/erroneous_module.js
 data/shared_storage/getter_module.js

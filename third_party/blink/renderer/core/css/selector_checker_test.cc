@@ -120,6 +120,26 @@ ScopeProximityTestData scope_proximity_test_data[] = {
       )CSS",
       3
     },
+
+    // @scope(.a) creates two scopes, but the selector only matches in the
+    // outermost scope.
+    {
+      R"HTML(
+        <div class=b>
+          <div class=a>
+            <div class=a>
+              <div id=target></div>
+            </div>
+          </div>
+        </div>
+      )HTML",
+      R"CSS(
+        @scope (.a) {
+          .b > :scope #target { z-index: 1; }
+        }
+      )CSS",
+      2
+    },
     // clang-format on
 };
 
@@ -160,7 +180,6 @@ TEST_P(ScopeProximityTest, All) {
 
   auto* style_rule = DynamicTo<StyleRule>(rule);
   ASSERT_TRUE(style_rule);
-  ASSERT_TRUE(style_rule->FirstSelector()->IsLastInSelectorList());
 
   Element* target = GetDocument().getElementById("target");
   ASSERT_TRUE(target);
@@ -418,6 +437,51 @@ TEST_F(EasySelectorCheckerTest, SmokeTest) {
   EXPECT_FALSE(Matches("div#a #c.cls1", "b"));
   EXPECT_FALSE(Matches("#c .cls1", "c"));
   EXPECT_FALSE(Matches("div #a .cls1", "c"));
+}
+
+class SelectorCheckerTest : public PageTestBase {};
+
+TEST_F(SelectorCheckerTest, PseudoScopeWithoutScope) {
+  GetDocument().body()->setInnerHTML("<div id=foo></div>");
+  UpdateAllLifecyclePhasesForTest();
+
+  CSSSelectorList* selector_list =
+      css_test_helpers::ParseSelectorList(":scope #foo");
+  ASSERT_TRUE(selector_list);
+  ASSERT_TRUE(selector_list->First());
+
+  Element* foo = GetDocument().getElementById("foo");
+  ASSERT_TRUE(foo);
+
+  SelectorChecker checker(SelectorChecker::kResolvingStyle);
+  SelectorChecker::SelectorCheckingContext context(foo);
+  context.selector = selector_list->First();
+  // We have a selector with :scope, but no context.scope:
+  context.scope = nullptr;
+
+  SelectorChecker::MatchResult result;
+
+  // Don't crash.
+  EXPECT_FALSE(checker.Match(context, result));
+}
+
+TEST_F(SelectorCheckerTest, PseudoTrue) {
+  GetDocument().body()->setInnerHTML("<div id=foo></div>");
+  UpdateAllLifecyclePhasesForTest();
+
+  CSSSelector selector;
+  selector.SetTrue();
+  selector.SetLastInTagHistory(true);
+
+  Element* foo = GetDocument().getElementById("foo");
+  ASSERT_TRUE(foo);
+
+  SelectorChecker checker(SelectorChecker::kResolvingStyle);
+  SelectorChecker::SelectorCheckingContext context(foo);
+  context.selector = &selector;
+
+  SelectorChecker::MatchResult result;
+  EXPECT_TRUE(checker.Match(context, result));
 }
 
 }  // namespace blink

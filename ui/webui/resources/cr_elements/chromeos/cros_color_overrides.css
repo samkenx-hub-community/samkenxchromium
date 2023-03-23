@@ -23,6 +23,11 @@ To get Chrome OS System Colors, an element must:
   color: var(--cros-link-color);
 }
 
+:host-context([cros]) cr-button[has-prefix-icon_],
+:host-context([cros]) cr-button[has-suffix-icon_] {
+  --iron-icon-fill-color: currentColor;
+}
+
 :host-context([cros]) cr-dialog::part(dialog) {
   --cr-dialog-background-color: var(--cros-bg-color-elevation-3);
   background-image: none;
@@ -100,6 +105,66 @@ To get Chrome OS System Colors, an element must:
   --cr-secondary-text-color: var(--cros-sys-secondary);
 }
 
+/* Button */
+:host-context(body.jelly-enabled) cr-button {
+  /* Default button colors */
+  --text-color: var(--cros-sys-on_primary_container);
+  --ink-color: var(--cros-sys-ripple_primary);
+  --iron-icon-fill-color: currentColor;
+  --hover-bg-color: var(--cros-sys-hover_on_subtle);
+  --ripple-opacity: .1;
+
+  /* Action button colors */
+  --bg-action: var(--cros-sys-primary);
+  --ink-color-action: var(--cros-sys-ripple_primary);
+  --text-color-action: var(--cros-sys-on_primary);
+  --hover-bg-action: var(--cros-sys-hover_on_prominent);
+  --ripple-opacity-action: 1;
+
+  /* Disabled button colors */
+  --disabled-bg: var(--cros-sys-disabled_container);
+  --disabled-bg-action: var(--cros-sys-disabled_container);
+  --disabled-text-color: var(--cros-sys-disabled);
+
+  background-color: var(--cros-sys-primary_container);
+  border: none;
+}
+
+:host-context(body.jelly-enabled) cr-button:hover::part(hoverBackground) {
+  background-color: var(--hover-bg-color);
+  display: block;
+}
+
+:host-context(body.jelly-enabled) cr-button.action-button {
+  background-color: var(--bg-action);
+}
+
+:host-context(body.jelly-enabled)
+    cr-button.action-button:hover::part(hoverBackground) {
+  background-color: var(--hover-bg-action);
+}
+
+:host-context(body.jelly-enabled) cr-button[disabled] {
+  background-color: var(--cros-sys-disabled_container);
+}
+
+:host-context(body.jelly-enabled):host-context(.focus-outline-visible)
+    cr-button:focus {
+  box-shadow: none;
+  outline: 2px solid var(--cros-sys-focus_ring);
+}
+
+/* Checkbox */
+:host-context(body.jelly-enabled) cr-checkbox {
+  --cr-checkbox-checked-box-color: var(--cros-sys-primary);
+  --cr-checkbox-ripple-checked-color: var(--cros-sys-ripple_primary);
+  --cr-checkbox-checked-ripple-opacity: 1;
+  --cr-checkbox-mark-color: var(--cros-sys-inverse_on_surface);
+  --cr-checkbox-ripple-unchecked-color: var(--cros-sys-ripple_primary);
+  --cr-checkbox-unchecked-box-color: var(--cros-sys-on_surface);
+  --cr-checkbox-unchecked-ripple-opacity: 1;
+}
+
 /* Dialog */
 :host-context(body.jelly-enabled) cr-dialog::part(dialog) {
   --cr-dialog-background-color: var(--cros-sys-app_base_elevated);
@@ -116,12 +181,22 @@ To get Chrome OS System Colors, an element must:
   --cr-icon-button-fill-color: var(--cros-sys-secondary);
 }
 
-/* Input */
-:host-context(body.jelly-enabled) cr-input {
+/* Input and Textarea */
+:host-context(body.jelly-enabled) cr-input,
+:host-context(body.jelly-enabled) cr-search-field::part(searchInput),
+:host-context(body.jelly-enabled) cr-textarea {
   --cr-input-background-color: var(--cros-sys-input_field_dark);
   --cr-input-error-color: var(--cros-sys-error);
   --cr-input-focus-color: var(--cros-sys-primary);
   --cr-input-placeholder-color: var(--cros-sys-secondary);
+}
+
+/* md-select */
+:host-context(body.jelly-enabled) .md-select {
+  --md-select-bg-color: var(--cros-sys-input_field_dark);
+  --md-select-focus-shadow-color: var(--cros-sys-primary);
+  --md-select-option-bg-color: var(--cros-sys-app_base_elevated);
+  --md-select-text-color: var(--cros-sys-on_surface);
 }
 
 /* Radio button */
@@ -132,6 +207,52 @@ To get Chrome OS System Colors, an element must:
   --cr-radio-button-unchecked-color: var(--cros-sys-on_surface);
   --cr-radio-button-unchecked-ripple-color:
       var(--cros-sys-ripple_neutral_on_subtle);
+}
+
+/* Search field */
+:host-context(body.jelly-enabled) cr-search-field {
+  --cr-search-field-clear-icon-fill: var(--cros-sys-primary);
+  --cr-search-field-clear-icon-margin-end: 6px;
+  --cr-search-field-input-border-bottom: none;
+  --cr-search-field-input-padding-start: 8px;
+  --cr-search-field-input-underline-border-radius: 4px;
+  --cr-search-field-search-icon-display: none;
+  --cr-search-field-search-icon-fill: var(--cros-sys-primary);
+  --cr-search-field-search-icon-inline-display: block;
+  --cr-search-field-search-icon-inline-margin-start: 6px;
+  border-radius: 4px;
+}
+
+/* Slider */
+:host-context(body.jelly-enabled) cr-slider {
+  --cr-slider-active-color: var(--cros-sys-primary);
+  --cr-slider-container-color: var(--cros-sys-primary_container);
+  --cr-slider-container-disabled-color: var(--cros-sys-disabled_container);
+  --cr-slider-disabled-color: var(--cros-sys-disabled);
+  --cr-slider-knob-active-color: var(--cros-sys-primary);
+  --cr-slider-knob-disabled-color: var(--cros-sys-disabled);
+  --cr-slider-marker-active-color: var(--cros-sys-primary_container);
+  --cr-slider-marker-color: var(--cros-sys-primary);
+  --cr-slider-marker-disabled-color: var(--cros-sys-disabled);
+  --cr-slider-ripple-color: var(--cros-sys-hover_on_prominent);
+}
+
+:host-context(body.jelly-enabled) cr-slider:not([disabled])::part(knob) {
+  background-color: var(--cros-sys-primary);
+}
+
+:host-context(body.jelly-enabled) cr-slider[disabled]::part(knob) {
+  border: none;
+}
+
+:host-context(body.jelly-enabled) cr-slider::part(label) {
+  background: var(--cros-sys-primary);
+  color: var(--cros-sys-on_primary);
+}
+
+/* Tabs */
+:host-context(body.jelly-enabled) cr-tabs {
+  --cr-tabs-selected-color: var(--cros-sys-primary);
 }
 
 /* Toggle */

@@ -524,7 +524,6 @@ BrowserAutofillManager::BrowserAutofillManager(AutofillDriver* driver,
     : AutofillManager(driver, client),
       external_delegate_(
           std::make_unique<AutofillExternalDelegate>(this, driver)),
-      touch_to_fill_delegate_(std::make_unique<TouchToFillDelegateImpl>(this)),
       app_locale_(app_locale),
       personal_data_(client->GetPersonalDataManager()),
       field_filler_(app_locale, client->GetAddressNormalizer()),
@@ -634,6 +633,9 @@ PopupType BrowserAutofillManager::GetPopupType(const FormData& form,
     case FieldTypeGroup::kCreditCard:
       return PopupType::kCreditCards;
 
+    case FieldTypeGroup::kIban:
+      return PopupType::kIbans;
+
     case FieldTypeGroup::kAddressHome:
     case FieldTypeGroup::kAddressBilling:
       return PopupType::kAddresses;
@@ -647,9 +649,6 @@ PopupType BrowserAutofillManager::GetPopupType(const FormData& form,
     case FieldTypeGroup::kBirthdateField:
       return FormHasAddressField(form) ? PopupType::kAddresses
                                        : PopupType::kPersonalInformation;
-
-    default:
-      NOTREACHED();
   }
 }
 
@@ -726,8 +725,7 @@ void BrowserAutofillManager::OnVirtualCardCandidateSelected(
 }
 #endif
 
-bool BrowserAutofillManager::ShouldParseForms(
-    const std::vector<FormData>& forms) {
+bool BrowserAutofillManager::ShouldParseForms() {
   bool autofill_enabled = IsAutofillEnabled();
   // If autofill is disabled but the password manager is enabled, we still
   // need to parse the forms and query the server as the password manager
@@ -889,7 +887,9 @@ void BrowserAutofillManager::OnFormSubmittedImpl(const FormData& form,
   if (IsAutofillCreditCardEnabled()) {
     credit_card_form_event_logger_->OnFormSubmitted(sync_state_,
                                                     *submitted_form);
-    touch_to_fill_delegate_->LogMetricsAfterSubmission(*submitted_form);
+    if (touch_to_fill_delegate_) {
+      touch_to_fill_delegate_->LogMetricsAfterSubmission(*submitted_form);
+    }
   }
 }
 
@@ -1233,9 +1233,10 @@ void BrowserAutofillManager::OnAskForValuesToFillImpl(
     }
 
     single_field_form_fill_router_->CancelPendingQueries(this);
-    if (touch_to_fill_delegate_->IsShowingTouchToFill() ||
-        (form_element_was_clicked &&
-         touch_to_fill_delegate_->TryToShowTouchToFill(form, field))) {
+    if (touch_to_fill_delegate_ &&
+        (touch_to_fill_delegate_->IsShowingTouchToFill() ||
+         (form_element_was_clicked &&
+          touch_to_fill_delegate_->TryToShowTouchToFill(form, field)))) {
       // Touch To Fill surface is shown, so abort showing regular Autofill UI.
       // Now the flow is controlled by the |touch_to_fill_delegate_| instead
       // of |external_delegate_|.
@@ -1558,7 +1559,9 @@ void BrowserAutofillManager::OnHidePopupImpl() {
   single_field_form_fill_router_->CancelPendingQueries(this);
   client()->HideAutofillPopup(PopupHidingReason::kRendererEvent);
   client()->HideFastCheckout(/*allow_further_runs=*/false);
-  touch_to_fill_delegate_->HideTouchToFill();
+  if (touch_to_fill_delegate_) {
+    touch_to_fill_delegate_->HideTouchToFill();
+  }
 }
 
 bool BrowserAutofillManager::GetDeletionConfirmationText(
@@ -1607,8 +1610,7 @@ bool BrowserAutofillManager::GetDeletionConfirmationText(
     return true;
   }
 
-  NOTREACHED();
-  return false;
+  return false;  // The ID was valid. The entry may have been deleted in a race.
 }
 
 bool BrowserAutofillManager::RemoveAutofillProfileOrCreditCard(int unique_id) {
@@ -1626,8 +1628,7 @@ bool BrowserAutofillManager::RemoveAutofillProfileOrCreditCard(int unique_id) {
     return is_local;
   }
 
-  NOTREACHED();
-  return false;
+  return false;  // The ID was valid. The entry may have been deleted in a race.
 }
 
 void BrowserAutofillManager::RemoveCurrentSingleFieldSuggestion(
@@ -2073,7 +2074,9 @@ void BrowserAutofillManager::Reset() {
   credit_card_action_ = mojom::RendererFormDataAction::kPreview;
   initial_interaction_timestamp_ = TimeTicks();
   external_delegate_->Reset();
-  touch_to_fill_delegate_->Reset();
+  if (touch_to_fill_delegate_) {
+    touch_to_fill_delegate_->Reset();
+  }
   filling_context_.clear();
   form_submitted_timestamp_ = TimeTicks();
 }
@@ -3431,12 +3434,14 @@ void BrowserAutofillManager::ProcessFieldLogEventsInForm(
     LogEventCountsUMAMetric(form_structure);
   }
 
-  // Log FieldInfo UKM event.
+  // ShouldUploadUkm reduces the UKM load by ignoring e.g. search boxes at best
+  // effort.
+  bool should_upload_ukm = base::FeatureList::IsEnabled(
+                               features::kAutofillLogUKMEventsWithSampleRate) &&
+                           ShouldUploadUkm(form_structure);
+
   for (const auto& autofill_field : form_structure) {
-    // This reduces the UKM load by ignoring e.g. search boxes at best effort.
-    if (base::FeatureList::IsEnabled(
-            features::kAutofillLogUKMEventsWithSampleRate) &&
-        ShouldUploadUKM(form_structure)) {
+    if (should_upload_ukm) {
       form_interactions_ukm_logger()->LogAutofillFieldInfoAtFormRemove(
           form_structure, *autofill_field);
     }
@@ -3448,9 +3453,7 @@ void BrowserAutofillManager::ProcessFieldLogEventsInForm(
   }
 
   // Log FormSummary UKM event.
-  if (base::FeatureList::IsEnabled(
-          features::kAutofillLogUKMEventsWithSampleRate) &&
-      ShouldUploadUKM(form_structure)) {
+  if (should_upload_ukm) {
     AutofillMetrics::FormEventSet form_events;
     form_events.insert_all(
         address_form_event_logger_->GetFormEvents(form_structure.global_id()));
@@ -3463,25 +3466,35 @@ void BrowserAutofillManager::ProcessFieldLogEventsInForm(
   }
 }
 
-bool BrowserAutofillManager::ShouldUploadUKM(
+bool BrowserAutofillManager::ShouldUploadUkm(
     const FormStructure& form_structure) {
   if (!form_structure.ShouldBeParsed()) {
     return false;
   }
 
-  // If the form contains a single field which contains the string "search" in
-  // its name/id/placeholder, the function return false and the form is not
-  // recorded into UKM.
-  if (form_structure.field_count() == 1 &&
-      (base::ToLowerASCII(form_structure.field(0)->placeholder)
-               .find(u"search") != std::string::npos ||
-       base::ToLowerASCII(form_structure.field(0)->name).find(u"search") !=
-           std::string::npos ||
-       base::ToLowerASCII(form_structure.field(0)->label).find(u"search") !=
-           std::string::npos ||
-       base::ToLowerASCII(form_structure.field(0)->aria_label)
-               .find(u"search") != std::string::npos)) {
+  auto is_text_field = [](const std::unique_ptr<AutofillField>& field) {
+    return field->IsTextInputElement();
+  };
+
+  size_t num_text_fields =
+      base::ranges::count_if(form_structure.fields(), is_text_field);
+  if (num_text_fields == 0) {
     return false;
+  }
+
+  // If the form contains a single text field and this contains the string
+  // "search" in its name/id/placeholder, the function return false and the form
+  // is not recorded into UKM. The form is considered a search box.
+  if (num_text_fields == 1) {
+    auto it = base::ranges::find_if(form_structure.fields(), is_text_field);
+    if (base::ToLowerASCII((*it)->placeholder).find(u"search") !=
+            std::string::npos ||
+        base::ToLowerASCII((*it)->name).find(u"search") != std::string::npos ||
+        base::ToLowerASCII((*it)->label).find(u"search") != std::string::npos ||
+        base::ToLowerASCII((*it)->aria_label).find(u"search") !=
+            std::string::npos) {
+      return false;
+    }
   }
 
   return true;

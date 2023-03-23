@@ -137,6 +137,7 @@ if (!is_a_target_toolchain || toolchain_disables_sanitizers) {
   msan_track_origins = 0
   sanitizer_coverage_flags = ""
   use_afl = false
+  use_centipede = false
   use_cfi_diag = false
   use_cfi_recover = false
   use_libfuzzer = false
@@ -162,6 +163,10 @@ use_fuzzing_engine =
 # this is just libfuzzer, but others are likely to support this in future,
 # so it's preferable to check this.
 use_fuzzing_engine_with_lpm = use_libfuzzer || use_centipede
+
+# Whether the fuzzing engine supports fuzzers which supply their own
+# "main" function.
+fuzzing_engine_supports_custom_main = use_libfuzzer || use_centipede
 
 # Args that are in turn dependent on other args must be in a separate
 # declare_args block. User overrides are only applied at the end of a

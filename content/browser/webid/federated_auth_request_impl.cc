@@ -470,6 +470,14 @@ void FederatedAuthRequestImpl::RequestToken(
     return;
   }
 
+  bool intercept = false;
+  bool should_complete_request_immediately = false;
+  devtools_instrumentation::WillSendFedCmRequest(
+      &render_frame_host(), &intercept, &should_complete_request_immediately);
+  should_complete_request_immediately_ =
+      (intercept && should_complete_request_immediately) ||
+      api_permission_delegate_->ShouldCompleteRequestImmediately();
+
   auth_request_token_callback_ = std::move(callback);
   GetPageData(&render_frame_host())->SetPendingWebIdentityRequest(this);
   network_manager_ = CreateNetworkManager();
@@ -1095,7 +1103,7 @@ void FederatedAuthRequestImpl::HandleAccountsFetchFailure(
   // failed.
   request_dialog_controller_->ShowFailureDialog(
       rp_web_contents, FormatOriginForDisplay(GetEmbeddingOrigin()),
-      FormatOriginForDisplay(idp_origin),
+      FormatOriginForDisplay(idp_origin), idp_info->metadata,
       base::BindOnce(&FederatedAuthRequestImpl::OnDismissFailureDialog,
                      weak_ptr_factory_.GetWeakPtr(),
                      FederatedAuthRequestResult::kError,
@@ -1305,8 +1313,8 @@ void FederatedAuthRequestImpl::OnDialogDismissed(
   // the virtual keyboard showing on Android.
   bool should_embargo = false;
   switch (dismiss_reason) {
-    case IdentityRequestDialogController::DismissReason::CLOSE_BUTTON:
-    case IdentityRequestDialogController::DismissReason::SWIPE:
+    case IdentityRequestDialogController::DismissReason::kCloseButton:
+    case IdentityRequestDialogController::DismissReason::kSwipe:
       should_embargo = true;
       break;
     default:
@@ -1345,7 +1353,7 @@ void FederatedAuthRequestImpl::OnTokenResponseReceived(
   // |token_request_delay_| seconds for better UX.
   token_response_time_ = base::TimeTicks::Now();
   base::TimeDelta fetch_time = token_response_time_ - select_account_time_;
-  if (ShouldCompleteRequestImmediately() ||
+  if (should_complete_request_immediately_ ||
       fetch_time >= token_request_delay_) {
     CompleteTokenRequest(std::move(idp), status, id_token);
     return;
@@ -1535,7 +1543,7 @@ void FederatedAuthRequestImpl::CompleteRequest(
 
   CleanUp();
 
-  if (!should_delay_callback || ShouldCompleteRequestImmediately()) {
+  if (!should_delay_callback || should_complete_request_immediately_) {
     GetPageData(&render_frame_host())->SetPendingWebIdentityRequest(nullptr);
     errors_logged_to_console_ = false;
 
@@ -1629,10 +1637,6 @@ void FederatedAuthRequestImpl::MaybeAddResponseCodeToConsole(
   }
 }
 
-bool FederatedAuthRequestImpl::ShouldCompleteRequestImmediately() {
-  return api_permission_delegate_->ShouldCompleteRequestImmediately();
-}
-
 url::Origin FederatedAuthRequestImpl::GetEmbeddingOrigin() const {
   return render_frame_host().GetMainFrame()->GetLastCommittedOrigin();
 }
@@ -1710,6 +1714,25 @@ void FederatedAuthRequestImpl::OnRejectRequest() {
     CompleteRequestWithError(FederatedAuthRequestResult::kError, absl::nullopt,
                              /*should_delay_callback=*/false);
   }
+}
+
+void FederatedAuthRequestImpl::AcceptAccountsDialogForDevtools(
+    const GURL& config_url,
+    const IdentityRequestAccount& account) {
+  bool is_sign_in =
+      account.login_state == IdentityRequestAccount::LoginState::kSignIn;
+  OnAccountSelected(/*auto_reauthn=*/false, config_url, account.id, is_sign_in);
+}
+
+void FederatedAuthRequestImpl::DismissAccountsDialogForDevtools(
+    bool should_embargo) {
+  // We somewhat arbitrarily pick a reason that does/does not trigger
+  // cooldown.
+  IdentityRequestDialogController::DismissReason reason =
+      should_embargo
+          ? IdentityRequestDialogController::DismissReason::kCloseButton
+          : IdentityRequestDialogController::DismissReason::kOther;
+  OnDialogDismissed(reason);
 }
 
 bool FederatedAuthRequestImpl::GetSingleReturningAccount(

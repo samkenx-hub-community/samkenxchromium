@@ -7,23 +7,26 @@
 
 #include "base/component_export.h"
 #include "base/time/time.h"
+#include "base/timer/elapsed_timer.h"
 #include "base/timer/timer.h"
 #include "chromeos/ash/components/login/login_state/login_state.h"
 #include "chromeos/ash/components/network/hotspot_capabilities_provider.h"
+#include "chromeos/ash/components/network/hotspot_state_handler.h"
 #include "chromeos/ash/services/hotspot_config/public/mojom/cros_hotspot_config.mojom.h"
 #include "mojo/public/cpp/bindings/receiver.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
 
 namespace ash {
 
+class HotspotConfigurationHandler;
 class HotspotController;
-class HotspotStateHandler;
 
 // This class is used to track the hotspot capabilities and status update and
 // emits UMA metrics to the related histogram.
 class COMPONENT_EXPORT(CHROMEOS_NETWORK) HotspotMetricsHelper
     : public LoginState::Observer,
       public HotspotCapabilitiesProvider::Observer,
+      public HotspotStateHandler::Observer,
       public hotspot_config::mojom::HotspotEnabledStateObserver {
  public:
   // Emits enable/disable hotspot operation result to related UMA histogram.
@@ -39,6 +42,9 @@ class COMPONENT_EXPORT(CHROMEOS_NETWORK) HotspotMetricsHelper
   static void RecordSetHotspotConfigResult(
       hotspot_config::mojom::SetHotspotConfigResult result);
 
+  // Emits hotspot enable operation latency to related UMA histogram.
+  static void RecordEnableHotspotLatency(const base::TimeDelta& latency);
+
   HotspotMetricsHelper();
   HotspotMetricsHelper(const HotspotMetricsHelper&) = delete;
   HotspotMetricsHelper& operator=(const HotspotMetricsHelper&) = delete;
@@ -46,7 +52,13 @@ class COMPONENT_EXPORT(CHROMEOS_NETWORK) HotspotMetricsHelper
 
   void Init(HotspotCapabilitiesProvider* hotspot_capabilities_provider,
             HotspotStateHandler* hotspot_state_handler,
-            HotspotController* hotspot_controller);
+            HotspotController* hotspot_controller,
+            HotspotConfigurationHandler* hotspot_configuration_handler,
+            NetworkStateHandler* network_state_handler);
+
+  void set_is_enterprise_managed(bool is_enterprise_managed) {
+    is_enterprise_managed_ = is_enterprise_managed;
+  }
 
  private:
   friend class HotspotMetricsHelperTest;
@@ -54,19 +66,31 @@ class COMPONENT_EXPORT(CHROMEOS_NETWORK) HotspotMetricsHelper
                            HotspotAllowStatusHistogram);
   FRIEND_TEST_ALL_PREFIXES(HotspotMetricsHelperTest,
                            HotspotUsageConfigHistogram);
+  FRIEND_TEST_ALL_PREFIXES(HotspotMetricsHelperTest,
+                           HotspotUsageDurationHistogram);
+  FRIEND_TEST_ALL_PREFIXES(HotspotMetricsHelperTest,
+                           HotspotMaxClientCountHistogram);
+  FRIEND_TEST_ALL_PREFIXES(HotspotMetricsHelperTest,
+                           HotspotIsDeviceManagedHistogram);
+  FRIEND_TEST_ALL_PREFIXES(HotspotMetricsHelperTest,
+                           HotspotEnabledUpstreamStatusHistogram);
+  FRIEND_TEST_ALL_PREFIXES(HotspotMetricsHelperTest,
+                           HotspotDisableReasonHistogram);
   FRIEND_TEST_ALL_PREFIXES(HotspotControllerTest, EnableTetheringSuccess);
   FRIEND_TEST_ALL_PREFIXES(HotspotControllerTest,
                            EnableTetheringReadinessCheckFailure);
   FRIEND_TEST_ALL_PREFIXES(HotspotControllerTest,
                            EnableTetheringNetworkSetupFailure);
   FRIEND_TEST_ALL_PREFIXES(HotspotControllerTest, DisableTetheringSuccess);
-  FRIEND_TEST_ALL_PREFIXES(HotspotStateHandlerTest, SetAndGetHotspotConfig);
+  FRIEND_TEST_ALL_PREFIXES(HotspotConfigurationHandlerTest,
+                           SetAndGetHotspotConfig);
   FRIEND_TEST_ALL_PREFIXES(HotspotCapabilitiesProviderTest,
                            CheckTetheringReadiness);
 
   enum class HotspotMetricsSetEnabledResult;
   enum class HotspotMetricsSetConfigResult;
   enum class HotspotMetricsCheckReadinessResult;
+  enum class HotspotMetricsDisableReason;
 
   static const char kHotspotAllowStatusHistogram[];
   static const char kHotspotAllowStatusAtLoginHistogram[];
@@ -77,6 +101,12 @@ class COMPONENT_EXPORT(CHROMEOS_NETWORK) HotspotMetricsHelper
   static const char kHotspotUsageConfigAutoDisable[];
   static const char kHotspotUsageConfigMAR[];
   static const char kHotspotUsageConfigCompatibilityMode[];
+  static const char kHotspotUsageDuration[];
+  static const char kHotspotMaxClientCount[];
+  static const char kHotspotIsDeviceManaged[];
+  static const char kHotspotEnableLatency[];
+  static const char kHotspotUpstreamStatusWhenEnabled[];
+  static const char kHotspotDisableReasonHistogram[];
   static const base::TimeDelta kLogAllowStatusAtLoginTimeout;
 
   static HotspotMetricsCheckReadinessResult GetCheckReadinessMetricsResult(
@@ -85,6 +115,8 @@ class COMPONENT_EXPORT(CHROMEOS_NETWORK) HotspotMetricsHelper
       const hotspot_config::mojom::HotspotControlResult& result);
   static HotspotMetricsSetConfigResult GetSetConfigMetricsResult(
       const hotspot_config::mojom::SetHotspotConfigResult& result);
+  static HotspotMetricsDisableReason GetMetricsDisableReason(
+      const hotspot_config::mojom::DisableReason& reason);
 
   // Represents the hotspot allow status on device. Note:
   // kDisallowNoCellularUpstream is not logged in the metric because it means
@@ -92,12 +124,12 @@ class COMPONENT_EXPORT(CHROMEOS_NETWORK) HotspotMetricsHelper
   // adding the bucket. These values are persisted to logs. Entries should not
   // be renumbered and numeric values should never be reused.
   enum class HotspotMetricsAllowStatus {
-    kAllowed,
-    kDisallowedWiFiDownstreamNotSupported,
-    kDisallowedNoWiFiSecurityModes,
-    kDisallowedNoMobileData,
-    kDisallowedReadinessCheckFail,
-    kDisallowedByPolicy,
+    kAllowed = 0,
+    kDisallowedWiFiDownstreamNotSupported = 1,
+    kDisallowedNoWiFiSecurityModes = 2,
+    kDisallowedNoMobileData = 3,
+    kDisallowedReadinessCheckFail = 4,
+    kDisallowedByPolicy = 5,
     kMaxValue = kDisallowedByPolicy,
   };
 
@@ -105,9 +137,9 @@ class COMPONENT_EXPORT(CHROMEOS_NETWORK) HotspotMetricsHelper
   // related UMA histogram. These values are persisted to logs. Entries should
   // not be renumbered and numeric values should never be reused.
   enum class HotspotMetricsSetConfigResult {
-    kSuccess,
-    kFailedNotLogin,
-    kFailedInvalidConfiguration,
+    kSuccess = 0,
+    kFailedNotLogin = 1,
+    kFailedInvalidConfiguration = 2,
     kMaxValue = kFailedInvalidConfiguration,
   };
 
@@ -127,33 +159,65 @@ class COMPONENT_EXPORT(CHROMEOS_NETWORK) HotspotMetricsHelper
   // UMA histograms. These values are persisted to logs. Entries should not be
   // renumbered and numeric values should never be reused.
   enum class HotspotMetricsSetEnabledResult {
-    kSuccess,
-    kNotAllowed,
-    kReadinessCheckFailure,
-    kDisableWifiFailure,
-    kInvalidConfiguration,
-    kUpstreamNotAvailable,
-    kNetworkSetupFailure,
-    kWifiDriverFailure,
-    kCellularAttachFailure,
-    kShillOperationFailure,
-    kUnknownFailure,
-    kMaxValue = kUnknownFailure,
+    kSuccess = 0,
+    kNotAllowed = 1,
+    kReadinessCheckFailure = 2,
+    kDisableWifiFailure = 3,
+    kInvalidConfiguration = 4,
+    kUpstreamNotAvailable = 5,
+    kNetworkSetupFailure = 6,
+    kWifiDriverFailure = 7,
+    kCellularAttachFailure = 8,
+    kShillOperationFailure = 9,
+    kUnknownFailure = 10,
+    kAlreadyFulfilled = 11,
+    kMaxValue = kAlreadyFulfilled,
+  };
+
+  // Represents the upstream status when hotspot is enabled. These values are
+  // persisted to logs. Entries should not be renumbered and numeric values
+  // should never be reused.
+  enum class HotspotMetricsUpstreamStatus {
+    kWifiWithCellularConnected = 0,
+    kWifiWithCellularNotConnected = 1,
+    kMaxValue = kWifiWithCellularNotConnected,
+  };
+
+  // Represents the hotspot disable reason. These values are persisted to logs.
+  // Entries should not be renumbered and numeric values should never be used.
+  enum class HotspotMetricsDisableReason {
+    kAutoDisabled = 0,
+    kInternalError = 1,
+    kUserInitiated = 2,
+    kWifiEnabled = 3,
+    kProhibitedByPolicy = 4,
+    kUpstreamNetworkNotAvailable = 5,
+    kSuspended = 6,
+    kRestart = 7,
+    kMaxValue = kRestart,
   };
 
   // HotspotCapabilitiesProvider::Observer:
   void OnHotspotCapabilitiesChanged() override;
+
+  // HotspotStateHandler::Observer:
+  void OnHotspotStatusChanged() override;
 
   // LoginState::Observer:
   void LoggedInStateChanged() override;
 
   // hotspot_config::mojom::HotspotEnabledStateObserver:
   void OnHotspotTurnedOn(bool wifi_turned_off) override;
-  void OnHotspotTurnedOff(
-      hotspot_config::mojom::DisableReason reason) override {}
+  void OnHotspotTurnedOff(hotspot_config::mojom::DisableReason reason) override;
 
   void LogAllowStatus();
   void LogAllowStatusAtLogin();
+  void LogUsageConfig();
+  void LogUsageDuration();
+  void LogMaxClientCount();
+  void LogIsDeviceManaged();
+  void LogUpstreamStatus();
+  void LogDisableReason(const hotspot_config::mojom::DisableReason& reason);
 
   // Retrieves the latest hotspot allow status and converts to
   // HotspotMetricsAllowStatus enum. Return absl::nullopt if it is disallowed
@@ -162,16 +226,32 @@ class COMPONENT_EXPORT(CHROMEOS_NETWORK) HotspotMetricsHelper
 
   HotspotCapabilitiesProvider* hotspot_capabilities_provider_ = nullptr;
   HotspotStateHandler* hotspot_state_handler_ = nullptr;
+  HotspotConfigurationHandler* hotspot_configuration_handler_ = nullptr;
+  NetworkStateHandler* network_state_handler_ = nullptr;
 
   // A timer to wait for user connecting to their upstream cellular network
   // after login.
   base::OneShotTimer timer_;
 
+  // Tracks the maximum connected client count per hotspot session.
+  size_t max_client_count_ = 0;
+
   // Tracks whether the metrics are already logged for this session.
   bool is_metrics_logged_ = false;
 
+  // Tracks whether the hotspot is active.
+  bool is_hotspot_active_ = false;
+
+  // Tracks the usage time for each hotspot session.
+  absl::optional<base::ElapsedTimer> usage_timer_;
+
+  // Tracks if the device is enterprise managed or not.
+  bool is_enterprise_managed_ = false;
+
   mojo::Receiver<hotspot_config::mojom::HotspotEnabledStateObserver>
-      hostpot_enabled_state_observer_receiver_{this};
+      hotspot_state_enabled_state_observer_receiver_{this};
+  mojo::Receiver<hotspot_config::mojom::HotspotEnabledStateObserver>
+      hotspot_controller_enabled_state_observer_receiver_{this};
 };
 
 }  // namespace ash

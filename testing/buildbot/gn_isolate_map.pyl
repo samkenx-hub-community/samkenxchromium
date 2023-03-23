@@ -503,6 +503,10 @@
     "label": "//chrome/test/chromedriver:chromedriver_server",
     "type": "additional_compile_target",
   },
+  "chromedriver_group": {
+    "label": "//:chromedriver_group",
+    "type": "additional_compile_target",
+  },
   "chromedriver_py_tests": {
     "args": [
       "../../testing/scripts/run_chromedriver_tests.py",
@@ -1234,10 +1238,6 @@
   },
   "monochrome_public_bundle_smoke_test": {
     "label": "//chrome/android:monochrome_public_bundle_smoke_test",
-    "type": "console_test_launcher",
-  },
-  "mojo_core_unittests": {
-    "label": "//mojo/core:mojo_core_unittests",
     "type": "console_test_launcher",
   },
   "mojo_python_unittests": {

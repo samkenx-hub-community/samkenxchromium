@@ -254,21 +254,33 @@ ts_files = [
   # Actions.
   "file_manager/state/actions.ts",
   "file_manager/state/actions/all_entries.ts",
+  "file_manager/state/actions/android_apps.ts",
   "file_manager/state/actions/current_directory.ts",
+  "file_manager/state/actions/folder_shortcuts.ts",
+  "file_manager/state/actions/navigation.ts",
+  "file_manager/state/actions/ui_entries.ts",
+  "file_manager/state/actions/volumes.ts",
 
   # ActionsProducers.
+  "file_manager/state/actions_producers/all_entries.ts",
   "file_manager/state/actions_producers/current_directory.ts",
 
   # Reducers.
   "file_manager/state/reducers/root.ts",
   "file_manager/state/reducers/all_entries.ts",
+  "file_manager/state/reducers/android_apps.ts",
   "file_manager/state/reducers/current_directory.ts",
+  "file_manager/state/reducers/folder_shortcuts.ts",
+  "file_manager/state/reducers/navigation.ts",
   "file_manager/state/reducers/search.ts",
+  "file_manager/state/reducers/ui_entries.ts",
+  "file_manager/state/reducers/volumes.ts",
 
   # Containers.
   "file_manager/containers/breadcrumb_container.ts",
   "file_manager/containers/nudge_container.ts",
   "file_manager/containers/search_container.ts",
+  "file_manager/containers/directory_tree_container.ts",
 
   # Widgets.
   "file_manager/widgets/xf_base.ts",
@@ -312,6 +324,7 @@ ts_templates = [
 ts_test_files = [
   # Containers
   "file_manager/containers/breadcrumb_container_unittest.ts",
+  "file_manager/containers/directory_tree_container_unittest.ts",
   "file_manager/containers/nudge_container_unittest.ts",
   "file_manager/containers/search_container_unittest.ts",
 
@@ -320,11 +333,19 @@ ts_test_files = [
   "file_manager/lib/actions_producer_unittest.ts",
   "file_manager/lib/for_tests.ts",
 
+  # Action producers:
+  "file_manager/state/actions_producers/all_entries_unittest.ts",
+
   # Reducers:
   "file_manager/state/for_tests.ts",
   "file_manager/state/reducers/all_entries_unittest.ts",
+  "file_manager/state/reducers/android_apps_unittest.ts",
   "file_manager/state/reducers/current_directory_unittest.ts",
+  "file_manager/state/reducers/folder_shortcuts_unittest.ts",
+  "file_manager/state/reducers/navigation_unittest.ts",
   "file_manager/state/reducers/search_unittest.ts",
+  "file_manager/state/reducers/ui_entries_unittest.ts",
+  "file_manager/state/reducers/volumes_unittest.ts",
 
   # Widgets:
   "file_manager/widgets/xf_breadcrumb_unittest.ts",

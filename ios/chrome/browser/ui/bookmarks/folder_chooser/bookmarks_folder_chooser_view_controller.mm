@@ -15,13 +15,13 @@
 #import "base/strings/sys_string_conversions.h"
 #import "components/bookmarks/browser/bookmark_model.h"
 #import "ios/chrome/browser/bookmarks/bookmark_model_bridge_observer.h"
+#import "ios/chrome/browser/shared/ui/table_view/table_view_utils.h"
 #import "ios/chrome/browser/ui/bookmarks/bookmark_ui_constants.h"
 #import "ios/chrome/browser/ui/bookmarks/bookmark_utils_ios.h"
 #import "ios/chrome/browser/ui/bookmarks/cells/table_view_bookmarks_folder_item.h"
 #import "ios/chrome/browser/ui/bookmarks/folder_chooser/bookmarks_folder_chooser_mutator.h"
 #import "ios/chrome/browser/ui/bookmarks/folder_chooser/bookmarks_folder_chooser_view_controller_presentation_delegate.h"
 #import "ios/chrome/browser/ui/icons/chrome_icon.h"
-#import "ios/chrome/browser/ui/table_view/table_view_utils.h"
 #import "ios/chrome/common/ui/colors/semantic_color_names.h"
 #import "ios/chrome/grit/ios_strings.h"
 #import "ui/base/l10n/l10n_util_mac.h"
@@ -197,6 +197,8 @@ using bookmarks::BookmarkNode;
         [[TableViewBookmarksFolderItem alloc]
             initWithType:ItemTypeCreateNewFolder
                    style:BookmarksFolderStyleNewFolder];
+    createFolderItem.shouldDisplayCloudSlashIcon =
+        [_dataSource shouldDisplayCloudIconForProfileBookmarks];
     // Add the "New Folder" Item to the same section as the rest of the folder
     // entries.
     [self.tableViewModel addItem:createFolderItem
@@ -214,6 +216,8 @@ using bookmarks::BookmarkNode;
                    style:BookmarksFolderStyleFolderEntry];
     folderItem.title = bookmark_utils_ios::TitleForBookmarkNode(folderNode);
     folderItem.currentFolder = ([_dataSource selectedFolder] == folderNode);
+    folderItem.shouldDisplayCloudSlashIcon =
+        [_dataSource shouldDisplayCloudIconForProfileBookmarks];
 
     // Indentation level.
     NSInteger level = 0;

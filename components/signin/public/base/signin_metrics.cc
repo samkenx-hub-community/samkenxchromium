@@ -454,6 +454,14 @@ void RecordSigninUserActionForAccessPoint(AccessPoint access_point) {
       base::RecordAction(
           base::UserMetricsAction("Signin_Signin_FromForYouFre"));
       break;
+    case AccessPoint::ACCESS_POINT_CREATOR_FEED_FOLLOW:
+      base::RecordAction(
+          base::UserMetricsAction("Signin_Signin_FromCreatorFeedFollow"));
+      break;
+    case AccessPoint::ACCESS_POINT_READING_LIST:
+      base::RecordAction(
+          base::UserMetricsAction("Signin_Signin_FromReadingList"));
+      break;
     case AccessPoint::ACCESS_POINT_MAX:
       NOTREACHED();
       break;
@@ -580,6 +588,14 @@ void RecordSigninImpressionUserActionForAccessPoint(AccessPoint access_point) {
       NOTREACHED() << "Signin_Impression_From* user actions"
                    << " are not recorded for access point "
                    << static_cast<int>(access_point);
+      break;
+    case AccessPoint::ACCESS_POINT_CREATOR_FEED_FOLLOW:
+      base::RecordAction(
+          base::UserMetricsAction("Signin_Impression_FromCreatorFeedFollow"));
+      break;
+    case AccessPoint::ACCESS_POINT_READING_LIST:
+      base::RecordAction(
+          base::UserMetricsAction("Signin_Impression_FromReadingList"));
       break;
     case AccessPoint::ACCESS_POINT_MAX:
       NOTREACHED();

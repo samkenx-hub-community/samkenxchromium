@@ -7,6 +7,7 @@ import './suggest_tile.js';
 import './tile.js';
 
 import {CrLazyRenderElement} from 'chrome://resources/cr_elements/cr_lazy_render/cr_lazy_render.js';
+import {assert} from 'chrome://resources/js/assert_ts.js';
 import {PolymerElement} from 'chrome://resources/polymer/v3_0/polymer/polymer_bundled.min.js';
 
 import {Cluster, URLVisit} from '../../history_cluster_types.mojom-webui.js';
@@ -37,6 +38,17 @@ export enum HistoryClusterLayoutType {
   LAYOUT_3 = 3,  // 2 image visits & 2 non-image visits
 }
 
+/**
+ * Available module element types. This enum must match the numbering for
+ * NTPHistoryClustersElementType in enums.xml. These values are persisted to
+ * logs. Entries should not be renumbered, removed or reused.
+ */
+export enum HistoryClusterElementType {
+  VISIT = 0,
+  SUGGEST = 1,
+  SHOW_ALL = 2,
+}
+
 export interface HistoryClustersModuleElement {
   $: {
     infoDialogRender: CrLazyRenderElement<InfoDialogElement>,
@@ -61,26 +73,48 @@ export class HistoryClustersModuleElement extends I18nMixin
       cluster: Object,
 
       searchResultPage: Object,
-
-      title_: {
-        type: String,
-        computed: 'computeClusterTitle_(cluster)',
-      },
     };
   }
 
-  private title_: string;
   cluster: Cluster;
   layoutType: HistoryClusterLayoutType;
   searchResultPage: URLVisit;
 
-  private computeClusterTitle_() {
-    return this.cluster.label ? this.cluster.label :
-                                this.searchResultPage.pageTitle;
-  }
-
   private isLayout_(type: HistoryClusterLayoutType): boolean {
     return type === this.layoutType;
+  }
+
+  private onVisitTileClick_(e: Event) {
+    this.recordTileClickIndex_(e.target as HTMLElement, 'Visit');
+    this.recordClick_(HistoryClusterElementType.VISIT);
+  }
+
+  private onSuggestTileClick_(e: Event) {
+    this.recordTileClickIndex_(e.target as HTMLElement, 'Suggest');
+    this.recordClick_(HistoryClusterElementType.SUGGEST);
+  }
+
+  private recordClick_(type: HistoryClusterElementType) {
+    chrome.metricsPrivate.recordEnumerationValue(
+        `NewTabPage.HistoryClusters.Layout${this.layoutType}.Click`, type,
+        Object.keys(HistoryClusterElementType).length);
+  }
+
+  private recordTileClickIndex_(tile: HTMLElement, tileType: string) {
+    assert(this.layoutType !== HistoryClusterLayoutType.NONE);
+    const index = Array.from(tile.parentNode!.children).indexOf(tile);
+    chrome.metricsPrivate.recordValue(
+        {
+          metricName: `NewTabPage.HistoryClusters.Layout${this.layoutType}.${
+              tileType!}Tile.ClickIndex`,
+          type: chrome.metricsPrivate.MetricTypeType.HISTOGRAM_LINEAR,
+          min: 0,
+          max: 10,
+          buckets: 10,
+        },
+        index);
+
+    this.dispatchEvent(new Event('usage', {bubbles: true, composed: true}));
   }
 
   private onDisableButtonClick_() {
@@ -102,8 +136,8 @@ export class HistoryClustersModuleElement extends I18nMixin
       bubbles: true,
       composed: true,
       detail: {
-        message:
-            loadTimeData.getStringF('dismissModuleToastMessage', this.title_),
+        message: loadTimeData.getStringF(
+            'dismissModuleToastMessage', this.cluster.label),
       },
     }));
   }
@@ -113,8 +147,10 @@ export class HistoryClustersModuleElement extends I18nMixin
   }
 
   private onShowAllClick_() {
+    assert(this.cluster.label.length >= 2);
     HistoryClustersProxyImpl.getInstance().handler.showJourneysSidePanel(
-        this.cluster.label || '');
+        this.cluster.label.substring(1, this.cluster.label.length - 1));
+    this.recordClick_(HistoryClusterElementType.SHOW_ALL);
   }
 }
 
@@ -166,8 +202,11 @@ async function createElement(): Promise<HistoryClustersModuleElement|null> {
   // isn't used in the layout.
   const visits = element.cluster.visits.slice(1);
   // Count number of visits with images.
-  const imageCount =
-      visits.filter((visit: URLVisit) => visit.hasUrlKeyedImage).length;
+  const imageCount = visits
+                         .filter(
+                             (visit: URLVisit) =>
+                                 visit.hasUrlKeyedImage && visit.isKnownToSync)
+                         .length;
   const visitCount = visits.length;
 
   // Calculate which layout to use.

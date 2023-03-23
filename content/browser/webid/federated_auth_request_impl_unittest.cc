@@ -535,7 +535,7 @@ class TestDialogController
       case AccountsDialogAction::kClose:
         base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
             FROM_HERE, base::BindOnce(std::move(dismiss_callback),
-                                      DismissReason::CLOSE_BUTTON));
+                                      DismissReason::kCloseButton));
         break;
       case AccountsDialogAction::kNone:
         break;
@@ -545,6 +545,7 @@ class TestDialogController
   void ShowFailureDialog(content::WebContents* rp_web_contents,
                          const std::string& top_frame_for_display,
                          const std::string& idp_for_display,
+                         const IdentityProviderMetadata& idp_metadata,
                          IdentityRequestDialogController::DismissCallback
                              dismiss_callback) override {
     if (!state_) {
@@ -556,7 +557,7 @@ class TestDialogController
       case IdpSigninStatusMismatchDialogAction::kClose:
         base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
             FROM_HERE, base::BindOnce(std::move(dismiss_callback),
-                                      DismissReason::CLOSE_BUTTON));
+                                      DismissReason::kCloseButton));
         break;
       case IdpSigninStatusMismatchDialogAction::kNone:
         break;

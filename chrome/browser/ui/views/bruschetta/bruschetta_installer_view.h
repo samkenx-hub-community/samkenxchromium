@@ -12,6 +12,7 @@
 #include "chrome/browser/ash/guest_os/guest_id.h"
 #include "ui/base/metadata/metadata_header_macros.h"
 #include "ui/views/controls/button/radio_button.h"
+#include "ui/views/controls/progress_bar.h"
 #include "ui/views/window/dialog_delegate.h"
 
 class Profile;
@@ -68,12 +69,18 @@ class BruschettaInstallerView
     installer_factory_ = std::move(factory);
   }
 
+  raw_ptr<views::ProgressBar> progress_bar_for_testing() {
+    return progress_bar_;
+  }
+
  private:
   class TitleLabel;
   enum class State {
     kConfirmInstall,  // Waiting for user to start installation.
     kInstalling,      // Installation in progress.
-    kFailed,          // Installation process failed.
+    kCleaningUp,      // Cleaning up a partial install.
+    kFailed,          // Failed to install.
+    kFailedCleanup,   // Failed to install then also failed to clean up.
     // Note: No succeeded state since we close the installer upon success.
   };
 
@@ -98,13 +105,17 @@ class BruschettaInstallerView
   void StartInstallation();
   void OnStateUpdated();
 
+  void CleanupPartialInstall();
+  void UninstallBruschettaFinished(bool success);
+
   raw_ptr<Profile> profile_ = nullptr;
   raw_ptr<views::Label> primary_message_label_ = nullptr;
   raw_ptr<views::Label> secondary_message_label_ = nullptr;
   raw_ptr<views::ProgressBar> progress_bar_ = nullptr;
-  raw_ptr<views::View> radio_button_container_ = nullptr;
+  raw_ptr<views::View, DanglingUntriaged> radio_button_container_ = nullptr;
 
-  base::flat_map<std::string, raw_ptr<views::RadioButton>> radio_buttons_;
+  base::flat_map<std::string, raw_ptr<views::RadioButton, DanglingUntriaged>>
+      radio_buttons_;
   std::string selected_config_;
 
   State state_ = State::kConfirmInstall;

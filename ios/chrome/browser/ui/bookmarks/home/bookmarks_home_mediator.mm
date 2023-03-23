@@ -21,6 +21,8 @@
 #import "ios/chrome/browser/browser_state/chrome_browser_state.h"
 #import "ios/chrome/browser/main/browser.h"
 #import "ios/chrome/browser/shared/public/features/features.h"
+#import "ios/chrome/browser/shared/ui/table_view/cells/table_view_text_item.h"
+#import "ios/chrome/browser/shared/ui/table_view/table_view_model.h"
 #import "ios/chrome/browser/sync/sync_observer_bridge.h"
 #import "ios/chrome/browser/sync/sync_service_factory.h"
 #import "ios/chrome/browser/sync/sync_setup_service.h"
@@ -35,8 +37,6 @@
 #import "ios/chrome/browser/ui/bookmarks/home/bookmarks_home_consumer.h"
 #import "ios/chrome/browser/ui/bookmarks/home/bookmarks_home_shared_state.h"
 #import "ios/chrome/browser/ui/bookmarks/synced_bookmarks_bridge.h"
-#import "ios/chrome/browser/ui/table_view/cells/table_view_text_item.h"
-#import "ios/chrome/browser/ui/table_view/table_view_model.h"
 #import "ios/chrome/common/ui/colors/semantic_color_names.h"
 #import "ios/chrome/grit/ios_strings.h"
 #import "ui/base/l10n/l10n_util.h"
@@ -69,9 +69,11 @@ const int kMaxBookmarksSearchResults = 50;
   // Registrar for pref changes notifications.
   std::unique_ptr<PrefChangeRegistrar> _prefChangeRegistrar;
   // The browser for this mediator.
-  Browser* _browser;
+  base::WeakPtr<Browser> _browser;
   // The sync setup service for this mediator.
   SyncSetupService* _syncSetupService;
+  // Base view controller to present sign-in UI.
+  UIViewController* _baseViewController;
 }
 
 // Shared state between Bookmark home classes.
@@ -89,10 +91,13 @@ const int kMaxBookmarksSearchResults = 50;
 @implementation BookmarksHomeMediator
 
 - (instancetype)initWithSharedState:(BookmarksHomeSharedState*)sharedState
-                            browser:(Browser*)browser {
+                            browser:(Browser*)browser
+                 baseViewController:(UIViewController*)baseViewController {
   if ((self = [super init])) {
+    DCHECK(browser);
     _sharedState = sharedState;
-    _browser = browser;
+    _browser = browser->AsWeakPtr();
+    _baseViewController = baseViewController;
   }
   return self;
 }
@@ -102,16 +107,17 @@ const int kMaxBookmarksSearchResults = 50;
   DCHECK(self.sharedState);
 
   // Set up observers.
-  ChromeBrowserState* browserState = _browser->GetBrowserState();
+  ChromeBrowserState* browserState = [self originalBrowserState];
   _modelBridge = std::make_unique<BookmarkModelBridge>(
       self, self.sharedState.profileBookmarkModel);
   _syncedBookmarksObserver =
       std::make_unique<sync_bookmarks::SyncedBookmarksObserverBridge>(
           self, browserState);
   _bookmarkPromoController =
-      [[BookmarkPromoController alloc] initWithBrowser:_browser
+      [[BookmarkPromoController alloc] initWithBrowser:_browser.get()
                                               delegate:self
-                                             presenter:self];
+                                             presenter:self
+                                    baseViewController:_baseViewController];
 
   _prefChangeRegistrar = std::make_unique<PrefChangeRegistrar>();
   _prefChangeRegistrar->Init(browserState->GetPrefs());
@@ -238,7 +244,7 @@ const int kMaxBookmarksSearchResults = 50;
   }
 
   // Add "Managed Bookmarks" to the table if it exists.
-  ChromeBrowserState* browserState = _browser->GetBrowserState();
+  ChromeBrowserState* browserState = [self originalBrowserState];
   bookmarks::ManagedBookmarkService* managedBookmarkService =
       ManagedBookmarkServiceFactory::GetForBrowserState(browserState);
   const BookmarkNode* managedNode = managedBookmarkService->managed_node();
@@ -547,6 +553,13 @@ const int kMaxBookmarksSearchResults = 50;
 
 #pragma mark - Private Helpers
 
+// The original chrome browser state used for services that don't exist in
+// incognito mode. E.g., `_syncSetupService`, `_syncService` and
+// `ManagedBookmarkService`.
+- (ChromeBrowserState*)originalBrowserState {
+  return _browser->GetBrowserState()->GetOriginalChromeBrowserState();
+}
+
 - (BOOL)hasBookmarksOrFolders {
   if (self.sharedState.tableViewDisplayedRootNode ==
       self.sharedState.profileBookmarkModel->root_node()) {
@@ -581,7 +594,7 @@ const int kMaxBookmarksSearchResults = 50;
 // Returns YES if the user cannot turn on sync for enterprise policy reasons.
 - (BOOL)isSyncDisabledByAdministrator {
   DCHECK(self.syncService);
-  ChromeBrowserState* browserState = _browser->GetBrowserState();
+  ChromeBrowserState* browserState = [self originalBrowserState];
   bool syncDisabledPolicy = self.syncService->GetDisableReasons().Has(
       syncer::SyncService::DISABLE_REASON_ENTERPRISE_POLICY);
   PrefService* prefService = browserState->GetPrefs();

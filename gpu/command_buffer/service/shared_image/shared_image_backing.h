@@ -124,8 +124,9 @@ class GPU_GLES2_EXPORT SharedImageBacking {
 
   void OnContextLost();
 
-  // Creates SkImageInfo matching backing size, format, alpha and color space.
-  SkImageInfo AsSkImageInfo() const;
+  // Creates SkImageInfo matching backing size, format, alpha and color space
+  // for the specified `plane_index`.
+  SkImageInfo AsSkImageInfo(int plane_index = 0) const;
 
   // Disables reference counting for backing. No references should be added,
   // either before or after this is called.
@@ -236,10 +237,6 @@ class GPU_GLES2_EXPORT SharedImageBacking {
   // Used by SharedImageManager.
   friend class SharedImageManager;
   friend class CompoundImageBacking;
-
-  // Memory dump importance values for shared ownership edges.
-  static constexpr int kNonOwningEdgeImportance = 0;
-  static constexpr int kOwningEdgeImportance = 2;
 
   virtual std::unique_ptr<GLTextureImageRepresentation> ProduceGLTexture(
       SharedImageManager* manager,

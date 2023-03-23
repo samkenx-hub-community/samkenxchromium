@@ -332,7 +332,7 @@ function getCSS(): CSSResultGroup {
       margin-inline: 4px;
       min-width: auto;
       outline: none;
-      padding: 0px 8px;
+      padding: 0px 8px 0 12px;
       white-space: nowrap;
     }
     .xf-select-icon {
@@ -361,7 +361,10 @@ function getCSS(): CSSResultGroup {
     }
     cr-button.dropdown-item {
       --focus-shadow-color: none;
-      padding: 0 12px;
+      padding: 0 16px;
+    }
+    cr-button.dropdown-item:hover {
+      background-color: var(--cros-ripple-color);
     }
     cr-button.dropdown-item-center {
       justify-content: center;

@@ -169,7 +169,7 @@ void AddCredentialsCallback(
 
   UMA_HISTOGRAM_COUNTS_1M("PasswordManager.ImportedPasswordsPerUserInCSV",
                           import_results.number_imported);
-  for (const ImportEntry& entry : import_results.failed_imports) {
+  for (const ImportEntry& entry : import_results.displayed_entries) {
     conflicts_count += entry.status == ImportEntry::CONFLICT_ACCOUNT ||
                        entry.status == ImportEntry::CONFLICT_PROFILE;
 
@@ -189,7 +189,7 @@ void AddCredentialsCallback(
   base::UmaHistogramLongTimes("PasswordManager.ImportDuration",
                               base::Time::Now() - start_time);
 
-  const size_t all_errors_count = import_results.failed_imports.size();
+  const size_t all_errors_count = import_results.displayed_entries.size();
 
   base::UmaHistogramCounts1M("PasswordManager.Import.PerFile.AnyErrors",
                              all_errors_count);
@@ -218,7 +218,7 @@ void AddCredentialsCallback(
 }
 
 bool HasConflicts(
-    const std::map<std::u16string, std::vector<const CredentialUIEntry>>&
+    const std::map<std::u16string, std::vector<CredentialUIEntry>>&
         credentials_by_username,
     const CredentialUIEntry& imported_credential) {
   auto it = credentials_by_username.find(imported_credential.username);
@@ -339,7 +339,7 @@ void PasswordImporter::ConsumePasswords(
   add_credentials.reserve(seq->csv_passwords.size());
 
   // Used to compute conflicts and duplicates.
-  std::map<std::u16string, std::vector<const CredentialUIEntry>>
+  std::map<std::u16string, std::vector<CredentialUIEntry>>
       credentials_by_username;
   for (const CredentialUIEntry& credential : presenter_->GetSavedPasswords()) {
     // Don't consider credentials from a store other than the target store.
@@ -382,7 +382,7 @@ void PasswordImporter::ConsumePasswords(
     if (imported_note.size() + 1u + local_credential.note.size() >=
         MAX_NOTE_LENGTH) {
       // Notes concatenation size should not exceed 1000 characters.
-      results.failed_imports.push_back(CreateFailedImportEntry(
+      results.displayed_entries.push_back(CreateFailedImportEntry(
           imported_credential, ImportEntry::Status::LONG_CONCATENATED_NOTE));
       return false;
     }
@@ -414,14 +414,14 @@ void PasswordImporter::ConsumePasswords(
         credential = CSVPasswordToCredentialUIEntry(csv_password, store);
 
     if (!credential.has_value()) {
-      results.failed_imports.emplace_back(std::move(credential.error()));
+      results.displayed_entries.emplace_back(std::move(credential.error()));
       continue;
     }
 
     const CredentialUIEntry& current_credential = credential.value();
 
     if (HasConflicts(credentials_by_username, current_credential)) {
-      results.failed_imports.emplace_back(
+      results.displayed_entries.emplace_back(
           CreateFailedImportEntry(current_credential, GetConflictType(store)));
       continue;
     }

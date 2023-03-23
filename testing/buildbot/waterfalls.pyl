@@ -704,6 +704,9 @@
           'linux-bionic',
           'x86-64',
         ],
+        'args': [
+          '--use-persistent-shell',
+        ],
         'os_type': 'android',
         'test_suites': {
           'gtest_tests': 'android_12_emulator_gtests',
@@ -1738,7 +1741,6 @@
         'mixins': [
           'arm64',
           'docker',
-          'lifo-test-pool',
           'linux-focal',
         ],
       },
@@ -2582,7 +2584,7 @@
           'walleye',
         ],
         'test_suites': {
-           'gtest_tests': 'chromium_swarm_android_gtests',
+           'gtest_tests': 'chromium_dev_android_gtests',
         },
         'swarming': {
           'dimension_sets': [
@@ -2599,7 +2601,7 @@
           'linux-bionic',
         ],
         'test_suites': {
-           'gtest_tests': 'chromium_swarm_linux_gtests',
+           'gtest_tests': 'chromium_dev_linux_gtests',
         },
       },
       'linux-ssd-rel-swarming': {
@@ -2612,7 +2614,7 @@
           'mac_12_arm64',
         ],
         'test_suites': {
-           'gtest_tests': 'chromium_swarm_desktop_gtests',
+           'gtest_tests': 'chromium_dev_desktop_gtests',
         },
       },
       'mac-rel-swarming': {
@@ -2620,12 +2622,12 @@
           'mac_x64',
         ],
         'test_suites': {
-           'gtest_tests': 'chromium_swarm_desktop_gtests',
+           'gtest_tests': 'chromium_dev_desktop_gtests',
         },
       },
       'win-rel-swarming': {
         'test_suites': {
-           'gtest_tests': 'chromium_swarm_desktop_gtests',
+           'gtest_tests': 'chromium_dev_desktop_gtests',
         },
       },
       'win11-rel-swarming': {
@@ -2633,7 +2635,7 @@
           'win11',
         ],
         'test_suites': {
-           'gtest_tests': 'chromium_swarm_desktop_gtests',
+           'gtest_tests': 'chromium_dev_desktop_gtests',
         },
       },
     },
@@ -2669,7 +2671,6 @@
         'mixins': [
           'arm64',
           'docker',
-          'lifo-test-pool',
           'linux-focal',
         ],
       },
@@ -2684,7 +2685,6 @@
         'mixins': [
           'arm64',
           'docker',
-          'lifo-test-pool',
           'linux-focal',
         ],
       },
@@ -2695,6 +2695,7 @@
         'browser_config': 'web-engine-shell',
         'os_type': 'fuchsia',
         'mixins': [
+          'isolate_profile_data',
           'linux-bionic',
         ],
         'swarming': {
@@ -2753,7 +2754,6 @@
         'mixins': [
           'arm64',
           'docker',
-          'lifo-test-pool',
           'linux-focal',
         ],
       },
@@ -2768,7 +2768,6 @@
         'mixins': [
           'arm64',
           'docker',
-          'lifo-test-pool',
           'linux-focal',
         ],
       },
@@ -3230,6 +3229,7 @@
         ],
         'mixins': [
           'has_native_resultdb_integration',
+          'mac_12_arm64',
           'mac_toolchain',
           'out_dir_arg',
           'xcode_14_main',
@@ -3329,6 +3329,7 @@
           'has_native_resultdb_integration',
           'mac_12_x64',
           'mac_toolchain',
+          'xcode_14_main',
         ],
         'test_suites': {
           'isolated_scripts': 'wpt_tests_ios',
@@ -3762,7 +3763,7 @@
         'mixins': [
           'has_native_resultdb_integration',
           'isolate_profile_data',
-          'mac_beta_x64',
+          'mac_beta_arm64',
         ],
         'test_suites': {
           'isolated_scripts': 'wpt_web_tests_content_shell',
@@ -3773,7 +3774,7 @@
         'mixins': [
           'has_native_resultdb_integration',
           'isolate_profile_data',
-          'mac_beta_arm64',
+          'mac_beta_x64',
         ],
         'test_suites': {
           'isolated_scripts': 'wpt_web_tests_content_shell',
@@ -4349,13 +4350,11 @@
         'mixins': [
           'android_t',
           'has_native_resultdb_integration',
-          'limited_capacity_bot',
           'oriole',
           'gpu-swarming-pool',
         ],
         'test_suites': {
           'gpu_telemetry_tests': 'gpu_pixel_4_and_6_telemetry_tests',
-          'android_webview_gpu_telemetry_tests': 'android_webview_gpu_telemetry_tests',
         },
       },
       'Android FYI Release (Samsung A13)': {
@@ -6602,6 +6601,25 @@
         ],
         # no tests, stay compile only.
       },
+      'win-arm64-dbg': {
+        'additional_compile_targets': [
+          'all',
+        ],
+      },
+      'win-arm64-rel': {
+        'additional_compile_targets': [
+          'chrome',
+          'chromedriver_group',
+        ],
+        'mixins': [
+          'win_arm64',
+          'isolate_profile_data',
+        ],
+        'test_suites': {
+          'gtest_tests': 'chromium_win10_gtests',
+          'isolated_scripts': 'chromium_win_rel_isolated_scripts',
+        },
+      },
       'win-chrome-reclient': {
         'additional_compile_targets': [
            # same build target as win-chrome even if it doesn't run the tests
@@ -6652,6 +6670,17 @@
         'test_suites': {
           'gtest_tests': 'chromeos_browser_finch_tests',
         },
+      },
+      'chromeos-octopus-chrome-skylab-fyi': {
+        'additional_compile_targets': [
+          "chrome",
+          "linux_symbols",
+          "symupload",
+        ],
+        'test_suites': {
+          'skylab_tests': 'chromeos_octopus_skylab_tests',
+        },
+        'os_type': 'chromeos',
       },
       'lacros-amd64-generic-chrome-fyi': {
         'additional_compile_targets': [

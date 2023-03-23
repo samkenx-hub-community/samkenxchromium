@@ -39,8 +39,8 @@
 #include "components/autofill/core/browser/personal_data_manager.h"
 #include "components/autofill/core/browser/single_field_form_fill_router.h"
 #include "components/autofill/core/browser/sync_utils.h"
-#include "components/autofill/core/browser/touch_to_fill_delegate_impl.h"
 #include "components/autofill/core/browser/ui/popup_types.h"
+#include "components/autofill/core/browser/ui/touch_to_fill_delegate.h"
 #include "components/autofill/core/common/dense_set.h"
 #include "components/autofill/core/common/form_data.h"
 #include "components/autofill/core/common/signatures.h"
@@ -316,14 +316,18 @@ class BrowserAutofillManager : public AutofillManager,
   virtual void SetFastCheckoutRunId(FieldTypeGroup field_type_group,
                                     int64_t run_id);
 
+  TouchToFillDelegate* touch_to_fill_delegate() {
+    return touch_to_fill_delegate_.get();
+  }
+
+  void set_touch_to_fill_delegate(
+      std::unique_ptr<TouchToFillDelegate> touch_to_fill_delegate) {
+    touch_to_fill_delegate_ = std::move(touch_to_fill_delegate);
+  }
+
   void SetExternalDelegateForTest(
       std::unique_ptr<AutofillExternalDelegate> external_delegate) {
     external_delegate_ = std::move(external_delegate);
-  }
-
-  void SetTouchToFillDelegateImplForTest(
-      std::unique_ptr<TouchToFillDelegateImpl> touch_to_fill_delegate) {
-    touch_to_fill_delegate_ = std::move(touch_to_fill_delegate);
   }
 
   static void DeterminePossibleFieldTypesForUploadForTest(
@@ -453,7 +457,7 @@ class BrowserAutofillManager : public AutofillManager,
   void OnSelectControlDidChangeImpl(const FormData& form,
                                     const FormFieldData& field,
                                     const gfx::RectF& bounding_box) override;
-  bool ShouldParseForms(const std::vector<FormData>& forms) override;
+  bool ShouldParseForms() override;
   void OnBeforeProcessParsedForms() override;
   void OnFormProcessed(const FormData& form,
                        const FormStructure& form_structure) override;
@@ -676,7 +680,7 @@ class BrowserAutofillManager : public AutofillManager,
 
   // Checks whether JavaScript cleared an autofilled value within
   // kLimitBeforeRefill after the filling and records metrics for this. This
-  // method should be called after we learend that JavaScript modified an
+  // method should be called after we learned that JavaScript modified an
   // autofilled field. It's responsible for assessing the nature of the
   // modification.
   void AnalyzeJavaScriptChangedAutofilledValue(const FormData& form,
@@ -721,15 +725,15 @@ class BrowserAutofillManager : public AutofillManager,
   // destruction time (whatever comes first).
   void LogEventCountsUMAMetric(const FormStructure& form_structure);
 
-  // When the forms that meet certain criteria are identified as useless to
-  // Autofill, the function should return false and the forms are not recorded
-  // into UKM.
-  bool ShouldUploadUKM(const FormStructure& form_structure);
+  // Returns whether the form is considered parseable and meets a couple of
+  // other requirements which makes uploading UKM data worthwhile. E.g. the
+  // form should not be a search form.
+  bool ShouldUploadUkm(const FormStructure& form_structure);
 
   // Delegates to perform external processing (display, selection) on
   // our behalf.
   std::unique_ptr<AutofillExternalDelegate> external_delegate_;
-  std::unique_ptr<TouchToFillDelegateImpl> touch_to_fill_delegate_;
+  std::unique_ptr<TouchToFillDelegate> touch_to_fill_delegate_;
 
   std::string app_locale_;
 

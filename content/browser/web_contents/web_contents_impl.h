@@ -716,6 +716,8 @@ class CONTENT_EXPORT WebContentsImpl : public WebContents,
       blink::mojom::ResourceLoadInfoPtr resource_load_information) override;
   void OnCookiesAccessed(RenderFrameHostImpl*,
                          const CookieAccessDetails& details) override;
+  void OnTrustTokensAccessed(RenderFrameHostImpl*,
+                             const TrustTokenAccessDetails& details) override;
 
   // Called when WebAudio starts or stops playing audible audio in an
   // AudioContext.
@@ -892,6 +894,8 @@ class CONTENT_EXPORT WebContentsImpl : public WebContents,
                                AllowServiceWorkerResult allowed) override;
   void OnCookiesAccessed(NavigationHandle*,
                          const CookieAccessDetails& details) override;
+  void OnTrustTokensAccessed(NavigationHandle*,
+                             const TrustTokenAccessDetails& details) override;
   void RegisterExistingOriginAsHavingDefaultIsolation(
       const url::Origin& origin,
       NavigationRequest* navigation_request_to_exclude) override;
@@ -2359,10 +2363,6 @@ class CONTENT_EXPORT WebContentsImpl : public WebContents,
   // WebContents::CreateParams::picture_in_picture_options.
   absl::optional<blink::mojom::PictureInPictureWindowOptions>
       picture_in_picture_options_;
-
-  // Pip might require the content window to continue rendering. This handle
-  // ensures that rendering continues despite occlusion or hidden window state.
-  base::ScopedClosureRunner pip_capture_handle_;
 
   VisibleTimeRequestTrigger visible_time_request_trigger_;
 

@@ -43,6 +43,7 @@
 #include "chrome/browser/google/google_brand.h"
 #include "chrome/browser/history/history_service_factory.h"
 #include "chrome/browser/metrics/cached_metrics_profile.h"
+#include "chrome/browser/metrics/chrome_browser_main_extra_parts_metrics.h"
 #include "chrome/browser/metrics/chrome_metrics_extensions_helper.h"
 #include "chrome/browser/metrics/chrome_metrics_service_accessor.h"
 #include "chrome/browser/metrics/chrome_metrics_services_manager_client.h"
@@ -123,7 +124,6 @@
 
 #if BUILDFLAG(IS_ANDROID)
 #include "chrome/browser/metrics/chrome_android_metrics_provider.h"
-#include "chrome/browser/metrics/family_link_user_metrics_provider.h"
 #include "chrome/browser/metrics/page_load_metrics_provider.h"
 #include "components/metrics/android_metrics_provider.h"
 #else
@@ -200,6 +200,12 @@
 #if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS)
 #include "chrome/browser/metrics/bluetooth_metrics_provider.h"
 #endif  // BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS)
+
+#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) || \
+    BUILDFLAG(IS_CHROMEOS_LACROS) || BUILDFLAG(IS_ANDROID)
+#include "chrome/browser/metrics/family_link_user_metrics_provider.h"
+#endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || (BUILDFLAG(IS_LINUX) ||
+        // BUILDFLAG(IS_CHROMEOS_LACROS))||BUILDFLAG(IS_ANDROID))
 
 namespace {
 
@@ -541,6 +547,7 @@ std::unique_ptr<ChromeMetricsServiceClient> ChromeMetricsServiceClient::Create(
 
 // static
 void ChromeMetricsServiceClient::RegisterPrefs(PrefRegistrySimple* registry) {
+  ChromeBrowserMainExtraPartsMetrics::RegisterPrefs(registry);
   metrics::MetricsService::RegisterPrefs(registry);
   ukm::UkmService::RegisterPrefs(registry);
   metrics::StabilityMetricsHelper::RegisterPrefs(registry);
@@ -822,8 +829,6 @@ void ChromeMetricsServiceClient::RegisterMetricsServiceProviders() {
       std::make_unique<ChromeAndroidMetricsProvider>(local_state));
   metrics_service_->RegisterMetricsProvider(
       std::make_unique<PageLoadMetricsProvider>());
-  metrics_service_->RegisterMetricsProvider(
-      std::make_unique<FamilyLinkUserMetricsProvider>());
 #else
   metrics_service_->RegisterMetricsProvider(
       base::WrapUnique(new performance_manager::MetricsProvider(local_state)));
@@ -844,6 +849,23 @@ void ChromeMetricsServiceClient::RegisterMetricsServiceProviders() {
       std::make_unique<DesktopPlatformFeaturesMetricsProvider>());
 #endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || (BUILDFLAG(IS_LINUX) ||
         // BUILDFLAG(IS_CHROMEOS_LACROS))
+
+#if BUILDFLAG(ENABLE_SUPERVISED_USERS) &&                             \
+    (BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) || \
+     BUILDFLAG(IS_CHROMEOS_LACROS))
+  if (base::FeatureList::IsEnabled(
+          kExtendFamilyLinkUserLogSegmentToAllPlatforms)) {
+    metrics_service_->RegisterMetricsProvider(
+        std::make_unique<FamilyLinkUserMetricsProvider>());
+  }
+#endif  // BUILDFLAG(ENABLE_SUPERVISED_USERS) && (BUILDFLAG(IS_WIN) ||
+        // BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) ||
+        // BUILDFLAG(IS_CHROMEOS_LACROS) )
+
+#if BUILDFLAG(ENABLE_SUPERVISED_USERS) && BUILDFLAG(IS_ANDROID)
+  metrics_service_->RegisterMetricsProvider(
+      std::make_unique<FamilyLinkUserMetricsProvider>());
+#endif  // BUILDFLAG(ENABLE_SUPERVISED_USERS) && BUILDFLAG(IS_ANDROID)
 
 #if BUILDFLAG(IS_CHROMEOS_LACROS)
   metrics_service_->RegisterMetricsProvider(

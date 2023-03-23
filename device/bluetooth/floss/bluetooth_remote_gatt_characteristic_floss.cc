@@ -9,6 +9,7 @@
 #include "device/bluetooth/bluetooth_gatt_service.h"
 #include "device/bluetooth/bluetooth_remote_gatt_descriptor.h"
 #include "device/bluetooth/floss/bluetooth_adapter_floss.h"
+#include "device/bluetooth/floss/bluetooth_device_floss.h"
 #include "device/bluetooth/floss/bluetooth_gatt_service_floss.h"
 #include "device/bluetooth/floss/bluetooth_remote_gatt_descriptor_floss.h"
 #include "device/bluetooth/floss/bluetooth_remote_gatt_service_floss.h"
@@ -113,8 +114,14 @@ void BluetoothRemoteGattCharacteristicFloss::
     DeprecatedWriteRemoteCharacteristic(const std::vector<uint8_t>& value,
                                         base::OnceClosure callback,
                                         ErrorCallback error_callback) {
-  WriteRemoteCharacteristicImpl(value, floss::WriteType::kWriteNoResponse,
-                                std::move(callback), std::move(error_callback));
+  Properties props = GetProperties();
+  floss::WriteType write_type = floss::WriteType::kWrite;
+  if (props & PROPERTY_WRITE_WITHOUT_RESPONSE) {
+    write_type = floss::WriteType::kWriteNoResponse;
+  }
+
+  WriteRemoteCharacteristicImpl(value, write_type, std::move(callback),
+                                std::move(error_callback));
 }
 
 #if BUILDFLAG(IS_CHROMEOS)
@@ -122,6 +129,13 @@ void BluetoothRemoteGattCharacteristicFloss::PrepareWriteRemoteCharacteristic(
     const std::vector<uint8_t>& value,
     base::OnceClosure callback,
     ErrorCallback error_callback) {
+  // Make sure we're using reliable writes before starting a prepared write.
+  BluetoothDeviceFloss* device =
+      static_cast<BluetoothDeviceFloss*>(service_->GetDevice());
+  if (device && !device->UsingReliableWrite()) {
+    device->BeginReliableWrite();
+  }
+
   WriteRemoteCharacteristicImpl(value, floss::WriteType::kWritePrepare,
                                 std::move(callback), std::move(error_callback));
 }
@@ -161,7 +175,6 @@ void BluetoothRemoteGattCharacteristicFloss::GattCharacteristicRead(
 
     std::move(pending_read_callback_)
         .Run(/*error_code=*/absl::nullopt, cached_data_);
-    NotifyValueChanged();
   } else {
     std::move(pending_read_callback_)
         .Run(BluetoothGattServiceFloss::GattStatusToServiceError(status), {});
@@ -183,7 +196,6 @@ void BluetoothRemoteGattCharacteristicFloss::GattCharacteristicWrite(
     cached_data_ = data;
 
     std::move(callback).Run();
-    NotifyValueChanged();
   } else {
     std::move(error_callback)
         .Run(BluetoothGattServiceFloss::GattStatusToServiceError(status));

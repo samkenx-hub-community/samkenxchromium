@@ -41,7 +41,9 @@
 #include "base/task/single_thread_task_runner.h"
 #include "base/time/time.h"
 #include "base/unguessable_token.h"
+#include "services/network/public/cpp/request_destination.h"
 #include "services/network/public/cpp/request_mode.h"
+#include "services/network/public/mojom/fetch_api.mojom-shared.h"
 #include "services/network/public/mojom/url_loader_factory.mojom-blink.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
 #include "third_party/blink/public/common/features.h"
@@ -125,8 +127,8 @@ static constexpr char kCrossDocumentCachedResource[] =
   }
 
 const std::string ResourceTypeName(ResourceType type) {
-  // `ResourceType` histogram_suffixes in
-  // tools/metrics/histograms/metadata/histogram_suffixes_list.xml
+  // `ResourceType` variants in
+  // tools/metrics/histograms/metadata/blink/histograms.xml
   // should be updated when you update the followings.
   switch (type) {
     RESOURCE_TYPE_NAME(Image)             // 1
@@ -184,6 +186,31 @@ bool ShouldResourceBeAddedToMemoryCache(const FetchParameters& params,
          params.GetResourceRequest().HttpMethod() == http_names::kGET &&
          params.Options().data_buffering_policy != kDoNotBufferData &&
          !IsRawResource(*resource);
+}
+
+bool ShouldResourceBeKeptStrongReferenceByType(Resource* resource) {
+  // Image, fonts, stylesheets and scripts are the most commonly reused scripts.
+  return (resource->GetType() == ResourceType::kImage ||
+          resource->GetType() == ResourceType::kFont ||
+          resource->GetType() == ResourceType::kCSSStyleSheet ||
+          resource->GetType() == ResourceType::kScript);
+}
+
+bool ShouldResourceBeKeptStrongReference(Resource* resource) {
+  return IsMainThread() && resource->IsLoaded() &&
+         resource->GetResourceRequest().HttpMethod() == http_names::kGET &&
+         resource->Options().data_buffering_policy != kDoNotBufferData &&
+         ShouldResourceBeKeptStrongReferenceByType(resource) &&
+         !resource->GetResponse().CacheControlContainsNoCache() &&
+         !resource->GetResponse().CacheControlContainsNoStore();
+}
+
+base::TimeDelta GetResourceStrongReferenceTimeout(Resource* resource) {
+  base::TimeDelta lifetime = resource->FreshnessLifetime();
+  if (resource->GetResponse().ResponseTime() + lifetime < base::Time::Now()) {
+    return base::TimeDelta();
+  }
+  return resource->GetResponse().ResponseTime() + lifetime - base::Time::Now();
 }
 
 static ResourceFetcher::ResourceFetcherSet& MainThreadFetchersSet() {
@@ -580,14 +607,19 @@ ResourceFetcher::ResourceFetcher(const ResourceFetcherInit& init)
               ? init.frame_or_worker_scheduler->GetWeakPtr()
               : nullptr),
       blob_registry_remote_(init.context_lifecycle_notifier),
+      resource_cache_remote_(init.context_lifecycle_notifier),
       auto_load_images_(true),
       images_enabled_(true),
       allow_stale_resources_(false),
       image_fetched_(false) {
   InstanceCounters::IncrementCounter(InstanceCounters::kResourceFetcherCounter);
 
-  if (IsMainThread())
+  if (IsMainThread()) {
     MainThreadFetchersSet().insert(this);
+    if (MemoryPressureListenerRegistry::IsLowEndDevice()) {
+      MemoryPressureListenerRegistry::Instance().RegisterClient(this);
+    }
+  }
 }
 
 ResourceFetcher::~ResourceFetcher() {
@@ -1274,6 +1306,7 @@ Resource* ResourceFetcher::RequestResource(FetchParameters& params,
     String resource_url =
         MemoryCache::RemoveFragmentIdentifierIfNeeded(params.Url());
     cached_resources_map_.Set(resource_url, resource);
+    MaybeSaveResourceToStrongReference(resource);
     if (PriorityObserverMapCreated() &&
         PriorityObservers()->Contains(resource_url)) {
       // Resolve the promise.
@@ -1303,6 +1336,13 @@ Resource* ResourceFetcher::RequestResource(FetchParameters& params,
   // the resource was already initialized for the revalidation here, but won't
   // start loading.
   if (ResourceNeedsLoad(resource, policy, should_defer)) {
+    if (resource_cache_remote_.is_bound()) {
+      resource_cache_remote_->Contains(
+          params.Url(),
+          WTF::BindOnce(&ResourceFetcher::OnResourceCacheContainsFinished,
+                        WrapWeakPersistent(this), base::TimeTicks::Now(),
+                        resource_request.GetRequestDestination()));
+    }
     if (!StartLoad(resource,
                    std::move(params.MutableResourceRequest().MutableBody()),
                    load_blocking_policy, params.GetRenderBlockingBehavior())) {
@@ -1323,6 +1363,10 @@ Resource* ResourceFetcher::RequestResource(FetchParameters& params,
   }
 
   return resource;
+}
+
+void ResourceFetcher::RemoveImageStrongReference(Resource* image_resource) {
+  document_resource_strong_refs_.erase(image_resource);
 }
 
 void ResourceFetcher::ResourceTimingReportTimerFired(TimerBase* timer) {
@@ -2137,6 +2181,7 @@ void ResourceFetcher::HandleLoaderFinish(Resource* resource,
         resource->GetResponse().DecodedBodyLength(),
         should_report_corb_blocking);
   }
+  MaybeSaveResourceToStrongReference(resource);
 }
 
 void ResourceFetcher::HandleLoaderError(Resource* resource,
@@ -2622,6 +2667,74 @@ void ResourceFetcher::CancelWebBundleSubresourceLoadersFor(
   }
 }
 
+void ResourceFetcher::MaybeSaveResourceToStrongReference(Resource* resource) {
+  if (base::FeatureList::IsEnabled(features::kMemoryCacheStrongReference) &&
+      ShouldResourceBeKeptStrongReference(resource)) {
+    if (resource->GetType() != ResourceType::kImage ||
+        !base::FeatureList::IsEnabled(
+            features::kMemoryCacheStrongReferenceFilterImages)) {
+      document_resource_strong_refs_.insert(resource);
+      freezable_task_runner_->PostDelayedTask(
+          FROM_HERE,
+          WTF::BindOnce(&ResourceFetcher::RemoveImageStrongReference,
+                        WrapWeakPersistent(this), WrapWeakPersistent(resource)),
+          GetResourceStrongReferenceTimeout(resource));
+    }
+  }
+}
+
+void ResourceFetcher::OnMemoryPressure(
+    base::MemoryPressureListener::MemoryPressureLevel level) {
+  document_resource_strong_refs_.clear();
+}
+
+void ResourceFetcher::SetResourceCache(
+    mojo::PendingRemote<mojom::blink::ResourceCache> remote) {
+  DCHECK(remote.is_valid());
+  resource_cache_remote_.reset();
+  resource_cache_remote_.Bind(std::move(remote), unfreezable_task_runner_);
+}
+
+void ResourceFetcher::OnResourceCacheContainsFinished(
+    base::TimeTicks ipc_send_time,
+    network::mojom::RequestDestination destination,
+    mojom::blink::ResourceCacheContainsResultPtr result) {
+  DCHECK(result);
+
+  base::UmaHistogramBoolean(
+      base::StrCat(
+          {"Blink.MemoryCache.Remote.IsInCache.",
+           network::RequestDestinationToStringForHistogram(destination)}),
+      result->is_in_cache);
+  const char* visibility = result->is_visible ? "Visible" : "Hidden";
+  const char* lifecycle = nullptr;
+  switch (result->lifecycle_state) {
+    case mojom::blink::ResourceCacheContainsResult::LifecycleState::kUnknown:
+      lifecycle = ".Unknown";
+      break;
+    case mojom::blink::ResourceCacheContainsResult::LifecycleState::kRunning:
+      lifecycle = ".Running";
+      break;
+    case mojom::blink::ResourceCacheContainsResult::LifecycleState::kPaused:
+      lifecycle = ".Paused";
+      break;
+    case mojom::blink::ResourceCacheContainsResult::LifecycleState::kFrozen:
+      lifecycle = ".Frozen";
+      break;
+  }
+  base::TimeDelta send_delay = result->ipc_response_time - ipc_send_time;
+  base::UmaHistogramMicrosecondsTimes(
+      base::StrCat({"Blink.MemoryCache.Remote.", visibility, lifecycle,
+                    ".IPCSendDelay"}),
+      send_delay);
+  base::TimeDelta recv_delay =
+      base::TimeTicks::Now() - result->ipc_response_time;
+  base::UmaHistogramMicrosecondsTimes(
+      base::StrCat({"Blink.MemoryCache.Remote.", visibility, lifecycle,
+                    ".IPCRecvDelay"}),
+      recv_delay);
+}
+
 void ResourceFetcher::Trace(Visitor* visitor) const {
   visitor->Trace(context_);
   visitor->Trace(properties_);
@@ -2643,6 +2756,9 @@ void ResourceFetcher::Trace(Visitor* visitor) const {
   visitor->Trace(resource_timing_info_map_);
   visitor->Trace(blob_registry_remote_);
   visitor->Trace(subresource_web_bundles_);
+  visitor->Trace(document_resource_strong_refs_);
+  visitor->Trace(resource_cache_remote_);
+  MemoryPressureListener::Trace(visitor);
 }
 
 // static

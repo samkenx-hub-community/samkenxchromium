@@ -82,7 +82,9 @@ source_set("popup_menu") {
     "//ios/chrome/browser/shared/coordinator/chrome_coordinator",
     "//ios/chrome/browser/shared/public/commands",
     "//ios/chrome/browser/shared/public/features",
+    "//ios/chrome/browser/shared/ui/list_model",
     "//ios/chrome/browser/shared/ui/util",
+    "//ios/chrome/browser/sync",
     "//ios/chrome/browser/tabs:features",
     "//ios/chrome/browser/translate",
     "//ios/chrome/browser/ui/bookmarks:core",
@@ -93,7 +95,6 @@ source_set("popup_menu") {
     "//ios/chrome/browser/ui/default_promo:utils",
     "//ios/chrome/browser/ui/icons:symbols",
     "//ios/chrome/browser/ui/lens:lens_entrypoint",
-    "//ios/chrome/browser/ui/list_model",
     "//ios/chrome/browser/ui/main:layout_guide_util",
     "//ios/chrome/browser/ui/main:scene_state_header",
     "//ios/chrome/browser/ui/ntp/metrics",
@@ -144,10 +145,7 @@ source_set("metrics_protocols") {
 source_set("unit_tests") {
   testonly = true
 
-  sources = [
-    "popup_menu_coordinator_unittest.mm",
-    "popup_menu_mediator_unittest.mm",
-  ]
+  sources = [ "popup_menu_mediator_unittest.mm" ]
   deps = [
     ":constants",
     ":popup_menu",
@@ -226,7 +224,6 @@ source_set("eg2_tests") {
     "//ios/chrome/browser/ui/settings:constants",
     "//ios/chrome/test/earl_grey:eg_test_support+eg2",
     "//ios/testing/earl_grey:eg_test_support+eg2",
-    "//ios/third_party/earl_grey2:test_lib",
     "//ios/web/common:features",
     "//ios/web/common:user_agent",
     "//ios/web/public/test/http_server:http_server",

@@ -31,6 +31,7 @@ namespace ash {
 class DiagnosticsServiceAsh;
 class ProbeServiceAsh;
 class SmartReaderManagerAsh;
+class TelemetryEventServiceAsh;
 class VideoConferenceManagerAsh;
 }  // namespace ash
 
@@ -81,6 +82,7 @@ class LocalPrinterAsh;
 class LoginAsh;
 class LoginScreenStorageAsh;
 class LoginStateAsh;
+class MediaUIAsh;
 class MessageCenterAsh;
 class MetricsAsh;
 class MetricsReportingAsh;
@@ -251,6 +253,7 @@ class CrosapiAsh : public mojom::Crosapi {
       mojo::PendingReceiver<
           chromeos::machine_learning::mojom::MachineLearningService> receiver)
       override;
+  void BindMediaUI(mojo::PendingReceiver<mojom::MediaUI> receiver) override;
   void BindMediaSessionAudioFocus(
       mojo::PendingReceiver<media_session::mojom::AudioFocusManager> receiver)
       override;
@@ -317,6 +320,8 @@ class CrosapiAsh : public mojom::Crosapi {
       mojo::PendingReceiver<mojom::SyncService> receiver) override;
   void BindTaskManager(
       mojo::PendingReceiver<mojom::TaskManager> receiver) override;
+  void BindTelemetryEventService(
+      mojo::PendingReceiver<mojom::TelemetryEventService> receiver) override;
   void BindTelemetryProbeService(
       mojo::PendingReceiver<mojom::TelemetryProbeService> receiver) override;
   void BindTestController(
@@ -428,6 +433,8 @@ class CrosapiAsh : public mojom::Crosapi {
   }
 
   LoginStateAsh* login_state_ash() { return login_state_ash_.get(); }
+
+  MediaUIAsh* media_ui_ash() { return media_ui_ash_.get(); }
 
   MultiCaptureServiceAsh* multi_capture_service_ash() {
     return multi_capture_service_ash_.get();
@@ -548,6 +555,7 @@ class CrosapiAsh : public mojom::Crosapi {
   std::unique_ptr<LoginAsh> login_ash_;
   std::unique_ptr<LoginScreenStorageAsh> login_screen_storage_ash_;
   std::unique_ptr<LoginStateAsh> login_state_ash_;
+  std::unique_ptr<MediaUIAsh> media_ui_ash_;
   std::unique_ptr<MessageCenterAsh> message_center_ash_;
   std::unique_ptr<MetricsAsh> metrics_ash_;
   std::unique_ptr<MetricsReportingAsh> metrics_reporting_ash_;
@@ -564,6 +572,7 @@ class CrosapiAsh : public mojom::Crosapi {
 #if BUILDFLAG(USE_CUPS)
   std::unique_ptr<PrintingMetricsAsh> printing_metrics_ash_;
 #endif  // BUILDFLAG(USE_CUPS)
+  std::unique_ptr<ash::TelemetryEventServiceAsh> telemetry_event_service_ash_;
   std::unique_ptr<ash::ProbeServiceAsh> probe_service_ash_;
   std::unique_ptr<RemotingAsh> remoting_ash_;
   std::unique_ptr<ResourceManagerAsh> resource_manager_ash_;

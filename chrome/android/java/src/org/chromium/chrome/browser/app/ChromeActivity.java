@@ -175,7 +175,6 @@ import org.chromium.chrome.browser.tabmodel.TabModelSelectorProfileSupplier;
 import org.chromium.chrome.browser.tabmodel.TabModelSelectorSupplier;
 import org.chromium.chrome.browser.tabmodel.TabModelSelectorTabObserver;
 import org.chromium.chrome.browser.tabmodel.TabModelUtils;
-import org.chromium.chrome.browser.tasks.ReturnToChromeUtil;
 import org.chromium.chrome.browser.toolbar.ControlContainer;
 import org.chromium.chrome.browser.toolbar.ToolbarManager;
 import org.chromium.chrome.browser.translate.TranslateAssistContent;
@@ -235,6 +234,7 @@ import org.chromium.printing.PrintingController;
 import org.chromium.printing.PrintingControllerImpl;
 import org.chromium.ui.UiUtils;
 import org.chromium.ui.base.ActivityWindowAndroid;
+import org.chromium.ui.base.ApplicationViewportInsetSupplier;
 import org.chromium.ui.base.Clipboard;
 import org.chromium.ui.base.DeviceFormFactor;
 import org.chromium.ui.base.PageTransition;
@@ -397,7 +397,7 @@ public abstract class ChromeActivity<C extends ChromeActivityComponent>
     // returned by {@link isInPictureInPictureMode}.
     private boolean mLastPictureInPictureModeForTesting;
 
-    protected BackPressManager mBackPressManager = new BackPressManager(this::handleOnBackPressed);
+    protected BackPressManager mBackPressManager = new BackPressManager();
     private TextBubbleBackPressHandler mTextBubbleBackPressHandler;
     private SelectionPopupBackPressHandler mSelectionPopupBackPressHandler;
     private Callback<TabModelSelector> mSelectionPopupBackPressInitCallback;
@@ -645,8 +645,7 @@ public abstract class ChromeActivity<C extends ChromeActivityComponent>
                     getControlContainerHeightResource());
 
             mBottomContainer.initialize(getBrowserControlsManager(),
-                    getWindowAndroid().getApplicationBottomInsetSupplier(),
-                    mManualFillingComponentSupplier.get().getBottomInsetSupplier());
+                    getWindowAndroid().getApplicationBottomInsetSupplier());
 
             ShareDelegate shareDelegate =
                     new ShareDelegateImpl(mRootUiCoordinator.getBottomSheetController(),
@@ -2038,11 +2037,14 @@ public abstract class ChromeActivity<C extends ChromeActivityComponent>
         compositorViewHolder.setControlContainer(controlContainer);
         compositorViewHolder.setBrowserControlsManager(mBrowserControlsManagerSupplier.get());
         compositorViewHolder.setUrlBar(urlBar);
-        compositorViewHolder.setInsetObserverView(mInsetObserverViewSupplier.get());
-        compositorViewHolder.setAutofillUiBottomInsetSupplier(
+
+        ApplicationViewportInsetSupplier insetSupplier =
+                getWindowAndroid().getApplicationBottomInsetSupplier();
+        insetSupplier.setKeyboardInsetSupplier(
+                mInsetObserverViewSupplier.get().getSupplierForBottomInset());
+        insetSupplier.setKeyboardAccessoryInsetSupplier(
                 mManualFillingComponentSupplier.get().getBottomInsetSupplier());
-        compositorViewHolder.setApplicationViewportInsetSupplier(
-                getWindowAndroid().getApplicationBottomInsetSupplier());
+        compositorViewHolder.setApplicationViewportInsetSupplier(insetSupplier);
 
         compositorViewHolder.setTopUiThemeColorProvider(
                 mRootUiCoordinator.getTopUiThemeColorProvider());
@@ -2429,7 +2431,6 @@ public abstract class ChromeActivity<C extends ChromeActivityComponent>
                 NewTabPageUma.recordAction(NewTabPageUma.ACTION_OPENED_HISTORY_MANAGER);
             }
             RecordUserAction.record("MobileMenuHistory");
-            ReturnToChromeUtil.onHistoryOpened();
             HistoryManagerUtils.showHistoryManager(
                     this, currentTab, getTabModelSelector().isIncognitoSelected());
             RecordHistogram.recordEnumeratedHistogram("Android.OpenHistoryFromMenu.PerProfileType",
@@ -2576,7 +2577,7 @@ public abstract class ChromeActivity<C extends ChromeActivityComponent>
             if (isEnabled) {
                 WebContentsDarkModeMessageController.attemptToShowDialog(this, profile,
                         url.getSpec(), getModalDialogManager(), new SettingsLauncherImpl(),
-                        HelpAndFeedbackLauncherImpl.getInstance());
+                        HelpAndFeedbackLauncherImpl.getForProfile(profile));
             }
 
             return true;
@@ -2606,7 +2607,7 @@ public abstract class ChromeActivity<C extends ChromeActivityComponent>
         // before starting the GoogleHelp.
         String helpContextId = HelpAndFeedbackLauncherImpl.getHelpContextIdFromUrl(
                 this, url, getCurrentTabModel().isIncognito());
-        HelpAndFeedbackLauncherImpl.getInstance().show(this, helpContextId, profile, url);
+        HelpAndFeedbackLauncherImpl.getForProfile(profile).show(this, helpContextId, url);
         RecordUserAction.record(recordAction);
     }
 

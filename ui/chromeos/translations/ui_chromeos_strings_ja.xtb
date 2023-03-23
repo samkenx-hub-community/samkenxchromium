@@ -119,7 +119,6 @@
 <translation id="1942765061641586207">画像解像度</translation>
 <translation id="1972984168337863910">ファイルのフィードバック パネルを展開します</translation>
 <translation id="1995337122023280937">ファイルの場所へ移動</translation>
-<translation id="1999709132469742660">すべての URL によるファイル アクセス</translation>
 <translation id="2001796770603320721">ドライブで管理</translation>
 <translation id="2009067268969781306">ドライブをフォーマットすると、そのドライブに保存されているすべてのデータが削除されます。この操作は元に戻せません。</translation>
 <translation id="2025955442973426285">チグリヤナ語</translation>
@@ -151,6 +150,7 @@
 <translation id="2236732657580416950">Google ドライブのキャッシュを削除しました。</translation>
 <translation id="2239068707900391003">コーヒーを持っている人</translation>
 <translation id="2251368349685848079">ゴミ箱から復元</translation>
+<translation id="2278133026967558505">すべてのウェブサイトと URL によるファイル アクセス</translation>
 <translation id="2282155092769082568">自動設定 URL:</translation>
 <translation id="2284767815536050991">リムーバブル ストレージ</translation>
 <translation id="2288278176040912387">レコード プレーヤー</translation>
@@ -543,7 +543,6 @@
 <translation id="5323213332664049067">ラテン アメリカ</translation>
 <translation id="5330145655348521461">これらのファイルは別のデスクトップで開かれます。表示するには <ph name="USER_NAME" />（<ph name="MAIL_ADDRESS" />）に移動してください。</translation>
 <translation id="5330512191124428349">情報を見る</translation>
-<translation id="5337538975554986899"><ph name="NON_RESTRICTED_DESTINATIONS" /> を除くすべての URL によるファイル アクセス</translation>
 <translation id="5344246330454251646">Bruschetta の共有を管理</translation>
 <translation id="535792325654997756">猫と一緒にいる人</translation>
 <translation id="5358764674931277">フレームレート</translation>
@@ -769,6 +768,7 @@
 <translation id="7162080671816799010">認証サーバーの ID を検証するための「サブジェクト代替名マッチ」または「ドメイン サフィックス マッチ」がありません</translation>
 <translation id="7165320105431587207">ネットワークを設定できませんでした</translation>
 <translation id="7170041865419449892">圏外</translation>
+<translation id="7179579940054351344"><ph name="NON_RESTRICTED_DESTINATIONS" /> を除く、すべてのウェブサイトと URL によるファイル アクセス</translation>
 <translation id="7180611975245234373">更新</translation>
 <translation id="7189874332498648577"><ph name="NUMBER_OF_GB" /> GB</translation>
 <translation id="7191454237977785534">名前を付けて保存</translation>
@@ -942,6 +942,7 @@
 <translation id="8492972329130824181">ホーム ネットワークは使用できません。接続するには、モバイルデータ ローミングを有効にする必要があります。</translation>
 <translation id="8499098729323186194"><ph name="NUMBER_OF_ITEMS" /> 件のアイテムを抽出しています...</translation>
 <translation id="8502913769543567768"><ph name="NETWORK_INDEX" /> 番目のネットワーク（全 <ph name="NETWORK_COUNT" /> 件）、<ph name="NETWORK_NAME" />、<ph name="NETWORK_PROVIDER_NAME" />、デバイスのセットアップ後に有効化、管理者によって管理</translation>
+<translation id="8512483403832814140">常時</translation>
 <translation id="8521441079177373948">UK</translation>
 <translation id="853494022971700746">フランス語（フランス）</translation>
 <translation id="8540608333167683902"><ph name="NETWORK_INDEX" /> 番目のネットワーク（全 <ph name="NETWORK_COUNT" /> 件）、<ph name="NETWORK_NAME" />、<ph name="CONNECTION_STATUS" />、信号強度 <ph name="SIGNAL_STRENGTH" />%、詳細</translation>

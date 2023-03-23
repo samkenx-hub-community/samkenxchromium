@@ -284,6 +284,7 @@
 <translation id="2581165646603367611">‏سيؤدي هذا إلى محو ملفات تعريف الارتباط وذاكرة التخزين المؤقت والبيانات الأخرى للمواقع التي لا يعتقد Chrome أنها مهمة.</translation>
 <translation id="2587052924345400782">يتوفر إصدار أحدث</translation>
 <translation id="2593272815202181319">أحادي المسافة</translation>
+<translation id="2603212228005142861">تسجيل الدخول لإدارة إعداداتك المفضَّلة</translation>
 <translation id="2604446170045642109">يمكنك إيقاف المظهر الداكن للمواقع الإلكترونية من الإعدادات.</translation>
 <translation id="2612676031748830579">رقم البطاقة</translation>
 <translation id="2625189173221582860">تم نسخ كلمة المرور</translation>
@@ -477,6 +478,7 @@
 <translation id="3587596251841506391">المساعدة في تحسين الأمان على الويب</translation>
 <translation id="3597179440835065298">الحصول على اقتراحات أفضل</translation>
 <translation id="3602290021589620013">معاينة</translation>
+<translation id="360901359071773787">هل تريد حذف بيانات التصفّح لآخر 15 دقيقة؟</translation>
 <translation id="3616113530831147358">المقاطع الصوتية</translation>
 <translation id="3622349720008044802">إدارة النوافذ</translation>
 <translation id="3631987586758005671">جارٍ المشاركة مع <ph name="DEVICE_NAME" /></translation>
@@ -631,6 +633,7 @@
 
 قد يحتوي حسابك على Google على نماذج أخرى لسجل التصفح، مثل عمليات البحث والأنشطة من خدمات Google الأخرى في <ph name="BEGIN_LINK" />myactivity.google.com<ph name="END_LINK" />.</translation>
 <translation id="452750746583162491">مراجعة البيانات المتزامنة</translation>
+<translation id="4528638190900283934">سجِّل الدخول للحصول على ميزات إضافية.</translation>
 <translation id="4532845899244822526">اختيار مجلد</translation>
 <translation id="4547551584605870320">{TAB_COUNT,plural, =1{علامة تبويب واحدة (<ph name="TAB_COUNT_ONE" />)}zero{<ph name="TAB_COUNT_MANY" /> علامة تبويب عادية و<ph name="TAB_COUNT_INCOGNITO" /> علامة تبويب في وضع التصفُّح المتخفي}two{علامتا تبويب عاديتان (<ph name="TAB_COUNT_MANY" />) وعلامتا تبويب في وضع التصفُّح المتخفي (<ph name="TAB_COUNT_INCOGNITO" />)}few{<ph name="TAB_COUNT_MANY" /> علامات تبويب عادية و<ph name="TAB_COUNT_INCOGNITO" /> علامات تبويب في وضع التصفُّح المتخفي}many{<ph name="TAB_COUNT_MANY" /> علامة تبويب عادية و<ph name="TAB_COUNT_INCOGNITO" /> علامة تبويب في وضع التصفُّح المتخفي}other{<ph name="TAB_COUNT_MANY" /> علامة تبويب عادية و<ph name="TAB_COUNT_INCOGNITO" /> علامة تبويب في وضع التصفُّح المتخفي}}</translation>
 <translation id="4554077758708533499">‏تم التوصيل باستخدام كابل USB.</translation>
@@ -821,6 +824,7 @@
 <translation id="5517095782334947753">تتوفر لديك الإشارات المرجعية، والسجل، وكلمات المرور، والإعدادات الأخرى من <ph name="FROM_ACCOUNT" />.</translation>
 <translation id="5524761631371622910">‏عندما تكون التجارب مفعَّلة، وفي حال أضافك Chrome عشوائيًا إلى تجربة نشطة، سيؤثر سجلّ تصفّحك في الإعلانات التي تظهر لك والاهتمامات التي يتم تقديرها على النحو الموضّح أدناه. ولحماية خصوصيتك، يحذف Chrome اهتماماتك بشكل متواصل مرة واحدة على الأقل شهريًا.</translation>
 <translation id="5524843473235508879">تم حظر إعادة التوجيه.</translation>
+<translation id="554297709083131118">سيتم حذف البيانات التالية من آخر 15 دقيقة.</translation>
 <translation id="5548606607480005320">التحقّق من الأمان</translation>
 <translation id="5555525474779371165">اختيار حماية "التصفُّح الآمن"</translation>
 <translation id="5556459405103347317">إعادة التحميل</translation>
@@ -1075,6 +1079,7 @@
 <translation id="6824899148643461612">تم اختيار علامة التبويب <ph name="TAB_TITLE" />.</translation>
 <translation id="6828070228333235514">إيقاف ميزة تتبُّع السعر</translation>
 <translation id="6830728435402077660">غير آمن</translation>
+<translation id="6831043979455480757">ترجمة</translation>
 <translation id="6833996806551876956">‏الفترة التجريبية لاستخدام ميزة Privacy Sandbox</translation>
 <translation id="6836206421467243968">استعادة مجموعة علامات التبويب <ph name="TITLE_OF_GROUP" /> كمجموعة علامات تبويب جديدة في الخلفية</translation>
 <translation id="6846298663435243399">جارٍ التحميل…</translation>
@@ -1245,7 +1250,6 @@
 <translation id="7725024127233776428">يتم عرض الصفحات التي يتم وضع إشارة عليها هنا.</translation>
 <translation id="7757787379047923882">تمت مشاركة النص من <ph name="DEVICE_NAME" />.</translation>
 <translation id="7762668264895820836">‏بطاقة SD <ph name="SD_CARD_NUMBER" /></translation>
-<translation id="7762928140712606393">‏سجِّل الدخول للحصول على ميزات إضافية وأعلى مستوى أمان في Chrome‏\u2019s</translation>
 <translation id="7764225426217299476">إضافة عنوان</translation>
 <translation id="7772032839648071052">تأكيد عبارة المرور</translation>
 <translation id="7772375229873196092">إغلاق <ph name="APP_NAME" /></translation>
@@ -1261,6 +1265,7 @@
 <translation id="78270725016672455">يريد جهاز الكمبيوتر تسجيل هذا الجهاز لتسجيل الدخول إلى موقع إلكتروني.</translation>
 <translation id="7844171778363018843">لم يتم اختيار أي بيانات لمزامنتها.</translation>
 <translation id="7846296061357476882">‏خدمات Google</translation>
+<translation id="7847228556075070294">تم حذف السجلّ وملفات تعريف الارتباط والبيانات الأخرى.</translation>
 <translation id="784934925303690534">النطاق الزمني</translation>
 <translation id="7851858861565204677">أجهزة أخرى</translation>
 <translation id="7853202427316060426">النشاط</translation>

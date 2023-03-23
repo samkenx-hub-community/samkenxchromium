@@ -1024,6 +1024,11 @@ PrefetchStreamingURLLoaderStatus PrefetchService::OnPrefetchResponseStarted(
           net::HttpUtil::ParseRetryAfterHeader(
               retry_after_string, base::Time::Now(), &retry_after) &&
           delegate_) {
+        // Cap the retry after value to a maximum.
+        if (retry_after > PrefetchMaximumRetryAfterDelta()) {
+          retry_after = PrefetchMaximumRetryAfterDelta();
+        }
+
         delegate_->ReportOriginRetryAfter(prefetch_container->GetURL(),
                                           retry_after);
       }
@@ -1175,7 +1180,7 @@ void PrefetchService::CopyIsolatedCookies(
   prefetch_container->OnIsolatedCookieCopyStart();
   net::CookieOptions options = net::CookieOptions::MakeAllInclusive();
   prefetch_container->GetNetworkContext()->GetCookieManager()->GetCookieList(
-      prefetch_container->GetURL(), options,
+      prefetch_container->GetCurrentURLToServe(), options,
       net::CookiePartitionKeyCollection::Todo(),
       base::BindOnce(&PrefetchService::OnGotIsolatedCookiesForCopy,
                      weak_method_factory_.GetWeakPtr(), prefetch_container));
@@ -1202,9 +1207,9 @@ void PrefetchService::OnGotIsolatedCookiesForCopy(
   for (const net::CookieWithAccessResult& cookie : cookie_list) {
     browser_context_->GetDefaultStoragePartition()
         ->GetCookieManagerForBrowserProcess()
-        ->SetCanonicalCookie(cookie.cookie, prefetch_container->GetURL(),
-                             options,
-                             base::BindOnce(&CookieSetHelper, barrier));
+        ->SetCanonicalCookie(
+            cookie.cookie, prefetch_container->GetCurrentURLToServe(), options,
+            base::BindOnce(&CookieSetHelper, barrier));
   }
 }
 
@@ -1220,13 +1225,6 @@ void PrefetchService::GetPrefetchToServe(
   base::WeakPtr<PrefetchContainer> prefetch_container = prefetch_iter->second;
   prefetches_ready_to_serve_.erase(prefetch_iter);
   if (!prefetch_container) {
-    std::move(on_prefetch_to_serve_ready).Run(nullptr);
-    return;
-  }
-
-  // TODO(https://crbug.com/1266876): Allow prefetches with redirects to be
-  // served.
-  if (prefetch_container->GetRedirectChainSize() > 1) {
     std::move(on_prefetch_to_serve_ready).Run(nullptr);
     return;
   }

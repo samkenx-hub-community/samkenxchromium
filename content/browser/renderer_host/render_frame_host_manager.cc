@@ -492,7 +492,7 @@ bool RenderFrameHostManager::IsMainFrameForInnerDelegate() {
              FrameTreeNode::kFrameTreeNodeInvalidId;
 }
 
-FrameTreeNode* RenderFrameHostManager::GetOuterDelegateNode() {
+FrameTreeNode* RenderFrameHostManager::GetOuterDelegateNode() const {
   int outer_contents_frame_tree_node_id =
       frame_tree_node_->frame_tree()
           .delegate()
@@ -2555,6 +2555,15 @@ RenderFrameHostManager::DetermineSiteInstanceForURL(
     // the UrlInfoInit constructor.
     AppendReason(reason, "DetermineSiteInstanceForURL => error-instance");
 
+    // Top level frames ending up as error pages should use COOP: unsafe-none.
+    // They should therefore be non isolated. Note that it is possible for a
+    // top-level error page to have a nullopt WebExposedIsolationInfo, in
+    // certain post-commit error pages on top of about:blank scenarios.
+    DCHECK(!frame_tree_node_->IsOutermostMainFrame() ||
+           !dest_url_info.web_exposed_isolation_info.has_value() ||
+           dest_url_info.web_exposed_isolation_info.value() ==
+               WebExposedIsolationInfo::CreateNonIsolated());
+
     UrlInfo computed_url_info(
         UrlInfoInit(GURL(kUnreachableWebDataURL))
             .WithWebExposedIsolationInfo(
@@ -3410,7 +3419,8 @@ RenderFrameHostManager::CreateSpeculativeRenderFrame(
 
 void RenderFrameHostManager::CreateRenderFrameProxy(
     SiteInstanceImpl* instance,
-    const scoped_refptr<BrowsingContextState>& browsing_context_state) {
+    const scoped_refptr<BrowsingContextState>& browsing_context_state,
+    BatchedProxyIPCSender* batched_proxy_ipc_sender) {
   CHECK(instance);
   TRACE_EVENT_INSTANT("navigation",
                       "RenderFrameHostManager::CreateRenderFrameProxy",
@@ -3497,7 +3507,7 @@ void RenderFrameHostManager::CreateRenderFrameProxy(
   if (frame_tree_node_->IsMainFrame() && proxy->GetRenderViewHost()) {
     InitRenderView(group, proxy->GetRenderViewHost(), proxy);
   } else {
-    proxy->InitRenderFrameProxy();
+    proxy->InitRenderFrameProxy(batched_proxy_ipc_sender);
   }
 }
 
@@ -3883,8 +3893,9 @@ RenderFrameHostManager::GetFrameTokenForSiteInstanceGroup(
   if (features::GetBrowsingContextMode() ==
           features::BrowsingContextStateImplementationType::
               kSwapForCrossBrowsingInstanceNavigations &&
-      render_frame_host_->GetSiteInstance()->group()->browsing_instance_id() !=
-          site_instance_group->browsing_instance_id()) {
+      !render_frame_host_->GetSiteInstance()
+           ->group()
+           ->IsRelatedSiteInstanceGroup(site_instance_group)) {
     return absl::nullopt;
   }
   if (render_frame_host_->GetSiteInstance()->group() == site_instance_group)

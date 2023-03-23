@@ -809,6 +809,10 @@ NSString* SerializedValue(const base::Value* value) {
   chrome_test_util::AddTypedURLToFakeSyncServer(base::SysNSStringToUTF8(URL));
 }
 
++ (void)addFakeSyncServerHistoryVisit:(NSURL*)URL {
+  chrome_test_util::AddHistoryVisitToFakeSyncServer(net::GURLWithNSURL(URL));
+}
+
 + (void)addFakeSyncServerDeviceInfo:(NSString*)deviceName
                lastUpdatedTimestamp:(base::Time)lastUpdatedTimestamp {
   chrome_test_util::AddDeviceInfoToFakeSyncServer(
@@ -824,11 +828,11 @@ NSString* SerializedValue(const base::Value* value) {
       GURL(base::SysNSStringToUTF8(URL)));
 }
 
-+ (BOOL)isTypedURL:(NSString*)spec presentOnClient:(BOOL)expectPresent {
++ (BOOL)isURL:(NSString*)spec presentOnClient:(BOOL)expectPresent {
   NSError* error = nil;
   GURL URL(base::SysNSStringToUTF8(spec));
   BOOL success =
-      chrome_test_util::IsTypedUrlPresentOnClient(URL, expectPresent, &error);
+      chrome_test_util::IsUrlPresentOnClient(URL, expectPresent, &error);
   return success && !error;
 }
 
@@ -1180,6 +1184,9 @@ NSString* SerializedValue(const base::Value* value) {
   return UseSymbols();
 }
 
++ (BOOL)isUIButtonConfigurationEnabled {
+  return IsUIButtonConfigurationEnabled();
+}
 #pragma mark - ContentSettings
 
 + (ContentSetting)popupPrefValue {
@@ -1199,6 +1206,13 @@ NSString* SerializedValue(const base::Value* value) {
       chrome_test_util::GetOriginalBrowserState())
       ->SetDefaultContentSetting(ContentSettingsType::REQUEST_DESKTOP_SITE,
                                  CONTENT_SETTING_BLOCK);
+}
+
+#pragma mark - Default Utilities (EG2)
+
+// Stores a value for the provided key in NSUserDefaults.
++ (void)setUserDefaultObject:(id)value forKey:(NSString*)defaultName {
+  [[NSUserDefaults standardUserDefaults] setObject:value forKey:defaultName];
 }
 
 #pragma mark - Pref Utilities (EG2)

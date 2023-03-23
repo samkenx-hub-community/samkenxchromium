@@ -179,11 +179,6 @@ class ReadAnythingAppController
   void SetPageHandlerForTesting(
       mojo::PendingRemote<read_anything::mojom::PageHandler> page_handler);
 
-  ui::AXNode* GetAXNode(ui::AXNodeID ax_node_id) const;
-  bool IsNodeIgnoredForReadAnything(ui::AXNodeID ax_node_id) const;
-
-  bool NodeIsContentNode(ui::AXNodeID ax_node_id) const;
-
   content::RenderFrame* render_frame_;
   std::unique_ptr<AXTreeDistiller> distiller_;
   mojo::Remote<read_anything::mojom::PageHandlerFactory> page_handler_factory_;

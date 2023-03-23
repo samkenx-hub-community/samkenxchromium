@@ -23,9 +23,33 @@ import {PrefsMixin} from '../../prefs/prefs_mixin.js';
 import {DeepLinkingMixin} from '../deep_linking_mixin.js';
 import {routes} from '../os_settings_routes.js';
 import {RouteOriginMixin} from '../route_origin_mixin.js';
-import {Route} from '../router.js';
+import {Route, Router} from '../router.js';
 
 import {getTemplate} from './chromevox_subpage.html.js';
+import {ChromeVoxSubpageBrowserProxy, ChromeVoxSubpageBrowserProxyImpl} from './chromevox_subpage_browser_proxy.js';
+
+export {SettingsToggleButtonElement} from '../../controls/settings_toggle_button.js';
+
+const SYSTEM_VOICE = 'chromeos_system_voice';
+const CHROMEVOX_EXTENSION_ID = 'mndnfokpggljbaajbnioimlmbfngpief';
+const GOOGLE_TTS_EXTENSION_ID = 'gjjabgpgjpampikjhjpfhneeoapjbjaf';
+const ESPEAK_TTS_EXTENSION_ID = 'dakbfdmgjiabojdgbiljlhgjbokobjpg';
+const EVENT_STREAM_FILTERS_PREF_KEY =
+    'settings.a11y.chromevox.event_stream_filters';
+
+type EventStreamFiltersPrefValue = Record<string, boolean>;
+
+/**
+ * Represents a voice as sent from the TTS Handler class.
+ * |name| is the user-facing voice name.
+ * |remote| is whether the TTS voice is online (versus on-device).
+ * |extensionId| is the Chrome Extension ID for the TTS voice.
+ */
+interface TtsHandlerVoice {
+  name: string;
+  remote: boolean;
+  extensionId: string;
+}
 
 interface SettingsChromeVoxSubpageElement {
   $: {
@@ -135,6 +159,86 @@ class SettingsChromeVoxSubpageElement extends
           ];
         },
       },
+
+      /**
+       * Dropdown menu choices for voice options.
+       */
+      voiceOptions_: {
+        type: Array,
+        value: [],
+      },
+
+      /**
+       * Whether developer options is expanded.
+       */
+      developerOptionsExpanded_: {
+        type: Boolean,
+        value: false,
+      },
+
+      /**
+       * Event stream filters list. Should match
+       * SettingsManager.EVENT_STREAM_FILTERS from settings_manager.js.
+       */
+      eventStreamFilters_: {
+        readOnly: true,
+        type: Array,
+        value() {
+          return [
+            'activedescendantchanged',
+            'alert',
+            'ariaAttributeChanged',
+            'autocorrectionOccured',
+            'blur',
+            'checkedStateChanged',
+            'childrenChanged',
+            'clicked',
+            'documentSelectionChanged',
+            'documentTitleChanged',
+            'expandedChanged',
+            'focus',
+            'focusContext',
+            'hide',
+            'hitTestResult',
+            'hover',
+            'imageFrameUpdated',
+            'invalidStatusChanged',
+            'layoutComplete',
+            'liveRegionChanged',
+            'liveRegionCreated',
+            'loadComplete',
+            'locationChanged',
+            'mediaStartedPlaying',
+            'mediaStoppedPlaying',
+            'menuEnd',
+            'menuItemSelected',
+            'menuListValueChanged',
+            'menuPopupEnd',
+            'menuPopupStart',
+            'menuStart',
+            'mouseCanceled',
+            'mouseDragged',
+            'mouseMoved',
+            'mousePressed',
+            'mouseReleased',
+            'rowCollapsed',
+            'rowCountChanged',
+            'rowExpanded',
+            'scrollPositionChanged',
+            'scrolledToAnchor',
+            'selectedChildrenChanged',
+            'selection',
+            'selectionAdd',
+            'selectionRemove',
+            'show',
+            'stateChanged',
+            'textChanged',
+            'textSelectionChanged',
+            'treeChanged',
+            'valueInTextFieldChanged',
+          ];
+        },
+      },
     };
   }
 
@@ -147,13 +251,28 @@ class SettingsChromeVoxSubpageElement extends
   private numberReadingStyleOptions_: DropdownMenuOptionList;
   private punctuationEchoOptions_: DropdownMenuOptionList;
   private audioStrategyOptions_: DropdownMenuOptionList;
+  private voiceOptions_: DropdownMenuOptionList;
+  private chromeVoxBrowserProxy_: ChromeVoxSubpageBrowserProxy;
 
   // TODO(270619855): Add tests to verify these controls change their prefs.
   constructor() {
     super();
 
+    this.chromeVoxBrowserProxy_ =
+        ChromeVoxSubpageBrowserProxyImpl.getInstance();
+
     /** RouteOriginMixin override */
     this.route_ = routes.A11Y_CHROMEVOX;
+  }
+
+  override ready() {
+    super.ready();
+
+    this.addWebUiListener(
+        'all-voice-data-updated',
+        (voices: TtsHandlerVoice[]) => this.populateVoiceList_(voices));
+    this.chromeVoxBrowserProxy_.getAllTtsVoiceData();
+    this.chromeVoxBrowserProxy_.refreshTtsVoices();
   }
 
   /**
@@ -200,6 +319,83 @@ class SettingsChromeVoxSubpageElement extends
             .value;
     this.setPrefValue(
         'settings.a11y.chromevox.capital_strategy', capitalStrategyBackup);
+  }
+
+  /**
+   * Populates the list of voices for the UI to use in display.
+   */
+  private populateVoiceList_(voices: TtsHandlerVoice[]): void {
+    // TODO(b/271422242): voiceName can actually be omitted in the TTS engine.
+    // We should generate a name in that case.
+    voices.forEach(voice => voice.name = voice.name || '');
+    voices.sort(function(a, b) {
+      function score(voice: TtsHandlerVoice) {
+        // Prefer Google tts voices over all others.
+        if (voice.extensionId === GOOGLE_TTS_EXTENSION_ID) {
+          return 4;
+        }
+
+        // Next, prefer Espeak tts voices.
+        if (voice.extensionId === ESPEAK_TTS_EXTENSION_ID) {
+          return 2;
+        }
+
+        // Finally, prefer local over remote voices.
+        if (!voice.remote) {
+          return 1;
+        }
+        return 0;
+      }
+      return score(b) - score(a);
+    });
+
+    this.voiceOptions_ = [
+      {
+        value: SYSTEM_VOICE,
+        name: this.i18n('chromeVoxSystemVoice'),
+      },
+      ...voices.map(({name}) => ({value: name, name})),
+    ];
+  }
+
+  private onTtsSettingsTap_(): void {
+    Router.getInstance().navigateTo(
+        routes.MANAGE_TTS_SETTINGS,
+        /* dynamicParams= */ undefined, /* removeSearch= */ true);
+  }
+
+  private onEventLogTap_(): void {
+    window.open(
+        'chrome-extension://' + CHROMEVOX_EXTENSION_ID +
+        '/chromevox/log_page/log.html');
+  }
+
+  private getEventStreamFilterPref_(eventStreamFilter: string):
+      chrome.settingsPrivate.PrefObject<boolean> {
+    return {
+      key: '',
+      type: chrome.settingsPrivate.PrefType.BOOLEAN,
+      value: Boolean(this.prefs) &&
+          this.getPref<EventStreamFiltersPrefValue>(
+                  EVENT_STREAM_FILTERS_PREF_KEY)
+              .value[eventStreamFilter],
+    };
+  }
+
+  /**
+   * When an event stream filter checkbox is checked, update the dictionary pref
+   * of event stream filter states.
+   */
+  private onEventStreamFilterPrefChanged_(e: Event): void {
+    // Get all eventStreamFilters, set new filter state.
+    const filter = e.target as SettingsToggleButtonElement;
+    const eventStreamFilters = {
+      ...this
+          .getPref<EventStreamFiltersPrefValue>(EVENT_STREAM_FILTERS_PREF_KEY)
+          .value,
+      [filter.id]: filter.checked,
+    };
+    this.setPrefValue(EVENT_STREAM_FILTERS_PREF_KEY, eventStreamFilters);
   }
 }
 

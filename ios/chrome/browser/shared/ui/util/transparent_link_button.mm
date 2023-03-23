@@ -5,7 +5,10 @@
 #import "ios/chrome/browser/shared/ui/util/transparent_link_button.h"
 
 #import "base/check.h"
+#import "base/ios/ios_util.h"
 #import "base/strings/sys_string_conversions.h"
+#import "ios/chrome/browser/shared/public/features/features.h"
+#import "ios/chrome/common/button_configuration_util.h"
 #import "url/gurl.h"
 
 #if !defined(__has_feature) || !__has_feature(objc_arc)
@@ -90,21 +93,22 @@ const CGFloat kHighlightViewBackgroundAlpha = 0.25;
 
     // TODO(crbug.com/1418068): Simplify after minimum version required is >=
     // iOS 15.
-    if (@available(iOS 15, *)) {
-      UIButtonConfiguration* buttonConfiguration =
-          [UIButtonConfiguration plainButtonConfiguration];
-      buttonConfiguration.contentInsets =
-          NSDirectionalEdgeInsetsMake(linkHeightExpansion, linkWidthExpansion,
-                                      linkHeightExpansion, linkWidthExpansion);
-      self.configuration = buttonConfiguration;
-    }
-#if __IPHONE_OS_VERSION_MIN_REQUIRED < __IPHONE_15_0
-    else {
-      self.contentEdgeInsets =
+    if (base::ios::IsRunningOnIOS15OrLater() &&
+        IsUIButtonConfigurationEnabled()) {
+      if (@available(iOS 15, *)) {
+        UIButtonConfiguration* buttonConfiguration =
+            [UIButtonConfiguration plainButtonConfiguration];
+        buttonConfiguration.contentInsets = NSDirectionalEdgeInsetsMake(
+            linkHeightExpansion, linkWidthExpansion, linkHeightExpansion,
+            linkWidthExpansion);
+        self.configuration = buttonConfiguration;
+      }
+    } else {
+      UIEdgeInsets contentEdgeInsets =
           UIEdgeInsetsMake(linkHeightExpansion, linkWidthExpansion,
                            linkHeightExpansion, linkWidthExpansion);
+      SetContentEdgeInsets(self, contentEdgeInsets);
     }
-#endif  // __IPHONE_OS_VERSION_MIN_REQUIRED < __IPHONE_15_0
 
     self.backgroundColor = [UIColor clearColor];
     self.exclusiveTouch = YES;

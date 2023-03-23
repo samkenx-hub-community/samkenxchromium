@@ -13,6 +13,7 @@ module ash.cros_healthd.mojom;
 import "chromeos/ash/services/cros_healthd/private/mojom/cros_healthd_internal.mojom";
 import "chromeos/ash/services/cros_healthd/public/mojom/cros_healthd_diagnostics.mojom";
 import "chromeos/ash/services/cros_healthd/public/mojom/cros_healthd_events.mojom";
+import "chromeos/ash/services/cros_healthd/public/mojom/cros_healthd_exception.mojom";
 import "chromeos/ash/services/cros_healthd/public/mojom/cros_healthd_probe.mojom";
 import "chromeos/ash/services/cros_healthd/public/mojom/nullable_primitives.mojom";
 import "chromeos/ash/services/cros_healthd/public/mojom/wilco_ec.mojom";
@@ -24,7 +25,6 @@ import "chromeos/services/network_health/public/mojom/network_health.mojom";
 // network-related implementations to the cros_healthd daemon.
 //
 // NextMinVersion: 2, NextIndex: 7
-[Stable]
 interface CrosHealthdServiceFactory {
   // Returns a bound interface to the diagnostics service.
   GetDiagnosticsService@0(pending_receiver<CrosHealthdDiagnosticsService> service);
@@ -725,7 +725,7 @@ interface CrosHealthdDiagnosticsService {
 
 // Event interface exposed by the cros_healthd daemon.
 //
-// NextMinVersion: 3, NextIndex: 8
+// NextMinVersion: 4, NextIndex: 9
 [Stable]
 interface CrosHealthdEventService {
   // Adds an observer to be notified on Bluetooth events. The caller can remove
@@ -794,6 +794,17 @@ interface CrosHealthdEventService {
   [MinVersion=2] AddEventObserver@7(
       EventCategoryEnum category,
       pending_remote<EventObserver> observer);
+
+  // Checks whether an event is supported. It does the same support status check
+  // as in `AddEventObserver()` and returns immediately after the check.
+  //
+  // The request:
+  // * |category| - Event category to check.
+  //
+  // The response:
+  // * |status| - See the documentation of `SupportStatus`.
+  [MinVersion=3] IsEventSupported@8(
+      EventCategoryEnum category) => (SupportStatus status);
 };
 
 // Probe interface exposed by the cros_healthd daemon.

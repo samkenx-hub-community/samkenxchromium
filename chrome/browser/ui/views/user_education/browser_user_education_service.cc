@@ -65,7 +65,6 @@ const char kCustomizeChromeTutorialMetricPrefix[] = "CustomizeChromeSidePanel";
 const char kSideSearchTutorialMetricPrefix[] = "SideSearch";
 constexpr char kTabGroupHeaderElementName[] = "TabGroupHeader";
 constexpr char kReadingListItemElementName[] = "ReadingListItem";
-constexpr char kChangeChromeThemeElementName[] = "ChangeChromeTheme";
 
 class BrowserHelpBubbleDelegate : public user_education::HelpBubbleDelegate {
  public:
@@ -209,12 +208,10 @@ void MaybeRegisterChromeFeaturePromos(
 
   // kIPHAutofillVirtualCardSuggestionFeature:
   registry.RegisterFeature(std::move(
-      FeaturePromoSpecification::CreateForToastPromo(
-          feature_engagement::kIPHAutofillVirtualCardSuggestionFeature,
+      FeaturePromoSpecification::CreateForLegacyPromo(
+          &feature_engagement::kIPHAutofillVirtualCardSuggestionFeature,
           kAutofillCreditCardSuggestionEntryElementId,
-          IDS_AUTOFILL_VIRTUAL_CARD_SUGGESTION_IPH_BUBBLE_LABEL,
-          IDS_AUTOFILL_VIRTUAL_CARD_SUGGESTION_IPH_BUBBLE_LABEL,
-          FeaturePromoSpecification::AcceleratorInfo())
+          IDS_AUTOFILL_VIRTUAL_CARD_SUGGESTION_IPH_BUBBLE_LABEL)
           .SetBubbleArrow(HelpBubbleArrow::kLeftCenter)));
 
   // kIPHDesktopPwaInstallFeature:
@@ -271,6 +268,30 @@ void MaybeRegisterChromeFeaturePromos(
           .SetBubbleTitleText(IDS_PASSWORD_MANAGER_IPH_TITLE_SAVE_TO_ACCOUNT)
           .SetBubbleArrow(HelpBubbleArrow::kRightCenter)));
 
+  // kIPHPasswordsManagementBubbleAfterSaveFeature:
+  registry.RegisterFeature(FeaturePromoSpecification::CreateForToastPromo(
+      feature_engagement::kIPHPasswordsManagementBubbleAfterSaveFeature,
+      kPasswordsOmniboxKeyIconElementId,
+      IDS_PASSWORD_MANAGER_IPH_MANAGEMENT_BUBBLE_AFTER_SAVE,
+      IDS_PASSWORD_MANAGER_IPH_MANAGEMENT_BUBBLE_AFTER_SAVE_SCREENREADER,
+      FeaturePromoSpecification::AcceleratorInfo()));
+
+  // kIPHPasswordsManagementBubbleDuringSigninFeature:
+  registry.RegisterFeature(FeaturePromoSpecification::CreateForToastPromo(
+      feature_engagement::kIPHPasswordsManagementBubbleDuringSigninFeature,
+      kPasswordsOmniboxKeyIconElementId,
+      IDS_PASSWORD_MANAGER_IPH_MANAGEMENT_BUBBLE_DURING_SIGNIN,
+      IDS_PASSWORD_MANAGER_IPH_MANAGEMENT_BUBBLE_DURING_SIGNIN_SCREENREADER,
+      FeaturePromoSpecification::AcceleratorInfo()));
+
+  // kIPHPasswordsWebAppProfileSwitchFeature:
+  registry.RegisterFeature(
+      std::move(FeaturePromoSpecification::CreateForSnoozePromo(
+                    feature_engagement::kIPHPasswordsWebAppProfileSwitchFeature,
+                    kAvatarButtonElementId,
+                    IDS_PASSWORD_MANAGER_IPH_BODY_WEB_APP_PROFILE_SWITCH)
+                    .SetBubbleIcon(&vector_icons::kLightbulbOutlineIcon)));
+
   // kIPHPowerBookmarksSidePanelFeature:
   registry.RegisterFeature(FeaturePromoSpecification::CreateForSnoozePromo(
       feature_engagement::kIPHPowerBookmarksSidePanelFeature,
@@ -295,14 +316,14 @@ void MaybeRegisterChromeFeaturePromos(
       kBookmarkStarViewElementId, IDS_READING_LIST_ENTRY_POINT_PROMO));
 
   // kIPHIntentChipFeature
-  registry.RegisterFeature(FeaturePromoSpecification::CreateForToastPromo(
-      feature_engagement::kIPHIntentChipFeature, kIntentChipElementId,
+  registry.RegisterFeature(FeaturePromoSpecification::CreateForLegacyPromo(
+      &feature_engagement::kIPHIntentChipFeature, kIntentChipElementId,
 #if BUILDFLAG(IS_CHROMEOS)
-      IDS_INTENT_CHIP_IPH_CHROME_OS, IDS_INTENT_CHIP_IPH_CHROME_OS,
+      IDS_INTENT_CHIP_IPH_CHROME_OS
 #else
-      IDS_INTENT_CHIP_IPH_GENERIC, IDS_INTENT_CHIP_IPH_GENERIC,
+      IDS_INTENT_CHIP_IPH_GENERIC
 #endif
-      FeaturePromoSpecification::AcceleratorInfo()));
+      ));
 
   // kIPHReadingListInSidePanelFeature:
   registry.RegisterFeature(FeaturePromoSpecification::CreateForLegacyPromo(
@@ -412,6 +433,14 @@ void MaybeRegisterChromeFeaturePromos(
   registry.RegisterFeature(FeaturePromoSpecification::CreateForLegacyPromo(
       &feature_engagement::kIPHPriceTrackingInSidePanelFeature,
       kSidePanelButtonElementId, IDS_PRICE_TRACKING_SIDE_PANEL_IPH));
+
+  // kIPHDownloadToolbarButtonFeature:
+  registry.RegisterFeature(
+      std::move(FeaturePromoSpecification::CreateForSnoozePromo(
+                    feature_engagement::kIPHDownloadToolbarButtonFeature,
+                    kDownloadToolbarButtonElementId, IDS_DOWNLOAD_BUBBLE_PROMO)
+                    .SetBubbleArrow(HelpBubbleArrow::kTopRight)
+                    .SetBubbleTitleText(IDS_DOWNLOAD_BUBBLE_PROMO_TITLE)));
 }
 
 void MaybeRegisterChromeTutorials(
@@ -582,20 +611,17 @@ void MaybeRegisterChromeTutorials(
         HelpBubbleArrow::kRightCenter, ui::CustomElementEventType(),
         /* must_remain_visible =*/false,
         /* transition_only_on_event =*/false,
-        base::BindRepeating(
-            [](ui::InteractionSequence* sequence, ui::TrackedElement* element) {
-              sequence->NameElement(
-                  element, base::StringPiece(kChangeChromeThemeElementName));
-              return true;
-            }),
+        user_education::TutorialDescription::NameElementsCallback(),
         TutorialDescription::ContextMode::kAny);
     customize_chrome_description.steps.emplace_back(select_theme_step);
 
     // Event step - select theme event
     TutorialDescription::Step select_theme_event_step(
         0, 0, ui::InteractionSequence::StepType::kCustomEvent,
-        ui::ElementIdentifier(), kChangeChromeThemeElementName,
-        HelpBubbleArrow::kNone, kChromeThemeSelectedCustomEventId);
+        kBrowserViewElementId, std::string(), HelpBubbleArrow::kNone,
+        kBrowserThemeChangedEventId,
+        /* must_remain_visible =*/false);
+    select_theme_event_step.must_be_visible = false;
     customize_chrome_description.steps.emplace_back(select_theme_event_step);
 
     // Bubble step - back button

@@ -74,7 +74,7 @@ BASE_FEATURE(kAppShimNewCloseBehavior,
 BASE_FEATURE(kAsyncDns,
              "AsyncDns",
 #if BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_ANDROID) || \
-    BUILDFLAG(IS_WIN)
+    BUILDFLAG(IS_WIN) || BUILDFLAG(IS_LINUX)
              base::FEATURE_ENABLED_BY_DEFAULT
 #else
              base::FEATURE_DISABLED_BY_DEFAULT
@@ -381,7 +381,7 @@ BASE_FEATURE(kEnableRestrictedWebApis,
 // Enable WebHID on extension service workers.
 BASE_FEATURE(kEnableWebHidOnExtensionServiceWorker,
              "EnableWebHidOnExtensionServiceWorker",
-             base::FEATURE_ENABLED_BY_DEFAULT);
+             base::FEATURE_DISABLED_BY_DEFAULT);
 #endif
 
 // Enable WebUSB on extension service workers.
@@ -685,6 +685,13 @@ BASE_FEATURE(kIncognitoNtpRevamp,
 // install untrusted Isolated Web Apps.
 BASE_FEATURE(kIsolatedWebAppDevMode,
              "IsolatedWebAppDevMode",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+// When enabled, the requests in a third party context to domains included in
+// the Masked Domain List Component will use the Privacy Proxy to shield the
+// client's IP.
+BASE_FEATURE(kMaskedDomainList,
+             "MaskedDomainList",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 #if BUILDFLAG(IS_CHROMEOS)
@@ -1370,13 +1377,6 @@ BASE_FEATURE(kUserActivityEventLogging,
              "UserActivityEventLogging",
              base::FEATURE_ENABLED_BY_DEFAULT);
 #endif
-
-// When this feature is enabled, the toolbar for Web App windows will be hosted
-// inside the BrowserView, rather than in the BrowserNonClientFrameView. This
-// makes Web App windows work more similarly to regular browser windows.
-BASE_FEATURE(kWebAppFrameToolbarInBrowserView,
-             "WebAppFrameToolbarInBrowserView",
-             base::FEATURE_ENABLED_BY_DEFAULT);
 
 #if !BUILDFLAG(IS_ANDROID)
 BASE_FEATURE(kWebAppManifestIconUpdating,

@@ -548,7 +548,6 @@ class CORE_EXPORT Document : public ContainerNode,
   HTMLCollection* WindowNamedItems(const AtomicString& name);
   DocumentNameCollection* DocumentNamedItems(const AtomicString& name);
   HTMLCollection* DocumentAllNamedItems(const AtomicString& name);
-  HTMLCollection* PopoverInvokers();
 
   // The unassociated listed elements are listed elements that are not
   // associated to a <form> element.
@@ -757,7 +756,10 @@ class CORE_EXPORT Document : public ContainerNode,
   // AXContexts are deleted, the AXObjectCache will be removed.
   AXObjectCache* ExistingAXObjectCache() const;
   Document& AXObjectCacheOwner() const;
-  void ClearAXObjectCache();
+  // If there is an accessibility tree, recompute it and re-serialize it all.
+  // This method is useful when something that potentially affects most of the
+  // page occurs, such as an inertness change or a fullscreen toggle.
+  void RefreshAccessibilityTree() const;
 
   // to get visually ordered hebrew and arabic pages right
   bool VisuallyOrdered() const { return visually_ordered_; }
@@ -1197,8 +1199,8 @@ class CORE_EXPORT Document : public ContainerNode,
   // may otherwise be blocked.
   ScriptPromise hasStorageAccess(ScriptState* script_state);
   ScriptPromise requestStorageAccess(ScriptState* script_state);
-  ScriptPromise requestStorageAccessForOrigin(ScriptState* script_state,
-                                              const AtomicString& site);
+  ScriptPromise requestStorageAccessFor(ScriptState* script_state,
+                                        const AtomicString& site);
 
   // Fragment directive API, currently used to feature detect text-fragments.
   // https://wicg.github.io/scroll-to-text-fragment/#feature-detectability
@@ -1576,9 +1578,7 @@ class CORE_EXPORT Document : public ContainerNode,
   Document& EnsureTemplateDocument();
   Document* TemplateDocumentHost() { return template_document_host_; }
 
-  // TODO(thestig): Rename these and related functions, since we can call them
-  // for controls outside of forms as well.
-  void DidAssociateFormControl(Element*);
+  void DidAddOrRemoveFormRelatedElement(Element*);
 
   void AddConsoleMessage(ConsoleMessage* message,
                          bool discard_duplicates = false) const;
@@ -2000,6 +2000,7 @@ class CORE_EXPORT Document : public ContainerNode,
   void RemoveAXContext(AXContext*);
   // Called when the AXMode of an existing AXContext changes.
   void AXContextModeChanged();
+  void ClearAXObjectCache();
 
   bool IsDocumentFragment() const =
       delete;  // This will catch anyone doing an unnecessary check.
@@ -2089,7 +2090,7 @@ class CORE_EXPORT Document : public ContainerNode,
   }
   void AddMutationEventListenerTypeIfEnabled(ListenerType);
 
-  void DidAssociateFormControlsTimerFired(TimerBase*);
+  void DidAddOrRemoveFormRelatedElementsTimerFired(TimerBase*);
 
   void ClearFocusedElementTimerFired(TimerBase*);
 
@@ -2146,15 +2147,37 @@ class CORE_EXPORT Document : public ContainerNode,
       bool has_user_gesture,
       mojom::blink::PermissionStatus previous_status);
 
+  // Similar to `OnGotExistingStorageAccessPermissionState`, but for the
+  // top-level variant. Allows bypassing user activation checks in the event
+  // that the permission is already granted.
+  void OnGotExistingTopLevelStorageAccessPermissionState(
+      ScriptPromiseResolver* resolver,
+      bool has_user_gesture,
+      mojom::blink::PermissionDescriptorPtr descriptor,
+      mojom::blink::PermissionStatus previous_status);
+
   // Wraps `ProcessStorageAccessPermissionState` to handle the requested
   // permission status.
   void OnRequestedStorageAccessPermissionState(
       ScriptPromiseResolver* resolver,
       mojom::blink::PermissionStatus status);
 
+  // Similar to `OnRequestedStorageAccessPermissionState`, but for the top-level
+  // variant. Used to react to the result of a permission request.
+  void OnRequestedTopLevelStorageAccessPermissionState(
+      ScriptPromiseResolver* resolver,
+      mojom::blink::PermissionStatus status);
+
   // Resolves the promise if the `status` can approve; rejects the promise
   // otherwise, and consumes user activation.
   void ProcessStorageAccessPermissionState(
+      ScriptPromiseResolver* resolver,
+      bool use_existing_status,
+      mojom::blink::PermissionStatus status);
+
+  // Similar to `ProcessStorageAccessPermissionState`, but for the top-level
+  // variant. Notably, does not modify the per-frame storage access bit.
+  void ProcessTopLevelStorageAccessPermissionState(
       ScriptPromiseResolver* resolver,
       bool use_existing_status,
       mojom::blink::PermissionStatus status);
@@ -2480,7 +2503,7 @@ class CORE_EXPORT Document : public ContainerNode,
   Member<Document> template_document_;
   Member<Document> template_document_host_;
 
-  HeapTaskRunnerTimer<Document> did_associate_form_controls_timer_;
+  HeapTaskRunnerTimer<Document> did_add_or_remove_form_related_elements_timer_;
 
   HeapHashSet<Member<SVGUseElement>> use_elements_needing_update_;
 

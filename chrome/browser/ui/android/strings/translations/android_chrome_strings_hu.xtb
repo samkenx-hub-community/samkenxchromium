@@ -283,6 +283,7 @@ A privát állapottokenek nagyobb fokú adatvédelmet biztosítanak az internete
 <translation id="2581165646603367611">Ezzel törli a cookie-kat, a gyorsítótárat, valamint a webhelyek összes olyan adatát, amelyről a Chrome úgy véli, hogy nem fontos.</translation>
 <translation id="2587052924345400782">Rendelkezésre áll új verzió</translation>
 <translation id="2593272815202181319">Monospace</translation>
+<translation id="2603212228005142861">Jelentkezzen be a beállításai kezeléséhez</translation>
 <translation id="2604446170045642109">A webhelyeknél használt sötét témát bármikor kikapcsolhatja a beállításokban.</translation>
 <translation id="2612676031748830579">Kártyaszám</translation>
 <translation id="2625189173221582860">Jelszó vágólapra másolva</translation>
@@ -476,6 +477,7 @@ A privát állapottokenek nagyobb fokú adatvédelmet biztosítanak az internete
 <translation id="3587596251841506391">Legyen biztonságos a böngészés</translation>
 <translation id="3597179440835065298">Relevánsabb javaslatokat kaphat</translation>
 <translation id="3602290021589620013">Előnézet</translation>
+<translation id="360901359071773787">Törli az előző 15 percet?</translation>
 <translation id="3616113530831147358">Audio</translation>
 <translation id="3622349720008044802">Ablakok kezelése</translation>
 <translation id="3631987586758005671">Megosztás a következővel: <ph name="DEVICE_NAME" /></translation>
@@ -630,6 +632,7 @@ A privát állapottokenek nagyobb fokú adatvédelmet biztosítanak az internete
 
 Előfordulhat, hogy Google-fiókjában (a <ph name="BEGIN_LINK" />myactivity.google.com<ph name="END_LINK" /> címen) még szerepelnek a böngészési előzmények egyéb formái, így például a keresések és egyéb tevékenységek más Google-szolgáltatásokból.</translation>
 <translation id="452750746583162491">A szinkronizált adatok áttekintése</translation>
+<translation id="4528638190900283934">Jelentkezzen be, hogy még több funkciót használhasson.</translation>
 <translation id="4532845899244822526">Mappa kiválasztása</translation>
 <translation id="4547551584605870320">{TAB_COUNT,plural, =1{<ph name="TAB_COUNT_ONE" /> lap}other{<ph name="TAB_COUNT_MANY" /> lap, <ph name="TAB_COUNT_INCOGNITO" /> inkognitó módban}}</translation>
 <translation id="4554077758708533499">Csatlakoztatva USB-kábellel</translation>
@@ -820,6 +823,7 @@ A beállítás módosításához <ph name="BEGIN_LINK" />állítsa vissza a szin
 <translation id="5517095782334947753">Vannak könyvjelzői, előzményei, jelszavai és más beállításai a(z) <ph name="FROM_ACCOUNT" /> fiókból.</translation>
 <translation id="5524761631371622910">A próbaidőszakok során, ha a Chrome véletlenszerű módon regisztrálta Önt egy próbaidőszakra, az Ön böngészési előzményei hatással vannak a megjelenő hirdetésekre és a becslések szerinti érdeklődési körökre. Adatai védelme érdekében a Chrome havi rendszerességgel törli az Ön érdeklődési köreit.</translation>
 <translation id="5524843473235508879">Átirányítás letiltva.</translation>
+<translation id="554297709083131118">Az elmúlt 15 percből származó következő adatokat töröljük</translation>
 <translation id="5548606607480005320">Biztonsági ellenőrzés</translation>
 <translation id="5555525474779371165">Válassza ki, hogy milyen védelmet nyújtson a Biztonságos Böngészés</translation>
 <translation id="5556459405103347317">Újratöltés</translation>
@@ -1074,6 +1078,7 @@ Egyes webhelyek például válaszolhatnak rá úgy, hogy olyan hirdetéseket jel
 <translation id="6824899148643461612"><ph name="TAB_TITLE" />, lap, kiválasztva</translation>
 <translation id="6828070228333235514">Árkövetés leállítása</translation>
 <translation id="6830728435402077660">Nem biztonságos</translation>
+<translation id="6831043979455480757">Fordítás</translation>
 <translation id="6833996806551876956">A Privacy Sandbox próbaidőszaka</translation>
 <translation id="6836206421467243968">A(z) <ph name="TITLE_OF_GROUP" /> nevű lapcsoport visszaállítása új háttérbeli lapcsoportként.</translation>
 <translation id="6846298663435243399">Betöltés…</translation>
@@ -1241,10 +1246,10 @@ Egyes webhelyek például válaszolhatnak rá úgy, hogy olyan hirdetéseket jel
 <translation id="7707922173985738739">Mobiladat-kapcsolat használata</translation>
 <translation id="7709094866268987903">Az eltávolított érdeklődési körök itt jelennek meg</translation>
 <translation id="7709918231054955894">Az összes lapjához hozzáférhet</translation>
+<translation id="772434085369393266">Minden navigációt HTTPS-re módosít, és figyelmezteti Önt a protokollt nem támogató webhelyek betöltése előtt. Ezt a beállítást nem módosíthatja, mert be van kapcsolva a Speciális védelem.</translation>
 <translation id="7725024127233776428">Itt jelennek meg a könyvjelzőként mentett oldalak</translation>
 <translation id="7757787379047923882">Szöveg megosztva a következő eszközről: <ph name="DEVICE_NAME" /></translation>
 <translation id="7762668264895820836">SD-kártya (<ph name="SD_CARD_NUMBER" />)</translation>
-<translation id="7762928140712606393">Jelentkezzen be: még több funkció és a Chrome legerősebb biztonsága vár Önre</translation>
 <translation id="7764225426217299476">Cím hozzáadása</translation>
 <translation id="7772032839648071052">Összetett jelszó megerősítése</translation>
 <translation id="7772375229873196092">A(z) <ph name="APP_NAME" /> bezárása</translation>
@@ -1260,6 +1265,7 @@ Egyes webhelyek például válaszolhatnak rá úgy, hogy olyan hirdetéseket jel
 <translation id="78270725016672455">Számítógépe ezt az eszközt szeretné regisztrálni az adott webhelyre való bejelentkezéshez</translation>
 <translation id="7844171778363018843">Nincs szinkronizálásra kiválasztott adat</translation>
 <translation id="7846296061357476882">Google-szolgáltatások</translation>
+<translation id="7847228556075070294">Törölt előzmények, cookie-k és egyéb adatok</translation>
 <translation id="784934925303690534">Időszak</translation>
 <translation id="7851858861565204677">Egyéb eszközök</translation>
 <translation id="7853202427316060426">Aktivitás</translation>
@@ -1439,6 +1445,7 @@ Egyes webhelyek például válaszolhatnak rá úgy, hogy olyan hirdetéseket jel
 <translation id="869891660844655955">Lejárati dátum</translation>
 <translation id="8699120352855309748">Ne ajánlja fel a fordítást ezekről a nyelvekről</translation>
 <translation id="8712637175834984815">Értem</translation>
+<translation id="8723453889042591629">Gyorsan lefordíthatja ezt az oldalt. A gyorsparancs szerkesztéséhez tartsa lenyomva.</translation>
 <translation id="8725066075913043281">Újrapróbálás</translation>
 <translation id="8746155870861185046">Kiemelés megosztása</translation>
 <translation id="874726034427945498">Ha jobb javaslatokat szeretne látni a címsávban, szinkronizálja lapjait és előzményeit.</translation>

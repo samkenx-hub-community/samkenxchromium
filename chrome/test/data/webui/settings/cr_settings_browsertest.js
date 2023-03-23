@@ -900,6 +900,7 @@ TEST_F('CrSettingsMenuTest', 'All', function() {
  ['DownloadsPage', 'downloads_page_test.js'],
  ['DropdownMenu', 'dropdown_menu_tests.js'],
  ['ExtensionControlledIndicator', 'extension_controlled_indicator_tests.js'],
+ ['FileSystemSettings', 'file_system_site_list_tests.js'],
  ['HelpPage', 'help_page_test.js'],
  ['PasswordView', 'password_view_test.js'],
  ['PasswordsExportDialog', 'passwords_export_dialog_test.js'],
@@ -1041,13 +1042,6 @@ function registerTest(testName, module, caseName) {
    ],
  ],
  [
-   'PrivacyGuideIntegration',
-   'privacy_guide_integration_test.js',
-   [
-     'PrivacyGuideEligibleReachedMetricsTests',
-   ],
- ],
- [
    'PrivacyGuideFragments',
    'privacy_guide_fragments_test.js',
    [
@@ -1061,6 +1055,13 @@ function registerTest(testName, module, caseName) {
    ],
  ],
 ].forEach(test => registerTestSuites(...test));
+
+// TODO(https://crbug.com/1426530): Re-enable when no longer flaky.
+GEN('#if !BUILDFLAG(IS_LINUX) || defined(NDEBUG)');
+registerTestSuites(
+    'PrivacyGuideIntegration', 'privacy_guide_integration_test.js',
+    ['PrivacyGuideEligibleReachedMetricsTests']);
+GEN('#endif');
 
 // TODO(crbug.com/1403969): SecurityPage_SafeBrowsing suite is flaky on Mac.
 // TODO(crbug.com/1404109): SecurityPage_SafeBrowsing suite is flaky on Linux.

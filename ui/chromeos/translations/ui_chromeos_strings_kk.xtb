@@ -119,7 +119,6 @@
 <translation id="1942765061641586207">Кескін ажыратымдылығы</translation>
 <translation id="1972984168337863910">Файлдар пікірі панельдерін жаю</translation>
 <translation id="1995337122023280937">Файл орнына өту</translation>
-<translation id="1999709132469742660">Файлдарды барлық URL мекенжайы арқылы пайдалану</translation>
 <translation id="2001796770603320721">Drive қызметінде басқару</translation>
 <translation id="2009067268969781306">Дискіні форматтасаңыз, онда сақталған деректердің барлығы өшіп қалады. Бұл әрекеттен бас тарту мүмкін емес.</translation>
 <translation id="2025955442973426285">Тигринья</translation>
@@ -151,6 +150,7 @@
 <translation id="2236732657580416950">Google Drive кэшіңіз өшірілді.</translation>
 <translation id="2239068707900391003">Кофе ұстаған адам</translation>
 <translation id="2251368349685848079">Себеттен қалпына келтіру</translation>
+<translation id="2278133026967558505">Барлық веб-сайт және URL мекенжайы арқылы файлды пайдалану</translation>
 <translation id="2282155092769082568">Автоматты конфигурациялау URL мекенжайы:</translation>
 <translation id="2284767815536050991">алынбалы жад</translation>
 <translation id="2288278176040912387">Пластина ойнатқыш</translation>
@@ -542,7 +542,6 @@
 <translation id="5323213332664049067">Латын американдық</translation>
 <translation id="5330145655348521461">Бұл файлдар басқа жұмыс үстелінде ашылды. Оны көру үшін <ph name="USER_NAME" /> (<ph name="MAIL_ADDRESS" />) мекенжайына жылжытыңыз.</translation>
 <translation id="5330512191124428349">Ақпарат алу</translation>
-<translation id="5337538975554986899"><ph name="NON_RESTRICTED_DESTINATIONS" /> қоспағанда, файлдарды барлық URL мекенжайы арқылы пайдалану</translation>
 <translation id="5344246330454251646">Bruschetta-мен бөлісуді басқару</translation>
 <translation id="535792325654997756">Мысықтары бар адам</translation>
 <translation id="5358764674931277">Кадр жиілігі</translation>
@@ -768,6 +767,7 @@
 <translation id="7162080671816799010">Аутентификация серверінің идентификациясын тексеру үшін "Балама атау тақырыбы сәйкестігі" немесе "Домен суффиксі сәйкестігі" жоқ.</translation>
 <translation id="7165320105431587207">Желіні реттеу мүмкін емес</translation>
 <translation id="7170041865419449892">Ауқымнан тыс</translation>
+<translation id="7179579940054351344"><ph name="NON_RESTRICTED_DESTINATIONS" /> қоспағанда, барлық веб-сайт және URL мекенжайы арқылы файлды пайдалану</translation>
 <translation id="7180611975245234373">Жаңарту</translation>
 <translation id="7189874332498648577"><ph name="NUMBER_OF_GB" /> ГБ</translation>
 <translation id="7191454237977785534">Файлды басқаша сақтау</translation>
@@ -941,6 +941,7 @@
 <translation id="8492972329130824181">Үй желісі қолжетімді емес. Байланысу үшін мобильдік интернет роумингін қосу қажет.</translation>
 <translation id="8499098729323186194"><ph name="NUMBER_OF_ITEMS" /> элемент алынып жатыр…</translation>
 <translation id="8502913769543567768"><ph name="NETWORK_INDEX" />/<ph name="NETWORK_COUNT" /> желі, <ph name="NETWORK_NAME" />, <ph name="NETWORK_PROVIDER_NAME" />, Құрылғыны орнатудан кейін белсендіру, Әкімшіңіз басқарады</translation>
+<translation id="8512483403832814140">Кез келген уақытта</translation>
 <translation id="8521441079177373948">Ұлыбритания</translation>
 <translation id="853494022971700746">Француз (Франция)</translation>
 <translation id="8540608333167683902"><ph name="NETWORK_INDEX" />/<ph name="NETWORK_COUNT" /> желі, <ph name="NETWORK_NAME" />, <ph name="CONNECTION_STATUS" />, сигнал күші: <ph name="SIGNAL_STRENGTH" />%, мәліметтер</translation>

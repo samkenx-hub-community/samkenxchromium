@@ -23,15 +23,6 @@ namespace blink {
 
 namespace {
 
-// When possible, provides a clip rect that limits the visibility.
-absl::optional<gfx::RectF> VisibilityLimit(const PropertyTreeState& state) {
-  if (&state.Clip().LocalTransformSpace() == &state.Transform())
-    return state.Clip().PaintClipRect().Rect();
-  if (const auto* scroll = state.Transform().ScrollNode())
-    return gfx::RectF(scroll->ContentsRect());
-  return absl::nullopt;
-}
-
 bool IsCompositedScrollHitTest(const PaintChunk& chunk) {
   if (!chunk.hit_test_data)
     return false;
@@ -81,7 +72,7 @@ PendingLayer::PendingLayer(scoped_refptr<const PaintArtifact> artifact,
   // true when !has_text to simplify code.
   DCHECK(has_text_ || text_known_to_be_on_opaque_background_);
   if (const absl::optional<gfx::RectF>& visibility_limit =
-          VisibilityLimit(GetPropertyTreeState())) {
+          GeometryMapper::VisibilityLimit(GetPropertyTreeState())) {
     bounds_.Intersect(*visibility_limit);
     if (bounds_.IsEmpty()) {
       draws_content_ = false;
@@ -203,7 +194,7 @@ static constexpr float kMergeSparsityAreaTolerance = 10000;
 
 bool PendingLayer::MergeInternal(const PendingLayer& guest,
                                  const PropertyTreeState& guest_state,
-                                 bool prefers_lcd_text,
+                                 LCDTextPreference lcd_text_preference,
                                  bool dry_run) {
   DCHECK_EQ(&Chunks().GetPaintArtifact(), &guest.Chunks().GetPaintArtifact());
   if (ChunkRequiresOwnLayer() || guest.ChunkRequiresOwnLayer())
@@ -217,7 +208,7 @@ bool PendingLayer::MergeInternal(const PendingLayer& guest,
     return false;
 
   const absl::optional<gfx::RectF>& merged_visibility_limit =
-      VisibilityLimit(*merged_state);
+      GeometryMapper::VisibilityLimit(*merged_state);
 
   // If the current bounds and known-to-be-opaque area already cover the entire
   // visible area of the merged state, and the current state is already equal
@@ -282,7 +273,8 @@ bool PendingLayer::MergeInternal(const PendingLayer& guest,
     // This is in the 'if' block because if guest.has_decomposited_blend_mode_
     // is true, we'll lose LCD text anyway due to the exotic blend mode
     // regardless of whether it's decomposited.
-    if (prefers_lcd_text && !merged_text_known_to_be_on_opaque_background) {
+    if (lcd_text_preference == LCDTextPreference::kStronglyPreferred &&
+        !merged_text_known_to_be_on_opaque_background) {
       if (has_text_ && text_known_to_be_on_opaque_background_)
         return false;
       if (guest.has_text_ && guest.text_known_to_be_on_opaque_background_)

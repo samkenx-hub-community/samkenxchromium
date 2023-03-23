@@ -265,6 +265,7 @@ chrome.accessibilityPrivate.AccessibilityFeature = {
   GOOGLE_TTS_LANGUAGE_PACKS: 'googleTtsLanguagePacks',
   SELECT_TO_SPEAK_CONTEXT_MENU_OPTION: 'selectToSpeakContextMenuOption',
   DICTATION_CONTEXT_CHECKING: 'dictationContextChecking',
+  CHROMEVOX_TABS_DEPRECATION: 'chromevoxTabsDeprecation',
 };
 
 /**
@@ -632,6 +633,13 @@ chrome.accessibilityPrivate.silenceSpokenFeedback = function() {};
  *     contents are returned.
  */
 chrome.accessibilityPrivate.getDlcContents = function(dlc, callback) {};
+
+/**
+ * Gets whether new browser windows and tabs should be in Lacros browser.
+ * @param {function(boolean): void} callback A callback that is run when the
+ *     result is returned.
+ */
+chrome.accessibilityPrivate.isLacrosPrimary = function(callback) {};
 
 /**
  * Fired whenever ChromeVox should output introduction.

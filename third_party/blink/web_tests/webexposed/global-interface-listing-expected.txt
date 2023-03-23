@@ -189,6 +189,8 @@ interface Animation : EventTarget
     getter pending
     getter playState
     getter playbackRate
+    getter rangeEnd
+    getter rangeStart
     getter ready
     getter replaceState
     getter startTime
@@ -209,6 +211,8 @@ interface Animation : EventTarget
     setter onfinish
     setter onremove
     setter playbackRate
+    setter rangeEnd
+    setter rangeStart
     setter startTime
     setter timeline
 interface AnimationEffect
@@ -1993,6 +1997,8 @@ interface Document : Node
     method getElementsByTagNameNS
     method getSelection
     method hasFocus
+    method hasPrivateToken
+    method hasRedemptionRecord
     method hasStorageAccess
     method importNode
     method open
@@ -2007,7 +2013,7 @@ interface Document : Node
     method releaseEvents
     method replaceChildren
     method requestStorageAccess
-    method requestStorageAccessForOrigin
+    method requestStorageAccessFor
     method startViewTransition
     method webkitCancelFullScreen
     method webkitExitFullscreen
@@ -4009,6 +4015,7 @@ interface HTMLIFrameElement : HTMLElement
     getter marginWidth
     getter name
     getter policy
+    getter privateToken
     getter referrerPolicy
     getter sandbox
     getter scrolling
@@ -4031,6 +4038,7 @@ interface HTMLIFrameElement : HTMLElement
     setter marginWidth
     setter name
     setter policy
+    setter privateToken
     setter referrerPolicy
     setter sandbox
     setter scrolling
@@ -4957,6 +4965,7 @@ interface Headers
     method entries
     method forEach
     method get
+    method getSetCookie
     method has
     method keys
     method set
@@ -5510,6 +5519,7 @@ interface MLGraphBuilder
     method gemm
     method hardSwish
     method input
+    method leakyRelu
     method max
     method maxPool2d
     method min
@@ -6858,6 +6868,7 @@ interface PerformanceEventTiming : PerformanceEntry
 interface PerformanceLongAnimationFrameTiming : PerformanceEntry
     attribute @@toStringTag
     getter desiredRenderStart
+    getter firstUIEventTimestamp
     getter renderStart
     getter scripts
     getter styleAndLayoutStart
@@ -7044,6 +7055,7 @@ interface PointerEvent : MouseEvent
     attribute @@toStringTag
     getter altitudeAngle
     getter azimuthAngle
+    getter deviceId
     getter height
     getter isPrimary
     getter pointerId
@@ -7253,6 +7265,7 @@ interface RTCEncodedAudioFrame
     attribute @@toStringTag
     getter data
     getter timestamp
+    method clone
     method constructor
     method getMetadata
     method toString
@@ -8806,6 +8819,7 @@ interface Scheduler
     attribute @@toStringTag
     method constructor
     method postTask
+    method yield
 interface Scheduling
     attribute @@toStringTag
     method constructor
@@ -11441,6 +11455,7 @@ interface XMLHttpRequest : XMLHttpRequestEventTarget
     attribute OPENED
     attribute UNSENT
     getter onreadystatechange
+    getter privateTokenOperationError
     getter readyState
     getter response
     getter responseText
@@ -11459,6 +11474,7 @@ interface XMLHttpRequest : XMLHttpRequestEventTarget
     method open
     method overrideMimeType
     method send
+    method setPrivateToken
     method setRequestHeader
     setter onreadystatechange
     setter responseType
@@ -11743,9 +11759,11 @@ interface XRSession : EventTarget
     getter domOverlayState
     getter enabledFeatures
     getter environmentBlendMode
+    getter frameRate
     getter inputSources
     getter interactionMode
     getter onend
+    getter onframeratechange
     getter oninputsourceschange
     getter onselect
     getter onselectend
@@ -11756,6 +11774,7 @@ interface XRSession : EventTarget
     getter onvisibilitychange
     getter preferredReflectionFormat
     getter renderState
+    getter supportedFrameRates
     getter visibilityState
     method cancelAnimationFrame
     method constructor
@@ -11767,7 +11786,9 @@ interface XRSession : EventTarget
     method requestLightProbe
     method requestReferenceSpace
     method updateRenderState
+    method updateTargetFrameRate
     setter onend
+    setter onframeratechange
     setter oninputsourceschange
     setter onselect
     setter onselectend

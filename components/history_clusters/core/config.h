@@ -79,6 +79,11 @@ struct Config {
   // Does nothing if `should_label_clusters` is false.
   bool labels_from_entities = false;
 
+  // Whether to assign labels to clusters from the entities associated with
+  // search visits within a cluster if there are multiple search visits for the
+  // cluster.
+  bool labels_from_search_visit_entities = false;
+
   // The `kJourneysImages` feature and child params.
 
   // Whether to attempt to provide images for eligible Journeys (so far just
@@ -280,6 +285,10 @@ struct Config {
   // should be performed by the clustering backend.
   bool content_clustering_enabled = false;
 
+  // Returns whether content clustering should only be done across clusters that
+  // contain a search.
+  bool content_clustering_search_visits_only = false;
+
   // Returns the similarity threshold, between 0 and 1, used to determine if
   // two clusters are similar enough to be combined into
   // a single cluster.
@@ -291,8 +300,8 @@ struct Config {
 
   // The set of collections to block from being content clustered.
   base::flat_set<std::string> collections_to_block_from_content_clustering = {
-      "/collection/it_glosssary", "/collection/software",
-      "/collection/websites"};
+      "/collection/it_glossary", "/collection/periodicals",
+      "/collection/software", "/collection/websites"};
 
   // Whether to merge similar clusters using pairwise merge.
   bool use_pairwise_merge = false;
@@ -323,6 +332,10 @@ struct Config {
   // Returns the weight to use for visits that are search results pages ranking
   // visits within a cluster. Will always be greater than or equal to 0.
   float search_results_page_ranking_weight = 2.0;
+
+  // Returns the weight to use for visits with URL-keyed images when ranking
+  // visits within a cluster. Will always be greater than or equal to 0.
+  float has_url_keyed_image_ranking_weight = 1.5;
 
   // The `kHistoryClustersNavigationContextClustering` feature and child params.
 
@@ -386,6 +399,9 @@ struct Config {
 
   // Whether to include synced visits in clusters.
   bool include_synced_visits = false;
+
+  // Whether keyword caches should be written to and read from prefs.
+  bool persist_caches_to_prefs = false;
 
   // Order consistently with features.h.
 

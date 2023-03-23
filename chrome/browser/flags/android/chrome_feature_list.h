@@ -14,6 +14,8 @@ namespace android {
 
 // Alphabetical:
 BASE_DECLARE_FEATURE(kAdaptiveButtonInTopToolbar);
+BASE_DECLARE_FEATURE(kAdaptiveButtonInTopToolbarTranslate);
+BASE_DECLARE_FEATURE(kAdaptiveButtonInTopToolbarAddToBookmarks);
 BASE_DECLARE_FEATURE(kAdaptiveButtonInTopToolbarCustomizationV2);
 BASE_DECLARE_FEATURE(kAddEduAccountFromAccountSettingsForSupervisedUsers);
 BASE_DECLARE_FEATURE(kAddToHomescreenIPH);
@@ -36,6 +38,7 @@ BASE_DECLARE_FEATURE(kCloseTabSuggestions);
 BASE_DECLARE_FEATURE(kCriticalPersistedTabData);
 BASE_DECLARE_FEATURE(kCommerceCoupons);
 BASE_DECLARE_FEATURE(kCastDeviceFilter);
+BASE_DECLARE_FEATURE(kCCTAllowCrossUidActivitySwitchFromBelow);
 BASE_DECLARE_FEATURE(kCCTBackgroundTab);
 BASE_DECLARE_FEATURE(kCCTBottomBarSwipeUpGesture);
 BASE_DECLARE_FEATURE(kCCTBrandTransparency);

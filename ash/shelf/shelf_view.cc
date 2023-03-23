@@ -2506,7 +2506,8 @@ void ShelfView::ShowMenu(std::unique_ptr<ui::SimpleMenuModel> menu_model,
   shelf_menu_model_adapter_ = std::make_unique<ShelfMenuModelAdapter>(
       item ? item->id.app_id : std::string(), std::move(menu_model), source,
       source_type,
-      base::BindOnce(&ShelfView::OnMenuClosed, base::Unretained(this), source),
+      base::BindOnce(&ShelfView::OnMenuClosed, base::Unretained(this),
+                     base::UnsafeDanglingUntriaged(source)),
       IsTabletModeEnabled(),
       /*for_application_menu_items*/ !context_menu);
   shelf_menu_model_adapter_->Run(
@@ -2797,8 +2798,10 @@ views::View::DropCallback ShelfView::GetDropCallback(
              : base::DoNothing();
 }
 
-void ShelfView::EndDragCallback(const ui::DropTargetEvent& event,
-                                ui::mojom::DragOperation& output_drag_op) {
+void ShelfView::EndDragCallback(
+    const ui::DropTargetEvent& event,
+    ui::mojom::DragOperation& output_drag_op,
+    std::unique_ptr<ui::LayerTreeOwner> drag_image_layer_owner) {
   // TODO(b/271601288): Hook up drop animation with the drag image icon.
   output_drag_op = ui::mojom::DragOperation::kMove;
   EndDrag(false, /*icon_proxy = */ nullptr);

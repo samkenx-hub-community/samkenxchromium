@@ -283,6 +283,7 @@
 <translation id="2581165646603367611">这会清除 Chrome 认为不重要的网站的 Cookie、缓存和其他数据。</translation>
 <translation id="2587052924345400782">新版本已推出</translation>
 <translation id="2593272815202181319">等宽</translation>
+<translation id="2603212228005142861">登录以管理您的偏好设置</translation>
 <translation id="2604446170045642109">您可在设置中为网站关闭深色主题。</translation>
 <translation id="2612676031748830579">卡号</translation>
 <translation id="2625189173221582860">已复制密码</translation>
@@ -476,6 +477,7 @@
 <translation id="3587596251841506391">帮助我们改善网络安全环境</translation>
 <translation id="3597179440835065298">获得更好的建议</translation>
 <translation id="3602290021589620013">预览</translation>
+<translation id="360901359071773787">要删除过去 15 分钟的浏览数据吗？</translation>
 <translation id="3616113530831147358">音频</translation>
 <translation id="3622349720008044802">管理窗口</translation>
 <translation id="3631987586758005671">正在分享给<ph name="DEVICE_NAME" /></translation>
@@ -630,6 +632,7 @@
 
 不过，您的 Google 帐号在 <ph name="BEGIN_LINK" />myactivity.google.com<ph name="END_LINK" /> 上可能还有其他形式的浏览记录（例如，在其他 Google 服务中的搜索记录和活动记录）。</translation>
 <translation id="452750746583162491">查看您已同步的数据</translation>
+<translation id="4528638190900283934">登录即可获享更多功能</translation>
 <translation id="4532845899244822526">选择文件夹</translation>
 <translation id="4547551584605870320">{TAB_COUNT,plural, =1{<ph name="TAB_COUNT_ONE" /> 个标签页}other{<ph name="TAB_COUNT_MANY" /> 个标签页，<ph name="TAB_COUNT_INCOGNITO" /> 个无痕式标签页}}</translation>
 <translation id="4554077758708533499">已使用 USB 线连接到手机</translation>
@@ -820,6 +823,7 @@
 <translation id="5517095782334947753">您有来自 <ph name="FROM_ACCOUNT" /> 的书签、历史记录、密码及其他设置。</translation>
 <translation id="5524761631371622910">在试用期间，如果 Chrome 随机将您加入到了其中某项正在进行的试用活动，您的浏览记录会影响您看到的广告以及系统推测出的兴趣（如下所示）。为了保护您的隐私，Chrome 每个月都会按保留时间先后顺序删除您的部分兴趣。</translation>
 <translation id="5524843473235508879">已禁止重定向。</translation>
+<translation id="554297709083131118">过去 15 分钟内浏览的以下数据将被删除</translation>
 <translation id="5548606607480005320">安全检查</translation>
 <translation id="5555525474779371165">选择所需的“安全浏览”功能保护级别</translation>
 <translation id="5556459405103347317">重新加载</translation>
@@ -1074,6 +1078,7 @@
 <translation id="6824899148643461612">已选择标签页“<ph name="TAB_TITLE" />”</translation>
 <translation id="6828070228333235514">停止跟踪价格</translation>
 <translation id="6830728435402077660">不安全</translation>
+<translation id="6831043979455480757">翻译</translation>
 <translation id="6833996806551876956">隐私沙盒试用</translation>
 <translation id="6836206421467243968">将标签页分组“<ph name="TITLE_OF_GROUP" />”恢复为新的背景标签页分组。</translation>
 <translation id="6846298663435243399">正在加载…</translation>
@@ -1241,10 +1246,10 @@
 <translation id="7707922173985738739">使用移动数据</translation>
 <translation id="7709094866268987903">您移除的兴趣将会显示在此处</translation>
 <translation id="7709918231054955894">同步显示您的所有标签页</translation>
+<translation id="772434085369393266">将导航路径升级到 HTTPS，并在加载不支持 HTTPS 的网站前向您发出警告。您无法更改此设置，因为您已启用“高级保护”。</translation>
 <translation id="7725024127233776428">您添加了书签的网页会显示在此处</translation>
 <translation id="7757787379047923882">分享自“<ph name="DEVICE_NAME" />”的文字</translation>
 <translation id="7762668264895820836">SD 卡 <ph name="SD_CARD_NUMBER" /></translation>
-<translation id="7762928140712606393">登录可使用更多功能并获享 Chrome 最强大的安全保护</translation>
 <translation id="7764225426217299476">添加地址</translation>
 <translation id="7772032839648071052">确认密码</translation>
 <translation id="7772375229873196092">关闭<ph name="APP_NAME" /></translation>
@@ -1260,6 +1265,7 @@
 <translation id="78270725016672455">您的计算机希望注册此设备以登录网站</translation>
 <translation id="7844171778363018843">未选择任何要同步的数据</translation>
 <translation id="7846296061357476882">Google 服务</translation>
+<translation id="7847228556075070294">已删除历史记录、Cookie 和其他数据</translation>
 <translation id="784934925303690534">时间范围</translation>
 <translation id="7851858861565204677">来自其他设备的同步</translation>
 <translation id="7853202427316060426">活动</translation>
@@ -1439,6 +1445,7 @@
 <translation id="869891660844655955">截止日期</translation>
 <translation id="8699120352855309748">不询问是否翻译这些语言</translation>
 <translation id="8712637175834984815">知道了</translation>
+<translation id="8723453889042591629">快速翻译该页面。若要修改此快捷方式，请轻触并按住这里。</translation>
 <translation id="8725066075913043281">重试</translation>
 <translation id="8746155870861185046">分享突出显示的内容</translation>
 <translation id="874726034427945498">为了在地址栏中获得更好的建议，请同步您的标签页和历史记录</translation>

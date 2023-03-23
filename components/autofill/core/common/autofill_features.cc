@@ -40,6 +40,14 @@ BASE_FEATURE(kAutofillAccountProfilesUnionView,
 const base::FeatureParam<bool> kAutofillEnableSilentUpdatesForAccountProfiles{
     &kAutofillAccountProfilesUnionView, "enable_silent_updates", true};
 
+// When enabled, creating new kAccount profiles becomes possible for eligible
+// users. Moreover, users are prompted to migrate existing kLocalOrSyncable
+// profiles to the kAccount storage.
+// TODO(crbug.com/1423319): Remove once launched.
+BASE_FEATURE(kAutofillAccountProfileStorage,
+             "AutofillAccountProfileStorage",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 // TODO(crbug.com/1135188): Remove this feature flag after the explicit save
 // prompts for address profiles is complete.
 // When enabled, address profile save problem will contain a dropdown for
@@ -220,16 +228,16 @@ BASE_FEATURE(kAutofillEnableImportWhenMultiplePhoneNumbers,
 // importing from multi-step input flows possible.
 BASE_FEATURE(kAutofillEnableMultiStepImports,
              "AutofillEnableMultiStepImports",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 // When enabled, imported profiles are stored as multi-step candidates too,
 // which enables complementing a recently imported profile during later steps of
 // a multi-step input flow.
 const base::FeatureParam<bool> kAutofillEnableMultiStepImportComplements{
-    &kAutofillEnableMultiStepImports, "enable_multistep_complement", false};
+    &kAutofillEnableMultiStepImports, "enable_multistep_complement", true};
 // Configures the TTL of multi-step import candidates.
 const base::FeatureParam<base::TimeDelta> kAutofillMultiStepImportCandidateTTL{
     &kAutofillEnableMultiStepImports, "multistep_candidate_ttl",
-    base::Minutes(30)};
+    base::Minutes(5)};
 
 // When enabled, phone number local heuristics match empty labels when looking
 // for composite phone number inputs. E.g. Phone number <input><input>.
@@ -300,7 +308,7 @@ BASE_FEATURE(kAutofillStreetNameOrHouseNumberPrecedenceOverAutocomplete,
 const base::FeatureParam<PrecedenceOverAutocompleteScope>::Option
     kPrecedenceOverAutocompleteScope[] = {
         {PrecedenceOverAutocompleteScope::kNone, "none"},
-        {PrecedenceOverAutocompleteScope::kAddressLine1Or2,
+        {PrecedenceOverAutocompleteScope::kAddressLine1And2,
          "address_line_1_and_2"},
         {PrecedenceOverAutocompleteScope::kRecognized, "recognized"},
         {PrecedenceOverAutocompleteScope::kSpecified, "specified"}};
@@ -309,7 +317,7 @@ const base::FeatureParam<PrecedenceOverAutocompleteScope>
     kAutofillHeuristicPrecedenceScopeOverAutocomplete{
         &kAutofillStreetNameOrHouseNumberPrecedenceOverAutocomplete,
         "AutofillHeuristicPrecedenceOverAutocompleteScope",
-        PrecedenceOverAutocompleteScope::kAddressLine1Or2,
+        PrecedenceOverAutocompleteScope::kAddressLine1And2,
         &kPrecedenceOverAutocompleteScope};
 
 const base::FeatureParam<PrecedenceOverAutocompleteScope>
@@ -511,6 +519,12 @@ BASE_FEATURE(kAutofillSkipComparingInferredLabels,
              "AutofillSkipComparingInferredLabels",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
+// Stronger conditions for splitting credit card numbers across multiple fields.
+// TODO(crbug.com/1419578): Remove when launched.
+BASE_FEATURE(kAutofillSplitCreditCardNumbersCautiously,
+             "AutofillSplitCreditCardNumbersCautiously",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 // Enables support for artificial placeholders, implemented by placing text on
 // top of the input field using CSS.
 // TODO(crbug.com/1396374): Remove when launched.
@@ -701,6 +715,11 @@ BASE_FEATURE(kAutofillDisableSilentProfileUpdates,
 // TODO(crbug.com/1348294): Remove once the migration UI exists.
 BASE_FEATURE(kAutofillCreateAccountProfilesFromSettings,
              "AutofillCreateAccountProfilesFromSettings",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+// Enables logging the content of chrome://autofill-internals to the terminal.
+BASE_FEATURE(kAutofillLogToTerminal,
+             "AutofillLogToTerminal",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Enables or Disables (mostly for hermetic testing) autofill server

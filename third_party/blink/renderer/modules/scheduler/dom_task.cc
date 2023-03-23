@@ -8,6 +8,7 @@
 
 #include "base/check_op.h"
 #include "base/metrics/histogram_macros.h"
+#include "third_party/blink/public/common/scheduler/task_attribution_id.h"
 #include "third_party/blink/renderer/bindings/core/v8/idl_types.h"
 #include "third_party/blink/renderer/bindings/core/v8/script_promise_resolver.h"
 #include "third_party/blink/renderer/bindings/core/v8/script_value.h"
@@ -22,7 +23,9 @@
 #include "third_party/blink/renderer/core/inspector/inspector_trace_events.h"
 #include "third_party/blink/renderer/core/probe/core_probes.h"
 #include "third_party/blink/renderer/modules/scheduler/dom_task_signal.h"
+#include "third_party/blink/renderer/modules/scheduler/script_wrappable_task_state.h"
 #include "third_party/blink/renderer/platform/bindings/script_state.h"
+#include "third_party/blink/renderer/platform/runtime_enabled_features.h"
 #include "third_party/blink/renderer/platform/scheduler/public/task_attribution_tracker.h"
 #include "third_party/blink/renderer/platform/scheduler/public/thread_scheduler.h"
 #include "third_party/blink/renderer/platform/scheduler/public/web_scheduling_priority.h"
@@ -93,7 +96,7 @@ void AbortPostTaskCallbackTraceEventData(perfetto::TracedValue trace_context,
 
 DOMTask::DOMTask(ScriptPromiseResolver* resolver,
                  V8SchedulerPostTaskCallback* callback,
-                 AbortSignal* signal,
+                 DOMTaskSignal* signal,
                  DOMScheduler::DOMTaskQueue* task_queue,
                  base::TimeDelta delay)
     : callback_(callback),
@@ -105,10 +108,11 @@ DOMTask::DOMTask(ScriptPromiseResolver* resolver,
       queue_time_(delay.is_zero() ? base::TimeTicks::Now() : base::TimeTicks()),
       delay_(delay),
       task_id_for_tracing_(NextIdForTracing()) {
-  DCHECK(task_queue_);
-  DCHECK(callback_);
+  CHECK(task_queue_);
+  CHECK(callback_);
+  CHECK(signal_);
 
-  if (signal_) {
+  if (signal_->CanAbort()) {
     abort_handle_ = signal_->AddAlgorithm(
         WTF::BindOnce(&DOMTask::OnAbort, WrapWeakPersistent(this)));
   }
@@ -196,17 +200,27 @@ void DOMTask::InvokeInternal(ScriptState* script_state) {
 
   std::unique_ptr<scheduler::TaskAttributionTracker::TaskScope>
       task_attribution_scope;
+  // For the main thread (tracker exists), create the task scope with the signal
+  // to set up propagation. On workers, set the current context here since there
+  // is no tracker.
   if (auto* tracker = ThreadScheduler::Current()->GetTaskAttributionTracker()) {
     task_attribution_scope = tracker->CreateTaskScope(
         script_state, parent_task_id_,
-        scheduler::TaskAttributionTracker::TaskScopeType::kSchedulerPostTask);
+        scheduler::TaskAttributionTracker::TaskScopeType::kSchedulerPostTask,
+        signal_);
+  } else if (RuntimeEnabledFeatures::SchedulerYieldEnabled(
+                 ExecutionContext::From(script_state))) {
+    ScriptWrappableTaskState::SetCurrent(
+        script_state, MakeGarbageCollected<ScriptWrappableTaskState>(
+                          scheduler::TaskAttributionId(), signal_));
   }
 
   ScriptValue result;
-  if (callback_->Invoke(nullptr).To(&result))
+  if (callback_->Invoke(nullptr).To(&result)) {
     resolver_->Resolve(result.V8Value());
-  else if (try_catch.HasCaught())
+  } else if (try_catch.HasCaught()) {
     resolver_->Reject(try_catch.Exception());
+  }
 }
 
 void DOMTask::OnAbort() {

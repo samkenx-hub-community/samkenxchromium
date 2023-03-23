@@ -1,5 +1,5 @@
 (async function(testRunner) {
-  var {page, session, dp} =
+  const {page, session, dp} =
       await testRunner.startBlank(
           "Check that the dialogShown event works after enabling the " +
           "FedCm domain");
@@ -7,15 +7,17 @@
   await page.navigate(
       "https://devtools.test:8443/inspector-protocol/fedcm/resources/dialog-shown-event.https.html");
 
-  await dp.FedCm.enable();
+  await dp.FedCm.enable({disableRejectionDelay: true});
 
-  const result = await session.evaluateAsync("triggerDialog()");
-  testRunner.log(result);
+  const dialogPromise = session.evaluateAsync("triggerDialog()");
   let msg = await dp.FedCm.onceDialogShown();
   if (msg.error) {
     testRunner.log(msg.error);
   } else {
     testRunner.log(msg.params.accounts, "accounts: ");
+    dp.FedCm.selectAccount({dialogId: msg.params.dialogId, accountIndex: 0});
+    const token = await dialogPromise;
+    testRunner.log("token: " + token);
   }
   testRunner.completeTest();
 })

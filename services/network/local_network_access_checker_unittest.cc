@@ -167,8 +167,8 @@ TEST(LocalNetworkAccessCheckerTest,
 
   mojom::ClientSecurityState client_security_state;
   client_security_state.ip_address_space = mojom::IPAddressSpace::kPublic;
-  client_security_state.private_network_request_policy =
-      mojom::PrivateNetworkRequestPolicy::kPreflightBlock;
+  client_security_state.local_network_request_policy =
+      mojom::LocalNetworkRequestPolicy::kPreflightBlock;
 
   LocalNetworkAccessChecker checker(request, &client_security_state,
                                     mojom::kURLLoadOptionNone);
@@ -196,8 +196,8 @@ TEST(LocalNetworkAccessCheckerTest,
 
   mojom::ClientSecurityState client_security_state;
   client_security_state.ip_address_space = mojom::IPAddressSpace::kPublic;
-  client_security_state.private_network_request_policy =
-      mojom::PrivateNetworkRequestPolicy::kPreflightBlock;
+  client_security_state.local_network_request_policy =
+      mojom::LocalNetworkRequestPolicy::kPreflightBlock;
 
   LocalNetworkAccessChecker checker(request, &client_security_state,
                                     mojom::kURLLoadOptionNone);
@@ -222,8 +222,8 @@ TEST(LocalNetworkAccessCheckerTest, CheckDisallowedUntrustworthySameOrigin) {
 
   mojom::ClientSecurityState client_security_state;
   client_security_state.ip_address_space = mojom::IPAddressSpace::kPublic;
-  client_security_state.private_network_request_policy =
-      mojom::PrivateNetworkRequestPolicy::kBlock;
+  client_security_state.local_network_request_policy =
+      mojom::LocalNetworkRequestPolicy::kBlock;
 
   LocalNetworkAccessChecker checker(request, &client_security_state,
                                     mojom::kURLLoadOptionNone);
@@ -249,8 +249,8 @@ TEST(LocalNetworkAccessCheckerTest,
 
   mojom::ClientSecurityState client_security_state;
   client_security_state.ip_address_space = mojom::IPAddressSpace::kPublic;
-  client_security_state.private_network_request_policy =
-      mojom::PrivateNetworkRequestPolicy::kPreflightBlock;
+  client_security_state.local_network_request_policy =
+      mojom::LocalNetworkRequestPolicy::kPreflightBlock;
 
   LocalNetworkAccessChecker checker(request, &client_security_state,
                                     mojom::kURLLoadOptionNone);
@@ -278,8 +278,8 @@ TEST(LocalNetworkAccessCheckerTest,
 
   mojom::ClientSecurityState client_security_state;
   client_security_state.ip_address_space = mojom::IPAddressSpace::kPublic;
-  client_security_state.private_network_request_policy =
-      mojom::PrivateNetworkRequestPolicy::kPreflightBlock;
+  client_security_state.local_network_request_policy =
+      mojom::LocalNetworkRequestPolicy::kPreflightBlock;
 
   LocalNetworkAccessChecker checker(request, &client_security_state,
                                     mojom::kURLLoadOptionNone);
@@ -330,8 +330,8 @@ TEST(LocalNetworkAccessCheckerTest, CheckAllowedNoLessPublic) {
 
   mojom::ClientSecurityState client_security_state;
   client_security_state.ip_address_space = mojom::IPAddressSpace::kLocal;
-  client_security_state.private_network_request_policy =
-      mojom::PrivateNetworkRequestPolicy::kBlock;
+  client_security_state.local_network_request_policy =
+      mojom::LocalNetworkRequestPolicy::kBlock;
 
   LocalNetworkAccessChecker checker(ResourceRequest(), &client_security_state,
                                     mojom::kURLLoadOptionNone);
@@ -348,8 +348,8 @@ TEST(LocalNetworkAccessCheckerTest, CheckAllowedByPolicyAllow) {
 
   mojom::ClientSecurityState client_security_state;
   client_security_state.ip_address_space = mojom::IPAddressSpace::kPublic;
-  client_security_state.private_network_request_policy =
-      mojom::PrivateNetworkRequestPolicy::kAllow;
+  client_security_state.local_network_request_policy =
+      mojom::LocalNetworkRequestPolicy::kAllow;
 
   LocalNetworkAccessChecker checker(ResourceRequest(), &client_security_state,
                                     mojom::kURLLoadOptionNone);
@@ -367,8 +367,8 @@ TEST(LocalNetworkAccessCheckerTest,
 
   mojom::ClientSecurityState client_security_state;
   client_security_state.ip_address_space = mojom::IPAddressSpace::kPublic;
-  client_security_state.private_network_request_policy =
-      mojom::PrivateNetworkRequestPolicy::kWarn;
+  client_security_state.local_network_request_policy =
+      mojom::LocalNetworkRequestPolicy::kWarn;
 
   LocalNetworkAccessChecker checker(ResourceRequest(), &client_security_state,
                                     mojom::kURLLoadOptionNone);
@@ -388,8 +388,8 @@ TEST(LocalNetworkAccessCheckerTest,
 
   mojom::ClientSecurityState client_security_state;
   client_security_state.ip_address_space = mojom::IPAddressSpace::kPublic;
-  client_security_state.private_network_request_policy =
-      mojom::PrivateNetworkRequestPolicy::kAllow;
+  client_security_state.local_network_request_policy =
+      mojom::LocalNetworkRequestPolicy::kAllow;
 
   LocalNetworkAccessChecker checker(ResourceRequest(), &client_security_state,
                                     mojom::kURLLoadOptionNone);
@@ -411,8 +411,8 @@ TEST(LocalNetworkAccessCheckerTest, CheckAllowedByPolicyWarn) {
 
   mojom::ClientSecurityState client_security_state;
   client_security_state.ip_address_space = mojom::IPAddressSpace::kPublic;
-  client_security_state.private_network_request_policy =
-      mojom::PrivateNetworkRequestPolicy::kWarn;
+  client_security_state.local_network_request_policy =
+      mojom::LocalNetworkRequestPolicy::kWarn;
 
   LocalNetworkAccessChecker checker(ResourceRequest(), &client_security_state,
                                     mojom::kURLLoadOptionNone);
@@ -429,8 +429,8 @@ TEST(LocalNetworkAccessCheckerTest, CheckBlockedByPolicyBlock) {
 
   mojom::ClientSecurityState client_security_state;
   client_security_state.ip_address_space = mojom::IPAddressSpace::kPublic;
-  client_security_state.private_network_request_policy =
-      mojom::PrivateNetworkRequestPolicy::kBlock;
+  client_security_state.local_network_request_policy =
+      mojom::LocalNetworkRequestPolicy::kBlock;
 
   LocalNetworkAccessChecker checker(ResourceRequest(), &client_security_state,
                                     mojom::kURLLoadOptionNone);
@@ -447,8 +447,8 @@ TEST(LocalNetworkAccessCheckerTest, CheckBlockedByPolicyPreflightWarn) {
 
   mojom::ClientSecurityState client_security_state;
   client_security_state.ip_address_space = mojom::IPAddressSpace::kPublic;
-  client_security_state.private_network_request_policy =
-      mojom::PrivateNetworkRequestPolicy::kPreflightWarn;
+  client_security_state.local_network_request_policy =
+      mojom::LocalNetworkRequestPolicy::kPreflightWarn;
 
   LocalNetworkAccessChecker checker(ResourceRequest(), &client_security_state,
                                     mojom::kURLLoadOptionNone);
@@ -465,8 +465,8 @@ TEST(LocalNetworkAccessCheckerTest, CheckBlockedByPolicyPreflightBlock) {
 
   mojom::ClientSecurityState client_security_state;
   client_security_state.ip_address_space = mojom::IPAddressSpace::kPublic;
-  client_security_state.private_network_request_policy =
-      mojom::PrivateNetworkRequestPolicy::kPreflightBlock;
+  client_security_state.local_network_request_policy =
+      mojom::LocalNetworkRequestPolicy::kPreflightBlock;
 
   LocalNetworkAccessChecker checker(ResourceRequest(), &client_security_state,
                                     mojom::kURLLoadOptionNone);
@@ -483,8 +483,8 @@ TEST(LocalNetworkAccessCheckerTest, CheckBlockedByTargetIpAddressSpace) {
 
   mojom::ClientSecurityState client_security_state;
   client_security_state.ip_address_space = mojom::IPAddressSpace::kPublic;
-  client_security_state.private_network_request_policy =
-      mojom::PrivateNetworkRequestPolicy::kPreflightBlock;
+  client_security_state.local_network_request_policy =
+      mojom::LocalNetworkRequestPolicy::kPreflightBlock;
 
   ResourceRequest request;
   request.target_ip_address_space = mojom::IPAddressSpace::kPublic;
@@ -504,8 +504,8 @@ TEST(LocalNetworkAccessCheckerTest, CheckAllowedByPolicyPreflightWarn) {
 
   mojom::ClientSecurityState client_security_state;
   client_security_state.ip_address_space = mojom::IPAddressSpace::kPublic;
-  client_security_state.private_network_request_policy =
-      mojom::PrivateNetworkRequestPolicy::kPreflightWarn;
+  client_security_state.local_network_request_policy =
+      mojom::LocalNetworkRequestPolicy::kPreflightWarn;
 
   ResourceRequest request;
   request.target_ip_address_space = mojom::IPAddressSpace::kLoopback;
@@ -525,8 +525,8 @@ TEST(LocalNetworkAccessCheckerTest, CheckAllowedByTargetIpAddressSpace) {
 
   mojom::ClientSecurityState client_security_state;
   client_security_state.ip_address_space = mojom::IPAddressSpace::kPublic;
-  client_security_state.private_network_request_policy =
-      mojom::PrivateNetworkRequestPolicy::kPreflightBlock;
+  client_security_state.local_network_request_policy =
+      mojom::LocalNetworkRequestPolicy::kPreflightBlock;
 
   ResourceRequest request;
   request.target_ip_address_space = mojom::IPAddressSpace::kLocal;
@@ -545,8 +545,8 @@ TEST(LocalNetworkAccessCheckerTest,
      CheckAllowedByPolicyPreflightWarnInconsistent) {
   mojom::ClientSecurityState client_security_state;
   client_security_state.ip_address_space = mojom::IPAddressSpace::kPublic;
-  client_security_state.private_network_request_policy =
-      mojom::PrivateNetworkRequestPolicy::kPreflightWarn;
+  client_security_state.local_network_request_policy =
+      mojom::LocalNetworkRequestPolicy::kPreflightWarn;
 
   LocalNetworkAccessChecker checker(ResourceRequest(), &client_security_state,
                                     mojom::kURLLoadOptionNone);
@@ -565,8 +565,8 @@ TEST(LocalNetworkAccessCheckerTest,
 TEST(LocalNetworkAccessCheckerTest, CheckBlockedByInconsistentIpAddressSpace) {
   mojom::ClientSecurityState client_security_state;
   client_security_state.ip_address_space = mojom::IPAddressSpace::kLocal;
-  client_security_state.private_network_request_policy =
-      mojom::PrivateNetworkRequestPolicy::kPreflightBlock;
+  client_security_state.local_network_request_policy =
+      mojom::LocalNetworkRequestPolicy::kPreflightBlock;
 
   LocalNetworkAccessChecker checker(ResourceRequest(), &client_security_state,
                                     mojom::kURLLoadOptionNone);
@@ -650,8 +650,8 @@ TEST(LocalNetworkAccessCheckerTest, CachedTransportAddressSpace) {
 TEST(LocalNetworkAccessCheckerTest, ResetTargetAddressSpace) {
   mojom::ClientSecurityState client_security_state;
   client_security_state.ip_address_space = mojom::IPAddressSpace::kLocal;
-  client_security_state.private_network_request_policy =
-      mojom::PrivateNetworkRequestPolicy::kPreflightBlock;
+  client_security_state.local_network_request_policy =
+      mojom::LocalNetworkRequestPolicy::kPreflightBlock;
 
   ResourceRequest request;
   request.target_ip_address_space = mojom::IPAddressSpace::kPublic;
@@ -720,8 +720,8 @@ TEST(LocalNetworkAccessCheckerTest,
      DoesNotRecordLocalIpInferrableHistogramWithTargetIpAddressSpace) {
   mojom::ClientSecurityState client_security_state;
   client_security_state.ip_address_space = mojom::IPAddressSpace::kPublic;
-  client_security_state.private_network_request_policy =
-      mojom::PrivateNetworkRequestPolicy::kPreflightWarn;
+  client_security_state.local_network_request_policy =
+      mojom::LocalNetworkRequestPolicy::kPreflightWarn;
 
   base::HistogramTester histogram_tester;
 
@@ -739,11 +739,11 @@ TEST(LocalNetworkAccessCheckerTest,
 }
 
 TEST(LocalNetworkAccessCheckerTest,
-     RecordsLocalIpInferrableHistogramWrongPolicy) {
+     RecordsLocalIpInferrableHistogramPolicyAllow) {
   mojom::ClientSecurityState client_security_state;
   client_security_state.ip_address_space = mojom::IPAddressSpace::kPublic;
-  client_security_state.private_network_request_policy =
-      mojom::PrivateNetworkRequestPolicy::kPreflightWarn;
+  client_security_state.local_network_request_policy =
+      mojom::LocalNetworkRequestPolicy::kAllow;
 
   base::HistogramTester histogram_tester;
 
@@ -754,16 +754,16 @@ TEST(LocalNetworkAccessCheckerTest,
 
   checker.Check(DirectTransport(LocalEndpoint()));
 
-  histogram_tester.ExpectTotalCount(
-      "Security.PrivateNetworkAccess.PrivateIpInferrable", 0);
+  histogram_tester.ExpectUniqueSample(
+      "Security.PrivateNetworkAccess.PrivateIpInferrable", true, 1);
 }
 
 TEST(LocalNetworkAccessCheckerTest,
      RecordsLocalIpInferrableHistogramNoLessPublic) {
   mojom::ClientSecurityState client_security_state;
   client_security_state.ip_address_space = mojom::IPAddressSpace::kLocal;
-  client_security_state.private_network_request_policy =
-      mojom::PrivateNetworkRequestPolicy::kBlock;
+  client_security_state.local_network_request_policy =
+      mojom::LocalNetworkRequestPolicy::kBlock;
 
   base::HistogramTester histogram_tester;
 
@@ -774,15 +774,15 @@ TEST(LocalNetworkAccessCheckerTest,
 
   checker.Check(DirectTransport(LocalEndpoint()));
 
-  histogram_tester.ExpectTotalCount(
-      "Security.PrivateNetworkAccess.PrivateIpInferrable", 0);
+  histogram_tester.ExpectUniqueSample(
+      "Security.PrivateNetworkAccess.PrivateIpInferrable", true, 1);
 }
 
 TEST(LocalNetworkAccessCheckerTest, RecordsLocalIpInferrableHistogramTrue) {
   mojom::ClientSecurityState client_security_state;
   client_security_state.ip_address_space = mojom::IPAddressSpace::kPublic;
-  client_security_state.private_network_request_policy =
-      mojom::PrivateNetworkRequestPolicy::kBlock;
+  client_security_state.local_network_request_policy =
+      mojom::LocalNetworkRequestPolicy::kBlock;
 
   base::HistogramTester histogram_tester;
 
@@ -800,8 +800,8 @@ TEST(LocalNetworkAccessCheckerTest, RecordsLocalIpInferrableHistogramTrue) {
 TEST(LocalNetworkAccessCheckerTest, RecordsLocalIpInferrableHistogramTrueIpv6) {
   mojom::ClientSecurityState client_security_state;
   client_security_state.ip_address_space = mojom::IPAddressSpace::kPublic;
-  client_security_state.private_network_request_policy =
-      mojom::PrivateNetworkRequestPolicy::kBlock;
+  client_security_state.local_network_request_policy =
+      mojom::LocalNetworkRequestPolicy::kBlock;
 
   base::HistogramTester histogram_tester;
 
@@ -820,8 +820,8 @@ TEST(LocalNetworkAccessCheckerTest, RecordsLocalIpInferrableHistogramTrueIpv6) {
 TEST(LocalNetworkAccessCheckerTest, RecordsLocalIpInferrableHistogramFalse) {
   mojom::ClientSecurityState client_security_state;
   client_security_state.ip_address_space = mojom::IPAddressSpace::kPublic;
-  client_security_state.private_network_request_policy =
-      mojom::PrivateNetworkRequestPolicy::kBlock;
+  client_security_state.local_network_request_policy =
+      mojom::LocalNetworkRequestPolicy::kBlock;
 
   base::HistogramTester histogram_tester;
 

@@ -95,6 +95,8 @@ class CORE_EXPORT CSSSelectorParser {
   static absl::optional<base::span<CSSSelector>> ParseScopeBoundary(
       CSSParserTokenRange,
       const CSSParserContext*,
+      CSSNestingType,
+      const StyleRule* parent_rule_for_nesting,
       StyleSheetContents*,
       HeapVector<CSSSelector>&);
 
@@ -129,7 +131,8 @@ class CORE_EXPORT CSSSelectorParser {
   CSSSelectorList* ConsumeForgivingNestedSelectorList(CSSParserTokenRange&);
   // https://drafts.csswg.org/selectors/#typedef-forgiving-selector-list
   absl::optional<base::span<CSSSelector>> ConsumeForgivingComplexSelectorList(
-      CSSParserTokenRange&);
+      CSSParserTokenRange&,
+      bool in_nested_style_rule);
   CSSSelectorList* ConsumeForgivingCompoundSelectorList(CSSParserTokenRange&);
   // https://drafts.csswg.org/selectors/#typedef-relative-selector-list
   CSSSelectorList* ConsumeForgivingRelativeSelectorList(CSSParserTokenRange&);
@@ -161,7 +164,8 @@ class CORE_EXPORT CSSSelectorParser {
   bool ConsumePartialComplexSelector(
       CSSParserTokenRange&,
       CSSSelector::RelationType& /* current combinator */,
-      unsigned /* previous compound flags */);
+      unsigned /* previous compound flags */,
+      bool in_nested_style_rule);
 
   bool ConsumeName(CSSParserTokenRange&,
                    AtomicString& name,
@@ -178,7 +182,8 @@ class CORE_EXPORT CSSSelectorParser {
   bool ConsumeSimpleSelector(CSSParserTokenRange&);
 
   // Returns an empty range on error.
-  base::span<CSSSelector> ConsumeCompoundSelector(CSSParserTokenRange&);
+  base::span<CSSSelector> ConsumeCompoundSelector(CSSParserTokenRange&,
+                                                  bool in_nested_style_rule);
 
   bool PeekIsCombinator(CSSParserTokenRange& range);
   CSSSelector::RelationType ConsumeCombinator(CSSParserTokenRange&);

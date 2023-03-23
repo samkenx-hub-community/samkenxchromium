@@ -19,6 +19,7 @@ source_set("pinned_tabs") {
     "//ios/chrome/browser/main",
     "//ios/chrome/browser/snapshots",
     "//ios/chrome/browser/tabs:features",
+    "//ios/chrome/browser/ui/icons:symbols",
     "//ios/chrome/browser/ui/tab_switcher",
     "//ios/chrome/browser/ui/tab_switcher:tab_utils",
     "//ios/chrome/browser/ui/tab_switcher/tab_grid:tab_collection_commands",
@@ -57,6 +58,7 @@ source_set("pinned_tabs_ui") {
     "//ios/chrome/browser/ui/tab_switcher/tab_grid/transitions",
     "//ios/chrome/common/ui/colors",
     "//ios/chrome/common/ui/elements",
+    "//ios/chrome/common/ui/util",
     "//ios/third_party/material_components_ios",
     "//ui/base",
   ]

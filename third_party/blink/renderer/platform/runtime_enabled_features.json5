@@ -637,12 +637,6 @@
       status: "experimental",
     },
     {
-      name: "ConditionalFocus",
-      depends_on: ["CaptureController"],
-      status: {"Android": "", "default": "stable"},
-      base_feature: "none",
-    },
-    {
       name: "ConfirmationOfAction",
       status: "test",
       base_feature: "none",
@@ -765,6 +759,12 @@
       status: "experimental",
       base_feature: "none",
     },
+    // Ablation study to try to measure very roughly memory savings from not saving
+    // pretokenized strings in CSS custom properties.
+    {
+      name: "CSSCustomPropertiesAblation",
+      // Off by default.
+    },
     {
       name: "CSSDisplayAnimation",
       status: "test",
@@ -877,7 +877,7 @@
     },
     {
       name: "CSSLinearTimingFunction",
-      status: "experimental"
+      status: "stable"
     },
     {
       name: "CSSLogical",
@@ -962,7 +962,7 @@
     },
     {
       name: "CSSOverflowMediaFeatures",
-      status: "experimental",
+      status: "stable",
     },
     {
       name: "CSSPaintAPIArguments",
@@ -1040,7 +1040,7 @@
     },
     {
       name: "CSSSignRelatedFunctions",
-      status: "test",
+      status: "experimental",
     },
     {
       // Support for CSS ::spelling-error, ::grammar-error, and the
@@ -1062,9 +1062,10 @@
       base_feature: "none",
     },
     {
-      name: "CSSSystemAccentColor",
-      status: "experimental",
-      base_feature: "none",
+      // TODO(https://crbug.com/1411581):
+      // https://w3c.github.io/csswg-drafts/css-inline-3/#propdef-leading-trim
+      name: "CSSTextBoxTrim",
+      status: "test",
     },
     // `text-wrap: balance`. crbug.com/1251079
     {
@@ -1104,7 +1105,7 @@
     },
     {
       name: "CSSUpdateMediaFeature",
-      status: "experimental",
+      status: "stable",
     },
     // Support for `user-select:contain`.
     {
@@ -1249,12 +1250,6 @@
       name: "DirectSockets",
       public: true,
       status: "experimental",
-      base_feature: "none",
-    },
-    {
-      name: "DirectSocketsExperimental",
-      status: "test",
-      depends_on: ["DirectSockets"],
       base_feature: "none",
     },
     {
@@ -1462,7 +1457,6 @@
     {
       name: "FastPositionIterator",
       // Not enabled due to a RTL issue. crbug.com/1421016.
-      status: "test",
     },
     {
       name: "FeaturePolicyReporting",
@@ -1890,6 +1884,10 @@
       base_feature: "none",
     },
     {
+      name: "InertDisplayTransition",
+      status: "experimental",
+    },
+    {
       // If a painting bug no longer reproduces with this feature enabled, then
       // the bug is caused by incorrect cull rects.
       name: "InfiniteCullRect",
@@ -1932,6 +1930,11 @@
       name: "LangAttributeAwareFormControlUI",
       base_feature: "none",
       settable_from_internals: true,
+    },
+    {
+      // crbug.com/1425520. Enabled since M113.
+      name: "LayoutMediaChildPaintContainment",
+      status: "stable",
     },
     {
       name: "LayoutMediaNGContainer",
@@ -2017,6 +2020,14 @@
       name: "LegacyWindowsDWriteFontFallback",
       // Enabled by features::kLegacyWindowsDWriteFontFallback;
       base_feature: "none",
+    },
+    {
+      // A feature to load <input type=image> images even if there is no layout object.
+      // This aligns with <img> behavior, but for safety can be disabled with this
+      // flag.
+      name: "LoadInputImageWithoutObject",
+      status: "stable",
+      base_feature: "LoadInputImageWithoutObject",
     },
     {
       name: "LongAnimationFrameTiming",
@@ -2565,6 +2576,10 @@
       origin_trial_feature_name: "PNaCl",
     },
     {
+      name: "PointerEventDeviceId",
+      status: "test",
+    },
+    {
       name: "PointerLockOptions",
       origin_trial_feature_name: "PointerLockOptions",
       public: true,
@@ -2649,12 +2664,6 @@
       base_feature: "none",
       origin_trial_feature_name: "PrivacySandboxAdsAPIs",
       origin_trial_allows_third_party: true,
-    },
-    {
-      name: "PrivateAggregationApiFledgeExtensions",
-      origin_trial_feature_name: "PrivacySandboxAdsAPIs",
-      origin_trial_allows_third_party: true,
-      base_feature: "PrivateAggregationApiFledgeExtensions",
     },
     {
       name: "PrivateNetworkAccessNonSecureContextsAllowed",
@@ -2811,6 +2820,10 @@
       base_feature: "none",
     },
     {
+      name: "RTCEncodedAudioFrameClone",
+      status: "experimental",
+    },
+    {
       name: "RTCEncodedVideoFrameAdditionalMetadata",
       status: "experimental",
     },
@@ -2887,6 +2900,12 @@
       status: "stable",
     },
     {
+      name: "SchedulerYield",
+      origin_trial_feature_name: "SchedulerYield",
+      depends_on: ["AbortSignalComposition"],
+      status: "experimental",
+    },
+    {
       // https://wicg.github.io/webcomponents/proposals/Scoped-Custom-Element-Registries
       name: "ScopedCustomElementRegistry",
       status: "test",
@@ -2925,10 +2944,6 @@
       name: "ScrollEndEvents",
       status: "experimental",
       base_feature: "none",
-    },
-    {
-      name: "ScrollOverlapOptimization",
-      status: "experimental",
     },
     {
       name: "ScrollTimeline",
@@ -2970,16 +2985,6 @@
       name: "SecurePaymentConfirmationOptOut",
       origin_trial_feature_name: "SecurePaymentConfirmationOptOut",
       origin_trial_allows_third_party: true,
-      status: "stable",
-      base_feature: "none",
-    },
-    {
-      // When a Web application calls getDisplayMedia() and asks for video,
-      // allow a hint to be provided as to whether the current tab should be
-      // excluded from the list of tabs offered to the user.
-      //
-      // https://github.com/w3c/mediacapture-screen-share/pull/216/files
-      name: "SelfBrowserSurfaceConstraint",
       status: "stable",
       base_feature: "none",
     },
@@ -3232,25 +3237,6 @@
       base_feature: "none",
     },
     {
-      // Allow an application that's capturing a tab, to control whether
-      // the local audio playback of the captured tab is suppressed.
-      //
-      // https://w3c.github.io/mediacapture-screen-share/#dfn-suppresslocalaudioplayback
-      name: "SuppressLocalAudioPlayback",
-      status: "stable",
-      base_feature: "none",
-    },
-    {
-      // When a Web application calls getDisplayMedia() and asks for video,
-      // allow a hint to be provided to offer the user an option to
-      // dynamically switch the source display surface during the capture.
-      //
-      // https://github.com/w3c/mediacapture-screen-share/pull/225/files
-      name: "SurfaceSwitchingConstraint",
-      status: "stable",
-      base_feature: "none",
-    },
-    {
       // crbug.com/1393223
       name: "SvgContainersRejectSvgInDisplayContents",
       status: "stable",
@@ -3262,16 +3248,6 @@
     {
       name: "SynthesizedKeyboardEventsForAccessibilityActions",
       status: "experimental",
-      base_feature: "none",
-    },
-    {
-      // When a Web application calls getDisplayMedia() and asks for audio,
-      // allow a hint to be provided as to whether the Web application is
-      // interested in system-audio being among the options offered to the user.
-      //
-      // https://github.com/w3c/mediacapture-screen-share/pull/222/files
-      name: "SystemAudioConstraint",
-      status: "stable",
       base_feature: "none",
     },
     {
@@ -3422,6 +3398,9 @@
       name: "UnexposedTaskIds",
       base_feature: "none",
     },
+    {
+      name: "UnifiedScrollPainting",
+    },
     // This is a reverse OT used for a phased deprecation, on desktop
     // https://crbug.com/1071424
     {
@@ -3507,12 +3486,6 @@
     },
     {
       name: "VideoTrackGeneratorInWorker",
-      base_feature: "none",
-    },
-    {
-      name: "VideoWakeLockOptimisationHiddenMuted",
-      public: true,
-      status: "stable",
       base_feature: "none",
     },
     {
@@ -3652,15 +3625,6 @@
       status: "test",
       base_feature: "none",
     },
-    // A more subtle UI for WebAuthn that is web exposed.
-    // It's controlled by the corresponding Chromium feature which needs to
-    // be enabled to make the whole feature work, except for WPTs where the
-    // virtual authenticator environment is used.
-    {
-      name: "WebAuthenticationConditionalUI",
-      status: "stable",
-      base_feature: "none",
-    },
     // https://github.com/w3c/webauthn/pull/1663
     {
       name: "WebAuthenticationDevicePublicKey",
@@ -3760,7 +3724,6 @@
     {
       name: "WebGPU",
       base_feature: "none",
-      public: true,
       // Note that this isn't enough to enable WebGPU and that access to
       // WebGPU is further gated on the "WebGPUService" feature exposing GPU
       // process access to WebGPU to the renderer process.
@@ -3894,6 +3857,13 @@
       name: "WebXREnabledFeatures",
       depends_on: ["WebXR"],
       status: "stable",
+    },
+    {
+      name: "WebXRFrameRate",
+      depends_on: ["WebXR"],
+      public: true,
+      status: "experimental",
+      base_feature: "none",
     },
     {
       name: "WebXRFrontFacing",

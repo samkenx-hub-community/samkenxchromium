@@ -16,7 +16,10 @@
 #include "gpu/command_buffer/service/shared_image/wrapped_sk_image_backing.h"
 #include "gpu/config/gpu_finch_features.h"
 #include "skia/buildflags.h"
+#include "third_party/skia/include/core/SkAlphaType.h"
+#include "third_party/skia/include/core/SkColorType.h"
 #include "third_party/skia/include/core/SkSurface.h"
+#include "third_party/skia/include/core/SkTextureCompressionType.h"
 #include "third_party/skia/include/gpu/GrDirectContext.h"
 #include "third_party/skia/include/gpu/GrTypes.h"
 
@@ -162,13 +165,17 @@ bool WrappedSkImageBackingFactory::IsSupported(
     }
   }
 
+  if (context_state_->context_lost()) {
+    return false;
+  }
+
   if (format.IsCompressed()) {
     if (pixel_data.empty()) {
       // ETC1 is only supported with initial pixel upload.
       return false;
     }
     auto backend_format = context_state_->gr_context()->compressedBackendFormat(
-        SkImage::kETC1_CompressionType);
+        SkTextureCompressionType::kETC1_RGB8);
     if (!backend_format.isValid()) {
       return false;
     }

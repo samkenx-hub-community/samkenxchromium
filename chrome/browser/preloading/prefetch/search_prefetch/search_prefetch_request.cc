@@ -22,6 +22,7 @@
 #include "chrome/browser/preloading/prefetch/search_prefetch/field_trial_settings.h"
 #include "chrome/browser/preloading/prefetch/search_prefetch/streaming_search_prefetch_url_loader.h"
 #include "chrome/browser/preloading/prerender/prerender_manager.h"
+#include "chrome/browser/preloading/prerender/prerender_utils.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/search_engines/template_url_service_factory.h"
 #include "chrome/common/pref_names.h"
@@ -405,17 +406,25 @@ void SearchPrefetchRequest::ErrorEncountered() {
 
 void SearchPrefetchRequest::OnServableResponseCodeReceived() {
   servable_response_code_received_ = true;
+
   // TODO(https://crbug.com/1295170): Do not start prerendering if this request
   // is about to expire.
   if (prerender_manager_) {
-    // Start prerender asynchronously, so that the request can prepare the data
-    // pipe completely.
-    base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
-        FROM_HERE,
-        base::BindOnce(&PrerenderManager::StartPrerenderSearchResult,
-                       prerender_manager_,
-                       base::OwnedRef(canonical_search_url_), prerender_url_,
-                       prerender_preloading_attempt_));
+    DCHECK(prerender_utils::SearchPrefetchUpgradeToPrerenderIsEnabled());
+    if (prerender_utils::SearchPreloadShareableCacheIsEnabled()) {
+      // Start prerender synchronously. For shareable cache cases, the request
+      // will build the data pipe by itself and we do not need to wait.
+      prerender_manager_->StartPrerenderSearchResult(
+          canonical_search_url_, prerender_url_, prerender_preloading_attempt_);
+    } else {
+      // Start prerender asynchronously, so that the request can prepare the
+      // data pipe completely
+      base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
+          FROM_HERE,
+          base::BindOnce(&PrerenderManager::StartPrerenderSearchResult,
+                         prerender_manager_, canonical_search_url_,
+                         prerender_url_, prerender_preloading_attempt_));
+    }
   }
 }
 
@@ -460,12 +469,31 @@ void SearchPrefetchRequest::RecordClickTime() {
   time_clicked_ = base::TimeTicks::Now();
 }
 
-std::unique_ptr<SearchPrefetchURLLoader>
+std::unique_ptr<StreamingSearchPrefetchURLLoader>
 SearchPrefetchRequest::TakeSearchPrefetchURLLoader() {
   DCHECK(streaming_url_loader_);
   streaming_url_loader_->ClearOwnerPointer();
 
   return std::move(streaming_url_loader_);
+}
+
+void SearchPrefetchRequest::TransferLoaderOwnershipIfStillServing() {
+  // The loader has been taken away.
+  if (!streaming_url_loader_) {
+    return;
+  }
+  std::unique_ptr<StreamingSearchPrefetchURLLoader> loader =
+      TakeSearchPrefetchURLLoader();
+  StreamingSearchPrefetchURLLoader* raw_loader = loader.get();
+  // Give the loader a chance to own itself.
+  loader = raw_loader->OwnItselfIfServing(std::move(loader));
+}
+
+SearchPrefetchURLLoader::RequestHandler
+SearchPrefetchRequest::CreateResponseReader() {
+  DCHECK(prerender_utils::SearchPreloadShareableCacheIsEnabled());
+  DCHECK(streaming_url_loader_);
+  return streaming_url_loader_->GetCallbackForReadingViaResponseReader();
 }
 
 void SearchPrefetchRequest::StartPrefetchRequestInternal(
@@ -540,11 +568,14 @@ void SearchPrefetchRequest::SetSearchPrefetchStatus(
           {SearchPrefetchStatus::kCanBeServedAndUserClicked,
            {SearchPrefetchStatus::kComplete,
             SearchPrefetchStatus::kPrefetchServedForRealNavigation,
-            SearchPrefetchStatus::kRequestFailed}},
+            SearchPrefetchStatus::kRequestFailed,
+            // TODO(crbug.com/1400881): Add a test to cover this.
+            SearchPrefetchStatus::kPrerenderActivated}},
 
           {SearchPrefetchStatus::kComplete,
            {SearchPrefetchStatus::kPrefetchServedForRealNavigation,
-            SearchPrefetchStatus::kPrerendered}},
+            SearchPrefetchStatus::kPrerendered,
+            SearchPrefetchStatus::kPrerenderActivated}},
 
           {SearchPrefetchStatus::kPrefetchServedForRealNavigation, {}},
 

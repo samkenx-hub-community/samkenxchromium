@@ -40,10 +40,11 @@ BASE_DECLARE_FEATURE(kNtpDummyModules);
 BASE_DECLARE_FEATURE(kNtpComprehensiveTheming);
 BASE_DECLARE_FEATURE(kNtpComprehensiveThemeRealbox);
 BASE_DECLARE_FEATURE(kNtpLogo);
+BASE_DECLARE_FEATURE(kNtpReducedLogoSpace);
 BASE_DECLARE_FEATURE(kNtpMiddleSlotPromo);
 BASE_DECLARE_FEATURE(kNtpMiddleSlotPromoDismissal);
 BASE_DECLARE_FEATURE(kNtpModulesLoadTimeoutMilliseconds);
-BASE_DECLARE_FEATURE(kNtpModulesParams);
+BASE_DECLARE_FEATURE(kNtpWideModules);
 BASE_DECLARE_FEATURE(kNtpModulesOrder);
 BASE_DECLARE_FEATURE(kNtpModulesDragAndDrop);
 BASE_DECLARE_FEATURE(kNtpModulesFirstRunExperience);
@@ -62,12 +63,14 @@ BASE_DECLARE_FEATURE(kNtpRecipeTasksModule);
 BASE_DECLARE_FEATURE(kNtpRemoveScrim);
 BASE_DECLARE_FEATURE(kNtpSafeBrowsingModule);
 BASE_DECLARE_FEATURE(kNtpShortcuts);
+BASE_DECLARE_FEATURE(kNtpSingleRowShortcuts);
 BASE_DECLARE_FEATURE(kNtpHandleMostVisitedNavigationExplicitly);
 BASE_DECLARE_FEATURE(kNtpHistoryClustersModule);
 BASE_DECLARE_FEATURE(kNtpHistoryClustersModuleBeginTimeDuration);
 BASE_DECLARE_FEATURE(kNtpHistoryClustersModuleMinimumImagesRequired);
 BASE_DECLARE_FEATURE(kNtpHistoryClustersModuleCategories);
 BASE_DECLARE_FEATURE(kNtpHistoryClustersModuleLoad);
+BASE_DECLARE_FEATURE(kNtpHistoryClustersModuleMaxClusters);
 BASE_DECLARE_FEATURE(kNtpModulesHeaderIcon);
 
 // Parameter for controlling the luminosity difference for NTP elements on light
@@ -88,8 +91,6 @@ extern const base::FeatureParam<std::string>
 
 // Parameter determining the module load timeout.
 extern const char kNtpModulesLoadTimeoutMillisecondsParam[];
-// Parameter determining the modules' maximum display width.
-extern const char kNtpModulesMaxWidthParam[];
 // Parameter determining the module order.
 extern const char kNtpModulesOrderParam[];
 // Parameter determining the type of cart data used to render module.
@@ -148,13 +149,19 @@ extern const char kNtpHistoryClustersModuleBeginTimeDurationHoursParam[];
 extern const char kNtpHistoryClustersModuleMinimumImagesRequiredParam[];
 // Parameter for determining the categories a history cluster must fall into to
 // be shown.
-extern const char kNtpHistoryClustersModuleCategoriesParam[];
+extern const char kNtpHistoryClustersModuleCategoriesAllowlistParam[];
+// Parameter for determining the categories a history cluster must not fall into
+// to be shown.
+extern const char kNtpHistoryClustersModuleCategoriesBlocklistParam[];
+// Parameter for determining the categories a history cluster falls into to be
+// boosted for showing on the New Tab Page.
+extern const char kNtpHistoryClustersModuleCategoriesBoostlistParam[];
+// Parameter for setting the maximum number of candidate clusters for the
+// History Clusters Service to return.
+extern const char kNtpHistoryClustersModuleMaxClustersParam[];
 
 // Returns the timeout after which the load of a module should be aborted.
 base::TimeDelta GetModulesLoadTimeout();
-
-// Returns the maximum allowed width for modules if any.
-absl::optional<int> GetModulesMaxWidthPixels();
 
 // Returns a list of module IDs ordered by how they should appear on the NTP.
 std::vector<std::string> GetModulesOrder();

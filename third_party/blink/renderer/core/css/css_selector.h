@@ -189,7 +189,20 @@ class CORE_EXPORT CSSSelector {
     // leftmost + combinator of relative selector
     kRelativeDirectAdjacent,
     // leftmost ~ combinator of relative selector
-    kRelativeIndirectAdjacent
+    kRelativeIndirectAdjacent,
+
+    // The following applies to selectors within @scope
+    // (see CSSNestingType::kScope):
+    //
+    // The kScopeActivation relation is implicitly inserted parse-time before
+    // any compound selector which contains either :scope or the parent
+    // selector (&). When encountered during selector matching,
+    // kScopeActivation will try the to match the rest of the selector (i.e. the
+    // TagHistory from that point) using activation roots as the :scope
+    // element, trying the nearest activation root first.
+    //
+    // See also StyleScopeActivation.
+    kScopeActivation,
   };
 
   enum PseudoType {
@@ -320,6 +333,8 @@ class CORE_EXPORT CSSSelector {
     kPseudoSpatialNavigationInterest,
     kPseudoSpellingError,
     kPseudoTargetText,
+    // Always matches. See SetTrue().
+    kPseudoTrue,
     kPseudoVideoPersistent,
     kPseudoVideoPersistentAncestor,
 
@@ -359,17 +374,23 @@ class CORE_EXPORT CSSSelector {
   // since any selector which is nest-containing is also treated as
   // scope-containing during parsing.
   CSSNestingType GetNestingType() const;
+  // Set this CSSSelector as a :true pseudo-class. This can be useful if you
+  // need to insert a special RelationType into a selector's TagHistory,
+  // but lack any existing/suitable CSSSelector to attach that RelationType to.
+  //
+  // Note that :true is always implicit (see IsImplicit).
+  void SetTrue();
   void UpdatePseudoPage(const AtomicString&, const Document*);
   static PseudoType NameToPseudoType(const AtomicString&,
                                      bool has_arguments,
                                      const Document* document);
   static PseudoId GetPseudoId(PseudoType);
 
-  // See StyleRule::Reparent().
-  void Reparent(StyleRule* old_parent, StyleRule* new_parent) {
-    DCHECK_EQ(old_parent, ParentRule());
-    data_.parent_rule_ = new_parent;
-  }
+  // Replaces the parent pointer held by kPseudoParent selectors found
+  // within this simple selector (including inner selector lists).
+  //
+  // See also StyleRule::Reparent().
+  void Reparent(StyleRule* old_parent, StyleRule* new_parent);
 
   // Selectors are kept in an array by CSSSelectorList. The next component of
   // the selector is the next item in the array.
@@ -844,6 +865,11 @@ inline void swap(CSSSelector& a, CSSSelector& b) {
 // call NOTREACHED().
 CSSSelector::RelationType ConvertRelationToRelative(
     CSSSelector::RelationType relation);
+
+// Returns the maximum specificity within a list of selectors. This is typically
+// used to calculate the specificity of selectors that have an inner selector
+// list, e.g. :is(), :where() etc.
+unsigned MaximumSpecificity(const CSSSelector* first_selector);
 
 }  // namespace blink
 

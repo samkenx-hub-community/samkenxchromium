@@ -119,7 +119,6 @@
 <translation id="1942765061641586207">Resim çözünürlüğü</translation>
 <translation id="1972984168337863910">Dosyalar geri bildirim panellerini genişlet</translation>
 <translation id="1995337122023280937">Dosya konumuna git</translation>
-<translation id="1999709132469742660">Tüm URL'ler tarafından dosya erişimi</translation>
 <translation id="2001796770603320721">Drive'da Yönet</translation>
 <translation id="2009067268969781306">Bir sürücünün biçimlendirilmesi, üzerinde depolanan tüm verileri siler. Bu işlem geri alınamaz.</translation>
 <translation id="2025955442973426285">Tigrinya dili</translation>
@@ -151,6 +150,7 @@
 <translation id="2236732657580416950">Google Drive önbelleğiniz temizlendi.</translation>
 <translation id="2239068707900391003">Elinde kahve tutan bir kişi</translation>
 <translation id="2251368349685848079">Çöp kutusundan geri yükle</translation>
+<translation id="2278133026967558505">Tüm web siteleri ve URL'ler tarafından dosya erişimi</translation>
 <translation id="2282155092769082568">Otomatik yapılandırma URL'si:</translation>
 <translation id="2284767815536050991">çıkarılabilir depolama alanı</translation>
 <translation id="2288278176040912387">Plak çalar</translation>
@@ -543,7 +543,6 @@
 <translation id="5323213332664049067">Latin Amerika</translation>
 <translation id="5330145655348521461">Bu dosyalar farklı bir masaüstünde açıldı. Görüntülemek için <ph name="USER_NAME" /> (<ph name="MAIL_ADDRESS" />) adlı kullanıcıya geçin.</translation>
 <translation id="5330512191124428349">Bilgi al</translation>
-<translation id="5337538975554986899"><ph name="NON_RESTRICTED_DESTINATIONS" /> dışındaki tüm URL'ler tarafından dosya erişimi</translation>
 <translation id="5344246330454251646">Bruschetta paylaşımını yönetin</translation>
 <translation id="535792325654997756">Kediler ve insan</translation>
 <translation id="5358764674931277">Kare hızı</translation>
@@ -769,6 +768,7 @@
 <translation id="7162080671816799010">Kimlik doğrulama sunucusu kimliğini doğrulamak için "Konu alternatif adı eşleşmesi" veya "Alan adı son eki eşleşmesi" eksik</translation>
 <translation id="7165320105431587207">Ağ yapılandırılamadı</translation>
 <translation id="7170041865419449892">Aralık dışında</translation>
+<translation id="7179579940054351344"><ph name="NON_RESTRICTED_DESTINATIONS" /> dışındaki tüm web siteleri ve URL'ler tarafından dosya erişimi</translation>
 <translation id="7180611975245234373">Yenile</translation>
 <translation id="7189874332498648577"><ph name="NUMBER_OF_GB" /> GB</translation>
 <translation id="7191454237977785534">Dosyayı farklı kaydet</translation>
@@ -942,6 +942,7 @@
 <translation id="8492972329130824181">Ev ağı kullanılamıyor. Bağlanmak için mobil veri dolaşımı etkinleştirilmelidir.</translation>
 <translation id="8499098729323186194"><ph name="NUMBER_OF_ITEMS" /> öğe çıkarılıyor...</translation>
 <translation id="8502913769543567768">Ağ <ph name="NETWORK_INDEX" />/<ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, <ph name="NETWORK_PROVIDER_NAME" />, Cihaz kurulumundan sonra etkinleştir, Yöneticiniz tarafından yönetiliyor</translation>
+<translation id="8512483403832814140">Herhangi bir zaman</translation>
 <translation id="8521441079177373948">İngiltere</translation>
 <translation id="853494022971700746">Fransızca (Fransa)</translation>
 <translation id="8540608333167683902">Ağ <ph name="NETWORK_INDEX" />/<ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, <ph name="CONNECTION_STATUS" />, %<ph name="SIGNAL_STRENGTH" /> Sinyal Gücü, Ayrıntılar</translation>

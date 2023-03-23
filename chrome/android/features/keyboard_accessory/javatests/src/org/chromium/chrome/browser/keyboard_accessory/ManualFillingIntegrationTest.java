@@ -39,6 +39,7 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 
 import org.chromium.base.task.PostTask;
+import org.chromium.base.task.TaskTraits;
 import org.chromium.base.test.util.CommandLineFlags;
 import org.chromium.base.test.util.CriteriaHelper;
 import org.chromium.base.test.util.DisabledTest;
@@ -56,7 +57,6 @@ import org.chromium.chrome.test.ChromeTabbedActivityTestRule;
 import org.chromium.chrome.test.util.InfoBarTestAnimationListener;
 import org.chromium.chrome.test.util.browser.Features;
 import org.chromium.chrome.test.util.browser.Features.EnableFeatures;
-import org.chromium.content_public.browser.UiThreadTaskTraits;
 import org.chromium.content_public.browser.test.util.TestThreadUtils;
 import org.chromium.ui.test.util.UiRestriction;
 
@@ -188,10 +188,6 @@ public class ManualFillingIntegrationTest {
         mHelper.waitForKeyboardToDisappear();
         whenDisplayed(withChild(withId(R.id.keyboard_accessory_sheet_frame))).check((view, e) -> {
             accessorySheetView.set(view);
-        });
-        // The accessory bar is now pushed up by the accessory.
-        CriteriaHelper.pollUiThread(() -> {
-            return accessoryMargins.get().bottomMargin == accessorySheetView.get().getHeight();
         });
 
         mHelper.focusPasswordField();
@@ -369,7 +365,7 @@ public class ManualFillingIntegrationTest {
         TestThreadUtils.runOnUiThreadBlocking(
                 () -> mActivityTestRule.getInfoBarContainer().addAnimationListener(listener));
         final String kInfoBarText = "SomeInfoBar";
-        PostTask.runOrPostTask(UiThreadTaskTraits.DEFAULT, () -> {
+        PostTask.runOrPostTask(TaskTraits.UI_DEFAULT, () -> {
             SimpleConfirmInfoBarBuilder.create(
                     mActivityTestRule.getActivity().getActivityTab().getWebContents(),
                     InfoBarIdentifier.DUPLICATE_DOWNLOAD_INFOBAR_DELEGATE_ANDROID, kInfoBarText,
@@ -410,7 +406,7 @@ public class ManualFillingIntegrationTest {
         TestThreadUtils.runOnUiThreadBlocking(
                 () -> mActivityTestRule.getInfoBarContainer().addAnimationListener(listener));
         final String kInfoBarText = "SomeInfoBar";
-        PostTask.runOrPostTask(UiThreadTaskTraits.DEFAULT, () -> {
+        PostTask.runOrPostTask(TaskTraits.UI_DEFAULT, () -> {
             SimpleConfirmInfoBarBuilder.create(
                     mActivityTestRule.getActivity().getActivityTab().getWebContents(),
                     InfoBarIdentifier.DUPLICATE_DOWNLOAD_INFOBAR_DELEGATE_ANDROID, kInfoBarText,
@@ -451,7 +447,6 @@ public class ManualFillingIntegrationTest {
 
     @Test
     @SmallTest
-    @DisabledTest(message = "Broken with OSKResizesVisualViewportByDefault - crbug.com/1384433")
     public void testMovesUpSnackbar() throws TimeoutException {
         final String kSnackbarText = "snackbar";
 
@@ -459,7 +454,7 @@ public class ManualFillingIntegrationTest {
 
         // Create a simple, persistent snackbar and verify it's displayed.
         SnackbarManager manager = mActivityTestRule.getActivity().getSnackbarManager();
-        PostTask.runOrPostTask(UiThreadTaskTraits.DEFAULT,
+        PostTask.runOrPostTask(TaskTraits.UI_DEFAULT,
                 ()
                         -> manager.showSnackbar(Snackbar.make(kSnackbarText,
                                 new SnackbarManager.SnackbarController() {},
@@ -499,7 +494,7 @@ public class ManualFillingIntegrationTest {
         TestThreadUtils.runOnUiThreadBlocking(
                 () -> mActivityTestRule.getInfoBarContainer().addAnimationListener(listener));
         final String kInfoBarText = "SomeInfoBar";
-        PostTask.runOrPostTask(UiThreadTaskTraits.DEFAULT, () -> {
+        PostTask.runOrPostTask(TaskTraits.UI_DEFAULT, () -> {
             SimpleConfirmInfoBarBuilder.create(
                     mActivityTestRule.getActivity().getActivityTab().getWebContents(),
                     InfoBarIdentifier.DUPLICATE_DOWNLOAD_INFOBAR_DELEGATE_ANDROID, kInfoBarText,

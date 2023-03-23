@@ -20,13 +20,15 @@ BASE_FEATURE(kTabInactivityThreshold,
              "TabInactivityThreshold",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-const char kTabInactivityThresholdParameterName[] = "default";
+const char kTabInactivityThresholdParameterName[] = "variant";
 const char kTabInactivityThresholdOneWeekParam[] =
     "tab-inactivity-threshold-one-week";
 const char kTabInactivityThresholdTwoWeeksParam[] =
     "tab-inactivity-threshold-two-weeks";
 const char kTabInactivityThresholdThreeWeeksParam[] =
     "tab-inactivity-threshold-three-weeks";
+const char kTabInactivityThresholdOneMinuteDemoParam[] =
+    "tab-inactivity-threshold-one-minute-demo";
 
 bool IsInactiveTabsEnabled() {
   if (ui::GetDeviceFormFactor() == ui::DEVICE_FORM_FACTOR_TABLET) {
@@ -62,13 +64,16 @@ const base::TimeDelta InactiveTabsTimeThreshold() {
     return base::Days(14);
   } else if (feature_param == kTabInactivityThresholdThreeWeeksParam) {
     return base::Days(21);
+  } else if (feature_param == kTabInactivityThresholdOneMinuteDemoParam) {
+    return base::Minutes(1);
   }
   return base::Days(14);
 }
 
-std::u16string InactiveTabsTimeThresholdDisplayString() {
+NSString* InactiveTabsTimeThresholdDisplayString() {
   DCHECK(IsInactiveTabsEnabled());
-  return base::NumberToString16(InactiveTabsTimeThreshold().InDays());
+  return [NSString
+      stringWithFormat:@"%@", @(InactiveTabsTimeThreshold().InDays())];
 }
 
 BASE_FEATURE(kShowInactiveTabsCount,

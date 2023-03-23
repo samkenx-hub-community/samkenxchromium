@@ -325,10 +325,9 @@ void AutofillManager::OnFormsSeen(
   if (!IsValidFormDataVector(updated_forms) || !driver_->RendererIsAvailable())
     return;
 
-  // This should be called even forms is empty, AutofillProviderAndroid uses
-  // this event to detect form submission.
-  if (!ShouldParseForms(updated_forms))
+  if (!ShouldParseForms()) {
     return;
+  }
 
   NotifyObservers(&Observer::OnBeforeFormsSeen,
                   GetFormGlobalIds(updated_forms));
@@ -509,7 +508,7 @@ void AutofillManager::OnAskForValuesToFill(
 #if BUILDFLAG(IS_ANDROID)
       // TODO(crbug.com/1375966,crbug.com/1379149) Asynchronous parsing breaks
       // FastCheckout's keyboard suppression mechanism.
-      || client()->IsFastCheckoutSupported()
+      || client()->IsFastCheckoutSupported(form, field, *this)
 #endif
   ) {
     OnAskForValuesToFillImpl(form, field, bounding_box,

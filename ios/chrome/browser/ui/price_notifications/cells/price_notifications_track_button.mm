@@ -4,8 +4,11 @@
 
 #import "ios/chrome/browser/ui/price_notifications/cells/price_notifications_track_button.h"
 
+#import "base/ios/ios_util.h"
+#import "ios/chrome/browser/shared/public/features/features.h"
 #import "ios/chrome/browser/ui/price_notifications/cells/price_notifications_track_button_util.h"
 #import "ios/chrome/browser/ui/price_notifications/price_notifications_constants.h"
+#import "ios/chrome/common/button_configuration_util.h"
 #import "ios/chrome/common/ui/colors/semantic_color_names.h"
 #import "ios/chrome/grit/ios_strings.h"
 #import "ui/base/l10n/l10n_util_mac.h"
@@ -37,20 +40,21 @@ const CGFloat kTrackButtonTopPadding = 4;
     // TODO(crbug.com/1418068): Simplify after minimum version required is >=
     // iOS 15.
     size_t horizontalPadding = [self horizontalPadding];
-    if (@available(iOS 15, *)) {
-      UIButtonConfiguration* buttonConfiguration = self.configuration;
-      buttonConfiguration.contentInsets = NSDirectionalEdgeInsetsMake(
-          kTrackButtonTopPadding, horizontalPadding, kTrackButtonTopPadding,
-          horizontalPadding);
-      self.configuration = buttonConfiguration;
-    }
-#if __IPHONE_OS_VERSION_MIN_REQUIRED < __IPHONE_15_0
-    else {
-      self.contentEdgeInsets =
+    if (base::ios::IsRunningOnIOS15OrLater() &&
+        IsUIButtonConfigurationEnabled()) {
+      if (@available(iOS 15, *)) {
+        UIButtonConfiguration* buttonConfiguration = self.configuration;
+        buttonConfiguration.contentInsets = NSDirectionalEdgeInsetsMake(
+            kTrackButtonTopPadding, horizontalPadding, kTrackButtonTopPadding,
+            horizontalPadding);
+        self.configuration = buttonConfiguration;
+      }
+    } else {
+      UIEdgeInsets contentEdgeInsets =
           UIEdgeInsetsMake(kTrackButtonTopPadding, horizontalPadding,
                            kTrackButtonTopPadding, horizontalPadding);
+      SetContentEdgeInsets(self, contentEdgeInsets);
     }
-#endif  // __IPHONE_OS_VERSION_MIN_REQUIRED < __IPHONE_15_0
   }
   return self;
 }

@@ -64,6 +64,7 @@
 #include "content/public/test/prerender_test_util.h"
 #include "content/public/test/slow_download_http_response.h"
 #include "content/public/test/test_navigation_observer.h"
+#include "content/public/test/test_utils.h"
 #include "content/shell/browser/shell.h"
 #include "content/shell/browser/shell_browser_context.h"
 #include "content/shell/browser/shell_content_browser_client.h"
@@ -3890,15 +3891,18 @@ IN_PROC_BROWSER_TEST_F(PrerenderDevToolsProtocolTest,
   // Stash current RFDTAH for WebContents that is about to be retained
   // by BFCache after prerender navigation and flushed later.
   auto old_host = DevToolsAgentHost::GetOrCreateFor(web_contents_impl);
+  RenderFrameDeletedObserver delete_observer(
+      web_contents_impl->GetPrimaryMainFrame());
 
   // Activating a prerender should cause FTN swapping on the RFH and put
   // the old one into the BFCache with frame_tree_node_ == nullptr.
   AddPrerender(kPrerenderingUrl);
   NavigatePrimaryPage(kPrerenderingUrl);
 
+  EXPECT_FALSE(delete_observer.deleted());
   web_contents_impl->GetController().GetBackForwardCache().Flush();
-  // Flush() above will actually purge RFHs asynchronously, so pump tasks.
-  base::RunLoop().RunUntilIdle();
+  delete_observer.WaitUntilDeleted();
+
   // Assure methods on disconnected host are safe to call.
   EXPECT_THAT(old_host->GetTitle(), testing::Eq(""));
 }

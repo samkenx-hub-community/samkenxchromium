@@ -9,6 +9,9 @@
 #import "components/safe_browsing/core/common/features.h"
 #import "components/strings/grit/components_strings.h"
 #import "ios/chrome/browser/autofill/form_suggestion_constants.h"
+#import "ios/chrome/browser/shared/ui/table_view/cells/table_view_switch_cell.h"
+#import "ios/chrome/browser/shared/ui/table_view/cells/table_view_switch_item.h"
+#import "ios/chrome/browser/shared/ui/table_view/cells/table_view_url_item.h"
 #import "ios/chrome/browser/shared/ui/util/uikit_ui_util.h"
 #import "ios/chrome/browser/ui/authentication/cells/signin_promo_view_constants.h"
 #import "ios/chrome/browser/ui/authentication/signin/advanced_settings_signin/advanced_settings_signin_constants.h"
@@ -56,9 +59,6 @@
 #import "ios/chrome/browser/ui/tab_switcher/tab_grid/grid/grid_constants.h"
 #import "ios/chrome/browser/ui/tab_switcher/tab_grid/grid/plus_sign_cell.h"
 #import "ios/chrome/browser/ui/tab_switcher/tab_grid/tab_grid_constants.h"
-#import "ios/chrome/browser/ui/table_view/cells/table_view_switch_cell.h"
-#import "ios/chrome/browser/ui/table_view/cells/table_view_switch_item.h"
-#import "ios/chrome/browser/ui/table_view/cells/table_view_url_item.h"
 #import "ios/chrome/browser/ui/toolbar/primary_toolbar_view.h"
 #import "ios/chrome/browser/ui/toolbar/public/toolbar_constants.h"
 #import "ios/chrome/common/ui/promo_style/constants.h"
@@ -789,35 +789,6 @@ UIWindow* WindowWithAccessibilityIdentifier(NSString* accessibility_id) {
   return grey_accessibilityID(kToolsMenuNewWindowId);
 }
 
-+ (id<GREYMatcher>)systemSelectionCallout {
-  if (@available(iOS 16.0, *)) {
-    return grey_kindOfClass(NSClassFromString(@"_UIEditMenuListViewCell"));
-  } else {
-    return grey_kindOfClass(NSClassFromString(@"UICalloutBarButton"));
-  }
-}
-
-+ (id<GREYMatcher>)systemSelectionCalloutLinkToTextButton {
-  return grey_allOf(grey_accessibilityLabel(
-                        l10n_util::GetNSString(IDS_IOS_SHARE_LINK_TO_TEXT)),
-                    [self systemSelectionCallout], nil);
-}
-
-+ (id<GREYMatcher>)systemSelectionCalloutCopyButton {
-  return grey_allOf(grey_accessibilityLabel(@"Copy"),
-                    [self systemSelectionCallout], nil);
-}
-
-+ (id<GREYMatcher>)systemSelectionCalloutOverflowButton {
-  if (@available(iOS 16.0, *)) {
-    return grey_allOf(
-        grey_accessibilityLabel(@"Forward"),
-        grey_kindOfClass(NSClassFromString(@"_UIEditMenuPageButton")), nil);
-  } else {
-    return grey_accessibilityID(@"show.next.items.menu.button");
-  }
-}
-
 + (id<GREYMatcher>)copyActivityButton {
   id<GREYMatcher> copyStaticText = [ChromeMatchersAppInterface
       staticTextWithAccessibilityLabel:l10n_util::GetNSString(
@@ -1117,7 +1088,18 @@ UIWindow* WindowWithAccessibilityIdentifier(NSString* accessibility_id) {
 }
 
 + (id<GREYMatcher>)settingsDestinationButton {
-  return grey_accessibilityID(kToolsMenuSettingsId);
+  // The settings button could have a dot or something on it, changing its ID to
+  // "kToolsMenuSettingsId - Dot" or something else. The matcher needs to be
+  // adapted to match both.
+  GREYMatchesBlock matches = ^BOOL(id element) {
+    return [[element accessibilityIdentifier] hasPrefix:kToolsMenuSettingsId];
+  };
+  GREYDescribeToBlock describe = ^void(id<GREYDescription> description) {
+    [description appendText:[NSString stringWithFormat:@"starts with('%@')",
+                                                       kToolsMenuSettingsId]];
+  };
+  return [[GREYElementMatcherBlock alloc] initWithMatchesBlock:matches
+                                              descriptionBlock:describe];
 }
 
 + (id<GREYMatcher>)siteInfoDestinationButton {
@@ -1205,6 +1187,11 @@ UIWindow* WindowWithAccessibilityIdentifier(NSString* accessibility_id) {
 + (id<GREYMatcher>)manualFallbackManagePasswordsMatcher {
   return grey_accessibilityID(
       manual_fill::ManagePasswordsAccessibilityIdentifier);
+}
+
++ (id<GREYMatcher>)manualFallbackManageSettingsMatcher {
+  return grey_accessibilityID(
+      manual_fill::ManageSettingsAccessibilityIdentifier);
 }
 
 + (id<GREYMatcher>)manualFallbackOtherPasswordsMatcher {

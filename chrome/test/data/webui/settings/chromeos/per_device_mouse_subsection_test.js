@@ -4,11 +4,13 @@
 
 import 'chrome://resources/polymer/v3_0/iron-test-helpers/mock-interactions.js';
 
-import {FakeInputDeviceSettingsProvider, fakeMice, setInputDeviceSettingsProviderForTesting, SettingsPerDeviceMouseSubsectionElement} from 'chrome://os-settings/chromeos/os_settings.js';
+import {FakeInputDeviceSettingsProvider, fakeMice, Router, routes, setInputDeviceSettingsProviderForTesting, SettingsPerDeviceMouseSubsectionElement} from 'chrome://os-settings/chromeos/os_settings.js';
 import {assert} from 'chrome://resources/ash/common/assert.js';
 import {assertEquals, assertFalse, assertTrue} from 'chrome://webui-test/chai_assert.js';
-import {flushTasks} from 'chrome://webui-test/polymer_test_util.js';
+import {flushTasks, waitAfterNextRender} from 'chrome://webui-test/polymer_test_util.js';
 import {isVisible} from 'chrome://webui-test/test_util.js';
+
+const MOUSE_ACCELERATION_SETTING_ID = 408;
 
 suite('PerDeviceMouseSubsection', function() {
   /**
@@ -55,6 +57,11 @@ suite('PerDeviceMouseSubsection', function() {
     return flushTasks();
   }
 
+  async function getConnectedMouseSettings() {
+    const mice = await provider.getConnectedMouseSettings();
+    return mice;
+  }
+
   // Test that API are updated when mouse settings change.
   test('Update API when mouse settings change', async () => {
     await initializePerDeviceMouseSubsection();
@@ -65,7 +72,7 @@ suite('PerDeviceMouseSubsection', function() {
       value: false,
     };
     await flushTasks();
-    let updatedMice = await provider.getConnectedMouseSettings();
+    let updatedMice = await getConnectedMouseSettings();
     assertEquals(
         updatedMice[0].settings.swapRight, mouseSwapButtonDropdown.pref.value);
 
@@ -73,7 +80,7 @@ suite('PerDeviceMouseSubsection', function() {
         subsection.shadowRoot.querySelector('#mouseAcceleration');
     mouseAccelerationToggleButton.click();
     await flushTasks();
-    updatedMice = await provider.getConnectedMouseSettings();
+    updatedMice = await getConnectedMouseSettings();
     assertEquals(
         updatedMice[0].settings.accelerationEnabled,
         mouseAccelerationToggleButton.pref.value);
@@ -84,7 +91,7 @@ suite('PerDeviceMouseSubsection', function() {
         mouseSpeedSlider.shadowRoot.querySelector('cr-slider'), 39 /* right */,
         [], 'ArrowRight');
     await flushTasks();
-    updatedMice = await provider.getConnectedMouseSettings();
+    updatedMice = await getConnectedMouseSettings();
     assertEquals(
         updatedMice[0].settings.sensitivity, mouseSpeedSlider.pref.value);
 
@@ -92,7 +99,7 @@ suite('PerDeviceMouseSubsection', function() {
         subsection.shadowRoot.querySelector('#mouseReverseScroll');
     mouseReverseScrollToggleButton.click();
     await flushTasks();
-    updatedMice = await provider.getConnectedMouseSettings();
+    updatedMice = await getConnectedMouseSettings();
     assertEquals(
         updatedMice[0].settings.reverseScrolling,
         mouseReverseScrollToggleButton.checked);
@@ -101,7 +108,7 @@ suite('PerDeviceMouseSubsection', function() {
         subsection.shadowRoot.querySelector('#mouseScrollAcceleration');
     mouseScrollAccelerationToggleButton.click();
     await flushTasks();
-    updatedMice = await provider.getConnectedMouseSettings();
+    updatedMice = await getConnectedMouseSettings();
     assertEquals(
         updatedMice[0].settings.scrollAcceleration,
         mouseScrollAccelerationToggleButton.pref.value);
@@ -112,7 +119,7 @@ suite('PerDeviceMouseSubsection', function() {
         mouseScrollSpeedSlider.shadowRoot.querySelector('cr-slider'),
         39 /* right */, [], 'ArrowRight');
     await flushTasks();
-    updatedMice = await provider.getConnectedMouseSettings();
+    updatedMice = await getConnectedMouseSettings();
     assertEquals(
         updatedMice[0].settings.scrollSensitivity,
         mouseScrollSpeedSlider.pref.value);
@@ -167,7 +174,53 @@ suite('PerDeviceMouseSubsection', function() {
         subsection.shadowRoot.querySelector('#mouseScrollAcceleration');
     assertFalse(isVisible(mouseScrollAccelerationToggleButton));
     mouseScrollSpeedSlider =
-        assert(subsection.shadowRoot.querySelector('#mouseScrollSpeedSlider'));
+        subsection.shadowRoot.querySelector('#mouseScrollSpeedSlider');
     assertFalse(isVisible(mouseScrollSpeedSlider));
+  });
+
+  /**
+   * Verify entering the page with search tags matched will auto focus the
+   * searched element.
+   */
+  test('deep linking mixin focus on the first searched element', async () => {
+    await initializePerDeviceMouseSubsection();
+    const mouseAccelerationToggle =
+        subsection.shadowRoot.querySelector('#mouseAcceleration');
+    subsection.mouseIndex = 0;
+    // Enter the page from auto repeat search tag.
+    const url = new URLSearchParams(
+        'search=mouse+accel&settingId=' +
+        encodeURIComponent(MOUSE_ACCELERATION_SETTING_ID));
+
+    await Router.getInstance().navigateTo(
+        routes.PER_DEVICE_MOUSE,
+        /* dynamicParams= */ url, /* removeSearch= */ true);
+
+    await waitAfterNextRender(mouseAccelerationToggle);
+    assertTrue(!!mouseAccelerationToggle);
+    assertEquals(subsection.shadowRoot.activeElement, mouseAccelerationToggle);
+  });
+
+  /**
+   * Verify entering the page with search tags matched wll not auto focus the
+   * searched element if it's not the first keyboard displayed.
+   */
+  test('deep linkng mixin does not focus on second element', async () => {
+    await initializePerDeviceMouseSubsection();
+    const mouseAccelerationToggle =
+        subsection.shadowRoot.querySelector('#mouseAcceleration');
+    subsection.mouseIndex = 1;
+    // Enter the page from auto repeat search tag.
+    const url = new URLSearchParams(
+        'search=mouse+accel&settingId=' +
+        encodeURIComponent(MOUSE_ACCELERATION_SETTING_ID));
+
+    await Router.getInstance().navigateTo(
+        routes.PER_DEVICE_MOUSE,
+        /* dynamicParams= */ url, /* removeSearch= */ true);
+    await flushTasks();
+
+    assertTrue(!!mouseAccelerationToggle);
+    assertFalse(!!subsection.shadowRoot.activeElement);
   });
 });

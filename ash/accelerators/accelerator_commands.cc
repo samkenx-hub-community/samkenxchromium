@@ -662,10 +662,6 @@ void DisableCapsLock() {
   Shell::Get()->ime_controller()->SetCapsLockEnabled(false);
 }
 
-void DumpCalendarModel() {
-  Shell::Get()->system_tray_model()->calendar_model()->DebugDump();
-}
-
 void FocusCameraPreview() {
   auto* camera_controller = CaptureModeController::Get()->camera_controller();
   DCHECK(camera_controller);
@@ -905,6 +901,12 @@ void OpenHelp() {
 void PowerPressed(bool pressed) {
   Shell::Get()->power_button_controller()->OnPowerButtonEvent(
       pressed, base::TimeTicks());
+}
+
+void RecordVolumeSource() {
+  base::UmaHistogramEnumeration(
+      CrasAudioHandler::kOutputVolumeChangedSourceHistogramName,
+      CrasAudioHandler::AudioSettingsChangeSource::kAccelerator);
 }
 
 void RemoveCurrentDesk() {

@@ -12,6 +12,8 @@
 #include "ash/components/arc/session/arc_vm_data_migration_status.h"
 #include "ash/constants/app_types.h"
 #include "ash/constants/ash_switches.h"
+#include "ash/system/time/calendar_utils.h"
+#include "ash/system/time/date_helper.h"
 #include "base/command_line.h"
 #include "base/feature_list.h"
 #include "base/functional/bind.h"
@@ -84,6 +86,14 @@ void OnConfigureUpstartJobs(std::deque<JobDesc> jobs,
           << (is_start ? " started" : (result ? " stopped " : " not running?"));
   jobs.pop_front();
   ConfigureUpstartJobs(std::move(jobs), std::move(callback));
+}
+
+int64_t GetRequiredDiskImageSizeForArcVmDataMigrationInBytes(
+    uint64_t android_data_size_in_bytes) {
+  // Reserved disk space for virtio-blk /data disk image (128 MB). Defined in
+  // the guest's arc-mkfs-blk-data.
+  constexpr uint64_t kReservedDiskSpaceInBytes = 128ULL << 20;
+  return android_data_size_in_bytes * 11ULL / 10ULL + kReservedDiskSpaceInBytes;
 }
 
 }  // namespace
@@ -452,24 +462,98 @@ bool ShouldUseVirtioBlkData(PrefService* prefs) {
 }
 
 int GetDaysUntilArcVmDataMigrationDeadline(PrefService* prefs) {
+  if (GetArcVmDataMigrationStatus(prefs) ==
+      ArcVmDataMigrationStatus::kStarted) {
+    // If ARCVM /data migration is in progress. Treat it in the same way as
+    // cases where the deadline is passed.
+    // TODO(b/258278176): Do not call this function when the migration is in
+    // progress, or return a different value (0) to provide a dedicated UI.
+    return 1;
+  }
   const base::Time notification_first_shown_time =
       prefs->GetTime(prefs::kArcVmDataMigrationNotificationFirstShownTime);
   if (notification_first_shown_time == base::Time()) {
     // The preference is uninitialized (the notification has not been shown).
     LOG(ERROR) << "No deadline can be calculated because ARCVM /data migration "
                   "notification has not been shown before";
-    return kArcVmDataMigrationDismissibleTimeDelta.InDays();
+    return kArcVmDataMigrationNumberOfDismissibleDays;
   }
-  // TODO(b/258278176): Make this work nicely in any timezones in a robust way.
-  const base::Time deadline =
-      notification_first_shown_time + kArcVmDataMigrationDismissibleTimeDelta;
-  const base::Time now = base::Time::Now();
-  const base::TimeDelta delta = now < deadline ? deadline - now : base::Days(0);
-  return delta.InDays() + 1;
+
+  auto* date_helper = ash::DateHelper::GetInstance();
+  DCHECK(date_helper);
+  // Calculate the deadline assuming that the first notification was shown in
+  // the current timezone.
+  // ash::calendar_utils::kDurationForAdjustingDST is added to take into account
+  // days longer than 24 hours due to daylight saving time.
+  // For example, if the notification is shown for the first time at
+  // 2023-01-01T16:00:00Z and kArcVmDataMigrationNumberOfDismissibleDays is 30,
+  // the deadline will be 2023-01-31T00:00:00Z.
+  // This function will return 30 until 2023-01-01T23:59:99Z and keep returning
+  // 1 from 2023-01-30T00:00:00Z onward.
+  const base::Time deadline = date_helper->GetLocalMidnight(
+      date_helper->GetLocalMidnight(notification_first_shown_time) +
+      kArcVmDataMigrationDismissibleTimeDelta +
+      ash::calendar_utils::kDurationForAdjustingDST);
+  const base::Time last_local_midnight =
+      date_helper->GetLocalMidnight(base::Time::Now());
+  const base::TimeDelta delta =
+      last_local_midnight < deadline
+          ? deadline - last_local_midnight +
+                ash::calendar_utils::kDurationForAdjustingDST
+          : base::Days(0);
+  const int delta_in_days = delta.InDays();
+  if (delta_in_days > kArcVmDataMigrationNumberOfDismissibleDays) {
+    return kArcVmDataMigrationNumberOfDismissibleDays;
+  }
+  return std::max(delta_in_days, 1);
 }
 
 bool ArcVmDataMigrationShouldBeDismissible(int days_until_deadline) {
   return days_until_deadline > 1;
+}
+
+uint64_t GetDesiredDiskImageSizeForArcVmDataMigrationInBytes(
+    uint64_t android_data_size_in_bytes,
+    uint64_t free_disk_space_in_bytes) {
+  // Mask to make the disk image size a multiple of the block size (4096 bytes).
+  constexpr uint64_t kDiskImageSizeMaskInBytes = ~((4ULL << 10) - 1);
+
+  // Minimum disk image size for virtio-blk /data (4 GB).
+  constexpr uint64_t kMinimumDiskImageSizeInBytes = 4ULL << 30;
+
+  // The default disk image size set by Concierge.
+  const uint64_t default_disk_image_size_in_bytes =
+      free_disk_space_in_bytes * 9ULL / 10ULL;
+
+  const uint64_t required_disk_image_size_in_bytes =
+      GetRequiredDiskImageSizeForArcVmDataMigrationInBytes(
+          android_data_size_in_bytes);
+
+  return std::max(default_disk_image_size_in_bytes +
+                      required_disk_image_size_in_bytes,
+                  kMinimumDiskImageSizeInBytes) &
+         kDiskImageSizeMaskInBytes;
+}
+
+uint64_t GetRequiredFreeDiskSpaceForArcVmDataMigrationInBytes(
+    uint64_t android_data_size_in_bytes,
+    uint64_t free_disk_space_in_bytes) {
+  // Mask to make the required free disk space a multiple of 512 MB.
+  constexpr uint64_t kRequiredFreeDiskSpaceMaskInBytes = ~((512ULL << 20) - 1);
+
+  // Minimum required free disk space for ARCVM /data migration (1 GB).
+  constexpr uint64_t kMinimumRequiredFreeDiskSpaceInBytes = 1ULL << 30;
+
+  const uint64_t required_disk_image_size_in_bytes =
+      GetRequiredDiskImageSizeForArcVmDataMigrationInBytes(
+          android_data_size_in_bytes);
+
+  const uint64_t maximum_disk_space_overhead_in_bytes =
+      required_disk_image_size_in_bytes - android_data_size_in_bytes;
+
+  return (kMinimumRequiredFreeDiskSpaceInBytes +
+          maximum_disk_space_overhead_in_bytes) &
+         kRequiredFreeDiskSpaceMaskInBytes;
 }
 
 }  // namespace arc

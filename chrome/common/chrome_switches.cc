@@ -197,11 +197,6 @@ const char kDisableExtensions[] = "disable-extensions";
 // Disable extensions except those specified in a comma-separated list.
 const char kDisableExtensionsExcept[] = "disable-extensions-except";
 
-// Disable checking for user opt-in for extensions that want to inject script
-// into file URLs (ie, always allow it). This is used during automated testing.
-const char kDisableExtensionsFileAccessCheck[] =
-    "disable-extensions-file-access-check";
-
 // Disables print preview (For testing, and for users who don't like us. :[ )
 const char kDisablePrintPreview[] = "disable-print-preview";
 
@@ -678,12 +673,6 @@ const char kForceEnableNightMode[] = "force-enable-night-mode";
 
 // Forces the update menu badge to show.
 const char kForceShowUpdateMenuBadge[] = "force-show-update-menu-badge";
-
-// Forces signin FRE flow.
-const char kForceEnableSigninFRE[] = "force-enable-signin-fre";
-
-// Forces the FRE to go through the legacy sync consent flow for testing.
-const char kForceDisableSigninFRE[] = "force-disable-signin-fre";
 
 // Forces the update menu type to a specific type.
 const char kForceUpdateMenuType[] = "force-update-menu-type";

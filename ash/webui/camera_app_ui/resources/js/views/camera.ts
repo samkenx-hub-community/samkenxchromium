@@ -18,6 +18,7 @@ import {
   setAvc1Parameters,
   VideoResult,
 } from '../device/index.js';
+import {TimeLapseResult} from '../device/mode/video';
 import * as dom from '../dom.js';
 import * as error from '../error.js';
 import * as expert from '../expert.js';
@@ -835,6 +836,14 @@ export class Camera extends View implements CameraViewUI {
     ChromeHelper.getInstance().maybeTriggerSurvey();
   }
 
+  async onTimeLapseCaptureDone({timeLapseSaver}: TimeLapseResult):
+      Promise<void> {
+    // TODO(b/236800499): Send perf metrics, trigger survey.
+    nav.open(ViewName.FLASH);
+    await this.resultSaver.finishSaveVideo(timeLapseSaver);
+    nav.close(ViewName.FLASH);
+  }
+
   override layout(): void {
     this.layoutHandler.update();
   }
@@ -845,24 +854,30 @@ export class Camera extends View implements CameraViewUI {
           this.cameraManager.getPreviewResolution().toString());
       return true;
     }
-    if ((key === 'AudioVolumeUp' || key === 'AudioVolumeDown') &&
-        state.get(state.State.TABLET) && state.get(state.State.STREAMING)) {
-      if (state.get(state.State.TAKING)) {
-        this.endTake();
-      } else {
-        this.beginTake(metrics.ShutterType.VOLUME_KEY);
+
+    if (state.get(state.State.STREAMING) &&
+        !state.get(state.State.ENABLE_SCAN_BARCODE)) {
+      if ((key === 'AudioVolumeUp' || key === 'AudioVolumeDown') &&
+          state.get(state.State.TABLET)) {
+        if (state.get(state.State.TAKING)) {
+          this.endTake();
+        } else {
+          this.beginTake(metrics.ShutterType.VOLUME_KEY);
+        }
+        return true;
       }
-      return true;
-    }
-    if (key === ' ') {
-      this.focusShutterButton();
-      if (state.get(state.State.TAKING)) {
-        this.endTake();
-      } else {
-        this.beginTake(metrics.ShutterType.KEYBOARD);
+
+      if (key === ' ') {
+        this.focusShutterButton();
+        if (state.get(state.State.TAKING)) {
+          this.endTake();
+        } else {
+          this.beginTake(metrics.ShutterType.KEYBOARD);
+        }
+        return true;
       }
-      return true;
     }
+
     return false;
   }
 

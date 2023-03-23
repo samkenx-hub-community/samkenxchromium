@@ -480,7 +480,9 @@ void TrustedSignals::HandleDownloadResultOnV8Thread(
   std::string data_version_string;
   if (headers &&
       headers->GetNormalizedHeader("Data-Version", &data_version_string) &&
-      !net::ParseUint32(data_version_string, &data_version)) {
+      !net::ParseUint32(data_version_string,
+                        net::ParseIntFormat::STRICT_NON_NEGATIVE,
+                        &data_version)) {
     std::string error = base::StringPrintf(
         "Rejecting load of %s due to invalid Data-Version header: %s",
         signals_url.spec().c_str(), data_version_string.c_str());
@@ -495,7 +497,11 @@ void TrustedSignals::HandleDownloadResultOnV8Thread(
   v8::Local<v8::Value> v8_data;
   if (!v8_helper->CreateValueFromJson(v8_helper->scratch_context(), *body)
            .ToLocal(&v8_data) ||
-      !v8_data->IsObject()) {
+      !v8_data->IsObject() ||
+      // v8 considers arrays a subtype of object, but the response body must be
+      // a JSON object, not a JSON array, so need to explicitly check if it's an
+      // array.
+      v8_data->IsArray()) {
     std::string error = base::StrCat(
         {signals_url.spec(), " Unable to parse as a JSON object."});
     PostCallbackToUserThread(std::move(user_thread_task_runner), weak_instance,

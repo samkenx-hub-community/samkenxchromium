@@ -283,6 +283,7 @@
 <translation id="2581165646603367611">Ова ќе ги избрише колачињата, кешот и другите податоци од сајтовите за коишто Chrome смета дека не се важни.</translation>
 <translation id="2587052924345400782">Достапна е понова верзија</translation>
 <translation id="2593272815202181319">Monospace</translation>
+<translation id="2603212228005142861">Најавете се за да управувате со вашите поставки</translation>
 <translation id="2604446170045642109">Може да ја исклучите темната тема за сајтовите во вашите поставки.</translation>
 <translation id="2612676031748830579">Број на картичка</translation>
 <translation id="2625189173221582860">Лозинката е копирана</translation>
@@ -476,6 +477,7 @@
 <translation id="3587596251841506391">Подобра безбедноста на интернет</translation>
 <translation id="3597179440835065298">Добивајте подобри предлози</translation>
 <translation id="3602290021589620013">Преглед</translation>
+<translation id="360901359071773787">Дали да се избришат изминатите 15 минути?</translation>
 <translation id="3616113530831147358">Аудио</translation>
 <translation id="3622349720008044802">Управувајте со прозорци</translation>
 <translation id="3631987586758005671">Се споделува на <ph name="DEVICE_NAME" /></translation>
@@ -630,6 +632,7 @@
 
 Вашата сметка на Google можеби има други форми на историја на прелистување, како на пр., пребарувања и активност од други услуги на Google на <ph name="BEGIN_LINK" />myactivity.google.com<ph name="END_LINK" />.</translation>
 <translation id="452750746583162491">Прегледајте ги синхронизираните податоци</translation>
+<translation id="4528638190900283934">Најавете се за дополнителни функции</translation>
 <translation id="4532845899244822526">Избери папка</translation>
 <translation id="4547551584605870320">{TAB_COUNT,plural, =1{<ph name="TAB_COUNT_ONE" /> картичка}one{<ph name="TAB_COUNT_MANY" /> картичка, <ph name="TAB_COUNT_INCOGNITO" /> инкогнито}other{<ph name="TAB_COUNT_MANY" /> картички, <ph name="TAB_COUNT_INCOGNITO" /> инкогнито}}</translation>
 <translation id="4554077758708533499">Поврзано со USB-кабел</translation>
@@ -820,6 +823,7 @@
 <translation id="5517095782334947753">Имате обележувачи, историја, лозинки и други поставки од <ph name="FROM_ACCOUNT" />.</translation>
 <translation id="5524761631371622910">Кога пробните периоди се вклучени и ако Chrome по случаен избор ве ставил во активен пробен период, вашата историја на прелистувањето влијае на рекламите што ги гледате и интересите како што е проценето долу. За да ја заштити приватноста, Chrome ги брише вашите интереси секој месец.</translation>
 <translation id="5524843473235508879">Пренасочувањето е блокирано.</translation>
+<translation id="554297709083131118">Ќе се избришат следниве податоци од изминатите 15 минути</translation>
 <translation id="5548606607480005320">Безбедносна проверка</translation>
 <translation id="5555525474779371165">Изберете ја вашата заштита со „Безбедно прелистување“</translation>
 <translation id="5556459405103347317">Повторно вчитај</translation>
@@ -1074,6 +1078,7 @@
 <translation id="6824899148643461612">Избрана е картичката <ph name="TAB_TITLE" /></translation>
 <translation id="6828070228333235514">Запри го следењето цени</translation>
 <translation id="6830728435402077660">Небезбедно</translation>
+<translation id="6831043979455480757">Преведи</translation>
 <translation id="6833996806551876956">Пробен период за Sandbox за приватност</translation>
 <translation id="6836206421467243968">Врати ја групата картички <ph name="TITLE_OF_GROUP" /> како нова заднинска група картички.</translation>
 <translation id="6846298663435243399">Се вчитува…</translation>
@@ -1241,10 +1246,10 @@
 <translation id="7707922173985738739">Ќе користи мобилен интернет</translation>
 <translation id="7709094866268987903">Интересите што сте ги отстраниле ќе се појават тука</translation>
 <translation id="7709918231054955894">Преземете ги сите картички</translation>
+<translation id="772434085369393266">Ги надградува навигациите до HTTPS и ве предупредува пред вчитувањето сајтови што не го поддржуваат. Не може да ја промените поставкава затоа што имате овозможено „Напредна заштита“.</translation>
 <translation id="7725024127233776428">Страниците што ќе ги обележите се појавуваат тука</translation>
 <translation id="7757787379047923882">Текстот е споделен од <ph name="DEVICE_NAME" /></translation>
 <translation id="7762668264895820836">SD-картичка <ph name="SD_CARD_NUMBER" /></translation>
-<translation id="7762928140712606393">Најавете се за дополнителни функции и најдобрата безбедност на Chrome</translation>
 <translation id="7764225426217299476">Додај адреса</translation>
 <translation id="7772032839648071052">Потврди лозинка</translation>
 <translation id="7772375229873196092">Затвори <ph name="APP_NAME" /></translation>
@@ -1260,6 +1265,7 @@
 <translation id="78270725016672455">Компјутерот сака да го регистрира уредов за најавување на сајт</translation>
 <translation id="7844171778363018843">Не се избрани податоци за синхронизација</translation>
 <translation id="7846296061357476882">Услуги на Google</translation>
+<translation id="7847228556075070294">Историјата, колачињата и другите податоци се избришани</translation>
 <translation id="784934925303690534">Временски период</translation>
 <translation id="7851858861565204677">Други уреди</translation>
 <translation id="7853202427316060426">Активност</translation>

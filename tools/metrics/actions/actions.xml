@@ -16927,6 +16927,14 @@ should be able to be added at any place in this file.
   </description>
 </action>
 
+<action name="ManualFallback_Password_OpenManageSettings">
+  <owner>tmartino@chromium.org</owner>
+  <description>
+    The user opened the Password Settings submenu using the &quot;Manage
+    Settings...&quot; link in the Password Manual Fallback View.
+  </description>
+</action>
+
 <action name="ManualFallback_Password_OpenOtherPassword">
   <owner>djean@chromium.org</owner>
   <owner>olivierrobin@chromium.org</owner>
@@ -21914,6 +21922,14 @@ should be able to be added at any place in this file.
   <description>Please enter the description of this user action.</description>
 </action>
 
+<action name="MobileTopToolbarAddToBookmarksButton">
+  <owner>salg@google.com</owner>
+  <owner>clank-app-team@google.com</owner>
+  <description>
+    The user tapped on the top toolbar's add to bookmarks button.
+  </description>
+</action>
+
 <action name="MobileTopToolbarHomeButton">
   <obsolete>Removed as of 2020/09/09.</obsolete>
   <owner>mdjones@chromium.org</owner>
@@ -21950,6 +21966,14 @@ should be able to be added at any place in this file.
   <owner>clank-app-team@google.com</owner>
   <description>
     Action indicating the top toolbar's overflow menu was shown.
+  </description>
+</action>
+
+<action name="MobileTopToolbarTranslateButton">
+  <owner>salg@google.com</owner>
+  <owner>clank-app-team@google.com</owner>
+  <description>
+    The user tapped on the top toolbar's translate button.
   </description>
 </action>
 
@@ -26280,6 +26304,14 @@ should be able to be added at any place in this file.
   </description>
 </action>
 
+<action name="PasswordManager_OpenSettings">
+  <owner>tmartino@chromium.org</owner>
+  <description>
+    The user opened the Password Settings submenu from within the main Password
+    Manager screen. iOS only.
+  </description>
+</action>
+
 <action name="PasswordManager_RemovePasswordException">
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <description>Please enter the description of this user action.</description>
@@ -30433,8 +30465,16 @@ should be able to be added at any place in this file.
 
 <action name="Signin_AddAccountToDevice">
   <owner>gogerald@chromium.org</owner>
+  <description>Recorded when the add account dialog is opened.</description>
+</action>
+
+<action name="Signin_AddAccountToDevice_DismissedWithError"
+    not_user_triggered="true">
+  <owner>jlebel@chromium.org</owner>
+  <owner>chrome-signin-team@google.com</owner>
   <description>
-    Recorded when the user chooses to add an account to device.
+    Recorded when the add account view is dismissed with an error. Recorded for
+    iOS only.
   </description>
 </action>
 
@@ -30617,6 +30657,13 @@ should be able to be added at any place in this file.
   </description>
 </action>
 
+<action name="Signin_Impression_FromCreatorFeedFollow">
+  <owner>wry@chromium.org</owner>
+  <description>
+    Recorded when showing sign-in entry in Creator Feed on Android only.
+  </description>
+</action>
+
 <action name="Signin_Impression_FromDevicesPage" not_user_triggered="true">
   <owner>gogerald@chromium.org</owner>
   <description>
@@ -30718,6 +30765,14 @@ should be able to be added at any place in this file.
   <owner>bling-get-set-up@google.com</owner>
   <description>
     Recorded when showing sign in after the post restore signin promo.
+  </description>
+</action>
+
+<action name="Signin_Impression_FromReadingList" not_user_triggered="true">
+  <owner>myuu@google.com</owner>
+  <owner>chrome-signin-team@chromium.org</owner>
+  <description>
+    Recorded when showing sign in entry in the reading list.
   </description>
 </action>
 
@@ -31233,6 +31288,15 @@ should be able to be added at any place in this file.
   </description>
 </action>
 
+<action name="Signin_Signin_FromCreatorFeedFollow">
+  <owner>wry@chromium.org</owner>
+  <description>
+    Recorded on sign in start from access point
+    signin_metrics::AccessPoint::ACCESS_POINT_CREATOR_FEED_FOLLOW on Android
+    Only.
+  </description>
+</action>
+
 <action name="Signin_Signin_FromDevicesPage">
   <owner>gogerald@chromium.org</owner>
   <description>
@@ -31382,6 +31446,15 @@ should be able to be added at any place in this file.
   <description>
     Recorded on sign in start from access point
     signin_metrics::AccessPoint::ACCESS_POINT_POST_DEVICE_RESTORE_SIGNIN_PROMO.
+  </description>
+</action>
+
+<action name="Signin_Signin_FromReadingList">
+  <owner>myuu@google.com</owner>
+  <owner>chrome-signin-team@chromium.org</owner>
+  <description>
+    Recorded on sign in start from access point
+    signin_metrics::AccessPoint::ACCESS_POINT_READING_LIST.
   </description>
 </action>
 
@@ -36681,10 +36754,15 @@ should be able to be added at any place in this file.
 </action>
 
 <action-suffix separator="_" ordering="suffix">
+  <suffix name="AdaptiveButtonInTopToolbarCustomization_AddToBookmarks"
+      label="For AdaptiveButtonInTopToolbarCustomization add to bookmarks
+             feature."/>
   <suffix name="AdaptiveButtonInTopToolbarCustomization_NewTab"
       label="For AdaptiveButtonInTopToolbarCustomization new tab feature."/>
   <suffix name="AdaptiveButtonInTopToolbarCustomization_Share"
       label="For AdaptiveButtonInTopToolbarCustomization share feature."/>
+  <suffix name="AdaptiveButtonInTopToolbarCustomization_Translate"
+      label="For AdaptiveButtonInTopToolbarCustomization translate feature."/>
   <suffix name="AdaptiveButtonInTopToolbarCustomization_VoiceSearch"
       label="For AdaptiveButtonInTopToolbarCustomization voice search
              feature."/>
@@ -36769,6 +36847,8 @@ should be able to be added at any place in this file.
   <suffix name="DownloadPageScreenshot"
       label="For DownloadPageScreenshot feature."/>
   <suffix name="DownloadSettings" label="For DownloadSettings feature."/>
+  <suffix name="DownloadToolbarButton"
+      label="For Download toolbar button feature."/>
   <suffix name="EphemeralTab" label="For Ephemeral Tab."/>
   <suffix name="ExploreSitesTile" label="For Explore Sites feature."/>
   <suffix name="ExtensionsMenu" label="For Extensions menu opening."/>
@@ -36833,6 +36913,11 @@ should be able to be added at any place in this file.
       label="For iOSDefaultBrowserOverflowMenuBadge feature"/>
   <suffix name="iOSDefaultBrowserSettingsBadge"
       label="For iOSDefaultBrowserSettingsBadge feature"/>
+  <suffix name="iOSPromoAppStore" label="For iOSPromoAppStore feature"/>
+  <suffix name="iOSPromoCredentialProviderExtension"
+      label="For iOSPromoCredentialProviderExtension feature"/>
+  <suffix name="iOSPromoPostRestore" label="For iOSPromoPostRestore feature"/>
+  <suffix name="iOSPromoWhatsNew" label="For iOSPromoWhatsNew feature"/>
   <suffix name="KeyboardAccessoryAddressFilling"
       label="For KeyboardAccessoryAddressFilling feature."/>
   <suffix name="KeyboardAccessoryBarSwiping"
@@ -36862,7 +36947,13 @@ should be able to be added at any place in this file.
   <suffix name="PageZoom" label="For Page Zoom feature."/>
   <suffix name="PasswordsAccountStorage"
       label="For PasswordsAccountStorage feature."/>
+  <suffix name="PasswordsManagementBubbleAfterSave"
+      label="For password management bubble after save feature."/>
+  <suffix name="PasswordsManagementBubbleDuringSignin"
+      label="For password management bubble during signin feature."/>
   <suffix name="PasswordSuggestions" label="For PasswordSuggestions feature."/>
+  <suffix name="PasswordsWebAppProfileSwitch"
+      label="For PasswordsWebAppProfileSwitch feature."/>
   <suffix name="PerformanceNewBadge"
       label="For new badge next to Performance feature."/>
   <suffix name="PowerBookmarksSidePanel"

@@ -123,12 +123,21 @@ if (is_fuchsia) {
 # TODO(crbug.com/1304707): Drop toolchain_has_rust after we have support for all
 # our toolchains: Linux x86 is missing in order to build for Android.
 #
+# Rust to C++ type conversions.
+build_rust_base_conversions = toolchain_has_rust && enable_rust_base_conversions
+
 # The Rust implementation of base::JSONReader.
 build_rust_json_reader = toolchain_has_rust && enable_rust_json
 
-buildflag_header("parsing_buildflags") {
-  header = "parsing_buildflags.h"
-  flags = [ "BUILD_RUST_JSON_READER=$build_rust_json_reader" ]
+assert(build_rust_base_conversions || !build_rust_json_reader,
+       "Cannot enable Rust JSON decoder without also base conversions")
+
+buildflag_header("rust_buildflags") {
+  header = "rust_buildflags.h"
+  flags = [
+    "BUILD_RUST_JSON_READER=$build_rust_json_reader",
+    "BUILD_RUST_BASE_CONVERSIONS=$build_rust_base_conversions",
+  ]
 }
 
 if (is_win) {
@@ -247,7 +256,6 @@ component("base") {
     "big_endian.h",
     "bit_cast.h",
     "bits.h",
-    "build_time.cc",
     "build_time.h",
     "callback_list.cc",
     "callback_list.h",
@@ -445,6 +453,7 @@ component("base") {
     "memory/shared_memory_tracker.cc",
     "memory/shared_memory_tracker.h",
     "memory/singleton.h",
+    "memory/stack_allocated.h",
     "memory/unsafe_shared_memory_pool.cc",
     "memory/unsafe_shared_memory_pool.h",
     "memory/unsafe_shared_memory_region.cc",
@@ -1068,9 +1077,9 @@ component("base") {
     ":ios_cronet_buildflags",
     ":logging_buildflags",
     ":orderfile_buildflags",
-    ":parsing_buildflags",
     ":power_monitor_buildflags",
     ":profiler_buildflags",
+    ":rust_buildflags",
     ":sanitizer_buildflags",
     ":synchronization_buildflags",
     ":tracing_buildflags",
@@ -1078,11 +1087,10 @@ component("base") {
     "//base/numerics:base_numerics",
     "//build:chromecast_buildflags",
     "//build:chromeos_buildflags",
-    "//build/rust:rust_buildflags",
     "//third_party/abseil-cpp:absl",
   ]
 
-  if (toolchain_has_rust) {
+  if (build_rust_base_conversions) {
     # Base provides conversions between CXX types and base types (e.g.
     # StringPiece).
     public_deps += [ "//build/rust:cxx_cppdeps" ]
@@ -1247,6 +1255,7 @@ component("base") {
       "android/task_scheduler/post_task_android.h",
       "android/task_scheduler/task_runner_android.cc",
       "android/task_scheduler/task_runner_android.h",
+      "android/task_scheduler/task_traits_android.h",
       "android/thread_instruction_count.cc",
       "android/thread_instruction_count.h",
       "android/timezone_utils.cc",
@@ -1404,6 +1413,7 @@ component("base") {
       "files/memory_mapped_file_posix.cc",
       "fuchsia/default_job.cc",
       "fuchsia/default_job.h",
+      "fuchsia/fidl_event_handler.h",
       "fuchsia/file_utils.cc",
       "fuchsia/file_utils.h",
       "fuchsia/filtered_service_directory.cc",
@@ -1479,9 +1489,9 @@ component("base") {
       "//third_party/fuchsia-sdk/sdk/fidl/fuchsia.intl:fuchsia.intl_hlcpp",
       "//third_party/fuchsia-sdk/sdk/fidl/fuchsia.io:fuchsia.io_cpp",
       "//third_party/fuchsia-sdk/sdk/fidl/fuchsia.io:fuchsia.io_hlcpp",
-      "//third_party/fuchsia-sdk/sdk/fidl/fuchsia.logger:fuchsia.logger_hlcpp",
+      "//third_party/fuchsia-sdk/sdk/fidl/fuchsia.logger:fuchsia.logger_cpp",
       "//third_party/fuchsia-sdk/sdk/fidl/fuchsia.mem:fuchsia.mem_hlcpp",
-      "//third_party/fuchsia-sdk/sdk/fidl/fuchsia.process.lifecycle:fuchsia.process.lifecycle_hlcpp",
+      "//third_party/fuchsia-sdk/sdk/fidl/fuchsia.process.lifecycle:fuchsia.process.lifecycle_cpp",
       "//third_party/fuchsia-sdk/sdk/pkg/async",
       "//third_party/fuchsia-sdk/sdk/pkg/component_incoming_cpp",
       "//third_party/fuchsia-sdk/sdk/pkg/fdio",
@@ -1498,7 +1508,7 @@ component("base") {
       "//third_party/fuchsia-sdk/sdk/fidl/fuchsia.buildinfo:fuchsia.buildinfo_cpp",
       "//third_party/fuchsia-sdk/sdk/fidl/fuchsia.hwinfo:fuchsia.hwinfo_cpp",
       "//third_party/fuchsia-sdk/sdk/fidl/fuchsia.io:fuchsia.io_cpp_hlcpp_conversion",
-      "//third_party/fuchsia-sdk/sdk/fidl/fuchsia.media:fuchsia.media_hlcpp",
+      "//third_party/fuchsia-sdk/sdk/fidl/fuchsia.media:fuchsia.media_cpp",
       "//third_party/fuchsia-sdk/sdk/fidl/fuchsia.sys:fuchsia.sys_hlcpp",
       "//third_party/fuchsia-sdk/sdk/pkg/async-default",
       "//third_party/fuchsia-sdk/sdk/pkg/async-loop-cpp",
@@ -2204,6 +2214,8 @@ component("base") {
       ]
     } else {
       sources -= [
+        "allocator/dispatcher/dispatcher.cc",
+        "allocator/dispatcher/dispatcher.h",
         "sampling_heap_profiler/poisson_allocation_sampler.cc",
         "sampling_heap_profiler/poisson_allocation_sampler.h",
         "sampling_heap_profiler/sampling_heap_profiler.cc",
@@ -3047,7 +3059,6 @@ source_set("arm_bti_testfunctions") {
 
 test("base_unittests") {
   sources = [
-    "allocator/dispatcher/dispatcher_unittest.cc",
     "allocator/dispatcher/initializer_unittest.cc",
     "allocator/dispatcher/internal/dispatcher_internal_unittest.cc",
     "allocator/dispatcher/testing/dispatcher_test.cc",
@@ -3094,7 +3105,6 @@ test("base_unittests") {
     "containers/linked_list_unittest.cc",
     "containers/lru_cache_unittest.cc",
     "containers/small_map_unittest.cc",
-    "containers/span_rust_unittest.cc",
     "containers/span_unittest.cc",
     "containers/stack_container_unittest.cc",
     "containers/unique_ptr_adapters_unittest.cc",
@@ -3260,7 +3270,6 @@ test("base_unittests") {
     "strings/safe_sprintf_unittest.cc",
     "strings/strcat_unittest.cc",
     "strings/string_number_conversions_unittest.cc",
-    "strings/string_piece_rust_unittest.cc",
     "strings/string_piece_unittest.cc",
     "strings/string_split_unittest.cc",
     "strings/string_tokenizer_unittest.cc",
@@ -3411,6 +3420,17 @@ test("base_unittests") {
     "vlog_unittest.cc",
   ]
 
+  if (build_rust_base_conversions) {
+    sources += [
+      "containers/span_rust_unittest.cc",
+      "strings/string_piece_rust_unittest.cc",
+    ]
+  }
+
+  if (use_allocator_shim) {
+    sources += [ "allocator/dispatcher/dispatcher_unittest.cc" ]
+  }
+
   if (use_custom_libcxx && enable_safe_libcxx) {
     sources += [ "libcpp_hardening_test.cc" ]
   }
@@ -3450,7 +3470,7 @@ test("base_unittests") {
     data_deps += [ "//clank/build/bot/filters:base_unittests_filters" ]
   }
 
-  if (toolchain_has_rust) {
+  if (build_rust_base_conversions) {
     deps += [ "//build/rust:cxx_cppdeps" ]
   }
 
@@ -3872,6 +3892,7 @@ test("base_unittests") {
     sources += [
       "files/dir_reader_posix_unittest.cc",
       "files/file_descriptor_watcher_posix_unittest.cc",
+      "fuchsia/fidl_event_handler_unittest.cc",
       "fuchsia/file_utils_unittest.cc",
       "fuchsia/filtered_service_directory_unittest.cc",
       "fuchsia/fuchsia_logging_unittest.cc",
@@ -3897,7 +3918,7 @@ test("base_unittests") {
       "//third_party/fuchsia-sdk/sdk/fidl/fuchsia.buildinfo:fuchsia.buildinfo_cpp",
       "//third_party/fuchsia-sdk/sdk/fidl/fuchsia.hwinfo:fuchsia.hwinfo_cpp",
       "//third_party/fuchsia-sdk/sdk/fidl/fuchsia.intl:fuchsia.intl_hlcpp",
-      "//third_party/fuchsia-sdk/sdk/fidl/fuchsia.logger:fuchsia.logger_hlcpp",
+      "//third_party/fuchsia-sdk/sdk/fidl/fuchsia.logger:fuchsia.logger_cpp",
       "//third_party/fuchsia-sdk/sdk/fidl/fuchsia.mem:fuchsia.mem_hlcpp",
       "//third_party/fuchsia-sdk/sdk/fidl/fuchsia.sys:fuchsia.sys_cpp",
       "//third_party/fuchsia-sdk/sdk/fidl/fuchsia.sys:fuchsia.sys_hlcpp",
@@ -3998,7 +4019,7 @@ test("base_unittests") {
 }
 
 action("build_date") {
-  script = "//build/write_build_date_header.py"
+  script = "write_build_date_header.py"
 
   outputs = [ "$target_gen_dir/generated_build_date.h" ]
 
@@ -4195,6 +4216,7 @@ if (is_android) {
       ":jni_java",
       "//build/android:build_java",
       "//third_party/android_deps:com_google_code_findbugs_jsr305_java",
+      "//third_party/android_deps:com_google_errorprone_error_prone_annotations_java",
       "//third_party/androidx:androidx_annotation_annotation_experimental_java",
       "//third_party/androidx:androidx_annotation_annotation_java",
       "//third_party/androidx:androidx_collection_collection_java",
@@ -4320,7 +4342,6 @@ if (is_android) {
       "android/java/src/org/chromium/base/task/BackgroundOnlyAsyncTask.java",
       "android/java/src/org/chromium/base/task/ChainedTasks.java",
       "android/java/src/org/chromium/base/task/ChromeThreadPoolExecutor.java",
-      "android/java/src/org/chromium/base/task/DefaultTaskExecutor.java",
       "android/java/src/org/chromium/base/task/PostTask.java",
       "android/java/src/org/chromium/base/task/SequencedTaskRunner.java",
       "android/java/src/org/chromium/base/task/SequencedTaskRunnerImpl.java",
@@ -4330,8 +4351,8 @@ if (is_android) {
       "android/java/src/org/chromium/base/task/TaskExecutor.java",
       "android/java/src/org/chromium/base/task/TaskRunner.java",
       "android/java/src/org/chromium/base/task/TaskRunnerImpl.java",
-      "android/java/src/org/chromium/base/task/TaskTraits.java",
-      "android/java/src/org/chromium/base/task/TaskTraitsExtensionDescriptor.java",
+      "android/java/src/org/chromium/base/task/ThreadPoolTaskExecutor.java",
+      "android/java/src/org/chromium/base/task/UiThreadTaskExecutor.java",
     ]
 
     if (!is_cronet_build) {
@@ -4531,7 +4552,6 @@ if (is_android) {
       "test/android/javatests/src/org/chromium/base/test/util/Manual.java",
       "test/android/javatests/src/org/chromium/base/test/util/Matchers.java",
       "test/android/javatests/src/org/chromium/base/test/util/MaxAndroidSdkLevel.java",
-      "test/android/javatests/src/org/chromium/base/test/util/MetricsUtils.java",
       "test/android/javatests/src/org/chromium/base/test/util/MinAndroidSdkLevel.java",
       "test/android/javatests/src/org/chromium/base/test/util/PackageManagerWrapper.java",
       "test/android/javatests/src/org/chromium/base/test/util/PayloadCallbackHelper.java",
@@ -4621,7 +4641,6 @@ if (is_android) {
       "android/junit/src/org/chromium/base/supplier/UnownedUserDataSupplierTest.java",
       "android/junit/src/org/chromium/base/task/AsyncTaskThreadTest.java",
       "android/junit/src/org/chromium/base/task/SequencedTaskRunnerTaskMigrationTest.java",
-      "android/junit/src/org/chromium/base/task/TaskTraitsTest.java",
       "android/junit/src/org/chromium/base/util/GarbageCollectionTestUtilsUnitTest.java",
       "test/android/junit/src/org/chromium/base/test/SetUpStatementTest.java",
       "test/android/junit/src/org/chromium/base/test/TestListInstrumentationRunListenerTest.java",
@@ -4660,6 +4679,7 @@ if (is_android) {
       "android/library_loader/library_loader_hooks.h",
       "android/linker/linker_jni.h",
       "android/task_scheduler/task_runner_android.h",
+      "android/task_scheduler/task_traits_android.h",
       "memory/memory_pressure_listener.h",
       "metrics/histogram_base.h",
       "task/task_traits.h",

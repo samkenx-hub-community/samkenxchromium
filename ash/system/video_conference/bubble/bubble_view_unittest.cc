@@ -42,13 +42,14 @@ class SquareCinnamonCereal : public VcEffectsDelegate {
         VcEffectType::kToggle,
         base::BindRepeating(&SquareCinnamonCereal::GetEffectState,
                             base::Unretained(this),
-                            /*effect_id=*/VcEffectState::kUnusedId));
+                            /*effect_id=*/VcEffectId::kTestEffect),
+        VcEffectId::kTestEffect);
     auto state = std::make_unique<VcEffectState>(
         &ash::kPrivacyIndicatorsCameraIcon, u"Square Cinnamon Cereal",
         IDS_PRIVACY_NOTIFICATION_TITLE_CAMERA,
         base::BindRepeating(&SquareCinnamonCereal::OnEffectControlActivated,
                             base::Unretained(this),
-                            /*effect_id=*/VcEffectState::kUnusedId,
+                            /*effect_id=*/VcEffectId::kTestEffect,
                             /*value=*/absl::nullopt));
     effect->AddState(std::move(state));
     effect->set_container_id(kSquareCinnamonCerealViewId);
@@ -60,8 +61,10 @@ class SquareCinnamonCereal : public VcEffectsDelegate {
   ~SquareCinnamonCereal() override = default;
 
   // VcEffectsDelegate:
-  absl::optional<int> GetEffectState(int effect_id) override { return 0; }
-  void OnEffectControlActivated(absl::optional<int> effect_id,
+  absl::optional<int> GetEffectState(VcEffectId effect_id) override {
+    return 0;
+  }
+  void OnEffectControlActivated(VcEffectId effect_id,
                                 absl::optional<int> state) override {}
 };
 
@@ -74,13 +77,14 @@ class SnackNationForever : public VcEffectsDelegate {
         VcEffectType::kSetValue,
         base::BindRepeating(&SnackNationForever::GetEffectState,
                             base::Unretained(this),
-                            /*effect_id=*/VcEffectState::kUnusedId));
+                            /*effect_id=*/VcEffectId::kTestEffect),
+        VcEffectId::kTestEffect);
     auto state = std::make_unique<VcEffectState>(
         &ash::kPrivacyIndicatorsCameraIcon, u"Snack Nation",
         IDS_PRIVACY_NOTIFICATION_TITLE_CAMERA,
         base::BindRepeating(&SnackNationForever::OnEffectControlActivated,
                             base::Unretained(this),
-                            /*effect_id=*/VcEffectState::kUnusedId,
+                            /*effect_id=*/VcEffectId::kTestEffect,
                             /*value=*/0),
         /*state=*/0);
     effect->AddState(std::move(state));
@@ -93,8 +97,10 @@ class SnackNationForever : public VcEffectsDelegate {
   ~SnackNationForever() override = default;
 
   // VcEffectsDelegate:
-  absl::optional<int> GetEffectState(int effect_id) override { return 0; }
-  void OnEffectControlActivated(absl::optional<int> effect_id,
+  absl::optional<int> GetEffectState(VcEffectId effect_id) override {
+    return 0;
+  }
+  void OnEffectControlActivated(VcEffectId effect_id,
                                 absl::optional<int> state) override {}
 };
 
@@ -217,6 +223,8 @@ class BubbleViewTest : public AshTestBase {
       super_cuteness_;
 };
 
+// TODO(b/273604669): Move tests that are only related to `toggle_effects_view`
+// to its own unit test file.
 TEST_F(BubbleViewTest, NoEffects) {
   EXPECT_FALSE(bubble_view());
 
@@ -575,11 +583,10 @@ TEST_P(ResourceDependencyTest, ResourceDependency) {
   // app(s) has been granted permission to use the resource.
   const bool camera_satisfied =
       !has_camera_dependency() ||
-      (has_camera_dependency() && camera_enabled() && has_camera_permission());
+      (has_camera_dependency() && has_camera_permission());
   const bool microphone_satisfied =
       !has_microphone_dependency() ||
-      (has_microphone_dependency() && microphone_enabled() &&
-       has_microphone_permission());
+      (has_microphone_dependency() && has_microphone_permission());
 
   if (camera_satisfied && microphone_satisfied) {
     EXPECT_TRUE(toggle_effect_container_view());

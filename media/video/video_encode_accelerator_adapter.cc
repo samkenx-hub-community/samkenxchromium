@@ -381,6 +381,14 @@ void VideoEncodeAcceleratorAdapter::InitializeOnAcceleratorThread(
     return;
   }
 
+  if (options.bitrate.has_value() &&
+      options.bitrate->mode() == Bitrate::Mode::kExternal) {
+    std::move(done_cb).Run(
+        EncoderStatus(EncoderStatus::Codes::kEncoderUnsupportedConfig,
+                      "Unsupported bitrate mode"));
+    return;
+  }
+
   if (!options.frame_size.GetCheckedArea().IsValid()) {
     std::move(done_cb).Run(
         EncoderStatus(EncoderStatus::Codes::kEncoderUnsupportedConfig,
@@ -842,7 +850,8 @@ void VideoEncodeAcceleratorAdapter::BitstreamBufferReady(
   bool erased_active_encode = false;
   for (auto it = active_encodes_.begin(); it != active_encodes_.end(); ++it) {
     if ((*it)->timestamp == result.timestamp) {
-      result.color_space = (*it)->color_space;
+      result.color_space =
+          metadata.encoded_color_space.value_or((*it)->color_space);
       std::move((*it)->done_callback).Run(EncoderStatus::Codes::kOk);
       active_encodes_.erase(it);
       erased_active_encode = true;

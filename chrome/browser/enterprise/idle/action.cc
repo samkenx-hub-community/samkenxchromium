@@ -20,13 +20,17 @@
 #include "chrome/common/pref_names.h"
 #include "components/prefs/pref_service.h"
 #include "content/public/browser/browsing_data_remover.h"
+#include "content/public/browser/web_contents.h"
 
-#if !BUILDFLAG(IS_ANDROID)
+#if BUILDFLAG(IS_ANDROID)
+#include "chrome/browser/ui/android/tab_model/tab_model.h"
+#include "chrome/browser/ui/android/tab_model/tab_model_list.h"
+#else
 #include "chrome/browser/enterprise/idle/dialog_manager.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_list.h"
 #include "chrome/browser/ui/profile_picker.h"
-#endif  // !BUILDFLAG(IS_ANDROID)
+#endif  // BUILDFLAG(IS_ANDROID)
 
 namespace enterprise_idle {
 
@@ -50,7 +54,8 @@ bool ProfileHasBrowsers(const Profile* profile) {
 // ActionFactory if appropriate.
 class ShowDialogAction : public Action {
  public:
-  ShowDialogAction() : Action(/*priority=*/-1) {}
+  explicit ShowDialogAction(base::flat_set<ActionType> action_types)
+      : Action(/*priority=*/-1), action_types_(action_types) {}
 
   void Run(Profile* profile, Continuation continuation) override {
     base::TimeDelta timeout =
@@ -59,8 +64,9 @@ class ShowDialogAction : public Action {
     // Action object's lifetime extends until it calls `continuation_`, so
     // passing `this` as a raw pointer is safe.
     subscription_ = DialogManager::GetInstance()->ShowDialog(
-        timeout, base::BindOnce(&ShowDialogAction::OnCloseFinished,
-                                base::Unretained(this)));
+        timeout, action_types_,
+        base::BindOnce(&ShowDialogAction::OnCloseFinished,
+                       base::Unretained(this)));
   }
 
   bool ShouldNotifyUserOfPendingDestructiveAction(Profile* profile) override {
@@ -73,6 +79,7 @@ class ShowDialogAction : public Action {
     std::move(continuation_).Run(/*success=*/expired);
   }
 
+  base::flat_set<ActionType> action_types_;
   Action::Continuation continuation_;
   base::CallbackListSubscription subscription_;
 };
@@ -174,7 +181,7 @@ class ClearBrowsingDataAction : public Action,
   }
 
   bool ShouldNotifyUserOfPendingDestructiveAction(Profile* profile) override {
-    return false;
+    return true;
   }
 
   // content::BrowsingDataRemoverObserver::Observer:
@@ -234,6 +241,40 @@ class ClearBrowsingDataAction : public Action,
   Continuation continuation_;
 };
 
+class ReloadPagesAction : public Action {
+ public:
+  ReloadPagesAction() : Action(static_cast<int>(ActionType::kReloadPages)) {}
+
+  void Run(Profile* profile, Continuation continuation) override {
+#if BUILDFLAG(IS_ANDROID)
+    // This covers regular tabs, PWAs, and CCTs.
+    for (TabModel* model : TabModelList::models()) {
+#else
+    // This covers regular tabs and PWAs.
+    for (Browser* browser : *BrowserList::GetInstance()) {
+      TabStripModel* model = browser->tab_strip_model();
+#endif  // BUILDFLAG(IS_ANDROID)
+      if (model->GetProfile() != profile) {
+        continue;  // Deliberately ignore incognito.
+      }
+      for (int i = 0; i < model->GetTabCount(); i++) {
+        model->GetWebContentsAt(i)->GetController().Reload(
+            content::ReloadType::NORMAL,
+            /*check_for_repost=*/true);
+      }
+    }
+    std::move(continuation).Run(/*success=*/true);
+  }
+
+  bool ShouldNotifyUserOfPendingDestructiveAction(Profile* profile) override {
+#if BUILDFLAG(IS_ANDROID)
+    return true;
+#else
+    return profile && ProfileHasBrowsers(profile);
+#endif
+  }
+};
+
 }  // namespace
 
 Action::Action(int priority) : priority_(priority) {}
@@ -283,6 +324,10 @@ ActionFactory::ActionQueue ActionFactory::Build(
         clear_actions.insert(action_type);
         break;
 
+      case ActionType::kReloadPages:
+        actions.push_back(std::make_unique<ReloadPagesAction>());
+        break;
+
       default:
         // TODO(crbug.com/1316551): Perform validation in the `PolicyHandler`.
         NOTREACHED();
@@ -300,7 +345,8 @@ ActionFactory::ActionQueue ActionFactory::Build(
     return a->ShouldNotifyUserOfPendingDestructiveAction(profile);
   });
   if (needs_dialog) {
-    actions.push_back(std::make_unique<ShowDialogAction>());
+    actions.push_back(std::make_unique<ShowDialogAction>(
+        base::flat_set<ActionType>(action_types)));
   }
 #endif  // !BUILDFLAG(IS_ANDROID)
 

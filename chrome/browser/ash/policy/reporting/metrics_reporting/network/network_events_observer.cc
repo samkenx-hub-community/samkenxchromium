@@ -10,6 +10,7 @@
 #include "base/check.h"
 #include "base/containers/contains.h"
 #include "base/containers/queue.h"
+#include "base/feature_list.h"
 #include "base/logging.h"
 #include "base/task/bind_post_task.h"
 #include "chrome/browser/ash/net/network_health/network_health_manager.h"
@@ -34,6 +35,13 @@ bool IsConnectedWifiNetwork(const ash::NetworkState* network_state) {
 
 }  // namespace
 
+BASE_FEATURE(kEnableWifiSignalEventsReporting,
+             "EnableWifiSignalEventsReporting",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+BASE_FEATURE(kEnableNetworkConnectionStateEventsReporting,
+             "EnableNetworkConnectionStateEventsReporting",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 NetworkEventsObserver::NetworkEventsObserver()
     : MojoServiceEventsObserverBase<
           chromeos::network_health::mojom::NetworkEventsObserver>(this) {}
@@ -48,9 +56,17 @@ void NetworkEventsObserver::OnConnectionStateChanged(
   using NetworkStateMojom = chromeos::network_health::mojom::NetworkState;
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
 
+  if (!base::FeatureList::IsEnabled(
+          kEnableNetworkConnectionStateEventsReporting)) {
+    return;
+  }
+
   const auto* network_state = ::ash::NetworkHandler::Get()
                                   ->network_state_handler()
                                   ->GetNetworkStateFromGuid(guid);
+  if (!network_state) {
+    return;
+  }
   const auto network_type =
       ::ash::NetworkTypePattern::Primitive(network_state->type());
   if (!network_type.MatchesPattern(ash::NetworkTypePattern::Physical())) {
@@ -152,6 +168,10 @@ void NetworkEventsObserver::SetReportingEnabled(bool is_enabled) {
 
 void NetworkEventsObserver::CheckForSignalStrengthEvent(
     const ash::NetworkState* network_state) {
+  if (!base::FeatureList::IsEnabled(kEnableWifiSignalEventsReporting)) {
+    return;
+  }
+
   auto wifi_signal_rssi_cb = base::BindOnce(
       &NetworkEventsObserver::OnSignalStrengthChangedRssiValueReceived,
       weak_ptr_factory_.GetWeakPtr(), network_state->guid(),

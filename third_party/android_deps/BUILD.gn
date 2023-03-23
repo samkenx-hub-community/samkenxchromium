@@ -7,6 +7,7 @@ import("//build/config/android/rules.gni")
 # Library groups
 if (!limit_android_deps) {
   java_group("dagger_java") {
+    preferred_dep = true
     if (defined(dagger_java_target)) {
       deps = [ dagger_java_target ]
     } else {
@@ -26,6 +27,7 @@ if (!limit_android_deps) {
   }
 
   java_group("espresso_java") {
+    preferred_dep = true
     testonly = true
 
     # TODO(crbug.com/1005891): Update to use espresso targets below once androidx
@@ -34,6 +36,7 @@ if (!limit_android_deps) {
   }
 
   java_group("guava_android_java") {
+    preferred_dep = true
     if (defined(guava_android_target)) {
       deps = [ guava_android_target ]
     } else {
@@ -43,6 +46,7 @@ if (!limit_android_deps) {
   }
 
   java_group("robolectric_all_java") {
+    preferred_dep = true
     testonly = true
 
     deps = [
@@ -60,6 +64,7 @@ if (!limit_android_deps) {
   }
 
   java_group("material_design_java") {
+    preferred_dep = true
     if (defined(material_design_target)) {
       deps = [ material_design_target ]
     } else {
@@ -70,6 +75,7 @@ if (!limit_android_deps) {
   }
 
   java_group("protobuf_lite_runtime_java") {
+    preferred_dep = true
     deps = [ android_proto_runtime ]
   }
 
@@ -84,6 +90,7 @@ if (!limit_android_deps) {
   }
 
   java_group("playcore_java") {
+    preferred_dep = true
     if (defined(playcore_target)) {
       deps = [ playcore_target ]
     } else {
@@ -1531,6 +1538,15 @@ if (!limit_android_deps) {
   }
 
   # This is generated, do not edit. Update BuildConfigGenerator.groovy instead.
+  java_prebuilt("org_mockito_mockito_subclass_java") {
+    jar_path = "libs/org_mockito_mockito_subclass/mockito-subclass-5.1.1.jar"
+    output_name = "org_mockito_mockito_subclass"
+    supports_android = true
+    testonly = true
+    deps = [ ":org_mockito_mockito_core_java" ]
+  }
+
+  # This is generated, do not edit. Update BuildConfigGenerator.groovy instead.
   java_prebuilt("org_robolectric_robolectric_java") {
     jar_path = "libs/org_robolectric_robolectric/robolectric-4.8.1.jar"
     output_name = "org_robolectric_robolectric"
@@ -2342,24 +2358,6 @@ if (!limit_android_deps) {
 
     # Can't find com.sun.jna / dalvik.system classes.
     enable_bytecode_checks = false
-  }
-
-  # This is generated, do not edit. Update BuildConfigGenerator.groovy instead.
-  java_prebuilt("net_sf_kxml_kxml2_java") {
-    jar_path = "libs/net_sf_kxml_kxml2/kxml2-2.3.0.jar"
-    output_name = "net_sf_kxml_kxml2"
-    supports_android = true
-
-    # To remove visibility constraint, add this dependency to
-    # //third_party/android_deps/build.gradle.
-    visibility = [
-      ":*",
-      "//third_party/androidx:*",
-    ]
-    testonly = true
-
-    # Target needs to exclude *xmlpull* files as already included in Android SDK.
-    jar_excluded_patterns = [ "*xmlpull*" ]
   }
 
   # This is generated, do not edit. Update BuildConfigGenerator.groovy instead.

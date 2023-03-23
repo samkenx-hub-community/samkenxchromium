@@ -557,7 +557,6 @@ public class StartSurfaceTest {
             assertEquals(0, START_SURFACE_RETURN_TIME_SECONDS.getValue());
         }
 
-        Assert.assertEquals("single", StartSurfaceConfiguration.START_SURFACE_VARIATION.getValue());
         Assert.assertEquals(isSingleTabSwitcher,
                 StartSurfaceConfiguration.START_SURFACE_LAST_ACTIVE_TAB_ONLY.getValue());
         StartSurfaceTestUtils.waitForStartSurfaceVisible(mLayoutChangedCallbackHelper,
@@ -737,7 +736,6 @@ public class StartSurfaceTest {
     @Feature({"StartSurface"})
     @EnableFeatures(ChromeFeatureList.START_SURFACE_REFACTOR)
     @CommandLineFlags.Add({START_SURFACE_TEST_SINGLE_ENABLED_PARAMS})
-    @DisabledTest(message = "Flaky, crbug.com/1407193")
     public void testShow_SingleAsHomepage_DoNotResetScrollPositionFromBack() {
         assumeTrue(mImmediateReturn);
 

@@ -100,13 +100,19 @@ class IntegrationTest : public ::testing::Test {
     ASSERT_NO_FATAL_FAILURE(EnterTestMode(GURL("http://localhost:1234")));
 
 #if BUILDFLAG(IS_LINUX)
-    // On LUCI the XDG_RUNTIME_DIR environment variable may not be set. This is
-    // required for systemctl to connect to its bus in user mode.
+    // On LUCI the XDG_RUNTIME_DIR and DBUS_SESSION_BUS_ADDRESS environment
+    // variables may not be set. These are required for systemctl to connect to
+    // its bus in user mode.
     std::unique_ptr<base::Environment> env = base::Environment::Create();
+    const std::string xdg_runtime_dir =
+        base::StrCat({"/run/user/", base::NumberToString(getuid())});
     if (!env->HasVar("XDG_RUNTIME_DIR")) {
-      ASSERT_TRUE(env->SetVar(
-          "XDG_RUNTIME_DIR",
-          base::StrCat({"/run/user/", base::NumberToString(getuid())})));
+      ASSERT_TRUE(env->SetVar("XDG_RUNTIME_DIR", xdg_runtime_dir));
+    }
+    if (!env->HasVar("DBUS_SESSION_BUS_ADDRESS")) {
+      ASSERT_TRUE(
+          env->SetVar("DBUS_SESSION_BUS_ADDRESS",
+                      base::StrCat({"unix:path=", xdg_runtime_dir, "/bus"})));
     }
 #endif
   }
@@ -183,11 +189,14 @@ class IntegrationTest : public ::testing::Test {
     test_commands_->ExpectMarshalInterfaceSucceeds();
   }
 
-  void ExpectLegacyUpdate3WebSucceeds(const std::string& app_id,
-                                      int expected_final_state,
-                                      int expected_error_code) {
-    test_commands_->ExpectLegacyUpdate3WebSucceeds(app_id, expected_final_state,
-                                                   expected_error_code);
+  void ExpectLegacyUpdate3WebSucceeds(
+      const std::string& app_id,
+      AppBundleWebCreateMode app_bundle_web_create_mode,
+      int expected_final_state,
+      int expected_error_code) {
+    test_commands_->ExpectLegacyUpdate3WebSucceeds(
+        app_id, app_bundle_web_create_mode, expected_final_state,
+        expected_error_code);
   }
 
   void ExpectLegacyProcessLauncherSucceeds() {
@@ -411,17 +420,10 @@ TEST_F(IntegrationTest, Install) {
   ASSERT_NO_FATAL_FAILURE(Uninstall());
 }
 
-// TODO(crbug.com/1398845) Enable test once SetupRealUpdaterLowerVersion
-// is implemented.
-#if !BUILDFLAG(IS_LINUX)
-// TODO(crbug.com/1396103): fix after implementing `CheckForUpdate` and
-// rolling out a new CIPD build.
-#if BUILDFLAG(IS_WIN)
-#define MAYBE_OverinstallWorking DISABLED_OverinstallWorking
-#else
-#define MAYBE_OverinstallWorking OverinstallWorking
-#endif
-TEST_F(IntegrationTest, MAYBE_OverinstallWorking) {
+// TODO(crbug.com/1398845) Enable test once version-skewed updater is available
+// for unbranded Linux.
+#if !(BUILDFLAG(IS_LINUX) && BUILDFLAG(CHROMIUM_BRANDING))
+TEST_F(IntegrationTest, OverinstallWorking) {
   ASSERT_NO_FATAL_FAILURE(SetupRealUpdaterLowerVersion());
   ASSERT_TRUE(WaitForUpdaterExit());
   ASSERT_NO_FATAL_FAILURE(ExpectVersionNotActive(kUpdaterVersion));
@@ -435,14 +437,7 @@ TEST_F(IntegrationTest, MAYBE_OverinstallWorking) {
   ASSERT_NO_FATAL_FAILURE(Uninstall());
 }
 
-// TODO(crbug.com/1396103): fix after implementing `CheckForUpdate` and
-// rolling out a new CIPD build.
-#if BUILDFLAG(IS_WIN)
-#define MAYBE_OverinstallBroken DISABLED_OverinstallBroken
-#else
-#define MAYBE_OverinstallBroken OverinstallBroken
-#endif
-TEST_F(IntegrationTest, MAYBE_OverinstallBroken) {
+TEST_F(IntegrationTest, OverinstallBroken) {
   ASSERT_NO_FATAL_FAILURE(SetupRealUpdaterLowerVersion());
   ASSERT_TRUE(WaitForUpdaterExit());
   ASSERT_NO_FATAL_FAILURE(DeleteUpdaterDirectory());
@@ -462,7 +457,7 @@ TEST_F(IntegrationTest, MAYBE_OverinstallBroken) {
   ASSERT_TRUE(WaitForUpdaterExit());
   ASSERT_NO_FATAL_FAILURE(Uninstall());
 }
-#endif  // !BUILDFLAG(IS_LINUX)
+#endif  // !(BUILDFLAG(IS_LINUX) && BUILDFLAG(CHROMIUM_BRANDING))
 
 TEST_F(IntegrationTest, SelfUninstallOutdatedUpdater) {
   ASSERT_NO_FATAL_FAILURE(Install());
@@ -599,17 +594,23 @@ TEST_F(IntegrationTest, CheckForUpdate_UpdaterNotInstalled) {
   update_service->CheckForUpdate(
       "test", UpdateService::Priority::kForeground,
       UpdateService::PolicySameVersionUpdate::kNotAllowed, base::DoNothing(),
-      base::BindLambdaForTesting([&loop](UpdateService::Result result_unused) {
-        EXPECT_EQ(result_unused, UpdateService::Result::kServiceFailed);
+      base::BindLambdaForTesting([&loop](UpdateService::Result result) {
+        EXPECT_TRUE(result == UpdateService::Result::kServiceFailed ||
+                    result == UpdateService::Result::kIPCConnectionFailed)
+            << "result == " << result;
         loop.Quit();
       }));
   loop.Run();
 }
 
-// TODO(crbug.com/1396103): enable this test on POSIX after making the Mojo
-// changes to remote the function `CheckForUpdate`.
-#if BUILDFLAG(IS_WIN)
 TEST_F(IntegrationTest, CheckForUpdate) {
+#if BUILDFLAG(IS_WIN)
+  // TODO(crbug.com/1425609): Remove procmon logging once bug is fixed.
+  const base::ScopedClosureRunner stop_procmon_logging(
+      base::BindOnce(&updater::test::StopProcmonLogging,
+                     updater::test::StartProcmonLogging()));
+#endif  // #if BUILDFLAG(IS_WIN)
+
   ScopedServer test_server(test_commands_);
   ASSERT_NO_FATAL_FAILURE(Install());
 
@@ -622,7 +623,6 @@ TEST_F(IntegrationTest, CheckForUpdate) {
 
   ASSERT_NO_FATAL_FAILURE(Uninstall());
 }
-#endif  // IS_WIN
 
 TEST_F(IntegrationTest, UpdateApp) {
   ScopedServer test_server(test_commands_);
@@ -882,9 +882,12 @@ TEST_F(IntegrationTest, UnregisterUnownedApp) {
 
 #if BUILDFLAG(CHROMIUM_BRANDING) || BUILDFLAG(GOOGLE_CHROME_BRANDING)
 #if !defined(COMPONENT_BUILD)
-// TODO(crbug.com/1398845): Enable test once SetupRealUpdaterLowerVersion
-// is implemented.
-#if !BUILDFLAG(IS_LINUX)
+// TODO(crbug.com/1398845) Enable test once version-skewed updater is available
+// for unbranded Linux.
+#if !BUILDFLAG(IS_LINUX) || BUILDFLAG(GOOGLE_CHROME_BRANDING)
+// TODO(crbug.com/1097297) Enable these tests once the `Brand the updater and
+// qualification app ids` change is available on CIPD.
+#if BUILDFLAG(GOOGLE_CHROME_BRANDING)
 TEST_F(IntegrationTest, SelfUpdateFromOldReal) {
   ScopedServer test_server(test_commands_);
 
@@ -941,6 +944,9 @@ TEST_F(IntegrationTest, UninstallIfUnusedSelfAndOldReal) {
 
   // Expect that the updater uninstalled itself as well as the lower version.
 }
+#endif  // #if BUILDFLAG(GOOGLE_CHROME_BRANDING) TODO(crbug.com/1097297) Enable
+        // these tests once the `Brand the updater and qualification app ids`
+        // change is available on CIPD.
 
 // Tests that installing and uninstalling an old version of the updater from
 // CIPD is possible.
@@ -961,7 +967,7 @@ TEST_F(IntegrationTest, InstallLowerVersion) {
 #endif  // IS_WIN
 }
 
-#endif  // !BUILDFLAG(IS_LINUX)
+#endif  // !BUILDFLAG(IS_LINUX) || BUILDFLAG(GOOGLE_CHROME_BRANDING)
 #endif
 #endif
 
@@ -1123,45 +1129,69 @@ class IntegrationTestLegacyUpdate3Web : public IntegrationTest {
 
 TEST_F(IntegrationTestLegacyUpdate3Web, NoUpdate) {
   ASSERT_NO_FATAL_FAILURE(ExpectNoUpdateSequence(test_server_.get(), kAppId));
-  ASSERT_NO_FATAL_FAILURE(
-      ExpectLegacyUpdate3WebSucceeds(kAppId, STATE_NO_UPDATE, S_OK));
+  ASSERT_NO_FATAL_FAILURE(ExpectLegacyUpdate3WebSucceeds(
+      kAppId, AppBundleWebCreateMode::kCreateInstalledApp, STATE_NO_UPDATE,
+      S_OK));
 }
 
-// TODO(crbug.com/1396103): enable the test after fixing the implementation of
-// `ExpectLegacyUpdate3WebSucceeds`.
-TEST_F(IntegrationTestLegacyUpdate3Web, DISABLED_DisabledPolicyManual) {
+TEST_F(IntegrationTestLegacyUpdate3Web, DisabledPolicyManual) {
   base::Value::Dict group_policies;
   group_policies.Set("Updatetest1", kPolicyAutomaticUpdatesOnly);
   ASSERT_NO_FATAL_FAILURE(SetGroupPolicies(group_policies));
   ASSERT_NO_FATAL_FAILURE(ExpectLegacyUpdate3WebSucceeds(
-      kAppId, STATE_ERROR, GOOPDATE_E_APP_UPDATE_DISABLED_BY_POLICY_MANUAL));
+      kAppId, AppBundleWebCreateMode::kCreateInstalledApp, STATE_ERROR,
+      GOOPDATE_E_APP_UPDATE_DISABLED_BY_POLICY_MANUAL));
 }
 
-// TODO(crbug.com/1396103): enable the test after fixing the implementation of
-// `ExpectLegacyUpdate3WebSucceeds`.
-TEST_F(IntegrationTestLegacyUpdate3Web, DISABLED_DisabledPolicy) {
+TEST_F(IntegrationTestLegacyUpdate3Web, DisabledPolicy) {
   base::Value::Dict group_policies;
   group_policies.Set("Updatetest1", kPolicyDisabled);
   ASSERT_NO_FATAL_FAILURE(SetGroupPolicies(group_policies));
-  ExpectLegacyUpdate3WebSucceeds(kAppId, STATE_ERROR,
-                                 GOOPDATE_E_APP_UPDATE_DISABLED_BY_POLICY);
+  ExpectLegacyUpdate3WebSucceeds(
+      kAppId, AppBundleWebCreateMode::kCreateInstalledApp, STATE_ERROR,
+      GOOPDATE_E_APP_UPDATE_DISABLED_BY_POLICY);
 }
 
 TEST_F(IntegrationTestLegacyUpdate3Web, CheckForUpdate) {
   ASSERT_NO_FATAL_FAILURE(ExpectUpdateCheckSequence(
       test_server_.get(), kAppId, UpdateService::Priority::kForeground,
       base::Version("0.1"), base::Version("0.2")));
-  ASSERT_NO_FATAL_FAILURE(
-      ExpectLegacyUpdate3WebSucceeds(kAppId, STATE_UPDATE_AVAILABLE, S_OK));
+  ASSERT_NO_FATAL_FAILURE(ExpectLegacyUpdate3WebSucceeds(
+      kAppId, AppBundleWebCreateMode::kCreateInstalledApp,
+      STATE_UPDATE_AVAILABLE, S_OK));
 }
 
-// TODO(crbug.com/1396103): fix after implementing `CheckForUpdate`.
-TEST_F(IntegrationTestLegacyUpdate3Web, DISABLED_Update) {
+TEST_F(IntegrationTestLegacyUpdate3Web, Update) {
+  ASSERT_NO_FATAL_FAILURE(ExpectUpdateCheckSequence(
+      test_server_.get(), kAppId, UpdateService::Priority::kForeground,
+      base::Version("0.1"), base::Version("0.2")));
   ASSERT_NO_FATAL_FAILURE(ExpectUpdateSequence(
       test_server_.get(), kAppId, "", UpdateService::Priority::kForeground,
       base::Version("0.1"), base::Version("0.2")));
+  ASSERT_NO_FATAL_FAILURE(ExpectLegacyUpdate3WebSucceeds(
+      kAppId, AppBundleWebCreateMode::kCreateInstalledApp,
+      STATE_INSTALL_COMPLETE, S_OK));
+}
+
+TEST_F(IntegrationTestLegacyUpdate3Web, CheckForInstall) {
+  ASSERT_NO_FATAL_FAILURE(ExpectUpdateCheckSequence(
+      test_server_.get(), kAppId, UpdateService::Priority::kForeground,
+      base::Version("0.1"), base::Version("0.1")));
   ASSERT_NO_FATAL_FAILURE(
-      ExpectLegacyUpdate3WebSucceeds(kAppId, STATE_INSTALL_COMPLETE, S_OK));
+      ExpectLegacyUpdate3WebSucceeds(kAppId, AppBundleWebCreateMode::kCreateApp,
+                                     STATE_UPDATE_AVAILABLE, S_OK));
+}
+
+TEST_F(IntegrationTestLegacyUpdate3Web, Install) {
+  ASSERT_NO_FATAL_FAILURE(ExpectUpdateCheckSequence(
+      test_server_.get(), kAppId, UpdateService::Priority::kForeground,
+      base::Version("0.1"), base::Version("0.1")));
+  ASSERT_NO_FATAL_FAILURE(ExpectUpdateSequence(
+      test_server_.get(), kAppId, "", UpdateService::Priority::kForeground,
+      base::Version("0.1"), base::Version("0.1")));
+  ASSERT_NO_FATAL_FAILURE(
+      ExpectLegacyUpdate3WebSucceeds(kAppId, AppBundleWebCreateMode::kCreateApp,
+                                     STATE_INSTALL_COMPLETE, S_OK));
 }
 #endif  // BUILDFLAG(IS_WIN)
 

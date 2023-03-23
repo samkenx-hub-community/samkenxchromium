@@ -17,6 +17,7 @@
 #import "base/strings/sys_string_conversions.h"
 #import "components/password_manager/core/browser/move_password_to_account_store_helper.h"
 #import "components/password_manager/core/browser/password_form.h"
+#import "components/password_manager/core/browser/password_manager_client.h"
 #import "components/password_manager/core/browser/password_manager_features_util.h"
 #import "components/password_manager/core/browser/password_manager_metrics_util.h"
 #import "components/password_manager/core/browser/ui/credential_ui_entry.h"
@@ -24,6 +25,7 @@
 #import "components/sync/base/features.h"
 #import "components/sync/driver/sync_service.h"
 #import "ios/chrome/browser/passwords/password_check_observer_bridge.h"
+#import "ios/chrome/browser/ui/settings/password/account_storage_utils.h"
 #import "ios/chrome/browser/ui/settings/password/password_details/password_details.h"
 #import "ios/chrome/browser/ui/settings/password/password_details/password_details_consumer.h"
 #import "ios/chrome/browser/ui/settings/password/password_details/password_details_table_view_controller_delegate.h"
@@ -36,6 +38,15 @@ namespace {
 
 bool IsPasswordNotesWithBackupEnabled() {
   return base::FeatureList::IsEnabled(syncer::kPasswordNotesWithBackup);
+}
+
+bool MatchesRealmUsernameAndPassword(
+    PasswordDetails* password,
+    const password_manager::CredentialUIEntry& credential) {
+  return base::SysNSStringToUTF8(password.signonRealm) ==
+             credential.GetFirstSignonRealm() &&
+         base::SysNSStringToUTF16(password.username) == credential.username &&
+         base::SysNSStringToUTF16(password.password) == credential.password;
 }
 
 }  // namespace
@@ -61,11 +72,11 @@ using base::SysNSStringToUTF16;
   // Password manager client.
   raw_ptr<password_manager::PasswordManagerClient> _passwordManagerClient;
 
-  // The signed in user account, or the empty string if there's none.
-  __strong NSString* _signedInAccount;
+  // The BrowserState pref service.
+  raw_ptr<PrefService> _prefService;
 
-  // YES when user is opted in for account storage, NO otherwise.
-  BOOL _isOptedInForAccountStorage;
+  // The sync service.
+  raw_ptr<syncer::SyncService> _syncService;
 }
 
 // Dictionary of usernames of a same domain. Key: domain and value: NSSet of
@@ -107,11 +118,8 @@ using base::SysNSStringToUTF16;
       std::make_unique<PasswordCheckObserverBridge>(self, manager);
   _supportMoveToAccount = supportMoveToAccount;
   _passwordManagerClient = passwordManagerClient;
-  _signedInAccount =
-      base::SysUTF8ToNSString(syncService->GetAccountInfo().email);
-  _isOptedInForAccountStorage =
-      password_manager::features_util::IsOptedInForAccountStorage(prefService,
-                                                                  syncService);
+  _prefService = prefService;
+  _syncService = syncService;
 
   // TODO(crbug.com/1400692): Improve saved passwords logic when helper is
   // available in SavedPasswordsPresenter.
@@ -152,7 +160,9 @@ using base::SysNSStringToUTF16;
     return;
   _consumer = consumer;
 
-  [_consumer setUserEmail:_signedInAccount];
+  // The email might be empty and the callee handles that.
+  [_consumer setUserEmail:base::SysUTF8ToNSString(
+                              _syncService->GetAccountInfo().email)];
 
   [self providePasswordsToConsumer];
 
@@ -179,12 +189,7 @@ using base::SysNSStringToUTF16;
   auto it = base::ranges::find_if(
       _credentials,
       [password](const password_manager::CredentialUIEntry& credential) {
-        return base::SysNSStringToUTF8(password.signonRealm) ==
-                   credential.GetFirstSignonRealm() &&
-               base::SysNSStringToUTF16(password.username) ==
-                   credential.username &&
-               base::SysNSStringToUTF16(password.password) ==
-                   credential.password;
+        return MatchesRealmUsernameAndPassword(password, credential);
       });
   if (it == _credentials.end()) {
     // TODO(crbug.com/1359392): Convert into DCHECK.
@@ -209,12 +214,7 @@ using base::SysNSStringToUTF16;
   auto it = base::ranges::find_if(
       _credentials,
       [password](const password_manager::CredentialUIEntry& credential) {
-        return base::SysNSStringToUTF8(password.signonRealm) ==
-                   credential.GetFirstSignonRealm() &&
-               base::SysNSStringToUTF16(password.username) ==
-                   credential.username &&
-               base::SysNSStringToUTF16(password.password) ==
-                   credential.password;
+        return MatchesRealmUsernameAndPassword(password, credential);
       });
 
   if (it == _credentials.end()) {
@@ -229,6 +229,29 @@ using base::SysNSStringToUTF16;
       password_manager::metrics_util::MoveToAccountStoreTrigger::
           kExplicitlyTriggeredInSettings);
   [self providePasswordsToConsumer];
+}
+
+- (void)moveCredentialToAccountStoreWithConflict:(PasswordDetails*)password {
+  auto localCredential = base::ranges::find_if(
+      _credentials,
+      [password](const password_manager::CredentialUIEntry& credential) {
+        return MatchesRealmUsernameAndPassword(password, credential);
+      });
+  absl::optional<password_manager::CredentialUIEntry> accountCredential =
+      [self conflictingAccountPassword:password];
+  DCHECK(localCredential != _credentials.end());
+  DCHECK(accountCredential.has_value());
+  if (localCredential->last_used_time < accountCredential->last_used_time) {
+    [self removeCredential:password];
+    return;
+  }
+  [self removeCredential:[[PasswordDetails alloc]
+                             initWithCredential:*accountCredential]];
+  [self moveCredentialToAccountStore:password];
+}
+
+- (BOOL)hasPasswordConflictInAccount:(PasswordDetails*)password {
+  return [self conflictingAccountPassword:password].has_value();
 }
 
 #pragma mark - PasswordDetailsTableViewControllerDelegate
@@ -350,18 +373,20 @@ using base::SysNSStringToUTF16;
   NSMutableArray<PasswordDetails*>* passwords = [NSMutableArray array];
   std::vector<password_manager::CredentialUIEntry> insecureCredentials =
       _manager->GetInsecureCredentials();
-  for (password_manager::CredentialUIEntry credential : _credentials) {
+  for (const password_manager::CredentialUIEntry& credential : _credentials) {
     PasswordDetails* password =
         [[PasswordDetails alloc] initWithCredential:credential];
     password.compromised = base::Contains(insecureCredentials, credential);
-    // Move to account option is offered when a credential is not in account
-    // store. If the exact credential is stored in both profile and account
-    // it will not be offered, no need to bother the user.
+    // Only offer moving to the account if all of these hold.
+    // - The embedder of this page wants to support it.
+    // - The entry was flagged as local only in the top-level view.
+    // - The user is interested in saving passwords to the account, i.e. they
+    // are opted in to account storage.
     password.shouldOfferToMoveToAccount =
-        _supportMoveToAccount && _isOptedInForAccountStorage &&
-        !credential.stored_in.contains(
-            password_manager::PasswordForm::Store::kAccountStore) &&
-        !credential.blocked_by_user;
+        _supportMoveToAccount &&
+        password_manager::features_util::IsOptedInForAccountStorage(
+            _prefService, _syncService) &&
+        ShouldShowLocalOnlyIcon(credential, _syncService);
     [passwords addObject:password];
   }
   [self.consumer setPasswords:passwords andTitle:_displayName];
@@ -381,6 +406,26 @@ using base::SysNSStringToUTF16;
     [set removeObject:oldUsername];
     [set addObject:newUsername];
   }
+}
+
+- (absl::optional<password_manager::CredentialUIEntry>)
+    conflictingAccountPassword:(PasswordDetails*)password {
+  auto it = base::ranges::find_if(
+      _credentials,
+      [password](const password_manager::CredentialUIEntry& credential) {
+        return credential.stored_in.contains(
+                   password_manager::PasswordForm::Store::kAccountStore) &&
+               base::SysNSStringToUTF8(password.signonRealm) ==
+                   credential.GetFirstSignonRealm() &&
+               base::SysNSStringToUTF16(password.username) ==
+                   credential.username &&
+               base::SysNSStringToUTF16(password.password) !=
+                   credential.password;
+      });
+  if (it == _credentials.end()) {
+    return absl::nullopt;
+  }
+  return *it;
 }
 
 @end

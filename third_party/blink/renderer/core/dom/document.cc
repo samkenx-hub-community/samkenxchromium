@@ -395,9 +395,9 @@ void FireRequestStorageAccessHistogram(RequestStorageResult result) {
                                 result);
 }
 
-void FireRequestStorageAccessForOriginHistogram(RequestStorageResult result) {
+void FireRequestStorageAccessForHistogram(RequestStorageResult result) {
   base::UmaHistogramEnumeration(
-      "API.TopLevelStorageAccess.RequestStorageAccessForOrigin", result);
+      "API.TopLevelStorageAccess.RequestStorageAccessFor", result);
 }
 
 class IntrinsicSizeResizeObserverDelegate : public ResizeObserver::Delegate {
@@ -803,10 +803,10 @@ Document::Document(const DocumentInit& initializer,
       worklet_animation_controller_(
           MakeGarbageCollected<WorkletAnimationController>(this)),
       template_document_host_(nullptr),
-      did_associate_form_controls_timer_(
+      did_add_or_remove_form_related_elements_timer_(
           GetTaskRunner(TaskType::kInternalLoading),
           this,
-          &Document::DidAssociateFormControlsTimerFired),
+          &Document::DidAddOrRemoveFormRelatedElementsTimerFired),
       parser_sync_policy_(kAllowDeferredParsing),
       // Use the source id from the document initializer if it is available.
       // Otherwise, generate a new source id to cover any cases that don't
@@ -3124,6 +3124,8 @@ void Document::ClearAXObjectCache() {
   DCHECK(IsMainThread());
   DCHECK_EQ(&AXObjectCacheOwner(), this);
 
+  DCHECK_EQ(ax_contexts_.size(), 0U);
+
   // Clear the cache member variable before calling delete because attempts
   // are made to access it during destruction.
   if (ax_object_cache_) {
@@ -3131,19 +3133,6 @@ void Document::ClearAXObjectCache() {
     ax_object_cache_.Clear();
     DCHECK_NE(g_ax_object_cache_count, 0u);
     g_ax_object_cache_count--;
-  }
-
-  // If there's at least one AXContext in scope and there's still a LayoutView
-  // around, recreate an empty AXObjectCache.
-  //
-  // TODO(dmazzoni): right now ClearAXObjectCache() is being used as a way
-  // to invalidate / reset the AXObjectCache while keeping it around. We
-  // should rewrite that as a method on AXObjectCache rather than destroying
-  // and recreating it here.
-  if (ax_contexts_.size() > 0 && GetLayoutView()) {
-    ax_object_cache_ =
-        AXObjectCache::Create(*this, ComputeAXModeFromAXContexts(ax_contexts_));
-    g_ax_object_cache_count++;
   }
 }
 
@@ -3160,6 +3149,12 @@ AXObjectCache* Document::ExistingAXObjectCache() const {
     return nullptr;
 
   return cache_owner.ax_object_cache_.Get();
+}
+
+void Document::RefreshAccessibilityTree() const {
+  if (AXObjectCache* cache = ExistingAXObjectCache()) {
+    cache->MarkDocumentDirty();
+  }
 }
 
 CanvasFontCache* Document::GetCanvasFontCache() {
@@ -3296,6 +3291,17 @@ void Document::open(LocalDOMWindow* entered_window,
   // for this document with the entered window's url.
   if (dom_window_ && entered_window) {
     KURL new_url = entered_window->Url();
+    if (new_url.IsAboutSrcdocURL() &&
+        blink::features::IsNewBaseUrlInheritanceBehaviorEnabled()) {
+      // When updating the URL to about:srcdoc due to a document.open() call,
+      // the opened document should also end up with the same base URL as the
+      // opener about:srcdoc document. Propagate the fallback information here
+      // so that SetURL() below will take it into account.
+      // TODO(https://crbug.com/751329): about:blank should also be handled
+      // here once it supports the new base url inheritance behavior.
+      fallback_base_url_for_srcdoc_ = entered_window->BaseURL();
+      is_srcdoc_document_ = new_url.IsAboutSrcdocURL();
+    }
     // Clear the hash fragment from the inherited URL to prevent a
     // scroll-into-view for any document.open()'d frame.
     if (dom_window_ != entered_window)
@@ -6133,10 +6139,9 @@ ScriptPromise Document::hasStorageAccess(ScriptState* script_state) {
       return false;
     }
 
-    // #8: if doc's origin is same-origin with the top-level origin of doc's
-    // relevant settings object, return true.
-    if (GetExecutionContext()->GetSecurityOrigin()->IsSameOriginWith(
-            &*TopFrameOrigin())) {
+    // #8: if doc's origin is in the first-party context with the top-level
+    // origin of doc's relevant settings object, return true.
+    if (!SiteForCookies().IsNull()) {
       return true;
     }
 
@@ -6146,19 +6151,17 @@ ScriptPromise Document::hasStorageAccess(ScriptState* script_state) {
   return promise;
 }
 
-ScriptPromise Document::requestStorageAccessForOrigin(
-    ScriptState* script_state,
-    const AtomicString& origin) {
+ScriptPromise Document::requestStorageAccessFor(ScriptState* script_state,
+                                                const AtomicString& origin) {
   if (!GetFrame()) {
-    FireRequestStorageAccessForOriginHistogram(
+    FireRequestStorageAccessForHistogram(
         RequestStorageResult::REJECTED_NO_ORIGIN);
     // Note that in detached frames, resolvers are not able to return a promise.
     return ScriptPromise::RejectWithDOMException(
-        script_state,
-        MakeGarbageCollected<DOMException>(
-            DOMExceptionCode::kInvalidStateError,
-            "requestStorageAccessForOrigin: Cannot be used unless "
-            "the document is fully active."));
+        script_state, MakeGarbageCollected<DOMException>(
+                          DOMExceptionCode::kInvalidStateError,
+                          "requestStorageAccessFor: Cannot be used unless "
+                          "the document is fully active."));
   }
 
   ScriptPromiseResolver* resolver =
@@ -6168,34 +6171,17 @@ ScriptPromise Document::requestStorageAccessForOrigin(
   // can be changed when it is resolved or rejected.
   ScriptPromise promise = resolver->Promise();
 
-  const bool has_user_gesture =
-      LocalFrame::HasTransientUserActivation(GetFrame());
-  if (!has_user_gesture) {
-    AddConsoleMessage(MakeGarbageCollected<ConsoleMessage>(
-        mojom::blink::ConsoleMessageSource::kSecurity,
-        mojom::blink::ConsoleMessageLevel::kError,
-        "requestStorageAccessForOrigin: Must be handling a user gesture to "
-        "use."));
-
-    FireRequestStorageAccessForOriginHistogram(
-        RequestStorageResult::REJECTED_NO_USER_GESTURE);
-    resolver->Reject(V8ThrowDOMException::CreateOrEmpty(
-        script_state->GetIsolate(), DOMExceptionCode::kNotAllowedError,
-        "requestStorageAccessForOrigin not allowed"));
-    return promise;
-  }
-
   if (!IsInOutermostMainFrame()) {
     AddConsoleMessage(MakeGarbageCollected<ConsoleMessage>(
         mojom::blink::ConsoleMessageSource::kSecurity,
         mojom::blink::ConsoleMessageLevel::kError,
-        "requestStorageAccessForOrigin: Only supported in primary top-level "
+        "requestStorageAccessFor: Only supported in primary top-level "
         "browsing contexts."));
-    FireRequestStorageAccessForOriginHistogram(
+    FireRequestStorageAccessForHistogram(
         RequestStorageResult::REJECTED_INCORRECT_FRAME);
     resolver->Reject(V8ThrowDOMException::CreateOrEmpty(
         script_state->GetIsolate(), DOMExceptionCode::kNotAllowedError,
-        "requestStorageAccessForOrigin not allowed"));
+        "requestStorageAccessFor not allowed"));
     return promise;
   }
 
@@ -6203,13 +6189,13 @@ ScriptPromise Document::requestStorageAccessForOrigin(
     AddConsoleMessage(MakeGarbageCollected<ConsoleMessage>(
         mojom::blink::ConsoleMessageSource::kSecurity,
         mojom::blink::ConsoleMessageLevel::kError,
-        "requestStorageAccessForOrigin: Cannot be used by opaque origins."));
+        "requestStorageAccessFor: Cannot be used by opaque origins."));
 
-    FireRequestStorageAccessForOriginHistogram(
+    FireRequestStorageAccessForHistogram(
         RequestStorageResult::REJECTED_OPAQUE_ORIGIN);
     resolver->Reject(V8ThrowDOMException::CreateOrEmpty(
         script_state->GetIsolate(), DOMExceptionCode::kNotAllowedError,
-        "requestStorageAccessForOrigin not allowed"));
+        "requestStorageAccessFor not allowed"));
     return promise;
   }
 
@@ -6217,14 +6203,14 @@ ScriptPromise Document::requestStorageAccessForOrigin(
     AddConsoleMessage(MakeGarbageCollected<ConsoleMessage>(
         mojom::blink::ConsoleMessageSource::kSecurity,
         mojom::blink::ConsoleMessageLevel::kError,
-        "requestStorageAccessForOrigin: May not be used in an insecure "
+        "requestStorageAccessFor: May not be used in an insecure "
         "context."));
-    FireRequestStorageAccessForOriginHistogram(
+    FireRequestStorageAccessForHistogram(
         RequestStorageResult::REJECTED_INSECURE_CONTEXT);
 
     resolver->Reject(V8ThrowDOMException::CreateOrEmpty(
         script_state->GetIsolate(), DOMExceptionCode::kNotAllowedError,
-        "requestStorageAccessForOrigin not allowed"));
+        "requestStorageAccessFor not allowed"));
     return promise;
   }
 
@@ -6235,19 +6221,19 @@ ScriptPromise Document::requestStorageAccessForOrigin(
     AddConsoleMessage(MakeGarbageCollected<ConsoleMessage>(
         mojom::blink::ConsoleMessageSource::kSecurity,
         mojom::blink::ConsoleMessageLevel::kError,
-        "requestStorageAccessForOrigin: Invalid origin parameter."));
-    FireRequestStorageAccessForOriginHistogram(
+        "requestStorageAccessFor: Invalid origin parameter."));
+    FireRequestStorageAccessForHistogram(
         RequestStorageResult::REJECTED_OPAQUE_ORIGIN);
     resolver->Reject(V8ThrowDOMException::CreateOrEmpty(
         script_state->GetIsolate(), DOMExceptionCode::kNotAllowedError,
-        "requestStorageAccessForOrigin not allowed"));
+        "requestStorageAccessFor not allowed"));
     return promise;
   }
 
   if (dom_window_->GetSecurityOrigin()->IsSameSiteWith(supplied_origin.get())) {
     // Access is not actually disabled, so accept the request.
     resolver->Resolve();
-    FireRequestStorageAccessForOriginHistogram(
+    FireRequestStorageAccessForHistogram(
         RequestStorageResult::APPROVED_EXISTING_ACCESS);
     return promise;
   }
@@ -6261,38 +6247,15 @@ ScriptPromise Document::requestStorageAccessForOrigin(
       mojom::blink::PermissionDescriptorExtension::NewTopLevelStorageAccess(
           std::move(top_level_storage_access_extension));
 
+  auto descriptor_copy = descriptor->Clone();
   GetPermissionService(ExecutionContext::From(script_state))
-      ->RequestPermission(
-          std::move(descriptor), has_user_gesture,
+      ->HasPermission(
+          std::move(descriptor),
           WTF::BindOnce(
-              [](ScriptPromiseResolver* resolver, Document* document,
-                 mojom::blink::PermissionStatus status) {
-                DCHECK(resolver);
-                DCHECK(document);
-
-                switch (status) {
-                  case mojom::blink::PermissionStatus::GRANTED:
-                    FireRequestStorageAccessForOriginHistogram(
-                        RequestStorageResult::APPROVED_NEW_GRANT);
-                    resolver->Resolve();
-                    break;
-                  case mojom::blink::PermissionStatus::DENIED:
-                    LocalFrame::ConsumeTransientUserActivation(
-                        document->GetFrame());
-                    [[fallthrough]];
-                  case mojom::blink::PermissionStatus::ASK:
-                  default:
-                    FireRequestStorageAccessForOriginHistogram(
-                        RequestStorageResult::REJECTED_GRANT_DENIED);
-                    ScriptState* state = resolver->GetScriptState();
-                    DCHECK(state->ContextIsValid());
-                    ScriptState::Scope scope(state);
-                    resolver->Reject(V8ThrowDOMException::CreateOrEmpty(
-                        state->GetIsolate(), DOMExceptionCode::kNotAllowedError,
-                        "requestStorageAccessForOrigin not allowed"));
-                }
-              },
-              WrapPersistent(resolver), WrapPersistent(this)));
+              &Document::OnGotExistingTopLevelStorageAccessPermissionState,
+              WrapPersistent(this), WrapPersistent(resolver),
+              LocalFrame::HasTransientUserActivation(GetFrame()),
+              std::move(descriptor_copy)));
 
   return promise;
 }
@@ -6354,32 +6317,13 @@ ScriptPromise Document::requestStorageAccess(ScriptState* script_state) {
     return promise;
   }
 
-  if (GetExecutionContext()->GetSecurityOrigin()->IsSameOriginWith(
+  if (GetExecutionContext()->GetSecurityOrigin()->IsSameSiteWith(
           &*TopFrameOrigin())) {
     FireRequestStorageAccessHistogram(
         RequestStorageResult::APPROVED_PRIMARY_FRAME);
 
-    // If this frame is same-origin with the outermost frame we no longer need
+    // If this frame is same-site with the outermost frame we no longer need
     // to make a request and can resolve the promise.
-
-    // Deviation from spec: we set the has_storage_access bool here, so that
-    // downstream cookie accesses will know that this frame opted into storage
-    // access. This knowledge is necessary since Chromium considers the entire
-    // frame hierarchy when deciding if a context is first-party or third-party;
-    // rather than just considering the current frame and top frame.
-    //
-    // As a concrete example, consider an A(B(A)) embedding context. The inner A
-    // iframe is same-origin with the top-level A document. However, because
-    // Chromium's block-third-party-cookies behavior considers the whole frame
-    // hierarchy, block-third-party-cookies would still prevent the inner A
-    // iframe from accessing its cookies, even though document.hasStorageAccess
-    // and document.requestStorageAccess are written (in the spec) with early
-    // returns to imply that access should be granted in such a same-origin
-    // scenario. If we set the has_storage_access bool here, and modify
-    // consumers of the storage-access permission such that they do not require
-    // an explicit permission for contexts in which the frame and the top-level
-    // frame are same-origin, then the "actual" cookie access will match the
-    // "implied" cookie access in the spec.
     dom_window_->SetHasStorageAccess();
 
     resolver->Resolve();
@@ -6470,6 +6414,45 @@ void Document::OnGotExistingStorageAccessPermissionState(
                         WrapPersistent(this), WrapPersistent(resolver)));
 }
 
+void Document::OnGotExistingTopLevelStorageAccessPermissionState(
+    ScriptPromiseResolver* resolver,
+    bool has_user_gesture,
+    mojom::blink::PermissionDescriptorPtr descriptor,
+    mojom::blink::PermissionStatus previous_status) {
+  DCHECK(resolver);
+  DCHECK(GetFrame());
+  ScriptState* script_state = resolver->GetScriptState();
+  DCHECK(script_state);
+  ScriptState::Scope scope(script_state);
+  if (previous_status != mojom::blink::PermissionStatus::ASK) {
+    // Permission state already exists, resolve with the existing value.
+    ProcessTopLevelStorageAccessPermissionState(
+        resolver, /*use_existing_status=*/true, previous_status);
+    return;
+  }
+  // Proceed to request permission.
+  if (!has_user_gesture) {
+    AddConsoleMessage(MakeGarbageCollected<ConsoleMessage>(
+        mojom::blink::ConsoleMessageSource::kSecurity,
+        mojom::blink::ConsoleMessageLevel::kError,
+        "requestStorageAccessFor: Must be handling a user gesture to use."));
+    FireRequestStorageAccessHistogram(
+        RequestStorageResult::REJECTED_NO_USER_GESTURE);
+
+    resolver->Reject(V8ThrowDOMException::CreateOrEmpty(
+        script_state->GetIsolate(), DOMExceptionCode::kNotAllowedError,
+        "requestStorageAccessFor not allowed"));
+    return;
+  }
+
+  GetPermissionService(ExecutionContext::From(resolver->GetScriptState()))
+      ->RequestPermission(
+          std::move(descriptor), has_user_gesture,
+          WTF::BindOnce(
+              &Document::OnRequestedTopLevelStorageAccessPermissionState,
+              WrapPersistent(this), WrapPersistent(resolver)));
+}
+
 void Document::OnRequestedStorageAccessPermissionState(
     ScriptPromiseResolver* resolver,
     mojom::blink::PermissionStatus status) {
@@ -6481,6 +6464,20 @@ void Document::OnRequestedStorageAccessPermissionState(
 
   ProcessStorageAccessPermissionState(resolver,
                                       /*use_existing_status=*/false, status);
+}
+
+void Document::OnRequestedTopLevelStorageAccessPermissionState(
+    ScriptPromiseResolver* resolver,
+    mojom::blink::PermissionStatus status) {
+  DCHECK(resolver);
+  DCHECK(GetFrame());
+  ScriptState* script_state = resolver->GetScriptState();
+  DCHECK(script_state);
+  ScriptState::Scope scope(script_state);
+
+  ProcessTopLevelStorageAccessPermissionState(resolver,
+                                              /*use_existing_status=*/false,
+                                              status);
 }
 
 void Document::ProcessStorageAccessPermissionState(
@@ -6513,6 +6510,38 @@ void Document::ProcessStorageAccessPermissionState(
     resolver->Reject(V8ThrowDOMException::CreateOrEmpty(
         script_state->GetIsolate(), DOMExceptionCode::kNotAllowedError,
         "requestStorageAccess not allowed"));
+  }
+}
+
+void Document::ProcessTopLevelStorageAccessPermissionState(
+    ScriptPromiseResolver* resolver,
+    bool use_existing_status,
+    mojom::blink::PermissionStatus status) {
+  DCHECK(resolver);
+  DCHECK(GetFrame());
+
+  if (status == mojom::blink::PermissionStatus::GRANTED) {
+    if (use_existing_status) {
+      FireRequestStorageAccessForHistogram(
+          RequestStorageResult::APPROVED_EXISTING_ACCESS);
+    } else {
+      FireRequestStorageAccessForHistogram(
+          RequestStorageResult::APPROVED_NEW_GRANT);
+    }
+    resolver->Resolve();
+  } else {
+    LocalFrame::ConsumeTransientUserActivation(GetFrame());
+    FireRequestStorageAccessForHistogram(
+        RequestStorageResult::REJECTED_GRANT_DENIED);
+    AddConsoleMessage(MakeGarbageCollected<ConsoleMessage>(
+        mojom::blink::ConsoleMessageSource::kSecurity,
+        mojom::blink::ConsoleMessageLevel::kError,
+        "requestStorageAccessFor: Permission denied."));
+    ScriptState* script_state = resolver->GetScriptState();
+    DCHECK(script_state);
+    resolver->Reject(V8ThrowDOMException::CreateOrEmpty(
+        script_state->GetIsolate(), DOMExceptionCode::kNotAllowedError,
+        "requestStorageAccessFor not allowed"));
   }
 }
 
@@ -7243,10 +7272,6 @@ DocumentNameCollection* Document::DocumentNamedItems(const AtomicString& name) {
 HTMLCollection* Document::DocumentAllNamedItems(const AtomicString& name) {
   return EnsureCachedCollection<DocumentAllNameCollection>(
       kDocumentAllNamedItems, name);
-}
-
-HTMLCollection* Document::PopoverInvokers() {
-  return EnsureCachedCollection<HTMLCollection>(kPopoverInvokers);
 }
 
 void Document::IncrementLazyAdsFrameCount() {
@@ -8294,24 +8319,26 @@ Document& Document::EnsureTemplateDocument() {
   return *template_document_.Get();
 }
 
-void Document::DidAssociateFormControl(Element* element) {
+void Document::DidAddOrRemoveFormRelatedElement(Element* element) {
   if (!GetFrame() || !GetFrame()->GetPage() || !HasFinishedParsing())
     return;
 
   // We add a slight delay because this could be called rapidly.
-  if (!did_associate_form_controls_timer_.IsActive()) {
-    did_associate_form_controls_timer_.StartOneShot(base::Milliseconds(300),
-                                                    FROM_HERE);
+  if (!did_add_or_remove_form_related_elements_timer_.IsActive()) {
+    did_add_or_remove_form_related_elements_timer_.StartOneShot(
+        base::Milliseconds(300), FROM_HERE);
   }
 }
 
-void Document::DidAssociateFormControlsTimerFired(TimerBase* timer) {
-  DCHECK_EQ(timer, &did_associate_form_controls_timer_);
+void Document::DidAddOrRemoveFormRelatedElementsTimerFired(TimerBase* timer) {
+  DCHECK_EQ(timer, &did_add_or_remove_form_related_elements_timer_);
   if (!GetFrame() || !GetFrame()->GetPage())
     return;
 
-  GetFrame()->GetPage()->GetChromeClient().DidAssociateFormControlsAfterLoad(
-      GetFrame());
+  GetFrame()
+      ->GetPage()
+      ->GetChromeClient()
+      .DidAddOrRemoveFormRelatedElementsAfterLoad(GetFrame());
 }
 
 float Document::DevicePixelRatio() const {
@@ -8724,7 +8751,7 @@ void Document::Trace(Visitor* visitor) const {
   visitor->Trace(use_elements_needing_update_);
   visitor->Trace(template_document_);
   visitor->Trace(template_document_host_);
-  visitor->Trace(did_associate_form_controls_timer_);
+  visitor->Trace(did_add_or_remove_form_related_elements_timer_);
   visitor->Trace(user_action_elements_);
   visitor->Trace(svg_extensions_);
   visitor->Trace(layout_view_);

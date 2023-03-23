@@ -96,6 +96,10 @@ bool IsSupportedAccessPoint(signin_metrics::AccessPoint access_point) {
     case signin_metrics::AccessPoint::ACCESS_POINT_NTP_SIGNED_OUT_ICON:
     case signin_metrics::AccessPoint::ACCESS_POINT_DESKTOP_SIGNIN_MANAGER:
     case signin_metrics::AccessPoint::ACCESS_POINT_FOR_YOU_FRE:
+    case signin_metrics::AccessPoint::ACCESS_POINT_CREATOR_FEED_FOLLOW:
+    // TODO(crbug.com/1420194): Change the value when the signin promo will be
+    // supported in reading list.
+    case signin_metrics::AccessPoint::ACCESS_POINT_READING_LIST:
     case signin_metrics::AccessPoint::ACCESS_POINT_MAX:
       return false;
   }
@@ -120,6 +124,11 @@ void RecordImpressionsTilSigninButtonsHistogramForAccessPoint(
     case signin_metrics::AccessPoint::ACCESS_POINT_NTP_FEED_TOP_PROMO:
       base::UmaHistogramCounts100(
           "MobileSignInPromo.NTPFeedTop.ImpressionsTilSigninButtons",
+          displayed_count);
+      break;
+    case signin_metrics::AccessPoint::ACCESS_POINT_READING_LIST:
+      base::UmaHistogramCounts100(
+          "MobileSignInPromo.ReadingList.ImpressionsTilSigninButtons",
           displayed_count);
       break;
     case signin_metrics::AccessPoint::
@@ -165,6 +174,7 @@ void RecordImpressionsTilSigninButtonsHistogramForAccessPoint(
     case signin_metrics::AccessPoint::ACCESS_POINT_NTP_FEED_BOTTOM_PROMO:
     case signin_metrics::AccessPoint::ACCESS_POINT_DESKTOP_SIGNIN_MANAGER:
     case signin_metrics::AccessPoint::ACCESS_POINT_FOR_YOU_FRE:
+    case signin_metrics::AccessPoint::ACCESS_POINT_CREATOR_FEED_FOLLOW:
     case signin_metrics::AccessPoint::ACCESS_POINT_MAX:
       NOTREACHED() << "Unexpected value for access point "
                    << static_cast<int>(access_point);
@@ -193,6 +203,11 @@ void RecordImpressionsTilDismissHistogramForAccessPoint(
           "MobileSignInPromo.NTPFeedTop.ImpressionsTilDismiss",
           displayed_count);
       break;
+    case signin_metrics::AccessPoint::ACCESS_POINT_READING_LIST:
+      base::UmaHistogramCounts100(
+          "MobileSignInPromo.ReadingList.ImpressionsTilDismiss",
+          displayed_count);
+      break;
     case signin_metrics::AccessPoint::
         ACCESS_POINT_ENTERPRISE_SIGNOUT_COORDINATOR:
     case signin_metrics::AccessPoint::ACCESS_POINT_RECENT_TABS:
@@ -236,6 +251,7 @@ void RecordImpressionsTilDismissHistogramForAccessPoint(
     case signin_metrics::AccessPoint::ACCESS_POINT_NTP_FEED_BOTTOM_PROMO:
     case signin_metrics::AccessPoint::ACCESS_POINT_DESKTOP_SIGNIN_MANAGER:
     case signin_metrics::AccessPoint::ACCESS_POINT_FOR_YOU_FRE:
+    case signin_metrics::AccessPoint::ACCESS_POINT_CREATOR_FEED_FOLLOW:
     case signin_metrics::AccessPoint::ACCESS_POINT_MAX:
       NOTREACHED() << "Unexpected value for access point "
                    << static_cast<int>(access_point);
@@ -264,6 +280,11 @@ void RecordImpressionsTilXButtonHistogramForAccessPoint(
           "MobileSignInPromo.NTPFeedTop.ImpressionsTilXButton",
           displayed_count);
       break;
+    case signin_metrics::AccessPoint::ACCESS_POINT_READING_LIST:
+      base::UmaHistogramCounts100(
+          "MobileSignInPromo.ReadingList.ImpressionsTilXButton",
+          displayed_count);
+      break;
     case signin_metrics::AccessPoint::
         ACCESS_POINT_ENTERPRISE_SIGNOUT_COORDINATOR:
     case signin_metrics::AccessPoint::ACCESS_POINT_RECENT_TABS:
@@ -307,6 +328,7 @@ void RecordImpressionsTilXButtonHistogramForAccessPoint(
     case signin_metrics::AccessPoint::ACCESS_POINT_NTP_FEED_BOTTOM_PROMO:
     case signin_metrics::AccessPoint::ACCESS_POINT_DESKTOP_SIGNIN_MANAGER:
     case signin_metrics::AccessPoint::ACCESS_POINT_FOR_YOU_FRE:
+    case signin_metrics::AccessPoint::ACCESS_POINT_CREATOR_FEED_FOLLOW:
     case signin_metrics::AccessPoint::ACCESS_POINT_MAX:
       NOTREACHED() << "Unexpected value for access point "
                    << static_cast<int>(access_point);
@@ -324,6 +346,8 @@ const char* DisplayedCountPreferenceKey(
       return prefs::kIosSettingsSigninPromoDisplayedCount;
     case signin_metrics::AccessPoint::ACCESS_POINT_NTP_FEED_TOP_PROMO:
       return prefs::kIosNtpFeedTopSigninPromoDisplayedCount;
+    case signin_metrics::AccessPoint::ACCESS_POINT_READING_LIST:
+      return prefs::kIosReadingListSigninPromoDisplayedCount;
     case signin_metrics::AccessPoint::ACCESS_POINT_RECENT_TABS:
     case signin_metrics::AccessPoint::ACCESS_POINT_TAB_SWITCHER:
     case signin_metrics::AccessPoint::ACCESS_POINT_START_PAGE:
@@ -367,6 +391,7 @@ const char* DisplayedCountPreferenceKey(
     case signin_metrics::AccessPoint::ACCESS_POINT_NTP_FEED_BOTTOM_PROMO:
     case signin_metrics::AccessPoint::ACCESS_POINT_DESKTOP_SIGNIN_MANAGER:
     case signin_metrics::AccessPoint::ACCESS_POINT_FOR_YOU_FRE:
+    case signin_metrics::AccessPoint::ACCESS_POINT_CREATOR_FEED_FOLLOW:
     case signin_metrics::AccessPoint::ACCESS_POINT_MAX:
       return nullptr;
   }
@@ -382,6 +407,8 @@ const char* AlreadySeenSigninViewPreferenceKey(
       return prefs::kIosSettingsPromoAlreadySeen;
     case signin_metrics::AccessPoint::ACCESS_POINT_NTP_FEED_TOP_PROMO:
       return prefs::kIosNtpFeedTopPromoAlreadySeen;
+    case signin_metrics::AccessPoint::ACCESS_POINT_READING_LIST:
+      return prefs::kIosReadingListPromoAlreadySeen;
     case signin_metrics::AccessPoint::ACCESS_POINT_RECENT_TABS:
     case signin_metrics::AccessPoint::ACCESS_POINT_TAB_SWITCHER:
     case signin_metrics::AccessPoint::ACCESS_POINT_START_PAGE:
@@ -425,6 +452,7 @@ const char* AlreadySeenSigninViewPreferenceKey(
     case signin_metrics::AccessPoint::ACCESS_POINT_NTP_FEED_BOTTOM_PROMO:
     case signin_metrics::AccessPoint::ACCESS_POINT_DESKTOP_SIGNIN_MANAGER:
     case signin_metrics::AccessPoint::ACCESS_POINT_FOR_YOU_FRE:
+    case signin_metrics::AccessPoint::ACCESS_POINT_CREATOR_FEED_FOLLOW:
     case signin_metrics::AccessPoint::ACCESS_POINT_MAX:
       return nullptr;
   }
@@ -432,10 +460,7 @@ const char* AlreadySeenSigninViewPreferenceKey(
 
 }  // namespace
 
-@interface SigninPromoViewMediator () <ChromeAccountManagerServiceObserver> {
-  std::unique_ptr<ChromeAccountManagerServiceObserverBridge>
-      _accountManagerServiceObserver;
-}
+@interface SigninPromoViewMediator () <ChromeAccountManagerServiceObserver>
 
 // Redefined to be readwrite.
 @property(nonatomic, strong, readwrite) id<SystemIdentity> identity;
@@ -470,7 +495,13 @@ const char* AlreadySeenSigninViewPreferenceKey(
 
 @end
 
-@implementation SigninPromoViewMediator
+@implementation SigninPromoViewMediator {
+  std::unique_ptr<ChromeAccountManagerServiceObserverBridge>
+      _accountManagerServiceObserver;
+  Browser* _browser;
+  // View used to present sign-in UI.
+  UIViewController* _baseViewController;
+}
 
 + (void)registerBrowserStatePrefs:(user_prefs::PrefRegistrySyncable*)registry {
   // Bookmarks
@@ -484,6 +515,10 @@ const char* AlreadySeenSigninViewPreferenceKey(
   // NTP Feed
   registry->RegisterBooleanPref(prefs::kIosNtpFeedTopPromoAlreadySeen, false);
   registry->RegisterIntegerPref(prefs::kIosNtpFeedTopSigninPromoDisplayedCount,
+                                0);
+  // Reading List
+  registry->RegisterBooleanPref(prefs::kIosReadingListPromoAlreadySeen, false);
+  registry->RegisterIntegerPref(prefs::kIosReadingListSigninPromoDisplayedCount,
                                 0);
 }
 
@@ -547,24 +582,25 @@ const char* AlreadySeenSigninViewPreferenceKey(
   return YES;
 }
 
-- (instancetype)
-    initWithAccountManagerService:
-        (ChromeAccountManagerService*)accountManagerService
-                      authService:(AuthenticationService*)authService
-                      prefService:(PrefService*)prefService
-                      accessPoint:(signin_metrics::AccessPoint)accessPoint
-                        presenter:(id<SigninPresenter>)presenter {
+- (instancetype)initWithBrowser:(Browser*)browser
+          accountManagerService:
+              (ChromeAccountManagerService*)accountManagerService
+                    authService:(AuthenticationService*)authService
+                    prefService:(PrefService*)prefService
+                    accessPoint:(signin_metrics::AccessPoint)accessPoint
+                      presenter:(id<SigninPresenter>)presenter
+             baseViewController:(UIViewController*)baseViewController {
   self = [super init];
   if (self) {
     DCHECK(accountManagerService);
     DCHECK(IsSupportedAccessPoint(accessPoint));
-
+    _browser = browser;
     _accountManagerService = accountManagerService;
     _authService = authService;
     _prefService = prefService;
     _accessPoint = accessPoint;
     _presenter = presenter;
-
+    _baseViewController = baseViewController;
     _accountManagerServiceObserver =
         std::make_unique<ChromeAccountManagerServiceObserverBridge>(
             self, _accountManagerService);
@@ -598,7 +634,8 @@ const char* AlreadySeenSigninViewPreferenceKey(
                           userEmail:self.identity.userEmail
                       userGivenName:self.identity.userGivenName
                           userImage:self.identityAvatar
-                     hasCloseButton:hasCloseButton];
+                     hasCloseButton:hasCloseButton
+                   hasSignInSpinner:NO];
   }
   if (self.identity) {
     return [[SigninPromoViewConfigurator alloc]
@@ -606,14 +643,16 @@ const char* AlreadySeenSigninViewPreferenceKey(
                           userEmail:self.identity.userEmail
                       userGivenName:self.identity.userGivenName
                           userImage:self.identityAvatar
-                     hasCloseButton:hasCloseButton];
+                     hasCloseButton:hasCloseButton
+                   hasSignInSpinner:NO];
   }
   return [[SigninPromoViewConfigurator alloc]
       initWithSigninPromoViewMode:SigninPromoViewModeNoAccounts
                         userEmail:nil
                     userGivenName:nil
                         userImage:nil
-                   hasCloseButton:hasCloseButton];
+                   hasCloseButton:hasCloseButton
+                 hasSignInSpinner:NO];
 }
 
 - (void)signinPromoViewIsVisible {

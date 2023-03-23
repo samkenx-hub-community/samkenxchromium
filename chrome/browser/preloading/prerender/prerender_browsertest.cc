@@ -8,10 +8,12 @@
 #include "base/functional/bind.h"
 #include "base/path_service.h"
 #include "base/test/metrics/histogram_tester.h"
+#include "base/test/scoped_feature_list.h"
 #include "build/build_config.h"
 #include "chrome/browser/prefetch/prefetch_prefs.h"
 #include "chrome/browser/preloading/prerender/prerender_utils.h"
 #include "chrome/browser/profiles/profile.h"
+#include "chrome/common/chrome_features.h"
 #include "chrome/common/chrome_paths.h"
 #include "chrome/test/base/chrome_test_utils.h"
 #include "components/prefs/pref_service.h"
@@ -36,11 +38,9 @@ namespace {
 
 namespace {
 
-// This is equal to content::PrerenderFinalStatus::kActivated.
-// TODO(crbug.com/1274021): Replace this with the FinalStatus enum value
-// once it is exposed.
+// Following definitions are equal to content::PrerenderFinalStatus.
 constexpr int kFinalStatusActivated = 0;
-constexpr int kFinalStatusCrossSiteNavigation = 45;
+constexpr int kFinalStatusCrossSiteNavigationInMainFrameNavigation = 64;
 
 }  // namespace
 
@@ -312,12 +312,13 @@ IN_PROC_BROWSER_TEST_F(PrerenderHoldbackBrowserTest,
 }
 
 // TODO(crbug.com/1239281): Merge PrerenderMainFrameNavigationBrowserTest into
-// PrerenderBrowserTest once the feature is enabled by default.
+// PrerenderBrowserTest.
 class PrerenderMainFrameNavigationBrowserTest : public PrerenderBrowserTest {
  public:
   PrerenderMainFrameNavigationBrowserTest() {
-    feature_list_.InitAndEnableFeature(
-        blink::features::kPrerender2MainFrameNavigation);
+    // TODO(crbug.com/1394910): Use HTTPS URLs in tests to avoid having to
+    // disable this feature.
+    feature_list_.InitAndDisableFeature(features::kHttpsUpgrades);
   }
 
  private:
@@ -467,7 +468,7 @@ IN_PROC_BROWSER_TEST_F(
 
   histogram_tester.ExpectUniqueSample(
       "Prerender.Experimental.PrerenderHostFinalStatus.Embedder_DirectURLInput",
-      kFinalStatusCrossSiteNavigation, 1);
+      kFinalStatusCrossSiteNavigationInMainFrameNavigation, 1);
 }
 
 }  // namespace

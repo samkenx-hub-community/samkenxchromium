@@ -187,12 +187,6 @@ extern const char kPhoneNumberDescription[] =
     "When enabled, one tapping or long pressing on a phone number will trigger "
     "the phone number experience.";
 
-extern const char kEnableExpKitCalendarTextClassifierName[] =
-    "Text Classifier in Experience Kit Calendar";
-extern const char kEnableExpKitCalendarTextClassifierDescription[] =
-    "When enabled, Experience Kit Calendar will use Text Classifier library in "
-    "entity detection where possible.";
-
 extern const char kEnableExpKitTextClassifierName[] =
     "Text Classifier in Experience Kit";
 extern const char kEnableExpKitTextClassifierDescription[] =
@@ -370,6 +364,12 @@ const char kEnablePasswordsAccountStorageDescription[] =
     "Enables storing passwords in a second, Gaia-account-scoped storage for "
     "signed-in but not syncing users";
 
+const char kEnablePreferencesAccountStorageName[] =
+    "Enable the account data storage for preferences for syncing users";
+const char kEnablePreferencesAccountStorageDescription[] =
+    "Enables storing preferences in a second, Gaia-account-scoped storage for "
+    "syncing users";
+
 const char kEnablePinnedTabsName[] = "Enable Pinned Tabs";
 const char kEnablePinnedTabsDescription[] = "Allows users to pin tabs.";
 
@@ -425,13 +425,15 @@ const char kFeedExperimentTaggingName[] = "Enable Feed experiment tagging";
 const char kFeedExperimentTaggingDescription[] =
     "Makes server experiments visible as client-side experiments.";
 
-const char kFeedForegroundRefreshName[] = "Enable feed foreground refresh";
-const char kFeedForegroundRefreshDescription[] =
-    "Foreground refresh has two variations. The first is when the Feed is "
-    "refreshed after the user ends a Feed session, but the app is still in the "
-    "foreground (e.g., user switches tabs, user navigates away from Feed in "
-    "current tab). The second is when the Feed is refreshed at the moment the "
-    "app is backgrounding (e.g., extended execution time).";
+const char kFeedInvisibleForegroundRefreshName[] =
+    "Enable feed invisible foreground refresh";
+const char kFeedInvisibleForegroundRefreshDescription[] =
+    "Invisible foreground refresh has two variations. The first is when the "
+    "Feed is refreshed after the user ends a Feed session, but the app is "
+    "still in the foreground (e.g., user switches tabs, user navigates away "
+    "from Feed in current tab). The second is when the Feed is refreshed at "
+    "the moment the app is backgrounding (e.g., during extended execution "
+    "time).";
 
 const char kFillingAcrossAffiliatedWebsitesName[] =
     "Fill passwords across affiliated websites.";
@@ -477,12 +479,22 @@ const char kIndicateAccountStorageErrorInAccountCellDescription[] =
     "When enabled, the Account Cell indicates the Account"
     " Storage error when Sync is turned OFF";
 
+const char kIndicateIdentityErrorInOverflowMenuName[] =
+    "Indicate Identity Error in Overflow Menu";
+const char kIndicateIdentityErrorInOverflowMenuDescription[] =
+    "When enabled, the Overflow Menu indicates the identity error with an "
+    "error badge on the Settings destination";
+
 const char kInProductHelpDemoModeName[] = "In-Product Help Demo Mode";
 const char kInProductHelpDemoModeDescription[] =
     "When enabled, in-product help promotions occur exactly once per cold "
     "start. Enabled causes all in-product help promotions to occur. Enabling "
     "an individual promotion causes that promotion but no other promotions to "
     "occur.";
+
+const char kIOSBrowserEditMenuMetricsName[] = "Browser edit menu metrics";
+const char kIOSBrowserEditMenuMetricsDescription[] =
+    "Collect metrics for edit menu usage.";
 
 const char kIOSCustomBrowserEditMenuName[] = "Custom browser edit menu";
 const char kIOSCustomBrowserEditMenuDescription[] =
@@ -548,10 +560,6 @@ const char kIOSShowPasswordStorageInSaveInfobarName[] =
 const char kIOSShowPasswordStorageInSaveInfobarDescription[] =
     "Modifies the save password infobar to show whether the save happens to an "
     "account or only to the current device";
-
-const char kKeyboardShortcutsMenuName[] = "Keyboard Shortcuts Menu";
-const char kKeyboardShortcutsMenuDescription[] =
-    "Enables the new keyboard shortcuts menu.";
 
 const char kLockBottomToolbarName[] = "Lock bottom toolbar";
 const char kLockBottomToolbarDescription[] =
@@ -981,7 +989,9 @@ const char kTabGridRecencySortDescription[] =
 const char kTabInactivityThresholdName[] = "Change Tab inactivity threshold";
 const char kTabInactivityThresholdDescription[] =
     "When enabled, the tabs older than the threshold are considered inactive "
-    "and set aside in the Inactive Tabs section of the TabGrid.";
+    "and set aside in the Inactive Tabs section of the TabGrid."
+    "IMPORTANT: If you ever used the in-app settings for Inactive Tabs, this "
+    "flag is never read again.";
 
 const char kUseLoadSimulatedRequestForOfflinePageName[] =
     "Use loadSimulatedRequest:responseHTMLString: when displaying offline "
@@ -989,10 +999,6 @@ const char kUseLoadSimulatedRequestForOfflinePageName[] =
 const char kUseLoadSimulatedRequestForOfflinePageDescription[] =
     "When enabled, the offline pages uses the iOS 15 "
     "loadSimulatedRequest:responseHTMLString: API";
-
-const char kUseSFSymbolsName[] = "Replace Image by SFSymbols";
-const char kUseSFSymbolsDescription[] =
-    "When enabled, images are replaced by SFSymbols";
 
 const char kUseSFSymbolsInOmniboxName[] =
     "Replace Image by SFSymbols in Omnibox";

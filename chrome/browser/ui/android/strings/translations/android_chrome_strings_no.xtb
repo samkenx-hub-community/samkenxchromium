@@ -283,6 +283,7 @@ Med private tilstandstokener får du bedre personvern på nettet, og de kan ikke
 <translation id="2581165646603367611">Dette sletter informasjonskapsler, buffere og annen data fra nettsteder Chrome ikke tror er viktige.</translation>
 <translation id="2587052924345400782">En nyere versjon er tilgjengelig</translation>
 <translation id="2593272815202181319">Monospace</translation>
+<translation id="2603212228005142861">Logg på for å administrere preferansene dine</translation>
 <translation id="2604446170045642109">Du kan slå av mørkt tema for nettsteder i innstillingene.</translation>
 <translation id="2612676031748830579">Kortnummer</translation>
 <translation id="2625189173221582860">Passordet er kopiert</translation>
@@ -476,6 +477,7 @@ Med private tilstandstokener får du bedre personvern på nettet, og de kan ikke
 <translation id="3587596251841506391">Bidra til å gjøre nettet sikrere</translation>
 <translation id="3597179440835065298">Få bedre forslag</translation>
 <translation id="3602290021589620013">Forhåndsvisning</translation>
+<translation id="360901359071773787">Vil du slette de siste 15 minuttene?</translation>
 <translation id="3616113530831147358">Lyd</translation>
 <translation id="3622349720008044802">Administrer vinduer</translation>
 <translation id="3631987586758005671">Deler med <ph name="DEVICE_NAME" /></translation>
@@ -630,6 +632,7 @@ Med private tilstandstokener får du bedre personvern på nettet, og de kan ikke
 
 Google-kontoen din kan ha andre former for nettleserlogger, for eksempel søk og aktivitet fra andre Google-tjenester, på <ph name="BEGIN_LINK" />myactivity.google.com<ph name="END_LINK" />.</translation>
 <translation id="452750746583162491">Gjennomgå de synkroniserte dataene dine</translation>
+<translation id="4528638190900283934">Logg på for å få tilgang til flere funksjoner</translation>
 <translation id="4532845899244822526">Velg en mappe</translation>
 <translation id="4547551584605870320">{TAB_COUNT,plural, =1{<ph name="TAB_COUNT_ONE" /> fane}other{<ph name="TAB_COUNT_MANY" /> faner, <ph name="TAB_COUNT_INCOGNITO" /> inkognito}}</translation>
 <translation id="4554077758708533499">Tilkoblet med USB-kabel</translation>
@@ -820,6 +823,7 @@ For å endre denne innstillingen, <ph name="BEGIN_LINK" />tilbakestill synkronis
 <translation id="5517095782334947753">Du har bokmerker, loggen, passord og andre innstillinger fra <ph name="FROM_ACCOUNT" />.</translation>
 <translation id="5524761631371622910">Når prøveprosjekter er påslått, og hvis Chrome har plassert deg tilfeldig i et aktivt prøveprosjekt, påvirker nettleserloggen din annonsene du ser, og interessene som er anslått nedenfor. For å beskytte personvernet ditt sletter Chrome interessene dine på rullerende basis hver måned.</translation>
 <translation id="5524843473235508879">Viderekobling blokkert.</translation>
+<translation id="554297709083131118">Følgende data fra de siste 15 minuttene blir slettet</translation>
 <translation id="5548606607480005320">Sikkerhetssjekk</translation>
 <translation id="5555525474779371165">Velg Safe Browsing-beskyttelse</translation>
 <translation id="5556459405103347317">Last inn på nytt</translation>
@@ -1074,6 +1078,7 @@ Noen nettsteder kan for eksempel svare på denne forespørselen ved å vise deg 
 <translation id="6824899148643461612"><ph name="TAB_TITLE" />, fane, valgt</translation>
 <translation id="6828070228333235514">Slutt å spore prisen</translation>
 <translation id="6830728435402077660">Ikke sikker</translation>
+<translation id="6831043979455480757">Oversett</translation>
 <translation id="6833996806551876956">Prøveperiode på Prosessisolering for personvern</translation>
 <translation id="6836206421467243968">Gjenopprett fanegruppen <ph name="TITLE_OF_GROUP" /> som en ny bakgrunnsfanegruppe.</translation>
 <translation id="6846298663435243399">Laster inn …</translation>
@@ -1241,10 +1246,10 @@ Noen nettsteder kan for eksempel svare på denne forespørselen ved å vise deg 
 <translation id="7707922173985738739">Bruk mobildata</translation>
 <translation id="7709094866268987903">Interesser du fjerner, vises her</translation>
 <translation id="7709918231054955894">Hent alle fanene dine</translation>
+<translation id="772434085369393266">Oppgrader navigeringer til HTTPS og bli varslet før innlasting av nettsteder som ikke støtter dette. Du kan ikke endre denne innstillingen, ettersom Avansert beskyttelse er slått på.</translation>
 <translation id="7725024127233776428">Sider du setter som bokmerker, vises her</translation>
 <translation id="7757787379047923882">Tekst delt fra <ph name="DEVICE_NAME" /></translation>
 <translation id="7762668264895820836">SD-kort <ph name="SD_CARD_NUMBER" /></translation>
-<translation id="7762928140712606393">Logg på for å få flere funksjoner og den sterkeste sikkerheten i Chrome</translation>
 <translation id="7764225426217299476">Legg til adresse</translation>
 <translation id="7772032839648071052">Bekreft passord</translation>
 <translation id="7772375229873196092">Lukk <ph name="APP_NAME" /></translation>
@@ -1260,6 +1265,7 @@ Noen nettsteder kan for eksempel svare på denne forespørselen ved å vise deg 
 <translation id="78270725016672455">Datamaskinen din vil registrere denne enheten for pålogging på et nettsted</translation>
 <translation id="7844171778363018843">Ingen data er valgt for synkronisering</translation>
 <translation id="7846296061357476882">Google-tjenester</translation>
+<translation id="7847228556075070294">Slettet logg, informasjonskapsler og andre data</translation>
 <translation id="784934925303690534">Tidsperiode</translation>
 <translation id="7851858861565204677">Andre enheter</translation>
 <translation id="7853202427316060426">Aktivitet</translation>
@@ -1439,6 +1445,7 @@ Noen nettsteder kan for eksempel svare på denne forespørselen ved å vise deg 
 <translation id="869891660844655955">Utløpsdato</translation>
 <translation id="8699120352855309748">Ikke tilby å oversette disse språkene</translation>
 <translation id="8712637175834984815">Skjønner</translation>
+<translation id="8723453889042591629">Oversett denne siden raskt. Trykk og hold for å redigere denne snarveien.</translation>
 <translation id="8725066075913043281">Prøv på nytt</translation>
 <translation id="8746155870861185046">Del merket tekst</translation>
 <translation id="874726034427945498">Synkroniser fanene og loggen for å få bedre forslag i adressefeltet</translation>

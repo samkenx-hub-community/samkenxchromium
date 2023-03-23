@@ -476,6 +476,11 @@ public class TabSwitcherLayout extends Layout {
         mTabToSwitcherAnimation.playTogether(animationList);
         mTabToSwitcherAnimation.addListener(new AnimatorListenerAdapter() {
             @Override
+            public void onAnimationStart(Animator animation) {
+                mController.prepareShowTabSwitcherView();
+            }
+
+            @Override
             public void onAnimationEnd(Animator animation) {
                 mTabToSwitcherAnimation = null;
                 // Step 2: fade in the real GTS RecyclerView.
@@ -729,6 +734,6 @@ public class TabSwitcherLayout extends Layout {
      */
     private boolean isTabGtsAnimationEnabled() {
         if (DeviceFormFactor.isNonMultiDisplayContextOnTablet(getContext())) return false;
-        return TabUiFeatureUtilities.isTabToGtsAnimationEnabled();
+        return TabUiFeatureUtilities.isTabToGtsAnimationEnabled(getContext());
     }
 }

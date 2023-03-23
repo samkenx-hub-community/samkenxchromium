@@ -19,6 +19,7 @@
 #include "base/metrics/histogram_macros.h"
 #include "base/strings/stringprintf.h"
 #include "base/strings/utf_string_conversions.h"
+#include "base/trace_event/common/trace_event_common.h"
 #include "base/trace_event/trace_event.h"
 #include "base/win/core_winrt_util.h"
 #include "base/win/scoped_propvariant.h"
@@ -287,6 +288,9 @@ WASAPIAudioInputStream::WASAPIAudioInputStream(
     AudioManager::LogCallback log_callback)
     : manager_(manager),
       glitch_reporter_(SystemGlitchReporter::StreamType::kCapture),
+      peak_detector_(base::BindRepeating(&AudioManager::TraceAmplitudePeak,
+                                         base::Unretained(manager_),
+                                         /*trace_start=*/true)),
       data_discontinuity_reporter_(
           std::make_unique<DataDiscontinuityReporter>()),
       device_id_(device_id),
@@ -869,6 +873,8 @@ void WASAPIAudioInputStream::PullCaptureDataAndPushToSink() {
     // The behavior of the AUDCLNT_BUFFERFLAGS_DATA_DISCONTINUITY flag is
     // undefined on the application's first call to GetBuffer after Start and
     // Windows 7 or later is required for support.
+    // TODO(https://crbug.com/1427096): take this into account when reporting
+    // glitch info.
     const bool observed_data_discontinuity =
         (device_position > 0 && flags & AUDCLNT_BUFFERFLAGS_DATA_DISCONTINUITY);
     if (observed_data_discontinuity) {
@@ -909,6 +915,9 @@ void WASAPIAudioInputStream::PullCaptureDataAndPushToSink() {
               input_format_.Format.nSamplesPerSec);
         }
         glitch_reporter_.UpdateStats(glitch_duration);
+        if (glitch_duration.is_positive()) {
+          glitch_accumulator_.Add({.duration = glitch_duration, .count = 1});
+        }
       }
 
       last_device_position = device_position;
@@ -956,8 +965,10 @@ void WASAPIAudioInputStream::PullCaptureDataAndPushToSink() {
     if (flags & AUDCLNT_BUFFERFLAGS_SILENT) {
       fifo_->PushSilence(num_frames_to_read);
     } else {
-      fifo_->Push(data_ptr, num_frames_to_read,
-                  input_format_.Format.wBitsPerSample / 8);
+      const int bytes_per_sample = input_format_.Format.wBitsPerSample / 8;
+
+      peak_detector_.FindPeak(data_ptr, num_frames_to_read, bytes_per_sample);
+      fifo_->Push(data_ptr, num_frames_to_read, bytes_per_sample);
     }
 
     hr = audio_capture_client_->ReleaseBuffer(num_frames_to_read);
@@ -986,13 +997,15 @@ void WASAPIAudioInputStream::PullCaptureDataAndPushToSink() {
           return;
         }
         converter_->Convert(convert_bus_.get());
-        sink_->OnData(convert_bus_.get(), capture_time, volume, {});
+        sink_->OnData(convert_bus_.get(), capture_time, volume,
+                      glitch_accumulator_.GetAndReset());
 
         // Move the capture time forward for each vended block.
         capture_time += AudioTimestampHelper::FramesToTime(
             convert_bus_->frames(), output_format_.nSamplesPerSec);
       } else {
-        sink_->OnData(fifo_->Consume(), capture_time, volume, {});
+        sink_->OnData(fifo_->Consume(), capture_time, volume,
+                      glitch_accumulator_.GetAndReset());
 
         // Move the capture time forward for each vended block.
         capture_time += AudioTimestampHelper::FramesToTime(
@@ -1649,6 +1662,7 @@ double WASAPIAudioInputStream::ProvideInput(
 }
 
 void WASAPIAudioInputStream::ReportAndResetGlitchStats() {
+  glitch_accumulator_.GetAndReset();
   SystemGlitchReporter::Stats stats =
       glitch_reporter_.GetLongTermStatsAndReset();
   SendLogMessage(

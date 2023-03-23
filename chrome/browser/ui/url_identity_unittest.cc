@@ -57,8 +57,8 @@ class UrlIdentityTest : public testing::Test {
     web_app::test::AwaitStartWebAppProviderAndSubsystems(&testing_profile_);
     std::string iwa_name(kTestIsolatedWebAppName);
     GURL iwa_url(kTestIsolatedWebAppUrl);
-    web_app::AppId app_id_ = web_app::AddDummyIsolatedAppToRegistry(
-        &testing_profile_, iwa_url, iwa_name);
+    web_app::AddDummyIsolatedAppToRegistry(&testing_profile_, iwa_url,
+                                           iwa_name);
   }
 
   void InstallExtension() {
@@ -134,12 +134,33 @@ TEST_F(UrlIdentityTest, DefaultFormatOptionsTest) {
            .type = Type::kDefault,
            .name = u"https://example.com",
        }},
+      {GURL("https://example.com/123"),
+       {Type::kDefault},
+       {},
+       {
+           .type = Type::kDefault,
+           .name = u"https://example.com",
+       }},
+      {GURL("https://example.com/123"),
+       {Type::kDefault},
+       {.default_options = {DefaultFormatOptions::kRawSpec}},
+       {
+           .type = Type::kDefault,
+           .name = u"https://example.com/123",
+       }},
       {GURL("https://example.com"),
        {Type::kDefault},
        {.default_options = {DefaultFormatOptions::kOmitCryptographicScheme}},
        {
            .type = Type::kDefault,
            .name = u"example.com",
+       }},
+      {GURL("https://abc.example.com"),
+       {Type::kDefault},
+       {.default_options = {DefaultFormatOptions::kHostname}},
+       {
+           .type = Type::kDefault,
+           .name = u"abc.example.com",
        }},
   };
 

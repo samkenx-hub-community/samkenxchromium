@@ -10,6 +10,7 @@
 
 #import "base/feature_list.h"
 #import "base/i18n/rtl.h"
+#import "base/ios/ios_util.h"
 #import "base/mac/bundle_locations.h"
 #import "base/mac/foundation_util.h"
 #import "base/metrics/histogram_functions.h"
@@ -19,12 +20,13 @@
 #import "base/strings/sys_string_conversions.h"
 #import "components/bookmarks/browser/bookmark_model.h"
 #import "components/favicon/ios/web_favicon_driver.h"
-#import "ios/chrome/browser/bookmarks/bookmark_model_factory.h"
+#import "ios/chrome/browser/bookmarks/local_or_syncable_bookmark_model_factory.h"
 #import "ios/chrome/browser/browser_state/chrome_browser_state.h"
 #import "ios/chrome/browser/drag_and_drop/drag_item_util.h"
 #import "ios/chrome/browser/drag_and_drop/url_drag_drop_handler.h"
 #import "ios/chrome/browser/flags/system_flags.h"
 #import "ios/chrome/browser/main/browser.h"
+#import "ios/chrome/browser/ntp/new_tab_page_util.h"
 #import "ios/chrome/browser/shared/public/commands/application_commands.h"
 #import "ios/chrome/browser/shared/public/commands/bookmarks_commands.h"
 #import "ios/chrome/browser/shared/public/commands/browser_commands.h"
@@ -48,7 +50,6 @@
 #import "ios/chrome/browser/ui/icons/symbols.h"
 #import "ios/chrome/browser/ui/main/scene_state.h"
 #import "ios/chrome/browser/ui/main/scene_state_browser_agent.h"
-#import "ios/chrome/browser/ui/ntp/new_tab_page_util.h"
 #import "ios/chrome/browser/ui/popup_menu/public/popup_menu_long_press_delegate.h"
 #import "ios/chrome/browser/ui/tab_switcher/tab_utils.h"
 #import "ios/chrome/browser/ui/tabs/requirements/tab_strip_constants.h"
@@ -68,6 +69,7 @@
 #import "ios/chrome/browser/web_state_list/web_state_list_favicon_driver_observer.h"
 #import "ios/chrome/browser/web_state_list/web_state_list_observer_bridge.h"
 #import "ios/chrome/browser/web_state_list/web_state_opener.h"
+#import "ios/chrome/common/button_configuration_util.h"
 #import "ios/chrome/common/ui/colors/semantic_color_names.h"
 #import "ios/chrome/common/ui/util/ui_util.h"
 #import "ios/chrome/grit/ios_strings.h"
@@ -491,7 +493,7 @@ const CGFloat kSymbolSize = 18;
             _webStateList, _webStateObserver.get());
     _style = style;
 
-    _pinnedTabCount = _webStateList->GetIndexOfFirstNonPinnedWebState();
+    [self updatePinnedTabCount];
 
     // `self.view` setup.
     _useTabStacking = [self shouldUseTabStacking];
@@ -538,35 +540,30 @@ const CGFloat kSymbolSize = 18;
                                       UIViewAutoresizingFlexibleBottomMargin);
     _buttonNewTab.imageView.contentMode = UIViewContentModeCenter;
 
-    UIImage* buttonNewTabImage;
-    if (UseSymbols()) {
-      buttonNewTabImage = DefaultSymbolWithPointSize(kPlusSymbol, kSymbolSize);
-    } else {
-      buttonNewTabImage = [UIImage imageNamed:@"tabstrip_new_tab"];
-      buttonNewTabImage = [buttonNewTabImage
-          imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
-    }
+    UIImage* buttonNewTabImage =
+        DefaultSymbolWithPointSize(kPlusSymbol, kSymbolSize);
 
     // TODO(crbug.com/1418068): Simplify after minimum version required is >=
     // iOS 15.
-    if (@available(iOS 15, *)) {
-      UIButtonConfiguration* buttonConfiguration =
-          [UIButtonConfiguration plainButtonConfiguration];
-      buttonConfiguration.contentInsets = NSDirectionalEdgeInsetsMake(
-          0, kNewTabButtonLeadingImageInset, kNewTabButtonBottomImageInset, 0);
-      buttonConfiguration.image = buttonNewTabImage;
-      _buttonNewTab.tintColor = [UIColor colorNamed:kGrey500Color];
-      _buttonNewTab.configuration = buttonConfiguration;
-    }
-#if __IPHONE_OS_VERSION_MIN_REQUIRED < __IPHONE_15_0
-    else {
+    if (base::ios::IsRunningOnIOS15OrLater() &&
+        IsUIButtonConfigurationEnabled()) {
+      if (@available(iOS 15, *)) {
+        UIButtonConfiguration* buttonConfiguration =
+            [UIButtonConfiguration plainButtonConfiguration];
+        buttonConfiguration.contentInsets =
+            NSDirectionalEdgeInsetsMake(0, kNewTabButtonLeadingImageInset,
+                                        kNewTabButtonBottomImageInset, 0);
+        buttonConfiguration.image = buttonNewTabImage;
+        _buttonNewTab.tintColor = [UIColor colorNamed:kGrey500Color];
+        _buttonNewTab.configuration = buttonConfiguration;
+      }
+    } else {
       UIEdgeInsets imageInsets = UIEdgeInsetsMake(
           0, kNewTabButtonLeadingImageInset, kNewTabButtonBottomImageInset, 0);
-      _buttonNewTab.imageEdgeInsets = imageInsets;
+      SetImageEdgeInsets(_buttonNewTab, imageInsets);
       [_buttonNewTab setImage:buttonNewTabImage forState:UIControlStateNormal];
       [_buttonNewTab.imageView setTintColor:[UIColor colorNamed:kGrey500Color]];
     }
-#endif  // __IPHONE_OS_VERSION_MIN_REQUIRED < __IPHONE_15_0
 
     SetA11yLabelAndUiAutomationName(
         _buttonNewTab,
@@ -946,6 +943,11 @@ const CGFloat kSymbolSize = 18;
   UrlLoadingBrowserAgent::FromBrowser(_browser)->Load(params);
 }
 
+// Updates pinned tab count.
+- (void)updatePinnedTabCount {
+  _pinnedTabCount = _webStateList->GetIndexOfFirstNonPinnedWebState();
+}
+
 #pragma mark - TabStripContextMenuDelegate
 
 - (void)addToReadingListURL:(const GURL&)URL title:(NSString*)title {
@@ -960,7 +962,7 @@ const CGFloat kSymbolSize = 18;
 
 - (void)bookmarkURL:(const GURL&)URL title:(NSString*)title {
   bookmarks::BookmarkModel* bookmarkModel =
-      ios::BookmarkModelFactory::GetForBrowserState(
+      ios::LocalOrSyncableBookmarkModelFactory::GetForBrowserState(
           _browser->GetBrowserState());
   bool currentlyBookmarked =
       bookmarkModel && bookmarkModel->GetMostRecentlyAddedUserNodeForURL(URL);
@@ -977,11 +979,11 @@ const CGFloat kSymbolSize = 18;
 }
 
 - (void)pinTabWithIdentifier:(NSString*)identifier {
-  SetWebStatePinnedState(_webStateList, identifier, YES);
+  SetWebStatePinnedState(_webStateList, identifier, /*pin_state=*/YES);
 }
 
 - (void)unpinTabWithIdentifier:(NSString*)identifier {
-  SetWebStatePinnedState(_webStateList, identifier, NO);
+  SetWebStatePinnedState(_webStateList, identifier, /*pin_state=*/NO);
 }
 
 - (void)closeTabWithIdentifier:(NSString*)identifier {
@@ -1338,6 +1340,8 @@ const CGFloat kSymbolSize = 18;
   [_closingTabs addObject:view];
   _targetFrames.RemoveFrame(view);
 
+  [self updatePinnedTabCount];
+
   // Adjust the content size now that the tab has been removed from the model.
   [self updateContentSizeAndRepositionViews];
 
@@ -1377,6 +1381,7 @@ const CGFloat kSymbolSize = 18;
   TabView* view = [self createTabViewForWebState:webState
                                       isSelected:activating];
   [_tabArray insertObject:view atIndex:[self indexForWebStateListIndex:index]];
+  [self updatePinnedTabCount];
   [[self tabStripView] addSubview:view];
 
   [self updateContentSizeAndRepositionViews];
@@ -1397,7 +1402,7 @@ const CGFloat kSymbolSize = 18;
     didChangePinnedStateForWebState:(web::WebState*)webState
                             atIndex:(int)index {
   DCHECK_EQ(_webStateList, webStateList);
-  _pinnedTabCount = webStateList->GetIndexOfFirstNonPinnedWebState();
+  [self updatePinnedTabCount];
 
   [self layoutTabStripSubviews];
 }

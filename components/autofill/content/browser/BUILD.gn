@@ -39,7 +39,7 @@ static_library("browser") {
   deps = [
     "//base",
     "//base:i18n",
-    "//components/os_crypt",
+    "//components/os_crypt/sync",
     "//components/prefs",
     "//components/profile_metrics",
     "//components/resources",
@@ -90,6 +90,7 @@ source_set("test_support") {
     "test_autofill_manager_injector.h",
     "test_content_autofill_client.cc",
     "test_content_autofill_client.h",
+    "test_content_autofill_driver.h",
   ]
 
   public_deps = [

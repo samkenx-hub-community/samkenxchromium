@@ -35,9 +35,11 @@ class EventRewriterDelegateImpl : public ui::EventRewriterChromeOS::Delegate {
 
   // ui::EventRewriterChromeOS::Delegate:
   bool RewriteModifierKeys() override;
-  bool RewriteMetaTopRowKeyComboEvents() const override;
-  bool GetKeyboardRemappedPrefValue(const std::string& pref_name,
-                                    int* result) const override;
+  bool RewriteMetaTopRowKeyComboEvents(int device_id) const override;
+  absl::optional<ui::mojom::ModifierKey> GetKeyboardRemappedModifierValue(
+      int device_id,
+      ui::mojom::ModifierKey modifier_key,
+      const std::string& pref_name) const override;
   bool TopRowKeysAreFunctionKeys(int device_id) const override;
   bool IsExtensionCommandRegistered(ui::KeyboardCode key_code,
                                     int flags) const override;
@@ -63,7 +65,8 @@ class EventRewriterDelegateImpl : public ui::EventRewriterChromeOS::Delegate {
   // Tracks whether meta + top row key rewrites should be suppressed or not.
   bool suppress_meta_top_row_key_rewrites_ = false;
 
-  raw_ptr<InputDeviceSettingsController> input_device_settings_controller_;
+  raw_ptr<InputDeviceSettingsController, DanglingUntriaged>
+      input_device_settings_controller_;
 };
 
 }  // namespace ash

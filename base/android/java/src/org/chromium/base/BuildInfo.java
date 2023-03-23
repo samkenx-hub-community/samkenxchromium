@@ -75,8 +75,10 @@ public class BuildInfo {
 
     /** Returns a serialized string array of all properties of this class. */
     @VisibleForTesting
+    @OptIn(markerClass = androidx.core.os.BuildCompat.PrereleaseSdkCheck.class)
     String[] getAllProperties() {
         String hostPackageName = ContextUtils.getApplicationContext().getPackageName();
+        // This implementation needs to be kept in sync with the native BuildInfo constructor.
         return new String[] {
                 Build.BRAND,
                 Build.DEVICE,
@@ -107,6 +109,9 @@ public class BuildInfo {
                 Build.HARDWARE,
                 isAtLeastT() ? "1" : "0",
                 isAutomotive ? "1" : "0",
+                BuildCompat.isAtLeastU() ? "1" : "0",
+                targetsAtLeastU() ? "1" : "0",
+                Build.VERSION.CODENAME,
         };
     }
 
@@ -226,11 +231,28 @@ public class BuildInfo {
     }
 
     /**
-     * Check if this is a debuggable build of Android. Use this to enable developer-only features.
+     * Check if this is a debuggable build of Android.
      * This is a rough approximation of the hidden API {@code Build.IS_DEBUGGABLE}.
      */
     public static boolean isDebugAndroid() {
         return "eng".equals(Build.TYPE) || "userdebug".equals(Build.TYPE);
+    }
+
+    /*
+     * Check if the app is declared debuggable in its manifest.
+     * In WebView, this refers to the host app.
+     */
+    public static boolean isDebugApp() {
+        int appFlags = ContextUtils.getApplicationContext().getApplicationInfo().flags;
+        return (appFlags & ApplicationInfo.FLAG_DEBUGGABLE) != 0;
+    }
+
+    /**
+     * Check if this is either a debuggable build of Android or of the host app.
+     * Use this to enable developer-only features.
+     */
+    public static boolean isDebugAndroidOrApp() {
+        return isDebugAndroid() || isDebugApp();
     }
 
     /**

@@ -153,32 +153,30 @@ TEST(JsonSchemaCompilerSimpleTest, NoParamsResultCreate) {
 
 TEST(JsonSchemaCompilerSimpleTest, TestTypePopulate) {
   {
-    auto test_type = std::make_unique<simple_api::TestType>();
-    base::Value value(CreateTestTypeDictionary());
-    EXPECT_TRUE(simple_api::TestType::Populate(value, test_type.get()));
-    EXPECT_EQ("bling", test_type->string);
-    EXPECT_EQ(1.1, test_type->number);
-    EXPECT_EQ(4, test_type->integer);
-    EXPECT_EQ(true, test_type->boolean);
-    EXPECT_EQ(value, test_type->ToValue());
+    simple_api::TestType test_type;
+    base::Value::Dict value = CreateTestTypeDictionary();
+    EXPECT_TRUE(simple_api::TestType::Populate(value, test_type));
+    EXPECT_EQ("bling", test_type.string);
+    EXPECT_EQ(1.1, test_type.number);
+    EXPECT_EQ(4, test_type.integer);
+    EXPECT_EQ(true, test_type.boolean);
+    EXPECT_EQ(value, test_type.ToValue());
   }
   {
-    auto test_type = std::make_unique<simple_api::TestType>();
+    simple_api::TestType test_type;
     base::Value::Dict value = CreateTestTypeDictionary();
     value.Remove("number");
-    EXPECT_FALSE(simple_api::TestType::Populate(base::Value(std::move(value)),
-                                                test_type.get()));
+    EXPECT_FALSE(simple_api::TestType::Populate(std::move(value), test_type));
   }
 }
 
 TEST(JsonSchemaCompilerSimpleTest, GetTestType) {
   {
     base::Value::Dict value = CreateTestTypeDictionary();
-    auto test_type = std::make_unique<simple_api::TestType>();
-    EXPECT_TRUE(simple_api::TestType::Populate(base::Value(value.Clone()),
-                                               test_type.get()));
+    simple_api::TestType test_type;
+    EXPECT_TRUE(simple_api::TestType::Populate(value.Clone(), test_type));
     base::Value::List results =
-        simple_api::GetTestType::Results::Create(*test_type);
+        simple_api::GetTestType::Results::Create(test_type);
     ASSERT_EQ(1u, results.size());
     EXPECT_EQ(results[0], value);
   }
@@ -431,7 +429,7 @@ TEST(JsonSchemaCompilerSimpleTest, ManifestKeyParsing_Success_AllKeys) {
   EXPECT_TRUE(manifest_keys.key_obj->obj_bool);
   ASSERT_TRUE(manifest_keys.key_obj->obj_optional_enum_array);
   EXPECT_THAT(*manifest_keys.key_obj->obj_optional_enum_array,
-              ::testing::ElementsAre(enums::ENUMERATION_THREE));
+              ::testing::ElementsAre(enums::Enumeration::kThree));
 
   EXPECT_EQ(simple_api::TEST_ENUM_ONE, manifest_keys.key_enum);
 
@@ -444,7 +442,7 @@ TEST(JsonSchemaCompilerSimpleTest, ManifestKeyParsing_Success_AllKeys) {
   ASSERT_TRUE(manifest_keys.key_ref.array);
   EXPECT_THAT(*manifest_keys.key_ref.array,
               ::testing::ElementsAre("one", "two"));
-  EXPECT_EQ(enums::ENUMERATION_TWO, manifest_keys.key_ref.opt_external_enum);
+  EXPECT_EQ(enums::Enumeration::kTwo, manifest_keys.key_ref.opt_external_enum);
   EXPECT_THAT(manifest_keys.key_enum_array,
               ::testing::ElementsAre(simple_api::TEST_ENUM_TWO,
                                      simple_api::TEST_ENUM_ONE));
@@ -479,6 +477,6 @@ TEST(JsonSchemaCompilerSimpleTest,
   EXPECT_DOUBLE_EQ(25.4, manifest_keys.key_ref.number);
   EXPECT_EQ(32, manifest_keys.key_ref.integer);
   EXPECT_FALSE(manifest_keys.key_ref.array);
-  EXPECT_EQ(enums::ENUMERATION_NONE, manifest_keys.key_ref.opt_external_enum);
+  EXPECT_EQ(enums::Enumeration::kNone, manifest_keys.key_ref.opt_external_enum);
   EXPECT_EQ(simple_api::_3D_NONE, manifest_keys._3d_key);
 }

@@ -88,8 +88,10 @@ class AccountSelectionBubbleView : public views::BubbleDialogDelegateView,
       const IdentityProviderDisplayData& idp_display_data,
       bool show_back_button) override;
 
-  void ShowFailureDialog(const std::u16string& top_frame_for_display,
-                         const std::u16string& idp_for_display) override;
+  void ShowFailureDialog(
+      const std::u16string& top_frame_for_display,
+      const std::u16string& idp_for_display,
+      const content::IdentityProviderMetadata& idp_metadata) override;
 
   // Populates `idp_images` when an IDP image has been fetched.
   void AddIdpImage(const GURL& image_url, gfx::ImageSkia idp_image);
@@ -150,6 +152,9 @@ class AccountSelectionBubbleView : public views::BubbleDialogDelegateView,
 
   // The accessible title.
   std::u16string accessible_title_;
+
+  // The initial title for the dialog.
+  std::u16string title_;
 
   // The initial subtitle for the dialog.
   std::u16string subtitle_;

@@ -81,11 +81,14 @@ using feed::FeedUserActionType;
 // `ContentSuggestions.Feed.TimeSpentInFeed`
 @property(nonatomic, assign) base::TimeDelta timeSpentInFeed;
 
-// Timer to signal end of session.
-@property(nonatomic, strong) NSTimer* sessionEndTimer;
+// Timer to refresh the feed.
+@property(nonatomic, strong) NSTimer* refreshTimer;
 
 // YES if the NTP is visible.
 @property(nonatomic, assign) BOOL isNTPVisible;
+
+// YES if the feed is toggled on in the feed header menu.
+@property(nonatomic, assign) BOOL isFeedVisible;
 
 @end
 
@@ -103,8 +106,8 @@ using feed::FeedUserActionType;
 #pragma mark - Public
 
 - (void)dealloc {
-  [self.sessionEndTimer invalidate];
-  self.sessionEndTimer = nil;
+  [self.refreshTimer invalidate];
+  self.refreshTimer = nil;
 }
 
 + (void)recordFeedRefreshTrigger:(FeedRefreshTrigger)trigger {
@@ -112,10 +115,8 @@ using feed::FeedUserActionType;
 }
 
 - (void)recordFeedScrolled:(int)scrollDistance {
-  if (IsGoodVisitsMetricEnabled()) {
-    self.goodVisitScroll = YES;
-    [self checkEngagementGoodVisitWithInteraction:NO];
-  }
+  self.goodVisitScroll = YES;
+  [self checkEngagementGoodVisitWithInteraction:NO];
 
   // If neither feed has been scrolled into, log "AllFeeds" scrolled.
   if (!self.scrolledReportedDiscover && !self.scrolledReportedFollowing) {
@@ -163,12 +164,12 @@ using feed::FeedUserActionType;
   // Invalidate the timer when the user returns to the feed since the feed
   // should not be refreshed when the user is viewing it.
   if (visible) {
-    [self.sessionEndTimer invalidate];
+    [self.refreshTimer invalidate];
+    [self recordDiscoverFeedUserActionHistogram:FeedUserActionType::
+                                                    kOpenedFeedSurface
+                                  asInteraction:NO];
   }
 
-  if (!IsGoodVisitsMetricEnabled()) {
-    return;
-  }
   NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
   if (visible) {
     NSDate* lastInteractionTimeForGoodVisitsDate = base::mac::ObjCCast<NSDate>(
@@ -195,9 +196,9 @@ using feed::FeedUserActionType;
     }
 
     // Total time spent in feed metrics.
-    [self recordTimeSpentInFeedIfDayIsDone];
     self.timeSpentInFeed =
         base::Seconds([defaults doubleForKey:kTimeSpentInFeedAggregateKey]);
+    [self recordTimeSpentInFeedIfDayIsDone];
 
     self.previousTimeInFeedForGoodVisitSession =
         [defaults doubleForKey:kLongFeedVisitTimeAggregateKey];
@@ -303,6 +304,7 @@ using feed::FeedUserActionType;
 }
 
 - (void)recordDiscoverFeedVisibilityChanged:(BOOL)visible {
+  self.isFeedVisible = visible;
   if (visible) {
     [self
         recordDiscoverFeedUserActionHistogram:FeedUserActionType::kTappedTurnOn
@@ -642,9 +644,10 @@ using feed::FeedUserActionType;
   }
 }
 
-// Deprecated. Renamed to `hasEngagedWithLatestRefreshedContent`.
-- (BOOL)hasMetFeedRefreshUserEngagementCriteria {
-  return [self hasEngagedWithLatestRefreshedContent];
+#pragma mark - FeedRefreshStateTracker
+
+- (BOOL)isNTPAndFeedVisible {
+  return self.isNTPVisible && self.isFeedVisible;
 }
 
 #pragma mark - Follow
@@ -847,9 +850,6 @@ using feed::FeedUserActionType;
   // Check if actionType warrants a Good Explicit Visit
   // If actionType is any of the cases below, trigger a Good Explicit
   // interaction by calling recordEngagementGoodVisit
-  if (!IsGoodVisitsMetricEnabled()) {
-    return;
-  }
   switch (actionType) {
     case FeedUserActionType::kAddedToReadLater:
     case FeedUserActionType::kOpenedNativeContextMenu:
@@ -885,7 +885,10 @@ using feed::FeedUserActionType;
   // Chrome run.
   if (scrollDistance > 0 || interacted) {
     [self recordEngagedSimple];
-    self.engagedWithLatestRefreshedContent = YES;
+    if (GetFeedRefreshEngagementCriteriaType() ==
+        FeedRefreshEngagementCriteriaType::kSimpleEngagement) {
+      self.engagedWithLatestRefreshedContent = YES;
+    }
   }
 
   // Report the user as engaged if they have scrolled more than the threshold or
@@ -893,22 +896,25 @@ using feed::FeedUserActionType;
   // Chrome run.
   if (scrollDistance > kMinScrollThreshold || interacted) {
     [self recordEngaged];
+    if (GetFeedRefreshEngagementCriteriaType() ==
+        FeedRefreshEngagementCriteriaType::kEngagement) {
+      self.engagedWithLatestRefreshedContent = YES;
+    }
   }
 
   [self.sessionRecorder recordUserInteractionOrScrolling];
 
-  // This must be called after memoizing if the current session has met
-  // engagement criteria. For example, setting `engagedSimpleReportedDiscover`
-  // must happen before this call.
-  if (IsFeedRefreshPostFeedSessionEnabled()) {
-    [self setOrExtendSessionEndTimer];
+  // This must be called after setting `engagedWithLatestRefreshedContent`
+  // properly after scrolling or interactions.
+  if (IsFeedSessionCloseForegroundRefreshEnabled() &&
+      [self hasEngagedWithLatestRefreshedContent]) {
+    [self setOrExtendRefreshTimer];
   }
 }
 
 // Checks if a Good Visit should be recorded. `interacted` is YES if it was
 // triggered by an explicit interaction. (e.g. Opening a new Tab in Incognito.)
 - (void)checkEngagementGoodVisitWithInteraction:(BOOL)interacted {
-  DCHECK(IsGoodVisitsMetricEnabled());
   // Determine if this interaction is part of a new session.
   base::Time now = base::Time::Now();
   if ((now - self.lastInteractionTimeForGoodVisits) >
@@ -1069,7 +1075,6 @@ using feed::FeedUserActionType;
   // Check if the user has previously engaged with the feed in the same
   // session.
   // If neither feed has been engaged with, log "AllFeeds" engagement.
-  DCHECK(IsGoodVisitsMetricEnabled());
   if (!self.goodVisitReportedAllFeeds) {
     // Log for the all feeds aggregate.
     UMA_HISTOGRAM_ENUMERATION(kAllFeedsEngagementTypeHistogram,
@@ -1087,6 +1092,10 @@ using feed::FeedUserActionType;
     UMA_HISTOGRAM_ENUMERATION(kDiscoverFeedEngagementTypeHistogram,
                               FeedEngagementType::kGoodVisit);
     self.goodVisitReportedDiscover = YES;
+    if (GetFeedRefreshEngagementCriteriaType() ==
+        FeedRefreshEngagementCriteriaType::kGoodVisit) {
+      self.engagedWithLatestRefreshedContent = YES;
+    }
   }
 
   // Log interaction for Following feed.
@@ -1210,9 +1219,9 @@ using feed::FeedUserActionType;
 
   BOOL shouldResetData = NO;
   if (lastInteractionReported) {
-    base::TimeDelta sinceDayStart =
-        (base::Time::Now() - lastInteractionReportedInTime);
-    if (sinceDayStart >= base::Days(1) || sinceDayStart < -base::Hours(1)) {
+    base::Time now = base::Time::Now();
+    base::TimeDelta sinceDayStart = (now - lastInteractionReportedInTime);
+    if (sinceDayStart >= base::Days(1)) {
       // Check if the user has spent any time in the feed.
       if (self.timeSpentInFeed > base::Seconds(0)) {
         UMA_HISTOGRAM_LONG_TIMES(kTimeSpentInFeedHistogram,
@@ -1270,25 +1279,23 @@ using feed::FeedUserActionType;
   }
 }
 
-// Sets or extends the session end timer.
-- (void)setOrExtendSessionEndTimer {
-  [self.sessionEndTimer invalidate];
+// Sets or extends the refresh timer.
+- (void)setOrExtendRefreshTimer {
+  [self.refreshTimer invalidate];
   __weak FeedMetricsRecorder* weakSelf = self;
-  self.sessionEndTimer = [NSTimer
-      scheduledTimerWithTimeInterval:GetFeedSessionEndTimerTimeoutInSeconds()
+  self.refreshTimer = [NSTimer
+      scheduledTimerWithTimeInterval:GetFeedRefreshTimerTimeoutInSeconds()
                               target:weakSelf
-                            selector:@selector
-                            (refreshFeedIfSessionConditionsAreMet)
+                            selector:@selector(refreshTimerEnded)
                             userInfo:nil
                              repeats:NO];
 }
 
-// Refresh the feed if session conditions are met. See implementation for which
-// specific conditions are used.
-- (void)refreshFeedIfSessionConditionsAreMet {
-  [self.sessionEndTimer invalidate];
-  self.sessionEndTimer = nil;
-  if (!self.isNTPVisible) {
+// Signals that the refresh timer ended.
+- (void)refreshTimerEnded {
+  [self.refreshTimer invalidate];
+  self.refreshTimer = nil;
+  if (![self isNTPAndFeedVisible]) {
     // The feed refresher checks feed engagement criteria.
     self.feedRefresher->RefreshFeed(
         FeedRefreshTrigger::kForegroundFeedNotVisible);

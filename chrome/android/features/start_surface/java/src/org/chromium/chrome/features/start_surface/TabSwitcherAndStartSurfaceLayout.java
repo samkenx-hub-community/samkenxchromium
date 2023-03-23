@@ -490,8 +490,9 @@ public class TabSwitcherAndStartSurfaceLayout extends Layout {
         if (mBackgroundTabAnimation != null && mBackgroundTabAnimation.isStarted()) {
             mBackgroundTabAnimation.end();
         }
-        mBackgroundTabAnimation = BackgroundTabAnimation.create(this, primaryTasksSurface, originX,
-                originY, getOrientation() == Orientation.PORTRAIT);
+        float dpToPx = getContext().getResources().getDisplayMetrics().density;
+        mBackgroundTabAnimation = BackgroundTabAnimation.create(this, primaryTasksSurface,
+                originX * dpToPx, originY * dpToPx, getOrientation() == Orientation.PORTRAIT);
         mBackgroundTabAnimation.start();
     }
 
@@ -580,6 +581,14 @@ public class TabSwitcherAndStartSurfaceLayout extends Layout {
         mTabToSwitcherAnimation = new AnimatorSet();
         mTabToSwitcherAnimation.playTogether(animationList);
         mTabToSwitcherAnimation.addListener(new AnimatorListenerAdapter() {
+            @Override
+            public void onAnimationStart(Animator animation) {
+                TabSwitcher.Controller controller = mStartSurface.getGridTabSwitcherController();
+                if (controller != null) {
+                    controller.prepareShowTabSwitcherView();
+                }
+            }
+
             @Override
             public void onAnimationEnd(Animator animation) {
                 mTabToSwitcherAnimation = null;
@@ -894,6 +903,6 @@ public class TabSwitcherAndStartSurfaceLayout extends Layout {
      */
     private boolean isTabGtsAnimationEnabled() {
         if (DeviceFormFactor.isNonMultiDisplayContextOnTablet(getContext())) return false;
-        return TabUiFeatureUtilities.isTabToGtsAnimationEnabled();
+        return TabUiFeatureUtilities.isTabToGtsAnimationEnabled(getContext());
     }
 }

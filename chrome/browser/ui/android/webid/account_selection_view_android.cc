@@ -121,7 +121,7 @@ void AccountSelectionViewAndroid::Show(
     // It's possible that the constructor cannot access the bottom sheet clank
     // component. That case may be temporary but we can't let users in a
     // waiting state so report that AccountSelectionView is dismissed instead.
-    delegate_->OnDismiss(DismissReason::OTHER);
+    delegate_->OnDismiss(DismissReason::kOther);
     return;
   }
 
@@ -150,7 +150,8 @@ void AccountSelectionViewAndroid::Show(
 
 void AccountSelectionViewAndroid::ShowFailureDialog(
     const std::string& top_frame_for_display,
-    const std::string& idp_for_display) {
+    const std::string& idp_for_display,
+    const content::IdentityProviderMetadata& idp_metadata) {
   // TODO(crbug.com/1357790): add support on Android.
 }
 

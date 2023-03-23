@@ -65,6 +65,7 @@
 #include "ui/base/window_open_disposition_utils.h"
 #include "ui/color/color_id.h"
 #include "ui/color/color_provider.h"
+#include "ui/compositor/layer_tree_owner.h"
 #include "ui/gfx/canvas.h"
 #include "ui/gfx/font_list.h"
 #include "ui/gfx/geometry/skia_conversions.h"
@@ -872,9 +873,10 @@ absl::optional<SkColor> AppMenu::GetLabelColor(int command_id) const {
   // to correctly determine the label color as this requires querying the View's
   // hosting widget (crbug.com/1233392).
   return GetLabelFontList(command_id)
-             ? absl::optional<SkColor>(views::style::GetColor(
-                   *root_->GetSubmenu(), views::style::CONTEXT_MENU,
-                   views::style::STYLE_PRIMARY))
+             ? absl::make_optional(
+                   root_->GetSubmenu()->GetColorProvider()->GetColor(
+                       views::style::GetColorId(views::style::CONTEXT_MENU,
+                                                views::style::STYLE_PRIMARY)))
              : absl::nullopt;
 }
 

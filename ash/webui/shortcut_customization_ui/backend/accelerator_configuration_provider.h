@@ -64,6 +64,7 @@ class AcceleratorConfigurationProvider
   // shortcut_customization::mojom::AcceleratorConfigurationProvider:
   void IsMutable(ash::mojom::AcceleratorSource source,
                  IsMutableCallback callback) override;
+  void HasLauncherButton(HasLauncherButtonCallback callback) override;
   void GetAccelerators(GetAcceleratorsCallback callback) override;
   void AddObserver(mojo::PendingRemote<
                    shortcut_customization::mojom::AcceleratorsUpdatedObserver>
@@ -74,6 +75,9 @@ class AcceleratorConfigurationProvider
                          uint32_t action_id,
                          const ui::Accelerator& accelerator,
                          RemoveAcceleratorCallback callback) override;
+  void RestoreDefault(mojom::AcceleratorSource source,
+                      uint32_t action_id,
+                      RestoreDefaultCallback callback) override;
   void RestoreAllDefaults(RestoreAllDefaultsCallback callback) override;
 
   // ui::InputDeviceEventObserver:

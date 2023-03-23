@@ -6,6 +6,8 @@ package org.chromium.chrome.browser.customtabs.features.partialcustomtab;
 
 import static android.view.ViewGroup.LayoutParams.MATCH_PARENT;
 
+import static org.chromium.chrome.browser.browserservices.intents.BrowserServicesIntentDataProvider.ACTIVITY_LAYOUT_STATE_FULL_SCREEN;
+
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.ValueAnimator;
@@ -28,9 +30,10 @@ import androidx.annotation.Nullable;
 import androidx.annotation.Px;
 import androidx.annotation.VisibleForTesting;
 
-import org.chromium.base.SysUtils;
 import org.chromium.chrome.R;
+import org.chromium.chrome.browser.browserservices.intents.BrowserServicesIntentDataProvider.ActivityLayoutState;
 import org.chromium.chrome.browser.customtabs.features.toolbar.CustomTabToolbar;
+import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.fullscreen.FullscreenManager;
 import org.chromium.chrome.browser.fullscreen.FullscreenOptions;
 import org.chromium.chrome.browser.multiwindow.MultiWindowUtils;
@@ -48,6 +51,7 @@ public abstract class PartialCustomTabBaseStrategy
         extends CustomTabHeightStrategy implements FullscreenManager.Observer {
     protected final Activity mActivity;
     protected final OnResizedCallback mOnResizedCallback;
+    protected final OnActivityLayoutCallback mOnActivityLayoutCallback;
     protected final FullscreenManager mFullscreenManager;
     protected final boolean mIsTablet;
     protected final boolean mInteractWithBackground;
@@ -83,7 +87,6 @@ public abstract class PartialCustomTabBaseStrategy
     protected PartialCustomTabHandleStrategyFactory mHandleStrategyFactory;
 
     protected int mShadowOffset;
-    protected boolean mDrawOutlineShadow;
 
     // Note: Do not use anywhere except in |onConfigurationChanged| as it might not be up-to-date.
     protected boolean mIsInMultiWindowMode;
@@ -105,10 +108,12 @@ public abstract class PartialCustomTabBaseStrategy
     }
 
     public PartialCustomTabBaseStrategy(Activity activity, OnResizedCallback onResizedCallback,
-            FullscreenManager fullscreenManager, boolean isTablet, boolean interactWithBackground,
+            OnActivityLayoutCallback onActivityLayoutCallback, FullscreenManager fullscreenManager,
+            boolean isTablet, boolean interactWithBackground,
             PartialCustomTabHandleStrategyFactory handleStrategyFactory) {
         mActivity = activity;
         mOnResizedCallback = onResizedCallback;
+        mOnActivityLayoutCallback = onActivityLayoutCallback;
         mIsTablet = isTablet;
         mInteractWithBackground = interactWithBackground;
 
@@ -119,7 +124,6 @@ public abstract class PartialCustomTabBaseStrategy
         mFullscreenManager = fullscreenManager;
         mFullscreenManager.addObserver(this);
 
-        mDrawOutlineShadow = SysUtils.isLowEndDevice();
         mCachedHandleHeight =
                 mActivity.getResources().getDimensionPixelSize(R.dimen.custom_tabs_handle_height);
 
@@ -215,6 +219,15 @@ public abstract class PartialCustomTabBaseStrategy
 
     protected void maybeInvokeResizeCallback() {
         WindowManager.LayoutParams attrs = mActivity.getWindow().getAttributes();
+
+        if (ChromeFeatureList.sCctResizableSideSheet.isEnabled()) {
+            // onActivityLayout should be called before onResized and only when the PCCT is created
+            // or its size has changed.
+            if (mHeight != attrs.height || mWidth != attrs.width) {
+                invokeActivityLayoutCallback();
+            }
+        }
+
         if (isFullHeight() || isFullscreen()) {
             mOnResizedCallback.onResized(mDisplayHeight, mDisplayWidth);
             mHeight = mDisplayHeight;
@@ -228,8 +241,32 @@ public abstract class PartialCustomTabBaseStrategy
         }
     }
 
+    protected void invokeActivityLayoutCallback() {
+        @ActivityLayoutState
+        int activityLayoutState = getActivityLayoutState();
+
+        // If we are in full screen then we manually need to set the values as we are using
+        // MATCH_PARENT which has the value -1.
+        int left = 0;
+        int top = 0;
+        int right = mDisplayWidth;
+        int bottom = mDisplayHeight;
+        if (activityLayoutState != ACTIVITY_LAYOUT_STATE_FULL_SCREEN) {
+            WindowManager.LayoutParams attrs = mActivity.getWindow().getAttributes();
+            left = attrs.x;
+            top = attrs.y;
+            right = left + attrs.width;
+            bottom = top + attrs.height;
+        }
+
+        mOnActivityLayoutCallback.onActivityLayout(left, top, right, bottom, activityLayoutState);
+    }
+
     @PartialCustomTabType
     public abstract int getStrategyType();
+
+    @ActivityLayoutState
+    protected abstract int getActivityLayoutState();
 
     protected abstract void updatePosition();
 
@@ -246,6 +283,10 @@ public abstract class PartialCustomTabBaseStrategy
     protected abstract boolean shouldHaveNoShadowOffset();
 
     protected abstract boolean isMaximized();
+
+    protected abstract void drawDividerLine(CustomTabToolbar toolbar);
+
+    protected abstract boolean shouldDrawDividerLine();
 
     protected boolean canInteractWithBackground() {
         return mInteractWithBackground;
@@ -285,7 +326,8 @@ public abstract class PartialCustomTabBaseStrategy
     }
 
     protected void updateShadowOffset() {
-        if (isFullHeight() || isFullscreen() || mDrawOutlineShadow || shouldHaveNoShadowOffset()) {
+        if (isFullHeight() || isFullscreen() || shouldHaveNoShadowOffset()
+                || shouldDrawDividerLine()) {
             mShadowOffset = 0;
         } else {
             mShadowOffset = mActivity.getResources().getDimensionPixelSize(
@@ -307,6 +349,9 @@ public abstract class PartialCustomTabBaseStrategy
             handleViewStub.inflate();
         }
 
+        mCoordinatorLayout = (ViewGroup) mActivity.findViewById(R.id.coordinator);
+        mCoordinatorLayout.setElevation(
+                mActivity.getResources().getDimensionPixelSize(R.dimen.custom_tabs_elevation));
         View handleView = mActivity.findViewById(R.id.custom_tabs_handle_view);
         handleView.setElevation(
                 mActivity.getResources().getDimensionPixelSize(R.dimen.custom_tabs_elevation));
@@ -322,13 +367,9 @@ public abstract class PartialCustomTabBaseStrategy
         View dragBar = handleView.findViewById(R.id.drag_bar);
         GradientDrawable dragBarBackground = (GradientDrawable) dragBar.getBackground();
         adjustCornerRadius(dragBarBackground, toolbarCornerRadius);
-        if (mDrawOutlineShadow) {
-            int width = mActivity.getResources().getDimensionPixelSize(
-                    R.dimen.custom_tabs_outline_width);
-            cctBackground.setStroke(width, toolbar.getToolbarHairlineColor(mToolbarColor));
 
-            // We need an inset to make the outline shadow visible.
-            dragBar.setBackground(new InsetDrawable(dragBarBackground, width, width, width, 0));
+        if (shouldDrawDividerLine()) {
+            drawDividerLine(toolbar);
         } else {
             dragBar.setBackground(dragBarBackground);
         }
@@ -338,6 +379,24 @@ public abstract class PartialCustomTabBaseStrategy
 
         // Having the transparent background is necessary for the shadow effect.
         mActivity.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+    }
+
+    protected void drawDividerLine(
+            int leftInset, int topInset, int rightInset, CustomTabToolbar toolbar) {
+        mCoordinatorLayout = (ViewGroup) mActivity.findViewById(R.id.coordinator);
+        View handleView = mActivity.findViewById(R.id.custom_tabs_handle_view);
+        View dragBar = handleView.findViewById(R.id.drag_bar);
+        GradientDrawable cctBackground = (GradientDrawable) handleView.getBackground();
+        GradientDrawable dragBarBackground = (GradientDrawable) dragBar.getBackground();
+        int width =
+                mActivity.getResources().getDimensionPixelSize(R.dimen.custom_tabs_outline_width);
+
+        cctBackground.setStroke(width, toolbar.getToolbarHairlineColor(mToolbarColor));
+
+        // We need an inset to make the outline shadow visible.
+        dragBar.setBackground(new InsetDrawable(dragBarBackground, width, width, width, 0));
+        mCoordinatorLayout.setBackground(
+                new InsetDrawable(cctBackground, leftInset, topInset, rightInset, 0));
     }
 
     protected boolean isFullscreen() {

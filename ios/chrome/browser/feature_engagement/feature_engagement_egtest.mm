@@ -7,9 +7,9 @@
 #import "base/strings/sys_string_conversions.h"
 #import "base/test/ios/wait_util.h"
 #import "ios/chrome/browser/feature_engagement/feature_engagement_app_interface.h"
+#import "ios/chrome/browser/shared/ui/table_view/table_view_navigation_controller_constants.h"
 #import "ios/chrome/browser/tabs/features.h"
 #import "ios/chrome/browser/ui/popup_menu/popup_menu_constants.h"
-#import "ios/chrome/browser/ui/table_view/table_view_navigation_controller_constants.h"
 #import "ios/chrome/grit/ios_chromium_strings.h"
 #import "ios/chrome/grit/ios_strings.h"
 #import "ios/chrome/test/earl_grey/chrome_actions.h"
@@ -572,10 +572,19 @@ std::unique_ptr<net::test_server::HttpResponse> LoadFrenchPage(
     // Only available for iOS 15+.
     return;
   }
+  XCUIApplication* app = [[XCUIApplication alloc] init];
   GREYAssert([FeatureEngagementAppInterface enableTabPinnedTipTriggering],
              @"Feature Engagement tracker did not load");
 
+  // Make sure that the pinned tabs feature has never been used from the
+  // overflow menu.
+  [ChromeEarlGrey setUserDefaultObject:@(0) forKey:kPinnedTabsOverflowEntryKey];
+
   [ChromeEarlGreyUI openToolsMenu];
+
+  // Check that the "N" IPH bagde is displayed before tapping on the action.
+  GREYAssert([[app images][@"overflowRowIPHBadgeIdentifier"] exists],
+             @"The 'N' IPH bagde should be displayed.");
   [ChromeEarlGreyUI
       tapToolsMenuAction:grey_accessibilityID(kToolsMenuPinTabId)];
 
@@ -603,6 +612,10 @@ std::unique_ptr<net::test_server::HttpResponse> LoadFrenchPage(
   }
 
   [ChromeEarlGreyUI openToolsMenu];
+
+  // Check that the "N" IPH bagde is not displayed before tapping on the action.
+  GREYAssertFalse([[app images][@"overflowRowIPHBadgeIdentifier"] exists],
+                  @"The 'N' IPH bagde should not be displayed.");
   [ChromeEarlGreyUI
       tapToolsMenuAction:grey_accessibilityID(kToolsMenuUnpinTabId)];
   [[EarlGrey selectElementWithMatcher:TabPinnedTip()]

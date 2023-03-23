@@ -99,11 +99,19 @@ class DualReadingListModel : public ReadingListModel,
                                   const GURL& url) override;
   void ReadingListDidRemoveEntry(const ReadingListModel* model,
                                  const GURL& url) override;
+  void ReadingListWillMoveEntry(const ReadingListModel* model,
+                                const GURL& url) override;
+  void ReadingListDidMoveEntry(const ReadingListModel* model,
+                               const GURL& url) override;
   void ReadingListWillAddEntry(const ReadingListModel* model,
                                const ReadingListEntry& entry) override;
   void ReadingListDidAddEntry(const ReadingListModel* model,
                               const GURL& url,
                               reading_list::EntrySource source) override;
+  void ReadingListWillUpdateEntry(const ReadingListModel* model,
+                                  const GURL& url) override;
+  void ReadingListDidUpdateEntry(const ReadingListModel* model,
+                                 const GURL& url) override;
   void ReadingListDidApplyChanges(ReadingListModel* model) override;
 
   class ScopedReadingListBatchUpdateImpl : public ScopedReadingListBatchUpdate {
@@ -131,12 +139,27 @@ class DualReadingListModel : public ReadingListModel,
   void NotifyObserversWithDidUpdateEntry(const GURL& url);
   void NotifyObserversWithDidApplyChanges();
 
+  // Convenience function that safely "casts" to ReadingListModelImpl for
+  // codepaths where model is guaranteed to be either local_or_syncable_model_
+  // or account_model_.
+  const ReadingListModelImpl* ToReadingListModelImpl(
+      const ReadingListModel* model);
+
+  // Update the unseen/unread/read entry counts considering addition/removal of
+  // `entry` and updates applied to it.
+  void UpdateEntryStateCountersOnEntryRemoval(const ReadingListEntry& entry);
+  void UpdateEntryStateCountersOnEntryInsertion(const ReadingListEntry& entry);
+
   const std::unique_ptr<ReadingListModelImpl> local_or_syncable_model_;
   const std::unique_ptr<ReadingListModelImpl> account_model_;
 
   // Indicates whether the DualReadingListModel is currently handling the
   // notifications.
   bool suppress_observer_notifications_ = false;
+
+  size_t unread_entry_count_ = 0;
+  size_t read_entry_count_ = 0;
+  size_t unseen_entry_count_ = 0;
 
   unsigned int current_batch_updates_count_ = 0;
 

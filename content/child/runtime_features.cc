@@ -69,7 +69,7 @@ void SetRuntimeFeatureDefaultsForPlatform(
   WebRuntimeFeatures::EnableCompositedSelectionUpdate(true);
 #endif
 
-#if BUILDFLAG(IS_MAC) || BUILDFLAG(IS_CHROMEOS_LACROS)
+#if BUILDFLAG(IS_APPLE) || BUILDFLAG(IS_CHROMEOS_LACROS)
   const bool enable_canvas_2d_image_chromium =
       command_line.HasSwitch(
           blink::switches::kEnableGpuMemoryBufferCompositorResources) &&
@@ -291,8 +291,6 @@ void SetRuntimeFeaturesFromChromiumFeatures() {
     {wf::EnableUserActivationSameOriginVisibility,
      raw_ref(features::kUserActivationSameOriginVisibility)},
     {wf::EnableVideoPlaybackQuality, raw_ref(features::kVideoPlaybackQuality)},
-    {wf::EnableVideoWakeLockOptimisationHiddenMuted,
-     raw_ref(media::kWakeLockOptimisationHiddenMuted)},
     {wf::EnableWebBluetooth, raw_ref(features::kWebBluetooth),
      kSetOnlyIfOverridden},
     {wf::EnableWebBluetoothGetDevices,
@@ -313,6 +311,7 @@ void SetRuntimeFeaturesFromChromiumFeatures() {
     {wf::EnableWebXR, raw_ref(features::kWebXr)},
 #if BUILDFLAG(ENABLE_VR)
     {wf::EnableWebXRFrontFacing, raw_ref(device::features::kWebXrIncubations)},
+    {wf::EnableWebXRFrameRate, raw_ref(device::features::kWebXrIncubations)},
     {wf::EnableWebXRHandInput, raw_ref(device::features::kWebXrHandInput)},
     {wf::EnableWebXRImageTracking,
      raw_ref(device::features::kWebXrIncubations)},
@@ -554,6 +553,9 @@ void SetCustomizedRuntimeFeaturesFromCombinedArgs(
       content::IsBackForwardCacheEnabled());
 
   if (base::FeatureList::IsEnabled(network::features::kPrivateStateTokens)) {
+    WebRuntimeFeatures::EnablePrivateStateTokens(true);
+    WebRuntimeFeatures::EnablePrivateStateTokensAlwaysAllowIssuance(true);
+  } else if (base::FeatureList::IsEnabled(network::features::kFledgePst)) {
     // See https://bit.ly/configuring-trust-tokens.
     using network::features::TrustTokenOriginTrialSpec;
     switch (

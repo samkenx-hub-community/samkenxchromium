@@ -6,7 +6,9 @@
 
 #include <cstdint>
 
+#include "base/location.h"
 #include "base/synchronization/waitable_event.h"
+#include "base/test/bind.h"
 #include "base/test/task_environment.h"
 #include "components/exo/wayland/test/client_util.h"
 #include "components/exo/wayland/test/server_util.h"
@@ -71,13 +73,8 @@ TEST_F(WaylandDisplayOutputTest, DelayedSelfDestruct) {
   UpdateDisplay("800x600");
 
   // Fast forward until at least one delete has been attempted.
-  // TODO(crbug.com/1420468): For flakes debugging.
-  auto ff_delta = WaylandDisplayOutput::kDeleteTaskDelay * 1.5;
-  LOG(INFO) << "Want fastforward: " << ff_delta;
-  auto start_time = task_environment()->NowTicks();
-  task_environment()->FastForwardBy(ff_delta);
-  LOG(INFO) << "Actual fastforward: "
-            << task_environment()->NowTicks() - start_time;
+  task_environment()->FastForwardBy(WaylandDisplayOutput::kDeleteTaskDelay *
+                                    1.5);
 
   // Try releasing now and check for client error.
   PostToClientAndWait([&](test::TestClient* client) {
@@ -87,6 +84,9 @@ TEST_F(WaylandDisplayOutputTest, DelayedSelfDestruct) {
     client->Roundtrip();
     EXPECT_EQ(wl_display_get_error(client->display()), 0);
   });
+
+  task_environment()->FastForwardBy(WaylandDisplayOutput::kDeleteTaskDelay *
+                                    WaylandDisplayOutput::kDeleteRetries);
 }
 
 // Verify that in the case where an output is added and removed quickly before
@@ -105,13 +105,8 @@ TEST_F(WaylandDisplayOutputTest, DelayedSelfDestructBeforeFirstBind) {
   UpdateDisplay("800x600");
 
   // Fast forward until at least one delete has been attempted.
-  // TODO(crbug.com/1420468): For flakes debugging.
-  auto ff_delta = WaylandDisplayOutput::kDeleteTaskDelay * 1.5;
-  LOG(INFO) << "Want fastforward: " << ff_delta;
-  auto start_time = task_environment()->NowTicks();
-  task_environment()->FastForwardBy(ff_delta);
-  LOG(INFO) << "Actual fastforward: "
-            << task_environment()->NowTicks() - start_time;
+  task_environment()->FastForwardBy(WaylandDisplayOutput::kDeleteTaskDelay *
+                                    1.5);
 
   // Unblock client thread so the bind request happens now.
   block_bind_event.Signal();
@@ -121,6 +116,11 @@ TEST_F(WaylandDisplayOutputTest, DelayedSelfDestructBeforeFirstBind) {
   PostToClientAndWait([&](test::TestClient* client) {
     client->Roundtrip();
     EXPECT_EQ(wl_display_get_error(client->display()), 0);
+  });
+
+  // Clean up client output object.
+  PostToClientAndWait([&](test::TestClient* client) {
+    wl_output_release(client->globals().output.release());
   });
 
   task_environment()->FastForwardBy(WaylandDisplayOutput::kDeleteTaskDelay *

@@ -62,7 +62,7 @@ class ReadAnythingController : public ui::AXActionHandlerObserver,
 
   // ReadAnythingFontCombobox::Delegate:
   void OnFontChoiceChanged(int new_index) override;
-  ui::ComboboxModel* GetFontComboboxModel() override;
+  ReadAnythingFontModel* GetFontComboboxModel() override;
 
   // ReadAnythingToolbarView::Delegate:
   void OnFontSizeChanged(bool increase) override;
@@ -72,6 +72,7 @@ class ReadAnythingController : public ui::AXActionHandlerObserver,
   ReadAnythingMenuModel* GetLineSpacingModel() override;
   void OnLetterSpacingChanged(int new_index) override;
   ReadAnythingMenuModel* GetLetterSpacingModel() override;
+  void OnSystemThemeChanged() override;
 
   // ReadAnythingPageHandler::Delegate:
   void OnUIReady() override;
@@ -94,6 +95,7 @@ class ReadAnythingController : public ui::AXActionHandlerObserver,
   // content::WebContentsObserver:
   void AccessibilityEventReceived(
       const content::AXEventNotificationDetails& details) override;
+  void PrimaryPageChanged(content::Page& page) override;
 
   // When the active web contents changes (or the UI becomes active):
   // 1. Begins observing the web contents of the active tab and enables web
@@ -103,6 +105,9 @@ class ReadAnythingController : public ui::AXActionHandlerObserver,
   //    copy of the web contents' AXTree.
   // 2. Notifies the model that the AXTreeID has changed.
   void OnActiveWebContentsChanged();
+
+  // Notifies the model that the AXTreeID has changed.
+  void OnActiveAXTreeIDChanged();
 
   const raw_ptr<ReadAnythingModel> model_;
 

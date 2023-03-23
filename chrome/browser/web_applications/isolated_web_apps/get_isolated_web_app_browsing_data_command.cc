@@ -10,6 +10,7 @@
 #include "base/functional/callback.h"
 #include "base/functional/callback_helpers.h"
 #include "base/memory/weak_ptr.h"
+#include "base/task/sequenced_task_runner.h"
 #include "chrome/browser/browsing_data/chrome_browsing_data_model_delegate.h"
 #include "chrome/browser/browsing_data/cookies_tree_model.h"
 #include "chrome/browser/browsing_data/local_data_container.h"
@@ -43,16 +44,21 @@ class StoragePartitionSizeEstimator : private CookiesTreeModel::Observer,
     // it when called or reset.
     auto* estimator = new StoragePartitionSizeEstimator(profile);
     base::OnceClosure owning_closure =
-        base::DoNothingWithBoundArgs(base::WrapUnique(estimator));
+        base::BindOnce(&DeleteEstimatorSoon, base::WrapUnique(estimator));
 
     estimator->Start(
         storage_partition_config,
         std::move(complete_callback).Then(std::move(owning_closure)));
   }
 
-  ~StoragePartitionSizeEstimator() override { profile_->RemoveObserver(this); }
-
  private:
+  static void DeleteEstimatorSoon(
+      std::unique_ptr<StoragePartitionSizeEstimator> estimator) {
+    estimator->profile_->RemoveObserver(estimator.get());
+    base::SequencedTaskRunner::GetCurrentDefault()->DeleteSoon(
+        FROM_HERE, std::move(estimator));
+  }
+
   explicit StoragePartitionSizeEstimator(Profile* profile) : profile_(profile) {
     profile_->AddObserver(this);
   }
@@ -69,9 +75,10 @@ class StoragePartitionSizeEstimator : private CookiesTreeModel::Observer,
 
     content::StoragePartition* storage_partition =
         profile_->GetStoragePartition(storage_partition_config);
-    BrowsingDataModel::BuildFromDisk(
+    BrowsingDataModel::BuildFromNonDefaultStoragePartition(
         storage_partition,
-        ChromeBrowsingDataModelDelegate::CreateForProfile(profile_),
+        ChromeBrowsingDataModelDelegate::CreateForStoragePartition(
+            profile_, storage_partition),
         base::BindOnce(&StoragePartitionSizeEstimator::BrowsingDataModelLoaded,
                        weak_ptr_factory_.GetWeakPtr()));
 

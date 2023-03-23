@@ -163,7 +163,7 @@ TEST_F(AshAcceleratorConfigurationTest, DeprecatedAccelerators) {
   // overall accelerators list too.
   ExpectAllAcceleratorsEqual(expected_test_data, accelerators);
 
-  // Verify that the fetch deprecated accelerators are correct.
+  // Verify that the fetched deprecated accelerators are correct.
   std::vector<ui::Accelerator> deprecated_accelerators;
   for (const auto& accel : accelerators) {
     if (config_->IsDeprecated(accel)) {
@@ -187,6 +187,86 @@ TEST_F(AshAcceleratorConfigurationTest, DeprecatedAccelerators) {
   const ui::Accelerator active_accelerator(ui::VKEY_ESCAPE,
                                            ui::EF_COMMAND_DOWN);
   EXPECT_FALSE(config_->IsDeprecated(active_accelerator));
+}
+
+TEST_F(AshAcceleratorConfigurationTest,
+       RemoveAndRestoreDeprecatedAccelerators) {
+  // Test deprecated accelerators, in this case `SHOW_TASK_MANAGER` has two
+  // associated accelerators: (deprecated) ESCAPE + SHIFT and
+  // (active) ESCAPE + COMMAND.
+  const AcceleratorData initial_test_data[] = {
+      {/*trigger_on_press=*/true, ui::VKEY_TAB, ui::EF_ALT_DOWN,
+       CYCLE_FORWARD_MRU},
+      {/*trigger_on_press=*/true, ui::VKEY_TAB,
+       ui::EF_SHIFT_DOWN | ui::EF_ALT_DOWN, CYCLE_BACKWARD_MRU},
+      {/*trigger_on_press=*/true, ui::VKEY_ESCAPE, ui::EF_COMMAND_DOWN,
+       SHOW_TASK_MANAGER},
+  };
+
+  const AcceleratorData expected_test_data[] = {
+      {/*trigger_on_press=*/true, ui::VKEY_TAB, ui::EF_ALT_DOWN,
+       CYCLE_FORWARD_MRU},
+      {/*trigger_on_press=*/true, ui::VKEY_TAB,
+       ui::EF_SHIFT_DOWN | ui::EF_ALT_DOWN, CYCLE_BACKWARD_MRU},
+      {/*trigger_on_press=*/true, ui::VKEY_ESCAPE, ui::EF_COMMAND_DOWN,
+       SHOW_TASK_MANAGER},
+      {/*trigger_on_press=*/true, ui::VKEY_ESCAPE, ui::EF_SHIFT_DOWN,
+       SHOW_TASK_MANAGER},
+  };
+
+  const DeprecatedAcceleratorData deprecated_data[] = {
+      {SHOW_TASK_MANAGER, /*uma_histogram_name=*/"deprecated.showTaskManager",
+       /*notification_message_id=*/1, /*old_shortcut_id=*/1,
+       /*new_shortcut_id=*/2, /*deprecated_enabled=*/true},
+  };
+
+  const AcceleratorData test_deprecated_accelerators[] = {
+      {/*trigger_on_press=*/true, ui::VKEY_ESCAPE, ui::EF_SHIFT_DOWN,
+       SHOW_TASK_MANAGER},
+  };
+
+  config_->Initialize(initial_test_data);
+  config_->InitializeDeprecatedAccelerators(deprecated_data,
+                                            test_deprecated_accelerators);
+
+  const ui::Accelerator deprecated_accelerator(ui::VKEY_ESCAPE,
+                                               ui::EF_SHIFT_DOWN);
+
+  // Remove the deprecated accelerator ESCAPE + SHIFT.
+  const AcceleratorData updated_expected_test_data[] = {
+      {/*trigger_on_press=*/true, ui::VKEY_TAB, ui::EF_ALT_DOWN,
+       CYCLE_FORWARD_MRU},
+      {/*trigger_on_press=*/true, ui::VKEY_TAB,
+       ui::EF_SHIFT_DOWN | ui::EF_ALT_DOWN, CYCLE_BACKWARD_MRU},
+      {/*trigger_on_press=*/true, ui::VKEY_ESCAPE, ui::EF_COMMAND_DOWN,
+       SHOW_TASK_MANAGER},
+  };
+  AcceleratorConfigResult result =
+      config_->RemoveAccelerator(SHOW_TASK_MANAGER, deprecated_accelerator);
+  EXPECT_EQ(AcceleratorConfigResult::kSuccess, result);
+  // Verify that the accelerator is no longer deprecated.
+  EXPECT_FALSE(config_->IsDeprecated(deprecated_accelerator));
+  EXPECT_FALSE(config_->GetDeprecatedAcceleratorData(SHOW_TASK_MANAGER));
+  ExpectAllAcceleratorsEqual(updated_expected_test_data,
+                             config_->GetAllAccelerators());
+
+  // Attempt to restore SHOW_TASK_MANAGER, expect deprecated accelerator to NOT
+  // be re-added.
+  result = config_->RestoreDefault(SHOW_TASK_MANAGER);
+  EXPECT_EQ(AcceleratorConfigResult::kSuccess, result);
+  EXPECT_FALSE(config_->IsDeprecated(deprecated_accelerator));
+  EXPECT_FALSE(config_->GetDeprecatedAcceleratorData(SHOW_TASK_MANAGER));
+  ExpectAllAcceleratorsEqual(updated_expected_test_data,
+                             config_->GetAllAccelerators());
+
+  // Now restore all accelerators, this time deprecated accelerators should be
+  // restored.
+  result = config_->RestoreAllDefaults();
+  EXPECT_EQ(AcceleratorConfigResult::kSuccess, result);
+  EXPECT_TRUE(config_->IsDeprecated(deprecated_accelerator));
+  EXPECT_EQ(deprecated_data,
+            config_->GetDeprecatedAcceleratorData(SHOW_TASK_MANAGER));
+  ExpectAllAcceleratorsEqual(expected_test_data, config_->GetAllAccelerators());
 }
 
 TEST_F(AshAcceleratorConfigurationTest, IsDefaultAccelerator) {
@@ -575,6 +655,90 @@ TEST_F(AshAcceleratorConfigurationTest, RestoreAllConsecutively) {
   // Nothing should have changed, but the observer is called.
   ExpectAllAcceleratorsEqual(test_data, config_->GetAllAccelerators());
   EXPECT_EQ(3, observer_.num_times_accelerator_updated_called());
+}
+
+TEST_F(AshAcceleratorConfigurationTest, RemoveAndRestoreOneAction) {
+  EXPECT_EQ(0, observer_.num_times_accelerator_updated_called());
+  const AcceleratorData test_data[] = {
+      {/*trigger_on_press=*/true, ui::VKEY_SPACE, ui::EF_CONTROL_DOWN,
+       SWITCH_TO_LAST_USED_IME},
+      {/*trigger_on_press=*/true, ui::VKEY_SPACE,
+       ui::EF_CONTROL_DOWN | ui::EF_ALT_DOWN, SWITCH_TO_LAST_USED_IME},
+      {/*trigger_on_press=*/true, ui::VKEY_TAB, ui::EF_ALT_DOWN,
+       CYCLE_FORWARD_MRU},
+      {/*trigger_on_press=*/true, ui::VKEY_TAB,
+       ui::EF_SHIFT_DOWN | ui::EF_ALT_DOWN, CYCLE_BACKWARD_MRU},
+  };
+
+  config_->Initialize(test_data);
+
+  ExpectAllAcceleratorsEqual(test_data, config_->GetAllAccelerators());
+  EXPECT_EQ(1, observer_.num_times_accelerator_updated_called());
+
+  // Remove `SWITCH_TO_LAST_USE_IME`.
+  const AcceleratorData updated_test_data[] = {
+      {/*trigger_on_press=*/true, ui::VKEY_SPACE,
+       ui::EF_CONTROL_DOWN | ui::EF_ALT_DOWN, SWITCH_TO_LAST_USED_IME},
+      {/*trigger_on_press=*/true, ui::VKEY_TAB, ui::EF_ALT_DOWN,
+       CYCLE_FORWARD_MRU},
+      {/*trigger_on_press=*/true, ui::VKEY_TAB,
+       ui::EF_SHIFT_DOWN | ui::EF_ALT_DOWN, CYCLE_BACKWARD_MRU},
+  };
+  AcceleratorConfigResult result = config_->RemoveAccelerator(
+      SWITCH_TO_LAST_USED_IME,
+      ui::Accelerator(ui::VKEY_SPACE, ui::EF_CONTROL_DOWN));
+  EXPECT_EQ(AcceleratorConfigResult::kSuccess, result);
+
+  // Compare expected accelerators and that the observer was fired after
+  // removing an accelerator.
+  ExpectAllAcceleratorsEqual(updated_test_data, config_->GetAllAccelerators());
+  EXPECT_EQ(2, observer_.num_times_accelerator_updated_called());
+
+  // Reset the `SWITCH_TO_LAST_USED_IME` action..
+  result = config_->RestoreDefault(SWITCH_TO_LAST_USED_IME);
+  EXPECT_EQ(AcceleratorConfigResult::kSuccess, result);
+
+  // Expect accelerators to revert back to the default state and observer
+  // is called.
+  ExpectAllAcceleratorsEqual(test_data, config_->GetAllAccelerators());
+  EXPECT_EQ(3, observer_.num_times_accelerator_updated_called());
+
+  // Reset one more time, no changes should be made.
+  result = config_->RestoreDefault(SWITCH_TO_LAST_USED_IME);
+  EXPECT_EQ(AcceleratorConfigResult::kSuccess, result);
+
+  // No changes to be made, but observer should be called.
+  ExpectAllAcceleratorsEqual(test_data, config_->GetAllAccelerators());
+  EXPECT_EQ(4, observer_.num_times_accelerator_updated_called());
+}
+
+TEST_F(AshAcceleratorConfigurationTest, RestoreInvalidAction) {
+  EXPECT_EQ(0, observer_.num_times_accelerator_updated_called());
+  const AcceleratorData test_data[] = {
+      {/*trigger_on_press=*/true, ui::VKEY_SPACE, ui::EF_CONTROL_DOWN,
+       SWITCH_TO_LAST_USED_IME},
+      {/*trigger_on_press=*/true, ui::VKEY_SPACE,
+       ui::EF_CONTROL_DOWN | ui::EF_ALT_DOWN, SWITCH_TO_LAST_USED_IME},
+      {/*trigger_on_press=*/true, ui::VKEY_TAB, ui::EF_ALT_DOWN,
+       CYCLE_FORWARD_MRU},
+      {/*trigger_on_press=*/true, ui::VKEY_TAB,
+       ui::EF_SHIFT_DOWN | ui::EF_ALT_DOWN, CYCLE_BACKWARD_MRU},
+  };
+
+  config_->Initialize(test_data);
+
+  ExpectAllAcceleratorsEqual(test_data, config_->GetAllAccelerators());
+  EXPECT_EQ(1, observer_.num_times_accelerator_updated_called());
+
+  // `BRIGHTNESS_DOWN` is not a valid accelerator, so this should return an
+  // error.
+  const AcceleratorConfigResult result =
+      config_->RestoreDefault(BRIGHTNESS_DOWN);
+  EXPECT_EQ(AcceleratorConfigResult::kNotFound, result);
+
+  // Expect nothing to change.
+  ExpectAllAcceleratorsEqual(test_data, config_->GetAllAccelerators());
+  EXPECT_EQ(1, observer_.num_times_accelerator_updated_called());
 }
 
 }  // namespace ash

@@ -54,7 +54,6 @@
 #include "chrome/common/chrome_constants.h"
 #include "chrome/common/chrome_features.h"
 #include "chrome/common/chrome_paths.h"
-#include "chrome/common/net/safe_search_util.h"
 #include "chrome/common/pdf_util.h"
 #include "chrome/common/pref_names.h"
 #include "chrome/grit/generated_resources.h"
@@ -64,6 +63,7 @@
 #include "components/download/public/common/download_item.h"
 #include "components/download/public/common/download_stats.h"
 #include "components/offline_pages/buildflags/buildflags.h"
+#include "components/policy/core/common/policy_pref_names.h"
 #include "components/pref_registry/pref_registry_syncable.h"
 #include "components/prefs/pref_member.h"
 #include "components/prefs/pref_service.h"
@@ -71,6 +71,7 @@
 #include "components/safe_browsing/content/browser/download/download_stats.h"
 #include "components/safe_browsing/content/browser/web_ui/safe_browsing_ui.h"
 #include "components/safe_browsing/content/common/file_type_policies.h"
+#include "components/safe_search_api/safe_search_util.h"
 #include "components/services/quarantine/public/mojom/quarantine.mojom.h"
 #include "components/services/quarantine/quarantine_impl.h"
 #include "content/public/browser/browser_task_traits.h"
@@ -849,9 +850,10 @@ void ChromeDownloadManagerDelegate::SanitizeSavePackageResourceName(
 
 void ChromeDownloadManagerDelegate::SanitizeDownloadParameters(
     download::DownloadUrlParameters* params) {
-  if (profile_->GetPrefs()->GetBoolean(prefs::kForceGoogleSafeSearch)) {
+  if (profile_->GetPrefs()->GetBoolean(
+          policy::policy_prefs::kForceGoogleSafeSearch)) {
     GURL safe_url;
-    safe_search_util::ForceGoogleSafeSearch(params->url(), &safe_url);
+    safe_search_api::ForceGoogleSafeSearch(params->url(), &safe_url);
     if (!safe_url.is_empty())
       params->set_url(std::move(safe_url));
   }

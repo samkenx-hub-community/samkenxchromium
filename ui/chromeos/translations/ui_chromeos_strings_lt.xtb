@@ -119,7 +119,6 @@
 <translation id="1942765061641586207">Vaizdo skyra</translation>
 <translation id="1972984168337863910">Išskleisti failų atsiliepimų skydelius</translation>
 <translation id="1995337122023280937">Eiti į failo vietą</translation>
-<translation id="1999709132469742660">Prieiga prie failų naudojant visus URL</translation>
 <translation id="2001796770603320721">Tvarkyti Diske</translation>
 <translation id="2009067268969781306">Formatuojant atmintuką bus ištrinti visi jame saugomi duomenys. Šio veiksmo anuliuoti negalima.</translation>
 <translation id="2025955442973426285">Tigrinų k.</translation>
@@ -151,6 +150,7 @@
 <translation id="2236732657580416950">Your Google Drive cache was cleared.</translation>
 <translation id="2239068707900391003">Žmogus su kava</translation>
 <translation id="2251368349685848079">Atkurti iš šiukšliadėžės</translation>
+<translation id="2278133026967558505">Visų svetainių ir URL prieiga prie failų</translation>
 <translation id="2282155092769082568">Automatinės konfigūracijos URL:</translation>
 <translation id="2284767815536050991">pašalinama saugykla</translation>
 <translation id="2288278176040912387">Grotuvas</translation>
@@ -543,7 +543,6 @@
 <translation id="5323213332664049067">Lotynų amerikiečių</translation>
 <translation id="5330145655348521461">Šie failai atidaryti kitame darbalaukyje. Perkelkite failus <ph name="USER_NAME" /> (<ph name="MAIL_ADDRESS" />), kad peržiūrėtumėte juos.</translation>
 <translation id="5330512191124428349">Gauti informacijos</translation>
-<translation id="5337538975554986899">Prieiga prie failų naudojant visus URL, išskyrus <ph name="NON_RESTRICTED_DESTINATIONS" /></translation>
 <translation id="5344246330454251646">Tvarkyti „Bruschetta“ bendrinimą</translation>
 <translation id="535792325654997756">Žmogus su katėmis</translation>
 <translation id="5358764674931277">Kadrų dažnis</translation>
@@ -629,6 +628,7 @@
 <translation id="603895874132768835">Negalėsite naudoti šio tinklo, kol nustatysite naują PIN kodą</translation>
 <translation id="6040143037577758943">Uždaryti</translation>
 <translation id="6055907707645252013">Tinklas: <ph name="NETWORK_TYPE" />, neprisijungta</translation>
+<translation id="6073060579181816027">Kelios failų vietos</translation>
 <translation id="6074825444536523002">„Google“ forma</translation>
 <translation id="6079871810119356840">Vengrų k. su QWERTY klaviatūra</translation>
 <translation id="6096979789310008754">Paieškos tekstas išvalytas, rodomi visi failai ir aplankai.</translation>
@@ -769,6 +769,7 @@
 <translation id="7162080671816799010">Neužpildytas laukas „Alternatyvaus subjekto pavadinimo atitiktis“ arba „Domeno plėtinio atitiktis“, todėl negalima patvirtinti autentifikavimo serverio tapatybės</translation>
 <translation id="7165320105431587207">Nepavyko sukonfigūruoti tinklo</translation>
 <translation id="7170041865419449892">Nepasiekiama</translation>
+<translation id="7179579940054351344">Visų svetainių ir URL (išskyrus <ph name="NON_RESTRICTED_DESTINATIONS" />) prieiga prie failų</translation>
 <translation id="7180611975245234373">Atnaujinti</translation>
 <translation id="7189874332498648577"><ph name="NUMBER_OF_GB" /> GB</translation>
 <translation id="7191454237977785534">Išsaugoti failą kaip</translation>
@@ -942,6 +943,7 @@
 <translation id="8492972329130824181">Namų tinklas nepasiekiamas. Norint prisijungti turi būti įgalintas tarptinklinis duomenų ryšys mobiliesiems.</translation>
 <translation id="8499098729323186194">Išarchyvuojami elementai (iš viso: <ph name="NUMBER_OF_ITEMS" />)...</translation>
 <translation id="8502913769543567768"><ph name="NETWORK_INDEX" /> tinklas iš <ph name="NETWORK_COUNT" />, „<ph name="NETWORK_NAME" />“, „<ph name="NETWORK_PROVIDER_NAME" />“, aktyvinti nustačius įrenginį, tvarko administratorius</translation>
+<translation id="8512483403832814140">Bet kuriuo metu</translation>
 <translation id="8521441079177373948">JK</translation>
 <translation id="853494022971700746">Prancūzų k. (Prancūzija)</translation>
 <translation id="8540608333167683902"><ph name="NETWORK_INDEX" /> tinklas iš <ph name="NETWORK_COUNT" />, „<ph name="NETWORK_NAME" />“, <ph name="CONNECTION_STATUS" />, signalo stiprumas <ph name="SIGNAL_STRENGTH" /> %, išsami informacija</translation>

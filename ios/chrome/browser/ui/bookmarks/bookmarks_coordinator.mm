@@ -17,15 +17,23 @@
 #import "base/time/time.h"
 #import "components/bookmarks/browser/bookmark_model.h"
 #import "components/bookmarks/browser/bookmark_utils.h"
-#import "ios/chrome/browser/bookmarks/bookmark_model_factory.h"
+#import "ios/chrome/browser/bookmarks/local_or_syncable_bookmark_model_factory.h"
 #import "ios/chrome/browser/browser_state/chrome_browser_state.h"
 #import "ios/chrome/browser/main/browser.h"
 #import "ios/chrome/browser/metrics/new_tab_page_uma.h"
 #import "ios/chrome/browser/shared/public/commands/application_commands.h"
 #import "ios/chrome/browser/shared/public/commands/command_dispatcher.h"
 #import "ios/chrome/browser/shared/public/commands/snackbar_commands.h"
+#import "ios/chrome/browser/shared/ui/table_view/table_view_navigation_controller.h"
 #import "ios/chrome/browser/shared/ui/util/uikit_ui_util.h"
 #import "ios/chrome/browser/shared/ui/util/url_with_title.h"
+// #import "ios/chrome/browser/shared/public/commands/application_commands.h"
+// #import "ios/chrome/browser/shared/public/commands/command_dispatcher.h"
+// #import "ios/chrome/browser/shared/public/commands/snackbar_commands.h"
+// #import "ios/chrome/browser/shared/ui/util/uikit_ui_util.h"
+// #import "ios/chrome/browser/shared/ui/util/url_with_title.h"
+#import "ios/chrome/browser/signin/authentication_service_factory.h"
+#import "ios/chrome/browser/sync/sync_setup_service_factory.h"
 #import "ios/chrome/browser/tabs/tab_title_util.h"
 #import "ios/chrome/browser/ui/bookmarks/bookmark_mediator.h"
 #import "ios/chrome/browser/ui/bookmarks/bookmark_navigation_controller.h"
@@ -40,7 +48,6 @@
 #import "ios/chrome/browser/ui/bookmarks/folder_editor/bookmarks_folder_editor_coordinator_delegate.h"
 #import "ios/chrome/browser/ui/bookmarks/home/bookmarks_home_view_controller.h"
 #import "ios/chrome/browser/ui/default_promo/default_browser_utils.h"
-#import "ios/chrome/browser/ui/table_view/table_view_navigation_controller.h"
 #import "ios/chrome/browser/url_loading/url_loading_browser_agent.h"
 #import "ios/chrome/browser/url_loading/url_loading_params.h"
 #import "ios/chrome/browser/url_loading/url_loading_util.h"
@@ -75,18 +82,12 @@ enum class PresentedState {
                                     BookmarksFolderChooserCoordinatorDelegate,
                                     BookmarksHomeViewControllerDelegate,
                                     UIAdaptivePresentationControllerDelegate> {
-  // The browser bookmarks are presented in.
-  Browser* _browser;  // weak
-
   // The browser state of the current user.
   ChromeBrowserState* _currentBrowserState;  // weak
 
   // The browser state to use, might be different from _currentBrowserState if
   // it is incognito.
   ChromeBrowserState* _browserState;  // weak
-
-  // The web state list currently in use.
-  WebStateList* _webStateList;
 }
 
 // The type of view controller that is being presented.
@@ -148,17 +149,20 @@ enum class PresentedState {
 - (instancetype)initWithBrowser:(Browser*)browser {
   self = [super initWithBaseViewController:nil browser:browser];
   if (self) {
-    _browser = browser;
     // Bookmarks are always opened with the main browser state, even in
     // incognito mode.
     _currentBrowserState = browser->GetBrowserState();
     _browserState = _currentBrowserState->GetOriginalChromeBrowserState();
-    _webStateList = browser->GetWebStateList();
     _bookmarkModel =
-        ios::BookmarkModelFactory::GetForBrowserState(_browserState);
+        ios::LocalOrSyncableBookmarkModelFactory::GetForBrowserState(
+            _browserState);
     _mediator = [[BookmarkMediator alloc]
         initWithWithBookmarkModel:self.bookmarkModel
-                            prefs:_browserState->GetPrefs()];
+                            prefs:_browserState->GetPrefs()
+            authenticationService:AuthenticationServiceFactory::
+                                      GetForBrowserState(_browserState)
+                 syncSetupService:SyncSetupServiceFactory::GetForBrowserState(
+                                      _browserState)];
     _currentPresentedState = PresentedState::NONE;
     DCHECK(_bookmarkModel);
   }
@@ -170,6 +174,7 @@ enum class PresentedState {
 }
 
 - (void)shutdown {
+  [_mediator disconnect];
   switch (self.currentPresentedState) {
     case PresentedState::BOOKMARK_BROWSER:
       [self bookmarkBrowserDismissed];
@@ -198,7 +203,7 @@ enum class PresentedState {
   // not being yet dispatched.
   if (!_applicationCommandsHandler) {
     _applicationCommandsHandler = HandlerForProtocol(
-        _browser->GetCommandDispatcher(), ApplicationCommands);
+        self.browser->GetCommandDispatcher(), ApplicationCommands);
   }
   return _applicationCommandsHandler;
 }
@@ -207,8 +212,8 @@ enum class PresentedState {
   // Using lazy loading here to avoid potential crashes with SnackbarCommands
   // not being yet dispatched.
   if (!_snackbarCommandsHandler) {
-    _snackbarCommandsHandler =
-        HandlerForProtocol(_browser->GetCommandDispatcher(), SnackbarCommands);
+    _snackbarCommandsHandler = HandlerForProtocol(
+        self.browser->GetCommandDispatcher(), SnackbarCommands);
   }
   return _snackbarCommandsHandler;
 }
@@ -273,7 +278,7 @@ enum class PresentedState {
   self.currentPresentedState = PresentedState::BOOKMARK_EDITOR;
   self.bookmarkEditorCoordinator = [[BookmarksEditorCoordinator alloc]
       initWithBaseViewController:self.baseViewController
-                         browser:_browser
+                         browser:self.browser
                             node:node
          snackbarCommandsHandler:self.snackbarCommandsHandler];
   self.bookmarkEditorCoordinator.delegate = self;
@@ -292,7 +297,7 @@ enum class PresentedState {
   // `self.baseViewController.navigationController`.
   self.folderEditorCoordinator = [[BookmarksFolderEditorCoordinator alloc]
       initWithBaseViewController:self.baseViewController.navigationController
-                         browser:_browser
+                         browser:self.browser
                       folderNode:node];
   self.folderEditorCoordinator.delegate = self;
   [self.folderEditorCoordinator start];
@@ -483,6 +488,7 @@ enum class PresentedState {
      inIncognito:(BOOL)inIncognito
           newTab:(BOOL)newTab {
   BOOL openInForegroundTab = YES;
+  WebStateList* webStateList = self.browser->GetWebStateList();
   for (const GURL& url : urls) {
     DCHECK(url.is_valid());
     // TODO(crbug.com/695749): Force url to open in non-incognito mode. if
@@ -494,8 +500,8 @@ enum class PresentedState {
 
       // TODO(crbug.com/695749): See if we need different metrics for 'Open
       // all', 'Open all in incognito' and 'Open in incognito'.
-      new_tab_page_uma::RecordAction(_browserState,
-                                     _webStateList->GetActiveWebState(),
+      new_tab_page_uma::RecordAction(_browserState->IsOffTheRecord(),
+                                     webStateList->GetActiveWebState(),
                                      new_tab_page_uma::ACTION_OPENED_BOOKMARK);
       base::RecordAction(
           base::UserMetricsAction("MobileBookmarkManagerEntryOpened"));
@@ -622,13 +628,14 @@ enum class PresentedState {
 }
 
 - (void)openURLInCurrentTab:(const GURL&)url {
-  if (url.SchemeIs(url::kJavaScriptScheme) && _webStateList) {  // bookmarklet
-    LoadJavaScriptURL(url, _browserState, _webStateList->GetActiveWebState());
+  WebStateList* webStateList = self.browser->GetWebStateList();
+  if (url.SchemeIs(url::kJavaScriptScheme) && webStateList) {  // bookmarklet
+    LoadJavaScriptURL(url, _browserState, webStateList->GetActiveWebState());
     return;
   }
   UrlLoadParams params = UrlLoadParams::InCurrentTab(url);
   params.web_params.transition_type = ui::PAGE_TRANSITION_AUTO_BOOKMARK;
-  UrlLoadingBrowserAgent::FromBrowser(_browser)->Load(params);
+  UrlLoadingBrowserAgent::FromBrowser(self.browser)->Load(params);
 }
 
 - (void)openURLInNewTab:(const GURL&)url
@@ -639,7 +646,7 @@ enum class PresentedState {
   UrlLoadParams params = UrlLoadParams::InNewTab(url);
   params.SetInBackground(inBackground);
   params.in_incognito = inIncognito;
-  UrlLoadingBrowserAgent::FromBrowser(_browser)->Load(params);
+  UrlLoadingBrowserAgent::FromBrowser(self.browser)->Load(params);
 }
 
 // Presents the bookmarks browser modally. If `selectingBookmark` is non-nil,
@@ -653,7 +660,7 @@ enum class PresentedState {
   DCHECK(!self.bookmarkNavigationController);
 
   self.bookmarkBrowser =
-      [[BookmarksHomeViewController alloc] initWithBrowser:_browser];
+      [[BookmarksHomeViewController alloc] initWithBrowser:self.browser];
   self.bookmarkBrowser.homeDelegate = self;
   self.bookmarkBrowser.applicationCommandsHandler =
       self.applicationCommandsHandler;

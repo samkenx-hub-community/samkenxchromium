@@ -119,7 +119,6 @@
 <translation id="1942765061641586207">Bildupplösning</translation>
 <translation id="1972984168337863910">Utöka panel med information om filåtgärder</translation>
 <translation id="1995337122023280937">Gå till filens plats</translation>
-<translation id="1999709132469742660">Filåtkomst för alla webbadresser</translation>
 <translation id="2001796770603320721">Hantera i Drive</translation>
 <translation id="2009067268969781306">Om du formaterar en enhet raderas all data som lagras på den. Det går inte att ångra åtgärden.</translation>
 <translation id="2025955442973426285">tigrinja</translation>
@@ -151,6 +150,7 @@
 <translation id="2236732657580416950">Ditt cacheminne har rensats på Google Drive.</translation>
 <translation id="2239068707900391003">Person med en kopp kaffe</translation>
 <translation id="2251368349685848079">Återställ från papperskorgen</translation>
+<translation id="2278133026967558505">Filåtkomst för alla webbplatser och webbadresser</translation>
 <translation id="2282155092769082568">Webbadress för automatisk konfiguration:</translation>
 <translation id="2284767815536050991">externt lagringsutrymme</translation>
 <translation id="2288278176040912387">Skivspelare</translation>
@@ -543,7 +543,6 @@
 <translation id="5323213332664049067">Latinamerikanskt</translation>
 <translation id="5330145655348521461">Filerna öppnades på ett annat skrivbord. Byt till <ph name="USER_NAME" /> (<ph name="MAIL_ADDRESS" />) om du vill visa dem.</translation>
 <translation id="5330512191124428349">Mer information</translation>
-<translation id="5337538975554986899">Filåtkomst för alla webbadresser utom <ph name="NON_RESTRICTED_DESTINATIONS" /></translation>
 <translation id="5344246330454251646">Hantera delning med Bruschetta</translation>
 <translation id="535792325654997756">Person med katter</translation>
 <translation id="5358764674931277">Bildfrekvens</translation>
@@ -769,6 +768,7 @@
 <translation id="7162080671816799010">Matchning av ämnets andra namn eller Matchning av domänsuffix saknas för att validera autentiseringsserverns identitet</translation>
 <translation id="7165320105431587207">Det gick inte att konfigurera nätverket</translation>
 <translation id="7170041865419449892">Utanför räckvidden</translation>
+<translation id="7179579940054351344">Filåtkomst för alla webbplatser och webbadresser utom <ph name="NON_RESTRICTED_DESTINATIONS" /></translation>
 <translation id="7180611975245234373">Uppdatera</translation>
 <translation id="7189874332498648577"><ph name="NUMBER_OF_GB" /> GB</translation>
 <translation id="7191454237977785534">Spara filen som</translation>
@@ -942,6 +942,7 @@
 <translation id="8492972329130824181">Hemnätverket är inte tillgängligt. Dataroaming med mobildata måste aktiveras för anslutningen.</translation>
 <translation id="8499098729323186194"><ph name="NUMBER_OF_ITEMS" /> objekt extraheras …</translation>
 <translation id="8502913769543567768">Nätverk <ph name="NETWORK_INDEX" /> av <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, <ph name="NETWORK_PROVIDER_NAME" />, Aktivera efter enhetskonfigureringen, Hanteras av administratören</translation>
+<translation id="8512483403832814140">När som helst</translation>
 <translation id="8521441079177373948">Storbritannien</translation>
 <translation id="853494022971700746">franska (Frankrike)</translation>
 <translation id="8540608333167683902">Nätverk <ph name="NETWORK_INDEX" /> av <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, <ph name="CONNECTION_STATUS" />, signalstyrka <ph name="SIGNAL_STRENGTH" /> %, information</translation>

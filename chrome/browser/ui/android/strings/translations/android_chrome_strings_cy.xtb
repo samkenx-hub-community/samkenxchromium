@@ -283,6 +283,7 @@ Mae tocynnau ymddiriedaeth yn gwella eich preifatrwydd ar y we ac ni ellir eu de
 <translation id="2581165646603367611">Bydd hyn yn clirio cwcis, storfa, a data eraill o wefannau nad yw Chrome yn credu sy'n bwysig.</translation>
 <translation id="2587052924345400782">Mae fersiwn mwy newydd ar gael</translation>
 <translation id="2593272815202181319">Lled sefydlog</translation>
+<translation id="2603212228005142861">Mewngofnodwch i reoli'ch dewisiadau</translation>
 <translation id="2604446170045642109">Gallwch ddiffodd thema dywyll ar gyfer gwefannau yn eich gosodiadau.</translation>
 <translation id="2612676031748830579">Rhif y cerdyn</translation>
 <translation id="2625189173221582860">Copïwyd cyfrinair</translation>
@@ -476,6 +477,7 @@ Mae tocynnau ymddiriedaeth yn gwella eich preifatrwydd ar y we ac ni ellir eu de
 <translation id="3587596251841506391">Helpu i wella diogelwch ar y we</translation>
 <translation id="3597179440835065298">Cael awgrymiadau gwell</translation>
 <translation id="3602290021589620013">Rhagolwg</translation>
+<translation id="360901359071773787">Dileu'r 15 munud diwethaf?</translation>
 <translation id="3616113530831147358">Sain</translation>
 <translation id="3622349720008044802">Rheoli ffenestri</translation>
 <translation id="3631987586758005671">Wrthi'n rhannu i <ph name="DEVICE_NAME" /></translation>
@@ -630,6 +632,7 @@ Mae tocynnau ymddiriedaeth yn gwella eich preifatrwydd ar y we ac ni ellir eu de
 
 Mae'n bosib y bydd gan eich cyfrif Google fathau eraill o hanes pori megis chwiliadau a gweithgarwch gan wasanaethau Google eraill yn <ph name="BEGIN_LINK" />myactivity.google.com<ph name="END_LINK" />.</translation>
 <translation id="452750746583162491">Adolygwch eich data a gysonwyd</translation>
+<translation id="4528638190900283934">Mewngofnodwch i gael nodweddion ychwanegol</translation>
 <translation id="4532845899244822526">Dewis ffolder</translation>
 <translation id="4547551584605870320">{TAB_COUNT,plural, =1{<ph name="TAB_COUNT_ONE" /> tab}zero{<ph name="TAB_COUNT_MANY" /> tab, <ph name="TAB_COUNT_INCOGNITO" /> tab anhysbys}two{<ph name="TAB_COUNT_MANY" /> dab, <ph name="TAB_COUNT_INCOGNITO" /> dab anhysbys}few{<ph name="TAB_COUNT_MANY" /> thab, <ph name="TAB_COUNT_INCOGNITO" /> thab anhysbys}many{<ph name="TAB_COUNT_MANY" /> thab, <ph name="TAB_COUNT_INCOGNITO" /> thab anhysbys}other{<ph name="TAB_COUNT_MANY" /> tab, <ph name="TAB_COUNT_INCOGNITO" /> tab anhysbys}}</translation>
 <translation id="4554077758708533499">Wedi cysylltu â chebl USB</translation>
@@ -820,6 +823,7 @@ I newid y gosodiad hwn, <ph name="BEGIN_LINK" />ailosodwch gysoni<ph name="END_L
 <translation id="5517095782334947753">Mae gennych nodau tudalen, hanes, cyfrineiriau a gosodiadau eraill o <ph name="FROM_ACCOUNT" />.</translation>
 <translation id="5524761631371622910">Pan fydd treialon ymlaen ac os yw Chrome wedi'ch gosod ar hap mewn treial gweithredol, mae eich hanes pori yn effeithio ar yr hysbysebion a welwch a'r diddordebau fel yr amcangyfrifir isod. Er mwyn amddiffyn eich preifatrwydd, mae Chrome yn dileu eich diddordebau yn awtomatig bob mis.</translation>
 <translation id="5524843473235508879">Ailgyfeirio wedi'i rwystro.</translation>
+<translation id="554297709083131118">Bydd data dilynol o'r 15 munud diwethaf yn cael eu dileu</translation>
 <translation id="5548606607480005320">Gwiriad diogelwch</translation>
 <translation id="5555525474779371165">Dewiswch eich diogelwch Pori'n Ddiogel</translation>
 <translation id="5556459405103347317">Ail-lwytho</translation>
@@ -1074,6 +1078,7 @@ Er enghraifft, gall rhai gwefannau ymateb i'r cais hwn drwy ddangos hysbysebion 
 <translation id="6824899148643461612"><ph name="TAB_TITLE" />, tab, wedi'i ddewis</translation>
 <translation id="6828070228333235514">Stopio dilyn y pris</translation>
 <translation id="6830728435402077660">Ddim yn ddiogel</translation>
+<translation id="6831043979455480757">Cyfieithu</translation>
 <translation id="6833996806551876956">Prawf Privacy Sandbox</translation>
 <translation id="6836206421467243968">Adfer grŵp tabiau <ph name="TITLE_OF_GROUP" /> fel grŵp tabiau cefndirol newydd.</translation>
 <translation id="6846298663435243399">Yn llwytho…</translation>
@@ -1241,10 +1246,10 @@ Er enghraifft, gall rhai gwefannau ymateb i'r cais hwn drwy ddangos hysbysebion 
 <translation id="7707922173985738739">Defnyddio data symudol</translation>
 <translation id="7709094866268987903">Bydd diddordebau a dynnwyd gennych yn ymddangos yma</translation>
 <translation id="7709918231054955894">Cael eich holl dabiau</translation>
+<translation id="772434085369393266">Uwchraddio llywio i HTTPS a'ch rhybuddio cyn llwytho gwefannau nad ydynt yn ei gefnogi. Ni allwch newid y gosodiad hwn oherwydd eich bod wedi galluogi Advanced Protection.</translation>
 <translation id="7725024127233776428">Bydd tudalennau rydych yn creu nodau tudalen ohonynt yn ymddangos yma</translation>
 <translation id="7757787379047923882">Testun wedi'i rannu gan <ph name="DEVICE_NAME" /></translation>
 <translation id="7762668264895820836">Cerdyn SD <ph name="SD_CARD_NUMBER" /></translation>
-<translation id="7762928140712606393">Mewngofnodwch i gael nodweddion ychwanegol a diogelwch cryfaf Chrome</translation>
 <translation id="7764225426217299476">Ychwanegu cyfeiriad</translation>
 <translation id="7772032839648071052">Cadarnhau cyfrinymadrodd</translation>
 <translation id="7772375229873196092">Cau <ph name="APP_NAME" /></translation>
@@ -1260,6 +1265,7 @@ Er enghraifft, gall rhai gwefannau ymateb i'r cais hwn drwy ddangos hysbysebion 
 <translation id="78270725016672455">Mae eich cyfrifiadur eisiau cofrestru'r ddyfais hon i fewngofnodi i wefan</translation>
 <translation id="7844171778363018843">Ni ddewiswyd unrhyw ddata i'w cysoni</translation>
 <translation id="7846296061357476882">Gwasanaethau Google</translation>
+<translation id="7847228556075070294">Hanes, cwcis a data eraill a ddilëwyd</translation>
 <translation id="784934925303690534">Ystod amser</translation>
 <translation id="7851858861565204677">Dyfeisiau eraill</translation>
 <translation id="7853202427316060426">Gweithgarwch</translation>

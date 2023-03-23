@@ -143,6 +143,10 @@
 #include "chrome/browser/ash/profiles/profile_helper.h"
 #endif  // BUILDFLAG(IS_CHROMEOS_ASH)
 
+#if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS_ASH)
+#include "ui/ozone/buildflags.h"
+#endif  // BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS_ASH)
+
 using content::WebContents;
 
 namespace extensions {
@@ -345,7 +349,13 @@ class ExtensionWebRequestApiTest : public ExtensionApiTest {
  public:
   explicit ExtensionWebRequestApiTest(
       ContextType context_type = ContextType::kFromManifest)
-      : ExtensionApiTest(context_type) {}
+      : ExtensionApiTest(context_type) {
+    feature_list_.InitWithFeatures(
+        /*enabled_features=*/{},
+        // TODO(crbug.com/1394910): Use HTTPS URLs in tests to avoid having to
+        // disable this feature.
+        /*disabled_features=*/{features::kHttpsUpgrades});
+  }
   ExtensionWebRequestApiTest(const ExtensionWebRequestApiTest&) = delete;
   ExtensionWebRequestApiTest& operator=(const ExtensionWebRequestApiTest&) =
       delete;
@@ -403,6 +413,7 @@ class ExtensionWebRequestApiTest : public ExtensionApiTest {
   }
 
  private:
+  base::test::ScopedFeatureList feature_list_;
   std::vector<std::unique_ptr<TestExtensionDir>> test_dirs_;
   std::unique_ptr<NavigateTabMessageHandler> navigationHandler_;
 };
@@ -432,6 +443,12 @@ INSTANTIATE_TEST_SUITE_P(ServiceWorker,
 
 class DevToolsFrontendInWebRequestApiTest : public ExtensionApiTest {
  public:
+  DevToolsFrontendInWebRequestApiTest() {
+    // TODO(crbug.com/1394910): Use HTTPS URLs in tests to avoid having to
+    // disable this feature.
+    feature_list_.InitAndDisableFeature(features::kHttpsUpgrades);
+  }
+
   void SetUpOnMainThread() override {
     ExtensionApiTest::SetUpOnMainThread();
     host_resolver()->AddRule("*", "127.0.0.1");
@@ -506,6 +523,7 @@ class DevToolsFrontendInWebRequestApiTest : public ExtensionApiTest {
         base::StringPrintf("HTTP/1.0 200 OK\n%s\n", content_type.c_str());
   }
 
+  base::test::ScopedFeatureList feature_list_;
   base::FilePath test_root_dir_;
   std::unique_ptr<content::URLLoaderInterceptor> url_loader_interceptor_;
   std::unique_ptr<NavigateTabMessageHandler> navigationHandler_;
@@ -4880,7 +4898,12 @@ class RedirectInfoWebRequestApiTest
     : public testing::WithParamInterface<RITestParams>,
       public ExtensionApiTest {
  public:
-  RedirectInfoWebRequestApiTest() : ExtensionApiTest(GetParam().context_type) {}
+  RedirectInfoWebRequestApiTest() : ExtensionApiTest(GetParam().context_type) {
+    // TODO(crbug.com/1394910): Use HTTPS URLs in tests to avoid having to
+    // disable this feature.
+    feature_list_.InitAndDisableFeature(features::kHttpsUpgrades);
+  }
+
   ~RedirectInfoWebRequestApiTest() override = default;
   RedirectInfoWebRequestApiTest(const RedirectInfoWebRequestApiTest&) = delete;
   RedirectInfoWebRequestApiTest& operator=(
@@ -4927,6 +4950,7 @@ class RedirectInfoWebRequestApiTest
 
  private:
   TestExtensionDir test_dir_;
+  base::test::ScopedFeatureList feature_list_;
 };
 
 INSTANTIATE_TEST_SUITE_P(
@@ -6181,11 +6205,19 @@ IN_PROC_BROWSER_TEST_F(ManifestV3WebRequestApiTest, TestOnAuthRequired) {
   EXPECT_TRUE(navigation_observer.last_navigation_succeeded());
 }
 
+// The build flag OZONE_PLATFORM_WAYLAND is only available on
+// Linux or ChromeOS, so this simplifies the next set of ifdefs.
+#if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS_ASH)
+#if BUILDFLAG(OZONE_PLATFORM_WAYLAND)
+#define OZONE_PLATFORM_WAYLAND
+#endif  // BUILDFLAG(OZONE_PLATFORM_WAYLAND)
+#endif  // BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS_ASH)
+
 // Tests the behavior of an extension that registers an event listener
 // asynchronously.
 // Regression test for https://crbug.com/1397879.
-// Flaky on linux-lacros. See https://crbug.com/1423241
-#if BUILDFLAG(IS_CHROMEOS_LACROS)
+// Flaky on linux-lacros and linux-wayland-rel. See https://crbug.com/1423018
+#if BUILDFLAG(IS_CHROMEOS_LACROS) || defined(OZONE_PLATFORM_WAYLAND)
 #define MAYBE_AsyncListenerRegistration DISABLED_AsyncListenerRegistration
 #else
 #define MAYBE_AsyncListenerRegistration AsyncListenerRegistration

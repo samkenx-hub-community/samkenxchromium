@@ -29,7 +29,6 @@ import org.chromium.chrome.browser.tabmodel.TabModelFilter;
 import org.chromium.chrome.browser.tabmodel.TabModelObserver;
 import org.chromium.chrome.browser.tabmodel.TabModelSelector;
 import org.chromium.chrome.browser.tabmodel.TabModelSelectorObserver;
-import org.chromium.chrome.browser.tasks.ReturnToChromeUtil;
 import org.chromium.chrome.browser.tasks.tab_groups.TabGroupModelFilter;
 import org.chromium.chrome.browser.tasks.tab_management.TabListRecyclerView.RecyclerViewPosition;
 import org.chromium.chrome.browser.tasks.tab_management.TabSelectionEditorAction.ButtonType;
@@ -409,8 +408,7 @@ public class TabGridDialogMediator
     }
 
     private void updateDialog() {
-        List<Tab> relatedTabs = getRelatedTabs(mCurrentTabId);
-        int tabsCount = relatedTabs.size();
+        final int tabsCount = getRelatedTabs(mCurrentTabId).size();
         if (tabsCount == 0) {
             hideDialog(true);
             return;
@@ -418,12 +416,12 @@ public class TabGridDialogMediator
         if (mTabGroupTitleEditor != null) {
             Tab currentTab = mTabModelSelector.getTabById(mCurrentTabId);
             String storedTitle = mTabGroupTitleEditor.getTabGroupTitle(getRootId(currentTab));
-            if (storedTitle != null && relatedTabs.size() > 1) {
+            if (storedTitle != null && tabsCount > 1) {
                 if (TabUiFeatureUtilities.isTabGroupsAndroidContinuationEnabled(mContext)) {
                     mModel.set(TabGridPanelProperties.COLLAPSE_BUTTON_CONTENT_DESCRIPTION,
                             mContext.getResources().getQuantityString(
                                     R.plurals.accessibility_dialog_back_button_with_group_name,
-                                    relatedTabs.size(), storedTitle, relatedTabs.size()));
+                                    tabsCount, storedTitle, tabsCount));
                 }
                 mModel.set(TabGridPanelProperties.HEADER_TITLE, storedTitle);
                 return;
@@ -432,12 +430,10 @@ public class TabGridDialogMediator
         if (TabUiFeatureUtilities.isTabGroupsAndroidContinuationEnabled(mContext)) {
             mModel.set(TabGridPanelProperties.COLLAPSE_BUTTON_CONTENT_DESCRIPTION,
                     mContext.getResources().getQuantityString(
-                            R.plurals.accessibility_dialog_back_button, relatedTabs.size(),
-                            relatedTabs.size()));
+                            R.plurals.accessibility_dialog_back_button, tabsCount, tabsCount));
         }
         mModel.set(TabGridPanelProperties.HEADER_TITLE,
-                mContext.getResources().getQuantityString(
-                        R.plurals.bottom_tab_grid_title_placeholder, tabsCount, tabsCount));
+                TabGroupTitleEditor.getDefaultTitle(mContext, tabsCount));
     }
 
     private void updateColorProperties(Context context, boolean isIncognito) {
@@ -593,9 +589,6 @@ public class TabGridDialogMediator
                     .createNewTab(new LoadUrlParams(UrlConstants.NTP_URL),
                             TabLaunchType.FROM_TAB_GROUP_UI, parentTabToAttach);
             RecordUserAction.record("MobileNewTabOpened." + mComponentName);
-            if (!currentTab.isIncognito()) {
-                ReturnToChromeUtil.onNewTabOpened();
-            }
         };
     }
 
@@ -623,14 +616,15 @@ public class TabGridDialogMediator
         assert mTabGroupTitleEditor != null;
 
         Tab currentTab = mTabModelSelector.getTabById(mCurrentTabId);
-        if (mCurrentGroupModifiedTitle.length() == 0) {
-            // When dialog title is empty, delete previously stored title and restore default title.
+        int tabsCount = getRelatedTabs(mCurrentTabId).size();
+        assert tabsCount >= 2;
+        if (mCurrentGroupModifiedTitle.length() == 0
+                || mTabGroupTitleEditor.isDefaultTitle(mCurrentGroupModifiedTitle, tabsCount)) {
+            // When dialog title is empty or was unchanged, delete previously stored title and
+            // restore default title.
             mTabGroupTitleEditor.deleteTabGroupTitle(getRootId(currentTab));
-            int tabsCount = getRelatedTabs(mCurrentTabId).size();
-            assert tabsCount >= 2;
 
-            String originalTitle = mContext.getResources().getQuantityString(
-                    R.plurals.bottom_tab_grid_title_placeholder, tabsCount, tabsCount);
+            String originalTitle = TabGroupTitleEditor.getDefaultTitle(mContext, tabsCount);
             if (TabUiFeatureUtilities.isTabGroupsAndroidContinuationEnabled(mContext)) {
                 mModel.set(TabGridPanelProperties.COLLAPSE_BUTTON_CONTENT_DESCRIPTION,
                         mContext.getResources().getQuantityString(
@@ -638,6 +632,7 @@ public class TabGridDialogMediator
             }
             mModel.set(TabGridPanelProperties.HEADER_TITLE, originalTitle);
             mTabGroupTitleEditor.updateTabGroupTitle(currentTab, originalTitle);
+            mCurrentGroupModifiedTitle = null;
             return;
         }
         mTabGroupTitleEditor.storeTabGroupTitle(getRootId(currentTab), mCurrentGroupModifiedTitle);

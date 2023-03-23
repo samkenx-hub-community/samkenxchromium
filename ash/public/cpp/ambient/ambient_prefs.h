@@ -7,6 +7,8 @@
 
 #include "ash/public/cpp/ash_public_export.h"
 
+class PrefService;
+
 namespace ash {
 namespace ambient {
 namespace prefs {
@@ -57,6 +59,40 @@ ASH_PUBLIC_EXPORT extern const char kAmbientModeAnimationPlaybackSpeed[];
 // Integer pref for the interval in seconds to refresh photos. Not displayed to
 // the user in settings.
 ASH_PUBLIC_EXPORT extern const char kAmbientModePhotoRefreshIntervalSeconds[];
+
+// Boolean policy to pref mapping for whether the managed screensaver is
+// enabled. This pref takes the value from the ScreensaverLockScreenEnabled
+// policy for user profiles, and from the DeviceScreensaverLoginScreenEnabled
+// policy for the sign-in profile.
+ASH_PUBLIC_EXPORT extern const char kAmbientModeManagedScreensaverEnabled[];
+
+// Integer policy to pref mapping for the time in seconds that the device will
+// wait idle before showing the managed screensaver. This pref takes the value
+// from the ScreensaverLockScreenIdleTimeoutSeconds policy for user profiles,
+// and from the DeviceScreensaverLoginScreenIdleTimeoutSeconds policy for the
+// sign-in profile.
+ASH_PUBLIC_EXPORT extern const char
+    kAmbientModeManagedScreensaverIdleTimeoutSeconds[];
+
+// Integer policy to pref mapping for the interval in seconds to display an
+// image when the managed screensaver has multiple images to display. This pref
+// takes the value from the ScreensaverLockScreenImageDisplayIntervalSeconds
+// policy for user profiles, and from the
+// DeviceScreensaverLoginScreenImageDisplayIntervalSeconds policy for the
+// sign-in profile.
+ASH_PUBLIC_EXPORT extern const char
+    kAmbientModeManagedScreensaverImageDisplayIntervalSeconds[];
+
+// List policy to pref mapping for the list of external images sources to
+// display in the managed screensaver has multiple images to display.
+// This pref takes the value from the ScreensaverLockScreenImages policy
+// for user profiles, and from the DeviceScreensaverLoginScreenImages policy
+// for the sign-in profile.
+ASH_PUBLIC_EXPORT extern const char kAmbientModeManagedScreensaverImages[];
+
+// Migrates from the legacy |ambient::prefs::kAmbientTheme| to the new
+// |ambient::prefs::kAmbientUiSettings|.
+ASH_PUBLIC_EXPORT void MigrateDeprecatedPrefs(PrefService& pref_service);
 
 }  // namespace prefs
 }  // namespace ambient

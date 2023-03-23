@@ -163,6 +163,10 @@ public abstract class ChromeFeatureList {
 
     /* Alphabetical: */
     public static final String ADAPTIVE_BUTTON_IN_TOP_TOOLBAR = "AdaptiveButtonInTopToolbar";
+    public static final String ADAPTIVE_BUTTON_IN_TOP_TOOLBAR_TRANSLATE =
+            "AdaptiveButtonInTopToolbarTranslate";
+    public static final String ADAPTIVE_BUTTON_IN_TOP_TOOLBAR_ADD_TO_BOOKMARKS =
+            "AdaptiveButtonInTopToolbarAddToBookmarks";
     public static final String ADAPTIVE_BUTTON_IN_TOP_TOOLBAR_CUSTOMIZATION_V2 =
             "AdaptiveButtonInTopToolbarCustomizationV2";
     public static final String ADD_EDU_ACCOUNT_FROM_ACCOUNT_SETTINGS_FOR_SUPERVISED_USERS =
@@ -204,6 +208,7 @@ public abstract class ChromeFeatureList {
             "AutofillTouchToFillForCreditCardsAndroid";
     public static final String BACKGROUND_THREAD_POOL = "BackgroundThreadPool";
     public static final String BACK_FORWARD_CACHE = "BackForwardCache";
+    public static final String BACK_FORWARD_TRANSITIONS = "BackForwardTransitions";
     public static final String BACK_GESTURE_REFACTOR = "BackGestureRefactorAndroid";
     public static final String BACK_GESTURE_REFACTOR_ACTIVITY =
             "BackGestureRefactorActivityAndroid";
@@ -215,6 +220,8 @@ public abstract class ChromeFeatureList {
             "CacheDeprecatedSystemLocationSetting";
     public static final String CAF_MRP_DEFERRED_DISCOVERY = "CafMRPDeferredDiscovery";
     public static final String CAPTIVE_PORTAL_CERTIFICATE_LIST = "CaptivePortalCertificateList";
+    public static final String CCT_ALLOW_CROSS_UID_ACTIVITY_SWITCH_FROM_BELOW =
+            "CCTAllowCrossUidActivitySwitchFromBelow";
     public static final String CCT_AUTO_TRANSLATE = "CCTAutoTranslate";
     public static final String CCT_BACKGROUND_TAB = "CCTBackgroundTab";
     public static final String CCT_BOTTOM_BAR_SWIPE_UP_GESTURE = "CCTBottomBarSwipeUpGesture";
@@ -325,7 +332,6 @@ public abstract class ChromeFeatureList {
             "ForceDisableExtendedSyncPromos";
     public static final String FORCE_STARTUP_SIGNIN_PROMO = "ForceStartupSigninPromo";
     public static final String FORCE_WEB_CONTENTS_DARK_MODE = "WebContentsForceDark";
-    public static final String GRID_TAB_SWITCHER_FOR_TABLETS = "GridTabSwitcherForTablets";
     public static final String HIDE_NON_DISPLAYABLE_ACCOUNT_EMAIL =
             "HideNonDisplayableAccountEmail";
     public static final String HISTORY_JOURNEYS = "Journeys";
@@ -426,7 +432,7 @@ public abstract class ChromeFeatureList {
     public static final String PRIVACY_SANDBOX_FPS_UI = "PrivacySandboxFirstPartySetsUI";
     public static final String PRIVACY_SANDBOX_SETTINGS_3 = "PrivacySandboxSettings3";
     public static final String PRIVACY_SANDBOX_SETTINGS_4 = "PrivacySandboxSettings4";
-    public static final String PRIVATE_STATE_TOKENS = "TrustTokens";
+    public static final String PRIVATE_STATE_TOKENS = "PrivateStateTokens";
     public static final String PROBABILISTIC_CRYPTID_RENDERER = "ProbabilisticCryptidRenderer";
     public static final String PUSH_MESSAGING_DISALLOW_SENDER_IDS =
             "PushMessagingDisallowSenderIDs";
@@ -547,7 +553,6 @@ public abstract class ChromeFeatureList {
     public static final String VIDEO_TUTORIALS = "VideoTutorials";
     public static final String VOICE_BUTTON_IN_TOP_TOOLBAR = "VoiceButtonInTopToolbar";
     public static final String VOICE_SEARCH_AUDIO_CAPTURE_POLICY = "VoiceSearchAudioCapturePolicy";
-    public static final String WEBNOTES_DYNAMIC_TEMPLATES = "WebNotesDynamicTemplates";
     public static final String WEBNOTES_STYLIZE = "WebNotesStylize";
     public static final String WEB_APK_ALLOW_ICON_UPDATA = "WebApkAllowIconUpdate";
     public static final String WEB_APK_INSTALL_COMPLETE_NOTIFICATION =
@@ -556,6 +561,9 @@ public abstract class ChromeFeatureList {
     public static final String WEB_APK_TRAMPOLINE_ON_INITIAL_INTENT =
             "WebApkTrampolineOnInitialIntent";
     public static final String WEB_APK_UNIQUE_ID = "WebApkUniqueId";
+    public static final String WEB_APK_INSTALL_FAILURE_NOTIFICATION =
+            "kWebApkInstallFailureNotification";
+    public static final String WEB_APK_INSTALL_RETRY = "WebApkInstallFailureRetry";
     public static final String WEB_FEED = "WebFeed";
     public static final String WEB_FEED_AWARENESS = "WebFeedAwareness";
     public static final String WEB_FEED_ONBOARDING = "WebFeedOnboarding";
@@ -573,6 +581,8 @@ public abstract class ChromeFeatureList {
             new CachedFlag(BACK_GESTURE_REFACTOR, false);
     public static final CachedFlag sBaselineGm3SurfaceColors =
             new CachedFlag(BASELINE_GM3_SURFACE_COLORS, false);
+    public static final CachedFlag sCctAllowCrossUidActivitySwitchFromBelow =
+            new CachedFlag(CCT_ALLOW_CROSS_UID_ACTIVITY_SWITCH_FROM_BELOW, true);
     public static final CachedFlag sCctAutoTranslate = new CachedFlag(CCT_AUTO_TRANSLATE, true);
     public static final CachedFlag sCctBottomBarSwipeUpGesture =
             new CachedFlag(CCT_BOTTOM_BAR_SWIPE_UP_GESTURE, true);
@@ -611,8 +621,6 @@ public abstract class ChromeFeatureList {
     public static final CachedFlag sFeedLoadingPlaceholder =
             new CachedFlag(FEED_LOADING_PLACEHOLDER, false);
     public static final CachedFlag sFoldableJankFix = new CachedFlag(FOLDABLE_JANK_FIX, true);
-    public static final CachedFlag sGridTabSwitcherForTablets =
-            new CachedFlag(GRID_TAB_SWITCHER_FOR_TABLETS, true);
     public static final CachedFlag sHideNonDisplayableAccountEmail =
             new CachedFlag(HIDE_NON_DISPLAYABLE_ACCOUNT_EMAIL, false);
     public static final CachedFlag sIncognitoReauthenticationForAndroid =

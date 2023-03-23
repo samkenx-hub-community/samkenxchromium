@@ -353,6 +353,11 @@ body:is(:not(.recording), .enable-gif-recording, .should-handle-intent-result) :
   display: none;
 }
 
+/* TODO(b/236800499): Handle pause for time-lapse recording */
+body.record-type-time-lapse #pause-recordvideo {
+  display: none;
+}
+
 #video-snapshot-holder {
   bottom: calc(var(--shutter-vertical-center) + 84px);
   transform: translate(50%, 50%);
@@ -500,7 +505,7 @@ body.video.taking #recordvideo {
   background: transparent;
 }
 
-body:is(:not(.video), .record-type-gif) #toggle-mic,
+body:is(:not(.video), .record-type-gif, .record-type-time-lapse) #toggle-mic,
 body:not(.multi-camera) #switch-device {
   visibility: hidden;
 }
@@ -907,15 +912,20 @@ body.use-fake-camera #view-expert-settings label.require-chromeos-vcd {
   position: absolute;
   right: 0;
   top: 0;
+  transition: visibility 500ms;
+  visibility: hidden;
 }
 
 body:not(.streaming) #expert-controls,
 body:not(.streaming) #open-settings,
 body:not(.streaming) #options-group,
 body:not(.streaming) #preview-focus,
-body:not(.streaming) #preview-grid,
 body:not(.streaming) #toggle-mic {
   visibility: hidden;
+}
+
+body:not(.streaming) #preview-grid {
+  display: none;
 }
 
 body:not(.expert) #settings-expert,
@@ -935,6 +945,10 @@ body:not(.custom-video-parameters) #expert-controls>.video-option-row {
   right: 0;
   top: 50%;
   transform: translateY(-50%);
+}
+
+body.grid #preview-grid {
+  visibility: visible;
 }
 
 body.grid.grid-4x4 #preview-grid-horizontal::before {
@@ -996,12 +1010,12 @@ body.grid.grid-4x4 #preview-grid-vertical::before {
 
 #preview-grid-horizontal,
 #preview-grid-horizontal::before {
-  transition: height 500ms, visibility 500ms;
+  transition: height 500ms;
 }
 
 #preview-grid-vertical,
 #preview-grid-vertical::before {
-  transition: width 500ms, visibility 500ms;
+  transition: width 500ms;
 }
 
 #record-time {

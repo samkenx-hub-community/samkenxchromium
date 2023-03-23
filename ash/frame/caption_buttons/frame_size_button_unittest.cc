@@ -793,7 +793,8 @@ TEST_F(MultitaskMenuTest, TestMultitaskMenuPartialSplit) {
   generator->ClickLeftButton();
   EXPECT_EQ(WindowStateType::kPrimarySnapped, window_state()->GetStateType());
   EXPECT_EQ(window_state()->window()->bounds().width(),
-            work_area_bounds_in_screen.width() * 0.67);
+            std::round(work_area_bounds_in_screen.width() *
+                       chromeos::kTwoThirdSnapRatio));
   EXPECT_EQ(user_action_tester.GetActionCount(
                 chromeos::kPartialSplitTwoThirdsUserAction),
             1);
@@ -803,18 +804,17 @@ TEST_F(MultitaskMenuTest, TestMultitaskMenuPartialSplit) {
 
   // Snap to secondary with 0.33f screen ratio.
   ShowMultitaskMenu();
-  gfx::Rect partial_bounds(GetMultitaskMenu()
-                               ->multitask_menu_view()
-                               ->partial_button()
-                               ->GetBoundsInScreen());
-  gfx::Point secondary_center(
-      gfx::Point(partial_bounds.x() + partial_bounds.width() * 0.67f,
-                 partial_bounds.y() + partial_bounds.y() / 2));
-  generator->MoveMouseTo(secondary_center);
+  generator->MoveMouseTo(GetMultitaskMenu()
+                             ->multitask_menu_view()
+                             ->partial_button()
+                             ->GetRightBottomButton()
+                             ->GetBoundsInScreen()
+                             .CenterPoint());
   generator->ClickLeftButton();
   EXPECT_EQ(WindowStateType::kSecondarySnapped, window_state()->GetStateType());
   EXPECT_EQ(window_state()->window()->bounds().width(),
-            work_area_bounds_in_screen.width() * 0.33);
+            std::round(work_area_bounds_in_screen.width() *
+                       chromeos::kOneThirdSnapRatio));
   EXPECT_EQ(user_action_tester.GetActionCount(
                 chromeos::kPartialSplitOneThirdUserAction),
             1);
@@ -912,6 +912,33 @@ TEST_F(MultitaskMenuTest, HoverWhenMenuAlreadyShown) {
       size_button()->GetBoundsInScreen().bottom_right() + gfx::Vector2d(2, 2));
   GetEventGenerator()->MoveMouseTo(CenterPointInScreen(size_button()));
   EXPECT_EQ(multitask_menu, GetMultitaskMenu());
+}
+
+TEST_F(MultitaskMenuTest, CloseOnClickOutside) {
+  // Snap the window to half so we can click outside the window bounds.
+  ShowMultitaskMenu();
+  GetEventGenerator()->MoveMouseTo(GetMultitaskMenu()
+                                       ->multitask_menu_view()
+                                       ->half_button_for_testing()
+                                       ->GetBoundsInScreen()
+                                       .left_center());
+  GetEventGenerator()->ClickLeftButton();
+  EXPECT_EQ(WindowStateType::kPrimarySnapped, window_state()->GetStateType());
+
+  ShowMultitaskMenu();
+  MultitaskMenu* multitask_menu = GetMultitaskMenu();
+  ASSERT_TRUE(multitask_menu);
+
+  // Click on a point outside the menu on the screen below.
+  gfx::Point offset_point(multitask_menu->multitask_menu_view()
+                              ->GetBoundsInScreen()
+                              .bottom_right());
+  offset_point.Offset(10, 10);
+  DCHECK(!GetWidget()->GetWindowBoundsInScreen().Contains(offset_point));
+  GetEventGenerator()->MoveMouseTo(offset_point);
+  GetEventGenerator()->ClickLeftButton();
+  base::RunLoop().RunUntilIdle();
+  ASSERT_FALSE(GetMultitaskMenu());
 }
 
 }  // namespace ash

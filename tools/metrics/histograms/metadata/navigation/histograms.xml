@@ -366,7 +366,7 @@ Also used in tools/metrics/histograms/metadata/page/histograms.xml.
 </histogram>
 
 <histogram name="BackForwardCache.PageWithForm.RestoreResult"
-    enum="BackForwardCacheHistoryNavigationOutcome" expires_after="2023-06-30">
+    enum="BackForwardCacheHistoryNavigationOutcome" expires_after="2023-09-17">
   <owner>wenyufu@chromium.org</owner>
   <owner>bfcache-dev@chromium.org</owner>
   <summary>
@@ -383,7 +383,7 @@ Also used in tools/metrics/histograms/metadata/page/histograms.xml.
 </histogram>
 
 <histogram name="BackForwardCache.PageWithForm.Storable"
-    enum="BackForwardCachePageWithFormStorable" expires_after="2023-06-30">
+    enum="BackForwardCachePageWithFormStorable" expires_after="2023-09-17">
   <owner>wenyufu@chromium.org</owner>
   <owner>bfcache-dev@chromium.org</owner>
   <summary>
@@ -691,7 +691,7 @@ Also used in tools/metrics/histograms/metadata/page/histograms.xml.
 </histogram>
 
 <histogram name="Navigation.Guest.IsHTTPOrHTTPS"
-    enum="BooleanHttpBasedOrOtherScheme" expires_after="2023-07-16">
+    enum="BooleanHttpBasedOrOtherScheme" expires_after="2023-09-17">
   <owner>alexmos@chromium.org</owner>
   <owner>creis@chromium.org</owner>
   <owner>wjmaclean@chromium.org</owner>
@@ -704,7 +704,7 @@ Also used in tools/metrics/histograms/metadata/page/histograms.xml.
 </histogram>
 
 <histogram name="Navigation.Guest.IsMainFrame" enum="BooleanMainFrame"
-    expires_after="2023-07-16">
+    expires_after="2023-09-17">
   <owner>alexmos@chromium.org</owner>
   <owner>creis@chromium.org</owner>
   <owner>wjmaclean@chromium.org</owner>
@@ -750,7 +750,7 @@ Also used in tools/metrics/histograms/metadata/page/histograms.xml.
 </histogram>
 
 <histogram name="Navigation.IsGuest" enum="NavigationIsGuest"
-    expires_after="2023-07-16">
+    expires_after="2023-09-17">
   <owner>alexmos@chromium.org</owner>
   <owner>creis@chromium.org</owner>
   <owner>wjmaclean@chromium.org</owner>
@@ -866,7 +866,7 @@ Also used in tools/metrics/histograms/metadata/page/histograms.xml.
 </histogram>
 
 <histogram name="Navigation.MainFrame.MaxFrameCount" units="frames"
-    expires_after="2023-07-16">
+    expires_after="2023-09-17">
   <owner>michaelpg@chromium.org</owner>
   <owner>yilkal@chromium.org</owner>
   <owner>cros-families-eng@google.com</owner>
@@ -1046,7 +1046,7 @@ Also used in tools/metrics/histograms/metadata/page/histograms.xml.
 </histogram>
 
 <histogram name="Navigation.OnBeforeUnloadBrowserToRendererIpcTime" units="ms"
-    expires_after="2023-07-16">
+    expires_after="2023-09-17">
   <owner>sky@chromium.org</owner>
   <owner>jam@chromium.org</owner>
   <summary>
@@ -1056,7 +1056,7 @@ Also used in tools/metrics/histograms/metadata/page/histograms.xml.
 </histogram>
 
 <histogram name="Navigation.OnBeforeUnloadLegacyPostTaskTime" units="ms"
-    expires_after="2023-07-16">
+    expires_after="2023-09-17">
   <owner>sky@chromium.org</owner>
   <owner>jam@chromium.org</owner>
   <summary>
@@ -1352,7 +1352,7 @@ Also used in tools/metrics/histograms/metadata/page/histograms.xml.
 </histogram>
 
 <histogram name="Navigation.StartToCommit" units="ms"
-    expires_after="2023-07-09">
+    expires_after="2023-09-10">
   <owner>nasko@chromium.org</owner>
   <owner>csharrison@chromium.org</owner>
   <summary>
@@ -1402,7 +1402,7 @@ Also used in tools/metrics/histograms/metadata/page/histograms.xml.
 </histogram>
 
 <histogram name="Navigation.TimeToReadyToCommit2" units="ms"
-    expires_after="2023-07-09">
+    expires_after="2023-09-10">
   <owner>clamy@chromium.org</owner>
   <owner>nasko@chromium.org</owner>
   <summary>
@@ -1608,6 +1608,17 @@ Also used in tools/metrics/histograms/metadata/page/histograms.xml.
     PrerenderHost in the browser process when comparing these two parameters.
   </summary>
   <token key="PrerenderTriggerType" variants="PrerenderTriggerType"/>
+</histogram>
+
+<histogram name="Prerender.Experimental.BookmarkUrlButtonEvent"
+    enum="PreloadBookmarkMetricsEvent" expires_after="2023-06-20">
+  <owner>robertlin@chromium.org</owner>
+  <owner>toyoshim@chromium.org</owner>
+  <owner>chrome-prerendering@google.com</owner>
+  <summary>
+    The metrics for preload bookmark to evaluate the ratio of mouseover and
+    mousedown translating into full mouse click.
+  </summary>
 </histogram>
 
 <histogram
@@ -1846,23 +1857,6 @@ Also used in tools/metrics/histograms/metadata/page/histograms.xml.
   <summary>
     Length of the redirect chain for main resources loaded by NoStatePrefetch.
     Recorded when the final response in the chain is received.
-  </summary>
-</histogram>
-
-<histogram name="Prerender.NoStatePrefetchRendererLifetimeExtension" units="ms"
-    expires_after="M77">
-  <owner>jam@chromium.org</owner>
-  <summary>
-    Time a prefetch renderer is kept alive after parsing to wait for
-    subresources to finish loading.
-  </summary>
-</histogram>
-
-<histogram name="Prerender.NoStatePrefetchRendererParseTime" units="ms"
-    expires_after="M81">
-  <owner>jam@chromium.org</owner>
-  <summary>
-    Time between prefetch renderer startup and when parsing is complete.
   </summary>
 </histogram>
 

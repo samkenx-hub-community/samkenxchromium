@@ -579,7 +579,7 @@ const base::FeatureParam<int>
     OmniboxFieldTrial::kFuzzyUrlSuggestionsMinInputLength(
         &omnibox::kOmniboxFuzzyUrlSuggestions,
         "FuzzyUrlSuggestionsMinInputLength",
-        2);
+        3);
 
 // Note about this default, which produces good results for most inputs:
 // Using 10% reasonably took a 1334 relevance match down to 1200,
@@ -1078,6 +1078,10 @@ const base::FeatureParam<bool> kDomainSuggestionsAlternativeScoring(
 
 // ---------------------------------------------------------
 // ML Relevance Scoring ->
+const base::FeatureParam<bool> kMlRelevanceScoringIncreaseNumCandidates(
+    &omnibox::kMlRelevanceScoring,
+    "MlRelevanceScoringIncreaseNumCandidates",
+    false);
 
 MLConfig::MLConfig() {
   log_url_scoring_signals =
@@ -1087,6 +1091,7 @@ MLConfig::MLConfig() {
       /*default_value=*/false);
   ml_relevance_scoring =
       base::FeatureList::IsEnabled(omnibox::kMlRelevanceScoring);
+  increase_num_candidates = kMlRelevanceScoringIncreaseNumCandidates.Get();
   url_scoring_model = base::FeatureList::IsEnabled(omnibox::kUrlScoringModel);
 }
 
@@ -1117,11 +1122,27 @@ bool IsMlRelevanceScoringEnabled() {
   return GetMLConfig().ml_relevance_scoring && IsUrlScoringModelEnabled();
 }
 
+bool IsMlRelevanceScoringIncreaseNumCandidatesEnabled() {
+  return GetMLConfig().increase_num_candidates;
+}
+
 bool IsUrlScoringModelEnabled() {
   return GetMLConfig().url_scoring_model;
 }
 
 // <- ML Relevance Scoring
+// ---------------------------------------------------------
+// Inspire Me ->
+const base::FeatureParam<int> kInspireMeAdditionalRelatedQueries(
+    &omnibox::kInspireMe,
+    "AdditionalRelatedQueries",
+    0);
+
+const base::FeatureParam<int> kInspireMeAdditionalTrendingQueries(
+    &omnibox::kInspireMe,
+    "AdditionalTrendingQueries",
+    0);
+// <- Inspire Me
 // ---------------------------------------------------------
 
 }  // namespace OmniboxFieldTrial

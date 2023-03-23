@@ -14,9 +14,6 @@
 namespace policy {
 namespace features {
 
-// Enable force installed Chrome apps policy migration.
-POLICY_EXPORT BASE_DECLARE_FEATURE(kDefaultChromeAppsMigration);
-
 // Enable reporting Login events to the reporting connector when the Password
 // Manager detects that the user logged in to a web page.
 POLICY_EXPORT BASE_DECLARE_FEATURE(kLoginEventReporting);
@@ -35,8 +32,16 @@ POLICY_EXPORT BASE_DECLARE_FEATURE(
 POLICY_EXPORT BASE_DECLARE_FEATURE(kDmTokenDeletion);
 
 #if BUILDFLAG(IS_ANDROID)
+// Enable comma-separated strings for list policies on Android.
+// Enabled by default, to be used as a kill switch.
+POLICY_EXPORT BASE_DECLARE_FEATURE(
+    kListPoliciesAcceptCommaSeparatedStringsAndroid);
+
 // Enable logging and chrome://policy/logs page on Android.
 POLICY_EXPORT BASE_DECLARE_FEATURE(kPolicyLogsPageAndroid);
+
+// Enable SafeSitesFilterBehavior policy on Android.
+POLICY_EXPORT BASE_DECLARE_FEATURE(kSafeSitesFilterBehaviorPolicyAndroid);
 #endif  // BUILDFLAG(IS_ANDROID)
 
 // Prevent policies set by a single source from being treated as merged.

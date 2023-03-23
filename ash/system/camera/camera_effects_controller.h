@@ -26,6 +26,8 @@ struct VectorIcon;
 
 namespace ash {
 
+enum class VcEffectId;
+
 // CameraEffectsController is the interface for any object in ash to
 // enable/change camera effects.
 class ASH_EXPORT CameraEffectsController : public media::CameraEffectObserver,
@@ -34,13 +36,31 @@ class ASH_EXPORT CameraEffectsController : public media::CameraEffectObserver,
  public:
   // Enum that represents the value persisted  to `prefs::kBackgroundBlur`,
   // which is the "ultimate source of truth" for the background blur setting.
-  enum BackgroundBlurEffectState {
+  // WARNING: This enum and `prefs::kBackgroundBlur` should always be in sync.
+  // Any changes made to this enum or `prefs::kBackgroundBlur` should also be
+  // reflected in the other place.
+  enum BackgroundBlurPrefValue {
     kOff = -1,
     kLowest = 0,
     kLight = 1,
     kMedium = 2,
     kHeavy = 3,
     kMaximum = 4,
+  };
+
+  // This enum contains all the state of the background blur effect. This enum
+  // is used for metrics collection (we cannot use `BackgroundBlurPrefValue`
+  // since `base::UmaHistogramEnumeration` cannot take a negative value for
+  // an enum). Note to keep in sync with enum in
+  // tools/metrics/histograms/enums.xml.
+  enum class BackgroundBlurState {
+    kOff = 0,
+    kLowest = 1,
+    kLight = 2,
+    kMedium = 3,
+    kHeavy = 4,
+    kMaximum = 5,
+    kMaxValue = kMaximum
   };
 
   CameraEffectsController();
@@ -66,9 +86,11 @@ class ASH_EXPORT CameraEffectsController : public media::CameraEffectObserver,
   void OnActiveUserPrefServiceChanged(PrefService* pref_service) override;
 
   // VcEffectsDelegate:
-  absl::optional<int> GetEffectState(int effect_id) override;
-  void OnEffectControlActivated(absl::optional<int> effect_id,
+  absl::optional<int> GetEffectState(VcEffectId effect_id) override;
+  void OnEffectControlActivated(VcEffectId effect_id,
                                 absl::optional<int> state) override;
+  void RecordMetricsForSetValueEffect(VcEffectId effect_id,
+                                      int state_value) const override;
 
   // media::CameraEffectObserver:
   void OnCameraEffectChanged(
@@ -79,12 +101,12 @@ class ASH_EXPORT CameraEffectsController : public media::CameraEffectObserver,
   }
 
  private:
+  // Returns the segmentation model that should be used in the effects pipeline
+  // based on the value of the feature flag.
+  cros::mojom::SegmentationModel GetSegmentationModelType();
+
   // SetCameraEffects camera effects with `config`.
   void SetCameraEffects(cros::mojom::EffectsConfigPtr config);
-
-  // SetInitialCameraEffects tells the camera server what `config`
-  // to use when it first registers.
-  void SetInitialCameraEffects(cros::mojom::EffectsConfigPtr config);
 
   // Constructs EffectsConfigPtr from prefs.
   cros::mojom::EffectsConfigPtr GetEffectsConfigFromPref();

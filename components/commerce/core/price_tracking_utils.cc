@@ -13,6 +13,7 @@
 #include "base/time/time.h"
 #include "components/bookmarks/browser/bookmark_model.h"
 #include "components/bookmarks/browser/bookmark_node.h"
+#include "components/bookmarks/common/bookmark_metrics.h"
 #include "components/commerce/core/pref_names.h"
 #include "components/commerce/core/shopping_service.h"
 #include "components/commerce/core/subscriptions/commerce_subscription.h"
@@ -52,6 +53,11 @@ void UpdateBookmarksForSubscriptionsResult(
       if (!specifics || specifics->product_cluster_id() != cluster_id)
         continue;
 
+      // TODO(b:273526228): Once crrev.com/c/4278641 reaches stable, remove this
+      //                    call -- shopping specifics no longer tracks
+      //                    subscription state.
+      specifics->set_is_price_tracked(enabled);
+
       // Always use the Windows epoch to keep consistency. This also align with
       // how we set the time fields in the bookmark_specifics.proto and in the
       // subscriptions_manager.cc.
@@ -78,7 +84,7 @@ void UpdateBookmarksForSubscriptionsResult(
                                                 std::move(meta));
 
       if (should_delete_node) {
-        model->Remove(node);
+        model->Remove(node, bookmarks::metrics::BookmarkEditSource::kOther);
       }
     }
   }

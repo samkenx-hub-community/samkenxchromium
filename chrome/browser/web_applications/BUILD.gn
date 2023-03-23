@@ -191,16 +191,12 @@ source_set("web_applications") {
     "web_app_command_scheduler.h",
     "web_app_constants.cc",
     "web_app_constants.h",
-    "web_app_data_retriever.cc",
-    "web_app_data_retriever.h",
     "web_app_database.cc",
     "web_app_database.h",
     "web_app_database_factory.cc",
     "web_app_database_factory.h",
     "web_app_helpers.cc",
     "web_app_helpers.h",
-    "web_app_icon_downloader.cc",
-    "web_app_icon_downloader.h",
     "web_app_icon_generator.cc",
     "web_app_icon_generator.h",
     "web_app_icon_manager.cc",
@@ -256,10 +252,14 @@ source_set("web_applications") {
     "web_app_uninstall_and_replace_job.h",
     "web_app_uninstall_job.cc",
     "web_app_uninstall_job.h",
-    "web_app_url_loader.cc",
-    "web_app_url_loader.h",
     "web_app_utils.cc",
     "web_app_utils.h",
+    "web_contents/web_app_data_retriever.cc",
+    "web_contents/web_app_data_retriever.h",
+    "web_contents/web_app_icon_downloader.cc",
+    "web_contents/web_app_icon_downloader.h",
+    "web_contents/web_app_url_loader.cc",
+    "web_contents/web_app_url_loader.h",
   ]
 
   if (is_chromeos) {
@@ -274,6 +274,10 @@ source_set("web_applications") {
       "isolated_web_apps/policy/isolated_web_app_policy_manager.h",
       "os_integration/web_app_run_on_os_login_chromeos.cc",
       "os_integration/web_app_shortcut_chromeos.cc",
+      "preinstalled_web_app_window_experiment.cc",
+      "preinstalled_web_app_window_experiment.h",
+      "preinstalled_web_app_window_experiment_utils.cc",
+      "preinstalled_web_app_window_experiment_utils.h",
       "web_app_run_on_os_login_manager.cc",
       "web_app_run_on_os_login_manager.h",
     ]
@@ -378,6 +382,7 @@ source_set("web_applications") {
     "//components/services/app_service/public/cpp:app_types",
     "//components/services/app_service/public/cpp:app_update",
     "//components/services/app_service/public/cpp:app_url_handling",
+    "//components/services/app_service/public/cpp:preferred_apps",
     "//components/services/app_service/public/cpp:protocol_handling",
     "//components/services/app_service/public/cpp:run_on_os_login",
     "//components/services/app_service/public/cpp:types",
@@ -635,10 +640,8 @@ source_set("web_applications_unit_tests") {
     "test/web_app_test.h",
     "web_app_command_manager_unittest.cc",
     "web_app_command_scheduler_unittest.cc",
-    "web_app_data_retriever_unittest.cc",
     "web_app_database_unittest.cc",
     "web_app_helpers_unittest.cc",
-    "web_app_icon_downloader_unittest.cc",
     "web_app_icon_generator_unittest.cc",
     "web_app_icon_manager_unittest.cc",
     "web_app_install_finalizer_unittest.cc",
@@ -651,8 +654,10 @@ source_set("web_applications_unit_tests") {
     "web_app_translation_manager_unittest.cc",
     "web_app_ui_manager_unittest.cc",
     "web_app_unittest.cc",
-    "web_app_url_loader_unittest.cc",
     "web_app_utils_unittest.cc",
+    "web_contents/web_app_data_retriever_unittest.cc",
+    "web_contents/web_app_icon_downloader_unittest.cc",
+    "web_contents/web_app_url_loader_unittest.cc",
   ]
 
   if (is_win) {
@@ -797,7 +802,7 @@ source_set("web_applications_browser_tests") {
     "web_app_internals_browsertest.cc",
     "web_app_origin_association_manager_browsertest.cc",
     "web_app_pref_migration_browsertest.cc",
-    "web_app_url_loader_browsertest.cc",
+    "web_contents/web_app_url_loader_browsertest.cc",
   ]
 
   if (is_linux) {
@@ -906,4 +911,16 @@ source_set("interactive_ui_tests") {
     "//ui/base/idle:test_support",
     "//ui/events/devices:test_support",
   ]
+
+  if (is_chromeos) {
+    sources += [ "preinstalled_web_app_window_experiment_browsertest.cc" ]
+
+    deps += [
+      "//chrome/browser/apps/app_service",
+      "//chrome/browser/apps/app_service:test_support",
+      "//chrome/browser/web_applications/app_service:test_support",
+      "//components/services/app_service/public/cpp:intents",
+      "//components/services/app_service/public/cpp:preferred_apps",
+    ]
+  }
 }

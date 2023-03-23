@@ -144,9 +144,6 @@ class ChromeContentBrowserClient : public content::ContentBrowserClient {
   // update our I/O thread cache of this value.
   static void SetApplicationLocale(const std::string& locale);
 
-  // Whether DNS prefetching and preconnect are allowed.
-  static bool ShouldPreconnect(content::BrowserContext* browser_context);
-
   // content::ContentBrowserClient:
   std::unique_ptr<content::BrowserMainParts> CreateBrowserMainParts(
       bool is_integration_test) override;
@@ -235,7 +232,6 @@ class ChromeContentBrowserClient : public content::ContentBrowserClient {
       const GURL& current_effective_url,
       const GURL& destination_effective_url) override;
   bool ShouldIsolateErrorPage(bool in_main_frame) override;
-  bool ShouldAssignSiteForURL(const GURL& url) override;
   std::vector<url::Origin> GetOriginsRequiringDedicatedProcess() override;
   bool ShouldEnableStrictSiteIsolation() override;
   bool ShouldDisableSiteIsolation(
@@ -275,6 +271,9 @@ class ChromeContentBrowserClient : public content::ContentBrowserClient {
       const absl::optional<url::Origin>& top_frame_origin,
       const GURL& script_url,
       content::BrowserContext* context) override;
+  bool MayDeleteServiceWorkerRegistration(
+      const GURL& scope,
+      content::BrowserContext* browser_context) override;
   void UpdateEnabledBlinkRuntimeFeaturesInIsolatedWorker(
       content::BrowserContext* context,
       const GURL& script_url,
@@ -352,7 +351,10 @@ class ChromeContentBrowserClient : public content::ContentBrowserClient {
   GetSystemSharedURLLoaderFactory() override;
   network::mojom::NetworkContext* GetSystemNetworkContext() override;
   std::string GetGeolocationApiKey() override;
+
+#if BUILDFLAG(IS_MAC)
   device::GeolocationManager* GetGeolocationManager() override;
+#endif
 
 #if BUILDFLAG(IS_ANDROID)
   bool ShouldUseGmsCoreGeolocationProvider() override;
@@ -783,7 +785,7 @@ class ChromeContentBrowserClient : public content::ContentBrowserClient {
       const GURL& url) override;
   bool ShouldServiceWorkerInheritPolicyContainerFromCreator(
       const GURL& url) override;
-  bool ShouldAllowInsecurePrivateNetworkRequests(
+  bool ShouldAllowInsecureLocalNetworkRequests(
       content::BrowserContext* browser_context,
       const url::Origin& origin) override;
   bool IsJitDisabledForSite(content::BrowserContext* browser_context,
@@ -863,7 +865,13 @@ class ChromeContentBrowserClient : public content::ContentBrowserClient {
       content::BrowserContext* browser_context) override;
 
   bool IsThirdPartyStoragePartitioningAllowed(
-      content::BrowserContext* browser_context) override;
+      content::BrowserContext* browser_context,
+      const url::Origin& top_level_origin) override;
+
+  bool IsTransientActivationRequiredForShowFileOrDirectoryPicker(
+      content::WebContents* web_contents) override;
+
+  bool ShouldUseFirstPartyStorageKey(const url::Origin& origin) override;
 
  protected:
   static bool HandleWebUI(GURL* url, content::BrowserContext* browser_context);

@@ -7,6 +7,7 @@
 #import "base/feature_list.h"
 #import "base/metrics/field_trial_params.h"
 #import "base/metrics/histogram_functions.h"
+#import "base/metrics/histogram_macros.h"
 #import "base/metrics/user_metrics.h"
 #import "base/metrics/user_metrics_action.h"
 #import "base/time/time.h"
@@ -81,6 +82,7 @@
 #import "ios/chrome/browser/ui/ntp/incognito/incognito_view_controller.h"
 #import "ios/chrome/browser/ui/ntp/metrics/feed_metrics_constants.h"
 #import "ios/chrome/browser/ui/ntp/metrics/feed_metrics_recorder.h"
+#import "ios/chrome/browser/ui/ntp/new_tab_page_component_factory_protocol.h"
 #import "ios/chrome/browser/ui/ntp/new_tab_page_content_delegate.h"
 #import "ios/chrome/browser/ui/ntp/new_tab_page_coordinator+private.h"
 #import "ios/chrome/browser/ui/ntp/new_tab_page_delegate.h"
@@ -248,6 +250,11 @@ bool IsNTPActiveForWebState(web::WebState* web_state) {
 // Returns `YES` if the coordinator is started.
 @property(nonatomic, assign) BOOL started;
 
+// Contains a factory which can generate NTP components which are initialized
+// on `start`.
+@property(nonatomic, strong) id<NewTabPageComponentFactoryProtocol>
+    componentFactory;
+
 @end
 
 @implementation NewTabPageCoordinator
@@ -258,10 +265,13 @@ bool IsNTPActiveForWebState(web::WebState* web_state) {
 
 #pragma mark - ChromeCoordinator
 
-- (instancetype)initWithBrowser:(Browser*)browser {
+- (instancetype)initWithBrowser:(Browser*)browser
+               componentFactory:
+                   (id<NewTabPageComponentFactoryProtocol>)componentFactory {
   DCHECK(browser);
   self = [super initWithBaseViewController:nil browser:browser];
   if (self) {
+    _componentFactory = componentFactory;
     _containerViewController = [[UIViewController alloc] init];
   }
   return self;
@@ -382,7 +392,6 @@ bool IsNTPActiveForWebState(web::WebState* web_state) {
   self.NTPViewController = nil;
   self.feedHeaderViewController.ntpDelegate = nil;
   self.feedHeaderViewController = nil;
-  self.feedTopSectionCoordinator.ntpDelegate = nil;
   [self.feedTopSectionCoordinator stop];
   self.feedTopSectionCoordinator = nil;
 
@@ -453,7 +462,7 @@ bool IsNTPActiveForWebState(web::WebState* web_state) {
 }
 
 - (void)focusFakebox {
-  [self.NTPViewController focusFakebox];
+  [self.NTPViewController focusOmnibox];
 }
 
 - (void)reload {
@@ -587,25 +596,19 @@ bool IsNTPActiveForWebState(web::WebState* web_state) {
 
 // Creates all the NTP components.
 - (void)initializeNTPComponents {
-  self.NTPViewController = [[NewTabPageViewController alloc] init];
-  self.headerController = [[ContentSuggestionsHeaderViewController alloc] init];
-  self.NTPMediator = [[NewTabPageMediator alloc]
-              initWithWebState:self.webState
-            templateURLService:self.templateURLService
-                     URLLoader:UrlLoadingBrowserAgent::FromBrowser(self.browser)
-                   authService:self.authService
-               identityManager:IdentityManagerFactory::GetForBrowserState(
-                                   self.browser->GetBrowserState())
-         accountManagerService:ChromeAccountManagerServiceFactory::
-                                   GetForBrowserState(
-                                       self.browser->GetBrowserState())
-                    logoVendor:ios::provider::CreateLogoVendor(self.browser,
-                                                               self.webState)
-      identityDiscImageUpdater:self.headerController];
-  self.contentSuggestionsCoordinator = [[ContentSuggestionsCoordinator alloc]
-      initWithBaseViewController:nil
-                         browser:self.browser];
-  self.feedMetricsRecorder = self.discoverFeedService->GetFeedMetricsRecorder();
+  Browser* browser = self.browser;
+  id<NewTabPageComponentFactoryProtocol> componentFactory =
+      self.componentFactory;
+  self.NTPViewController = [componentFactory NTPViewController];
+  self.headerController = [componentFactory headerController];
+  self.NTPMediator =
+      [componentFactory NTPMediatorForBrowser:browser
+                                     webState:self.webState
+                     identityDiscImageUpdater:self.headerController];
+  self.contentSuggestionsCoordinator =
+      [componentFactory contentSuggestionsCoordinatorForBrowser:browser];
+  self.feedMetricsRecorder =
+      [componentFactory feedMetricsRecorderForBrowser:browser];
 }
 
 #pragma mark - Configurators
@@ -651,8 +654,8 @@ bool IsNTPActiveForWebState(web::WebState* web_state) {
   // TODO(crbug.com/1045047): Use HandlerForProtocol after commands protocol
   // clean up.
   self.headerController.dispatcher =
-      static_cast<id<ApplicationCommands, BrowserCommands, OmniboxCommands,
-                     FakeboxFocuser, LensCommands>>(
+      static_cast<id<ApplicationCommands, BrowserCoordinatorCommands,
+                     OmniboxCommands, FakeboxFocuser, LensCommands>>(
           self.browser->GetCommandDispatcher());
   self.headerController.commandHandler = self;
   self.headerController.delegate = self.NTPViewController;
@@ -660,15 +663,10 @@ bool IsNTPActiveForWebState(web::WebState* web_state) {
       LayoutGuideCenterForBrowser(self.browser);
   self.headerController.toolbarDelegate = self.toolbarDelegate;
   self.headerController.baseViewController = self.baseViewController;
-  if (NewTabPageTabHelper::FromWebState(self.webState)
-          ->ShouldShowStartSurface()) {
-    self.headerController.isStartShowing = YES;
-  }
 }
 
 // Configures `self.contentSuggestionsCoordiantor`.
 - (void)configureContentSuggestionsCoordinator {
-  DCHECK(self.contentSuggestionsCoordinator);
   self.contentSuggestionsCoordinator.webState = self.webState;
   self.contentSuggestionsCoordinator.ntpDelegate = self;
   self.contentSuggestionsCoordinator.feedDelegate = self;
@@ -679,7 +677,6 @@ bool IsNTPActiveForWebState(web::WebState* web_state) {
 - (void)configureNTPMediator {
   NewTabPageMediator* NTPMediator = self.NTPMediator;
   DCHECK(NTPMediator);
-  DCHECK(self.contentSuggestionsCoordinator.contentSuggestionsMediator);
   NTPMediator.browser = self.browser;
   NTPMediator.feedControlDelegate = self;
   NTPMediator.contentSuggestionsHeaderConsumer = self.headerController;
@@ -774,6 +771,18 @@ bool IsNTPActiveForWebState(web::WebState* web_state) {
 
 - (void)updateForHeaderSizeChange {
   [self.NTPViewController updateHeightAboveFeedAndScrollToTopIfNeeded];
+}
+
+- (void)fakeboxTapped {
+  if (NewTabPageTabHelper::FromWebState(self.webState)
+          ->ShouldShowStartSurface()) {
+    UMA_HISTOGRAM_ENUMERATION("IOS.ContentSuggestions.ActionOnStartSurface",
+                              IOSContentSuggestionsActionType::kFakebox);
+  } else {
+    UMA_HISTOGRAM_ENUMERATION("IOS.ContentSuggestions.ActionOnNTP",
+                              IOSContentSuggestionsActionType::kFakebox);
+  }
+  [self focusFakebox];
 }
 
 - (void)identityDiscWasTapped {
@@ -1108,7 +1117,14 @@ bool IsNTPActiveForWebState(web::WebState* web_state) {
 }
 
 - (BOOL)isStartSurface {
-  DCHECK(self.webState);
+  // TODO(crbug.com/1425382): This condition should be removed once the issue of
+  // having this coordinator started with no valid webstate (e.g. visible NTP in
+  // non-active tab) is resolved. At that point, we should just leave the
+  // `self.webState` DCHECK.
+  if (!self.webState) {
+    DCHECK(NO);
+    return NO;
+  }
   NewTabPageTabHelper* NTPHelper =
       NewTabPageTabHelper::FromWebState(self.webState);
   return NTPHelper && NTPHelper->ShouldShowStartSurface();
@@ -1342,12 +1358,8 @@ bool IsNTPActiveForWebState(web::WebState* web_state) {
 }
 
 - (void)updateStartForVisibilityChange:(BOOL)visible {
-  if (visible && self.started &&
-      NewTabPageTabHelper::FromWebState(self.webState)
-          ->ShouldShowStartSurface()) {
-    // Start is being shown on an existing NTP, so configure it
-    // appropriately.
-    self.headerController.isStartShowing = YES;
+  if (visible && NewTabPageTabHelper::FromWebState(self.webState)
+                     ->ShouldShowStartSurface()) {
     [self.contentSuggestionsCoordinator configureStartSurfaceIfNeeded];
   }
   if (!visible && NewTabPageTabHelper::FromWebState(self.webState)
@@ -1356,7 +1368,6 @@ bool IsNTPActiveForWebState(web::WebState* web_state) {
     // since it should not show Start after disappearing.
     NewTabPageTabHelper::FromWebState(self.webState)
         ->SetShowStartSurface(false);
-    self.headerController.isStartShowing = NO;
   }
 }
 
@@ -1643,10 +1654,8 @@ bool IsNTPActiveForWebState(web::WebState* web_state) {
     // Check if feed is visible before reporting NTP visibility as the feed
     // needs to be visible in order to use for metrics.
     // TODO(crbug.com/1373650) Move isFeedVisible check to the metrics recorder
-    if (IsGoodVisitsMetricEnabled()) {
-      if ([self isFeedVisible]) {
-        [self.feedMetricsRecorder recordNTPDidChangeVisibility:visible];
-      }
+    if ([self isFeedVisible]) {
+      [self.feedMetricsRecorder recordNTPDidChangeVisibility:visible];
     }
   }
 

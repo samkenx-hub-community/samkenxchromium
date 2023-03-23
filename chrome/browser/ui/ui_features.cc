@@ -51,7 +51,7 @@ BASE_FEATURE(kChromeWhatsNewUI,
 // Create new Extensions app menu option (removing "More Tools -> Extensions")
 // with submenu to manage extensions and visit chrome web store.
 BASE_FEATURE(kExtensionsMenuInAppMenu,
-             "kExtensionsMenuInAppMenu",
+             "ExtensionsMenuInAppMenu",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 #if !defined(ANDROID)
@@ -83,12 +83,6 @@ BASE_FEATURE(kLightweightExtensionOverrideConfirmations,
 // Enables Bookmarks++ Side Panel UI.
 BASE_FEATURE(kPowerBookmarksSidePanel,
              "PowerBookmarksSidePanel",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-
-// Enables a more prominent active tab title in dark mode to aid with
-// accessibility.
-BASE_FEATURE(kProminentDarkModeActiveTabTitle,
-             "ProminentDarkModeActiveTabTitle",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Enables the QuickCommands UI surface. See https://crbug.com/1014639
@@ -126,9 +120,6 @@ BASE_FEATURE(kSidePanelJourneysQueryless,
              "SidePanelJourneysQueryless",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-BASE_FEATURE(kSidePanelSearchCompanion,
-             "SidePanelSearchCompanion",
-             base::FEATURE_DISABLED_BY_DEFAULT);
 #if !defined(ANDROID)
 // This differs from the search companion by providing a separate WebUI that
 // contains untrusted content in an iframe.
@@ -167,7 +158,9 @@ const char kScrollableTabStripOverflowModeName[] = "tabScrollOverflow";
 
 // Splits pinned and unpinned tabs into separate TabStrips.
 // https://crbug.com/1346019
-BASE_FEATURE(kSplitTabStrip, "SplitTabStrip", base::FEATURE_ENABLED_BY_DEFAULT);
+BASE_FEATURE(kSplitTabStrip,
+             "SplitTabStrip",
+             base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Enables tabs to be frozen when collapsed.
 // https://crbug.com/1110108
@@ -188,8 +181,12 @@ BASE_FEATURE(kTabGroupsNewBadgePromo,
 BASE_FEATURE(kTabGroupsSave,
              "TabGroupsSave",
              base::FEATURE_DISABLED_BY_DEFAULT);
-const base::FeatureParam<bool> kTabGroupsSaveSyncIntegration{
-    &kTabGroupsSave, "TabGroupsSaveSyncIntegration", false};
+
+// Enables users to explicitly save and recall tab groups.
+// https://crbug.com/1223929
+BASE_FEATURE(kTabGroupsSaveSyncIntegration,
+             "TabGroupsSaveSyncIntegration",
+             base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Enables preview images in tab-hover cards.
 // https://crbug.com/928954

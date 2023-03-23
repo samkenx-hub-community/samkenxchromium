@@ -283,6 +283,7 @@ Privātā stāvokļa pilnvaras uzlabo konfidencialitāti tīmeklī. Tās nevar i
 <translation id="2581165646603367611">Tādējādi tiks dzēsti sīkfaili, kešatmiņa un citi vietņu dati, kas pārlūkā Chrome netiek uzskatīti par svarīgiem.</translation>
 <translation id="2587052924345400782">Pieejama jaunāka versija</translation>
 <translation id="2593272815202181319">Vienplatuma</translation>
+<translation id="2603212228005142861">Pierakstieties, lai pārvaldītu preferences</translation>
 <translation id="2604446170045642109">Savos iestatījumos varat izslēgt tumšo motīvu vietnēm.</translation>
 <translation id="2612676031748830579">Kartes numurs</translation>
 <translation id="2625189173221582860">Parole ir nokopēta.</translation>
@@ -476,6 +477,7 @@ Privātā stāvokļa pilnvaras uzlabo konfidencialitāti tīmeklī. Tās nevar i
 <translation id="3587596251841506391">Palīdzēt uzlabot drošību tīmeklī</translation>
 <translation id="3597179440835065298">Iegūstiet labākus ieteikumus</translation>
 <translation id="3602290021589620013">Priekšskatīt</translation>
+<translation id="360901359071773787">Vai dzēst pēdējo 15 minūšu laikā uzkrātos datus?</translation>
 <translation id="3616113530831147358">Audio</translation>
 <translation id="3622349720008044802">Logu pārvaldība</translation>
 <translation id="3631987586758005671">Notiek kopīgošana ar ierīci <ph name="DEVICE_NAME" /></translation>
@@ -630,6 +632,7 @@ Privātā stāvokļa pilnvaras uzlabo konfidencialitāti tīmeklī. Tās nevar i
 
 Jūsu Google kontam vietnē <ph name="BEGIN_LINK" />myactivity.google.com<ph name="END_LINK" /> var būt citu veidu pārlūkošanas vēstures dati, piemēram, meklēšanas vaicājumi un darbības citos Google pakalpojumos.</translation>
 <translation id="452750746583162491">Pārskatīt sinhronizētos datus</translation>
+<translation id="4528638190900283934">Pierakstieties, lai piekļūtu papildu funkcijām</translation>
 <translation id="4532845899244822526">Mapes izvēlēšanās</translation>
 <translation id="4547551584605870320">{TAB_COUNT,plural, =1{<ph name="TAB_COUNT_ONE" /> cilne}zero{<ph name="TAB_COUNT_MANY" /> ciļņu, <ph name="TAB_COUNT_INCOGNITO" /> inkognito}one{<ph name="TAB_COUNT_MANY" /> cilne, <ph name="TAB_COUNT_INCOGNITO" /> inkognito}other{<ph name="TAB_COUNT_MANY" /> cilnes, <ph name="TAB_COUNT_INCOGNITO" /> inkognito}}</translation>
 <translation id="4554077758708533499">Pievienots ar USB vadu</translation>
@@ -820,6 +823,7 @@ Lai mainītu šo iestatījumu, <ph name="BEGIN_LINK" />atiestatiet sinhronizāci
 <translation id="5517095782334947753">Ir pieejamas grāmatzīmes, vēsture, paroles un citi iestatījumi no konta <ph name="FROM_ACCOUNT" />.</translation>
 <translation id="5524761631371622910">Ja izmēģināšana ir ieslēgta un jūs esat iesaistīts aktīvā izmēģinājumā pārlūkā Chrome, jūsu pārlūkošanas vēsture ietekmē to, kādas reklāmas jums tiek rādītas, un tālāk redzamās aptuveni noteiktās intereses. Lai aizsargātu jūsu konfidencialitāti, Chrome katru mēnesi pakāpeniski dzēš jūsu intereses.</translation>
 <translation id="5524843473235508879">Novirzīšana ir bloķēta.</translation>
+<translation id="554297709083131118">Tiks dzēsti tālāk norādītie pēdējo 15 minūšu laikā uzkrātie dati</translation>
 <translation id="5548606607480005320">Drošības pārbaude</translation>
 <translation id="5555525474779371165">Drošas pārlūkošanas aizsardzības opciju izvēle</translation>
 <translation id="5556459405103347317">Pārlādēt</translation>
@@ -1074,6 +1078,7 @@ Piemēram, dažas vietnes, reaģējot uz šo pieprasījumu, var rādīt jums rek
 <translation id="6824899148643461612"><ph name="TAB_TITLE" />, cilne, atlasīta</translation>
 <translation id="6828070228333235514">Apturēt cenas izsekošanu</translation>
 <translation id="6830728435402077660">Nav droši</translation>
+<translation id="6831043979455480757">Tulkot</translation>
 <translation id="6833996806551876956">Privacy Sandbox izmēģinājuma periods</translation>
 <translation id="6836206421467243968">Atjaunot ciļņu grupu <ph name="TITLE_OF_GROUP" /> kā jaunu fona ciļņu grupu.</translation>
 <translation id="6846298663435243399">Notiek ielāde…</translation>
@@ -1241,10 +1246,10 @@ Piemēram, dažas vietnes, reaģējot uz šo pieprasījumu, var rādīt jums rek
 <translation id="7707922173985738739">Izmantot mobilos datus</translation>
 <translation id="7709094866268987903">Šeit būs redzamas jūsu noņemtās intereses.</translation>
 <translation id="7709918231054955894">Iegūstiet visas savas cilnes</translation>
+<translation id="772434085369393266">Navigācijai izmantot HTTPS un brīdināt pirms tādu vietņu ielādes, kas to neatbalsta. Jūs nevarat mainīt šo iestatījumu, jo esat iespējojis papildu aizsardzību.</translation>
 <translation id="7725024127233776428">Šeit tiek rādītas ar grāmatzīmēm atzīmētās lapas</translation>
 <translation id="7757787379047923882">Kopīgots teksts no ierīces <ph name="DEVICE_NAME" /></translation>
 <translation id="7762668264895820836">SD karte <ph name="SD_CARD_NUMBER" /></translation>
-<translation id="7762928140712606393">Pierakstieties, lai izmantotu papildu funkcijas un Chrome drošības risinājumus</translation>
 <translation id="7764225426217299476">Pievienot adresi</translation>
 <translation id="7772032839648071052">Apstipriniet ieejas frāzi</translation>
 <translation id="7772375229873196092">Aizvērt <ph name="APP_NAME" /></translation>
@@ -1260,6 +1265,7 @@ Piemēram, dažas vietnes, reaģējot uz šo pieprasījumu, var rādīt jums rek
 <translation id="78270725016672455">Lai varētu pierakstīties vietnē, datorā tiek pieprasīta atļauja reģistrēt šo ierīci</translation>
 <translation id="7844171778363018843">Sinhronizēšanai nav atlasīti dati.</translation>
 <translation id="7846296061357476882">Google pakalpojumi</translation>
+<translation id="7847228556075070294">Vēsture, sīkfaili un citi dati ir izdzēsti.</translation>
 <translation id="784934925303690534">Laika periods</translation>
 <translation id="7851858861565204677">Citas ierīces</translation>
 <translation id="7853202427316060426">Aktivitāte</translation>
