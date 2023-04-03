@@ -274,6 +274,7 @@
 <translation id="3456078764689556234">Ispisane stranice: <ph name="PRINTED_PAGES" /> od <ph name="TOTAL_PAGES" />.</translation>
 <translation id="345898999683440380">Skeniranje stranice <ph name="PAGE_NUM" />. Dovršeno je <ph name="PERCENTAGE_VALUE" />%.</translation>
 <translation id="3459509316159669723">Ispis</translation>
+<translation id="346423161771747987">Struja</translation>
 <translation id="346539236881580388">Snimi ponovo</translation>
 <translation id="3484914941826596830">Dok se oprema ažurira, nemojte iskopčavati ovaj vanjski uređaj niti isključivati računalo. Ovaj prozor možete minimizirati. Ažuriranje može potrajati nekoliko minuta i vaš vanjski uređaj tada možda neće funkcionirati.</translation>
 <translation id="3486220673238053218">definicija</translation>
@@ -697,6 +698,7 @@
 <translation id="7103252855940681301">Uređaj <ph name="INDEX" /> od <ph name="COUNT" /> pod nazivom <ph name="NAME" />.</translation>
 <translation id="7108668606237948702">enter</translation>
 <translation id="7130438335435247835">Pristupna točka (APN)</translation>
+<translation id="7131634559772719176">Potvrda unaprijed definirane postavke</translation>
 <translation id="7134436342991564651">{0,plural, =1{Poslužitelj naziva}one{Poslužitelji naziva}few{Poslužitelji naziva}other{Poslužitelji naziva}}</translation>
 <translation id="7143207342074048698">Povezivanje</translation>
 <translation id="7144878232160441200">Pokušaj ponovno</translation>
@@ -759,6 +761,7 @@
 <translation id="7656388927906093505">Uređaj je miš.</translation>
 <translation id="7658239707568436148">Odustani</translation>
 <translation id="7665800271478495366">Promjena avatara</translation>
+<translation id="7675241868020048622">Aurora (Plus ekskluzivno)</translation>
 <translation id="7690294790491645610">Potvrdite novu zaporku</translation>
 <translation id="7701040980221191251">Nema ih</translation>
 <translation id="7705524343798198388">VPN</translation>
@@ -768,6 +771,7 @@
 <translation id="7762130827864645708">Promjena zaporke je uspjela. Od sad upotrebljavajte novu zaporku.</translation>
 <translation id="7763470514545477072">Podudaranje domenskog nastavka</translation>
 <translation id="7769672763586021400">ID modela</translation>
+<translation id="7770834998503326261">Dodatne informacije u vezi s vašim odabirom</translation>
 <translation id="7778717409420828014">Vaše povratne informacije pomažu nam da poboljšamo doživljaj Chromebooka i pregledat će ih naš tim. Zbog velikog broja izvješća nećemo moći poslati odgovor.</translation>
 <translation id="7784116172884276937">Nije postavljen nijedan DNS poslužitelj</translation>
 <translation id="7791543448312431591">Dodavanje</translation>
@@ -800,6 +804,7 @@
 <translation id="80398733265834479">Omogućite način automatske boje</translation>
 <translation id="8041089156583427627">Slanje povratnih informacija</translation>
 <translation id="8045012663542226664">Mikrofon isključen</translation>
+<translation id="8050091914317269817">Ako odaberete tu pozadinu, uključit ćete automatski tamni način rada i podudaranje boje pozadine.</translation>
 <translation id="8075838845814659848">Preostala razina napunjenosti</translation>
 <translation id="8076492880354921740">Kartice</translation>
 <translation id="8082366717211101304">Razrješavanje DNS-a iz Android aplikacija nije uspjelo</translation>

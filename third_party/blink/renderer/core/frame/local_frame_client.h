@@ -143,7 +143,6 @@ class CORE_EXPORT LocalFrameClient : public FrameClient {
 
   virtual void DispatchDidHandleOnloadEvents() = 0;
   virtual void DidFinishSameDocumentNavigation(
-      HistoryItem*,
       WebHistoryCommitType,
       bool is_synchronously_committed,
       mojom::blink::SameDocumentNavigationType,
@@ -188,7 +187,8 @@ class CORE_EXPORT LocalFrameClient : public FrameClient {
       std::unique_ptr<SourceLocation> source_location,
       mojo::PendingRemote<mojom::blink::PolicyContainerHostKeepAliveHandle>
           initiator_policy_container_handle,
-      bool is_container_initiated) = 0;
+      bool is_container_initiated,
+      bool is_fullscreen_requested) = 0;
 
   virtual void DispatchWillSendSubmitEvent(HTMLFormElement*) = 0;
 

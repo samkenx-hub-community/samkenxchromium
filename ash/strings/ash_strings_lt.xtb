@@ -40,6 +40,7 @@ Jei norite pradėti, pabandykite atlikti nurodytus veiksmus.</translation>
 <translation id="1181037720776840403">Pašalinti</translation>
 <translation id="1182225749592316782">Suteikiama prieiga visoms programoms ir svetainėms, turinčioms fotoaparato ir mikrofono leidimus</translation>
 <translation id="1183863904939664422">Šis pasiūlymas nedomina</translation>
+<translation id="1184126796192815024">Šis tinklas nepalaiko srautinio perdavimo programų iš telefono. Pabandykite naudoti telefono viešosios interneto prieigos tašką. <ph name="LEARN_MORE" /></translation>
 <translation id="118437560755358292">Norėdami užtikrinti patikimesnę apsaugą, įveskite slaptažodį arba PIN kodą</translation>
 <translation id="118532027333893379">Palieskite bet kur, kad būtų užfiksuotas visas ekranas</translation>
 <translation id="1190609913194133056">Pranešimų centras</translation>
@@ -219,6 +220,7 @@ Jei norite pradėti, pabandykite atlikti nurodytus veiksmus.</translation>
 <translation id="1969011864782743497"><ph name="DEVICE_NAME" /> (USB)</translation>
 <translation id="1972950159383891558">Sveiki, <ph name="USERNAME" />!</translation>
 <translation id="1978498689038657292">Teksto įvestis</translation>
+<translation id="1980808257969311265">Prisijungti prie: <ph name="EVENT_SUMMARY" /></translation>
 <translation id="1982717156487272186">Rodyti ankstesnę savaitę</translation>
 <translation id="1989113344093894667">Negalima užfiksuoti turinio</translation>
 <translation id="1990046457226896323">Kalbos failai atsisiųsti</translation>
@@ -573,6 +575,7 @@ Jei norite pradėti, pabandykite atlikti nurodytus veiksmus.</translation>
 <translation id="3659814201068740063">Liko apie <ph name="TIME_LEFT" /> (<ph name="PERCENTAGE" /> proc.).
 Prijunkite įrenginį prie maitinimo šaltinio.</translation>
 <translation id="366222428570480733"><ph name="USER_EMAIL_ADDRESS" /> tvarkomas naudotojas</translation>
+<translation id="3666266999138159418">Perbraukite, kad paslėptumėte slankųjį langą</translation>
 <translation id="367531336287639526">Pasirinkti pirmą piktogramą adreso juostos kairėje</translation>
 <translation id="3679827876008292680">Eiti į paskutinį skirtuką lange</translation>
 <translation id="36813544980941320">„Wi-Fi“ tinklai bus bendrinami telefone ir „<ph name="DEVICE_NAME" />“ įrenginyje</translation>
@@ -621,7 +624,6 @@ Prijunkite įrenginį prie maitinimo šaltinio.</translation>
 <translation id="3925540965556789199"><ph name="DATE" />, įkeliami įvykiai.</translation>
 <translation id="3932043219784172185">Nėra susieto įrenginio</translation>
 <translation id="3934456833412894880">Prisitaikantis įkrovimas įjungtas. Bus palaikomas 80 proc. akumuliatoriaus įkrovos lygis siekiant pailginti akumuliatoriaus veikimo laiką, o prireikus jis bus visiškai įkrautas.</translation>
-<translation id="3936620957945677513">Spustelėkite „Enter“, kad prisijungtumėte prie įvykio „<ph name="EVENT_SUMMARY" />“</translation>
 <translation id="3943857333388298514">Įklijuoti</translation>
 <translation id="394485226368336402">Garso nustatymai</translation>
 <translation id="3945319193631853098">Palieskite, kad baigtumėte sąranką</translation>
@@ -1252,6 +1254,7 @@ Naujas įdiegimas</translation>
 <translation id="685782768769951078">{NUM_DIGITS,plural, =1{Liko vienas skaitmuo}one{Liko # skaitmuo}few{Liko # skaitmenys}many{Liko # skaitmens}other{Liko # skaitmenų}}</translation>
 <translation id="6867938213751067702">Failo <ph name="FILENAME" /> atsisiuntimas pristabdytas</translation>
 <translation id="6878400149835617132">Spartusis klavišas išjungtas</translation>
+<translation id="6878701771800702153">{NUM_APPS,plural, =1{1 programa}one{# programa}few{# programos}many{# programos}other{# programų}}</translation>
 <translation id="6884665277231944629">Grįžti į šiandieną</translation>
 <translation id="6886172995547742638">Gali sumažėti „<ph name="DEVICE_TYPE" />“ įrenginio našumas. Naudokite sertifikuotą <ph name="PREFERRED_MINIMUM_POWER" /> W ar didesnės galios USB-C maitinimo adapterį.</translation>
 <translation id="688631446150864480">Norėdami perjungti langus, paspauskite rodyklę žemyn</translation>
@@ -1419,6 +1422,7 @@ Jei norite išjungti įrenginį, dar kartą paspauskite ir palaikykite įrengini
 <translation id="7689817529363080918">Tai leis pasiekti mikrofoną programoms „<ph name="APP1_NAME" />“, „<ph name="APP2_NAME" />“ ir visoms programoms bei svetainėms, turinčioms mikrofono leidimą</translation>
 <translation id="7704000866383261579">Grąžinti paskutinį veiksmą</translation>
 <translation id="7705524343798198388">VPN</translation>
+<translation id="770741401784017797">Kuriamas GIF</translation>
 <translation id="7714767791242455379">Pridėti naują mobiliojo ryšio tinklą</translation>
 <translation id="7720400844887872976">Įjungta iki <ph name="TIME" /></translation>
 <translation id="7720410380936703141">BANDYKITE DAR KARTĄ</translation>
@@ -1431,6 +1435,7 @@ Jei norite išjungti įrenginį, dar kartą paspauskite ir palaikykite įrengini
 <translation id="7749443890790263709">Pasiektas didžiausias pultų skaičius.</translation>
 <translation id="776344839111254542">Spustelėkite ir peržiūrėkite išsamią atnaujinimo informaciją</translation>
 <translation id="7768784765476638775">Teksto ištarimas</translation>
+<translation id="7769299611924763557">GIF elementas bus netrukus paruoštas</translation>
 <translation id="7780094051999721182">sparčiųjų klavišų</translation>
 <translation id="7780159184141939021">Ekrano pasukimas</translation>
 <translation id="7796735576426975947">Nauji pranešimai paslėpti</translation>

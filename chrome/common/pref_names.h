@@ -32,6 +32,8 @@ extern const char kDisableScreenshots[];
 extern const char kDownloadRestrictions[];
 extern const char kDownloadBubbleEnabled[];
 extern const char kDownloadBubbleIphSuppression[];
+extern const char kDownloadBubblePartialViewEnabled[];
+extern const char kDownloadBubblePartialViewImpressions[];
 extern const char kDownloadDuplicateFilePromptEnabled[];
 extern const char kForceEphemeralProfiles[];
 extern const char kHomePageIsNewTabPage[];
@@ -427,7 +429,6 @@ extern const char kProfileUsingDefaultName[];
 extern const char kProfileName[];
 extern const char kProfileUsingDefaultAvatar[];
 extern const char kProfileUsingGAIAAvatar[];
-extern const char kSupervisedUserId[];
 
 extern const char kInvertNotificationShown[];
 
@@ -853,6 +854,7 @@ extern const char kH2ClientCertCoalescingHosts[];
 extern const char kHSTSPolicyBypassList[];
 extern const char kCECPQ2Enabled[];
 extern const char kEncryptedClientHelloEnabled[];
+extern const char kInsecureHashesInTLSHandshakesEnabled[];
 
 extern const char kBuiltInDnsClientEnabled[];
 extern const char kDnsOverHttpsMode[];

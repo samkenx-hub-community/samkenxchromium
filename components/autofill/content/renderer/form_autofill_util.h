@@ -183,7 +183,7 @@ bool IsTextAreaElement(const blink::WebFormControlElement& element);
 bool IsTextAreaElementOrTextInput(const blink::WebFormControlElement& element);
 
 // Returns true if |element| is a checkbox or a radio button element.
-bool IsCheckableElement(const blink::WebInputElement& element);
+bool IsCheckableElement(const blink::WebFormControlElement& element);
 
 // Returns true if |element| is one of the input element types that can be
 // autofilled. {Text, Radiobutton, Checkbox}.
@@ -192,6 +192,9 @@ bool IsAutofillableInputElement(const blink::WebInputElement& element);
 // Returns true if |element| is one of the element types that can be autofilled.
 // {Text, Radiobutton, Checkbox, Select, TextArea}.
 bool IsAutofillableElement(const blink::WebFormControlElement& element);
+
+// Returns true if |element| can be edited (enabled and not read only).
+bool IsElementEditable(const blink::WebInputElement& element);
 
 // True if this node can take focus. If the layout is blocked, then the function
 // checks if the element takes up space in the layout, i.e., this element or a

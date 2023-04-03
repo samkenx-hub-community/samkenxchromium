@@ -22,6 +22,7 @@
 <translation id="1399397803214730675">Máy tính này đã có phiên bản Google Chrome mới hơn. Nếu phần mềm hiện không hoạt động, vui lòng gỡ cài đặt Google Chrome và thử lại.</translation>
 <translation id="139993653570221430">Bạn có thể thay đổi quyết định bất cứ lúc nào trong phần cài đặt trên Chrome. Chương trình dùng thử diễn ra đồng thời với cách phân phát quảng cáo hiện hành, nên bạn sẽ không thấy thay đổi ngay lập tức.</translation>
 <translation id="1434626383986940139">Ứng dụng Chrome Canary</translation>
+<translation id="1496905273983707119">{NUM_DEVICES,plural, =0{Google Chrome hiện không được kết nối với một thiết bị HID}=1{Google Chrome đang được kết nối với một thiết bị HID}other{Google Chrome đang được kết nối với nhiều thiết bị HID}}</translation>
 <translation id="1507198376417198979">Tùy chỉnh hồ sơ mới của bạn trên Chrome</translation>
 <translation id="1516530951338665275">Google Chrome cần có quyền truy cập Bluetooth để tiếp tục 
  ghép nối. <ph name="IDS_BLUETOOTH_DEVICE_CHOOSER_AUTHORIZE_BLUETOOTH_LINK" /></translation>
@@ -124,7 +125,6 @@
 <translation id="3140883423282498090">Thay đổi của bạn sẽ có hiệu lực vào lần tiếp theo bạn chạy lại Google Chrome.</translation>
 <translation id="3149510190863420837">Ứng dụng Chrome</translation>
 <translation id="3169523567916669830">Trong thời gian thử nghiệm, bạn có thể xem và xoá những chủ đề quan tâm mà các trang web dựa vào để hiện quảng cáo cho bạn. Chrome ước đoán các mối quan tâm của bạn dựa trên nhật ký duyệt web gần đây của bạn.</translation>
-<translation id="3211604354460514046">{NUM_DEVICES,plural, =1{Google Chrome được kết nối với một thiết bị HID}other{Google Chrome được kết nối với nhiều thiết bị HID}}</translation>
 <translation id="3245429137663807393">Nếu bạn cũng chia sẻ báo cáo sử dụng của Chrome, các báo cáo đó sẽ bao gồm cả những URL bạn truy cập</translation>
 <translation id="3282568296779691940">Đăng nhập vào Chrome</translation>
 <translation id="3286538390144397061">Khởi động lại Ngay bây giờ</translation>

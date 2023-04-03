@@ -19,12 +19,13 @@ extern NSString* const kConfirmationAlertSecondaryActionAccessibilityIdentifier;
 // A view controller useful to show modal alerts and confirmations. The main
 // content consists in a big image, a title, and a subtitle which are contained
 // in a scroll view for cases when the content doesn't fit in the screen.
-// The view controller can have up to three action buttons, which are position
-// in the bottom. They are arranged, from top to bottom,
+// The view controller can have up to three action buttons, which are positioned
+// at the bottom. They are arranged, from top to bottom,
 // `primaryActionString`, `secondaryActionString`, `tertiaryActionString`.
 // Setting those properties will make those buttons be added to the view
 // controller.
 @interface ConfirmationAlertViewController : UIViewController
+
 // The navigation bar title view. Nil if not needed. If needed, must be set
 // before the view is loaded.
 @property(nonatomic, strong) UIView* titleView;
@@ -33,7 +34,7 @@ extern NSString* const kConfirmationAlertSecondaryActionAccessibilityIdentifier;
 @property(nonatomic, copy) NSString* titleString;
 
 // Text style for the title. If nil, will default to UIFontTextStyleTitle1.
-@property(nonatomic, copy) NSString* titleTextStyle;
+@property(nonatomic, copy) UIFontTextStyle titleTextStyle;
 
 // (Optional) The additional headline below the main title. Must be set before
 // the view is loaded.
@@ -99,6 +100,13 @@ extern NSString* const kConfirmationAlertSecondaryActionAccessibilityIdentifier;
 
 // The action handler for interactions in this View Controller.
 @property(nonatomic, weak) id<ConfirmationAlertActionHandler> actionHandler;
+
+// Designated initializer.
+- (instancetype)init NS_DESIGNATED_INITIALIZER;
+
+- (instancetype)initWithCoder:(NSCoder*)coder NS_UNAVAILABLE;
+- (instancetype)initWithNibName:(NSString*)name
+                         bundle:(NSBundle*)bundle NS_UNAVAILABLE;
 
 // Can be overridden by subclasses to customize the secondary title, e.g. set a
 // different style, or a UITextViewDelegate. The default implementation does

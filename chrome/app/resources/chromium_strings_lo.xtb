@@ -24,6 +24,7 @@
 
 ການອະນຸຍາດທີ່ທ່ານໄດ້ມອບໃຫ້ເວັບໄຊ ແລະ ແອັບຕ່າງໆໄປກ່ອນແລ້ວອາດມີຜົນກັບບັນຊີນີ້ນຳ. ທ່ານສາມາດຈັດການບັນຊີ Google ຂອງທ່ານໄດ້ໃນ <ph name="SETTINGS_LINK_BEGIN" />ການຕັ້ງຄ່າ<ph name="SETTINGS_LINK_END" />.</translation>
 <translation id="1640672724030957280">ກຳລັງດາວໂຫຼດ...</translation>
+<translation id="1691024636239527281">{NUM_DEVICES,plural, =0{Chromium ໄດ້ເຊື່ອມຕໍ່ກັບອຸປະກອນ HID}=1{Chromium ເຊື່ອມຕໍ່ກັບອຸປະກອນ HID}other{Chromium ເຊື່ອມຕໍ່ກັບອຸປະກອນ HID}}</translation>
 <translation id="1708666629004767631">ມີ Chromium ລຸ້ນໃໝ່ປອດໄພກ່ວາຢູ່.</translation>
 <translation id="17264556997921157">ທ່ານສາມາດເບິ່ງ ແລະ ລຶບຫົວຂໍ້ຂອງຄວາມສົນໃຈທີ່ເວັບໄຊຕ່າງໆໃຊ້ເພື່ອສະແດງໂຄສະນາໃຫ້ທ່ານເຫັນໄດ້. Chromium ປະເມີນຄວາມສົນໃຈຂອງທ່ານໂດຍອ້າງອີງໃສ່ປະຫວັດການທ່ອງເວັບຫຼ້າສຸດຂອງທ່ານ.</translation>
 <translation id="1733725117201708356">Chromium ຈະລຶບຂໍ້ມູນການທ່ອງເວັບໃນໄວໆນີ້</translation>
@@ -81,7 +82,6 @@
 <translation id="2928420929544864228">ສຳເລັດການຕິດຕັ້ງແລ້ວ.</translation>
 <translation id="2977470724722393594">Chromium ແມ່ນເວີຊັນໃໝ່ຫຼ້າສຸດແລ້ວ</translation>
 <translation id="2977506796191543575">ຖ້າມີເວັບໄຊໃດໜຶ່ງພະຍາຍາມລັກເອົາລະຫັດຜ່ານຂອງທ່ານ ຫຼື ເມື່ອທ່ານດາວໂຫຼດໄຟລ໌ອັນຕະລາຍ, Chromium ອາດສົ່ງ URL, ຮວມທັງເນື້ອຫາບາງສ່ວນຂອງໜ້າໄປໃຫ້ Safe Browsing</translation>
-<translation id="3021964162552004083">{NUM_DEVICES,plural, =1{Chromium ເຊື່ອມຕໍ່ກັບອຸປະກອນ HID}other{Chromium ເຊື່ອມຕໍ່ກັບອຸປະກອນ HID}}</translation>
 <translation id="3032706164202344641">Chromium ບໍ່ສາມາດກວດລະຫັດຜ່ານຂອງທ່ານໄດ້. ກະລຸນາລອງໃໝ່ໃນພາຍຫລັງ.</translation>
 <translation id="3032787606318309379">ກໍາລັງເພີ່ມ Chromium...</translation>
 <translation id="3038232873781883849">ກຳ​ລັງ​ລໍ​ຖ້າ​ຕິດ​ຕັ້ງ...</translation>

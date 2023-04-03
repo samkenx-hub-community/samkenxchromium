@@ -46,3 +46,11 @@ export function isPersonalizationJellyEnabled() {
 export function isMultiZoneRgbKeyboardSupported() {
   return loadTimeData.getInteger('keyboardBacklightZoneCount') > 1;
 }
+
+export function isUserAvatarCustomizationSelectorsEnabled() {
+  return loadTimeData.getBoolean('isUserAvatarCustomizationSelectorsEnabled');
+}
+
+export function isTimeOfDayScreenSaverEnabled() {
+  return loadTimeData.getBoolean('isTimeOfDayScreenSaverEnabled');
+}

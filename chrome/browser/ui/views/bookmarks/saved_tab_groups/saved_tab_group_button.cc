@@ -38,6 +38,7 @@
 #include "ui/base/dragdrop/drag_drop_types.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/models/dialog_model.h"
+#include "ui/base/models/dialog_model_field.h"
 #include "ui/base/models/dialog_model_menu_model_adapter.h"
 #include "ui/base/models/image_model.h"
 #include "ui/base/theme_provider.h"
@@ -51,6 +52,11 @@
 #include "ui/views/controls/menu/menu_runner.h"
 #include "ui/views/view_class_properties.h"
 #include "ui/views/view_utils.h"
+
+DEFINE_CLASS_ELEMENT_IDENTIFIER_VALUE(SavedTabGroupButton,
+                                      kDeleteGroupMenuItem);
+DEFINE_CLASS_ELEMENT_IDENTIFIER_VALUE(SavedTabGroupButton,
+                                      kMoveGroupToNewWindowMenuItem);
 
 namespace {
 constexpr float kBorderRadius = 4.5f;
@@ -84,8 +90,12 @@ SavedTabGroupButton::SavedTabGroupButton(
               &SavedTabGroupButton::CreateDialogModelForContextMenu,
               base::Unretained(this)),
           views::MenuRunner::CONTEXT_MENU | views::MenuRunner::IS_NESTED) {
+  SetAccessibilityProperties(
+      ax::mojom::Role::kPopUpButton, group.title(),
+      /*description*/ absl::nullopt,
+      l10n_util::GetStringUTF16(
+          IDS_ACCNAME_SAVED_TAB_GROUP_BUTTON_ROLE_DESCRIPTION));
   SetText(group.title());
-  SetAccessibleName(group.title());
   SetTooltipText(group.title());
   SetID(VIEW_ID_BOOKMARK_BAR_ELEMENT);
   SetProperty(views::kElementIdentifierKey, kSavedTabGroupButtonElementId);
@@ -157,17 +167,15 @@ std::u16string SavedTabGroupButton::GetTooltipText(const gfx::Point& p) const {
 }
 
 void SavedTabGroupButton::GetAccessibleNodeData(ui::AXNodeData* node_data) {
+  views::MenuButton::GetAccessibleNodeData(node_data);
+
+  // TODO(crbug.com/1411342): Under what circumstances would there be no
+  // name? Please read the bug description and update accordingly.
   // If the button would have no name, avoid crashing by setting the name
   // explicitly empty.
   if (GetAccessibleName().empty()) {
     node_data->SetNameExplicitlyEmpty();
   }
-
-  views::MenuButton::GetAccessibleNodeData(node_data);
-  node_data->AddStringAttribute(
-      ax::mojom::StringAttribute::kRoleDescription,
-      l10n_util::GetStringUTF8(
-          IDS_ACCNAME_SAVED_TAB_GROUP_BUTTON_ROLE_DESCRIPTION));
 }
 
 void SavedTabGroupButton::OnPaintBackground(gfx::Canvas* canvas) {
@@ -339,12 +347,15 @@ SavedTabGroupButton::CreateDialogModelForContextMenu() {
           ui::ImageModel::FromVectorIcon(kMoveGroupToNewWindowIcon),
           move_or_open_group_text,
           base::BindRepeating(&SavedTabGroupButton::MoveGroupToNewWindowPressed,
-                              base::Unretained(this)))
+                              base::Unretained(this)),
+          ui::DialogModelMenuItem::Params().SetId(
+              kMoveGroupToNewWindowMenuItem))
       .AddMenuItem(
           ui::ImageModel::FromVectorIcon(kCloseGroupIcon),
           l10n_util::GetStringUTF16(IDS_TAB_GROUP_HEADER_CXMENU_DELETE_GROUP),
           base::BindRepeating(&SavedTabGroupButton::DeleteGroupPressed,
-                              base::Unretained(this)))
+                              base::Unretained(this)),
+          ui::DialogModelMenuItem::Params().SetId(kDeleteGroupMenuItem))
       .AddSeparator();
 
   for (const SavedTabGroupTab& tab : tabs_) {

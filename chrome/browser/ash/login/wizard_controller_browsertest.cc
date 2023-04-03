@@ -37,7 +37,6 @@
 #include "chrome/browser/ash/login/screens/device_disabled_screen.h"
 #include "chrome/browser/ash/login/screens/error_screen.h"
 #include "chrome/browser/ash/login/screens/hid_detection_screen.h"
-#include "chrome/browser/ash/login/screens/mock_arc_terms_of_service_screen.h"
 #include "chrome/browser/ash/login/screens/mock_consolidated_consent_screen.h"
 #include "chrome/browser/ash/login/screens/mock_demo_preferences_screen.h"
 #include "chrome/browser/ash/login/screens/mock_demo_setup_screen.h"
@@ -72,6 +71,7 @@
 #include "chrome/browser/ash/policy/enrollment/enrollment_state_fetcher.h"
 #include "chrome/browser/ash/policy/enrollment/fake_auto_enrollment_client.h"
 #include "chrome/browser/ash/policy/server_backed_state/server_backed_device_state.h"
+#include "chrome/browser/ash/policy/server_backed_state/server_backed_state_keys_broker.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/browser_process_platform_part.h"
 #include "chrome/browser/chrome_notification_types.h"
@@ -310,7 +310,9 @@ class ScopedEnrollmentStateFetcherFactory {
       policy::EnrollmentStateFetcher::RlweClientFactory rlwe_client_factory,
       policy::DeviceManagementService* device_management_service,
       scoped_refptr<network::SharedURLLoaderFactory> url_loader_factory,
-      ash::SystemClockClient* system_clock_client) {
+      ash::SystemClockClient* system_clock_client,
+      policy::ServerBackedStateKeysBroker* state_key_broker,
+      ash::DeviceSettingsService* device_settings_service) {
     // Only allow one `EnrollmentStateFetcher` to be created. The test should
     // call `Reset` to expect a new `EnrollmentStateFetcher` to be created.
     EXPECT_FALSE(fetcher_created_);
@@ -635,15 +637,6 @@ class WizardControllerFlowTest : public WizardControllerTest {
             base::BindRepeating(&WizardController::OnDemoPreferencesScreenExit,
                                 base::Unretained(wizard_controller))));
 
-    mock_arc_terms_of_service_screen_view_ =
-        std::make_unique<MockArcTermsOfServiceScreenView>();
-    mock_arc_terms_of_service_screen_ =
-        MockScreenExpectLifecycle(std::make_unique<MockArcTermsOfServiceScreen>(
-            mock_arc_terms_of_service_screen_view_->AsWeakPtr(),
-            base::BindRepeating(
-                &WizardController::OnArcTermsOfServiceScreenExit,
-                base::Unretained(wizard_controller))));
-
     device_disabled_screen_view_ =
         std::make_unique<MockDeviceDisabledScreenView>();
     MockScreen(std::make_unique<DeviceDisabledScreen>(
@@ -720,15 +713,6 @@ class WizardControllerFlowTest : public WizardControllerTest {
             mock_demo_preferences_screen_view_->AsWeakPtr(),
             base::BindRepeating(&WizardController::OnDemoPreferencesScreenExit,
                                 base::Unretained(wizard_controller))));
-
-    mock_arc_terms_of_service_screen_view_ =
-        std::make_unique<MockArcTermsOfServiceScreenView>();
-    mock_arc_terms_of_service_screen_ =
-        MockScreenExpectLifecycle(std::make_unique<MockArcTermsOfServiceScreen>(
-            mock_arc_terms_of_service_screen_view_->AsWeakPtr(),
-            base::BindRepeating(
-                &WizardController::OnArcTermsOfServiceScreenExit,
-                base::Unretained(wizard_controller))));
 
     mock_consolidated_consent_screen_view_ =
         std::make_unique<MockConsolidatedConsentScreenView>();
@@ -895,10 +879,6 @@ class WizardControllerFlowTest : public WizardControllerTest {
   MockDemoPreferencesScreen* mock_demo_preferences_screen_ = nullptr;
   std::unique_ptr<MockDemoPreferencesScreenView>
       mock_demo_preferences_screen_view_;
-
-  MockArcTermsOfServiceScreen* mock_arc_terms_of_service_screen_ = nullptr;
-  std::unique_ptr<MockArcTermsOfServiceScreenView>
-      mock_arc_terms_of_service_screen_view_;
 
   MockConsolidatedConsentScreen* mock_consolidated_consent_screen_ = nullptr;
   std::unique_ptr<MockConsolidatedConsentScreenView>

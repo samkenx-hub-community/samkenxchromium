@@ -22,6 +22,7 @@
 <translation id="1399397803214730675">這台電腦已安裝較新的 Google Chrome 版本，如果軟體無法順利運作，請解除安裝 Google Chrome，然後再試一次。</translation>
 <translation id="139993653570221430">你隨時可以前往 Chrome 設定變更這個選項。系統會同時執行試用功能和目前放送廣告的方式，因此你不會立即看到變化。</translation>
 <translation id="1434626383986940139">Chrome Canary 應用程式</translation>
+<translation id="1496905273983707119">{NUM_DEVICES,plural, =0{Google Chrome 曾連線至 HID 裝置}=1{Google Chrome 已連線至 HID 裝置}other{Google Chrome 已連線至 HID 裝置}}</translation>
 <translation id="1507198376417198979">自訂新的 Chrome 設定檔</translation>
 <translation id="1516530951338665275">Google Chrome 需要藍牙存取權才能繼續配對。<ph name="IDS_BLUETOOTH_DEVICE_CHOOSER_AUTHORIZE_BLUETOOTH_LINK" /></translation>
 <translation id="1547295885616600893">Chrome OS 受惠於其他<ph name="BEGIN_LINK_CROS_OSS" />開放原始碼軟體<ph name="END_LINK_CROS_OSS" />技術才能成功發布。</translation>
@@ -122,7 +123,6 @@
 <translation id="3140883423282498090">你的變更將於下次重新啟動 Google Chrome 時生效。</translation>
 <translation id="3149510190863420837">Chrome 應用程式</translation>
 <translation id="3169523567916669830">在試用期間，你可以查看及移除網站用來向你顯示廣告的感興趣主題。Chrome 會根據近期瀏覽記錄，推測你可能感興趣的主題。</translation>
-<translation id="3211604354460514046">{NUM_DEVICES,plural, =1{Google Chrome 已連線至 HID 裝置}other{Google Chrome 已連線至 HID 裝置}}</translation>
 <translation id="3245429137663807393">如果你一併提供 Chrome 使用報告，這些報告中會包含你造訪的網址</translation>
 <translation id="3282568296779691940">登入 Chrome</translation>
 <translation id="3286538390144397061">立即重新啟動</translation>

@@ -20,6 +20,8 @@
 #import "ios/chrome/browser/passwords/ios_chrome_password_check_manager.h"
 #import "ios/chrome/browser/passwords/ios_chrome_password_check_manager_factory.h"
 #import "ios/chrome/browser/passwords/password_tab_helper.h"
+#import "ios/chrome/browser/shared/coordinator/alert/action_sheet_coordinator.h"
+#import "ios/chrome/browser/shared/coordinator/alert/alert_coordinator.h"
 #import "ios/chrome/browser/shared/public/commands/application_commands.h"
 #import "ios/chrome/browser/shared/public/commands/command_dispatcher.h"
 #import "ios/chrome/browser/shared/public/commands/credential_provider_promo_commands.h"
@@ -27,8 +29,6 @@
 #import "ios/chrome/browser/shared/public/commands/snackbar_commands.h"
 #import "ios/chrome/browser/shared/public/features/features.h"
 #import "ios/chrome/browser/sync/sync_service_factory.h"
-#import "ios/chrome/browser/ui/alert_coordinator/action_sheet_coordinator.h"
-#import "ios/chrome/browser/ui/alert_coordinator/alert_coordinator.h"
 #import "ios/chrome/browser/ui/settings/password/password_details/password_details.h"
 #import "ios/chrome/browser/ui/settings/password/password_details/password_details_consumer.h"
 #import "ios/chrome/browser/ui/settings/password/password_details/password_details_coordinator_delegate.h"
@@ -62,7 +62,8 @@
 
 // Module containing the reauthentication mechanism for viewing and copying
 // passwords.
-@property(nonatomic, weak) ReauthenticationModule* reauthenticationModule;
+// Has to be strong for password bottom sheet feature or else it becomes nil.
+@property(nonatomic, strong) ReauthenticationModule* reauthenticationModule;
 
 // Modal alert for interactions with password.
 @property(nonatomic, strong) AlertCoordinator* alertCoordinator;
@@ -160,7 +161,9 @@
   self.viewController.snackbarCommandsHandler = HandlerForProtocol(
       self.browser->GetCommandDispatcher(), SnackbarCommands);
   self.viewController.reauthModule = self.reauthenticationModule;
-
+  if (self.showCancelButton) {
+    [self.viewController setupLeftCancelButton];
+  }
   [self.baseNavigationController pushViewController:self.viewController
                                            animated:YES];
 }
@@ -173,15 +176,17 @@
 
 #pragma mark - PasswordDetailsHandler
 
-- (void)passwordDetailsTableViewControllerDidDisappear {
+- (void)passwordDetailsTableViewControllerWasDismissed {
   [self.delegate passwordDetailsCoordinatorDidRemove:self];
 }
 
-- (void)showPasscodeDialog {
+- (void)showPasscodeDialogForReason:(PasscodeDialogReason)reason {
   NSString* title =
       l10n_util::GetNSString(IDS_IOS_SETTINGS_SET_UP_SCREENLOCK_TITLE);
-  NSString* message =
-      l10n_util::GetNSString(IDS_IOS_SETTINGS_SET_UP_SCREENLOCK_CONTENT);
+  NSString* message = l10n_util::GetNSString(
+      reason == PasscodeDialogReasonShowPassword
+          ? IDS_IOS_SETTINGS_SET_UP_SCREENLOCK_CONTENT
+          : IDS_IOS_SETTINGS_SET_UP_SCREENLOCK_CONTENT_FOR_MOVE_TO_ACCOUNT);
   self.alertCoordinator =
       [[AlertCoordinator alloc] initWithBaseViewController:self.viewController
                                                    browser:self.browser

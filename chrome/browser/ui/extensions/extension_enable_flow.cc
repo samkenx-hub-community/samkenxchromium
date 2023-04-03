@@ -101,18 +101,20 @@ void ExtensionEnableFlow::CheckPermissionAndMaybePromptUser() {
               ->Get(profile_)
               ->GetSupervisedUserExtensionsDelegate();
   DCHECK(supervised_user_extensions_delegate);
-  if (profile_->IsChild() && extension &&
+  SupervisedUserService* supervised_user_service =
+      SupervisedUserServiceFactory::GetForProfile(profile_);
+  if (supervised_user_service->AreExtensionsPermissionsEnabled() && extension &&
+
       // Only ask for parent approval if the extension still requires approval.
       !supervised_user_extensions_delegate->IsExtensionAllowedByParent(
-          *extension, profile_)) {
+          *extension)) {
     // Either ask for parent permission or notify the child that their parent
     // has disabled this action.
     auto extension_approval_callback =
         base::BindOnce(&ExtensionEnableFlow::OnExtensionApprovalDone,
                        weak_ptr_factory_.GetWeakPtr());
     supervised_user_extensions_delegate->RequestToEnableExtensionOrShowError(
-        *extension, profile_, parent_contents_,
-        std::move(extension_approval_callback));
+        *extension, parent_contents_, std::move(extension_approval_callback));
     return;
   }
 #endif  // BUILDFLAG(ENABLE_SUPERVISED_USERS)
@@ -244,10 +246,10 @@ void ExtensionEnableFlow::EnableExtension() {
     return;
   }
 #if BUILDFLAG(ENABLE_SUPERVISED_USERS)
-  if (profile_->IsChild()) {
+  SupervisedUserService* supervised_user_service =
+      SupervisedUserServiceFactory::GetForProfile(profile_);
+  if (supervised_user_service->AreExtensionsPermissionsEnabled()) {
     // We need to add parent approval first.
-    SupervisedUserService* supervised_user_service =
-        SupervisedUserServiceFactory::GetForProfile(profile_);
     supervised_user_service->AddExtensionApproval(*extension);
     supervised_user_service->RecordExtensionEnablementUmaMetrics(
         /*enabled=*/true);

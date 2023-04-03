@@ -737,6 +737,7 @@ Lai mainītu šo iestatījumu, <ph name="BEGIN_LINK" />atiestatiet sinhronizāci
 <translation id="5001388021414335527">Šeit varat sekot šai vietnei</translation>
 <translation id="5004416275253351869">Google aktivitātes vadīklas</translation>
 <translation id="5005498671520578047">Paroles kopēšana</translation>
+<translation id="5010886807652684893">Vizuālais skats</translation>
 <translation id="5011311129201317034"><ph name="SITE" /> vēlas izveidot savienojumu</translation>
 <translation id="5016205925109358554">Serif</translation>
 <translation id="5017529052065664584">Pēdējās 15 minūtes</translation>
@@ -794,6 +795,7 @@ Lai mainītu šo iestatījumu, <ph name="BEGIN_LINK" />atiestatiet sinhronizāci
 <translation id="5342314432463739672">Atļauju pieprasījumi</translation>
 <translation id="53537532693258630">Šeit būs redzamas jūsu noņemtās vietnes.</translation>
 <translation id="5355191726083956201">Uzlabota aizsardzība ir ieslēgta</translation>
+<translation id="5361107212971249203">ziņojumu</translation>
 <translation id="5368227114232678694">Lai pārlūkotu tīmekli privāti šajā ierīcē, izmēģiniet inkognito režīmu.</translation>
 <translation id="5375577065097716013">Meklēt attēlu ar Google Lens <ph name="BEGIN_NEW" />Jaunums<ph name="END_NEW" /></translation>
 <translation id="5401851137404501592">Lai turpinātu, <ph name="IDENTITY_PROVIDER_ETLD_PLUS_ONE" /> kopīgos jūsu vārdu, e-pasta adresi un profila attēlu ar šo vietni.</translation>
@@ -1191,6 +1193,7 @@ Piemēram, dažas vietnes, reaģējot uz šo pieprasījumu, var rādīt jums rek
 <translation id="7454641608352164238">Nepietiek vietas</translation>
 <translation id="7455988709578031708">Pamatā ir jūsu pārlūkošanas vēsture. Šis iestatījums ir ieslēgts.</translation>
 <translation id="7456774706094330779">Paplašināta iepriekšēja ielāde</translation>
+<translation id="7466431077154602932">Kompaktais skats</translation>
 <translation id="7474822150871987353">Uzziniet vairāk par vietnēs aprakstītajām tēmām, neaizverot lapu. Atlasiet vienu vai vairākus vārdus lapā, lai tos meklētu.</translation>
 <translation id="7475192538862203634">Ja šis ziņojums tiek rādīts bieži, izmēģiniet šos <ph name="BEGIN_LINK" />ieteikumus<ph name="END_LINK" />.</translation>
 <translation id="7475688122056506577">SD karte nav atrasta. Iespējams, trūkst kādi jūsu faili.</translation>
@@ -1320,6 +1323,7 @@ Piemēram, dažas vietnes, reaģējot uz šo pieprasījumu, var rādīt jums rek
 <translation id="8058746566562539958">Atvērt jaunā Chrome cilnē</translation>
 <translation id="8062594758852531064">Paplašināta iepriekšēja ielāde:</translation>
 <translation id="8063895661287329888">Neizdevās pievienot grāmatzīmi.</translation>
+<translation id="8066816452984416180">Varat ātri saglabāt šo lapu kā grāmatzīmi. Lai rediģētu šo īsinājumtaustiņu, pieskarieties un turiet.</translation>
 <translation id="806745655614357130">Glabāt datus atsevišķi</translation>
 <translation id="8073388330009372546">Atvērt attēlu jaunā cilnē</translation>
 <translation id="8076492880354921740">Cilnes</translation>
@@ -1351,6 +1355,7 @@ Piemēram, dažas vietnes, reaģējot uz šo pieprasījumu, var rādīt jums rek
 <translation id="8216351761227087153">Skatīties</translation>
 <translation id="8218622182176210845">Konta pārvaldība</translation>
 <translation id="8223642481677794647">Plūsmas kartītes izvēlne</translation>
+<translation id="8236097722223016103">Pievienot grāmatzīmēm</translation>
 <translation id="8250920743982581267">Dokumenti</translation>
 <translation id="8255617931166444521">Vietnes var izmantot jūsu sīkfailus tikai jūsu pārlūkošanas darbību skatīšanai savā vietnē.</translation>
 <translation id="8259179246279078674">Tā kā iepriekš ielādētās lapas ir šifrētas, Google neiegūs nekādu informāciju par iepriekš ielādēto lapu saturu. Google serveri iegūs informāciju par to, kuras vietnes ir privāti iepriekš ielādētas. Šī informācija tiek izmantota tikai lapu iepriekšējai ielādei, un tā nav saistīta ar citu informāciju no Google konta.</translation>
@@ -1445,6 +1450,7 @@ Piemēram, dažas vietnes, reaģējot uz šo pieprasījumu, var rādīt jums rek
 <translation id="869891660844655955">Derīguma termiņš</translation>
 <translation id="8699120352855309748">Nepiedāvāt tulkot no šīm valodām</translation>
 <translation id="8712637175834984815">Sapratu!</translation>
+<translation id="8723453889042591629">Ātri pārtulkojiet šo lapu. Lai rediģētu šo īsinājumtaustiņu, pieskarieties un turiet.</translation>
 <translation id="8725066075913043281">Mēģināt vēlreiz</translation>
 <translation id="8746155870861185046">Kopīgot atzīmēto tekstu</translation>
 <translation id="874726034427945498">Sinhronizējiet cilnes un vēsturi, lai adreses joslā iegūtu labākus ieteikumus</translation>
@@ -1497,6 +1503,7 @@ Piemēram, dažas vietnes, reaģējot uz šo pieprasījumu, var rādīt jums rek
 <translation id="8989968390305463310">Pārlūkošanas vēsture ietekmē to, kādas reklāmas jums tiek rādītas, un tālāk redzamās aptuveni noteiktās intereses. Lai aizsargātu jūsu konfidencialitāti, Chrome automātiski katru mēnesi pakāpeniski dzēš jūsu intereses. Intereses var tikt atjaunotas, ja vien nenoņemat tās.</translation>
 <translation id="8993760627012879038">Atvērt jaunu cilni inkognito režīmā</translation>
 <translation id="8996847606757455498">Izvēlēties citu nodrošinātāju</translation>
+<translation id="8998289560386111590">Nav pieejams jūsu ierīcē</translation>
 <translation id="8998729206196772491">Jūs pierakstāties kontā, kas tiek pārvaldīts domēnā <ph name="MANAGED_DOMAIN" />, un sniedzat tā administratoram kontroli pār saviem Chrome datiem. Jūsu dati tiks neatgriezeniski saistīti ar šo kontu. Izrakstoties no pārlūka Chrome, jūsu dati tiks dzēsti no šīs ierīces, taču tie tiks saglabāti jūsu Google kontā.</translation>
 <translation id="9022774213089566801">Bieži apmeklētas vietnes</translation>
 <translation id="9022871169049522985">Vietnes un reklāmdevēji var izvērtēt savu reklāmu veiktspēju</translation>

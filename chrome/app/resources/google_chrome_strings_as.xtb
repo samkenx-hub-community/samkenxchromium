@@ -24,6 +24,7 @@
 <translation id="1399397803214730675">এই কম্পিউটাৰটোৰ এটা অধিক শেহতীয়া Google Chrome সংস্কৰণ আছে। যদি ছফ্টৱেৰটোৱে কাম নকৰে তেন্তে Google Chrome আনইনষ্টল কৰি আকৌ চেষ্টা কৰক।</translation>
 <translation id="139993653570221430">আপুনি যিকোনো সময়তে Chromeৰ ছেটিঙত নিজৰ সিদ্ধান্ত সলনি কৰিব পাৰে। ট্ৰায়েলসমূহ বৰ্তমান বিজ্ঞাপনবোৰ দেখুওৱাৰ সমান্তৰালকৈ চলে, সেয়েহে আপুনি লগে লগে সালসলনিসমূহ দেখা নাপাব।</translation>
 <translation id="1434626383986940139">Chrome Canary এপ্</translation>
+<translation id="1496905273983707119">{NUM_DEVICES,plural, =0{Google Chromeক এটা HID ডিভাইচৰ সৈতে সংযোগ কৰা হৈছিল}=1{Google Chromeক এটা HID ডিভাইচৰ সৈতে সংযোগ কৰা হৈছে}one{Google Chrome HID ডিভাইচসমূহৰ সৈতে সংযোগ কৰা হৈছে}other{Google Chrome HID ডিভাইচসমূহৰ সৈতে সংযোগ কৰা হৈছে}}</translation>
 <translation id="1507198376417198979">আপোনাৰ Chromeৰ নতুন প্ৰ’ফাইলটো কাষ্টমাইজ কৰক</translation>
 <translation id="1516530951338665275">পেয়াৰ কৰাটো অব্যাহত ৰাখিবলৈ Google Chromeক ব্লুটুথ সুবিধাৰ এক্সেছৰ 
 আৱশ্যক। <ph name="IDS_BLUETOOTH_DEVICE_CHOOSER_AUTHORIZE_BLUETOOTH_LINK" /></translation>
@@ -126,7 +127,6 @@
 <translation id="3140883423282498090">আপুনি পৰৱৰ্তী সময়ত Google Chrome পুনৰ লঞ্চ কৰিলে আপুনি কৰা সলনিসমূহ কাৰ্যকৰী হ’ব।</translation>
 <translation id="3149510190863420837">Chromeৰ এপ্‌</translation>
 <translation id="3169523567916669830">আপোনাক বিজ্ঞাপন দেখুৱাবলৈ ছাইটবোৰে ব্যৱহাৰ কৰা আগ্ৰহৰ বিষয়বোৰ আপুনি ট্ৰায়েলৰ সময়ত চাব আৰু আঁতৰাব পাৰে। আপোনাৰ শেহতীয়া ব্ৰাউজিঙৰ ইতিহাসৰ ওপৰত ভিত্তি কৰি Chromeএ আপোনাৰ আগ্ৰহ থকা বিষয়বস্তু অনুমান কৰে।</translation>
-<translation id="3211604354460514046">{NUM_DEVICES,plural, =1{Google Chrome এটা HID ডিভাইচৰ সৈতে সংযোগ কৰা হৈছে}one{Google Chrome HID ডিভাইচসমূহৰ সৈতে সংযোগ কৰা হৈছে}other{Google Chrome HID ডিভাইচসমূহৰ সৈতে সংযোগ কৰা হৈছে}}</translation>
 <translation id="3245429137663807393">যদি আপুনি Chrome ব্যৱহাৰ কৰাৰ ৰিপ’ৰ্টও শ্বেয়াৰ কৰে, সেই ৰিপ’ৰ্টত আপুনি চোৱা URLসমূহ অন্তৰ্ভুক্ত হয়</translation>
 <translation id="3282568296779691940">Chromeত ছাইন-ইন কৰক</translation>
 <translation id="3286538390144397061">এতিয়াই ৰিষ্টাৰ্ট কৰক</translation>

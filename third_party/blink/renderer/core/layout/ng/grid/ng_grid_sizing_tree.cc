@@ -9,7 +9,7 @@ namespace blink {
 std::unique_ptr<NGGridLayoutTrackCollection>
 NGSubgriddedItemData::CreateSubgridCollection(
     GridTrackSizingDirection track_direction) const {
-  DCHECK(item_data_in_parent_->IsSubgrid());
+  DCHECK(item_data_in_parent_ && item_data_in_parent_->IsSubgrid());
 
   const bool is_for_columns_in_parent =
       item_data_in_parent_->is_parallel_with_root_grid
@@ -29,12 +29,35 @@ NGSubgriddedItemData::CreateSubgridCollection(
 }
 
 scoped_refptr<const NGGridLayoutTree> NGGridSizingTree::FinalizeTree() const {
-  auto layout_tree =
-      base::MakeRefCounted<NGGridLayoutTree>(sizing_data_.size());
-  for (const auto& sizing_data : sizing_data_) {
-    layout_tree->Append(sizing_data->layout_data, sizing_data->subtree_size);
+  auto layout_tree = base::MakeRefCounted<NGGridLayoutTree>(tree_data_.size());
+  for (const auto& grid_tree_node : tree_data_) {
+    layout_tree->Append(grid_tree_node->layout_data,
+                        grid_tree_node->subtree_size);
   }
   return layout_tree;
+}
+
+void NGGridSizingTree::AddSubgriddedItemLookupData(
+    NGSubgriddedItemData&& subgridded_item_data) {
+  const auto* item_layout_box = subgridded_item_data->node.GetLayoutBox();
+
+  if (!subgridded_item_data_lookup_map_) {
+    subgridded_item_data_lookup_map_ =
+        MakeGarbageCollected<SubgriddedItemDataLookupMap>();
+  }
+
+  DCHECK(!subgridded_item_data_lookup_map_->Contains(item_layout_box));
+  subgridded_item_data_lookup_map_->insert(item_layout_box,
+                                           std::move(subgridded_item_data));
+}
+
+NGSubgriddedItemData NGGridSizingTree::LookupSubgriddedItemData(
+    const GridItemData& grid_item) const {
+  const auto* item_layout_box = grid_item.node.GetLayoutBox();
+
+  DCHECK(subgridded_item_data_lookup_map_ &&
+         subgridded_item_data_lookup_map_->Contains(item_layout_box));
+  return subgridded_item_data_lookup_map_->at(item_layout_box);
 }
 
 }  // namespace blink

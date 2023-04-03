@@ -24,6 +24,7 @@
 <translation id="1399397803214730675">ဒီကွန်ပျူတာ ထဲမှာ ပိုပြီး နောက်ကျသော Google Chrome  ဗားရှင်း ရှိနေပါပြီ။ ဆော့ဝဲ အလုပ်မလုပ်လျှင်၊ ကျေးဇူးပြုပြီး Google Chrome ကို ဖြုတ်လိုက်ပြီး ထပ်စမ်းကြည့်ပါ။</translation>
 <translation id="139993653570221430">Chrome ဆက်တင်များတွင် အချိန်မရွေး စိတ်အလိုကျ ပြောင်းလဲနိုင်သည်။ လက်ရှိကြော်ငြာ ပြသသည့်နည်းလမ်းနှင့်တွဲ၍ စမ်းသပ်မှုများကို ပြုလုပ်သဖြင့် ပြောင်းလဲမှုများကို ချက်ချင်းမြင်နိုင်မည်မဟုတ်ပါ။</translation>
 <translation id="1434626383986940139">Chrome ၏ Canary စမ်းသပ်အက်ပ်များ</translation>
+<translation id="1496905273983707119">{NUM_DEVICES,plural, =0{Google Chrome ကို HID စက်နှင့် ချိတ်ဆက်ထားသည်}=1{Google Chrome ကို HID စက်နှင့် ချိတ်ဆက်ထားသည်}other{Google Chrome ကို HID စက်များနှင့် ချိတ်ဆက်ထားသည်}}</translation>
 <translation id="1507198376417198979">သင့် Chrome ပရိုဖိုင်ကို စိတ်ကြိုက်ပြင်ပါ</translation>
 <translation id="1516530951338665275">Google Chrome သည် ဆက်လက်တွဲချိတ်ရန် ဘလူးတုသ်သုံးခွင့် 
  လိုပါသည်။ <ph name="IDS_BLUETOOTH_DEVICE_CHOOSER_AUTHORIZE_BLUETOOTH_LINK" /></translation>
@@ -126,7 +127,6 @@
 <translation id="3140883423282498090">သင် ပြောင်းလဲခဲ့သည်များမျာ သင်က Google Chrome ကို နောက်တစ်ကြိမ် ပြန်ဖွင့်စဉ် အကျိုးသက်ရောက် လာကြပါမည်။</translation>
 <translation id="3149510190863420837">Chrome အက်ပ်များ</translation>
 <translation id="3169523567916669830">စမ်းသပ်ကာလအတွင်း သင့်ကို ကြော်ငြာပြသလေ့ရှိသည့် စိတ်ဝင်စားသော ဝဘ်ဆိုက်များ၏ အကြောင်းအရာများကို မြင်နိုင်ပြီး ဖယ်ရှားနိုင်သည်။ သင့်လတ်တလော ကြည့်ရှုခြင်းမှတ်တမ်းအပေါ်မူတည်၍ သင့်စိတ်ဝင်စားမှုများကို Chrome က ခန့်မှန်းသည်။</translation>
-<translation id="3211604354460514046">{NUM_DEVICES,plural, =1{Google Chrome ကို HID စက်နှင့် ချိတ်ဆက်ထားသည်}other{Google Chrome ကို HID စက်များနှင့် ချိတ်ဆက်ထားသည်}}</translation>
 <translation id="3245429137663807393">Chrome အသုံးပြမှုအစီရင်ခံစာများ မျှဝေပါကလည်း ထိုအစီရင်ခံစာများတွင် သင်ဝင်ကြည့်သော URL များ ပါဝင်သည်</translation>
 <translation id="3282568296779691940">Chrome သို့ လက်မှတ်ထိုး ဝင်</translation>
 <translation id="3286538390144397061">ယခု ပြန်လည်အစပြုမည</translation>

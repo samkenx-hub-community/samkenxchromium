@@ -55,7 +55,7 @@ import java.util.List;
 @RunWith(ParameterizedRunner.class)
 @Batch(Batch.PER_CLASS)
 @CommandLineFlags.Add({ChromeSwitches.DISABLE_FIRST_RUN_EXPERIENCE})
-@DisabledTest(message = "Flaky - http://crbug.com/1424888")
+@DisabledTest(message = "https://crbug.com/1424888")
 public class FastCheckoutRenderTest {
     private static final FastCheckoutAutofillProfile AUTOFILL_PROFILE =
             FastCheckoutTestUtils.createDetailedProfile(
@@ -93,7 +93,7 @@ public class FastCheckoutRenderTest {
                     .setBugComponent(Component.UI_BROWSER_AUTOFILL)
                     // Increase revision number with each UI change if it invalidates previous
                     // golden images.
-                    .setRevision(1)
+                    .setRevision(2)
                     .build();
 
     @Mock

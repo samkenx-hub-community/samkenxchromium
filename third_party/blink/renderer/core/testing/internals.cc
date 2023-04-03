@@ -160,6 +160,7 @@
 #include "third_party/blink/renderer/core/testing/hit_test_layer_rect_list.h"
 #include "third_party/blink/renderer/core/testing/internal_runtime_flags.h"
 #include "third_party/blink/renderer/core/testing/internal_settings.h"
+#include "third_party/blink/renderer/core/testing/internals_ukm_recorder.h"
 #include "third_party/blink/renderer/core/testing/mock_hyphenation.h"
 #include "third_party/blink/renderer/core/testing/origin_trials_test.h"
 #include "third_party/blink/renderer/core/testing/record_test.h"
@@ -345,7 +346,7 @@ class TestReadableStreamSource : public UnderlyingSourceBase {
         return std::make_unique<Optimizer>(
             context->GetTaskRunner(TaskType::kInternalDefault),
             CrossThreadBindOnce(&TestReadableStreamSource::Detach,
-                                WrapCrossThreadWeakPersistent(this)),
+                                MakeUnwrappingCrossThreadWeakHandle(this)),
             type_);
     }
   }
@@ -559,7 +560,7 @@ class TestWritableStreamSink final : public UnderlyingSinkBase {
     return std::make_unique<Optimizer>(
         context->GetTaskRunner(TaskType::kInternalDefault),
         CrossThreadBindOnce(&TestWritableStreamSink::Detach,
-                            WrapCrossThreadWeakPersistent(this)),
+                            MakeUnwrappingCrossThreadWeakHandle(this)),
         optimizer_flag_, type_);
   }
 
@@ -2355,6 +2356,7 @@ Vector<AtomicString> Internals::svgTags() {
 }
 
 StaticNodeList* Internals::nodesFromRect(
+    ScriptState* script_state,
     Document* document,
     int x,
     int y,
@@ -2391,6 +2393,13 @@ StaticNodeList* Internals::nodesFromRect(
   HitTestResult result(request, location);
   frame->ContentLayoutObject()->HitTest(location, result);
   HeapVector<Member<Node>> matches(result.ListBasedTestResult());
+
+  // Ensure WindowProxy instances for child frames. crbug.com/1407555.
+  for (auto& node : matches) {
+    if (node->IsDocumentNode() && node.Get() != document) {
+      node->GetDocument().GetFrame()->GetWindowProxy(script_state->World());
+    }
+  }
 
   return StaticNodeList::Adopt(matches);
 }
@@ -2856,6 +2865,10 @@ SequenceTest* Internals::sequenceTest() const {
 
 UnionTypesTest* Internals::unionTypesTest() const {
   return MakeGarbageCollected<UnionTypesTest>();
+}
+
+InternalsUkmRecorder* Internals::initializeUKMRecorder() {
+  return MakeGarbageCollected<InternalsUkmRecorder>(document_);
 }
 
 OriginTrialsTest* Internals::originTrialsTest() const {

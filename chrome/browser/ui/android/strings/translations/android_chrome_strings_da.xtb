@@ -737,6 +737,7 @@ Hvis du vil ændre denne indstilling, skal du <ph name="BEGIN_LINK" />nulstille 
 <translation id="5001388021414335527">Følg dette website her</translation>
 <translation id="5004416275253351869">Aktivitetsadministration på Google</translation>
 <translation id="5005498671520578047">Kopiér adgangskode</translation>
+<translation id="5010886807652684893">Visuel visning</translation>
 <translation id="5011311129201317034"><ph name="SITE" /> vil gerne oprette forbindelse</translation>
 <translation id="5016205925109358554">Serif</translation>
 <translation id="5017529052065664584">De seneste 15 minutter</translation>
@@ -794,6 +795,7 @@ Hvis du vil ændre denne indstilling, skal du <ph name="BEGIN_LINK" />nulstille 
 <translation id="5342314432463739672">Anmodninger om tilladelse</translation>
 <translation id="53537532693258630">Websites, du har fjernet, vises her</translation>
 <translation id="5355191726083956201">Forbedret beskyttelse er aktiveret</translation>
+<translation id="5361107212971249203">besked</translation>
 <translation id="5368227114232678694">Hvis du vil bruge nettet privat på denne enhed, kan du prøve at bruge inkognitotilstand</translation>
 <translation id="5375577065097716013">Søg efter billedet med Google Lens <ph name="BEGIN_NEW" />Nyhed<ph name="END_NEW" /></translation>
 <translation id="5401851137404501592">For at fortsætte deler <ph name="IDENTITY_PROVIDER_ETLD_PLUS_ONE" /> dit navn, din mailadresse, og dit profilbillede med dette website.</translation>
@@ -1191,6 +1193,7 @@ Nogle websites kan f.eks. reagere på denne anmodning ved at vise dig annoncer, 
 <translation id="7454641608352164238">Der er ikke nok plads</translation>
 <translation id="7455988709578031708">Baseret på din browserhistorik. Denne indstilling er aktiveret.</translation>
 <translation id="7456774706094330779">Udvidet forudindlæsning</translation>
+<translation id="7466431077154602932">Meget tæt visning</translation>
 <translation id="7474822150871987353">Læs om emner på websites uden at forlade siden. Vælg ét eller flere ord på siden for at søge efter dem.</translation>
 <translation id="7475192538862203634">Hvis du ser dette jævnligt, kan du prøve disse <ph name="BEGIN_LINK" />forslag<ph name="END_LINK" />.</translation>
 <translation id="7475688122056506577">SD-kortet blev fundet. Nogle af dine filer mangler muligvis.</translation>
@@ -1320,6 +1323,7 @@ Nogle websites kan f.eks. reagere på denne anmodning ved at vise dig annoncer, 
 <translation id="8058746566562539958">Åbn på ny fane i Chrome</translation>
 <translation id="8062594758852531064">Udvidet forudindlæsning:</translation>
 <translation id="8063895661287329888">Bogmærket kunne ikke tilføjes.</translation>
+<translation id="8066816452984416180">Tilføj hurtigt denne side som bogmærke. Hold fingeren på denne genvej for at redigere den.</translation>
 <translation id="806745655614357130">Hold mine data adskilt</translation>
 <translation id="8073388330009372546">Åbn billede på ny fane</translation>
 <translation id="8076492880354921740">Faner</translation>
@@ -1351,6 +1355,7 @@ Nogle websites kan f.eks. reagere på denne anmodning ved at vise dig annoncer, 
 <translation id="8216351761227087153">Se</translation>
 <translation id="8218622182176210845">Administrer din konto</translation>
 <translation id="8223642481677794647">Feedkortmenu</translation>
+<translation id="8236097722223016103">Føj til bogmærker</translation>
 <translation id="8250920743982581267">Dokumenter</translation>
 <translation id="8255617931166444521">Websites kan kun bruge dine cookies til at se din browseraktivitet på deres eget website</translation>
 <translation id="8259179246279078674">Fordi de forudindlæste sider er krypterede, vil Google ikke få nogle oplysninger om det forudindlæste sideindhold. Googles servere vil få oplysninger om, hvilke websites der forudindlæses privat. Disse oplysninger bruges udelukkende til at forudindlæse siderne og knyttes ikke til andre oplysninger på din Google-konto.</translation>
@@ -1445,6 +1450,7 @@ Nogle websites kan f.eks. reagere på denne anmodning ved at vise dig annoncer, 
 <translation id="869891660844655955">Udløbsdato</translation>
 <translation id="8699120352855309748">Tilbyd ikke at oversætte disse sprog</translation>
 <translation id="8712637175834984815">Forstået</translation>
+<translation id="8723453889042591629">Oversæt hurtigt denne side. Hold fingeren nede for at redigere denne genvej.</translation>
 <translation id="8725066075913043281">Forsøg igen</translation>
 <translation id="8746155870861185046">Del fremhævet</translation>
 <translation id="874726034427945498">Synkroniser dine faner og din historik for at få bedre forslag i adresselinjen</translation>
@@ -1497,6 +1503,7 @@ Nogle websites kan f.eks. reagere på denne anmodning ved at vise dig annoncer, 
 <translation id="8989968390305463310">Din browserhistorik påvirker de annoncer, som du ser, og de interesser, som er estimeret nedenfor. Af hensyn til beskyttelsen af dine personlige oplysninger sletter Chrome automatisk dine interesser en gang om måneden. Interesserne kan blive opdateret, medmindre du fjerner dem.</translation>
 <translation id="8993760627012879038">Åbn en ny fane i inkognitotilstand</translation>
 <translation id="8996847606757455498">Vælg en anden udbyder</translation>
+<translation id="8998289560386111590">Ikke tilgængelig på din enhed</translation>
 <translation id="8998729206196772491">Du er ved at logge ind med en konto, der administreres af <ph name="MANAGED_DOMAIN" />, hvilket giver administratoren kontrol over dine Chrome-data. Dine data tilknyttes denne konto permanent. Hvis du logger ud af Chrome, slettes dine data fra denne enhed, men de forbliver gemt på din Google-konto.</translation>
 <translation id="9022774213089566801">Ofte besøgte</translation>
 <translation id="9022871169049522985">Websites og annoncører kan måle effektiviteten af deres annoncer</translation>

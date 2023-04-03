@@ -49,6 +49,7 @@
 #include "components/viz/test/begin_frame_args_test.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
+#include "third_party/skia/include/core/SkImage.h"
 #include "third_party/skia/include/core/SkImageGenerator.h"
 #include "third_party/skia/include/core/SkRefCnt.h"
 #include "third_party/skia/include/core/SkSurface.h"
@@ -1941,7 +1942,7 @@ class TileManagerOcclusionTest : public TileManagerTest {
         .WillOnce(testing::Invoke([&run_loop]() { run_loop.Quit(); }));
     tile_manager()->PrepareTiles(state);
     run_loop.Run();
-    tile_manager()->CheckForCompletedTasks();
+    tile_manager()->PrepareToDraw();
   }
 
   TileManager* tile_manager() { return host_impl()->tile_manager(); }
@@ -2096,7 +2097,7 @@ TEST_F(PixelInspectTileManagerTest, LowResHasNoImage) {
         .WillOnce(testing::Invoke([&run_loop]() { run_loop.Quit(); }));
     tile_manager->PrepareTiles(host_impl()->global_tile_state());
     run_loop.Run();
-    tile_manager->CheckForCompletedTasks();
+    tile_manager->PrepareToDraw();
 
     Tile* tile = tiling->TileAt(0, 0);
     // The tile in the tiling was rastered.
@@ -2535,7 +2536,7 @@ TEST_F(InvalidResourceTileManagerTest, InvalidResource) {
       .WillOnce(testing::Invoke([&run_loop]() { run_loop.Quit(); }));
   tile_manager->PrepareTiles(host_impl()->global_tile_state());
   run_loop.Run();
-  tile_manager->CheckForCompletedTasks();
+  tile_manager->PrepareToDraw();
 
   Tile* tile = tiling->TileAt(0, 0);
   ASSERT_TRUE(tile);
@@ -3722,7 +3723,7 @@ class HdrImageTileManagerTest : public CheckerImagingTileManagerTest {
     PaintImage hdr_image = PaintImageBuilder::WithDefault()
                                .set_id(PaintImage::kInvalidId)
                                .set_is_high_bit_depth(true)
-                               .set_image(SkImage::MakeFromBitmap(bitmap),
+                               .set_image(SkImages::RasterFromBitmap(bitmap),
                                           PaintImage::GetNextContentId())
                                .TakePaintImage();
 

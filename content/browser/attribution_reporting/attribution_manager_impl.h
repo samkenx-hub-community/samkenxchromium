@@ -32,6 +32,10 @@
 #include "third_party/abseil-cpp/absl/types/optional.h"
 #include "third_party/abseil-cpp/absl/types/variant.h"
 
+#if BUILDFLAG(IS_ANDROID)
+#include "content/browser/attribution_reporting/attribution_reporting.mojom-forward.h"
+#endif
+
 namespace attribution_reporting {
 class SuitableOrigin;
 }  // namespace attribution_reporting
@@ -165,7 +169,9 @@ class CONTENT_EXPORT AttributionManagerImpl : public AttributionManager {
     return attribution_os_level_manager_.get();
   }
 
-  void NotifyOsRegistration(const OsRegistration&, bool is_debug_key_allowed);
+  void NotifyOsRegistration(const OsRegistration&,
+                            bool is_debug_key_allowed,
+                            attribution_reporting::mojom::OsRegistrationResult);
 
 #endif  // BUILDFLAG(IS_ANDROID)
 
@@ -185,7 +191,6 @@ class CONTENT_EXPORT AttributionManagerImpl : public AttributionManager {
       std::unique_ptr<AttributionStorageDelegate> storage_delegate,
       std::unique_ptr<AttributionCookieChecker> cookie_checker,
       std::unique_ptr<AttributionReportSender> report_sender,
-      std::unique_ptr<AttributionDataHostManager> data_host_manager,
       scoped_refptr<base::UpdateableSequencedTaskRunner> storage_task_runner);
 
   void MaybeEnqueueEvent(SourceOrTrigger);
@@ -256,6 +261,9 @@ class CONTENT_EXPORT AttributionManagerImpl : public AttributionManager {
   void OverrideOsLevelManagerForTesting(
       std::unique_ptr<AttributionOsLevelManager>);
   void ProcessNextOsEvent();
+  void OnOsRegistration(const OsRegistration&,
+                        bool is_debug_key_allowed,
+                        bool success);
 #endif  // BUILDFLAG(IS_ANDROID)
 
   // Never null.

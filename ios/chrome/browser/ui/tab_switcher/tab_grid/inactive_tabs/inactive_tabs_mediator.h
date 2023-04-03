@@ -24,8 +24,17 @@ class WebStateList;
     NS_DESIGNATED_INITIALIZER;
 - (instancetype)init NS_UNAVAILABLE;
 
+// Returns the number of items pushed to the consumer.
+- (NSInteger)numberOfItems;
+
 // Tells the receiver to close the item with the `itemID` identifier.
 - (void)closeItemWithID:(NSString*)itemID;
+
+// Tells the receiver to close all items of the web state list.
+- (void)closeAllItems;
+
+// Disconnects the mediator.
+- (void)disconnect;
 
 @end
 

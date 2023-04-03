@@ -39,6 +39,13 @@ BASE_FEATURE(kAutofillDetectRemovedFormControls,
              "AutofillDetectRemovedFormControls",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
+// If disabled (default for many years), autofilling triggers KeyDown and
+// KeyUp events that do not send any key codes. If enabled, these events
+// contain the "Unidentified" key.
+BASE_FEATURE(kAutofillSendUnidentifiedKeyAfterFill,
+             "AutofillSendUnidentifiedKeyAfterFill",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 // Apply lazy-loading to ad frames which have embeds likely impacting Core Web
 // Vitals.
 BASE_FEATURE(kAutomaticLazyFrameLoadingToAds,
@@ -287,6 +294,11 @@ constexpr base::FeatureParam<bool>
                                                   "fledge_extensions_enabled",
                                                   /*default_value=*/false};
 
+// Maximum budget allowed to be claimed per-origin per-day per-API. See
+// `content::PrivateAggregationBudgeter` for more detail.
+constexpr base::FeatureParam<int> kPrivateAggregationApiMaxBudgetPerScope{
+    &kPrivateAggregationApi, "max_budget_per_scope", /*default_value=*/65536};
+
 // Enable the shared storage API. Note that enabling this feature does not
 // automatically expose this API to the web, it only allows the element to be
 // enabled by the runtime enabled feature, for origin trials.
@@ -357,7 +369,7 @@ const base::FeatureParam<int> kSharedStorageReportEventBitBudgetPerPageLoad = {
 
 BASE_FEATURE(kPrerender2SequentialPrerendering,
              "Prerender2SequentialPrerendering",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 BASE_FEATURE(kPrerender2MainFrameNavigation,
              "Prerender2MainFrameNavigation",
@@ -970,7 +982,7 @@ const base::FeatureParam<int> kInterestGroupStorageMaxOwners{
 const base::FeatureParam<int> kInterestGroupStorageMaxGroupsPerOwner{
     &kInterestGroupStorage, "max_groups_per_owner", 1000};
 const base::FeatureParam<int> kInterestGroupStorageMaxOpsBeforeMaintenance{
-    &kInterestGroupStorage, "max_ops_before_maintenance", 1000000};
+    &kInterestGroupStorage, "max_ops_before_maintenance", 1000};
 
 // See https://github.com/WICG/turtledove/blob/main/FLEDGE.md
 // Enables FLEDGE implementation. See https://crbug.com/1186444.
@@ -1485,7 +1497,7 @@ BASE_FEATURE(kStylusWritingToInput,
 
 BASE_FEATURE(kAndroidExtendedKeyboardShortcuts,
              "AndroidExtendedKeyboardShortcuts",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 BASE_FEATURE(kStylusPointerAdjustment,
              "StylusPointerAdjustment",
@@ -1642,7 +1654,7 @@ BASE_FEATURE(kForceHighPerformanceGPUForWebGL,
 
 BASE_FEATURE(kSplitUserMediaQueues,
              "SplitUserMediaQueues",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 BASE_FEATURE(kTextCodecCJKEnabled,
              "TextCodecCJKEnabled",
@@ -1723,7 +1735,7 @@ BASE_FEATURE(kQuoteEmptySecChUaStringHeadersConsistently,
              base::FEATURE_ENABLED_BY_DEFAULT);
 
 const base::FeatureParam<int> kStorageAccessAPIImplicitGrantLimit{
-    &kStorageAccessAPI, "storage-access-api-implicit-grant-limit", 5};
+    &kStorageAccessAPI, "storage-access-api-implicit-grant-limit", 0};
 const base::FeatureParam<bool> kStorageAccessAPIAutoGrantInFPS{
     &kStorageAccessAPI, "storage_access_api_auto_grant_in_fps", true};
 const base::FeatureParam<bool> kStorageAccessAPIAutoDenyOutsideFPS{
@@ -1754,6 +1766,10 @@ BASE_FEATURE(kMemoryCacheStrongReferenceFilterImages,
 
 BASE_FEATURE(kRemoteResourceCache,
              "RemoteResourceCache",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+BASE_FEATURE(kKeepAliveInBrowserMigration,
+             "KeepAliveInBrowserMigration",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 }  // namespace features

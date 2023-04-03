@@ -187,28 +187,6 @@ class CORE_EXPORT LayoutBlock : public LayoutBox {
     return has_positioned_objects_;
   }
 
-  void AddPercentHeightDescendant(LayoutBox*);
-  void RemovePercentHeightDescendant(LayoutBox*);
-  bool HasPercentHeightDescendant(LayoutBox* o) const {
-    NOT_DESTROYED();
-    return HasPercentHeightDescendants() &&
-           PercentHeightDescendantsInternal()->Contains(o);
-  }
-
-  TrackedLayoutBoxLinkedHashSet* PercentHeightDescendants() const {
-    NOT_DESTROYED();
-    return HasPercentHeightDescendants() ? PercentHeightDescendantsInternal()
-                                         : nullptr;
-  }
-  bool HasPercentHeightDescendants() const {
-    NOT_DESTROYED();
-    DCHECK(has_percent_height_descendants_
-               ? (PercentHeightDescendantsInternal() &&
-                  !PercentHeightDescendantsInternal()->empty())
-               : !PercentHeightDescendantsInternal());
-    return has_percent_height_descendants_;
-  }
-
   void AddSvgTextDescendant(LayoutBox& svg_text);
   void RemoveSvgTextDescendant(LayoutBox& svg_text);
 
@@ -231,27 +209,6 @@ class CORE_EXPORT LayoutBlock : public LayoutBox {
     NOT_DESTROYED();
     return has_markup_truncation_;
   }
-
-  void SetHasMarginBeforeQuirk(bool b) {
-    NOT_DESTROYED();
-    has_margin_before_quirk_ = b;
-  }
-  void SetHasMarginAfterQuirk(bool b) {
-    NOT_DESTROYED();
-    has_margin_after_quirk_ = b;
-  }
-
-  bool HasMarginBeforeQuirk() const {
-    NOT_DESTROYED();
-    return has_margin_before_quirk_;
-  }
-  bool HasMarginAfterQuirk() const {
-    NOT_DESTROYED();
-    return has_margin_after_quirk_;
-  }
-
-  bool HasMarginBeforeQuirk(const LayoutBox* child) const;
-  bool HasMarginAfterQuirk(const LayoutBox* child) const;
 
   void MarkPositionedObjectsForLayout();
 
@@ -330,8 +287,6 @@ class CORE_EXPORT LayoutBlock : public LayoutBox {
     NOT_DESTROYED();
     child.SetMarginAfter(value, Style());
   }
-  LayoutUnit CollapsedMarginBeforeForChild(const LayoutBox& child) const;
-  LayoutUnit CollapsedMarginAfterForChild(const LayoutBox& child) const;
 
   enum ScrollbarChangeContext { kStyleChange, kLayout };
   virtual void ScrollbarsChanged(bool horizontal_scrollbar_changed,
@@ -412,8 +367,6 @@ class CORE_EXPORT LayoutBlock : public LayoutBox {
  protected:
   void WillBeDestroyed() override;
 
-  void DirtyForLayoutFromPercentageHeightDescendants(SubtreeLayoutScope&);
-
   void UpdateLayout() override;
 
   enum PositionedLayoutBehavior {
@@ -491,9 +444,6 @@ class CORE_EXPORT LayoutBlock : public LayoutBox {
   void StyleDidChange(StyleDifference, const ComputedStyle* old_style) override;
   bool RespectsCSSOverflow() const override;
 
-  bool SimplifiedLayout();
-  virtual void SimplifiedNormalFlowLayout();
-
  private:
   void AddLayoutOverflowFromPositionedObjects();
   void AddLayoutOverflowFromBlockChildren();
@@ -555,10 +505,6 @@ class CORE_EXPORT LayoutBlock : public LayoutBox {
   virtual void RemoveLeftoverAnonymousBlock(LayoutBlock* child);
 
   TrackedLayoutBoxLinkedHashSet* PositionedObjectsInternal() const;
-  TrackedLayoutBoxLinkedHashSet* PercentHeightDescendantsInternal() const;
-
-  // Returns true if the positioned movement-only layout succeeded.
-  bool TryLayoutDoingPositionedMovementOnly();
 
   void ComputeBlockPreferredLogicalWidths(LayoutUnit& min_logical_width,
                                           LayoutUnit& max_logical_width) const;
@@ -605,8 +551,6 @@ class CORE_EXPORT LayoutBlock : public LayoutBox {
 
   // Note these quirk values can't be put in LayoutBlockRareData since they are
   // set too frequently.
-  unsigned has_margin_before_quirk_ : 1;
-  unsigned has_margin_after_quirk_ : 1;
   unsigned has_markup_truncation_ : 1;
   unsigned width_available_to_children_changed_ : 1;
   unsigned height_available_to_children_changed_ : 1;
@@ -615,7 +559,6 @@ class CORE_EXPORT LayoutBlock : public LayoutBox {
   unsigned descendants_with_floats_marked_for_layout_ : 1;
 
   unsigned has_positioned_objects_ : 1;
-  unsigned has_percent_height_descendants_ : 1;
   unsigned has_svg_text_descendants_ : 1;
 
   // When an object ceases to establish a fragmentation context (e.g. the

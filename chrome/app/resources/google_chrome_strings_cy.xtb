@@ -24,6 +24,7 @@ Mae'n bosib na fydd rhai nodweddion ar gael ac ni fydd newidiadau o ran dewisiad
 <translation id="1399397803214730675">Mae gan y cyfrifiadur hwn fersiwn mwy diweddar o Google Chrome. Os nad yw'r feddalwedd yn gweithio, dadosodwch Google Chrome a rhowch gynnig arall arni.</translation>
 <translation id="139993653570221430">Gallwch newid eich meddwl ar unrhyw bryd yng ngosodiadau Chrome. Mae'r profion yn rhedeg ochr yn ochr â'r ffordd bresennol o gyflwyno hysbysebion, felly ni fyddwch yn gweld newidiadau ar unwaith.</translation>
 <translation id="1434626383986940139">Apiau Chrome Canary</translation>
+<translation id="1496905273983707119">{NUM_DEVICES,plural, =0{Roedd Google Chrome wedi'i gysylltu â dyfais HID}=1{Mae Google Chrome wedi'i gysylltu â dyfais HID}two{Mae Google Chrome wedi'i gysylltu â dyfeisiau HID}few{Mae Google Chrome wedi'i gysylltu â dyfeisiau HID}many{Mae Google Chrome wedi'i gysylltu â dyfeisiau HID}other{Mae Google Chrome wedi'i gysylltu â dyfeisiau HID}}</translation>
 <translation id="1507198376417198979">Personoleiddio eich proffil Chrome newydd</translation>
 <translation id="1516530951338665275">Mae angen mynediad Bluetooth ar Google Chrome i barhau i 
 baru <ph name="IDS_BLUETOOTH_DEVICE_CHOOSER_AUTHORIZE_BLUETOOTH_LINK" /></translation>
@@ -126,7 +127,6 @@ baru <ph name="IDS_BLUETOOTH_DEVICE_CHOOSER_AUTHORIZE_BLUETOOTH_LINK" /></transl
 <translation id="3140883423282498090">Bydd eich newidiadau yn dod i rym y tro nesaf y byddwch yn ail-lansio Google Chrome.</translation>
 <translation id="3149510190863420837">Apiau Chrome</translation>
 <translation id="3169523567916669830">Yn ystod y profion, gallwch weld a chael gwared ar bynciau sydd o ddiddordeb y mae gwefannau yn eu defnyddio i ddangos hysbysebion i chi. Mae Chrome yn amcangyfrif eich diddordebau yn seiliedig ar eich hanes pori diweddar.</translation>
-<translation id="3211604354460514046">{NUM_DEVICES,plural, =1{Mae Google Chrome wedi'i gysylltu â dyfais HID}zero{Mae Google Chrome wedi'i gysylltu â dyfeisiau HID}two{Mae Google Chrome wedi'i gysylltu â dyfeisiau HID}few{Mae Google Chrome wedi'i gysylltu â dyfeisiau HID}many{Mae Google Chrome wedi'i gysylltu â dyfeisiau HID}other{Mae Google Chrome wedi'i gysylltu â dyfeisiau HID}}</translation>
 <translation id="3245429137663807393">Os ydych hefyd yn rhannu adroddiadau defnydd Chrome, mae'r adroddiadau hynny'n cynnwys y cyfeiriadau URL rydych yn ymweld â nhw</translation>
 <translation id="3282568296779691940">Mewngofnodi i Chrome</translation>
 <translation id="3286538390144397061">Ailddechrau Nawr</translation>

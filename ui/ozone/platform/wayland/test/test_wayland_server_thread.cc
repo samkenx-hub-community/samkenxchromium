@@ -20,6 +20,7 @@
 #include "base/strings/string_number_conversions.h"
 #include "base/test/bind.h"
 #include "ui/ozone/platform/wayland/test/test_gtk_primary_selection.h"
+#include "ui/ozone/platform/wayland/test/test_zcr_text_input_extension.h"
 #include "ui/ozone/platform/wayland/test/test_zwp_primary_selection.h"
 
 namespace wl {
@@ -46,6 +47,9 @@ TestWaylandServerThread::TestWaylandServerThread()
       client_destroy_listener_(this),
       compositor_v4_(4),
       compositor_v3_(3),
+      output_(base::BindRepeating(
+          &TestWaylandServerThread::OnTestOutputMetricsFlush,
+          base::Unretained(this))),
       controller_(FROM_HERE) {
   DETACH_FROM_THREAD(thread_checker_);
 }
@@ -105,6 +109,25 @@ bool TestWaylandServerThread::Start(const ServerConfig& config) {
   if (!alpha_compositing_.Initialize(display_.get()))
     return false;
 
+  if (config.enable_aura_shell == EnableAuraShellProtocol::kEnabled) {
+    if (config.use_aura_output_manager) {
+      // zaura_output_manager should be initialized before any wl_output
+      // globals.
+      if (!zaura_output_manager_.Initialize(display_.get())) {
+        return false;
+      }
+    } else {
+      if (!zxdg_output_manager_.Initialize(display_.get())) {
+        return false;
+      }
+    }
+
+    output_.set_aura_shell_enabled();
+    if (!zaura_shell_.Initialize(display_.get())) {
+      return false;
+    }
+  }
+
   if (!output_.Initialize(display_.get()))
     return false;
 
@@ -119,23 +142,23 @@ bool TestWaylandServerThread::Start(const ServerConfig& config) {
   if (!xdg_shell_.Initialize(display_.get()))
     return false;
 
-  if (config.enable_aura_shell == EnableAuraShellProtocol::kEnabled) {
-    if (!zaura_output_manager_.Initialize(display_.get())) {
-      return false;
-    }
-
-    if (!zxdg_output_manager_.Initialize(display_.get()))
-      return false;
-
-    output_.set_aura_shell_enabled();
-    if (!zaura_shell_.Initialize(display_.get()))
-      return false;
-  }
-
   if (!zcr_stylus_.Initialize(display_.get()))
     return false;
-  if (!zcr_text_input_extension_v1_.Initialize(display_.get()))
+
+  switch (config.text_input_extension_version) {
+    case TextInputExtensionVersion::kV7:
+      zcr_text_input_extension_v1_ =
+          std::make_unique<TestZcrTextInputExtensionV1>(7);
+      break;
+    case TextInputExtensionVersion::kV8:
+      zcr_text_input_extension_v1_ =
+          std::make_unique<TestZcrTextInputExtensionV1>(8);
+      break;
+  }
+  if (!zcr_text_input_extension_v1_->Initialize(display_.get())) {
     return false;
+  }
+
   if (!zwp_text_input_manager_v1_.Initialize(display_.get()))
     return false;
   if (!SetupExplicitSynchronizationProtocol(
@@ -208,6 +231,14 @@ TestSurfaceAugmenter* TestWaylandServerThread::EnsureSurfaceAugmenter() {
   if (surface_augmenter_.Initialize(display_.get()))
     return &surface_augmenter_;
   return nullptr;
+}
+
+void TestWaylandServerThread::OnTestOutputMetricsFlush(
+    wl_resource* output_resource,
+    const TestOutputMetrics& metrics) {
+  if (zaura_output_manager_.resource()) {
+    zaura_output_manager_.SendOutputMetrics(output_resource, metrics);
+  }
 }
 
 void TestWaylandServerThread::OnClientDestroyed(wl_client* client) {

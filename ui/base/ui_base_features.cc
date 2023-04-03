@@ -131,11 +131,6 @@ bool IsPercentBasedScrollingEnabled() {
   return base::FeatureList::IsEnabled(features::kWindowsScrollingPersonality);
 }
 
-// Allows requesting unadjusted movement when entering pointerlock.
-BASE_FEATURE(kPointerLockOptions,
-             "PointerLockOptions",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
 // Uses a stylus-specific tap slop region parameter for gestures.  Stylus taps
 // tend to slip more than touch taps (presumably because the user doesn't feel
 // the movement friction with a stylus).  As a result, it is harder to tap with
@@ -464,6 +459,10 @@ BASE_FEATURE(kChromeRefresh2023,
 bool IsChromeRefresh2023() {
   return base::FeatureList::IsEnabled(kChromeRefresh2023);
 }
+
+BASE_FEATURE(kWebUiSystemFont,
+             "WebUiSystemFont",
+             base::FEATURE_DISABLED_BY_DEFAULT);
 
 BASE_FEATURE(kUseNanosecondsForMotionEvent,
              "UseNanosecondsForMotionEvent",

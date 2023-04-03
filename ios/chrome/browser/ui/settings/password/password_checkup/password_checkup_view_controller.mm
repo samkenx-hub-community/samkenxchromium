@@ -6,6 +6,7 @@
 
 #import "base/metrics/user_metrics.h"
 #import "base/strings/string_number_conversions.h"
+#import "components/strings/grit/components_strings.h"
 #import "ios/chrome/browser/shared/ui/table_view/cells/table_view_text_item.h"
 #import "ios/chrome/browser/shared/ui/util/uikit_ui_util.h"
 #import "ios/chrome/browser/ui/icons/symbols.h"
@@ -19,13 +20,13 @@
 #import "ios/chrome/common/ui/colors/semantic_color_names.h"
 #import "ios/chrome/grit/ios_strings.h"
 #import "ui/base/l10n/l10n_util.h"
-#import "ui/base/l10n/l10n_util_mac.h"
 
 #if !defined(__has_feature) || !__has_feature(objc_arc)
 #error "This file requires ARC support."
 #endif
 
 using password_manager::InsecurePasswordCounts;
+using password_manager::WarningType;
 
 namespace {
 
@@ -81,7 +82,6 @@ UIImage* GetHeaderImage(PasswordCheckupHomepageState password_checkup_state,
     case PasswordCheckupHomepageStateRunning:
       return [UIImage
           imageNamed:password_manager::kPasswordCheckupHeaderImageLoading];
-    case PasswordCheckupHomepageStateError:
     case PasswordCheckupHomepageStateDisabled:
       return nil;
   }
@@ -152,7 +152,6 @@ void SetUpTrailingIconAndAccessoryType(
       item.indicatorHidden = NO;
       break;
     }
-    case PasswordCheckupHomepageStateError:
     case PasswordCheckupHomepageStateDisabled:
       break;
   }
@@ -187,6 +186,12 @@ void SetUpTrailingIconAndAccessoryType(
 
   // Password counts associated with the different insecure types.
   InsecurePasswordCounts _insecurePasswordCounts;
+
+  // The string containing the timestamp of the last completed check.
+  NSString* _formattedElapsedTimeSinceLastCheck;
+
+  // The number of affiliated groups for which the user has saved passwords.
+  NSInteger _affiliatedGroupCount;
 
   // Image view at the top of the screen, indicating the overall Password
   // Checkup status.
@@ -285,6 +290,11 @@ void SetUpTrailingIconAndAccessoryType(
   }
   [model addItem:_checkPasswordsButtonItem
       toSectionWithIdentifier:SectionIdentifierLastPasswordCheckup];
+
+  if (_consumerHasBeenUpdated) {
+    [self updateItemsDependingOnPasswordCheckupState];
+  }
+  [self updatePasswordCheckupTimestampDetailText];
 }
 
 #pragma mark - Items
@@ -375,20 +385,38 @@ void SetUpTrailingIconAndAccessoryType(
 
   _passwordCheckupState = state;
   _insecurePasswordCounts = insecurePasswordCounts;
-  [self updateHeaderImage];
-  [self updateCompromisedPasswordsItem];
-  [self updateReusedPasswordsItem];
-  [self updateWeakPasswordsItem];
-  [self updatePasswordCheckupTimestampTextWith:
-            formattedElapsedTimeSinceLastCheck];
-  [self updateCheckPasswordsButtonItem];
+  _formattedElapsedTimeSinceLastCheck = formattedElapsedTimeSinceLastCheck;
+  [self updateItemsDependingOnPasswordCheckupState];
 
   _consumerHasBeenUpdated = YES;
 }
 
 - (void)setAffiliatedGroupCount:(NSInteger)affiliatedGroupCount {
-  [self updatePasswordCheckupTimestampDetailTextWithAffiliatedGroupCount:
-            affiliatedGroupCount];
+  // If the affiliated group count hasn't changed, there is no need to update
+  // the item.
+  if (_affiliatedGroupCount == affiliatedGroupCount) {
+    return;
+  }
+
+  _affiliatedGroupCount = affiliatedGroupCount;
+  [self updatePasswordCheckupTimestampDetailText];
+}
+
+- (void)showErrorDialogWithMessage:(NSString*)message {
+  NSString* title = l10n_util::GetNSString(
+      IDS_IOS_PASSWORD_CHECKUP_HOMEPAGE_ERROR_DIALOG_TITLE);
+  UIAlertController* alert =
+      [UIAlertController alertControllerWithTitle:title
+                                          message:message
+                                   preferredStyle:UIAlertControllerStyleAlert];
+
+  UIAlertAction* okAction =
+      [UIAlertAction actionWithTitle:l10n_util::GetNSString(IDS_OK)
+                               style:UIAlertActionStyleDefault
+                             handler:nil];
+  [alert addAction:okAction];
+
+  [self presentViewController:alert animated:YES completion:nil];
 }
 
 #pragma mark - UITableViewDelegate
@@ -402,8 +430,16 @@ void SetUpTrailingIconAndAccessoryType(
       static_cast<ItemType>([model itemTypeForIndexPath:indexPath]);
   switch (itemType) {
     case ItemTypeCompromisedPasswords:
+      [self.handler showPasswordIssuesWithWarningType:
+                        WarningType::kCompromisedPasswordsWarning];
+      break;
     case ItemTypeReusedPasswords:
+      [self.handler showPasswordIssuesWithWarningType:
+                        WarningType::kReusedPasswordsWarning];
+      break;
     case ItemTypeWeakPasswords:
+      [self.handler
+          showPasswordIssuesWithWarningType:WarningType::kWeakPasswordsWarning];
       break;
     case ItemTypePasswordCheckupTimestamp:
       break;
@@ -484,15 +520,17 @@ void SetUpTrailingIconAndAccessoryType(
       [_headerImageView setImage:headerImage];
       break;
     }
-    case PasswordCheckupHomepageStateError:
     case PasswordCheckupHomepageStateDisabled:
       break;
   }
-  [self.tableView layoutIfNeeded];
 }
 
 // Updates the `_compromisedPasswordsItem`.
 - (void)updateCompromisedPasswordsItem {
+  if (!_compromisedPasswordsItem) {
+    return;
+  }
+
   BOOL hasCompromisedPasswords = _insecurePasswordCounts.compromised_count > 0;
   BOOL hasDismissedWarnings = _insecurePasswordCounts.dismissed_count > 0;
 
@@ -512,6 +550,10 @@ void SetUpTrailingIconAndAccessoryType(
 
 // Updates the `_reusedPasswordsItem`.
 - (void)updateReusedPasswordsItem {
+  if (!_reusedPasswordsItem) {
+    return;
+  }
+
   BOOL hasReusedPasswords = _insecurePasswordCounts.reused_count > 0;
 
   NSString* text;
@@ -539,6 +581,10 @@ void SetUpTrailingIconAndAccessoryType(
 
 // Updates the `_weakPasswordsItem`.
 - (void)updateWeakPasswordsItem {
+  if (!_weakPasswordsItem) {
+    return;
+  }
+
   BOOL hasWeakPasswords = _insecurePasswordCounts.weak_count > 0;
 
   NSString* text;
@@ -565,8 +611,11 @@ void SetUpTrailingIconAndAccessoryType(
 }
 
 // Updates the `_passwordCheckupTimestampItem` text.
-- (void)updatePasswordCheckupTimestampTextWith:
-    (NSString*)formattedElapsedTimeSinceLastCheck {
+- (void)updatePasswordCheckupTimestampText {
+  if (!_passwordCheckupTimestampItem) {
+    return;
+  }
+
   switch (_passwordCheckupState) {
     case PasswordCheckupHomepageStateRunning: {
       _passwordCheckupTimestampItem.text =
@@ -575,9 +624,8 @@ void SetUpTrailingIconAndAccessoryType(
       break;
     }
     case PasswordCheckupHomepageStateDone:
-    case PasswordCheckupHomepageStateError:
     case PasswordCheckupHomepageStateDisabled:
-      _passwordCheckupTimestampItem.text = formattedElapsedTimeSinceLastCheck;
+      _passwordCheckupTimestampItem.text = _formattedElapsedTimeSinceLastCheck;
       _passwordCheckupTimestampItem.indicatorHidden = YES;
       break;
   }
@@ -586,16 +634,23 @@ void SetUpTrailingIconAndAccessoryType(
 }
 
 // Updates the `_passwordCheckupTimestampItem` detail text.
-- (void)updatePasswordCheckupTimestampDetailTextWithAffiliatedGroupCount:
-    (NSInteger)affiliatedGroupCount {
+- (void)updatePasswordCheckupTimestampDetailText {
+  if (!_passwordCheckupTimestampItem) {
+    return;
+  }
+
   _passwordCheckupTimestampItem.detailText = l10n_util::GetPluralNSStringF(
-      IDS_IOS_PASSWORD_CHECKUP_SITES_AND_APPS_COUNT, affiliatedGroupCount);
+      IDS_IOS_PASSWORD_CHECKUP_SITES_AND_APPS_COUNT, _affiliatedGroupCount);
 
   [self reconfigureCellsForItems:@[ _passwordCheckupTimestampItem ]];
 }
 
 // Updates the `_checkPasswordsButtonItem`.
 - (void)updateCheckPasswordsButtonItem {
+  if (!_checkPasswordsButtonItem) {
+    return;
+  }
+
   if (_passwordCheckupState == PasswordCheckupHomepageStateRunning) {
     _checkPasswordsButtonItem.enabled = NO;
     _checkPasswordsButtonItem.textColor =
@@ -610,6 +665,16 @@ void SetUpTrailingIconAndAccessoryType(
   }
 
   [self reconfigureCellsForItems:@[ _checkPasswordsButtonItem ]];
+}
+
+// Updates all items whose content is depending on `_passwordCheckupState`.
+- (void)updateItemsDependingOnPasswordCheckupState {
+  [self updateHeaderImage];
+  [self updateCompromisedPasswordsItem];
+  [self updateReusedPasswordsItem];
+  [self updateWeakPasswordsItem];
+  [self updatePasswordCheckupTimestampText];
+  [self updateCheckPasswordsButtonItem];
 }
 
 @end

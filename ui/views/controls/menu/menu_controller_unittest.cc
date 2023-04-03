@@ -3351,6 +3351,31 @@ TEST_F(MenuControllerTest, BrowserHotkeysCancelMenusAndAreRedispatched) {
 }
 #endif
 
+#if BUILDFLAG(IS_WIN)
+#define MAYBE_SubmenuOpenByKey DISABLED_SubmenuOpenByKey
+#else
+#define MAYBE_SubmenuOpenByKey SubmenuOpenByKey
+#endif
+TEST_F(MenuControllerTest, MAYBE_SubmenuOpenByKey) {
+  // Create a submenu.
+  MenuItemView* const child_menu = menu_item()->GetSubmenu()->GetMenuItemAt(0);
+  SubmenuView* sub_menu = child_menu->CreateSubmenu();
+  child_menu->AppendMenuItem(5, u"Five");
+  child_menu->AppendMenuItem(6, u"Six");
+
+  // Open the menu and select the menu item that has a submenu.
+  OpenMenu(menu_item());
+  SetPendingStateItem(child_menu);
+  SetState(child_menu);
+  EXPECT_EQ(1, pending_state_item()->GetCommand());
+  EXPECT_EQ(nullptr, sub_menu->host());
+
+  // Dispatch a key to open the submenu.
+  DispatchKey(ui::VKEY_RIGHT);
+  EXPECT_EQ(5, pending_state_item()->GetCommand());
+  EXPECT_NE(nullptr, sub_menu->host());
+}
+
 class ExecuteCommandWithoutClosingMenuTest : public MenuControllerTest {
  public:
   void SetUp() override {

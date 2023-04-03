@@ -714,6 +714,38 @@ class DriveIntegrationService::DriveFsHolder
   base::OnceClosure pending_connect_to_extension_request_;
 };
 
+// Updates the bulk pinning preference when the `PinManager` stops or errors.
+using drivefs::pinning::PinManager;
+using drivefs::pinning::Progress;
+using drivefs::pinning::Stage;
+class DriveIntegrationService::BulkPinningPrefUpdater
+    : public PinManager::Observer {
+ public:
+  explicit BulkPinningPrefUpdater(PrefService* pref_service)
+      : pref_service_(pref_service) {
+    DCHECK(pref_service_);
+  }
+
+  void OnProgress(const Progress& progress) override {
+    if (progress.IsStoppedOrError()) {
+      DisableBulkPinningPref();
+    }
+  }
+
+  void OnDrop() override { DisableBulkPinningPref(); }
+
+ private:
+  void DisableBulkPinningPref() {
+    if (!pref_service_) {
+      LOG(ERROR) << "Service unavailable to update bulk pinning pref";
+      return;
+    }
+    pref_service_->SetBoolean(drive::prefs::kDriveFsBulkPinningEnabled, false);
+  }
+
+  raw_ptr<PrefService> const pref_service_;
+};
+
 DriveIntegrationService::DriveIntegrationService(
     Profile* profile,
     const std::string& test_mount_point_name,
@@ -1074,6 +1106,10 @@ void DriveIntegrationService::RemoveDriveMountPoint() {
 
   if (pin_manager_) {
     pin_manager_->Stop();
+    if (bulk_pinning_pref_updater_) {
+      pin_manager_->RemoveObserver(bulk_pinning_pref_updater_.get());
+      bulk_pinning_pref_updater_.reset();
+    }
     GetDriveFsHost()->RemoveObserver(pin_manager_.get());
     pin_manager_.reset();
     GetDriveFsHost()->SetAlwaysEnableDocsOffline(false);
@@ -1160,6 +1196,10 @@ void DriveIntegrationService::OnMounted(const base::FilePath& mount_path) {
     DCHECK(!pin_manager_);
     pin_manager_ = std::make_unique<PinManager>(profile_->GetPath(),
                                                 GetDriveFsInterface());
+    DCHECK(!bulk_pinning_pref_updater_);
+    bulk_pinning_pref_updater_ =
+        std::make_unique<BulkPinningPrefUpdater>(GetPrefs());
+    pin_manager_->AddObserver(bulk_pinning_pref_updater_.get());
     GetDriveFsHost()->AddObserver(pin_manager_.get());
 
     if (preference_watcher_) {
@@ -1285,6 +1325,7 @@ void DriveIntegrationService::ToggleBulkPinning() {
   GetDriveFsHost()->SetAlwaysEnableDocsOffline(enabled);
 
   if (enabled) {
+    pin_manager_->ShouldPin(true);
     pin_manager_->Start();
   } else {
     pin_manager_->Stop();
@@ -1326,7 +1367,7 @@ void DriveIntegrationService::OnGetOfflineItemsPage(
       error != drive::FILE_ERROR_OK || results->empty() ||
       callback.IsCancelled()) {
     LOG_IF(ERROR, error != drive::FILE_ERROR_OK)
-        << "Failed to get offline size: " << drive::FileErrorToString(error);
+        << "Cannot get offline size: " << error;
     std::move(callback).Run(total_size);
     return;
   }

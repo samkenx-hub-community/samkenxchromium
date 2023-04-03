@@ -75,9 +75,6 @@
 #include "third_party/blink/renderer/core/html_names.h"
 #include "third_party/blink/renderer/core/input_type_names.h"
 #include "third_party/blink/renderer/core/layout/layout_inline.h"
-#include "third_party/blink/renderer/core/layout/layout_table.h"
-#include "third_party/blink/renderer/core/layout/layout_table_cell.h"
-#include "third_party/blink/renderer/core/layout/layout_table_row.h"
 #include "third_party/blink/renderer/core/layout/layout_view.h"
 #include "third_party/blink/renderer/core/layout/line/abstract_inline_text_box.h"
 #include "third_party/blink/renderer/core/page/chrome_client.h"
@@ -2905,6 +2902,17 @@ void AXObjectCacheImpl::ListboxActiveIndexChanged(HTMLSelectElement* select) {
   ax_object->ActiveIndexChanged();
 }
 
+void AXObjectCacheImpl::SetMenuListOptionsBounds(
+    HTMLSelectElement* select,
+    const WTF::Vector<gfx::Rect>& options_bounds) {
+  auto* ax_object = DynamicTo<AXMenuList>(Get(select));
+  if (!ax_object) {
+    return;
+  }
+
+  ax_object->SetOptionsBounds(options_bounds);
+}
+
 // This is called when the actual style of an object changed, which can occur in
 // script-based animations as opposed to more automated animations, e.g. via CSS
 // or SVG animation.
@@ -4048,6 +4056,32 @@ void AXObjectCacheImpl::SerializeDirtyObjectsAndEvents(
 
     VLOG(1) << "AXEvent: " << event.event_type << " on "
             << ObjectFromAXID(event.id);
+  }
+}
+
+void AXObjectCacheImpl::GetImagesToAnnotate(
+    ui::AXTreeUpdate& update,
+    std::vector<ui::AXNodeData*>& nodes) {
+  for (auto& node : update.nodes) {
+    AXObject* src = ObjectFromAXID(node.id);
+    if (!src || src->IsDetached() || !src->AccessibilityIsIncludedInTree() ||
+        (src->AccessibilityIsIgnored() &&
+         !node.HasState(ax::mojom::blink::State::kFocusable))) {
+      continue;
+    }
+
+    if (src->IsImage()) {
+      nodes.push_back(&node);
+      // This else clause matches links/documents because we would like to find
+      // an image that is in the near-descendant subtree of the link/document,
+      // since that image may be semantically representative of that
+      // link/document. See FindExactlyOneInnerImageInMaxDepthThree (not in
+      // this file), which is used by the caller of this method to find such
+      // an image.
+    } else if ((src->IsLink() || ui::IsPlatformDocument(node.role)) &&
+               node.GetNameFrom() != ax::mojom::blink::NameFrom::kAttribute) {
+      nodes.push_back(&node);
+    }
   }
 }
 

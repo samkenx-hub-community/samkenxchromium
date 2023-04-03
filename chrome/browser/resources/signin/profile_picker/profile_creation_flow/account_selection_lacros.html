@@ -165,12 +165,12 @@
   }
 </style>
 
-<div id="leftBanner" class="banner"></div>
 <div style$="--theme-frame-color:[[profileThemeInfo.themeFrameColor]];
              --theme-text-color:[[profileThemeInfo.themeFrameTextColor]];">
   <template is="dom-if" if="[[hasPreviousRoute_]]">
     <cr-icon-button id="backButton" iron-icon="cr:arrow-back"
-        on-click="onBackClick_" aria-label$="[[getBackButtonAriaLabel_()]]">
+        on-click="onBackClick_" aria-label$="[[getBackButtonAriaLabel_()]]"
+        title$="[[getBackButtonAriaLabel_()]]">
     </cr-icon-button>
   </template>
 </div>
@@ -208,5 +208,4 @@
     </template>
   </div>
 </div>
-<div id="rightBanner" class="banner"></div>
 <div id="footer"></div>

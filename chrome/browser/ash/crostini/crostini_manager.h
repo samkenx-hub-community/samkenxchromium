@@ -25,6 +25,7 @@
 #include "chrome/browser/ash/crostini/crostini_util.h"
 #include "chrome/browser/ash/crostini/termina_installer.h"
 #include "chrome/browser/ash/guest_os/guest_id.h"
+#include "chrome/browser/ash/guest_os/guest_os_launcher.h"
 #include "chrome/browser/ash/guest_os/guest_os_remover.h"
 #include "chrome/browser/ash/guest_os/guest_os_session_tracker.h"
 #include "chrome/browser/ash/guest_os/public/guest_os_mount_provider_registry.h"
@@ -347,13 +348,6 @@ class CrostiniManager : public KeyedService,
   void CancelUpgradeContainer(const guest_os::GuestId& key,
                               CrostiniResultCallback callback);
 
-  // Asynchronously launches an app as specified by its desktop file id.
-  void LaunchContainerApplication(const guest_os::GuestId& container_id,
-                                  std::string desktop_file_id,
-                                  const std::vector<std::string>& files,
-                                  bool display_scaled,
-                                  CrostiniSuccessCallback callback);
-
   // Asynchronously gets app icons as specified by their desktop file ids.
   // |callback| is called after the method call finishes.
   using GetContainerAppIconsCallback =
@@ -397,17 +391,6 @@ class CrostiniManager : public KeyedService,
   void UninstallPackageOwningFile(const guest_os::GuestId& container_id,
                                   std::string desktop_file_id,
                                   CrostiniResultCallback callback);
-
-  // Asynchronously gets SSH server public key of container and trusted SSH
-  // client private key which can be used to connect to the container.
-  // |callback| is called after the method call finishes.
-  using GetContainerSshKeysCallback =
-      base::OnceCallback<void(bool success,
-                              const std::string& container_public_key,
-                              const std::string& host_private_key,
-                              const std::string& hostname)>;
-  void GetContainerSshKeys(const guest_os::GuestId& container_id,
-                           GetContainerSshKeysCallback callback);
 
   // Runs all the steps required to restart the given crostini vm and container.
   // The optional |observer| tracks progress. If provided, it must be alive
@@ -576,7 +559,7 @@ class CrostiniManager : public KeyedService,
   bool IsVmRunning(std::string vm_name);
   // Returns absl::nullopt if VM is not running.
   absl::optional<VmInfo> GetVmInfo(std::string vm_name);
-  void AddRunningVmForTesting(std::string vm_name);
+  void AddRunningVmForTesting(std::string vm_name, uint32_t cid = 0);
   void AddStoppingVmForTesting(std::string vm_name);
 
   void SetContainerOsRelease(const guest_os::GuestId& container_id,
@@ -754,7 +737,7 @@ class CrostiniManager : public KeyedService,
 
   // Callback for CrostiniManager::LaunchContainerApplication.
   void OnLaunchContainerApplication(
-      CrostiniSuccessCallback callback,
+      guest_os::launcher::SuccessCallback callback,
       absl::optional<vm_tools::cicerone::LaunchContainerApplicationResponse>
           response);
 
@@ -779,12 +762,6 @@ class CrostiniManager : public KeyedService,
       CrostiniResultCallback callback,
       absl::optional<vm_tools::cicerone::UninstallPackageOwningFileResponse>
           response);
-
-  // Callback for CrostiniManager::GetContainerSshKeys. Called after the
-  // Concierge service finishes.
-  void OnGetContainerSshKeys(
-      GetContainerSshKeysCallback callback,
-      absl::optional<vm_tools::concierge::ContainerSshKeysResponse> response);
 
   // Helper for CrostiniManager::MaybeUpdateCrostini. Makes blocking calls to
   // check for /dev/kvm.

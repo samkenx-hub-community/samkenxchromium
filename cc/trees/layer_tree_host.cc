@@ -1006,7 +1006,7 @@ void LayerTreeHost::ApplyViewportChanges(
       commit_data.elastic_overscroll_delta.IsZero() &&
       !commit_data.top_controls_delta && !commit_data.bottom_controls_delta &&
       !commit_data.browser_controls_constraint_changed &&
-      !commit_data.scroll_gesture_did_end &&
+      !commit_data.scroll_end_data.scroll_gesture_did_end &&
       commit_data.is_pinch_gesture_active ==
           is_pinch_gesture_active_from_impl_) {
     return;
@@ -1033,7 +1033,7 @@ void LayerTreeHost::ApplyViewportChanges(
        commit_data.page_scale_delta, commit_data.is_pinch_gesture_active,
        commit_data.top_controls_delta, commit_data.bottom_controls_delta,
        commit_data.browser_controls_constraint,
-       commit_data.scroll_gesture_did_end});
+       commit_data.scroll_end_data.scroll_gesture_did_end});
   SetNeedsUpdateLayers();
 }
 
@@ -1058,11 +1058,10 @@ void LayerTreeHost::UpdateScrollOffsetFromImpl(
       // animations, but that is not needed for an impl-side scroll.
 
       // Update the offset in the transform node.
-      DCHECK(scroll_node->transform_id != kInvalidPropertyNodeId);
       TransformTree& transform_tree =
           property_trees()->transform_tree_mutable();
       auto* transform_node = transform_tree.Node(scroll_node->transform_id);
-      if (transform_node->scroll_offset != new_offset) {
+      if (transform_node && transform_node->scroll_offset != new_offset) {
         transform_node->scroll_offset = new_offset;
         transform_node->needs_local_transform_update = true;
         transform_node->transform_changed = true;

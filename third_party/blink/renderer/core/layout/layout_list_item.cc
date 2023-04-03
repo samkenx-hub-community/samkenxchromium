@@ -398,10 +398,6 @@ void LayoutListItem::ComputeVisualOverflow(bool recompute_floats) {
   AddVisualOverflowFromChildren();
   AddVisualEffectOverflow();
 
-  if (recompute_floats || CreatesNewFormattingContext() ||
-      HasSelfPaintingLayer())
-    AddVisualOverflowFromFloats();
-
   if (VisualOverflowRect() != previous_visual_overflow_rect) {
     InvalidateIntersectionObserverCachedRects();
     SetShouldCheckForPaintInvalidation();
@@ -680,6 +676,9 @@ void LayoutListItem::UpdateLayout() {
   if (ListMarker* list_marker = ListMarker::Get(marker))
     list_marker->UpdateMarkerTextIfNeeded(*marker);
   LayoutBlockFlow::UpdateLayout();
+
+  // TODO(1229581): Remove this logic.
+  NOTREACHED_NORETURN();
 }
 
 }  // namespace blink

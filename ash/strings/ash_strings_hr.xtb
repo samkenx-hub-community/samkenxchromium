@@ -40,6 +40,7 @@ Evo nekih stvari koje možete pokušati pokrenuti.</translation>
 <translation id="1181037720776840403">Ukloni</translation>
 <translation id="1182225749592316782">To omogućuje pristup svim aplikacijama i web-lokacijama s dopuštenjem za kameru i mikrofon</translation>
 <translation id="1183863904939664422">Ne zanima me taj prijedlog</translation>
+<translation id="1184126796192815024">Ova mreža ne podržava aplikacije za streaming na vašem telefonu. Pokušajte upotrijebiti žarišnu točku telefona. <ph name="LEARN_MORE" /></translation>
 <translation id="118437560755358292">Unesite zaporku ili PIN radi dodatne sigurnosti</translation>
 <translation id="118532027333893379">Dodirnite bilo gdje da biste snimili cijeli zaslon</translation>
 <translation id="1190609913194133056">Centar za obavijesti</translation>
@@ -219,6 +220,7 @@ Evo nekih stvari koje možete pokušati pokrenuti.</translation>
 <translation id="1969011864782743497"><ph name="DEVICE_NAME" /> (USB)</translation>
 <translation id="1972950159383891558">Pozdrav, <ph name="USERNAME" /></translation>
 <translation id="1978498689038657292">Unos teksta</translation>
+<translation id="1980808257969311265">Pridruži se događaju:<ph name="EVENT_SUMMARY" /></translation>
 <translation id="1982717156487272186">Prikaz prethodnog tjedna</translation>
 <translation id="1989113344093894667">Snimanje sadržaja nije moguće</translation>
 <translation id="1990046457226896323">Govorne datoteke su preuzete</translation>
@@ -620,7 +622,6 @@ Priključite uređaj na napajanje.</translation>
 <translation id="3925540965556789199"><ph name="DATE" />, Učitavanje događaja.</translation>
 <translation id="3932043219784172185">Nije povezan nijedan uređaj</translation>
 <translation id="3934456833412894880">Uključeno je adaptivno punjenje. Baterija će ostati na 80% kako bi se produljilo trajanje baterije i napunjena kad vam zatreba.</translation>
-<translation id="3936620957945677513">Pritisnite tipku Enter da biste se pridružili događaju <ph name="EVENT_SUMMARY" /></translation>
 <translation id="3943857333388298514">Zalijepi</translation>
 <translation id="394485226368336402">Postavke zvuka</translation>
 <translation id="3945319193631853098">Dodirnite da biste dovršili postavljanje</translation>
@@ -1251,6 +1252,7 @@ Novo instaliranje</translation>
 <translation id="685782768769951078">{NUM_DIGITS,plural, =1{Preostala jedna brojka}one{Preostala # brojka}few{Preostale # brojke}other{Preostalo # brojki}}</translation>
 <translation id="6867938213751067702">Pauzirano je preuzimanje datoteke <ph name="FILENAME" /></translation>
 <translation id="6878400149835617132">Prečac je isključen</translation>
+<translation id="6878701771800702153">{NUM_APPS,plural, =1{1 aplikacija}one{# aplikacija}few{# aplikacije}other{# aplikacija}}</translation>
 <translation id="6884665277231944629">Povratak na današnji datum</translation>
 <translation id="6886172995547742638">Uređaj <ph name="DEVICE_TYPE" /> može pokazati slabiju izvedbu. Upotrebljavajte certificirani pretvarač napona USB-C od najmanje <ph name="PREFERRED_MINIMUM_POWER" /> W.</translation>
 <translation id="688631446150864480">Pritisnite tipku strelice prema dolje da biste prešli na drugi prozor</translation>
@@ -1418,6 +1420,7 @@ Da biste isključili uređaj, ponovno pritisnite i zadržite tipku za uključiva
 <translation id="7689817529363080918">Omogućuje pristup mikrofonu za aplikacije <ph name="APP1_NAME" /> i <ph name="APP2_NAME" /> te sve aplikacije i web-lokacije s dopuštenjem za mikrofon</translation>
 <translation id="7704000866383261579">Ponavljanje zadnje radnje</translation>
 <translation id="7705524343798198388">VPN</translation>
+<translation id="770741401784017797">Izrada GIF-a</translation>
 <translation id="7714767791242455379">Dodajte novu mobilnu mrežu</translation>
 <translation id="7720400844887872976">Uključeno do <ph name="TIME" /></translation>
 <translation id="7720410380936703141">PONOVI</translation>
@@ -1430,6 +1433,7 @@ Da biste isključili uređaj, ponovno pritisnite i zadržite tipku za uključiva
 <translation id="7749443890790263709">Dosegnut je maksimalan broj radnih površina.</translation>
 <translation id="776344839111254542">Kliknite da biste vidjeli pojedinosti o ažuriranju</translation>
 <translation id="7768784765476638775">Odabir za govor</translation>
+<translation id="7769299611924763557">GIF će uskoro biti spreman</translation>
 <translation id="7780094051999721182">prečace</translation>
 <translation id="7780159184141939021">Zakretanje zaslona</translation>
 <translation id="7796735576426975947">Nova obavijest je skrivena</translation>

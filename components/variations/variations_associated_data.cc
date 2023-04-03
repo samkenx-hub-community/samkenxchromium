@@ -151,18 +151,6 @@ VariationID GetGoogleVariationIDFromHashes(
   return GroupMapAccessor::GetInstance()->GetID(key, active_group);
 }
 
-bool AssociateVariationParams(
-    const std::string& trial_name,
-    const std::string& group_name,
-    const std::map<std::string, std::string>& params) {
-  return base::AssociateFieldTrialParams(trial_name, group_name, params);
-}
-
-std::string GetVariationParamValue(const std::string& trial_name,
-                                   const std::string& param_name) {
-  return base::GetFieldTrialParamValue(trial_name, param_name);
-}
-
 // Functions below are exposed for testing explicitly behind this namespace.
 // They simply wrap existing functions in this file.
 namespace testing {

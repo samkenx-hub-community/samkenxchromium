@@ -158,6 +158,8 @@ EnumTraits<MojomOnlineImageType, ::backdrop::Image::ImageType>::ToMojom(
       return MojomOnlineImageType::kMorning;
     case ::backdrop::Image::IMAGE_TYPE_LATE_AFTERNOON_MODE:
       return MojomOnlineImageType::kLateAfternoon;
+    case ::backdrop::Image::IMAGE_TYPE_PREVIEW_MODE:
+      return MojomOnlineImageType::kPreview;
   }
 }
 
@@ -179,6 +181,9 @@ bool EnumTraits<MojomOnlineImageType, ::backdrop::Image::ImageType>::FromMojom(
       return true;
     case MojomOnlineImageType::kLateAfternoon:
       *output = ::backdrop::Image::IMAGE_TYPE_LATE_AFTERNOON_MODE;
+      return true;
+    case MojomOnlineImageType::kPreview:
+      *output = ::backdrop::Image::IMAGE_TYPE_PREVIEW_MODE;
       return true;
   }
   NOTREACHED();
@@ -437,6 +442,8 @@ EnumTraits<MojomTopicSource, ash::AmbientModeTopicSource>::ToMojom(
       return MojomTopicSource::kGooglePhotos;
     case ash::AmbientModeTopicSource::kArtGallery:
       return MojomTopicSource::kArtGallery;
+    case ash::AmbientModeTopicSource::kVideo:
+      return MojomTopicSource::kVideo;
   }
 }
 
@@ -449,6 +456,9 @@ bool EnumTraits<MojomTopicSource, ash::AmbientModeTopicSource>::FromMojom(
       return true;
     case MojomTopicSource::kArtGallery:
       *output = ash::AmbientModeTopicSource::kArtGallery;
+      return true;
+    case MojomTopicSource::kVideo:
+      *output = ash::AmbientModeTopicSource::kVideo;
       return true;
   }
   NOTREACHED();

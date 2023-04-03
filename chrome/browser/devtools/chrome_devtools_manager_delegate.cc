@@ -47,14 +47,13 @@
 #include "extensions/browser/extension_host.h"
 #include "extensions/browser/extension_registry.h"
 #include "extensions/browser/process_manager.h"
+#include "extensions/browser/view_type_utils.h"
 #include "extensions/common/manifest.h"
+#include "extensions/common/mojom/view_type.mojom.h"
 #include "ui/base/resource/resource_bundle.h"
 
 #if BUILDFLAG(IS_CHROMEOS_ASH)
 #include "ash/constants/ash_switches.h"
-#include "chrome/common/channel_info.h"
-#include "components/version_info/version_info.h"
-#include "third_party/cros_system_api/switches/chrome_switches.h"
 #endif
 
 using content::DevToolsAgentHost;
@@ -62,6 +61,7 @@ using content::DevToolsAgentHost;
 const char ChromeDevToolsManagerDelegate::kTypeApp[] = "app";
 const char ChromeDevToolsManagerDelegate::kTypeBackgroundPage[] =
     "background_page";
+const char ChromeDevToolsManagerDelegate::kTypePage[] = "page";
 
 namespace {
 
@@ -88,6 +88,14 @@ bool GetExtensionInfo(content::WebContents* wc,
       extension->is_platform_app()) {
     *name = extension->name();
     *type = ChromeDevToolsManagerDelegate::kTypeApp;
+    return true;
+  }
+  if (extensions::GetViewType(wc) ==
+      extensions::mojom::ViewType::kExtensionPopup) {
+    // Note that we are intentionally not setting name here, so that we can
+    // construct a name based on the URL or page title in
+    // RenderFrameDevToolsAgentHost::GetTitle()
+    *type = ChromeDevToolsManagerDelegate::kTypePage;
     return true;
   }
   return false;
@@ -204,21 +212,6 @@ bool ChromeDevToolsManagerDelegate::AllowInspection(
     content::WebContents* web_contents) {
   const extensions::Extension* extension = nullptr;
   if (web_contents) {
-#if BUILDFLAG(IS_CHROMEOS_ASH)
-    // Disable devtools for ash webui for dev, beta, stable channels unless
-    // device is in devmode, or running with `--force-devtools-available'.
-    GURL url = web_contents->GetLastCommittedURL();
-    if ((url.SchemeIs("chrome") && url.host() != "inspect") ||
-        url.SchemeIs("os")) {
-      base::CommandLine* command_line = base::CommandLine::ForCurrentProcess();
-      if (chrome::GetChannel() >= version_info::Channel::DEV &&
-          !command_line->HasSwitch(chromeos::switches::kSystemInDevMode) &&
-          !command_line->HasSwitch(ash::switches::kForceDevToolsAvailable)) {
-        return false;
-      }
-    }
-#endif
-
     if (auto* process_manager = extensions::ProcessManager::Get(
             web_contents->GetBrowserContext())) {
       extension = process_manager->GetExtensionForWebContents(web_contents);
@@ -275,8 +268,7 @@ bool ChromeDevToolsManagerDelegate::AllowInspection(
     case Availability::kAllowed:
       return true;
     case Availability::kDisallowedForForceInstalledExtensions:
-      return !web_app || (!web_app->IsPolicyInstalledApp() &&
-                          !web_app->IsKioskInstalledApp());
+      return !web_app || !web_app->IsKioskInstalledApp();
     default:
       NOTREACHED() << "Unknown developer tools policy";
       return true;

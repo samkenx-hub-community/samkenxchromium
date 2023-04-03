@@ -22,34 +22,37 @@
 
 namespace autofill {
 
-TouchToFillDelegateImpl::DryRunResult::DryRunResult(
+TouchToFillDelegateAndroidImpl::DryRunResult::DryRunResult(
     TriggerOutcome outcome,
     std::vector<CreditCard> cards_to_suggest)
     : outcome(outcome), cards_to_suggest(std::move(cards_to_suggest)) {}
 
-TouchToFillDelegateImpl::DryRunResult::DryRunResult(DryRunResult&&) = default;
+TouchToFillDelegateAndroidImpl::DryRunResult::DryRunResult(DryRunResult&&) =
+    default;
 
-TouchToFillDelegateImpl::DryRunResult&
-TouchToFillDelegateImpl::DryRunResult::operator=(DryRunResult&&) = default;
+TouchToFillDelegateAndroidImpl::DryRunResult&
+TouchToFillDelegateAndroidImpl::DryRunResult::operator=(DryRunResult&&) =
+    default;
 
-TouchToFillDelegateImpl::DryRunResult::~DryRunResult() = default;
+TouchToFillDelegateAndroidImpl::DryRunResult::~DryRunResult() = default;
 
-TouchToFillDelegateImpl::TouchToFillDelegateImpl(
+TouchToFillDelegateAndroidImpl::TouchToFillDelegateAndroidImpl(
     BrowserAutofillManager* manager,
     FastCheckoutClient* fast_checkout_client)
     : manager_(manager), fast_checkout_client_(fast_checkout_client) {
   DCHECK(manager);
 }
 
-TouchToFillDelegateImpl::~TouchToFillDelegateImpl() {
+TouchToFillDelegateAndroidImpl::~TouchToFillDelegateAndroidImpl() {
   // Invalidate pointers to avoid post hide callbacks.
   weak_ptr_factory_.InvalidateWeakPtrs();
   HideTouchToFill();
 }
 
-TouchToFillDelegateImpl::DryRunResult TouchToFillDelegateImpl::DryRun(
-    FormGlobalId form_id,
-    FieldGlobalId field_id) {
+TouchToFillDelegateAndroidImpl::DryRunResult
+TouchToFillDelegateAndroidImpl::DryRun(FormGlobalId form_id,
+                                       FieldGlobalId field_id,
+                                       const FormData* optional_received_form) {
   // Trigger only on supported platforms.
   if (!manager_->client()->IsTouchToFillCreditCardSupported()) {
     return {TriggerOutcome::kUnsupportedFieldType, {}};
@@ -69,8 +72,12 @@ TouchToFillDelegateImpl::DryRunResult TouchToFillDelegateImpl::DryRun(
 
   // Trigger only for complete forms (contining the fields for the card number
   // and the card expiration date).
-  if (!FormHasAllCreditCardFields(*form)) {
+  if (!FormHasAllEmtyCreditCardFields(*form)) {
     return {TriggerOutcome::kIncompleteForm, {}};
+  }
+  if (optional_received_form != nullptr &&
+      IsFormPrefilled(*optional_received_form)) {
+    return {TriggerOutcome::kFormAlreadyFilled, {}};
   }
   // Trigger only if not shown before.
   if (ttf_credit_card_state_ != TouchToFillState::kShouldShow) {
@@ -120,19 +127,22 @@ TouchToFillDelegateImpl::DryRunResult TouchToFillDelegateImpl::DryRun(
   return {TriggerOutcome::kShown, std::move(real_and_virtual_cards)};
 }
 
-bool TouchToFillDelegateImpl::IntendsToShowTouchToFill(FormGlobalId form_id,
-                                                       FieldGlobalId field_id) {
+bool TouchToFillDelegateAndroidImpl::IntendsToShowTouchToFill(
+    FormGlobalId form_id,
+    FieldGlobalId field_id) {
+  // optional_received_form is not available to pass here.
   return DryRun(form_id, field_id).outcome == TriggerOutcome::kShown;
 }
 
-bool TouchToFillDelegateImpl::TryToShowTouchToFill(const FormData& form,
-                                                   const FormFieldData& field) {
+bool TouchToFillDelegateAndroidImpl::TryToShowTouchToFill(
+    const FormData& form,
+    const FormFieldData& field) {
   // TODO(crbug.com/1386143): store only FormGlobalId and FieldGlobalId instead
   // to avoid that FormData and FormFieldData may become obsolete during the
   // bottomsheet being open.
   query_form_ = form;
   query_field_ = field;
-  DryRunResult dry_run = DryRun(form.global_id(), field.global_id());
+  DryRunResult dry_run = DryRun(form.global_id(), field.global_id(), &form);
   if (dry_run.outcome == TriggerOutcome::kShown &&
       !manager_->client()->ShowTouchToFillCreditCard(
           GetWeakPtr(), std::move(dry_run.cards_to_suggest))) {
@@ -153,18 +163,18 @@ bool TouchToFillDelegateImpl::TryToShowTouchToFill(const FormData& form,
   return true;
 }
 
-bool TouchToFillDelegateImpl::IsShowingTouchToFill() {
+bool TouchToFillDelegateAndroidImpl::IsShowingTouchToFill() {
   return ttf_credit_card_state_ == TouchToFillState::kIsShowing;
 }
 
 // TODO(crbug.com/1348538): Create a central point for TTF hiding decision.
-void TouchToFillDelegateImpl::HideTouchToFill() {
+void TouchToFillDelegateAndroidImpl::HideTouchToFill() {
   if (IsShowingTouchToFill()) {
     // TODO(crbug.com/1417442): This is to prevent calling virtual functions in
     // destructors in the following call chain:
     //       ~ContentAutofillDriver()
     //   --> ~BrowserAutofillManager()
-    //   --> ~TouchToFillDelegateImpl()
+    //   --> ~TouchToFillDelegateAndroidImpl()
     //   --> HideTouchToFill()
     //   --> AutofillManager::safe_client()
     //   --> ContentAutofillDriver::IsPrerendering()
@@ -172,16 +182,16 @@ void TouchToFillDelegateImpl::HideTouchToFill() {
   }
 }
 
-void TouchToFillDelegateImpl::Reset() {
+void TouchToFillDelegateAndroidImpl::Reset() {
   HideTouchToFill();
   ttf_credit_card_state_ = TouchToFillState::kShouldShow;
 }
 
-AutofillManager* TouchToFillDelegateImpl::GetManager() {
+AutofillManager* TouchToFillDelegateAndroidImpl::GetManager() {
   return manager_;
 }
 
-bool TouchToFillDelegateImpl::ShouldShowScanCreditCard() {
+bool TouchToFillDelegateAndroidImpl::ShouldShowScanCreditCard() {
   if (!manager_->client()->HasCreditCardScanFeature()) {
     return false;
   }
@@ -189,46 +199,49 @@ bool TouchToFillDelegateImpl::ShouldShowScanCreditCard() {
   return !IsFormOrClientNonSecure(manager_->client(), query_form_);
 }
 
-void TouchToFillDelegateImpl::ScanCreditCard() {
+void TouchToFillDelegateAndroidImpl::ScanCreditCard() {
   manager_->client()->ScanCreditCard(base::BindOnce(
-      &TouchToFillDelegateImpl::OnCreditCardScanned, GetWeakPtr()));
+      &TouchToFillDelegateAndroidImpl::OnCreditCardScanned, GetWeakPtr()));
 }
 
-void TouchToFillDelegateImpl::OnCreditCardScanned(const CreditCard& card) {
+void TouchToFillDelegateAndroidImpl::OnCreditCardScanned(
+    const CreditCard& card) {
   HideTouchToFill();
-  manager_->FillCreditCardFormImpl(query_form_, query_field_, card,
-                                   std::u16string());
+  manager_->FillCreditCardFormImpl(
+      query_form_, query_field_, card, std::u16string(),
+      AutofillTriggerSource::kTouchToFillCreditCard);
 }
 
-void TouchToFillDelegateImpl::ShowCreditCardSettings() {
+void TouchToFillDelegateAndroidImpl::ShowCreditCardSettings() {
   manager_->client()->ShowAutofillSettings(PopupType::kCreditCards);
 }
 
-void TouchToFillDelegateImpl::SuggestionSelected(std::string unique_id,
-                                                 bool is_virtual) {
+void TouchToFillDelegateAndroidImpl::SuggestionSelected(std::string unique_id,
+                                                        bool is_virtual) {
   HideTouchToFill();
 
   if (is_virtual) {
     manager_->FillOrPreviewVirtualCardInformation(
         mojom::RendererFormDataAction::kFill, unique_id, query_form_,
-        query_field_);
+        query_field_, AutofillTriggerSource::kTouchToFillCreditCard);
   } else {
     PersonalDataManager* pdm = manager_->client()->GetPersonalDataManager();
     DCHECK(pdm);
     CreditCard* card = pdm->GetCreditCardByGUID(unique_id);
-    manager_->FillOrPreviewCreditCardForm(mojom::RendererFormDataAction::kFill,
-                                          query_form_, query_field_, card);
+    manager_->FillOrPreviewCreditCardForm(
+        mojom::RendererFormDataAction::kFill, query_form_, query_field_, card,
+        AutofillTriggerSource::kTouchToFillCreditCard);
   }
 }
 
-void TouchToFillDelegateImpl::OnDismissed(bool dismissed_by_user) {
+void TouchToFillDelegateAndroidImpl::OnDismissed(bool dismissed_by_user) {
   if (IsShowingTouchToFill()) {
     ttf_credit_card_state_ = TouchToFillState::kWasShown;
     dismissed_by_user_ = dismissed_by_user;
   }
 }
 
-void TouchToFillDelegateImpl::LogMetricsAfterSubmission(
+void TouchToFillDelegateAndroidImpl::LogMetricsAfterSubmission(
     const FormStructure& submitted_form) {
   // Log whether autofill was used after dismissing the touch to fill (without
   // selecting any credit card for filling)
@@ -249,27 +262,41 @@ void TouchToFillDelegateImpl::LogMetricsAfterSubmission(
   }
 }
 
-bool TouchToFillDelegateImpl::HasAnyAutofilledFields(
+bool TouchToFillDelegateAndroidImpl::HasAnyAutofilledFields(
     const FormStructure& submitted_form) const {
   return base::ranges::any_of(
       submitted_form, [](const auto& field) { return field->is_autofilled; });
 }
 
-bool TouchToFillDelegateImpl::IsFillingPerfect(
+bool TouchToFillDelegateAndroidImpl::IsFillingPerfect(
     const FormStructure& submitted_form) const {
   return base::ranges::all_of(submitted_form, [](const auto& field) {
     return field->value.empty() || field->is_autofilled;
   });
 }
 
-bool TouchToFillDelegateImpl::IsFillingCorrect(
+bool TouchToFillDelegateAndroidImpl::IsFillingCorrect(
     const FormStructure& submitted_form) const {
   return !base::ranges::any_of(submitted_form, [](const auto& field) {
     return field->previously_autofilled();
   });
 }
 
-base::WeakPtr<TouchToFillDelegateImpl> TouchToFillDelegateImpl::GetWeakPtr() {
+bool TouchToFillDelegateAndroidImpl::IsFormPrefilled(const FormData& form) {
+  return base::ranges::any_of(
+      form.fields.begin(), form.fields.end(), [&](const FormFieldData& field) {
+        AutofillField* autofill_field = manager_->GetAutofillField(form, field);
+        if (!FieldHasExpirationDateType(autofill_field) &&
+            autofill_field->Type().GetStorableType() !=
+                ServerFieldType::CREDIT_CARD_NUMBER) {
+          return false;
+        }
+        return !SanitizedFieldIsEmpty(field.value);
+      });
+}
+
+base::WeakPtr<TouchToFillDelegateAndroidImpl>
+TouchToFillDelegateAndroidImpl::GetWeakPtr() {
   return weak_ptr_factory_.GetWeakPtr();
 }
 

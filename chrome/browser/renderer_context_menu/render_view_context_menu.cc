@@ -89,6 +89,8 @@
 #include "chrome/browser/ui/passwords/ui_utils.h"
 #include "chrome/browser/ui/qrcode_generator/qrcode_generator_bubble_controller.h"
 #include "chrome/browser/ui/send_tab_to_self/send_tab_to_self_bubble.h"
+#include "chrome/browser/ui/side_panel/companion/companion_tab_helper.h"
+#include "chrome/browser/ui/side_panel/companion/companion_utils.h"
 #include "chrome/browser/ui/side_search/side_search_utils.h"
 #include "chrome/browser/ui/tab_contents/core_tab_helper.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
@@ -133,6 +135,7 @@
 #include "components/password_manager/core/browser/password_manager_metrics_util.h"
 #include "components/password_manager/core/browser/password_manager_util.h"
 #include "components/policy/content/policy_blocklist_service.h"
+#include "components/policy/core/common/policy_pref_names.h"
 #include "components/prefs/pref_member.h"
 #include "components/prefs/pref_service.h"
 #include "components/search_engines/search_engines_pref_names.h"
@@ -1046,7 +1049,8 @@ void RenderViewContextMenu::InitMenu() {
     AppendLinkToTextItems();
   }
 
-  if (user_notes::IsUserNotesEnabled()) {
+  if (user_notes::IsUserNotesEnabled() && GetBrowser() &&
+      GetBrowser()->is_type_normal()) {
     AppendUserNotesItems();
   }
 
@@ -1766,7 +1770,8 @@ void RenderViewContextMenu::AppendSearchWebForImageItems() {
 
   menu_model_.AddItem(GetSearchForImageIdc(), menu_string);
 
-  if (base::FeatureList::IsEnabled(lens::features::kEnableImageTranslate) &&
+  if (base::FeatureList::IsEnabled(lens::features::kLensStandalone) &&
+      base::FeatureList::IsEnabled(lens::features::kEnableImageTranslate) &&
       provider && !provider->image_translate_url().empty() &&
       provider->image_translate_url_ref().IsValid(
           service->search_terms_data())) {
@@ -2958,6 +2963,11 @@ void RenderViewContextMenu::ExecuteCommand(int id, int event_flags) {
     case IDC_CONTENT_CONTEXT_SEARCHWEBFOR: {
       RecordAmbientSearchQuery(
           lens::AmbientSearchEntryPoint::CONTEXT_MENU_SEARCH_WEB_FOR);
+      if (companion::IsSearchWebInCompanionSidePanelSupported(
+              chrome::FindBrowserWithWebContents(embedder_web_contents_))) {
+        ExecSearchWebInCompanionSidePanel(selection_navigation_url_);
+        break;
+      }
       if (side_search::IsSearchWebInSidePanelSupported(
               chrome::FindBrowserWithWebContents(embedder_web_contents_))) {
         ExecSearchWebInSidePanel(selection_navigation_url_);
@@ -3548,9 +3558,9 @@ bool RenderViewContextMenu::IsOpenLinkOTREnabled() const {
   if (!IsURLAllowedInIncognito(params_.link_url, browser_context_))
     return false;
 
-  IncognitoModePrefs::Availability incognito_avail =
+  policy::IncognitoModeAvailability incognito_avail =
       IncognitoModePrefs::GetAvailability(GetPrefs(browser_context_));
-  return incognito_avail != IncognitoModePrefs::Availability::kDisabled;
+  return incognito_avail != policy::IncognitoModeAvailability::kDisabled;
 }
 
 void RenderViewContextMenu::ExecOpenWebApp() {
@@ -3788,6 +3798,15 @@ void RenderViewContextMenu::ExecSearchWebForImage(bool is_image_translate) {
       lens::AmbientSearchEntryPoint::CONTEXT_MENU_SEARCH_IMAGE_WITH_WEB);
   core_tab_helper->SearchByImage(render_frame_host, params().src_url,
                                  is_image_translate);
+}
+
+void RenderViewContextMenu::ExecSearchWebInCompanionSidePanel(const GURL& url) {
+  auto* companion_helper =
+      companion::CompanionTabHelper::FromWebContents(embedder_web_contents_);
+  if (!companion_helper) {
+    return;
+  }
+  companion_helper->ShowCompanionSidePanel(url);
 }
 
 void RenderViewContextMenu::ExecSearchWebInSidePanel(const GURL& url) {

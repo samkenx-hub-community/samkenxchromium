@@ -242,8 +242,13 @@
   E_CPONLY(kColorOmniboxText) \
   E_CPONLY(kColorOmniboxTextDimmed) \
   /* Page Info colors */ \
+  E_CPONLY(kColorPageActionIconHover) \
+  E_CPONLY(kColorPageActionIconPressed) \
+  E_CPONLY(kColorPageInfoBackground) \
   E_CPONLY(kColorPageInfoChosenObjectDeleteButtonIcon) \
   E_CPONLY(kColorPageInfoChosenObjectDeleteButtonIconDisabled) \
+  E_CPONLY(kColorPageInfoIconHover) \
+  E_CPONLY(kColorPageInfoIconPressed) \
   /* Payments colors. */ \
   E_CPONLY(kColorPaymentsFeedbackTipBackground) \
   E_CPONLY(kColorPaymentsFeedbackTipBorder) \
@@ -457,6 +462,7 @@
   E_CPONLY(kColorToolbarContentAreaSeparator) \
   E_CPONLY(kColorToolbarFeaturePromoHighlight) \
   E_CPONLY(kColorToolbarInkDrop) \
+  E_CPONLY(kColorToolbarInkDropRipple) \
   E_CPONLY(kColorToolbarSeparator) \
   E_CPONLY(kColorToolbarSeparatorDefault) \
   E_CPONLY(kColorToolbarText) \

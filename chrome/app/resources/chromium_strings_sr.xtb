@@ -24,6 +24,7 @@
 
 Дозволе које сте већ дали веб-сајтовима и апликацијама могу да важе за овај налог. Google налозима можете да управљате у <ph name="SETTINGS_LINK_BEGIN" />Подешавањима<ph name="SETTINGS_LINK_END" />.</translation>
 <translation id="1640672724030957280">Преузимање...</translation>
+<translation id="1691024636239527281">{NUM_DEVICES,plural, =0{Chromium је био повезан са HID уређајем}=1{Chromium је повезан са HID уређајем}one{Chromium је повезан са HID уређајима}few{Chromium је повезан са HID уређајима}other{Chromium је повезан са HID уређајима}}</translation>
 <translation id="1708666629004767631">Доступна је нова, безбеднија верзија Chromium-а.</translation>
 <translation id="17264556997921157">Можете да видите и уклоните теме интересовања које сајтови користе да би вам приказивали огласе. Chromium процењује ваша интересовања на основу недавне историје прегледања.</translation>
 <translation id="1733725117201708356">Chromium ће ускоро избрисати податке прегледања</translation>
@@ -81,7 +82,6 @@
 <translation id="2928420929544864228">Инсталација је довршена.</translation>
 <translation id="2977470724722393594">Chromium је ажуриран</translation>
 <translation id="2977506796191543575">Ако неки сајт покуша да украде вашу лозинку или пробате да преузмете штетни фајл, Chromium може да пошаље URL-ове, укључујући делове садржаја странице, у Безбедно прегледање</translation>
-<translation id="3021964162552004083">{NUM_DEVICES,plural, =1{Chromium је повезан са HID уређајем}one{Chromium је повезан са HID уређајима}few{Chromium је повезан са HID уређајима}other{Chromium је повезан са HID уређајима}}</translation>
 <translation id="3032706164202344641">Chromium не може да вам проверава лозинке. Пробајте поново касније.</translation>
 <translation id="3032787606318309379">Додавање у Chromium...</translation>
 <translation id="3038232873781883849">Чека се инсталирање...</translation>

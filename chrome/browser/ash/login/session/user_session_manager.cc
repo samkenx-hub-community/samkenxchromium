@@ -1035,18 +1035,15 @@ void UserSessionManager::OnSessionRestoreStateChanged(
       IdentityManagerFactory::GetForProfile(user_profile);
   switch (state) {
     case OAuth2LoginManager::SESSION_RESTORE_DONE:
-      // Session restore done does not always mean valid token because the
-      // merge session operation could be skipped when the first account in
-      // Gaia cookies matches the primary account in TokenService. However
-      // the token could still be invalid in some edge cases. See
-      // http://crbug.com/760610
-      user_status =
-          (identity_manager &&
-           identity_manager->HasAccountWithRefreshTokenInPersistentErrorState(
-               identity_manager->GetPrimaryAccountInfo(ConsentLevel::kSignin)
-                   .account_id))
-              ? user_manager::User::OAUTH2_TOKEN_STATUS_INVALID
-              : user_manager::User::OAUTH2_TOKEN_STATUS_VALID;
+      if (identity_manager) {
+        // SESSION_RESTORE_DONE state means that primary account has a valid
+        // token.
+        DCHECK(
+            !identity_manager->HasAccountWithRefreshTokenInPersistentErrorState(
+                identity_manager->GetPrimaryAccountInfo(ConsentLevel::kSignin)
+                    .account_id));
+      }
+      user_status = user_manager::User::OAUTH2_TOKEN_STATUS_VALID;
       break;
     case OAuth2LoginManager::SESSION_RESTORE_FAILED:
       user_status = user_manager::User::OAUTH2_TOKEN_STATUS_INVALID;
@@ -2154,7 +2151,11 @@ void UserSessionManager::CheckEolInfo(Profile* profile) {
   std::map<Profile*, std::unique_ptr<EolNotification>, ProfileCompare>::iterator
       iter = eol_notification_handler_.find(profile);
   if (iter == eol_notification_handler_.end()) {
-    auto eol_notification = std::make_unique<EolNotification>(profile);
+    auto eol_notification =
+        eol_notification_handler_test_factory_.is_null()
+            ? std::make_unique<EolNotification>(profile)
+            : eol_notification_handler_test_factory_.Run(profile);
+
     iter = eol_notification_handler_
                .insert(std::make_pair(profile, std::move(eol_notification)))
                .first;
@@ -2414,6 +2415,12 @@ void UserSessionManager::MaybeShowHelpAppReleaseNotesNotification(
     return;
   GetHelpAppNotificationController(profile)
       ->MaybeShowReleaseNotesNotification();
+}
+
+void UserSessionManager::SetEolNotificationHandlerFactoryForTesting(
+    const EolNotificationHandlerFactoryCallback&
+        eol_notification_handler_factory) {
+  eol_notification_handler_test_factory_ = eol_notification_handler_factory;
 }
 
 base::WeakPtr<UserSessionManager>

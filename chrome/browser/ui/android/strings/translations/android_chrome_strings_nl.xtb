@@ -737,6 +737,7 @@ Voor je Google-account kunnen andere vormen van browsegeschiedenis (zoals zoekop
 <translation id="5001388021414335527">Volg deze site hier</translation>
 <translation id="5004416275253351869">Google-activiteitsopties</translation>
 <translation id="5005498671520578047">Wachtwoord kopiëren</translation>
+<translation id="5010886807652684893">Visuele weergave</translation>
 <translation id="5011311129201317034"><ph name="SITE" /> wil verbinding maken</translation>
 <translation id="5016205925109358554">Serif</translation>
 <translation id="5017529052065664584">Afgelopen 15 minuten</translation>
@@ -794,6 +795,7 @@ Voor je Google-account kunnen andere vormen van browsegeschiedenis (zoals zoekop
 <translation id="5342314432463739672">Rechtenverzoeken</translation>
 <translation id="53537532693258630">Hier zie je sites die je hebt verwijderd</translation>
 <translation id="5355191726083956201">Geoptimaliseerde beveiliging staat aan</translation>
+<translation id="5361107212971249203">tekst</translation>
 <translation id="5368227114232678694">Gebruik de incognitomodus als je privé wilt browsen op dit apparaat</translation>
 <translation id="5375577065097716013">Afbeelding zoeken met Google Lens <ph name="BEGIN_NEW" />Nieuw<ph name="END_NEW" /></translation>
 <translation id="5401851137404501592"><ph name="IDENTITY_PROVIDER_ETLD_PLUS_ONE" /> deelt je naam, e-mailadres en profielfoto met deze site om door te gaan.</translation>
@@ -1191,6 +1193,7 @@ Zo kunnen sommige websites op dit verzoek reageren door advertenties te bekijken
 <translation id="7454641608352164238">Onvoldoende ruimte</translation>
 <translation id="7455988709578031708">Gebaseerd op je browsegeschiedenis. Deze instelling staat aan.</translation>
 <translation id="7456774706094330779">Uitgebreid vooraf laden</translation>
+<translation id="7466431077154602932">Compacte weergave</translation>
 <translation id="7474822150871987353">Bekijk informatie over onderwerpen op websites zonder de pagina te verlaten. Selecteer een of meer woorden op de pagina om hiernaar te zoeken.</translation>
 <translation id="7475192538862203634">Als je deze melding vaker ziet, kun je deze <ph name="BEGIN_LINK" />suggesties<ph name="END_LINK" /> proberen.</translation>
 <translation id="7475688122056506577">SD-kaart niet gevonden. Sommige van je bestanden kunnen ontbreken.</translation>
@@ -1320,6 +1323,7 @@ Zo kunnen sommige websites op dit verzoek reageren door advertenties te bekijken
 <translation id="8058746566562539958">Openen op nieuw Chrome-tabblad</translation>
 <translation id="8062594758852531064">Uitgebreid vooraf laden:</translation>
 <translation id="8063895661287329888">Kan bookmark niet toevoegen.</translation>
+<translation id="8066816452984416180">Bookmark deze pagina snel. Houd je vinger op het scherm om deze snelkoppeling te bewerken.</translation>
 <translation id="806745655614357130">Mijn gegevens gescheiden houden</translation>
 <translation id="8073388330009372546">Openen op nieuw tabblad</translation>
 <translation id="8076492880354921740">Tabbladen</translation>
@@ -1351,6 +1355,7 @@ Zo kunnen sommige websites op dit verzoek reageren door advertenties te bekijken
 <translation id="8216351761227087153">Bekijken</translation>
 <translation id="8218622182176210845">Je account beheren</translation>
 <translation id="8223642481677794647">Feedkaartmenu</translation>
+<translation id="8236097722223016103">Toevoegen aan bookmarks</translation>
 <translation id="8250920743982581267">Documenten</translation>
 <translation id="8255617931166444521">Sites kunnen je cookies alleen gebruiken om je browse-activiteit op hun eigen site te bekijken</translation>
 <translation id="8259179246279078674">Omdat de vooraf geladen pagina's versleuteld zijn, krijgt Google geen informatie over de content van de vooraf geladen pagina. Google-servers kunnen wel zien welke sites privé vooraf worden geladen. Deze informatie wordt alleen gebruikt om de pagina's vooraf te laden en is niet gekoppeld aan andere informatie in je Google-account.</translation>
@@ -1498,6 +1503,7 @@ Zo kunnen sommige websites op dit verzoek reageren door advertenties te bekijken
 <translation id="8989968390305463310">Je browsegeschiedenis heeft invloed op de advertenties die je ziet en je interesses. Hieronder staat een schatting. Ter bescherming van je privacy verwijdert Chrome je interesses automatisch elke maand op voortschrijdende basis. Interesses kunnen worden vernieuwd, tenzij je ze verwijdert.</translation>
 <translation id="8993760627012879038">Een nieuw venster openen in de incognitomodus</translation>
 <translation id="8996847606757455498">Een andere provider kiezen</translation>
+<translation id="8998289560386111590">Niet beschikbaar op je apparaat</translation>
 <translation id="8998729206196772491">Je logt in met een account dat wordt beheerd door <ph name="MANAGED_DOMAIN" /> waarmee je de eigenaar beheer geeft over je Chrome-gegevens. Je gegevens worden permanent gekoppeld aan dit account. Als je uitlogt van Chrome, worden je gegevens van dit apparaat verwijderd. Ze blijven echter opgeslagen in je Google-account.</translation>
 <translation id="9022774213089566801">Veelbezocht</translation>
 <translation id="9022871169049522985">Sites en adverteerders kunnen de prestaties van hun advertenties meten</translation>

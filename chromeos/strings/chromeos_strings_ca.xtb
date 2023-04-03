@@ -274,6 +274,7 @@
 <translation id="3456078764689556234">S'ha imprès la pàgina <ph name="PRINTED_PAGES" /> de <ph name="TOTAL_PAGES" />.</translation>
 <translation id="345898999683440380">S'està escanejant la pàgina <ph name="PAGE_NUM" />. <ph name="PERCENTAGE_VALUE" />% completat.</translation>
 <translation id="3459509316159669723">Imprimeix</translation>
+<translation id="346423161771747987">Corrent</translation>
 <translation id="346539236881580388">Repeteix</translation>
 <translation id="3484914941826596830">Mentre el microprogramari s'actualitza, no desconnectis el dispositiu extern ni apaguis l'ordinador. Pots minimitzar aquesta finestra. Aquesta actualització pot tardar uns quants minuts i és possible que, durant aquest temps, el dispositiu extern no funcioni.</translation>
 <translation id="3486220673238053218">definició</translation>
@@ -697,6 +698,7 @@
 <translation id="7103252855940681301">Dispositiu <ph name="INDEX" /> de <ph name="COUNT" />, anomenat <ph name="NAME" />.</translation>
 <translation id="7108668606237948702">retorn</translation>
 <translation id="7130438335435247835">Nom del punt d'accés (APN)</translation>
+<translation id="7131634559772719176">Confirma el valor predefinit</translation>
 <translation id="7134436342991564651">{0,plural, =1{Servidor de noms}other{Servidors de noms}}</translation>
 <translation id="7143207342074048698">Connectant</translation>
 <translation id="7144878232160441200">Torna-ho a provar</translation>
@@ -759,6 +761,7 @@
 <translation id="7656388927906093505">El dispositiu és un ratolí.</translation>
 <translation id="7658239707568436148">Cancel·la</translation>
 <translation id="7665800271478495366">Canvia l'avatar</translation>
+<translation id="7675241868020048622">Aurora (exclusiu per a Plus)</translation>
 <translation id="7690294790491645610">Confirma la contrasenya nova</translation>
 <translation id="7701040980221191251">Cap</translation>
 <translation id="7705524343798198388">VPN</translation>
@@ -768,6 +771,7 @@
 <translation id="7762130827864645708">La contrasenya s'ha canviat correctament. Utilitza la contrasenya nova a partir d'ara.</translation>
 <translation id="7763470514545477072">Sufix de domini coincident</translation>
 <translation id="7769672763586021400">Identificador del model</translation>
+<translation id="7770834998503326261">Informació addicional relacionada amb la teva selecció</translation>
 <translation id="7778717409420828014">Els suggeriments ens ajuden a millorar l'experiència de Chromebook i el nostre equip els revisarà. Com que hi ha un gran nombre d'informes, no podrem respondre.</translation>
 <translation id="7784116172884276937">No hi ha cap servidor DNS configurat</translation>
 <translation id="7791543448312431591">Afegeix</translation>
@@ -800,6 +804,7 @@
 <translation id="80398733265834479">Activa el mode de color automàtic</translation>
 <translation id="8041089156583427627">Envia suggeriments</translation>
 <translation id="8045012663542226664">Silenci del micròfon</translation>
+<translation id="8050091914317269817">Si selecciones aquest fons de pantalla, s'activarà el mode fosc automàtic i l'adaptació del color del fons de pantalla.</translation>
 <translation id="8075838845814659848">Càrrega restant</translation>
 <translation id="8076492880354921740">Pestanyes</translation>
 <translation id="8082366717211101304">No es pot resoldre el DNS des d'aplicacions d'Android</translation>

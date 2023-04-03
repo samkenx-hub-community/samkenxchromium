@@ -52,6 +52,7 @@
 #import "components/policy/core/common/features.h"
 #import "components/policy/core/common/policy_loader_ios_constants.h"
 #import "components/policy/policy_constants.h"
+#import "components/reading_list/features/reading_list_switches.h"
 #import "components/safe_browsing/core/common/features.h"
 #import "components/send_tab_to_self/features.h"
 #import "components/shared_highlighting/core/common/shared_highlighting_features.h"
@@ -65,9 +66,11 @@
 #import "components/translate/core/browser/translate_prefs.h"
 #import "components/translate/core/common/translate_util.h"
 #import "ios/chrome/app/background_mode_buildflags.h"
+#import "ios/chrome/browser/bring_android_tabs/features.h"
 #import "ios/chrome/browser/browsing_data/browsing_data_features.h"
 #import "ios/chrome/browser/crash_report/features.h"
 #import "ios/chrome/browser/credential_provider_promo/features.h"
+#import "ios/chrome/browser/default_browser/utils.h"
 #import "ios/chrome/browser/find_in_page/features.h"
 #import "ios/chrome/browser/flags/chrome_switches.h"
 #import "ios/chrome/browser/flags/ios_chrome_flag_descriptions.h"
@@ -79,13 +82,13 @@
 #import "ios/chrome/browser/promos_manager/features.h"
 #import "ios/chrome/browser/screen_time/screen_time_buildflags.h"
 #import "ios/chrome/browser/shared/public/features/features.h"
+#import "ios/chrome/browser/snapshots/features.h"
 #import "ios/chrome/browser/tabs/features.h"
 #import "ios/chrome/browser/tabs/inactive_tabs/features.h"
 #import "ios/chrome/browser/text_selection/text_selection_util.h"
 #import "ios/chrome/browser/ui/app_store_rating/features.h"
 #import "ios/chrome/browser/ui/autofill/features.h"
 #import "ios/chrome/browser/ui/content_suggestions/content_suggestions_feature.h"
-#import "ios/chrome/browser/ui/default_promo/default_browser_utils.h"
 #import "ios/chrome/browser/ui/download/features.h"
 #import "ios/chrome/browser/ui/first_run/trending_queries_field_trial.h"
 #import "ios/chrome/browser/ui/ntp/new_tab_page_feature.h"
@@ -1128,6 +1131,9 @@ const flags_ui::FeatureEntry kFeatureEntries[] = {
     {"ios-password-ui-split", flag_descriptions::kIOSPasswordUISplitName,
      flag_descriptions::kIOSPasswordUISplitDescription, flags_ui::kOsIos,
      FEATURE_VALUE_TYPE(password_manager::features::kIOSPasswordUISplit)},
+    {"ios-set-up-list", flag_descriptions::kIOSSetUpListName,
+     flag_descriptions::kIOSSetUpListDescription, flags_ui::kOsIos,
+     FEATURE_VALUE_TYPE(kIOSSetUpList)},
     {"ios-password-manager-cross-origin-iframe-support",
      flag_descriptions::kIOSPasswordManagerCrossOriginIframeSupportName,
      flag_descriptions::kIOSPasswordManagerCrossOriginIframeSupportDescription,
@@ -1180,6 +1186,10 @@ const flags_ui::FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kOmniboxOnDeviceTailSuggestionsName,
      flag_descriptions::kOmniboxOnDeviceTailSuggestionsDescription,
      flags_ui::kOsIos, FEATURE_VALUE_TYPE(omnibox::kOnDeviceTailModel)},
+    {"enable-browser-lockdown-mode",
+     flag_descriptions::kEnableBrowserLockdownModeName,
+     flag_descriptions::kEnableBrowserLockdownModeDescription, flags_ui::kOsIos,
+     FEATURE_VALUE_TYPE(web::kEnableBrowserLockdownMode)},
     {"enable-button-configuration-usage",
      flag_descriptions::kEnableUIButtonConfigurationName,
      flag_descriptions::kEnableUIButtonConfigurationDescription,
@@ -1213,6 +1223,11 @@ const flags_ui::FeatureEntry kFeatureEntries[] = {
      flags_ui::kOsIos,
      FEATURE_VALUE_TYPE(
          autofill::features::kAutofillParseVcnCardOnFileStandaloneCvcFields)},
+    {"default-browser-refactoring-promo-manager",
+     flag_descriptions::kDefaultBrowserRefactoringPromoManagerName,
+     flag_descriptions::kDefaultBrowserRefactoringPromoManagerDescription,
+     flags_ui::kOsIos,
+     FEATURE_VALUE_TYPE(kDefaultBrowserRefactoringPromoManager)},
 #if BUILDFLAG(IOS_BACKGROUND_MODE_ENABLED)
     {"feed-background-refresh-ios",
      flag_descriptions::kFeedBackgroundRefreshName,
@@ -1301,12 +1316,6 @@ const flags_ui::FeatureEntry kFeatureEntries[] = {
      FEATURE_WITH_PARAMS_VALUE_TYPE(kEnablePinnedTabs,
                                     kEnablePinnedTabsVariations,
                                     "EnablePinnedTabs")},
-    {"enable-pinned-tabs-ipad", flag_descriptions::kEnablePinnedTabsIpadName,
-     flag_descriptions::kEnablePinnedTabsIpadDescription, flags_ui::kOsIos,
-     FEATURE_VALUE_TYPE(kEnablePinnedTabsIpad)},
-    {"remove-crash-infobar", flag_descriptions::kRemoveCrashInfobarName,
-     flag_descriptions::kRemoveCrashInfobarDescription, flags_ui::kOsIos,
-     FEATURE_VALUE_TYPE(kRemoveCrashInfobar)},
     {"credential-provider-extension-promo",
      flag_descriptions::kCredentialProviderExtensionPromoName,
      flag_descriptions::kCredentialProviderExtensionPromoDescription,
@@ -1481,6 +1490,24 @@ const flags_ui::FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kIOSBrowserEditMenuMetricsName,
      flag_descriptions::kIOSBrowserEditMenuMetricsDescription, flags_ui::kOsIos,
      FEATURE_VALUE_TYPE(kIOSBrowserEditMenuMetrics)},
+    {"sf-symbols-follow-up", flag_descriptions::kSFSymbolsFollowUpName,
+     flag_descriptions::kSFSymbolsFollowUpDescription, flags_ui::kOsIos,
+     FEATURE_VALUE_TYPE(kSFSymbolsFollowUp)},
+    {"enable-reading-list-account-storage",
+     flag_descriptions::kEnableReadingListAccountStorageName,
+     flag_descriptions::kEnableReadingListAccountStorageDescription,
+     flags_ui::kOsIos,
+     FEATURE_VALUE_TYPE(
+         reading_list::switches::kReadingListEnableDualReadingListModel)},
+    {"enable-reading-list-sign-in-promo",
+     flag_descriptions::kEnableReadingListSignInPromoName,
+     flag_descriptions::kEnableReadingListSignInPromoDescription,
+     flags_ui::kOsIos,
+     FEATURE_VALUE_TYPE(reading_list::switches::
+                            kReadingListEnableSyncTransportModeUponSignIn)},
+    {"fix-pdf-snapshot", flag_descriptions::kPDFSnapshotName,
+     flag_descriptions::kPDFSnapshotDescription, flags_ui::kOsIos,
+     FEATURE_VALUE_TYPE(kPDFSnapshot)},
 };
 
 bool SkipConditionalFeatureEntry(const flags_ui::FeatureEntry& entry) {

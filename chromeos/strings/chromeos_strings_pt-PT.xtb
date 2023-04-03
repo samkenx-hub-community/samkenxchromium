@@ -274,6 +274,7 @@
 <translation id="3456078764689556234">Página <ph name="PRINTED_PAGES" /> impressa de <ph name="TOTAL_PAGES" />.</translation>
 <translation id="345898999683440380">A digitalizar a página <ph name="PAGE_NUM" />… <ph name="PERCENTAGE_VALUE" />% concluído.</translation>
 <translation id="3459509316159669723">Impressão</translation>
+<translation id="346423161771747987">Corrente</translation>
 <translation id="346539236881580388">Repetir</translation>
 <translation id="3484914941826596830">Enquanto o firmware está a ser atualizado, não desligue este dispositivo externo nem encerre o computador. Pode minimizar esta janela. Esta atualização pode demorar alguns minutos e o seu dispositivo externo pode não funcionar durante este período.</translation>
 <translation id="3486220673238053218">definição</translation>
@@ -697,6 +698,7 @@
 <translation id="7103252855940681301">Dispositivo <ph name="INDEX" /> de <ph name="COUNT" /> designado <ph name="NAME" />.</translation>
 <translation id="7108668606237948702">enter</translation>
 <translation id="7130438335435247835">Nome do Ponto de Acesso (APN)</translation>
+<translation id="7131634559772719176">Confirme a predefinição</translation>
 <translation id="7134436342991564651">{0,plural, =1{Servidor de nomes}other{Servidores de nomes}}</translation>
 <translation id="7143207342074048698">A ligar</translation>
 <translation id="7144878232160441200">Tentar novamente</translation>
@@ -759,6 +761,7 @@
 <translation id="7656388927906093505">O dispositivo é um rato.</translation>
 <translation id="7658239707568436148">Cancelar</translation>
 <translation id="7665800271478495366">Alterar avatar</translation>
+<translation id="7675241868020048622">Aurora (mais exclusivo)</translation>
 <translation id="7690294790491645610">Confirmar a nova palavra-passe</translation>
 <translation id="7701040980221191251">Nenhuma</translation>
 <translation id="7705524343798198388">VPN</translation>
@@ -768,6 +771,7 @@
 <translation id="7762130827864645708">A alteração da sua palavra-passe foi efetuada com êxito. A partir de agora, utilize a nova palavra-passe.</translation>
 <translation id="7763470514545477072">Correspondência do sufixo do domínio</translation>
 <translation id="7769672763586021400">ID do modelo</translation>
+<translation id="7770834998503326261">Informações adicionais relacionadas com a sua seleção</translation>
 <translation id="7778717409420828014">O seu feedback ajuda-nos a melhorar a experiência do Chromebook e vai ser analisado pela nossa equipa. Devido ao elevado número de relatórios, não é possível enviar uma resposta.</translation>
 <translation id="7784116172884276937">Não foram configurados servidores DNS</translation>
 <translation id="7791543448312431591">Adicionar</translation>
@@ -800,6 +804,7 @@
 <translation id="80398733265834479">Ativar modo de cor automática</translation>
 <translation id="8041089156583427627">Enviar feedback</translation>
 <translation id="8045012663542226664">Desativação do som do microfone</translation>
+<translation id="8050091914317269817">Ao selecionar esta imagem de fundo, ativa o modo escuro automático e a correspondência de cores da imagem de fundo.</translation>
 <translation id="8075838845814659848">Carregamento restante</translation>
 <translation id="8076492880354921740">Separadores</translation>
 <translation id="8082366717211101304">Não é possível resolver o DNS a partir de apps Android</translation>

@@ -46,7 +46,6 @@
 <translation id="1075079914415273530">வேளாண்மை &amp; வனவியல்</translation>
 <translation id="1080116354587839789">அகலத்திற்குப் பொருத்து</translation>
 <translation id="1081061862829655580">டிரே 19</translation>
-<translation id="1088860948719068836">கார்டிலுள்ள பெயரைச் சேர்க்கவும்</translation>
 <translation id="1089439967362294234">கடவுச்சொல்லை மாற்று</translation>
 <translation id="1096545575934602868">இதில் <ph name="MAX_ITEMS_LIMIT" /> உள்ளீடுகளுக்கு மேல் இருக்கக்கூடாது. மீதமிருக்கும் அனைத்தும் நிராகரிக்கப்படும்.</translation>
 <translation id="1100782917270858593">உலாவலைத் தொடர்வதற்கான பட்டன். Chrome செயல்பாடுகளில் இருக்கும் தொடர்புடைய செயல்பாடுகளைப் பார்த்து உலாவலைத் தொடர, Enter பட்டனை அழுத்துங்கள்</translation>
@@ -339,7 +338,6 @@
 <translation id="1721424275792716183">* அவசியமான புலம்</translation>
 <translation id="1725591448053514783">என்வெலப் யூ 6</translation>
 <translation id="1727613060316725209">சான்றிதழ் சரியானது</translation>
-<translation id="1727741090716970331">சரியான கார்டு எண்ணைச் சேர்க்கவும்</translation>
 <translation id="1728677426644403582">இணையப் பக்கத்தின் மூலத்தைப் பார்க்கிறீர்கள்</translation>
 <translation id="173080396488393970">இந்தக் கார்டு வகை ஆதரிக்கப்படவில்லை</translation>
 <translation id="1732445923934584865">நேரில் அனுமதி கேளுங்கள்</translation>
@@ -628,6 +626,7 @@
 <translation id="2469153820345007638">முன்னோக்கிய வரிசை</translation>
 <translation id="2470767536994572628">விரிவுரைகளைத் திருத்தினால் இந்த ஆவணம் ஒற்றைப் பக்கக்காட்சிக்கும் தனது அசல் நிலைக்கும் மாறும்</translation>
 <translation id="2479410451996844060">தவறான தேடல் URL.</translation>
+<translation id="2480300195898055381">உங்கள் Google கணக்கில் (<ph name="USER_EMAIL" />)</translation>
 <translation id="2482878487686419369">அறிவிப்புகள்</translation>
 <translation id="248348093745724435">சாதனக் கொள்கைகள்</translation>
 <translation id="2491120439723279231">சேவையகச் சான்றிதழில் பிழைகள் உள்ளன.</translation>
@@ -809,6 +808,7 @@
 <translation id="2951588413176968965">எனது அஞ்சல் பெட்டி</translation>
 <translation id="2952820037279740115">மறைநிலைச் சாளரங்கள் அனைத்தையும் மூடுக</translation>
 <translation id="2952904171810469095">A2x5</translation>
+<translation id="2954624054936281172">சேமித்த பேமெண்ட் முறைகளின் பட்டியல்</translation>
 <translation id="295526156371527179">எச்சரிக்கை: இது டிக்‌ஷனரி இல்லை என்பதால் கொள்கையில் குறிப்பிட்டபடி ஒன்றிணைக்கப்படவில்லை.</translation>
 <translation id="2955913368246107853">தேடல் பெட்டியை மூடுக</translation>
 <translation id="2958544468932521864">கிரிக்கெட்</translation>
@@ -840,6 +840,7 @@
 <translation id="3029752078111257850">உலகச் செய்திகள்</translation>
 <translation id="3037177537145227281">விலையைக் கண்காணிக்கிறது</translation>
 <translation id="3037605927509011580">அச்சச்சோ!</translation>
+<translation id="3041450980936463495">சேமிக்கப்படும் முகவரிகளை Google தயாரிப்புகள் முழுவதிலும் பயன்படுத்தலாம். இந்த முகவரி உங்கள் Google கணக்கில் (<ph name="ACCOUNT" />) சேமிக்கப்பட்டது.</translation>
 <translation id="3041612393474885105">சான்றிதழ் தகவல்</translation>
 <translation id="305162504811187366">நேர முத்திரைகள், ஹோஸ்ட்டுகள், கிளையண்ட் அமர்வு ஐடிகள் உட்பட இதுவரையிலான Chrome தொலைநிலை டெஸ்க்டாப் நிகழ்வுகள்</translation>
 <translation id="3052964831964880138"><ph name="PRODUCT_NAME" /> விலை <ph name="PRICE_DROP" /> குறைந்துள்ளது</translation>
@@ -918,7 +919,6 @@
 <translation id="3249151924975132674">மாணவருக்கான கடன்கள் &amp; கல்லூரி சார்ந்த நிதிச் சேவைகள்</translation>
 <translation id="3249845759089040423">க்ரூவி</translation>
 <translation id="3250640885957938546">விளம்பரப்படுத்தல் &amp; மார்க்கெட்டிங்</translation>
-<translation id="3252266817569339921">பிரெஞ்ச்</translation>
 <translation id="3254301855501243548">18 x 22 இன்ச்</translation>
 <translation id="3256863843508922226">பணி ஓய்வு &amp; ஓய்வூதியம்</translation>
 <translation id="3259648571731540213"><ph name="CREATE_GOOGLE_CALENDAR_EVENT_FOCUSED_FRIENDLY_MATCH_TEXT" />, Google Calendarரில் புதிய நிகழ்வை விரைவாக உருவாக்க Tab பட்டனை அழுத்திவிட்டு Enter பட்டனை அழுத்துங்கள்</translation>
@@ -934,7 +934,6 @@
 <translation id="3272091146646336650">சூப்பர் B</translation>
 <translation id="3281350579597955952">{0,plural, =1{<ph name="DESTINATION_NAME" /> இல் இந்த ஃபைலைத் திறப்பதை நிர்வாகக் கொள்கை பரிந்துரைக்கவில்லை}other{<ph name="DESTINATION_NAME" /> இல் இந்த ஃபைல்களைத் திறப்பதை நிர்வாகக் கொள்கை பரிந்துரைக்கவில்லை}}</translation>
 <translation id="3282085321714087552">அமைப்புகள், கொள்கைகள் போன்ற சில தகவல்களை உங்கள் நிறுவனம் <ph name="ENROLLMENT_DOMAIN" /> பின்வரும் இணையதளங்களுக்கு அனுப்பியுள்ளது.</translation>
-<translation id="3282497668470633863">கார்டிலுள்ள பெயரைச் சேர்க்கவும்</translation>
 <translation id="3286372614333682499">போர்ட்ரெயிட்</translation>
 <translation id="3287510313208355388">ஆன்லைனில் இருக்கும் போது பதிவிறக்கு</translation>
 <translation id="3288238092761586174">உங்கள் பேமெண்ட்டை உறுதிப்படுத்த <ph name="URL" /> தளத்தில் கூடுதல் படிகளைச் செய்ய வேண்டியிருக்கலாம்</translation>
@@ -947,7 +946,6 @@
 <translation id="3304777285002411338">A2x3</translation>
 <translation id="33073482541490531">நீங்கள் தற்போது பயன்படுத்திய கடவுச்சொல், தரவு மீறலுக்கு உள்ளாகியிருப்பதாகக் கண்டறியப்பட்டுள்ளது. இதை இப்போதே மாற்றும்படி கடவுச்சொல் நிர்வாகி பரிந்துரைக்கிறது.</translation>
 <translation id="3308006649705061278">நிறுவன யூனிட் (OU)</translation>
-<translation id="3320021301628644560">பில்லிங் முகவரியைச் சேர்க்கவும்</translation>
 <translation id="3324687287337751929">4 x 6 இன்ச்</translation>
 <translation id="3324983252691184275">அடர்சிவப்பு</translation>
 <translation id="3329013043687509092">நிறை செறிவு நிலை</translation>
@@ -1010,7 +1008,6 @@
 <translation id="3461824795358126837">ஹைலைட்டர்</translation>
 <translation id="3462200631372590220">மேம்பட்டவையை மறை</translation>
 <translation id="346601286295919445">வேதியியல்</translation>
-<translation id="3467763166455606212">கார்டு உரிமையாளரின் பெயர் தேவை</translation>
 <translation id="3468054117417088249">தற்போது திறந்துள்ள <ph name="TAB_SWITCH_SUFFIX" /> தாவலுக்கு மாற, ‘தாவல்’ மாற்ற பட்டனைத் தட்டி, ‘எண்டர்’ பட்டனை அழுத்தவும்</translation>
 <translation id="3470563864795286535"><ph name="CLOSE_INCOGNITO_WINDOWS_FOCUSED_FRIENDLY_MATCH_TEXT" />. தற்போது திறந்துள்ள மறைநிலைச் சாளரங்கள் அனைத்தையும் மூட, Tab பட்டனை அழுத்திவிட்டு Enter பட்டனை அழுத்துங்கள்</translation>
 <translation id="3477679029130949506">திரைப்படப் பட்டியல்கள் &amp; தியேட்டர் காட்சிநேரங்கள்</translation>
@@ -1581,7 +1578,6 @@
 <translation id="484988093836683706">'சாதனத்தில் அன்லாக் செய்தல்' அம்சத்தைப் பயன்படுத்து</translation>
 <translation id="4850886885716139402">காட்சி</translation>
 <translation id="4852429274334674023">ஆப்ரேட்டிங் சிஸ்டங்கள்</translation>
-<translation id="485316830061041779">ஜெர்மன்</translation>
 <translation id="4853901935952445031">பிப்ரவரி 2022க்குப் பிறகு U2F APIயை இந்தத் தளத்தால் பயன்படுத்த முடியாது. இது உங்களுடைய தளமாக இருந்தால் Web Authentication APIயைப் பயன்படுத்தும் வகையில் இதை மாற்ற வேண்டும்.</translation>
 <translation id="4854362297993841467">இந்த டெலிவரி முறை இல்லை. வேறு முறையைப் பயன்படுத்திப் பார்க்கவும்.</translation>
 <translation id="4854853140771946034">Google Keepபில் புதிய குறிப்பை விரைவாக உருவாக்கும்</translation>
@@ -1650,6 +1646,7 @@
 <translation id="5018422839182700155">பக்கத்தைத் திறக்க முடியவில்லை</translation>
 <translation id="5018802455907704660">16 x 20 இன்ச்</translation>
 <translation id="5019198164206649151">தவறான நிலையில் மீட்பு சேமிப்பு உள்ளது</translation>
+<translation id="5019293549442035120">சேமிக்கப்படும் முகவரிகளை Google தயாரிப்புகள் முழுவதிலும் பயன்படுத்தலாம். இந்த முகவரி உங்கள் Google கணக்கில் (<ph name="USER_EMAIL" />) சேமிக்கப்படும்.</translation>
 <translation id="5020776957610079374">சர்வதேச இசை</translation>
 <translation id="5021557570875267742">Chrome மூலம் விலைகளைக் கண்காணித்தல்</translation>
 <translation id="5023310440958281426">உங்கள் நிர்வாகியின் கொள்கைகளைச் சரிபார்க்கவும்</translation>
@@ -1787,6 +1784,7 @@
 <translation id="5324080437450482387">தொடர்புத் தகவலைத் தேர்வு செய்</translation>
 <translation id="5329858041417644019">உங்கள் உலாவி நிர்வகிக்கப்படவில்லை</translation>
 <translation id="5332219387342487447">ஷிப்பிங் முறை</translation>
+<translation id="5332769172018416402">மெசேஜ் மூலம் கேள்</translation>
 <translation id="5333022057423422993">நீங்கள் தற்போது பயன்படுத்திய கடவுச்சொல், தரவு மீறலுக்கு உட்பட்டது என Chrome கண்டறிந்துள்ளது. கணக்குகளைப் பாதுகாக்க, சேமித்த கடவுச்சொற்களைச் சரிபார்க்கவும்.</translation>
 <translation id="5334013548165032829">விரிவான சிஸ்டம் பதிவுகள்</translation>
 <translation id="5334145288572353250">முகவரியைச் சேமிக்கவா?</translation>
@@ -1820,7 +1818,6 @@
 <translation id="5423269318075950257">விலையைக் கண்காணித்தல்</translation>
 <translation id="5425241977284572032">{NUM_COOKIES,plural, =0{தளங்கள் எதுவும் தடுக்கப்படவில்லை}=1{1 தளம் தடுக்கப்பட்டுள்ளது}other{# தளங்கள் தடுக்கப்பட்டுள்ளன}}</translation>
 <translation id="5426179911063097041"><ph name="SITE" /> உங்களுக்கு அறிவிப்புகளை அனுப்ப விரும்புகிறது</translation>
-<translation id="5428105026674456456">ஸ்பானிஷ்</translation>
 <translation id="5430298929874300616">புத்தகக்குறியை அகற்று</translation>
 <translation id="5443468954631487277">பின்னோக்கிய வரிசையில் மேல் நோக்கிய பாணி</translation>
 <translation id="5447765697759493033">இந்தத் தளம் மொழிபெயர்க்கப்படாது</translation>
@@ -1829,7 +1826,6 @@
 <translation id="5457113250005438886">தவறானது</translation>
 <translation id="5458150163479425638">{CONTACT,plural, =0{<ph name="CONTACT_PREVIEW" />}=1{<ph name="CONTACT_PREVIEW" />, மேலும் <ph name="NUMBER_OF_ADDITIONAL_CONTACTS" />}other{<ph name="CONTACT_PREVIEW" />, மேலும் <ph name="NUMBER_OF_ADDITIONAL_CONTACTS" />}}</translation>
 <translation id="5463625433003343978">சாதனங்களைத் தேடுகிறது...</translation>
-<translation id="5469868506864199649">இத்தாலியன்</translation>
 <translation id="5470230812924696184">கட்டடப் பொறியியல்</translation>
 <translation id="5470861586879999274">&amp;மீண்டும் திருத்து</translation>
 <translation id="5471337644440862957">நகைச்சுவைத் திரைப்படங்கள்</translation>
@@ -1842,7 +1838,6 @@
     <ph name="LINE_BREAK" />
     உங்கள் சிஸ்டம் நிர்வாகியைத் தொடர்புகொள்ள முயலவும்.</translation>
 <translation id="549333378215107354">அளவு: 3</translation>
-<translation id="5503356662318814623">மெசேஜ் அனுப்பு</translation>
 <translation id="5509762909502811065">B0</translation>
 <translation id="5509780412636533143">நிர்வகிக்கப்படும் புக்மார்க்குகள்</translation>
 <translation id="5510481203689988000">குக்கீகள் அமைப்புகளில் இந்த அமைப்பு கட்டுப்படுத்தப்படுகிறது.</translation>
@@ -1928,6 +1923,7 @@
 <translation id="5695542892312572833">உங்கள் பர்ச்சேஸைச் சரிபார்த்து நிறைவுசெய்ய Windows Helloவைப் பயன்படுத்த விரும்புகிறீர்களா?</translation>
 <translation id="5701381305118179107">மையம்</translation>
 <translation id="570530837424789914">நிர்வகி...</translation>
+<translation id="5706906618852913030">கணக்கில் சேமிக்கவா?</translation>
 <translation id="5707154300732650394">உலாவலைத் தொடர்க</translation>
 <translation id="57094364128775171">வலுவான கடவுச்சொல்லைப் பரிந்துரைசெய்…</translation>
 <translation id="571403275720188526">(arm64)</translation>
@@ -1977,6 +1973,7 @@
 <translation id="5817918615728894473">இணை</translation>
 <translation id="5824687817967109979">{NUM_CARDS,plural, =1{நீங்கள் பணம் செலுத்தும்போது இந்தக் கார்டிலிருந்து கட்டணம் வசூலிக்கப்படும், ஆனால் கார்டின் எண் இந்தத் தளத்துடன் பகிரப்படாது. கூடுதல் பாதுகாப்பிற்காக, தற்காலிக CVC ஒன்று உருவாக்கப்படும்.}other{பணம் செலுத்தும்போது நீங்கள் தேர்ந்தெடுக்கும் கார்டிலிருந்து கட்டணம் வசூலிக்கப்படும், ஆனால் கார்டின் எண் இந்தத் தளத்துடன் பகிரப்படாது. கூடுதல் பாதுகாப்பிற்காக, தற்காலிக CVC ஒன்று உருவாக்கப்படும்.}}</translation>
 <translation id="5826507051599432481">பொதுவான பெயர் (CN)</translation>
+<translation id="5829215001860862731">கணக்கில் சேமியுங்கள்</translation>
 <translation id="5830698870816298009">கேமரா உபயோகம் &amp; நகர்வு</translation>
 <translation id="583281660410589416">தெரியாதது</translation>
 <translation id="5838278095973806738">தீங்கிழைப்பவர்கள் திருடிவிடலாம் என்பதால், இந்தத் தளத்தில் பாதுகாக்கப்பட வேண்டிய தகவலை (எடுத்துக்காட்டு: கடவுச்சொற்கள் அல்லது கிரெடிட் கார்டுகள்) உள்ளிட வேண்டாம்.</translation>
@@ -2279,7 +2276,6 @@
 <translation id="6612010098632894193">ஆன்லைன் வீடியோ</translation>
 <translation id="6615297766614333076">ஸ்டேக்கர் 2</translation>
 <translation id="6624427990725312378">தொடர்புத் தகவல்</translation>
-<translation id="6626291197371920147">சரியான கார்டு எண்ணைச் சேர்க்கவும்</translation>
 <translation id="6627727261837091711">விளம்பரத்தைப் பிரத்தியேகமாக்குவதற்கான விவரங்களைக் காட்டும்</translation>
 <translation id="6628463337424475685"><ph name="ENGINE" /> தேடல்</translation>
 <translation id="6630043285902923878">USB சாதனங்களைத் தேடுகிறது...</translation>
@@ -2765,13 +2761,13 @@
 <translation id="7716375162095500223">இன்னும் பதிவேற்றப்படவில்லை அல்லது புறக்கணிக்கப்பட்டது</translation>
 <translation id="7716424297397655342">தற்காலிகச் சேமிப்பிலிருந்து இந்தத் தளத்தை ஏற்ற முடியவில்லை</translation>
 <translation id="772128550427553158">கார்டின் முன்பக்கத்தில் CVC எண் இருக்கும்.</translation>
-<translation id="7723047071702270851">கார்டைத் திருத்தவும்</translation>
 <translation id="7724603315864178912">வெட்டு</translation>
 <translation id="7734285854693414638">Google Formsஸில் புதிய படிவத்தை விரைவாக உருவாக்கும்</translation>
 <translation id="773466115871691567"><ph name="SOURCE_LANGUAGE" /> மொழியில் உள்ள பக்கங்களை எப்போதும் மொழிபெயர்</translation>
 <translation id="7736959720849233795">இணைப்பின் முகவரியை நகலெடு</translation>
 <translation id="7740996059027112821">நிலையானது</translation>
 <translation id="77424286611022110">குறுக்கிடும் அல்லது தவறாக வழிநடத்தும் விளம்பரங்களை இந்தத் தளம் காட்டுகிறது. <ph name="LEARN_MORE_LINK_TEXT" /></translation>
+<translation id="7744505202669469867">சேமித்த முகவரிகளின் பட்டியல்</translation>
 <translation id="774634243536837715">ஆபத்தான உள்ளடக்கம் தடுக்கப்பட்டது.</translation>
 <translation id="7751971323486164747">Chromeமில் எழுத்து வடிவ அளவுகளையும் வகைகளையும் பிரத்தியேகமாக்கலாம்</translation>
 <translation id="7752995774971033316">நிர்வகிக்கப்படாதது</translation>
@@ -2998,7 +2994,6 @@
 <translation id="8296205692406981542">பகுதிசார்ந்த பூங்காக்கள் &amp; தோட்டங்கள்</translation>
 <translation id="8297545700510100061">குக்கீகளும் பிற தளத் தரவும் உங்கள் செயல்பாட்டை நினைவில் வைத்துக்கொள்ளப் பயன்படுத்தப்படுகின்றன. உதாரணமாக உங்களின் உள்நுழைவுச் செயல்பாடு அல்லது விளம்பரங்களைப் பிரத்தியேகமாக்குவது. அனைத்துத் தளங்களுக்கான குக்கீகளையும் நிர்வகிக்க <ph name="SETTINGS" /> ஐப் பார்க்கவும்.</translation>
 <translation id="8298115750975731693">நீங்கள் பயன்படுத்திக் கொண்டிருக்கும் (<ph name="WIFI_NAME" />) வைஃபை, அதன் <ph name="BEGIN_BOLD" /><ph name="LOGIN_URL" /><ph name="END_BOLD" />ஐ நீங்கள் பார்க்கக் கோரலாம்.</translation>
-<translation id="8299269255470343364">ஜாப்பனீஸ்</translation>
 <translation id="8303854710873047864">"<ph name="SECTION" />" பிரிவு காட்டப்படுகிறது</translation>
 <translation id="830498451218851433">ஃபோல்டு ஹாஃப்</translation>
 <translation id="8307888238279532626">நிறுவியுள்ள ஆப்ஸும் அவை எப்போதெல்லாம் பயன்படுத்தப்படுகின்றன என்ற தகவலும்</translation>
@@ -3013,6 +3008,7 @@
 <translation id="8347658365704983341">தொலைநிலைக் கல்வி</translation>
 <translation id="8349305172487531364">புக்மார்க் பட்டி</translation>
 <translation id="8351131234907093545">குறிப்பை உருவாக்கு</translation>
+<translation id="835203957414790336">நீங்கள் அச்சிடும் பக்கங்களில் இருக்கும் உள்ளடக்கமும் உங்கள் பிரிண்ட்டர் குறித்த தகவலும் பகுப்பாய்விற்காக Google Cloud அல்லது மூன்றாம் தரப்புகளுக்கு அனுப்பப்படும். உதாரணமாக, பாதுகாக்கப்பட வேண்டிய தனிப்பட்ட தரவு உள்ளதா எனக் கண்டறிவதற்காக அது ஸ்கேன் செய்யப்படலாம்.</translation>
 <translation id="8355270400102541638">அகச் சிதைவுச் சூழல்:</translation>
 <translation id="8363502534493474904">விமானப் பயன்முறையை முடக்குதல்</translation>
 <translation id="8364627913115013041">அமைக்கப்படவில்லை.</translation>
@@ -3118,7 +3114,6 @@
 <translation id="865032292777205197">மோஷன் சென்சார்கள்</translation>
 <translation id="8654126188050905496">55 x 91 மிமீ</translation>
 <translation id="8663226718884576429">ஆர்டர் சுருக்கம், <ph name="TOTAL_LABEL" />, மேலும் விவரங்கள்</translation>
-<translation id="8666678546361132282">ஆங்கிலம்</translation>
 <translation id="8671519637524426245"><ph name="SECURE_DNS_SALT" /> மதிப்பு அளவுத் தேவைகளைப் பூர்த்தி செய்யவில்லை.</translation>
 <translation id="867224526087042813">கையொப்பம்</translation>
 <translation id="8672264262457010862">பிசினஸ் &amp; தொழில்துறை</translation>

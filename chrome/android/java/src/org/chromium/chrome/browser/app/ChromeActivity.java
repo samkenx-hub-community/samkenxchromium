@@ -19,7 +19,6 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.CancellationSignal;
-import android.os.Handler;
 import android.os.SystemClock;
 import android.util.Pair;
 import android.util.TypedValue;
@@ -404,6 +403,7 @@ public abstract class ChromeActivity<C extends ChromeActivityComponent>
     private StylusWritingCoordinator mStylusWritingCoordinator;
     private boolean mBlockingDrawForAppRestart;
     private Runnable mShowContentRunnable;
+    private boolean mIsRecreatingForTabletModeChange;
 
     protected ChromeActivity() {
         mIntentHandler = new IntentHandler(this, createIntentHandlerDelegate());
@@ -979,6 +979,8 @@ public abstract class ChromeActivity<C extends ChromeActivityComponent>
         if (mDeferredStartupQueued || shouldPostDeferredStartupForReparentedTab()) {
             postDeferredStartupIfNeeded();
         }
+
+        mRootUiCoordinator.restoreUiState(getSavedInstanceState());
     }
 
     /**
@@ -1491,6 +1493,7 @@ public abstract class ChromeActivity<C extends ChromeActivityComponent>
     @Override
     protected void onSaveInstanceState(Bundle outState) {
         super.onSaveInstanceState(outState);
+        mRootUiCoordinator.onSaveInstanceState(outState, mIsRecreatingForTabletModeChange);
     }
 
     /**
@@ -1663,19 +1666,9 @@ public abstract class ChromeActivity<C extends ChromeActivityComponent>
         // focus dependency is because doing it earlier can cause drawing bugs, e.g. crbug/673831.
         if (!mNativeInitialized || !hasWindowFocus()) return;
 
-        if (!DeviceFormFactor.isNonMultiDisplayContextOnTablet(this)) {
-            changeBackgroundColorForResizing();
-        } else {
-            // Post the background update call as a separate task, as doing it synchronously
-            // here can cause redrawing glitches. See crbug.com/686662 and crbug.com/1260127 for
-            // example problems.
-            Handler handler = new Handler();
-            handler.post(() -> {
-                // The window background color is used as the resizing background color in
-                // Android N+ multi-window mode. See crbug.com/602366.
-                changeBackgroundColorForResizing();
-            });
-        }
+        // The window background color is used as the resizing background color in Android N+
+        // multi-window mode. See crbug.com/602366.
+        changeBackgroundColorForResizing();
         mRemoveWindowBackgroundDone = true;
     }
 
@@ -2814,6 +2807,7 @@ public abstract class ChromeActivity<C extends ChromeActivityComponent>
             mTabReparentingControllerSupplier.get().prepareTabsForReparenting();
             mIsTabReparentingPrepared = true;
             if (!isFinishing()) {
+                mIsRecreatingForTabletModeChange = true;
                 recreate();
                 mHandler.removeCallbacks(mShowContentRunnable);
                 return true;
@@ -2846,6 +2840,11 @@ public abstract class ChromeActivity<C extends ChromeActivityComponent>
     @VisibleForTesting
     public BackPressManager getBackPressManagerForTesting() {
         return mBackPressManager;
+    }
+
+    @VisibleForTesting
+    public boolean recreatingForTabletModeChangeForTesting() {
+        return mIsRecreatingForTabletModeChange;
     }
 
     /** Returns whether the print action was successfully started. */

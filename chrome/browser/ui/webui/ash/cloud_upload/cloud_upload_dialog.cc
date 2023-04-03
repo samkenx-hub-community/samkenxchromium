@@ -653,8 +653,7 @@ void CloudOpenTask::SetTaskArgs(
       dialog_task->icon_url = task.icon_url.spec();
       dialog_task->app_id = task.task_descriptor.app_id;
 
-      // TODO(petermarshall): Rename args->tasks to local_tasks.
-      args->tasks.push_back(std::move(dialog_task));
+      args->local_tasks.push_back(std::move(dialog_task));
       local_tasks_.push_back(std::move(task.task_descriptor));
     }
   }
@@ -666,12 +665,14 @@ void CloudOpenTask::FilesAppWindowCreated(
   if (result != platform_util::OpenOperationResult::OPEN_SUCCEEDED) {
     // We keep going even if we failed to launch files app. The dialog
     // just won't be modal in this case.
+    dialog->set_modal_type(ui::MODAL_TYPE_NONE);
     dialog->ShowSystemDialog();
     return;
   }
   Browser* browser =
       FindSystemWebAppBrowser(profile_, SystemWebAppType::FILE_MANAGER);
   if (!browser) {
+    dialog->set_modal_type(ui::MODAL_TYPE_NONE);
     dialog->ShowSystemDialog();
     return;
   }
@@ -710,9 +711,6 @@ void CloudOpenTask::OnDialogComplete(const std::string& user_response) {
     StartUpload();
   } else if (user_response == kUserActionUploadToOneDrive) {
     StartUpload();
-  } else if (user_response == kUserActionSetUpGoogleDrive) {
-    cloud_provider_ = CloudProvider::kGoogleDrive;
-    InitAndShowDialog(mojom::DialogPage::kGoogleDriveSetup);
   } else if (user_response == kUserActionSetUpOneDrive) {
     cloud_provider_ = CloudProvider::kOneDrive;
     InitAndShowDialog(mojom::DialogPage::kOneDriveSetup);
@@ -868,13 +866,13 @@ CloudUploadDialog::CloudUploadDialog(mojom::DialogArgsPtr args,
       dialog_args_(std::move(args)),
       callback_(std::move(callback)),
       dialog_page_(dialog_page),
-      num_local_tasks_(dialog_args_->tasks.size()),
+      num_local_tasks_(dialog_args_->local_tasks.size()),
       office_move_confirmation_shown_(office_move_confirmation_shown) {}
 
 CloudUploadDialog::~CloudUploadDialog() = default;
 
 ui::ModalType CloudUploadDialog::GetDialogModalType() const {
-  return ui::MODAL_TYPE_WINDOW;
+  return modal_type_;
 }
 
 bool CloudUploadDialog::ShouldCloseDialogOnEscape() const {
@@ -892,11 +890,8 @@ const int kDialogWidthForOneDriveSetup = 512;
 const int kDialogHeightForOneDriveSetup = 556;
 
 const int kDialogWidthForFileHandlerDialog = 512;
-const int kDialogHeightForFileHandlerDialog = 475;
-const int kDialogHeightForFileHandlerDialogNoLocalApp = 310;
-
-const int kDialogWidthForDriveSetup = 512;
-const int kDialogHeightForDriveSetup = 220;
+const int kDialogHeightForFileHandlerDialog = 375;
+const int kDialogHeightForFileHandlerDialogNoLocalApp = 311;
 
 const int kDialogWidthForMoveConfirmation = 512;
 const int kDialogHeightForMoveConfirmationWithCheckbox = 500;
@@ -916,11 +911,6 @@ void CloudUploadDialog::GetDialogSize(gfx::Size* size) const {
     case mojom::DialogPage::kOneDriveSetup: {
       size->set_width(kDialogWidthForOneDriveSetup);
       size->set_height(kDialogHeightForOneDriveSetup);
-      return;
-    }
-    case mojom::DialogPage::kGoogleDriveSetup: {
-      size->set_width(kDialogWidthForDriveSetup);
-      size->set_height(kDialogHeightForDriveSetup);
       return;
     }
     case mojom::DialogPage::kMoveConfirmationGoogleDrive:

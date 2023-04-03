@@ -71,10 +71,10 @@ constexpr char kNote[] = "note";
 
 @implementation FakePasswordDetailsHandler
 
-- (void)passwordDetailsTableViewControllerDidDisappear {
+- (void)passwordDetailsTableViewControllerWasDismissed {
 }
 
-- (void)showPasscodeDialog {
+- (void)showPasscodeDialogForReason:(PasscodeDialogReason)reason {
 }
 
 - (void)showPasswordDeleteDialogWithPasswordDetails:(PasswordDetails*)password

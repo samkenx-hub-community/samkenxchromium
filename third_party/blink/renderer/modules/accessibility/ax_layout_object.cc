@@ -73,15 +73,15 @@
 #include "third_party/blink/renderer/core/layout/layout_list_item.h"
 #include "third_party/blink/renderer/core/layout/layout_list_marker.h"
 #include "third_party/blink/renderer/core/layout/layout_replaced.h"
-#include "third_party/blink/renderer/core/layout/layout_table.h"
-#include "third_party/blink/renderer/core/layout/layout_table_cell.h"
-#include "third_party/blink/renderer/core/layout/layout_table_row.h"
-#include "third_party/blink/renderer/core/layout/layout_table_section.h"
 #include "third_party/blink/renderer/core/layout/layout_view.h"
 #include "third_party/blink/renderer/core/layout/list_marker.h"
 #include "third_party/blink/renderer/core/layout/ng/inline/ng_inline_cursor.h"
 #include "third_party/blink/renderer/core/layout/ng/inline/ng_inline_node.h"
 #include "third_party/blink/renderer/core/layout/ng/list/layout_ng_list_item.h"
+#include "third_party/blink/renderer/core/layout/ng/table/layout_ng_table.h"
+#include "third_party/blink/renderer/core/layout/ng/table/layout_ng_table_cell.h"
+#include "third_party/blink/renderer/core/layout/ng/table/layout_ng_table_row.h"
+#include "third_party/blink/renderer/core/layout/ng/table/layout_ng_table_section.h"
 #include "third_party/blink/renderer/core/loader/progress_tracker.h"
 #include "third_party/blink/renderer/core/mathml/mathml_element.h"
 #include "third_party/blink/renderer/core/page/page.h"
@@ -102,6 +102,28 @@
 #include "ui/accessibility/ax_role_properties.h"
 
 namespace blink {
+
+namespace {
+
+// Return the first LayoutNGTableSection if maybe_table is a non-anonymous
+// table. If non-null, set table_out to the containing table.
+LayoutNGTableSection* FirstTableSection(LayoutObject* maybe_table,
+                                        LayoutNGTable** table_out = nullptr) {
+  if (auto* table = DynamicTo<LayoutNGTable>(maybe_table)) {
+    if (table->GetNode()) {
+      if (table_out) {
+        *table_out = table;
+      }
+      return table->FirstSection();
+    }
+  }
+  if (table_out) {
+    *table_out = nullptr;
+  }
+  return nullptr;
+}
+
+}  // anonymous namespace
 
 AXLayoutObject::AXLayoutObject(LayoutObject* layout_object,
                                AXObjectCacheImpl& ax_object_cache)
@@ -244,9 +266,9 @@ ax::mojom::blink::Role AXLayoutObject::RoleFromLayoutObjectOrNode() const {
     }
     if (layout_object_->IsSVGShape())
       return ax::mojom::blink::Role::kGraphicsSymbol;
-    if (layout_object_->IsSVGForeignObjectIncludingNG() ||
-        IsA<SVGGElement>(node))
+    if (layout_object_->IsSVGForeignObject() || IsA<SVGGElement>(node)) {
       return ax::mojom::blink::Role::kGroup;
+    }
     if (IsA<SVGUseElement>(node))
       return ax::mojom::blink::Role::kGraphicsObject;
   }
@@ -380,9 +402,9 @@ bool AXLayoutObject::IsPlaceholder() const {
     return false;
 
   LayoutObject* parent_layout_object = parent_object->GetLayoutObject();
-  if (!parent_layout_object ||
-      !parent_layout_object->IsTextControlIncludingNG())
+  if (!parent_layout_object || !parent_layout_object->IsTextControl()) {
     return false;
+  }
 
   const auto* text_control_element =
       To<TextControlElement>(parent_layout_object->GetNode());
@@ -396,10 +418,6 @@ bool AXLayoutObject::ComputeAccessibilityIsIgnored(
 #if DCHECK_IS_ON()
   DCHECK(initialized_);
 #endif
-
-  // Ignore continuations, they're duplicate copies of inline nodes with blocks
-  // inside. AXObjects are no longer created for these.
-  DCHECK(!layout_object_->IsElementContinuation());
 
   if (AXObject::ShouldIgnoreForHiddenOrInert(ignored_reasons)) {
     return true;
@@ -1239,14 +1257,7 @@ unsigned AXLayoutObject::ColumnCount() const {
   if (AriaRoleAttribute() != ax::mojom::blink::Role::kUnknown)
     return AXNodeObject::ColumnCount();
 
-  LayoutObject* layout_object = GetLayoutObject();
-  if (!layout_object || !layout_object->IsTable() || !layout_object->GetNode())
-    return AXNodeObject::ColumnCount();
-
-  LayoutNGTableInterface* table =
-      ToInterface<LayoutNGTableInterface>(layout_object);
-  table->RecalcSectionsIfNeeded();
-  LayoutNGTableSectionInterface* table_section = table->FirstSectionInterface();
+  auto* table_section = FirstTableSection(GetLayoutObject());
   if (!table_section)
     return AXNodeObject::ColumnCount();
 
@@ -1257,37 +1268,23 @@ unsigned AXLayoutObject::RowCount() const {
   if (AriaRoleAttribute() != ax::mojom::blink::Role::kUnknown)
     return AXNodeObject::RowCount();
 
-  LayoutObject* layout_object = GetLayoutObject();
-  if (!layout_object || !layout_object->IsTable() || !layout_object->GetNode())
-    return AXNodeObject::RowCount();
-
-  LayoutNGTableInterface* table =
-      ToInterface<LayoutNGTableInterface>(layout_object);
-  table->RecalcSectionsIfNeeded();
-
-  unsigned row_count = 0;
-  const LayoutNGTableSectionInterface* table_section =
-      table->FirstSectionInterface();
+  LayoutNGTable* table;
+  auto* table_section = FirstTableSection(GetLayoutObject(), &table);
   if (!table_section)
     return AXNodeObject::RowCount();
 
+  unsigned row_count = 0;
   while (table_section) {
     row_count += table_section->NumRows();
-    table_section =
-        table->NextSectionInterface(table_section, kSkipEmptySections);
+    table_section = table->NextSection(table_section, kSkipEmptySections);
   }
   return row_count;
 }
 
 unsigned AXLayoutObject::ColumnIndex() const {
-  LayoutObject* layout_object = GetLayoutObject();
-  if (!layout_object || !layout_object->GetNode())
-    return AXNodeObject::ColumnIndex();
-
-  if (layout_object->IsTableCell()) {
-    const LayoutNGTableCellInterface* cell =
-        ToInterface<LayoutNGTableCellInterface>(layout_object);
-    return cell->TableInterface()->AbsoluteColumnToEffectiveColumn(
+  auto* cell = DynamicTo<LayoutNGTableCell>(GetLayoutObject());
+  if (cell && cell->GetNode()) {
+    return cell->Table()->AbsoluteColumnToEffectiveColumn(
         cell->AbsoluteColumnIndex());
   }
 
@@ -1300,20 +1297,16 @@ unsigned AXLayoutObject::RowIndex() const {
     return AXNodeObject::RowIndex();
 
   unsigned row_index = 0;
-  const LayoutNGTableSectionInterface* row_section = nullptr;
-  const LayoutNGTableInterface* table = nullptr;
-  if (layout_object->IsTableRow()) {
-    const LayoutNGTableRowInterface* row =
-        ToInterface<LayoutNGTableRowInterface>(layout_object);
+  const LayoutNGTableSection* row_section = nullptr;
+  const LayoutNGTable* table = nullptr;
+  if (const auto* row = DynamicTo<LayoutNGTableRow>(layout_object)) {
     row_index = row->RowIndex();
-    row_section = row->SectionInterface();
-    table = row->TableInterface();
-  } else if (layout_object->IsTableCell()) {
-    const LayoutNGTableCellInterface* cell =
-        ToInterface<LayoutNGTableCellInterface>(layout_object);
+    row_section = row->Section();
+    table = row->Table();
+  } else if (const auto* cell = DynamicTo<LayoutNGTableCell>(layout_object)) {
     row_index = cell->RowIndex();
-    row_section = cell->SectionInterface();
-    table = cell->TableInterface();
+    row_section = cell->Section();
+    table = cell->Table();
   } else {
     return AXNodeObject::RowIndex();
   }
@@ -1323,42 +1316,34 @@ unsigned AXLayoutObject::RowIndex() const {
 
   // Since our table might have multiple sections, we have to offset our row
   // appropriately.
-  table->RecalcSectionsIfNeeded();
-  const LayoutNGTableSectionInterface* section = table->FirstSectionInterface();
+  const LayoutNGTableSection* section = table->FirstSection();
   while (section && section != row_section) {
     row_index += section->NumRows();
-    section = table->NextSectionInterface(section, kSkipEmptySections);
+    section = table->NextSection(section, kSkipEmptySections);
   }
 
   return row_index;
 }
 
 unsigned AXLayoutObject::ColumnSpan() const {
-  LayoutObject* layout_object = GetLayoutObject();
-  if (!layout_object || !layout_object->IsTableCell())
+  auto* cell = DynamicTo<LayoutNGTableCell>(GetLayoutObject());
+  if (!cell) {
     return AXNodeObject::ColumnSpan();
+  }
 
-  const LayoutNGTableCellInterface* cell =
-      ToInterface<LayoutNGTableCellInterface>(layout_object);
+  LayoutNGTable* table = cell->Table();
   unsigned absolute_first_col = cell->AbsoluteColumnIndex();
   unsigned absolute_last_col = absolute_first_col + cell->ColSpan() - 1;
   unsigned effective_first_col =
-      cell->TableInterface()->AbsoluteColumnToEffectiveColumn(
-          absolute_first_col);
+      table->AbsoluteColumnToEffectiveColumn(absolute_first_col);
   unsigned effective_last_col =
-      cell->TableInterface()->AbsoluteColumnToEffectiveColumn(
-          absolute_last_col);
+      table->AbsoluteColumnToEffectiveColumn(absolute_last_col);
   return effective_last_col - effective_first_col + 1;
 }
 
 unsigned AXLayoutObject::RowSpan() const {
-  LayoutObject* layout_object = GetLayoutObject();
-  if (!layout_object || !layout_object->IsTableCell())
-    return AXNodeObject::ColumnSpan();
-
-  LayoutNGTableCellInterface* cell =
-      ToInterface<LayoutNGTableCellInterface>(layout_object);
-  return cell->ResolvedRowSpan();
+  auto* cell = DynamicTo<LayoutNGTableCell>(GetLayoutObject());
+  return cell ? cell->ResolvedRowSpan() : AXNodeObject::RowSpan();
 }
 
 ax::mojom::blink::SortDirection AXLayoutObject::GetSortDirection() const {
@@ -1385,17 +1370,8 @@ ax::mojom::blink::SortDirection AXLayoutObject::GetSortDirection() const {
 
 AXObject* AXLayoutObject::CellForColumnAndRow(unsigned target_column_index,
                                               unsigned target_row_index) const {
-  LayoutObject* layout_object = GetLayoutObject();
-  if (!layout_object || !layout_object->IsTable()) {
-    return AXNodeObject::CellForColumnAndRow(target_column_index,
-                                             target_row_index);
-  }
-
-  LayoutNGTableInterface* table =
-      ToInterface<LayoutNGTableInterface>(layout_object);
-  table->RecalcSectionsIfNeeded();
-
-  LayoutNGTableSectionInterface* table_section = table->FirstSectionInterface();
+  LayoutNGTable* table;
+  auto* table_section = FirstTableSection(GetLayoutObject(), &table);
   if (!table_section) {
     return AXNodeObject::CellForColumnAndRow(target_column_index,
                                              target_row_index);
@@ -1405,32 +1381,29 @@ AXObject* AXLayoutObject::CellForColumnAndRow(unsigned target_column_index,
   while (table_section) {
     // Iterate backwards through the rows in case the desired cell has a rowspan
     // and exists in a previous row.
-    for (LayoutNGTableRowInterface* row = table_section->LastRowInterface();
-         row; row = row->PreviousRowInterface()) {
+    for (LayoutNGTableRow* row = table_section->LastRow(); row;
+         row = row->PreviousRow()) {
       unsigned row_index = row->RowIndex() + row_offset;
-      for (LayoutNGTableCellInterface* cell = row->LastCellInterface(); cell;
-           cell = cell->PreviousCellInterface()) {
+      for (LayoutNGTableCell* cell = row->LastCell(); cell;
+           cell = cell->PreviousCell()) {
         unsigned absolute_first_col = cell->AbsoluteColumnIndex();
         unsigned absolute_last_col = absolute_first_col + cell->ColSpan() - 1;
         unsigned effective_first_col =
-            cell->TableInterface()->AbsoluteColumnToEffectiveColumn(
-                absolute_first_col);
+            table->AbsoluteColumnToEffectiveColumn(absolute_first_col);
         unsigned effective_last_col =
-            cell->TableInterface()->AbsoluteColumnToEffectiveColumn(
-                absolute_last_col);
+            table->AbsoluteColumnToEffectiveColumn(absolute_last_col);
         unsigned row_span = cell->ResolvedRowSpan();
         if (target_column_index >= effective_first_col &&
             target_column_index <= effective_last_col &&
             target_row_index >= row_index &&
             target_row_index < row_index + row_span) {
-          return AXObjectCache().GetOrCreate(cell->ToMutableLayoutObject());
+          return AXObjectCache().GetOrCreate(cell);
         }
       }
     }
 
     row_offset += table_section->NumRows();
-    table_section =
-        table->NextSectionInterface(table_section, kSkipEmptySections);
+    table_section = table->NextSection(table_section, kSkipEmptySections);
   }
 
   return nullptr;
@@ -1438,32 +1411,24 @@ AXObject* AXLayoutObject::CellForColumnAndRow(unsigned target_column_index,
 
 bool AXLayoutObject::FindAllTableCellsWithRole(ax::mojom::blink::Role role,
                                                AXObjectVector& cells) const {
-  LayoutObject* layout_object = GetLayoutObject();
-  if (!layout_object || !layout_object->IsTable())
+  LayoutNGTable* table;
+  auto* table_section = FirstTableSection(GetLayoutObject(), &table);
+  if (!table_section) {
     return false;
-
-  LayoutNGTableInterface* table =
-      ToInterface<LayoutNGTableInterface>(layout_object);
-  table->RecalcSectionsIfNeeded();
-
-  LayoutNGTableSectionInterface* table_section = table->FirstSectionInterface();
-  if (!table_section)
-    return true;
+  }
 
   while (table_section) {
-    for (LayoutNGTableRowInterface* row = table_section->FirstRowInterface();
-         row; row = row->NextRowInterface()) {
-      for (LayoutNGTableCellInterface* cell = row->FirstCellInterface(); cell;
-           cell = cell->NextCellInterface()) {
-        AXObject* ax_cell =
-            AXObjectCache().GetOrCreate(cell->ToMutableLayoutObject());
+    for (LayoutNGTableRow* row = table_section->FirstRow(); row;
+         row = row->NextRow()) {
+      for (LayoutNGTableCell* cell = row->FirstCell(); cell;
+           cell = cell->NextCell()) {
+        AXObject* ax_cell = AXObjectCache().GetOrCreate(cell);
         if (ax_cell && ax_cell->RoleValue() == role)
           cells.push_back(ax_cell);
       }
     }
 
-    table_section =
-        table->NextSectionInterface(table_section, kSkipEmptySections);
+    table_section = table->NextSection(table_section, kSkipEmptySections);
   }
 
   return true;
@@ -1482,17 +1447,14 @@ void AXLayoutObject::RowHeaders(AXObjectVector& headers) const {
 }
 
 AXObject* AXLayoutObject::HeaderObject() const {
-  LayoutObject* layout_object = GetLayoutObject();
-  if (!layout_object || !layout_object->IsTableRow())
+  auto* row = DynamicTo<LayoutNGTableRow>(GetLayoutObject());
+  if (!row) {
     return nullptr;
+  }
 
-  LayoutNGTableRowInterface* row =
-      ToInterface<LayoutNGTableRowInterface>(layout_object);
-  for (LayoutNGTableCellInterface* cell = row->FirstCellInterface(); cell;
-       cell = cell->NextCellInterface()) {
-    AXObject* ax_cell =
-        cell ? AXObjectCache().GetOrCreate(cell->ToMutableLayoutObject())
-             : nullptr;
+  for (LayoutNGTableCell* cell = row->FirstCell(); cell;
+       cell = cell->NextCell()) {
+    AXObject* ax_cell = cell ? AXObjectCache().GetOrCreate(cell) : nullptr;
     if (ax_cell && ax_cell->RoleValue() == ax::mojom::blink::Role::kRowHeader)
       return ax_cell;
   }

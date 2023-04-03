@@ -114,7 +114,6 @@ struct LayoutBoxRareData final : public GarbageCollected<LayoutBoxRareData> {
 
   LayoutUnit pagination_strut_;
 
-  Member<LayoutBlock> percent_height_container_;
   // For snap area, the owning snap container.
   Member<LayoutBox> snap_container_;
   // For snap container, the descendant snap areas that contribute snap
@@ -595,8 +594,7 @@ class CORE_EXPORT LayoutBox : public LayoutBoxModelObject {
   LayoutRect NoOverflowRect() const;
   LayoutRect LayoutOverflowRect() const {
     NOT_DESTROYED();
-    DCHECK(!RuntimeEnabledFeatures::LayoutNGPrintingEnabled() ||
-           !IsLayoutMultiColumnSet());
+    DCHECK(!IsLayoutMultiColumnSet());
     return LayoutOverflowIsSet()
                ? overflow_->layout_overflow->LayoutOverflowRect()
                : NoOverflowRect();
@@ -807,10 +805,6 @@ class CORE_EXPORT LayoutBox : public LayoutBoxModelObject {
     NOT_DESTROYED();
     return Size().Height();
   }
-
-  // TODO(crbug.com/962299): This is incorrect in some cases.
-  int PixelSnappedOffsetWidth(const Element*) const final;
-  int PixelSnappedOffsetHeight(const Element*) const final;
 
   bool UsesOverlayScrollbars() const;
 
@@ -1392,14 +1386,6 @@ class CORE_EXPORT LayoutBox : public LayoutBoxModelObject {
   // value of the previous in-flow sibling.
   bool NeedsForcedBreakBefore(EBreakBetween previous_break_after_value) const;
 
-  // Get the name of the start page name for this object; see
-  // https://drafts.csswg.org/css-page-3/#start-page-value
-  virtual const AtomicString StartPageName() const;
-
-  // Get the name of the end page name for this object; see
-  // https://drafts.csswg.org/css-page-3/#end-page-value
-  virtual const AtomicString EndPageName() const;
-
   bool MapToVisualRectInAncestorSpaceInternal(
       const LayoutBoxModelObject* ancestor,
       TransformState&,
@@ -1449,12 +1435,11 @@ class CORE_EXPORT LayoutBox : public LayoutBoxModelObject {
     return StyleRef().IsHorizontalWritingMode() ? IntrinsicSize().Height()
                                                 : IntrinsicSize().Width();
   }
+  // TODO(1229581): Remove this function, and intrinsic_content_logical_height_.
   virtual LayoutUnit IntrinsicContentLogicalHeight() const {
     NOT_DESTROYED();
-    DCHECK(!RuntimeEnabledFeatures::LayoutNGPrintingEnabled());
-    return HasOverrideIntrinsicContentLogicalHeight()
-               ? OverrideIntrinsicContentLogicalHeight()
-               : intrinsic_content_logical_height_;
+    NOTREACHED();
+    return LayoutUnit();
   }
 
   // Whether or not the element shrinks to its intrinsic width (rather than
@@ -1621,37 +1606,11 @@ class CORE_EXPORT LayoutBox : public LayoutBoxModelObject {
     return false;
   }
 
-  // Page / column breakability inside block-level objects.
-  enum PaginationBreakability {
-    kAllowAnyBreaks,  // No restrictions on breaking. May examine children to
-                      // find possible break points.
-    kForbidBreaks,  // Forbid breaks inside this object. Content cannot be split
-                    // nicely into smaller pieces.
-    kAvoidBreaks  // Preferably avoid breaks. If not possible, examine children
-                  // to find possible break points.
-  };
-  enum FragmentationEngine {
-    kLegacyFragmentationEngine,
-    kNGFragmentationEngine,
-    kUnknownFragmentationEngine
-  };
-  // |is_ng_fragmentation| must be true if we're in an NG block fragmentation
-  // context. We need to specify which engine we're using for fragmentation,
-  // since anything being laid out by the other engine will need to be treated
-  // as monolithic (kForbidBreaks), since the two engines cannot cooperate on
-  // block fragmentation.
-  virtual PaginationBreakability GetPaginationBreakability(
-      FragmentationEngine) const;
-  PaginationBreakability GetLegacyPaginationBreakability() const {
-    NOT_DESTROYED();
-    return GetPaginationBreakability(kLegacyFragmentationEngine);
-  }
-  PaginationBreakability GetNGPaginationBreakability() const {
-    NOT_DESTROYED();
-    return GetPaginationBreakability(kNGFragmentationEngine);
-  }
+  // Return true if this box is monolithic, i.e. unbreakable in a fragmentation
+  // context.
+  virtual bool IsMonolithic() const;
 
-  bool HasUnsplittableScrollingOverflow(FragmentationEngine) const;
+  bool HasUnsplittableScrollingOverflow() const;
 
   LayoutRect LocalCaretRect(
       const InlineBox*,
@@ -1738,35 +1697,17 @@ class CORE_EXPORT LayoutBox : public LayoutBoxModelObject {
   bool IsCustomItem() const;
   bool IsCustomItemShrinkToFit() const;
 
-  bool IsFlexItemIncludingDeprecatedAndNG() const {
-    NOT_DESTROYED();
-    return IsFlexItemCommon() &&
-           Parent()->IsFlexibleBoxIncludingDeprecatedAndNG();
-  }
-
-  // TODO(dgrogan): Replace the rest of the calls to IsFlexItem with
-  // IsFlexItemIncludingNG when all the callsites can handle an item with an NG
-  // parent.
-  bool IsFlexItem() const {
-    NOT_DESTROYED();
-    return IsFlexItemCommon() && Parent()->IsFlexibleBox();
-  }
+  // TODO(1229581): Rename this function.
   bool IsFlexItemIncludingNG() const {
     NOT_DESTROYED();
-    return IsFlexItemCommon() && Parent()->IsFlexibleBoxIncludingNG();
-  }
-  bool IsFlexItemCommon() const {
-    NOT_DESTROYED();
-    return !IsInline() && !IsOutOfFlowPositioned() && Parent();
+    return !IsInline() && !IsOutOfFlowPositioned() && Parent() &&
+           Parent()->IsFlexibleBoxIncludingNG();
   }
 
-  bool IsGridItem() const {
-    NOT_DESTROYED();
-    return Parent() && Parent()->IsLayoutGrid();
-  }
+  // TODO(1229581): Rename this function.
   bool IsGridItemIncludingNG() const {
     NOT_DESTROYED();
-    return Parent() && Parent()->IsLayoutGridIncludingNG();
+    return Parent() && Parent()->IsLayoutNGGrid();
   }
 
   bool IsMathItem() const {
@@ -1947,13 +1888,6 @@ class CORE_EXPORT LayoutBox : public LayoutBoxModelObject {
 
   bool CanRenderBorderImage() const;
 
-  LayoutBlock* PercentHeightContainer() const {
-    NOT_DESTROYED();
-    return rare_data_ ? rare_data_->percent_height_container_ : nullptr;
-  }
-  void SetPercentHeightContainer(LayoutBlock*);
-  void RemoveFromPercentHeightContainer();
-  void ClearPercentHeightDescendants();
   // For snap areas, returns the snap container that owns us.
   LayoutBox* SnapContainer() const;
   void SetSnapContainer(LayoutBox*);

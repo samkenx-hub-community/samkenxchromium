@@ -33,6 +33,7 @@
 #include "third_party/blink/renderer/core/core_export.h"
 #include "third_party/blink/renderer/core/dom/document.h"
 #include "third_party/blink/renderer/platform/wtf/hash_counted_set.h"
+#include "third_party/blink/renderer/platform/wtf/vector.h"
 
 namespace gfx {
 class Point;
@@ -90,6 +91,8 @@ class CORE_EXPORT AXObjectCache : public GarbageCollected<AXObjectCache> {
   virtual void ListboxOptionStateChanged(HTMLOptionElement*) = 0;
   virtual void ListboxSelectedChildrenChanged(HTMLSelectElement*) = 0;
   virtual void ListboxActiveIndexChanged(HTMLSelectElement*) = 0;
+  virtual void SetMenuListOptionsBounds(HTMLSelectElement*,
+                                        const WTF::Vector<gfx::Rect>&) = 0;
   virtual void LocationChanged(const LayoutObject*) = 0;
   virtual void ImageLoaded(const LayoutObject*) = 0;
 
@@ -244,6 +247,10 @@ class CORE_EXPORT AXObjectCache : public GarbageCollected<AXObjectCache> {
       bool& had_end_of_test_event,
       bool& had_load_complete_messages,
       bool& need_to_send_location_changes) = 0;
+
+  // Returns a vector of the images found in |updates|.
+  virtual void GetImagesToAnnotate(ui::AXTreeUpdate& updates,
+                                   std::vector<ui::AXNodeData*>&) = 0;
 
   virtual void ClearDirtyObjectsAndPendingEvents() = 0;
 

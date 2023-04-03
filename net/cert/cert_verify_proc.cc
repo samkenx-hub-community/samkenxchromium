@@ -64,8 +64,6 @@
 #include "net/cert/cert_verify_proc_android.h"
 #elif BUILDFLAG(IS_IOS)
 #include "net/cert/cert_verify_proc_ios.h"
-#elif BUILDFLAG(IS_WIN)
-#include "net/cert/cert_verify_proc_win.h"
 #endif
 
 namespace net {
@@ -441,11 +439,14 @@ scoped_refptr<CertVerifyProc> CertVerifyProc::CreateBuiltinVerifyProc(
 #if BUILDFLAG(CHROME_ROOT_STORE_SUPPORTED)
 // static
 scoped_refptr<CertVerifyProc> CertVerifyProc::CreateBuiltinWithChromeRootStore(
-    scoped_refptr<CertNetFetcher> cert_net_fetcher) {
+    scoped_refptr<CertNetFetcher> cert_net_fetcher,
+    const ChromeRootStoreData* root_store_data) {
+  std::unique_ptr<TrustStoreChrome> chrome_root =
+      root_store_data ? std::make_unique<TrustStoreChrome>(*root_store_data)
+                      : std::make_unique<TrustStoreChrome>();
   return CreateCertVerifyProcBuiltin(
       std::move(cert_net_fetcher),
-      CreateSslSystemTrustStoreChromeRoot(
-          std::make_unique<net::TrustStoreChrome>()));
+      CreateSslSystemTrustStoreChromeRoot(std::move(chrome_root)));
 }
 #endif
 

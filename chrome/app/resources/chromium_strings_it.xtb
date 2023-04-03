@@ -22,6 +22,7 @@
 
 A questo account potrebbero essere applicate le autorizzazioni già concesse a siti web e app. Puoi gestire i tuoi Account Google nelle <ph name="SETTINGS_LINK_BEGIN" />Impostazioni<ph name="SETTINGS_LINK_END" />.</translation>
 <translation id="1640672724030957280">Download in corso...</translation>
+<translation id="1691024636239527281">{NUM_DEVICES,plural, =0{Chromium non è connesso ad alcun dispositivo HID}=1{Chromium è connesso a un dispositivo HID}other{Chromium è connesso ai dispositivi HID}}</translation>
 <translation id="1708666629004767631">È disponibile una nuova versione più sicura di Chromium.</translation>
 <translation id="17264556997921157">Puoi visualizzare e rimuovere argomenti di interesse usati dai siti per mostrarti annunci. Chromium stima i tuoi interessi in base alla tua recente cronologia di navigazione.</translation>
 <translation id="1733725117201708356">A breve Chromium eliminerà i dati di navigazione</translation>
@@ -79,7 +80,6 @@ A questo account potrebbero essere applicate le autorizzazioni già concesse a s
 <translation id="2928420929544864228">Installazione completata.</translation>
 <translation id="2977470724722393594">Chromium è aggiornato</translation>
 <translation id="2977506796191543575">Se un sito cerca di rubare la tua password o se scarichi un file dannoso, Chromium potrebbe anche inviare gli URL, inclusi frammenti dei contenuti delle pagine, a Navigazione sicura</translation>
-<translation id="3021964162552004083">{NUM_DEVICES,plural, =1{Chromium è connesso a un dispositivo HID}other{Chromium è connesso ai dispositivi HID}}</translation>
 <translation id="3032706164202344641">Chromium non può controllare le tue password. Riprova più tardi.</translation>
 <translation id="3032787606318309379">Aggiunta a Chromium in corso...</translation>
 <translation id="3038232873781883849">In attesa dell'installazione…</translation>

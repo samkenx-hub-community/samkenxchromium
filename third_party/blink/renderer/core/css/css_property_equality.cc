@@ -28,7 +28,7 @@ bool CounterRulesEqual(const CounterDirectiveMap* a_map,
     return false;
   }
 
-  base::ranges::equal(*a_map, *b_map, [](const auto& a, const auto& b) {
+  return base::ranges::equal(*a_map, *b_map, [](const auto& a, const auto& b) {
     switch (property) {
       case CSSPropertyID::kCounterIncrement:
         if (a.value.IncrementValue() != b.value.IncrementValue()) {
@@ -53,7 +53,6 @@ bool CounterRulesEqual(const CounterDirectiveMap* a_map,
     }
     return true;
   });
-  return true;
 }
 
 template <CSSPropertyID property>
@@ -687,13 +686,13 @@ bool CSSPropertyEquality::PropertiesEqual(const PropertyHandle& property,
     case CSSPropertyID::kTextUnderlinePosition:
       return a.GetTextUnderlinePosition() == b.GetTextUnderlinePosition();
     case CSSPropertyID::kTextWrap:
-      return a.TextWrap() == b.TextWrap();
+      return a.GetTextWrap() == b.GetTextWrap();
     case CSSPropertyID::kToggleVisibility:
       return a.ToggleVisibility() == b.ToggleVisibility();
     case CSSPropertyID::kTop:
       return a.Top() == b.Top();
-    case CSSPropertyID::kTopLayer:
-      return a.TopLayer() == b.TopLayer();
+    case CSSPropertyID::kOverlay:
+      return a.Overlay() == b.Overlay();
     case CSSPropertyID::kTouchAction:
       return a.GetTouchAction() == b.GetTouchAction();
     case CSSPropertyID::kTransformBox:
@@ -812,6 +811,8 @@ bool CSSPropertyEquality::PropertiesEqual(const PropertyHandle& property,
       return a.GetTransformOrigin().Z() == b.GetTransformOrigin().Z();
     case CSSPropertyID::kWhiteSpace:
       return a.WhiteSpace() == b.WhiteSpace();
+    case CSSPropertyID::kWhiteSpaceCollapse:
+      return a.GetWhiteSpaceCollapse() == b.GetWhiteSpaceCollapse();
     case CSSPropertyID::kWidows:
       return a.Widows() == b.Widows();
     case CSSPropertyID::kWidth:
@@ -1180,6 +1181,7 @@ bool CSSPropertyEquality::PropertiesEqual(const PropertyHandle& property,
     case CSSPropertyID::kWebkitMaskPosition:
     case CSSPropertyID::kWebkitMaskRepeat:
     case CSSPropertyID::kWebkitTextStroke:
+    case CSSPropertyID::kAlternativeWhiteSpace:
       NOTREACHED() << property.GetCSSPropertyName().ToAtomicString().Ascii();
       return true;
 

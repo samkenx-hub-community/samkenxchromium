@@ -24,6 +24,7 @@ Baadhi ya vipengele huenda visipatikane na mabadiliko katika mapendeleo hayatahi
 <translation id="1399397803214730675">Kompyuta hii tayari ina toleo jipya zaidi la Google Chrome. Ikiwa programu haifanyi kazi, tafadhali ondoa Google Chrome kisha ujaribu tena.</translation>
 <translation id="139993653570221430">Unaweza kubadilisha mawazo yako wakati wowote kwenye mipangilio ya Chrome. Vipindi vya kujaribu vinatekelezwa pamoja na jinsi matangazo yanavyoonyeshwa kwa sasa, hivyo hutaona mabadiliko papo hapo.</translation>
 <translation id="1434626383986940139">Programu za Chrome Canary</translation>
+<translation id="1496905273983707119">{NUM_DEVICES,plural, =0{Google Chrome iliunganishwa kwenye kifaa cha HID}=1{Google Chrome imeunganishwa kwenye kifaa cha HID}other{Google Chrome imeunganishwa kwenye vifaa vya HID}}</translation>
 <translation id="1507198376417198979">Weka wasifu wako mpya wa Chrome uwe upendavyo</translation>
 <translation id="1516530951338665275">Google Chrome inahitaji ruhusa ya kufikia Bluetooth ili iendelee 
  kuoanisha. <ph name="IDS_BLUETOOTH_DEVICE_CHOOSER_AUTHORIZE_BLUETOOTH_LINK" /></translation>
@@ -126,7 +127,6 @@ Baadhi ya vipengele huenda visipatikane na mabadiliko katika mapendeleo hayatahi
 <translation id="3140883423282498090">Mabadiliko yako yataanza kufanya kazi wakati ujao utakapozindua Google Chrome.</translation>
 <translation id="3149510190863420837">Programu za Chrome</translation>
 <translation id="3169523567916669830">Vipindi vya kujaribu vinapotumika, unaweza kuona na kuondoa mada za tovuti zinazokuvutia zinazotumika kukuonyesha matangazo. Chrome hukadiria mambo yanayokuvutia kulingana na historia yako ya kuvinjari ya hivi karibuni.</translation>
-<translation id="3211604354460514046">{NUM_DEVICES,plural, =1{Google Chrome imeunganishwa kwenye kifaa cha HID}other{Google Chrome imeunganishwa kwenye vifaa vya HID}}</translation>
 <translation id="3245429137663807393">Ikiwa pia unashiriki ripoti za matumizi ya Chrome, ripoti hizo zinajumuisha URL unazotembelea</translation>
 <translation id="3282568296779691940">Ingia katika Chrome</translation>
 <translation id="3286538390144397061">Zima na uwashe sasa</translation>

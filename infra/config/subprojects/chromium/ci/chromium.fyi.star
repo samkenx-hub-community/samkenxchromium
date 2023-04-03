@@ -904,13 +904,9 @@ fyi_ios_builder(
     ),
 )
 
-# This is launching & collecting entirely isolated tests.
-# OS shouldn't matter.
-ci.thin_tester(
+ci.builder(
     name = "mac-osxbeta-rel",
-    triggered_by = ["ci/Mac Builder (dbg)"],
     builder_spec = builder_config.builder_spec(
-        execution_mode = builder_config.execution_mode.TEST,
         gclient_config = builder_config.gclient_config(
             config = "chromium",
         ),
@@ -1167,6 +1163,7 @@ The bot specs should be in sync with <a href="https://ci.chromium.org/p/chromium
         "RBE_deps_cache_mode": "reproxy",
     },
     reclient_cache_silo = "Comparison Android - cache siloed",
+    reclient_instance = reclient.instance.TEST_TRUSTED,
 )
 
 ci.builder(
@@ -1191,6 +1188,7 @@ The bot specs should be in sync with <a href="https://ci.chromium.org/p/chromium
         "RBE_deps_cache_mode": "reproxy",
     },
     reclient_cache_silo = "Comparison Android (reproxy cache) - cache siloed",
+    reclient_instance = reclient.instance.TEST_TRUSTED,
 )
 
 ci.builder(
@@ -1208,6 +1206,7 @@ ci.builder(
         "RBE_deps_cache_mode": "reproxy",
     },
     reclient_cache_silo = "Comparison Linux - cache siloed",
+    reclient_instance = reclient.instance.TEST_TRUSTED,
 )
 
 fyi_mac_builder(
@@ -1288,6 +1287,7 @@ ci.builder(
         "RBE_deps_cache_mode": "reproxy",
     },
     reclient_cache_silo = "Comparison Windows 8 cores - cache siloed",
+    reclient_instance = reclient.instance.TEST_TRUSTED,
     reclient_jobs = 80,
 )
 
@@ -1309,6 +1309,7 @@ ci.builder(
         "RBE_deps_cache_mode": "reproxy",
     },
     reclient_cache_silo = "Comparison Windows - cache siloed",
+    reclient_instance = reclient.instance.TEST_TRUSTED,
 )
 
 ci.builder(
@@ -1327,6 +1328,7 @@ ci.builder(
         "RBE_deps_cache_mode": "reproxy",
     },
     reclient_cache_silo = "Comparison Simple Chrome - cache siloed",
+    reclient_instance = reclient.instance.TEST_TRUSTED,
 )
 
 fyi_mac_builder(
@@ -1671,12 +1673,14 @@ ci.builder(
         short_name = "re",
     ),
     execution_timeout = 14 * time.hour,
+    reclient_bootstrap_env = {
+        "RBE_clang_depscan_archive": "true",
+    },
     reclient_ensure_verified = True,
     reclient_instance = reclient.instance.TEST_TRUSTED,
     reclient_jobs = None,
     reclient_rewrapper_env = {
         "RBE_compare": "true",
-        "RBE_compression_threshold": "4000000",
     },
 )
 
@@ -1707,9 +1711,6 @@ ci.builder(
     ),
     reclient_instance = reclient.instance.TEST_TRUSTED,
     reclient_jobs = None,
-    reclient_rewrapper_env = {
-        "RBE_compression_threshold": "4000000",
-    },
 )
 
 ci.builder(
@@ -1739,7 +1740,6 @@ ci.builder(
     reclient_jobs = None,
     reclient_rewrapper_env = {
         "RBE_compare": "true",
-        "RBE_compression_threshold": "4000000",
     },
 )
 
@@ -1770,9 +1770,6 @@ fyi_mac_builder(
     ),
     reclient_instance = reclient.instance.TEST_TRUSTED,
     reclient_jobs = None,
-    reclient_rewrapper_env = {
-        "RBE_compression_threshold": "4000000",
-    },
 )
 
 fyi_mac_builder(
@@ -1806,7 +1803,6 @@ fyi_mac_builder(
     reclient_jobs = None,
     reclient_rewrapper_env = {
         "RBE_compare": "true",
-        "RBE_compression_threshold": "4000000",
     },
 )
 
@@ -2280,6 +2276,7 @@ fyi_ios_builder(
         build_gs_bucket = "chromium-fyi-archive",
     ),
     os = os.MAC_13,
+    cpu = cpu.ARM64,
     console_view_entry = [
         consoles.console_view_entry(
             category = "iOS|iOS15",

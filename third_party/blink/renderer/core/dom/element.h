@@ -90,7 +90,7 @@ class EditContext;
 class ElementAnimations;
 class ElementInternals;
 class ElementIntersectionObserverData;
-class ElementRareDataBase;
+class ElementRareDataVector;
 class ExceptionState;
 class FocusOptions;
 class GetInnerHTMLOptions;
@@ -786,6 +786,7 @@ class CORE_EXPORT Element : public ContainerNode, public Animatable {
   // ComputedStyle is up to date;
   // e.g. by calling Document::UpdateStyleAndLayoutTree().
   bool IsFocusable() const;
+  virtual bool HasNoFocusableChildren() const;
   virtual bool IsKeyboardFocusable() const;
   virtual bool IsMouseFocusable() const;
   // IsBaseElementFocusable() is used by some subclasses to check if the base
@@ -1151,8 +1152,14 @@ class CORE_EXPORT Element : public ContainerNode, public Animatable {
   bool AffectedByMultipleHas() const;
   void SetAffectedByMultipleHas();
 
-  void SaveIntrinsicSize(ResizeObserverSize* size);
-  const ResizeObserverSize* LastIntrinsicSize() const;
+  // This is meant to be used by document's resize observer to notify that the
+  // size has changed.
+  void LastRememberedSizeChanged(ResizeObserverSize* size);
+
+  void SetLastRememberedInlineSize(absl::optional<LayoutUnit>);
+  void SetLastRememberedBlockSize(absl::optional<LayoutUnit>);
+  absl::optional<LayoutUnit> LastRememberedInlineSize() const;
+  absl::optional<LayoutUnit> LastRememberedBlockSize() const;
 
   // Returns a unique pseudo element for the given |pseudo_id| and
   // |view_transition_name| originating from this DOM element.
@@ -1539,8 +1546,8 @@ class CORE_EXPORT Element : public ContainerNode, public Animatable {
                             bool include_shadow_roots,
                             ExceptionState&);
 
-  ElementRareDataBase* GetElementRareData() const;
-  ElementRareDataBase& EnsureElementRareData();
+  ElementRareDataVector* GetElementRareData() const;
+  ElementRareDataVector& EnsureElementRareData();
 
   void RemoveAttrNodeList();
   void DetachAllAttrNodesFromElement();
@@ -1606,6 +1613,11 @@ class CORE_EXPORT Element : public ContainerNode, public Animatable {
 
   void PseudoStateChanged(CSSSelector::PseudoType pseudo,
                           AffectedByPseudoStateChange&&);
+
+  void ProcessContainIntrinsicSizeChanges();
+
+  bool ShouldUpdateLastRememberedBlockSize() const;
+  bool ShouldUpdateLastRememberedInlineSize() const;
 
   enum class HighlightRecalc {
     // No highlight recalc is needed.

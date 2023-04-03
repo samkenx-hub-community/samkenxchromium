@@ -40,6 +40,7 @@ Hier is 'n paar dinge wat jy kan probeer om aan die gang te kom.</translation>
 <translation id="1181037720776840403">Verwyder</translation>
 <translation id="1182225749592316782">Dit gee toegang vir alle apps en webwerwe met die kamera- en mikrofoontoestemming</translation>
 <translation id="1183863904939664422">Stel nie in hierdie voorstel belang nie</translation>
+<translation id="1184126796192815024">Hierdie netwerk steun nie die opsie dat apps van jou foon af gestroom word nie. Probeer om jou foon se warmkol te gebruik. <ph name="LEARN_MORE" /></translation>
 <translation id="118437560755358292">Voer wagwoord of PIN in vir meer sekuriteit</translation>
 <translation id="118532027333893379">Tik op enige plek om volskerm vas te vang</translation>
 <translation id="1190609913194133056">Kennisgewingsentrum</translation>
@@ -219,6 +220,7 @@ Hier is 'n paar dinge wat jy kan probeer om aan die gang te kom.</translation>
 <translation id="1969011864782743497"><ph name="DEVICE_NAME" /> (USB)</translation>
 <translation id="1972950159383891558">Hallo, <ph name="USERNAME" /></translation>
 <translation id="1978498689038657292">Teksinvoer</translation>
+<translation id="1980808257969311265">Sluit aan by <ph name="EVENT_SUMMARY" /></translation>
 <translation id="1982717156487272186">Wys vorige week</translation>
 <translation id="1989113344093894667">Kan nie inhoud vasvang nie</translation>
 <translation id="1990046457226896323">Spraaklêers is afgelaai</translation>
@@ -573,6 +575,7 @@ Hier is 'n paar dinge wat jy kan probeer om aan die gang te kom.</translation>
 <translation id="3659814201068740063">Ongeveer <ph name="TIME_LEFT" /> oor (<ph name="PERCENTAGE" />%).
 Koppel jou toestel aan krag.</translation>
 <translation id="366222428570480733"><ph name="USER_EMAIL_ADDRESS" /> Bestuurde gebruiker</translation>
+<translation id="3666266999138159418">Swiep om jou swewende venster te versteek</translation>
 <translation id="367531336287639526">Kies die eerste ikoon aan die linkerkant van die adresbalk</translation>
 <translation id="3679827876008292680">Gaan na laaste oortjie in venster</translation>
 <translation id="36813544980941320">Wi-Fi-netwerke sal tussen jou foon en <ph name="DEVICE_NAME" /> gedeel word</translation>
@@ -622,7 +625,6 @@ Alle gebruikers moet afmeld om voort te gaan.</translation>
 <translation id="3925540965556789199"><ph name="DATE" />; laai tans geleenthede.</translation>
 <translation id="3932043219784172185">Geen toestel is gekoppel nie</translation>
 <translation id="3934456833412894880">Aanpasbare laaiproses is aan. Jou battery sal op 80% bly om batterylewe te verleng, en heeltemal laai wanneer jy dit nodig het.</translation>
-<translation id="3936620957945677513">Druk Enter om by die geleentheid <ph name="EVENT_SUMMARY" /> aan te sluit</translation>
 <translation id="3943857333388298514">Plak</translation>
 <translation id="394485226368336402">Oudio-instellings</translation>
 <translation id="3945319193631853098">Tik om opstelling te voltooi</translation>
@@ -1253,6 +1255,7 @@ Nuwe installasie</translation>
 <translation id="685782768769951078">{NUM_DIGITS,plural, =1{Een syfer bly oor}other{# syfers bly oor}}</translation>
 <translation id="6867938213751067702">Aflaai is onderbreek <ph name="FILENAME" /></translation>
 <translation id="6878400149835617132">Kortpad is afgeskakel</translation>
+<translation id="6878701771800702153">{NUM_APPS,plural, =1{1 app}other{# apps}}</translation>
 <translation id="6884665277231944629">Gaan terug na vandag</translation>
 <translation id="6886172995547742638">Jou <ph name="DEVICE_TYPE" /> kan dalk laer werkverrigting ervaar. Gebruik 'n gesertifiseerde <ph name="PREFERRED_MINIMUM_POWER" />W- of hoër USB-C-kragprop.</translation>
 <translation id="688631446150864480">Druk die afpyl om tussen vensters te wissel</translation>
@@ -1420,6 +1423,7 @@ Druk en hou weer die aan/af-skakelaar op die toestel om dit af te skakel.</trans
 <translation id="7689817529363080918">Dit gee mikrofoontoegang vir <ph name="APP1_NAME" />, <ph name="APP2_NAME" /> en alle apps en webwerwe met die mikrofoontoestemming</translation>
 <translation id="7704000866383261579">Herdoen jongste handeling</translation>
 <translation id="7705524343798198388">VPN</translation>
+<translation id="770741401784017797">Skep tans GIF</translation>
 <translation id="7714767791242455379">Voeg nuwe selnetwerk by</translation>
 <translation id="7720400844887872976">Aan tot <ph name="TIME" /></translation>
 <translation id="7720410380936703141">PROBEER WEER</translation>
@@ -1432,6 +1436,7 @@ Druk en hou weer die aan/af-skakelaar op die toestel om dit af te skakel.</trans
 <translation id="7749443890790263709">Maksimum aantal lessenaars is bereik.</translation>
 <translation id="776344839111254542">Klik om die opdateringbesonderhede te sien</translation>
 <translation id="7768784765476638775">Hardoplees</translation>
+<translation id="7769299611924763557">Jou GIF sal binnekort gereed wees</translation>
 <translation id="7780094051999721182">kortpaaie</translation>
 <translation id="7780159184141939021">Draai skerm</translation>
 <translation id="7796735576426975947">Nuwe kennisgewing is versteek</translation>
@@ -1609,7 +1614,7 @@ Druk en hou weer die aan/af-skakelaar op die toestel om dit af te skakel.</trans
 <translation id="8619138598101195078">Stel volume sagter</translation>
 <translation id="8627191004499078455">Gekoppel aan <ph name="DEVICE_NAME" /></translation>
 <translation id="8630991711272431708">Skakel kameratoegang af</translation>
-<translation id="8631727435199967028">Toeganklikheidinstellings</translation>
+<translation id="8631727435199967028">Toeganklikheid-instellings</translation>
 <translation id="8637598503828012618"><ph name="CONNECTION_STATUS" />, seinsterkte <ph name="SIGNAL_STRENGTH" />, deur jou administrateur bestuur</translation>
 <translation id="8638637208069328956">Skakel mikrofoon aan of af</translation>
 <translation id="8639760480004882931"><ph name="PERCENTAGE" /> oor</translation>

@@ -22,6 +22,7 @@
 
 สิทธิ์ที่คุณให้กับเว็บไซต์และแอปต่างๆ ไว้แล้วอาจมีผลกับบัญชีนี้ คุณจัดการบัญชี Google ใน<ph name="SETTINGS_LINK_BEGIN" />การตั้งค่า<ph name="SETTINGS_LINK_END" />ได้</translation>
 <translation id="1640672724030957280">กำลังดาวน์โหลด...</translation>
+<translation id="1691024636239527281">{NUM_DEVICES,plural, =0{Chromium ไม่ได้เชื่อมต่อกับอุปกรณ์ HID ในขณะนี้}=1{Chromium เชื่อมต่อกับอุปกรณ์ HID}other{Chromium เชื่อมต่อกับอุปกรณ์ HID}}</translation>
 <translation id="1708666629004767631">Chromium รุ่นใหม่ที่ปลอดภัยกว่าเดิมพร้อมให้ใช้งานแล้ว</translation>
 <translation id="17264556997921157">คุณสามารถดูและลบหัวข้อที่สนใจซึ่งเว็บไซต์ใช้เพื่อแสดงโฆษณาแก่คุณ Chromium คาดคะเนความสนใจของคุณโดยอิงจากประวัติการท่องเว็บล่าสุด</translation>
 <translation id="1733725117201708356">Chromium จะลบข้อมูลการท่องเว็บเร็วๆ นี้</translation>
@@ -79,7 +80,6 @@
 <translation id="2928420929544864228">การติดตั้งเสร็จสมบูรณ์</translation>
 <translation id="2977470724722393594">Chromium อัปเดตแล้ว</translation>
 <translation id="2977506796191543575">หากเว็บไซต์พยายามขโมยรหัสผ่าน หรือคุณดาวน์โหลดไฟล์ที่เป็นอันตราย Chromium อาจส่ง URL รวมถึงเนื้อหาบางส่วนในหน้าไปยัง Google Safe Browsing ด้วย</translation>
-<translation id="3021964162552004083">{NUM_DEVICES,plural, =1{Chromium เชื่อมต่อกับอุปกรณ์ HID}other{Chromium เชื่อมต่อกับอุปกรณ์ HID}}</translation>
 <translation id="3032706164202344641">Chromium ตรวจสอบรหัสผ่านของคุณไม่ได้ โปรดลองอีกครั้งภายหลัง</translation>
 <translation id="3032787606318309379">กำลังเพิ่มลงใน Chromium...</translation>
 <translation id="3038232873781883849">กำลังรอติดตั้ง...</translation>

@@ -30,6 +30,7 @@
 <translation id="1022669824195822609">ອຸປະກອນຂອງທ່ານຖືກຈັດການໂດຍ <ph name="DOMAIN" />. ຜູ້ເບິ່ງແຍງລະບົບສາມາດເຂົ້າເຖິງຂໍ້ມູນໃນໂປຣໄຟລ໌ໃດກໍໄດ້ຢູ່ອຸປະກອນນີ້.</translation>
 <translation id="1026655690966755180">ເພີ່ມຜອດ</translation>
 <translation id="1026822031284433028">ໂຫຼດ​ຮູບ</translation>
+<translation id="1026959648338730078">ໜ້າຈໍ Hello ຫຼື ກະແຈຄວາມປອດໄພພາຍນອກ</translation>
 <translation id="1028604629594230522">Chrome ໂຫຼດໜ້າທີ່ທ່ານອາດຈະເຂົ້າເບິ່ງໄວ້ລ່ວງໜ້າ, ເພື່ອໃຫ້ພວກມັນໂຫຼດໄວຂຶ້ນເມື່ອທ່ານເຂົ້າເບິ່ງ.</translation>
 <translation id="1028700151766901954">ເຫດຜົນ: LBS ຢູ່ໃນ <ph name="DEFAULT_OPEN_BROWSER" /> ຕາມຄ່າເລີ່ມຕົ້ນ.</translation>
 <translation id="1029317248976101138">ຊູມ</translation>
@@ -43,6 +44,7 @@
 <translation id="1036511912703768636">ເຂົ້າ​ຫາ​ອຸ​ປະ​ກອນ USB ເຫຼົ່າ​ນີ້​ອັນ​ໃດ​ອັນ​ໜຶ່ງ</translation>
 <translation id="1038168778161626396">ປ່ຽນເປັນລະຫັດເທົ່ານັ້ນ</translation>
 <translation id="1038462104119736705">ຂໍແນະນຳພື້ນທີ່ຫວ່າງຢ່າງໜ້ອຍ <ph name="INSTALL_SIZE" /> ສຳລັບ Linux. ເພື່ອເພີ່ມພື້ນທີ່ຫວ່າງ, ກະລຸນາລຶບໄຟລ໌ຕ່າງໆອອກຈາກອຸປະກອນຂອງທ່ານ.</translation>
+<translation id="1038643060055067718">ເສັ້ນ:</translation>
 <translation id="1039337018183941703">ໄຟລ໌ເສຍຫາຍ ຫຼື ບໍ່ຖືກຕ້ອງ</translation>
 <translation id="1041175011127912238">ໜ້ານີ້ບໍ່ຕອບສະໜອງ</translation>
 <translation id="1041263367839475438">ອຸປະກອນທີ່ໃຊ້ໄດ້</translation>
@@ -50,6 +52,8 @@
 <translation id="1042248468362992359">ເຊື່ອມຕໍ່ອິນເຕີເນັດມືຖືເພື່ອໃຊ້ຮັອດສະປອດ. <ph name="BEGIN_LINK_LEARN_MORE" />ສຶກສາເພີ່ມເຕີມ<ph name="END_LINK_LEARN_MORE" /></translation>
 <translation id="1043505821207197890">ມີບາງຢ່າງຜິດພາດເກີດຂຶ້ນ. Linux ອາດຖືກອັບເກຣດບາງສ່ວນເທົ່ານັ້ນ. ກວດສອບບັນທຶກສຳລັບຂໍ້ມູນເພີ່ມເຕີມ. ຈັດເກັບບັນທຶກໄວ້ແລ້ວໃນໄຟລ໌ &gt; ໄຟລ໌ຂອງຂ້ອຍ &gt; <ph name="LOG_FILE" /></translation>
 <translation id="104419033123549300">ຮູບແບບແຜນຜັງປຸ່ມ</translation>
+<translation id="1046219820096501039"><ph name="BEGIN_PARAGRAPH1" />ການອະນຸຍາດໃຫ້ອຸປະກອນ ChromeOS ສົ່ງລາຍງານອັດຕະໂນມັດຈະຊ່ວຍໃຫ້ພວກເຮົາຈັດລຳດັບຄວາມສຳຄັນໄດ້ວ່າຈະແກ້ໄຂ ແລະ ປັບປຸງຫຍັງໃນ ChromeOS. ລາຍງານເຫຼົ່ານີ້ສາມາດຮວມເອົາຂໍ້ມູນຕ່າງໆ ເຊັ່ນ: ChromeOS ຫຼົ້ມຕອນໃດ, ມີການໃຊ້ຄຸນສົມບັດໃດ ແລະ ໂດຍປົກກະຕິແລ້ວໃຊ້ໜ່ວຍຄວາມຈຳເທົ່າໃດ. ຂໍ້ມູນການວິນິໄສ ແລະ ການນຳໃຊ້ແອັບອື່ນໆ, ເຊິ່ງມີການຮວບຮວມກັນສຳລັບແອັບ Android ແລະ ເວັບແອັບ ຫາກມີການເປີດໃຊ້ການຊິ້ງແອັບ.<ph name="END_PARAGRAPH1" />
+    <ph name="BEGIN_PARAGRAPH2" />ທ່ານສາມາດເລີ່ມ ຫຼື ຢຸດການອະນຸຍາດລາຍງານເຫຼົ່ານີ້ຕອນໃດກໍໄດ້ໃນການຕັ້ງຄ່າອຸປະກອນ ChromeOS ຂອງລູກທ່ານ. ຫາກທ່ານເປັນຜູ້ເບິ່ງແຍງລະບົບໂດເມນ, ທ່ານສາມາດປ່ຽນການຕັ້ງຄ່ານີ້ໄດ້ໃນຄອນໂຊນຂອງຜູ້ເບິ່ງແຍງ.<ph name="END_PARAGRAPH2" /></translation>
 <translation id="104710386808485638">ຣິສະຕາດ Linux ບໍ?</translation>
 <translation id="1047431265488717055">ອັດ​ສຳ​ເນົາ​ຂໍ້​ຄວາມ​ລິ້ງ</translation>
 <translation id="1048286738600630630">ການສະແດງຜົນ</translation>
@@ -72,6 +76,7 @@
 <translation id="1061130374843955397">ຍິນດີຕ້ອນຮັບສູ່ <ph name="DEVICE_TYPE" /> ຂອງທ່ານ</translation>
 <translation id="1061373870045429865">ສ້າງລະຫັດ QR ສຳລັບລິ້ງນີ້</translation>
 <translation id="1061904396131502319">ໃກ້ຮອດເວລາພັກແລ້ວ</translation>
+<translation id="1062407476771304334">​ປ່ຽນ​ແທນ​</translation>
 <translation id="1062628064301375934">ຊ່ວຍພວກເຮົາປັບປຸງເວັບສ່ວນຕົວເພີ່ມເຕີມ</translation>
 <translation id="1067048845568873861">ສ້າງຂຶ້ນແລ້ວ</translation>
 <translation id="1067661089446014701">ເພື່ອຄວາມປອດໄພທີ່ເພີ່ມຂຶ້ນ, ທ່ານສາມາດເຂົ້າລະຫັດຜ່ານຢູ່ອຸປະກອນຂອງທ່ານໄດ້ກ່ອນທີ່ພວກມັນຈະໄດ້ຮັບການບັນທຶກໃສ່ບັນຊີ Google ຂອງທ່ານ</translation>
@@ -289,6 +294,9 @@
 <translation id="1243436884219965846">ກວດເບິ່ງລະຫັດຜ່ານ</translation>
 <translation id="1244265436519979884">ການກູ້ຄືນຂໍ້ມູນຂອງ Linux ພວມດຳເນີນຢູ່ໃນປັດຈຸບັນ</translation>
 <translation id="1244303850296295656">ສ່ວນຂະຫຍາຍຜິດພາດ</translation>
+<translation id="124479667302995853"><ph name="BEGIN_PARAGRAPH1" />ການອະນຸຍາດໃຫ້ອຸປະກອນ ChromeOS ຂອງທ່ານສົ່ງລາຍງານອັດຕະໂນມັດຈະຊ່ວຍໃຫ້ພວກເຮົາຈັດລຳດັບຄວາມສຳຄັນໄດ້ວ່າຈະແກ້ໄຂ ແລະ ປັບປຸງຫຍັງໃນ ChromeOS. ລາຍງານເຫຼົ່ານີ້ສາມາດຮວມເອົາຂໍ້ມູນຕ່າງໆ ເຊັ່ນ: ChromeOS ຫຼົ້ມຕອນໃດ, ທ່ານໃຊ້ຄຸນສົມບັດໃດ, ປົກກະຕິທ່ານໃຊ້ໜ່ວຍຄວາມຈຳເທົ່າໃດ ແລະ ຂໍ້ມູນການວິນິໄສ ແລະ ການນຳໃຊ້ແອັບ Android. ນອກຈາກນັ້ນ, ຂໍ້ມູນຮວມບາງຢ່າງຍັງຈະຊ່ວຍແອັບ ແລະ ຮຸ້ນສ່ວນຂອງ Google ນຳ ເຊັ່ນ: ນັກພັດທະນາ Android. ຂໍ້ມູນການວິນິໄສ ແລະ ການນຳໃຊ້ແອັບອື່ນໆ, ເຊິ່ງມີການຮວບຮວມກັນສຳລັບແອັບ Android ແລະ ເວັບແອັບ ຫາກມີການເປີດໃຊ້ການຊິ້ງແອັບ.<ph name="END_PARAGRAPH1" />
+    <ph name="BEGIN_PARAGRAPH2" />ທ່ານສາມາດເລີ່ມ ຫຼື ຢຸດການອະນຸຍາດລາຍງານເຫຼົ່ານີ້ຕອນໃດກໍໄດ້ໃນການຕັ້ງຄ່າອຸປະກອນ ChromeOS ຂອງທ່ານ. ຫາກທ່ານເປັນຜູ້ເບິ່ງແຍງລະບົບໂດເມນ, ທ່ານສາມາດປ່ຽນການຕັ້ງຄ່ານີ້ໄດ້ໃນຄອນໂຊນຂອງຜູ້ເບິ່ງແຍງ.<ph name="END_PARAGRAPH2" />
+    <ph name="BEGIN_PARAGRAPH3" />ຫາກມີການເປີດໃຊ້ການຕັ້ງຄ່າການເຄື່ອນໄຫວເວັບ ແລະ ແອັບໄວ້ສຳລັບບັນຊີ Google ຂອງທ່ານ, ຂໍ້ມູນ Android ຂອງທ່ານອາດຖືກບັນທຶກໄວ້ໃນບັນຊີ Google ຂອງທ່ານນຳ. ທ່ານສາມາດເບິ່ງຂໍ້ມູນຂອງທ່ານ, ລຶບມັນອອກ ແລະ ປ່ຽນການຕັ້ງຄ່າບັນຊີຂອງທ່ານໄດ້ຢູ່ account.google.com.<ph name="END_PARAGRAPH3" /></translation>
 <translation id="1245628370644070008">ການກູ້ຄືນຂໍ້ມູນໃນເຄື່ອງ</translation>
 <translation id="1246863218384630739">ບໍ່ສາມາດຕິດຕັ້ງ <ph name="VM_NAME" /> ໄດ້: URL ຮູບພາບຕອບລະຫັດຜິດພາດ <ph name="HTTP_ERROR" /> ກັບມາ. ກະລຸນາຕິດຕໍ່ຜູ້ເບິ່ງແຍງລະບົບຂອງທ່ານ.</translation>
 <translation id="1247372569136754018">ໄມໂຄຣໂຟນ (ພາຍໃນ)</translation>
@@ -378,7 +386,9 @@
 <translation id="1331977651797684645">ນີ້ແມ່ນຂ້ອຍ.</translation>
 <translation id="1333489022424033687">ບາງຄຸນສົມບັດໃນ <ph name="ORIGIN" /> ອາດຈະບໍ່ເຮັດວຽກຈົນກວ່າວ່າທ່ານລຶບຂໍ້ມູນທີ່ເວັບໄຊອື່ນເກັບໄວ້ໃນອຸປະກອນຂອງທ່ານ</translation>
 <translation id="1333965224356556482">ບໍ່ອະນຸຍາດໃຫ້ເວັບໄຊເຫັນສະຖານທີ່ຂອງທ່ານ</translation>
+<translation id="1335282218035876586">Chromebook ຂອງທ່ານບໍ່ໄດ້ຮັບການອັບເດດຄວາມປອດໄພ ແລະ ຊອບແວອີກຕໍ່ໄປ. ອັບເກຣດ Chromebook ຂອງທ່ານເພື່ອປະສົບການໃນການໃຊ້ທີ່ດີທີ່ສຸດ.</translation>
 <translation id="133535873114485416">ການປ້ອນຂໍ້ມູນທີ່ຕ້ອງການ</translation>
+<translation id="1335437153193710305">ທ່ານສາມາດເລືອກໂປຣໄຟລ໌ທີ່ທ່ານຕ້ອງການເບິ່ງລະຫັດຜ່ານໄດ້</translation>
 <translation id="1335929031622236846">ລົງທະບຽນອຸປະກອນຂອງທ່ານ</translation>
 <translation id="1336902454946927954">ກະແຈຄວາມປອດໄພຂອງທ່ານຖືກລັອກ ເພາະວ່າບໍ່ສາມາດຮັບຮູ້ລາຍນິ້ວມືຂອງທ່ານໄດ້. ເພື່ອປົດລັອກມັນ, ກະລຸນາປ້ອນ PIN ຂອງທ່ານ.</translation>
 <translation id="1338631221631423366">ກຳລັງຈັບຄູ່...</translation>
@@ -613,6 +623,7 @@
 <translation id="1531734061664070992"><ph name="FIRST_SWITCH" />, <ph name="SECOND_SWITCH" />, <ph name="THIRD_SWITCH" /></translation>
 <translation id="1533948060140843887">ຂ້ອຍເຂົ້າໃຈວ່າການດາວໂຫຼດນີ້ອາດເປັນອັນຕະລາຍກັບຄອມພິວເຕີຂອງຂ້ອຍ</translation>
 <translation id="1535228823998016251">ດັງ</translation>
+<translation id="1535597783576881392">ຄຳແນະນໍານີ້ຊ່ວຍໃຫ້ທ່ານເຂົ້າໃຈທາງເລືອກຂອງທ່ານ, ເພື່ອໃຫ້ Chrome ເຮັດວຽກຕາມທີ່ທ່ານຕ້ອງການ</translation>
 <translation id="1535753739390684432">ຟັງຂໍ້ຄວາມສະເພາະທີ່ອ່ານອອກສຽງ. ທໍາອິດ, ໃຫ້ເລືອກໄອຄອນເລືອກເພື່ອເວົ້າຢູ່ດ້ານລຸ່ມຂອງໜ້າຈໍທ່ານ, ຈາກນັ້ນໃຫ້ໄຮໄລ້ຂໍ້ຄວາມ.</translation>
 <translation id="1536754031901697553">ກຳລັງຕັດການເຊື່ອມຕໍ່...</translation>
 <translation id="1537254971476575106">ແວ່ນຂະຫຍາຍເຕັມຈໍ</translation>
@@ -938,6 +949,7 @@
 <translation id="1797117170091578105">ຫຼິ້ນໂດຍໃຊ້ແປ້ນພິມ Chromebook ຂອງທ່ານ. ທ່ານສາມາດປັບແຕ່ງປຸ່ມເປັນຄຳສັ່ງສະເພາະຕ່າງໆໄດ້.</translation>
 <translation id="1800502858278951817">ບໍ່ມີສ່ວນຂະຫຍາຍທີ່ຮ້ອງຂໍໃຫ້ອ່ານ ແລະ ປ່ຽນແປງ <ph name="SITE_NAME" /></translation>
 <translation id="180203835522132923">ຊອກຫາ + O, ຈາກນັ້ນ W</translation>
+<translation id="1802457294427928325">ປ່ຽນພຶດຕິກຳຂອງປຸ່ມ F ເປັນຄຳສັ່ງແຖວເທິງສຸດຂອງ ChromeOS</translation>
 <translation id="1802624026913571222">ພັກເຄື່ອງເມື່ອປິດຝາ</translation>
 <translation id="1802687198411089702">ໜ້ານີ້ບໍ່ຕອບສະໜອງ. ທ່ານສາມາດລໍຖ້າມັນ ຫຼື ອອກໄດ້.</translation>
 <translation id="1803531841600994172">ພາສາທີ່ຈະແປເປັນ</translation>
@@ -1161,6 +1173,7 @@
 <translation id="1987317783729300807">ບັນ​ຊີ</translation>
 <translation id="1987574314042117472">ເລືອກ ແລະ ຕິດຕັ້ງແອັບຍອດນິຍົມ</translation>
 <translation id="1988259784461813694">ຄວາມຕ້ອງການ</translation>
+<translation id="1988733631391393183">ສະແດງຄຳສັ່ງອັກສອນນູນໃນເມນູ ChromeVox</translation>
 <translation id="1989112275319619282">ເປີດ​ເບິ່ງ</translation>
 <translation id="1989903373608997757">ໃຊ້ຕະຫຼອດ</translation>
 <translation id="1990046457226896323">ດາວໂຫຼດໄຟລ໌ສຽງເວົ້າແລ້ວ</translation>
@@ -1174,6 +1187,7 @@
 <translation id="1997433994358798851">Chrome ຕ້ອງການການອະນຸຍາດເພື່ອໃຊ້ Bluetooth ເພື່ອເຊື່ອມຕໍ່ກັບອຸປະກອນຂອງທ່ານ</translation>
 <translation id="1997616988432401742">ໃບ​ຢັ້ງ​ຢືນ​ຂອງ​ທ່ານ</translation>
 <translation id="1999115740519098545">ຢູ່ໃນຕອນເລີ່ມຕົ້ນ</translation>
+<translation id="1999315477791571194">ຫາຕົວຈັດການລະຫັດຜ່ານ Google <ph name="SEPARATOR" /> <ph name="ACCOUNT" /></translation>
 <translation id="2002109485265116295">ເວລາຈິງ</translation>
 <translation id="2003130567827682533">ເພື່ອເປີດນຳໃຊ້ອິນເຕີເນັດ '<ph name="NAME" />', ກ່ອນອື່ນໃຫ້ເຊື່ອມຕໍ່ກັບເຄືອຂ່າຍ Wi-Fi</translation>
 <translation id="2004697686368036666">ຄຸນສົມບັດຢູ່ບາງເວັບໄຊອາດບໍ່ເຮັດວຽກ</translation>
@@ -1215,6 +1229,7 @@
 <translation id="2039464276165755892">ເຊື່ອງເນື້ອຫາການແຈ້ງເຕືອນເມື່ອກວດພົບຄົນອື່ນ</translation>
 <translation id="2040460856718599782">ອຸ້ຍ! ມີບາງອັນຜິດພາດ ເມື່ອພະຍາຍາມຮັບຮອງ. ກະລຸນາກວດເບິ່ງໃບຢັ້ງຢືນການລົງຊື່ເຂົ້າໃຊ້ໃຫ້ດີ ແລະລອງໃໝ່ອີກ.</translation>
 <translation id="2040894699575719559">ບລັອກສະຖານທີ່ແລ້ວ</translation>
+<translation id="2041246176170574368">ການອັບເດດຄວາມປອດໄພຈະສິ້ນສຸດລົງໃນໄວໆນີ້. ປະຢັດຢ່າງໜ້ອຍ $50 ເມື່ອຊື້ Chromebook ເຄື່ອງໃໝ່.</translation>
 <translation id="2042279886444479655">ໂປຣໄຟລ໌ທີ່ໃຊ້ຢູ່</translation>
 <translation id="2044014337866019681">ກະລຸນາກວດສອບໃຫ້ແນ່ໃຈວ່າທ່ານກຳລັງຢັ້ງຢືນ <ph name="ACCOUNT" /> ເພື່ອປົດລັອກເຊດຊັນ.</translation>
 <translation id="204497730941176055">ຊື່​ແມ່​ແບບໃບຢັ້ງຢືນ Microsoft</translation>
@@ -1243,6 +1258,7 @@
 <translation id="2061366302742593739">ບໍ່ມີຫຍັງໃຫ້ສະແດງ</translation>
 <translation id="2062354623176996748">ໃຊ້ເວັບໂດຍບໍ່ບັນທຶກປະຫວັດການທ່ອງເວັບຂອງທ່ານດ້ວຍໜ້າ​ຈໍ​ທີ່ບໍ່ເປີດເຜີຍຕົວຕົນ</translation>
 <translation id="206308717637808771">ລຶບຂໍ້ມູນເມື່ອທ່ານປິດທຸກໜ້າຈໍ. ຂໍ້ມູນຈະຖືກປະຕິບັດຄືກັບເວັບໄຊທີ່ທ່ານກຳລັງເບິ່ງຢູ່</translation>
+<translation id="2063623149012168328">ເພີ່ມທາງລັດໃສ່ <ph name="BRAND" /></translation>
 <translation id="2065405795449409761">Chrome ກຳລັງຖືກຄວບຄຸມໂດຍຊອບແວທົດສອບອັດຕະໂນມັດ.</translation>
 <translation id="2071393345806050157">ບໍ່ມີໄຟລ໌ບັນທຶກກັບທີ່.</translation>
 <translation id="2071692954027939183">ການແຈ້ງເຕືອນຖືກບລັອກໄວ້ອັດຕະໂນມັດເນື່ອງຈາກທ່ານບໍ່ອະນຸຍາດພວກມັນ</translation>
@@ -1256,6 +1272,7 @@
 <translation id="2077129598763517140">ໃຊ້ການເລັ່ງຮາດແວເມື່ອມີຢູ່</translation>
 <translation id="2078019350989722914">ເຕືອນກ່ອນອອກ (<ph name="KEY_EQUIVALENT" />)</translation>
 <translation id="2079053412993822885">ຖ້າທ່ານລຶບໜຶ່ງໃນໃບຢັ້ງຢືນຂອງທ່ານ, ທ່ານຈະບໍ່ສາມາດໃຊ້ມັນລະບຸຕົວທ່ານໄດ້ອີກ.</translation>
+<translation id="2079495302726689071">ເປີດລິ້ງໃນແຖບ <ph name="APP" /> ໃໝ່</translation>
 <translation id="2079545284768500474">ບໍ່ເຮັດ</translation>
 <translation id="2080070583977670716">ການຕັ້ງຄ່າເພີ່ມເຕີມ</translation>
 <translation id="2081816110395725788">ພັກເຄື່ອງໃນຂະນະໃຊ້ແບັດເຕີຣີ</translation>
@@ -1265,6 +1282,7 @@
 <translation id="208634871997892083">VPN ແບບເປີດຕະຫຼອດ</translation>
 <translation id="2087822576218954668">ພິມ​: <ph name="PRINT_NAME" /></translation>
 <translation id="2088092308059522196">ຮອງຮັບການລົງທະບຽນຫຼັງຈາກທີ່ທ່ານຕິດຕັ້ງ <ph name="DEVICE_OS" /> ເທົ່ານັ້ນ.</translation>
+<translation id="2088564884469682888">TrackPoint ໃນຕົວ</translation>
 <translation id="2089090684895656482">ຫນ້ອຍ</translation>
 <translation id="208928984520943006">ປັດຂຶ້ນຈາກລຸ່ມສຸດເພື່ອໄປຫາໜ້າຈໍຫຼັກໄດ້ທຸກເວລາ.</translation>
 <translation id="2089566709556890888">ທ່ອງເວັບຢ່າງປອດໄພດ້ວຍ Google Chrome</translation>
@@ -1377,6 +1395,7 @@
 <translation id="2162705204091149050">ອ່ານຂໍ້ມູນກ່ຽວກັບໂປຣແກຣມທ່ອງເວັບ, OS, ອຸປະກອນ, ຊອບແວທີ່ໄດ້ຕິດຕັ້ງ ແລະ ໄຟລ໌ຂອງທ່ານ.</translation>
 <translation id="2162926944953615670">ບໍ່ມີໂປຣໄຟລ໌ eSIM ທີ່ສາມາດໃຊ້ໄດ້</translation>
 <translation id="2163470535490402084">ກະ​ລຸ​ນາ​ເຊື່ອມ​ຕໍ່​ກັບ​ອິນ​ເຕີ​ເນັດ ເພື່ອ​ລົງຊື່ເຂົ້າໃຊ້​ຫາ <ph name="DEVICE_TYPE" /> ຂອງ​ທ່ານ.</translation>
+<translation id="2163996651553460171">ໃຊ້ປະໂຫຍດສູງສຸດຈາກ Chrome</translation>
 <translation id="2164131635608782358"><ph name="FIRST_SWITCH" />, <ph name="SECOND_SWITCH" />, <ph name="THIRD_SWITCH" /> ແລະ ອີກ 1 ປຸ່ມ</translation>
 <translation id="2165102982098084499">ທ່ານລິ້ງອຸປະກອນເຫຼົ່ານີ້ແລ້ວໂດຍການສະແກນລະຫັດ QR.</translation>
 <translation id="2165177462441582039">ເລືອກວ່າຈະໃຫ້ໄຮໄລ້ຢູ່ດົນປານໃດໃນແຕ່ລະລາຍການ</translation>
@@ -1389,6 +1408,7 @@
 <translation id="2175384018164129879">&amp;ຈັດການໂປຣແກຣມຊອກຫາ ແລະ ການຊອກຫາເວັບໄຊ</translation>
 <translation id="217576141146192373">ບໍ່ສາມາດເພີ່ມເຄື່ອງພິມໄດ້. ກະລຸນາກວດເບິ່ງການຕັ້ງຄ່າເຄື່ອງພິມຂອງທ່ານແລ້ວລອງໃໝ່.</translation>
 <translation id="2175927920773552910">ລະຫັດ QR</translation>
+<translation id="2177306523871626993">ກຳລັງດາວໂຫຼດໄຟລ໌ການຮັບຮູ້ຂໍ້ຄວາມ… <ph name="PERCENT" />%</translation>
 <translation id="2177950615300672361">ແຖບທີ່​ບໍ່​ເຜີຍ​ຕົນ​ຕົວ: <ph name="TAB_NAME" /></translation>
 <translation id="2178585470774851578">ທ່ານກຳລັງເປີດການນຳໃຊ້ຄຸນສົມບັດການດີບັກ ChromeOS Flex ເຊິ່ງຈະຕັ້ງຄ່າ sshd daemon ແລະ ເປີດການນຳໃຊ້ການເປີດຈາກໄດຣຟ໌ USB.</translation>
 <translation id="2178614541317717477">ຜ່ອນຜັນ CA</translation>
@@ -1459,6 +1479,7 @@
 <translation id="2235344399760031203">ບລັອກຄຸກກີ້ພາກສ່ວນທີສາມໄວ້</translation>
 <translation id="2238379619048995541">ຂໍ້ມູນສະພາບຄວາມຖີ່</translation>
 <translation id="2241053333139545397">ອ່ານ​ ແລະ​ປ່ຽນແປງ​ຂໍ້​ມູນ​ຂອງ​ທ່ານຢູ່ເທິງເວັບໄຊທ໌ຈຳ​ນວນ​ໜຶ່ງ</translation>
+<translation id="2241242047787527912">ສໍາລັບແຕ່ລະປຸ່ມທີ່ລະບຸໄວ້ຂ້າງລຸ່ມນີ້, ໃຫ້ເລືອກຄຳສັ່ງທີ່ທ່ານຕ້ອງການໃຫ້ມັນປະຕິບັດ</translation>
 <translation id="2241634353105152135">ຄັ້ງ​ດຽວ​ເທົ່າ​ນັ້ນ</translation>
 <translation id="2242687258748107519">ຂໍ້​ມູນໄຟລ໌</translation>
 <translation id="2245603955208828424">ໃຊ້ປຸ່ມລູກສອນເພື່ອເລື່ອນເບິ່ງລາຍການຕ່າງໆເທື່ອລະຕົວອັກສອນ</translation>
@@ -1500,12 +1521,14 @@
 <translation id="2271986192355138465">ສຶກສາວິທີຕິດຕັ້ງເວັບແອັບ</translation>
 <translation id="2272430695183451567">ມອບໝາຍ 0 ປຸ່ມແລ້ວ</translation>
 <translation id="2272570998639520080">ຈອກເຫຼົ້າມາຕິນີ</translation>
+<translation id="2272830751703114341">ເປີດການນຳໃຊ້ປຸ່ມລະບົບ/ຕົວເປີດໃຊ້ ເພື່ອສະຫຼັບພຶດຕິກຳຂອງປຸ່ມແຖວເທິງສຸດ</translation>
 <translation id="2273119997271134996">ບັນຫາຜອດວິດີໂອຂອງແທ່ນສາກ</translation>
 <translation id="2274840746523584236">ສາກ Chromebook ຂອງທ່ານ</translation>
 <translation id="2276503375879033601">ເພີ່ມແອັບເພີ່ມເຕີມ</translation>
 <translation id="2276910256003242519">ກຳລັງລຶບຂໍ້ມູນ...</translation>
 <translation id="2278562042389100163">ເປີດໜ້າ​ຕ່າງ​ບຣາວເຊີ</translation>
 <translation id="2278668501808246459">ກຳລັງເລີ່ມຕົວຈັດການກ່ອງບັນຈຸ</translation>
+<translation id="2279051792571591988">ໃຊ້ການຕັ້ງຄ່າເລີ່ມຕົ້ນ</translation>
 <translation id="2280486287150724112">ຂອບ​ເບື້ອງຂວາ</translation>
 <translation id="2281863813036651454">ຄລິກເມົ້າຊ້າຍ</translation>
 <translation id="2282146716419988068">ປະມວນຜົນ GPU</translation>
@@ -1906,6 +1929,7 @@
 <translation id="2612676031748830579">ເລກບັດ</translation>
 <translation id="2613210758071148851">ບໍ່ອະນຸຍາດສ່ວນຂະຫຍາຍໃດໆຢູ່ <ph name="RESTRICTED_SITE" /></translation>
 <translation id="2613535083491958306"><ph name="ORIGIN" /> ຈະສາມາດແກ້ໄຂ <ph name="FILENAME" /> ໄດ້</translation>
+<translation id="2616008379779647117">ພາສາຄຳບັນຍາຍ</translation>
 <translation id="2616366145935564096">ອ່ານ​ ແລະ​ປ່ຽນແປງ​ຂໍ້​ມູນ​ຂອງ​ທ່ານຢູ່ເທິງ <ph name="WEBSITE_1" /></translation>
 <translation id="2618797463720777311">ຕັ້ງຄ່າການແບ່ງປັນໃກ້ຄຽງ</translation>
 <translation id="2620215283731032047">ບໍ່ສາມາດດາວໂຫຼດ <ph name="FILE_NAME" /> ໄດ້ຢ່າງປອດໄພ.</translation>
@@ -2299,6 +2323,7 @@
 <translation id="2949289451367477459">ໃຊ້ສະຖານທີ່. ອະນຸຍາດໃຫ້ແອັບ ແລະ ການບໍລິການທີ່ມີການອະນຸຍາດສະຖານທີ່ໃຊ້ສະຖານທີ່ຂອງອຸປະກອນນີ້. Google ອາດຈະເກັບກຳຂໍ້ມູນສະຖານທີ່ເປັນຊ່ວງໄລຍະ ແລະ ໃຊ້ຂໍ້ມູນນີ້ໃນແບບທີ່ບໍ່ເປີດເຜີຍຊື່ເພື່ອປັບປຸງຄວາມຖືກຕ້ອງຂອງສະຖານທີ່ ແລະ ການບໍລິການທີ່ອີງໃສ່ສະຖານທີ່. <ph name="BEGIN_LINK1" />ສຶກສາເພີ່ມເຕີມ<ph name="END_LINK1" /></translation>
 <translation id="2950666755714083615">ໃຫ້ຂ້ອຍລົງທະບຽນ</translation>
 <translation id="2953019166882260872">ເຊື່ອມຕໍ່ໂທລະສັບໂດຍໃຊ້ສາຍ</translation>
+<translation id="2953210795988451570">ການອັບເດດຄວາມປອດໄພໄດ້ສິ້ນສຸດລົງແລ້ວ. ອັບເກຣດເປັນ Chromebook ເວີຊັນໃໝ່.</translation>
 <translation id="2953218713108551165">ບໍ່ອະນຸຍາດການແຈ້ງເຕືອນສຳລັບ <ph name="SITE" />. ທ່ານຈະຖືກຖາມອີກເທື່ອໜຶ່ງໃນການເຂົ້າເບິ່ງເທື່ອຕໍ່ໄປຂອງທ່ານ.</translation>
 <translation id="2956070239128776395">ສ່ວນທີ່ຝັງຢູ່ໃນກຸ່ມ: <ph name="ERROR_LINE" /></translation>
 <translation id="2958721676848865875">ຄຳເຕືອນກ່ຽວກັບສ່ວນຂະຫຍາຍແພັກ</translation>
@@ -2556,7 +2581,6 @@
 <translation id="3193695589337931419">System Signals Utilities</translation>
 <translation id="3194786596445804250">ສະແດງລາຍລະອຽດກ່ຽວກັບການບລັອກຄຸກກີ້ພາກສ່ວນທີສາມ</translation>
 <translation id="3197453258332670132">ດ້ວຍການຄລິກຂວາ ຫຼື ການກົດຄ້າງໄວ້, ໃຫ້ສະແດງຂໍ້ມູນທີ່ກ່ຽວຂ້ອງສຳລັບການເລືອກຂໍ້ຄວາມຂອງທ່ານ</translation>
-<translation id="3198804549162832936">ເປີດລິ້ງໃນ <ph name="APP" /> ໃໝ່</translation>
 <translation id="3199127022143353223">ເຊີບເວີ</translation>
 <translation id="3200061262156232574">ໃນກະຕ່າຊື້ເຄື່ອງຂອງທ່ານ</translation>
 <translation id="3201237270673604992">Z ຫາ A</translation>
@@ -2565,6 +2589,7 @@
 <translation id="3202173864863109533">ສຽງ​ແຖບ​ຂອງ​ນີ້​ກໍາລັງຖືກປິດ.</translation>
 <translation id="3202578601642193415">ໃໝ່ສຸດ</translation>
 <translation id="3204648577100496185">ຂໍ້ມູນທີ່ເຊື່ອມໂຍງກັບແອັບນີ້ອາດຖືກລຶບອອກຈາກອຸປະກອນນີ້</translation>
+<translation id="3207960819495026254">ໃສ່ບຸກ​ມາກ​໌​ແລ້ວ</translation>
 <translation id="3208321278970793882">ແອັບ</translation>
 <translation id="3208584281581115441">ກວດເບິ່ງດຽວນີ້</translation>
 <translation id="3208703785962634733">ບໍ່ຢືນຢັນ</translation>
@@ -2590,6 +2615,7 @@
 <translation id="3234978181857588512">ບັນທຶກໃສ່ອຸປະກອນ</translation>
 <translation id="3238192140106069382">ກຳລັງເຊື່ອມຕໍ່ ແລະ ຢັ້ງຢືນ</translation>
 <translation id="3239373508713281971">ລຶບຂີດຈຳກັດເວລາສຳລັບ <ph name="APP_NAME" /> ອອກແລ້ວ</translation>
+<translation id="3241638166094654466">ຫ້ອງໃນແຕ່ລະແຖວ</translation>
 <translation id="3241680850019875542">ເລືອກໄດເຣັກຕໍຣີພື້ນຖານຂອງສ່ວນຂະຫຍາຍເພື່ອບັນຈຸ. ເພື່ອອັບເດດສ່ວນຂະຫຍາຍ, ເລືອກໄຟລ໌ລະຫັດສ່ວນຕົວເພື່ອ​ໃຊ້​ຄືນອີກ.</translation>
 <translation id="3242289508736283383">ຕ້ອງຕິດຕັ້ງແອັບທີ່ມີ​ຄຸນ​ສົມ​ບັດ manifest 'kiosk_only' ຢູ່ໃນໂໝດ kiosk ຂອງ ChromeOS</translation>
 <translation id="3242665648857227438">ໂປຣໄຟລ໌ນີ້ໃຊ້ການຕັ້ງຄ່າພຣັອກຊີຂອງ ChromeOS.</translation>
@@ -2685,6 +2711,7 @@
 <translation id="3317678681329786349">ບລັອກກ້ອງຖ່າຍຮູບ ແລະ ໄມໂຄຣໂຟນໄວ້ແລ້ວ</translation>
 <translation id="3319306431415395200">ແປຂໍ້ຄວາມໃນຮູບດ້ວຍ <ph name="VISUAL_SEARCH_PROVIDER" /></translation>
 <translation id="3320630259304269485">Safe Browsing (ການປົກປ້ອງຈາກເວັບໄຊອັນຕະລາຍ) ແລະ ການຕັ້ງຄ່າຄວາມປອດໄພອື່ນໆ</translation>
+<translation id="3321460131042519426">ເປີດ​ໃຊ້​ງານ​ການ​ຕັດຄໍາ</translation>
 <translation id="3323521181261657960">ໂບນັດ! ທ່ານໄດ້ເວລາໜ້າຈໍເພີ່ມ</translation>
 <translation id="3323577066981719144">ການປ່ຽນແປງທີ່ທ່ານສ້າງຢູ່ບ່ອນນີ້ຈະມີຜົນກັບໂປຣແກຣມທ່ອງເວັບ Chrome ເທົ່ານັ້ນ. ເພື່ອປ່ຽນການຕັ້ງຄ່າໂປຣແກຣມທ່ອງເວັບ Lacros Chrome ຂອງທ່ານ, ໃຫ້ເປີດໂປຣແກຣມທ່ອງເວັບ Lacros Chrome ຂຶ້ນມາແລ້ວໄປຫາການຕັ້ງຄ່າ.</translation>
 <translation id="3325804108816646710">ກຳລັງຊອກຫາໂປຣໄຟລ໌ທີ່ມີຢູ່...</translation>
@@ -2753,6 +2780,7 @@
 <translation id="3388094447051599208">ຖາດເຈ້ຍອອກໃກ້ເຕັມແລ້ວ</translation>
 <translation id="3388788256054548012">ໄຟລ໌ນີ້ມີການເຂົ້າລະຫັດໄວ້. ຂໍໃຫ້ເຈົ້າຂອງມັນຖອດລະຫັດ.</translation>
 <translation id="3390013585654699824">ລາຍລະອຽດແອັບ</translation>
+<translation id="3390530051434634135">ໝາຍເຫດ: <ph name="NOTE" /></translation>
 <translation id="3393554941209044235">ການວິເຄາະເອກະສານ Chrome</translation>
 <translation id="3393582007140394275">ບໍ່ສາມາດສົ່ງສັນຍານໜ້າຈໍໄດ້.</translation>
 <translation id="3394850431319394743">ອະນຸຍາດໃຫ້ຕົວລະບຸຫຼິ້ນເນື້ອຫາທີ່ມີການປົກປ້ອງແລ້ວ</translation>
@@ -2815,6 +2843,7 @@
 <translation id="3441663102605358937">ເຂົ້າສູ່ລະບົບ <ph name="ACCOUNT" /> ອີກຄັ້ງເພື່ອຢັ້ງຢືນບັນຊີນີ້</translation>
 <translation id="3442674350323953953">ໃຫ້ Google ໃຊ້ຂໍ້ມູນຮາດແວຂອງທ່ານເພື່ອຊ່ວຍປັບປຸງ <ph name="DEVICE_OS" />. ຫາກທ່ານປະຕິເສດ, ຂໍ້ມູນນີ້ຈະຍັງຄົງຖືກສົ່ງໄປໃຫ້ Google ເພື່ອກວດສອບການອັບເດດທີ່ເໝາະສົມ, ແຕ່ຈະບໍ່ຖືກຈັດເກັບ ຫຼື ຖືກໃຊ້ໄປໃນທາງອື່ນ.</translation>
 <translation id="3443744348829035122"><ph name="BRAND" /> ໝົດເວລາແລ້ວ</translation>
+<translation id="3443754338602062261">ທ່ານມີລະຫັດຜ່ານສຳລັບບັນຊີເຫຼົ່ານີ້ຢູ່ແລ້ວໃນ <ph name="BRAND" /> ຂອງທ່ານ. ຫາກທ່ານເລືອກສົ່ງອອກໜຶ່ງໃນລະຫັດຜ່ານດ້ານລຸ່ມ, ມັນຈະປ່ຽນແທນລະຫັດຜ່ານທີ່ມີຢູ່ແລ້ວ.</translation>
 <translation id="3444726579402183581"><ph name="ORIGIN" /> ຈະສາມາດເບິ່ງ <ph name="FILENAME" /> ໄດ້</translation>
 <translation id="3445047461171030979">ຄຳຕອບດ່ວນຂອງຜູ້ຊ່ວຍ Google</translation>
 <translation id="3445288400492335833"><ph name="MINUTES" /> ນາທີ</translation>
@@ -2845,7 +2874,6 @@
 <translation id="3462958980772249646">{COUNT,plural, =1{ມີ {COUNT} ລະຫັດຜ່ານບັນທຶກໄວ້ຢູ່ອຸປະກອນນີ້}other{ມີ {COUNT} ລະຫັດຜ່ານບັນທຶກໄວ້ຢູ່ອຸປະກອນນີ້}}</translation>
 <translation id="346298925039590474">ເຄືອຂ່າຍມືຖືນີ້ຈະສາມາດໃຊ້ໄດ້ກັບຜູ້ໃຊ້ທັງໝົດຢູ່ອຸປະກອນນີ້</translation>
 <translation id="3464145797867108663">ເພີ່ມໂປຣໄຟລ໌ບ່ອນເຮັດວຽກ</translation>
-<translation id="346431825526753">ອັນ​ນີ້​ແມ່ນ​ບັນ​ຊີ​ສຳ​ລັບ​ເດັກ​ນ້ອຍ​ທີ່​ຈັດ​ການ​ໂດຍ <ph name="CUSTODIAN_EMAIL" />.</translation>
 <translation id="346546413339447252">ຮັບສ່ວນຫຼຸດສຳລັບ <ph name="MERCHANT_NAME_1" />, <ph name="MERCHANT_NAME_2" /> ແລະ ອື່ນໆ</translation>
 <translation id="3468298837301810372">ປ້າຍກຳກັບ</translation>
 <translation id="3468999815377931311">ໂທລະສັບ Android</translation>
@@ -3024,7 +3052,6 @@
 <translation id="3627671146180677314">ເວລາຕໍ່ໃບຢັ້ງຢືນ Netscape ໃໝ່</translation>
 <translation id="3627879631695760395">ຕິດຕັ້ງ <ph name="APP" />...</translation>
 <translation id="3628275722731025472">ປິດ Bluetooth</translation>
-<translation id="3629631988386925734">ປ້ອນລະຫັດຜ່ານຂອງທ່ານເພື່ອເປີດນຳໃຊ້ Smart Lock. ຄັ້ງຕໍ່ໄປ, ໂທລະສັບຂອງທ່ານຈະປົດລັອກ <ph name="DEVICE_TYPE" /> ຂອງທ່ານ. ທ່ານສາມາດປິດ Smart Lock ໄດ້ໃນການຕັ້ງຄ່າ.</translation>
 <translation id="3629664892718440872">ຈື່ການເລືອກນີ້ໄວ້</translation>
 <translation id="3630132874740063857">ໂທລະສັບຂອງທ່ານ</translation>
 <translation id="3630995161997703415">ເພີ່ມເວັບໄຊນີ້ໃສ່ຖ້ານຂອງທ່ານເພື່ອໃຊ້ມັນໄດ້ທຸກເວລາ</translation>
@@ -3061,6 +3088,7 @@
 <translation id="3659550105763988702">ໃຊ້ກະແຈຜ່ານຂອງທ່ານສຳລັບ <ph name="APP_NAME" /></translation>
 <translation id="3659929705630080526">ທ່ານໃສ່ລະ​ຫັດ​ການ​ເຂົ້າ​ຫາບໍ່ຖືກຕ້ອງຫຼາຍເທື່ອເກີນໄປ. ກະລຸນາລອງໃໝ່ໃນພາຍຫຼັງ</translation>
 <translation id="3660234220361471169">ບໍ່ເຊື່ອຖືໄດ້</translation>
+<translation id="3661297433172569100">{NUM_PASSWORDS,plural, =1{ພົບ 1 ລະຫັດຜ່ານທີ່ມີຢູ່ແລ້ວ}other{ພົບ {NUM_PASSWORDS} ລະຫັດຜ່ານທີ່ມີຢູ່ແລ້ວ}}</translation>
 <translation id="3664511988987167893">ໄອຄອນສ່ວນຂະຫຍາຍ</translation>
 <translation id="3665589677786828986">Chrome ກວດພົບວ່າ ການຕັ້ງຄ່າຂອງທ່ານບາງຕົວໄດ້ຮັບຄວາມເສຍຫາຍໂດຍໂປຣແກຼມອື່ນ ແລະໄດ້ຕັ້ງຄ່າພວກມັນໄປເປັນຄ່າມາດຕະຖານເດີມຂອງພວກມັນແລ້ວ.</translation>
 <translation id="3665919494326051362">ເວີຊັນປັດຈຸບັນແມ່ນ <ph name="CURRENT_VERSION" /></translation>
@@ -3076,6 +3104,7 @@
 <translation id="3677959414150797585">ຮວມມີແອັບ, ໜ້າເວັບ ແລະ ອື່ນໆອີກ. ສົ່ງສະຖິຕິເພື່ອປັບປຸງການແນະນຳພຽງແຕ່ຖ້າທ່ານໄດ້ເລືອກແບ່ງປັນຂໍ້ມູນການນຳໃຊ້ເທົ່ານັ້ນ.</translation>
 <translation id="3678156199662914018">ສ່ວນຂະ​ຫຍາຍ​: <ph name="EXTENSION_NAME" /></translation>
 <translation id="3678188444105291936">ໜ້າເວັບຕ່າງໆທີ່ທ່ານເບິ່ງຢູ່ໜ້າຈໍນີ້ຈະບໍ່ປາກົດໃນປະຫວັດການທ່ອງເວັບ ແລະ ພວກມັນຈະບໍ່ມີຮ່ອງຮອຍອື່ນໆ ເຊັ່ນ: ຄຸກກີ້ ຢູ່ຄອມພິວເຕີຫຼັງຈາກທີ່ທ່ານອອກຈາກລະບົບ. ໄຟລ໌ທີ່ທ່ານດາວໂຫຼດ ແລະ ບຸກມາກທີ່ທ່ານສ້າງຈະບໍ່ຖືກຈັດເກັບໄວ້.</translation>
+<translation id="3679126865530709868">ແຜ່ນສຳຜັດໃນຕົວ</translation>
 <translation id="368019053277764111">ເປີດການຊອກຫາໃນແຜງຄວບຄຸມດ້ານຂ້າງ</translation>
 <translation id="3680683624079082902">ສຽງຂອງການປ່ຽນຂໍ້ຄວາມເປັນສຽງເວົ້າ</translation>
 <translation id="3681311097828166361">ຂໍຂອບໃຈສຳລັບຄຳຕິຊົມຂອງທ່ານ. ທ່ານອອບລາຍຢູ່ຕອນນີ້ ແລະ ລາຍງານຂອງທ່ານຈະຖືກສົ່ງໃນພາຍຫຼັງ.</translation>
@@ -3096,6 +3125,7 @@
 <translation id="3694590407685276748">ເຄີເຊີຂໍ້ຄວາມໄຮໄລ້</translation>
 <translation id="369489984217678710">ລະຫັດຜ່ານ ແລະ ຂໍ້ມູນການເຂົ້າສູ່ລະບົບອື່ນ</translation>
 <translation id="369522892592566391">{NUM_FILES,plural, =0{ການກວດສອບຄວາມປອດໄພສຳເລັດແລ້ວ. ລະບົບຈະອັບໂຫຼດຂໍ້ມູນຂອງທ່ານ.}=1{ການກວດສອບຄວາມປອດໄພສຳເລັດແລ້ວ. ລະບົບຈະອັບໂຫຼດໄຟລ໌ຂອງທ່ານ.}other{ການກວດສອບຄວາມປອດໄພສຳເລັດແລ້ວ. ລະບົບຈະອັບໂຫຼດໄຟລ໌ຂອງທ່ານ.}}</translation>
+<translation id="3696817060563289264">ດາວໂຫຼດໄຟລ໌ການຮັບຮູ້ຂໍ້ຄວາມແລ້ວ</translation>
 <translation id="3698471669415859717">ກວດສອບສຳເລັດແລ້ວ</translation>
 <translation id="3698825735945432002">ປະເພດຕົວກັ່ນຕອງ</translation>
 <translation id="3699624789011381381">ທີ່​ຢູ່​ອີ​ເມວ</translation>
@@ -3114,6 +3144,7 @@
 <translation id="370649949373421643">ເປີດໃຊ້ງານ Wi​-Fi</translation>
 <translation id="370665806235115550">ກໍາລັງໂຫຼດ ...</translation>
 <translation id="3707163604290651814">ໃນປັດຈຸບັນເຂົ້າສູ່ລະບົບເປັນ <ph name="NAME" /></translation>
+<translation id="3707348585109246684">ເປີດລິ້ງໃນແຖບ <ph name="APP" /> ໃໝ່</translation>
 <translation id="3708295717182051206">ຄຳບັນຍາຍ</translation>
 <translation id="3708684582558000260">ບໍ່ອະນຸຍາດໃຫ້ເວັບໄຊທີ່ປິດໄປແລ້ວສາມາດສົ່ງ ຫຼື ຮັບຂໍ້ມູນໃຫ້ແລ້ວໄດ້</translation>
 <translation id="3709244229496787112">ບຣາວ​ເຊີໄດ້​ປິດ​ລົງ​ກ່ອນ​ທີ່​ຈະ​ດາວ​ໂຫລດ​ໄດ້​ສໍາ​ເລັດ​.</translation>
@@ -3235,6 +3266,7 @@
 <translation id="380329542618494757">ຊື່</translation>
 <translation id="3803345858388753269">ຄຸນ​ນະ​ພາບວິ​ດີ​ໂອ​</translation>
 <translation id="3803367742635802571">ເວັບໄຊທີ່ທ່ານເຂົ້າອາດຢຸດການເຮັດວຽກຕາມທີ່ອອກແບບໄວ້</translation>
+<translation id="3803583375545057606">ຂໍໃຫ້ພໍ່ແມ່ຂອງທ່ານເປີດການນຳໃຊ້ສ່ວນຂະຫຍາຍນີ້ບໍ?</translation>
 <translation id="380408572480438692">ການເປີດໃຊ້ງງານການເກັບກໍາຂໍ້ມູນປະຕິບັດຈະຊ່ວຍໃຫ້ Google ປັບປຸງລະບົບໄດ້ຕະຫຼອດເວລາ. ຈະບໍ່ມີການສົ່ງຂໍ້ມູນໃດໃຫ້ຈົນກ່ວາທ່ານຍື່ນບົດລາຍງານຄວາມຄິດເຫັນ (Alt-Shift-I) ແລະລວມເອົາຂໍ້ມູນປະຕິບັດ. ທ່ານສາມາດກັບຄືນໄປຫາໜ້າຈໍນີ້ໄດ້ ເພື່ອປິດໃຊ້ງານການເກັບກໍາໄດ້ທຸກເວລາ.</translation>
 <translation id="3807249107536149332">ບໍ່ອະນຸຍາດ <ph name="EXTENSION_NAME" /> (ID ສ່ວນຂະຫຍາຍ "<ph name="EXTENSION_ID" />") ຢູ່ໃນໜ້າຈໍເຂົ້າສູ່ລະບົບ.</translation>
 <translation id="3807747707162121253">ຍົກ​ເລີກ​</translation>
@@ -3295,6 +3327,7 @@
 <translation id="3846116211488856547">ດາວໂຫຼດເຄື່ອງມືສຳລັບພັດທະນາເວັບໄຊ, ແອັບ Android ແລະ ອື່ນໆອີກ. ການຕິດຕັ້ງ Linux ຈະດາວໂຫຼດຂໍ້ມູນ <ph name="DOWNLOAD_SIZE" />.</translation>
 <translation id="3847319713229060696">ຊ່ວຍປັບປຸງຄວາມປອດໄພໃນເວັັບໄຊສຳລັບທຸກຄົນ</translation>
 <translation id="3848547754896969219">ເປີດໃນ&amp;ໜ້າ​ຈໍ​ທີ່ບໍ່ເປີດເຜີຍຕົວຕົນ</translation>
+<translation id="3850172593216628215">ການອັບເດດຄວາມປອດໄພໄດ້ສິ້ນສຸດລົງແລ້ວ. ປະຢັດຢ່າງໜ້ອຍ $50 ເມື່ອຊື້ Chromebook ເຄື່ອງໃໝ່.</translation>
 <translation id="385051799172605136">ກັບ​ຄືນ​</translation>
 <translation id="3851428669031642514">ໂຫຼດ​ໜັງ​ສື​ຂຽນ​ທີ່​ບໍ່​ປອດ​ໄພ</translation>
 <translation id="3852215160863921508">ຜູ້ຊ່ວຍປ້ອນຂໍ້ມູນ</translation>
@@ -3503,6 +3536,7 @@
 <translation id="4027958407426528157">ເປີດເວັບໄຊໃນແອັບທີ່ຕິດຕັ້ງໄວ້ຢູ່ <ph name="DEVICE_TYPE" /> ຂອງທ່ານ</translation>
 <translation id="4028467762035011525">ເພີ່ມວິທີການປ້ອນຂໍ້ມູນ</translation>
 <translation id="4029556917477724407">ກັບມາຈາກໜ້າ <ph name="PAGE_TITLE" /></translation>
+<translation id="403088439874411464">ກຳລັງດາວໂຫຼດໄຟລ໌ການຮັບຮູ້ຂໍ້ຄວາມ</translation>
 <translation id="4031179711345676612">ອະນຸຍາດໄມໂຄຣໂຟນແລ້ວ</translation>
 <translation id="4031527940632463547">ບລັອກເຊັນເຊີແລ້ວ</translation>
 <translation id="4033471457476425443">ເພີ່ມໂຟນເດີໃໝ່</translation>
@@ -3642,7 +3676,6 @@
 <translation id="4157869833395312646">Microsoft Server Gated Cryptography</translation>
 <translation id="4158315983204257156">ຟອນ ແລະ ຂະໜາດຂໍ້ຄວາມໃນເວັບໄຊ</translation>
 <translation id="4158364720893025815">ຜ່ານ</translation>
-<translation id="4159681666905192102">ນີ້​ແມ່ນ​ບັນ​ຊີ​ສຳ​ລັບ​ເດັກ​ນ້ອຍ​ທີ່​ຖືກ​ຄຸ້​ມ​ຄອງ​ໂດຍ <ph name="CUSTODIAN_EMAIL" /> ແລະ <ph name="SECOND_CUSTODIAN_EMAIL" />.</translation>
 <translation id="4163560723127662357">ຄີບອດທີ່ບໍ່ຮູ້​ຈັກ</translation>
 <translation id="4165942112764990069"><ph name="USER_EMAIL" /> ບໍ່ໄດ້ເປັນຂອງອົງການທີ່ຖືກຕ້ອງ. ກະລຸນາຕິດຕໍ່ຜູ້ເບິ່ງແຍງລະບົບຂອງທ່ານ. ຫາກທ່ານເປັນຜູ້ເບິ່ງແຍງລະບົບ, ທ່ານສາມາດຕັ້ງຄ່າອົງການຂອງທ່ານໄດ້ໂດຍການເຂົ້າໄປ: g.co/ChromeEnterpriseAccount</translation>
 <translation id="4165986682804962316">ການຕັ້ງຄ່າເວັບໄຊທ໌</translation>
@@ -3654,6 +3687,7 @@
 <translation id="4169535189173047238">ບໍ່ອະນຸຍາດ</translation>
 <translation id="4170314459383239649">ລຶບລ້າງເມື່ອອອກ</translation>
 <translation id="417096670996204801">ເລືອກໂປຣໄຟລ໌</translation>
+<translation id="41725145403849567">ຂໍໃຫ້ພໍ່ແມ່ຂອງທ່ານເພີ່ມສ່ວນຂະຫຍາຍນີ້ບໍ?</translation>
 <translation id="4175137578744761569">ສີມ່ວງອ່ອນ ແລະ ສີຂາວ</translation>
 <translation id="4175737294868205930">ການຈັດເກັບຂໍ້ມູນຕໍ່ເນື່ອງ</translation>
 <translation id="4176463684765177261">ປິດໃຊ້ງານແລ້ວ</translation>
@@ -4150,6 +4184,7 @@
 <translation id="4622051949285931942">ປິດການອັບເດດອັດຕະໂນມັດບໍ?</translation>
 <translation id="4623167406982293031">ຢັ້ງຢືນບັນຊີ</translation>
 <translation id="4623189117674524348">ລະບົບອະນຸຍາດສິດເຂົ້າເຖິງ API ສຳລັບອຸປະກອນນີ້ບໍ່ສຳເລັດ.</translation>
+<translation id="4623341761454569602">ໃນຕົວຈັດການລະຫັດຜ່ານ Google <ph name="SEPARATOR" /> <ph name="ACCOUNT" /></translation>
 <translation id="4625078469366263107">ເປີດນຳໃຊ້ແອັບ</translation>
 <translation id="4627427111733173920">ບລັອກຄຸກກີ້ໄວ້ແລ້ວ</translation>
 <translation id="4627442949885028695">ສືບຕໍ່ຈາກອຸປະກອນອື່ນ</translation>
@@ -4254,6 +4289,7 @@
 <translation id="47158868804223727">ຄລິກຊື່ກຸ່ມເພື່ອຂະຫຍາຍ ຫຼື ຫຍໍ້ມັນລົງ</translation>
 <translation id="4716483597559580346">Powerwash ເພື່ອຄວາມປອດໄພເພີ່ມຂຶ້ນ</translation>
 <translation id="471759229191973607">ປ່ຽນຮູບແບບສີສັນ</translation>
+<translation id="4718564115458102525">ກວດບໍ່ພົບແປ້ນພິມ</translation>
 <translation id="4722735765955348426">ລະຫັດຜ່ານສຳລັບ <ph name="USERNAME" /></translation>
 <translation id="4722920479021006856"><ph name="APP_NAME" /> ກໍາລັງແຊຣ໌ໜ້າຈໍຂອງທ່ານ.</translation>
 <translation id="4722989931633062466">ບໍ່ອະນຸຍາດໃຫ້ສະແດງຂໍ້ຄວາມເຂົ້າສູ່ລະບົບພາກສ່ວນທີສາມ</translation>
@@ -4388,6 +4424,7 @@
 <translation id="4841741146571978176">ບໍ່ມີເຄື່ອງສະເໝືອນທີ່ຕ້ອງການ. ກະລຸນາລອງຕັ້ງ <ph name="VM_TYPE" /> ເພື່ອສືບຕໍ່</translation>
 <translation id="4842976633412754305">ໜ້າ​ນີ້​ພະ​ຍາ​ຍາມ​ໂຫຼດ​ໜັງ​ສື​ຂຽນ​ຈາກ​ແຫຼ່ງ​ທີ່​ບໍ່​ໄດ້​ຮັບ​ຮອງ.</translation>
 <translation id="4844333629810439236">ຄີບອດອື່ນ</translation>
+<translation id="4844347226195896707">ເບິ່ງລະຫັດຜ່ານຂອງທ່ານ ເຖິງແມ່ນວ່າທ່ານຈະບໍ່ໄດ້ໃຊ້ Chrome ຫຼື Android ຢູ່ໂດຍການເຂົ້າສູ່ລະບົບ &lt;a target='_blank' href='<ph name="LINK" />'&gt;passwords.google.com&lt;/a&gt;</translation>
 <translation id="484462545196658690">ອັດຕະໂນມັດ</translation>
 <translation id="4844633725025837809">ເພື່ອຄວາມປອດໄພເພີ່ມເຕີມ, ໃຫ້ເຂົ້າລະຫັດລະຫັດຜ່ານຢູ່ອຸປະກອນຂອງທ່ານກ່ອນທີ່ພວກມັນຈະຖືກບັນທຶກໄປໃສ່ຕົວຈັດການລະຫັດຜ່ານ Google</translation>
 <translation id="4846628405149428620">ເລືອກບ່ອນທີ່ເວັບໄຊນີ້ສາມາດບັນທຶກການປ່ຽນແປງໄດ້</translation>
@@ -4431,6 +4468,7 @@
 <translation id="4878653975845355462">ຜູ້ເບິ່ງແຍງລະບົບຂອງທ່ານໄດ້ປິດພາບພື້ນຫຼັງແບບກຳນົດເອງແລ້ວ</translation>
 <translation id="4878718769565915065">ການເພີ່ມລາຍນິ້ວມືໃສ່ກະແຈຄວາມປອດໄພບໍ່ສຳເລັດ</translation>
 <translation id="4879491255372875719">ອັດຕະໂນມັດ (ຄ່າເລີ່ມຕົ້ນ)</translation>
+<translation id="4880315242806573837">ການອັບເດດຄວາມປອດໄພຈະສິ້ນສຸດລົງໃນໄວໆນີ້. ອັບເກຣດເປັນ Chromebook ເວີຊັນໃໝ່.</translation>
 <translation id="4880827082731008257">ຄົ້ນຫາປະຫວັດ</translation>
 <translation id="4881062916686771679">ໄຟລ໌ນີ້ມີເມົາແວທີ່ສາມາດສ້າງຄວາມເສຍຫາຍໃຫ້ກັບບັນຊີສ່ວນຕົວ ຫຼື ບັນຊີເຄືອຂ່າຍສັງຄົມຂອງທ່ານໄດ້, ຮວມທັງ <ph name="USER_EMAIL" /></translation>
 <translation id="4881685975363383806">ຢ່າແຈ້ງເຕືອນຂ້ອຍໃນເທື່ອຕໍ່ໄປ</translation>
@@ -4505,7 +4543,6 @@
 <translation id="4941963255146903244">ເບິ່ງຮູບພາບ, ມີເດຍ ແລະ ແອັບຂອງໂທລະສັບທ່ານ</translation>
 <translation id="494286511941020793">ຊ່ວຍເຫຼືອການ​ປັບ​ຕັ້ງ​ຄ່າພຣັອກຊີ</translation>
 <translation id="4943368462779413526">ບານເຕະ</translation>
-<translation id="4943691134276646401">"<ph name="CHROME_EXTENSION_NAME" />" ຕ້ອງການເຊື່ອມຕໍ່ກັບຜອດອະນຸກໍາ</translation>
 <translation id="4944310289250773232"><ph name="SAML_DOMAIN" /> ເປັນແມ່ຂ່າຍການບໍລິການກວດສອບຄວາມຖືກຕ້ອງ.</translation>
 <translation id="4945439665401275950">ໃຫ້ລູກຄ້າທ່ານແຕະໃສ່ປຸ່ມເປີດປິດເພື່ອຕັ້ງຄ່າລາຍນິ້ວມື. ຂໍ້ມູນລາຍນິ້ວມືຂອງລູກທ່ານແມ່ນຖືກຈັດເກັບໄວ້ຢ່າງປອດໄພ ແລະ ຈະບໍ່ຖືກສົ່ງອອກຈາກ <ph name="DEVICE_TYPE" /> ນີ້ເດັດຂາດ.</translation>
 <translation id="4946459324029651239">ທ່ານກຳລັງໄດ້ຮັບການປົກປ້ອງແບບມາດຕະຖານຢູ່</translation>
@@ -4672,7 +4709,6 @@
 <translation id="5111794652433847656">ບໍ່ມີກະແຈຜ່ານໃດໆສຳລັບ <ph name="APP_NAME" /> ຢູ່ອຸປະກອນນີ້</translation>
 <translation id="5112577000029535889">ເຄື່ອງ​ມື​ຜູ້ພັດ​ທະ​ນາ</translation>
 <translation id="511313294362309725">ເປີດໃຊ້ການຈັບຄູ່ດ່ວນ</translation>
-<translation id="5113739826273394829">ຖ້າ​ທ່ານ​ຄ​ລິກ​ໄອ​ຄອນ​ນີ້, ທ່ານ​ຈະ​ລັອກ <ph name="DEVICE_TYPE" /> ນີ້​ເອົາ​ເອງ. ຄັ້ງ​ຕໍ່​ໄປ, ທ່ານ​ຈະ​ຕ້ອງ​ໄດ້​ພິ​ມ​ລະ​ຫັດ​ຜ່ານ​ຂອງ​ທ່ານ ເພື່ອ​ປ້ອນ​ເຂົ້າ.</translation>
 <translation id="51143538739122961">ສຽບກະແຈຄວາມປອດໄພຂອງທ່ານ ແລ້ວແຕະມັນ</translation>
 <translation id="5115309401544567011">ກະລຸນາສຽບ <ph name="DEVICE_TYPE" /> ຂອງທ່ານໃສ່ແຫຼ່ງໄຟຟ້າ.</translation>
 <translation id="5115338116365931134">SSO</translation>
@@ -4841,6 +4877,7 @@
 <translation id="5275352920323889391">ໝາ</translation>
 <translation id="527605719918376753">ປິດສຽງແຖບ</translation>
 <translation id="527605982717517565">ອະ​ນຸ​ຍາດ​ JavaScript ຢູ່ເທິງ <ph name="HOST" /> ຢູ່ສະເໝີ</translation>
+<translation id="5276288422515364908">ທ່ານຈະຢຸດໄດ້ຮັບການອັບເດດຄວາມປອດໄພ ແລະ ຊອບແວສຳລັບ Chromebook ເຄື່ອງນີ້ໃນ <ph name="MONTH_AND_YEAR" />. ອັບເກຣດ Chromebook ຂອງທ່ານເພື່ອປະສົບການໃນການໃຊ້ທີ່ດີທີ່ສຸດ.</translation>
 <translation id="5276357196618041410">ບໍ່ສາມາດບັນທຶກການຕັ້ງຄ່າໂດຍບໍ່ມີການເຂົ້າສູ່ລະບົບກ່ອນ</translation>
 <translation id="5277127016695466621">ສະແດງແຜງຄວບຄຸມດ້ານຂ້າງ</translation>
 <translation id="5278823018825269962">ID ສະຖານະ</translation>
@@ -4904,7 +4941,6 @@
 <translation id="532943162177641444">ແຕະການແຈ້ງເຕືອນໃນ <ph name="PHONE_NAME" /> ຂອງທ່ານເພື່ອຕັ້ງຄ່າຈຸດເຊື່ອມຕໍ່ມືຖືທີ່ອຸປະກອນນີ້ສາມາດໃຊ້ໄດ້.</translation>
 <translation id="5329858601952122676">ລຶບ</translation>
 <translation id="5331069282670671859">ບໍ່ມີໃບຮັບຮອງໃນໝວດໝູ່ນີ້</translation>
-<translation id="5331425616433531170">"<ph name="CHROME_EXTENSION_NAME" />" ຕ້ອງການຈັບຄູ່</translation>
 <translation id="5331568967879689647">ແອັບລະບົບ ChromeOS</translation>
 <translation id="5331975486040154427">ອຸ​ປະ​ກອນ USB-C (​ຜອດ​ດ້ານ​ຫຼັງເບື້ອງຊ້າຍ)</translation>
 <translation id="5333896723098573627">ເພື່ອລຶບແອັບອອກ, ໃຫ້ເຂົ້າໄປການຕັ້ງຄ່າ &gt; Google Play Store &gt; ຈັດການການຕັ້ງຄ່າ Android &gt; ແອັບ ຫຼື ຕົວຈັດການແອັບພລິເຄຊັນ. ຈາກນັ້ນແຕະໃສ່ແອັບທີ່ທ່ານຕ້ອງການຖອນການຕິດຕັ້ງ (ທ່ານອາດຈຳເປັນຕ້ອງປັດຂວາ ຫຼື ຊ້າຍເພື່ອຊອກຫາແອັບດັ່ງກ່າວ). ຈາກນັ້ນແຕະໃສ່ຖອນການຕິດຕັ້ງ ຫຼື ປິດການນຳໃຊ້.</translation>
@@ -5062,11 +5098,11 @@
 <translation id="5473156705047072749">{NUM_CHARACTERS,plural, =1{PIN ຕ້ອງມີຢ່າງໜ້ອຍໜຶ່ງຕົວອັກສອນ}other{PIN ຕ້ອງມີຢ່າງໜ້ອຍ # ຕົວອັກສອນ}}</translation>
 <translation id="5474859849784484111"><ph name="MANAGER" /> ກຳນົດໃຫ້ທ່ານຕ້ອງເຊື່ອມຕໍ່ກັບ Wi-Fi ຕອນນີ້ ແລະ ດາວໂຫຼດການອັບເດດ. ຫຼື ດາວໂຫຼດຈາກການເຊື່ອມຕໍ່ແບບວັດແທກປະລິມານອິນເຕີເນັດ (ອາດເກັບຄ່າບໍລິການ).</translation>
 <translation id="5476016146231427848">ກະລຸນາຣີສະຕາດອຸປະກອນຂອງທ່ານເພື່ອໃຊ້ Steam ຢູ່ Chromebook</translation>
+<translation id="5476897066181964657">ພໍ່ແມ່ ຫຼື ຜູ້ປົກຄອງຕ້ອງເວົ້າວ່າທ່ານສາມາດເພີ່ມສ່ວນຂະຫຍາຍນີ້ໄດ້</translation>
 <translation id="5481273127572794904">ບໍ່ໄດ້ຮັບອະນຸຍາດໃຫ້ດາວໂຫຼດຫຼາຍໄຟລ໌ໂດຍອັດຕະໂນມັດ</translation>
 <translation id="5481941284378890518">ເພີ່ມເຄື່ອງພິມທີ່ຢູ່ໃກ້ຄຽງ</translation>
 <translation id="5483785310822538350">ຖອນຄືນ​ໄຟລ​໌​ ແລະ​ການ​ເຂົ້າຫາ​ອຸ​ປະ​ກອນ</translation>
 <translation id="5484772771923374861">{NUM_DAYS,plural, =1{<ph name="MANAGER" /> ກຳນົດໃຫ້ທ່ານສຳຮອງຂໍ້ມູນຂອງທ່ານໄວ້ ແລະ ສົ່ງ <ph name="DEVICE_TYPE" /> ນີ້ຄືນໃນມື້ນີ້. <ph name="LINK_BEGIN" />ເບິ່ງລາຍລະອຽດ<ph name="LINK_END" />}other{<ph name="MANAGER" /> ກຳນົດໃຫ້ທ່ານສຳຮອງຂໍ້ມູນຂອງທ່ານໄວ້ ແລະ ສົ່ງ <ph name="DEVICE_TYPE" /> ນີ້ຄືນພາຍໃນ {NUM_DAYS} ມື້. <ph name="LINK_BEGIN" />ເບິ່ງລາຍລະອຽດ<ph name="LINK_END" />}}</translation>
-<translation id="5485080380723335835">ລັອກ <ph name="DEVICE_TYPE" /> ຂອງທ່ານໄວ້ແລ້ວເພື່ອຄວາມປອດໄພ. ກະລຸນາປ້ອນລະຫັດຜ່ານຂອງທ່ານດ້ວຍຕົນເອງເພື່ອສືບຕໍ່.</translation>
 <translation id="5485102783864353244">ເພີ່ມ​ແອັບ</translation>
 <translation id="5485754497697573575">ຟື້ນ​ຄືນທຸກແຖບ</translation>
 <translation id="5486261815000869482">ຢືນ​ຢັນ​ລະ​ຫັດ​ຜ່ານ​</translation>
@@ -5163,6 +5199,9 @@
 <translation id="5559311991468302423">ລຶບທີ່ຢູ່</translation>
 <translation id="55601339223879446">ປັບຂອບເຂດເດັສທັອບຂອງທ່ານຢູ່ພາຍໃນຈໍສະແດງຜົນ</translation>
 <translation id="5561162485081632007">ກວດຫາ ແລະ ເຕືອນທ່ານກ່ຽວກັບເຫດການອັນຕະລາຍເມື່ອພວກມັນເກີດຂຶ້ນ</translation>
+<translation id="5561488201985846671"><ph name="BEGIN_PARAGRAPH1" />ການອະນຸຍາດໃຫ້ອຸປະກອນ ChromeOS ສົ່ງລາຍງານອັດຕະໂນມັດຈະຊ່ວຍໃຫ້ພວກເຮົາຈັດລຳດັບຄວາມສຳຄັນໄດ້ວ່າຈະແກ້ໄຂ ແລະ ປັບປຸງຫຍັງໃນ ChromeOS. ລາຍງານເຫຼົ່ານີ້ສາມາດຮວມເອົາຂໍ້ມູນຕ່າງໆ ເຊັ່ນ: ChromeOS ຫຼົ້ມຕອນໃດ, ມີການໃຊ້ຄຸນສົມບັດໃດ, ໂດຍປົກກະຕິແລ້ວໃຊ້ໜ່ວຍຄວາມຈຳເທົ່າໃດ ແລະ ຂໍ້ມູນການວິນິໄສ ແລະ ການນຳໃຊ້ແອັບ Android. ນອກຈາກນັ້ນ, ຂໍ້ມູນຮວມບາງຢ່າງຍັງຈະຊ່ວຍແອັບ ແລະ ຮຸ້ນສ່ວນຂອງ Google ນຳ ເຊັ່ນ: ນັກພັດທະນາ Android. ຂໍ້ມູນການວິນິໄສ ແລະ ການນຳໃຊ້ແອັບອື່ນໆ, ເຊິ່ງມີການຮວບຮວມກັນສຳລັບແອັບ Android ແລະ ເວັບແອັບ ຫາກມີການເປີດໃຊ້ການຊິ້ງແອັບ.<ph name="END_PARAGRAPH1" />
+    <ph name="BEGIN_PARAGRAPH2" />ທ່ານສາມາດເລີ່ມ ຫຼື ຢຸດການອະນຸຍາດລາຍງານເຫຼົ່ານີ້ຕອນໃດກໍໄດ້ໃນການຕັ້ງຄ່າອຸປະກອນ ChromeOS ຂອງລູກທ່ານ. ຫາກທ່ານເປັນຜູ້ເບິ່ງແຍງລະບົບໂດເມນ, ທ່ານສາມາດປ່ຽນການຕັ້ງຄ່ານີ້ໄດ້ໃນຄອນໂຊນຂອງຜູ້ເບິ່ງແຍງ.<ph name="END_PARAGRAPH2" />
+    <ph name="BEGIN_PARAGRAPH4" />ຫາກມີການເປີດໃຊ້ການເຄື່ອນໄຫວເວັບ ແລະ ແອັບສຳລັບບັນຊີ Google ຂອງລູກທ່ານໄວ້, ຂໍ້ມູນຂອງລູກທ່ານອາດຖືກບັນທຶກໄວ້ໃນບັນຊີ Google ຂອງເຂົາເຈົ້າ. ສຶກສາເພີ່ມເຕີມກ່ຽວກັບການຕັ້ງຄ່າເຫຼົ່ານີ້ ແລະ ວິທີປັບແກ້ພວກມັນໄດ້ຢູ່ families.google.com.<ph name="END_PARAGRAPH4" /></translation>
 <translation id="5562781907504170924">ແຖບນີ້ຖືກເຊື່ອມຕໍ່ກັບອຸປະກອນ Bluetooth.</translation>
 <translation id="556321030400250233">ໄຟລ໌ໃນເຄື່ອງ ຫຼື ທີ່ແບ່ງປັນ</translation>
 <translation id="5563234215388768762">ຊອກຫາໃນ Google ຫຼື ພິມ URL</translation>
@@ -5269,7 +5308,6 @@
 <translation id="5656845498778518563">ສົ່ງຄຳຕິຊົມຫາ Google</translation>
 <translation id="5657156137487675418">ອະນຸຍາດຄຸກກີ້ທັງໝົດ</translation>
 <translation id="5657667036353380798">ສ່ວນຂະຫຍາຍທາງນອກຕ້ອງການໃຫ້ຕິດຕັ້ງ chrome ລຸ້ນ <ph name="MINIMUM_CHROME_VERSION" /> ຫຼືສູງກ່ວາ.</translation>
-<translation id="5658415415603568799">ເພື່ອເພີ່ມຄວາມປອດໄພ, Smart Lock ຈະຮ້ອງຂໍໃຫ້ທ່ານປ້ອນລະຫັດຜ່ານຂອງທ່ານຫຼັງຈາກ 20 ຊົ່ວໂມງ.</translation>
 <translation id="5659593005791499971">ອີເມວ</translation>
 <translation id="5662513737565158057">ປ່ຽນວ່າຈະໃຫ້ແອັບ Linux ເຮັດວຽກແນວໃດ.</translation>
 <translation id="5663459693447872156">ປ່ຽນໄປໃສ່ເຄື່ອງຄວາມກ້ວາງໂດຍອັດ​ຕະ​ໂນ​ມັດ</translation>
@@ -5287,6 +5325,7 @@
 <translation id="5678550637669481956">ການເຂົ້າເຖິງ <ph name="VOLUME_NAME" /> ເພື່ອອ່ານ ແລະຂຽນໄດ້​ຮັບ​ອະ​ນຸ​ຍາດແລ້ວ​.</translation>
 <translation id="5678821117681811450">ກຳລັງສົ່ງຫາ <ph name="WEB_DRIVE" /></translation>
 <translation id="5678955352098267522">ອ່ານ​ຂໍ້​ມູນ​ຂອງ​ທ່ານ​ຢູ່​ເທິງ <ph name="WEBSITE_1" /></translation>
+<translation id="5679785611070310751">ທ່ານຈະຢຸດໄດ້ຮັບການອັບເດດຄວາມປອດໄພສຳລັບ Chromebook ເຄື່ອງນີ້ໃນ <ph name="MONTH_AND_YEAR" />. ຮອດເວລາໃນການອັບເກຣດຄວາມປອດໄພ ແລະ ຊອບແວເປັນເວີຊັນຫຼ້າສຸດແລ້ວ. ມີຂໍ້ກຳນົດຂໍ້ສະເໜີ.</translation>
 <translation id="5680050361008726776">ລຶບ "<ph name="ESIM_PROFILE_NAME" />" ອອກບໍ?</translation>
 <translation id="5683806393796685434">ກະລຸນາປ້ອນລະຫັດການເປີດນຳໃຊ້ຂອງທ່ານ</translation>
 <translation id="5684181005476681636">ລາຍລະອຽດ Wi-Fi</translation>
@@ -5335,7 +5374,6 @@
 <translation id="5723967018671998714">ບລັອກຄຸກກີ້ພາກສ່ວນທີສາມໃນໂໝດບໍ່ເປິດເຜີຍຕົວຕົນ</translation>
 <translation id="5724642200346111167">ລະບົບຈະລຶບລ້າງຂໍ້ມູນເວັບໄຊອອກຈາກອຸປະກອນຂອງທ່ານເມື່ອທ່ານປິດໜ້າຈໍທັງໝົດ</translation>
 <translation id="5727728807527375859">ສ່ວນຂະຫຍາຍ, ແອັບ, ແລະເທມສາມາດທໍາລາຍຄອມພິວເຕີຂອງທ່ານໄດ້. ທ່ານແນ່ໃຈບໍວ່າ ທ່ານຕ້ອງການສືບຕໍ່?</translation>
-<translation id="5728235544432023605">ສົ່ງສັນຍານບໍ່ຕອບສະໜອງ. ຢຸດຈາກ <ph name="DEVICE_NAME" />.</translation>
 <translation id="5728450728039149624">ຕົວເລືອກການລັອກໜ້າຈໍ Smart Lock</translation>
 <translation id="5729712731028706266">ເບິ່ງ</translation>
 <translation id="5731247495086897348">ແປະໃສ່ ແລະຄົ້ນຫາ</translation>
@@ -5409,6 +5447,7 @@
 <translation id="5794786537412027208">ອອກທຸກແອັບ Chrome</translation>
 <translation id="5796485699458186843">ແ&amp;ຖບ​ບໍ່ເປີດເຜີຍຕົວຕົນໃໝ່</translation>
 <translation id="5797521893972859201">ລຶບລ້າງປະຫວັດ, ຮວມທັງໃນກ່ອງຊອກຫາ</translation>
+<translation id="5797934230382081317">ສຶກສາວິທີເລີ່ມຕົ້ນຢູ່ &lt;a target='_blank' href='<ph name="LINK_ANDROID" />'&gt;Android&lt;/a&gt; ແລະ &lt;a target='_blank' href='<ph name="LINK_IOS" />'&gt;iOS&lt;/a&gt;</translation>
 <translation id="5798079537501238810">ເວັບໄຊສາມາດຕິດຕັ້ງຕົວຈັດການການຈ່າຍເງິນໄດ້</translation>
 <translation id="579915268381781820">ຖອດກະແຈຄວາມປອດໄພອອກແລ້ວ.</translation>
 <translation id="5799478978078236781">ຮັບເຄັດລັບ, ຂໍ້ສະເໜີ ແລະ ການອັບເດດກ່ຽວກັບ <ph name="DEVICE_TYPE" /> ແລະ ແບ່ງປັນຄຳຕິຊົມ.</translation>
@@ -5463,6 +5502,7 @@
 <translation id="5841270259333717135">ຕັ້ງຄ່າອີເທີເນັດ</translation>
 <translation id="5842497610951477805">ເປີດນຳໃຊ້ Bluetooth</translation>
 <translation id="5844574845205796324">ແນະນຳເນື້ອຫາໃໝ່ເພື່ອໃຫ້ສຳຫຼວດເບິ່ງ</translation>
+<translation id="5845424750482472447">{COUNT,plural, =1{1 ປຸ່ມທີ່ແມັບໃໝ່}other{{COUNT} ປຸ່ມທີ່ແມັບໃໝ່}}</translation>
 <translation id="5846200638699387931">ຂໍ້ຜິດພາດທາງໄວຍະກອນທີ່ກ່ຽວຂ້ອງ: <ph name="ERROR_LINE" /></translation>
 <translation id="5846455742152785308">ບໍ່ມີເງົາ</translation>
 <translation id="5846504156837627898">ຈັດການການອະນຸຍາດເວັບໄຊ</translation>
@@ -5479,6 +5519,7 @@
 <translation id="5857090052475505287">ໂຟລເດີ​ໃຫມ່</translation>
 <translation id="5857171483910641802">ລະບົບແນະນຳທາງລັດອີງຕາມເວັບໄຊທີ່ທ່ານມັກເຂົ້າເບິ່ງ</translation>
 <translation id="5857675236236529683">ເມື່ອທ່ານພ້ອມແລ້ວ, ໃຫ້ຊອກຫາລາຍຊື່ການອ່ານຂອງທ່ານຢູ່ບ່ອນນີ້</translation>
+<translation id="5857693745746757503">ປະຢັດຢ່າງໜ້ອຍ $50 ເມື່ອຊື້ Chromebook ເຄື່ອງໃໝ່, ອັບເກຣດເລີຍມື້ນີ້.</translation>
 <translation id="5858490737742085133">ອຸປະກອນປາຍທາງ</translation>
 <translation id="585979798156957858">ເມຕາພາຍນອກ</translation>
 <translation id="5860033963881614850">ປິດ</translation>
@@ -5587,6 +5628,7 @@
 <translation id="5945002094477276055"><ph name="FILE_NAME" /> ອາດເປັນອັນຕະລາຍ. ສົ່ງໄປໃຫ້ Google Safe Browsing ສະແກນບໍ?</translation>
 <translation id="5945363896952315544">ກະແຈຄວາມປອດໄພຂອງທ່ານບໍ່ສາມາດຈັດເກັບລາຍນິ້ວມືເພີ່ມເຕີມໄດ້ແລ້ວ. ເພື່ອເພີ່ມລາຍນິ້ວມືໃໝ່, ໃຫ້ລຶບລາຍນິ້ວມືທີ່ມີຢູ່ກ່ອນແລ້ວອອກກ່ອນ.</translation>
 <translation id="5946591249682680882">ID ບົດລາຍງານ <ph name="WEBRTC_LOG_REPORT_ID" /></translation>
+<translation id="5948476936444935795">ຍົກເລີກການນຳເຂົ້າ</translation>
 <translation id="5948536763493709626">ເຊື່ອມຕໍ່ແປ້ນພິມ ຫຼື ເມົ້າ ຫຼື ສືບຕໍ່ຕັ້ງຄ່າໂດຍໃຊ້ໜ້າຈໍສຳຜັດຂອງທ່ານ. ຫາກທ່ານກຳລັງໃຊ້ອຸປະກອນ Bluetooth ຢູ່, ໃຫ້ກວດສອບວ່າອຸປະກອນຂອງທ່ານພ້ອມຈັບຄູ່ແລ້ວ.</translation>
 <translation id="5949544233750246342">ບໍ່ສາມາດແຍກວິເຄາະໄຟລ໌ໄດ້</translation>
 <translation id="5951303645598168883"><ph name="ORIGIN" /> ຕ້ອງການໃຊ້ຟອນໃນເຄື່ອງ</translation>
@@ -5735,7 +5777,6 @@
 <translation id="6078323886959318429">ເພີ່ມທາງລັດ</translation>
 <translation id="6078742430369906859">ການເຊື່ອມຕໍ່ຢູ່ "<ph name="NETWORK_ID" />" ອາດຖືກຈຳກັດ</translation>
 <translation id="6078752646384677957">ກະລຸນາກວດເບິ່ງໄມໂຄຣໂຟນ ແລະ ລະດັບສຽງຂອງທ່ານ.</translation>
-<translation id="6078769373519310690">"<ph name="CHROME_EXTENSION_NAME" />" ຕ້ອງການເຊື່ອມຕໍ່ກັບອຸປະກອນ HID</translation>
 <translation id="6079162143107623965">ເວັບໄຊທີ່ທ່ານກຳລັງເບິ່ງຢູ່ສາມາດຝັງເນື້ອຫາຈາກເວັບໄຊອື່ນໆໄດ້, ເຊັ່ນ: ຮູບ, ໂຄສະນາ ແລະ ຂໍ້ຄວາມ. ເວັບໄຊທີ່ຝັງເຫຼົ່ານີ້ສາມາດບັນທຶກຂໍ້ມູນໃສ່ອຸປະກອນຂອງທ່ານໄດ້.</translation>
 <translation id="608029822688206592">ບໍ່ພົບເຄືອຂ່າຍ. ກະລຸນາໃສ່ SIM ຂອງທ່ານແລ້ວລອງໃໝ່.</translation>
 <translation id="6080689532560039067">ກວດ​ເບິ່ງເວ​ລາ​ລະ​ບົບ​ຂອງ​ທ່ານ</translation>
@@ -5843,6 +5884,7 @@
 <translation id="6177412385419165772">ກຳລັງລຶບອອກ…</translation>
 <translation id="6178664161104547336">ເລືອກ​ໃບ​ຢັ້ງ​ຢືນ​</translation>
 <translation id="6178682841350631965">ອັບເດດຂໍ້ມູນການເຂົ້າສູ່ລະບົບຂອງທ່ານແລ້ວ</translation>
+<translation id="6179893151569852357">ປ່ຽນແປງປຸ່ມ F ເປັນປຸ່ມແຖວເທິງສຸດຂອງ ChromeOS</translation>
 <translation id="6180510783007738939">ເຄື່ອງມືເສັ້ນ</translation>
 <translation id="6180550893222597997">ທ່ານຕ້ອງການໃຊ້ກະແຈຜ່ານໃດສຳລັບ <ph name="APP_NAME" />?</translation>
 <translation id="6181431612547969857">ບລັອກດາວໂຫຼດແລ້ວ</translation>
@@ -5986,7 +6028,6 @@
 <translation id="630948338437014525">ຄວາມຊົງຈຳ</translation>
 <translation id="6309510305002439352">ປິດໄມໂຄຣໂຟນແລ້ວ</translation>
 <translation id="6310141306111263820">ບໍ່ສາມາດຕິດຕັ້ງໂປຣໄຟລ໌ eSIM ໄດ້. ກະລຸນາຕິດຕໍ່ຜູ້ໃຫ້ບໍລິການຂອງທ່ານເພື່ອຂໍຄວາມຊ່ວຍເຫຼືອ.</translation>
-<translation id="6311165245110979290">ບັດສະເໝືອນສາມາດໃຊ້ໄດ້</translation>
 <translation id="6311220991371174222">ບໍ່ສາມາດເລີ່ມ Chrome ໄດ້ເພາະວ່າມີບາງຢ່າງຜິດພາດໃນເວລາເປີດໂປຣໄຟລ໌ຂອງທ່ານ. ກະລຸນາລອງປິດເປີດ Chrome ຄືນໃໝ່.</translation>
 <translation id="6312567056350025599">{NUM_DAYS,plural, =1{ດຳເນີນການກວດສອບຄວາມປອດໄພເມື່ອ 1 ມື້ກ່ອນ}other{ດຳເນີນການກວດສອບຄວາມປອດໄພເມື່ອ {NUM_DAYS} ມື້ກ່ອນ}}</translation>
 <translation id="6312638141433622592">ສະເໜີສະແດງບົດຄວາມໃນໂໝດຜູ້ອ່ານ, ເມື່ອຮອງຮັບ</translation>
@@ -6043,6 +6084,7 @@
 <translation id="636850387210749493">ການລົງທະບຽນວິສາຫະກິດ</translation>
 <translation id="6370021412472292592">ບໍ່​ສາ​ມາດ​ໂຫຼດໃບລາຍການໄດ້​.</translation>
 <translation id="637135143619858508">ຫ່າງ</translation>
+<translation id="6372856076511744743">ປຸ້ມແປ້ນພິມ Remap</translation>
 <translation id="6374077068638737855">Iceweasel</translation>
 <translation id="6374469231428023295">ລອງໃໝ່ອີກ</translation>
 <translation id="6374635887697228982">ຮັບສ່ວນຫຼຸດບໍ?</translation>
@@ -6355,6 +6397,7 @@
 <translation id="6647690760956378579">ຕົວຢ່າງສຽງທຳມະຊາດ</translation>
 <translation id="6648911618876616409">ການອັບເດດທີ່ສຳຄັນພ້ອມໃຫ້ຕິດຕັ້ງແລ້ວ. ກະລຸນາເຂົ້າສູ່ລະບົບເພື່ອເລີ່ມຕົ້ນ.</translation>
 <translation id="6649018507441623493">ຖ້າບຶດໜຶ່ງ...</translation>
+<translation id="6650206238642452078">ຕິດຕາມເຫດການໃນລະບົບ ChromeOS</translation>
 <translation id="665061930738760572">ເປີດ​ຢູ່​ໃນໜ້າ​ຕ່າງ​ໃຫມ່</translation>
 <translation id="6651237644330755633">ເຊື່ອຖືໃບຢັ້ງຢືນນີ້ສຳລັບການລະບຸເວັບໄຊ</translation>
 <translation id="6651495917527016072">ຊິ້ງຂໍ້ມູນເຄືອຂ່າຍ Wi-Fi ກັບໂທລະສັບຂອງທ່ານ. <ph name="LINK_BEGIN" />ສຶກສາເພີ່ມເຕີມ<ph name="LINK_END" /></translation>
@@ -6485,6 +6528,7 @@
 <translation id="677646486571529447">ເພີ່ມໝາຍເຫດ</translation>
 <translation id="6776589734354015877">ຮັບຄຸນສົມບັດເພີ່ມເຕີມ</translation>
 <translation id="6776729248872343918">ເປີດການນຳໃຊ້ການຈັບຄູ່ດ່ວນ</translation>
+<translation id="677778081766640955">ກົດປຸ່ມຄ້າງໄວ້ເພື່ອສະຫຼັບລະຫວ່າງປຸ່ມ F ແລະ ຄຳສັ່ງ ChromeOS</translation>
 <translation id="6777817260680419853">ບລັອກການປ່ຽນເສັ້ນທາງແລ້ວ</translation>
 <translation id="6779092717724412415">ເພື່ອສ້າງໄຮໄລ້ແບບນີ້, ໃຫ້ເລືອກຂໍ້ຄວາມໃດກໍໄດ້ແລ້ວຄລິກຂວາ.</translation>
 <translation id="6779447100905857289">ກະຕ່າຂອງທ່ານ</translation>
@@ -6555,6 +6599,7 @@
 <translation id="6823174134746916417">ແຕະເພື່ອຄລິກແຜ່ນສຳຜັດ</translation>
 <translation id="6824564591481349393">ກັອບປີ້ທີ່ຢູ່ອີເມວ</translation>
 <translation id="6824584962142919697">&amp;ກວດກາອົງປະກອບ</translation>
+<translation id="6824725898506587159">ຈັດການພາ​ສາ</translation>
 <translation id="6825184156888454064">ຮຽງຕາມຊື່</translation>
 <translation id="6826872289184051766">ຢັ້ງຢືນຜ່ານ USB</translation>
 <translation id="6827121912381363404">ອະນຸຍາດສ່ວນຂະຫຍາຍທັງໝົດໃຫ້ອ່ານ ແລະ ປ່ຽນ <ph name="PERMITTED_SITE" /> ໄດ້</translation>
@@ -6679,7 +6724,6 @@
 <translation id="6925127338315966709">ທ່ານກຳລັງເພີ່ມໂປຣໄຟລ໌ທີ່ມີການຈັດການໄປໃສ່ໂປຣແກຣມທ່ອງເວັບນີ້. ຜູ້ເບິ່ງແຍງລະບົບຂອງທ່ານສາມາດຄວບຄຸມໂປຣໄຟລ໌ ແລະ ເຂົ້າເຖິງຂໍ້ມູນຂອງມັນໄດ້. ຜູ້ເບິ່ງແຍງລະບົບຂອງທ່ານສາມາດຊິ້ງຂໍ້ມູນ ແລະ ຈັດການບຸກມາກ, ປະຫວັດ, ລະຫັດຜ່ານ ແລະ ການຕັ້ງຄ່າອື່ນໆຂອງທ່ານໄດ້.</translation>
 <translation id="6929126689972602640">ບໍ່ຮອງຮັບການຄວບຄຸມຂອງພໍ່ແມ່ສຳລັບບັນຊີໂຮງຮຽນ. ເພື່ອເພີ່ມບັນຊີໂຮງຮຽນເພື່ອເຂົ້າເຖິງ Google ຫ້ອງຮຽນ ແລະ ເວັບໄຊອື່ນສຳລັບການເຮັດວຽກບ້ານຢູ່ເຮືອນ, ກະລຸນາເຂົ້າສູ່ລະບົບດ້ວຍບັນຊີສ່ວນຕົວຂອງເດັກກ່ອນ. ທ່ານສາມາດເພີ່ມບັນຊີໂຮງຮຽນໄດ້ໃນພາຍຫຼັງໃນການຕັ້ງຄ່າ.</translation>
 <translation id="6929760895658557216">Okay Google</translation>
-<translation id="6930036377490597025">ລະຫັດຄວາມປອດໄພພາຍນອກ ຫຼື ເຊັນເຊີໃນຕົວ</translation>
 <translation id="6930161297841867798">{NUM_EXTENSIONS,plural, =1{ປະຕິເສດສ່ວນຂະຫຍາຍໜຶ່ງລາຍການແລ້ວ}other{ປະຕິເສດສ່ວນຂະຫຍາຍ # ລາຍການແລ້ວ}}</translation>
 <translation id="6931690462168617033">ຄວາມແຮງການຄລິກ</translation>
 <translation id="6935286146439255109">ບໍ່ມີຖາດເຈ້ຍ</translation>
@@ -6766,7 +6810,6 @@
 <translation id="7000347579424117903">ລວມມີ Ctrl, Alt ຫຼື ຊອກຫາ</translation>
 <translation id="7001036685275644873">ກຳລັງສຳຮອງແອັບ ແລະ ໄຟລ໌ Linux</translation>
 <translation id="7001066449188684145">ຈຳເປັນຕ້ອງມີການລະບຸຕົວຕົນເພື່ອພິມຫາ <ph name="PRINTER_NAME" />. ກະລຸນາຕິດຕໍ່ຜູ້ເບິ່ງແຍງລະບົບຂອງທ່ານ.</translation>
-<translation id="7002055706763150362">ເພື່ອ​ຕັ້ງ Smart Lock ສຳ​ລັບ Chromebook, Google ຕ້ອງ​ແນ່​ໃຈ​ວ່າ ມັນ​ແມ່ນ​ທ່ານ--ພິມ​ລະ​ຫັດ​ຜ່ານ​ຂອງ​ທ່ານ ເພື່ອ​ເລີ່ມ​ຕົ້ນ.</translation>
 <translation id="7003339318920871147">ຖານ​ຂໍ້​ມູນ​ເວັບ​ໄຊ​ທ໌</translation>
 <translation id="7003454175711353260">{COUNT,plural, =1{{COUNT} ໄຟລ​໌}other{{COUNT} ໄຟລ໌}}</translation>
 <translation id="7003705861991657723">Alpha</translation>
@@ -6803,6 +6846,7 @@
 <translation id="7025190659207909717">ການຈັດການເລື່ອງການບໍລິການຂໍ້ມູນມືຖື</translation>
 <translation id="7025895441903756761">ຄວາມປອດໄພ ແລະ ຄວາມເປັນສ່ວນຕົວ</translation>
 <translation id="7027258625819743915">{COUNT,plural, =0{ເປີດທັງໝົດໃນ&amp;ໜ້າຈໍທີ່ບໍ່ເປີດເຜີຍຕົວຕົນ}=1{ເປີດໃນ&amp;ໜ້າຈໍທີ່ບໍ່ເປີດເຜີຍຕົວຕົນ}other{ເປີດທັງໝົດ ({COUNT}) ໃນ&amp;ໜ້າຈໍທີ່ບໍ່ເປີດເຜີຍຕົວຕົນ}}</translation>
+<translation id="7028057921476386252">ພໍ່ແມ່ ຫຼື ຜູ້ປົກຄອງຕ້ອງເວົ້າວ່າທ່ານສາມາດເປີດການນຳໃຊ້ສ່ວນຂະຫຍາຍນີ້ໄດ້</translation>
 <translation id="7029307918966275733">ບໍ່ໄດ້ຕິດຕັ້ງ Crostini ກະລຸນາຕິດຕັ້ງ Crostini ເພື່ອເບິ່ງເຄຣດິດ.</translation>
 <translation id="7029809446516969842">ລະ​ຫັດ​ຜ່ານ</translation>
 <translation id="7030304022046916278">ສົ່ງ URL ໄປໃຫ້ Safe Browsing ກວດເບິ່ງພວກມັນ</translation>
@@ -6817,6 +6861,7 @@
 <translation id="7039326228527141150">ເຂົ້າ​ຫາ​ອຸ​ປະ​ກອນ USB ຈາກ <ph name="VENDOR_NAME" /></translation>
 <translation id="7039912931802252762">ລົງຊື່ເຂົ້າ​ໃຊ້ Microsoft Smart Card</translation>
 <translation id="7039951224110875196">ສ້າງບັນຊີ Google ສຳລັບເດັກ</translation>
+<translation id="7039968672732182060">Chromebook ຂອງທ່ານບໍ່ໄດ້ຮັບການອັບເດດຄວາມປອດໄພອີກຕໍ່ໄປ. ຮອດເວລາໃນການອັບເກຣດຄວາມປອດໄພ ແລະ ຊອບແວເປັນເວີຊັນຫຼ້າສຸດແລ້ວ. ມີຂໍ້ກຳນົດຂໍ້ສະເໜີ.</translation>
 <translation id="7041405817194720353">ລຶບ <ph name="PERMISSION_1" />, <ph name="PERMISSION_2" /> ແລະ ອີກ <ph name="COUNT" /> ລາຍການອອກແລ້ວ</translation>
 <translation id="7042116641003232070">ອະນຸຍາດໃຫ້ບັນທຶກຂໍ້ມູນໃສ່ອຸປະກອນຂອງທ່ານແລ້ວ</translation>
 <translation id="7043108582968290193">ສຳເລັດແລ້ວ! ບໍ່ມີພົບແອັບພລິເຄຊັນທີ່ບໍ່ເຂົ້າກັນໃດໆ.</translation>
@@ -7048,6 +7093,7 @@
 <translation id="7272674038937250585">ບໍ່ມີລາຍລະອຽດທີ່ໃຫ້ໄວ້</translation>
 <translation id="7273110280511444812">ຄັດຕິດ​ຫຼ້າ​ສຸດ​ໃນ​ວັນ​ທີ <ph name="DATE" /></translation>
 <translation id="727441411541283857"><ph name="PERCENTAGE" />% - <ph name="TIME" /> ຈົນ​ກ່​ວາ​ຈະ​ເຕັມ</translation>
+<translation id="727595954130325265">ຊື້ດຽວນີ້</translation>
 <translation id="727952162645687754">ດາວ​ໂຫລດ​ຜິດພາດ</translation>
 <translation id="7280041992884344566">ເກີດຄວາມຜິດພາດຂຶ້ນໃນຂະນະທີ່ Chrome ກຳລັງຊອກຫາຊອບແວອັນຕະລາຍ</translation>
 <translation id="7280649757394340890">ການຕັ້ງຄ່າສຽງສຳລັບການປ່ຽນຂໍ້ຄວາມເປັນສຽງເວົ້າ</translation>
@@ -7215,6 +7261,7 @@
 <translation id="7427315069950454694">ຄວາມຊົງຈຳຂອງທ່ານສຳລັບມື້ນີ້</translation>
 <translation id="7427348830195639090">ໜ້າພື້ນຫຼັງ: <ph name="BACKGROUND_PAGE_URL" /></translation>
 <translation id="7427798576651127129">ການໂທຈາກ <ph name="DEVICE_NAME" /></translation>
+<translation id="7429415133937917139">ຈຳລອງຜົນຮັບຂອງການສະແດງຜົນຕົວອັກສອນນູນສຳລັບຄົນຕາບອດທີ່ໂຫຼດຄືນໃໝ່ໄດ້ໃນແຜງ ChromeVox ຢູ່ເທິງສຸດຂອງໜ້າຈໍ</translation>
 <translation id="7431719494109538750">ບໍ່ພົບອຸປະກອນ HID ໃດ</translation>
 <translation id="7431991332293347422">ຄວບຄຸມວ່າຈະໃຫ້ໃຊ້ປະຫວັດການທ່ອງເວັບຂອງທ່ານແນວໃດເພື່ອປັບແຕ່ງການຊອກຫາ ແລະ ອື່ນໆອີກໃຫ້ເປັນແບບສ່ວນຕົວ</translation>
 <translation id="7432200167665670017">ຜູ້ເບິ່ງແຍງຂອງທ່ານບລັອກ "<ph name="EXTENSION_NAME" />" ໄວ້ແລ້ວ - App ID <ph name="EXTENSION_ID" /></translation>
@@ -7249,6 +7296,7 @@
 <translation id="7457831169406914076">{COUNT,plural, =1{ລິ້ງ}other{# ລິ້ງ}}</translation>
 <translation id="7458168200501453431">ໃຊ້ຕົວກວດການສະກົດຄໍາດຽວກັນກັບທີ່ໃຊ້ໃນ Google ຊອກຫາ. ລະບົບຈະສົ່ງຂໍ້ຄວາມທີ່ທ່ານພິມໃນໂປຣແກຣມທ່ອງເວັບໄປໃຫ້ Google.</translation>
 <translation id="7458715171471938198">ກູ້ຄືນແອັບບໍ?</translation>
+<translation id="7458933488302148148">ກວດສອບລະຫັດຜ່ານທີ່ບັນທຶກໄວ້ຂອງທ່ານເພື່ອເພີ່ມຄວາມປອດໄພຂອງທ່ານ ແລະ ໃຊ້ໂລກອອນລາຍຢ່າງປອດໄພຍິ່ງຂຶ້ນ</translation>
 <translation id="7460045493116006516">ຮູບແບບສີສັນປັດຈຸບັນທີ່ທ່ານໄດ້ຕິດຕັ້ງ</translation>
 <translation id="7461924472993315131">ປັກໝຸດ</translation>
 <translation id="746216226901520237">ຄັ້ງຕໍ່ໄປ, ໂທລະສັບຂອງທ່ານຈະປົດລັອກ <ph name="DEVICE_TYPE" /> ຂອງທ່ານ. ທ່ານສາມາດປິດ Smart Lock ໄດ້ໃນການຕັ້ງຄ່າ.</translation>
@@ -7376,6 +7424,8 @@
 <translation id="7575272930307342804">ການຄວບຄຸມການນຳທາງ</translation>
 <translation id="7576690715254076113">ລຽນລໍາດັບ</translation>
 <translation id="7576976045740938453">ເກີດບັນຫາກັບບັນຊີໂໝດສາທິດ.</translation>
+<translation id="7577048250795121670"><ph name="BEGIN_PARAGRAPH1" />ການອະນຸຍາດໃຫ້ອຸປະກອນ ChromeOS ຂອງທ່ານສົ່ງລາຍງານອັດຕະໂນມັດຈະຊ່ວຍໃຫ້ພວກເຮົາຈັດລຳດັບຄວາມສຳຄັນໄດ້ວ່າຈະແກ້ໄຂ ແລະ ປັບປຸງຫຍັງໃນ ChromeOS. ລາຍງານເຫຼົ່ານີ້ສາມາດຮວມເອົາຂໍ້ມູນຕ່າງໆ ເຊັ່ນ: ChromeOS ຫຼົ້ມຕອນໃດ, ມີການໃຊ້ຄຸນສົມບັດໃດ ແລະ ໂດຍປົກກະຕິແລ້ວທ່ານໃຊ້ໜ່ວຍຄວາມຈຳເທົ່າໃດ. ຂໍ້ມູນການວິນິໄສ ແລະ ການນຳໃຊ້ແອັບອື່ນໆ, ເຊິ່ງມີການຮວບຮວມກັນສຳລັບແອັບ Android ແລະ ເວັບແອັບ ຫາກມີການເປີດໃຊ້ການຊິ້ງແອັບ.<ph name="END_PARAGRAPH1" />
+    <ph name="BEGIN_PARAGRAPH2" />ທ່ານສາມາດເລີ່ມ ຫຼື ຢຸດການອະນຸຍາດລາຍງານເຫຼົ່ານີ້ຕອນໃດກໍໄດ້ໃນການຕັ້ງຄ່າອຸປະກອນ Chrome ຂອງທ່ານ. ຫາກທ່ານເປັນຜູ້ເບິ່ງແຍງລະບົບໂດເມນ, ທ່ານສາມາດປ່ຽນການຕັ້ງຄ່ານີ້ໄດ້ໃນຄອນໂຊນຂອງຜູ້ເບິ່ງແຍງ.<ph name="END_PARAGRAPH2" /></translation>
 <translation id="7578137152457315135">ການຕັ້ງຄ່າລາຍນິ້ວມື</translation>
 <translation id="7578692661782707876">ກະລຸນາປ້ອນລະຫັດການຢືນຢັນຂອງທ່ານ.</translation>
 <translation id="7581007437437492586">ມີການຕັ້ງຄ່ານະໂຍບາຍຖືກຕ້ອງແລ້ວ</translation>
@@ -7476,6 +7526,7 @@
 <translation id="7660146600670077843">ຄລິກຂວາໃສ່ແຖບໃດໜຶ່ງແລ້ວເລືອກ "ເພີ່ມແຖບໃສ່ກຸ່ມໃໝ່"</translation>
 <translation id="7661259717474717992">ອະ​ນຸ​ຍາດ​ໃຫ້​ເວັບໄຊ​ບັນທຶກ ແລະ ​ອ່ານ​ຂໍ້ມູນ​ຄຸກກີ້​ໄດ້</translation>
 <translation id="7661451191293163002">ບໍ່ສາມາດໄດ້ຮັບໃບຢັ້ງຢືນການລົງທະບຽນ.</translation>
+<translation id="7662164944369232556">ບໍ່ສາມາດດາວໂຫຼດໄຟລ໌ການຮັບຮູ້ຂໍ້ຄວາມໄດ້. ກະລຸນາລອງໃໝ່ໃນພາຍຫຼັງ.</translation>
 <translation id="7662283695561029522">ແຕະເພື່ອກຳນົດຄ່າ</translation>
 <translation id="7663719505383602579">ຕົວຮັບ: <ph name="ARC_PROCESS_NAME" /></translation>
 <translation id="7663774460282684730">ມີຄີລັດທີ່ສາມາດໃຊ້ໄດ້</translation>
@@ -7653,6 +7704,7 @@
 <translation id="780301667611848630">ບໍ່​, ​ຂອບ​ໃຈ</translation>
 <translation id="7804072833593604762">ປິດແຖບແລ້ວ</translation>
 <translation id="7805768142964895445">ສະ​ຖາ​ນະ​</translation>
+<translation id="7805906048382884326">ປິດເຄັດລັບ</translation>
 <translation id="7807067443225230855">ການຊອກຫາ ແລະ ຜູ້ຊ່ວຍ</translation>
 <translation id="7807117920154132308"><ph name="SUPERVISED_USER_NAME" /> ໄດ້ຕັ້ງຄ່າຜູ້ຊ່ວຍ Google ຢູ່ອຸປະກອນອື່ນໄປກ່ອນແລ້ວ. <ph name="SUPERVISED_USER_NAME" /> ສາມາດໃຊ້ປະໂຫຍດຈາກຜູ້ຊ່ວຍໄດ້ຫຼາຍຍິ່ງຂຶ້ນໂດຍການເປີດໃຊ້ບໍລິບົດໜ້າຈໍຢູ່ອຸປະກອນນີ້.</translation>
 <translation id="7807711621188256451">​ອະ​ນຸ​ຍາດ​ໃຫ້ <ph name="HOST" /> ເຂົ້າຫາກ້ອງ​ຖ່າຍ​ຮູບ​ຂອງ​ທ່ານທຸກຄັ້ງ</translation>
@@ -7720,11 +7772,13 @@
 <translation id="7870790288828963061">ບໍ່ພົບ​ແອັບ Kiosk ລຸ້ນ​ໃໝ່​ກວ່າ​ໃດ. ບໍ່​ມີ​ອັນ​ໃດ​ຈະ​ອັບ​ເດດ. ກະ​ລຸ​ນາ​ເອົາ USB ອອກ.</translation>
 <translation id="7871049986386271121">ຢູ່ໃນເວັບໄຊນີ້ສະເໝີ</translation>
 <translation id="7871109039747854576">ໃຊ້ປຸ່ມ <ph name="COMMA" /> ແລະ <ph name="PERIOD" /> ເພື່ອສົ່ງສັນຍານຕິດຕາມລາຍຊື່ຕົວເລືອກ</translation>
+<translation id="7871691770940645922">ການສະແດງຜົນໜັງສືໂພງສະເໝືອນຈິງ</translation>
 <translation id="787268756490971083">ປິດ</translation>
 <translation id="7872758299142009420">ມີກຸ່ມຊ້ອນກັນຫຼາຍເກີນໄປ: <ph name="ERROR_LINE" /></translation>
 <translation id="7874257161694977650">ພື້ນຫຼັງ Chrome</translation>
 <translation id="7876027585589532670">ບໍ່ສາມາດແກ້ໄຂທາງລັດໄດ້</translation>
 <translation id="7877451762676714207">ການຜິດພາດຂອງເຊີບເວີທີ່ບໍ່ຮູ້ຈັກ. ກະລຸນາລອງໃໝ່ອີກ, ຫຼືຕິດຕໍ່ຫາຜູ້ຄວບຄຸມເຊີບເວີ.</translation>
+<translation id="7878945852730162014">ຈັດການໄຟລ໌ເມື່ອດາວໂຫຼດ ແລະ ເປີດໄຟລ໌ເຫຼົ່ານັ້ນເມື່ອສຳເລັດ.</translation>
 <translation id="7879478708475862060">ປະຕິບັດຕາມໂໝດປ້ອນເຂົ້າ</translation>
 <translation id="7879631849810108578">ທາງລັດທີ່ຕັ້ງຄ່າ: <ph name="IDS_SHORT_SET_COMMAND" /></translation>
 <translation id="7880823633812189969">ຂໍ້ມູນພາຍໃນເຄື່ອງຈະຖືກລຶບເມື່ອທ່ານປິດເປີດຄືນໃໝ່</translation>
@@ -7808,7 +7862,6 @@
 <translation id="7943368935008348579">ດາວໂຫຼດ PDF</translation>
 <translation id="7943837619101191061">ເພີ່ມ​ທີ່ຕັ້ງ...</translation>
 <translation id="7944772052836377867">ການຊິ້ງຂໍ້ມູນຕ້ອງການຢັ້ງຢືນວ່າແມ່ນທ່ານແທ້</translation>
-<translation id="7945031593909029181">"<ph name="CHROME_EXTENSION_NAME" />" ຕ້ອງການເຊື່ອມຕໍ່</translation>
 <translation id="7945703887991230167">ສຽງທີ່ຕ້ອງການ</translation>
 <translation id="7946586320617670168">ຕົ້ນທາງຕ້ອງປອດໄພ</translation>
 <translation id="794676567536738329">ຢືນ​ຢັນ​ການ​ອະ​ນຸ​ຍາດ</translation>
@@ -7899,6 +7952,7 @@
 <translation id="8023133589013344428">ຈັດການພາສາໃນການຕັ້ງຄ່າ ChromeOS Flex</translation>
 <translation id="8023801379949507775">ອັບເດດສ່ວນຂະຫຍາຍດຽວນີ້</translation>
 <translation id="8025151549289123443">ໜ້າຈໍລັອກ ແລະ ການເຂົ້າສູ່ລະບົບ</translation>
+<translation id="8025291188699172126">ກ່ຽວກັບການອັບເດດ</translation>
 <translation id="8026334261755873520">ລຶບຂໍ້​ມູນການທ່ອງ​ເນັດ</translation>
 <translation id="8026471514777758216">ອຸປະກອນທັງໝົດຂອງທ່ານ</translation>
 <translation id="8027581147000338959">ເປີດໃນໜ້າຈໍໃໝ່</translation>
@@ -7995,6 +8049,7 @@
 <translation id="8097959162767603171">ກ່ອນອື່ນຜູ້ເບິ່ງແຍງລະບົບຂອງທ່ານຕ້ອງຍອມຮັບຂໍ້ກຳນົດການບໍລິການໃນລາຍຊື່ອຸປະກອນ Chrome ຂອງຄອນໂຊນຜູ້ເບິ່ງແຍງລະບົບ.</translation>
 <translation id="8098156986344908134">ຕິດຕັ້ງ <ph name="DEVICE_OS" /> ແລະ ລຶບຂໍ້ມູນໃນຮາດໄດຣຟ໌ອອກບໍ?</translation>
 <translation id="8098616321286360457">ຕ້ອງມີການເຊື່ອມຕໍ່ອິນເຕີເນັດ</translation>
+<translation id="8100230553590752325">ໃຊ້ລະຫັດຜ່ານທີ່ບັນທຶກໄວ້ຢູ່ອຸປະກອນໃດກໍໄດ້</translation>
 <translation id="810068641062493918">ເລືອກ <ph name="LANGUAGE" /> ແລ້ວ ກົດປຸ່ມຊອກຫາພ້ອມກັບປຸ່ມຍະຫວ່າງເພື່ອຍົກເລີກການເລືອກ.</translation>
 <translation id="8100972288595615768">ລຶບລ້າງຂໍ້ມູນເວັບໄຊ ແລະ ການອະນຸຍາດສຳລັບ <ph name="SITE_NAME" /> ບໍ?</translation>
 <translation id="8101409298456377967">ສ້າງ, ບັນທຶກ ແລະ ຈັດການລະຫັດຜ່ານຂອງທ່ານເພື່ອໃຫ້ທ່ານສາມາດເຂົ້າສູ່ລະບົບຫາເວັບໄຊ ແລະ ແອັບໄດ້ຢ່າງງ່າຍດາຍ. <ph name="BEGIN_LINK" />ສຶກສາເພີ່ມເຕີມ<ph name="END_LINK" /></translation>
@@ -8101,6 +8156,7 @@
 <translation id="8195027750202970175">ຂະໜາດໃນດິສ</translation>
 <translation id="8195191503358432289">ເພີ່ມ​ລະ​ຫັດ​ຜ່ານ</translation>
 <translation id="8195265224453131880">ຄວາມເຂັ້ມ</translation>
+<translation id="8195737548602430447">ແປພາສາຄຳບັນຍາຍເປັນພາສາເປົ້າໝາຍໂດຍອັດຕະໂນມັດ.</translation>
 <translation id="8197673340773315084">ເພີ່ມຊື່ ຫຼື ປ້າຍກຳກັບ, ເຊັ່ນ: ບ່ອນເຮັດວຽກ ຫຼື ສ່ວນຕົວ</translation>
 <translation id="8198456017687137612">ແຖບການສົ່ງສັນຍານ</translation>
 <translation id="8199300056570174101">ຄຸນລັກສະນະຂອງເຄືອຂ່າຍ (ການບໍລິການ) ແລະ ອຸປະກອນ</translation>
@@ -8218,6 +8274,7 @@
 <translation id="8291415872436043161">ດາວໂຫຼດ Chrome</translation>
 <translation id="8293206222192510085">ເພີ່ມບຸກມາກຄ໌</translation>
 <translation id="8294431847097064396">ແຫຼ່ງທີ່ມາ</translation>
+<translation id="8295449579927246485">ແປດ່ວນ</translation>
 <translation id="8298429963694909221">ຕອນນີ້ທ່ານສາມາດຮັບການແຈ້ງເຕືອນຈາກໂທລະສັບຂອງທ່ານໃນ <ph name="DEVICE_TYPE" /> ຂອງທ່ານໄດ້ແລ້ວ. ການປິດການແຈ້ງເຕືອນນີ້ໄວ້ໃນ <ph name="DEVICE_TYPE" /> ຂອງທ່ານຈະປິດພວກມັນໃນໂທລະສັບຂອງທ່ານໄວ້ນຳ. ກວດໃຫ້ແນ່ໃຈວ່າໂທລະສັບຂອງທ່ານຢູ່ໃກ້ ແລະ ເປີດ Bluetooth ແລະ Wi-Fi ແລ້ວ.</translation>
 <translation id="8299319456683969623">ປະ​ຈຸ​ບັນ​ທ່ານອອຟລາຍນ໌ຢູ່.</translation>
 <translation id="8300011035382349091">ແກ້ໄຂບຸກມາກສຳລັບແຖບນີ້</translation>
@@ -8285,6 +8342,7 @@
 <translation id="835951711479681002">ບັນທຶກໄວ້ໃນບັນຊີ Google ຂອງທ່ານ</translation>
 <translation id="8360140320636871023">ປັບແຕ່ງຮູບແບບສີສັນການສະແດງຜົນຂອງທ່ານໃຫ້ເປັນແບບສ່ວນຕົວ</translation>
 <translation id="8360267485906769442">ປຸ່ມສົ່ງຄຳຕິຊົມ</translation>
+<translation id="8362914115861174987">ແປພາສາເປັນ</translation>
 <translation id="8363095875018065315">​ຫມັ້ນ​ຄົງ</translation>
 <translation id="8363142353806532503">ບລັອກໄມໂຄຣໂຟນໄວ້ແລ້ວ</translation>
 <translation id="8366396658833131068">ການເຊື່ອມຕໍ່ເຄືອຂ່າຍຂອງທ່ານກັບຄືນມາແລ້ວ. ກະລຸນາເລືອກເຄືອຂ່າຍອື່ນ ຫຼືກົດປຸ່ມ 'ສືບຕໍ່' ຢູ່ລຸ່ມນີ້ ເພື່ອເປີດໃຊ້ແອັບ kiosk ຂອງທ່ານ.</translation>
@@ -8381,6 +8439,7 @@
 <translation id="8448729345478502352">ເຮັດໃຫ້ລາຍການຕ່າງໆໃນໜ້າຈໍຂອງທ່ານນ້ອຍລົງ ຫຼື ໃຫຍ່ຂຶ້ນ</translation>
 <translation id="8449008133205184768">ແປະໃສ່ ແລະຈັບຄູ່ຮູບແບບ</translation>
 <translation id="8449036207308062757">ຈັດການບ່ອນເກັບຂໍ້ມູນ</translation>
+<translation id="8449836157089738489">ເປີດທັງໝົດໃນກຸ່ມແຖບໃໝ່</translation>
 <translation id="845702320058262034">ບໍ່ສາມາດເຊື່ອມຕໍ່ໄດ້. ກວດໃຫ້ແນ່ໃຈວ່າ Bluetooth ຂອງໂທລະສັບຂອງທ່ານເປີດຢູ່.</translation>
 <translation id="8457451314607652708">ນໍາບຸກມາກສ໌ເຂົ້າມາ</translation>
 <translation id="8458341576712814616">ທາງລັດ</translation>
@@ -8407,6 +8466,7 @@
 <translation id="8472623782143987204">ຮາດແວສໍາຮອງໄວ້</translation>
 <translation id="8473540203671727883">ເວົ້າຂໍ້ຄວາມຢູ່ກ້ອງເມົ້າ</translation>
 <translation id="8473863474539038330">ທີ່ຢູ່ ແລະ ອື່ນໆອີກ</translation>
+<translation id="8474733733775441349">ສະແດງລະຫັດຜ່ານຈາກບັນຊີ Google ຂອງທ່ານ</translation>
 <translation id="8475313423285172237">ໂປຣແກຼມອື່ນຢູ່ໃນຄອມພິວເຕີຂອງທ່ານໄດ້ເພີ່ມສ່ວນຂະຫຍາຍທີ່ອາດຈະປ່ຽນແປງວິທີການເຮັດວຽກຂອງ Chrome ແລ້ວ.</translation>
 <translation id="8476408756881832830">ຢຸດການຫຼິ້ນໄວ້ຊົ່ວຄາວ ເມື່ອ ChromeVox ກຳລັງເວົ້າ</translation>
 <translation id="8476491056950015181"><ph name="BEGIN_PARAGRAPH1" />ການອະນຸຍາດໃຫ້ອຸປະກອນ ChromeOS ສົ່ງລາຍງານອັດຕະໂນມັດຈະຊ່ວຍໃຫ້ພວກເຮົາຈັດລຳດັບຄວາມສຳຄັນໄດ້ວ່າຈະແກ້ໄຂ ແລະ ປັບປຸງຫຍັງໃນ ChromeOS. ລາຍງານເຫຼົ່ານີ້ສາມາດຮວມເອົາຂໍ້ມູນຕ່າງໆ ເຊັ່ນ: ChromeOS ຫຼົ້ມຕອນໃດ, ມີການໃຊ້ຄຸນສົມບັດໃດ, ໂດຍປົກກະຕິແລ້ວໃຊ້ໜ່ວຍຄວາມຈຳເທົ່າໃດ ແລະ ຂໍ້ມູນການວິນິໄສ ແລະ ການນຳໃຊ້ແອັບ Android. ຂໍ້ມູນຮວມບາງຢ່າງຈະຊ່ວຍແອັບ ແລະ ຮຸ້ນສ່ວນຂອງ Google ໄດ້ນຳ, ເຊັ່ນ: ນັກພັດທະນາ Android.<ph name="END_PARAGRAPH1" />
@@ -8823,6 +8883,7 @@
 <translation id="8846163936679269230">ຣີເຊັດໂປຣໄຟລ໌ eSIM</translation>
 <translation id="8846239054091760429">ສຽງໂມໂນ, ສະຕາດອັບ, ຄຳບັນຍາຍສົດ ແລະ ອື່ນໆ</translation>
 <translation id="8847988622838149491">USB</translation>
+<translation id="8848963863312877204">ຊອກຫາໄຟລ໌ດາວໂຫຼດຂອງທ່ານຢູ່ບ່ອນນີ້</translation>
 <translation id="8849001918648564819">ເຊື່ອງໄວ້</translation>
 <translation id="8849219423513870962">ຍົກເລີກການລຶບໂປຣໄຟລ໌ eSIM ຊື່ <ph name="PROFILE_NAME" /> ອອກ</translation>
 <translation id="8849262417389398097"><ph name="CHECKED" /> ຈາກທັງໝົດ <ph name="CHECKING" /></translation>
@@ -9003,6 +9064,7 @@
 <translation id="9008828754342192581">ກ່ອນໜ້ານີ້ທ່ານເລືອກອະນຸຍາດສ່ວນຂະຫຍາຍທັງໝົດຢູ່ <ph name="ORIGIN" /></translation>
 <translation id="9009369504041480176">ກໍາລັງອັບ​ໂຫຼດ ( <ph name="PROGRESS_PERCENT" /> %​)...</translation>
 <translation id="9009708085379296446">ທ່ານຕັ້ງໃຈຈະປ່ຽນໜ້ານີ້ບໍ?</translation>
+<translation id="9010845741772269259">ເພີ່ມວິທີການຈ່າຍເງິນ</translation>
 <translation id="9011163749350026987">ສະແດງໄອຄອນສະເໝີ</translation>
 <translation id="9011262023858991985">ກຳລັງສົ່ງສັນຍານແຖບນີ້</translation>
 <translation id="9011393886518328654">ບັນທຶກການປ່ຽນແປງ</translation>
@@ -9051,6 +9113,7 @@
 <translation id="904224458472510106">ການດຳເນີນການນີ້ບໍ່ສາມາດຍົກເລີກໄດ້</translation>
 <translation id="9042827002460091668">ກະລຸນາກວດສອບການເຊື່ອມຕໍ່ອິນເຕີເນັດຂອງທ່ານແລ້ວລອງໃໝ່</translation>
 <translation id="9042893549633094279">ຄວາມເປັນສ່ວນຕົວ ແລະ ຄວາມປອດໄພ</translation>
+<translation id="9043264199499366189">ຕິດຕາມເຫດການໃນລະບົບ ChromeOS Flex</translation>
 <translation id="9044646465488564462">​ເຊື່ອມ​ຕໍ່​ກັບ​ເຄືອ​ຂ່າຍບໍ່ໄດ້​: <ph name="DETAILS" /></translation>
 <translation id="9045160989383249058">ຍ້າຍລາຍຊື່ການອ່ານຂອງທ່ານໄປໃສ່ແຜງຄວບຄຸມດ້ານຂ້າງໃໝ່ແລ້ວ. ລອງໃຊ້ມັນຢູ່ບ່ອນນີ້.</translation>
 <translation id="9045430190527754450">ສົ່ງທີ່ຢູ່ເວັບຂອງໜ້າທີ່ທ່ານກຳລັງພະຍາຍາມເຂົ້າຫາໃຫ້ Google</translation>
@@ -9090,6 +9153,7 @@
 <translation id="907779190626433918">ໃຊ້ລະຫັດຜ່ານທີ່ບໍ່ຊ້ຳກັນສຳລັບແຕ່ລະເວັບໄຊ ຫຼື ແອັບ. ຫາກມີບຸກຄົນອື່ນຮູ້ລະຫັດຜ່ານທີ່ທ່ານໃຊ້ຊ້ຳ, ອາດມີການນຳເອົາລະຫັດຜ່ານນັ້ນໄປໃຊ້ເພື່ອເຂົ້າເຖິງບັນຊີອື່ນໆຂອງທ່ານໄດ້.</translation>
 <translation id="9078193189520575214">ກຳລັງນຳໃຊ້ການປ່ຽນແປງ...</translation>
 <translation id="9078316009970372699">ປິດການນຳໃຊ້ການປ່ອຍສັນຍານທັນທີ</translation>
+<translation id="9078546160009814724">ຊື່ຜູ້ໃຊ້: <ph name="USERNAME" /></translation>
 <translation id="9079267182985899251">ໃນໄວໆນີ້ລະບົບຈະບໍ່ຮອງຮັບຕົວເລືອກນີ້ອີກຕໍ່ໄປ. ເພື່ອນຳສະເໜີແຖບ, ກະລຸນາໃຊ້ <ph name="GOOGLE_MEET" />.</translation>
 <translation id="9080175821499742274">ຕົວປະຢັດໜ່ວຍຄວາມຈຳຈະສ້າງພື້ນທີ່ຫວ່າງໃນໜ່ວຍຄວາມຈຳຈາກແຖບທີ່ບໍ່ເຮັດວຽກເພື່ອໃຫ້ມັນສາມາດຖືກໃຊ້ໄດ້ໂດຍແຖບທີ່ເຮັດວຽກ ແລະ ແອັບອື່ນໆ.</translation>
 <translation id="9080971985541434310">ຄາດຄະເນຄວາມສົນໃຈຂອງທ່ານ - Chrome ສາມາດຄາດຄະເນຄວາມສົນໃຈຂອງທ່ານໄດ້</translation>
@@ -9260,7 +9324,6 @@
 <translation id="934244546219308557">ຕັ້ງຊື່ໃຫ້ກຸ່ມນີ້</translation>
 <translation id="934503638756687833">ລາຍການທີ່ບໍ່ລະບຸຢູ່ບ່ອນນີ້ຈະຖືກລຶບອອກເຊັ່ນກັນ ຖ້າຈຳເປັນ. ສຶກສາເພີ່ມເຕີມກ່ຽວກັບ &lt;a href="<ph name="URL" />"&gt;ການປົກປ້ອງຊອບແວທີ່ບໍ່ຕ້ອງການ&lt;/a&gt; ໃນເອກະສານຂາວວ່າດ້ວຍຄວາມເປັນສ່ວນຕົວຂອງ Chrome.</translation>
 <translation id="93480724622239549">ຂໍ້ບົກພ່ອງ ຫຼື ຂໍ້ຜິດພາດ</translation>
-<translation id="935854577147268200">ປ່ຽນໂທລະສັບ Smart Lock ແລ້ວ ປ້ອນລະຫັດຜ່ານຂອງທ່ານເພື່ອອັບເດດ Smart Lock. ຄັ້ງຕໍ່ໄປ, ໂທລະສັບຂອງທ່ານຈະປົດລັອກ <ph name="DEVICE_TYPE" /> ຂອງທ່ານ. ທ່ານສາມາດປິດ Smart Lock ໄດ້ໃນການຕັ້ງຄ່າ</translation>
 <translation id="936646668635477464">ກ້ອງ ແລະ ໄມໂຄຣໂຟນ</translation>
 <translation id="936801553271523408">ຂໍ້ມູນກວດວິເຄາະລະບົບ</translation>
 <translation id="93766956588638423">ສ້ອມ​ແປງສ່ວນຂະ​ຫຍາຍ​</translation>

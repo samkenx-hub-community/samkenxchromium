@@ -5,7 +5,7 @@
 <translation id="1028699632127661925">Mengirim ke <ph name="DEVICE_NAME" />...</translation>
 <translation id="103269572468856066">Hapus data dari situs dan aplikasi ini juga?</translation>
 <translation id="1034259925032978114">Jendela terbuka</translation>
-<translation id="1036348656032585052">Matikan</translation>
+<translation id="1036348656032585052">Nonaktifkan</translation>
 <translation id="1045899828449635435">Hapus data dari situs ini juga?</translation>
 <translation id="1049743911850919806">Samaran</translation>
 <translation id="1058669287135776095">Anda offline. Periksa koneksi internet Anda, lalu coba lagi.</translation>
@@ -60,7 +60,7 @@ Hanya orang yang memiliki frasa sandi Anda yang dapat membaca data terenkripsi A
 <translation id="1273937721055267968">Blokir <ph name="DOMAIN" /></translation>
 <translation id="1283039547216852943">Ketuk untuk meluaskan</translation>
 <translation id="1285310382777185058">Ubah bahasa</translation>
-<translation id="1291207594882862231">Menghapus histori, cookie, data situs, cache...</translation>
+<translation id="1291207594882862231">Hapus histori, cookie, data situs, cache...</translation>
 <translation id="129553762522093515">Baru saja ditutup</translation>
 <translation id="1298077576058087471">Hemat data hingga 60%, baca berita hari ini</translation>
 <translation id="1303339473099049190">Tidak dapat menemukan sandi tersebut. Periksa ejaan sandi dan coba lagi.</translation>
@@ -214,7 +214,7 @@ Jika Anda menghapus histori penjelajahan, baik semua histori maupun histori untu
 <translation id="2189903024544168260">Minat dihapus</translation>
 <translation id="2194856509914051091">Hal-hal yang perlu dipertimbangkan</translation>
 <translation id="2200113223741723867">Kelola pembagian data penggunaan</translation>
-<translation id="2218567645332692482">Mengupgrade navigasi ke HTTPS dan memperingatkan Anda sebelum memuat situs yang tidak mendukungnya</translation>
+<translation id="2218567645332692482">Upgrade navigasi ke HTTPS dan peringatkan Anda sebelum memuat situs yang tidak mendukungnya</translation>
 <translation id="2227444325776770048">Lanjutkan sebagai <ph name="USER_FULL_NAME" /></translation>
 <translation id="2230777942707397948">Jendela kosong</translation>
 <translation id="223356358902285214">Aktivitas Web &amp; Aplikasi</translation>
@@ -737,6 +737,7 @@ Untuk mengubah setelan ini, <ph name="BEGIN_LINK" />reset sinkronisasi<ph name="
 <translation id="5001388021414335527">Ikuti situs ini di sini</translation>
 <translation id="5004416275253351869">Kontrol aktivitas Google</translation>
 <translation id="5005498671520578047">Salin sandi</translation>
+<translation id="5010886807652684893">Tampilan visual</translation>
 <translation id="5011311129201317034"><ph name="SITE" /> ingin terhubung</translation>
 <translation id="5016205925109358554">Serif</translation>
 <translation id="5017529052065664584">15 menit terakhir</translation>
@@ -794,6 +795,7 @@ Untuk mengubah setelan ini, <ph name="BEGIN_LINK" />reset sinkronisasi<ph name="
 <translation id="5342314432463739672">Permintaan izin</translation>
 <translation id="53537532693258630">Situs yang Anda hapus akan muncul di sini</translation>
 <translation id="5355191726083956201">Perlindungan yang Ditingkatkan aktif</translation>
+<translation id="5361107212971249203">teks</translation>
 <translation id="5368227114232678694">Untuk menjelajah secara pribadi di perangkat ini, coba mode Samaran</translation>
 <translation id="5375577065097716013">Telusuri dengan Lens <ph name="BEGIN_NEW" />Baru<ph name="END_NEW" /></translation>
 <translation id="5401851137404501592">Untuk melanjutkan, <ph name="IDENTITY_PROVIDER_ETLD_PLUS_ONE" /> akan membagikan nama, alamat email, dan foto profil Anda ke situs ini.</translation>
@@ -1191,6 +1193,7 @@ Misalnya, beberapa situs web mungkin menanggapi permintaan ini dengan menayangka
 <translation id="7454641608352164238">Tidak cukup ruang</translation>
 <translation id="7455988709578031708">Berdasarkan histori penjelajahan Anda. Setelan ini aktif.</translation>
 <translation id="7456774706094330779">Pramuat ekstensif</translation>
+<translation id="7466431077154602932">Tampilan ringkas</translation>
 <translation id="7474822150871987353">Pelajari topik di situs tanpa meninggalkan halaman. Pilih satu atau beberapa kata di halaman untuk menelusurinya.</translation>
 <translation id="7475192538862203634">Jika masalah ini sering terjadi, coba <ph name="BEGIN_LINK" />saran<ph name="END_LINK" /> berikut.</translation>
 <translation id="7475688122056506577">Kartu SD tidak ditemukan. Beberapa file Anda mungkin tidak tersimpan.</translation>
@@ -1320,6 +1323,7 @@ Misalnya, beberapa situs web mungkin menanggapi permintaan ini dengan menayangka
 <translation id="8058746566562539958">Buka di tab Chrome baru</translation>
 <translation id="8062594758852531064">Pramuat ekstensif:</translation>
 <translation id="8063895661287329888">Gagal menambahkan bookmark.</translation>
+<translation id="8066816452984416180">Bookmark halaman ini dengan cepat. Sentuh lama untuk mengedit pintasan ini.</translation>
 <translation id="806745655614357130">Tetap pisahkan data saya</translation>
 <translation id="8073388330009372546">Buka gambar di tab baru</translation>
 <translation id="8076492880354921740">Tab</translation>
@@ -1351,6 +1355,7 @@ Misalnya, beberapa situs web mungkin menanggapi permintaan ini dengan menayangka
 <translation id="8216351761227087153">Tonton</translation>
 <translation id="8218622182176210845">Kelola akun Anda</translation>
 <translation id="8223642481677794647">Menu kartu feed</translation>
+<translation id="8236097722223016103">Tambahkan ke bookmark</translation>
 <translation id="8250920743982581267">Dokumen</translation>
 <translation id="8255617931166444521">Situs hanya dapat menggunakan cookie Anda untuk melihat aktivitas penjelajahan Anda di situs itu sendiri</translation>
 <translation id="8259179246279078674">Karena halaman yang dipramuat terenkripsi, Google tidak akan mempelajari apa pun tentang konten halaman yang dipramuat. Server Google akan mempelajari situs mana yang dipramuat secara pribadi. Informasi ini hanya digunakan untuk melakukan pramuat halaman tersebut dan tidak akan ditautkan ke informasi lain dari Akun Google Anda.</translation>
@@ -1498,6 +1503,7 @@ Misalnya, beberapa situs web mungkin menanggapi permintaan ini dengan menayangka
 <translation id="8989968390305463310">Histori penjelajahan Anda memengaruhi iklan yang Anda lihat dan minat yang diperkirakan di bawah. Untuk melindungi privasi Anda, Chrome otomatis menghapus minat Anda secara berkala setiap bulan. Minat dapat diperbarui kecuali jika Anda menghapusnya.</translation>
 <translation id="8993760627012879038">Membuka tab baru dalam mode Samaran</translation>
 <translation id="8996847606757455498">Pilih penyedia lain</translation>
+<translation id="8998289560386111590">Tidak tersedia di perangkat Anda</translation>
 <translation id="8998729206196772491">Anda akan login dengan akun yang dikelola oleh <ph name="MANAGED_DOMAIN" /> dan memberikan kontrol data Chrome kepada administratornya. Data akan terikat dengan akun ini secara permanen. Bila Anda logout dari Chrome, data akan dihapus dari perangkat ini, tetapi data tetap tersimpan di Akun Google.</translation>
 <translation id="9022774213089566801">Sering dikunjungi</translation>
 <translation id="9022871169049522985">Situs dan pengiklan dapat mengukur performa iklannya</translation>

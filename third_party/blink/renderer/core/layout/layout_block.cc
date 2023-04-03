@@ -49,19 +49,18 @@
 #include "third_party/blink/renderer/core/layout/box_layout_extra_input.h"
 #include "third_party/blink/renderer/core/layout/hit_test_location.h"
 #include "third_party/blink/renderer/core/layout/hit_test_result.h"
-#include "third_party/blink/renderer/core/layout/layout_flexible_box.h"
 #include "third_party/blink/renderer/core/layout/layout_flow_thread.h"
-#include "third_party/blink/renderer/core/layout/layout_grid.h"
 #include "third_party/blink/renderer/core/layout/layout_inline.h"
 #include "third_party/blink/renderer/core/layout/layout_multi_column_flow_thread.h"
 #include "third_party/blink/renderer/core/layout/layout_multi_column_spanner_placeholder.h"
 #include "third_party/blink/renderer/core/layout/layout_object_factory.h"
 #include "third_party/blink/renderer/core/layout/layout_object_inlines.h"
-#include "third_party/blink/renderer/core/layout/layout_table_cell.h"
 #include "third_party/blink/renderer/core/layout/layout_theme.h"
 #include "third_party/blink/renderer/core/layout/layout_view.h"
 #include "third_party/blink/renderer/core/layout/line/inline_text_box.h"
+#include "third_party/blink/renderer/core/layout/ng/flex/layout_ng_flexible_box.h"
 #include "third_party/blink/renderer/core/layout/ng/legacy_layout_tree_walking.h"
+#include "third_party/blink/renderer/core/layout/ng/mathml/layout_ng_mathml_block.h"
 #include "third_party/blink/renderer/core/layout/ng/ng_constraint_space.h"
 #include "third_party/blink/renderer/core/layout/ng/ng_length_utils.h"
 #include "third_party/blink/renderer/core/layout/ng/ng_physical_box_fragment.h"
@@ -111,26 +110,14 @@ TrackedContainerMap& GetPositionedContainerMap() {
   return *map;
 }
 
-// This map keeps track of the descendants whose 'height' is percentage
-// associated with a containing block. Like |gPositionedDescendantsMap|, it is
-// also recomputed for every layout (see the comment above about why).
-static TrackedDescendantsMap& GetPercentHeightDescendantsMap() {
-  DEFINE_STATIC_LOCAL(Persistent<TrackedDescendantsMap>, map,
-                      (MakeGarbageCollected<TrackedDescendantsMap>()));
-  return *map;
-}
-
 LayoutBlock::LayoutBlock(ContainerNode* node)
     : LayoutBox(node),
-      has_margin_before_quirk_(false),
-      has_margin_after_quirk_(false),
       has_markup_truncation_(false),
       width_available_to_children_changed_(false),
       height_available_to_children_changed_(false),
       is_self_collapsing_(false),
       descendants_with_floats_marked_for_layout_(false),
       has_positioned_objects_(false),
-      has_percent_height_descendants_(false),
       has_svg_text_descendants_(false),
       pagination_state_changed_(false),
       is_legacy_initiated_out_of_flow_layout_(false) {
@@ -152,15 +139,6 @@ void LayoutBlock::RemoveFromGlobalMaps() {
     for (LayoutBox* descendant : *descendants) {
       DCHECK_EQ(GetPositionedContainerMap().at(descendant), this);
       GetPositionedContainerMap().erase(descendant);
-    }
-  }
-  if (HasPercentHeightDescendants()) {
-    TrackedLayoutBoxLinkedHashSet* descendants =
-        GetPercentHeightDescendantsMap().Take(this);
-    DCHECK(!descendants->empty());
-    for (LayoutBox* descendant : *descendants) {
-      DCHECK_EQ(descendant->PercentHeightContainer(), this);
-      descendant->SetPercentHeightContainer(nullptr);
     }
   }
   if (has_svg_text_descendants_) {
@@ -330,7 +308,7 @@ void LayoutBlock::AddChildBeforeDescendant(LayoutObject* new_child,
     if (new_child->IsInline() ||
         (new_child->IsFloatingOrOutOfFlowPositioned() &&
          (StyleRef().IsDeprecatedFlexboxUsingFlexLayout() ||
-          (!IsFlexibleBoxIncludingNG() && !IsLayoutGridIncludingNG()))) ||
+          (!IsFlexibleBoxIncludingNG() && !IsLayoutNGGrid()))) ||
         before_descendant->Parent()->SlowFirstChild() != before_descendant) {
       before_descendant_container->AddChild(new_child, before_descendant);
     } else {
@@ -374,7 +352,7 @@ void LayoutBlock::AddChild(LayoutObject* new_child,
   if (new_child->IsInline() ||
       (new_child->IsFloatingOrOutOfFlowPositioned() &&
        (StyleRef().IsDeprecatedFlexboxUsingFlexLayout() ||
-        (!IsFlexibleBoxIncludingNG() && !IsLayoutGridIncludingNG())))) {
+        (!IsFlexibleBoxIncludingNG() && !IsLayoutNGGrid())))) {
     // If we're inserting an inline child but all of our children are blocks,
     // then we have to make sure it is put into an anomyous block box. We try to
     // use an existing anonymous box if possible, otherwise a new one is created
@@ -405,9 +383,6 @@ void LayoutBlock::RemoveLeftoverAnonymousBlock(LayoutBlock* child) {
   DCHECK(!child->ChildrenInline());
   DCHECK_EQ(child->Parent(), this);
 
-  if (child->Continuation())
-    return;
-
   // Promote all the leftover anonymous block's children (to become children of
   // this block instead). We still want to keep the leftover block in the tree
   // for a moment, for notification purposes done further below (flow threads
@@ -417,11 +392,6 @@ void LayoutBlock::RemoveLeftoverAnonymousBlock(LayoutBlock* child) {
   // Remove all the information in the flow thread associated with the leftover
   // anonymous block.
   child->RemoveFromLayoutFlowThread();
-
-  // LayoutGrid keeps track of its children, we must notify it about changes in
-  // the tree.
-  if (child->Parent()->IsLayoutGrid())
-    To<LayoutGrid>(child->Parent())->DirtyGrid();
 
   // Now remove the leftover anonymous block from the tree, and destroy it.
   // We'll rip it out manually from the tree before destroying it, because we
@@ -487,8 +457,8 @@ bool LayoutBlock::UpdateLogicalWidthAndColumnWidth() {
 
 void LayoutBlock::UpdateBlockLayout(bool) {
   NOT_DESTROYED();
-  NOTREACHED();
   ClearNeedsLayout();
+  NOTREACHED_NORETURN();
 }
 
 void LayoutBlock::AddVisualOverflowFromChildren() {
@@ -584,17 +554,6 @@ void LayoutBlock::AddVisualOverflowFromBlockChildren() {
         child->IsOutOfFlowPositioned() || child->IsColumnSpanAll())
       continue;
 
-    // If the child contains inline with outline and continuation, its
-    // visual overflow computed during its layout might be inaccurate because
-    // the layout of continuations might not be up-to-date at that time.
-    // Re-add overflow from inline children to ensure its overflow covers
-    // the outline which may enclose continuations.
-    auto* child_block_flow = DynamicTo<LayoutBlockFlow>(child);
-    if (child_block_flow &&
-        child_block_flow->ContainsInlineWithOutlineAndContinuation() &&
-        !child_block_flow->ChildPrePaintBlockedByDisplayLock()) {
-      child_block_flow->AddVisualOverflowFromInlineChildren();
-    }
     AddVisualOverflowFromChild(*child);
   }
 }
@@ -606,18 +565,6 @@ void LayoutBlock::AddLayoutOverflowFromBlockChildren() {
     if ((!IsLayoutNGContainingBlock(this) && child->IsFloating()) ||
         child->IsOutOfFlowPositioned() || child->IsColumnSpanAll())
       continue;
-
-    // If the child contains inline with outline and continuation, its
-    // visual overflow computed during its layout might be inaccurate because
-    // the layout of continuations might not be up-to-date at that time.
-    // Re-add overflow from inline children to ensure its overflow covers
-    // the outline which may enclose continuations.
-    auto* child_block_flow = DynamicTo<LayoutBlockFlow>(child);
-    if (child_block_flow &&
-        child_block_flow->ContainsInlineWithOutlineAndContinuation() &&
-        !child_block_flow->ChildPrePaintBlockedByDisplayLock()) {
-      child_block_flow->AddLayoutOverflowFromInlineChildren();
-    }
 
     AddLayoutOverflowFromChild(*child);
   }
@@ -675,112 +622,12 @@ void LayoutBlock::UpdateBlockChildDirtyBitsBeforeLayout(bool relayout_children,
   if (relayout_children ||
       (has_relative_logical_height && !IsA<LayoutView>(this)) ||
       (height_available_to_children_changed_ &&
-       ChangeInAvailableLogicalHeightAffectsChild(this, child)) ||
-      (child.IsListMarker() && IsListItem() &&
-       To<LayoutBlockFlow>(this)->ContainsFloats())) {
+       ChangeInAvailableLogicalHeightAffectsChild(this, child))) {
     if (child.IsLayoutNGObject())
       child.SetSelfNeedsLayoutForAvailableSpace(true);
     else
       child.SetChildNeedsLayout(kMarkOnlyThis);
   }
-}
-
-void LayoutBlock::SimplifiedNormalFlowLayout() {
-  NOT_DESTROYED();
-  if (ChildrenInline()) {
-    SECURITY_DCHECK(IsLayoutBlockFlow());
-    auto* block_flow = To<LayoutBlockFlow>(this);
-    block_flow->SimplifiedNormalFlowInlineLayout();
-  } else {
-    for (LayoutBox* box = FirstChildBox(); box; box = box->NextSiblingBox()) {
-      if (!box->IsOutOfFlowPositioned()) {
-        if (box->IsLayoutMultiColumnSpannerPlaceholder())
-          To<LayoutMultiColumnSpannerPlaceholder>(box)
-              ->MarkForLayoutIfObjectInFlowThreadNeedsLayout();
-        box->LayoutIfNeeded();
-      }
-    }
-  }
-}
-
-bool LayoutBlock::SimplifiedLayout() {
-  NOT_DESTROYED();
-  // Check if we need to do a full layout.
-  if (NormalChildNeedsLayout() || SelfNeedsLayout())
-    return false;
-
-  // Check that we actually need to do a simplified layout.
-  if (!PosChildNeedsLayout() &&
-      !(NeedsSimplifiedNormalFlowLayout() || NeedsPositionedMovementLayout()))
-    return false;
-
-  {
-    // LayoutState needs this deliberate scope to pop before paint invalidation.
-    LayoutState state(*this);
-
-    if (NeedsPositionedMovementLayout() &&
-        !TryLayoutDoingPositionedMovementOnly())
-      return false;
-
-    // If this block is inside a multicol container, we may not be able to
-    // perform simplified layout.
-    if (LayoutFlowThread* flow_thread = FlowThreadContainingBlock()) {
-      if (!flow_thread->CanSkipLayout(*this))
-        return false;
-    }
-    // Additionally, if this block itself establishes a multicol container, we
-    // may not be able to perform simplified layout inside it. This is really
-    // only unsafe if there are spanners in there, but let's just bail.
-    if (const auto* block_flow = DynamicTo<LayoutBlockFlow>(this)) {
-      if (block_flow->MultiColumnFlowThread())
-        return false;
-    }
-
-    if (ChildLayoutBlockedByDisplayLock())
-      return false;
-
-    TextAutosizer::LayoutScope text_autosizer_layout_scope(this);
-
-    // Lay out positioned descendants or objects that just need to recompute
-    // overflow.
-    if (NeedsSimplifiedNormalFlowLayout())
-      SimplifiedNormalFlowLayout();
-
-    // Lay out our positioned objects if our positioned child bit is set.
-    // Also, if an absolute position element inside a relative positioned
-    // container moves, and the absolute element has a fixed position child
-    // neither the fixed element nor its container learn of the movement since
-    // posChildNeedsLayout() is only marked as far as the relative positioned
-    // container. So if we can have fixed pos objects in our positioned objects
-    // list check if any of them are statically positioned and thus need to move
-    // with their absolute ancestors.
-    bool can_contain_fixed_pos_objects = CanContainFixedPositionObjects();
-    if (PosChildNeedsLayout() || NeedsPositionedMovementLayout() ||
-        can_contain_fixed_pos_objects)
-      LayoutPositionedObjects(
-          false, NeedsPositionedMovementLayout()
-                     ? kForcedLayoutAfterContainingBlockMoved
-                     : (!PosChildNeedsLayout() && can_contain_fixed_pos_objects
-                            ? kLayoutOnlyFixedPositionedObjects
-                            : kDefaultLayout));
-
-    // Recompute our overflow information.
-    // FIXME: We could do better here by computing a temporary overflow object
-    // from layoutPositionedObjects and only updating our overflow if we either
-    // used to have overflow or if the new temporary object has overflow.
-    // For now just always recompute overflow. This is no worse performance-wise
-    // than the old code that called rightmostPosition and lowestPosition on
-    // every relayout so it's not a regression. computeOverflow expects the
-    // bottom edge before we clamp our height. Since this information isn't
-    // available during simplifiedLayout, we cache the value in m_overflow.
-    LayoutUnit old_client_after_edge = LayoutClientAfterEdge();
-    ComputeLayoutOverflow(old_client_after_edge, true);
-  }
-
-  UpdateAfterLayout();
-  ClearNeedsLayout();
-
-  return true;
 }
 
 void LayoutBlock::MarkFixedPositionObjectForLayoutIfNeeded(
@@ -917,8 +764,7 @@ void LayoutBlock::LayoutPositionedObject(LayoutBox* positioned_object,
   LayoutUnit logical_top_estimate;
   bool is_paginated = View()->GetLayoutState()->IsPaginated();
   bool needs_block_direction_location_set_before_layout =
-      is_paginated &&
-      positioned_object->GetLegacyPaginationBreakability() != kForbidBreaks;
+      is_paginated && !positioned_object->IsMonolithic();
   bool bogus_logical_top_estimate = false;
   if (needs_block_direction_location_set_before_layout) {
     // Out-of-flow objects are normally positioned after layout (while in-flow
@@ -967,30 +813,6 @@ void LayoutBlock::LayoutPositionedObject(LayoutBox* positioned_object,
 
   if (positioned_object->NeedsLayout())
     positioned_object->UpdateLayout();
-
-  LayoutObject* parent = positioned_object->Parent();
-  bool layout_changed = false;
-  if ((parent->IsLayoutNGFlexibleBox() &&
-       !positioned_object->IsLayoutNGObject() &&
-       LayoutFlexibleBox::SetStaticPositionForChildInFlexNGContainer(
-           *positioned_object, To<LayoutBlock>(parent))) ||
-      (parent->IsFlexibleBox() &&
-       To<LayoutFlexibleBox>(parent)->SetStaticPositionForPositionedLayout(
-           *positioned_object))) {
-    // The static position of an abspos child of a flexbox depends on its size
-    // (for example, they can be centered). So we may have to reposition the
-    // item after layout.
-    // TODO(cbiesinger): We could probably avoid a layout here and just
-    // reposition?
-    positioned_object->ForceLayout();
-    layout_changed = true;
-  }
-
-  // Lay out again if our estimate was wrong.
-  if (!layout_changed && needs_block_direction_location_set_before_layout &&
-      logical_top_estimate != LogicalTopForChild(*positioned_object)) {
-    positioned_object->ForceLayout();
-  }
 
   if (is_paginated)
     UpdateFragmentationInfoForChild(*positioned_object);
@@ -1077,7 +899,7 @@ void LayoutBlock::RemovePositionedObject(LayoutBox* o) {
 
 bool LayoutBlock::IsAnonymousNGFieldsetContentWrapper() const {
   NOT_DESTROYED();
-  return Parent() && Parent()->IsLayoutNGFieldset() && IsAnonymous();
+  return Parent() && Parent()->IsFieldset() && IsAnonymous();
 }
 
 void LayoutBlock::InvalidatePaint(
@@ -1179,60 +1001,6 @@ void LayoutBlock::RemovePositionedObjects(
   }
 }
 
-void LayoutBlock::AddPercentHeightDescendant(LayoutBox* descendant) {
-  NOT_DESTROYED();
-  // A replaced object is incapable of properly acting as a containing block for
-  // its children. This is an issue with VIDEO elements, for instance, which
-  // insert some percentage height flexbox children. It is also very easily
-  // achievable with a foreignObject inside an SVG. Detect this situation and
-  // bail. The assumption is that there is no situation where we require quirky
-  // percentage height behavior inside replaced content.
-  if (UNLIKELY(descendant->Container()->IsLayoutReplaced()))
-    return;
-
-  if (descendant->PercentHeightContainer()) {
-    if (descendant->PercentHeightContainer() == this) {
-      DCHECK(HasPercentHeightDescendant(descendant));
-      return;
-    }
-    descendant->RemoveFromPercentHeightContainer();
-  }
-  descendant->SetPercentHeightContainer(this);
-
-  // Mark our containing block chain as potentially having a percent height
-  // descendant.
-  LayoutBlock* cb = descendant->ContainingBlock();
-  while (cb) {
-    cb->SetMaybeHasPercentHeightDescendant();
-    if (cb == this)
-      break;
-    cb = cb->ContainingBlock();
-  }
-
-  auto it = GetPercentHeightDescendantsMap().find(this);
-  TrackedLayoutBoxLinkedHashSet* descendant_set =
-      it != GetPercentHeightDescendantsMap().end() ? &*it->value : nullptr;
-  if (!descendant_set) {
-    descendant_set = MakeGarbageCollected<TrackedLayoutBoxLinkedHashSet>();
-    GetPercentHeightDescendantsMap().Set(this, descendant_set);
-  }
-  descendant_set->insert(descendant);
-
-  has_percent_height_descendants_ = true;
-}
-
-void LayoutBlock::RemovePercentHeightDescendant(LayoutBox* descendant) {
-  NOT_DESTROYED();
-  if (TrackedLayoutBoxLinkedHashSet* descendants = PercentHeightDescendants()) {
-    descendants->erase(descendant);
-    descendant->SetPercentHeightContainer(nullptr);
-    if (descendants->empty()) {
-      GetPercentHeightDescendantsMap().erase(this);
-      has_percent_height_descendants_ = false;
-    }
-  }
-}
-
 void LayoutBlock::AddSvgTextDescendant(LayoutBox& svg_text) {
   NOT_DESTROYED();
   DCHECK(IsA<LayoutNGSVGText>(svg_text));
@@ -1257,34 +1025,6 @@ void LayoutBlock::RemoveSvgTextDescendant(LayoutBox& svg_text) {
   if (descendants->empty()) {
     map.erase(this);
     has_svg_text_descendants_ = false;
-  }
-}
-
-TrackedLayoutBoxLinkedHashSet* LayoutBlock::PercentHeightDescendantsInternal()
-    const {
-  NOT_DESTROYED();
-  auto it = GetPercentHeightDescendantsMap().find(this);
-  return it != GetPercentHeightDescendantsMap().end() ? &*it->value : nullptr;
-}
-
-void LayoutBlock::DirtyForLayoutFromPercentageHeightDescendants(
-    SubtreeLayoutScope& layout_scope) {
-  NOT_DESTROYED();
-  TrackedLayoutBoxLinkedHashSet* descendants = PercentHeightDescendants();
-  if (!descendants)
-    return;
-
-  for (LayoutBox* box : *descendants) {
-    DCHECK(box->IsDescendantOf(this));
-    while (box != this) {
-      if (box->NormalChildNeedsLayout())
-        break;
-      layout_scope.SetChildNeedsLayout(box);
-      box = box->ContainingBlock();
-      DCHECK(box);
-      if (!box)
-        break;
-    }
   }
 }
 
@@ -1393,8 +1133,9 @@ PositionWithAffinity LayoutBlock::PositionForPointRespectingEditingBoundaries(
     const PhysicalOffset& point_in_parent_coordinates) const {
   NOT_DESTROYED();
   PhysicalOffset child_location = child.PhysicalLocation();
-  if (child.IsInFlowPositioned())
-    child_location += child.OffsetForInFlowPosition();
+  if (child.IsStickyPositioned()) {
+    child_location += child.StickyPositionOffset();
+  }
 
   PhysicalOffset point_in_child_coordinates =
       point_in_parent_coordinates - child_location;
@@ -1553,8 +1294,9 @@ MinMaxSizes LayoutBlock::ComputeIntrinsicLogicalWidths() const {
     if (default_inline_size != kIndefiniteSize) {
       sizes.max_size += default_inline_size;
       // <textarea>'s intrinsic size should ignore scrollbar existence.
-      if (IsTextAreaIncludingNG())
+      if (IsTextArea()) {
         sizes -= scrollbar_thickness;
+      }
       if (!StyleRef().LogicalWidth().IsPercentOrCalc())
         sizes.min_size = sizes.max_size;
       return sizes;
@@ -1582,16 +1324,6 @@ MinMaxSizes LayoutBlock::ComputeIntrinsicLogicalWidths() const {
   if (UNLIKELY(IsListBox(this) && StyleRef().LogicalWidth().IsPercentOrCalc()))
     child_sizes.min_size = LayoutUnit();
 
-  if (IsTableCellLegacy()) {
-    Length table_cell_width =
-        To<LayoutTableCell>(this)->StyleOrColLogicalWidth();
-    if (table_cell_width.IsFixed() && table_cell_width.Value() > 0) {
-      child_sizes.max_size = std::max(
-          child_sizes.min_size, AdjustContentBoxLogicalWidthForBoxSizing(
-                                    LayoutUnit(table_cell_width.Value())));
-    }
-  }
-
   sizes += child_sizes;
   return sizes;
 }
@@ -1606,9 +1338,7 @@ MinMaxSizes LayoutBlock::PreferredLogicalWidths() const {
   // values for width.
   const ComputedStyle& style_to_use = StyleRef();
   if (!IsTableCell() && style_to_use.LogicalWidth().IsFixed() &&
-      style_to_use.LogicalWidth().Value() >= 0 &&
-      !(IsFlexItemCommon() && Parent()->StyleRef().IsDeprecatedWebkitBox() &&
-        !style_to_use.LogicalWidth().IntValue())) {
+      style_to_use.LogicalWidth().Value() >= 0) {
     sizes = AdjustBorderBoxLogicalWidthForBoxSizing(
         LayoutUnit(style_to_use.LogicalWidth().Value()));
   } else {
@@ -1893,22 +1623,6 @@ LayoutUnit LayoutBlock::BaselinePosition(
     LayoutUnit baseline_pos = (IsWritingModeRoot() && !IsRubyRun())
                                   ? LayoutUnit(-1)
                                   : InlineBlockBaseline(direction);
-
-    if (IsDeprecatedFlexibleBox()) {
-      // Historically, we did this check for all baselines. But we can't
-      // remove this code from deprecated flexbox, because it effectively
-      // breaks -webkit-line-clamp, which is used in the wild -- we would
-      // calculate the baseline as if -webkit-line-clamp wasn't used.
-      // For simplicity, we use this for all uses of deprecated flexbox.
-      LayoutUnit bottom_of_content =
-          direction == kHorizontalLine
-              ? Size().Height() - BorderBottom() - PaddingBottom() -
-                    ComputeScrollbars().bottom
-              : Size().Width() - BorderLeft() - PaddingLeft() -
-                    ComputeScrollbars().left;
-      if (baseline_pos > bottom_of_content)
-        baseline_pos = LayoutUnit(-1);
-    }
     if (baseline_pos != -1)
       return BeforeMarginInLineDirection(direction) + baseline_pos;
 
@@ -1961,8 +1675,9 @@ absl::optional<LayoutUnit> LayoutBlock::FirstLineBoxBaselineOverride() const {
 
   // Orthogonal grid items can participate in baseline alignment along column
   // axis.
-  if (IsWritingModeRoot() && !IsRubyRun() && !IsGridItem())
+  if (IsWritingModeRoot() && !IsRubyRun()) {
     return LayoutUnit(-1);
+  }
 
   return absl::nullopt;
 }
@@ -2158,92 +1873,6 @@ void LayoutBlock::PaginatedContentWasLaidOut(
                                    logical_bottom_offset_after_pagination);
 }
 
-LayoutUnit LayoutBlock::CollapsedMarginBeforeForChild(
-    const LayoutBox& child) const {
-  NOT_DESTROYED();
-  // If the child has the same directionality as we do, then we can just return
-  // its collapsed margin.
-  if (!child.IsWritingModeRoot())
-    return child.CollapsedMarginBefore();
-
-  // The child has a different directionality.  If the child is parallel, then
-  // it's just flipped relative to us.  We can use the collapsed margin for the
-  // opposite edge.
-  if (child.IsHorizontalWritingMode() == IsHorizontalWritingMode())
-    return child.CollapsedMarginAfter();
-
-  // The child is perpendicular to us, which means its margins don't collapse
-  // but are on the "logical left/right" sides of the child box. We can just
-  // return the raw margin in this case.
-  return MarginBeforeForChild(child);
-}
-
-LayoutUnit LayoutBlock::CollapsedMarginAfterForChild(
-    const LayoutBox& child) const {
-  NOT_DESTROYED();
-  // If the child has the same directionality as we do, then we can just return
-  // its collapsed margin.
-  if (!child.IsWritingModeRoot())
-    return child.CollapsedMarginAfter();
-
-  // The child has a different directionality.  If the child is parallel, then
-  // it's just flipped relative to us.  We can use the collapsed margin for the
-  // opposite edge.
-  if (child.IsHorizontalWritingMode() == IsHorizontalWritingMode())
-    return child.CollapsedMarginBefore();
-
-  // The child is perpendicular to us, which means its margins don't collapse
-  // but are on the "logical left/right" side of the child box. We can just
-  // return the raw margin in this case.
-  return MarginAfterForChild(child);
-}
-
-bool LayoutBlock::HasMarginBeforeQuirk(const LayoutBox* child) const {
-  NOT_DESTROYED();
-  // If the child has the same directionality as we do, then we can just return
-  // its margin quirk.
-  auto* child_layout_block = DynamicTo<LayoutBlock>(child);
-  if (!child->IsWritingModeRoot()) {
-    return child_layout_block ? child_layout_block->HasMarginBeforeQuirk()
-                              : child->StyleRef().HasMarginBeforeQuirk();
-  }
-
-  // The child has a different directionality. If the child is parallel, then
-  // it's just flipped relative to us. We can use the opposite edge.
-  if (child->IsHorizontalWritingMode() == IsHorizontalWritingMode()) {
-    return child_layout_block ? child_layout_block->HasMarginAfterQuirk()
-                              : child->StyleRef().HasMarginAfterQuirk();
-  }
-
-  // The child is perpendicular to us and box sides are never quirky in
-  // html.css, and we don't really care about whether or not authors specified
-  // quirky ems, since they're an implementation detail.
-  return false;
-}
-
-bool LayoutBlock::HasMarginAfterQuirk(const LayoutBox* child) const {
-  NOT_DESTROYED();
-  // If the child has the same directionality as we do, then we can just return
-  // its margin quirk.
-  auto* child_layout_block = DynamicTo<LayoutBlock>(child);
-  if (!child->IsWritingModeRoot()) {
-    return child_layout_block ? child_layout_block->HasMarginAfterQuirk()
-                              : child->StyleRef().HasMarginAfterQuirk();
-  }
-
-  // The child has a different directionality. If the child is parallel, then
-  // it's just flipped relative to us. We can use the opposite edge.
-  if (child->IsHorizontalWritingMode() == IsHorizontalWritingMode()) {
-    return child_layout_block ? child_layout_block->HasMarginBeforeQuirk()
-                              : child->StyleRef().HasMarginBeforeQuirk();
-  }
-
-  // The child is perpendicular to us and box sides are never quirky in
-  // html.css, and we don't really care about whether or not authors specified
-  // quirky ems, since they're an implementation detail.
-  return false;
-}
-
 const char* LayoutBlock::GetName() const {
   NOT_DESTROYED();
   NOTREACHED();
@@ -2289,14 +1918,13 @@ LayoutBlock* LayoutBlock::CreateAnonymousWithParentAndDisplay(
 
   LayoutBlock* layout_block;
   if (new_display == EDisplay::kFlex) {
-    layout_block = LayoutObjectFactory::CreateFlexibleBox(parent->GetDocument(),
-                                                          *new_style, legacy);
+    layout_block =
+        MakeGarbageCollected<LayoutNGFlexibleBox>(/* element */ nullptr);
   } else if (new_display == EDisplay::kGrid) {
-    layout_block = LayoutObjectFactory::CreateGrid(parent->GetDocument(),
-                                                   *new_style, legacy);
+    layout_block = MakeGarbageCollected<LayoutNGGrid>(/* element */ nullptr);
   } else if (new_display == EDisplay::kBlockMath) {
-    layout_block = LayoutObjectFactory::CreateMath(parent->GetDocument(),
-                                                   *new_style, legacy);
+    layout_block =
+        MakeGarbageCollected<LayoutNGMathMLBlock>(/* element */ nullptr);
   } else {
     DCHECK(new_display == EDisplay::kBlock ||
            new_display == EDisplay::kFlowRoot);
@@ -2410,44 +2038,6 @@ void LayoutBlock::RecalcSelfVisualOverflow() {
   ComputeVisualOverflow(true);
 }
 
-// Called when a positioned object moves but doesn't necessarily change size.
-// A simplified layout is attempted that just updates the object's position.
-// If the size does change, the object remains dirty.
-bool LayoutBlock::TryLayoutDoingPositionedMovementOnly() {
-  NOT_DESTROYED();
-  LayoutUnit old_width = LogicalWidth();
-  LogicalExtentComputedValues computed_values;
-  LogicalExtentAfterUpdatingLogicalWidth(LogicalTop(), computed_values);
-  // If we shrink to fit our width may have changed, so we still need full
-  // layout.
-  if (old_width != computed_values.extent_)
-    return false;
-  SetLogicalWidth(computed_values.extent_);
-  SetLogicalLeft(computed_values.position_);
-  SetMarginStart(computed_values.margins_.start_);
-  SetMarginEnd(computed_values.margins_.end_);
-
-  LayoutUnit old_height = LogicalHeight();
-  LayoutUnit old_intrinsic_content_logical_height =
-      IntrinsicContentLogicalHeight();
-
-  SetIntrinsicContentLogicalHeight(ContentLogicalHeight());
-  ComputeLogicalHeight(old_height, LogicalTop(), computed_values);
-
-  if (old_height != computed_values.extent_ &&
-      (HasPercentHeightDescendants() || IsFlexibleBoxIncludingNG())) {
-    SetIntrinsicContentLogicalHeight(old_intrinsic_content_logical_height);
-    return false;
-  }
-
-  SetLogicalHeight(computed_values.extent_);
-  SetLogicalTop(computed_values.position_);
-  SetMarginBefore(computed_values.margins_.before_);
-  SetMarginAfter(computed_values.margins_.after_);
-
-  return true;
-}
-
 #if DCHECK_IS_ON()
 void LayoutBlock::CheckPositionedObjectsNeedLayout() {
   NOT_DESTROYED();
@@ -2497,17 +2087,11 @@ LayoutUnit LayoutBlock::AvailableLogicalHeightForPercentageComputation() const {
        (!style.LogicalTop().IsAuto() && !style.LogicalBottom().IsAuto()));
 
   LayoutUnit stretched_flex_height(-1);
-  if (IsFlexItem()) {
-    const auto* flex_box = To<LayoutFlexibleBox>(Parent());
-    if (flex_box->UseOverrideLogicalHeightForPerentageResolution(*this))
-      stretched_flex_height = OverrideContentLogicalHeight();
-  } else if (HasOverrideLogicalHeight() && IsOverrideLogicalHeightDefinite()) {
+  if (HasOverrideLogicalHeight() && IsOverrideLogicalHeightDefinite()) {
     stretched_flex_height = OverrideContentLogicalHeight();
   }
   if (stretched_flex_height != LayoutUnit(-1)) {
     available_height = stretched_flex_height;
-  } else if (IsGridItem() && HasOverrideLogicalHeight()) {
-    available_height = OverrideContentLogicalHeight();
   } else if (style.LogicalHeight().IsFixed()) {
     LayoutUnit content_box_height = AdjustContentBoxLogicalHeightForBoxSizing(
         style.LogicalHeight().Value());

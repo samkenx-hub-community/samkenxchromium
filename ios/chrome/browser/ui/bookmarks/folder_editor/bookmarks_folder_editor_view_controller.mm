@@ -20,13 +20,13 @@
 #import "ios/chrome/browser/bookmarks/bookmark_model_bridge_observer.h"
 #import "ios/chrome/browser/browser_state/chrome_browser_state.h"
 #import "ios/chrome/browser/main/browser.h"
+#import "ios/chrome/browser/shared/coordinator/alert/action_sheet_coordinator.h"
 #import "ios/chrome/browser/shared/public/commands/snackbar_commands.h"
 #import "ios/chrome/browser/shared/ui/table_view/chrome_table_view_styler.h"
 #import "ios/chrome/browser/shared/ui/table_view/table_view_utils.h"
 #import "ios/chrome/browser/shared/ui/util/rtl_geometry.h"
 #import "ios/chrome/browser/sync/sync_observer_bridge.h"
 #import "ios/chrome/browser/sync/sync_setup_service.h"
-#import "ios/chrome/browser/ui/alert_coordinator/action_sheet_coordinator.h"
 #import "ios/chrome/browser/ui/bookmarks/bookmark_ui_constants.h"
 #import "ios/chrome/browser/ui/bookmarks/bookmark_utils_ios.h"
 #import "ios/chrome/browser/ui/bookmarks/cells/bookmark_parent_folder_item.h"
@@ -370,24 +370,27 @@ typedef NS_ENUM(NSInteger, ItemType) {
 
 #pragma mark - BookmarkModelBridgeObserver
 
-- (void)bookmarkModelLoaded {
+- (void)bookmarkModelLoaded:(bookmarks::BookmarkModel*)model {
   // The bookmark model is assumed to be loaded when this controller is created.
   NOTREACHED();
 }
 
-- (void)bookmarkNodeChanged:(const BookmarkNode*)bookmarkNode {
+- (void)bookmarkModel:(bookmarks::BookmarkModel*)model
+        didChangeNode:(const bookmarks::BookmarkNode*)bookmarkNode {
   if (bookmarkNode == self.parentFolder) {
     [self updateParentFolderState];
   }
 }
 
-- (void)bookmarkNodeChildrenChanged:(const BookmarkNode*)bookmarkNode {
+- (void)bookmarkModel:(bookmarks::BookmarkModel*)model
+    didChangeChildrenForNode:(const bookmarks::BookmarkNode*)bookmarkNode {
   // No-op.
 }
 
-- (void)bookmarkNode:(const BookmarkNode*)bookmarkNode
-     movedFromParent:(const BookmarkNode*)oldParent
-            toParent:(const BookmarkNode*)newParent {
+- (void)bookmarkModel:(bookmarks::BookmarkModel*)model
+          didMoveNode:(const bookmarks::BookmarkNode*)bookmarkNode
+           fromParent:(const bookmarks::BookmarkNode*)oldParent
+             toParent:(const bookmarks::BookmarkNode*)newParent {
   if (_ignoresOwnMove) {
     return;
   }
@@ -398,21 +401,22 @@ typedef NS_ENUM(NSInteger, ItemType) {
   }
 }
 
-- (void)bookmarkNodeDeleted:(const BookmarkNode*)bookmarkNode
-                 fromFolder:(const BookmarkNode*)folder {
-  if (bookmarkNode == self.parentFolder) {
+- (void)bookmarkModel:(bookmarks::BookmarkModel*)model
+        didDeleteNode:(const bookmarks::BookmarkNode*)node
+           fromFolder:(const bookmarks::BookmarkNode*)folder {
+  if (node == self.parentFolder) {
     self.parentFolder = NULL;
     [self updateParentFolderState];
     return;
   }
-  if (bookmarkNode == self.folder) {
+  if (node == self.folder) {
     self.folder = NULL;
     self.editingExistingFolder = NO;
     [self updateEditingState];
   }
 }
 
-- (void)bookmarkModelRemovedAllNodes {
+- (void)bookmarkModelRemovedAllNodes:(bookmarks::BookmarkModel*)model {
   if (self.bookmarkModel->is_permanent_node(self.parentFolder)) {
     return;  // The current parent folder is still valid.
   }

@@ -18,17 +18,16 @@
 #include "chrome/browser/nearby_sharing/certificates/nearby_share_certificate_storage.h"
 #include "chrome/browser/nearby_sharing/certificates/nearby_share_encrypted_metadata_key.h"
 #include "chrome/browser/nearby_sharing/certificates/nearby_share_private_certificate.h"
-#include "chrome/browser/nearby_sharing/common/nearby_share_http_result.h"
 #include "chrome/browser/nearby_sharing/contacts/nearby_share_contact_manager.h"
 #include "chrome/browser/nearby_sharing/local_device_data/nearby_share_local_device_data_manager.h"
 #include "chrome/browser/nearby_sharing/proto/rpc_resources.pb.h"
+#include "chromeos/ash/components/nearby/common/client/nearby_share_http_result.h"
 #include "chromeos/ash/services/nearby/public/mojom/nearby_share_settings.mojom.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
 
 class NearbyShareClient;
 class NearbyShareClientFactory;
 class NearbyShareLocalDeviceDataManager;
-class NearbyShareScheduler;
 class PrefService;
 
 namespace device {
@@ -38,6 +37,10 @@ class BluetoothAdapter;
 namespace leveldb_proto {
 class ProtoDatabaseProvider;
 }  // namespace leveldb_proto
+
+namespace ash::nearby {
+class NearbyScheduler;
+}  // namespace ash::nearby
 
 namespace nearbyshare {
 namespace proto {
@@ -191,13 +194,14 @@ class NearbyShareCertificateManagerImpl
   NearbyShareClientFactory* client_factory_ = nullptr;
   const base::Clock* clock_;
   std::unique_ptr<NearbyShareCertificateStorage> certificate_storage_;
-  std::unique_ptr<NearbyShareScheduler>
+  std::unique_ptr<ash::nearby::NearbyScheduler>
       private_certificate_expiration_scheduler_;
-  std::unique_ptr<NearbyShareScheduler>
+  std::unique_ptr<ash::nearby::NearbyScheduler>
       public_certificate_expiration_scheduler_;
-  std::unique_ptr<NearbyShareScheduler>
+  std::unique_ptr<ash::nearby::NearbyScheduler>
       upload_local_device_certificates_scheduler_;
-  std::unique_ptr<NearbyShareScheduler> download_public_certificates_scheduler_;
+  std::unique_ptr<ash::nearby::NearbyScheduler>
+      download_public_certificates_scheduler_;
   std::unique_ptr<NearbyShareClient> client_;
   base::WeakPtrFactory<NearbyShareCertificateManagerImpl> weak_ptr_factory_{
       this};

@@ -72,9 +72,7 @@ LayoutState::LayoutState(LayoutBox& layout_object,
   // Disable pagination for objects we don't support. For now this includes
   // overflow:scroll/auto, inline blocks and writing mode roots. Additionally,
   // pagination inside SVG is not allowed.
-  if (layout_object.GetLegacyPaginationBreakability() ==
-          LayoutBox::kForbidBreaks ||
-      layout_object_->IsSVGChild()) {
+  if (layout_object.IsMonolithic() || layout_object_->IsSVGChild()) {
     flow_thread_ = nullptr;
     is_paginated_ = false;
     return;
@@ -90,15 +88,6 @@ LayoutState::LayoutState(LayoutBox& layout_object,
       next_->pagination_offset_ + layout_object.LocationOffset();
   if (!layout_object.IsOutOfFlowPositioned())
     return;
-  if (LayoutObject* container = layout_object.Container()) {
-    if (container->StyleRef().HasInFlowPosition() &&
-        container->IsLayoutInline()) {
-      pagination_offset_ += To<LayoutInline>(container)
-                                ->OffsetForInFlowPositionedInline(layout_object)
-                                .ToLayoutSize();
-    }
-  }
-
   // FIXME: <http://bugs.webkit.org/show_bug.cgi?id=13443> Apply control clip if
   // present.
 }

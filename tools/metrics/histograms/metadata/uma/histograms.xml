@@ -162,7 +162,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="UMA.CrosPerUser.IdReset" enum="PerUserIdType"
-    expires_after="2023-06-18">
+    expires_after="2023-09-24">
   <owner>jongahn@chromium.org</owner>
   <owner>asvitkine@chromium.org</owner>
   <summary>
@@ -554,6 +554,16 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
+<histogram name="UMA.MetricsService.SnapshotDeltasTime" units="ms"
+    expires_after="2023-07-01">
+  <owner>lucnguyen@google.com</owner>
+  <owner>src/base/metrics/OWNERS</owner>
+  <summary>
+    The runtime of SnapshotStatisticsRecorderDeltas(). Emitted every time it is
+    called.
+  </summary>
+</histogram>
+
 <histogram name="UMA.NegativeSamples.Histogram" enum="HistogramNameHash"
     expires_after="2023-11-01">
   <owner>asvitkine@chromium.org</owner>
@@ -871,7 +881,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="UMA.TruncatedEvents.UserAction" units="events"
-    expires_after="2023-09-17">
+    expires_after="2023-09-24">
   <owner>rkaplow@chromium.org</owner>
   <owner>src/base/metrics/OWNERS</owner>
   <summary>

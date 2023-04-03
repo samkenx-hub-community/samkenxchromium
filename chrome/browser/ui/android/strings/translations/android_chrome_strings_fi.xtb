@@ -737,6 +737,7 @@ Jos haluat muokata asetusta, <ph name="BEGIN_LINK" />nollaa synkronointi<ph name
 <translation id="5001388021414335527">Seuraa sivustoa valitsemalla tämä</translation>
 <translation id="5004416275253351869">Google-toimintojen hallinta</translation>
 <translation id="5005498671520578047">Kopioi salasana</translation>
+<translation id="5010886807652684893">Visuaalinen näkymä</translation>
 <translation id="5011311129201317034"><ph name="SITE" /> haluaa muodostaa yhteyden</translation>
 <translation id="5016205925109358554">Serif</translation>
 <translation id="5017529052065664584">Viimeiset 15 minuuttia</translation>
@@ -794,6 +795,7 @@ Jos haluat muokata asetusta, <ph name="BEGIN_LINK" />nollaa synkronointi<ph name
 <translation id="5342314432463739672">Käyttöoikeuspyynnöt</translation>
 <translation id="53537532693258630">Poistamasi sivustot näkyvät täällä</translation>
 <translation id="5355191726083956201">Parannettu suojaus on päällä</translation>
+<translation id="5361107212971249203">teksti</translation>
 <translation id="5368227114232678694">Voit selata yksityisesti tällä laitteella incognito-tilassa</translation>
 <translation id="5375577065097716013">Hae kuvaa Google Lensilla <ph name="BEGIN_NEW" />Uusi<ph name="END_NEW" /></translation>
 <translation id="5401851137404501592">Jos jatkat, <ph name="IDENTITY_PROVIDER_ETLD_PLUS_ONE" /> jakaa nimesi, sähköpostiosoitteesi, osoitteesi ja profiilikuvasi tälle sivustolle.</translation>
@@ -1191,6 +1193,7 @@ Jotkin verkkosivustot voivat vastata tähän pyyntöön esimerkiksi näyttämäl
 <translation id="7454641608352164238">Tallennustila ei riitä</translation>
 <translation id="7455988709578031708">Perustuu selaushistoriaasi. Tämä asetus on päällä.</translation>
 <translation id="7456774706094330779">Laajennettu esilataus</translation>
+<translation id="7466431077154602932">Tiivis näkymä</translation>
 <translation id="7474822150871987353">Tutustu verkkosivuston aiheisiin poistumatta sivulta. Valitse sivulta ainakin yksi tai useampi sana, niin voit hakea niitä.</translation>
 <translation id="7475192538862203634">Jos näet tämän ilmoituksen usein, kokeile näitä <ph name="BEGIN_LINK" />ehdotuksia<ph name="END_LINK" />.</translation>
 <translation id="7475688122056506577">SD-korttia ei löydy. Osa tiedostoista voi puuttua.</translation>
@@ -1320,6 +1323,7 @@ Jotkin verkkosivustot voivat vastata tähän pyyntöön esimerkiksi näyttämäl
 <translation id="8058746566562539958">Avaa, uusi Chrome-välilehti</translation>
 <translation id="8062594758852531064">Laajennettu esilataus:</translation>
 <translation id="8063895661287329888">Kirjanmerkin lisääminen epäonnistui.</translation>
+<translation id="8066816452984416180">Lisää sivu kirjanmerkkeihin nopeasti. Kosketa pikakuvaketta pitkään, niin voit muokata sitä.</translation>
 <translation id="806745655614357130">Pidä tiedot erillään</translation>
 <translation id="8073388330009372546">Avaa kuva uudessa välilehdessä</translation>
 <translation id="8076492880354921740">Välilehdet</translation>
@@ -1351,6 +1355,7 @@ Jotkin verkkosivustot voivat vastata tähän pyyntöön esimerkiksi näyttämäl
 <translation id="8216351761227087153">Katso</translation>
 <translation id="8218622182176210845">Ylläpidä tiliäsi</translation>
 <translation id="8223642481677794647">Fiidikottien valikko</translation>
+<translation id="8236097722223016103">Lisää kirjanmerkkeihin</translation>
 <translation id="8250920743982581267">Dokumentit</translation>
 <translation id="8255617931166444521">Sivustot voivat nähdä selaustoimintaasi evästeiden kautta vain omalla sivustollaan</translation>
 <translation id="8259179246279078674">Google ei saa mitään tietoja esiladattujen sivujen sisällöstä, sillä nämä sivut ovat salattuja. Googlen palvelimet saavat tietää, mitkä sivustot on esiladattu yksityisesti. Tietoja käytetään vain sivujen esilataamiseen, eikä niitä linkitetä muihin Google-tilisi tietoihin.</translation>
@@ -1498,6 +1503,7 @@ Jotkin verkkosivustot voivat vastata tähän pyyntöön esimerkiksi näyttämäl
 <translation id="8989968390305463310">Selaushistoria vaikuttaa näkemiisi mainoksiin ja alla kuvatulla tavalla arvioituihin kiinnostuksen kohteisiisi. Yksityisyyden suojaamiseksi Chrome poistaa kiinnostuksen kohteesi automaattisesti kuukausittain. Kiinnostuksen kohteet voivat päivittyä, ellet poista niitä.</translation>
 <translation id="8993760627012879038">Avaa uusi välilehti incognito-tilassa</translation>
 <translation id="8996847606757455498">Valitse toinen palvelu</translation>
+<translation id="8998289560386111590">Ei saatavilla laitteellasi</translation>
 <translation id="8998729206196772491">Olet kirjautumassa sisään verkkotunnuksen <ph name="MANAGED_DOMAIN" /> hallinnoimalla tilillä ja antamassa sen järjestelmänvalvojalle oikeuden hallita Chrome-tietojasi. Tietosi liitetään pysyvästi tähän tiliin. Chromesta uloskirjautuminen poistaa tietosi tältä laitteelta, mutta ne säilyvät Google-tililläsi.</translation>
 <translation id="9022774213089566801">Usein avatut</translation>
 <translation id="9022871169049522985">Sivustot ja mainostajat voivat mitata mainostensa tuloksia</translation>

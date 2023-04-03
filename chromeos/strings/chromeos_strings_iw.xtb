@@ -106,6 +106,7 @@
 <translation id="1759842336958782510">Chrome</translation>
 <translation id="1768959921651994223">סוג אימות</translation>
 <translation id="1782199038061388045">תרגום</translation>
+<translation id="1790209694022261219">חלונות ושולחנות עבודה וירטואליים</translation>
 <translation id="1792647875738159689">הסריקה מתבטלת</translation>
 <translation id="1801418420130173017">השבתת העיצוב הכהה</translation>
 <translation id="1807246157184219062">בהיר</translation>
@@ -273,6 +274,7 @@
 <translation id="3456078764689556234">הודפס עמוד <ph name="PRINTED_PAGES" /> מתוך <ph name="TOTAL_PAGES" />.</translation>
 <translation id="345898999683440380">מתבצעת סריקה של עמוד <ph name="PAGE_NUM" />. החלק שהושלם: <ph name="PERCENTAGE_VALUE" />%.</translation>
 <translation id="3459509316159669723">הדפסה</translation>
+<translation id="346423161771747987">זרם</translation>
 <translation id="346539236881580388">צילום חוזר</translation>
 <translation id="3484914941826596830">במהלך עדכון הקושחה אין לנתק את המכשיר החיצוני הזה או לכבות את המחשב. אפשר למזער את החלון הזה. העדכון הזה עשוי לקחת כמה דקות ויכול להיות שהמכשיר החיצוני לא יפעל במהלכו.</translation>
 <translation id="3486220673238053218">הגדרה</translation>
@@ -373,6 +375,7 @@
 <translation id="4311195029067684288">מלא</translation>
 <translation id="4333390807948134856">בוצעה לחיצה על המקש <ph name="KEY_NAME" /></translation>
 <translation id="435692326371619097">‏ניהול הגדרות APN של הרשת. נקודות APN יוצרות חיבור בין רשת סלולרית לבין האינטרנט. <ph name="BEGIN_LINK" />מידע נוסף<ph name="END_LINK" /></translation>
+<translation id="437294888293595148">איפוס כל קיצורי הדרך</translation>
 <translation id="4378373042927530923">לא הופעל</translation>
 <translation id="4378551569595875038">התחברות...</translation>
 <translation id="4382484599443659549">PDF</translation>
@@ -757,6 +760,7 @@
 <translation id="7656388927906093505">המכשיר הוא עכבר.</translation>
 <translation id="7658239707568436148">ביטול</translation>
 <translation id="7665800271478495366">החלפת הדמות</translation>
+<translation id="7675241868020048622">הזוהר הצפוני (עם אפשרויות בלעדיות)</translation>
 <translation id="7690294790491645610">אישור הסיסמה החדשה</translation>
 <translation id="7701040980221191251">אין</translation>
 <translation id="7705524343798198388">VPN</translation>
@@ -766,6 +770,7 @@
 <translation id="7762130827864645708">שינוי הסיסמה הסתיים בהצלחה. עליך להשתמש בסיסמה החדשה מעתה ואילך.</translation>
 <translation id="7763470514545477072">התאמה של סיומות אתרים</translation>
 <translation id="7769672763586021400">מזהה דגם</translation>
+<translation id="7770834998503326261">מידע נוסף שקשור לבחירה שלך</translation>
 <translation id="7778717409420828014">‏המשוב שלך ייבדק על ידי הצוות שלנו ויעזור בשיפור חוויית השימוש ב-Chromebook. אנחנו מקבלים הרבה דיווחים, ולכן לא נוכל לשלוח תשובה.</translation>
 <translation id="7784116172884276937">‏לא הוגדרו שרתי DNS</translation>
 <translation id="7791543448312431591">הוספה</translation>

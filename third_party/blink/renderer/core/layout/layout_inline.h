@@ -150,6 +150,9 @@ class CORE_EXPORT LayoutInline : public LayoutBoxModelObject {
   LayoutUnit MarginTop() const final;
   LayoutUnit MarginBottom() const final;
 
+  // Returns the bounding box of all quads returned by `LocalQuadsForSelf`.
+  gfx::RectF LocalBoundingBoxRectF() const;
+
   gfx::RectF LocalBoundingBoxRectForAccessibility() const final;
 
   PhysicalRect PhysicalLinesBoundingBox() const;
@@ -192,30 +195,10 @@ class CORE_EXPORT LayoutInline : public LayoutBoxModelObject {
   void ClearFirstInlineFragmentItemIndex() final;
   void SetFirstInlineFragmentItemIndex(wtf_size_t) final;
 
-  LayoutBoxModelObject* VirtualContinuation() const final {
-    NOT_DESTROYED();
-    return Continuation();
-  }
-  LayoutInline* InlineElementContinuation() const;
-
-  PhysicalOffset OffsetForInFlowPositionedInline(const LayoutBox& child) const;
-
   void AddOutlineRects(Vector<PhysicalRect>&,
                        OutlineInfo*,
                        const PhysicalOffset& additional_offset,
                        NGOutlineType) const override;
-  // The following methods are called from the container if it has already added
-  // outline rects for line boxes and/or children of this LayoutInline.
-  void AddOutlineRectsForChildrenAndContinuations(
-      Vector<PhysicalRect>&,
-      const PhysicalOffset& additional_offset,
-      NGOutlineType) const;
-  void AddOutlineRectsForContinuations(Vector<PhysicalRect>&,
-                                       const PhysicalOffset& additional_offset,
-                                       NGOutlineType) const;
-
-  using LayoutBoxModelObject::Continuation;
-  using LayoutBoxModelObject::SetContinuation;
 
   bool AlwaysCreateLineBoxes() const {
     NOT_DESTROYED();
@@ -285,9 +268,8 @@ class CORE_EXPORT LayoutInline : public LayoutBoxModelObject {
 
   void InvalidateDisplayItemClients(PaintInvalidationReason) const override;
 
-  void LocalQuadsForSelf(Vector<gfx::QuadF>& quads) const override;
-  void AbsoluteQuadsForSelf(Vector<gfx::QuadF>& quads,
-                            MapCoordinatesFlags mode = 0) const override;
+  void AbsoluteQuads(Vector<gfx::QuadF>& quads,
+                     MapCoordinatesFlags mode = 0) const override;
 
   PhysicalOffset OffsetFromContainerInternal(
       const LayoutObject*,
@@ -348,29 +330,13 @@ class CORE_EXPORT LayoutInline : public LayoutBoxModelObject {
       const FlippedRectCollector&,
       const LayoutInline* container) const;
 
-  void AddChildToContinuation(LayoutObject* new_child,
-                              LayoutObject* before_child);
   void AddChildIgnoringContinuation(LayoutObject* new_child,
                                     LayoutObject* before_child = nullptr) final;
   void AddChildAsBlockInInline(LayoutObject* new_child,
                                LayoutObject* before_child);
 
-  void MoveChildrenToIgnoringContinuation(LayoutInline* to,
-                                          LayoutObject* start_child);
-
-  void SplitInlines(LayoutBlockFlow* from_block,
-                    LayoutBlockFlow* to_block,
-                    LayoutBlockFlow* middle_block,
-                    LayoutObject* before_child,
-                    LayoutBoxModelObject* old_cont);
-  void SplitFlow(LayoutObject* before_child,
-                 LayoutBlockFlow* new_block_box,
-                 LayoutObject* new_child,
-                 LayoutBoxModelObject* old_cont);
-
   // Create an anonymous block for block children of this inline.
-  LayoutBlockFlow* CreateAnonymousContainerForBlockChildren(
-      bool split_flow) const;
+  LayoutBlockFlow* CreateAnonymousContainerForBlockChildren() const;
   LayoutBox* CreateAnonymousBoxToSplit(
       const LayoutBox* box_to_split) const final;
 
@@ -441,10 +407,6 @@ class CORE_EXPORT LayoutInline : public LayoutBoxModelObject {
     NOT_DESTROYED();
     return true;
   }
-
-  LayoutInline* Clone() const;
-
-  LayoutBoxModelObject* ContinuationBefore(LayoutObject* before_child);
 
   absl::optional<PhysicalOffset> FirstLineBoxTopLeftInternal() const;
   PhysicalOffset AnchorPhysicalLocation() const;

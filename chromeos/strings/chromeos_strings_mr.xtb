@@ -274,6 +274,7 @@
 <translation id="3456078764689556234"><ph name="TOTAL_PAGES" /> पैकी <ph name="PRINTED_PAGES" /> पेज प्रिंट केली.</translation>
 <translation id="345898999683440380"><ph name="PAGE_NUM" /> पेज स्कॅन करत आहे. <ph name="PERCENTAGE_VALUE" />% पूर्ण झाले.</translation>
 <translation id="3459509316159669723">प्रिंट</translation>
+<translation id="346423161771747987">करंट</translation>
 <translation id="346539236881580388">पुन्हा काढा</translation>
 <translation id="3484914941826596830">फर्मवेअर अपडेट होत असताना, हे बाह्य डिव्हाइस अनप्लग करू नका किंवा तुमचा कॉंप्युटर बंद करू नका. तुम्ही ही विंडो लहान करू शकता. या अपडेटला काही मिनिटे लागू शकतात आणि या कालावधीदरम्यान तुमचे बाह्य डिव्हाइस कदाचित काम करणार नाही.</translation>
 <translation id="3486220673238053218">परिभाषा</translation>
@@ -404,7 +405,7 @@
 <translation id="458794348635939462">सर्व होस्टचे निराकरण करता आले नाही</translation>
 <translation id="4593212453765072419">प्रॉक्सी प्रमाणीकरण आवश्यक</translation>
 <translation id="4609350030397390689">कीबोर्डचा ब्राइटनेस कमी करा</translation>
-<translation id="4627232916386272576"><ph name="DOCUMENT_TITLE" />, <ph name="PRINTER_NAME" />, <ph name="CREATION_TIME" />, <ph name="TOTAL_PAGE_NUMBER" /> पैकी <ph name="PRINTED_PAGE_NUMBER" />. प्रिंट कार्य रद्द करण्यासाठी एंटर दाबा.</translation>
+<translation id="4627232916386272576"><ph name="DOCUMENT_TITLE" />, <ph name="PRINTER_NAME" />, <ph name="CREATION_TIME" />, <ph name="TOTAL_PAGE_NUMBER" /> पैकी <ph name="PRINTED_PAGE_NUMBER" />. प्रिंट कार्य रद्द करण्यासाठी एंटर प्रेस करा.</translation>
 <translation id="463791356324567266">स्कॅनिंग रद्द करत आहे...</translation>
 <translation id="4646949265910132906">सुरक्षित वायफाय कनेक्शन</translation>
 <translation id="4650608062294027130">उजवीकडे शिफ्ट करा</translation>
@@ -434,7 +435,7 @@
 <translation id="4835901797422965222">कोणतीही अ‍ॅक्टिव्ह नेटवर्क नाहीत</translation>
 <translation id="4839698083503556542">स्वतः चित्रपट तयार करा</translation>
 <translation id="484462545196658690">ऑटो</translation>
-<translation id="4847902821209177679"><ph name="TOPIC_SOURCE" /> <ph name="TOPIC_SOURCE_DESC" /> निवडले, <ph name="TOPIC_SOURCE" /> अल्बम निवडण्यासाठी एंटर दाबा</translation>
+<translation id="4847902821209177679"><ph name="TOPIC_SOURCE" /> <ph name="TOPIC_SOURCE_DESC" /> निवडले, <ph name="TOPIC_SOURCE" /> अल्बम निवडण्यासाठी एंटर प्रेस करा</translation>
 <translation id="484790837831576105">(Android) DNS रिझोल्यूशन</translation>
 <translation id="4848429997038228357">रन होत आहे</translation>
 <translation id="4854586501323951986">बिल्ट-इन टचस्क्रीन</translation>
@@ -697,6 +698,7 @@
 <translation id="7103252855940681301"><ph name="NAME" /> नावाची <ph name="COUNT" /> पैकी <ph name="INDEX" /> डिव्हाइस.</translation>
 <translation id="7108668606237948702">प्रविष्‍ट करा</translation>
 <translation id="7130438335435247835">अ‍ॅक्सेस पॉइंट नाव (APN)</translation>
+<translation id="7131634559772719176">प्रीसेट कंफर्म करा</translation>
 <translation id="7134436342991564651">{0,plural, =1{नेम सर्व्हर}other{नेम सर्व्हर}}</translation>
 <translation id="7143207342074048698">कनेक्ट करत आहे</translation>
 <translation id="7144878232160441200">पुन्हा प्रयत्न करा</translation>
@@ -759,6 +761,7 @@
 <translation id="7656388927906093505">डिव्हाइस हे माउस आहे.</translation>
 <translation id="7658239707568436148">रद्द करा</translation>
 <translation id="7665800271478495366">अवतार बदला</translation>
+<translation id="7675241868020048622">ऑरोरा (Plus साठी अनन्य)</translation>
 <translation id="7690294790491645610">नवीन पासवर्ड कन्फर्म करा</translation>
 <translation id="7701040980221191251">काहीही नाही</translation>
 <translation id="7705524343798198388">VPN</translation>
@@ -768,6 +771,7 @@
 <translation id="7762130827864645708">तुमचा पासवर्ड यशस्वीरीत्या बदलला होता. कृपया आतापासून नवीन पासवर्ड वापरा.</translation>
 <translation id="7763470514545477072">डोमेन सफिक्स जुळणी</translation>
 <translation id="7769672763586021400">मॉडेल आयडी</translation>
+<translation id="7770834998503326261">तुमच्या निवडीसंबंधित अतिरिक्त माहिती</translation>
 <translation id="7778717409420828014">तुमचा फीडबॅक आम्हाला Chromebook अनुभवामध्ये सुधारणा करण्यात मदत करू शकतो आणि त्याचे आमच्या टीमकडून पुनरावलोकन केले जाईल. मोठ्या प्रमाणात तक्रारी मिळाल्यामुळे, आम्हाला उत्तर पाठवता येणार नाही.</translation>
 <translation id="7784116172884276937">कोणतेही DNS सर्व्हर सेट केलेले नाहीत</translation>
 <translation id="7791543448312431591">जोडा</translation>
@@ -800,6 +804,7 @@
 <translation id="80398733265834479">ऑटो कलर मोड सुरू करा</translation>
 <translation id="8041089156583427627">अभिप्राय पाठवा</translation>
 <translation id="8045012663542226664">मायक्रोफोन म्यूट</translation>
+<translation id="8050091914317269817">हा वॉलपेपर निवडल्याने ऑटो डार्क मोड आणि वॉलपेपरचा रंग जुळवणे सुरू होईल.</translation>
 <translation id="8075838845814659848">शिल्लक चार्जिंग</translation>
 <translation id="8076492880354921740">टॅब</translation>
 <translation id="8082366717211101304">Android अ‍ॅप्सवरून DNS चे निराकरण करू शकत नाही</translation>

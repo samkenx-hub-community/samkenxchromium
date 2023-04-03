@@ -309,6 +309,11 @@ void AddAboutStrings(content::WebUIDataSource* html_source, Profile* profile) {
 #if BUILDFLAG(IS_MAC)
     {"aboutLearnMoreUpdating", IDS_SETTINGS_ABOUT_PAGE_LEARN_MORE_UPDATING},
 #endif
+#if BUILDFLAG(GOOGLE_CHROME_BRANDING)
+    {"getTheMostOutOfChrome", IDS_SETTINGS_GET_THE_MOST_OUT_OF_CHROME},
+    {"getTheMostOutOfChromeDescription",
+     IDS_SETTINGS_GET_THE_MOST_OUT_OF_CHROME_DESCRIPTION},
+#endif
   };
   html_source->AddLocalizedStrings(kLocalizedStrings);
 
@@ -350,6 +355,9 @@ void AddAboutStrings(content::WebUIDataSource* html_source, Profile* profile) {
   html_source->AddString("aboutTermsURL", chrome::kChromeUITermsURL);
   html_source->AddLocalizedString("aboutProductTos",
                                   IDS_ABOUT_TERMS_OF_SERVICE);
+  html_source->AddBoolean(
+      "showGetTheMostOutOfChromeSection",
+      base::FeatureList::IsEnabled(features::kGetTheMostOutOfChrome));
 #endif
 }
 
@@ -1231,7 +1239,6 @@ void AddAutofillStrings(content::WebUIDataSource* html_source,
     {"addVirtualCard", IDS_AUTOFILL_ADD_VIRTUAL_CARD},
     {"removeVirtualCard", IDS_AUTOFILL_REMOVE_VIRTUAL_CARD},
     {"editServerCard", IDS_AUTOFILL_EDIT_SERVER_CREDIT_CARD},
-    {"virtualCardAvailable", IDS_AUTOFILL_VIRTUAL_CARD_AVAILABLE_LABEL},
     {"virtualCardEnabled", IDS_AUTOFILL_VIRTUAL_CARD_ENABLED_LABEL},
     {"virtualCardTurnedOn", IDS_AUTOFILL_VIRTUAL_CARD_TURNED_ON_LABEL},
     {"unenrollVirtualCardDialogTitle",

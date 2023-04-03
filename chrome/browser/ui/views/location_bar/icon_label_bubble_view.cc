@@ -12,7 +12,6 @@
 #include "chrome/browser/ui/color/chrome_color_id.h"
 #include "chrome/browser/ui/layout_constants.h"
 #include "chrome/browser/ui/omnibox/omnibox_theme.h"
-#include "ui/accessibility/ax_node_data.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
 #include "ui/compositor/layer_animator.h"
@@ -209,7 +208,12 @@ void IconLabelBubbleView::SetPaintLabelOverSolidBackground(
 }
 
 void IconLabelBubbleView::SetLabel(const std::u16string& label_text) {
-  SetAccessibleName(label_text);
+  // TODO(crbug.com/1411342): Under what conditions, if any, will the text be
+  // empty? Read the description of the bug and update accordingly.
+  SetAccessibleName(label_text,
+                    label_text.empty()
+                        ? ax::mojom::NameFrom::kAttributeExplicitlyEmpty
+                        : ax::mojom::NameFrom::kAttribute);
   label()->SetText(label_text);
   separator_view_->SetVisible(ShouldShowSeparator());
   separator_view_->UpdateOpacity();
@@ -421,12 +425,6 @@ void IconLabelBubbleView::AnimationCanceled(const gfx::Animation* animation) {
   AnimationEnded(animation);
 }
 
-void IconLabelBubbleView::GetAccessibleNodeData(ui::AXNodeData* node_data) {
-  LabelButton::GetAccessibleNodeData(node_data);
-  if (GetAccessibleName().empty())
-    node_data->SetNameExplicitlyEmpty();
-}
-
 void IconLabelBubbleView::SetImageModel(const ui::ImageModel& image_model) {
   DCHECK(!image_model.IsEmpty());
   LabelButton::SetImageModel(STATE_NORMAL, image_model);
@@ -451,6 +449,16 @@ gfx::Size IconLabelBubbleView::GetSizeForLabelWidth(int label_width) const {
   const int max_width = image_size.width() + GetInternalSpacing() + label_width;
 
   return gfx::Size(GetWidthBetween(min_width, max_width), image_size.height());
+}
+
+void IconLabelBubbleView::UpdateBorder() {
+  // Bubbles are given the full internal height of the location bar so that all
+  // child views in the location bar have the same height. The visible height of
+  // the bubble should be smaller, so use an empty border to shrink down the
+  // content bounds so the background gets painted correctly.
+  SetBorder(views::CreateEmptyBorder(gfx::Insets::VH(
+      GetLayoutConstant(LOCATION_BAR_CHILD_INTERIOR_PADDING),
+      GetLayoutInsets(LOCATION_BAR_ICON_INTERIOR_PADDING).left())));
 }
 
 int IconLabelBubbleView::GetInternalSpacing() const {
@@ -603,16 +611,6 @@ SkPath IconLabelBubbleView::GetHighlightPath() const {
   const SkRect rect = RectToSkRect(highlight_bounds);
 
   return SkPath().addRoundRect(rect, corner_radius, corner_radius);
-}
-
-void IconLabelBubbleView::UpdateBorder() {
-  // Bubbles are given the full internal height of the location bar so that all
-  // child views in the location bar have the same height. The visible height of
-  // the bubble should be smaller, so use an empty border to shrink down the
-  // content bounds so the background gets painted correctly.
-  SetBorder(views::CreateEmptyBorder(gfx::Insets::VH(
-      GetLayoutConstant(LOCATION_BAR_CHILD_INTERIOR_PADDING),
-      GetLayoutInsets(LOCATION_BAR_ICON_INTERIOR_PADDING).left())));
 }
 
 BEGIN_METADATA(IconLabelBubbleView, views::LabelButton)

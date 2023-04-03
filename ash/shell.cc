@@ -92,6 +92,7 @@
 #include "ash/multi_device_setup/multi_device_notification_presenter.h"
 #include "ash/policy/policy_recommendation_restorer.h"
 #include "ash/projector/projector_controller_impl.h"
+#include "ash/public/cpp/accelerator_keycode_lookup_cache.h"
 #include "ash/public/cpp/ash_prefs.h"
 #include "ash/public/cpp/holding_space/holding_space_controller.h"
 #include "ash/public/cpp/nearby_share_delegate.h"
@@ -115,6 +116,7 @@
 #include "ash/shutdown_controller_impl.h"
 #include "ash/style/ash_color_mixer.h"
 #include "ash/style/ash_color_provider.h"
+#include "ash/style/color_palette_controller.h"
 #include "ash/style/dark_light_mode_controller_impl.h"
 #include "ash/style/style_util.h"
 #include "ash/system/audio/audio_effects_controller.h"
@@ -140,7 +142,6 @@
 #include "ash/system/keyboard_brightness/keyboard_brightness_controller.h"
 #include "ash/system/keyboard_brightness_control_delegate.h"
 #include "ash/system/locale/locale_update_controller_impl.h"
-#include "ash/system/machine_learning/user_settings_event_logger.h"
 #include "ash/system/media/media_notification_provider.h"
 #include "ash/system/message_center/message_center_ash_impl.h"
 #include "ash/system/message_center/message_center_controller.h"
@@ -811,10 +812,6 @@ Shell::~Shell() {
   // widgets that may be animating out.
   clipboard_history_controller_->Shutdown();
 
-  // Destroy UserSettingsEventLogger before |system_tray_model_| and
-  // |video_detector_| which it observes.
-  ml::UserSettingsEventLogger::DeleteInstance();
-
   toast_manager_.reset();
 
   // Accesses root window containers.
@@ -921,6 +918,10 @@ Shell::~Shell() {
   rgb_keyboard_manager_.reset();
 
   ash_color_provider_.reset();
+
+  // Depends on `dark_light_mode_controller_` and `wallpaper_controller_` so it
+  // should be destroyed first.
+  color_palette_controller_.reset();
 
   // Depends on `geolocation_controller_` and `wallpaper_controller_`, so it
   // must be destructed before the geolocation controller and wallpaper
@@ -1234,6 +1235,9 @@ void Shell::Init(
 
   dark_light_mode_controller_ = std::make_unique<DarkLightModeControllerImpl>();
 
+  color_palette_controller_ = ColorPaletteController::Create(
+      dark_light_mode_controller_.get(), wallpaper_controller_.get());
+
   // Privacy Screen depends on the display manager, so initialize it after
   // display manager was properly initialized.
   privacy_screen_controller_ = std::make_unique<PrivacyScreenController>();
@@ -1318,6 +1322,9 @@ void Shell::Init(
   cursor_manager_->SetDisplay(
       display::Screen::GetScreen()->GetPrimaryDisplay());
 
+  // Must be initialized after InputMethodManager.
+  accelerator_keycode_lookup_cache_ =
+      std::make_unique<AcceleratorKeycodeLookupCache>();
   ash_accelerator_configuration_ =
       std::make_unique<AshAcceleratorConfiguration>();
   ash_accelerator_configuration_->Initialize();
@@ -1580,10 +1587,6 @@ void Shell::Init(
   sms_observer_ = std::make_unique<SmsObserver>();
   snap_controller_ = std::make_unique<SnapControllerImpl>();
   key_accessibility_enabler_ = std::make_unique<KeyAccessibilityEnabler>();
-
-  // Create UserSettingsEventLogger after |system_tray_model_| and
-  // |video_detector_| which it observes.
-  ml::UserSettingsEventLogger::CreateInstance();
 
   // The compositor thread and main message loop have to be running in
   // order to create mirror window. Run it after the main message loop

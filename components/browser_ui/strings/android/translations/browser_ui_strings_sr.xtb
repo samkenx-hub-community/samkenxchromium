@@ -103,6 +103,7 @@
 <translation id="2717722538473713889">Имејл адресе</translation>
 <translation id="2750481671343847896">Сајтови могу да приказују упите за пријављивање из услуга за идентитет.</translation>
 <translation id="2822354292072154809">Желите ли стварно да ресетујете све дозволе за сајт за <ph name="CHOSEN_OBJECT_NAME" />?</translation>
+<translation id="2850913818900871965">Захтевај приказ за мобилне уређаје</translation>
 <translation id="2870560284913253234">Сајт</translation>
 <translation id="2874939134665556319">Претходна песма</translation>
 <translation id="2891975107962658722">Онемогућите да сајт чува податке на уређају</translation>
@@ -222,7 +223,6 @@
 <translation id="509133520954049755">Тражи приказ за рачунаре</translation>
 <translation id="5100237604440890931">Скупљено је – Кликните да бисте проширили.</translation>
 <translation id="5123685120097942451">Картица без архивирања</translation>
-<translation id="5134599672855298214">Тражи приказ за мобилне уређаје (препоручено)</translation>
 <translation id="5186036860380548585">Опција је доступна у врху екрана</translation>
 <translation id="5197729504361054390">Контакти које изаберете ће се делити са <ph name="BEGIN_BOLD" /><ph name="SITE" /><ph name="END_BOLD" />.</translation>
 <translation id="5216942107514965959">Последњи посећен данас</translation>

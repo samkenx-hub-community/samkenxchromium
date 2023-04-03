@@ -107,9 +107,9 @@ ExternalSource GetExternalSourceFromExternalImage(
         external_source.external_texture_source = external_texture_source;
         DCHECK(external_texture_source.media_video_frame);
         external_source.width = static_cast<uint32_t>(
-            external_texture_source.media_video_frame->visible_rect().width());
+            external_texture_source.media_video_frame->natural_size().width());
         external_source.height = static_cast<uint32_t>(
-            external_texture_source.media_video_frame->visible_rect().height());
+            external_texture_source.media_video_frame->natural_size().height());
         external_source.valid = true;
       }
       return external_source;
@@ -154,12 +154,13 @@ ExternalSource GetExternalSourceFromExternalImage(
     return external_source;
   }
 
-  if (canvas && !(canvas->IsWebGL() || canvas->IsRenderingContext2D() ||
-                  canvas->IsWebGPU())) {
+  if (canvas &&
+      !(canvas->IsWebGL() || canvas->IsRenderingContext2D() ||
+        canvas->IsWebGPU() || canvas->IsImageBitmapRenderingContext())) {
     exception_state.ThrowDOMException(
         DOMExceptionCode::kOperationError,
-        "CopyExternalImageToTexture doesn't support canvas without 2d, webgl,"
-        " webgl2 or webgpu context");
+        "CopyExternalImageToTexture doesn't support canvas without rendering "
+        "context");
     return external_source;
   }
 
@@ -578,10 +579,11 @@ void GPUQueue::copyExternalImageToTexture(
   }
 
   if (source.external_texture_source.valid) {
-    CopyFromVideoElement(source.external_texture_source,
-                         origin_in_external_image, dawn_copy_size,
-                         dawn_destination, destination->premultipliedAlpha(),
-                         color_space, copyImage->flipY());
+    WGPUExtent2D video_frame_natural_size = {source.width, source.height};
+    CopyFromVideoElement(
+        source.external_texture_source, video_frame_natural_size,
+        origin_in_external_image, dawn_copy_size, dawn_destination,
+        destination->premultipliedAlpha(), color_space, copyImage->flipY());
     return;
   }
 
@@ -598,13 +600,15 @@ void GPUQueue::copyExternalImageToTexture(
   }
 }
 
-void GPUQueue::CopyFromVideoElement(const ExternalTextureSource source,
-                                    const WGPUOrigin2D& origin,
-                                    const WGPUExtent3D& copy_size,
-                                    const WGPUImageCopyTexture& destination,
-                                    bool dst_premultiplied_alpha,
-                                    PredefinedColorSpace dst_color_space,
-                                    bool flipY) {
+void GPUQueue::CopyFromVideoElement(
+    const ExternalTextureSource source,
+    const WGPUExtent2D& video_frame_natural_size,
+    const WGPUOrigin2D& origin,
+    const WGPUExtent3D& copy_size,
+    const WGPUImageCopyTexture& destination,
+    bool dst_premultiplied_alpha,
+    PredefinedColorSpace dst_color_space,
+    bool flipY) {
   DCHECK(source.valid);
 
   // Import GPUExternalTexture to sRGB color space always.
@@ -651,6 +655,7 @@ void GPUQueue::CopyFromVideoElement(const ExternalTextureSource source,
   WGPUImageCopyExternalTexture src = {};
   src.externalTexture = external_texture.wgpu_external_texture;
   src.origin = {origin.x, origin.y, 0};
+  src.naturalSize = video_frame_natural_size;
 
   GetProcs().queueCopyExternalTextureForBrowser(GetHandle(), &src, &destination,
                                                 &copy_size, &options);

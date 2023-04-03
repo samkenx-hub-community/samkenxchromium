@@ -55,8 +55,8 @@ public class TabUiFeatureUtilities {
     private static final String TAB_GROUP_AUTO_CREATION_PARAM = "enable_tab_group_auto_creation";
 
     public static final BooleanCachedFieldTrialParameter ENABLE_TAB_GROUP_AUTO_CREATION =
-            new BooleanCachedFieldTrialParameter(
-                    ChromeFeatureList.TAB_GRID_LAYOUT_ANDROID, TAB_GROUP_AUTO_CREATION_PARAM, true);
+            new BooleanCachedFieldTrialParameter(ChromeFeatureList.TAB_GRID_LAYOUT_ANDROID,
+                    TAB_GROUP_AUTO_CREATION_PARAM, false);
 
     // Field trial parameter for configuring the "Open in new tab" and "Open in new tab in group"
     // item order in the context menu.
@@ -65,13 +65,7 @@ public class TabUiFeatureUtilities {
 
     public static final BooleanCachedFieldTrialParameter SHOW_OPEN_IN_TAB_GROUP_MENU_ITEM_FIRST =
             new BooleanCachedFieldTrialParameter(ChromeFeatureList.TAB_GRID_LAYOUT_ANDROID,
-                    SHOW_OPEN_IN_TAB_GROUP_MENU_ITEM_FIRST_PARAM, false);
-
-    // Field trial parameter for defining tab width for tab strip improvements.
-    private static final String TAB_STRIP_IMPROVEMENTS_TAB_WIDTH_PARAM = "min_tab_width";
-    public static final DoubleCachedFieldTrialParameter TAB_STRIP_TAB_WIDTH =
-            new DoubleCachedFieldTrialParameter(ChromeFeatureList.TAB_STRIP_IMPROVEMENTS,
-                    TAB_STRIP_IMPROVEMENTS_TAB_WIDTH_PARAM, 108.f);
+                    SHOW_OPEN_IN_TAB_GROUP_MENU_ITEM_FIRST_PARAM, true);
 
     // Field trial parameter for controlling share tabs in TabSelectionEditorV2.
     private static final String TAB_SELECTION_EDITOR_V2_SHARE_PARAM = "enable_share";
@@ -148,21 +142,11 @@ public class TabUiFeatureUtilities {
     }
 
     /**
-     * @return Whether the tab strip improvements are enabled.
-     * @param context The activity context.
-     */
-    public static boolean isTabStripImprovementsEnabled(Context context) {
-        return DeviceFormFactor.isNonMultiDisplayContextOnTablet(context)
-                && ChromeFeatureList.sTabStripImprovements.isEnabled();
-    }
-
-    /**
      * @return Whether tab groups are enabled for tablet.
      * @param context The activity context.
      */
     public static boolean isTabletTabGroupsEnabled(Context context) {
         return DeviceFormFactor.isNonMultiDisplayContextOnTablet(context)
-                && ChromeFeatureList.sTabStripImprovements.isEnabled()
                 && ChromeFeatureList.sTabGroupsForTablets.isEnabled()
                 && !DeviceClassManager.enableAccessibilityLayout(context);
     }
@@ -226,25 +210,7 @@ public class TabUiFeatureUtilities {
                 && !SysUtils.isLowEndDevice();
     }
 
-    private static Float sTabMinWidthForTesting;
-
-    /**
-     * Set the min tab width for testing.
-     */
-    public static void setTabMinWidthForTesting(@Nullable Float minWidth) {
-        sTabMinWidthForTesting = minWidth;
-    }
-
-    /**
-     * @return The min tab width.
-     */
-    public static float getTabMinWidth() {
-        if (sTabMinWidthForTesting != null) {
-            return sTabMinWidthForTesting;
-        }
-
-        return (float) TAB_STRIP_TAB_WIDTH.getValue();
-    }
+    public static Float sTabMinWidthForTesting;
 
     /**
      * @return Whether the "Open in new tab in group" context menu item should show before the

@@ -107,7 +107,6 @@
 <translation id="1834290891154666894">Ogiltig inmatning för matchning av ämnets andra namn</translation>
 <translation id="1838709767668011582">Google-webbplats</translation>
 <translation id="1853795129690976061">Den här mappen delas med Linux</translation>
-<translation id="1859422890169495746">Denna Chromebook</translation>
 <translation id="1864756863218646478">Filen hittades inte.</translation>
 <translation id="1884013283844450420">Nätverk <ph name="NETWORK_INDEX" /> av <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, anslut</translation>
 <translation id="1920670151694390848">malayalam, translitterering</translation>
@@ -130,6 +129,7 @@
 <translation id="2084108471225856927">Enhetsinställningar</translation>
 <translation id="2084809735218147718">Person som säger tack på teckenspråk</translation>
 <translation id="2088690981887365033">VPN-nätverk</translation>
+<translation id="2111134541987263231">Aktivera <ph name="BEGIN_BOLD" />Tillåt i inkognito<ph name="END_BOLD" /></translation>
 <translation id="2114191879048183086"><ph name="NUMBER_OF_ITEMS" /> objekt raderas och du kan inte återställa dem.</translation>
 <translation id="2122305276694332719">Med automatisk anslutning till ett dolt nätverk kan andra se enheten och vissa nätverksinställningar. Detta rekommenderas inte.</translation>
 <translation id="2125607626296734455">khmer</translation>
@@ -228,6 +228,7 @@
 <translation id="290843123675549676">marathi</translation>
 <translation id="2923240520113693977">estniska</translation>
 <translation id="2938685643439809023">mongoliska</translation>
+<translation id="293972288692056847">{COUNT,plural, =1{Det går inte att hitta tillägget}other{Det går inte att hitta tilläggen}}</translation>
 <translation id="2943503720238418293">Ange ett kortare namn</translation>
 <translation id="2949781154072577687">Formaterar <ph name="DRIVE_NAME" /> …</translation>
 <translation id="2951236788251446349">Manet</translation>
@@ -282,6 +283,7 @@
 <translation id="3356580349448036450">Klart</translation>
 <translation id="3358452157379365236">Gitarr</translation>
 <translation id="3368922792935385530">Ansluten</translation>
+<translation id="3372635229069101468">Klicka på <ph name="BEGIN_BOLD" />Information<ph name="END_BOLD" /></translation>
 <translation id="3382143449143186018">nepali med InScript-tangentbord</translation>
 <translation id="338691029516748599">Nätverk <ph name="NETWORK_INDEX" /> av <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, <ph name="SECURITY_STATUS" />, signalstyrka <ph name="SIGNAL_STRENGTH" /> %, hanteras av administratören, anslut</translation>
 <translation id="3408072735282270043">Aktivera, <ph name="NETWORK_NAME" /></translation>
@@ -366,6 +368,7 @@
 <translation id="4124935795427217608">Enhörning</translation>
 <translation id="4131235941541910880">Lägg objekt som inte behövs i papperskorgen</translation>
 <translation id="4134804435730168042">Nätverk <ph name="NETWORK_INDEX" /> av <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, <ph name="NETWORK_PROVIDER_NAME" />, Aktivera efter enhetskonfigurering</translation>
+<translation id="41501027364808384">{COUNT,plural, =1{Aktivera följande tillägg i inkognitoläge:}other{Aktivera följande tillägg i inkognitoläge:}}</translation>
 <translation id="4153015322587141338">Högerklicka på en fil som du vill ha snabbt tillgänglig i hyllan och välj <ph name="PIN_COMMAND" />.</translation>
 <translation id="4157569377477607576">Enligt administratörspolicyn rekommenderas inte följande:</translation>
 <translation id="4159731583141908892"><ph name="FILE_NAME" /> har flyttats.</translation>
@@ -462,12 +465,15 @@
 <translation id="4801956050125744859">Behåll båda</translation>
 <translation id="4804827417948292437">Avokado</translation>
 <translation id="4805966553127040832">Återställer <ph name="COUNT" /> objekt</translation>
+<translation id="4816695657735045067">{COUNT,plural, =1{Om du vill använda inkognitoläge kräver din organisation ett tillägg}other{Om du vill använda inkognitoläge kräver din organisation vissa tillägg}}</translation>
 <translation id="4823651846660089135">Enheten är skrivskyddad</translation>
 <translation id="4826849268470072925">tamil (ITRANS)</translation>
+<translation id="482932175346970750">Skriv <ph name="BEGIN_BOLD" />chrome://extensions<ph name="END_BOLD" /> i webbläsaren</translation>
 <translation id="4839847978919684242"><ph name="SELCTED_FILES_COUNT" /> poster har valts</translation>
 <translation id="4843566743023903107">Chromebase-modeller</translation>
 <translation id="4850886885716139402">Visa</translation>
 <translation id="485316830061041779">tyska</translation>
+<translation id="4862885579661885411">Inställningar för Filer</translation>
 <translation id="4867079195717347957">Klicka här om kolumnen ska sorteras i fallande ordning.</translation>
 <translation id="4867297348137739678">Förra veckan</translation>
 <translation id="4873265419374180291"><ph name="NUMBER_OF_BYTES" /> byte</translation>
@@ -533,6 +539,7 @@
     med filer tillsammans med andra på ett och samma ställe.<ph name="MARKUP_9" /></translation>
 <translation id="5275973617553375938">Återställda filer från Google Drive</translation>
 <translation id="5278111733643988471">Om du vill återställa det här objektet drar du det till en ny mapp utanför papperskorgen. Den ursprungliga mappen <ph name="PARENT_FOLDER_NAME" /> för objektet har raderats.</translation>
+<translation id="5283101102242354279">Aktivera ett tillägg i inkognitoläge:</translation>
 <translation id="5286194356314741248">Skannar</translation>
 <translation id="5288441970121584418">Hamburgare</translation>
 <translation id="5288481194217812690"><ph name="FILENAME" /></translation>
@@ -628,6 +635,7 @@
 <translation id="603895874132768835">Du kan inte använda det här nätverket förrän du har ställt in en ny pinkod.</translation>
 <translation id="6040143037577758943">Stäng</translation>
 <translation id="6055907707645252013">Nätverkstyp: <ph name="NETWORK_TYPE" />, inte anslutet</translation>
+<translation id="6073060579181816027">Flera filplatser</translation>
 <translation id="6074825444536523002">Formulär från Google</translation>
 <translation id="6079871810119356840">ungerska med QWERTY-tangentbord</translation>
 <translation id="6096979789310008754">Söktexten har tagits bort och alla filer och mappar visas.</translation>
@@ -778,6 +786,7 @@
 <translation id="7238643356913091553"><ph name="NETWORK_NAME" />, information</translation>
 <translation id="7246947237293279874">FTP-proxy</translation>
 <translation id="7248671827512403053">Program</translation>
+<translation id="7252604552361840748">Hitta tillägget ovan</translation>
 <translation id="7256405249507348194">Okänt fel: <ph name="DESC" /></translation>
 <translation id="7268659760406822741">Tillgängliga tjänster</translation>
 <translation id="7292816689782057017">Administratörspolicyn begränsar möjligheten att spara på vissa platser.</translation>

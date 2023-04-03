@@ -257,6 +257,8 @@ Textfield::Textfield()
   AddAccelerator(ui::Accelerator(ui::VKEY_V, ui::EF_CONTROL_DOWN));
 #endif
 
+  SetAccessibilityProperties(ax::mojom::Role::kTextField);
+
   // Sometimes there are additional ignored views, such as the View representing
   // the cursor, inside the text field. These should always be ignored by
   // accessibility since a plain text field should always be a leaf node in the
@@ -269,11 +271,6 @@ Textfield::~Textfield() {
     // The textfield should have been blurred before destroy.
     DCHECK(this != GetInputMethod()->GetTextInputClient());
   }
-}
-
-void Textfield::SetAssociatedLabel(View* labelling_view) {
-  DCHECK(labelling_view);
-  GetViewAccessibility().OverrideLabelledBy(labelling_view);
 }
 
 void Textfield::SetController(TextfieldController* controller) {
@@ -1013,10 +1010,7 @@ void Textfield::OnDragDone() {
 }
 
 void Textfield::GetAccessibleNodeData(ui::AXNodeData* node_data) {
-  node_data->role = ax::mojom::Role::kTextField;
-
-  node_data->SetName(GetAccessibleName());
-  node_data->SetNameFrom(ax::mojom::NameFrom::kAttribute);
+  View::GetAccessibleNodeData(node_data);
 
   // Editable state indicates support of editable interface, and is always set
   // for a textfield, even if disabled or readonly.

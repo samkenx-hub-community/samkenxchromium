@@ -220,6 +220,7 @@ Her er noen ting du kan prøve til å begynne med.</translation>
 <translation id="1969011864782743497"><ph name="DEVICE_NAME" /> (USB)</translation>
 <translation id="1972950159383891558">Hei, <ph name="USERNAME" /></translation>
 <translation id="1978498689038657292">Tekstfelt</translation>
+<translation id="1980808257969311265">Bli med i <ph name="EVENT_SUMMARY" /></translation>
 <translation id="1982717156487272186">Vis forrige uke</translation>
 <translation id="1989113344093894667">Kan ikke ta bilde av innhold</translation>
 <translation id="1990046457226896323">Talefiler er lastet ned</translation>
@@ -574,6 +575,7 @@ Her er noen ting du kan prøve til å begynne med.</translation>
 <translation id="3659814201068740063">Omtrent <ph name="TIME_LEFT" /> igjen (<ph name="PERCENTAGE" /> %).
 Koble enheten til strøm.</translation>
 <translation id="366222428570480733"><ph name="USER_EMAIL_ADDRESS" /> – administrert bruker</translation>
+<translation id="3666266999138159418">Sveip for å skjule det flytende vinduet</translation>
 <translation id="367531336287639526">Velg det første ikonet til venstre for adressefeltet</translation>
 <translation id="3679827876008292680">Gå til den siste fanen i vinduet</translation>
 <translation id="36813544980941320">Wifi-nettverk blir delt mellom telefonen din og <ph name="DEVICE_NAME" /></translation>
@@ -622,7 +624,6 @@ Koble enheten til strøm.</translation>
 <translation id="3925540965556789199"><ph name="DATE" /> – laster inn hendelser.</translation>
 <translation id="3932043219784172185">Ingen enheter er koblet til</translation>
 <translation id="3934456833412894880">Tilpasset lading er på. Batteriet kommer til å holde seg på 80 % for å forlenge batterilevetiden, og det lades helt opp når du trenger det.</translation>
-<translation id="3936620957945677513">Trykk på Enter for å bli med i aktiviteten <ph name="EVENT_SUMMARY" /></translation>
 <translation id="3943857333388298514">Lim inn</translation>
 <translation id="394485226368336402">Lydinnstillinger</translation>
 <translation id="3945319193631853098">Trykk for å fullføre konfigureringen</translation>
@@ -1253,6 +1254,7 @@ Nylig installert</translation>
 <translation id="685782768769951078">{NUM_DIGITS,plural, =1{Ett siffer gjenstår}other{# sifre gjenstår}}</translation>
 <translation id="6867938213751067702">Nedlastingen av <ph name="FILENAME" /> er satt på pause</translation>
 <translation id="6878400149835617132">Snarveien er avslått</translation>
+<translation id="6878701771800702153">{NUM_APPS,plural, =1{1 app}other{# apper}}</translation>
 <translation id="6884665277231944629">Gå tilbake til i dag</translation>
 <translation id="6886172995547742638">Ytelsen til <ph name="DEVICE_TYPE" /> kan svekkes. Bruk en sertifisert USB-C-strømadapter på <ph name="PREFERRED_MINIMUM_POWER" /> W eller mer.</translation>
 <translation id="688631446150864480">Trykk på nedoverpiltasten for å bytte vindu</translation>
@@ -1420,6 +1422,7 @@ For å slå av enheten, trykk og hold på av/på-knappen på enheten igjen.</tra
 <translation id="7689817529363080918">Dette gir mikrofontilgang til <ph name="APP1_NAME" />, <ph name="APP2_NAME" /> og alle apper og nettsteder som har mikrofontillatelsen</translation>
 <translation id="7704000866383261579">Utfør siste handling likevel</translation>
 <translation id="7705524343798198388">VPN</translation>
+<translation id="770741401784017797">Oppretter GIF</translation>
 <translation id="7714767791242455379">Legg til nytt mobilnettverk</translation>
 <translation id="7720400844887872976">Påslått til <ph name="TIME" /></translation>
 <translation id="7720410380936703141">PRØV PÅ NYTT</translation>
@@ -1432,6 +1435,7 @@ For å slå av enheten, trykk og hold på av/på-knappen på enheten igjen.</tra
 <translation id="7749443890790263709">Maksimalt antall skrivebord er nådd.</translation>
 <translation id="776344839111254542">Klikk for å se oppdateringsdetaljene</translation>
 <translation id="7768784765476638775">Tekstopplesing</translation>
+<translation id="7769299611924763557">GIF-en din er snart klar</translation>
 <translation id="7780094051999721182">snarveier</translation>
 <translation id="7780159184141939021">Rotér skjermen</translation>
 <translation id="7796735576426975947">Et nytt varsel er skjult</translation>

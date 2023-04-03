@@ -274,6 +274,7 @@
 <translation id="3456078764689556234">Đã in trang <ph name="PRINTED_PAGES" />/<ph name="TOTAL_PAGES" />.</translation>
 <translation id="345898999683440380">Đang quét trang <ph name="PAGE_NUM" />. Ðã quét được <ph name="PERCENTAGE_VALUE" />%.</translation>
 <translation id="3459509316159669723">In</translation>
+<translation id="346423161771747987">Cường độ dòng điện</translation>
 <translation id="346539236881580388">Chụp lại</translation>
 <translation id="3484914941826596830">Khi chương trình cơ sở đang cập nhật, đừng rút thiết bị bên ngoài này ra hay tắt máy tính. Bạn có thể thu nhỏ cửa sổ này. Quá trình cập nhật có thể mất vài phút và thiết bị bên ngoài của bạn có thể không hoạt động được trong thời gian này.</translation>
 <translation id="3486220673238053218">định nghĩa</translation>
@@ -697,6 +698,7 @@
 <translation id="7103252855940681301">Thiết bị <ph name="INDEX" />/<ph name="COUNT" /> tên là <ph name="NAME" />.</translation>
 <translation id="7108668606237948702">nhập</translation>
 <translation id="7130438335435247835">Tên điểm truy cập (APN)</translation>
+<translation id="7131634559772719176">Xác nhận giá trị đặt trước</translation>
 <translation id="7134436342991564651">{0,plural, =1{Máy chủ định danh}other{Các máy chủ định danh}}</translation>
 <translation id="7143207342074048698">Đang kết nối</translation>
 <translation id="7144878232160441200">Thử lại</translation>
@@ -759,6 +761,7 @@
 <translation id="7656388927906093505">Thiết bị là chuột.</translation>
 <translation id="7658239707568436148">Hủy</translation>
 <translation id="7665800271478495366">Thay đổi hình đại diện</translation>
+<translation id="7675241868020048622">Aurora (Dành riêng cho Aurora Plus)</translation>
 <translation id="7690294790491645610">Xác nhận mật khẩu mới</translation>
 <translation id="7701040980221191251">Không có</translation>
 <translation id="7705524343798198388">VPN</translation>
@@ -768,6 +771,7 @@
 <translation id="7762130827864645708">Bạn đã thay đổi mật khẩu thành công. Hãy sử dụng mật khẩu mới từ giờ trở đi.</translation>
 <translation id="7763470514545477072">Khớp hậu tố tên miền</translation>
 <translation id="7769672763586021400">ID kiểu máy</translation>
+<translation id="7770834998503326261">Thông tin bổ sung liên quan đến lựa chọn của bạn</translation>
 <translation id="7778717409420828014">Ý kiến phản hồi của bạn giúp chúng tôi cải thiện trải nghiệm sử dụng Chromebook và sẽ được đội ngũ của chúng tôi xem xét. Do nhận được số lượng lớn báo cáo nên chúng tôi sẽ không thể gửi thư trả lời cho bạn.</translation>
 <translation id="7784116172884276937">Không có máy chủ DNS nào được thiết lập</translation>
 <translation id="7791543448312431591">Thêm</translation>
@@ -800,6 +804,7 @@
 <translation id="80398733265834479">Bật chế độ màu tự động</translation>
 <translation id="8041089156583427627">Gửi ý kiến phản hồi</translation>
 <translation id="8045012663542226664">Tắt micrô</translation>
+<translation id="8050091914317269817">Nếu bạn chọn hình nền này, chế độ tối và tính năng khớp màu hình nền sẽ tự động bật.</translation>
 <translation id="8075838845814659848">Mức pin còn lại</translation>
 <translation id="8076492880354921740">Thẻ</translation>
 <translation id="8082366717211101304">Không thể phân giải DNS từ các ứng dụng Android</translation>

@@ -274,6 +274,7 @@
 <translation id="3456078764689556234">Printed page <ph name="PRINTED_PAGES" /> out of <ph name="TOTAL_PAGES" />.</translation>
 <translation id="345898999683440380">Scanning page <ph name="PAGE_NUM" />. <ph name="PERCENTAGE_VALUE" />% completed.</translation>
 <translation id="3459509316159669723">Printing</translation>
+<translation id="346423161771747987">Current</translation>
 <translation id="346539236881580388">Retake</translation>
 <translation id="3484914941826596830">While the firmware is updating, do not unplug this external device or shut down your computer. You can minimise this window. This update may take a few minutes and your external device may not work during this time.</translation>
 <translation id="3486220673238053218">definition</translation>
@@ -697,6 +698,7 @@
 <translation id="7103252855940681301">Device <ph name="INDEX" /> of <ph name="COUNT" /> named <ph name="NAME" />.</translation>
 <translation id="7108668606237948702">enter</translation>
 <translation id="7130438335435247835">Access Point Name (APN)</translation>
+<translation id="7131634559772719176">Confirm preset</translation>
 <translation id="7134436342991564651">{0,plural, =1{Name server}other{Name servers}}</translation>
 <translation id="7143207342074048698">Connecting</translation>
 <translation id="7144878232160441200">Retry</translation>
@@ -759,6 +761,7 @@
 <translation id="7656388927906093505">Device is a mouse.</translation>
 <translation id="7658239707568436148">Cancel</translation>
 <translation id="7665800271478495366">Change avatar</translation>
+<translation id="7675241868020048622">Aurora (Plus exclusive)</translation>
 <translation id="7690294790491645610">Confirm new password</translation>
 <translation id="7701040980221191251">None</translation>
 <translation id="7705524343798198388">VPN</translation>
@@ -768,6 +771,7 @@
 <translation id="7762130827864645708">Your password change was successful. Please use the new password from now on.</translation>
 <translation id="7763470514545477072">Domain suffix match</translation>
 <translation id="7769672763586021400">Model ID</translation>
+<translation id="7770834998503326261">Additional info related to your selection</translation>
 <translation id="7778717409420828014">Your feedback helps us improve the Chromebook experience and will be reviewed by our team. Because of the large number of reports, we won’t be able to send a reply.</translation>
 <translation id="7784116172884276937">No DNS servers are set up</translation>
 <translation id="7791543448312431591">Add</translation>
@@ -800,6 +804,7 @@
 <translation id="80398733265834479">Enable auto colour mode</translation>
 <translation id="8041089156583427627">Send Feedback</translation>
 <translation id="8045012663542226664">Microphone mute</translation>
+<translation id="8050091914317269817">Selecting this wallpaper will turn on auto dark mode and wallpaper colour matching.</translation>
 <translation id="8075838845814659848">Remaining charge</translation>
 <translation id="8076492880354921740">Tabs</translation>
 <translation id="8082366717211101304">Can't resolve DNS from Android apps</translation>

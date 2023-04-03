@@ -12,11 +12,6 @@
 #include "third_party/blink/renderer/core/layout/ng/layout_box_utils.h"
 #include "third_party/blink/renderer/core/layout/ng/layout_ng_block.h"
 #include "third_party/blink/renderer/core/layout/ng/layout_ng_block_flow.h"
-#include "third_party/blink/renderer/core/layout/ng/layout_ng_progress.h"
-#include "third_party/blink/renderer/core/layout/ng/layout_ng_ruby_as_block.h"
-#include "third_party/blink/renderer/core/layout/ng/layout_ng_ruby_base.h"
-#include "third_party/blink/renderer/core/layout/ng/layout_ng_ruby_run.h"
-#include "third_party/blink/renderer/core/layout/ng/layout_ng_ruby_text.h"
 #include "third_party/blink/renderer/core/layout/ng/ng_box_fragment_builder.h"
 #include "third_party/blink/renderer/core/layout/ng/ng_constraint_space.h"
 #include "third_party/blink/renderer/core/layout/ng/ng_constraint_space_builder.h"
@@ -72,9 +67,7 @@ void LayoutNGMixin<Base>::Paint(const PaintInfo& paint_info) const {
   // instead of |LayoutObject|, because this function cannot handle block
   // fragmented objects. We can come here only when |this| cannot traverse
   // fragments, or the parent is legacy.
-  DCHECK(Base::GetNGPaginationBreakability() ==
-             LayoutNGBlockFlow::kForbidBreaks ||
-         !Base::CanTraversePhysicalFragments() ||
+  DCHECK(Base::IsMonolithic() || !Base::CanTraversePhysicalFragments() ||
          !Base::Parent()->CanTraversePhysicalFragments());
   // We may get here in multiple-fragment cases if the object is repeated
   // (inside table headers and footers, for instance).
@@ -107,9 +100,7 @@ bool LayoutNGMixin<Base>::NodeAtPoint(HitTestResult& result,
   Base::CheckIsNotDestroyed();
 
   // See |Paint()|.
-  DCHECK(Base::GetNGPaginationBreakability() ==
-             LayoutNGBlockFlow::kForbidBreaks ||
-         !Base::CanTraversePhysicalFragments() ||
+  DCHECK(Base::IsMonolithic() || !Base::CanTraversePhysicalFragments() ||
          !Base::Parent()->CanTraversePhysicalFragments());
   // We may get here in multiple-fragment cases if the object is repeated
   // (inside table headers and footers, for instance).
@@ -267,7 +258,7 @@ void LayoutNGMixin<Base>::UpdateOutOfFlowBlockLayout() {
   // should get laid out by the actual containing block.
   NGOutOfFlowLayoutPart(css_container->CanContainAbsolutePositionObjects(),
                         css_container->CanContainFixedPositionObjects(),
-                        css_container->IsLayoutGrid(), constraint_space,
+                        /* is_grid_container */ false, constraint_space,
                         &container_builder, initial_containing_block_fixed_size)
       .Run(/* only_layout */ this);
   const NGLayoutResult* result = container_builder.ToBoxFragment();
@@ -387,13 +378,7 @@ void LayoutNGMixin<Base>::UpdateMargins() {
 
 template class CORE_TEMPLATE_EXPORT LayoutNGMixin<LayoutBlock>;
 template class CORE_TEMPLATE_EXPORT LayoutNGMixin<LayoutBlockFlow>;
-template class CORE_TEMPLATE_EXPORT LayoutNGMixin<LayoutProgress>;
-template class CORE_TEMPLATE_EXPORT LayoutNGMixin<LayoutRubyAsBlock>;
-template class CORE_TEMPLATE_EXPORT LayoutNGMixin<LayoutRubyBase>;
-template class CORE_TEMPLATE_EXPORT LayoutNGMixin<LayoutRubyRun>;
-template class CORE_TEMPLATE_EXPORT LayoutNGMixin<LayoutRubyText>;
 template class CORE_TEMPLATE_EXPORT LayoutNGMixin<LayoutSVGBlock>;
-template class CORE_TEMPLATE_EXPORT LayoutNGMixin<LayoutTableCaption>;
 template class CORE_TEMPLATE_EXPORT LayoutNGMixin<LayoutView>;
 
 }  // namespace blink

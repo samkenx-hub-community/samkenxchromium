@@ -310,6 +310,9 @@ const PolicyToPreferenceMapEntry kSimplePolicyMap[] = {
   { key::kThirdPartyStoragePartitioningBlockedForOrigins,
     prefs::kManagedThirdPartyStoragePartitioningBlockedForOrigins,
     base::Value::Type::LIST },
+  { key::kInsecureHashesInTLSHandshakesEnabled,
+    prefs::kInsecureHashesInTLSHandshakesEnabled,
+    base::Value::Type::BOOLEAN },
 // Policies for all platforms - End
 #if BUILDFLAG(IS_ANDROID)
   { key::kAuthAndroidNegotiateAccountType,
@@ -1341,9 +1344,6 @@ const PolicyToPreferenceMapEntry kSimplePolicyMap[] = {
   { key::kSecurityTokenSessionNotificationSeconds,
     prefs::kSecurityTokenSessionNotificationSeconds,
     base::Value::Type::INTEGER },
-  { key::kDeviceArcDataSnapshotHours,
-    arc::prefs::kArcSnapshotHours,
-    base::Value::Type::DICT },
   { key::kDeviceAllowMGSToStoreDisplayProperties,
     ash::prefs::kAllowMGSToStoreDisplayProperties,
     base::Value::Type::BOOLEAN },

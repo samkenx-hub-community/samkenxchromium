@@ -10,16 +10,6 @@ import {mountCrostini, navigateWithDirectoryTree, remoteCall, setupAndWaitUntilR
 import {BASIC_DRIVE_ENTRY_SET, BASIC_FAKE_ENTRY_SET, BASIC_LOCAL_ENTRY_SET, NESTED_ENTRY_SET} from './test_data.js';
 
 /**
- * Expected files shown in the search results for 'hello'
- *
- * @type {!Array<!TestEntryInfo>}
- * @const
- */
-const SEARCH_RESULTS_ENTRY_SET = [
-  ENTRIES.hello,
-];
-
-/**
  * @param {string} appId The ID that identifies the files app.
  * @param {string} type The search option type (location, recency, type).
  * @return {Promise<string>} The text of the element with 'selected-option' ID.
@@ -48,23 +38,12 @@ testcase.searchDownloadsWithResults = async () => {
   // Open Files app on Downloads.
   const appId = await setupAndWaitUntilReady(RootPath.DOWNLOADS);
 
-  // Click on the search button to display the search box.
-  await remoteCall.waitAndClickElement(appId, '#search-button');
-
-  // Focus the search box.
-  chrome.test.assertTrue(await remoteCall.callRemoteTestUtil(
-      'fakeEvent', appId, ['#search-box [type="search"]', 'focus']));
-
-  // Input a text.
-  await remoteCall.inputText(appId, '#search-box [type="search"]', 'hello');
-
-  // Notify the element of the input.
-  chrome.test.assertTrue(await remoteCall.callRemoteTestUtil(
-      'fakeEvent', appId, ['#search-box [type="search"]', 'input']));
+  // Search for all files with "hello" in their name.
+  await remoteCall.typeSearchText(appId, 'hello');
 
   // Wait file list to display the search result.
   await remoteCall.waitForFiles(
-      appId, TestEntryInfo.getExpectedRows(SEARCH_RESULTS_ENTRY_SET));
+      appId, TestEntryInfo.getExpectedRows([ENTRIES.hello]));
 
   // Check that a11y message for results has been issued.
   const a11yMessages =
@@ -82,17 +61,8 @@ testcase.searchDownloadsWithNoResults = async () => {
   // Open Files app on Downloads.
   const appId = await setupAndWaitUntilReady(RootPath.DOWNLOADS);
 
-  // Focus the search box.
-  chrome.test.assertTrue(await remoteCall.callRemoteTestUtil(
-      'fakeEvent', appId, ['#search-box [type="search"]', 'focus']));
-
-  // Input a text.
-  await remoteCall.inputText(
-      appId, '#search-box [type="search"]', 'INVALID TERM');
-
-  // Notify the element of the input.
-  chrome.test.assertTrue(await remoteCall.callRemoteTestUtil(
-      'fakeEvent', appId, ['#search-box [type="search"]', 'input']));
+  // Search for name not present among basic entry set.
+  await remoteCall.typeSearchText(appId, 'INVALID TERM');
 
   // Wait file list to display no results.
   await remoteCall.waitForFiles(appId, []);
@@ -604,7 +574,7 @@ testcase.resetSearchOptionsOnFolderChange = async () => {
 
   // Check the defaults.
   chrome.test.assertEq(
-      'This folder', await getSelectedOptionText(appId, 'location'));
+      'Downloads', await getSelectedOptionText(appId, 'location'));
   chrome.test.assertEq(
       'Any time', await getSelectedOptionText(appId, 'recency'));
   chrome.test.assertEq('All types', await getSelectedOptionText(appId, 'type'));
@@ -624,7 +594,7 @@ testcase.resetSearchOptionsOnFolderChange = async () => {
 
   // Check that we are back to defaults.
   chrome.test.assertEq(
-      'This folder', await getSelectedOptionText(appId, 'location'));
+      'photos', await getSelectedOptionText(appId, 'location'));
   chrome.test.assertEq(
       'Any time', await getSelectedOptionText(appId, 'recency'));
   chrome.test.assertEq('All types', await getSelectedOptionText(appId, 'type'));
@@ -737,25 +707,27 @@ testcase.selectionPath = async () => {
   const singleSelectionPath = await remoteCall.waitForElement(appId, [
     'xf-path-display',
   ]);
+  chrome.test.assertFalse(singleSelectionPath.hidden);
   chrome.test.assertEq(
-      'My files/Downloads', singleSelectionPath.attributes.path);
-  // Select now the desktop entry, too. Both are in the same
-  // directory, so the path should not change.
+      'My files/Downloads/' + ENTRIES.hello.nameText,
+      singleSelectionPath.attributes.path);
+  // Select now the desktop entry, too. Two or more selected files,
+  // regardless of the directory in which they sit, result in no path.
   await remoteCall.waitAndClickElement(
       appId, `#file-list [file-name="${ENTRIES.desktop.nameText}"]`,
       {ctrl: true});
-  const twoFilesOneFolderPath = await remoteCall.waitForElement(appId, [
+  const twoFilesSelectedPath = await remoteCall.waitForElement(appId, [
     'xf-path-display',
   ]);
-  chrome.test.assertEq(
-      'My files/Downloads', twoFilesOneFolderPath.attributes.path);
+  chrome.test.assertTrue(twoFilesSelectedPath.hidden);
+  chrome.test.assertEq('', twoFilesSelectedPath.attributes.path);
   await remoteCall.waitAndClickElement(
       appId,
       `#file-list [file-name="${ENTRIES.deeplyBurriedSmallJpeg.nameText}"]`,
       {ctrl: true});
-  const threeFilesTwoFolderPath = await remoteCall.waitForElement(appId, [
+  const threeFilesSelectedPath = await remoteCall.waitForElement(appId, [
     'xf-path-display',
   ]);
-  chrome.test.assertEq(
-      'Multiple file locations', threeFilesTwoFolderPath.attributes.path);
+  chrome.test.assertTrue(threeFilesSelectedPath.hidden);
+  chrome.test.assertEq('', threeFilesSelectedPath.attributes.path);
 };

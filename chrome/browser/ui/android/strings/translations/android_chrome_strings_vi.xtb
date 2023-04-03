@@ -536,7 +536,7 @@ Mã thông báo trạng thái riêng tư giúp cải thiện quyền riêng tư
 <translation id="397583555483684758">Đồng bộ hóa đã ngừng hoạt động</translation>
 <translation id="3976396876660209797">Xóa và tạo lại lối tắt này</translation>
 <translation id="3981902534690264083">Nhà quảng cáo có thể nắm được hiệu suất của quảng cáo</translation>
-<translation id="3985022125189960801">Thêm lại một trang web nếu bạn muốn trang này nằm trong số những trang web có thể đoán sở thích của bạn</translation>
+<translation id="3985022125189960801">Thêm lại một trang web nếu bạn muốn thêm trang này vào nhóm những trang web có thể đoán sở thích của bạn</translation>
 <translation id="3985215325736559418">Bạn có muốn tải lại <ph name="FILE_NAME" /> xuống không?</translation>
 <translation id="3987993985790029246">Sao chép đường liên kết</translation>
 <translation id="3999683152997576765">Bạn có thể xem và xoá những chủ đề quan tâm mà các trang web dựa vào để hiện quảng cáo cho bạn. Chrome ước đoán các mối quan tâm dựa trên nhật ký duyệt web gần đây của bạn.</translation>
@@ -660,7 +660,7 @@ Tài khoản Google của bạn có thể có các dạng nhật ký duyệt web
 <translation id="4678082183394354975">Đã bật giao diện tối cho các trang web trong Chrome</translation>
 <translation id="4684427112815847243">Đồng bộ hóa mọi thứ</translation>
 <translation id="4685741273709472646">Chọn từ danh sách thả xuống</translation>
-<translation id="4687718960473379118">Quảng cáo do trang web đề xuất</translation>
+<translation id="4687718960473379118">QC do trang web đề xuất</translation>
 <translation id="4689792375321623175">Tìm hình ảnh bằng Google <ph name="BEGIN_NEW" />Mới<ph name="END_NEW" /></translation>
 <translation id="4695891336199304370">{SHIPPING_OPTIONS,plural, =1{<ph name="SHIPPING_OPTION_PREVIEW" />\u2026 và <ph name="NUMBER_OF_ADDITIONAL_SHIPPING_OPTIONS" /> tùy chọn khác}other{<ph name="SHIPPING_OPTION_PREVIEW" />\u2026 và <ph name="NUMBER_OF_ADDITIONAL_SHIPPING_OPTIONS" /> tùy chọn khác}}</translation>
 <translation id="4699172675775169585">Tệp và hình ảnh được lưu trong bộ nhớ đệm</translation>
@@ -737,6 +737,7 @@ Tài khoản Google của bạn có thể có các dạng nhật ký duyệt web
 <translation id="5001388021414335527">Theo dõi trang web này tại đây</translation>
 <translation id="5004416275253351869">Kiểm soát hoạt động trên Google</translation>
 <translation id="5005498671520578047">Sao chép mật khẩu</translation>
+<translation id="5010886807652684893">Chế độ xem hình ảnh</translation>
 <translation id="5011311129201317034"><ph name="SITE" /> muốn kết nối</translation>
 <translation id="5016205925109358554">Serif</translation>
 <translation id="5017529052065664584">15 phút qua</translation>
@@ -794,6 +795,7 @@ Tài khoản Google của bạn có thể có các dạng nhật ký duyệt web
 <translation id="5342314432463739672">Yêu cầu cấp quyền</translation>
 <translation id="53537532693258630">Các trang web bạn đã loại bỏ sẽ xuất hiện tại đây</translation>
 <translation id="5355191726083956201">Tính năng Bảo vệ tăng cường đang bật</translation>
+<translation id="5361107212971249203">văn bản</translation>
 <translation id="5368227114232678694">Để duyệt web riêng tư trên thiết bị này, hãy thử chế độ Ẩn danh</translation>
 <translation id="5375577065097716013">Tìm hình ảnh bằng Google Ống kính <ph name="BEGIN_NEW" />Mới<ph name="END_NEW" /></translation>
 <translation id="5401851137404501592">Để tiếp tục, <ph name="IDENTITY_PROVIDER_ETLD_PLUS_ONE" /> sẽ chia sẻ tên, địa chỉ email và ảnh hồ sơ của bạn với trang web này.</translation>
@@ -1191,6 +1193,7 @@ Ví dụ: một số trang web có thể phản hồi yêu cầu này bằng cá
 <translation id="7454641608352164238">Không đủ dung lượng</translation>
 <translation id="7455988709578031708">Dựa trên nhật ký duyệt web của bạn. Chế độ cài đặt này đang bật.</translation>
 <translation id="7456774706094330779">Tải trước mở rộng</translation>
+<translation id="7466431077154602932">Chế độ xem thu gọn</translation>
 <translation id="7474822150871987353">Tìm hiểu về các chủ đề trên trang web mà không cần rời khỏi trang. Bạn có thể tìm kiếm bằng cách chọn một hoặc nhiều từ trên trang.</translation>
 <translation id="7475192538862203634">Nếu bạn thường xuyên thấy thông báo này, hãy thử các <ph name="BEGIN_LINK" />đề xuất<ph name="END_LINK" /> sau.</translation>
 <translation id="7475688122056506577">Không tìm thấy thẻ SD. Một số tệp của bạn có thể bị thiếu.</translation>
@@ -1320,6 +1323,7 @@ Ví dụ: một số trang web có thể phản hồi yêu cầu này bằng cá
 <translation id="8058746566562539958">Mở trong thẻ Chrome mới</translation>
 <translation id="8062594758852531064">Chế độ tải trước mở rộng:</translation>
 <translation id="8063895661287329888">Không thêm được dấu trang.</translation>
+<translation id="8066816452984416180">Nhanh chóng đánh dấu trang này. Để chỉnh sửa lối tắt này, hãy chạm và giữ lối tắt.</translation>
 <translation id="806745655614357130">Giữ dữ liệu của tôi riêng biệt</translation>
 <translation id="8073388330009372546">Mở ảnh trong thẻ mới</translation>
 <translation id="8076492880354921740">Thẻ</translation>
@@ -1351,6 +1355,7 @@ Ví dụ: một số trang web có thể phản hồi yêu cầu này bằng cá
 <translation id="8216351761227087153">Xem</translation>
 <translation id="8218622182176210845">Quản lý tài khoản của bạn</translation>
 <translation id="8223642481677794647">Trình đơn thẻ nguồn cấp dữ liệu</translation>
+<translation id="8236097722223016103">Thêm vào dấu trang</translation>
 <translation id="8250920743982581267">Tài liệu</translation>
 <translation id="8255617931166444521">Các trang web chỉ có thể dùng cookie để xem hoạt động duyệt web của bạn trên trang web của riêng họ</translation>
 <translation id="8259179246279078674">Vì các trang tải trước đã được mã hóa, nên Google sẽ không tìm hiểu bất cứ điều gì về nội dung trên trang được tải trước. Máy chủ của Google sẽ tìm hiểu những trang web nào đã được tải trước ở chế độ riêng tư. Thông tin này chỉ được dùng để tải trước các trang và không được liên kết với thông tin khác trong Tài khoản Google của bạn.</translation>
@@ -1498,13 +1503,14 @@ Ví dụ: một số trang web có thể phản hồi yêu cầu này bằng cá
 <translation id="8989968390305463310">Nhật ký duyệt web của bạn ảnh hưởng tới quảng cáo mà bạn thấy cũng như mối quan tâm được ước đoán như dưới đây. Để bảo vệ quyền riêng tư của bạn, Chrome tự động xoá thông tin về các mối quan tâm của bạn theo chu kỳ luân phiên mỗi tháng. Các mối quan tâm sẽ được làm mới trừ phi bạn xoá chúng.</translation>
 <translation id="8993760627012879038">Mở thẻ mới trong chế độ Ẩn danh</translation>
 <translation id="8996847606757455498">Chọn nhà cung cấp khác</translation>
+<translation id="8998289560386111590">Không hoạt động trên thiết bị của bạn</translation>
 <translation id="8998729206196772491">Bạn đang đăng nhập bằng tài khoản do <ph name="MANAGED_DOMAIN" /> quản lý và cấp cho quản trị viên quyền kiểm soát dữ liệu Chrome của bạn. Dữ liệu của bạn sẽ được liên kết vĩnh viễn với tài khoản này. Việc đăng xuất khỏi Chrome sẽ xóa dữ liệu của bạn khỏi thiết bị này nhưng dữ liệu sẽ vẫn được lưu trữ trong Tài khoản Google.</translation>
 <translation id="9022774213089566801">Truy cập thường xuyên</translation>
 <translation id="9022871169049522985">Các trang web và nhà quảng cáo có thể đo lường hiệu suất mà quảng cáo của họ đạt được</translation>
 <translation id="9041669420854607037">{FILE_COUNT,plural, =1{# video}other{# video}}</translation>
 <translation id="9042893549633094279">Quyền riêng tư và bảo mật</translation>
 <translation id="9050666287014529139">Cụm mật khẩu</translation>
-<translation id="9055497320631373736">Đã thêm lại trang web vào danh sách các trang web tiềm năng</translation>
+<translation id="9055497320631373736">Đã thêm lại trang web vào danh sách trang tiềm năng</translation>
 <translation id="9063523880881406963">Tắt Yêu cầu trang web cho máy tính</translation>
 <translation id="9065203028668620118">Chỉnh sửa</translation>
 <translation id="9065383040763568503">Dữ liệu lưu trữ mà Chrome cho là không quan trọng (ví dụ: những trang web không được lưu tùy chọn cài đặt hoặc những trang web mà bạn không truy cập thường xuyên)</translation>

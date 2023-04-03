@@ -22,6 +22,7 @@
 <translation id="1399397803214730675">На този компютър вече има по-нова версия на Google Chrome. Ако софтуерът не работи, моля, деинсталирайте Google Chrome и опитайте отново.</translation>
 <translation id="139993653570221430">По всяко време можете да промените решението си в настройките на Chrome. Изпробването се извършва заедно с досегашния начин на показване на реклами, така че няма да забележите промени веднага.</translation>
 <translation id="1434626383986940139">Приложения в ранната версия на Chrome</translation>
+<translation id="1496905273983707119">{NUM_DEVICES,plural, =0{Google Chrome бе свързан с HID устройство}=1{Google Chrome е свързан с HID устройство}other{Google Chrome е свързан с HID устройства}}</translation>
 <translation id="1507198376417198979">Персонализирайте новия си потребителски профил в Chrome</translation>
 <translation id="1516530951338665275">Google Chrome се нуждае от достъп до Bluetooth, за да продължи
 сдвояването. <ph name="IDS_BLUETOOTH_DEVICE_CHOOSER_AUTHORIZE_BLUETOOTH_LINK" /></translation>
@@ -124,7 +125,6 @@
 <translation id="3140883423282498090">Промените ви ще влязат в сила следващия път, когато стартирате отново Google Chrome.</translation>
 <translation id="3149510190863420837">Приложения в Chrome</translation>
 <translation id="3169523567916669830">По време на изпробването можете да виждате и премахвате темите, към които имате интерес и които сайтовете използват, за да ви показват реклами. Chrome прогнозира интересите ви въз основа на скорошната ви история на сърфиране.</translation>
-<translation id="3211604354460514046">{NUM_DEVICES,plural, =1{Google Chrome е свързан с HID устройство}other{Google Chrome е свързан с HID устройства}}</translation>
 <translation id="3245429137663807393">Ако споделяте и отчети за употребата на Chrome, те ще включват посещаваните от вас URL адреси</translation>
 <translation id="3282568296779691940">Вход в Chrome</translation>
 <translation id="3286538390144397061">Рестартиране сега</translation>

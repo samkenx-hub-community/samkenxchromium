@@ -23,6 +23,7 @@ import org.chromium.content_public.common.ContentFeatures;
 import org.chromium.content_public.common.ContentSwitches;
 import org.chromium.gpu.config.GpuFeatures;
 import org.chromium.gpu.config.GpuSwitches;
+import org.chromium.net.NetFeatures;
 import org.chromium.services.network.NetworkServiceFeatures;
 import org.chromium.ui.accessibility.AccessibilityFeatures;
 
@@ -329,8 +330,6 @@ public final class ProductionSupportedFlagList {
                     "This changes event propagation for disabled form controls."),
             Flag.baseFeature(ContentFeatures.SURFACE_SYNC_FULLSCREEN_KILLSWITCH,
                     "Disable to turn off the new SurfaceSync Fullscreen path."),
-            Flag.baseFeature(MetricsFeatures.EMIT_HISTOGRAMS_EARLIER,
-                    "Controls whether histograms are emitted earlier."),
             Flag.baseFeature(ContentFeatures.PERSISTENT_ORIGIN_TRIALS,
                     "If enabled, servers will be able to use persistent origin trials "
                             + "on this device."),
@@ -389,6 +388,21 @@ public final class ProductionSupportedFlagList {
             Flag.baseFeature("LessChattyNetworkService"),
             Flag.baseFeature(BlinkFeatures.AUTOFILL_DETECT_REMOVED_FORM_CONTROLS,
                     "Enables Autofill to detect if form controls are removed from the DOM"),
+            Flag.baseFeature(NetFeatures.SUPPORT_PARTITIONED_BLOB_URL,
+                    "Enables the new Blob URL implementation needed for third-party storage"
+                            + " partitioning"),
+            Flag.baseFeature(NetFeatures.THIRD_PARTY_STORAGE_PARTITIONING,
+                    "Enables partitioning of third-party storage by top-level site. "
+                            + "Note: this is under active development and may result in unexpected "
+                            + "behavior. Please file bugs at https://bugs.chromium.org/p/chromium/issues/"
+                            + "entry?labels=StoragePartitioning-trial-bugs&components=Blink%3EStorage."),
+            Flag.baseFeature(BaseFeatures.CRASH_BROWSER_ON_CHILD_MISMATCH_IF_BROWSER_CHANGED,
+                    "Causes the browser process to crash if child processes are failing to launch"
+                            + " due to a browser version change."),
+            Flag.baseFeature(BlinkFeatures.NEW_BASE_URL_INHERITANCE_BEHAVIOR,
+                    "Enables the new base-url inheritance behavior for about:blank and "
+                            + "about:srcdoc pages loaded in a webview."),
+            Flag.baseFeature("MojoIpcz"),
             // Add new commandline switches and features above. The final entry should have a
             // trailing comma for cleaner diffs.
     };

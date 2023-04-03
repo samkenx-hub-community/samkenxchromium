@@ -89,6 +89,7 @@
 #include "chrome/browser/ash/dbus/vm/vm_launch_service_provider.h"
 #include "chrome/browser/ash/dbus/vm/vm_permission_service_provider.h"
 #include "chrome/browser/ash/dbus/vm/vm_sk_forwarding_service_provider.h"
+#include "chrome/browser/ash/dbus/vm/vm_wl_service_provider.h"
 #include "chrome/browser/ash/device_name/device_name_store.h"
 #include "chrome/browser/ash/diagnostics/diagnostics_browser_delegate_impl.h"
 #include "chrome/browser/ash/display/quirks_manager_delegate_impl.h"
@@ -260,12 +261,13 @@
 #include "dbus/object_path.h"
 #include "device/bluetooth/bluetooth_adapter_factory.h"
 #include "net/base/network_change_notifier.h"
-#include "net/base/network_change_notifier_posix.h"
+#include "net/base/network_change_notifier_passive.h"
 #include "printing/backend/print_backend.h"
 #include "rlz/buildflags/buildflags.h"
 #include "services/audio/public/cpp/sounds/sounds_manager.h"
 #include "third_party/cros_system_api/dbus/service_constants.h"
 #include "third_party/cros_system_api/dbus/vm_launch/dbus-constants.h"
+#include "third_party/cros_system_api/dbus/vm_wl/dbus-constants.h"
 #include "ui/base/emoji/emoji_panel_helper.h"
 #include "ui/base/ime/ash/ime_keyboard.h"
 #include "ui/base/ime/ash/input_method_manager.h"
@@ -455,6 +457,12 @@ class DBusServices {
         CrosDBusService::CreateServiceProviderList(
             std::make_unique<VmPermissionServiceProvider>()));
 
+    vm_wl_service_ = CrosDBusService::Create(
+        system_bus, vm_tools::wl::kVmWlServiceName,
+        dbus::ObjectPath(vm_tools::wl::kVmWlServicePath),
+        CrosDBusService::CreateServiceProviderList(
+            std::make_unique<VmWlServiceProvider>()));
+
     drive_file_stream_service_ = CrosDBusService::Create(
         system_bus, drivefs::kDriveFileStreamServiceName,
         dbus::ObjectPath(drivefs::kDriveFileStreamServicePath),
@@ -572,6 +580,7 @@ class DBusServices {
     vm_launch_service_.reset();
     vm_sk_forwarding_service_.reset();
     vm_permission_service_.reset();
+    vm_wl_service_.reset();
     drive_file_stream_service_.reset();
     cryptohome_key_delegate_service_.reset();
     encrypted_reporting_service_.reset();
@@ -605,6 +614,7 @@ class DBusServices {
   std::unique_ptr<CrosDBusService> vm_launch_service_;
   std::unique_ptr<CrosDBusService> vm_sk_forwarding_service_;
   std::unique_ptr<CrosDBusService> vm_permission_service_;
+  std::unique_ptr<CrosDBusService> vm_wl_service_;
   std::unique_ptr<CrosDBusService> drive_file_stream_service_;
   std::unique_ptr<CrosDBusService> cryptohome_key_delegate_service_;
   std::unique_ptr<CrosDBusService> encrypted_reporting_service_;
@@ -741,7 +751,7 @@ void ChromeBrowserMainPartsAsh::PostCreateMainMessageLoop() {
 // about_flags settings are applied in ChromeBrowserMainParts::PreCreateThreads.
 int ChromeBrowserMainPartsAsh::PreMainMessageLoopRun() {
   network_change_manager_client_ = std::make_unique<NetworkChangeManagerClient>(
-      static_cast<net::NetworkChangeNotifierPosix*>(
+      static_cast<net::NetworkChangeNotifierPassive*>(
           content::GetNetworkChangeNotifier()));
 
   // Set the crypto thread after the IO thread has been created/started.

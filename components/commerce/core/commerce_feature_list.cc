@@ -117,6 +117,10 @@ BASE_FEATURE(kCommerceAllowOnDemandBookmarkUpdates,
              "CommerceAllowOnDemandBookmarkUpdates",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
+BASE_FEATURE(kCommerceAllowOnDemandBookmarkBatchUpdates,
+             "CommerceAllowOnDemandBookmarkBatchUpdates",
+             base::FEATURE_ENABLED_BY_DEFAULT);
+
 BASE_FEATURE(kCommerceAllowServerImages,
              "CommerceAllowServerImages",
              base::FEATURE_ENABLED_BY_DEFAULT);
@@ -304,6 +308,12 @@ const base::FeatureParam<bool> kReadyToFetchMerchantWidePromotion{
 const char kCodeBasedRuleDiscountParam[] = "code-based-rbd";
 const base::FeatureParam<bool> kCodeBasedRuleDiscount{
     &commerce::kCodeBasedRBD, kCodeBasedRuleDiscountParam, false};
+const char kCodeBasedRuleDiscountCouponDeletionTimeParam[] =
+    "coupon-deletion-time";
+const base::FeatureParam<base::TimeDelta>
+    kCodeBasedRuleDiscountCouponDeletionTime{
+        &commerce::kCodeBasedRBD, kCodeBasedRuleDiscountCouponDeletionTimeParam,
+        base::Seconds(10)};
 
 const char kRevertIconOnFailureParam[] =
     "shopping-list-revert-page-action-icon-on-failure";

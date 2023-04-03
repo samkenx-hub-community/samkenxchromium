@@ -105,7 +105,6 @@
 #include "ui/views/button_drag_utils.h"
 #include "ui/views/controls/textfield/textfield.h"
 #include "ui/views/view_class_properties.h"
-#include "ui/views/views_features.h"
 #include "ui/views/widget/widget.h"
 #include "url/gurl.h"
 
@@ -617,8 +616,12 @@ void OmniboxViewViews::UpdateSchemeStyle(const gfx::Range& range) {
 void OmniboxViewViews::OnThemeChanged() {
   views::Textfield::OnThemeChanged();
 
-  set_placeholder_text_color(
-      GetColorProvider()->GetColor(kColorOmniboxTextDimmed));
+  bool gm3_text_color_enabled =
+      base::FeatureList::IsEnabled(omnibox::kCr2023Umbrella) ||
+      base::FeatureList::IsEnabled(omnibox::kOmniboxSteadyStateTextColor);
+
+  set_placeholder_text_color(GetColorProvider()->GetColor(
+      gm3_text_color_enabled ? kColorOmniboxText : kColorOmniboxTextDimmed));
 
   EmphasizeURLComponents();
 }

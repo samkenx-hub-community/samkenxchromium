@@ -131,6 +131,7 @@ class ReadAnythingAppController
 
   void Distill();
   void Draw();
+  void DrawSelection();
 
   void UnserializeUpdates(std::vector<ui::AXTreeUpdate> updates,
                           const ui::AXTreeID& tree_id);
@@ -139,15 +140,7 @@ class ReadAnythingAppController
   void OnAXTreeDistilled(const ui::AXTreeID& tree_id,
                          const std::vector<ui::AXNodeID>& content_node_ids);
 
-  // Helper functions for the rendering algorithm. Post-process the AXTree and
-  // cache values before sending an `updateContent` notification to the Read
-  // Anything app.ts. These functions:
-  // 1. Save state related to selection (start_node_, end_node_, start_offset_,
-  //    end_offset_).
-  // 2. Save the display_node_ids_, which is a set of all nodes to be displayed
-  //    in Read Anything app.ts.
-  void PostProcessAXTreeWithSelection();
-  void PostProcessDistillableAXTree();
+  void PostProcessSelection();
 
   // The following methods are used for testing ReadAnythingAppTest.
   // Snapshot_lite is a data structure which resembles an AXTreeUpdate. E.g.:

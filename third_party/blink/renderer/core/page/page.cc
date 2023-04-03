@@ -218,7 +218,8 @@ Page::Page(base::PassKey<Page>,
       prev_related_page_(this),
       autoplay_flags_(0),
       web_text_autosizer_page_info_({0, 0, 1.f}),
-      v8_compile_hints_(MakeGarbageCollected<V8CompileHints>(this)) {
+      v8_compile_hints_(
+          MakeGarbageCollected<V8CrowdsourcedCompileHintsProducer>(this)) {
   DCHECK(!AllPages().Contains(this));
   AllPages().insert(this);
 
@@ -885,7 +886,6 @@ void Page::DidCommitLoad(LocalFrame* frame) {
     // TODO(loonybear): Most of this doesn't appear to take into account that
     // each SVGImage gets it's own Page instance.
     GetDeprecation().ClearSuppression();
-    GetVisualViewport().SendUMAMetrics();
     // Need to reset visual viewport position here since before commit load we
     // would update the previous history item, Page::didCommitLoad is called
     // after a new history item is created in FrameLoader.

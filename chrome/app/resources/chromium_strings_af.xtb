@@ -24,6 +24,7 @@ Sommige kenmerke kan dalk nie beskikbaar wees nie en veranderings aan voorkeure 
 
 Toestemmings wat jy reeds aan webwerwe en apps gegee het, kan op hierdie rekening van toepassing wees. Jy kan jou Google-rekeninge in <ph name="SETTINGS_LINK_BEGIN" />Instellings<ph name="SETTINGS_LINK_END" /> bestuur.</translation>
 <translation id="1640672724030957280">Laai tans af …</translation>
+<translation id="1691024636239527281">{NUM_DEVICES,plural, =0{Chromium was aan ’n HID-toestel gekoppel}=1{Chromium is aan ’n HID-toestel gekoppel}other{Chromium is aan HID-toestelle gekoppel}}</translation>
 <translation id="1708666629004767631">Daar is 'n nuwe, veiliger weergawe van Chromium beskikbaar.</translation>
 <translation id="17264556997921157">Jy kan onderwerpe van belangstelling wat werwe gebruik om vir jou advertensies te wys, sien en verwyder. Chromium skat jou belangstellings op grond van jou onlangse blaaigeskiedenis.</translation>
 <translation id="1733725117201708356">Chromium gaan blaaierdata binnekort uitvee</translation>
@@ -81,7 +82,6 @@ Toestemmings wat jy reeds aan webwerwe en apps gegee het, kan op hierdie rekenin
 <translation id="2928420929544864228">Installering is voltooi.</translation>
 <translation id="2977470724722393594">Chromium is op datum</translation>
 <translation id="2977506796191543575">As 'n werf probeer om jou wagwoord te steel, of wanneer jy 'n skadelike lêer aflaai, sal Chromium dalk ook URL'e, insluitend stukkies bladsyinhoud, na Veiligblaai toe stuur</translation>
-<translation id="3021964162552004083">{NUM_DEVICES,plural, =1{Chromium is aan ’n HID-toestel gekoppel}other{Chromium is aan HID-toestelle gekoppel}}</translation>
 <translation id="3032706164202344641">Chromium kan nie jou wagwoorde nagaan nie. Probeer later weer.</translation>
 <translation id="3032787606318309379">Voeg tans by Chromium …</translation>
 <translation id="3038232873781883849">Wag tans om te installeer...</translation>

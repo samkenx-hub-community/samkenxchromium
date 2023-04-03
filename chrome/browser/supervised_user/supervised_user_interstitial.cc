@@ -17,32 +17,21 @@
 #include "base/values.h"
 #include "build/build_config.h"
 #include "chrome/browser/browser_process.h"
-#include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/supervised_user/supervised_user_navigation_observer.h"
 #include "chrome/browser/supervised_user/supervised_user_service.h"
 #include "chrome/browser/supervised_user/supervised_user_service_factory.h"
-#include "chrome/grit/generated_resources.h"
-#include "components/infobars/content/content_infobar_manager.h"
-#include "components/infobars/core/infobar.h"
-#include "components/infobars/core/infobar_delegate.h"
 #include "components/prefs/pref_service.h"
 #include "components/supervised_user/core/browser/web_content_handler.h"
 #include "components/supervised_user/core/common/features.h"
 #include "components/supervised_user/core/common/pref_names.h"
 #include "content/public/browser/browser_task_traits.h"
 #include "content/public/browser/browser_thread.h"
-#include "content/public/browser/navigation_controller.h"
-#include "content/public/browser/navigation_details.h"
-#include "content/public/browser/navigation_entry.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/browser/web_contents_user_data.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/resource/resource_bundle.h"
-#include "ui/gfx/image/image_skia.h"
 
-#if BUILDFLAG(IS_ANDROID)
-#include "chrome/browser/supervised_user/child_accounts/child_account_feedback_reporter_android.h"
-#else
+#if !BUILDFLAG(IS_ANDROID)
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_finder.h"
 #include "chrome/browser/ui/chrome_pages.h"
@@ -52,10 +41,6 @@
 #if BUILDFLAG(IS_CHROMEOS_ASH)
 #include "components/user_manager/user.h"
 #include "components/user_manager/user_manager.h"
-#endif
-
-#if BUILDFLAG(IS_CHROMEOS_ASH) || BUILDFLAG(IS_CHROMEOS_LACROS)
-#include "chrome/browser/supervised_user/chromeos/supervised_user_favicon_request_handler.h"
 #endif
 
 using content::WebContents;
@@ -115,34 +100,6 @@ class TabCloser : public content::WebContentsUserData<TabCloser> {
 
 WEB_CONTENTS_USER_DATA_KEY_IMPL(TabCloser);
 
-// Removes all the infobars which are attached to |web_contents| and for
-// which ShouldExpire() returns true.
-void CleanUpInfoBar(content::WebContents* web_contents) {
-  infobars::ContentInfoBarManager* manager =
-      infobars::ContentInfoBarManager::FromWebContents(web_contents);
-  if (manager) {
-    content::LoadCommittedDetails details;
-    // |details.is_same_document| is default false, and |details.is_main_frame|
-    // is default true. This results in is_navigation_to_different_page()
-    // returning true.
-    DCHECK(details.is_navigation_to_different_page());
-    content::NavigationController& controller = web_contents->GetController();
-    details.entry = controller.GetVisibleEntry();
-    if (controller.GetLastCommittedEntry()) {
-      details.previous_entry_index = controller.GetLastCommittedEntryIndex();
-      details.previous_main_frame_url =
-          controller.GetLastCommittedEntry()->GetURL();
-    }
-    for (int i = manager->infobar_count() - 1; i >= 0; --i) {
-      infobars::InfoBar* infobar = manager->infobar_at(i);
-      if (infobar->delegate()->ShouldExpire(
-              infobars::ContentInfoBarManager::
-                  NavigationDetailsFromLoadCommittedDetails(details)))
-        manager->RemoveInfoBar(infobar);
-    }
-  }
-}
-
 // TODO(b/250924204): Implement shared logic to get the user's given name.
 std::u16string GetActiveUserFirstName() {
 #if BUILDFLAG(IS_CHROMEOS_ASH)
@@ -159,7 +116,6 @@ std::unique_ptr<SupervisedUserInterstitial> SupervisedUserInterstitial::Create(
     WebContents* web_contents,
     std::unique_ptr<supervised_user::WebContentHandler> web_content_handler,
     SupervisedUserService& supervised_user_service,
-    favicon::LargeIconService* large_icon_service,
     const GURL& url,
     supervised_user::FilteringBehaviorReason reason,
     int frame_id,
@@ -167,11 +123,9 @@ std::unique_ptr<SupervisedUserInterstitial> SupervisedUserInterstitial::Create(
   std::unique_ptr<SupervisedUserInterstitial> interstitial =
       base::WrapUnique(new SupervisedUserInterstitial(
           web_contents, std::move(web_content_handler), supervised_user_service,
-          large_icon_service, url, reason, frame_id,
-          interstitial_navigation_id));
+          url, reason, frame_id, interstitial_navigation_id));
 
-  if (web_contents->GetPrimaryMainFrame()->GetFrameTreeNodeId() == frame_id)
-    CleanUpInfoBar(web_contents);
+  interstitial->web_content_handler()->CleanUpInfoBarOnMainFrame(frame_id);
 
   // Caller is responsible for deleting the interstitial.
   return interstitial;
@@ -181,31 +135,17 @@ SupervisedUserInterstitial::SupervisedUserInterstitial(
     WebContents* web_contents,
     std::unique_ptr<supervised_user::WebContentHandler> web_content_handler,
     SupervisedUserService& supervised_user_service,
-    favicon::LargeIconService* large_icon_service,
     const GURL& url,
     supervised_user::FilteringBehaviorReason reason,
     int frame_id,
     int64_t interstitial_navigation_id)
     : supervised_user_service_(supervised_user_service),
-      large_icon_service_(large_icon_service),
       web_content_handler_(std::move(web_content_handler)),
       web_contents_(web_contents),
       url_(url),
       reason_(reason),
       frame_id_(frame_id),
-      interstitial_navigation_id_(interstitial_navigation_id) {
-#if BUILDFLAG(IS_CHROMEOS_ASH) || BUILDFLAG(IS_CHROMEOS_LACROS)
-  if (supervised_user::IsLocalWebApprovalsEnabled()) {
-    favicon_handler_ = std::make_unique<SupervisedUserFaviconRequestHandler>(
-        url_.GetWithEmptyPath(), large_icon_service_);
-    // Prefetch the favicon which will be rendered as part of the web approvals
-    // ParentAccessDialog. Pass in DoNothing() for the favicon fetched callback
-    // because if the favicon is by the time the user triggers the opening of
-    // the ParentAccessDialog, we show the default favicon.
-    favicon_handler_->StartFaviconFetch(base::DoNothing());
-  }
-#endif
-}
+      interstitial_navigation_id_(interstitial_navigation_id) {}
 
 SupervisedUserInterstitial::~SupervisedUserInterstitial() {}
 
@@ -268,12 +208,8 @@ void SupervisedUserInterstitial::RequestUrlAccessLocal(
                             Commands::HISTOGRAM_BOUNDING_VALUE);
   OutputRequestPermissionSourceMetric();
 
-  gfx::ImageSkia favicon;
-#if BUILDFLAG(IS_CHROMEOS_ASH) || BUILDFLAG(IS_CHROMEOS_LACROS)
-  favicon = favicon_handler_->GetFaviconOrFallback();
-#endif
   web_content_handler_->RequestLocalApproval(url_, GetActiveUserFirstName(),
-                                             favicon, std::move(callback));
+                                             std::move(callback));
 }
 
 void SupervisedUserInterstitial::ShowFeedback() {
@@ -282,19 +218,7 @@ void SupervisedUserInterstitial::ShowFeedback() {
 
   std::u16string reason = l10n_util::GetStringUTF16(
       supervised_user::GetBlockMessageID(reason_, second_custodian.empty()));
-  std::string message = l10n_util::GetStringFUTF8(
-      IDS_BLOCK_INTERSTITIAL_DEFAULT_FEEDBACK_TEXT, reason);
-#if BUILDFLAG(IS_ANDROID)
-  ReportChildAccountFeedback(web_contents_, message, url_);
-#else
-  // TODO(b/273692421): This profile reference will be moved to the
-  // web_content_handler.
-  chrome::ShowFeedbackPage(
-      url_, Profile::FromBrowserContext(web_contents()->GetBrowserContext()),
-      chrome::kFeedbackSourceSupervisedUserInterstitial, message,
-      std::string() /* description_placeholder_text */,
-      std::string() /* category_tag */, std::string() /* extra_diagnostics */);
-#endif
+  web_content_handler_->ShowFeedback(url_, reason);
   return;
 }
 
@@ -326,10 +250,11 @@ void SupervisedUserInterstitial::OnInterstitialDone() {
 
 void SupervisedUserInterstitial::OutputRequestPermissionSourceMetric() {
   RequestPermissionSource source;
-  if (web_contents()->GetPrimaryMainFrame()->GetFrameTreeNodeId() == frame_id())
+  if (web_content_handler_->IsMainFrame(frame_id_)) {
     source = RequestPermissionSource::MAIN_FRAME;
-  else
+  } else {
     source = RequestPermissionSource::SUB_FRAME;
+  }
 
   UMA_HISTOGRAM_ENUMERATION(kInterstitialPermissionSourceHistogramName, source,
                             RequestPermissionSource::HISTOGRAM_BOUNDING_VALUE);

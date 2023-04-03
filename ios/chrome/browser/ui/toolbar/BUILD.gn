@@ -123,6 +123,7 @@ source_set("toolbar_ui") {
     "//ios/chrome/browser/ui/thumb_strip:feature_flags",
     "//ios/chrome/browser/ui/toolbar/buttons",
     "//ios/chrome/browser/ui/toolbar/public",
+    "//ios/chrome/browser/ui/toolbar/public:constants",
     "//ios/chrome/browser/ui/toolbar_container:toolbar_collapsing",
     "//ios/chrome/common:timing",
     "//ios/chrome/common/ui/colors",
@@ -137,10 +138,7 @@ source_set("toolbar_ui") {
 source_set("unit_tests") {
   testonly = true
 
-  sources = [
-    "adaptive_toolbar_view_controller_unittest.mm",
-    "toolbar_mediator_unittest.mm",
-  ]
+  sources = [ "toolbar_mediator_unittest.mm" ]
   deps = [
     ":toolbar",
     ":toolbar_ui",
@@ -167,7 +165,6 @@ source_set("unit_tests") {
     "//ios/chrome/browser/ui/menu",
     "//ios/chrome/browser/ui/popup_menu/public",
     "//ios/chrome/browser/ui/toolbar/buttons",
-    "//ios/chrome/browser/ui/toolbar/public",
     "//ios/chrome/browser/ui/toolbar/test",
     "//ios/chrome/browser/url:constants",
     "//ios/chrome/browser/web",

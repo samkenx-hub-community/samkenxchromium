@@ -160,7 +160,7 @@ std::unique_ptr<net::test_server::HttpResponse> LoadFrenchPage(
     AppLaunchConfiguration config;
     config.additional_args.push_back(
         "--enable-features=" + std::string(kEnablePinnedTabs.name) + ":" +
-        kEnablePinnedTabsOverflowParam + "/true," + kEnablePinnedTabsIpad.name);
+        kEnablePinnedTabsOverflowParam + "/true");
     return config;
   }
   return [super appConfigurationForTestCase];
@@ -567,6 +567,10 @@ std::unique_ptr<net::test_server::HttpResponse> LoadFrenchPage(
 // Verifies that the IPH for Pinned tab is displayed after pinning a tab from
 // the overflow menu.
 - (void)testPinTabFromOverflowMenu {
+  if ([ChromeEarlGrey isIPadIdiom]) {
+    EARL_GREY_TEST_SKIPPED(@"Skipped for iPad. The Pinned Tabs feature is only "
+                           @"supported on iPhone.");
+  }
   if (@available(iOS 15, *)) {
   } else {
     // Only available for iOS 15+.
@@ -593,23 +597,11 @@ std::unique_ptr<net::test_server::HttpResponse> LoadFrenchPage(
   NSString* unpinTabSnackbarMessage =
       l10n_util::GetNSString(IDS_IOS_SNACKBAR_MESSAGE_UNPINNED_TAB);
 
-  if ([ChromeEarlGrey isIPadIdiom]) {
-    [[EarlGrey selectElementWithMatcher:TabPinnedTip()]
-        assertWithMatcher:grey_nil()];
-    [[EarlGrey
-        selectElementWithMatcher:grey_accessibilityLabel(pinTabSnackbarMessage)]
-        assertWithMatcher:grey_sufficientlyVisible()];
-    // Tap the snackbar to make it disappear.
-    [[EarlGrey
-        selectElementWithMatcher:grey_accessibilityLabel(pinTabSnackbarMessage)]
-        performAction:grey_tap()];
-  } else {
-    [[EarlGrey selectElementWithMatcher:TabPinnedTip()]
-        assertWithMatcher:grey_sufficientlyVisible()];
-    [[EarlGrey
-        selectElementWithMatcher:grey_accessibilityLabel(pinTabSnackbarMessage)]
-        assertWithMatcher:grey_nil()];
-  }
+  [[EarlGrey selectElementWithMatcher:TabPinnedTip()]
+      assertWithMatcher:grey_sufficientlyVisible()];
+  [[EarlGrey
+      selectElementWithMatcher:grey_accessibilityLabel(pinTabSnackbarMessage)]
+      assertWithMatcher:grey_nil()];
 
   [ChromeEarlGreyUI openToolsMenu];
 

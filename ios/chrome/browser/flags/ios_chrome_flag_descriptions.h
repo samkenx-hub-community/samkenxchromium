@@ -152,6 +152,10 @@ extern const char kAppleCalendarExperienceKitDescription[];
 extern const char kEmailName[];
 extern const char kEmailDescription[];
 
+// Title and description for the flag to fix the PDF snapshot.
+extern const char kPDFSnapshotName[];
+extern const char kPDFSnapshotDescription[];
+
 // Title and description for the flag to enable phone numbers detection and
 // processing.
 extern const char kPhoneNumberName[];
@@ -205,6 +209,11 @@ extern const char kDefaultBrowserFullscreenPromoExperimentDescription[];
 extern const char kDefaultBrowserIntentsShowSettingsName[];
 extern const char kDefaultBrowserIntentsShowSettingsDescription[];
 
+// Title and description for the flag to allow the fullscreen default browser
+// promos to be added to the promo manager.
+extern const char kDefaultBrowserRefactoringPromoManagerName[];
+extern const char kDefaultBrowserRefactoringPromoManagerDescription[];
+
 // Title and description for the flag to control if a crash report is generated
 // on main thread freeze.
 extern const char kDetectMainThreadFreezeName[];
@@ -214,6 +223,10 @@ extern const char kDetectMainThreadFreezeDescription[];
 // and related UI features.
 extern const char kEnableBookmarksAccountStorageName[];
 extern const char kEnableBookmarksAccountStorageDescription[];
+
+// Title and description for the flag to enable browser lockdown mode.
+extern const char kEnableBrowserLockdownModeName[];
+extern const char kEnableBrowserLockdownModeDescription[];
 
 // Title and description for the flag to enable checking feed visibility on
 // attention log start.
@@ -330,9 +343,14 @@ extern const char kEnablePreferencesAccountStorageDescription[];
 extern const char kEnablePinnedTabsName[];
 extern const char kEnablePinnedTabsDescription[];
 
-// Title and description for the flag to enable pinned tabs on iPad.
-extern const char kEnablePinnedTabsIpadName[];
-extern const char kEnablePinnedTabsIpadDescription[];
+// Title and description for the flag to enable the account storage.
+extern const char kEnableReadingListAccountStorageName[];
+extern const char kEnableReadingListAccountStorageDescription[];
+
+// Title and description for the flag to enable the sign-in promo in the reading
+// list screen.
+extern const char kEnableReadingListSignInPromoName[];
+extern const char kEnableReadingListSignInPromoDescription[];
 
 // Title and description for the flag to enable refining data source reload
 // reporting when having a very short attention log.
@@ -453,6 +471,10 @@ extern const char kIOSPasswordCheckupDescription[];
 // management into two separate UIs.
 extern const char kIOSPasswordUISplitName[];
 extern const char kIOSPasswordUISplitDescription[];
+
+// Title and description for the flag to display the Set Up List.
+extern const char kIOSSetUpListName[];
+extern const char kIOSSetUpListDescription[];
 
 // Title and description for the flag to enable password saving and
 // filling in cross-origin iframes on IOS.
@@ -714,9 +736,6 @@ extern const char kRestoreSessionFromCacheDescription[];
 extern const char kRecordSnapshotSizeName[];
 extern const char kRecordSnapshotSizeDescription[];
 
-extern const char kRemoveCrashInfobarName[];
-extern const char kRemoveCrashInfobarDescription[];
-
 // Title and description for the flag to remove excess NTP tabs that don't have
 // navigation history.
 extern const char kRemoveExcessNTPsExperimentName[];
@@ -851,6 +870,10 @@ extern const char kEnableLensContextMenuAltTextDescription[];
 // copied images in the omnibox.
 extern const char kEnableLensInOmniboxCopiedImageName[];
 extern const char kEnableLensInOmniboxCopiedImageDescription[];
+
+// Title and description for the flag to enable the follow up of the SF Symbols.
+extern const char kSFSymbolsFollowUpName[];
+extern const char kSFSymbolsFollowUpDescription[];
 
 // Title and description for the flag to sort the tab by recency in the TabGrid.
 extern const char kTabGridRecencySortName[];

@@ -56,9 +56,9 @@
 namespace WTF {
 
 template <>
-struct CrossThreadCopier<scoped_refptr<webrtc::DataChannelInterface>>
+struct CrossThreadCopier<rtc::scoped_refptr<webrtc::DataChannelInterface>>
     : public CrossThreadCopierPassThrough<
-          scoped_refptr<webrtc::DataChannelInterface>> {
+          rtc::scoped_refptr<webrtc::DataChannelInterface>> {
   STATIC_ONLY(CrossThreadCopier);
 };
 
@@ -185,7 +185,7 @@ void IncrementErrorCounter(const webrtc::RTCError& error) {
 }
 
 void SendOnSignalingThread(
-    const scoped_refptr<webrtc::DataChannelInterface> channel,
+    const rtc::scoped_refptr<webrtc::DataChannelInterface> channel,
     const webrtc::DataBuffer data_buffer) {
   // The Javascript API being synchronous, we cannot wait for the call on the
   // signaling thread to resolve from the JS main thread. So we make sure that
@@ -226,7 +226,7 @@ static void ThrowSendBufferFullException(ExceptionState* exception_state) {
 RTCDataChannel::Observer::Observer(
     scoped_refptr<base::SingleThreadTaskRunner> main_thread,
     RTCDataChannel* blink_channel,
-    scoped_refptr<webrtc::DataChannelInterface> channel)
+    rtc::scoped_refptr<webrtc::DataChannelInterface> channel)
     : main_thread_(main_thread),
       blink_channel_(blink_channel),
       webrtc_channel_(channel) {}
@@ -236,7 +236,7 @@ RTCDataChannel::Observer::~Observer() {
   DCHECK(!webrtc_channel_.get()) << "Unregister hasn't been called.";
 }
 
-const scoped_refptr<webrtc::DataChannelInterface>&
+const rtc::scoped_refptr<webrtc::DataChannelInterface>&
 RTCDataChannel::Observer::channel() const {
   return webrtc_channel_;
 }
@@ -303,18 +303,12 @@ void RTCDataChannel::Observer::OnMessageImpl(
 
 RTCDataChannel::RTCDataChannel(
     ExecutionContext* context,
-    scoped_refptr<webrtc::DataChannelInterface> channel,
+    rtc::scoped_refptr<webrtc::DataChannelInterface> channel,
     RTCPeerConnectionHandler* peer_connection_handler)
     : ExecutionContextLifecycleObserver(context),
-      state_(webrtc::DataChannelInterface::kConnecting),
-      binary_type_(kBinaryTypeArrayBuffer),
       scheduled_event_timer_(context->GetTaskRunner(TaskType::kNetworking),
                              this,
                              &RTCDataChannel::ScheduledEventTimerFired),
-      buffered_amount_low_threshold_(0U),
-      buffered_amount_(0U),
-      stopped_(false),
-      closed_from_owner_(false),
       observer_(base::MakeRefCounted<Observer>(
           context->GetTaskRunner(TaskType::kNetworking),
           this,
@@ -331,7 +325,7 @@ RTCDataChannel::RTCDataChannel(
       CrossThreadBindOnce(
           [](scoped_refptr<RTCDataChannel::Observer> observer,
              webrtc::DataChannelInterface::DataState current_state) {
-            scoped_refptr<webrtc::DataChannelInterface> channel =
+            rtc::scoped_refptr<webrtc::DataChannelInterface> channel =
                 observer->channel();
             channel->RegisterObserver(observer.get());
             if (channel->state() != current_state) {
@@ -387,9 +381,19 @@ bool RTCDataChannel::negotiated() const {
 
 absl::optional<uint16_t> RTCDataChannel::id() const {
   DCHECK_CALLED_ON_VALID_THREAD(thread_checker_);
-  if (channel()->id() == -1)
+  if (id_.has_value()) {
+    return id_;
+  }
+
+  int id = channel()->id();
+  if (id == -1) {
     return absl::nullopt;
-  return channel()->id();
+  }
+
+  DCHECK(id >= 0 && id <= std::numeric_limits<uint16_t>::max());
+  id_ = static_cast<uint16_t>(id);
+
+  return id;
 }
 
 String RTCDataChannel::readyState() const {
@@ -713,8 +717,8 @@ void RTCDataChannel::ScheduledEventTimerFired(TimerBase*) {
   events.clear();
 }
 
-const scoped_refptr<webrtc::DataChannelInterface>& RTCDataChannel::channel()
-    const {
+const rtc::scoped_refptr<webrtc::DataChannelInterface>&
+RTCDataChannel::channel() const {
   return observer_->channel();
 }
 

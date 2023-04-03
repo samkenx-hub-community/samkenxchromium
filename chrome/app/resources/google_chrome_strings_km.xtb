@@ -24,6 +24,7 @@
 <translation id="1399397803214730675">កុំព្យូទ័រនេះមានកំណែ  Google Chrome ថ្មីជាងនេះរួចហើយ ប្រសិនបើកម្មវិធីនេះមិនដំណើរការ សូមលុបការតំឡើង Google Chrome ហើយព្យាយាមម្តងទៀត។</translation>
 <translation id="139993653570221430">អ្នកអាចប្ដូរចិត្តរបស់អ្នកបានគ្រប់ពេលនៅក្នុងការកំណត់ Chrome។ ការ​សាក​ល្បងដំណើរការជាមួយវិធីបច្ចុប្បន្ន ដែលការផ្សាយពាណិជ្ជកម្មបង្ហាញ ដូច្នេះអ្នកនឹងមើលមិនឃើញការផ្លាស់ប្ដូរភ្លាមៗទេ។</translation>
 <translation id="1434626383986940139">Chrome Canary Apps</translation>
+<translation id="1496905273983707119">{NUM_DEVICES,plural, =0{Google Chrome ត្រូ​វ​បាន​​ភ្ជាប់​ជាមួយ​ឧបករណ៍ HID}=1{Google Chrome ត្រូ​វ​បាន​​ភ្ជាប់​ជាមួយ​ឧបករណ៍ HID}other{Google Chrome ត្រូ​វ​បាន​​ភ្ជាប់​ជាមួយ​ឧបករណ៍ HID}}</translation>
 <translation id="1507198376417198979">ប្ដូរកម្រងព័ត៌មាន Chrome ថ្មីរបស់អ្នកតាមបំណង</translation>
 <translation id="1516530951338665275">Google Chrome ត្រូវការសិទ្ធិ​ចូលប្រើប៊្លូធូស ដើម្បីបន្ត
 ផ្គូផ្គង។ <ph name="IDS_BLUETOOTH_DEVICE_CHOOSER_AUTHORIZE_BLUETOOTH_LINK" /></translation>
@@ -126,7 +127,6 @@
 <translation id="3140883423282498090">ការផ្លាស់ប្តូររបស់អ្នកនឹងមានប្រសិទ្ធភាពនៅពេលដែលបើកដំណើរការ Google Chrome ពេលក្រោយ។</translation>
 <translation id="3149510190863420837">កម្មវិធី Chrome</translation>
 <translation id="3169523567916669830">នៅអំឡុងពេលសាកល្បង អ្នកអាចមើលឃើញ និងលុបប្រធានបទដែលចាប់អារម្មណ៍ចេញ ដែលគេហទំព័រប្រើសម្រាប់បង្ហាញការផ្សាយពាណិជ្ជកម្មដល់អ្នក។ Chrome ប៉ាន់ស្មានចំណាប់អារម្មណ៍របស់អ្នក ដោយផ្អែកលើប្រវត្តិ​រុករក​តាមអ៊ីនធឺណិតថ្មីៗរបស់អ្នក។</translation>
-<translation id="3211604354460514046">{NUM_DEVICES,plural, =1{Google Chrome ត្រូ​វ​បាន​​ភ្ជាប់​ជាមួយ​ឧបករណ៍ HID}other{Google Chrome ត្រូ​វ​បាន​​ភ្ជាប់​ជាមួយ​ឧបករណ៍ HID}}</translation>
 <translation id="3245429137663807393">ប្រសិនបើអ្នកចែករំលែករបាយការណ៍ប្រើប្រាស់ Chrome ផងដែររបាយការណ៍ទាំងនោះរួមបញ្ចូល URL ដែលអ្នកចូលមើល</translation>
 <translation id="3282568296779691940">ចូលទៅ Chrome</translation>
 <translation id="3286538390144397061">ចាប់ផ្ដើមឡើងវិញឥឡូវនេះ</translation>

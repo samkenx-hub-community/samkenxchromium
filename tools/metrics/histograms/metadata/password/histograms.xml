@@ -529,6 +529,26 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram
+    name="PasswordManager.AccountStorageNoticeDismissalReason{EntryPoint}"
+    enum="PasswordsAccountStorageNoticeDismissalReason"
+    expires_after="2024-03-28">
+  <owner>victorvianna@google.com</owner>
+  <owner>src/components/password_manager/OWNERS</owner>
+  <summary>
+    Records the action that caused the one-time account storage notice to be
+    dismissed. Recorded for {EntryPoint} once both the bottom sheet and password
+    settings have been closed (the latter only in case the user clicked &quot;go
+    to settings&quot;). Mobile-only (in fact only iOS as of 03/2023).
+  </summary>
+  <token key="EntryPoint">
+    <variant name="" summary="all entry points"/>
+    <variant name=".Fill" summary="the fill entry point"/>
+    <variant name=".Save" summary="the save entry point"/>
+    <variant name=".Update" summary="the update entry point"/>
+  </token>
+</histogram>
+
+<histogram
     name="PasswordManager.AccountStorageUserStateDuration{UserSyncingType}"
     units="ms" expires_after="2023-08-12">
   <owner>mamir@chromium.org</owner>
@@ -1027,18 +1047,6 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
-<histogram
-    name="PasswordManager.BulkCheck.CompromisedCredentialsCountWithAutoChangeAfterCheckAndroid"
-    units="credentials" expires_after="2023-05-07">
-  <owner>ioanap@chromium.org</owner>
-  <owner>fhorschig@chromium.org</owner>
-  <summary>
-    Count of compromised credentials that have a 'Change automatically' button,
-    recorded whenever a bulk leak check finished successfully. Should be
-    compared to 'CompromisedCredentialsCountAfterCheckAndroid'.
-  </summary>
-</histogram>
-
 <histogram name="PasswordManager.BulkCheck.Error"
     enum="PasswordLeakDetectionError" expires_after="2023-09-10">
   <owner>vasilii@chromium.org</owner>
@@ -1343,7 +1351,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="PasswordManager.DefaultPasswordStoreSet"
-    enum="PasswordManager.Store" expires_after="2023-07-23">
+    enum="PasswordManager.Store" expires_after="2023-09-24">
   <owner>mamir@chromium.org</owner>
   <owner>treib@chromium.org</owner>
   <summary>
@@ -1426,7 +1434,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="PasswordManager.EnableState" enum="PasswordManagerEnableState"
-    expires_after="2023-07-09">
+    expires_after="2023-09-24">
   <owner>markusheintz@google.com</owner>
   <owner>mamir@chromium.org</owner>
   <summary>
@@ -1830,7 +1838,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="PasswordManager.iOS.InfoBar.PasswordSave" enum="Boolean"
-    expires_after="2023-07-16">
+    expires_after="2023-09-24">
   <owner>djean@chromium.org</owner>
   <owner>sczs@google.com</owner>
   <summary>
@@ -1839,7 +1847,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="PasswordManager.iOS.PasswordDetails.CopyDetailsFailed"
-    enum="Boolean" expires_after="2023-07-16">
+    enum="Boolean" expires_after="2023-09-24">
   <owner>eic@google.com</owner>
   <owner>tmartino@chromium.com</owner>
   <summary>
@@ -2096,7 +2104,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="PasswordManager.MergeSyncData.AddLoginSyncError"
-    enum="PasswordAddLoginSyncError" expires_after="2023-07-23">
+    enum="PasswordAddLoginSyncError" expires_after="2023-09-24">
   <owner>mamir@chromium.org</owner>
   <owner>mastiz@chromium.org</owner>
   <summary>
@@ -2107,7 +2115,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="PasswordManager.MergeSyncData.UpdateLoginSyncError"
-    enum="PasswordUpdateLoginSyncError" expires_after="2023-07-23">
+    enum="PasswordUpdateLoginSyncError" expires_after="2023-09-24">
   <owner>mamir@chromium.org</owner>
   <owner>mastiz@chromium.org</owner>
   <summary>
@@ -2189,8 +2197,41 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram
+    name="PasswordManager.PasswordChangeFlowDurationV2.LeakCheckInSettings{StartEvent}{EndEvent}"
+    units="ms" expires_after="2023-11-09">
+  <owner>jkeitel@google.com</owner>
+  <owner>kolos@chromium.org</owner>
+  <summary>
+    Duration of a password change flow that was triggered from a password check
+    {StartEvent} {EndEvent}.
+  </summary>
+  <token key="StartEvent">
+    <variant name=".ManualChangePasswordUrlFlow"
+        summary="as a manual change password flow with a domain-specific URL"/>
+    <variant name=".ManualHomepageFlow"
+        summary="as a manual change password flow that starts at the origin
+                 of a stored credential (supposed to be the homepage)"/>
+    <variant name=".ManualUnknownFlow"
+        summary="as a manual change password flow of unknown type"/>
+    <variant name=".ManualWellKnownUrlFlow"
+        summary="as a manual change password flow that supports
+                 /.well-known/change-password"/>
+  </token>
+  <token key="EndEvent">
+    <variant name="" summary="aggregated over all end events"/>
+    <variant name=".ManualFlowPasswordChosen"
+        summary="and ended with a password from a manual flow"/>
+    <variant name=".Timeout" summary="and ended with a timeout"/>
+  </token>
+</histogram>
+
+<histogram
     name="PasswordManager.PasswordChangeFlowDuration{EntryPoint}{StartEvent}{EndEvent}"
-    units="ms" expires_after="2023-05-09">
+    units="ms" expires_after="M114">
+  <obsolete>
+    Obsolete in M114 after automated password change deprecation. Look at
+    PasswordChangeFlowDurationV2 for manual change password flows.
+  </obsolete>
   <owner>jkeitel@google.com</owner>
   <owner>kolos@chromium.org</owner>
   <summary>
@@ -3203,7 +3244,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="PasswordManager.SavingOnUsernameFirstFlow"
-    enum="SavingOnUsernameFirstFlow" expires_after="2023-07-23">
+    enum="SavingOnUsernameFirstFlow" expires_after="2023-09-24">
   <owner>kazinova@google.com</owner>
   <owner>vasilii@chromium.org</owner>
   <summary>
@@ -3413,7 +3454,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="PasswordManager.SyncMetadataReadError2"
-    enum="PasswordSyncMetadataReadError" expires_after="2023-07-23">
+    enum="PasswordSyncMetadataReadError" expires_after="2023-09-24">
   <owner>mamir@chromium.org</owner>
   <owner>mastiz@chromium.org</owner>
   <summary>
@@ -3735,7 +3776,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="PasswordManager.WellKnownChangePasswordResult"
-    enum="WellKnownChangePasswordResult" expires_after="2023-04-20">
+    enum="WellKnownChangePasswordResult" expires_after="2023-10-20">
   <owner>kolos@chromium.org</owner>
   <owner>jkeitel@google.com</owner>
   <summary>
@@ -3761,11 +3802,13 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="PasswordManager.{Location}.AuthenticationTime" units="ms"
-    expires_after="M115">
+    expires_after="M120">
   <owner>vsemeniuk@google.com</owner>
   <owner>vasilii@chromium.org</owner>
   <summary>Records the time it takes user to authenticate {Location}.</summary>
   <token key="Location">
+    <variant name="ManagementBubble"
+        summary="in management bubble when navigating to details view"/>
     <variant name="PasswordFilling"
         summary="on webpage after selecting a suggestion to fill"/>
     <variant name="Settings"

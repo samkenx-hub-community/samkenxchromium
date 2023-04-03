@@ -157,6 +157,12 @@ class MockAutofillClient : public TestAutofillClient {
   MOCK_METHOD(void, HideAutofillPopup, (PopupHidingReason reason), (override));
   MOCK_METHOD(bool, IsPasswordManagerEnabled, (), (override));
   MOCK_METHOD(void, HideFastCheckout, (bool), (override));
+  MOCK_METHOD(void,
+              DidFillOrPreviewForm,
+              (mojom::RendererFormDataAction action,
+               AutofillTriggerSource trigger_source,
+               bool is_refill),
+              (override));
 };
 
 class MockAutofillDownloadManager : public AutofillDownloadManager {
@@ -208,7 +214,7 @@ class MockTouchToFillDelegate : public TouchToFillDelegate {
   MockTouchToFillDelegate(const MockTouchToFillDelegate&) = delete;
   MockTouchToFillDelegate& operator=(const MockTouchToFillDelegate&) = delete;
   ~MockTouchToFillDelegate() override = default;
-  MOCK_METHOD(AutofillManager*, GetManager, (), (override));
+  MOCK_METHOD(BrowserAutofillManager*, GetManager, (), (override));
   MOCK_METHOD(bool,
               IntendsToShowTouchToFill,
               (FormGlobalId, FieldGlobalId),
@@ -423,6 +429,7 @@ class BrowserAutofillManagerTest : public testing::Test {
                          /*local_state=*/autofill_client_.GetPrefs(),
                          /*identity_manager=*/nullptr,
                          /*history_service=*/nullptr,
+                         /*sync_service=*/nullptr,
                          /*strike_database=*/nullptr,
                          /*image_fetcher=*/nullptr,
                          /*is_off_the_record=*/false);
@@ -610,7 +617,8 @@ class BrowserAutofillManagerTest : public testing::Test {
         form, field, {}, AutoselectFirstSuggestion(true),
         FormElementWasClicked(false));
     browser_autofill_manager_->FillOrPreviewForm(
-        mojom::RendererFormDataAction::kFill, form, field, unique_id);
+        mojom::RendererFormDataAction::kFill, form, field, unique_id,
+        AutofillTriggerSource::kPopup);
   }
 
   // Calls |browser_autofill_manager_->OnFillAutofillFormData()| with the
@@ -637,7 +645,7 @@ class BrowserAutofillManagerTest : public testing::Test {
         .WillOnce((DoAll(testing::SaveArg<1>(response_data),
                          testing::Return(std::vector<FieldGlobalId>{}))));
     browser_autofill_manager_->FillOrPreviewVirtualCardInformation(
-        action, guid, input_form, input_field);
+        action, guid, input_form, input_field, AutofillTriggerSource::kPopup);
   }
 
   int MakeFrontendId(
@@ -715,7 +723,8 @@ class BrowserAutofillManagerTest : public testing::Test {
     EXPECT_CALL(*autofill_driver_, FillOrPreviewForm(_, _, _, _))
         .Times(AtLeast(1));
     browser_autofill_manager_->FillOrPreviewCreditCardForm(
-        mojom::RendererFormDataAction::kFill, *form, form->fields[0], card);
+        mojom::RendererFormDataAction::kFill, *form, form->fields[0], card,
+        AutofillTriggerSource::kPopup);
   }
 
   void OnDidGetRealPan(AutofillClient::PaymentsRpcResult result,
@@ -2445,7 +2454,8 @@ TEST_F(BrowserAutofillManagerTest, OnCreditCardFetched_StoreInstrumentId) {
   FormsSeen({form});
   CreditCard credit_card = test::GetMaskedServerCard();
   browser_autofill_manager_->FillOrPreviewCreditCardForm(
-      mojom::RendererFormDataAction::kFill, form, form.fields[0], &credit_card);
+      mojom::RendererFormDataAction::kFill, form, form.fields[0], &credit_card,
+      AutofillTriggerSource::kPopup);
 
   browser_autofill_manager_->OnCreditCardFetchedForTest(
       CreditCardFetchResult::kSuccess, &credit_card,
@@ -2676,6 +2686,22 @@ TEST_F(BrowserAutofillManagerTest, DoNotFillIfFormFieldChanged) {
 
   EXPECT_THAT(filled_fields, Each(Not(HasValue(u""))));
   EXPECT_THAT(skipped_fields, Each(HasValue(u"")));
+}
+
+TEST_F(BrowserAutofillManagerTest,
+       FillOrPreviewDataModelFormCallsDidFillOrPreviewForm) {
+  FormData form =
+      CreateTestCreditCardFormData(/*is_https=*/true, /*use_month_type=*/false);
+  FormsSeen({form});
+  FormStructure* form_structure;
+  AutofillField* autofill_field;
+  ASSERT_TRUE(browser_autofill_manager_->GetCachedFormAndField(
+      form, form.fields.front(), &form_structure, &autofill_field));
+  EXPECT_CALL(autofill_client_, DidFillOrPreviewForm);
+  browser_autofill_manager_->FillOrPreviewDataModelFormForTest(
+      mojom::RendererFormDataAction::kFill, form, form.fields.front(),
+      personal_data().GetCreditCards()[0], /*optional_cvc=*/nullptr,
+      form_structure, autofill_field);
 }
 
 // Test that if the form cache is outdated because a field was removed, filling

@@ -47,11 +47,13 @@
 #include "third_party/blink/renderer/core/layout/layout_inline.h"
 #include "third_party/blink/renderer/core/layout/layout_list_item.h"
 #include "third_party/blink/renderer/core/layout/layout_multi_column_flow_thread.h"
-#include "third_party/blink/renderer/core/layout/layout_ruby_run.h"
-#include "third_party/blink/renderer/core/layout/layout_table.h"
-#include "third_party/blink/renderer/core/layout/layout_table_cell.h"
 #include "third_party/blink/renderer/core/layout/layout_view.h"
+#include "third_party/blink/renderer/core/layout/ng/layout_ng_ruby_run.h"
 #include "third_party/blink/renderer/core/layout/ng/list/layout_ng_list_item.h"
+#include "third_party/blink/renderer/core/layout/ng/table/layout_ng_table.h"
+#include "third_party/blink/renderer/core/layout/ng/table/layout_ng_table_cell.h"
+#include "third_party/blink/renderer/core/layout/ng/table/layout_ng_table_row.h"
+#include "third_party/blink/renderer/core/layout/ng/table/layout_ng_table_section.h"
 #include "third_party/blink/renderer/core/layout/style_retain_scope.h"
 #include "third_party/blink/renderer/core/page/chrome_client.h"
 #include "third_party/blink/renderer/core/page/page.h"
@@ -133,11 +135,11 @@ static bool IsIndependentDescendant(const LayoutBlock* layout_object) {
   return IsA<LayoutView>(layout_object) || layout_object->IsFloating() ||
          layout_object->IsOutOfFlowPositioned() ||
          layout_object->IsTableCell() || layout_object->IsTableCaption() ||
-         layout_object->IsFlexibleBoxIncludingDeprecatedAndNG() ||
+         layout_object->IsFlexibleBoxIncludingNG() ||
          (containing_block && containing_block->IsHorizontalWritingMode() !=
                                   layout_object->IsHorizontalWritingMode()) ||
          layout_object->StyleRef().IsDisplayReplacedType() ||
-         layout_object->IsTextAreaIncludingNG() ||
+         layout_object->IsTextArea() ||
          layout_object->StyleRef().UsedUserModify() != EUserModify::kReadOnly;
 }
 
@@ -380,20 +382,16 @@ void TextAutosizer::BeginLayout(LayoutBlock* block,
 
   DCHECK(!cluster_stack_.empty());
 
-  // Cells in auto-layout tables are handled separately by inflateAutoTable.
+  // Cells in auto-layout tables are handled separately by InflateAutoTable.
+  auto* cell = DynamicTo<LayoutNGTableCell>(block);
   bool is_auto_table_cell =
-      block->IsTableCell() && !ToInterface<LayoutNGTableCellInterface>(block)
-                                   ->TableInterface()
-                                   ->ToLayoutObject()
-                                   ->StyleRef()
-                                   .IsFixedTableLayout();
+      cell && !cell->Table()->StyleRef().IsFixedTableLayout();
   if (!is_auto_table_cell && !cluster_stack_.empty())
     Inflate(block, layouter);
 }
 
-void TextAutosizer::InflateAutoTable(LayoutNGTableInterface* table_interface) {
-  DCHECK(table_interface);
-  const LayoutBlock* table = To<LayoutBlock>(table_interface->ToLayoutObject());
+void TextAutosizer::InflateAutoTable(LayoutNGTable* table) {
+  DCHECK(table);
   DCHECK(!table->StyleRef().IsFixedTableLayout());
   DCHECK(table->ContainingBlock());
 
@@ -403,23 +401,22 @@ void TextAutosizer::InflateAutoTable(LayoutNGTableInterface* table_interface) {
 
   // Pre-inflate cells that have enough text so that their inflated preferred
   // widths will be used for column sizing.
-  for (LayoutObject* section = table->FirstChild(); section;
-       section = section->NextSibling()) {
-    if (!section->IsTableSection())
+  for (LayoutObject* child = table->FirstChild(); child;
+       child = child->NextSibling()) {
+    auto* section = DynamicTo<LayoutNGTableSection>(child);
+    if (!section) {
       continue;
-    for (const LayoutNGTableRowInterface* row =
-             ToInterface<LayoutNGTableSectionInterface>(section)
-                 ->FirstRowInterface();
-         row; row = row->NextRowInterface()) {
-      for (LayoutNGTableCellInterface* cell = row->FirstCellInterface(); cell;
-           cell = cell->NextCellInterface()) {
-        LayoutBlock* cell_layout_object =
-            To<LayoutBlock>(cell->ToMutableLayoutObject());
-        if (!cell_layout_object->NeedsLayout())
+    }
+    for (const LayoutNGTableRow* row = section->FirstRow(); row;
+         row = row->NextRow()) {
+      for (LayoutNGTableCell* cell = row->FirstCell(); cell;
+           cell = cell->NextCell()) {
+        if (!cell->NeedsLayout()) {
           continue;
-        BeginLayout(cell_layout_object, nullptr);
-        Inflate(cell_layout_object, nullptr, kDescendToInnerBlocks);
-        EndLayout(cell_layout_object);
+        }
+        BeginLayout(cell, nullptr);
+        Inflate(cell, nullptr, kDescendToInnerBlocks);
+        EndLayout(cell);
       }
     }
   }
@@ -450,11 +447,10 @@ float TextAutosizer::Inflate(LayoutObject* parent,
 
   LayoutObject* child = nullptr;
   if (parent->IsRuby()) {
-    // Skip layoutRubyRun which is inline-block.
+    // Skip LayoutNGRubyRun which is inline-block.
     // Inflate rubyRun's inner blocks.
-    LayoutObject* run = parent->SlowFirstChild();
-    if (run && run->IsRubyRun()) {
-      child = To<LayoutRubyRun>(run)->FirstChild();
+    if (auto* run = DynamicTo<LayoutNGRubyRun>(parent->SlowFirstChild())) {
+      child = run->FirstChild();
       behavior = kDescendToInnerBlocks;
     }
   } else if (parent->IsListMarker()) {
@@ -792,7 +788,7 @@ bool TextAutosizer::ClusterHasEnoughTextToAutosize(
 
   // TextAreas and user-modifiable areas get a free pass to autosize regardless
   // of text content.
-  if (root->IsTextAreaIncludingNG() ||
+  if (root->IsTextArea() ||
       (root->Style() &&
        root->StyleRef().UsedUserModify() != EUserModify::kReadOnly)) {
     cluster->has_enough_text_to_autosize_ = kHasEnoughText;
@@ -1049,10 +1045,7 @@ float TextAutosizer::WidthFromBlock(const LayoutBlock* block) const {
   // methods to obtain a width, and fall back on a containing block's width.
   for (; block; block = block->ContainingBlock()) {
     float width;
-    Length specified_width =
-        block->IsTableCellLegacy()
-            ? To<LayoutTableCell>(block)->StyleOrColLogicalWidth()
-            : block->StyleRef().LogicalWidth();
+    Length specified_width = block->StyleRef().LogicalWidth();
     if (specified_width.IsFixed()) {
       if ((width = specified_width.Value()) > 0)
         return width;
@@ -1443,8 +1436,8 @@ TextAutosizer::LayoutScope::~LayoutScope() {
     text_autosizer_->EndLayout(block_);
 }
 
-TextAutosizer::TableLayoutScope::TableLayoutScope(LayoutNGTableInterface* table)
-    : LayoutScope(To<LayoutBlock>(table->ToMutableLayoutObject())) {
+TextAutosizer::TableLayoutScope::TableLayoutScope(LayoutNGTable* table)
+    : LayoutScope(table) {
   if (text_autosizer_) {
     DCHECK(text_autosizer_->ShouldHandleLayout());
     text_autosizer_->InflateAutoTable(table);

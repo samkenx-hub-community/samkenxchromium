@@ -67,6 +67,7 @@ import org.chromium.chrome.browser.tabmodel.TabModelSelector;
 import org.chromium.chrome.browser.tabmodel.TabModelSelectorObserver;
 import org.chromium.chrome.browser.theme.TopUiThemeColorProvider;
 import org.chromium.chrome.browser.toolbar.ControlContainer;
+import org.chromium.chrome.browser.toolbar.ToolbarFeatures;
 import org.chromium.chrome.browser.util.ChromeAccessibilityUtil;
 import org.chromium.chrome.features.start_surface.StartSurfaceUserData;
 import org.chromium.components.browser_ui.widget.TouchEventObserver;
@@ -547,8 +548,6 @@ public class CompositorViewHolder extends FrameLayout
             if (controlContainerVG != null) {
                 controlContainerVG.setBackgroundResource(0);
             }
-
-            mSetBackgroundRunnable = null;
         };
     }
 
@@ -1220,12 +1219,7 @@ public class CompositorViewHolder extends FrameLayout
     public void didSwapFrame(int pendingFrameCount) {
         TraceEvent.instant("didSwapFrame");
 
-        if (mHasDrawnOnce && mSetBackgroundRunnable != null) {
-            post(mSetBackgroundRunnable);
-        }
-
         mHasDrawnOnce = true;
-
         mPendingFrameCount = pendingFrameCount;
 
         if (!mSkipInvalidation || pendingFrameCount == 0) flushInvalidation();
@@ -1237,7 +1231,12 @@ public class CompositorViewHolder extends FrameLayout
     }
 
     @Override
-    public void didSwapBuffers(boolean swappedCurrentSize) {
+    public void didSwapBuffers(boolean swappedCurrentSize, int framesUntilHideBackground) {
+        if (mSetBackgroundRunnable != null && mHasDrawnOnce && framesUntilHideBackground == 0) {
+            post(mSetBackgroundRunnable);
+            mSetBackgroundRunnable = null;
+        }
+
         for (Runnable runnable : mDidSwapBuffersCallbacks) {
             runnable.run();
         }
@@ -1369,10 +1368,19 @@ public class CompositorViewHolder extends FrameLayout
         // See http://crbug/236424
         // TODO(aberent) Find a better place to put this, possibly as part of a wider
         // redesign of focus control.
-        if (mUrlBar != null) mUrlBar.clearFocus();
+        if (mUrlBar != null && mUrlBar.isFocused()) mUrlBar.clearFocus();
         boolean wasVisible = false;
         if (hasFocus()) {
-            wasVisible = KeyboardVisibilityDelegate.getInstance().hideKeyboard(this);
+            if (ToolbarFeatures.shouldDelayTransitionsForAnimation()) {
+                KeyboardVisibilityDelegate keyboardVisibilityDelegate =
+                        KeyboardVisibilityDelegate.getInstance();
+                wasVisible = keyboardVisibilityDelegate.isKeyboardShowing(getContext(), this);
+                if (wasVisible) {
+                    keyboardVisibilityDelegate.hideKeyboard(this);
+                }
+            } else {
+                wasVisible = KeyboardVisibilityDelegate.getInstance().hideKeyboard(this);
+            }
         }
         if (wasVisible) {
             mPostHideKeyboardTask = postHideTask;
@@ -1765,7 +1773,7 @@ public class CompositorViewHolder extends FrameLayout
 
     // Should be called any time inputs used to compute `needsSwapCallback` changes.
     private void updateNeedsSwapBuffersCallback() {
-        boolean needsSwapCallback = !mOnCompositorLayoutCallbacks.isEmpty()
+        boolean needsSwapCallback = !mHasDrawnOnce || !mOnCompositorLayoutCallbacks.isEmpty()
                 || !mDidSwapFrameCallbacks.isEmpty() || !mDidSwapBuffersCallbacks.isEmpty();
         mCompositorView.setRenderHostNeedsDidSwapBuffersCallback(needsSwapCallback);
     }

@@ -16322,45 +16322,7 @@
     ]
   },
   "DeviceArcDataSnapshotHours": {
-    "os": [
-      "chromeos_ash"
-    ],
-    "policy_pref_mapping_tests": [
-      {
-        "policies": {
-          "DeviceArcDataSnapshotHours": {
-            "intervals": [
-              {
-                "start": {
-                  "day_of_week": 1,
-                  "time": 1284000
-                },
-                "end": {
-                  "day_of_week": 1,
-                  "time": 21720000
-                }
-              },
-              {
-                "start": {
-                  "day_of_week": 2,
-                  "time": 1284000
-                },
-                "end": {
-                  "day_of_week": 2,
-                  "time": 21720000
-                }
-              }
-            ],
-            "timezone": "GMT"
-          }
-        },
-        "prefs": {
-          "arc.snapshot_hours": {
-            "location": "local_state"
-          }
-        }
-      }
-    ]
+    "reason_for_missing_test": "Policy was removed"
   },
   "DeviceBorealisAllowed": {
     "reason_for_missing_test": "Policy was removed"
@@ -22963,6 +22925,50 @@
               "google.com",
               "[*.]example.edu"
             ]
+          }
+        }
+      }
+    ]
+  },
+  "InsecureHashesInTLSHandshakesEnabled": {
+    "os": [
+      "win",
+      "linux",
+      "mac",
+      "chromeos_ash",
+      "chromeos_lacros",
+      "android",
+      "fuchsia"
+    ],
+    "policy_pref_mapping_tests": [
+      {
+        "note": "Default value (no policies set).",
+        "prefs": {
+          "ssl.insecure_hash_enabled": {
+            "default_value": false,
+            "location": "local_state"
+          }
+        }
+      },
+      {
+        "policies": {
+          "InsecureHashesInTLSHandshakesEnabled": true
+        },
+        "prefs": {
+          "ssl.insecure_hash_enabled": {
+            "value": true,
+            "location": "local_state"
+          }
+        }
+      },
+      {
+        "policies": {
+            "InsecureHashesInTLSHandshakesEnabled": false
+        },
+        "prefs": {
+          "ssl.insecure_hash_enabled": {
+            "value": false,
+            "location": "local_state"
           }
         }
       }

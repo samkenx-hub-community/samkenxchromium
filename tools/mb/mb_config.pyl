@@ -270,19 +270,19 @@
 
     'chromium.dev': {
       # This should be the same with 'android-pie-arm64-rel'.
-      'android-pie-arm64-rel-swarming':  'android_release_bot_minimal_symbols_arm64_webview_monochrome_reclient',
+      'android-pie-arm64-rel-dev':  'android_release_bot_minimal_symbols_arm64_webview_monochrome_reclient',
 
       # These should be the same with 'Linux Builder'.
-      'linux-rel-swarming': 'gpu_tests_release_bot_do_typecheck_reclient',
-      'linux-ssd-rel-swarming': 'gpu_tests_release_bot_do_typecheck_reclient',
+      'linux-rel-dev': 'gpu_tests_release_bot_do_typecheck_reclient',
+      'linux-ssd-rel-dev': 'gpu_tests_release_bot_do_typecheck_reclient',
 
       # This should be the same with 'Mac Builder'.
-      'mac-arm-rel-swarming': 'gpu_tests_release_bot_minimal_symbols_no_nacl_reclient',
-      'mac-rel-swarming': 'gpu_tests_release_bot_minimal_symbols_no_nacl_reclient',
+      'mac-arm-rel-dev': 'gpu_tests_release_bot_minimal_symbols_no_nacl_reclient',
+      'mac-rel-dev': 'gpu_tests_release_bot_minimal_symbols_no_nacl_reclient',
 
       # This should be the same with 'Win x64 Builder'.
-      'win-rel-swarming': 'gpu_tests_release_bot_minimal_symbols_reclient',
-      'win11-rel-swarming': 'gpu_tests_release_bot_minimal_symbols_reclient',
+      'win-rel-dev': 'gpu_tests_release_bot_minimal_symbols_reclient',
+      'win11-rel-dev': 'gpu_tests_release_bot_minimal_symbols_reclient',
     },
 
     'chromium.devtools-frontend': {
@@ -457,6 +457,7 @@
       'linux-wpt-input-fyi-rel': 'release_bot_minimal_symbols_reclient',
       'mac-backuprefptr-x64-fyi-rel': 'release_trybot_backuprefptr_x64_reclient',
       'mac-hermetic-upgrade-rel': 'release_bot_reclient',
+      'mac-osxbeta-rel': 'gpu_tests_debug_trybot_reclient',
       'mac-perfetto-rel': 'perfetto_release_bot_reclient',
       'mac-upload-perfetto': 'release_bot_perfetto_zlib_reclient',
       'mac10.15-wpt-content-shell-fyi-rel': 'release_trybot_minimal_symbols_reclient',
@@ -581,6 +582,7 @@
       'GPU FYI Win x64 DX12 Vulkan Builder': 'gpu_fyi_tests_dx12vk_release_trybot_reclient',
       'GPU FYI Win x64 DX12 Vulkan Builder (dbg)': 'gpu_fyi_tests_dx12vk_debug_trybot_reclient',
       'GPU FYI XR Win x64 Builder': 'gpu_fyi_tests_release_trybot_reclient',
+      'Lacros FYI Release (octopus)': 'gpu_tests_lacros_octopus_release_trybot_dcheck_off_no_symbols_reclient',
       'Linux FYI GPU TSAN Release': 'gpu_fyi_tests_release_trybot_tsan_reclient',
     },
 
@@ -1295,7 +1297,7 @@
       'ios-catalyst': 'ios_catalyst_debug_static_bot_compile_only_libfuzzer_asan_no_dsyms_no_remoting_reclient',
       'ios-device': 'ios_device_release_compile_only_reclient',
       'ios-fieldtrial-rel': 'ios_simulator_debug_static_bot_xctest_arm64_reclient',
-      'ios-m1-simulator': 'ios_simulator_debug_static_bot_xctest_arm64',
+      'ios-m1-simulator': 'ios_simulator_debug_static_bot_xctest_arm64_reclient',
       'ios-m1-simulator-cronet': 'ios_cronet_xctest_arm64_reclient',
       'ios-simulator': 'ios_simulator_code_coverage_partial_instrumentation_xctest_reclient',
       'ios-simulator-code-coverage': 'clang_code_coverage_ios_xctest_sim_reclient',
@@ -1322,10 +1324,10 @@
       'mac11-arm64-rel': 'mac_arm64_gpu_tests_release_trybot_no_symbols_reclient',
       'mac11-wpt-content-shell-fyi-rel': 'release_trybot_minimal_symbols_reclient',
       'mac12-arm64-rel': 'mac_arm64_gpu_tests_release_trybot_no_symbols_reclient',
-      'mac12-arm64-wpt-content-shell-fyi-rel': 'release_trybot_minimal_symbols_reclient',
+      'mac12-arm64-wpt-content-shell-fyi-rel': 'mac_arm64_release_trybot_reclient',
       'mac12-tests': 'release_trybot_reclient',
       'mac12-wpt-content-shell-fyi-rel': 'release_trybot_minimal_symbols_reclient',
-      'mac13-arm64-wpt-content-shell-fyi-rel': 'release_trybot_minimal_symbols_reclient',
+      'mac13-arm64-wpt-content-shell-fyi-rel': 'mac_arm64_release_trybot_reclient',
       'mac13-wpt-content-shell-fyi-rel': 'release_trybot_minimal_symbols_reclient',
       'mac_chromium_10.13_rel_ng': 'release_trybot_reclient',
       'mac_chromium_10.14_rel_ng': 'release_trybot_reclient',
@@ -1367,7 +1369,6 @@
       'android-rust-arm64-rel': 'release_rust_android_arm64_reclient',
       'linux-rust-x64-dbg': 'debug_bot_rust_desktop_x64_reclient',
       'linux-rust-x64-rel': 'release_rust_desktop_x64_reclient',
-      'linux-rust-x64-rel-android-toolchain': 'release_rust_linux_x64_android_toolchain_reclient',
       'mac-rust-x64-rel': 'release_rust_desktop_x64_reclient',
       'win-rust-x64-dbg': 'debug_bot_rust_desktop_x64_reclient',
       'win-rust-x64-rel': 'release_rust_desktop_x64_reclient',
@@ -1457,7 +1458,7 @@
       'linux_chromium_compile': 'release_trybot_reclient',
       'linux_chromium_compile_dbg': 'debug_bot_reclient',
       'mac_chromium_compile': 'gpu_tests_release_trybot_reclient',
-      'webrtc_linux_chromium': 'release_trybot_reclient',
+      'webrtc_linux_chromium': 'release_trybot_blink_reclient',
       'win_chromium_compile': 'gpu_tests_release_trybot_resource_allowlisting_reclient',
       'win_chromium_compile_dbg': 'gpu_tests_debug_bot_x86_no_symbols_reclient',
     },
@@ -2443,11 +2444,11 @@
     ],
 
     'codesearch_gen_chromium_fuchsia_bot': [
-      'codesearch_release', 'fuchsia',
+      'codesearch_release', 'fuchsia', 'cast_receiver',
     ],
 
     'codesearch_gen_chromium_ios_bot': [
-      'codesearch', 'ios',
+      'codesearch_ios', 'ios', 'ios_disable_code_signing'
     ],
 
     # Lacros uses different gn args to build for chromeOS device vs. Linux. For
@@ -2673,6 +2674,11 @@
 
     'gpu_tests_debug_trybot_reclient': [
       'gpu_tests', 'debug', 'no_symbols', 'dcheck_always_on', 'static', 'reclient'
+    ],
+
+    'gpu_tests_lacros_octopus_release_trybot_dcheck_off_no_symbols_reclient': [
+      'gpu_tests', 'chromeos_octopus_reclient', 'release_trybot_dcheck_off_reclient', 'no_symbols',
+      'also_build_lacros_chrome_for_architecture_amd64',
     ],
 
     'gpu_tests_ozone_linux_non_x11_release_trybot_reclient': [
@@ -2914,10 +2920,6 @@
 
     'ios_simulator_debug_static_bot_xctest': [
         'debug_static_bot', 'ios', 'ios_simulator', 'ios_cpu_x64', 'xctest',
-    ],
-
-    'ios_simulator_debug_static_bot_xctest_arm64': [
-        'debug_static_bot', 'ios', 'ios_simulator', 'ios_cpu_arm64', 'xctest',
     ],
 
     'ios_simulator_debug_static_bot_xctest_arm64_reclient': [
@@ -3538,28 +3540,24 @@
       'release_trybot_minimal_symbols_reclient', 'enable_rust', 'enable_all_rust_features', 'x64',
     ],
 
-    'release_rust_linux_x64_android_toolchain_reclient': [
-      'release_trybot_minimal_symbols_reclient', 'enable_rust', 'enable_all_rust_features', 'use_android_rust_toolchain', 'x64',
-    ],
-
     'release_trybot': [
       'release_trybot',
     ],
 
     'release_trybot_backuprefptr_arm64_reclient': [
-      'release_trybot_blink', 'no_goma', 'reclient', 'backuprefptr', 'android', 'arm64', 'enable_dangling_raw_ptr_checks',
+      'release_trybot_blink', 'no_goma', 'reclient', 'backuprefptr', 'android', 'arm64',
     ],
 
     'release_trybot_backuprefptr_arm_reclient': [
-      'release_trybot_blink', 'no_goma', 'reclient', 'backuprefptr', 'android', 'arm', 'enable_dangling_raw_ptr_checks',
+      'release_trybot_blink', 'no_goma', 'reclient', 'backuprefptr', 'android', 'arm',
     ],
 
     'release_trybot_backuprefptr_x64_reclient': [
-      'release_trybot_blink', 'no_goma', 'reclient', 'backuprefptr', 'x64', 'enable_dangling_raw_ptr_checks',
+      'release_trybot_blink', 'no_goma', 'reclient', 'backuprefptr', 'x64',
     ],
 
     'release_trybot_backuprefptr_x86_reclient': [
-      'release_trybot_blink', 'no_goma', 'reclient', 'backuprefptr', 'x86', 'enable_dangling_raw_ptr_checks',
+      'release_trybot_blink', 'no_goma', 'reclient', 'backuprefptr', 'x86',
     ],
 
     'release_trybot_blink': [
@@ -4009,6 +4007,14 @@
       'mixins': ['goma', 'clang', 'shared', 'debug', 'minimal_symbols',
                  'blink_enable_generated_code_formatting'],
     },
+
+    # Same as regular codesearch except ios does not allow component builds
+    'codesearch_ios': {
+      'gn_args': 'clang_use_chrome_plugins=false enable_kythe_annotations=true',
+      'mixins': ['goma', 'clang', 'debug', 'minimal_symbols',
+                 'blink_enable_generated_code_formatting'],
+    },
+
     'codesearch_release': {
       'gn_args': 'clang_use_chrome_plugins=false enable_kythe_annotations=true',
       'mixins': ['release', 'static', 'goma',
@@ -4707,10 +4713,6 @@
 
     'updater': {
       'gn_args': 'enable_updater=true',
-    },
-
-    'use_android_rust_toolchain': {
-      'gn_args': 'use_chromium_rust_toolchain=false',
     },
 
     'use_blink': {

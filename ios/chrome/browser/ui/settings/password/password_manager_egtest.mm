@@ -1773,7 +1773,7 @@ id<GREYMatcher> EditDoneButton() {
 
   if ([self groupingEnabled]) {
     [GetInteractionForPasswordEntry([NSString
-        stringWithFormat:@"www01.example.com, %d accounts", kPasswordsCount])
+        stringWithFormat:@"example.com, %d accounts", kPasswordsCount])
         performAction:grey_tap()];
   } else {
     // The scrolling in GetInteractionForPasswordEntry has too fine steps to
@@ -2328,7 +2328,7 @@ id<GREYMatcher> EditDoneButton() {
   TapEdit();
 
   if ([self groupingEnabled]) {
-    [[GetInteractionForPasswordEntry(@"www01.example.com, 4 accounts")
+    [[GetInteractionForPasswordEntry(@"example.com, 4 accounts")
         assertWithMatcher:grey_notNil()] performAction:grey_tap()];
     [[GetInteractionForPasswordEntry(@"example11.com")
         assertWithMatcher:grey_notNil()] performAction:grey_tap()];

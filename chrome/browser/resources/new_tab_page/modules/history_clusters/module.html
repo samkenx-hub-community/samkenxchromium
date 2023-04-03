@@ -1,10 +1,13 @@
 <style>
   :host {
     width: 100%;
+    --gap-size: 12px;
   }
 
-  ntp-module-header::part(module-icon-bg) {
-    margin-inline-start: 8px;
+  :host-context(.focus-outline-visible) #showAllButton:focus,
+  #showAllButton:focus-visible {
+    box-shadow: var(--ntp-focus-shadow);
+    outline: none;
   }
 
   #showAllButton {
@@ -12,20 +15,20 @@
     border: none;
     color: var(--color-new-tab-page-link);
     cursor: pointer;
-    font-size: 13px;
+    font-size: var(--ntp-module-text-size);
   }
 
   .small-tiles {
     display: flex;
     flex-direction: row;
-    gap: 16px;
+    gap: var(--gap-size);
     grid-column: 2 / 3;
     grid-row: 1 / 2;
   }
 
   .layout {
     display: grid;
-    grid-gap: 16px 16px;
+    grid-gap: var(--gap-size) var(--gap-size);
     grid-template-columns: repeat(2, 1fr);
     grid-template-rows: repeat(2, 1fr);
     padding: 0 24px 24px;
@@ -44,6 +47,15 @@
   .related-searches-tile {
     grid-column: 2 / 3;
     grid-row: 2 / 3;
+  }
+
+  /* Set styles for high contrast mode in Windows. */
+  @media (forced-colors: active) {
+    /* Set focus outline since box-shadow isn't visible in hcm */
+    :host-context(.focus-outline-visible) #showAllButton:focus,
+    #showAllButton:focus-visible {
+      outline: var(--cr-focus-outline-hcm);
+    }
   }
 
   /* At less than 768px + 2*18px side gaps, switch to the one column
@@ -86,6 +98,11 @@
         slot="title-actions"
         aria-label$="[[i18n('modulesJourneysShowAllAcc', cluster.label)]]">
       [[i18n('modulesJourneysShowAll')]]
+    </button>
+    <button id="openAllInTabGroupButton" class="dropdown-item"
+        on-click="onOpenAllInTabGroupClick_"
+        slot="action-menu-items" type="button">
+      [[i18n('modulesJourneysOpenAllInNewTabGroupButtonText')]]
     </button>
   </ntp-module-header>
   <template is="dom-if" if="[[isLayout_(1, layoutType)]]" restamp>

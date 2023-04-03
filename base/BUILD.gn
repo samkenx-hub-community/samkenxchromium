@@ -774,15 +774,11 @@ component("base") {
     "task/sequenced_task_runner.cc",
     "task/sequenced_task_runner.h",
     "task/sequenced_task_runner_helpers.h",
-    "task/simple_task_executor.cc",
-    "task/simple_task_executor.h",
     "task/single_thread_task_executor.cc",
     "task/single_thread_task_executor.h",
     "task/single_thread_task_runner.cc",
     "task/single_thread_task_runner.h",
     "task/single_thread_task_runner_thread_mode.h",
-    "task/task_executor.cc",
-    "task/task_executor.h",
     "task/task_features.cc",
     "task/task_features.h",
     "task/task_observer.h",
@@ -945,6 +941,8 @@ component("base") {
     "types/variant_util.h",
     "unguessable_token.cc",
     "unguessable_token.h",
+    "uuid.cc",
+    "uuid.h",
     "value_iterators.cc",
     "value_iterators.h",
     "values.cc",
@@ -2077,8 +2075,8 @@ component("base") {
       "mac/scoped_mach_port.h",
       "mac/scoped_mach_vm.cc",
       "mac/scoped_mach_vm.h",
+      "mac/scoped_nsautorelease_pool.cc",
       "mac/scoped_nsautorelease_pool.h",
-      "mac/scoped_nsautorelease_pool.mm",
       "mac/scoped_nsobject.h",
       "mac/scoped_objc_class_swizzler.h",
       "mac/scoped_objc_class_swizzler.mm",
@@ -3142,7 +3140,6 @@ test("base_unittests") {
     "functional/not_fn_unittest.cc",
     "functional/overloaded_unittest.cc",
     "gmock_unittest.cc",
-    "guid_unittest.cc",
     "hash/hash_unittest.cc",
     "hash/legacy_hash_unittest.cc",
     "hash/md5_constexpr_unittest.cc",
@@ -3172,7 +3169,6 @@ test("base_unittests") {
     "json/string_escape_unittest.cc",
     "json/values_util_unittest.cc",
     "lazy_instance_unittest.cc",
-    "location_unittest.cc",
     "logging_unittest.cc",
     "memory/aligned_memory_unittest.cc",
     "memory/discardable_memory_backing_field_trial_unittest.cc",
@@ -3205,6 +3201,7 @@ test("base_unittests") {
     "metrics/histogram_macros_unittest.cc",
     "metrics/histogram_samples_unittest.cc",
     "metrics/histogram_snapshot_manager_unittest.cc",
+    "metrics/histogram_threadsafe_unittest.cc",
     "metrics/histogram_unittest.cc",
     "metrics/metrics_hashes_unittest.cc",
     "metrics/persistent_histogram_allocator_unittest.cc",
@@ -3414,11 +3411,19 @@ test("base_unittests") {
     "types/token_type_unittest.cc",
     "types/variant_util_unittest.cc",
     "unguessable_token_unittest.cc",
+    "uuid_unittest.cc",
     "value_iterators_unittest.cc",
     "values_unittest.cc",
     "version_unittest.cc",
     "vlog_unittest.cc",
   ]
+
+  if (!is_cronet_build) {
+    # location_unittest.cc fails gn check for tracing-shimmed Cronet builds.
+    # Cronet buildbot do not run base_unittests, so exclusing this test
+    # instead of adding a nogncheck is preferred (crbug.com/1400235).
+    sources += [ "location_unittest.cc" ]
+  }
 
   if (build_rust_base_conversions) {
     sources += [
@@ -3713,7 +3718,6 @@ test("base_unittests") {
     sources += [
       "ios/device_util_unittest.mm",
       "ios/scoped_critical_action_unittest.mm",
-      "ios/weak_nsobject_unittest.mm",
     ]
 
     if (is_cronet_build) {
@@ -4387,8 +4391,8 @@ if (is_android) {
       "//base:jni_java",
       "//base/test:test_support_java",
       "//build/android:build_java",
-      "//third_party/android_support_test_runner:runner_java",
       "//third_party/androidx:androidx_annotation_annotation_java",
+      "//third_party/androidx:androidx_test_monitor_java",
       "//third_party/androidx:androidx_test_runner_java",
       "//third_party/hamcrest:hamcrest_java",
       "//third_party/junit:junit",
@@ -4470,10 +4474,11 @@ if (is_android) {
       "//third_party/android_deps:guava_android_java",
       "//third_party/android_sdk:android_test_base_java",
       "//third_party/android_sdk:android_test_mock_java",
-      "//third_party/android_support_test_runner:runner_java",
       "//third_party/androidx:androidx_annotation_annotation_java",
       "//third_party/androidx:androidx_core_core_java",
       "//third_party/androidx:androidx_multidex_multidex_java",
+      "//third_party/androidx:androidx_test_monitor_java",
+      "//third_party/androidx:androidx_test_runner_java",
       "//third_party/androidx:androidx_test_uiautomator_uiautomator_java",
       "//third_party/hamcrest:hamcrest_java",
       "//third_party/junit",
@@ -4597,8 +4602,8 @@ if (is_android) {
       ":base_java",
       ":base_java_test_support",
       "//testing/android/junit:junit_test_support",
-      "//third_party/android_support_test_runner:runner_java",
       "//third_party/androidx:androidx_test_core_java",
+      "//third_party/androidx:androidx_test_monitor_java",
       "//third_party/hamcrest:hamcrest_java",
       "//third_party/junit:junit",
     ]

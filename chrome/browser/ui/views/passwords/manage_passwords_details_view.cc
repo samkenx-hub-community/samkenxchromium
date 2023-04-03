@@ -50,9 +50,26 @@ constexpr int kIconSize = 16;
 constexpr int kDetailRowHeight = 44;
 constexpr int kMaxLinesVisibleFromPasswordNote = 7;
 
-void WriteToClipboard(const std::u16string& text) {
+void WriteToClipboard(const std::u16string& text, bool is_confidential) {
   ui::ScopedClipboardWriter scw(ui::ClipboardBuffer::kCopyPaste);
   scw.WriteText(text);
+  if (is_confidential) {
+    scw.MarkAsConfidential();
+  }
+}
+
+// Computes the margins of each row. This adjusts the left margin equal to the
+// dialog left margin + the back button insets to make sure all icons are
+// vertically aligned with the back button.
+gfx::Insets ComputeRowMargins() {
+  ChromeLayoutProvider* layout_provider = ChromeLayoutProvider::Get();
+  gfx::Insets margins = layout_provider->GetInsetsMetric(views::INSETS_DIALOG);
+  margins.set_top_bottom(0, 0);
+  margins.set_left(
+      margins.left() +
+      layout_provider->GetInsetsMetric(views::INSETS_VECTOR_IMAGE_BUTTON)
+          .left());
+  return margins;
 }
 
 std::unique_ptr<views::View> CreateIconView(
@@ -120,6 +137,7 @@ std::unique_ptr<views::FlexLayoutView> CreateDetailsRow(
     std::unique_ptr<views::View> detail_view) {
   auto row = std::make_unique<views::FlexLayoutView>();
   row->SetCollapseMargins(true);
+  row->SetInteriorMargin(ComputeRowMargins());
   row->SetDefault(
       views::kMarginsKey,
       gfx::Insets::VH(0, ChromeLayoutProvider::Get()->GetDistanceMetric(
@@ -247,6 +265,7 @@ std::unique_ptr<views::View> CreateEditUsernameRow(
   DCHECK(form.username_value.empty());
   auto row = std::make_unique<views::FlexLayoutView>();
   row->SetCollapseMargins(true);
+  row->SetInteriorMargin(ComputeRowMargins());
   row->SetDefault(
       views::kMarginsKey,
       gfx::Insets::VH(0, ChromeLayoutProvider::Get()->GetDistanceMetric(
@@ -282,6 +301,7 @@ std::unique_ptr<views::View> CreateEditNoteRow(
     raw_ptr<views::Label>* error_label) {
   auto row = std::make_unique<views::FlexLayoutView>();
   row->SetCollapseMargins(true);
+  row->SetInteriorMargin(ComputeRowMargins());
   row->SetDefault(
       views::kMarginsKey,
       gfx::Insets::VH(0, ChromeLayoutProvider::Get()->GetDistanceMetric(
@@ -367,7 +387,8 @@ ManagePasswordsDetailsView::ManagePasswordsDetailsView(
                                  username_label->GetText()));
   if (!password_form.username_value.empty()) {
     auto copy_username_button_callback =
-        base::BindRepeating(&WriteToClipboard, password_form.username_value)
+        base::BindRepeating(&WriteToClipboard, password_form.username_value,
+                            /*is_confidential=*/false)
             .Then(on_activity_callback_)
             .Then(base::BindRepeating(
                 &password_manager::metrics_util::
@@ -375,8 +396,7 @@ ManagePasswordsDetailsView::ManagePasswordsDetailsView(
                 PasswordManagementBubbleInteractions::
                     kUsernameCopyButtonClicked));
     AddChildView(CreateDetailsRowWithActionButton(
-        kAccountCircleIcon, std::move(username_label),
-        vector_icons::kContentCopyIcon,
+        kAccountCircleIcon, std::move(username_label), kCopyIcon,
         l10n_util::GetStringUTF16(IDS_PASSWORD_MANAGER_UI_COPY_USERNAME),
         std::move(copy_username_button_callback),
         ManagePasswordsViewIDs::kCopyUsernameButton));
@@ -407,7 +427,8 @@ ManagePasswordsDetailsView::ManagePasswordsDetailsView(
     return;
   }
   auto copy_password_button_callback =
-      base::BindRepeating(&WriteToClipboard, password_form.password_value)
+      base::BindRepeating(&WriteToClipboard, password_form.password_value,
+                          /*is_confidential=*/true)
           .Then(on_activity_callback_)
           .Then(base::BindRepeating(
               &password_manager::metrics_util::
@@ -418,7 +439,7 @@ ManagePasswordsDetailsView::ManagePasswordsDetailsView(
       kKeyIcon,
       CreatePasswordLabelWithEyeIconView(std::move(password_label),
                                          on_activity_callback_),
-      vector_icons::kContentCopyIcon,
+      kCopyIcon,
       l10n_util::GetStringUTF16(IDS_PASSWORD_MANAGER_UI_COPY_PASSWORD),
       std::move(copy_password_button_callback),
       ManagePasswordsViewIDs::kCopyPasswordButton));
@@ -475,10 +496,6 @@ void ManagePasswordsDetailsView::SwitchToEditUsernameMode() {
   on_activity_callback_.Run();
   LogUserInteractionsInPasswordManagementBubble(
       PasswordManagementBubbleInteractions::kUsernameEditButtonClicked);
-  // Invoke OnUserInputChanged() to validate the current input. Relevant only
-  // for empty username to make sure the bubble is opened showing the username
-  // as invalid.
-  OnUserInputChanged();
 }
 
 void ManagePasswordsDetailsView::SwitchToEditNoteMode() {
@@ -497,13 +514,10 @@ void ManagePasswordsDetailsView::OnUserInputChanged() {
   on_activity_callback_.Run();
   bool is_username_invalid = false;
   if (username_textfield_ && username_textfield_->IsDrawn()) {
-    bool username_empty = username_textfield_->GetText().empty();
-    bool username_exists =
-        username_empty
-            ? false
-            : username_exists_callback_.Run(username_textfield_->GetText());
-    username_error_label_->SetVisible(username_exists);
-    is_username_invalid = username_empty || username_exists;
+    is_username_invalid =
+        !username_textfield_->GetText().empty() &&
+        username_exists_callback_.Run(username_textfield_->GetText());
+    username_error_label_->SetVisible(is_username_invalid);
     username_textfield_->SetInvalid(is_username_invalid);
   }
 

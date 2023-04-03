@@ -10,12 +10,7 @@
 #include "base/functional/callback.h"
 #include "base/time/time.h"
 
-namespace gfx {
-class ImageSkia;
-}  // namespace gfx
-
 class GURL;
-
 namespace supervised_user {
 
 class SupervisedUserSettingsService;
@@ -49,8 +44,25 @@ class WebContentHandler {
   virtual void RequestLocalApproval(
       const GURL& url,
       const std::u16string& child_display_name,
-      const gfx::ImageSkia& favicon,
       ApprovalRequestInitiatedCallback callback) = 0;
+  // Returns true if the given frame is the primary main frame for the active
+  // page.
+  // TODO(b/273692421): Once all content-based methods are moved from the
+  // interstitial, frame_id will be moved from into WebContentHandler.
+  // WebContentHandler.
+  virtual bool IsMainFrame(int frame_id) = 0;
+  // Shows the feedback page to the user.
+  // TODO(b/276428131): Remove when local we approvals if fully launched.
+  virtual void ShowFeedback(GURL url, std::u16string reason) = 0;
+
+  // Removes all the infobars which are attached to web_contents_
+  // and for which ShouldExpire() returns true, if the navigation frame_id
+  // is the main frame.
+  // TODO(b/273692421): frame_id will be moved from the interstitial into
+  // WebContentHandler.
+  // TODO(b/273692421): Add unit (or browser test) coverage for the moved
+  // methods that currently have no test coverage.
+  virtual void CleanUpInfoBarOnMainFrame(int frame_id) = 0;
 
   static const char* GetLocalApprovalDurationMillisecondsHistogram();
   static const char* GetLocalApprovalResultHistogram();

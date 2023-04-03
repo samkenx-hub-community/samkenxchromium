@@ -5,7 +5,7 @@
 import 'chrome://personalization/strings.m.js';
 import 'chrome://webui-test/mojo_webui_test_support.js';
 
-import {AlbumsSubpage, AmbientActionName, AmbientModeAlbum, AmbientObserver, AmbientSubpage, AmbientUiVisibility, AnimationTheme, AnimationThemeItem, emptyState, Paths, PersonalizationRouter, SetAlbumsAction, SetAmbientModeEnabledAction, SetAnimationThemeAction, SetTemperatureUnitAction, SetTopicSourceAction, TemperatureUnit, TopicSource, TopicSourceItem, WallpaperGridItem} from 'chrome://personalization/js/personalization_app.js';
+import {AlbumsSubpage, AmbientActionName, AmbientModeAlbum, AmbientObserver, AmbientSubpage, AmbientUiVisibility, AnimationTheme, AnimationThemeItem, emptyState, Paths, PersonalizationRouter, QueryParams, ScrollableTarget, SetAlbumsAction, SetAmbientModeEnabledAction, SetAnimationThemeAction, SetTemperatureUnitAction, SetTopicSourceAction, TemperatureUnit, TopicSource, TopicSourceItem, WallpaperGridItem} from 'chrome://personalization/js/personalization_app.js';
 import {CrRadioButtonElement} from 'chrome://resources/cr_elements/cr_radio_button/cr_radio_button.js';
 import {loadTimeData} from 'chrome://resources/js/load_time_data.js';
 import {Url} from 'chrome://resources/mojo/url/mojom/url.mojom-webui.js';
@@ -54,8 +54,8 @@ suite('AmbientSubpageTest', function() {
   async function displayMainSettings(
       topicSource: TopicSource|null, temperatureUnit: TemperatureUnit|null,
       ambientModeEnabled: boolean|null,
-      animationTheme = AnimationTheme.kSlideshow,
-      previews: Url[] = []): Promise<AmbientSubpage> {
+      animationTheme = AnimationTheme.kSlideshow, previews: Url[] = [],
+      queryParams: QueryParams = {}): Promise<AmbientSubpage> {
     personalizationStore.data.ambient.albums = ambientProvider.albums;
     personalizationStore.data.ambient.animationTheme = animationTheme;
     personalizationStore.data.ambient.topicSource = topicSource;
@@ -63,7 +63,7 @@ suite('AmbientSubpageTest', function() {
     personalizationStore.data.ambient.ambientModeEnabled = ambientModeEnabled;
     personalizationStore.data.ambient.previews = previews;
     const ambientSubpage =
-        initElement(AmbientSubpage, {path: Paths.AMBIENT, queryParams: {}});
+        initElement(AmbientSubpage, {path: Paths.AMBIENT, queryParams});
     personalizationStore.notifyObservers();
     await waitAfterNextRender(ambientSubpage);
     return Promise.resolve(ambientSubpage);
@@ -415,6 +415,20 @@ suite('AmbientSubpageTest', function() {
     const albumsSubpage =
         ambientSubpageElement.shadowRoot!.querySelector('albums-subpage');
     assertFalse(!!albumsSubpage);
+  });
+
+  test('scroll to image source when clicked from thumbnail', async () => {
+    ambientSubpageElement = await displayMainSettings(
+        TopicSource.kArtGallery, TemperatureUnit.kFahrenheit, true,
+        AnimationTheme.kSlideshow, [],
+        {scrollTo: ScrollableTarget.TOPIC_SOURCE_LIST});
+
+    await ambientProvider.whenCalled('setAmbientObserver');
+    ambientProvider.updateAmbientObserver();
+
+    const imageSource =
+        ambientSubpageElement.shadowRoot!.querySelector('topic-source-list');
+    assertTrue(!!imageSource, 'Image source should present.');
   });
 
   test('has albums subpage visible with path ambient albums', async () => {
@@ -790,5 +804,39 @@ suite('AmbientSubpageTest', function() {
     const downloadingButton =
         ambientPreview.shadowRoot!.querySelector('.preview-button-disabled');
     assertTrue(!!downloadingButton, 'downloading button should be present');
+  });
+
+  test('shows video animation theme on supported devices', async () => {
+    // Enabled `isTimeOfDayScreensaverEnabled` to show the updated UI.
+    loadTimeData.overrideValues({'isTimeOfDayScreenSaverEnabled': true});
+
+    ambientSubpageElement = await displayMainSettings(
+        TopicSource.kArtGallery, TemperatureUnit.kFahrenheit,
+        /*ambientModeEnabled=*/ true);
+
+    const animationThemeList =
+        ambientSubpageElement.shadowRoot!.querySelector('animation-theme-list');
+    assertTrue(!!animationThemeList);
+
+    // The grid may not have templated all the items yet since it was just
+    // instantiated. See crbug/1334962.
+    const grid = animationThemeList.shadowRoot!.getElementById('grid');
+    assertTrue(!!grid, 'animation theme list has a grid');
+    await waitAfterNextRender(grid);
+
+    const animationThemeItems =
+        animationThemeList!.shadowRoot!.querySelectorAll<AnimationThemeItem>(
+            'animation-theme-item:not([hidden])');
+    assertEquals(4, animationThemeItems.length);
+    const videoTheme = animationThemeItems[3] as AnimationThemeItem;
+    assertEquals(AnimationTheme.kVideo, videoTheme.animationTheme);
+    assertEquals('false', videoTheme.ariaChecked);
+
+    personalizationStore.expectAction(AmbientActionName.SET_ANIMATION_THEME);
+    videoTheme.click();
+    const action =
+        await personalizationStore.waitForAction(
+            AmbientActionName.SET_ANIMATION_THEME) as SetAnimationThemeAction;
+    assertEquals(AnimationTheme.kVideo, action.animationTheme);
   });
 });

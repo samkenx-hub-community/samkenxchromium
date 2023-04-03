@@ -15,8 +15,6 @@ import static org.mockito.Mockito.when;
 import static org.chromium.components.browser_ui.widget.highlight.ViewHighlighterTestUtils.checkHighlightOff;
 import static org.chromium.components.browser_ui.widget.highlight.ViewHighlighterTestUtils.checkHighlightPulse;
 
-import android.support.test.InstrumentationRegistry;
-import android.support.test.runner.lifecycle.Stage;
 import android.text.TextUtils;
 import android.view.View;
 import android.view.ViewGroup;
@@ -26,8 +24,10 @@ import androidx.annotation.Nullable;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.recyclerview.widget.RecyclerView.AdapterDataObserver;
 import androidx.recyclerview.widget.RecyclerView.ViewHolder;
+import androidx.test.InstrumentationRegistry;
 import androidx.test.filters.MediumTest;
 import androidx.test.filters.SmallTest;
+import androidx.test.runner.lifecycle.Stage;
 
 import org.hamcrest.Matchers;
 import org.junit.After;
@@ -403,8 +403,8 @@ public class BookmarkTest {
 
         // Check that we are in the mobile bookmarks folder.
         Assert.assertEquals("Mobile bookmarks", toolbar.getTitle());
-        Assert.assertEquals(SelectableListToolbar.NAVIGATION_BUTTON_BACK,
-                toolbar.getNavigationButtonForTests());
+        Assert.assertEquals(
+                SelectableListToolbar.NavigationButton.BACK, toolbar.getNavigationButtonForTests());
         Assert.assertFalse(toolbar.getMenu().findItem(R.id.edit_menu_id).isVisible());
 
         // Open the new test folder.
@@ -412,8 +412,8 @@ public class BookmarkTest {
 
         // Check that we are in the editable test folder.
         Assert.assertEquals(TEST_FOLDER_TITLE, toolbar.getTitle());
-        Assert.assertEquals(SelectableListToolbar.NAVIGATION_BUTTON_BACK,
-                toolbar.getNavigationButtonForTests());
+        Assert.assertEquals(
+                SelectableListToolbar.NavigationButton.BACK, toolbar.getNavigationButtonForTests());
         Assert.assertTrue(toolbar.getMenu().findItem(R.id.edit_menu_id).isVisible());
 
         TestThreadUtils.runOnUiThreadBlocking(
@@ -427,8 +427,8 @@ public class BookmarkTest {
 
         // Check that we are back in the mobile folder
         Assert.assertEquals("Mobile bookmarks", toolbar.getTitle());
-        Assert.assertEquals(SelectableListToolbar.NAVIGATION_BUTTON_BACK,
-                toolbar.getNavigationButtonForTests());
+        Assert.assertEquals(
+                SelectableListToolbar.NavigationButton.BACK, toolbar.getNavigationButtonForTests());
         Assert.assertFalse(toolbar.getMenu().findItem(R.id.edit_menu_id).isVisible());
 
         // Call BookmarkToolbar#onClick() to activate the navigation button.
@@ -436,8 +436,8 @@ public class BookmarkTest {
 
         // Check that we are in the root folder.
         Assert.assertEquals("Bookmarks", toolbar.getTitle());
-        Assert.assertEquals(SelectableListToolbar.NAVIGATION_BUTTON_NONE,
-                toolbar.getNavigationButtonForTests());
+        Assert.assertEquals(
+                SelectableListToolbar.NavigationButton.NONE, toolbar.getNavigationButtonForTests());
         Assert.assertFalse(toolbar.getMenu().findItem(R.id.edit_menu_id).isVisible());
     }
 
@@ -736,6 +736,7 @@ public class BookmarkTest {
 
     @Test
     @MediumTest
+    @Restriction({UiRestriction.RESTRICTION_TYPE_PHONE}) // see crbug.com/1429025
     public void testEditHiddenWhileStillLoading() throws Exception {
         BookmarkManagerCoordinator.preventLoadingForTesting(true);
 
@@ -1832,8 +1833,8 @@ public class BookmarkTest {
 
         // Check that we are in the mobile bookmarks folder.
         Assert.assertEquals("Tracked products", toolbar.getTitle());
-        Assert.assertEquals(SelectableListToolbar.NAVIGATION_BUTTON_BACK,
-                toolbar.getNavigationButtonForTests());
+        Assert.assertEquals(
+                SelectableListToolbar.NavigationButton.BACK, toolbar.getNavigationButtonForTests());
     }
 
     @Test

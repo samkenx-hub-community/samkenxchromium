@@ -227,6 +227,10 @@ if (is_win || is_mac || is_linux) {
         "app/server/win/server.h",
         "app/server/win/service_main.cc",
         "app/server/win/service_main.h",
+        "app/server/win/update_service_internal_stub_win.cc",
+        "app/server/win/update_service_internal_stub_win.h",
+        "app/server/win/update_service_stub_win.cc",
+        "app/server/win/update_service_stub_win.h",
         "app/server/win/wrl_classes.cc",
         "device_management/dm_storage_win.cc",
         "ipc/update_service_internal_proxy_win.cc",
@@ -824,6 +828,7 @@ if (is_win || is_mac || is_linux) {
       sources += [
         "mac/keystone/ksadmin_unittest.cc",
         "mac/privileged_helper/privileged_helper_unittests.mm",
+        "mac/setup/keystone_unittest.cc",
         "mac/setup/ks_tickets_unittest.mm",
         "mac/setup/setup_unittest.mm",
         "policy/mac/managed_preference_policy_manager_impl_unittest.mm",
@@ -841,6 +846,7 @@ if (is_win || is_mac || is_linux) {
       ]
 
       data += [
+        "//chrome/test/data/updater/CountingMetrics.plist",
         "//chrome/test/data/updater/Keystone.ticketstore",
         "//chrome/test/data/updater/Keystone.withlaunchservicechecker.ticketstore",
         "//chrome/test/data/updater/Keystone.legacy.ticketstore",
@@ -884,7 +890,7 @@ if (is_win || is_mac || is_linux) {
 
       data_deps = [
         ":updater_selfupdate_test_crx",
-        "//chrome/updater/mac:ksadmin",
+        "//chrome/updater/mac:ksadmin_test",
         "//chrome/updater/mac:updater_bundle_test",
       ]
 

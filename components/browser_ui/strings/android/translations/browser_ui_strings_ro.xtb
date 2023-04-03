@@ -103,6 +103,7 @@
 <translation id="2717722538473713889">Adrese de e-mail</translation>
 <translation id="2750481671343847896">Site-urile pot afișa solicitări de conectare de la servicii de identitate.</translation>
 <translation id="2822354292072154809">Sigur dorești să resetezi toate permisiunile la nivel de site pentru <ph name="CHOSEN_OBJECT_NAME" />?</translation>
+<translation id="2850913818900871965">Solicită afișarea pe mobil</translation>
 <translation id="2870560284913253234">Site</translation>
 <translation id="2874939134665556319">Melodia anterioară</translation>
 <translation id="2891975107962658722">Nu permite unui site să salveze date pe dispozitiv</translation>
@@ -222,7 +223,6 @@
 <translation id="509133520954049755">Solicită afișarea pe desktop</translation>
 <translation id="5100237604440890931">Afișare restrânsă – dă clic pentru a extinde.</translation>
 <translation id="5123685120097942451">Filă incognito</translation>
-<translation id="5134599672855298214">Solicită afișarea pe mobil (recomandat)</translation>
 <translation id="5186036860380548585">Opțiunea este disponibilă în partea de sus a ecranului</translation>
 <translation id="5197729504361054390">Persoanele de contact pe care le selectezi vor fi trimise site-ului <ph name="BEGIN_BOLD" /><ph name="SITE" /><ph name="END_BOLD" />.</translation>
 <translation id="5216942107514965959">Accesat ultima dată azi</translation>

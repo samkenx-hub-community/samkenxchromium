@@ -7,8 +7,10 @@
 #import "components/prefs/pref_service.h"
 #import "ios/chrome/browser/application_context/application_context.h"
 #import "ios/chrome/browser/browser_state/chrome_browser_state.h"
+#import "ios/chrome/browser/feature_engagement/tracker_factory.h"
 #import "ios/chrome/browser/main/browser.h"
 #import "ios/chrome/browser/prefs/pref_names.h"
+#import "ios/chrome/browser/promos_manager/promos_manager_factory.h"
 #import "ios/chrome/browser/shared/public/commands/command_dispatcher.h"
 #import "ios/chrome/browser/shared/public/commands/credential_provider_promo_commands.h"
 #import "ios/chrome/browser/shared/public/commands/promos_manager_commands.h"
@@ -57,8 +59,10 @@ using credential_provider_promo::IOSCredentialProviderPromoAction;
   [self.browser->GetCommandDispatcher()
       startDispatchingToTarget:self
                    forProtocol:@protocol(CredentialProviderPromoCommands)];
+  PromosManager* promosManager =
+      PromosManagerFactory::GetForBrowserState(self.browser->GetBrowserState());
   self.mediator = [[CredentialProviderPromoMediator alloc]
-      initWithPromosManager:GetApplicationContext()->GetPromosManager()
+      initWithPromosManager:promosManager
                 prefService:self.browser->GetBrowserState()->GetPrefs()];
 }
 
@@ -88,6 +92,9 @@ using credential_provider_promo::IOSCredentialProviderPromoAction;
   }
   self.viewController = [[CredentialProviderPromoViewController alloc] init];
   self.mediator.consumer = self.viewController;
+  self.mediator.tracker =
+      feature_engagement::TrackerFactory::GetForBrowserState(
+          self.browser->GetBrowserState());
   self.viewController.actionHandler = self;
   self.viewController.presentationController.delegate = self;
   self.promoContext = CredentialProviderPromoContext::kFirstStep;

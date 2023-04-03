@@ -107,7 +107,6 @@
 <translation id="1834290891154666894">చెల్లని సబ్జెక్ట్ ప్రత్యామ్నాయ పేరుకు సంబంధించిన మ్యాచ్ ఎంటర్ చేయబడింది</translation>
 <translation id="1838709767668011582">Google సైట్</translation>
 <translation id="1853795129690976061">ఈ ఫోల్డర్ Linuxతో షేర్ చేయబడింది</translation>
-<translation id="1859422890169495746">ఈ Chromebook</translation>
 <translation id="1864756863218646478">ఫైల్‌ను కనుగొనబడలేదు.</translation>
 <translation id="1884013283844450420"><ph name="NETWORK_COUNT" />లో <ph name="NETWORK_INDEX" />, <ph name="NETWORK_NAME" />, కనెక్ట్ చేయండి</translation>
 <translation id="1920670151694390848">మలయాళం ట్రాన్స్‌లిటరేషన్</translation>
@@ -120,7 +119,7 @@
 <translation id="1972984168337863910">అభిప్రాయ ప్యానెల్‌ల ఫైళ్లు విస్తరించు</translation>
 <translation id="1995337122023280937">ఫైల్ లొకేషన్‌కు వెళ్ళు</translation>
 <translation id="2001796770603320721">డిస్క్‌లో మేనేజ్ చేయండి</translation>
-<translation id="2009067268969781306">డ్రైవ్‌ను ఫార్మాట్ చేయడం వలన దానిలో నిల్వ చేయబడిన మొత్తం డేటా తొలగించబడుతుంది. ఈ చర్యను రద్దు చేయలేరు.</translation>
+<translation id="2009067268969781306">డ్రైవ్‌ను ఫార్మాట్ చేయడం వలన దానిలో స్టోరేజ్‌ చేయబడిన మొత్తం డేటా తొలగించబడుతుంది. ఈ చర్యను రద్దు చేయలేరు.</translation>
 <translation id="2025955442973426285">టైగ్రిన్యా</translation>
 <translation id="2037845485764049925">రష్యన్</translation>
 <translation id="2044023416777079300">మోడెమ్ రిజిస్టర్ చేయబడలేదు</translation>
@@ -130,6 +129,7 @@
 <translation id="2084108471225856927">పరికర సెట్టింగ్‌లు</translation>
 <translation id="2084809735218147718">సంజ్ఞ ద్వారా థ్యాంక్ యు చెబుతున్న వ్యక్తి</translation>
 <translation id="2088690981887365033">VPN నెట్‌వర్క్</translation>
+<translation id="2111134541987263231"><ph name="BEGIN_BOLD" />అజ్ఞాత మోడ్‌లో అనుమతించండి<ph name="END_BOLD" /> ఆప్షన్‌ను ఆన్ చేయండి</translation>
 <translation id="2114191879048183086"><ph name="NUMBER_OF_ITEMS" /> ఐటెమ్‌లు తొలగించబడతాయి, మీరు వాటిని రీస్టోర్ చేయలేరు.</translation>
 <translation id="2122305276694332719">దాచబడిన నెట్‌వర్క్‌కు ఆటోమేటిక్‌గా కనెక్ట్ చేయడం వలన మీ పరికరాన్ని, కొన్ని నెట్‌వర్క్‌ల సెట్టింగ్‌లను ఇతరులు చూడగలుగుతారు, కనుక ఇది సిఫార్సు చేయబడదు.</translation>
 <translation id="2125607626296734455">ఖ్మేర్</translation>
@@ -228,6 +228,7 @@
 <translation id="290843123675549676">మరాఠీ</translation>
 <translation id="2923240520113693977">ఈస్టోనియన్</translation>
 <translation id="2938685643439809023">మంగోలియన్</translation>
+<translation id="293972288692056847">{COUNT,plural, =1{ఎక్స్‌టెన్షన్‌ను కనుగొనడం సాధ్యపడలేదు}other{ఎక్స్‌టెన్షన్‌లను కనుగొనడం సాధ్యపడలేదు}}</translation>
 <translation id="2943503720238418293">కొద్దిగా చిన్న పేరును ఉపయోగించండి</translation>
 <translation id="2949781154072577687"><ph name="DRIVE_NAME" />ను ఫార్మాట్ చేస్తోంది...</translation>
 <translation id="2951236788251446349">జెల్లీఫిష్</translation>
@@ -282,6 +283,7 @@
 <translation id="3356580349448036450">పూర్తయింది</translation>
 <translation id="3358452157379365236">గిటార్</translation>
 <translation id="3368922792935385530">కనెక్ట్ అయింది</translation>
+<translation id="3372635229069101468"><ph name="BEGIN_BOLD" />వివరాల<ph name="END_BOLD" />ను క్లిక్ చేయండి</translation>
 <translation id="3382143449143186018">ఇన్‌స్క్రిప్ట్ కీబోర్డ్‌తో నేపాలీ</translation>
 <translation id="338691029516748599"><ph name="NETWORK_COUNT" />లో <ph name="NETWORK_INDEX" /> నెట్‌వర్క్, <ph name="NETWORK_NAME" />, <ph name="SECURITY_STATUS" />, సిగ్నల్ సామర్థ్యం <ph name="SIGNAL_STRENGTH" />%, మీ అడ్మినిస్ట్రేటర్ ద్వారా నిర్వహించబడుతోంది, కనెక్ట్ చేయండి</translation>
 <translation id="3408072735282270043"><ph name="NETWORK_NAME" />, యాక్టివేట్ చేయి</translation>
@@ -366,6 +368,7 @@
 <translation id="4124935795427217608">యునికార్న్</translation>
 <translation id="4131235941541910880">మీకు అవసరం లేని ఐటెమ్‌లను ట్రాష్‌కు తరలించండి</translation>
 <translation id="4134804435730168042"><ph name="NETWORK_COUNT" />‌లో <ph name="NETWORK_INDEX" /> నెట్‌వర్క్, <ph name="NETWORK_NAME" />, <ph name="NETWORK_PROVIDER_NAME" />, పరికరాన్ని సెటప్ చేసిన తర్వాత యాక్టివేట్ చేయండి</translation>
+<translation id="41501027364808384">{COUNT,plural, =1{కింది ఎక్స్‌టెన్షన్‌ను అజ్ఞాత మోడ్‌లో ఆన్ చేయండి:}other{కింది ఎక్స్‌టెన్షన్‌లను అజ్ఞాత మోడ్‌లో ఆన్ చేయండి:}}</translation>
 <translation id="4153015322587141338">షెల్ఫ్‌లో ఉన్న మీ ఫైల్స్‌కు క్విక్ యాక్సెస్‌ను పొందడానికి, ఫైల్‌పై కుడి క్లిక్ చేసి, "<ph name="PIN_COMMAND" />"ను ఎంచుకోండి.</translation>
 <translation id="4157569377477607576">అడ్మినిస్ట్రేటర్ పాలసీ వీటిని సిఫార్సు చేయదు:</translation>
 <translation id="4159731583141908892"><ph name="FILE_NAME" /> తరలించబడింది.</translation>
@@ -462,12 +465,15 @@
 <translation id="4801956050125744859">రెండింటినీ ఉంచు</translation>
 <translation id="4804827417948292437">వెన్నపండు</translation>
 <translation id="4805966553127040832"><ph name="COUNT" /> ఐటెమ్‌లను రీస్టోర్ చేస్తోంది</translation>
+<translation id="4816695657735045067">{COUNT,plural, =1{అజ్ఞాత మోడ్‌ను ఉపయోగించడానికి, మీ సంస్థకు ఎక్స్‌టెన్షన్ అవసరం}other{అజ్ఞాత మోడ్‌ను ఉపయోగించడానికి, మీ సంస్థకు ఎక్స్‌టెన్షన్‌లు అవసరం}}</translation>
 <translation id="4823651846660089135">పరికరం చదవడానికి మాత్రమే</translation>
 <translation id="4826849268470072925">తమిళం ITRANS</translation>
+<translation id="482932175346970750">మీ బ్రౌజర్‌లో <ph name="BEGIN_BOLD" />chrome://extensions<ph name="END_BOLD" /> అని టైప్ చేయండి</translation>
 <translation id="4839847978919684242"><ph name="SELCTED_FILES_COUNT" /> అంశాలు ఎంచుకోబడ్డాయి</translation>
 <translation id="4843566743023903107">Chromebaseలు</translation>
 <translation id="4850886885716139402">వీక్షణ</translation>
 <translation id="485316830061041779">జర్మన్</translation>
+<translation id="4862885579661885411">Files సెట్టింగ్‌లు</translation>
 <translation id="4867079195717347957">నిలువు వరుసను అవరోహణ క్రమంలో వర్గీకరించడానికి క్లిక్ చేయండి.</translation>
 <translation id="4867297348137739678">గత వారం</translation>
 <translation id="4873265419374180291"><ph name="NUMBER_OF_BYTES" /> బైట్‌లు</translation>
@@ -528,11 +534,12 @@
 <translation id="5262311848634918433"><ph name="MARKUP_1" />ఫైళ్లను ఎక్కడి నుండైనా యాక్సెస్ చేయండి, ఆఫ్‌లైన్‌లో ఉన్నా కూడా.<ph name="MARKUP_2" />
     Google Driveలోని ఫైళ్లు అప్‌డేట్ చేయబడి ఉంటాయి, ఇవి ఏ పరికరం నుండైనా అందుబాటులో ఉంటాయి.<ph name="MARKUP_3" />
     <ph name="MARKUP_4" />మీ ఫైళ్లను సురక్షితంగా ఉంచుకోండి.<ph name="MARKUP_5" />
-    మీ పరికరానికి ఏ విధమైన ఆపద సంభవించినా ఫర్వాలేదు, మీ ఫైళ్లు Google Driveలో సురక్షితంగా నిల్వ చేయబడి ఉంటాయి.<ph name="MARKUP_6" />
+    మీ పరికరానికి ఏ విధమైన ఆపద సంభవించినా ఫర్వాలేదు, మీ ఫైళ్లు Google Driveలో సురక్షితంగా స్టోరేజ్‌ చేయబడి ఉంటాయి.<ph name="MARKUP_6" />
     అన్ని ఫైళ్లు ఒకే చోట ఉంటాయి, కాబట్టి <ph name="MARKUP_7" />షేర్ చేయండి, క్రియేట్ చేయండి,
     వాటిపై ఇతరులతో కలిసి పని చేయండి<ph name="MARKUP_8" />.<ph name="MARKUP_9" /></translation>
 <translation id="5275973617553375938">Google Drive నుండి పునరుద్ధరించబడిన ఫైళ్లు</translation>
 <translation id="5278111733643988471">ఈ ఐటెమ్‌ను రీస్టోర్ చేయడానికి, దాన్ని ట్రాష్ వెలుపల ఉన్న కొత్త ఫోల్డర్‌కు లాగండి. ఈ ఐటెమ్‌కు సంబంధించిన ఒరిజినల్ ఫోల్డర్ "<ph name="PARENT_FOLDER_NAME" />" తొలగించబడింది.</translation>
+<translation id="5283101102242354279">ఈ ఎక్స్‌టెన్షన్‌ను అజ్ఞాత మోడ్‌లో ఆన్ చేయండి:</translation>
 <translation id="5286194356314741248">స్కాన్ చేస్తోంది</translation>
 <translation id="5288441970121584418">బర్గర్</translation>
 <translation id="5288481194217812690"><ph name="FILENAME" /></translation>
@@ -628,6 +635,7 @@
 <translation id="603895874132768835">మీరు కొత్త PINను సెటప్ చేసే వరకు ఈ నెట్‌వర్క్‌ను ఉపయోగించలేరు</translation>
 <translation id="6040143037577758943">మూసివేయి</translation>
 <translation id="6055907707645252013"><ph name="NETWORK_TYPE" /> నెట్‌వర్క్, కనెక్ట్ కాలేదు</translation>
+<translation id="6073060579181816027">అనేక ఫైల్ లొకేషన్‌లు</translation>
 <translation id="6074825444536523002">Google ఫారమ్</translation>
 <translation id="6079871810119356840">Qwerty కీబోర్డ్‌తో హంగేరియన్</translation>
 <translation id="6096979789310008754">శోధన వచనం క్లియర్ చేయబడింది, అన్ని ఫైళ్లు మరియు ఫోల్డర్‌లు చూపబడుతున్నాయి.</translation>
@@ -761,7 +769,7 @@
 <translation id="7086590977277044826">ఇన్‌స్క్రిప్ట్ కీబోర్డ్‌తో తమిళం</translation>
 <translation id="7088615885725309056">పాతవి</translation>
 <translation id="7103992300314999525">మాసిడోనియన్</translation>
-<translation id="7106346894903675391">మరింత నిల్వని కొనుగోలు చేయండి...</translation>
+<translation id="7106346894903675391">మరింత స్టోరేజ్‌ను కొనుగోలు చేయండి...</translation>
 <translation id="7126604456862387217">'&lt;b&gt;<ph name="SEARCH_STRING" />&lt;/b&gt;' - &lt;em&gt;డిస్క్‌లో వెతకండి&lt;/em&gt;</translation>
 <translation id="7135561821015524160">కన్నడ ఫొనెటిక్</translation>
 <translation id="714034171374937760">Chromebase</translation>
@@ -778,6 +786,7 @@
 <translation id="7238643356913091553"><ph name="NETWORK_NAME" />, వివరాలు</translation>
 <translation id="7246947237293279874">FTP ప్రాక్సీ</translation>
 <translation id="7248671827512403053">అప్లికేషన్‌</translation>
+<translation id="7252604552361840748">ఎగువున ఉన్న ఎక్స్‌టెన్షన్‌ను కనుగొనండి</translation>
 <translation id="7256405249507348194">గుర్తించబడని ఎర్రర్: <ph name="DESC" /></translation>
 <translation id="7268659760406822741">అందుబాటులో ఉన్న సేవలు</translation>
 <translation id="7292816689782057017">అడ్మినిస్ట్రేటర్ పాలసీ ప్రకారం, ఫైల్స్‌ను కేవలం కొన్ని లొకేషన్‌లలో మాత్రమే సేవ్ చేయడానికి వీలవుతుంది.</translation>

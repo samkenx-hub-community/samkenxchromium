@@ -22,6 +22,7 @@
 <translation id="1399397803214730675">Selles arvutis on juba Google Chrome'i uuem versioon. Kui tarkvara ei tööta, desinstallige Google Chrome ja proovige uuesti.</translation>
 <translation id="139993653570221430">Chrome'i seadetes saate oma valikuid alati muuta. Prooviversioone käitatakse kõrvuti praeguse reklaamide esitamise viisiga, seega ei näe te kohe muutusi.</translation>
 <translation id="1434626383986940139">Chrome Canary rakendused</translation>
+<translation id="1496905273983707119">{NUM_DEVICES,plural, =0{Google Chrome oli ühendatud HID-seadmega}=1{Google Chrome on ühendatud HID-seadmega}other{Google Chrome on ühendatud HID-seadmetega}}</translation>
 <translation id="1507198376417198979">Kohandage oma uut Chrome'i profiili</translation>
 <translation id="1516530951338665275">Google Chrome vajab sidumise jätkamiseks juurdepääsu Bluetoothile. <ph name="IDS_BLUETOOTH_DEVICE_CHOOSER_AUTHORIZE_BLUETOOTH_LINK" /></translation>
 <translation id="1547295885616600893">Chrome OS on võimalik tänu <ph name="BEGIN_LINK_CROS_OSS" />avatud lähtekoodiga lisatarkvarale<ph name="END_LINK_CROS_OSS" />.</translation>
@@ -123,7 +124,6 @@
 <translation id="3140883423282498090">Teie muudatused jõustuvad järgmine kord, kui avate Google Chrome'i.</translation>
 <translation id="3149510190863420837">Chrome'i rakendused</translation>
 <translation id="3169523567916669830">Prooviperioodidel saate vaadata ja eemaldada huvipakkuvaid teemasid, mida saidid teile reklaamide näitamiseks kasutavad. Chrome prognoosib teie huvisid teie hiljutise sirvimisajaloo põhjal.</translation>
-<translation id="3211604354460514046">{NUM_DEVICES,plural, =1{Google Chrome on ühendatud HID-seadmega}other{Google Chrome on ühendatud HID-seadmetega}}</translation>
 <translation id="3245429137663807393">Kui jagate ka Chrome'i kasutusaruandeid, hõlmavad need teie külastatavaid URL-e</translation>
 <translation id="3282568296779691940">Chrome'i sisselogimine</translation>
 <translation id="3286538390144397061">Taaskäivitada kohe</translation>

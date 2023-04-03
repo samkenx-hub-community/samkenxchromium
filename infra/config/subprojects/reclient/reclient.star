@@ -114,9 +114,6 @@ def fyi_reclient_test_builder(
         console_view_category,
         **kwargs):
     reclient_bootstrap_env = kwargs.pop("reclient_bootstrap_env", {})
-    reclient_bootstrap_env.update({
-        "RBE_compression_threshold": "4000000",
-    })
     return fyi_reclient_staging_builder(
         name = name,
         console_view_category = console_view_category,
@@ -424,7 +421,7 @@ ci.builder(
         "RBE_clang_depscan_archive": "true",
     },
     reclient_cache_silo = "Comparison Linux remote links - cache siloed",
-    reclient_instance = reclient.instance.DEFAULT_TRUSTED,
+    reclient_instance = reclient.instance.TEST_TRUSTED,
     reclient_jobs = reclient.jobs.DEFAULT,
 )
 
@@ -442,7 +439,6 @@ ci.builder(
         "RBE_clang_depscan_archive": "true",
         "RBE_use_unified_uploads": "false",
         "GOMA_DEPS_CACHE_TABLE_THRESHOLD": "40000",
-        "RBE_compression_threshold": "4000000",
     },
     reclient_cache_silo = "Comparison Linux remote links - cache siloed",
     reclient_instance = reclient.instance.TEST_TRUSTED,

@@ -58,6 +58,8 @@ static_library("test_support") {
     "../browser/attribution_reporting/attribution_test_utils.h",
     "../browser/attribution_reporting/test/configurable_storage_delegate.cc",
     "../browser/attribution_reporting/test/configurable_storage_delegate.h",
+    "../browser/attribution_reporting/test/mock_attribution_data_host_manager.cc",
+    "../browser/attribution_reporting/test/mock_attribution_data_host_manager.h",
     "../browser/attribution_reporting/test/mock_attribution_host.cc",
     "../browser/attribution_reporting/test/mock_attribution_host.h",
     "../browser/attribution_reporting/test/mock_attribution_manager.cc",
@@ -91,6 +93,8 @@ static_library("test_support") {
     "../browser/file_system_access/mock_file_system_access_permission_grant.h",
     "../browser/font_access/font_access_test_utils.cc",
     "../browser/font_access/font_access_test_utils.h",
+    "../browser/interest_group/test_interest_group_observer.cc",
+    "../browser/interest_group/test_interest_group_observer.h",
     "../browser/media/session/mock_media_session_player_observer.cc",
     "../browser/media/session/mock_media_session_player_observer.h",
     "../browser/media/session/mock_media_session_service_impl.cc",
@@ -1345,6 +1349,7 @@ test("content_browsertests") {
     "../browser/loader/cross_site_document_blocking_browsertest.cc",
     "../browser/loader/derived_origin_in_fetch_browsertest.cc",
     "../browser/loader/file_url_loader_factory_browsertest.cc",
+    "../browser/loader/keep_alive_url_browsertest.cc",
     "../browser/loader/loader_browsertest.cc",
     "../browser/loader/navigation_early_hints_browsertest.cc",
     "../browser/loader/prefetch_browsertest.cc",
@@ -2325,6 +2330,7 @@ test("content_unittests") {
     "../browser/indexed_db/mock_mojo_indexed_db_database_callbacks.cc",
     "../browser/indexed_db/mock_mojo_indexed_db_database_callbacks.h",
     "../browser/interest_group/ad_auction_service_impl_unittest.cc",
+    "../browser/interest_group/auction_metrics_recorder_unittest.cc",
     "../browser/interest_group/auction_process_manager_unittest.cc",
     "../browser/interest_group/auction_runner_unittest.cc",
     "../browser/interest_group/auction_url_loader_factory_proxy_unittest.cc",
@@ -2500,6 +2506,7 @@ test("content_unittests") {
     "../browser/renderer_host/navigation_policy_container_builder_unittest.cc",
     "../browser/renderer_host/navigation_request_unittest.cc",
     "../browser/renderer_host/navigation_throttle_runner_unittest.cc",
+    "../browser/renderer_host/navigation_transitions/navigation_entry_screenshot_cache_unittest.cc",
     "../browser/renderer_host/navigator_unittest.cc",
     "../browser/renderer_host/overscroll_controller_unittest.cc",
     "../browser/renderer_host/pending_beacon_host_unittest.cc",
@@ -2947,7 +2954,10 @@ test("content_unittests") {
   }
 
   if (is_fuchsia) {
-    deps += [ "//third_party/fuchsia-sdk/sdk/fidl/fuchsia.accessibility.semantics:fuchsia.accessibility.semantics_hlcpp" ]
+    deps += [
+      "//third_party/fuchsia-sdk/sdk/fidl/fuchsia.accessibility.semantics:fuchsia.accessibility.semantics_cpp",
+      "//third_party/fuchsia-sdk/sdk/fidl/fuchsia.accessibility.semantics:fuchsia.accessibility.semantics_hlcpp",
+    ]
   }
 
   if (enable_printing) {
@@ -3153,7 +3163,8 @@ test("content_unittests") {
   }
 
   if (is_chromeos) {
-    sources += [ "../browser/smart_card/smart_card_reader_tracker_unittest.cc" ]
+    sources +=
+        [ "../browser/smart_card/smart_card_reader_tracker_impl_unittest.cc" ]
   }
 
   if (use_aura) {

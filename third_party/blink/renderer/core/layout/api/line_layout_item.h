@@ -144,8 +144,6 @@ class LineLayoutItem {
 
   bool IsBR() const { return layout_object_->IsBR(); }
 
-  bool IsCombineText() const { return layout_object_->IsCombineText(); }
-
   bool IsHorizontalWritingMode() const {
     return layout_object_->IsHorizontalWritingMode();
   }
@@ -156,10 +154,6 @@ class LineLayoutItem {
 
   bool IsInlineBlockOrInlineTable() const {
     return layout_object_->IsInlineBlockOrInlineTable();
-  }
-
-  bool IsInlineElementContinuation() const {
-    return layout_object_->IsInlineElementContinuation();
   }
 
   // TODO(dgrogan/eae): Replace isType with an enum in the API? As it stands
@@ -185,8 +179,6 @@ class LineLayoutItem {
   bool IsSVGInline() const { return layout_object_->IsSVGInline(); }
 
   bool IsSVGInlineText() const { return layout_object_->IsSVGInlineText(); }
-
-  bool IsSVGText() const { return layout_object_->IsSVGText(); }
 
   bool IsSVGTextPath() const { return layout_object_->IsSVGTextPath(); }
 
@@ -236,8 +228,8 @@ class LineLayoutItem {
     return layout_object_->ResolveColor(style_to_use, color_property);
   }
 
-  bool IsInFlowPositioned() const {
-    return layout_object_->IsInFlowPositioned();
+  bool IsStickyPositioned() const {
+    return layout_object_->IsStickyPositioned();
   }
 
   bool IsRelPositioned() const { return layout_object_->IsRelPositioned(); }

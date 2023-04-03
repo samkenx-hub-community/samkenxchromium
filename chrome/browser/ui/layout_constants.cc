@@ -11,6 +11,7 @@
 #include "components/omnibox/common/omnibox_features.h"
 #include "ui/base/pointer/touch_ui_controller.h"
 #include "ui/base/ui_base_features.h"
+#include "ui/gfx/geometry/insets.h"
 
 int GetLayoutConstant(LayoutConstant constant) {
   const bool touch_ui = ui::TouchUiController::Get()->touch_ui();
@@ -37,15 +38,27 @@ int GetLayoutConstant(LayoutConstant constant) {
       return 3;
     case LOCATION_BAR_ELEMENT_PADDING:
       return touch_ui ? 3 : 2;
+    case LOCATION_BAR_PAGE_INFO_ICON_VERTICAL_PADDING:
+      return touch_ui ? 3 : 5;
+    case LOCATION_BAR_LEADING_DECORATION_EDGE_PADDING:
+      return touch_ui ? 3 : 5;
+    case LOCATION_BAR_TRAILING_DECORATION_EDGE_PADDING:
+      return touch_ui ? 3 : 12;
     case LOCATION_BAR_HEIGHT:
       if (base::FeatureList::IsEnabled(omnibox::kOmniboxSteadyStateHeight) ||
-          base::FeatureList::IsEnabled(features::kChromeRefresh2023)) {
+          base::FeatureList::IsEnabled(omnibox::kCr2023Umbrella)) {
         return touch_ui ? 36 : 34;
       } else {
         return touch_ui ? 36 : 28;
       }
     case LOCATION_BAR_ICON_SIZE:
       return touch_ui ? 20 : 16;
+    case LOCATION_BAR_LEADING_ICON_SIZE:
+      return GetLayoutConstant(LOCATION_BAR_ICON_SIZE);
+    case LOCATION_BAR_TRAILING_ICON_SIZE:
+      return base::FeatureList::IsEnabled(features::kChromeRefresh2023)
+                 ? 20
+                 : GetLayoutConstant(LOCATION_BAR_ICON_SIZE);
     case TAB_AFTER_TITLE_PADDING:
       return touch_ui ? 8 : 4;
     case TAB_ALERT_INDICATOR_CAPTURE_ICON_WIDTH:
@@ -67,11 +80,25 @@ int GetLayoutConstant(LayoutConstant constant) {
         return 0;
       return 1;
     case TOOLBAR_BUTTON_HEIGHT:
-      return touch_ui ? 48 : 28;
+      if (base::FeatureList::IsEnabled(features::kChromeRefresh2023)) {
+        return touch_ui ? 48 : 34;
+      } else {
+        return touch_ui ? 48 : 28;
+      }
     case TOOLBAR_ELEMENT_PADDING:
       return touch_ui ? 0 : 4;
+    case TOOLBAR_ICON_DEFAULT_MARGIN:
+      if (base::FeatureList::IsEnabled(features::kChromeRefresh2023)) {
+        return touch_ui ? 0 : 2;
+      } else {
+        return GetLayoutConstant(TOOLBAR_ELEMENT_PADDING);
+      }
     case TOOLBAR_STANDARD_SPACING:
-      return touch_ui ? 12 : 8;
+      if (base::FeatureList::IsEnabled(features::kChromeRefresh2023)) {
+        return touch_ui ? 12 : 9;
+      } else {
+        return touch_ui ? 12 : 8;
+      }
     case PAGE_INFO_ICON_SIZE:
       return 16;
     case DOWNLOAD_ICON_SIZE:
@@ -97,6 +124,12 @@ gfx::Insets GetLayoutInsets(LayoutInset inset) {
     case LOCATION_BAR_ICON_INTERIOR_PADDING:
       return touch_ui ? gfx::Insets::VH(5, 10) : gfx::Insets::VH(4, 8);
 
+    case LOCATION_BAR_PAGE_INFO_ICON_PADDING:
+      return touch_ui ? gfx::Insets::VH(5, 10) : gfx::Insets::VH(4, 4);
+
+    case LOCATION_BAR_PAGE_ACTION_ICON_PADDING:
+      return touch_ui ? gfx::Insets::VH(5, 10) : gfx::Insets::VH(2, 2);
+
     case TOOLBAR_ACTION_VIEW: {
       // TODO(afakhry): Unify all toolbar button sizes on all platforms.
       // https://crbug.com/822967.
@@ -107,7 +140,11 @@ gfx::Insets GetLayoutInsets(LayoutInset inset) {
       return gfx::Insets(touch_ui ? 12 : 6);
 
     case TOOLBAR_INTERIOR_MARGIN:
-      return touch_ui ? gfx::Insets() : gfx::Insets::VH(4, 8);
+      if (base::FeatureList::IsEnabled(features::kChromeRefresh2023)) {
+        return touch_ui ? gfx::Insets() : gfx::Insets::VH(6, 3);
+      } else {
+        return touch_ui ? gfx::Insets() : gfx::Insets::VH(4, 8);
+      }
 
     case WEBUI_TAB_STRIP_TOOLBAR_INTERIOR_MARGIN:
       return gfx::Insets::VH(4, 0);

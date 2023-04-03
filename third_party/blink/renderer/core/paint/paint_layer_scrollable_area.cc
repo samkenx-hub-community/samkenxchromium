@@ -60,9 +60,11 @@
 #include "third_party/blink/renderer/core/accessibility/ax_object_cache.h"
 #include "third_party/blink/renderer/core/animation/scroll_timeline.h"
 #include "third_party/blink/renderer/core/content_capture/content_capture_manager.h"
+#include "third_party/blink/renderer/core/css/color_scheme_flags.h"
 #include "third_party/blink/renderer/core/css/style_request.h"
 #include "third_party/blink/renderer/core/dom/dom_node_ids.h"
 #include "third_party/blink/renderer/core/dom/node.h"
+#include "third_party/blink/renderer/core/dom/node_computed_style.h"
 #include "third_party/blink/renderer/core/dom/shadow_root.h"
 #include "third_party/blink/renderer/core/editing/frame_selection.h"
 #include "third_party/blink/renderer/core/editing/markers/document_marker_controller.h"
@@ -81,7 +83,6 @@
 #include "third_party/blink/renderer/core/layout/custom_scrollbar.h"
 #include "third_party/blink/renderer/core/layout/layout_custom_scrollbar_part.h"
 #include "third_party/blink/renderer/core/layout/layout_embedded_content.h"
-#include "third_party/blink/renderer/core/layout/layout_flexible_box.h"
 #include "third_party/blink/renderer/core/layout/layout_theme.h"
 #include "third_party/blink/renderer/core/layout/layout_view.h"
 #include "third_party/blink/renderer/core/layout/ng/legacy_layout_tree_walking.h"
@@ -539,11 +540,6 @@ void PaintLayerScrollableArea::InvalidatePaintForScrollOffsetChange() {
   auto* box = GetLayoutBox();
   auto* frame_view = box->GetFrameView();
   frame_view->InvalidateBackgroundAttachmentFixedDescendantsOnScroll(*box);
-
-  // TODO(chrishtr): remove this slow path once crbug.com/906885 is fixed.
-  // See also https://bugs.chromium.org/p/chromium/issues/detail?id=903287#c10.
-  if (Layer()->EnclosingPaginationLayer())
-    box->SetSubtreeShouldCheckForPaintInvalidation();
 
   if (!box->BackgroundNeedsFullPaintInvalidation()) {
     auto background_paint_location = box->GetBackgroundPaintLocation();
@@ -1083,11 +1079,6 @@ void PaintLayerScrollableArea::UpdateAfterLayout() {
           in_overflow_relayout_ = false;
           scrollbar_manager_.DestroyDetachedScrollbars();
         }
-        LayoutObject* parent = GetLayoutBox()->Parent();
-        if (parent && parent->IsFlexibleBox()) {
-          To<LayoutFlexibleBox>(parent)->ClearCachedMainSizeForChild(
-              *GetLayoutBox());
-        }
       }
     }
   } else if (!HasScrollbar() && resizer_will_change) {
@@ -1231,7 +1222,22 @@ mojom::blink::ScrollBehavior PaintLayerScrollableArea::ScrollBehaviorStyle()
   return GetLayoutBox()->StyleRef().GetScrollBehavior();
 }
 
-mojom::blink::ColorScheme PaintLayerScrollableArea::UsedColorScheme() const {
+mojom::blink::ColorScheme PaintLayerScrollableArea::UsedColorSchemeScrollbars()
+    const {
+  if (RuntimeEnabledFeatures::UsedColorSchemeRootScrollbarsEnabled() &&
+      GetLayoutBox()->IsGlobalRootScroller() &&
+      !GetPageScrollbarTheme().UsesOverlayScrollbars()) {
+    const Document& document = GetLayoutBox()->GetDocument();
+    if (document.documentElement() &&
+        document.documentElement()->ComputedStyleRef().ColorScheme().empty() &&
+        document.GetStyleEngine().GetPageColorSchemes() ==
+            static_cast<ColorSchemeFlags>(ColorSchemeFlag::kNormal) &&
+        document.GetPreferredColorScheme() ==
+            mojom::blink::PreferredColorScheme::kDark) {
+      return mojom::blink::ColorScheme::kDark;
+    }
+  }
+
   return GetLayoutBox()->StyleRef().UsedColorScheme();
 }
 
@@ -1317,7 +1323,8 @@ void PaintLayerScrollableArea::UpdateAfterStyleChange(
 
   UpdateScrollCornerStyle();
 
-  if (!old_style || old_style->UsedColorScheme() != UsedColorScheme() ||
+  if (!old_style ||
+      old_style->UsedColorScheme() != UsedColorSchemeScrollbars() ||
       old_style->ScrollbarWidth() !=
           GetLayoutBox()->StyleRef().ScrollbarWidth()) {
     SetScrollControlsNeedFullPaintInvalidation();
@@ -1560,8 +1567,7 @@ void PaintLayerScrollableArea::ComputeScrollbarExistence(
   if (VisualViewportSuppliesScrollbars() ||
       !CanHaveOverflowScrollbars(*GetLayoutBox()) ||
       GetLayoutBox()->GetFrame()->GetSettings()->GetHideScrollbars() ||
-      GetLayoutBox()->IsLayoutNGFieldset() ||
-      GetLayoutBox()->IsLayoutNGFrameSet() ||
+      GetLayoutBox()->IsFieldset() || GetLayoutBox()->IsFrameSet() ||
       GetLayoutBox()->StyleRef().ScrollbarWidth() == EScrollbarWidth::kNone) {
     needs_horizontal_scrollbar = false;
     needs_vertical_scrollbar = false;
@@ -2380,8 +2386,8 @@ void PaintLayerScrollableArea::UpdateScrollableAreaSet() {
     frame_view->RemoveScrollAnchoringScrollableArea(this);
   }
 
-  bool is_visible_to_hit_test =
-      GetLayoutBox()->StyleRef().VisibleToHitTesting();
+  bool is_visible =
+      GetLayoutBox()->StyleRef().Visibility() == EVisibility::kVisible;
   bool did_scroll_overflow = scrolls_overflow_;
   if (auto* layout_view = DynamicTo<LayoutView>(GetLayoutBox())) {
     mojom::blink::ScrollbarMode h_mode;
@@ -2392,7 +2398,7 @@ void PaintLayerScrollableArea::UpdateScrollableAreaSet() {
       has_overflow = false;
   }
 
-  scrolls_overflow_ = has_overflow && is_visible_to_hit_test;
+  scrolls_overflow_ = has_overflow && is_visible;
   if (did_scroll_overflow == ScrollsOverflow())
     return;
 
@@ -2481,8 +2487,10 @@ bool PaintLayerScrollableArea::ComputeNeedsCompositedScrolling(
       box->ComputeBackgroundPaintLocationIfComposited();
   bool needs_composited_scrolling = ComputeNeedsCompositedScrollingInternal(
       new_background_paint_location, force_prefer_compositing_to_lcd_text);
-  if (!needs_composited_scrolling)
+  if (!RuntimeEnabledFeatures::CompositeScrollAfterPaintEnabled() &&
+      !needs_composited_scrolling) {
     new_background_paint_location = kBackgroundPaintInBorderBoxSpace;
+  }
   box->GetMutableForPainting().SetBackgroundPaintLocation(
       new_background_paint_location);
 
@@ -2500,21 +2508,24 @@ bool PaintLayerScrollableArea::ComputeNeedsCompositedScrollingInternal(
   if (CompositingReasonFinder::RequiresCompositingForRootScroller(*layer_)) {
     return true;
   }
-
   if (!ScrollsOverflow()) {
     return false;
   }
-
-  if (!force_prefer_compositing_to_lcd_text &&
-      RuntimeEnabledFeatures::PreferNonCompositedScrollingEnabled()) {
+  if (force_prefer_compositing_to_lcd_text) {
+    return true;
+  }
+  if (RuntimeEnabledFeatures::CompositeScrollAfterPaintEnabled()) {
+    // We'll decide composited scrolling in PaintArtifactCompositor later.
+    return false;
+  }
+  if (RuntimeEnabledFeatures::PreferNonCompositedScrollingEnabled()) {
     return false;
   }
 
   const auto* box = GetLayoutBox();
   bool needs_composited_scrolling = true;
-  if (!force_prefer_compositing_to_lcd_text &&
-      box->GetDocument().GetSettings()->GetLCDTextPreference() ==
-          LCDTextPreference::kStronglyPreferred) {
+  if (box->GetDocument().GetSettings()->GetLCDTextPreference() ==
+      LCDTextPreference::kStronglyPreferred) {
     if (!box->TextIsKnownToBeOnOpaqueBackground()) {
       non_composited_main_thread_scrolling_reasons_ |=
           cc::MainThreadScrollingReason::kNotOpaqueForTextAndLCDText;
@@ -2895,11 +2906,19 @@ static bool ScrollControlNeedsPaintInvalidation(
 bool PaintLayerScrollableArea::ShouldDirectlyCompositeScrollbar(
     const Scrollbar& scrollbar) const {
   // Don't composite non-scrollable scrollbars.
-  if (!scrollbar.Maximum())
+  if (!scrollbar.Maximum()) {
     return false;
-  if (scrollbar.IsCustomScrollbar())
+  }
+  if (scrollbar.IsCustomScrollbar()) {
     return false;
-
+  }
+  if (RuntimeEnabledFeatures::CompositeScrollAfterPaintEnabled()) {
+    // In CompositeScrollAfterPaint, compositing of scrollbar is decided
+    // in PaintArtifactCompositor. We assume compositing here so that paint
+    // invalidation will be skipped here. We'll invalidate raster if needed
+    // after paint, without paint invalidation.
+    return true;
+  }
   return NeedsCompositedScrolling();
 }
 

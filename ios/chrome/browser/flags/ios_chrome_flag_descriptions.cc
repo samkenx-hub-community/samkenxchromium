@@ -182,6 +182,11 @@ extern const char kEmailDescription[] =
     "When enabled, one tapping or long pressing on an email address will "
     "trigger the email experience.";
 
+extern const char kPDFSnapshotName[] =
+    "Fix PDF snapshot by using a different API";
+extern const char kPDFSnapshotDescription[] =
+    "When enabled, the tab showing PDF should have the correct thumbnail.";
+
 extern const char kPhoneNumberName[] = "Phone number experience enable";
 extern const char kPhoneNumberDescription[] =
     "When enabled, one tapping or long pressing on a phone number will trigger "
@@ -242,6 +247,13 @@ const char kDefaultBrowserIntentsShowSettingsDescription[] =
     "When enabled, external apps can trigger the settings screen showing "
     "default browser tutorial.";
 
+const char kDefaultBrowserRefactoringPromoManagerName[] =
+    "Enable the refactoring of the full screen default browser promos to be "
+    "included in the promo manager";
+const char kDefaultBrowserRefactoringPromoManagerDescription[] =
+    "When enabled, the full screen default browser promos will be be included "
+    "and managed in the promo manager";
+
 const char kDetectMainThreadFreezeName[] = "Detect freeze in the main thread.";
 const char kDetectMainThreadFreezeDescription[] =
     "A crash report will be uploaded if the main thread is frozen more than "
@@ -281,6 +293,10 @@ const char kEnableBookmarksAccountStorageName[] =
     "Enable Bookmarks Account Storage";
 const char kEnableBookmarksAccountStorageDescription[] =
     "Enable bookmarks account storage and related UI features.";
+
+const char kEnableBrowserLockdownModeName[] = "Enable Browser Lockdown Mode";
+const char kEnableBrowserLockdownModeDescription[] =
+    "Enable browser lockdown mode.";
 
 const char kEnableCBDSignOutName[] = "Enable Clear Browsing Data Sign-out";
 const char kEnableCBDSignOutDescription[] =
@@ -373,10 +389,15 @@ const char kEnablePreferencesAccountStorageDescription[] =
 const char kEnablePinnedTabsName[] = "Enable Pinned Tabs";
 const char kEnablePinnedTabsDescription[] = "Allows users to pin tabs.";
 
-const char kEnablePinnedTabsIpadName[] = "Enable Pinned Tabs on iPad";
-const char kEnablePinnedTabsIpadDescription[] =
-    "Allows users to pin tabs."
-    "#enable-pinned-tabs should also be enabled.";
+const char kEnableReadingListAccountStorageName[] =
+    "Enable Reading List Account Storage";
+const char kEnableReadingListAccountStorageDescription[] =
+    "Enable the reading list account storage.";
+
+const char kEnableReadingListSignInPromoName[] =
+    "Enable Reading List Sign-in promo";
+const char kEnableReadingListSignInPromoDescription[] =
+    "Enable the sign-in promo view in the reading list screen.";
 
 const char kEnableRefineDataSourceReloadReportingName[] =
     "Enable Refine Data Source Reload Reporting";
@@ -524,6 +545,10 @@ const char kIOSPasswordUISplitName[] = "Password Manager UI Split";
 const char kIOSPasswordUISplitDescription[] =
     "Splits Password Settings and "
     "Password Manager into two separate UIs.";
+
+const char kIOSSetUpListName[] = "IOS Set Up List";
+const char kIOSSetUpListDescription[] =
+    "Displays an unobtrusive list of set up tasks on Home for a new user.";
 
 const char kIOSPasswordManagerCrossOriginIframeSupportName[] =
     "IOS Password Manager Cross-Origin Iframe Support";
@@ -811,11 +836,6 @@ const char kRecordSnapshotSizeDescription[] =
     "snapshots. PDF snaphot will be taken just for the purpose of the "
     "histogram recording.";
 
-const char kRemoveCrashInfobarName[] = "Remove Crash Infobars";
-const char kRemoveCrashInfobarDescription[] =
-    "When enabled, always auto restore tabs rather than showing a crash "
-    "infobar";
-
 const char kRemoveExcessNTPsExperimentName[] = "Remove extra New Tab Pages";
 const char kRemoveExcessNTPsExperimentDescription[] =
     "When enabled, extra tabs with the New Tab Page open and no navigation "
@@ -981,6 +1001,9 @@ const char kEnableLensInOmniboxCopiedImageDescription[] =
     "When enabled, use Lens to search images from your device clipboard "
     "when Google is the selected search engine, accessible from the omnibox or "
     "popup menu.";
+
+const char kSFSymbolsFollowUpName[] = "SF Symbol follow up";
+const char kSFSymbolsFollowUpDescription[] = "Change the + button.";
 
 const char kTabGridRecencySortName[] = "Change TabGrid sorting";
 const char kTabGridRecencySortDescription[] =

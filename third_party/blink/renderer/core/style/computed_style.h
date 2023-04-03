@@ -95,6 +95,7 @@ class CSSVariableData;
 class FilterOperations;
 class Font;
 class Hyphenation;
+class LayoutBox;
 class LayoutTheme;
 class Longhand;
 class NinePieceImage;
@@ -980,13 +981,8 @@ class ComputedStyle : public ComputedStyleBase,
   }
 
   // Column utility functions.
-  static bool SpecifiesColumns(bool has_auto_column_count,
-                               bool has_auto_column_width) {
-    return !has_auto_column_count || !has_auto_column_width;
-  }
   bool SpecifiesColumns() const {
-    return ComputedStyle::SpecifiesColumns(HasAutoColumnCount(),
-                                           HasAutoColumnWidth());
+    return !HasAutoColumnCount() || !HasAutoColumnWidth();
   }
   bool ColumnRuleIsTransparent() const {
     return !ColumnRuleColor()
@@ -2158,7 +2154,7 @@ class ComputedStyle : public ComputedStyleBase,
     if (HasNonInitialBackdropFilter()) {
       return true;
     }
-    if (ViewTransitionName()) {
+    if (ViewTransitionName() || ElementIsViewTransitionParticipant()) {
       return true;
     }
     return false;
@@ -2237,23 +2233,30 @@ class ComputedStyle : public ComputedStyleBase,
   // `white-space` property may become a shorthand in future.
   // https://drafts.csswg.org/css-text-4/#white-space-property
   static bool DeprecatedAutoWrap(EWhiteSpace ws) {
-    return blink::ShouldWrapLine(ws);
+    return blink::ShouldWrapLine(ToTextWrap(ws));
   }
   static bool DeprecatedPreserveNewline(EWhiteSpace ws) {
-    return ShouldPreserveBreaks(ws);
+    return ShouldPreserveBreaks(ToWhiteSpaceCollapse(ws));
   }
   static bool DeprecatedCollapseWhiteSpace(EWhiteSpace ws) {
-    return blink::ShouldCollapseSpacesAndTabs(ws);
+    return blink::ShouldCollapseSpacesAndTabs(ToWhiteSpaceCollapse(ws));
   }
 
+  // This function may return values not defined as the enum values. See
+  // `EWhiteSpace`. Prefer using semantic functions below.
+  EWhiteSpace WhiteSpace() const {
+    return ToWhiteSpace(GetWhiteSpaceCollapse(), GetTextWrap());
+  }
+
+  // Semantic functions for the `white-space` property and its longhands.
   bool ShouldPreserveSpacesAndTabs() const {
-    return blink::ShouldPreserveSpacesAndTabs(WhiteSpace());
+    return blink::ShouldPreserveSpacesAndTabs(GetWhiteSpaceCollapse());
   }
   bool PreserveNewline() const {
-    return DeprecatedPreserveNewline(WhiteSpace());
+    return blink::ShouldPreserveBreaks(GetWhiteSpaceCollapse());
   }
   bool CollapseWhiteSpace() const {
-    return DeprecatedCollapseWhiteSpace(WhiteSpace());
+    return blink::ShouldCollapseSpacesAndTabs(GetWhiteSpaceCollapse());
   }
   bool IsCollapsibleWhiteSpace(UChar c) const {
     switch (c) {
@@ -2266,9 +2269,9 @@ class ComputedStyle : public ComputedStyleBase,
     return false;
   }
 
-  bool ShouldWrapLine() const { return DeprecatedAutoWrap(WhiteSpace()); }
+  bool ShouldWrapLine() const { return blink::ShouldWrapLine(GetTextWrap()); }
   bool ShouldBreakSpaces() const {
-    return blink::ShouldBreakSpaces(WhiteSpace());
+    return blink::ShouldBreakSpaces(GetWhiteSpaceCollapse());
   }
   bool BreakOnlyAfterWhiteSpace() const {
     return (ShouldPreserveSpacesAndTabs() && ShouldWrapLine()) ||
@@ -2386,7 +2389,7 @@ class ComputedStyle : public ComputedStyleBase,
     if (pseudo == kPseudoIdMarker) {
       return Display() == EDisplay::kListItem;
     }
-    if (pseudo == kPseudoIdBackdrop && TopLayer() == ETopLayer::kNone) {
+    if (pseudo == kPseudoIdBackdrop && Overlay() == EOverlay::kNone) {
       return false;
     }
     if (!HasPseudoElementStyle(pseudo)) {
@@ -2401,8 +2404,8 @@ class ComputedStyle : public ComputedStyleBase,
     return pseudo == kPseudoIdBefore || pseudo == kPseudoIdAfter;
   }
 
-  // Returns true if the element is a top layer candidate whose top-layer
-  // property computes to 'browser'.
+  // Returns true if the element is a top layer candidate whose overlay property
+  // computes to 'auto'.
   bool IsInTopLayer(const Element& element) const;
 
   // Load the images of CSS properties that were deferred by LazyLoad.
@@ -2977,10 +2980,6 @@ class ComputedStyleBuilder final : public ComputedStyleBuilderBase {
     SetColumnWidthInternal(0);
   }
 
-  bool SpecifiesColumns() const {
-    return ComputedStyle::SpecifiesColumns(HasAutoColumnCount(),
-                                           HasAutoColumnWidth());
-  }
   // contain
   bool ShouldApplyAnyContainment(const Element& element) const {
     unsigned effective_containment = ComputedStyle::EffectiveContainment(
@@ -3185,14 +3184,6 @@ class ComputedStyleBuilder final : public ComputedStyleBuilderBase {
   void SetOpacity(float f) {
     float v = ClampTo<float>(f, 0, 1);
     SetOpacityInternal(v);
-  }
-
-  // order
-  void SetOrder(int o) {
-    // TODO(ikilpatrick): Remove this setter once OrderIterator is removed.
-    // We restrict the smallest value to int min + 2 because we use int min and
-    // int min + 1 as special values in a hash set.
-    SetOrderInternal(max(std::numeric_limits<int>::min() + 2, o));
   }
 
   // orphans
@@ -3449,6 +3440,12 @@ class ComputedStyleBuilder final : public ComputedStyleBuilderBase {
   }
   CORE_EXPORT void SetInitialData(scoped_refptr<StyleInitialData> data) {
     MutableInitialDataInternal() = std::move(data);
+  }
+
+  EWhiteSpace WhiteSpace() const { return style_->WhiteSpace(); }
+  void SetWhiteSpace(EWhiteSpace whitespace) {
+    SetWhiteSpaceCollapse(ToWhiteSpaceCollapse(whitespace));
+    SetTextWrap(ToTextWrap(whitespace));
   }
 
   // WritingMode

@@ -40,6 +40,7 @@
 <translation id="1181037720776840403">移除</translation>
 <translation id="1182225749592316782">這將允許具有攝影機和麥克風權限的所有應用程式和網站存取</translation>
 <translation id="1183863904939664422">對這項建議不感興趣</translation>
+<translation id="1184126796192815024">無法透過這個網路串流使用手機上的應用程式。請嘗試使用手機的無線基地台。<ph name="LEARN_MORE" /></translation>
 <translation id="118437560755358292">基於安全考量，請輸入密碼或 PIN 碼</translation>
 <translation id="118532027333893379">輕觸任一處即可擷取全螢幕畫面</translation>
 <translation id="1190609913194133056">通知中心</translation>
@@ -219,6 +220,7 @@
 <translation id="1969011864782743497"><ph name="DEVICE_NAME" /> (USB)</translation>
 <translation id="1972950159383891558"><ph name="USERNAME" />，你好：</translation>
 <translation id="1978498689038657292">文字輸入</translation>
+<translation id="1980808257969311265">加入「<ph name="EVENT_SUMMARY" />」</translation>
 <translation id="1982717156487272186">顯示前一週的活動</translation>
 <translation id="1989113344093894667">無法擷取內容</translation>
 <translation id="1990046457226896323">已下載即時字幕檔案</translation>
@@ -570,6 +572,7 @@
 <translation id="3659814201068740063">大約還可使用 <ph name="TIME_LEFT" /> (<ph name="PERCENTAGE" />%)。
 請將裝置接上電源。</translation>
 <translation id="366222428570480733">受管理的使用者：<ph name="USER_EMAIL_ADDRESS" /></translation>
+<translation id="3666266999138159418">滑動即可隱藏浮動視窗</translation>
 <translation id="367531336287639526">選取網址列左側的第一個圖示</translation>
 <translation id="3679827876008292680">前往視窗中的最後一個分頁</translation>
 <translation id="36813544980941320">你的手機和「<ph name="DEVICE_NAME" />」將共用 Wi-Fi 網路</translation>
@@ -618,7 +621,6 @@
 <translation id="3925540965556789199"><ph name="DATE" />，正在載入活動。</translation>
 <translation id="3932043219784172185">未連線到任何裝置</translation>
 <translation id="3934456833412894880">自動調節充電功能已開啟。裝置電量會維持在 80% 以延長電池壽命，並在你需要時充飽電。</translation>
-<translation id="3936620957945677513">按下 Enter 即可加入「<ph name="EVENT_SUMMARY" />」活動</translation>
 <translation id="3943857333388298514">貼上</translation>
 <translation id="394485226368336402">音訊設定</translation>
 <translation id="3945319193631853098">輕觸即可完成設定</translation>
@@ -1248,6 +1250,7 @@
 <translation id="685782768769951078">{NUM_DIGITS,plural, =1{剩餘一個位數}other{剩餘 # 個位數}}</translation>
 <translation id="6867938213751067702">已暫停下載 <ph name="FILENAME" /></translation>
 <translation id="6878400149835617132">已關閉快速鍵功能</translation>
+<translation id="6878701771800702153">{NUM_APPS,plural, =1{1 個應用程式}other{# 個應用程式}}</translation>
 <translation id="6884665277231944629">返回今天</translation>
 <translation id="6886172995547742638">你的「<ph name="DEVICE_TYPE" />」可能會有效能低落的問題。請使用 <ph name="PREFERRED_MINIMUM_POWER" /> 瓦以上且符合標準的 USB-C 電源變壓器。</translation>
 <translation id="688631446150864480">按下向下鍵即可切換視窗</translation>
@@ -1415,6 +1418,7 @@
 <translation id="7689817529363080918">這將允許「<ph name="APP1_NAME" />」、「<ph name="APP2_NAME" />」和具有麥克風權限的所有應用程式和網站存取麥克風</translation>
 <translation id="7704000866383261579">重做上一個動作</translation>
 <translation id="7705524343798198388">VPN</translation>
+<translation id="770741401784017797">正在建立 GIF</translation>
 <translation id="7714767791242455379">新增行動網路</translation>
 <translation id="7720400844887872976">開啟，直到<ph name="TIME" /></translation>
 <translation id="7720410380936703141">再試一次</translation>
@@ -1427,6 +1431,7 @@
 <translation id="7749443890790263709">桌面數量已達上限。</translation>
 <translation id="776344839111254542">按一下即可查看更新詳細資料</translation>
 <translation id="7768784765476638775">隨選朗讀</translation>
+<translation id="7769299611924763557">GIF 很快就能使用</translation>
 <translation id="7780094051999721182">捷徑</translation>
 <translation id="7780159184141939021">旋轉螢幕</translation>
 <translation id="7796735576426975947">已隱藏新通知</translation>

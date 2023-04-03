@@ -54,10 +54,13 @@ struct DisplayDeleter {
 // Server configuration related enums and structs.
 enum class PrimarySelectionProtocol { kNone, kGtk, kZwp };
 enum class CompositorVersion { kV3, kV4 };
+enum class TextInputExtensionVersion { kV7, kV8 };
 enum class ShouldUseExplicitSynchronizationProtocol { kNone, kUse };
 enum class EnableAuraShellProtocol { kEnabled, kDisabled };
 
 struct ServerConfig {
+  TextInputExtensionVersion text_input_extension_version =
+      TextInputExtensionVersion::kV8;
   CompositorVersion compositor_version = CompositorVersion::kV4;
   PrimarySelectionProtocol primary_selection_protocol =
       PrimarySelectionProtocol::kNone;
@@ -66,6 +69,7 @@ struct ServerConfig {
   EnableAuraShellProtocol enable_aura_shell =
       EnableAuraShellProtocol::kDisabled;
   bool surface_submission_in_pixel_coordinates = true;
+  bool use_aura_output_manager = false;
 };
 
 class TestWaylandServerThread;
@@ -122,7 +126,10 @@ class TestWaylandServerThread : public base::Thread,
   }
 
   TestOutput* CreateAndInitializeOutput(TestOutputMetrics metrics = {}) {
-    auto output = std::make_unique<TestOutput>(std::move(metrics));
+    auto output = std::make_unique<TestOutput>(
+        base::BindRepeating(&TestWaylandServerThread::OnTestOutputMetricsFlush,
+                            base::Unretained(this)),
+        std::move(metrics));
     if (output_.aura_shell_enabled()) {
       output->set_aura_shell_enabled();
     }
@@ -133,6 +140,12 @@ class TestWaylandServerThread : public base::Thread,
     return output_ptr;
   }
 
+  // Called when the Flush() is called for a TestOutput associated with
+  // `output_resource`. When called sends the corresponding events for the
+  // `metrics` to clients of the zaura_output_manager.
+  void OnTestOutputMetricsFlush(wl_resource* output_resource,
+                                const TestOutputMetrics& metrics);
+
   TestDataDeviceManager* data_device_manager() { return &data_device_manager_; }
   TestSeat* seat() { return &seat_; }
   MockXdgShell* xdg_shell() { return &xdg_shell_; }
@@ -142,7 +155,7 @@ class TestWaylandServerThread : public base::Thread,
   TestZAuraShell* zaura_shell() { return &zaura_shell_; }
   TestOutput* output() { return &output_; }
   TestZcrTextInputExtensionV1* text_input_extension_v1() {
-    return &zcr_text_input_extension_v1_;
+    return zcr_text_input_extension_v1_.get();
   }
   TestZwpTextInputManagerV1* text_input_manager_v1() {
     return &zwp_text_input_manager_v1_;
@@ -233,7 +246,11 @@ class TestWaylandServerThread : public base::Thread,
   TestZAuraShell zaura_shell_;
   MockZcrColorManagerV1 zcr_color_manager_v1_;
   TestZcrStylus zcr_stylus_;
-  TestZcrTextInputExtensionV1 zcr_text_input_extension_v1_;
+  // The version of text_input_extension_v1 can be selected dynamically when
+  // Start is called, but the versions of GlobalObjects need to be supplied on
+  // construction, so we have to delay construction of this particular global.
+  // TODO(crbug.com/1315587): Consider not heap-allocating GlobalObjects.
+  std::unique_ptr<TestZcrTextInputExtensionV1> zcr_text_input_extension_v1_;
   TestZwpTextInputManagerV1 zwp_text_input_manager_v1_;
   TestZwpLinuxExplicitSynchronizationV1 zwp_linux_explicit_synchronization_v1_;
   MockZwpLinuxDmabufV1 zwp_linux_dmabuf_v1_;

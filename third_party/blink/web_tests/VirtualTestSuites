@@ -134,6 +134,19 @@
   },
 
   {
+    "prefix": "composite-scroll-after-paint",
+    "platforms": ["Linux"],
+    "bases": ["compositing/overflow",
+              "fast/scrolling",
+              "paint/invalidation/overflow",
+              "scrollbars",
+              "external/wpt/css/css-scroll-snap",
+              "external/wpt/scroll-animations",
+              "external/wpt/css/css-overflow"],
+    "args": ["--enable-features=CompositeScrollAfterPaint"],
+    "expires": "Sep 1, 2023"
+  },
+  {
     "prefix": "attribution-reporting-debug-mode",
     "platforms": ["Linux", "Mac", "Win"],
     "bases": ["wpt_internal/attribution-reporting"],
@@ -797,7 +810,16 @@
     "args": ["--disable-blink-features=CSSSignRelatedFunctions"],
     "expires": "Jul 1, 2023"
   },
-
+  {
+    "prefix": "css-nesting-ident",
+    "platforms": ["Linux"],
+    "bases": [
+      "wpt_internal/css/css-nesting/ident"
+    ],
+    "exclusive_tests": "ALL",
+    "args": ["--enable-blink-features=CSSNestingIdent"],
+    "expires": "Dec 1, 2023"
+  },
   {
     "prefix": "import-maps-disabled",
     "platforms": ["Linux", "Mac", "Win"],
@@ -805,12 +827,15 @@
     "args": ["--disable-blink-features=ImportMaps"],
     "expires": "Jul 1, 2023"
   },
+  "The overlay-scrollbar virtual suite is testing a feature that is enabled",
+  "or not based on platform and settings, so it should not expire.",
   {
     "prefix": "overlay-scrollbar",
     "platforms": ["Linux", "Mac", "Win"],
-    "bases": [],
+    "bases": [ "external/wpt/css/css-ui/pointer-events-no-scrollbars-001.html",
+               "external/wpt/css/css-ui/pointer-events-no-scrollbars-002.html"],
     "args": ["--enable-features=OverlayScrollbar"],
-    "expires": "Jul 1, 2023"
+    "expires": "never"
   },
   {
     "prefix": "elastic-overscroll",
@@ -821,12 +846,14 @@
              "--enable-threaded-compositing"],
     "expires": "Jul 1, 2023"
   },
+  "The non-overlay-scrollbar virtual suite is testing a feature that is",
+  "enabled or not based on platform and settings, so it should not expire.",
   {
     "prefix": "non-overlay-scrollbar",
     "platforms": ["Linux", "Mac", "Win"],
     "bases": [],
     "args": ["--disable-features=OverlayScrollbar"],
-    "expires": "Jul 1, 2023"
+    "expires": "never"
   },
   {
     "prefix": "fluent-non-overlay-scrollbar",
@@ -1187,7 +1214,8 @@
     "bases": ["external/wpt/css/css-view-transitions",
               "wpt_internal/view-transition",
               "view-transition",
-              "inspector-protocol/css/css-get-styles-for-view-transition.js"],
+              "inspector-protocol/css/css-get-styles-for-view-transition.js",
+              "external/wpt/soft-navigation-heuristics/navigation-api-view-transition.tentative.html"],
     "exclusive_tests": "ALL",
     "args": ["--enable-threaded-compositing"],
     "expires": "Jul 1, 2023"
@@ -1211,13 +1239,6 @@
     "exclusive_tests": "ALL",
     "args": ["--enable-threaded-compositing",
              "--force-color-profile=display-p3-d65"],
-    "expires": "Jul 1, 2023"
-  },
-  {
-    "prefix": "popover-disabled",
-    "platforms": ["Linux", "Mac", "Win"],
-    "bases": [],
-    "args": ["--disable-blink-features=HTMLSelectMenuElement,HTMLPopoverAttribute,HTMLPopoverHint"],
     "expires": "Jul 1, 2023"
   },
   {
@@ -1267,7 +1288,7 @@
       "http/tests/inspector-protocol/storage/interest-groups.js"
     ],
     "args": [
-      "--enable-features=InterestGroupStorage,AdInterestGroupAPI,Fledge,PrivacySandboxAdsAPIsOverride,FencedFrames:implementation_type/mparch"
+      "--enable-features=InterestGroupStorage,AdInterestGroupAPI,Fledge,PrivacySandboxAdsAPIsOverride,FencedFrames:implementation_type/mparch,FencedFramesAPIChanges"
     ],
     "expires": "Dec 1, 2023"
   },
@@ -1415,7 +1436,7 @@
     "exclusive_tests": [
       "wpt_internal/shared_storage_reportevent_limit/"
     ],
-    "args": ["--enable-features=SharedStorageAPI,FencedFrames:implementation_type/mparch,PrivacySandboxAdsAPIsOverride,SharedStorageReportEventLimit"],
+    "args": ["--enable-features=SharedStorageAPI,FencedFrames:implementation_type/mparch,FencedFramesAPIChanges,PrivacySandboxAdsAPIsOverride,SharedStorageReportEventLimit"],
     "expires": "Jul 1, 2023"
   },
   {
@@ -1427,7 +1448,7 @@
     "exclusive_tests": [
       "wpt_internal/shared_storage_selecturl_limit/"
     ],
-    "args": ["--enable-features=SharedStorageAPI,FencedFrames:implementation_type/mparch,PrivacySandboxAdsAPIsOverride,SharedStorageSelectURLLimit"],
+    "args": ["--enable-features=SharedStorageAPI,FencedFrames:implementation_type/mparch,FencedFramesAPIChanges,PrivacySandboxAdsAPIsOverride,SharedStorageSelectURLLimit"],
     "expires": "Jul 1, 2023"
   },
   {
@@ -1885,17 +1906,6 @@
     "expires": "Dec 21, 2023"
   },
   {
-    "prefix": "webrtc-vp9-simulcast",
-    "platforms": ["Linux", "Mac", "Win"],
-    "bases": [
-      "external/wpt/webrtc/simulcast/vp9-scalability-mode.https.html"
-    ],
-    "args": [
-      "--force-fieldtrials=WebRTC-AllowDisablingLegacyScalability/Enabled"
-    ],
-    "expires": "Jun 16, 2023"
-  },
-  {
     "prefix": "allow-rtc-encoded-video-frame-set-metadata-csrcs",
     "platforms": ["Linux", "Mac", "Win"],
     "bases": [
@@ -1916,5 +1926,20 @@
     ],
     "args": ["--disable-blink-features=AbortSignalComposition"],
     "expires": "Dec 21, 2023"
+  },
+  {
+    "prefix": "keepalive-in-browser-migration",
+    "platforms": ["Linux", "Mac", "Win"],
+    "bases": [
+      "external/wpt/background-fetch/",
+      "external/wpt/beacon/beacon-basic.https.window.js",
+      "external/wpt/beacon/beacon-navigate.https.window.js",
+      "external/wpt/fetch/",
+      "external/wpt/xhr/"
+    ],
+    "args": [
+      "--enable-features=KeepAliveInBrowserMigration"
+    ],
+    "expires": "Dec 1, 2023"
   }
 ]

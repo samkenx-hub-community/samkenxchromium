@@ -176,7 +176,7 @@ BASE_FEATURE(kAudioSourceFetcherResampling,
 // audio configuration. crbug.com/1092970.
 BASE_FEATURE(kAudioSettingsPage,
              "AudioSettingsPage",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // Enables the Audio URL that is designed to help user debug or troubleshoot
 // common issues on ChromeOS.
@@ -295,11 +295,6 @@ BASE_FEATURE(kCalendarJelly,
              "CalendarJelly",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-// Enables to allow low storage warning feature in the camera app.
-BASE_FEATURE(kCameraAppLowStorageWarning,
-             "CameraAppLowStorageWarning",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
 // Enables to allow time-lapse video recording in the camera app.
 BASE_FEATURE(kCameraAppTimeLapse,
              "CameraAppTimeLapse",
@@ -345,12 +340,6 @@ BASE_FEATURE(kCheckPasswordsAgainstCryptohomeHelper,
 // select a clipboard history item to replace the initially pasted content.
 BASE_FEATURE(kClipboardHistoryLongpress,
              "ClipboardHistoryLongpress",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-
-// If enabled, the clipboard nudge shown prefs will be reset at the start of
-// each new user session.
-BASE_FEATURE(kClipboardHistoryNudgeSessionReset,
-             "ClipboardHistoryNudgeSessionReset",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Enables updated UI for the clipboard history menu and new system behavior
@@ -659,6 +648,12 @@ BASE_FEATURE(kEnableInputInDiagnosticsApp,
              "EnableInputInDiagnosticsApp",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
+// If enabled, the jelly colors will be used in the diagnostics app. Requires
+// jelly-colors flag to also be enabled.
+BASE_FEATURE(kDiagnosticsAppJelly,
+             "kDiagnosticsAppJelly",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 // Enables or disables keyboard backlight toggle.
 BASE_FEATURE(kEnableKeyboardBacklightToggle,
              "EnableKeyboardBacklightToggle",
@@ -712,10 +707,6 @@ BASE_FEATURE(kEnableSamlNotificationOnPasswordChangeSuccess,
              "EnableSamlNotificationOnPasswordChangeSuccess",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
-BASE_FEATURE(kEnableSavedDesks,
-             "EnableSavedDesks",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
 // Enables all registered system web apps, regardless of their respective
 // feature flags.
 BASE_FEATURE(kEnableAllSystemWebApps,
@@ -725,6 +716,11 @@ BASE_FEATURE(kEnableAllSystemWebApps,
 // Enables per-desk Z order for all-desk windows.
 BASE_FEATURE(kEnablePerDeskZOrder,
              "EnablePerDeskZOrder",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+// Enables RFC8925 (prefer IPv6-only on an IPv6-only-capable network).
+BASE_FEATURE(kEnableRFC8925,
+             "EnableRFC8925",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 // If enabled, touchpad cards will be shown in the diagnostics app's input
@@ -809,6 +805,12 @@ BASE_FEATURE(kExoOrdinalMotion,
              "ExoOrdinalMotion",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
+// Enables to check KeyEvent flag to see if the event is consumed by IME
+// or not (=decides using heuristics based on key code etc.).
+BASE_FEATURE(kExoConsumedByImeByFlag,
+             "ExoConsumedByImeByFlag",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 // Allows RGB Keyboard to test new animations/patterns.
 BASE_FEATURE(kExperimentalRgbKeyboardPatterns,
              "ExperimentalRgbKeyboardPatterns",
@@ -838,6 +840,9 @@ BASE_FEATURE(kFastPairBleRotation,
 BASE_FEATURE(kFastPairHandshakeRefactor,
              "FastPairHandshakeRefactor",
              base::FEATURE_ENABLED_BY_DEFAULT);
+
+// Enables prototype support for Fast Pair HID.
+BASE_FEATURE(kFastPairHID, "FastPairHID", base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Enables Saved Devices nicknames logic for Fast Pair.
 BASE_FEATURE(kFastPairSavedDevicesNicknames,
@@ -929,7 +934,7 @@ BASE_FEATURE(kFilesDriveShortcuts,
 // Enable inline sync status in Files app.
 BASE_FEATURE(kFilesInlineSyncStatus,
              "FilesInlineSyncStatus",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // Enables V2 of search functionality in files.
 BASE_FEATURE(kFilesSearchV2,
@@ -1076,6 +1081,11 @@ BASE_FEATURE(kHandwritingLibraryDlc,
              "HandwritingLibraryDlc",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
+// Enables the ChromeOS Apps Discovery experience in the Help App.
+BASE_FEATURE(kHelpAppAppsDiscovery,
+             "HelpAppAppsDiscovery",
+             base::FEATURE_ENABLED_BY_DEFAULT);
+
 // Enables or disables the Help App Discover tab notifications on non-stable
 // ChromeOS channels. Used for testing.
 BASE_FEATURE(kHelpAppDiscoverTabNotificationAllChannels,
@@ -1184,7 +1194,7 @@ BASE_FEATURE(kStartAssistantAudioDecoderOnDemand,
 // Enable or disable a new header bar for the ChromeOS virtual keyboard.
 BASE_FEATURE(kVirtualKeyboardNewHeader,
              "VirtualKeyboardNewHeader",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // If enabled, used to configure the heuristic rules for some advanced IME
 // features (e.g. auto-correct).
@@ -1371,6 +1381,11 @@ BASE_FEATURE(kMacAddressRandomization,
              "MacAddressRandomization",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
+// Enables PDF signature saving and a selection tool in the media app.
+BASE_FEATURE(kMediaAppPdfSignature,
+             "MediaAppPdfSignature",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 // Enables notification of when a microphone-using app is launched while the
 // microphone is muted.
 BASE_FEATURE(kMicMuteNotifications,
@@ -1555,6 +1570,12 @@ BASE_FEATURE(kOsSettingsAppNotificationsPage,
 // enabling this without enabling Lacros flag will have no effect
 BASE_FEATURE(kOsSyncConsentRevamp,
              "OsSyncConsentRevamp",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+// If enabled, the jelly colors will be used in the os feedback app. Requires
+// jelly-colors flag to also be enabled.
+BASE_FEATURE(kOsFeedbackJelly,
+             "OsFeedbackJelly",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Enables app badging toggle to be displayed in app notification page in
@@ -1810,6 +1831,11 @@ BASE_FEATURE(kReleaseTrackUi,
              "ReleaseTrackUi",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
+// Enables rendering ARC notifications using ChromeOS notification framework
+BASE_FEATURE(kRenderArcNotificationsByChrome,
+             "RenderArcNotificationsByChrome",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 // When enabled, the overview and desk reverse scrolling behaviors are changed
 // and if the user performs the old gestures, a notification or toast will show
 // up.
@@ -1892,11 +1918,6 @@ BASE_FEATURE(kShelfStackedHotseat,
 // the swipe gesture to show the extended hotseat. Limited to certain apps.
 BASE_FEATURE(kShelfPalmRejectionSwipeOffset,
              "ShelfPalmRejectionSwipeOffset",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
-// Enables or disables the new shimless rma flow.
-BASE_FEATURE(kShimlessRMAFlow,
-             "ShimlessRMAFlow",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
 // Enables or disables the OS update page in the shimless RMA flow.
@@ -2020,7 +2041,7 @@ BASE_FEATURE(kTelemetryExtension,
 // Enables the alternative emulator for the Terminal app.
 BASE_FEATURE(kTerminalAlternativeEmulator,
              "TerminalAlternativeEmulator",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 //
 // Enables Terminal System App to load from Downloads for developer testing.
 // Only works in dev and canary channels.
@@ -2232,7 +2253,7 @@ BASE_FEATURE(kDeviceActiveClient,
 // on ChromeOS.
 BASE_FEATURE(kDeviceActiveClient28DayActiveCheckIn,
              "DeviceActiveClient28DayActiveCheckIn",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // Enables or disables PSM CheckMembership for 28 day device active pings
 // on ChromeOS.
@@ -2470,10 +2491,6 @@ bool IsClipboardHistoryLongpressEnabled() {
   return base::FeatureList::IsEnabled(kClipboardHistoryLongpress);
 }
 
-bool IsClipboardHistoryNudgeSessionResetEnabled() {
-  return base::FeatureList::IsEnabled(kClipboardHistoryNudgeSessionReset);
-}
-
 bool IsClipboardHistoryRefreshEnabled() {
   return base::FeatureList::IsEnabled(kClipboardHistoryRefresh);
 }
@@ -2610,6 +2627,10 @@ bool IsFastPairBleRotationEnabled() {
 
 bool IsFastPairHandshakeRefactorEnabled() {
   return base::FeatureList::IsEnabled(kFastPairHandshakeRefactor);
+}
+
+bool IsFastPairHIDEnabled() {
+  return base::FeatureList::IsEnabled(kFastPairHID);
 }
 
 bool IsFastPairSavedDevicesNicknamesEnabled() {
@@ -2809,6 +2830,16 @@ bool IsInternalServerSideSpeechRecognitionControlEnabled() {
 
 bool IsIppClientInfoEnabled() {
   return base::FeatureList::IsEnabled(kIppClientInfo);
+}
+
+bool IsJellyEnabledForDiagnosticsApp() {
+  return chromeos::features::IsJellyEnabled() &&
+         base::FeatureList::IsEnabled(kDiagnosticsAppJelly);
+}
+
+bool IsJellyEnabledForOsFeedback() {
+  return chromeos::features::IsJellyEnabled() &&
+         base::FeatureList::IsEnabled(kOsFeedbackJelly);
 }
 
 bool IsKeyboardBacklightToggleEnabled() {
@@ -3150,6 +3181,10 @@ bool IsReleaseTrackUiEnabled() {
   return base::FeatureList::IsEnabled(kReleaseTrackUi);
 }
 
+bool IsRenderArcNotificationsByChromeEnabled() {
+  return base::FeatureList::IsEnabled(kRenderArcNotificationsByChrome);
+}
+
 bool IsReverseScrollGesturesEnabled() {
   return base::FeatureList::IsEnabled(kReverseScrollGestures);
 }
@@ -3165,10 +3200,6 @@ bool IsSameAppWindowCycleEnabled() {
 bool IsSamlNotificationOnPasswordChangeSuccessEnabled() {
   return base::FeatureList::IsEnabled(
       kEnableSamlNotificationOnPasswordChangeSuccess);
-}
-
-bool IsSavedDesksEnabled() {
-  return base::FeatureList::IsEnabled(kEnableSavedDesks);
 }
 
 bool IsSeparateNetworkIconsEnabled() {
@@ -3194,10 +3225,6 @@ bool IsShelfPalmRejectionSwipeOffsetEnabled() {
 
 bool IsShelfStackedHotseatEnabled() {
   return base::FeatureList::IsEnabled(kShelfStackedHotseat);
-}
-
-bool IsShimlessRMAFlowEnabled() {
-  return base::FeatureList::IsEnabled(kShimlessRMAFlow);
 }
 
 bool IsShimlessRMAOsUpdateEnabled() {

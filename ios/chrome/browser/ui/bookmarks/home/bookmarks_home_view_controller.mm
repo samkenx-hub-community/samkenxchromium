@@ -23,6 +23,7 @@
 #import "ios/chrome/browser/bookmarks/local_or_syncable_bookmark_model_factory.h"
 #import "ios/chrome/browser/bookmarks/managed_bookmark_service_factory.h"
 #import "ios/chrome/browser/browser_state/chrome_browser_state.h"
+#import "ios/chrome/browser/default_browser/utils.h"
 #import "ios/chrome/browser/drag_and_drop/drag_item_util.h"
 #import "ios/chrome/browser/drag_and_drop/table_view_url_drag_drop_handler.h"
 #import "ios/chrome/browser/favicon/favicon_loader.h"
@@ -30,9 +31,12 @@
 #import "ios/chrome/browser/main/browser.h"
 #import "ios/chrome/browser/metrics/new_tab_page_uma.h"
 #import "ios/chrome/browser/policy/policy_util.h"
+#import "ios/chrome/browser/shared/coordinator/alert/action_sheet_coordinator.h"
+#import "ios/chrome/browser/shared/coordinator/alert/alert_coordinator.h"
 #import "ios/chrome/browser/shared/public/commands/application_commands.h"
 #import "ios/chrome/browser/shared/public/commands/command_dispatcher.h"
 #import "ios/chrome/browser/shared/public/commands/snackbar_commands.h"
+#import "ios/chrome/browser/shared/ui/elements/home_waiting_view.h"
 #import "ios/chrome/browser/shared/ui/table_view/cells/table_view_url_item.h"
 #import "ios/chrome/browser/shared/ui/table_view/chrome_table_view_styler.h"
 #import "ios/chrome/browser/shared/ui/table_view/table_view_illustrated_empty_view.h"
@@ -42,8 +46,6 @@
 #import "ios/chrome/browser/shared/ui/util/rtl_geometry.h"
 #import "ios/chrome/browser/shared/ui/util/uikit_ui_util.h"
 #import "ios/chrome/browser/sync/sync_setup_service_factory.h"
-#import "ios/chrome/browser/ui/alert_coordinator/action_sheet_coordinator.h"
-#import "ios/chrome/browser/ui/alert_coordinator/alert_coordinator.h"
 #import "ios/chrome/browser/ui/authentication/cells/signin_promo_view_configurator.h"
 #import "ios/chrome/browser/ui/authentication/cells/table_view_signin_promo_item.h"
 #import "ios/chrome/browser/ui/bookmarks/bookmark_navigation_controller.h"
@@ -60,8 +62,6 @@
 #import "ios/chrome/browser/ui/bookmarks/home/bookmarks_home_consumer.h"
 #import "ios/chrome/browser/ui/bookmarks/home/bookmarks_home_mediator.h"
 #import "ios/chrome/browser/ui/bookmarks/home/bookmarks_home_shared_state.h"
-#import "ios/chrome/browser/ui/default_promo/default_browser_utils.h"
-#import "ios/chrome/browser/ui/elements/home_waiting_view.h"
 #import "ios/chrome/browser/ui/incognito_reauth/incognito_reauth_scene_agent.h"
 #import "ios/chrome/browser/ui/keyboard/UIKeyCommand+Chrome.h"
 #import "ios/chrome/browser/ui/main/scene_state_browser_agent.h"
@@ -252,10 +252,11 @@ std::vector<GURL> GetUrlsToOpen(const std::vector<const BookmarkNode*>& nodes) {
 }
 
 - (void)shutdown {
-  [_bookmarksCoordinator shutdown];
-  _bookmarksCoordinator = nil;
-
+  [self.bookmarksCoordinator shutdown];
+  self.bookmarksCoordinator = nil;
   [self.mediator disconnect];
+  self.mediator.consumer = nil;
+  self.mediator = nil;
   _sharedState.tableView.dataSource = nil;
   _sharedState.tableView.delegate = nil;
   self.browser = nullptr;
@@ -970,7 +971,7 @@ std::vector<GURL> GetUrlsToOpen(const std::vector<const BookmarkNode*>& nodes) {
 
 #pragma mark - BookmarkModelBridgeObserver
 
-- (void)bookmarkModelLoaded {
+- (void)bookmarkModelLoaded:(bookmarks::BookmarkModel*)model {
   DCHECK(!self.displayedFolderNode);
   self.displayedFolderNode = self.profileBookmarks->root_node();
 
@@ -1027,28 +1028,32 @@ std::vector<GURL> GetUrlsToOpen(const std::vector<const BookmarkNode*>& nodes) {
   }];
 }
 
-- (void)bookmarkNodeChanged:(const BookmarkNode*)node {
+- (void)bookmarkModel:(bookmarks::BookmarkModel*)model
+        didChangeNode:(const bookmarks::BookmarkNode*)bookmarkNode {
   // No-op here.  Bookmarks might be refreshed in BookmarksHomeMediator.
 }
 
-- (void)bookmarkNodeChildrenChanged:(const BookmarkNode*)bookmarkNode {
+- (void)bookmarkModel:(bookmarks::BookmarkModel*)model
+    didChangeChildrenForNode:(const bookmarks::BookmarkNode*)bookmarkNode {
   // No-op here.  Bookmarks might be refreshed in BookmarksHomeMediator.
 }
 
-- (void)bookmarkNode:(const BookmarkNode*)bookmarkNode
-     movedFromParent:(const BookmarkNode*)oldParent
-            toParent:(const BookmarkNode*)newParent {
+- (void)bookmarkModel:(bookmarks::BookmarkModel*)model
+          didMoveNode:(const bookmarks::BookmarkNode*)bookmarkNode
+           fromParent:(const bookmarks::BookmarkNode*)oldParent
+             toParent:(const bookmarks::BookmarkNode*)newParent {
   // No-op here.  Bookmarks might be refreshed in BookmarksHomeMediator.
 }
 
-- (void)bookmarkNodeDeleted:(const BookmarkNode*)node
-                 fromFolder:(const BookmarkNode*)folder {
+- (void)bookmarkModel:(bookmarks::BookmarkModel*)model
+        didDeleteNode:(const bookmarks::BookmarkNode*)node
+           fromFolder:(const bookmarks::BookmarkNode*)folder {
   if (self.displayedFolderNode == node) {
     [self setTableViewEditing:NO];
   }
 }
 
-- (void)bookmarkModelRemovedAllNodes {
+- (void)bookmarkModelRemovedAllNodes:(bookmarks::BookmarkModel*)model {
   // No-op
 }
 

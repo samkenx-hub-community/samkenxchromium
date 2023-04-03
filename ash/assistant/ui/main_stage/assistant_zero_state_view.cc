@@ -11,8 +11,6 @@
 #include "ash/assistant/ui/assistant_ui_constants.h"
 #include "ash/assistant/ui/assistant_view_delegate.h"
 #include "ash/assistant/ui/assistant_view_ids.h"
-#include "ash/assistant/ui/colors/assistant_colors.h"
-#include "ash/assistant/ui/colors/assistant_colors_util.h"
 #include "ash/assistant/ui/main_stage/assistant_onboarding_view.h"
 #include "ash/constants/ash_features.h"
 #include "ash/public/cpp/assistant/assistant_state.h"
@@ -47,6 +45,24 @@ constexpr base::StringPiece kLearnMoreUrl =
 constexpr auto kToastMarginDip = gfx::Insets::TLBR(0, 24, 4, 24);
 constexpr auto kToastPreferredSizeDip = gfx::Size(496, 64);
 
+bool ShouldShowGreetingOrOnboarding(bool in_tablet_mode) {
+  if (assistant::features::IsAssistantLearnMoreEnabled()) {
+    return !in_tablet_mode;
+  }
+  return true;
+}
+
+bool ShouldShowSpacer(bool in_tablet_mode) {
+  if (assistant::features::IsAssistantLearnMoreEnabled()) {
+    return !in_tablet_mode;
+  }
+  return false;
+}
+
+bool ShouldShowLearnMoreToast() {
+  return assistant::features::IsAssistantLearnMoreEnabled();
+}
+
 }  // namespace
 
 AssistantZeroStateView::AssistantZeroStateView(AssistantViewDelegate* delegate)
@@ -75,16 +91,6 @@ gfx::Size AssistantZeroStateView::CalculatePreferredSize() const {
 
 void AssistantZeroStateView::ChildPreferredSizeChanged(views::View* child) {
   PreferredSizeChanged();
-}
-
-void AssistantZeroStateView::OnThemeChanged() {
-  views::View::OnThemeChanged();
-
-  greeting_label_->SetBackgroundColor(ash::assistant::ResolveAssistantColor(
-      assistant_colors::ColorName::kBgAssistantPlate));
-
-  greeting_label_->SetEnabledColor(
-      GetColorProvider()->GetColor(kColorAshAssistantTextColorPrimary));
 }
 
 void AssistantZeroStateView::OnAssistantControllerDestroying() {
@@ -130,32 +136,40 @@ void AssistantZeroStateView::InitLayout() {
   greeting_label_->SetMultiLine(true);
   greeting_label_->SetText(
       l10n_util::GetStringUTF16(IDS_ASH_ASSISTANT_PROMPT_DEFAULT));
+  greeting_label_->SetBackgroundColorId(kColorAshAssistantBgPlate);
+  greeting_label_->SetEnabledColorId(kColorAshAssistantTextColorPrimary);
 
-  if (assistant::features::IsAssistantLearnMoreEnabled()) {
-    // Spacer.
-    auto* spacer = AddChildView(std::make_unique<views::View>());
-    layout->SetFlexForView(spacer, 1);
+  // Spacer.
+  spacer_ = AddChildView(std::make_unique<views::View>());
+  layout->SetFlexForView(spacer_, 1);
 
-    // Learn more toast.
-    // TODO(b/274527683, b/274525194): add i18n and a11y supports.
-    learn_more_toast_ = AddChildView(
-        AppListToastView::Builder(u"Learn more about Google Assistant")
-            .SetButton(l10n_util::GetStringUTF16(IDS_ASH_LEARN_MORE),
-                       base::BindRepeating(
-                           &AssistantZeroStateView::OnLearnMoreButtonPressed,
-                           base::Unretained(this)))
-            .Build());
-    learn_more_toast_->SetID(AssistantViewID::kLearnMoreToast);
-    learn_more_toast_->SetProperty(views::kMarginsKey, kToastMarginDip);
-    learn_more_toast_->SetPreferredSize(kToastPreferredSizeDip);
-    learn_more_toast_->SetTitleLabelMaximumWidth();
-  }
+  // Learn more toast.
+  // TODO(b/274527683, b/274525194): add i18n and a11y supports.
+  learn_more_toast_ = AddChildView(
+      AppListToastView::Builder(u"Learn more about Google Assistant")
+          .SetButton(l10n_util::GetStringUTF16(IDS_ASH_LEARN_MORE),
+                     base::BindRepeating(
+                         &AssistantZeroStateView::OnLearnMoreButtonPressed,
+                         base::Unretained(this)))
+          .Build());
+  learn_more_toast_->SetID(AssistantViewID::kLearnMoreToast);
+  learn_more_toast_->SetProperty(views::kMarginsKey, kToastMarginDip);
+  learn_more_toast_->SetPreferredSize(kToastPreferredSizeDip);
+  learn_more_toast_->SetTitleLabelMaximumWidth();
 }
 
 void AssistantZeroStateView::UpdateLayout() {
+  const bool show_greeting_or_onboarding =
+      ShouldShowGreetingOrOnboarding(delegate_->IsTabletMode());
   const bool show_onboarding = delegate_->ShouldShowOnboarding();
-  onboarding_view_->SetVisible(show_onboarding);
-  greeting_label_->SetVisible(!show_onboarding);
+  onboarding_view_->SetVisible(show_greeting_or_onboarding && show_onboarding);
+  greeting_label_->SetVisible(show_greeting_or_onboarding && !show_onboarding);
+
+  const bool show_spacer = ShouldShowSpacer(delegate_->IsTabletMode());
+  spacer_->SetVisible(show_spacer);
+
+  const bool show_learn_more_toast = ShouldShowLearnMoreToast();
+  learn_more_toast_->SetVisible(show_learn_more_toast);
 }
 
 void AssistantZeroStateView::OnLearnMoreButtonPressed() {

@@ -94,6 +94,7 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &autofill::features::kAutofillEnableManualFallbackForVirtualCards,
     &autofill::features::kAutofillKeyboardAccessory,
     &autofill::features::kAutofillManualFallbackAndroid,
+    &autofill::features::kAutofillEnableNewCardArtAndNetworkImages,
     &autofill::features::kAutofillEnableSupportForHonorificPrefixes,
     &autofill::features::kAutofillEnableUpdateVirtualCardEnrollment,
     &autofill::features::kAutofillEnableVirtualCardMetadata,
@@ -157,6 +158,7 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &feed::kXsurfaceMetricsReporting,
     &history::kOrganicRepeatableQueries,
     &history_clusters::internal::kJourneys,
+    &history_clusters::internal::kOmniboxHistoryClusterProvider,
     &kAdaptiveButtonInTopToolbar,
     &kAdaptiveButtonInTopToolbarTranslate,
     &kAdaptiveButtonInTopToolbarAddToBookmarks,
@@ -173,6 +175,9 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &kAssistantIntentTranslateInfo,
     &kAssistantNonPersonalizedVoiceSearch,
     &kAppMenuMobileSiteOption,
+    &kBackGestureActivityTabProvider,
+    &kBackGestureRefactorActivityAndroid,
+    &kBackGestureRefactorAndroid,
     &kBackgroundThreadPool,
     &kBaselineGM3SurfaceColors,
     &kCastDeviceFilter,
@@ -201,6 +206,7 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &kCCTResizable90MaximumHeight,
     &kCCTResizableForThirdParties,
     &kCCTResizableSideSheet,
+    &kCCTResizableSideSheetDiscoverFeedSettings,
     &kCCTResizableSideSheetForThirdParties,
     &kCCTRetainingStateInMemory,
     &kCCTResourcePrefetch,
@@ -227,6 +233,7 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &kContextualSearchThinWebViewImplementation,
     &kDeferKeepScreenOnDuringGesture,
     &kDeferNotifyInMotion,
+    &kDelayTransitionsForAnimation,
     &kExperimentsForAgsa,
     &kExploreSites,
     &kFocusOmniboxInIncognitoTabIntents,
@@ -245,8 +252,6 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &kPageAnnotationsService,
     &kBookmarksImprovedSaveFlow,
     &kBookmarksRefresh,
-    &kBackGestureRefactorActivityAndroid,
-    &kBackGestureRefactorAndroid,
     &kOmahaMinSdkVersionAndroid,
     &kOmniboxAdaptNarrowTabletWindows,
     &kOmniboxConsumesImeInsets,
@@ -301,7 +306,6 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &kTabGridLayoutAndroid,
     &kTabSelectionEditorV2,
     &kTabStateV1Optimizations,
-    &kTabStripImprovements,
     &kTabToGTSAnimation,
     &kTestDefaultDisabled,
     &kTestDefaultEnabled,
@@ -346,7 +350,6 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &offline_pages::kOfflinePagesDescriptiveFailStatusFeature,
     &offline_pages::kOfflinePagesDescriptivePendingStatusFeature,
     &offline_pages::kOfflinePagesLivePageSharingFeature,
-    &offline_pages::kPrefetchingOfflinePagesFeature,
     &omnibox::kOmniboxAssistantVoiceSearch,
     &omnibox::kOmniboxMatchToolbarAndStatusBarColor,
     &omnibox::kOmniboxRemoveExcessiveRecycledViewClearCalls,
@@ -608,6 +611,10 @@ BASE_FEATURE(kCCTResizableSideSheet,
              "CCTResizableSideSheet",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
+BASE_FEATURE(kCCTResizableSideSheetDiscoverFeedSettings,
+             "CCTResizableSideSheetDiscoverFeedSettings",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 BASE_FEATURE(kCCTResizableSideSheetForThirdParties,
              "CCTResizableSideSheetForThirdParties",
              base::FEATURE_DISABLED_BY_DEFAULT);
@@ -720,6 +727,10 @@ BASE_FEATURE(kDeferNotifyInMotion,
              "DeferNotifyInMotion",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
+BASE_FEATURE(kDelayTransitionsForAnimation,
+             "DelayTransitionsForAnimation",
+             base::FEATURE_ENABLED_BY_DEFAULT);
+
 BASE_FEATURE(kDownloadAutoResumptionThrottling,
              "DownloadAutoResumptionThrottling",
              base::FEATURE_ENABLED_BY_DEFAULT);
@@ -782,6 +793,10 @@ BASE_FEATURE(kBookmarksImprovedSaveFlow,
 
 BASE_FEATURE(kBookmarksRefresh,
              "BookmarksRefresh",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+BASE_FEATURE(kBackGestureActivityTabProvider,
+             "BackGestureActivityTabProvider",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 BASE_FEATURE(kBackGestureRefactorActivityAndroid,
@@ -989,10 +1004,6 @@ BASE_FEATURE(kTabSelectionEditorV2,
 
 BASE_FEATURE(kTabStateV1Optimizations,
              "TabStateV1Optimizations",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
-BASE_FEATURE(kTabStripImprovements,
-             "TabStripImprovements",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
 BASE_FEATURE(kDiscoverFeedMultiColumn,

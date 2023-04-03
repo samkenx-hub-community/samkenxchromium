@@ -30,6 +30,12 @@ BASE_FEATURE(kBiometricTouchToFill,
              "BiometricTouchToFill",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
+// Disables fallback filling if the server or the autocomplete attribute says it
+// is a credit card field.
+BASE_FEATURE(kDisablePasswordsDropdownForCvcFields,
+             "DisablePasswordsDropdownForCvcFields",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 // Enables the overwriting of prefilled username fields if the server predicted
 // the field to contain a placeholder value.
 BASE_FEATURE(kEnableOverwritingPlaceholderUsernames,
@@ -119,7 +125,7 @@ BASE_FEATURE(kIOSPasswordCheckup,
 // subtitle.
 BASE_FEATURE(kIOSShowPasswordStorageInSaveInfobar,
              "IOSShowPasswordStorageInSaveInfobar",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // Enables password bottom sheet to be displayed (on iOS) when a user is
 // signed-in and taps on a username or password field on a website that has at
@@ -288,6 +294,12 @@ BASE_FEATURE(kExploratorySaveUpdatePasswordStrings,
 // we don't need additional signals.
 BASE_FEATURE(kUsernameFirstFlowFallbackCrowdsourcing,
              "UsernameFirstFlowFallbackCrowdsourcing",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+// Enables suggesting username in the save/update prompt in the case of
+// autocomplete="username".
+BASE_FEATURE(kUsernameFirstFlowHonorAutocomplete,
+             "UsernameFirstFlowHonorAutocomplete",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Enables previewing password generation suggestion in the target form in

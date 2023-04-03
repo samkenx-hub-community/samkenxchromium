@@ -40,7 +40,6 @@ data/attribution_reporting/aggregatable_report_goldens/version_/report_5.json
 data/attribution_reporting/aggregatable_report_goldens/version_/report_5_cleartext_payloads.json
 data/attribution_reporting/aggregatable_report_goldens/version_/report_6.json
 data/attribution_reporting/aggregatable_report_goldens/version_/report_6_cleartext_payloads.json
-data/attribution_reporting/databases/version_34.sql
 data/attribution_reporting/databases/version_35.sql
 data/attribution_reporting/databases/version_36.sql
 data/attribution_reporting/databases/version_37.sql
@@ -406,6 +405,8 @@ data/fenced_frames/ad_with_fenced_frame_private_aggregation_reporting.html
 data/fenced_frames/ad_with_fenced_frame_private_aggregation_reporting.html.mock-http-headers
 data/fenced_frames/ad_with_fenced_frame_reporting.html
 data/fenced_frames/ad_with_fenced_frame_reporting.html.mock-http-headers
+data/fenced_frames/attribution_reporting_disallowed.html
+data/fenced_frames/attribution_reporting_disallowed.html.mock-http-headers
 data/fenced_frames/basic.html
 data/fenced_frames/basic.html.mock-http-headers
 data/fenced_frames/basic_fenced_frame_src.html
@@ -781,6 +782,7 @@ data/gpu/vc/teddy3_vp8_320x180_30fps.webm
 data/gpu/vc/teddy3_vp9_320x180_30fps.webm
 data/gpu/vc/video_utils.js
 data/gpu/vc/videos_mxn.html
+data/gpu/vc/webgl2_videos_mxn.html
 data/gpu/vc/webgl_video.js
 data/gpu/vc/webgl_videos_mxn.html
 data/gpu/vc/webgpu_video.js
@@ -794,6 +796,8 @@ data/gpu/webcodecs/encode-color-space.html
 data/gpu/webcodecs/encode-decode.html
 data/gpu/webcodecs/encode.html
 data/gpu/webcodecs/encoding-modes.html
+data/gpu/webcodecs/encoding-rate-control.html
+data/gpu/webcodecs/encoding-rate-control.js
 data/gpu/webcodecs/svc.html
 data/gpu/webcodecs/tex-image-2d.html
 data/gpu/webcodecs/webcodecs_common.js
@@ -1480,6 +1484,7 @@ data/service_worker/fetch_event_respond_with_fetch.js
 data/service_worker/fetch_event_response_via_cache.js
 data/service_worker/fetch_event_set_in_install_event.js
 data/service_worker/fetch_event_set_in_install_event.js.mock-http-headers
+data/service_worker/fetch_event_with_handle_event_property.js
 data/service_worker/fetch_event_worker_clients.js
 data/service_worker/fetch_from_page.html
 data/service_worker/fetch_from_service_worker.html
@@ -1564,6 +1569,7 @@ data/shared_storage/private_aggregation_permissions_policy_none.html
 data/shared_storage/private_aggregation_permissions_policy_none.html.mock-http-headers
 data/shared_storage/simple_module.js
 data/shared_storage/simple_module2.js
+data/shared_storage/slow_and_fast_module.js
 data/simple_database.html
 data/simple_links.html
 data/simple_page.html

@@ -86,7 +86,7 @@
 <translation id="2482878487686419369">Notifications</translation>
 <translation id="2485422356828889247">Uninstall</translation>
 <translation id="2490684707762498678">Managed by <ph name="APP_NAME" /></translation>
-<translation id="2498359688066513246">Help &amp; feedback</translation>
+<translation id="2498359688066513246">Help and feedback</translation>
 <translation id="2501278716633472235">Go back</translation>
 <translation id="2546283357679194313">Cookies and site data</translation>
 <translation id="2569468611847789653">{COOKIE_COUNT,plural, =1{1 cookie blocked}other{# cookies blocked}}</translation>
@@ -103,6 +103,7 @@
 <translation id="2717722538473713889">Email addresses</translation>
 <translation id="2750481671343847896">Sites can show sign-in prompts from identity services.</translation>
 <translation id="2822354292072154809">Are you sure that you want to reset all site permissions for <ph name="CHOSEN_OBJECT_NAME" />?</translation>
+<translation id="2850913818900871965">Request mobile view</translation>
 <translation id="2870560284913253234">Site</translation>
 <translation id="2874939134665556319">Previous track</translation>
 <translation id="2891975107962658722">Block a site from saving data on your device</translation>
@@ -222,7 +223,6 @@
 <translation id="509133520954049755">Request desktop view</translation>
 <translation id="5100237604440890931">Collapsed – click to expand.</translation>
 <translation id="5123685120097942451">Incognito tab</translation>
-<translation id="5134599672855298214">Request mobile view (recommended)</translation>
 <translation id="5186036860380548585">Option available near top of the screen</translation>
 <translation id="5197729504361054390">The contacts that you select will be shared with <ph name="BEGIN_BOLD" /><ph name="SITE" /><ph name="END_BOLD" />.</translation>
 <translation id="5216942107514965959">Last visited today</translation>

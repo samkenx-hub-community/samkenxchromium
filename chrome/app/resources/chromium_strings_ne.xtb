@@ -24,6 +24,7 @@
 
 तपाईंले वेबसाइट तथा एपहरूलाई दिइसक्नुभएका अनुमति यो खाताका हकमा पनि लागू हुन सक्छ। तपाईं <ph name="SETTINGS_LINK_BEGIN" />सेटिङ<ph name="SETTINGS_LINK_END" />मा गई आफ्ना Google खाताहरू व्यवस्थापन गर्न सक्नुहुन्छ।</translation>
 <translation id="1640672724030957280">डाउनलोड गरिँदै छ...</translation>
+<translation id="1691024636239527281">{NUM_DEVICES,plural, =0{Chromium कुनै पनि HID डिभाइसमा कनेक्ट गरिएको छैन}=1{Chromium HID डिभाइसमा कनेक्ट गरिएको छ}other{Chromium HID डिभाइसहरूमा कनेक्ट गरिएको छ}}</translation>
 <translation id="1708666629004767631">क्रोमियनको नयाँ, सुरक्षित संस्करण उपलब्ध छ।</translation>
 <translation id="17264556997921157">तपाईं वेबसाइटहरूले तपाईंलाई विज्ञापन देखाउन प्रयोग गर्ने रुचिका विषयहरू हेर्न तथा हटाउन सक्नुहुन्छ। Chromium ले तपाईंको हालसालैको ब्राउजिङ इतिहासका आधारमा तपाईंलाई रुचि लाग्न सक्ने विषयहरू पत्ता लगाउँछ।</translation>
 <translation id="1733725117201708356">Chromium ले चाँडै नै ब्राउजिङ डेटा मेटाउने छ</translation>
@@ -81,7 +82,6 @@
 <translation id="2928420929544864228">इन्स्टल गरियो।</translation>
 <translation id="2977470724722393594">Chromium अद्यावधिक छ</translation>
 <translation id="2977506796191543575">कुनै साइटले तपाईंको पासवर्ड चोरी गर्न खोज्दा वा तपाईंले कुनै हानिकारक फाइल डाउनलोड गर्दा Chromium ले पेजमा भएका केही सामग्रीसहित उक्त साइटका URL हरू Safe Browsing मा पठाउन पनि सक्छ</translation>
-<translation id="3021964162552004083">{NUM_DEVICES,plural, =1{Chromium HID डिभाइसमा कनेक्ट गरिएको छ}other{Chromium HID डिभाइसहरूमा कनेक्ट गरिएको छ}}</translation>
 <translation id="3032706164202344641">Chromium ले तपाईंका पासवर्डहरूको जाँच गर्न सकेन। पछि फेरि प्रयास गर्नुहोस्।</translation>
 <translation id="3032787606318309379">Chromium मा थप्दै...</translation>
 <translation id="3038232873781883849">इन्स्टल गर्ने प्रतीक्षा गरिँदै छ...</translation>

@@ -274,6 +274,7 @@
 <translation id="3456078764689556234">Отпечатана е страница <ph name="PRINTED_PAGES" /> от <ph name="TOTAL_PAGES" />.</translation>
 <translation id="345898999683440380">Сканира се страница <ph name="PAGE_NUM" />. Завършена: <ph name="PERCENTAGE_VALUE" />%.</translation>
 <translation id="3459509316159669723">Отпечатване</translation>
+<translation id="346423161771747987">Ток</translation>
 <translation id="346539236881580388">Повторно заснемане</translation>
 <translation id="3484914941826596830">Докато фърмуерът се актуализира, не изключвайте това външно устройство, нито компютъра си. Можете да намалите прозореца. Възможно е актуализацията да отнеме няколко минути и през това време външното ви устройство може да не работи.</translation>
 <translation id="3486220673238053218">дефиниция</translation>
@@ -697,6 +698,7 @@
 <translation id="7103252855940681301">Устройство <ph name="INDEX" /> от <ph name="COUNT" /> на име <ph name="NAME" />.</translation>
 <translation id="7108668606237948702">enter</translation>
 <translation id="7130438335435247835">Име на точката за достъп (APN)</translation>
+<translation id="7131634559772719176">Потвърждаване на предварително зададеното</translation>
 <translation id="7134436342991564651">{0,plural, =1{Сървър за имена}other{Сървъри за имена}}</translation>
 <translation id="7143207342074048698">Свързва се</translation>
 <translation id="7144878232160441200">Повторен опит</translation>
@@ -759,6 +761,7 @@
 <translation id="7656388927906093505">Устройството е мишка.</translation>
 <translation id="7658239707568436148">Отказ</translation>
 <translation id="7665800271478495366">Промяна на аватара</translation>
+<translation id="7675241868020048622">Северно сияние (изключително за Plus)</translation>
 <translation id="7690294790491645610">Потвърдете новата парола</translation>
 <translation id="7701040980221191251">Няма</translation>
 <translation id="7705524343798198388">VPN</translation>
@@ -768,6 +771,7 @@
 <translation id="7762130827864645708">Промяната на паролата ви беше успешна. Моля, използвайте новата парола от сега нататък.</translation>
 <translation id="7763470514545477072">Съответствие на суфикса на домейна</translation>
 <translation id="7769672763586021400">Идент. № на модела</translation>
+<translation id="7770834998503326261">Допълнителна информация, свързана с избраното от вас</translation>
 <translation id="7778717409420828014">Отзивите ви ни помагат да подобрим практическата работа с Chromebook и ще бъдат прегледани от екипа ни. Поради големия брой сигнали не можем да изпратим отговор.</translation>
 <translation id="7784116172884276937">Не са настроени DNS сървъри</translation>
 <translation id="7791543448312431591">Добавяне</translation>
@@ -800,6 +804,7 @@
 <translation id="80398733265834479">Активиране на режима за автоматични цветове</translation>
 <translation id="8041089156583427627">Изпращане на отзивите</translation>
 <translation id="8045012663542226664">Заглушаване на микрофона</translation>
+<translation id="8050091914317269817">Избирането на този тапет ще включи автоматичния тъмен режим и задаването на съответстващ цвят за тапета.</translation>
 <translation id="8075838845814659848">Оставащ заряд</translation>
 <translation id="8076492880354921740">Раздели</translation>
 <translation id="8082366717211101304">Преобразуването от DNS не е възможно от приложения за Android</translation>

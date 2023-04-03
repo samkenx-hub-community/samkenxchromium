@@ -68,6 +68,7 @@ public class ChromeCachedFlags {
 
         // clang-format off
         List<CachedFlag> featuresToCache = List.of(ChromeFeatureList.sAppMenuMobileSiteOption,
+                ChromeFeatureList.sBackGestureActivityTabProvider,
                 ChromeFeatureList.sBackGestureRefactorAndroid,
                 ChromeFeatureList.sBaselineGm3SurfaceColors,
                 ChromeFeatureList.sCctAutoTranslate,
@@ -81,6 +82,7 @@ public class ChromeCachedFlags {
                 ChromeFeatureList.sCctResizable90MaximumHeight,
                 ChromeFeatureList.sCctResizableForThirdParties,
                 ChromeFeatureList.sCctResizableSideSheet,
+                ChromeFeatureList.sCctResizableSideSheetDiscoverFeedSettings,
                 ChromeFeatureList.sCctResizableSideSheetForThirdParties,
                 ChromeFeatureList.sCctRetainableStateInMemory,
                 ChromeFeatureList.sCctToolbarCustomizations,
@@ -120,7 +122,6 @@ public class ChromeCachedFlags {
                 ChromeFeatureList.sTabGroupsContinuationAndroid,
                 ChromeFeatureList.sTabGroupsForTablets,
                 ChromeFeatureList.sTabSelectionEditorV2,
-                ChromeFeatureList.sTabStripImprovements,
                 ChromeFeatureList.sTabToGTSAnimation,
                 ChromeFeatureList.sToolbarUseHardwareBitmapDraw,
                 ChromeFeatureList.sUseChimeAndroidSdk,
@@ -169,7 +170,6 @@ public class ChromeCachedFlags {
                 TabUiFeatureUtilities.ZOOMING_MIN_MEMORY,
                 TabUiFeatureUtilities.SKIP_SLOW_ZOOMING,
                 TabUiFeatureUtilities.THUMBNAIL_ASPECT_RATIO,
-                TabUiFeatureUtilities.TAB_STRIP_TAB_WIDTH,
                 TabUiFeatureUtilities.ENABLE_TAB_SELECTION_EDITOR_V2_LONGPRESS_ENTRY,
                 TabUiFeatureUtilities.ENABLE_TAB_SELECTION_EDITOR_V2_SHARE,
                 TabUiFeatureUtilities.ENABLE_TAB_SELECTION_EDITOR_V2_BOOKMARKS,

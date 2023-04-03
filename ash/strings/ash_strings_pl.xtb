@@ -40,6 +40,7 @@ Oto kilka rzeczy, które możesz wypróbować na początek.</translation>
 <translation id="1181037720776840403">Usuń</translation>
 <translation id="1182225749592316782">Zezwala na dostęp wszystkim aplikacjom i stronom internetowym, które mają uprawnienia do korzystania z kamery i mikrofonu.</translation>
 <translation id="1183863904939664422">Ta sugestia mnie nie interesuje</translation>
+<translation id="1184126796192815024">Ta sieć nie obsługuje strumieniowego przesyłania aplikacji z telefonu. Spróbuj użyć hotspota w telefonie. <ph name="LEARN_MORE" /></translation>
 <translation id="118437560755358292">Dla większego bezpieczeństwa podaj kod PIN lub hasło</translation>
 <translation id="118532027333893379">Aby zrobić zrzut całego ekranu, kliknij w dowolnym miejscu</translation>
 <translation id="1190609913194133056">Centrum powiadomień</translation>
@@ -219,6 +220,7 @@ Oto kilka rzeczy, które możesz wypróbować na początek.</translation>
 <translation id="1969011864782743497"><ph name="DEVICE_NAME" /> (USB)</translation>
 <translation id="1972950159383891558">Cześć <ph name="USERNAME" />,</translation>
 <translation id="1978498689038657292">Wprowadzanie tekstu</translation>
+<translation id="1980808257969311265">Dołącz do: <ph name="EVENT_SUMMARY" /></translation>
 <translation id="1982717156487272186">Pokaż poprzedni tydzień</translation>
 <translation id="1989113344093894667">Nie można przechwytywać treści</translation>
 <translation id="1990046457226896323">Pliki z mową zostały pobrane</translation>
@@ -573,6 +575,7 @@ Oto kilka rzeczy, które możesz wypróbować na początek.</translation>
 <translation id="3659814201068740063">Pozostało około <ph name="TIME_LEFT" /> (<ph name="PERCENTAGE" />%).
 Podłącz urządzenie do zasilania.</translation>
 <translation id="366222428570480733">Użytkownik zarządzany <ph name="USER_EMAIL_ADDRESS" /></translation>
+<translation id="3666266999138159418">Przesuń, aby ukryć pływające okno</translation>
 <translation id="367531336287639526">Wybierz pierwszą ikonę na lewo od paska adresu</translation>
 <translation id="3679827876008292680">Przejdź do ostatniej karty w oknie</translation>
 <translation id="36813544980941320">Twój telefon i <ph name="DEVICE_NAME" /> będą wspólnie korzystać z sieci Wi-Fi</translation>
@@ -621,7 +624,6 @@ Podłącz urządzenie do zasilania.</translation>
 <translation id="3925540965556789199"><ph name="DATE" />, ładuję wydarzenia.</translation>
 <translation id="3932043219784172185">Brak podłączonych urządzeń</translation>
 <translation id="3934456833412894880">Włączono ładowanie adaptacyjne. Bateria będzie się ładować do 80%, co pozwoli wydłużyć jej żywotność. Jeśli będziesz tego potrzebować, będzie mogła naładować się do pełna.</translation>
-<translation id="3936620957945677513">Naciśnij Enter, aby dołączyć do wydarzenia <ph name="EVENT_SUMMARY" /></translation>
 <translation id="3943857333388298514">Wklej</translation>
 <translation id="394485226368336402">Ustawienia dźwięku</translation>
 <translation id="3945319193631853098">Kliknij, aby dokończyć konfigurację</translation>
@@ -1251,6 +1253,7 @@ Podłącz urządzenie do zasilania.</translation>
 <translation id="685782768769951078">{NUM_DIGITS,plural, =1{Pozostała 1 cyfra}few{Pozostały # cyfry}many{Pozostało # cyfr}other{Pozostało # cyfry}}</translation>
 <translation id="6867938213751067702">Pobieranie wstrzymane: <ph name="FILENAME" /></translation>
 <translation id="6878400149835617132">Skrót wyłączony</translation>
+<translation id="6878701771800702153">{NUM_APPS,plural, =1{1 aplikacja}few{# aplikacje}many{# aplikacji}other{# aplikacji}}</translation>
 <translation id="6884665277231944629">Wróć do dzisiaj</translation>
 <translation id="6886172995547742638">Twoje urządzenie <ph name="DEVICE_TYPE" /> może mieć gorszą wydajność. Używaj certyfikowanego zasilacza USB-C o mocy co najmniej <ph name="PREFERRED_MINIMUM_POWER" /> W.</translation>
 <translation id="688631446150864480">Aby przełączać okna, naciskaj klawisz strzałki w dół</translation>
@@ -1418,6 +1421,7 @@ Aby wyłączyć urządzenie, ponownie naciśnij i przytrzymaj na nim przycisk z
 <translation id="7689817529363080918">Zezwala to na dostęp do mikrofonu w przypadku aplikacji <ph name="APP1_NAME" />, <ph name="APP2_NAME" /> oraz wszystkich aplikacji i stron internetowych, które mają uprawnienia do korzystania z niego</translation>
 <translation id="7704000866383261579">Ponów ostatnią czynność</translation>
 <translation id="7705524343798198388">VPN</translation>
+<translation id="770741401784017797">Tworzę GIF-a</translation>
 <translation id="7714767791242455379">Dodaj nową sieć komórkową</translation>
 <translation id="7720400844887872976">Włączone do <ph name="TIME" /></translation>
 <translation id="7720410380936703141">SPRÓBUJ PONOWNIE</translation>
@@ -1430,6 +1434,7 @@ Aby wyłączyć urządzenie, ponownie naciśnij i przytrzymaj na nim przycisk z
 <translation id="7749443890790263709">Osiągnięto maksymalną liczbę biurek.</translation>
 <translation id="776344839111254542">Kliknij, by wyświetlić szczegóły aktualizacji</translation>
 <translation id="7768784765476638775">Przeczytaj na głos</translation>
+<translation id="7769299611924763557">Twój GIF będzie wkrótce gotowy</translation>
 <translation id="7780094051999721182">skróty</translation>
 <translation id="7780159184141939021">Obróć ekran</translation>
 <translation id="7796735576426975947">Nowe powiadomienie zostało ukryte</translation>

@@ -220,6 +220,7 @@
 <translation id="1969011864782743497"><ph name="DEVICE_NAME" /> (USB)</translation>
 <translation id="1972950159383891558">Здраво, <ph name="USERNAME" /></translation>
 <translation id="1978498689038657292">Унос текста</translation>
+<translation id="1980808257969311265">Придружи се догађају <ph name="EVENT_SUMMARY" /></translation>
 <translation id="1982717156487272186">Прикажите претходну недељу</translation>
 <translation id="1989113344093894667">Снимање садржаја није успело</translation>
 <translation id="1990046457226896323">Преузети су фајлови говора</translation>
@@ -574,6 +575,7 @@
 <translation id="3659814201068740063">Преостало је око <ph name="TIME_LEFT" /> (<ph name="PERCENTAGE" />%).
 Прикључите уређај на напајање.</translation>
 <translation id="366222428570480733"><ph name="USER_EMAIL_ADDRESS" /> Корисник којим се управља</translation>
+<translation id="3666266999138159418">Превуците да бисте сакрили плутајући прозор</translation>
 <translation id="367531336287639526">Изаберите прву икону са леве стране траке за адресу</translation>
 <translation id="3679827876008292680">Иди на последњу картицу у прозору</translation>
 <translation id="36813544980941320">WiFi мреже ће се делити између вашег телефона и уређаја <ph name="DEVICE_NAME" /></translation>
@@ -622,7 +624,6 @@
 <translation id="3925540965556789199"><ph name="DATE" />, догађаји се учитавају.</translation>
 <translation id="3932043219784172185">Нема повезаних уређаја</translation>
 <translation id="3934456833412894880">Прилагодљиво пуњење је укључено. Батерија ће остати на 80% да продужи трајање батерије, а напуниће се до краја када вам треба.</translation>
-<translation id="3936620957945677513">Притисните Enter да бисте ушли на догађај <ph name="EVENT_SUMMARY" /></translation>
 <translation id="3943857333388298514">Налепи</translation>
 <translation id="394485226368336402">Подешавања звука</translation>
 <translation id="3945319193631853098">Додирните да бисте довршили подешавање</translation>
@@ -1254,6 +1255,7 @@
 <translation id="685782768769951078">{NUM_DIGITS,plural, =1{Преостала је једна цифра}one{Преостала је # цифра}few{Преостале су # цифре}other{Преостало је # цифара}}</translation>
 <translation id="6867938213751067702">Преузимање је паузирано <ph name="FILENAME" /></translation>
 <translation id="6878400149835617132">Пречица је искључена</translation>
+<translation id="6878701771800702153">{NUM_APPS,plural, =1{1 апликација}one{# апликација}few{# апликације}other{# апликација}}</translation>
 <translation id="6884665277231944629">Вратите се на данас</translation>
 <translation id="6886172995547742638">То може негативно да утиче на рад уређаја <ph name="DEVICE_TYPE" />. Користите сертификовани USB-C адаптер од <ph name="PREFERRED_MINIMUM_POWER" /> W или јачи.</translation>
 <translation id="688631446150864480">Притискајте тастер са стрелицом надоле да бисте мењали прозоре</translation>
@@ -1421,6 +1423,7 @@
 <translation id="7689817529363080918">Ово дозвољава приступ микрофону за апликације <ph name="APP1_NAME" />, <ph name="APP2_NAME" /> и све апликације и веб-сајтове са дозволом за микрофон</translation>
 <translation id="7704000866383261579">Понови последњу радњу</translation>
 <translation id="7705524343798198388">VPN</translation>
+<translation id="770741401784017797">Прави се GIF</translation>
 <translation id="7714767791242455379">Додајте нову мобилну мрежу</translation>
 <translation id="7720400844887872976">Укључено до <ph name="TIME" /></translation>
 <translation id="7720410380936703141">ПРОБАЈ ПОНОВО</translation>
@@ -1433,6 +1436,7 @@
 <translation id="7749443890790263709">Достигли сте максималан број радних површина.</translation>
 <translation id="776344839111254542">Кликните за приказ детаља ажурирања</translation>
 <translation id="7768784765476638775">Изаберите за говор</translation>
+<translation id="7769299611924763557">GIF ће ускоро бити спреман</translation>
 <translation id="7780094051999721182">пречице</translation>
 <translation id="7780159184141939021">Ротирајте екран</translation>
 <translation id="7796735576426975947">Ново обавештење је скривено</translation>

@@ -3,36 +3,52 @@
 <div
     class="settings-box two-line first"
     deep-link-focus-id$="[[Setting.kGoogleDriveConnection]]">
-  <div class="start">
-    <!-- TODO(b/273399125): email associated with current drive account -->
-    $i18n{googleDriveSignedInAs}
-  </div>
-  <cr-button role="button">
-    $i18n{googleDriveDisconnectLabel}
-  </cr-button>
-</div>
-
-<div class="hr"></div>
-
-<settings-toggle-button
-    id="disconnectGoogleDriveAccount"
-    pref="{{prefs.gdata.disabled}}"
-    label="$i18n{googleDriveOfflineTitle}"
-    sub-label="$i18n{googleDriveOfflineSubtitle}"
-    deep-link-focus-id$="[[Setting.kGoogleDriveConnection]]">
-</settings-toggle-button>
-
-<div class="settings-box two-line">
-  <div class="start">
-    $i18n{googleDriveOfflineClearTitle}
-    <div class="secondary">
-      <!-- TODO(b/273399125): storage being used by offline files -->
-      $i18n{googleDriveOfflineClearSubtitle}
+  <template is="dom-if" if="[[driveDisabled_]]" restamp>
+    <div class="start">
+      $i18nRaw{googleDriveDisconnectedFrom}
     </div>
-  </div>
-  <cr-button role="button">
-    $i18n{googleDriveOfflineClearAction}
-  </cr-button>
+  </template>
+  <template is="dom-if" if="[[!driveDisabled_]]" restamp>
+    <div class="start">
+      $i18nRaw{googleDriveSignedInAs}
+    </div>
+  </template>
+  <controlled-button id="driveConnectDisconnect"
+      on-click="onConnectDisconnectTap_"
+      pref="{{prefs.gdata.disabled}}"
+      label="[[getConnectDisconnectButtonLabel_(driveDisabled_)]]"
+      deep-link-focus-id$="[[Setting.kGoogleDriveConnection]]">
+  </controlled-button>
+  <template is="dom-if" if="[[showDisconnectDriveConfirmationDialog_]]" restamp>
+    <settings-disconnect-drive-confirmation-dialog
+        id="drive-disconnect-dialog"
+        on-close="onDriveDisconnectConfirmationDialogClose_">
+    </settings-disconnect-drive-confirmation-dialog>
+  </template>
 </div>
 
 <div class="hr"></div>
+
+<template is="dom-if" if="[[!driveDisabled_]]" restamp>
+  <settings-toggle-button
+      id="driveBulkPinning"
+      pref="{{prefs.drivefs.bulk_pinning_enabled}}"
+      label="$i18n{googleDriveOfflineTitle}"
+      sub-label="$i18n{googleDriveOfflineSubtitle}">
+  </settings-toggle-button>
+
+  <div class="settings-box two-line">
+    <div class="start">
+      $i18n{googleDriveOfflineClearTitle}
+      <div class="secondary">
+        <!-- TODO(b/273399125): storage being used by offline files -->
+        $i18n{googleDriveOfflineClearSubtitle}
+      </div>
+    </div>
+    <cr-button role="button">
+      $i18n{googleDriveOfflineClearAction}
+    </cr-button>
+  </div>
+
+  <div class="hr"></div>
+</template>

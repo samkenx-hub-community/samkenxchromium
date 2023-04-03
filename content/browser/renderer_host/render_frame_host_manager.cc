@@ -326,7 +326,7 @@ void ReuseDefaultProcessFromDifferentBrowsingInstanceIfPossible(
         if (RenderProcessHost* default_process =
                 rfhi->GetSiteInstance()
                     ->GetDefaultProcessForBrowsingInstance()) {
-          site_instance->ReuseCurrentProcessIfPossible(default_process);
+          site_instance->ReuseExistingProcessIfPossible(default_process);
           if (site_instance->HasProcess())
             return RenderFrameHost::FrameIterationAction::kStop;
         }
@@ -1095,13 +1095,14 @@ void RenderFrameHostManager::RestorePage(
   // in the long run. For now, and to avoid complex edge cases, we simply reuse
   // it to preserve the understood logic in CommitPending.
 
-  // When navigation queueing is disabled, there should be no speculative RFH at
-  // this point. With BackForwardCache, it should have never been created, and
-  // with prerender activation, it should have been cleared out earlier.
-  // TODO(https://crbug.com/1220337): Ensure we aren't deleting a pending commit
-  // RFH.
-  DCHECK(ShouldAvoidRedundantNavigationCancellations() ||
-         !speculative_render_frame_host_);
+  // There should be no speculative RFH at this point. With BackForwardCache, it
+  // should have never been created, and with prerender activation, it should
+  // have been cleared out earlier. If a speculative RenderFrameHost used for
+  // another NavigationRequest existed, then it must be a pending commit RFH,
+  // which would delay the activation navigation from getting here (see also
+  // ConcurrentNavigationsCommitDeferringCondition) until the pending commit
+  // RFH finished the commit and becomes the current RenderFrameHost.
+  DCHECK(!speculative_render_frame_host_);
   SCOPED_CRASH_KEY_BOOL("Bug1407526", "spec_rfh_exists",
                         !!speculative_render_frame_host_);
   speculative_render_frame_host_ = stored_page->TakeRenderFrameHost();
@@ -1308,10 +1309,8 @@ RenderFrameHostManager::GetFrameHostForNavigation(
     // navigation race should be fairly rare, so for navigation queueing, do the
     // simple thing and give up trying to assign a RenderFrameHost for the
     // navigation.
-    if (speculative_render_frame_host_ &&
-        speculative_render_frame_host_
-            ->HasPendingCommitForCrossDocumentNavigation() &&
-        ShouldQueueNavigationsWhenPendingCommitRFHExists()) {
+    if (ShouldQueueNavigationsWhenPendingCommitRFHExists() &&
+        request->ShouldQueueDueToExistingPendingCommitRFH()) {
       return base::unexpected(
           GetFrameHostForNavigationFailed::kBlockedByPendingCommit);
     }
@@ -1395,9 +1394,7 @@ RenderFrameHostManager::GetFrameHostForNavigation(
       // order for the browser and the renderer state to remain in sync. See
       // https://crbug.com/838348.
       if (ShouldQueueNavigationsWhenPendingCommitRFHExists() &&
-          speculative_render_frame_host_ &&
-          speculative_render_frame_host_
-              ->HasPendingCommitForCrossDocumentNavigation()) {
+          request->ShouldQueueDueToExistingPendingCommitRFH()) {
         return base::unexpected(
             GetFrameHostForNavigationFailed::kBlockedByPendingCommit);
       }
@@ -2216,15 +2213,6 @@ RenderFrameHostManager::GetSiteInstanceForNavigation(
 
   SiteInstanceImpl* current_instance = render_frame_host_->GetSiteInstance();
 
-  // Do not currently swap processes for navigations in webview tag guests,
-  // unless site isolation is enabled for them.
-  if (current_instance->IsGuest() &&
-      !SiteIsolationPolicy::IsSiteIsolationForGuestsEnabled()) {
-    AppendReason(reason,
-                 "GetSiteInstanceForNavigation => current_instance (IsGuest)");
-    return current_instance;
-  }
-
   // Determine if we need a new BrowsingInstance for this entry.  If true, this
   // implies that it will get a new SiteInstance (and likely process), and that
   // other tabs in the current BrowsingInstance will be unable to script it.
@@ -2352,7 +2340,7 @@ RenderFrameHostManager::GetSiteInstanceForNavigation(
   // Note: process reuse might not be possible in some cases, e.g. for
   // cross-site navigations when the current SiteInstance needs a dedicated
   // process.  This will be enforced by the checks inside
-  // ReuseCurrentProcessIfPossible().
+  // ReuseExistingProcessIfPossible().
   RenderProcessHost* process_to_reuse = nullptr;
 
   // Process-reuse cases include:
@@ -2432,7 +2420,7 @@ RenderFrameHostManager::GetSiteInstanceForNavigation(
 
   if (process_to_reuse) {
     DCHECK(frame_tree_node_->IsMainFrame());
-    new_instance->ReuseCurrentProcessIfPossible(process_to_reuse);
+    new_instance->ReuseExistingProcessIfPossible(process_to_reuse);
   }
 
   // We want fenced frame BrowsingInstances to share the same default
@@ -2936,11 +2924,9 @@ scoped_refptr<SiteInstanceImpl> RenderFrameHostManager::ConvertToSiteInstance(
 
   // If the current SiteInstance is for a guest, the new unrelated
   // SiteInstance must also be for a guest and must stay in the same
-  // StoragePartition.  Note that we should only attempt BrowsingInstance
-  // swaps in guests when site isolation for guests is enabled.
+  // StoragePartition.
   UrlInfo dest_url_info = descriptor.dest_url_info;
   if (current_instance->IsGuest()) {
-    DCHECK(SiteIsolationPolicy::IsSiteIsolationForGuestsEnabled());
     dest_url_info.storage_partition_config =
         current_instance->GetSiteInfo().storage_partition_config();
   }
@@ -4039,28 +4025,37 @@ void RenderFrameHostManager::CommitPending(
   // For all main frames, the RenderWidgetHost will not be destroyed when the
   // local frame is detached. https://crbug.com/419087
   //
-  // The RenderWidget in the renderer process is destroyed, but the
-  // RenderWidgetHost and RenderWidgetHostView are still kept alive for a remote
-  // main frame.
+  // The blink::WidgetBase in the renderer process has its lifetime connected to
+  // a RenderWdigetHost, which is owned by a RenderFrameHost. While the host is
+  // eligible for BFCache it will remain alive. The eligibility is decided in
+  // UnloadOldFrame. If not eligible then the host will be added to
+  // `pending_delete_host_` to be destroyed.
   //
-  // To work around that, we hide it here. Truly this is to hit all the hide
-  // paths in the browser side, but has a side effect of also hiding the
-  // renderer side RenderWidget, even though it will get frozen anyway in the
-  // future. However freezing doesn't do all the things hiding does at this time
-  // so that's probably good.
+  // The blink::WebFrameWidget is destroyed when the blink::WebLocalFrame goes
+  // away.
+  //
+  // The RenderWidgetHost and RenderWidgetHostView are still kept alive, paired
+  // to the blink::WidgetBase and blink::FrameWidget.
+  //
+  // We hide the browser side here, which will have side-effects from notifying
+  // listeners. This will also have the side effect of hiding the
+  // blink::WidgetBase, which is desired so that frame production stops, and we
+  // can reclaim memory when we eventually evict it.
   //
   // Note the RenderWidgetHostView can be missing if the process for the old
   // RenderFrameHost crashed.
   //
-  // TODO(crbug.com/419087): This is only done for the main frame, as for sub
-  // frames the RenderWidgetHost and its view will be destroyed when the frame
-  // is detached, but for the main frame it is not. This call to Hide() can go
-  // away when the main frame's RenderWidgetHost is destroyed on frame detach.
-  // Note that calling this on a subframe that is not a local root would be
-  // incorrect as it would hide an ancestor local root's RenderWidget when that
-  // frame is not necessarily navigating. Removing this Hide() has previously
-  // been attempted without success in r426913 (https://crbug.com/658688) and
-  // r438516 (broke assumptions about RenderWidgetHosts not changing
+  // We also hide all subframes that are a local root. As while in BFCache they
+  // are not detached nor destroyed. This prevents them from continuing frame
+  // production, and allows for memory to be reclaimed when they are evicted.
+  //
+  // TODO(crbug.com/419087): This call to Hide() can go away when the main
+  // frame's RenderWidgetHost is destroyed on frame detach. Note that calling
+  // this on a subframe that is not a local root would be incorrect as it would
+  // hide an ancestor local root's RenderWidget when that frame is not
+  // necessarily navigating. Removing this Hide() has previously been attempted
+  // without success in r426913 (https://crbug.com/658688) and r438516
+  // (broke assumptions about RenderWidgetHosts not changing
   // RenderWidgetHostViews over time).
   //
   // |old_rvh| and |new_rvh| can be the same when navigating same-site from a
@@ -4074,7 +4069,18 @@ void RenderFrameHostManager::CommitPending(
     // did hide the Page then making a new RenderFrameHost on another call to
     // here would need to make sure it showed the `blink::WebView` when the
     // RenderWidget was created as visible.
+    //
+    // TODO(crbug.com/1429008): In addition to the RenderWidgetHostView
+    // visibility there is also the concept of PageVisibilityState. The
+    // PageLifecycleStateManager will have the RenderViewHostImpl notify the
+    // blink::Page of changes to the PageVisibilityState. This currently does
+    // not affect the visibility of the blink::WidgetBase. We should unify these
+    // two visibility states to prevent them from drifting.
     old_view->Hide();
+    if (base::FeatureList::IsEnabled(kNavigationUpdatesChildViewsVisibility) &&
+        old_render_frame_host->child_count()) {
+      old_render_frame_host->SetVisibilityForChildViews(false);
+    }
   }
 
   RenderWidgetHostView* new_view = render_frame_host_->GetView();
@@ -4096,9 +4102,7 @@ void RenderFrameHostManager::CommitPending(
       // it would end up trying to focus the root view. Instead, we need to
       // focus the new main frame's RenderWidgetHost, which would set the new
       // widget as focused and also propagate page-level focus to the
-      // corresponding renderer process. Note that for <webview> guests, this
-      // case is only reached when cross-process navigations are possible,
-      // which requires features::kSiteIsolationForGuests.
+      // corresponding renderer process.
       if (frame_tree_node_->GetParentOrOuterDocumentOrEmbedder()) {
         render_frame_host_->GetRenderWidgetHost()->Focus();
       } else {
@@ -4270,8 +4274,14 @@ void RenderFrameHostManager::CommitPending(
   if (render_frame_host_->is_local_root()) {
     // RenderFrames are created with a hidden RenderWidgetHost. When navigation
     // finishes, we show it if the delegate is shown.
-    if (!frame_tree_node_->frame_tree().IsHidden())
+    if (!frame_tree_node_->frame_tree().IsHidden()) {
       new_view->Show();
+      if (base::FeatureList::IsEnabled(
+              kNavigationUpdatesChildViewsVisibility) &&
+          render_frame_host_->child_count()) {
+        render_frame_host_->SetVisibilityForChildViews(true);
+      }
+    }
   }
 
   // The process will no longer try to exit, so we can decrement the count.
@@ -4532,7 +4542,7 @@ void RenderFrameHostManager::ExecutePageBroadcastMethod(
 
 void RenderFrameHostManager::ExecuteRemoteFramesBroadcastMethod(
     RemoteFramesBroadcastMethodCallback callback,
-    SiteInstanceImpl* instance_to_skip) {
+    SiteInstanceGroup* group_to_skip) {
   DCHECK(!frame_tree_node_->parent());
 
   // When calling a ExecuteRemoteFramesBroadcastMethod() for an inner
@@ -4541,7 +4551,7 @@ void RenderFrameHostManager::ExecuteRemoteFramesBroadcastMethod(
   RenderFrameProxyHost* outer_delegate_proxy =
       IsMainFrameForInnerDelegate() ? GetProxyToOuterDelegate() : nullptr;
   render_frame_host_->browsing_context_state()
-      ->ExecuteRemoteFramesBroadcastMethod(callback, instance_to_skip,
+      ->ExecuteRemoteFramesBroadcastMethod(callback, group_to_skip,
                                            outer_delegate_proxy);
 }
 

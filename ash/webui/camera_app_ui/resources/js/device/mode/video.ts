@@ -10,7 +10,6 @@ import {
 import * as dom from '../../dom.js';
 import {reportError} from '../../error.js';
 import * as expert from '../../expert.js';
-import {Flag} from '../../flag.js';
 import * as h264 from '../../h264.js';
 import {I18nString} from '../../i18n_string.js';
 import {LowStorageActionType, sendLowStorageEvent} from '../../metrics.js';
@@ -42,6 +41,7 @@ import {
   Resolution,
   VideoType,
 } from '../../type.js';
+import {getFpsRangeFromConstraints} from '../../util.js';
 import {WaitableEvent} from '../../waitable_event.js';
 import {StreamConstraints} from '../stream_constraints.js';
 import {StreamManager} from '../stream_manager.js';
@@ -87,12 +87,6 @@ const GRAB_GIF_FRAME_RATIO = 2;
  * Initial speed for time-lapse recording.
  */
 const TIME_LAPSE_INITIAL_SPEED = 5;
-
-/**
- * Number of maximum frames recorded in a specific speed time-lapse video. If
- * the current number of frames exceeds, the speed must be increasd.
- */
-const TIME_LAPSE_MAX_FRAMES = 5 * 30;
 
 
 /**
@@ -283,6 +277,7 @@ export class Video extends ModeBase {
       private readonly snapshotResolution: Resolution|null,
       facing: Facing,
       private readonly handler: VideoHandler,
+      private readonly frameRate: number,
   ) {
     super(video, facing);
 
@@ -387,11 +382,6 @@ export class Video extends ModeBase {
    * start/resume the recording.
    */
   private async startMonitorStorage(): Promise<boolean> {
-    // If the monitoring is not enabled, skip setting callback and return true
-    // to always allow users to start/resume recording.
-    if (!loadTimeData.getChromeFlag(Flag.LOW_STORAGE_WARNING)) {
-      return true;
-    }
     const onChange = (newState: StorageMonitorStatus) => {
       if (newState === StorageMonitorStatus.NORMAL) {
         this.toggleLowStorageWarning(false);
@@ -610,7 +600,7 @@ export class Video extends ModeBase {
       return [this.handler.onTimeLapseCaptureDone({
         duration: this.recordTime.inMilliseconds(),
         resolution: this.captureResolution,
-        speed: timeLapseSaver.getSpeed(),
+        speed: timeLapseSaver.speed,
         timeLapseSaver,
       })];
     } else {
@@ -660,9 +650,7 @@ export class Video extends ModeBase {
 
   override stop(): void {
     this.stopped = true;
-    if (loadTimeData.getChromeFlag(Flag.LOW_STORAGE_WARNING)) {
-      ChromeHelper.getInstance().stopMonitorStorage();
-    }
+    ChromeHelper.getInstance().stopMonitorStorage();
     this.toggleLowStorageWarning(false);
     if (!state.get(state.State.RECORDING)) {
       return;
@@ -743,18 +731,12 @@ export class Video extends ModeBase {
   private async captureTimeLapse(param: h264.EncoderParameters):
       Promise<TimeLapseSaver> {
     const encoderConfig = getVideoEncoderConfig(param, this.captureResolution);
-    const saver = await TimeLapseSaver.create(
-        encoderConfig, this.captureResolution, TIME_LAPSE_INITIAL_SPEED);
     const video = this.video.video;
 
-    // Handles time-lapse speed adjustment.
-    let speed = TIME_LAPSE_INITIAL_SPEED;
-    let speedCheckpoint = speed * TIME_LAPSE_MAX_FRAMES;
-    function updateSpeed() {
-      speed = speed * 2;
-      speedCheckpoint = speed * TIME_LAPSE_MAX_FRAMES;
-      saver.updateSpeed(speed);
-    }
+    // Creates a saver given the initial speed.
+    const saver = await TimeLapseSaver.create(
+        encoderConfig, this.captureResolution, this.frameRate,
+        TIME_LAPSE_INITIAL_SPEED);
 
     // Creates a frame reader from track processor.
     const track = this.getVideoTrack() as MediaStreamVideoTrack;
@@ -772,7 +754,7 @@ export class Video extends ModeBase {
           resolve(writtenFrameCount);
           return;
         }
-        if (frameCount % speed === 0) {
+        if (frameCount % saver.speed === 0) {
           try {
             const {done, value: frame} = await reader.read();
             if (done) {
@@ -782,9 +764,6 @@ export class Video extends ModeBase {
             saver.write(frame, frameCount);
             writtenFrameCount++;
             frame.close();
-            if (frameCount >= speedCheckpoint) {
-              updateSpeed();
-            }
           } catch (e) {
             reject(e);
           }
@@ -901,8 +880,10 @@ export class VideoFactory extends ModeFactory {
     }
     assert(this.previewVideo !== null);
     assert(this.facing !== null);
+    const frameRate =
+        getFpsRangeFromConstraints(this.constraints.video.frameRate).minFps;
     return new Video(
         this.previewVideo, captureConstraints, this.captureResolution,
-        this.snapshotResolution, this.facing, this.handler);
+        this.snapshotResolution, this.facing, this.handler, frameRate);
   }
 }

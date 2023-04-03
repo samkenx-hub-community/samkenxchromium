@@ -4,8 +4,8 @@
 
 // This file contains business logic for power bookmarks side panel content.
 
-import {ImageServiceBrowserProxy} from '//resources/cr_components/image_service/browser_proxy.js';
-import {ClientId as ImageServiceClientId} from '//resources/cr_components/image_service/image_service.mojom-webui.js';
+import {PageImageServiceBrowserProxy} from '//resources/cr_components/page_image_service/browser_proxy.js';
+import {ClientId as PageImageServiceClientId} from '//resources/cr_components/page_image_service/page_image_service.mojom-webui.js';
 import {loadTimeData} from '//resources/js/load_time_data.js';
 import {PluralStringProxyImpl} from '//resources/js/plural_string_proxy.js';
 import {Url} from '//resources/mojo/url/mojom/url.mojom-webui.js';
@@ -54,6 +54,18 @@ export function editingDisabledByPolicy(
     }
   }
   return false;
+}
+
+// Return an array that includes folder and all its descendants.
+export function getFolderDescendants(folder: chrome.bookmarks.BookmarkTreeNode):
+    chrome.bookmarks.BookmarkTreeNode[] {
+  let expanded: chrome.bookmarks.BookmarkTreeNode[] = [folder];
+  if (folder.children) {
+    folder.children.forEach((child: chrome.bookmarks.BookmarkTreeNode) => {
+      expanded = expanded.concat(getFolderDescendants(child));
+    });
+  }
+  return expanded;
 }
 
 export class PowerBookmarksService {
@@ -414,26 +426,15 @@ export class PowerBookmarksService {
 
     // Fetch the representative image for this page, if possible.
     const {result} =
-        await ImageServiceBrowserProxy.getInstance().handler.getPageImageUrl(
-            ImageServiceClientId.Bookmarks, url,
-            {suggestImages: true, optimizationGuideImages: true});
+        await PageImageServiceBrowserProxy.getInstance()
+            .handler.getPageImageUrl(
+                PageImageServiceClientId.Bookmarks, url,
+                {suggestImages: true, optimizationGuideImages: true});
     if (result) {
       return result.imageUrl.url;
     }
 
     return emptyUrl;
-  }
-
-  // Return an array that includes folder and all its descendants.
-  private expandFolder_(folder: chrome.bookmarks.BookmarkTreeNode):
-      chrome.bookmarks.BookmarkTreeNode[] {
-    let expanded: chrome.bookmarks.BookmarkTreeNode[] = [folder];
-    if (folder.children) {
-      folder.children.forEach((child: chrome.bookmarks.BookmarkTreeNode) => {
-        expanded = expanded.concat(this.expandFolder_(child));
-      });
-    }
-    return expanded;
   }
 
   private applySearchQueryAndLabels_(
@@ -443,7 +444,7 @@ export class PowerBookmarksService {
     // Search space should include all descendants of the shown bookmarks, in
     // addition to the shown bookmarks themselves.
     shownBookmarks.forEach((bookmark: chrome.bookmarks.BookmarkTreeNode) => {
-      searchSpace = searchSpace.concat(this.expandFolder_(bookmark));
+      searchSpace = searchSpace.concat(getFolderDescendants(bookmark));
     });
     return searchSpace.filter(
         (bookmark: chrome.bookmarks.BookmarkTreeNode) =>

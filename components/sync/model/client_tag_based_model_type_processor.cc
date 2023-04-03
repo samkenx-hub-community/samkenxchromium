@@ -109,20 +109,20 @@ void ClientTagBasedModelTypeProcessor::ModelReadyToSync(
     batch->SetModelTypeState(model_type_state);
   }
 
-  if (CheckForInvalidPersistedMetadata(*batch)) {
+  if (ClearPersistedMetadataIfInvalid(*batch)) {
+    DLOG(ERROR) << "The persisted metadata was invalid and was cleared for "
+                << ModelTypeToDebugString(type_) << ". Start over fresh.";
+  } else {
     if (IsInitialSyncAtLeastPartiallyDone(
             model_type_state.initial_sync_state())) {
       entity_tracker_ = std::make_unique<ProcessorEntityTracker>(
           model_type_state, batch->TakeAllMetadata());
     } else {
       // If initial sync isn't done, there must be no entity metadata (if there
-      // was, CheckForInvalidPersistedMetadata() would've detected the
+      // was, ClearPersistedMetadataIfInvalid() would've detected the
       // inconsistency).
       DCHECK(batch->GetAllMetadata().empty());
     }
-  } else {
-    DLOG(ERROR) << "The persisted metadata was invalid and was cleared for "
-                << ModelTypeToDebugString(type_) << ". Start over fresh.";
   }
 
   DCHECK(model_ready_to_sync_);
@@ -149,7 +149,7 @@ void ClientTagBasedModelTypeProcessor::ConnectIfReady() {
   }
   DCHECK(!pending_clear_metadata_);
 
-  CheckForInvalidPersistedModelTypeState();
+  ClearPersistedMetadataIfInconsistentWithActivationRequest();
 
   auto activation_response = std::make_unique<DataTypeActivationResponse>();
   if (!entity_tracker_) {
@@ -332,8 +332,6 @@ void ClientTagBasedModelTypeProcessor::ReportErrorImpl(const ModelError& error,
     return;
   }
 
-  model_error_ = error;
-
   const std::string type_suffix = ModelTypeToHistogramSuffix(type_);
   base::UmaHistogramEnumeration(kErrorSiteHistogramPrefix + type_suffix, site);
 
@@ -345,6 +343,8 @@ void ClientTagBasedModelTypeProcessor::ReportErrorImpl(const ModelError& error,
   if (IsConnected()) {
     DisconnectSync();
   }
+
+  model_error_ = error;
 
   // Shouldn't connect anymore.
   start_callback_.Reset();
@@ -370,6 +370,8 @@ ClientTagBasedModelTypeProcessor::GetControllerDelegate() {
 void ClientTagBasedModelTypeProcessor::ConnectSync(
     std::unique_ptr<CommitQueue> worker) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  DCHECK(!model_error_);
+
   DVLOG(1) << "Successfully connected " << ModelTypeToDebugString(type_);
 
   worker_ = std::move(worker);
@@ -380,6 +382,7 @@ void ClientTagBasedModelTypeProcessor::ConnectSync(
 void ClientTagBasedModelTypeProcessor::DisconnectSync() {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   DCHECK(IsConnected());
+  DCHECK(!model_error_);
 
   DVLOG(1) << "Disconnecting sync for " << ModelTypeToDebugString(type_);
   weak_ptr_factory_for_worker_.InvalidateWeakPtrs();
@@ -611,13 +614,12 @@ void ClientTagBasedModelTypeProcessor::GetLocalChanges(
     GetLocalChangesCallback callback) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   DCHECK_GT(max_entries, 0U);
+  DCHECK(IsConnected());
+  DCHECK(!model_error_);
 
-  // If there is a model error, it must have been reported already but hasn't
-  // reached the sync engine yet. In this case return directly to avoid
-  // interactions with the bridge.
   // In some cases local changes may be requested before entity tracker is
   // loaded. Just invoke the callback with empty list.
-  if (model_error_ || !entity_tracker_) {
+  if (!entity_tracker_) {
     std::move(callback).Run(CommitRequestDataList());
     return;
   }
@@ -652,6 +654,7 @@ void ClientTagBasedModelTypeProcessor::OnCommitCompleted(
     const CommitResponseDataList& committed_response_list,
     const FailedCommitResponseDataList& error_response_list) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  DCHECK(IsConnected());
   DCHECK(!model_error_);
 
   DCHECK(entity_tracker_)
@@ -736,6 +739,8 @@ bool HasClearAllDirective(
 void ClientTagBasedModelTypeProcessor::OnCommitFailed(
     SyncCommitError commit_error) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  DCHECK(IsConnected());
+  DCHECK(!model_error_);
 
   switch (bridge_->OnCommitAttemptFailed(commit_error)) {
     case ModelTypeSyncBridge::CommitAttemptFailedBehavior::
@@ -758,6 +763,7 @@ void ClientTagBasedModelTypeProcessor::OnUpdateReceived(
     absl::optional<sync_pb::GarbageCollectionDirective> gc_directive) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   DCHECK(model_ready_to_sync_);
+  DCHECK(IsConnected());
   DCHECK(!model_error_);
   DCHECK(!model_type_state.progress_marker().has_gc_directive());
 
@@ -821,8 +827,9 @@ void ClientTagBasedModelTypeProcessor::OnUpdateReceived(
 void ClientTagBasedModelTypeProcessor::StorePendingInvalidations(
     std::vector<sync_pb::ModelTypeState::Invalidation> invalidations_to_store) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-  DCHECK(!model_error_);
   DCHECK(IsConnected());
+  DCHECK(!model_error_);
+
   std::unique_ptr<MetadataChangeList> metadata_changes =
       bridge_->CreateMetadataChangeList();
   sync_pb::ModelTypeState model_type_state =
@@ -1240,7 +1247,7 @@ void ClientTagBasedModelTypeProcessor::MergeDataWithMetadataForDebugging(
   std::move(callback).Run(type_, std::move(all_nodes));
 }
 
-bool ClientTagBasedModelTypeProcessor::CheckForInvalidPersistedMetadata(
+bool ClientTagBasedModelTypeProcessor::ClearPersistedMetadataIfInvalid(
     const MetadataBatch& metadata) {
   // The entity tracker must not have been created before the metadata was
   // validated.
@@ -1263,10 +1270,10 @@ bool ClientTagBasedModelTypeProcessor::CheckForInvalidPersistedMetadata(
       ClearAllProvidedMetadataAndResetState(metadata_map);
       // Not having `entity_tracker_` results in doing the initial sync again.
       CHECK(!entity_tracker_);
-      return false;
+      return true;
     }
     // Else: There was nothing to clear.
-    return true;
+    return false;
   }
 
   // Check that there's no entity metadata unless the initial sync is at least
@@ -1281,7 +1288,7 @@ bool ClientTagBasedModelTypeProcessor::CheckForInvalidPersistedMetadata(
     ClearAllProvidedMetadataAndResetState(metadata_map);
     // Not having `entity_tracker_` results in doing the initial sync again.
     CHECK(!entity_tracker_);
-    return false;
+    return true;
   }
 
   // Check that there are no duplicate client tags.
@@ -1298,14 +1305,14 @@ bool ClientTagBasedModelTypeProcessor::CheckForInvalidPersistedMetadata(
     ClearAllProvidedMetadataAndResetState(metadata_map);
     // Not having `entity_tracker_` results in doing the initial sync again.
     CHECK(!entity_tracker_);
-    return false;
+    return true;
   }
 
-  return true;
+  return false;
 }
 
 void ClientTagBasedModelTypeProcessor::
-    CheckForInvalidPersistedModelTypeState() {
+    ClearPersistedMetadataIfInconsistentWithActivationRequest() {
   if (!entity_tracker_) {
     return;
   }
@@ -1315,6 +1322,8 @@ void ClientTagBasedModelTypeProcessor::
   // Check for a mismatch in authenticated account id. The id can change after
   // restart (and this does not mean the account has changed, this is checked
   // later here by cache_guid mismatch). Easy to fix in place.
+  // TODO(crbug.com/1423326): This doesn't fit the method name. It's also not
+  // clear if this codepath is even required
   if (model_type_state.authenticated_account_id() !=
       activation_request_.authenticated_account_id.ToString()) {
     sync_pb::ModelTypeState update_model_type_state = model_type_state;

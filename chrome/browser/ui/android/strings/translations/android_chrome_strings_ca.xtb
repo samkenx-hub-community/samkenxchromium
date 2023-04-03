@@ -737,6 +737,7 @@ Per canviar aquesta opció, <ph name="BEGIN_LINK" />restableix la sincronitzaci�
 <translation id="5001388021414335527">Segueix aquest lloc web aquí</translation>
 <translation id="5004416275253351869">Controls d'activitat de Google</translation>
 <translation id="5005498671520578047">Copia la contrasenya</translation>
+<translation id="5010886807652684893">Visualització visual</translation>
 <translation id="5011311129201317034"><ph name="SITE" /> es vol connectar</translation>
 <translation id="5016205925109358554">Serif</translation>
 <translation id="5017529052065664584">Últims 15 minuts</translation>
@@ -794,6 +795,7 @@ Per canviar aquesta opció, <ph name="BEGIN_LINK" />restableix la sincronitzaci�
 <translation id="5342314432463739672">Sol·licituds de permís</translation>
 <translation id="53537532693258630">Els llocs web que hagis suprimit es mostraran aquí</translation>
 <translation id="5355191726083956201">La protecció millorada està activada</translation>
+<translation id="5361107212971249203">el text</translation>
 <translation id="5368227114232678694">Per navegar de manera privada en aquest dispositiu, prova el mode d'incògnit</translation>
 <translation id="5375577065097716013">Cerca la imatge amb Lens <ph name="BEGIN_NEW" />Novetat<ph name="END_NEW" /></translation>
 <translation id="5401851137404501592">Per continuar, <ph name="IDENTITY_PROVIDER_ETLD_PLUS_ONE" /> compartirà el teu nom, la teva adreça electrònica i la teva foto de perfil amb aquest lloc web.</translation>
@@ -1191,6 +1193,7 @@ Per exemple, és possible que alguns llocs web responguin a aquesta sol·licitud
 <translation id="7454641608352164238">No hi ha prou espai</translation>
 <translation id="7455988709578031708">Segons el teu historial de navegació. Aquesta opció de configuració està activada.</translation>
 <translation id="7456774706094330779">Precàrrega ampliada</translation>
+<translation id="7466431077154602932">Visualització compacta</translation>
 <translation id="7474822150871987353">Obtén informació sobre temes dels llocs web sense sortir de la pàgina. Selecciona una o més paraules de la pàgina per cercar-les.</translation>
 <translation id="7475192538862203634">Si això passa sovint, prova aquests <ph name="BEGIN_LINK" />suggeriments<ph name="END_LINK" />.</translation>
 <translation id="7475688122056506577">La targeta SD no s'ha trobat. Pot ser que faltin alguns fitxers.</translation>
@@ -1320,6 +1323,7 @@ Per exemple, és possible que alguns llocs web responguin a aquesta sol·licitud
 <translation id="8058746566562539958">Obre en pestanya nova a Chrome</translation>
 <translation id="8062594758852531064">Precàrrega ampliada:</translation>
 <translation id="8063895661287329888">L'adreça d'interès no s'ha pogut afegir.</translation>
+<translation id="8066816452984416180">Afegeix ràpidament aquesta pàgina a les adreces d'interès. Per editar aquesta drecera, mantén-la premuda.</translation>
 <translation id="806745655614357130">Mantén les meves dades separades</translation>
 <translation id="8073388330009372546">Obre en una pestanya nova</translation>
 <translation id="8076492880354921740">Pestanyes</translation>
@@ -1351,6 +1355,7 @@ Per exemple, és possible que alguns llocs web responguin a aquesta sol·licitud
 <translation id="8216351761227087153">Mira</translation>
 <translation id="8218622182176210845">Gestiona el compte</translation>
 <translation id="8223642481677794647">Menú de la targeta del tauler</translation>
+<translation id="8236097722223016103">Afegeix a les adreces d'interès</translation>
 <translation id="8250920743982581267">Documents</translation>
 <translation id="8255617931166444521">Els llocs web només poden fer servir les teves galetes per veure la teva activitat de navegació només en aquests mateixos llocs web</translation>
 <translation id="8259179246279078674">Com que les pàgines precarregades estan encriptades, Google no obtindrà informació del contingut de la pàgina precarregada. Els servidors de Google sabran quins llocs web es precarreguen de manera privada. Aquesta informació només s'utilitza per precarregar les pàgines i no es vincula amb cap altra informació del teu Compte de Google.</translation>
@@ -1445,6 +1450,7 @@ Per exemple, és possible que alguns llocs web responguin a aquesta sol·licitud
 <translation id="869891660844655955">Data de caducitat</translation>
 <translation id="8699120352855309748">No proposis traduir aquests idiomes</translation>
 <translation id="8712637175834984815">Entesos</translation>
+<translation id="8723453889042591629">Tradueix ràpidament aquesta pàgina. Mantingues premuda aquesta drecera per editar-la.</translation>
 <translation id="8725066075913043281">Torna-ho a provar</translation>
 <translation id="8746155870861185046">Comparteix el text marcat</translation>
 <translation id="874726034427945498">Per veure millors suggeriments a la barra d'adreces, sincronitza les pestanyes i l'historial</translation>
@@ -1497,6 +1503,7 @@ Per exemple, és possible que alguns llocs web responguin a aquesta sol·licitud
 <translation id="8989968390305463310">El teu historial de navegació afecta els anuncis que veus i les estimacions d'interessos que es mostren més avall. Amb la finalitat de protegir la teva privadesa, Chrome suprimeix automàticament els interessos de manera contínua cada mes, i es poden actualitzar tret que els suprimeixis.</translation>
 <translation id="8993760627012879038">Obre una pestanya nova en mode d'incògnit</translation>
 <translation id="8996847606757455498">Tria un altre proveïdor</translation>
+<translation id="8998289560386111590">No disponible al teu dispositiu</translation>
 <translation id="8998729206196772491">Estàs iniciant la sessió amb un compte gestionat per <ph name="MANAGED_DOMAIN" /> i estàs donant a l'administrador el control de les teves dades de Chrome. Les dades passaran a estar vinculades a aquest compte permanentment. Si tanques la sessió de Chrome, se suprimiran les teves dades d'aquest dispositiu, però continuaran emmagatzemades al teu compte de Google.</translation>
 <translation id="9022774213089566801">Visitats amb freqüència</translation>
 <translation id="9022871169049522985">Els llocs web i els anunciants poden mesurar el rendiment dels seus anuncis</translation>

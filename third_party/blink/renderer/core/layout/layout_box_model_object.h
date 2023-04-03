@@ -133,16 +133,6 @@ class CORE_EXPORT LayoutBoxModelObject : public LayoutObject {
   // This is the only way layers should ever be destroyed.
   void DestroyLayer();
 
-  PhysicalOffset RelativePositionOffset() const;
-  LayoutSize RelativePositionLogicalOffset() const {
-    NOT_DESTROYED();
-    // TODO(layout-dev): This seems incorrect in flipped blocks writing mode,
-    // but seems for legacy layout only.
-    auto offset = RelativePositionOffset().ToLayoutSize();
-    return StyleRef().IsHorizontalWritingMode() ? offset
-                                                : offset.TransposedSize();
-  }
-
   // If needed, populates StickyPositionConstraints, setting the sticky box
   // rect, containing block rect and updating the constraint offsets according
   // to the available space, and returns true. Otherwise returns false.
@@ -160,8 +150,6 @@ class CORE_EXPORT LayoutBoxModelObject : public LayoutObject {
     GetMutableForPainting().FirstFragment().SetStickyConstraints(constraints);
   }
 
-  PhysicalOffset OffsetForInFlowPosition() const;
-
   // IE extensions. Used to calculate offsetWidth/Height. Overridden by inlines
   // (LayoutInline) to return the remaining width on a given line (and the
   // height of a single line).
@@ -178,8 +166,6 @@ class CORE_EXPORT LayoutBoxModelObject : public LayoutObject {
     NOT_DESTROYED();
     return RoundToInt(OffsetTop(parent));
   }
-  virtual int PixelSnappedOffsetWidth(const Element*) const;
-  virtual int PixelSnappedOffsetHeight(const Element*) const;
 
   bool HasSelfPaintingLayer() const;
   PaintLayer* Layer() const {
@@ -248,8 +234,6 @@ class CORE_EXPORT LayoutBoxModelObject : public LayoutObject {
   }
 
   // These functions are used during layout.
-  // - Table cells override them to include the intrinsic padding (see
-  //   explanations in LayoutTableCell).
   // - Table override them to exclude padding with collapsing borders.
   virtual LayoutUnit PaddingTop() const {
     NOT_DESTROYED();
@@ -535,6 +519,7 @@ class CORE_EXPORT LayoutBoxModelObject : public LayoutObject {
   // opaque background.
   virtual bool TextIsKnownToBeOnOpaqueBackground() const {
     NOT_DESTROYED();
+    DCHECK(!RuntimeEnabledFeatures::CompositeScrollAfterPaintEnabled());
     return false;
   }
 
@@ -548,16 +533,6 @@ class CORE_EXPORT LayoutBoxModelObject : public LayoutObject {
   // of the layout object of the document element.
   bool BackgroundTransfersToView(
       const ComputedStyle* document_element_style = nullptr) const;
-
-  // Same as AbsoluteQuads, but in the local border box coordinates of this
-  // object.
-  void LocalQuads(Vector<gfx::QuadF>& quads) const;
-
-  void AbsoluteQuads(Vector<gfx::QuadF>& quads,
-                     MapCoordinatesFlags mode = 0) const override;
-
-  // Returns the bounodiong box of all quads returned by LocalQuads.
-  gfx::RectF LocalBoundingBoxRectF() const;
 
   virtual LayoutUnit OverrideContainingBlockContentWidth() const {
     NOT_DESTROYED();
@@ -578,58 +553,25 @@ class CORE_EXPORT LayoutBoxModelObject : public LayoutObject {
     return false;
   }
 
-  // Returns the continuation associated with |this|.
-  // Returns nullptr if no continuation is associated with |this|.
-  //
-  // See the section about CONTINUATIONS AND ANONYMOUS LAYOUTBLOCKFLOWS in
-  // LayoutInline for more details about them.
-  //
-  // Our implementation uses a HashMap to store them to avoid paying the cost
-  // for each LayoutBoxModelObject (|continuationMap| in the cpp file).
-  // public only for NGOutOfFlowLayoutPart, otherwise protected.
-  LayoutBoxModelObject* Continuation() const;
-
   void RecalcVisualOverflow() override;
 
- protected:
-  // Compute absolute quads for |this|, but not any continuations. May only be
-  // called for objects which can be or have continuations, i.e. LayoutInline or
-  // LayoutBlockFlow.
-  virtual void AbsoluteQuadsForSelf(Vector<gfx::QuadF>& quads,
-                                    MapCoordinatesFlags mode = 0) const;
-  // Same as AbsoluteQuadsForSelf, but in the local border box coordinates.
-  virtual void LocalQuadsForSelf(Vector<gfx::QuadF>& quads) const;
+  void AddOutlineRectsForNormalChildren(Vector<PhysicalRect>&,
+                                        const PhysicalOffset& additional_offset,
+                                        NGOutlineType) const;
 
+ protected:
   void WillBeDestroyed() override;
 
   PhysicalOffset AdjustedPositionRelativeTo(const PhysicalOffset&,
                                             const Element*) const;
 
-  // Set the next link in the continuation chain.
-  //
-  // See continuation above for more details.
-  void SetContinuation(LayoutBoxModelObject*);
-
-  virtual PhysicalOffset AccumulateRelativePositionOffsets() const {
-    NOT_DESTROYED();
-    return PhysicalOffset();
-  }
-
   LayoutRect LocalCaretRectForEmptyElement(LayoutUnit width,
                                            LayoutUnit text_indent_offset) const;
 
-  enum RegisterPercentageDescendant {
-    kDontRegisterPercentageDescendant,
-    kRegisterPercentageDescendant,
-  };
-  bool HasAutoHeightOrContainingBlockWithAutoHeight(
-      RegisterPercentageDescendant = kRegisterPercentageDescendant) const;
+  bool HasAutoHeightOrContainingBlockWithAutoHeight() const;
   LayoutBlock* ContainingBlockForAutoHeightDetection(
       const Length& logical_height) const;
 
-  void AddOutlineRectsForNormalChildren(Vector<PhysicalRect>&,
-                                        const PhysicalOffset& additional_offset,
-                                        NGOutlineType) const;
   void AddOutlineRectsForDescendant(const LayoutObject& descendant,
                                     Vector<PhysicalRect>&,
                                     const PhysicalOffset& additional_offset,
@@ -689,10 +631,6 @@ class CORE_EXPORT LayoutBoxModelObject : public LayoutObject {
       const LayoutBox* box_to_split) const;
 
  private:
-  void QuadsInternal(Vector<gfx::QuadF>& quads,
-                     MapCoordinatesFlags mode,
-                     bool map_to_absolute) const;
-
   void CreateLayerAfterStyleChange();
 
   LayoutUnit ComputedCSSPadding(const Length&) const;

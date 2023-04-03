@@ -4,48 +4,23 @@
 
 #include "content/browser/attribution_reporting/attribution_utils.h"
 
+#include <vector>
+
 #include "base/check.h"
 #include "base/check_op.h"
 #include "base/containers/span.h"
 #include "base/json/json_writer.h"
-#include "base/metrics/field_trial_params.h"
 #include "base/time/time.h"
 #include "base/values.h"
-#include "components/attribution_reporting/source_type.mojom.h"
-#include "content/browser/attribution_reporting/common_source_info.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
-#include "third_party/blink/public/common/features.h"
 
 namespace content {
 
 namespace {
 
-using ::attribution_reporting::mojom::SourceType;
-
 constexpr base::TimeDelta kWindowDeadlineOffset = base::Hours(1);
 
-const base::FeatureParam<base::TimeDelta> kFirstReportWindowDeadline{
-    &blink::features::kConversionMeasurement, "first_report_window_deadline",
-    base::Days(2)};
-
-const base::FeatureParam<base::TimeDelta> kSecondReportWindowDeadline{
-    &blink::features::kConversionMeasurement, "second_report_window_deadline",
-    base::Days(7)};
-
-base::span<const base::TimeDelta> EarlyDeadlines(SourceType source_type) {
-  // TODO(tquintanilla): Investigate techniques to valid these params.
-  static const base::TimeDelta kEarlyDeadlinesNavigation[] = {
-      kFirstReportWindowDeadline.Get(),
-      kSecondReportWindowDeadline.Get(),
-  };
-
-  switch (source_type) {
-    case SourceType::kNavigation:
-      return kEarlyDeadlinesNavigation;
-    case SourceType::kEvent:
-      return base::span<const base::TimeDelta>();
-  }
-}
+}  // namespace
 
 base::TimeDelta ExpiryDeadline(base::Time source_time,
                                base::Time event_report_window_time) {
@@ -59,8 +34,6 @@ base::Time ReportTimeFromDeadline(base::Time source_time,
   DCHECK(!deadline.is_zero());
   return source_time + deadline + kWindowDeadlineOffset;
 }
-
-}  // namespace
 
 base::Time ComputeReportTime(
     base::Time source_time,
@@ -102,35 +75,6 @@ base::Time ComputeReportTime(
   }
 
   return ReportTimeFromDeadline(source_time, deadline_to_use);
-}
-
-base::Time ComputeReportTime(const CommonSourceInfo& source,
-                             base::Time event_report_window_time,
-                             base::Time trigger_time) {
-  return ComputeReportTime(source.source_time(), event_report_window_time,
-                           trigger_time, EarlyDeadlines(source.source_type()));
-}
-
-int NumReportWindows(SourceType source_type) {
-  // Add 1 for the expiry deadline.
-  return 1 + EarlyDeadlines(source_type).size();
-}
-
-base::Time ReportTimeAtWindow(const CommonSourceInfo& source,
-                              base::Time event_report_window_time,
-                              int window_index) {
-  DCHECK_GE(window_index, 0);
-  DCHECK_LT(window_index, NumReportWindows(source.source_type()));
-
-  base::span<const base::TimeDelta> early_deadlines =
-      EarlyDeadlines(source.source_type());
-
-  base::TimeDelta deadline =
-      static_cast<size_t>(window_index) < early_deadlines.size()
-          ? early_deadlines[window_index]
-          : ExpiryDeadline(source.source_time(), event_report_window_time);
-
-  return ReportTimeFromDeadline(source.source_time(), deadline);
 }
 
 base::Time LastTriggerTimeForReportTime(base::Time report_time) {

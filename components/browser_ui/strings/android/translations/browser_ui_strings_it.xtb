@@ -103,6 +103,7 @@
 <translation id="2717722538473713889">Indirizzi email</translation>
 <translation id="2750481671343847896">I siti possono mostrare richieste di accesso da servizi di identità.</translation>
 <translation id="2822354292072154809">Vuoi reimpostare tutte le autorizzazioni del sito per <ph name="CHOSEN_OBJECT_NAME" />?</translation>
+<translation id="2850913818900871965">Richiedi visualizzazione mobile</translation>
 <translation id="2870560284913253234">Sito</translation>
 <translation id="2874939134665556319">Traccia precedente</translation>
 <translation id="2891975107962658722">Impedisci a un sito di salvare dati sul dispositivo</translation>
@@ -179,7 +180,7 @@
 <translation id="4200726100658658164">Apri Impostazioni di geolocalizzazione</translation>
 <translation id="4226663524361240545">Le notifiche possono far vibrare il dispositivo</translation>
 <translation id="4259722352634471385">Navigazione bloccata: <ph name="URL" /></translation>
-<translation id="4278390842282768270">Consentita</translation>
+<translation id="4278390842282768270">Autorizzazione consentita</translation>
 <translation id="429312253194641664">Un sito sta riproducendo contenuti multimediali</translation>
 <translation id="42981349822642051">Espandi</translation>
 <translation id="4336434711095810371">Cancella tutti i dati</translation>
@@ -222,7 +223,6 @@
 <translation id="509133520954049755">Richiedi visualizzazione desktop</translation>
 <translation id="5100237604440890931">Compresso. Fai clic per espandere.</translation>
 <translation id="5123685120097942451">Scheda di navigazione in incognito</translation>
-<translation id="5134599672855298214">Richiedi visualizzazione mobile (opzione consigliata)</translation>
 <translation id="5186036860380548585">Opzione disponibile nella parte superiore dello schermo</translation>
 <translation id="5197729504361054390">I contatti che selezioni verranno condivisi con <ph name="BEGIN_BOLD" /><ph name="SITE" /><ph name="END_BOLD" />.</translation>
 <translation id="5216942107514965959">Ultima visita: oggi</translation>
@@ -254,7 +254,7 @@
 <translation id="5596627076506792578">Altre opzioni</translation>
 <translation id="5649053991847567735">Download automatici</translation>
 <translation id="5668404140385795438">Ignora la richiesta di un sito per evitare l'aumento dello zoom</translation>
-<translation id="5677928146339483299">Blocca</translation>
+<translation id="5677928146339483299">Autorizzazione bloccata</translation>
 <translation id="5689516760719285838">Posizione</translation>
 <translation id="5690795753582697420">La fotocamera è disattivata nelle impostazioni di Android</translation>
 <translation id="5706552988683188916">Vengono eliminati i cookie e altri dati dei siti per <ph name="WEBSITE" /></translation>

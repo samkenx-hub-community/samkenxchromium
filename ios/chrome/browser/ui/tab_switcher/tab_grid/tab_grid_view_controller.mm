@@ -15,6 +15,7 @@
 #import "base/metrics/user_metrics_action.h"
 #import "base/strings/sys_string_conversions.h"
 #import "ios/chrome/browser/crash_report/crash_keys_helper.h"
+#import "ios/chrome/browser/default_browser/utils.h"
 #import "ios/chrome/browser/shared/public/commands/application_commands.h"
 #import "ios/chrome/browser/shared/public/commands/popup_menu_commands.h"
 #import "ios/chrome/browser/shared/public/features/features.h"
@@ -25,7 +26,6 @@
 #import "ios/chrome/browser/shared/ui/util/util_swift.h"
 #import "ios/chrome/browser/tabs/features.h"
 #import "ios/chrome/browser/tabs/inactive_tabs/features.h"
-#import "ios/chrome/browser/ui/default_promo/default_browser_utils.h"
 #import "ios/chrome/browser/ui/gestures/view_controller_trait_collection_observer.h"
 #import "ios/chrome/browser/ui/gestures/view_revealing_vertical_pan_handler.h"
 #import "ios/chrome/browser/ui/icons/symbols.h"
@@ -724,6 +724,12 @@ NSUInteger GetPageIndexFromPage(TabGridPage page) {
   [_reauthAgent addObserver:self];
 }
 
+- (void)setBottomMessage:(UIViewController*)bottomMessage {
+  _bottomMessage = bottomMessage;
+  // TODO(crbug.com/1418117): Move around other UI components in the regular tab
+  // grid accordingly, and add/remove `bottomMessage` to the view hierarchy.
+}
+
 #pragma mark - TabGridPaging
 
 - (void)setActivePage:(TabGridPage)activePage {
@@ -801,7 +807,7 @@ NSUInteger GetPageIndexFromPage(TabGridPage page) {
     completion(completeds[0], finisheds[0]);
   };
 
-  // Each LayoutSwitcher method calls regular and icognito grid controller's
+  // Each LayoutSwitcher method calls regular and incognito grid controller's
   // corresponding method. Thus, attaching the completion to only one of the
   // grid view controllers should suffice.
   [regularViewController willTransitionToLayout:nextState
@@ -1103,8 +1109,8 @@ NSUInteger GetPageIndexFromPage(TabGridPage page) {
     GridTransitionLayout* pinnedTabsTransitionLayout =
         [self.pinnedTabsViewController transitionLayout];
 
-    return [self combineTransitionLayout:pinnedTabsTransitionLayout
-                    withTransitionLayout:regularTabsTransitionLayout];
+    return [self combineTransitionLayout:regularTabsTransitionLayout
+                    withTransitionLayout:pinnedTabsTransitionLayout];
   }
 
   return regularTabsTransitionLayout;
@@ -1861,9 +1867,7 @@ NSUInteger GetPageIndexFromPage(TabGridPage page) {
   GridViewController* gridViewController =
       [self gridViewControllerForPage:self.currentPage];
 
-  BOOL enabled = (gridViewController == nil)
-                     ? NO
-                     : [self tabsPresentForPage:self.currentPage];
+  BOOL enabled = gridViewController && ![gridViewController isGridEmpty];
   BOOL incognitoTabsNeedsAuth =
       (self.currentPage == TabGridPageIncognitoTabs &&
        self.incognitoTabsViewController.contentNeedsAuthentication);
@@ -2089,6 +2093,27 @@ NSUInteger GetPageIndexFromPage(TabGridPage page) {
       NOTREACHED() << "It is invalid to have an active tab in remote tabs.";
       break;
   }
+}
+
+// Updates the views, buttons, toolbars as well as broadcasts incognito tabs
+// visibility after the tab count has changed.
+- (void)handleTabCountChangeWithTabCount:(NSUInteger)tabCount {
+  if (self.tabGridMode == TabGridModeSelection) {
+    // Exit selection mode if there are no more tabs.
+    if (tabCount == 0) {
+      self.tabGridMode = TabGridModeNormal;
+    }
+
+    [self updateSelectionModeToolbars];
+  }
+
+  if (tabCount > 0) {
+    // Undo is only available when the tab grid is empty.
+    self.undoCloseAllAvailable = NO;
+  }
+
+  [self configureButtonsForActiveAndCurrentPage];
+  [self broadcastIncognitoContentVisibility];
 }
 
 // Broadcasts whether incognito tabs are showing.
@@ -2402,6 +2427,11 @@ NSUInteger GetPageIndexFromPage(TabGridPage page) {
             (PinnedTabsViewController*)pinnedTabsViewController
               didChangeItemCount:(NSUInteger)count {
   self.topToolbar.pageControl.pinnedTabCount = count;
+  const NSUInteger totalTabCount =
+      count + self.topToolbar.pageControl.regularTabCount;
+
+  crash_keys::SetRegularTabCount(totalTabCount);
+  [self handleTabCountChangeWithTabCount:totalTabCount];
 }
 
 - (void)pinnedTabsViewControllerVisibilityDidChange:
@@ -2450,10 +2480,6 @@ NSUInteger GetPageIndexFromPage(TabGridPage page) {
     return;
   }
 
-  // Update the model with the tab selection, but don't have the grid view
-  // controller display the new selection, since there will be a transition
-  // away from it immediately afterwards.
-  gridViewController.showsSelectionUpdates = NO;
   // Check if the tab being selected is already selected.
   BOOL alreadySelected = NO;
   id<GridCommands> tabsDelegate;
@@ -2503,7 +2529,6 @@ NSUInteger GetPageIndexFromPage(TabGridPage page) {
   [self.tabPresentationDelegate showActiveTabInPage:self.currentPage
                                        focusOmnibox:NO
                                        closeTabGrid:closeTabGrid];
-  gridViewController.showsSelectionUpdates = YES;
 }
 
 - (void)gridViewController:(GridViewController*)gridViewController
@@ -2546,26 +2571,18 @@ NSUInteger GetPageIndexFromPage(TabGridPage page) {
 
 - (void)gridViewController:(GridViewController*)gridViewController
         didChangeItemCount:(NSUInteger)count {
-  if (self.tabGridMode == TabGridModeSelection) {
-    // Exit selection mode if there are no more tabs.
-    if (count == 0) {
-      self.tabGridMode = TabGridModeNormal;
-    }
-    [self updateSelectionModeToolbars];
-  }
-
-  if (count > 0) {
-    // Undo is only available when the tab grid is empty.
-    self.undoCloseAllAvailable = NO;
-  }
-  [self configureButtonsForActiveAndCurrentPage];
   if (gridViewController == self.regularTabsViewController) {
     self.topToolbar.pageControl.regularTabCount = count;
-    crash_keys::SetRegularTabCount(count);
+    const NSUInteger totalTabCount =
+        count + self.topToolbar.pageControl.pinnedTabCount;
+
+    crash_keys::SetRegularTabCount(totalTabCount);
+    [self handleTabCountChangeWithTabCount:totalTabCount];
+
   } else if (gridViewController == self.incognitoTabsViewController) {
     crash_keys::SetIncognitoTabCount(count);
+    [self handleTabCountChangeWithTabCount:count];
   }
-  [self broadcastIncognitoContentVisibility];
 }
 
 - (void)gridViewController:(GridViewController*)gridViewController
@@ -2669,6 +2686,11 @@ NSUInteger GetPageIndexFromPage(TabGridPage page) {
   [self.delegate showInactiveTabs];
 }
 
+- (void)didTapInactiveTabsSettingsLinkInGridViewController:
+    (GridViewController*)gridViewController {
+  NOTREACHED();
+}
+
 #pragma mark - Control actions
 
 - (void)doneButtonTapped:(id)sender {
@@ -2739,24 +2761,14 @@ NSUInteger GetPageIndexFromPage(TabGridPage page) {
 }
 
 - (void)handleCloseAllButtonForRegularTabsWithAnchor:(UIBarButtonItem*)anchor {
-  const BOOL hasPinnedTabs =
-      (IsPinnedTabsEnabled() && !self.pinnedTabsViewController.collectionEmpty);
-  const BOOL hasOpenTabs =
-      !self.regularTabsViewController.gridEmpty || hasPinnedTabs;
-  DCHECK_EQ(self.undoCloseAllAvailable, !hasOpenTabs);
+  DCHECK_EQ(self.undoCloseAllAvailable,
+            self.regularTabsViewController.gridEmpty);
 
   if (self.undoCloseAllAvailable) {
     [self undoCloseAllItemsForRegularTabs];
-  } else if (hasPinnedTabs) {
-    [self confirmCloseAllItemsForRegularTabs:anchor];
   } else {
     [self saveAndCloseAllItemsForRegularTabs];
   }
-}
-
-- (void)confirmCloseAllItemsForRegularTabs:(UIBarButtonItem*)anchor {
-  [self.regularTabsDelegate
-      showCloseAllItemsConfirmationActionSheetWithAnchor:anchor];
 }
 
 - (void)undoCloseAllItemsForRegularTabs {

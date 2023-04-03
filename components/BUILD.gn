@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//base/debug/debug.gni")
 import("//build/config/chrome_build.gni")
 import("//build/config/chromeos/ui_mode.gni")
 import("//build/config/features.gni")
@@ -151,7 +152,6 @@ test("components_unittests") {
     "//components/history/core/browser:unit_tests",
     "//components/history/metrics:unit_tests",
     "//components/image_fetcher/core:unit_tests",
-    "//components/image_service:unit_tests",
     "//components/keyed_service/core:unit_tests",
     "//components/language/core/browser:unit_tests",
     "//components/language/core/common:unit_tests",
@@ -178,6 +178,7 @@ test("components_unittests") {
     "//components/os_crypt/async/browser:unit_tests",
     "//components/os_crypt/async/common:unit_tests",
     "//components/os_crypt/sync:unit_tests",
+    "//components/page_image_service:unit_tests",
     "//components/password_manager/core/browser:unit_tests",
     "//components/payments/core:unit_tests",
     "//components/policy/core/browser:unit_tests",
@@ -258,8 +259,15 @@ test("components_unittests") {
     ]
   }
 
+  if (build_allocation_stack_trace_recorder) {
+    deps += [ "//components/allocation_recorder/crash_client:unit_tests" ]
+  }
+
   if (!is_ios) {
-    deps += [ "//components/file_access:unit_tests" ]
+    deps += [
+      "//components/file_access:unit_tests",
+      "//components/webauthn/json:unit_tests",
+    ]
   }
 
   if (enable_screen_ai_service) {

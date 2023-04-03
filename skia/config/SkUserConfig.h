@@ -214,20 +214,20 @@ SK_API void SkDebugf_FileLine(const char* file,
 // Temporarily insulate Chrome pixel tests from Skia LOD bias change on GPU.
 #define SK_USE_LEGACY_MIPMAP_LOD_BIAS
 
-// Temporarily insulate Chrome pixel tests from Skia luminance changes in RP.
-#define SK_USE_LEGACY_RP_LUMINANCE
-
 // Max. verb count for paths rendered by the edge-AA tessellating path renderer.
 #define GR_AA_TESSELLATOR_MAX_VERB_COUNT 100
 
-#define SK_SUPPORT_LEGACY_AAA_CHOICE
+#if defined(SK_BUILD_FOR_WIN)
+#define SK_FORCE_AAA
+#endif
 
 #define SK_SUPPORT_LEGACY_DRAWLOOPER
 
 #define SK_USE_LEGACY_MIPMAP_BUILDER
 
 // Use the original std::vector based serializer
-#define SK_SUPPORT_LEGACY_STRIKE_SERIALIZATION
+// Remove when new streaming support operations has been verified.
+// #define SK_SUPPORT_LEGACY_STRIKE_SERIALIZATION
 
 ///////////////////////// Imported from BUILD.gn and skia_common.gypi
 

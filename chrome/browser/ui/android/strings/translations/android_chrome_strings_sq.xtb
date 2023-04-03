@@ -737,6 +737,7 @@ Për të ndryshuar këtë cilësim, <ph name="BEGIN_LINK" />rivendos sinkronizim
 <translation id="5001388021414335527">Ndiqe këtë sajt këtu</translation>
 <translation id="5004416275253351869">Kontrollet e aktivitetit të Google</translation>
 <translation id="5005498671520578047">Kopjo fjalëkalimin</translation>
+<translation id="5010886807652684893">Pamja vizuale</translation>
 <translation id="5011311129201317034"><ph name="SITE" /> dëshiron që të lidhet</translation>
 <translation id="5016205925109358554">Serif</translation>
 <translation id="5017529052065664584">15 minutat e fundit</translation>
@@ -794,6 +795,7 @@ Për të ndryshuar këtë cilësim, <ph name="BEGIN_LINK" />rivendos sinkronizim
 <translation id="5342314432463739672">Kërkesat për autorizim</translation>
 <translation id="53537532693258630">Sajtet që ke hequr do të shfaqen këtu</translation>
 <translation id="5355191726083956201">"Mbrojtja e përmirësuar" është aktive</translation>
+<translation id="5361107212971249203">teksti</translation>
 <translation id="5368227114232678694">Provo modalitetin "E fshehtë" për të shfletuar në mënyrë private në këtë pajisje</translation>
 <translation id="5375577065097716013">Kërko imazh me "Lenten e Google" <ph name="BEGIN_NEW" />E re<ph name="END_NEW" /></translation>
 <translation id="5401851137404501592">Për të vazhduar, <ph name="IDENTITY_PROVIDER_ETLD_PLUS_ONE" /> do të ndajë emrin, adresën e email-it dhe fotografinë tënde të profilit me këtë sajt.</translation>
@@ -1191,6 +1193,7 @@ Për shembull, disa sajte uebi mund t'i përgjigjen kësaj kërkese duke të tre
 <translation id="7454641608352164238">Nuk ka hapësirë të mjaftueshme</translation>
 <translation id="7455988709578031708">Bazuar në historikun tënd të shfletimit. Ky cilësim është aktiv.</translation>
 <translation id="7456774706094330779">Ngarkim paraprak i zgjatur</translation>
+<translation id="7466431077154602932">Pamja kompakte</translation>
 <translation id="7474822150871987353">Mëso për temat në sajtet e uebit pa u larguar nga faqja. Zgjidh një ose më shumë fjalë në faqe për të kërkuar për to.</translation>
 <translation id="7475192538862203634">Nëse e shikon shpesh këtë, provo këto <ph name="BEGIN_LINK" />sugjerime<ph name="END_LINK" />.</translation>
 <translation id="7475688122056506577">Karta SD nuk u gjet. Mund të mungojnë disa nga skedarët e tu.</translation>
@@ -1320,6 +1323,7 @@ Për shembull, disa sajte uebi mund t'i përgjigjen kësaj kërkese duke të tre
 <translation id="8058746566562539958">Hape në një skedë të re të Chrome</translation>
 <translation id="8062594758852531064">Ngarkimi paraprak i zgjatur:</translation>
 <translation id="8063895661287329888">Shtimi i faqeshënuesit dështoi.</translation>
+<translation id="8066816452984416180">Shtoje këtë faqe me shpejtësi te faqeshënuesit. Për ta modifikuar këtë shkurtore, preke dhe mbaje shtypur.</translation>
 <translation id="806745655614357130">Mbaji më vete të dhënat e mia</translation>
 <translation id="8073388330009372546">Hape imazhin në një skedë të re</translation>
 <translation id="8076492880354921740">Skedat</translation>
@@ -1351,6 +1355,7 @@ Për shembull, disa sajte uebi mund t'i përgjigjen kësaj kërkese duke të tre
 <translation id="8216351761227087153">Shikoje</translation>
 <translation id="8218622182176210845">Menaxho llogarinë tënde</translation>
 <translation id="8223642481677794647">Menyja e kartave të furnizimit</translation>
+<translation id="8236097722223016103">Shto te faqeshënuesit</translation>
 <translation id="8250920743982581267">Dokumentet</translation>
 <translation id="8255617931166444521">Sajtet mund t'i përdorin kukit e tua vetëm për të parë aktivitetin tënd të shfletimit në sajtin e tyre</translation>
 <translation id="8259179246279078674">Për shkak se faqet e ngarkuara paraprakisht janë të enkriptuara, Google nuk do të mësojë asgjë rreth përmbajtjes së faqes së ngarkuar paraprakisht. Serverët e Google do të mësojnë se cilat sajte janë ngarkuar paraprakisht në mënyrë private. Ky informacion përdoret vetëm për të ngarkuar paraprakisht faqet dhe nuk lidhet me informacione të tjera nga "Llogaria jote e Google".</translation>
@@ -1445,6 +1450,7 @@ Për shembull, disa sajte uebi mund t'i përgjigjen kësaj kërkese duke të tre
 <translation id="869891660844655955">Data e skadimit</translation>
 <translation id="8699120352855309748">Mos ofro t'i përkthesh këto gjuhë</translation>
 <translation id="8712637175834984815">E kuptova</translation>
+<translation id="8723453889042591629">Përktheje me shpejtësi këtë faqe. Për ta modifikuar këtë shkurtore, preke dhe mbaje shtypur.</translation>
 <translation id="8725066075913043281">Provo sërish</translation>
 <translation id="8746155870861185046">Shpërndaj theksimin</translation>
 <translation id="874726034427945498">Për të parë sugjerime më të mira në shiritin e adresës, sinkronizo skedat dhe historikun</translation>
@@ -1497,6 +1503,7 @@ Për shembull, disa sajte uebi mund t'i përgjigjen kësaj kërkese duke të tre
 <translation id="8989968390305463310">Historiku yt i shfletimit ndikon te reklamat që shikon dhe tek interesat sipas përllogaritjes më poshtë. Për të mbrojtur privatësinë tënde, Chrome fshin automatikisht interesat e tua në vazhdimësi çdo muaj. Interesat mund të rifreskohen, përveçse nëse ti i heq ato.</translation>
 <translation id="8993760627012879038">Hap një skedë të re në "Modalitetin e fshehtë"</translation>
 <translation id="8996847606757455498">Zgjidh një ofrues tjetër</translation>
+<translation id="8998289560386111590">Nuk ofrohet në pajisjen tënde</translation>
 <translation id="8998729206196772491">Po identifikohesh me një llogari të menaxhuar nga <ph name="MANAGED_DOMAIN" /> dhe po i jep administratorit të saj kontroll mbi të dhënat e tua të Chrome. Duke dalë nga Chrome do të fshihen të dhënat e tua nga kjo pajisje, por do të mbeten të ruajtura në llogarinë tënde të Google.</translation>
 <translation id="9022774213089566801">Të vizituara shpesh</translation>
 <translation id="9022871169049522985">Sajtet dhe reklamuesit mund të matin performancën e reklamave të tyre</translation>

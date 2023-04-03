@@ -92,6 +92,16 @@ class AutofillSaveUpdateAddressProfileDelegateIOS
 
   bool IsMigrationToAccount() const { return is_migration_to_account_; }
 
+  absl::optional<std::u16string> SyncingUserEmail() const {
+    return syncing_user_email_;
+  }
+
+  // Returns true if the profile's source is
+  // `AutofillProfile::Source::kAccount`.
+  bool IsProfileAnAccountProfile() const {
+    return profile_.source() == autofill::AutofillProfile::Source::kAccount;
+  }
+
 #if defined(UNIT_TEST)
   // Getter for |user_decision_|. Used for the testing purposes.
   AutofillClient::SaveAddressProfileOfferUserDecision user_decision() const {

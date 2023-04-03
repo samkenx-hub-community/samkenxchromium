@@ -34,6 +34,7 @@
 #include "base/files/file_path.h"
 #include "base/files/file_util.h"
 #include "base/functional/bind.h"
+#include "base/functional/callback_forward.h"
 #include "base/functional/callback_helpers.h"
 #include "base/location.h"
 #include "base/memory/ref_counted_memory.h"
@@ -61,6 +62,7 @@
 #include "ui/message_center/message_center.h"
 #include "ui/message_center/public/cpp/notification.h"
 #include "ui/message_center/public/cpp/notification_delegate.h"
+#include "ui/message_center/public/cpp/notification_types.h"
 #include "ui/snapshot/snapshot.h"
 #include "ui/views/widget/widget.h"
 
@@ -234,6 +236,16 @@ void DeleteFileAsync(scoped_refptr<base::SequencedTaskRunner> task_runner,
                      path));
 }
 
+// Adds the given `notification` to the message center after it removes any
+// existing notification that has the same ID.
+void AddNotificationToMessageCenter(
+    std::unique_ptr<message_center::Notification> notification) {
+  auto* message_center = message_center::MessageCenter::Get();
+  message_center->RemoveNotification(notification->id(),
+                                     /*by_user=*/false);
+  message_center->AddNotification(std::move(notification));
+}
+
 // Shows a Capture Mode related notification with the given parameters.
 // |for_video_thumbnail| will be considered only if |optional_fields| contain
 // an image to show in the notification as a thumbnail for what was captured.
@@ -267,12 +279,7 @@ void ShowNotification(
                                            : kScreenShotNotificationType);
   }
 
-  // Remove the previous notification before showing the new one if there is
-  // any.
-  auto* message_center = message_center::MessageCenter::Get();
-  message_center->RemoveNotification(notification_id,
-                                     /*by_user=*/false);
-  message_center->AddNotification(std::move(notification));
+  AddNotificationToMessageCenter(std::move(notification));
 }
 
 // Shows a notification informing the user that a Capture Mode operation has
@@ -282,6 +289,24 @@ void ShowFailureNotification() {
                    IDS_ASH_SCREEN_CAPTURE_FAILURE_TITLE,
                    IDS_ASH_SCREEN_CAPTURE_FAILURE_MESSAGE,
                    /*optional_fields=*/{}, /*delegate=*/nullptr);
+}
+
+// Shows a notification that indicates to the user that the GIF file is being
+// processed and will be ready shortly.
+void ShowGifProgressNotification() {
+  message_center::RichNotificationData optional_fields;
+  optional_fields.progress = -1;  // Infinite progress.
+  optional_fields.never_timeout = true;
+  AddNotificationToMessageCenter(CreateSystemNotificationPtr(
+      message_center::NOTIFICATION_TYPE_PROGRESS, kScreenCaptureNotificationId,
+      l10n_util::GetStringUTF16(IDS_ASH_SCREEN_CAPTURE_GIF_PROGRESS_TITLE),
+      l10n_util::GetStringUTF16(IDS_ASH_SCREEN_CAPTURE_GIF_PROGRESS_MESSAGE),
+      l10n_util::GetStringUTF16(IDS_ASH_SCREEN_CAPTURE_DISPLAY_SOURCE), GURL(),
+      message_center::NotifierId(message_center::NotifierType::SYSTEM_COMPONENT,
+                                 kScreenCaptureNotifierId,
+                                 NotificationCatalogName::kScreenCapture),
+      optional_fields, /*delegate=*/nullptr, kCaptureModeIcon,
+      message_center::SystemNotificationWarningLevel::NORMAL));
 }
 
 // Returns the ID of the message or the title for the notification based on
@@ -697,19 +722,18 @@ CaptureModeController::GetCurrentCaptureFolder() const {
 }
 
 void CaptureModeController::CaptureScreenshotsOfAllDisplays() {
-  if (pending_dlp_check_)
-    return;
+  CaptureInstantScreenshot(
+      CaptureModeEntryType::kCaptureAllDisplays, CaptureModeSource::kFullscreen,
+      base::BindOnce(&CaptureModeController::PerformScreenshotsOfAllDisplays,
+                     weak_ptr_factory_.GetWeakPtr()));
+}
 
-  if (!delegate_->IsCaptureAllowedByPolicy()) {
-    ShowDisabledNotification(CaptureAllowance::kDisallowedByPolicy);
-    return;
-  }
-
-  pending_dlp_check_ = true;
-  delegate_->CheckCaptureModeInitRestrictionByDlp(base::BindOnce(
-      &CaptureModeController::
-          OnDlpRestrictionCheckedAtCaptureScreenshotsOfAllDisplays,
-      weak_ptr_factory_.GetWeakPtr()));
+void CaptureModeController::CaptureScreenshotOfGivenWindow(
+    aura::Window* given_window) {
+  CaptureInstantScreenshot(
+      CaptureModeEntryType::kCaptureGivenWindow, CaptureModeSource::kWindow,
+      base::BindOnce(&CaptureModeController::PerformScreenshotOfGivenWindow,
+                     weak_ptr_factory_.GetWeakPtr(), given_window));
 }
 
 void CaptureModeController::PerformCapture() {
@@ -1216,6 +1240,13 @@ void CaptureModeController::TerminateRecordingUiElements() {
   camera_controller_->MaybeRevertAutoCameraSelection();
 
   video_recording_watcher_->ShutDown();
+
+  // GIF files take a while to finalize and fully get written to disk. Therefore
+  // we show a notification to the user to let them know that the file will be
+  // ready shortly.
+  if (current_video_file_path_.MatchesExtension(".gif")) {
+    ShowGifProgressNotification();
+  }
 }
 
 void CaptureModeController::CaptureImage(const CaptureParams& capture_params,
@@ -1835,6 +1866,12 @@ void CaptureModeController::OnDlpRestrictionCheckedAtVideoEnd(
   current_video_file_path_.clear();
 
   if (should_delete_file) {
+    // Remove any lingering notification, e.g. the GIF progress notification,
+    // before proceeding, since it no longer makes sense as the file will be
+    // deleted.
+    message_center::MessageCenter::Get()->RemoveNotification(
+        kScreenCaptureNotificationId, /*by_user=*/false);
+
     DeleteFileAsync(blocking_task_runner_, video_file_path,
                     std::move(on_file_deleted_callback_for_test_));
   } else {
@@ -1851,19 +1888,55 @@ void CaptureModeController::OnDlpRestrictionCheckedAtVideoEnd(
   recording_start_time_ = base::TimeTicks();
 }
 
-void CaptureModeController::
-    OnDlpRestrictionCheckedAtCaptureScreenshotsOfAllDisplays(bool proceed) {
-  pending_dlp_check_ = false;
-  if (!proceed)
+void CaptureModeController::CaptureInstantScreenshot(
+    CaptureModeEntryType entry_type,
+    CaptureModeSource source,
+    base::OnceClosure instant_screenshot_callback) {
+  if (pending_dlp_check_) {
     return;
+  }
 
-  // Due to fact that the DLP warning dialog may take a while, check policy
-  // again even though we checked in CaptureScreenshotsOfAllDisplays().
   if (!delegate_->IsCaptureAllowedByPolicy()) {
     ShowDisabledNotification(CaptureAllowance::kDisallowedByPolicy);
     return;
   }
 
+  pending_dlp_check_ = true;
+  delegate_->CheckCaptureModeInitRestrictionByDlp(base::BindOnce(
+      &CaptureModeController::OnDlpRestrictionCheckedAtCaptureScreenshot,
+      weak_ptr_factory_.GetWeakPtr(), entry_type, source,
+      std::move(instant_screenshot_callback)));
+}
+
+void CaptureModeController::OnDlpRestrictionCheckedAtCaptureScreenshot(
+    CaptureModeEntryType entry_type,
+    CaptureModeSource source,
+    base::OnceClosure instant_screenshot_callback,
+    bool proceed) {
+  pending_dlp_check_ = false;
+  if (!proceed) {
+    return;
+  }
+
+  // Due to fact that the DLP warning dialog may take a while, check the
+  // enterprise policy again even though we checked in
+  // `CaptureInstantScreenshot()`.
+  if (!delegate_->IsCaptureAllowedByPolicy()) {
+    ShowDisabledNotification(CaptureAllowance::kDisallowedByPolicy);
+    return;
+  }
+
+  std::move(instant_screenshot_callback).Run();
+
+  // Since this doesn't create a capture mode session, log metrics here.
+  RecordCaptureModeEntryType(entry_type);
+  RecordCaptureModeConfiguration(
+      CaptureModeType::kImage, source,
+      recording_type_,  // This parameter will be ignored.
+      /*audio_on=*/false, /*is_in_projector_mode=*/false);
+}
+
+void CaptureModeController::PerformScreenshotsOfAllDisplays() {
   // Get a vector of RootWindowControllers with primary root window at first.
   const std::vector<RootWindowController*> controllers =
       RootWindowController::root_window_controllers();
@@ -1880,13 +1953,13 @@ void CaptureModeController::
                                      : BuildImagePathForDisplay(display_index));
     ++display_index;
   }
+}
 
-  // Since this doesn't create a capture mode session, log metrics here.
-  RecordCaptureModeEntryType(CaptureModeEntryType::kCaptureAllDisplays);
-  RecordCaptureModeConfiguration(
-      CaptureModeType::kImage, CaptureModeSource::kFullscreen,
-      recording_type_,  // This parameter will be ignored.
-      /*audio_on=*/false, /*is_in_projector_mode=*/false);
+void CaptureModeController::PerformScreenshotOfGivenWindow(
+    aura::Window* given_window) {
+  const CaptureParams capture_params{given_window,
+                                     gfx::Rect(given_window->bounds().size())};
+  CaptureImage(capture_params, BuildImagePath());
 }
 
 CaptureModeSaveToLocation CaptureModeController::GetSaveToOption(

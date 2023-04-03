@@ -15,6 +15,7 @@
 #include "ash/style/ash_color_provider.h"
 #include "ash/system/phonehub/phone_connected_view.h"
 #include "ash/system/phonehub/phone_hub_app_loading_icon.h"
+#include "ash/system/phonehub/phone_hub_metrics.h"
 #include "ash/system/phonehub/phone_hub_more_apps_button.h"
 #include "ash/system/phonehub/phone_hub_recent_app_button.h"
 #include "ash/system/phonehub/phone_hub_view_ids.h"
@@ -22,6 +23,7 @@
 #include "ash/system/tray/tray_constants.h"
 #include "ash/webui/eche_app_ui/mojom/eche_app.mojom.h"
 #include "base/cxx17_backports.h"
+#include "base/metrics/histogram_functions.h"
 #include "base/ranges/algorithm.h"
 #include "chromeos/ash/components/phonehub/notification.h"
 #include "chromeos/ash/components/phonehub/phone_hub_manager.h"
@@ -219,6 +221,9 @@ PhoneHubRecentAppsView::PhoneHubRecentAppsView(
         recent_apps_content->AddChildView(std::make_unique<LoadingView>());
   }
 
+  phone_hub_metrics::LogRecentAppsStateOnBubbleOpened(
+      recent_apps_interaction_handler_->ui_state());
+
   Update();
   recent_apps_interaction_handler_->AddObserver(this);
 }
@@ -367,6 +372,7 @@ void PhoneHubRecentAppsView::Update() {
         loading_view_->SetVisible(true);
         header_view_->SetErrorButtonVisible(false);
         SetVisible(true);
+        loading_animation_start_time_ = base::TimeTicks::Now();
         break;
       }
       [[fallthrough]];
@@ -376,6 +382,15 @@ void PhoneHubRecentAppsView::Update() {
         loading_view_->SetVisible(true);
         header_view_->SetErrorButtonVisible(true);
         SetVisible(true);
+
+        if (loading_animation_start_time_ != base::TimeTicks()) {
+          phone_hub_metrics::LogRecentAppsTransitionToFailedLatency(
+              base::TimeTicks::Now() - loading_animation_start_time_);
+
+          loading_animation_start_time_ = base::TimeTicks();
+        }
+
+        error_button_start_time_ = base::TimeTicks::Now();
         break;
       }
       [[fallthrough]];
@@ -409,6 +424,20 @@ void PhoneHubRecentAppsView::Update() {
         recent_app_button_list_.push_back(
             recent_app_buttons_view_->AddRecentAppButton(
                 GenerateMoreAppsButton()));
+      }
+
+      if (loading_animation_start_time_ != base::TimeTicks()) {
+        phone_hub_metrics::LogRecentAppsTransitionToSuccessLatency(
+            base::TimeTicks::Now() - loading_animation_start_time_);
+
+        loading_animation_start_time_ = base::TimeTicks();
+      }
+
+      if (error_button_start_time_ != base::TimeTicks()) {
+        phone_hub_metrics::LogRecentAppsTransitionToSuccessLatency(
+            base::TimeTicks::Now() - error_button_start_time_);
+
+        error_button_start_time_ = base::TimeTicks();
       }
 
       recent_app_buttons_view_->SetVisible(true);

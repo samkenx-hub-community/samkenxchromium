@@ -8,10 +8,6 @@
 <translation id="1044891598689252897">Sivustot toimivat normaalisti</translation>
 <translation id="1049743911850919806">Incognito</translation>
 <translation id="105093091697134113">Seuraavat tilit käyttävät salasanoja, jotka vaarantuivat kolmannen osapuolen tietosuojaloukkauksessa tai lisättiin harhaanjohtavalle sivustolle. Vaihda nämä salasanat heti tiliesi suojaamiseksi.</translation>
-<translation id="105214722824962652">Sinua ei kirjata ulos Google-tililtäsi. <ph name="BEGIN_LINK" />Muita toimintoja<ph name="END_LINK" /> voidaan tallentaa Google-tilillesi, kun olet kirjautuneena sisään. Voit poistaa niitä koska vain.
-
-        
-Hakukoneesi on <ph name="DSE_NAME" />. Katso tarvittaessa hakukoneen ohjeet hakuhistorian poistamiselle.</translation>
 <translation id="1054045277222934172">Voit vaihtaa sivuston oletusnäkymän tietokonenäkymään kohdasta Asetukset &gt; Sisältöasetukset</translation>
 <translation id="1054745118061919935">Jatkamalla hyväksyt <ph name="BEGIN_LINK" />käyttöehdot<ph name="END_LINK" />.</translation>
 <translation id="1063454504051558093">Käytä toista salasanaa…</translation>
@@ -33,6 +29,7 @@ Salatun datasi voi lukea vain tunnuslauseen avulla. Tunnuslausetta ei lähetetä
 <translation id="1154984953698510061">Katso muut välilehdet</translation>
 <translation id="1161340988127985692">Pyydä lupaa avata muiden sovellusten linkkejä incognito-tilassa</translation>
 <translation id="1164064664035028907">Käytä vahvaa salasanaa:</translation>
+<translation id="1164891049599601209">Käytetty petollisella sivustolla</translation>
 <translation id="1165039591588034296">Virhe</translation>
 <translation id="1172898394251786223">Seuraava kenttä</translation>
 <translation id="1176932207622159128">Kuvaa ei voi tall.</translation>
@@ -58,6 +55,7 @@ Salatun datasi voi lukea vain tunnuslauseen avulla. Tunnuslausetta ei lähetetä
 <translation id="1283524564873030414">Viimeiset 24 tuntia</translation>
 <translation id="1285320974508926690">Älä käännä tätä sivustoa</translation>
 <translation id="1291506870746876680">Luvat (<ph name="BEGIN_BOLD" /><ph name="SITE_NAME" /><ph name="END_BOLD" />) nollataan, kun poistut sivustolta.</translation>
+<translation id="1305822519689023679">Vahvista henkilöllisyytesi, jotta voit aina käyttää Google-tilisi salasanoja.</translation>
 <translation id="1312721752506309252">Parannettu suojaus on päällä</translation>
 <translation id="1321993286294231467">Virhe tallennettaessa kuvaa</translation>
 <translation id="1322735045095424339">Organisaatiosi edellyttää incognito-tilaa</translation>
@@ -107,6 +105,7 @@ Salatun datasi voi lukea vain tunnuslauseen avulla. Tunnuslausetta ei lähetetä
 <translation id="1626771852476987600"><ph name="COUNT" /> uudelleenkäytettyä salasanaa</translation>
 <translation id="1641113438599504367">Selaussuoja</translation>
 <translation id="1644574205037202324">Historia</translation>
+<translation id="165008673352427892">Uusi ominaisuus</translation>
 <translation id="1650222530560417226">Aloita JavaScript-konsolilokien ja kaikilla välilehdillä havaittujen virheiden kerääminen valitsemalla Kirjausten käynnistys. Lokeja kerätään (niitä säilytetään vain muistissa), kunnes suljet tämän sivun tai valitset Kirjauksen lopetus.</translation>
 <translation id="1653432787084483144">{count,plural, =1{Näppäimistön yläpuolella on saatavilla {count} tallennettu salasana.}other{Näppäimistön yläpuolella on saatavilla {count} tallennettua salasanaa.}}</translation>
 <translation id="1657011748321897393">Jakaminen epäonnistui, koska verkkoyhteyttä ei ole.</translation>
@@ -120,6 +119,7 @@ Salatun datasi voi lukea vain tunnuslauseen avulla. Tunnuslausetta ei lähetetä
 <translation id="1700629756560807968"><ph name="NUMBER_OF_SELECTED_BOOKMARKS" /> valittu</translation>
 <translation id="1715515772563243997">Jos <ph name="SITE" /> on luotettava, voit kirjautua sisään tallennetulla salasanalla.</translation>
 <translation id="1740468249224277719">Asenna kaksoisnapauttamalla.</translation>
+<translation id="1750238553597293878">Jatka Google-tilisi salasanojen käyttöä</translation>
 <translation id="1752547299766512813">Tall. salasanat</translation>
 <translation id="1753905327828125965">Käydyimmät</translation>
 <translation id="1767766085187034454">Google Kääntäjä</translation>
@@ -145,6 +145,7 @@ Salatun datasi voi lukea vain tunnuslauseen avulla. Tunnuslausetta ei lähetetä
 <translation id="1965935827552890526">Siirry toiseen avoimeen Chrome-ikkunaan ja viimeistele aloittamasi.</translation>
 <translation id="1973912524893600642">Säilytä data</translation>
 <translation id="1974060860693918893">Lisäasetukset</translation>
+<translation id="1980417445547898121">{count,plural, =1{Avaa {count} toisella laitteella äskettäin aktiivisena ollut välilehti tällä iPhonella}other{Avaa {count} toisella laitteella äskettäin aktiivisena ollutta välilehteä tällä iPhonella}}</translation>
 <translation id="1981118202195772574">Mobiili</translation>
 <translation id="1989112275319619282">Selaa</translation>
 <translation id="1990820278544963435">Hae</translation>
@@ -154,6 +155,7 @@ Salatun datasi voi lukea vain tunnuslauseen avulla. Tunnuslausetta ei lähetetä
 <translation id="2021670401941426298">Katso tarvittaessa hakukoneesi ohjeet hakuhistorian poistamiselle.</translation>
 <translation id="202292859882676807">Pääsy mikrofoniin myönnetty</translation>
 <translation id="20485545164632846">uusi tuote</translation>
+<translation id="2049727122989709386"><ph name="COUNT" /> tilillä käytetään samaa salasanaa</translation>
 <translation id="2050196510205866090">{count,plural, =1{Näppäimistön yläpuolella on saatavilla {count} tallennettu maksutapa.}other{Näppäimistön yläpuolella on saatavilla {count} tallennettua maksutapaa.}}</translation>
 <translation id="2073572773299281212">Aktiivinen <ph name="DAYS" /> päivää sitten</translation>
 <translation id="2074131957428911366">Voit valita synkronoitavan sisällön <ph name="BEGIN_LINK" />asetuksissa<ph name="END_LINK" />.</translation>
@@ -237,6 +239,10 @@ Sivustot eivät näe selaustoimintaasi eri sivustoilla evästeiden kautta esim. 
 <translation id="26915454213703967">Hae kuvasta Googlella</translation>
 <translation id="2691653761409724435">Ei offline-käytössä</translation>
 <translation id="2695507686909505111">Sivu käännetty</translation>
+<translation id="2696180352517415858">Sinua ei kirjata ulos Google-tililtäsi. <ph name="BEGIN_LINK" />Muita toimintoja<ph name="END_LINK" /> voidaan tallentaa Google-tilillesi, kun olet kirjautuneena sisään. Voit poistaa niitä koska vain.
+
+
+Hakukoneesi on <ph name="DSE_NAME" />. Katso tarvittaessa hakukoneen ohjeet hakuhistorian poistamiselle.</translation>
 <translation id="2697526135132990015">Kirjaudu ulos ja poista data</translation>
 <translation id="2700241355396984822">Lupien myöntämisen valinnat</translation>
 <translation id="2702801445560668637">Lukulista</translation>
@@ -249,6 +255,7 @@ Sivustot eivät näe selaustoimintaasi eri sivustoilla evästeiden kautta esim. 
 <translation id="2747003861858887689">Edellinen kenttä</translation>
 <translation id="2749231692441336879"><ph name="CHANNEL_NAME" /> seurannassa</translation>
 <translation id="2764831210418622012">äsken</translation>
+<translation id="2772667768515195373">Voit käyttää tallennettuja osoitteita kaikissa Google-tuotteissa. Osoite on tallennettu Google-tilillesi, <ph name="USER_EMAIL" />.</translation>
 <translation id="2773292004659987824">Incognito-haku</translation>
 <translation id="277771892408211951">Valitse kieli</translation>
 <translation id="2780046210906776326">Ei sähköpostitilejä</translation>
@@ -317,7 +324,6 @@ Katso tarvittaessa hakukoneesi ohjeet hakuhistorian poistamiselle.</translation>
 <translation id="3174662312949010067">Voit käyttää tallennettuja salasanoja myös muilla laitteillasi.</translation>
 <translation id="3175081911749765310">Verkkopalvelut</translation>
 <translation id="3178650076442119961">Aktiivinen tänään</translation>
-<translation id="3181261441371833039">Sulje vain tavalliset välilehdet</translation>
 <translation id="3181825792072797598">Ota synkronointi käyttöön</translation>
 <translation id="3181954750937456830">Selaussuoja (suojaa sinua ja laitettasi vaarallisilta sivustoilta)</translation>
 <translation id="3184767182050912705"><ph name="BIOMETRIC_AUTHENITCATION_TYPE" /> avaa lukituksen</translation>
@@ -325,6 +331,7 @@ Katso tarvittaessa hakukoneesi ohjeet hakuhistorian poistamiselle.</translation>
 <translation id="3214379938835224220">Sinut kirjattiin ulos, kun iPad nollattiin. Kirjaudu sisään valitsemalla alta "Jatka".</translation>
 <translation id="3224641773458703735">Jos haluat viedä salasanoja, sinun on ensin määritettävä laitteellesi tunnuskoodi.</translation>
 <translation id="3227137524299004712">Mikrofoni</translation>
+<translation id="3235063766008841141">Käytetty petollisella sivustolla ja kuului tietosuojaloukkaukseen</translation>
 <translation id="3240426699337459095">Linkki kopioitu</translation>
 <translation id="3244271242291266297">KK</translation>
 <translation id="3245744387817103524">Muutosta ei voitu tallentaa.</translation>
@@ -364,6 +371,7 @@ Katso tarvittaessa hakukoneesi ohjeet hakuhistorian poistamiselle.</translation>
 <translation id="3494788280727468875">Vahvista selaustietojen poistaminen</translation>
 <translation id="35083190962747987">Avaa ${url}</translation>
 <translation id="3519193562722059437">Avaa välilehti selailua varten.</translation>
+<translation id="3519905498307021260">{count,plural, =1{Avaa välilehti}other{Avaa {count} välilehteä}}</translation>
 <translation id="3527085408025491307">Kansio</translation>
 <translation id="3529024052484145543">Ei turvallinen</translation>
 <translation id="3530206579861815432">Löydä kaikilla synkronoiduilla laitteilla auki olevia tai äskettäin suljettuja välilehtiä nopeasti.</translation>
@@ -398,10 +406,10 @@ Katso tarvittaessa hakukoneesi ohjeet hakuhistorian poistamiselle.</translation>
 <translation id="3789841737615482174">Asenna</translation>
 <translation id="380329542618494757">Nimi</translation>
 <translation id="3803696231112616155">Tarjoa tämän sivuston kääntämistä</translation>
-<translation id="3803967590068704619">Tämä osoite on tallennettu Google-tilillesi (<ph name="USER_EMAIL" />). Voit käyttää osoitetta kaikissa Googlen tuotteissa millä tahansa laitteella.</translation>
 <translation id="3810973564298564668">Hallinnoi</translation>
 <translation id="3818293389945649617">Hae seuraava</translation>
 <translation id="3819183753496523827">Olet offline-tilassa. Tarkista internetyhteytesi ja yritä uudelleen.</translation>
+<translation id="3832419617903252251">Salasana on tallennettu vain tälle laitteelle</translation>
 <translation id="3835964409414434850">Siirry seuraavalle välilehdelle</translation>
 <translation id="3838691874161539578">Tarkista tallentamasi salasanat tietoturvan parantamiseksi ja selataksesi turvallisemmin</translation>
 <translation id="385051799172605136">Takaisin</translation>
@@ -411,6 +419,7 @@ Katso tarvittaessa hakukoneesi ohjeet hakuhistorian poistamiselle.</translation>
 <translation id="3863769054730344136">Laitteille lähettäminen</translation>
 <translation id="387280738075653372">Lataa Chrome täältä.</translation>
 <translation id="3888863481921783344">Sinulle näytetään mahdollisia osallistujia tapahtumaan.</translation>
+<translation id="3891414008432200754">Hinta</translation>
 <translation id="3892144330757387737">Näet historiasi täällä</translation>
 <translation id="3897092660631435901">Valikko</translation>
 <translation id="3904829425754749514">Organisaatiosi on laittanut synkronoinnin pois päältä. Voit edelleen nähdä kirjanmerkit, historian, salasanat ja muut asetukset tällä laitteella. Jos teet muutoksia, niitä ei synkronoida tilillesi.</translation>
@@ -458,6 +467,7 @@ Katso tarvittaessa hakukoneesi ohjeet hakuhistorian poistamiselle.</translation>
 <translation id="4237377247299956313">Valitse <ph name="BEGIN_BOLD" />Oletusselainsovellus<ph name="END_BOLD" /></translation>
 <translation id="424315890655130736">Anna tunnuslause</translation>
 <translation id="4249955472157341256">Lajittele viimeisimmät ensimmäisiksi</translation>
+<translation id="4250432749243022864">{count,plural, =0{Avaa {count} välilehti}=1{Avaa {count} välilehti}other{Avaa {count} välilehteä}}</translation>
 <translation id="4253168017788158739">Huomautus</translation>
 <translation id="4263576668337963058">Näytä käytettävissä olevat sivutoiminnot</translation>
 <translation id="4267586310863245665">{COUNT,plural, =1{Olet hylännyt {COUNT} varoituksen}other{Olet hylännyt {COUNT} varoitusta}}</translation>
@@ -475,6 +485,7 @@ Katso tarvittaessa hakukoneesi ohjeet hakuhistorian poistamiselle.</translation>
 <translation id="4342946437867096381">Olet jo tallentanut tämän sivuston salasanan Google-tilillesi. Google voi valita uusimman salasanan puolestasi.</translation>
 <translation id="4343046787186034850">Pääsy kameraan ja mikrofoniin myönnetty</translation>
 <translation id="4359125752503270327">Tämä sivu avataan toisessa sovelluksessa.</translation>
+<translation id="4371526908359194219">Sähköposti-ilmoitukset</translation>
 <translation id="4375040482473363939">QR-koodihaku</translation>
 <translation id="4378154925671717803">Puhelin</translation>
 <translation id="4389019817280890563">Vaihda kieltä napauttamalla.</translation>
@@ -499,6 +510,7 @@ Katso tarvittaessa hakukoneesi ohjeet hakuhistorian poistamiselle.</translation>
 <translation id="452750746583162491">Tarkista synkronoitu datasi</translation>
 <translation id="4536418791685807335">Yritä kirjautua sisään uudelleen.</translation>
 <translation id="4540780316273593836">Jotain meni pieleen</translation>
+<translation id="457292989631956153">{COUNT,plural, =1{Suljetaanko {COUNT} ei-aktiivinen välilehti?}other{Suljetaanko {COUNT} ei-aktiivista välilehteä?}}</translation>
 <translation id="457386861538956877">Lisää...</translation>
 <translation id="4587235830039045480">Tallenna salasana Google-tilille</translation>
 <translation id="4587589328781138893">Sivustot</translation>
@@ -528,6 +540,7 @@ Tietosi salataan synkronoinnin tunnuslauseesi avulla. Aloita synkronointi antama
 <translation id="470966556546083668">Älä laita synkronointia päälle</translation>
 <translation id="4737560986434232178">Hiljattain suljetut välilehdet</translation>
 <translation id="473775607612524610">Päivitä</translation>
+<translation id="4746926359847517643">Voit milloin tahansa palauttaa ne historiasta.</translation>
 <translation id="4747097190499141774">Google Payn maksutapoja tai osoitteita ei salata tunnuslauseella. Salattua dataa voidaan lukea vain tunnuslauseesi avulla. Tunnuslausetta ei lähetetä Googlelle eikä Google tallenna sitä. Jos unohdat tunnuslauseesi tai haluat muokata tätä asetusta, synkronointi täytyy nollata. <ph name="BEGIN_LINK" />Lisätietoja<ph name="END_LINK" /></translation>
 <translation id="4751162929052964260"><ph name="TITLE" />, <ph name="STATE" />, Vain tällä laitteella, <ph name="URL" /></translation>
 <translation id="4751645464639803239">Uusi incognito-välilehti</translation>
@@ -576,6 +589,7 @@ Jos haluat muokata asetusta, <ph name="BEGIN_LINK" />nollaa synkronointi<ph name
 <translation id="4986678885919050584">Poista tältä laitteelta</translation>
 <translation id="498985224078955265">Jos haluat lähettää välilehden toiselle laitteelle, kirjaudu Chromeen molemmilla laitteilla.</translation>
 <translation id="5005498671520578047">Kopioi salasana</translation>
+<translation id="5016420433031926653">Lähetä tänne: <ph name="USER_EMAIL" /></translation>
 <translation id="5017828934289857214">Muistuta myöhemmin</translation>
 <translation id="5037676449506322593">Valitse kaikki</translation>
 <translation id="5039804452771397117">Salli</translation>
@@ -596,6 +610,7 @@ Jos haluat muokata asetusta, <ph name="BEGIN_LINK" />nollaa synkronointi<ph name
 <translation id="5168414296986405587">Suunniteltu iPadOS:lle</translation>
 <translation id="5173088371991956744">Synkronoinnin on vahvistettava henkilöllisyytesi</translation>
 <translation id="5176312250994681348">Säilytä uusin salasana</translation>
+<translation id="51802232683641391">{count,plural, =1{Haluatko avata välilehden, joka oli avoinna Android-laitteella?}other{Haluatko avata välilehdet, jotka olivat avoinna Android-laitteella?}}</translation>
 <translation id="5181140330217080051">Ladataan</translation>
 <translation id="5184329579814168207">Avaa Chromessa</translation>
 <translation id="5186185447130319458">Yksityinen</translation>
@@ -630,6 +645,7 @@ Jos haluat muokata asetusta, <ph name="BEGIN_LINK" />nollaa synkronointi<ph name
 <translation id="54401264925851789">Sivun suojaustiedot</translation>
 <translation id="5443952882982198570">Luottokortit</translation>
 <translation id="5444892875087332195">Kirjanmerkit</translation>
+<translation id="5453250766792920795">{count,plural, =1{Tilillesi ({email}) tallennettu kirjanmerkki}other{Tilillesi ({email}) tallennetut kirjanmerkit}}</translation>
 <translation id="5457226814769348910">Avaa offline-versio</translation>
 <translation id="5489208564673669003">Jos haluat ylläpitää kaikkien sivustojen evästeitä, siirry <ph name="BEGIN_LINK" />Evästeasetuksiin<ph name="END_LINK" />.</translation>
 <translation id="5490005495580364134">Estä kaikki evästeet (ei suositella)</translation>
@@ -656,6 +672,7 @@ Handoff täytyy ottaa käyttöön myös Asetusten Yleiset-osiossa. Lisäksi mole
 <translation id="5669528293118408608">www</translation>
 <translation id="5669617676038747374">QR-koodin luominen</translation>
 <translation id="567881659373499783">Versio <ph name="PRODUCT_VERSION" /></translation>
+<translation id="5683499062697987550">Vahvista henkilöllisyytesi, jotta voit käyttää ja tallentaa salasanoja Google-tililläsi.</translation>
 <translation id="5690398455483874150">{count,plural, =1{Nyt näytetään 1 Chrome-ikkuna}other{Nyt näytetään {count} Chrome-ikkunaa}}</translation>
 <translation id="5701270923492462699">Pääsy kameraan myönnetty</translation>
 <translation id="5704908597376970822">Sisäänkirjautuminen ei onnistu.</translation>
@@ -706,6 +723,7 @@ Handoff täytyy ottaa käyttöön myös Asetusten Yleiset-osiossa. Lisäksi mole
 <translation id="5963939892571022323">Korostukseen ei voi luoda linkkiä.</translation>
 <translation id="5965679971710331625">Olet kirjautunut sisään</translation>
 <translation id="5979837087407522202">Hae salasanoista</translation>
+<translation id="5981230843984570095">Sulje kaikki ei-aktiiviset</translation>
 <translation id="5982717868370722439">Lisää olemassa olevat tiedot tilille <ph name="USER_EMAIL" />.</translation>
 <translation id="5984222099446776634">Viimeksi vieraillut</translation>
 <translation id="5988097621740394599">Katso hinnanalennukset välilehdiltä.</translation>
@@ -749,11 +767,13 @@ Handoff täytyy ottaa käyttöön myös Asetusten Yleiset-osiossa. Lisäksi mole
 <translation id="6219550825416862075">Tervetuloa takaisin</translation>
 <translation id="6219688215832490856">Älä käännä koskaan</translation>
 <translation id="6223816392543092032">Käytä kirjanmerkkejäsi, historiaasi, salasanojasi ja muita asetuksiasi kaikilla laitteillasi</translation>
+<translation id="6224759905509595045">Vahvista henkilöllisyytesi…</translation>
 <translation id="6229318421047648685">Tietokoneversion pyytäminen</translation>
 <translation id="6231782223312638214">Ehdotukset</translation>
 <translation id="6232329973559504466">Incognito-haku</translation>
 <translation id="6247557882553405851">Googlen Salasanojen ylläpito</translation>
 <translation id="6254066287920239840">Avaa linkit sovelluksessa selaimen sijaan.</translation>
+<translation id="625491139841322297">{count,plural, =1{Tarkista välilehti}other{Tarkista kaikki välilehdet}}</translation>
 <translation id="6255097610484507482">Luottokortin muokkaus</translation>
 <translation id="6277426346321820595">Ei suojausta</translation>
 <translation id="6284652193729350524">Tarjoudu kääntämään <ph name="LANGUAGE" /></translation>
@@ -788,6 +808,7 @@ Handoff täytyy ottaa käyttöön myös Asetusten Yleiset-osiossa. Lisäksi mole
 
 Tietosi salattiin tunnuslauseesi avulla <ph name="TIME" />. Aloita synkronointi antamalla tunnuslause.</translation>
 <translation id="6418346271604475326">Valmistellaan</translation>
+<translation id="6421095165635308">{count,plural, =1{Kirjanmerkki tallennettu tilillesi: {title}, {email}}other{Kirjanmerkit tallennettu tilillesi: {title}, {email}}}</translation>
 <translation id="6429213933892582367">Avaa Salasana-asetukset</translation>
 <translation id="6434591244308415567">Tapahtui virhe, yritä myöhemmin uudelleen.</translation>
 <translation id="6435236283694032571">Lisää lukulistalle</translation>
@@ -866,6 +887,7 @@ Kun olet incognito-tilassa, sivustot eivät näe selaustoimintaasi eri sivustoil
 <translation id="6831043979455480757">Käännä</translation>
 <translation id="6842136130964845393">Todenna henkilöllisyytesi varmistaaksesi, että sinulla on aina pääsy tallennettuihin salasanoihisi</translation>
 <translation id="6851516051005285358">Käytä tietokoneversiota</translation>
+<translation id="6852222216891664518">Sulje kiinnitetty välilehti</translation>
 <translation id="6858855187367714033">Luettu</translation>
 <translation id="6859944681507688231">Jos haluat skannata QR-koodin tai credit-kortin, ota kamera käyttöön asetuksista.</translation>
 <translation id="6867369562105931222">salasana</translation>
@@ -876,6 +898,7 @@ Kun olet incognito-tilassa, sivustot eivät näe selaustoimintaasi eri sivustoil
 <translation id="6888009575607455378">Haluatko varmasti hylätä muutokset?</translation>
 <translation id="6896758677409633944">Kopioi</translation>
 <translation id="6897187120838603299">Salasana tallennetaan laitteellesi.</translation>
+<translation id="6906448540340261898">Varmista, että voit aina käyttää Google-tilisi salasanoja</translation>
 <translation id="6913136913033237761"><ph name="FOLDER_NAME" />. Vain tällä laitteella.</translation>
 <translation id="6914583639806229067">Hae kopioitua kuvaa</translation>
 <translation id="6914783257214138813">Salasanasi näkyvät kaikille, jotka näkevät viedyn tiedoston.</translation>
@@ -907,6 +930,7 @@ Kun olet incognito-tilassa, sivustot eivät näe selaustoimintaasi eri sivustoil
 <translation id="7108762695052995889">Siirry sivustolle</translation>
 <translation id="7133798577887235672">Koko nimi</translation>
 <translation id="7136892417564438900">Kamera ei ole käytettävissä</translation>
+<translation id="7161230316646448869">Synkronoi kirjanmerkkisi, historiasi ja paljon muuta kaikilla laitteilla</translation>
 <translation id="7162168282402939716"><ph name="BIOMETRIC_AUTHENITCATION_TYPE" /> avaa incognito-välilehtien lukituksen</translation>
 <translation id="7172852049901402487">Suojaa salasanasi tietoturvaongelmilta</translation>
 <translation id="7173114856073700355">Avaa asetukset</translation>
@@ -928,6 +952,7 @@ Kun olet incognito-tilassa, sivustot eivät näe selaustoimintaasi eri sivustoil
 <translation id="7346909386216857016">Selvä</translation>
 <translation id="734758817008927353">Kortin tallentamisvaihtoehdot</translation>
 <translation id="7351537303876921605">Valitse kontekstivalikosta "Luo linkki"</translation>
+<translation id="7352651011704765696">Tapahtui jokin virhe</translation>
 <translation id="7353432112255316844">Todenna henkilöllisyytesi</translation>
 <translation id="7383797227493018512">Lukulista</translation>
 <translation id="7398893703713203428">Luo linkki</translation>
@@ -962,6 +987,7 @@ Kun olet incognito-tilassa, sivustot eivät näe selaustoimintaasi eri sivustoil
 <translation id="7607521702806708809">Poista salasana</translation>
 <translation id="7611459119367035420">Kiinnitetyt välilehdet löytyvät täältä.</translation>
 <translation id="7638584964844754484">Väärä tunnuslause.</translation>
+<translation id="7640669552036055091">Välilehdet Android-laitteelta</translation>
 <translation id="7646263789464975852">Valikko → Asetukset → Turvatarkistus</translation>
 <translation id="7646772052135772216">Salasanojen synkronointi ei toimi</translation>
 <translation id="764827086632467055">Valitse Oletusselainsovellus</translation>
@@ -977,6 +1003,7 @@ Kun olet incognito-tilassa, sivustot eivät näe selaustoimintaasi eri sivustoil
 <translation id="7733646263819020771"><ph name="BOOKMRK_NAME" />. Vain tällä laitteella.</translation>
 <translation id="7738120385185846461">Ilmoita ongelmasta…</translation>
 <translation id="7741325291586284254">Uusi sivu incognito-välilehdellä</translation>
+<translation id="7744192722284567281">Kuului tietosuojaloukkaukseen</translation>
 <translation id="7744394900930577716">Salasanat muissa sovelluksissa</translation>
 <translation id="7749790401023484470">Et valinnut tekstiä.</translation>
 <translation id="7756478488453921771">Valikko → Asetukset → Maksutavat</translation>
@@ -1033,6 +1060,7 @@ Sivustot voivat nähdä selaustoimintaasi eri sivustoilta evästeiden kautta esi
 <translation id="806745655614357130">Pidä tiedot erillään</translation>
 <translation id="8073670137947914548">Lataus valmis</translation>
 <translation id="8073872304774253879">Paranna hakuja ja selausta</translation>
+<translation id="8076492880354921740">Välilehdet</translation>
 <translation id="8077675488769462025">Ei-aktiiviset välilehdet</translation>
 <translation id="8079602123447022758">Tätä asetusta ylläpidetään, katso lisätietoja kaksoisnapauttamalla</translation>
 <translation id="8080028325999236607">Sulje kaikki välilehdet</translation>
@@ -1126,6 +1154,7 @@ Sivustot voivat nähdä selaustoimintaasi eri sivustoilta evästeiden kautta esi
 <translation id="8764015330924122850">Älä seuraa: <ph name="DOMAIN_NAME" /></translation>
 <translation id="8766790350274092814">Näiden salasanat poistetaan: <ph name="WEBSITE" /> ja <ph name="SECOND_WEBSITE" />. Tilejäsi ei poisteta.</translation>
 <translation id="8775144690796719618">Virheellinen URL-osoite</translation>
+<translation id="8780076847684176174">{count,plural, =1{Tarkista välilehti…}other{Tarkista kaikki välilehdet…}}</translation>
 <translation id="8787968206789828143">Hae verkosta</translation>
 <translation id="8792626944327216835">mikrofoni</translation>
 <translation id="8803639129939845298">Turvallinen</translation>
@@ -1151,6 +1180,7 @@ Sivustot voivat nähdä selaustoimintaasi eri sivustoilta evästeiden kautta esi
 <translation id="891658175948553296">Korosta sivuston tekstiä</translation>
 <translation id="8917490105272468696">Kyllä</translation>
 <translation id="8928133177108699615">Työpöytä</translation>
+<translation id="8934982071228289624">Jos haluat tallentaa tämän salasanan tilillesi, sinun on ensin lisättävä laitteellesi tunnuskoodi.</translation>
 <translation id="894191600409472540">Luo vahvoja salasanoja</translation>
 <translation id="8952559610785099500">Lisää salasana</translation>
 <translation id="8953046091948372197">Näet kirjanmerkkisi täällä</translation>
@@ -1162,6 +1192,7 @@ Sivustot voivat nähdä selaustoimintaasi eri sivustoilta evästeiden kautta esi
 <translation id="8978059030508051916">{count,plural, =0{Ei vaarantuneita salasanoja}=1{{count} vaarantunut salasana}other{{count} vaarantunutta salasanaa}}</translation>
 <translation id="8981454092730389528">Googlen toimintojen hallinta</translation>
 <translation id="8985320356172329008">Olet kirjautuneena Google-tilille käyttäjänä</translation>
+<translation id="8998289560386111590">Ei saatavilla laitteellasi</translation>
 <translation id="9000089900434778519">Hakukoneesi on <ph name="DSE_NAME" />. Katso tarvittaessa hakukoneen ohjeet hakuhistorian poistamiselle.</translation>
 <translation id="9008201768610948239">Ohita</translation>
 <translation id="9034759925968272072">Sinua ei kirjata ulos Google-tililtäsi. Google-tililläsi voi olla muita selaushistoriatietoja osoitteessa <ph name="BEGIN_LINK" />history.google.com<ph name="END_LINK" />.</translation>
@@ -1189,6 +1220,7 @@ Sivustot voivat nähdä selaustoimintaasi eri sivustoilta evästeiden kautta esi
 <translation id="9162432979321511934">Laita Täytä salasanat automaattisesti päälle.</translation>
 <translation id="9165320910061267720">Jos haluat saada ilmoituksia hinnan laskusta, sinun on laitettava ilmoitukset päälle iOS-asetuksista.</translation>
 <translation id="9177438225260810839">Hae avoimilta välilehdiltä</translation>
+<translation id="9187853111759024059">Suljetaanko yli 99 ei-aktiivista välilehteä?</translation>
 <translation id="9188680907066685419">Kirjaudu ulos hallinnoidulta tililtä</translation>
 <translation id="9200875785104711666"><ph name="TIME" /> pv sitten</translation>
 <translation id="9203116392574189331">Handoff</translation>

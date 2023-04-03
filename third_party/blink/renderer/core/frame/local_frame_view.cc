@@ -345,6 +345,7 @@ void LocalFrameView::Trace(Visitor* visitor) const {
   visitor->Trace(fullscreen_video_elements_);
   visitor->Trace(pending_transform_updates_);
   visitor->Trace(pending_opacity_updates_);
+  visitor->Trace(disconnected_elements_with_remembered_size_);
 }
 
 void LocalFrameView::ForAllChildViewsAndPlugins(
@@ -1431,33 +1432,13 @@ bool LocalFrameView::HasOrthogonalWritingModeRoots() const {
   return !orthogonal_writing_mode_root_list_.IsEmpty();
 }
 
-static inline void RemoveFloatingObjectsForSubtreeRoot(LayoutObject& root) {
-  // TODO(kojii): Under certain conditions, moveChildTo() defers
-  // removeFloatingObjects() until the containing block layouts. For
-  // instance, when descendants of the moving child is floating,
-  // removeChildNode() does not clear them. In such cases, at this
-  // point, FloatingObjects may contain old or even deleted objects.
-  // Dealing this in markAllDescendantsWithFloatsForLayout() could
-  // solve, but since that is likely to suffer the performance and
-  // since the containing block of orthogonal writing mode roots
-  // having floats is very rare, prefer to re-create
-  // FloatingObjects.
-  if (LayoutBlock* cb = root.ContainingBlock()) {
-    auto* child_block_flow = DynamicTo<LayoutBlockFlow>(cb);
-    if ((cb->NormalChildNeedsLayout() || cb->SelfNeedsLayout()) &&
-        child_block_flow) {
-      child_block_flow->RemoveFloatingObjectsFromDescendants();
-    }
-  }
-}
-
 static bool PrepareOrthogonalWritingModeRootForLayout(LayoutObject& root) {
   DCHECK(To<LayoutBox>(root).IsOrthogonalWritingModeRoot());
   if (!root.NeedsLayout() || root.IsOutOfFlowPositioned() ||
       root.IsColumnSpanAll() || root.StyleRef().LogicalHeight().IsSpecified() ||
-      To<LayoutBox>(root).IsGridItem() || root.IsTablePart() ||
-      root.IsLayoutFlowThread())
+      root.IsTablePart() || root.IsLayoutFlowThread()) {
     return false;
+  }
 
   // Do not pre-layout objects that are fully managed by LayoutNG; it is not
   // necessary and may lead to double layouts. We do need to pre-layout objects
@@ -1477,7 +1458,6 @@ static bool PrepareOrthogonalWritingModeRootForLayout(LayoutObject& root) {
     }
   }
 
-  RemoveFloatingObjectsForSubtreeRoot(root);
   return true;
 }
 
@@ -2575,6 +2555,14 @@ bool LocalFrameView::RunResizeObserverSteps(
     DocumentLifecycle::LifecycleState target_state) {
   if (target_state != DocumentLifecycle::kPaintClean)
     return false;
+
+  for (auto& element : disconnected_elements_with_remembered_size_) {
+    if (!element->isConnected()) {
+      element->SetLastRememberedBlockSize(absl::nullopt);
+      element->SetLastRememberedInlineSize(absl::nullopt);
+    }
+  }
+  disconnected_elements_with_remembered_size_.clear();
 
   bool re_run_lifecycles = false;
   ForAllNonThrottledLocalFrameViews(
@@ -5018,4 +5006,10 @@ void LocalFrameView::RemoveAllPendingUpdates() {
     pending_transform_updates_->clear();
   }
 }
+
+void LocalFrameView::NotifyElementWithRememberedSizeDisconnected(
+    Element* element) {
+  disconnected_elements_with_remembered_size_.insert(element);
+}
+
 }  // namespace blink

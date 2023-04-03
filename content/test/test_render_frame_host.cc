@@ -426,7 +426,8 @@ void TestRenderFrameHost::SendRendererInitiatedNavigationRequest(
           absl::nullopt /* web_bundle_token */,
           blink::mojom::NavigationInitiatorActivationAndAdStatus::
               kDidNotStartWithTransientActivation,
-          false /* is_container_initiated */);
+          false /* is_container_initiated */,
+          false /* is_fullscreen_requested */, false /* has_storage_access */);
   auto common_params = blink::CreateCommonNavigationParams();
   common_params->url = url;
   common_params->initiator_origin = GetLastCommittedOrigin();
@@ -618,6 +619,8 @@ void TestRenderFrameHost::SendCommitNavigation(
     mojo::PendingRemote<network::mojom::URLLoaderFactory>
         prefetch_loader_factory,
     mojo::PendingRemote<network::mojom::URLLoaderFactory> topics_loader_factory,
+    mojo::PendingRemote<network::mojom::URLLoaderFactory>
+        keep_alive_loader_factory,
     const absl::optional<blink::ParsedPermissionsPolicy>& permissions_policy,
     blink::mojom::PolicyContainerPtr policy_container,
     const blink::DocumentToken& document_token,
@@ -686,8 +689,8 @@ TestRenderFrameHost::BuildDidCommitParams(bool did_create_new_entry,
   }
 
   // In most cases, the origin will match the URL's origin.  Tests that need to
-  // check corner cases (like about:blank) should specify the origin param
-  // manually.
+  // check corner cases (like about:blank) should specify the origin and
+  // initiator_base_url params manually.
   url::Origin origin = url::Origin::Create(url);
   params->origin = origin;
 

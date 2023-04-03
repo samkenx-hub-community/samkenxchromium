@@ -99,7 +99,7 @@ class ChromeUserManagerImpl
   bool IsGuestSessionAllowed() const override;
   bool IsGaiaUserAllowed(const user_manager::User& user) const override;
   bool IsUserAllowed(const user_manager::User& user) const override;
-  bool AreEphemeralUsersEnabled() const override;
+  bool IsEphemeralAccountId(const AccountId& account_id) const override;
   const AccountId& GetGuestAccountId() const override;
   bool IsFirstExecAfterBoot() const override;
   void AsyncRemoveCryptohome(const AccountId& account_id) const override;
@@ -277,6 +277,7 @@ class ChromeUserManagerImpl
   base::CallbackListSubscription family_link_accounts_subscription_;
   base::CallbackListSubscription owner_subscription_;
 
+  base::CallbackListSubscription ephemeral_users_enabled_subscription_;
   base::CallbackListSubscription local_accounts_subscription_;
 
   std::unique_ptr<MultiProfileUserController> multi_profile_user_controller_;

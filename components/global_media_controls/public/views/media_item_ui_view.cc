@@ -14,7 +14,6 @@
 #include "components/global_media_controls/public/views/media_item_ui_device_selector.h"
 #include "components/global_media_controls/public/views/media_item_ui_footer.h"
 #include "components/media_message_center/media_notification_item.h"
-#include "components/media_message_center/media_notification_view_ash_impl.h"
 #include "components/media_message_center/media_notification_view_modern_impl.h"
 #include "components/strings/grit/components_strings.h"
 #include "components/vector_icons/vector_icons.h"
@@ -85,7 +84,8 @@ MediaItemUIView::MediaItemUIView(
     base::WeakPtr<media_message_center::MediaNotificationItem> item,
     std::unique_ptr<MediaItemUIFooter> footer_view,
     std::unique_ptr<MediaItemUIDeviceSelector> device_selector_view,
-    absl::optional<media_message_center::NotificationTheme> theme)
+    absl::optional<media_message_center::NotificationTheme> theme,
+    absl::optional<media_message_center::MediaDisplayPage> media_display_page)
     : views::Button(base::BindRepeating(&MediaItemUIView::ContainerClicked,
                                         base::Unretained(this))),
       id_(id),
@@ -100,8 +100,12 @@ MediaItemUIView::MediaItemUIView(
       l10n_util::GetStringUTF16(IDS_GLOBAL_MEDIA_CONTROLS_BACK_TO_TAB));
 
 #if BUILDFLAG(IS_CHROMEOS)
+  // The updated UI requires notification theme to be set while the toolbar
+  // media button does not provide it, so we need to verify the source display
+  // page is from the quick settings.
   bool use_cros_updated_ui =
-      base::FeatureList::IsEnabled(media::kGlobalMediaControlsCrOSUpdatedUI);
+      base::FeatureList::IsEnabled(media::kGlobalMediaControlsCrOSUpdatedUI) &&
+      media_display_page.has_value();
 #else
   bool use_cros_updated_ui = false;
 #endif
@@ -146,8 +150,10 @@ MediaItemUIView::MediaItemUIView(
 
   std::unique_ptr<media_message_center::MediaNotificationView> view;
   if (use_cros_updated_ui) {
+    DCHECK(theme.has_value());
     view = std::make_unique<media_message_center::MediaNotificationViewAshImpl>(
-        this, std::move(item), std::move(dismiss_button_placeholder), theme);
+        this, std::move(item), std::move(dismiss_button_placeholder),
+        theme.value(), media_display_page.value());
   } else if (base::FeatureList::IsEnabled(
                  media::kGlobalMediaControlsModernUI)) {
     footer_view_ = footer_view_.get();

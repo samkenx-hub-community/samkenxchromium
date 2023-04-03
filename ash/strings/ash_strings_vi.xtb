@@ -40,6 +40,7 @@ Dưới đây là một số việc bạn có thể thử để bắt đầu.</t
 <translation id="1181037720776840403">Xóa</translation>
 <translation id="1182225749592316782">Điều này cho phép truy cập máy ảnh và micrô đối với tất cả ứng dụng và trang web có quyền truy cập máy ảnh và micrô</translation>
 <translation id="1183863904939664422">Không quan tâm đến nội dung đề xuất này</translation>
+<translation id="1184126796192815024">Mạng này không hỗ trợ truyền trực tuyến các ứng dụng từ điện thoại của bạn. Hãy thử dùng điểm phát sóng trên điện thoại. <ph name="LEARN_MORE" /></translation>
 <translation id="118437560755358292">Hãy nhập mật khẩu hoặc mã PIN để tăng cường bảo mật</translation>
 <translation id="118532027333893379">Nhấn vào vị trí bất kỳ để chụp toàn màn hình</translation>
 <translation id="1190609913194133056">Trung tâm thông báo</translation>
@@ -219,6 +220,7 @@ Dưới đây là một số việc bạn có thể thử để bắt đầu.</t
 <translation id="1969011864782743497"><ph name="DEVICE_NAME" /> (USB)</translation>
 <translation id="1972950159383891558">Chào <ph name="USERNAME" />!</translation>
 <translation id="1978498689038657292">Nhập văn bản</translation>
+<translation id="1980808257969311265">Tham gia <ph name="EVENT_SUMMARY" /></translation>
 <translation id="1982717156487272186">Hiện dữ liệu tuần trước</translation>
 <translation id="1989113344093894667">Không thể chụp nội dung</translation>
 <translation id="1990046457226896323">Đã tải tệp mã chuyển lời nói thành văn bản xuống</translation>
@@ -573,6 +575,7 @@ Dưới đây là một số việc bạn có thể thử để bắt đầu.</t
 <translation id="3659814201068740063">Còn <ph name="TIME_LEFT" /> (<ph name="PERCENTAGE" />%).
 Hãy sạc thiết bị.</translation>
 <translation id="366222428570480733"><ph name="USER_EMAIL_ADDRESS" /> Người dùng được quản lý</translation>
+<translation id="3666266999138159418">Vuốt để ẩn cửa sổ nổi</translation>
 <translation id="367531336287639526">Chọn biểu tượng đầu tiên ở bên trái thanh địa chỉ</translation>
 <translation id="3679827876008292680">Chuyển đến thẻ cuối cùng trong cửa sổ</translation>
 <translation id="36813544980941320">Điện thoại và <ph name="DEVICE_NAME" /> của bạn sẽ dùng chung mạng Wi-Fi</translation>
@@ -621,7 +624,6 @@ Hãy sạc thiết bị.</translation>
 <translation id="3925540965556789199"><ph name="DATE" />, Đang tải sự kiện.</translation>
 <translation id="3932043219784172185">Không có thiết bị nào được kết nối</translation>
 <translation id="3934456833412894880">Tính năng Sạc thích ứng đang bật Pin của bạn sẽ giữ ở mức 80% để kéo dài thời lượng pin và sạc đầy khi bạn cần.</translation>
-<translation id="3936620957945677513">Nhấn Enter để tham gia sự kiện <ph name="EVENT_SUMMARY" /></translation>
 <translation id="3943857333388298514">Dán</translation>
 <translation id="394485226368336402">Cài đặt âm thanh</translation>
 <translation id="3945319193631853098">Nhấn để hoàn tất quá trình thiết lập</translation>
@@ -1252,6 +1254,7 @@ Mới cài đặt</translation>
 <translation id="685782768769951078">{NUM_DIGITS,plural, =1{Còn lại một số}other{Còn lại # số}}</translation>
 <translation id="6867938213751067702">Đã tạm dừng tải <ph name="FILENAME" /> xuống</translation>
 <translation id="6878400149835617132">Đã tắt phím tắt</translation>
+<translation id="6878701771800702153">{NUM_APPS,plural, =1{1 ứng dụng}other{# ứng dụng}}</translation>
 <translation id="6884665277231944629">Quay lại hôm nay</translation>
 <translation id="6886172995547742638">Hiệu suất của <ph name="DEVICE_TYPE" /> của bạn có thể bị giảm. Hãy dùng bộ sạc USB-C được chứng nhận có công suất <ph name="PREFERRED_MINIMUM_POWER" />W trở lên.</translation>
 <translation id="688631446150864480">Nhấn phím Mũi tên xuống để chuyển đổi giữa các cửa sổ</translation>
@@ -1419,6 +1422,7 @@ Mới cài đặt</translation>
 <translation id="7689817529363080918">Điều này cho phép sử dụng micrô đối với <ph name="APP1_NAME" />, <ph name="APP2_NAME" /> cũng như mọi ứng dụng và trang web có quyền sử dụng micrô</translation>
 <translation id="7704000866383261579">Làm lại thao tác thực hiện gần đây nhất</translation>
 <translation id="7705524343798198388">VPN</translation>
+<translation id="770741401784017797">Đang tạo GIF</translation>
 <translation id="7714767791242455379">Thêm mạng di động mới</translation>
 <translation id="7720400844887872976">Bật cho đến <ph name="TIME" /></translation>
 <translation id="7720410380936703141">THỬ LẠI</translation>
@@ -1431,6 +1435,7 @@ Mới cài đặt</translation>
 <translation id="7749443890790263709">Đã đạt đến số lượng không gian làm việc tối đa.</translation>
 <translation id="776344839111254542">Nhấp để xem chi tiết cập nhật</translation>
 <translation id="7768784765476638775">Chọn để nói</translation>
+<translation id="7769299611924763557">Ảnh GIF của bạn sẽ sớm sẵn sàng</translation>
 <translation id="7780094051999721182">lối tắt</translation>
 <translation id="7780159184141939021">Xoay màn hình</translation>
 <translation id="7796735576426975947">Đã ẩn thông báo mới</translation>

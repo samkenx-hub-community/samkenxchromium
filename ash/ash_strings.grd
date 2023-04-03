@@ -573,6 +573,12 @@ Style notes:
       <message name="IDS_ASH_STATUS_TRAY_CAST_STOP_CASTING" desc="Label for a button in the system tray popup to stop casting to a Chromecast device.">
         Stop casting
       </message>
+      <message name="IDS_ASH_STATUS_TRAY_CAST_PAUSE" desc="Label for a button in the cast notification to pause the current cast mirroring session to a Chromecast device">
+        Pause
+      </message>
+      <message name="IDS_ASH_STATUS_TRAY_CAST_RESUME" desc="Label for a button in the cast notification to resume a paused cast mirroring session to a Chromecast device">
+        Resume
+      </message>
       <message name="IDS_ASH_STATUS_TRAY_QUIET_MODE_TOOLTIP" desc="The tooltip text for the status area icon to tell do-not-disturb mode is currently on.">
         Do Not Disturb is on
       </message>
@@ -4807,7 +4813,7 @@ Connect your device to power.
       </message>
 
       <message name="IDS_ASH_CALENDAR_JOIN_BUTTON_ACCESSIBLE_NAME" desc="The join meeting button accessible name on the event list item views.">
-        Hit enter to join event <ph name="event_summary">$1<ex>Lunch break</ex></ph>
+        Join <ph name="event_summary">$1<ex>Lunch break</ex></ph>
       </message>
 
       <message name="IDS_ASH_STATUS_TRAY_PROGRESS_BAR_ACCESSIBLE_NAME" desc="The accessible name for the progress bar shown in the status tray.">
@@ -5296,6 +5302,12 @@ Here are some things you can try to get started.
       </message>
       <message name="IDS_ASH_SCREEN_CAPTURE_DISPLAY_SOURCE" desc="The name that is the display source of the screen capture notification.">
         Screen capture
+      </message>
+      <message name="IDS_ASH_SCREEN_CAPTURE_GIF_PROGRESS_TITLE" desc="The title of the notification that shows up informing the user about the GIF file being processed.">
+        Creating GIF
+      </message>
+      <message name="IDS_ASH_SCREEN_CAPTURE_GIF_PROGRESS_MESSAGE" desc="The message of the notification that shows up informing the user about the GIF file being processed.">
+        Your GIF will be ready shortly
       </message>
       <message name="IDS_ASH_SCREEN_CAPTURE_SCREENSHOT_TITLE" desc="The title of the notificaton which shows after a screenshot is taken.">
         Screenshot taken
@@ -6434,10 +6446,10 @@ New install
       </message>
 
       <!-- pagination view -->
-      <message name="IDS_ASH_PAGINATION_LEFT_ARROW_TOOLTIP" desc="The tooltip text used for pagination left arrow button." >
+      <message name="IDS_ASH_PAGINATION_BACKWARD_ARROW_TOOLTIP" desc="The tooltip text used for pagination backward arrow button." >
         Previous page
       </message>
-      <message name="IDS_ASH_PAGINATION_RIGHT_ARROW_TOOLTIP" desc="The tooltip text used for pagination right arrow button." >
+      <message name="IDS_ASH_PAGINATION_FORWARD_ARROW_TOOLTIP" desc="The tooltip text used for pagination forward arrow button." >
         Next page
       </message>
 
@@ -6450,6 +6462,11 @@ New install
 
 To shut down the device, press and hold the power button on the device again.
       </message>
-    </messages>
-  </release>
+
+       <!-- Tuck Education -->
+      <message name="IDS_ASH_TUCK_EDUCATIONAL_NUDGE_LABEL" desc="The text shown to users when a window is floated in tablet mode to indicate the tuck gesture." >
+        Swipe to hide your floating window
+      </message>
+     </messages>
+    </release>
 </grit>

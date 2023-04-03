@@ -15,6 +15,17 @@ export interface OpenPdfParams {
   page?: number;
 }
 
+export enum ViewMode {
+  FIT = 'fit',
+  FIT_B = 'fitb',
+  FIT_BH = 'fitbh',
+  FIT_BV = 'fitbv',
+  FIT_H = 'fith',
+  FIT_R = 'fitr',
+  FIT_V = 'fitv',
+  XYZ = 'xyz',
+}
+
 type GetNamedDestinationCallback = (name: string) =>
     Promise<NamedDestinationMessageData>;
 
@@ -84,29 +95,44 @@ export class OpenPdfParamsParser {
   /**
    * Parse view parameter of open PDF parameters. The PDF should be opened at
    * the specified fitting type mode and position.
+   * @param paramValue Params to parse.
    * @return Map with view parameters (view and viewPosition).
    */
-  private parseViewParam_(paramValue: string): OpenPdfParams {
+  private async parseViewParam_(paramValue: string): Promise<OpenPdfParams> {
     const viewModeComponents = paramValue.toLowerCase().split(',');
-    if (viewModeComponents.length < 1) {
+    if (viewModeComponents.length === 0) {
       return {};
     }
 
     const params: OpenPdfParams = {};
     const viewMode = viewModeComponents[0];
-    let acceptsPositionParam;
-    if (viewMode === 'fit') {
-      params['view'] = FittingType.FIT_TO_PAGE;
-      acceptsPositionParam = false;
-    } else if (viewMode === 'fith') {
-      params['view'] = FittingType.FIT_TO_WIDTH;
-      acceptsPositionParam = true;
-    } else if (viewMode === 'fitv') {
-      params['view'] = FittingType.FIT_TO_HEIGHT;
-      acceptsPositionParam = true;
+    let acceptsPositionParam = false;
+    switch (viewMode) {
+      case ViewMode.FIT:
+        params['view'] = FittingType.FIT_TO_PAGE;
+        break;
+      case ViewMode.FIT_H:
+        params['view'] = FittingType.FIT_TO_WIDTH;
+        acceptsPositionParam = true;
+        break;
+      case ViewMode.FIT_V:
+        params['view'] = FittingType.FIT_TO_HEIGHT;
+        acceptsPositionParam = true;
+        break;
+      case ViewMode.FIT_B:
+      case ViewMode.FIT_BH:
+      case ViewMode.FIT_BV:
+        // Not implemented yet, do nothing.
+        break;
+      case ViewMode.FIT_R:
+      case ViewMode.XYZ:
+        // Should have already been handled in `parseNameddestViewParam_()`.
+        break;
+      default:
+        // Invalid view parameter, do nothing.
     }
 
-    if (!acceptsPositionParam || viewModeComponents.length < 2) {
+    if (!acceptsPositionParam || viewModeComponents.length === 1) {
       return params;
     }
 
@@ -120,14 +146,16 @@ export class OpenPdfParamsParser {
 
   /**
    * Parse view parameters which come from nameddest.
+   * @param paramValue Params to parse.
    * @return Map with view parameters.
    */
-  private parseNameddestViewParam_(paramValue: string): OpenPdfParams {
+  private async parseNameddestViewParam_(paramValue: string):
+      Promise<OpenPdfParams> {
     const viewModeComponents = paramValue.toLowerCase().split(',');
     const viewMode = viewModeComponents[0];
     const params: OpenPdfParams = {};
 
-    if (viewMode === 'xyz' && viewModeComponents.length === 4) {
+    if (viewMode === ViewMode.XYZ && viewModeComponents.length === 4) {
       const x = parseFloat(viewModeComponents[1]);
       const y = parseFloat(viewModeComponents[2]);
       const zoom = parseFloat(viewModeComponents[3]);
@@ -145,7 +173,7 @@ export class OpenPdfParamsParser {
       return params;
     }
 
-    if (viewMode === 'fitr' && viewModeComponents.length === 5) {
+    if (viewMode === ViewMode.FIT_R && viewModeComponents.length === 5) {
       assert(this.viewportDimensions_ !== undefined);
       let x1 = parseFloat(viewModeComponents[1]);
       let y1 = parseFloat(viewModeComponents[2]);
@@ -250,7 +278,7 @@ export class OpenPdfParamsParser {
     }
 
     if (urlParams.has('view')) {
-      Object.assign(params, this.parseViewParam_(urlParams.get('view')!));
+      Object.assign(params, await this.parseViewParam_(urlParams.get('view')!));
     }
 
     if (urlParams.has('zoom')) {
@@ -267,12 +295,11 @@ export class OpenPdfParamsParser {
 
       if (data.namedDestinationView) {
         Object.assign(
-            params, this.parseNameddestViewParam_(data.namedDestinationView));
+            params,
+            await this.parseNameddestViewParam_(data.namedDestinationView));
       }
-
       return params;
     }
-
-    return Promise.resolve(params);
+    return params;
   }
 }

@@ -50,13 +50,13 @@ import android.graphics.Bitmap;
 import android.graphics.Bitmap.Config;
 import android.os.Build;
 import android.os.Build.VERSION_CODES;
-import android.support.test.InstrumentationRegistry;
 import android.view.View;
 
 import androidx.annotation.Nullable;
 import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+import androidx.test.InstrumentationRegistry;
 import androidx.test.espresso.Espresso;
 import androidx.test.espresso.NoMatchingViewException;
 import androidx.test.espresso.ViewAssertion;
@@ -69,7 +69,6 @@ import org.hamcrest.Matcher;
 import org.hamcrest.Matchers;
 import org.junit.After;
 import org.junit.Before;
-import org.junit.BeforeClass;
 import org.junit.ClassRule;
 import org.junit.Rule;
 import org.junit.Test;
@@ -125,7 +124,6 @@ import org.chromium.chrome.test.util.browser.Features.DisableFeatures;
 import org.chromium.chrome.test.util.browser.Features.EnableFeatures;
 import org.chromium.components.embedder_support.util.UrlUtilities;
 import org.chromium.content_public.browser.LoadUrlParams;
-import org.chromium.content_public.browser.test.NativeLibraryTestUtils;
 import org.chromium.content_public.browser.test.util.TestThreadUtils;
 import org.chromium.content_public.browser.test.util.WebContentsUtils;
 import org.chromium.net.test.EmbeddedTestServer;
@@ -188,12 +186,6 @@ public class TabSwitcherAndStartSurfaceLayoutTest {
     private Callback<Bitmap> mBitmapListener =
             (bitmap) -> mAllBitmaps.add(new WeakReference<>(bitmap));
     private TabSwitcher.TabListDelegate mTabListDelegate;
-
-    @BeforeClass
-    public static void beforeClass() {
-        // Only needs to be loaded once and needs to be loaded before HistogramTestRule.
-        NativeLibraryTestUtils.loadNativeLibraryNoBrowserProcess();
-    }
 
     @Before
     public void setUp() throws ExecutionException {
@@ -1727,14 +1719,14 @@ public class TabSwitcherAndStartSurfaceLayoutTest {
         mActivityTestRule.loadUrl(mUrl);
         Tab parentTab = cta.getTabModelSelector().getCurrentTab();
 
-        // Create a tab whose parent tab is parentTab.
+        // Create a tab group.
         TabCreator tabCreator =
                 TestThreadUtils.runOnUiThreadBlockingNoException(() -> cta.getTabCreator(false));
         LoadUrlParams loadUrlParams = new LoadUrlParams(mUrl);
         TestThreadUtils.runOnUiThreadBlocking(
                 ()
-                        -> tabCreator.createNewTab(
-                                loadUrlParams, TabLaunchType.FROM_LONGPRESS_BACKGROUND, parentTab));
+                        -> tabCreator.createNewTab(loadUrlParams,
+                                TabLaunchType.FROM_LONGPRESS_BACKGROUND_IN_GROUP, parentTab));
         Tab childTab = cta.getTabModelSelector().getCurrentModel().getTabAt(1);
         enterTabSwitcher(cta);
         verifyTabSwitcherCardCount(cta, 1);

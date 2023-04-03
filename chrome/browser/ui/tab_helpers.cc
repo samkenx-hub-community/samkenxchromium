@@ -84,7 +84,7 @@
 #include "chrome/browser/ui/focus_tab_after_navigation_helper.h"
 #include "chrome/browser/ui/passwords/manage_passwords_ui_controller.h"
 #include "chrome/browser/ui/pdf/chrome_pdf_web_contents_helper_client.h"
-#include "chrome/browser/ui/performance_controls/tab_discard_tab_helper.h"
+#include "chrome/browser/ui/performance_controls/high_efficiency_chip_tab_helper.h"
 #include "chrome/browser/ui/prefs/prefs_tab_helper.h"
 #include "chrome/browser/ui/privacy_sandbox/privacy_sandbox_prompt_helper.h"
 #include "chrome/browser/ui/recently_audible_helper.h"
@@ -172,6 +172,7 @@
 #include "chrome/browser/ui/javascript_dialogs/javascript_tab_modal_dialog_manager_delegate_desktop.h"
 #include "chrome/browser/ui/sad_tab_helper.h"
 #include "chrome/browser/ui/search/search_tab_helper.h"
+#include "chrome/browser/ui/side_panel/companion/companion_tab_helper.h"
 #include "chrome/browser/ui/side_panel/customize_chrome/customize_chrome_tab_helper.h"
 #include "chrome/browser/ui/side_panel/customize_chrome/customize_chrome_utils.h"
 #include "chrome/browser/ui/side_panel/history_clusters/history_clusters_tab_helper.h"
@@ -272,8 +273,9 @@ void TabHelpers::AttachTabHelpers(WebContents* web_contents) {
   // If already adopted, nothing to be done.
   base::SupportsUserData::Data* adoption_tag =
       web_contents->GetUserData(&kTabContentsAttachedTabHelpersUserDataKey);
-  if (adoption_tag)
+  if (adoption_tag) {
     return;
+  }
 
   // Mark as adopted.
   web_contents->SetUserData(&kTabContentsAttachedTabHelpersUserDataKey,
@@ -488,7 +490,7 @@ void TabHelpers::AttachTabHelpers(WebContents* web_contents) {
   TabDialogs::CreateForWebContents(web_contents);
   if (base::FeatureList::IsEnabled(
           performance_manager::features::kHighEfficiencyModeAvailable)) {
-    TabDiscardTabHelper::CreateForWebContents(web_contents);
+    HighEfficiencyChipTabHelper::CreateForWebContents(web_contents);
   }
   if (base::FeatureList::IsEnabled(features::kTabHoverCardImages) ||
       base::FeatureList::IsEnabled(features::kWebUITabStrip)) {
@@ -511,6 +513,9 @@ void TabHelpers::AttachTabHelpers(WebContents* web_contents) {
   }
   if (base::FeatureList::IsEnabled(ntp_features::kNtpHistoryClustersModule)) {
     side_panel::HistoryClustersTabHelper::CreateForWebContents(web_contents);
+  }
+  if (base::FeatureList::IsEnabled(features::kSidePanelCompanion)) {
+    companion::CompanionTabHelper::CreateForWebContents(web_contents);
   }
 #endif
 

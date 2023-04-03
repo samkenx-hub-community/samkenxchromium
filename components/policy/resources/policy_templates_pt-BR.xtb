@@ -571,9 +571,15 @@ Se você desativar a política, essa rolagem será desativada.</translation>
 
       Se esta for desativada ou deixada sem definição, as políticas de nuvem no nível do usuário não poderão ser mescladas com políticas de outras origens.</translation>
 <translation id="152657506688053119">Lista de URLs alternativos para o provedor de pesquisa padrão</translation>
+<translation id="152740744678799092">Se a política for ativada, uma pesquisa padrão será feita quando o usuário digitar um texto na barra de endereço que não seja um URL. Para especificar o provedor de pesquisa padrão, configure o restante das políticas de pesquisa padrão. Se essas políticas forem deixadas em branco, o usuário poderá escolher o provedor padrão. Se a política for desativada, nenhuma pesquisa será realizada quando o usuário digitar um texto na barra de endereço que não seja um URL. O valor "Desativado" não pode ser usado no <ph name="GOOGLE_ADMIN_CONSOLE_PRODUCT_NAME" />.
+
+      Se você definir a política, ela não poderá ser mudada pelos usuários no <ph name="PRODUCT_NAME" />. Se ela não for definida, o provedor de pesquisa padrão ficará ativado e o usuário poderá definir a lista de provedores de pesquisa.
+
+      No <ph name="MS_WIN_NAME" />, essa funcionalidade está disponível apenas em instâncias associadas a um domínio do <ph name="MS_AD_NAME" />, executadas no Windows 10 Pro ou registradas no Gerenciamento de nuvem do navegador Chrome. No <ph name="MAC_OS_NAME" />, ela está disponível apenas em instâncias gerenciadas por MDM ou associadas a um domínio via MCX.</translation>
 <translation id="1530812829012954197">Sempre renderizar os seguintes padrões de URL no navegador do host</translation>
 <translation id="1542491165152947087">Permitir que os usuários ativem ou desativem a configuração do <ph name="PRIVACY_SANDBOX_NAME" /> para temas de anúncios no dispositivo.</translation>
 <translation id="1547424904796464052">Hash SHA-256 codificado em hexadecimal da imagem do firmware.</translation>
+<translation id="1550295162561011575">Se a política for definida, os administradores poderão configurar a automação para iniciar apps em dispositivos <ph name="PRODUCT_NAME" />. Esses apps podem ser iniciados no login ou pelo usuário na tela de início.</translation>
 <translation id="1552418937045050762">Se esta configuração estiver ativada, os usuários poderão usar o recurso "Compartilhar por proximidade", que permite que eles enviem e recebam arquivos de pessoas próximas.
 
       Se esta configuração estiver desativada, os usuários não terão permissão para usar o recurso "Compartilhar por proximidade".
@@ -1043,6 +1049,7 @@ Se a política for definida como <ph name="DISABLE_UNPUBLISHED" /> (1), as exten
 <translation id="1980777339173013601">A não ser que o ARC seja desativado por outros meios, definir a política como verdadeira ou não defini-la vai permitir que os usuários usem o ARC. Definir a política como falsa vai impedir que usuários sem afiliação usem o ARC.
 
       Mudanças na política são aplicadas apenas enquanto o ARC não está em execução, como durante a inicialização do ChromeOS.</translation>
+<translation id="1984934843478301531">Automação da inicialização de apps</translation>
 <translation id="1985598967415986700">A redução do user agent vai poder ser controlada por testes de campo e origem.</translation>
 <translation id="1987789058026551147">Ativar relatórios sobre sessões de quiosque do dispositivo</translation>
 <translation id="1988345404999458987">Oferece as configurações dos servidores de impressão disponíveis.
@@ -1093,7 +1100,6 @@ Se a política for definida como <ph name="DISABLE_UNPUBLISHED" /> (1), as exten
 <translation id="2006954055163088863">Considerar o usuário inativo durante a reprodução de vídeos</translation>
 <translation id="2008514891623783266">A política de processamento de IPs do WebRTC</translation>
 <translation id="2012296492055302633">Sempre ativar a tela de privacidade</translation>
-<translation id="2013285471046373727">Especifica como um app é instalado. OPTIONAL: o app não será instalado automaticamente, mas o usuário poderá instalá-lo. Caso a política não seja especificada, esse será o valor padrão. PRELOAD: o app será instalado automaticamente, mas o usuário poderá desinstalá-lo. FORCE_INSTALLED: o app será instalado automaticamente, e o usuário não poderá desinstalá-lo. BLOCKED: o app fica bloqueado e não pode ser instalado. Se o app tiver sido instalado por uma política anterior, ele será desinstalado.</translation>
 <translation id="2014757022750736514">Controla o comportamento da tela de login, onde o usuário se conecta à própria conta. As configurações incluem quem pode fazer login, que tipo de conta é permitido, que métodos de autenticação precisam ser usados, além de configurações gerais de acessibilidade, método de entrada e localidade.</translation>
 <translation id="201557587962247231">Frequência de uploads de relatórios de status do dispositivo</translation>
 <translation id="2016031354108680330">Ativar acesso raiz a máquinas virtuais Linux</translation>
@@ -1541,6 +1547,7 @@ Se esta política for definida, o usuário não poderá modificar o valor.
 Se esta política não for definida, a tela de privacidade ficará desativada inicialmente, mas poderá ser controlada pelo usuário.</translation>
 <translation id="2413899611035194909">Mostrar opções de acessibilidade no menu da bandeja do sistema na tela de login</translation>
 <translation id="2415715982424988916">Explorar (compatível desde a versão 91)</translation>
+<translation id="2420958105721932612">Especifica como um app é instalado. AVAILABLE: o app não será instalado automaticamente, mas o usuário poderá fazer isso de forma manual. Se a política não for especificada, esse será o valor padrão. FORCE_INSTALLED: o app será instalado automaticamente, e o usuário não poderá desinstalá-lo. BLOCKED: o app fica bloqueado e não pode ser instalado. Se tiver sido instalado em uma política anterior, ele será desinstalado.</translation>
 <translation id="2421400544595297401">Não permitir o acesso de usuários não afiliados aos apps Android</translation>
 <translation id="2421677964966613267">Esta política foi suspensa na versão M88. O Flash não é mais compatível com o Chrome. Se a política for definida, será possível configurar uma lista de padrões de URL que especifica os sites que não podem executar o plug-in <ph name="FLASH_PLUGIN_NAME" />.
 
@@ -2122,6 +2129,7 @@ A política <ph name="DEVICE_LOCAL_ACCOUNTS_POLICY_NAME" /> pode substituir o co
       Definir a política como "Desativada" ou deixá-la sem definição faz com que a chave de manifesto <ph name="REQUIRED_PLATFORM_VERSION" /> seja ignorada e a atualização automática continue normalmente.
 
       Alerta: não delegue o controle da versão do <ph name="PRODUCT_OS_NAME" /> para um aplicativo de quiosque, porque isso pode impedir que o dispositivo receba atualizações de software e correções de segurança críticas. Delegar o controle da versão do <ph name="PRODUCT_OS_NAME" /> pode colocar os usuários em risco.</translation>
+<translation id="2989404644164421834">Atualizar páginas</translation>
 <translation id="299446489108785864">A lista de URLs especificando para quais URLs a <ph name="AUTO_OPEN_FILE_TYPES_POLICY_NAME" /> é válida. Esta política não tem impacto em valores de abertura automática definidos pelo usuário.
 
       Se esta política for definida, os arquivos serão abertos automaticamente se o URL fizer parte deste conjunto e o tipo de arquivo estiver listado em <ph name="AUTO_OPEN_FILE_TYPES_POLICY_NAME" />. Se alguma das condições for falsa, o download não será aberto automaticamente por padrão.
@@ -4163,6 +4171,25 @@ Esta política é temporária e será removida assim que o cancelamento de eco d
 <translation id="4860900625632464759">Permitir que os usuários sincronizem mensagens SMS entre o smartphone e o Chromebook</translation>
 <translation id="486146220825734683">Não permitir que os usuários salvem senhas do Kerberos</translation>
 <translation id="4861767323695239729">Configurar os métodos de entrada permitidos em uma sessão de usuário</translation>
+<translation id="4870120523614402392">Lista de ações a serem executadas quando o tempo limite da política <ph name="IDLE_TIMEOUT_POLICY_NAME" /> for atingido.
+
+      Se a <ph name="IDLE_TIMEOUT_POLICY_NAME" /> não for definida, esta política não terá efeito.
+
+      Quando o tempo limite da <ph name="IDLE_TIMEOUT_POLICY_NAME" /> for atingido, o <ph name="PRODUCT_NAME" /> vai executar as ações configuradas nesta política.
+
+      Se esta política for deixada em branco ou sem definição, a <ph name="IDLE_TIMEOUT_POLICY_NAME" /> não terá efeito.
+
+      As ações disponíveis são:
+
+      <ph name="CLOSE_BROWSERS_ACTION" />: fechar todos os PWAs e janelas do navegador deste perfil. Indisponível no Android.
+
+      <ph name="SHOW_PROFILE_PICKER_ACTION" />: mostrar a janela do seletor de perfil. Indisponível no Android.
+
+      <ph name="CLEAR_BROWSING_HISTORY_ACTION" />, <ph name="CLEAR_DOWNLOAD_HISTORY_ACTION" />, <ph name="CLEAR_COOKIES_AND_OTHER_SITE_DATA_ACTION" />, <ph name="CLEAR_CACHED_IMAGES_AND_FILES_ACTION" />, <ph name="CLEAR_PASSWORD_SIGNIN_ACTION" />, <ph name="CLEAR_AUTOFILL_ACTION" />, <ph name="CLEAR_SITE_SETTINGS_ACTION" />, <ph name="CLEAR_HOSTED_APP_DATA_ACTION" />: limpar os dados de navegação correspondentes. Consulte a política <ph name="CLEAR_BROWSING_DATA_ON_EXIT_LIST_POLICY_NAME" /> para mais detalhes.
+
+      <ph name="RELOAD_PAGES_ACTION" />: atualizar todas as páginas da Web. Em algumas delas, o usuário pode receber uma solicitação de confirmação primeiro.
+
+      <ph name="CLEAR_BROWSING_HISTORY_ACTION" />, <ph name="CLEAR_PASSWORD_SIGNIN_ACTION" />, <ph name="CLEAR_AUTOFILL_ACTION" /> e <ph name="CLEAR_HOSTED_APP_DATA_ACTION" /> exigem que a política <ph name="SYNC_DISABLED_POLICY_NAME" /> seja definida como "true".</translation>
 <translation id="4873380469296842901">Se esta configuração estiver ativada, os usuários que já ativaram o recurso "Seu smartphone" vão poder enviar/receber as notificações do smartphone no ChromeOS.
 
       Se a configuração estiver desativada, os usuários não vão ter permissão para usar o recurso. Se a política PhoneHubAllowed estiver desativada, os usuários também não terão permissão para usar o recurso.
@@ -4565,11 +4592,6 @@ Se a política não for definida ou se a lista não tiver referências de imagem
       Se a política for ativada e o usuário for afiliado, o estado será informado ao servidor, permitindo que ele detecte se o dispositivo está off-line.</translation>
 <translation id="5238275681097851753">Permitir que determinados conteúdos do <ph name="FLASH_PLUGIN_NAME" /> sejam bloqueados</translation>
 <translation id="5238976843489093540">Forçar a ativação do Pareamento rápido (pareamento rápido por Bluetooth).</translation>
-<translation id="52393120393725840">Se a política for definida como "Ativada", os usuários poderão fazer com que o <ph name="PRODUCT_NAME" /> se lembre de senhas e as forneça na próxima vez em que eles fizerem login em um site.
-
-      Se a política for definida como "Desativada", os usuários não poderão salvar senhas novas, mas as senhas salvas anteriormente ainda poderão ser usadas.
-
-      Se a política for definida, os usuários não poderão mudá-la no <ph name="PRODUCT_NAME" />. Se ela não for definida, os usuários poderão desativar o salvamento de senhas.</translation>
 <translation id="5239333626804545932">Se a política for definida como "Ativada" ou não for definida, o Varredura do Chrome verificará o sistema periodicamente em busca de softwares indesejados e, caso algum seja encontrado, perguntará aos usuários se eles querem removê-los. O acionamento manual do Varredura do Chrome em chrome://settings será permitido.
 
       Se a política for definida como "Desativada" o Varredura do Chrome não fará verificações periódicas e o acionamento manual será desativado.
@@ -4838,9 +4860,6 @@ Se a política for desativada ou deixada sem definição, as configurações de 
 
       O valor da política precisa ser especificado em dias.</translation>
 <translation id="5457065417344056871">Ativar o modo visitante no navegador</translation>
-<translation id="5457387982448145430">Se a política for definida como ativada, as senhas salvas serão importadas do navegador padrão anterior durante a primeira execução. Se a política for definida como desativada ou não for definida, nenhuma senha será importada durante a primeira execução.
-
-      O usuário pode acionar uma caixa de diálogo de importação em que a caixa de seleção de senhas salvas estará marcada ou desmarcada de acordo com o valor da política.</translation>
 <translation id="5457924070961220141">Permite configurar o processador HTML padrão quando <ph name="PRODUCT_FRAME_NAME" /> estiver instalado. A configuração padrão utilizada quando esta política é deixada sem definição é permitir que o navegador host faça o processamento, mas você pode, opcionalmente, substituí-la para que <ph name="PRODUCT_FRAME_NAME" /> processe as páginas HTML por padrão.</translation>
 <translation id="545817252640069915">Ativar interceptação de login</translation>
 <translation id="5460797984317417682">Permitir alertas de tela cheia</translation>
@@ -7254,11 +7273,6 @@ A definição desta política requer que a <ph name="PRIVACY_SANDBOX_PROMPT_ENAB
 <translation id="7657261947024629645">Otimiza o desempenho.</translation>
 <translation id="76580522298425324">Permitir captura de tela sem o gesto anterior do usuário</translation>
 <translation id="7666228839913571182">Permitir cookies de terceiros</translation>
-<translation id="7668830462800981702">Se a política for definida como "Ativada", uma pesquisa padrão será realizada quando o usuário digitar um texto na barra de endereço que não seja um URL. Para especificar o provedor de pesquisa padrão, configure o restante das políticas de pesquisa padrão. Se essas políticas forem deixadas em branco, o usuário poderá escolher o provedor padrão. Se a política for definida como "Desativada", nenhuma pesquisa será realizada quando o usuário digitar um texto na barra de endereço que não seja um URL.
-
-      Se você definir a política, os usuários não poderão mudá-la no <ph name="PRODUCT_NAME" />. Se ela não for definida, o provedor de pesquisa padrão ficará ativado e o usuário poderá definir a lista de provedores de pesquisa.
-
-      No <ph name="MS_WIN_NAME" />, essa funcionalidade está disponível apenas em instâncias associadas a um domínio do <ph name="MS_AD_NAME" />, executado no Windows 10 Pro, ou está registrada no Gerenciamento de nuvem do navegador Chrome. No <ph name="MAC_OS_NAME" />, essa funcionalidade está disponível apenas em instâncias gerenciadas por MDM ou associadas a um domínio via MCX.</translation>
 <translation id="7669630878711068277">Se a política for definida como "Ativada" ou deixada sem definição, os usuários poderão imprimir com o <ph name="PRODUCT_NAME" /> e não poderão mudar esta configuração.
 
       Se a política for definida como "Desativada", os usuários não poderão imprimir usando o <ph name="PRODUCT_NAME" />. A impressão ficará desativada no menu de três pontos, nas extensões e nos aplicativos JavaScript.</translation>

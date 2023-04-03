@@ -29,6 +29,7 @@ BASE_DECLARE_FEATURE(kBiometricAuthenticationForFilling);
 BASE_DECLARE_FEATURE(kBiometricAuthenticationInSettings);
 #endif
 BASE_DECLARE_FEATURE(kBiometricTouchToFill);
+BASE_DECLARE_FEATURE(kDisablePasswordsDropdownForCvcFields);
 BASE_DECLARE_FEATURE(kEnableOverwritingPlaceholderUsernames);
 
 BASE_DECLARE_FEATURE(kEnablePasswordsAccountStorage);
@@ -92,6 +93,7 @@ BASE_DECLARE_FEATURE(kUnifiedPasswordManagerAndroidBranding);
 BASE_DECLARE_FEATURE(kExploratorySaveUpdatePasswordStrings);
 #endif
 BASE_DECLARE_FEATURE(kUsernameFirstFlowFallbackCrowdsourcing);
+BASE_DECLARE_FEATURE(kUsernameFirstFlowHonorAutocomplete);
 BASE_DECLARE_FEATURE(kPasswordGenerationPreviewOnHover);
 
 // All features parameters are in alphabetical order.

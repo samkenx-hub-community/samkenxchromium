@@ -1760,6 +1760,9 @@
         'additional_compile_targets': [
           'all',
         ],
+        'mixins': [
+          'linux-bionic',
+        ],
         'test_suites': {
           'isolated_scripts': 'chrome_sizes',
         },
@@ -1781,6 +1784,9 @@
       'ToTLinuxASanLibfuzzer': {
         'additional_compile_targets': [
           'all',
+        ],
+        'mixins': [
+          'linux-bionic',
         ],
         'test_suites': {
           'isolated_scripts': 'chrome_sizes',
@@ -2577,7 +2583,7 @@
     'name': 'chromium.dev',
     'mixins': ['chromium-tester-dev-service-account'],
     'machines': {
-      'android-pie-arm64-rel-swarming': {
+      'android-pie-arm64-rel-dev': {
         'mixins': [
           'has_native_resultdb_integration',
           'pie_fleet',
@@ -2596,7 +2602,7 @@
         },
         'os_type': 'android',
       },
-      'linux-rel-swarming': {
+      'linux-rel-dev': {
         'mixins': [
           'linux-bionic',
         ],
@@ -2604,12 +2610,12 @@
            'gtest_tests': 'chromium_dev_linux_gtests',
         },
       },
-      'linux-ssd-rel-swarming': {
+      'linux-ssd-rel-dev': {
         'mixins': [
           'linux-bionic',
         ],
       },
-      'mac-arm-rel-swarming': {
+      'mac-arm-rel-dev': {
         'mixins': [
           'mac_12_arm64',
         ],
@@ -2617,7 +2623,7 @@
            'gtest_tests': 'chromium_dev_desktop_gtests',
         },
       },
-      'mac-rel-swarming': {
+      'mac-rel-dev': {
         'mixins': [
           'mac_x64',
         ],
@@ -2625,12 +2631,15 @@
            'gtest_tests': 'chromium_dev_desktop_gtests',
         },
       },
-      'win-rel-swarming': {
+      'win-rel-dev': {
+        'mixins': [
+          'win10',
+        ],
         'test_suites': {
            'gtest_tests': 'chromium_dev_desktop_gtests',
         },
       },
-      'win11-rel-swarming': {
+      'win11-rel-dev': {
         'mixins': [
           'win11',
         ],
@@ -2804,6 +2813,29 @@
         'test_suites': {
           'gtest_tests': 'fuchsia_gtests',
           'isolated_scripts': 'gpu_angle_fuchsia_unittests_isolated_scripts',
+        },
+      },
+      'fuchsia-fyi-x64-dbg-persistent-emulator' : {
+        'additional_compile_targets': [
+          'all',
+        ],
+        'browser_config': 'web-engine-shell',
+        'os_type': 'fuchsia',
+        'mixins': [
+          'fuchsia-persistent-emulator',
+          'linux-focal',
+        ],
+        'swarming': {
+          'dimension_sets': [
+            {
+              'kvm': '1',
+              'machine_type': 'e2-standard-2',
+              'pool': 'chromium.tests.fuchsia',
+            },
+          ],
+        },
+        'test_suites': {
+          'gtest_tests': 'fuchsia_facility_gtests',
         },
       },
       'fuchsia-x64-chrome-rel': {
@@ -3142,7 +3174,6 @@
       'android-backuprefptr-arm-fyi-rel': {
         'test_suites': {
           'gtest_tests': 'backuprefptr_gtests',
-          'isolated_scripts': 'dangling_pointer_detection_chromium_web_tests_and_wpt_webdriver_isolated_scripts',
         },
         'mixins': [
           'has_native_resultdb_integration',
@@ -3157,7 +3188,6 @@
       'android-backuprefptr-arm64-fyi-rel': {
         'test_suites': {
           'gtest_tests': 'backuprefptr_gtests',
-          'isolated_scripts': 'dangling_pointer_detection_chromium_web_tests_and_wpt_webdriver_isolated_scripts',
         },
         'mixins': [
           'has_native_resultdb_integration',
@@ -3360,9 +3390,6 @@
           'xcode_14_main',
           'xctest',
         ],
-        'test_suites': {
-          'isolated_scripts': 'ios15_sdk_simulator_tests'
-        },
       },
       # ios16-beta-sim compiles with xcode version n-1, but
       # runs testers with xcode n during an xcode roll.
@@ -3456,8 +3483,7 @@
       },
       'linux-backuprefptr-x64-fyi-rel': {
         'test_suites': {
-          'gtest_tests': 'chromium_linux_and_dangling_pointer_detection_gtests',
-          'isolated_scripts': 'dangling_pointer_detection_chromium_web_tests_and_wpt_webdriver_isolated_scripts',
+          'gtest_tests': 'backuprefptr_gtests',
         },
         'mixins': [
           'linux-bionic',
@@ -3664,8 +3690,7 @@
       },
       'mac-backuprefptr-x64-fyi-rel': {
         'test_suites': {
-          'gtest_tests': 'chromium_mac_and_dangling_pointer_detection_gtests',
-          'isolated_scripts': 'dangling_pointer_detection_chromium_web_tests_and_wpt_webdriver_isolated_scripts',
+          'gtest_tests': 'backuprefptr_gtests',
         },
         'mixins': [
           'mac_10.15',
@@ -3788,8 +3813,7 @@
       },
       'win-backuprefptr-x64-fyi-rel': {
         'test_suites': {
-          'gtest_tests': 'chromium_win_and_dangling_pointer_detection_gtests',
-          'isolated_scripts': 'dangling_pointer_detection_chromium_web_tests_and_wpt_webdriver_isolated_scripts',
+          'gtest_tests': 'backuprefptr_gtests',
         },
         'mixins': [
           'win10',
@@ -3802,7 +3826,6 @@
       'win-backuprefptr-x86-fyi-rel': {
         'test_suites': {
           'gtest_tests': 'backuprefptr_gtests',
-          'isolated_scripts': 'dangling_pointer_detection_chromium_web_tests_and_wpt_webdriver_isolated_scripts',
         },
         'mixins': [
           'win10',
@@ -4362,6 +4385,7 @@
         'os_type': 'android',
         'skip_merge_script': True,
         'mixins': [
+          'android_user',
           'has_native_resultdb_integration',
           'gpu-swarming-pool',
           'samsung_a13',
@@ -4378,6 +4402,7 @@
         'os_type': 'android',
         'skip_merge_script': True,
         'mixins': [
+          'android_user',
           'has_native_resultdb_integration',
           'gpu-swarming-pool',
           'samsung_a23',
@@ -4451,6 +4476,29 @@
       'GPU FYI Win x64 Builder (dbg)' : {},
       'GPU FYI Win x64 DX12 Vulkan Builder': {},
       'GPU FYI Win x64 DX12 Vulkan Builder (dbg)': {},
+      'Lacros FYI Release (octopus)': {
+        'additional_compile_targets': [
+          'chromiumos_preflight',
+        ],
+        'os_type': 'chromeos',
+        'browser_config': 'lacros-chrome',
+        'mixins': [
+          'limited_capacity_bot',
+        ],
+        'swarming': {
+          'dimension_sets': [
+            {
+              'os': 'ChromeOS',
+              'device_type': 'octopus',
+              'pool': 'chromium.tests',
+            },
+          ],
+        },
+        'test_suites': {
+          'gpu_telemetry_tests': 'gpu_fyi_lacros_device_release_telemetry_tests',
+        },
+        'skip_merge_script': True,
+      },
       'Lacros FYI x64 Release (AMD)': {
         'os_type': 'lacros',
         'browser_config': 'release',
@@ -5567,9 +5615,12 @@
           'mojo_rust',
           'rust_build_tests',
         ],
-        'mixins': [ 'pie_fleet' ],
+        'mixins': [
+          'pie_fleet',
+          'walleye',
+        ],
         'test_suites': {
-          'gtest_tests': 'rust_gtests',
+          'gtest_tests': 'rust_common_gtests',
           # Currently `can_build_rust_unit_tests` is false on Android (because
           # we need to construct an APK instead of compile an exe).
           # TODO(https://crbug.com/1260120): Cover `rust_native_tests` here.
@@ -5580,9 +5631,12 @@
           'mojo_rust',
           'rust_build_tests',
         ],
-        'mixins': [ 'pie_fleet' ],
+        'mixins': [
+          'pie_fleet',
+          'walleye',
+        ],
         'test_suites': {
-          'gtest_tests': 'rust_gtests',
+          'gtest_tests': 'rust_common_gtests',
           # Currently `can_build_rust_unit_tests` is false on Android (because
           # we need to construct an APK instead of compile an exe).
           # TODO(https://crbug.com/1260120): Cover `rust_native_tests` here.
@@ -5593,9 +5647,12 @@
           'mojo_rust',
           'rust_build_tests',
         ],
-        'mixins': [ 'pie_fleet' ],
+        'mixins': [
+          'pie_fleet',
+          'walleye',
+        ],
         'test_suites': {
-          'gtest_tests': 'rust_gtests',
+          'gtest_tests': 'rust_common_gtests',
           # Currently `can_build_rust_unit_tests` is false on Android (because
           # we need to construct an APK instead of compile an exe).
           # TODO(https://crbug.com/1260120): Cover `rust_native_tests` here.
@@ -5612,7 +5669,7 @@
           'linux-bionic'
         ],
         'test_suites': {
-          'gtest_tests': 'rust_gtests',
+          'gtest_tests': 'rust_host_gtests',
           'isolated_scripts': 'rust_native_tests',
         },
       },
@@ -5627,22 +5684,7 @@
           'linux-bionic'
         ],
         'test_suites': {
-          'gtest_tests': 'rust_gtests',
-          'isolated_scripts': 'rust_native_tests',
-        },
-      },
-      'linux-rust-x64-rel-android-toolchain' : {
-        'additional_compile_targets': [
-          'gnrt_unittests',
-          'mojo_rust',
-          'mojo_rust_tests',
-          'rust_build_tests',
-        ],
-        'mixins': [
-          'linux-bionic'
-        ],
-        'test_suites': {
-          'gtest_tests': 'rust_gtests',
+          'gtest_tests': 'rust_host_gtests',
           'isolated_scripts': 'rust_native_tests',
         },
       },
@@ -5662,7 +5704,7 @@
           'xctest',
         ],
         'test_suites': {
-          'gtest_tests': 'rust_gtests',
+          'gtest_tests': 'rust_host_gtests',
           'isolated_scripts': 'rust_native_tests',
         },
       },
@@ -5678,7 +5720,7 @@
           'x86-64',
         ],
         'test_suites': {
-          'gtest_tests': 'rust_gtests',
+          'gtest_tests': 'rust_host_gtests',
           'isolated_scripts': 'rust_native_tests',
         },
       },
@@ -5694,7 +5736,7 @@
           'x86-64',
         ],
         'test_suites': {
-          'gtest_tests': 'rust_gtests',
+          'gtest_tests': 'rust_host_gtests',
           'isolated_scripts': 'rust_native_tests',
         },
       },
@@ -7042,6 +7084,9 @@
         ],
       },
       'webrtc_linux_chromium': {
+        'mixins': [
+          'linux-bionic',
+        ],
         'additional_compile_targets': [
           'blink_unittests',
           'browser_tests',

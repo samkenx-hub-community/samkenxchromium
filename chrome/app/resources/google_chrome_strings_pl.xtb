@@ -22,6 +22,7 @@
 <translation id="1399397803214730675">Na tym komputerze jest już zainstalowana nowsza wersja Google Chrome. Jeśli oprogramowanie nie działa, odinstaluj Google Chrome, a następnie spróbuj ponownie.</translation>
 <translation id="139993653570221430">W każdej chwili możesz zmienić swój wybór w ustawieniach Chrome. Testy są przeprowadzanie przy dotychczasowych zasadach wyświetlania reklam, więc zmiany mogą nie być widoczne od razu.</translation>
 <translation id="1434626383986940139">Aplikacje Chrome w wersji poglądowej</translation>
+<translation id="1496905273983707119">{NUM_DEVICES,plural, =0{Przeglądarka Google Chrome została połączona z urządzeniem HID}=1{Przeglądarka Google Chrome jest połączona z urządzeniem HID}few{Przeglądarka Google Chrome jest połączona z urządzeniami HID}many{Przeglądarka Google Chrome jest połączona z urządzeniami HID}other{Przeglądarka Google Chrome jest połączona z urządzeniami HID}}</translation>
 <translation id="1507198376417198979">Dostosuj swój nowy profil w Chrome</translation>
 <translation id="1516530951338665275">Aby kontynuować parowanie, Google Chrome potrzebuje dostępu do Bluetootha. <ph name="IDS_BLUETOOTH_DEVICE_CHOOSER_AUTHORIZE_BLUETOOTH_LINK" /></translation>
 <translation id="1547295885616600893">Opracowanie Chrome OS było możliwe dzięki dodatkowemu <ph name="BEGIN_LINK_CROS_OSS" />oprogramowaniu open source<ph name="END_LINK_CROS_OSS" />.</translation>
@@ -121,7 +122,6 @@
 <translation id="3140883423282498090">Zmiany zaczną obowiązywać po ponownym uruchomieniu Google Chrome.</translation>
 <translation id="3149510190863420837">Aplikacje Chrome</translation>
 <translation id="3169523567916669830">W czasie testów możesz przeglądać i usuwać interesujące Cię tematy, których witryny używają do dobierania wyświetlanych reklam. Chrome ocenia, jakie są Twoje zainteresowania, na podstawie ostatniej historii przeglądania.</translation>
-<translation id="3211604354460514046">{NUM_DEVICES,plural, =1{Przeglądarka Google Chrome jest połączona z urządzeniem HID}few{Przeglądarka Google Chrome jest połączona z urządzeniami HID}many{Przeglądarka Google Chrome jest połączona z urządzeniami HID}other{Przeglądarka Google Chrome jest połączona z urządzeniami HID}}</translation>
 <translation id="3245429137663807393">Jeśli udostępnisz także raporty o użytkowaniu Chrome, będą one zawierały odwiedzane przez Ciebie adresy URL.</translation>
 <translation id="3282568296779691940">Zaloguj się w Chrome</translation>
 <translation id="3286538390144397061">Uruchom ponownie teraz</translation>

@@ -274,6 +274,7 @@
 <translation id="3456078764689556234"><ph name="TOTAL_PAGES" />ଟି ପୃଷ୍ଠା ମଧ୍ୟରୁ <ph name="PRINTED_PAGES" /> ନମ୍ବର ପୃଷ୍ଠା ପ୍ରିଣ୍ଟ କରାଯାଇଛି।</translation>
 <translation id="345898999683440380">ପୃଷ୍ଠା <ph name="PAGE_NUM" />କୁ ସ୍କାନ୍ କରାଯାଉଛି। <ph name="PERCENTAGE_VALUE" />% ସମ୍ପୂର୍ଣ୍ଣ ହୋଇଛି।</translation>
 <translation id="3459509316159669723">ପ୍ରିଣ୍ଟିଂ</translation>
+<translation id="346423161771747987">କରେଣ୍ଟ</translation>
 <translation id="346539236881580388">ପୁଣି ଉଠାନ୍ତୁ</translation>
 <translation id="3484914941826596830">ଫାର୍ମୱେରକୁ ଅପଡେଟ କରାଯାଉଥିବା ସମୟରେ ଏହି ଏକ୍ସଟର୍ନଲ ଡିଭାଇସକୁ ଅନପ୍ଲଗ କରନ୍ତୁ ନାହିଁ କିମ୍ବା ଆପଣଙ୍କ କମ୍ପ୍ୟୁଟରକୁ ବନ୍ଦ କରନ୍ତୁ ନାହିଁ। ଆପଣ ଏହି ୱିଣ୍ଡୋକୁ ଛୋଟ କରିପାରିବେ। ଏହି ଅପଡେଟ ପାଇଁ କିଛି ସମୟ ଲାଗିପାରେ ଏବଂ ଏହି ସମୟରେ ଆପଣଙ୍କ ଏକ୍ସଟର୍ନଲ ଡିଭାଇସ କାମ କରିନପାରେ।</translation>
 <translation id="3486220673238053218">ସଂଜ୍ଞା</translation>
@@ -697,6 +698,7 @@
 <translation id="7103252855940681301"><ph name="COUNT" />ଟିରୁ <ph name="NAME" /> ନାମ ଥିବା <ph name="INDEX" /> ନମ୍ବର ଡିଭାଇସ।</translation>
 <translation id="7108668606237948702">ଏଣ୍ଟର୍</translation>
 <translation id="7130438335435247835">ଆକ୍ସେସ ପଏଣ୍ଟ ନାମ (APN)</translation>
+<translation id="7131634559772719176">ପ୍ରିସେଟକୁ ସୁନିଶ୍ଚିତ କରନ୍ତୁ</translation>
 <translation id="7134436342991564651">{0,plural, =1{ନାମ ସର୍ଭର୍}other{ନାମ ସର୍ଭର୍}}</translation>
 <translation id="7143207342074048698">ସଂଯୋଗ କରୁଛି</translation>
 <translation id="7144878232160441200">ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ</translation>
@@ -759,6 +761,7 @@
 <translation id="7656388927906093505">ଡିଭାଇସଟି ଏକ ମାଉସ ଅଟେ।</translation>
 <translation id="7658239707568436148">ବାତିଲ</translation>
 <translation id="7665800271478495366">ଅବତାର ପରିବର୍ତ୍ତନ କରନ୍ତୁ</translation>
+<translation id="7675241868020048622">Aurora (Plus ଏକ୍ସକ୍ଲୁସିଭ)</translation>
 <translation id="7690294790491645610">ନୂଆ ପାସ୍‌ୱାର୍ଡ ସୁନିଶ୍ଚିତ କରନ୍ତୁ</translation>
 <translation id="7701040980221191251">କିଛି ନାହିଁ</translation>
 <translation id="7705524343798198388">VPN</translation>
@@ -768,6 +771,7 @@
 <translation id="7762130827864645708">ଆପଣଙ୍କ ପାସୱାର୍ଡ ପରିବର୍ତ୍ତନ ସଫଳ ହୋଇଛି। ଦୟାକରି ବର୍ତ୍ତମାନଠାରୁ ନୂଆ ପାସୱାର୍ଡ ବ୍ୟବହାର କରନ୍ତୁ।</translation>
 <translation id="7763470514545477072">ଡୋମେନ୍ ସଫିକ୍ସ ସହ ମେଳ</translation>
 <translation id="7769672763586021400">ମଡେଲ୍ ID</translation>
+<translation id="7770834998503326261">ଆପଣଙ୍କ ଚୟନ ସମ୍ବନ୍ଧିତ ଅତିରିକ୍ତ ସୂଚନା</translation>
 <translation id="7778717409420828014">Chromebook ଅନୁଭୂତିକୁ ଉନ୍ନତ କରିବାରେ ଆପଣଙ୍କ ମତାମତ ଆମକୁ ସାହାଯ୍ୟ କରେ ଏବଂ ଏହାକୁ ଆମ ଟିମ ଦ୍ୱାରା ସମୀକ୍ଷା କରାଯିବ। ବହୁ ସଂଖ୍ୟକ ରିପୋର୍ଟ ଯୋଗୁଁ ଆମେ ଏକ ପ୍ରତ୍ୟୁତ୍ତର ପଠାଇବାକୁ ସକ୍ଷମ ହେବୁ ନାହିଁ।</translation>
 <translation id="7784116172884276937">କୌଣସି DNS ସର୍ଭର ସେଟ ଅପ କରାଯାଇନାହିଁ</translation>
 <translation id="7791543448312431591">ଯୋଡନ୍ତୁ</translation>
@@ -800,6 +804,7 @@
 <translation id="80398733265834479">ଅଟୋ କଲର ମୋଡକୁ ସକ୍ଷମ କରନ୍ତୁ</translation>
 <translation id="8041089156583427627">ମତାମତ ପଠାନ୍ତୁ</translation>
 <translation id="8045012663542226664">ମାଇକ୍ରୋଫୋନ ମ୍ୟୁଟ</translation>
+<translation id="8050091914317269817">ଏହି ୱାଲପେପରକୁ ଚୟନ କରିବା ଫଳରେ ଏହା ଅଟୋ ଡାର୍କ ମୋଡ ଏବଂ ୱାଲପେପର ରଙ୍ଗ ମେଚିଂକୁ ଚାଲୁ କରିବ।</translation>
 <translation id="8075838845814659848">ବାକି ଥିବା ଚାର୍ଜ</translation>
 <translation id="8076492880354921740">ଟାବ୍</translation>
 <translation id="8082366717211101304">Android ଆପଗୁଡ଼ିକରୁ DNSର ସମାଧାନ କରାଯାଇପାରିବ ନାହିଁ</translation>

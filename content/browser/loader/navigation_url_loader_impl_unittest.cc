@@ -238,7 +238,9 @@ class NavigationURLLoaderImplTest : public testing::Test {
             absl::nullopt /* web_bundle_token */,
             blink::mojom::NavigationInitiatorActivationAndAdStatus::
                 kDidNotStartWithTransientActivation,
-            false /* is_container_initiated */);
+            false /* is_container_initiated */,
+            false /* is_fullscreen_requested */,
+            false /* has_storage_access */);
 
     auto common_params = blink::CreateCommonNavigationParams();
     common_params->url = url;

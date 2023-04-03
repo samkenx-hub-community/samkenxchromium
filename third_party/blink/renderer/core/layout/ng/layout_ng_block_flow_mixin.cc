@@ -18,11 +18,6 @@
 #include "third_party/blink/renderer/core/layout/ng/inline/ng_physical_line_box_fragment.h"
 #include "third_party/blink/renderer/core/layout/ng/layout_box_utils.h"
 #include "third_party/blink/renderer/core/layout/ng/layout_ng_block_flow.h"
-#include "third_party/blink/renderer/core/layout/ng/layout_ng_progress.h"
-#include "third_party/blink/renderer/core/layout/ng/layout_ng_ruby_as_block.h"
-#include "third_party/blink/renderer/core/layout/ng/layout_ng_ruby_base.h"
-#include "third_party/blink/renderer/core/layout/ng/layout_ng_ruby_run.h"
-#include "third_party/blink/renderer/core/layout/ng/layout_ng_ruby_text.h"
 #include "third_party/blink/renderer/core/layout/ng/ng_block_break_token.h"
 #include "third_party/blink/renderer/core/layout/ng/ng_constraint_space.h"
 #include "third_party/blink/renderer/core/layout/ng/ng_layout_result.h"
@@ -160,9 +155,7 @@ LayoutUnit LayoutNGBlockFlowMixin<Base>::InlineBlockBaseline(
   Base::CheckIsNotDestroyed();
 
   // Please see |LayoutNGMixin<Base>::Paint()| for these DCHECKs.
-  DCHECK(Base::GetNGPaginationBreakability() ==
-             LayoutNGBlockFlow::kForbidBreaks ||
-         !Base::CanTraversePhysicalFragments() ||
+  DCHECK(Base::IsMonolithic() || !Base::CanTraversePhysicalFragments() ||
          !Base::Parent()->CanTraversePhysicalFragments());
   DCHECK_LE(Base::PhysicalFragmentCount(), 1u);
 
@@ -200,9 +193,7 @@ bool LayoutNGBlockFlowMixin<Base>::NodeAtPoint(
   Base::CheckIsNotDestroyed();
 
   // Please see |LayoutNGMixin<Base>::Paint()| for these DCHECKs.
-  DCHECK(Base::GetNGPaginationBreakability() ==
-             LayoutNGBlockFlow::kForbidBreaks ||
-         !Base::CanTraversePhysicalFragments() ||
+  DCHECK(Base::IsMonolithic() || !Base::CanTraversePhysicalFragments() ||
          !Base::Parent()->CanTraversePhysicalFragments());
   // We may get here in multiple-fragment cases if the object is repeated
   // (inside table headers and footers, for instance).
@@ -287,13 +278,7 @@ void LayoutNGBlockFlowMixin<Base>::Trace(Visitor* visitor) const {
 }
 
 template class CORE_TEMPLATE_EXPORT LayoutNGBlockFlowMixin<LayoutBlockFlow>;
-template class CORE_TEMPLATE_EXPORT LayoutNGBlockFlowMixin<LayoutProgress>;
-template class CORE_TEMPLATE_EXPORT LayoutNGBlockFlowMixin<LayoutRubyAsBlock>;
-template class CORE_TEMPLATE_EXPORT LayoutNGBlockFlowMixin<LayoutRubyBase>;
-template class CORE_TEMPLATE_EXPORT LayoutNGBlockFlowMixin<LayoutRubyRun>;
-template class CORE_TEMPLATE_EXPORT LayoutNGBlockFlowMixin<LayoutRubyText>;
 template class CORE_TEMPLATE_EXPORT LayoutNGBlockFlowMixin<LayoutSVGBlock>;
-template class CORE_TEMPLATE_EXPORT LayoutNGBlockFlowMixin<LayoutTableCaption>;
 template class CORE_TEMPLATE_EXPORT LayoutNGBlockFlowMixin<LayoutView>;
 
 }  // namespace blink

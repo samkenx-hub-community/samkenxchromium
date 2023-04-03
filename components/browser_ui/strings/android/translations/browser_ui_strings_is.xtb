@@ -103,6 +103,7 @@
 <translation id="2717722538473713889">Netföng</translation>
 <translation id="2750481671343847896">Vefsvæði geta nú birt innskráningartilkynningar frá auðkenningarþjónustum.</translation>
 <translation id="2822354292072154809">Viltu örugglega endurstilla allar heimildir vefsvæða fyrir „<ph name="CHOSEN_OBJECT_NAME" />“?</translation>
+<translation id="2850913818900871965">Biðja um símaútgáfu</translation>
 <translation id="2870560284913253234">Vefsvæði</translation>
 <translation id="2874939134665556319">Fyrra lag</translation>
 <translation id="2891975107962658722">Loka á að vefsvæði geti vistað gögn í tækinu þínu</translation>
@@ -222,7 +223,6 @@
 <translation id="509133520954049755">Biðja um tölvuútgáfu</translation>
 <translation id="5100237604440890931">Minnkað – smelltu til að stækka.</translation>
 <translation id="5123685120097942451">Huliðsflipi</translation>
-<translation id="5134599672855298214">Biðja um símaútgáfu (ráðlagt)</translation>
 <translation id="5186036860380548585">Valkosturinn er við efri brún skjásins</translation>
 <translation id="5197729504361054390">Tengiliðunum sem þú valdir verður deilt með <ph name="BEGIN_BOLD" /><ph name="SITE" /><ph name="END_BOLD" />.</translation>
 <translation id="5216942107514965959">Síðast opnað í dag</translation>

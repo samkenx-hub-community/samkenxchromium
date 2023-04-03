@@ -21,6 +21,7 @@
 #import "components/feature_engagement/public/event_constants.h"
 #import "components/feature_engagement/public/tracker.h"
 #import "components/infobars/core/infobar_manager.h"
+#import "components/password_manager/core/browser/ui/credential_ui_entry.h"
 #import "components/prefs/pref_service.h"
 #import "components/previous_session_info/previous_session_info.h"
 #import "components/signin/public/base/signin_metrics.h"
@@ -47,8 +48,8 @@
 #import "ios/chrome/browser/crash_report/crash_keys_helper.h"
 #import "ios/chrome/browser/crash_report/crash_loop_detection_util.h"
 #import "ios/chrome/browser/crash_report/crash_report_helper.h"
-#import "ios/chrome/browser/crash_report/crash_restore_helper.h"
 #import "ios/chrome/browser/default_browser/promo_source.h"
+#import "ios/chrome/browser/default_browser/utils.h"
 #import "ios/chrome/browser/feature_engagement/tracker_factory.h"
 #import "ios/chrome/browser/first_run/first_run.h"
 #import "ios/chrome/browser/geolocation/geolocation_logger.h"
@@ -67,6 +68,7 @@
 #import "ios/chrome/browser/policy/policy_watcher_browser_agent_observer_bridge.h"
 #import "ios/chrome/browser/prefs/pref_names.h"
 #import "ios/chrome/browser/promos_manager/features.h"
+#import "ios/chrome/browser/promos_manager/promos_manager_factory.h"
 #import "ios/chrome/browser/screenshot/screenshot_delegate.h"
 #import "ios/chrome/browser/sessions/session_saving_scene_agent.h"
 #import "ios/chrome/browser/sessions/session_service_ios.h"
@@ -76,6 +78,7 @@
 #import "ios/chrome/browser/shared/public/commands/command_dispatcher.h"
 #import "ios/chrome/browser/shared/public/commands/lens_commands.h"
 #import "ios/chrome/browser/shared/public/commands/omnibox_commands.h"
+#import "ios/chrome/browser/shared/public/commands/open_lens_input_selection_command.h"
 #import "ios/chrome/browser/shared/public/commands/open_new_tab_command.h"
 #import "ios/chrome/browser/shared/public/commands/policy_change_commands.h"
 #import "ios/chrome/browser/shared/public/commands/qr_scanner_commands.h"
@@ -103,7 +106,6 @@
 #import "ios/chrome/browser/ui/browser_view/browser_view_controller.h"
 #import "ios/chrome/browser/ui/credential_provider_promo/credential_provider_promo_scene_agent.h"
 #import "ios/chrome/browser/ui/default_promo/default_browser_promo_non_modal_scheduler.h"
-#import "ios/chrome/browser/ui/default_promo/default_browser_utils.h"
 #import "ios/chrome/browser/ui/first_run/orientation_limiting_navigation_controller.h"
 #import "ios/chrome/browser/ui/history/history_coordinator.h"
 #import "ios/chrome/browser/ui/incognito_interstitial/incognito_interstitial_coordinator.h"
@@ -818,30 +820,6 @@ void InjectNTP(Browser* browser) {
   self.sceneState.UIEnabled = YES;
 }
 
-// Returns YES if restore prompt can be shown.
-// The restore prompt shouldn't appear if its appearance may be in conflict
-// with the expected behavior by the user.
-// The following cases will not show restore prompt:
-//   1- New tab / Navigation startup parameters are specified.
-//   2- Load URL User activity is queud.
-//   3- Move tab user activity is queued.
-//   4- Only incognito mode is available.
-// In these cases if a restore prompt was shown, it may be dismissed immediately
-// and the user will not have a chance to restore the session.
-- (BOOL)shouldShowRestorePrompt {
-  BOOL shouldShow = !self.startupParameters && ![self isIncognitoForced];
-  if (shouldShow) {
-    for (NSUserActivity* activity in self.sceneState.connectionOptions
-             .userActivities) {
-      if (ActivityIsTabMove(activity) || ActivityIsURLLoad(activity)) {
-        shouldShow = NO;
-        break;
-      }
-    }
-  }
-  return shouldShow;
-}
-
 // Starts up a single chrome window and its UI.
 - (void)startUpChromeUI {
   DCHECK(!self.browserViewWrangler);
@@ -923,30 +901,7 @@ void InjectNTP(Browser* browser) {
       initWithBrowserInterfaceProvider:self.browserViewWrangler];
   [self.sceneState.scene.screenshotService setDelegate:self.screenshotDelegate];
 
-  // Only create the restoration helper if the session with the current session
-  // id was backed up successfully.
-  if (self.sceneState.appState.sessionRestorationRequired &&
-      !self.sceneState.appState.startupInformation.isFirstRun) {
-    if ([CrashRestoreHelper
-            isBackedUpSessionID:self.sceneState.sceneSessionID
-                   browserState:mainBrowser->GetBrowserState()]) {
-      self.sceneState.appState.startupInformation.restoreHelper =
-          [[CrashRestoreHelper alloc] initWithBrowser:mainBrowser];
-    }
-  }
-
-  // If the application crashed, clear incognito state.
-  if (self.sceneState.appState.postCrashAction ==
-      PostCrashAction::kStashTabsAndShowNTP)
-    [self clearIOSSpecificIncognitoData];
-
   [self createInitialUI:[self initialUIMode]];
-
-  if ([self shouldShowRestorePrompt]) {
-    [self.sceneState.appState.startupInformation
-            .restoreHelper showRestorePrompt];
-    self.sceneState.appState.startupInformation.restoreHelper = nil;
-  }
 
   // Make sure the geolocation controller is created to observe permission
   // events.
@@ -956,28 +911,25 @@ void InjectNTP(Browser* browser) {
         addAgent:[[PromosManagerSceneAgent alloc]
                      initWithCommandDispatcher:mainCommandDispatcher]];
 
-  if (IsAppStoreRatingEnabled()) {
-    [self.sceneState
-        addAgent:[[AppStoreRatingSceneAgent alloc]
-                     initWithPromosManager:GetApplicationContext()
-                                               ->GetPromosManager()]];
-  }
+    PromosManager* promosManager =
+        PromosManagerFactory::GetForBrowserState(browserState);
+
+    if (IsAppStoreRatingEnabled()) {
+    [self.sceneState addAgent:[[AppStoreRatingSceneAgent alloc]
+                                  initWithPromosManager:promosManager]];
+    }
 
   if (IsWhatsNewEnabled()) {
-    [self.sceneState
-        addAgent:[[WhatsNewSceneAgent alloc]
-                     initWithPromosManager:GetApplicationContext()
-                                               ->GetPromosManager()]];
+    [self.sceneState addAgent:[[WhatsNewSceneAgent alloc]
+                                  initWithPromosManager:promosManager]];
   }
 
   // Do not gate by feature flag so it can run for enabled -> disabled
   // scenarios.
   [self.sceneState
       addAgent:[[CredentialProviderPromoSceneAgent alloc]
-                   initWithPromosManager:GetApplicationContext()
-                                             ->GetPromosManager()
-                             prefService:self.sceneState.appState
-                                             .mainBrowserState->GetPrefs()]];
+                   initWithPromosManager:promosManager
+                             prefService:browserState->GetPrefs()]];
 }
 
 // Determines the mode (normal or incognito) the initial UI should be in.
@@ -1003,12 +955,6 @@ void InjectNTP(Browser* browser) {
                  ? ApplicationMode::INCOGNITO
                  : ApplicationMode::NORMAL;
     }
-  }
-
-  // If the app crashed, always launch in normal mode.
-  if (self.sceneState.appState.postCrashAction ==
-      PostCrashAction::kStashTabsAndShowNTP) {
-    return ApplicationMode::NORMAL;
   }
 
   // Launch in the mode that matches the state of the scene when the application
@@ -1064,7 +1010,6 @@ void InjectNTP(Browser* browser) {
   // the current webState.
   if (self.sceneState.appState.postCrashAction ==
       PostCrashAction::kShowNTPWithReturnToTab) {
-    DCHECK(base::FeatureList::IsEnabled(kRemoveCrashInfobar));
     InjectNTP(browser);
   }
 
@@ -1305,8 +1250,8 @@ void InjectNTP(Browser* browser) {
 
   NSString* text =
       inIncognitoMode
-          ? l10n_util::GetNSString(IDS_IOS_SNACKBAR_MESSAGE_ICOGNITO_FORCED)
-          : l10n_util::GetNSString(IDS_IOS_SNACKBAR_MESSAGE_ICOGNITO_DISABLED);
+          ? l10n_util::GetNSString(IDS_IOS_SNACKBAR_MESSAGE_INCOGNITO_FORCED)
+          : l10n_util::GetNSString(IDS_IOS_SNACKBAR_MESSAGE_INCOGNITO_DISABLED);
 
   MDCSnackbarMessage* message = [MDCSnackbarMessage messageWithText:text];
   message.action = action;
@@ -1986,6 +1931,27 @@ void InjectNTP(Browser* browser) {
                                  completion:nil];
 }
 
+- (void)showPasswordDetailsForCredential:
+            (password_manager::CredentialUIEntry)credential
+                        showCancelButton:(BOOL)showCancelButton {
+  UIViewController* baseViewController = self.currentInterface.viewController;
+  if (self.settingsNavigationController) {
+    [self.settingsNavigationController
+        showPasswordDetailsForCredential:credential
+                        showCancelButton:showCancelButton];
+    return;
+  }
+  Browser* browser = self.mainInterface.browser;
+  self.settingsNavigationController = [SettingsNavigationController
+      passwordDetailsControllerForBrowser:browser
+                                 delegate:self
+                               credential:credential
+                         showCancelButton:showCancelButton];
+  [baseViewController presentViewController:self.settingsNavigationController
+                                   animated:YES
+                                 completion:nil];
+}
+
 // TODO(crbug.com/779791) : Remove show settings commands from MainController.
 - (void)showProfileSettingsFromViewController:
     (UIViewController*)baseViewController {
@@ -2286,8 +2252,12 @@ void InjectNTP(Browser* browser) {
   }
   id<LensCommands> lensHandler = HandlerForProtocol(
       self.currentInterface.browser->GetCommandDispatcher(), LensCommands);
-  [lensHandler
-      openInputSelectionForEntrypoint:LensEntrypoint::HomeScreenWidget];
+  OpenLensInputSelectionCommand* command = [[OpenLensInputSelectionCommand
+      alloc]
+          initWithEntryPoint:LensEntrypoint::HomeScreenWidget
+           presentationStyle:LensInputSelectionPresentationStyle::SlideFromRight
+      presentationCompletion:nil];
+  [lensHandler openLensInputSelection:command];
 }
 
 - (void)focusOmnibox {
@@ -2729,16 +2699,6 @@ void InjectNTP(Browser* browser) {
     [self openOrReuseTabInMode:targetMode
              withUrlLoadParams:urlLoadParams
            tabOpenedCompletion:tabOpenedCompletion];
-  }
-
-  if (self.sceneState.appState.startupInformation.restoreHelper) {
-    // Now that all the operations on the tabs have been done, display the
-    // restore infobar if needed.
-    dispatch_async(dispatch_get_main_queue(), ^{
-      [self.sceneState.appState.startupInformation
-              .restoreHelper showRestorePrompt];
-      self.sceneState.appState.startupInformation.restoreHelper = nil;
-    });
   }
 }
 

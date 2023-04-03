@@ -40,6 +40,7 @@ Veja o que você pode fazer para começar.</translation>
 <translation id="1181037720776840403">Remover</translation>
 <translation id="1182225749592316782">Esta ação libera o acesso para todos os apps e sites com essas permissões</translation>
 <translation id="1183863904939664422">Não tenho interesse nesta sugestão</translation>
+<translation id="1184126796192815024">Esta rede não oferece suporte aos apps de streaming do seu smartphone. Tente usar o ponto de acesso do smartphone. <ph name="LEARN_MORE" /></translation>
 <translation id="118437560755358292">Informe a senha ou o PIN para aumentar a segurança</translation>
 <translation id="118532027333893379">Toque em qualquer lugar para capturar a tela cheia</translation>
 <translation id="1190609913194133056">Central de Notificações</translation>
@@ -219,6 +220,7 @@ Veja o que você pode fazer para começar.</translation>
 <translation id="1969011864782743497"><ph name="DEVICE_NAME" /> (USB)</translation>
 <translation id="1972950159383891558">Olá, <ph name="USERNAME" /></translation>
 <translation id="1978498689038657292">Entrada de texto</translation>
+<translation id="1980808257969311265">Participar do evento <ph name="EVENT_SUMMARY" /></translation>
 <translation id="1982717156487272186">Mostrar semana anterior</translation>
 <translation id="1989113344093894667">Não é possível fazer uma captura do conteúdo</translation>
 <translation id="1990046457226896323">Download de arquivos de fala concluído</translation>
@@ -573,6 +575,7 @@ Veja o que você pode fazer para começar.</translation>
 <translation id="3659814201068740063">Tempo restante: cerca de <ph name="TIME_LEFT" /> (<ph name="PERCENTAGE" />%).
 Conecte o dispositivo a uma fonte de energia.</translation>
 <translation id="366222428570480733">Usuário gerenciado <ph name="USER_EMAIL_ADDRESS" /></translation>
+<translation id="3666266999138159418">Deslize para ocultar a janela flutuante</translation>
 <translation id="367531336287639526">Selecionar o primeiro ícone à esquerda da barra de endereço</translation>
 <translation id="3679827876008292680">Ir para a última guia na janela</translation>
 <translation id="36813544980941320">Redes Wi-Fi serão compartilhadas entre seu smartphone e o <ph name="DEVICE_NAME" /></translation>
@@ -621,7 +624,6 @@ Conecte o dispositivo a uma fonte de energia.</translation>
 <translation id="3925540965556789199"><ph name="DATE" />. Carregando eventos.</translation>
 <translation id="3932043219784172185">Nenhum dispositivo conectado</translation>
 <translation id="3934456833412894880">O carregamento adaptável está ativado. Sua bateria vai parar em 80% para prolongar a vida útil e será totalmente carregada quando você precisar.</translation>
-<translation id="3936620957945677513">Pressione "Enter" para participar do evento <ph name="EVENT_SUMMARY" /></translation>
 <translation id="3943857333388298514">Colar</translation>
 <translation id="394485226368336402">Configurações de áudio</translation>
 <translation id="3945319193631853098">Toque para concluir a configuração</translation>
@@ -1252,6 +1254,7 @@ Nova instalação</translation>
 <translation id="685782768769951078">{NUM_DIGITS,plural, =1{1 dígito restante}one{# dígito restante}other{# dígitos restantes}}</translation>
 <translation id="6867938213751067702">Download de <ph name="FILENAME" /> pausado</translation>
 <translation id="6878400149835617132">Atalho desativado</translation>
+<translation id="6878701771800702153">{NUM_APPS,plural, =1{1 app}one{# app}other{# apps}}</translation>
 <translation id="6884665277231944629">Voltar para hoje</translation>
 <translation id="6886172995547742638">Seu <ph name="DEVICE_TYPE" /> pode ter baixo desempenho. Use um adaptador de energia USB-C certificado de <ph name="PREFERRED_MINIMUM_POWER" /> W ou mais.</translation>
 <translation id="688631446150864480">Pressione a seta para baixo para mudar de janela</translation>
@@ -1419,6 +1422,7 @@ Para desligar o dispositivo, toque no botão liga/desliga novamente e pressione.
 <translation id="7689817529363080918">Dá acesso ao microfone para os apps <ph name="APP1_NAME" /> e <ph name="APP2_NAME" /> e todos os apps e sites com essa permissão</translation>
 <translation id="7704000866383261579">Refazer a última ação</translation>
 <translation id="7705524343798198388">VPN</translation>
+<translation id="770741401784017797">Criando GIF</translation>
 <translation id="7714767791242455379">Adicionar nova rede celular</translation>
 <translation id="7720400844887872976">Ativado até <ph name="TIME" /></translation>
 <translation id="7720410380936703141">TENTAR NOVAMENTE</translation>
@@ -1431,6 +1435,7 @@ Para desligar o dispositivo, toque no botão liga/desliga novamente e pressione.
 <translation id="7749443890790263709">O número máximo de áreas de trabalho foi atingido.</translation>
 <translation id="776344839111254542">Clique para ver detalhes da atualização</translation>
 <translation id="7768784765476638775">Selecionar para ouvir</translation>
+<translation id="7769299611924763557">Seu GIF estará pronto em breve</translation>
 <translation id="7780094051999721182">atalhos</translation>
 <translation id="7780159184141939021">Girar tela</translation>
 <translation id="7796735576426975947">Nova notificação oculta</translation>

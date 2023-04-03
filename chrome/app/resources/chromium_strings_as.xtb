@@ -24,6 +24,7 @@
 
 আপুনি ইতিমধ্যে ৱেবছাইট আৰু এপক দিয়া অনুমতি এই একাউণ্টটোত প্ৰযোজ্য হ’ব পাৰে। আপুনি <ph name="SETTINGS_LINK_BEGIN" />ছেটিঙ<ph name="SETTINGS_LINK_END" />ত আপোনাৰ Google একাউণ্ট পৰিচালনা কৰিব পাৰে।</translation>
 <translation id="1640672724030957280">ডাউনল’ড হৈ আছে...</translation>
+<translation id="1691024636239527281">{NUM_DEVICES,plural, =0{Chromiumক এটা HID ডিভাইচৰ সৈতে সংযোগ কৰা হৈছিল}=1{Chromiumক এটা HID ডিভাইচৰ সৈতে সংযোগ কৰা হৈছে}one{Chromiumক HID ডিভাইচসমূহৰ সৈতে সংযোগ কৰা হৈছে}other{Chromiumক HID ডিভাইচসমূহৰ সৈতে সংযোগ কৰা হৈছে}}</translation>
 <translation id="1708666629004767631">Chromiumৰ এটা নতুন আৰু সুৰক্ষিত সংস্কৰণ উপলব্ধ।</translation>
 <translation id="17264556997921157">আপোনাক বিজ্ঞাপন দেখুৱাবলৈ ছাইটসমূহে ব্যৱহাৰ কৰা আগ্ৰহৰ বিষয়বোৰ আপুনি চাব আৰু আঁতৰাব পাৰে। আপোনাৰ শেহতীয়া ব্ৰাউজিঙৰ ইতিহাসৰ ওপৰত ভিত্তি কৰি Chromiumএ আপোনাৰ আগ্ৰহ থকা বিষয়বোৰ অনুমান কৰে।</translation>
 <translation id="1733725117201708356">Chromiumএ শীঘ্ৰেই ব্ৰাউজিঙৰ ডেটা মচি পেলাব</translation>
@@ -81,7 +82,6 @@
 <translation id="2928420929544864228">ইনষ্টল কৰাটো সম্পূৰ্ণ হ’ল।</translation>
 <translation id="2977470724722393594">Chromium একেবাৰে শেহতীয়া অৱস্থাত আছে</translation>
 <translation id="2977506796191543575">যদি কোনোবা ছাইটে আপোনাৰ পাছৱৰ্ড চুৰি কৰিবলৈ চেষ্টা কৰে অথবা আপুনি কোনো ক্ষতিকাৰক ফাইল ডাউনল’ড কৰাৰ সময়ত Chromiumএ পৃষ্ঠাৰ সমলৰ বিটসমূহকে ধৰি URLসমূহো সুৰক্ষিত ব্ৰাউজিঙলৈ পঠিয়াব পাৰে</translation>
-<translation id="3021964162552004083">{NUM_DEVICES,plural, =1{Chromium এটা HID ডিভাইচৰ সৈতে সংযোগ কৰা হৈছে}one{Chromium HID ডিভাইচসমূহৰ সৈতে সংযোগ কৰা হৈছে}other{Chromium HID ডিভাইচসমূহৰ সৈতে সংযোগ কৰা হৈছে}}</translation>
 <translation id="3032706164202344641">Chromiumএ আপোনাৰ পাছৱর্ডসমূহ পৰীক্ষা কৰিব নোৱাৰে। পাছত আকৌ চেষ্টা কৰক।</translation>
 <translation id="3032787606318309379">Chromiumত যোগ কৰি থকা হৈছে...</translation>
 <translation id="3038232873781883849">ইনষ্টল কৰাৰ বাবে অপেক্ষা কৰি থকা হৈছে...</translation>

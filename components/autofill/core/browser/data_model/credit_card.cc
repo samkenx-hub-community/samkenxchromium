@@ -227,7 +227,8 @@ int CreditCard::IconResourceId(const std::string& network) {
                                      : IDR_AUTOFILL_CC_DISCOVER;
   }
   if (network == kEloCard)
-    return IDR_AUTOFILL_CC_ELO;
+    return should_show_metadata_icon ? IDR_AUTOFILL_METADATA_CC_ELO
+                                     : IDR_AUTOFILL_CC_ELO;
   if (network == kJCBCard)
     return should_show_metadata_icon ? IDR_AUTOFILL_METADATA_CC_JCB
                                      : IDR_AUTOFILL_CC_JCB;
@@ -773,7 +774,7 @@ int CreditCard::Compare(const CreditCard& credit_card) const {
       return comparison;
   }
 
-  if (!HasSameNumberAs(credit_card)) {
+  if (!MatchingCardDetails(credit_card)) {
     return number().compare(credit_card.number());
   }
 
@@ -856,10 +857,10 @@ bool CreditCard::IsLocalDuplicateOfServerCard(const CreditCard& other) const {
   if (number_.empty())
     return true;
 
-  return HasSameNumberAs(other);
+  return MatchingCardDetails(other);
 }
 
-bool CreditCard::HasSameNumberAs(const CreditCard& other) const {
+bool CreditCard::MatchingCardDetails(const CreditCard& other) const {
   // Masked cards are considered to have the same number if their last four
   // digits match and if any expiration date information available for both
   // cards matches.

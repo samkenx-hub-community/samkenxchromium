@@ -1832,13 +1832,19 @@ class CONTENT_EXPORT RenderFrameHostImpl
   using BackForwardCacheDisablingFeature =
       blink::scheduler::WebSchedulerTrackedFeature;
 
-  // BackForwardCache disabling feature for |this|, used in determing |this|
-  // frame's BackForwardCache eligibility.
-  // See comments at |renderer_reported_bfcache_disabling_features_| and
+  // BackForwardCache disabling feature for |this|, used in determining |this|
+  // frame's BackForwardCache eligibility. The return value includes all the
+  // blocking features from browser, renderer and dedicated workers.
+  // See comments at |renderer_reported_bfcache_blocking_details_| and
   // |browser_reported_bfcache_disabling_features_|.
   BackForwardCacheDisablingFeatures GetBackForwardCacheDisablingFeatures()
       const;
-
+  using BackForwardCacheBlockingDetails =
+      std::vector<blink::mojom::BlockingDetailsPtr>;
+  // Returns a vector of blocking details for |this|. This returns more
+  // information than `GetBackForwardCacheDisablingFeatures()`, which returns
+  // only a list of features used.
+  BackForwardCacheBlockingDetails GetBackForwardCacheBlockingDetails() const;
   using BackForwardCacheDisablingFeaturesCallback =
       base::RepeatingCallback<void(BackForwardCacheDisablingFeatures)>;
   void SetBackForwardCacheDisablingFeaturesCallbackForTesting(
@@ -2412,8 +2418,7 @@ class CONTENT_EXPORT RenderFrameHostImpl
 
   // blink::mojom::BackForwardCacheControllerHost:
   void EvictFromBackForwardCache(blink::mojom::RendererEvictionReason) override;
-  using BackForwardCacheBlockingDetails =
-      std::vector<blink::mojom::BlockingDetailsPtr>;
+
   void DidChangeBackForwardCacheDisablingFeatures(
       BackForwardCacheBlockingDetails details) override;
 
@@ -2948,6 +2953,8 @@ class CONTENT_EXPORT RenderFrameHostImpl
           prefetch_loader_factory,
       mojo::PendingRemote<network::mojom::URLLoaderFactory>
           topics_loader_factory,
+      mojo::PendingRemote<network::mojom::URLLoaderFactory>
+          keep_alive_loader_factory,
       const absl::optional<blink::ParsedPermissionsPolicy>& permissions_policy,
       blink::mojom::PolicyContainerPtr policy_container,
       const blink::DocumentToken& document_token,
@@ -3096,6 +3103,8 @@ class CONTENT_EXPORT RenderFrameHostImpl
                            SetOwnerInSpeculativeRFHOwner);
   FRIEND_TEST_ALL_PREFIXES(RenderFrameHostImplBrowserTestWithBFCache,
                            ResetOwnerInBFCache);
+  FRIEND_TEST_ALL_PREFIXES(RenderFrameHostImplBrowserTestWithBFCache,
+                           ChildFramesHiddenWhileInBFCache);
   FRIEND_TEST_ALL_PREFIXES(RenderFrameHostImplPrerenderBrowserTest,
                            KeepPrerenderRFHOwnerAfterActivation);
   class SubresourceLoaderFactoriesConfig;
@@ -4549,16 +4558,16 @@ class CONTENT_EXPORT RenderFrameHostImpl
   // These values should be cleared on document commit.
   //
   // Some features are tracked in these places:
-  //   * `renderer_reported_bfcache_disabling_features_` for features in the
-  //      document in the renderer.
+  //   * `renderer_reported_bfcache_blocking_details_` for features in the
+  //      document in the renderer and the JavaScript locations that used the
+  //      features.
   //   * `browser_reported_bfcache_disabling_features_counts_` for the browser
   //      features.
   //   * `DedicatedWorkerHost` for features used in dedicated workers.
   // They are tracked separately, because when the renderer updates the set of
   // features, the browser ones should persist. Also, dedicated workers might be
   // destroyed while their renderers persist.
-  BackForwardCacheDisablingFeatures
-      renderer_reported_bfcache_disabling_features_;
+  BackForwardCacheBlockingDetails renderer_reported_bfcache_blocking_details_;
 
   // Count the usage of BackForwardCacheDisablingFeature.
   base::flat_map<BackForwardCacheDisablingFeature, int>
@@ -4981,6 +4990,14 @@ class CONTENT_EXPORT RenderFrameHostImpl
   // the destruction of the document. See the comments of the
   // `cookie_change_listener_` in `NavigationRequest`.
   std::unique_ptr<CookieChangeListener> cookie_change_listener_;
+
+  // Contains a document token to fullscreen when the document element is ready.
+  // Set when a committed navigation requested fullscreen (e.g. Fullscreen popup
+  // window) and triggers a fullscreen on the document element once it is ready
+  // (`MainDocumentElementAvailable` dispatched).
+  // See: https://chromestatus.com/feature/6002307972464640
+  absl::optional<blink::DocumentToken>
+      fullscreen_document_on_document_element_ready_ = absl::nullopt;
 
   // WeakPtrFactories are the last members, to ensure they are destroyed before
   // all other fields of `this`.

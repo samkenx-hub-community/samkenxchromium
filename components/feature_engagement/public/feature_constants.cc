@@ -46,10 +46,10 @@ BASE_FEATURE(kIPHGMCCastStartStopFeature,
              base::FEATURE_ENABLED_BY_DEFAULT);
 BASE_FEATURE(kIPHHighEfficiencyInfoModeFeature,
              "IPH_HighEfficiencyInfoMode",
-             base::FEATURE_ENABLED_BY_DEFAULT);
+             base::FEATURE_DISABLED_BY_DEFAULT);
 BASE_FEATURE(kIPHHighEfficiencyModeFeature,
              "IPH_HighEfficiencyMode",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 BASE_FEATURE(kIPHLiveCaptionFeature,
              "IPH_LiveCaption",
              base::FEATURE_ENABLED_BY_DEFAULT);
@@ -483,6 +483,9 @@ BASE_FEATURE(kIPHAutofillVirtualCardSuggestionFeature,
 #if BUILDFLAG(IS_CHROMEOS_ASH)
 BASE_FEATURE(kIPHGoogleOneOfferNotificationFeature,
              "IPH_GoogleOneOfferNotification",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+BASE_FEATURE(kIPHLauncherSearchHelpUiFeature,
+             "IPH_LauncherSearchHelpUi",
              base::FEATURE_DISABLED_BY_DEFAULT);
 #endif
 

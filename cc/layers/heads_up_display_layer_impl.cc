@@ -60,6 +60,7 @@
 #include "third_party/skia/include/core/SkFont.h"
 #include "third_party/skia/include/core/SkPaint.h"
 #include "third_party/skia/include/core/SkPath.h"
+#include "third_party/skia/include/core/SkSurface.h"
 #include "third_party/skia/include/core/SkTextBlob.h"
 #include "third_party/skia/include/core/SkTypeface.h"
 #include "third_party/skia/include/gpu/GrDirectContext.h"
@@ -350,8 +351,8 @@ void HeadsUpDisplayLayerImpl::UpdateHudTexture(
       backing->layer_tree_frame_sink = layer_tree_frame_sink;
       backing->shared_bitmap_id = viz::SharedBitmap::GenerateId();
       base::MappedReadOnlyRegion shm =
-          viz::bitmap_allocation::AllocateSharedBitmap(
-              pool_resource.size(), pool_resource.format().resource_format());
+          viz::bitmap_allocation::AllocateSharedBitmap(pool_resource.size(),
+                                                       pool_resource.format());
       backing->shared_mapping = std::move(shm.mapping);
 
       layer_tree_frame_sink->DidAllocateSharedBitmap(std::move(shm.region),

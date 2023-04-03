@@ -323,6 +323,10 @@ class BBJSONGenerator(object):  # pylint: disable=useless-object-inheritance
     self.gn_isolate_map = None
     self.variants = None
 
+    # Relative sub dir of the pyl dir where the JSON files will be written.
+    # Used only for unit testing.
+    self.json_sub_dir = None
+
   @staticmethod
   def parse_args(argv):
 
@@ -1587,6 +1591,8 @@ class BBJSONGenerator(object):  # pylint: disable=useless-object-inheritance
 
     for filename, contents in result.items():
       jsonstr = self.jsonify(contents)
+      if self.json_sub_dir:
+        filename = os.path.join(self.json_sub_dir, filename)
       self.write_file(self.pyl_file_path(filename + suffix), jsonstr)
 
   def get_valid_bot_names(self):
@@ -2007,8 +2013,10 @@ class BBJSONGenerator(object):  # pylint: disable=useless-object-inheritance
     outputs = self.generate_outputs()
     for filename, expected_contents in outputs.items():
       expected = self.jsonify(expected_contents)
-      file_path = filename + '.json'
-      current = self.read_file(self.pyl_file_path(file_path))
+      file_path = self.pyl_file_path(filename + '.json')
+      if self.json_sub_dir:
+        file_path = os.path.join(self.json_sub_dir, file_path)
+      current = self.read_file(file_path)
       if expected != current:
         ungenerated_files.add(filename)
         if verbose: # pragma: no cover
@@ -2039,17 +2047,19 @@ class BBJSONGenerator(object):  # pylint: disable=useless-object-inheritance
                                       step_data)
 
   def _check_swarming_config(self, filename, builder, step_name, step_data):
-    # TODO(crbug.com/1203436): Ensure all swarming tests specify os and cpu, not
+    # TODO(crbug.com/1203436): Ensure all swarming tests specify cpu, not
     # just mac tests.
-    if ('mac' in builder.lower()
-        and step_data['swarming']['can_use_on_swarming_builders']):
+    if step_data['swarming']['can_use_on_swarming_builders']:
       dimension_sets = step_data['swarming'].get('dimension_sets')
       if not dimension_sets:
-        raise BBGenErr('%s: %s / %s : os and cpu must be specified for mac '
+        raise BBGenErr('%s: %s / %s : os must be specified for all '
                        'swarmed tests' % (filename, builder, step_name))
       for s in dimension_sets:
-        if not s.get('os') or not s.get('cpu'):
-          raise BBGenErr('%s: %s / %s : os and cpu must be specified for mac '
+        if not s.get('os'):
+          raise BBGenErr('%s: %s / %s : os must be specified for all '
+                         'swarmed tests' % (filename, builder, step_name))
+        if 'Mac' in s.get('os') and not s.get('cpu'):
+          raise BBGenErr('%s: %s / %s : cpu must be specified for mac '
                          'swarmed tests' % (filename, builder, step_name))
 
   def check_consistency(self, verbose=False):

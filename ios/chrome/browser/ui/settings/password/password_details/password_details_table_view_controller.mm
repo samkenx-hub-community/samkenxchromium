@@ -195,7 +195,7 @@ const int kMinNoteCharAmountForWarning = 901;
 }
 
 - (void)viewDidDisappear:(BOOL)animated {
-  [self.handler passwordDetailsTableViewControllerDidDisappear];
+  [self.handler passwordDetailsTableViewControllerWasDismissed];
   [super viewDidDisappear:animated];
 }
 
@@ -498,6 +498,13 @@ const int kMinNoteCharAmountForWarning = 901;
         [self.applicationCommandsHandler closeSettingsUIAndOpenURL:command];
       }
       break;
+    case PasswordDetailsItemTypeNote: {
+      UITableViewCell* cell = [self.tableView cellForRowAtIndexPath:indexPath];
+      TableViewMultiLineTextEditCell* textFieldCell =
+          base::mac::ObjCCastStrict<TableViewMultiLineTextEditCell>(cell);
+      [textFieldCell.textView becomeFirstResponder];
+      break;
+    }
     case PasswordDetailsItemTypeChangePasswordRecommendation:
     case PasswordDetailsItemTypeDeleteButton:
     case PasswordDetailsItemTypeMoveToAccountButton:
@@ -533,7 +540,8 @@ const int kMinNoteCharAmountForWarning = 901;
 
 - (BOOL)tableView:(UITableView*)tableView
     shouldHighlightRowAtIndexPath:(NSIndexPath*)indexPath {
-  return !self.editing;
+  NSInteger itemType = [self.tableViewModel itemTypeForIndexPath:indexPath];
+  return !self.editing || itemType == PasswordDetailsItemTypeNote;
 }
 
 - (CGFloat)tableView:(UITableView*)tableView
@@ -610,7 +618,10 @@ const int kMinNoteCharAmountForWarning = 901;
       [cell setTag:indexPath.section];
       break;
     }
-    case PasswordDetailsItemTypeNote:
+    case PasswordDetailsItemTypeNote: {
+      cell.selectionStyle = UITableViewCellSelectionStyleNone;
+      break;
+    }
     case PasswordDetailsItemTypeNoteFooter:
     case PasswordDetailsItemTypeWebsite:
     case PasswordDetailsItemTypeFederation:
@@ -803,7 +814,7 @@ const int kMinNoteCharAmountForWarning = 901;
                                  handler:showPasswordHandler];
   } else {
     DCHECK(self.handler);
-    [self.handler showPasscodeDialog];
+    [self.handler showPasscodeDialogForReason:PasscodeDialogReasonShowPassword];
   }
 }
 
@@ -1351,6 +1362,8 @@ const int kMinNoteCharAmountForWarning = 901;
   }
 
   if (![self.reauthModule canAttemptReauth]) {
+    [self.handler
+        showPasscodeDialogForReason:PasscodeDialogReasonMovePasswordToAccount];
     return;
   }
   __weak __typeof(self) weakSelf = self;
@@ -1371,6 +1384,11 @@ const int kMinNoteCharAmountForWarning = 901;
           l10n_util::GetNSString(IDS_IOS_AUTH_TO_SAVE_PASSWORD_TO_ACCOUNT_STORE)
                   canReusePreviousAuth:YES
                                handler:movePasswordHandler];
+}
+
+- (void)dismissView {
+  [self.view endEditing:YES];
+  [self.handler passwordDetailsTableViewControllerWasDismissed];
 }
 
 #pragma mark - UIResponder
@@ -1482,6 +1500,15 @@ const int kMinNoteCharAmountForWarning = 901;
 - (void)showEditViewWithoutAuthentication {
   self.showPasswordWithoutAuth = YES;
   [self editButtonPressed];
+}
+
+- (void)setupLeftCancelButton {
+  UIBarButtonItem* cancelButton = [[UIBarButtonItem alloc]
+      initWithBarButtonSystemItem:UIBarButtonSystemItemCancel
+                           target:self
+                           action:@selector(dismissView)];
+  self.backButtonItem = cancelButton;
+  self.navigationItem.leftBarButtonItem = self.backButtonItem;
 }
 
 @end

@@ -14,7 +14,6 @@
 #include "third_party/blink/renderer/core/layout/hit_test_location.h"
 #include "third_party/blink/renderer/core/layout/hit_test_result.h"
 #include "third_party/blink/renderer/core/layout/layout_inline.h"
-#include "third_party/blink/renderer/core/layout/layout_table_cell.h"
 #include "third_party/blink/renderer/core/layout/layout_view.h"
 #include "third_party/blink/renderer/core/layout/ng/geometry/ng_box_strut.h"
 #include "third_party/blink/renderer/core/layout/ng/inline/layout_ng_text_combine.h"
@@ -26,6 +25,8 @@
 #include "third_party/blink/renderer/core/layout/ng/ng_fragmentation_utils.h"
 #include "third_party/blink/renderer/core/layout/ng/ng_outline_utils.h"
 #include "third_party/blink/renderer/core/layout/ng/ng_physical_box_fragment.h"
+#include "third_party/blink/renderer/core/layout/ng/table/layout_ng_table.h"
+#include "third_party/blink/renderer/core/layout/ng/table/layout_ng_table_cell.h"
 #include "third_party/blink/renderer/core/layout/pointer_events_hit_rules.h"
 #include "third_party/blink/renderer/core/page/page.h"
 #include "third_party/blink/renderer/core/paint/background_image_geometry.h"
@@ -410,7 +411,7 @@ void NGBoxFragmentPainter::Paint(const PaintInfo& paint_info) {
       !box_fragment_.HasSelfPaintingLayer() &&
       paint_info.phase != PaintPhase::kOverlayOverflowControls) {
     PaintAllPhasesAtomically(paint_info);
-  } else if (layout_object && layout_object->IsNGSVGForeignObject()) {
+  } else if (layout_object && layout_object->IsSVGForeignObject()) {
     ScopedSVGPaintState paint_state(*layout_object, paint_info);
     PaintTiming::From(layout_object->GetDocument()).MarkFirstContentfulPaint();
     PaintInternal(paint_info);
@@ -1167,32 +1168,18 @@ void NGBoxFragmentPainter::PaintBoxDecorationBackgroundWithRectImpl(
   }
 
   bool needs_end_layer = false;
-  if (!box_decoration_data.IsPaintingBackgroundInContentsSpace()) {
-    if (box_fragment_.HasSelfPaintingLayer() && layout_box.IsTableCell() &&
-        ToInterface<LayoutNGTableCellInterface>(layout_box)
-            .TableInterface()
-            ->ShouldCollapseBorders()) {
-      // TODO(crbug.com/1081425) This branch is only used by Legacy
-      // tables. Remove when Legacy tables are removed.
-      // We have to clip here because the background would paint on top of the
-      // collapsed table borders otherwise, since this is a self-painting layer.
-      PhysicalRect clip_rect = paint_rect;
-      clip_rect.Expand(layout_box.BorderInsets());
-      state_saver.Save();
-      paint_info.context.Clip(ToPixelSnappedRect(clip_rect));
-    } else if (BleedAvoidanceIsClipping(
-                   box_decoration_data.GetBackgroundBleedAvoidance())) {
-      state_saver.Save();
-      FloatRoundedRect border =
-          RoundedBorderGeometry::PixelSnappedRoundedBorder(
-              style, paint_rect, box_fragment_.SidesToInclude());
-      paint_info.context.ClipRoundedRect(border);
+  if (!box_decoration_data.IsPaintingBackgroundInContentsSpace() &&
+      BleedAvoidanceIsClipping(
+          box_decoration_data.GetBackgroundBleedAvoidance())) {
+    state_saver.Save();
+    FloatRoundedRect border = RoundedBorderGeometry::PixelSnappedRoundedBorder(
+        style, paint_rect, box_fragment_.SidesToInclude());
+    paint_info.context.ClipRoundedRect(border);
 
-      if (box_decoration_data.GetBackgroundBleedAvoidance() ==
-          kBackgroundBleedClipLayer) {
-        paint_info.context.BeginLayer();
-        needs_end_layer = true;
-      }
+    if (box_decoration_data.GetBackgroundBleedAvoidance() ==
+        kBackgroundBleedClipLayer) {
+      paint_info.context.BeginLayer();
+      needs_end_layer = true;
     }
   }
 
@@ -1823,8 +1810,6 @@ PhysicalRect NGBoxFragmentPainter::AdjustRectForScrolledContent(
 }
 
 LayoutRectOutsets NGBoxFragmentPainter::ComputeBorders() const {
-  if (box_fragment_.GetLayoutObject()->IsTableCellLegacy())
-    return To<LayoutBox>(box_fragment_.GetLayoutObject())->BorderBoxOutsets();
   return PhysicalFragment().Borders().ToLayoutRectOutsets();
 }
 

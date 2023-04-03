@@ -17,6 +17,7 @@
 #include "base/memory/discardable_memory.h"
 #include "base/memory/memory_pressure_listener.h"
 #include "base/memory/raw_ptr.h"
+#include "base/memory/raw_ptr_exclusion.h"
 #include "base/synchronization/lock.h"
 #include "base/time/time.h"
 #include "base/trace_event/memory_dump_provider.h"
@@ -597,7 +598,8 @@ class CC_EXPORT GpuImageDecodeCache
   // Calculate the mip level to upload-scale the image to before uploading. We
   // use mip levels rather than exact scales to increase re-use of scaled
   // images.
-  int CalculateUploadScaleMipLevel(const DrawImage& draw_image) const;
+  int CalculateUploadScaleMipLevel(const DrawImage& draw_image,
+                                   AuxImage aux_image) const;
 
   InUseCacheKey InUseCacheKeyFromDrawImage(const DrawImage& draw_image) const;
 
@@ -668,6 +670,7 @@ class CC_EXPORT GpuImageDecodeCache
       bool allow_hardware_decode);
   void WillAddCacheEntry(const DrawImage& draw_image);
   SkImageInfo CreateImageInfoForDrawImage(const DrawImage& draw_image,
+                                          AuxImage aux_image,
                                           int upload_scale_mip_level) const;
 
   // Finds the ImageData that should be used for the given DrawImage. Looks
@@ -828,7 +831,9 @@ class CC_EXPORT GpuImageDecodeCache
   size_t working_set_items_ = 0;
   bool aggressively_freeing_resources_ = false;
 
-  RasterDarkModeFilter* const dark_mode_filter_;
+  // This field is not a raw_ptr<> because of incompatibilities with tracing
+  // (TRACE_EVENT*), perfetto::TracedDictionary::Add and gmock/EXPECT_THAT.
+  RAW_PTR_EXCLUSION RasterDarkModeFilter* const dark_mode_filter_;
 
   // We can't modify GPU backed SkImages without holding the context lock, so
   // we queue up operations to run the next time the lock is held.

@@ -9,9 +9,14 @@ import android.content.Context;
 import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.graphics.Bitmap;
+import android.graphics.Canvas;
 import android.graphics.ColorFilter;
+import android.graphics.Paint;
 import android.graphics.PorterDuff;
 import android.graphics.PorterDuffColorFilter;
+import android.graphics.PorterDuffXfermode;
+import android.graphics.Rect;
+import android.graphics.RectF;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
 import android.os.Handler;
@@ -29,6 +34,7 @@ import android.widget.PopupWindow;
 import android.widget.TextView;
 
 import androidx.annotation.IntDef;
+import androidx.annotation.Nullable;
 import androidx.annotation.Px;
 import androidx.annotation.VisibleForTesting;
 import androidx.appcompat.content.res.AppCompatResources;
@@ -500,11 +506,13 @@ public class AutofillUiUtils {
      * @param widthId Resource Id for the width spec.
      * @param heightId Resource Id for the height spec.
      * @param showCustomIcon If true, custom card icon is fetched, else, default icon is fetched.
-     * @return {@link Drawable} that can be set as the card icon.
+     * @return {@link Drawable} that can be set as the card icon. If neither the custom icon nor the
+     *         default icon is available, returns null.
      */
-    public static Drawable getCardIcon(Context context, GURL cardArtUrl, int defaultIconId,
-            int widthId, int heightId, boolean showCustomIcon) {
-        Drawable defaultIcon = AppCompatResources.getDrawable(context, defaultIconId);
+    public static @Nullable Drawable getCardIcon(Context context, GURL cardArtUrl,
+            int defaultIconId, int widthId, int heightId, boolean showCustomIcon) {
+        Drawable defaultIcon =
+                defaultIconId == 0 ? null : AppCompatResources.getDrawable(context, defaultIconId);
         if (!showCustomIcon || !cardArtUrl.isValid()) {
             return defaultIcon;
         }
@@ -521,5 +529,50 @@ public class AutofillUiUtils {
                 resources.getDimensionPixelSize(widthId), resources.getDimensionPixelSize(heightId),
                 true);
         return new BitmapDrawable(resources, scaledBitmap);
+    }
+
+    public static int getSettingsPageIconWidthId() {
+        if (ChromeFeatureList.isEnabled(
+                    ChromeFeatureList.AUTOFILL_ENABLE_NEW_CARD_ART_AND_NETWORK_IMAGES)) {
+            return R.dimen.settings_page_card_icon_width_new;
+        }
+        return R.dimen.settings_page_card_icon_width;
+    }
+
+    public static int getSettingsPageIconHeightId() {
+        if (ChromeFeatureList.isEnabled(
+                    ChromeFeatureList.AUTOFILL_ENABLE_NEW_CARD_ART_AND_NETWORK_IMAGES)) {
+            return R.dimen.settings_page_card_icon_height_new;
+        }
+        return R.dimen.settings_page_card_icon_height;
+    }
+
+    /**
+     * If {@code roundBitmapCorners} is true, add a corner radius to bitmap corners.
+     * @param bitmap to be updated.
+     * @param roundBitmapCorners If true, the bitmap corners are rounded, else the input bitmap is
+     *         returned as it is.
+     * @return {@link Bitmap} with the corners rounded.
+     */
+    public static Bitmap getRoundedBitmap(Bitmap bitmap, boolean roundBitmapCorners) {
+        if (!roundBitmapCorners) {
+            return bitmap;
+        }
+
+        float cornerRadius = ContextUtils.getApplicationContext().getResources().getDimension(
+                R.dimen.card_art_corner_radius);
+
+        Bitmap roundedBitmap =
+                Bitmap.createBitmap(bitmap.getWidth(), bitmap.getHeight(), Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(roundedBitmap);
+        Paint paint = new Paint();
+        paint.setAntiAlias(true);
+        Rect rect = new Rect(0, 0, bitmap.getWidth(), bitmap.getHeight());
+        RectF rectF = new RectF(rect);
+        canvas.drawRoundRect(rectF, cornerRadius, cornerRadius, paint);
+        paint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.SRC_IN));
+        canvas.drawBitmap(bitmap, rect, rect, paint);
+
+        return roundedBitmap;
     }
 }

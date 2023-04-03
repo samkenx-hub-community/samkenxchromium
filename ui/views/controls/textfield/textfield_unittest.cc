@@ -47,6 +47,7 @@
 #include "ui/gfx/render_text.h"
 #include "ui/gfx/render_text_test_api.h"
 #include "ui/strings/grit/ui_strings.h"
+#include "ui/views/accessibility/view_accessibility.h"
 #include "ui/views/border.h"
 #include "ui/views/controls/textfield/textfield_model.h"
 #include "ui/views/controls/textfield/textfield_test_api.h"
@@ -4183,6 +4184,31 @@ TEST_F(TextfieldTest, SetAccessibleNameNotifiesAccessibilityEvent) {
   EXPECT_EQ(data.GetNameFrom(), ax::mojom::NameFrom::kAttribute);
 }
 
+TEST_F(TextfieldTest, AccessibleNameFromLabel) {
+  InitTextfield();
+
+  const std::u16string label_text = u"Some label";
+  View label;
+  label.SetAccessibleName(label_text);
+  textfield_->SetAccessibleName(&label);
+
+  // Use `ViewAccessibility::GetAccessibleNodeData` so that we can get the
+  // label's accessible id to compare with the textfield's labelled-by id.
+  ui::AXNodeData label_data;
+  label.GetViewAccessibility().GetAccessibleNodeData(&label_data);
+
+  ui::AXNodeData textfield_data;
+  textfield_->GetAccessibleNodeData(&textfield_data);
+  EXPECT_EQ(
+      textfield_data.GetString16Attribute(ax::mojom::StringAttribute::kName),
+      label_text);
+  EXPECT_EQ(textfield_->GetAccessibleName(), label_text);
+  EXPECT_EQ(textfield_data.GetNameFrom(), ax::mojom::NameFrom::kRelatedElement);
+  EXPECT_EQ(textfield_data.GetIntListAttribute(
+                ax::mojom::IntListAttribute::kLabelledbyIds)[0],
+            label_data.id);
+}
+
 #if BUILDFLAG(IS_CHROMEOS_ASH)
 // Check that when accessibility virtual keyboard is enabled, windows are
 // shifted up when focused and restored when focus is lost.
@@ -4565,6 +4591,22 @@ TEST_F(TextfieldTest, AccessiblePasswordTest) {
   EXPECT_EQ(u"••••••••", node_data_protected.GetString16Attribute(
                              ax::mojom::StringAttribute::kValue));
   EXPECT_TRUE(node_data_protected.HasState(ax::mojom::State::kProtected));
+}
+
+TEST_F(TextfieldTest, AccessibleRole) {
+  InitTextfield();
+
+  ui::AXNodeData data;
+  textfield_->GetAccessibleNodeData(&data);
+  EXPECT_EQ(data.role, ax::mojom::Role::kTextField);
+  EXPECT_EQ(textfield_->GetAccessibleRole(), ax::mojom::Role::kTextField);
+
+  textfield_->SetAccessibleRole(ax::mojom::Role::kSearchBox);
+
+  data = ui::AXNodeData();
+  textfield_->GetAccessibleNodeData(&data);
+  EXPECT_EQ(data.role, ax::mojom::Role::kSearchBox);
+  EXPECT_EQ(textfield_->GetAccessibleRole(), ax::mojom::Role::kSearchBox);
 }
 
 // Verify that cursor visibility is controlled by SetCursorEnabled.

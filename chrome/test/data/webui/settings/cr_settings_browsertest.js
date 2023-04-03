@@ -887,6 +887,7 @@ TEST_F('CrSettingsMenuTest', 'All', function() {
    'SettingsCategoryDefaultRadioGroup',
    'settings_category_default_radio_group_tests.js',
  ],
+ ['AntiAbusePage', 'anti_abuse_page_test.js'],
  ['CategoryDefaultSetting', 'category_default_setting_tests.js'],
  ['CategorySettingExceptions', 'category_setting_exceptions_tests.js'],
  ['Checkbox', 'checkbox_tests.js'],
@@ -933,6 +934,7 @@ TEST_F('CrSettingsMenuTest', 'All', function() {
  ['SecurityKeysSetPinDialog', 'security_keys_set_pin_dialog_test.js'],
  ['SecurityKeysPhonesSubpage', 'security_keys_phones_subpage_test.js'],
  ['SecureDns', 'secure_dns_test.js'],
+ ['SimpleConfirmationDialog', 'simple_confirmation_dialog_test.js'],
  ['SiteDataTest', 'site_data_test.js'],
  ['SiteDetailsPermission', 'site_details_permission_tests.js'],
  [

@@ -103,6 +103,7 @@
 <translation id="2717722538473713889">Adresy e-mail</translation>
 <translation id="2750481671343847896">Witryny mogą wyświetlać prośby o zalogowanie się pochodzące od usług tożsamości.</translation>
 <translation id="2822354292072154809">Czy na pewno chcesz zresetować wszystkie uprawnienia witryny dla obiektu <ph name="CHOSEN_OBJECT_NAME" />?</translation>
+<translation id="2850913818900871965">Żądaj wersji na urządzenia mobilne</translation>
 <translation id="2870560284913253234">Witryna</translation>
 <translation id="2874939134665556319">Poprzedni utwór</translation>
 <translation id="2891975107962658722">Nie zezwalaj witrynie na zapisywanie danych na Twoim urządzeniu</translation>
@@ -222,7 +223,6 @@
 <translation id="509133520954049755">Żądaj wersji na komputery</translation>
 <translation id="5100237604440890931">Zwinięty – kliknij, by rozwinąć.</translation>
 <translation id="5123685120097942451">Karta incognito</translation>
-<translation id="5134599672855298214">Żądaj wersji na urządzenia mobilne (zalecane)</translation>
 <translation id="5186036860380548585">Opcja dostępna u góry ekranu</translation>
 <translation id="5197729504361054390">Wybrane kontakty zostaną udostępnione witrynie <ph name="BEGIN_BOLD" /><ph name="SITE" /><ph name="END_BOLD" />.</translation>
 <translation id="5216942107514965959">Ostatnio używana dzisiaj</translation>

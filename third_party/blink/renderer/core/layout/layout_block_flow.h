@@ -39,7 +39,6 @@
 #include "base/dcheck_is_on.h"
 #include "third_party/blink/renderer/core/core_export.h"
 #include "third_party/blink/renderer/core/layout/api/line_layout_item.h"
-#include "third_party/blink/renderer/core/layout/floating_objects.h"
 #include "third_party/blink/renderer/core/layout/layout_block.h"
 #include "third_party/blink/renderer/core/layout/line/line_box_list.h"
 #include "third_party/blink/renderer/core/layout/line/root_inline_box.h"
@@ -50,13 +49,11 @@ namespace blink {
 template <class Run>
 class BidiRunList;
 class BlockChildrenLayoutInfo;
-class LayoutInline;
 class LineInfo;
 class LineLayoutState;
 class LineWidth;
 class LayoutMultiColumnFlowThread;
 class LayoutMultiColumnSpannerPlaceholder;
-class LayoutRubyRun;
 class MarginInfo;
 class NGOffsetMapping;
 class NGPhysicalFragment;
@@ -70,15 +67,6 @@ enum IndentTextOrNot { kDoNotIndentText, kIndentText };
 //
 // LayoutBlockFlows are the only LayoutObject allowed to own floating objects
 // (aka floats): http://www.w3.org/TR/CSS21/visuren.html#floats .
-//
-// Floats are inserted into |floating_objects_| (see FloatingObjects for more
-// information on how floats are modelled) during layout. This happens either as
-// part of laying out blocks (LayoutBlockChildren) or line layout (LineBreaker
-// class). This is because floats can be part of an inline or a block context.
-//
-// An interesting feature of floats is that they can intrude into the next
-// block(s). This means that |floating_objects_| can potentially contain
-// pointers to a previous sibling LayoutBlockFlow's float.
 //
 // LayoutBlockFlow is also the only LayoutObject to own a line box tree and
 // perform inline layout. See layout_block_flow_line.cc for these parts.
@@ -111,8 +99,6 @@ class CORE_EXPORT LayoutBlockFlow : public LayoutBlock {
   void UpdateBlockLayout(bool relayout_children) override;
 
   void ComputeVisualOverflow(bool recompute_floats) override;
-  void ComputeLayoutOverflow(LayoutUnit old_client_after_edge,
-                             bool recompute_floats = false) override;
 
   void DeleteLineBoxTree();
 
@@ -166,15 +152,13 @@ class CORE_EXPORT LayoutBlockFlow : public LayoutBlock {
       LayoutUnit position,
       LayoutUnit logical_height = LayoutUnit()) const {
     NOT_DESTROYED();
-    return LogicalLeftFloatOffsetForAvoidingFloats(
-        position, LogicalLeftOffsetForContent(), logical_height);
+    return LogicalLeftOffsetForContent();
   }
   LayoutUnit LogicalRightOffsetForAvoidingFloats(
       LayoutUnit position,
       LayoutUnit logical_height = LayoutUnit()) const {
     NOT_DESTROYED();
-    return LogicalRightFloatOffsetForAvoidingFloats(
-        position, LogicalRightOffsetForContent(), logical_height);
+    return LogicalRightOffsetForContent();
   }
   LayoutUnit StartOffsetForAvoidingFloats(
       LayoutUnit position,
@@ -232,33 +216,9 @@ class CORE_EXPORT LayoutBlockFlow : public LayoutBlock {
   LayoutUnit FirstLineBoxBaseline() const override;
   LayoutUnit InlineBlockBaseline(LineDirectionMode) const override;
 
-  void RemoveFloatingObjectsFromDescendants();
   void MarkAllDescendantsWithFloatsForLayout(
       LayoutBox* float_to_remove = nullptr,
       bool in_layout = true);
-  void MarkSiblingsWithFloatsForLayout(LayoutBox* float_to_remove = nullptr);
-
-  bool ContainsFloats() const {
-    NOT_DESTROYED();
-    return floating_objects_ && !floating_objects_->Set().empty();
-  }
-  bool ContainsFloat(LayoutBox*) const;
-
-  void RemoveFloatingObjects();
-
-  LayoutBoxModelObject* VirtualContinuation() const final {
-    NOT_DESTROYED();
-    return Continuation();
-  }
-  bool IsAnonymousBlockContinuation() const {
-    NOT_DESTROYED();
-    return Continuation() && IsAnonymousBlock();
-  }
-
-  using LayoutBoxModelObject::Continuation;
-  using LayoutBoxModelObject::SetContinuation;
-
-  LayoutInline* InlineElementContinuation() const;
 
   void AddChild(LayoutObject* new_child,
                 LayoutObject* before_child = nullptr) override;
@@ -273,66 +233,6 @@ class CORE_EXPORT LayoutBlockFlow : public LayoutBlock {
   void CollapseAnonymousBlockChild(LayoutBlockFlow* child);
 
   bool GeneratesLineBoxesForInlineChild(LayoutObject*);
-
-  LayoutUnit LogicalTopForFloat(const FloatingObject& floating_object) const {
-    NOT_DESTROYED();
-    return IsHorizontalWritingMode() ? floating_object.Y()
-                                     : floating_object.X();
-  }
-  LayoutUnit LogicalBottomForFloat(
-      const FloatingObject& floating_object) const {
-    NOT_DESTROYED();
-    return IsHorizontalWritingMode() ? floating_object.MaxY()
-                                     : floating_object.MaxX();
-  }
-  LayoutUnit LogicalLeftForFloat(const FloatingObject& floating_object) const {
-    NOT_DESTROYED();
-    return IsHorizontalWritingMode() ? floating_object.X()
-                                     : floating_object.Y();
-  }
-  LayoutUnit LogicalRightForFloat(const FloatingObject& floating_object) const {
-    NOT_DESTROYED();
-    return IsHorizontalWritingMode() ? floating_object.MaxX()
-                                     : floating_object.MaxY();
-  }
-  LayoutUnit LogicalWidthForFloat(const FloatingObject& floating_object) const {
-    NOT_DESTROYED();
-    return IsHorizontalWritingMode() ? floating_object.Width()
-                                     : floating_object.Height();
-  }
-
-  void SetLogicalTopForFloat(FloatingObject& floating_object,
-                             LayoutUnit logical_top) {
-    NOT_DESTROYED();
-    if (IsHorizontalWritingMode())
-      floating_object.SetY(logical_top);
-    else
-      floating_object.SetX(logical_top);
-  }
-  void SetLogicalLeftForFloat(FloatingObject& floating_object,
-                              LayoutUnit logical_left) {
-    NOT_DESTROYED();
-    if (IsHorizontalWritingMode())
-      floating_object.SetX(logical_left);
-    else
-      floating_object.SetY(logical_left);
-  }
-  void SetLogicalHeightForFloat(FloatingObject& floating_object,
-                                LayoutUnit logical_height) {
-    NOT_DESTROYED();
-    if (IsHorizontalWritingMode())
-      floating_object.SetHeight(logical_height);
-    else
-      floating_object.SetWidth(logical_height);
-  }
-  void SetLogicalWidthForFloat(FloatingObject& floating_object,
-                               LayoutUnit logical_width) {
-    NOT_DESTROYED();
-    if (IsHorizontalWritingMode())
-      floating_object.SetWidth(logical_width);
-    else
-      floating_object.SetHeight(logical_width);
-  }
 
   LayoutUnit StartAlignedOffsetForLine(LayoutUnit position, IndentTextOrNot);
 
@@ -413,9 +313,6 @@ class CORE_EXPORT LayoutBlockFlow : public LayoutBlock {
   }
   void SetFirstForcedBreakOffset(LayoutUnit);
 
-  const AtomicString StartPageName() const final;
-  const AtomicString EndPageName() const final;
-
   void PositionSpannerDescendant(LayoutMultiColumnSpannerPlaceholder& child);
 
   bool CreatesNewFormattingContext() const override;
@@ -427,67 +324,9 @@ class CORE_EXPORT LayoutBlockFlow : public LayoutBlock {
                       LayoutObject* before_child,
                       bool full_remove_insert = false) override;
 
-  LayoutUnit XPositionForFloatIncludingMargin(
-      const FloatingObject& child) const {
-    NOT_DESTROYED();
-    LayoutUnit scrollbar_adjustment(OriginAdjustmentForScrollbars().x());
-    if (IsHorizontalWritingMode()) {
-      return child.X() + child.GetLayoutObject()->MarginLeft() +
-             scrollbar_adjustment;
-    }
-    return child.X() + MarginBeforeForChild(*child.GetLayoutObject());
-  }
-
-  DISABLE_CFI_PERF
-  LayoutUnit YPositionForFloatIncludingMargin(
-      const FloatingObject& child) const {
-    NOT_DESTROYED();
-    if (IsHorizontalWritingMode())
-      return child.Y() + MarginBeforeForChild(*child.GetLayoutObject());
-
-    return child.Y() + child.GetLayoutObject()->MarginTop();
-  }
-
-  LayoutPoint FlipFloatForWritingModeForChild(const FloatingObject&,
-                                              const LayoutPoint&) const;
-
   const char* GetName() const override {
     NOT_DESTROYED();
     return "LayoutBlockFlow";
-  }
-
-  FloatingObject* InsertFloatingObject(LayoutBox&);
-
-  // Return the last placed float. If |iterator| is non-null, it will be set to
-  // the float right after said float.
-  FloatingObject* LastPlacedFloat(
-      FloatingObjectSetIterator* iterator = nullptr) const;
-
-  // Position and lay out all floats that have not yet been positioned.
-  //
-  // This will mark them as "placed", which means that they have found their
-  // final location in this layout pass.
-  //
-  // |logical_top_margin_edge| is the minimum logical top for the floats. The
-  // final logical top of the floats will also be affected by clearance and
-  // space available after having positioned earlier floats.
-  //
-  // Returns true if and only if it has placed any floats.
-  bool PlaceNewFloats(LayoutUnit logical_top_margin_edge, LineWidth* = nullptr);
-
-  // Position and lay out the float, if it needs layout.
-  // |logical_top_margin_edge| is the minimum logical top offset for the float.
-  // The value returned is the minimum logical top offset for subsequent
-  // floats.
-  LayoutUnit PositionAndLayoutFloat(FloatingObject&,
-                                    LayoutUnit logical_top_margin_edge);
-
-  LayoutUnit NextFloatLogicalBottomBelow(LayoutUnit) const;
-  LayoutUnit NextFloatLogicalBottomBelowForBlock(LayoutUnit) const;
-
-  FloatingObject* LastFloatFromPreviousLine() const {
-    NOT_DESTROYED();
-    return ContainsFloats() ? floating_objects_->Set().back().Get() : nullptr;
   }
 
   void SetShouldDoFullPaintInvalidationForFirstLine();
@@ -500,20 +339,6 @@ class CORE_EXPORT LayoutBlockFlow : public LayoutBlock {
 
   bool ShouldMoveCaretToHorizontalBoundaryWhenPastTopOrBottom() const;
 
-  LayoutUnit LowestFloatLogicalBottom(EClear = EClear::kBoth) const;
-
-  bool HasOverhangingFloats() const {
-    NOT_DESTROYED();
-    return Parent() && ContainsFloats() &&
-           LowestFloatLogicalBottom() > LogicalHeight();
-  }
-  bool IsOverhangingFloat(const FloatingObject& float_object) const {
-    NOT_DESTROYED();
-    return LogicalBottomForFloat(float_object) > LogicalHeight();
-  }
-
-  LayoutUnit LogicalHeightWithVisibleOverflow() const final;
-
   void SetIsSelfCollapsingFromNG(bool is_self_collapsing) {
     NOT_DESTROYED();
     is_self_collapsing_ = is_self_collapsing;
@@ -521,9 +346,7 @@ class CORE_EXPORT LayoutBlockFlow : public LayoutBlock {
 
   // These functions are only public so we can call it from NGBlockNode while
   // we're still working on LayoutNG.
-  void AddVisualOverflowFromFloats();
   void AddVisualOverflowFromFloats(const NGPhysicalFragment& fragment);
-  void AddLayoutOverflowFromFloats();
 
   virtual NGInlineNodeData* TakeNGInlineNodeData() {
     NOT_DESTROYED();
@@ -550,24 +373,13 @@ class CORE_EXPORT LayoutBlockFlow : public LayoutBlock {
 #endif
 
  protected:
-  void RebuildFloatsFromIntruding();
   void LayoutInlineChildren(bool relayout_children, LayoutUnit after_edge);
-  void AddLowestFloatFromChildren(LayoutBlockFlow*);
-
-  void CreateFloatingObjects();
 
   void WillBeDestroyed() override;
-  void StyleWillChange(StyleDifference,
-                       const ComputedStyle& new_style) override;
   void StyleDidChange(StyleDifference, const ComputedStyle* old_style) override;
 
   void UpdateBlockChildDirtyBitsBeforeLayout(bool relayout_children,
                                              LayoutBox&);
-  void AbsoluteQuads(Vector<gfx::QuadF>&,
-                     MapCoordinatesFlags mode = 0) const override;
-  void LocalQuadsForSelf(Vector<gfx::QuadF>& quads) const override;
-  void AbsoluteQuadsForSelf(Vector<gfx::QuadF>& quads,
-                            MapCoordinatesFlags mode = 0) const override;
 
   LayoutUnit LogicalRightOffsetForLine(
       LayoutUnit logical_top,
@@ -575,10 +387,7 @@ class CORE_EXPORT LayoutBlockFlow : public LayoutBlock {
       IndentTextOrNot apply_text_indent,
       LayoutUnit logical_height = LayoutUnit()) const {
     NOT_DESTROYED();
-    return AdjustLogicalRightOffsetForLine(
-        LogicalRightFloatOffsetForLine(logical_top, fixed_offset,
-                                       logical_height),
-        apply_text_indent);
+    return AdjustLogicalRightOffsetForLine(fixed_offset, apply_text_indent);
   }
   LayoutUnit LogicalLeftOffsetForLine(
       LayoutUnit logical_top,
@@ -586,10 +395,7 @@ class CORE_EXPORT LayoutBlockFlow : public LayoutBlock {
       IndentTextOrNot apply_text_indent,
       LayoutUnit logical_height = LayoutUnit()) const {
     NOT_DESTROYED();
-    return AdjustLogicalLeftOffsetForLine(
-        LogicalLeftFloatOffsetForLine(logical_top, fixed_offset,
-                                      logical_height),
-        apply_text_indent);
+    return AdjustLogicalLeftOffsetForLine(fixed_offset, apply_text_indent);
   }
 
   virtual LayoutObject* LayoutSpecialExcludedChild(bool /*relayout_children*/,
@@ -613,25 +419,14 @@ class CORE_EXPORT LayoutBlockFlow : public LayoutBlock {
                        const PhysicalOffset& accumulated_offset,
                        HitTestPhase) override;
 
-  PhysicalOffset AccumulateRelativePositionOffsets() const override;
-
  private:
-  void QuadsForSelfInternal(Vector<gfx::QuadF>& quads,
-                            MapCoordinatesFlags mode,
-                            bool map_to_absolute) const;
-
   void ResetLayout();
   void LayoutChildren(bool relayout_children, SubtreeLayoutScope&);
-  void AddOverhangingFloatsFromChildren(LayoutUnit unconstrained_height);
   void LayoutBlockChildren(bool relayout_children,
                            SubtreeLayoutScope&,
                            LayoutUnit before_edge,
                            LayoutUnit after_edge);
 
-  void MarkDescendantsWithFloatsForLayoutIfNeeded(
-      LayoutBlockFlow& child,
-      LayoutUnit new_logical_top,
-      LayoutUnit previous_float_logical_bottom);
   bool PositionAndLayoutOnceIfNeeded(LayoutBox& child,
                                      LayoutUnit new_logical_top,
                                      BlockChildrenLayoutInfo&);
@@ -643,45 +438,6 @@ class CORE_EXPORT LayoutBlockFlow : public LayoutBlock {
 
   void LayoutBlockChild(LayoutBox& child, BlockChildrenLayoutInfo&);
   void AdjustPositionedBlock(LayoutBox& child, const BlockChildrenLayoutInfo&);
-  void AdjustFloatingBlock(const MarginInfo&);
-
-  LayoutPoint ComputeLogicalLocationForFloat(
-      const FloatingObject&,
-      LayoutUnit logical_top_offset) const;
-
-  void RemoveFloatingObject(LayoutBox*);
-  void RemoveFloatingObjectsBelow(FloatingObject*, LayoutUnit logical_offset);
-
-  LayoutUnit GetClearDelta(LayoutBox* child, LayoutUnit y_pos);
-
-  bool HasOverhangingFloat(LayoutBox*);
-  void AddIntrudingFloats(LayoutBlockFlow* prev,
-                          LayoutUnit xoffset,
-                          LayoutUnit yoffset);
-  void AddOverhangingFloats(LayoutBlockFlow* child,
-                            bool make_child_paint_other_floats);
-
-  bool HitTestFloats(HitTestResult&,
-                     const HitTestLocation&,
-                     const PhysicalOffset& accumulated_offset);
-
-  void ClearFloats(EClear);
-
-  LayoutUnit LogicalRightFloatOffsetForLine(LayoutUnit logical_top,
-                                            LayoutUnit fixed_offset,
-                                            LayoutUnit logical_height) const;
-  LayoutUnit LogicalLeftFloatOffsetForLine(LayoutUnit logical_top,
-                                           LayoutUnit fixed_offset,
-                                           LayoutUnit logical_height) const;
-
-  LayoutUnit LogicalLeftFloatOffsetForAvoidingFloats(
-      LayoutUnit logical_top,
-      LayoutUnit fixed_offset,
-      LayoutUnit logical_height) const;
-  LayoutUnit LogicalRightFloatOffsetForAvoidingFloats(
-      LayoutUnit logical_top,
-      LayoutUnit fixed_offset,
-      LayoutUnit logical_height) const;
 
   LayoutUnit LogicalRightOffsetForPositioningFloat(
       LayoutUnit logical_top,
@@ -755,16 +511,6 @@ class CORE_EXPORT LayoutBlockFlow : public LayoutBlock {
     return rare_data_ && rare_data_->did_break_at_line_to_avoid_widow_;
   }
 
-  // Start page name propagated from the first child, if there are children, and
-  // the first child has a start page name associated with it.
-  const AtomicString PropagatedStartPageName() const;
-  void SetPropagatedStartPageName(const AtomicString&);
-
-  // End page name propagated from the last child, if there are children, and
-  // the last child has a end page name associated with it.
-  const AtomicString PropagatedEndPageName() const;
-  void SetPropagatedEndPageName(const AtomicString&);
-
  public:
   struct FloatWithRect {
     DISALLOW_NEW();
@@ -780,55 +526,6 @@ class CORE_EXPORT LayoutBlockFlow : public LayoutBlock {
     bool ever_had_layout;
   };
 
-  // MarginValues holds the margins in the block direction
-  // used during collapsing margins computation.
-  // CSS mandates to keep track of both positive and negative margins:
-  // "When two or more margins collapse, the resulting margin width is the
-  // maximum of the collapsing margins' widths. In the case of negative
-  // margins, the maximum of the absolute values of the negative adjoining
-  // margins is deducted from the maximum of the positive adjoining margins.
-  // If there are no positive margins, the maximum of the absolute values of
-  // the adjoining margins is deducted from zero."
-  // https://drafts.csswg.org/css2/box.html#collapsing-margins
-  class MarginValues {
-    DISALLOW_NEW();
-
-   public:
-    MarginValues(LayoutUnit before_pos,
-                 LayoutUnit before_neg,
-                 LayoutUnit after_pos,
-                 LayoutUnit after_neg)
-        : positive_margin_before_(before_pos),
-          negative_margin_before_(before_neg),
-          positive_margin_after_(after_pos),
-          negative_margin_after_(after_neg) {}
-
-    LayoutUnit PositiveMarginBefore() const { return positive_margin_before_; }
-    LayoutUnit NegativeMarginBefore() const { return negative_margin_before_; }
-    LayoutUnit PositiveMarginAfter() const { return positive_margin_after_; }
-    LayoutUnit NegativeMarginAfter() const { return negative_margin_after_; }
-
-    void SetPositiveMarginBefore(LayoutUnit pos) {
-      positive_margin_before_ = pos;
-    }
-    void SetNegativeMarginBefore(LayoutUnit neg) {
-      negative_margin_before_ = neg;
-    }
-    void SetPositiveMarginAfter(LayoutUnit pos) {
-      positive_margin_after_ = pos;
-    }
-    void SetNegativeMarginAfter(LayoutUnit neg) {
-      negative_margin_after_ = neg;
-    }
-
-   private:
-    LayoutUnit positive_margin_before_;
-    LayoutUnit negative_margin_before_;
-    LayoutUnit positive_margin_after_;
-    LayoutUnit negative_margin_after_;
-  };
-  MarginValues MarginValuesForChild(LayoutBox& child) const;
-
   // Allocated only when some of these fields have non-default values
   struct LayoutBlockFlowRareData final
       : public GarbageCollected<LayoutBlockFlowRareData> {
@@ -838,24 +535,8 @@ class CORE_EXPORT LayoutBlockFlow : public LayoutBlock {
     LayoutBlockFlowRareData& operator=(const LayoutBlockFlowRareData&) = delete;
     ~LayoutBlockFlowRareData();
 
-    static LayoutUnit PositiveMarginBeforeDefault(
-        const LayoutBlockFlow* block) {
-      return block->MarginBefore().ClampNegativeToZero();
-    }
-    static LayoutUnit NegativeMarginBeforeDefault(
-        const LayoutBlockFlow* block) {
-      return (-block->MarginBefore()).ClampNegativeToZero();
-    }
-    static LayoutUnit PositiveMarginAfterDefault(const LayoutBlockFlow* block) {
-      return block->MarginAfter().ClampNegativeToZero();
-    }
-    static LayoutUnit NegativeMarginAfterDefault(const LayoutBlockFlow* block) {
-      return (-block->MarginAfter()).ClampNegativeToZero();
-    }
-
     void Trace(Visitor*) const;
 
-    MarginValues margins_;
     LayoutUnit pagination_strut_propagated_from_child_;
 
     LayoutUnit first_forced_break_offset_;
@@ -868,14 +549,6 @@ class CORE_EXPORT LayoutBlockFlow : public LayoutBlock {
     // |offset_mapping_| here.
     Member<NGOffsetMapping> offset_mapping_;
 
-    // Name of the start page for this object, if propagated from a descendant;
-    // see https://drafts.csswg.org/css-page-3/#start-page-value
-    AtomicString propagated_start_page_name_;
-
-    // Name of the end page for this object, if propagated from a descendant;
-    // see https://drafts.csswg.org/css-page-3/#end-page-value
-    AtomicString propagated_end_page_name_;
-
     unsigned break_before_ : 4;
     unsigned break_after_ : 4;
     int line_break_to_avoid_widow_;
@@ -886,91 +559,12 @@ class CORE_EXPORT LayoutBlockFlow : public LayoutBlock {
   const NGOffsetMapping* GetOffsetMapping() const;
   void SetOffsetMapping(NGOffsetMapping*);
 
-  const FloatingObjects* GetFloatingObjects() const {
-    NOT_DESTROYED();
-    return floating_objects_;
-  }
-
   bool ShouldTruncateOverflowingText() const;
 
  protected:
-  LayoutUnit MaxPositiveMarginBefore() const {
-    NOT_DESTROYED();
-    return rare_data_
-               ? rare_data_->margins_.PositiveMarginBefore()
-               : LayoutBlockFlowRareData::PositiveMarginBeforeDefault(this);
-  }
-  LayoutUnit MaxNegativeMarginBefore() const {
-    NOT_DESTROYED();
-    return rare_data_
-               ? rare_data_->margins_.NegativeMarginBefore()
-               : LayoutBlockFlowRareData::NegativeMarginBeforeDefault(this);
-  }
-  LayoutUnit MaxPositiveMarginAfter() const {
-    NOT_DESTROYED();
-    return rare_data_
-               ? rare_data_->margins_.PositiveMarginAfter()
-               : LayoutBlockFlowRareData::PositiveMarginAfterDefault(this);
-  }
-  LayoutUnit MaxNegativeMarginAfter() const {
-    NOT_DESTROYED();
-    return rare_data_
-               ? rare_data_->margins_.NegativeMarginAfter()
-               : LayoutBlockFlowRareData::NegativeMarginAfterDefault(this);
-  }
-
-  void SetMaxMarginBeforeValues(LayoutUnit pos, LayoutUnit neg);
-  void SetMaxMarginAfterValues(LayoutUnit pos, LayoutUnit neg);
-
-  void InitMaxMarginValues() {
-    NOT_DESTROYED();
-    if (rare_data_) {
-      rare_data_->margins_ = MarginValues(
-          LayoutBlockFlowRareData::PositiveMarginBeforeDefault(this),
-          LayoutBlockFlowRareData::NegativeMarginBeforeDefault(this),
-          LayoutBlockFlowRareData::PositiveMarginAfterDefault(this),
-          LayoutBlockFlowRareData::NegativeMarginAfterDefault(this));
-    }
-  }
-
   virtual ETextAlign TextAlignmentForLine(bool ends_with_soft_break) const;
 
  private:
-  LayoutUnit CollapsedMarginBefore() const final {
-    NOT_DESTROYED();
-    return MaxPositiveMarginBefore() - MaxNegativeMarginBefore();
-  }
-  LayoutUnit CollapsedMarginAfter() const final {
-    NOT_DESTROYED();
-    return MaxPositiveMarginAfter() - MaxNegativeMarginAfter();
-  }
-
-  LayoutUnit AdjustedMarginBeforeForPagination(
-      const LayoutBox&,
-      LayoutUnit logical_top_margin_edge,
-      LayoutUnit logical_top_border_edge,
-      const BlockChildrenLayoutInfo&) const;
-
-  LayoutUnit CollapseMargins(LayoutBox& child,
-                             BlockChildrenLayoutInfo&,
-                             bool child_is_self_collapsing);
-  LayoutUnit ClearFloatsIfNeeded(LayoutBox& child,
-                                 MarginInfo&,
-                                 LayoutUnit old_top_pos_margin,
-                                 LayoutUnit old_top_neg_margin,
-                                 LayoutUnit y_pos,
-                                 bool child_is_self_collapsing);
-  LayoutUnit EstimateLogicalTopPosition(
-      LayoutBox& child,
-      const BlockChildrenLayoutInfo&,
-      LayoutUnit& estimate_without_pagination);
-  void MarginBeforeEstimateForChild(LayoutBox&, LayoutUnit&, LayoutUnit&) const;
-  void HandleAfterSideOfBlock(LayoutBox* last_child,
-                              LayoutUnit top,
-                              LayoutUnit bottom,
-                              MarginInfo&);
-  void SetCollapsedBottomMargin(const MarginInfo&);
-
   static void RecalcFloatingDescendantsVisualOverflow(
       const NGPhysicalFragment& fragment);
 
@@ -1005,9 +599,6 @@ class CORE_EXPORT LayoutBlockFlow : public LayoutBlock {
   LayoutUnit AdjustForUnsplittableChild(LayoutBox&,
                                         LayoutUnit logical_offset) const;
 
-  // Used to store state between StyleWillChange and StyleDidChange
-  static bool can_propagate_float_into_sibling_;
-
   LineBoxList line_boxes_;  // All of the root line boxes created for this block
                             // flow.  For example, <div>Hello<br>world.</div>
                             // will have two total lines for the <div>.
@@ -1019,14 +610,13 @@ class CORE_EXPORT LayoutBlockFlow : public LayoutBlock {
 
  protected:
   Member<LayoutBlockFlowRareData> rare_data_;
-  Member<FloatingObjects> floating_objects_;
 
   friend class MarginInfo;
   friend class LineWidth;  // needs to know FloatingObject
 
-  // LayoutRubyBase objects need to be able to split and merge, moving their
-  // children around (calling makeChildrenNonInline).
-  friend class LayoutRubyBase;
+  // LayoutNGRubyBase objects need to be able to split and merge, moving their
+  // children around (calling MakeChildrenNonInline).
+  friend class LayoutNGRubyBase;
 
   // FIXME-BLOCKFLOW: These methods have implementations in
   // LayoutBlockFlowLine. They should be moved to the proper header once the
@@ -1036,10 +626,6 @@ class CORE_EXPORT LayoutBlockFlow : public LayoutBlock {
   InlineFlowBox* CreateLineBoxes(LineLayoutItem,
                                  const LineInfo&,
                                  InlineBox* child_box);
-  void SetMarginsForRubyRun(BidiRun*,
-                            LayoutRubyRun*,
-                            LayoutObject*,
-                            const LineInfo&);
   void ComputeInlineDirectionPositionsForLine(RootInlineBox*,
                                               const LineInfo&,
                                               BidiRun* first_run,
@@ -1062,11 +648,6 @@ class CORE_EXPORT LayoutBlockFlow : public LayoutBlock {
                                              BidiRun*,
                                              GlyphOverflowAndFallbackFontsMap&,
                                              VerticalPositionCache&);
-  void AppendFloatingObjectToLastLine(FloatingObject&);
-  void AppendFloatsToLastLine(LineLayoutState&,
-                              const InlineIterator& clean_line_start,
-                              const InlineBidiResolver&,
-                              const BidiStatus& clean_line_bidi_status);
   // Helper function for LayoutInlineChildren()
   RootInlineBox* CreateLineBoxesFromBidiRuns(unsigned bidi_level,
                                              BidiRunList<BidiRun>&,
@@ -1076,18 +657,11 @@ class CORE_EXPORT LayoutBlockFlow : public LayoutBlock {
                                              BidiRun* trailing_space_run,
                                              const WordMeasurements&);
   void LayoutRunsAndFloats(LineLayoutState&);
-  const InlineIterator& RestartLayoutRunsAndFloatsInRange(
-      LayoutUnit old_logical_height,
-      LayoutUnit new_logical_height,
-      FloatingObject* last_float_from_previous_line,
-      InlineBidiResolver&,
-      const InlineIterator&);
   void LayoutRunsAndFloatsInRange(LineLayoutState&,
                                   InlineBidiResolver&,
                                   const InlineIterator& clean_line_start,
                                   const BidiStatus& clean_line_bidi_status);
   void LinkToEndLineIfNeeded(LineLayoutState&);
-  void MarkDirtyFloatsForPaintInvalidation(HeapVector<FloatWithRect>& floats);
   RootInlineBox* DetermineStartPosition(LineLayoutState&, InlineBidiResolver&);
   void DetermineEndPosition(LineLayoutState&,
                             RootInlineBox* start_box,

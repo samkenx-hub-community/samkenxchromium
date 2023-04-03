@@ -28,10 +28,7 @@
 #include "base/check_op.h"
 #include "third_party/blink/renderer/core/layout/api/line_layout_box.h"
 #include "third_party/blink/renderer/core/layout/api/line_layout_list_marker.h"
-#include "third_party/blink/renderer/core/layout/api/line_layout_ruby_run.h"
-#include "third_party/blink/renderer/core/layout/api/line_layout_svg_inline_text.h"
 #include "third_party/blink/renderer/core/layout/api/line_layout_text.h"
-#include "third_party/blink/renderer/core/layout/api/line_layout_text_combine.h"
 #include "third_party/blink/renderer/core/layout/line/inline_iterator.h"
 #include "third_party/blink/renderer/core/layout/line/inline_text_box.h"
 #include "third_party/blink/renderer/core/layout/line/layout_text_info.h"
@@ -85,7 +82,6 @@ class BreakingContext {
         include_end_width_(true),
         auto_wrap_(false),
         auto_wrap_was_ever_true_on_line_(false),
-        floats_fit_on_line_(true),
         collapse_white_space_(false),
         starting_new_paragraph_(line_info_.PreviousLineBrokeCleanly()),
         at_end_(false),
@@ -103,12 +99,10 @@ class BreakingContext {
 
   void HandleBR(EClear&);
   void HandleOutOfFlowPositioned(Vector<LineLayoutBox>& positioned_objects);
-  void HandleFloat();
   void HandleEmptyInline();
   void HandleReplaced();
   bool HandleText(WordMeasurements&, bool& hyphenated);
   void PrepareForNextCharacter(const LineLayoutText&,
-                               bool& prohibit_break_inside,
                                bool previous_character_is_space);
   bool CanBreakAtWhitespace(bool break_words,
                             WordMeasurement&,
@@ -216,7 +210,6 @@ class BreakingContext {
   bool include_end_width_;
   bool auto_wrap_;
   bool auto_wrap_was_ever_true_on_line_;
-  bool floats_fit_on_line_;
   bool collapse_white_space_;
   bool starting_new_paragraph_;
   bool at_end_;
@@ -352,7 +345,7 @@ inline void BreakingContext::SkipTrailingWhitespace(InlineIterator& iterator,
     if (item.IsOutOfFlowPositioned())
       SetStaticPositions(block_, LineLayoutBox(item), kDoNotIndentText);
     else if (item.IsFloating())
-      block_.InsertFloatingObject(LineLayoutBox(item));
+      NOTREACHED();
     iterator.Increment();
   }
 }
@@ -534,58 +527,6 @@ inline void BreakingContext::HandleOutOfFlowPositioned(
   layout_text_info_.line_break_iterator_.ResetPriorContext();
 }
 
-inline void BreakingContext::HandleFloat() {
-  LineLayoutBox float_box(current_.GetLineLayoutItem());
-  FloatingObject* floating_object = block_.InsertFloatingObject(float_box);
-
-  if (floats_fit_on_line_) {
-    // We need to calculate the logical width of the float before we can tell
-    // whether it's going to fit on the line. That means that we need to
-    // position and lay it out. Note that we have to avoid positioning floats
-    // that have been placed prematurely: Sometimes, floats are inserted too
-    // early by skipTrailingWhitespace(), and later on they all get placed by
-    // the first float here in handleFloat(). Their position may then be wrong,
-    // but it's too late to do anything about that now. See crbug.com/671577
-    if (!floating_object->IsPlaced()) {
-      LayoutUnit logical_top = block_.LogicalHeight();
-      if (const FloatingObject* last_placed_float = block_.LastPlacedFloat()) {
-        logical_top = std::max(logical_top,
-                               block_.LogicalTopForFloat(*last_placed_float));
-      }
-      block_.PositionAndLayoutFloat(*floating_object, logical_top);
-    }
-
-    // Check if it fits in the current line; if it does, place it now,
-    // otherwise, place it after moving to next line (in newLine() func).
-    // FIXME: Bug 110372: Properly position multiple stacked floats with
-    // non-rectangular shape outside.
-    // When fitting the float on the line we need to treat the width on the line
-    // so far as though end-border, -padding and -margin from
-    // inline ancestors has been applied to the end of the previous inline box.
-    float width_from_ancestors =
-        InlineLogicalWidthFromAncestorsIfNeeded(float_box, false, true,
-                                                kUseCollapsibleWhiteSpace)
-            .ToFloat();
-    width_.AddUncommittedWidth(width_from_ancestors);
-    if (width_.FitsOnLine(
-            block_.LogicalWidthForFloat(*floating_object).ToFloat(),
-            kExcludeWhitespace)) {
-      block_.PlaceNewFloats(block_.LogicalHeight(), &width_);
-      if (line_break_.GetLineLayoutItem() == current_.GetLineLayoutItem()) {
-        DCHECK(!line_break_.Offset());
-        line_break_.Increment();
-      }
-    } else {
-      floats_fit_on_line_ = false;
-    }
-    width_.AddUncommittedWidth(-width_from_ancestors);
-  }
-  // Update prior line break context characters, using U+FFFD (OBJECT
-  // REPLACEMENT CHARACTER) for floating element.
-  layout_text_info_.line_break_iterator_.UpdatePriorContext(
-      kReplacementCharacter);
-}
-
 // This is currently just used for list markers and inline flows that have line
 // boxes. Neither should have an effect on whitespace at the start of the line.
 inline bool ShouldSkipWhitespaceAfterStartObject(
@@ -663,12 +604,8 @@ inline void BreakingContext::HandleReplaced() {
   if (at_start_)
     width_.UpdateAvailableWidth(replaced_box.LogicalHeight());
 
-  // Break on replaced elements if either has normal white-space,
-  // or if the replaced element is ruby that can break before.
-  if ((auto_wrap_ || ComputedStyle::DeprecatedAutoWrap(last_ws_)) &&
-      (!current_.GetLineLayoutItem().IsRubyRun() ||
-       LineLayoutRubyRun(current_.GetLineLayoutItem())
-           .CanBreakBefore(layout_text_info_.line_break_iterator_))) {
+  // Break on replaced elements if either has normal white-space.
+  if (auto_wrap_ || ComputedStyle::DeprecatedAutoWrap(last_ws_)) {
     width_.Commit();
     line_break_.MoveToStartOf(current_.GetLineLayoutItem());
   }
@@ -705,9 +642,6 @@ inline void BreakingContext::HandleReplaced() {
   } else {
     width_.AddUncommittedWidth(replaced_logical_width.ToFloat());
   }
-  if (current_.GetLineLayoutItem().IsRubyRun())
-    width_.ApplyOverhang(LineLayoutRubyRun(current_.GetLineLayoutItem()),
-                         last_object_, next_object_);
   // Update prior line break context characters, using U+FFFD (OBJECT
   // REPLACEMENT CHARACTER) for replaced element.
   layout_text_info_.line_break_iterator_.UpdatePriorContext(
@@ -1024,9 +958,6 @@ inline bool BreakingContext::HandleText(WordMeasurements& word_measurements,
                      line_break_anywhere);
   bool keep_all =
       auto_wrap_ && current_style_->WordBreak() == EWordBreak::kKeepAll;
-  bool prohibit_break_inside = current_style_->HasTextCombine() &&
-                               layout_text.IsCombineText() &&
-                               LineLayoutTextCombine(layout_text).IsCombined();
 
   // This is currently only used for word-break: break-all, specifically for the
   // case where we have a break opportunity within a word, then a string of non-
@@ -1148,7 +1079,7 @@ inline bool BreakingContext::HandleText(WordMeasurements& word_measurements,
         StopIgnoringSpaces(last_space);
       }
 
-      PrepareForNextCharacter(layout_text, prohibit_break_inside,
+      PrepareForNextCharacter(layout_text,
                               previous_is_space_or_other_space_separator_);
       at_start_ = false;
       NextCharacter(c, last_character, second_to_last_character);
@@ -1307,7 +1238,7 @@ inline bool BreakingContext::HandleText(WordMeasurements& word_measurements,
       }
     }
 
-    PrepareForNextCharacter(layout_text, prohibit_break_inside,
+    PrepareForNextCharacter(layout_text,
                             previous_is_space_or_other_space_separator_);
     at_start_ = false;
     is_line_empty = line_info_.IsEmpty();
@@ -1387,19 +1318,7 @@ inline bool BreakingContext::HandleText(WordMeasurements& word_measurements,
 
 inline void BreakingContext::PrepareForNextCharacter(
     const LineLayoutText& layout_text,
-    bool& prohibit_break_inside,
     bool previous_is_space_or_other_space_separator) {
-  if (layout_text.IsSVGInlineText() && current_.Offset()) {
-    // Force creation of new InlineBoxes for each absolute positioned character
-    // (those that start new text chunks).
-    if (LineLayoutSVGInlineText(layout_text)
-            .CharacterStartsNewTextChunk(current_.Offset()))
-      line_midpoint_state_.EnsureCharacterGetsLineBox(current_);
-  }
-  if (prohibit_break_inside) {
-    current_.SetNextBreakablePosition(layout_text.TextLength());
-    prohibit_break_inside = false;
-  }
   if (current_character_is_space_ && !previous_character_is_space_) {
     start_of_ignored_spaces_.SetLineLayoutItem(current_.GetLineLayoutItem());
     start_of_ignored_spaces_.SetOffset(current_.Offset());

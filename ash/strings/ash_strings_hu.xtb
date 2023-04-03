@@ -40,6 +40,7 @@
 <translation id="1181037720776840403">Eltávolítás</translation>
 <translation id="1182225749592316782">Ezzel engedélyezi a hozzáférést a kamera- és mikrofonengedéllyel rendelkező összes alkalmazás és webhely számára.</translation>
 <translation id="1183863904939664422">Nem érdekel ez a javaslat</translation>
+<translation id="1184126796192815024">Ez a hálózat nem támogatja alkalmazások streamelését a telefonjáról. Próbálja meg a telefon hotspotját használni. <ph name="LEARN_MORE" /></translation>
 <translation id="118437560755358292">A nagyobb biztonság érdekében adja meg a jelszót vagy a PIN-kódot</translation>
 <translation id="118532027333893379">Koppintson bárhova teljes képernyőkép készítéséhez</translation>
 <translation id="1190609913194133056">Értesítési központ</translation>
@@ -219,6 +220,7 @@
 <translation id="1969011864782743497"><ph name="DEVICE_NAME" /> (USB)</translation>
 <translation id="1972950159383891558">Üdv, <ph name="USERNAME" />!</translation>
 <translation id="1978498689038657292">Szöveges bevitel</translation>
+<translation id="1980808257969311265">Csatlakozás a következőhöz: <ph name="EVENT_SUMMARY" /></translation>
 <translation id="1982717156487272186">Az előző hét megjelenítése</translation>
 <translation id="1989113344093894667">Nem lehet rögzíteni tartalmat</translation>
 <translation id="1990046457226896323">Beszédfájlok letöltve</translation>
@@ -622,7 +624,6 @@ Az összes felhasználónak ki kell jelentkeznie a folytatáshoz.</translation>
 <translation id="3925540965556789199"><ph name="DATE" />, események betöltése…</translation>
 <translation id="3932043219784172185">Nincs csatlakoztatott eszköz</translation>
 <translation id="3934456833412894880">Az adaptív töltés be van kapcsolva. Az akkumulátor töltöttségi szintje 80%-on marad az akkumulátor-élettartam növelése érdekében, és teljesen feltöltődik, ha szükséges.</translation>
-<translation id="3936620957945677513">Nyomja meg az Entert, ha csatlakozni szeretne az eseményhez – <ph name="EVENT_SUMMARY" /></translation>
 <translation id="3943857333388298514">Beillesztés</translation>
 <translation id="394485226368336402">Hangbeállítások</translation>
 <translation id="3945319193631853098">Koppintson a beállítás befejezéséhez</translation>
@@ -1253,6 +1254,7 @@ Frissen telepítve</translation>
 <translation id="685782768769951078">{NUM_DIGITS,plural, =1{1 számjegy maradt}other{# számjegy maradt}}</translation>
 <translation id="6867938213751067702">A következő letöltése szünetel: <ph name="FILENAME" /></translation>
 <translation id="6878400149835617132">A billentyűparancs ki van kapcsolva</translation>
+<translation id="6878701771800702153">{NUM_APPS,plural, =1{1 alkalmazás}other{# alkalmazás}}</translation>
 <translation id="6884665277231944629">Vissza a mai napra</translation>
 <translation id="6886172995547742638">A(z) <ph name="DEVICE_TYPE" /> eszközön a teljesítmény csökkenése észlelhető. Használjon tanúsítvánnyal rendelkező, <ph name="PREFERRED_MINIMUM_POWER" /> W-os vagy nagyobb teljesítményű USB-C tápcsatlakozót.</translation>
 <translation id="688631446150864480">Ablakváltáshoz nyomja le a lefelé mutató nyilat</translation>
@@ -1420,6 +1422,7 @@ Az eszköz leállításához tartsa ismét nyomva az eszköz bekapcsológombját
 <translation id="7689817529363080918">Ezzel engedélyezi a mikrofonhoz való hozzáférést a(z) <ph name="APP1_NAME" />, a(z) <ph name="APP2_NAME" />, illetve a mikrofonhasználati engedéllyel rendelkező összes alkalmazás és webhely számára</translation>
 <translation id="7704000866383261579">Az utolsó művelet ismételt végrehajtása</translation>
 <translation id="7705524343798198388">VPN</translation>
+<translation id="770741401784017797">GIF létrehozása…</translation>
 <translation id="7714767791242455379">Új mobilhálózat hozzáadása</translation>
 <translation id="7720400844887872976">Bekapcsolva eddig: <ph name="TIME" /></translation>
 <translation id="7720410380936703141">ÚJRA</translation>
@@ -1432,6 +1435,7 @@ Az eszköz leállításához tartsa ismét nyomva az eszköz bekapcsológombját
 <translation id="7749443890790263709">Elérte az asztalok maximális számát.</translation>
 <translation id="776344839111254542">Kattintson a frissítés részleteinek megtekintéséhez</translation>
 <translation id="7768784765476638775">Felolvasás</translation>
+<translation id="7769299611924763557">A GIF hamarosan elkészül.</translation>
 <translation id="7780094051999721182">billentyűparancsok</translation>
 <translation id="7780159184141939021">Képernyő elforgatása</translation>
 <translation id="7796735576426975947">Új értesítés elrejtve</translation>

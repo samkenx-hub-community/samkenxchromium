@@ -145,15 +145,12 @@ void RunGetDisplayMedia(content::WebContents* tab,
   const std::string script = base::StringPrintf(
       "runGetDisplayMedia(%s, \"top-level-document\", \"%s\");",
       constraints.c_str(), expected_error.c_str());
-  std::string result;
-
-  if (with_user_gesture) {
-    EXPECT_TRUE(
-        content::ExecuteScriptAndExtractString(adapter, script, &result));
-  } else {
-    EXPECT_TRUE(content::ExecuteScriptWithoutUserGestureAndExtractString(
-        adapter, script, &result));
-  }
+  std::string result =
+      content::EvalJs(adapter, script,
+                      with_user_gesture
+                          ? content::EXECUTE_SCRIPT_DEFAULT_OPTIONS
+                          : content::EXECUTE_SCRIPT_NO_USER_GESTURE)
+          .ExtractString();
 
 #if BUILDFLAG(IS_MAC)
   if (!is_fake_ui && !is_tab_capture &&
@@ -786,13 +783,10 @@ class GetDisplayMediaVideoTrackBrowserTest
     tab_ = OpenTestPageInNewTab(kMainHtmlPage);
 
     // Initiate the capture.
-    std::string result;
-    ASSERT_TRUE(content::ExecuteScriptAndExtractString(
-        tab_->GetPrimaryMainFrame(),
-        "runGetDisplayMedia({video: true, audio: true}, "
-        "\"top-level-document\");",
-        &result));
-    ASSERT_EQ(result, "capture-success");
+    ASSERT_EQ("capture-success",
+              content::EvalJs(tab_->GetPrimaryMainFrame(),
+                              "runGetDisplayMedia({video: true, audio: true}, "
+                              "\"top-level-document\");"));
   }
 
   void SetUpCommandLine(base::CommandLine* command_line) override {
@@ -1148,7 +1142,9 @@ INSTANTIATE_TEST_SUITE_P(All,
                                           testing::Bool(),
                                           testing::Bool()));
 
-IN_PROC_BROWSER_TEST_P(GetDisplayMediaChangeSourceBrowserTest, ChangeSource) {
+// TODO(1428806) Re-enable flaky test.
+IN_PROC_BROWSER_TEST_P(GetDisplayMediaChangeSourceBrowserTest,
+                       DISABLED_ChangeSource) {
   ASSERT_TRUE(embedded_test_server()->Start());
   content::WebContents* captured_tab = OpenTestPageInNewTab(kCapturedPageMain);
   content::WebContents* other_tab = OpenTestPageInNewTab(kMainHtmlPage);
@@ -1207,9 +1203,9 @@ IN_PROC_BROWSER_TEST_P(GetDisplayMediaChangeSourceBrowserTest, ChangeSource) {
               capturing_tab->GetPrimaryMainFrame()->GetLastCommittedOrigin(),
               url_formatter::SchemeDisplay::OMIT_HTTP_AND_HTTPS)));
 }
-
+// TODO(1428806) Re-enable flaky test.
 IN_PROC_BROWSER_TEST_P(GetDisplayMediaChangeSourceBrowserTest,
-                       ChangeSourceThenStopTracksRemovesIndicators) {
+                       DISABLED_ChangeSourceThenStopTracksRemovesIndicators) {
   if (!ShouldShowShareThisTabInsteadButton()) {
     GTEST_SKIP();
   }
@@ -1238,8 +1234,9 @@ IN_PROC_BROWSER_TEST_P(GetDisplayMediaChangeSourceBrowserTest,
   } while (GetInfoBarManager(capturing_tab)->infobar_count() > 0u);
 }
 
+// TODO(1428806) Re-enable flaky test.
 IN_PROC_BROWSER_TEST_P(GetDisplayMediaChangeSourceBrowserTest,
-                       ChangeSourceReject) {
+                       DISABLED_ChangeSourceReject) {
   ASSERT_TRUE(embedded_test_server()->Start());
   content::WebContents* captured_tab = OpenTestPageInNewTab(kCapturedPageMain);
   content::WebContents* other_tab = OpenTestPageInNewTab(kMainHtmlPage);
@@ -1370,8 +1367,9 @@ INSTANTIATE_TEST_SUITE_P(All,
                          GetDisplayMediaSelfBrowserSurfaceBrowserTest,
                          testing::Values("", "include", "exclude"));
 
+// TODO(1428806) Re-enable flaky test.
 IN_PROC_BROWSER_TEST_P(GetDisplayMediaSelfBrowserSurfaceBrowserTest,
-                       SelfBrowserSurfaceChangesCapturedTab) {
+                       DISABLED_SelfBrowserSurfaceChangesCapturedTab) {
   ASSERT_TRUE(embedded_test_server()->Start());
 
   // This test relies on |capturing_tab| appearing earlier in the media picker,
@@ -1388,8 +1386,10 @@ IN_PROC_BROWSER_TEST_P(GetDisplayMediaSelfBrowserSurfaceBrowserTest,
   EXPECT_EQ(IsSelfBrowserSurfaceExclude(), other_tab->IsBeingCaptured());
 }
 
-IN_PROC_BROWSER_TEST_P(GetDisplayMediaSelfBrowserSurfaceBrowserTest,
-                       SelfBrowserSurfaceInteractionWithPreferCurrentTab) {
+// TODO(1428806) Re-enable flaky test.
+IN_PROC_BROWSER_TEST_P(
+    GetDisplayMediaSelfBrowserSurfaceBrowserTest,
+    DISABLED_SelfBrowserSurfaceInteractionWithPreferCurrentTab) {
   ASSERT_TRUE(embedded_test_server()->Start());
 
   // This test relies on |capturing_tab| appearing earlier in the media picker,

@@ -127,7 +127,7 @@ InputHandler::ScrollStatus InputHandler::ScrollBegin(ScrollState* scroll_state,
   bool unification_enabled =
       base::FeatureList::IsEnabled(features::kScrollUnification);
 
-  if (target_element_id && !scroll_state->is_main_thread_hit_tested()) {
+  if (target_element_id && !scroll_state->main_thread_hit_tested_reasons()) {
     TRACE_EVENT_INSTANT0("cc", "Latched scroll node provided",
                          TRACE_EVENT_SCOPE_THREAD);
     // If the caller passed in an element_id we can skip all the hit-testing
@@ -154,7 +154,7 @@ InputHandler::ScrollStatus InputHandler::ScrollBegin(ScrollState* scroll_state,
       // scroll in the given direction. This mode is only used when scroll
       // unification is enabled and the targeted scroller comes back from a
       // main thread hit test.
-      DCHECK(scroll_state->data()->is_main_thread_hit_tested);
+      DCHECK(scroll_state->main_thread_hit_tested_reasons());
       DCHECK(unification_enabled);
       starting_node = scroll_tree.FindNodeFromElementId(target_element_id);
 
@@ -177,7 +177,7 @@ InputHandler::ScrollStatus InputHandler::ScrollBegin(ScrollState* scroll_state,
                           compositor_delegate_->DeviceScaleFactor());
 
       if (unification_enabled) {
-        if (scroll_state->data()->is_main_thread_hit_tested) {
+        if (scroll_state->main_thread_hit_tested_reasons()) {
           // The client should have discarded the scroll when the hit test came
           // back with an invalid element id. If we somehow get here, we should
           // drop the scroll as continuing could cause us to infinitely bounce
@@ -199,7 +199,9 @@ InputHandler::ScrollStatus InputHandler::ScrollBegin(ScrollState* scroll_state,
                                TRACE_EVENT_SCOPE_THREAD);
           scroll_status.thread =
               InputHandler::ScrollThread::SCROLL_ON_IMPL_THREAD;
-          scroll_status.needs_main_thread_hit_test = true;
+          DCHECK(scroll_hit_test.main_thread_hit_test_reasons);
+          scroll_status.main_thread_hit_test_reasons =
+              scroll_hit_test.main_thread_hit_test_reasons;
           return scroll_status;
         }
 
@@ -294,14 +296,16 @@ InputHandler::ScrollStatus InputHandler::ScrollBegin(ScrollState* scroll_state,
   // If the viewport is scrolling and it cannot consume any delta hints, the
   // scroll event will need to get bubbled if the viewport is for a guest or
   // oopif.
-  if (GetViewport().ShouldScroll(*CurrentlyScrollingNode()) &&
-      !GetViewport().CanScroll(*CurrentlyScrollingNode(), *scroll_state)) {
-    // TODO(crbug.com/1155758): This is a temporary workaround for GuestViews
-    // as they create viewport nodes and want to bubble scroll if the
-    // viewport cannot scroll in the given delta directions. There should be
-    // a parameter to ThreadInputHandler to specify whether unused delta is
-    // consumed by the viewport or bubbles to the parent.
-    scroll_status.viewport_cannot_scroll = true;
+  if (GetViewport().ShouldScroll(*CurrentlyScrollingNode())) {
+    outer_viewport_consumed_delta_ = false;
+    if (!GetViewport().CanScroll(*CurrentlyScrollingNode(), *scroll_state)) {
+      // TODO(crbug.com/1155758): This is a temporary workaround for GuestViews
+      // as they create viewport nodes and want to bubble scroll if the
+      // viewport cannot scroll in the given delta directions. There should be
+      // a parameter to ThreadInputHandler to specify whether unused delta is
+      // consumed by the viewport or bubbles to the parent.
+      scroll_status.viewport_cannot_scroll = true;
+    }
   }
 
   return scroll_status;
@@ -323,7 +327,7 @@ InputHandler::ScrollStatus InputHandler::RootScrollBegin(
 
   // Since we provided an ElementId, there should never be a need to perform a
   // hit test.
-  DCHECK(!scroll_status.needs_main_thread_hit_test);
+  DCHECK(!scroll_status.main_thread_hit_test_reasons);
 
   return scroll_status;
 }
@@ -1007,7 +1011,7 @@ void InputHandler::ProcessCommitDeltas(
   has_pinch_zoomed_ = false;
   has_scrolled_by_scrollbar_ = false;
 
-  commit_data->scroll_gesture_did_end = scroll_gesture_did_end_;
+  commit_data->scroll_end_data.scroll_gesture_did_end = scroll_gesture_did_end_;
   scroll_gesture_did_end_ = false;
 
   commit_data->overscroll_delta = overscroll_delta_for_main_thread_;
@@ -1019,8 +1023,12 @@ void InputHandler::ProcessCommitDeltas(
   // TODO(bokan): This is wrong - if we also started a scroll this frame then
   // this will clear this value for that scroll. https://crbug.com/1116780.
   commit_data->scroll_latched_element_id = last_latched_scroller_;
-  if (commit_data->scroll_gesture_did_end)
+  if (commit_data->scroll_end_data.scroll_gesture_did_end) {
     last_latched_scroller_ = ElementId();
+    commit_data->scroll_end_data.gesture_affects_outer_viewport_scroll =
+        outer_viewport_consumed_delta_;
+    outer_viewport_consumed_delta_ = false;
+  }
 }
 
 void InputHandler::TickAnimations(base::TimeTicks monotonic_time) {
@@ -1272,6 +1280,7 @@ InputHandler::ScrollStatus InputHandler::TryScroll(
     const ScrollTree& scroll_tree,
     ScrollNode* scroll_node) const {
   DCHECK(!base::FeatureList::IsEnabled(features::kScrollUnification));
+  DCHECK(scroll_node->transform_id != kInvalidPropertyNodeId);
 
   InputHandler::ScrollStatus scroll_status;
   scroll_status.main_thread_scrolling_reasons =
@@ -1456,6 +1465,8 @@ InputHandler::ScrollHitTestResult InputHandler::HitTestScrollNode(
     // this, we have to get a hit test from the main thread.
     if (!IsInitialScrollHitTestReliable(layer_impl, scroller_layer)) {
       TRACE_EVENT_INSTANT0("cc", "Failed Hit Test", TRACE_EVENT_SCOPE_THREAD);
+      result.main_thread_hit_test_reasons =
+          MainThreadScrollingReason::kFailedHitTest;
       return result;
     }
 
@@ -1465,6 +1476,8 @@ InputHandler::ScrollHitTestResult InputHandler::HitTestScrollNode(
     // failure.
     if (ActiveTree().PointHitsNonFastScrollableRegion(device_viewport_point,
                                                       *layer_impl)) {
+      result.main_thread_hit_test_reasons =
+          MainThreadScrollingReason::kNonFastScrollableRegion;
       return result;
     }
   }
@@ -1610,6 +1623,10 @@ bool InputHandler::CalculateLocalScrollDeltaAndStartPoint(
     const gfx::Vector2dF& viewport_delta,
     gfx::Vector2dF* out_local_scroll_delta,
     gfx::PointF* out_local_start_point /*= nullptr*/) {
+  if (scroll_node.transform_id == kInvalidPropertyNodeId) {
+    return false;
+  }
+
   // Layers with non-invertible screen space transforms should not have passed
   // the scroll hit test in the first place.
   const gfx::Transform screen_space_transform =
@@ -1804,7 +1821,12 @@ void InputHandler::ScrollLatchedScroller(ScrollState* scroll_state,
       TRACE_EVENT_INSTANT0("cc", "CreateNewAnimation",
                            TRACE_EVENT_SCOPE_THREAD);
       if (scroll_node.scrolls_outer_viewport) {
-        applied_delta = GetViewport().ScrollAnimated(delta, delayed_by);
+        auto result = GetViewport().ScrollAnimated(delta, delayed_by);
+        applied_delta = result.consumed_delta;
+        if (std::abs(result.outer_viewport_scrolled_delta.x()) > kEpsilon ||
+            std::abs(result.outer_viewport_scrolled_delta.y()) > kEpsilon) {
+          outer_viewport_consumed_delta_ = true;
+        }
       } else {
         applied_delta = ComputeScrollDelta(scroll_node, delta);
         compositor_delegate_->GetImplDeprecated().ScrollAnimationCreate(
@@ -1834,6 +1856,10 @@ void InputHandler::ScrollLatchedScroller(ScrollState* scroll_state,
 
       applied_delta = result.consumed_delta;
       delta_applied_to_content = result.content_scrolled_delta;
+      if (std::abs(result.outer_viewport_scrolled_delta.x()) > kEpsilon ||
+          std::abs(result.outer_viewport_scrolled_delta.y()) > kEpsilon) {
+        outer_viewport_consumed_delta_ = true;
+      }
     } else {
       applied_delta = ScrollSingleNode(scroll_node, delta, viewport_point,
                                        scroll_state->is_direct_manipulation());
@@ -2070,7 +2096,9 @@ bool InputHandler::SnapAtScrollEnd(SnapReason reason) {
     gfx::Vector2dF scaled_delta(delta);
     scaled_delta.Scale(compositor_delegate_->PageScaleFactor());
     gfx::Vector2dF consumed_delta =
-        GetViewport().ScrollAnimated(scaled_delta, base::TimeDelta());
+        GetViewport()
+            .ScrollAnimated(scaled_delta, base::TimeDelta())
+            .consumed_delta;
     did_animate = !consumed_delta.IsZero();
   } else {
     did_animate =

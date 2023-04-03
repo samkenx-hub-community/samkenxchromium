@@ -151,6 +151,8 @@ class MODULES_EXPORT AXObjectCacheImpl
   void ListboxOptionStateChanged(HTMLOptionElement*) override;
   void ListboxSelectedChildrenChanged(HTMLSelectElement*) override;
   void ListboxActiveIndexChanged(HTMLSelectElement*) override;
+  void SetMenuListOptionsBounds(HTMLSelectElement*,
+                                const WTF::Vector<gfx::Rect>&) override;
   void LocationChanged(const LayoutObject*) override;
   void ImageLoaded(const LayoutObject*) override;
 
@@ -476,6 +478,9 @@ class MODULES_EXPORT AXObjectCacheImpl
       bool& had_end_of_test_event,
       bool& had_load_complete_messages,
       bool& need_to_send_location_changes) override;
+
+  void GetImagesToAnnotate(ui::AXTreeUpdate& updates,
+                           std::vector<ui::AXNodeData*>& nodes) override;
 
   void ClearDirtyObjectsAndPendingEvents() override {
     dirty_objects_.clear();

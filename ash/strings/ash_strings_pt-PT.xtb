@@ -40,6 +40,7 @@ Eis alguns exemplos do que pode experimentar para começar.</translation>
 <translation id="1181037720776840403">Remover</translation>
 <translation id="1182225749592316782">Isto permite o acesso para todas as apps e Websites com as autorizações da câmara e do microfone</translation>
 <translation id="1183863904939664422">Não tenho interesse nesta sugestão</translation>
+<translation id="1184126796192815024">Esta rede não suporta apps de streaming do seu telemóvel. Experimente usar a zona Wi-Fi do telemóvel. <ph name="LEARN_MORE" /></translation>
 <translation id="118437560755358292">Introduzir palavra-passe ou PIN para uma maior segurança</translation>
 <translation id="118532027333893379">Toque em qualquer local para capturar o ecrã inteiro.</translation>
 <translation id="1190609913194133056">Centro de Notificações</translation>
@@ -219,6 +220,7 @@ Eis alguns exemplos do que pode experimentar para começar.</translation>
 <translation id="1969011864782743497"><ph name="DEVICE_NAME" /> (USB)</translation>
 <translation id="1972950159383891558">Olá, <ph name="USERNAME" /></translation>
 <translation id="1978498689038657292">Entrada de texto</translation>
+<translation id="1980808257969311265">Aderir a <ph name="EVENT_SUMMARY" /></translation>
 <translation id="1982717156487272186">Mostrar semana anterior</translation>
 <translation id="1989113344093894667">Não é possível capturar conteúdo</translation>
 <translation id="1990046457226896323">Ficheiros de voz transferidos.</translation>
@@ -573,6 +575,7 @@ Eis alguns exemplos do que pode experimentar para começar.</translation>
 <translation id="3659814201068740063">Resta(m) cerca de <ph name="TIME_LEFT" /> (<ph name="PERCENTAGE" />%).
 Ligue o dispositivo à corrente.</translation>
 <translation id="366222428570480733">Utilizador gerido por <ph name="USER_EMAIL_ADDRESS" /></translation>
+<translation id="3666266999138159418">Deslize rapidamente para ocultar a janela flutuante</translation>
 <translation id="367531336287639526">Selecionar o primeiro ícone à esquerda da barra de endereço</translation>
 <translation id="3679827876008292680">Aceder ao último separador na janela</translation>
 <translation id="36813544980941320">As redes Wi-Fi serão partilhadas entre o seu telemóvel e o dispositivo <ph name="DEVICE_NAME" />.</translation>
@@ -621,7 +624,6 @@ Ligue o dispositivo à corrente.</translation>
 <translation id="3925540965556789199"><ph name="DATE" />, a carregar eventos.</translation>
 <translation id="3932043219784172185">Nenhum dispositivo ligado</translation>
 <translation id="3934456833412894880">O carregamento adaptável está ativado. A bateria vai permanecer nos 80% para prolongar a autonomia da mesma e ser carregada totalmente quando precisar.</translation>
-<translation id="3936620957945677513">Prima Enter para participar no evento <ph name="EVENT_SUMMARY" /></translation>
 <translation id="3943857333388298514">Colar</translation>
 <translation id="394485226368336402">Definições de áudio</translation>
 <translation id="3945319193631853098">Toque para concluir a configuração.</translation>
@@ -1252,6 +1254,7 @@ Nova instalação</translation>
 <translation id="685782768769951078">{NUM_DIGITS,plural, =1{Um dígito restante}other{# dígitos restantes}}</translation>
 <translation id="6867938213751067702">Transferência de <ph name="FILENAME" /> colocada em pausa</translation>
 <translation id="6878400149835617132">Atalho desativado</translation>
+<translation id="6878701771800702153">{NUM_APPS,plural, =1{1 app}other{# apps}}</translation>
 <translation id="6884665277231944629">Voltar a hoje</translation>
 <translation id="6886172995547742638">O dispositivo <ph name="DEVICE_TYPE" /> pode ter um desempenho inferior. Utilize um transformador USB-C certificado de <ph name="PREFERRED_MINIMUM_POWER" /> W ou superior.</translation>
 <translation id="688631446150864480">Prima a seta para baixo para alternar entre janelas.</translation>
@@ -1419,6 +1422,7 @@ Para encerrar o dispositivo, prima sem soltar o botão ligar/desligar novamente 
 <translation id="7689817529363080918">Isto permite o acesso ao microfone para a app <ph name="APP1_NAME" />, <ph name="APP2_NAME" /> e todas as apps e Websites com a autorização do microfone</translation>
 <translation id="7704000866383261579">Refazer a última ação</translation>
 <translation id="7705524343798198388">VPN</translation>
+<translation id="770741401784017797">A criar GIF</translation>
 <translation id="7714767791242455379">Adicionar nova rede móvel</translation>
 <translation id="7720400844887872976">Ativada até à(s) <ph name="TIME" /></translation>
 <translation id="7720410380936703141">TENTAR NOVAMENTE</translation>
@@ -1431,6 +1435,7 @@ Para encerrar o dispositivo, prima sem soltar o botão ligar/desligar novamente 
 <translation id="7749443890790263709">Atingiu o número máximo de espaços de trabalho.</translation>
 <translation id="776344839111254542">Clique para ver os detalhes da atualização</translation>
 <translation id="7768784765476638775">Selecionar para ativar voz</translation>
+<translation id="7769299611924763557">O seu GIF vai estar pronto em breve</translation>
 <translation id="7780094051999721182">atalhos</translation>
 <translation id="7780159184141939021">Rodar ecrã</translation>
 <translation id="7796735576426975947">Nova notificação oculta</translation>

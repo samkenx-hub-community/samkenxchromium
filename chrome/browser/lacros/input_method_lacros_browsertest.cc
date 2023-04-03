@@ -364,43 +364,55 @@ bool SetInputFieldText(content::WebContents* web_content,
   return ExecJs(web_content, script);
 }
 
-mojom::KeyEventPtr CreateKeyPressEvent(ui::DomKey dom_key,
-                                       ui::DomCode dom_code,
-                                       ui::EventFlags flags = ui::EF_NONE) {
+mojom::KeyEventPtr CreateKeyPressEvent(
+    ui::DomKey dom_key,
+    ui::DomCode dom_code,
+    ui::KeyboardCode key_code = ui::KeyboardCode::VKEY_UNKNOWN,
+    ui::EventFlags flags = ui::EF_NONE) {
   return mojom::KeyEvent::New(
       mojom::KeyEventType::kKeyPress, static_cast<int>(dom_key),
-      static_cast<int>(dom_code),
-      static_cast<int>(ui::KeyboardCode::VKEY_UNKNOWN), flags);
+      static_cast<int>(dom_code), static_cast<int>(key_code), flags);
 }
 
-mojom::KeyEventPtr CreateKeyReleaseEvent(ui::DomKey dom_key,
-                                         ui::DomCode dom_code,
-                                         ui::EventFlags flags = ui::EF_NONE) {
+mojom::KeyEventPtr CreateKeyReleaseEvent(
+    ui::DomKey dom_key,
+    ui::DomCode dom_code,
+    ui::KeyboardCode key_code = ui::KeyboardCode::VKEY_UNKNOWN,
+    ui::EventFlags flags = ui::EF_NONE) {
   return mojom::KeyEvent::New(
       mojom::KeyEventType::kKeyRelease, static_cast<int>(dom_key),
-      static_cast<int>(dom_code),
-      static_cast<int>(ui::KeyboardCode::VKEY_UNKNOWN), flags);
+      static_cast<int>(dom_code), static_cast<int>(key_code), flags);
 }
 
 class KeySequenceBuilder {
  public:
-  KeySequenceBuilder Press(ui::DomKey dom_key, ui::DomCode dom_code) && {
+  KeySequenceBuilder Press(
+      ui::DomKey dom_key,
+      ui::DomCode dom_code,
+      ui::KeyboardCode key_code = ui::KeyboardCode::VKEY_UNKNOWN) && {
     UpdateModifiersFromDomKey(dom_key, true);
-    key_events_.push_back(
-        CreateKeyPressEvent(dom_key, dom_code, active_modifiers_.ToFlags()));
+    key_events_.push_back(CreateKeyPressEvent(dom_key, dom_code, key_code,
+                                              active_modifiers_.ToFlags()));
     return std::move(*this);
   }
 
-  KeySequenceBuilder Release(ui::DomKey dom_key, ui::DomCode dom_code) && {
+  KeySequenceBuilder Release(
+      ui::DomKey dom_key,
+      ui::DomCode dom_code,
+      ui::KeyboardCode key_code = ui::KeyboardCode::VKEY_UNKNOWN) && {
     UpdateModifiersFromDomKey(dom_key, false);
-    key_events_.push_back(
-        CreateKeyReleaseEvent(dom_key, dom_code, active_modifiers_.ToFlags()));
+    key_events_.push_back(CreateKeyReleaseEvent(dom_key, dom_code, key_code,
+                                                active_modifiers_.ToFlags()));
     return std::move(*this);
   }
 
-  KeySequenceBuilder PressAndRelease(ui::DomKey dom_key,
-                                     ui::DomCode dom_code) && {
-    return std::move(*this).Press(dom_key, dom_code).Release(dom_key, dom_code);
+  KeySequenceBuilder PressAndRelease(
+      ui::DomKey dom_key,
+      ui::DomCode dom_code,
+      ui::KeyboardCode key_code = ui::KeyboardCode::VKEY_UNKNOWN) && {
+    return std::move(*this)
+        .Press(dom_key, dom_code, key_code)
+        .Release(dom_key, dom_code, key_code);
   }
 
   std::vector<mojom::KeyEventPtr> Build() && { return std::move(key_events_); }
@@ -456,6 +468,22 @@ void SendKeyEventAsync(
   input_method_async_waiter.SendKeyEvent(std::move(key_event), &key_event_id);
   const bool handled = std::move(callback).Run(input_method_async_waiter);
   input_method_async_waiter.KeyEventHandled(key_event_id, handled);
+}
+
+void WaitUntilSurroundingTextIs(
+    InputMethodTestInterfaceAsyncWaiter& input_method_async_waiter,
+    const std::string& expected_surrounding_text,
+    const gfx::Range& expected_selection_range) {
+  std::string surrounding_text;
+  gfx::Range selection_range;
+  while (true) {
+    input_method_async_waiter.WaitForNextSurroundingTextChange(
+        &surrounding_text, &selection_range);
+    if (surrounding_text == expected_surrounding_text &&
+        selection_range == expected_selection_range) {
+      break;
+    }
+  }
 }
 
 using InputMethodLacrosBrowserTest = InProcessBrowserTest;
@@ -875,9 +903,12 @@ IN_PROC_BROWSER_TEST_F(InputMethodLacrosBrowserTest,
   SendKeyEventsSync(
       input_method_async_waiter,
       KeySequenceBuilder()
-          .PressAndRelease(ui::DomKey::FromCharacter('a'), ui::DomCode::US_A)
-          .PressAndRelease(ui::DomKey::FromCharacter('b'), ui::DomCode::US_B)
-          .PressAndRelease(ui::DomKey::FromCharacter('c'), ui::DomCode::US_C)
+          .PressAndRelease(ui::DomKey::FromCharacter('a'), ui::DomCode::US_A,
+                           ui::KeyboardCode::VKEY_A)
+          .PressAndRelease(ui::DomKey::FromCharacter('b'), ui::DomCode::US_B,
+                           ui::KeyboardCode::VKEY_B)
+          .PressAndRelease(ui::DomKey::FromCharacter('c'), ui::DomCode::US_C,
+                           ui::KeyboardCode::VKEY_C)
           .Build());
 
   EXPECT_TRUE(WaitUntilInputFieldHasText(GetActiveWebContents(browser()), id,
@@ -924,6 +955,64 @@ IN_PROC_BROWSER_TEST_F(InputMethodLacrosBrowserTest,
           .Build());
   EXPECT_TRUE(WaitUntilInputFieldHasText(GetActiveWebContents(browser()), id,
                                          "lo", gfx::Range(0)));
+}
+
+IN_PROC_BROWSER_TEST_F(InputMethodLacrosBrowserTest,
+                       SendLeftArrowKeyWithSelectionCollapsesSelectionLeft) {
+  mojo::Remote<InputMethodTestInterface> input_method =
+      BindInputMethodTestInterface(
+          {InputMethodTestInterface::MethodMinVersions::kWaitForFocusMinVersion,
+           InputMethodTestInterface::MethodMinVersions::
+               kKeyEventHandledMinVersion});
+  if (!input_method.is_bound()) {
+    GTEST_SKIP() << "Unsupported ash version";
+  }
+  const std::string id = RenderAutofocusedInputFieldInLacros(browser());
+  ASSERT_TRUE(SetInputFieldText(GetActiveWebContents(browser()), id, "abcde",
+                                gfx::Range(1, 4)));
+  InputMethodTestInterfaceAsyncWaiter input_method_async_waiter(
+      input_method.get());
+  input_method_async_waiter.WaitForFocus();
+  WaitUntilSurroundingTextIs(input_method_async_waiter, "abcde",
+                             gfx::Range(1, 4));
+
+  SendKeyEventsSync(
+      input_method_async_waiter,
+      KeySequenceBuilder()
+          .PressAndRelease(ui::DomKey::ARROW_LEFT, ui::DomCode::ARROW_LEFT)
+          .Build());
+
+  EXPECT_TRUE(WaitUntilInputFieldHasText(GetActiveWebContents(browser()), id,
+                                         "abcde", gfx::Range(1)));
+}
+
+IN_PROC_BROWSER_TEST_F(InputMethodLacrosBrowserTest,
+                       SendRightArrowKeyWithSelectionCollapsesSelectionRight) {
+  mojo::Remote<InputMethodTestInterface> input_method =
+      BindInputMethodTestInterface(
+          {InputMethodTestInterface::MethodMinVersions::kWaitForFocusMinVersion,
+           InputMethodTestInterface::MethodMinVersions::
+               kKeyEventHandledMinVersion});
+  if (!input_method.is_bound()) {
+    GTEST_SKIP() << "Unsupported ash version";
+  }
+  const std::string id = RenderAutofocusedInputFieldInLacros(browser());
+  ASSERT_TRUE(SetInputFieldText(GetActiveWebContents(browser()), id, "abcde",
+                                gfx::Range(1, 4)));
+  InputMethodTestInterfaceAsyncWaiter input_method_async_waiter(
+      input_method.get());
+  input_method_async_waiter.WaitForFocus();
+  WaitUntilSurroundingTextIs(input_method_async_waiter, "abcde",
+                             gfx::Range(1, 4));
+
+  SendKeyEventsSync(
+      input_method_async_waiter,
+      KeySequenceBuilder()
+          .PressAndRelease(ui::DomKey::ARROW_RIGHT, ui::DomCode::ARROW_RIGHT)
+          .Build());
+
+  EXPECT_TRUE(WaitUntilInputFieldHasText(GetActiveWebContents(browser()), id,
+                                         "abcde", gfx::Range(4)));
 }
 
 IN_PROC_BROWSER_TEST_F(InputMethodLacrosBrowserTest,
@@ -1151,6 +1240,81 @@ IN_PROC_BROWSER_TEST_F(InputMethodLacrosBrowserTest,
   EXPECT_THAT(event_listener.WaitForMessage(),
               IsKeyUpEvent("Meta", "MetaLeft", 91));
   EXPECT_FALSE(event_listener.HasMessages());
+}
+
+IN_PROC_BROWSER_TEST_F(InputMethodLacrosBrowserTest,
+                       ConfirmCompositionWithNoSelectionAndNoComposition) {
+  mojo::Remote<InputMethodTestInterface> input_method =
+      BindInputMethodTestInterface(
+          {InputMethodTestInterface::MethodMinVersions::kWaitForFocusMinVersion,
+           InputMethodTestInterface::MethodMinVersions::
+               kWaitForNextSurroundingTextChangeMinVersion},
+          {kInputMethodTestCapabilityConfirmComposition});
+  if (!input_method.is_bound()) {
+    GTEST_SKIP() << "Unsupported ash version";
+  }
+  const std::string id = RenderAutofocusedInputFieldInLacros(browser());
+  ASSERT_TRUE(SetInputFieldText(GetActiveWebContents(browser()), id, "hello",
+                                gfx::Range(3)));
+  InputMethodTestInterfaceAsyncWaiter input_method_async_waiter(
+      input_method.get());
+  input_method_async_waiter.WaitForFocus();
+  WaitUntilSurroundingTextIs(input_method_async_waiter, "hello", gfx::Range(3));
+
+  input_method_async_waiter.ConfirmComposition();
+
+  EXPECT_TRUE(WaitUntilInputFieldHasText(GetActiveWebContents(browser()), id,
+                                         "hello", gfx::Range(3)));
+}
+
+IN_PROC_BROWSER_TEST_F(InputMethodLacrosBrowserTest,
+                       ConfirmCompositionWithNoSelectionAndComposition) {
+  mojo::Remote<InputMethodTestInterface> input_method =
+      BindInputMethodTestInterface(
+          {InputMethodTestInterface::MethodMinVersions::kWaitForFocusMinVersion,
+           InputMethodTestInterface::MethodMinVersions::
+               kWaitForNextSurroundingTextChangeMinVersion},
+          {kInputMethodTestCapabilityConfirmComposition});
+  if (!input_method.is_bound()) {
+    GTEST_SKIP() << "Unsupported ash version";
+  }
+  const std::string id = RenderAutofocusedInputFieldInLacros(browser());
+  InputMethodTestInterfaceAsyncWaiter input_method_async_waiter(
+      input_method.get());
+  input_method_async_waiter.WaitForFocus();
+  input_method_async_waiter.SetComposition("hello", 3);
+  WaitUntilSurroundingTextIs(input_method_async_waiter, "hello", gfx::Range(3));
+
+  input_method_async_waiter.ConfirmComposition();
+
+  EXPECT_TRUE(WaitUntilInputFieldHasText(GetActiveWebContents(browser()), id,
+                                         "hello", gfx::Range(3)));
+}
+
+IN_PROC_BROWSER_TEST_F(InputMethodLacrosBrowserTest,
+                       ConfirmCompositionWithSelectionAndNoComposition) {
+  mojo::Remote<InputMethodTestInterface> input_method =
+      BindInputMethodTestInterface(
+          {InputMethodTestInterface::MethodMinVersions::kWaitForFocusMinVersion,
+           InputMethodTestInterface::MethodMinVersions::
+               kWaitForNextSurroundingTextChangeMinVersion},
+          {kInputMethodTestCapabilityConfirmComposition});
+  if (!input_method.is_bound()) {
+    GTEST_SKIP() << "Unsupported ash version";
+  }
+  const std::string id = RenderAutofocusedInputFieldInLacros(browser());
+  ASSERT_TRUE(SetInputFieldText(GetActiveWebContents(browser()), id, "hello",
+                                gfx::Range(1, 3)));
+  InputMethodTestInterfaceAsyncWaiter input_method_async_waiter(
+      input_method.get());
+  input_method_async_waiter.WaitForFocus();
+  WaitUntilSurroundingTextIs(input_method_async_waiter, "hello",
+                             gfx::Range(1, 3));
+
+  input_method_async_waiter.ConfirmComposition();
+
+  EXPECT_TRUE(WaitUntilInputFieldHasText(GetActiveWebContents(browser()), id,
+                                         "hello", gfx::Range(1, 3)));
 }
 
 }  // namespace

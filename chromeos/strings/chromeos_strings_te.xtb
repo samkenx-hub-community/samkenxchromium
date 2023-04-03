@@ -274,6 +274,7 @@
 <translation id="3456078764689556234"><ph name="TOTAL_PAGES" /> పేజీలలో <ph name="PRINTED_PAGES" />వ పేజీ ప్రింట్ చేయబడింది.</translation>
 <translation id="345898999683440380"><ph name="PAGE_NUM" />వ పేజీని స్కాన్ చేస్తోంది. <ph name="PERCENTAGE_VALUE" />% పూర్తయింది.</translation>
 <translation id="3459509316159669723">ప్రింటింగ్</translation>
+<translation id="346423161771747987">విద్యుత్తు</translation>
 <translation id="346539236881580388">మళ్లీ తీయండి</translation>
 <translation id="3484914941826596830">ఫర్మ్‌వేర్ అప్‌డేట్ అవుతున్నప్పుడు, ఈ బాహ్య పరికరాన్ని అన్‌ప్లగ్ చేయవద్దు లేదా మీ కంప్యూటర్‌ను షట్ డౌన్ చేయవద్దు. మీరు ఈ విండోను చిన్నదిగా చేయవచ్చు. ఈ అప్‌డేట్‌కు కొన్ని నిమిషాల సమయం పట్టవచ్చు, ఇంకా ఈ సమయంలో మీ బాహ్య పరికరం పని చేయకపోవచ్చు.</translation>
 <translation id="3486220673238053218">నిర్వచనం</translation>
@@ -697,6 +698,7 @@
 <translation id="7103252855940681301"><ph name="COUNT" />లో <ph name="INDEX" /> పరికరాలు <ph name="NAME" /> అనే పేరుతో ఉన్నాయి.</translation>
 <translation id="7108668606237948702">ఎంటర్</translation>
 <translation id="7130438335435247835">యాక్సెస్ స్థానం పేరు (APN)</translation>
+<translation id="7131634559772719176">ప్రీసెట్‌ను నిర్ధారించండి</translation>
 <translation id="7134436342991564651">{0,plural, =1{సర్వర్ పేరు}other{సర్వర్‌ల పేరు}}</translation>
 <translation id="7143207342074048698">కనెక్ట్ అవుతో.</translation>
 <translation id="7144878232160441200">మళ్ళీ ప్రయత్నించు</translation>
@@ -759,6 +761,7 @@
 <translation id="7656388927906093505">పరికరం రకం మౌస్.</translation>
 <translation id="7658239707568436148">రద్దు చేయండి</translation>
 <translation id="7665800271478495366">అవతార్‌ను మార్చండి</translation>
+<translation id="7675241868020048622">అరోరా (ప్లస్ ఎక్స్‌క్లూజివ్)</translation>
 <translation id="7690294790491645610">కొత్త పాస్‌వర్డ్‌ను నిర్ధారించండి</translation>
 <translation id="7701040980221191251">ఏదీ లేదు</translation>
 <translation id="7705524343798198388">VPN</translation>
@@ -768,6 +771,7 @@
 <translation id="7762130827864645708">మీ పాస్‌వర్డ్ మార్పు విజయవంతమైంది. ఇప్పటి నుండి కొత్త పాస్‌వర్డ్‌ను ఉపయోగించండి.</translation>
 <translation id="7763470514545477072">డొమైన్ సఫిక్స్ మ్యాచ్</translation>
 <translation id="7769672763586021400">మోడల్ ID</translation>
+<translation id="7770834998503326261">మీ ఎంపికకు సంబంధించిన అదనపు సమాచారం</translation>
 <translation id="7778717409420828014">మీ ఫీడ్‌బ్యాక్ Chromebook అనుభవాన్ని మెరుగుపరచడంలో మాకు సహాయపడుతుంది, ఇంకా మా టీమ్ ద్వారా రివ్యూ చేయబడుతుంది. పెద్ద సంఖ్యలో రిపోర్ట్‌లు ఉన్నందున మేము రిప్లయిని పంపడం సాధ్యం కాదు.</translation>
 <translation id="7784116172884276937">DNS సర్వర్‌లు ఏవీ సెటప్ చేయబడలేదు</translation>
 <translation id="7791543448312431591">జోడించండి</translation>
@@ -800,6 +804,7 @@
 <translation id="80398733265834479">ఆటోమేటిక్ రంగు మోడ్‌ను ఎనేబుల్ చేయండి</translation>
 <translation id="8041089156583427627">ప్రతిస్పందనను పంపండి</translation>
 <translation id="8045012663542226664">మైక్రోఫోన్ మ్యూట్</translation>
+<translation id="8050091914317269817">ఈ వాల్‌పేపర్‌ను ఎంచుకోవడం వలన ఆటో డార్క్ మోడ్, అలాగే వాల్‌పేపర్ కలర్ మ్యాచింగ్ ఫీచర్ ఆన్ చేయబడతాయి.</translation>
 <translation id="8075838845814659848">మిగిలిన ఛార్జ్</translation>
 <translation id="8076492880354921740">ట్యాబ్‌లు</translation>
 <translation id="8082366717211101304">Android యాప్‌ల నుండి DNSను పరిష్కరించడం సాధ్యపడదు</translation>
@@ -885,7 +890,7 @@
 <translation id="8834539327799336565">ప్రస్తుతం కనెక్ట్ చేయబడింది</translation>
 <translation id="8845001906332463065">సహాయం పొందండి</translation>
 <translation id="8855781559874488009">HTTP వెబ్‌సైట్‌లకు ఫైర్‌వాల్ ద్వారా కనెక్ట్ చేయడం సాధ్యపడదు</translation>
-<translation id="885701979325669005">నిల్వ</translation>
+<translation id="885701979325669005">స్టోరేజ్‌</translation>
 <translation id="8863170912498892583">ముదురు రంగు రూపాన్ని ఎనేబుల్ చేయండి</translation>
 <translation id="8863888432376731307">"<ph name="QUERY" />", అలాగే మరిన్నింటి కోసం <ph name="INTENT" />ను పొందండి</translation>
 <translation id="8864415976656252616">ఏ కంటెంట్ సూచించబడలేదు. టాప్ సహాయక కంటెంట్‌ను చూడండి.</translation>

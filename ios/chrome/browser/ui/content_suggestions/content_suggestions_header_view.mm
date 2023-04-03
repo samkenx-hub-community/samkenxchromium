@@ -11,6 +11,7 @@
 #import "base/feature_list.h"
 #import "components/strings/grit/components_strings.h"
 #import "ios/chrome/browser/shared/public/features/features.h"
+#import "ios/chrome/browser/shared/ui/elements/extended_touch_target_button.h"
 #import "ios/chrome/browser/shared/ui/util/dynamic_type_util.h"
 #import "ios/chrome/browser/shared/ui/util/named_guide.h"
 #import "ios/chrome/browser/shared/ui/util/named_guide_util.h"
@@ -18,7 +19,7 @@
 #import "ios/chrome/browser/ui/content_suggestions/content_suggestions_collection_utils.h"
 #import "ios/chrome/browser/ui/content_suggestions/content_suggestions_feature.h"
 #import "ios/chrome/browser/ui/content_suggestions/ntp_home_constant.h"
-#import "ios/chrome/browser/ui/elements/extended_touch_target_button.h"
+#import "ios/chrome/browser/ui/lens/lens_availability.h"
 #import "ios/chrome/browser/ui/ntp/new_tab_page_delegate.h"
 #import "ios/chrome/browser/ui/ntp/new_tab_page_header_constants.h"
 #import "ios/chrome/browser/ui/omnibox/omnibox_constants.h"
@@ -62,8 +63,8 @@ const CGFloat kEndButtonFakeboxTrailingSpace = 12.0;
 const CGFloat kEndButtonOmniboxTrailingSpace = 7.0;
 
 // The constants for the constraints the leading-edge aligned UI elements.
-const CGFloat kHintLabelFakeboxLeadingSpace = 12.0;
-const CGFloat kHintLabelOmniboxLeadingSpace = 7.0;
+const CGFloat kHintLabelFakeboxLeadingSpace = 18.0;
+const CGFloat kHintLabelOmniboxLeadingSpace = 13.0;
 
 // The constants for the constraints affecting the separation between the Lens
 // and Voice Search buttons.
@@ -269,9 +270,9 @@ CGFloat ToolbarHeight() {
   UIButton* endButton = self.voiceSearchButton;
 
   // Lens.
-  const BOOL lensEnabled = ios::provider::IsLensSupported() &&
-                           base::FeatureList::IsEnabled(kEnableLensInNTP);
-  const BOOL useLens = lensEnabled && self.isGoogleDefaultSearchEngine;
+  const BOOL useLens =
+      lens_availability::CheckAndLogAvailabilityForLensEntryPoint(
+          LensEntrypoint::NewTabPage, self.isGoogleDefaultSearchEngine);
   if (useLens) {
     self.lensButton =
         [ExtendedTouchTargetButton buttonWithType:UIButtonTypeSystem];
@@ -481,7 +482,7 @@ CGFloat ToolbarHeight() {
   // it's where the focused adapative toolbar focuses.
   CGFloat inset = !IsSplitToolbarMode(self) ? kBackgroundLandscapeInset : 0;
   self.fakeLocationBarLeadingConstraint.constant =
-      (safeAreaInsets.left + kExpandedLocationBarLeadingMargin + inset) *
+      (safeAreaInsets.left + kExpandedLocationBarHorizontalMargin + inset) *
       percent;
   self.fakeLocationBarTrailingConstraint.constant =
       -(safeAreaInsets.right + kExpandedLocationBarHorizontalMargin + inset) *

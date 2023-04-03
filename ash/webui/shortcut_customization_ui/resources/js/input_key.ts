@@ -15,7 +15,6 @@ import {AcceleratorLookupManager} from './accelerator_lookup_manager.js';
 import {getTemplate} from './input_key.html.js';
 
 const META_KEY = 'meta';
-const OPEN_LAUNCHER_KEY = 'OpenLauncher';
 
 /**
  * Refers to the state of an 'input-key' item.
@@ -56,11 +55,10 @@ export const keyToIconNameMap: {[key: string]: string} = {
   'MediaPlayPause': 'play-pause',
   'MediaTrackNext': 'next-track',
   'MediaTrackPrevious': 'last-track',
+  'Menu': 'menu',
   'MicrophoneMuteToggle': 'microphone-mute',
   'ModeChange': 'space-bar',
-  // TODO(cambickel) The launcher icon will vary per-device; update this when
-  // we're able to detect which one to show.
-  'OpenLauncher': 'launcher',
+  'OpenLauncher': 'open-launcher',
   'Power': 'power',
   'PrintScreen': 'screenshot',
   'PrivacyScreenToggle': 'electronic-privacy-screen',
@@ -94,13 +92,45 @@ export class InputKeyElement extends InputKeyElementBase {
         value: KeyInputState.NOT_SELECTED,
         reflectToAttribute: true,
       },
+
+      // If this property is true, the spacing between keys will be narrower
+      // than usual.
+      narrow: {
+        type: Boolean,
+        value: false,
+        reflectToAttribute: true,
+      },
+
+      // If this property is true, keys will be styled with the bolder highlight
+      // background.
+      highlighted: {
+        type: Boolean,
+        value: false,
+        reflectToAttribute: true,
+      },
+
+      // This property is used to apply different styling to keys containing
+      // only text and those with icons.
+      hasIcon: {
+        type: Boolean,
+        value: false,
+        reflectToAttribute: true,
+      },
     };
   }
 
   key: string;
   keyState: KeyInputState;
+  narrow: boolean;
+  highlighted: boolean;
+  hasIcon: boolean;
   private lookupManager: AcceleratorLookupManager =
       AcceleratorLookupManager.getInstance();
+
+  override connectedCallback(): void {
+    super.connectedCallback();
+    this.hasIcon = this.key in keyToIconNameMap;
+  }
 
   static get template(): HTMLTemplateElement {
     return getTemplate();
@@ -108,7 +138,9 @@ export class InputKeyElement extends InputKeyElementBase {
 
   private getIconIdForKey(): string|null {
     const hasLauncherButton = this.lookupManager.getHasLauncherButton();
-    if (this.key === META_KEY || this.key === OPEN_LAUNCHER_KEY) {
+    if (this.key === META_KEY) {
+      // 'meta' key should always be the modifier key.
+      this.keyState = KeyInputState.MODIFIER_SELECTED;
       return hasLauncherButton ? 'shortcut-customization-keys:launcher' :
                                  'shortcut-customization-keys:search';
     }
@@ -125,7 +157,7 @@ export class InputKeyElement extends InputKeyElementBase {
    *     search button.
    */
   static getAriaLabelStringId(key: string, hasLauncherButton: boolean): string {
-    if (key === META_KEY || key === OPEN_LAUNCHER_KEY) {
+    if (key === META_KEY) {
       return hasLauncherButton ? 'iconLabelOpenLauncher' :
                                  'iconLabelBrowserSearch';
     }

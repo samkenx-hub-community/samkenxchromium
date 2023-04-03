@@ -15,9 +15,9 @@
 #import "ios/chrome/browser/main/browser.h"
 #import "ios/chrome/browser/main/browser_observer_bridge.h"
 #import "ios/chrome/browser/policy/policy_util.h"
+#import "ios/chrome/browser/shared/coordinator/alert/action_sheet_coordinator.h"
 #import "ios/chrome/browser/shared/ui/table_view/table_view_navigation_controller.h"
 #import "ios/chrome/browser/sync/sync_service_factory.h"
-#import "ios/chrome/browser/ui/alert_coordinator/action_sheet_coordinator.h"
 #import "ios/chrome/browser/ui/history/history_clear_browsing_data_coordinator.h"
 #import "ios/chrome/browser/ui/history/history_mediator.h"
 #import "ios/chrome/browser/ui/history/history_menu_provider.h"
@@ -135,6 +135,11 @@ history::WebHistoryService* WebHistoryServiceGetter(
 }
 
 - (void)stop {
+  // `stop` is called as part of the UI teardown, which means that the browser
+  // objects may be deleted before the dismiss animation is complete.
+  // Disconnect the historyTableViewController before dismissing it to avoid
+  // it accessing stalled objects.
+  [self.historyTableViewController detachFromBrowser];
   [self stopWithCompletion:nil];
 }
 

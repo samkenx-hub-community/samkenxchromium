@@ -312,10 +312,9 @@ class CookieSettingsTest
                "  let cookie_str = '';"
                "  for (const cookie of cookies)"
                "    cookie_str += `${cookie.name}=${cookie.value};`;"
-               "  window.domAutomationController.send(cookie_str);"
+               "  return cookie_str;"
                "}"
-               "doGet()",
-               content::EXECUTE_SCRIPT_USE_MANUAL_REPLY)
+               "doGet()")
         .ExtractString();
   }
 
@@ -347,10 +346,9 @@ class CookieSettingsTest
                         "         value: 'Good',"
                         "         expires: Date.now() + 3600*1000,"
                         "         sameSite: 'none' });"
-                        "  window.domAutomationController.send(true);"
+                        "  return true;"
                         "}"
-                        "doSet()",
-                        content::EXECUTE_SCRIPT_USE_MANUAL_REPLY);
+                        "doSet()");
     // Failure ignored here since some tests purposefully try to set disallowed
     // cookies.
   }
@@ -412,13 +410,7 @@ IN_PROC_BROWSER_TEST_P(CookieSettingsTest, BlockCookies) {
 
 // Verify that cookies can be allowed and set using exceptions for particular
 // website(s) when all others are blocked.
-// Flaky on Mac (crbug.com/1155077) and Linux (crbug.com/1242410).
-#if BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
-#define MAYBE_AllowCookiesUsingExceptions DISABLED_AllowCookiesUsingExceptions
-#else
-#define MAYBE_AllowCookiesUsingExceptions AllowCookiesUsingExceptions
-#endif
-IN_PROC_BROWSER_TEST_P(CookieSettingsTest, MAYBE_AllowCookiesUsingExceptions) {
+IN_PROC_BROWSER_TEST_P(CookieSettingsTest, AllowCookiesUsingExceptions) {
   ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), GetPageURL()));
   content_settings::CookieSettings* settings =
       CookieSettingsFactory::GetForProfile(browser()->profile()).get();

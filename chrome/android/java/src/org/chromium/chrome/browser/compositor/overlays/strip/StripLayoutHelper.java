@@ -58,7 +58,6 @@ import org.chromium.chrome.browser.tasks.tab_management.TabUiThemeUtil;
 import org.chromium.components.browser_ui.styles.ChromeColors;
 import org.chromium.components.browser_ui.styles.SemanticColorUtils;
 import org.chromium.components.browser_ui.widget.animation.Interpolators;
-import org.chromium.ui.base.DeviceFormFactor;
 import org.chromium.ui.base.LocalizationUtils;
 import org.chromium.ui.util.ColorUtils;
 
@@ -120,6 +119,8 @@ public class StripLayoutHelper implements StripLayoutTab.StripLayoutTabDelegate 
     private static final int ANIM_TAB_DIM_MS = 150;
     private static final int ANIM_BUTTONS_FADE_MS = 150;
     private static final int NEW_TAB_BUTTON_OFFSET_MOVE_MS = 250;
+    private static final int SCROLL_DISTANCE_SHORT = 960;
+    private static final int SCROLL_DISTANCE_MEDIUM = 1920;
     private static final long INVALID_TIME = 0L;
     static final long DROP_INTO_GROUP_MS = 300L;
 
@@ -156,6 +157,7 @@ public class StripLayoutHelper implements StripLayoutTab.StripLayoutTabDelegate 
     static final float BACKGROUND_TAB_BRIGHTNESS_DEFAULT = 1.f;
     static final float BACKGROUND_TAB_BRIGHTNESS_DIMMED = 0.65f;
     static final float FADE_FULL_OPACITY_THRESHOLD_DP = 24.f;
+    private static final float TAB_STRIP_TAB_WIDTH = 108.f;
 
     private static final int MESSAGE_RESIZE = 1;
     private static final int MESSAGE_UPDATE_SPINNER = 2;
@@ -171,9 +173,7 @@ public class StripLayoutHelper implements StripLayoutTab.StripLayoutTabDelegate 
     private TabModel mModel;
     private TabGroupModelFilter mTabGroupModelFilter;
     private TabCreator mTabCreator;
-    private StripStacker mStripStacker;
-    private CascadingStripStacker mCascadingStripStacker = new CascadingStripStacker();
-    private ScrollingStripStacker mScrollingStripStacker = new ScrollingStripStacker();
+    private StripStacker mStripStacker = new ScrollingStripStacker();
 
     // Internal State
     private StripLayoutTab[] mStripTabs = new StripLayoutTab[0];
@@ -230,8 +230,6 @@ public class StripLayoutHelper implements StripLayoutTab.StripLayoutTabDelegate 
     private float mNewTabButtonWithTabStripEndPadding;
 
     private final boolean mIncognito;
-    // Whether the CascadingStripStacker should be used.
-    private boolean mShouldCascadeTabs;
     private boolean mIsFirstLayoutPass;
     private boolean mAnimationsDisabledForTesting;
     // Whether tab strip scrolling is in progress
@@ -246,9 +244,6 @@ public class StripLayoutHelper implements StripLayoutTab.StripLayoutTabDelegate 
     private boolean mMultiStepTabCloseAnimRunning;
     private boolean mTabGroupMarginAnimRunning;
     private boolean mTabCreating;
-
-    // Experiment flags
-    private final boolean mTabStripImpEnabled;
 
     /**
      * Creates an instance of the {@link StripLayoutHelper}.
@@ -274,7 +269,6 @@ public class StripLayoutHelper implements StripLayoutTab.StripLayoutTabDelegate 
             mNewTabButtonWidth = NEW_TAB_BUTTON_WIDTH_DP;
         }
         mModelSelectorButton = modelSelectorButton;
-        mTabStripImpEnabled = ChromeFeatureList.sTabStripImprovements.isEnabled();
 
         if (ChromeFeatureList.sTabStripRedesign.isEnabled()) {
             mNewTabButtonWithTabStripEndPadding =
@@ -290,7 +284,7 @@ public class StripLayoutHelper implements StripLayoutTab.StripLayoutTabDelegate 
                 ? mNewTabButtonWithTabStripEndPadding + mNewTabButtonWidth
                 : 0;
 
-        mMinTabWidth = TabUiFeatureUtilities.getTabMinWidth();
+        mMinTabWidth = TAB_STRIP_TAB_WIDTH;
 
         mMaxTabWidth = TabUiThemeUtil.getMaxTabStripTabWidthDp();
         mReorderMoveStartThreshold = REORDER_MOVE_START_THRESHOLD_DP;
@@ -416,10 +410,6 @@ public class StripLayoutHelper implements StripLayoutTab.StripLayoutTabDelegate 
         int menuWidth = mContext.getResources().getDimensionPixelSize(R.dimen.menu_width);
         mTabMenu.setWidth(menuWidth);
         mTabMenu.setModal(true);
-
-        mShouldCascadeTabs =
-                DeviceFormFactor.isNonMultiDisplayContextOnTablet(context) && !mTabStripImpEnabled;
-        mStripStacker = mShouldCascadeTabs ? mCascadingStripStacker : mScrollingStripStacker;
         mIsFirstLayoutPass = true;
     }
 
@@ -499,8 +489,6 @@ public class StripLayoutHelper implements StripLayoutTab.StripLayoutTabDelegate 
      * @return The opacity to use for the fade.
      */
     private float getFadeOpacity(boolean isLeft) {
-        if (mShouldCascadeTabs) return 0.f;
-
         // In RTL, scroll position 0 is on the right side of the screen, whereas in LTR scroll
         // position 0 is on the left. Account for that in the offset calculation.
         boolean isRtl = LocalizationUtils.isLayoutRtl();
@@ -557,6 +545,8 @@ public class StripLayoutHelper implements StripLayoutTab.StripLayoutTabDelegate 
         } else {
             mRightMargin = margin + mNewTabButtonWithTabStripEndPadding + mNewTabButtonWidth;
         }
+
+        computeAndUpdateTabWidth(false, false);
     }
 
     /**
@@ -569,9 +559,8 @@ public class StripLayoutHelper implements StripLayoutTab.StripLayoutTabDelegate 
     public void onSizeChanged(float width, float height, boolean orientationChanged, long time) {
         if (mWidth == width && mHeight == height) return;
 
-        boolean wasSelectedTabVisible = mTabStripImpEnabled && orientationChanged && mModel != null
-                && mModel.index() >= 0 && mModel.index() < mStripTabs.length
-                && mStripTabs[mModel.index()].isVisible();
+        boolean wasSelectedTabVisible = orientationChanged && mModel != null && mModel.index() >= 0
+                && mModel.index() < mStripTabs.length && mStripTabs[mModel.index()].isVisible();
 
         boolean widthChanged = mWidth != width;
 
@@ -584,9 +573,6 @@ public class StripLayoutHelper implements StripLayoutTab.StripLayoutTabDelegate 
 
         if (widthChanged) {
             computeAndUpdateTabWidth(false, false);
-            boolean shouldCascade =
-                    width >= DeviceFormFactor.MINIMUM_TABLET_WIDTH_DP && !mTabStripImpEnabled;
-            setShouldCascadeTabs(shouldCascade);
         }
         if (mStripTabs.length > 0) mUpdateHost.requestUpdate();
 
@@ -594,33 +580,6 @@ public class StripLayoutHelper implements StripLayoutTab.StripLayoutTabDelegate 
         mTabMenu.dismiss();
 
         if (wasSelectedTabVisible) bringSelectedTabToVisibleArea(time, true);
-    }
-
-    /**
-     * Should be called when the viewport width crosses the 600dp threshold. The
-     * {@link CascadingStripStacker} should be used at 600dp+, otherwise the
-     * {@link ScrollingStripStacker} should be used.
-     * @param shouldCascadeTabs Whether the {@link CascadingStripStacker} should be used.
-     */
-    void setShouldCascadeTabs(boolean shouldCascadeTabs) {
-        if (mModel == null) return;
-
-        if (shouldCascadeTabs != mShouldCascadeTabs) {
-            mShouldCascadeTabs = shouldCascadeTabs;
-            setTabStacker(shouldCascadeTabs ? mCascadingStripStacker : mScrollingStripStacker);
-
-            // Scroll to make the selected tab visible and nearby tabs visible.
-            if (mModel.getTabAt(mModel.index()) != null) {
-                updateScrollOffsetLimits();
-                StripLayoutTab tab = findTabById(mModel.getTabAt(mModel.index()).getId());
-                float delta = calculateOffsetToMakeTabVisible(tab, true, true, true, true);
-                // During this resize, mMinScrollOffset will be changing, so the scroll effect
-                // cannot be properly animated. Jump to the new scroll offset instead.
-                mScrollOffset = mScrollOffset + delta;
-            }
-
-            updateStrip();
-        }
     }
 
     /**
@@ -652,7 +611,6 @@ public class StripLayoutHelper implements StripLayoutTab.StripLayoutTabDelegate 
         if (mModel == model) return;
         mModel = model;
         mTabCreator = tabCreator;
-        setShouldCascadeTabs(mShouldCascadeTabs);
         computeAndUpdateTabOrders(false, false);
     }
 
@@ -823,42 +781,27 @@ public class StripLayoutHelper implements StripLayoutTab.StripLayoutTabDelegate 
 
         // 3. Figure out which tab needs to be visible.
         StripLayoutTab fastExpandTab = findTabById(prevId);
-        boolean allowLeftExpand = false;
-        boolean canExpandSelectedTab = false;
-        if (!selected) {
-            fastExpandTab = tab;
-            allowLeftExpand = true;
-        }
 
-        if (!mShouldCascadeTabs) {
-            int selIndex = mModel.index();
-            if (mTabStripImpEnabled && !selected && selIndex >= 0 && selIndex < mStripTabs.length) {
-                // Prioritize focusing on selected tab over newly created unselected tabs.
-                fastExpandTab = mStripTabs[selIndex];
-            } else {
-                fastExpandTab = tab;
-            }
-            allowLeftExpand = true;
-            canExpandSelectedTab = true;
+        int selIndex = mModel.index();
+        if (!selected && selIndex >= 0 && selIndex < mStripTabs.length) {
+            // Prioritize focusing on selected tab over newly created unselected tabs.
+            fastExpandTab = mStripTabs[selIndex];
+        } else {
+            fastExpandTab = tab;
         }
+        boolean allowLeftExpand = true;
+        boolean canExpandSelectedTab = true;
 
         // 4. Scroll the stack so that the fast expand tab is visible. Skip if tab was restored.
-        boolean skipAutoScroll = (mTabStripImpEnabled && closureCancelled) || onStartup;
+        boolean skipAutoScroll = closureCancelled || onStartup;
         if (fastExpandTab != null && !skipAutoScroll) {
             float delta = calculateOffsetToMakeTabVisible(
                     fastExpandTab, canExpandSelectedTab, allowLeftExpand, true, selected);
 
-            if (!mShouldCascadeTabs) {
-                // If the ScrollingStripStacker is being used and the new tab button is visible, go
-                // directly to the new scroll offset rather than animating. Animating the scroll
-                // causes the new tab button to disappear for a frame.
-                boolean shouldAnimate = (!mNewTabButton.isVisible() || mTabStripImpEnabled)
-                        && !mAnimationsDisabledForTesting;
-                setScrollForScrollingTabStacker(delta, shouldAnimate, time);
-            } else if (delta != 0.f) {
-                mScroller.startScroll(
-                        Math.round(mScrollOffset), 0, (int) delta, 0, time, getExpandDuration());
-            }
+            // If new tab button is visible, go directly to the new scroll offset rather than
+            // animating. Animating the scroll causes the new tab button to disappear for a frame.
+            boolean shouldAnimate = !mAnimationsDisabledForTesting;
+            setScrollForScrollingTabStacker(delta, shouldAnimate, time);
         }
 
         // 5. When restoring tabs through startup, ensure the selected tab is visible, as the newly
@@ -873,24 +816,15 @@ public class StripLayoutHelper implements StripLayoutTab.StripLayoutTabDelegate 
      * partially visible tabs at the edge of the tab strip when min tab width is set to >=156dp.
      */
     private void updateCloseButtons() {
-        if (!mTabStripImpEnabled) {
-            return;
-        }
-
         Tab selectedTab = mModel.getTabAt(mModel.index());
         final int count = mModel.getCount();
         if (selectedTab == null) return;
 
         for (int i = 0; i < count; i++) {
             final StripLayoutTab tab = mStripTabs[i];
-            if (mMinTabWidth == TAB_WIDTH_MEDIUM) {
-                boolean canShowCloseButton = shouldShowCloseButton(tab, i);
-                mStripTabs[i].setCanShowCloseButton(canShowCloseButton, !mIsFirstLayoutPass);
-            } else if (mMinTabWidth == TAB_WIDTH_SMALL) {
-                boolean canShowCloseButton = tab.getWidth() >= TAB_WIDTH_MEDIUM
-                        || (tab.getId() == selectedTab.getId() && shouldShowCloseButton(tab, i));
-                mStripTabs[i].setCanShowCloseButton(canShowCloseButton, !mIsFirstLayoutPass);
-            }
+            boolean canShowCloseButton = tab.getWidth() >= TAB_WIDTH_MEDIUM
+                    || (tab.getId() == selectedTab.getId() && shouldShowCloseButton(tab, i));
+            mStripTabs[i].setCanShowCloseButton(canShowCloseButton, !mIsFirstLayoutPass);
         }
     }
 
@@ -1084,42 +1018,13 @@ public class StripLayoutHelper implements StripLayoutTab.StripLayoutTabDelegate 
             // 2.b. Still scrolling, update the scroll destination here.
             mScroller.setFinalX((int) (mScroller.getFinalX() + deltaX));
         } else {
-            // 2.c. Not scrolling. Check if we need to fast expand.
-            float fastExpandDelta;
-            if (mShouldCascadeTabs) {
-                fastExpandDelta =
-                        calculateOffsetToMakeTabVisible(mInteractingTab, true, true, true, true);
-            } else {
-                // Non-cascaded tabs are never hidden behind each other, so there's no need to fast
-                // expand.
-                fastExpandDelta = 0.f;
+            // 2.c. Not scrolling.
+            if (!mIsStripScrollInProgress) {
+                mIsStripScrollInProgress = true;
+                RecordUserAction.record("MobileToolbarSlideTabs");
+                onStripScrollStart();
             }
-
-            if (mInteractingTab != null && fastExpandDelta != 0.f) {
-                if ((fastExpandDelta > 0 && deltaX > 0) || (fastExpandDelta < 0 && deltaX < 0)) {
-                    mScroller.startScroll(Math.round(mScrollOffset), 0, (int) fastExpandDelta, 0,
-                            time, getExpandDuration());
-                }
-            } else {
-                if (!mIsStripScrollInProgress) {
-                    mIsStripScrollInProgress = true;
-                    RecordUserAction.record("MobileToolbarSlideTabs");
-                    onStripScrollStart();
-                }
-                updateScrollOffsetPosition(mScrollOffset + deltaX);
-            }
-        }
-
-        // 3. Check if we should start the reorder mode. Disabling this for tab strip improvements
-        // experiments to prevent accidentally entering reorder mode when scrolling the tab strip.
-        if (!ChromeFeatureList.sTabStripImprovements.isEnabled() && !mInReorderMode) {
-            final float absTotalX = Math.abs(totalX);
-            final float absTotalY = Math.abs(totalY);
-            if (totalY > mReorderMoveStartThreshold && absTotalX < mReorderMoveStartThreshold * 2.f
-                    && (absTotalX > EPSILON
-                               && (absTotalY / absTotalX) > TAN_OF_REORDER_ANGLE_START_THRESHOLD)) {
-                startReorderMode(time, x, x - totalX);
-            }
+            updateScrollOffsetPosition(mScrollOffset + deltaX);
         }
 
         // If we're scrolling at all we aren't interacting with any particular tab.
@@ -1257,10 +1162,11 @@ public class StripLayoutHelper implements StripLayoutTab.StripLayoutTabDelegate 
         // Find out if we're closing the last tab to determine if we resize immediately.
         boolean lastTab =
                 mStripTabs.length == 0 || mStripTabs[mStripTabs.length - 1].getId() == tab.getId();
-        // For the improved tab strip design, when a tab is closed #resizeStripOnTabClose will run
-        // animations for the new tab offset and tab x offsets. When there is only 1 tab remaining,
-        // we do not need to run those animations, so #resizeTabStrip() is used instead.
-        boolean runImprovedTabAnimations = mTabStripImpEnabled && mStripTabs.length > 1;
+
+        // When a tab is closed #resizeStripOnTabClose will run animations for the new tab offset
+        // and tab x offsets. When there is only 1 tab remaining, we do not need to run those
+        // animations, so #resizeTabStrip() is used instead.
+        boolean runImprovedTabAnimations = mStripTabs.length > 1;
 
         // 1. Setup the close animation.
         CompositorAnimator tabClosingAnimator = CompositorAnimator.ofFloatProperty(
@@ -1505,27 +1411,19 @@ public class StripLayoutHelper implements StripLayoutTab.StripLayoutTabDelegate 
         }
     }
 
-    private void updateScrollOffsetLimits() {
+    @VisibleForTesting
+    void updateScrollOffsetLimits() {
         // 1. Compute the width of the available space for all tabs.
         float stripWidth = mWidth - mLeftMargin - mRightMargin;
 
         // 2. Compute the effective width of every tab.
-        float tabsWidth = 0.f;
-        if (mShouldCascadeTabs) {
+        float tabsWidth = mStripTabs.length * (mCachedTabWidth - mTabOverlapWidth);
+
+        if (mInReorderMode || mTabGroupMarginAnimRunning) {
+            tabsWidth += mStripStartMarginForReorder;
             for (int i = 0; i < mStripTabs.length; i++) {
                 final StripLayoutTab tab = mStripTabs[i];
-                tabsWidth += (tab.getWidth() - mTabOverlapWidth) * tab.getWidthWeight();
-            }
-        } else {
-            // When tabs aren't cascaded, they're non-animating width weight is always 1.0 so it
-            // doesn't need to be included in this calculation.
-            tabsWidth = mStripTabs.length * (mCachedTabWidth - mTabOverlapWidth);
-            if (mInReorderMode || mTabGroupMarginAnimRunning) {
-                tabsWidth += mStripStartMarginForReorder;
-                for (int i = 0; i < mStripTabs.length; i++) {
-                    final StripLayoutTab tab = mStripTabs[i];
-                    tabsWidth += tab.getTrailingMargin();
-                }
+                tabsWidth += tab.getTrailingMargin();
             }
         }
 
@@ -1605,8 +1503,7 @@ public class StripLayoutHelper implements StripLayoutTab.StripLayoutTabDelegate 
     private void pushStackerPropertiesToTab(StripLayoutTab tab) {
         // The close button is visible by default. If it should be hidden on tab creation, do not
         // animate the fade-out. See (https://crbug.com/1342654).
-        boolean shouldShowCloseButton =
-                (!mTabStripImpEnabled) || mCachedTabWidth >= TAB_WIDTH_MEDIUM;
+        boolean shouldShowCloseButton = mCachedTabWidth >= TAB_WIDTH_MEDIUM;
         tab.setCanShowCloseButton(
                 mStripStacker.canShowCloseButton() && shouldShowCloseButton, false);
         // TODO(dtrainor): Push more properties as they are added (title text slide, etc?)
@@ -1856,8 +1753,8 @@ public class StripLayoutHelper implements StripLayoutTab.StripLayoutTabDelegate 
         if (selIndex >= 0 && selIndex < mStripTabs.length) {
             currentlyFocusedTab = mStripTabs[selIndex];
         }
-        if (mTabStripImpEnabled && currentlyFocusedTab != null
-                && isSelectedTabCompletelyVisible(currentlyFocusedTab) && !selected) {
+        if (currentlyFocusedTab != null && isSelectedTabCompletelyVisible(currentlyFocusedTab)
+                && !selected) {
             // We want to prioritize keeping the currently selected tab in visible area if newly
             // created tab is not selected. If selected tab is already visible, no need to scroll.
             return 0.f;
@@ -1871,30 +1768,14 @@ public class StripLayoutHelper implements StripLayoutTab.StripLayoutTabDelegate 
 
         // 4. Return the proper deltaX that has to be applied to the current scroll to see the
         // tab.
-        if (mShouldCascadeTabs) {
-            if (mScrollOffset < optimalLeft && canExpandLeft) {
-                return optimalLeft - mScrollOffset;
-            } else if (mScrollOffset > optimalRight && canExpandRight) {
-                return optimalRight - mScrollOffset;
-            }
-        } else {
-            if (mTabStripImpEnabled) {
-                // Distance to make tab visible on the left edge and the right edge.
-                float offsetToOptimalLeft = optimalLeft - mScrollOffset;
-                float offsetToOptimalRight = optimalRight - mScrollOffset - mTabOverlapWidth;
-                // Scroll the minimum possible distance to bring the selected tab into visible area.
-                if (Math.abs(offsetToOptimalLeft) < Math.abs(offsetToOptimalRight)) {
-                    return offsetToOptimalLeft;
-                }
-                return offsetToOptimalRight;
-            }
-            // If tabs are not cascaded, the entire tab strip scrolls and the strip should be
-            // scrolled to the optimal left offset.
-            return optimalLeft - mScrollOffset;
+        // Distance to make tab visible on the left edge and the right edge.
+        float offsetToOptimalLeft = optimalLeft - mScrollOffset;
+        float offsetToOptimalRight = optimalRight - mScrollOffset - mTabOverlapWidth;
+        // Scroll the minimum possible distance to bring the selected tab into visible area.
+        if (Math.abs(offsetToOptimalLeft) < Math.abs(offsetToOptimalRight)) {
+            return offsetToOptimalLeft;
         }
-
-        // 5. We don't have to do anything.  Return no delta.
-        return 0.f;
+        return offsetToOptimalRight;
     }
 
     @VisibleForTesting
@@ -2029,14 +1910,9 @@ public class StripLayoutHelper implements StripLayoutTab.StripLayoutTabDelegate 
         }
         setCompositorButtonsVisible(false);
 
-        // 6. Fast expand to make sure this tab is visible. If tabs are not cascaded, the selected
-        //    tab will already be visible, so there's no need to fast expand to make it visible.
-        if (mShouldCascadeTabs) {
-            float fastExpandDelta =
-                    calculateOffsetToMakeTabVisible(mInteractingTab, true, true, true, true);
-            mScroller.startScroll(Math.round(mScrollOffset), 0, (int) fastExpandDelta, 0, time,
-                    getExpandDuration());
-        } else if (TabUiFeatureUtilities.isTabletTabGroupsEnabled(mContext)) {
+        // 6. the selected tab will already be visible, so update tab group and background
+        // container.
+        if (TabUiFeatureUtilities.isTabletTabGroupsEnabled(mContext)) {
             Tab tab = getTabById(mInteractingTab.getId());
             computeAndUpdateTabGroupMargins(true, animationList);
             if (ChromeFeatureList.sTabStripRedesign.isEnabled()) {
@@ -2801,27 +2677,20 @@ public class StripLayoutHelper implements StripLayoutTab.StripLayoutTabDelegate 
      * @return the duration in ms.
      */
     private int getExpandDuration() {
-        if (mTabStripImpEnabled) {
-            float scrollDistance = Math.abs(mScrollOffset);
-            if (scrollDistance <= 960) {
-                return EXPAND_DURATION_MS;
-            } else if (scrollDistance <= 1920) {
-                return EXPAND_DURATION_MS_MEDIUM;
-            } else {
-                return EXPAND_DURATION_MS_LONG;
-            }
+        float scrollDistance = Math.abs(mScrollOffset);
+        if (scrollDistance <= SCROLL_DISTANCE_SHORT) {
+            return EXPAND_DURATION_MS;
+        } else if (scrollDistance <= SCROLL_DISTANCE_MEDIUM) {
+            return EXPAND_DURATION_MS_MEDIUM;
+        } else {
+            return EXPAND_DURATION_MS_LONG;
         }
-
-        return EXPAND_DURATION_MS;
     }
 
     /**
      * Scrolls to the selected tab if it's not fully visible.
      */
     private void bringSelectedTabToVisibleArea(long time, boolean animate) {
-        // The selected tab is always visible in the CascadingStripStacker.
-        if (mShouldCascadeTabs) return;
-
         Tab selectedTab = mModel.getTabAt(mModel.index());
         if (selectedTab == null) return;
 
@@ -2833,20 +2702,15 @@ public class StripLayoutHelper implements StripLayoutTab.StripLayoutTabDelegate 
     }
 
     private boolean isSelectedTabCompletelyVisible(StripLayoutTab selectedTab) {
-        if (mTabStripImpEnabled) {
-            boolean isRtl = LocalizationUtils.isLayoutRtl();
-            if (isRtl) {
-                return selectedTab.isVisible()
-                        && selectedTab.getDrawX() >= getCloseBtnVisibilityThreshold(false)
-                        && selectedTab.getDrawX() + selectedTab.getWidth() <= mWidth;
-            } else {
-                return selectedTab.isVisible() && selectedTab.getDrawX() >= 0
-                        && selectedTab.getDrawX() + selectedTab.getWidth() <= getScrollableWidth();
-            }
+        boolean isRtl = LocalizationUtils.isLayoutRtl();
+        if (isRtl) {
+            return selectedTab.isVisible()
+                    && selectedTab.getDrawX() >= getCloseBtnVisibilityThreshold(false)
+                    && selectedTab.getDrawX() + selectedTab.getWidth() <= mWidth;
+        } else {
+            return selectedTab.isVisible() && selectedTab.getDrawX() >= 0
+                    && selectedTab.getDrawX() + selectedTab.getWidth() <= getScrollableWidth();
         }
-
-        return selectedTab.isVisible() && selectedTab.getDrawX() >= 0
-                && selectedTab.getDrawX() + selectedTab.getWidth() <= mWidth;
     }
 
     /**
@@ -2855,13 +2719,8 @@ public class StripLayoutHelper implements StripLayoutTab.StripLayoutTabDelegate 
      * @return the width of the tab strip that is scrollable.
      */
     private float getScrollableWidth() {
-        if (mTabStripImpEnabled) {
-            return mWidth - getCloseBtnVisibilityThreshold(false)
-                    - (LocalizationUtils.isLayoutRtl() ? mRightMargin : mLeftMargin);
-        }
-
-        // TODO(dtrainor): Use real tab widths here?
-        return mWidth - mLeftMargin - mRightMargin;
+        return mWidth - getCloseBtnVisibilityThreshold(false)
+                - (LocalizationUtils.isLayoutRtl() ? mRightMargin : mLeftMargin);
     }
 
     /**
@@ -2873,6 +2732,8 @@ public class StripLayoutHelper implements StripLayoutTab.StripLayoutTabDelegate 
      */
     private float getCloseBtnVisibilityThreshold(boolean start) {
         if (start) {
+            //@TODO(zheliooo) Add unit tests to cover start tab cases for testTabSelected in
+            // StripLayoutHelperTest
             // The start of the tab strip does not have the new tab and model selector button
             // so the threshold is constant.
             return CLOSE_BTN_VISIBILITY_THRESHOLD_START;
@@ -2898,14 +2759,6 @@ public class StripLayoutHelper implements StripLayoutTab.StripLayoutTabDelegate 
     @VisibleForTesting
     public void clickTabMenuItem(int menuItemId) {
         mTabMenu.performItemClick(menuItemId);
-    }
-
-    /**
-     * @return Whether the {@link CascadingStripStacker} is being used.
-     */
-    @VisibleForTesting
-    boolean shouldCascadeTabs() {
-        return mShouldCascadeTabs;
     }
 
     @VisibleForTesting

@@ -13,9 +13,9 @@ import static androidx.test.espresso.matcher.ViewMatchers.withContentDescription
 import static androidx.test.espresso.matcher.ViewMatchers.withId;
 import static androidx.test.espresso.matcher.ViewMatchers.withText;
 
-import android.support.test.InstrumentationRegistry;
 import android.view.View;
 
+import androidx.test.InstrumentationRegistry;
 import androidx.test.filters.SmallTest;
 import androidx.test.uiautomator.UiDevice;
 
@@ -363,7 +363,6 @@ public class ExpandablePaymentHandlerTest {
     @Test
     @SmallTest
     @Feature({"Payments"})
-    @DisabledTest(message = "crbug.com/1131674")
     public void testNavigateBackWithSystemBackButton() throws Throwable {
         startDefaultServer();
 
@@ -399,7 +398,6 @@ public class ExpandablePaymentHandlerTest {
     @SmallTest
     @Feature({"Payments"})
     @ParameterAnnotations.UseMethodParameter(BadCertParams.class)
-    @DisabledTest(message = "https://crbug.com/1288003")
     public void testInsecureConnectionNotShowUi(int badCertificate) throws Throwable {
         startServer(badCertificate);
         PaymentHandlerCoordinator paymentHandler = createPaymentHandlerAndShow(mDefaultIsIncognito);

@@ -680,6 +680,156 @@ be describing additional metrics about the same event.
   </metric>
 </event>
 
+<event name="AdsInterestGroup.AuctionLatency">
+  <owner>orrb@google.com</owner>
+  <owner>chrome-ads-core@google.com</owner>
+  <summary>
+    Captures latency-relevant metrics associated with a single FLEDGE auction.
+    Many of these metrics are latency measurements, aggregated (mean/max) for
+    parts of the auction flow that happen multiple times in an auction, e.g.
+    calls to GenerateBid. Others are potentially latency-impacting measures of
+    the auction, e.g. the number of InterestGroups, buyers, component auctions,
+    bids that were scored either together or separately for the enforced and
+    non-enforced KAnon modes. Finally, some of these metrics look at points in
+    the auction flow where multiple inputs come together to assess which of
+    these inputs most frequently appears on the latency critical path.
+  </summary>
+  <metric name="EndToEndLatencyInMillis">
+    <summary>
+      Time in ms between AdAuctionServiceImpl::RunAdAuction and
+      AdAuctionServiceImpl::OnAuctionComplete. Roughly equivalent to UMA metric,
+      Ads.InterestGroup.Auction.AuctionWithWinnerTime.
+    </summary>
+  </metric>
+  <metric name="KAnonymityBidMode" enum="KAnonymityBidMode">
+    <summary>
+      Indicates the KAnonymityBidMode used for this auction.
+    </summary>
+  </metric>
+  <metric name="LoadInterestGroupPhaseLatencyInMillis">
+    <summary>
+      The latency in milliseconds between the initial call to
+      InterestGroupAuction::StartLoadInterestGroupsPhase (not the recursive
+      calls issued for component auctions in a multi-seller auction), and the
+      call to AuctionRunner::OnLoadInterestGroupsComplete. This is related to
+      UMA metric, Ads.InterestGroup.Auction.LoadGroupsTime, except that, in a
+      multi-seller auction, the UMA metric is recorded once per component
+      auction and then again for the top-level auction, whereas this metric is
+      recorded only once, for the top-level auction. This metric also isn't
+      limited to those cases where there were InterestGroups to load, Since we
+      can independently filter this based on the value of NumInterestGroups.
+    </summary>
+  </metric>
+  <metric name="NumBidderWorklets">
+    <summary>
+      The number of distinct BidderWorklets. Interest groups with the same owner
+      can only share worklets if they have the same bidding script URL and KV
+      server URL. As such, we might observe a non-standard setup in which, for
+      example, a buyer has used a different bidding script URL for each
+      InterestGroup, causing performance issues because of the fragmentation of
+      BidderWorklets. BidderWorklets are shared across component auctions, and
+      this measure counts the number of distinct BidderWorklets used within the
+      scope of the scope of an entire auction, either single- or multi-seller.
+      This may imply that the number of BidderWorklets created in the context of
+      this auction is actually less than this number, because of reuse. However,
+      it also means that this metric can be compared against the
+      NumDistinctOwnersWithInterestGroups metric, which (unlike
+      NumOwnersWithInterestGroups) counts each buyer involved in a multi-seller
+      auction once, even if that buyer participates in multiple components.
+    </summary>
+  </metric>
+  <metric name="NumDistinctOwnersWithInterestGroups">
+    <summary>
+      The number of buyers with InterestGroups participating in an auction,
+      aggregated across all component auctions. This number excludes buyers with
+      no ads or no script URL, and also those filtered because the priority for
+      all InterestGroups calculated in the BuyerHelper constructor was negative.
+      Unlike NumOwnersWithInterestGroups, it only counts each buyer once, even
+      if it appears in multiple component auctions of a multi-seller auction.
+      Also unlike NumOwnersWithInterestGroups, this metric has a value even if
+      there are no bidders eligible to participate in this auction, though, in
+      this case, that value is likely to be zero.
+    </summary>
+  </metric>
+  <metric name="NumInterestGroups">
+    <summary>
+      Total number of InterestGroups aggregated across all owners and component
+      auctions, equivalent to UMA metric,
+      Ads.InterestGroup.Auction.NumInterestGroups. This is the number of
+      InterestGroups loaded, before per-buyer limits are applied. Excluded from
+      this (and all other metrics counting InterestGroups) are InterestGroups
+      that are incapable of participating in an auction, e.g. those with no
+      bidding logic URLs, or with no ads. No value is defined for this metric if
+      there are no bidders eligible to participate in this auction.
+    </summary>
+  </metric>
+  <metric name="NumInterestGroupsWithNoBids">
+    <summary>
+      Number of instances in which the the BidderWorklet doesn't bid, maybe
+      because it failed to load or crashed. Because there's no bid, ScoreAd
+      won't be called for these.
+    </summary>
+  </metric>
+  <metric name="NumInterestGroupsWithOnlyNonKAnonBid">
+    <summary>
+      Number of instances in which the BidderWorklet only generates one bid. If
+      the KAnonymityBidMode is Simulate or Enforce, this means that the
+      InterestGroup's top generated bid didn't satisfy the kAnonymity threshold,
+      and no separate bid could be generated that did satisfy the kAnonymity
+      threshold. If the KAnonymityBidMode is None, this just means that a bid
+      was successfully generated. For each of these, ScoreAd will be called
+      once.
+    </summary>
+  </metric>
+  <metric name="NumInterestGroupsWithSameBidForKAnonAndNonKAnon">
+    <summary>
+      Number of instances in which an InterestGroup's top generated bid did
+      satisfy the kAnonymity threshold, and so no separate bid was needed. For
+      each of these, ScoreAd will be called once. If the KAnonymityBidMode is
+      None, this metric will be 0, because there won't be a separate kAnon bid.
+    </summary>
+  </metric>
+  <metric name="NumInterestGroupsWithSeparateBidsForKAnonAndNonKAnon">
+    <summary>
+      Number of instances in which an InterestGroup's top generated bid didn't
+      satisfy the kAnonymity threshold, and a separate bid was generated that
+      did satisfy the kAnonymity threshold. For each of these, ScoreAd will be
+      called twice, once for each of these bids, which has latency and
+      performance implications. If the KAnonymityBidMode is None, this metric
+      will be 0, because there won't be a separate kAnon bid.
+    </summary>
+  </metric>
+  <metric name="NumOwnersWithInterestGroups">
+    <summary>
+      The number of buyers with InterestGroups participating in an auction,
+      aggregated across all component auctions. Equivalent to UMA metric,
+      Ads.InterestGroup.Auction.NumInterestGroups. This number excludes buyers
+      with no ads or no script URL, and also those filtered because the priority
+      for all InterestGroups calculated in the BuyerHelper constructor was
+      negative. However, it counts a buyer repeatedly for each component auction
+      that buyer participates in. No value is defined for this metric if there
+      are no bidders eligible to participate in this auction.
+    </summary>
+  </metric>
+  <metric name="NumSellersWithBidders">
+    <summary>
+      This is either the number of component auctions in a multi-seller auction
+      (under the assumption that the top-level auction may not itself have any
+      InterestGroups), or 1 for a single-seller auction. Equivalent to UMA
+      metric, Ads.InterestGroup.Auction.NumSellersWithBidders. No value is
+      defined for this metric if there are no bidders eligible to participate in
+      this auction.
+    </summary>
+  </metric>
+  <metric name="Result" enum="AuctionResult">
+    <summary>
+      How the auction concluded, whether that's successfully selecting an ad to
+      be shown, or finding no InterestGroups to load, or getting no bids that
+      outbid the contextual bid, or any other outcome.
+    </summary>
+  </metric>
+</event>
+
 <event name="AdsIntervention.LastIntervention" singular="True">
   <owner>yaoxia@google.com</owner>
   <owner>chrome-ads-core@google.com</owner>
@@ -17400,6 +17550,918 @@ be describing additional metrics about the same event.
   </metric>
 </event>
 
+<event name="PerformanceAPI.LongAnimationFrame.AfterLoad.BlockingFrame">
+  <owner>nrosenthal@chromium.org</owner>
+  <summary>
+    This event is associated with the LongAnimationFrame Web Platform API. The
+    metrics are recorded when a long animation frame is detected and reported to
+    the page. For more details see https://crbug.com/1392685.
+  </summary>
+  <metric name="DidPause" enum="Boolean">
+    <summary>
+      True if there was a pause (sync XHR, dialog) during the long frame.
+    </summary>
+  </metric>
+  <metric name="Duration.DelayDefer">
+    <summary>
+      A positive or negative duration in milliseconds, representing the time
+      between the desired time for rendering the frame and rendering it in
+      practice. Positive means delayed, negative means deferred.
+    </summary>
+    <aggregation>
+      <history>
+        <statistics>
+          <quantiles type="std-percentiles"/>
+        </statistics>
+      </history>
+    </aggregation>
+  </metric>
+  <metric name="Duration.EffectiveBlocking">
+    <summary>
+      The duration in milliseconds, representing the time the LoAF blocked an
+      actual UI event or pending render.
+    </summary>
+    <aggregation>
+      <history>
+        <statistics>
+          <quantiles type="std-percentiles"/>
+        </statistics>
+      </history>
+    </aggregation>
+  </metric>
+  <metric name="Duration.LongScript.JSCompilation">
+    <summary>
+      The total duration of long-script JS compilation, in milliseconds.
+    </summary>
+    <aggregation>
+      <history>
+        <statistics>
+          <quantiles type="std-percentiles"/>
+        </statistics>
+      </history>
+    </aggregation>
+  </metric>
+  <metric name="Duration.LongScript.JSExecution">
+    <summary>
+      The total duration of long-script JS execution, not including compilation,
+      in milliseconds.
+    </summary>
+    <aggregation>
+      <history>
+        <statistics>
+          <quantiles type="std-percentiles"/>
+        </statistics>
+      </history>
+    </aggregation>
+  </metric>
+  <metric name="Duration.LongScript.JSExecution.EventListeners">
+    <summary>
+      The total duration spent in event listeners (e.g. onclick).
+    </summary>
+    <aggregation>
+      <history>
+        <statistics>
+          <quantiles type="std-percentiles"/>
+        </statistics>
+      </history>
+    </aggregation>
+  </metric>
+  <metric name="Duration.LongScript.JSExecution.PromiseHandlers">
+    <summary>
+      The total duration spent in promise resolve/reject tasks.
+    </summary>
+    <aggregation>
+      <history>
+        <statistics>
+          <quantiles type="std-percentiles"/>
+        </statistics>
+      </history>
+    </aggregation>
+  </metric>
+  <metric name="Duration.LongScript.JSExecution.ScriptBlocks">
+    <summary>
+      The total duration spent in script blocks (script element, import)
+    </summary>
+    <aggregation>
+      <history>
+        <statistics>
+          <quantiles type="std-percentiles"/>
+        </statistics>
+      </history>
+    </aggregation>
+  </metric>
+  <metric name="Duration.LongScript.JSExecution.UserCallbacks">
+    <summary>
+      The total duration spent in user callbacks (e.g. requestAnimationFrame).
+    </summary>
+    <aggregation>
+      <history>
+        <statistics>
+          <quantiles type="std-percentiles"/>
+        </statistics>
+      </history>
+    </aggregation>
+  </metric>
+  <metric name="Duration.StyleAndLayout.Forced">
+    <summary>
+      The total duration of forced style and layout in long scripts.
+    </summary>
+    <aggregation>
+      <history>
+        <statistics>
+          <quantiles type="std-percentiles"/>
+        </statistics>
+      </history>
+    </aggregation>
+  </metric>
+  <metric name="Duration.StyleAndLayout.RenderPhase">
+    <summary>
+      The total duration of the style and layout lifecycle phase, not including
+      forced style and layout.
+    </summary>
+    <aggregation>
+      <history>
+        <statistics>
+          <quantiles type="std-percentiles"/>
+        </statistics>
+      </history>
+    </aggregation>
+  </metric>
+  <metric name="Duration.Total">
+    <summary>
+      The duration of the long animation frame in milliseconds. Mirrors the
+      value reported in PerformanceEntry.duration.
+    </summary>
+    <aggregation>
+      <history>
+        <statistics>
+          <quantiles type="std-percentiles"/>
+        </statistics>
+      </history>
+    </aggregation>
+  </metric>
+</event>
+
+<event name="PerformanceAPI.LongAnimationFrame.AfterLoad.BlockingInput">
+  <owner>nrosenthal@chromium.org</owner>
+  <summary>
+    This event is associated with the LongAnimationFrame Web Platform API. The
+    metrics are recorded when a long animation frame is detected and reported to
+    the page. For more details see https://crbug.com/1392685.
+  </summary>
+  <metric name="DidPause" enum="Boolean">
+    <summary>
+      True if there was a pause (sync XHR, dialog) during the long frame.
+    </summary>
+  </metric>
+  <metric name="Duration.DelayDefer">
+    <summary>
+      A positive or negative duration in milliseconds, representing the time
+      between the desired time for rendering the frame and rendering it in
+      practice. Positive means delayed, negative means deferred.
+    </summary>
+    <aggregation>
+      <history>
+        <statistics>
+          <quantiles type="std-percentiles"/>
+        </statistics>
+      </history>
+    </aggregation>
+  </metric>
+  <metric name="Duration.EffectiveBlocking">
+    <summary>
+      The duration in milliseconds, representing the time the LoAF blocked an
+      actual UI event or pending render.
+    </summary>
+    <aggregation>
+      <history>
+        <statistics>
+          <quantiles type="std-percentiles"/>
+        </statistics>
+      </history>
+    </aggregation>
+  </metric>
+  <metric name="Duration.LongScript.JSCompilation">
+    <summary>
+      The total duration of long-script JS compilation, in milliseconds.
+    </summary>
+    <aggregation>
+      <history>
+        <statistics>
+          <quantiles type="std-percentiles"/>
+        </statistics>
+      </history>
+    </aggregation>
+  </metric>
+  <metric name="Duration.LongScript.JSExecution">
+    <summary>
+      The total duration of long-script JS execution, not including compilation,
+      in milliseconds.
+    </summary>
+    <aggregation>
+      <history>
+        <statistics>
+          <quantiles type="std-percentiles"/>
+        </statistics>
+      </history>
+    </aggregation>
+  </metric>
+  <metric name="Duration.LongScript.JSExecution.EventListeners">
+    <summary>
+      The total duration spent in event listeners (e.g. onclick).
+    </summary>
+    <aggregation>
+      <history>
+        <statistics>
+          <quantiles type="std-percentiles"/>
+        </statistics>
+      </history>
+    </aggregation>
+  </metric>
+  <metric name="Duration.LongScript.JSExecution.PromiseHandlers">
+    <summary>
+      The total duration spent in promise resolve/reject tasks.
+    </summary>
+    <aggregation>
+      <history>
+        <statistics>
+          <quantiles type="std-percentiles"/>
+        </statistics>
+      </history>
+    </aggregation>
+  </metric>
+  <metric name="Duration.LongScript.JSExecution.ScriptBlocks">
+    <summary>
+      The total duration spent in script blocks (script element, import)
+    </summary>
+    <aggregation>
+      <history>
+        <statistics>
+          <quantiles type="std-percentiles"/>
+        </statistics>
+      </history>
+    </aggregation>
+  </metric>
+  <metric name="Duration.LongScript.JSExecution.UserCallbacks">
+    <summary>
+      The total duration spent in user callbacks (e.g. requestAnimationFrame).
+    </summary>
+    <aggregation>
+      <history>
+        <statistics>
+          <quantiles type="std-percentiles"/>
+        </statistics>
+      </history>
+    </aggregation>
+  </metric>
+  <metric name="Duration.StyleAndLayout.Forced">
+    <summary>
+      The total duration of forced style and layout in long scripts.
+    </summary>
+    <aggregation>
+      <history>
+        <statistics>
+          <quantiles type="std-percentiles"/>
+        </statistics>
+      </history>
+    </aggregation>
+  </metric>
+  <metric name="Duration.StyleAndLayout.RenderPhase">
+    <summary>
+      The total duration of the style and layout lifecycle phase, not including
+      forced style and layout.
+    </summary>
+    <aggregation>
+      <history>
+        <statistics>
+          <quantiles type="std-percentiles"/>
+        </statistics>
+      </history>
+    </aggregation>
+  </metric>
+  <metric name="Duration.Total">
+    <summary>
+      The duration of the long animation frame in milliseconds. Mirrors the
+      value reported in PerformanceEntry.duration.
+    </summary>
+    <aggregation>
+      <history>
+        <statistics>
+          <quantiles type="std-percentiles"/>
+        </statistics>
+      </history>
+    </aggregation>
+  </metric>
+</event>
+
+<event name="PerformanceAPI.LongAnimationFrame.AfterLoad.NonBlocking">
+  <owner>nrosenthal@chromium.org</owner>
+  <summary>
+    This event is associated with the LongAnimationFrame Web Platform API. The
+    metrics are recorded when a long animation frame is detected and reported to
+    the page. For more details see https://crbug.com/1392685.
+  </summary>
+  <metric name="DidPause" enum="Boolean">
+    <summary>
+      True if there was a pause (sync XHR, dialog) during the long frame.
+    </summary>
+  </metric>
+  <metric name="Duration.DelayDefer">
+    <summary>
+      A positive or negative duration in milliseconds, representing the time
+      between the desired time for rendering the frame and rendering it in
+      practice. Positive means delayed, negative means deferred.
+    </summary>
+    <aggregation>
+      <history>
+        <statistics>
+          <quantiles type="std-percentiles"/>
+        </statistics>
+      </history>
+    </aggregation>
+  </metric>
+  <metric name="Duration.EffectiveBlocking">
+    <summary>
+      The duration in milliseconds, representing the time the LoAF blocked an
+      actual UI event or pending render.
+    </summary>
+    <aggregation>
+      <history>
+        <statistics>
+          <quantiles type="std-percentiles"/>
+        </statistics>
+      </history>
+    </aggregation>
+  </metric>
+  <metric name="Duration.LongScript.JSCompilation">
+    <summary>
+      The total duration of long-script JS compilation, in milliseconds.
+    </summary>
+    <aggregation>
+      <history>
+        <statistics>
+          <quantiles type="std-percentiles"/>
+        </statistics>
+      </history>
+    </aggregation>
+  </metric>
+  <metric name="Duration.LongScript.JSExecution">
+    <summary>
+      The total duration of long-script JS execution, not including compilation,
+      in milliseconds.
+    </summary>
+    <aggregation>
+      <history>
+        <statistics>
+          <quantiles type="std-percentiles"/>
+        </statistics>
+      </history>
+    </aggregation>
+  </metric>
+  <metric name="Duration.LongScript.JSExecution.EventListeners">
+    <summary>
+      The total duration spent in event listeners (e.g. onclick).
+    </summary>
+    <aggregation>
+      <history>
+        <statistics>
+          <quantiles type="std-percentiles"/>
+        </statistics>
+      </history>
+    </aggregation>
+  </metric>
+  <metric name="Duration.LongScript.JSExecution.PromiseHandlers">
+    <summary>
+      The total duration spent in promise resolve/reject tasks.
+    </summary>
+    <aggregation>
+      <history>
+        <statistics>
+          <quantiles type="std-percentiles"/>
+        </statistics>
+      </history>
+    </aggregation>
+  </metric>
+  <metric name="Duration.LongScript.JSExecution.ScriptBlocks">
+    <summary>
+      The total duration spent in script blocks (script element, import)
+    </summary>
+    <aggregation>
+      <history>
+        <statistics>
+          <quantiles type="std-percentiles"/>
+        </statistics>
+      </history>
+    </aggregation>
+  </metric>
+  <metric name="Duration.LongScript.JSExecution.UserCallbacks">
+    <summary>
+      The total duration spent in user callbacks (e.g. requestAnimationFrame).
+    </summary>
+    <aggregation>
+      <history>
+        <statistics>
+          <quantiles type="std-percentiles"/>
+        </statistics>
+      </history>
+    </aggregation>
+  </metric>
+  <metric name="Duration.StyleAndLayout.Forced">
+    <summary>
+      The total duration of forced style and layout in long scripts.
+    </summary>
+    <aggregation>
+      <history>
+        <statistics>
+          <quantiles type="std-percentiles"/>
+        </statistics>
+      </history>
+    </aggregation>
+  </metric>
+  <metric name="Duration.StyleAndLayout.RenderPhase">
+    <summary>
+      The total duration of the style and layout lifecycle phase, not including
+      forced style and layout.
+    </summary>
+    <aggregation>
+      <history>
+        <statistics>
+          <quantiles type="std-percentiles"/>
+        </statistics>
+      </history>
+    </aggregation>
+  </metric>
+  <metric name="Duration.Total">
+    <summary>
+      The duration of the long animation frame in milliseconds. Mirrors the
+      value reported in PerformanceEntry.duration.
+    </summary>
+    <aggregation>
+      <history>
+        <statistics>
+          <quantiles type="std-percentiles"/>
+        </statistics>
+      </history>
+    </aggregation>
+  </metric>
+</event>
+
+<event name="PerformanceAPI.LongAnimationFrame.BeforeLoad.BlockingFrame">
+  <owner>nrosenthal@chromium.org</owner>
+  <summary>
+    This event is associated with the LongAnimationFrame Web Platform API. The
+    metrics are recorded when a long animation frame is detected and reported to
+    the page. For more details see https://crbug.com/1392685.
+  </summary>
+  <metric name="DidPause" enum="Boolean">
+    <summary>
+      True if there was a pause (sync XHR, dialog) during the long frame.
+    </summary>
+  </metric>
+  <metric name="Duration.DelayDefer">
+    <summary>
+      A positive or negative duration in milliseconds, representing the time
+      between the desired time for rendering the frame and rendering it in
+      practice. Positive means delayed, negative means deferred.
+    </summary>
+    <aggregation>
+      <history>
+        <statistics>
+          <quantiles type="std-percentiles"/>
+        </statistics>
+      </history>
+    </aggregation>
+  </metric>
+  <metric name="Duration.EffectiveBlocking">
+    <summary>
+      The duration in milliseconds, representing the time the LoAF blocked an
+      actual UI event or pending render.
+    </summary>
+    <aggregation>
+      <history>
+        <statistics>
+          <quantiles type="std-percentiles"/>
+        </statistics>
+      </history>
+    </aggregation>
+  </metric>
+  <metric name="Duration.LongScript.JSCompilation">
+    <summary>
+      The total duration of long-script JS compilation, in milliseconds.
+    </summary>
+    <aggregation>
+      <history>
+        <statistics>
+          <quantiles type="std-percentiles"/>
+        </statistics>
+      </history>
+    </aggregation>
+  </metric>
+  <metric name="Duration.LongScript.JSExecution">
+    <summary>
+      The total duration of long-script JS execution, not including compilation,
+      in milliseconds.
+    </summary>
+    <aggregation>
+      <history>
+        <statistics>
+          <quantiles type="std-percentiles"/>
+        </statistics>
+      </history>
+    </aggregation>
+  </metric>
+  <metric name="Duration.LongScript.JSExecution.EventListeners">
+    <summary>
+      The total duration spent in event listeners (e.g. onclick).
+    </summary>
+    <aggregation>
+      <history>
+        <statistics>
+          <quantiles type="std-percentiles"/>
+        </statistics>
+      </history>
+    </aggregation>
+  </metric>
+  <metric name="Duration.LongScript.JSExecution.PromiseHandlers">
+    <summary>
+      The total duration spent in promise resolve/reject tasks.
+    </summary>
+    <aggregation>
+      <history>
+        <statistics>
+          <quantiles type="std-percentiles"/>
+        </statistics>
+      </history>
+    </aggregation>
+  </metric>
+  <metric name="Duration.LongScript.JSExecution.ScriptBlocks">
+    <summary>
+      The total duration spent in script blocks (script element, import)
+    </summary>
+    <aggregation>
+      <history>
+        <statistics>
+          <quantiles type="std-percentiles"/>
+        </statistics>
+      </history>
+    </aggregation>
+  </metric>
+  <metric name="Duration.LongScript.JSExecution.UserCallbacks">
+    <summary>
+      The total duration spent in user callbacks (e.g. requestAnimationFrame).
+    </summary>
+    <aggregation>
+      <history>
+        <statistics>
+          <quantiles type="std-percentiles"/>
+        </statistics>
+      </history>
+    </aggregation>
+  </metric>
+  <metric name="Duration.StyleAndLayout.Forced">
+    <summary>
+      The total duration of forced style and layout in long scripts.
+    </summary>
+    <aggregation>
+      <history>
+        <statistics>
+          <quantiles type="std-percentiles"/>
+        </statistics>
+      </history>
+    </aggregation>
+  </metric>
+  <metric name="Duration.StyleAndLayout.RenderPhase">
+    <summary>
+      The total duration of the style and layout lifecycle phase, not including
+      forced style and layout.
+    </summary>
+    <aggregation>
+      <history>
+        <statistics>
+          <quantiles type="std-percentiles"/>
+        </statistics>
+      </history>
+    </aggregation>
+  </metric>
+  <metric name="Duration.Total">
+    <summary>
+      The duration of the long animation frame in milliseconds. Mirrors the
+      value reported in PerformanceEntry.duration.
+    </summary>
+    <aggregation>
+      <history>
+        <statistics>
+          <quantiles type="std-percentiles"/>
+        </statistics>
+      </history>
+    </aggregation>
+  </metric>
+</event>
+
+<event name="PerformanceAPI.LongAnimationFrame.BeforeLoad.BlockingInput">
+  <owner>nrosenthal@chromium.org</owner>
+  <summary>
+    This event is associated with the LongAnimationFrame Web Platform API. The
+    metrics are recorded when a long animation frame is detected and reported to
+    the page. For more details see https://crbug.com/1392685.
+  </summary>
+  <metric name="DidPause" enum="Boolean">
+    <summary>
+      True if there was a pause (sync XHR, dialog) during the long frame.
+    </summary>
+  </metric>
+  <metric name="Duration.DelayDefer">
+    <summary>
+      A positive or negative duration in milliseconds, representing the time
+      between the desired time for rendering the frame and rendering it in
+      practice. Positive means delayed, negative means deferred.
+    </summary>
+    <aggregation>
+      <history>
+        <statistics>
+          <quantiles type="std-percentiles"/>
+        </statistics>
+      </history>
+    </aggregation>
+  </metric>
+  <metric name="Duration.EffectiveBlocking">
+    <summary>
+      The duration in milliseconds, representing the time the LoAF blocked an
+      actual UI event or pending render.
+    </summary>
+    <aggregation>
+      <history>
+        <statistics>
+          <quantiles type="std-percentiles"/>
+        </statistics>
+      </history>
+    </aggregation>
+  </metric>
+  <metric name="Duration.LongScript.JSCompilation">
+    <summary>
+      The total duration of long-script JS compilation, in milliseconds.
+    </summary>
+    <aggregation>
+      <history>
+        <statistics>
+          <quantiles type="std-percentiles"/>
+        </statistics>
+      </history>
+    </aggregation>
+  </metric>
+  <metric name="Duration.LongScript.JSExecution">
+    <summary>
+      The total duration of long-script JS execution, not including compilation,
+      in milliseconds.
+    </summary>
+    <aggregation>
+      <history>
+        <statistics>
+          <quantiles type="std-percentiles"/>
+        </statistics>
+      </history>
+    </aggregation>
+  </metric>
+  <metric name="Duration.LongScript.JSExecution.EventListeners">
+    <summary>
+      The total duration spent in event listeners (e.g. onclick).
+    </summary>
+    <aggregation>
+      <history>
+        <statistics>
+          <quantiles type="std-percentiles"/>
+        </statistics>
+      </history>
+    </aggregation>
+  </metric>
+  <metric name="Duration.LongScript.JSExecution.PromiseHandlers">
+    <summary>
+      The total duration spent in promise resolve/reject tasks.
+    </summary>
+    <aggregation>
+      <history>
+        <statistics>
+          <quantiles type="std-percentiles"/>
+        </statistics>
+      </history>
+    </aggregation>
+  </metric>
+  <metric name="Duration.LongScript.JSExecution.ScriptBlocks">
+    <summary>
+      The total duration spent in script blocks (script element, import)
+    </summary>
+    <aggregation>
+      <history>
+        <statistics>
+          <quantiles type="std-percentiles"/>
+        </statistics>
+      </history>
+    </aggregation>
+  </metric>
+  <metric name="Duration.LongScript.JSExecution.UserCallbacks">
+    <summary>
+      The total duration spent in user callbacks (e.g. requestAnimationFrame).
+    </summary>
+    <aggregation>
+      <history>
+        <statistics>
+          <quantiles type="std-percentiles"/>
+        </statistics>
+      </history>
+    </aggregation>
+  </metric>
+  <metric name="Duration.StyleAndLayout.Forced">
+    <summary>
+      The total duration of forced style and layout in long scripts.
+    </summary>
+    <aggregation>
+      <history>
+        <statistics>
+          <quantiles type="std-percentiles"/>
+        </statistics>
+      </history>
+    </aggregation>
+  </metric>
+  <metric name="Duration.StyleAndLayout.RenderPhase">
+    <summary>
+      The total duration of the style and layout lifecycle phase, not including
+      forced style and layout.
+    </summary>
+    <aggregation>
+      <history>
+        <statistics>
+          <quantiles type="std-percentiles"/>
+        </statistics>
+      </history>
+    </aggregation>
+  </metric>
+  <metric name="Duration.Total">
+    <summary>
+      The duration of the long animation frame in milliseconds. Mirrors the
+      value reported in PerformanceEntry.duration.
+    </summary>
+    <aggregation>
+      <history>
+        <statistics>
+          <quantiles type="std-percentiles"/>
+        </statistics>
+      </history>
+    </aggregation>
+  </metric>
+</event>
+
+<event name="PerformanceAPI.LongAnimationFrame.BeforeLoad.NonBlocking">
+  <owner>nrosenthal@chromium.org</owner>
+  <summary>
+    This event is associated with the LongAnimationFrame Web Platform API. The
+    metrics are recorded when a long animation frame is detected and reported to
+    the page. For more details see https://crbug.com/1392685.
+  </summary>
+  <metric name="DidPause" enum="Boolean">
+    <summary>
+      True if there was a pause (sync XHR, dialog) during the long frame.
+    </summary>
+  </metric>
+  <metric name="Duration.DelayDefer">
+    <summary>
+      A positive or negative duration in milliseconds, representing the time
+      between the desired time for rendering the frame and rendering it in
+      practice. Positive means delayed, negative means deferred.
+    </summary>
+    <aggregation>
+      <history>
+        <statistics>
+          <quantiles type="std-percentiles"/>
+        </statistics>
+      </history>
+    </aggregation>
+  </metric>
+  <metric name="Duration.EffectiveBlocking">
+    <summary>
+      The duration in milliseconds, representing the time the LoAF blocked an
+      actual UI event or pending render.
+    </summary>
+    <aggregation>
+      <history>
+        <statistics>
+          <quantiles type="std-percentiles"/>
+        </statistics>
+      </history>
+    </aggregation>
+  </metric>
+  <metric name="Duration.LongScript.JSCompilation">
+    <summary>
+      The total duration of long-script JS compilation, in milliseconds.
+    </summary>
+    <aggregation>
+      <history>
+        <statistics>
+          <quantiles type="std-percentiles"/>
+        </statistics>
+      </history>
+    </aggregation>
+  </metric>
+  <metric name="Duration.LongScript.JSExecution">
+    <summary>
+      The total duration of long-script JS execution, not including compilation,
+      in milliseconds.
+    </summary>
+    <aggregation>
+      <history>
+        <statistics>
+          <quantiles type="std-percentiles"/>
+        </statistics>
+      </history>
+    </aggregation>
+  </metric>
+  <metric name="Duration.LongScript.JSExecution.EventListeners">
+    <summary>
+      The total duration spent in event listeners (e.g. onclick).
+    </summary>
+    <aggregation>
+      <history>
+        <statistics>
+          <quantiles type="std-percentiles"/>
+        </statistics>
+      </history>
+    </aggregation>
+  </metric>
+  <metric name="Duration.LongScript.JSExecution.PromiseHandlers">
+    <summary>
+      The total duration spent in promise resolve/reject tasks.
+    </summary>
+    <aggregation>
+      <history>
+        <statistics>
+          <quantiles type="std-percentiles"/>
+        </statistics>
+      </history>
+    </aggregation>
+  </metric>
+  <metric name="Duration.LongScript.JSExecution.ScriptBlocks">
+    <summary>
+      The total duration spent in script blocks (script element, import)
+    </summary>
+    <aggregation>
+      <history>
+        <statistics>
+          <quantiles type="std-percentiles"/>
+        </statistics>
+      </history>
+    </aggregation>
+  </metric>
+  <metric name="Duration.LongScript.JSExecution.UserCallbacks">
+    <summary>
+      The total duration spent in user callbacks (e.g. requestAnimationFrame).
+    </summary>
+    <aggregation>
+      <history>
+        <statistics>
+          <quantiles type="std-percentiles"/>
+        </statistics>
+      </history>
+    </aggregation>
+  </metric>
+  <metric name="Duration.StyleAndLayout.Forced">
+    <summary>
+      The total duration of forced style and layout in long scripts.
+    </summary>
+    <aggregation>
+      <history>
+        <statistics>
+          <quantiles type="std-percentiles"/>
+        </statistics>
+      </history>
+    </aggregation>
+  </metric>
+  <metric name="Duration.StyleAndLayout.RenderPhase">
+    <summary>
+      The total duration of the style and layout lifecycle phase, not including
+      forced style and layout.
+    </summary>
+    <aggregation>
+      <history>
+        <statistics>
+          <quantiles type="std-percentiles"/>
+        </statistics>
+      </history>
+    </aggregation>
+  </metric>
+  <metric name="Duration.Total">
+    <summary>
+      The duration of the long animation frame in milliseconds. Mirrors the
+      value reported in PerformanceEntry.duration.
+    </summary>
+    <aggregation>
+      <history>
+        <statistics>
+          <quantiles type="std-percentiles"/>
+        </statistics>
+      </history>
+    </aggregation>
+  </metric>
+</event>
+
 <event name="PerformanceAPI.LongTask">
   <owner>hpayer@chromium.org</owner>
   <owner>mlippautz@chromium.org</owner>
@@ -19001,7 +20063,6 @@ be describing additional metrics about the same event.
 <event name="PrerenderPageLoad" singular="True">
   <owner>ksakamoto@chromium.org</owner>
   <owner>nhiroki@chromium.org</owner>
-  <owner>asamidoi@chromium.org</owner>
   <summary>
     Metrics related to Prerender2
     (https://docs.google.com/document/d/1P2VKCLpmnNm_cRAjUeE-bqLL0bslL_zKqiNeCzNom_w/edit?usp=sharing).
@@ -19095,6 +20156,9 @@ be describing additional metrics about the same event.
     </summary>
   </metric>
   <metric name="PageEndReason" enum="PageEndReason">
+    <obsolete>
+      Removed March 2023.
+    </obsolete>
     <summary>
       The |page_load_metrics::PageEndReason| for the prerender's activation.
     </summary>
@@ -22326,10 +23390,11 @@ be describing additional metrics about the same event.
   </metric>
   <metric name="InitialSourceLanguageInContentLanguages" enum="Boolean">
     <summary>
-      Signals whether the initial source language is in the list of the user's
-      content languages. The user's content languages loosely match with the
-      languages the user has translated to before or has blocked for
-      translation.
+      Whether or not the initial source language is in the user's never
+      translate language list. By default the UI language, languages the user
+      has translated to, and languages added to the content languages are on the
+      never tranlsate list. However, users can add or remove languages manually
+      as well.
     </summary>
   </metric>
   <metric name="InitialState" enum="TranslateState">
@@ -22900,6 +23965,9 @@ be describing additional metrics about the same event.
 </event>
 
 <event name="UserSettingsEvent">
+  <obsolete>
+    Removed 3/2023
+  </obsolete>
   <owner>wrong@chromium.org</owner>
   <owner>jiameng@chromium.org</owner>
   <summary>
@@ -23412,12 +24480,12 @@ be describing additional metrics about the same event.
   </metric>
 </event>
 
-<event name="V8CompileHints.Version1">
+<event name="V8CompileHints.Version3">
   <owner>marja@chromium.org</owner>
   <owner>v8-loading@google.com</owner>
   <summary>
     Data about which JavaScript functions are compiled. The collected data is
-    obfuscated to not reveal script URLs. The total data, 2048 B, is split into
+    obfuscated to not reveal script URLs. The total data, 8 kB, is split into
     separate int64s.
   </summary>
   <metric name="Data000"/>
@@ -23676,6 +24744,262 @@ be describing additional metrics about the same event.
   <metric name="Data253"/>
   <metric name="Data254"/>
   <metric name="Data255"/>
+  <metric name="Data256"/>
+  <metric name="Data257"/>
+  <metric name="Data258"/>
+  <metric name="Data259"/>
+  <metric name="Data260"/>
+  <metric name="Data261"/>
+  <metric name="Data262"/>
+  <metric name="Data263"/>
+  <metric name="Data264"/>
+  <metric name="Data265"/>
+  <metric name="Data266"/>
+  <metric name="Data267"/>
+  <metric name="Data268"/>
+  <metric name="Data269"/>
+  <metric name="Data270"/>
+  <metric name="Data271"/>
+  <metric name="Data272"/>
+  <metric name="Data273"/>
+  <metric name="Data274"/>
+  <metric name="Data275"/>
+  <metric name="Data276"/>
+  <metric name="Data277"/>
+  <metric name="Data278"/>
+  <metric name="Data279"/>
+  <metric name="Data280"/>
+  <metric name="Data281"/>
+  <metric name="Data282"/>
+  <metric name="Data283"/>
+  <metric name="Data284"/>
+  <metric name="Data285"/>
+  <metric name="Data286"/>
+  <metric name="Data287"/>
+  <metric name="Data288"/>
+  <metric name="Data289"/>
+  <metric name="Data290"/>
+  <metric name="Data291"/>
+  <metric name="Data292"/>
+  <metric name="Data293"/>
+  <metric name="Data294"/>
+  <metric name="Data295"/>
+  <metric name="Data296"/>
+  <metric name="Data297"/>
+  <metric name="Data298"/>
+  <metric name="Data299"/>
+  <metric name="Data300"/>
+  <metric name="Data301"/>
+  <metric name="Data302"/>
+  <metric name="Data303"/>
+  <metric name="Data304"/>
+  <metric name="Data305"/>
+  <metric name="Data306"/>
+  <metric name="Data307"/>
+  <metric name="Data308"/>
+  <metric name="Data309"/>
+  <metric name="Data310"/>
+  <metric name="Data311"/>
+  <metric name="Data312"/>
+  <metric name="Data313"/>
+  <metric name="Data314"/>
+  <metric name="Data315"/>
+  <metric name="Data316"/>
+  <metric name="Data317"/>
+  <metric name="Data318"/>
+  <metric name="Data319"/>
+  <metric name="Data320"/>
+  <metric name="Data321"/>
+  <metric name="Data322"/>
+  <metric name="Data323"/>
+  <metric name="Data324"/>
+  <metric name="Data325"/>
+  <metric name="Data326"/>
+  <metric name="Data327"/>
+  <metric name="Data328"/>
+  <metric name="Data329"/>
+  <metric name="Data330"/>
+  <metric name="Data331"/>
+  <metric name="Data332"/>
+  <metric name="Data333"/>
+  <metric name="Data334"/>
+  <metric name="Data335"/>
+  <metric name="Data336"/>
+  <metric name="Data337"/>
+  <metric name="Data338"/>
+  <metric name="Data339"/>
+  <metric name="Data340"/>
+  <metric name="Data341"/>
+  <metric name="Data342"/>
+  <metric name="Data343"/>
+  <metric name="Data344"/>
+  <metric name="Data345"/>
+  <metric name="Data346"/>
+  <metric name="Data347"/>
+  <metric name="Data348"/>
+  <metric name="Data349"/>
+  <metric name="Data350"/>
+  <metric name="Data351"/>
+  <metric name="Data352"/>
+  <metric name="Data353"/>
+  <metric name="Data354"/>
+  <metric name="Data355"/>
+  <metric name="Data356"/>
+  <metric name="Data357"/>
+  <metric name="Data358"/>
+  <metric name="Data359"/>
+  <metric name="Data360"/>
+  <metric name="Data361"/>
+  <metric name="Data362"/>
+  <metric name="Data363"/>
+  <metric name="Data364"/>
+  <metric name="Data365"/>
+  <metric name="Data366"/>
+  <metric name="Data367"/>
+  <metric name="Data368"/>
+  <metric name="Data369"/>
+  <metric name="Data370"/>
+  <metric name="Data371"/>
+  <metric name="Data372"/>
+  <metric name="Data373"/>
+  <metric name="Data374"/>
+  <metric name="Data375"/>
+  <metric name="Data376"/>
+  <metric name="Data377"/>
+  <metric name="Data378"/>
+  <metric name="Data379"/>
+  <metric name="Data380"/>
+  <metric name="Data381"/>
+  <metric name="Data382"/>
+  <metric name="Data383"/>
+  <metric name="Data384"/>
+  <metric name="Data385"/>
+  <metric name="Data386"/>
+  <metric name="Data387"/>
+  <metric name="Data388"/>
+  <metric name="Data389"/>
+  <metric name="Data390"/>
+  <metric name="Data391"/>
+  <metric name="Data392"/>
+  <metric name="Data393"/>
+  <metric name="Data394"/>
+  <metric name="Data395"/>
+  <metric name="Data396"/>
+  <metric name="Data397"/>
+  <metric name="Data398"/>
+  <metric name="Data399"/>
+  <metric name="Data400"/>
+  <metric name="Data401"/>
+  <metric name="Data402"/>
+  <metric name="Data403"/>
+  <metric name="Data404"/>
+  <metric name="Data405"/>
+  <metric name="Data406"/>
+  <metric name="Data407"/>
+  <metric name="Data408"/>
+  <metric name="Data409"/>
+  <metric name="Data410"/>
+  <metric name="Data411"/>
+  <metric name="Data412"/>
+  <metric name="Data413"/>
+  <metric name="Data414"/>
+  <metric name="Data415"/>
+  <metric name="Data416"/>
+  <metric name="Data417"/>
+  <metric name="Data418"/>
+  <metric name="Data419"/>
+  <metric name="Data420"/>
+  <metric name="Data421"/>
+  <metric name="Data422"/>
+  <metric name="Data423"/>
+  <metric name="Data424"/>
+  <metric name="Data425"/>
+  <metric name="Data426"/>
+  <metric name="Data427"/>
+  <metric name="Data428"/>
+  <metric name="Data429"/>
+  <metric name="Data430"/>
+  <metric name="Data431"/>
+  <metric name="Data432"/>
+  <metric name="Data433"/>
+  <metric name="Data434"/>
+  <metric name="Data435"/>
+  <metric name="Data436"/>
+  <metric name="Data437"/>
+  <metric name="Data438"/>
+  <metric name="Data439"/>
+  <metric name="Data440"/>
+  <metric name="Data441"/>
+  <metric name="Data442"/>
+  <metric name="Data443"/>
+  <metric name="Data444"/>
+  <metric name="Data445"/>
+  <metric name="Data446"/>
+  <metric name="Data447"/>
+  <metric name="Data448"/>
+  <metric name="Data449"/>
+  <metric name="Data450"/>
+  <metric name="Data451"/>
+  <metric name="Data452"/>
+  <metric name="Data453"/>
+  <metric name="Data454"/>
+  <metric name="Data455"/>
+  <metric name="Data456"/>
+  <metric name="Data457"/>
+  <metric name="Data458"/>
+  <metric name="Data459"/>
+  <metric name="Data460"/>
+  <metric name="Data461"/>
+  <metric name="Data462"/>
+  <metric name="Data463"/>
+  <metric name="Data464"/>
+  <metric name="Data465"/>
+  <metric name="Data466"/>
+  <metric name="Data467"/>
+  <metric name="Data468"/>
+  <metric name="Data469"/>
+  <metric name="Data470"/>
+  <metric name="Data471"/>
+  <metric name="Data472"/>
+  <metric name="Data473"/>
+  <metric name="Data474"/>
+  <metric name="Data475"/>
+  <metric name="Data476"/>
+  <metric name="Data477"/>
+  <metric name="Data478"/>
+  <metric name="Data479"/>
+  <metric name="Data480"/>
+  <metric name="Data481"/>
+  <metric name="Data482"/>
+  <metric name="Data483"/>
+  <metric name="Data484"/>
+  <metric name="Data485"/>
+  <metric name="Data486"/>
+  <metric name="Data487"/>
+  <metric name="Data488"/>
+  <metric name="Data489"/>
+  <metric name="Data490"/>
+  <metric name="Data491"/>
+  <metric name="Data492"/>
+  <metric name="Data493"/>
+  <metric name="Data494"/>
+  <metric name="Data495"/>
+  <metric name="Data496"/>
+  <metric name="Data497"/>
+  <metric name="Data498"/>
+  <metric name="Data499"/>
+  <metric name="Data500"/>
+  <metric name="Data501"/>
+  <metric name="Data502"/>
+  <metric name="Data503"/>
+  <metric name="Data504"/>
+  <metric name="Data505"/>
+  <metric name="Data506"/>
+  <metric name="Data507"/>
+  <metric name="Data508"/>
+  <metric name="Data509"/>
+  <metric name="Data510"/>
+  <metric name="Data511"/>
 </event>
 
 <event name="VirtualKeyboard.Open">

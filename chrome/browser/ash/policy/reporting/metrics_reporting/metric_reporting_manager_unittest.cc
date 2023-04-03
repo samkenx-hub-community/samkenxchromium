@@ -20,6 +20,7 @@
 #include "chrome/browser/ash/settings/stub_cros_settings_provider.h"
 #include "chrome/browser/chromeos/reporting/metric_default_utils.h"
 #include "chrome/browser/profiles/profile.h"
+#include "chrome/test/base/testing_profile.h"
 #include "chromeos/ash/components/settings/cros_settings_names.h"
 #include "components/reporting/client/report_queue_configuration.h"
 #include "components/reporting/metrics/collector_base.h"
@@ -33,6 +34,7 @@
 #include "components/reporting/metrics/sampler.h"
 #include "components/reporting/proto/synced/metric_data.pb.h"
 #include "components/reporting/proto/synced/record_constants.pb.h"
+#include "content/public/test/browser_task_environment.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
@@ -229,6 +231,9 @@ const MetricReportingSettingData displays_telemetry_settings = {
     1};
 const MetricReportingSettingData app_event_settings = {
     ::ash::kReportDeviceAppInfo, false, "", 1};
+const MetricReportingSettingData app_telemetry_settings = {
+    ::ash::kReportDeviceAppInfo, false,
+    ::ash::kDeviceActivityHeartbeatCollectionRateMs, 1};
 const MetricReportingSettingData device_activity_telemetry_settings = {
     ::ash::kDeviceActivityHeartbeatEnabled, false,
     ::ash::kDeviceActivityHeartbeatCollectionRateMs, 1};
@@ -759,6 +764,57 @@ TEST_P(MetricReportingManagerTelemetryTest, Default) {
   EXPECT_EQ(collector_count, 0);
 }
 
+TEST_F(MetricReportingManagerTelemetryTest,
+       ShouldNotInitializeAppTelemetrySamplersWhenAppServiceUnavailable) {
+  // Enable app metrics reporting feature flag.
+  base::test::ScopedFeatureList scoped_feature_list;
+  scoped_feature_list.InitAndEnableFeature(kEnableAppMetricsReporting);
+
+  const base::TimeDelta init_delay = metrics::InitDelayParam::Get();
+  const base::TimeDelta upload_delay = mock_delegate_->GetInitialUploadDelay();
+  auto* const mock_delegate_ptr = mock_delegate_.get();
+  int collector_count = 0;
+  ON_CALL(*mock_delegate_ptr, IsAffiliated).WillByDefault(Return(true));
+  ON_CALL(*mock_delegate_ptr, IsAppServiceAvailableForProfile)
+      .WillByDefault(Return(false));
+  ON_CALL(*mock_delegate_ptr,
+          CreatePeriodicCollector(
+              _, telemetry_queue_ptr_, _,
+              app_telemetry_settings.enable_setting_path,
+              app_telemetry_settings.setting_enabled_default_value,
+              app_telemetry_settings.rate_setting_path, _,
+              app_telemetry_settings.rate_unit_to_ms, init_delay))
+      .WillByDefault(
+          [&]() { return std::make_unique<FakeCollector>(&collector_count); });
+  ON_CALL(*mock_delegate_ptr,
+          CreatePeriodicCollector(
+              _, user_telemetry_queue_ptr_, _,
+              app_telemetry_settings.enable_setting_path,
+              app_telemetry_settings.setting_enabled_default_value,
+              app_telemetry_settings.rate_setting_path, _,
+              app_telemetry_settings.rate_unit_to_ms, init_delay))
+      .WillByDefault(
+          [&]() { return std::make_unique<FakeCollector>(&collector_count); });
+
+  const auto metric_reporting_manager =
+      MetricReportingManager::CreateForTesting(std::move(mock_delegate_),
+                                               nullptr);
+  EXPECT_EQ(collector_count, 0);
+  task_environment_.FastForwardBy(upload_delay + init_delay);
+  EXPECT_EQ(telemetry_queue_ptr_->GetNumFlush(), 1);
+  metric_reporting_manager->OnLogin(profile());
+  EXPECT_EQ(collector_count, 0);
+
+  const int expected_login_flush_count = 1;
+  task_environment_.FastForwardBy(upload_delay + init_delay);
+  EXPECT_EQ(telemetry_queue_ptr_->GetNumFlush(),
+            1 + expected_login_flush_count);
+
+  ON_CALL(*mock_delegate_ptr, IsDeprovisioned).WillByDefault(Return(true));
+  metric_reporting_manager->DeviceSettingsUpdated();
+  EXPECT_EQ(collector_count, 0);
+}
+
 INSTANTIATE_TEST_SUITE_P(
     MetricReportingManagerTelemetryTests,
     MetricReportingManagerTelemetryTest,
@@ -812,7 +868,33 @@ INSTANTIATE_TEST_SUITE_P(
           /*is_affiliated=*/true, device_activity_telemetry_settings,
           /*has_init_delay=*/true,
           /*expected_count_before_login=*/0,
-          /*expected_count_after_login=*/1}}),
+          /*expected_count_after_login=*/1},
+         {"AppTelemetry_Unaffiliated", /*enabled_features=*/{},
+          /*disabled_features=*/{},
+          /*is_affiliated=*/false, app_telemetry_settings,
+          /*has_init_delay=*/true,
+          /*expected_count_before_login=*/0,
+          /*expected_count_after_login=*/0},
+         {"AppTelemetry_Default", /*enabled_features=*/{},
+          /*disabled_features=*/{},
+          /*is_affiliated=*/true, app_telemetry_settings,
+          /*has_init_delay=*/true,
+          /*expected_count_before_login=*/0,
+          /*expected_count_after_login=*/0},
+         {"AppTelemetry_FeatureFlagEnabled",
+          /*enabled_features=*/{kEnableAppMetricsReporting},
+          /*disabled_features=*/{},
+          /*is_affiliated=*/true, app_telemetry_settings,
+          /*has_init_delay=*/true,
+          /*expected_count_before_login=*/0,
+          /*expected_count_after_login=*/1},
+         {"AppTelemetry_FeatureFlagDisabled",
+          /*enabled_features=*/{},
+          /*disabled_features=*/{kEnableAppMetricsReporting},
+          /*is_affiliated=*/true, app_telemetry_settings,
+          /*has_init_delay=*/true,
+          /*expected_count_before_login=*/0,
+          /*expected_count_after_login=*/0}}),
     [](const testing::TestParamInfo<
         MetricReportingManagerTelemetryTest::ParamType>& info) {
       return info.param.test_name;
@@ -879,19 +961,22 @@ class EventDrivenTelemetryCollectorPoolTest
         .WillByDefault(Return(ByMove(std::move(https_latency_collector))));
   }
 
-  base::test::SingleThreadTaskEnvironment task_environment_;
+  content::BrowserTaskEnvironment task_environment_;
 
   raw_ptr<CollectorBase> https_latency_collector_ptr_;
   raw_ptr<CollectorBase> network_telemetry_collector_ptr_;
 
   std::unique_ptr<::testing::NiceMock<MockDelegate>> mock_delegate_;
+  ::ash::ScopedTestingCrosSettings cros_settings_;
+
+  // Placeholder test profile needed for initializing downstream components.
+  TestingProfile profile_;
 };
 
 TEST_P(EventDrivenTelemetryCollectorPoolTest,
        SettingBasedTelemetry_AffiliatedOnly) {
   EventDrivenTelemetryCollectorPoolTestCase test_case = GetParam();
 
-  ash::ScopedTestingCrosSettings cros_settings;
   base::Value::List telemetry_list;
   telemetry_list.Append("invalid");
   telemetry_list.Append("network_telemetry");
@@ -899,8 +984,8 @@ TEST_P(EventDrivenTelemetryCollectorPoolTest,
   telemetry_list.Append("https_latency");  // duplicate.
   telemetry_list.Append("invalid");
 
-  cros_settings.device_settings()->Set(test_case.setting_name,
-                                       base::Value(std::move(telemetry_list)));
+  cros_settings_.device_settings()->Set(test_case.setting_name,
+                                        base::Value(std::move(telemetry_list)));
 
   ON_CALL(*mock_delegate_, IsDeprovisioned).WillByDefault(Return(false));
   ON_CALL(*mock_delegate_, IsAffiliated).WillByDefault(Return(true));
@@ -915,7 +1000,7 @@ TEST_P(EventDrivenTelemetryCollectorPoolTest,
 
   ASSERT_TRUE(event_telemetry.empty());
 
-  metric_reporting_manager->OnLogin(nullptr);
+  metric_reporting_manager->OnLogin(&profile_);
 
   event_telemetry =
       metric_reporting_manager->GetTelemetryCollectors(test_case.event_type);

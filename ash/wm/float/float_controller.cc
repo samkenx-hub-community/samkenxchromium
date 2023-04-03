@@ -17,6 +17,7 @@
 #include "ash/wm/desks/desk.h"
 #include "ash/wm/desks/desks_util.h"
 #include "ash/wm/float/scoped_window_tucker.h"
+#include "ash/wm/float/tablet_mode_tuck_education.h"
 #include "ash/wm/mru_window_tracker.h"
 #include "ash/wm/tablet_mode/tablet_mode_controller.h"
 #include "ash/wm/tablet_mode/tablet_mode_window_state.h"
@@ -150,6 +151,12 @@ class FloatController::FloatedWindowInfo : public aura::WindowObserver {
 
     if (desk->is_active())
       float_start_time_ = base::TimeTicks::Now();
+
+    if (Shell::Get()->tablet_mode_controller()->InTabletMode() &&
+        TabletModeTuckEducation::CanActivateTuckEducation()) {
+      tuck_education_ =
+          std::make_unique<TabletModeTuckEducation>(floated_window);
+    }
   }
 
   FloatedWindowInfo(const FloatedWindowInfo&) = delete;
@@ -189,6 +196,10 @@ class FloatController::FloatedWindowInfo : public aura::WindowObserver {
     scoped_window_tucker_ =
         std::make_unique<ScopedWindowTucker>(floated_window_, left);
     scoped_window_tucker_->AnimateTuck();
+
+    // Education doesn't need to happen after the user has successfully tucked
+    // once.
+    TabletModeTuckEducation::OnWindowTucked();
   }
 
   void OnUntuckAnimationEnded() { scoped_window_tucker_.reset(); }
@@ -259,6 +270,9 @@ class FloatController::FloatedWindowInfo : public aura::WindowObserver {
   // Scoped object that handles the special tucked window state, which is not
   // a normal window state. Null when `floated_window_` is currently not tucked.
   std::unique_ptr<ScopedWindowTucker> scoped_window_tucker_;
+
+  // An object responsible for managing the tuck education nudge and animations.
+  std::unique_ptr<TabletModeTuckEducation> tuck_education_;
 
   // Used to get the tucked window bounds (as opposed to normal floated). False
   // during `scoped_window_tucker_` construction.
@@ -632,6 +646,10 @@ void FloatController::OnMovingFloatedWindowToDesk(aura::Window* floated_window,
   target_desk->NotifyContentChanged();
 }
 
+void FloatController::ClearWorkspaceEventHandler(aura::Window* root) {
+  workspace_event_handlers_.erase(root);
+}
+
 void FloatController::OnTabletModeStarted() {
   DCHECK(!floated_window_info_map_.empty());
   // If a window can still remain floated, update its bounds, otherwise unfloat
@@ -681,6 +699,15 @@ void FloatController::OnDeskActivationChanged(const Desk* activated,
   if (auto* activated_desk_floated_window =
           FindFloatedWindowOfDesk(activated)) {
     ShowFloatedWindow(activated_desk_floated_window);
+
+    // Activate the floated window if it is the top window. This is normally
+    // done in `Desk::Activate`, but floated windows are technically not owned
+    // by the desk, and the window is still hidden at that point so it isn't in
+    // the MRU list.
+    if (auto* top_window = window_util::GetTopWindow();
+        top_window == activated_desk_floated_window) {
+      wm::ActivateWindow(top_window);
+    }
   }
 }
 
@@ -724,14 +751,6 @@ void FloatController::OnRootWindowAdded(aura::Window* root_window) {
       ->SetLayoutManager(std::make_unique<FloatLayoutManager>());
 }
 
-void FloatController::OnRootWindowWillShutdown(aura::Window* root_window) {
-  workspace_event_handlers_.erase(root_window);
-}
-
-void FloatController::OnShellDestroying() {
-  workspace_event_handlers_.clear();
-}
-
 void FloatController::ToggleFloat(aura::Window* window) {
   WindowState* window_state = WindowState::Get(window);
   const WMEvent toggle_event(window_state->IsFloated() ? WM_EVENT_RESTORE
@@ -745,8 +764,9 @@ void FloatController::FloatForTablet(aura::Window* window,
 
   FloatImpl(window);
 
-  if (!chromeos::IsSnappedWindowStateType(old_state_type))
+  if (!chromeos::IsSnappedWindowStateType(old_state_type)) {
     return;
+  }
 
   // Update magnetism so that the float window is roughly in the same location
   // as it was when it was snapped.

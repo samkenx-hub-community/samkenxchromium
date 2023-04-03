@@ -79,9 +79,9 @@ LayoutFlowThread* LayoutFlowThread::LocateFlowThreadContainingBlockOf(
         // is being used, so we have to detect any engine mismatch ourselves.
         if (box->IsLayoutNGObject() != inner_is_ng_object)
           return nullptr;
-        if (box->GetPaginationBreakability(kUnknownFragmentationEngine) ==
-            kForbidBreaks)
+        if (box->IsMonolithic()) {
           return nullptr;
+        }
       }
     }
     curr = curr->Parent();
@@ -144,6 +144,9 @@ void LayoutFlowThread::UpdateLayout() {
   page_logical_size_changed_ = column_sets_invalidated_ && EverHadLayout();
   LayoutBlockFlow::UpdateLayout();
   page_logical_size_changed_ = false;
+
+  // TODO(1229581): Remove this logic.
+  NOTREACHED_NORETURN();
 }
 
 PaintLayerType LayoutFlowThread::LayerTypeRequired() const {

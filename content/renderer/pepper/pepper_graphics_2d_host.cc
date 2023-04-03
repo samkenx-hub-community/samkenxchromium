@@ -745,8 +745,8 @@ bool PepperGraphics2DHost::PrepareTransferableResource(
   if (!shared_bitmap) {
     viz::SharedBitmapId id = viz::SharedBitmap::GenerateId();
     base::MappedReadOnlyRegion shm =
-        viz::bitmap_allocation::AllocateSharedBitmap(pixel_image_size,
-                                                     viz::RGBA_8888);
+        viz::bitmap_allocation::AllocateSharedBitmap(
+            pixel_image_size, viz::SinglePlaneFormat::kRGBA_8888);
     shared_bitmap = base::MakeRefCounted<cc::CrossThreadSharedBitmap>(
         id, std::move(shm), pixel_image_size,
         viz::SinglePlaneFormat::kRGBA_8888);
@@ -759,7 +759,8 @@ bool PepperGraphics2DHost::PrepareTransferableResource(
   image_data_->Unmap();
 
   *transferable_resource = viz::TransferableResource::MakeSoftware(
-      shared_bitmap->id(), pixel_image_size, viz::RGBA_8888);
+      shared_bitmap->id(), pixel_image_size,
+      viz::SinglePlaneFormat::kRGBA_8888);
   *release_callback = base::BindOnce(
       &PepperGraphics2DHost::ReleaseSoftwareCallback, this->AsWeakPtr(),
       std::move(shared_bitmap), std::move(registration));

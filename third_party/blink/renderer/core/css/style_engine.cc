@@ -34,6 +34,7 @@
 #include "base/hash/hash.h"
 #include "base/ranges/algorithm.h"
 #include "third_party/blink/public/mojom/frame/color_scheme.mojom-blink.h"
+#include "third_party/blink/public/mojom/timing/resource_timing.mojom-blink.h"
 #include "third_party/blink/public/platform/web_theme_engine.h"
 #include "third_party/blink/renderer/core/css/cascade_layer_map.h"
 #include "third_party/blink/renderer/core/css/check_pseudo_has_cache_scope.h"
@@ -3825,13 +3826,6 @@ void StyleEngine::MarkForLayoutTreeChangesAfterDetach() {
   auto* layout_object = parent_for_detached_subtree_.Get();
   if (auto* layout_object_element =
           DynamicTo<Element>(layout_object->GetNode())) {
-    // Use the LayoutObject pointed to by the element. There may be multiple
-    // LayoutObjects associated with an element for continuations. The
-    // LayoutObject pointed to by the element is the one that is checked for the
-    // flag during style recalc.
-    if (layout_object->IsInline()) {
-      layout_object = layout_object->ContinuationRoot();
-    }
     DCHECK_EQ(layout_object, layout_object_element->GetLayoutObject());
 
     // Mark the parent of a detached subtree for doing a whitespace or list item
@@ -3859,25 +3853,6 @@ void StyleEngine::MarkForLayoutTreeChangesAfterDetach() {
     }
   }
   parent_for_detached_subtree_ = nullptr;
-}
-
-void StyleEngine::ReportUseOfLegacyLayoutWithContainerQueries() {
-  DCHECK(!HasFullNGFragmentationSupport());
-
-  // Only report once.
-  if (legacy_layout_query_container_) {
-    return;
-  }
-
-  legacy_layout_query_container_ = true;
-
-  ConsoleMessage* console_message = MakeGarbageCollected<ConsoleMessage>(
-      mojom::blink::ConsoleMessageSource::kRendering,
-      mojom::blink::ConsoleMessageLevel::kWarning,
-      String::Format(
-          "Using container queries or units with printing, or in combination "
-          "with tables inside multicol will not work correctly."));
-  GetDocument().AddConsoleMessage(console_message);
 }
 
 bool StyleEngine::AllowSkipStyleRecalcForScope() const {

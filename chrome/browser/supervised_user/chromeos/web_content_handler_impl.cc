@@ -4,6 +4,7 @@
 
 #include "chrome/browser/supervised_user/chromeos/web_content_handler_impl.h"
 
+#include "base/check.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback.h"
 #include "base/logging.h"
@@ -12,9 +13,17 @@
 #include "chrome/browser/ash/crosapi/parent_access_ash.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/profiles/profile_key.h"
+#include "chrome/browser/supervised_user/chromeos/supervised_user_favicon_request_handler.h"
+#include "chrome/browser/supervised_user/supervised_user_browser_utils.h"
 #include "chrome/browser/supervised_user/supervised_user_settings_service_factory.h"
+#include "chrome/browser/ui/chrome_pages.h"
+#include "chrome/grit/generated_resources.h"
+#include "components/favicon/core/large_icon_service.h"
 #include "components/supervised_user/core/browser/supervised_user_settings_service.h"
+#include "components/supervised_user/core/common/features.h"
 #include "content/public/browser/web_contents.h"
+#include "ui/base/l10n/l10n_util.h"
+#include "ui/gfx/image/image_skia.h"
 
 namespace {
 
@@ -57,16 +66,32 @@ void HandleChromeOSErrorResult(
 
 }  // namespace
 
-WebContentHandlerImpl::WebContentHandlerImpl(content::WebContents& web_contents)
-    : web_contents_(web_contents) {}
+WebContentHandlerImpl::WebContentHandlerImpl(
+    content::WebContents* web_contents,
+    const GURL& url,
+    favicon::LargeIconService& large_icon_service)
+    : web_contents_(web_contents),
+      favicon_handler_(std::make_unique<SupervisedUserFaviconRequestHandler>(
+          url.GetWithEmptyPath(),
+          &large_icon_service)),
+      profile_(
+          *Profile::FromBrowserContext(web_contents->GetBrowserContext())) {
+  if (supervised_user::IsLocalWebApprovalsEnabled()) {
+    // Prefetch the favicon which will be rendered as part of the web approvals
+    // ParentAccessDialog. Pass in DoNothing() for the favicon fetched callback
+    // because if the favicon is by the time the user triggers the opening of
+    // the ParentAccessDialog, we show the default favicon.
+    favicon_handler_->StartFaviconFetch(base::DoNothing());
+  }
+}
 
 WebContentHandlerImpl::~WebContentHandlerImpl() = default;
 
 void WebContentHandlerImpl::RequestLocalApproval(
     const GURL& url,
     const std::u16string& child_display_name,
-    const gfx::ImageSkia& favicon,
     ApprovalRequestInitiatedCallback callback) {
+  CHECK(web_contents_);
   supervised_user::SupervisedUserSettingsService* settings_service =
       SupervisedUserSettingsServiceFactory::GetForKey(
           Profile::FromBrowserContext(web_contents_->GetBrowserContext())
@@ -76,12 +101,34 @@ void WebContentHandlerImpl::RequestLocalApproval(
       crosapi::CrosapiManager::Get()->crosapi_ash()->parent_access_ash();
   DCHECK(parent_access);
 
+  gfx::ImageSkia favicon = favicon_handler_->GetFaviconOrFallback();
+
   parent_access->GetWebsiteParentApproval(
       url.GetWithEmptyPath(), child_display_name, favicon,
       base::BindOnce(&WebContentHandlerImpl::OnLocalApprovalRequestCompleted,
                      weak_ptr_factory_.GetWeakPtr(),
                      std::ref(*settings_service), url, base::TimeTicks::Now()));
   std::move(callback).Run(true);
+}
+
+bool WebContentHandlerImpl::IsMainFrame(int frame_id) {
+  return web_contents_->GetPrimaryMainFrame()->GetFrameTreeNodeId() == frame_id;
+}
+
+void WebContentHandlerImpl::CleanUpInfoBarOnMainFrame(int frame_id) {
+  if (IsMainFrame(frame_id)) {
+    supervised_user::CleanUpInfoBarForContent(web_contents_.get());
+  }
+}
+
+void WebContentHandlerImpl::ShowFeedback(GURL url, std::u16string reason) {
+  std::string message = l10n_util::GetStringFUTF8(
+      IDS_BLOCK_INTERSTITIAL_DEFAULT_FEEDBACK_TEXT, reason);
+
+  chrome::ShowFeedbackPage(
+      url, &profile_.get(), chrome::kFeedbackSourceSupervisedUserInterstitial,
+      message, std::string() /* description_placeholder_text */,
+      std::string() /* category_tag */, std::string() /* extra_diagnostics */);
 }
 
 void WebContentHandlerImpl::OnLocalApprovalRequestCompleted(

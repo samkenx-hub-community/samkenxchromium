@@ -63,18 +63,25 @@ from update_rust import (RUST_REVISION, RUST_TOOLCHAIN_OUT_DIR,
                          VERSION_STAMP_PATH, GetPackageVersionForBuild)
 
 EXCLUDED_TESTS = [
-    # Temporarily disabled due to https://github.com/rust-lang/rust/issues/94322
-    os.path.join('tests', 'ui', 'numeric', 'numeric-cast.rs'),
-    # Temporarily disabled due to https://github.com/rust-lang/rust/issues/96497
+    # https://github.com/rust-lang/rust/issues/45222 which appears to have
+    # regressed as of a recent LLVM update. This test is purely performance
+    # related, not correctness.
+    os.path.join('tests', 'codegen', 'issue-45222.rs'),
+    # https://github.com/rust-lang/rust/issues/96497
     os.path.join('tests', 'codegen', 'issue-96497-slice-size-nowrap.rs'),
     # TODO(crbug.com/1347563): Re-enable when fixed.
     os.path.join('tests', 'codegen', 'sanitizer-cfi-emit-type-checks.rs'),
     os.path.join('tests', 'codegen',
                  'sanitizer-cfi-emit-type-metadata-itanium-cxx-abi.rs'),
-    # Temporarily disabled due to https://github.com/rust-lang/rust/issues/45222
-    # which appears to have regressed as of a recent LLVM update. This test is
-    # purely performance related, not correctness.
-    os.path.join('tests', 'codegen', 'issue-45222.rs')
+    # https://github.com/rust-lang/rust/issues/109671 the test is being
+    # optimized in newer LLVM which breaks its expectations.
+    os.path.join('tests', 'ui', 'abi', 'stack-protector.rs'),
+    # https://github.com/rust-lang/rust/issues/109672 the second panic in a
+    # double-panic is being optimized out (reasonably correctly) by newer LLVM.
+    os.path.join('tests', 'ui', 'backtrace.rs'),
+    # https://github.com/rust-lang/rust/issues/94322 large output from
+    # compiletests is breaking json parsing of the results.
+    os.path.join('tests', 'ui', 'numeric', 'numeric-cast.rs'),
 ]
 EXCLUDED_TESTS_WINDOWS = [
     # https://github.com/rust-lang/rust/issues/96464
@@ -248,27 +255,41 @@ def CargoVendor(cargo_bin):
     '''Runs `cargo vendor` to pull down dependencies.'''
     os.chdir(RUST_SRC_DIR)
 
-    # Some Submodules are part of the workspace and need to exist (so we can
-    # read their Cargo.toml files) before we can vendor their deps.
-    RunCommand([
-        'git', 'submodule', 'update', '--init', '--recursive', '--depth', '1'
-    ])
+    for i in range(0, 3):
+        # Some Submodules are part of the workspace and need to exist (so we can
+        # read their Cargo.toml files) before we can vendor their deps.
+        submod_cmd = [
+            'git', 'submodule', 'update', '--init', '--recursive', '--depth',
+            '1'
+        ]
+        if not RunCommand(submod_cmd, fail_hard=False):
+            if i < 2:
+                print('Failed git submodule, retrying...')
+                continue
+            else:
+                sys.exit(1)
 
-    # From https://github.com/rust-lang/rust/blob/master/src/bootstrap/dist.rs#L986-L995
-    # The additional `--sync` Cargo.toml files are not part of the top level
-    # workspace.
-    RunCommand([
-        cargo_bin,
-        'vendor',
-        '--locked',
-        '--versioned-dirs',
-        '--sync',
-        'src/tools/rust-analyzer/Cargo.toml',
-        '--sync',
-        'compiler/rustc_codegen_cranelift/Cargo.toml',
-        '--sync',
-        'src/bootstrap/Cargo.toml',
-    ])
+        # From https://github.com/rust-lang/rust/blob/master/src/bootstrap/dist.rs#L986-L995:
+        # The additional `--sync` Cargo.toml files are not part of the top level
+        # workspace.
+        vendor_cmd = [
+            cargo_bin,
+            'vendor',
+            '--locked',
+            '--versioned-dirs',
+            '--sync',
+            'src/tools/rust-analyzer/Cargo.toml',
+            '--sync',
+            'compiler/rustc_codegen_cranelift/Cargo.toml',
+            '--sync',
+            'src/bootstrap/Cargo.toml',
+        ]
+        if not RunCommand(vendor_cmd, fail_hard=False):
+            if i < 2:
+                print('Failed cargo vendor, retrying...')
+                continue
+            else:
+                sys.exit(1)
 
     # Make a `.cargo/config.toml` the points to the `vendor` directory for all
     # dependency crates.
@@ -480,6 +501,18 @@ def GetLatestRustCommit():
     return main['commit']
 
 
+def RustTargetTriple(build_mac_arm):
+    if sys.platform == 'darwin':
+        if platform.machine() == 'arm64' or build_mac_arm:
+            return 'aarch64-apple-darwin'
+        else:
+            return 'x86_64-apple-darwin'
+    elif sys.platform == 'win32':
+        return 'x86_64-pc-windows-msvc'
+    else:
+        return 'x86_64-unknown-linux-gnu'
+
+
 # Fetch or build the LLVM libraries, for the host machine and when
 # cross-compiling for the target machine.
 #
@@ -613,15 +646,8 @@ def main():
     else:
         checkout_revision = RUST_REVISION
 
-    if sys.platform == 'darwin':
-        if platform.machine() == 'arm64' or args.build_mac_arm:
-            host_triple = 'aarch64-apple-darwin'
-        else:
-            host_triple = 'x86_64-apple-darwin'
-    elif sys.platform == 'win32':
-        host_triple = 'x86_64-pc-windows-msvc'
-    else:
-        host_triple = 'x86_64-unknown-linux-gnu'
+    building_on_host_triple = RustTargetTriple(False)
+    building_for_host_triple = RustTargetTriple(args.build_mac_arm)
 
     args.gcc_toolchain = None
     if sys.platform.startswith('linux'):
@@ -684,9 +710,12 @@ def main():
     else:
         assert not rest
 
-    xpy_args = []
+    xpy_args = ['--build', building_on_host_triple]
     if args.build_mac_arm:
-        xpy_args.extend(['--host', host_triple, '--target', host_triple])
+        xpy_args.extend([
+            '--host', building_for_host_triple, '--target',
+            building_for_host_triple
+        ])
 
     if not args.skip_clean:
         print('Cleaning build artifacts...')

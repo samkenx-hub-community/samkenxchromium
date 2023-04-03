@@ -24,6 +24,7 @@ Neke funkcije su možda nedostupne i promene podešavanja neće biti sačuvane.
 
 Dozvole koje ste već dali veb-sajtovima i aplikacijama mogu da važe za ovaj nalog. Google nalozima možete da upravljate u <ph name="SETTINGS_LINK_BEGIN" />Podešavanjima<ph name="SETTINGS_LINK_END" />.</translation>
 <translation id="1640672724030957280">Preuzimanje...</translation>
+<translation id="1691024636239527281">{NUM_DEVICES,plural, =0{Chromium je bio povezan sa HID uređajem}=1{Chromium je povezan sa HID uređajem}one{Chromium je povezan sa HID uređajima}few{Chromium je povezan sa HID uređajima}other{Chromium je povezan sa HID uređajima}}</translation>
 <translation id="1708666629004767631">Dostupna je nova, bezbednija verzija Chromium-a.</translation>
 <translation id="17264556997921157">Možete da vidite i uklonite teme interesovanja koje sajtovi koriste da bi vam prikazivali oglase. Chromium procenjuje vaša interesovanja na osnovu nedavne istorije pregledanja.</translation>
 <translation id="1733725117201708356">Chromium će uskoro izbrisati podatke pregledanja</translation>
@@ -81,7 +82,6 @@ Dozvole koje ste već dali veb-sajtovima i aplikacijama mogu da važe za ovaj n
 <translation id="2928420929544864228">Instalacija je dovršena.</translation>
 <translation id="2977470724722393594">Chromium je ažuriran</translation>
 <translation id="2977506796191543575">Ako neki sajt pokuša da ukrade vašu lozinku ili probate da preuzmete štetni fajl, Chromium može da pošalje URL-ove, uključujući delove sadržaja stranice, u Bezbedno pregledanje</translation>
-<translation id="3021964162552004083">{NUM_DEVICES,plural, =1{Chromium je povezan sa HID uređajem}one{Chromium je povezan sa HID uređajima}few{Chromium je povezan sa HID uređajima}other{Chromium je povezan sa HID uređajima}}</translation>
 <translation id="3032706164202344641">Chromium ne može da vam proverava lozinke. Probajte ponovo kasnije.</translation>
 <translation id="3032787606318309379">Dodavanje u Chromium...</translation>
 <translation id="3038232873781883849">Čeka se instaliranje...</translation>

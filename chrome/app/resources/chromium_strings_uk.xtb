@@ -22,6 +22,7 @@
 
 Дозволи, надані веб-сайтам і додаткам, можуть діяти для цього облікового запису. Ви можете керувати своїми обліковими записами Google у <ph name="SETTINGS_LINK_BEGIN" />Налаштуваннях<ph name="SETTINGS_LINK_END" />.</translation>
 <translation id="1640672724030957280">Завантаження...</translation>
+<translation id="1691024636239527281">{NUM_DEVICES,plural, =0{Chromium не підключено до пристрою HID}=1{Chromium підключено до пристрою HID}one{Chromium підключено до пристроїв HID}few{Chromium підключено до пристроїв HID}many{Chromium підключено до пристроїв HID}other{Chromium підключено до пристроїв HID}}</translation>
 <translation id="1708666629004767631">Доступна нова, надійніша версія Chromium.</translation>
 <translation id="17264556997921157">Ви можете переглядати й вилучати цікаві теми, на основі яких сайти показують вам оголошення. Chromium оцінює, які теми вас цікавлять, за вашою нещодавньою історією веб-перегляду.</translation>
 <translation id="1733725117201708356">Незабаром Chromium видалить дані веб-перегляду</translation>
@@ -79,7 +80,6 @@
 <translation id="2928420929544864228">Встановлення завершено.</translation>
 <translation id="2977470724722393594">У вас остання версія Chromium</translation>
 <translation id="2977506796191543575">Якщо сайт намагається викрасти ваш пароль або ви завантажуєте шкідливий файл, Chromium також може надсилати в Безпечний перегляд URL-адреси, зокрема уривки контенту сторінки</translation>
-<translation id="3021964162552004083">{NUM_DEVICES,plural, =1{Chromium підключено до пристрою HID}one{Chromium підключено до пристроїв HID}few{Chromium підключено до пристроїв HID}many{Chromium підключено до пристроїв HID}other{Chromium підключено до пристроїв HID}}</translation>
 <translation id="3032706164202344641">Chromium не може перевірити паролі. Повторіть спробу пізніше.</translation>
 <translation id="3032787606318309379">Додавання в Chromium...</translation>
 <translation id="3038232873781883849">Очікується встановлення…</translation>

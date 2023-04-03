@@ -22,6 +22,7 @@
 <translation id="1399397803214730675">Este equipo ya cuenta con una versión más reciente de Google Chrome. Si el software no funciona, desinstala Google Chrome y descárgalo nuevamente.</translation>
 <translation id="139993653570221430">Puedes cambiar de opinión en cualquier momento en la configuración de Chrome. Las pruebas se ejecutan junto a la publicación actual de anuncios, por lo que no verás cambios de inmediato.</translation>
 <translation id="1434626383986940139">Aplicaciones de Chrome Canary</translation>
+<translation id="1496905273983707119">{NUM_DEVICES,plural, =0{Google Chrome estaba conectado a un dispositivo HID.}=1{Google Chrome está conectado a un dispositivo HID.}other{Google Chrome está conectado a dispositivos HID.}}</translation>
 <translation id="1507198376417198979">Personaliza tu nuevo perfil de Chrome.</translation>
 <translation id="1516530951338665275">Google Chrome necesita acceso a la conexión Bluetooth para continuar con la 
  vinculación. <ph name="IDS_BLUETOOTH_DEVICE_CHOOSER_AUTHORIZE_BLUETOOTH_LINK" /></translation>
@@ -122,7 +123,6 @@
 <translation id="3140883423282498090">Los cambios se aplicarán la próxima vez que reinicies Google Chrome.</translation>
 <translation id="3149510190863420837">Aplicaciones de Chrome</translation>
 <translation id="3169523567916669830">Durante las pruebas, puedes ver y quitar los temas de interés que usan los sitios para mostrarte anuncios. Chrome estima tus intereses en función de tu historial de navegación reciente.</translation>
-<translation id="3211604354460514046">{NUM_DEVICES,plural, =1{Google Chrome está conectado a un dispositivo HID}other{Google Chrome está conectado a dispositivos HID}}</translation>
 <translation id="3245429137663807393">Si también compartes los informes de uso de Chrome, estos incluirán las URL que visites.</translation>
 <translation id="3282568296779691940">Acceder a Chrome</translation>
 <translation id="3286538390144397061">Reiniciar ahora</translation>

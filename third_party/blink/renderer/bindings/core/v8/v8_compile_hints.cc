@@ -23,25 +23,31 @@
 namespace blink {
 
 namespace {
-constexpr int kBloomFilterInt32Count = 512;
+constexpr int kBloomFilterInt32Count = 1024;
 }
 
-std::atomic<bool> V8CompileHints::data_generated_for_this_process_ = false;
+std::atomic<bool>
+    V8CrowdsourcedCompileHintsProducer::data_generated_for_this_process_ =
+        false;
 
-V8CompileHints::V8CompileHints(Page* page) : page_(page) {}
+V8CrowdsourcedCompileHintsProducer::V8CrowdsourcedCompileHintsProducer(
+    Page* page)
+    : page_(page) {}
 
-void V8CompileHints::RecordScript(Frame* frame,
-                                  ExecutionContext* execution_context,
-                                  const v8::Local<v8::Script> script,
-                                  ScriptState* script_state) {
+void V8CrowdsourcedCompileHintsProducer::RecordScript(
+    Frame* frame,
+    ExecutionContext* execution_context,
+    const v8::Local<v8::Script> script,
+    ScriptState* script_state) {
   if (state_ == State::kDataGenerationFinished || state_ == State::kDisabled) {
     // We've already generated data for this V8CompileHints, or data generation
     // is disabled. Don't record any script compilations happening after it.
     return;
   }
   if (data_generated_for_this_process_) {
-    // We've already generated data for some other V8CompileHints, so stop
-    // collecting data. The task for data generation might still run.
+    // We've already generated data for some other
+    // V8CrowdsourcedCompileHintsProducer, so stop collecting data. The task for
+    // data generation might still run.
     state_ = State::kDataGenerationFinished;
     ClearData();
   }
@@ -77,7 +83,7 @@ void V8CompileHints::RecordScript(Frame* frame,
   script_name_hashes_.emplace_back(script_name_hash);
 }
 
-void V8CompileHints::GenerateData() {
+void V8CrowdsourcedCompileHintsProducer::GenerateData() {
   // Call FeatureList::IsEnabled only once.
   static bool compile_hints_enabled =
       base::FeatureList::IsEnabled(features::kProduceCompileHints);
@@ -100,16 +106,16 @@ void V8CompileHints::GenerateData() {
   ClearData();
 }
 
-void V8CompileHints::Trace(Visitor* visitor) const {
+void V8CrowdsourcedCompileHintsProducer::Trace(Visitor* visitor) const {
   visitor->Trace(page_);
 }
 
-void V8CompileHints::ClearData() {
+void V8CrowdsourcedCompileHintsProducer::ClearData() {
   scripts_.clear();
   script_name_hashes_.clear();
 }
 
-bool V8CompileHints::SendDataToUkm() {
+bool V8CrowdsourcedCompileHintsProducer::SendDataToUkm() {
   Frame* main_frame = page_->MainFrame();
   // Because of OOPIF, the main frame is not necessarily a LocalFrame. We cannot
   // generate good compile hints for those pages, so skip sending them.
@@ -125,9 +131,9 @@ bool V8CompileHints::SendDataToUkm() {
 
   DCHECK_EQ(scripts_.size(), script_name_hashes_.size());
 
-  // Create a Bloom filter w/ 14 key bits. This results in a Bloom filter
-  // containing 2 ^ 14 bits, which equals to 256 64-bit ints.
-  constexpr int kBloomFilterKeySize = 14;
+  // Create a Bloom filter w/ 15 key bits. This results in a Bloom filter
+  // containing 2 ^ 15 bits, which equals to 512 64-bit ints.
+  constexpr int kBloomFilterKeySize = 15;
   static_assert((1 << kBloomFilterKeySize) / (sizeof(int32_t) * 8) ==
                 kBloomFilterInt32Count);
   WTF::BloomFilter<kBloomFilterKeySize> bloom;
@@ -168,7 +174,7 @@ bool V8CompileHints::SendDataToUkm() {
   // Send the data to UKM.
   DCHECK_NE(execution_context->UkmSourceID(), ukm::kInvalidSourceId);
   ukm::UkmRecorder* ukm_recorder = execution_context->UkmRecorder();
-  ukm::builders::V8CompileHints_Version1(execution_context->UkmSourceID())
+  ukm::builders::V8CompileHints_Version3(execution_context->UkmSourceID())
       .SetData000(static_cast<int64_t>(raw_data[1]) << 32 | raw_data[0])
       .SetData001(static_cast<int64_t>(raw_data[3]) << 32 | raw_data[2])
       .SetData002(static_cast<int64_t>(raw_data[5]) << 32 | raw_data[4])
@@ -425,11 +431,267 @@ bool V8CompileHints::SendDataToUkm() {
       .SetData253(static_cast<int64_t>(raw_data[507]) << 32 | raw_data[506])
       .SetData254(static_cast<int64_t>(raw_data[509]) << 32 | raw_data[508])
       .SetData255(static_cast<int64_t>(raw_data[511]) << 32 | raw_data[510])
+      .SetData256(static_cast<int64_t>(raw_data[513]) << 32 | raw_data[512])
+      .SetData257(static_cast<int64_t>(raw_data[515]) << 32 | raw_data[514])
+      .SetData258(static_cast<int64_t>(raw_data[517]) << 32 | raw_data[516])
+      .SetData259(static_cast<int64_t>(raw_data[519]) << 32 | raw_data[518])
+      .SetData260(static_cast<int64_t>(raw_data[521]) << 32 | raw_data[520])
+      .SetData261(static_cast<int64_t>(raw_data[523]) << 32 | raw_data[522])
+      .SetData262(static_cast<int64_t>(raw_data[525]) << 32 | raw_data[524])
+      .SetData263(static_cast<int64_t>(raw_data[527]) << 32 | raw_data[526])
+      .SetData264(static_cast<int64_t>(raw_data[529]) << 32 | raw_data[528])
+      .SetData265(static_cast<int64_t>(raw_data[531]) << 32 | raw_data[530])
+      .SetData266(static_cast<int64_t>(raw_data[533]) << 32 | raw_data[532])
+      .SetData267(static_cast<int64_t>(raw_data[535]) << 32 | raw_data[534])
+      .SetData268(static_cast<int64_t>(raw_data[537]) << 32 | raw_data[536])
+      .SetData269(static_cast<int64_t>(raw_data[539]) << 32 | raw_data[538])
+      .SetData270(static_cast<int64_t>(raw_data[541]) << 32 | raw_data[540])
+      .SetData271(static_cast<int64_t>(raw_data[543]) << 32 | raw_data[542])
+      .SetData272(static_cast<int64_t>(raw_data[545]) << 32 | raw_data[544])
+      .SetData273(static_cast<int64_t>(raw_data[547]) << 32 | raw_data[546])
+      .SetData274(static_cast<int64_t>(raw_data[549]) << 32 | raw_data[548])
+      .SetData275(static_cast<int64_t>(raw_data[551]) << 32 | raw_data[550])
+      .SetData276(static_cast<int64_t>(raw_data[553]) << 32 | raw_data[552])
+      .SetData277(static_cast<int64_t>(raw_data[555]) << 32 | raw_data[554])
+      .SetData278(static_cast<int64_t>(raw_data[557]) << 32 | raw_data[556])
+      .SetData279(static_cast<int64_t>(raw_data[559]) << 32 | raw_data[558])
+      .SetData280(static_cast<int64_t>(raw_data[561]) << 32 | raw_data[560])
+      .SetData281(static_cast<int64_t>(raw_data[563]) << 32 | raw_data[562])
+      .SetData282(static_cast<int64_t>(raw_data[565]) << 32 | raw_data[564])
+      .SetData283(static_cast<int64_t>(raw_data[567]) << 32 | raw_data[566])
+      .SetData284(static_cast<int64_t>(raw_data[569]) << 32 | raw_data[568])
+      .SetData285(static_cast<int64_t>(raw_data[571]) << 32 | raw_data[570])
+      .SetData286(static_cast<int64_t>(raw_data[573]) << 32 | raw_data[572])
+      .SetData287(static_cast<int64_t>(raw_data[575]) << 32 | raw_data[574])
+      .SetData288(static_cast<int64_t>(raw_data[577]) << 32 | raw_data[576])
+      .SetData289(static_cast<int64_t>(raw_data[579]) << 32 | raw_data[578])
+      .SetData290(static_cast<int64_t>(raw_data[581]) << 32 | raw_data[580])
+      .SetData291(static_cast<int64_t>(raw_data[583]) << 32 | raw_data[582])
+      .SetData292(static_cast<int64_t>(raw_data[585]) << 32 | raw_data[584])
+      .SetData293(static_cast<int64_t>(raw_data[587]) << 32 | raw_data[586])
+      .SetData294(static_cast<int64_t>(raw_data[589]) << 32 | raw_data[588])
+      .SetData295(static_cast<int64_t>(raw_data[591]) << 32 | raw_data[590])
+      .SetData296(static_cast<int64_t>(raw_data[593]) << 32 | raw_data[592])
+      .SetData297(static_cast<int64_t>(raw_data[595]) << 32 | raw_data[594])
+      .SetData298(static_cast<int64_t>(raw_data[597]) << 32 | raw_data[596])
+      .SetData299(static_cast<int64_t>(raw_data[599]) << 32 | raw_data[598])
+      .SetData300(static_cast<int64_t>(raw_data[601]) << 32 | raw_data[600])
+      .SetData301(static_cast<int64_t>(raw_data[603]) << 32 | raw_data[602])
+      .SetData302(static_cast<int64_t>(raw_data[605]) << 32 | raw_data[604])
+      .SetData303(static_cast<int64_t>(raw_data[607]) << 32 | raw_data[606])
+      .SetData304(static_cast<int64_t>(raw_data[609]) << 32 | raw_data[608])
+      .SetData305(static_cast<int64_t>(raw_data[611]) << 32 | raw_data[610])
+      .SetData306(static_cast<int64_t>(raw_data[613]) << 32 | raw_data[612])
+      .SetData307(static_cast<int64_t>(raw_data[615]) << 32 | raw_data[614])
+      .SetData308(static_cast<int64_t>(raw_data[617]) << 32 | raw_data[616])
+      .SetData309(static_cast<int64_t>(raw_data[619]) << 32 | raw_data[618])
+      .SetData310(static_cast<int64_t>(raw_data[621]) << 32 | raw_data[620])
+      .SetData311(static_cast<int64_t>(raw_data[623]) << 32 | raw_data[622])
+      .SetData312(static_cast<int64_t>(raw_data[625]) << 32 | raw_data[624])
+      .SetData313(static_cast<int64_t>(raw_data[627]) << 32 | raw_data[626])
+      .SetData314(static_cast<int64_t>(raw_data[629]) << 32 | raw_data[628])
+      .SetData315(static_cast<int64_t>(raw_data[631]) << 32 | raw_data[630])
+      .SetData316(static_cast<int64_t>(raw_data[633]) << 32 | raw_data[632])
+      .SetData317(static_cast<int64_t>(raw_data[635]) << 32 | raw_data[634])
+      .SetData318(static_cast<int64_t>(raw_data[637]) << 32 | raw_data[636])
+      .SetData319(static_cast<int64_t>(raw_data[639]) << 32 | raw_data[638])
+      .SetData320(static_cast<int64_t>(raw_data[641]) << 32 | raw_data[640])
+      .SetData321(static_cast<int64_t>(raw_data[643]) << 32 | raw_data[642])
+      .SetData322(static_cast<int64_t>(raw_data[645]) << 32 | raw_data[644])
+      .SetData323(static_cast<int64_t>(raw_data[647]) << 32 | raw_data[646])
+      .SetData324(static_cast<int64_t>(raw_data[649]) << 32 | raw_data[648])
+      .SetData325(static_cast<int64_t>(raw_data[651]) << 32 | raw_data[650])
+      .SetData326(static_cast<int64_t>(raw_data[653]) << 32 | raw_data[652])
+      .SetData327(static_cast<int64_t>(raw_data[655]) << 32 | raw_data[654])
+      .SetData328(static_cast<int64_t>(raw_data[657]) << 32 | raw_data[656])
+      .SetData329(static_cast<int64_t>(raw_data[659]) << 32 | raw_data[658])
+      .SetData330(static_cast<int64_t>(raw_data[661]) << 32 | raw_data[660])
+      .SetData331(static_cast<int64_t>(raw_data[663]) << 32 | raw_data[662])
+      .SetData332(static_cast<int64_t>(raw_data[665]) << 32 | raw_data[664])
+      .SetData333(static_cast<int64_t>(raw_data[667]) << 32 | raw_data[666])
+      .SetData334(static_cast<int64_t>(raw_data[669]) << 32 | raw_data[668])
+      .SetData335(static_cast<int64_t>(raw_data[671]) << 32 | raw_data[670])
+      .SetData336(static_cast<int64_t>(raw_data[673]) << 32 | raw_data[672])
+      .SetData337(static_cast<int64_t>(raw_data[675]) << 32 | raw_data[674])
+      .SetData338(static_cast<int64_t>(raw_data[677]) << 32 | raw_data[676])
+      .SetData339(static_cast<int64_t>(raw_data[679]) << 32 | raw_data[678])
+      .SetData340(static_cast<int64_t>(raw_data[681]) << 32 | raw_data[680])
+      .SetData341(static_cast<int64_t>(raw_data[683]) << 32 | raw_data[682])
+      .SetData342(static_cast<int64_t>(raw_data[685]) << 32 | raw_data[684])
+      .SetData343(static_cast<int64_t>(raw_data[687]) << 32 | raw_data[686])
+      .SetData344(static_cast<int64_t>(raw_data[689]) << 32 | raw_data[688])
+      .SetData345(static_cast<int64_t>(raw_data[691]) << 32 | raw_data[690])
+      .SetData346(static_cast<int64_t>(raw_data[693]) << 32 | raw_data[692])
+      .SetData347(static_cast<int64_t>(raw_data[695]) << 32 | raw_data[694])
+      .SetData348(static_cast<int64_t>(raw_data[697]) << 32 | raw_data[696])
+      .SetData349(static_cast<int64_t>(raw_data[699]) << 32 | raw_data[698])
+      .SetData350(static_cast<int64_t>(raw_data[701]) << 32 | raw_data[700])
+      .SetData351(static_cast<int64_t>(raw_data[703]) << 32 | raw_data[702])
+      .SetData352(static_cast<int64_t>(raw_data[705]) << 32 | raw_data[704])
+      .SetData353(static_cast<int64_t>(raw_data[707]) << 32 | raw_data[706])
+      .SetData354(static_cast<int64_t>(raw_data[709]) << 32 | raw_data[708])
+      .SetData355(static_cast<int64_t>(raw_data[711]) << 32 | raw_data[710])
+      .SetData356(static_cast<int64_t>(raw_data[713]) << 32 | raw_data[712])
+      .SetData357(static_cast<int64_t>(raw_data[715]) << 32 | raw_data[714])
+      .SetData358(static_cast<int64_t>(raw_data[717]) << 32 | raw_data[716])
+      .SetData359(static_cast<int64_t>(raw_data[719]) << 32 | raw_data[718])
+      .SetData360(static_cast<int64_t>(raw_data[721]) << 32 | raw_data[720])
+      .SetData361(static_cast<int64_t>(raw_data[723]) << 32 | raw_data[722])
+      .SetData362(static_cast<int64_t>(raw_data[725]) << 32 | raw_data[724])
+      .SetData363(static_cast<int64_t>(raw_data[727]) << 32 | raw_data[726])
+      .SetData364(static_cast<int64_t>(raw_data[729]) << 32 | raw_data[728])
+      .SetData365(static_cast<int64_t>(raw_data[731]) << 32 | raw_data[730])
+      .SetData366(static_cast<int64_t>(raw_data[733]) << 32 | raw_data[732])
+      .SetData367(static_cast<int64_t>(raw_data[735]) << 32 | raw_data[734])
+      .SetData368(static_cast<int64_t>(raw_data[737]) << 32 | raw_data[736])
+      .SetData369(static_cast<int64_t>(raw_data[739]) << 32 | raw_data[738])
+      .SetData370(static_cast<int64_t>(raw_data[741]) << 32 | raw_data[740])
+      .SetData371(static_cast<int64_t>(raw_data[743]) << 32 | raw_data[742])
+      .SetData372(static_cast<int64_t>(raw_data[745]) << 32 | raw_data[744])
+      .SetData373(static_cast<int64_t>(raw_data[747]) << 32 | raw_data[746])
+      .SetData374(static_cast<int64_t>(raw_data[749]) << 32 | raw_data[748])
+      .SetData375(static_cast<int64_t>(raw_data[751]) << 32 | raw_data[750])
+      .SetData376(static_cast<int64_t>(raw_data[753]) << 32 | raw_data[752])
+      .SetData377(static_cast<int64_t>(raw_data[755]) << 32 | raw_data[754])
+      .SetData378(static_cast<int64_t>(raw_data[757]) << 32 | raw_data[756])
+      .SetData379(static_cast<int64_t>(raw_data[759]) << 32 | raw_data[758])
+      .SetData380(static_cast<int64_t>(raw_data[761]) << 32 | raw_data[760])
+      .SetData381(static_cast<int64_t>(raw_data[763]) << 32 | raw_data[762])
+      .SetData382(static_cast<int64_t>(raw_data[765]) << 32 | raw_data[764])
+      .SetData383(static_cast<int64_t>(raw_data[767]) << 32 | raw_data[766])
+      .SetData384(static_cast<int64_t>(raw_data[769]) << 32 | raw_data[768])
+      .SetData385(static_cast<int64_t>(raw_data[771]) << 32 | raw_data[770])
+      .SetData386(static_cast<int64_t>(raw_data[773]) << 32 | raw_data[772])
+      .SetData387(static_cast<int64_t>(raw_data[775]) << 32 | raw_data[774])
+      .SetData388(static_cast<int64_t>(raw_data[777]) << 32 | raw_data[776])
+      .SetData389(static_cast<int64_t>(raw_data[779]) << 32 | raw_data[778])
+      .SetData390(static_cast<int64_t>(raw_data[781]) << 32 | raw_data[780])
+      .SetData391(static_cast<int64_t>(raw_data[783]) << 32 | raw_data[782])
+      .SetData392(static_cast<int64_t>(raw_data[785]) << 32 | raw_data[784])
+      .SetData393(static_cast<int64_t>(raw_data[787]) << 32 | raw_data[786])
+      .SetData394(static_cast<int64_t>(raw_data[789]) << 32 | raw_data[788])
+      .SetData395(static_cast<int64_t>(raw_data[791]) << 32 | raw_data[790])
+      .SetData396(static_cast<int64_t>(raw_data[793]) << 32 | raw_data[792])
+      .SetData397(static_cast<int64_t>(raw_data[795]) << 32 | raw_data[794])
+      .SetData398(static_cast<int64_t>(raw_data[797]) << 32 | raw_data[796])
+      .SetData399(static_cast<int64_t>(raw_data[799]) << 32 | raw_data[798])
+      .SetData400(static_cast<int64_t>(raw_data[801]) << 32 | raw_data[800])
+      .SetData401(static_cast<int64_t>(raw_data[803]) << 32 | raw_data[802])
+      .SetData402(static_cast<int64_t>(raw_data[805]) << 32 | raw_data[804])
+      .SetData403(static_cast<int64_t>(raw_data[807]) << 32 | raw_data[806])
+      .SetData404(static_cast<int64_t>(raw_data[809]) << 32 | raw_data[808])
+      .SetData405(static_cast<int64_t>(raw_data[811]) << 32 | raw_data[810])
+      .SetData406(static_cast<int64_t>(raw_data[813]) << 32 | raw_data[812])
+      .SetData407(static_cast<int64_t>(raw_data[815]) << 32 | raw_data[814])
+      .SetData408(static_cast<int64_t>(raw_data[817]) << 32 | raw_data[816])
+      .SetData409(static_cast<int64_t>(raw_data[819]) << 32 | raw_data[818])
+      .SetData410(static_cast<int64_t>(raw_data[821]) << 32 | raw_data[820])
+      .SetData411(static_cast<int64_t>(raw_data[823]) << 32 | raw_data[822])
+      .SetData412(static_cast<int64_t>(raw_data[825]) << 32 | raw_data[824])
+      .SetData413(static_cast<int64_t>(raw_data[827]) << 32 | raw_data[826])
+      .SetData414(static_cast<int64_t>(raw_data[829]) << 32 | raw_data[828])
+      .SetData415(static_cast<int64_t>(raw_data[831]) << 32 | raw_data[830])
+      .SetData416(static_cast<int64_t>(raw_data[833]) << 32 | raw_data[832])
+      .SetData417(static_cast<int64_t>(raw_data[835]) << 32 | raw_data[834])
+      .SetData418(static_cast<int64_t>(raw_data[837]) << 32 | raw_data[836])
+      .SetData419(static_cast<int64_t>(raw_data[839]) << 32 | raw_data[838])
+      .SetData420(static_cast<int64_t>(raw_data[841]) << 32 | raw_data[840])
+      .SetData421(static_cast<int64_t>(raw_data[843]) << 32 | raw_data[842])
+      .SetData422(static_cast<int64_t>(raw_data[845]) << 32 | raw_data[844])
+      .SetData423(static_cast<int64_t>(raw_data[847]) << 32 | raw_data[846])
+      .SetData424(static_cast<int64_t>(raw_data[849]) << 32 | raw_data[848])
+      .SetData425(static_cast<int64_t>(raw_data[851]) << 32 | raw_data[850])
+      .SetData426(static_cast<int64_t>(raw_data[853]) << 32 | raw_data[852])
+      .SetData427(static_cast<int64_t>(raw_data[855]) << 32 | raw_data[854])
+      .SetData428(static_cast<int64_t>(raw_data[857]) << 32 | raw_data[856])
+      .SetData429(static_cast<int64_t>(raw_data[859]) << 32 | raw_data[858])
+      .SetData430(static_cast<int64_t>(raw_data[861]) << 32 | raw_data[860])
+      .SetData431(static_cast<int64_t>(raw_data[863]) << 32 | raw_data[862])
+      .SetData432(static_cast<int64_t>(raw_data[865]) << 32 | raw_data[864])
+      .SetData433(static_cast<int64_t>(raw_data[867]) << 32 | raw_data[866])
+      .SetData434(static_cast<int64_t>(raw_data[869]) << 32 | raw_data[868])
+      .SetData435(static_cast<int64_t>(raw_data[871]) << 32 | raw_data[870])
+      .SetData436(static_cast<int64_t>(raw_data[873]) << 32 | raw_data[872])
+      .SetData437(static_cast<int64_t>(raw_data[875]) << 32 | raw_data[874])
+      .SetData438(static_cast<int64_t>(raw_data[877]) << 32 | raw_data[876])
+      .SetData439(static_cast<int64_t>(raw_data[879]) << 32 | raw_data[878])
+      .SetData440(static_cast<int64_t>(raw_data[881]) << 32 | raw_data[880])
+      .SetData441(static_cast<int64_t>(raw_data[883]) << 32 | raw_data[882])
+      .SetData442(static_cast<int64_t>(raw_data[885]) << 32 | raw_data[884])
+      .SetData443(static_cast<int64_t>(raw_data[887]) << 32 | raw_data[886])
+      .SetData444(static_cast<int64_t>(raw_data[889]) << 32 | raw_data[888])
+      .SetData445(static_cast<int64_t>(raw_data[891]) << 32 | raw_data[890])
+      .SetData446(static_cast<int64_t>(raw_data[893]) << 32 | raw_data[892])
+      .SetData447(static_cast<int64_t>(raw_data[895]) << 32 | raw_data[894])
+      .SetData448(static_cast<int64_t>(raw_data[897]) << 32 | raw_data[896])
+      .SetData449(static_cast<int64_t>(raw_data[899]) << 32 | raw_data[898])
+      .SetData450(static_cast<int64_t>(raw_data[901]) << 32 | raw_data[900])
+      .SetData451(static_cast<int64_t>(raw_data[903]) << 32 | raw_data[902])
+      .SetData452(static_cast<int64_t>(raw_data[905]) << 32 | raw_data[904])
+      .SetData453(static_cast<int64_t>(raw_data[907]) << 32 | raw_data[906])
+      .SetData454(static_cast<int64_t>(raw_data[909]) << 32 | raw_data[908])
+      .SetData455(static_cast<int64_t>(raw_data[911]) << 32 | raw_data[910])
+      .SetData456(static_cast<int64_t>(raw_data[913]) << 32 | raw_data[912])
+      .SetData457(static_cast<int64_t>(raw_data[915]) << 32 | raw_data[914])
+      .SetData458(static_cast<int64_t>(raw_data[917]) << 32 | raw_data[916])
+      .SetData459(static_cast<int64_t>(raw_data[919]) << 32 | raw_data[918])
+      .SetData460(static_cast<int64_t>(raw_data[921]) << 32 | raw_data[920])
+      .SetData461(static_cast<int64_t>(raw_data[923]) << 32 | raw_data[922])
+      .SetData462(static_cast<int64_t>(raw_data[925]) << 32 | raw_data[924])
+      .SetData463(static_cast<int64_t>(raw_data[927]) << 32 | raw_data[926])
+      .SetData464(static_cast<int64_t>(raw_data[929]) << 32 | raw_data[928])
+      .SetData465(static_cast<int64_t>(raw_data[931]) << 32 | raw_data[930])
+      .SetData466(static_cast<int64_t>(raw_data[933]) << 32 | raw_data[932])
+      .SetData467(static_cast<int64_t>(raw_data[935]) << 32 | raw_data[934])
+      .SetData468(static_cast<int64_t>(raw_data[937]) << 32 | raw_data[936])
+      .SetData469(static_cast<int64_t>(raw_data[939]) << 32 | raw_data[938])
+      .SetData470(static_cast<int64_t>(raw_data[941]) << 32 | raw_data[940])
+      .SetData471(static_cast<int64_t>(raw_data[943]) << 32 | raw_data[942])
+      .SetData472(static_cast<int64_t>(raw_data[945]) << 32 | raw_data[944])
+      .SetData473(static_cast<int64_t>(raw_data[947]) << 32 | raw_data[946])
+      .SetData474(static_cast<int64_t>(raw_data[949]) << 32 | raw_data[948])
+      .SetData475(static_cast<int64_t>(raw_data[951]) << 32 | raw_data[950])
+      .SetData476(static_cast<int64_t>(raw_data[953]) << 32 | raw_data[952])
+      .SetData477(static_cast<int64_t>(raw_data[955]) << 32 | raw_data[954])
+      .SetData478(static_cast<int64_t>(raw_data[957]) << 32 | raw_data[956])
+      .SetData479(static_cast<int64_t>(raw_data[959]) << 32 | raw_data[958])
+      .SetData480(static_cast<int64_t>(raw_data[961]) << 32 | raw_data[960])
+      .SetData481(static_cast<int64_t>(raw_data[963]) << 32 | raw_data[962])
+      .SetData482(static_cast<int64_t>(raw_data[965]) << 32 | raw_data[964])
+      .SetData483(static_cast<int64_t>(raw_data[967]) << 32 | raw_data[966])
+      .SetData484(static_cast<int64_t>(raw_data[969]) << 32 | raw_data[968])
+      .SetData485(static_cast<int64_t>(raw_data[971]) << 32 | raw_data[970])
+      .SetData486(static_cast<int64_t>(raw_data[973]) << 32 | raw_data[972])
+      .SetData487(static_cast<int64_t>(raw_data[975]) << 32 | raw_data[974])
+      .SetData488(static_cast<int64_t>(raw_data[977]) << 32 | raw_data[976])
+      .SetData489(static_cast<int64_t>(raw_data[979]) << 32 | raw_data[978])
+      .SetData490(static_cast<int64_t>(raw_data[981]) << 32 | raw_data[980])
+      .SetData491(static_cast<int64_t>(raw_data[983]) << 32 | raw_data[982])
+      .SetData492(static_cast<int64_t>(raw_data[985]) << 32 | raw_data[984])
+      .SetData493(static_cast<int64_t>(raw_data[987]) << 32 | raw_data[986])
+      .SetData494(static_cast<int64_t>(raw_data[989]) << 32 | raw_data[988])
+      .SetData495(static_cast<int64_t>(raw_data[991]) << 32 | raw_data[990])
+      .SetData496(static_cast<int64_t>(raw_data[993]) << 32 | raw_data[992])
+      .SetData497(static_cast<int64_t>(raw_data[995]) << 32 | raw_data[994])
+      .SetData498(static_cast<int64_t>(raw_data[997]) << 32 | raw_data[996])
+      .SetData499(static_cast<int64_t>(raw_data[999]) << 32 | raw_data[998])
+      .SetData500(static_cast<int64_t>(raw_data[1001]) << 32 | raw_data[1000])
+      .SetData501(static_cast<int64_t>(raw_data[1003]) << 32 | raw_data[1002])
+      .SetData502(static_cast<int64_t>(raw_data[1005]) << 32 | raw_data[1004])
+      .SetData503(static_cast<int64_t>(raw_data[1007]) << 32 | raw_data[1006])
+      .SetData504(static_cast<int64_t>(raw_data[1009]) << 32 | raw_data[1008])
+      .SetData505(static_cast<int64_t>(raw_data[1011]) << 32 | raw_data[1010])
+      .SetData506(static_cast<int64_t>(raw_data[1013]) << 32 | raw_data[1012])
+      .SetData507(static_cast<int64_t>(raw_data[1015]) << 32 | raw_data[1014])
+      .SetData508(static_cast<int64_t>(raw_data[1017]) << 32 | raw_data[1016])
+      .SetData509(static_cast<int64_t>(raw_data[1019]) << 32 | raw_data[1018])
+      .SetData510(static_cast<int64_t>(raw_data[1021]) << 32 | raw_data[1020])
+      .SetData511(static_cast<int64_t>(raw_data[1023]) << 32 | raw_data[1022])
       .Record(ukm_recorder);
   return true;
 }
 
-void V8CompileHints::AddNoise(unsigned* data) {
+void V8CrowdsourcedCompileHintsProducer::AddNoise(unsigned* data) {
   // Add differential privacy noise:
   // With noise / 2 probability, the bit will be 0.
   // With noise / 2 probability, the bit will be 1.

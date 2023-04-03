@@ -2,7 +2,7 @@
   :host {
     background:
         var(--color-new-tab-page-history-clusters-module-item-background);
-    border-radius: 12px;
+    border-radius: var(--ntp-module-item-border-radius);
     color: var(--color-new-tab-page-primary-foreground);
     display: inline-block;
     width: 100%;
@@ -15,7 +15,9 @@
     text-decoration: none;
   }
 
-  :host-context(.focus-outline-visible) :focus {
+  :host-context(.focus-outline-visible) :focus,
+  :focus-visible {
+    border-radius: var(--ntp-module-item-border-radius);
     box-shadow: var(--ntp-focus-shadow);
     outline: none;
   }
@@ -38,14 +40,14 @@
   }
 
   :host([large-format]) #image {
-    border-radius: 7px;
+    border-radius: var(--ntp-module-item-border-radius);
     height: 152px;
     margin: 16px;
     width: calc(100% - 32px);
   }
 
   :host([medium-format]) #image {
-    border-radius: 6px;
+    border-radius: var(--ntp-module-item-border-radius);
     height: 128px;
     margin: 8px;
     width: 128px;
@@ -124,9 +126,29 @@
   }
 
   #label,
-  #date {
+  #date,
+  #annotation {
     bottom: -2px;
     position: relative;
+  }
+
+  #date {
+    min-width: max-content;
+  }
+
+  #annotation {
+    display: none;
+  }
+
+  #info-container-spacer {
+    display: none;
+    flex: 1 1 auto;
+    min-width: 8px;
+  }
+
+  :host([large-format]) #annotation,
+  :host([large-format]) #info-container-spacer {
+    display: block;
   }
 
   :host([large-format]) #label {
@@ -163,12 +185,12 @@
 <a id="content" href="[[visit.normalizedUrl.url]]"
    aria-label$="[[visit.pageTitle]], [[label_]], [[visit.relativeDate]]">
   <div id="image">
-    <template is="dom-if" if="[[hasImageUrl_(imageUrl_)]]" restamp>
+    <template is="dom-if" if="[[imageUrl_]]" restamp>
       <img is="cr-auto-img" auto-src="[[imageUrl_.url]]"
           draggable="false">
       </img>
     </template>
-    <template is="dom-if" if="[[!hasImageUrl_(imageUrl_)]]" restamp>
+    <template is="dom-if" if="[[!imageUrl_]]" restamp>
       <page-favicon url="[[visit.normalizedUrl]]"
           is-known-to-sync="[[visit.isKnownToSync]]" size="24">
       </page-favicon>
@@ -183,6 +205,10 @@
       <div id="label" class="truncate"> [[label_]]</div>
       <span id="dot">&nbsp&#8226&nbsp</span>
       <div id="date">[[visit.relativeDate]]</div>
+      <template is="dom-if" if="[[annotation_]]">
+        <div id="info-container-spacer"></div>
+        <div id="annotation">[[annotation_]]</div>
+      </template>
     </div>
   </div>
 </a>

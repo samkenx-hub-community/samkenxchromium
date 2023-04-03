@@ -54,6 +54,9 @@ struct InProgressCluster {
   // The vector of visits that have not been persisted yet. Note that each entry
   // only contains the minimum required to persist a cluster visit.
   std::vector<history::ClusterVisit> unpersisted_visits;
+  // Whether this cluster was meant to be cleaned up but is being held for
+  // persistence.
+  bool cleaned_up = false;
 };
 
 // A HistoryServiceObserver responsible for grouping visits into clusters.
@@ -102,6 +105,7 @@ class ContextClustererHistoryServiceObserver
 
   // Creates a cluster visit from `normalized_url` and `visit_row`.
   history::ClusterVisit CreateClusterVisit(const std::string& normalized_url,
+                                           bool is_search_normalized_url,
                                            const history::VisitRow& visit_row);
 
   // Overrides `clock_` for testing.

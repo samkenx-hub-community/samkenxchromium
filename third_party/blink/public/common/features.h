@@ -22,6 +22,8 @@ BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kAnonymousIframeOriginTrial);
 BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kAttributionReportingCrossAppWeb);
 BLINK_COMMON_EXPORT
 BASE_DECLARE_FEATURE(kAutofillDetectRemovedFormControls);
+BLINK_COMMON_EXPORT
+BASE_DECLARE_FEATURE(kAutofillSendUnidentifiedKeyAfterFill);
 BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kAutomaticLazyFrameLoadingToAds);
 BLINK_COMMON_EXPORT extern const base::FeatureParam<int>
     kTimeoutMillisForLazyAds;
@@ -83,6 +85,8 @@ BLINK_COMMON_EXPORT extern const base::FeatureParam<bool>
     kPrivateAggregationApiEnabledInFledge;
 BLINK_COMMON_EXPORT extern const base::FeatureParam<bool>
     kPrivateAggregationApiFledgeExtensionsEnabled;
+BLINK_COMMON_EXPORT extern const base::FeatureParam<int>
+    kPrivateAggregationApiMaxBudgetPerScope;
 
 enum class SharedStorageWorkletImplementationType {
   // The worklet thread is created via base::SequenceBound, and JS bindings are
@@ -1080,6 +1084,12 @@ BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(
 // use cached resources in other rendereres yet, just record histograms.
 // See https://crbug.com/1414262
 BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kRemoteResourceCache);
+
+// Kill-switch for the fetch keepalive request infra migration.
+// If enabled, all keepalive requests will be proxied via the browser process.
+// Design Doc: https://bit.ly/chromium-keepalive-migration
+// Tracker: https://crbug.com/1356128
+BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kKeepAliveInBrowserMigration);
 
 }  // namespace features
 }  // namespace blink

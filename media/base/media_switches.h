@@ -245,6 +245,7 @@ MEDIA_EXPORT BASE_DECLARE_FEATURE(kMediaOptimizer);
 MEDIA_EXPORT BASE_DECLARE_FEATURE(kMediaPowerExperiment);
 MEDIA_EXPORT BASE_DECLARE_FEATURE(kMemoryPressureBasedSourceBufferGC);
 MEDIA_EXPORT BASE_DECLARE_FEATURE(kUseMultiPlaneFormatForHardwareVideo);
+MEDIA_EXPORT BASE_DECLARE_FEATURE(kUseMultiPlaneFormatForSoftwareVideo);
 MEDIA_EXPORT BASE_DECLARE_FEATURE(kMultiPlaneSoftwareVideoSharedImages);
 MEDIA_EXPORT BASE_DECLARE_FEATURE(kMultiPlaneVideoCaptureSharedImages);
 MEDIA_EXPORT BASE_DECLARE_FEATURE(kOpenscreenCastStreamingSession);
@@ -395,6 +396,10 @@ MEDIA_EXPORT BASE_DECLARE_FEATURE(kPlatformEncryptedDolbyVision);
 MEDIA_EXPORT BASE_DECLARE_FEATURE(
     kAllowClearDolbyVisionInMseWhenPlatformEncryptedDvEnabled);
 #endif
+
+#if BUILDFLAG(IS_CHROMEOS_ASH)
+MEDIA_EXPORT BASE_DECLARE_FEATURE(kExposeOutOfProcessVideoDecodingToLacros);
+#endif  // BUILDFLAG(IS_CHROMEOS_ASH)
 
 #if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS)
 MEDIA_EXPORT BASE_DECLARE_FEATURE(kUseOutOfProcessVideoDecoding);

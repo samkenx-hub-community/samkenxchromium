@@ -225,11 +225,12 @@ void NavigateEvent::React(ScriptState* script_state) {
 void NavigateEvent::ReactDone(ScriptValue value, bool did_fulfill) {
   CHECK_NE(intercept_state_, InterceptState::kIntercepted);
   CHECK_NE(intercept_state_, InterceptState::kFinished);
-  if (signal_->aborted()) {
+
+  LocalDOMWindow* window = DomWindow();
+  if (signal_->aborted() || !window) {
     return;
   }
 
-  LocalDOMWindow* window = DomWindow();
   CHECK_EQ(this, window->navigation()->ongoing_navigate_event_);
   window->navigation()->ongoing_navigate_event_ = nullptr;
 

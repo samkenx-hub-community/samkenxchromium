@@ -148,10 +148,6 @@ tast_disabled_tests_from_chrome_all = [
   # https://crbug.com/1312908
   "policy.DefaultNotificationsSetting",
 
-  # https://crbug.com/1318989
-  "assistant.StartupInSignedOutMode",
-  "login.ChangePassword",
-
   # https://crbug.com/1401568
   "assistant.Hotkey.search_plus_a",
 
@@ -315,6 +311,10 @@ tast_disabled_tests_from_chrome_all = [
   "crostini.AppVscode.bullseye_clamshell_stable",
   "crostini.AppVscode.clamshell_stable",
 
+  # https://crbug.com/1427905
+  "inputs.VirtualKeyboardHandwriting.floating",
+  "inputs.VirtualKeyboardTypingUserMode.incognito",
+
   # READ COMMENT AT TOP BEFORE ADDING NEW TESTS HERE.
 ]
 
@@ -344,7 +344,8 @@ tast_disabled_tests_from_lacros_all = [
   "tast.inputs.PhysicalKeyboardAutocorrect.*@jacuzzi",
   "tast.inputs.PhysicalKeyboardShapeBasedChineseTyping.*@jacuzzi",
   "tast.inputs.VirtualKeyboardTypingOmnibox.*@jacuzzi",
-  "tast.inputs.PhysicalKeyboardShapeBasedChineseTyping.*@jacuzzi",
   "tast.inputs.PhysicalKeyboardZhuyinTyping.*@jacuzzi",
   "tast.inputs.VirtualKeyboardDeadKeys.*@jacuzzi",
+  "tast.inputs.PhysicalKeyboardShapeBasedChineseTyping.array_lacros",
+  "tast.inputs.VirtualKeyboardSpeech.lacros",
 ]

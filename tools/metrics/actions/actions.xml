@@ -6981,6 +6981,26 @@ should be able to be added at any place in this file.
   </description>
 </action>
 
+<action name="ContentSuggestions.Feed.SignIn.ShowFeedSignInOnlyUIWithoutUserId">
+  <owner>sczs@google.com</owner>
+  <owner>tinazwang@chromium.org</owner>
+  <owner>feed@chromium.org</owner>
+  <description>
+    The user with no device-level identity triggered a sign-in only flow from
+    Discover feed.
+  </description>
+</action>
+
+<action name="ContentSuggestions.Feed.SignIn.ShowFeedSignInOnlyUIWithUserId">
+  <owner>sczs@google.com</owner>
+  <owner>tinazwang@chromium.org</owner>
+  <owner>feed@chromium.org</owner>
+  <description>
+    The user with one or more device-level identities triggered a sign-in only
+    flow from Discover feed.
+  </description>
+</action>
+
 <action name="ContentSuggestions.Feed.WebFeed.Selected">
   <owner>adamta@google.com</owner>
   <owner>sczs@chromium.org</owner>
@@ -19574,6 +19594,7 @@ should be able to be added at any place in this file.
 </action>
 
 <action name="MobileMenuIncognitoSearch">
+  <obsolete>Deprecated as of 3/2023</obsolete>
   <owner>gambard@chromium.org</owner>
   <description>
     The user tapped the &quot;Incognito Search&quot; button in the mobile menu
@@ -19582,6 +19603,7 @@ should be able to be added at any place in this file.
 </action>
 
 <action name="MobileMenuLensCopiedImage">
+  <obsolete>Deprecated as of 3/2023</obsolete>
   <owner>hujasonx@google.com</owner>
   <owner>schechter@google.com</owner>
   <description>User pressed 'Lens Copied Image' in the app menu.</description>
@@ -19639,6 +19661,7 @@ should be able to be added at any place in this file.
 </action>
 
 <action name="MobileMenuPasteAndGo">
+  <obsolete>Deprecated as of 3/2023</obsolete>
   <owner>gambard@chromium.org</owner>
   <description>User pressed 'Paste and Go' in the app menu.</description>
 </action>
@@ -19710,11 +19733,13 @@ should be able to be added at any place in this file.
 </action>
 
 <action name="MobileMenuScanQRCode">
+  <obsolete>Deprecated as of 3/2023</obsolete>
   <owner>gambard@chromium.org</owner>
   <description>User pressed 'Scan QR Code' in the app menu.</description>
 </action>
 
 <action name="MobileMenuSearch">
+  <obsolete>Deprecated as of 3/2023</obsolete>
   <owner>gambard@chromium.org</owner>
   <description>
     The user tapped the &quot;New Search&quot; button in the mobile menu
@@ -19723,6 +19748,7 @@ should be able to be added at any place in this file.
 </action>
 
 <action name="MobileMenuSearchCopiedImage">
+  <obsolete>Deprecated as of 3/2023</obsolete>
   <owner>rkgibson@google.com</owner>
   <description>User pressed 'Search Copied Image' in the app menu.</description>
 </action>
@@ -19800,6 +19826,7 @@ should be able to be added at any place in this file.
 </action>
 
 <action name="MobileMenuVoiceSearch">
+  <obsolete>Deprecated as of 3/2023</obsolete>
   <owner>gambard@chromium.org</owner>
   <description>User pressed 'Voice Search' in the app menu.</description>
 </action>
@@ -20368,6 +20395,7 @@ should be able to be added at any place in this file.
 </action>
 
 <action name="MobilePopupMenuSwipeToSelect">
+  <obsolete>Deprecated as of 3/2023</obsolete>
   <owner>gambard@chromium.org</owner>
   <description>
     The user selected an option in the Popup Menu without lifting the finger
@@ -21823,6 +21851,7 @@ should be able to be added at any place in this file.
 </action>
 
 <action name="MobileToolbarShowNewTabMenu">
+  <obsolete>Deprecated as of 3/2023</obsolete>
   <owner>gambard@chromium.org</owner>
   <description>
     The user long-pressed on the NewTab button in the toolbar
@@ -21843,6 +21872,7 @@ should be able to be added at any place in this file.
 </action>
 
 <action name="MobileToolbarShowTabGridMenu">
+  <obsolete>Deprecated as of 3/2023</obsolete>
   <owner>gambard@chromium.org</owner>
   <description>
     User long pressed the Tab Grid button to display the menu associated with
@@ -21851,6 +21881,7 @@ should be able to be added at any place in this file.
 </action>
 
 <action name="MobileToolbarShowTabHistoryMenu">
+  <obsolete>Deprecated as of 3/2023</obsolete>
   <owner>gambard@chromium.org</owner>
   <description>
     User long pressed the toolbar navigation buttons to display the tab history
@@ -27635,12 +27666,47 @@ should be able to be added at any place in this file.
   </description>
 </action>
 
+<action name="SafeBrowsing.AccountIntegration.DisabledDialog.Dismissed">
+  <owner>jacastro@chromium.org</owner>
+  <owner>chrome-safebrowsing-alerts@google.com</owner>
+  <description>The ESB disabled dialog was dismissed.</description>
+</action>
+
+<action name="SafeBrowsing.AccountIntegration.DisabledDialog.OkButtonClicked">
+  <owner>jacastro@chromium.org</owner>
+  <owner>chrome-safebrowsing-alerts@google.com</owner>
+  <description>
+    User clicks the OK button on the ESB disabled dialog.
+  </description>
+</action>
+
 <action
     name="SafeBrowsing.AccountIntegration.DisabledDialog.SettingsButtonClicked">
   <owner>awado@chromium.org</owner>
   <owner>chrome-safebrowsing-alerts@google.com</owner>
   <description>
     User clicks the settings button on the ESB disabled dialog.
+  </description>
+</action>
+
+<action name="SafeBrowsing.AccountIntegration.DisabledDialog.Shown"
+    not_user_triggered="true">
+  <owner>awado@chromium.org</owner>
+  <owner>chrome-safebrowsing-alerts@google.com</owner>
+  <description>The ESB disabled dialog was shown to the user.</description>
+</action>
+
+<action name="SafeBrowsing.AccountIntegration.EnabledDialog.Dismissed">
+  <owner>jacastro@chromium.org</owner>
+  <owner>chrome-safebrowsing-alerts@google.com</owner>
+  <description>The ESB enabled dialog was dismissed.</description>
+</action>
+
+<action name="SafeBrowsing.AccountIntegration.EnabledDialog.OkButtonClicked">
+  <owner>jacastro@chromium.org</owner>
+  <owner>chrome-safebrowsing-alerts@google.com</owner>
+  <description>
+    User clicks the OK button on the ESB enabled dialog.
   </description>
 </action>
 
@@ -27651,6 +27717,13 @@ should be able to be added at any place in this file.
   <description>
     User clicks the settings button on the ESB enabled dialog.
   </description>
+</action>
+
+<action name="SafeBrowsing.AccountIntegration.EnabledDialog.Shown"
+    not_user_triggered="true">
+  <owner>jacastro@chromium.org</owner>
+  <owner>chrome-safebrowsing-alerts@google.com</owner>
+  <description>The ESB enabled dialog was shown to the user.</description>
 </action>
 
 <action name="SafeBrowsing.Download.WarningBypassed">
@@ -30799,6 +30872,14 @@ should be able to be added at any place in this file.
   </description>
 </action>
 
+<action name="Signin_Impression_FromSearchCompanion">
+  <owner>shaktisahu@google.com</owner>
+  <owner>chrome-signin-team@chromium.org</owner>
+  <description>
+    Recorded when showing sign in promo in the search companion.
+  </description>
+</action>
+
 <action name="Signin_Impression_FromSendTabToSelfPromo">
   <owner>victorvianna@google.com</owner>
   <owner>harrisonsean@chromium.org</owner>
@@ -31229,6 +31310,15 @@ should be able to be added at any place in this file.
   </description>
 </action>
 
+<action name="Signin_Signin_FromAccountConsistencyService">
+  <owner>jlebel@google.com</owner>
+  <owner>chrome-signin-team@chromium.org</owner>
+  <description>
+    Recorded on sign in start from access point
+    signin_metrics::AccessPoint::ACCESS_POINT_ACCOUNT_CONSISTENCY_SERVICE.
+  </description>
+</action>
+
 <action name="Signin_Signin_FromAppsPageLink">
   <obsolete>
     Deprecated as the apps page no longer has a sign-in link/promo.
@@ -31458,6 +31548,15 @@ should be able to be added at any place in this file.
   </description>
 </action>
 
+<action name="Signin_Signin_FromReauthInfoBar">
+  <owner>jlebel@google.com</owner>
+  <owner>chrome-signin-team@chromium.org</owner>
+  <description>
+    Recorded on sign in start from access point
+    signin_metrics::AccessPoint::ACCESS_POINT_REAUTH_INFO_BAR.
+  </description>
+</action>
+
 <action name="Signin_Signin_FromRecentTabs">
   <owner>gogerald@chromium.org</owner>
   <description>
@@ -31481,6 +31580,15 @@ should be able to be added at any place in this file.
   <description>
     Recorded on sign in start from access point
     signin_metrics::AccessPoint::ACCESS_POINT_SAVE_CARD_BUBBLE.
+  </description>
+</action>
+
+<action name="Signin_Signin_FromSearchCompanion">
+  <owner>shaktisahu@google.com</owner>
+  <owner>chrome-signin-team@chromium.org</owner>
+  <description>
+    Recorded on sign in start from access point
+    signin_metrics::AccessPoint::ACCESS_POINT_SEARCH_COMPANION.
   </description>
 </action>
 
@@ -36928,6 +37036,7 @@ should be able to be added at any place in this file.
       label="For KeyboardAccessoryPaymentFilling feature."/>
   <suffix name="KeyboardAccessoryPaymentOffer"
       label="For KeyboardAccessoryPaymentOffer feature."/>
+  <suffix name="LauncherSearchHelpUi" label="For launcher search IPH feature."/>
   <suffix name="LiveCaption" label="For LiveCaption feature."/>
   <suffix name="LongPressToolbarTip" label="For LongPressToolbar feature."/>
   <suffix name="LowUserEngagementDetector"

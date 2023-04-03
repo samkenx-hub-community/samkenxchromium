@@ -49,7 +49,9 @@
 #include "chrome/test/base/testing_profile.h"
 #include "components/account_id/account_id.h"
 #include "components/keyed_service/content/browser_context_dependency_manager.h"
+#include "components/policy/core/common/policy_pref_names.h"
 #include "components/supervised_user/core/common/buildflags.h"
+#include "components/supervised_user/core/common/pref_names.h"
 #include "content/public/browser/notification_service.h"
 #include "content/public/common/content_switches.h"
 #include "content/public/test/browser_task_environment.h"
@@ -74,7 +76,7 @@
 #include "chrome/browser/ash/login/users/scoped_test_user_manager.h"
 #include "chrome/browser/ash/profiles/profile_helper.h"
 #include "chrome/browser/ash/settings/scoped_cros_settings_test_helper.h"
-#include "chrome/browser/ash/wallpaper_handlers/test_backdrop_fetcher_delegate.h"
+#include "chrome/browser/ash/wallpaper_handlers/test_wallpaper_fetcher_delegate.h"
 #include "chrome/browser/ui/ash/test_wallpaper_controller.h"
 #include "chrome/browser/ui/ash/wallpaper_controller_client_impl.h"
 #include "components/user_manager/fake_user_manager.h"
@@ -164,7 +166,7 @@ class ProfileManagerTest : public testing::Test {
     ash::UserImageManagerImpl::SkipDefaultUserImageDownloadForTesting();
     wallpaper_controller_client_ = std::make_unique<
         WallpaperControllerClientImpl>(
-        std::make_unique<wallpaper_handlers::TestBackdropFetcherDelegate>());
+        std::make_unique<wallpaper_handlers::TestWallpaperFetcherDelegate>());
     wallpaper_controller_client_->InitForTesting(&test_wallpaper_controller_);
 
     // Have to manually reset the session type in between test runs because
@@ -1231,14 +1233,14 @@ TEST_F(ProfileManagerTest, GetLastUsedProfileAllowedByPolicy) {
   ASSERT_TRUE(profile->GetPrimaryOTRProfile(/*create_if_needed=*/true));
 
   IncognitoModePrefs::SetAvailability(
-      prefs, IncognitoModePrefs::Availability::kDisabled);
+      prefs, policy::IncognitoModeAvailability::kDisabled);
   EXPECT_FALSE(
       profile_manager->GetLastUsedProfileAllowedByPolicy()->IsOffTheRecord());
 
   // GetLastUsedProfileAllowedByPolicy() returns the off-the-record Profile when
   // incognito mode is forced.
   IncognitoModePrefs::SetAvailability(
-      prefs, IncognitoModePrefs::Availability::kForced);
+      prefs, policy::IncognitoModeAvailability::kForced);
   EXPECT_TRUE(
       profile_manager->GetLastUsedProfileAllowedByPolicy()->IsOffTheRecord());
 }

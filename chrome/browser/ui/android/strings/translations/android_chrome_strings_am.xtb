@@ -477,6 +477,7 @@
 <translation id="3587596251841506391">ድር ላይ ደህንነትን ለማሻሻል ያግዙ</translation>
 <translation id="3597179440835065298">የተሻሉ ጥቆማዎችን ያግኙ</translation>
 <translation id="3602290021589620013">ቅድመ-ዕይታ</translation>
+<translation id="360901359071773787">የመጨረሻዎቹ 15 ደቂቃዎች ይሰረዙ?</translation>
 <translation id="3616113530831147358">ድምፅ</translation>
 <translation id="3622349720008044802">መስኮቶች ያቀናብሩ</translation>
 <translation id="3631987586758005671">ለ <ph name="DEVICE_NAME" /> በማጋራት ላይ</translation>
@@ -736,6 +737,7 @@
 <translation id="5001388021414335527">ይህንን ጣቢያ እዚህ ይከተሉ</translation>
 <translation id="5004416275253351869">የGoogle እንቅስቃሴ መቆጣጠሪያዎች</translation>
 <translation id="5005498671520578047">የይለፍ ቃል ቅዳ</translation>
+<translation id="5010886807652684893">ምስላዊ እይታ</translation>
 <translation id="5011311129201317034"><ph name="SITE" /> መገናኘት ይፈልጋል</translation>
 <translation id="5016205925109358554">ሰሪፍ</translation>
 <translation id="5017529052065664584">ያለፉት 15 ደቂቃዎች</translation>
@@ -793,6 +795,7 @@
 <translation id="5342314432463739672">የፈቃድ ጥያቄዎች</translation>
 <translation id="53537532693258630">እርስዎ ያስወገዷቸው ጣቢያዎች እዚህ ይመጣሉ</translation>
 <translation id="5355191726083956201">የተሻሻለ ጥበቃ በርቷል</translation>
+<translation id="5361107212971249203">ጽሁፍ</translation>
 <translation id="5368227114232678694">በዚህ መሣሪያ ላይ በግል ለማሰስ፣ ማንነት የማያሳውቅን ይሞክሩ</translation>
 <translation id="5375577065097716013">በ Google ሌንስ <ph name="BEGIN_NEW" />አዲስ<ph name="END_NEW" /> ምስል ይፈልጉ</translation>
 <translation id="5401851137404501592">ለመቀጠል <ph name="IDENTITY_PROVIDER_ETLD_PLUS_ONE" /> የእርስዎን ስም፣ ኢሜይል አድራሻ እና የመገለጫ ሥዕል ለዚህ ጣቢያ ያጋራል።</translation>
@@ -822,6 +825,7 @@
 <translation id="5517095782334947753">ከ<ph name="FROM_ACCOUNT" /> የመጡ ዕልባቶች፣ ታሪክ፣ የይለፍ ቃላት  እና ሌሎች ቅንብሮች አለዎት።</translation>
 <translation id="5524761631371622910">ሙከራዎች ሲበሩ እና Chrome በዘፈቀደ እርስዎን በገቢር ሙከራ ካስቀመጠ የአሰሳ ታሪክዎ በሚያዩዋቸው ማስታወቂያዎች እና ከታች በተገመተው ዝንባሌዎች ላይ ተጽዕኖ ይኖረዋል። የእርስዎን ግላዊነት ለመጠበቅ Chrome በየወሩ ዝንባሌዎችዎን ይሰርዛል።</translation>
 <translation id="5524843473235508879">አቅጣጫ ማዞር ታግዷል።</translation>
+<translation id="554297709083131118">ከመጨረሻዎቹ 15 ደቂቃዎች የመጣው የሚከተለው ውሂብ ይሰረዛል</translation>
 <translation id="5548606607480005320">የደህንነት ፍተሻ</translation>
 <translation id="5555525474779371165">የእርስዎን ደህንነቱ የተጠበቀ የአሰሳ ጥበቃን ይምረጡ</translation>
 <translation id="5556459405103347317">ዳግም ጫን</translation>
@@ -1189,6 +1193,7 @@
 <translation id="7454641608352164238">በቂ ቦታ የለም</translation>
 <translation id="7455988709578031708">በእርስዎ የአሰሳ ታሪክ ላይ የተመሠረተ። ይህ ቅንብር በርቷል።</translation>
 <translation id="7456774706094330779">የተራዘመ ቅድሚያ መጫን</translation>
+<translation id="7466431077154602932">ውሱን ዕይታ</translation>
 <translation id="7474822150871987353">ከገጹ ሳይወጡ በድር ጣቢያዎች ላይ ስላሉ ርዕሶች ይወቁ። እነሱን ለመፈለግ በገጹ ላይ አንድ ወይም ከዚያ በላይ ቃላትን ይምረጡ።</translation>
 <translation id="7475192538862203634">ይህን በተደጋጋሚነት እያዩት ከሆኑ እነዚህን <ph name="BEGIN_LINK" />የአስተያየት ጥቆማዎች<ph name="END_LINK" /> ይሞክሩ።</translation>
 <translation id="7475688122056506577">ኤስዲ ካርድ አልተገኘም። አንዳንዶቹ ፋይሎችዎ ሊጎድሉ ይችላሉ።</translation>
@@ -1263,6 +1268,7 @@
 <translation id="78270725016672455">ኮምፒተርዎ ወደ አንድ ጣቢያ ለመግባት ይህንን መሣሪያ ለመመዝገብ ይፈልጋል</translation>
 <translation id="7844171778363018843">ለማመሳሰል ምንም ውሂብ አልተመረጠም</translation>
 <translation id="7846296061357476882">የGoogle አገልግሎቶች</translation>
+<translation id="7847228556075070294">የተሰረዘ ታሪክ፣ ኩኪዎች እና ሌላ ውሂብ</translation>
 <translation id="784934925303690534">የጊዜ ወሰን</translation>
 <translation id="7851858861565204677">ሌሎች መሣሪያዎች</translation>
 <translation id="7853202427316060426">እንቅስቃሴ</translation>
@@ -1317,6 +1323,7 @@
 <translation id="8058746566562539958">በአዲስ የChrome ትር ውስጥ ክፈት</translation>
 <translation id="8062594758852531064">የተራዘመ ቅድሚያ መጫን፦</translation>
 <translation id="8063895661287329888">ዕልባት ማከል አልተሳካም።</translation>
+<translation id="8066816452984416180">ይህን ገጽ በፍጥነት ዕልባት ያድርጉ። ይህን አቋራጭ ለማርትዕ ይንኩ እና ይያዙ።</translation>
 <translation id="806745655614357130">የእኔን ውሂብ ለብቻው አቆይ</translation>
 <translation id="8073388330009372546">ምስሉን በአዲስ ትር ውስጥ ክፈት</translation>
 <translation id="8076492880354921740">ትሮች</translation>
@@ -1348,6 +1355,7 @@
 <translation id="8216351761227087153">ይመልከቱ</translation>
 <translation id="8218622182176210845">መለያዎን ያቀናብሩ</translation>
 <translation id="8223642481677794647">የምግብ ካርድ ምናሌ</translation>
+<translation id="8236097722223016103">ወደ እልባቶች አክል</translation>
 <translation id="8250920743982581267">ሰነዶች</translation>
 <translation id="8255617931166444521">ጣቢያዎች የአሰሳ እንቅስቃሴዎን በራሳቸው ጣቢያ ላይ ብቻ ለማየት የእርስዎን ኩኪዎች ብቻ ሊጠቀሙ ይችላሉ።</translation>
 <translation id="8259179246279078674">ቅድሚያ የሚጫኑ ገጾች የተመሠጠሩ ስለሆኑ Google ቅድሚያ ስለተጫነው የገጽ ይዘት ምንም ነገር አያውቅም። የGoogle አገልጋዮች የትኛዎቹ ጣቢያዎች በግል ቅድሚያ እንደሚጫኑ ይማራል። ይህ መረጃ ገጾቹን ቅድሚያ ለመጫን ብቻ ነው ስራ ላይ የሚውለው፣ እና ከGoogle መለያዎ ከመጣ ሌላ መረጃ ጋር አይገናኝም።</translation>
@@ -1442,6 +1450,7 @@
 <translation id="869891660844655955">የሚያበቀበት ጊዜ</translation>
 <translation id="8699120352855309748">እነዚህን ቋንቋዎች ለመተርጎም አያቅርቡ</translation>
 <translation id="8712637175834984815">ገባኝ</translation>
+<translation id="8723453889042591629">ይህን ገጽ በፍጥነት ይተርጉሙ። ይህን አቋራጭ ለማርትዕ ነክተው ይያዙ።</translation>
 <translation id="8725066075913043281">እንደገና ይሞክሩ</translation>
 <translation id="8746155870861185046">ማድመቂያ ያጋሩ</translation>
 <translation id="874726034427945498">በእርስዎ አድራሻ አሞሌ ውስጥ የተሻሉ ጥቆማዎችን ለማየት ትሮችዎን እና ታሪክዎን ያስምሩ</translation>
@@ -1494,6 +1503,7 @@
 <translation id="8989968390305463310">የአሰሳ ታሪክዎ ከታች እንደተገመተው እርስዎ በሚያዩዋቸው ማስታወቂያዎች እና ዝንባሌዎች ላይ ተጽዕኖ ያሳድራል። የእርስዎን ግላዊነት ለመጠበቅ Chrome በየወሩ ዝንባሌዎችዎን በራስ-ሰር ይሰርዛል። እርስዎ ካላስወገዷቸው በስተቀር ዝንባሌዎችን ማደስ ይችላሉ።</translation>
 <translation id="8993760627012879038">አዲስ ትር በማንነት የማያሳውቅ ሁነታ ውስጥ ክፈት</translation>
 <translation id="8996847606757455498">ሌላ አቅራቢ ይምረጡ</translation>
+<translation id="8998289560386111590">መሣሪያዎ ላይ አይገኝም</translation>
 <translation id="8998729206196772491">በ<ph name="MANAGED_DOMAIN" /> ወደሚተዳደር መለያ እየገቡና ሙሉውን የChrome ውሂብዎ ቁጥጥር ለአስተዳዳሪው እየሰጡ ነው። የእርስዎ ውሂብ እስከመጨረሻው ከዚህ መለያ ጋር ይተሳሰራል። ከChrome ዘግቶ መውጣት ውሂብዎን ከዚህ መሣሪያ ይሰርዘዋል፣ ነገር ግን በእርስዎ የGoogle መለያ ላይ እንደተከማቸ ይቆያል።</translation>
 <translation id="9022774213089566801">በተደጋጋሚነት የተጎበኙ</translation>
 <translation id="9022871169049522985">ጣቢያዎች እና ማስታወቂያ ሰሪዎች የማስታወቂያዎቻቸውን አፈጻጸም መለካት ይችላሉ።</translation>

@@ -25,6 +25,7 @@
 #include <memory>
 #include "third_party/blink/renderer/core/dom/pseudo_element.h"
 #include "third_party/blink/renderer/core/dom/tree_scope.h"
+#include "third_party/blink/renderer/core/layout/layout_counter.h"
 #include "third_party/blink/renderer/core/layout/layout_image.h"
 #include "third_party/blink/renderer/core/layout/layout_image_resource.h"
 #include "third_party/blink/renderer/core/layout/layout_image_resource_style_image.h"
@@ -80,7 +81,7 @@ LayoutObject* TextContentData::CreateLayoutObject(
     const ComputedStyle& pseudo_style,
     LegacyLayout legacy) const {
   LayoutObject* layout_object =
-      LayoutTextFragment::CreateAnonymous(pseudo, text_.Impl(), legacy);
+      LayoutTextFragment::CreateAnonymous(pseudo, text_, legacy);
   layout_object->SetPseudoElementStyle(&pseudo_style);
   return layout_object;
 }
@@ -100,7 +101,7 @@ LayoutObject* CounterContentData::CreateLayoutObject(
     const ComputedStyle& pseudo_style,
     LegacyLayout legacy) const {
   LayoutObject* layout_object =
-      LayoutObjectFactory::CreateCounter(pseudo, *this, legacy);
+      MakeGarbageCollected<LayoutCounter>(pseudo, *this);
   layout_object->SetPseudoElementStyle(&pseudo_style);
   return layout_object;
 }

@@ -6,6 +6,7 @@
 
 #include <string>
 
+#include "ash/constants/ash_constants.h"
 #include "base/time/time.h"
 #include "base/trace_event/trace_event.h"
 #include "build/branding_buildflags.h"
@@ -214,7 +215,6 @@
 
 #if BUILDFLAG(ENABLE_OFFLINE_PAGES)
 #include "chrome/browser/offline_pages/prefetch/offline_metrics_collector_impl.h"
-#include "chrome/browser/offline_pages/prefetch/prefetch_background_task_handler_impl.h"
 #include "components/offline_pages/core/prefetch/prefetch_prefs.h"
 #endif
 
@@ -278,6 +278,7 @@
 #include "chrome/browser/ui/webui/new_tab_page/new_tab_page_handler.h"
 #include "chrome/browser/ui/webui/new_tab_page/new_tab_page_ui.h"
 #include "chrome/browser/ui/webui/settings/settings_ui.h"
+#include "chrome/browser/ui/webui/side_panel/companion/promo_handler.h"
 #include "chrome/browser/ui/webui/side_panel/read_anything/read_anything_prefs.h"
 #include "chrome/browser/ui/webui/tab_search/tab_search_prefs.h"
 #include "chrome/browser/ui/webui/whats_new/whats_new_ui.h"
@@ -826,6 +827,18 @@ const char kGlanceablesSignoutScreenshotDuration[] =
 const char kEasyUnlockLocalStateUserPrefs[] = "easy_unlock.user_prefs";
 #endif  // BUILDFLAG(IS_CHROMEOS_ASH)
 
+// Deprecated 03/2023
+#if BUILDFLAG(IS_CHROMEOS_ASH)
+const char kDarkLightModeNudgeLeftToShowCount[] =
+    "ash.dark_light_mode.educational_nudge";
+#endif  // BUILDFLAG(IS_CHROMEOS_ASH)
+
+// Deprecated 03/2023.
+#if BUILDFLAG(IS_WIN)
+const char kWebAuthnLastOperationWasNativeAPI[] =
+    "webauthn.last_op_used_native_api";
+#endif
+
 // Register local state used only for migration (clearing or moving to a new
 // key).
 void RegisterLocalStatePrefsForMigration(PrefRegistrySimple* registry) {
@@ -1119,6 +1132,17 @@ void RegisterProfilePrefsForMigration(
   // Deprecated 03/2023.
   registry->RegisterTimePref(
       kGoogleSearchDomainMixingMetricsEmitterLastMetricsTime, base::Time());
+
+  // Deprecated 03/2023.
+#if BUILDFLAG(IS_CHROMEOS_ASH)
+  registry->RegisterIntegerPref(kDarkLightModeNudgeLeftToShowCount,
+                                ash::kDarkLightModeNudgeMaxShownCount);
+#endif  // BUILDFLAG(IS_CHROMEOS_ASH)
+
+  // Deprecated 03/2023.
+#if BUILDFLAG(IS_WIN)
+  registry->RegisterBooleanPref(kWebAuthnLastOperationWasNativeAPI, false);
+#endif
 }
 
 }  // namespace
@@ -1531,6 +1555,7 @@ void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry,
   BrowserFeaturePromoSnoozeService::RegisterProfilePrefs(registry);
   captions::LiveTranslateController::RegisterProfilePrefs(registry);
   ChromeAuthenticatorRequestDelegate::RegisterProfilePrefs(registry);
+  companion::PromoHandler::RegisterProfilePrefs(registry);
   DeviceServiceImpl::RegisterProfilePrefs(registry);
   DevToolsWindow::RegisterProfilePrefs(registry);
   DriveService::RegisterProfilePrefs(registry);
@@ -2172,6 +2197,16 @@ void MigrateObsoleteProfilePrefs(Profile* profile) {
   // Added 03/2023
   profile_prefs->ClearPref(
       kGoogleSearchDomainMixingMetricsEmitterLastMetricsTime);
+
+// Added 03/2023.
+#if BUILDFLAG(IS_CHROMEOS_ASH)
+  profile_prefs->ClearPref(kDarkLightModeNudgeLeftToShowCount);
+#endif  // BUILDFLAG(IS_CHROMEOS_ASH)
+
+  // Added 03/2023.
+#if BUILDFLAG(IS_WIN)
+  profile_prefs->ClearPref(kWebAuthnLastOperationWasNativeAPI);
+#endif
 
   // Please don't delete the following line. It is used by PRESUBMIT.py.
   // END_MIGRATE_OBSOLETE_PROFILE_PREFS

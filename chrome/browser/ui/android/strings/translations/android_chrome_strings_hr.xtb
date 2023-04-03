@@ -737,6 +737,7 @@ Da biste promijenili tu postavku, <ph name="BEGIN_LINK" />poništite sinkronizac
 <translation id="5001388021414335527">Pratite web-lokaciju ovdje</translation>
 <translation id="5004416275253351869">Kontrole aktivnosti na Googleu</translation>
 <translation id="5005498671520578047">Kopiranje zaporke</translation>
+<translation id="5010886807652684893">Vizualni prikaz</translation>
 <translation id="5011311129201317034">Web-lokacija <ph name="SITE" /> želi se povezati</translation>
 <translation id="5016205925109358554">Serif</translation>
 <translation id="5017529052065664584">Posljednjih 15 minuta</translation>
@@ -794,6 +795,7 @@ Da biste promijenili tu postavku, <ph name="BEGIN_LINK" />poništite sinkronizac
 <translation id="5342314432463739672">Zahtjevi za dopuštenja</translation>
 <translation id="53537532693258630">Ovdje će se prikazivati web-lokacije koje ste uklonili</translation>
 <translation id="5355191726083956201">Uključena je Poboljšana zaštita</translation>
+<translation id="5361107212971249203">tekstna poruka</translation>
 <translation id="5368227114232678694">Da biste pregledavali u privatnosti na ovom uređaju, isprobajte anonimni način.</translation>
 <translation id="5375577065097716013">Pretraži sliku pomoću Google objektiva <ph name="BEGIN_NEW" />Novo<ph name="END_NEW" /></translation>
 <translation id="5401851137404501592">Da biste nastavili, <ph name="IDENTITY_PROVIDER_ETLD_PLUS_ONE" /> podijelit će vaše ime, e-adresu i profilnu sliku s ovom web-lokacijom.</translation>
@@ -1191,6 +1193,7 @@ Na primjer, neke web-lokacije na taj zahtjev mogu odgovoriti tako da vam prikaž
 <translation id="7454641608352164238">Nema dovoljno prostora</translation>
 <translation id="7455988709578031708">Na temelju vaše povijesti pregledavanja. Postavka je uključena.</translation>
 <translation id="7456774706094330779">Prošireno predučitavanje</translation>
+<translation id="7466431077154602932">Sažeti prikaz</translation>
 <translation id="7474822150871987353">Ne morate napustiti stranicu da biste saznali koje su teme web-lokacija. Odaberite jednu ili više riječi na stranici da biste ih pretražili.</translation>
 <translation id="7475192538862203634">Ako se to često događa, isprobajte ove <ph name="BEGIN_LINK" />prijedloge<ph name="END_LINK" />.</translation>
 <translation id="7475688122056506577">SD kartica nije pronađena. Neke od vaših datoteka možda nedostaju.</translation>
@@ -1320,6 +1323,7 @@ Na primjer, neke web-lokacije na taj zahtjev mogu odgovoriti tako da vam prikaž
 <translation id="8058746566562539958">Otvori u novoj Chrome kartici</translation>
 <translation id="8062594758852531064">Prošireno predučitavanje:</translation>
 <translation id="8063895661287329888">Dodavanje oznake nije uspjelo.</translation>
+<translation id="8066816452984416180">Brzo označite ovu stranicu. Da biste uredili taj prečac, dodirnite ga i zadržite pritisak.</translation>
 <translation id="806745655614357130">Moje podatke čuvaj zasebno</translation>
 <translation id="8073388330009372546">Otvori sliku u novoj kartici</translation>
 <translation id="8076492880354921740">Kartice</translation>
@@ -1351,6 +1355,7 @@ Na primjer, neke web-lokacije na taj zahtjev mogu odgovoriti tako da vam prikaž
 <translation id="8216351761227087153">Pogledajte</translation>
 <translation id="8218622182176210845">Upravljanje računom</translation>
 <translation id="8223642481677794647">Izbornik kartica feeda</translation>
+<translation id="8236097722223016103">Dodaj u oznake</translation>
 <translation id="8250920743982581267">Dokumenti</translation>
 <translation id="8255617931166444521">Pojedina web-lokacija može upotrebljavati vaše kolačiće samo za uvid u vašu aktivnost pregledavanja na toj web-lokaciji</translation>
 <translation id="8259179246279078674">Budući da se predučitane stranice šifriraju, Google neće saznati ništa o sadržaju predučitanih stranica. Googleovi poslužitelji saznat će koje se web-lokacije anonimno predučitavaju. Ti se podaci koriste samo za predučitavanje stranica i ne povezuju se s drugim podacima s vašeg Google računa.</translation>
@@ -1498,6 +1503,7 @@ Na primjer, neke web-lokacije na taj zahtjev mogu odgovoriti tako da vam prikaž
 <translation id="8989968390305463310">Vaša povijest pregledavanja utječe na oglase koji vam se prikazuju i interese procijenjene u nastavku. Da bi zaštitio vašu privatnost, Chrome automatski kontinuirano briše vaše interese svakog mjeseca. Interesi se mogu osvježiti ako ih ne uklonite.</translation>
 <translation id="8993760627012879038">Otvaranje nove kartice u anonimnom načinu</translation>
 <translation id="8996847606757455498">Odaberi drugog davatelja usluga</translation>
+<translation id="8998289560386111590">Nije dostupno na vašem uređaju</translation>
 <translation id="8998729206196772491">Prijavljujete se računom kojim upravlja <ph name="MANAGED_DOMAIN" /> i njegovom administratoru dajete kontrolu nad svojim podacima u Chromeu. Vaši će se podaci trajno povezati s tim računom. Ako se odjavite iz Chromea, vaši će se podaci izbrisati s ovog uređaja, no ostat će pohranjeni na vašem Google računu.</translation>
 <translation id="9022774213089566801">Često posjećeno</translation>
 <translation id="9022871169049522985">Web-lokacije i oglašivači mogu mjeriti izvedbu svojih oglasa</translation>

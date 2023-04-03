@@ -22,6 +22,7 @@
 
 これまでにウェブサイトやアプリに許可した権限がこのアカウントに適用される可能性があります。Google アカウントは [<ph name="SETTINGS_LINK_BEGIN" />設定<ph name="SETTINGS_LINK_END" />] で管理できます。</translation>
 <translation id="1640672724030957280">ダウンロードしています...</translation>
+<translation id="1691024636239527281">{NUM_DEVICES,plural, =0{Chromium は HID デバイスに接続されていました}=1{Chromium は HID デバイスに接続されています}other{Chromium は HID デバイスに接続されています}}</translation>
 <translation id="1708666629004767631">Chromium がさらに安全になりました。最新バージョンをぜひお試しください。</translation>
 <translation id="17264556997921157">サイトでの広告表示に使用される興味 / 関心のトピックを表示、削除できます。Chromium では最近の閲覧履歴に基づいてユーザーの興味 / 関心を推定します。</translation>
 <translation id="1733725117201708356">Chromium でまもなく閲覧データが削除されます</translation>
@@ -79,7 +80,6 @@
 <translation id="2928420929544864228">インストールが完了しました。</translation>
 <translation id="2977470724722393594">Chromium は最新版です</translation>
 <translation id="2977506796191543575">サイトがパスワードを不正に取得しようとしている場合や、ユーザーが安全でないファイルをダウンロードしようとした場合は、URL とページ コンテンツの一部をセーフ ブラウジングに送信することがあります</translation>
-<translation id="3021964162552004083">{NUM_DEVICES,plural, =1{Chromium は HID デバイスに接続されています}other{Chromium は HID デバイスに接続されています}}</translation>
 <translation id="3032706164202344641">Chromium でパスワードを確認できません。しばらくしてからもう一度お試しください。</translation>
 <translation id="3032787606318309379">Chromium に追加...</translation>
 <translation id="3038232873781883849">インストールの待機中...</translation>

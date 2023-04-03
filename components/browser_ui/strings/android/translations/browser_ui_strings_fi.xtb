@@ -103,6 +103,7 @@
 <translation id="2717722538473713889">Sähköpostiosoitteet</translation>
 <translation id="2750481671343847896">Sivustot voivat näyttää henkilöllisyyspalveluiden sisäänkirjautumiskehotteita.</translation>
 <translation id="2822354292072154809">Haluatko varmasti nollata kaikki sivuston käyttöoikeudet (<ph name="CHOSEN_OBJECT_NAME" />)?</translation>
+<translation id="2850913818900871965">Pyydä mobiilinäkymää</translation>
 <translation id="2870560284913253234">Sivusto</translation>
 <translation id="2874939134665556319">Edellinen kappale</translation>
 <translation id="2891975107962658722">Estä sivustoa tallentamasta dataa laitteellesi</translation>
@@ -222,7 +223,6 @@
 <translation id="509133520954049755">Pyydä tietokonenäkymää</translation>
 <translation id="5100237604440890931">Tiivistetty – laajenna klikkaamalla.</translation>
 <translation id="5123685120097942451">Incognito-välilehti</translation>
-<translation id="5134599672855298214">Pyydä mobiilinäkymää (suositus)</translation>
 <translation id="5186036860380548585">Toiminto on käytettävissä näytön yläosassa</translation>
 <translation id="5197729504361054390"><ph name="BEGIN_BOLD" /><ph name="SITE" /><ph name="END_BOLD" /> saa valitsemasi yhteystiedot.</translation>
 <translation id="5216942107514965959">Viimeksi avattu tänään</translation>

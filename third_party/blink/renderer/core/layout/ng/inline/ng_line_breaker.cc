@@ -242,8 +242,7 @@ LayoutUnit ComputeFloatAncestorInlineEndSize(
     const NGInlineItem& item = *cur;
 
     if (item.Type() == NGInlineItem::kCloseTag) {
-      if (item.HasEndEdge())
-        inline_end_size += ComputeInlineEndSize(space, item.Style());
+      inline_end_size += ComputeInlineEndSize(space, item.Style());
       continue;
     }
 
@@ -415,9 +414,7 @@ NGLineBreaker::NGLineBreaker(NGInlineNode node,
   SetCurrentStyle(*line_initial_style);
 }
 
-NGLineBreaker::~NGLineBreaker() {
-  propagated_break_tokens_.clear();
-}
+NGLineBreaker::~NGLineBreaker() = default;
 
 inline NGInlineItemResult* NGLineBreaker::AddItem(const NGInlineItem& item,
                                                   unsigned end_offset,
@@ -2380,7 +2377,7 @@ void NGLineBreaker::HandleFloat(const NGInlineItem& item,
       // algorithm. The float will start in the next fragmentainer.
       auto* break_before = NGBlockBreakToken::CreateBreakBefore(
           unpositioned_float.node, /* is_forced_break */ false);
-      PropagateBreakToken(break_before);
+      line_info->PropagateBreakToken(break_before);
       return;
     }
     // If we broke inside the float, we also need to propagate a break token to
@@ -2389,7 +2386,7 @@ void NGLineBreaker::HandleFloat(const NGInlineItem& item,
     const NGPhysicalFragment& fragment =
         item_result->positioned_float->layout_result->PhysicalFragment();
     if (const NGBreakToken* token = fragment.BreakToken())
-      PropagateBreakToken(To<NGBlockBreakToken>(token));
+      line_info->PropagateBreakToken(To<NGBlockBreakToken>(token));
   }
 
   NGLayoutOpportunity opportunity = exclusion_space_->FindLayoutOpportunity(
@@ -2435,19 +2432,15 @@ bool NGLineBreaker::ComputeOpenTagResult(
   DCHECK_EQ(item.Type(), NGInlineItem::kOpenTag);
   DCHECK(item.Style());
   const ComputedStyle& style = *item.Style();
-  item_result->has_edge = item.HasStartEdge();
   if (!is_in_svg_text && item.ShouldCreateBoxFragment() &&
-      (style.HasBorder() || style.MayHavePadding() ||
-       (style.MayHaveMargin() && item_result->has_edge))) {
+      (style.HasBorder() || style.MayHavePadding() || style.MayHaveMargin())) {
     item_result->borders = ComputeLineBorders(style);
     item_result->padding = ComputeLinePadding(constraint_space, style);
-    if (item_result->has_edge) {
-      item_result->margins = ComputeLineMarginsForSelf(constraint_space, style);
-      item_result->inline_size = item_result->margins.inline_start +
-                                 item_result->borders.inline_start +
-                                 item_result->padding.inline_start;
-      return true;
-    }
+    item_result->margins = ComputeLineMarginsForSelf(constraint_space, style);
+    item_result->inline_size = item_result->margins.inline_start +
+                               item_result->borders.inline_start +
+                               item_result->padding.inline_start;
+    return true;
   }
   return false;
 }
@@ -2507,8 +2500,7 @@ void NGLineBreaker::HandleCloseTag(const NGInlineItem& item,
                                    NGLineInfo* line_info) {
   NGInlineItemResult* item_result = AddItem(item, line_info);
 
-  item_result->has_edge = item.HasEndEdge();
-  if (item_result->has_edge && !is_svg_text_) {
+  if (!is_svg_text_) {
     DCHECK(item.Style());
     const ComputedStyle& style = *item.Style();
     item_result->inline_size = ComputeInlineEndSize(constraint_space_, &style);
@@ -3109,10 +3101,6 @@ const NGInlineBreakToken* NGLineBreaker::CreateBreakToken(
 
   return NGInlineBreakToken::Create(node_, current_style_.get(), item_index_,
                                     offset_, flags, sub_break_token);
-}
-
-void NGLineBreaker::PropagateBreakToken(const NGBlockBreakToken* token) {
-  propagated_break_tokens_.push_back(token);
 }
 
 }  // namespace blink

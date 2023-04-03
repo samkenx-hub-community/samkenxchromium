@@ -737,6 +737,7 @@ Para cambiar esta opción de configuración, deberás <ph name="BEGIN_LINK" />re
 <translation id="5001388021414335527">Seguir este sitio aquí</translation>
 <translation id="5004416275253351869">Controis de actividade de Google</translation>
 <translation id="5005498671520578047">Copiar contrasinal</translation>
+<translation id="5010886807652684893">Vista visual</translation>
 <translation id="5011311129201317034"><ph name="SITE" /> quere conectarse</translation>
 <translation id="5016205925109358554">Serif</translation>
 <translation id="5017529052065664584">Últimos 15 minutos</translation>
@@ -794,6 +795,7 @@ Para cambiar esta opción de configuración, deberás <ph name="BEGIN_LINK" />re
 <translation id="5342314432463739672">Solicitudes de permisos</translation>
 <translation id="53537532693258630">Os sitios que quites aparecerán aquí</translation>
 <translation id="5355191726083956201">A protección mellorada está activada</translation>
+<translation id="5361107212971249203">mensaxe de texto</translation>
 <translation id="5368227114232678694">Se queres navegar de forma privada neste dispositivo, proba o modo de incógnito</translation>
 <translation id="5375577065097716013">Buscar imaxe con Google Lens <ph name="BEGIN_NEW" />Novo<ph name="END_NEW" /></translation>
 <translation id="5401851137404501592">Para continuar, <ph name="IDENTITY_PROVIDER_ETLD_PLUS_ONE" /> compartirá o teu nome, enderezo de correo electrónico e imaxe do perfil con este sitio.</translation>
@@ -1191,6 +1193,7 @@ Por exemplo, algúns sitios web poden responder a esta solicitude mostrándoche 
 <translation id="7454641608352164238">Non hai espazo suficiente</translation>
 <translation id="7455988709578031708">En función do teu historial de navegación. Esta opción de configuración está activada.</translation>
 <translation id="7456774706094330779">Precarga ampliada</translation>
+<translation id="7466431077154602932">Vista compacta</translation>
 <translation id="7474822150871987353">Obtén información sobre os temas en sitios web sen saír da páxina. Selecciona unha ou varias palabras na páxina para buscalas.</translation>
 <translation id="7475192538862203634">Se esta mensaxe aparece frecuentemente, proba estas <ph name="BEGIN_LINK" />suxestións<ph name="END_LINK" />.</translation>
 <translation id="7475688122056506577">Non se atopou a tarxeta SD. É posible que falten algúns dos teus ficheiros.</translation>
@@ -1320,6 +1323,7 @@ Por exemplo, algúns sitios web poden responder a esta solicitude mostrándoche 
 <translation id="8058746566562539958">Abrir na pestana de Chrome</translation>
 <translation id="8062594758852531064">Precarga ampliada:</translation>
 <translation id="8063895661287329888">Non se puido engadir o marcador.</translation>
+<translation id="8066816452984416180">Engade rapidamente esta páxina aos marcadores. Mantén premido este atallo para editalo.</translation>
 <translation id="806745655614357130">Conservar os meus datos por separado</translation>
 <translation id="8073388330009372546">Abrir imaxe na pestana nova</translation>
 <translation id="8076492880354921740">Pestanas</translation>
@@ -1351,6 +1355,7 @@ Por exemplo, algúns sitios web poden responder a esta solicitude mostrándoche 
 <translation id="8216351761227087153">Ver</translation>
 <translation id="8218622182176210845">Xestiona a túa conta</translation>
 <translation id="8223642481677794647">Menú da tarxeta do feed</translation>
+<translation id="8236097722223016103">Engadir aos marcadores</translation>
 <translation id="8250920743982581267">Documentos</translation>
 <translation id="8255617931166444521">Os distintos sitios só poden utilizar as túas cookies para consultar a actividade de navegación que levaches a cabo no seu propio sitio</translation>
 <translation id="8259179246279078674">Como as páxinas precargadas están encriptadas, Google non recibirá información sobre o seu contido. Os nosos servidores saberán que sitios se precargan de forma privada. Esta información só se utilizará para precargar as páxinas e non se vinculará a outros datos da túa Conta de Google.</translation>
@@ -1445,6 +1450,7 @@ Por exemplo, algúns sitios web poden responder a esta solicitude mostrándoche 
 <translation id="869891660844655955">Data de vencemento</translation>
 <translation id="8699120352855309748">Non ofrecer a opción de traducir texto escrito nestes idiomas</translation>
 <translation id="8712637175834984815">De acordo</translation>
+<translation id="8723453889042591629">Traduce rapidamente esta páxina. Para editar este atallo, mantén premido o botón.</translation>
 <translation id="8725066075913043281">Tentar de novo</translation>
 <translation id="8746155870861185046">Compartir texto destacado</translation>
 <translation id="874726034427945498">Para ver mellores suxestións na barra de enderezos, sincroniza as pestanas e o historial</translation>
@@ -1497,6 +1503,7 @@ Por exemplo, algúns sitios web poden responder a esta solicitude mostrándoche 
 <translation id="8989968390305463310">O teu historial de navegación aféctalles aos anuncios que se che mostran e aos intereses estimados que se indican abaixo. Para protexer a túa privacidade, Chrome elimina automaticamente os teus intereses cada mes. A menos que os quites, os intereses poden actualizarse.</translation>
 <translation id="8993760627012879038">Abrir unha nova pestana no modo de incógnito</translation>
 <translation id="8996847606757455498">Escoller outro provedor</translation>
+<translation id="8998289560386111590">Non está dispoñible no teu dispositivo</translation>
 <translation id="8998729206196772491">Estás iniciando sesión cunha conta xestionada por <ph name="MANAGED_DOMAIN" /> e proporcionándolle ao seu administrador o control dos teus datos de Chrome, que quedarán ligados permanentemente a esta conta. Se pechas sesión en Chrome, eliminaranse os teus datos deste dispositivo, pero seguirán almacenados na túa conta de Google.</translation>
 <translation id="9022774213089566801">Visitas frecuentes</translation>
 <translation id="9022871169049522985">Os sitios e os anunciantes poden medir o rendemento dos seus anuncios</translation>

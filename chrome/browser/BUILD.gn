@@ -375,6 +375,8 @@ static_library("browser") {
     "dips/cookie_access_filter.h",
     "dips/dips_bounce_detector.cc",
     "dips/dips_bounce_detector.h",
+    "dips/dips_browser_signin_detector.cc",
+    "dips/dips_browser_signin_detector.h",
     "dips/dips_cleanup_service.cc",
     "dips/dips_cleanup_service.h",
     "dips/dips_cleanup_service_factory.cc",
@@ -2111,7 +2113,6 @@ static_library("browser") {
     "//components/history/metrics",
     "//components/history_clusters/core",
     "//components/history_clusters/history_clusters_internals/webui",
-    "//components/image_service",
     "//components/infobars/content",
     "//components/infobars/core",
     "//components/invalidation/impl",
@@ -2167,6 +2168,7 @@ static_library("browser") {
     "//components/origin_trials:browser",
     "//components/origin_trials:common",
     "//components/os_crypt/sync",
+    "//components/page_image_service",
     "//components/page_info/core:proto",
     "//components/page_load_metrics/browser",
     "//components/page_load_metrics/browser/observers/ad_metrics",
@@ -2174,6 +2176,7 @@ static_library("browser") {
     "//components/paint_preview/buildflags",
     "//components/paint_preview/features",
     "//components/password_manager/content/browser",
+    "//components/password_manager/content/common",
     "//components/password_manager/core/browser",
     "//components/password_manager/core/common",
     "//components/payments/content:utils",
@@ -3872,6 +3875,8 @@ static_library("browser") {
       "new_tab_page/chrome_colors/chrome_colors_factory.h",
       "new_tab_page/chrome_colors/chrome_colors_service.cc",
       "new_tab_page/chrome_colors/chrome_colors_service.h",
+      "new_tab_page/customize_chrome/customize_chrome_feature_promo_helper.cc",
+      "new_tab_page/customize_chrome/customize_chrome_feature_promo_helper.h",
       "new_tab_page/modules/drive/drive_handler.cc",
       "new_tab_page/modules/drive/drive_handler.h",
       "new_tab_page/modules/drive/drive_service.cc",
@@ -4329,6 +4334,8 @@ static_library("browser") {
       "webauthn/local_credential_management.h",
       "webauthn/observable_authenticator_list.cc",
       "webauthn/observable_authenticator_list.h",
+      "webauthn/passkey_model_factory.cc",
+      "webauthn/passkey_model_factory.h",
       "webauthn/webauthn_switches.cc",
       "webauthn/webauthn_switches.h",
     ]
@@ -4359,6 +4366,7 @@ static_library("browser") {
       "//chrome/browser/resource_coordinator:intervention_policy_database_proto",
       "//chrome/browser/resources:component_extension_resources",
       "//chrome/browser/share/proto:proto",
+      "//chrome/browser/smart_card",
       "//chrome/browser/support_tool:support_tool_proto",
       "//chrome/browser/ui/color:color_headers",
       "//chrome/browser/ui/webui/access_code_cast:mojo_bindings",
@@ -4421,6 +4429,7 @@ static_library("browser") {
       "//components/user_notes/interfaces",
       "//components/user_notes/storage",
       "//components/web_modal",
+      "//components/webauthn/core/browser",
       "//courgette:courgette_lib",
       "//services/device/public/cpp/hid",
       "//third_party/sqlite",
@@ -4965,7 +4974,6 @@ static_library("browser") {
       "//ash/components/arc",
       "//ash/components/arc:arc_base",
       "//ash/components/arc:arc_base_utils",
-      "//ash/components/arc/enterprise",
       "//ash/components/arc/mojom",
       "//ash/constants",
       "//ash/public/cpp",
@@ -5044,7 +5052,6 @@ static_library("browser") {
       "//chrome/browser/nearby_sharing/proto",
       "//chrome/browser/nearby_sharing/proto:tachyon_proto",
       "//chrome/browser/nearby_sharing/public/cpp",
-      "//chrome/browser/nearby_sharing/scheduling",
       "//chrome/browser/policy:onc",
       "//chrome/browser/resources:app_icon_resources",
       "//chrome/browser/ui/ash/system_web_apps",
@@ -5094,6 +5101,7 @@ static_library("browser") {
       "//chromeos/ash/components/login/login_state",
       "//chromeos/ash/components/login/session",
       "//chromeos/ash/components/memory",
+      "//chromeos/ash/components/nearby/common/client",
       "//chromeos/ash/components/network",
       "//chromeos/ash/components/settings",
       "//chromeos/ash/components/standalone_browser",
@@ -5358,6 +5366,8 @@ static_library("browser") {
       "lacros/screen_orientation_delegate_lacros.h",
       "lacros/standalone_browser_test_controller.cc",
       "lacros/standalone_browser_test_controller.h",
+      "lacros/sync/crosapi_session_sync_favicon_delegate.cc",
+      "lacros/sync/crosapi_session_sync_favicon_delegate.h",
       "lacros/sync/crosapi_session_sync_notifier.cc",
       "lacros/sync/crosapi_session_sync_notifier.h",
       "lacros/sync/sync_crosapi_manager_lacros.cc",
@@ -6600,7 +6610,10 @@ static_library("browser") {
       ]
     }
     if (is_chromeos) {
-      deps += [ "//chromeos/crosapi/mojom" ]
+      deps += [
+        "//chrome/browser/chromeos/extensions/telemetry/api:keyed_service_factory",
+        "//chromeos/crosapi/mojom",
+      ]
     }
     if (is_linux || is_chromeos) {
       sources += [ "printing/printer_manager_dialog_linux.cc" ]
@@ -7098,15 +7111,8 @@ static_library("browser") {
       "offline_pages/offliner_helper.h",
       "offline_pages/offliner_user_data.cc",
       "offline_pages/offliner_user_data.h",
-      "offline_pages/prefetch/gcm_token.cc",
-      "offline_pages/prefetch/gcm_token.h",
       "offline_pages/prefetch/offline_metrics_collector_impl.cc",
       "offline_pages/prefetch/offline_metrics_collector_impl.h",
-      "offline_pages/prefetch/offline_prefetch_download_client.cc",
-      "offline_pages/prefetch/offline_prefetch_download_client.h",
-      "offline_pages/prefetch/prefetch_background_task_handler_impl.cc",
-      "offline_pages/prefetch/prefetch_background_task_handler_impl.h",
-      "offline_pages/prefetch/prefetch_background_task_scheduler.h",
       "offline_pages/prefetch/prefetch_service_factory.cc",
       "offline_pages/prefetch/prefetch_service_factory.h",
       "offline_pages/recent_tab_helper.cc",
@@ -7145,16 +7151,10 @@ static_library("browser") {
         "offline_pages/android/offline_page_model_factory.cc",
         "offline_pages/android/offline_page_origin_utils_android.cc",
         "offline_pages/android/offline_page_utils_android.cc",
-        "offline_pages/android/prefetch_background_task_android.cc",
-        "offline_pages/android/prefetch_background_task_android.h",
-        "offline_pages/android/prefetch_background_task_scheduler_android.cc",
-        "offline_pages/android/prefetch_configuration_impl_android.cc",
         "offline_pages/android/request_coordinator_bridge.cc",
         "offline_pages/android/request_coordinator_bridge.h",
         "offline_pages/android/request_coordinator_factory.cc",
       ]
-
-      deps += [ "//chrome/browser/offline_pages/android:jni_headers" ]
     }
 
     public_deps += [
@@ -7430,8 +7430,6 @@ static_library("browser") {
       "supervised_user/supervised_user_navigation_observer.h",
       "supervised_user/supervised_user_navigation_throttle.cc",
       "supervised_user/supervised_user_navigation_throttle.h",
-      "supervised_user/supervised_user_pref_store.cc",
-      "supervised_user/supervised_user_pref_store.h",
       "supervised_user/supervised_user_service.cc",
       "supervised_user/supervised_user_service.h",
       "supervised_user/supervised_user_service_factory.cc",
@@ -7497,16 +7495,22 @@ static_library("browser") {
     ]
 
     if (is_android) {
+      if (enable_arcore || enable_cardboard) {
+        deps += [ "//components/webxr/android" ]
+      }
+
       if (enable_arcore) {
         deps += [
           "//chrome/browser/android/vr:ar_jni_headers",
-          "//components/webxr/android",
           "//device/vr/android/arcore",
         ]
       }
 
       if (enable_cardboard) {
-        deps += [ "//device/vr/android/cardboard:vr_cardboard" ]
+        deps += [
+          "//chrome/browser/android/vr:vr_jni_headers",
+          "//device/vr/android/cardboard:vr_cardboard",
+        ]
       }
     } else {
       deps += [ "//device/vr/public/mojom:isolated_xr_service" ]

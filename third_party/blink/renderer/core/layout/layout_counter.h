@@ -23,7 +23,7 @@
 #define THIRD_PARTY_BLINK_RENDERER_CORE_LAYOUT_LAYOUT_COUNTER_H_
 
 #include "base/dcheck_is_on.h"
-#include "third_party/blink/renderer/core/layout/layout_text.h"
+#include "third_party/blink/renderer/core/layout/ng/inline/layout_ng_text.h"
 #include "third_party/blink/renderer/core/style/content_data.h"
 #include "third_party/blink/renderer/platform/heap/collection_support/heap_hash_map.h"
 
@@ -52,7 +52,7 @@ using CounterMap = HeapHashMap<AtomicString, Member<CounterNode>>;
 //
 // Keeping the map up to date is the reason why LayoutObjects need to call into
 // LayoutCounter during their lifetime (see the static functions below).
-class LayoutCounter : public LayoutText {
+class LayoutCounter : public LayoutNGText {
  public:
   LayoutCounter(PseudoElement&, const CounterContentData&);
   ~LayoutCounter() override;
@@ -99,7 +99,7 @@ class LayoutCounter : public LayoutText {
     NOT_DESTROYED();
     return type == kLayoutObjectCounter || LayoutText::IsOfType(type);
   }
-  scoped_refptr<StringImpl> OriginalText() const override;
+  String OriginalText() const override;
 
   // Removes the reference to the CounterNode associated with this layoutObject.
   // This is used to cause a counter display update when the CounterNode tree

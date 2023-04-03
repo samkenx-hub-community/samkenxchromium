@@ -76,6 +76,7 @@
 #include "content/browser/installedapp/installed_app_provider_impl.h"
 #include "content/browser/interest_group/ad_auction_document_data.h"
 #include "content/browser/loader/file_url_loader_factory.h"
+#include "content/browser/loader/keep_alive_url_loader_service.h"
 #include "content/browser/loader/navigation_early_hints_manager.h"
 #include "content/browser/loader/prefetch_url_loader_service.h"
 #include "content/browser/log_console_message.h"
@@ -223,6 +224,7 @@
 #include "third_party/blink/public/common/associated_interfaces/associated_interface_registry.h"
 #include "third_party/blink/public/common/chrome_debug_urls.h"
 #include "third_party/blink/public/common/features.h"
+#include "third_party/blink/public/common/features_generated.h"
 #include "third_party/blink/public/common/fenced_frame/fenced_frame_utils.h"
 #include "third_party/blink/public/common/frame/fenced_frame_sandbox_flags.h"
 #include "third_party/blink/public/common/frame/frame_owner_element_type.h"
@@ -251,6 +253,7 @@
 #include "third_party/blink/public/mojom/loader/transferrable_url_loader.mojom.h"
 #include "third_party/blink/public/mojom/navigation/navigation_params.mojom.h"
 #include "third_party/blink/public/mojom/opengraph/metadata.mojom.h"
+#include "third_party/blink/public/mojom/permissions/permission_status.mojom.h"
 #include "third_party/blink/public/mojom/scroll/scroll_into_view_params.mojom.h"
 #include "third_party/blink/public/mojom/service_worker/service_worker_object.mojom.h"
 #include "third_party/blink/public/mojom/storage_key/ancestor_chain_bit.mojom.h"
@@ -4463,18 +4466,13 @@ void RenderFrameHostImpl::CancelInitialHistoryLoad() {
 
 void RenderFrameHostImpl::DidChangeBackForwardCacheDisablingFeatures(
     BackForwardCacheBlockingDetails details) {
-  renderer_reported_bfcache_disabling_features_.Clear();
-  for (auto& feature_details : details) {
-    renderer_reported_bfcache_disabling_features_.Put(
-        static_cast<blink::scheduler::WebSchedulerTrackedFeature>(
-            feature_details->feature));
-  }
+  renderer_reported_bfcache_blocking_details_ = std::move(details);
 
   MaybeEvictFromBackForwardCache();
 
   if (back_forward_cache_disabling_features_callback_for_testing_) {
     back_forward_cache_disabling_features_callback_for_testing_.Run(
-        renderer_reported_bfcache_disabling_features_);
+        GetBackForwardCacheDisablingFeatures());
   }
 }
 
@@ -4523,19 +4521,33 @@ void RenderFrameHostImpl::OnBackForwardCacheDisablingFeatureRemoved(
 
 RenderFrameHostImpl::BackForwardCacheDisablingFeatures
 RenderFrameHostImpl::GetBackForwardCacheDisablingFeatures() const {
-  BackForwardCacheDisablingFeatures features =
-      renderer_reported_bfcache_disabling_features_;
+  BackForwardCacheDisablingFeatures features;
+  for (const auto& details : GetBackForwardCacheBlockingDetails()) {
+    features.Put(static_cast<blink::scheduler::WebSchedulerTrackedFeature>(
+        details->feature));
+  }
+  return features;
+}
 
-  features.PutAll(
+RenderFrameHostImpl::BackForwardCacheBlockingDetails
+RenderFrameHostImpl::GetBackForwardCacheBlockingDetails() const {
+  BackForwardCacheBlockingDetails combined_details_list =
       DedicatedWorkerHostsForDocument::GetOrCreateForCurrentDocument(
           const_cast<RenderFrameHostImpl*>(this))
-          ->GetBackForwardCacheDisablingFeatures());
+          ->GetBackForwardCacheBlockingDetails();
 
-  for (const auto& it : browser_reported_bfcache_disabling_features_counts_) {
-    features.Put(it.first);
+  for (const auto& details : renderer_reported_bfcache_blocking_details_) {
+    combined_details_list.push_back(details.Clone());
   }
 
-  return features;
+  for (const auto& it : browser_reported_bfcache_disabling_features_counts_) {
+    // Browser reported features do not have JS location details. Create a
+    // blocking details struct with only the feature filled.
+    auto details_ptr = blink::mojom::BlockingDetails::New();
+    details_ptr->feature = static_cast<uint32_t>(it.first);
+    combined_details_list.push_back(std::move(details_ptr));
+  }
+  return combined_details_list;
 }
 
 RenderFrameHostImpl::BackForwardCacheDisablingFeatureHandle
@@ -5682,8 +5694,9 @@ void RenderFrameHostImpl::DownloadURL(
     return;
   }
 
-  if (!VerifyDownloadUrlParams(GetSiteInstance(), *blink_parameters))
+  if (!VerifyDownloadUrlParams(GetProcess(), *blink_parameters)) {
     return;
+  }
 
   net::NetworkTrafficAnnotationTag traffic_annotation =
       net::DefineNetworkTrafficAnnotation("renderer_initiated_download", R"(
@@ -6286,6 +6299,17 @@ void RenderFrameHostImpl::MainDocumentElementAvailable(
     return;
 
   delegate_->PrimaryMainDocumentElementAvailable();
+
+  if (base::FeatureList::IsEnabled(blink::features::kFullscreenPopupWindows) &&
+      fullscreen_document_on_document_element_ready_ &&
+      (*fullscreen_document_on_document_element_ready_) == GetDocumentToken()) {
+    fullscreen_document_on_document_element_ready_ = absl::nullopt;
+    // Create a fullscreen request token to waive the user activation
+    // requirement when the request is received back to the browser in
+    // `EnterFullscreen`.
+    fullscreen_request_token_.Activate();
+    GetAssociatedLocalFrame()->RequestFullscreenDocumentElement();
+  }
 
   if (!uses_temporary_zoom_level)
     return;
@@ -7417,7 +7441,7 @@ void RenderFrameHostImpl::OpenURL(blink::mojom::OpenURLParamsPtr params) {
   // Verify and unpack the Mojo payload.
   GURL validated_url;
   scoped_refptr<network::SharedURLLoaderFactory> blob_url_loader_factory;
-  if (!VerifyOpenURLParams(this, GetSiteInstance(), params, &validated_url,
+  if (!VerifyOpenURLParams(this, GetProcess(), params, &validated_url,
                            &blob_url_loader_factory)) {
     return;
   }
@@ -8337,10 +8361,7 @@ void RenderFrameHostImpl::BeginNavigation(
 
   blink::mojom::CommonNavigationParamsPtr validated_common_params =
       unvalidated_common_params.Clone();
-  if (!VerifyBeginNavigationCommonParams(
-          *this, GetSiteInstance(),
-          base::OptionalToPtr(begin_params->initiator_frame_token),
-          &*validated_common_params)) {
+  if (!VerifyBeginNavigationCommonParams(*this, &*validated_common_params)) {
     return;
   }
 
@@ -8403,6 +8424,34 @@ void RenderFrameHostImpl::BeginNavigation(
     bad_message::ReceivedBadMessage(
         GetProcess(), bad_message::WEB_BUNDLE_INVALID_NAVIGATION_URL);
     return;
+  }
+
+  if (begin_params->is_fullscreen_requested) {
+    // Fullscreen requests on navigation are only allowed from initial empty
+    // documents that are the outermost main frame. The initiator must also have
+    // window management granted, otherwise the fullscreen bit is dropped.
+    if (!is_initial_empty_document()) {
+      bad_message::ReceivedBadMessage(
+          GetProcess(),
+          bad_message::RFHI_FULLSCREEN_NAV_INVALID_INITIAL_DOCUMENT);
+      return;
+    }
+    if (!IsOutermostMainFrame()) {
+      bad_message::ReceivedBadMessage(
+          GetProcess(),
+          bad_message::RFHI_FULLSCREEN_NAV_NOT_OUTERMOST_MAIN_FRAME);
+      return;
+    }
+    RenderFrameHostImpl* initiator_render_frame_host =
+        begin_params->initiator_frame_token
+            ? RenderFrameHostImpl::FromFrameToken(
+                  initiator_process_id,
+                  begin_params->initiator_frame_token.value())
+            : nullptr;
+    if (!initiator_render_frame_host ||
+        !IsWindowManagementGranted(initiator_render_frame_host)) {
+      begin_params->is_fullscreen_requested = false;
+    }
   }
 
   GetProcess()->FilterURL(true, &begin_params->searchable_form_url);
@@ -9642,6 +9691,7 @@ void RenderFrameHostImpl::CommitNavigation(
       }
     }
 
+    // Set up prefetch loader factory.
     std::unique_ptr<blink::PendingURLLoaderFactoryBundle>
         factory_bundle_for_prefetch;
     mojo::PendingRemote<network::mojom::URLLoaderFactory>
@@ -9710,6 +9760,37 @@ void RenderFrameHostImpl::CommitNavigation(
       }
     }
 
+    // Set up keepalive loader factory. It is used to proxy the keepalive
+    // requests, i.e. fetch(..., {keepalive: true}), via the browser process.
+    // See
+    // https://docs.google.com/document/d/1ZzxMMBvpqn8VZBZKnb7Go8TWjnrGcXuLS_USwVVRUvY/edit
+    // Note that this loader does not depend on `prefetch_loader_factory` nor
+    // `topics_loader_factory`.
+    mojo::PendingRemote<network::mojom::URLLoaderFactory>
+        keep_alive_loader_factory;
+    if (base::FeatureList::IsEnabled(
+            blink::features::kKeepAliveInBrowserMigration)) {
+      std::unique_ptr<blink::PendingURLLoaderFactoryBundle>
+          factory_bundle_for_keep_alive;
+
+      if (subresource_loader_factories) {
+        // Clone the factory bundle for keepalive.
+        auto bundle = base::MakeRefCounted<blink::URLLoaderFactoryBundle>(
+            std::move(subresource_loader_factories));
+        subresource_loader_factories = CloneFactoryBundle(bundle);
+        factory_bundle_for_keep_alive = CloneFactoryBundle(bundle);
+      }
+
+      if (factory_bundle_for_keep_alive) {
+        // Also setting up URLLoaderFactory for keepalive using the same loader
+        // factories.
+        auto* storage_partition = GetStoragePartition();
+        storage_partition->GetKeepAliveURLLoaderService()->BindFactory(
+            keep_alive_loader_factory.InitWithNewPipeAndPassReceiver(),
+            std::move(factory_bundle_for_keep_alive));
+      }
+    }
+
     mojom::NavigationClient* navigation_client =
         navigation_request->GetCommitNavigationClient();
 
@@ -9772,8 +9853,8 @@ void RenderFrameHostImpl::CommitNavigation(
         std::move(subresource_loader_factories),
         std::move(subresource_overrides), std::move(controller),
         std::move(container_info), std::move(prefetch_loader_factory),
-        std::move(topics_loader_factory), manifest_policy,
-        std::move(policy_container), *document_token,
+        std::move(topics_loader_factory), std::move(keep_alive_loader_factory),
+        manifest_policy, std::move(policy_container), *document_token,
         devtools_navigation_token);
     navigation_request->frame_tree_node()
         ->navigator()
@@ -12492,7 +12573,7 @@ void RenderFrameHostImpl::DidCommitNewDocument(
   DCHECK(params.embedding_token.has_value());
   SetEmbeddingToken(params.embedding_token.value());
 
-  renderer_reported_bfcache_disabling_features_.Clear();
+  renderer_reported_bfcache_blocking_details_.clear();
   browser_reported_bfcache_disabling_features_counts_.clear();
 
   TakeNewDocumentPropertiesFromNavigation(navigation_request);
@@ -12626,6 +12707,19 @@ void RenderFrameHostImpl::TakeNewDocumentPropertiesFromNavigation(
   loading_mem_tracker_ = navigation_request->TakePeakGpuMemoryTracker();
 
   early_hints_manager_ = navigation_request->TakeEarlyHintsManager();
+
+  // If fullscreen was requested on the navigation, then set a signal to trigger
+  // a fullscreen request when the document element is ready. If a previous
+  // navigation was committed without a call to `MainDocumentElementAvailable`
+  // before the current navigation then this value is overwritten by the current
+  // navigation.
+  fullscreen_document_on_document_element_ready_.reset();
+  if (navigation_request->begin_params().is_fullscreen_requested) {
+    fullscreen_document_on_document_element_ready_ =
+        navigation_request->GetDocumentToken();
+  }
+  CHECK(!fullscreen_document_on_document_element_ready_ ||
+        IsOutermostMainFrame());
 
   // Only take some properties if this is not the synchronous initial
   // `about:blank` navigation, because the values set at construction time
@@ -12761,6 +12855,8 @@ void RenderFrameHostImpl::SendCommitNavigation(
     mojo::PendingRemote<network::mojom::URLLoaderFactory>
         prefetch_loader_factory,
     mojo::PendingRemote<network::mojom::URLLoaderFactory> topics_loader_factory,
+    mojo::PendingRemote<network::mojom::URLLoaderFactory>
+        keep_alive_loader_factory,
     const absl::optional<blink::ParsedPermissionsPolicy>& permissions_policy,
     blink::mojom::PolicyContainerPtr policy_container,
     const blink::DocumentToken& document_token,
@@ -12855,7 +12951,8 @@ void RenderFrameHostImpl::SendCommitNavigation(
       std::move(subresource_loader_factories), std::move(subresource_overrides),
       std::move(controller), std::move(container_info),
       std::move(prefetch_loader_factory), std::move(topics_loader_factory),
-      document_token, devtools_navigation_token, permissions_policy,
+      std::move(keep_alive_loader_factory), document_token,
+      devtools_navigation_token, permissions_policy,
       std::move(policy_container), std::move(code_cache_host),
       std::move(cookie_manager_info), std::move(storage_info),
       BuildCommitNavigationCallback(navigation_request));

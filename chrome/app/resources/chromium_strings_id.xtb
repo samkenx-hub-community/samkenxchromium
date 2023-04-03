@@ -22,6 +22,7 @@
 
 Izin yang telah Anda berikan ke situs dan aplikasi dapat berlaku untuk akun ini. Anda dapat mengelola Akun Google Anda di <ph name="SETTINGS_LINK_BEGIN" />Setelan<ph name="SETTINGS_LINK_END" />.</translation>
 <translation id="1640672724030957280">Mengunduh...</translation>
+<translation id="1691024636239527281">{NUM_DEVICES,plural, =0{Chromium tidak terhubung ke perangkat HID}=1{Chromium terhubung ke perangkat HID}other{Chromium terhubung ke perangkat HID}}</translation>
 <translation id="1708666629004767631">Tersedia versi Chromium yang baru dan lebih aman.</translation>
 <translation id="17264556997921157">Anda dapat melihat dan menghapus topik terkait minat yang digunakan situs untuk menampilkan iklan kepada Anda. Chromium memperkirakan minat Anda berdasarkan histori penjelajahan terbaru Anda.</translation>
 <translation id="1733725117201708356">Chromium akan segera menghapus data penjelajahan</translation>
@@ -79,7 +80,6 @@ Izin yang telah Anda berikan ke situs dan aplikasi dapat berlaku untuk akun ini.
 <translation id="2928420929544864228">Penginstalan selesai.</translation>
 <translation id="2977470724722393594">Chromium sudah diperbarui</translation>
 <translation id="2977506796191543575">Jika situs berusaha mencuri sandi Anda, atau jika Anda mendownload file berbahaya, Chromium mungkin juga mengirimkan URL, termasuk bit konten halaman, ke Safe Browsing</translation>
-<translation id="3021964162552004083">{NUM_DEVICES,plural, =1{Chromium terhubung ke perangkat HID}other{Chromium terhubung ke perangkat HID}}</translation>
 <translation id="3032706164202344641">Chromium tidak dapat memeriksa sandi Anda. Coba lagi nanti.</translation>
 <translation id="3032787606318309379">Menambahkan Chromium...</translation>
 <translation id="3038232873781883849">Menunggu untuk menginstal...</translation>

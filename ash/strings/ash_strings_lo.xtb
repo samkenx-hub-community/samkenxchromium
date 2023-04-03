@@ -40,6 +40,7 @@
 <translation id="1181037720776840403">ລຶບອອກ</translation>
 <translation id="1182225749592316782">ນີ້ຈະອະນຸຍາດໃຫ້ແອັບ ແລະ ເວັບໄຊທັງໝົດເຂົ້າເຖິງກ້ອງຖ່າຍຮູບ ແລະ ໄມໂຄຣໂຟນໄດ້</translation>
 <translation id="1183863904939664422">ບໍ່ສົນໃຈການແນະນຳນີ້</translation>
+<translation id="1184126796192815024">ເຄືອຂ່າຍນີ້ບໍ່ຮອງຮັບແອັບຖ່າຍທອດຈາກໂທລະສັບຂອງທ່ານ. ລອງໃຊ້ຮັອດສະປອດໂທລະສັບຂອງທ່ານ. <ph name="LEARN_MORE" /></translation>
 <translation id="118437560755358292">ໃສ່ລະຫັດຜ່ານ ຫຼື PIN ເພື່ອຄວາມປອດໄພເພີ່ມເຕີມ</translation>
 <translation id="118532027333893379">ແຕະບ່ອນໃດກໍໄດ້ເພື່ອຖ່າຍຮູບເຕັມຈໍ</translation>
 <translation id="1190609913194133056">ສູນ​ແຈ້ງ​ເຕືອນ</translation>
@@ -219,6 +220,7 @@
 <translation id="1969011864782743497"><ph name="DEVICE_NAME" /> (USB)</translation>
 <translation id="1972950159383891558">ສະບາຍດີ, <ph name="USERNAME" /></translation>
 <translation id="1978498689038657292">ການປ້ອນຂໍ້ຄວາມເຂົ້າ</translation>
+<translation id="1980808257969311265">ເຂົ້າຮ່ວມ <ph name="EVENT_SUMMARY" /></translation>
 <translation id="1982717156487272186">ສະແດງອາທິດກ່ອນໜ້າ</translation>
 <translation id="1989113344093894667">ບໍ່ສາມາດຖ່າຍຮູບເນື້ອຫາໄດ້</translation>
 <translation id="1990046457226896323">ດາວໂຫຼດໄຟລ໌ສຽງເວົ້າແລ້ວ</translation>
@@ -621,7 +623,6 @@
 <translation id="3925540965556789199"><ph name="DATE" />, ກຳລັງໂຫຼດນັດໝາຍ.</translation>
 <translation id="3932043219784172185">ບໍ່ມີການເຊື່ອມຕໍ່ອຸປະກອນ</translation>
 <translation id="3934456833412894880">ເປີດໃຊ້ການສາກໄຟແບບປັບອັດຕະໂນມັດແລ້ວ. ແບັດເຕີຣີຂອງທ່ານຈະຄົງຢູ່ທີ່ 80% ເພື່ອຍືດອາຍຸແບັດເຕີຣີ ແລະ ສາກເຕັມເມື່ອທ່ານຕ້ອງການມັນ.</translation>
-<translation id="3936620957945677513">ກົດ Enter ເພື່ອເຂົ້າຮ່ວມກິດຈະກຳ <ph name="EVENT_SUMMARY" /></translation>
 <translation id="3943857333388298514">ແປະໃສ່</translation>
 <translation id="394485226368336402">ການຕັ້ງຄ່າສຽງ</translation>
 <translation id="3945319193631853098">ແຕະເພື່ອສຳເລັດການຕັ້ງຄ່າ</translation>
@@ -1252,6 +1253,7 @@
 <translation id="685782768769951078">{NUM_DIGITS,plural, =1{ຍັງເຫຼືອໜຶ່ງຕົວເລກ}other{ຍັງເຫຼືອ # ຕົວເລກ}}</translation>
 <translation id="6867938213751067702">ຢຸດດາວໂຫຼດ <ph name="FILENAME" /> ຊົ່ວຄາວແລ້ວ</translation>
 <translation id="6878400149835617132">ປິດທາງລັດແລ້ວ</translation>
+<translation id="6878701771800702153">{NUM_APPS,plural, =1{1 ແອັບ}other{# ແອັບ}}</translation>
 <translation id="6884665277231944629">ກັບໄປຫາມື້ນີ້</translation>
 <translation id="6886172995547742638"><ph name="DEVICE_TYPE" /> ຂອງທ່ານອາດຈະປະສົບກັບປະສິດທິພາບຕໍ່າ. ໃຊ້ອະແດັບເຕີ <ph name="PREFERRED_MINIMUM_POWER" />W ທີ່ມີການຮັບຮອງ ຫຼື ອະແດັບເຕີໄຟ USB-C ທີ່ສູງກວ່າ.</translation>
 <translation id="688631446150864480">ກົດປຸ່ມລູກສອນລົງເພື່ອປ່ຽນໜ້າຈໍ</translation>
@@ -1419,6 +1421,7 @@
 <translation id="7689817529363080918">ການດຳເນີນການນີ້ອະນຸຍາດສິດເຂົ້າເຖິງໄມໂຄຣໂຟນໃຫ້ <ph name="APP1_NAME" />, <ph name="APP2_NAME" /> ແລະ ແອັບ ແລະ ເວັບໄຊທັງໝົດທີ່ມີສິດອະນຸຍາດໄມໂຄຣໂຟນ</translation>
 <translation id="7704000866383261579">ເຮັດຄຳສັ່ງຫຼ້າສຸດຊ້ຳ</translation>
 <translation id="7705524343798198388">VPN</translation>
+<translation id="770741401784017797">ກຳລັງສ້າງ GIF</translation>
 <translation id="7714767791242455379">ເພີ່ມເຄືອຂ່າຍມືຖືໃໝ່</translation>
 <translation id="7720400844887872976">ເປີດຈົນຮອດ <ph name="TIME" /></translation>
 <translation id="7720410380936703141">ລອງໃໝ່</translation>
@@ -1431,6 +1434,7 @@
 <translation id="7749443890790263709">ຮອດຈຳນວນສູງສຸດຂອງພື້ນທີ່ເຮັດວຽກແລ້ວ</translation>
 <translation id="776344839111254542">ຄລິກເພື່ອເບິ່ງລາຍລະອຽດການອັບເດດ</translation>
 <translation id="7768784765476638775">ເລືອກເພື່ອເວົ້າ</translation>
+<translation id="7769299611924763557">GIF ຂອງທ່ານຈະພ້ອມໃນໄວໆນີ້</translation>
 <translation id="7780094051999721182">ທາງລັດ</translation>
 <translation id="7780159184141939021">ໝຸນໜ້າຈໍ</translation>
 <translation id="7796735576426975947">ເຊື່ອງການແຈ້ງເຕືອນໃໝ່ແລ້ວ</translation>

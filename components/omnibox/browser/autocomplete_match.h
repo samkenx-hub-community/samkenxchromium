@@ -13,6 +13,7 @@
 #include <utility>
 #include <vector>
 
+#include "base/memory/raw_ptr_exclusion.h"
 #include "base/memory/scoped_refptr.h"
 #include "base/memory/weak_ptr.h"
 #include "base/strings/utf_offset_string_conversions.h"
@@ -592,7 +593,9 @@ struct AutocompleteMatch {
   // The provider of this match, used to remember which provider the user had
   // selected when the input changes. This may be NULL, in which case there is
   // no provider (or memory of the user's selection).
-  AutocompleteProvider* provider = nullptr;
+  // This field is not a raw_ptr<> because it was filtered by the rewriter for:
+  // #union
+  RAW_PTR_EXCLUSION AutocompleteProvider* provider = nullptr;
 
   // The relevance of this match. See table in autocomplete.h for scores
   // returned by various providers. This is used to rank matches among all
@@ -711,8 +714,6 @@ struct AutocompleteMatch {
 
   // If true, UI-level code should swap the contents and description fields
   // before displaying.
-  // This field is set when matches are appended to autocomplete results via
-  // |AutocompleteResult::AppendMatches| rather than when matches are created.
   bool swap_contents_and_description = false;
 
   // A rich-format version of the display for the dropdown.

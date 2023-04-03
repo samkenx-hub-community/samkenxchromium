@@ -7,11 +7,11 @@ package org.chromium.chrome.browser.app.appmenu;
 import static org.junit.Assert.assertEquals;
 
 import android.content.res.Configuration;
-import android.support.test.InstrumentationRegistry;
 import android.view.KeyEvent;
 import android.view.View;
 import android.widget.ListView;
 
+import androidx.test.InstrumentationRegistry;
 import androidx.test.filters.LargeTest;
 import androidx.test.filters.SmallTest;
 
@@ -460,10 +460,8 @@ public class TabbedAppMenuTest {
     @EnableFeatures({ChromeFeatureList.QUICK_DELETE_FOR_ANDROID})
     public void testQuickDeleteMenu_entryFromMenuItemHistogram() throws IOException {
         HistogramWatcher histogramWatcher =
-                HistogramWatcher.newBuilder()
-                        .expectIntRecords("Privacy.QuickDelete",
-                                QuickDeleteMetricsDelegate.PrivacyQuickDelete.MENU_ITEM_CLICKED, 1)
-                        .build();
+                HistogramWatcher.newSingleRecordWatcher("Privacy.QuickDelete",
+                                QuickDeleteMetricsDelegate.QuickDeleteAction.MENU_ITEM_CLICKED);
 
         MenuUtils.invokeCustomMenuActionSync(InstrumentationRegistry.getInstrumentation(),
                 mActivityTestRule.getActivity(), R.id.quick_delete_menu_id);

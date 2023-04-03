@@ -2,6 +2,8 @@
   :host {
     --cr-toolbar-search-field-background:
         var(--cros-toolbar-search-bg-color);
+    --cr-toolbar-icon-container-size: 32px;
+    --cr-toolbar-icon-margin: 8px 16px;
 
     --separator-height: 8px;
     -webkit-tap-highlight-color: transparent;
@@ -56,15 +58,20 @@
     border-radius: 0 0 20px 20px;
     box-shadow: var(--cr-elevation-3);
     display: table;
-    padding-bottom: 8px;
+    padding-bottom: 16px;
     width: var(--cr-toolbar-field-width);
   }
 
   iron-list {
     max-height: 50vh;
+    /* Explicitly set the min-height here so that iron-list can render correctly
+     * in browser tests. */
+    min-height: 1px;
+    user-select: none;
   }
 
   #noSearchResultsContainer {
+    color: var(--cros-text-color-secondary);
     height: 32px;
     line-height: 32px;
     margin-inline-start: 24px;
@@ -86,10 +93,10 @@
   }
 </style>
 
-<!-- TODO(longbowei): Localize string -->
-<cr-toolbar-search-field id="search"
-        label="Search for keyboard shortcuts"
-        on-keydown="onKeyDown">
+<cr-toolbar-search-field id="search" label="[[i18n('searchPlaceholderLabel')]]"
+    clear-label="[[i18n('searchClearQueryLabel')]]"
+    on-search-icon-clicked="onSearchIconClicked"
+    spinner-active="[[spinnerActive]]">
 </cr-toolbar-search-field>
 <iron-dropdown id="searchResults" opened="[[shouldShowDropdown]]"
     allow-outside-scroll no-cancel-on-outside-click>
@@ -98,15 +105,28 @@
         iron-dropdown's open() is called on the JS side. -->
   <div slot="dropdown-content">
     <div class="separator"></div>
-    <iron-list id="searchResultList" selection-enabled
-        items="[[searchResults]]">
+    <iron-list id="searchResultList" selection-enabled items="[[searchResults]]"
+        selected-item="{{selectedItem}}">
       <template>
-        <search-result-row search-result="[[item]]"></search-result-row>
+        <search-result-row
+            selected="[[isItemSelected(item, selectedItem)]]"
+            search-result="[[item]]"
+            last-focused="{{lastFocused}}"
+            list-blurred="{{listBlurred}}"
+            on-navigated-to-result-route="onNavigatedToResultRowRoute"
+            tabindex$="[[getRowTabIndex(item, selectedItem,
+                shouldShowDropdown)]]"
+            iron-list-tab-index$="[[getRowTabIndex(item, selectedItem,
+                shouldShowDropdown)]]">
+        </search-result-row>
       </template>
     </iron-list>
-    <div id="noSearchResultsContainer" hidden="[[searchResultsExist]]">
-      <!-- TODO(cambickel) localize this string -->
-      No search results!
+    <!-- noSearchResultsContainer is aria-hidden because the aria-label of this
+    specific container gets announced as soon as search results have changed
+    (onSearchResultsChanged) and no search results exist. -->
+    <div id="noSearchResultsContainer" hidden="[[searchResultsExist]]"
+        aria-hidden="true">
+      [[i18n('searchNoResults')]]
     </div>
   </div>
 </iron-dropdown>

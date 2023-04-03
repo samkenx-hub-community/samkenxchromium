@@ -16,6 +16,7 @@
 #include "base/time/time.h"
 #include "components/network_session_configurator/common/network_switches.h"
 #include "components/ukm/test_ukm_recorder.h"
+#include "content/browser/attribution_reporting/attribution_features.h"
 #include "content/browser/attribution_reporting/attribution_manager.h"
 #include "content/browser/back_forward_cache_browsertest.h"
 #include "content/browser/fenced_frame/fenced_frame.h"
@@ -4549,7 +4550,8 @@ class FencedFrameReportEventBrowserTest
   // supporting iframes.
   FencedFrameReportEventBrowserTest() {
     scoped_feature_list_.InitWithFeaturesAndParameters(
-        {{blink::features::kAllowURNsInIframes, {}}},
+        {{blink::features::kAllowURNsInIframes, {}},
+         {kAttributionFencedFrameReportingBeacon, {}}},
         {/* disabled_features */});
   }
 
@@ -4566,6 +4568,9 @@ class FencedFrameReportEventBrowserTest
     // Whether the navigation should be via a urn:uuid or a normal URL.
     // (This should always be false when `!is_embedder_initiated`.
     bool is_opaque = false;
+    // Whether attribution-reporting permission policy is expected to be
+    // allowed.
+    bool expect_attribution_reporting_allowed = true;
 
     struct Event {
       std::string type;
@@ -4698,7 +4703,8 @@ class FencedFrameReportEventBrowserTest
         std::string final_destination_origin =
             step.redirects.empty() ? step.destination.origin
                                    : step.redirects.back().origin;
-        if (final_destination_origin != reporting_origin) {
+        if (final_destination_origin != reporting_origin &&
+            step.expect_attribution_reporting_allowed) {
           // The reporting beacon is cross-origin. Two requests will be sent.
           // First is the preflight request, the second is the actual request.
           responses.emplace_back(
@@ -4878,7 +4884,8 @@ class FencedFrameReportEventBrowserTest
         std::string final_destination_origin =
             step.redirects.empty() ? step.destination.origin
                                    : step.redirects.back().origin;
-        if (final_destination_origin != reporting_origin) {
+        if (final_destination_origin != reporting_origin &&
+            step.expect_attribution_reporting_allowed) {
           auto& preflight_response = *responses[response_index];
           // Verify the preflight request contains the eligibility header under
           // "Access-Control-Request-Headers".
@@ -4903,9 +4910,14 @@ class FencedFrameReportEventBrowserTest
             response.http_request()->content,
             step.event.type + " " + base::NumberToString(navigation_index));
         // Verify the request contains the eligibility header.
-        EXPECT_EQ(response.http_request()->headers.at(
-                      "Attribution-Reporting-Eligible"),
-                  "event-source");
+        if (step.expect_attribution_reporting_allowed) {
+          EXPECT_EQ(response.http_request()->headers.at(
+                        "Attribution-Reporting-Eligible"),
+                    "event-source");
+        } else {
+          EXPECT_FALSE(base::Contains(response.http_request()->headers,
+                                      "Attribution-Reporting-Eligible"));
+        }
         EXPECT_FALSE(base::Contains(response.http_request()->headers,
                                     "Attribution-Reporting-Support"));
         response.Done();
@@ -5265,6 +5277,48 @@ IN_PROC_BROWSER_TEST_F(FencedFrameReportEventBrowserTest,
                   {"b.test", "/fenced_frames/redirect2.html"},
                   {"a.test", "/fenced_frames/title1.html"},
               },
+          .report_event_result = Step::Result::kSuccess,
+      },
+  };
+  RunTest(config);
+}
+
+// Attribution Reporting headers are not set if attribution-reporting permission
+// policy is disallowed for the fenced frame.
+IN_PROC_BROWSER_TEST_F(FencedFrameReportEventBrowserTest,
+                       FencedFrameReportEventAttributionReportingDisallowed) {
+  std::vector<Step> config = {
+      {
+          .is_embedder_initiated = true,
+          .is_opaque = true,
+          .expect_attribution_reporting_allowed = false,
+          .destination =
+              {"a.test",
+               "/fenced_frames/attribution_reporting_disallowed.html"},
+          .report_event_result = Step::Result::kSuccess,
+      },
+  };
+  RunTest(config);
+}
+
+// Attribution Reporting headers are not set if attribution-reporting permission
+// policy is disallowed for the nested iframe.
+IN_PROC_BROWSER_TEST_F(
+    FencedFrameReportEventBrowserTest,
+    FencedFrameReportEventNestedIframeAttributionReportingDisallowed) {
+  std::vector<Step> config = {
+      {
+          .is_embedder_initiated = true,
+          .is_opaque = true,
+          .destination = {"a.test", "/fenced_frames/title1.html"},
+          .report_event_result = Step::Result::kSuccess,
+      },
+      {
+          .is_target_nested_iframe = true,
+          .expect_attribution_reporting_allowed = false,
+          .destination =
+              {"a.test",
+               "/fenced_frames/attribution_reporting_disallowed.html"},
           .report_event_result = Step::Result::kSuccess,
       },
   };
@@ -6027,8 +6081,10 @@ class FencedFrameAutomaticBeaconBrowserTest
       public testing::WithParamInterface<const char*> {
  public:
   FencedFrameAutomaticBeaconBrowserTest() {
-    scoped_feature_list_.InitAndEnableFeature(
-        blink::features::kAllowURNsInIframes);
+    scoped_feature_list_.InitWithFeatures(
+        /*enabled_features=*/{blink::features::kAllowURNsInIframes,
+                              kAttributionFencedFrameReportingBeacon},
+        /*disabled_features=*/{});
   }
 
   // An object representing the configuration of the test. First a frame is

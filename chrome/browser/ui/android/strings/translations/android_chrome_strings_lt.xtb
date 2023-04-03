@@ -737,6 +737,7 @@ Jei norite pakeisti šį nustatymą, <ph name="BEGIN_LINK" />iš naujo nustatyki
 <translation id="5001388021414335527">Stebėkite šią svetainę čia</translation>
 <translation id="5004416275253351869">„Google“ veiklos valdikliai</translation>
 <translation id="5005498671520578047">Kopijuoti slaptažodį</translation>
+<translation id="5010886807652684893">Vizualinis rodinys</translation>
 <translation id="5011311129201317034"><ph name="SITE" /> nori prisijungti</translation>
 <translation id="5016205925109358554">Su užraitais</translation>
 <translation id="5017529052065664584">Pastarosios penkiolika minučių</translation>
@@ -794,6 +795,7 @@ Jei norite pakeisti šį nustatymą, <ph name="BEGIN_LINK" />iš naujo nustatyki
 <translation id="5342314432463739672">Leidimų užklausos</translation>
 <translation id="53537532693258630">Pašalintos svetainės bus rodomos čia</translation>
 <translation id="5355191726083956201">Sustiprinta apsauga įjungta</translation>
+<translation id="5361107212971249203">tekstas</translation>
 <translation id="5368227114232678694">Jei norite naršyti privačiai šiame įrenginyje, išbandykite inkognito režimą</translation>
 <translation id="5375577065097716013">Ieškoti vaizdo su „Google Lens“ <ph name="BEGIN_NEW" />Nauja<ph name="END_NEW" /></translation>
 <translation id="5401851137404501592">Kad būtų galima tęsti, <ph name="IDENTITY_PROVIDER_ETLD_PLUS_ONE" /> bendrins jūsų vardą ir pavardę, el. pašto adresą ir profilio nuotrauką su šia svetaine.</translation>
@@ -1191,6 +1193,7 @@ Pavyzdžiui, kai kurios svetainės gali atsakyti į šią užklausą rodydamos j
 <translation id="7454641608352164238">Nepakanka vietos</translation>
 <translation id="7455988709578031708">Pagrįsta jūsų naršymo istorija. Šis nustatymas įjungtas.</translation>
 <translation id="7456774706094330779">Išplėstinis išankstinis įkėlimas</translation>
+<translation id="7466431077154602932">Kompaktiškas rodinys</translation>
 <translation id="7474822150871987353">Sužinokite apie temas svetainėse neišėję iš puslapio. Pasirinkite bent vieną žodį puslapyje, kurio norite ieškoti.</translation>
 <translation id="7475192538862203634">Jei tai rodoma dažnai, peržiūrėkite šiuos <ph name="BEGIN_LINK" />pasiūlymus<ph name="END_LINK" />.</translation>
 <translation id="7475688122056506577">SD kortelė nerasta. Gali trūkti kai kurių failų.</translation>
@@ -1320,6 +1323,7 @@ Pavyzdžiui, kai kurios svetainės gali atsakyti į šią užklausą rodydamos j
 <translation id="8058746566562539958">Atidaryti naujame „Chrome“ skirtuke</translation>
 <translation id="8062594758852531064">Išplėstinis išankstinis įkėlimas:</translation>
 <translation id="8063895661287329888">Nepavyko pridėti žymės.</translation>
+<translation id="8066816452984416180">Sparčiai pažymėkite šį puslapį. Jei norite redaguoti šį spartųjį klavišą, palieskite ir palaikykite.</translation>
 <translation id="806745655614357130">Duomenis laikyti atskirai</translation>
 <translation id="8073388330009372546">Atid. vaizdą nauj. skirt. lap.</translation>
 <translation id="8076492880354921740">Skirtukai</translation>
@@ -1351,6 +1355,7 @@ Pavyzdžiui, kai kurios svetainės gali atsakyti į šią užklausą rodydamos j
 <translation id="8216351761227087153">Žiūrėti</translation>
 <translation id="8218622182176210845">Paskyros tvarkymas</translation>
 <translation id="8223642481677794647">Sklaidos kanalo kortelės meniu</translation>
+<translation id="8236097722223016103">Pridėti prie žymių</translation>
 <translation id="8250920743982581267">Dokumentai</translation>
 <translation id="8255617931166444521">Svetainės slapukai gali būti naudojami tik siekiant peržiūrėti naršymo veiklą toje svetainėje.</translation>
 <translation id="8259179246279078674">Kadangi iš anksto įkelti puslapiai yra šifruojami, „Google“ nežinos nieko apie iš anksto įkelto puslapio turinį. „Google“ serveriai žinos, kurios svetainės yra privačiai iš anksto įkeltos. Ši informacija naudojama tik puslapiams iš anksto įkelti ir nėra susieta su kita informacija iš jūsų „Google“ paskyros.</translation>
@@ -1498,6 +1503,7 @@ Pavyzdžiui, kai kurios svetainės gali atsakyti į šią užklausą rodydamos j
 <translation id="8989968390305463310">Naršymo istorija lemia, kokius skelbimus matysite ir kokie jūsų pomėgiai bus numatomi toliau. Siekiant apsaugoti privatumą, „Chrome“ reguliariai kiekvieną mėnesį automatiškai ištrina jūsų pomėgius. Pomėgiai gali būti atnaujinami, kol jų nepašalinate.</translation>
 <translation id="8993760627012879038">Atidaryti naują skirtuką inkognito režimu</translation>
 <translation id="8996847606757455498">Pasirinkti kitą teikėją</translation>
+<translation id="8998289560386111590">Nepasiekiama jūsų įrenginyje</translation>
 <translation id="8998729206196772491">Prisijungiate naudodami „<ph name="MANAGED_DOMAIN" />“ tvarkomą paskyrą ir suteikiate jos administratoriui galimybę valdyti jūsų „Chrome“ duomenis. Duomenys bus visam laikui susieti su šia paskyra. Atsijungę nuo „Chrome“ ištrinsite duomenis iš šio įrenginio, bet jie ir toliau bus saugomi „Google“ paskyroje.</translation>
 <translation id="9022774213089566801">Dažnai lankytasi</translation>
 <translation id="9022871169049522985">Svetainės ir reklamuotojai gali vertinti skelbimų našumą</translation>

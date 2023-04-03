@@ -25,6 +25,7 @@
 #include "third_party/skia/include/core/SkColorSpace.h"
 #include "third_party/skia/include/core/SkData.h"
 #include "third_party/skia/include/core/SkFlattenable.h"
+#include "third_party/skia/include/core/SkImage.h"
 #include "third_party/skia/include/core/SkM44.h"
 #include "third_party/skia/include/core/SkMatrix.h"
 #include "third_party/skia/include/core/SkPath.h"
@@ -448,6 +449,27 @@ void PaintOpWriter::Write(const SkColorSpace* color_space) {
   size_t written = color_space->writeToMemory(memory_);
   CHECK_EQ(written, size);
   DidWrite(written);
+}
+
+void PaintOpWriter::Write(const SkGainmapInfo& gainmap_info) {
+  Write(gainmap_info.fGainmapRatioMin);
+  Write(gainmap_info.fGainmapRatioMax);
+  Write(gainmap_info.fGainmapGamma);
+  Write(gainmap_info.fEpsilonSdr);
+  Write(gainmap_info.fEpsilonHdr);
+  Write(gainmap_info.fDisplayRatioSdr);
+  Write(gainmap_info.fDisplayRatioHdr);
+  Write(gainmap_info.fDisplayRatioHdr);
+  uint32_t base_image_type = 0;
+  switch (gainmap_info.fBaseImageType) {
+    case SkGainmapInfo::BaseImageType::kSDR:
+      base_image_type = 0;
+      break;
+    case SkGainmapInfo::BaseImageType::kHDR:
+      base_image_type = 1;
+      break;
+  }
+  Write(base_image_type);
 }
 
 void PaintOpWriter::Write(const sk_sp<GrSlug>& slug) {
@@ -986,8 +1008,8 @@ void PaintOpWriter::Write(const PaintRecord& record,
 
   // Nested records are used for picture shaders and filters. These are always
   // converted to a fixed scale mode (hence |post_scale|), which means they are
-  // first rendered offscreen via SkImage::MakeFromPicture. This inherently does
-  // not support lcd text, so reflect that in the serialization options.
+  // first rendered offscreen via SkImages::DeferredFromPicture. This inherently
+  // does not support lcd text, so reflect that in the serialization options.
   PaintOp::SerializeOptions lcd_disabled_options = *options_;
   lcd_disabled_options.can_use_lcd_text = false;
   SimpleBufferSerializer serializer(memory_, remaining_bytes_,

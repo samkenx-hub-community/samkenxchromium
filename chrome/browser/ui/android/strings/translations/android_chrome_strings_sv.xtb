@@ -738,6 +738,7 @@ Det kan finnas andra former av webbhistorik i Google-kontot på <ph name="BEGIN_
 <translation id="5001388021414335527">Följ denna webbplats här</translation>
 <translation id="5004416275253351869">Googles aktivitetsinställningar</translation>
 <translation id="5005498671520578047">Kopiera lösenord</translation>
+<translation id="5010886807652684893">Visuell vy</translation>
 <translation id="5011311129201317034"><ph name="SITE" /> vill ansluta</translation>
 <translation id="5016205925109358554">Serif</translation>
 <translation id="5017529052065664584">De senaste 15 minuterna</translation>
@@ -795,6 +796,7 @@ Det kan finnas andra former av webbhistorik i Google-kontot på <ph name="BEGIN_
 <translation id="5342314432463739672">Behörighetsförfrågningar</translation>
 <translation id="53537532693258630">Webbplatser som du har tagit bort visas här</translation>
 <translation id="5355191726083956201">Förbättrat skydd är aktiverat</translation>
+<translation id="5361107212971249203">text</translation>
 <translation id="5368227114232678694">Testa inkognitoläget om du vill surfa privat på enheten</translation>
 <translation id="5375577065097716013">Bildsökning med Google Lens <ph name="BEGIN_NEW" />Ny<ph name="END_NEW" /></translation>
 <translation id="5401851137404501592"><ph name="IDENTITY_PROVIDER_ETLD_PLUS_ONE" /> delar ditt namn, din e-postadress och din profilbild med den här webbplatsen om du fortsätter.</translation>
@@ -1192,6 +1194,7 @@ Vissa webbplatser kan till exempel svara på begäran genom att visa annonser so
 <translation id="7454641608352164238">Utrymmet räcker inte</translation>
 <translation id="7455988709578031708">Baserat på din webbhistorik. Inställningen är aktiverad.</translation>
 <translation id="7456774706094330779">Utökad förinläsning</translation>
+<translation id="7466431077154602932">Kompakt vy</translation>
 <translation id="7474822150871987353">Läs om olika ämnen på webbplatser utan att lämna sidan. Välj ett eller flera ord på sidan som du vill söka efter.</translation>
 <translation id="7475192538862203634">Om du ser detta ofta provar du de här <ph name="BEGIN_LINK" />förslagen<ph name="END_LINK" />.</translation>
 <translation id="7475688122056506577">Det gick inte att hitta SD-kortet. Det kan saknas filer.</translation>
@@ -1321,6 +1324,7 @@ Vissa webbplatser kan till exempel svara på begäran genom att visa annonser so
 <translation id="8058746566562539958">Öppna på ny flik i Chrome</translation>
 <translation id="8062594758852531064">Utökad förinläsning:</translation>
 <translation id="8063895661287329888">Det gick inte att lägga till bokmärket.</translation>
+<translation id="8066816452984416180">Infoga snabbt ett bokmärke för den här sidan. Tryck länge om du vill ändra det här kortkommandot.</translation>
 <translation id="806745655614357130">Håll min data separat</translation>
 <translation id="8073388330009372546">Öppna bild i ny flik</translation>
 <translation id="8076492880354921740">Flikar</translation>
@@ -1352,6 +1356,7 @@ Vissa webbplatser kan till exempel svara på begäran genom att visa annonser so
 <translation id="8216351761227087153">Titta</translation>
 <translation id="8218622182176210845">Hantera kontot</translation>
 <translation id="8223642481677794647">Menyn med flödeskort</translation>
+<translation id="8236097722223016103">Lägg till i bokmärken</translation>
 <translation id="8250920743982581267">Dokument</translation>
 <translation id="8255617931166444521">Webbplatser får endast se din webbaktivitet på den aktuella webbplatsen med hjälp av cookies</translation>
 <translation id="8259179246279078674">Eftersom förinlästa sidor är krypterade får Google ingen information om innehållet på dem. Googles servrar lär sig vilka webbplatser som läses in privat i förväg. Den här informationen används endast för att läsa in sidor i förväg och är inte länkar till andra uppgifter från ditt Google-konto.</translation>
@@ -1446,6 +1451,7 @@ Vissa webbplatser kan till exempel svara på begäran genom att visa annonser so
 <translation id="869891660844655955">Utgångsdatum</translation>
 <translation id="8699120352855309748">Erbjud inte att översätta dessa språk</translation>
 <translation id="8712637175834984815">Uppfattat</translation>
+<translation id="8723453889042591629">Översätt sidan snabbt. Tryck länge om du vill ändra det här kortkommandot.</translation>
 <translation id="8725066075913043281">Försök igen</translation>
 <translation id="8746155870861185046">Dela markering</translation>
 <translation id="874726034427945498">Synkronisera flikar och historik för att få bättre förslag i adressfältet</translation>
@@ -1498,6 +1504,7 @@ Vissa webbplatser kan till exempel svara på begäran genom att visa annonser so
 <translation id="8989968390305463310">Webbhistoriken påverkar vilka annonser som visas och vilka intressen som du uppskattas ha. Av integritetsskäl raderas dina intressen automatiskt och löpande varje månad. Intressen kan förnyas om du inte tar bort dem.</translation>
 <translation id="8993760627012879038">Öppna en ny flik i inkognitoläge</translation>
 <translation id="8996847606757455498">Välj en annan leverantör</translation>
+<translation id="8998289560386111590">Inte tillgängligt på din enhet</translation>
 <translation id="8998729206196772491">Du håller på att logga in med ett konto som hanteras av <ph name="MANAGED_DOMAIN" />, vilket ger administratören kontroll över data i Chrome. Din data kopplas permanent till det här kontot. Om du loggar ut från Chrome raderas all din data från enheten, men den lagras fortfarande i Google-kontot.</translation>
 <translation id="9022774213089566801">Mest besökta</translation>
 <translation id="9022871169049522985">Webbplatser och annonsörer kan mäta annonsernas resultat</translation>

@@ -50,6 +50,10 @@ BASE_DECLARE_FEATURE(kDefaultBrowserIntentsShowSettings);
 // Feature flag to log metrics for the edit menu.
 BASE_DECLARE_FEATURE(kIOSBrowserEditMenuMetrics);
 
+// Feature flag that allows full screen default browser promos to be added to
+// the promo manager.
+BASE_DECLARE_FEATURE(kDefaultBrowserRefactoringPromoManager);
+
 // Feature flag to use the new Edit menu API for browser view.
 BASE_DECLARE_FEATURE(kIOSCustomBrowserEditMenu);
 
@@ -68,9 +72,6 @@ BASE_DECLARE_FEATURE(kIOSLocationBarUseNativeContextMenu);
 
 // Feature flag that swaps the omnibox textfield implementation.
 BASE_DECLARE_FEATURE(kIOSNewOmniboxImplementation);
-
-// Feature flag that removes the crash infobar.
-BASE_DECLARE_FEATURE(kRemoveCrashInfobar);
 
 // Feature flag to enable using Lens to search for images.
 BASE_DECLARE_FEATURE(kUseLensToSearchForImage);
@@ -105,6 +106,9 @@ BASE_DECLARE_FEATURE(kEnableShortenedPasswordAutoFillInstruction);
 
 // Feature flag to switch images to SFSymbols in the omnibox when enabled.
 BASE_DECLARE_FEATURE(kUseSFSymbolsInOmnibox);
+
+// Feature flag for the follow up of the SF Symbols.
+BASE_DECLARE_FEATURE(kSFSymbolsFollowUp);
 
 // Feature flag to enable Calendar event in experience kit.
 BASE_DECLARE_FEATURE(kCalendarExperienceKit);
@@ -157,26 +161,6 @@ bool ShouldAddToHomeScreen(bool in_incognito);
 
 // Feature flag to enable the new layout of the NTP omnibox.
 BASE_DECLARE_FEATURE(kNewNTPOmniboxLayout);
-
-// Feature flag to turn on the prompt that brings the user's Android tabs to iOS
-// Chrome.
-BASE_DECLARE_FEATURE(kBringYourOwnTabsIOS);
-
-// Enum for "Bring Your Own Tabs" experiment groups (control/experiment) and its
-// param.
-enum class BringYourOwnTabsPromptType {
-  // "Bring Your Own Tabs" enabled with half sheet modal prompt.
-  kHalfSheet = 0,
-  // "Bring Your Own Tabs" enabled with bottom message prompt.
-  kBottomMessage,
-  // "Bring Your Own Tabs" not enabled.
-  kDisabled,
-};
-extern const char kBringYourOwnTabsIOSParam[];
-
-// Returns the current BringYourOwnTabsPromptType according to the feature flag
-// and experiment "BringYourOwnTabsIOS".
-BringYourOwnTabsPromptType GetBringYourOwnTabsPromptType();
 
 // Whether the email is shown in the snackbar indicating that a new bookmark
 // or reading list item is added.

@@ -25,18 +25,18 @@ import static org.chromium.ui.test.util.ViewUtils.onViewWaiting;
 import android.app.Activity;
 import android.content.Intent;
 import android.graphics.Bitmap;
-import android.support.test.InstrumentationRegistry;
-import android.support.test.runner.lifecycle.ActivityLifecycleMonitorRegistry;
-import android.support.test.runner.lifecycle.Stage;
 import android.util.Base64;
 import android.view.View;
 import android.view.ViewGroup;
 
 import androidx.annotation.Nullable;
+import androidx.test.InstrumentationRegistry;
 import androidx.test.espresso.UiController;
 import androidx.test.espresso.ViewAction;
 import androidx.test.espresso.contrib.RecyclerViewActions;
 import androidx.test.espresso.matcher.ViewMatchers;
+import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry;
+import androidx.test.runner.lifecycle.Stage;
 import androidx.test.uiautomator.UiDevice;
 
 import org.hamcrest.Matcher;
@@ -276,6 +276,11 @@ public class StartSurfaceTestUtils {
      */
     public static void createTabStateFile(int[] tabIds, @Nullable String[] urls, int selectedIndex)
             throws IOException {
+        createTabStateFile(tabIds, urls, selectedIndex, true);
+    }
+
+    private static void createTabStateFile(int[] tabIds, @Nullable String[] urls, int selectedIndex,
+            boolean createStateFile) throws IOException {
         TabPersistentStore.TabModelMetadata normalInfo =
                 new TabPersistentStore.TabModelMetadata(selectedIndex);
         for (int i = 0; i < tabIds.length; i++) {
@@ -283,7 +288,9 @@ public class StartSurfaceTestUtils {
             String url = urls != null ? urls[i] : "about:blank";
             normalInfo.urls.add(url);
 
-            saveTabState(tabIds[i], false);
+            if (createStateFile) {
+                saveTabState(tabIds[i], false);
+            }
         }
         TabPersistentStore.TabModelMetadata incognitoInfo =
                 new TabPersistentStore.TabModelMetadata(0);
@@ -295,6 +302,17 @@ public class StartSurfaceTestUtils {
         FileOutputStream output = new FileOutputStream(stateFile);
         output.write(listData);
         output.close();
+    }
+
+    /**
+     * Creates a Tab state metadata file without creating Tab state files for the given Tab's info.
+     * @param tabIds All the Tab IDs in the normal tab model.
+     * @param urls All the Tab URLs in the normal tab model.
+     * @param selectedIndex The selected index of normal tab model.
+     */
+    public static void prepareTabStateMetadataFile(
+            int[] tabIds, @Nullable String[] urls, int selectedIndex) throws IOException {
+        createTabStateFile(tabIds, urls, selectedIndex, false);
     }
 
     /**
@@ -453,7 +471,7 @@ public class StartSurfaceTestUtils {
      * @param position The position of the tab which is clicked.
      */
     public static void clickTabInCarousel(int position) {
-        onViewWaiting(allOf(withParent(withId(R.id.carousel_tab_switcher_container)),
+        onViewWaiting(allOf(withParent(withId(R.id.tab_switcher_module_container)),
                               withId(R.id.tab_list_view)))
                 .perform(RecyclerViewActions.actionOnItemAtPosition(position, click()));
     }
@@ -553,7 +571,7 @@ public class StartSurfaceTestUtils {
      * Gets the "tab_list_view" from the carousel tab switcher module on Start surface.
      */
     static View getCarouselTabSwitcherTabListView(ChromeTabbedActivity cta) {
-        return cta.findViewById(R.id.carousel_tab_switcher_container)
+        return cta.findViewById(R.id.tab_switcher_module_container)
                 .findViewById(org.chromium.chrome.test.R.id.tab_list_view);
     }
 

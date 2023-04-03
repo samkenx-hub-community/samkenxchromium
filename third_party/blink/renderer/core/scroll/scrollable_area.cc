@@ -660,7 +660,7 @@ void ScrollableArea::RecalculateScrollbarOverlayColorTheme() {
 
   // Start with a scrollbar overlay theme based on the used color scheme.
   ScrollbarOverlayColorTheme overlay_theme =
-      UsedColorScheme() == mojom::blink::ColorScheme::kDark
+      UsedColorSchemeScrollbars() == mojom::blink::ColorScheme::kDark
           ? kScrollbarOverlayColorThemeLight
           : kScrollbarOverlayColorThemeDark;
 
@@ -688,14 +688,25 @@ void ScrollableArea::SetScrollbarNeedsPaintInvalidation(
   else
     vertical_scrollbar_needs_paint_invalidation_ = true;
 
+  // Invalidate the scrollbar directly if it's already composited.
   // GetLayoutBox() may be null in some unit tests.
   if (auto* box = GetLayoutBox()) {
     auto* frame_view = GetLayoutBox()->GetFrameView();
     if (auto* compositor = frame_view->GetPaintArtifactCompositor()) {
-      compositor->SetScrollbarNeedsDisplay(GetScrollbarElementId(orientation));
+      if (compositor->SetScrollbarNeedsDisplay(
+              GetScrollbarElementId(orientation))) {
+        if (auto* scrollbar = GetScrollbar(orientation)) {
+          scrollbar->ClearNeedsUpdateDisplay();
+        }
+      }
     }
   }
 
+  // TODO(crbug.com/1414885): we don't need to invalidate paint of scrollbar
+  // for changes inside of the scrollbar. We'll invalidate raster if needed
+  // after paint. We can remove some of paint invalidation code in this class,
+  // and move remaining paint invalidation code into
+  // PaintLayerScrollableArea and Scrollbar.
   ScrollControlWasSetNeedsPaintInvalidation();
 }
 
@@ -866,8 +877,9 @@ ScrollableArea::GetCompositorTaskRunner() {
 Node* ScrollableArea::EventTargetNode() const {
   const LayoutBox* box = GetLayoutBox();
   Node* node = box->GetNode();
-  if (!node && box->Parent() && box->Parent()->IsLayoutNGFieldset())
+  if (!node && box->Parent() && box->Parent()->IsFieldset()) {
     node = box->Parent()->GetNode();
+  }
   if (node && IsA<Element>(node)) {
     const LayoutBox* layout_box_for_scrolling =
         To<Element>(node)->GetLayoutBoxForScrolling();

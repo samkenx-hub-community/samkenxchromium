@@ -6,6 +6,7 @@
 
 #include <memory>
 
+#include "base/metrics/histogram_functions.h"
 #include "base/metrics/histogram_macros.h"
 #include "base/notreached.h"
 #include "base/time/time.h"
@@ -231,6 +232,40 @@ void SetTriggeringOutcomeAndFailureReasonFromStatus(
   }
 }
 
+std::string GetEagernessHistogramSuffix(
+    const blink::mojom::SpeculationEagerness& eagerness) {
+  switch (eagerness) {
+    case blink::mojom::SpeculationEagerness::kEager:
+      return "Eager";
+    case blink::mojom::SpeculationEagerness::kModerate:
+      return "Moderate";
+    case blink::mojom::SpeculationEagerness::kConservative:
+      return "Conservative";
+  }
+}
+
+void RecordWasBlockedUntilHeadWhenServingHistogram(
+    const blink::mojom::SpeculationEagerness& eagerness,
+    bool blocked_until_head) {
+  base::UmaHistogramBoolean(
+      base::StringPrintf(
+          "PrefetchProxy.AfterClick.WasBlockedUntilHeadWhenServing.%s",
+          GetEagernessHistogramSuffix(eagerness).c_str()),
+      blocked_until_head);
+}
+
+void RecordBlockUntilHeadDurationHistogram(
+    const blink::mojom::SpeculationEagerness& eagerness,
+    const base::TimeDelta& block_until_head_duration,
+    bool served) {
+  base::UmaHistogramTimes(
+      base::StringPrintf(
+          "PrefetchProxy.AfterClick.BlockUntilHeadDuration.%s.%s",
+          served ? "Served" : "NotServed",
+          GetEagernessHistogramSuffix(eagerness).c_str()),
+      block_until_head_duration);
+}
+
 }  // namespace
 
 PrefetchContainer::PrefetchContainer(
@@ -352,7 +387,7 @@ void PrefetchContainer::OnEligibilityCheckComplete(
         .Run(is_eligible);
   }
 
-  if (url == prefetch_url_) {
+  if (url == prefetch_url_ && redirect_chain_.size() == 1) {
     // This case is for just the URL that was originally requested to be
     // prefetched.
     if (!is_eligible) {
@@ -369,7 +404,9 @@ void PrefetchContainer::OnEligibilityCheckComplete(
       }
     }
 
-    prefetch_document_manager_->OnEligibilityCheckComplete(is_eligible);
+    if (prefetch_document_manager_) {
+      prefetch_document_manager_->OnEligibilityCheckComplete(is_eligible);
+    }
   } else {
     // This case is for any URLs from redirects.
     if (!is_eligible) {
@@ -604,7 +641,8 @@ void PrefetchContainer::UpdatePrefetchRequestMetrics(
 bool PrefetchContainer::ShouldBlockUntilHeadReceived() const {
   // Can only block until head if the request has been started using a streaming
   // URL loader and head hasn't been received yet.
-  if (!streaming_loader_ || streaming_loader_->GetHead()) {
+  if (!streaming_loader_ || streaming_loader_->GetHead() ||
+      streaming_loader_->Failed()) {
     return false;
   }
   return PrefetchShouldBlockUntilHead(prefetch_type_.GetEagerness());
@@ -692,6 +730,34 @@ bool PrefetchContainer::IsMatchingNoVarySearchUrl(
   }
 
   return internal_url == no_vary_search_match_url.value();
+}
+
+void PrefetchContainer::OnGetPrefetchToServe(bool blocked_until_head) {
+  if (blocked_until_head) {
+    blocked_until_head_start_time_ = base::TimeTicks::Now();
+  }
+
+  RecordWasBlockedUntilHeadWhenServingHistogram(prefetch_type_.GetEagerness(),
+                                                blocked_until_head);
+}
+
+void PrefetchContainer::OnReturnPrefetchToServe(bool served) {
+  if (served) {
+    navigated_to_ = true;
+  }
+
+  if (blocked_until_head_start_time_.has_value()) {
+    RecordBlockUntilHeadDurationHistogram(
+        prefetch_type_.GetEagerness(),
+        base::TimeTicks::Now() - blocked_until_head_start_time_.value(),
+        served);
+  }
+}
+
+std::ostream& operator<<(std::ostream& ostream,
+                         const PrefetchContainer& prefetch_container) {
+  return ostream << "PrefetchContainer[" << &prefetch_container
+                 << ", URL=" << prefetch_container.GetURL() << "]";
 }
 
 PrefetchContainer::SinglePrefetch::SinglePrefetch(const GURL& url)

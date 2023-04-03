@@ -23,6 +23,7 @@
 
 तुम्ही वेबसाइट आणि अ‍ॅप्सना आधीपासून दिलेल्या परवानग्या या खात्याला लागू होऊ शकतात. तुम्ही तुमची Google खाती <ph name="SETTINGS_LINK_BEGIN" />सेटिंग्ज<ph name="SETTINGS_LINK_END" /> मध्ये व्यवस्थापित करू शकता.</translation>
 <translation id="1640672724030957280">डाऊनलोड करीत आहे...</translation>
+<translation id="1691024636239527281">{NUM_DEVICES,plural, =0{Chromium was connected to a HID device}=1{Chromium हे HID डिव्हाइसशी कनेक्ट केले आहे}other{Chromium हे HID डिव्हाइसशी कनेक्ट केले आहे}}</translation>
 <translation id="1708666629004767631">Chromium ची नवीन, सुरक्षित आवृत्ती उपलब्ध आहे.</translation>
 <translation id="17264556997921157">तुम्हाला जाहिराती दाखवण्यासाठी साइट जे स्वारस्याचे विषय वापरतात, ते तुम्ही पाहू आणि काढून टाकू शकता. तुमच्या अलीकडील ब्राउझिंग इतिहासाच्या आधारे Chromium तुमच्या स्वारस्यांचा अंदाज लावते.</translation>
 <translation id="1733725117201708356">Chromium लवकरच ब्राउझिंग डेटा हटवेल</translation>
@@ -80,7 +81,6 @@
 <translation id="2928420929544864228">इंस्टॉलेशन पूर्ण झाले.</translation>
 <translation id="2977470724722393594">Chromium अद्ययावत आहे</translation>
 <translation id="2977506796191543575">साइटने तुमचा पासवर्ड चोरण्याचा प्रयत्न केल्यास किंवा तुम्ही हानिकारक फाइल डाउनलोड केल्यास, Chromium कदाचित पेज आशयाच्या भागांसह, URLs देखील सुरक्षित ब्राउझिंग ला पाठवेल</translation>
-<translation id="3021964162552004083">{NUM_DEVICES,plural, =1{Chromium हे HID डिव्हाइसशी कनेक्ट केले आहे}other{Chromium हे HID डिव्हाइसशी कनेक्ट केले आहे}}</translation>
 <translation id="3032706164202344641">Chromium तुमचे पासवर्ड तपासू शकत नाही. नंतर पुन्हा प्रयत्न करा.</translation>
 <translation id="3032787606318309379">Chromium वर जोडत आहे...</translation>
 <translation id="3038232873781883849">इंस्टॉल करण्यासाठी प्रतीक्षा करत आहे...</translation>

@@ -1516,14 +1516,6 @@ chromium-metrics-reviews@google.com.
   <affected-histogram name="DataUse.TrafficSize.User"/>
 </histogram_suffixes>
 
-<histogram_suffixes name="DataUse_Dimensions_AllServicesKB" separator=".">
-  <suffix name="Downstream.Background" label=""/>
-  <suffix name="Downstream.Foreground" label=""/>
-  <suffix name="Upstream.Background" label=""/>
-  <suffix name="Upstream.Foreground" label=""/>
-  <affected-histogram name="DataUse.AllServicesKB"/>
-</histogram_suffixes>
-
 <histogram_suffixes name="DataUse_TrafficSource" separator=".">
   <suffix name="System" label=""/>
   <suffix name="User" label=""/>
@@ -2109,6 +2101,7 @@ chromium-metrics-reviews@google.com.
   <suffix name="GpuRasterization" label="GpuRasterization"/>
   <suffix name="Webgl" label="Webgl"/>
   <suffix name="Webgl2" label="Webgl2"/>
+  <suffix name="Webgpu" label="Webgpu"/>
   <affected-histogram name="GPU.BlocklistFeatureTestResults"/>
 </histogram_suffixes>
 
@@ -4980,21 +4973,6 @@ chromium-metrics-reviews@google.com.
   <affected-histogram name="AnimatedImage.NumOfFramesSkipped"/>
 </histogram_suffixes>
 
-<histogram_suffixes name="RequestThrottlerTypes" separator="_">
-  <suffix name="SuggestionFetcherActiveNTPUser"
-      label="Fetcher for content suggestions on mobile NTP - active NTP users"/>
-  <suffix name="SuggestionFetcherActiveSuggestionsConsumer"
-      label="Fetcher for content suggestions on mobile NTP - active
-             suggestions consumers"/>
-  <suffix name="SuggestionFetcherRareNTPUser"
-      label="Fetcher for content suggestions on mobile NTP - rare NTP users"/>
-  <suffix name="SuggestionThumbnailFetcher"
-      label="Fetcher for article thumbnails on mobile NTP"/>
-  <affected-histogram name="NewTabPage.RequestThrottler.PerDay"/>
-  <affected-histogram name="NewTabPage.RequestThrottler.PerDayInteractive"/>
-  <affected-histogram name="NewTabPage.RequestThrottler.RequestStatus"/>
-</histogram_suffixes>
-
 <histogram_suffixes name="ResourceSchedulerPeakDelayableRequestsInFlight"
     separator=".">
   <suffix name="LayoutBlocking"
@@ -5777,8 +5755,6 @@ chromium-metrics-reviews@google.com.
   <affected-histogram name="Startup.FirstWebContents.MainNavigationFinished"/>
   <affected-histogram name="Startup.FirstWebContents.MainNavigationStart"/>
   <affected-histogram name="Startup.FirstWebContents.NonEmptyPaint3"/>
-  <affected-histogram
-      name="Startup.FirstWebContents.RenderProcessHostInit.ToNonEmptyPaint"/>
   <affected-histogram name="Startup.LoadTime.ApplicationStartToChromeMain"/>
   <affected-histogram name="Startup.LoadTime.ProcessCreateToApplicationStart"/>
 </histogram_suffixes>
@@ -5850,10 +5826,8 @@ chromium-metrics-reviews@google.com.
   <affected-histogram name="Apps.AppListContinueTaskOpenType"/>
   <affected-histogram name="Apps.AppListFolderNameLength"/>
   <affected-histogram name="Apps.AppListPageSwitcherSource"/>
-  <affected-histogram name="Apps.AppListSearchBoxActivated"/>
   <affected-histogram name="Apps.AppListSearchQueryLength"/>
   <affected-histogram name="Apps.AppListSearchResultOpenTypeV2"/>
-  <affected-histogram name="Apps.AppListSuggestedChipOpenType"/>
   <affected-histogram name="Apps.ContextMenuExecuteCommand.FromApp"/>
   <affected-histogram name="Apps.ContextMenuExecuteCommand.NotFromApp"/>
   <affected-histogram

@@ -24,6 +24,7 @@
 <translation id="1399397803214730675">ຄອມພິວເຕີນີ້ມີ Google Chrome ລຸ້ນໃໝ່ກ່ວາຢູ່ຮຽບຮ້ອຍແລ້ວ. ຖ້າຊອບແວບໍ່ເຮັດວຽກ, ກະລຸນາຖອນຕິດຕັ້ງ Google Chrome ແລະລອງໃໝ່ອີກ.</translation>
 <translation id="139993653570221430">ທ່ານສາມາດປ່ຽນໃຈຕອນໃດກໍໄດ້ໃນການຕັ້ງຄ່າ Chrome. ການທົດລອງໃຊ້ຈະດຳເນີນໄປພ້ອມກັບວິທີປັດຈຸບັນທີ່ສະແດງໂຄສະນາ, ດັ່ງນັ້ນທ່ານຈຶ່ງຈະບໍ່ເຫັນການປ່ຽນແປງໃນທັນທີ.</translation>
 <translation id="1434626383986940139">ແອັບ Chrome Canary</translation>
+<translation id="1496905273983707119">{NUM_DEVICES,plural, =0{Google Chrome ໄດ້ເຊື່ອມຕໍ່ກັບອຸປະກອນ HID}=1{Google Chrome ເຊື່ອມຕໍ່ກັບອຸປະກອນ HID}other{Google Chrome ເຊື່ອມຕໍ່ກັບອຸປະກອນ HID}}</translation>
 <translation id="1507198376417198979">ປັບແຕ່ງໂປຣໄຟລ໌ Chrome ໃໝ່ຂອງທ່ານ</translation>
 <translation id="1516530951338665275">Google Chrome ຕ້ອງການສິດເຂົ້າເຖິງ Bluetooth ເພື່ອສືບຕໍ່ 
  ການຈັບຄູ່. <ph name="IDS_BLUETOOTH_DEVICE_CHOOSER_AUTHORIZE_BLUETOOTH_LINK" /></translation>
@@ -126,7 +127,6 @@
 <translation id="3140883423282498090">ການປ່ຽນແປງຂອງທ່ານຈະມີຜົນຄັ້ງຕໍ່ໄປທີ່ທ່ານເລີ່ມເປີດໃຊ້ Google Chrome ໃໝ່.</translation>
 <translation id="3149510190863420837">ແອັບ Chrome</translation>
 <translation id="3169523567916669830">ໃນລະຫວ່າງການທົດລອງໃຊ້, ທ່ານສາມາດເບິ່ງ ແລະ ລຶບຫົວຂໍ້ຂອງຄວາມສົນໃຈທີ່ເວັບໄຊຕ່າງໆໃຊ້ເພື່ອສະແດງໂຄສະນາໃຫ້ທ່ານເຫັນໄດ້. Chrome ປະເມີນຄວາມສົນໃຈຂອງທ່ານໂດຍອ້າງອີງໃສ່ປະຫວັດການທ່ອງເວັບຫຼ້າສຸດຂອງທ່ານ.</translation>
-<translation id="3211604354460514046">{NUM_DEVICES,plural, =1{Google Chrome ເຊື່ອມຕໍ່ກັບອຸປະກອນ HID}other{Google Chrome ເຊື່ອມຕໍ່ກັບອຸປະກອນ HID}}</translation>
 <translation id="3245429137663807393">ຫາກທ່ານແບ່ງປັນລາຍງານການນຳໃຊ້ Chrome ນຳ, ລາຍງານເຫຼົ່ານັ້ນຈະຮວມເອົາ URL ທີ່ທ່ານເຂົ້າໄວ້ພ້ອມ</translation>
 <translation id="3282568296779691940">ລົງຊື່ເຂົ້າ​ໃຊ້ Chrome</translation>
 <translation id="3286538390144397061">ປິດເປີດໃໝ່ດຽວນີ້</translation>

@@ -390,6 +390,9 @@ BASE_FEATURE(kFedCm, "FedCm", base::FEATURE_ENABLED_BY_DEFAULT);
 // is enabled.
 const char kFedCmIdpSignoutFieldTrialParamName[] = "IdpSignout";
 
+// Enables usage of the FedCM Authz API.
+BASE_FEATURE(kFedCmAuthz, "FedCmAuthz", base::FEATURE_DISABLED_BY_DEFAULT);
+
 // Enables usage of the FedCM API with auto re-authentication. Note that actual
 // exposure of FedCM's auto re-authentication feature to web content is
 // controlled by the flag in RuntimeEnabledFeatures on the blink side. See also
@@ -743,11 +746,6 @@ BASE_FEATURE(kMojoVideoCaptureSecondary,
              "MojoVideoCaptureSecondary",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
-// When enable, iframe does not implicit capture mouse event.
-BASE_FEATURE(kMouseSubframeNoImplicitCapture,
-             "MouseSubframeNoImplicitCapture",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-
 // When NavigationNetworkResponseQueue is enabled, the browser will schedule
 // some tasks related to navigation network responses in a kHighest priority
 // queue.
@@ -1097,13 +1095,6 @@ BASE_FEATURE(kSecurePaymentConfirmationDebug,
              "SecurePaymentConfirmationDebug",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-// Remove the 'rp' field from the output SPC
-// CollectedClientAdditionalPaymentData dictionary. See
-// https://crbug.com/1356224 .
-BASE_FEATURE(kSecurePaymentConfirmationRemoveRpField,
-             "SecurePaymentConfirmationRemoveRpField",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
 // Make sendBeacon throw for a Blob with a non simple type.
 BASE_FEATURE(kSendBeaconThrowForBlobWithNonSimpleType,
              "SendBeaconThrowForBlobWithNonSimpleType",
@@ -1215,11 +1206,6 @@ const base::FeatureParam<base::TimeDelta>
     kSiteIsolationForCrossOriginOpenerPolicyExpirationTimeoutParam{
         &kSiteIsolationForCrossOriginOpenerPolicy, "expiration_timeout",
         base::Days(7)};
-
-// This feature turns on site isolation support in <webview> guests.
-BASE_FEATURE(kSiteIsolationForGuests,
-             "SiteIsolationForGuests",
-             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // When enabled, OOPIFs will not try to reuse compatible processes from
 // unrelated tabs.
@@ -1514,6 +1500,12 @@ BASE_FEATURE(kRequestDesktopSiteExceptions,
 // when desktop user agent is used.
 BASE_FEATURE(kRequestDesktopSiteZoom,
              "RequestDesktopSiteZoom",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+// Text autosizing uses heuristics to inflate text sizes on devices with
+// small screens. This feature is for disabling these heuristics.
+BASE_FEATURE(kForceOffTextAutosizing,
+             "ForceOffTextAutosizing",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Screen Capture API support for Android

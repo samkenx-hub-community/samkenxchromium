@@ -59,13 +59,15 @@ class SidePanelToolbarContainer : public ToolbarIconContainerView {
    private:
     std::unique_ptr<ui::MenuModel> CreateMenuModel();
 
-    BrowserView* browser_view_;
+    raw_ptr<BrowserView> browser_view_;
     SidePanelEntry::Id id_;
   };
 
   // Sorts child views to display them in the correct order (pinned buttons,
   // side panel button).
   void ReorderViews();
+
+  void OnPinnedButtonPrefChanged();
 
   void UpdatePinnedButtonsVisibility();
 

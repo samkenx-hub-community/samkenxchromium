@@ -737,6 +737,7 @@ Aby zmienić to ustawienie, <ph name="BEGIN_LINK" />zresetuj synchronizację<ph 
 <translation id="5001388021414335527">Dodaj stronę do obserwowanych tutaj</translation>
 <translation id="5004416275253351869">Zarządzanie aktywnością w Google</translation>
 <translation id="5005498671520578047">Skopiuj hasło</translation>
+<translation id="5010886807652684893">Widok graficzny</translation>
 <translation id="5011311129201317034"><ph name="SITE" /> chce się połączyć</translation>
 <translation id="5016205925109358554">Szeryfowa</translation>
 <translation id="5017529052065664584">Ostatnie 15 minut</translation>
@@ -794,6 +795,7 @@ Aby zmienić to ustawienie, <ph name="BEGIN_LINK" />zresetuj synchronizację<ph 
 <translation id="5342314432463739672">Prośby o uprawnienia</translation>
 <translation id="53537532693258630">Tutaj pojawią się usunięte witryny</translation>
 <translation id="5355191726083956201">Włączona jest silniejsza ochrona</translation>
+<translation id="5361107212971249203">tekst</translation>
 <translation id="5368227114232678694">Wypróbuj tryb incognito do prywatnego przeglądania internetu na tym urządzeniu</translation>
 <translation id="5375577065097716013">Szukaj z Obiektywem Google <ph name="BEGIN_NEW" />Nowe<ph name="END_NEW" /></translation>
 <translation id="5401851137404501592"><ph name="IDENTITY_PROVIDER_ETLD_PLUS_ONE" /> udostępni teraz witrynie Twoje imię i nazwisko, adres e-mail i zdjęcie profilowe.</translation>
@@ -1191,6 +1193,7 @@ Na przykład niektóre strony mogą na nie zareagować, wyświetlając reklamy b
 <translation id="7454641608352164238">Za mało miejsca</translation>
 <translation id="7455988709578031708">Na podstawie Twojej historii przeglądania. To ustawienie jest włączone.</translation>
 <translation id="7456774706094330779">Wczytywanie rozszerzone</translation>
+<translation id="7466431077154602932">Widok kompaktowy</translation>
 <translation id="7474822150871987353">Poznaj tematy omawiane w witrynach, nie opuszczając strony. Zaznacz na stronie co najmniej 1 słowo, aby je wyszukać.</translation>
 <translation id="7475192538862203634">Jeśli często widzisz ten komunikat, przeczytaj te <ph name="BEGIN_LINK" />wskazówki<ph name="END_LINK" />.</translation>
 <translation id="7475688122056506577">Nie znaleziono karty SD. Może brakować niektórych Twoich plików.</translation>
@@ -1320,6 +1323,7 @@ Na przykład niektóre strony mogą na nie zareagować, wyświetlając reklamy b
 <translation id="8058746566562539958">Otwórz w nowej karcie Chrome</translation>
 <translation id="8062594758852531064">Wczytywanie rozszerzone:</translation>
 <translation id="8063895661287329888">Nie udało się dodać zakładki.</translation>
+<translation id="8066816452984416180">W łatwy sposób dodaj tę stronę do zakładek. Aby edytować ten skrót, naciśnij i przytrzymaj.</translation>
 <translation id="806745655614357130">Przechowuj dane oddzielnie</translation>
 <translation id="8073388330009372546">Otwórz grafikę w nowej karcie</translation>
 <translation id="8076492880354921740">Karty</translation>
@@ -1351,6 +1355,7 @@ Na przykład niektóre strony mogą na nie zareagować, wyświetlając reklamy b
 <translation id="8216351761227087153">Zobacz</translation>
 <translation id="8218622182176210845">Zarządzaj kontem</translation>
 <translation id="8223642481677794647">Menu karty kanału</translation>
+<translation id="8236097722223016103">Dodaj do zakładek</translation>
 <translation id="8250920743982581267">Dokumenty</translation>
 <translation id="8255617931166444521">Witryny mogą używać plików cookie tylko do śledzenia Twojej aktywności związanej z przeglądaniem tych witryn</translation>
 <translation id="8259179246279078674">Wstępnie wczytywane strony są zaszyfrowane, dlatego Google nie dowie się niczego o ich zawartości. Serwery Google wiedzą, jakie witryny są wstępnie wczytywane w trybie prywatnym. Te informacje są używane tylko w celu wczytywania stron i nie są łączone z innymi informacjami na Twoim koncie Google.</translation>
@@ -1498,6 +1503,7 @@ Na przykład niektóre strony mogą na nie zareagować, wyświetlając reklamy b
 <translation id="8989968390305463310">Historia przeglądania wpływa na wyświetlane reklamy i oszacowane zainteresowania (patrz poniżej). Żeby chronić Twoją prywatność, Chrome co miesiąc automatycznie usuwa Twoje zainteresowania. Zainteresowania mogą być odświeżane, chyba że je usuniesz.</translation>
 <translation id="8993760627012879038">Otwórz nową kartę w trybie incognito</translation>
 <translation id="8996847606757455498">Wybierz innego dostawcę</translation>
+<translation id="8998289560386111590">Niedostępne na Twoim urządzeniu</translation>
 <translation id="8998729206196772491">Logujesz się na konto, którym zarządza <ph name="MANAGED_DOMAIN" />, i przekazujesz jego administratorowi kontrolę nad Twoimi danymi Chrome. Zostaną one trwale przypisane do tego konta. Gdy się wylogujesz, znikną one z tego urządzenia, ale pozostaną zapisane na Twoim koncie Google.</translation>
 <translation id="9022774213089566801">Często odwiedzane</translation>
 <translation id="9022871169049522985">Witryny i reklamodawcy mogą mierzyć skuteczność reklam</translation>

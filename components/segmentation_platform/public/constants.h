@@ -128,6 +128,8 @@ proto::Predictor::PredictorTypeCase GetClassifierType(
 const char kAdaptiveToolbarModelLabelNewTab[] = "NewTab";
 const char kAdaptiveToolbarModelLabelShare[] = "Share";
 const char kAdaptiveToolbarModelLabelVoice[] = "Voice";
+const char kAdaptiveToolbarModelLabelTranslate[] = "Translate";
+const char kAdaptiveToolbarModelLabelAddToBookmarks[] = "AddToBookmarks";
 
 // Labels for contextual page actions model.
 const char kContextualPageActionModelLabelPriceTracking[] = "price_tracking";
@@ -140,6 +142,14 @@ const char kSearchUserModelLabelNone[] = "None";
 const char kSearchUserModelLabelLow[] = "Low";
 const char kSearchUserModelLabelMedium[] = "Medium";
 const char kSearchUserModelLabelHigh[] = "High";
+
+// Labels for device tier model.
+// Any updates to these strings need to also update the field trials allowlist
+// in go/segmentation-field-trials-map.;
+const char kDeviceTierSegmentLabelNone[] = "None";
+const char kDeviceTierSegmentLabelLow[] = "Low";
+const char kDeviceTierSegmentLabelMedium[] = "Medium";
+const char kDeviceTierSegmentLabelHigh[] = "High";
 
 // Custom inputs for contextual page actions model.
 const char kContextualPageActionModelInputPriceTracking[] = "can_track_price";

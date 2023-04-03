@@ -274,6 +274,7 @@
 <translation id="3456078764689556234"><ph name="PRINTED_PAGES" /> бет (жалпы саны: <ph name="TOTAL_PAGES" />) басып шығарылды.</translation>
 <translation id="345898999683440380"><ph name="PAGE_NUM" />-бет сканерленуде. <ph name="PERCENTAGE_VALUE" />% орындалды.</translation>
 <translation id="3459509316159669723">Басып шығару</translation>
+<translation id="346423161771747987">Ағымдағы</translation>
 <translation id="346539236881580388">Қайта түсіру</translation>
 <translation id="3484914941826596830">Микробағдарлама жаңартылып жатқанда, сыртқы құрылғыны ажыратпаңыз немесе компьютерді өшірмеңіз. Бұл терезені кішірейте аласыз. Бұл жаңарту бірнеше минутқа созылып, ол кезде сыртқы құрылғы жұмыс істемей қалуы мүмкін.</translation>
 <translation id="3486220673238053218">анықтама</translation>
@@ -697,6 +698,7 @@
 <translation id="7103252855940681301"><ph name="NAME" /> атты құрылғы, <ph name="INDEX" />/<ph name="COUNT" /></translation>
 <translation id="7108668606237948702">enter</translation>
 <translation id="7130438335435247835">Кіру нүктесінің атауы (APN)</translation>
+<translation id="7131634559772719176">Параметрлер жинағын растау</translation>
 <translation id="7134436342991564651">{0,plural, =1{Сервер атауы}other{Сервер атаулары}}</translation>
 <translation id="7143207342074048698">Қосылып жатыр</translation>
 <translation id="7144878232160441200">Қайталау</translation>
@@ -768,6 +770,7 @@
 <translation id="7762130827864645708">Құпия сөзіңіз өзгерді. Бұдан былай жаңа құпия сөзді пайдаланыңыз.</translation>
 <translation id="7763470514545477072">Домен суффиксі сәйкестігі</translation>
 <translation id="7769672763586021400">Үлгі идентификаторы</translation>
+<translation id="7770834998503326261">Таңдауыңызға қатысты қосымша ақпарат</translation>
 <translation id="7778717409420828014">Пікіріңіз Chromebook тәжірибесін жақсартуға көмектеседі және оған біздің топ пікір қалдырады. Келіп түскен пікірлердің көптігіне байланысты жауап бере алмаймыз.</translation>
 <translation id="7784116172884276937">DNS серверлері реттелмеген.</translation>
 <translation id="7791543448312431591">Қосу</translation>
@@ -800,6 +803,7 @@
 <translation id="80398733265834479">Автобаланс режимін қосу</translation>
 <translation id="8041089156583427627">Пікір жіберу</translation>
 <translation id="8045012663542226664">Микрофон дыбысын өшіру</translation>
+<translation id="8050091914317269817">Бұл тұсқағазды таңдау автоматты қараңғы режим мен тұсқағаз түсін сәйкестендіруді қосады.</translation>
 <translation id="8075838845814659848">Қалған заряд</translation>
 <translation id="8076492880354921740">Қойындылар</translation>
 <translation id="8082366717211101304">Android қолданбаларынан DNS-ті анықтау мүмкін емес.</translation>

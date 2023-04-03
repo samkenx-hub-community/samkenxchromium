@@ -4,6 +4,7 @@
 
 #include "chrome/browser/ui/webui/password_manager/sync_handler.h"
 
+#include "base/memory/raw_ptr.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/signin/identity_test_environment_profile_adaptor.h"
 #include "chrome/browser/sync/sync_service_factory.h"
@@ -116,7 +117,7 @@ class SyncHandlerTest : public ChromeRenderViewHostTestHarness {
   std::unique_ptr<IdentityTestEnvironmentProfileAdaptor>
       identity_test_env_adaptor_;
   raw_ptr<MockSyncService> mock_sync_service_;
-  SyncHandler* handler_;
+  raw_ptr<SyncHandler> handler_;
 };
 
 TEST_F(SyncHandlerTest, HandleTrustedVaultBannerStateNotShown) {
@@ -234,6 +235,21 @@ TEST_F(SyncHandlerTest, AccountInfo) {
   ASSERT_EQ(num_account_change_updates + 1, update_args.size());
   ASSERT_TRUE(update_args[1]->is_dict());
   EXPECT_EQ(account_info.email, *update_args[1]->GetDict().FindString("email"));
+}
+
+TEST_F(SyncHandlerTest, NotEligibleForAccountStorageWhenSetupNotComplete) {
+  CreateTestSyncAccount();
+  ON_CALL(*sync_service()->GetMockUserSettings(), IsFirstSetupComplete())
+      .WillByDefault(Return(false));
+
+  base::Value::List args;
+  args.Append(kTestCallbackId);
+  web_ui()->ProcessWebUIMessage(GURL(), "GetSyncInfo", std::move(args));
+
+  auto& data = *web_ui()->call_data().back();
+  ASSERT_TRUE(CallbackReturnedSuccessfully(data));
+  ASSERT_TRUE(data.arg3()->is_dict());
+  EXPECT_FALSE(*data.arg3()->GetDict().FindBool("isEligibleForAccountStorage"));
 }
 
 }  // namespace password_manager

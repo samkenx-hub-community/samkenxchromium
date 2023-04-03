@@ -33,8 +33,6 @@ using testing::Not;
 using testing::NotNull;
 using testing::Return;
 
-const char kNigoriKeyName[] = "nigori-key";
-
 NigoriMetadataBatch CreateDummyNigoriMetadataBatch(
     const std::string& progress_marker_token,
     int64_t entity_metadata_sequence_number);
@@ -47,11 +45,8 @@ MATCHER_P(HasDefaultKeyDerivedFrom, key_params, "") {
   const Cryptographer& cryptographer = arg;
   std::unique_ptr<Nigori> expected_default_nigori = Nigori::CreateByDerivation(
       key_params.derivation_params, key_params.password);
-  std::string expected_default_key_name;
-  EXPECT_TRUE(expected_default_nigori->Permute(
-      Nigori::Type::Password, kNigoriKeyName, &expected_default_key_name));
   return cryptographer.GetDefaultEncryptionKeyName() ==
-         expected_default_key_name;
+         expected_default_nigori->GetKeyName();
 }
 
 MATCHER(HasKeystoreNigori, "") {
@@ -89,12 +84,9 @@ MATCHER_P(CanDecryptWith, key_params, "") {
   const Cryptographer& cryptographer = arg;
   std::unique_ptr<Nigori> nigori = Nigori::CreateByDerivation(
       key_params.derivation_params, key_params.password);
-  std::string nigori_name;
-  EXPECT_TRUE(
-      nigori->Permute(Nigori::Type::Password, kNigoriKeyName, &nigori_name));
   const std::string unencrypted = "test";
   sync_pb::EncryptedData encrypted;
-  encrypted.set_key_name(nigori_name);
+  encrypted.set_key_name(nigori->GetKeyName());
   encrypted.set_blob(nigori->Encrypt(unencrypted));
 
   if (!cryptographer.CanDecrypt(encrypted)) {

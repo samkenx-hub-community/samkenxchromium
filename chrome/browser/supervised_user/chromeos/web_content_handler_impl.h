@@ -8,21 +8,30 @@
 #include <memory>
 #include <string>
 
-#include "base/allocator/partition_allocator/pointers/raw_ref.h"
 #include "base/memory/weak_ptr.h"
 #include "chrome/browser/ash/crosapi/crosapi_ash.h"
 #include "components/supervised_user/core/browser/web_content_handler.h"
 #include "ui/gfx/image/image_skia.h"
 #include "url/gurl.h"
 
+class Profile;
+
 namespace content {
 class WebContents;
 }  // namespace content
 
+namespace favicon {
+class LargeIconService;
+}  // namespace favicon
+
+class SupervisedUserFaviconRequestHandler;
+
 // Chrome Ash specific implementation of web content handler.
 class WebContentHandlerImpl : public supervised_user::WebContentHandler {
  public:
-  explicit WebContentHandlerImpl(content::WebContents& web_contents);
+  WebContentHandlerImpl(content::WebContents* web_contents,
+                        const GURL& url,
+                        favicon::LargeIconService& large_icon_service);
 
   WebContentHandlerImpl(const WebContentHandlerImpl&) = delete;
   WebContentHandlerImpl& operator=(const WebContentHandlerImpl&) = delete;
@@ -31,8 +40,10 @@ class WebContentHandlerImpl : public supervised_user::WebContentHandler {
   // supervised_user::WebContentHandler:
   void RequestLocalApproval(const GURL& url,
                             const std::u16string& child_display_name,
-                            const gfx::ImageSkia& favicon,
                             ApprovalRequestInitiatedCallback callback) override;
+  bool IsMainFrame(int frame_id) override;
+  void CleanUpInfoBarOnMainFrame(int frame_id) override;
+  void ShowFeedback(GURL url, std::u16string reason) override;
 
  private:
   void OnLocalApprovalRequestCompleted(
@@ -51,7 +62,9 @@ class WebContentHandlerImpl : public supervised_user::WebContentHandler {
   FRIEND_TEST_ALL_PREFIXES(WebContentHandlerImplTest,
                            LocalWebApprovalErrorChromeOSTest);
 
-  const raw_ref<content::WebContents> web_contents_;
+  const raw_ptr<content::WebContents> web_contents_;
+  std::unique_ptr<SupervisedUserFaviconRequestHandler> favicon_handler_;
+  const raw_ref<Profile> profile_;
   base::WeakPtrFactory<WebContentHandlerImpl> weak_ptr_factory_{this};
 };
 

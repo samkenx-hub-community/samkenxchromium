@@ -5524,6 +5524,7 @@ interface MLGraphBuilder
     method maxPool2d
     method min
     method mul
+    method pad
     method relu
     method resample2d
     method reshape
@@ -5785,6 +5786,7 @@ interface MediaDevices : EventTarget
     getter ondevicechange
     method constructor
     method enumerateDevices
+    method getAllScreensMedia
     method getDisplayMedia
     method getDisplayMediaSet
     method getSupportedConstraints
@@ -6961,6 +6963,7 @@ interface PerformanceScriptTiming : PerformanceEntry
     getter desiredExecutionStart
     getter executionStart
     getter forcedStyleAndLayoutDuration
+    getter pauseDuration
     getter sourceLocation
     getter type
     getter window
@@ -7316,23 +7319,17 @@ interface RTCIceTransport : EventTarget
     attribute @@toStringTag
     getter gatheringState
     getter ongatheringstatechange
-    getter onicecandidate
     getter onselectedcandidatepairchange
     getter onstatechange
     getter role
     getter state
-    method addRemoteCandidate
     method constructor
-    method gather
     method getLocalCandidates
     method getLocalParameters
     method getRemoteCandidates
     method getRemoteParameters
     method getSelectedCandidatePair
-    method start
-    method stop
     setter ongatheringstatechange
-    setter onicecandidate
     setter onselectedcandidatepairchange
     setter onstatechange
 interface RTCPeerConnection : EventTarget
@@ -9414,11 +9411,11 @@ interface TextTrackList : EventTarget
     setter onremovetrack
 interface TextUpdateEvent : Event
     attribute @@toStringTag
-    getter newSelectionEnd
-    getter newSelectionStart
+    getter selectionEnd
+    getter selectionStart
+    getter text
     getter updateRangeEnd
     getter updateRangeStart
-    getter updateText
     method constructor
 interface TimeRanges
     attribute @@toStringTag
@@ -11408,20 +11405,6 @@ interface Worklet
     attribute @@toStringTag
     method addModule
     method constructor
-interface WorkletAnimation
-    attribute @@toStringTag
-    getter animatorName
-    getter currentTime
-    getter effect
-    getter playState
-    getter playbackRate
-    getter startTime
-    getter timeline
-    method cancel
-    method constructor
-    method pause
-    method play
-    setter playbackRate
 interface WritableStream
     attribute @@toStringTag
     getter locked
@@ -11706,7 +11689,9 @@ interface XRPlaneSet
     method values
 interface XRPose
     attribute @@toStringTag
+    getter angularVelocity
     getter emulatedPosition
+    getter linearVelocity
     getter transform
     method constructor
 interface XRProjectionLayer : XRCompositionLayer
@@ -12064,7 +12049,6 @@ interface webkitURL
 [NAMESPACES]
 namespace CSS
     attribute @@toStringTag
-    getter animationWorklet
     getter highlights
     getter layoutWorklet
     getter paintWorklet

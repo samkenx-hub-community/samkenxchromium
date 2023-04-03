@@ -8,9 +8,12 @@
 #include "build/build_config.h"
 #include "chrome/browser/extensions/extension_ui_util.h"
 #include "chrome/browser/ui/browser_element_identifiers.h"
+#include "chrome/browser/ui/color/chrome_color_id.h"
 #include "chrome/browser/ui/layout_constants.h"
 #include "chrome/browser/ui/page_info/page_info_dialog.h"
 #include "chrome/browser/ui/view_ids.h"
+#include "chrome/browser/ui/views/location_bar/icon_label_bubble_view.h"
+#include "chrome/browser/ui/views/location_bar/location_bar_util.h"
 #include "chrome/browser/ui/views/page_info/page_info_bubble_view.h"
 #include "chrome/grit/chromium_strings.h"
 #include "chrome/grit/generated_resources.h"
@@ -23,10 +26,12 @@
 #include "content/public/common/url_constants.h"
 #include "extensions/common/constants.h"
 #include "ui/accessibility/ax_enums.mojom.h"
-#include "ui/accessibility/ax_node_data.h"
 #include "ui/base/clipboard/clipboard.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
+#include "ui/base/ui_base_features.h"
+#include "ui/color/color_id.h"
+#include "ui/gfx/color_palette.h"
 #include "ui/views/animation/ink_drop.h"
 #include "ui/views/controls/label.h"
 #include "ui/views/style/platform_style.h"
@@ -34,6 +39,12 @@
 
 using content::WebContents;
 using security_state::SecurityLevel;
+
+namespace {
+constexpr int kDefaultInternalSpacing = 8;
+constexpr int kDefaultInternalSpacingTouchUI = 10;
+constexpr int kDefaultInternalSpacingChromeRefresh = 4;
+}  // namespace
 
 LocationIconView::LocationIconView(
     const gfx::FontList& font_list,
@@ -48,6 +59,14 @@ LocationIconView::LocationIconView(
 
   // Readability is guaranteed by the omnibox theme.
   label()->SetAutoColorReadabilityEnabled(false);
+
+  SetAccessibleProperties(/*is_initialization*/ true);
+  if (features::IsChromeRefresh2023()) {
+    ConfigureInkdropForRefresh2023(this, kColorPageInfoIconHover,
+                                   kColorPageInfoIconPressed);
+  }
+
+  UpdateBorder();
 }
 
 LocationIconView::~LocationIconView() {}
@@ -70,7 +89,7 @@ SkColor LocationIconView::GetForegroundColor() const {
 }
 
 bool LocationIconView::ShouldShowSeparator() const {
-  return ShouldShowLabel();
+  return !features::IsChromeRefresh2023() && ShouldShowLabel();
 }
 
 bool LocationIconView::ShowBubble(const ui::Event& event) {
@@ -87,25 +106,6 @@ bool LocationIconView::OnMousePressed(const ui::MouseEvent& event) {
 
   IconLabelBubbleView::OnMousePressed(event);
   return true;
-}
-
-void LocationIconView::GetAccessibleNodeData(ui::AXNodeData* node_data) {
-  if (delegate_->IsEditingOrEmpty()) {
-    node_data->role = ax::mojom::Role::kImage;
-    node_data->SetNameChecked(l10n_util::GetStringUTF8(IDS_ACC_SEARCH_ICON));
-    return;
-  }
-
-  // If no display text exists, ensure that the accessibility label is added.
-  auto accessibility_label = base::UTF16ToUTF8(
-      delegate_->GetLocationBarModel()->GetSecureAccessibilityText());
-  if (label()->GetText().empty() && !accessibility_label.empty()) {
-    node_data->AddStringAttribute(ax::mojom::StringAttribute::kDescription,
-                                  accessibility_label);
-  }
-
-  IconLabelBubbleView::GetAccessibleNodeData(node_data);
-  node_data->role = ax::mojom::Role::kPopUpButton;
 }
 
 void LocationIconView::AddedToWidget() {
@@ -147,6 +147,19 @@ bool LocationIconView::GetShowText() const {
   }
 
   return !location_bar_model->GetSecureDisplayText().empty();
+}
+
+int LocationIconView::GetInternalSpacing() const {
+  if (image()->GetPreferredSize().IsEmpty()) {
+    return 0;
+  }
+
+  return (ui::TouchUiController::Get()->touch_ui()
+              ? kDefaultInternalSpacingTouchUI
+              : (features::IsChromeRefresh2023()
+                     ? kDefaultInternalSpacingChromeRefresh
+                     : kDefaultInternalSpacing)) +
+         GetExtraInternalSpacing();
 }
 
 const views::InkDrop* LocationIconView::get_ink_drop_for_testing() {
@@ -211,6 +224,32 @@ void LocationIconView::UpdateTextVisibility(bool suppress_animations) {
     AnimateOut();
 }
 
+void LocationIconView::SetAccessibleProperties(bool is_initialization) {
+  ax::mojom::Role role = delegate_->IsEditingOrEmpty()
+                             ? ax::mojom::Role::kImage
+                             : ax::mojom::Role::kPopUpButton;
+
+  const std::u16string name =
+      delegate_->IsEditingOrEmpty()
+          ? l10n_util::GetStringUTF16(IDS_ACC_SEARCH_ICON)
+          : GetAccessibleName();
+
+  // If no display text exists, ensure that the accessibility label is added.
+  const std::u16string description =
+      delegate_->IsEditingOrEmpty() ? GetAccessibleDescription()
+      : label()->GetText().empty()
+          ? delegate_->GetLocationBarModel()->GetSecureAccessibilityText()
+          : std::u16string();
+
+  if (is_initialization) {
+    SetAccessibilityProperties(role, name, description);
+  } else {
+    SetAccessibleRole(role);
+    SetAccessibleName(name);
+    SetAccessibleDescription(description);
+  }
+}
+
 void LocationIconView::UpdateIcon() {
   // Cancel any previous outstanding icon requests, as they are now outdated.
   icon_fetch_weak_ptr_factory_.InvalidateWeakPtrs();
@@ -230,7 +269,13 @@ void LocationIconView::OnIconFetched(const gfx::Image& image) {
 void LocationIconView::Update(bool suppress_animations) {
   UpdateTextVisibility(suppress_animations);
   UpdateIcon();
+  SetAccessibleProperties(/*is_initialization*/ false);
 
+  if (features::IsChromeRefresh2023()) {
+    SetBackground(views::CreateRoundedRectBackground(
+        GetColorProvider()->GetColor(ui::kColorSysBaseContainerElevated),
+        height() / 2));
+  }
   // The label text color may have changed in response to changes in security
   // level.
   UpdateLabelColors();
@@ -280,6 +325,20 @@ bool LocationIconView::IsTriggerableEvent(const ui::Event& event) {
   }
 
   return IconLabelBubbleView::IsTriggerableEvent(event);
+}
+
+void LocationIconView::UpdateBorder() {
+  // Bubbles are given the full internal height of the location bar so that all
+  // child views in the location bar have the same height. The visible height of
+  // the bubble should be smaller, so use an empty border to shrink down the
+  // content bounds so the background gets painted correctly.
+  if (features::IsChromeRefresh2023()) {
+    SetBorder(views::CreateEmptyBorder(gfx::Insets::VH(
+        GetLayoutInsets(LOCATION_BAR_PAGE_INFO_ICON_PADDING).top(),
+        GetLayoutInsets(LOCATION_BAR_PAGE_INFO_ICON_PADDING).left())));
+  } else {
+    IconLabelBubbleView::UpdateBorder();
+  }
 }
 
 gfx::Size LocationIconView::GetMinimumSizeForPreferredSize(

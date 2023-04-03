@@ -18,6 +18,7 @@
 #include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "base/time/time.h"
+#include "content/browser/interest_group/auction_result.h"
 #include "content/browser/interest_group/auction_worklet_manager.h"
 #include "content/browser/interest_group/interest_group_auction_reporter.h"
 #include "content/browser/interest_group/interest_group_storage.h"
@@ -43,6 +44,7 @@ struct AuctionConfig;
 namespace content {
 
 class AttributionManager;
+class AuctionMetricsRecorder;
 class InterestGroupManagerImpl;
 class PrivateAggregationManager;
 
@@ -105,53 +107,6 @@ class CONTENT_EXPORT InterestGroupAuction
 
   using PrivateAggregationRequests =
       std::vector<auction_worklet::mojom::PrivateAggregationRequestPtr>;
-
-  // Result of an auction or a component auction. Used for histograms. Only
-  // recorded for valid auctions. These are used in histograms, so values of
-  // existing entries must not change when adding/removing values, and obsolete
-  // values must not be reused.
-  enum class AuctionResult {
-    // The auction succeeded, with a winning bidder.
-    kSuccess = 0,
-
-    // The auction was aborted, due to either navigating away from the frame
-    // that started the auction or browser shutdown.
-    kAborted = 1,
-
-    // Bad message received over Mojo. This is potentially a security error.
-    kBadMojoMessage = 2,
-
-    // The user was in no interest groups that could participate in the auction.
-    kNoInterestGroups = 3,
-
-    // The seller worklet failed to load.
-    kSellerWorkletLoadFailed = 4,
-
-    // The seller worklet crashed.
-    kSellerWorkletCrashed = 5,
-
-    // All bidders failed to bid. This happens when all bidders choose not to
-    // bid, fail to load, or crash before making a bid.
-    kNoBids = 6,
-
-    // The seller worklet rejected all bids (of which there was at least one).
-    kAllBidsRejected = 7,
-
-    // Obsolete:
-    // kWinningBidderWorkletCrashed = 8,
-
-    // The seller is not allowed to use the interest group API.
-    kSellerRejected = 9,
-
-    // The component auction completed with a winner, but that winner lost the
-    // top-level auction.
-    kComponentLostAuction = 10,
-
-    // Obsolete:
-    // kWinningComponentSellerWorkletCrashed = 11,
-
-    kMaxValue = kComponentLostAuction
-  };
 
   struct BidState {
     BidState();
@@ -304,9 +259,11 @@ class CONTENT_EXPORT InterestGroupAuction
     Bid(BidRole bid_role,
         std::string ad_metadata,
         double bid,
+        std::string bid_currency,
         absl::optional<double> ad_cost,
         blink::AdDescriptor ad_descriptor,
         std::vector<blink::AdDescriptor> ad_component_descriptors,
+        absl::optional<uint16_t> modeling_signals,
         base::TimeDelta bid_duration,
         absl::optional<uint32_t> bidding_signals_data_version,
         const blink::InterestGroup::Ad* bid_ad,
@@ -336,9 +293,11 @@ class CONTENT_EXPORT InterestGroupAuction
     // auction_worklet::mojom::BidderWorkletBid.
     const std::string ad_metadata;
     const double bid;
+    const std::string bid_currency;
     const absl::optional<double> ad_cost;
     const blink::AdDescriptor ad_descriptor;
     const std::vector<blink::AdDescriptor> ad_component_descriptors;
+    const absl::optional<uint16_t> modeling_signals;
     const base::TimeDelta bid_duration;
     const absl::optional<uint32_t> bidding_signals_data_version;
 
@@ -406,6 +365,7 @@ class CONTENT_EXPORT InterestGroupAuction
       const InterestGroupAuction* parent,
       AuctionWorkletManager* auction_worklet_manager,
       InterestGroupManagerImpl* interest_group_manager,
+      AuctionMetricsRecorder* auction_metrics_recorder,
       base::Time auction_start_time,
       base::RepeatingCallback<
           void(const PrivateAggregationRequests& private_aggregation_requests)>
@@ -903,6 +863,7 @@ class CONTENT_EXPORT InterestGroupAuction
 
   const raw_ptr<AuctionWorkletManager> auction_worklet_manager_;
   const raw_ptr<InterestGroupManagerImpl> interest_group_manager_;
+  const raw_ptr<AuctionMetricsRecorder> auction_metrics_recorder_;
 
   // Configuration of this auction.
   raw_ptr<const blink::AuctionConfig> config_;

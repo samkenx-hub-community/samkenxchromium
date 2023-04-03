@@ -7,7 +7,6 @@
 
 #include <string>
 
-#include "base/allocator/partition_allocator/pointers/raw_ref.h"
 #include "base/memory/weak_ptr.h"
 #include "components/supervised_user/core/browser/web_content_handler.h"
 
@@ -20,7 +19,7 @@ class WebContents;
 // Android specific implementation of web content handler.
 class WebContentHandlerImpl : public supervised_user::WebContentHandler {
  public:
-  explicit WebContentHandlerImpl(content::WebContents& web_contents);
+  explicit WebContentHandlerImpl(content::WebContents* web_contents);
 
   WebContentHandlerImpl(const WebContentHandlerImpl&) = delete;
   WebContentHandlerImpl& operator=(const WebContentHandlerImpl&) = delete;
@@ -29,8 +28,10 @@ class WebContentHandlerImpl : public supervised_user::WebContentHandler {
   // supervised_user::WebContentHandler:
   void RequestLocalApproval(const GURL& url,
                             const std::u16string& child_display_name,
-                            const gfx::ImageSkia& favicon,
                             ApprovalRequestInitiatedCallback callback) override;
+  bool IsMainFrame(int frame_id) override;
+  void CleanUpInfoBarOnMainFrame(int frame_id) override;
+  void ShowFeedback(GURL url, std::u16string reason) override;
 
  private:
   void OnLocalApprovalRequestCompleted(
@@ -47,7 +48,7 @@ class WebContentHandlerImpl : public supervised_user::WebContentHandler {
   FRIEND_TEST_ALL_PREFIXES(WebContentHandlerImplTest,
                            LocalWebApprovalDurationHistogramCancellationTest);
 
-  const raw_ref<content::WebContents> web_contents_;
+  const raw_ptr<content::WebContents> web_contents_;
   base::WeakPtrFactory<WebContentHandlerImpl> weak_ptr_factory_{this};
 };
 

@@ -22,8 +22,6 @@
 #ifndef THIRD_PARTY_BLINK_RENDERER_CORE_LAYOUT_LAYOUT_VIEW_H_
 #define THIRD_PARTY_BLINK_RENDERER_CORE_LAYOUT_LAYOUT_VIEW_H_
 
-#include <memory>
-
 #include "base/check_op.h"
 #include "base/dcheck_is_on.h"
 #include "third_party/blink/public/mojom/scroll/scrollbar_mode.mojom-blink.h"
@@ -42,7 +40,6 @@ namespace blink {
 
 class LayoutQuote;
 class LocalFrameView;
-class NamedPagesMapper;
 class ViewFragmentationContext;
 
 // LayoutView is the root of the layout tree and the Document's LayoutObject.
@@ -210,20 +207,10 @@ class CORE_EXPORT LayoutView : public LayoutBlockFlow {
     page_size_ = size;
   }
 
-  virtual AtomicString NamedPageAtIndex(wtf_size_t page_index) const;
-
-  NamedPagesMapper* GetNamedPagesMapper() const {
-    NOT_DESTROYED();
-
-    // NamedPagesMapper is deprecated.
-    DCHECK(!RuntimeEnabledFeatures::LayoutNGPrintingEnabled());
-
-    return named_pages_mapper_.get();
-  }
+  // TODO(1229581): Make non-virtual.
+  virtual AtomicString NamedPageAtIndex(wtf_size_t page_index) const = 0;
 
   PhysicalRect DocumentRect() const;
-
-  IntervalArena* GetIntervalArena();
 
   void SetLayoutQuoteHead(LayoutQuote* head) {
     NOT_DESTROYED();
@@ -397,8 +384,6 @@ class CORE_EXPORT LayoutView : public LayoutBlockFlow {
   LayoutState* layout_state_;
 
   Member<ViewFragmentationContext> fragmentation_context_;
-  std::unique_ptr<NamedPagesMapper> named_pages_mapper_;
-  scoped_refptr<IntervalArena> interval_arena_;
 
   Member<LayoutQuote> layout_quote_head_;
   unsigned layout_counter_count_ = 0;

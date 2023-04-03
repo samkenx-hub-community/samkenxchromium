@@ -22,6 +22,7 @@
 <translation id="1399397803214730675">Na ovom računalu već postoji novija verzija programa Google Chrome. Ako softver ne radi, deinstalirajte Google Chrome i pokušajte ponovo.</translation>
 <translation id="139993653570221430">Uvijek se možete predomisliti i promijeniti postavke u Chromeu. Probe se prikazuju uz trenutačan način prikazivanja oglasa, stoga nećete odmah vidjeti promjene.</translation>
 <translation id="1434626383986940139">Aplikacije kanala Chrome Canary</translation>
+<translation id="1496905273983707119">{NUM_DEVICES,plural, =0{Google Chrome bio je povezan s HID uređajem}=1{Google Chrome povezan je s HID uređajem}one{Google Chrome povezan je s HID uređajima}few{Google Chrome povezan je s HID uređajima}other{Google Chrome povezan je s HID uređajima}}</translation>
 <translation id="1507198376417198979">Prilagodite svoj novi profil u Chromeu</translation>
 <translation id="1516530951338665275">Google Chrome treba pristup Bluetoothu za nastavak 
  uparivanja. <ph name="IDS_BLUETOOTH_DEVICE_CHOOSER_AUTHORIZE_BLUETOOTH_LINK" /></translation>
@@ -122,7 +123,6 @@
 <translation id="3140883423282498090">Vaše izmjene stupit će na snagu sljedeći put kada se ponovo pokrene Google Chrome.</translation>
 <translation id="3149510190863420837">Aplikacije sustava Chrome</translation>
 <translation id="3169523567916669830">Tijekom probi možete vidjeti i ukloniti teme koje web-lokacije koriste da bi vam prikazivale oglase. Chrome procjenjuje vaše interese na temelju vaše nedavne povijesti pregledavanja.</translation>
-<translation id="3211604354460514046">{NUM_DEVICES,plural, =1{Google Chrome povezan je s HID uređajem}one{Google Chrome povezan je s HID uređajima}few{Google Chrome povezan je s HID uređajima}other{Google Chrome povezan je s HID uređajima}}</translation>
 <translation id="3245429137663807393">Ako dijelite i izvješća o upotrebi Chromea, ta izvješća uključuju URL-ove koje posjećujete</translation>
 <translation id="3282568296779691940">Prijavite se u Chrome</translation>
 <translation id="3286538390144397061">Ponovo pokreni sad</translation>

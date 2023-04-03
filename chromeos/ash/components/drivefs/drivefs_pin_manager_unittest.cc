@@ -906,7 +906,7 @@ TEST_F(DriveFsPinManagerTest, OnFileDeleted) {
   PinManager manager(temp_dir_.GetPath(), &drivefs_);
 
   DCHECK_CALLED_ON_VALID_SEQUENCE(manager.sequence_checker_);
-  EXPECT_EQ(manager.progress_.stage, Stage::kStopped);
+  manager.progress_.stage = Stage::kSyncing;
 
   const DriveItem item{.size = 2487};
   const Path path("/root/Path 1");
@@ -916,15 +916,28 @@ TEST_F(DriveFsPinManagerTest, OnFileDeleted) {
   event.stable_id = item.stable_id;
   event.path = path;
 
-  EXPECT_CALL(drivefs_, SetPinnedByStableId(item.stable_id, false, _))
-      .WillOnce(RunOnceCallback<2>(kFileOk));
+  // Add a tracked file.
+  ASSERT_TRUE(manager.Add(*MakeMetadata(item), path));
+  EXPECT_THAT(manager.files_to_pin_, SizeIs(1));
+  EXPECT_THAT(manager.files_to_track_, SizeIs(1));
+  EXPECT_EQ(manager.progress_.failed_files, 0);
 
+  // Notify that the file has been deleted.
   manager.OnFileDeleted(std::as_const(event));
 
-  EXPECT_CALL(drivefs_, SetPinnedByStableId(item.stable_id, false, _))
-      .WillOnce(RunOnceCallback<2>(FileError::FILE_ERROR_ACCESS_DENIED));
+  // The file should have been removed from the tracked files.
+  EXPECT_THAT(manager.files_to_pin_, IsEmpty());
+  EXPECT_THAT(manager.files_to_track_, IsEmpty());
+  EXPECT_EQ(manager.progress_.failed_files, 1);
 
+  // Receiving a delete notification for an untracked file shouldn't do
+  // anything.
   manager.OnFileDeleted(std::as_const(event));
+  EXPECT_THAT(manager.files_to_pin_, IsEmpty());
+  EXPECT_THAT(manager.files_to_track_, IsEmpty());
+  EXPECT_EQ(manager.progress_.failed_files, 1);
+
+  manager.Stop();
 }
 
 // Tests PinManager::OnFilesChanged().
@@ -964,7 +977,6 @@ TEST_F(DriveFsPinManagerTest, OnFilesChanged) {
   }
 
   EXPECT_CALL(drivefs_, GetMetadataByStableId(id, _));
-  EXPECT_CALL(drivefs_, SetPinnedByStableId(id, false, _));
   manager.OnFilesChanged(std::as_const(events));
 
   manager.Stop();
@@ -1384,7 +1396,8 @@ TEST_F(DriveFsPinManagerTest, OnSyncingEvent) {
     event.stable_id = static_cast<int64_t>(id1);
     event.path = path1.value();
     event.state = ItemEvent::State::kQueued;
-    event.bytes_to_transfer = 0;
+    event.bytes_to_transfer = 10000;
+    event.bytes_transferred = 0;
     EXPECT_FALSE(manager.OnSyncingEvent(event));
   }
 
@@ -1574,7 +1587,8 @@ TEST_F(DriveFsPinManagerTest, OnSyncingStatusUpdate) {
     event->stable_id = static_cast<int64_t>(id1);
     event->path = path1.value();
     event->state = ItemEvent::State::kQueued;
-    event->bytes_to_transfer = 0;
+    event->bytes_to_transfer = 10000;
+    event->bytes_transferred = 0;
     events.item_events.push_back(ItemEvent::New(*event));
     events.item_events.push_back(std::move(event));
   }
@@ -1743,31 +1757,6 @@ TEST_F(DriveFsPinManagerTest, CannotListFiles) {
   EXPECT_EQ(progress.pinned_files, 0);
 }
 
-TEST_F(DriveFsPinManagerTest, InvalidFileList) {
-  CompletionCallback completion_callback;
-  RunLoop run_loop;
-
-  EXPECT_CALL(drivefs_, OnStartSearchQuery(_)).Times(1);
-  EXPECT_CALL(drivefs_, OnGetNextPage(_)).WillOnce(Return(kFileOk));
-  EXPECT_CALL(completion_callback, Run(Stage::kCannotListFiles))
-      .WillOnce(RunClosure(run_loop.QuitClosure()));
-  EXPECT_CALL(space_getter_, GetFreeSpace(gcache_dir_, _))
-      .WillOnce(RunOnceCallback<1>(1 << 30));  // 1 GB.
-
-  PinManager manager(temp_dir_.GetPath(), &drivefs_);
-  manager.SetSpaceGetter(GetSpaceGetter());
-  manager.SetCompletionCallback(completion_callback.Get());
-  manager.Start();
-  run_loop.Run();
-
-  const Progress progress = manager.GetProgress();
-  EXPECT_EQ(progress.stage, Stage::kCannotListFiles);
-  EXPECT_EQ(progress.free_space, 1 << 30);
-  EXPECT_EQ(progress.required_space, 0);
-  EXPECT_EQ(progress.pinned_bytes, 0);
-  EXPECT_EQ(progress.pinned_files, 0);
-}
-
 // Tests what happens when PinManager cannot get enough free space during
 // the initial setup.
 TEST_F(DriveFsPinManagerTest, NotEnoughSpace) {
@@ -1908,9 +1897,8 @@ TEST_F(DriveFsPinManagerTest, JustCheckRequiredSpace) {
 
   PinManager manager(temp_dir_.GetPath(), &drivefs_);
   manager.SetSpaceGetter(GetSpaceGetter());
-  manager.ShouldPin(false);
   manager.SetCompletionCallback(completion_callback.Get());
-  manager.Start();
+  manager.CalculateRequiredSpace();
   run_loop.Run();
 
   const Progress progress = manager.GetProgress();
@@ -1969,6 +1957,52 @@ TEST_F(DriveFsPinManagerTest, SetOnline) {
   EXPECT_FALSE(manager.is_online_);
 }
 
+// Tests PinManager::HandleQueryItem().
+TEST_F(DriveFsPinManagerTest, HandleQueryItem) {
+  PinManager manager(temp_dir_.GetPath(), &drivefs_);
+
+  DCHECK_CALLED_ON_VALID_SEQUENCE(manager.sequence_checker_);
+  manager.progress_.stage = Stage::kListingFiles;
+  manager.progress_.max_active_queries = 2;
+  manager.progress_.active_queries = 2;
+
+  const Id dir_id = Id(101);
+  const Path dir_path("/root/Folder");
+  QueryItem item;
+  item.path = Path("/root/Folder/Item");
+  item.metadata = FileMetadata::New();
+  FileMetadata& md = *item.metadata;
+  md.stable_id = 102;
+  md.type = FileMetadata::Type(-1);
+  md.size = 0;
+  md.pinned = false;
+  md.available_offline = false;
+  md.capabilities = mojom::Capabilities::New();
+
+  manager.HandleQueryItem(dir_id, dir_path, std::as_const(item));
+
+  manager.Stop();
+}
+
+// Tests PinManager::OnSearchResult() when a query finishes and there are still
+// other active queries.
+TEST_F(DriveFsPinManagerTest, OnSearchResult) {
+  PinManager manager(temp_dir_.GetPath(), &drivefs_);
+
+  DCHECK_CALLED_ON_VALID_SEQUENCE(manager.sequence_checker_);
+  manager.progress_.stage = Stage::kListingFiles;
+  manager.progress_.max_active_queries = 2;
+  manager.progress_.active_queries = 2;
+
+  manager.OnSearchResult(Id(101), Path("/root/My Folder"), PinManager::Query(),
+                         FileError::FILE_ERROR_OK, {});
+
+  EXPECT_EQ(manager.progress_.max_active_queries, 2);
+  EXPECT_EQ(manager.progress_.active_queries, 1);
+
+  manager.Stop();
+}
+
 // Tests PinManager::OnSearchResult() with transient errors.
 TEST_F(DriveFsPinManagerTest, OnTransientError) {
   PinManager manager(temp_dir_.GetPath(), &drivefs_);
@@ -1977,11 +2011,9 @@ TEST_F(DriveFsPinManagerTest, OnTransientError) {
   manager.progress_.stage = Stage::kListingFiles;
 
   EXPECT_CALL(drivefs_, OnStartSearchQuery(_)).Times(1);
-  manager.StartSearchQuery();
-
   EXPECT_CALL(drivefs_, OnGetNextPage(_))
       .WillOnce(Return(FileError::FILE_ERROR_NO_CONNECTION));
-  manager.GetNextPage();
+  manager.ListItems(Id::kNone, Path("/root"));
   EXPECT_EQ(manager.progress_.stage, Stage::kListingFiles);
 
   task_environment_.FastForwardBy(Seconds(4));
@@ -2032,13 +2064,14 @@ TEST_F(DriveFsPinManagerTest, OnError) {
   manager.OnError(std::as_const(error));
   EXPECT_EQ(manager.progress_.stage, Stage::kNotEnoughSpace);
 
+  // Stopping the pin manager should retain the existing error stage.
   manager.Stop();
-  EXPECT_EQ(manager.progress_.stage, Stage::kStopped);
+  EXPECT_EQ(manager.progress_.stage, Stage::kNotEnoughSpace);
 
   // Error of type kPinningFailedDiskFull should not have any effect if the pin
   // manager is already stopped.
   manager.OnError(std::as_const(error));
-  EXPECT_EQ(manager.progress_.stage, Stage::kStopped);
+  EXPECT_EQ(manager.progress_.stage, Stage::kNotEnoughSpace);
 }
 
 // Tests that calling PinManager::Start() when the PinManager is already in

@@ -174,6 +174,7 @@ bool SupportsInvalidation(CSSSelector::PseudoType type) {
     case CSSSelector::kPseudoHostHasAppearance:
     case CSSSelector::kPseudoOpen:
     case CSSSelector::kPseudoClosed:
+    case CSSSelector::kPseudoPopoverOpen:
     case CSSSelector::kPseudoSlotted:
     case CSSSelector::kPseudoVideoPersistent:
     case CSSSelector::kPseudoVideoPersistentAncestor:
@@ -650,7 +651,7 @@ bool RuleFeatureSet::InsertIntoSelfInvalidationBloomFilter(
       names_with_self_invalidation_ = std::make_unique<WTF::BloomFilter<14>>();
     }
   }
-  names_with_self_invalidation_->Add(value.Impl()->ExistingHash() * salt);
+  names_with_self_invalidation_->Add(value.Hash() * salt);
   return true;
 }
 
@@ -729,6 +730,7 @@ InvalidationSet* RuleFeatureSet::InvalidationSetForSimpleSelector(
       case CSSSelector::kPseudoDefined:
       case CSSSelector::kPseudoOpen:
       case CSSSelector::kPseudoClosed:
+      case CSSSelector::kPseudoPopoverOpen:
       case CSSSelector::kPseudoVideoPersistent:
       case CSSSelector::kPseudoVideoPersistentAncestor:
       case CSSSelector::kPseudoXrOverlay:
@@ -1930,8 +1932,8 @@ void RuleFeatureSet::CollectInvalidationSetsForClass(
   // Implicit self-invalidation sets for all classes (with Bloom filter
   // rejection); see comment on class_invalidation_sets_.
   if (names_with_self_invalidation_ &&
-      names_with_self_invalidation_->MayContain(
-          class_name.Impl()->ExistingHash() * kClassSalt)) {
+      names_with_self_invalidation_->MayContain(class_name.Hash() *
+                                                kClassSalt)) {
     invalidation_lists.descendants.push_back(
         InvalidationSet::SelfInvalidationSet());
   }
@@ -1989,8 +1991,7 @@ void RuleFeatureSet::CollectInvalidationSetsForId(
     Element& element,
     const AtomicString& id) const {
   if (names_with_self_invalidation_ &&
-      names_with_self_invalidation_->MayContain(id.Impl()->ExistingHash() *
-                                                kIdSalt)) {
+      names_with_self_invalidation_->MayContain(id.Hash() * kIdSalt)) {
     invalidation_lists.descendants.push_back(
         InvalidationSet::SelfInvalidationSet());
   }

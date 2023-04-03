@@ -125,7 +125,10 @@ WindowCycleView::WindowCycleView(aura::Window* root_window,
   SetBackground(views::CreateThemedRoundedRectBackground(
       cros_tokens::kCrosSysScrim2, kBackgroundCornerRadius));
   SetBorder(std::make_unique<views::HighlightBorder>(
-      kBackgroundCornerRadius, views::HighlightBorder::Type::kHighlightBorder1,
+      kBackgroundCornerRadius,
+      chromeos::features::IsJellyrollEnabled()
+          ? views::HighlightBorder::Type::kHighlightBorderOnShadow
+          : views::HighlightBorder::Type::kHighlightBorder1,
       /*use_light_colors=*/false));
 
   // |mirror_container_| may be larger than |this|. In this case, it will be
@@ -582,8 +585,6 @@ void WindowCycleView::Layout() {
 
   // Layout a tab slider if there is more than one desk.
   if (is_interactive_alt_tab_mode_allowed) {
-    // TODO(crbug.com/1216238): Change these back to DCHECKs once the bug is
-    // resolved.
     CHECK(tab_slider_);
     CHECK(no_recent_items_label_);
     // Layout the tab slider.

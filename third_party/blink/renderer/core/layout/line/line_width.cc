@@ -29,7 +29,6 @@
 
 #include "third_party/blink/renderer/core/layout/line/line_width.h"
 
-#include "third_party/blink/renderer/core/layout/api/line_layout_ruby_run.h"
 #include "third_party/blink/renderer/core/layout/shapes/shape_outside_info.h"
 
 namespace blink {
@@ -58,79 +57,9 @@ void LineWidth::UpdateAvailableWidth(LayoutUnit replaced_height) {
   ComputeAvailableWidthFromLeftAndRight();
 }
 
-void LineWidth::ShrinkAvailableWidthForNewFloatIfNeeded(
-    const FloatingObject& new_float) {
-  LayoutUnit height = block_.LogicalHeight();
-  if (height < block_.LogicalTopForFloat(new_float) ||
-      height >= block_.LogicalBottomForFloat(new_float))
-    return;
-
-  ShapeOutsideDeltas shape_deltas;
-  if (ShapeOutsideInfo* shape_outside_info =
-          new_float.GetLayoutObject()->GetShapeOutsideInfo()) {
-    LayoutUnit line_height = block_.LineHeight(
-        is_first_line_,
-        block_.IsHorizontalWritingMode() ? kHorizontalLine : kVerticalLine,
-        kPositionOfInteriorLineBoxes);
-    shape_deltas = shape_outside_info->ComputeDeltasForContainingBlockLine(
-        block_, new_float, block_.LogicalHeight(), line_height);
-  }
-
-  if (new_float.GetType() == FloatingObject::kFloatLeft) {
-    LayoutUnit new_left = block_.LogicalRightForFloat(new_float);
-    if (shape_deltas.IsValid()) {
-      if (shape_deltas.LineOverlapsShape()) {
-        new_left += shape_deltas.RightMarginBoxDelta();
-      } else {
-        // Per the CSS Shapes spec, If the line doesn't overlap the shape, then
-        // ignore this shape for this line.
-        new_left = left_;
-      }
-    }
-    if (IndentText() == kIndentText &&
-        block_.StyleRef().IsLeftToRightDirection())
-      new_left += FloorToInt(block_.TextIndentOffset());
-    left_ = std::max(left_, new_left);
-  } else {
-    LayoutUnit new_right = block_.LogicalLeftForFloat(new_float);
-    if (shape_deltas.IsValid()) {
-      if (shape_deltas.LineOverlapsShape()) {
-        new_right += shape_deltas.LeftMarginBoxDelta();
-      } else {
-        // Per the CSS Shapes spec, If the line doesn't overlap the shape, then
-        // ignore this shape for this line.
-        new_right = right_;
-      }
-    }
-    if (IndentText() == kIndentText &&
-        !block_.StyleRef().IsLeftToRightDirection())
-      new_right -= FloorToInt(block_.TextIndentOffset());
-    right_ = std::min(right_, new_right);
-  }
-
-  ComputeAvailableWidthFromLeftAndRight();
-}
-
 void LineWidth::Commit() {
   committed_width_ += uncommitted_width_;
   uncommitted_width_ = 0;
-}
-
-void LineWidth::ApplyOverhang(LineLayoutRubyRun ruby_run,
-                              LineLayoutItem start_layout_item,
-                              LineLayoutItem end_layout_item) {
-  int start_overhang;
-  int end_overhang;
-  ruby_run.GetOverhang(is_first_line_, start_layout_item, end_layout_item,
-                       start_overhang, end_overhang);
-
-  start_overhang = std::min<int>(start_overhang, committed_width_);
-  available_width_ += start_overhang;
-
-  end_overhang = std::max(
-      std::min<int>(end_overhang, available_width_ - CurrentWidth()), 0);
-  available_width_ += end_overhang;
-  overhang_width_ += start_overhang + end_overhang;
 }
 
 inline static LayoutUnit AvailableWidthAtOffset(
@@ -168,8 +97,7 @@ void LineWidth::WrapNextToShapeOutside(bool is_first_line) {
       kPositionOfInteriorLineBoxes);
   LayoutUnit line_logical_top = block_.LogicalHeight();
   LayoutUnit new_line_top = line_logical_top;
-  LayoutUnit float_logical_bottom =
-      block_.NextFloatLogicalBottomBelow(line_logical_top);
+  LayoutUnit float_logical_bottom = line_logical_top;
 
   LayoutUnit new_line_width;
   LayoutUnit new_line_left = left_;
@@ -193,34 +121,12 @@ void LineWidth::WrapNextToShapeOutside(bool is_first_line) {
 void LineWidth::FitBelowFloats(bool is_first_line) {
   DCHECK(!committed_width_);
   DCHECK(!FitsOnLine());
-  block_.PlaceNewFloats(block_.LogicalHeight(), this);
 
-  LayoutUnit float_logical_bottom;
   LayoutUnit last_float_logical_bottom = block_.LogicalHeight();
   LayoutUnit new_line_width = available_width_;
   LayoutUnit new_line_left = left_;
   LayoutUnit new_line_right = right_;
 
-  FloatingObject* last_float_from_previous_line =
-      block_.LastFloatFromPreviousLine();
-  if (last_float_from_previous_line &&
-      last_float_from_previous_line->GetLayoutObject()->GetShapeOutsideInfo())
-    return WrapNextToShapeOutside(is_first_line);
-
-  while (true) {
-    float_logical_bottom =
-        block_.NextFloatLogicalBottomBelow(last_float_logical_bottom);
-    if (float_logical_bottom <= last_float_logical_bottom)
-      break;
-
-    new_line_width =
-        AvailableWidthAtOffset(block_, float_logical_bottom, IndentText(),
-                               new_line_left, new_line_right);
-    last_float_logical_bottom = float_logical_bottom;
-
-    if (new_line_width >= uncommitted_width_)
-      break;
-  }
   UpdateLineDimension(last_float_logical_bottom, LayoutUnit(new_line_width),
                       new_line_left, new_line_right);
 }

@@ -2611,14 +2611,6 @@ IN_PROC_BROWSER_TEST_F(DownloadTestWithHistogramTester,
   ASSERT_EQ(url, download_items[0]->GetOriginalUrl());
   ASSERT_EQ(url, download_items[1]->GetOriginalUrl());
 
-  metrics::SubprocessMetricsProvider::MergeHistogramDeltasForTesting();
-  // Assert that the NIK is populated for 4 requests:
-  // - Navigation: image.jpg
-  // - favicon.ico
-  // - SavePage: image.jpg
-  // - context menu: image.jpg
-  histogram_tester().ExpectBucketCount("HttpCache.NetworkIsolationKeyPresent2",
-                                       2 /*kPresent*/, 4 /*count*/);
   ResetURLLoaderInterceptor();
 }
 
@@ -4951,7 +4943,13 @@ IN_PROC_BROWSER_TEST_F(DownloadTest,
 // Verify that we have 1 window, and the download surface is not visible.
 //
 // Regression test for http://crbug.com/44454
-IN_PROC_BROWSER_TEST_F(DownloadTest, NewWindow) {
+// TODO(crbug.com/1427917): Flaky on Linux.
+#if BUILDFLAG(IS_LINUX)
+#define MAYBE_NewWindow DISABLED_NewWindow
+#else
+#define MAYBE_NewWindow NewWindow
+#endif
+IN_PROC_BROWSER_TEST_F(DownloadTest, MAYBE_NewWindow) {
   embedded_test_server()->ServeFilesFromDirectory(GetTestDataDirectory());
   ASSERT_TRUE(embedded_test_server()->Start());
   GURL url =

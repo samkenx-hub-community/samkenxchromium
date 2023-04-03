@@ -15,10 +15,10 @@ import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
-import android.support.test.InstrumentationRegistry;
 
 import androidx.annotation.Nullable;
 import androidx.preference.TwoStatePreference;
+import androidx.test.InstrumentationRegistry;
 import androidx.test.espresso.contrib.RecyclerViewActions;
 
 import org.junit.Assert;
@@ -277,8 +277,6 @@ public class SyncTestRule extends ChromeTabbedActivityTestRule {
     public CoreAccountInfo setUpTestAccountAndSignInWithSyncSetupAsIncomplete() {
         CoreAccountInfo accountInfo = mSigninTestRule.addTestAccountThenSigninAndEnableSync(
                 /* syncService= */ null);
-        // Enable UKM when enabling sync as it is done by the sync confirmation UI.
-        enableUKM();
         SyncTestUtil.waitForSyncTransportActive();
         return accountInfo;
     }

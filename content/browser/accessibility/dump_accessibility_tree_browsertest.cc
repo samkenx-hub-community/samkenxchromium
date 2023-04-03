@@ -1868,7 +1868,7 @@ IN_PROC_BROWSER_TEST_P(DumpAccessibilityTreeTest, AccessibilityFieldset) {
 }
 
 // TODO(crbug.com/1307316): failing on Linux bots and flaky on Fuchsia bots.
-#if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_FUCHSIA)
+#if BUILDFLAG(IS_FUCHSIA)
 #define MAYBE_AccessibilityFigcaption DISABLED_AccessibilityFigcaption
 #else
 #define MAYBE_AccessibilityFigcaption AccessibilityFigcaption
@@ -2058,8 +2058,16 @@ INSTANTIATE_TEST_SUITE_P(
     ::testing::ValuesIn(ui::AXInspectTestHelper::TreeTestPasses()),
     DumpAccessibilityTreeTestPassToString());
 
+// TODO(crbug.com/1428918): Re-enable this test.
+#if BUILDFLAG(IS_CHROMEOS)
+#define MAYBE_AccessibilityFencedFrameScrollable \
+  DISABLED_AccessibilityFencedFrameScrollable
+#else
+#define MAYBE_AccessibilityFencedFrameScrollable \
+  AccessibilityFencedFrameScrollable
+#endif
 IN_PROC_BROWSER_TEST_P(DumpAccessibilityTreeFencedFrameTest,
-                       AccessibilityFencedFrameScrollable) {
+                       MAYBE_AccessibilityFencedFrameScrollable) {
   RunHtmlTest(FILE_PATH_LITERAL("fencedframe-scrollable-mparch.html"));
 }
 
@@ -2786,6 +2794,10 @@ IN_PROC_BROWSER_TEST_P(DumpAccessibilityTreeTest,
 IN_PROC_BROWSER_TEST_P(DumpAccessibilityTreeTest,
                        AccessibilityPopoverCollapsed) {
   RunHtmlTest(FILE_PATH_LITERAL("popover-collapsed.html"));
+}
+
+IN_PROC_BROWSER_TEST_P(DumpAccessibilityTreeTest, AccessibilityPopoverHint) {
+  RunPopoverHintTest(FILE_PATH_LITERAL("popover-hint.html"));
 }
 
 IN_PROC_BROWSER_TEST_P(DumpAccessibilityTreeTest, AccessibilityPre) {

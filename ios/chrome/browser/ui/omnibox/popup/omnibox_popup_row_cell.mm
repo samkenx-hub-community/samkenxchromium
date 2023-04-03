@@ -9,17 +9,16 @@
 #import "base/metrics/histogram_macros.h"
 #import "base/strings/sys_string_conversions.h"
 #import "components/omnibox/common/omnibox_features.h"
+#import "ios/chrome/browser/shared/ui/elements/extended_touch_target_button.h"
+#import "ios/chrome/browser/shared/ui/elements/fade_truncating_label.h"
 #import "ios/chrome/browser/shared/ui/util/attributed_string_util.h"
 #import "ios/chrome/browser/shared/ui/util/layout_guide_names.h"
 #import "ios/chrome/browser/shared/ui/util/uikit_ui_util.h"
 #import "ios/chrome/browser/shared/ui/util/util_swift.h"
-#import "ios/chrome/browser/ui/elements/extended_touch_target_button.h"
-#import "ios/chrome/browser/ui/elements/fade_truncating_label.h"
 #import "ios/chrome/browser/ui/icons/symbols.h"
 #import "ios/chrome/browser/ui/omnibox/omnibox_ui_features.h"
 #import "ios/chrome/browser/ui/omnibox/popup/autocomplete_suggestion.h"
 #import "ios/chrome/browser/ui/omnibox/popup/omnibox_icon_view.h"
-#import "ios/chrome/browser/ui/toolbar/public/toolbar_constants.h"
 #import "ios/chrome/common/ui/colors/semantic_color_names.h"
 #import "ios/chrome/common/ui/elements/gradient_view.h"
 #import "ios/chrome/common/ui/util/pointer_interaction_util.h"
@@ -279,6 +278,13 @@ BOOL IsMultilineSearchSuggestionEnabled() {
       constraintGreaterThanOrEqualToAnchor:self.contentView.topAnchor
                                   constant:kTextTopMargin];
 
+  // When there is no trailing button, the text should extend to the cell's
+  // trailing edge with a padding.
+  self.textTrailingConstraint = [self.contentView.trailingAnchor
+      constraintEqualToAnchor:self.textStackView.trailingAnchor
+                     constant:kTextTrailingMargin];
+  self.textTrailingConstraint.priority = UILayoutPriorityRequired - 1;
+
   [NSLayoutConstraint activateConstraints:@[
     // Row has a minimum height.
     [self.contentView.heightAnchor
@@ -296,6 +302,7 @@ BOOL IsMultilineSearchSuggestionEnabled() {
     // is actually left off because it will be added via a
     // layout guide once the cell has been added to the view hierarchy.
     self.textTopConstraint,
+    self.textTrailingConstraint,
     [self.textStackView.centerYAnchor
         constraintEqualToAnchor:self.contentView.centerYAnchor],
 
@@ -341,15 +348,6 @@ BOOL IsMultilineSearchSuggestionEnabled() {
   DCHECK(self.imageLayoutGuide);
   DCHECK(self.textLayoutGuide);
 
-  // When there is no trailing button, the text should extend to the cell's
-  // trailing edge with a padding.
-  NSLayoutConstraint* stackViewToCellTrailing =
-      [self.textStackView.trailingAnchor
-          constraintEqualToAnchor:self.contentView.trailingAnchor
-                         constant:-kTextTrailingMargin];
-  stackViewToCellTrailing.priority = UILayoutPriorityRequired - 1;
-  self.textTrailingConstraint = stackViewToCellTrailing;
-
   // These constraints need to be removed when freezing the position of these
   // views. See -freezeLayoutGuidePositions for the reason why.
   [NSLayoutConstraint
@@ -361,7 +359,6 @@ BOOL IsMultilineSearchSuggestionEnabled() {
         constraintEqualToAnchor:self.imageLayoutGuide.widthAnchor],
     [self.textStackView.leadingAnchor
         constraintEqualToAnchor:self.textLayoutGuide.leadingAnchor],
-    stackViewToCellTrailing,
   ];
 
   [NSLayoutConstraint

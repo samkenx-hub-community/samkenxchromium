@@ -17,7 +17,9 @@
           "dimension_sets": [
             {
               "device_os": "PQ3A.190801.002",
-              "device_os_flavor": "google"
+              "device_os_flavor": "google",
+              "device_type": "walleye",
+              "os": "Android"
             }
           ],
           "service_account": "chromium-tester@chops-service-accounts.iam.gserviceaccount.com"
@@ -35,25 +37,9 @@
           "dimension_sets": [
             {
               "device_os": "PQ3A.190801.002",
-              "device_os_flavor": "google"
-            }
-          ],
-          "service_account": "chromium-tester@chops-service-accounts.iam.gserviceaccount.com"
-        },
-        "test": "gnrt_unittests",
-        "test_id_prefix": "ninja://tools/crates/gnrt:gnrt_unittests/"
-      },
-      {
-        "merge": {
-          "args": [],
-          "script": "//testing/merge_scripts/standard_gtest_merge.py"
-        },
-        "swarming": {
-          "can_use_on_swarming_builders": true,
-          "dimension_sets": [
-            {
-              "device_os": "PQ3A.190801.002",
-              "device_os_flavor": "google"
+              "device_os_flavor": "google",
+              "device_type": "walleye",
+              "os": "Android"
             }
           ],
           "service_account": "chromium-tester@chops-service-accounts.iam.gserviceaccount.com"
@@ -72,7 +58,9 @@
           "dimension_sets": [
             {
               "device_os": "PQ3A.190801.002",
-              "device_os_flavor": "google"
+              "device_os_flavor": "google",
+              "device_type": "walleye",
+              "os": "Android"
             }
           ],
           "service_account": "chromium-tester@chops-service-accounts.iam.gserviceaccount.com"
@@ -91,7 +79,9 @@
           "dimension_sets": [
             {
               "device_os": "PQ3A.190801.002",
-              "device_os_flavor": "google"
+              "device_os_flavor": "google",
+              "device_type": "walleye",
+              "os": "Android"
             }
           ],
           "service_account": "chromium-tester@chops-service-accounts.iam.gserviceaccount.com"
@@ -117,7 +107,9 @@
           "dimension_sets": [
             {
               "device_os": "PQ3A.190801.002",
-              "device_os_flavor": "google"
+              "device_os_flavor": "google",
+              "device_type": "walleye",
+              "os": "Android"
             }
           ],
           "service_account": "chromium-tester@chops-service-accounts.iam.gserviceaccount.com"
@@ -135,25 +127,9 @@
           "dimension_sets": [
             {
               "device_os": "PQ3A.190801.002",
-              "device_os_flavor": "google"
-            }
-          ],
-          "service_account": "chromium-tester@chops-service-accounts.iam.gserviceaccount.com"
-        },
-        "test": "gnrt_unittests",
-        "test_id_prefix": "ninja://tools/crates/gnrt:gnrt_unittests/"
-      },
-      {
-        "merge": {
-          "args": [],
-          "script": "//testing/merge_scripts/standard_gtest_merge.py"
-        },
-        "swarming": {
-          "can_use_on_swarming_builders": true,
-          "dimension_sets": [
-            {
-              "device_os": "PQ3A.190801.002",
-              "device_os_flavor": "google"
+              "device_os_flavor": "google",
+              "device_type": "walleye",
+              "os": "Android"
             }
           ],
           "service_account": "chromium-tester@chops-service-accounts.iam.gserviceaccount.com"
@@ -172,7 +148,9 @@
           "dimension_sets": [
             {
               "device_os": "PQ3A.190801.002",
-              "device_os_flavor": "google"
+              "device_os_flavor": "google",
+              "device_type": "walleye",
+              "os": "Android"
             }
           ],
           "service_account": "chromium-tester@chops-service-accounts.iam.gserviceaccount.com"
@@ -191,7 +169,9 @@
           "dimension_sets": [
             {
               "device_os": "PQ3A.190801.002",
-              "device_os_flavor": "google"
+              "device_os_flavor": "google",
+              "device_type": "walleye",
+              "os": "Android"
             }
           ],
           "service_account": "chromium-tester@chops-service-accounts.iam.gserviceaccount.com"
@@ -217,7 +197,9 @@
           "dimension_sets": [
             {
               "device_os": "PQ3A.190801.002",
-              "device_os_flavor": "google"
+              "device_os_flavor": "google",
+              "device_type": "walleye",
+              "os": "Android"
             }
           ],
           "service_account": "chromium-tester@chops-service-accounts.iam.gserviceaccount.com"
@@ -235,25 +217,9 @@
           "dimension_sets": [
             {
               "device_os": "PQ3A.190801.002",
-              "device_os_flavor": "google"
-            }
-          ],
-          "service_account": "chromium-tester@chops-service-accounts.iam.gserviceaccount.com"
-        },
-        "test": "gnrt_unittests",
-        "test_id_prefix": "ninja://tools/crates/gnrt:gnrt_unittests/"
-      },
-      {
-        "merge": {
-          "args": [],
-          "script": "//testing/merge_scripts/standard_gtest_merge.py"
-        },
-        "swarming": {
-          "can_use_on_swarming_builders": true,
-          "dimension_sets": [
-            {
-              "device_os": "PQ3A.190801.002",
-              "device_os_flavor": "google"
+              "device_os_flavor": "google",
+              "device_type": "walleye",
+              "os": "Android"
             }
           ],
           "service_account": "chromium-tester@chops-service-accounts.iam.gserviceaccount.com"
@@ -272,7 +238,9 @@
           "dimension_sets": [
             {
               "device_os": "PQ3A.190801.002",
-              "device_os_flavor": "google"
+              "device_os_flavor": "google",
+              "device_type": "walleye",
+              "os": "Android"
             }
           ],
           "service_account": "chromium-tester@chops-service-accounts.iam.gserviceaccount.com"
@@ -291,7 +259,9 @@
           "dimension_sets": [
             {
               "device_os": "PQ3A.190801.002",
-              "device_os_flavor": "google"
+              "device_os_flavor": "google",
+              "device_type": "walleye",
+              "os": "Android"
             }
           ],
           "service_account": "chromium-tester@chops-service-accounts.iam.gserviceaccount.com"
@@ -575,143 +545,6 @@
       }
     ]
   },
-  "linux-rust-x64-rel-android-toolchain": {
-    "additional_compile_targets": [
-      "gnrt_unittests",
-      "mojo_rust",
-      "mojo_rust_tests",
-      "rust_build_tests"
-    ],
-    "gtest_tests": [
-      {
-        "merge": {
-          "args": [],
-          "script": "//testing/merge_scripts/standard_gtest_merge.py"
-        },
-        "swarming": {
-          "can_use_on_swarming_builders": true,
-          "dimension_sets": [
-            {
-              "os": "Ubuntu-18.04"
-            }
-          ],
-          "service_account": "chromium-tester@chops-service-accounts.iam.gserviceaccount.com"
-        },
-        "test": "base_unittests",
-        "test_id_prefix": "ninja://base:base_unittests/"
-      },
-      {
-        "merge": {
-          "args": [],
-          "script": "//testing/merge_scripts/standard_gtest_merge.py"
-        },
-        "swarming": {
-          "can_use_on_swarming_builders": true,
-          "dimension_sets": [
-            {
-              "os": "Ubuntu-18.04"
-            }
-          ],
-          "service_account": "chromium-tester@chops-service-accounts.iam.gserviceaccount.com"
-        },
-        "test": "gnrt_unittests",
-        "test_id_prefix": "ninja://tools/crates/gnrt:gnrt_unittests/"
-      },
-      {
-        "merge": {
-          "args": [],
-          "script": "//testing/merge_scripts/standard_gtest_merge.py"
-        },
-        "swarming": {
-          "can_use_on_swarming_builders": true,
-          "dimension_sets": [
-            {
-              "os": "Ubuntu-18.04"
-            }
-          ],
-          "service_account": "chromium-tester@chops-service-accounts.iam.gserviceaccount.com"
-        },
-        "test": "rust_gtest_interop_unittests",
-        "test_id_prefix": "ninja://testing/rust_gtest_interop:rust_gtest_interop_unittests/"
-      },
-      {
-        "merge": {
-          "args": [],
-          "script": "//testing/merge_scripts/standard_gtest_merge.py"
-        },
-        "name": "test_cpp_including_rust_unittests",
-        "swarming": {
-          "can_use_on_swarming_builders": true,
-          "dimension_sets": [
-            {
-              "os": "Ubuntu-18.04"
-            }
-          ],
-          "service_account": "chromium-tester@chops-service-accounts.iam.gserviceaccount.com"
-        },
-        "test": "test_cpp_including_rust_unittests",
-        "test_id_prefix": "ninja://build/rust/tests/test_cpp_including_rust:test_cpp_including_rust_unittests/"
-      },
-      {
-        "merge": {
-          "args": [],
-          "script": "//testing/merge_scripts/standard_gtest_merge.py"
-        },
-        "name": "test_serde_json_lenient",
-        "swarming": {
-          "can_use_on_swarming_builders": true,
-          "dimension_sets": [
-            {
-              "os": "Ubuntu-18.04"
-            }
-          ],
-          "service_account": "chromium-tester@chops-service-accounts.iam.gserviceaccount.com"
-        },
-        "test": "test_serde_json_lenient",
-        "test_id_prefix": "ninja://build/rust/tests/test_serde_json_lenient:test_serde_json_lenient/"
-      }
-    ],
-    "isolated_scripts": [
-      {
-        "isolate_name": "build_rust_tests",
-        "merge": {
-          "args": [],
-          "script": "//testing/merge_scripts/standard_isolated_script_merge.py"
-        },
-        "name": "build_rust_tests",
-        "swarming": {
-          "can_use_on_swarming_builders": true,
-          "dimension_sets": [
-            {
-              "os": "Ubuntu-18.04"
-            }
-          ],
-          "service_account": "chromium-tester@chops-service-accounts.iam.gserviceaccount.com"
-        },
-        "test": "build_rust_tests",
-        "test_id_prefix": "ninja://build/rust/tests:build_rust_tests/"
-      },
-      {
-        "isolate_name": "mojo_rust_tests",
-        "merge": {
-          "args": [],
-          "script": "//testing/merge_scripts/standard_isolated_script_merge.py"
-        },
-        "name": "mojo_rust_tests",
-        "swarming": {
-          "can_use_on_swarming_builders": true,
-          "dimension_sets": [
-            {
-              "os": "Ubuntu-18.04"
-            }
-          ],
-          "service_account": "chromium-tester@chops-service-accounts.iam.gserviceaccount.com"
-        },
-        "test": "mojo_rust_tests",
-        "test_id_prefix": "ninja://mojo/public/rust:mojo_rust_tests/"
-      }
-    ]
-  },
   "mac-rust-x64-rel": {
     "additional_compile_targets": [
       "gnrt_unittests",
@@ -742,7 +575,7 @@
             {
               "cipd_package": "infra/tools/mac_toolchain/${platform}",
               "location": ".",
-              "revision": "git_revision:723fc1a6c8cdf2631a57851f5610e598db0c1de1"
+              "revision": "git_revision:5468d28877d7106d8ab4f7e23b784578ffc86aff"
             }
           ],
           "dimension_sets": [
@@ -784,7 +617,7 @@
             {
               "cipd_package": "infra/tools/mac_toolchain/${platform}",
               "location": ".",
-              "revision": "git_revision:723fc1a6c8cdf2631a57851f5610e598db0c1de1"
+              "revision": "git_revision:5468d28877d7106d8ab4f7e23b784578ffc86aff"
             }
           ],
           "dimension_sets": [
@@ -826,7 +659,7 @@
             {
               "cipd_package": "infra/tools/mac_toolchain/${platform}",
               "location": ".",
-              "revision": "git_revision:723fc1a6c8cdf2631a57851f5610e598db0c1de1"
+              "revision": "git_revision:5468d28877d7106d8ab4f7e23b784578ffc86aff"
             }
           ],
           "dimension_sets": [
@@ -869,7 +702,7 @@
             {
               "cipd_package": "infra/tools/mac_toolchain/${platform}",
               "location": ".",
-              "revision": "git_revision:723fc1a6c8cdf2631a57851f5610e598db0c1de1"
+              "revision": "git_revision:5468d28877d7106d8ab4f7e23b784578ffc86aff"
             }
           ],
           "dimension_sets": [
@@ -912,7 +745,7 @@
             {
               "cipd_package": "infra/tools/mac_toolchain/${platform}",
               "location": ".",
-              "revision": "git_revision:723fc1a6c8cdf2631a57851f5610e598db0c1de1"
+              "revision": "git_revision:5468d28877d7106d8ab4f7e23b784578ffc86aff"
             }
           ],
           "dimension_sets": [
@@ -958,7 +791,7 @@
             {
               "cipd_package": "infra/tools/mac_toolchain/${platform}",
               "location": ".",
-              "revision": "git_revision:723fc1a6c8cdf2631a57851f5610e598db0c1de1"
+              "revision": "git_revision:5468d28877d7106d8ab4f7e23b784578ffc86aff"
             }
           ],
           "dimension_sets": [
@@ -1002,7 +835,7 @@
             {
               "cipd_package": "infra/tools/mac_toolchain/${platform}",
               "location": ".",
-              "revision": "git_revision:723fc1a6c8cdf2631a57851f5610e598db0c1de1"
+              "revision": "git_revision:5468d28877d7106d8ab4f7e23b784578ffc86aff"
             }
           ],
           "dimension_sets": [

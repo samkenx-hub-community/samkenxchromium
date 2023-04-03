@@ -809,6 +809,21 @@ chromium-metrics-reviews@google.com.
   </token>
 </histogram>
 
+<histogram name="Ads.InterestGroup.Net.DeprecatedBiddingSignalsFormatReceived"
+    enum="Boolean" expires_after="2023-10-31">
+  <owner>mmenke@chromium.org</owner>
+  <owner>morlovich@chromium.org</owner>
+  <owner>privacy-sandbox-dev@chromium.org</owner>
+  <summary>
+    True if the trustedBiddingSignals fetched for use in a FLEDGE auction was
+    received in the deprecated format. Recorded whenever there's a network fetch
+    for trustedBiddingSignals, and they're successfully decoded.
+
+    See https://github.com/WICG/turtledove/blob/main/FLEDGE.md for the latest
+    version of the FLEDGE explainer.
+  </summary>
+</histogram>
+
 <histogram name="Ads.InterestGroup.Net.DownloadTime.{Type}" units="ms"
     expires_after="2023-07-31">
   <owner>pauljensen@chromium.org</owner>
@@ -2165,15 +2180,6 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
-<histogram name="ChildProcess.BadMessgeTerminated" enum="ProcessType2"
-    expires_after="M81">
-  <owner>jam@chromium.org</owner>
-  <summary>
-    Count of child processes killed because they sent an IPC that couldn't be
-    deserialized.
-  </summary>
-</histogram>
-
 <histogram name="ChildProcess.Crashed.UtilityProcessExitCode"
     enum="WindowsExitCode" expires_after="never">
 <!-- expires-never: Critical stability metrics. go/chrome-stability-metrics -->
@@ -2208,14 +2214,6 @@ chromium-metrics-reviews@google.com.
   <summary>Count of child process crashes grouped by process type.</summary>
 </histogram>
 
-<histogram name="ChildProcess.Disconnected2" enum="ProcessType2"
-    expires_after="2020-04-26">
-  <owner>wfh@chromium.org</owner>
-  <summary>
-    Count of child process abnormal channel disconnects grouped by process type.
-  </summary>
-</histogram>
-
 <histogram name="ChildProcess.DisconnectedAlive2" enum="ProcessType2"
     expires_after="never">
 <!-- expires-never: For monitoring stability regressions. -->
@@ -2235,15 +2233,6 @@ chromium-metrics-reviews@google.com.
   <owner>wfh@chromium.org</owner>
   <owner>chrome-stability-core@google.com</owner>
   <summary>Count of child process kills grouped by process type.</summary>
-</histogram>
-
-<histogram name="ChildProcess.Killed2.OOM" enum="ProcessType2"
-    expires_after="2020-11-08">
-  <owner>oshima@chromium.org</owner>
-  <summary>
-    Out of ChildProcess.Killled, number of kills due to SIGKILL, which is a
-    strong signal of out of memory on Chrome OS, grouped by process type.
-  </summary>
 </histogram>
 
 <histogram name="ChildProcess.Launched.UtilityProcessHash"
@@ -3777,7 +3766,7 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
-<histogram name="Conversions.NavigationDataHostStatus2"
+<histogram name="Conversions.NavigationDataHostStatus3"
     enum="ConversionNavigationDataHostStatus" expires_after="M117">
   <owner>linnan@chromium.org</owner>
   <owner>johnidel@chromium.org</owner>
@@ -3786,19 +3775,6 @@ chromium-metrics-reviews@google.com.
     Records status for navigation data hosts. A single navigation data host may
     emit two status, one when the navigation started and the data host was
     registered, and one when the navigation finished or failed.
-  </summary>
-</histogram>
-
-<histogram name="Conversions.RegisterConversionAllowed" enum="BooleanAllowed"
-    expires_after="M117">
-  <owner>apaseltiner@chromium.org</owner>
-  <owner>johnidel@chromium.org</owner>
-  <owner>measurement-api-dev+metrics@google.com</owner>
-  <summary>
-    Measures how often conversions are dropped by the Attribution Reporting API
-    being disabled. Recorded when a conversion is processed by the browser
-    process. Records not allowed if within an OTR profile, or if the privacy
-    sandbox is not allowed for the conversion and reporting origin.
   </summary>
 </histogram>
 
@@ -3821,19 +3797,6 @@ chromium-metrics-reviews@google.com.
   <summary>
     Measures the number of triggers registered per data host. Recorded when the
     data host is disconnected or when the data host manager is destroyed.
-  </summary>
-</histogram>
-
-<histogram name="Conversions.RegisterImpressionAllowed" enum="BooleanAllowed"
-    expires_after="M117">
-  <owner>apaseltiner@chromium.org</owner>
-  <owner>johnidel@chromium.org</owner>
-  <owner>measurement-api-dev+metrics@google.com</owner>
-  <summary>
-    Measures how often impressions are dropped by the Attribution Reporting API
-    being disabled. Recorded when an impression is processed by the browser
-    process. Records not allowed if within an OTR profile, or if the privacy
-    sandbox is not allowed for the impression and reporting origin.
   </summary>
 </histogram>
 
@@ -4188,6 +4151,22 @@ chromium-metrics-reviews@google.com.
     verbose debug report. The net error code is recorded if the HTTP response
     code is unavailable.
   </summary>
+</histogram>
+
+<histogram name="Conversions.{ReportType}.NetworkConnectionTypeOnFailure"
+    enum="NetworkConnectionType" expires_after="M117">
+  <owner>linnan@chromium.org</owner>
+  <owner>johnidel@chromium.org</owner>
+  <owner>measurement-api-dev+metrics@google.com</owner>
+  <summary>
+    Records the network connection type in the event that the report failed to
+    be sent due to network issues. Recorded for each report sending attempt that
+    failed.
+  </summary>
+  <token key="ReportType">
+    <variant name="AggregatableReport"/>
+    <variant name="EventLevelReport"/>
+  </token>
 </histogram>
 
 <histogram name="CopylessPaste.CacheHit" enum="CopylessCacheHit"
@@ -5426,6 +5405,26 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
+<histogram name="Eche.NetworkCheck.FailureReason" enum="ConnectionFailReason"
+    expires_after="2023-08-20">
+  <owner>jonmann@google.com</owner>
+  <owner>nayebi@google.com</owner>
+  <summary>
+    Failure reason emitted by EcheSignaler on background connect attempt
+    failures.
+  </summary>
+</histogram>
+
+<histogram name="Eche.NetworkCheck.Result" enum="BooleanSuccess"
+    expires_after="2023-08-27">
+  <owner>jonmann@google.com</owner>
+  <owner>nayebi@google.com</owner>
+  <summary>
+    Emitted on success or failure of a background network connection attempt.
+    Triggered when Phone Hub first connects, and on each bubble opened event.
+  </summary>
+</histogram>
+
 <histogram name="Eche.NotificationClicked" enum="EcheNotificationInteraction"
     expires_after="2023-04-16">
   <obsolete>
@@ -6363,14 +6362,14 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="FirstRun.Sentinel.Created" enum="FirstRunSentinelResult"
-    expires_after="2023-09-17">
+    expires_after="2024-04-01">
   <owner>jlebel@chromium.org</owner>
   <owner>chrome-signin-team@google.com</owner>
   <summary>Result of sentinel file has been written.</summary>
 </histogram>
 
 <histogram name="FirstRun.Sentinel.CreatedFileError" enum="PlatformFileError"
-    expires_after="2023-04-01">
+    expires_after="2024-04-01">
   <owner>jlebel@chromium.org</owner>
   <owner>chrome-signin-team@google.com</owner>
   <summary>File error when the sentinel file was not written.</summary>
@@ -7963,7 +7962,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Manifest.ParseIdResult" enum="ManifestParseIdResultType"
-    expires_after="2023-06-04">
+    expires_after="2023-09-24">
   <owner>phillis@chromium.org</owner>
   <owner>desktop-pwas-team@chromium.org</owner>
   <summary>Tracks the result of parsing id field in the Manifest.</summary>
@@ -8570,32 +8569,6 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
-<histogram name="Networks.RememberedShared" units="units"
-    expires_after="2020-08-01">
-  <owner>stevenjb@chromium.org</owner>
-  <summary>
-    Number of shared remembered (preferred) networks on Chrome OS. Updated any
-    time the network list changes.
-  </summary>
-</histogram>
-
-<histogram name="Networks.RememberedUnshared" units="units"
-    expires_after="2020-08-01">
-  <owner>stevenjb@chromium.org</owner>
-  <summary>
-    Number of private remembered (preferred) networks on Chrome OS. Updated any
-    time the network list changes.
-  </summary>
-</histogram>
-
-<histogram name="Networks.Visible" units="units" expires_after="2020-08-01">
-  <owner>stevenjb@chromium.org</owner>
-  <summary>
-    Number of visible (in-range) networks on Chrome OS. Updated any time the
-    network list changes.
-  </summary>
-</histogram>
-
 <histogram name="NQE.CachedNetworkQualityAvailable" enum="BooleanAvailable"
     expires_after="2021-10-10">
   <owner>tbansal@chromium.org</owner>
@@ -8819,6 +8792,10 @@ chromium-metrics-reviews@google.com.
 
 <histogram name="OAuth2Login.PostMergeVerification"
     enum="PostMergeVerificationOutcome" expires_after="2021-06-17">
+  <obsolete>
+    Deprecated on 2023-03-27 in M114. The code that generated this histogram was
+    removed.
+  </obsolete>
   <owner>droger@chromium.org</owner>
   <owner>msarda@chromium.org</owner>
   <owner>chrome-signin-team@google.com</owner>
@@ -8831,6 +8808,10 @@ chromium-metrics-reviews@google.com.
 
 <histogram name="OAuth2Login.PreMergeVerification"
     enum="PostMergeVerificationOutcome" expires_after="2021-06-17">
+  <obsolete>
+    Deprecated on 2023-03-27 in M114. The code that generated this histogram was
+    removed.
+  </obsolete>
   <owner>droger@chromium.org</owner>
   <owner>msarda@chromium.org</owner>
   <owner>chrome-signin-team@google.com</owner>
@@ -10348,27 +10329,6 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
-<histogram name="PushMessaging.DeliveryStatus.FindServiceWorker"
-    enum="ServiceWorkerStatusCode" expires_after="M98">
-  <owner>peter@chromium.org</owner>
-  <owner>knollr@chromium.org</owner>
-  <summary>
-    When attempting to deliver a push message to a Service Worker, this records
-    the result of finding the Service Worker registration given its ID and
-    origin.
-  </summary>
-</histogram>
-
-<histogram name="PushMessaging.DeliveryStatus.ServiceWorkerEvent"
-    enum="ServiceWorkerStatusCode" expires_after="M98">
-  <owner>peter@chromium.org</owner>
-  <owner>knollr@chromium.org</owner>
-  <summary>
-    When a Service Worker receives a push message, this records the precise
-    result received from the Service Worker code.
-  </summary>
-</histogram>
-
 <histogram name="PushMessaging.GetRegistrationStatus"
     enum="PushGetRegistrationStatus" expires_after="2022-06-26">
   <owner>peter@chromium.org</owner>
@@ -10837,7 +10797,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="ReduceAcceptLanguage.AcceptLanguageNegotiationRestart"
-    enum="AcceptLanguageNegotiationRestart" expires_after="2023-06-01">
+    enum="AcceptLanguageNegotiationRestart" expires_after="M119">
   <owner>awillia@chromium.org</owner>
   <owner>miketaylr@chromium.org</owner>
   <owner>victortan@chromium.org</owner>
@@ -10910,28 +10870,6 @@ chromium-metrics-reviews@google.com.
   <owner>grt@chromium.org</owner>
   <summary>
     The result of an attempt to show a relaunch notification dialog.
-  </summary>
-</histogram>
-
-<histogram name="RenderFrameHostImpl.DroppedInterfaceRequestName"
-    enum="RenderFrameHostImpl.InterfaceNames" expires_after="M85">
-  <obsolete>
-    Removed in January 2022.
-  </obsolete>
-  <owner>engedy@chromium.org</owner>
-  <summary>
-    For each load and dropped Mojo interface request in a frame, records a
-    sample with a value corresponding to the hash of the interface name,
-    calculated as the lower 31 bits of the interface name's metric name hash.
-
-    Interface requests to RenderFrame::GetRemoteInterfaces are dropped when they
-    arrive to the RenderFrameHostImpl after the RenderFrameHostImpl had already
-    committed the next cross-document navigation.
-
-    This means that |document_scoped_interface_provider_binding_| was already
-    unbound at the time from the interface connection that had been used to
-    service RenderFrame::GetRemoteInterface for the previous load, so those
-    interface requests are dropped.
   </summary>
 </histogram>
 
@@ -13032,7 +12970,7 @@ should be kept until we remove incident reporting. -->
 </histogram>
 
 <histogram name="SSORecallPromo.PromoSeenCount" units="units"
-    expires_after="2023-07-09">
+    expires_after="2023-09-24">
   <owner>jlebel@chromium.org</owner>
   <owner>chrome-signin-team@google.com</owner>
   <summary>
@@ -14192,21 +14130,6 @@ should be kept until we use this API.  -->
   </summary>
 </histogram>
 
-<histogram name="UserImage.Changed" enum="ChromeOSUserImageId"
-    expires_after="M92">
-  <obsolete>
-    Removed in M92. Replaced by UserImage.Changed2, with the enum
-    ChromeOSUserImageId2.
-  </obsolete>
-  <owner>jasontt@chromium.org</owner>
-  <owner>assistive-eng@google.com</owner>
-  <summary>
-    Distribution of the device images that users changed (Chrome OS). The
-    statistic is recorded each time the user changes their device image to a
-    different one in Settings.
-  </summary>
-</histogram>
-
 <histogram name="UserImage.Changed2" enum="ChromeOSUserImageId2"
     expires_after="2023-09-17">
   <owner>jasontt@chromium.org</owner>
@@ -14220,34 +14143,6 @@ should be kept until we use this API.  -->
     these times is incomplete.
 
     This metric supersedes `UserImage.Changed` due to a change in enum values.
-  </summary>
-</histogram>
-
-<histogram name="UserImage.LoggedIn" enum="ChromeOSUserImageId"
-    expires_after="M82">
-  <obsolete>
-    Removed in M92. Replaced by UserImage.LoggedIn2, with the enum
-    ChromeOSUserImageId updated.
-  </obsolete>
-  <owner>achuith@chromium.org</owner>
-  <summary>
-    Distribution of the default images that existing users login with (Chrome
-    OS). One sample is taken each time the user logs in.
-  </summary>
-</histogram>
-
-<histogram name="UserImage.LoggedIn2" enum="ChromeOSUserImageId"
-    expires_after="M92">
-  <obsolete>
-    Removed in M92. Replaced by UserImage.LoggedIn3, with new enum
-    ChromeOSUserImageId2.
-  </obsolete>
-  <owner>achuith@chromium.org</owner>
-  <owner>alemate@chromium.org</owner>
-  <owner>cros-oac@google.com</owner>
-  <summary>
-    Distribution of the default images that existing users login with (Chrome
-    OS). One sample is taken each time the user logs in.
   </summary>
 </histogram>
 
@@ -14635,7 +14530,7 @@ regressions. -->
 </histogram>
 
 <histogram name="VoiceInteraction.VoiceResultConfidenceValue" units="%"
-    expires_after="2023-09-17">
+    expires_after="2023-09-24">
   <owner>basiaz@google.com</owner>
   <owner>chrome-language@google.com</owner>
   <summary>
@@ -14745,7 +14640,7 @@ regressions. -->
 </histogram>
 
 <histogram name="WebController.CertVerificationErrorsCacheHit"
-    enum="BooleanCacheHit" expires_after="2023-05-01">
+    enum="BooleanCacheHit" expires_after="2024-03-20">
   <owner>ajuma@chromium.org</owner>
   <owner>gambard@chromium.org</owner>
   <summary>
@@ -15250,7 +15145,7 @@ regressions. -->
 </histogram>
 
 <histogram name="WhatsNew.LoadResponseCode"
-    enum="CombinedHttpResponseAndNetErrorCode" expires_after="2023-06-18">
+    enum="CombinedHttpResponseAndNetErrorCode" expires_after="2023-09-24">
   <owner>rbpotter@chromium.org</owner>
   <owner>mahmadi@chromium.org</owner>
   <summary>
