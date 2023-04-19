@@ -20,7 +20,8 @@
 # tags: [ android-chromium android-webview-instrumentation
 #         debug debug-x64
 #         release release-x64
-#         fuchsia-chrome web-engine-shell ]
+#         fuchsia-chrome web-engine-shell
+#         lacros-chrome cros-chrome ]
 # GPU
 # tags: [ amd amd-0x6613 amd-0x679e amd-0x67ef amd-0x6821 amd-0x7340
 #         apple apple-apple-m1 apple-angle-metal-renderer:-apple-m1
@@ -151,6 +152,11 @@ crbug.com/1237319 [ chromeos no-passthrough ] conformance2/textures/misc/origin-
 crbug.com/1237319 [ chromeos no-passthrough ] conformance2/textures/webgl_canvas/tex-3d-* [ Skip ]
 crbug.com/1237319 [ chromeos no-passthrough ] deqp/functional/gles3/clipping.html [ Skip ]
 
+# Unsupported on this config.
+crbug.com/1429756 [ chromeos chromeos-board-kevin passthrough ] WebglExtension_EXT_disjoint_timer_query_webgl2 [ Skip ]
+crbug.com/1429756 [ chromeos chromeos-board-kevin passthrough ] WebglExtension_WEBGL_clip_cull_distance [ Skip ]
+crbug.com/1429756 [ chromeos chromeos-board-kevin ] WebglExtension_WEBGL_provoking_vertex [ Skip ]
+
 # Parallel Shader compile/link is currently slower with Vulkan backend.
 crbug.com/angleproject/6748 [ angle-vulkan passthrough ] WebglExtension_KHR_parallel_shader_compile [ Skip ]
 crbug.com/angleproject/6748 [ angle-swiftshader passthrough ] WebglExtension_KHR_parallel_shader_compile [ Skip ]
@@ -224,9 +230,7 @@ crbug.com/1345782 [ mac amd-0x67ef passthrough angle-opengl ] deqp/functional/gl
 crbug.com/1426916 [ chromeos chromeos-board-amd64-generic passthrough ] conformance/extensions/webgl-compressed-texture-astc.html [ Slow ]
 crbug.com/1426916 [ chromeos chromeos-board-amd64-generic passthrough ] conformance/extensions/s3tc-and-rgtc.html [ Slow ]
 crbug.com/1426916 [ chromeos chromeos-board-amd64-generic passthrough ] conformance/textures/canvas_sub_rectangle/tex-2d-rgba-rgba-unsigned_short_4_4_4_4.html [ Slow ]
-crbug.com/1426916 [ chromeos chromeos-board-amd64-generic passthrough ] conformance/textures/misc/tex-image-and-sub-image-2d-with-array-buffer-view.html [ Slow ]
 crbug.com/1426916 [ chromeos chromeos-board-amd64-generic passthrough ] conformance2/extensions/webgl-multi-draw-instanced-base-vertex-base-instance.html [ Slow ]
-crbug.com/1426916 [ chromeos chromeos-board-amd64-generic passthrough ] conformance2/sync/sync-webgl-specific.html [ Slow ]
 crbug.com/1426916 [ chromeos chromeos-board-amd64-generic passthrough ] conformance2/textures/canvas_sub_rectangle/tex-2d-rg32f-rg-float.html [ Slow ]
 crbug.com/1426916 [ chromeos chromeos-board-amd64-generic passthrough ] conformance2/textures/canvas_sub_rectangle/tex-2d-rg8ui-rg_integer-unsigned_byte.html [ Slow ]
 crbug.com/1426916 [ chromeos chromeos-board-amd64-generic passthrough ] conformance2/uniforms/incompatible-texture-type-for-sampler.html [ Slow ]
@@ -476,7 +480,7 @@ crbug.com/1424484 [ mac nvidia-0xfe9 ] deqp/functional/gles3/multisample/fbo_max
 crbug.com/772651 [ mac nvidia ] conformance/glsl/bugs/vector-scalar-arithmetic-inside-loop-complex.html [ Failure ]
 crbug.com/795052 [ mac nvidia-0xfe9 ] conformance2/uniforms/draw-with-uniform-blocks.html [ Failure ]
 crbug.com/1037650 [ mac nvidia-0xfe9 ] conformance2/textures/canvas_sub_rectangle/* [ RetryOnFailure ]
-crbug.com/1416275 [ mac nvidia-0xfe9 ] deqp/functional/gles3/occlusionquery_strict.html [ Failure ]
+crbug.com/1414878 [ mac nvidia-0xfe9 ] conformance2/textures/video/* [ RetryOnFailure ]
 
 crbug.com/1338004 [ mac nvidia-0xfe9 passthrough ] deqp/functional/gles3/multisample/fbo_4_samples.html [ RetryOnFailure ]
 
@@ -713,8 +717,8 @@ crbug.com/1419019 [ android android-pixel-4 no-passthrough ] conformance2/transf
 
 crbug.com/1215700 [ chromeos no-passthrough ] deqp/functional/gles3/negativetextureapi.html [ Failure ]
 crbug.com/1380411 [ chromeos passthrough ] conformance2/textures/canvas_sub_rectangle/tex-3d-* [ Skip ]
-crbug.com/1380411 [ chromeos passthrough ] conformance2/textures/canvas_sub_rectangle/tex-2d-r8ui-red_integer-unsigned_byte.html [ Failure ]
-crbug.com/1380411 [ chromeos passthrough ] conformance2/textures/webgl_canvas/tex-2d-r8ui-red_integer-unsigned_byte.html [ Failure ]
+crbug.com/1380411 [ chromeos chromeos-board-amd64-generic mesa_ge_21.0 passthrough target-cpu-64 ] conformance2/textures/canvas_sub_rectangle/tex-2d-r8ui-red_integer-unsigned_byte.html [ Failure ]
+crbug.com/1380411 [ chromeos chromeos-board-amd64-generic mesa_ge_21.0 passthrough target-cpu-64 ] conformance2/textures/webgl_canvas/tex-2d-r8ui-red_integer-unsigned_byte.html [ Failure ]
 crbug.com/1380411 [ chromeos passthrough ] conformance2/textures/webgl_canvas/tex-3d-* [ Skip ]
 crbug.com/1210240 [ chromeos chromeos-board-amd64-generic no-passthrough ] conformance2/textures/canvas_sub_rectangle/tex-2d-r8ui-red_integer-unsigned_byte.html [ Failure ]
 crbug.com/1210240 [ chromeos chromeos-board-amd64-generic no-passthrough ] conformance2/textures/webgl_canvas/tex-2d-r8ui-red_integer-unsigned_byte.html [ Failure ]
@@ -873,69 +877,22 @@ crbug.com/1328444 [ chromeos chromeos-board-kevin ] conformance2/rendering/blitf
 crbug.com/1328444 [ chromeos chromeos-board-kevin ] conformance2/textures/misc/tex-input-validation.html [ Failure ]
 crbug.com/1373277 [ chromeos chromeos-board-kevin ] conformance2/textures/video/tex-3d-srgb8-rgb-unsigned_byte.html [ Failure ]
 
-# finder:disable-narrowing
-crbug.com/1429731 [ chromeos chromeos-board-kevin ] conformance/context/context-attributes-alpha-depth-stencil-antialias.html [ Failure ]
-crbug.com/1429731 [ chromeos chromeos-board-kevin ] conformance/glsl/constructors/glsl-construct-bvec4.html [ Failure ]
-crbug.com/1429731 [ chromeos chromeos-board-kevin ] conformance/glsl/implicit/divide_int_mat4.vert.html [ Failure ]
-crbug.com/1429731 [ chromeos chromeos-board-kevin ] conformance/glsl/implicit/divide_ivec3_vec3.vert.html [ Failure ]
-crbug.com/1429731 [ chromeos chromeos-board-kevin ] conformance/glsl/misc/shader-with-arbitrary-indexing.vert.html [ Failure ]
-crbug.com/1429731 [ chromeos chromeos-board-kevin ] conformance/glsl/misc/shader-with-default-precision.frag.html [ Failure ]
-crbug.com/1429731 [ chromeos chromeos-board-kevin ] conformance/glsl/misc/shader-with-too-many-uniforms.html [ Failure ]
-crbug.com/1429731 [ chromeos chromeos-board-kevin ] conformance/ogles/GL/equal/equal_009_to_012.html [ Failure ]
-crbug.com/1429731 [ chromeos chromeos-board-kevin ] conformance/ogles/GL/mat/mat_009_to_016.html [ Failure ]
-crbug.com/1429731 [ chromeos chromeos-board-kevin ] conformance/ogles/GL/mod/mod_001_to_008.html [ Failure ]
-crbug.com/1429731 [ chromeos chromeos-board-kevin ] conformance/ogles/GL/swizzlers/swizzlers_057_to_064.html [ Failure ]
-crbug.com/1429731 [ chromeos chromeos-board-kevin ] conformance/textures/canvas/tex-2d-rgba-rgba-unsigned_byte.html [ Failure ]
-crbug.com/1429731 [ chromeos chromeos-board-kevin ] conformance/textures/image_bitmap_from_canvas/tex-2d-rgba-rgba-unsigned_byte.html [ Failure ]
-crbug.com/1429731 [ chromeos chromeos-board-kevin ] conformance/textures/image_data/tex-2d-rgba-rgba-unsigned_short_4_4_4_4.html [ Failure ]
-crbug.com/1429731 [ chromeos chromeos-board-kevin ] conformance/textures/misc/copy-tex-image-crash.html [ Failure ]
-crbug.com/1429731 [ chromeos chromeos-board-kevin passthrough ] conformance/textures/video/tex-2d-alpha-alpha-unsigned_byte.html [ Failure ]
-crbug.com/1429731 [ chromeos chromeos-board-kevin ] conformance/uniforms/no-over-optimization-on-uniform-array-00.html [ Failure ]
-crbug.com/1429731 [ chromeos chromeos-board-kevin ] conformance/uniforms/no-over-optimization-on-uniform-array-02.html [ Failure ]
-crbug.com/1429731 [ chromeos chromeos-board-kevin ] conformance/uniforms/out-of-bounds-uniform-array-access.html [ Failure ]
-crbug.com/1429731 [ chromeos chromeos-board-kevin ] conformance/uniforms/uniform-samplers-test.html [ Failure ]
-crbug.com/1429731 [ chromeos chromeos-board-kevin ] conformance/uniforms/uniform-values-per-program.html [ Failure ]
-crbug.com/1429731 [ chromeos chromeos-board-kevin ] conformance2/state/gl-object-get-calls.html [ Failure ]
-crbug.com/1429731 [ chromeos chromeos-board-kevin ] conformance2/sync/sync-webgl-specific.html [ Failure ]
-crbug.com/1429731 [ chromeos chromeos-board-kevin ] conformance2/textures/canvas/tex-2d-rgb565-rgb-unsigned_short_5_6_5.html [ Failure ]
-crbug.com/1429731 [ chromeos chromeos-board-kevin ] conformance2/textures/canvas/tex-2d-srgb8-rgb-unsigned_byte.html [ Failure ]
-crbug.com/1429731 [ chromeos chromeos-board-kevin ] conformance2/textures/canvas/tex-3d-r16f-red-half_float.html [ Failure ]
-crbug.com/1429731 [ chromeos chromeos-board-kevin ] conformance2/textures/canvas/tex-3d-rg16f-rg-half_float.html [ Failure ]
-crbug.com/1429731 [ chromeos chromeos-board-kevin ] conformance2/textures/canvas/tex-3d-rgb16f-rgb-float.html [ Failure ]
-crbug.com/1429731 [ chromeos chromeos-board-kevin ] conformance2/textures/canvas/tex-3d-rgb5_a1-rgba-unsigned_byte.html [ Failure ]
-crbug.com/1429731 [ chromeos chromeos-board-kevin ] conformance2/textures/canvas/tex-3d-rgb9_e5-rgb-half_float.html [ Failure ]
-crbug.com/1429731 [ chromeos chromeos-board-kevin ] conformance2/textures/canvas/tex-3d-rgba4-rgba-unsigned_short_4_4_4_4.html [ Failure ]
-crbug.com/1429731 [ chromeos chromeos-board-kevin ] conformance2/textures/canvas_sub_rectangle/tex-2d-r11f_g11f_b10f-rgb-half_float.html [ Failure ]
-crbug.com/1429731 [ chromeos chromeos-board-kevin ] conformance2/textures/canvas_sub_rectangle/tex-2d-rg8-rg-unsigned_byte.html [ Failure ]
-crbug.com/1429731 [ chromeos chromeos-board-kevin ] conformance2/textures/canvas_sub_rectangle/tex-2d-rgb5_a1-rgba-unsigned_short_5_5_5_1.html [ Failure ]
-crbug.com/1429731 [ chromeos chromeos-board-kevin ] conformance2/textures/canvas_sub_rectangle/tex-2d-rgb9_e5-rgb-float.html [ Failure ]
-crbug.com/1429731 [ chromeos chromeos-board-kevin ] conformance2/textures/image/tex-2d-rgb16f-rgb-float.html [ Failure ]
-crbug.com/1429731 [ chromeos chromeos-board-kevin ] conformance2/textures/image/tex-2d-rgb9_e5-rgb-half_float.html [ Failure ]
-crbug.com/1429731 [ chromeos chromeos-board-kevin ] conformance2/textures/image/tex-3d-srgb8_alpha8-rgba-unsigned_byte.html [ Failure ]
-crbug.com/1429731 [ chromeos chromeos-board-kevin ] conformance2/textures/image_bitmap_from_blob/tex-2d-rg16f-rg-float.html [ Failure ]
-crbug.com/1429731 [ chromeos chromeos-board-kevin ] conformance2/textures/image_bitmap_from_blob/tex-3d-srgb8-rgb-unsigned_byte.html [ Failure ]
-crbug.com/1429731 [ chromeos chromeos-board-kevin ] conformance2/textures/image_bitmap_from_canvas/tex-2d-rgb8ui-rgb_integer-unsigned_byte.html [ Failure ]
-crbug.com/1429731 [ chromeos chromeos-board-kevin ] conformance2/textures/image_bitmap_from_canvas/tex-3d-rgba4-rgba-unsigned_byte.html [ Failure ]
-crbug.com/1429731 [ chromeos chromeos-board-kevin ] conformance2/textures/image_bitmap_from_image/tex-3d-rgb565-rgb-unsigned_short_5_6_5.html [ Failure ]
-# finder:enable-narrowing
-
-crbug.com/1429756 [ chromeos chromeos-board-kevin passthrough ] WebglExtension_EXT_disjoint_timer_query_webgl2 [ Failure ]
-crbug.com/1429756 [ chromeos chromeos-board-kevin passthrough ] WebglExtension_WEBGL_clip_cull_distance [ Failure ]
-crbug.com/1429756 [ chromeos chromeos-board-kevin ] WebglExtension_WEBGL_provoking_vertex [ Failure ]
-
 crbug.com/1232106 [ chromeos chromeos-board-amd64-generic no-passthrough ] conformance/extensions/webgl-compressed-texture-astc.html [ Failure ]
 crbug.com/1232118 [ angle-opengles chromeos chromeos-board-amd64-generic passthrough ] conformance/uniforms/uniform-samplers-test.html [ Failure ]
 crbug.com/1238075 [ chromeos chromeos-board-amd64-generic ] conformance/rendering/gl-scissor-test.html [ Failure ]
 crbug.com/1241179 [ chromeos chromeos-board-amd64-generic passthrough ] conformance2/extensions/ext-texture-norm16.html [ Failure ]
 crbug.com/1241183 [ chromeos chromeos-board-amd64-generic passthrough ] conformance2/textures/misc/immutable-tex-render-feedback.html [ Failure ]
 crbug.com/1399117 [ chromeos chromeos-board-amd64-generic passthrough ] WebglExtension_WEBGL_provoking_vertex [ Skip ]
+crbug.com/1426916 [ chromeos chromeos-board-amd64-generic passthrough ] conformance/textures/misc/tex-image-and-sub-image-2d-with-array-buffer-view.html [ Failure ]
 
 # Must investigate ChromeOS failures with passthrough command decoder.
 crbug.com/angleproject/5038 [ chromeos passthrough ] conformance/extensions/ext-color-buffer-half-float.html [ Failure ]
 
 # Failures on validating command decoder only; won't fix.
-crbug.com/angleproject/5038 [ chromeos no-passthrough ] conformance/extensions/ext-color-buffer-half-float.html [ Failure ]
+crbug.com/angleproject/5038 [ chromeos chromeos-board-amd64-generic mesa_ge_21.0 no-passthrough target-cpu-64 ] conformance/extensions/ext-color-buffer-half-float.html [ Failure ]
 
+# Still frequently times out with Slow expectation.
+crbug.com/1426913 [ chromeos chromeos-board-amd64-generic passthrough ] conformance2/sync/sync-webgl-specific.html [ Failure ]
 
 ##############################
 # Lacros-like Linux Failures #

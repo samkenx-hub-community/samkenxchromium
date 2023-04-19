@@ -29,6 +29,8 @@ using Observer = TargetDeviceBootstrapController::Observer;
 using Status = TargetDeviceBootstrapController::Status;
 using Step = TargetDeviceBootstrapController::Step;
 using ErrorCode = TargetDeviceBootstrapController::ErrorCode;
+using ConnectionClosedReason =
+    TargetDeviceConnectionBroker::ConnectionClosedReason;
 
 class FakeObserver : public Observer {
  public:
@@ -127,7 +129,7 @@ TEST_F(TargetDeviceBootstrapControllerTest, StopAdvertising) {
   EXPECT_EQ(fake_observer_->last_status.step, Step::NONE);
 }
 
-TEST_F(TargetDeviceBootstrapControllerTest, InitiateConnection) {
+TEST_F(TargetDeviceBootstrapControllerTest, InitiateConnection_QRCode) {
   bootstrap_controller_->StartAdvertising();
   connection_broker()->on_start_advertising_callback().Run(/*success=*/true);
   ASSERT_EQ(fake_observer_->last_status.step, Step::ADVERTISING);
@@ -137,6 +139,20 @@ TEST_F(TargetDeviceBootstrapControllerTest, InitiateConnection) {
   EXPECT_EQ(fake_observer_->last_status.step, Step::QR_CODE_VERIFICATION);
   using QRCodePixelData = TargetDeviceBootstrapController::QRCodePixelData;
   EXPECT_TRUE(absl::holds_alternative<QRCodePixelData>(
+      fake_observer_->last_status.payload));
+}
+
+TEST_F(TargetDeviceBootstrapControllerTest, InitiateConnection_Pin) {
+  connection_broker()->set_use_pin_authentication(true);
+  bootstrap_controller_->StartAdvertising();
+  connection_broker()->on_start_advertising_callback().Run(/*success=*/true);
+  ASSERT_EQ(fake_observer_->last_status.step, Step::ADVERTISING);
+
+  connection_broker()->InitiateConnection(kSourceDeviceId);
+
+  EXPECT_EQ(fake_observer_->last_status.step, Step::PIN_VERIFICATION);
+  // TODO: Test PIN payload
+  EXPECT_TRUE(absl::holds_alternative<absl::monostate>(
       fake_observer_->last_status.payload));
 }
 
@@ -178,7 +194,7 @@ TEST_F(TargetDeviceBootstrapControllerTest, RejectConnection) {
   connection_broker()->on_start_advertising_callback().Run(/*success=*/true);
   connection_broker()->InitiateConnection(kSourceDeviceId);
 
-  connection_broker()->RejectConnection(kSourceDeviceId);
+  connection_broker()->RejectConnection();
 
   EXPECT_EQ(fake_observer_->last_status.step, Step::ERROR);
   ASSERT_TRUE(
@@ -192,7 +208,7 @@ TEST_F(TargetDeviceBootstrapControllerTest, CloseConnection) {
   connection_broker()->on_start_advertising_callback().Run(/*success=*/true);
   connection_broker()->InitiateConnection(kSourceDeviceId);
 
-  connection_broker()->CloseConnection(kSourceDeviceId);
+  connection_broker()->CloseConnection(ConnectionClosedReason::kConnectionLost);
 
   EXPECT_EQ(fake_observer_->last_status.step, Step::ERROR);
   ASSERT_TRUE(
@@ -236,7 +252,7 @@ TEST_F(TargetDeviceBootstrapControllerTest, PrepareForUpdate) {
   // Pref shouldn't change until the connection is closed.
   EXPECT_FALSE(
       GetLocalState()->GetBoolean(prefs::kShouldResumeQuickStartAfterReboot));
-  connection_broker()->CloseConnection(kSourceDeviceId);
+  connection_broker()->CloseConnection(ConnectionClosedReason::kConnectionLost);
   EXPECT_TRUE(
       GetLocalState()->GetBoolean(prefs::kShouldResumeQuickStartAfterReboot));
   GetLocalState()->ClearPref(prefs::kShouldResumeQuickStartAfterReboot);

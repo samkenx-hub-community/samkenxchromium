@@ -20,7 +20,7 @@
 #include "chrome/browser/ui/browser_dialogs.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/browser/web_applications/os_integration/os_integration_manager.h"
-#include "chrome/browser/web_applications/os_integration/os_integration_test_override.h"
+#include "chrome/browser/web_applications/test/os_integration_test_override_impl.h"
 #include "chrome/browser/web_applications/test/web_app_test_observers.h"
 #include "chrome/browser/web_applications/web_app_callback_app_identity.h"
 #include "chrome/browser/web_applications/web_app_id.h"
@@ -298,6 +298,7 @@ class WebAppIntegrationTestDriver : WebAppInstallManagerObserver {
 #endif
   void OpenAppSettingsFromChromeApps(Site site);
   void OpenAppSettingsFromAppMenu(Site site);
+  void OpenAppSettingsFromCommand(Site site);
   void CreateShortcutsFromList(Site site);
   void NavigateBrowser(Site site);
   void NavigatePwa(Site app, Site to);
@@ -325,6 +326,7 @@ class WebAppIntegrationTestDriver : WebAppInstallManagerObserver {
   void UninstallFromOs(Site site);
 #if BUILDFLAG(IS_MAC)
   void CorruptAppShim(Site site);
+  void QuitAppShim(Site site);
 #endif
 
   // State Check Actions:
@@ -348,7 +350,7 @@ class WebAppIntegrationTestDriver : WebAppInstallManagerObserver {
   void CheckInstallIconNotShown();
   void CheckLaunchIconShown();
   void CheckLaunchIconNotShown();
-  void CheckTabCreated();
+  void CheckTabCreated(Number number);
   void CheckTabNotCreated();
   void CheckCustomToolbar();
   void CheckNoToolbar();
@@ -364,6 +366,9 @@ class WebAppIntegrationTestDriver : WebAppInstallManagerObserver {
   void CheckWindowClosed();
   void CheckWindowCreated();
   void CheckPwaWindowCreated(Site site, Number number);
+  void CheckPwaWindowCreatedInProfile(Site site,
+                                      Number number,
+                                      ProfileName profile_name);
   void CheckWindowNotCreated();
   void CheckWindowControlsOverlay(Site site, IsOn is_on);
   void CheckWindowControlsOverlayToggle(Site site, IsShown is_shown);
@@ -374,6 +379,7 @@ class WebAppIntegrationTestDriver : WebAppInstallManagerObserver {
   void CheckNotHasSubApp(Site subapp);
   void CheckHasSubApp(Site subapp);
   void CheckNoSubApps();
+  void CheckAppLoadedInTab(Site site);
 
  protected:
   // WebAppInstallManagerObserver:
@@ -404,6 +410,8 @@ class WebAppIntegrationTestDriver : WebAppInstallManagerObserver {
 
   std::unique_ptr<StateSnapshot> ConstructStateSnapshot();
 
+  Profile* GetOrCreateProfile(ProfileName profile_name);
+
   content::WebContents* GetCurrentTab(Browser* browser);
   GURL GetInScopeURL(Site site);
   base::FilePath GetShortcutPath(base::FilePath shortcut_dir,
@@ -415,7 +423,7 @@ class WebAppIntegrationTestDriver : WebAppInstallManagerObserver {
                                 const bool install_as_shortcut);
   void ApplyRunOnOsLoginPolicy(Site site, const char* policy);
 
-  void UninstallPolicyAppById(const AppId& id);
+  void UninstallPolicyAppById(Profile* profile, const AppId& id);
   void ForceUpdateManifestContents(Site site,
                                    const GURL& app_url_with_manifest_param);
   void MaybeNavigateTabbedBrowserInScope(Site site);
@@ -447,6 +455,8 @@ class WebAppIntegrationTestDriver : WebAppInstallManagerObserver {
 #endif
 
   void CheckAppSettingsAppState(Profile* profile, const AppState& app_state);
+
+  void CheckPwaWindowCreatedImpl(Profile* profile, Site site, Number number);
 
   base::FilePath GetResourceFile(base::FilePath::StringPieceType relative_path);
 
@@ -502,7 +512,7 @@ class WebAppIntegrationTestDriver : WebAppInstallManagerObserver {
   base::ScopedObservation<web_app::WebAppInstallManager,
                           web_app::WebAppInstallManagerObserver>
       observation_{this};
-  std::unique_ptr<OsIntegrationTestOverride::BlockingRegistration>
+  std::unique_ptr<OsIntegrationTestOverrideImpl::BlockingRegistration>
       override_registration_;
 
   std::unique_ptr<base::RunLoop> window_controls_overlay_callback_for_testing_ =

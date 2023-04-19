@@ -74,8 +74,8 @@ bool SyncUserSettingsImpl::IsSyncRequested() const {
   return prefs_->IsSyncRequested();
 }
 
-void SyncUserSettingsImpl::SetSyncRequested(bool requested) {
-  prefs_->SetSyncRequested(requested);
+void SyncUserSettingsImpl::SetSyncRequested() {
+  prefs_->SetSyncRequested(true);
 }
 
 bool SyncUserSettingsImpl::IsFirstSetupComplete() const {
@@ -254,6 +254,10 @@ void SyncUserSettingsImpl::SetDecryptionNigoriKey(
 
 std::unique_ptr<Nigori> SyncUserSettingsImpl::GetDecryptionNigoriKey() const {
   return crypto_->GetDecryptionNigoriKey();
+}
+
+void SyncUserSettingsImpl::ClearSyncRequested() {
+  prefs_->SetSyncRequested(false);
 }
 
 void SyncUserSettingsImpl::SetSyncRequestedIfNotSetExplicitly() {

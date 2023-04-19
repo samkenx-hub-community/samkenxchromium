@@ -34,7 +34,7 @@ VideoDecoderType GetActualPlatformDecoderImplementation(
     return VideoDecoderType::kUnknown;
   }
 
-  if (base::FeatureList::IsEnabled(kUseOutOfProcessVideoDecoding)) {
+  if (IsOutOfProcessVideoDecodingEnabled()) {
     return VideoDecoderType::kOutOfProcess;
   }
 
@@ -155,7 +155,8 @@ VideoDecoderType GetPlatformDecoderImplementationType(
 }
 
 std::unique_ptr<AudioDecoder> CreatePlatformAudioDecoder(
-    scoped_refptr<base::SequencedTaskRunner> task_runner) {
+    scoped_refptr<base::SequencedTaskRunner> task_runner,
+    std::unique_ptr<MediaLog> media_log) {
   return nullptr;
 }
 

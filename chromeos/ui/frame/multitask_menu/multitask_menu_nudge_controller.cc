@@ -100,8 +100,7 @@ std::unique_ptr<views::Widget> CreateWidget(aura::Window* window) {
       corner_radius,
       chromeos::features::IsJellyrollEnabled()
           ? views::HighlightBorder::Type::kHighlightBorderOnShadow
-          : views::HighlightBorder::Type::kHighlightBorder1,
-      /*use_light_colors=*/false));
+          : views::HighlightBorder::Type::kHighlightBorder1));
 
   widget->SetContentsView(std::move(contents_view));
   return widget;
@@ -110,12 +109,12 @@ std::unique_ptr<views::Widget> CreateWidget(aura::Window* window) {
 }  // namespace
 
 MultitaskMenuNudgeController::Delegate::~Delegate() {
-  DCHECK_EQ(this, g_delegate_instance);
+  CHECK_EQ(this, g_delegate_instance);
   g_delegate_instance = nullptr;
 }
 
 MultitaskMenuNudgeController::Delegate::Delegate() {
-  DCHECK_EQ(nullptr, g_delegate_instance);
+  CHECK_EQ(nullptr, g_delegate_instance);
   g_delegate_instance = this;
 }
 
@@ -149,12 +148,15 @@ void MultitaskMenuNudgeController::MaybeShowNudge(aura::Window* window) {
 
 void MultitaskMenuNudgeController::MaybeShowNudge(aura::Window* window,
                                                   views::View* anchor_view) {
+  // Delegate could be null if the associated window was created during OOBE.
+  if (!g_delegate_instance) {
+    return;
+  }
+
   if (!chromeos::wm::features::IsWindowLayoutMenuEnabled() ||
       g_suppress_nudge_for_testing || nudge_widget_) {
     return;
   }
-
-  DCHECK(g_delegate_instance);
 
   // If the window is not visible, do not show the nudge.
   if (!window->IsVisible()) {
@@ -207,8 +209,16 @@ void MultitaskMenuNudgeController::OnWindowParentChanged(aura::Window* window,
   if (!parent) {
     return;
   }
-  DCHECK_EQ(window_, window);
+  CHECK_EQ(window_, window);
   UpdateWidgetAndPulse();
+}
+
+void MultitaskMenuNudgeController::OnWindowVisibilityChanged(
+    aura::Window* window,
+    bool visible) {
+  if (window == window_ && !visible) {
+    DismissNudge();
+  }
 }
 
 void MultitaskMenuNudgeController::OnWindowBoundsChanged(
@@ -216,14 +226,14 @@ void MultitaskMenuNudgeController::OnWindowBoundsChanged(
     const gfx::Rect& old_bounds,
     const gfx::Rect& new_bounds,
     ui::PropertyChangeReason reason) {
-  DCHECK_EQ(window_, window);
+  CHECK_EQ(window_, window);
   UpdateWidgetAndPulse();
 }
 
 void MultitaskMenuNudgeController::OnWindowTargetTransformChanging(
     aura::Window* window,
     const gfx::Transform& new_transform) {
-  DCHECK_EQ(window_, window);
+  CHECK_EQ(window_, window);
   // Prevent unintended behaviour in situations that use transforms such as
   // overview mode.
   // TODO(hewer): Decide how the cue behaves when adjusting the split view
@@ -233,7 +243,7 @@ void MultitaskMenuNudgeController::OnWindowTargetTransformChanging(
 
 void MultitaskMenuNudgeController::OnWindowStackingChanged(
     aura::Window* window) {
-  DCHECK_EQ(window_, window);
+  CHECK_EQ(window_, window);
 
   // Stacking may change during the construction of the widget, at which
   // `nudge_widget_` would still be null.
@@ -248,7 +258,7 @@ void MultitaskMenuNudgeController::OnWindowStackingChanged(
 }
 
 void MultitaskMenuNudgeController::OnWindowDestroying(aura::Window* window) {
-  DCHECK_EQ(window_, window);
+  CHECK_EQ(window_, window);
   DismissNudge();
 }
 
@@ -327,7 +337,7 @@ void MultitaskMenuNudgeController::OnGetPreferences(
   }
 
   UpdateWidgetAndPulse();
-  DCHECK(nudge_widget_);
+  CHECK(nudge_widget_);
 
   // Fade the education nudge in.
   ui::Layer* layer = nudge_widget_->GetLayer();
@@ -371,13 +381,13 @@ void MultitaskMenuNudgeController::OnDismissTimerEnded() {
 }
 
 void MultitaskMenuNudgeController::UpdateWidgetAndPulse() {
-  DCHECK(window_);
-  DCHECK(nudge_widget_);
+  CHECK(window_);
+  CHECK(nudge_widget_);
 
   const bool tablet_mode = TabletState::Get()->InTabletMode();
   if (!tablet_mode) {
-    DCHECK(pulse_layer_);
-    DCHECK(anchor_view_);
+    CHECK(pulse_layer_);
+    CHECK(anchor_view_);
   }
 
   // Dismiss the nudge if the window (or anchor in clamshell mode) is not
@@ -461,7 +471,7 @@ void MultitaskMenuNudgeController::PerformPulseAnimation(int pulse_count) {
     return;
   }
 
-  DCHECK(pulse_layer_);
+  CHECK(pulse_layer_);
 
   // The pulse animation scales up and fades out on top of the maximize/restore
   // button until the nudge disappears.

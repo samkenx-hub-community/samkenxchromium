@@ -20,7 +20,7 @@
 #include "chrome/browser/ash/app_mode/web_app/web_kiosk_app_data.h"
 #include "chrome/browser/ash/app_mode/web_app/web_kiosk_app_manager.h"
 #include "chrome/browser/extensions/extension_special_storage_policy.h"
-#include "chrome/browser/ui/web_applications/web_app_launch_manager.h"
+#include "chrome/browser/ui/web_applications/web_app_launch_process.h"
 #include "chrome/browser/web_applications/external_install_options.h"
 #include "chrome/browser/web_applications/externally_managed_app_manager.h"
 #include "chrome/browser/web_applications/mojom/user_display_mode.mojom.h"
@@ -41,6 +41,7 @@
 #include "components/services/app_service/public/cpp/app_types.h"
 #include "components/services/app_service/public/cpp/instance.h"
 #include "components/webapps/browser/install_result_code.h"
+#include "components/webapps/browser/installable/installable_metrics.h"
 #include "content/public/browser/web_contents.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
@@ -154,7 +155,7 @@ class WebKioskAppServiceLauncherTest : public BrowserWithTestWindowTest {
                   install_result_code_, app_id);
             }));
 
-    web_app::WebAppLaunchManager::SetOpenApplicationCallbackForTesting(
+    web_app::WebAppLaunchProcess::SetOpenApplicationCallbackForTesting(
         base::BindLambdaForTesting(
             [this](apps::AppLaunchParams&& params) -> content::WebContents* {
               auto instance = std::make_unique<apps::Instance>(
@@ -274,7 +275,8 @@ class WebKioskAppServiceLauncherTest : public BrowserWithTestWindowTest {
 
   void OnAppUnregistered(std::string app_id, bool success) {
     ASSERT_TRUE(success);
-    web_app_provider()->install_manager().NotifyWebAppUninstalled(app_id);
+    web_app_provider()->install_manager().NotifyWebAppUninstalled(
+        app_id, webapps::WebappUninstallSource::kSync);
   }
 
   AccountId account_id_;

@@ -92,8 +92,10 @@ using bookmarks::BookmarkNode;
 
 - (void)disconnect {
   [_profileDataSource disconnect];
+  _profileDataSource.consumer = nil;
   _profileDataSource = nil;
   [_accountDataSource disconnect];
+  _accountDataSource.consumer = nil;
   _accountDataSource = nil;
   _editedNodes.clear();
   _authService = nullptr;
@@ -109,6 +111,7 @@ using bookmarks::BookmarkNode;
 #pragma mark - BookmarksFolderChooserDataSource
 
 - (id<BookmarksFolderChooserSubDataSource>)accountDataSource {
+  DCHECK([self shouldShowAccountBookmarks]);
   return _accountDataSource;
 }
 
@@ -117,21 +120,12 @@ using bookmarks::BookmarkNode;
 }
 
 - (BOOL)shouldDisplayCloudIconForProfileBookmarks {
-  return bookmark_utils_ios::ShouldDisplayCloudSlashIcon(_syncSetupService);
+  return bookmark_utils_ios::ShouldDisplayCloudSlashIconForProfileModel(
+      _syncSetupService);
 }
 
-// TODO(crbug.com/1420237): Update this logic when two bookmark models are
-// available.
 - (BOOL)shouldShowAccountBookmarks {
-  if (!base::FeatureList::IsEnabled(
-          bookmarks::kEnableBookmarksAccountStorage)) {
-    return false;
-  }
-
-  BOOL isSignedIn =
-      _authService->HasPrimaryIdentity(signin::ConsentLevel::kSignin) &&
-      !_authService->HasPrimaryIdentity(signin::ConsentLevel::kSync);
-  return isSignedIn;
+  return bookmark_utils_ios::IsAccountBookmarkModelAvailable(_authService);
 }
 
 #pragma mark - BookmarksFolderChooserMutator
@@ -166,7 +160,6 @@ using bookmarks::BookmarkNode;
     // The selected folder has been deleted. Unset `_selectedFolderNode`.
     _selectedFolderNode = nil;
   }
-  [_consumer notifyModelUpdated];
 }
 
 - (void)bookmarkModelWillRemoveAllNodes:(const BookmarkModel*)bookmarkModel {
@@ -181,9 +174,7 @@ using bookmarks::BookmarkNode;
     // chooser.
     [_delegate bookmarksFolderChooserMediatorWantsDismissal:self];
   } else if (_selectedFolderNode->HasAncestor(bookmarkModel->root_node())) {
-    // The selected folder will be deleted. Unset `_selectedFolderNode`. The UI
-    // will be updated after the nodes are deleted in
-    // `BookmarksFolderChooserSubDataSourceImpl::bookmarkModelRemovedAllNodes`.
+    // The selected folder will be deleted. Unset `_selectedFolderNode`.
     _selectedFolderNode = nil;
   }
 }

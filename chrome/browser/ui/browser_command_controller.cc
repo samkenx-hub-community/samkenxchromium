@@ -49,6 +49,7 @@
 #include "chrome/browser/ui/web_applications/web_app_tabbed_utils.h"
 #include "chrome/browser/ui/webui/inspect_ui.h"
 #include "chrome/browser/web_applications/web_app_install_params.h"
+#include "chrome/browser/web_applications/web_app_utils.h"
 #include "chrome/common/chrome_features.h"
 #include "chrome/common/content_restriction.h"
 #include "chrome/common/pref_names.h"
@@ -165,12 +166,6 @@ bool CanOpenFile(Browser* browser) {
     return local_state->GetBoolean(prefs::kAllowFileSelectionDialogs);
 
   return true;
-}
-
-bool IsPinnedHomeTab(Browser* browser) {
-  return web_app::AppBrowserController::IsWebApp(browser) &&
-         web_app::IsPinnedHomeTab(browser->tab_strip_model(),
-                                  browser->tab_strip_model()->active_index());
 }
 
 }  // namespace
@@ -944,10 +939,12 @@ bool BrowserCommandController::ExecuteCommandWithDisposition(
     case IDC_OPEN_IN_CHROME:
       OpenInChrome(browser_);
       break;
-    case IDC_SITE_SETTINGS:
-      ShowSiteSettings(
-          browser_,
-          browser_->tab_strip_model()->GetActiveWebContents()->GetVisibleURL());
+    case IDC_WEB_APP_SETTINGS:
+#if !BUILDFLAG(IS_CHROMEOS)
+      CHECK(browser_->app_controller());
+      ShowWebAppSettings(browser_, browser_->app_controller()->app_id(),
+                         web_app::AppSettingsPageEntryPoint::kBrowserCommand);
+#endif
       break;
     case IDC_WEB_APP_MENU_APP_INFO: {
       content::WebContents* const web_contents =
@@ -1160,6 +1157,7 @@ void BrowserCommandController::InitCommandState() {
       IDC_SHOW_HISTORY,
       (!profile()->IsGuestSession() && !profile()->IsSystemProfile()));
   command_updater_.UpdateCommandEnabled(IDC_SHOW_DOWNLOADS, true);
+  command_updater_.UpdateCommandEnabled(IDC_FIND_AND_EDIT_MENU, true);
   command_updater_.UpdateCommandEnabled(IDC_HELP_MENU, true);
   command_updater_.UpdateCommandEnabled(IDC_HELP_PAGE_VIA_KEYBOARD, true);
   command_updater_.UpdateCommandEnabled(IDC_HELP_PAGE_VIA_MENU, true);
@@ -1209,7 +1207,7 @@ void BrowserCommandController::InitCommandState() {
       is_web_app_or_custom_tab ||
       sharing_hub::SharingHubOmniboxEnabled(browser_->profile());
   command_updater_.UpdateCommandEnabled(IDC_COPY_URL, enable_copy_url);
-  command_updater_.UpdateCommandEnabled(IDC_SITE_SETTINGS,
+  command_updater_.UpdateCommandEnabled(IDC_WEB_APP_SETTINGS,
                                         is_web_app_or_custom_tab);
   command_updater_.UpdateCommandEnabled(IDC_WEB_APP_MENU_APP_INFO,
                                         is_web_app_or_custom_tab);
@@ -1407,9 +1405,11 @@ void BrowserCommandController::UpdateCommandsForTabState() {
   bool is_isolated_app = current_web_contents->GetPrimaryMainFrame()
                              ->GetWebExposedIsolationLevel() >=
                          WebExposedIsolationLevel::kMaybeIsolatedApplication;
+  bool is_pinned_home_tab = web_app::IsPinnedHomeTab(
+      browser_->tab_strip_model(), browser_->tab_strip_model()->active_index());
   command_updater_.UpdateCommandEnabled(
       IDC_OPEN_IN_CHROME,
-      IsWebAppOrCustomTab() && !is_isolated_app && !IsPinnedHomeTab(browser_));
+      IsWebAppOrCustomTab() && !is_isolated_app && !is_pinned_home_tab);
 
   command_updater_.UpdateCommandEnabled(
       IDC_TOGGLE_REQUEST_TABLET_SITE,
@@ -1756,8 +1756,8 @@ void BrowserCommandController::UpdateCommandsForWebContentsFocus() {
 
 void BrowserCommandController::UpdateCommandsForTabStripStateChanged() {
   command_updater_.UpdateCommandEnabled(
-      IDC_CLOSE_TAB,
-      !IsPinnedHomeTab(browser_) || browser_->tab_strip_model()->count() == 1);
+      IDC_CLOSE_TAB, browser_->tab_strip_model()->IsTabClosable(
+                         browser_->tab_strip_model()->active_index()));
 }
 
 BrowserWindow* BrowserCommandController::window() {

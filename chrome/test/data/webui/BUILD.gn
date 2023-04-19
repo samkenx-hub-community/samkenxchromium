@@ -30,6 +30,7 @@ if (include_js_tests) {
       "cr_elements/cr_elements_focus_test.js",
       "extensions/cr_extensions_interactive_ui_tests.js",
       "history/history_focus_test.js",
+      "password_manager/password_manager_interactive_ui_tests.js",
       "print_preview/print_preview_interactive_ui_tests.js",
       "settings/cr_settings_interactive_ui_tests.js",
       "support_tool/support_tool_interactive_ui_test.js",
@@ -103,7 +104,6 @@ if (include_js_tests) {
       "media_internals/media_internals_ui_browsertest.js",
       "metrics_internals/metrics_internals_ui_browsertest.js",
       "net_internals/net_internals_browsertest.js",
-      "ntp4.js",
       "password_manager/password_manager_browsertest.js",
       "privacy_sandbox/privacy_sandbox_dialog_a11y_browsertest.js",
       "privacy_sandbox/privacy_sandbox_dialog_browsertest.js",
@@ -167,6 +167,7 @@ if (include_js_tests) {
         "chromeos/edu_coexistence/edu_coexistence_browsertest.js",
         "chromeos/emoji_picker/emoji_picker_browsertest.js",
         "chromeos/gaia_action_buttons/gaia_action_buttons_browsertest.js",
+        "chromeos/internet_config_dialog_browsertest.js",
         "chromeos/internet_detail_dialog_browsertest.js",
         "chromeos/network_browsertest.js",
         "chromeos/office_fallback/office_fallback_browsertest.js",
@@ -381,6 +382,7 @@ ts_library("build_ts") {
     "chai_assert.ts",
     "chrome_timeticks_test.ts",
     "fake_chrome_event.ts",
+    "fake_settings_private.ts",
     "invalidations/invalidations_test.ts",
     "metrics_test_support.ts",
     "mock_controller.ts",
@@ -428,6 +430,7 @@ ts_library("build_ts") {
     "//tools/typescript/definitions/chrome_send.d.ts",
     "//tools/typescript/definitions/chrome_timeticks.d.ts",
     "//tools/typescript/definitions/metrics_private.d.ts",
+    "//tools/typescript/definitions/settings_private.d.ts",
   ]
 }
 

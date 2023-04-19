@@ -106,9 +106,7 @@
 #include "third_party/blink/renderer/platform/instrumentation/use_counter.h"
 #include "third_party/blink/renderer/platform/runtime_enabled_features.h"
 #include "third_party/blink/renderer/platform/scheduler/public/post_cancellable_task.h"
-#include "third_party/blink/renderer/platform/text/bidi_resolver.h"
-#include "third_party/blink/renderer/platform/text/bidi_text_run.h"
-#include "third_party/blink/renderer/platform/text/text_run_iterator.h"
+#include "third_party/blink/renderer/platform/text/bidi_paragraph.h"
 #include "third_party/blink/renderer/platform/wtf/std_lib_extras.h"
 
 namespace blink {
@@ -791,7 +789,8 @@ void HTMLElement::AttributeChanged(const AttributeModificationParams& params) {
     EnsureElementInternals().ReadonlyAttributeChanged();
     return;
   }
-  if (params.name == html_names::kAnchorAttr) {
+  if (params.name == html_names::kAnchorAttr &&
+      RuntimeEnabledFeatures::CSSAnchorPositioningEnabled()) {
     EnsureAnchorElementObserver().Notify();
     return;
   }
@@ -1305,7 +1304,8 @@ bool HTMLElement::popoverOpen() const {
 
 bool HTMLElement::IsPopoverReady(PopoverTriggerAction action,
                                  ExceptionState* exception_state,
-                                 bool include_event_handler_text) const {
+                                 bool include_event_handler_text,
+                                 Document* expected_document) const {
   DCHECK(RuntimeEnabledFeatures::HTMLPopoverAttributeEnabled(
       GetDocument().GetExecutionContext()));
   DCHECK_NE(action, PopoverTriggerAction::kNone);
@@ -1333,6 +1333,12 @@ bool HTMLElement::IsPopoverReady(PopoverTriggerAction action,
   if (!isConnected()) {
     maybe_throw_exception(DOMExceptionCode::kInvalidStateError,
                           "Invalid on disconnected popover elements.");
+    return false;
+  }
+  if (expected_document && &GetDocument() != expected_document) {
+    maybe_throw_exception(DOMExceptionCode::kInvalidStateError,
+                          "Invalid when the document changes while showing or "
+                          "hiding a popover element.");
     return false;
   }
   if (action == PopoverTriggerAction::kShow &&
@@ -1414,8 +1420,9 @@ void HTMLElement::showPopover(ExceptionState& exception_state) {
 }
 
 void HTMLElement::ShowPopoverInternal(ExceptionState* exception_state) {
+  auto& original_document = GetDocument();
   DCHECK(RuntimeEnabledFeatures::HTMLPopoverAttributeEnabled(
-      GetDocument().GetExecutionContext()));
+      original_document.GetExecutionContext()));
   if (!IsPopoverReady(PopoverTriggerAction::kShow, exception_state)) {
     DCHECK(exception_state)
         << " Callers which aren't supposed to throw exceptions should not call "
@@ -1437,14 +1444,15 @@ void HTMLElement::ShowPopoverInternal(ExceptionState* exception_state) {
     return;
 
   // The 'beforetoggle' event handler could have changed this popover, e.g. by
-  // changing its type, removing it from the document, or calling showPopover().
+  // changing its type, removing it from the document, moving it to another
+  // document, or calling showPopover().
   if (!IsPopoverReady(PopoverTriggerAction::kShow, exception_state,
-                      /*include_event_handler_text=*/true)) {
+                      /*include_event_handler_text=*/true,
+                      &original_document)) {
     return;
   }
 
   bool should_restore_focus = false;
-  auto& document = GetDocument();
   auto original_type = PopoverType();
   if (original_type == PopoverValueType::kAuto ||
       original_type == PopoverValueType::kHint) {
@@ -1452,8 +1460,8 @@ void HTMLElement::ShowPopoverInternal(ExceptionState* exception_state) {
     if (original_type == PopoverValueType::kHint) {
       DCHECK(RuntimeEnabledFeatures::HTMLPopoverHintEnabled());
       // If the new popover is popover=hint, hide other hints first.
-      if (document.PopoverHintShowing()) {
-        document.PopoverHintShowing()->HidePopoverInternal(
+      if (original_document.PopoverHintShowing()) {
+        original_document.PopoverHintShowing()->HidePopoverInternal(
             HidePopoverFocusBehavior::kNone,
             HidePopoverTransitionBehavior::kFireEventsAndWaitForTransitions,
             exception_state);
@@ -1461,7 +1469,7 @@ void HTMLElement::ShowPopoverInternal(ExceptionState* exception_state) {
       // Then hide open popovers that aren't ancestors of this hint.
       if (ancestor) {
         HideAllPopoversUntil(
-            ancestor, document, HidePopoverFocusBehavior::kNone,
+            ancestor, original_document, HidePopoverFocusBehavior::kNone,
             HidePopoverTransitionBehavior::kFireEventsAndWaitForTransitions,
             HidePopoverIndependence::kHideUnrelated);
       }
@@ -1469,14 +1477,14 @@ void HTMLElement::ShowPopoverInternal(ExceptionState* exception_state) {
       // If the new popover is a popover=auto, hide any popover above this in
       // the stack, if any.
       HideAllPopoversUntil(
-          ancestor, document, HidePopoverFocusBehavior::kNone,
+          ancestor, original_document, HidePopoverFocusBehavior::kNone,
           HidePopoverTransitionBehavior::kFireEventsAndWaitForTransitions,
           HidePopoverIndependence::kHideUnrelated);
     }
 
     // The 'beforetoggle' event handlers could have changed this popover, e.g.
-    // by changing its type, removing it from the document, or calling
-    // showPopover().
+    // by changing its type, removing it from the document, moving it to
+    // another document, or calling showPopover().
     if (PopoverType() != original_type) {
       if (exception_state) {
         exception_state->ThrowDOMException(
@@ -1487,29 +1495,30 @@ void HTMLElement::ShowPopoverInternal(ExceptionState* exception_state) {
       return;
     }
     if (!IsPopoverReady(PopoverTriggerAction::kShow, exception_state,
-                        /*include_event_handler_text=*/true)) {
+                        /*include_event_handler_text=*/true,
+                        &original_document)) {
       return;
     }
 
     // We only restore focus for popover=auto/hint, and only for the first
     // popover in the stack. If there's nothing showing, restore focus.
-    should_restore_focus = !document.TopmostPopoverOrHint();
+    should_restore_focus = !original_document.TopmostPopoverOrHint();
 
     // Add this popover to the popover stack.
     if (original_type == PopoverValueType::kAuto) {
-      auto& stack = document.PopoverStack();
+      auto& stack = original_document.PopoverStack();
       DCHECK(!stack.Contains(this));
       stack.push_back(this);
     } else {
       DCHECK(RuntimeEnabledFeatures::HTMLPopoverHintEnabled());
-      document.SetPopoverHintShowing(this);
+      original_document.SetPopoverHintShowing(this);
     }
   }
 
   MarkPopoverInvokersDirty(*this);
   GetPopoverData()->setPreviouslyFocusedElement(nullptr);
-  Element* originally_focused_element = document.FocusedElement();
-  document.AddToTopLayer(this);
+  Element* originally_focused_element = original_document.FocusedElement();
+  original_document.AddToTopLayer(this);
   // Make the popover match `:popover-open` and remove `display:none` styling:
   GetPopoverData()->setVisibilityState(PopoverVisibilityState::kShowing);
   PseudoStateChanged(CSSSelector::kPseudoPopoverOpen);
@@ -1517,7 +1526,7 @@ void HTMLElement::ShowPopoverInternal(ExceptionState* exception_state) {
   // Force a style update. This ensures that base property values are set prior
   // to `:popover-open` matching, so that transitions can start on the change to
   // top layer.
-  document.UpdateStyleAndLayoutTreeForNode(this);
+  original_document.UpdateStyleAndLayoutTreeForNode(this);
 
   SetPopoverFocusOnShow();
 
@@ -1547,7 +1556,7 @@ void HTMLElement::ShowPopoverInternal(ExceptionState* exception_state) {
   DCHECK(!after_event->cancelable());
   after_event->SetTarget(this);
   GetPopoverData()->setPendingToggleEventTask(PostCancellableTask(
-      *GetDocument().GetTaskRunner(TaskType::kDOMManipulation), FROM_HERE,
+      *original_document.GetTaskRunner(TaskType::kDOMManipulation), FROM_HERE,
       WTF::BindOnce(
           [](HTMLElement* element, ToggleEvent* event) {
             DCHECK(element);
@@ -1784,6 +1793,10 @@ void HTMLElement::HidePopoverInternal(
           /*gate_on_user_activation=*/true));
     }
   }
+
+  if (auto* selectmenu = ownerSelectMenuElement()) {
+    selectmenu->ListboxWasClosed();
+  }
 }
 
 void HTMLElement::SetPopoverFocusOnShow() {
@@ -1932,16 +1945,8 @@ const HTMLElement* HTMLElement::FindTopmostPopoverAncestor(
       FlatTreeTraversal::ParentElement(new_popover)));
   // 2. Anchor attribute.
   check_ancestor(new_popover.anchorElement());
-  // 3. Invoker to popover (need to consider all of them).
-  for (auto* invoker :
-       *new_popover.GetTreeScope().RootNode().PopoverInvokers()) {
-    DCHECK(IsA<HTMLFormControlElement>(invoker));
-    auto* popover = To<HTMLFormControlElement>(invoker)
-                        ->popoverTargetElement()
-                        .popover.Get();
-    if (popover == &new_popover)
-      check_ancestor(invoker);
-  }
+  // 3. Invoker to popover
+  check_ancestor(new_popover.GetPopoverData()->invoker());
   return topmost_popover_ancestor;
 }
 
@@ -2052,37 +2057,6 @@ Element* HTMLElement::anchorElement() {
 void HTMLElement::setAnchorElement(Element* new_element) {
   SetElementAttribute(html_names::kAnchorAttr, new_element);
   EnsureAnchorElementObserver().Notify();
-}
-
-void HTMLElement::CheckAndPossiblyClosePopoverStack() {
-  if (LIKELY(!GetDocument().PopoverAutoShowing())) {
-    return;
-  }
-  // TODO(crbug.com/1307772): We could add more early returns by checking to see
-  // if the modified element is really a form control that contributed to the
-  // linking of the popover stack. For example, we could keep track of the set
-  // of elements which contributed to the current popover stack.
-  auto& stack = GetDocument().PopoverStack();
-  for (int i = stack.size() - 1; i > 0; i--) {
-    if (FindTopmostPopoverAncestor(*stack[i]) != stack[i - 1]) {
-      auto* console_message = MakeGarbageCollected<ConsoleMessage>(
-          mojom::blink::ConsoleMessageSource::kOther,
-          mojom::blink::ConsoleMessageLevel::kWarning,
-          "The ancestral popover relationship was changed due to a "
-          "modification to a button with a popover target attribute such as "
-          "adding the disabled attribute, adding the form attribute, or "
-          "disconnecting it from the document. All open popovers will be "
-          "closed, and no events will be fired.");
-      console_message->SetNodes(GetDocument().GetFrame(),
-                                {DOMNodeIds::IdForNode(this)});
-      GetDocument().AddConsoleMessage(console_message);
-      HTMLElement::HideAllPopoversUntil(
-          nullptr, GetDocument(), HidePopoverFocusBehavior::kNone,
-          HidePopoverTransitionBehavior::kNoEventsNoWaiting,
-          HidePopoverIndependence::kHideUnrelated);
-      return;
-    }
-  }
 }
 
 void HTMLElement::SetOwnerSelectMenuElement(HTMLSelectMenuElement* element) {
@@ -2278,9 +2252,7 @@ absl::optional<TextDirection> HTMLElement::ResolveAutoDirectionality(
     Node* stay_within) const {
   is_deferred = false;
   if (auto* input_element = DynamicTo<HTMLInputElement>(*this)) {
-    bool has_strong_directionality;
-    return DetermineDirectionality(input_element->Value(),
-                                   &has_strong_directionality);
+    return BidiParagraph::BaseDirectionForStringOrLtr(input_element->Value());
   }
 
   // For <textarea>, the heuristic is applied on a per-paragraph level, and
@@ -2324,11 +2296,10 @@ absl::optional<TextDirection> HTMLElement::ResolveAutoDirectionality(
     }
 
     if (node->IsTextNode()) {
-      bool has_strong_directionality;
-      TextDirection text_direction = DetermineDirectionality(
-          node->textContent(true), &has_strong_directionality);
-      if (has_strong_directionality)
-        return text_direction;
+      if (const absl::optional<TextDirection> text_direction =
+              BidiParagraph::BaseDirectionForString(node->textContent(true))) {
+        return *text_direction;
+      }
     }
 
     if (slot) {
@@ -2399,26 +2370,26 @@ void HTMLElement::AdjustDirectionalityIfNeededAfterChildrenChanged(
     return;
 
   Node* stay_within = nullptr;
-  bool has_strong_directionality;
   if (change.type == ChildrenChangeType::kTextChanged) {
     CHECK(change.old_text);
     TextDirection old_text_direction =
-        DetermineDirectionality(*change.old_text, &has_strong_directionality);
+        BidiParagraph::BaseDirectionForStringOrLtr(*change.old_text);
     auto* character_data = DynamicTo<CharacterData>(change.sibling_changed);
     DCHECK(character_data);
-    TextDirection new_text_direction = DetermineDirectionality(
-        character_data->data(), &has_strong_directionality);
+    TextDirection new_text_direction =
+        BidiParagraph::BaseDirectionForStringOrLtr(character_data->data());
     if (old_text_direction == new_text_direction)
       return;
     stay_within = change.sibling_changed;
   } else if (change.IsChildInsertion()) {
     if (change.sibling_changed->IsTextNode()) {
-      TextDirection new_text_direction =
-          DetermineDirectionality(change.sibling_changed->textContent(true),
-                                  &has_strong_directionality);
-      if (!has_strong_directionality ||
-          new_text_direction == CachedDirectionality())
+      const absl::optional<TextDirection> new_text_direction =
+          BidiParagraph::BaseDirectionForString(
+              change.sibling_changed->textContent(true));
+      if (!new_text_direction ||
+          *new_text_direction == CachedDirectionality()) {
         return;
+      }
     }
     stay_within = change.sibling_changed;
   }

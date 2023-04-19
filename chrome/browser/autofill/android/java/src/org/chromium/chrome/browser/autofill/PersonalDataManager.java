@@ -5,6 +5,7 @@
 package org.chromium.chrome.browser.autofill;
 
 import android.content.Context;
+import android.content.res.Resources;
 import android.graphics.Bitmap;
 import android.text.format.DateUtils;
 
@@ -480,6 +481,10 @@ public class PersonalDataManager {
 
         public void setOrigin(String origin) {
             mOrigin = origin;
+        }
+
+        public void setSource(@Source int source) {
+            mSource = source;
         }
 
         public void setHonorificPrefix(String honorificPrefix) {
@@ -1171,6 +1176,25 @@ public class PersonalDataManager {
     }
 
     /**
+     * Determines whether the logged in user (if any) is eligible to store
+     * Autofill address profiles to their account.
+     */
+    public boolean isEligibleForAddressAccountStorage() {
+        return PersonalDataManagerJni.get().isEligibleForAddressAccountStorage(
+                mPersonalDataManagerAndroid, PersonalDataManager.this);
+    }
+
+    /**
+     * Users based in unsupported countries and profiles with a country value set
+     * to an unsupported country are not eligible for account storage. This
+     * function determines if the `country_code` is eligible.
+     */
+    public boolean isCountryEligibleForAccountStorage(String countryCode) {
+        return PersonalDataManagerJni.get().isCountryEligibleForAccountStorage(
+                mPersonalDataManagerAndroid, PersonalDataManager.this, countryCode);
+    }
+
+    /**
      * Starts loading the address validation rules for the specified {@code regionCode}.
      *
      * @param regionCode The code of the region for which to load the rules.
@@ -1306,6 +1330,21 @@ public class PersonalDataManager {
     }
 
     /**
+     * @return Whether the Autofill feature for payment methods mandatory reauth is enabled.
+     */
+    public static boolean isAutofillPaymentMethodsMandatoryReauthEnabled() {
+        return getPrefService().getBoolean(Pref.AUTOFILL_PAYMENT_METHODS_MANDATORY_REAUTH);
+    }
+
+    /**
+     * Enables or disables the Autofill feature for payment methods mandatory reauth.
+     * @param enable True to enable payment methods mandatory reauth, false otherwise.
+     */
+    public static void setAutofillPaymentMethodsMandatoryReauth(boolean enable) {
+        getPrefService().setBoolean(Pref.AUTOFILL_PAYMENT_METHODS_MANDATORY_REAUTH, enable);
+    }
+
+    /**
      * @return Whether the Autofill feature is managed.
      */
     public static boolean isAutofillManaged() {
@@ -1376,24 +1415,36 @@ public class PersonalDataManager {
 
     /**
      * Return the card art image for the given `customImageUrl`.
-     *
+     * @param context required to get resources.
      * @param customImageUrl  URL of the image. If the image is available, it is returned, otherwise
      *         it is fetched from this URL.
+     * @param widthId Resource id of the width spec.
+     * @param heightId Resource id of the height spec.
+     * @param cornerRadiusId Resource id of the corner radius spec.
      * @return Bitmap if found in the local cache, else return null.
      */
-    public Bitmap getCustomImageForAutofillSuggestionIfAvailable(GURL customImageUrl) {
-        if (mCreditCardArtImages.containsKey(customImageUrl.getSpec())) {
-            return mCreditCardArtImages.get(customImageUrl.getSpec());
+    public Bitmap getCustomImageForAutofillSuggestionIfAvailable(
+            Context context, GURL customImageUrl, int widthId, int heightId, int cornerRadiusId) {
+        Resources res = context.getResources();
+        int width = res.getDimensionPixelSize(widthId);
+        int height = res.getDimensionPixelSize(heightId);
+        float cornerRadius = res.getDimension(cornerRadiusId);
+        GURL urlWithParams =
+                AutofillUiUtils.getCreditCardIconUrlWithParams(customImageUrl, width, height);
+
+        if (mCreditCardArtImages.containsKey(urlWithParams.getSpec())) {
+            return mCreditCardArtImages.get(urlWithParams.getSpec());
         }
         // Schedule the fetching of image and return null so that the UI thread does not have to
         // wait and can show the default network icon.
-        fetchImage(customImageUrl, bitmap -> {
+        fetchImage(urlWithParams, bitmap -> {
             // TODO (crbug.com/1410418): Log image fetching failure metrics.
             // If the image fetching was unsuccessful, silently return.
             if (bitmap == null) return;
 
-            mCreditCardArtImages.put(customImageUrl.getSpec(),
-                    AutofillUiUtils.getRoundedBitmap(bitmap,
+            mCreditCardArtImages.put(urlWithParams.getSpec(),
+                    AutofillUiUtils.resizeAndAddRoundedCornersAndGreyBorder(bitmap, width, height,
+                            cornerRadius,
                             ChromeFeatureList.isEnabled(
                                     ChromeFeatureList
                                             .AUTOFILL_ENABLE_NEW_CARD_ART_AND_NETWORK_IMAGES)));
@@ -1431,6 +1482,10 @@ public class PersonalDataManager {
                 boolean includeOrganizationInLabel, boolean includeCountryInLabel);
         AutofillProfile getProfileByGUID(
                 long nativePersonalDataManagerAndroid, PersonalDataManager caller, String guid);
+        boolean isEligibleForAddressAccountStorage(
+                long nativePersonalDataManagerAndroid, PersonalDataManager caller);
+        boolean isCountryEligibleForAccountStorage(long nativePersonalDataManagerAndroid,
+                PersonalDataManager caller, String countryCode);
         String setProfile(long nativePersonalDataManagerAndroid, PersonalDataManager caller,
                 AutofillProfile profile);
         String setProfileToLocal(long nativePersonalDataManagerAndroid, PersonalDataManager caller,

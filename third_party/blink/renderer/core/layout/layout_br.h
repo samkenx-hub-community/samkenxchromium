@@ -21,7 +21,7 @@
 #ifndef THIRD_PARTY_BLINK_RENDERER_CORE_LAYOUT_LAYOUT_BR_H_
 #define THIRD_PARTY_BLINK_RENDERER_CORE_LAYOUT_LAYOUT_BR_H_
 
-#include "third_party/blink/renderer/core/layout/ng/inline/layout_ng_text.h"
+#include "third_party/blink/renderer/core/layout/layout_text.h"
 
 // The whole class here is a hack to get <br> working, as long as we don't have
 // support for CSS2 :before and :after pseudo elements.
@@ -29,7 +29,7 @@ namespace blink {
 
 class HTMLBRElement;
 
-class LayoutBR : public LayoutNGText {
+class LayoutBR : public LayoutText {
  public:
   explicit LayoutBR(HTMLBRElement& node);
   ~LayoutBR() override;
@@ -43,31 +43,6 @@ class LayoutBR : public LayoutNGText {
   // to return a rect that includes space to illustrate a newline.
   using LayoutText::LocalSelectionVisualRect;
 
-  float Width(unsigned /* from */,
-              unsigned /* len */,
-              const Font&,
-              LayoutUnit /* xpos */,
-              TextDirection,
-              HashSet<const SimpleFontData*>* = nullptr /* fallbackFonts */,
-              gfx::RectF* /* glyphBounds */ = nullptr,
-              float /* expansion */ = false) const override {
-    NOT_DESTROYED();
-    return 0;
-  }
-  float Width(unsigned /* from */,
-              unsigned /* len */,
-              LayoutUnit /* xpos */,
-              TextDirection,
-              bool = false /* firstLine */,
-              HashSet<const SimpleFontData*>* = nullptr /* fallbackFonts */,
-              gfx::RectF* /* glyphBounds */ = nullptr,
-              float /* expansion */ = false) const override {
-    NOT_DESTROYED();
-    return 0;
-  }
-
-  int LineHeight(bool first_line) const;
-
   bool IsOfType(LayoutObjectType type) const override {
     NOT_DESTROYED();
     return type == kLayoutObjectBr || LayoutText::IsOfType(type);
@@ -80,9 +55,6 @@ class LayoutBR : public LayoutNGText {
 
   Position PositionForCaretOffset(unsigned) const final;
   absl::optional<unsigned> CaretOffsetForPosition(const Position&) const final;
-
- protected:
-  void StyleDidChange(StyleDifference, const ComputedStyle* old_style) override;
 };
 
 template <>

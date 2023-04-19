@@ -116,7 +116,11 @@ build_recipe(
 )
 
 build_recipe(
-    name = "recipe:build_perf",
+    name = "recipe:chrome_build/build_perf",
+)
+
+build_recipe(
+    name = "recipe:chrome_build/build_perf_siso",
 )
 
 build_recipe(
@@ -153,10 +157,6 @@ build_recipe(
 
 build_recipe(
     name = "recipe:chromium_3pp",
-)
-
-build_recipe(
-    name = "recipe:chromium_afl",
 )
 
 build_recipe(
@@ -206,6 +206,10 @@ build_recipe(
 )
 
 build_recipe(
+    name = "recipe:chromium_upload_rust",
+)
+
+build_recipe(
     name = "recipe:cronet",
 )
 
@@ -215,11 +219,6 @@ build_recipe(
 
 build_recipe(
     name = "recipe:flakiness/reproducer",
-)
-
-build_recipe(
-    name = "recipe:findit/chromium/single_revision",
-    bootstrappable = POLYMORPHIC,
 )
 
 build_recipe(

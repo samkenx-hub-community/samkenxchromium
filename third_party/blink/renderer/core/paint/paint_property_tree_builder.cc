@@ -20,6 +20,9 @@
 #include "third_party/blink/renderer/core/frame/local_frame_view.h"
 #include "third_party/blink/renderer/core/frame/settings.h"
 #include "third_party/blink/renderer/core/frame/visual_viewport.h"
+#include "third_party/blink/renderer/core/html/forms/html_input_element.h"
+#include "third_party/blink/renderer/core/html/forms/html_select_element.h"
+#include "third_party/blink/renderer/core/html/forms/text_control_element.h"
 #include "third_party/blink/renderer/core/layout/anchor_scroll_data.h"
 #include "third_party/blink/renderer/core/layout/fragmentainer_iterator.h"
 #include "third_party/blink/renderer/core/layout/geometry/transform_state.h"
@@ -106,7 +109,9 @@ PaintPropertyTreeBuilderFragmentContext::
       &ScrollPaintPropertyNode::Root();
 }
 
-PaintPropertyTreeBuilderContext::PaintPropertyTreeBuilderContext() = default;
+PaintPropertyTreeBuilderContext::PaintPropertyTreeBuilderContext()
+    : composited_scrolling_preference(
+          static_cast<unsigned>(CompositedScrollingPreference::kDefault)) {}
 
 PaintPropertyTreeBuilderContext::~PaintPropertyTreeBuilderContext() {
   fragments.clear();
@@ -186,9 +191,6 @@ void PaintPropertyTreeBuilder::SetupContextForFrame(
   full_context.container_for_fixed_position = nullptr;
   context.fixed_position = context.current;
   context.fixed_position.fixed_position_children_fixed_to_root = true;
-
-  full_context.scroll_unification_enabled =
-      base::FeatureList::IsEnabled(::features::kScrollUnification);
 }
 
 namespace {
@@ -2102,6 +2104,14 @@ void FragmentPaintPropertyTreeBuilder::UpdateInnerBorderRadiusClip() {
       FloatRoundedRect paint_clip_rect =
           RoundedBorderGeometry::PixelSnappedRoundedInnerBorder(box.StyleRef(),
                                                                 box_rect);
+
+      if (pre_paint_info_) {
+        gfx::Vector2dF offset(
+            -OffsetInStitchedFragments(pre_paint_info_->box_fragment));
+        layout_clip_rect.Offset(offset);
+        paint_clip_rect.Move(offset);
+      }
+
       AdjustRoundedClipForOverflowClipMargin(box, layout_clip_rect,
                                              paint_clip_rect);
       ClipPaintPropertyNode::State state(context_.current.transform,
@@ -2295,11 +2305,15 @@ FragmentPaintPropertyTreeBuilder::GetMainThreadScrollingReasons() const {
   DCHECK(IsA<LayoutBox>(object_));
   auto* scrollable_area = To<LayoutBox>(object_).GetScrollableArea();
   DCHECK(scrollable_area);
-  if (!full_context_.scroll_unification_enabled) {
-    return full_context_.global_main_thread_scrolling_reasons;
+  MainThreadScrollingReasons reasons =
+      full_context_.global_main_thread_scrolling_reasons;
+  if (!RuntimeEnabledFeatures::CompositeScrollAfterPaintEnabled()) {
+    reasons |= scrollable_area->GetNonCompositedMainThreadScrollingReasons();
   }
-  return full_context_.global_main_thread_scrolling_reasons |
-         scrollable_area->GetNonCompositedMainThreadScrollingReasons();
+  if (scrollable_area->BackgroundNeedsRepaintOnScroll()) {
+    reasons |= cc::MainThreadScrollingReason::kBackgroundNeedsRepaintOnScroll;
+  }
+  return reasons;
 }
 
 void FragmentPaintPropertyTreeBuilder::UpdateScrollAndScrollTranslation() {
@@ -2330,6 +2344,9 @@ void FragmentPaintPropertyTreeBuilder::UpdateScrollAndScrollTranslation() {
         object_.GetFrameView()->RemoveUserScrollableArea(scrollable_area);
       }
 
+      state.composited_scrolling_preference =
+          static_cast<CompositedScrollingPreference>(
+              full_context_.composited_scrolling_preference);
       state.main_thread_scrolling_reasons = GetMainThreadScrollingReasons();
 
       state.compositor_element_id = scrollable_area->GetScrollElementId();
@@ -2488,7 +2505,8 @@ void FragmentPaintPropertyTreeBuilder::UpdateScrollAndScrollTranslation() {
       // was also updated in LayerTreeHost::ApplyCompositorChanges.
       if (effective_change_type <=
               PaintPropertyChangeType::kChangedOnlySimpleValues &&
-          properties_->ScrollTranslation()->HasDirectCompositingReasons() &&
+          (RuntimeEnabledFeatures::CompositeScrollAfterPaintEnabled() ||
+           properties_->ScrollTranslation()->HasDirectCompositingReasons()) &&
           // In platform code, only scroll translations with scroll nodes are
           // treated as scroll translations with overlap testing treatment.
           // A scroll translation for overflow:hidden doesn't have a scroll node
@@ -3146,9 +3164,17 @@ void PaintPropertyTreeBuilder::UpdateForSelf() {
   context_.was_main_thread_scrolling = false;
   if (const auto* box = DynamicTo<LayoutBox>(object_)) {
     if (auto* scrollable_area = box->GetScrollableArea()) {
-      scrollable_area->UpdateNeedsCompositedScrolling(
+      bool force_prefer_compositing =
           CompositingReasonFinder::ShouldForcePreferCompositingToLCDText(
-              object_, context_.direct_compositing_reasons));
+              object_, context_.direct_compositing_reasons);
+      if (RuntimeEnabledFeatures::CompositeScrollAfterPaintEnabled()) {
+        context_.composited_scrolling_preference = static_cast<unsigned>(
+            force_prefer_compositing ? CompositedScrollingPreference::kPreferred
+            : scrollable_area->PrefersNonCompositedScrolling()
+                ? CompositedScrollingPreference::kNotPreferred
+                : CompositedScrollingPreference::kDefault);
+      }
+      scrollable_area->UpdateNeedsCompositedScrolling(force_prefer_compositing);
       context_.was_main_thread_scrolling =
           scrollable_area->ShouldScrollOnMainThread();
       context_.direct_compositing_reasons =

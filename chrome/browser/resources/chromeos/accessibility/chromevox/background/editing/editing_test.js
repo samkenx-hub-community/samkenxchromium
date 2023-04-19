@@ -24,12 +24,12 @@ ChromeVoxEditingTest = class extends ChromeVoxE2ETest {
         'BrailleTranslatorManager',
         '/chromevox/background/braille/braille_translator_manager.js');
     await importModule(
-        'DesktopAutomationInterface',
-        '/chromevox/background/desktop_automation_interface.js');
-    await importModule(
         'EditableLine', '/chromevox/background/editing/editable_line.js');
     await importModule(
         'TextEditHandler', '/chromevox/background/editing/editing.js');
+    await importModule(
+        'DesktopAutomationInterface',
+        '/chromevox/background/event/desktop_automation_interface.js');
     await importModule(
         ['BrailleKeyEvent', 'BrailleKeyCommand'],
         '/chromevox/common/braille/braille_key_types.js');
@@ -2361,9 +2361,12 @@ AX_TEST_F(
     });
 
 // Regression test that large text areas produce output.
-AX_TEST_F('ChromeVoxEditingTest', 'GiantTextAreaPerformance', async function() {
-  const mockFeedback = this.createMockFeedback();
-  const site = `
+// Flaky test: https://crbug.com/1430387
+AX_TEST_F(
+    'ChromeVoxEditingTest', 'DISABLED_GiantTextAreaPerformance',
+    async function() {
+      const mockFeedback = this.createMockFeedback();
+      const site = `
     <p>start</p>
     <textarea></textarea>
     <script>

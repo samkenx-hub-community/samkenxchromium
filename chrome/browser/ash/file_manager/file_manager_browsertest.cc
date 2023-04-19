@@ -1549,6 +1549,7 @@ WRAPPED_INSTANTIATE_TEST_SUITE_P(
         TestCase("driveLinkOpenFileThroughTransitiveLink"),
         TestCase("driveWelcomeBanner"),
         TestCase("driveOfflineInfoBanner"),
+        TestCase("driveEncryptionBadge"),
         TestCase("driveDeleteDialogDoesntMentionPermanentDelete"),
         TestCase("driveInlineSyncStatusSingleFile").EnableInlineStatusSync(),
         TestCase("driveInlineSyncStatusParentFolder").EnableInlineStatusSync()
@@ -1577,12 +1578,8 @@ WRAPPED_INSTANTIATE_TEST_SUITE_P(
     ::testing::Values(
         TestCase("transferFromDriveToDownloads")
             .FeatureIds({"screenplay-9e3628b5-86db-481f-8623-f13eac08d61a"}),
-// TODO(crbug.com/1425820), TODO(crbug.com/1428909): Re-enable this test.
-#if !defined(LEAK_SANITIZER) || !BUILDFLAG(IS_CHROMEOS) || \
-    !defined(ADDRESS_SANITIZER)
         TestCase("transferOfficeFileFromDriveToDownloads")
             .FeatureIds({"screenplay-9e3628b5-86db-481f-8623-f13eac08d61a"}),
-#endif
         TestCase("transferFromDownloadsToMyFiles")
             .FeatureIds({"screenplay-9e3628b5-86db-481f-8623-f13eac08d61a"}),
         TestCase("transferFromDownloadsToMyFilesMove")
@@ -2191,7 +2188,8 @@ WRAPPED_INSTANTIATE_TEST_SUITE_P(
         TestCase("showSearchResultMessageWhenSearching").EnableSearchV2(),
         TestCase("showsEducationNudge").EnableSearchV2(),
         TestCase("searchFromMyFiles").EnableSearchV2(),
-        TestCase("selectionPath").EnableSearchV2()
+        TestCase("selectionPath").EnableSearchV2(),
+        TestCase("searchHierarchy").EnableSearchV2()
         // TODO(b/189173190): Enable
         // TestCase("searchQueryLaunchParam")
         ));
@@ -2200,12 +2198,12 @@ WRAPPED_INSTANTIATE_TEST_SUITE_P(
     Metrics, /* metrics.js */
     FilesAppBrowserTest,
     ::testing::Values(TestCase("metricsRecordEnum"),
-                      TestCase("metricsOpenSwa"),
 // TODO(https://crbug.com/1303472): Fix flakes and re-enable.
 #if !BUILDFLAG(IS_CHROMEOS)
                       TestCase("metricsRecordDirectoryListLoad"),
+                      TestCase("metricsRecordUpdateAvailableApps"),
 #endif
-                      TestCase("metricsRecordUpdateAvailableApps")));
+                      TestCase("metricsOpenSwa")));
 
 WRAPPED_INSTANTIATE_TEST_SUITE_P(
     Breadcrumbs, /* breadcrumbs.js */

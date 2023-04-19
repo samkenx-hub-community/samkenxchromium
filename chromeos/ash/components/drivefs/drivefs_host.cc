@@ -147,6 +147,8 @@ class DriveFsHost::MountState : public DriveFsSession,
   }
 
   void DispatchBatchIndividualSyncEvents() {
+    DCHECK_CALLED_ON_VALID_SEQUENCE(host_->sequence_checker_);
+
     if (!base::FeatureList::IsEnabled(ash::features::kFilesInlineSyncStatus)) {
       return;
     }
@@ -179,6 +181,8 @@ class DriveFsHost::MountState : public DriveFsSession,
   }
 
   void OnSyncingStatusUpdate(mojom::SyncingStatusPtr status) override {
+    DCHECK_CALLED_ON_VALID_SEQUENCE(host_->sequence_checker_);
+
     if (base::FeatureList::IsEnabled(ash::features::kFilesInlineSyncStatus)) {
       ResetThrottleTimer();
 
@@ -188,7 +192,8 @@ class DriveFsHost::MountState : public DriveFsSession,
         // Currently, download syncing (AKA downsync) events are not reliably
         // delivered by DriveFs. Therefore, let's not show inline sync status
         // indicators for them until this is fixed on DriveFs/Cello.
-        if (event->is_download) {
+        // Also filter out invalid stable_ids (with value 0).
+        if (event->is_download || event->stable_id == 0) {
           continue;
         }
 
@@ -321,11 +326,6 @@ class DriveFsHost::MountState : public DriveFsSession,
                             DisplayConfirmDialogCallback callback) override {
     if (!IsKnownEnumValue(error->type) || !host_->dialog_handler_) {
       std::move(callback).Run(mojom::DialogResult::kNotDisplayed);
-      return;
-    }
-    if (error->type == mojom::DialogReason::Type::kEnableDocsOffline &&
-        host_->ShouldAlwaysEnableDocsOffline()) {
-      std::move(callback).Run(mojom::DialogResult::kAccept);
       return;
     }
     host_->dialog_handler_.Run(

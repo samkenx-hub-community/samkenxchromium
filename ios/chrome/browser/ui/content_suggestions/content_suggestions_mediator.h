@@ -13,7 +13,6 @@
 #import "ios/chrome/browser/ui/content_suggestions/cells/content_suggestions_gesture_commands.h"
 #import "ios/chrome/browser/ui/content_suggestions/content_suggestions_commands.h"
 #import "ios/chrome/browser/ui/content_suggestions/content_suggestions_consumer.h"
-#import "ios/chrome/browser/ui/content_suggestions/start_suggest_service_response_bridge.h"
 #import "ios/chrome/browser/ui/start_surface/start_surface_recent_tab_removal_observer_bridge.h"
 
 namespace favicon {
@@ -31,9 +30,11 @@ class PrefRegistrySyncable;
 @protocol ApplicationCommands;
 class Browser;
 @protocol BrowserCoordinatorCommands;
+@class ContentSuggestionsMetricsRecorder;
 @protocol FeedDelegate;
 class GURL;
 class LargeIconCache;
+@class NTPHomeMetrics;
 class PromosManager;
 class ReadingListModel;
 @protocol SnackbarCommands;
@@ -43,8 +44,7 @@ class WebStateList;
 @interface ContentSuggestionsMediator
     : NSObject <ContentSuggestionsCommands,
                 ContentSuggestionsGestureCommands,
-                StartSurfaceRecentTabObserving,
-                StartSuggestServiceResponseDelegating>
+                StartSurfaceRecentTabObserving>
 
 // Default initializer.
 - (instancetype)
@@ -86,6 +86,13 @@ class WebStateList;
 
 // The promos manager to alert if the user uses What's New.
 @property(nonatomic, assign) PromosManager* promosManager;
+
+// Recorder for the metrics related to the NTP.
+@property(nonatomic, assign) NTPHomeMetrics* NTPMetrics;
+
+// Recorder for content suggestions metrics.
+@property(nonatomic, assign)
+    ContentSuggestionsMetricsRecorder* contentSuggestionsMetricsRecorder;
 
 // Disconnects the mediator.
 - (void)disconnect;

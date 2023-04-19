@@ -81,7 +81,7 @@
 // Web app window commands
 #define IDC_COPY_URL                    34060
 #define IDC_OPEN_IN_CHROME              34061
-#define IDC_SITE_SETTINGS               34062
+#define IDC_WEB_APP_SETTINGS            34062
 #define IDC_WEB_APP_MENU_APP_INFO    34063
 
 #if BUILDFLAG(IS_CHROMEOS_ASH)
@@ -147,6 +147,9 @@
 #define IDC_FIND_PREVIOUS               37002
 #define IDC_CLOSE_FIND_OR_STOP          37003
 #define IDC_FIND_MENU                   37100
+
+// Find/Edit sub menu
+#define IDC_FIND_AND_EDIT_MENU          37200
 
 // Zoom
 #define IDC_ZOOM_MENU                   38000

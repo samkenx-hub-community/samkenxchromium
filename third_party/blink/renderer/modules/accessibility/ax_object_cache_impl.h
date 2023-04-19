@@ -201,6 +201,7 @@ class MODULES_EXPORT AXObjectCacheImpl
 
   void HandleAttributeChanged(const QualifiedName& attr_name,
                               Element*) override;
+  void FinishedParsingTable(HTMLTableElement*) override;
   void HandleValidationMessageVisibilityChanged(
       const Node* form_control) override;
   void HandleEventListenerAdded(const Node& node,
@@ -353,6 +354,7 @@ class MODULES_EXPORT AXObjectCacheImpl
   void HandleValidationMessageVisibilityChangedWithCleanLayout(const Node*);
   void HandleUpdateActiveMenuOptionWithCleanLayout(Node*);
   void HandleEditableTextContentChangedWithCleanLayout(Node*);
+  void UpdateTableRoleWithCleanLayout(Node*);
 
   bool InlineTextBoxAccessibilityEnabled();
 
@@ -453,16 +455,13 @@ class MODULES_EXPORT AXObjectCacheImpl
     return ax_tree_source_->GetPluginRoot();
   }
 
-  bool SerializeEntireTree(bool exclude_offscreen,
-                           size_t max_node_count,
+  bool SerializeEntireTree(size_t max_node_count,
                            base::TimeDelta timeout,
                            ui::AXTreeUpdate*) override;
 
   void MarkAllImageAXObjectsDirty() override {
     return Root()->MarkAllImageAXObjectsDirty();
   }
-
-  void ResetSerializer() override { ax_tree_serializer_->Reset(); }
 
   void MarkAXObjectDirtyWithDetails(
       AXObject* obj,
@@ -481,11 +480,6 @@ class MODULES_EXPORT AXObjectCacheImpl
 
   void GetImagesToAnnotate(ui::AXTreeUpdate& updates,
                            std::vector<ui::AXNodeData*>& nodes) override;
-
-  void ClearDirtyObjectsAndPendingEvents() override {
-    dirty_objects_.clear();
-    pending_events_.clear();
-  }
 
   bool HasDirtyObjects() const override { return !dirty_objects_.empty(); }
 
@@ -516,6 +510,7 @@ class MODULES_EXPORT AXObjectCacheImpl
 
   void UpdateAXForAllDocuments() override;
   void MarkDocumentDirty() override;
+  void ResetSerializer() override;
   void MarkElementDirty(const Node*) override;
 
  protected:
@@ -670,6 +665,7 @@ class MODULES_EXPORT AXObjectCacheImpl
       ax::mojom::blink::Action event_from_action);
   void MarkAXSubtreeDirty(AXObject*);
   void MarkElementDirtyWithCleanLayout(const Node*);
+  void MarkDocumentDirtyWithCleanLayout();
 
   // Given an object to mark dirty or fire an event on, return an object
   // included in the tree that can be used with the serializer, or null if there
@@ -938,6 +934,9 @@ class MODULES_EXPORT AXObjectCacheImpl
   HeapDeque<Member<AXDirtyObject>> dirty_objects_;
 
   Deque<ui::AXEvent> pending_events_;
+
+  // Make sure the next serialization sends everything.
+  bool mark_all_dirty_ = false;
 
   FRIEND_TEST_ALL_PREFIXES(AccessibilityTest, PauseUpdatesAfterMaxNumberQueued);
   FRIEND_TEST_ALL_PREFIXES(AccessibilityTest, RemoveReferencesToAXID);

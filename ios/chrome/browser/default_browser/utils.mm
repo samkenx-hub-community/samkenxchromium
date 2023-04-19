@@ -14,7 +14,9 @@
 #import "components/feature_engagement/public/feature_constants.h"
 #import "components/feature_engagement/public/tracker.h"
 #import "components/sync/driver/sync_service.h"
+#import "ios/chrome/browser/application_context/application_context.h"
 #import "ios/chrome/browser/feature_engagement/tracker_factory.h"
+#import "ios/chrome/browser/ntp/features.h"
 #import "ios/chrome/browser/settings/sync/utils/identity_error_util.h"
 #import "ios/chrome/browser/shared/public/features/features.h"
 
@@ -129,9 +131,6 @@ constexpr base::TimeDelta kPromosShortCoolDown = base::Days(3);
 // Maximum time range between first-party app launches to notify the FET.
 constexpr base::TimeDelta kMaximumTimeBetweenFirstPartyAppLaunches =
     base::Days(7);
-
-// Maximum time representing one user session.
-constexpr base::TimeDelta kMaximumTimeOneUserSession = base::Hours(6);
 
 // Maximum time range between valid user URL pastes to notify the FET.
 constexpr base::TimeDelta kMaximumTimeBetweenValidURLPastes = base::Days(7);
@@ -524,12 +523,14 @@ void LogUserInteractionWithFirstRunPromo(BOOL openedSettings) {
 }
 
 bool HasRecentFirstPartyIntentLaunchesAndRecordsCurrentLaunch() {
+  const base::TimeDelta max_session_time =
+      base::Seconds(GetFeedUnseenRefreshThresholdInSeconds());
+
   if (HasRecordedEventForKeyLessThanDelay(
           kTimestampAppLastOpenedViaFirstPartyIntent,
           kMaximumTimeBetweenFirstPartyAppLaunches)) {
     if (HasRecordedEventForKeyMoreThanDelay(
-            kTimestampAppLastOpenedViaFirstPartyIntent,
-            kMaximumTimeOneUserSession)) {
+            kTimestampAppLastOpenedViaFirstPartyIntent, max_session_time)) {
       SetObjectIntoStorageForKey(kTimestampAppLastOpenedViaFirstPartyIntent,
                                  [NSDate date]);
       return YES;
@@ -555,8 +556,10 @@ bool HasRecentValidURLPastesAndRecordsCurrentPaste() {
 }
 
 bool HasRecentTimestampForKey(NSString* eventKey) {
-  if (HasRecordedEventForKeyLessThanDelay(eventKey,
-                                          kMaximumTimeOneUserSession)) {
+  const base::TimeDelta max_session_time =
+      base::Seconds(GetFeedUnseenRefreshThresholdInSeconds());
+
+  if (HasRecordedEventForKeyLessThanDelay(eventKey, max_session_time)) {
     return YES;
   }
 
@@ -633,4 +636,39 @@ const NSArray<NSString*>* DefaultBrowserUtilsLegacyKeysForTesting() {
   ];
 
   return keysForTesting;
+}
+
+bool ShouldRegisterPromoWithPromoManager(bool is_signed_in) {
+  // Consider showing the default browser promo if (1) launch is not after a
+  // crash, (2) chrome is not likely set as default browser, (3) the user
+  // skipped first run, (4) the user is not going through the First Run
+  // screens or first run was not recent, and (5) the user has not seen any
+  // default browser promo outside of the First Run screens.
+  return GetApplicationContext()->WasLastShutdownClean() &&
+         !IsChromeLikelyDefaultBrowser() &&
+         !HasUserOpenedSettingsFromFirstRunPromo() && !UserInPromoCooldown() &&
+         (IsTailoredPromoEligibleUser(is_signed_in) ||
+          IsGeneralPromoEligibleUser(is_signed_in));
+}
+
+bool IsTailoredPromoEligibleUser(bool is_signed_in) {
+  bool is_made_for_ios_promo_eligible =
+      IsLikelyInterestedDefaultBrowserUser(DefaultPromoTypeMadeForIOS);
+  bool is_all_tabs_promo_eligible =
+      IsLikelyInterestedDefaultBrowserUser(DefaultPromoTypeAllTabs) &&
+      is_signed_in;
+  bool is_stay_safe_promo_eligible =
+      IsLikelyInterestedDefaultBrowserUser(DefaultPromoTypeStaySafe);
+  return !HasUserInteractedWithTailoredFullscreenPromoBefore() &&
+         (is_made_for_ios_promo_eligible || is_all_tabs_promo_eligible ||
+          is_stay_safe_promo_eligible);
+}
+
+bool IsGeneralPromoEligibleUser(bool is_signed_in) {
+  bool isGeneralPromoEligibleUser =
+      !HasUserInteractedWithFullscreenPromoBefore() &&
+      (IsLikelyInterestedDefaultBrowserUser(DefaultPromoTypeGeneral) ||
+       is_signed_in);
+  return isGeneralPromoEligibleUser ||
+         ShouldShowRemindMeLaterDefaultBrowserFullscreenPromo();
 }

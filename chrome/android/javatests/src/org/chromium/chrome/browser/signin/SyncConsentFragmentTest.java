@@ -49,7 +49,6 @@ import org.chromium.base.test.util.CriteriaHelper;
 import org.chromium.base.test.util.DisabledTest;
 import org.chromium.base.test.util.Feature;
 import org.chromium.base.test.util.HistogramWatcher;
-import org.chromium.chrome.R;
 import org.chromium.chrome.browser.firstrun.FirstRunPageDelegate;
 import org.chromium.chrome.browser.firstrun.SyncConsentFirstRunFragment;
 import org.chromium.chrome.browser.flags.ChromeFeatureList;
@@ -60,6 +59,7 @@ import org.chromium.chrome.browser.signin.services.SigninMetricsUtils.State;
 import org.chromium.chrome.browser.sync.SyncService;
 import org.chromium.chrome.test.ChromeJUnit4ClassRunner;
 import org.chromium.chrome.test.ChromeTabbedActivityTestRule;
+import org.chromium.chrome.test.R;
 import org.chromium.chrome.test.util.ActivityTestUtils;
 import org.chromium.chrome.test.util.ChromeRenderTestRule;
 import org.chromium.chrome.test.util.browser.Features.DisableFeatures;
@@ -571,7 +571,7 @@ public class SyncConsentFragmentTest {
                     .hasPrimaryAccount(ConsentLevel.SYNC);
         });
         TestThreadUtils.runOnUiThreadBlocking(() -> {
-            assertTrue(SyncService.get().isSyncRequested());
+            assertTrue(SyncService.get().hasSyncConsent());
             assertFalse(SyncService.get().isFirstSetupComplete());
             assertEquals(ALL_CLANK_SYNCABLE_DATA_TYPES, SyncService.get().getSelectedTypes());
             assertTrue(SyncService.get().hasKeepEverythingSynced());
@@ -602,7 +602,7 @@ public class SyncConsentFragmentTest {
                     .hasPrimaryAccount(ConsentLevel.SYNC);
         });
         TestThreadUtils.runOnUiThreadBlocking(() -> {
-            assertTrue(SyncService.get().isSyncRequested());
+            assertTrue(SyncService.get().hasSyncConsent());
             assertFalse(SyncService.get().isFirstSetupComplete());
             assertEquals(HISTORY_SYNC_DATA_TYPES, SyncService.get().getSelectedTypes());
             assertFalse(SyncService.get().hasKeepEverythingSynced());
@@ -637,7 +637,7 @@ public class SyncConsentFragmentTest {
                     .hasPrimaryAccount(ConsentLevel.SYNC);
         });
         TestThreadUtils.runOnUiThreadBlocking(() -> {
-            assertTrue(SyncService.get().isSyncRequested());
+            assertTrue(SyncService.get().hasSyncConsent());
             assertFalse(SyncService.get().isFirstSetupComplete());
         });
         // Click the cancel button to exit the activity.

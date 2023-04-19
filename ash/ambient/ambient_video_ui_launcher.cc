@@ -4,10 +4,12 @@
 
 #include "ash/ambient/ambient_video_ui_launcher.h"
 
+#include "ash/ambient/ambient_controller.h"
 #include "ash/ambient/ambient_ui_settings.h"
 #include "ash/ambient/ui/ambient_video_utils.h"
 #include "ash/ambient/ui/ambient_video_view.h"
 #include "ash/public/cpp/personalization_app/time_of_day_paths.h"
+#include "ash/shell.h"
 #include "base/check.h"
 #include "base/files/file_path.h"
 #include "base/files/file_util.h"
@@ -34,13 +36,11 @@ void VerifyVideoExistsOnDisc(AmbientVideo video) {
   // Currently, all resources are shipped with the OTA and reside on rootfs, so
   // this should never be true unless there is a major bug.
   //
-  // TODO(b/271182121): Add UMA metrics for this error case, and change the
-  // |AmbientUiLauncher::Initialize()| callback signature to take a boolean
-  // saying whether initialization succeeded or not. If the video doesn't exist,
-  // we should run the callback with a failure result, and the caller should not
-  // try to render the UI and call |AmbientUiLauncher::CreateView()|. This
-  // should only make a difference if/when the ambient video resources start
-  // getting downloaded at run-time.
+  // TODO(b/271182121): Add UMA metrics for this error case, and start using the
+  // Initialize with bool callback, not being used right now as it causes some
+  // tests to fail. This should only make a difference if/when the ambient
+  // video resources start getting downloaded at run-time.
+
   if (!all_resources_exists) {
     LOG(ERROR) << "Ambient video resources do not exist on disc. video="
                << GetAmbientVideoPath(video) << " src=" << GetVideoHtmlPath();
@@ -55,7 +55,7 @@ AmbientVideoUiLauncher::AmbientVideoUiLauncher(PrefService* pref_service)
 }
 AmbientVideoUiLauncher::~AmbientVideoUiLauncher() = default;
 
-void AmbientVideoUiLauncher::Initialize(base::OnceClosure on_done) {
+void AmbientVideoUiLauncher::Initialize(InitializationCallback on_done) {
   CHECK(on_done);
   CHECK(!is_active_);
   is_active_ = true;
@@ -70,7 +70,11 @@ void AmbientVideoUiLauncher::Initialize(base::OnceClosure on_done) {
       {base::MayBlock(), base::TaskPriority::BEST_EFFORT,
        base::TaskShutdownBehavior::CONTINUE_ON_SHUTDOWN},
       base::BindOnce(&VerifyVideoExistsOnDisc, current_video_));
-  std::move(on_done).Run();
+  weather_refresher_ = Shell::Get()
+                           ->ambient_controller()
+                           ->ambient_weather_controller()
+                           ->CreateScopedRefresher();
+  std::move(on_done).Run(/*success=*/true);
 }
 
 std::unique_ptr<views::View> AmbientVideoUiLauncher::CreateView() {
@@ -80,6 +84,7 @@ std::unique_ptr<views::View> AmbientVideoUiLauncher::CreateView() {
 }
 
 void AmbientVideoUiLauncher::Finalize() {
+  weather_refresher_.reset();
   is_active_ = false;
 }
 
@@ -89,6 +94,10 @@ AmbientBackendModel* AmbientVideoUiLauncher::GetAmbientBackendModel() {
 
 bool AmbientVideoUiLauncher::IsActive() {
   return is_active_;
+}
+
+bool AmbientVideoUiLauncher::IsReady() {
+  return true;
 }
 
 }  // namespace ash

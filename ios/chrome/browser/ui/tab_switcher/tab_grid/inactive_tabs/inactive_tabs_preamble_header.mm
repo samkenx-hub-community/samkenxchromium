@@ -44,7 +44,6 @@ const CGFloat kHorizontalPadding = 16;
     _textView.scrollEnabled = NO;
     _textView.editable = NO;
     _textView.delegate = self;
-    _textView.font = [UIFont preferredFontForTextStyle:UIFontTextStyleFootnote];
     _textView.adjustsFontForContentSizeCategory = YES;
     _textView.backgroundColor = [UIColor colorNamed:kGridBackgroundColor];
     _textView.textContainer.lineFragmentPadding = 0;
@@ -65,10 +64,12 @@ const CGFloat kHorizontalPadding = 16;
   // Update the text view's attributed text.
   NSString* argument = [NSString stringWithFormat:@"%@", @(daysThreshold)];
   NSString* text =
-      [L10NUtils formatStringForMessageId:IDS_IOS_INACTIVE_TABS_PREAMBLE
+      [L10nUtils formatStringForMessageID:IDS_IOS_INACTIVE_TABS_PREAMBLE
                                  argument:argument];
   NSDictionary* attributes = @{
     NSForegroundColorAttributeName : [UIColor colorNamed:kTextSecondaryColor],
+    NSFontAttributeName :
+        [UIFont preferredFontForTextStyle:UIFontTextStyleFootnote],
   };
   NSDictionary* linkAttributes = @{
     NSForegroundColorAttributeName : [UIColor colorNamed:kBlueColor],

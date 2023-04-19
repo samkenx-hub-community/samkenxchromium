@@ -2387,14 +2387,14 @@ CSSValue* ConsumeColorContrast(CSSParserTokenRange& range,
   // and other variables at used-value time instead of doing it at parse time
   // below.
 
-  SkColor resolved_background_color =
-      ResolveColor(background_color).ToSkColorDeprecated();
+  SkColor4f resolved_background_color =
+      ResolveColor(background_color).toSkColor4f();
   int highest_contrast_index = -1;
   float highest_contrast_ratio = 0;
   for (unsigned i = 0; i < colors_to_compare_against.size(); i++) {
     float contrast_ratio = color_utils::GetContrastRatio(
         resolved_background_color,
-        ResolveColor(colors_to_compare_against[i]).ToSkColorDeprecated());
+        ResolveColor(colors_to_compare_against[i]).toSkColor4f());
     if (target_contrast.has_value()) {
       if (contrast_ratio >= target_contrast.value()) {
         highest_contrast_ratio = contrast_ratio;
@@ -2412,9 +2412,9 @@ CSSValue* ConsumeColorContrast(CSSParserTokenRange& range,
     // contrast, then return white or black depending on which has the most
     // contrast.
     return color_utils::GetContrastRatio(resolved_background_color,
-                                         SK_ColorWHITE) >
+                                         SkColors::kWhite) >
                    color_utils::GetContrastRatio(resolved_background_color,
-                                                 SK_ColorBLACK)
+                                                 SkColors::kBlack)
                ? MakeGarbageCollected<cssvalue::CSSColor>(Color::kWhite)
                : MakeGarbageCollected<cssvalue::CSSColor>(Color::kBlack);
   }
@@ -4180,24 +4180,42 @@ CSSValue* ConsumeScrollFunction(CSSParserTokenRange& range,
     return nullptr;
   }
   CSSParserTokenRange block = range.ConsumeBlock();
-  CSSIdentifierValue* axis =
-      ConsumeIdent<CSSValueID::kBlock, CSSValueID::kInline,
-                   CSSValueID::kVertical, CSSValueID::kHorizontal>(block);
-  CSSValue* scroller =
-      ConsumeIdent<CSSValueID::kNearest, CSSValueID::kRoot>(block);
+
+  CSSValue* scroller = nullptr;
+  CSSIdentifierValue* axis = nullptr;
+
+  while (!scroller || !axis) {
+    if (block.AtEnd()) {
+      break;
+    }
+    if (!scroller) {
+      if ((scroller = ConsumeIdent<CSSValueID::kRoot, CSSValueID::kNearest,
+                                   CSSValueID::kSelf>(block))) {
+        continue;
+      }
+    }
+    if (!axis) {
+      if ((axis = ConsumeIdent<CSSValueID::kBlock, CSSValueID::kInline,
+                               CSSValueID::kVertical, CSSValueID::kHorizontal>(
+               block))) {
+        continue;
+      }
+    }
+    return nullptr;
+  }
   if (!block.AtEnd()) {
     return nullptr;
   }
   // Nullify default values.
-  // https://drafts.csswg.org/scroll-animations-1/#valdef-scroll-block
-  if (axis && IsIdent(*axis, CSSValueID::kBlock)) {
-    axis = nullptr;
-  }
   // https://drafts.csswg.org/scroll-animations-1/#valdef-scroll-nearest
   if (scroller && IsIdent(*scroller, CSSValueID::kNearest)) {
     scroller = nullptr;
   }
-  return MakeGarbageCollected<cssvalue::CSSScrollValue>(axis, scroller);
+  // https://drafts.csswg.org/scroll-animations-1/#valdef-scroll-block
+  if (axis && IsIdent(*axis, CSSValueID::kBlock)) {
+    axis = nullptr;
+  }
+  return MakeGarbageCollected<cssvalue::CSSScrollValue>(scroller, axis);
 }
 
 CSSValue* ConsumeViewFunction(CSSParserTokenRange& range,
@@ -4399,6 +4417,11 @@ bool ConsumeAnimationShorthand(
   } while (ConsumeCommaIncludingWhitespace(range));
 
   return true;
+}
+
+CSSValue* ConsumeSingleTimelineAttachment(CSSParserTokenRange& range) {
+  return ConsumeIdent<CSSValueID::kLocal, CSSValueID::kDefer,
+                      CSSValueID::kAncestor>(range);
 }
 
 CSSValue* ConsumeSingleTimelineAxis(CSSParserTokenRange& range) {

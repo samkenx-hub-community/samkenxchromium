@@ -40,9 +40,6 @@ void ProximityAuthProfilePrefManager::RegisterPrefs(
       prefs::kProximityAuthLastPromotionCheckTimestampMs, 0L);
   registry->RegisterIntegerPref(prefs::kProximityAuthPromotionShownCount, 0);
   registry->RegisterDictionaryPref(prefs::kProximityAuthRemoteBleDevices);
-  registry->RegisterBooleanPref(
-      prefs::kProximityAuthIsChromeOSLoginEnabled, false,
-      user_prefs::PrefRegistrySyncable::SYNCABLE_OS_PREF);
 }
 
 bool ProximityAuthProfilePrefManager::IsEasyUnlockAllowed() const {
@@ -92,21 +89,6 @@ void ProximityAuthProfilePrefManager::SetPromotionShownCount(int count) {
 
 int ProximityAuthProfilePrefManager::GetPromotionShownCount() const {
   return pref_service_->GetInteger(prefs::kProximityAuthPromotionShownCount);
-}
-
-bool ProximityAuthProfilePrefManager::IsChromeOSLoginAllowed() const {
-  return pref_service_->GetBoolean(
-      ash::multidevice_setup::kSmartLockSigninAllowedPrefName);
-}
-
-void ProximityAuthProfilePrefManager::SetIsChromeOSLoginEnabled(
-    bool is_enabled) {
-  return pref_service_->SetBoolean(prefs::kProximityAuthIsChromeOSLoginEnabled,
-                                   is_enabled);
-}
-
-bool ProximityAuthProfilePrefManager::IsChromeOSLoginEnabled() const {
-  return pref_service_->GetBoolean(prefs::kProximityAuthIsChromeOSLoginEnabled);
 }
 
 void ProximityAuthProfilePrefManager::SetHasShownLoginDisabledMessage(

@@ -54,10 +54,10 @@
 #import "ios/chrome/browser/shared/public/commands/reading_list_add_command.h"
 #import "ios/chrome/browser/shared/public/commands/text_zoom_commands.h"
 #import "ios/chrome/browser/shared/public/features/features.h"
+#import "ios/chrome/browser/shared/ui/symbols/symbols.h"
 #import "ios/chrome/browser/shared/ui/util/uikit_ui_util.h"
 #import "ios/chrome/browser/tabs/features.h"
 #import "ios/chrome/browser/translate/chrome_ios_translate_client.h"
-#import "ios/chrome/browser/ui/icons/symbols.h"
 #import "ios/chrome/browser/ui/ntp/metrics/feed_metrics_recorder.h"
 #import "ios/chrome/browser/ui/popup_menu/overflow_menu/destination_usage_history/constants.h"
 #import "ios/chrome/browser/ui/popup_menu/overflow_menu/destination_usage_history/destination_usage_history.h"
@@ -79,7 +79,6 @@
 #import "ios/public/provider/chrome/browser/user_feedback/user_feedback_api.h"
 #import "ios/web/common/user_agent.h"
 #import "ios/web/public/js_messaging/web_frame.h"
-#import "ios/web/public/js_messaging/web_frame_util.h"
 #import "ios/web/public/navigation/navigation_item.h"
 #import "ios/web/public/navigation/navigation_manager.h"
 #import "ios/web/public/web_client.h"
@@ -1504,7 +1503,7 @@ NSArray<OverflowMenuDestination*>* SortBadgedDestinations(
 // Dismisses the menu and adds the current page as a bookmark or opens the
 // bookmark edit screen if the current page is bookmarked.
 - (void)addOrEditBookmark {
-  RecordAction(UserMetricsAction("MobileMenuAddToBookmarks"));
+  RecordAction(UserMetricsAction("MobileMenuAddToOrEditBookmark"));
   // Dismissing the menu disconnects the mediator, so save anything cleaned up
   // there.
   web::WebState* currentWebState = self.webState;
@@ -1530,7 +1529,8 @@ NSArray<OverflowMenuDestination*>* SortBadgedDestinations(
 
   // Fetching the canonical URL is asynchronous (and happen on a background
   // thread), so the operation can be started before the UI is dismissed.
-  reading_list::AddToReadingListUsingCanonicalUrl(self.dispatcher, webState);
+  reading_list::AddToReadingListUsingCanonicalUrl(self.readingListBrowserAgent,
+                                                  webState);
 
   [self.popupMenuCommandsHandler dismissPopupMenuAnimated:YES];
 }

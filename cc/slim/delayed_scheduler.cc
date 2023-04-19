@@ -88,17 +88,20 @@ void DelayedScheduler::MaybeCompositeNow() {
 }
 
 void DelayedScheduler::BeginFrameAndResetArgs(viz::BeginFrameArgs& args) {
-  if (client_->DoBeginFrame(args)) {
-    args = viz::BeginFrameArgs();
-  } else {
-    SendDidNotProduceFrameAndResetArgs(args);
+  // Make a copy and clear immediately to avoid re-entrancy issues.
+  viz::BeginFrameArgs copy = args;
+  args = viz::BeginFrameArgs();
+  if (!client_->DoBeginFrame(copy)) {
+    SendDidNotProduceFrameAndResetArgs(copy);
   }
 }
 
 void DelayedScheduler::SendDidNotProduceFrameAndResetArgs(
     viz::BeginFrameArgs& args) {
-  client_->SendDidNotProduceFrame(args);
+  // Make a copy and clear immediately to avoid re-entrancy issues.
+  viz::BeginFrameArgs copy = args;
   args = viz::BeginFrameArgs();
+  client_->SendDidNotProduceFrame(copy);
 }
 
 }  // namespace cc::slim

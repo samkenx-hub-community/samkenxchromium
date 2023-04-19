@@ -77,10 +77,9 @@ class VerdictCacheManager : public history::HistoryServiceObserver,
   size_t GetStoredPhishGuardVerdictCount(
       LoginReputationClientRequest::TriggerType trigger_type);
 
-  // Stores |verdict| in |content_settings_| based on its |url|, |verdict| and
+  // Stores |verdict| in |content_settings_| based on its |verdict| and
   // |receive_time|.
-  void CacheRealTimeUrlVerdict(const GURL& url,
-                               const RTLookupResponse& verdict,
+  void CacheRealTimeUrlVerdict(const RTLookupResponse& verdict,
                                const base::Time& receive_time);
 
   // Looks up |content_settings_| to find the cached verdict response. If
@@ -109,10 +108,14 @@ class VerdictCacheManager : public history::HistoryServiceObserver,
       const V5::Duration& cache_duration);
 
   // Searches the hash-prefix real-time cache object for the requested
-  // |hash_prefixes|.
+  // |hash_prefixes|. |skip_logging| specifies whether metric logging should be
+  // skipped when this function is called.
+  // TODO(crbug.com/1432308): [Also TODO(thefrog)] Remove |skip_logging|
+  // parameter after investigation is complete.
   std::unordered_map<std::string, std::vector<V5::FullHash>>
   GetCachedHashPrefixRealTimeLookupResults(
-      const std::set<std::string>& hash_prefixes);
+      const std::set<std::string>& hash_prefixes,
+      bool skip_logging);
 
   // Overridden from history::HistoryServiceObserver.
   void OnURLsDeleted(history::HistoryService* history_service,

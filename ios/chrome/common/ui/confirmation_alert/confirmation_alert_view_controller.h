@@ -30,6 +30,10 @@ extern NSString* const kConfirmationAlertSecondaryActionAccessibilityIdentifier;
 // before the view is loaded.
 @property(nonatomic, strong) UIView* titleView;
 
+// The view displayed under titles and subtitles. Nil if not needed.
+// If needed, must be set before the view is loaded.
+@property(nonatomic, strong) UIView* underTitleView;
+
 // The headline below the image. Must be set before the view is loaded.
 @property(nonatomic, copy) NSString* titleString;
 
@@ -82,6 +86,10 @@ extern NSString* const kConfirmationAlertSecondaryActionAccessibilityIdentifier;
 // Set to YES to enclose the image in a frame with a shadow and a corner badge
 // with a green checkmark. Must be set before the view is loaded. Default is NO.
 @property(nonatomic) BOOL imageEnclosedWithShadowAndBadge;
+
+// Set to NO to prevent the scroll view from showing a vertical scrollbar
+// indicator. Must be set before the view is loaded. Default is YES.
+@property(nonatomic) BOOL showsVerticalScrollIndicator;
 
 // When set, this value will be set as the accessibility label for the help
 // button.

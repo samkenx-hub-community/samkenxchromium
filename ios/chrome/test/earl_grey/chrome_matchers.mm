@@ -498,6 +498,14 @@ id<GREYMatcher> SystemSelectionCalloutCopyButton() {
   return [EditMenuAppInterface editMenuCopyButtonMatcher];
 }
 
+id<GREYMatcher> SystemSelectionCalloutCutButton() {
+  return [EditMenuAppInterface editMenuCutButtonMatcher];
+}
+
+id<GREYMatcher> SystemSelectionCalloutPasteButton() {
+  return [EditMenuAppInterface editMenuPasteButtonMatcher];
+}
+
 id<GREYMatcher> SystemSelectionCalloutOverflowButton() {
   return [EditMenuAppInterface editMenuNextButtonMatcher];
 }
@@ -699,6 +707,10 @@ id<GREYMatcher> PasswordsDestinationButton() {
   return [ChromeMatchersAppInterface passwordsDestinationButton];
 }
 
+id<GREYMatcher> PriceNotificationsDestinationButton() {
+  return [ChromeMatchersAppInterface priceNotificationsDestinationButton];
+}
+
 id<GREYMatcher> DownloadsDestinationButton() {
   return [ChromeMatchersAppInterface downloadsDestinationButton];
 }
@@ -713,6 +725,10 @@ id<GREYMatcher> SiteInfoDestinationButton() {
 
 id<GREYMatcher> SettingsDestinationButton() {
   return [ChromeMatchersAppInterface settingsDestinationButton];
+}
+
+id<GREYMatcher> WhatsNewDestinationButton() {
+  return [ChromeMatchersAppInterface whatsNewDestinationButton];
 }
 
 #pragma mark - Overflow Menu Actions

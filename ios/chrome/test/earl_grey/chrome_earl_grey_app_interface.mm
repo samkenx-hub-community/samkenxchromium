@@ -40,13 +40,13 @@
 #import "ios/chrome/browser/search_engines/template_url_service_factory.h"
 #import "ios/chrome/browser/sessions/session_restoration_browser_agent.h"
 #import "ios/chrome/browser/sessions/session_service_ios.h"
+#import "ios/chrome/browser/shared/coordinator/scene/scene_state.h"
 #import "ios/chrome/browser/shared/public/commands/application_commands.h"
 #import "ios/chrome/browser/shared/public/features/features.h"
+#import "ios/chrome/browser/shared/ui/symbols/symbols.h"
 #import "ios/chrome/browser/shared/ui/util/rtl_geometry.h"
 #import "ios/chrome/browser/signin/fake_system_identity.h"
 #import "ios/chrome/browser/sync/sync_service_factory.h"
-#import "ios/chrome/browser/ui/icons/symbols.h"
-#import "ios/chrome/browser/ui/main/scene_state.h"
 #import "ios/chrome/browser/ui/ntp/new_tab_page_feature.h"
 #import "ios/chrome/browser/ui/popup_menu/overflow_menu/feature_flags.h"
 #import "ios/chrome/browser/ui/thumb_strip/thumb_strip_feature.h"
@@ -70,7 +70,7 @@
 #import "ios/web/common/features.h"
 #import "ios/web/js_messaging/web_view_js_utils.h"
 #import "ios/web/public/js_messaging/web_frame.h"
-#import "ios/web/public/js_messaging/web_frame_util.h"
+#import "ios/web/public/js_messaging/web_frames_manager.h"
 #import "ios/web/public/navigation/navigation_manager.h"
 #import "ios/web/public/test/element_selector.h"
 #import "ios/web/public/test/url_test_util.h"
@@ -880,14 +880,6 @@ NSString* SerializedValue(const base::Value* value) {
   chrome_test_util::ClearSyncServerData();
 }
 
-+ (void)startSync {
-  chrome_test_util::StartSync();
-}
-
-+ (void)stopSync {
-  chrome_test_util::StopSync();
-}
-
 + (NSError*)waitForSyncEngineInitialized:(BOOL)isInitialized
                              syncTimeout:(base::TimeDelta)timeout {
   bool success = WaitUntilConditionOrTimeout(timeout, ^{
@@ -1036,7 +1028,9 @@ NSString* SerializedValue(const base::Value* value) {
   __block web::WebFrame* main_frame = nullptr;
   bool completed =
       WaitUntilConditionOrTimeout(kWaitForJSCompletionTimeout, ^bool {
-        main_frame = web::GetMainFrame(chrome_test_util::GetCurrentWebState());
+        main_frame = chrome_test_util::GetCurrentWebState()
+                         ->GetPageWorldWebFramesManager()
+                         ->GetMainWebFrame();
         return main_frame != nullptr;
       });
 
@@ -1206,9 +1200,12 @@ NSString* SerializedValue(const base::Value* value) {
 
 #pragma mark - Default Utilities (EG2)
 
-// Stores a value for the provided key in NSUserDefaults.
 + (void)setUserDefaultObject:(id)value forKey:(NSString*)defaultName {
   [[NSUserDefaults standardUserDefaults] setObject:value forKey:defaultName];
+}
+
++ (void)removeUserDefaultObjectForKey:(NSString*)key {
+  [[NSUserDefaults standardUserDefaults] removeObjectForKey:key];
 }
 
 #pragma mark - Pref Utilities (EG2)

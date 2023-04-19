@@ -659,10 +659,11 @@ void WebFrameWidgetImpl::GetStringAtPoint(const gfx::Point& point_in_local_root,
                                           GetStringAtPointCallback callback) {
   gfx::Point baseline_point;
   ui::mojom::blink::AttributedStringPtr attributed_string = nullptr;
-  NSAttributedString* string = SubstringUtil::AttributedWordAtPoint(
+  CFAttributedStringRef string = SubstringUtil::AttributedWordAtPoint(
       this, point_in_local_root, baseline_point);
-  if (string)
+  if (string) {
     attributed_string = ui::mojom::blink::AttributedString::From(string);
+  }
 
   std::move(callback).Run(std::move(attributed_string), baseline_point);
 }
@@ -1272,12 +1273,7 @@ void WebFrameWidgetImpl::SendScrollEndEventFromImplSide(
     // VisualViewport currently handles scroll but not scrollends. If that
     // changes, we should consider firing scrollend at the visualviewport
     // instead of simply bailing.
-    Node* document_node = nullptr;
-    if (View()->MainFrameImpl() &&
-        View()->MainFrameImpl()->GetFrame()->GetDocument()) {
-      document_node = View()->MainFrameImpl()->GetFrame()->GetDocument();
-    }
-    if (affects_outer_viewport || target_node != document_node) {
+    if (affects_outer_viewport || !target_node->IsDocumentNode()) {
       target_node->GetDocument().EnqueueScrollEndEventForNode(target_node);
     }
   }
@@ -1513,7 +1509,7 @@ void WebFrameWidgetImpl::UpdateLifecycle(WebLifecycleUpdate requested_update,
       SetBackgroundColor(background_color);
       if (background_color != data.last_background_color) {
         LocalRootImpl()->GetFrame()->DidChangeBackgroundColor(
-            background_color, false /* color_adjust */);
+            SkColor4f::FromColor(background_color), false /* color_adjust */);
         data.last_background_color = background_color;
       }
     }
@@ -3132,12 +3128,9 @@ class ReportTimeSwapPromise : public cc::SwapPromise {
 
   DidNotSwapAction DidNotSwap(DidNotSwapReason reason,
                               base::TimeTicks timestamp) override {
-    if (base::FeatureList::IsEnabled(
-            features::kReportFCPOnlyOnSuccessfulCommit)) {
-      if (reason != DidNotSwapReason::SWAP_FAILS &&
-          reason != DidNotSwapReason::COMMIT_NO_UPDATE) {
-        return DidNotSwapAction::KEEP_ACTIVE;
-      }
+    if (reason != DidNotSwapReason::SWAP_FAILS &&
+        reason != DidNotSwapReason::COMMIT_NO_UPDATE) {
+      return DidNotSwapAction::KEEP_ACTIVE;
     }
 
     DidNotSwapAction action = DidNotSwapAction::BREAK_PROMISE;

@@ -5,6 +5,7 @@
 #ifndef THIRD_PARTY_BLINK_RENDERER_MODULES_ML_ML_CONTEXT_H_
 #define THIRD_PARTY_BLINK_RENDERER_MODULES_ML_ML_CONTEXT_H_
 
+#include "services/webnn/public/mojom/webnn_service.mojom-blink.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_ml_device_preference.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_ml_model_format.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_ml_power_preference.h"
@@ -14,10 +15,12 @@
 #include "third_party/blink/renderer/platform/bindings/script_wrappable.h"
 #include "third_party/blink/renderer/platform/heap/member.h"
 #include "third_party/blink/renderer/platform/heap/visitor.h"
+#include "third_party/blink/renderer/platform/mojo/heap_mojo_remote.h"
 
 namespace blink {
 
 class ML;
+class MLModelLoader;
 
 class MODULES_EXPORT MLContext final : public ScriptWrappable {
   DEFINE_WRAPPERTYPEINFO();
@@ -41,6 +44,9 @@ class MODULES_EXPORT MLContext final : public ScriptWrappable {
   void LogConsoleWarning(const String& message);
 
   ML* GetML();
+  // This method returns a MLModelLoader that's used and shared by WebNN APIs
+  // invoked on this MLContext.
+  MLModelLoader* GetModelLoaderForWebNN(ScriptState* script_state);
 
   void Trace(Visitor* visitor) const override;
 
@@ -56,6 +62,15 @@ class MODULES_EXPORT MLContext final : public ScriptWrappable {
                    const MLNamedArrayBufferViews& outputs,
                    ExceptionState& exception_state);
 
+  enum CreateWebNNGraphResult { kOk, kUnknownError, kNotSupported };
+  // Return `kNotSupported` with `mojo::NullRemote` if the input configuration
+  // of creating `WebNNContext` is not supported.
+  using CreateWebNNGraphCallback = base::OnceCallback<void(
+      CreateWebNNGraphResult result,
+      mojo::PendingRemote<webnn::mojom::blink::WebNNGraph>)>;
+  void CreateWebNNGraph(ScriptState* script_state,
+                        CreateWebNNGraphCallback callback);
+
  private:
   V8MLDevicePreference device_preference_;
   V8MLPowerPreference power_preference_;
@@ -63,6 +78,20 @@ class MODULES_EXPORT MLContext final : public ScriptWrappable {
   unsigned int num_threads_;
 
   Member<ML> ml_;
+  // WebNN uses this MLModelLoader to build a computational graph.
+  Member<MLModelLoader> ml_model_loader_;
+
+  // The callback of creating context called from WebNN server side.
+  void OnCreateWebNNContext(
+      ScriptState* script_state,
+      CreateWebNNGraphCallback callback,
+      webnn::mojom::blink::CreateContextResult result,
+      mojo::PendingRemote<webnn::mojom::blink::WebNNContext>
+          pending_remote_context);
+  // WebNN support multiple types of neural network inference hardware
+  // acceleration, the context of WebNN in server side is used to map different
+  // device and represent a state of graph execution processes.
+  HeapMojoRemote<webnn::mojom::blink::WebNNContext> webnn_context_;
 };
 
 }  // namespace blink

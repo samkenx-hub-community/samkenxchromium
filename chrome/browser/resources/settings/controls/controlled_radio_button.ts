@@ -3,15 +3,14 @@
 // found in the LICENSE file.
 
 import '//resources/cr_elements/cr_radio_button/cr_radio_button_style.css.js';
+import '//resources/cr_elements/cr_shared_vars.css.js';
 import '//resources/cr_elements/policy/cr_policy_pref_indicator.js';
-import '../settings_shared.css.js';
 
 import {CrRadioButtonMixin, CrRadioButtonMixinInterface} from '//resources/cr_elements/cr_radio_button/cr_radio_button_mixin.js';
 import {assert} from '//resources/js/assert_ts.js';
 import {mixinBehaviors, PolymerElement} from '//resources/polymer/v3_0/polymer/polymer_bundled.min.js';
+import {prefToString} from 'chrome://resources/cr_components/settings_prefs/pref_util.js';
 import {PaperRippleBehavior} from 'chrome://resources/polymer/v3_0/paper-behaviors/paper-ripple-behavior.js';
-
-import {prefToString} from '../prefs/pref_util.js';
 
 import {getTemplate} from './controlled_radio_button.html.js';
 import {PrefControlMixin, PrefControlMixinInterface} from './pref_control_mixin.js';
@@ -70,7 +69,7 @@ export class ControlledRadioButtonElement extends
     return this.name === prefToString(this.pref);
   }
 
-  private onIndicatorTap_(e: Event) {
+  private onIndicatorClick_(e: Event) {
     // Disallow <controlled-radio-button on-click="..."> when disabled.
     e.preventDefault();
     e.stopPropagation();

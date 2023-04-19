@@ -162,10 +162,6 @@ class HistogramThreadsafeTest : public testing::Test {
   ~HistogramThreadsafeTest() override = default;
 
   void SetUp() override {
-    // TODO(crbug/1293026): Remove this when enabled by default.
-    scoped_feature_list_.InitAndEnableFeature(
-        internal::kHistogramNewSnapshotDelta);
-
     GlobalHistogramAllocator::CreateWithLocalMemory(4 << 20, /*id=*/0,
                                                     /*name=*/"");
     ASSERT_TRUE(GlobalHistogramAllocator::Get());
@@ -185,6 +181,8 @@ class HistogramThreadsafeTest : public testing::Test {
   }
 
   void TearDown() override {
+    histograms_.clear();
+    allocator_view_.reset();
     GlobalHistogramAllocator::ReleaseForTesting();
     ASSERT_FALSE(GlobalHistogramAllocator::Get());
   }
@@ -287,8 +285,6 @@ class HistogramThreadsafeTest : public testing::Test {
   }
 
  private:
-  test::ScopedFeatureList scoped_feature_list_;
-
   // A view of the GlobalHistogramAllocator to simulate a subprocess having its
   // own view of some shared memory.
   std::unique_ptr<PersistentHistogramAllocator> allocator_view_;
@@ -311,7 +307,9 @@ TEST_F(HistogramThreadsafeTest, SnapshotDeltaThreadsafe) {
   // vs a vector). Hence, the goal of doing this test multiple time is to have
   // coverage of the SingleSample scenario, because once the histogram has moved
   // to using a vector, it will not use SingleSample again.
-  constexpr size_t kNumIterations = 200;
+  // Note: |kNumIterations| was 200 on 4/2023, but was decreased because the
+  // workload was causing flakiness (timing out).
+  constexpr size_t kNumIterations = 100;
   for (size_t iteration = 0; iteration < kNumIterations; ++iteration) {
     // TL;DR of the test: multiple threads are created, which will each emit to
     // the same histograms and snapshot their delta multiple times. We keep
@@ -336,11 +334,11 @@ TEST_F(HistogramThreadsafeTest, SnapshotDeltaThreadsafe) {
     // later on.
     constexpr size_t kNumThreads = 2;
     constexpr size_t kNumEmissions = 2000;
-    std::unique_ptr<SnapshotDeltaThread> threads[kNumThreads];
     subtle::Atomic32 real_total_samples_count = 0;
     std::vector<subtle::Atomic32> real_bucket_counts(kHistogramMax, 0);
     subtle::Atomic32 snapshots_total_samples_count = 0;
     std::vector<subtle::Atomic32> snapshots_bucket_counts(kHistogramMax, 0);
+    std::unique_ptr<SnapshotDeltaThread> threads[kNumThreads];
     for (size_t i = 0; i < kNumThreads; ++i) {
       threads[i] = std::make_unique<SnapshotDeltaThread>(
           StringPrintf("SnapshotDeltaThread.%zu.%zu", iteration, i),

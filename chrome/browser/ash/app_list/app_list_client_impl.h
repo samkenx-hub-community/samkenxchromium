@@ -87,8 +87,6 @@ class AppListClientImpl
                         bool launch_as_default) override;
   void InvokeSearchResultAction(const std::string& result_id,
                                 ash::SearchResultActionType action) override;
-  void ViewClosing() override;
-  void ViewShown(int64_t display_id) override;
   void ActivateItem(int profile_id,
                     const std::string& id,
                     int event_flags,
@@ -105,9 +103,10 @@ class AppListClientImpl
       const std::string& setting_name,
       const std::map<std::string, int>& values) override;
   ash::AppListNotifier* GetNotifier() override;
-  void QueryWouldTriggerLauncherSearchIph() override;
+  void RecalculateWouldTriggerLauncherSearchIph() override;
   std::unique_ptr<ash::ScopedIphSession> CreateLauncherSearchIphSession()
       override;
+  void OpenSearchBoxIphUrl() override;
   void LoadIcon(int profile_id, const std::string& app_id) override;
   ash::AppListSortOrder GetPermanentSortingOrder() const override;
 
@@ -192,8 +191,8 @@ class AppListClientImpl
   // Updates the speech webview and start page for the current |profile_|.
   void SetUpSearchUI();
 
-  // Maybe records the metrics related to showing the app list.
-  void MaybeRecordViewShown();
+  // Records the metrics related to showing the app list.
+  void RecordViewShown();
 
   // Records the browser window status + the opened search result type when
   // the result is opened from the search box.
@@ -203,9 +202,6 @@ class AppListClientImpl
   // app and opening a search result from either a suggestion chip or the search
   // box. `launched_from` indicates where the launcher action comes from.
   void MaybeRecordLauncherAction(ash::AppListLaunchedFrom launched_from);
-
-  // The current display id showing the app list.
-  int64_t display_id_ = display::kInvalidDisplayId;
 
   // Unowned pointer to the associated profile. May change if SetProfile is
   // called.

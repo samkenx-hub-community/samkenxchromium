@@ -102,6 +102,13 @@ user_manager::User* FakeChromeUserManager::AddUserWithAffiliation(
       account_id, is_affiliated, user_manager::USER_TYPE_REGULAR, nullptr);
 }
 
+user_manager::User* FakeChromeUserManager::AddSamlUser(
+    const AccountId& account_id) {
+  user_manager::User* user = AddUser(account_id);
+  user->set_using_saml(true);
+  return user;
+}
+
 user_manager::User*
 FakeChromeUserManager::AddUserWithAffiliationAndTypeAndProfile(
     const AccountId& account_id,
@@ -166,12 +173,9 @@ user_manager::User* FakeChromeUserManager::AddGuestUser() {
 }
 
 user_manager::User* FakeChromeUserManager::AddPublicAccountUser(
-    const AccountId& account_id,
-    bool with_saml) {
+    const AccountId& account_id) {
   user_manager::User* user =
-      with_saml ? user_manager::User::CreatePublicAccountUserForTestingWithSAML(
-                      account_id)
-                : user_manager::User::CreatePublicAccountUser(account_id);
+      user_manager::User::CreatePublicAccountUser(account_id);
   user->set_username_hash(
       user_manager::FakeUserManager::GetFakeUsernameHash(account_id));
   user->SetStubImage(
@@ -285,10 +289,9 @@ void FakeChromeUserManager::SwitchActiveUser(const AccountId& account_id) {
 
 void FakeChromeUserManager::OnSessionStarted() {}
 
-void FakeChromeUserManager::RemoveUser(
-    const AccountId& account_id,
-    user_manager::UserRemovalReason reason,
-    user_manager::RemoveUserDelegate* delegate) {}
+void FakeChromeUserManager::RemoveUser(const AccountId& account_id,
+                                       user_manager::UserRemovalReason reason) {
+}
 
 void FakeChromeUserManager::RemoveUserFromList(const AccountId& account_id) {
   WallpaperControllerClientImpl* const wallpaper_client =
@@ -659,11 +662,6 @@ bool FakeChromeUserManager::IsUserAllowed(
   return true;
 }
 
-void FakeChromeUserManager::CreateLocalState() {
-  local_state_ = std::make_unique<TestingPrefServiceSimple>();
-  ChromeUserManager::RegisterPrefs(local_state_->registry());
-}
-
 void FakeChromeUserManager::SimulateUserProfileLoad(
     const AccountId& account_id) {
   for (auto* user : users_) {
@@ -672,13 +670,6 @@ void FakeChromeUserManager::SimulateUserProfileLoad(
       break;
     }
   }
-}
-
-PrefService* FakeChromeUserManager::GetLocalState() const {
-  if (local_state_.get()) {
-    return local_state_.get();
-  }
-  return g_browser_process ? g_browser_process->local_state() : nullptr;
 }
 
 void FakeChromeUserManager::SetIsCurrentUserNew(bool is_new) {
@@ -731,21 +722,6 @@ void FakeChromeUserManager::SetUserAffiliation(
 bool FakeChromeUserManager::IsFullManagementDisclosureNeeded(
     policy::DeviceLocalAccountPolicyBroker* broker) const {
   return true;
-}
-
-void FakeChromeUserManager::CacheRemovedUser(
-    const std::string& user_email,
-    user_manager::UserRemovalReason reason) {
-  removed_user_cache_.push_back(std::make_pair(user_email, reason));
-}
-
-std::vector<std::pair<std::string, user_manager::UserRemovalReason>>
-FakeChromeUserManager::GetRemovedUserCache() const {
-  return removed_user_cache_;
-}
-
-void FakeChromeUserManager::MarkReporterInitialized() {
-  removed_user_cache_.clear();
 }
 
 user_manager::User* FakeChromeUserManager::GetActiveUserInternal() const {

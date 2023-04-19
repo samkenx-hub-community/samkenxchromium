@@ -31,19 +31,27 @@ bool CounterRulesEqual(const CounterDirectiveMap* a_map,
   return base::ranges::equal(*a_map, *b_map, [](const auto& a, const auto& b) {
     switch (property) {
       case CSSPropertyID::kCounterIncrement:
-        if (a.value.IncrementValue() != b.value.IncrementValue()) {
+        if (a.value.IsIncrement() != b.value.IsIncrement()) {
+          return false;
+        }
+        if (a.value.IsIncrement() &&
+            a.value.IncrementValue() != b.value.IncrementValue()) {
           return false;
         }
         break;
       case CSSPropertyID::kCounterReset:
-        if (a.value.IsReset() != b.value.IsReset() ||
-            a.value.ResetValue() != b.value.ResetValue()) {
+        if (a.value.IsReset() != b.value.IsReset()) {
+          return false;
+        }
+        if (a.value.IsReset() && a.value.ResetValue() != b.value.ResetValue()) {
           return false;
         }
         break;
       case CSSPropertyID::kCounterSet:
-        if (a.value.IsSet() != b.value.IsSet() ||
-            a.value.SetValue() != b.value.SetValue()) {
+        if (a.value.IsSet() != b.value.IsSet()) {
+          return false;
+        }
+        if (a.value.IsSet() && a.value.SetValue() != b.value.SetValue()) {
           return false;
         }
         break;
@@ -318,6 +326,8 @@ bool CSSPropertyEquality::PropertiesEqual(const PropertyHandle& property,
       return a.Cursor() == b.Cursor();
     case CSSPropertyID::kDisplay:
       return a.Display() == b.Display();
+    case CSSPropertyID::kContentVisibility:
+      return a.ContentVisibility() == b.ContentVisibility();
     case CSSPropertyID::kDominantBaseline:
       return a.DominantBaseline() == b.DominantBaseline();
     case CSSPropertyID::kEmptyCells:
@@ -862,6 +872,8 @@ bool CSSPropertyEquality::PropertiesEqual(const PropertyHandle& property,
     case CSSPropertyID::kViewTimelineAxis:
     case CSSPropertyID::kViewTimelineInset:
     case CSSPropertyID::kViewTimelineName:
+    case CSSPropertyID::kScrollTimelineAttachment:
+    case CSSPropertyID::kViewTimelineAttachment:
       NOTREACHED() << property.GetCSSPropertyName().ToAtomicString().Ascii();
       return true;
 
@@ -1086,6 +1098,7 @@ bool CSSPropertyEquality::PropertiesEqual(const PropertyHandle& property,
       return true;
 
     // No transitions on internal properties:
+    case CSSPropertyID::kInternalAlignContentBlock:
     case CSSPropertyID::kInternalAlignSelfBlock:
     case CSSPropertyID::kInternalEmptyLineHeight:
     case CSSPropertyID::kInternalFontSizeDelta:
@@ -1208,7 +1221,6 @@ bool CSSPropertyEquality::PropertiesEqual(const PropertyHandle& property,
     case CSSPropertyID::kContain:
     case CSSPropertyID::kContainerName:
     case CSSPropertyID::kContainerType:
-    case CSSPropertyID::kContentVisibility:
     case CSSPropertyID::kDirection:
     case CSSPropertyID::kTextCombineUpright:
     case CSSPropertyID::kTextOrientation:

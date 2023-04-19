@@ -159,6 +159,7 @@
 <translation id="2304820083631266885">سیارہ</translation>
 <translation id="2305020378527873881"><ph name="VOLUME_NAME" /> کو خارج کر دیا گیا ہے۔</translation>
 <translation id="2307462900900812319">نیٹ ورک کنفیگر کریں</translation>
+<translation id="2312704192806647271">{COUNT,plural, =1{‏ID والی ایک ایکسٹینشن <ph name="BEGIN_LIST" /><ph name="END_LIST" /> کا پتہ نہیں لگایا جا سکا۔ اپنے منتظم سے رابطہ کریں۔}other{‏IDs والی ایکسٹینشنز <ph name="BEGIN_LIST" /><ph name="END_LIST" /> کا پتہ نہیں لگایا جا سکا۔ اپنے منتظم سے رابطہ کریں۔}}</translation>
 <translation id="2325650632570794183">‏فائل کی یہ قسم تعاون یافتہ نہیں ہے۔ اس قسم کی فائل کو کھول سکنے والی ایپ تلاش کرنے کیلئے براہ کرم Chrome ویب اسٹور ملاحظہ کریں۔</translation>
 <translation id="2326539130272988168">بلغاریائی</translation>
 <translation id="2337715497728194187">‏Bruschetta کے ساتھ اشتراک کریں</translation>
@@ -274,6 +275,7 @@
 <translation id="3290356915286466215">غیر محفوظ</translation>
 <translation id="3291218047831493686">‏SIM لاک کی ترتیب تبدیل کرنے کے لیے اس نیٹ ورک سے منسلک ہوں</translation>
 <translation id="3293023191599135697">‏WEP نیٹ ورکس تعاون یافتہ نہیں ہیں</translation>
+<translation id="3295006446256079333">یہ والیوم</translation>
 <translation id="3295357220137379386">آلہ مصروف ہے</translation>
 <translation id="3296763833017966289">جارجی</translation>
 <translation id="3307875152560779385">يُوکرينی</translation>

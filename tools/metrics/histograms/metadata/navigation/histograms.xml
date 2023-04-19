@@ -45,6 +45,7 @@ Also used in tools/metrics/histograms/metadata/page/histograms.xml.
       was removed in Feb 2022.
     </obsolete>
   </variant>
+  <variant name=".Embedder_BookmarkBar"/>
   <variant name=".Embedder_DefaultSearchEngine"/>
   <variant name=".Embedder_DirectURLInput"/>
   <variant name=".SpeculationRule"/>
@@ -487,7 +488,7 @@ Also used in tools/metrics/histograms/metadata/page/histograms.xml.
 </histogram>
 
 <histogram name="Navigation.AnonymousIframeIsSandboxed" enum="Boolean"
-    expires_after="2023-07-09">
+    expires_after="2023-10-01">
   <owner>arthursonzogni@chromium.org</owner>
   <owner>chrome-security-owp-team@google.com</owner>
   <summary>
@@ -519,7 +520,7 @@ Also used in tools/metrics/histograms/metadata/page/histograms.xml.
   <summary>Whether the back-forward navigation was served from cache.</summary>
 </histogram>
 
-<histogram name="Navigation.BlobUrl" enum="Boolean" expires_after="2023-08-13">
+<histogram name="Navigation.BlobUrl" enum="Boolean" expires_after="2023-10-15">
   <owner>jkokatsu@google.com</owner>
   <owner>chrome-security-owp-team@google.com</owner>
   <summary>
@@ -530,7 +531,7 @@ Also used in tools/metrics/histograms/metadata/page/histograms.xml.
 </histogram>
 
 <histogram name="Navigation.BlobUrl.MainFrame" enum="Boolean"
-    expires_after="2023-08-13">
+    expires_after="2023-10-15">
   <owner>jkokatsu@google.com</owner>
   <owner>chrome-security-owp-team@google.com</owner>
   <summary>
@@ -540,7 +541,7 @@ Also used in tools/metrics/histograms/metadata/page/histograms.xml.
 </histogram>
 
 <histogram name="Navigation.BlobUrl.Sandboxed" enum="Boolean"
-    expires_after="2023-08-13">
+    expires_after="2023-10-15">
   <owner>jkokatsu@google.com</owner>
   <owner>chrome-security-owp-team@google.com</owner>
   <summary>
@@ -669,7 +670,7 @@ Also used in tools/metrics/histograms/metadata/page/histograms.xml.
 </histogram>
 
 <histogram name="Navigation.EngagementTime.Ratio" units="%"
-    expires_after="2023-08-13">
+    expires_after="2023-10-15">
   <owner>estark@chromium.org</owner>
   <owner>security-enamel@chromium.org</owner>
   <summary>
@@ -679,7 +680,7 @@ Also used in tools/metrics/histograms/metadata/page/histograms.xml.
 </histogram>
 
 <histogram name="Navigation.GetFrameHostForNavigation.Duration" units="ms"
-    expires_after="2023-08-13">
+    expires_after="2023-10-15">
   <owner>peilinwang@google.com</owner>
   <owner>woa-performance-bugs+jank@google.com</owner>
   <summary>
@@ -739,7 +740,7 @@ Also used in tools/metrics/histograms/metadata/page/histograms.xml.
 </histogram>
 
 <histogram name="Navigation.HostnameHasDeviationCharacters" units="count"
-    expires_after="2023-08-08">
+    expires_after="2023-10-08">
   <owner>meacer@chromium.org</owner>
   <owner>chrome-trusty-transport@google.com</owner>
   <summary>
@@ -784,7 +785,7 @@ Also used in tools/metrics/histograms/metadata/page/histograms.xml.
 </histogram>
 
 <histogram name="Navigation.IsNavigationSameSite.Duration" units="ms"
-    expires_after="2023-08-13">
+    expires_after="2023-10-15">
   <owner>peilinwang@google.com</owner>
   <owner>woa-performance-bugs+jank@google.com</owner>
   <summary>
@@ -880,7 +881,7 @@ Also used in tools/metrics/histograms/metadata/page/histograms.xml.
 
 <histogram
     name="Navigation.MainFrame.RendererInitiated.InitiatorFramePresentAtStart"
-    enum="BooleanPresent" expires_after="2023-07-30">
+    enum="BooleanPresent" expires_after="2023-10-01">
   <owner>yaoxia@chromium.org</owner>
   <owner>cammie@chromium.org</owner>
   <summary>
@@ -1022,7 +1023,7 @@ Also used in tools/metrics/histograms/metadata/page/histograms.xml.
 </histogram>
 
 <histogram name="Navigation.NavigationStartToBeforeUnloadForLegacy" units="ms"
-    expires_after="2023-08-08">
+    expires_after="2023-10-08">
   <owner>sky@chromium.org</owner>
   <owner>swarm-team@chromium.org</owner>
   <summary>
@@ -1035,7 +1036,7 @@ Also used in tools/metrics/histograms/metadata/page/histograms.xml.
 
 <histogram
     name="Navigation.NavigationStartToBeginWithAvoidUnnecessaryBeforeUnloadSync"
-    units="ms" expires_after="2023-08-08">
+    units="ms" expires_after="2023-10-08">
   <owner>sky@chromium.org</owner>
   <owner>swarm-team@chromium.org</owner>
   <summary>
@@ -1079,7 +1080,7 @@ Also used in tools/metrics/histograms/metadata/page/histograms.xml.
 </histogram>
 
 <histogram name="Navigation.OnBeforeUnloadTotalTime" units="ms"
-    expires_after="2023-08-08">
+    expires_after="2023-10-08">
   <owner>chikamune@chromium.org</owner>
   <owner>chrome-loading@google.com</owner>
   <summary>
@@ -1364,6 +1365,24 @@ Also used in tools/metrics/histograms/metadata/page/histograms.xml.
   </summary>
 </histogram>
 
+<histogram name="Navigation.SuddenTerminationDisabler.{Origins}"
+    enum="NavigationSuddenTerminationDisabler" expires_after="2023-10-11">
+  <owner>fergal@chromium.org</owner>
+  <owner>rakina@chromium.org</owner>
+  <summary>
+    Records the combination of mainframe/subframe and what sudden termination
+    disablers were present. This is recorded on every cross-document navigation.
+    Currently only covers Unload. The SameOrigin variant only considers a frame
+    to be same origin as the main frame if it can be reached through a chain of
+    same-origin frames. So e.g. in a-&gt;b-&gt;a, the second a is not
+    same-origin.
+  </summary>
+  <token key="Origins">
+    <variant name="AllOrigins"/>
+    <variant name="SameOrigin"/>
+  </token>
+</histogram>
+
 <histogram name="Navigation.ThrottleDeferTime.{Event}" units="ms"
     expires_after="2023-02-11">
   <owner>cduvall@chromium.org</owner>
@@ -1617,17 +1636,37 @@ Also used in tools/metrics/histograms/metadata/page/histograms.xml.
 </histogram>
 
 <histogram
-    name="Prerender.Experimental.BookmarkBar.HoverDuration.{ConversionResultType}"
+    name="Prerender.Experimental.BookmarkBar.EnterToPressDuration{ButtonType}"
+    units="ms" expires_after="2023-09-24">
+  <owner>robertlin@chromium.org</owner>
+  <owner>toyoshim@chromium.org</owner>
+  <owner>chrome-prerendering@google.com</owner>
+  <summary>
+    The metrics for preload bookmark to understand the distribution of delay to
+    press {ButtonType}. Recorded when the mouse {ButtonType} is pressed.
+  </summary>
+  <token key="ButtonType">
+    <variant name="" summary="any button"/>
+    <variant name=".LeftButton" summary="the left button"/>
+  </token>
+</histogram>
+
+<histogram
+    name="Prerender.Experimental.BookmarkBar.HoverDuration{OriginType}.{ConversionResultType}"
     units="ms" expires_after="2023-09-24">
   <owner>robertlin@chromium.org</owner>
   <owner>toyoshim@chromium.org</owner>
   <owner>chrome-prerendering@google.com</owner>
   <summary>
     The metrics for preload boomark to understand the distribution of mouse
-    hovering duration. It records mouse hovering duration time when mouse leaves
-    the bookmark button areas without using it as NotTaken, or when the bookmark
-    is actually clicked as Taken.
+    hovering duration from {OriginType}. It records mouse hovering duration time
+    when mouse leaves the bookmark button areas without using it as NotTaken, or
+    when the bookmark is actually clicked as Taken.
   </summary>
+  <token key="OriginType">
+    <variant name="" summary="the time mouse entering to the button"/>
+    <variant name=".FromLastMouseMove" summary="the last time mouse move"/>
+  </token>
   <token key="ConversionResultType">
     <variant name="NotTaken"/>
     <variant name="Taken"/>
@@ -1642,19 +1681,6 @@ Also used in tools/metrics/histograms/metadata/page/histograms.xml.
   <summary>
     The metrics for preload bookmark to evaluate the ratio of mouseover and
     mousedown translating into full mouse click.
-  </summary>
-</histogram>
-
-<histogram
-    name="Prerender.Experimental.CancellationPercentageByExcessiveMemoryUsage.SpeculationRule"
-    units="%" expires_after="2023-08-27">
-  <owner>asamidoi@chromium.org</owner>
-  <owner>chrome-prerendering@google.com</owner>
-  <summary>
-    Records the percentage of destroyed prerenders due to the excessive memory
-    usage in started prerenders. The result should be an integer between 0 and
-    100. This is recorded when SpeculationHostImpl is destructed or a primary
-    page is updated.
   </summary>
 </histogram>
 

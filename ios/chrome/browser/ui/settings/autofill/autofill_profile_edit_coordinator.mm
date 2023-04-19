@@ -93,7 +93,8 @@
   self.sharedViewController = [[AutofillProfileEditTableViewController alloc]
       initWithDelegate:self.mediator
              userEmail:[self syncingUserEmail]
-            controller:self.viewController];
+            controller:self.viewController
+          settingsView:YES];
   self.mediator.consumer = self.sharedViewController;
   self.viewController.handler = self.sharedViewController;
 
@@ -132,7 +133,8 @@
           [[AutofillCountrySelectionTableViewController alloc]
               initWithDelegate:self
                selectedCountry:country
-                  allCountries:allCountries];
+                  allCountries:allCountries
+                  settingsView:YES];
   [self.baseNavigationController
       pushViewController:autofillCountrySelectionTableViewController
                 animated:YES];

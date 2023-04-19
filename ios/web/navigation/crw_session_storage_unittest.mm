@@ -15,7 +15,7 @@
 #import "ios/web/navigation/serializable_user_data_manager_impl.h"
 #import "ios/web/public/navigation/referrer.h"
 #import "ios/web/public/session/crw_navigation_item_storage.h"
-#import "ios/web/session/crw_session_user_data.h"
+#import "ios/web/public/session/crw_session_user_data.h"
 #import "net/base/mac/url_conversions.h"
 #import "testing/gtest/include/gtest/gtest.h"
 #import "testing/gtest_mac.h"
@@ -88,8 +88,6 @@ class CRWSessionStorageTest : public PlatformTest {
         web::Referrer(GURL("http://referrer.url"), web::ReferrerPolicyDefault);
     item_storage.timestamp = base::Time::Now();
     item_storage.title = base::SysNSStringToUTF16(@"Title");
-    item_storage.displayState =
-        web::PageDisplayState(CGPointZero, UIEdgeInsetsZero, 0.0, 0.0, 0.0);
     item_storage.HTTPRequestHeaders = @{@"HeaderKey" : @"HeaderValue"};
     session_storage_.itemStorages = @[ item_storage ];
   }

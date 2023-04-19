@@ -158,8 +158,7 @@ using GLTextureImageBackingFactoryWithReadbackTest =
     GLTextureImageBackingFactoryWithUploadTest;
 
 TEST_F(GLTextureImageBackingFactoryTest, InvalidFormat) {
-  auto format = viz::SharedImageFormat::SinglePlane(
-      viz::ResourceFormat::YUV_420_BIPLANAR);
+  auto format = viz::LegacyMultiPlaneFormat::kNV12;
   gfx::Size size(256, 256);
   uint32_t usage = SHARED_IMAGE_USAGE_GLES2;
   bool supported = backing_factory_->CanCreateSharedImage(
@@ -187,7 +186,7 @@ TEST_F(GLTextureImageBackingFactoryTest, EstimatedSize) {
 
   auto backing = backing_factory_->CreateSharedImage(
       mailbox, format, surface_handle, size, color_space, surface_origin,
-      alpha_type, usage, /*is_thread_safe=*/false);
+      alpha_type, usage, "TestLabel", /*is_thread_safe=*/false);
   ASSERT_TRUE(backing);
 
   size_t backing_estimated_size = backing->GetEstimatedSize();
@@ -297,7 +296,7 @@ TEST_P(GLTextureImageBackingFactoryWithFormatTest, Basic) {
 
   auto backing = backing_factory_->CreateSharedImage(
       mailbox, format, surface_handle, size, color_space, surface_origin,
-      alpha_type, usage, /*is_thread_safe=*/false);
+      alpha_type, usage, "TestLabel", /*is_thread_safe=*/false);
   ASSERT_TRUE(backing);
 
   // Check clearing.
@@ -428,7 +427,7 @@ TEST_P(GLTextureImageBackingFactoryInitialDataTest, InitialData) {
 
   auto backing = backing_factory_->CreateSharedImage(
       mailbox, format, size, color_space, surface_origin, alpha_type, usage,
-      initial_data);
+      "TestLabel", initial_data);
   ASSERT_TRUE(backing);
   EXPECT_TRUE(backing->IsCleared());
 
@@ -509,7 +508,7 @@ TEST_P(GLTextureImageBackingFactoryWithUploadTest, UploadFromMemory) {
 
   auto backing = backing_factory_->CreateSharedImage(
       mailbox, format, surface_handle, size, color_space, surface_origin,
-      alpha_type, usage, /*is_thread_safe=*/false);
+      alpha_type, usage, "TestLabel", /*is_thread_safe=*/false);
   ASSERT_TRUE(backing);
 
   // Upload from bitmap with expected stride.
@@ -551,7 +550,7 @@ TEST_P(GLTextureImageBackingFactoryWithReadbackTest, ReadbackToMemory) {
 
   auto backing = backing_factory_->CreateSharedImage(
       mailbox, format, surface_handle, size, color_space, surface_origin,
-      alpha_type, usage, /*is_thread_safe=*/false);
+      alpha_type, usage, "TestLabel", /*is_thread_safe=*/false);
   ASSERT_TRUE(backing);
 
   std::vector<SkBitmap> src_bitmaps =
@@ -639,8 +638,8 @@ const auto kSharedImageFormats =
                       viz::SinglePlaneFormat::kR_16,
                       viz::SinglePlaneFormat::kRG_1616,
                       viz::SinglePlaneFormat::kRGBA_F16,
-                      viz::MultiPlaneFormat::kYUV_420_BIPLANAR,
-                      viz::MultiPlaneFormat::kYVU_420);
+                      viz::MultiPlaneFormat::kNV12,
+                      viz::MultiPlaneFormat::kYV12);
 
 INSTANTIATE_TEST_SUITE_P(,
                          GLTextureImageBackingFactoryWithFormatTest,
@@ -658,8 +657,8 @@ const auto kReadbackFormats =
                       viz::SinglePlaneFormat::kRG_88,
                       viz::SinglePlaneFormat::kRGBX_8888,
                       viz::SinglePlaneFormat::kBGRX_8888,
-                      viz::MultiPlaneFormat::kYUV_420_BIPLANAR,
-                      viz::MultiPlaneFormat::kYVU_420);
+                      viz::MultiPlaneFormat::kNV12,
+                      viz::MultiPlaneFormat::kYV12);
 
 INSTANTIATE_TEST_SUITE_P(,
                          GLTextureImageBackingFactoryWithReadbackTest,

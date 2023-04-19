@@ -19,7 +19,10 @@
 
   cr-toast {
     justify-content: space-between;
-    margin: 58px 8px;
+    left: 50%;
+    margin: 58px 0;
+    transform: translate(-50%, 0);
+    width: calc(100% - 16px);
   }
 
   cr-toolbar-search-field {
@@ -91,7 +94,7 @@
   }
 
   :host-context([chrome-refresh-2023]) sp-heading {
-    margin: 8px 16px;
+    margin: var(--sp-card-block-padding) var(--sp-card-inline-padding);
   }
 
   .icon-button-row {
@@ -137,6 +140,28 @@
     cr-toolbar-selection-overlay {
       background: var(--google-grey-900-white-4-percent);
     }
+  }
+
+  :host-context([chrome-refresh-2023]) cr-toolbar-selection-overlay {
+    --cr-toolbar-selection-overlay-slot-gap: 8px;
+    background: transparent;
+    font-weight: 500;
+  }
+
+  :host-context([chrome-refresh-2023])
+      cr-toolbar-selection-overlay::part(clearIcon),
+  :host-context([chrome-refresh-2023])
+      cr-toolbar-selection-overlay cr-icon-button {
+    --cr-icon-button-icon-size: 20px;
+    height: 28px;
+    width: 28px;
+  }
+
+
+  :host-context([chrome-refresh-2023])
+      cr-toolbar-selection-overlay::part(clearIcon) {
+    margin-inline-end: 0;
+    margin-inline-start: -4px;
   }
 </style>
 
@@ -218,7 +243,9 @@
               row-aria-description="[[getBookmarkA11yDescription_(item)]]"
               tabindex$="[[tabIndex]]"
               image-urls="[[getBookmarkImageUrls_(
-                            item, item.*, imageUrls_.*)]]">
+                            item, item.*, imageUrls_.*)]]"
+              force-hover="[[getBookmarkForceHover_(
+                            item, contextMenuBookmark_)]]">
             <template is="dom-if" restamp
                 if="[[isPriceTracked(item, trackedProductInfos_.*)]]">
               <sp-list-item-badge slot="badges"
@@ -245,12 +272,13 @@
       hidden="[[!hasNoBookmarksInActiveFolder_(shownBookmarks_,
                                                activeFolderPath_.*)]]"
       guest$="[[guestMode_]]"
-      image-path="./images/bookmarks_empty.svg"
-      dark-image-path="./images/bookmarks_empty_dark.svg"
-      heading="[[getEmptyTitle_()]]"
-      body="[[getEmptyBody_()]]">
+      image-path="[[getEmptyImagePath_(labels_.*, searchQuery_)]]"
+      dark-image-path="[[getEmptyImagePathDark_(labels_.*, searchQuery_)]]"
+      heading="[[getEmptyTitle_(labels_.*, searchQuery_)]]"
+      body="[[getEmptyBody_(labels_.*, searchQuery_)]]">
   </sp-empty-state>
   <sp-footer
+      hidden="[[shouldShowEmptySearchState_(labels_.*, searchQuery_)]]"
       pinned="[[!hasNoBookmarksInActiveFolder_(shownBookmarks_,
                                                activeFolderPath_.*)]]">
     <cr-button class="floating-button"
@@ -291,7 +319,7 @@
       <iron-icon icon="cr:check"
           invisible$="[[!sortMenuItemIsSelected_(item, activeSortIndex_)]]">
       </iron-icon>
-      [[getSortMenuItemLabel_(item)]]
+      [[getSortMenuItemLowerLabel_(item)]]
     </button>
   </template>
   <hr>
@@ -323,7 +351,8 @@
     on-delete-clicked="onContextMenuDeleteClicked_"
     on-disabled-feature="showDisabledFeatureDialog_"
     on-edit-clicked="onContextMenuEditClicked_"
-    on-rename-clicked="setRenamingId_">
+    on-rename-clicked="setRenamingId_"
+    on-close="onContextMenuClosed_">
 </power-bookmarks-context-menu>
 
 <cr-lazy-render id="deletionToast">

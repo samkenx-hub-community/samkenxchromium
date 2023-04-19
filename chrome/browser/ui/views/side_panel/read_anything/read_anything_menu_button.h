@@ -26,6 +26,9 @@ class ReadAnythingMenuButton : public views::MenuButton {
   ReadAnythingMenuButton& operator=(const ReadAnythingMenuButton&) = delete;
   ~ReadAnythingMenuButton() override;
 
+  // views::MenuButton
+  bool IsGroupFocusTraversable() const override;
+
   void SetMenuModel(ReadAnythingMenuModel* menu_model);
   ReadAnythingMenuModel* GetMenuModel() const;
   absl::optional<size_t> GetSelectedIndex() const;
@@ -33,7 +36,8 @@ class ReadAnythingMenuButton : public views::MenuButton {
                int icon_size,
                ui::ColorId icon_color);
   void SetDropdownColorIds(ui::ColorId background_color,
-                           ui::ColorId foreground_color);
+                           ui::ColorId foreground_color,
+                           ui::ColorId selected_color);
 
  private:
   void ButtonPressed();

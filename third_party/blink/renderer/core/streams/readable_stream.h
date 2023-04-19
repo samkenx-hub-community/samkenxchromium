@@ -21,9 +21,9 @@
 
 namespace blink {
 
-class AbortSignal;
 class ExceptionState;
 class MessagePort;
+class PipeOptions;
 class ReadableByteStreamController;
 class ReadableStreamBYOBReader;
 class ReadableStreamController;
@@ -49,30 +49,6 @@ class CORE_EXPORT ReadableStream : public ScriptWrappable {
   DEFINE_WRAPPERTYPEINFO();
 
  public:
-  class PipeOptions : public GarbageCollected<PipeOptions> {
-   public:
-    PipeOptions();
-    explicit PipeOptions(const StreamPipeOptions* options);
-
-    bool PreventClose() const { return prevent_close_; }
-    bool PreventAbort() const { return prevent_abort_; }
-    bool PreventCancel() const { return prevent_cancel_; }
-    AbortSignal* Signal() const { return signal_; }
-
-    void Trace(Visitor*) const;
-
-   private:
-    bool GetBoolean(ScriptState* script_state,
-                    v8::Local<v8::Object> dictionary,
-                    const char* property_name,
-                    ExceptionState& exception_state);
-
-    bool prevent_close_ = false;
-    bool prevent_abort_ = false;
-    bool prevent_cancel_ = false;
-    Member<AbortSignal> signal_;
-  };
-
   enum State : uint8_t { kReadable, kClosed, kErrored };
 
   // Zero-argument form of the constructor called from JavaScript.
@@ -113,6 +89,13 @@ class CORE_EXPORT ReadableStream : public ScriptWrappable {
                                 double high_water_mark,
                                 StrategySizeAlgorithm* size_algorithm,
                                 ExceptionState&);
+
+  // https://streams.spec.whatwg.org/#abstract-opdef-createreadablebytestream
+  static ReadableStream* CreateByteStream(ScriptState*,
+                                          StreamStartAlgorithm* start_algorithm,
+                                          StreamAlgorithm* pull_algorithm,
+                                          StreamAlgorithm* cancel_algorithm,
+                                          ExceptionState&);
 
   // Entry point to create a ReadableByteStream from other C++ APIs.
   // CreateReadableByteStream():
@@ -193,11 +176,16 @@ class CORE_EXPORT ReadableStream : public ScriptWrappable {
   // https://streams.spec.whatwg.org/#rs-tee
   HeapVector<Member<ReadableStream>> tee(ScriptState*, ExceptionState&);
 
-  // TODO(domenic): cloneForBranch2 argument from spec not supported yet
   void Tee(ScriptState*,
            ReadableStream** branch1,
            ReadableStream** branch2,
+           bool clone_for_branch2,
            ExceptionState&);
+
+  void ByteStreamTee(ScriptState*,
+                     ReadableStream** branch1,
+                     ReadableStream** branch2,
+                     ExceptionState&);
 
   bool IsLocked() const { return IsLocked(this); }
 
@@ -221,13 +209,6 @@ class CORE_EXPORT ReadableStream : public ScriptWrappable {
       MessagePort* port,
       std::unique_ptr<ReadableStreamTransferringOptimizer> optimizer,
       ExceptionState&);
-
-  // Returns a reader that doesn't have the |for_author_code_| flag set. This is
-  // used in contexts where reads should not be interceptable by user code. This
-  // corresponds to calling AcquireReadableStreamDefaultReader(stream, false) in
-  // specification language. The caller must ensure that the stream is not
-  // locked.
-  ReadableStreamDefaultReader* GetReaderNotForAuthorCode(ScriptState*);
 
   //
   // Readable stream abstract operations
@@ -289,17 +270,18 @@ class CORE_EXPORT ReadableStream : public ScriptWrappable {
   void Trace(Visitor*) const override;
 
  private:
+  friend class ByteStreamTeeEngine;
+  friend class PipeToEngine;
   friend class ReadableByteStreamController;
   friend class ReadableStreamBYOBReader;
   friend class ReadableStreamDefaultController;
   friend class ReadableStreamDefaultReader;
   friend class ReadableStreamGenericReader;
+  friend class TeeEngine;
 
   class PullAlgorithm;
   class CancelAlgorithm;
-  class PipeToEngine;
   class ReadHandleImpl;
-  class TeeEngine;
 
   // https://streams.spec.whatwg.org/#rs-constructor
   void InitInternal(ScriptState*,
@@ -353,15 +335,12 @@ class CORE_EXPORT ReadableStream : public ScriptWrappable {
   // https://streams.spec.whatwg.org/#readable-stream-has-default-reader
   static bool HasDefaultReader(const ReadableStream*);
 
-  //
-  // TODO(ricea): Functions for transferable streams.
-  //
-
   // Calls Tee() on |readable|, converts the two branches to a JavaScript array
   // and returns them.
   static HeapVector<Member<ReadableStream>> CallTeeAndReturnBranchArray(
       ScriptState* script_state,
       ReadableStream* readable,
+      bool clone_for_branch2,
       ExceptionState& exception_state);
 
   bool is_disturbed_ = false;

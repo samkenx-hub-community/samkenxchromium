@@ -17,7 +17,7 @@ try_.defaults.set(
     cores = 8,
     os = os.LINUX_DEFAULT,
     compilator_cores = 8,
-    compilator_reclient_jobs = reclient.jobs.HIGH_JOBS_FOR_CQ,
+    compilator_reclient_jobs = reclient.jobs.MID_JOBS_FOR_CQ,
     execution_timeout = try_.DEFAULT_EXECUTION_TIMEOUT,
     orchestrator_cores = 2,
     reclient_instance = reclient.instance.DEFAULT_UNTRUSTED,
@@ -592,6 +592,19 @@ try_.builder(
     builderless = True,
     cores = 32,
     # This builder produces the clang binaries used on all builders. Since it
+    # uses the system's sysroot when compiling, the builder needs to run on the
+    # OS version that's the oldest used on any bot.
+    os = os.LINUX_BIONIC,
+    execution_timeout = 5 * time.hour,
+    notifies = ["chrome-rust-toolchain"],
+)
+
+try_.builder(
+    name = "linux_upload_rust",
+    executable = "recipe:chromium_upload_rust",
+    builderless = True,
+    cores = 32,
+    # This builder produces the rustc binaries used on all builders. Since it
     # uses the system's sysroot when compiling, the builder needs to run on the
     # OS version that's the oldest used on any bot.
     os = os.LINUX_BIONIC,

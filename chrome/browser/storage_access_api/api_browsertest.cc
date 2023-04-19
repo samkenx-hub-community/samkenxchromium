@@ -432,12 +432,11 @@ class StorageAccessAPIBrowserTest : public StorageAccessAPIBaseBrowserTest {
 // Check default values for permissions.query on storage-access.
 IN_PROC_BROWSER_TEST_F(StorageAccessAPIBrowserTest, PermissionQueryDefault) {
   SetBlockThirdPartyCookies(true);
-  base::HistogramTester histogram_tester;
 
   NavigateToPageWithFrame(kHostA);
   NavigateFrameTo(kHostB, "/echoheader?cookie");
 
-  EXPECT_EQ(QueryPermission(GetPrimaryMainFrame()), "prompt");
+  EXPECT_EQ(QueryPermission(GetPrimaryMainFrame()), "granted");
   EXPECT_EQ(QueryPermission(GetFrame()), "prompt");
 }
 
@@ -445,7 +444,6 @@ IN_PROC_BROWSER_TEST_F(StorageAccessAPIBrowserTest, PermissionQueryDefault) {
 // request was successful.
 IN_PROC_BROWSER_TEST_F(StorageAccessAPIBrowserTest, PermissionQueryGranted) {
   SetBlockThirdPartyCookies(true);
-  base::HistogramTester histogram_tester;
 
   NavigateToPageWithFrame(kHostA);
   NavigateFrameTo(kHostB, "/echoheader?cookie");
@@ -469,7 +467,6 @@ IN_PROC_BROWSER_TEST_F(StorageAccessAPIBrowserTest, PermissionQueryGranted) {
 
 IN_PROC_BROWSER_TEST_F(StorageAccessAPIBrowserTest, PermissionQueryCrossSite) {
   SetBlockThirdPartyCookies(true);
-  base::HistogramTester histogram_tester;
 
   NavigateToPageWithFrame(kHostB);
   NavigateFrameTo(kHostA, "/echoheader?cookie");

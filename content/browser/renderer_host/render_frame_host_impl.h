@@ -384,11 +384,6 @@ class CONTENT_EXPORT RenderFrameHostImpl
   const base::UnguessableToken& GetReportingSource() override;
 
   ui::AXTreeID GetAXTreeID() override;
-  void RequestAXTreeSnapshot(AXTreeSnapshotCallback callback,
-                             const ui::AXMode& ax_mode,
-                             bool exclude_offscreen,
-                             size_t max_nodes,
-                             const base::TimeDelta& timeout) override;
   SiteInstanceImpl* GetSiteInstance() const override;
   RenderProcessHost* GetProcess() const override;
   GlobalRenderFrameHostId GetGlobalId() const override;
@@ -771,6 +766,17 @@ class CONTENT_EXPORT RenderFrameHostImpl
   // Set the URL of the document represented by this RenderFrameHost. Called
   // when the navigation commits. See also `GetLastCommittedURL`.
   void SetLastCommittedUrl(const GURL& url);
+
+  // RenderFrameHost represents a document in a frame. It is either:
+  // 1. The initial empty document,
+  // 2. A document created by a navigation.
+  //
+  // In case of (2), this returns the ID of the navigation who created this
+  // document.
+  //
+  // Note 1: This is updated after receiving DidCommitNavigation IPC.
+  // Note 2: Same-document navigation are not updating this field.
+  int64_t navigation_id() const { return navigation_id_; }
 
   // The most recent non-net-error URL to commit in this frame.  In almost all
   // cases, use GetLastCommittedURL instead.
@@ -1495,13 +1501,9 @@ class CONTENT_EXPORT RenderFrameHostImpl
   // addition, its associated RenderWidgetHost has to be focused.
   bool IsFocused();
 
-  // Creates a WebUI for this RenderFrameHost based on the provided |dest_url|
-  // if required. Returns true if a new WebUI was created.
-  // If this is a history navigation its NavigationEntry bindings should be
-  // provided through |entry_bindings| to allow verifying that they are not
-  // being set differently this time around. Otherwise |entry_bindings| should
-  // be set to NavigationEntryImpl::kInvalidBindings so that no checks are done.
-  bool CreateWebUI(const GURL& dest_url, int entry_bindings);
+  // Sets the WebUI owned by `request` as the WebUI for this RenderFrameHost,
+  // which is based on the provided `request`'s URL.
+  void SetWebUI(NavigationRequest& request);
 
   // Destroys WebUI instance and resets related data.
   // This indirectly calls content's embedders and may have arbitrary side
@@ -1555,6 +1557,10 @@ class CONTENT_EXPORT RenderFrameHostImpl
 
   bool has_focused_editable_element() const {
     return has_focused_editable_element_;
+  }
+
+  bool has_focused_richly_editable_element() const {
+    return has_focused_richly_editable_element_;
   }
 
   // Binds a DevToolsAgent interface for debugging.
@@ -1876,8 +1882,9 @@ class CONTENT_EXPORT RenderFrameHostImpl
     // This will reduce the feature count for |feature_| for the first time, and
     // do nothing for further calls.
     inline void reset() {
-      if (render_frame_host_)
+      if (render_frame_host_) {
         render_frame_host_->OnBackForwardCacheDisablingFeatureRemoved(feature_);
+      }
       render_frame_host_ = nullptr;
     }
 
@@ -2263,7 +2270,7 @@ class CONTENT_EXPORT RenderFrameHostImpl
   void SetVirtualKeyboardMode(ui::mojom::VirtualKeyboardMode mode) override;
   void VisibilityChanged(blink::mojom::FrameVisibility) override;
   void DidChangeThemeColor(absl::optional<SkColor> theme_color) override;
-  void DidChangeBackgroundColor(SkColor background_color,
+  void DidChangeBackgroundColor(const SkColor4f& background_color,
                                 bool color_adjust) override;
   void DidFailLoadWithError(const GURL& url, int32_t error_code) override;
   void DidFocusFrame() override;
@@ -2328,6 +2335,7 @@ class CONTENT_EXPORT RenderFrameHostImpl
       std::vector<blink::mojom::FaviconURLPtr> favicon_urls) override;
   void DownloadURL(blink::mojom::DownloadURLParamsPtr params) override;
   void FocusedElementChanged(bool is_editable_element,
+                             bool is_richly_editable_element,
                              const gfx::Rect& bounds_in_frame_widget,
                              blink::mojom::FocusType focus_type) override;
   void TextSelectionChanged(const std::u16string& text,
@@ -2896,13 +2904,15 @@ class CONTENT_EXPORT RenderFrameHostImpl
   // last committed document.
   CookieChangeListener::CookieChangeInfo GetCookieChangeInfo();
 
-  // Sets a ResourceCache in the renderer. `remote` must have the same process
+  // Sets a ResourceCache in the renderer. `this` must be active and there must
+  // be no pending navigation. `remote` must have the same and process
   // isolation policy.
-  // TODO(https://crbug.com/1414262): Add checks to ensure the preconditions.
-  void SetResourceCache(
-      mojo::PendingRemote<blink::mojom::ResourceCache> remote);
+  void SetResourceCacheRemote(
+      mojo::PendingRemote<blink::mojom::ResourceCache> pending_remote);
 
-  void FlushMojomFrameRemoteForTesting();
+  // Records metrics on sudden termination handlers found in this frame and
+  // subframes.
+  void RecordNavigationSuddenTerminationHandlers();
 
  protected:
   friend class RenderFrameHostFactory;
@@ -2955,6 +2965,7 @@ class CONTENT_EXPORT RenderFrameHostImpl
           topics_loader_factory,
       mojo::PendingRemote<network::mojom::URLLoaderFactory>
           keep_alive_loader_factory,
+      mojo::PendingRemote<blink::mojom::ResourceCache> resource_cache_remote,
       const absl::optional<blink::ParsedPermissionsPolicy>& permissions_policy,
       blink::mojom::PolicyContainerPtr policy_container,
       const blink::DocumentToken& document_token,
@@ -3105,8 +3116,19 @@ class CONTENT_EXPORT RenderFrameHostImpl
                            ResetOwnerInBFCache);
   FRIEND_TEST_ALL_PREFIXES(RenderFrameHostImplBrowserTestWithBFCache,
                            ChildFramesHiddenWhileInBFCache);
+  FRIEND_TEST_ALL_PREFIXES(RenderFrameHostImplBrowserTestWithBFCache,
+                           EvictionInBFCache);
   FRIEND_TEST_ALL_PREFIXES(RenderFrameHostImplPrerenderBrowserTest,
                            KeepPrerenderRFHOwnerAfterActivation);
+  FRIEND_TEST_ALL_PREFIXES(NavigationSuddenTerminationDisablerTypeBrowserTest,
+                           RecordUma);
+  FRIEND_TEST_ALL_PREFIXES(
+      NavigationBrowserTest,
+      NavigationSuddenTerminationDisablerTypeRecordUmaSameOrigin);
+  FRIEND_TEST_ALL_PREFIXES(
+      NavigationBrowserTest,
+      NavigationSuddenTerminationDisablerTypeRecordUmaActivation);
+
   class SubresourceLoaderFactoriesConfig;
 
   FrameTreeNode* GetSibling(int relative_offset) const;
@@ -3171,6 +3193,7 @@ class CONTENT_EXPORT RenderFrameHostImpl
       blink::mojom::FrameOwnerPropertiesPtr frame_owner_properties,
       blink::FrameOwnerElementType owner_type,
       ukm::SourceId document_ukm_source_id) override;
+  void StartLoadingForAsyncNavigationApiCommit() override;
   void DidCommitSameDocumentNavigation(
       mojom::DidCommitProvisionalLoadParamsPtr params,
       mojom::DidCommitSameDocumentNavigationParamsPtr same_document_params)
@@ -3616,6 +3639,23 @@ class CONTENT_EXPORT RenderFrameHostImpl
   // report to be routed to the Reporting API.
   void MaybeGenerateCrashReport(base::TerminationStatus status, int exit_code);
 
+  // Bitfield values for recording navigation frame-type (main or subframe)
+  // combined with whether a sudden termination disabler is present. Currently
+  // it only covers unload.
+  enum NavigationSuddenTerminationDisablerType : uint32_t {
+    kMainFrame = 1 << 0,
+    kUnload = 1 << 1,
+    kMaxValue = kUnload,
+  };
+  // Returns information to be recoreded in UMA about sudden termination
+  // disablers presence.
+  // The return value is ORed values from
+  // `NavigationSuddenTerminationDisablerType`.
+  // If `same_origin` is true, the tree traversal will only recurse into frames
+  // that are the same origin as `this`. E.g. a(b(a)) will not find the second
+  // a.
+  uint32_t FindSuddenTerminationHandlers(bool same_origin);
+
   // The reason for calling StartPendingDeletionOnSubtree() / what is causing
   // the RenderFrameHost to enter the "pending deletion" stage.
   enum class PendingDeletionReason {
@@ -4045,6 +4085,11 @@ class CONTENT_EXPORT RenderFrameHostImpl
   // Track this frame's last committed origin.
   url::Origin last_committed_origin_;
 
+  // Tracks the id of the navigation that created the document. It is updated
+  // after receiving DidCommitNavigation IPC. Same-document navigation are not
+  // updating this field. It will be empty `0` for the initial empty document.
+  int64_t navigation_id_ = 0;
+
   // For about:blank and about:srcdoc documents, this tracks the inherited base
   // URL, snapshotted from the initiator's FrameLoadRequest. This is an empty
   // URL for all other cases. This is currently only set if
@@ -4376,6 +4421,10 @@ class CONTENT_EXPORT RenderFrameHostImpl
 
   // If true then this frame's document has a focused element which is editable.
   bool has_focused_editable_element_ = false;
+
+  // If true then this frame's document has a focused element which is richly
+  // editable.
+  bool has_focused_richly_editable_element_ = false;
 
   std::unique_ptr<PendingNavigation> pending_navigate_;
 

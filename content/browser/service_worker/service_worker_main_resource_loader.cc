@@ -27,6 +27,7 @@
 #include "content/common/service_worker/service_worker_resource_loader.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/common/content_features.h"
+#include "net/http/http_request_headers.h"
 #include "net/http/http_status_code.h"
 #include "services/network/public/cpp/features.h"
 #include "services/network/public/cpp/timing_allow_origin_parser.h"
@@ -225,6 +226,11 @@ bool ServiceWorkerMainResourceLoader::MaybeStartRaceNetworkRequest(
     return false;
   }
 
+  // RaceNetworkRequest only supports GET method.
+  if (resource_request_.method != net::HttpRequestHeaders::kGetMethod) {
+    return false;
+  }
+
   // Create URLLoader related assets to handle the request triggered by
   // RaceNetworkRequset.
   auto race_network_request_url_loader_client =
@@ -356,6 +362,14 @@ void ServiceWorkerMainResourceLoader::DidDispatchFetchEvent(
   if (fetch_response_from() == FetchResponseFrom::kWithoutServiceWorker) {
     return;
   }
+  // Use the response from ServiceWorker fetch handler, and cancel the
+  // connection for RaceNetworkRequest.
+  // TODO(crbug.com/1420517) RaceNetworkRequrest doesn't support fallback case.
+  // If the response from the fetch handler is fallback, the fallback resource
+  // fetch will start separately without using RaceNetworkRequest's result.
+  set_fetch_response_from(FetchResponseFrom::kServiceWorker);
+  race_network_request_url_loader_.reset();
+
   DCHECK_EQ(status_, Status::kStarted);
 
   ServiceWorkerMetrics::RecordFetchEventStatus(true /* is_main_resource */,
@@ -416,9 +430,6 @@ void ServiceWorkerMainResourceLoader::DidDispatchFetchEvent(
 
   DCHECK_EQ(fetch_result,
             ServiceWorkerFetchDispatcher::FetchEventResult::kGotResponse);
-
-  // Use the response from ServiceWorker fetch handler.
-  set_fetch_response_from(FetchResponseFrom::kServiceWorker);
 
   // A response with status code 0 is Blink telling us to respond with
   // network error.

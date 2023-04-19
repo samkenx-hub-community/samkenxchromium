@@ -36,7 +36,7 @@ config("find_bad_constructs") {
       ]
     }
 
-    if (!is_official_build && is_linux && !is_castos) {
+    if (enable_check_raw_ptr_fields) {
       cflags += [
         "-Xclang",
         "-plugin-arg-find-bad-constructs",

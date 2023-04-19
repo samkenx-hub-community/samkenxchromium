@@ -124,11 +124,11 @@ struct SameSizeAsPaintLayer : GarbageCollected<PaintLayer>, DisplayItemClient {
 #if DCHECK_IS_ON()
   bool is_destroyed;
 #endif
-  Member<void*> members1[6];
+  Member<void*> members[9];
   PhysicalOffset offset;
   LayoutSize size;
   LayoutUnit layout_units[2];
-  Member<void*> members2[3];
+  std::unique_ptr<void*> pointer;
 };
 
 ASSERT_SIZE(PaintLayer, SameSizeAsPaintLayer);
@@ -165,13 +165,6 @@ PaintLayer* SlowContainingLayer(const PaintLayer* ancestor,
 }
 
 }  // namespace
-
-PaintLayerRareData::PaintLayerRareData() = default;
-PaintLayerRareData::~PaintLayerRareData() = default;
-
-void PaintLayerRareData::Trace(Visitor* visitor) const {
-  visitor->Trace(resource_info);
-}
 
 PaintLayer::PaintLayer(LayoutBoxModelObject* layout_object)
     : is_root_layer_(IsA<LayoutView>(layout_object)),
@@ -231,14 +224,14 @@ void PaintLayer::Destroy() {
 #if DCHECK_IS_ON()
   DCHECK(!is_destroyed_);
 #endif
-  if (rare_data_ && rare_data_->resource_info) {
+  if (resource_info_) {
     const ComputedStyle& style = GetLayoutObject().StyleRef();
     if (style.HasFilter())
-      style.Filter().RemoveClient(*rare_data_->resource_info);
+      style.Filter().RemoveClient(*resource_info_);
     if (auto* reference_clip =
             DynamicTo<ReferenceClipPathOperation>(style.ClipPath()))
-      reference_clip->RemoveClient(*rare_data_->resource_info);
-    rare_data_->resource_info->ClearLayer();
+      reference_clip->RemoveClient(*resource_info_);
+    resource_info_->ClearLayer();
   }
 
   // Reset this flag before disposing scrollable_area_ to prevent
@@ -352,9 +345,9 @@ void PaintLayer::UpdateTransformAfterStyleChange(
 
   if (has_transform != had_transform) {
     if (has_transform)
-      EnsureRareData().transform = std::make_unique<gfx::Transform>();
+      transform_ = std::make_unique<gfx::Transform>();
     else
-      rare_data_->transform.reset();
+      transform_.reset();
   }
 
   UpdateTransform();
@@ -572,6 +565,9 @@ void PaintLayer::UpdateLayerPosition() {
   // their size.
   if (GetLayoutObject().IsLayoutInline())
     UpdateSize();
+  if (RuntimeEnabledFeatures::RemoveConvertToLayerCoordsEnabled()) {
+    return;
+  }
   PhysicalOffset local_point;
   if (LayoutBox* box = GetLayoutBox()) {
     local_point += box->PhysicalLocation();
@@ -957,6 +953,7 @@ static inline const PaintLayer* AccumulateOffsetTowardsAncestor(
 
 void PaintLayer::ConvertToLayerCoords(const PaintLayer* ancestor_layer,
                                       PhysicalOffset& location) const {
+  DCHECK(!RuntimeEnabledFeatures::RemoveConvertToLayerCoordsEnabled());
   if (ancestor_layer == this)
     return;
 
@@ -966,20 +963,12 @@ void PaintLayer::ConvertToLayerCoords(const PaintLayer* ancestor_layer,
         AccumulateOffsetTowardsAncestor(curr_layer, ancestor_layer, location);
 }
 
-void PaintLayer::ConvertToLayerCoords(const PaintLayer* ancestor_layer,
-                                      PhysicalRect& rect) const {
-  PhysicalOffset delta;
-  ConvertToLayerCoords(ancestor_layer, delta);
-  rect.Move(delta);
-}
-
-PhysicalOffset PaintLayer::VisualOffsetFromAncestor(
-    const PaintLayer* ancestor_layer,
-    PhysicalOffset offset) const {
-  if (ancestor_layer == this)
-    return offset;
-  ConvertToLayerCoords(ancestor_layer, offset);
-  return offset;
+const PhysicalOffset& PaintLayer::LocationWithoutPositionOffset() const {
+  DCHECK(!RuntimeEnabledFeatures::RemoveConvertToLayerCoordsEnabled());
+#if DCHECK_IS_ON()
+  DCHECK(!needs_position_update_);
+#endif
+  return location_without_position_offset_;
 }
 
 void PaintLayer::DidUpdateScrollsOverflow() {
@@ -1068,10 +1057,9 @@ void PaintLayer::AppendSingleFragmentForHitTesting(
   ClipRectsContext clip_rects_context(this, fragment.fragment_data,
                                       kExcludeOverlayScrollbarSizeForHitTesting,
                                       respect_overflow_clip);
-  Clipper(GeometryMapperOption::kUseGeometryMapper)
-      .CalculateRects(clip_rects_context, fragment.fragment_data,
-                      fragment.layer_offset, fragment.background_rect,
-                      fragment.foreground_rect);
+  Clipper().CalculateRects(clip_rects_context, *fragment.fragment_data,
+                           fragment.layer_offset, fragment.background_rect,
+                           fragment.foreground_rect);
 
   fragments.push_back(fragment);
 }
@@ -1138,10 +1126,9 @@ void PaintLayer::CollectFragments(
         kExcludeOverlayScrollbarSizeForHitTesting, respect_overflow_clip,
         PhysicalOffset());
 
-    Clipper(GeometryMapperOption::kUseGeometryMapper)
-        .CalculateRects(clip_rects_context, fragment_data,
-                        fragment.layer_offset, fragment.background_rect,
-                        fragment.foreground_rect);
+    Clipper().CalculateRects(clip_rects_context, *fragment_data,
+                             fragment.layer_offset, fragment.background_rect,
+                             fragment.foreground_rect);
 
     fragment.fragment_data = fragment_data;
 
@@ -1403,6 +1390,14 @@ PaintLayer* PaintLayer::HitTestLayer(
     return nullptr;
   }
 
+  if (const auto* box = GetLayoutBox()) {
+    // A child layer of a <frameset> might have no physical fragments. We can
+    // skip such layer. See ClearNeedsLayoutOnHiddenFrames().
+    if (box->PhysicalFragmentCount() == 0) {
+      return nullptr;
+    }
+  }
+
   if (!IsSelfPaintingLayer() && !HasSelfPaintingLayerDescendant())
     return nullptr;
 
@@ -1531,9 +1526,7 @@ PaintLayer* PaintLayer::HitTestLayer(
   if (local_transform_state &&
       layout_object.StyleRef().BackfaceVisibility() ==
           EBackfaceVisibility::kHidden &&
-      local_transform_state->AccumulatedTransform()
-          .InverseOrIdentity()
-          .IsBackFaceVisible()) {
+      local_transform_state->AccumulatedTransform().IsBackFaceVisible()) {
     return nullptr;
   }
 
@@ -2022,10 +2015,15 @@ bool PaintLayer::HitTestClippedOutByClipPath(
   DCHECK(GetLayoutObject().HasClipPath());
   DCHECK(IsSelfPaintingLayer());
 
-  PhysicalRect origin;
-  ConvertToLayerCoords(&root_layer, origin);
+  PhysicalOffset origin;
+  if (RuntimeEnabledFeatures::RemoveConvertToLayerCoordsEnabled()) {
+    origin = GetLayoutObject().LocalToAncestorPoint(
+        origin, &root_layer.GetLayoutObject());
+  } else {
+    ConvertToLayerCoords(&root_layer, origin);
+  }
 
-  gfx::PointF point(hit_test_location.Point() - origin.offset);
+  gfx::PointF point(hit_test_location.Point() - origin);
   gfx::RectF reference_box =
       ClipPathClipper::LocalReferenceBox(GetLayoutObject());
 
@@ -2066,20 +2064,6 @@ PhysicalRect PaintLayer::LocalBoundingBox() const {
         PhysicalRect(rect.offset, GetLayoutObject().View()->ViewRect().size));
   }
   return rect;
-}
-
-PhysicalRect PaintLayer::PhysicalBoundingBox(
-    const PaintLayer* ancestor_layer) const {
-  PhysicalOffset offset_from_root;
-  ConvertToLayerCoords(ancestor_layer, offset_from_root);
-  return PhysicalBoundingBox(offset_from_root);
-}
-
-PhysicalRect PaintLayer::PhysicalBoundingBox(
-    const PhysicalOffset& offset_from_root) const {
-  PhysicalRect result = LocalBoundingBox();
-  result.Move(offset_from_root);
-  return result;
 }
 
 void PaintLayer::ExpandRectForSelfPaintingDescendants(
@@ -2127,7 +2111,12 @@ void PaintLayer::ExpandRectForSelfPaintingDescendants(
     }
 
     PhysicalOffset delta;
-    child_layer->ConvertToLayerCoords(this, delta);
+    if (RuntimeEnabledFeatures::RemoveConvertToLayerCoordsEnabled()) {
+      delta = child_layer->GetLayoutObject().LocalToAncestorPoint(
+          delta, &GetLayoutObject(), kIgnoreTransforms);
+    } else {
+      child_layer->ConvertToLayerCoords(this, delta);
+    }
     added_rect.Move(delta);
 
     result.Unite(added_rect);
@@ -2371,10 +2360,8 @@ gfx::Vector2d PaintLayer::PixelSnappedScrolledContentOffset() const {
   return gfx::Vector2d();
 }
 
-PaintLayerClipper PaintLayer::Clipper(
-    GeometryMapperOption geometry_mapper_option) const {
-  return PaintLayerClipper(
-      this, geometry_mapper_option == GeometryMapperOption::kUseGeometryMapper);
+PaintLayerClipper PaintLayer::Clipper() const {
+  return PaintLayerClipper(this);
 }
 
 bool PaintLayer::ScrollsOverflow() const {
@@ -2460,12 +2447,10 @@ void PaintLayer::UpdateCompositorFilterOperationsForBackdropFilter(
 }
 
 PaintLayerResourceInfo& PaintLayer::EnsureResourceInfo() {
-  PaintLayerRareData& rare_data = EnsureRareData();
-  if (!rare_data.resource_info) {
-    rare_data.resource_info =
-        MakeGarbageCollected<PaintLayerResourceInfo>(this);
+  if (!resource_info_) {
+    resource_info_ = MakeGarbageCollected<PaintLayerResourceInfo>(this);
   }
-  return *rare_data.resource_info;
+  return *resource_info_;
 }
 
 void PaintLayer::SetNeedsReorderOverlayOverflowControls(bool b) {
@@ -2611,7 +2596,7 @@ void PaintLayer::Trace(Visitor* visitor) const {
   visitor->Trace(last_);
   visitor->Trace(scrollable_area_);
   visitor->Trace(stacking_node_);
-  visitor->Trace(rare_data_);
+  visitor->Trace(resource_info_);
   DisplayItemClient::Trace(visitor);
 }
 

@@ -265,8 +265,9 @@ const PrecisionMetrics = {
   sin: {ATOL: {float32: 1/1024, float16: 1/512}},
   tan: {ATOL: {float32: 1/1024, float16: 1/512}},
   // End Element-wise unary operations
-  hardSwish: {ULP: {float32: 4, float16: 4}},
+  elu: {ULP: {float32: 18, float16: 18}},
   gemm: {ULP: {float32: getGemmPrecisionTolerance, float16: getGemmPrecisionTolerance}},
+  hardSwish: {ULP: {float32: 4, float16: 4}},
   leakyRelu: {ULP: {float32: 1, float16: 1}},
   matmul: {ULP: {float32: getMatmulPrecisionTolerance, float16: getMatmulPrecisionTolerance}},
   pad: {ULP: {float32: 0, float16: 0}},
@@ -287,6 +288,7 @@ const PrecisionMetrics = {
   sigmoid: {ULP: {float32: 32+2, float16: 3}}, // float32 (leaving a few ULP for roundoff)
   slice: {ULP: {float32: 0, float16: 0}},
   softmax: {ULP: {float32: getSoftmaxPrecisionTolerance, float16: getSoftmaxPrecisionTolerance}},
+  softsign: {ULP: {float32: 3, float16: 3}},
   split: {ULP: {float32: 0, float16: 0}},
   squeeze: {ULP: {float32: 0, float16: 0}},
   tanh: {ATOL: {float32: 1/1024, float16: 1/512}},

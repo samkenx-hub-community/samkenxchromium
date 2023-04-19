@@ -20,11 +20,11 @@
 #include "base/time/time.h"
 #include "base/values.h"
 #include "components/account_id/account_id.h"
-#include "components/user_manager/remove_user_delegate.h"
 #include "components/user_manager/user.h"
 #include "components/user_manager/user_manager.h"
 #include "components/user_manager/user_manager_export.h"
 #include "components/user_manager/user_type.h"
+#include "third_party/abseil-cpp/absl/types/optional.h"
 
 class PrefRegistrySimple;
 
@@ -63,9 +63,10 @@ class USER_MANAGER_EXPORT UserManagerBase : public UserManager {
     kMaxValue = kLSUDeleted
   };
 
-  // Creates UserManagerBase with |task_runner| for UI thread.
-  explicit UserManagerBase(
-      scoped_refptr<base::SingleThreadTaskRunner> task_runner);
+  // Creates UserManagerBase with |task_runner| for UI thread, and given
+  // |local_state|. |local_state| must outlive this UserManager.
+  UserManagerBase(scoped_refptr<base::SingleThreadTaskRunner> task_runner,
+                  PrefService* local_state);
 
   UserManagerBase(const UserManagerBase&) = delete;
   UserManagerBase& operator=(const UserManagerBase&) = delete;
@@ -94,8 +95,7 @@ class USER_MANAGER_EXPORT UserManagerBase : public UserManager {
   void SwitchToLastActiveUser() override;
   void OnSessionStarted() override;
   void RemoveUser(const AccountId& account_id,
-                  UserRemovalReason reason,
-                  RemoveUserDelegate* delegate) override;
+                  UserRemovalReason reason) override;
   void RemoveUserFromList(const AccountId& account_id) override;
   void RemoveUserFromListForRecreation(const AccountId& account_id) override;
   bool IsKnownUser(const AccountId& account_id) const override;
@@ -160,6 +160,7 @@ class USER_MANAGER_EXPORT UserManagerBase : public UserManager {
   void NotifyUserToBeRemoved(const AccountId& account_id) override;
   void NotifyUserRemoved(const AccountId& account_id,
                          UserRemovalReason reason) override;
+  PrefService* GetLocalState() const final;
   void Initialize() override;
 
   // This method updates "User was added to the device in this session nad is
@@ -227,8 +228,7 @@ class USER_MANAGER_EXPORT UserManagerBase : public UserManager {
   // Pass |account_id| by value here to avoid use-after-free. Original
   // |account_id| could be destroyed during the user removal.
   virtual void RemoveNonOwnerUserInternal(AccountId account_id,
-                                          UserRemovalReason reason,
-                                          RemoveUserDelegate* delegate);
+                                          UserRemovalReason reason);
 
   // Removes a regular or supervised user from the user list.
   // Returns the user if found or NULL otherwise.
@@ -238,15 +238,19 @@ class USER_MANAGER_EXPORT UserManagerBase : public UserManager {
   User* RemoveRegularOrSupervisedUserFromList(const AccountId& account_id,
                                               bool notify);
 
-  // Implementation for `RemoveUserFromList`[`ForRecreation`] methods.
-  void RemoveUserFromListImpl(const AccountId& account_id, bool notify);
+  // Implementation for RemoveUser. If |reason| is set, it notifies observers
+  // via OnUserToBeRemoved, OnUserRemoved and LocalStateChanged.
+  // If |trigger_cryptohome_removal| is set to true, this triggeres an
+  // asynchronous operation to remove the user data in Cryptohome.
+  void RemoveUserFromListImpl(const AccountId& account_id,
+                              absl::optional<UserRemovalReason> reason,
+                              bool trigger_cryptohome_removal);
 
   // Implementation for RemoveUser method. This is an asynchronous part of the
   // method, that verifies that owner will not get deleted, and calls
   // |RemoveNonOwnerUserInternal|.
   virtual void RemoveUserInternal(const AccountId& account_id,
-                                  UserRemovalReason reason,
-                                  RemoveUserDelegate* delegate);
+                                  UserRemovalReason reason);
 
   // Removes data stored or cached outside the user's cryptohome (wallpaper,
   // avatar, OAuth token status, display name, display email).
@@ -274,6 +278,7 @@ class USER_MANAGER_EXPORT UserManagerBase : public UserManager {
                                               const UserType user_type);
 
   // Should be called when regular user was removed.
+  // DEPRECATED: TODO(b/267685577): replace this by Observer::OnUserRemoved.
   virtual void OnUserRemoved(const AccountId& account_id) = 0;
 
   // Update the global LoginState.
@@ -414,6 +419,8 @@ class USER_MANAGER_EXPORT UserManagerBase : public UserManager {
 
   // TaskRunner for UI thread.
   scoped_refptr<base::SingleThreadTaskRunner> task_runner_;
+
+  const base::raw_ptr<PrefService> local_state_;
 
   base::WeakPtrFactory<UserManagerBase> weak_factory_{this};
 };

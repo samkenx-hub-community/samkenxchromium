@@ -397,6 +397,12 @@ id<GREYMatcher> SystemSelectionCalloutLinkToTextButton();
 // Returns a matcher for the copy button on the system selection callout.
 id<GREYMatcher> SystemSelectionCalloutCopyButton();
 
+// Returns a matcher for the cut button on the system selection callout.
+id<GREYMatcher> SystemSelectionCalloutCutButton();
+
+// Returns a matcher for the paste button on the system selection callout.
+id<GREYMatcher> SystemSelectionCalloutPasteButton();
+
 // Returns a matcher for the system selection callout overflow button to show
 // more menu items.
 id<GREYMatcher> SystemSelectionCalloutOverflowButton();
@@ -673,6 +679,10 @@ id<GREYMatcher> ReadingListDestinationButton();
 // Returns a matcher for the passwords destination button in the overflow menu.
 id<GREYMatcher> PasswordsDestinationButton();
 
+// Returns a matchwer for the price notifications destination button in the
+// overflow menu.
+id<GREYMatcher> PriceNotificationsDestinationButton();
+
 // Returns a matcher for the downloads destination button in the overflow menu.
 id<GREYMatcher> DownloadsDestinationButton();
 
@@ -685,6 +695,9 @@ id<GREYMatcher> SiteInfoDestinationButton();
 
 // Returns a matcher for the settings destination button in the overflow menu.
 id<GREYMatcher> SettingsDestinationButton();
+
+// Returns a matcher for the What's New destination button in the overflow menu.
+id<GREYMatcher> WhatsNewDestinationButton();
 
 #pragma mark - Overflow Menu Actions
 

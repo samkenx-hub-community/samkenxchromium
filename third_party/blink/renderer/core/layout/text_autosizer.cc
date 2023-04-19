@@ -45,8 +45,8 @@
 #include "third_party/blink/renderer/core/html/forms/html_text_area_element.h"
 #include "third_party/blink/renderer/core/layout/layout_block.h"
 #include "third_party/blink/renderer/core/layout/layout_inline.h"
-#include "third_party/blink/renderer/core/layout/layout_list_item.h"
 #include "third_party/blink/renderer/core/layout/layout_multi_column_flow_thread.h"
+#include "third_party/blink/renderer/core/layout/layout_text.h"
 #include "third_party/blink/renderer/core/layout/layout_view.h"
 #include "third_party/blink/renderer/core/layout/ng/layout_ng_ruby_run.h"
 #include "third_party/blink/renderer/core/layout/ng/list/layout_ng_list_item.h"
@@ -195,8 +195,8 @@ static bool BlockHeightConstrained(const LayoutBlock* block) {
     if (style.OverflowY() != EOverflow::kVisible
         && style.OverflowY() != EOverflow::kHidden)
       return false;
-    if (style.Height().IsSpecified() || style.MaxHeight().IsSpecified() ||
-        block->IsOutOfFlowPositioned()) {
+    if (style.UsedHeight().IsSpecified() ||
+        style.UsedMaxHeight().IsSpecified() || block->IsOutOfFlowPositioned()) {
       // Some sites (e.g. wikipedia) set their html and/or body elements to
       // height:100%, without intending to constrain the height of the content
       // within them.
@@ -245,7 +245,7 @@ static bool BlockSuppressesAutosizing(const LayoutBlock* block) {
 static bool HasExplicitWidth(const LayoutBlock* block) {
   // FIXME: This heuristic may need to be expanded to other ways a block can be
   // wider or narrower than its parent containing block.
-  return block->Style() && block->StyleRef().Width().IsSpecified();
+  return block->Style() && block->StyleRef().UsedWidth().IsSpecified();
 }
 
 static LayoutObject* GetParent(const LayoutObject* object) {
@@ -362,8 +362,7 @@ void TextAutosizer::PrepareClusterStack(LayoutObject* layout_object) {
   }
 }
 
-void TextAutosizer::BeginLayout(LayoutBlock* block,
-                                SubtreeLayoutScope* layouter) {
+void TextAutosizer::BeginLayout(LayoutBlock* block) {
   DCHECK(ShouldHandleLayout());
 
   if (PrepareForLayout(block) == kStopLayout)
@@ -387,7 +386,7 @@ void TextAutosizer::BeginLayout(LayoutBlock* block,
   bool is_auto_table_cell =
       cell && !cell->Table()->StyleRef().IsFixedTableLayout();
   if (!is_auto_table_cell && !cluster_stack_.empty())
-    Inflate(block, layouter);
+    Inflate(block);
 }
 
 void TextAutosizer::InflateAutoTable(LayoutNGTable* table) {
@@ -414,8 +413,8 @@ void TextAutosizer::InflateAutoTable(LayoutNGTable* table) {
         if (!cell->NeedsLayout()) {
           continue;
         }
-        BeginLayout(cell, nullptr);
-        Inflate(cell, nullptr, kDescendToInnerBlocks);
+        BeginLayout(cell);
+        Inflate(cell, kDescendToInnerBlocks);
         EndLayout(cell);
       }
     }
@@ -439,7 +438,6 @@ void TextAutosizer::EndLayout(LayoutBlock* block) {
 }
 
 float TextAutosizer::Inflate(LayoutObject* parent,
-                             SubtreeLayoutScope* layouter,
                              InflateBehavior behavior,
                              float multiplier) {
   Cluster* cluster = CurrentCluster();
@@ -453,9 +451,6 @@ float TextAutosizer::Inflate(LayoutObject* parent,
       child = run->FirstChild();
       behavior = kDescendToInnerBlocks;
     }
-  } else if (parent->IsListMarker()) {
-    // The list item already applied the multiplier to the marker, keep it.
-    return multiplier;
   } else if (parent->IsLayoutBlock() &&
              (parent->ChildrenInline() || behavior == kDescendToInnerBlocks)) {
     child = To<LayoutBlock>(parent)->FirstChild();
@@ -472,7 +467,7 @@ float TextAutosizer::Inflate(LayoutObject* parent,
         multiplier =
             cluster->flags_ & SUPPRESSING ? 1.0f : ClusterMultiplier(cluster);
       }
-      ApplyMultiplier(child, multiplier, layouter);
+      ApplyMultiplier(child, multiplier);
 
       if (behavior == kDescendToInnerBlocks) {
         // The ancestor nodes might be inline-blocks. We should
@@ -483,7 +478,7 @@ float TextAutosizer::Inflate(LayoutObject* parent,
         child->SetIntrinsicLogicalWidthsDirty(kMarkOnlyThis);
       }
     } else if (child->IsLayoutInline()) {
-      multiplier = Inflate(child, layouter, behavior, multiplier);
+      multiplier = Inflate(child, behavior, multiplier);
       // If this LayoutInline is an anonymous inline that has multiplied
       // children, apply the multiplifer to the parent too. We compute
       // ::first-line style from the style of the parent block.
@@ -492,40 +487,35 @@ float TextAutosizer::Inflate(LayoutObject* parent,
     } else if (child->IsLayoutBlock() && behavior == kDescendToInnerBlocks &&
                !ClassifyBlock(child,
                               INDEPENDENT | EXPLICIT_WIDTH | SUPPRESSING)) {
-      multiplier = Inflate(child, layouter, behavior, multiplier);
+      multiplier = Inflate(child, behavior, multiplier);
     }
     child = child->NextSibling();
   }
 
   if (has_text_child) {
-    ApplyMultiplier(parent, multiplier,
-                    layouter);  // Parent handles line spacing.
+    ApplyMultiplier(parent, multiplier);  // Parent handles line spacing.
   } else if (!parent->IsListItemIncludingNG()) {
     // For consistency, a block with no immediate text child should always have
     // a multiplier of 1.
-    ApplyMultiplier(parent, 1, layouter);
+    ApplyMultiplier(parent, 1);
   }
 
-  if (parent->IsListItemIncludingNG()) {
+  if (parent->IsLayoutNGListItem()) {
     float list_item_multiplier = ClusterMultiplier(cluster);
-    ApplyMultiplier(parent, list_item_multiplier, layouter);
+    ApplyMultiplier(parent, list_item_multiplier);
 
     // The list item has to be treated special because we can have a tree such
     // that you have a list item for a form inside it. The list marker then ends
     // up inside the form and when we try to get the clusterMultiplier we have
     // the wrong cluster root to work from and get the wrong value.
-    LayoutObject* marker = nullptr;
-    if (parent->IsListItem())
-      marker = To<LayoutListItem>(parent)->Marker();
-    else if (parent->IsLayoutNGListItem())
-      marker = To<LayoutNGListItem>(parent)->Marker();
+    LayoutObject* marker = To<LayoutNGListItem>(parent)->Marker();
 
     // A LayoutNGOutsideListMarker has a text child that needs its font
     // multiplier updated. Just mark the entire subtree, to make sure we get to
     // it.
     for (LayoutObject* walker = marker; walker;
          walker = walker->NextInPreOrder(marker)) {
-      ApplyMultiplier(walker, list_item_multiplier, layouter);
+      ApplyMultiplier(walker, list_item_multiplier);
       walker->SetIntrinsicLogicalWidthsDirty(kMarkOnlyThis);
     }
   }
@@ -718,7 +708,7 @@ void TextAutosizer::ResetMultipliers() {
   while (layout_object) {
     if (const ComputedStyle* style = layout_object->Style()) {
       if (style->TextAutosizingMultiplier() != 1)
-        ApplyMultiplier(layout_object, 1, nullptr, kLayoutNeeded);
+        ApplyMultiplier(layout_object, 1, kLayoutNeeded);
     }
     layout_object = layout_object->NextInPreOrder();
   }
@@ -867,7 +857,7 @@ TextAutosizer::Fingerprint TextAutosizer::ComputeFingerprint(
         (static_cast<unsigned>(style->UnresolvedFloating()) << 4);
     data.packed_style_properties_ |=
         (static_cast<unsigned>(style->Display()) << 7);
-    const Length& width = style->Width();
+    const Length& width = style->UsedWidth();
     data.packed_style_properties_ |= (width.GetType() << 12);
     // packedStyleProperties effectively using 16 bits now.
 
@@ -1210,7 +1200,6 @@ void TextAutosizer::ReportIfCrossSiteFrame() {
 
 void TextAutosizer::ApplyMultiplier(LayoutObject* layout_object,
                                     float multiplier,
-                                    SubtreeLayoutScope* layouter,
                                     RelayoutBehavior relayout_behavior) {
   DCHECK(layout_object);
   const ComputedStyle& current_style = layout_object->StyleRef();
@@ -1255,14 +1244,11 @@ void TextAutosizer::ApplyMultiplier(LayoutObject* layout_object,
           std::move(style), LayoutObject::ApplyStyleChanges::kNo);
       if (layout_object->IsText())
         To<LayoutText>(layout_object)->AutosizingMultiplerChanged();
-      DCHECK(!layouter || layout_object->IsDescendantOf(&layouter->Root()));
       layout_object->SetNeedsLayoutAndFullPaintInvalidation(
-          layout_invalidation_reason::kTextAutosizing, kMarkContainerChain,
-          layouter);
+          layout_invalidation_reason::kTextAutosizing, kMarkContainerChain);
       break;
 
     case kLayoutNeeded:
-      DCHECK(!layouter);
       layout_object->SetModifiedStyleOutsideStyleRecalc(
           std::move(style), LayoutObject::ApplyStyleChanges::kYes);
       break;
@@ -1419,14 +1405,13 @@ TextAutosizer::FingerprintMapper::GetTentativeClusterRoots(
   return it != blocks_for_fingerprint_.end() ? &*it->value : nullptr;
 }
 
-TextAutosizer::LayoutScope::LayoutScope(LayoutBlock* block,
-                                        SubtreeLayoutScope* layouter)
+TextAutosizer::LayoutScope::LayoutScope(LayoutBlock* block)
     : text_autosizer_(block->GetDocument().GetTextAutosizer()), block_(block) {
   if (!text_autosizer_)
     return;
 
   if (text_autosizer_->ShouldHandleLayout())
-    text_autosizer_->BeginLayout(block_, layouter);
+    text_autosizer_->BeginLayout(block_);
   else
     text_autosizer_ = nullptr;
 }
@@ -1489,7 +1474,7 @@ TextAutosizer::NGLayoutScope::NGLayoutScope(LayoutBox* box,
   // before, at least if the autosizer is enabled.
   text_autosizer_->RegisterInlineSize(*block_, inline_size);
 
-  text_autosizer_->BeginLayout(block_, nullptr);
+  text_autosizer_->BeginLayout(block_);
 }
 
 TextAutosizer::NGLayoutScope::~NGLayoutScope() {

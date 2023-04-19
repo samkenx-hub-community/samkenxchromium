@@ -4,6 +4,7 @@
 
 #include "third_party/blink/renderer/modules/smart_card/smart_card_resource_manager.h"
 
+#include "services/device/public/mojom/smart_card.mojom-blink.h"
 #include "third_party/blink/public/mojom/permissions_policy/permissions_policy_feature.mojom-shared.h"
 #include "third_party/blink/public/mojom/smart_card/smart_card.mojom-blink.h"
 #include "third_party/blink/renderer/core/execution_context/navigator_base.h"
@@ -100,11 +101,22 @@ void SmartCardResourceManager::ReaderChanged(
   ReaderAdded(std::move(reader_info));
 }
 
-void SmartCardResourceManager::Error(SmartCardResponseCode response_code) {
+void SmartCardResourceManager::Error(
+    device::mojom::blink::SmartCardError error) {
   tracking_started_ = false;
   // TODO(crbug.com/1386175):
   // * Put existing SmartCardReader instances into an invalid state.
   // * Forward error to existing SmartCardPresenceObservers.
+}
+
+void SmartCardResourceManager::Connect(
+    const String& reader_name,
+    device::mojom::blink::SmartCardShareMode share_mode,
+    device::mojom::blink::SmartCardProtocolsPtr preferred_protocols,
+    mojom::blink::SmartCardService::ConnectCallback callback) {
+  EnsureServiceConnection();
+  service_->Connect(reader_name, share_mode, std::move(preferred_protocols),
+                    std::move(callback));
 }
 
 void SmartCardResourceManager::Trace(Visitor* visitor) const {
@@ -169,8 +181,8 @@ void SmartCardResourceManager::FinishGetReaders(
   DCHECK(get_readers_promises_.Contains(resolver));
   get_readers_promises_.erase(resolver);
 
-  if (result->is_response_code()) {
-    auto* error = SmartCardError::Create(result->get_response_code());
+  if (result->is_error()) {
+    auto* error = SmartCardError::Create(result->get_error());
     resolver->Reject(error);
     return;
   }
@@ -185,7 +197,7 @@ void SmartCardResourceManager::FinishGetReaders(
 
 void SmartCardResourceManager::UpdateReadersCache(
     mojom::blink::SmartCardGetReadersResultPtr result) {
-  if (result->is_response_code()) {
+  if (result->is_error()) {
     return;
   }
 
@@ -203,7 +215,7 @@ SmartCardReader* SmartCardResourceManager::GetOrCreateReader(
 
   const String name = info->name;
   SmartCardReader* reader = MakeGarbageCollected<SmartCardReader>(
-      std::move(info), GetExecutionContext());
+      this, std::move(info), GetExecutionContext());
 
   reader_cache_.insert(name, reader);
   return reader;

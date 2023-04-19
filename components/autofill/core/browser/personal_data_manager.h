@@ -86,6 +86,20 @@ class PersonalDataManager : public KeyedService,
                             public signin::IdentityManager::Observer,
                             public AccountInfoGetter {
  public:
+  // Profiles can be retrieved from the PersonalDataManager in different orders.
+  enum class ProfileOrder {
+    // Arbitrary order.
+    kNone,
+    // In descending order of frecency
+    // (`AutofillProfile::HasGreaterRankingThan())`.
+    kHighestFrecencyDesc,
+    // Most recently modified profiles first.
+    kMostRecentlyModifiedDesc,
+    // Most recently used profiles first.
+    kMostRecentlyUsedFirstDesc,
+    kMaxValue = kMostRecentlyUsedFirstDesc
+  };
+
   explicit PersonalDataManager(const std::string& app_locale);
   PersonalDataManager(const std::string& app_locale,
                       const std::string& country_code);
@@ -213,14 +227,10 @@ class PersonalDataManager : public KeyedService,
   // Autofill address profiles to their account.
   virtual bool IsEligibleForAddressAccountStorage() const;
 
-  // Migrates a given kLocalOrSyncable `profile` to source kAccount. This has
-  // multiple side-effects for the profile:
-  // - It is stored in a different backend.
-  // - It receives a new GUID.
-  // Like all database operations, the migration happens asynchronously.
-  // `profile` (the kLocalOrSyncable one) will not be available in the
-  // PersonalDataManager anymore once the migrating has finished.
-  void MigrateProfileToAccount(const AutofillProfile& profile);
+  // Users based in unsupported countries and profiles with a country value set
+  // to an unsupported country are not eligible for account storage. This
+  // function determines if the `country_code` is eligible.
+  bool IsCountryEligibleForAccountStorage(base::StringPiece country_code) const;
 
   // Adds `iban` to the web database as a local IBAN. Returns the guid of
   // `iban` if the add is successful, or an empty string otherwise.
@@ -322,10 +332,12 @@ class PersonalDataManager : public KeyedService,
   // `GetProfiles()` returns all `kAccount` and `kLocalOrSyncable` profiles. By
   // using `GetProfilesFromSource()`, profiles from a single source are be
   // retrieved.
-  // The profiles are returned in unspecified order.
-  virtual std::vector<AutofillProfile*> GetProfiles() const;
+  // The profiles are returned in the specified `order`.
+  virtual std::vector<AutofillProfile*> GetProfiles(
+      ProfileOrder order = ProfileOrder::kNone) const;
   virtual std::vector<AutofillProfile*> GetProfilesFromSource(
-      AutofillProfile::Source profile_source) const;
+      AutofillProfile::Source profile_source,
+      ProfileOrder order = ProfileOrder::kNone) const;
   // Returns just SERVER_PROFILES.
   // TODO(crbug.com/1348294): Server profiles are only accessed in tests and the
   // concept should be removed.
@@ -530,6 +542,10 @@ class PersonalDataManager : public KeyedService,
   virtual void SetProfilesForAllSources(
       std::vector<AutofillProfile>* new_profiles);
 
+  // Sets |credit_cards_| to the contents of |credit_cards| and updates the web
+  // database by adding, updating and removing credit cards.
+  void SetCreditCards(std::vector<CreditCard>* credit_cards);
+
   // Returns true if a `kLocalOrSyncable` profile identified by its guid is
   // blocked for migration to a `kAccount` profile.
   bool IsProfileMigrationBlocked(const std::string& guid) const;
@@ -537,6 +553,10 @@ class PersonalDataManager : public KeyedService,
   // Adds a strike to block a profile identified by its `guid` for migrations.
   // Does nothing if the strike database is not available.
   void AddStrikeToBlockProfileMigration(const std::string& guid);
+
+  // Adds enough strikes to the profile identified by `guid` to block migrations
+  // for it.
+  void AddMaxStrikesToBlockProfileMigration(const std::string& guid);
 
   // Removes potential strikes to block a profile identified by its `guid` for
   // migrations. Does nothing if the strike database is not available.
@@ -571,6 +591,9 @@ class PersonalDataManager : public KeyedService,
 
   // Returns true if Sync is enabled for `model_type`.
   bool IsSyncEnabledFor(syncer::ModelType model_type) const;
+
+  // Returns true if payments mandatory re-auth is enabled.
+  bool IsAutofillPaymentMethodsMandatoryReauthEnabled();
 
   // Used to automatically import addresses without a prompt. Should only be
   // set to true in tests.
@@ -670,10 +693,6 @@ class PersonalDataManager : public KeyedService,
   AutofillProfileUpdateStrikeDatabase* GetProfileUpdateStrikeDatabase();
   virtual const AutofillProfileUpdateStrikeDatabase*
   GetProfileUpdateStrikeDatabase() const;
-
-  // Sets |credit_cards_| to the contents of |credit_cards| and updates the web
-  // database by adding, updating and removing credit cards.
-  void SetCreditCards(std::vector<CreditCard>* credit_cards);
 
   // Like `SetProfilesForAllSources()`, but assumes that all profiles in
   // `new_profiles` have the given `source`.

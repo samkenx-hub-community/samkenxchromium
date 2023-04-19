@@ -24,6 +24,7 @@ import org.chromium.base.metrics.RecordHistogram;
 import org.chromium.base.metrics.RecordUserAction;
 import org.chromium.base.supplier.ObservableSupplier;
 import org.chromium.base.supplier.ObservableSupplierImpl;
+import org.chromium.base.supplier.Supplier;
 import org.chromium.chrome.browser.ActivityTabProvider;
 import org.chromium.chrome.browser.ChromeInactivityTracker;
 import org.chromium.chrome.browser.IntentHandler;
@@ -32,7 +33,10 @@ import org.chromium.chrome.browser.feed.FeedFeatures;
 import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.homepage.HomepageManager;
 import org.chromium.chrome.browser.homepage.HomepagePolicyManager;
+import org.chromium.chrome.browser.layouts.LayoutStateProvider;
+import org.chromium.chrome.browser.layouts.LayoutType;
 import org.chromium.chrome.browser.locale.LocaleManager;
+import org.chromium.chrome.browser.ntp.NewTabPage;
 import org.chromium.chrome.browser.preferences.ChromePreferenceKeys;
 import org.chromium.chrome.browser.preferences.Pref;
 import org.chromium.chrome.browser.preferences.PrefChangeRegistrar;
@@ -43,6 +47,7 @@ import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.browser.tab.TabLaunchType;
 import org.chromium.chrome.browser.tabmodel.TabCreator;
 import org.chromium.chrome.browser.tabmodel.TabModel;
+import org.chromium.chrome.browser.tabmodel.TabModelObserver;
 import org.chromium.chrome.browser.tabmodel.TabModelSelector;
 import org.chromium.chrome.browser.tabmodel.TabModelUtils;
 import org.chromium.chrome.browser.tabmodel.TabPersistentStore.ActiveTabState;
@@ -101,9 +106,12 @@ public final class ReturnToChromeUtil {
         private final Runnable mOnBackPressedCallback;
         private final ActivityTabProvider.ActivityTabTabObserver mActivityTabObserver;
         private final ActivityTabProvider mActivityTabProvider;
+        private final Supplier<Tab> mTabSupplier; // for debugging only
+        private final Supplier<LayoutStateProvider> mLayoutStateProviderSupplier;
 
-        public ReturnToChromeBackPressHandler(
-                ActivityTabProvider activityTabProvider, Runnable onBackPressedCallback) {
+        public ReturnToChromeBackPressHandler(ActivityTabProvider activityTabProvider,
+                Runnable onBackPressedCallback, Supplier<Tab> tabSupplier,
+                Supplier<LayoutStateProvider> layoutStateProviderSupplier) {
             mActivityTabProvider = activityTabProvider;
             mActivityTabObserver =
                     new ActivityTabProvider.ActivityTabTabObserver(activityTabProvider, true) {
@@ -113,6 +121,8 @@ public final class ReturnToChromeUtil {
                         }
                     };
             mOnBackPressedCallback = onBackPressedCallback;
+            mTabSupplier = tabSupplier;
+            mLayoutStateProviderSupplier = layoutStateProviderSupplier;
             onBackPressStateChanged();
         }
 
@@ -125,8 +135,16 @@ public final class ReturnToChromeUtil {
         public @BackPressResult int handleBackPress() {
             Tab tab = mActivityTabProvider.get();
             boolean res = tab != null && !tab.canGoBack() && isTabFromStartSurface(tab);
-            assert res
-                : String.format("tab %s; back press state %s", tab, tab != null && tab.canGoBack());
+            if (!res) {
+                var controlTab = mTabSupplier.get();
+                int layoutType = mLayoutStateProviderSupplier.hasValue()
+                        ? mLayoutStateProviderSupplier.get().getActiveLayoutType()
+                        : LayoutType.NONE;
+                assert false
+                    : String.format("tab %s; control tab %s; back press state %s; layout %s", tab,
+                              controlTab, tab != null && tab.canGoBack(), layoutType);
+            }
+
             mOnBackPressedCallback.run();
             return res ? BackPressResult.SUCCESS : BackPressResult.FAILURE;
         }
@@ -504,13 +522,45 @@ public final class ReturnToChromeUtil {
     }
 
     /**
-     * Creates a new Tab.
+     * Creates a new Tab and show Home surface UI. This is called when the last active Tab isn't a
+     * NTP, and we need to create one and show Home surface UI (a module showing the last active
+     * Tab).
      * @param tabCreator The {@link TabCreator} object.
+     * @param tabModelSelector The {@link TabModelSelector} object.
+     * @param lastActiveTabUrl The URL of the last active Tab. It is non-null in cold startup before
+     *                         the Tab is restored.
+     * @param lastActiveTab The object of the last active Tab. It is non-null after TabModel is
+     *                      initialized, e.g., in warm startup.
      */
-    public static Tab createNewTab(TabCreator tabCreator) {
+    public static Tab createNewTabAndShowHomeSurfaceUi(TabCreator tabCreator,
+            TabModelSelector tabModelSelector, @Nullable String lastActiveTabUrl,
+            @Nullable Tab lastActiveTab) {
+        assert lastActiveTab != null || lastActiveTabUrl != null;
+
         // Creates a new Tab if doesn't find an existing to reuse.
-        return tabCreator.createNewTab(
+        Tab ntpTab = tabCreator.createNewTab(
                 new LoadUrlParams(UrlConstants.NTP_URL), TabLaunchType.FROM_STARTUP, null);
+
+        // If the last active Tab isn't ready yet, we will listen to the willAddTab() event and find
+        // the Tab instance with the given last active Tab's URL. The last active Tab is always the
+        // first one to be restored.
+        if (lastActiveTab == null) {
+            assert lastActiveTabUrl != null;
+            TabModelObserver observer = new TabModelObserver() {
+                @Override
+                public void willAddTab(Tab tab, int type) {
+                    assert TextUtils.equals(lastActiveTabUrl, tab.getUrl().getSpec())
+                        : "The URL of first Tab restored doesn't match the URL of the last active Tab read from the Tab state metadata file!";
+                    showHomeSurfaceUiOnNtp(ntpTab, tab);
+                    tabModelSelector.getModel(false).removeObserver(this);
+                }
+            };
+            tabModelSelector.getModel(false).addObserver(observer);
+        } else {
+            showHomeSurfaceUiOnNtp(ntpTab, lastActiveTab);
+        }
+
+        return ntpTab;
     }
 
     /**
@@ -528,11 +578,19 @@ public final class ReturnToChromeUtil {
             return;
         }
 
+        int index = currentTabModel.index();
+        Tab lastActiveTab = TabModelUtils.getCurrentTab(currentTabModel);
+        if (lastActiveTab == null) return;
+
         int indexOfFirstNtp = TabModelUtils.getTabIndexByUrl(currentTabModel, UrlConstants.NTP_URL);
         if (indexOfFirstNtp != TabModel.INVALID_TAB_INDEX) {
+            // If the last active Tab is NTP, early return here.
+            if (indexOfFirstNtp == index) return;
+
             TabModelUtils.setIndex(currentTabModel, indexOfFirstNtp, false);
+            showHomeSurfaceUiOnNtp(currentTabModel.getTabAt(indexOfFirstNtp), lastActiveTab);
         } else {
-            createNewTab(tabCreator);
+            createNewTabAndShowHomeSurfaceUi(tabCreator, null, null, lastActiveTab);
         }
     }
 
@@ -666,5 +724,13 @@ public final class ReturnToChromeUtil {
             BrowserUiUtils.recordModuleClickHistogram(HostSurface.NEW_TAB_PAGE,
                     BrowserUiUtils.ModuleTypeOnStartAndNTP.TAB_SWITCHER_BUTTON);
         }
+    }
+
+    /**
+     * Shows the home surface UI on the given Ntp on tablets.
+     */
+    private static void showHomeSurfaceUiOnNtp(Tab ntpTab, Tab lastActiveTab) {
+        assert ntpTab.isNativePage();
+        ((NewTabPage) ntpTab.getNativePage()).showHomeSurfaceUi(lastActiveTab);
     }
 }

@@ -645,8 +645,9 @@ FontDescription::Size StyleBuilderConverter::ConvertFontSize(
       value, state.FontSizeConversionData(), parent_size, &state.GetDocument());
 }
 
-float StyleBuilderConverter::ConvertFontSizeAdjust(StyleResolverState& state,
-                                                   const CSSValue& value) {
+FontSizeAdjust StyleBuilderConverter::ConvertFontSizeAdjust(
+    StyleResolverState& state,
+    const CSSValue& value) {
   auto* identifier_value = DynamicTo<CSSIdentifierValue>(value);
   if (identifier_value && identifier_value->GetValueID() == CSSValueID::kNone) {
     return FontBuilder::InitialSizeAdjust();
@@ -658,7 +659,7 @@ float StyleBuilderConverter::ConvertFontSizeAdjust(StyleResolverState& state,
 
   const auto& primitive_value = To<CSSPrimitiveValue>(value);
   DCHECK(primitive_value.IsNumber());
-  return primitive_value.GetFloatValue();
+  return FontSizeAdjust(primitive_value.GetFloatValue());
 }
 
 FontSelectionValue StyleBuilderConverterBase::ConvertFontStretch(
@@ -2644,6 +2645,14 @@ StyleAspectRatio StyleBuilderConverter::ConvertAspectRatio(
   return StyleAspectRatio(type, ratio);
 }
 
+bool StyleBuilderConverter::ConvertInternalAlignContentBlock(
+    StyleResolverState&,
+    const CSSValue& value) {
+  auto* identifier_value = DynamicTo<CSSIdentifierValue>(value);
+  return identifier_value &&
+         identifier_value->GetValueID() == CSSValueID::kCenter;
+}
+
 bool StyleBuilderConverter::ConvertInternalAlignSelfBlock(
     StyleResolverState&,
     const CSSValue& value) {
@@ -3050,6 +3059,17 @@ Vector<TimelineAxis> StyleBuilderConverter::ConvertViewTimelineAxis(
     axes.push_back(To<CSSIdentifierValue>(*item).ConvertTo<TimelineAxis>());
   }
   return axes;
+}
+
+Vector<TimelineAttachment> StyleBuilderConverter::ConvertViewTimelineAttachment(
+    StyleResolverState& state,
+    const CSSValue& value) {
+  Vector<TimelineAttachment> attachments;
+  for (const Member<const CSSValue>& item : To<CSSValueList>(value)) {
+    attachments.push_back(
+        To<CSSIdentifierValue>(*item).ConvertTo<TimelineAttachment>());
+  }
+  return attachments;
 }
 
 TimelineInset StyleBuilderConverter::ConvertSingleTimelineInset(

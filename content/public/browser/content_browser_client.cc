@@ -10,7 +10,6 @@
 #include "base/feature_list.h"
 #include "base/files/file_path.h"
 #include "base/functional/callback_helpers.h"
-#include "base/guid.h"
 #include "base/no_destructor.h"
 #include "base/notreached.h"
 #include "base/strings/string_piece.h"
@@ -19,6 +18,7 @@
 #include "base/values.h"
 #include "build/build_config.h"
 #include "build/chromeos_buildflags.h"
+#include "content/browser/webid/mdocs/mdoc_provider.h"
 #include "content/public/browser/anchor_element_preconnect_delegate.h"
 #include "content/public/browser/authenticator_request_client_delegate.h"
 #include "content/public/browser/browser_accessibility_state.h"
@@ -74,10 +74,6 @@
 
 #if BUILDFLAG(IS_ANDROID)
 #include "content/public/browser/tts_environment_android.h"
-#endif
-
-#if BUILDFLAG(IS_CHROMEOS)
-#include "content/public/browser/firewall_hole_proxy.h"
 #endif
 
 namespace content {
@@ -506,6 +502,10 @@ bool ContentBrowserClient::IsInterestGroupAPIAllowed(
   return false;
 }
 
+void ContentBrowserClient::OnAuctionComplete(
+    RenderFrameHost* render_frame_host,
+    InterestGroupManager::InterestGroupDataKey data_key) {}
+
 bool ContentBrowserClient::IsAttributionReportingOperationAllowed(
     content::BrowserContext* browser_context,
     AttributionReportingOperation operation,
@@ -547,11 +547,6 @@ GeneratedCodeCacheSettings ContentBrowserClient::GetGeneratedCodeCacheSettings(
     BrowserContext* context) {
   // By default, code cache is disabled, embedders should override.
   return GeneratedCodeCacheSettings(false, 0, base::FilePath());
-}
-
-cert_verifier::mojom::CertVerifierServiceParamsPtr
-ContentBrowserClient::GetCertVerifierServiceParams() {
-  return nullptr;
 }
 
 void ContentBrowserClient::AllowCertificateError(
@@ -1350,6 +1345,10 @@ bool ContentBrowserClient::HasErrorPage(int http_status_code) {
 std::unique_ptr<IdentityRequestDialogController>
 ContentBrowserClient::CreateIdentityRequestDialogController() {
   return std::make_unique<IdentityRequestDialogController>();
+}
+
+std::unique_ptr<MDocProvider> ContentBrowserClient::CreateMDocProvider() {
+  return nullptr;
 }
 
 bool ContentBrowserClient::SuppressDifferentOriginSubframeJSDialogs(

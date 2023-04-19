@@ -12,7 +12,9 @@
 
 namespace arc::input_overlay {
 
+class Action;
 class DisplayOverlayController;
+
 // InputMappingView shows all the input mappings.
 class InputMappingView : public views::View {
  public:

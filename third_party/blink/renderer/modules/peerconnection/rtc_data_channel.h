@@ -25,8 +25,6 @@
 #ifndef THIRD_PARTY_BLINK_RENDERER_MODULES_PEERCONNECTION_RTC_DATA_CHANNEL_H_
 #define THIRD_PARTY_BLINK_RENDERER_MODULES_PEERCONNECTION_RTC_DATA_CHANNEL_H_
 
-#include <memory>
-
 #include "base/gtest_prod_util.h"
 #include "base/task/single_thread_task_runner.h"
 #include "base/threading/thread_checker.h"
@@ -143,12 +141,13 @@ class MODULES_EXPORT RTCDataChannel final
     void OnStateChange() override;
     void OnBufferedAmountChange(uint64_t sent_data_size) override;
     void OnMessage(const webrtc::DataBuffer& buffer) override;
+    bool IsOkToCallOnTheNetworkThread() override;
 
    private:
     // webrtc::DataChannelObserver implementation on the main thread.
     void OnStateChangeImpl(webrtc::DataChannelInterface::DataState state);
     void OnBufferedAmountChangeImpl(unsigned sent_data_size);
-    void OnMessageImpl(std::unique_ptr<webrtc::DataBuffer> buffer);
+    void OnMessageImpl(webrtc::DataBuffer buffer);
 
     const scoped_refptr<base::SingleThreadTaskRunner> main_thread_;
     WeakPersistent<RTCDataChannel> blink_channel_;
@@ -157,7 +156,7 @@ class MODULES_EXPORT RTCDataChannel final
 
   void OnStateChange(webrtc::DataChannelInterface::DataState state);
   void OnBufferedAmountChange(unsigned previous_amount);
-  void OnMessage(std::unique_ptr<webrtc::DataBuffer> buffer);
+  void OnMessage(webrtc::DataBuffer buffer);
 
   void Dispose();
 

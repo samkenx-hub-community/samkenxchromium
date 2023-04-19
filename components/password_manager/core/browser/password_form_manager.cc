@@ -385,13 +385,13 @@ void PasswordFormManager::OnUpdateUsernameFromPrompt(
     // knows about. Set `votes_uploader_`'s UsernameChangeState depending on
     // whether the username is present or not. Also set `username_element` if it
     // is a known username.
-    const auto& possible_usernames =
-        parsed_submitted_form_->all_possible_usernames;
-    auto possible_username_it = base::ranges::find(
-        possible_usernames, new_username, &ValueElementPair::first);
+    const auto& alternative_usernames =
+        parsed_submitted_form_->all_alternative_usernames;
+    auto alternative_username_it = base::ranges::find(
+        alternative_usernames, new_username, &AlternativeElement::value);
 
-    if (possible_username_it != possible_usernames.end()) {
-      parsed_submitted_form_->username_element = possible_username_it->second;
+    if (alternative_username_it != alternative_usernames.end()) {
+      parsed_submitted_form_->username_element = alternative_username_it->name;
       votes_uploader_.set_username_change_state(
           VotesUploader::UsernameChangeState::kChangedToKnownValue);
     } else {
@@ -414,12 +414,12 @@ void PasswordFormManager::OnUpdatePasswordFromPrompt(
   parsed_submitted_form_->new_password_value.clear();
   parsed_submitted_form_->new_password_element.clear();
 
-  for (const ValueElementPair& pair :
-       parsed_submitted_form_->all_possible_passwords) {
-    if (pair.first == new_password) {
-      parsed_submitted_form_->password_element = pair.second;
-      break;
-    }
+  const AlternativeElementVector& alternative_passwords =
+      parsed_submitted_form_->all_alternative_passwords;
+  auto alternative_password_it = base::ranges::find(
+      alternative_passwords, new_password, &AlternativeElement::value);
+  if (alternative_password_it != alternative_passwords.end()) {
+    parsed_submitted_form_->password_element = alternative_password_it->name;
   }
 
   CreatePendingCredentials();

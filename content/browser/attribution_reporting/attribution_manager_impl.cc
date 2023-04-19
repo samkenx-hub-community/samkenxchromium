@@ -33,7 +33,6 @@
 #include "base/time/time.h"
 #include "build/build_config.h"
 #include "build/buildflag.h"
-#include "components/attribution_reporting/os_support.mojom.h"
 #include "components/attribution_reporting/source_registration.h"
 #include "components/attribution_reporting/source_registration_error.mojom.h"
 #include "components/attribution_reporting/suitable_origin.h"
@@ -73,10 +72,11 @@
 #include "content/public/browser/storage_partition.h"
 #include "content/public/common/content_client.h"
 #include "content/public/common/content_switches.h"
+#include "services/network/public/cpp/features.h"
+#include "services/network/public/mojom/attribution.mojom.h"
 #include "services/network/public/mojom/network_change_manager.mojom-forward.h"
 #include "storage/browser/quota/special_storage_policy.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
-#include "third_party/blink/public/common/features.h"
 #include "third_party/blink/public/common/storage_key/storage_key.h"
 #include "url/gurl.h"
 #include "url/origin.h"
@@ -420,8 +420,7 @@ AttributionManagerImpl::CreateWithNewDbForTesting(
 
 bool AttributionManagerImpl::IsReportAllowed(
     const AttributionReport& report) const {
-  const CommonSourceInfo& common_info =
-      report.attribution_info().source.common_info();
+  const CommonSourceInfo& common_info = report.GetStoredSource().common_info();
   return IsOperationAllowed(
       storage_partition_.get(),
       ContentBrowserClient::AttributionReportingOperation::kReport,
@@ -449,11 +448,11 @@ AttributionManagerImpl::CreateForTesting(
 }
 
 // static
-attribution_reporting::mojom::OsSupport AttributionManagerImpl::GetOsSupport() {
+network::mojom::AttributionOsSupport AttributionManagerImpl::GetOsSupport() {
 #if BUILDFLAG(IS_ANDROID)
   return AttributionOsLevelManagerAndroid::GetOsSupport();
 #else
-  return attribution_reporting::mojom::OsSupport::kDisabled;
+  return network::mojom::AttributionOsSupport::kDisabled;
 #endif
 }
 
@@ -518,7 +517,7 @@ AttributionManagerImpl::AttributionManagerImpl(
 
 #if BUILDFLAG(IS_ANDROID)
   if (base::FeatureList::IsEnabled(
-          blink::features::kAttributionReportingCrossAppWeb)) {
+          network::features::kAttributionReportingCrossAppWeb)) {
     attribution_os_level_manager_ =
         std::make_unique<AttributionOsLevelManagerAndroid>();
   }
@@ -754,16 +753,14 @@ void AttributionManagerImpl::AddPendingAggregatableReportTiming(
     return;
   }
 
-  const auto* data =
-      absl::get_if<AttributionReport::AggregatableAttributionData>(
-          &report.data());
-  DCHECK(data);
+  DCHECK_EQ(report.GetReportType(),
+            AttributionReport::Type::kAggregatableAttribution);
 
   auto [it, inserted] = pending_aggregatable_reports_.try_emplace(
-      data->id, PendingReportTimings{
-                    .creation_time = base::Time::Now(),
-                    .report_time = report.report_time(),
-                });
+      report.id(), PendingReportTimings{
+                       .creation_time = base::Time::Now(),
+                       .report_time = report.report_time(),
+                   });
   DCHECK(inserted);
 }
 
@@ -812,7 +809,7 @@ void AttributionManagerImpl::OnReportStored(
 
 void AttributionManagerImpl::MaybeSendDebugReport(AttributionReport&& report) {
   const AttributionInfo& attribution_info = report.attribution_info();
-  if (!attribution_info.debug_key || !attribution_info.source.debug_key() ||
+  if (!attribution_info.debug_key || !report.GetStoredSource().debug_key() ||
       !IsReportAllowed(report)) {
     return;
   }
@@ -967,7 +964,7 @@ void AttributionManagerImpl::SendReports(
   for (AttributionReport& report : reports) {
     DCHECK_LE(report.report_time(), now);
 
-    bool inserted = reports_being_sent_.emplace(report.ReportId()).second;
+    bool inserted = reports_being_sent_.emplace(report.id()).second;
     if (!inserted) {
       if (web_ui_callback) {
         web_ui_callback.Run();
@@ -976,11 +973,9 @@ void AttributionManagerImpl::SendReports(
       continue;
     }
 
-    if (auto id = report.ReportId();
-        const auto* aggregatable_id =
-            absl::get_if<AttributionReport::AggregatableAttributionData::Id>(
-                &id)) {
-      pending_aggregatable_reports_.erase(*aggregatable_id);
+    if (report.GetReportType() ==
+        AttributionReport::Type::kAggregatableAttribution) {
+      pending_aggregatable_reports_.erase(report.id());
     }
 
     if (!IsReportAllowed(report)) {
@@ -1060,13 +1055,13 @@ void AttributionManagerImpl::OnReportSent(base::OnceClosure done,
           manager->NotifyReportsChanged();
         }
       },
-      std::move(done), weak_factory_.GetWeakPtr(), report.ReportId(),
+      std::move(done), weak_factory_.GetWeakPtr(), report.id(),
       new_report_time);
 
   if (new_report_time) {
     attribution_storage_
         .AsyncCall(&AttributionStorage::UpdateReportForSendFailure)
-        .WithArgs(report.ReportId(), *new_report_time)
+        .WithArgs(report.id(), *new_report_time)
         .Then(std::move(then));
 
     // TODO(apaseltiner): Consider surfacing retry attempts in internals UI.
@@ -1075,7 +1070,7 @@ void AttributionManagerImpl::OnReportSent(base::OnceClosure done,
   }
 
   attribution_storage_.AsyncCall(&AttributionStorage::DeleteReport)
-      .WithArgs(report.ReportId())
+      .WithArgs(report.id())
       .Then(std::move(then));
 
   LogMetricsOnReportCompleted(report, info.status);

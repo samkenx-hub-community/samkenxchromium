@@ -162,10 +162,17 @@ class PLATFORM_EXPORT PaintArtifactCompositor final
   // noncomposited nodes, and is used for Scroll Unification to generate scroll
   // nodes for noncomposited scrollers to complete the compositor's scroll
   // property tree.
+  //
+  // |anchor_scroll_container_nodes| is the set of scroll nodes whose scroll
+  // offset contributes to any anchor-scroll translation (namely, whose id is
+  // snapshotted in an AnchorScrollData). This is needed only when
+  // ScrollUnification is disabled.
   void Update(
       scoped_refptr<const PaintArtifact> artifact,
       const ViewportProperties& viewport_properties,
       const Vector<const TransformPaintPropertyNode*>& scroll_translation_nodes,
+      const Vector<const TransformPaintPropertyNode*>&
+          anchor_scroll_container_nodes,
       Vector<std::unique_ptr<cc::ViewTransitionRequest>> requests);
 
   // Fast-path update where the painting of existing composited layers changed,
@@ -197,6 +204,8 @@ class PLATFORM_EXPORT PaintArtifactCompositor final
   // transform node in DirectlyUpdateScrollOffsetTransform() or Update()).
   bool DirectlySetScrollOffset(CompositorElementId,
                                const gfx::PointF& scroll_offset);
+
+  uint32_t GetMainThreadScrollingReasons(const ScrollPaintPropertyNode&) const;
 
   // The root layer of the tree managed by this object.
   cc::Layer* RootLayer() const { return root_layer_.get(); }
@@ -259,6 +268,10 @@ class PLATFORM_EXPORT PaintArtifactCompositor final
   bool SetScrollbarNeedsDisplay(CompositorElementId element_id);
 
  private:
+  void UpdateCompositorViewportProperties(const ViewportProperties&,
+                                          PropertyTreeManager&,
+                                          cc::LayerTreeHost*);
+
   // Collects the PaintChunks into groups which will end up in the same
   // cc layer. This is the entry point of the layerization algorithm.
   void CollectPendingLayers(scoped_refptr<const PaintArtifact>);
@@ -326,7 +339,7 @@ class PLATFORM_EXPORT PaintArtifactCompositor final
 
   CompositingReasons GetCompositingReasons(
       const PendingLayer& layer,
-      const PendingLayer* previous_layer) const;
+      const PropertyTreeState& previous_layer_state) const;
 
   void UpdateDebugInfo() const;
 

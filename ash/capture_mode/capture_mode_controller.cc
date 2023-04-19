@@ -8,9 +8,10 @@
 #include <vector>
 
 #include "ash/capture_mode/capture_mode_ash_notification_view.h"
+#include "ash/capture_mode/capture_mode_behavior.h"
 #include "ash/capture_mode/capture_mode_camera_controller.h"
 #include "ash/capture_mode/capture_mode_metrics.h"
-#include "ash/capture_mode/capture_mode_notification_view.h"
+#include "ash/capture_mode/capture_mode_observer.h"
 #include "ash/capture_mode/capture_mode_session.h"
 #include "ash/capture_mode/capture_mode_types.h"
 #include "ash/capture_mode/capture_mode_util.h"
@@ -20,6 +21,7 @@
 #include "ash/public/cpp/capture_mode/recording_overlay_view.h"
 #include "ash/public/cpp/holding_space/holding_space_client.h"
 #include "ash/public/cpp/holding_space/holding_space_controller.h"
+#include "ash/public/cpp/new_window_delegate.h"
 #include "ash/public/cpp/notification_utils.h"
 #include "ash/resources/vector_icons/vector_icons.h"
 #include "ash/root_window_controller.h"
@@ -447,6 +449,8 @@ int GetFileSizeInKB(const base::FilePath& file_path) {
   return size_in_bytes / 1024;
 }
 
+constexpr char kShareToYouTubeURL[] = "https://studio.youtube.com";
+
 }  // namespace
 
 CaptureModeController::CaptureModeController(
@@ -487,21 +491,12 @@ CaptureModeController::CaptureModeController(
   DCHECK(!MessageViewFactory::HasCustomNotificationViewFactory(
       kScreenRecordingNotificationType));
 
-  if (features::IsNotificationsRefreshEnabled()) {
-    MessageViewFactory::SetCustomNotificationViewFactory(
-        kScreenShotNotificationType,
-        base::BindRepeating(&CaptureModeAshNotificationView::CreateForImage));
-    MessageViewFactory::SetCustomNotificationViewFactory(
-        kScreenRecordingNotificationType,
-        base::BindRepeating(&CaptureModeAshNotificationView::CreateForVideo));
-  } else {
-    MessageViewFactory::SetCustomNotificationViewFactory(
-        kScreenShotNotificationType,
-        base::BindRepeating(&CaptureModeNotificationView::CreateForImage));
-    MessageViewFactory::SetCustomNotificationViewFactory(
-        kScreenRecordingNotificationType,
-        base::BindRepeating(&CaptureModeNotificationView::CreateForVideo));
-  }
+  MessageViewFactory::SetCustomNotificationViewFactory(
+      kScreenShotNotificationType,
+      base::BindRepeating(&CaptureModeAshNotificationView::CreateForImage));
+  MessageViewFactory::SetCustomNotificationViewFactory(
+      kScreenRecordingNotificationType,
+      base::BindRepeating(&CaptureModeAshNotificationView::CreateForVideo));
 
   Shell::Get()->session_controller()->AddObserver(this);
   chromeos::PowerManagerClient::Get()->AddObserver(this);
@@ -954,6 +949,14 @@ void CaptureModeController::MaybeRestoreCachedCaptureConfigurations() {
   cached_normal_session_configs_.reset();
 }
 
+void CaptureModeController::AddObserver(CaptureModeObserver* observer) {
+  observers_.AddObserver(observer);
+}
+
+void CaptureModeController::RemoveObserver(CaptureModeObserver* observer) {
+  observers_.RemoveObserver(observer);
+}
+
 void CaptureModeController::PushNewRootSizeToRecordingService(
     const gfx::Size& root_size,
     float device_scale_factor) {
@@ -1349,8 +1352,7 @@ void CaptureModeController::OnImageFileSaved(
     RecordSaveToLocation(GetSaveToOption(file_saved_path));
   // NOTE: Holding space `client` may be `nullptr` in tests.
   if (auto* client = HoldingSpaceController::Get()->client()) {
-    client->AddScreenCapture(HoldingSpaceItem::Type::kScreenshot,
-                             file_saved_path);
+    client->AddItemOfType(HoldingSpaceItem::Type::kScreenshot, file_saved_path);
   }
 }
 
@@ -1371,10 +1373,10 @@ void CaptureModeController::OnVideoFileSaved(
                               CaptureModeType::kVideo);
       // NOTE: Holding space `client` may be `nullptr` in tests.
       if (auto* client = HoldingSpaceController::Get()->client()) {
-        client->AddScreenCapture(
-            is_gif ? HoldingSpaceItem::Type::kScreenRecordingGif
-                   : HoldingSpaceItem::Type::kScreenRecording,
-            saved_video_file_path);
+        client->AddItemOfType(is_gif
+                                  ? HoldingSpaceItem::Type::kScreenRecordingGif
+                                  : HoldingSpaceItem::Type::kScreenRecording,
+                              saved_video_file_path);
       }
 
       // We only record the file size histogram if it's not a projector-
@@ -1978,6 +1980,23 @@ CaptureModeSaveToLocation CaptureModeController::GetSaveToOption(
       return CaptureModeSaveToLocation::kDriveFolder;
   }
   return CaptureModeSaveToLocation::kCustomizedFolder;
+}
+
+void CaptureModeController::OnShareToYouTubeButtonPressed() {
+  NewWindowDelegate::GetPrimary()->OpenUrl(
+      GURL(kShareToYouTubeURL),
+      NewWindowDelegate::OpenUrlFrom::kUserInteraction,
+      NewWindowDelegate::Disposition::kNewForegroundTab);
+}
+
+CaptureModeBehavior* CaptureModeController::GetBehavior(
+    BehaviorType behavior_type) {
+  auto& behavior = behaviors_map_[behavior_type];
+  if (!behavior) {
+    behavior = CaptureModeBehavior::Create(behavior_type);
+  }
+
+  return behavior.get();
 }
 
 }  // namespace ash

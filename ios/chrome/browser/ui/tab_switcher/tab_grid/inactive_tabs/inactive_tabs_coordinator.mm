@@ -9,12 +9,16 @@
 
 #import "base/notreached.h"
 #import "base/strings/sys_string_conversions.h"
+#import "ios/chrome/browser/application_context/application_context.h"
 #import "ios/chrome/browser/main/browser.h"
+#import "ios/chrome/browser/sessions/ios_chrome_tab_restore_service_factory.h"
+#import "ios/chrome/browser/sessions/session_restoration_browser_agent.h"
 #import "ios/chrome/browser/shared/coordinator/alert/action_sheet_coordinator.h"
 #import "ios/chrome/browser/snapshots/snapshot_browser_agent.h"
 #import "ios/chrome/browser/tabs/inactive_tabs/features.h"
 #import "ios/chrome/browser/ui/settings/settings_navigation_controller.h"
 #import "ios/chrome/browser/ui/tab_switcher/tab_grid/grid/grid_view_controller.h"
+#import "ios/chrome/browser/ui/tab_switcher/tab_grid/inactive_tabs/inactive_tabs_commands.h"
 #import "ios/chrome/browser/ui/tab_switcher/tab_grid/inactive_tabs/inactive_tabs_mediator.h"
 #import "ios/chrome/browser/ui/tab_switcher/tab_grid/inactive_tabs/inactive_tabs_user_education_coordinator.h"
 #import "ios/chrome/browser/ui/tab_switcher/tab_grid/inactive_tabs/inactive_tabs_view_controller.h"
@@ -41,6 +45,7 @@ NSString* const kInactiveTabsUserEducationShownOnce =
 
 @interface InactiveTabsCoordinator () <
     GridViewControllerDelegate,
+    InactiveTabsCommands,
     InactiveTabsUserEducationCoordinatorDelegate,
     InactiveTabsViewControllerDelegate,
     SettingsNavigationControllerDelegate>
@@ -62,15 +67,37 @@ NSString* const kInactiveTabsUserEducationShownOnce =
 
 @end
 
-@implementation InactiveTabsCoordinator
+@implementation InactiveTabsCoordinator {
+  // Delegate for dismissing the coordinator.
+  __weak id<InactiveTabsCoordinatorDelegate> _delegate;
+
+  // Provides the context menu for the tabs on the grid.
+  __weak id<TabContextMenuProvider> _menuProvider;
+}
+
+#pragma mark - Public
+
+- (instancetype)
+    initWithBaseViewController:(UIViewController*)viewController
+                       browser:(Browser*)browser
+                      delegate:(id<InactiveTabsCoordinatorDelegate>)delegate
+                  menuProvider:(id<TabContextMenuProvider>)menuProvider {
+  CHECK(IsInactiveTabsEnabled());
+  CHECK(menuProvider);
+  CHECK(delegate);
+  self = [super initWithBaseViewController:viewController browser:browser];
+  if (self) {
+    _delegate = delegate;
+    _menuProvider = menuProvider;
+  }
+  return self;
+}
+
+- (id<GridCommands>)gridCommandsHandler {
+  return self.mediator;
+}
 
 #pragma mark - ChromeCoordinator
-
-- (instancetype)initWithBaseViewController:(UIViewController*)viewController
-                                   browser:(Browser*)browser {
-  DCHECK(IsInactiveTabsEnabled());
-  return [super initWithBaseViewController:viewController browser:browser];
-}
 
 - (void)start {
   [super start];
@@ -81,14 +108,24 @@ NSString* const kInactiveTabsUserEducationShownOnce =
   self.viewController.gridViewController.delegate = self;
 
   // Create the mediator.
-  SnapshotCache* snapshotCache =
-      SnapshotBrowserAgent::FromBrowser(self.browser)->snapshot_cache();
+  SessionRestorationBrowserAgent* sessionRestorationBrowserAgent =
+      SessionRestorationBrowserAgent::FromBrowser(self.browser);
+  SnapshotBrowserAgent* snapshotBrowserAgent =
+      SnapshotBrowserAgent::FromBrowser(self.browser);
+  sessions::TabRestoreService* tabRestoreService =
+      IOSChromeTabRestoreServiceFactory::GetForBrowserState(
+          self.browser->GetBrowserState());
+
   self.mediator = [[InactiveTabsMediator alloc]
-      initWithConsumer:self.viewController.gridViewController
-          webStateList:self.browser->GetWebStateList()
-         snapshotCache:snapshotCache];
-  self.viewController.gridViewController.imageDataSource = self.mediator;
-  self.viewController.gridViewController.menuProvider = self.menuProvider;
+             initWithConsumer:self.viewController.gridViewController
+               commandHandler:self
+                 webStateList:self.browser->GetWebStateList()
+                  prefService:GetApplicationContext()->GetLocalState()
+      sessionRestorationAgent:sessionRestorationBrowserAgent
+                snapshotAgent:snapshotBrowserAgent
+            tabRestoreService:tabRestoreService];
+
+  self.viewController.gridViewController.menuProvider = _menuProvider;
 }
 
 - (void)show {
@@ -125,6 +162,11 @@ NSString* const kInactiveTabsUserEducationShownOnce =
 }
 
 - (void)hide {
+  [self.userEducationCoordinator stop];
+  self.userEducationCoordinator = nil;
+  [self closeSettings];
+  [self.viewController.gridViewController dismissModals];
+
   UIView* baseView = self.baseViewController.view;
 
   [baseView layoutIfNeeded];
@@ -160,8 +202,8 @@ NSString* const kInactiveTabsUserEducationShownOnce =
 
 - (void)gridViewController:(GridViewController*)gridViewController
        didSelectItemWithID:(NSString*)itemID {
-  [self.delegate inactiveTabsCoordinator:self didSelectItemWithID:itemID];
-  [self.delegate inactiveTabsCoordinatorDidFinish:self];
+  [_delegate inactiveTabsCoordinator:self didSelectItemWithID:itemID];
+  [_delegate inactiveTabsCoordinatorDidFinish:self];
 }
 
 - (void)gridViewController:(GridViewController*)gridViewController
@@ -240,6 +282,12 @@ NSString* const kInactiveTabsUserEducationShownOnce =
   [self presentSettings];
 }
 
+#pragma mark - InactiveTabsCommands
+
+- (void)inactiveTabsExplicitlyDisabledByUser {
+  [_delegate inactiveTabsCoordinatorDidFinish:self];
+}
+
 #pragma mark - InactiveTabsUserEducationCoordinatorDelegate
 
 - (void)inactiveTabsUserEducationCoordinatorDidTapSettingsButton:
@@ -261,7 +309,7 @@ NSString* const kInactiveTabsUserEducationShownOnce =
 
 - (void)inactiveTabsViewControllerDidTapBackButton:
     (InactiveTabsViewController*)inactiveTabsViewController {
-  [self.delegate inactiveTabsCoordinatorDidFinish:self];
+  [_delegate inactiveTabsCoordinatorDidFinish:self];
 }
 
 - (void)inactiveTabsViewController:
@@ -351,7 +399,7 @@ NSString* const kInactiveTabsUserEducationShownOnce =
 
 // Called when the user confirmed wanting to close all inactive tabs.
 - (void)closeAllInactiveTabs {
-  [self.delegate inactiveTabsCoordinatorDidFinish:self];
+  [_delegate inactiveTabsCoordinatorDidFinish:self];
   [self.mediator closeAllItems];
 }
 

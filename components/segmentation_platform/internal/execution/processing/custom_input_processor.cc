@@ -9,9 +9,14 @@
 #include "base/task/sequenced_task_runner.h"
 #include "components/segmentation_platform/internal/database/ukm_types.h"
 #include "components/segmentation_platform/internal/execution/processing/feature_processor_state.h"
+#include "components/segmentation_platform/internal/execution/processing/processing_utils.h"
 #include "components/segmentation_platform/internal/metadata/metadata_utils.h"
 #include "components/segmentation_platform/public/input_delegate.h"
 #include "components/segmentation_platform/public/proto/model_metadata.pb.h"
+
+#if BUILDFLAG(IS_ANDROID)
+#include "components/segmentation_platform/internal/android/execution/processing/custom_device_utils.h"
+#endif  // BUILDFLAG(IS_ANDROID)
 
 namespace segmentation_platform::processing {
 
@@ -33,11 +38,6 @@ absl::optional<int> GetArgAsInt(
     return absl::optional<int>();
 
   return absl::optional<int>(value);
-}
-
-int ProcessOsVersionString(std::string os_version) {
-  // TODO(ritikagup@) : Add the implementation logic here.
-  return 0;
 }
 
 }  // namespace
@@ -303,7 +303,7 @@ bool CustomInputProcessor::AddDeviceOSVersionNumber(
     return false;
   }
   std::string os_version = base::SysInfo::OperatingSystemVersion();
-  int device_os_version = ProcessOsVersionString(os_version);
+  int device_os_version = processing::ProcessOsVersionString(os_version);
   out_tensor.emplace_back(device_os_version);
   return true;
 }
@@ -314,9 +314,12 @@ bool CustomInputProcessor::AddDevicePPI(
   if (custom_input.tensor_length() != 1) {
     return false;
   }
-  // TODO(crbug.com/1424539) : Add logic to read device max PPI and add it in
-  // out_tensor. out_tensor.emplace_back(device_max_ppi);
+#if BUILDFLAG(IS_ANDROID)
+  int device_ppi = CustomDeviceUtils::GetDevicePPI();
+  out_tensor.emplace_back(device_ppi);
   return true;
+#else
+  return false;
+#endif  // BUILDFLAG(IS_ANDROID)
 }
-
 }  // namespace segmentation_platform::processing

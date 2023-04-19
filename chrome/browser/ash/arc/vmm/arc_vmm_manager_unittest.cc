@@ -115,7 +115,7 @@ class ArcVmmManagerTest : public testing::Test {
 
 TEST_F(ArcVmmManagerTest, SwapSuccess) {
   InitVmmManager();
-  manager()->SetSwapState(true);
+  manager()->SetSwapState(SwapState::ENABLE_WITH_SWAPOUT);
   base::RunLoop().RunUntilIdle();
   // Send "ENABLE" first.
   EXPECT_EQ(1, client()->enable_count());
@@ -129,31 +129,33 @@ TEST_F(ArcVmmManagerTest, SwapSuccess) {
   EXPECT_EQ(0, client()->disable_count());
 }
 
-TEST_F(ArcVmmManagerTest, ObservationAndScheduler) {
-  base::test::ScopedFeatureList features_;
-  // The feature companion with some paremeter. Although the test will use
-  // the default value, keep the empty parameter here for better readability.
-  features_.InitAndEnableFeatureWithParameters(kVmmSwapPolicy, {{}});
-  InitVmmManager();
+// This test verify the weak ptr safety in scheduler.
+TEST_F(ArcVmmManagerTest, WeakPtrRef) {
+  class TestClass {
+   public:
+    void add(int x) { value += x; }
 
-  // Should enabled observation.
-  EXPECT_NE(manager()->system_state_observation_for_testing(), nullptr);
+    int value = 0;
 
-  base::RunLoop().RunUntilIdle();
-  // Mark ARC is inactive.
-  manager()->system_state_observation_for_testing()->ThrottleInstance(true);
+    base::WeakPtrFactory<TestClass> weak_ptr_factory_{this};
+  };
 
-  // Haven't start swap out.
-  task_environment_.FastForwardBy(base::Minutes(1));
-  EXPECT_EQ(0, client()->enable_count());
-  EXPECT_EQ(0, client()->swap_out_count());
-  EXPECT_EQ(0, client()->disable_count());
+  TestClass* test_class = new TestClass;
+  auto cb = base::BindRepeating(
+      [](base::WeakPtr<TestClass> c, int v) {
+        if (c) {
+          c->add(v);
+        }
+      },
+      test_class->weak_ptr_factory_.GetWeakPtr());
 
-  // Should trigger the swap out state after 1 hour.
-  task_environment_.FastForwardBy(base::Hours(1));
-  EXPECT_EQ(1, client()->enable_count());
-  EXPECT_EQ(1, client()->swap_out_count());
-  EXPECT_EQ(0, client()->disable_count());
+  EXPECT_EQ(test_class->value, 0);
+  cb.Run(1);
+  EXPECT_EQ(test_class->value, 1);
+
+  delete test_class;
+  cb.Run(2);
+  // Expect no crash here.
 }
 
 }  // namespace arc

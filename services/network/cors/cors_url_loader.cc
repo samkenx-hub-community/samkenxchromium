@@ -9,6 +9,9 @@
 
 #include "base/containers/contains.h"
 #include "base/containers/flat_set.h"
+#include "base/dcheck_is_on.h"
+#include "base/debug/crash_logging.h"
+#include "base/debug/dump_without_crashing.h"
 #include "base/functional/bind.h"
 #include "base/metrics/histogram_functions.h"
 #include "base/strings/strcat.h"
@@ -30,6 +33,10 @@
 #include "services/network/public/mojom/early_hints.mojom.h"
 #include "services/network/public/mojom/ip_address_space.mojom.h"
 #include "services/network/public/mojom/url_response_head.mojom.h"
+#include "services/network/shared_dictionary/shared_dictionary_data_pipe_writer.h"
+#include "services/network/shared_dictionary/shared_dictionary_manager.h"
+#include "services/network/shared_dictionary/shared_dictionary_storage.h"
+#include "services/network/shared_dictionary/shared_dictionary_writer.h"
 #include "services/network/trust_tokens/trust_token_operation_metrics_recorder.h"
 #include "services/network/url_loader.h"
 #include "services/network/url_loader_factory.h"
@@ -265,6 +272,7 @@ CorsURLLoader::CorsURLLoader(
     mojo::PendingRemote<mojom::DevToolsObserver> devtools_observer,
     const mojom::ClientSecurityState* factory_client_security_state,
     const CrossOriginEmbedderPolicy& cross_origin_embedder_policy,
+    scoped_refptr<SharedDictionaryStorage> shared_dictionary_storage,
     NetworkContext* context)
     : receiver_(this, std::move(loader_receiver)),
       process_id_(process_id),
@@ -289,7 +297,8 @@ CorsURLLoader::CorsURLLoader(
       // logs.
       net_log_(net::NetLogWithSource::Make(net::NetLog::Get(),
                                            net::NetLogSourceType::URL_REQUEST)),
-      context_(context) {
+      context_(context),
+      shared_dictionary_storage_(std::move(shared_dictionary_storage)) {
   if (ignore_isolated_world_origin)
     request_.isolated_world_origin = absl::nullopt;
 
@@ -499,6 +508,30 @@ void CorsURLLoader::OnReceiveResponse(
     }
   }
 
+  if (shared_dictionary_storage_ && (IsCorsEnabledRequestMode(request_.mode))) {
+    // The compressed dictionary transport feature currently supports storing
+    // dictionaries only if the request was fetched using Cors enabled mode.
+    // Note: We may extend this support in future (For example, same-origin mode
+    // requests, responses containing a valid Access-Control-Allow-Origin header
+    // even if the request mode was not Cors.)
+    // TODO(crbug.com/1413922): Check the Origin Trial state flag of
+    // CompressionDictionaryTransport which will be set in ResourceRequest.
+    auto writer = shared_dictionary_storage_->MaybeCreateWriter(
+        request_.url, response_head->response_time, *response_head->headers);
+    if (writer) {
+      shared_dictionary_data_pipe_writer_ =
+          SharedDictionaryDataPipeWriter::Create(
+              body, std::move(writer),
+              base::BindOnce(&CorsURLLoader::OnSharedDictionaryWritten,
+                             base::Unretained(this)));
+      if (!shared_dictionary_data_pipe_writer_) {
+        HandleComplete(
+            URLLoaderCompletionStatus(net::ERR_INSUFFICIENT_RESOURCES));
+        return;
+      }
+    }
+  }
+
   has_forwarded_response_ = true;
   timing_allow_failed_flag_ = !PassesTimingAllowOriginCheck(*response_head);
 
@@ -659,7 +692,13 @@ void CorsURLLoader::OnComplete(const URLLoaderCompletionStatus& status) {
   // to expect it also happens even during redirect handling.
   DCHECK(!deferred_redirect_url_ || status.error_code != net::OK);
 
-  HandleComplete(status);
+  if (shared_dictionary_data_pipe_writer_) {
+    deferred_completion_status_ = status;
+    shared_dictionary_data_pipe_writer_->OnComplete(status.error_code ==
+                                                    net::OK);
+  } else {
+    HandleComplete(status);
+  }
 }
 
 void CorsURLLoader::StartRequest() {
@@ -800,7 +839,18 @@ absl::optional<URLLoaderCompletionStatus> CorsURLLoader::ConvertPreflightResult(
   // Private Network Access warning: ignore net and CORS errors.
   if (net_error == net::OK || sending_pna_only_warning_preflight_) {
     CHECK(ShouldIgnorePrivateNetworkAccessErrors());
-    CHECK_EQ(*reason, PreflightRequiredReason::kPrivateNetworkAccess);
+
+    // TODO(https://crbug.com/1432684): Upgrade to a CHECK once the reason for
+    // crashes in the wild is understood and fixed, or remove/replace.
+    SCOPED_CRASH_KEY_NUMBER("network", "preflight_reason",
+                            static_cast<int>(*reason));
+#if DCHECK_IS_ON()
+    DCHECK_EQ(*reason, PreflightRequiredReason::kPrivateNetworkAccess);
+#else
+    if (*reason != PreflightRequiredReason::kPrivateNetworkAccess) {
+      base::debug::DumpWithoutCrashing();
+    }
+#endif
 
     // Record the existence of the warning so that we can report it to
     // `forwarding_client_` in the next `URLResponseHead` we construct.
@@ -913,8 +963,8 @@ void CorsURLLoader::StartNetworkRequest() {
         request_, network_client_receiver_.BindNewPipeAndPassRemote(),
         traffic_annotation_);
   }
-  network_client_receiver_.set_disconnect_handler(
-      base::BindOnce(&CorsURLLoader::OnMojoDisconnect, base::Unretained(this)));
+  network_client_receiver_.set_disconnect_handler(base::BindOnce(
+      &CorsURLLoader::OnNetworkClientMojoDisconnect, base::Unretained(this)));
 
   request_.credentials_mode = original_credentials_mode;
 }
@@ -994,6 +1044,19 @@ void CorsURLLoader::HandleComplete(URLLoaderCompletionStatus status) {
 
 void CorsURLLoader::OnMojoDisconnect() {
   HandleComplete(URLLoaderCompletionStatus(net::ERR_ABORTED));
+}
+
+void CorsURLLoader::OnNetworkClientMojoDisconnect() {
+  if (shared_dictionary_data_pipe_writer_) {
+    // If we already received URLLoaderCompletionStatus, ignores this disconnect
+    // error.
+    if (!deferred_completion_status_) {
+      deferred_completion_status_ = URLLoaderCompletionStatus(net::ERR_ABORTED);
+      shared_dictionary_data_pipe_writer_->OnComplete(/*success=*/false);
+    }
+  } else {
+    HandleComplete(URLLoaderCompletionStatus(net::ERR_ABORTED));
+  }
 }
 
 // This should be identical to CalculateCorsFlag defined in
@@ -1128,6 +1191,14 @@ CorsURLLoader::GetPrivateNetworkAccessPreflightBehavior() const {
     return PrivateNetworkAccessPreflightBehavior::kWarnWithTimeout;
   }
   return PrivateNetworkAccessPreflightBehavior::kWarn;
+}
+
+void CorsURLLoader::OnSharedDictionaryWritten(bool success) {
+  shared_dictionary_data_pipe_writer_.reset();
+  if (deferred_completion_status_) {
+    HandleComplete(*deferred_completion_status_);
+    return;
+  }
 }
 
 mojom::PrivateNetworkAccessPreflightResult

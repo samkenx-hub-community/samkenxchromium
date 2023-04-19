@@ -8,7 +8,6 @@
 #import "base/memory/ptr_util.h"
 #import "base/metrics/histogram_macros.h"
 #import "base/task/sequenced_task_runner.h"
-#import "ios/chrome/browser/snapshots/features.h"
 #import "ios/chrome/browser/snapshots/snapshot_cache.h"
 #import "ios/chrome/browser/snapshots/snapshot_generator.h"
 #import "ios/web/public/thread/web_task_traits.h"
@@ -35,8 +34,17 @@ enum class PageLoadedSnapshotResult {
   kMaxValue = kSnapshotSucceeded,
 };
 
-// MIME type of PDF.
-const char kMimeTypePDF[] = "application/pdf";
+// Generates an identifier for WebState's snapshot.
+NSString* GenerateSnapshotIdentifier(const web::WebState* web_state) {
+  DCHECK(web_state->GetUniqueIdentifier().is_valid());
+  DCHECK_GT(web_state->GetUniqueIdentifier().id(), 0);
+
+  static_assert(sizeof(SessionID::id_type) == sizeof(int32_t));
+  const uint32_t identifier =
+      static_cast<uint32_t>(web_state->GetUniqueIdentifier().id());
+
+  return [NSString stringWithFormat:@"%08u", identifier];
+}
 
 }  // namespace
 
@@ -63,14 +71,9 @@ void SnapshotTabHelper::RetrieveGreySnapshot(void (^callback)(UIImage*)) {
 void SnapshotTabHelper::UpdateSnapshotWithCallback(void (^callback)(UIImage*)) {
   was_loading_during_last_snapshot_ = web_state_->IsLoading();
 
-  bool is_pdf = web_state_->GetContentsMimeType() == kMimeTypePDF;
   bool showing_native_content =
       web::GetWebClient()->IsAppSpecificURL(web_state_->GetLastCommittedURL());
-  bool can_use_wkwebview_api =
-      base::FeatureList::IsEnabled(kPDFSnapshot)
-          ? !is_pdf && !showing_native_content && web_state_->CanTakeSnapshot()
-          : !showing_native_content && web_state_->CanTakeSnapshot();
-  if (can_use_wkwebview_api) {
+  if (!showing_native_content && web_state_->CanTakeSnapshot()) {
     // Take the snapshot using the optimized WKWebView snapshotting API for
     // pages loaded in the web view when the WebState snapshot API is available.
     [snapshot_generator_ updateWebViewSnapshotWithCompletion:callback];
@@ -98,22 +101,23 @@ void SnapshotTabHelper::IgnoreNextLoad() {
 }
 
 void SnapshotTabHelper::WillBeSavedGreyWhenBackgrounding() {
-  [snapshot_generator_.snapshotCache
-      willBeSavedGreyWhenBackgrounding:web_state_->GetStableIdentifier()];
+  [snapshot_generator_ willBeSavedGreyWhenBackgrounding];
 }
 
 void SnapshotTabHelper::SaveGreyInBackground() {
-  [snapshot_generator_.snapshotCache
-      saveGreyInBackgroundForSnapshotID:web_state_->GetStableIdentifier()];
+  [snapshot_generator_ saveGreyInBackground];
+}
+
+NSString* SnapshotTabHelper::GetSnapshotIdentifier() const {
+  return snapshot_generator_.snapshotIdentifier;
 }
 
 SnapshotTabHelper::SnapshotTabHelper(web::WebState* web_state)
-    : web_state_(web_state), weak_ptr_factory_(this) {
+    : web_state_(web_state) {
   DCHECK(web_state_);
-  DCHECK(web_state_->GetStableIdentifier().length > 0);
   snapshot_generator_ = [[SnapshotGenerator alloc]
-      initWithWebState:web_state_
-                 tabID:web_state_->GetStableIdentifier()];
+        initWithWebState:web_state_
+      snapshotIdentifier:GenerateSnapshotIdentifier(web_state_)];
   web_state_observation_.Observe(web_state_);
 }
 

@@ -49,7 +49,7 @@ audio {
 }
 
 body {
-  background: var(--grey-900);
+  background: var(--cros-sys-app_base);
   bottom: 0;
   font-family: var(--default-font-family);
   height: 100%;
@@ -328,10 +328,8 @@ div.mode-item>span {
 }
 
 .mode-item>input:checked + span {
-  background: white;
-  box-shadow: 0 2px 3px rgba(32, 33, 36, 0.3);
-  color: black;
-  text-shadow: none;
+  background: var(--cros-sys-primary);
+  color: var(--cros-sys-inverse_on_surface);
 }
 
 button.shutter {
@@ -350,11 +348,6 @@ body.taking.timer:not(.video) #stop-takephoto {
 }
 
 body:is(:not(.recording), .enable-gif-recording, .should-handle-intent-result) :is(#video-snapshot, #pause-recordvideo) {
-  display: none;
-}
-
-/* TODO(b/236800499): Handle pause for time-lapse recording */
-body.record-type-time-lapse #pause-recordvideo {
   display: none;
 }
 
@@ -548,7 +541,6 @@ body.mode-switching:not(.streaming) #camera-mode {
 }
 
 #switch-device {
-  background-image: url(/images/camera_button_switch_device.svg);
   height: var(--big-icon);
   outline-offset: 8px;
   width: var(--big-icon);
@@ -678,10 +670,6 @@ body.mirror #open-mirror-panel {
 
 #toggle-mic {
   background-image: url(/images/camera_button_mic_off.svg);
-}
-
-#open-settings {
-  background-image: url(/images/camera_button_settings.svg);
 }
 
 body.should-handle-intent-result #open-settings {
@@ -1493,7 +1481,7 @@ body:not(.video) #settings-video-resolution {
 }
 
 [tabindex='0']:focus-visible {
-  outline: 2px solid var(--blue-300);
+  outline: 2px solid var(--cros-sys-focus_ring);
 }
 
 .circle :is(button, input) {
@@ -1563,4 +1551,9 @@ body:not(.video) #settings-video-resolution {
   background: url(/images/external_link_icon.svg);
   height: 20px;
   width: 20px;
+}
+
+#open-settings,
+#switch-device {
+  color: var(--cros-sys-on_surface);
 }

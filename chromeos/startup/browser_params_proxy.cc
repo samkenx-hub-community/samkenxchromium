@@ -285,4 +285,13 @@ BrowserParamsProxy::StandaloneBrowserAppServiceBlockList() const {
       ->standalone_browser_app_service_blocklist.get();
 }
 
+bool BrowserParamsProxy::EnableCpuMappableNativeGpuMemoryBuffers() const {
+  return BrowserInitParams::Get()
+      ->enable_cpu_mappable_native_gpu_memory_buffers;
+}
+
+bool BrowserParamsProxy::OopVideoDecodingEnabled() const {
+  return BrowserInitParams::Get()->oop_video_decoding_enabled;
+}
+
 }  // namespace chromeos

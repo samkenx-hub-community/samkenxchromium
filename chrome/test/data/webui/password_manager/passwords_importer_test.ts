@@ -1,0 +1,357 @@
+// Copyright 2023 The Chromium Authors
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+import 'chrome://password-manager/password_manager.js';
+
+import {CrDialogElement, Page, PasswordManagerImpl, PasswordsImporterElement, Router} from 'chrome://password-manager/password_manager.js';
+import {PluralStringProxyImpl} from 'chrome://resources/js/plural_string_proxy.js';
+import {flush} from 'chrome://resources/polymer/v3_0/polymer/polymer_bundled.min.js';
+import {assertEquals, assertFalse, assertTrue} from 'chrome://webui-test/chai_assert.js';
+import {flushTasks} from 'chrome://webui-test/polymer_test_util.js';
+import {TestPluralStringProxy} from 'chrome://webui-test/test_plural_string_proxy.js';
+import {isChildVisible, isVisible} from 'chrome://webui-test/test_util.js';
+
+import {TestPasswordManagerProxy} from './test_password_manager_proxy.js';
+
+
+function createPasswordsImporter(
+    isUserSyncingPasswords: boolean = false,
+    isAccountStoreUser: boolean = false,
+    accountEmail: string = ''): PasswordsImporterElement {
+  const passwordsImporter = document.createElement('passwords-importer');
+  passwordsImporter.isUserSyncingPasswords = isUserSyncingPasswords;
+  passwordsImporter.isAccountStoreUser = isAccountStoreUser;
+  passwordsImporter.accountEmail = accountEmail;
+  document.body.appendChild(passwordsImporter);
+  flush();
+  return passwordsImporter;
+}
+
+async function triggerImportHelper(
+    importer: PasswordsImporterElement,
+    passwordManager: TestPasswordManagerProxy,
+    expectedStore: chrome.passwordsPrivate.PasswordStoreSet =
+        chrome.passwordsPrivate.PasswordStoreSet.DEVICE) {
+  const chooseFile =
+      importer.shadowRoot!.querySelector<HTMLElement>('#selectFileButton');
+  assertTrue(!!chooseFile);
+  assertTrue(isVisible(chooseFile));
+  chooseFile.click();
+  flush();
+
+  // In progress state after the click.
+  const spinner = importer.shadowRoot!.querySelector('paper-spinner-lite');
+  assertTrue(!!spinner);
+  assertTrue(spinner.active);
+  assertFalse(isVisible(chooseFile));
+
+  // Import flow should have been triggered.
+  const destinationStore = await passwordManager.whenCalled('importPasswords');
+  assertEquals(expectedStore, destinationStore);
+}
+
+function assertVisibleTextContent(
+    parent: HTMLElement, selector: string, expectedText: string) {
+  const element = parent.querySelector<HTMLElement>(selector);
+  assertTrue(!!element);
+  assertTrue(isVisible(element));
+  assertEquals(expectedText, element?.textContent!.trim());
+}
+
+function assertButtonShouldCloseDialog(
+    importer: PasswordsImporterElement, dialog: HTMLElement, selector: string) {
+  const button = dialog.querySelector<HTMLElement>(selector);
+  assertTrue(!!button);
+  // Should close the dialog.
+  button.click();
+  flush();
+  assertFalse(!!importer.shadowRoot!.querySelector<CrDialogElement>('#dialog'));
+}
+
+suite('PasswordsImporterTest', function() {
+  let passwordManager: TestPasswordManagerProxy;
+  let pluralString: TestPluralStringProxy;
+
+  setup(function() {
+    document.body.innerHTML = window.trustedTypes!.emptyHTML;
+    passwordManager = new TestPasswordManagerProxy();
+    PasswordManagerImpl.setInstance(passwordManager);
+    pluralString = new TestPluralStringProxy();
+    PluralStringProxyImpl.setInstance(pluralString);
+  });
+
+  test('has correct non-syncing initial state', function() {
+    const importer = createPasswordsImporter(
+        /*isUserSyncingPasswords=*/ false, /*isAccountStoreUser=*/ false);
+
+    const expectedDescription =
+        importer.i18n('importPasswordsDescriptionDevice');
+    assertEquals(expectedDescription, importer.$.linkRow.subLabel);
+    assertTrue(importer.$.linkRow.hasAttribute('hide-icon'));
+  });
+
+  test('has correct syncing initial state', function() {
+    const importer = createPasswordsImporter(
+        /*isUserSyncingPasswords=*/ true, /*isAccountStoreUser=*/ false,
+        /*accountEmail=*/ 'test@test.com');
+
+    const expectedDescription = importer.i18n(
+        'importPasswordsDescriptionAccount',
+        importer.i18n('localPasswordManager'), 'test@test.com');
+    assertEquals(expectedDescription, importer.$.linkRow.subLabel);
+    assertTrue(importer.$.linkRow.hasAttribute('hide-icon'));
+  });
+
+  test('has correct initial state for account store users', function() {
+    const importer = createPasswordsImporter(
+        /*isUserSyncingPasswords=*/ false, /*isAccountStoreUser=*/ true,
+        /*accountEmail=*/ 'test@test.com');
+
+    const expectedDescription =
+        importer.i18n('importPasswordsGenericDescription');
+    assertEquals(expectedDescription, importer.$.linkRow.subLabel);
+    assertFalse(importer.$.linkRow.hasAttribute('hide-icon'));
+  });
+
+  test('can trigger import', async function() {
+    const importer = createPasswordsImporter();
+
+    await triggerImportHelper(importer, passwordManager);
+  });
+
+  test('store picker dialog has correct state', function() {
+    const importer = createPasswordsImporter(
+        /*isUserSyncingPasswords=*/ false, /*isAccountStoreUser=*/ true,
+        /*accountEmail=*/ 'test@test.com');
+
+    // Clicking on the importer row should open the STORE_PICKER dialog.
+    importer.$.linkRow.click();
+    flush();
+
+    const dialog =
+        importer.shadowRoot!.querySelector<CrDialogElement>('#dialog');
+    assertTrue(!!dialog);
+    assertTrue(dialog.open);
+
+    assertTrue(isChildVisible(dialog, '#storePicker', /*checkLightDom=*/ true));
+
+    assertVisibleTextContent(
+        dialog, '#title', importer.i18n('importPasswords'));
+    assertVisibleTextContent(
+        dialog, '#description', importer.i18n('importPasswordsSelectFile'));
+    assertVisibleTextContent(
+        dialog, '#selectFileButton', importer.i18n('selectFile'));
+    assertVisibleTextContent(dialog, '#cancelButton', importer.i18n('cancel'));
+
+    assertButtonShouldCloseDialog(importer, dialog, '#cancelButton');
+  });
+
+  test('account store user can import passwords to device', async function() {
+    // Store picker should pre-select preferred store as DEVICE.
+    passwordManager.data.isAccountStorageDefault = false;
+    const importer = createPasswordsImporter(
+        /*isUserSyncingPasswords=*/ false, /*isAccountStoreUser=*/ true,
+        /*accountEmail=*/ 'test@test.com');
+    await flushTasks();
+
+    // Clicking on the importer row should open the STORE_PICKER dialog.
+    importer.$.linkRow.click();
+    flush();
+
+    const expectedStore = chrome.passwordsPrivate.PasswordStoreSet.DEVICE;
+    await triggerImportHelper(importer, passwordManager, expectedStore);
+  });
+
+  test('account store user can import passwords to account', async function() {
+    // Store picker should pre-select preferred store as ACCOUNT.
+    passwordManager.data.isAccountStorageDefault = true;
+    const importer = createPasswordsImporter(
+        /*isUserSyncingPasswords=*/ false, /*isAccountStoreUser=*/ true,
+        /*accountEmail=*/ 'test@test.com');
+    await flushTasks();
+
+    // Clicking on the importer row should open the STORE_PICKER dialog.
+    importer.$.linkRow.click();
+    flush();
+
+    const expectedStore = chrome.passwordsPrivate.PasswordStoreSet.ACCOUNT;
+    await triggerImportHelper(importer, passwordManager, expectedStore);
+  });
+
+  test('has correct success state with no errors', async function() {
+    const importer = createPasswordsImporter();
+    passwordManager.setImportResults({
+      status: chrome.passwordsPrivate.ImportResultsStatus.SUCCESS,
+      numberImported: 42,
+      displayedEntries: [],
+      fileName: 'test.csv',
+    });
+
+    await triggerImportHelper(importer, passwordManager);
+    await pluralString.whenCalled('getPluralString');
+    await flushTasks();
+
+    const dialog =
+        importer.shadowRoot!.querySelector<CrDialogElement>('#dialog');
+    assertTrue(!!dialog);
+    assertTrue(dialog.open);
+
+    assertVisibleTextContent(
+        dialog, '#title', importer.i18n('importPasswordsSuccessTitle'));
+
+    assertTrue(isChildVisible(dialog, '#tipBox', /*checkLightDom=*/ true));
+    assertFalse(
+        isChildVisible(dialog, '#failuresSummary', /*checkLightDom=*/ true));
+
+    const successTip = dialog.querySelector('#successTip');
+    assertTrue(!!successTip);
+    assertEquals(
+        successTip.innerHTML.toString(),
+        importer
+            .i18nAdvanced(
+                'importPasswordsSuccessTip',
+                {attrs: ['class'], substitutions: ['test.csv']})
+            .toString());
+
+    assertVisibleTextContent(dialog, '#closeButton', importer.i18n('close'));
+
+    assertButtonShouldCloseDialog(importer, dialog, '#closeButton');
+  });
+
+
+  test('view passwords navigates to the passwords page', async function() {
+    const importer = createPasswordsImporter();
+    passwordManager.setImportResults({
+      status: chrome.passwordsPrivate.ImportResultsStatus.SUCCESS,
+      numberImported: 42,
+      displayedEntries: [],
+      fileName: 'test.csv',
+    });
+
+    await triggerImportHelper(importer, passwordManager);
+    await pluralString.whenCalled('getPluralString');
+    await flushTasks();
+
+    const dialog =
+        importer.shadowRoot!.querySelector<CrDialogElement>('#dialog');
+    assertTrue(!!dialog);
+    assertTrue(dialog.open);
+
+    assertVisibleTextContent(
+        dialog, '#viewPasswordsButton', importer.i18n('viewPasswordsButton'));
+    const button = dialog.querySelector<HTMLElement>('#viewPasswordsButton');
+    assertTrue(!!button);
+    // Should close the dialog and navigate to PASSWORDS page.
+    button.click();
+    flush();
+    assertFalse(
+        !!importer.shadowRoot!.querySelector<CrDialogElement>('#dialog'));
+    await flushTasks();
+    assertEquals(Page.PASSWORDS, Router.getInstance().currentRoute.page);
+  });
+
+  test('has correct success state with failures', async function() {
+    const importer = createPasswordsImporter();
+    passwordManager.setImportResults({
+      status: chrome.passwordsPrivate.ImportResultsStatus.SUCCESS,
+      numberImported: 42,
+      displayedEntries: [
+        {
+          status: chrome.passwordsPrivate.ImportEntryStatus.MISSING_PASSWORD,
+          username: 'username',
+          url: 'https://google.com',
+          password: '',
+          id: 0,
+        },
+        {
+          status: chrome.passwordsPrivate.ImportEntryStatus.MISSING_URL,
+          username: 'username',
+          url: '',
+          password: '',
+          id: 0,
+        },
+        {
+          status: chrome.passwordsPrivate.ImportEntryStatus.INVALID_URL,
+          username: 'username',
+          url: 'http/google.com',
+          password: '',
+          id: 0,
+        },
+        {
+          status: chrome.passwordsPrivate.ImportEntryStatus.LONG_URL,
+          username: 'username',
+          url: 'https://morethan2048chars.com',
+          password: '',
+          id: 0,
+        },
+        {
+          status: chrome.passwordsPrivate.ImportEntryStatus.NON_ASCII_URL,
+          username: 'username',
+          url: 'https://أهلا.com',
+          password: '',
+          id: 0,
+        },
+        {
+          status: chrome.passwordsPrivate.ImportEntryStatus.LONG_PASSWORD,
+          username: 'username',
+          url: 'https://google.com',
+          password: '',
+          id: 0,
+        },
+        {
+          status: chrome.passwordsPrivate.ImportEntryStatus.LONG_USERNAME,
+          username: 'morethan1000chars',
+          url: 'https://google.com',
+          password: '',
+          id: 0,
+        },
+        {
+          status: chrome.passwordsPrivate.ImportEntryStatus.CONFLICT_PROFILE,
+          username: 'username',
+          url: 'https://google.com',
+          password: '',
+          id: 0,
+        },
+        {
+          status: chrome.passwordsPrivate.ImportEntryStatus.CONFLICT_ACCOUNT,
+          username: 'username',
+          url: 'https://google.com',
+          password: '',
+          id: 0,
+        },
+        {
+          status: chrome.passwordsPrivate.ImportEntryStatus.UNKNOWN_ERROR,
+          username: '',
+          url: '',
+          password: '',
+          id: 0,
+        },
+      ],
+      fileName: 'test.csv',
+    });
+
+    await triggerImportHelper(importer, passwordManager);
+    await pluralString.whenCalled('getPluralString');
+    await flushTasks();
+
+    const dialog =
+        importer.shadowRoot!.querySelector<CrDialogElement>('#dialog');
+    assertTrue(!!dialog);
+    assertTrue(dialog.open);
+
+    assertVisibleTextContent(
+        dialog, '#title', importer.i18n('importPasswordsCompleteTitle'));
+
+    // Success tip should not be visible.
+    assertFalse(isChildVisible(dialog, '#tipBox', /*checkLightDom=*/ true));
+
+    assertTrue(
+        isChildVisible(dialog, '#failuresSummary', /*checkLightDom=*/ true));
+
+    assertVisibleTextContent(dialog, '#closeButton', importer.i18n('close'));
+
+    assertButtonShouldCloseDialog(importer, dialog, '#closeButton');
+  });
+
+});

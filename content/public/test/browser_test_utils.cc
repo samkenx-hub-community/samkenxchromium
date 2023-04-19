@@ -17,7 +17,6 @@
 #include "base/files/file_util.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
-#include "base/guid.h"
 #include "base/json/json_reader.h"
 #include "base/no_destructor.h"
 #include "base/process/kill.h"
@@ -35,6 +34,7 @@
 #include "base/test/test_switches.h"
 #include "base/test/test_timeouts.h"
 #include "base/trace_event/typed_macros.h"
+#include "base/uuid.h"
 #include "base/values.h"
 #include "build/build_config.h"
 #include "cc/test/pixel_test_utils.h"
@@ -221,7 +221,8 @@ bool ExecuteScriptWithUserGestureControl(RenderFrameHost* frame,
 
   // TODO(nick): This function can't be replaced with a call to ExecJs(), since
   // ExecJs calls eval() which might be blocked by the page's CSP.
-  std::string expected_response = "ExecuteScript-" + base::GenerateGUID();
+  std::string expected_response =
+      "ExecuteScript-" + base::Uuid::GenerateRandomV4().AsLowercaseString();
   std::string new_script = base::StringPrintf(
       R"( %s;  // Original script.
           window.domAutomationController.send('%s'); )",
@@ -1468,22 +1469,6 @@ void ExecuteScriptAsyncWithoutUserGesture(const ToRenderFrameHost& adapter,
                                           const std::string& script) {
   adapter.render_frame_host()->ExecuteJavaScriptForTests(
       base::UTF8ToUTF16(script), base::NullCallback());
-}
-
-bool ExecuteScriptAndExtractInt(const ToRenderFrameHost& adapter,
-                                const std::string& script, int* result) {
-  DCHECK(result);
-  std::unique_ptr<base::Value> value;
-  // Prerendering pages will never have user gesture.
-  bool user_gesture = adapter.render_frame_host()->GetLifecycleState() !=
-                      RenderFrameHost::LifecycleState::kPrerendering;
-  if (ExecuteScriptHelper(adapter.render_frame_host(), script, user_gesture,
-                          ISOLATED_WORLD_ID_GLOBAL, &value) &&
-      value && value->is_int() && result) {
-    *result = value->GetInt();
-    return true;
-  }
-  return false;
 }
 
 bool ExecuteScriptAndExtractBool(const ToRenderFrameHost& adapter,

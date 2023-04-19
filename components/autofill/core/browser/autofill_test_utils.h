@@ -171,6 +171,11 @@ void VerifyFormGroupValues(const FormGroup& form_group,
                            bool ignore_status = false);
 
 const char kEmptyOrigin[] = "";
+// A valid France IBAN number.
+const char kIbanValue[] = "FR76 3000 6000 0112 3456 7890 189";
+// Two valid Switzerland IBAN numbers.
+const char kIbanValue_1[] = "CH56 0483 5012 3456 7800 9";
+const char kIbanValue_2[] = "CH93 0076 2011 6238 5295 7";
 
 // The following methods return a PrefService that can be used for
 // Autofill-related testing in contexts where the PrefService would otherwise
@@ -260,7 +265,7 @@ void CreateTestCreditCardFormData(FormData* form,
 // single IBAN field). Note that this actually appends fields to the form data,
 // which can be useful for building up more complex test forms.
 void CreateTestIbanFormData(FormData* form_data,
-                            const char* value = "IE64 IRCE 9205 0112 3456 78");
+                            const char* value = kIbanValue);
 
 // Strips those members from |form| and |field| that are not serialized via
 // mojo, i.e., resets them to `{}`.
@@ -299,8 +304,19 @@ void SetProfileCategory(
     AutofillProfile& profile,
     autofill_metrics::AutofillProfileSourceCategory category);
 
+// Returns the stripped (without characters representing whitespace) value of
+// the given `value`.
+std::string GetStrippedValue(const char* value);
+
 // Returns an IBAN full of dummy info.
 IBAN GetIBAN();
+
+// Returns an IBAN full of dummy info, different to the above.
+IBAN GetIBAN2();
+
+// Returns an IBAN full of dummy info, different to the above and without
+// nickname.
+IBAN GetIBANWithoutNickname();
 
 // Returns a credit card full of dummy info.
 CreditCard GetCreditCard();

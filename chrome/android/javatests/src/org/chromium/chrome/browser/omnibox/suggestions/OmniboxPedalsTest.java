@@ -34,16 +34,12 @@ import org.chromium.base.test.util.CommandLineFlags;
 import org.chromium.base.test.util.Criteria;
 import org.chromium.base.test.util.CriteriaHelper;
 import org.chromium.base.test.util.HistogramWatcher;
-import org.chromium.chrome.R;
 import org.chromium.chrome.browser.autofill.settings.AutofillPaymentMethodsFragment;
 import org.chromium.chrome.browser.browsing_data.ClearBrowsingDataTabsFragment;
 import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.flags.ChromeSwitches;
 import org.chromium.chrome.browser.history.HistoryActivity;
 import org.chromium.chrome.browser.omnibox.LocationBarLayout;
-import org.chromium.chrome.browser.omnibox.OmniboxSuggestionType;
-import org.chromium.chrome.browser.omnibox.action.OmniboxActionType;
-import org.chromium.chrome.browser.omnibox.action.OmniboxPedalType;
 import org.chromium.chrome.browser.omnibox.suggestions.base.BaseSuggestionView;
 import org.chromium.chrome.browser.password_manager.settings.PasswordSettings;
 import org.chromium.chrome.browser.safety_check.SafetyCheckSettingsFragment;
@@ -53,6 +49,7 @@ import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.browser.tabmodel.IncognitoTabHostUtils;
 import org.chromium.chrome.test.ChromeJUnit4RunnerDelegate;
 import org.chromium.chrome.test.ChromeTabbedActivityTestRule;
+import org.chromium.chrome.test.R;
 import org.chromium.chrome.test.util.ActivityTestUtils;
 import org.chromium.chrome.test.util.OmniboxTestUtils;
 import org.chromium.chrome.test.util.OmniboxTestUtils.SuggestionInfo;
@@ -63,8 +60,11 @@ import org.chromium.components.embedder_support.util.UrlConstants;
 import org.chromium.components.omnibox.AutocompleteMatch;
 import org.chromium.components.omnibox.AutocompleteMatchBuilder;
 import org.chromium.components.omnibox.AutocompleteResult;
+import org.chromium.components.omnibox.OmniboxSuggestionType;
 import org.chromium.components.omnibox.action.HistoryClustersAction;
+import org.chromium.components.omnibox.action.OmniboxActionType;
 import org.chromium.components.omnibox.action.OmniboxPedal;
+import org.chromium.components.omnibox.action.OmniboxPedalType;
 import org.chromium.content_public.browser.test.util.TestThreadUtils;
 import org.chromium.ui.base.DeviceFormFactor;
 import org.chromium.ui.test.util.DisableAnimationsTestRule;
@@ -441,27 +441,13 @@ public class OmniboxPedalsTest {
 
         checkPedalWasShown(OmniboxPedalType.VIEW_CHROME_HISTORY, /*expectShown=*/true);
 
-        if (DeviceFormFactor.isNonMultiDisplayContextOnTablet(sActivityTestRule.getActivity())) {
-            // On the phone, the history setting page will be shown as a {@link Fragment}, but on
-            // the tablet, the history setting page will be shown as a native url. So we need to
-            // have a different way to verify if the history setting page is opened.
-            clickOnPedal();
-            CriteriaHelper.pollUiThread(() -> {
-                Tab tab = sActivityTestRule.getActivity().getActivityTab();
-                Criteria.checkThat(tab, Matchers.notNullValue());
-                Criteria.checkThat(tab.getUrl().getSpec(),
-                        Matchers.startsWith(UrlConstants.NATIVE_HISTORY_URL));
-            });
-
-            histogramWatcher.assertExpected();
-            return;
-        }
-
-        HistoryActivity historyActivity =
-                clickOnPedalToSettings(HistoryActivity.class, OmniboxPedalType.VIEW_CHROME_HISTORY);
-
-        // Make sure the history setting page was opened.
-        Assert.assertNotNull("Could not find the history activity", historyActivity);
+        clickOnPedal();
+        CriteriaHelper.pollUiThread(() -> {
+            Tab tab = sActivityTestRule.getActivity().getActivityTab();
+            Criteria.checkThat(tab, Matchers.notNullValue());
+            Criteria.checkThat(
+                    tab.getUrl().getSpec(), Matchers.startsWith(UrlConstants.HISTORY_URL));
+        });
 
         histogramWatcher.assertExpected();
     }
@@ -531,7 +517,7 @@ public class OmniboxPedalsTest {
             Tab tab = sActivityTestRule.getActivity().getActivityTab();
             Criteria.checkThat(tab, Matchers.notNullValue());
             Criteria.checkThat(
-                    tab.getUrl().getSpec(), Matchers.startsWith(UrlConstants.CHROME_DINO_URL));
+                    tab.getUrl().getSpec(), Matchers.equalTo(UrlConstants.CHROME_DINO_URL));
         });
 
         histogramWatcher.assertExpected();

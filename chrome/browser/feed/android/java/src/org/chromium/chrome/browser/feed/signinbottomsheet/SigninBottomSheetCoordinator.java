@@ -6,15 +6,16 @@ package org.chromium.chrome.browser.feed.signinbottomsheet;
 import android.accounts.Account;
 import android.view.View;
 
+import androidx.annotation.Nullable;
 import androidx.annotation.StringRes;
 import androidx.annotation.VisibleForTesting;
 
 import org.chromium.base.Callback;
 import org.chromium.base.metrics.RecordHistogram;
+import org.chromium.chrome.browser.feed.R;
 import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.chrome.browser.signin.services.IdentityServicesProvider;
 import org.chromium.chrome.browser.signin.services.SigninManager;
-import org.chromium.chrome.browser.ui.signin.R;
 import org.chromium.chrome.browser.ui.signin.account_picker.AccountPickerBottomSheetCoordinator;
 import org.chromium.chrome.browser.ui.signin.account_picker.AccountPickerBottomSheetCoordinator.EntryPoint;
 import org.chromium.chrome.browser.ui.signin.account_picker.AccountPickerBottomSheetStrings;
@@ -35,14 +36,17 @@ public class SigninBottomSheetCoordinator implements AccountPickerDelegate {
     private final SigninManager mSigninManager;
     private boolean mSetTestToast;
     private AccountPickerBottomSheetCoordinator mAccountPickerBottomSheetCoordinator;
+    private final Runnable mOnSigninSuccessCallback;
 
-    public SigninBottomSheetCoordinator(
-            WindowAndroid windowAndroid, BottomSheetController controller, Profile profile) {
+    public SigninBottomSheetCoordinator(WindowAndroid windowAndroid,
+            BottomSheetController controller, Profile profile,
+            @Nullable Runnable onSigninSuccessCallback) {
         mWindowAndroid = windowAndroid;
         mController = controller;
         mProfile = profile;
         mSigninManager = IdentityServicesProvider.get().getSigninManager(mProfile);
         mSetTestToast = false;
+        mOnSigninSuccessCallback = onSigninSuccessCallback;
     }
 
     @Override
@@ -58,6 +62,9 @@ public class SigninBottomSheetCoordinator implements AccountPickerDelegate {
                 RecordHistogram.recordBooleanHistogram(
                         "ContentSuggestions.Feed.SignInFromFeedAction.SignInSuccessful", true);
                 mController.hideContent(mController.getCurrentSheetContent(), true);
+                if (mOnSigninSuccessCallback != null) {
+                    mOnSigninSuccessCallback.run();
+                }
             }
 
             @Override
@@ -135,8 +142,8 @@ public class SigninBottomSheetCoordinator implements AccountPickerDelegate {
 
         /** Returns the cancel button string for the bottom sheet dialog. */
         @Override
-        public @StringRes int getCancelButton() {
-            return R.string.cancel;
+        public @StringRes int getDismissButton() {
+            return R.string.close;
         }
     }
 }

@@ -22,6 +22,7 @@
 @synthesize webStateCreationRequested = _webStateCreationRequested;
 @synthesize webStateClosingRequested = _webStateClosingRequested;
 @synthesize repostFormWarningRequested = _repostFormWarningRequested;
+@synthesize permissionsRequestHandled = _permissionsRequestHandled;
 @synthesize authenticationRequested = _authenticationRequested;
 @synthesize isAppLaunchingAllowedForWebStateReturnValue =
     _isAppLaunchingAllowedForWebStateReturnValue;
@@ -58,6 +59,16 @@
   _webState = webState;
   _javaScriptDialogPresenterRequested = YES;
   return nil;
+}
+
+- (BOOL)webState:(web::WebState*)webState
+    handlePermissions:(NSArray<NSNumber*>*)permissions
+      decisionHandler:(void (^)(BOOL allow))decisionHandler
+    API_AVAILABLE(ios(15.0)) {
+  _webState = webState;
+  _permissionsRequestHandled = YES;
+  decisionHandler(YES);
+  return YES;
 }
 
 - (void)webState:(web::WebState*)webState

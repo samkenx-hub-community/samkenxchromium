@@ -46,6 +46,10 @@
 #include "media/filters/mac/audio_toolbox_audio_decoder.h"
 #endif
 
+#if BUILDFLAG(IS_WIN)
+#include "media/filters/win/media_foundation_audio_decoder.h"
+#endif
+
 #if BUILDFLAG(USE_PROPRIETARY_CODECS)
 #include "media/formats/mpeg/adts_stream_parser.h"
 #endif
@@ -139,7 +143,12 @@ class AudioDecoderTest
         break;
 #elif BUILDFLAG(IS_MAC)
       case AudioDecoderType::kAudioToolbox:
-        decoder_ = std::make_unique<AudioToolboxAudioDecoder>();
+        decoder_ =
+            std::make_unique<AudioToolboxAudioDecoder>(media_log_.Clone());
+        break;
+#elif BUILDFLAG(IS_WIN)
+      case AudioDecoderType::kMediaFoundation:
+        decoder_ = MediaFoundationAudioDecoder::Create();
         break;
 #endif
       default:
@@ -163,20 +172,10 @@ class AudioDecoderTest
 
  protected:
   bool IsSupported() const {
-#if BUILDFLAG(IS_MAC)
-    if (decoder_type_ == AudioDecoderType::kAudioToolbox) {
-      if (__builtin_available(macOS 10.15, *))
-        return true;  // Annoyingly !__builtin_available() doesn't work.
-      return false;
-    }
-#endif  // BUILDFLAG(IS_MAC)
-#if BUILDFLAG(IS_ANDROID)
-    if (decoder_type_ == AudioDecoderType::kMediaCodec &&
-        params_.profile == AudioCodecProfile::kXHE_AAC) {
+    if (params_.profile == AudioCodecProfile::kXHE_AAC) {
       return IsSupportedAudioType(
           {AudioCodec::kAAC, AudioCodecProfile::kXHE_AAC, false});
     }
-#endif
     return true;
   }
 
@@ -225,7 +224,8 @@ class AudioDecoderTest
         reader_->codec_context_for_testing(), EncryptionScheme::kUnencrypted,
         &config));
 
-#if BUILDFLAG(IS_ANDROID) && BUILDFLAG(USE_PROPRIETARY_CODECS)
+#if (BUILDFLAG(IS_ANDROID) || BUILDFLAG(IS_WIN)) && \
+    BUILDFLAG(USE_PROPRIETARY_CODECS)
     // MediaCodec type requires config->extra_data() for AAC codec. For ADTS
     // streams we need to extract it with a separate procedure.
     if ((decoder_type_ == AudioDecoderType::kMediaCodec ||
@@ -388,9 +388,6 @@ class AudioDecoderTest
 
   size_t decoded_audio_size() const { return decoded_audio_.size(); }
   base::TimeDelta start_timestamp() const { return start_timestamp_; }
-  const scoped_refptr<AudioBuffer>& decoded_audio(size_t i) {
-    return decoded_audio_[i];
-  }
   const DecoderStatus& last_decode_status() const {
     return last_decode_status_;
   }
@@ -460,7 +457,7 @@ constexpr TestParams kMediaCodecTestParams[] = {
 };
 #endif  // BUILDFLAG(IS_ANDROID)
 
-#if (BUILDFLAG(IS_MAC) || BUILDFLAG(IS_ANDROID)) && \
+#if (BUILDFLAG(IS_MAC) || BUILDFLAG(IS_ANDROID) || BUILDFLAG(IS_WIN)) && \
     BUILDFLAG(USE_PROPRIETARY_CODECS)
 // Note: We don't test hashes for xHE-AAC content since the decoder is provided
 // by the operating system and will apply DRC based on device specific params.
@@ -476,6 +473,8 @@ constexpr TestParams kXheAacTestParams[] = {
      48000,
      CHANNEL_LAYOUT_STEREO,
      AudioCodecProfile::kXHE_AAC},
+// Windows doesn't support 29.4kHz
+#if !BUILDFLAG(IS_WIN)
     {AudioCodec::kAAC,
      "noise-xhe-aac-mono.mp4",
      {{
@@ -487,6 +486,7 @@ constexpr TestParams kXheAacTestParams[] = {
      29400,
      CHANNEL_LAYOUT_MONO,
      AudioCodecProfile::kXHE_AAC},
+#endif
     {AudioCodec::kAAC,
      "noise-xhe-aac-44kHz.mp4",
      {{
@@ -499,7 +499,7 @@ constexpr TestParams kXheAacTestParams[] = {
      CHANNEL_LAYOUT_STEREO,
      AudioCodecProfile::kXHE_AAC},
 };
-#endif  // (BUILDFLAG(IS_MAC) || BUILDFLAG(IS_ANDROID)) &&
+#endif  // (BUILDFLAG(IS_MAC) || BUILDFLAG(IS_ANDROID) || BUILDFLAG(IS_WIN)) &&
         // BUILDFLAG(USE_PROPRIETARY_CODECS)
 
 constexpr DataExpectations kSfxFlacExpectations = {{
@@ -580,15 +580,9 @@ constexpr TestParams kFFmpegTestParams[] = {
     {AudioCodec::kOpus,
      "sfx-opus.ogg",
      {{
-#if defined(OPUS_FIXED_POINT)
          {0, 13500, "-2.70,-1.41,-0.78,-1.27,-2.56,-3.73,"},
          {13500, 20000, "5.48,5.93,6.05,5.83,5.54,5.46,"},
          {33500, 20000, "-3.44,-3.34,-3.57,-4.11,-4.74,-5.13,"},
-#else
-         {0, 13500, "-2.70,-1.41,-0.78,-1.27,-2.56,-3.73,"},
-         {13500, 20000, "5.48,5.93,6.04,5.83,5.54,5.45,"},
-         {33500, 20000, "-3.45,-3.35,-3.57,-4.12,-4.74,-5.14,"},
-#endif
      }},
      -312,
      48000,
@@ -598,9 +592,10 @@ constexpr TestParams kFFmpegTestParams[] = {
 };
 
 void AudioDecoderTest::SetReinitializeParams() {
-#if BUILDFLAG(IS_MAC) && BUILDFLAG(USE_PROPRIETARY_CODECS)
-  // AudioToolbox only supports xHE-AAC, so we can't use the Opus params. We can
-  // instead just swap between the two test parameter sets.
+#if (BUILDFLAG(IS_MAC) || BUILDFLAG(IS_WIN)) && \
+    BUILDFLAG(USE_PROPRIETARY_CODECS)
+  // AudioToolbox and MediaFoundation only support xHE-AAC, so we can't use the
+  // Opus params. We can instead just swap between the two test parameter sets.
   if (decoder_type_ == AudioDecoderType::kAudioToolbox ||
       decoder_type_ == AudioDecoderType::kMediaFoundation) {
     set_params(params_.channel_layout == kXheAacTestParams[0].channel_layout
@@ -682,6 +677,12 @@ TEST_P(AudioDecoderTest, ProduceAudioSamples) {
   }
 }
 
+TEST_P(AudioDecoderTest, DecodeMismatchedSubsamples) {
+  ASSERT_NO_FATAL_FAILURE(Initialize());
+  DecodeBuffer(CreateMismatchedBufferForTest());
+  EXPECT_TRUE(!last_decode_status().is_ok());
+}
+
 TEST_P(AudioDecoderTest, Decode) {
   ASSERT_NO_FATAL_FAILURE(Initialize());
   Decode();
@@ -695,7 +696,7 @@ TEST_P(AudioDecoderTest, Reset) {
 
 TEST_P(AudioDecoderTest, NoTimestamp) {
   ASSERT_NO_FATAL_FAILURE(Initialize());
-  scoped_refptr<DecoderBuffer> buffer(new DecoderBuffer(0));
+  auto buffer = base::MakeRefCounted<DecoderBuffer>(0);
   buffer->set_timestamp(kNoTimestamp);
   DecodeBuffer(std::move(buffer));
   EXPECT_THAT(last_decode_status(), IsDecodeErrorStatus());
@@ -724,11 +725,18 @@ INSTANTIATE_TEST_SUITE_P(MediaCodec,
                                  ValuesIn(GetAndroidParams())));
 #endif
 
-#if BUILDFLAG(USE_PROPRIETARY_CODECS) && BUILDFLAG(IS_MAC)
+#if BUILDFLAG(USE_PROPRIETARY_CODECS)
+#if BUILDFLAG(IS_MAC)
 INSTANTIATE_TEST_SUITE_P(AudioToolbox,
                          AudioDecoderTest,
                          Combine(Values(AudioDecoderType::kAudioToolbox),
                                  ValuesIn(kXheAacTestParams)));
+#elif BUILDFLAG(IS_WIN)
+INSTANTIATE_TEST_SUITE_P(MediaFoundation,
+                         AudioDecoderTest,
+                         Combine(Values(AudioDecoderType::kMediaFoundation),
+                                 ValuesIn(kXheAacTestParams)));
+#endif
 #endif
 
 }  // namespace media

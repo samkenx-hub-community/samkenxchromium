@@ -2708,7 +2708,6 @@
           "--avd-config=../../tools/android/avd/proto/generic_android30.textpb"
         ],
         "merge": {
-          "args": [],
           "script": "//testing/merge_scripts/standard_isolated_script_merge.py"
         },
         "resultdb": {
@@ -6510,7 +6509,7 @@
               "cpu": "x86-64",
               "device_os": null,
               "device_type": null,
-              "os": "Ubuntu-18.04",
+              "os": "Ubuntu-22.04",
               "pool": "chromium.tests.avd"
             }
           ],
@@ -6573,7 +6572,7 @@
               "cpu": "x86-64",
               "device_os": null,
               "device_type": null,
-              "os": "Ubuntu-18.04",
+              "os": "Ubuntu-22.04",
               "pool": "chromium.tests.avd"
             }
           ],
@@ -6635,7 +6634,7 @@
               "cpu": "x86-64",
               "device_os": null,
               "device_type": null,
-              "os": "Ubuntu-18.04",
+              "os": "Ubuntu-22.04",
               "pool": "chromium.tests.avd"
             }
           ],
@@ -6696,7 +6695,7 @@
               "cpu": "x86-64",
               "device_os": null,
               "device_type": null,
-              "os": "Ubuntu-18.04",
+              "os": "Ubuntu-22.04",
               "pool": "chromium.tests.avd"
             }
           ],
@@ -6735,7 +6734,6 @@
           "--avd-config=../../tools/android/avd/proto/generic_android31.textpb"
         ],
         "merge": {
-          "args": [],
           "script": "//testing/merge_scripts/standard_isolated_script_merge.py"
         },
         "resultdb": {
@@ -6750,7 +6748,7 @@
               "cpu": "x86-64",
               "device_os": null,
               "device_type": null,
-              "os": "Ubuntu-18.04",
+              "os": "Ubuntu-22.04",
               "pool": "chromium.tests.avd"
             }
           ],
@@ -6802,7 +6800,7 @@
               "cpu": "x86-64",
               "device_os": null,
               "device_type": null,
-              "os": "Ubuntu-18.04",
+              "os": "Ubuntu-22.04",
               "pool": "chromium.tests.avd"
             }
           ],
@@ -6862,7 +6860,7 @@
               "cpu": "x86-64",
               "device_os": null,
               "device_type": null,
-              "os": "Ubuntu-18.04",
+              "os": "Ubuntu-22.04",
               "pool": "chromium.tests.avd"
             }
           ],
@@ -6922,7 +6920,7 @@
               "cpu": "x86-64",
               "device_os": null,
               "device_type": null,
-              "os": "Ubuntu-18.04",
+              "os": "Ubuntu-22.04",
               "pool": "chromium.tests.avd"
             }
           ],
@@ -6982,7 +6980,7 @@
               "cpu": "x86-64",
               "device_os": null,
               "device_type": null,
-              "os": "Ubuntu-18.04",
+              "os": "Ubuntu-22.04",
               "pool": "chromium.tests.avd"
             }
           ],
@@ -7043,7 +7041,7 @@
               "cpu": "x86-64",
               "device_os": null,
               "device_type": null,
-              "os": "Ubuntu-18.04",
+              "os": "Ubuntu-22.04",
               "pool": "chromium.tests.avd"
             }
           ],
@@ -7104,7 +7102,7 @@
               "cpu": "x86-64",
               "device_os": null,
               "device_type": null,
-              "os": "Ubuntu-18.04",
+              "os": "Ubuntu-22.04",
               "pool": "chromium.tests.avd"
             }
           ],
@@ -7164,7 +7162,7 @@
               "cpu": "x86-64",
               "device_os": null,
               "device_type": null,
-              "os": "Ubuntu-18.04",
+              "os": "Ubuntu-22.04",
               "pool": "chromium.tests.avd"
             }
           ],
@@ -7225,7 +7223,7 @@
               "cpu": "x86-64",
               "device_os": null,
               "device_type": null,
-              "os": "Ubuntu-18.04",
+              "os": "Ubuntu-22.04",
               "pool": "chromium.tests.avd"
             }
           ],
@@ -7285,7 +7283,7 @@
               "cpu": "x86-64",
               "device_os": null,
               "device_type": null,
-              "os": "Ubuntu-18.04",
+              "os": "Ubuntu-22.04",
               "pool": "chromium.tests.avd"
             }
           ],
@@ -7346,7 +7344,7 @@
               "cpu": "x86-64",
               "device_os": null,
               "device_type": null,
-              "os": "Ubuntu-18.04",
+              "os": "Ubuntu-22.04",
               "pool": "chromium.tests.avd"
             }
           ],
@@ -7406,7 +7404,7 @@
               "cpu": "x86-64",
               "device_os": null,
               "device_type": null,
-              "os": "Ubuntu-18.04",
+              "os": "Ubuntu-22.04",
               "pool": "chromium.tests.avd"
             }
           ],
@@ -7477,7 +7475,7 @@
               "cpu": "x86-64",
               "device_os": null,
               "device_type": null,
-              "os": "Ubuntu-18.04",
+              "os": "Ubuntu-22.04",
               "pool": "chromium.tests.avd"
             }
           ],
@@ -7615,7 +7613,7 @@
               "cpu": "x86-64",
               "device_os": null,
               "device_type": null,
-              "os": "Ubuntu-18.04",
+              "os": "Ubuntu-22.04",
               "pool": "chromium.tests.avd"
             }
           ],
@@ -7676,7 +7674,7 @@
               "cpu": "x86-64",
               "device_os": null,
               "device_type": null,
-              "os": "Ubuntu-18.04",
+              "os": "Ubuntu-22.04",
               "pool": "chromium.tests.avd"
             }
           ],
@@ -7740,7 +7738,7 @@
               "cpu": "x86-64",
               "device_os": null,
               "device_type": null,
-              "os": "Ubuntu-18.04",
+              "os": "Ubuntu-22.04",
               "pool": "chromium.tests.avd"
             }
           ],
@@ -7801,7 +7799,7 @@
               "cpu": "x86-64",
               "device_os": null,
               "device_type": null,
-              "os": "Ubuntu-18.04",
+              "os": "Ubuntu-22.04",
               "pool": "chromium.tests.avd"
             }
           ],
@@ -7865,7 +7863,7 @@
               "cpu": "x86-64",
               "device_os": null,
               "device_type": null,
-              "os": "Ubuntu-18.04",
+              "os": "Ubuntu-22.04",
               "pool": "chromium.tests.avd"
             }
           ],
@@ -7928,7 +7926,7 @@
               "cpu": "x86-64",
               "device_os": null,
               "device_type": null,
-              "os": "Ubuntu-18.04",
+              "os": "Ubuntu-22.04",
               "pool": "chromium.tests.avd"
             }
           ],
@@ -7990,7 +7988,7 @@
               "cpu": "x86-64",
               "device_os": null,
               "device_type": null,
-              "os": "Ubuntu-18.04",
+              "os": "Ubuntu-22.04",
               "pool": "chromium.tests.avd"
             }
           ],
@@ -8055,7 +8053,7 @@
               "cpu": "x86-64",
               "device_os": null,
               "device_type": null,
-              "os": "Ubuntu-18.04",
+              "os": "Ubuntu-22.04",
               "pool": "chromium.tests.avd"
             }
           ],
@@ -8117,7 +8115,7 @@
               "cpu": "x86-64",
               "device_os": null,
               "device_type": null,
-              "os": "Ubuntu-18.04",
+              "os": "Ubuntu-22.04",
               "pool": "chromium.tests.avd"
             }
           ],
@@ -8177,7 +8175,7 @@
               "cpu": "x86-64",
               "device_os": null,
               "device_type": null,
-              "os": "Ubuntu-18.04",
+              "os": "Ubuntu-22.04",
               "pool": "chromium.tests.avd"
             }
           ],
@@ -8238,7 +8236,7 @@
               "cpu": "x86-64",
               "device_os": null,
               "device_type": null,
-              "os": "Ubuntu-18.04",
+              "os": "Ubuntu-22.04",
               "pool": "chromium.tests.avd"
             }
           ],
@@ -8298,7 +8296,7 @@
               "cpu": "x86-64",
               "device_os": null,
               "device_type": null,
-              "os": "Ubuntu-18.04",
+              "os": "Ubuntu-22.04",
               "pool": "chromium.tests.avd"
             }
           ],
@@ -8358,7 +8356,7 @@
               "cpu": "x86-64",
               "device_os": null,
               "device_type": null,
-              "os": "Ubuntu-18.04",
+              "os": "Ubuntu-22.04",
               "pool": "chromium.tests.avd"
             }
           ],
@@ -8418,7 +8416,7 @@
               "cpu": "x86-64",
               "device_os": null,
               "device_type": null,
-              "os": "Ubuntu-18.04",
+              "os": "Ubuntu-22.04",
               "pool": "chromium.tests.avd"
             }
           ],
@@ -8478,7 +8476,7 @@
               "cpu": "x86-64",
               "device_os": null,
               "device_type": null,
-              "os": "Ubuntu-18.04",
+              "os": "Ubuntu-22.04",
               "pool": "chromium.tests.avd"
             }
           ],
@@ -8538,7 +8536,7 @@
               "cpu": "x86-64",
               "device_os": null,
               "device_type": null,
-              "os": "Ubuntu-18.04",
+              "os": "Ubuntu-22.04",
               "pool": "chromium.tests.avd"
             }
           ],
@@ -8601,7 +8599,7 @@
               "cpu": "x86-64",
               "device_os": null,
               "device_type": null,
-              "os": "Ubuntu-18.04",
+              "os": "Ubuntu-22.04",
               "pool": "chromium.tests.avd"
             }
           ],
@@ -8662,7 +8660,7 @@
               "cpu": "x86-64",
               "device_os": null,
               "device_type": null,
-              "os": "Ubuntu-18.04",
+              "os": "Ubuntu-22.04",
               "pool": "chromium.tests.avd"
             }
           ],
@@ -8722,7 +8720,7 @@
               "cpu": "x86-64",
               "device_os": null,
               "device_type": null,
-              "os": "Ubuntu-18.04",
+              "os": "Ubuntu-22.04",
               "pool": "chromium.tests.avd"
             }
           ],
@@ -8782,7 +8780,7 @@
               "cpu": "x86-64",
               "device_os": null,
               "device_type": null,
-              "os": "Ubuntu-18.04",
+              "os": "Ubuntu-22.04",
               "pool": "chromium.tests.avd"
             }
           ],
@@ -8842,7 +8840,7 @@
               "cpu": "x86-64",
               "device_os": null,
               "device_type": null,
-              "os": "Ubuntu-18.04",
+              "os": "Ubuntu-22.04",
               "pool": "chromium.tests.avd"
             }
           ],
@@ -8902,7 +8900,7 @@
               "cpu": "x86-64",
               "device_os": null,
               "device_type": null,
-              "os": "Ubuntu-18.04",
+              "os": "Ubuntu-22.04",
               "pool": "chromium.tests.avd"
             }
           ],
@@ -8962,7 +8960,7 @@
               "cpu": "x86-64",
               "device_os": null,
               "device_type": null,
-              "os": "Ubuntu-18.04",
+              "os": "Ubuntu-22.04",
               "pool": "chromium.tests.avd"
             }
           ],
@@ -9022,7 +9020,7 @@
               "cpu": "x86-64",
               "device_os": null,
               "device_type": null,
-              "os": "Ubuntu-18.04",
+              "os": "Ubuntu-22.04",
               "pool": "chromium.tests.avd"
             }
           ],
@@ -9082,7 +9080,7 @@
               "cpu": "x86-64",
               "device_os": null,
               "device_type": null,
-              "os": "Ubuntu-18.04",
+              "os": "Ubuntu-22.04",
               "pool": "chromium.tests.avd"
             }
           ],
@@ -9143,7 +9141,7 @@
               "cpu": "x86-64",
               "device_os": null,
               "device_type": null,
-              "os": "Ubuntu-18.04",
+              "os": "Ubuntu-22.04",
               "pool": "chromium.tests.avd"
             }
           ],
@@ -9203,7 +9201,7 @@
               "cpu": "x86-64",
               "device_os": null,
               "device_type": null,
-              "os": "Ubuntu-18.04",
+              "os": "Ubuntu-22.04",
               "pool": "chromium.tests.avd"
             }
           ],
@@ -9263,7 +9261,7 @@
               "cpu": "x86-64",
               "device_os": null,
               "device_type": null,
-              "os": "Ubuntu-18.04",
+              "os": "Ubuntu-22.04",
               "pool": "chromium.tests.avd"
             }
           ],
@@ -9323,7 +9321,7 @@
               "cpu": "x86-64",
               "device_os": null,
               "device_type": null,
-              "os": "Ubuntu-18.04",
+              "os": "Ubuntu-22.04",
               "pool": "chromium.tests.avd"
             }
           ],
@@ -9383,7 +9381,7 @@
               "cpu": "x86-64",
               "device_os": null,
               "device_type": null,
-              "os": "Ubuntu-18.04",
+              "os": "Ubuntu-22.04",
               "pool": "chromium.tests.avd"
             }
           ],
@@ -9446,7 +9444,7 @@
               "cpu": "x86-64",
               "device_os": null,
               "device_type": null,
-              "os": "Ubuntu-18.04",
+              "os": "Ubuntu-22.04",
               "pool": "chromium.tests.avd"
             }
           ],
@@ -9506,7 +9504,7 @@
               "cpu": "x86-64",
               "device_os": null,
               "device_type": null,
-              "os": "Ubuntu-18.04",
+              "os": "Ubuntu-22.04",
               "pool": "chromium.tests.avd"
             }
           ],
@@ -9567,7 +9565,7 @@
               "cpu": "x86-64",
               "device_os": null,
               "device_type": null,
-              "os": "Ubuntu-18.04",
+              "os": "Ubuntu-22.04",
               "pool": "chromium.tests.avd"
             }
           ],
@@ -9628,7 +9626,7 @@
               "cpu": "x86-64",
               "device_os": null,
               "device_type": null,
-              "os": "Ubuntu-18.04",
+              "os": "Ubuntu-22.04",
               "pool": "chromium.tests.avd"
             }
           ],
@@ -9688,7 +9686,7 @@
               "cpu": "x86-64",
               "device_os": null,
               "device_type": null,
-              "os": "Ubuntu-18.04",
+              "os": "Ubuntu-22.04",
               "pool": "chromium.tests.avd"
             }
           ],
@@ -9748,7 +9746,7 @@
               "cpu": "x86-64",
               "device_os": null,
               "device_type": null,
-              "os": "Ubuntu-18.04",
+              "os": "Ubuntu-22.04",
               "pool": "chromium.tests.avd"
             }
           ],
@@ -9808,7 +9806,7 @@
               "cpu": "x86-64",
               "device_os": null,
               "device_type": null,
-              "os": "Ubuntu-18.04",
+              "os": "Ubuntu-22.04",
               "pool": "chromium.tests.avd"
             }
           ],
@@ -9868,7 +9866,7 @@
               "cpu": "x86-64",
               "device_os": null,
               "device_type": null,
-              "os": "Ubuntu-18.04",
+              "os": "Ubuntu-22.04",
               "pool": "chromium.tests.avd"
             }
           ],
@@ -9928,7 +9926,7 @@
               "cpu": "x86-64",
               "device_os": null,
               "device_type": null,
-              "os": "Ubuntu-18.04",
+              "os": "Ubuntu-22.04",
               "pool": "chromium.tests.avd"
             }
           ],
@@ -9988,7 +9986,7 @@
               "cpu": "x86-64",
               "device_os": null,
               "device_type": null,
-              "os": "Ubuntu-18.04",
+              "os": "Ubuntu-22.04",
               "pool": "chromium.tests.avd"
             }
           ],
@@ -10048,7 +10046,7 @@
               "cpu": "x86-64",
               "device_os": null,
               "device_type": null,
-              "os": "Ubuntu-18.04",
+              "os": "Ubuntu-22.04",
               "pool": "chromium.tests.avd"
             }
           ],
@@ -10108,7 +10106,7 @@
               "cpu": "x86-64",
               "device_os": null,
               "device_type": null,
-              "os": "Ubuntu-18.04",
+              "os": "Ubuntu-22.04",
               "pool": "chromium.tests.avd"
             }
           ],
@@ -10168,7 +10166,7 @@
               "cpu": "x86-64",
               "device_os": null,
               "device_type": null,
-              "os": "Ubuntu-18.04",
+              "os": "Ubuntu-22.04",
               "pool": "chromium.tests.avd"
             }
           ],
@@ -10229,7 +10227,7 @@
               "cpu": "x86-64",
               "device_os": null,
               "device_type": null,
-              "os": "Ubuntu-18.04",
+              "os": "Ubuntu-22.04",
               "pool": "chromium.tests.avd"
             }
           ],
@@ -10289,7 +10287,7 @@
               "cpu": "x86-64",
               "device_os": null,
               "device_type": null,
-              "os": "Ubuntu-18.04",
+              "os": "Ubuntu-22.04",
               "pool": "chromium.tests.avd"
             }
           ],
@@ -10350,7 +10348,7 @@
               "cpu": "x86-64",
               "device_os": null,
               "device_type": null,
-              "os": "Ubuntu-18.04",
+              "os": "Ubuntu-22.04",
               "pool": "chromium.tests.avd"
             }
           ],
@@ -10411,7 +10409,7 @@
               "cpu": "x86-64",
               "device_os": null,
               "device_type": null,
-              "os": "Ubuntu-18.04",
+              "os": "Ubuntu-22.04",
               "pool": "chromium.tests.avd"
             }
           ],
@@ -10471,7 +10469,7 @@
               "cpu": "x86-64",
               "device_os": null,
               "device_type": null,
-              "os": "Ubuntu-18.04",
+              "os": "Ubuntu-22.04",
               "pool": "chromium.tests.avd"
             }
           ],
@@ -10500,7 +10498,7 @@
             }
           ],
           "service_account": "chromium-tester@chops-service-accounts.iam.gserviceaccount.com",
-          "shards": 10
+          "shards": 11
         },
         "test": "webview_instrumentation_test_apk",
         "test_id_prefix": "ninja://android_webview/test:webview_instrumentation_test_apk/"
@@ -10537,7 +10535,7 @@
               "cpu": "x86-64",
               "device_os": null,
               "device_type": null,
-              "os": "Ubuntu-18.04",
+              "os": "Ubuntu-22.04",
               "pool": "chromium.tests.avd"
             }
           ],
@@ -10606,7 +10604,7 @@
               "cpu": "x86-64",
               "device_os": null,
               "device_type": null,
-              "os": "Ubuntu-18.04",
+              "os": "Ubuntu-22.04",
               "pool": "chromium.tests.avd"
             }
           ],
@@ -10679,7 +10677,7 @@
               "cpu": "x86-64",
               "device_os": null,
               "device_type": null,
-              "os": "Ubuntu-18.04",
+              "os": "Ubuntu-22.04",
               "pool": "chromium.tests.avd"
             }
           ],
@@ -10741,7 +10739,7 @@
               "cpu": "x86-64",
               "device_os": null,
               "device_type": null,
-              "os": "Ubuntu-18.04",
+              "os": "Ubuntu-22.04",
               "pool": "chromium.tests.avd"
             }
           ],
@@ -10801,7 +10799,7 @@
               "cpu": "x86-64",
               "device_os": null,
               "device_type": null,
-              "os": "Ubuntu-18.04",
+              "os": "Ubuntu-22.04",
               "pool": "chromium.tests.avd"
             }
           ],
@@ -10861,7 +10859,7 @@
               "cpu": "x86-64",
               "device_os": null,
               "device_type": null,
-              "os": "Ubuntu-18.04",
+              "os": "Ubuntu-22.04",
               "pool": "chromium.tests.avd"
             }
           ],
@@ -10902,7 +10900,6 @@
         ],
         "isolate_name": "private_code_failure_test",
         "merge": {
-          "args": [],
           "script": "//testing/merge_scripts/standard_isolated_script_merge.py"
         },
         "name": "private_code_failure_test",
@@ -10918,7 +10915,7 @@
               "cpu": "x86-64",
               "device_os": null,
               "device_type": null,
-              "os": "Ubuntu-18.04",
+              "os": "Ubuntu-22.04",
               "pool": "chromium.tests.avd"
             }
           ],
@@ -11188,7 +11185,6 @@
           "--avd-config=../../tools/android/avd/proto/generic_android32_foldable.textpb"
         ],
         "merge": {
-          "args": [],
           "script": "//testing/merge_scripts/standard_isolated_script_merge.py"
         },
         "resultdb": {
@@ -15179,7 +15175,6 @@
           "--avd-config=../../tools/android/avd/proto/generic_android33.textpb"
         ],
         "merge": {
-          "args": [],
           "script": "//testing/merge_scripts/standard_isolated_script_merge.py"
         },
         "resultdb": {
@@ -19202,7 +19197,6 @@
           "-v"
         ],
         "merge": {
-          "args": [],
           "script": "//testing/merge_scripts/standard_isolated_script_merge.py"
         },
         "resultdb": {
@@ -21945,7 +21939,6 @@
       {
         "isolate_name": "monochrome_public_apk_checker",
         "merge": {
-          "args": [],
           "script": "//testing/merge_scripts/standard_isolated_script_merge.py"
         },
         "name": "monochrome_public_apk_checker",
@@ -26185,7 +26178,6 @@
   },
   "android-nougat-x86-rel": {
     "additional_compile_targets": [
-      "cronet_test_instrumentation_apk",
       "chrome_nocompile_tests"
     ],
     "gtest_tests": [
@@ -26446,7 +26438,6 @@
         ],
         "isolate_profile_data": true,
         "merge": {
-          "args": [],
           "script": "//testing/merge_scripts/standard_isolated_script_merge.py"
         },
         "resultdb": {
@@ -30525,7 +30516,6 @@
         "isolate_name": "android_webview_junit_tests",
         "isolate_profile_data": true,
         "merge": {
-          "args": [],
           "script": "//testing/merge_scripts/standard_isolated_script_merge.py"
         },
         "name": "android_webview_junit_tests",
@@ -30555,7 +30545,6 @@
         "isolate_name": "base_junit_tests",
         "isolate_profile_data": true,
         "merge": {
-          "args": [],
           "script": "//testing/merge_scripts/standard_isolated_script_merge.py"
         },
         "name": "base_junit_tests",
@@ -30585,7 +30574,6 @@
         "isolate_name": "build_junit_tests",
         "isolate_profile_data": true,
         "merge": {
-          "args": [],
           "script": "//testing/merge_scripts/standard_isolated_script_merge.py"
         },
         "name": "build_junit_tests",
@@ -30615,7 +30603,6 @@
         "isolate_name": "chrome_java_test_pagecontroller_junit_tests",
         "isolate_profile_data": true,
         "merge": {
-          "args": [],
           "script": "//testing/merge_scripts/standard_isolated_script_merge.py"
         },
         "name": "chrome_java_test_pagecontroller_junit_tests",
@@ -30646,7 +30633,6 @@
         "isolate_name": "chrome_junit_tests",
         "isolate_profile_data": true,
         "merge": {
-          "args": [],
           "script": "//testing/merge_scripts/standard_isolated_script_merge.py"
         },
         "name": "chrome_junit_tests",
@@ -30676,7 +30662,6 @@
         "isolate_name": "components_junit_tests",
         "isolate_profile_data": true,
         "merge": {
-          "args": [],
           "script": "//testing/merge_scripts/standard_isolated_script_merge.py"
         },
         "name": "components_junit_tests",
@@ -30754,7 +30739,6 @@
         "isolate_name": "content_junit_tests",
         "isolate_profile_data": true,
         "merge": {
-          "args": [],
           "script": "//testing/merge_scripts/standard_isolated_script_merge.py"
         },
         "name": "content_junit_tests",
@@ -30784,7 +30768,6 @@
         "isolate_name": "device_junit_tests",
         "isolate_profile_data": true,
         "merge": {
-          "args": [],
           "script": "//testing/merge_scripts/standard_isolated_script_merge.py"
         },
         "name": "device_junit_tests",
@@ -30814,7 +30797,6 @@
         "isolate_name": "junit_unit_tests",
         "isolate_profile_data": true,
         "merge": {
-          "args": [],
           "script": "//testing/merge_scripts/standard_isolated_script_merge.py"
         },
         "name": "junit_unit_tests",
@@ -30844,7 +30826,6 @@
         "isolate_name": "keyboard_accessory_junit_tests",
         "isolate_profile_data": true,
         "merge": {
-          "args": [],
           "script": "//testing/merge_scripts/standard_isolated_script_merge.py"
         },
         "name": "keyboard_accessory_junit_tests",
@@ -30874,7 +30855,6 @@
         "isolate_name": "media_base_junit_tests",
         "isolate_profile_data": true,
         "merge": {
-          "args": [],
           "script": "//testing/merge_scripts/standard_isolated_script_merge.py"
         },
         "name": "media_base_junit_tests",
@@ -30904,7 +30884,6 @@
         "isolate_name": "module_installer_junit_tests",
         "isolate_profile_data": true,
         "merge": {
-          "args": [],
           "script": "//testing/merge_scripts/standard_isolated_script_merge.py"
         },
         "name": "module_installer_junit_tests",
@@ -30935,7 +30914,6 @@
         "isolate_name": "monochrome_public_apk_checker",
         "isolate_profile_data": true,
         "merge": {
-          "args": [],
           "script": "//testing/merge_scripts/standard_isolated_script_merge.py"
         },
         "name": "monochrome_public_apk_checker",
@@ -30981,7 +30959,6 @@
         "isolate_name": "net_junit_tests",
         "isolate_profile_data": true,
         "merge": {
-          "args": [],
           "script": "//testing/merge_scripts/standard_isolated_script_merge.py"
         },
         "name": "net_junit_tests",
@@ -31011,7 +30988,6 @@
         "isolate_name": "paint_preview_junit_tests",
         "isolate_profile_data": true,
         "merge": {
-          "args": [],
           "script": "//testing/merge_scripts/standard_isolated_script_merge.py"
         },
         "name": "paint_preview_junit_tests",
@@ -31041,7 +31017,6 @@
         "isolate_name": "password_check_junit_tests",
         "isolate_profile_data": true,
         "merge": {
-          "args": [],
           "script": "//testing/merge_scripts/standard_isolated_script_merge.py"
         },
         "name": "password_check_junit_tests",
@@ -31071,7 +31046,6 @@
         "isolate_name": "password_manager_junit_tests",
         "isolate_profile_data": true,
         "merge": {
-          "args": [],
           "script": "//testing/merge_scripts/standard_isolated_script_merge.py"
         },
         "name": "password_manager_junit_tests",
@@ -31101,7 +31075,6 @@
         "isolate_name": "services_junit_tests",
         "isolate_profile_data": true,
         "merge": {
-          "args": [],
           "script": "//testing/merge_scripts/standard_isolated_script_merge.py"
         },
         "name": "services_junit_tests",
@@ -31139,7 +31112,6 @@
         "isolate_name": "telemetry_perf_unittests_android_chrome",
         "isolate_profile_data": true,
         "merge": {
-          "args": [],
           "script": "//testing/merge_scripts/standard_isolated_script_merge.py"
         },
         "name": "telemetry_chromium_minidump_unittests",
@@ -31190,7 +31162,6 @@
         "isolate_name": "telemetry_perf_unittests_android_monochrome",
         "isolate_profile_data": true,
         "merge": {
-          "args": [],
           "script": "//testing/merge_scripts/standard_isolated_script_merge.py"
         },
         "name": "telemetry_monochrome_minidump_unittests",
@@ -31238,7 +31209,6 @@
         "isolate_name": "telemetry_perf_unittests_android_chrome",
         "isolate_profile_data": true,
         "merge": {
-          "args": [],
           "script": "//testing/merge_scripts/standard_isolated_script_merge.py"
         },
         "name": "telemetry_perf_unittests",
@@ -31284,7 +31254,6 @@
         "isolate_name": "touch_to_fill_junit_tests",
         "isolate_profile_data": true,
         "merge": {
-          "args": [],
           "script": "//testing/merge_scripts/standard_isolated_script_merge.py"
         },
         "name": "touch_to_fill_junit_tests",
@@ -31314,7 +31283,6 @@
         "isolate_name": "ui_junit_tests",
         "isolate_profile_data": true,
         "merge": {
-          "args": [],
           "script": "//testing/merge_scripts/standard_isolated_script_merge.py"
         },
         "name": "ui_junit_tests",
@@ -31344,7 +31312,6 @@
         "isolate_name": "webapk_client_junit_tests",
         "isolate_profile_data": true,
         "merge": {
-          "args": [],
           "script": "//testing/merge_scripts/standard_isolated_script_merge.py"
         },
         "name": "webapk_client_junit_tests",
@@ -31374,7 +31341,6 @@
         "isolate_name": "webapk_shell_apk_h2o_junit_tests",
         "isolate_profile_data": true,
         "merge": {
-          "args": [],
           "script": "//testing/merge_scripts/standard_isolated_script_merge.py"
         },
         "name": "webapk_shell_apk_h2o_junit_tests",
@@ -31404,7 +31370,6 @@
         "isolate_name": "webapk_shell_apk_junit_tests",
         "isolate_profile_data": true,
         "merge": {
-          "args": [],
           "script": "//testing/merge_scripts/standard_isolated_script_merge.py"
         },
         "name": "webapk_shell_apk_junit_tests",
@@ -33042,7 +33007,6 @@
           "--avd-config=../../tools/android/avd/proto/generic_android28.textpb"
         ],
         "merge": {
-          "args": [],
           "script": "//testing/merge_scripts/standard_isolated_script_merge.py"
         },
         "resultdb": {

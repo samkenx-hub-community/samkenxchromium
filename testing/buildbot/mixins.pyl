@@ -421,12 +421,6 @@
       },
     },
   },
-  'chromeos-kevin-skylab': {
-    'cros_board': 'kevin',
-    'cros_img': 'kevin-public/R114-15397.0.0',
-    'bucket': 'chromiumos-image-archive',
-    'timeout_sec': 10800,
-  },
   'chromeos-octopus': {
     'swarming': {
       'dimensions': {
@@ -613,18 +607,6 @@
       ],
     },
   },
-  'ios_runtime_cache_14_5': {
-    '$mixin_append': {
-      'swarming': {
-        'named_caches': [
-          {
-            'name': 'runtime_ios_14_5',
-            'path': 'Runtime-ios-14.5',
-          },
-        ],
-      },
-    },
-  },
   'ios_runtime_cache_15_5': {
     '$mixin_append': {
       'swarming': {
@@ -644,6 +626,18 @@
           {
             'name': 'runtime_ios_16_2',
             'path': 'Runtime-ios-16.2',
+          },
+        ],
+      },
+    },
+  },
+  'ios_runtime_cache_16_4': {
+    '$mixin_append': {
+      'swarming': {
+        'named_caches': [
+          {
+            'name': 'runtime_ios_16_4',
+            'path': 'Runtime-ios-16.4',
           },
         ],
       },
@@ -707,6 +701,13 @@
     'swarming': {
       'dimensions': {
         'os': 'Ubuntu-20.04',
+      },
+    },
+  },
+  'linux-jammy': {
+    'swarming': {
+      'dimensions': {
+        'os': 'Ubuntu-22.04',
       },
     },
   },
@@ -790,6 +791,9 @@
         },
       ]
     },
+  },
+  'long_skylab_timeout': {
+    'timeout_sec': 10800,
   },
   'mac-archive-rel-args': {
     'args': [
@@ -967,9 +971,9 @@
     'swarming': {
       'dimensions': {
         'cpu': 'x86-64',
-        'gpu': '1002:6821',
+        'gpu': '1002:67ef',
         'hidpi': '1',
-        'os': 'Mac-12.1',
+        'os': 'Mac-13.2.1',
         'pool': 'chromium.tests.gpu',
         'display_attached': '1',
       },
@@ -1006,7 +1010,7 @@
         {
           "cipd_package": 'infra/tools/mac_toolchain/${platform}',
           'location': '.',
-          'revision': 'git_revision:5468d28877d7106d8ab4f7e23b784578ffc86aff',
+          'revision': 'git_revision:a598cd77abc01089647a79e3cfa3cc8e8ecb5118',
         },
       ],
     },
@@ -1460,13 +1464,13 @@
     '$mixin_append': {
       'args': [
         '--xcode-build-version',
-        '14c18'
+        '14e222b'
       ],
     },
     'swarming': {
       'named_caches': [
         {
-          'name': 'xcode_ios_14c18',
+          'name': 'xcode_ios_14e222b',
           'path': 'Xcode.app',
         },
       ],

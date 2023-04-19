@@ -43,8 +43,7 @@ class FakeChromeUserManager : public ChromeUserManager {
   user_manager::User* AddKioskAppUser(const AccountId& account_id);
   user_manager::User* AddArcKioskAppUser(const AccountId& account_id);
   user_manager::User* AddWebKioskAppUser(const AccountId& account_id);
-  user_manager::User* AddPublicAccountUser(const AccountId& account_id,
-                                           bool with_saml = false);
+  user_manager::User* AddPublicAccountUser(const AccountId& account_id);
   user_manager::User* AddActiveDirectoryUser(const AccountId& account_id);
 
   // Calculates the user name hash and calls UserLoggedIn to login a user.
@@ -59,6 +58,7 @@ class FakeChromeUserManager : public ChromeUserManager {
   user_manager::User* AddChildUser(const AccountId& account_id);
   user_manager::User* AddUserWithAffiliation(const AccountId& account_id,
                                              bool is_affiliated);
+  user_manager::User* AddSamlUser(const AccountId& account_id);
 
   // Creates and adds user with specified `account_id` and `user_type`. Sets
   // user affiliation. If `profile` is valid, maps it to the created user.
@@ -67,10 +67,6 @@ class FakeChromeUserManager : public ChromeUserManager {
       bool is_affiliated,
       user_manager::UserType user_type,
       TestingProfile* profile);
-
-  // Creates the instance returned by `GetLocalState()` (which returns nullptr
-  // by default).
-  void CreateLocalState();
 
   // Sets the user profile created flag to simulate finishing user
   // profile loading. Note this does not create a profile.
@@ -92,8 +88,7 @@ class FakeChromeUserManager : public ChromeUserManager {
   void SwitchToLastActiveUser() override;
   void OnSessionStarted() override;
   void RemoveUser(const AccountId& account_id,
-                  user_manager::UserRemovalReason reason,
-                  user_manager::RemoveUserDelegate* delegate) override;
+                  user_manager::UserRemovalReason reason) override;
   void RemoveUserFromList(const AccountId& account_id) override;
   bool IsKnownUser(const AccountId& account_id) const override;
   const user_manager::User* FindUser(
@@ -135,7 +130,6 @@ class FakeChromeUserManager : public ChromeUserManager {
   bool IsGaiaUserAllowed(const user_manager::User& user) const override;
   bool IsUserAllowed(const user_manager::User& user) const override;
   bool IsEphemeralAccountId(const AccountId& account_id) const override;
-  PrefService* GetLocalState() const override;
   const AccountId& GetGuestAccountId() const override;
   bool IsFirstExecAfterBoot() const override;
   void AsyncRemoveCryptohome(const AccountId& account_id) const override;
@@ -181,11 +175,6 @@ class FakeChromeUserManager : public ChromeUserManager {
       const AffiliationIDSet& user_affiliation_ids) override;
   bool IsFullManagementDisclosureNeeded(
       policy::DeviceLocalAccountPolicyBroker* broker) const override;
-  void CacheRemovedUser(const std::string& user_email,
-                        user_manager::UserRemovalReason) override;
-  std::vector<std::pair<std::string, user_manager::UserRemovalReason>>
-  GetRemovedUserCache() const override;
-  void MarkReporterInitialized() override;
 
   void set_ephemeral_mode_config(EphemeralModeConfig ephemeral_mode_config) {
     fake_ephemeral_mode_config_ = std::move(ephemeral_mode_config);
@@ -256,8 +245,6 @@ class FakeChromeUserManager : public ChromeUserManager {
 
   using FlowMap = std::map<AccountId, UserFlow*>;
 
-  std::unique_ptr<TestingPrefServiceSimple> local_state_;
-
   // Specific flows by user e-mail.
   // Keys should be canonicalized before access.
   FlowMap specific_flows_;
@@ -270,10 +257,6 @@ class FakeChromeUserManager : public ChromeUserManager {
 
   // User avatar managers.
   UserImageManagerMap user_image_managers_;
-
-  // Fake cache of removed users. Used for reporting testing.
-  std::vector<std::pair<std::string, user_manager::UserRemovalReason>>
-      removed_user_cache_;
 };
 
 }  // namespace ash

@@ -7,6 +7,7 @@ package org.chromium.chrome.browser.omnibox.suggestions.base;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.verify;
@@ -30,15 +31,15 @@ import org.chromium.base.test.util.Features.DisableFeatures;
 import org.chromium.base.test.util.Features.EnableFeatures;
 import org.chromium.base.test.util.HistogramWatcher;
 import org.chromium.chrome.browser.flags.ChromeFeatureList;
-import org.chromium.chrome.browser.omnibox.OmniboxSuggestionType;
-import org.chromium.chrome.browser.omnibox.R;
 import org.chromium.chrome.browser.omnibox.UrlBarEditingTextStateProvider;
 import org.chromium.chrome.browser.omnibox.suggestions.FaviconFetcher;
 import org.chromium.chrome.browser.omnibox.suggestions.SuggestionHost;
 import org.chromium.chrome.browser.omnibox.suggestions.basic.BasicSuggestionProcessor.BookmarkState;
 import org.chromium.chrome.browser.omnibox.suggestions.basic.SuggestionViewProperties;
+import org.chromium.chrome.browser.omnibox.test.R;
 import org.chromium.components.omnibox.AutocompleteMatch;
 import org.chromium.components.omnibox.AutocompleteMatchBuilder;
+import org.chromium.components.omnibox.OmniboxSuggestionType;
 import org.chromium.components.omnibox.action.HistoryClustersAction;
 import org.chromium.ui.modelutil.PropertyModel;
 import org.chromium.url.ShadowGURL;
@@ -100,9 +101,11 @@ public class HistoryClustersProcessorTest {
         mProcessor.populateModel(suggestion, propertyModel, 2);
         assertEquals(new SuggestionSpannable(suggestion.getActions().get(0).hint),
                 propertyModel.get(SuggestionViewProperties.TEXT_LINE_2_TEXT));
+        assertTrue(propertyModel.get(SuggestionViewProperties.IS_SEARCH_SUGGESTION));
+        assertNull(propertyModel.get(BaseSuggestionViewProperties.ACTION_BUTTONS));
         SuggestionDrawableState sds = propertyModel.get(BaseSuggestionViewProperties.ICON);
         assertNotNull(sds);
-        assertEquals(R.drawable.ic_journeys, sds.resourceId);
+        assertEquals(R.drawable.action_journeys, sds.resourceId);
 
         mProcessor.onUrlFocusChange(false);
         watcher.assertExpected();

@@ -10,6 +10,7 @@
 #include "ash/ambient/ambient_view_delegate_impl.h"
 #include "ash/ambient/model/ambient_slideshow_photo_config.h"
 #include "ash/ambient/ui/photo_view.h"
+#include "ash/login/ui/lock_screen.h"
 #include "ash/public/cpp/ambient/ambient_managed_photo_source.h"
 #include "base/check.h"
 #include "base/functional/callback.h"
@@ -34,15 +35,14 @@ AmbientManagedSlideshowUiLauncher::AmbientManagedSlideshowUiLauncher(
 AmbientManagedSlideshowUiLauncher::~AmbientManagedSlideshowUiLauncher() =
     default;
 
-void AmbientManagedSlideshowUiLauncher::Initialize(base::OnceClosure on_done) {
+void AmbientManagedSlideshowUiLauncher::Initialize(
+    InitializationCallback on_done) {
   initialization_callback_ = std::move(on_done);
   if (!AmbientManagedPhotoSource::Get()) {
     LOG(WARNING) << "AmbientManagedPhotoSource not present. Probably "
                     "AmbientManagedPhotoController screen update is being "
                     "started during a shutdown";
-    // TODO(fahadmansoor): Start calling this callback with a boolean to handle
-    // the error case.
-    initialization_callback_.Reset();
+    std::move(initialization_callback_).Run(/*success=*/false);
     return;
   }
   photo_controller_.UpdateImageFilePaths(
@@ -56,7 +56,8 @@ void AmbientManagedSlideshowUiLauncher::UpdateImageFilePaths(
 }
 
 std::unique_ptr<views::View> AmbientManagedSlideshowUiLauncher::CreateView() {
-  return std::make_unique<PhotoView>(delegate_);
+  return std::make_unique<PhotoView>(delegate_,
+                                     /*peripheral_ui_visible=*/false);
 }
 
 void AmbientManagedSlideshowUiLauncher::Finalize() {
@@ -67,13 +68,18 @@ AmbientBackendModel*
 AmbientManagedSlideshowUiLauncher::GetAmbientBackendModel() {
   return photo_controller_.ambient_backend_model();
 }
+
 void AmbientManagedSlideshowUiLauncher::OnImagesReady() {
   CHECK(initialization_callback_);
-  std::move(initialization_callback_).Run();
+  std::move(initialization_callback_).Run(/*success=*/true);
 }
 
 bool AmbientManagedSlideshowUiLauncher::IsActive() {
   return photo_controller_.IsScreenUpdateActive();
+}
+
+bool AmbientManagedSlideshowUiLauncher::IsReady() {
+  return LockScreen::HasInstance();
 }
 
 }  // namespace ash

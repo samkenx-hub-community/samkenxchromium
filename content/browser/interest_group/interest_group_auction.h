@@ -241,6 +241,10 @@ class CONTENT_EXPORT InterestGroupAuction
     std::map<url::Origin, PrivateAggregationRequests>
         private_aggregation_requests;
 
+    // Requests made to Private aggregation API in generateBid() for the
+    // non-k-anonymous enforced bid when k-anonymity enforcement is active.
+    PrivateAggregationRequests non_kanon_private_aggregation_requests;
+
     // The reason this bid was rejected by the auction (i.e., reason why score
     // was non-positive).
     auction_worklet::mojom::RejectReason reject_reason =
@@ -894,6 +898,9 @@ class CONTENT_EXPORT InterestGroupAuction
   // is invoked when the phase completes.
   AuctionPhaseCompletionCallback load_interest_groups_phase_callback_;
   AuctionPhaseCompletionCallback bidding_and_scoring_phase_callback_;
+
+  // Start time of the BiddingAndScoring phase for UKM metrics.
+  base::TimeTicks bidding_and_scoring_phase_start_time_;
 
   // Invoked in the bidding and scoring phase, once the seller worklet has
   // loaded. May be null.

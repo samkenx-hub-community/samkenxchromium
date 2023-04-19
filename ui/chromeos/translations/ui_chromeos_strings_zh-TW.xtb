@@ -159,6 +159,7 @@
 <translation id="2304820083631266885">行星</translation>
 <translation id="2305020378527873881">「<ph name="VOLUME_NAME" />」已退出。</translation>
 <translation id="2307462900900812319">設定網路</translation>
+<translation id="2312704192806647271">{COUNT,plural, =1{找不到 ID 為 <ph name="BEGIN_LIST" /><ph name="END_LIST" /> 的擴充功能。請與系統管理員聯絡。}other{找不到 ID 為 <ph name="BEGIN_LIST" /><ph name="END_LIST" /> 的擴充功能。請與系統管理員聯絡。}}</translation>
 <translation id="2325650632570794183">系統不支援這個檔案類型。請造訪 Chrome 線上應用程式商店，尋找是否有可開啟這類檔案的應用程式。</translation>
 <translation id="2326539130272988168">保加利亞文</translation>
 <translation id="2337715497728194187">與 Bruschetta 共用</translation>
@@ -274,6 +275,7 @@
 <translation id="3290356915286466215">不安全</translation>
 <translation id="3291218047831493686">連上這個網路即可變更 SIM 卡鎖定設定</translation>
 <translation id="3293023191599135697">系統不支援 WEP 網路</translation>
+<translation id="3295006446256079333">這個磁碟區</translation>
 <translation id="3295357220137379386">裝置忙碌中</translation>
 <translation id="3296763833017966289">喬治亞文</translation>
 <translation id="3307875152560779385">烏克蘭文</translation>

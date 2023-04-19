@@ -35,6 +35,7 @@
 #include "ash/system/camera/autozoom_controller_impl.h"
 #include "ash/system/camera/autozoom_nudge_controller.h"
 #include "ash/system/camera/camera_effects_controller.h"
+#include "ash/system/geolocation/geolocation_controller.h"
 #include "ash/system/gesture_education/gesture_education_notification_controller.h"
 #include "ash/system/human_presence/snooping_protection_controller.h"
 #include "ash/system/input_device_settings/input_device_settings_controller_impl.h"
@@ -60,7 +61,6 @@
 #include "ash/touch/touch_devices_controller.h"
 #include "ash/wallpaper/wallpaper_pref_manager.h"
 #include "ash/wm/desks/desks_restore_util.h"
-#include "ash/wm/desks/persistent_desks_bar/persistent_desks_bar_controller.h"
 #include "ash/wm/desks/templates/saved_desk_util.h"
 #include "ash/wm/float/tablet_mode_tuck_education.h"
 #include "ash/wm/lock_state_controller.h"
@@ -99,6 +99,7 @@ void RegisterProfilePrefs(PrefRegistrySimple* registry, bool for_test) {
   DockedMagnifierController::RegisterProfilePrefs(registry);
   FeatureDiscoveryDurationReporterImpl::RegisterProfilePrefs(registry);
   FullscreenController::RegisterProfilePrefs(registry);
+  GeolocationController::RegisterProfilePrefs(registry);
   GestureEducationNotificationController::RegisterProfilePrefs(registry,
                                                                for_test);
   holding_space_prefs::RegisterProfilePrefs(registry);
@@ -116,7 +117,6 @@ void RegisterProfilePrefs(PrefRegistrySimple* registry, bool for_test) {
   PaletteTray::RegisterProfilePrefs(registry);
   PaletteWelcomeBubble::RegisterProfilePrefs(registry);
   PciePeripheralNotificationController::RegisterProfilePrefs(registry);
-  PersistentDesksBarController::RegisterProfilePrefs(registry);
   PrivacyHubController::RegisterProfilePrefs(registry);
   PrivacyScreenController::RegisterProfilePrefs(registry);
   ProjectorControllerImpl::RegisterProfilePrefs(registry);
@@ -158,6 +158,7 @@ void RegisterLocalStatePrefs(PrefRegistrySimple* registry, bool for_test) {
   WallpaperPrefManager::RegisterLocalStatePrefs(registry);
   DetachableBaseHandler::RegisterPrefs(registry);
   PowerPrefs::RegisterLocalStatePrefs(registry);
+  PrivacyHubController::RegisterLocalStatePrefs(registry);
   DisplayPrefs::RegisterLocalStatePrefs(registry);
   LoginExpandedPublicAccountView::RegisterLocalStatePrefs(registry);
   LockStateController::RegisterPrefs(registry);

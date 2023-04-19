@@ -241,7 +241,7 @@ SyncableServiceBasedBridge::CreateMetadataChangeList() {
   return ModelTypeStore::WriteBatch::CreateMetadataChangeList();
 }
 
-absl::optional<ModelError> SyncableServiceBasedBridge::MergeSyncData(
+absl::optional<ModelError> SyncableServiceBasedBridge::MergeFullSyncData(
     std::unique_ptr<MetadataChangeList> metadata_change_list,
     EntityChangeList entity_change_list) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
@@ -259,7 +259,8 @@ absl::optional<ModelError> SyncableServiceBasedBridge::MergeSyncData(
   return StartSyncableService();
 }
 
-absl::optional<ModelError> SyncableServiceBasedBridge::ApplySyncChanges(
+absl::optional<ModelError>
+SyncableServiceBasedBridge::ApplyIncrementalSyncChanges(
     std::unique_ptr<MetadataChangeList> metadata_change_list,
     EntityChangeList entity_change_list) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
@@ -336,16 +337,10 @@ ConflictResolution SyncableServiceBasedBridge::ResolveConflict(
   return ConflictResolution::kUseLocal;
 }
 
-void SyncableServiceBasedBridge::ApplyStopSyncChanges(
+void SyncableServiceBasedBridge::ApplyDisableSyncChanges(
     std::unique_ptr<MetadataChangeList> delete_metadata_change_list) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   DCHECK(store_);
-
-  // If Sync is being stopped only temporarily (i.e. we want to keep tracking
-  // metadata), then there's nothing to do here.
-  if (!delete_metadata_change_list) {
-    return;
-  }
 
   in_memory_store_.clear();
   store_->DeleteAllDataAndMetadata(base::DoNothing());
@@ -454,7 +449,7 @@ void SyncableServiceBasedBridge::OnSyncableServiceReady(
   // If sync was previously enabled according to the loaded metadata, then
   // immediately start the SyncableService to track as many local changes as
   // possible (regardless of whether sync actually starts or not). Otherwise,
-  // the SyncableService will be started from MergeSyncData().
+  // the SyncableService will be started from MergeFullSyncData().
   if (change_processor()->IsTrackingMetadata()) {
     ReportErrorIfSet(StartSyncableService());
   }

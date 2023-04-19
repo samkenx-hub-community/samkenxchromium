@@ -12,7 +12,10 @@ import androidx.annotation.Nullable;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.util.List;
+
 /**
+ * Implemented in Chromium.
+ *
  * Interface to provide chromium calling points for an external surface.
  */
 public interface SurfaceActionsHandler {
@@ -38,6 +41,33 @@ public interface SurfaceActionsHandler {
         int THANK_CREATOR = 6;
         // The URL is opened in a new tab that is organized as group.
         int NEW_TAB_IN_GROUP = 7;
+    }
+
+    /**
+     * Options for entry points to the single web feed.
+     */
+    @IntDef({OpenWebFeedEntryPoint.ATTRIBUTION, OpenWebFeedEntryPoint.RECOMMENDATION,
+            OpenWebFeedEntryPoint.GROUP_HEADER, OpenWebFeedEntryPoint.OTHER,
+            OpenWebFeedEntryPoint.MAX_VALUE})
+    @Retention(RetentionPolicy.SOURCE)
+    public @interface OpenWebFeedEntryPoint {
+        /**
+         * Feed Atteribution
+         */
+        int ATTRIBUTION = 0;
+        /**
+         * Feed Recomentation
+         */
+        int RECOMMENDATION = 1;
+        /**
+         * Group Header Attribution
+         */
+        int GROUP_HEADER = 2;
+        /**
+         * Other
+         */
+        int OTHER = 3;
+        int MAX_VALUE = OTHER;
     }
 
     /**
@@ -156,7 +186,17 @@ public interface SurfaceActionsHandler {
      * Opens a specific WebFeed by name.
      * @param webFeedName the relevant web feed name.
      */
-    default void openWebFeed(String webFeedName) {}
+    @Deprecated
+    default void openWebFeed(String webFeedName) {
+        openWebFeed(webFeedName, OpenWebFeedEntryPoint.OTHER);
+    }
+
+    /**
+     * Opens a specific WebFeed by name with a specific entrypoint.
+     * @param webFeedName the relevant web feed name.
+     * @param entryPoint the entry point used to launch the feed.
+     */
+    default void openWebFeed(String webFeedName, @OpenWebFeedEntryPoint int entryPoint) {}
 
     /** Requests that a sync consent prompt be shown. */
     default void showSyncConsentPrompt() {}

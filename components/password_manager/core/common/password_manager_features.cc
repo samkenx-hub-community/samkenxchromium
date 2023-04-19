@@ -110,11 +110,6 @@ BASE_FEATURE(kIOSPasswordUISplit,
              "IOSPasswordUISplit",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
-// Enables password saving and filling in cross-origin iframes on IOS.
-BASE_FEATURE(kIOSPasswordManagerCrossOriginIframeSupport,
-             "IOSPasswordManagerCrossOriginIframeSupport",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-
 // Enables displaying and managing compromised, weak and reused credentials in
 // the Password Manager.
 BASE_FEATURE(kIOSPasswordCheckup,
@@ -148,6 +143,13 @@ BASE_FEATURE(kNewRegexForOtpFields,
              "NewRegexForOtpFields",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
+// Killswitch for changes regarding password issues in
+// `PasswordSpcificsMetadata`. Guards writing issues to metadata and preserving
+// the new notification field.
+BASE_FEATURE(kPasswordIssuesInSpecificsMetadata,
+             "PasswordIssuesInSpecificsMetadata",
+             base::FEATURE_ENABLED_BY_DEFAULT);
+
 // Enables the new password viewing subpage.
 BASE_FEATURE(kPasswordViewPageInSettings,
              "PasswordViewPageInSettings",
@@ -168,20 +170,13 @@ BASE_FEATURE(kPasswordChangeWellKnown,
              "PasswordChangeWellKnown",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-// Enables import passwords flow from Chrome's settings page.
-BASE_FEATURE(kPasswordImport,
-             "PasswordImport",
-             base::FEATURE_ENABLED_BY_DEFAULT);
+BASE_FEATURE(kPasswordsImportM2,
+             "PasswordsImportM2",
+             base::FEATURE_DISABLED_BY_DEFAULT);
 
 #if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
 BASE_FEATURE(kPasswordManagerRedesign,
              "PasswordManagerRedesign",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-#endif
-
-#if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
-BASE_FEATURE(kPasswordsImportM2,
-             "PasswordsImportM2",
              base::FEATURE_DISABLED_BY_DEFAULT);
 #endif
 
@@ -259,6 +254,11 @@ BASE_FEATURE(kUnifiedPasswordManagerAndroid,
 BASE_FEATURE(kUnifiedPasswordManagerErrorMessages,
              "UnifiedPasswordManagerErrorMessages",
              base::FEATURE_ENABLED_BY_DEFAULT);
+
+// Enables showing the warning about UPM migrating local passwords.
+BASE_FEATURE(kUnifiedPasswordManagerLocalPasswordsMigrationWarning,
+             "UnifiedPasswordManagerLocalPasswordsMigrationWarning",
+             base::FEATURE_DISABLED_BY_DEFAULT);
 
 // If enabled, the built-in sync functionality in PasswordSyncBridge becomes
 // unused, meaning that SyncService/SyncEngine will no longer download or

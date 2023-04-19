@@ -802,19 +802,14 @@ scoped_refptr<CanvasResource> DrawingBuffer::ExportCanvasResource() {
 
   SkImageInfo resource_info = SkImageInfo::MakeN32Premul(
       out_resource.size.width(), out_resource.size.height());
-  switch (out_resource.format.resource_format()) {
-    case viz::RGBA_8888:
-      resource_info = resource_info.makeColorType(kRGBA_8888_SkColorType);
-      break;
-    case viz::RGBX_8888:
-      resource_info = resource_info.makeColorType(kRGB_888x_SkColorType);
-      break;
-    case viz::RGBA_F16:
-      resource_info = resource_info.makeColorType(kRGBA_F16_SkColorType);
-      break;
-    default:
-      NOTREACHED();
-      break;
+  if (out_resource.format == viz::SinglePlaneFormat::kRGBA_8888) {
+    resource_info = resource_info.makeColorType(kRGBA_8888_SkColorType);
+  } else if (out_resource.format == viz::SinglePlaneFormat::kRGBX_8888) {
+    resource_info = resource_info.makeColorType(kRGB_888x_SkColorType);
+  } else if (out_resource.format == viz::SinglePlaneFormat::kRGBA_F16) {
+    resource_info = resource_info.makeColorType(kRGBA_F16_SkColorType);
+  } else {
+    NOTREACHED();
   }
 
   return ExternalCanvasResource::Create(
@@ -1139,15 +1134,14 @@ bool DrawingBuffer::CopyToVideoFrame(
   const GrSurfaceOrigin src_surface_origin = src_origin_is_top_left
                                                  ? kTopLeft_GrSurfaceOrigin
                                                  : kBottomLeft_GrSurfaceOrigin;
-  auto copy_function = [&](const gpu::MailboxHolder& src_mailbox,
-                           viz::SharedImageFormat src_format,
-                           SkAlphaType src_alpha_type,
-                           const gfx::Size& src_size,
-                           const gfx::ColorSpace& src_color_space) {
-    return frame_pool->CopyRGBATextureToVideoFrame(
-        src_format.resource_format(), src_size, src_color_space,
-        src_surface_origin, src_mailbox, dst_color_space, std::move(callback));
-  };
+  auto copy_function =
+      [&](const gpu::MailboxHolder& src_mailbox,
+          viz::SharedImageFormat src_format, SkAlphaType src_alpha_type,
+          const gfx::Size& src_size, const gfx::ColorSpace& src_color_space) {
+        return frame_pool->CopyRGBATextureToVideoFrame(
+            src_format, src_size, src_color_space, src_surface_origin,
+            src_mailbox, dst_color_space, std::move(callback));
+      };
   return CopyToPlatformInternal(raster_interface, /*dst_is_unpremul_gl=*/false,
                                 src_buffer, copy_function);
 }

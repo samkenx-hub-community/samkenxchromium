@@ -158,15 +158,6 @@ class CORE_EXPORT LayoutBoxModelObject : public LayoutObject {
   virtual LayoutUnit OffsetWidth() const = 0;
   virtual LayoutUnit OffsetHeight() const = 0;
 
-  int PixelSnappedOffsetLeft(const Element* parent) const {
-    NOT_DESTROYED();
-    return RoundToInt(OffsetLeft(parent));
-  }
-  int PixelSnappedOffsetTop(const Element* parent) const {
-    NOT_DESTROYED();
-    return RoundToInt(OffsetTop(parent));
-  }
-
   bool HasSelfPaintingLayer() const;
   PaintLayer* Layer() const {
     NOT_DESTROYED();
@@ -503,11 +494,6 @@ class CORE_EXPORT LayoutBoxModelObject : public LayoutObject {
       bool first_line,
       LineDirectionMode,
       LinePositionMode = kPositionOnContainingLine) const = 0;
-  virtual LayoutUnit BaselinePosition(
-      FontBaseline,
-      bool first_line,
-      LineDirectionMode,
-      LinePositionMode = kPositionOnContainingLine) const = 0;
 
   // Returns true if the background is painted opaque in the given rect.
   // The query rect is given in local coordinate system.
@@ -534,28 +520,9 @@ class CORE_EXPORT LayoutBoxModelObject : public LayoutObject {
   bool BackgroundTransfersToView(
       const ComputedStyle* document_element_style = nullptr) const;
 
-  virtual LayoutUnit OverrideContainingBlockContentWidth() const {
-    NOT_DESTROYED();
-    NOTREACHED();
-    return LayoutUnit(-1);
-  }
-  virtual LayoutUnit OverrideContainingBlockContentHeight() const {
-    NOT_DESTROYED();
-    NOTREACHED();
-    return LayoutUnit(-1);
-  }
-  virtual bool HasOverrideContainingBlockContentWidth() const {
-    NOT_DESTROYED();
-    return false;
-  }
-  virtual bool HasOverrideContainingBlockContentHeight() const {
-    NOT_DESTROYED();
-    return false;
-  }
-
   void RecalcVisualOverflow() override;
 
-  void AddOutlineRectsForNormalChildren(Vector<PhysicalRect>&,
+  void AddOutlineRectsForNormalChildren(OutlineRectCollector&,
                                         const PhysicalOffset& additional_offset,
                                         NGOutlineType) const;
 
@@ -573,7 +540,7 @@ class CORE_EXPORT LayoutBoxModelObject : public LayoutObject {
       const Length& logical_height) const;
 
   void AddOutlineRectsForDescendant(const LayoutObject& descendant,
-                                    Vector<PhysicalRect>&,
+                                    OutlineRectCollector&,
                                     const PhysicalOffset& additional_offset,
                                     NGOutlineType) const;
 

@@ -4,7 +4,6 @@
 
 #include <utility>
 
-#include "ash/constants/ash_features.h"
 #include "ash/constants/ash_switches.h"
 #include "ash/webui/media_app_ui/buildflags.h"
 #include "ash/webui/media_app_ui/test/media_app_ui_browsertest.h"
@@ -203,28 +202,6 @@ class MediaAppIntegrationWithFilesAppTest : public MediaAppIntegrationTest {
     file_manager::test::AddDefaultComponentExtensionsOnMainThread(profile());
     MediaAppIntegrationTest::SetUpOnMainThread();
   }
-};
-
-class MediaAppIntegrationDarkLightModeEnabledTest
-    : public MediaAppIntegrationTest {
- public:
-  MediaAppIntegrationDarkLightModeEnabledTest() {
-    feature_list_.InitAndEnableFeature(chromeos::features::kDarkLightMode);
-  }
-
- private:
-  base::test::ScopedFeatureList feature_list_;
-};
-
-class MediaAppIntegrationDarkLightModeDisabledTest
-    : public MediaAppIntegrationTest {
- public:
-  MediaAppIntegrationDarkLightModeDisabledTest() {
-    feature_list_.InitAndDisableFeature(chromeos::features::kDarkLightMode);
-  }
-
- private:
-  base::test::ScopedFeatureList feature_list_;
 };
 
 using MediaAppIntegrationAllProfilesTest = MediaAppIntegrationTest;
@@ -1134,7 +1111,7 @@ IN_PROC_BROWSER_TEST_P(MediaAppIntegrationWithFilesAppAllProfilesTest,
   histograms.ExpectBucketCount("Apps.MediaApp.Load.OtherOpenWindowCount", 0, 1);
 }
 
-IN_PROC_BROWSER_TEST_P(MediaAppIntegrationDarkLightModeEnabledTest,
+IN_PROC_BROWSER_TEST_P(MediaAppIntegrationTest,
                        HasCorrectThemeAndBackgroundColor) {
   web_app::AppId app_id = MediaAppAppId();
 
@@ -1146,17 +1123,6 @@ IN_PROC_BROWSER_TEST_P(MediaAppIntegrationDarkLightModeEnabledTest,
   EXPECT_EQ(registrar.GetAppDarkModeThemeColor(app_id), gfx::kGoogleGrey900);
   EXPECT_EQ(registrar.GetAppDarkModeBackgroundColor(app_id),
             gfx::kGoogleGrey900);
-}
-
-IN_PROC_BROWSER_TEST_P(MediaAppIntegrationDarkLightModeDisabledTest,
-                       HasCorrectThemeAndBackgroundColor) {
-  web_app::AppId app_id = MediaAppAppId();
-
-  web_app::WebAppRegistrar& registrar =
-      web_app::WebAppProvider::GetForTest(profile())->registrar_unsafe();
-
-  EXPECT_EQ(registrar.GetAppThemeColor(app_id), gfx::kGoogleGrey900);
-  EXPECT_EQ(registrar.GetAppBackgroundColor(app_id), gfx::kGoogleGrey800);
 }
 
 // Ensures both the "audio" and "gallery" flavours of the MediaApp can be
@@ -1354,11 +1320,8 @@ IN_PROC_BROWSER_TEST_P(MediaAppIntegrationWithFilesAppAllProfilesTest,
   // Rename "image3.jpg" to "x.jpg".
   constexpr int kRenameResultSuccess = 0;
   constexpr char kScript[] =
-      "lastLoadedReceivedFileList().item(0).renameOriginalFile('x.jpg')"
-      ".then(result => domAutomationController.send(result));";
-  int result = ~kRenameResultSuccess;
-  EXPECT_EQ(true, content::ExecuteScriptAndExtractInt(app, kScript, &result));
-  EXPECT_EQ(kRenameResultSuccess, result);
+      "lastLoadedReceivedFileList().item(0).renameOriginalFile('x.jpg')";
+  EXPECT_EQ(kRenameResultSuccess, content::EvalJs(app, kScript));
 
   folder.Refresh();
 
@@ -1389,12 +1352,11 @@ IN_PROC_BROWSER_TEST_P(MediaAppIntegrationWithFilesAppTest, DeleteFile) {
 
   EXPECT_EQ("640x480", WaitForImageAlt(web_ui, kFileJpeg640x480));
 
-  int result = 0;
   constexpr char kScript[] =
       "lastLoadedReceivedFileList().item(0).deleteOriginalFile()"
-      ".then(() => domAutomationController.send(42));";
-  EXPECT_EQ(true, content::ExecuteScriptAndExtractInt(app, kScript, &result));
-  EXPECT_EQ(42, result);  // Magic success (no exception thrown).
+      ".then(() => 42);";
+  EXPECT_EQ(42, content::EvalJs(
+                    app, kScript));  // Magic success (no exception thrown).
 
   // Ensure the file *not* deleted is the only one that remains.
   folder.Refresh();
@@ -1498,10 +1460,9 @@ IN_PROC_BROWSER_TEST_P(MediaAppIntegrationWithFilesAppTest,
   // here that 0-1 retries are usually sufficient.
   int received_file_length = 0;
   do {
-    EXPECT_TRUE(content::ExecuteScriptAndExtractInt(
-        app,
-        "domAutomationController.send(lastLoadedReceivedFileList().length);",
-        &received_file_length));
+    received_file_length =
+        content::EvalJs(app, "lastLoadedReceivedFileList().length;")
+            .ExtractInt();
   } while (received_file_length != 2);
 
   bool result;
@@ -1685,12 +1646,6 @@ IN_PROC_BROWSER_TEST_P(MediaAppIntegrationTest, GuestCanReadLocalFonts) {
   content::WebContents* web_ui = LaunchWithNoFiles();
   EXPECT_EQ("success", ExtractStringInGlobalScope(web_ui, script));
 }
-
-INSTANTIATE_SYSTEM_WEB_APP_MANAGER_TEST_SUITE_REGULAR_PROFILE_P(
-    MediaAppIntegrationDarkLightModeEnabledTest);
-
-INSTANTIATE_SYSTEM_WEB_APP_MANAGER_TEST_SUITE_REGULAR_PROFILE_P(
-    MediaAppIntegrationDarkLightModeDisabledTest);
 
 INSTANTIATE_SYSTEM_WEB_APP_MANAGER_TEST_SUITE_REGULAR_PROFILE_P(
     MediaAppIntegrationTest);

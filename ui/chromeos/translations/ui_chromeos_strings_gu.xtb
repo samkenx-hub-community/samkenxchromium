@@ -159,6 +159,7 @@
 <translation id="2304820083631266885">ગ્રહ</translation>
 <translation id="2305020378527873881"><ph name="VOLUME_NAME" /> બહાર કાઢવામાં આવ્યું છે.</translation>
 <translation id="2307462900900812319">નેટવર્ક ગોઠવો</translation>
+<translation id="2312704192806647271">{COUNT,plural, =1{ID ધરાવતા એક્સ્ટેંશનને <ph name="BEGIN_LIST" /><ph name="END_LIST" /> શોધી શકાતું નથી. તમારા ઍડમિનિસ્ટ્રેટરનો સંપર્ક કરો.}one{ID ધરાવતા એક્સ્ટેંશનને <ph name="BEGIN_LIST" /><ph name="END_LIST" /> શોધી શકાતું નથી. તમારા ઍડમિનિસ્ટ્રેટરનો સંપર્ક કરો.}other{IDs ધરાવતા એક્સ્ટેંશનને <ph name="BEGIN_LIST" /><ph name="END_LIST" /> શોધી શકાતા નથી. તમારા ઍડમિનિસ્ટ્રેટરનો સંપર્ક કરો.}}</translation>
 <translation id="2325650632570794183">આ ફાઇલ પ્રકાર સમર્થિત નથી. આ પ્રકારની ફાઇલ ખોલી શકે તે એપ્લિકેશનને શોધવા માટે કૃપા કરીને Chrome વેબ દુકાનની મુલાકાત લો.</translation>
 <translation id="2326539130272988168">બલ્ગેરિયન</translation>
 <translation id="2337715497728194187">Bruschetta સાથે શેર કરો</translation>
@@ -274,6 +275,7 @@
 <translation id="3290356915286466215">અસુરક્ષિત</translation>
 <translation id="3291218047831493686">સિમ લૉક સેટિંગમાં ફેરફાર કરવા માટે આ નેટવર્ક સાથે કનેક્ટ કરો</translation>
 <translation id="3293023191599135697">WEP નેટવર્કને સપોર્ટ આપવામાં આવતો નથી</translation>
+<translation id="3295006446256079333">આ વૉલ્યૂમ</translation>
 <translation id="3295357220137379386">ડિવાઇસ વ્યસ્ત છે</translation>
 <translation id="3296763833017966289">જ્યોર્જિઅન</translation>
 <translation id="3307875152560779385">યુક્રેનિયન</translation>

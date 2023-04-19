@@ -85,6 +85,8 @@ LINK_RESOURCE_ID(IDR_AUTOFILL_CC_UNIONPAY, R.drawable.unionpay_card)
 LINK_RESOURCE_ID(IDR_AUTOFILL_CC_VISA, R.drawable.visa_card)
 LINK_RESOURCE_ID(IDR_AUTOFILL_GOOGLE_PAY, R.drawable.google_pay)
 LINK_RESOURCE_ID(IDR_AUTOFILL_METADATA_CC_AMEX, R.drawable.amex_metadata_card)
+LINK_RESOURCE_ID(IDR_AUTOFILL_METADATA_CC_CAPITALONE,
+                 R.drawable.capitalone_metadata_card)
 LINK_RESOURCE_ID(IDR_AUTOFILL_METADATA_CC_DINERS,
                  R.drawable.diners_metadata_card)
 LINK_RESOURCE_ID(IDR_AUTOFILL_METADATA_CC_DISCOVER,
@@ -120,6 +122,8 @@ DECLARE_RESOURCE_ID(IDR_ANDROID_AUTOFILL_CREATE, R.drawable.ic_edit_24dp)
 // Icon displayed in the save address message on Android.
 DECLARE_RESOURCE_ID(IDR_ANDROID_AUTOFILL_ADDRESS,
                     R.drawable.gm_filled_location_on_24)
+DECLARE_RESOURCE_ID(IDR_ANDROID_AUTOFILL_UPLOAD_ADDRESS,
+                    R.drawable.ic_cloud_upload_24dp)
 
 // We use PNG files for the following images.
 LINK_RESOURCE_ID(IDR_CREDIT_CARD_CVC_HINT_BACK, R.drawable.cvc_icon)

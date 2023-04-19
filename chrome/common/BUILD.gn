@@ -50,7 +50,6 @@ buildflag_header("buildflags") {
     "ENABLE_WEBUI_CERTIFICATE_VIEWER=$enable_webui_certificate_viewer",
     "ENABLE_WEBUI_TAB_STRIP=$enable_webui_tab_strip",
     "OPTIMIZE_WEBUI=$optimize_webui",
-    "ENABLE_BOUND_SESSION_CREDENTIALS=$enable_bound_session_credentials",
   ]
 }
 
@@ -334,6 +333,7 @@ static_library("common_lib") {
     ]
     deps += [
       "//chrome/common/apps/platform_apps",
+      "//chrome/common/controlled_frame",
       "//components/app_constants",
     ]
     public_deps += [

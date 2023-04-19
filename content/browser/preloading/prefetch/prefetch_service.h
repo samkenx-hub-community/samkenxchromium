@@ -37,6 +37,29 @@ class PrefetchProxyConfigurator;
 class PrefetchServiceDelegate;
 class ServiceWorkerContext;
 
+// These values are persisted to logs. Entries should not be renumbered and
+// numeric values should never be reused.
+enum class PrefetchRedirectResult {
+  kSuccessRedirectFollowed = 0,
+  kFailedNullPrefetch = 1,
+  kFailedRedirectsDisabled = 2,
+  kFailedInvalidMethod = 3,
+  kFailedInvalidResponseCode = 4,
+  kFailedInvalidChangeInNetworkContext = 5,
+  kFailedIneligible = 6,
+  kMaxValue = kFailedIneligible,
+};
+
+// These values are persisted to logs. Entries should not be renumbered and
+// numeric values should never be reused.
+enum class PrefetchRedirectNetworkContextTransition {
+  kDefaultToDefault = 0,
+  kDefaultToIsolated = 1,
+  kIsolatedToDefault = 2,
+  kIsolatedToIsolated = 3,
+  kMaxValue = kIsolatedToIsolated,
+};
+
 // Manages all prefetches within a single BrowserContext. Responsible for
 // checking the eligibility of the prefetch, making the network request for the
 // prefetch, and provide prefetched resources to URL loader interceptor when
@@ -85,7 +108,7 @@ class CONTENT_EXPORT PrefetchService {
   // |url|, and then calls |on_prefetch_to_serve_ready| with that prefetch.
   using OnPrefetchToServeReady = base::OnceCallback<void(
       base::WeakPtr<PrefetchContainer> prefetch_to_serve)>;
-  void GetPrefetchToServe(const GURL& url,
+  void GetPrefetchToServe(const PrefetchContainer::Key& key,
                           OnPrefetchToServeReady on_prefetch_to_serve_ready);
 
   // Copies any cookies in the isolated network context associated with
@@ -287,7 +310,11 @@ class CONTENT_EXPORT PrefetchService {
   // response, and have started the cookie copy process. A prefetch is added to
   // this map when |PrepareToServe| is called on it, and once in this map, it
   // can be returned by |GetPrefetchToServe|.
-  std::map<GURL, base::WeakPtr<PrefetchContainer>> prefetches_ready_to_serve_;
+  //
+  // Unlike other maps, the URL in `PrefetchContainer::Key` can be different
+  // from `PrefetchContainer::GetURL()` due to No-Vary-Search.
+  std::map<PrefetchContainer::Key, base::WeakPtr<PrefetchContainer>>
+      prefetches_ready_to_serve_;
 
   SEQUENCE_CHECKER(sequence_checker_);
 

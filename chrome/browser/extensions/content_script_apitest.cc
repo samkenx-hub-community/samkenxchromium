@@ -564,31 +564,20 @@ IN_PROC_BROWSER_TEST_F(ContentScriptCssInjectionTest,
     SCOPED_TRACE(base::StringPrintf(
         "URL: %s; Selector: %s",
         web_contents->GetLastCommittedURL().spec().c_str(), query_selector));
-    std::string color;
     constexpr char kGetColor[] =
         R"((function() {
              let element = document.querySelector('%s');
              style = window.getComputedStyle(element);
-             domAutomationController.send(style.backgroundColor);
+             return style.backgroundColor;
             })();)";
-    if (!content::ExecuteScriptAndExtractString(
-            get_active_tab(), base::StringPrintf(kGetColor, query_selector),
-            &color)) {
-      return "<Failed to execute>";
-    }
-
-    return color;
+    return content::EvalJs(get_active_tab(),
+                           base::StringPrintf(kGetColor, query_selector))
+        .ExtractString();
   };
   // Returns the number of stylesheets attached to the document.
   auto get_style_sheet_count = [&get_active_tab]() {
-    int count = -1;
-    constexpr char kGetStyleSheetCount[] =
-        "domAutomationController.send(document.styleSheets.length);";
-    if (!content::ExecuteScriptAndExtractInt(get_active_tab(),
-                                             kGetStyleSheetCount, &count)) {
-      return -1;
-    }
-    return count;
+    constexpr char kGetStyleSheetCount[] = "document.styleSheets.length;";
+    return content::EvalJs(get_active_tab(), kGetStyleSheetCount).ExtractInt();
   };
 
   // CSS injection should be allowed on an unprivileged web page that matches
@@ -648,14 +637,13 @@ IN_PROC_BROWSER_TEST_F(ContentScriptCssInjectionTest,
            sheet.type = 'text/css';
            sheet.rel = 'stylesheet';
            sheet.href = 'test_file_with_style2.css';
-           sheet.onload = () => { domAutomationController.send('success'); };
-           sheet.onerror = () => { domAutomationController.send('error'); };
-           document.head.appendChild(sheet);
+           return new Promise(resolve => {
+             sheet.onload = () => { resolve('success'); };
+             sheet.onerror = () => { resolve('error'); };
+             document.head.appendChild(sheet);
+           });
          })();)";
-  std::string result;
-  ASSERT_TRUE(content::ExecuteScriptAndExtractString(
-      get_active_tab(), kLoadExtraStylesheet, &result));
-  EXPECT_EQ("success", result);
+  EXPECT_EQ("success", content::EvalJs(get_active_tab(), kLoadExtraStylesheet));
   EXPECT_EQ(kInjectedDivColor, get_element_color("#div3"));
 }
 
@@ -2348,7 +2336,8 @@ class ContentScriptApiFencedFrameTest : public ContentScriptApiTest {
   ContentScriptApiFencedFrameTest() {
     feature_list_.InitWithFeaturesAndParameters(
         {{blink::features::kFencedFrames, {{"implementation_type", "mparch"}}},
-         {features::kPrivacySandboxAdsAPIsOverride, {}}},
+         {features::kPrivacySandboxAdsAPIsOverride, {}},
+         {blink::features::kFencedFramesAPIChanges, {}}},
         {/* disabled_features */});
     UseHttpsTestServer();
   }
@@ -2397,15 +2386,24 @@ IN_PROC_BROWSER_TEST_F(ContentScriptApiFencedFrameTest,
   GURL fenced_frame_url =
       embedded_test_server()->GetURL("a.test", "/fenced_frames/title1.html");
 
-  const char kFencedFrameHtml[] =
-      R"HTML(<html>Fenced Frame Test!<fencedframe src="%s">
-          </fencedframe></html>)HTML";
-
   TestExtensionDir document_idle_extension_dir;
   document_idle_extension_dir.WriteManifest(kDocumentIdleExtensionManifest);
+
+  document_idle_extension_dir.WriteFile(FILE_PATH_LITERAL("test.html"), R"HTML(
+    <html>
+      Fenced Frame Test!
+      <fencedframe></fencedframe>
+      <script src="navigation.js"></script>
+    </html>
+  )HTML");
+
   document_idle_extension_dir.WriteFile(
-      FILE_PATH_LITERAL("test.html"),
-      base::StringPrintf(kFencedFrameHtml, fenced_frame_url.spec().c_str()));
+      FILE_PATH_LITERAL("navigation.js"),
+      content::JsReplace(
+          "const fencedframe = document.querySelector('fencedframe');"
+          "fencedframe.config = new FencedFrameConfig($1);",
+          fenced_frame_url));
+
   document_idle_extension_dir.WriteFile(FILE_PATH_LITERAL("script.js"),
                                         kNonBlockingScript);
   const Extension* extension =

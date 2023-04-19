@@ -541,10 +541,9 @@ void Page::SetVisibilityState(
   if (is_initial_state)
     return;
 
-  page_visibility_observer_set_.ForEachObserver(
-      [](PageVisibilityObserver* observer) {
-        observer->PageVisibilityChanged();
-      });
+  for (auto observer : page_visibility_observer_set_) {
+    observer->PageVisibilityChanged();
+  }
 
   if (main_frame_) {
     if (lifecycle_state_->visibility ==
@@ -1009,11 +1008,10 @@ void Page::WillBeDestroyed() {
     validation_message_client_->WillBeDestroyed();
   main_frame_ = nullptr;
 
-  page_visibility_observer_set_.ForEachObserver(
-      [](PageVisibilityObserver* observer) {
-        observer->ObserverSetWillBeCleared();
-      });
-  page_visibility_observer_set_.Clear();
+  for (auto observer : page_visibility_observer_set_) {
+    observer->ObserverSetWillBeCleared();
+  }
+  page_visibility_observer_set_.clear();
 
   page_scheduler_ = nullptr;
 }
@@ -1061,13 +1059,6 @@ bool Page::RequestBeginMainFrameNotExpected(bool new_state) {
   chrome_client_->RequestBeginMainFrameNotExpected(*DeprecatedLocalMainFrame(),
                                                    new_state);
   return true;
-}
-
-bool Page::LocalMainFrameNetworkIsAlmostIdle() const {
-  LocalFrame* frame = DynamicTo<LocalFrame>(MainFrame());
-  if (!frame)
-    return true;
-  return frame->GetIdlenessDetector()->NetworkIsAlmostIdle();
 }
 
 void Page::AddAutoplayFlags(int32_t value) {

@@ -22,11 +22,10 @@ class BringAndroidTabsPromptConfirmationAlertViewController:
   // invocation.
   weak var commandHandler: BringAndroidTabsCommands?
   // Number of active tabs from Android.
-  private let tabCount: Int
+  private let tabsCount: Int
 
-  init(tabCount: Int) {
-    self.tabCount = tabCount
-    super.init()
+  init(tabsCount: Int) {
+    self.tabsCount = tabsCount
   }
 
   override func viewDidLoad() {
@@ -38,23 +37,23 @@ class BringAndroidTabsPromptConfirmationAlertViewController:
     self.customSpacingAfterImage = kSpacingAfterImage
     self.helpButtonAvailable = false
     self.showDismissBarButton = false
-    self.titleString = L10NUtils.pluralString(
-      forMessageId: IDS_IOS_BRING_ANDROID_TABS_PROMPT_TITLE,
-      number: Int32(self.tabCount))
+    self.titleString = L10nUtils.pluralString(
+      messageId: IDS_IOS_BRING_ANDROID_TABS_PROMPT_TITLE,
+      number: self.tabsCount)
     self.titleTextStyle = .title2
-    self.subtitleString = L10NUtils.pluralString(
-      forMessageId: IDS_IOS_BRING_ANDROID_TABS_PROMPT_SUBTITLE,
-      number: Int32(self.tabCount))
-    self.primaryActionString = L10NUtils.pluralString(
-      forMessageId: IDS_IOS_BRING_ANDROID_TABS_PROMPT_OPEN_TABS_BUTTON,
-      number: Int32(self.tabCount))
-    self.secondaryActionString = L10NUtils.pluralString(
-      forMessageId: IDS_IOS_BRING_ANDROID_TABS_CANCEL_BUTTON,
-      number: Int32(self.tabCount))
-    self.tertiaryActionString = L10NUtils.pluralString(
-      forMessageId:
+    self.subtitleString = L10nUtils.pluralString(
+      messageId: IDS_IOS_BRING_ANDROID_TABS_PROMPT_SUBTITLE,
+      number: self.tabsCount)
+    self.primaryActionString = L10nUtils.pluralString(
+      messageId: IDS_IOS_BRING_ANDROID_TABS_PROMPT_OPEN_TABS_BUTTON,
+      number: self.tabsCount)
+    self.secondaryActionString = L10nUtils.pluralString(
+      messageId: IDS_IOS_BRING_ANDROID_TABS_CANCEL_BUTTON,
+      number: self.tabsCount)
+    self.tertiaryActionString = L10nUtils.pluralString(
+      messageId:
         IDS_IOS_BRING_ANDROID_TABS_PROMPT_REVIEW_TABS_BUTTON_CONFIRMATION_ALERT,
-      number: Int32(self.tabCount))
+      number: self.tabsCount)
     super.viewDidLoad()
     // Configure properties specific to the "Bring Android Tabs" prompt.
     self.actionHandler = self
@@ -72,7 +71,7 @@ class BringAndroidTabsPromptConfirmationAlertViewController:
   // MARK: - UIAdaptivePresentationControllerDelegate
 
   func presentationControllerDidDismiss(_ controller: UIPresentationController) {
-    self.delegate?.bringAndroidTabsPromptViewControllerDidDismiss(withSwipe: true)
+    self.delegate?.bringAndroidTabsPromptViewControllerDidDismiss(swiped: true)
     self.commandHandler?.dismissBringAndroidTabsPrompt()
   }
 
@@ -84,7 +83,7 @@ class BringAndroidTabsPromptConfirmationAlertViewController:
   }
 
   func confirmationAlertSecondaryAction() {
-    self.delegate?.bringAndroidTabsPromptViewControllerDidDismiss(withSwipe: false)
+    self.delegate?.bringAndroidTabsPromptViewControllerDidDismiss(swiped: false)
     self.commandHandler?.dismissBringAndroidTabsPrompt()
   }
 

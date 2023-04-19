@@ -27,9 +27,7 @@
 <translation id="199526504800285197">หยุดบันทึกแล้ว</translation>
 <translation id="1995951722691075581">หยุดบันทึกแล้วเนื่องจากพื้นที่เก็บข้อมูลในอุปกรณ์เหลือน้อย คุณต้องเพิ่มพื้นที่ว่างในอุปกรณ์เพื่อบันทึกวิดีโอมากขึ้น</translation>
 <translation id="2036868001356139588">ระยะเวลาของตัวจับเวลา</translation>
-<translation id="2050339315714019657">แนวตั้ง</translation>
 <translation id="2064538373111010176">ใช้งาน <ph name="CAMERA" /> อยู่</translation>
-<translation id="2128052519899549250">บันทึกวิดีโอไทม์แลปส์</translation>
 <translation id="2134029355740465625">การตั้งค่าวิดีโอ</translation>
 <translation id="2144806332417375165">กำหนดพารามิเตอร์วิดีโอเอง</translation>
 <translation id="2175927920773552910">คิวอาร์โค้ด</translation>
@@ -93,7 +91,6 @@
 <translation id="5317780077021120954">บันทึก</translation>
 <translation id="5320594929574852403">ย้ายไปทางด้านซ้าย</translation>
 <translation id="5374917190292010970">4K (2160p)</translation>
-<translation id="5577251651370645658">ไทม์แลปส์</translation>
 <translation id="5662366948659129155">กำลังสแกนหน้า <ph name="COUNT" /></translation>
 <translation id="5671277269877808209">สี่เหลี่ยมจัตุรัส</translation>
 <translation id="5746169159649715125">บันทึกเป็น PDF</translation>
@@ -123,6 +120,7 @@
 <translation id="6888362557094394345">ย้ายไปทางด้านล่าง</translation>
 <translation id="695140971690006676">รีเซ็ตทั้งหมด</translation>
 <translation id="6965382102122355670">ตกลง</translation>
+<translation id="6965830616442491568">แนวตั้ง</translation>
 <translation id="698156982839284926">3 วินาที</translation>
 <translation id="7134221860976209830">ตัวจับเวลา 10 วินาที</translation>
 <translation id="7191890674911603392">ประเภทการบันทึก</translation>

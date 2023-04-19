@@ -411,7 +411,7 @@ CanvasResourceRasterSharedImage::CanvasResourceRasterSharedImage(
                                  ->GetCapabilities()
                                  .supports_oop_raster) {
   auto* gpu_memory_buffer_manager =
-      Platform::Current()->GetGpuMemoryBufferManager();
+      SharedGpuContext::GetGpuMemoryBufferManager();
   if (!is_accelerated_) {
     DCHECK(gpu_memory_buffer_manager);
     DCHECK(shared_image_usage_flags & gpu::SHARED_IMAGE_USAGE_DISPLAY_READ);
@@ -710,7 +710,6 @@ void CanvasResourceRasterSharedImage::CopyRenderingResultsToGpuMemoryBuffer(
   auto surface = SkSurface::MakeRasterDirect(CreateSkImageInfo(),
                                              gpu_memory_buffer_->memory(0),
                                              gpu_memory_buffer_->stride(0));
-
   SkPixmap pixmap;
   image->peekPixels(&pixmap);
   surface->writePixels(pixmap, 0, 0);
@@ -1048,16 +1047,27 @@ void CanvasResourceSwapChain::PresentSwapChain() {
   sync_token_ = sii->GenVerifiedSyncToken();
   raster_interface->WaitSyncTokenCHROMIUM(sync_token_.GetData());
 
+  // Relinquish shared image access before copy when using legacy GL raster.
+  if (!use_oop_rasterization_) {
+    raster_interface->EndSharedImageAccessDirectCHROMIUM(
+        back_buffer_texture_id_);
+  }
   // PresentSwapChain() flips the front and back buffers, but the mailboxes
   // still refer to the current front and back buffer after present.  So the
   // front buffer contains the content we just rendered, and it needs to be
   // copied into the back buffer to support a retained mode like canvas expects.
   // The wait sync token ensure that the present executes before we do the copy.
+  // Don't generate sync token after the copy so that it's not on critical path.
   raster_interface->CopySharedImage(front_buffer_mailbox_, back_buffer_mailbox_,
                                     GL_TEXTURE_2D, 0, 0, 0, 0, size_.width(),
                                     size_.height(), false /* unpack_flip_y */,
                                     false /* unpack_premultiply_alpha */);
-  // Don't generate sync token here so that the copy is not on critical path.
+  // Restore shared image access after copy when using legacy GL raster.
+  if (!use_oop_rasterization_) {
+    raster_interface->BeginSharedImageAccessDirectCHROMIUM(
+        back_buffer_texture_id_,
+        GL_SHARED_IMAGE_ACCESS_MODE_READWRITE_CHROMIUM);
+  }
 }
 
 base::WeakPtr<WebGraphicsContext3DProviderWrapper>

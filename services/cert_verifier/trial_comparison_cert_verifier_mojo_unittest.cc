@@ -11,6 +11,8 @@
 #include "net/cert/cert_verify_proc.h"
 #include "net/cert/cert_verify_proc_builtin.h"
 #include "net/cert/cert_verify_result.h"
+#include "net/cert/crl_set.h"
+#include "net/cert/mock_cert_verifier.h"
 #include "net/der/encode_values.h"
 #include "net/der/parse_values.h"
 #include "net/net_buildflags.h"
@@ -96,6 +98,9 @@ class FakeReportClient
 
 class NotCalledCertVerifyProc : public net::CertVerifyProc {
  public:
+  NotCalledCertVerifyProc()
+      : net::CertVerifyProc(net::CRLSet::BuiltinCRLSet()) {}
+
   bool SupportsAdditionalTrustAnchors() const override { return false; }
 
  protected:
@@ -107,7 +112,6 @@ class NotCalledCertVerifyProc : public net::CertVerifyProc {
                      const std::string& ocsp_response,
                      const std::string& sct_list,
                      int flags,
-                     net::CRLSet* crl_set,
                      const net::CertificateList& additional_trust_anchors,
                      net::CertVerifyResult* verify_result,
                      const net::NetLogWithSource& net_log) override {
@@ -120,9 +124,8 @@ class NotCalledProcFactory : public net::CertVerifyProcFactory {
  public:
   scoped_refptr<net::CertVerifyProc> CreateCertVerifyProc(
       scoped_refptr<net::CertNetFetcher> cert_net_fetcher,
-      const net::ChromeRootStoreData* root_store_data) override {
-    ADD_FAILURE() << "NotCalledProcFactory was called!";
-    return nullptr;
+      const ImplParams& impl_params) override {
+    return base::MakeRefCounted<NotCalledCertVerifyProc>();
   }
 
  protected:
@@ -191,10 +194,7 @@ TEST(TrialComparisonCertVerifierMojoTest, SendReportDebugInfo) {
       report_client_remote.InitWithNewPipeAndPassReceiver());
   cert_verifier::TrialComparisonCertVerifierMojo tccvm(
       true, {}, std::move(report_client_remote),
-      base::MakeRefCounted<NotCalledCertVerifyProc>(),
-      base::MakeRefCounted<NotCalledProcFactory>(),
-      base::MakeRefCounted<NotCalledCertVerifyProc>(),
-      base::MakeRefCounted<NotCalledProcFactory>());
+      base::MakeRefCounted<NotCalledProcFactory>(), nullptr, {});
 
   tccvm.OnSendTrialReport("example.com", unverified_cert, false, false, false,
                           false, "stapled ocsp", "sct list", primary_result,
@@ -251,4 +251,24 @@ TEST(TrialComparisonCertVerifierMojoTest, SendReportDebugInfo) {
 
   EXPECT_EQ(time, report.debug_info->trial_verification_time);
   EXPECT_EQ("20190927221108Z", report.debug_info->trial_der_verification_time);
+}
+
+TEST(TrialComparisonCertVerifierMojoTest, ObserverIsCalledOnCRSUpdate) {
+  base::test::TaskEnvironment scoped_task_environment;
+
+  mojo::PendingRemote<
+      cert_verifier::mojom::TrialComparisonCertVerifierReportClient>
+      report_client_remote;
+  FakeReportClient report_client(
+      report_client_remote.InitWithNewPipeAndPassReceiver());
+  cert_verifier::TrialComparisonCertVerifierMojo tccvm(
+      true, {}, std::move(report_client_remote),
+      base::MakeRefCounted<NotCalledProcFactory>(), nullptr, {});
+
+  net::CertVerifierObserverCounter observer_(&tccvm);
+  EXPECT_EQ(observer_.change_count(), 0u);
+  tccvm.UpdateVerifyProcData(nullptr, {});
+  // Observer is called twice since the TrialComparisonCertVerifier currently
+  // forwards notifications from both the primary and secondary verifiers.
+  EXPECT_EQ(observer_.change_count(), 2u);
 }

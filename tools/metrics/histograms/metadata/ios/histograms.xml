@@ -74,7 +74,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="IOS.BackgroundTimeBeforeColdStart" units="minutes"
-    expires_after="2023-09-17">
+    expires_after="2024-04-06">
   <owner>thegreenfrog@chromium.org</owner>
   <owner>bling-team@google.com</owner>
   <summary>
@@ -84,7 +84,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="IOS.BackgroundTimeBeforeWarmStart" units="minutes"
-    expires_after="2023-04-27">
+    expires_after="2024-04-06">
   <owner>thegreenfrog@chromium.org</owner>
   <owner>bling-team@google.com</owner>
   <summary>
@@ -232,7 +232,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="IOS.ContentSuggestions.ActionOnNTP"
-    enum="IOSContentSuggestionsActionType" expires_after="2023-08-06">
+    enum="IOSContentSuggestionsActionType" expires_after="2023-10-08">
   <owner>thegreenfrog@chromium.org</owner>
   <owner>bling-team@google.com</owner>
   <summary>
@@ -241,7 +241,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="IOS.ContentSuggestions.ActionOnStartSurface"
-    enum="IOSContentSuggestionsActionType" expires_after="2023-08-06">
+    enum="IOSContentSuggestionsActionType" expires_after="2023-10-08">
   <owner>thegreenfrog@chromium.org</owner>
   <owner>bling-team@google.com</owner>
   <summary>
@@ -261,7 +261,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="IOS.CredentialExtension.CopyPasswordCount" units="count"
-    expires_after="2023-06-11">
+    expires_after="2023-10-08">
   <owner>rkgibson@chromium.org</owner>
   <owner>djean@chromium.org</owner>
   <summary>
@@ -294,7 +294,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="IOS.CredentialExtension.DisplayCount" units="count"
-    expires_after="2023-08-13">
+    expires_after="2023-10-15">
   <owner>rkgibson@chromium.org</owner>
   <owner>djean@chromium.org</owner>
   <summary>
@@ -370,7 +370,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="IOS.CredentialExtension.PasswordUseCount" units="count"
-    expires_after="2023-08-13">
+    expires_after="2023-10-15">
   <owner>rkgibson@chromium.org</owner>
   <owner>djean@chromium.org</owner>
   <summary>
@@ -381,7 +381,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="IOS.CredentialExtension.QuickPasswordUseCount" units="count"
-    expires_after="2023-08-13">
+    expires_after="2023-10-15">
   <owner>rkgibson@chromium.org</owner>
   <owner>djean@chromium.org</owner>
   <summary>
@@ -414,7 +414,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="IOS.CredentialExtension.SearchCount" units="count"
-    expires_after="2023-08-13">
+    expires_after="2023-10-15">
   <owner>rkgibson@chromium.org</owner>
   <owner>djean@chromium.org</owner>
   <summary>
@@ -709,7 +709,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="IOS.ExperienceKitCalendar.TextClassifierModelAvailable"
-    enum="BooleanAvailable" expires_after="2023-08-08">
+    enum="BooleanAvailable" expires_after="2023-10-08">
   <owner>rajendrant@chromium.org</owner>
   <owner>sophiechang@chromium.org</owner>
   <summary>
@@ -1464,12 +1464,23 @@ chromium-metrics-reviews@google.com.
   <summary>The number of excess NTP tabs that are removed.</summary>
 </histogram>
 
-<histogram name="IOS.NTP.Impression" enum="IOSNTPImpression"
+<histogram name="IOS.NTP.Impression" enum="IOSNTPImpressionType"
     expires_after="2023-09-03">
   <owner>gambard@chromium.org</owner>
+  <owner>bling-team@google.com</owner>
   <summary>
-    The type of NTP impressions on iOS, split by type of suggestions shown
-    (local vs remote vs remote_collapsed).
+    The type of NTP impressions on iOS, split by the feed visibility. Logged
+    each time an NTP is made visible.
+  </summary>
+</histogram>
+
+<histogram name="IOS.NTP.OverscrollAction" enum="IOSNTPOverscrollAction"
+    expires_after="2023-09-03">
+  <owner>guiperez@google.com</owner>
+  <owner>bling-team@google.com</owner>
+  <summary>
+    The type of overscroll action that occurs on the NTP. This is recorded each
+    time a user overscrolls on the NTP.
   </summary>
 </histogram>
 
@@ -1522,14 +1533,14 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="IOS.OverflowMenu.ActionType" enum="IOSOverflowMenuActionType"
-    expires_after="2023-08-08">
+    expires_after="2023-10-08">
   <owner>rkgibson@google.com</owner>
   <owner>bling-team@google.com</owner>
   <summary>The type of action the user took in the overflow/tools menu</summary>
 </histogram>
 
 <histogram name="IOS.OverflowMenu.TimeOpen" units="ms"
-    expires_after="2023-08-08">
+    expires_after="2023-10-08">
   <owner>rkgibson@google.com</owner>
   <owner>bling-team@google.com</owner>
   <summary>The amount of time the overflow/tools menu is open.</summary>
@@ -1546,7 +1557,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="IOS.PageLoadCount.Counts"
-    enum="IOSPageLoadCountNavigationType" expires_after="2023-07-16">
+    enum="IOSPageLoadCountNavigationType" expires_after="2023-10-15">
   <owner>gambard@chromium.org</owner>
   <owner>bling-team@google.com</owner>
   <summary>The number of navigation started events by navigation type.</summary>
@@ -2081,7 +2092,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="IOS.Spotlight.Availability" enum="IOSSpotlightAvailability"
-    expires_after="2023-08-05">
+    expires_after="2023-10-08">
   <owner>rohitrao@chromium.org</owner>
   <owner>olivierrobin@chromium.org</owner>
   <summary>
@@ -2106,7 +2117,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="IOS.Spotlight.Origin" enum="IOSSpotlightOrigin"
-    expires_after="2023-08-05">
+    expires_after="2023-10-08">
   <owner>olivierrobin@chromium.org</owner>
   <owner>rohitrao@chromium.org</owner>
   <summary>
@@ -2311,7 +2322,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="IOS.TextSelection.EntityDetection.DetectedEntityType"
-    enum="TextSelectionDetectedEntityType" expires_after="2023-08-08">
+    enum="TextSelectionDetectedEntityType" expires_after="2023-10-08">
   <owner>rajendrant@chromium.org</owner>
   <owner>sophiechang@chromium.org</owner>
   <summary>
@@ -2335,7 +2346,7 @@ chromium-metrics-reviews@google.com.
 
 <histogram
     name="IOS.TextSelection.EntityDetection.TFLiteModelEvaluationDuration"
-    units="ms" expires_after="2023-08-08">
+    units="ms" expires_after="2023-10-08">
   <owner>rajendrant@chromium.org</owner>
   <owner>sophiechang@chromium.org</owner>
   <summary>
@@ -2400,7 +2411,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="IOS.Variations.CreateTrials.SeedExpiry"
-    enum="VariationsSeedExpiry" expires_after="2023-05-11">
+    enum="VariationsSeedExpiry" expires_after="2023-08-11">
   <owner>ginnyhuang@chromium.org</owner>
   <owner>bling-get-set-up@google.com</owner>
   <summary>
@@ -2412,7 +2423,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="IOS.Variations.FirstRun.SeedFetchResult"
-    enum="VariationsSeedFetchResult" expires_after="2023-05-09">
+    enum="VariationsSeedFetchResult" expires_after="2023-08-09">
   <owner>ginnyhuang@chromium.org</owner>
   <owner>bling-get-set-up@google.com</owner>
   <summary>
@@ -2560,7 +2571,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="ManualFallback.PresentedOptions.Profiles" units="Profiles"
-    expires_after="2023-08-13">
+    expires_after="2023-10-15">
   <owner>tmartino@chromium.org</owner>
   <owner>djean@chromium.org</owner>
   <summary>

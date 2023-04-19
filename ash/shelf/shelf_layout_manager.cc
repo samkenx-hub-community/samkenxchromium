@@ -602,10 +602,6 @@ void ShelfLayoutManager::LayoutShelf(bool animate) {
 
   CalculateTargetBoundsAndUpdateWorkArea();
   UpdateBoundsAndOpacity(animate);
-
-  // Update insets in ShelfWindowTargeter when shelf bounds change.
-  for (auto& observer : observers_)
-    observer.WillChangeVisibilityState(visibility_state());
 }
 
 void ShelfLayoutManager::UpdateVisibilityState() {
@@ -1909,8 +1905,9 @@ void ShelfLayoutManager::CalculateTargetBoundsAndUpdateWorkArea() {
   gfx::Insets shelf_insets =
       UpdateTargetBoundsAndCalculateShelfInsets(state_, hotseat_target_state);
 
+  ShelfWidget* shelf_widget = shelf_->shelf_widget();
   gfx::Rect shelf_bounds_for_workarea_calculation =
-      shelf_->shelf_widget()->GetTargetBounds();
+      shelf_widget->GetTargetBounds();
 
   gfx::Insets in_session_shelf_insets = shelf_insets;
 
@@ -1940,6 +1937,8 @@ void ShelfLayoutManager::CalculateTargetBoundsAndUpdateWorkArea() {
   if (Shell::Get()->IsInTabletMode() && IsVisible()) {
     shelf_bounds_for_workarea_calculation =
         GetIdealBoundsForWorkAreaCalculation();
+    wm::ConvertRectToScreen(shelf_widget->GetNativeWindow()->GetRootWindow(),
+                            &shelf_bounds_for_workarea_calculation);
   }
   if (!suspend_work_area_update_) {
     UpdateWorkAreaInsetsAndNotifyObserversInternal(
@@ -2164,6 +2163,10 @@ ShelfAutoHideState ShelfLayoutManager::CalculateAutoHideState(
   // Don't update the auto-hide state if it is locked.
   if (shelf_->auto_hide_lock())
     return state_.auto_hide_state;
+
+  if (shelf_->disable_auto_hide()) {
+    return SHELF_AUTO_HIDE_SHOWN;
+  }
 
   const bool in_tablet_mode = Shell::Get()->IsInTabletMode();
   // Don't let the shelf auto hide when in tablet mode and Chromevox is on.

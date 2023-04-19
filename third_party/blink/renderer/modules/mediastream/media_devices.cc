@@ -365,7 +365,8 @@ MediaDevices* MediaDevices::mediaDevices(Navigator& navigator) {
 }
 
 MediaDevices::MediaDevices(Navigator& navigator)
-    : Supplement<Navigator>(navigator),
+    : ActiveScriptWrappable<MediaDevices>({}),
+      Supplement<Navigator>(navigator),
       ExecutionContextLifecycleObserver(navigator.DomWindow()),
       stopped_(false),
       dispatcher_host_(navigator.GetExecutionContext()),
@@ -734,10 +735,9 @@ ScriptPromise MediaDevices::ProduceCropTarget(ScriptState* script_state,
     return ScriptPromise();
   }
 
-  if (!element || !element->IsSupportedByRegionCapture()) {
-    exception_state.ThrowDOMException(
-        DOMExceptionCode::kNotSupportedError,
-        "Support for this subtype is not yet implemented.");
+  if (!element) {
+    exception_state.ThrowDOMException(DOMExceptionCode::kNotSupportedError,
+                                      "Invalid element.");
     return ScriptPromise();
   }
 

@@ -123,6 +123,7 @@
 <translation id="1904932688895783618">Here are some other helpful resources:</translation>
 <translation id="1905710495812624430">Maximum allowed attempts exceeded.</translation>
 <translation id="1908234395526491708">UDP request failures</translation>
+<translation id="1923388006036088459">Accent colours</translation>
 <translation id="1947737735496445907">Printed</translation>
 <translation id="1951012854035635156">Assistant</translation>
 <translation id="1962550982027027473">A default APN is required</translation>
@@ -140,6 +141,7 @@
 <translation id="2056550196601855911">IPv4/IPv6</translation>
 <translation id="2080070583977670716">More settings</translation>
 <translation id="2085089206770112532">Display brightness down</translation>
+<translation id="209751264101900360">Dawn to dark - Cloud flow</translation>
 <translation id="2102231663024125441">Text editing</translation>
 <translation id="2105810540595158374">Device is a game controller.</translation>
 <translation id="2119172414412204879"><ph name="BOARD_NAME" />, version <ph name="MILESTONE_VERSION" /></translation>
@@ -331,6 +333,7 @@
 <translation id="3967822245660637423">Download complete</translation>
 <translation id="3969602104473960991">Chrome OS password updated</translation>
 <translation id="397105322502079400">Calculating...</translation>
+<translation id="3974175076798940554">Exclusive Chromebook Plus assets now available</translation>
 <translation id="39823212440917567">Print jobs older than <ph name="NUMBER_OF_DAYS" /> days will be removed</translation>
 <translation id="3993704782688964914">Your <ph name="DEVICE_NAME" /> is now up to date</translation>
 <translation id="4003384961948020559">Failed – Output full</translation>
@@ -370,6 +373,7 @@
 <translation id="4275663329226226506">Media</translation>
 <translation id="4289540628985791613">Overview</translation>
 <translation id="4289849978083912975">Slideshow</translation>
+<translation id="4293621540182258188">Dawn to dark - Earth flow</translation>
 <translation id="4297501883039923494">Stopped – unknown error</translation>
 <translation id="4300073214558989"><ph name="IMAGE_COUNT" /> images</translation>
 <translation id="4311195029067684288">Full</translation>
@@ -513,6 +517,7 @@
 <translation id="5423849171846380976">Activated</translation>
 <translation id="5430931332414098647">Instant Tethering</translation>
 <translation id="5431318178759467895">Colour</translation>
+<translation id="5456936324019847994">Can't connect to any enabled custom APNs. Contact your mobile operator for more information.</translation>
 <translation id="5457599981699367932">Browse as Guest</translation>
 <translation id="54609108002486618">Managed</translation>
 <translation id="5478289488939624992">{ATTEMPTS_LEFT,plural, =1{{0} attempt left}other{{0} attempts left}}</translation>
@@ -544,6 +549,7 @@
 <translation id="576835345334454681">Display brightness up</translation>
 <translation id="57838592816432529">Mute</translation>
 <translation id="5784136236926853061">High HTTP latency</translation>
+<translation id="5809090008577139505">Aurora</translation>
 <translation id="5826644637650799838">About the art</translation>
 <translation id="5832805196449965646">Add Person</translation>
 <translation id="583281660410589416">Unknown</translation>
@@ -562,10 +568,12 @@
 <translation id="5907649332524363701">key colour</translation>
 <translation id="5916084858004523819">Prohibited</translation>
 <translation id="5916664084637901428">On</translation>
+<translation id="5918201491776799918">Select Chromebook Plus exclusive artwork</translation>
 <translation id="5921506667911082617">{COUNT,plural, =1{Your file has been successfully scanned and saved to <ph name="LINK_BEGIN" /><ph name="FOLDER_NAME" /><ph name="LINK_END" />.}other{Your files have been successfully scanned and saved to <ph name="LINK_BEGIN" /><ph name="FOLDER_NAME" /><ph name="LINK_END" />.}}</translation>
 <translation id="5931523347251946569">File not found</translation>
 <translation id="5939518447894949180">Reset</translation>
 <translation id="594552776027197022">Generate random keypair</translation>
+<translation id="5946538341867151940">You are not connected yet. If your mobile operator recommends a custom APN, enter the APN information by selecting '+ New APN'</translation>
 <translation id="5972388717451707488">Update engine</translation>
 <translation id="5984145644188835034">Default wallpaper</translation>
 <translation id="6017514345406065928">Green</translation>
@@ -818,6 +826,7 @@
 <translation id="8138405288920084977">LTEAdvanced</translation>
 <translation id="8143951647992294073">Select <ph name="TOPIC_SOURCE" /> <ph name="TOPIC_SOURCE_DESC" /></translation>
 <translation id="8151185429379586178">Developer tools</translation>
+<translation id="8153923300383192510">Chromebook Plus exclusive</translation>
 <translation id="8179976553408161302">Enter</translation>
 <translation id="8183974620058026102">Attach</translation>
 <translation id="8206859287963243715">Mobile</translation>
@@ -840,6 +849,7 @@
 <translation id="8352772353338965963">Add an account to multiple sign-in. All signed-in accounts can be accessed without a password, so this feature should only be used with trusted accounts.</translation>
 <translation id="8364946094152050673">Empty name servers</translation>
 <translation id="8372477600026034341">Extra hosts</translation>
+<translation id="8373046809163484087">Use colour sets that match your wallpaper</translation>
 <translation id="8380114448424469341">Dock window on the <ph name="DIRECTION" /> half of the screen</translation>
 <translation id="8395584934117017006">This <ph name="DEVICE_TYPE" /> is enterprise managed</translation>
 <translation id="8398927464629426868">The rate at which the device is currently charging or discharging</translation>
@@ -859,6 +869,7 @@
 <translation id="8503813439785031346">Username</translation>
 <translation id="8503836310948963452">Just a few more minutes…</translation>
 <translation id="8508640263392900755">APN details</translation>
+<translation id="8522687886059337719">You now have access to new <ph name="BEGIN_LINK_WALLPAPER_SUBPAGE" />wallpapers<ph name="END_LINK_WALLPAPER_SUBPAGE" /> and <ph name="BEGIN_LINK_SCREENSAVER_SUBPAGE" />screen savers<ph name="END_LINK_SCREENSAVER_SUBPAGE" /></translation>
 <translation id="8528615187455571738">Crosvm</translation>
 <translation id="8557447961879934694">WPA2</translation>
 <translation id="8575298406870537639">Your operator may require this option to connect to their network. Contact your operator for details.</translation>

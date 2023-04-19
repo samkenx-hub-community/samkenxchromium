@@ -10,7 +10,6 @@
 
 #include "ash/ash_export.h"
 #include "ash/wm/overview/overview_observer.h"
-#include "ash/wm/snap_group/snap_group_lock_button.h"
 #include "ash/wm/window_state.h"
 #include "ash/wm/window_state_observer.h"
 #include "base/scoped_multi_source_observation.h"
@@ -23,14 +22,16 @@
 
 namespace gfx {
 class PointF;
-}
+}  // namespace gfx
 
 namespace views {
 class Widget;
-}
+}  // namespace views
 
 namespace ash {
+
 class MultiWindowResizeControllerTest;
+class SnapGroupLockOrUnlockButton;
 class WorkspaceWindowResizer;
 
 // MultiWindowResizeController is responsible for determining and showing a
@@ -78,10 +79,13 @@ class ASH_EXPORT MultiWindowResizeController
   void OnOverviewModeStarting() override;
   void OnOverviewModeEndingAnimationComplete(bool canceled) override;
 
-  SnapGroupLockButton* lock_button_for_testing() const { return lock_button_; }
+  SnapGroupLockOrUnlockButton* lock_button_for_testing() const {
+    return lock_button_;
+  }
 
  private:
   friend class MultiWindowResizeControllerTest;
+  friend class SnapGroupLockOrUnlockButton;
   friend class SnapGroupTest;
   class ResizeMouseWatcherHost;
   class ResizeView;
@@ -166,7 +170,7 @@ class ASH_EXPORT MultiWindowResizeController
   // Hides the `resize_widget_` and `lock_widget_` if they get created.
   void Hide();
 
-  // Resets the window resizer and hides the resize widget.
+  // Resets the window resizer and hides the widgets.
   void ResetResizer();
 
   // Initiates a resize.
@@ -207,6 +211,9 @@ class ASH_EXPORT MultiWindowResizeController
                        const gfx::Point& location_in_screen,
                        int component) const;
 
+  // Called when the lock button is pressed to create a snap group.
+  void OnLockButtonPressed();
+
   // Windows and direction to resize.
   ResizeWindows windows_;
 
@@ -220,7 +227,7 @@ class ASH_EXPORT MultiWindowResizeController
   std::unique_ptr<views::Widget> lock_widget_;
 
   // The contents view of the `lock_widget_`.
-  SnapGroupLockButton* lock_button_;
+  SnapGroupLockOrUnlockButton* lock_button_;
 
   // If non-null we're in a resize loop.
   std::unique_ptr<WorkspaceWindowResizer> window_resizer_;

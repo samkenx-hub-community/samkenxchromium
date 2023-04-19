@@ -71,7 +71,7 @@ class DCompImageBackingFactoryTest : public testing::Test {
     context_state_ = base::MakeRefCounted<SharedContextState>(
         std::move(share_group), surface_, context_,
         /*use_virtualized_gl_contexts=*/false, base::DoNothing());
-    context_state_->InitializeGrContext(GpuPreferences(), workarounds, nullptr);
+    context_state_->InitializeSkia(GpuPreferences(), workarounds);
     auto feature_info =
         base::MakeRefCounted<gles2::FeatureInfo>(workarounds, GpuFeatureInfo());
     context_state_->InitializeGL(GpuPreferences(), std::move(feature_info));
@@ -104,7 +104,8 @@ class DCompImageBackingFactoryTest : public testing::Test {
         shared_image_factory_->CreateSharedImage(
             mailbox, viz::SinglePlaneFormat::kRGBA_8888, nullptr,
             gfx::Size(100, 100), gfx::ColorSpace::CreateSRGB(),
-            kTopLeft_GrSurfaceOrigin, kPremul_SkAlphaType, usage, false);
+            kTopLeft_GrSurfaceOrigin, kPremul_SkAlphaType, usage, "TestLabel",
+            false);
     ASSERT_NE(nullptr, backing);
     std::unique_ptr<SharedImageRepresentationFactoryRef> factory_ref =
         shared_image_manager_.Register(std::move(backing),
@@ -159,7 +160,7 @@ class DCompImageBackingFactoryTest : public testing::Test {
             gfx::Size(100, 100), gfx::ColorSpace::CreateSRGB(),
             kTopLeft_GrSurfaceOrigin,
             has_alpha ? kPremul_SkAlphaType : kOpaque_SkAlphaType,
-            kDXGISwapChainUsage, false);
+            kDXGISwapChainUsage, "TestLabel", false);
     ASSERT_NE(nullptr, backing);
     std::unique_ptr<SharedImageRepresentationFactoryRef> factory_ref =
         shared_image_manager_.Register(std::move(backing),
@@ -253,7 +254,7 @@ TEST_F(DCompImageBackingFactoryTest, CanReadDXGISwapChain) {
           mailbox, viz::SinglePlaneFormat::kRGBA_8888, nullptr,
           gfx::Size(100, 100), gfx::ColorSpace::CreateSRGB(),
           kTopLeft_GrSurfaceOrigin, kOpaque_SkAlphaType, kDXGISwapChainUsage,
-          false);
+          "TestLabel", false);
   ASSERT_NE(nullptr, backing);
   std::unique_ptr<SharedImageRepresentationFactoryRef> factory_ref =
       shared_image_manager_.Register(std::move(backing),
@@ -310,7 +311,7 @@ TEST_F(DCompImageBackingFactoryTest, DCompSurfaceRestoresGLSurfaceAfterDraw) {
           mailbox, viz::SinglePlaneFormat::kRGBA_8888, nullptr,
           gfx::Size(100, 100), gfx::ColorSpace::CreateSRGB(),
           kTopLeft_GrSurfaceOrigin, kPremul_SkAlphaType, kDCompSurfaceUsage,
-          false);
+          "TestLabel", false);
   ASSERT_NE(nullptr, backing);
   std::unique_ptr<SharedImageRepresentationFactoryRef> factory_ref =
       shared_image_manager_.Register(std::move(backing),
@@ -349,7 +350,7 @@ TEST_F(DCompImageBackingFactoryTest,
           mailbox, viz::SinglePlaneFormat::kRGBA_8888, nullptr,
           gfx::Size(100, 100), gfx::ColorSpace::CreateSRGB(),
           kTopLeft_GrSurfaceOrigin, kPremul_SkAlphaType, kDCompSurfaceUsage,
-          false);
+          "TestLabel", false);
   ASSERT_NE(nullptr, backing);
   std::unique_ptr<SharedImageRepresentationFactoryRef> factory_ref =
       shared_image_manager_.Register(std::move(backing),
@@ -442,7 +443,7 @@ TEST_P(DCompImageBackingFactoryBufferCountTest, RootSwapChainBufferCount) {
           mailbox, viz::SinglePlaneFormat::kRGBA_8888, nullptr,
           gfx::Size(100, 100), gfx::ColorSpace::CreateSRGB(),
           kTopLeft_GrSurfaceOrigin, kOpaque_SkAlphaType, kDXGISwapChainUsage,
-          false);
+          "TestLabel", false);
   ASSERT_NE(nullptr, backing);
   std::unique_ptr<SharedImageRepresentationFactoryRef> factory_ref =
       shared_image_manager_.Register(std::move(backing),
@@ -577,7 +578,7 @@ class DCompImageBackingFactoryVisualTreeTest
             mailbox, format, nullptr, window_size_, color_space,
             kTopLeft_GrSurfaceOrigin,
             has_alpha ? kPremul_SkAlphaType : kOpaque_SkAlphaType, usage,
-            false);
+            "TestLabel", false);
     ASSERT_NE(nullptr, backing);
     std::unique_ptr<SharedImageRepresentationFactoryRef> factory_ref =
         shared_image_manager_.Register(std::move(backing),
@@ -647,18 +648,18 @@ class DCompImageBackingFactoryVisualTreeTest
 };
 
 TEST_F(DCompImageBackingFactoryVisualTreeTest, DCompSurfaceCanDisplay) {
-  viz::ResourceFormat formats[4] = {
-      viz::ResourceFormat::RGBA_8888,
-      viz::ResourceFormat::BGRA_8888,
-      viz::ResourceFormat::RGBX_8888,
-      viz::ResourceFormat::BGRX_8888,
+  viz::SharedImageFormat formats[4] = {
+      viz::SinglePlaneFormat::kRGBA_8888,
+      viz::SinglePlaneFormat::kBGRA_8888,
+      viz::SinglePlaneFormat::kRGBX_8888,
+      viz::SinglePlaneFormat::kBGRX_8888,
   };
 
   SkColor test_color = SkColorSetRGB(0x20, 0x40, 0x80);
   SkColor expected_color = test_color;
   for (auto format : formats) {
-    RunTest(kDCompSurfaceUsage, viz::SharedImageFormat::SinglePlane(format),
-            gfx::ColorSpace::CreateSRGB(), false, test_color, expected_color);
+    RunTest(kDCompSurfaceUsage, format, gfx::ColorSpace::CreateSRGB(), false,
+            test_color, expected_color);
   }
 }
 
@@ -672,16 +673,16 @@ TEST_F(DCompImageBackingFactoryVisualTreeTest, DCompSurfaceCanDisplayLinear) {
 
 TEST_F(DCompImageBackingFactoryVisualTreeTest,
        DCompSurfaceCanDisplayWithAlpha) {
-  viz::ResourceFormat formats[2] = {
-      viz::ResourceFormat::RGBA_8888,
-      viz::ResourceFormat::BGRA_8888,
+  viz::SharedImageFormat formats[2] = {
+      viz::SinglePlaneFormat::kRGBA_8888,
+      viz::SinglePlaneFormat::kBGRA_8888,
   };
 
   SkColor test_color = SkColorSetARGB(0x80, 0x20, 0x40, 0x80);
   SkColor expected_color = SkColorSetRGB(0x10, 0x20, 0x40);
   for (auto format : formats) {
-    RunTest(kDCompSurfaceUsage, viz::SharedImageFormat::SinglePlane(format),
-            gfx::ColorSpace::CreateSRGB(), true, test_color, expected_color);
+    RunTest(kDCompSurfaceUsage, format, gfx::ColorSpace::CreateSRGB(), true,
+            test_color, expected_color);
   }
 }
 
@@ -695,18 +696,18 @@ TEST_F(DCompImageBackingFactoryVisualTreeTest,
 }
 
 TEST_F(DCompImageBackingFactoryVisualTreeTest, DXGISwapChainCanDisplay) {
-  viz::ResourceFormat formats[4] = {
-      viz::ResourceFormat::RGBA_8888,
-      viz::ResourceFormat::BGRA_8888,
-      viz::ResourceFormat::RGBX_8888,
-      viz::ResourceFormat::BGRX_8888,
+  viz::SharedImageFormat formats[4] = {
+      viz::SinglePlaneFormat::kRGBA_8888,
+      viz::SinglePlaneFormat::kBGRA_8888,
+      viz::SinglePlaneFormat::kRGBX_8888,
+      viz::SinglePlaneFormat::kBGRX_8888,
   };
 
   SkColor test_color = SkColorSetRGB(0x20, 0x40, 0x80);
   SkColor expected_color = test_color;
   for (auto format : formats) {
-    RunTest(kDXGISwapChainUsage, viz::SharedImageFormat::SinglePlane(format),
-            gfx::ColorSpace::CreateSRGB(), false, test_color, expected_color);
+    RunTest(kDXGISwapChainUsage, format, gfx::ColorSpace::CreateSRGB(), false,
+            test_color, expected_color);
   }
 }
 
@@ -727,16 +728,16 @@ TEST_F(DCompImageBackingFactoryVisualTreeTest, DXGISwapChainCanDisplayHDR10) {
 
 TEST_F(DCompImageBackingFactoryVisualTreeTest,
        DXGISwapChainCanDisplayWithAlpha) {
-  viz::ResourceFormat formats[2] = {
-      viz::ResourceFormat::RGBA_8888,
-      viz::ResourceFormat::BGRA_8888,
+  viz::SharedImageFormat formats[2] = {
+      viz::SinglePlaneFormat::kRGBA_8888,
+      viz::SinglePlaneFormat::kBGRA_8888,
   };
 
   SkColor test_color = SkColorSetARGB(0x80, 0x20, 0x40, 0x80);
   SkColor expected_color = SkColorSetRGB(0x10, 0x20, 0x40);
   for (auto format : formats) {
-    RunTest(kDXGISwapChainUsage, viz::SharedImageFormat::SinglePlane(format),
-            gfx::ColorSpace::CreateSRGB(), true, test_color, expected_color);
+    RunTest(kDXGISwapChainUsage, format, gfx::ColorSpace::CreateSRGB(), true,
+            test_color, expected_color);
   }
 }
 
@@ -765,7 +766,7 @@ TEST_F(DCompImageBackingFactoryVisualTreeTest,
           mailbox, viz::SinglePlaneFormat::kRGBA_8888, nullptr,
           gfx::Size(100, 100), gfx::ColorSpace::CreateSRGB(),
           kTopLeft_GrSurfaceOrigin, kOpaque_SkAlphaType, kDXGISwapChainUsage,
-          false);
+          "TestLabel", false);
   ASSERT_NE(nullptr, backing);
   std::unique_ptr<SharedImageRepresentationFactoryRef> factory_ref =
       shared_image_manager_.Register(std::move(backing),
@@ -798,16 +799,12 @@ TEST_F(DCompImageBackingFactoryVisualTreeTest,
       CommitAndWait();
     }
 
-    std::vector<SkColor> window_readback =
+    gl::GLTestHelper::WindowPixels window_readback =
         gl::GLTestHelper::ReadBackWindow(window(), window_size());
-    EXPECT_SKCOLOR_EQ(
-        SK_ColorRED,
-        window_readback[window_size().width() * middle_of_left_half.y() +
-                        middle_of_left_half.x()]);
-    EXPECT_SKCOLOR_EQ(
-        SK_ColorRED,
-        window_readback[window_size().width() * middle_of_right_half.y() +
-                        middle_of_right_half.x()]);
+    EXPECT_SKCOLOR_EQ(SK_ColorRED,
+                      window_readback.GetPixel(middle_of_left_half));
+    EXPECT_SKCOLOR_EQ(SK_ColorRED,
+                      window_readback.GetPixel(middle_of_right_half));
   }
 
   // Next two draws will be partial, drawing different colors to each side
@@ -832,16 +829,12 @@ TEST_F(DCompImageBackingFactoryVisualTreeTest,
     // No Commit is needed, but we should wait for swap chains to flip.
     CommitAndWait();
 
-    std::vector<SkColor> window_readback =
+    gl::GLTestHelper::WindowPixels window_readback =
         gl::GLTestHelper::ReadBackWindow(window(), window_size());
-    EXPECT_SKCOLOR_EQ(
-        SK_ColorGREEN,
-        window_readback[window_size().width() * middle_of_left_half.y() +
-                        middle_of_left_half.x()]);
-    EXPECT_SKCOLOR_EQ(
-        SK_ColorBLUE,
-        window_readback[window_size().width() * middle_of_right_half.y() +
-                        middle_of_right_half.x()]);
+    EXPECT_SKCOLOR_EQ(SK_ColorGREEN,
+                      window_readback.GetPixel(middle_of_left_half));
+    EXPECT_SKCOLOR_EQ(SK_ColorBLUE,
+                      window_readback.GetPixel(middle_of_right_half));
   }
 }
 

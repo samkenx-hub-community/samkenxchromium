@@ -258,7 +258,8 @@ static bool DiffAffectsContainerQueries(const ComputedStyle& old_style,
       !new_style.IsContainerForSizeContainerQueries()) {
     return false;
   }
-  if ((old_style.ContainerName() != new_style.ContainerName()) ||
+  if (!base::ValuesEquivalent(old_style.ContainerName(),
+                              new_style.ContainerName()) ||
       (old_style.ContainerType() != new_style.ContainerType())) {
     return true;
   }
@@ -273,13 +274,19 @@ static bool DiffAffectsContainerQueries(const ComputedStyle& old_style,
 
 static bool DiffAffectsScrollAnimations(const ComputedStyle& old_style,
                                         const ComputedStyle& new_style) {
-  if ((old_style.ScrollTimelineName() != new_style.ScrollTimelineName()) ||
-      (old_style.ScrollTimelineAxis() != new_style.ScrollTimelineAxis())) {
+  if (!base::ValuesEquivalent(old_style.ScrollTimelineName(),
+                              new_style.ScrollTimelineName()) ||
+      (old_style.ScrollTimelineAxis() != new_style.ScrollTimelineAxis()) ||
+      (old_style.ScrollTimelineAttachment() !=
+       new_style.ScrollTimelineAttachment())) {
     return true;
   }
-  if ((old_style.ViewTimelineName() != new_style.ViewTimelineName()) ||
+  if (!base::ValuesEquivalent(old_style.ViewTimelineName(),
+                              new_style.ViewTimelineName()) ||
       (old_style.ViewTimelineAxis() != new_style.ViewTimelineAxis()) ||
-      (old_style.ViewTimelineInset() != new_style.ViewTimelineInset())) {
+      (old_style.ViewTimelineInset() != new_style.ViewTimelineInset()) ||
+      (old_style.ViewTimelineAttachment() !=
+       new_style.ViewTimelineAttachment())) {
     return true;
   }
   return false;
@@ -459,8 +466,7 @@ ComputedStyle::ComputeDifferenceIgnoringInheritedFirstLineStyle(
     return Difference::kPseudoElementStyle;
   }
   if (old_style.Display() != new_style.Display() &&
-      (new_style.Display() == EDisplay::kListItem ||
-       old_style.Display() == EDisplay::kListItem)) {
+      (new_style.IsDisplayListItem() || old_style.IsDisplayListItem())) {
     return Difference::kPseudoElementStyle;
   }
   return Difference::kNonInherited;
@@ -842,7 +848,7 @@ bool ComputedStyle::DiffNeedsFullLayoutAndPaintInvalidation(
           other.BorderRightStyle() == EBorderStyle::kHidden))) {
       return true;
     }
-  } else if (Display() == EDisplay::kListItem) {
+  } else if (IsDisplayListItem()) {
     if (ComputedStyleBase::
             DiffNeedsFullLayoutAndPaintInvalidationDisplayListItem(*this,
                                                                    other)) {
@@ -2391,6 +2397,16 @@ const AtomicString& ComputedStyle::ListStyleStringValue() const {
   return ListStyleType()->GetStringValue();
 }
 
+bool ComputedStyle::MarkerShouldBeInside(const Node& parent_node) const {
+  // https://w3c.github.io/csswg-drafts/css-lists/#list-style-position-outside
+  // > If the list item is an inline box: this value is equivalent to inside.
+  if (Display() == EDisplay::kInlineListItem) {
+    return true;
+  }
+  return ListStylePosition() == EListStylePosition::kInside ||
+         (IsA<HTMLLIElement>(parent_node) && !IsInsideListElement());
+}
+
 absl::optional<blink::Color> ComputedStyle::AccentColorResolved() const {
   const StyleAutoColor& auto_color = AccentColor();
   if (auto_color.IsAutoColor()) {
@@ -2468,7 +2484,6 @@ bool ComputedStyle::ShouldApplyAnyContainment(const Element& element,
 
 bool ComputedStyle::CanMatchSizeContainerQueries(const Element& element) const {
   return IsContainerForSizeContainerQueries() &&
-         !element.ShouldForceLegacyLayout() &&
          (!element.IsSVGElement() ||
           To<SVGElement>(element).IsOutermostSVGSVGElement());
 }

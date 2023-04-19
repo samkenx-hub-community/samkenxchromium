@@ -172,7 +172,7 @@ GetSwitchDependentFeatureOverrides(const base::CommandLine& command_line) {
      std::cref(blink::features::kConversionMeasurement),
      base::FeatureList::OVERRIDE_ENABLE_FEATURE},
     {switches::kEnablePrivacySandboxAdsApis,
-     std::cref(blink::features::kAttributionReportingCrossAppWeb),
+     std::cref(network::features::kAttributionReportingCrossAppWeb),
      base::FeatureList::OVERRIDE_ENABLE_FEATURE},
     {switches::kEnablePrivacySandboxAdsApis,
      std::cref(blink::features::kFencedFrames),
@@ -182,6 +182,13 @@ GetSwitchDependentFeatureOverrides(const base::CommandLine& command_line) {
      base::FeatureList::OVERRIDE_ENABLE_FEATURE},
     {switches::kEnablePrivacySandboxAdsApis,
      std::cref(blink::features::kPrivateAggregationApi),
+     base::FeatureList::OVERRIDE_ENABLE_FEATURE},
+    {switches::kEnablePrivacySandboxAdsApis,
+     std::cref(blink::features::
+                   kPrivateAggregationApiFledgeExtensionsLocalTestingOverride),
+     base::FeatureList::OVERRIDE_ENABLE_FEATURE},
+    {switches::kEnablePrivacySandboxAdsApis,
+     std::cref(features::kAttributionFencedFrameReportingBeacon),
      base::FeatureList::OVERRIDE_ENABLE_FEATURE},
   };
 

@@ -71,11 +71,18 @@ NetworkServiceClient::NetworkServiceClient()
 NetworkServiceClient::~NetworkServiceClient() {
   if (IsOutOfProcessNetworkService()) {
     net::CertDatabase::GetInstance()->RemoveObserver(this);
-#if BUILDFLAG(IS_ANDROID)
-    net::NetworkChangeNotifier::RemoveConnectionTypeObserver(this);
-    net::NetworkChangeNotifier::RemoveMaxBandwidthObserver(this);
-    net::NetworkChangeNotifier::RemoveIPAddressObserver(this);
-#endif
+#if BUILDFLAG(IS_ANDROID) || BUILDFLAG(IS_LINUX)
+    bool remove_ncn_observers = true;
+#if BUILDFLAG(IS_LINUX)
+    remove_ncn_observers = base::FeatureList::IsEnabled(
+        net::features::kAddressTrackerLinuxIsProxied);
+#endif  // BUILDFLAG(IS_LINUX)
+    if (remove_ncn_observers) {
+      net::NetworkChangeNotifier::RemoveConnectionTypeObserver(this);
+      net::NetworkChangeNotifier::RemoveMaxBandwidthObserver(this);
+      net::NetworkChangeNotifier::RemoveIPAddressObserver(this);
+    }
+#endif  // BUILDFLAG(IS_ANDROID) || BUILDFLAG(IS_LINUX)
   }
 }
 
@@ -97,7 +104,9 @@ void NetworkServiceClient::OnApplicationStateChange(
     base::android::ApplicationState state) {
   GetNetworkService()->OnApplicationStateChange(state);
 }
+#endif  // BUILDFLAG(IS_ANDROID)
 
+#if BUILDFLAG(IS_ANDROID) || BUILDFLAG(IS_LINUX)
 void NetworkServiceClient::OnConnectionTypeChanged(
     net::NetworkChangeNotifier::ConnectionType type) {
   network_change_manager_->OnNetworkChanged(
@@ -131,7 +140,7 @@ void NetworkServiceClient::OnIPAddressChanged() {
       network::mojom::ConnectionSubtype(
           net::NetworkChangeNotifier::GetConnectionSubtype()));
 }
-#endif  // BUILDFLAG(IS_ANDROID)
+#endif  // BUILDFLAG(IS_ANDROID) || BUILDFLAG(IS_LINUX)
 
 #if BUILDFLAG(USE_SOCKET_BROKER)
 mojo::PendingRemote<network::mojom::SocketBroker>
@@ -150,8 +159,13 @@ NetworkServiceClient::BindURLLoaderNetworkServiceObserver() {
 
 void NetworkServiceClient::OnNetworkServiceInitialized(
     network::mojom::NetworkService* service) {
-#if BUILDFLAG(IS_ANDROID)
-  if (IsOutOfProcessNetworkService()) {
+#if BUILDFLAG(IS_ANDROID) || BUILDFLAG(IS_LINUX)
+  bool add_ncn_observers = true;
+#if BUILDFLAG(IS_LINUX)
+  add_ncn_observers = base::FeatureList::IsEnabled(
+      net::features::kAddressTrackerLinuxIsProxied);
+#endif  // BUILDFLAG(IS_LINUX)
+  if (IsOutOfProcessNetworkService() && add_ncn_observers) {
     DCHECK(!net::NetworkChangeNotifier::CreateIfNeeded());
     service->GetNetworkChangeManager(
         network_change_manager_.BindNewPipeAndPassReceiver());
@@ -159,7 +173,7 @@ void NetworkServiceClient::OnNetworkServiceInitialized(
     net::NetworkChangeNotifier::AddMaxBandwidthObserver(this);
     net::NetworkChangeNotifier::AddIPAddressObserver(this);
   }
-#endif
+#endif  // BUILDFLAG(IS_ANDROID) || BUILDFLAG(IS_LINUX)
 }
 
 void NetworkServiceClient::OnSSLCertificateError(

@@ -45,8 +45,7 @@ class COMPONENT_EXPORT(MEDIA_MESSAGE_CENTER) MediaNotificationViewAshImpl
 
   MediaNotificationViewAshImpl(MediaNotificationContainer* container,
                                base::WeakPtr<MediaNotificationItem> item,
-                               std::unique_ptr<views::View> dismiss_button,
-                               NotificationTheme theme,
+                               MediaColorTheme theme,
                                MediaDisplayPage media_display_page);
   MediaNotificationViewAshImpl(const MediaNotificationViewAshImpl&) = delete;
   MediaNotificationViewAshImpl& operator=(const MediaNotificationViewAshImpl&) =
@@ -104,7 +103,7 @@ class COMPONENT_EXPORT(MEDIA_MESSAGE_CENTER) MediaNotificationViewAshImpl
   base::WeakPtr<MediaNotificationItem> item_;
 
   // The color theme for all the colors in this view.
-  NotificationTheme theme_;
+  MediaColorTheme theme_;
 
   media_session::MediaPosition position_;
 

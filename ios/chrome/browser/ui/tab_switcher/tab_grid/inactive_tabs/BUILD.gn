@@ -7,6 +7,7 @@ import("//build/config/ios/swift_source_set.gni")
 source_set("inactive_tabs") {
   configs += [ "//build/config/compiler:enable_arc" ]
   sources = [
+    "inactive_tabs_commands.h",
     "inactive_tabs_coordinator.h",
     "inactive_tabs_coordinator.mm",
     "inactive_tabs_mediator.h",
@@ -15,16 +16,26 @@ source_set("inactive_tabs") {
     "inactive_tabs_user_education_coordinator.mm",
   ]
   deps = [
+    ":inactive_tabs_button_ui",
     ":inactive_tabs_ui",
     "//base",
     "//components/favicon/ios",
+    "//components/prefs",
+    "//components/prefs/ios",
+    "//components/sessions",
     "//ios/chrome/app/strings",
+    "//ios/chrome/browser/application_context",
+    "//ios/chrome/browser/browser_state",
     "//ios/chrome/browser/main:public",
+    "//ios/chrome/browser/prefs:pref_names",
+    "//ios/chrome/browser/sessions",
+    "//ios/chrome/browser/sessions:restoration_agent",
+    "//ios/chrome/browser/sessions:serialisation",
     "//ios/chrome/browser/shared/coordinator/alert",
     "//ios/chrome/browser/shared/coordinator/chrome_coordinator",
+    "//ios/chrome/browser/shared/ui/symbols",
     "//ios/chrome/browser/snapshots",
     "//ios/chrome/browser/tabs/inactive_tabs:features",
-    "//ios/chrome/browser/ui/icons:symbols",
     "//ios/chrome/browser/ui/settings:settings_root",
     "//ios/chrome/browser/ui/tab_switcher",
     "//ios/chrome/browser/ui/tab_switcher:tab_utils",
@@ -63,7 +74,10 @@ source_set("inactive_tabs_button") {
   deps = [
     ":inactive_tabs_button_ui",
     "//base",
+    "//components/prefs",
+    "//components/prefs/ios",
     "//ios/chrome/browser/main:public",
+    "//ios/chrome/browser/prefs:pref_names",
     "//ios/chrome/browser/tabs/inactive_tabs:features",
     "//ios/chrome/browser/web_state_list",
   ]
@@ -72,7 +86,7 @@ source_set("inactive_tabs_button") {
 source_set("inactive_tabs_button_ui") {
   configs += [ "//build/config/compiler:enable_arc" ]
   sources = [
-    "inactive_tabs_count_consumer.h",
+    "inactive_tabs_info_consumer.h",
     "inactive_tabs_preamble_header.h",
     "inactive_tabs_preamble_header.mm",
   ]
@@ -97,6 +111,7 @@ swift_source_set("inactive_tabs_button_ui_swift") {
   ]
   deps = [
     "//ios/chrome/app/strings",
+    "//ios/chrome/browser/shared/ui/symbols",
     "//ios/chrome/common/ui/colors:swift",
     "//ui/base",
   ]

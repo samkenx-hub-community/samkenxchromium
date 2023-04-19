@@ -77,6 +77,7 @@
 #include "content/browser/interest_group/interest_group_manager_impl.h"
 #include "content/browser/loader/keep_alive_url_loader_service.h"
 #include "content/browser/loader/prefetch_url_loader_service.h"
+#include "content/browser/loader/resource_cache_manager.h"
 #include "content/browser/locks/lock_manager.h"
 #include "content/browser/navigation_or_document_handle.h"
 #include "content/browser/network_context_client_base_impl.h"
@@ -199,7 +200,8 @@ void BindStorageServiceFilesystemImpl(
     const base::FilePath& directory_path,
     mojo::PendingReceiver<storage::mojom::Directory> receiver) {
   mojo::MakeSelfOwnedReceiver(
-      std::make_unique<storage::FilesystemImpl>(directory_path),
+      std::make_unique<storage::FilesystemImpl>(
+          directory_path, storage::FilesystemImpl::ClientType::kUntrusted),
       std::move(receiver));
 }
 #endif
@@ -1510,6 +1512,10 @@ void StoragePartitionImpl::Initialize(
         std::make_unique<PrivateAggregationManagerImpl>(is_in_memory(), path,
                                                         this);
   }
+
+  if (base::FeatureList::IsEnabled(blink::features::kRemoteResourceCache)) {
+    resource_cache_manager_ = std::make_unique<ResourceCacheManager>();
+  }
 }
 
 void StoragePartitionImpl::OnStorageServiceDisconnected() {
@@ -1862,6 +1868,11 @@ PrivateAggregationManager*
 StoragePartitionImpl::GetPrivateAggregationManager() {
   DCHECK(initialized_);
   return private_aggregation_manager_.get();
+}
+
+ResourceCacheManager* StoragePartitionImpl::GetResourceCacheManager() {
+  CHECK(initialized_);
+  return resource_cache_manager_.get();
 }
 
 void StoragePartitionImpl::OpenLocalStorage(

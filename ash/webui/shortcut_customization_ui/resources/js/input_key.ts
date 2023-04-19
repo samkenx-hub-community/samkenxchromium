@@ -28,7 +28,7 @@ export enum KeyInputState {
 // The keys in this map are pulled from the file:
 // ui/events/keycodes/dom/dom_code_data.inc
 // TODO(cambickel): Add remaining missing icons.
-export const keyToIconNameMap: {[key: string]: string} = {
+export const keyToIconNameMap: {[key: string]: string|undefined} = {
   'ArrowDown': 'arrow-down',
   'ArrowLeft': 'arrow-left',
   'ArrowRight': 'arrow-right',
@@ -55,9 +55,8 @@ export const keyToIconNameMap: {[key: string]: string} = {
   'MediaPlayPause': 'play-pause',
   'MediaTrackNext': 'next-track',
   'MediaTrackPrevious': 'last-track',
-  'Menu': 'menu',
   'MicrophoneMuteToggle': 'microphone-mute',
-  'ModeChange': 'space-bar',
+  'ModeChange': 'globe',
   'OpenLauncher': 'open-launcher',
   'Power': 'power',
   'PrintScreen': 'screenshot',
@@ -85,6 +84,7 @@ export class InputKeyElement extends InputKeyElementBase {
       key: {
         type: String,
         value: '',
+        reflectToAttribute: true,
       },
 
       keyState: {

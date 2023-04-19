@@ -100,6 +100,17 @@ TEST_F(AutofillSaveUpdateAddressProfileDelegateIOSTest,
   delegate->EditAccepted();
 }
 
+// Tests that the callback is run with kNever on Never.
+TEST_F(AutofillSaveUpdateAddressProfileDelegateIOSTest,
+       HandleUserAction_NoThanks) {
+  std::unique_ptr<AutofillSaveUpdateAddressProfileDelegateIOS> delegate =
+      CreateAutofillSaveUpdateAddressProfileDelegate();
+  EXPECT_CALL(callback_,
+              Run(AutofillClient::SaveAddressProfileOfferUserDecision::kNever,
+                  profile_));
+  delegate->Never();
+}
+
 struct DelegateStringsTestCase {
   bool is_migration;
   bool is_update;
@@ -166,7 +177,7 @@ INSTANTIATE_TEST_SUITE_P(
             true, false, false,
             IDS_IOS_AUTOFILL_SAVE_ADDRESS_MESSAGE_PRIMARY_ACTION,
             IDS_IOS_AUTOFILL_SAVE_ADDRESS_IN_ACCOUNT_MESSAGE_TITLE,
-            IDS_IOS_AUTOFILL_SAVE_ADDRESS_IN_ACCOUNT_MESSAGE_SUBTITLE},
+            u"You can use it across Google products"},
         // Test strings for the update views.
         DelegateStringsTestCase{
             false, true, false,

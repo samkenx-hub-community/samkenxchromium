@@ -27,6 +27,7 @@
 #include "chrome/browser/chrome_notification_types.h"
 #include "chrome/browser/policy/profile_policy_connector.h"
 #include "chrome/browser/profiles/profile.h"
+#include "chrome/browser/ui/webui/ash/login/consolidated_consent_screen_handler.h"
 #include "chrome/browser/ui/webui/ash/login/demo_preferences_screen_handler.h"
 #include "chrome/test/base/testing_browser_process.h"
 #include "chrome/test/base/testing_profile.h"
@@ -70,38 +71,10 @@ void DisableDBusForProfileManager() {
     command_line->AppendSwitch(switches::kTestType);
 }
 
-class FakeUserManagerWithLocalState : public ash::FakeChromeUserManager {
- public:
-  explicit FakeUserManagerWithLocalState(
-      TestingProfileManager* testing_profile_manager)
-      : testing_profile_manager_(testing_profile_manager),
-        test_local_state_(std::make_unique<TestingPrefServiceSimple>()) {
-    RegisterPrefs(test_local_state_->registry());
-  }
-
-  FakeUserManagerWithLocalState(const FakeUserManagerWithLocalState&) = delete;
-  FakeUserManagerWithLocalState& operator=(
-      const FakeUserManagerWithLocalState&) = delete;
-
-  PrefService* GetLocalState() const override {
-    return test_local_state_.get();
-  }
-
-  TestingProfileManager* testing_profile_manager() {
-    return testing_profile_manager_;
-  }
-
- private:
-  // Unowned pointer.
-  TestingProfileManager* const testing_profile_manager_;
-
-  std::unique_ptr<TestingPrefServiceSimple> test_local_state_;
-};
-
 class ScopedLogIn {
  public:
   ScopedLogIn(
-      FakeUserManagerWithLocalState* fake_user_manager,
+      ash::FakeChromeUserManager* fake_user_manager,
       const AccountId& account_id,
       user_manager::UserType user_type = user_manager::USER_TYPE_REGULAR)
       : fake_user_manager_(fake_user_manager), account_id_(account_id) {
@@ -148,7 +121,7 @@ class ScopedLogIn {
     fake_user_manager_->LoginUser(account_id_);
   }
 
-  FakeUserManagerWithLocalState* fake_user_manager_;
+  ash::FakeChromeUserManager* fake_user_manager_;
   const AccountId account_id_;
 };
 
@@ -177,8 +150,7 @@ class ChromeArcUtilTest : public testing::Test {
     ASSERT_TRUE(profile_manager_->SetUp());
 
     user_manager_enabler_ = std::make_unique<user_manager::ScopedUserManager>(
-        std::make_unique<FakeUserManagerWithLocalState>(
-            profile_manager_.get()));
+        std::make_unique<ash::FakeChromeUserManager>());
 
     profile_ = profile_manager_->CreateTestingProfile(kTestProfileName);
   }
@@ -195,8 +167,8 @@ class ChromeArcUtilTest : public testing::Test {
 
   TestingProfile* profile() { return profile_; }
 
-  FakeUserManagerWithLocalState* GetFakeUserManager() const {
-    return static_cast<FakeUserManagerWithLocalState*>(
+  ash::FakeChromeUserManager* GetFakeUserManager() const {
+    return static_cast<ash::FakeChromeUserManager*>(
         user_manager::UserManager::Get());
   }
 
@@ -873,8 +845,8 @@ TEST_F(ArcOobeTest, ShouldStartArcSilentlyForManagedProfile) {
 using ArcOobeOptInActiveInTest = ArcOobeTest;
 
 TEST_F(ArcOobeOptInActiveInTest, OobeOptInActive) {
-  // OOBE OptIn is active in case of OOBE controller is alive and the ARC ToS
-  // screen is currently showing.
+  // OOBE OptIn is active in case of OOBE controller is alive and the
+  // Consolidated Consent screen is currently showing.
   LogIn();
   EXPECT_FALSE(IsArcOobeOptInActive());
   CreateLoginDisplayHost();
@@ -890,9 +862,10 @@ TEST_F(ArcOobeOptInActiveInTest, OobeOptInActive) {
   user_manager::KnownUser(g_browser_process->local_state())
       .SetOnboardingCompletedVersion(account_id, version_info::GetVersion());
   EXPECT_FALSE(IsArcOobeOptInActive());
-  // ARC ToS wizard but Onboarding flow completed.
+
+  // Consolidated Consent wizard but Onboarding flow completed.
   login_display_host()->StartWizard(
-      ash::ArcTermsOfServiceScreenView::kScreenId);
+      ash::ConsolidatedConsentScreenView::kScreenId);
   EXPECT_FALSE(IsArcOobeOptInActive());
 }
 

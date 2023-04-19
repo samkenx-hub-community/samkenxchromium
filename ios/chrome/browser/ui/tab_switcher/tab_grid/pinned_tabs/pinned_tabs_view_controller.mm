@@ -11,6 +11,7 @@
 #import "base/metrics/histogram_functions.h"
 #import "base/notreached.h"
 #import "base/numerics/safe_conversions.h"
+#import "ios/chrome/browser/shared/ui/util/rtl_geometry.h"
 #import "ios/chrome/browser/tabs/features.h"
 #import "ios/chrome/browser/ui/tab_switcher/tab_collection_drag_drop_handler.h"
 #import "ios/chrome/browser/ui/tab_switcher/tab_collection_drag_drop_metrics.h"
@@ -24,6 +25,7 @@
 #import "ios/chrome/common/ui/colors/semantic_color_names.h"
 #import "ios/chrome/common/ui/util/constraints_ui_util.h"
 #import "ios/chrome/grit/ios_strings.h"
+#import "ios/public/provider/chrome/browser/modals/modals_api.h"
 #import "ui/base/l10n/l10n_util_mac.h"
 
 #if !defined(__has_feature) || !__has_feature(objc_arc)
@@ -390,8 +392,7 @@ NSIndexPath* CreateIndexPath(NSInteger index) {
 }
 
 - (void)dismissModals {
-  // Should never be called for this class.
-  NOTREACHED();
+  ios::provider::DismissModalsForCollectionView(self.collectionView);
 }
 
 #pragma mark - UICollectionViewDataSource
@@ -620,7 +621,7 @@ NSIndexPath* CreateIndexPath(NSInteger index) {
   return _available;
 }
 
-#pragma mark - Private properties
+#pragma mark - UIScrollViewDelegate
 
 - (void)scrollViewDidScroll:(UIScrollView*)scrollView {
   _scrollInProgress = YES;
@@ -743,8 +744,11 @@ NSIndexPath* CreateIndexPath(NSInteger index) {
   collectionView.dropDelegate = self;
   collectionView.dragInteractionEnabled = YES;
   collectionView.showsHorizontalScrollIndicator = NO;
+  collectionView.accessibilityIdentifier = kPinnedViewIdentifier;
 
   self.view = collectionView;
+
+  UIView* backgroundView;
 
   // Only apply the blur if transparency effects are not disabled.
   if (!UIAccessibilityIsReduceTransparencyEnabled()) {
@@ -752,17 +756,18 @@ NSIndexPath* CreateIndexPath(NSInteger index) {
 
     UIBlurEffect* blurEffect =
         [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemThinMaterialDark];
-    UIVisualEffectView* blurEffectView =
-        [[UIVisualEffectView alloc] initWithEffect:blurEffect];
-
-    blurEffectView.frame = collectionView.bounds;
-    blurEffectView.autoresizingMask =
-        UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-
-    collectionView.backgroundView = blurEffectView;
+    backgroundView = [[UIVisualEffectView alloc] initWithEffect:blurEffect];
   } else {
     _backgroundColor = [UIColor colorNamed:kPrimaryBackgroundColor];
+
+    backgroundView = [[UIView alloc] init];
   }
+
+  backgroundView.frame = collectionView.bounds;
+  backgroundView.autoresizingMask =
+      UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+
+  collectionView.backgroundView = backgroundView;
   collectionView.backgroundColor = _backgroundColor;
 
   _dragEnabledConstraint = [collectionView.heightAnchor
@@ -789,6 +794,12 @@ NSIndexPath* CreateIndexPath(NSInteger index) {
   label.textColor = [UIColor colorNamed:kTextPrimaryColor];
   label.text = l10n_util::GetNSString(IDS_IOS_PINNED_TABS_DRAG_TO_PIN_LABEL);
   label.translatesAutoresizingMaskIntoConstraints = NO;
+
+  // Mirror the label for RTL (see crbug.com/1426256).
+  if (base::i18n::IsRTL()) {
+    label.transform = CGAffineTransformScale(label.transform, -1, 1);
+  }
+
   [_dropOverlayView addSubview:label];
 
   AddSameConstraints(_dropOverlayView, self.collectionView.backgroundView);
@@ -810,29 +821,31 @@ NSIndexPath* CreateIndexPath(NSInteger index) {
   [self updateDropOverlayViewVisibility];
 }
 
-// Configures `cell`'s identifier and title synchronously, favicon and snapshot
-// asynchronously with information from `item`.
+// Configures `cell`'s identifier and title synchronously, and favicon and
+// snapshot asynchronously from `item`.
 - (void)configureCell:(PinnedCell*)cell withItem:(TabSwitcherItem*)item {
   if (item) {
     cell.itemIdentifier = item.identifier;
     cell.title = item.title;
-    NSString* itemIdentifier = item.identifier;
-    [self.imageDataSource faviconForIdentifier:itemIdentifier
-                                    completion:^(UIImage* icon) {
-                                      // Only update the icon if the cell is not
-                                      // already reused for another item.
-                                      if ([cell hasIdentifier:itemIdentifier]) {
-                                        cell.icon = icon;
-                                      }
-                                    }];
-    [self.imageDataSource
-        snapshotForIdentifier:itemIdentifier
-                   completion:^(UIImage* snapshot) {
-                     if ([cell hasIdentifier:itemIdentifier]) {
-                       cell.snapshot = snapshot;
-                     }
-                   }];
+    [item fetchFavicon:^(TabSwitcherItem* innerItem, UIImage* icon) {
+      // Only update the icon if the cell is not already reused for another
+      // item.
+      if ([cell hasIdentifier:innerItem.identifier]) {
+        cell.icon = icon;
+      }
+    }];
+    [item fetchSnapshot:^(TabSwitcherItem* innerItem, UIImage* snapshot) {
+      // Only update the icon if the cell is not already reused for another
+      // item.
+      if ([cell hasIdentifier:innerItem.identifier]) {
+        cell.snapshot = snapshot;
+      }
+    }];
   }
+
+  cell.accessibilityIdentifier =
+      [NSString stringWithFormat:@"%@%ld", kPinnedCellIdentifier,
+                                 [self indexOfItemWithID:cell.itemIdentifier]];
 
   if (item.showsActivity) {
     [cell showActivityIndicator];
@@ -870,6 +883,10 @@ NSIndexPath* CreateIndexPath(NSInteger index) {
   // change.
   if (!visible && _items.count > 0) {
     return;
+  }
+
+  if (visible && _items.count == 1) {
+    [self popLastInsertedItem];
   }
 
   [self.delegate pinnedTabsViewControllerVisibilityDidChange:self];

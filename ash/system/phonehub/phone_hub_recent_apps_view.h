@@ -103,6 +103,11 @@ class ASH_EXPORT PhoneHubRecentAppsView
     views::View* AddRecentAppButton(
         std::unique_ptr<views::View> recent_app_button);
     void Reset();
+
+    base::WeakPtr<RecentAppButtonsView> GetWeakPtr();
+
+   private:
+    base::WeakPtrFactory<RecentAppButtonsView> weak_ptr_factory_{this};
   };
 
   class LoadingView : public views::BoxLayoutView {
@@ -120,9 +125,12 @@ class ASH_EXPORT PhoneHubRecentAppsView
     void StartLoadingAnimation();
     void StopLoadingAnimation();
 
+    base::WeakPtr<LoadingView> GetWeakPtr();
+
    private:
     std::vector<AppLoadingIcon*> app_loading_icons_;
     PhoneHubMoreAppsButton* more_apps_button_ = nullptr;
+    base::WeakPtrFactory<LoadingView> weak_ptr_factory_{this};
   };
 
   // Update the view to reflect the most recently opened apps.
@@ -133,9 +141,10 @@ class ASH_EXPORT PhoneHubRecentAppsView
 
   void ShowConnectionErrorDialog();
 
-  // Apply an opacity animation when swapping out the loading view for the
-  // RecentAppButtonsView.
+  // Apply an opacity animation when swapping out the LoadingView for the
+  // RecentAppButtonsView and vice-versa.
   void FadeOutLoadingView();
+  void FadeOutRecentAppsButtonView();
 
   // Generate more apps button.
   std::unique_ptr<views::View> GenerateMoreAppsButton();

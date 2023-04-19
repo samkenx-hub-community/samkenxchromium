@@ -184,15 +184,6 @@ bool IsAccessibilitySelectToSpeakPrefsMigrationEnabled() {
       ::features::kAccessibilitySelectToSpeakPrefsMigration);
 }
 
-BASE_FEATURE(kAccessibilitySelectToSpeakContextMenuOption,
-             "AccessibilitySelectToSpeakContextMenuOption",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
-bool IsAccessibilitySelectToSpeakContextMenuOptionEnabled() {
-  return base::FeatureList::IsEnabled(
-      ::features::kAccessibilitySelectToSpeakContextMenuOption);
-}
-
 BASE_FEATURE(kAccessibilitySelectToSpeakHoverTextImprovements,
              "AccessibilitySelectToSpeakHoverTextImprovements",
              base::FEATURE_ENABLED_BY_DEFAULT);
@@ -213,7 +204,7 @@ bool IsAccessibilityAcceleratorNotificationsTimeoutEnabled() {
 
 BASE_FEATURE(kAccessibilityDeprecateChromeVoxTabs,
              "AccessibilityDeprecateChromeVoxTabs",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 bool IsAccessibilityDeprecateChromeVoxTabsEnabled() {
   return base::FeatureList::IsEnabled(
@@ -256,21 +247,12 @@ bool IsAblateSendPendingAccessibilityEventsEnabled() {
 }
 
 #if BUILDFLAG(IS_ANDROID)
-BASE_FEATURE(kComputeAXMode,
-             "ComputeAXMode",
+BASE_FEATURE(kAccessibilityAXModes,
+             "AccessibilityAXModes",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-bool IsComputeAXModeEnabled() {
-  return base::FeatureList::IsEnabled(::features::kComputeAXMode);
-}
-
-BASE_FEATURE(kAccessibilityFormControlsMode,
-             "AccessibilityFormControlsAXMode",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-
-bool IsAccessibilityFormControlsAXModeEnabled() {
-  return base::FeatureList::IsEnabled(
-      ::features::kAccessibilityFormControlsMode);
+bool IsAccessibilityAXModesEnabled() {
+  return base::FeatureList::IsEnabled(::features::kAccessibilityAXModes);
 }
 #endif  // BUILDFLAG(IS_ANDROID)
 

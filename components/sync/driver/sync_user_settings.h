@@ -43,7 +43,7 @@ class SyncUserSettings {
   // by the Sync feature toggle in settings, or when Sync gets reset from the
   // dashboard. This maps to DISABLE_REASON_USER_CHOICE.
   virtual bool IsSyncRequested() const = 0;
-  virtual void SetSyncRequested(bool requested) = 0;
+  virtual void SetSyncRequested() = 0;
 
   // Whether the initial Sync setup has been completed, meaning the user has
   // consented to Sync.

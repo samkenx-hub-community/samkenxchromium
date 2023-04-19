@@ -65,26 +65,11 @@ enum class AboutThisSiteSeconaryIcon {
   kNoIcon = 3,
 };
 
-// Return a secondary icon for the AboutThisSite row based on finch parameters.
-absl::optional<ui::ImageModel> GetAboutThisSiteSecondaryIcon() {
-  AboutThisSiteSeconaryIcon icon_id = static_cast<AboutThisSiteSeconaryIcon>(
-      page_info::kAboutThisSiteSecondaryIconId.Get());
-  switch (icon_id) {
-    case AboutThisSiteSeconaryIcon::kNewTabIcon:
-      return PageInfoViewFactory::GetLaunchIcon();
-    case AboutThisSiteSeconaryIcon::kArrowIcon:
-      return PageInfoViewFactory::GetOpenSubpageIcon();
-    case AboutThisSiteSeconaryIcon::kSidePanelIcon:
-      return PageInfoViewFactory::GetSidePanelIcon();
-    case AboutThisSiteSeconaryIcon::kNoIcon:
-      return absl::nullopt;
-  }
-  return PageInfoViewFactory::GetLaunchIcon();
-}
-
 }  // namespace
 
 DEFINE_CLASS_ELEMENT_IDENTIFIER_VALUE(PageInfoMainView, kCookieButtonElementId);
+DEFINE_CLASS_ELEMENT_IDENTIFIER_VALUE(PageInfoMainView, kMainLayoutElementId);
+DEFINE_CLASS_ELEMENT_IDENTIFIER_VALUE(PageInfoMainView, kPermissionsElementId);
 
 PageInfoMainView::ContainerView::ContainerView() {
   SetLayoutManager(std::make_unique<views::BoxLayout>(
@@ -128,6 +113,8 @@ PageInfoMainView::PageInfoMainView(
   permissions_view_ = AddChildView(std::make_unique<views::View>());
   permissions_view_->SetLayoutManager(std::make_unique<views::FlexLayout>())
       ->SetOrientation(views::LayoutOrientation::kVertical);
+
+  SetProperty(views::kElementIdentifierKey, kMainLayoutElementId);
 
   site_settings_view_ = AddChildView(CreateContainerView());
 
@@ -274,6 +261,8 @@ void PageInfoMainView::SetPermissionInfo(
   content_view->SetLayoutManager(std::make_unique<views::FlexLayout>())
       ->SetOrientation(views::LayoutOrientation::kVertical);
   content_view->SetID(PageInfoViewFactory::VIEW_ID_PAGE_INFO_PERMISSION_VIEW);
+  content_view->SetProperty(views::kElementIdentifierKey,
+                            kPermissionsElementId);
 
   // If there is a permission that supports one time grants, offset all other
   // permissions to align toggles.
@@ -638,7 +627,7 @@ std::unique_ptr<views::View> PageInfoMainView::CreateAboutThisSiteSection(
             l10n_util::GetStringUTF16(IDS_PAGE_INFO_ABOUT_THIS_PAGE_TITLE),
             std::u16string(),
             l10n_util::GetStringUTF16(IDS_PAGE_INFO_ABOUT_THIS_PAGE_TOOLTIP),
-            description, GetAboutThisSiteSecondaryIcon()));
+            description, PageInfoViewFactory::GetLaunchIcon()));
     about_this_site_button->SetID(
         PageInfoViewFactory::VIEW_ID_PAGE_INFO_ABOUT_THIS_SITE_BUTTON);
   } else {

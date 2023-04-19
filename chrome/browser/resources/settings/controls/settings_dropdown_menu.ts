@@ -11,15 +11,13 @@
  *   <settings-dropdown-menu pref="{{prefs.foo}}">
  *   </settings-dropdown-menu>
  */
+import '//resources/cr_elements/cr_shared_vars.css.js';
 import '//resources/cr_elements/md_select.css.js';
 import '//resources/cr_elements/policy/cr_policy_pref_indicator.js';
-import '../settings_shared.css.js';
-import '../settings_vars.css.js';
 
 import {assert} from '//resources/js/assert_ts.js';
 import {microTask, PolymerElement} from '//resources/polymer/v3_0/polymer/polymer_bundled.min.js';
-
-import {prefToString, stringToPrefValue} from '../prefs/pref_util.js';
+import {prefToString, stringToPrefValue} from 'chrome://resources/cr_components/settings_prefs/pref_util.js';
 
 import {CrPolicyPrefMixin} from './cr_policy_pref_mixin.js';
 import {PrefControlMixin} from './pref_control_mixin.js';

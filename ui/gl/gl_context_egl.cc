@@ -47,7 +47,6 @@
 #ifndef EGL_ANGLE_external_context_and_surface
 #define EGL_ANGLE_external_context_and_surface 1
 #define EGL_EXTERNAL_CONTEXT_ANGLE 0x348E
-#define EGL_EXTERNAL_SURFACE_ANGLE 0x348F
 #define EGL_EXTERNAL_CONTEXT_SAVE_STATE_ANGLE 0x3490
 #endif /* EGL_ANGLE_external_context_and_surface */
 
@@ -543,6 +542,12 @@ bool GLContextEGL::IsCurrent(GLSurface* surface) {
   if (surface) {
     if (surface->GetHandle() != eglGetCurrentSurface(EGL_DRAW))
       return false;
+  }
+
+  if (gl_display_) {
+    if (gl_display_->GetDisplay() != eglGetCurrentDisplay()) {
+      return false;
+    }
   }
 
   return true;

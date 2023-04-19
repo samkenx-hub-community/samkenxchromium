@@ -14,6 +14,7 @@
  * </settings-lock-screen-subpage>
  */
 
+import 'chrome://resources/cr_components/settings_prefs/prefs.js';
 import 'chrome://resources/cr_elements/cr_button/cr_button.js';
 import 'chrome://resources/cr_elements/cr_radio_button/cr_radio_button.js';
 import 'chrome://resources/cr_elements/cr_radio_group/cr_radio_group.js';
@@ -23,9 +24,7 @@ import '../../controls/settings_toggle_button.js';
 import './setup_pin_dialog.js';
 import './pin_autosubmit_dialog.js';
 import './local_data_recovery_dialog.js';
-import '../../prefs/prefs.js';
 import '../../settings_shared.css.js';
-import '../../settings_vars.css.js';
 import '../multidevice_page/multidevice_smartlock_item.js';
 
 import {LockScreenProgress, recordLockScreenProgress} from 'chrome://resources/ash/common/quick_unlock/lock_screen_constants.js';
@@ -160,6 +159,17 @@ export class SettingsLockScreenElement extends SettingsLockScreenElementBase {
       },
 
       /**
+       * True if cryptohome recovery feature is enabled.
+       */
+      cryptohomeRecoveryEnabled_: {
+        type: Boolean,
+        value() {
+          return loadTimeData.getBoolean('cryptohomeRecoveryEnabled');
+        },
+        readOnly: true,
+      },
+
+      /**
        * State of the recovery toggle. Is |null| iff recovery is not a
        * available.
        */
@@ -226,6 +236,7 @@ export class SettingsLockScreenElement extends SettingsLockScreenElementBase {
   private numFingerprintDescription_: string;
   private lockScreenNotificationsEnabled_: boolean;
   private lockScreenHideSensitiveNotificationSupported_: boolean;
+  private cryptohomeRecoveryEnabled_: boolean;
   private recovery_: chrome.settingsPrivate.PrefObject|null;
   private recoveryChangeInProcess_: boolean;
   private quickUnlockPinAutosubmitFeatureEnabled_: boolean;
@@ -422,6 +433,10 @@ export class SettingsLockScreenElement extends SettingsLockScreenElementBase {
    */
   private showConfigurePinButton_(selectedUnlockType: string): boolean {
     return selectedUnlockType === LockScreenUnlockType.PIN_PASSWORD;
+  }
+
+  private showRecoveryWarning_(): boolean {
+    return this.cryptohomeRecoveryEnabled_ && this.recovery_ === null;
   }
 
   private getSetupPinText_(hasPin: boolean): string {

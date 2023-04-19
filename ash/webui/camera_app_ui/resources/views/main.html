@@ -121,7 +121,8 @@
       </div>
       <div class="top-stripe left-stripe buttons circle">
         <button id="open-settings" tabindex="0"
-                i18n-label="settings_button" aria-haspopup="true"></button>
+                i18n-label="settings_button" aria-haspopup="true"
+                data-svg="camera_button_settings.svg"></button>
       </div>
       <div class="top-stripe left-stripe buttons circle">
         <button id="back-to-review-document" tabindex="0"
@@ -209,7 +210,8 @@
       </div>
       <div class="bottom-stripe left-stripe buttons circle">
         <button id="switch-device" tabindex="0"
-                i18n-label="switch_camera_button"></button>
+                i18n-label="switch_camera_button"
+                data-svg="camera_button_switch_device.svg"></button>
       </div>
       <div id="mode-selector" class="bottom-stripe">
         <div id="modes-group" class="buttons" role="radiogroup"
@@ -248,7 +250,7 @@
       <div class="bottom-stripe right-stripe buttons circle">
         <button id="gallery-enter" tabindex="0"
                 i18n-label="gallery_button" hidden>
-          <img>
+          <img alt="">
         </button>
       </div>
       <div id="record-time" class="top-stripe horizontal-center-stripe" hidden>
@@ -453,7 +455,7 @@
     </div>
     <div id="view-review" class="review-views">
       <div class="review-frame">
-        <img class="review-image" hidden>
+        <img class="review-image" hidden alt="">
         <video class="review-video" hidden controls autoplay></video>
       </div>
     </div>
@@ -576,7 +578,7 @@
     <template id="indicator-toast-template">
       <div id="indicator-toast" class="custom-toast" tabindex="0">
         <div>
-          <img id="indicator-icon" alt>
+          <img id="indicator-icon" alt="">
         </div>
         <span class="custom-toast-text" aria-hidden="true"></span>
       </div>
@@ -607,7 +609,7 @@
     <template id="document-preview-mode">
       <div class="document-preview-mode">
         <div class="preview-area">
-          <img class="image">
+          <img class="image" alt="">
         </div>
         <div class="buttons-container">
           <div class="button-group left">
@@ -638,7 +640,7 @@
              i18n-text="document_corner_move_desc" hidden></div>
         <div class="preview-area">
           <div class="image-container">
-            <img class="image">
+            <img class="image" alt="">
             <svg class="crop-area-container">
               <polygon class="crop-area"></polygon>
             </svg>
@@ -666,7 +668,7 @@
                   i18n-label="delete_page_button" tabindex="0"></button>
         </div>
         <div class="thumbnail-container">
-          <img class="thumbnail">
+          <img class="thumbnail" alt="">
         </div>
       </div>
     </template>

@@ -26,8 +26,8 @@ namespace {
 constexpr char kDefaultGattManagerClientUuid[] =
     "e060b902508c485f8b0e27639c7f2d41";
 
-// Default to requesting eatt support with gatt client.
-constexpr bool kDefaultEattSupport = true;
+// Default to not requesting eatt support with gatt client.
+constexpr bool kDefaultEattSupport = false;
 
 void HandleResponse(const char* method, DBusResult<Void> result) {
   if (!result.has_value()) {
@@ -289,10 +289,8 @@ void FlossGattManagerClient::RemoveServerObserver(
 
 void FlossGattManagerClient::Connect(ResponseCallback<Void> callback,
                                      const std::string& remote_device,
-                                     const BluetoothTransport& transport) {
-  // Gatt client connections occur immediately instead of when next seen.
-  constexpr bool is_direct = true;
-
+                                     const BluetoothTransport& transport,
+                                     bool is_direct) {
   // Opportunistic connections should be false because we want connections to
   // immediately fail with timeout if it doesn't work out.
   const bool opportunistic = false;
@@ -590,6 +588,9 @@ void FlossGattManagerClient::Init(dbus::Bus* bus,
       gatt::kOnServerServiceAdded,
       &FlossGattServerObserver::GattServerServiceAdded);
   gatt_server_exported_callback_manager_.AddMethod(
+      gatt::kOnServerServiceRemoved,
+      &FlossGattServerObserver::GattServerServiceRemoved);
+  gatt_server_exported_callback_manager_.AddMethod(
       gatt::kOnServerCharacteristicReadRequest,
       &FlossGattServerObserver::GattServerCharacteristicReadRequest);
   gatt_server_exported_callback_manager_.AddMethod(
@@ -861,6 +862,13 @@ void FlossGattManagerClient::GattServerServiceAdded(GattStatus status,
                                                     GattService service) {
   for (auto& observer : gatt_server_observers_) {
     observer.GattServerServiceAdded(status, service);
+  }
+}
+
+void FlossGattManagerClient::GattServerServiceRemoved(GattStatus status,
+                                                      int32_t handle) {
+  for (auto& observer : gatt_server_observers_) {
+    observer.GattServerServiceRemoved(status, handle);
   }
 }
 

@@ -52,6 +52,7 @@
 #include "third_party/blink/renderer/core/layout/layout_block.h"
 #include "third_party/blink/renderer/core/layout/layout_box.h"
 #include "third_party/blink/renderer/core/layout/ng/grid/layout_ng_grid.h"
+#include "third_party/blink/renderer/core/layout/ng/ng_anchor_query.h"
 #include "third_party/blink/renderer/core/layout/svg/transform_helper.h"
 #include "third_party/blink/renderer/core/style/computed_style_constants.h"
 #include "third_party/blink/renderer/core/style/style_intrinsic_length.h"
@@ -573,22 +574,27 @@ CSSValue* ComputedStyleUtils::ValueForPositionOffset(
     const LayoutObject* layout_object) {
   std::pair<const Length*, const Length*> positions;
   bool is_horizontal_property;
+  bool is_right_or_bottom;
   switch (property.PropertyID()) {
     case CSSPropertyID::kLeft:
-      positions = std::make_pair(&style.Left(), &style.Right());
+      positions = std::make_pair(&style.UsedLeft(), &style.UsedRight());
       is_horizontal_property = true;
+      is_right_or_bottom = false;
       break;
     case CSSPropertyID::kRight:
-      positions = std::make_pair(&style.Right(), &style.Left());
+      positions = std::make_pair(&style.UsedRight(), &style.UsedLeft());
       is_horizontal_property = true;
+      is_right_or_bottom = true;
       break;
     case CSSPropertyID::kTop:
-      positions = std::make_pair(&style.Top(), &style.Bottom());
+      positions = std::make_pair(&style.UsedTop(), &style.UsedBottom());
       is_horizontal_property = false;
+      is_right_or_bottom = false;
       break;
     case CSSPropertyID::kBottom:
-      positions = std::make_pair(&style.Bottom(), &style.Top());
+      positions = std::make_pair(&style.UsedBottom(), &style.UsedTop());
       is_horizontal_property = false;
+      is_right_or_bottom = true;
       break;
     default:
       NOTREACHED();
@@ -618,8 +624,18 @@ CSSValue* ComputedStyleUtils::ValueForPositionOffset(
               : box->ContainingBlockLogicalHeightForGetComputedStyle();
     }
 
-    return ZoomAdjustedPixelValue(ValueForLength(offset, containing_block_size),
-                                  style);
+    absl::optional<NGAnchorEvaluatorImpl> anchor_evaluator_storage;
+    NGAnchorEvaluatorImpl* anchor_evaluator = nullptr;
+    if (offset.HasAnchorQueries() && layout_object->IsOutOfFlowPositioned()) {
+      anchor_evaluator_storage.emplace(
+          NGAnchorEvaluatorImpl::BuildFromLayoutResult(*layout_object));
+      anchor_evaluator = &anchor_evaluator_storage.value();
+      anchor_evaluator->SetAxis(!is_horizontal_property, is_right_or_bottom,
+                                containing_block_size);
+    }
+
+    return ZoomAdjustedPixelValue(
+        ValueForLength(offset, containing_block_size, anchor_evaluator), style);
   }
 
   if (offset.IsAuto() && layout_object) {
@@ -1303,7 +1319,6 @@ CSSValue* ComputedStyleUtils::ValueForFont(const ComputedStyle& style) {
   }
 
   FontDescription::Kerning kerning = style.GetFontDescription().GetKerning();
-  float size_adjust = style.GetFontDescription().SizeAdjust();
   FontDescription::FontVariantPosition variant_position =
       style.GetFontDescription().VariantPosition();
   OpticalSizing optical_sizing = style.GetFontDescription().FontOpticalSizing();
@@ -1311,7 +1326,7 @@ CSSValue* ComputedStyleUtils::ValueForFont(const ComputedStyle& style) {
   if (kerning != FontDescription::kAutoKerning ||
       optical_sizing != kAutoOpticalSizing ||
       (RuntimeEnabledFeatures::CSSFontSizeAdjustEnabled() &&
-       size_adjust != -1) ||
+       style.GetFontDescription().HasSizeAdjust()) ||
       (RuntimeEnabledFeatures::FontVariantPositionEnabled() &&
        variant_position != FontDescription::kNormalVariantPosition)) {
     return nullptr;
@@ -2418,15 +2433,15 @@ CSSValue* ComputedStyleUtils::ValueForAnimationTimeline(
   }
   DCHECK(timeline.IsScroll());
   const StyleTimeline::ScrollData& scroll_data = timeline.GetScroll();
-  CSSValue* axis = scroll_data.HasDefaultAxis()
-                       ? nullptr
-                       : CSSIdentifierValue::Create(scroll_data.GetAxis());
   CSSValue* scroller =
       scroll_data.HasDefaultScroller()
           ? nullptr
           : CSSIdentifierValue::Create(scroll_data.GetScroller());
+  CSSValue* axis = scroll_data.HasDefaultAxis()
+                       ? nullptr
+                       : CSSIdentifierValue::Create(scroll_data.GetAxis());
 
-  return MakeGarbageCollected<cssvalue::CSSScrollValue>(axis, scroller);
+  return MakeGarbageCollected<cssvalue::CSSScrollValue>(scroller, axis);
 }
 
 CSSValue* ComputedStyleUtils::ValueForAnimationTimelineList(
@@ -2440,11 +2455,15 @@ CSSValue* ComputedStyleUtils::ValueForAnimationTimelineList(
 
 CSSValue* ComputedStyleUtils::SingleValueForTimelineShorthand(
     const ScopedCSSName* name,
-    TimelineAxis axis) {
+    TimelineAxis axis,
+    TimelineAttachment attachment) {
   CSSValueList* list = CSSValueList::CreateSpaceSeparated();
   list->Append(*ValueForCustomIdentOrNone(name));
   if (axis != TimelineAxis::kBlock) {
     list->Append(*CSSIdentifierValue::Create(axis));
+  }
+  if (attachment != TimelineAttachment::kLocal) {
+    list->Append(*CSSIdentifierValue::Create(attachment));
   }
   return list;
 }

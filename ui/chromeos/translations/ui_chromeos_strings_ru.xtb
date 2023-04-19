@@ -30,7 +30,7 @@
 <translation id="1221555006497674479">Заканчивается место на общем диске. Свободное пространство: <ph name="REMAINING_PERCENTAGE" /> % от <ph name="TOTAL_SPACE" />.</translation>
 <translation id="1243314992276662751">Загрузить</translation>
 <translation id="1249250836236328755">Жанр</translation>
-<translation id="1254593899333212300">Прямое подключение к Интернету</translation>
+<translation id="1254593899333212300">Прямое подключение к интернету</translation>
 <translation id="1272293450992660632">PIN-коды не совпадают.</translation>
 <translation id="1280820357415527819">Поиск мобильных сетей...</translation>
 <translation id="1293556467332435079">Файлы</translation>
@@ -159,6 +159,7 @@
 <translation id="2304820083631266885">Планета</translation>
 <translation id="2305020378527873881">Том <ph name="VOLUME_NAME" /> извлечен.</translation>
 <translation id="2307462900900812319">Настройка сети</translation>
+<translation id="2312704192806647271">{COUNT,plural, =1{Расширение со следующим идентификатором не найдено: <ph name="BEGIN_LIST" /><ph name="END_LIST" /> Обратитесь к администратору.}one{Расширения со следующими идентификаторами не найдены: <ph name="BEGIN_LIST" /><ph name="END_LIST" /> Обратитесь к администратору.}few{Расширения со следующими идентификаторами не найдены: <ph name="BEGIN_LIST" /><ph name="END_LIST" /> Обратитесь к администратору.}many{Расширения со следующими идентификаторами не найдены: <ph name="BEGIN_LIST" /><ph name="END_LIST" /> Обратитесь к администратору.}other{Расширения со следующими идентификаторами не найдены: <ph name="BEGIN_LIST" /><ph name="END_LIST" /> Обратитесь к администратору.}}</translation>
 <translation id="2325650632570794183">Этот тип файла не поддерживается. Зайдите в Интернет-магазин Chrome, чтобы найти приложение, с помощью которого его можно открыть.</translation>
 <translation id="2326539130272988168">Болгарский</translation>
 <translation id="2337715497728194187">Поделиться с Bruschetta</translation>
@@ -274,6 +275,7 @@
 <translation id="3290356915286466215">Не защищена</translation>
 <translation id="3291218047831493686">Чтобы изменить настройки блокировки SIM-карты, подключитесь к этой сети</translation>
 <translation id="3293023191599135697">Сети WEP не поддерживаются</translation>
+<translation id="3295006446256079333">В этой области</translation>
 <translation id="3295357220137379386">Устройство занято.</translation>
 <translation id="3296763833017966289">Грузинский</translation>
 <translation id="3307875152560779385">Украинский</translation>

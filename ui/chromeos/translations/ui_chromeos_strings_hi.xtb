@@ -25,7 +25,7 @@
 <translation id="1190144681599273207">इस फ़ाइल को लाने में मोबाइल डेटा का करीब <ph name="FILE_SIZE" /> उपयोग होगा.</translation>
 <translation id="1194390763418645112">फ़ाइल का ऐक्सेस <ph name="RESTRICTED_DESTINATIONS" /> ने दिया है</translation>
 <translation id="1201402288615127009">अगला</translation>
-<translation id="1209796539517632982">स्वचालित नाम सर्वर</translation>
+<translation id="1209796539517632982">ऑटोमैटिक (अपने-आप कॉन्फ़िगर होने वाला) नेम सर्वर</translation>
 <translation id="1210831758834677569">लाओ</translation>
 <translation id="1221555006497674479">आपके <ph name="TOTAL_SPACE" /> की शेयर की गई ड्राइव में सिर्फ़ <ph name="REMAINING_PERCENTAGE" />% स्टोरेज बचा है.</translation>
 <translation id="1243314992276662751">अपलोड करें</translation>
@@ -83,7 +83,7 @@
 <translation id="1715848075824334077">व्यक्ति साइकल चला रहा है</translation>
 <translation id="1722487484194605434"><ph name="NUMBER_OF_ITEMS" /> आइटम ज़िप किए जा रहे हैं...</translation>
 <translation id="1722687688096767818">प्रोफ़ाइल जोड़ी जा रही है...</translation>
-<translation id="1726100011689679555">नाम सर्वर</translation>
+<translation id="1726100011689679555">नेम सर्वर</translation>
 <translation id="1727562178154619254">सिंक किया जा सकता है</translation>
 <translation id="1729953886957086472">जर्मन (जर्मनी)</translation>
 <translation id="1730235522912993863">चाइनीज़ शांग्जी</translation>
@@ -159,6 +159,7 @@
 <translation id="2304820083631266885">ग्रह</translation>
 <translation id="2305020378527873881"><ph name="VOLUME_NAME" /> को निकाल लिया गया है.</translation>
 <translation id="2307462900900812319">नेटवर्क कॉन्फ़िगर करें</translation>
+<translation id="2312704192806647271">{COUNT,plural, =1{<ph name="BEGIN_LIST" /><ph name="END_LIST" /> आईडी वाला एक्सटेंशन नहीं मिला. अपने एडमिन से संपर्क करें.}one{<ph name="BEGIN_LIST" /><ph name="END_LIST" /> आईडी वाला एक्सटेंशन नहीं मिला. अपने एडमिन से संपर्क करें.}other{<ph name="BEGIN_LIST" /><ph name="END_LIST" /> आईडी वाले एक्सटेंशन नहीं मिले. अपने एडमिन से संपर्क करें.}}</translation>
 <translation id="2325650632570794183">इस तरह की फ़ाइल नहीं खुल सकती है. वैसा ऐप्लिकेशन जिसमें ऐसी फ़ाइल खुल सके, उसे ढूंढने के लिए कृपया 'Chrome वेब स्टोर' पर जाएं.</translation>
 <translation id="2326539130272988168">बुल्गेरियन</translation>
 <translation id="2337715497728194187">Bruschetta के साथ शेयर करें</translation>
@@ -274,6 +275,7 @@
 <translation id="3290356915286466215">असुरक्षित</translation>
 <translation id="3291218047831493686">सिम लॉक सेटिंग में बदलाव करने के लिए इस नेटवर्क से कनेक्ट करें</translation>
 <translation id="3293023191599135697">WEP नेटवर्क से कनेक्ट नहीं किया जा सका</translation>
+<translation id="3295006446256079333">यह वॉल्यूम</translation>
 <translation id="3295357220137379386">डिवाइस व्यस्त है</translation>
 <translation id="3296763833017966289">जॉर्जियाई</translation>
 <translation id="3307875152560779385">यूक्रेनियन</translation>
@@ -422,7 +424,7 @@
 <translation id="4477219268485577442">बुल्गारियाई फ़ोनेटिक</translation>
 <translation id="4508265954913339219">सक्रियण विफल</translation>
 <translation id="4509667233588080747">वर्कमैन इंटरनैशनल कीबोर्ड के साथ अंग्रेज़ी (यूएस)</translation>
-<translation id="4522570452068850558">विवरण</translation>
+<translation id="4522570452068850558">ब्यौरा</translation>
 <translation id="4527800702232535228">यह फ़ोल्डर Parallels Desktop के साथ शेयर किया गया है</translation>
 <translation id="4552678318981539154">ज़्यादा स्टोरेज खरीदें</translation>
 <translation id="4552759165874948005"><ph name="NETWORK_TYPE" /> नेटवर्क, सिग्नल की क्षमता <ph name="SIGNAL_STRENGTH" />%</translation>

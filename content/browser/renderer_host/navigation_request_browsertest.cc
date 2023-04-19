@@ -738,7 +738,7 @@ IN_PROC_BROWSER_TEST_F(NavigationRequestBrowserTest,
           shell()->web_contents()->GetPrimaryMainFrame());
   EXPECT_TRUE(document_data);
   blink::RuntimeFeatureStateReadContext read_context =
-      document_data->runtime_feature_read_context();
+      document_data->runtime_feature_state_read_context();
   EXPECT_EQ(expected_feature_overrides, read_context.GetFeatureOverrides());
 }
 
@@ -784,7 +784,7 @@ IN_PROC_BROWSER_TEST_F(NavigationRequestBrowserTest,
           shell()->web_contents()->GetPrimaryMainFrame());
   EXPECT_TRUE(document_data);
   blink::RuntimeFeatureStateReadContext read_context =
-      document_data->runtime_feature_read_context();
+      document_data->runtime_feature_state_read_context();
   EXPECT_EQ(expected_feature_overrides, read_context.GetFeatureOverrides());
 }
 
@@ -829,7 +829,7 @@ IN_PROC_BROWSER_TEST_F(NavigationRequestBrowserTest,
           shell()->web_contents()->GetPrimaryMainFrame());
   EXPECT_TRUE(document_data);
   blink::RuntimeFeatureStateReadContext read_context =
-      document_data->runtime_feature_read_context();
+      document_data->runtime_feature_state_read_context();
   EXPECT_TRUE(read_context.GetFeatureOverrides().empty());
 }
 
@@ -3758,6 +3758,12 @@ IN_PROC_BROWSER_TEST_F(NavigationRequestBrowserTest,
   // The process should also be considered used at this point.
   EXPECT_FALSE(
       shell()->web_contents()->GetPrimaryMainFrame()->GetProcess()->IsUnused());
+
+  // Ensure the navigation finishes before we restore the ContentBrowserClient
+  // which would turn strict site isolation back on.  Otherwise, the navigation
+  // commit may fail citadel protection checks at test teardown.
+  EXPECT_TRUE(manager.WaitForNavigationFinished());
+  EXPECT_TRUE(manager.was_successful());
 }
 
 // Check that a subframe can load an error page with an about:srcdoc URL, and

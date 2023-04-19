@@ -96,12 +96,6 @@ InputType::ValueMode RangeInputType::GetValueMode() const {
 
 void RangeInputType::CountUsage() {
   CountUsageIfVisible(WebFeature::kInputTypeRange);
-  if (const ComputedStyle* style = GetElement().GetComputedStyle()) {
-    if (style->EffectiveAppearance() == kSliderVerticalPart) {
-      UseCounter::Count(GetElement().GetDocument(),
-                        WebFeature::kInputTypeRangeVerticalAppearance);
-    }
-  }
 }
 
 const AtomicString& RangeInputType::FormControlType() const {
@@ -253,8 +247,7 @@ void RangeInputType::CreateShadowSubtree() {
   GetElement().UserAgentShadowRoot()->AppendChild(container);
 }
 
-LayoutObject* RangeInputType::CreateLayoutObject(const ComputedStyle& style,
-                                                 LegacyLayout legacy) const {
+LayoutObject* RangeInputType::CreateLayoutObject(const ComputedStyle&) const {
   // TODO(crbug.com/1131352): input[type=range] should not use flexbox.
   return MakeGarbageCollected<LayoutNGFlexibleBox>(&GetElement());
 }

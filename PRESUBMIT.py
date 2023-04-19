@@ -50,6 +50,8 @@ _EXCLUDED_PATHS = (
     r"tools/perf/page_sets/maps_perf_test.*",
     # Test pages for WebRTC telemetry tests.
     r"tools/perf/page_sets/webrtc_cases.*",
+    # Test file compared with generated output.
+    r"tools/polymer/tests/html_to_wrapper/.*.html.ts$",
 )
 
 _EXCLUDED_SET_NO_PARENT_PATHS = (
@@ -456,7 +458,7 @@ _BANNED_IOS_OBJC_FUNCTIONS = (
       ),
       True,
       excluded_paths=(
-        'ios/chrome/browser/ui/icons/symbol_helpers.mm',
+        'ios/chrome/browser/shared/ui/symbols/symbol_helpers.mm',
         'ios/chrome/search_widget_extension/',
       ),
     ),
@@ -932,6 +934,7 @@ _BANNED_CPP_FUNCTIONS : Sequence[BanRule] = (
       [
         # Needed to use liburlpattern API.
         r'third_party/blink/renderer/core/url_pattern/.*',
+        r'third_party/blink/renderer/modules/manifest/manifest_parser\.cc',
         # Not an error in third_party folders.
         _THIRD_PARTY_EXCEPT_BLINK
       ],
@@ -946,21 +949,42 @@ _BANNED_CPP_FUNCTIONS : Sequence[BanRule] = (
       [_THIRD_PARTY_EXCEPT_BLINK],  # Not an error in third_party folders.
     ),
     BanRule(
-      r'/\b(absl|std)::(u16)?string_view\b',
+      r'/\babsl::string_view\b',
       (
-        'absl::string_view is banned and std::[u16]string_view are not allowed',
-        ' yet (https://crbug.com/691162). Use base::StringPiece[16] instead.',
+        'absl::string_view is a legacy spelling of std::string_view, which is ',
+        'not allowed yet (https://crbug.com/691162). Use base::StringPiece ',
+        'instead, unless std::string_view is needed to use with an external ',
+        'API.',
+      ),
+      True,
+      [_THIRD_PARTY_EXCEPT_BLINK],  # Don't warn in third_party folders.
+    ),
+    BanRule(
+      r'/\bstd::(u16)?string_view\b',
+      (
+        'std::[u16]string_view is not yet allowed (crbug.com/691162). Use ',
+        'base::StringPiece[16] instead, unless std::[u16]string_view is ',
+        'needed to use an external API.',
       ),
       True,
       [
+        # Needed to implement and test std::string_view interoperability.
+        r'base/strings/string_piece.*',
         # Needed to use liburlpattern API.
         r'third_party/blink/renderer/core/url_pattern/.*',
+        r'third_party/blink/renderer/modules/manifest/manifest_parser\.cc',
         # Needed to use QUICHE API.
         r'net/quic/.*',
         r'net/spdy/.*',
         r'net/test/embedded_test_server/.*',
         r'net/third_party/quiche/.*',
         r'services/network/web_transport\.cc',
+        # This code is in the process of being extracted into an external
+        # library, where //base will be unavailable.
+        r'net/cert/pki/.*',
+        r'net/der/.*',
+        # Needed to use APIs from the above.
+        r'net/cert/.*',
         # Not an error in third_party folders.
         _THIRD_PARTY_EXCEPT_BLINK
       ],
@@ -1122,15 +1146,6 @@ _BANNED_CPP_FUNCTIONS : Sequence[BanRule] = (
       (
         'std::aligned_alloc() is not yet allowed (crbug.com/1412818). Use ',
         'base::AlignedAlloc() instead.',
-      ),
-      True,
-      [_THIRD_PARTY_EXCEPT_BLINK],  # Don't warn in third_party folders.
-    ),
-    BanRule(
-      r'/\bstd::(u16)?string_view\b',
-      (
-        'std::[u16]string_view is not yet allowed (crbug.com/691162). Use ',
-        'base::StringPiece[16] instead.',
       ),
       True,
       [_THIRD_PARTY_EXCEPT_BLINK],  # Don't warn in third_party folders.
@@ -1540,6 +1555,42 @@ _BANNED_CPP_FUNCTIONS : Sequence[BanRule] = (
       False,
       [_THIRD_PARTY_EXCEPT_BLINK],  # Not an error in third_party folders.
     ),
+    BanRule(
+      r'CrossThreadPersistent<',
+      (
+        'Do not use blink::CrossThreadPersistent, but '
+        'blink::CrossThreadHandle. It is harder to mis-use.',
+        'More info: '
+        'https://docs.google.com/document/d/1GIT0ysdQ84sGhIo1r9EscF_fFt93lmNVM_q4vvHj2FQ/edit#heading=h.3e4d6y61tgs',
+        'Please contact platform-architecture-dev@ before adding new instances.'
+      ),
+      False,
+      []
+    ),
+    BanRule(
+      r'CrossThreadWeakPersistent<',
+      (
+        'Do not use blink::CrossThreadWeakPersistent, but '
+        'blink::CrossThreadWeakHandle. It is harder to mis-use.',
+        'More info: '
+        'https://docs.google.com/document/d/1GIT0ysdQ84sGhIo1r9EscF_fFt93lmNVM_q4vvHj2FQ/edit#heading=h.3e4d6y61tgs',
+        'Please contact platform-architecture-dev@ before adding new instances.'
+      ),
+      False,
+      []
+    ),
+    BanRule(
+      r'objc/objc.h',
+      (
+        'Do not include <objc/objc.h>. It defines away ARC lifetime '
+        'annotations, and is thus dangerous.',
+        'Please use the pimpl pattern; search for `ObjCStorage` for examples.',
+        'For further reading on how to safely mix C++ and Obj-C, see',
+        'https://chromium.googlesource.com/chromium/src/+/main/docs/mac/mixing_cpp_and_objc.md'
+      ),
+      True,
+      []
+    ),
 )
 
 _BANNED_MOJOM_PATTERNS : Sequence[BanRule] = (
@@ -1612,6 +1663,7 @@ _GENERIC_PYDEPS_FILES = [
     'build/android/gyp/allot_native_libraries.pydeps',
     'build/android/gyp/apkbuilder.pydeps',
     'build/android/gyp/assert_static_initializers.pydeps',
+    'build/android/gyp/binary_baseline_profile.pydeps',
     'build/android/gyp/bytecode_processor.pydeps',
     'build/android/gyp/bytecode_rewriter.pydeps',
     'build/android/gyp/check_flag_expectations.pydeps',

@@ -137,6 +137,16 @@ interface DriveFs {
   // Attempts to cancel an in progress upload. `path` must be made absolute
   // from the drive mount point.
   CancelUploadByPath(mojo_base.mojom.FilePath path);
+
+  // Enable Docs offline explicitly.
+  SetDocsOfflineEnabled(bool enabled) => (FileError error);
+
+  // Returns the total space used by files that have been pinned.
+  GetOfflineFilesSpaceUsage() => (FileError error, int64 space_used);
+
+  // Unpins all currently pinned items and force evicts them from the cache.
+  // NOTE: Force eviction does not work for hosted documents.
+  ClearOfflineFiles() => (FileError error);
 };
 
 // Implemented by Chrome, used from DriveFS.
@@ -352,7 +362,7 @@ struct DialogReason {
   mojo_base.mojom.FilePath path;
 };
 
-// Next MinVersion: 8
+// Next MinVersion: 9
 struct FileMetadata {
   [Extensible] enum Type {
     // A regular file.
@@ -364,6 +374,7 @@ struct FileMetadata {
     // A directory.
     kDirectory,
   };
+
   Type type;
 
   int64 size;
@@ -423,6 +434,9 @@ struct FileMetadata {
   // Populated if the item is a shortcut and contains information about the
   // target of the shortcut.
   [MinVersion=7] ShortcutDetails? shortcut_details;
+
+  // Whether the item is in the trash bin.
+  [MinVersion=8] bool trashed = false;
 };
 
 // Details relating to the target item that a shortcut refers to.

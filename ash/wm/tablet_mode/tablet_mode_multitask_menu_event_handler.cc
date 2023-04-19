@@ -25,10 +25,23 @@ namespace {
 // The dimensions of the region that can activate the multitask menu.
 constexpr gfx::SizeF kHitRegionSize(200.f, 100.f);
 
+// Returns true if `window` can show the menu and `screen_location` is in the
+// menu hit bounds.
+bool HitTestRect(aura::Window* window, const gfx::PointF& screen_location) {
+  if (!TabletModeMultitaskMenuEventHandler::CanShowMenu(window)) {
+    return false;
+  }
+  const gfx::RectF window_bounds(window->GetBoundsInScreen());
+  gfx::RectF hit_region(window_bounds);
+  hit_region.ClampToCenteredSize(kHitRegionSize);
+  hit_region.set_y(window_bounds.y());
+  return hit_region.Contains(screen_location);
+}
+
 }  // namespace
 
-TabletModeMultitaskMenuEventHandler::TabletModeMultitaskMenuEventHandler() {
-  multitask_cue_ = std::make_unique<TabletModeMultitaskCue>();
+TabletModeMultitaskMenuEventHandler::TabletModeMultitaskMenuEventHandler()
+    : multitask_cue_(std::make_unique<TabletModeMultitaskCue>()) {
   Shell::Get()->AddPreTargetHandler(this);
 }
 
@@ -43,8 +56,8 @@ TabletModeMultitaskMenuEventHandler::~TabletModeMultitaskMenuEventHandler() {
 // static
 bool TabletModeMultitaskMenuEventHandler::CanShowMenu(aura::Window* window) {
   auto* window_state = WindowState::Get(window);
-  return !window_state->IsFloated() && window_state->CanMaximize() &&
-         window_state->CanResize();
+  return window_state->CanMaximize() && window_state->CanResize() &&
+         !window_state->IsFloated() && !window_state->IsPinned();
 }
 
 void TabletModeMultitaskMenuEventHandler::ShowMultitaskMenu(
@@ -60,28 +73,13 @@ void TabletModeMultitaskMenuEventHandler::ResetMultitaskMenu() {
 void TabletModeMultitaskMenuEventHandler::OnGestureEvent(
     ui::GestureEvent* event) {
   aura::Window* active_window = window_util::GetActiveWindow();
-  auto* window_state = WindowState::Get(active_window);
-  // No-op if there is no multitask menu and no active window that can open the
-  // menu. If the menu is open, the checks in the second condition do not apply
-  // since the menu is the active window.
-  if (!multitask_menu_ && (!active_window || window_state->IsFloated() ||
-                           !window_state->CanMaximize())) {
+  if (!active_window) {
     return;
   }
 
   aura::Window* target = static_cast<aura::Window*>(event->target());
   gfx::PointF screen_location = event->location_f();
   wm::ConvertPointToScreen(target, &screen_location);
-
-  // If the menu is closed, only handle events inside the target area that might
-  // open the menu.
-  const gfx::RectF window_bounds(active_window->GetBoundsInScreen());
-  gfx::RectF hit_region(window_bounds);
-  hit_region.ClampToCenteredSize(kHitRegionSize);
-  hit_region.set_y(window_bounds.y());
-  if (!multitask_menu_ && !hit_region.Contains(screen_location)) {
-    return;
-  }
 
   // Save the window coordinates to pass to the menu.
   gfx::PointF window_location = event->location_f();
@@ -94,13 +92,13 @@ void TabletModeMultitaskMenuEventHandler::OnGestureEvent(
           std::fabs(details.scroll_x_hint())) {
         return;
       }
-      if (is_drag_active_) {
-        return;
-      }
-      if (details.scroll_y_hint() > 0) {
-        // If the menu hasn't been created yet and scroll down begins inside the
-        // target area, start a drag.
-        MaybeCreateMultitaskMenu(active_window);
+      is_drag_active_ = false;
+      if (details.scroll_y_hint() > 0 &&
+          HitTestRect(active_window, screen_location)) {
+        // We may need to recreate `multitask_menu_` on the new active window.
+        multitask_menu_ =
+            std::make_unique<TabletModeMultitaskMenu>(this, active_window);
+        multitask_cue_->DismissCue(/*menu_opened=*/true);
         multitask_menu_->BeginDrag(window_location.y(), /*down=*/true);
         event->SetHandled();
         is_drag_active_ = true;
@@ -116,20 +114,21 @@ void TabletModeMultitaskMenuEventHandler::OnGestureEvent(
       }
       break;
     case ui::ET_GESTURE_SCROLL_UPDATE:
-      if (is_drag_active_) {
+      if (is_drag_active_ && multitask_menu_) {
         multitask_menu_->UpdateDrag(window_location.y(),
                                     /*down=*/details.scroll_y() > 0);
         event->SetHandled();
       }
       break;
     case ui::ET_GESTURE_SCROLL_END:
+    case ui::ET_GESTURE_END:
       // If an unsupported gesture is sent, make sure we reset `is_drag_active_`
       // to stop consuming events.
-      if (is_drag_active_) {
+      if (is_drag_active_ && multitask_menu_) {
         multitask_menu_->EndDrag();
         event->SetHandled();
-        is_drag_active_ = false;
       }
+      is_drag_active_ = false;
       break;
     case ui::ET_SCROLL_FLING_START:
       if (!is_drag_active_) {
@@ -141,25 +140,14 @@ void TabletModeMultitaskMenuEventHandler::OnGestureEvent(
       MaybeCreateMultitaskMenu(active_window);
       multitask_menu_->Animate(details.velocity_y() > 0);
       event->SetHandled();
-      is_drag_active_ = false;
       break;
     default:
+      if (is_drag_active_ && multitask_menu_) {
+        // Do not reset `is_drag_active_` to handle until the gesture ends.
+        event->SetHandled();
+      }
       break;
   }
-}
-
-bool TabletModeMultitaskMenuEventHandler::CanProcessEvent(
-    aura::Window* window) const {
-  if (!window) {
-    return false;
-  }
-
-  // If the multitask menu is shown, we can always drag the menu.
-  if (multitask_menu_) {
-    return true;
-  }
-
-  return CanShowMenu(window);
 }
 
 void TabletModeMultitaskMenuEventHandler::MaybeCreateMultitaskMenu(

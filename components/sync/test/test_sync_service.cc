@@ -136,11 +136,11 @@ void TestSyncService::FireSyncCycleCompleted() {
     observer.OnSyncCycleCompleted(this);
 }
 
-SyncUserSettings* TestSyncService::GetUserSettings() {
+TestSyncUserSettings* TestSyncService::GetUserSettings() {
   return &user_settings_;
 }
 
-const SyncUserSettings* TestSyncService::GetUserSettings() const {
+const TestSyncUserSettings* TestSyncService::GetUserSettings() const {
   return &user_settings_;
 }
 
@@ -203,6 +203,14 @@ ModelTypeSet TestSyncService::GetPreferredDataTypes() const {
 
 ModelTypeSet TestSyncService::GetActiveDataTypes() const {
   if (transport_state_ != TransportState::ACTIVE) {
+    return ModelTypeSet();
+  }
+  return Difference(GetPreferredDataTypes(), failed_data_types_);
+}
+
+ModelTypeSet TestSyncService::GetTypesWithPendingDownloadForInitialSync()
+    const {
+  if (transport_state_ != TransportState::CONFIGURING) {
     return ModelTypeSet();
   }
   return Difference(GetPreferredDataTypes(), failed_data_types_);

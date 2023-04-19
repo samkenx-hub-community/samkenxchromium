@@ -16,7 +16,6 @@
 #include "components/attribution_reporting/suitable_origin.h"
 #include "content/browser/attribution_reporting/attribution_beacon_id.h"
 #include "content/browser/attribution_reporting/attribution_data_host_manager.h"
-#include "content/browser/attribution_reporting/attribution_features.h"
 #include "content/browser/attribution_reporting/attribution_input_event.h"
 #include "content/browser/attribution_reporting/attribution_manager.h"
 #include "content/browser/attribution_reporting/attribution_test_utils.h"
@@ -26,6 +25,7 @@
 #include "content/browser/web_contents/web_contents_impl.h"
 #include "content/public/browser/browser_context.h"
 #include "content/public/browser/global_routing_id.h"
+#include "content/public/common/content_features.h"
 #include "content/public/test/test_renderer_host.h"
 #include "content/public/test/test_utils.h"
 #include "content/test/navigation_simulator_impl.h"
@@ -49,6 +49,7 @@
 
 namespace content {
 
+// Friended helper class to access private `receivers_` for test.
 class AttributionHostTestPeer {
  public:
   static void SetCurrentTargetFrameForTesting(
@@ -113,11 +114,6 @@ class AttributionHostTest : public RenderViewHostTestHarness {
     return AttributionHost::FromWebContents(web_contents());
   }
 
-  void SetCurrentTargetFrameForTesting(RenderFrameHost* render_frame_host) {
-    AttributionHostTestPeer::SetCurrentTargetFrameForTesting(attribution_host(),
-                                                             render_frame_host);
-  }
-
   void ClearAttributionManager() {
     mock_data_host_manager_ = nullptr;
     OverrideAttributionManager(nullptr);
@@ -139,6 +135,24 @@ class AttributionHostTest : public RenderViewHostTestHarness {
   base::test::ScopedFeatureList feature_list_;
 };
 
+class ScopedAttributionHostTargetFrame {
+ public:
+  ScopedAttributionHostTargetFrame(AttributionHost* attribution_host,
+                                   RenderFrameHost* render_frame_host)
+      : attribution_host_(attribution_host) {
+    AttributionHostTestPeer::SetCurrentTargetFrameForTesting(attribution_host_,
+                                                             render_frame_host);
+  }
+
+  ~ScopedAttributionHostTargetFrame() {
+    AttributionHostTestPeer::SetCurrentTargetFrameForTesting(attribution_host_,
+                                                             nullptr);
+  }
+
+ private:
+  const raw_ptr<AttributionHost> attribution_host_;
+};
+
 TEST_F(AttributionHostTest, NavigationWithNoImpression_Ignored) {
   EXPECT_CALL(*mock_data_host_manager(), NotifyNavigationStartedForDataHost)
       .Times(0);
@@ -157,7 +171,8 @@ TEST_F(AttributionHostTest, ValidAttributionSrc_ForwardedToManager) {
                   impression.attribution_src_token,
                   *SuitableOrigin::Deserialize("https://secure_impression.com"),
                   impression.nav_type,
-                  /*is_within_fenced_frame=*/false, main_rfh()->GetGlobalId()));
+                  /*is_within_fenced_frame=*/false, main_rfh()->GetGlobalId(),
+                  /*navigation_id=*/_));
 
   contents()->NavigateAndCommit(GURL("https://secure_impression.com"));
   auto navigation = NavigationSimulatorImpl::CreateRendererInitiated(
@@ -307,14 +322,14 @@ INSTANTIATE_TEST_SUITE_P(
     ::testing::ValuesIn(kOriginTrustworthyChecksTestCases));
 
 TEST_F(AttributionHostTest, DataHost_RegisteredWithContext) {
-  EXPECT_CALL(
-      *mock_data_host_manager(),
-      RegisterDataHost(_, *SuitableOrigin::Deserialize("https://top.example"),
-                       /*is_within_fenced_frame=*/false,
-                       RegistrationType::kSource, main_rfh()->GetGlobalId()));
+  EXPECT_CALL(*mock_data_host_manager(),
+              RegisterDataHost(
+                  _, *SuitableOrigin::Deserialize("https://top.example"),
+                  /*is_within_fenced_frame=*/false, RegistrationType::kSource,
+                  main_rfh()->GetGlobalId(), /*last_navigation_id=*/_));
 
   contents()->NavigateAndCommit(GURL("https://top.example"));
-  SetCurrentTargetFrameForTesting(main_rfh());
+  ScopedAttributionHostTargetFrame frame_scope(attribution_host(), main_rfh());
 
   // Create a fake dispatch context to trigger a bad message in.
   mojo::FakeMessageDispatchContext fake_dispatch_context;
@@ -333,7 +348,7 @@ TEST_F(AttributionHostTest, DataHost_RegisteredWithContext) {
 // crbug.com/1378749.
 TEST_F(AttributionHostTest, DISABLED_DataHostOnInsecurePage_BadMessage) {
   contents()->NavigateAndCommit(GURL("http://top.example"));
-  SetCurrentTargetFrameForTesting(main_rfh());
+  ScopedAttributionHostTargetFrame frame_scope(attribution_host(), main_rfh());
 
   // Create a fake dispatch context to trigger a bad message in.
   mojo::FakeMessageDispatchContext fake_dispatch_context;
@@ -353,7 +368,7 @@ TEST_F(AttributionHostTest, DISABLED_DataHostOnInsecurePage_BadMessage) {
 TEST_F(AttributionHostTest,
        DISABLED_NavigationDataHostOnInsecurePage_BadMessage) {
   contents()->NavigateAndCommit(GURL("http://top.example"));
-  SetCurrentTargetFrameForTesting(main_rfh());
+  ScopedAttributionHostTargetFrame frame_scope(attribution_host(), main_rfh());
 
   // Create a fake dispatch context to trigger a bad message in.
   mojo::FakeMessageDispatchContext fake_dispatch_context;
@@ -375,7 +390,7 @@ TEST_F(AttributionHostTest, DuplicateAttributionSrcToken_BadMessage) {
       .WillByDefault(Return(false));
 
   contents()->NavigateAndCommit(GURL("https://top.example"));
-  SetCurrentTargetFrameForTesting(main_rfh());
+  ScopedAttributionHostTargetFrame frame_scope(attribution_host(), main_rfh());
 
   // Create a fake dispatch context to trigger a bad message in.
   mojo::FakeMessageDispatchContext fake_dispatch_context;
@@ -393,11 +408,11 @@ TEST_F(AttributionHostTest, DuplicateAttributionSrcToken_BadMessage) {
 }
 
 TEST_F(AttributionHostTest, DataHostInSubframe_ContextIsOutermostFrame) {
-  EXPECT_CALL(
-      *mock_data_host_manager(),
-      RegisterDataHost(_, *SuitableOrigin::Deserialize("https://top.example"),
-                       /*is_within_fenced_frame=*/false,
-                       RegistrationType::kSource, main_rfh()->GetGlobalId()));
+  EXPECT_CALL(*mock_data_host_manager(),
+              RegisterDataHost(
+                  _, *SuitableOrigin::Deserialize("https://top.example"),
+                  /*is_within_fenced_frame=*/false, RegistrationType::kSource,
+                  main_rfh()->GetGlobalId(), /*last_navigation_id=*/_));
 
   contents()->NavigateAndCommit(GURL("https://top.example"));
 
@@ -406,7 +421,7 @@ TEST_F(AttributionHostTest, DataHostInSubframe_ContextIsOutermostFrame) {
   content::RenderFrameHost* subframe = rfh_tester->AppendChild("subframe");
   subframe = NavigationSimulatorImpl::NavigateAndCommitFromDocument(
       GURL("https://subframe.example"), subframe);
-  SetCurrentTargetFrameForTesting(subframe);
+  ScopedAttributionHostTargetFrame frame_scope(attribution_host(), subframe);
 
   // Create a fake dispatch context to trigger a bad message in.
   mojo::FakeMessageDispatchContext fake_dispatch_context;
@@ -432,7 +447,7 @@ TEST_F(AttributionHostTest,
   content::RenderFrameHost* subframe = rfh_tester->AppendChild("subframe");
   subframe = NavigationSimulatorImpl::NavigateAndCommitFromDocument(
       GURL("https://subframe.example"), subframe);
-  SetCurrentTargetFrameForTesting(subframe);
+  ScopedAttributionHostTargetFrame frame_scope(attribution_host(), subframe);
 
   // Create a fake dispatch context to trigger a bad message in.
   mojo::FakeMessageDispatchContext fake_dispatch_context;
@@ -449,11 +464,11 @@ TEST_F(AttributionHostTest,
 }
 
 TEST_F(AttributionHostTest, DataHost_RegisteredWithFencedFrame) {
-  EXPECT_CALL(
-      *mock_data_host_manager(),
-      RegisterDataHost(_, *SuitableOrigin::Deserialize("https://top.example"),
-                       /*is_within_fenced_frame=*/true,
-                       RegistrationType::kSource, main_rfh()->GetGlobalId()));
+  EXPECT_CALL(*mock_data_host_manager(),
+              RegisterDataHost(
+                  _, *SuitableOrigin::Deserialize("https://top.example"),
+                  /*is_within_fenced_frame=*/true, RegistrationType::kSource,
+                  main_rfh()->GetGlobalId(), /*last_navigation_id=*/_));
 
   contents()->NavigateAndCommit(GURL("https://top.example"));
   RenderFrameHost* fenced_frame =
@@ -463,7 +478,8 @@ TEST_F(AttributionHostTest, DataHost_RegisteredWithFencedFrame) {
       ->SetFencedFramePropertiesOpaqueAdsModeForTesting();
   fenced_frame = NavigationSimulatorImpl::NavigateAndCommitFromDocument(
       GURL("https://fencedframe.example"), fenced_frame);
-  SetCurrentTargetFrameForTesting(fenced_frame);
+  ScopedAttributionHostTargetFrame frame_scope(attribution_host(),
+                                               fenced_frame);
 
   // Create a fake dispatch context to trigger a bad message in.
   mojo::FakeMessageDispatchContext fake_dispatch_context;
@@ -502,7 +518,7 @@ TEST_F(AttributionHostTest, FeatureDisabled_FencedFrameReportingBeaconDropped) {
 TEST_F(AttributionHostTest, NotifyFencedFrameReportingBeaconStarted) {
   base::test::ScopedFeatureList scoped_feature_list;
   scoped_feature_list.InitAndEnableFeature(
-      kAttributionFencedFrameReportingBeacon);
+      features::kAttributionFencedFrameReportingBeacon);
 
   const struct {
     const char* source_origin;
@@ -546,7 +562,7 @@ TEST_F(AttributionHostTest, NotifyFencedFrameReportingBeaconStarted) {
 TEST_F(AttributionHostTest, FencedFrameReportingBeacon_FeaturePolicyChecked) {
   base::test::ScopedFeatureList scoped_feature_list;
   scoped_feature_list.InitAndEnableFeature(
-      kAttributionFencedFrameReportingBeacon);
+      features::kAttributionFencedFrameReportingBeacon);
 
   contents()->NavigateAndCommit(GURL("https://secure.com"));
 

@@ -46,6 +46,7 @@ const CountryLocaleMap& GetAllowedCountryToLocaleMap() {
     map[&kShoppingPDPMetricsRegionLaunched] = {{"us", {"en-us"}}};
     map[&ntp_features::kNtpChromeCartModule] = {{"us", {"en-us"}}};
     map[&kCommerceMerchantViewerRegionLaunched] = {{"us", {"en-us"}}};
+    map[&kCommercePriceTrackingRegionLaunched] = {{"us", {"en-us"}}};
 
     return map;
   }());
@@ -125,10 +126,6 @@ BASE_FEATURE(kCommerceAllowServerImages,
              "CommerceAllowServerImages",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
-BASE_FEATURE(kCommerceCoupons,
-             "CommerceCoupons",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-
 BASE_FEATURE(kCommerceMerchantViewer,
              "CommerceMerchantViewer",
              base::FEATURE_DISABLED_BY_DEFAULT);
@@ -145,6 +142,15 @@ BASE_FEATURE(kCommerceMerchantViewerRegionLaunched,
 BASE_FEATURE(kCommercePriceTracking,
              "CommercePriceTracking",
              base::FEATURE_DISABLED_BY_DEFAULT);
+#if BUILDFLAG(IS_ANDROID)
+BASE_FEATURE(kCommercePriceTrackingRegionLaunched,
+             "CommercePriceTrackingRegionLaunched",
+             base::FEATURE_ENABLED_BY_DEFAULT);
+#else
+BASE_FEATURE(kCommercePriceTrackingRegionLaunched,
+             "CommercePriceTrackingRegionLaunched",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+#endif  // BUILDFLAG(IS_ANDROID)
 
 const base::FeatureParam<bool> kDeleteAllMerchantsOnClearBrowsingHistory{
     &kCommerceMerchantViewer, "delete_all_merchants_on_clear_history", false};
@@ -313,7 +319,7 @@ const char kCodeBasedRuleDiscountCouponDeletionTimeParam[] =
 const base::FeatureParam<base::TimeDelta>
     kCodeBasedRuleDiscountCouponDeletionTime{
         &commerce::kCodeBasedRBD, kCodeBasedRuleDiscountCouponDeletionTimeParam,
-        base::Seconds(10)};
+        base::Seconds(6)};
 
 const char kRevertIconOnFailureParam[] =
     "shopping-list-revert-page-action-icon-on-failure";

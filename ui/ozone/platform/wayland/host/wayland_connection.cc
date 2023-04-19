@@ -615,6 +615,10 @@ const gfx::PointF WaylandConnection::MaybeConvertLocation(
   return converted;
 }
 
+bool WaylandConnection::ShouldUseOverlayDelegation() const {
+  return IsWaylandOverlayDelegationEnabled() && !overlay_delegation_disabled_;
+}
+
 // static
 void WaylandConnection::GlobalRemove(void* data,
                                      wl_registry* registry,

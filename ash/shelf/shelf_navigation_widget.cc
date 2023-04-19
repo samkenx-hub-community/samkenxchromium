@@ -180,7 +180,7 @@ class BackgroundLayerDelegate : public ui::LayerDelegate {
 
     views::HighlightBorder::PaintBorderToCanvas(
         canvas, *shelf_view_, gfx::Rect(layer_->size()), corner_radii,
-        views::HighlightBorder::Type::kHighlightBorder2, false);
+        views::HighlightBorder::Type::kHighlightBorder2);
   }
 
   void OnDeviceScaleFactorChanged(float old_device_scale_factor,
@@ -364,18 +364,13 @@ class ShelfNavigationWidget::Delegate : public views::AccessiblePaneView,
 };
 
 ShelfNavigationWidget::Delegate::Delegate(Shelf* shelf, ShelfView* shelf_view)
-    : opaque_background_(features::IsDarkLightModeEnabled()
-                             ? ui::LAYER_TEXTURED
-                             : ui::LAYER_SOLID_COLOR),
-      shelf_(shelf) {
+    : opaque_background_(ui::LAYER_TEXTURED), shelf_(shelf) {
   SetOwnedByWidget(true);
 
-  if (features::IsDarkLightModeEnabled()) {
-    background_delegate_ = std::make_unique<BackgroundLayerDelegate>(
-        &opaque_background_, shelf_view);
-    opaque_background_.set_delegate(background_delegate_.get());
-    opaque_background_.SetFillsBoundsOpaquely(false);
-  }
+  background_delegate_ = std::make_unique<BackgroundLayerDelegate>(
+      &opaque_background_, shelf_view);
+  opaque_background_.set_delegate(background_delegate_.get());
+  opaque_background_.SetFillsBoundsOpaquely(false);
 
   set_allow_deactivate_on_esc(true);
 

@@ -40,6 +40,7 @@
 #include "chrome/browser/web_applications/web_app_provider.h"
 #include "chrome/browser/web_applications/web_app_sync_bridge.h"
 #include "chrome/common/chrome_paths.h"
+#include "chrome/common/extensions/extension_constants.h"
 #include "chrome/common/pref_names.h"
 #include "chrome/common/webui_url_constants.h"
 #include "chrome/test/base/in_process_browser_test.h"
@@ -182,8 +183,8 @@ class FileHandlerDialogBrowserTest : public InProcessBrowserTest {
   // Create test office files and store in `files_` and create `num_tasks_` fake
   // web apps for all office file types.
   void SetUpTasksAndFiles() {
-    // Create `n` fake web apps for office files with the Doc extension and
-    // store the created `urls_` and `tasks_`.
+    // Create `num_tasks_` fake web apps for office files with the Doc extension
+    // and store the created `urls_` and `tasks_`.
     CreateFakeWebApps(
         profile(), &urls_, &tasks_,
         {kDocxFileExtension, kPptxFileExtension, kXlsxFileExtension},
@@ -403,11 +404,11 @@ IN_PROC_BROWSER_TEST_F(FileHandlerDialogBrowserTest, OpenFileTaskFromDialog) {
     dialog_init_complete = !observed_app_ids.empty();
   }
 
-// Check QuickOffice was not observed by the dialog.
+// Check QuickOffice was observed by the dialog as it should always be shown.
 #if BUILDFLAG(GOOGLE_CHROME_BRANDING)
   ASSERT_TRUE(file_manager::file_tasks::IsExtensionInstalled(
       profile(), extension_misc::kQuickOfficeComponentExtensionId));
-  ASSERT_LT(PositionInList(observed_app_ids,
+  ASSERT_GE(PositionInList(observed_app_ids,
                            extension_misc::kQuickOfficeComponentExtensionId),
             0);
 #endif  // BUILDFLAG(GOOGLE_CHROME_BRANDING)
@@ -562,7 +563,7 @@ class FixUpFlowBrowserTest : public InProcessBrowserTest {
   void AddFakeODFS() {
     auto fake_provider =
         ash::file_system_provider::FakeExtensionProvider::Create(
-            file_manager::file_tasks::kODFSExtensionId);
+            extension_misc::kODFSExtensionId);
     const auto kProviderId = fake_provider->GetId();
     auto* service = file_system_provider::Service::Get(profile());
     service->RegisterProvider(std::move(fake_provider));
@@ -852,17 +853,17 @@ class MoveConfirmationDialogBrowserTest : public InProcessBrowserTest {
   base::test::ScopedFeatureList feature_list_;
 };
 
-// Tests that the preference |kOfficeMoveConfirmationShown| is False before the
-// `kMoveConfirmationGoogleDrive` dialog and True afterwards.
+// Tests that the preference |kOfficeMoveConfirmationShownForDrive| is False
+// before the `kMoveConfirmationGoogleDrive` dialog and True afterwards.
 IN_PROC_BROWSER_TEST_F(MoveConfirmationDialogBrowserTest,
                        MoveConfirmationGoogleDriveSetsPref) {
-  ASSERT_FALSE(
-      file_manager::file_tasks::OfficeMoveConfirmationShown(profile()));
+  ASSERT_FALSE(file_manager::file_tasks::GetOfficeMoveConfirmationShownForDrive(
+      profile()));
   {
     base::RunLoop run_loop;
     PrefChangeRegistrar change_observer;
     change_observer.Init(profile()->GetPrefs());
-    change_observer.Add(prefs::kOfficeMoveConfirmationShown,
+    change_observer.Add(prefs::kOfficeMoveConfirmationShownForDrive,
                         run_loop.QuitClosure());
     mojom::DialogArgsPtr args = mojom::DialogArgs::New();
     args->dialog_page = mojom::DialogPage::kMoveConfirmationGoogleDrive;
@@ -876,17 +877,18 @@ IN_PROC_BROWSER_TEST_F(MoveConfirmationDialogBrowserTest,
   }
 }
 
-// Tests that the preference |kOfficeMoveConfirmationShown| is False before the
-// `kMoveConfirmationOneDrive` dialog and True afterwards.
+// Tests that the preference |kOfficeMoveConfirmationShownForOneDrive| is False
+// before the `kMoveConfirmationOneDrive` dialog and True afterwards.
 IN_PROC_BROWSER_TEST_F(MoveConfirmationDialogBrowserTest,
                        MoveConfirmationOneDriveSetsPref) {
   ASSERT_FALSE(
-      file_manager::file_tasks::OfficeMoveConfirmationShown(profile()));
+      file_manager::file_tasks::GetOfficeMoveConfirmationShownForOneDrive(
+          profile()));
   {
     base::RunLoop run_loop;
     PrefChangeRegistrar change_observer;
     change_observer.Init(profile()->GetPrefs());
-    change_observer.Add(prefs::kOfficeMoveConfirmationShown,
+    change_observer.Add(prefs::kOfficeMoveConfirmationShownForOneDrive,
                         run_loop.QuitClosure());
     mojom::DialogArgsPtr args = mojom::DialogArgs::New();
     args->dialog_page = mojom::DialogPage::kMoveConfirmationOneDrive;

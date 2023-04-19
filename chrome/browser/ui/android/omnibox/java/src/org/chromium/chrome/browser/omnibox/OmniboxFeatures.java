@@ -39,6 +39,20 @@ public class OmniboxFeatures {
             new MutableFlagWithSafeDefault(
                     ChromeFeatureList.OMNIBOX_HISTORY_CLUSTER_PROVIDER, false);
 
+    private static final MutableFlagWithSafeDefault sCacheSuggestionResources =
+            new MutableFlagWithSafeDefault(
+                    ChromeFeatureList.OMNIBOX_CACHE_SUGGESTION_RESOURCES, false);
+    private static final MutableFlagWithSafeDefault
+            sOmniboxAdaptiveSuggestionsVisibleGroupEligibilityUpdate =
+                    new MutableFlagWithSafeDefault(
+                            ChromeFeatureList
+                                    .OMNIBOX_ADAPTIVE_SUGGESTIONS_VISIBLE_GROUP_ELIGIBILITY_UPDATE,
+                            false);
+
+    private static final MutableFlagWithSafeDefault sWarmRecycledViewPoolFlag =
+            new MutableFlagWithSafeDefault(
+                    ChromeFeatureList.OMNIBOX_WARM_RECYCLED_VIEW_POOL, false);
+
     /**
      * @param context The activity context.
      * @return Whether the new modernize visual UI update should be shown.
@@ -93,12 +107,6 @@ public class OmniboxFeatures {
     }
 
     /**
-     * Returns whether excessive calls to RecycledViewPool#clear should be removed.
-     */
-    public static boolean shouldRemoveExcessiveRecycledViewClearCalls() {
-        return ChromeFeatureList.sOmniboxRemoveExcessiveRecycledViewClearCalls.isEnabled();
-    }
-    /**
      * Returns whether the toolbar and status bar color should be matched.
      */
     public static boolean shouldMatchToolbarAndStatusBarColor() {
@@ -115,5 +123,28 @@ public class OmniboxFeatures {
     /** Whether Journeys suggestions should be shown in a dedicated row. */
     public static boolean isJourneysRowUiEnabled() {
         return sJourneysRowUiFlag.isEnabled();
+    }
+
+    /**
+     * Returns whether suggestion resources should be cached directly instead of relying on Android
+     * system caching.
+     */
+    public static boolean shouldCacheSuggestionResources() {
+        return sCacheSuggestionResources.isEnabled();
+    }
+
+    /**
+     * Returns whether a modified visible-group eligibility logic should be used when determining
+     * suggestion visibility.
+     */
+    public static boolean adaptiveSuggestionsVisibleGroupEligibilityUpdate() {
+        return sOmniboxAdaptiveSuggestionsVisibleGroupEligibilityUpdate.isEnabled();
+    }
+
+    /**
+     * Returns whether the omnibox's recycler view pool should be pre-warmed prior to initial use.
+     */
+    public static boolean shouldPreWarmRecyclerViewPool() {
+        return sWarmRecycledViewPoolFlag.isEnabled();
     }
 }

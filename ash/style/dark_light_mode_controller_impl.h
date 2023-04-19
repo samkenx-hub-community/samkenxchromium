@@ -28,7 +28,6 @@ class ColorModeObserver;
 class ASH_EXPORT DarkLightModeControllerImpl
     : public DarkLightModeController,
       public LoginDataDispatcher::Observer,
-      public WallpaperControllerObserver,
       public ScheduledFeature {
  public:
   DarkLightModeControllerImpl();
@@ -63,9 +62,6 @@ class ASH_EXPORT DarkLightModeControllerImpl
   void OnOobeDialogStateChanged(OobeDialogState state) override;
   void OnFocusPod(const AccountId& account_id) override;
 
-  // WallpaperControllerObserver:
-  void OnWallpaperColorsChanged() override;
-
   // ScheduledFeature:
   void OnActiveUserPrefServiceChanged(PrefService* prefs) override;
   void OnSessionStateChanged(session_manager::SessionState state) override;
@@ -75,9 +71,6 @@ class ASH_EXPORT DarkLightModeControllerImpl
   void RefreshFeatureState() override;
 
  private:
-  friend class ScopedLightModeAsDefault;
-  friend class ScopedAssistantLightModeAsDefault;
-
   // ScheduledFeature:
   const char* GetFeatureName() const override;
 
@@ -90,21 +83,12 @@ class ASH_EXPORT DarkLightModeControllerImpl
   base::ScopedClosureRunner GetNotifyOnDarkModeChangeClosure();
   void NotifyIfDarkModeChanged(bool old_is_dark_mode_enabled);
 
-  // The default color is DARK when the DarkLightMode feature is disabled. But
-  // we can also override it to LIGHT through ScopedLightModeAsDefault. This is
-  // done to help keeping some of the UI elements as LIGHT by default before
-  // launching the DarkLightMode feature. Overriding only if the DarkLightMode
-  // feature is disabled. This variable will be removed once fully launched the
-  // DarkLightMode feature.
-  bool override_light_mode_as_default_ = false;
-
   // Temporary field for testing purposes while OOBE WebUI is being migrated.
   absl::optional<bool> is_dark_mode_enabled_in_oobe_for_testing_;
 
   OobeDialogState oobe_state_ = OobeDialogState::HIDDEN;
 
-  // Keep track of the last value that was sent to avoid multiple
-  // notifications.
+  // Keep track of the last value that was sent to avoid multiple notifications.
   absl::optional<bool> last_value_;
 
   // absl::nullopt in case no user pod is focused.

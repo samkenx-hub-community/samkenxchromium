@@ -37,7 +37,7 @@
 #include "components/guest_view/browser/guest_view_base.h"
 #include "components/keep_alive_registry/keep_alive_types.h"
 #include "components/keep_alive_registry/scoped_keep_alive.h"
-#include "content/public/browser/browser_task_traits.h"
+#include "content/public/browser/browser_thread.h"
 #include "content/public/browser/devtools_agent_host.h"
 #include "content/public/browser/devtools_agent_host_client_channel.h"
 #include "content/public/browser/render_frame_host.h"
@@ -50,6 +50,7 @@
 #include "extensions/browser/view_type_utils.h"
 #include "extensions/common/manifest.h"
 #include "extensions/common/mojom/view_type.mojom.h"
+#include "extensions/common/permissions/permissions_data.h"
 #include "ui/base/resource/resource_bundle.h"
 
 #if BUILDFLAG(IS_CHROMEOS_ASH)
@@ -246,9 +247,19 @@ bool ChromeDevToolsManagerDelegate::AllowInspection(
       return false;
     case Availability::kAllowed:
       return true;
-    case Availability::kDisallowedForForceInstalledExtensions:
-      return !extension ||
-             !extensions::Manifest::IsPolicyLocation(extension->location());
+    case Availability::kDisallowedForSenstiveExtensions:
+      if (!extension) {
+        return true;
+      }
+      if (extensions::Manifest::IsPolicyLocation(extension->location())) {
+        return false;
+      }
+      if (extensions::Manifest::IsComponentLocation(extension->location()) &&
+          extension->permissions_data()->HasAPIPermission(
+              extensions::mojom::APIPermissionID::kManagement)) {
+        return false;
+      }
+      return true;
     default:
       NOTREACHED() << "Unknown developer tools policy";
       return true;
@@ -267,7 +278,7 @@ bool ChromeDevToolsManagerDelegate::AllowInspection(
       return false;
     case Availability::kAllowed:
       return true;
-    case Availability::kDisallowedForForceInstalledExtensions:
+    case Availability::kDisallowedForSenstiveExtensions:
       return !web_app || !web_app->IsKioskInstalledApp();
     default:
       NOTREACHED() << "Unknown developer tools policy";

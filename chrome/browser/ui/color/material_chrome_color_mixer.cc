@@ -82,12 +82,6 @@ void AddMaterialChromeColorMixer(ui::ColorProvider* provider,
   mixer[kColorOmniboxChipForegroundLowVisibility] = {
       ui::kColorSysOnSurfaceSubtle};
   mixer[kColorOmniboxChipForegroundNormalVisibility] = {ui::kColorSysOnSurface};
-  mixer[kColorPageActionIconHover] = {ui::kColorSysStateHoverOnSubtle};
-  mixer[kColorPageActionIconPressed] = {
-      ui::kColorSysStateRippleNeutralOnSubtle};
-  mixer[kColorPageInfoBackground] = {ui::kColorSysBaseContainerElevated};
-  mixer[kColorPageInfoIconHover] = {ui::kColorSysStateHoverDimBlendProtection};
-  mixer[kColorPageInfoIconPressed] = {ui::kColorSysStateRippleNeutralOnSubtle};
   mixer[kColorToolbar] = {ui::kColorSysBase};
   mixer[kColorToolbarButtonBackgroundHighlightedDefault] = {
       ui::kColorSysStateHoverOnSubtle};
@@ -102,8 +96,11 @@ void AddMaterialChromeColorMixer(ui::ColorProvider* provider,
   mixer[kColorToolbarButtonText] = {ui::kColorSysOnSurfaceSecondary};
   mixer[kColorToolbarContentAreaSeparator] = {ui::kColorSysOutline};
   mixer[kColorToolbarFeaturePromoHighlight] = {ui::kColorSysPrimary};
-  mixer[kColorToolbarInkDrop] = {ui::kColorSysStateHoverOnSubtle};
+  mixer[kColorToolbarInkDropHover] = {ui::kColorSysStateHoverOnSubtle};
   mixer[kColorToolbarInkDropRipple] = {ui::kColorSysStateRippleNeutralOnSubtle};
+  mixer[kColorToolbarExtensionSeparatorEnabled] = {ui::kColorSysSurfaceVariant};
+  mixer[kColorToolbarExtensionSeparatorDisabled] = {
+      kColorToolbarButtonIconInactive};
   mixer[kColorToolbarSeparator] = {kColorToolbarSeparatorDefault};
   mixer[kColorToolbarSeparatorDefault] =
       ui::AlphaBlend(kColorToolbarButtonIcon, kColorToolbar, 0x3A);

@@ -56,7 +56,7 @@ const char kAndroidOneDriveAuthority[] =
 std::vector<ProvidedFileSystemInfo> GetODFSFileSystems(Profile* profile) {
   Service* service = Service::Get(profile);
   ProviderId provider_id = ProviderId::CreateFromExtensionId(
-      file_manager::file_tasks::kODFSExtensionId);
+      file_manager::file_tasks::GetODFSExtensionId(profile));
   return service->GetProvidedFileSystemInfoList(provider_id);
 }
 
@@ -183,7 +183,7 @@ bool FileIsOnODFS(Profile* profile, const FileSystemURL& url) {
 
   file_system_provider::ProviderId provider_id =
       file_system_provider::ProviderId::CreateFromExtensionId(
-          file_manager::file_tasks::kODFSExtensionId);
+          file_manager::file_tasks::GetODFSExtensionId(profile));
   if (parser.file_system()->GetFileSystemInfo().provider_id() != provider_id) {
     return false;
   }
@@ -319,15 +319,20 @@ void CloudOpenTask::OpenODFSUrls() {
 }
 
 void CloudOpenTask::ConfirmMoveOrStartUpload() {
-  if (file_manager::file_tasks::AlwaysMoveOfficeFiles(profile_)) {
-    // No dialog required.
-    return StartUpload();
-  }
-
   if (cloud_provider_ == CloudProvider::kGoogleDrive) {
-    InitAndShowDialog(mojom::DialogPage::kMoveConfirmationGoogleDrive);
+    if (file_manager::file_tasks::AlwaysMoveOfficeFilesToDrive(profile_)) {
+      // No dialog required.
+      StartUpload();
+    } else {
+      InitAndShowDialog(mojom::DialogPage::kMoveConfirmationGoogleDrive);
+    }
   } else if (cloud_provider_ == CloudProvider::kOneDrive) {
-    InitAndShowDialog(mojom::DialogPage::kMoveConfirmationOneDrive);
+    if (file_manager::file_tasks::AlwaysMoveOfficeFilesToOneDrive(profile_)) {
+      // No dialog required.
+      StartUpload();
+    } else {
+      InitAndShowDialog(mojom::DialogPage::kMoveConfirmationOneDrive);
+    }
   }
 }
 
@@ -610,13 +615,18 @@ void CloudOpenTask::ShowDialog(
         resulting_tasks) {
   SetTaskArgs(args, std::move(resulting_tasks));
 
+  bool office_move_confirmation_shown =
+      cloud_provider_ == CloudProvider::kGoogleDrive
+          ? file_manager::file_tasks::GetOfficeMoveConfirmationShownForDrive(
+                profile_)
+          : file_manager::file_tasks::GetOfficeMoveConfirmationShownForOneDrive(
+                profile_);
   // This CloudUploadDialog pointer is managed by an instance of
   // `views::WebDialogView` and deleted in
   // `SystemWebDialogDelegate::OnDialogClosed`.
   CloudUploadDialog* dialog = new CloudUploadDialog(
       std::move(args), base::BindOnce(&CloudOpenTask::OnDialogComplete, this),
-      dialog_page,
-      file_manager::file_tasks::OfficeMoveConfirmationShown(profile_));
+      dialog_page, office_move_confirmation_shown);
 
   if (!modal_parent_) {
     // Create a files app window and use it as the modal parent.
@@ -638,10 +648,9 @@ void CloudOpenTask::SetTaskArgs(
     for (const file_manager::file_tasks::FullTaskDescriptor& task :
          resulting_tasks->tasks) {
       // Ignore Google Docs and MS Office tasks as they are already
-      // set up to show in the dialog. And ignore QuickOffice.
+      // set up to show in the dialog.
       if (IsWebDriveOfficeTask(task.task_descriptor) ||
-          file_manager::file_tasks::IsOpenInOfficeTask(task.task_descriptor) ||
-          extension_misc::IsQuickOfficeExtension(task.task_descriptor.app_id)) {
+          file_manager::file_tasks::IsOpenInOfficeTask(task.task_descriptor)) {
         continue;
       }
       mojom::DialogTaskPtr dialog_task = mojom::DialogTask::New();

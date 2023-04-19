@@ -31,7 +31,6 @@ import com.google.android.material.appbar.AppBarLayout;
 import org.chromium.base.Callback;
 import org.chromium.base.CallbackController;
 import org.chromium.base.TraceEvent;
-import org.chromium.base.jank_tracker.JankTracker;
 import org.chromium.base.supplier.ObservableSupplier;
 import org.chromium.base.supplier.ObservableSupplierImpl;
 import org.chromium.base.supplier.OneshotSupplier;
@@ -110,7 +109,7 @@ import org.chromium.chrome.browser.tabmodel.TabModelSelector;
 import org.chromium.chrome.browser.tabmodel.TabModelSelectorObserver;
 import org.chromium.chrome.browser.tasks.ReturnToChromeUtil;
 import org.chromium.chrome.browser.tasks.tab_management.TabGroupUi;
-import org.chromium.chrome.browser.tasks.tab_management.TabManagementModuleProvider;
+import org.chromium.chrome.browser.tasks.tab_management.TabManagementDelegateProvider;
 import org.chromium.chrome.browser.tasks.tab_management.TabUiFeatureUtilities;
 import org.chromium.chrome.browser.theme.ThemeColorProvider;
 import org.chromium.chrome.browser.theme.ThemeColorProvider.ThemeColorObserver;
@@ -452,7 +451,6 @@ public class ToolbarManager implements UrlFocusChangeListener, ThemeColorObserve
             @NonNull Supplier<Boolean> isWarmOnResumeSupplier,
             @NonNull TabContentManager tabContentManager,
             @NonNull TabCreatorManager tabCreatorManager, @NonNull SnackbarManager snackbarManager,
-            JankTracker jankTracker,
             @NonNull Supplier<MerchantTrustSignalsCoordinator>
                     merchantTrustSignalsCoordinatorSupplier,
             OneshotSupplier<TabReparentingController> tabReparentingControllerSupplier,
@@ -667,7 +665,6 @@ public class ToolbarManager implements UrlFocusChangeListener, ThemeColorObserve
                         return mToolbar.getCurrentOptionalButtonVariant() ==
                             AdaptiveToolbarButtonVariant.VOICE;
                     },
-                    jankTracker,
                     merchantTrustSignalsCoordinatorSupplier,
                     actionChipsDelegate, mControlsVisibilityDelegate,
                     ChromePureJavaExceptionReporter::reportJavaException, backPressManager,
@@ -742,10 +739,12 @@ public class ToolbarManager implements UrlFocusChangeListener, ThemeColorObserve
                 assert tab == mLocationBarModel.getTab();
                 mLocationBarModel.notifySecurityStateChanged();
                 mLocationBarModel.notifyUrlChanged();
+                onBackPressStateChanged();
             }
 
             @Override
             public void onTitleUpdated(Tab tab) {
+                onBackPressStateChanged();
                 mLocationBarModel.notifyTitleChanged();
             }
 
@@ -754,6 +753,7 @@ public class ToolbarManager implements UrlFocusChangeListener, ThemeColorObserve
                 // Update the SSL security state as a result of this notification as it will
                 // sometimes be the only update we receive.
                 updateTabLoadingState(true);
+                onBackPressStateChanged();
 
                 // A URL update is a decent enough indicator that the toolbar widget is in
                 // a stable state to capture its bitmap for use in fullscreen.
@@ -791,12 +791,14 @@ public class ToolbarManager implements UrlFocusChangeListener, ThemeColorObserve
                 maybeShowCursorInLocationBar();
                 // Paint preview status might have been changed. Update the omnibox chip.
                 mLocationBarModel.notifySecurityStateChanged();
+                onBackPressStateChanged();
             }
 
             @Override
             public void onWebContentsSwapped(Tab tab, boolean didStartLoad, boolean didFinishLoad) {
                 if (!didStartLoad) return;
                 mLocationBarModel.notifyUrlChanged();
+                onBackPressStateChanged();
                 mLocationBarModel.notifySecurityStateChanged();
             }
 
@@ -1207,8 +1209,8 @@ public class ToolbarManager implements UrlFocusChangeListener, ThemeColorObserve
 
         @Override
         public boolean hasCompletedFirstLayout() {
-            assert getNewTabPageForCurrentTab() != null;
-            return getNewTabPageForCurrentTab().hasCompletedFirstLayout();
+            NewTabPage newTabPage = getNewTabPageForCurrentTab();
+            return newTabPage != null && newTabPage.hasCompletedFirstLayout();
         }
 
         @Override
@@ -1315,7 +1317,7 @@ public class ToolbarManager implements UrlFocusChangeListener, ThemeColorObserve
      */
     public void enableBottomControls() {
         View root = ((ViewStub) mActivity.findViewById(R.id.bottom_controls_stub)).inflate();
-        mTabGroupUi = TabManagementModuleProvider.getDelegate().createTabGroupUi(mActivity,
+        mTabGroupUi = TabManagementDelegateProvider.getDelegate().createTabGroupUi(mActivity,
                 root.findViewById(R.id.bottom_container_slot), mIncognitoStateProvider,
                 mScrimCoordinator, mOmniboxFocusStateSupplier, mBottomSheetController,
                 mActivityLifecycleDispatcher, mIsWarmOnResumeSupplier, mTabModelSelector,
@@ -2165,13 +2167,16 @@ public class ToolbarManager implements UrlFocusChangeListener, ThemeColorObserve
                     : null;
             var tab = mActivityTabProvider.get();
             var t2 = mTabModelSelector != null ? mTabModelSelector.getCurrentTab() : null;
-            var msg = String.format(
-                    "BottomCtrl %s %s; actTab %s, urlBarTab %s, sTab %s, init %s, destroy %s", bc,
+            var layout = mLayoutStateProviderSupplier.hasValue()
+                    ? mLayoutStateProviderSupplier.get().getActiveLayoutType()
+                    : LayoutType.NONE;
+            var msg = String.format("BottomCtrl %s %s; actTab %s, urlBarTab %s, sTab %s, layout %s",
+                    bc,
                     bc != null && Boolean.TRUE.equals(bc.getHandleBackPressChangedSupplier().get()),
-                    tab, mLocationBarModel.getTab(), t2, tab != null && tab.isInitialized(),
-                    tab != null && tab.isDestroyed());
+                    tab, mLocationBarModel.getTab(), t2, layout);
             assert false : msg;
         }
+        onBackPressStateChanged();
         return ret ? BackPressResult.SUCCESS : BackPressResult.FAILURE;
     }
 

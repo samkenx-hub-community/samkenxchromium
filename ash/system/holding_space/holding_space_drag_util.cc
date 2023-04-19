@@ -7,11 +7,9 @@
 #include <memory>
 
 #include "ash/bubble/bubble_utils.h"
-#include "ash/constants/ash_features.h"
 #include "ash/public/cpp/holding_space/holding_space_image.h"
 #include "ash/public/cpp/holding_space/holding_space_item.h"
 #include "ash/public/cpp/rounded_image_view.h"
-#include "ash/public/cpp/style/scoped_light_mode_as_default.h"
 #include "ash/style/ash_color_id.h"
 #include "ash/style/dark_light_mode_controller_impl.h"
 #include "ash/style/typography.h"
@@ -225,11 +223,10 @@ class DragImageItemChipView : public DragImageItemView {
     // disabled. Otherwise, the view's background depends on theming.
     icon->SetImage(item->image().GetImageSkia(
         icon->GetPreferredSize(),
-        /*dark_background=*/features::IsDarkLightModeEnabled() &&
-            DarkLightModeControllerImpl::Get()->IsDarkModeEnabled()));
+        /*dark_background=*/DarkLightModeControllerImpl::Get()
+            ->IsDarkModeEnabled()));
 
     // Label.
-    ScopedLightModeAsDefault scoped_light_mode;
     auto* label = AddChildView(bubble_utils::CreateLabel(
         TypographyToken::kCrosBody2, item->GetText()));
     // Label created via `bubble_utils::CreateLabel()` has an enabled color id,
@@ -279,8 +276,8 @@ class DragImageItemScreenCaptureView : public DragImageItemView {
     // disabled. Otherwise, the view's background depends on theming.
     image->SetImage(item->image().GetImageSkia(
         image->GetPreferredSize(),
-        /*dark_background=*/features::IsDarkLightModeEnabled() &&
-            DarkLightModeControllerImpl::Get()->IsDarkModeEnabled()));
+        /*dark_background=*/DarkLightModeControllerImpl::Get()
+            ->IsDarkModeEnabled()));
   }
 };
 
@@ -310,10 +307,6 @@ class DragImageOverflowBadge : public views::View {
   }
 
   void InitLayout(size_t count) {
-    // NOTE: If the dark/light mode feature is disabled, the overflow badge
-    // should use light mode to be consistent with the `DragItemImageView`s.
-    ScopedLightModeAsDefault scoped_light_mode;
-
     // Background.
     SetBackground(views::CreateThemedRoundedRectBackground(
         ui::kColorAshFocusRing,

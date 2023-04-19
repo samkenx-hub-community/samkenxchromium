@@ -16,7 +16,7 @@ try_.defaults.set(
     builderless = True,
     os = os.MAC_ANY,
     ssd = True,
-    compilator_reclient_jobs = reclient.jobs.HIGH_JOBS_FOR_CQ,
+    compilator_reclient_jobs = reclient.jobs.MID_JOBS_FOR_CQ,
     execution_timeout = try_.DEFAULT_EXECUTION_TIMEOUT,
     orchestrator_cores = 2,
     reclient_instance = reclient.instance.DEFAULT_UNTRUSTED,
@@ -70,6 +70,17 @@ try_.builder(
         "ci/Mac Retina Release (AMD)",
     ],
     os = os.MAC_DEFAULT,
+)
+
+try_.builder(
+    name = "mac-intel-on-arm64-rel",
+    mirrors = [
+        "ci/mac-intel-on-arm64-rel",
+    ],
+    builderless = False,
+    os = os.MAC_DEFAULT,
+    cpu = cpu.ARM64,
+    reclient_jobs = reclient.jobs.LOW_JOBS_FOR_CQ,
 )
 
 try_.builder(
@@ -326,6 +337,20 @@ try_.builder(
 try_.builder(
     name = "mac_upload_clang_arm",
     executable = "recipe:chromium_upload_clang",
+    builderless = False,
+    execution_timeout = 8 * time.hour,
+)
+
+try_.builder(
+    name = "mac_upload_rust",
+    executable = "recipe:chromium_upload_rust",
+    builderless = False,
+    execution_timeout = 8 * time.hour,
+)
+
+try_.builder(
+    name = "mac_upload_rust_arm",
+    executable = "recipe:chromium_upload_rust",
     builderless = False,
     execution_timeout = 8 * time.hour,
 )

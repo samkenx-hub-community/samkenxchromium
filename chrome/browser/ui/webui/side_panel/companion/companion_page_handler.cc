@@ -5,18 +5,17 @@
 #include "chrome/browser/ui/webui/side_panel/companion/companion_page_handler.h"
 
 #include "build/build_config.h"
+#include "chrome/browser/companion/core/companion_permission_utils.h"
+#include "chrome/browser/companion/core/companion_url_builder.h"
+#include "chrome/browser/companion/core/promo_handler.h"
+#include "chrome/browser/companion/core/signin_delegate.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/search/search.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_window.h"
 #include "chrome/browser/ui/side_panel/companion/companion_side_panel_controller_utils.h"
 #include "chrome/browser/ui/side_panel/companion/companion_tab_helper.h"
-#include "chrome/browser/ui/ui_features.h"
-#include "chrome/browser/ui/webui/side_panel/companion/companion_permission_utils.h"
 #include "chrome/browser/ui/webui/side_panel/companion/companion_side_panel_untrusted_ui.h"
-#include "chrome/browser/ui/webui/side_panel/companion/companion_url_builder.h"
-#include "chrome/browser/ui/webui/side_panel/companion/promo_handler.h"
-#include "chrome/browser/ui/webui/side_panel/companion/signin_delegate.h"
 #include "chrome/browser/unified_consent/unified_consent_service_factory.h"
 #include "chrome/common/webui_url_constants.h"
 #include "components/lens/buildflags.h"
@@ -50,10 +49,10 @@ CompanionPageHandler::~CompanionPageHandler() = default;
 void CompanionPageHandler::PrimaryPageChanged(content::Page& page) {
   // Only notify the companion UI the page changed if we can share
   // information about the page by user consent.
-  if (IsUserPermittedToSharePageInfoWithCompanion(GetProfile()->GetPrefs())) {
+  if (!IsUserPermittedToSharePageInfoWithCompanion(GetProfile()->GetPrefs())) {
     return;
   }
-  NotifyURLChanged();
+  NotifyURLChanged(/*is_full_reload=*/false);
 }
 
 void CompanionPageHandler::ShowUI() {
@@ -70,11 +69,19 @@ void CompanionPageHandler::ShowUI() {
         companion::CompanionTabHelper::FromWebContents(active_web_contents);
     helper->SetCompanionPageHandler(weak_ptr_factory_.GetWeakPtr());
     std::string initial_text_query = helper->GetTextQuery();
-    if (initial_text_query.empty()) {
-      NotifyURLChanged();
-    } else {
+    if (!initial_text_query.empty()) {
       OnSearchTextQuery(initial_text_query);
+      return;
     }
+
+    std::unique_ptr<side_panel::mojom::ImageQuery> image_query =
+        helper->GetImageQuery();
+    if (image_query) {
+      OnImageQuery(*image_query);
+      return;
+    }
+
+    NotifyURLChanged(/*is_full_reload=*/true);
   }
 }
 
@@ -87,13 +94,24 @@ void CompanionPageHandler::OnSearchTextQuery(const std::string& query) {
   }
 
   GURL companion_url = url_builder_->BuildCompanionURL(page_url, query);
-  page_->OnURLChanged(companion_url);
+  page_->LoadCompanionPage(companion_url);
 }
 
-void CompanionPageHandler::NotifyURLChanged() {
-  GURL companion_url =
-      url_builder_->BuildCompanionURL(web_contents()->GetVisibleURL());
-  page_->OnURLChanged(companion_url);
+void CompanionPageHandler::NotifyURLChanged(bool is_full_reload) {
+  if (is_full_reload) {
+    GURL companion_url =
+        url_builder_->BuildCompanionURL(web_contents()->GetVisibleURL());
+    page_->LoadCompanionPage(companion_url);
+  } else {
+    auto companion_update_proto = url_builder_->BuildCompanionUrlParamProto(
+        web_contents()->GetVisibleURL());
+    page_->UpdateCompanionPage(companion_update_proto);
+  }
+}
+
+void CompanionPageHandler::OnImageQuery(
+    side_panel::mojom::ImageQuery image_query) {
+  page_->OnImageQuery(image_query.Clone());
 }
 
 void CompanionPageHandler::OnPromoAction(
@@ -103,21 +121,14 @@ void CompanionPageHandler::OnPromoAction(
 }
 
 void CompanionPageHandler::OnRegionSearchClicked() {
-#if BUILDFLAG(GOOGLE_CHROME_BRANDING)
-  // Start a region search here.
-  // TODO(shaktisahu): Pass a UI entry point for accurate metrics.
-  if (!lens_region_search_controller_) {
-    lens_region_search_controller_ =
-        std::make_unique<lens::LensRegionSearchController>(GetBrowser());
-  }
-  auto* profile =
-      Profile::FromBrowserContext(web_contents()->GetBrowserContext());
-  bool is_google_default_search_provider =
-      search::DefaultSearchProviderIsGoogle(profile);
-  lens_region_search_controller_->Start(web_contents(),
-                                        /*use_fullscreen_capture=*/false,
-                                        is_google_default_search_provider);
-#endif  // BUILDFLAG(GOOGLE_CHROME_BRANDING)
+  auto* helper = companion::CompanionTabHelper::FromWebContents(web_contents());
+  CHECK(helper);
+  helper->StartRegionSearch(web_contents(), /*use_fullscreen_capture=*/false);
+}
+
+void CompanionPageHandler::OnExpsOptInStatusAvailable(bool is_exps_opted_in) {
+  auto* pref_service = GetProfile()->GetPrefs();
+  pref_service->SetBoolean(kExpsOptInStatusGrantedPref, is_exps_opted_in);
 }
 
 void CompanionPageHandler::EnableMsbb(bool enable_msbb) {

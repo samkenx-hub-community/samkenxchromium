@@ -50,6 +50,9 @@ class AutofillSaveUpdateAddressProfileDelegateIOS
   // Returns the subtitle text to be displayed in the save/update banner.
   std::u16string GetDescription() const;
 
+  // Returns the profile description shown in the migration prompt.
+  std::u16string GetProfileDescriptionForMigrationPrompt() const;
+
   // Returns subtitle for the update modal.
   std::u16string GetSubtitle();
 
@@ -68,6 +71,7 @@ class AutofillSaveUpdateAddressProfileDelegateIOS
   void MessageTimeout();
   void MessageDeclined();
   void AutoDecline();
+  virtual bool Never();
 
   // Updates |profile_| |type| value to |value|.
   void SetProfileInfo(const ServerFieldType& type, const std::u16string& value);

@@ -22,7 +22,8 @@
 // OptimizationGuide's model handler.
 class AutocompleteScoringModelService : public KeyedService {
  public:
-  using ResultCallback = base::OnceCallback<void(absl::optional<float>)>;
+  using ResultCallback =
+      base::OnceCallback<void(std::tuple<absl::optional<float>, size_t, GURL>)>;
 
   explicit AutocompleteScoringModelService(
       optimization_guide::OptimizationGuideModelProvider* model_provider);
@@ -40,6 +41,8 @@ class AutocompleteScoringModelService : public KeyedService {
       base::CancelableTaskTracker* tracker,
       const metrics::OmniboxEventProto::Suggestion::ScoringSignals&
           scoring_signals,
+      size_t match_index,
+      GURL match_destination_url,
       ResultCallback result_callback);
 
   // Returns whether the scoring model is loaded and the pointer to the
@@ -52,6 +55,8 @@ class AutocompleteScoringModelService : public KeyedService {
   // output is nullopt or an empty vector (which is unexpected).
   void ProcessModelOutput(
       ResultCallback result_callback,
+      size_t match_index,
+      GURL match_destination_url,
       const absl::optional<AutocompleteScoringModelExecutor::ModelOutput>&
           model_output);
 

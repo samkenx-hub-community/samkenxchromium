@@ -23,7 +23,6 @@
 #include "chrome/browser/ash/login/oobe_screen.h"
 #include "chrome/browser/ash/login/screen_manager.h"
 #include "chrome/browser/ash/login/screens/active_directory_login_screen.h"
-#include "chrome/browser/ash/login/screens/arc_terms_of_service_screen.h"
 #include "chrome/browser/ash/login/screens/assistant_optin_flow_screen.h"
 #include "chrome/browser/ash/login/screens/choobe_screen.h"
 #include "chrome/browser/ash/login/screens/consolidated_consent_screen.h"
@@ -31,6 +30,7 @@
 #include "chrome/browser/ash/login/screens/cryptohome_recovery_setup_screen.h"
 #include "chrome/browser/ash/login/screens/demo_preferences_screen.h"
 #include "chrome/browser/ash/login/screens/demo_setup_screen.h"
+#include "chrome/browser/ash/login/screens/display_size_screen.h"
 #include "chrome/browser/ash/login/screens/edu_coexistence_login_screen.h"
 #include "chrome/browser/ash/login/screens/enable_adb_sideloading_screen.h"
 #include "chrome/browser/ash/login/screens/enable_debugging_screen.h"
@@ -298,7 +298,6 @@ class WizardController : public OobeUI::Observer {
   void ShowTermsOfServiceScreen();
   void ShowSyncConsentScreen();
   void ShowFingerprintSetupScreen();
-  void ShowArcTermsOfServiceScreen();
   void ShowRecommendAppsScreen();
   void ShowAppDownloadingScreen();
   void ShowWrongHWIDScreen();
@@ -328,6 +327,7 @@ class WizardController : public OobeUI::Observer {
   void ShowThemeSelectionScreen();
   void ShowChoobeScreen();
   void ShowTouchpadScrollScreen();
+  void ShowDisplaySizeScreen();
   void ShowGaiaPasswordChangedScreen(std::unique_ptr<UserContext> user_context);
 
   // Shows images login screen.
@@ -374,7 +374,6 @@ class WizardController : public OobeUI::Observer {
   void OnFingerprintSetupScreenExit(FingerprintSetupScreen::Result result);
   void OnSyncConsentScreenExit(SyncConsentScreen::Result result);
   void OnPinSetupScreenExit(PinSetupScreen::Result result);
-  void OnArcTermsOfServiceScreenExit(ArcTermsOfServiceScreen::Result result);
   void OnRecommendAppsScreenExit(RecommendAppsScreen::Result result);
   void OnAppDownloadingScreenExit();
   void OnAssistantOptInFlowScreenExit(AssistantOptInFlowScreen::Result result);
@@ -416,6 +415,7 @@ class WizardController : public OobeUI::Observer {
   void OnCryptohomeRecoveryScreenExit(CryptohomeRecoveryScreen::Result result);
   void OnChoobeScreenExit(ChoobeScreen::Result result);
   void OnTouchpadScreenExit(TouchpadScrollScreen::Result result);
+  void OnDisplaySizeScreenExit(DisplaySizeScreen::Result result);
 
   // Callback invoked once it has been determined whether the device is disabled
   // or not.

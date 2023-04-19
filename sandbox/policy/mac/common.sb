@@ -203,6 +203,7 @@
 ; Reads from /usr.
 (allow file-read-data
   (subpath "/usr/share/icu")
+  (subpath "/usr/share/locale")
 )
 
 ; Access to the home directory.
@@ -231,6 +232,9 @@
   (sysctl-name "hw.logicalcpu_max")
   (sysctl-name "hw.machine")
   (sysctl-name "hw.ncpu")
+  (sysctl-name "hw.nperflevels")
+  (sysctl-name "hw.optional.arm.FEAT_SHA512")
+  (sysctl-name "hw.optional.armv8_2_sha512")
   (sysctl-name "hw.pagesize_compat")
   (sysctl-name "hw.physicalcpu_max")
   (sysctl-name "hw.tbfrequency_compat")
@@ -246,6 +250,7 @@
   (sysctl-name "kern.usrstack64")
   (sysctl-name "kern.version")
   (sysctl-name "sysctl.proc_cputype")
+  (sysctl-name-prefix "hw.perflevel")
 )
 
 (allow network-outbound

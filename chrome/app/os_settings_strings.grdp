@@ -22,6 +22,9 @@
   <message name="IDS_SETTINGS_LEARN_MORE" desc="The label in the settings UI if users can obtain more information.">
     Learn more
   </message>
+  <message name="IDS_OS_SETTINGS_OPENS_IN_NEW_TAB_A11Y_LABEL" desc="ARIA (accessibility) label describing an external link which opens in a new tab.">
+    Opens in new tab
+  </message>
 
   <!--Main Page-->
   <message name="IDS_SETTINGS_SECONDARY_USER_BANNER" desc="Banner displayed in settings page when the user is secondary in a multi-profile session.">
@@ -885,6 +888,7 @@
   <message name="IDS_SETTINGS_DISCONNECT_GOOGLE_DRIVE" desc="Label for the checkbox which enables disconnecting from Google Drive account.">
     Disconnect Google Drive account
   </message>
+  <!-- TODO(b/276391980): Remove translateable="false" when all the strings have been defined. -->
   <message name="IDS_SETTINGS_GOOGLE_DRIVE" translateable="false" desc="Label for the settings link that takes the user to the page where they can manage their Google Drive settings.">
     Google Drive
   </message>
@@ -910,7 +914,10 @@
     Keep your files available when you're offline
   </message>
   <message name="IDS_SETTINGS_GOOGLE_DRIVE_OFFLINE_SUBTITLE" translateable="false" desc="Subtitle for the everything offline feature in Settings: Files: Google Drive.">
-    This will store your Google Drive files on this Chromebook so you can view and edit them without an internet connection. This will use about 12.2 GB leaving 96.8 GB available.
+    This will store your Google Drive files on this Chromebook so you can view and edit them without an internet connection.
+  </message>
+  <message name="IDS_SETTINGS_GOOGLE_DRIVE_OFFLINE_STORAGE_REQUIRED_SUBTITLE" translateable="false" desc="Subtitle to display the required and remaining space if all the google drive files are made available offline">
+    This will use about <ph name="REQUIRED_SPACE">$1<ex>12.2 GB</ex></ph> leaving <ph name="FREE_SPACE_LEFT">$2<ex>96.7 GB</ex></ph> available.
   </message>
   <message name="IDS_SETTINGS_GOOGLE_DRIVE_OFFLINE_CLEAR_TITLE" translateable="false" desc="Title for the Offline Storage row where users can clear their offline storage in Settings: Files: Google Drive.">
     Offline Storage
@@ -920,6 +927,27 @@
   </message>
   <message name="IDS_SETTINGS_GOOGLE_DRIVE_OFFLINE_CLEAR_ACTION" translateable="false" desc="Button for the Offline Storage row where users can clear their offline storage in Settings: Files: Google Drive.">
     Clear offline storage
+  </message>
+  <message name="IDS_SETTINGS_GOOGLE_DRIVE_TURN_OFF_BUTTON_LABEL" translateable="false" desc="Button for the confirmation dialog that spawns when attempting to turn off bulk pinning in Settings: Files: Google Drive.">
+    Turn off
+  </message>
+  <message name="IDS_SETTINGS_GOOGLE_DRIVE_TURN_OFF_TITLE_TEXT" translateable="false" desc="Title text for the confirmation dialog that spawns when attempting to turn off bulk pinning in Settings: Files: Google Drive.">
+    Are you sure you want to turn off automatic syncing?
+  </message>
+  <message name="IDS_SETTINGS_GOOGLE_DRIVE_TURN_OFF_BODY_TEXT" translateable="false" desc="Body text for the confirmation dialog that spawns when attempting to turn off bulk pinning in Settings: Files: Google Drive.">
+    New Google Drive files will no longer be synced automatically, but files that are already synced will remain available.
+  </message>
+  <message name="IDS_SETTINGS_GOOGLE_DRIVE_BULK_PINNING_NOT_ENOUGH_SPACE_TITLE_TEXT" translateable="false" desc="Title text for the confirmation dialog that spawns when attempting to turn on bulk pinning but the user doesn't have enough free space in Settings: Files: Google Drive.">
+    Low disk space
+  </message>
+  <message name="IDS_SETTINGS_GOOGLE_DRIVE_BULK_PINNING_NOT_ENOUGH_SPACE_BODY_TEXT" translateable="false" desc="Body text for the confirmation dialog that spawns when attempting to turn on bulk pinning but the user doesn't have enough free space in Settings: Files: Google Drive.">
+    Cannot enable this feature due to insufficient disk space.
+  </message>
+  <message name="IDS_SETTINGS_GOOGLE_DRIVE_BULK_PINNING_UNEXPECTED_ERROR_TITLE_TEXT" translateable="false" desc="Title text for the confirmation dialog that spawns when attempting to turn on bulk pinning but an unexpected error occurred in Settings: Files: Google Drive.">
+    An unexpected error occurred
+  </message>
+  <message name="IDS_SETTINGS_GOOGLE_DRIVE_BULK_PINNING_UNEXPECTED_ERROR_BODY_TEXT" translateable="false" desc="Body text for the confirmation dialog that spawns when attempting to turn on bulk pinning but an unexpected error occurred in Settings: Files: Google Drive.">
+    Cannot enable this feature as an unexpected error has occurred.
   </message>
   <message name="IDS_SETTINGS_DOWNLOADS_SMB_SHARES" desc="In Downloads Settings, the title of the SMB shares setting section.">
     Network file shares
@@ -959,6 +987,19 @@
   </message>
   <message name="IDS_SETTINGS_DOWNLOADS_SHARE_ADDED_SUCCESS_MESSAGE" desc="The message shown when a new SMB share is successfully mounted.">
     Share mounted successfully.
+  </message>
+  <!-- TODO(b/254586358): Finalise Office files strings -->
+  <message name="IDS_SETTINGS_OFFICE_LABEL" translateable="false" desc="Label for the Settings link that takes the user to the Office files settings.">
+    Office
+  </message>
+  <message name="IDS_SETTINGS_OFFICE_SUBPAGE_TITLE" translateable="false" desc="Title of the Office subpage.">
+    Office files
+  </message>
+  <message name="IDS_SETTINGS_ALWAYS_MOVE_OFFICE_TO_DRIVE_PREFERENCE_LABEL" translateable="false" desc="Label for the preference that allows users to always move files to Drive without asking for confirmation.">
+    Ask before moving Microsoft files to Google Drive
+  </message>
+  <message name="IDS_SETTINGS_ALWAYS_MOVE_OFFICE_TO_ONEDRIVE_PREFERENCE_LABEL" translateable="false" desc="Label for the preference that allows users to always move files to OneDrive without asking for confirmation.">
+    Ask before moving Microsoft files to OneDrive
   </message>
 
   <!-- Accessibility -->
@@ -1189,11 +1230,38 @@
   <message name="IDS_SETTINGS_CHROMEVOX_MENU_ENABLE_EVENT_STREAM_LOGGING" desc="In the ChromeVox settings subpage, under developer options the label for the toggle that enables event stream logging.">
     Enable event stream logging
   </message>
+  <message name="IDS_SETTINGS_CHROMEVOX_BRAILLE_TABLE_DESCRIPTION" desc="In the ChromeVox settings subpage, the label for the braille table type list box and braille table selection list box. A braille table describes how text gets converted from a unicode encoding into a pattern of dots. This varies based on locale and contraction. See http://en.wikipedia.org/wiki/Braille for more.">
+    Select a braille table
+  </message>
+  <message name="IDS_SETTINGS_CHROMEVOX_BRAILLE_TABLE_6_DOT" desc="In the ChromeVox settings subpage, the label for the braille table type list item for 6-dot braille. A braille table describes how text gets converted from a unicode encoding into a pattern of dots. This varies based on locale and contraction. See http://en.wikipedia.org/wiki/Braille for more.">
+    6-dot
+  </message>
+  <message name="IDS_SETTINGS_CHROMEVOX_BRAILLE_TABLE_8_DOT" desc="In the ChromeVox settings subpage, the label for the braille table type list item for 8-dot braille. A braille table describes how text gets converted from a unicode encoding into a pattern of dots. This varies based on locale and contraction. See http://en.wikipedia.org/wiki/Braille for more.">
+    8-dot
+  </message>
   <message name="IDS_SETTINGS_CHROMEVOX_BRAILLE_WORD_WRAP" desc="In the ChromeVox settings subpage, the label for the toggle that enables wrapping of words if a whole line doesn't fit on a braille display. When this option is enabled, an effort is made to keep the characters of words together on the display. Otherwise, as many characters as possible are put on each braille display line, possible splitting words between lines.">
     Enable word wrap
   </message>
   <message name="IDS_SETTINGS_CHROMEVOX_MENU_BRAILLE_COMMANDS" desc="In the ChromeVox settings subpage, the label for the toggle that enables displaying Perkins Brailler commands in the ChromeVox menus.">
     Show braille commands in the ChromeVox menus
+  </message>
+  <message name="IDS_SETTINGS_CHROMEVOX_BLUETOOTH_BRAILLE_DISPLAY_CONNECT" desc="Labels a button which when pressed, connects to a selected bluetooth braille display.">
+    Connect
+  </message>
+  <message name="IDS_SETTINGS_CHROMEVOX_BLUETOOTH_BRAILLE_DISPLAY_DISCONNECT" desc="Labels a button which when pressed, disconnects from a selected bluetooth braille display.">
+    Disconnect
+  </message>
+  <message name="IDS_SETTINGS_CHROMEVOX_BLUETOOTH_BRAILLE_DISPLAY_CONNECTING" desc="Labels a button which is disabled and indicates the system is connecting to a bluetooth braille display.">
+    Connecting
+  </message>
+  <message name="IDS_SETTINGS_CHROMEVOX_BLUETOOTH_BRAILLE_DISPLAY_FORGET" desc="Labels a button which when pressed, forgets the selected bluetooth braille display.">
+    Forget
+  </message>
+  <message name="IDS_SETTINGS_CHROMEVOX_BLUETOOTH_BRAILLE_DISPLAY_PINCODE_LABEL" desc="Labels a text field which prompts the user for a pincode when pairing a bluetooth braille display.">
+    Please enter a pin
+  </message>
+  <message name="IDS_SETTINGS_CHROMEVOX_BLUETOOTH_BRAILLE_DISPLAY_SELECT_LABEL" desc="Labels a select control which lists all bluetooth braille displays.">
+    Select a bluetooth braille display
   </message>
   <message name="IDS_SETTINGS_CHROMEVOX_VIRTUAL_BRAILLE_DISPLAY" desc="In the ChromeVox settings subpage, a section header for options about the ChromeVox virtual braille display. This section lets users change the rows, columns, and display style of the virtual braille display.">
     Virtual Braille Display
@@ -1207,6 +1275,15 @@
   </message>
   <message name="IDS_SETTINGS_CHROMEVOX_VIRTUAL_BRAILLE_DISPLAY_COLUMNS" desc="In the ChromeVox settings subpage, the label for a numberic input field where the user can choose the number of cells in each line of a grid (virtual braille display) that allows the user to control a simulation of a refreshable braille display (a physical hardware device) in the panel at the top of the screen.">
     Cells in each line:
+  </message>
+  <message name="IDS_SETTINGS_CHROMEVOX_VIRTUAL_BRAILLE_DISPLAY_STYLE_LABEL" desc="A label for the dropdown that lets the user select the display style of the virtual display - interleaving braille and regular text (one on top of the other), or side by side where regular text is on the left and braille is on the right">
+    Display style
+  </message>
+  <message name="IDS_SETTINGS_CHROMEVOX_VIRTUAL_BRAILLE_DISPLAY_STYLE_INTERLEAVE" desc="A dropdown item that lets the user enable the display style of the virtual display that interleaves braille and regular text, one on top of the other.">
+    Interleave
+  </message>
+  <message name="IDS_SETTINGS_CHROMEVOX_VIRTUAL_BRAILLE_DISPLAY_STYLE_SIDE_BY_SIDE" desc="A dropdown item that lets the user enable the display style of the virtual display that is side by side, where regular text is on the left and braille is on the right.">
+    Side-by-side
   </message>
   <message name="IDS_SETTINGS_SCREEN_MAGNIFIER_LABEL" desc="Label for checkbox which enables the fullscreen magnifier">
     Full-screen magnifier
@@ -4097,6 +4174,9 @@ Press an assigned switch or key to remove assignment.
   <message name="IDS_SETTINGS_PEOPLE_RECOVERY_DISABLE_DIALOG_MESSAGE" desc="Text for the notification informing the user that local data recovery will be disabled">
     You will not be able to recover local data if you forget your password or PIN.
   </message>
+  <message name="IDS_SETTINGS_PEOPLE_RECOVERY_NOT_SUPPORTED_MESSAGE" desc="Text for the notification informing the user that local data recovery not supported">
+    Local data recovery is currently not supported. <ph name="LINK_BEGIN">&lt;a&gt;</ph>Learn more<ph name="LINK_END">&lt;/a&gt;</ph>.
+  </message>
 
   <!-- Kerberos section (OS settings) -->
   <message name="IDS_OS_SETTINGS_KERBEROS" desc="Name of a section in the OS settings page." meaning="Manage Kerberos authetication tickets.">
@@ -4675,6 +4755,15 @@ Press an assigned switch or key to remove assignment.
   <message name="IDS_SETTINGS_SET_DATE_TIME" desc="Label for the button that shows the dialog for setting the system date and time.">
     Set date and time
   </message>
+  <message name="IDS_SETTINGS_TIME_ZONE_GEOLOCATION_DIALOG_TITLE" desc="Title for the dialog, that pops up when user wants to access precise location for better time zone resolution, but the system geoocation access is disabled. This dialog asks if the user wants to enable the system geolocation access.">
+    Turn on precise location access?
+  </message>
+  <message name="IDS_SETTINGS_TIME_ZONE_GEOLOCATION_DIALOG_BODY" desc="Description text of the dialog that prompts the user to enable system geolocation access. This gives detailed explanation of the outcomes, if the user accepts the dialog.">
+    This allows apps and websites with the location permission and ChromeOS to use the location determined by your Wi-Fi or mobile networks. <ph name="LINK_BEGIN">&lt;a&gt;</ph>Learn more<ph name="LINK_END">&lt;/a&gt;</ph>
+  </message>
+  <message name="IDS_SETTINGS_TIME_ZONE_GEOLOCATION_DIALOG_CANCEL_BUTTON" desc="Label of the cancel button, that dismisses the geolocation dialog.">
+    Cancel
+  </message>
 
   <!-- Per Device Keyboard page (OS settings) -->
   <message name="IDS_SETTINGS_BUILT_IN_KEYBOARD_NAME" desc="In Device Settings, the name of the built-in/internal keyboard device within the settings app.">
@@ -5056,6 +5145,9 @@ Press an assigned switch or key to remove assignment.
   </message>
   <message name="IDS_OS_SETTINGS_PRIVACY_HUB_GEOLOCATION_TOGGLE_TITLE" desc="The title of the toggle to enable/disable geolocation from the privacy hub.">
     Location access
+  </message>
+  <message name="IDS_OS_SETTINGS_PRIVACY_HUB_GEOLOCATION_TOGGLE_DESC" desc="The title of the toggle to enable/disable geolocation from the privacy hub.">
+    Allow apps and websites and the system time zone to use the location determined by Google Location Service. If location access is turned off, your location may still be visible through your IP address.
   </message>
   <message name="IDS_OS_SETTINGS_HW_DATA_USAGE_TOGGLE_TITLE" desc="The label of the checkbox to enable/disable device hardware data collection and usage in ChromeOS Flex.">
     <ph name="DEVICE_OS">$1<ex>ChromeOS Flex</ex></ph> hardware support and stability

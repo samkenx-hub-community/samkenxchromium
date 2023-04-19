@@ -458,6 +458,11 @@ void WebApp::SetScopeExtensions(
   scope_extensions_ = std::move(scope_extensions);
 }
 
+void WebApp::SetValidatedScopeExtensions(
+    std::vector<ScopeExtensionInfo> validated_scope_extensions) {
+  validated_scope_extensions_ = std::move(validated_scope_extensions);
+}
+
 void WebApp::SetLockScreenStartUrl(const GURL& lock_screen_start_url) {
   DCHECK(lock_screen_start_url.is_empty() || lock_screen_start_url.is_valid());
   lock_screen_start_url_ = lock_screen_start_url;
@@ -717,7 +722,7 @@ base::Value WebApp::IsolationData::AsDebugValue() const {
 bool WebApp::operator==(const WebApp& other) const {
   auto AsTuple = [](const WebApp& app) {
     // Keep in order declared in web_app.h.
-    return std::make_tuple(
+    return std::tie(
         // Disable clang-format so diffs are clearer when fields are added.
         // clang-format off
         app.app_id_,
@@ -755,6 +760,7 @@ bool WebApp::operator==(const WebApp& other) const {
         app.disallowed_launch_protocols_,
         app.url_handlers_,
         app.scope_extensions_,
+        app.validated_scope_extensions_,
         app.lock_screen_start_url_,
         app.note_taking_new_note_url_,
         app.last_badging_time_,
@@ -782,12 +788,12 @@ bool WebApp::operator==(const WebApp& other) const {
         app.management_to_external_config_map_,
         app.tab_strip_,
         app.always_show_toolbar_in_fullscreen_,
-        app.current_os_integration_states_.SerializeAsString(),
+        app.current_os_integration_states_,
         app.isolation_data_
         // clang-format on
     );
   };
-  return (AsTuple(*this) == AsTuple(other));
+  return AsTuple(*this) == AsTuple(other);
 }
 
 bool WebApp::operator!=(const WebApp& other) const {
@@ -966,12 +972,8 @@ base::Value WebApp::AsDebugValueWithOnlyPlatformAgnosticFields() const {
       }
       json_decl.Set("feature", feature_name->second);
       base::Value::List allowlist_json;
-      // TODO(crbug.com/1418009): Consolidate code and filter opaque origins.
-      if (decl.self_if_matches) {
-        allowlist_json.Append(decl.self_if_matches->Serialize());
-      }
-      for (const auto& origin_with_possible_wildcards : decl.allowed_origins) {
-        allowlist_json.Append(origin_with_possible_wildcards.Serialize());
+      for (const auto& allowlist_item : GetSerializedAllowedOrigins(decl)) {
+        allowlist_json.Append(allowlist_item);
       }
       json_decl.Set("allowed_origins", std::move(allowlist_json));
       json_decl.Set("matches_all_origins", decl.matches_all_origins);
@@ -1019,6 +1021,9 @@ base::Value WebApp::AsDebugValueWithOnlyPlatformAgnosticFields() const {
   root.Set("url_handlers", ConvertDebugValueList(url_handlers_));
 
   root.Set("scope_extensions", ConvertDebugValueList(scope_extensions_));
+
+  root.Set("scope_extensions_validated",
+           ConvertDebugValueList(validated_scope_extensions_));
 
   root.Set("user_display_mode",
            user_display_mode_.has_value()
@@ -1126,6 +1131,37 @@ bool operator==(const WebApp::ExternalManagementConfig& management_config1,
 bool operator!=(const WebApp::ExternalManagementConfig& management_config1,
                 const WebApp::ExternalManagementConfig& management_config2) {
   return !(management_config1 == management_config2);
+}
+
+namespace proto {
+
+bool operator==(const WebAppOsIntegrationState& os_integration_state1,
+                const WebAppOsIntegrationState& os_integration_state2) {
+  return os_integration_state1.SerializeAsString() ==
+         os_integration_state2.SerializeAsString();
+}
+
+bool operator!=(const WebAppOsIntegrationState& os_integration_state1,
+                const WebAppOsIntegrationState& os_integration_state2) {
+  return !(os_integration_state1 == os_integration_state2);
+}
+
+}  // namespace proto
+
+std::vector<std::string> GetSerializedAllowedOrigins(
+    const blink::ParsedPermissionsPolicyDeclaration
+        permissions_policy_declaration) {
+  std::vector<std::string> allowed_origins;
+  if (permissions_policy_declaration.self_if_matches) {
+    CHECK(!permissions_policy_declaration.self_if_matches->opaque());
+    allowed_origins.push_back(
+        permissions_policy_declaration.self_if_matches->Serialize());
+  }
+  for (const auto& origin_with_possible_wildcards :
+       permissions_policy_declaration.allowed_origins) {
+    allowed_origins.push_back(origin_with_possible_wildcards.Serialize());
+  }
+  return allowed_origins;
 }
 
 }  // namespace web_app

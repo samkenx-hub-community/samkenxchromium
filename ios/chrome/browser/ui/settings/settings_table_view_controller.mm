@@ -49,10 +49,14 @@
 #import "ios/chrome/browser/search_engines/template_url_service_factory.h"
 #import "ios/chrome/browser/settings/sync/utils/identity_error_util.h"
 #import "ios/chrome/browser/settings/sync/utils/sync_state.h"
+#import "ios/chrome/browser/shared/coordinator/scene/scene_state.h"
+#import "ios/chrome/browser/shared/coordinator/scene/scene_state_browser_agent.h"
 #import "ios/chrome/browser/shared/public/commands/application_commands.h"
 #import "ios/chrome/browser/shared/public/commands/command_dispatcher.h"
 #import "ios/chrome/browser/shared/public/commands/snackbar_commands.h"
 #import "ios/chrome/browser/shared/public/features/features.h"
+#import "ios/chrome/browser/shared/ui/symbols/buildflags.h"
+#import "ios/chrome/browser/shared/ui/symbols/symbols.h"
 #import "ios/chrome/browser/shared/ui/table_view/cells/table_view_detail_icon_item.h"
 #import "ios/chrome/browser/shared/ui/table_view/cells/table_view_image_item.h"
 #import "ios/chrome/browser/shared/ui/table_view/cells/table_view_info_button_cell.h"
@@ -80,10 +84,6 @@
 #import "ios/chrome/browser/ui/authentication/signin_presenter.h"
 #import "ios/chrome/browser/ui/authentication/signin_promo_view_mediator.h"
 #import "ios/chrome/browser/ui/content_suggestions/content_suggestions_feature.h"
-#import "ios/chrome/browser/ui/icons/buildflags.h"
-#import "ios/chrome/browser/ui/icons/symbols.h"
-#import "ios/chrome/browser/ui/main/scene_state.h"
-#import "ios/chrome/browser/ui/main/scene_state_browser_agent.h"
 #import "ios/chrome/browser/ui/ntp/new_tab_page_feature.h"
 #import "ios/chrome/browser/ui/settings/about_chrome_table_view_controller.h"
 #import "ios/chrome/browser/ui/settings/autofill/autofill_credit_card_table_view_controller.h"
@@ -100,6 +100,7 @@
 #import "ios/chrome/browser/ui/settings/google_services/manage_sync_settings_coordinator.h"
 #import "ios/chrome/browser/ui/settings/language/language_settings_mediator.h"
 #import "ios/chrome/browser/ui/settings/language/language_settings_table_view_controller.h"
+#import "ios/chrome/browser/ui/settings/password/password_checkup/password_checkup_utils.h"
 #import "ios/chrome/browser/ui/settings/password/passwords_coordinator.h"
 #import "ios/chrome/browser/ui/settings/price_notifications/price_notifications_coordinator.h"
 #import "ios/chrome/browser/ui/settings/privacy/privacy_coordinator.h"
@@ -129,9 +130,6 @@
 #endif
 
 namespace {
-
-// The size of trailing symbol icons for unsafe state.
-NSInteger kTrailingSymbolImagePointSize = 22;
 
 // Key used for storing NSUserDefault entry to keep track of the last timestamp
 // we've shown the default browser blue dot promo.
@@ -200,6 +198,8 @@ UIImage* GetBrandedGoogleServicesSymbol() {
   // PrefBackedBoolean that overrides ArticlesForYou switch for supervised
   // users.
   PrefBackedBoolean* _contentSuggestionForSupervisedUsersEnabled;
+  // PrefBackedBoolean for BottomOmnibox switch.
+  PrefBackedBoolean* _bottomOmniboxEnabled;
   // The item related to the switch for the show suggestions setting.
   TableViewSwitchItem* _showMemoryDebugToolsItem;
   // The item related to the safety check.
@@ -253,6 +253,8 @@ UIImage* GetBrandedGoogleServicesSymbol() {
   TabsSettingsCoordinator* _tabsCoordinator;
 }
 
+// The item related to the switch for the bottom omnibox settings.
+@property(nonatomic, strong, readonly) TableViewSwitchItem* bottomOmniboxItem;
 // The item related to the switch for the show feed settings.
 @property(nonatomic, strong, readonly) TableViewSwitchItem* feedSettingsItem;
 // The item related to the enterprise managed show feed settings.
@@ -276,6 +278,7 @@ UIImage* GetBrandedGoogleServicesSymbol() {
 @end
 
 @implementation SettingsTableViewController
+@synthesize bottomOmniboxItem = _bottomOmniboxItem;
 @synthesize dispatcher = _dispatcher;
 @synthesize managedFeedSettingsItem = _managedFeedSettingsItem;
 @synthesize feedSettingsItem = _feedSettingsItem;
@@ -340,6 +343,11 @@ UIImage* GetBrandedGoogleServicesSymbol() {
                    prefName:prefs::kArticlesForYouEnabled];
     [_articlesEnabled setObserver:self];
 
+    _bottomOmniboxEnabled =
+        [[PrefBackedBoolean alloc] initWithPrefService:prefService
+                                              prefName:prefs::kBottomOmnibox];
+    [_bottomOmniboxEnabled setObserver:self];
+
     _contentSuggestionPolicyEnabled = [[PrefBackedBoolean alloc]
         initWithPrefService:prefService
                    prefName:prefs::kNTPContentSuggestionsEnabled];
@@ -402,6 +410,12 @@ UIImage* GetBrandedGoogleServicesSymbol() {
       UINavigationItemLargeTitleDisplayModeAlways;
 }
 
+- (void)viewWillAppear:(BOOL)animated {
+  [super viewWillAppear:animated];
+  // Update the `_safetyCheckItem` icon when returning to this view controller.
+  [self updateSafetyCheckItemTrailingIcon];
+}
+
 #pragma mark SettingsRootTableViewController
 
 - (void)loadModel {
@@ -443,6 +457,10 @@ UIImage* GetBrandedGoogleServicesSymbol() {
   }
   [model addItem:[self voiceSearchDetailItem]
       toSectionWithIdentifier:SettingsSectionIdentifierAdvanced];
+  if (base::FeatureList::IsEnabled(kBottomOmniboxSteadyState)) {
+    [model addItem:[self bottomOmniboxItem]
+        toSectionWithIdentifier:SettingsSectionIdentifierAdvanced];
+  };
   [model addItem:[self safetyCheckDetailItem]
       toSectionWithIdentifier:SettingsSectionIdentifierAdvanced];
   [model addItem:[self privacyDetailItem]
@@ -881,6 +899,23 @@ UIImage* GetBrandedGoogleServicesSymbol() {
   return _voiceSearchDetailItem;
 }
 
+- (TableViewItem*)bottomOmniboxItem {
+  DCHECK(base::FeatureList::IsEnabled(kBottomOmniboxSteadyState));
+  if (!_bottomOmniboxItem) {
+    _bottomOmniboxItem =
+        [self switchItemWithType:SettingsItemTypeBottomOmnibox
+                              // TODO(crbug.com/1430093): add title.
+                              title:@"Bottom Omnibox"
+                             // TODO(crbug.com/1430093): add symbol.
+                             symbol:DefaultSettingsRootSymbol(kDiscoverSymbol)
+              // TODO(crbug.com/1430093): change background color.
+              symbolBackgroundColor:[UIColor colorNamed:kGreen500Color]
+            accessibilityIdentifier:kSettingsBottomOmniboxCellId];
+    _bottomOmniboxItem.on = [_bottomOmniboxEnabled value];
+  }
+  return _bottomOmniboxItem;
+}
+
 - (SettingsCheckItem*)safetyCheckDetailItem {
   NSString* safetyCheckTitle =
       l10n_util::GetNSString(IDS_OPTIONS_ADVANCED_SECTION_TITLE_SAFETY_CHECK);
@@ -900,11 +935,7 @@ UIImage* GetBrandedGoogleServicesSymbol() {
       kColorfulBackgroundSymbolCornerRadius;
   // Check if an issue state should be shown for updates.
   if (!IsAppUpToDate() && PreviousSafetyCheckIssueFound()) {
-    // TODO(crbug.com/1406540): Incorporate the new insecure types.
-    UIImage* unSafeIconImage = DefaultSymbolTemplateWithPointSize(
-        kWarningFillSymbol, kTrailingSymbolImagePointSize);
-    _safetyCheckItem.trailingImage = unSafeIconImage;
-    _safetyCheckItem.trailingImageTintColor = [UIColor colorNamed:kRedColor];
+    [self updateSafetyCheckItemTrailingIcon];
   }
 
   return _safetyCheckItem;
@@ -1155,6 +1186,14 @@ UIImage* GetBrandedGoogleServicesSymbol() {
           base::mac::ObjCCastStrict<TableViewSwitchCell>(cell);
       [switchCell.switchView addTarget:self
                                 action:@selector(articlesForYouSwitchToggled:)
+                      forControlEvents:UIControlEventValueChanged];
+      break;
+    }
+    case SettingsItemTypeBottomOmnibox: {
+      TableViewSwitchCell* switchCell =
+          base::mac::ObjCCastStrict<TableViewSwitchCell>(cell);
+      [switchCell.switchView addTarget:self
+                                action:@selector(bottomOmniboxSwitchToggled:)
                       forControlEvents:UIControlEventValueChanged];
       break;
     }
@@ -1486,6 +1525,21 @@ UIImage* GetBrandedGoogleServicesSymbol() {
   [_articlesEnabled setValue:newSwitchValue];
 }
 
+- (void)bottomOmniboxSwitchToggled:(UISwitch*)sender {
+  DCHECK(base::FeatureList::IsEnabled(kBottomOmniboxSteadyState));
+  NSIndexPath* switchPath = [self.tableViewModel
+      indexPathForItemType:SettingsItemTypeBottomOmnibox
+         sectionIdentifier:SettingsSectionIdentifierAdvanced];
+
+  TableViewSwitchItem* switchItem =
+      base::mac::ObjCCastStrict<TableViewSwitchItem>(
+          [self.tableViewModel itemAtIndexPath:switchPath]);
+
+  BOOL newSwitchValue = sender.isOn;
+  switchItem.on = newSwitchValue;
+  [_bottomOmniboxEnabled setValue:newSwitchValue];
+}
+
 #if BUILDFLAG(CHROMIUM_BRANDING) && !defined(NDEBUG)
 - (void)viewSourceSwitchToggled:(UISwitch*)sender {
   NSIndexPath* switchPath =
@@ -1563,17 +1617,33 @@ UIImage* GetBrandedGoogleServicesSymbol() {
   return !_passwordCheckManager->GetInsecureCredentials().empty();
 }
 
-// Displays a red issue state on `_safetyCheckItem` if there is a reamining
-// issue for any of the checks.
-- (void)setSafetyCheckIssueStateUnsafe:(BOOL)isUnsafe {
-  if (isUnsafe && PreviousSafetyCheckIssueFound()) {
-    UIImage* unSafeIconImage = DefaultSymbolTemplateWithPointSize(
-        kWarningFillSymbol, kTrailingSymbolImagePointSize);
-    _safetyCheckItem.trailingImage = unSafeIconImage;
-    _safetyCheckItem.trailingImageTintColor = [UIColor colorNamed:kRedColor];
-  } else {
+// Displays a warning icon in the `_safetyCheckItem` if there is a reamining
+// issue for any of the safety checks.
+- (void)updateSafetyCheckItemTrailingIcon {
+  if (!_safetyCheckItem) {
+    return;
+  }
+
+  if (!PreviousSafetyCheckIssueFound()) {
     _safetyCheckItem.trailingImage = nil;
     _safetyCheckItem.trailingImageTintColor = nil;
+    return;
+  }
+
+  if (!IsAppUpToDate()) {
+    _safetyCheckItem.warningState = WarningState::kSevereWarning;
+  } else if ([self hasPasswordIssuesRemaining]) {
+    password_manager::WarningType warningType = GetWarningOfHighestPriority(
+        _passwordCheckManager->GetInsecureCredentials());
+    if (warningType ==
+        password_manager::WarningType::kCompromisedPasswordsWarning) {
+      _safetyCheckItem.warningState = WarningState::kSevereWarning;
+    } else {
+      // Severe warning is of higher priority than a regular warning. Only show
+      // the regular warning icon if there isn't any severe warning existing for
+      // another part of the Safety Check module.
+      _safetyCheckItem.warningState = WarningState::kWarning;
+    }
   }
   [self reconfigureCellsForItems:@[ _safetyCheckItem ]];
 }
@@ -1888,6 +1958,10 @@ UIImage* GetBrandedGoogleServicesSymbol() {
   [_allowChromeSigninPreference setObserver:nil];
   _allowChromeSigninPreference = nil;
 
+  [_bottomOmniboxEnabled stop];
+  [_bottomOmniboxEnabled setObserver:nil];
+  _bottomOmniboxEnabled = nil;
+
   [_contentSuggestionPolicyEnabled stop];
   [_contentSuggestionPolicyEnabled setObserver:nil];
   _contentSuggestionPolicyEnabled = nil;
@@ -2024,7 +2098,7 @@ UIImage* GetBrandedGoogleServicesSymbol() {
   // Settings may have been dismissed in the meantime as the callback is
   // asynchronous. There is no UI to update in that case.
   if (!_settingsAreDismissed) {
-    [self setSafetyCheckIssueStateUnsafe:[self hasPasswordIssuesRemaining]];
+    [self updateSafetyCheckItemTrailingIcon];
   }
 }
 
@@ -2032,7 +2106,7 @@ UIImage* GetBrandedGoogleServicesSymbol() {
   // Settings may have been dismissed in the meantime as the callback is
   // asynchronous. There is no UI to update in that case.
   if (!_settingsAreDismissed) {
-    [self setSafetyCheckIssueStateUnsafe:[self hasPasswordIssuesRemaining]];
+    [self updateSafetyCheckItemTrailingIcon];
   }
 }
 

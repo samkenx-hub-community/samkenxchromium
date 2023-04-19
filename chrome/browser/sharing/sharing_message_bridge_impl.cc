@@ -118,7 +118,7 @@ SharingMessageBridgeImpl::CreateMetadataChangeList() {
   return std::make_unique<syncer::DummyMetadataChangeList>();
 }
 
-absl::optional<syncer::ModelError> SharingMessageBridgeImpl::MergeSyncData(
+absl::optional<syncer::ModelError> SharingMessageBridgeImpl::MergeFullSyncData(
     std::unique_ptr<syncer::MetadataChangeList> metadata_change_list,
     syncer::EntityChangeList entity_data) {
   DCHECK(entity_data.empty());
@@ -126,7 +126,8 @@ absl::optional<syncer::ModelError> SharingMessageBridgeImpl::MergeSyncData(
   return {};
 }
 
-absl::optional<syncer::ModelError> SharingMessageBridgeImpl::ApplySyncChanges(
+absl::optional<syncer::ModelError>
+SharingMessageBridgeImpl::ApplyIncrementalSyncChanges(
     std::unique_ptr<syncer::MetadataChangeList> metadata_change_list,
     syncer::EntityChangeList entity_changes) {
   sync_pb::SharingMessageCommitError no_error_message;
@@ -226,7 +227,7 @@ SharingMessageBridgeImpl::OnCommitAttemptFailed(
   return CommitAttemptFailedBehavior::kDontRetryOnNextCycle;
 }
 
-void SharingMessageBridgeImpl::ApplyStopSyncChanges(
+void SharingMessageBridgeImpl::ApplyDisableSyncChanges(
     std::unique_ptr<syncer::MetadataChangeList> metadata_change_list) {
   sync_pb::SharingMessageCommitError sync_disabled_error_message;
   sync_disabled_error_message.set_error_code(
@@ -236,6 +237,14 @@ void SharingMessageBridgeImpl::ApplyStopSyncChanges(
     cth_and_commit.second.timed_callback->Run(sync_disabled_error_message);
   }
   pending_commits_.clear();
+}
+
+void SharingMessageBridgeImpl::OnSyncPaused() {
+  // The controller always clears metadata so this is only reachable for the
+  // case where the initial download is interrupted before MergeFullSyncData()
+  // is invoked, which means there are no outgoing messages.
+  CHECK(!change_processor()->IsTrackingMetadata());
+  CHECK(pending_commits_.empty());
 }
 
 void SharingMessageBridgeImpl::ProcessCommitTimeout(

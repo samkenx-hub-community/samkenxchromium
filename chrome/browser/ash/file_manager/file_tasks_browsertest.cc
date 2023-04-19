@@ -50,7 +50,7 @@
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/web_applications/test/web_app_browsertest_util.h"
-#include "chrome/browser/ui/web_applications/web_app_launch_manager.h"
+#include "chrome/browser/ui/web_applications/web_app_launch_process.h"
 #include "chrome/browser/ui/webui/ash/cloud_upload/cloud_upload_dialog.h"
 #include "chrome/browser/ui/webui/ash/cloud_upload/cloud_upload_util.h"
 #include "chrome/browser/ui/webui/ash/office_fallback/office_fallback_ui.h"
@@ -61,6 +61,7 @@
 #include "chrome/browser/web_applications/web_app_registry_update.h"
 #include "chrome/browser/web_applications/web_app_sync_bridge.h"
 #include "chrome/common/chrome_paths.h"
+#include "chrome/common/extensions/extension_constants.h"
 #include "chrome/common/webui_url_constants.h"
 #include "chrome/test/base/in_process_browser_test.h"
 #include "chrome/test/base/mixin_based_in_process_browser_test.h"
@@ -516,7 +517,7 @@ IN_PROC_BROWSER_TEST_P(FileTasksBrowserTest, ExecuteWebApp) {
   }
 
   base::RunLoop run_loop;
-  web_app::WebAppLaunchManager::SetOpenApplicationCallbackForTesting(
+  web_app::WebAppLaunchProcess::SetOpenApplicationCallbackForTesting(
       base::BindLambdaForTesting(
           [&run_loop](apps::AppLaunchParams&& params) -> content::WebContents* {
             if (GetParam().crosapi_state ==
@@ -1413,9 +1414,10 @@ class OneDriveTest : public TestAccountBrowserTest {
     // `FakeProvidedFileSystemOneDrive`. The use of `base::Unretained()` is safe
     // because the class will exist for the duration of the test.
     service_->RegisterProvider(FakeExtensionProviderOneDrive::Create(
-        kODFSExtensionId, test_path_within_odfs_, test_file_name_));
+        extension_misc::kODFSExtensionId, test_path_within_odfs_,
+        test_file_name_));
     provider_id_ = ash::file_system_provider::ProviderId::CreateFromExtensionId(
-        kODFSExtensionId);
+        extension_misc::kODFSExtensionId);
     ash::file_system_provider::MountOptions options(file_system_id_, "ODFS");
     EXPECT_EQ(base::File::FILE_OK,
               service_->MountFileSystem(provider_id_, options));

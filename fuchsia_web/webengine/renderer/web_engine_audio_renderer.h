@@ -243,7 +243,10 @@ class WEB_ENGINE_EXPORT WebEngineAudioRenderer final
   // Values from TimelineFunction returned by AudioConsumer.
   base::TimeTicks reference_time_ GUARDED_BY(timeline_lock_);
   base::TimeDelta media_pos_ GUARDED_BY(timeline_lock_);
-  int32_t media_delta_ GUARDED_BY(timeline_lock_) = 1;
+
+  // Initialize `media_delta_` to 0 because media clock isn't ticking until
+  // playback has started.
+  int32_t media_delta_ GUARDED_BY(timeline_lock_) = 0;
   int32_t reference_delta_ GUARDED_BY(timeline_lock_) = 1;
 
   THREAD_CHECKER(thread_checker_);

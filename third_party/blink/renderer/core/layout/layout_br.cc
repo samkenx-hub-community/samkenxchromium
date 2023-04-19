@@ -34,23 +34,9 @@ static String NewlineString() {
   return string;
 }
 
-LayoutBR::LayoutBR(HTMLBRElement& node)
-    : LayoutNGText(&node, NewlineString()) {}
+LayoutBR::LayoutBR(HTMLBRElement& node) : LayoutText(&node, NewlineString()) {}
 
 LayoutBR::~LayoutBR() = default;
-
-int LayoutBR::LineHeight(bool first_line) const {
-  NOT_DESTROYED();
-  const ComputedStyle& style = StyleRef(
-      first_line && GetDocument().GetStyleEngine().UsesFirstLineRules());
-  return style.ComputedLineHeight();
-}
-
-void LayoutBR::StyleDidChange(StyleDifference diff,
-                              const ComputedStyle* old_style) {
-  NOT_DESTROYED();
-  LayoutNGText::StyleDidChange(diff, old_style);
-}
 
 int LayoutBR::CaretMinOffset() const {
   NOT_DESTROYED();

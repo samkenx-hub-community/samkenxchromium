@@ -13,24 +13,53 @@ namespace chromeos::converters {
 TEST(TelemetryExtensionEventsApiConvertersUnitTest, ConvertAudioJackState) {
   EXPECT_EQ(Convert(crosapi::mojom::TelemetryAudioJackEventInfo::State::
                         kUnmappedEnumField),
-            api::os_events::AudioJackEventState::kNone);
+            api::os_events::AudioJackEvent::kNone);
 
   EXPECT_EQ(Convert(crosapi::mojom::TelemetryAudioJackEventInfo::State::kAdd),
-            api::os_events::AudioJackEventState::kAdd);
+            api::os_events::AudioJackEvent::kConnected);
 
   EXPECT_EQ(
       Convert(crosapi::mojom::TelemetryAudioJackEventInfo::State::kRemove),
-      api::os_events::AudioJackEventState::kRemove);
+      api::os_events::AudioJackEvent::kDisconnected);
+}
+
+TEST(TelemetryExtensionEventsApiConvertersUnitTest,
+     ConvertAudioJackDeviceType) {
+  EXPECT_EQ(Convert(crosapi::mojom::TelemetryAudioJackEventInfo::DeviceType::
+                        kUnmappedEnumField),
+            api::os_events::AudioJackDeviceType::kNone);
+
+  EXPECT_EQ(
+      Convert(
+          crosapi::mojom::TelemetryAudioJackEventInfo::DeviceType::kHeadphone),
+      api::os_events::AudioJackDeviceType::kHeadphone);
+
+  EXPECT_EQ(
+      Convert(
+          crosapi::mojom::TelemetryAudioJackEventInfo::DeviceType::kMicrophone),
+      api::os_events::AudioJackDeviceType::kMicrophone);
+}
+
+TEST(TelemetryExtensionEventsApiConvertersUnitTest, ConvertEventCategoryEnum) {
+  EXPECT_EQ(Convert(api::os_events::EventCategory::kNone),
+            crosapi::mojom::TelemetryEventCategoryEnum::kUnmappedEnumField);
+
+  EXPECT_EQ(Convert(api::os_events::EventCategory::kAudioJack),
+            crosapi::mojom::TelemetryEventCategoryEnum::kAudioJack);
 }
 
 TEST(TelemetryExtensionEventsApiConvertersUnitTest, ConvertAudioJackEventInfo) {
   auto input = crosapi::mojom::TelemetryAudioJackEventInfo::New();
   input->state = crosapi::mojom::TelemetryAudioJackEventInfo::State::kAdd;
+  input->device_type =
+      crosapi::mojom::TelemetryAudioJackEventInfo::DeviceType::kHeadphone;
 
   auto result =
       ConvertEventPtr<api::os_events::AudioJackEventInfo>(std::move(input));
 
-  EXPECT_EQ(result.event_state, api::os_events::AudioJackEventState::kAdd);
+  EXPECT_EQ(result.event, api::os_events::AudioJackEvent::kConnected);
+  EXPECT_EQ(result.device_type,
+            api::os_events::AudioJackDeviceType::kHeadphone);
 }
 
 }  // namespace chromeos::converters

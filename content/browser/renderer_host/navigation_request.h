@@ -34,6 +34,8 @@
 #include "content/browser/renderer_host/navigation_type.h"
 #include "content/browser/renderer_host/render_frame_host_impl.h"
 #include "content/browser/site_instance_impl.h"
+#include "content/browser/webui/web_ui_controller_factory_registry.h"
+#include "content/browser/webui/web_ui_impl.h"
 #include "content/common/content_export.h"
 #include "content/common/navigation_client.mojom-forward.h"
 #include "content/public/browser/global_routing_id.h"
@@ -42,6 +44,7 @@
 #include "content/public/browser/prerender_trigger_type.h"
 #include "content/public/browser/render_process_host_observer.h"
 #include "content/public/browser/weak_document_ptr.h"
+#include "content/public/browser/web_ui_controller.h"
 #include "mojo/public/cpp/bindings/associated_remote.h"
 #include "mojo/public/cpp/bindings/pending_associated_remote.h"
 #include "mojo/public/cpp/bindings/pending_remote.h"
@@ -427,9 +430,13 @@ class CONTENT_EXPORT NavigationRequest
 #endif
   base::SafeRef<NavigationHandle> GetSafeRef() override;
   bool ExistingDocumentWasDiscarded() const override;
+  blink::RuntimeFeatureStateContext& GetMutableRuntimeFeatureStateContext()
+      override;
+  // End of NavigationHandle implementation.
 
-  // mojom::NavigationRendererCancellationListener implementation
+  // mojom::NavigationRendererCancellationListener implementation:
   void RendererCancellationWindowEnded() override;
+  // End of mojom::NavigationRendererCancellationListener implementation.
 
   void RegisterCommitDeferringConditionForTesting(
       std::unique_ptr<CommitDeferringCondition> condition);
@@ -791,6 +798,12 @@ class CONTENT_EXPORT NavigationRequest
   // Must only be called after ReadyToCommitNavigation().
   blink::mojom::PolicyContainerPtr CreatePolicyContainerForBlink();
 
+  // Returns a new refptr to this navigation's PolicyContainerHost.
+  //
+  // Must only be called after ReadyToCommitNavigation().
+  // It is invalid to call after `TakePolicyContainerHost()`.
+  scoped_refptr<PolicyContainerHost> GetPolicyContainerHost();
+
   // Moves this navigation's PolicyContainerHost out of this instance.
   //
   // Must only be called after ReadyToCommitNavigation().
@@ -1078,18 +1091,13 @@ class CONTENT_EXPORT NavigationRequest
   // for a ViewTransition.
   void SetViewTransitionState(blink::ViewTransitionState view_transition_state);
 
-  // Returns a mutable reference to a blink::RuntimeFeatureStateContext object,
-  // which exposes the getters and setters for Blink Runtime-Enabled Features to
-  // the browser process. Any feature set using the RuntimeFeatureStateContext
-  // before navigation commit will be communicated back to the renderer process.
+  // Returns a const reference to a blink::RuntimeFeatureStateContext (RFSC)
+  // object. Once the commit params are sent to the renderer we no longer allow
+  // write access to the RFSC, but read access is still available.
   //
-  // This function should not be called once the navigation has been committed.
-  // NOTE: these feature changes will apply to the "to-be-created" document.
-  blink::RuntimeFeatureStateContext& GetMutableRuntimeFeatureStateContext();
-
-  // Returns a const reference to a blink::RuntimeFeatureStateContext object.
-  // Once the commit params are sent to the renderer we no longer allow write
-  // access to the RFSC, but read access is still available.
+  // Note: This method has another
+  // version, `GetMutableRuntimeFeatureStateContext()`, accessible via
+  // NavigationHandle and will return a mutable reference to the RFSC.
   const blink::RuntimeFeatureStateContext& GetRuntimeFeatureStateContext();
 
   BrowsingContextGroupSwap browsing_context_group_swap() const {
@@ -1171,6 +1179,20 @@ class CONTENT_EXPORT NavigationRequest
 
   void set_resume_commit_closure(base::OnceClosure closure) {
     resume_commit_closure_ = std::move(closure);
+  }
+
+  // Creates a WebUI object for this navigation and saves it in `web_ui_`. Later
+  // on, the WebUI created will be moved to `frame_host` (if `frame_host` is
+  // null, it means a RenderFrameHost has not been picked for the navigation).
+  void CreateWebUIIfNeeded(RenderFrameHostImpl* frame_host);
+
+  bool HasWebUI() { return !!web_ui_; }
+
+  WebUIImpl* web_ui() { return web_ui_.get(); }
+
+  std::unique_ptr<WebUIImpl> TakeWebUI() {
+    CHECK(HasWebUI());
+    return std::move(web_ui_);
   }
 
  private:
@@ -1830,8 +1852,9 @@ class CONTENT_EXPORT NavigationRequest
 
   // Called on FrameTreeNode's queued NavigationRequest (if any) when another
   // NavigationRequest associated with the same FrameTreeNode is destroyed and
-  // the queued NavigationRequest can be resumed.
-  void ResumeCommit();
+  // the queued NavigationRequest can be resumed. Will post a task to run the
+  // `resume_commit_closure_` asynchronously.
+  void PostResumeCommitTask();
 
   // Used to detect if the page being navigated to is participating in the
   // related deprecation trial and recording that in NavigationControllerImpl.
@@ -2535,6 +2558,11 @@ class CONTENT_EXPORT NavigationRequest
   // See `RenderFrameHostImpl::CookieChangeListener`.
   std::unique_ptr<RenderFrameHostImpl::CookieChangeListener>
       cookie_change_listener_;
+
+  // The WebUI object to be used for this navigation. When a RenderFrameHost has
+  // been picked for the navigation, the WebUI object will be moved to be owned
+  // by the RenderFrameHost.
+  std::unique_ptr<WebUIImpl> web_ui_;
 
   base::WeakPtrFactory<NavigationRequest> weak_factory_{this};
 };

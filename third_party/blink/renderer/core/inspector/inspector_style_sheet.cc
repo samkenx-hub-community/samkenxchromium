@@ -151,7 +151,7 @@ void GetClassNamesFromRule(CSSStyleRule* rule, HashSet<String>& unique_names) {
     while (simple_selector) {
       if (simple_selector->Match() == CSSSelector::kClass)
         unique_names.insert(simple_selector->Value());
-      simple_selector = simple_selector->TagHistory();
+      simple_selector = simple_selector->NextSimpleSelector();
     }
   }
 }
@@ -1198,7 +1198,8 @@ CSSRule* InspectorStyleSheet::SetStyleText(const SourceRange& range,
 
   CSSRule* rule = RuleForSourceData(source_data);
   if (!rule || !rule->parentStyleSheet() ||
-      (!IsA<CSSStyleRule>(rule) && !IsA<CSSKeyframeRule>(rule))) {
+      (!IsA<CSSStyleRule>(rule) && !IsA<CSSKeyframeRule>(rule) &&
+       !IsA<CSSTryRule>(rule))) {
     exception_state.ThrowDOMException(
         DOMExceptionCode::kNotFoundError,
         "Source range didn't match existing style source range");
@@ -1206,10 +1207,13 @@ CSSRule* InspectorStyleSheet::SetStyleText(const SourceRange& range,
   }
 
   CSSStyleDeclaration* style = nullptr;
-  if (auto* style_rule = DynamicTo<CSSStyleRule>(rule))
+  if (auto* style_rule = DynamicTo<CSSStyleRule>(rule)) {
     style = style_rule->style();
-  else
+  } else if (IsA<CSSTryRule>(rule)) {
+    style = To<CSSTryRule>(rule)->style();
+  } else {
     style = To<CSSKeyframeRule>(rule)->style();
+  }
 
   Document* owner_document = page_style_sheet_->OwnerDocument();
   ExecutionContext* execution_context =
@@ -1787,6 +1791,10 @@ InspectorStyleSheet::BuildObjectForStyleSheetInfo() {
   if (HasSourceURL())
     result->setHasSourceURL(true);
 
+  if (request_failed_to_load_.has_value()) {
+    result->setLoadingFailed(*request_failed_to_load_);
+  }
+
   if (style_sheet->ownerNode()) {
     result->setOwnerNode(
         IdentifiersFactory::IntIdForNode(style_sheet->ownerNode()));
@@ -2195,7 +2203,8 @@ const CSSRuleVector& InspectorStyleSheet::FlatRules() {
   return cssom_flat_rules_;
 }
 
-bool InspectorStyleSheet::ResourceStyleSheetText(String* result) {
+bool InspectorStyleSheet::ResourceStyleSheetText(String* result,
+                                                 bool* loadingFailed) {
   if (origin_ == protocol::CSS::StyleSheetOriginEnum::Injected ||
       origin_ == protocol::CSS::StyleSheetOriginEnum::UserAgent)
     return false;
@@ -2218,7 +2227,8 @@ bool InspectorStyleSheet::ResourceStyleSheetText(String* result) {
 
   bool base64_encoded;
   bool success = network_agent_->FetchResourceContent(
-      page_style_sheet_->OwnerDocument(), KURL(href), result, &base64_encoded);
+      page_style_sheet_->OwnerDocument(), KURL(href), result, &base64_encoded,
+      loadingFailed);
   return success && !base64_encoded;
 }
 
@@ -2271,11 +2281,15 @@ void InspectorStyleSheet::SyncTextIfNeeded() {
 
 void InspectorStyleSheet::UpdateText() {
   String text;
+  request_failed_to_load_.reset();
   bool success = InspectorStyleSheetText(&text);
   if (!success)
     success = InlineStyleSheetText(&text);
-  if (!success)
-    success = ResourceStyleSheetText(&text);
+  if (!success) {
+    bool loadingFailed = false;
+    success = ResourceStyleSheetText(&text, &loadingFailed);
+    request_failed_to_load_ = loadingFailed;
+  }
   if (!success)
     success = CSSOMStyleSheetText(&text);
   if (success)

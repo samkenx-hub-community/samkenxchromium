@@ -48,8 +48,8 @@ import org.chromium.chrome.browser.ui.native_page.TouchEnabledDelegate;
 import org.chromium.chrome.browser.ui.signin.PersonalizedSigninPromoView;
 import org.chromium.chrome.browser.ui.signin.SyncPromoController;
 import org.chromium.chrome.browser.xsurface.FeedLaunchReliabilityLogger;
-import org.chromium.chrome.browser.xsurface.FeedLaunchReliabilityLogger.StreamType;
 import org.chromium.chrome.browser.xsurface.ListLayoutHelper;
+import org.chromium.chrome.browser.xsurface.feed.StreamType;
 import org.chromium.components.browser_ui.widget.listmenu.ListMenu;
 import org.chromium.components.browser_ui.widget.listmenu.ListMenuItemProperties;
 import org.chromium.components.feed.proto.wire.ReliabilityLoggingEnums.DiscoverLaunchResult;
@@ -824,8 +824,8 @@ public class FeedSurfaceMediator
         mSectionHeaderModel.set(SectionHeaderListProperties.IS_LOGO_KEY,
                 !isGoogleSearchEngine && isSignedIn && suggestionsVisible);
         ViewVisibility indicatorState;
-        if (!isSignedIn || !suggestionsVisible) {
-            // Gone when not signed in or feed off to align text to far left.
+        if (!isTabMode) {
+            // Gone when the following/for you tab switcher header is not shown
             indicatorState = ViewVisibility.GONE;
         } else if (!isGoogleSearchEngine) {
             // Visible when Google is not the search engine (show logo).

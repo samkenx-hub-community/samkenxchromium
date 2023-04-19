@@ -73,6 +73,9 @@ import org.chromium.chrome.browser.ui.appmenu.AppMenuItemProperties;
 import org.chromium.chrome.browser.ui.appmenu.AppMenuPropertiesDelegate;
 import org.chromium.chrome.browser.ui.appmenu.AppMenuUtil;
 import org.chromium.chrome.browser.ui.appmenu.CustomViewBinder;
+import org.chromium.chrome.browser.util.BrowserUiUtils;
+import org.chromium.chrome.browser.util.BrowserUiUtils.HostSurface;
+import org.chromium.chrome.browser.util.BrowserUiUtils.ModuleTypeOnStartAndNTP;
 import org.chromium.chrome.browser.webapps.WebappRegistry;
 import org.chromium.chrome.features.start_surface.StartSurface;
 import org.chromium.chrome.features.start_surface.StartSurfaceState;
@@ -572,27 +575,12 @@ public class AppMenuPropertiesDelegateImpl implements AppMenuPropertiesDelegate 
                 && TabUiFeatureUtilities.isTabGroupsAndroidEnabled(mContext)
                 && !DeviceClassManager.enableAccessibilityLayout(mContext);
 
-        boolean isMenuSelectTabsEnabled = false;
-        boolean isMenuSelectTabsVisible = false;
-        boolean isMenuGroupTabsEnabled = false;
-        boolean isMenuGroupTabsVisible = false;
-
-        if (TabUiFeatureUtilities.isTabSelectionEditorV2Enabled(mContext)) {
-            isMenuSelectTabsVisible = isTabSelectionEditorContext;
-            isMenuSelectTabsEnabled = !isIncognitoReauthShowing && isMenuSelectTabsVisible
-                    && mTabModelSelector.getTabModelFilterProvider()
-                                    .getCurrentTabModelFilter()
-                                    .getCount()
-                            != 0;
-        } else {
-            isMenuGroupTabsVisible = isTabSelectionEditorContext;
-            isMenuGroupTabsEnabled = !isIncognitoReauthShowing && isMenuGroupTabsVisible
-                    && mTabModelSelector.getTabModelFilterProvider()
-                                    .getCurrentTabModelFilter()
-                                    .getTabsWithNoOtherRelatedTabs()
-                                    .size()
-                            > 1;
-        }
+        boolean isMenuSelectTabsVisible = isTabSelectionEditorContext;
+        boolean isMenuSelectTabsEnabled = !isIncognitoReauthShowing && isMenuSelectTabsVisible
+                && mTabModelSelector.getTabModelFilterProvider()
+                                .getCurrentTabModelFilter()
+                                .getCount()
+                        != 0;
 
         boolean hasItemBetweenDividers = false;
 
@@ -636,10 +624,6 @@ public class AppMenuPropertiesDelegateImpl implements AppMenuPropertiesDelegate 
 
             if (item.getItemId() == R.id.recent_tabs_menu_id) {
                 item.setVisible(!isIncognito);
-            }
-            if (item.getItemId() == R.id.menu_group_tabs) {
-                item.setVisible(isMenuGroupTabsVisible);
-                item.setEnabled(isMenuGroupTabsEnabled);
             }
             if (item.getItemId() == R.id.menu_select_tabs) {
                 item.setVisible(isMenuSelectTabsVisible);
@@ -1274,6 +1258,22 @@ public class AppMenuPropertiesDelegateImpl implements AppMenuPropertiesDelegate 
         if (directShareTitle != null) {
             item.setTitle(
                     mContext.getString(R.string.accessibility_menu_share_via, directShareTitle));
+        }
+    }
+
+    /** Records user clicking on the menu button in New tab page or Start surface. */
+    @Override
+    public void onMenuShown() {
+        if (isInStartSurfaceHomepage()) {
+            BrowserUiUtils.recordModuleClickHistogram(
+                    HostSurface.START_SURFACE, ModuleTypeOnStartAndNTP.MENU_BUTTON);
+            return;
+        }
+        Tab currentTab = mActivityTabProvider.get();
+        if (currentTab != null && UrlUtilities.isNTPUrl(currentTab.getUrl())
+                && !currentTab.isIncognito()) {
+            BrowserUiUtils.recordModuleClickHistogram(
+                    HostSurface.NEW_TAB_PAGE, ModuleTypeOnStartAndNTP.MENU_BUTTON);
         }
     }
 }

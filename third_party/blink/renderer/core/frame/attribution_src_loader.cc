@@ -21,7 +21,6 @@
 #include "components/attribution_reporting/eligibility.h"
 #include "components/attribution_reporting/eligibility_error.mojom-shared.h"
 #include "components/attribution_reporting/os_registration.h"
-#include "components/attribution_reporting/os_support.mojom-shared.h"
 #include "components/attribution_reporting/registration_type.mojom-shared.h"
 #include "components/attribution_reporting/source_registration.h"
 #include "components/attribution_reporting/source_registration_error.mojom-shared.h"
@@ -29,21 +28,25 @@
 #include "components/attribution_reporting/trigger_registration.h"
 #include "components/attribution_reporting/trigger_registration_error.mojom-shared.h"
 #include "mojo/public/cpp/bindings/remote.h"
+#include "services/network/public/cpp/features.h"
 #include "services/network/public/cpp/trigger_attestation.h"
+#include "services/network/public/mojom/attribution.mojom-blink.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
 #include "third_party/blink/public/common/associated_interfaces/associated_interface_provider.h"
-#include "third_party/blink/public/common/features.h"
 #include "third_party/blink/public/common/navigation/impression.h"
 #include "third_party/blink/public/common/tokens/tokens.h"
 #include "third_party/blink/public/mojom/conversions/attribution_data_host.mojom-blink.h"
+#include "third_party/blink/public/mojom/conversions/attribution_reporting.mojom-blink.h"
 #include "third_party/blink/public/mojom/conversions/conversions.mojom-blink.h"
 #include "third_party/blink/public/mojom/fetch/fetch_api_request.mojom-blink.h"
 #include "third_party/blink/public/mojom/permissions_policy/permissions_policy_feature.mojom-blink.h"
 #include "third_party/blink/public/platform/platform.h"
+#include "third_party/blink/renderer/core/dom/document.h"
 #include "third_party/blink/renderer/core/execution_context/execution_context.h"
 #include "third_party/blink/renderer/core/frame/local_dom_window.h"
 #include "third_party/blink/renderer/core/frame/local_frame.h"
 #include "third_party/blink/renderer/core/frame/local_frame_client.h"
+#include "third_party/blink/renderer/core/html/html_anchor_element.h"
 #include "third_party/blink/renderer/core/html/html_element.h"
 #include "third_party/blink/renderer/core/inspector/identifiers_factory.h"
 #include "third_party/blink/renderer/core/inspector/inspector_audits_issue.h"
@@ -117,7 +120,7 @@ struct AttributionSrcLoader::AttributionHeaders {
         web_trigger(map.Get(http_names::kAttributionReportingRegisterTrigger)),
         request_id(request_id) {
     if (base::FeatureList::IsEnabled(
-            blink::features::kAttributionReportingCrossAppWeb)) {
+            network::features::kAttributionReportingCrossAppWeb)) {
       os_source = map.Get(http_names::kAttributionReportingRegisterOSSource);
       os_trigger = map.Get(http_names::kAttributionReportingRegisterOSTrigger);
     }
@@ -202,7 +205,7 @@ class AttributionSrcLoader::ResourceClient
     } else {
       // Send the data host normally.
       attribution_host->RegisterDataHost(
-          data_host_.BindNewPipeAndPassReceiver(), type);
+          data_host_.BindNewPipeAndPassReceiver(), type_);
     }
   }
 
@@ -253,10 +256,8 @@ class AttributionSrcLoader::ResourceClient
 
   const Member<AttributionSrcLoader> loader_;
 
-  // Type of events this request can register. In some cases, this will not be
-  // assigned until the first event is received. A single attributionsrc
-  // request can only register one type of event across redirects.
-  RegistrationType type_;
+  // Type of events this request can register.
+  const RegistrationType type_;
 
   // Remote used for registering responses with the browser-process.
   GC_PLUGIN_IGNORE("https://crbug.com/1381979")
@@ -277,69 +278,70 @@ void AttributionSrcLoader::Trace(Visitor* visitor) const {
 }
 
 void AttributionSrcLoader::Register(const KURL& src_url, HTMLElement* element) {
-  CreateAndSendRequest(src_url, element, RegistrationType::kSourceOrTrigger,
+  CreateAndSendRequest(src_url, element,
                        /*attribution_src_token=*/absl::nullopt);
 }
 
 absl::optional<Impression> AttributionSrcLoader::RegisterNavigation(
-    const KURL& src_url,
-    mojom::blink::AttributionNavigationType nav_type,
-    HTMLElement* element) {
+    const KURL& navigation_url,
+    const String& attribution_src,
+    HTMLAnchorElement* element) {
+  DCHECK(!attribution_src.IsNull());
+
   // TODO(apaseltiner): Add tests to ensure that this method can't be used to
   // register triggers.
 
-  const AttributionSrcToken attribution_src_token;
-  ResourceClient* client = CreateAndSendRequest(
-      src_url, element, RegistrationType::kSource, attribution_src_token);
-  if (!client)
-    return absl::nullopt;
+  const Impression impression{
+      .nav_type = element
+                      ? mojom::blink::AttributionNavigationType::kAnchor
+                      : mojom::blink::AttributionNavigationType::kWindowOpen};
 
-  return blink::Impression{.attribution_src_token = attribution_src_token,
-                           .nav_type = nav_type};
+  if (!attribution_src.empty()) {
+    KURL background_url =
+        local_frame_->GetDocument()->CompleteURL(attribution_src);
+    if (CreateAndSendRequest(background_url, element,
+                             impression.attribution_src_token)) {
+      return impression;
+    }
+  }
+
+  if (CanRegister(navigation_url, element, /*request_id=*/absl::nullopt)) {
+    return impression;
+  }
+
+  return absl::nullopt;
 }
 
-AttributionSrcLoader::ResourceClient*
-AttributionSrcLoader::CreateAndSendRequest(
+bool AttributionSrcLoader::CreateAndSendRequest(
     const KURL& src_url,
     HTMLElement* element,
-    RegistrationType src_type,
     absl::optional<AttributionSrcToken> attribution_src_token) {
   // Detached frames cannot/should not register new attributionsrcs.
   if (!local_frame_->IsAttached())
-    return nullptr;
+    return false;
 
   LocalDOMWindow* window = local_frame_->DomWindow();
 
-  if (num_resource_clients_ >= kMaxConcurrentRequests) {
-    LogAuditIssue(
-        window, AttributionReportingIssueType::kTooManyConcurrentRequests,
-        element, /*request_id=*/absl::nullopt,
-        /*invalid_parameter=*/AtomicString::Number(kMaxConcurrentRequests));
-    return nullptr;
-  }
-
   if (!CanRegister(src_url, element, /*request_id=*/absl::nullopt))
-    return nullptr;
+    return false;
 
   Document* document = window->document();
 
   if (document->IsPrerendering()) {
-    document->AddPostPrerenderingActivationStep(
-        WTF::BindOnce(base::IgnoreResult(&AttributionSrcLoader::DoRegistration),
-                      WrapPersistentIfNeeded(this), src_url, src_type,
-                      attribution_src_token));
-    return nullptr;
+    document->AddPostPrerenderingActivationStep(WTF::BindOnce(
+        base::IgnoreResult(&AttributionSrcLoader::DoRegistration),
+        WrapPersistentIfNeeded(this), src_url, attribution_src_token));
+    return false;
   }
 
-  return DoRegistration(src_url, src_type, attribution_src_token);
+  return DoRegistration(src_url, attribution_src_token);
 }
 
-AttributionSrcLoader::ResourceClient* AttributionSrcLoader::DoRegistration(
+bool AttributionSrcLoader::DoRegistration(
     const KURL& src_url,
-    const RegistrationType src_type,
     const absl::optional<AttributionSrcToken> attribution_src_token) {
   if (!local_frame_->IsAttached())
-    return nullptr;
+    return false;
 
   // TODO(apaseltiner): Respect the referrerpolicy attribute of the
   // originating <a> or <img> tag, if present.
@@ -349,22 +351,14 @@ AttributionSrcLoader::ResourceClient* AttributionSrcLoader::DoRegistration(
   request.SetKeepalive(true);
   request.SetRequestContext(mojom::blink::RequestContextType::ATTRIBUTION_SRC);
 
-  const char* eligible = [&]() -> const char* {
-    switch (src_type) {
-      case RegistrationType::kSource:
-        return attribution_src_token.has_value() ? "navigation-source"
-                                                 : "event-source";
-      case RegistrationType::kTrigger:
-        NOTREACHED();
-        return nullptr;
-      case RegistrationType::kSourceOrTrigger:
-        DCHECK(!attribution_src_token.has_value());
-        return kAttributionEligibleEventSourceAndTrigger;
-    }
-  }();
+  const auto src_type = attribution_src_token.has_value()
+                            ? RegistrationType::kSource
+                            : RegistrationType::kSourceOrTrigger;
 
   request.SetHttpHeaderField(http_names::kAttributionReportingEligible,
-                             eligible);
+                             attribution_src_token.has_value()
+                                 ? "navigation-source"
+                                 : kAttributionEligibleEventSourceAndTrigger);
 
   FetchParameters params(
       std::move(request),
@@ -374,8 +368,6 @@ AttributionSrcLoader::ResourceClient* AttributionSrcLoader::DoRegistration(
 
   auto* client = MakeGarbageCollected<ResourceClient>(this, src_type,
                                                       attribution_src_token);
-  ++num_resource_clients_;
-
   // TODO(https://crbug.com/1374121): If this registration is
   // `associated_with_navigation`, there is a risk that the navigation will
   // complete before the resource fetch here is complete. In this case, the
@@ -386,7 +378,7 @@ AttributionSrcLoader::ResourceClient* AttributionSrcLoader::DoRegistration(
 
   RecordAttributionSrcRequestStatus(AttributionSrcRequestStatus::kRequested);
 
-  return client;
+  return true;
 }
 
 absl::optional<attribution_reporting::SuitableOrigin>
@@ -456,14 +448,13 @@ bool AttributionSrcLoader::CanRegister(const KURL& url,
   return !!ReportingOriginForUrlIfValid(url, element, request_id, log_issues);
 }
 
-AtomicString AttributionSrcLoader::GetSupportHeader() const {
-  return AtomicString(String::FromUTF8(attribution_reporting::GetSupportHeader(
-      Platform::Current()->GetOsSupportForAttributionReporting())));
+bool AttributionSrcLoader::HasOsSupport() const {
+  return GetOsSupport() == network::mojom::AttributionOsSupport::kEnabled;
 }
 
-bool AttributionSrcLoader::HasOsSupport() const {
-  return Platform::Current()->GetOsSupportForAttributionReporting() ==
-         attribution_reporting::mojom::OsSupport::kEnabled;
+network::mojom::AttributionOsSupport AttributionSrcLoader::GetOsSupport()
+    const {
+  return Platform::Current()->GetOsSupportForAttributionReporting();
 }
 
 bool AttributionSrcLoader::MaybeRegisterAttributionHeaders(
@@ -528,9 +519,6 @@ bool AttributionSrcLoader::MaybeRegisterAttributionHeaders(
     return false;
   }
 
-  // TODO(johnidel): We should consider updating the eligibility header based on
-  // previously registered requests in the chain.
-
   if (Document* document = local_frame_->DomWindow()->document();
       document->IsPrerendering()) {
     document->AddPostPrerenderingActivationStep(WTF::BindOnce(
@@ -581,9 +569,6 @@ bool AttributionSrcLoader::ResourceClient::RedirectReceived(
 
 void AttributionSrcLoader::ResourceClient::NotifyFinished(Resource* resource) {
   ClearResource();
-
-  DCHECK_GT(loader_->num_resource_clients_, 0u);
-  --loader_->num_resource_clients_;
 
   if (resource->ErrorOccurred()) {
     RecordAttributionSrcRequestStatus(AttributionSrcRequestStatus::kFailed);
@@ -691,8 +676,6 @@ void AttributionSrcLoader::ResourceClient::HandleSourceRegistration(
     return;
   }
 
-  type_ = RegistrationType::kSource;
-
   if (!headers.web_source.IsNull()) {
     auto source_data = attribution_reporting::SourceRegistration::Parse(
         StringUTF8Adaptor(headers.web_source).AsStringPiece());
@@ -742,8 +725,6 @@ void AttributionSrcLoader::ResourceClient::HandleTriggerRegistration(
   if (!HasEitherWebOrOsHeader(headers.trigger_count(), headers.request_id)) {
     return;
   }
-
-  type_ = RegistrationType::kTrigger;
 
   if (!headers.web_trigger.IsNull()) {
     auto trigger_data = attribution_reporting::TriggerRegistration::Parse(

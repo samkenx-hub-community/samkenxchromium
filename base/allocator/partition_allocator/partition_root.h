@@ -258,7 +258,7 @@ struct PA_ALIGNAS(64) PA_COMPONENT_EXPORT(PARTITION_ALLOC) PartitionRoot {
     kEnabled,
   };
 
-  enum class BucketDistribution : uint8_t { kDefault, kCoarser, kDenser };
+  enum class BucketDistribution : uint8_t { kDefault, kDenser };
 
   // Flags accessed on fast paths.
   //
@@ -272,11 +272,11 @@ struct PA_ALIGNAS(64) PA_COMPONENT_EXPORT(PARTITION_ALLOC) PartitionRoot {
     // Defines whether the root should be scanned.
     ScanMode scan_mode;
 
-    // It's important to default to the coarser distribution, otherwise a switch
-    // from dense -> coarse would leave some buckets with dirty memory forever,
-    // since no memory would be allocated from these, their freelist would
-    // typically not be empty, making these unreclaimable.
-    BucketDistribution bucket_distribution = BucketDistribution::kCoarser;
+    // It's important to default to the 'default' distribution, otherwise a
+    // switch from 'dense' -> 'default' would leave some buckets with dirty
+    // memory forever, since no memory would be allocated from these, their
+    // freelist would typically not be empty, making these unreclaimable.
+    BucketDistribution bucket_distribution = BucketDistribution::kDefault;
 
     bool with_thread_cache = false;
 
@@ -608,10 +608,7 @@ struct PA_ALIGNAS(64) PA_COMPONENT_EXPORT(PARTITION_ALLOC) PartitionRoot {
   // This is safe to do because we are switching to a bucket distribution with
   // more buckets, meaning any allocations we have done before the switch are
   // guaranteed to have a bucket under the new distribution when they are
-  // eventually deallocated. We do not need synchronization here or below.
-  void SwitchToDefaultBucketDistribution() {
-    flags.bucket_distribution = BucketDistribution::kDefault;
-  }
+  // eventually deallocated. We do not need synchronization here.
   void SwitchToDenserBucketDistribution() {
     flags.bucket_distribution = BucketDistribution::kDenser;
   }
@@ -620,7 +617,7 @@ struct PA_ALIGNAS(64) PA_COMPONENT_EXPORT(PARTITION_ALLOC) PartitionRoot {
   // cannot allocate from, which will not cause problems besides wasting
   // memory.
   void ResetBucketDistributionForTesting() {
-    flags.bucket_distribution = BucketDistribution::kCoarser;
+    flags.bucket_distribution = BucketDistribution::kDefault;
   }
 
   ThreadCache* thread_cache_for_testing() const {
@@ -1066,8 +1063,18 @@ PA_ALWAYS_INLINE void PartitionAllocFreeForRefCounting(uintptr_t slot_start) {
   // supports reference counts.
   PA_DCHECK(root->brp_enabled());
 
-  // memset() can be really expensive.
+  // Iterating over the entire slot can be really expensive.
 #if BUILDFLAG(PA_EXPENSIVE_DCHECKS_ARE_ON)
+  auto hook = PartitionAllocHooks::GetQuarantineOverrideHook();
+  // If we have a hook the object segment is not necessarily filled
+  // with |kQuarantinedByte|.
+  if (PA_LIKELY(!hook)) {
+    unsigned char* object =
+        static_cast<unsigned char*>(root->SlotStartToObject(slot_start));
+    for (size_t i = 0; i < slot_span->GetUsableSize(root); ++i) {
+      PA_DCHECK(object[i] == kQuarantinedByte);
+    }
+  }
   DebugMemset(SlotStartAddr2Ptr(slot_start), kFreedByte,
               slot_span->GetUtilizedSlotSize()
 #if BUILDFLAG(PUT_REF_COUNT_IN_PREVIOUS_SLOT)
@@ -1808,11 +1815,9 @@ PA_ALWAYS_INLINE uint16_t PartitionRoot<thread_safe>::SizeToBucketIndex(
     BucketDistribution bucket_distribution) {
   switch (bucket_distribution) {
     case BucketDistribution::kDefault:
-      return internal::BucketIndexLookup::GetIndexForDenserBuckets(size);
-    case BucketDistribution::kCoarser:
-      return internal::BucketIndexLookup::GetIndex(size);
+      return internal::BucketIndexLookup::GetIndexForDefaultBuckets(size);
     case BucketDistribution::kDenser:
-      return internal::BucketIndexLookup::GetIndexFor8Buckets(size);
+      return internal::BucketIndexLookup::GetIndexForDenserBuckets(size);
   }
 }
 

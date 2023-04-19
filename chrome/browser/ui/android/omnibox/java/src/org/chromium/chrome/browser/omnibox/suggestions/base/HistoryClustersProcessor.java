@@ -12,7 +12,6 @@ import androidx.annotation.Nullable;
 
 import org.chromium.chrome.browser.omnibox.OmniboxFeatures;
 import org.chromium.chrome.browser.omnibox.UrlBarEditingTextStateProvider;
-import org.chromium.chrome.browser.omnibox.action.OmniboxActionType;
 import org.chromium.chrome.browser.omnibox.suggestions.ActionChipsDelegate;
 import org.chromium.chrome.browser.omnibox.suggestions.FaviconFetcher;
 import org.chromium.chrome.browser.omnibox.suggestions.SuggestionHost;
@@ -22,6 +21,7 @@ import org.chromium.chrome.browser.omnibox.suggestions.basic.SuggestionViewPrope
 import org.chromium.components.omnibox.AutocompleteMatch;
 import org.chromium.components.omnibox.action.HistoryClustersAction;
 import org.chromium.components.omnibox.action.OmniboxAction;
+import org.chromium.components.omnibox.action.OmniboxActionType;
 import org.chromium.ui.modelutil.PropertyModel;
 
 import java.util.List;
@@ -84,10 +84,13 @@ public class HistoryClustersProcessor extends BasicSuggestionProcessor {
         model.set(BaseSuggestionViewProperties.ON_LONG_CLICK,
                 () -> onJourneysSuggestionClicked(pedal, position));
         SuggestionDrawableState sds =
-                SuggestionDrawableState.Builder.forDrawableRes(mContext, pedal.getIcon().iconRes)
-                        .setAllowTint(true)
+                SuggestionDrawableState.Builder.forDrawableRes(mContext, pedal.icon.iconRes)
+                        .setAllowTint(false)
                         .build();
         model.set(BaseSuggestionViewProperties.ICON, sds);
+        // We want to behave like a search suggestion w.r.t. secondary text coloring.
+        model.set(SuggestionViewProperties.IS_SEARCH_SUGGESTION, true);
+        setActionButtons(model, null);
         mJourneysActionShownPosition = position;
     }
 

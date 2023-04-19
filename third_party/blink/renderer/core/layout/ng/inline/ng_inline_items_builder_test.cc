@@ -7,7 +7,7 @@
 #include "testing/gtest/include/gtest/gtest.h"
 #include "third_party/blink/renderer/core/css/resolver/style_resolver.h"
 #include "third_party/blink/renderer/core/layout/layout_inline.h"
-#include "third_party/blink/renderer/core/layout/ng/inline/layout_ng_text.h"
+#include "third_party/blink/renderer/core/layout/layout_text.h"
 #include "third_party/blink/renderer/core/layout/ng/inline/ng_inline_node_data.h"
 #include "third_party/blink/renderer/core/layout/ng/layout_ng_ruby_run.h"
 #include "third_party/blink/renderer/core/style/computed_style.h"
@@ -30,8 +30,7 @@ class NGInlineItemsBuilderTest : public RenderingTest {
   void SetUp() override {
     RenderingTest::SetUp();
     style_ = &GetDocument().GetStyleResolver().InitialStyle();
-    block_flow_ = LayoutBlockFlow::CreateAnonymous(&GetDocument(), style_,
-                                                   LegacyLayout::kAuto);
+    block_flow_ = LayoutBlockFlow::CreateAnonymous(&GetDocument(), style_);
     items_ = MakeGarbageCollected<HeapVector<NGInlineItem>>();
     anonymous_objects_ =
         MakeGarbageCollected<HeapVector<Member<LayoutObject>>>();
@@ -74,15 +73,15 @@ class NGInlineItemsBuilderTest : public RenderingTest {
   }
 
   void AppendAtomicInline(NGInlineItemsBuilder* builder) {
-    LayoutBlockFlow* layout_block_flow = LayoutBlockFlow::CreateAnonymous(
-        &GetDocument(), style_, LegacyLayout::kAuto);
+    LayoutBlockFlow* layout_block_flow =
+        LayoutBlockFlow::CreateAnonymous(&GetDocument(), style_);
     anonymous_objects_->push_back(layout_block_flow);
     builder->AppendAtomicInline(layout_block_flow);
   }
 
   void AppendBlockInInline(NGInlineItemsBuilder* builder) {
-    LayoutBlockFlow* layout_block_flow = LayoutBlockFlow::CreateAnonymous(
-        &GetDocument(), style_, LegacyLayout::kAuto);
+    LayoutBlockFlow* layout_block_flow =
+        LayoutBlockFlow::CreateAnonymous(&GetDocument(), style_);
     anonymous_objects_->push_back(layout_block_flow);
     builder->AppendBlockInInline(layout_block_flow);
   }

@@ -7,6 +7,7 @@
 #include <memory>
 
 #include "base/memory/weak_ptr.h"
+#include "base/metrics/histogram_macros.h"
 #include "content/browser/browser_context_impl.h"
 #include "content/browser/loader/navigation_loader_interceptor.h"
 #include "content/browser/preloading/prefetch/prefetch_container.h"
@@ -32,20 +33,39 @@ BrowserContext* BrowserContextFromFrameTreeNodeId(int frame_tree_node_id) {
   return web_content->GetBrowserContext();
 }
 
+void RecordWasFullRedirectChainServedHistogram(
+    bool was_full_redirect_chain_served) {
+  UMA_HISTOGRAM_BOOLEAN("PrefetchProxy.AfterClick.WasFullRedirectChainServed",
+                        was_full_redirect_chain_served);
+}
+
 }  // namespace
 
 // static
 std::unique_ptr<PrefetchURLLoaderInterceptor>
-PrefetchURLLoaderInterceptor::MaybeCreateInterceptor(int frame_tree_node_id) {
-  if (!base::FeatureList::IsEnabled(features::kPrefetchUseContentRefactor))
+PrefetchURLLoaderInterceptor::MaybeCreateInterceptor(
+    int frame_tree_node_id,
+    const GlobalRenderFrameHostId& referring_render_frame_host_id) {
+  if (!base::FeatureList::IsEnabled(features::kPrefetchUseContentRefactor)) {
     return nullptr;
+  }
 
-  return std::make_unique<PrefetchURLLoaderInterceptor>(frame_tree_node_id);
+  if (!referring_render_frame_host_id) {
+    // This is expected to occur only in unit tests.
+    return nullptr;
+  }
+
+  return std::make_unique<PrefetchURLLoaderInterceptor>(
+      frame_tree_node_id, referring_render_frame_host_id);
 }
 
 PrefetchURLLoaderInterceptor::PrefetchURLLoaderInterceptor(
-    int frame_tree_node_id)
-    : frame_tree_node_id_(frame_tree_node_id) {}
+    int frame_tree_node_id,
+    const GlobalRenderFrameHostId& referring_render_frame_host_id)
+    : frame_tree_node_id_(frame_tree_node_id),
+      referring_render_frame_host_id_(referring_render_frame_host_id) {
+  DCHECK(referring_render_frame_host_id_);
+}
 
 PrefetchURLLoaderInterceptor::~PrefetchURLLoaderInterceptor() = default;
 
@@ -70,6 +90,11 @@ void PrefetchURLLoaderInterceptor::MaybeCreateLoader(
     return;
   }
 
+  if (redirect_prefetch_container_) {
+    RecordWasFullRedirectChainServedHistogram(false);
+    redirect_prefetch_container_ = nullptr;
+  }
+
   GetPrefetch(
       tentative_resource_request,
       base::BindOnce(&PrefetchURLLoaderInterceptor::OnGetPrefetchComplete,
@@ -88,7 +113,8 @@ void PrefetchURLLoaderInterceptor::GetPrefetch(
   }
 
   prefetch_service->GetPrefetchToServe(
-      tentative_resource_request.url,
+      PrefetchContainer::Key(referring_render_frame_host_id_,
+                             tentative_resource_request.url),
       base::BindOnce(&OnGotPrefetchToServe, frame_tree_node_id_,
                      tentative_resource_request,
                      std::move(get_prefetch_callback)));
@@ -120,6 +146,9 @@ void PrefetchURLLoaderInterceptor::OnGetPrefetchComplete(
         base::MakeRefCounted<network::SingleRequestURLLoaderFactory>(
             raw_prefetch_streaming_url_loader->ServingFinalResponseHandler(
                 std::move(prefetch_streaming_url_loader)));
+    if (redirect_prefetch_container_) {
+      RecordWasFullRedirectChainServedHistogram(true);
+    }
     redirect_prefetch_container_ = nullptr;
   } else {
     single_request_url_loader_factory =

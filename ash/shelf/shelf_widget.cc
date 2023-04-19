@@ -102,12 +102,8 @@ class HideAnimationObserver : public ui::ImplicitAnimationObserver {
 class ShelfBackgroundLayerDelegate : public ui::LayerOwner,
                                      public ui::LayerDelegate {
  public:
-  ShelfBackgroundLayerDelegate(Shelf* shelf,
-                               views::View* owner_view,
-                               bool draw_highlight_border)
-      : shelf_(shelf),
-        owner_view_(owner_view),
-        draw_highlight_border_(draw_highlight_border) {}
+  ShelfBackgroundLayerDelegate(Shelf* shelf, views::View* owner_view)
+      : shelf_(shelf), owner_view_(owner_view) {}
 
   ShelfBackgroundLayerDelegate(const ShelfBackgroundLayerDelegate&) = delete;
   ShelfBackgroundLayerDelegate& operator=(const ShelfBackgroundLayerDelegate&) =
@@ -115,35 +111,20 @@ class ShelfBackgroundLayerDelegate : public ui::LayerOwner,
   ~ShelfBackgroundLayerDelegate() override {}
 
   void Initialize() {
-    // If the shelf does not have highlight border, it will be monochromatic, so
-    // it can use a solid color layer.
-    auto layer = std::make_unique<ui::Layer>(
-        draw_highlight_border_ ? ui::LAYER_TEXTURED : ui::LAYER_SOLID_COLOR);
+    auto layer = std::make_unique<ui::Layer>(ui::LAYER_TEXTURED);
     layer->SetName("shelf/Background");
-    if (draw_highlight_border_) {
-      layer->set_delegate(this);
-      layer->SetFillsBoundsOpaquely(false);
-    }
+    layer->set_delegate(this);
+    layer->SetFillsBoundsOpaquely(false);
     SetLayer(std::move(layer));
   }
 
   // Sets the shelf background color.
   void SetBackgroundColor(SkColor color) {
     background_color_ = color;
-
-    if (draw_highlight_border_) {
-      layer()->SchedulePaint(gfx::Rect(layer()->size()));
-    } else {
-      layer()->SetColor(color);
-    }
+    layer()->SchedulePaint(gfx::Rect(layer()->size()));
   }
 
-  // Sets the highlight border type to use if shelf uses highlight border.
-  // No-op if `draw_highlight_border_` is false.
   void SetBorderType(views::HighlightBorder::Type type) {
-    if (!draw_highlight_border_)
-      return;
-
     highlight_border_type_ = type;
     layer()->SchedulePaint(gfx::Rect(layer()->size()));
   }
@@ -158,9 +139,7 @@ class ShelfBackgroundLayerDelegate : public ui::LayerOwner,
         shelf_->SelectValueForShelfAlignment(0.0f, 0.0f, radius),
     });
 
-    // Schedule paint to repaint the highlight border.
-    if (draw_highlight_border_)
-      layer()->SchedulePaint(gfx::Rect(layer()->size()));
+    layer()->SchedulePaint(gfx::Rect(layer()->size()));
   }
 
   void SetLoginShelfFromShelfWidget(LoginShelfView* view) {
@@ -193,7 +172,7 @@ class ShelfBackgroundLayerDelegate : public ui::LayerOwner,
     if (corner_radius_ > 0) {
       views::HighlightBorder::PaintBorderToCanvas(
           canvas, *owner_view_, gfx::Rect(layer()->size()),
-          gfx::RoundedCornersF(corner_radius_), highlight_border_type_, false);
+          gfx::RoundedCornersF(corner_radius_), highlight_border_type_);
     } else {
       // If the shelf corners are not rounded, only paint the highlight border
       // on the inner edge of the shelf to separate the shelf and the work area.
@@ -208,9 +187,9 @@ class ShelfBackgroundLayerDelegate : public ui::LayerOwner,
 
   void PaintEdgeToCanvas(gfx::Canvas* canvas) {
     SkColor inner_color = views::HighlightBorder::GetHighlightColor(
-        *owner_view_, highlight_border_type_, /*use_light_colors=*/false);
+        *owner_view_, highlight_border_type_);
     SkColor outer_color = views::HighlightBorder::GetBorderColor(
-        *owner_view_, highlight_border_type_, /*use_light_colors=*/false);
+        *owner_view_, highlight_border_type_);
 
     const int border_thickness = views::kHighlightBorderThickness;
     const float half_thickness = border_thickness / 2.0f;
@@ -279,7 +258,6 @@ class ShelfBackgroundLayerDelegate : public ui::LayerOwner,
 
   Shelf* const shelf_;
   views::View* const owner_view_;
-  const bool draw_highlight_border_;
 
   // The pointer to the login shelf view that resides in the shelf widget. Set
   // only when the login shelf widget is not in use.
@@ -425,10 +403,7 @@ class ShelfWidget::DelegateView : public views::WidgetDelegate,
 
 ShelfWidget::DelegateView::DelegateView(ShelfWidget* shelf_widget, Shelf* shelf)
     : shelf_widget_(shelf_widget),
-      opaque_background_(
-          shelf,
-          this,
-          /*draw_highlight_border=*/features::IsDarkLightModeEnabled()),
+      opaque_background_(shelf, this),
       animating_background_(ui::LAYER_SOLID_COLOR),
       animating_drag_handle_(ui::LAYER_SOLID_COLOR) {
   animating_background_.SetName("shelf/Animation");

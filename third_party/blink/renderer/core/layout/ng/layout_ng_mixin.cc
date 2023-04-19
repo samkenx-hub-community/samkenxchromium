@@ -125,12 +125,6 @@ RecalcLayoutOverflowResult LayoutNGMixin<Base>::RecalcLayoutOverflow() {
 }
 
 template <typename Base>
-RecalcLayoutOverflowResult LayoutNGMixin<Base>::RecalcChildLayoutOverflow() {
-  Base::CheckIsNotDestroyed();
-  return Base::RecalcChildLayoutOverflowNG();
-}
-
-template <typename Base>
 void LayoutNGMixin<Base>::RecalcVisualOverflow() {
   Base::CheckIsNotDestroyed();
   if (Base::CanUseFragmentsForVisualOverflow()) {
@@ -152,8 +146,7 @@ MinMaxSizes LayoutNGMixin<Base>::ComputeIntrinsicLogicalWidths() const {
   DCHECK(!Base::IsTableCell());
 
   NGBlockNode node(const_cast<LayoutNGMixin<Base>*>(this));
-  if (!node.CanUseNewLayout())
-    return Base::ComputeIntrinsicLogicalWidths();
+  CHECK(node.CanUseNewLayout());
 
   NGConstraintSpace space = ConstraintSpaceForMinMaxSizes();
   return node
@@ -242,8 +235,10 @@ void LayoutNGMixin<Base>::UpdateOutOfFlowBlockLayout() {
                                        container_border_box_logical_height};
   container_builder.SetInitialFragmentGeometry(fragment_geometry);
 
+  // TODO(1229581): Remove this call to determine the static position.
   NGLogicalStaticPosition static_position =
       LayoutBoxUtils::ComputeStaticPositionFromLegacy(*this, border_scrollbar);
+
   // Set correct container for inline containing blocks.
   container_builder.AddOutOfFlowLegacyCandidate(
       NGBlockNode(this), static_position,
@@ -285,15 +280,12 @@ void LayoutNGMixin<Base>::UpdateOutOfFlowBlockLayout() {
         To<LayoutBox>(child_fragment->GetMutableLayoutObject());
     PhysicalOffset child_offset = child.Offset();
     if (container_style->IsFlippedBlocksWritingMode()) {
-      child_legacy_box->SetX(container_border_box_logical_height -
-                             child_offset.left - child_fragment->Size().width);
-    } else {
-      child_legacy_box->SetX(child_offset.left);
+      child_offset.left = container_border_box_logical_height -
+                          child_offset.left - child_fragment->Size().width;
     }
-    child_legacy_box->SetY(child_offset.top);
+    child_legacy_box->SetLocation(child_offset.ToLayoutPoint());
   }
   DCHECK_EQ(fragment.Children()[0]->GetLayoutObject(), this);
-  Base::SetIsLegacyInitiatedOutOfFlowLayout(true);
 }
 
 template <typename Base>

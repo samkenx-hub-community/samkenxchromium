@@ -298,6 +298,10 @@ class Profile : public content::BrowserContext {
   virtual const Profile* GetOriginalProfile() const = 0;
 
   // Returns whether the profile is associated with the account of a child.
+  // This method should not be used in new code to gate child-specific
+  // functionality. Prefer a feture specific method
+  // (eg. `SupervisedUserService::IsURLFilteringEnabled()`) or alternatively
+  // use `SupervisedUserService::IsSubjectToParentalControls()`.
   virtual bool IsChild() const = 0;
 
   // Returns whether opening browser windows is allowed in this profile. For
@@ -439,6 +443,13 @@ class Profile : public content::BrowserContext {
 
   // Returns true if this is the main profile as defined above.
   virtual bool IsMainProfile() const = 0;
+
+  // Returns true if the profile path is for an web app profile.
+  static bool IsWebAppProfilePath(const base::FilePath& profile_path);
+
+  // Returns true if the name of the profile (i.e. `profile_path.BaseName()`) is
+  // for an web app profile.
+  static bool IsWebAppProfileName(const std::string& profile_path);
 #endif  // BUILDFLAG(IS_CHROMEOS_LACROS)
 
   bool CanUseDiskWhenOffTheRecord() override;

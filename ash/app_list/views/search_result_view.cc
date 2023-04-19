@@ -28,10 +28,14 @@
 #include "ash/strings/grit/ash_strings.h"
 #include "ash/style/ash_color_id.h"
 #include "ash/style/ash_color_provider.h"
+#include "ash/style/typography.h"
 #include "base/functional/bind.h"
 #include "base/i18n/number_formatting.h"
+#include "chromeos/constants/chromeos_features.h"
 #include "ui/accessibility/ax_node_data.h"
 #include "ui/base/l10n/l10n_util.h"
+#include "ui/chromeos/styles/cros_tokens_color_mappings.h"
+#include "ui/color/color_id.h"
 #include "ui/compositor/layer.h"
 #include "ui/gfx/canvas.h"
 #include "ui/gfx/color_palette.h"
@@ -141,6 +145,10 @@ ui::ColorId GetLabelColorId(bool is_title, const SearchResult::Tags& tags) {
     case SearchResult::Tag::DIM:
       ABSL_FALLTHROUGH_INTENDED;
     case SearchResult::Tag::MATCH:
+      if (chromeos::features::IsJellyEnabled()) {
+        return is_title ? cros_tokens::kCrosSysOnSurface
+                        : cros_tokens::kCrosSysOnSurfaceVariant;
+      }
       return is_title ? kColorAshTextColorPrimary : kColorAshTextColorSecondary;
     case SearchResult::Tag::URL:
       return kColorAshTextColorURL;
@@ -198,6 +206,47 @@ views::Label* SetupChildLabelView(
           .WithOrder(flex_order));
 
   // Apply label text styling.
+  if (chromeos::features::IsJellyEnabled()) {
+    switch (label_type) {
+      case SearchResultView::LabelType::kBigTitle:
+        TypographyProvider::Get()->StyleLabel(TypographyToken::kCrosDisplay2,
+                                              *label);
+        label->SetEnabledColorId(cros_tokens::kCrosSysOnSurface);
+        break;
+      case SearchResultView::LabelType::kBigTitleSuperscript:
+        label->SetVerticalAlignment(gfx::ALIGN_TOP);
+        TypographyProvider::Get()->StyleLabel(TypographyToken::kCrosDisplay7,
+                                              *label);
+        label->SetEnabledColorId(cros_tokens::kCrosSysOnSurface);
+        break;
+      case SearchResultView::LabelType::kTitle:
+        TypographyProvider::Get()->StyleLabel(TypographyToken::kCrosBody1,
+                                              *label);
+        label->SetEnabledColorId(cros_tokens::kCrosSysOnSurface);
+        break;
+      case SearchResultView::LabelType::kDetails:
+        // has_keyboard_shortcut_contents forces inline title and details text
+        // for answer cards so title and details text should use the same
+        // context.
+        if (view_type == SearchResultView::SearchResultViewType::kAnswerCard &&
+            !has_keyboard_shortcut_contents) {
+          TypographyProvider::Get()->StyleLabel(
+              TypographyToken::kCrosAnnotation1, *label);
+        } else {
+          TypographyProvider::Get()->StyleLabel(TypographyToken::kCrosBody1,
+                                                *label);
+        }
+        label->SetEnabledColorId(cros_tokens::kCrosSysOnSurfaceVariant);
+        break;
+      case SearchResultView::LabelType::kKeyboardShortcut:
+        TypographyProvider::Get()->StyleLabel(TypographyToken::kCrosAnnotation1,
+                                              *label);
+        label->SetEnabledColorId(cros_tokens::kCrosSysPrimary);
+        break;
+    }
+    return label;
+  }
+
   ash::AshTextContext text_context;
   switch (label_type) {
     case SearchResultView::LabelType::kBigTitle:
@@ -916,8 +965,10 @@ void SearchResultView::UpdateRating() {
 
 void SearchResultView::StyleLabel(views::Label* label,
                                   const SearchResult::Tags& tags) {
-  // Reset font weight styling for label.
-  label->ApplyBaselineTextStyle();
+  if (!chromeos::features::IsJellyEnabled()) {
+    // Reset font weight styling for label.
+    label->ApplyBaselineTextStyle();
+  }
 
   for (const auto& tag : tags) {
     bool has_match_tag = (tag.styles & SearchResult::Tag::MATCH);
@@ -1122,10 +1173,16 @@ void SearchResultView::PaintButtonContents(gfx::Canvas* canvas) {
 
   gfx::Rect content_rect(rect);
 
-  const SkColor focus_bar_color =
-      GetColorProvider()->GetColor(ui::kColorAshFocusRing);
-  const SkColor highlight_color =
-      GetColorProvider()->GetColor(kColorAshHighlightColorHover);
+  bool is_jelly_enabled = chromeos::features::IsJellyEnabled();
+
+  const SkColor focus_bar_color = GetColorProvider()->GetColor(
+      is_jelly_enabled
+          ? static_cast<ui::ColorId>(cros_tokens::kCrosSysFocusRing)
+          : ui::kColorAshFocusRing);
+  const SkColor highlight_color = GetColorProvider()->GetColor(
+      is_jelly_enabled
+          ? static_cast<ui::ColorId>(cros_tokens::kCrosSysHoverOnSubtle)
+          : kColorAshHighlightColorHover);
   switch (view_type_) {
     case SearchResultViewType::kDefault:
       if (selected() && !actions_view()->HasSelectedAction()) {

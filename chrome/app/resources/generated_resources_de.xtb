@@ -46,6 +46,7 @@
 <translation id="1038462104119736705">Für Linux sind mindestens <ph name="INSTALL_SIZE" /> freier Speicherplatz erforderlich. Lösche Dateien von deinem Gerät, um Speicherplatz freizugeben.</translation>
 <translation id="1038643060055067718">Zeilen:</translation>
 <translation id="1039337018183941703">Ungültige oder beschädigte Datei</translation>
+<translation id="1040761927998636252">Unbenanntes Lesezeichen für <ph name="URL" /></translation>
 <translation id="1041175011127912238">Diese Seite reagiert nicht</translation>
 <translation id="1041263367839475438">Verfügbare Geräte</translation>
 <translation id="1042174272890264476">Auch die RLZ-Bibliothek von <ph name="SHORT_PRODUCT_NAME" /> ist auf deinem Computer vorinstalliert. RLZ sorgt für die Zuweisung von Tags, anhand derer gemessen wird, wie sich einzelne Werbekampagnen auf die Suchanfragen und die Nutzung von <ph name="SHORT_PRODUCT_NAME" /> auswirken. Die Tags sind weder eindeutig, noch personenbezogen und kommen manchmal in Google-Suchanfragen in <ph name="PRODUCT_NAME" /> vor.</translation>
@@ -117,7 +118,9 @@ Du kannst deine Passwörter jederzeit im <ph name="GOOGLE_PASSWORD_MANAGER" /> p
 <translation id="1090541560108055381">Prüfe vor dem Koppeln, ob dieser Code auf beiden Geräten übereinstimmt</translation>
 <translation id="1091767800771861448">Drücke die Esc-Taste, um die Aktualisierung zu überspringen (nur inoffizielle Builds).</translation>
 <translation id="1093457606523402488">Sichtbare Netzwerke:</translation>
+<translation id="1094219634413363886">Du siehst eine Benachrichtigung, wenn die Aufnahme auf diesem verwalteten Gerät beginnt</translation>
 <translation id="1095761715416917775">Du solltest jederzeit auf deine synchronisierten Daten zugreifen können</translation>
+<translation id="1095879482467973146">Google Passwortmanager im Web</translation>
 <translation id="109647177154844434">Durch die Deinstallation von Parallels Desktop wird dein Windows-Image gelöscht. Dazu gehören auch die darin enthaltenen Anwendungen, Einstellungen und Daten. Möchtest du wirklich fortfahren?</translation>
 <translation id="1097016918605049747">Diese Seite konnte nicht übersetzt werden</translation>
 <translation id="1097658378307015415">Melde dich vor der Anmeldung als Gast an, um das Netzwerk <ph name="NETWORK_ID" /> zu aktivieren.</translation>
@@ -386,7 +389,6 @@ Du kannst deine Passwörter jederzeit im <ph name="GOOGLE_PASSWORD_MANAGER" /> p
 <translation id="1333965224356556482">Websites dürfen meinen Standort nicht sehen</translation>
 <translation id="1335282218035876586">Dein Chromebook erhält keine Sicherheits- und Softwareupdates mehr. Wir empfehlen, auf ein neues Chromebook umzusteigen.</translation>
 <translation id="133535873114485416">Bevorzugte Eingabe</translation>
-<translation id="1335437153193710305">Du kannst das Profil auswählen, für das du die Passwörter sehen möchtest</translation>
 <translation id="1335929031622236846">Gerät registrieren</translation>
 <translation id="1336902454946927954">Dein Sicherheitsschlüssel ist gesperrt, weil dein Fingerabdruck nicht erkannt werden konnte. Gib deine PIN ein, um ihn zu entsperren.</translation>
 <translation id="1338631221631423366">Wird gekoppelt…</translation>
@@ -692,6 +694,7 @@ Berechtigungen, die du Apps bereits gewährt hast, gelten möglicherweise für d
 <translation id="1593594475886691512">Formatierung wird ausgeführt...</translation>
 <translation id="159359590073980872">Bilder-Cache</translation>
 <translation id="1593926297800505364">Zahlungsmethode speichern</translation>
+<translation id="1594703455918849716">Zur Seite „Überprüfung“</translation>
 <translation id="1595492813686795610">Linux wird aktualisiert</translation>
 <translation id="1596286373007273895">Verfügbar</translation>
 <translation id="1596709061955594992">Bluetooth ist deaktiviert. Schalte es ein, um verfügbare Geräte zu sehen.</translation>
@@ -790,6 +793,7 @@ Berechtigungen, die du Apps bereits gewährt hast, gelten möglicherweise für d
 <translation id="16620462294541761">Dein Passwort konnte nicht bestätigt werden. Bitte versuche es noch einmal.</translation>
 <translation id="166278006618318542">Algorithmus für öffentlichen Schlüssel des Antragstellers</translation>
 <translation id="1662801900924515589"><ph name="APP" /> installiert</translation>
+<translation id="1663698992894057019">Wir empfehlen, für die neuesten Sicherheits- und Softwareupdates auf ein neues Chromebook umzusteigen.</translation>
 <translation id="1665328953287874063">Passwort oder PIN zum Entsperren von <ph name="DEVICE_TYPE" /> verwenden</translation>
 <translation id="1666232093776384142">Schutz vor Datenzugriff durch Peripheriegeräte deaktivieren</translation>
 <translation id="1667842670298352129">Du kannst dir Text vorlesen lassen. Wähle zuerst unten auf dem Bildschirm das Symbol „Vorlesen“ aus und markiere dann den entsprechenden Text. Du kannst auch folgende Tastenkombination verwenden: Text hervorheben und dann die Suchtaste + S drücken.</translation>
@@ -1086,6 +1090,7 @@ Berechtigungen, die du Apps bereits gewährt hast, gelten möglicherweise für d
 <translation id="1915734383465415025">Geschäftsnummer</translation>
 <translation id="1916260783734263714">Aktueller Tab</translation>
 <translation id="1916502483199172559">Roter Standardavatar</translation>
+<translation id="1916770123977586577">Lade diese Seite neu, um die aktualisierten Einstellungen für diese Website zu übernehmen</translation>
 <translation id="1918141783557917887">&amp;Kleiner</translation>
 <translation id="1919872106782726755">Bitte dein Kind, einen Finger auf den Fingerabdrucksensor oben rechts auf der Tastatur zu legen, neben der Ein-/Aus-Taste. Sein Fingerabdruck wird sicher auf dem <ph name="DEVICE_TYPE" /> gespeichert und verlässt dieses Gerät nie.</translation>
 <translation id="1920390473494685033">Kontakte</translation>
@@ -1231,10 +1236,10 @@ Wenn du die Family Link App auf deinem Gerät installierst, kannst du die Einste
 <translation id="2048554637254265991">Fehler beim Starten des Container-Managers. Bitte versuche es noch einmal.</translation>
 <translation id="2048653237708779538">Aktion nicht verfügbar</translation>
 <translation id="204914487372604757">Verknüpfung erstellen</translation>
-<translation id="2050339315714019657">Hochformat</translation>
+<translation id="2050339315714019657">Porträt</translation>
 <translation id="2051555741181591333">Hotspot automatisch deaktivieren</translation>
 <translation id="2052572566310583903">Auf deinen anderen Geräten installiert</translation>
-<translation id="2053105195397337973">Wir probieren neue Optionen aus, um Tracking einzuschränken. Gleichzeitig wird Websites die Möglichkeit gegeben, Werbespam und Betrug zu bekämpfen.</translation>
+<translation id="2053105195397337973">Wir probieren neue Optionen aus, um Tracking einzuschränken und Websites gleichzeitig zu ermöglichen, Werbespam und Betrug zu verhindern.</translation>
 <translation id="2053312383184521053">Daten für inaktiven Zustand</translation>
 <translation id="2054240652864153171">Websitedaten für <ph name="SITE_NAME" />, die auf <ph name="PARTITION_SITE_NAME" /> partioniert sind, löschen?</translation>
 <translation id="2055585478631012616">Du wirst von diesen Websites abgemeldet, auch in offenen Tabs</translation>
@@ -1323,7 +1328,6 @@ Wenn du die Family Link App auf deinem Gerät installierst, kannst du die Einste
 <translation id="2114820389966440614">„Aktuelle Highlights“ und andere Erinnerungen hier ansehen</translation>
 <translation id="2114896190328250491">Foto von <ph name="NAME" /></translation>
 <translation id="2114995631896158695">Keine SIM-Karte eingelegt</translation>
-<translation id="2116020356255810305">Öffnen der App beim Start aktivieren</translation>
 <translation id="2116619964159595185">Websites verwenden Bluetooth-Geräte normalerweise für Funktionen wie das Einrichten oder Synchronisieren eines LE-Beacons, eines Gesundheits- oder Fitnesstrackers oder einer intelligenten Lampe</translation>
 <translation id="2117655453726830283">Nächste Folie</translation>
 <translation id="2119349053129246860">In <ph name="APP" /> öffnen</translation>
@@ -1483,6 +1487,7 @@ Wenn du die Family Link App auf deinem Gerät installierst, kannst du die Einste
 <translation id="2252017960592955005">Spionageschutz (Beta)</translation>
 <translation id="225240747099314620">Kennungen für geschützte Inhalte ermöglichen (erfordert eventuell einen Neustart des Computers)</translation>
 <translation id="2253318212986772520">PPD für <ph name="PRINTER_NAME" /> kann nicht abgerufen werden.</translation>
+<translation id="2253927598983295051">Inhalte zum Teilen mit <ph name="APP_NAME" /> auswählen</translation>
 <translation id="2255077166240162850">Dieses Gerät wurde zur ausschließlichen Nutzung in einer anderen Domain oder in einem anderen Modus eingerichtet.</translation>
 <translation id="2255317897038918278">Microsoft-Zeitstempeldienst</translation>
 <translation id="2256115617011615191">Jetzt neu starten</translation>
@@ -1603,7 +1608,7 @@ Wenn du die Family Link App auf deinem Gerät installierst, kannst du die Einste
 <translation id="2336228925368920074">Alle Tabs als Lesezeichen speichern...</translation>
 <translation id="2336376423977300504">Cookies immer löschen, wenn Fenster geschlossen werden</translation>
 <translation id="2336381494582898602">Powerwash</translation>
-<translation id="2337236196941929873">Seiten, die du nach Ansicht von Chrome besuchen könntest, werden vorab geladen. Chrome verwendet dazu möglicherweise Cookies, sofern du diese zulässt. Außerdem verschlüsselt und sendet es Seiten unter Umständen über Google, damit deine Identität auf Websites verborgen bleibt.</translation>
+<translation id="2337236196941929873">Seiten, die du nach Einschätzung von Chrome besuchen könntest, werden vorab geladen. Chrome verwendet dazu möglicherweise Cookies, sofern du diese zulässt. Außerdem verschlüsselt und sendet es Seiten unter Umständen über Google, damit deine Identität auf Websites verborgen bleibt.</translation>
 <translation id="2340239562261172947"><ph name="FILE_NAME" /> kann nicht sicher heruntergeladen werden</translation>
 <translation id="2342180549977909852">Anstelle eines Passworts kann dein Kind eine Nummer (PIN) zum Entsperren dieses Geräts verwenden. Die PIN kann später in den Einstellungen festgelegt werden.</translation>
 <translation id="2342740338116612727">Lesezeichen hinzugefügt</translation>
@@ -1674,6 +1679,7 @@ Wenn du die Family Link App auf deinem Gerät installierst, kannst du die Einste
 <translation id="2399699884460174994">Benachrichtigungen aktiviert</translation>
 <translation id="2399939490305346086">Anmeldedaten auf Sicherheitsschlüssel</translation>
 <translation id="2400664245143453337">Sofortiges Update erforderlich</translation>
+<translation id="2402226831639195063">Töne</translation>
 <translation id="2406153734066939945">Dieses Profil und die zugehörigen Daten löschen?</translation>
 <translation id="2408018932941436077">Karte wird gespeichert</translation>
 <translation id="2408955596600435184">PIN eingeben</translation>
@@ -1685,6 +1691,7 @@ Wenn du die Family Link App auf deinem Gerät installierst, kannst du die Einste
 <translation id="241082044617551207">Unbekanntes Plug-in</translation>
 <translation id="2410940059315936967">Auf einer Website, die du besuchst, können Inhalte von anderen Websites eingebettet sein, z. B. Bilder, Werbung und Text. Cookies, die von diesen anderen Websites gesetzt werden, werden als Drittanbieter-Cookies bezeichnet.</translation>
 <translation id="2411666601450687801">Auf diesem Gerät sind keine virtuellen Maschinen zulässig</translation>
+<translation id="2412015533711271895">Deine Eltern oder Erziehungsberechtigten müssen sagen, dass du diese Erweiterung verwenden darfst</translation>
 <translation id="2412753904894530585">Kerberos</translation>
 <translation id="2414886740292270097">Dunkel</translation>
 <translation id="2416435988630956212">Funktionstasten der Tastatur</translation>
@@ -1828,6 +1835,7 @@ Wenn du die Family Link App auf deinem Gerät installierst, kannst du die Einste
 <translation id="2532589005999780174">Modus mit hohem Kontrast</translation>
 <translation id="2533649878691950253">Diese Website darf nicht auf deinen genauen Standort zugreifen, weil du das meist nicht erlaubst</translation>
 <translation id="253434972992662860">&amp;Anhalten</translation>
+<translation id="253498598929009420">Die Website kann dann den Bildschirminhalt sehen</translation>
 <translation id="253557089021624350">Keepalive-Zahl</translation>
 <translation id="2535799430745250929">Kein Mobilfunknetz vorhanden</translation>
 <translation id="2537395079978992874"><ph name="ORIGIN" /> kann die folgenden Dateien und Ordner lesen und bearbeiten</translation>
@@ -2141,6 +2149,7 @@ Wenn du die Family Link App auf deinem Gerät installierst, kannst du die Einste
 <translation id="2804043232879091219">Der alternative Browser konnte nicht geöffnet werden</translation>
 <translation id="2804667941345577550">Du wirst von dieser Website abgemeldet, auch in offenen Tabs</translation>
 <translation id="2804680522274557040">Kamera ausgeschaltet</translation>
+<translation id="2804742109948581745">Nebeneinander</translation>
 <translation id="2805539617243680210">Fertig!</translation>
 <translation id="2805646850212350655">Verschlüsselndes Microsoft-Dateisystem</translation>
 <translation id="2805756323405976993">Apps</translation>
@@ -2624,6 +2633,7 @@ Servernachricht: <ph name="SERVER_MSG" /></translation>
 <translation id="3262986719682892278">Zu groß</translation>
 <translation id="3264544094376351444">Schriftart Sans-Serif</translation>
 <translation id="3264582393905923483">Kontext</translation>
+<translation id="3265032511221679826">Zugriff auf genauen Standort aktivieren?</translation>
 <translation id="3265459715026181080">Fenster schließen</translation>
 <translation id="3266022278425892773">Linux-Entwicklungsumgebung</translation>
 <translation id="3266274118485960573">Der Sicherheitscheck wird ausgeführt.</translation>
@@ -2712,6 +2722,7 @@ Servernachricht: <ph name="SERVER_MSG" /></translation>
 <translation id="3336855445806447827">Weiß nicht</translation>
 <translation id="3337568642696914359">Websites dürfen keine Protokolle verarbeiten</translation>
 <translation id="3340620525920140773">Download abgeschlossen: <ph name="FILE_NAME" />.</translation>
+<translation id="3340978935015468852">Einstellungen</translation>
 <translation id="3341699307020049241">Falsche PIN. Du hast noch <ph name="RETRIES" /> Versuche.</translation>
 <translation id="3341703758641437857">Zugriff auf Datei-URLs zulassen</translation>
 <translation id="3342361181740736773"><ph name="TRIGGERING_EXTENSION_NAME" /> möchte diese Erweiterung entfernen.</translation>
@@ -2983,6 +2994,7 @@ Servernachricht: <ph name="SERVER_MSG" /></translation>
 <translation id="3584527007414070635">Weiter nach <ph name="MODULE_TITLE" /> stöbern</translation>
 <translation id="3586787825263265024">Für die Anwendung <ph name="APPLICATION_NAME" /> ist OneDrive erforderlich.</translation>
 <translation id="3586806079541226322">Diese Datei kann nicht geöffnet werden</translation>
+<translation id="3586931643579894722">Details ausblenden</translation>
 <translation id="3587438013689771191">Weitere Informationen: <ph name="SUBPAGE_TITLE" /></translation>
 <translation id="3587482841069643663">Alle</translation>
 <translation id="3588790464166520201">Dürfen Zahlungs-Handler installieren</translation>
@@ -3009,6 +3021,7 @@ Servernachricht: <ph name="SERVER_MSG" /></translation>
 <translation id="3609277884604412258">Schnellsuche</translation>
 <translation id="3610241585790874201">Speichern von Daten auf deinem Gerät nicht genehmigt</translation>
 <translation id="3610369246614755442">Lüfter des Docks muss repariert werden</translation>
+<translation id="3610961622607302617">Passwort für <ph name="WEBSITE" /> ändern</translation>
 <translation id="361106536627977100">Flash-Daten</translation>
 <translation id="3611655097742243705">Im Play Store findest du weitere Apps</translation>
 <translation id="3611658447322220736">Kürzlich geschlossene Websites dürfen den Datenversand und -empfang abschließen</translation>
@@ -3065,6 +3078,7 @@ Servernachricht: <ph name="SERVER_MSG" /></translation>
 <translation id="3651488188562686558">Die WLAN-Verbindung trennen</translation>
 <translation id="3652817283076144888">Initialisierung läuft</translation>
 <translation id="3653160965917900914">Netzwerkfreigaben</translation>
+<translation id="3653887973853407813">Du kannst diese Erweiterung nicht verwenden. Deine Eltern oder Erziehungsberechtigten haben „Berechtigungen für Websites, Apps und Erweiterungen“ für Chrome deaktiviert.</translation>
 <translation id="3653999333232393305"><ph name="HOST" /> weiterhin Zugriff auf mein Mikrofon gestatten</translation>
 <translation id="3654045516529121250">Einstellungen für Bedienungshilfen lesen</translation>
 <translation id="3655712721956801464">{NUM_FILES,plural, =1{Dauerhafter Zugriff auf eine Datei}other{Dauerhafter Zugriff auf # Dateien}}</translation>
@@ -3110,6 +3124,7 @@ Servernachricht: <ph name="SERVER_MSG" /></translation>
 <translation id="369489984217678710">Passwörter und andere Anmeldedaten</translation>
 <translation id="369522892592566391">{NUM_FILES,plural, =0{Die Sicherheitsprüfungen wurden abgeschlossen. Deine Daten werden hochgeladen.}=1{Die Sicherheitsprüfungen wurden abgeschlossen. Deine Datei wird hochgeladen.}other{Die Sicherheitsprüfungen wurden abgeschlossen. Deine Dateien werden hochgeladen.}}</translation>
 <translation id="3696817060563289264">Texterkennungsdateien heruntergeladen</translation>
+<translation id="3697716475445175867">zuletzt geöffnet</translation>
 <translation id="3698471669415859717">Überprüfung abgeschlossen</translation>
 <translation id="3698825735945432002">Filtertyp</translation>
 <translation id="3699624789011381381">E-Mail-Adresse</translation>
@@ -3250,7 +3265,6 @@ Servernachricht: <ph name="SERVER_MSG" /></translation>
 <translation id="380329542618494757">Name</translation>
 <translation id="3803345858388753269">Videoqualität</translation>
 <translation id="3803367742635802571">Websites funktionieren möglicherweise nicht mehr erwartungsgemäß</translation>
-<translation id="3803583375545057606">Möchtest du deinen Elternteil darum bitten, diese Erweiterung zu aktivieren?</translation>
 <translation id="380408572480438692">Bei Aktivierung der Erfassung von Leistungsdaten kann Google das System mit der Zeit verbessern. Daten werden erst gesendet, wenn du mittels Alt+Umschalttaste+I einen Feedback-Bericht mit Leistungsdaten einreichst. Du kannst jederzeit zu diesem Bildschirm zurückkehren, um die Datenerfassung zu deaktivieren.</translation>
 <translation id="3807249107536149332"><ph name="EXTENSION_NAME" /> (Erweiterungs-ID "<ph name="EXTENSION_ID" />") ist auf Anmeldeseiten nicht zulässig.</translation>
 <translation id="3807747707162121253">Abbre&amp;chen</translation>
@@ -3299,7 +3313,6 @@ Servernachricht: <ph name="SERVER_MSG" /></translation>
 <translation id="383669374481694771">Dies sind allgemeine Informationen zu diesem Gerät und dessen Nutzung, zum Beispiel der Akkustand, System- und App-Aktivitäten und Fehler. Die Daten werden dazu verwendet, Android zu verbessern. Einige aggregierte Daten helfen auch Apps und Partnern von Google, beispielsweise Android-Entwicklern, ihre Apps und Produkte weiter zu verbessern.</translation>
 <translation id="3838085852053358637">Fehler beim Laden der Erweiterung</translation>
 <translation id="3838486795898716504">Weitere <ph name="PAGE_TITLE" /></translation>
-<translation id="3838487810283346084">Gespeicherte Passwörter im Google Passwortmanager hinzufügen</translation>
 <translation id="383891835335927981">Keine Websites wurden vergrößert oder verkleinert</translation>
 <translation id="3839509547554145593">Scroll-Beschleunigung für Maus aktivieren</translation>
 <translation id="3839516600093027468">Immer verhindern, dass <ph name="HOST" /> die Zwischenablage abruft</translation>
@@ -3518,7 +3531,6 @@ Möchtest du <ph name="CONTROL_PANEL_APPLET_NAME" /> starten?</translation>
 <translation id="4025039777635956441">Ausgewählte Website stummschalten</translation>
 <translation id="402707738228916911">Anweisung „<ph name="AUTHORIZE_INSTRUCTION_NAME" />“ erhalten</translation>
 <translation id="4027569221211770437">Ordner „<ph name="FOLDER_TITLE" />“</translation>
-<translation id="4027958407426528157">Websites in Apps öffnen, die auf deinem <ph name="DEVICE_TYPE" /> installiert sind</translation>
 <translation id="4028467762035011525">Eingabemethoden hinzufügen</translation>
 <translation id="4029556917477724407">Von der Seite „<ph name="PAGE_TITLE" />“ zurückgehen</translation>
 <translation id="403088439874411464">Texterkennungsdateien werden heruntergeladen</translation>
@@ -3672,7 +3684,6 @@ Möchtest du <ph name="CONTROL_PANEL_APPLET_NAME" /> starten?</translation>
 <translation id="4169535189173047238">Nicht zulassen</translation>
 <translation id="4170314459383239649">Beim Beenden löschen</translation>
 <translation id="417096670996204801">Profil auswählen</translation>
-<translation id="41725145403849567">Möchtest du deinen Elternteil darum bitten, diese Erweiterung hinzuzufügen?</translation>
 <translation id="4175137578744761569">Hellviolett und Weiß</translation>
 <translation id="4175737294868205930">Permanentspeicher</translation>
 <translation id="4176463684765177261">Deaktiviert</translation>
@@ -3725,8 +3736,9 @@ Möchtest du <ph name="CONTROL_PANEL_APPLET_NAME" /> starten?</translation>
 <translation id="4228209296591583948">{NUM_EXTENSIONS,plural, =1{Diese Erweiterung ist nicht zulässig}other{Einige Erweiterungen sind nicht zulässig}}</translation>
 <translation id="4231095370974836764">Apps und Spiele von Google Play auf dem <ph name="DEVICE_TYPE" /> installieren. <ph name="LINK_BEGIN" />Weitere Informationen<ph name="LINK_END" /></translation>
 <translation id="4231141543165771749">Spielsteuerung schließen</translation>
-<translation id="4231542173270219144">Wenn Tests aktiviert sind, werden für die Spam- und Betrugsreduzierung Private Stake Tokens verwendet, um Websites bei der Betrugsbekämpfung und der Unterscheidung zwischen Bots und Personen zu unterstützen.</translation>
+<translation id="4231542173270219144">Wenn Tests aktiviert sind, werden für die Spam- und Betrugsreduzierung Private State Tokens verwendet, um Websites bei der Betrugsbekämpfung und der Unterscheidung zwischen Bots und Personen zu unterstützen.</translation>
 <translation id="4232375817808480934">Kerberos konfigurieren</translation>
+<translation id="4233739489690259993">Dein Chromebook erhält keine Sicherheits- und Softwareupdates mehr. Aktualisiere dein Gerät, um die neuesten Sicherheitsupdates und Funktionen zu erhalten. Es gelten die Angebotsbedingungen.</translation>
 <translation id="4235965441080806197">Anmeldung abbrechen</translation>
 <translation id="4236163961381003811">Mehr Erweiterungen entdecken</translation>
 <translation id="4237282663517880406">Google Drive-Vorschläge anzeigen</translation>
@@ -3839,6 +3851,7 @@ Möchtest du <ph name="CONTROL_PANEL_APPLET_NAME" /> starten?</translation>
 <translation id="4340125850502689798">Ungültiger Nutzername</translation>
 <translation id="4340515029017875942"><ph name="ORIGIN" /> möchte mit der App "<ph name="EXTENSION_NAME" />" kommunizieren.</translation>
 <translation id="4340799661701629185">Websites dürfen keine Benachrichtigungen senden</translation>
+<translation id="4341280816303414009">Dein Bildschirm wird möglicherweise aufgezeichnet</translation>
 <translation id="4341577178275615435">Mit dem Tastaturkürzel F7 kann die Tastaturnavigation aktiviert oder deaktiviert werden</translation>
 <translation id="4341905082470253054">TPM-Status wird überprüft...</translation>
 <translation id="434198521554309404">Schnell. Sicher. Mühelos.</translation>
@@ -3872,7 +3885,7 @@ Möchtest du <ph name="CONTROL_PANEL_APPLET_NAME" /> starten?</translation>
 <translation id="4366138410738374926">Druckvorgang gestartet</translation>
 <translation id="4367513928820380646">Entfernte Berechtigungen überprüfen</translation>
 <translation id="4369215744064167350">Websiteanfrage genehmigt</translation>
-<translation id="4369735607080757018">Zur Messung der Leistung von Werbung werden nur manche Datentypen zwischen Websites geteilt, wie z. B. die Tageszeit, zu der dir die Werbung präsentiert wurde</translation>
+<translation id="4369735607080757018">Zur Erfolgsmessung von Werbeanzeigen werden nur manche Datentypen zwischen Websites geteilt, wie z. B. die Tageszeit, zu der dir die Werbung präsentiert wurde</translation>
 <translation id="4370975561335139969">Die E-Mail-Adresse und das Passwort, die du eingegeben hast, stimmen nicht überein.</translation>
 <translation id="4374805630006466253">Anderes Smartphone oder Tablet verwenden</translation>
 <translation id="4374831787438678295">Linux-Installationsprogramm</translation>
@@ -3980,7 +3993,6 @@ Möchtest du <ph name="CONTROL_PANEL_APPLET_NAME" /> starten?</translation>
 <translation id="4453430595102511050">Lege einen Finger auf den Fingerabdrucksensor rechts oben an der Tastatur. Dein Fingerabdruck wird sicher gespeichert und verlässt dein <ph name="DEVICE_TYPE" /> nie.</translation>
 <translation id="4453946976636652378">Mit <ph name="SEARCH_ENGINE_NAME" /> suchen oder eine URL eingeben</translation>
 <translation id="4457472090507035117">Aktuelle Stimme auswählen:</translation>
-<translation id="4458535500699390320">Während dieser Tab inaktiv war, hat der Arbeitsspeicher-Sparmodus Arbeitsspeicher für andere Aufgaben freigegeben. Du kannst dies jederzeit in den Einstellungen ändern.</translation>
 <translation id="4459169140545916303">Vor <ph name="DEVICE_LAST_ACTIVATED_TIME" /> Tagen aktiv</translation>
 <translation id="4460014764210899310">Gruppierung aufheben</translation>
 <translation id="4461483878391246134">Sprachen hinzufügen, für die nie eine Übersetzung angeboten werden soll</translation>
@@ -4082,6 +4094,7 @@ Möchtest du <ph name="CONTROL_PANEL_APPLET_NAME" /> starten?</translation>
 <translation id="4545759655004063573">Speichern aufgrund unzureichender Berechtigungen nicht möglich. Wähle bitte einen anderen Speicherort aus.</translation>
 <translation id="4546308221697447294">Schnell surfen mit Google Chrome</translation>
 <translation id="4546345569117159016">Rechte Taste</translation>
+<translation id="4546509872654834602"><ph name="SUPERVISED_USER_NAME" /> möchte diese Erweiterung verwenden:</translation>
 <translation id="4546692474302123343">Google Assistant-Spracheingabe</translation>
 <translation id="4547659257713117923">Keine Tabs von anderen Geräten</translation>
 <translation id="4547672827276975204">Automatisch festlegen</translation>
@@ -4158,7 +4171,6 @@ Möchtest du <ph name="CONTROL_PANEL_APPLET_NAME" /> starten?</translation>
 <translation id="4615586811063744755">Kein Cookie ausgewählt</translation>
 <translation id="461661862154729886">Energiequelle</translation>
 <translation id="4617001782309103936">Zu kurz</translation>
-<translation id="4617019240346358451">Seite aktualisieren, um „<ph name="EXTENSION_NAME" />“ zu verwenden</translation>
 <translation id="4617270414136722281">Optionen</translation>
 <translation id="4617880081511131945">Verbindung kann nicht hergestellt werden</translation>
 <translation id="4618195822946934889">Die URL darf nur aus ASCII-Zeichen bestehen</translation>
@@ -4395,7 +4407,6 @@ Zum Herauszoomen drücke Strg + Alt + „Helligkeit verringern“.</translatio
 <translation id="4833683849865011483">Auf dem Druckserver wurde 1 Drucker gefunden</translation>
 <translation id="4836504898754963407">Fingerabdrücke verwalten</translation>
 <translation id="4837128290434901661">Wieder zur Google Suche wechseln?</translation>
-<translation id="4837165100461973682">Seite aktualisieren, um Änderungen zu übernehmen</translation>
 <translation id="4837926214103741331">Du bist nicht zur Verwendung dieses Geräts berechtigt. Bitte den Geräteinhaber um eine Anmeldeberechtigung.</translation>
 <translation id="4837952862063191349">Gib dein altes <ph name="DEVICE_TYPE" />-Passwort ein, um deine lokalen Daten zu entsperren und wiederherzustellen.</translation>
 <translation id="4838170306476614339">Fotos, Medien und Benachrichtigungen von deinem Smartphone abrufen</translation>
@@ -4630,6 +4641,7 @@ Zum Herauszoomen drücke Strg + Alt + „Helligkeit verringern“.</translatio
 <translation id="5056950756634735043">Verbindung zum Container wird hergestellt</translation>
 <translation id="5057110919553308744">Wenn die Erweiterung angeklickt wird</translation>
 <translation id="5059241099014281248">Anmeldung beschränken</translation>
+<translation id="5059429103770496207">Anzeigestil</translation>
 <translation id="5059526285558225588">Auswählen, was geteilt werden soll</translation>
 <translation id="5060332552815861872">Es ist 1 Drucker verfügbar, der gespeichert werden kann.</translation>
 <translation id="5061347216700970798">{NUM_BOOKMARKS,plural, =1{Dieser Ordner enthält ein Lesezeichen. Möchtest du ihn wirklich löschen?}other{Dieser Ordner enthält # Lesezeichen. Möchtest du ihn wirklich löschen?}}</translation>
@@ -4812,6 +4824,7 @@ Zum Herauszoomen drücke Strg + Alt + „Helligkeit verringern“.</translatio
 <translation id="5228579091201413441">Synchronisierung aktivieren</translation>
 <translation id="5229337741799419985">Diese Einstellung funktioniert, ohne dass dabei deine Identität preisgegeben oder Websites erlaubt wird, deinen Browserverlauf einzusehen</translation>
 <translation id="5230516054153933099">Fenster</translation>
+<translation id="5231427103154766313">Verwende die Fernbedienung, um das Streamen zu beenden.</translation>
 <translation id="5233019165164992427">NaCl-Debug-Port</translation>
 <translation id="5233231016133573565">Prozess-ID</translation>
 <translation id="5233638681132016545">Neuer Tab</translation>
@@ -4938,6 +4951,7 @@ Zum Herauszoomen drücke Strg + Alt + „Helligkeit verringern“.</translatio
 <translation id="5338503421962489998">Lokaler Speicher</translation>
 <translation id="5339031667684712858">Entfernte Websites</translation>
 <translation id="5340638867532133571">Installation von Zahlungs-Handlern auf Websites zulassen (empfohlen)</translation>
+<translation id="5340787663756381836">&amp;Suchen und bearbeiten</translation>
 <translation id="5341793073192892252">Die folgenden Cookies wurden blockiert (Cookies von Drittanbietern werden ausnahmslos blockiert)</translation>
 <translation id="5342091991439452114">PIN muss mindestens <ph name="MINIMUM" /> Ziffern umfassen</translation>
 <translation id="5344036115151554031">Linux wird wiederhergestellt</translation>
@@ -5083,7 +5097,6 @@ Berechtigungen, die du Websites und Apps bereits gewährt hast, gelten mögliche
 <translation id="5473156705047072749">{NUM_CHARACTERS,plural, =1{Die PIN muss aus mindestens 1 Zeichen bestehen}other{Die PIN muss aus mindestens # Zeichen bestehen}}</translation>
 <translation id="5474859849784484111"><ph name="MANAGER" /> erfordert, dass du dein Gerät jetzt mit dem WLAN verbindest und ein Update herunterlädst. Das Update kann auch über eine kostenpflichtige Verbindung heruntergeladen werden (hierfür können zusätzliche Gebühren anfallen).</translation>
 <translation id="5476016146231427848">Bitte starte dein Gerät neu, um Steam auf Chromebook verwenden zu können</translation>
-<translation id="5476897066181964657">Ein Elternteil oder Erziehungsberechtigter muss dir erlauben, diese Erweiterung hinzuzufügen</translation>
 <translation id="5481273127572794904">Dürfen nicht automatisch mehrere Dateien herunterladen</translation>
 <translation id="5481941284378890518">Drucker in der Nähe hinzufügen</translation>
 <translation id="5483785310822538350">Datei- und Gerätezugriff aufheben</translation>
@@ -5137,6 +5150,7 @@ Berechtigungen, die du Websites und Apps bereits gewährt hast, gelten mögliche
 <translation id="5517304475148761050">Diese App benötigt Zugriff auf den Google Play Store</translation>
 <translation id="5517412723934627386"><ph name="NETWORK_TYPE" /> – <ph name="NETWORK_DISPLAY_NAME" /></translation>
 <translation id="5518219166343146486">Nachfragen, wenn eine Website Texte und Bilder aus der Zwischenablage abrufen möchte</translation>
+<translation id="5518949581554491184">Mit Android-Smartphone einrichten</translation>
 <translation id="5519195206574732858">LTE</translation>
 <translation id="5521078259930077036">Ist das deine erwartete Startseite?</translation>
 <translation id="5522156646677899028">Diese Erweiterung enthält eine schwere Sicherheitslücke.</translation>
@@ -5180,7 +5194,6 @@ Berechtigungen, die du Websites und Apps bereits gewährt hast, gelten mögliche
 <translation id="5555639311269196631">Hotspot deaktivieren</translation>
 <translation id="5556459405103347317">Neu laden</translation>
 <translation id="5558129378926964177">Ver&amp;größern</translation>
-<translation id="5558247502209241936">Öffnen der App im Fenster aktivieren</translation>
 <translation id="5559311991468302423">Adresse löschen</translation>
 <translation id="55601339223879446">Die Ränder des Desktops an den Bildschirm anpassen</translation>
 <translation id="5561162485081632007">Erkennt schädliche Ereignisse, sobald diese passieren, und warnt dich entsprechend</translation>
@@ -5233,6 +5246,7 @@ Berechtigungen, die du Websites und Apps bereits gewährt hast, gelten mögliche
 <translation id="5601503069213153581">PIN</translation>
 <translation id="5601823921345337195">Dürfen keine Verbindung mit MIDI-Geräten herstellen</translation>
 <translation id="5601833336918638013">Websites dürfen nicht darum bitten, nach Bluetooth-Geräten zu suchen</translation>
+<translation id="5602586420788540146">In neuer Tabgruppe öffnen</translation>
 <translation id="5602765853043467355">Lesezeichen, Verlauf, Passwörter und weitere Daten von diesem Gerät löschen</translation>
 <translation id="5605758115928394442">An dein Smartphone wurde eine Benachrichtigung gesendet, um deine Identität zu bestätigen.</translation>
 <translation id="5606849116180480101">{NUM_EXTENSIONS,plural, =1{Diese Erweiterung ist blockiert}other{Diese Erweiterungen sind blockiert}}</translation>
@@ -5559,6 +5573,7 @@ Berechtigungen, die du Websites und Apps bereits gewährt hast, gelten mögliche
 <translation id="5904614460720589786"><ph name="APP_NAME" /> konnte aufgrund eines Konfigurationsproblems nicht eingerichtet werden. Bitte wende dich an deinen Administrator. Fehlercode: <ph name="ERROR_CODE" />.</translation>
 <translation id="5906655207909574370">Fast fertig! Starte dein Gerät neu, um die Aktualisierung abzuschließen.</translation>
 <translation id="5906732635754427568">Daten, die dieser App zugewiesen sind, werden von diesem Gerät entfernt.</translation>
+<translation id="5906974869830879618">Bitte gib eine PIN ein</translation>
 <translation id="5908474332780919512">App beim Anmelden starten</translation>
 <translation id="5908695239556627796">Scroll-Geschwindigkeit mit der Maus</translation>
 <translation id="5909379458939060601">Dieses Profil und diese Browserdaten löschen?</translation>
@@ -5625,7 +5640,6 @@ Berechtigungen, die du Websites und Apps bereits gewährt hast, gelten mögliche
 <translation id="5957918771633727933">Keine verfügbaren eSIM-Profile. Lade ein neues <ph name="BEGIN_LINK" />Profil<ph name="END_LINK" /> herunter.</translation>
 <translation id="5957987129450536192">Tippe auf das Symbol "Vorlesen" in der Nähe deines Profilbilds und wähle aus, was vorgelesen werden soll.</translation>
 <translation id="5959471481388474538">Netzwerk nicht verfügbar</translation>
-<translation id="595959584676692139">Seite neu laden, um diese Erweiterung zu nutzen</translation>
 <translation id="5963413905009737549">Section-Element</translation>
 <translation id="5963453369025043595"><ph name="NUM_HANDLES" /> (Spitzenwert <ph name="NUM_KILOBYTES_LIVE" />)</translation>
 <translation id="5964113968897211042">{COUNT,plural, =0{Alle in &amp;neuem Fenster öffnen}=1{In &amp;neuem Fenster öffnen}other{Alle ({COUNT}) in &amp;neuem Fenster öffnen}}</translation>
@@ -5654,6 +5668,7 @@ Berechtigungen, die du Websites und Apps bereits gewährt hast, gelten mögliche
 <translation id="5979421442488174909">&amp;Übersetzen in <ph name="LANGUAGE" /></translation>
 <translation id="5979469435153841984">Klicke auf den Stern in der Adressleiste, um Seiten als Lesezeichen zu speichern</translation>
 <translation id="5981362776161841923">Wenn du eine Erweiterung zulassen möchtest, ändere unten die Standardeinstellung.</translation>
+<translation id="5982578203375898585">Fertige Downloads anzeigen</translation>
 <translation id="5984222099446776634">Kürzlich besucht</translation>
 <translation id="5985458664595100876">Ungültiges URL-Format. Unterstützt werden \\server\share und smb://server/share.</translation>
 <translation id="598810097218913399">Zuweisung aufheben</translation>
@@ -5692,6 +5707,7 @@ Berechtigungen, die du Websites und Apps bereits gewährt hast, gelten mögliche
 <translation id="6019851026059441029">Sehr gut – HD</translation>
 <translation id="6020431688553761150">Du wurdest vom Server nicht für den Zugriff auf diese Ressource autorisiert.</translation>
 <translation id="6021293122504240352"><ph name="APPS" /> Apps werden nicht mehr unterstützt</translation>
+<translation id="6021969570711251331">Überlappend</translation>
 <translation id="6022526133015258832">Im Vollbildmodus öffnen</translation>
 <translation id="6022659036123304283">Chrome personalisieren</translation>
 <translation id="6023643151125006053">Dieses Gerät (SN: <ph name="SERIAL_NUMBER" />) wurde durch den Administrator von <ph name="SAML_DOMAIN" /> gesperrt.</translation>
@@ -5826,6 +5842,7 @@ Berechtigungen, die du Websites und Apps bereits gewährt hast, gelten mögliche
 <translation id="6136114942382973861">Downloadleiste schließen</translation>
 <translation id="6136287496450963112">Dein Sicherheitsschlüssel ist nicht durch eine PIN geschützt. Erstelle zuerst eine PIN, um Fingerabdrücke zu verwalten.</translation>
 <translation id="6138680304137685902">X9.62-ECDSA-Signatur mit SHA-384</translation>
+<translation id="6140948187512243695">Details ansehen</translation>
 <translation id="6141988275892716286">Download bestätigen</translation>
 <translation id="6143186082490678276">Hilfe</translation>
 <translation id="6143366292569327983">Wähle die Ausgangssprache aus</translation>
@@ -6002,7 +6019,6 @@ Berechtigungen, die du Websites und Apps bereits gewährt hast, gelten mögliche
 <translation id="6305607932814307878">Globale Richtlinien:</translation>
 <translation id="6305702903308659374">Mit normaler Lautstärke wiedergeben, auch wenn eine Sprachausgabe durch ChromeVox stattfindet</translation>
 <translation id="6305909198255586420">Bitte installiere Steam über dein primäres Profil</translation>
-<translation id="630750887748244481">Dein Elternteil hat „Berechtigungen für Websites, Apps und Erweiterungen“ für Chrome deaktiviert. Deshalb kann diese Erweiterung nicht hinzugefügt werden.</translation>
 <translation id="6307990684951724544">System ausgelastet</translation>
 <translation id="6308493641021088955">Anmeldung zur Verfügung gestellt von <ph name="EXTENSION_NAME" /></translation>
 <translation id="6308937455967653460">&amp;Link speichern unter...</translation>
@@ -6023,6 +6039,7 @@ Berechtigungen, die du Websites und Apps bereits gewährt hast, gelten mögliche
 <translation id="6318125393809743217">Eine policies.json-Datei mit Richtlinienkonfigurationen einbeziehen.</translation>
 <translation id="6318407754858604988">Download gestartet</translation>
 <translation id="6318944945640833942">Es wurde kein Drucker erkannt. Bitte gib die Druckeradresse noch einmal ein.</translation>
+<translation id="6320808462673705899">Es gibt keine Lesezeichen, die deiner Suche entsprechen.</translation>
 <translation id="6322370287306604163">Mit dem Fingerabdruck schneller entsperren</translation>
 <translation id="6322559670748154781">Diese Datei ist ein ungewöhnlicher Download und wurde vom erweiterten Sicherheitsprogramm gelöscht</translation>
 <translation id="6324916366299863871">Verknüpfung bearbeiten</translation>
@@ -6294,6 +6311,7 @@ Berechtigungen, die du Websites und Apps bereits gewährt hast, gelten mögliche
 <translation id="657229725818377235">Mehr Schutz vor gefährlichen Websites und Downloads</translation>
 <translation id="6573096386450695060">Immer zulassen</translation>
 <translation id="6573497332121198392">Verknüpfung kann nicht entfernt werden</translation>
+<translation id="6573915150656780875">Dein Chromebook erhält keine Sicherheits- und Softwareupdates mehr. Wir empfehlen, auf ein neues Chromebook umzusteigen.</translation>
 <translation id="657402800789773160">&amp;Diese Seite neu laden</translation>
 <translation id="6577284282025554716">Download abgebrochen: <ph name="FILE_NAME" /></translation>
 <translation id="657866106756413002">Netzwerkzustand – Übersicht</translation>
@@ -6327,6 +6345,7 @@ Du hast # weitere gehackte Passwörter. Der Google Passwortmanager empfiehlt, d
 <translation id="6596816719288285829">IP-Adresse</translation>
 <translation id="6597017209724497268">Proben</translation>
 <translation id="6597331566371766302">Die folgenden Erweiterungen wurden von deinem Administrator blockiert:</translation>
+<translation id="659894938503552850">neuestem</translation>
 <translation id="6601262427770154296">Meine Wörterbücher verwalten</translation>
 <translation id="6601612474695404578">Manche Websites verwenden Drittanbieter-Cookies, um ihre Seiten zu laden. Wenn eine Website nicht richtig funktioniert, kannst du versuchen, Cookies zuzulassen.</translation>
 <translation id="6602937173026466876">Zugriff auf deine Drucker</translation>
@@ -6408,7 +6427,7 @@ Du hast # weitere gehackte Passwörter. Der Google Passwortmanager empfiehlt, d
 <translation id="6674571176963658787">Gib deine Passphrase ein, um die Synchronisierung zu starten</translation>
 <translation id="6675665718701918026">Zeigegerät verbunden</translation>
 <translation id="6676212663108450937">Es ist ratsam, beim Trainieren deiner Stimme Kopfhörer zu verwenden</translation>
-<translation id="6677942524382973058">Private Stake Tokens verbessern den Datenschutz im Web und können nicht dazu verwendet werden, deine Identität zu ermitteln.</translation>
+<translation id="6677942524382973058">Private State Tokens verbessern den Datenschutz im Web und können nicht dazu verwendet werden, deine Identität zu ermitteln.</translation>
 <translation id="6678717876183468697">Abfrage-URL</translation>
 <translation id="6680442031740878064">Verfügbar: <ph name="AVAILABLE_SPACE" /></translation>
 <translation id="6680650203439190394">Geschwindigkeit</translation>
@@ -6435,7 +6454,6 @@ Du hast # weitere gehackte Passwörter. Der Google Passwortmanager empfiehlt, d
 <translation id="6700480081846086223"><ph name="HOST_NAME" /> übertragen</translation>
 <translation id="6701535245008341853">Profil konnte nicht geladen werden.</translation>
 <translation id="6701547804986694515">Von dir besuchte Websites können Informationen in Chrome speichern, die belegen, dass du kein Bot bist. Wenn du dann weitersurfst, können Websites diese Daten von Chrome abrufen und über eine zuvor von dir besuchte Website bestätigen, dass du wahrscheinlich eine echte Person bist.</translation>
-<translation id="6701824422332982935">Seite aktualisieren, um diese Erweiterungen zu verwenden</translation>
 <translation id="6702639462873609204">&amp;Bearbeiten...</translation>
 <translation id="6703212423117969852">Du kannst es später in Chrome noch einmal versuchen.</translation>
 <translation id="6703254819490889819">Sicherung wiederherstellen</translation>
@@ -6466,6 +6484,7 @@ Du hast # weitere gehackte Passwörter. Der Google Passwortmanager empfiehlt, d
 <translation id="6725206449694821596">Internet Printing Protocol (IPP)</translation>
 <translation id="6725970970008349185">Anzahl von Kandidaten, die pro Seite angezeigt werden sollen</translation>
 <translation id="672609503628871915">Neuigkeiten</translation>
+<translation id="6726800386221816228">Sonderzeichen</translation>
 <translation id="67269783048918309">Du hast die Möglichkeit, Nutzungsdaten &amp; Fehlerberichte zu senden. Dieses Gerät sendet momentan automatisch Diagnose- sowie Geräte- und App-Nutzungsdaten an Google. Dein Kind wird mithilfe dieser Daten nicht identifiziert, sie helfen jedoch beispielsweise dabei, die Stabilität des Systems und der Apps zu verbessern. Einige aggregierte Daten sind auch für Apps und Partner von Google, beispielsweise Android-Entwickler, nützlich. Diese <ph name="BEGIN_LINK1" />Einstellung<ph name="END_LINK1" /> wird vom Inhaber erzwungen. Wenn zusätzlich die Einstellung "Web- &amp; App-Aktivitäten" für dein Kind aktiviert ist, werden diese Daten in seinem Google-Konto gespeichert. <ph name="BEGIN_LINK2" />Weitere Informationen<ph name="END_LINK2" /></translation>
 <translation id="6728528977475057549">IBAN, die mit <ph name="LAST_FOUR_DIGITS" /> endet</translation>
 <translation id="6729192290958770680">Nutzername eingeben</translation>
@@ -6820,7 +6839,6 @@ Du hast # weitere gehackte Passwörter. Der Google Passwortmanager empfiehlt, d
 <translation id="7017004637493394352">Sag noch einmal „Hey Google“.</translation>
 <translation id="7017219178341817193">Neue Seite hinzufügen</translation>
 <translation id="7017354871202642555">Nach Erstellung des Fensters kann der Modus nicht mehr festgelegt werden.</translation>
-<translation id="7018275672629230621">Deinen Browserverlauf lesen und ändern</translation>
 <translation id="7019546817926942979">Dein Gerät muss an ein Ladegerät angeschlossen werden. Wenn du Linux aktualisierst, kann dies den Akku stark beanspruchen. Verbinde das Gerät mit einem Ladegerät und versuche es noch einmal.</translation>
 <translation id="7019805045859631636">Schnell</translation>
 <translation id="7022562585984256452">Deine Startseite wurde eingerichtet.</translation>
@@ -6828,7 +6846,6 @@ Du hast # weitere gehackte Passwörter. Der Google Passwortmanager empfiehlt, d
 <translation id="7025190659207909717">Verwaltung mobiler Datendienste</translation>
 <translation id="7025895441903756761">Sicherheit und Datenschutz</translation>
 <translation id="7027258625819743915">{COUNT,plural, =0{Alle in &amp;Inkognitofenster öffnen}=1{In &amp;Inkognitofenster öffnen}other{Alle ({COUNT}) in &amp;Inkognitofenster öffnen}}</translation>
-<translation id="7028057921476386252">Ein Elternteil oder Erziehungsberechtigter muss dir erlauben, diese Erweiterung zu aktivieren</translation>
 <translation id="7029307918966275733">Crostini ist nicht installiert. Bitte installiere Crostini, um die Credits anzuzeigen.</translation>
 <translation id="7029809446516969842">Passwörter</translation>
 <translation id="7030304022046916278">Sendet URLs an Safe Browsing, um sie zu prüfen</translation>
@@ -6870,6 +6887,7 @@ Du hast # weitere gehackte Passwörter. Der Google Passwortmanager empfiehlt, d
 <translation id="7063129466199351735">Verknüpfungen werden bearbeitet...</translation>
 <translation id="7063311912041006059">URL mit <ph name="SPECIAL_SYMBOL" /> statt der Suchanfrage</translation>
 <translation id="706342288220489463">Assistant erlauben, Informationen auf deinem Bildschirm zum besseren Beantworten von Fragen zu verwenden</translation>
+<translation id="70641621694466590">Zur Seite „Passwörter“</translation>
 <translation id="7064734931812204395">Der Linux-Container wird konfiguriert. Dies kann bis zu 30 Minuten dauern.</translation>
 <translation id="7065223852455347715">Dieses Gerät ist gesperrt, sodass keine Unternehmensanmeldung möglich ist. Wenn du das Gerät anmelden möchtest, musst du zunächst eine Gerätewiederherstellung durchführen.</translation>
 <translation id="7065534935986314333">Systeminformationen</translation>
@@ -6942,6 +6960,7 @@ Du hast # weitere gehackte Passwörter. Der Google Passwortmanager empfiehlt, d
 <translation id="7139627972753429585"><ph name="APP_NAME" /> verwendet dein Mikrofon</translation>
 <translation id="7141105143012495934">Du konntest nicht angemeldet werden, weil deine Kontodetails nicht abgerufen werden konnten. Bitte wende dich an deinen Administrator oder versuche es noch einmal.</translation>
 <translation id="7141844554192012199">Überprüfung</translation>
+<translation id="7143207342074048698">Verbindung...</translation>
 <translation id="7144878232160441200">Wiederholen</translation>
 <translation id="7148426638542880639">Websites funktionieren möglicherweise nicht erwartungsgemäß. Wähle diese Option aus, wenn du keine Daten zu besuchten Websites auf deinem Gerät speichern möchtest.</translation>
 <translation id="7149839598364933473">Mache aus diesem Gerät ein <ph name="DEVICE_OS" />-Gerät.</translation>
@@ -7109,6 +7128,7 @@ Du hast # weitere gehackte Passwörter. Der Google Passwortmanager empfiehlt, d
 <translation id="7308643132139167865">Websitesprachen</translation>
 <translation id="7310598146671372464">Fehler beim Anmelden. Der Server unterstützt keine angegebenen Kerberos-Verschlüsselungstypen. Bitte wende dich an deinen Administrator.</translation>
 <translation id="7311089766378749632">Anfrage zum Lesen und Ändern von <ph name="SITE_NAME" /></translation>
+<translation id="7311244614769792472">Keine Ergebnisse gefunden</translation>
 <translation id="7312210124139670355">Dein Administrator setzt deine eSIM zurück. Das kann einige Minuten dauern.</translation>
 <translation id="7317831949569936035">Registrierung bei einer Bildungseinrichtung</translation>
 <translation id="7320213904474460808">Netzwerk als Standard festlegen</translation>
@@ -7346,7 +7366,7 @@ Du hast # weitere gehackte Passwörter. Der Google Passwortmanager empfiehlt, d
 <translation id="7515998400212163428">Android</translation>
 <translation id="7516981202574715431"><ph name="APP_NAME" /> pausiert</translation>
 <translation id="7520766081042531487">Inkognitoportal: <ph name="SUBFRAME_SITE" /></translation>
-<translation id="752098910262610337">Tastenkombinationen anzeigen</translation>
+<translation id="752098910262610337">Verknüpfungen anzeigen</translation>
 <translation id="7522255036471229694">Sag „Hey Google“.</translation>
 <translation id="7523117833414447032">Beim Lesen von Großbuchstaben</translation>
 <translation id="7523585675576642403">Profil umbenennen</translation>
@@ -7370,6 +7390,7 @@ Du hast # weitere gehackte Passwörter. Der Google Passwortmanager empfiehlt, d
 <translation id="7541773865713908457"><ph name="ACTION_NAME" /> mit der App "<ph name="APP_NAME" />"</translation>
 <translation id="754207240458482646">Mit anderen Geräten in deinem Konto synchronisiert. <ph name="LINK_BEGIN" />Weitere Informationen<ph name="LINK_END" /></translation>
 <translation id="7543104066686362383">Debugging-Funktionen auf diesem <ph name="IDS_SHORT_PRODUCT_NAME" />-Gerät aktivieren</translation>
+<translation id="7544977292347272434">Bitte deine Eltern, die Erweiterung zu erlauben</translation>
 <translation id="7545466883021407599">Keine Verbindung mit dem Server möglich. Prüfe deine Netzwerkverbindung und versuche es noch einmal. Falls weiterhin Probleme auftreten, versuche, dein Chromebook neu zu starten. Fehlercode: <ph name="ERROR_CODE" />.</translation>
 <translation id="7547317915858803630">Warnung: Deine <ph name="PRODUCT_NAME" />-Einstellungen werden auf einem Netzlaufwerk gespeichert. Dies kann zu einer Verlangsamung, zu Abstürzen oder sogar zu Datenverlust führen.</translation>
 <translation id="7548856833046333824">Cocktail</translation>
@@ -7598,6 +7619,7 @@ Du hast # weitere gehackte Passwörter. Der Google Passwortmanager empfiehlt, d
 <translation id="7728668285692163452">Die Kanaländerung erfolgt später</translation>
 <translation id="7730449930968088409">Inhalt deines Bildschirms erfassen</translation>
 <translation id="7730683939467795481">Diese Seite wurde durch die Erweiterung "<ph name="EXTENSION_NAME" />" geändert.</translation>
+<translation id="773511996612364297">Akzentzeichen</translation>
 <translation id="7735165285389721951">Es läuft bereits eine Einrichtung für Steam. Bitte warte, bis dieser Vorgang abgeschlossen ist, bevor du es noch einmal versuchst.</translation>
 <translation id="7737115349420013392">Wird mit "<ph name="DEVICE_NAME" />" gekoppelt…</translation>
 <translation id="7737203573077018777">Anweisung „<ph name="PROOF_OF_POSSESSION_INSTRUCTION_NAME" />“ erhalten</translation>
@@ -7680,6 +7702,7 @@ Drücke zum Entfernen der Zuweisung einen bereits zugewiesenen Schalter oder ein
 <translation id="7792388396321542707">Freigabe beenden</translation>
 <translation id="779308894558717334">Hellgrün</translation>
 <translation id="7793098747275782155">Dunkelblau</translation>
+<translation id="7796453472368605346">Diakritische Zeichen</translation>
 <translation id="7797571222998226653">Aus</translation>
 <translation id="7798504574384119986">Webberechtigungen ansehen</translation>
 <translation id="7798844538707273832"><ph name="PERMISSION" /> automatisch blockiert</translation>
@@ -7728,6 +7751,7 @@ Drücke zum Entfernen der Zuweisung einen bereits zugewiesenen Schalter oder ein
 <translation id="7844992432319478437">DIFF-Datei wird aktualisiert.</translation>
 <translation id="7846634333498149051">Tastatur</translation>
 <translation id="7847212883280406910">Drücke Strg + Alt + S, um zu <ph name="IDS_SHORT_PRODUCT_OS_NAME" /> zu wechseln.</translation>
+<translation id="7848244988854036372">Alle (<ph name="URL_COUNT" />) in neuer Tabgruppe öffnen</translation>
 <translation id="7849264908733290972">B&amp;ild in neuem Tab öffnen</translation>
 <translation id="784934925303690534">Zeitraum</translation>
 <translation id="7850717413915978159"><ph name="BEGIN_PARAGRAPH1" />Wenn du zulässt, dass deine Chrome OS-Geräte automatisch erstellte Berichte an Google senden, hilfst du uns dabei, Probleme in Chrome OS zu beheben und das Betriebssystem zu verbessern. Diese Berichte können Diagnose- und Nutzungsdaten von Android-Apps enthalten – außerdem Informationen über Chrome OS-Abstürze und Angaben dazu, welche Funktionen du verwendest und wie viel Speicher in der Regel genutzt wird. Bestimmte aggregierte Daten sind auch für Apps und Partner von Google, beispielsweise Android-Entwickler, nützlich.<ph name="END_PARAGRAPH1" />
@@ -7763,6 +7787,7 @@ Drücke zum Entfernen der Zuweisung einen bereits zugewiesenen Schalter oder ein
 <translation id="7876027585589532670">Verknüpfung kann nicht bearbeitet werden</translation>
 <translation id="7877451762676714207">Unbekannter Serverfehler. Bitte versuche es erneut oder wende dich an den Serveradministrator.</translation>
 <translation id="7878945852730162014">Dateien beim Download verwalten und nach Abschluss öffnen</translation>
+<translation id="7879172417209159252">Erweiterung kann nicht verwendet werden</translation>
 <translation id="7879478708475862060">Dieselbe Methode wie bei der Eingabe verwenden</translation>
 <translation id="7879631849810108578">Tastenkombination festgelegt: <ph name="IDS_SHORT_SET_COMMAND" /></translation>
 <translation id="7880823633812189969">Lokale Daten werden beim nächsten Neustart gelöscht</translation>
@@ -8103,6 +8128,7 @@ Speichere deine Schlüsseldatei an einem sicheren Ort. Du benötigst die Datei, 
 <translation id="8161293209665121583">Lesemodus für Webseiten</translation>
 <translation id="8161604891089629425">Schrift mit Umriss versehen</translation>
 <translation id="8162984717805647492">{NUM_TABS,plural, =1{Tab in ein neues Fenster verschieben}other{Tabs in ein neues Fenster verschieben}}</translation>
+<translation id="8163708146810922598">ältestem</translation>
 <translation id="8165997195302308593">Crostini-Portweiterleitung</translation>
 <translation id="816704878106051517">{COUNT,plural, =1{eine Telefonnummer}other{# Telefonnummern}}</translation>
 <translation id="8168071266284693455">Lesezeichen, Passwörter, Verlauf und mehr auf allen Geräten synchronisieren</translation>
@@ -8205,7 +8231,6 @@ Speichere deine Schlüsseldatei an einem sicheren Ort. Du benötigst die Datei, 
 <translation id="8251509999076836464">Wird mit „<ph name="DEVICE_NAME" />“ gekoppelt</translation>
 <translation id="8251578425305135684">Miniaturansicht wurde entfernt.</translation>
 <translation id="825238165904109940">Immer vollständige URLs anzeigen</translation>
-<translation id="8252538334423261825">Erweiterung kann nicht hinzugefügt werden</translation>
 <translation id="8252569384384439529">Wird hochgeladen…</translation>
 <translation id="8253198102038551905">Auf "+" klicken, um die Netzwerkeigenschaften anzuzeigen</translation>
 <translation id="8255212965098517578">Letzte Fotos, Benachrichtigungen und Apps</translation>
@@ -8577,7 +8602,7 @@ Speichere deine Schlüsseldatei an einem sicheren Ort. Du benötigst die Datei, 
 <translation id="8602674530529411098">Apps (Beta)</translation>
 <translation id="8602851771975208551">Ein anderes Programm auf deinem Computer hat eine App hinzugefügt, die sich möglicherweise auf die Funktionsweise von Chrome auswirkt.</translation>
 <translation id="8605428685123651449">SQLite-Speicher</translation>
-<translation id="8607326572516521315">Für die Spam- und Betrugsreduzierung werden Private Stake Tokens verwendet, um Websites bei der Betrugsbekämpfung und der Unterscheidung zwischen Bots und Personen zu unterstützen.</translation>
+<translation id="8607326572516521315">Für die Spam- und Betrugsreduzierung werden Private State Tokens verwendet, um Websites bei der Betrugsbekämpfung und der Unterscheidung zwischen Bots und Personen zu unterstützen.</translation>
 <translation id="8608618451198398104">Kerberos-Ticket hinzufügen</translation>
 <translation id="8609465669617005112">Nach oben</translation>
 <translation id="8610103157987623234">Fehlerhaftes Format. Bitte versuche es noch einmal.</translation>
@@ -8618,6 +8643,7 @@ Speichere deine Schlüsseldatei an einem sicheren Ort. Du benötigst die Datei, 
 <translation id="8637688295594795546">Systemupdate verfügbar. Download wird vorbereitet...</translation>
 <translation id="8639047128869322042">Nach schädlicher Software wird gesucht...</translation>
 <translation id="8639635302972078117">Du hast die Möglichkeit, Nutzungsdaten &amp; Fehlerberichte zu senden. Dieses Gerät sendet momentan automatisch Diagnose- und Gerätedaten sowie App-Nutzungsdaten an Google. Dein Kind wird mithilfe dieser Daten nicht identifiziert, sie helfen jedoch beispielsweise dabei, die Stabilität des Systems und der Apps zu verbessern. Einige aggregierte Daten sind auch für Apps und Partner von Google, beispielsweise Android-Entwickler, nützlich. Wenn die Einstellung „Zusätzliche Web- &amp; App-Aktivitäten“ für dein Kind aktiviert ist, werden diese Daten möglicherweise in seinem Google-Konto gespeichert.</translation>
+<translation id="8640575194957831802">Zuletzt geöffnet</translation>
 <translation id="8642900771896232685">2 Sekunden</translation>
 <translation id="8642947597466641025">Schriftgrad vergrößern</translation>
 <translation id="8643403533759285912">Gruppe löschen</translation>
@@ -8758,7 +8784,6 @@ Speichere deine Schlüsseldatei an einem sicheren Ort. Du benötigst die Datei, 
 <translation id="8749863574775030885">Auf USB-Geräte von einem unbekannten Anbieter zugreifen</translation>
 <translation id="8750155211039279868"><ph name="ORIGIN" /> möchte eine Verbindung mit einem seriellen Port herstellen</translation>
 <translation id="8750346984209549530">Mobilfunk-APN</translation>
-<translation id="8751419011949619279">Websites in Apps öffnen, die auf deinem Gerät installiert sind</translation>
 <translation id="8752451679755290210">Automatisch zwischen Elementen wechseln</translation>
 <translation id="8753868764580670305">Auf diesem Gerät gespeicherte Passwörter anzeigen und verwalten</translation>
 <translation id="8753948258138515839">Mit der App „Dateien“ erhältst du schnellen Zugriff auf Dateien, die du in Google Drive, auf externen Speichermedien oder auf deinem Chrome OS Flex-Gerät gespeichert hast.</translation>
@@ -8925,7 +8950,7 @@ Speichere deine Schlüsseldatei an einem sicheren Ort. Du benötigst die Datei, 
 <translation id="8890170499370378450">Es können Gebühren für mobile Daten anfallen</translation>
 <translation id="8890516388109605451">Quellen</translation>
 <translation id="8890529496706615641">Das Profil konnte nicht umbenannt werden. Bitte versuche es noch einmal oder wende dich an den technischen Support.</translation>
-<translation id="8891996167592415151">Auf Grundlage deiner Interaktion mit einer Website, z. B. wenn du dich regelmäßig in einem Konto anmeldest, kann diese Website ein Private Stake Token für deinen Browser ausstellen. Wenn andere von dir besuchte Websites später dann ein gültiges Private Stake Token finden, ist die Wahrscheinlichkeit höher, dass du als Person und nicht als Bot eingestuft wirst.</translation>
+<translation id="8891996167592415151">Auf Grundlage deiner Interaktion mit einer Website, z. B. wenn du dich regelmäßig in einem Konto anmeldest, kann diese Website ein Private State Token für deinen Browser ausstellen. Wenn andere von dir besuchte Websites später dann ein gültiges Private State Token finden, ist die Wahrscheinlichkeit höher, dass du als Person und nicht als Bot eingestuft wirst.</translation>
 <translation id="8892168913673237979">Fertig!</translation>
 <translation id="8893801527741465188">Deinstallation abgeschlossen</translation>
 <translation id="8893928184421379330">Das Gerät <ph name="DEVICE_LABEL" /> wurde nicht erkannt.</translation>
@@ -9319,6 +9344,7 @@ Informationen dazu, welche Daten von Google erhoben werden und warum, findest du
 <translation id="939401694733344652">Diese Konten werden momentan nicht mit Android-Apps verwendet. Wenn du ein Konto für die Verwendung mit dieser Android-App auswählst, kann es auch mit anderen Android-Apps verwendet werden. Du kannst den Zugriff auf Android-Apps unter <ph name="LINK_BEGIN" />„Einstellungen“ &gt; „Konten“<ph name="LINK_END" /> anpassen.</translation>
 <translation id="939598580284253335">Passphrase eingeben</translation>
 <translation id="939736085109172342">Neuer Ordner</translation>
+<translation id="940212040923880623">&amp;Suchen und bearbeiten</translation>
 <translation id="942532530371314860"><ph name="APP_NAME" /> hat einen Chrome-Tab und Audio freigegeben.</translation>
 <translation id="944799160843436808">Beim Einrichten von Steam auf Chromebook ist ein Problem aufgetreten</translation>
 <translation id="945522503751344254">Feedback geben</translation>
@@ -9340,6 +9366,7 @@ Informationen dazu, welche Daten von Google erhoben werden und warum, findest du
 <translation id="964790508619473209">Bildschirmanordnung</translation>
 <translation id="965211523698323809">SMS auf <ph name="DEVICE_TYPE" /> senden und empfangen. <ph name="LINK_BEGIN" />Weitere Informationen<ph name="LINK_END" /></translation>
 <translation id="96535553604365597">Problem mit Google Cast melden</translation>
+<translation id="966588271015727539">Wähle eine Bluetooth-Braillezeile aus</translation>
 <translation id="967398046773905967">Websites nicht erlauben, auf HID-Geräte zuzugreifen</translation>
 <translation id="967624055006145463">Gespeicherte Daten</translation>
 <translation id="96774243435178359">Verwaltete Drucker</translation>

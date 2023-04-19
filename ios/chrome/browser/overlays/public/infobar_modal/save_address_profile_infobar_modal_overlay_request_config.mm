@@ -43,6 +43,8 @@ SaveAddressProfileModalRequestConfig::SaveAddressProfileModalRequestConfig(
   is_migration_to_account_ = delegate->IsMigrationToAccount();
   syncing_user_email_ = delegate->SyncingUserEmail();
   is_profile_an_account_profile_ = delegate->IsProfileAnAccountProfile();
+  profile_description_for_migration_prompt_ =
+      delegate->GetProfileDescriptionForMigrationPrompt();
 }
 
 SaveAddressProfileModalRequestConfig::~SaveAddressProfileModalRequestConfig() =
@@ -78,6 +80,14 @@ NSDictionary* SaveAddressProfileModalRequestConfig::GetProfileInfo() {
                          numberWithInt:AutofillUITypeFromAutofillType(type)]];
   }
   return items;
+}
+
+const autofill::AutofillProfile*
+SaveAddressProfileModalRequestConfig::GetProfile() {
+  autofill::AutofillSaveUpdateAddressProfileDelegateIOS* delegate =
+      static_cast<autofill::AutofillSaveUpdateAddressProfileDelegateIOS*>(
+          infobar_->delegate());
+  return delegate->GetProfile();
 }
 
 void SaveAddressProfileModalRequestConfig::CreateAuxiliaryData(

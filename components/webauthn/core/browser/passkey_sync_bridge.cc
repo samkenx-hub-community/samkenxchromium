@@ -81,7 +81,7 @@ PasskeySyncBridge::CreateMetadataChangeList() {
   return syncer::ModelTypeStore::WriteBatch::CreateMetadataChangeList();
 }
 
-absl::optional<syncer::ModelError> PasskeySyncBridge::MergeSyncData(
+absl::optional<syncer::ModelError> PasskeySyncBridge::MergeFullSyncData(
     std::unique_ptr<syncer::MetadataChangeList> metadata_changes,
     syncer::EntityChangeList entity_changes) {
   // Passkeys are read-only for now.
@@ -111,7 +111,8 @@ absl::optional<syncer::ModelError> PasskeySyncBridge::MergeSyncData(
   return absl::nullopt;
 }
 
-absl::optional<syncer::ModelError> PasskeySyncBridge::ApplySyncChanges(
+absl::optional<syncer::ModelError>
+PasskeySyncBridge::ApplyIncrementalSyncChanges(
     std::unique_ptr<syncer::MetadataChangeList> metadata_change_list,
     syncer::EntityChangeList entity_changes) {
   std::unique_ptr<syncer::ModelTypeStore::WriteBatch> write_batch =
@@ -180,13 +181,8 @@ std::string PasskeySyncBridge::GetStorageKey(
   return entity_data.specifics.webauthn_credential().sync_id();
 }
 
-void PasskeySyncBridge::ApplyStopSyncChanges(
+void PasskeySyncBridge::ApplyDisableSyncChanges(
     std::unique_ptr<syncer::MetadataChangeList> delete_metadata_change_list) {
-  // If |delete_metadata_change_list| is null, it indicates that sync metadata
-  // shouldn't be deleted, for example chrome is shutting down.
-  if (!delete_metadata_change_list) {
-    return;
-  }
   CHECK(store_);
   store_->DeleteAllDataAndMetadata(base::DoNothing());
   data_.clear();

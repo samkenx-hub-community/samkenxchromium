@@ -426,7 +426,7 @@ inline NGInlineItemResult* NGLineBreaker::AddItem(const NGInlineItem& item,
     line_info->SetHaveTextCombineItem();
   NGInlineItemResults* item_results = line_info->MutableResults();
   return &item_results->emplace_back(
-      &item, item_index_, NGTextOffset(offset_, end_offset),
+      &item, item_index_, NGTextOffsetRange(offset_, end_offset),
       break_anywhere_if_overflow_, ShouldCreateLineBox(*item_results),
       HasUnpositionedFloats(*item_results));
 }
@@ -480,11 +480,15 @@ void NGLineBreaker::ComputeBaseDirection() {
     ++start_offset;
   }
 
-  wtf_size_t end_offset = text.find(kNewlineCharacter, offset_);
-  base_direction_ = NGBidiParagraph::BaseDirectionForString(
-      end_offset == kNotFound
-          ? StringView(text, start_offset)
-          : StringView(text, start_offset, end_offset - start_offset));
+  // LTR when no strong characters because `plaintext` uses P2 and P3 of UAX#9:
+  // https://w3c.github.io/csswg-drafts/css-writing-modes-3/#valdef-unicode-bidi-plaintext
+  // which sets to LTR if no strong characters.
+  // https://unicode.org/reports/tr9/#P3
+  base_direction_ = NGBidiParagraph::BaseDirectionForStringOrLtr(
+      StringView(text, start_offset),
+      // For CSS processing, line feed (U+000A) is treated as a segment break.
+      // https://w3c.github.io/csswg-drafts/css-text-3/#segment-break
+      Character::IsLineFeed);
 }
 
 void NGLineBreaker::RecalcClonedBoxDecorations() {
@@ -604,8 +608,8 @@ void NGLineBreaker::FinalizeHyphen(NGInlineItemResults* item_results) {
 
 // Initialize internal states for the next line.
 void NGLineBreaker::PrepareNextLine(NGLineInfo* line_info) {
-  // NGLineInfo is not supposed to be re-used because it's not much gain and to
-  // avoid rare code path.
+  line_info->Reset();
+
   const NGInlineItemResults& item_results = line_info->Results();
   DCHECK(item_results.empty());
 
@@ -967,7 +971,7 @@ void NGLineBreaker::HandleText(const NGInlineItem& item,
   // Most cases such spaces are handled as trailing spaces of the previous line,
   // but there are some cases doing so is too complex.
   if (trailing_whitespace_ == WhitespaceState::kLeading) {
-    if (item.Style()->CollapseWhiteSpace() &&
+    if (item.Style()->ShouldCollapseWhiteSpaces() &&
         Text()[offset_] == kSpaceCharacter) {
       // Skipping one whitespace removes all collapsible spaces because
       // collapsible spaces are collapsed to single space in
@@ -1061,7 +1065,7 @@ void NGLineBreaker::HandleText(const NGInlineItem& item,
     // Hanging trailing spaces may resolve the overflow.
     if (item_result->has_only_trailing_spaces) {
       state_ = LineBreakState::kTrailing;
-      if (!item_result->item->Style()->CollapseWhiteSpace() &&
+      if (item_result->item->Style()->ShouldPreserveWhiteSpaces() &&
           IsBreakableSpace(Text()[item_result->EndOffset() - 1])) {
         unsigned end_index = base::checked_cast<unsigned>(
             item_result - line_info->Results().begin());
@@ -1648,7 +1652,7 @@ void NGLineBreaker::HandleTrailingSpaces(const NGInlineItem& item,
   }
   DCHECK(!is_text_combine_);
 
-  if (style.CollapseWhiteSpace() &&
+  if (style.ShouldCollapseWhiteSpaces() &&
       !Character::IsOtherSpaceSeparator(text[offset_])) {
     if (text[offset_] != kSpaceCharacter) {
       if (offset_ > 0 && IsBreakableSpace(text[offset_ - 1]))
@@ -1669,7 +1673,7 @@ void NGLineBreaker::HandleTrailingSpaces(const NGInlineItem& item,
   } else if (!style.ShouldBreakSpaces()) {
     // Find the end of the run of space characters in this item.
     // Other white space characters (e.g., tab) are not included in this item.
-    DCHECK(style.BreakOnlyAfterWhiteSpace() ||
+    DCHECK(style.ShouldBreakOnlyAfterWhiteSpace() ||
            Character::IsOtherSpaceSeparator(text[offset_]));
     unsigned end = offset_;
     while (end < item.EndOffset() &&
@@ -1823,7 +1827,7 @@ void NGLineBreaker::ComputeTrailingCollapsibleSpace(NGLineInfo* line_info) {
       DCHECK(item.Style());
       if (!IsBreakableSpace(text[item_result.EndOffset() - 1]))
         break;
-      if (!item.Style()->CollapseWhiteSpace()) {
+      if (item.Style()->ShouldPreserveWhiteSpaces()) {
         trailing_whitespace_ = WhitespaceState::kPreserved;
         break;
       }
@@ -2552,7 +2556,7 @@ void NGLineBreaker::HandleCloseTag(const NGInlineItem& item,
           IsBreakableSpace(Text()[item_result->EndOffset() - 1]);
       item_result->can_break_after =
           IsBreakableSpace(Text()[item_result->EndOffset()]) &&
-          (!current_style_->BreakOnlyAfterWhiteSpace() ||
+          (!current_style_->ShouldBreakOnlyAfterWhiteSpace() ||
            preceded_by_breakable_space);
       return;
     }

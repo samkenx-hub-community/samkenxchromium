@@ -33,11 +33,11 @@ AttributionReport::EventLevelData::EventLevelData(
     uint64_t trigger_data,
     int64_t priority,
     double randomized_trigger_rate,
-    Id id)
+    StoredSource source)
     : trigger_data(trigger_data),
       priority(priority),
       randomized_trigger_rate(randomized_trigger_rate),
-      id(id) {
+      source(std::move(source)) {
   DCHECK_GE(randomized_trigger_rate, 0);
   DCHECK_LE(randomized_trigger_rate, 1);
 }
@@ -57,14 +57,14 @@ AttributionReport::EventLevelData::~EventLevelData() = default;
 
 AttributionReport::AggregatableAttributionData::AggregatableAttributionData(
     std::vector<AggregatableHistogramContribution> contributions,
-    Id id,
     ::aggregation_service::mojom::AggregationCoordinator
         aggregation_coordinator,
-    absl::optional<std::string> attestation_token)
+    absl::optional<std::string> attestation_token,
+    StoredSource source)
     : contributions(std::move(contributions)),
-      id(id),
       attestation_token(std::move(attestation_token)),
-      aggregation_coordinator(aggregation_coordinator) {}
+      aggregation_coordinator(aggregation_coordinator),
+      source(std::move(source)) {}
 
 AttributionReport::AggregatableAttributionData::AggregatableAttributionData(
     const AggregatableAttributionData&) = default;
@@ -92,14 +92,15 @@ AttributionReport::AggregatableAttributionData::BudgetRequired() const {
   return budget_required;
 }
 
-AttributionReport::AttributionReport(
-    AttributionInfo attribution_info,
-    base::Time report_time,
-    base::Time initial_report_time,
-    base::GUID external_report_id,
-    int failed_send_attempts,
-    absl::variant<EventLevelData, AggregatableAttributionData> data)
+AttributionReport::AttributionReport(AttributionInfo attribution_info,
+                                     Id id,
+                                     base::Time report_time,
+                                     base::Time initial_report_time,
+                                     base::Uuid external_report_id,
+                                     int failed_send_attempts,
+                                     Data data)
     : attribution_info_(std::move(attribution_info)),
+      id_(id),
       report_time_(report_time),
       initial_report_time_(initial_report_time),
       external_report_id_(std::move(external_report_id)),
@@ -139,7 +140,8 @@ GURL AttributionReport::ReportURL(bool debug) const {
 
   GURL::Replacements replacements;
   replacements.SetPathStr(path);
-  return attribution_info_.source.common_info()
+  return GetStoredSource()
+      .common_info()
       .reporting_origin()
       ->GetURL()
       .ReplaceComponents(replacements);
@@ -151,7 +153,7 @@ base::Value::Dict AttributionReport::ReportBody() const {
           [this](const EventLevelData& data) {
             base::Value::Dict dict;
 
-            const StoredSource& source = this->attribution_info().source;
+            const StoredSource& source = data.source;
 
             dict.Set("attribution_destination",
                      source.destination_sites().ToJson());
@@ -202,8 +204,7 @@ base::Value::Dict AttributionReport::ReportBody() const {
                        "not generated prior to send");
             }
 
-            if (absl::optional<uint64_t> debug_key =
-                    this->attribution_info().source.debug_key()) {
+            if (absl::optional<uint64_t> debug_key = data.source.debug_key()) {
               dict.Set("source_debug_key", base::NumberToString(*debug_key));
             }
 
@@ -218,16 +219,12 @@ base::Value::Dict AttributionReport::ReportBody() const {
       data_);
 }
 
-AttributionReport::Id AttributionReport::ReportId() const {
-  return absl::visit([](const auto& v) { return Id(v.id); }, data_);
-}
-
 void AttributionReport::set_report_time(base::Time report_time) {
   report_time_ = report_time;
 }
 
 void AttributionReport::SetExternalReportIdForTesting(
-    base::GUID external_report_id) {
+    base::Uuid external_report_id) {
   DCHECK(external_report_id.is_valid());
   external_report_id_ = std::move(external_report_id);
 }
@@ -254,6 +251,12 @@ void AttributionReport::PopulateAdditionalHeaders(
     headers.SetHeader("Sec-Attribution-Reporting-Private-State-Token",
                       *data->attestation_token);
   }
+}
+
+const StoredSource& AttributionReport::GetStoredSource() const {
+  return absl::visit(
+      [](const auto& data) -> const StoredSource& { return data.source; },
+      data_);
 }
 
 }  // namespace content

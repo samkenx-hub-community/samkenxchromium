@@ -27,9 +27,7 @@
 <translation id="199526504800285197">Įrašymas sustabdytas</translation>
 <translation id="1995951722691075581">Įrašymas sustabdytas, nes per mažai vietos įrenginio saugykloje. Jei norite įrašyti daugiau vaizdo įrašų, turite atlaisvinti vietos įrenginyje.</translation>
 <translation id="2036868001356139588">Laikmačio trukmė</translation>
-<translation id="2050339315714019657">Stačias</translation>
 <translation id="2064538373111010176"><ph name="CAMERA" /> aktyvus</translation>
-<translation id="2128052519899549250">Įrašyti pagreitintą vaizdo įrašą</translation>
 <translation id="2134029355740465625">Vaizdo įrašų nustatymai</translation>
 <translation id="2144806332417375165">Tinkinti vaizdo įrašų parametrai</translation>
 <translation id="2175927920773552910">QR kodas</translation>
@@ -93,7 +91,6 @@
 <translation id="5317780077021120954">Išsaugoti</translation>
 <translation id="5320594929574852403">Perkeliama kairėn</translation>
 <translation id="5374917190292010970">4K (2 160 tšk.)</translation>
-<translation id="5577251651370645658">Pagreitintas vaizdo įrašas</translation>
 <translation id="5662366948659129155">Nuskaitomas <ph name="COUNT" /> psl.</translation>
 <translation id="5671277269877808209">Kvadratas</translation>
 <translation id="5746169159649715125">Išsaugoti kaip PDF</translation>
@@ -123,6 +120,7 @@ Jei atsiliepimas susijęs su vaizdo arba vaizdo įrašo kokybe, pridėkite nuotr
 <translation id="6888362557094394345">Perkeliama žemyn</translation>
 <translation id="695140971690006676">Nustatyti viską iš naujo</translation>
 <translation id="6965382102122355670">Gerai</translation>
+<translation id="6965830616442491568">Portreto režimas</translation>
 <translation id="698156982839284926">3 sekundės</translation>
 <translation id="7134221860976209830">10 sek. laikmatis</translation>
 <translation id="7191890674911603392">Įrašo tipas</translation>

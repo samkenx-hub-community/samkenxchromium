@@ -232,6 +232,35 @@ BrowserContext* BrowserContextFromFrameTreeNodeId(int frame_tree_node_id) {
   return web_content->GetBrowserContext();
 }
 
+void RecordRedirectResult(PrefetchRedirectResult result) {
+  UMA_HISTOGRAM_ENUMERATION("PrefetchProxy.Redirect.Result", result);
+}
+
+void RecordRedirectNetworkContextTransition(
+    bool prefetch_requires_isolated_network_context,
+    bool redirect_requires_isolated_network_context) {
+  PrefetchRedirectNetworkContextTransition transition;
+  if (!prefetch_requires_isolated_network_context &&
+      !redirect_requires_isolated_network_context) {
+    transition = PrefetchRedirectNetworkContextTransition::kDefaultToDefault;
+  }
+  if (!prefetch_requires_isolated_network_context &&
+      redirect_requires_isolated_network_context) {
+    transition = PrefetchRedirectNetworkContextTransition::kDefaultToIsolated;
+  }
+  if (prefetch_requires_isolated_network_context &&
+      !redirect_requires_isolated_network_context) {
+    transition = PrefetchRedirectNetworkContextTransition::kIsolatedToDefault;
+  }
+  if (prefetch_requires_isolated_network_context &&
+      redirect_requires_isolated_network_context) {
+    transition = PrefetchRedirectNetworkContextTransition::kIsolatedToIsolated;
+  }
+
+  UMA_HISTOGRAM_ENUMERATION(
+      "PrefetchProxy.Redirect.NetworkContextStateTransition", transition);
+}
+
 }  // namespace
 
 // static
@@ -640,6 +669,10 @@ void PrefetchService::OnGotEligibilityResultForRedirect(
     return;
   }
 
+  RecordRedirectResult(eligible
+                           ? PrefetchRedirectResult::kSuccessRedirectFollowed
+                           : PrefetchRedirectResult::kFailedIneligible);
+
   // If the redirect is ineligible, the prefetch may change into a decoy.
   bool is_decoy = false;
   if (!eligible) {
@@ -785,8 +818,8 @@ void PrefetchService::ResetPrefetch(
     active_prefetches_.erase(active_prefetch_iter);
   }
 
-  auto prefetches_ready_to_serve_iter =
-      prefetches_ready_to_serve_.find(prefetch_container->GetURL());
+  auto prefetches_ready_to_serve_iter = prefetches_ready_to_serve_.find(
+      prefetch_container->GetPrefetchContainerKey());
   if (prefetches_ready_to_serve_iter != prefetches_ready_to_serve_.end() &&
       prefetches_ready_to_serve_iter->second->GetPrefetchContainerKey() ==
           prefetch_container->GetPrefetchContainerKey()) {
@@ -953,6 +986,7 @@ PrefetchStreamingURLLoaderStatus PrefetchService::OnPrefetchRedirect(
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
 
   if (!prefetch_container) {
+    RecordRedirectResult(PrefetchRedirectResult::kFailedNullPrefetch);
     return PrefetchStreamingURLLoaderStatus::kFailedInvalidRedirect;
   }
 
@@ -973,6 +1007,15 @@ PrefetchStreamingURLLoaderStatus PrefetchService::OnPrefetchRedirect(
 
     Prefetch();
 
+    if (!base::FeatureList::IsEnabled(features::kPrefetchRedirects)) {
+      RecordRedirectResult(PrefetchRedirectResult::kFailedRedirectsDisabled);
+    } else if (redirect_info.new_method != "GET") {
+      RecordRedirectResult(PrefetchRedirectResult::kFailedInvalidMethod);
+    } else if (response_head.headers->response_code() < 300 ||
+               response_head.headers->response_code() >= 400) {
+      RecordRedirectResult(PrefetchRedirectResult::kFailedInvalidResponseCode);
+    }
+
     return PrefetchStreamingURLLoaderStatus::kFailedInvalidRedirect;
   }
 
@@ -983,6 +1026,9 @@ PrefetchStreamingURLLoaderStatus PrefetchService::OnPrefetchRedirect(
   bool is_isolated_network_context_required =
       !url::Origin::Create(prefetch_container->GetReferrer().url)
            .IsSameOriginWith(redirect_info.new_url);
+  RecordRedirectNetworkContextTransition(
+      prefetch_container->GetPrefetchType().IsIsolatedNetworkContextRequired(),
+      is_isolated_network_context_required);
   if (is_isolated_network_context_required !=
       prefetch_container->GetPrefetchType()
           .IsIsolatedNetworkContextRequired()) {
@@ -995,6 +1041,9 @@ PrefetchStreamingURLLoaderStatus PrefetchService::OnPrefetchRedirect(
     prefetch_container->ResetStreamingLoader();
 
     Prefetch();
+
+    RecordRedirectResult(
+        PrefetchRedirectResult::kFailedInvalidChangeInNetworkContext);
 
     return PrefetchStreamingURLLoaderStatus::kFailedInvalidRedirect;
   }
@@ -1199,9 +1248,15 @@ void PrefetchService::PrepareToServe(
       owned_prefetches_.find(prefetch_container->GetPrefetchContainerKey()) !=
       owned_prefetches_.end());
 
+  // `url` might be different from
+  // `prefetch_container->GetPrefetchContainerKey().second` due to
+  // No-Vary-Search.
+  PrefetchContainer::Key ready_key(
+      prefetch_container->GetPrefetchContainerKey().first, url);
+
   // If there is already a prefetch with the same URL as |prefetch_container| in
   // |prefetches_ready_to_serve_|, then don't do anything.
-  if (prefetches_ready_to_serve_.find(url) !=
+  if (prefetches_ready_to_serve_.find(ready_key) !=
       prefetches_ready_to_serve_.end()) {
     DVLOG(1) << *prefetch_container
              << ": didn't promote to ready (another ready prefetch)";
@@ -1211,7 +1266,7 @@ void PrefetchService::PrepareToServe(
   // Move prefetch into |prefetches_ready_to_serve_|.
   DVLOG(1) << *prefetch_container << ": promoted to ready"
            << (block_until_head ? " and is blocked until head" : "");
-  prefetches_ready_to_serve_[url] = prefetch_container;
+  prefetches_ready_to_serve_[ready_key] = prefetch_container;
 
   if (is_servable) {
     // For prefetches that are already servable, start the process of copying
@@ -1294,11 +1349,12 @@ void PrefetchService::DumpPrefetchesForDebug() const {
 }
 
 void PrefetchService::GetPrefetchToServe(
-    const GURL& url,
+    const PrefetchContainer::Key& key,
     OnPrefetchToServeReady on_prefetch_to_serve_ready) {
   DumpPrefetchesForDebug();
+  const GURL& url = key.second;
 
-  auto prefetch_iter = prefetches_ready_to_serve_.find(url);
+  auto prefetch_iter = prefetches_ready_to_serve_.find(key);
   if (prefetch_iter == prefetches_ready_to_serve_.end()) {
     DVLOG(1) << "PrefetchService::GetPrefetchToServe(" << url
              << "): URL not found";

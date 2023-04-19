@@ -39,23 +39,6 @@ chromium-metrics-reviews@google.com.
   <variant name="Inactive" summary="inactive"/>
 </variants>
 
-<variants name="TabCreatedReason">
-  <variant name=".FromExternalApp"
-      summary="This bucket is for any tabs that are created because of custom
-               tabs or intends from other apps. This includes tab creation
-               via intent from other app, creation via homescreen link,
-               creation via custom tab."/>
-  <variant name=".FromManuallyCreated"
-      summary="This bucket is for any tabs that are created manually. This
-               includes new tab creation from toolbar menu, creation from
-               long press open, creation at tab switcher, creation from
-               launcher shortcut menu by long press the Chrome icon."/>
-  <variant name=".FromOthers" summary="This is the default bucket."/>
-  <variant name=".FromTargetBlank"
-      summary="This bucket is for any tabs that were created from a target
-               blank link. e.g. tehchmeme.com will create tabs this way."/>
-</variants>
-
 <variants name="TabDiscardReason">
   <variant name=".External"
       summary="from outside of TabManager (e.g. by an extension)"/>
@@ -156,38 +139,6 @@ chromium-metrics-reviews@google.com.
     memory pressure event, in percentage of the total amount of RAM. Note that
     the estimate is based on the most recent data collected by Performance
     Manager, which are refreshed at a low frequency (up to 2 minutes).
-  </summary>
-</histogram>
-
-<histogram
-    name="Discarding.WinOSPressureSignals.AvailableMemoryMbOnLowMemoryNotification"
-    units="MB" expires_after="2021-05-02">
-  <owner>chrisha@chromium.org</owner>
-  <owner>catan-team@chromium.org</owner>
-  <summary>
-    The amount of physical memory available when receiving a low memory
-    notification, in megabytes. Windows 8.1+ only.
-  </summary>
-</histogram>
-
-<histogram name="Discarding.WinOSPressureSignals.LowMemorySessionLength"
-    units="ms" expires_after="2021-05-02">
-  <owner>chrisha@chromium.org</owner>
-  <owner>catan-team@chromium.org</owner>
-  <summary>
-    The time it takes to receive a high memory notification from the OS after
-    receiving a low memory notification. Windows 8.1+ only.
-  </summary>
-</histogram>
-
-<histogram
-    name="Discarding.WinOSPressureSignals.PressureLevelOnLowMemoryNotification"
-    enum="MemoryPressureLevel" expires_after="2021-05-02">
-  <owner>chrisha@chromium.org</owner>
-  <owner>catan-team@chromium.org</owner>
-  <summary>
-    The memory pressure level when receiving a low memory notification from the
-    OS. Windows 8.1+ only.
   </summary>
 </histogram>
 
@@ -498,7 +449,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Tab.Screenshot.Action" enum="TabScreenshotAction"
-    expires_after="2023-08-08">
+    expires_after="2023-10-08">
   <owner>skare@chromium.org</owner>
   <summary>
     Records actions taken after one or more screenshots of a page were taken.
@@ -1025,7 +976,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="TabManager.Discarding.DiscardToReloadTime" units="ms"
-    expires_after="2023-08-08">
+    expires_after="2023-10-08">
   <owner>chrisha@chromium.org</owner>
   <owner>catan-team@chromium.org</owner>
   <summary>
@@ -1321,7 +1272,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Tabs.NewNavigationWithSameOriginTab" enum="Boolean"
-    expires_after="2023-08-08">
+    expires_after="2023-10-08">
   <owner>gjc@google.com</owner>
   <owner>blink-network-dev@chromium.org</owner>
   <summary>
@@ -1333,7 +1284,7 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
-<histogram name="Tabs.NTPCountAtResume" units="tabs" expires_after="2023-08-08">
+<histogram name="Tabs.NTPCountAtResume" units="tabs" expires_after="2023-10-08">
   <owner>gogerald@chromium.org</owner>
   <owner>nasims@google.com</owner>
   <summary>
@@ -1527,7 +1478,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Tabs.PersistedTabData.Storage.SaveTime.File" units="ms"
-    expires_after="2023-05-22">
+    expires_after="2024-04-10">
   <owner>yusufo@chromium.org</owner>
   <owner>nyquist@chromium.org</owner>
   <owner>dtrainor@chromium.org</owner>
@@ -2363,7 +2314,7 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
-<histogram name="Tabs.TabState.LoadTime" units="ms" expires_after="2023-07-30">
+<histogram name="Tabs.TabState.LoadTime" units="ms" expires_after="2023-10-01">
   <owner>yusufo@chromium.org</owner>
   <owner>nyquist@chromium.org</owner>
   <owner>dtrainor@chromium.org</owner>
@@ -2380,46 +2331,6 @@ chromium-metrics-reviews@google.com.
   <owner>davidjm@chromium.org</owner>
   <summary>
     Time taken to save a TabState file in the event of a successful save.
-  </summary>
-</histogram>
-
-<histogram name="Tabs.Tasks.AverageTabGroupSize" units="tabs"
-    expires_after="M85">
-  <owner>yusufo@chromium.org</owner>
-  <owner>wychen@chromium.org</owner>
-  <summary>
-    The average tab group size, average number of tabs in a group, on a cold
-    start after all tabs are restored.
-  </summary>
-</histogram>
-
-<histogram name="Tabs.Tasks.DuplicatedTab.DuplicatedTabCount" units="tabs"
-    expires_after="2020-06-01">
-  <owner>yusufo@chromium.org</owner>
-  <owner>wychen@chromium.org</owner>
-  <summary>
-    During tab restoration, a tab is considered as a duplicated tab when it has
-    an identical url with another restored tab.
-
-    This histogram records the number of duplicated tabs on a cold start after
-    all tabs are restored. The possible range for this number is from 0 to total
-    number of restored tabs minus 1. In other words, this number is equals to
-    total number of restored tabs minus the number of unique URLs.
-  </summary>
-</histogram>
-
-<histogram name="Tabs.Tasks.DuplicatedTab.DuplicatedTabRatio" units="%"
-    expires_after="2020-06-01">
-  <owner>yusufo@chromium.org</owner>
-  <owner>wychen@chromium.org</owner>
-  <summary>
-    During tab restoration, a tab is considered as a duplicated tab when it has
-    an identical url with another restored tab.
-
-    This histogram records the ratio of duplicated tabs to the total number of
-    tabs on a cold start after all tabs are restored. This ratio will never
-    reach 100%, since the highest possible number of duplicated tabs is total
-    number of restored tabs minus 1.
   </summary>
 </histogram>
 
@@ -2442,68 +2353,6 @@ chromium-metrics-reviews@google.com.
     TabModel would have been added at the correct position if
     TabGroupModelFilter had not interved to move it so it respected group
     position. Recorded each time a tab is added to the TabModel.
-  </summary>
-</histogram>
-
-<histogram name="Tabs.Tasks.TabCreated.Count{TabCreatedReason}" units="tabs"
-    expires_after="2020-06-30">
-  <owner>yusufo@chromium.org</owner>
-  <owner>wychen@chromium.org</owner>
-  <owner>zea@chromium.org</owner>
-  <summary>
-    This recorded value is the number of currently open tabs that were created
-    from a given source. This is recorded when entering the tab switcher mode.
-    {TabCreatedReason}
-  </summary>
-  <token key="TabCreatedReason" variants="TabCreatedReason"/>
-</histogram>
-
-<histogram name="Tabs.Tasks.TabCreated.Percent{TabCreatedReason}" units="%"
-    expires_after="2020-06-30">
-  <owner>yusufo@chromium.org</owner>
-  <owner>wychen@chromium.org</owner>
-  <owner>zea@chromium.org</owner>
-  <summary>
-    The recorded value is the percentage of the number of currently open tabs
-    that are created from a given source, relative to the total number of
-    currently open tabs. This is recorded when entering the tab switcher mode.
-    {TabCreatedReason}
-  </summary>
-  <token key="TabCreatedReason" variants="TabCreatedReason"/>
-</histogram>
-
-<histogram name="Tabs.Tasks.TabGroupCount" units="groups" expires_after="M85">
-  <owner>yusufo@chromium.org</owner>
-  <owner>wychen@chromium.org</owner>
-  <summary>
-    The number of tab groups on a cold start after all tabs are restored.
-  </summary>
-</histogram>
-
-<histogram name="Tabs.Tasks.TabGroupDensity" units="%" expires_after="M85">
-  <owner>yusufo@chromium.org</owner>
-  <owner>wychen@chromium.org</owner>
-  <summary>
-    The tab group density, the ratio of the number of tab groups to the total
-    number of tabs, on a cold start after all tabs are restored.
-  </summary>
-</histogram>
-
-<histogram name="Tabs.Tasks.TabsInGroupCount" units="tabs" expires_after="M85">
-  <owner>yusufo@chromium.org</owner>
-  <owner>wychen@chromium.org</owner>
-  <summary>
-    The number of tabs is belonging to a tab group on a cold start after all
-    tabs are restored.
-  </summary>
-</histogram>
-
-<histogram name="Tabs.Tasks.TabsInGroupRatio" units="%" expires_after="M85">
-  <owner>yusufo@chromium.org</owner>
-  <owner>wychen@chromium.org</owner>
-  <summary>
-    The ratio of all tabs in tab groups to the total number of tabs on a cold
-    start after all tabs are restored.
   </summary>
 </histogram>
 

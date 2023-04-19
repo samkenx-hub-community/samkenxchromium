@@ -20,6 +20,7 @@
 #include "chrome/browser/about_flags.h"
 #include "chrome/browser/accessibility/accessibility_ui.h"
 #include "chrome/browser/buildflags.h"
+#include "chrome/browser/commerce/shopping_service_factory.h"
 #include "chrome/browser/devtools/devtools_ui_bindings.h"
 #include "chrome/browser/history/history_service_factory.h"
 #include "chrome/browser/history_clusters/history_clusters_service_factory.h"
@@ -74,6 +75,8 @@
 #include "chrome/common/pref_names.h"
 #include "chrome/common/url_constants.h"
 #include "chrome/common/webui_url_constants.h"
+#include "components/commerce/content/browser/commerce_internals_ui.h"
+#include "components/commerce/core/commerce_constants.h"
 #include "components/favicon/core/favicon_service.h"
 #include "components/favicon_base/favicon_util.h"
 #include "components/favicon_base/select_favicon_frames.h"
@@ -185,8 +188,6 @@
 #include "ash/webui/camera_app_ui/url_constants.h"
 #include "ash/webui/color_internals/color_internals_ui.h"
 #include "ash/webui/color_internals/url_constants.h"
-#include "ash/webui/connectivity_diagnostics/connectivity_diagnostics_ui.h"
-#include "ash/webui/connectivity_diagnostics/url_constants.h"
 #include "ash/webui/diagnostics_ui/diagnostics_ui.h"
 #include "ash/webui/diagnostics_ui/url_constants.h"
 #include "ash/webui/eche_app_ui/eche_app_manager.h"
@@ -466,6 +467,17 @@ WebUIController* NewWebUI<AboutUI>(WebUI* web_ui, const GURL& url) {
 }
 
 template <>
+WebUIController* NewWebUI<commerce::CommerceInternalsUI>(WebUI* web_ui,
+                                                         const GURL& url) {
+  Profile* profile = Profile::FromWebUI(web_ui);
+  return new commerce::CommerceInternalsUI(
+      web_ui,
+      base::BindOnce(&SetUpWebUIDataSource, web_ui,
+                     commerce::kChromeUICommerceInternalsHost),
+      commerce::ShoppingServiceFactory::GetForBrowserContext(profile));
+}
+
+template <>
 WebUIController* NewWebUI<OptimizationGuideInternalsUI>(WebUI* web_ui,
                                                         const GURL& url) {
   return OptimizationGuideInternalsUI::MaybeCreateOptimizationGuideInternalsUI(
@@ -538,6 +550,15 @@ void BindSystemInfoProvider(
   }
 }
 
+void BindEcheAccessibilityProvider(
+    ash::eche_app::EcheAppManager* manager,
+    mojo::PendingReceiver<ash::eche_app::mojom::AccessibilityProvider>
+        receiver) {
+  if (manager) {
+    manager->BindAccessibilityProviderInterface(std::move(receiver));
+  }
+}
+
 void BindEcheUidGenerator(
     ash::eche_app::EcheAppManager* manager,
     mojo::PendingReceiver<ash::eche_app::mojom::UidGenerator> receiver) {
@@ -591,25 +612,12 @@ WebUIController* NewWebUI<ash::eche_app::EcheAppUI>(WebUI* web_ui,
   return new ash::eche_app::EcheAppUI(
       web_ui, base::BindRepeating(&BindEcheSignalingMessageExchanger, manager),
       base::BindRepeating(&BindSystemInfoProvider, manager),
+      base::BindRepeating(&BindEcheAccessibilityProvider, manager),
       base::BindRepeating(&BindEcheUidGenerator, manager),
       base::BindRepeating(&BindEcheNotificationGenerator, manager),
       base::BindRepeating(&BindEcheDisplayStreamHandler, manager),
       base::BindRepeating(&BindEcheStreamOrientationObserver, manager),
       base::BindRepeating(&BindEcheConnectionStatusHandler, manager));
-}
-
-template <>
-WebUIController* NewWebUI<ash::FilesInternalsUI>(WebUI* web_ui,
-                                                 const GURL& url) {
-  return new ash::FilesInternalsUI(
-      web_ui, std::make_unique<ChromeFilesInternalsUIDelegate>(web_ui));
-}
-
-template <>
-WebUIController* NewWebUI<ash::OSFeedbackUI>(WebUI* web_ui, const GURL& url) {
-  Profile* profile = Profile::FromWebUI(web_ui);
-  return new ash::OSFeedbackUI(
-      web_ui, std::make_unique<ash::ChromeOsFeedbackDelegate>(profile));
 }
 
 void BindScanService(
@@ -680,33 +688,6 @@ WebUIController* NewWebUI<ash::multidevice::ProximityAuthUI>(WebUI* web_ui,
       ash::device_sync::DeviceSyncClientFactory::GetForProfile(
           Profile::FromBrowserContext(browser_context)),
       base::BindRepeating(&BindMultiDeviceSetup, Profile::FromWebUI(web_ui)));
-}
-
-template <>
-WebUIController* NewWebUI<ash::ConnectivityDiagnosticsUI>(WebUI* web_ui,
-                                                          const GURL& url) {
-  return new ash::ConnectivityDiagnosticsUI(
-      web_ui,
-      /* BindNetworkDiagnosticsServiceCallback */
-      base::BindRepeating(
-          [](mojo::PendingReceiver<
-              chromeos::network_diagnostics::mojom::NetworkDiagnosticsRoutines>
-                 receiver) {
-            ash::network_health::NetworkHealthManager::GetInstance()
-                ->BindDiagnosticsReceiver(std::move(receiver));
-          }),
-      /* BindNetworkHealthServiceCallback */
-      base::BindRepeating(
-          [](mojo::PendingReceiver<
-              chromeos::network_health::mojom::NetworkHealthService> receiver) {
-            ash::network_health::NetworkHealthManager::GetInstance()
-                ->BindHealthReceiver(std::move(receiver));
-          }),
-      /* SendFeedbackReportCallback */
-      base::BindRepeating(
-          &chrome::ShowFeedbackDialogForWebUI,
-          chrome::WebUIFeedbackSource::kConnectivityDiagnostics),
-      /*show_feedback_button=*/!chrome::IsRunningInAppMode());
 }
 
 template <>
@@ -791,6 +772,9 @@ WebUIFactoryFunction GetWebUIFactoryFunction(WebUI* web_ui,
     return &NewWebUI<BrowsingTopicsInternalsUI>;
   if (url.host_piece() == chrome::kChromeUIComponentsHost)
     return &NewWebUI<ComponentsUI>;
+  if (url.host_piece() == commerce::kChromeUICommerceInternalsHost) {
+    return &NewWebUI<commerce::CommerceInternalsUI>;
+  }
   if (url.spec() == chrome::kChromeUIConstrainedHTMLTestURL)
     return &NewWebUI<ConstrainedWebDialogUI>;
 #if !BUILDFLAG(IS_CHROMEOS_LACROS)
@@ -971,30 +955,18 @@ WebUIFactoryFunction GetWebUIFactoryFunction(WebUI* web_ui,
     return &NewWebUI<ConflictsUI>;
 #endif
 #if BUILDFLAG(IS_CHROMEOS_ASH)
-  if (base::FeatureList::IsEnabled(ash::features::kOsFeedback)) {
-    if (url.host_piece() == ash::kChromeUIOSFeedbackHost)
-      return &NewWebUI<ash::OSFeedbackUI>;
-  }
   if (url.host_piece() == ash::kChromeUIFaceMLAppHost) {
     if (!ash::features::IsFaceMLSwaEnabled()) {
       return nullptr;
     }
     return &NewComponentUI<ash::FaceMLAppUI, ash::ChromeFaceMLUserProvider>;
   }
-  if (url.host_piece() == chrome::kChromeUIEnterpriseReportingHost &&
-      base::FeatureList::IsEnabled(ash::features::kEnterpriseReportingUI)) {
-    return &NewWebUI<ash::reporting::EnterpriseReportingUI>;
-  }
   if (url.host_piece() == ash::file_manager::kChromeUIFileManagerHost) {
     return &NewComponentUI<ash::file_manager::FileManagerUI,
                            ChromeFileManagerUIDelegate>;
   }
-  if (url.host_piece() == ash::kChromeUIConnectivityDiagnosticsHost)
-    return &NewWebUI<ash::ConnectivityDiagnosticsUI>;
   if (url.host_piece() == ash::kChromeUIGuestOSInstallerHost)
     return &NewWebUI<ash::GuestOSInstallerUI>;
-  if (url.host_piece() == ash::kChromeUIFilesInternalsHost)
-    return &NewWebUI<ash::FilesInternalsUI>;
   if (url.host_piece() == ash::kChromeUIHelpAppHost)
     return &NewComponentUI<ash::HelpAppUI, ash::ChromeHelpAppUIDelegate>;
   if (url.host_piece() == chrome::kChromeUIMobileSetupHost)
@@ -1504,7 +1476,6 @@ std::vector<GURL> ChromeWebUIControllerFactory::GetListOfAcceptableURLs() {
         GURL(chrome::kChromeUICrostiniUpgraderUrl),
         GURL(chrome::kChromeUICryptohomeURL),
         GURL(chrome::kOsUIDeviceEmulatorURL), GURL(chrome::kOsUIDeviceLogURL),
-        GURL(chrome::kChromeUIDiagnosticsAppURL),
         GURL(chrome::kChromeUIDriveInternalsUrl),
         GURL(chrome::kOsUIDriveInternalsURL),
         GURL(chrome::kChromeUIEmojiPickerURL),

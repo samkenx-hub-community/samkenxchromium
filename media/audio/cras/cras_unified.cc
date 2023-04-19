@@ -260,6 +260,10 @@ void CrasUnifiedStream::Start(AudioSourceCallback* callback) {
   // Done with config params.
   libcras_stream_params_destroy(stream_params);
 
+  peak_detector_ = std::make_unique<AmplitudePeakDetector>(base::BindRepeating(
+      &AudioManager::TraceAmplitudePeak, base::Unretained(manager_),
+      /*trace_start=*/false));
+
   is_playing_ = true;
 
   ReportStreamStartResult(StreamStartResult::kCallbackStartSuccess);
@@ -272,6 +276,8 @@ void CrasUnifiedStream::Stop() {
 
   // Removing the stream from the client stops audio.
   libcras_client_rm_stream(client_, stream_id_);
+
+  peak_detector_.reset();
 
   ReportAndResetStats();
 
@@ -331,6 +337,8 @@ uint32_t CrasUnifiedStream::WriteAudio(size_t frames,
   int frames_filled = source_callback_->OnMoreData(
       delay, base::TimeTicks::Now(), glitch_info_accumulator_.GetAndReset(),
       output_bus_.get());
+
+  peak_detector_->FindPeak(output_bus_.get());
 
   // Note: If this ever changes to output raw float the data must be clipped and
   // sanitized since it may come from an untrusted source such as NaCl.

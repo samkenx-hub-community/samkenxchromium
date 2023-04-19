@@ -199,26 +199,34 @@ class CORE_EXPORT CSSAnimations final {
     DISALLOW_NEW();
 
    public:
-    void SetScrollTimeline(const ScopedCSSName& name, CSSScrollTimeline*);
+    void SetScrollTimeline(const ScopedCSSName& name, ScrollTimeline*);
     const CSSScrollTimelineMap& GetScrollTimelines() const {
       return scroll_timelines_;
     }
-    void SetViewTimeline(const ScopedCSSName& name, CSSViewTimeline*);
+    void SetViewTimeline(const ScopedCSSName& name, ViewTimeline*);
     const CSSViewTimelineMap& GetViewTimelines() const {
       return view_timelines_;
     }
+    void SetAttachingTimeline(ScrollTimelineAttachment*, ScrollTimeline*);
+    ScrollTimeline* GetAttachingTimeline(ScrollTimelineAttachment*);
+    const AttachingTimelineMap& GetAttachingTimelines() const {
+      return attaching_timelines_;
+    }
     bool IsEmpty() const {
-      return scroll_timelines_.empty() && view_timelines_.empty();
+      return scroll_timelines_.empty() && view_timelines_.empty() &&
+             attaching_timelines_.empty();
     }
     void Clear() {
       scroll_timelines_.clear();
       view_timelines_.clear();
+      attaching_timelines_.clear();
     }
     void Trace(Visitor*) const;
 
    private:
     CSSScrollTimelineMap scroll_timelines_;
     CSSViewTimelineMap view_timelines_;
+    AttachingTimelineMap attaching_timelines_;
   };
 
   TimelineData timeline_data_;
@@ -300,23 +308,44 @@ class CORE_EXPORT CSSAnimations final {
       const CSSViewTimelineMap* existing_view_timelines,
       const ComputedStyleBuilder&);
 
+  template <typename MapType>
+  static const MapType* GetExistingTimelines(const TimelineData*);
+  template <typename MapType>
+  static const MapType* GetChangedTimelines(const CSSAnimationUpdate*);
+
+  // Invokes `callback` for each timeline, taking both existing timelines
+  // and pending changes into account.
+  template <typename TimelineType, typename CallbackFunc>
+  static void ForEachTimeline(const TimelineData*,
+                              const CSSAnimationUpdate*,
+                              CallbackFunc);
+
+  template <typename TimelineType>
+  static void CollectTimelinesWithAttachmentInto(
+      const TimelineData*,
+      const CSSAnimationUpdate*,
+      TimelineAttachment,
+      CSSTimelineMap<TimelineType>& result);
+
+  template <typename TimelineType>
+  static void CalculateChangedAttachingTimelines(
+      const CSSTimelineMap<TimelineType>& ancestor_attached_timelines,
+      const CSSTimelineMap<TimelineType>& deferred_timelines,
+      const AttachingTimelineMap* existing_attaching_timelines,
+      AttachingTimelineMap& changed_attaching_timelines);
+
+  static void CalculateAttachingTimelinesUpdate(CSSAnimationUpdate&,
+                                                Element& animating_element);
+
   static const TimelineData* GetTimelineData(const Element&);
 
   static ScrollTimeline* FindTimelineForNode(const ScopedCSSName& name,
                                              Node*,
                                              const CSSAnimationUpdate*);
-  static CSSScrollTimeline* FindScrollTimelineForElement(
-      const ScopedCSSName&,
-      const CSSAnimationUpdate*,
-      const TimelineData*);
-  static CSSViewTimeline* FindViewTimelineForElement(const ScopedCSSName& name,
-                                                     const CSSAnimationUpdate*,
-                                                     const TimelineData*);
   template <typename TimelineType>
-  static TimelineType* FindTimelineForElement(
-      const ScopedCSSName& name,
-      const CSSTimelineMap<TimelineType>* existing_timelines,
-      const CSSTimelineMap<TimelineType>* changed_timelines);
+  static TimelineType* FindTimelineForElement(const ScopedCSSName& name,
+                                              const TimelineData*,
+                                              const CSSAnimationUpdate*);
 
   static ScrollTimeline* FindPreviousSiblingAncestorTimeline(
       const ScopedCSSName& name,

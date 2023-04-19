@@ -41,6 +41,7 @@
 #include "third_party/blink/renderer/core/dom/element.h"
 #include "third_party/blink/renderer/core/editing/forward.h"
 #include "third_party/blink/renderer/core/html_names.h"
+#include "third_party/blink/renderer/core/inspector/inspector_trace_events.h"
 #include "third_party/blink/renderer/core/layout/api/selection_state.h"
 #include "third_party/blink/renderer/core/layout/geometry/physical_rect.h"
 #include "third_party/blink/renderer/core/layout/geometry/transform_state.h"
@@ -51,7 +52,7 @@
 #include "third_party/blink/renderer/core/layout/min_max_sizes.h"
 #include "third_party/blink/renderer/core/layout/ng/ng_outline_type.h"
 #include "third_party/blink/renderer/core/layout/ng/ng_style_variant.h"
-#include "third_party/blink/renderer/core/layout/subtree_layout_scope.h"
+#include "third_party/blink/renderer/core/layout/outline_rect_collector.h"
 #include "third_party/blink/renderer/core/loader/resource/image_resource_observer.h"
 #include "third_party/blink/renderer/core/paint/fragment_data.h"
 #include "third_party/blink/renderer/core/paint/paint_phase.h"
@@ -77,7 +78,6 @@ class AffineTransform;
 class FragmentDataIterator;
 class HitTestLocation;
 class HitTestRequest;
-class InlineBox;
 class LayoutBlock;
 class LayoutBlockFlow;
 class LayoutFlowThread;
@@ -814,7 +814,6 @@ class CORE_EXPORT LayoutObject : public GarbageCollected<LayoutObject>,
                         unsigned show_tree_character_offset) const;
   void ShowTreeForThis() const;
   void ShowLayoutTreeForThis() const;
-  void ShowLineTreeForThis() const;
   void ShowLayoutObject() const;
 
   // Dump the subtree established by this layout object to the specified string
@@ -846,9 +845,9 @@ class CORE_EXPORT LayoutObject : public GarbageCollected<LayoutObject>,
   // function also doesn't handle the default association between a tag
   // and its renderer (e.g. <iframe> creates a LayoutIFrame even if the
   // initial 'display' value is inline).
-  static LayoutObject* CreateObject(Element*,
-                                    const ComputedStyle&,
-                                    LegacyLayout);
+  static LayoutObject* CreateObject(Element*, const ComputedStyle&);
+  static LayoutBlockFlow* CreateBlockFlowOrListItem(Element* element,
+                                                    const ComputedStyle& style);
 
   bool IsPseudoElement() const {
     NOT_DESTROYED();
@@ -887,10 +886,6 @@ class CORE_EXPORT LayoutObject : public GarbageCollected<LayoutObject>,
     NOT_DESTROYED();
     return IsOfType(kLayoutObjectNGFrameSet);
   }
-  bool IsInsideListMarkerForCustomContent() const {
-    NOT_DESTROYED();
-    return IsOfType(kLayoutObjectInsideListMarker);
-  }
   bool IsLayoutNGBlockFlow() const {
     NOT_DESTROYED();
     return IsOfType(kLayoutObjectNGBlockFlow);
@@ -903,6 +898,10 @@ class CORE_EXPORT LayoutObject : public GarbageCollected<LayoutObject>,
     NOT_DESTROYED();
     return IsOfType(kLayoutObjectNGListItem);
   }
+  bool IsInlineListItem() const {
+    NOT_DESTROYED();
+    return IsOfType(kLayoutObjectNGInlineListItem);
+  }
   bool IsLayoutNGInsideListMarker() const {
     NOT_DESTROYED();
     return IsOfType(kLayoutObjectNGInsideListMarker);
@@ -910,10 +909,6 @@ class CORE_EXPORT LayoutObject : public GarbageCollected<LayoutObject>,
   bool IsLayoutNGOutsideListMarker() const {
     NOT_DESTROYED();
     return IsOfType(kLayoutObjectNGOutsideListMarker);
-  }
-  bool IsLayoutNGText() const {
-    NOT_DESTROYED();
-    return IsOfType(kLayoutObjectNGText);
   }
   bool IsLayoutNGTextCombine() const {
     NOT_DESTROYED();
@@ -926,14 +921,6 @@ class CORE_EXPORT LayoutObject : public GarbageCollected<LayoutObject>,
   bool IsLayoutTableCol() const {
     NOT_DESTROYED();
     return IsOfType(kLayoutObjectTableCol);
-  }
-  bool IsListItem() const {
-    NOT_DESTROYED();
-    return IsOfType(kLayoutObjectListItem);
-  }
-  bool IsListMarkerForNormalContent() const {
-    NOT_DESTROYED();
-    return IsOfType(kLayoutObjectListMarker);
   }
   bool IsListMarkerImage() const {
     NOT_DESTROYED();
@@ -950,10 +937,6 @@ class CORE_EXPORT LayoutObject : public GarbageCollected<LayoutObject>,
   bool IsMedia() const {
     NOT_DESTROYED();
     return IsOfType(kLayoutObjectMedia);
-  }
-  bool IsOutsideListMarkerForCustomContent() const {
-    NOT_DESTROYED();
-    return IsOfType(kLayoutObjectOutsideListMarker);
   }
   bool IsProgress() const {
     NOT_DESTROYED();
@@ -1199,19 +1182,6 @@ class CORE_EXPORT LayoutObject : public GarbageCollected<LayoutObject>,
     DCHECK(IsLayoutInline());
     bitfields_.SetAlwaysCreateLineBoxesForLayoutInline(
         always_create_line_boxes);
-  }
-
-  bool AncestorLineBoxDirty() const {
-    NOT_DESTROYED();
-    return bitfields_.AncestorLineBoxDirty();
-  }
-  void SetAncestorLineBoxDirty(bool value = true) {
-    NOT_DESTROYED();
-    bitfields_.SetAncestorLineBoxDirty(value);
-    if (value) {
-      SetNeedsLayoutAndFullPaintInvalidation(
-          layout_invalidation_reason::kLineBoxesChanged);
-    }
   }
 
   void SetIsInsideFlowThreadIncludingDescendants(bool);
@@ -1462,11 +1432,6 @@ class CORE_EXPORT LayoutObject : public GarbageCollected<LayoutObject>,
     NOT_DESTROYED();
     return bitfields_.IsInLayoutNGInlineFormattingContext();
   }
-  bool ForceLegacyLayout() const {
-    NOT_DESTROYED();
-    return bitfields_.ForceLegacyLayout();
-  }
-  bool ForceLegacyLayoutForChildren() const;
   bool IsAtomicInlineLevel() const {
     NOT_DESTROYED();
     return bitfields_.IsAtomicInlineLevel();
@@ -1995,24 +1960,20 @@ class CORE_EXPORT LayoutObject : public GarbageCollected<LayoutObject>,
     bitfields_.SetNeedsCollectInlines(b);
   }
 
-  void MarkContainerChainForLayout(bool schedule_relayout = true,
-                                   SubtreeLayoutScope* = nullptr);
+  void MarkContainerChainForLayout(bool schedule_relayout = true);
   void MarkParentForSpannerOrOutOfFlowPositionedChange();
   void SetNeedsLayout(LayoutInvalidationReasonForTracing,
-                      MarkingBehavior = kMarkContainerChain,
-                      SubtreeLayoutScope* = nullptr);
+                      MarkingBehavior = kMarkContainerChain);
   void SetNeedsLayoutAndFullPaintInvalidation(
       LayoutInvalidationReasonForTracing,
-      MarkingBehavior = kMarkContainerChain,
-      SubtreeLayoutScope* = nullptr);
+      MarkingBehavior = kMarkContainerChain);
 
   void ClearNeedsLayoutWithoutPaintInvalidation();
   // |ClearNeedsLayout()| calls |SetShouldCheckForPaintInvalidation()|.
   void ClearNeedsLayout();
   void ClearNeedsLayoutWithFullPaintInvalidation();
 
-  void SetChildNeedsLayout(MarkingBehavior = kMarkContainerChain,
-                           SubtreeLayoutScope* = nullptr);
+  void SetChildNeedsLayout(MarkingBehavior = kMarkContainerChain);
   void SetNeedsPositionedMovementLayout();
   void SetIntrinsicLogicalWidthsDirty(MarkingBehavior = kMarkContainerChain);
   void ClearIntrinsicLogicalWidthsDirty();
@@ -2132,11 +2093,6 @@ class CORE_EXPORT LayoutObject : public GarbageCollected<LayoutObject>,
   }
   virtual void ClearFirstInlineFragmentItemIndex() { NOT_DESTROYED(); }
   virtual void SetFirstInlineFragmentItemIndex(wtf_size_t) { NOT_DESTROYED(); }
-  void SetForceLegacyLayout() {
-    NOT_DESTROYED();
-    DCHECK(!IsLayoutNGObject());
-    bitfields_.SetForceLegacyLayout(true);
-  }
 
   void SetHasBoxDecorationBackground(bool);
 
@@ -2751,8 +2707,7 @@ class CORE_EXPORT LayoutObject : public GarbageCollected<LayoutObject>,
   // and the <ol>.
   bool AffectsWhitespaceSiblings() const {
     NOT_DESTROYED();
-    return !IsFloatingOrOutOfFlowPositioned() &&
-           !IsLayoutNGOutsideListMarker() && !IsOutsideListMarker();
+    return !IsFloatingOrOutOfFlowPositioned() && !IsLayoutNGOutsideListMarker();
   }
 
   // Not returning StyleRef().BoxReflect() because some objects ignore the
@@ -2807,16 +2762,14 @@ class CORE_EXPORT LayoutObject : public GarbageCollected<LayoutObject>,
    * useful for character range rect computations
    */
   virtual LayoutRect LocalCaretRect(
-      const InlineBox*,
       int caret_offset,
       LayoutUnit* extra_width_to_end_of_line = nullptr) const;
   PhysicalRect PhysicalLocalCaretRect(
-      const InlineBox* inline_box,
       int caret_offset,
       LayoutUnit* extra_width_to_end_of_line = nullptr) const {
     NOT_DESTROYED();
     return FlipForWritingMode(
-        LocalCaretRect(inline_box, caret_offset, extra_width_to_end_of_line));
+        LocalCaretRect(caret_offset, extra_width_to_end_of_line));
   }
 
   // When performing a global document tear-down, the layoutObject of the
@@ -2834,39 +2787,23 @@ class CORE_EXPORT LayoutObject : public GarbageCollected<LayoutObject>,
     return false;
   }
 
+  // TODO(1229581): Rename this function.
   bool IsListItemIncludingNG() const {
     NOT_DESTROYED();
-    return IsListItem() || IsLayoutNGListItem();
+    return IsLayoutNGListItem() || IsInlineListItem();
   }
 
-  // There 5 different types of list markers:
-  // * LayoutListMarker (LayoutBox): for both outside and inside markers with
-  //   'content: normal', in legacy layout.
-  // * LayoutInsideListMarker (LayoutInline): for non-normal inside markers in
-  //   legacy layout.
-  // * LayoutOutsideListMarker (LayoutBlockFlow): for non-normal outside markers
-  //   in legacy layout.
-  // * LayoutNGInsideListMarker (LayoutInline): for inside markers in LayoutNG.
+  // There 2 different types of list markers:
+  // * LayoutNGInsideListMarker (LayoutInline): for inside markers
   // * LayoutNGOutsideListMarker (LayoutNGBlockFlowMixin<LayoutBlockFlow>):
-  //   for outside markers in LayoutNG.
+  //   for outside markers.
 
-  // Legacy marker with inside position, normal or not.
-  bool IsInsideListMarker() const;
-  // Legacy marker with outside position, normal or not.
-  bool IsOutsideListMarker() const;
-  // Any kind of legacy list marker.
-  bool IsListMarker() const {
-    NOT_DESTROYED();
-    return IsListMarkerForNormalContent() ||
-           IsInsideListMarkerForCustomContent() ||
-           IsOutsideListMarkerForCustomContent();
-  }
   // Any kind of LayoutBox list marker.
+  // TODO(1229581): Remove this function. Just use
+  // IsLayoutNGOutsideListMarker().
   bool IsBoxListMarkerIncludingNG() const {
     NOT_DESTROYED();
-    return IsListMarkerForNormalContent() ||
-           IsOutsideListMarkerForCustomContent() ||
-           IsLayoutNGOutsideListMarker();
+    return IsLayoutNGOutsideListMarker();
   }
   // Any kind of LayoutNG list marker.
   bool IsLayoutNGListMarker() const {
@@ -2874,9 +2811,10 @@ class CORE_EXPORT LayoutObject : public GarbageCollected<LayoutObject>,
     return IsLayoutNGInsideListMarker() || IsLayoutNGOutsideListMarker();
   }
   // Any kind of list marker.
+  // TODO(1229581): Remove this function.
   bool IsListMarkerIncludingAll() const {
     NOT_DESTROYED();
-    return IsListMarker() || IsLayoutNGListMarker();
+    return IsLayoutNGListMarker();
   }
 
   // ImageResourceObserver override.
@@ -2983,7 +2921,7 @@ class CORE_EXPORT LayoutObject : public GarbageCollected<LayoutObject>,
   // the outside of, even if the object isn't styled with a outline for now.
   // The rects also cover continuations. Note that the OutlineInfo, if
   // specified, is filled in in the same space as the rects.
-  virtual void AddOutlineRects(Vector<PhysicalRect>&,
+  virtual void AddOutlineRects(OutlineRectCollector&,
                                OutlineInfo*,
                                const PhysicalOffset& additional_offset,
                                NGOutlineType) const {
@@ -3579,9 +3517,6 @@ class CORE_EXPORT LayoutObject : public GarbageCollected<LayoutObject>,
     kLayoutObjectFrame,
     kLayoutObjectIFrame,
     kLayoutObjectImage,
-    kLayoutObjectInsideListMarker,
-    kLayoutObjectListItem,
-    kLayoutObjectListMarker,
     kLayoutObjectListMarkerImage,
     kLayoutObjectMathML,
     kLayoutObjectMathMLRoot,
@@ -3595,15 +3530,14 @@ class CORE_EXPORT LayoutObject : public GarbageCollected<LayoutObject>,
     kLayoutObjectNGFlexibleBox,
     kLayoutObjectNGFrameSet,
     kLayoutObjectNGGrid,
+    kLayoutObjectNGInlineListItem,
     kLayoutObjectNGInsideListMarker,
     kLayoutObjectNGListItem,
     kLayoutObjectNGOutsideListMarker,
-    kLayoutObjectNGText,
     kLayoutObjectNGTextCombine,
     kLayoutObjectNGTextControlMultiLine,
     kLayoutObjectNGTextControlSingleLine,
     kLayoutObjectNGView,
-    kLayoutObjectOutsideListMarker,
     kLayoutObjectProgress,
     kLayoutObjectQuote,
     kLayoutObjectReplaced,
@@ -3965,7 +3899,6 @@ class CORE_EXPORT LayoutObject : public GarbageCollected<LayoutObject>,
           is_box_(false),
           is_inline_(true),
           is_in_layout_ng_inline_formatting_context_(false),
-          force_legacy_layout_(false),
           is_atomic_inline_level_(false),
           horizontal_writing_mode_(true),
           has_layer_(false),
@@ -3976,7 +3909,6 @@ class CORE_EXPORT LayoutObject : public GarbageCollected<LayoutObject>,
           can_contain_fixed_position_objects_(false),
           has_counter_node_map_(false),
           ever_had_layout_(false),
-          ancestor_line_box_dirty_(false),
           is_inside_flow_thread_(false),
           subtree_change_listener_registered_(false),
           notified_of_subtree_change_(false),
@@ -4140,10 +4072,6 @@ class CORE_EXPORT LayoutObject : public GarbageCollected<LayoutObject>,
     ADD_BOOLEAN_BITFIELD(is_in_layout_ng_inline_formatting_context_,
                          IsInLayoutNGInlineFormattingContext);
 
-    // Set if we're to force legacy layout (i.e. disable LayoutNG) on this
-    // object, and all descendants.
-    ADD_BOOLEAN_BITFIELD(force_legacy_layout_, ForceLegacyLayout);
-
     // This boolean is set if the element is an atomic inline-level box.
     //
     // In CSS, atomic inline-level boxes are laid out on a line but they
@@ -4191,7 +4119,6 @@ class CORE_EXPORT LayoutObject : public GarbageCollected<LayoutObject>,
     ADD_BOOLEAN_BITFIELD(has_counter_node_map_, HasCounterNodeMap);
 
     ADD_BOOLEAN_BITFIELD(ever_had_layout_, EverHadLayout);
-    ADD_BOOLEAN_BITFIELD(ancestor_line_box_dirty_, AncestorLineBoxDirty);
 
     ADD_BOOLEAN_BITFIELD(is_inside_flow_thread_, IsInsideFlowThread);
 
@@ -4411,7 +4338,6 @@ class CORE_EXPORT LayoutObject : public GarbageCollected<LayoutObject>,
  private:
   friend class LineLayoutItem;
   friend class LocalFrameView;
-  friend class SubtreeLayoutScope;
 
   scoped_refptr<const ComputedStyle> style_;
 
@@ -4474,8 +4400,7 @@ inline bool LayoutObject::IsBeforeOrAfterContent() const {
 // identical.
 inline void LayoutObject::SetNeedsLayout(
     LayoutInvalidationReasonForTracing reason,
-    MarkingBehavior mark_parents,
-    SubtreeLayoutScope* layouter) {
+    MarkingBehavior mark_parents) {
 #if DCHECK_IS_ON()
   DCHECK(!IsSetNeedsLayoutForbidden());
 #endif
@@ -4489,17 +4414,16 @@ inline void LayoutObject::SetNeedsLayout(
         TRACE_DISABLED_BY_DEFAULT("devtools.timeline.invalidationTracking"),
         "LayoutInvalidationTracking",
         inspector_layout_invalidation_tracking_event::Data, this, reason);
-    if (mark_parents == kMarkContainerChain &&
-        (!layouter || layouter->Root() != this))
-      MarkContainerChainForLayout(!layouter, layouter);
+    if (mark_parents == kMarkContainerChain) {
+      MarkContainerChainForLayout();
+    }
   }
 }
 
 inline void LayoutObject::SetNeedsLayoutAndFullPaintInvalidation(
     LayoutInvalidationReasonForTracing reason,
-    MarkingBehavior mark_parents,
-    SubtreeLayoutScope* layouter) {
-  SetNeedsLayout(reason, mark_parents, layouter);
+    MarkingBehavior mark_parents) {
+  SetNeedsLayout(reason, mark_parents);
   SetShouldDoFullPaintInvalidation();
 }
 
@@ -4511,7 +4435,6 @@ inline void LayoutObject::ClearNeedsLayoutWithoutPaintInvalidation() {
   SetSelfNeedsLayoutForStyle(false);
   SetSelfNeedsLayoutForAvailableSpace(false);
   SetNeedsPositionedMovementLayout(false);
-  SetAncestorLineBoxDirty(false);
 
   if (!ChildLayoutBlockedByDisplayLock()) {
     SetPosChildNeedsLayout(false);
@@ -4545,19 +4468,16 @@ inline void LayoutObject::ClearNeedsLayoutWithFullPaintInvalidation() {
   SetShouldDoFullPaintInvalidation();
 }
 
-inline void LayoutObject::SetChildNeedsLayout(MarkingBehavior mark_parents,
-                                              SubtreeLayoutScope* layouter) {
+inline void LayoutObject::SetChildNeedsLayout(MarkingBehavior mark_parents) {
 #if DCHECK_IS_ON()
   DCHECK(!IsSetNeedsLayoutForbidden());
 #endif
   bool already_needed_layout = NormalChildNeedsLayout();
   SetNeedsOverflowRecalc();
   SetNormalChildNeedsLayout(true);
-  // FIXME: Replace MarkOnlyThis with the SubtreeLayoutScope code path and
-  // remove the MarkingBehavior argument entirely.
-  if (!already_needed_layout && mark_parents == kMarkContainerChain &&
-      (!layouter || layouter->Root() != this))
-    MarkContainerChainForLayout(!layouter, layouter);
+  if (!already_needed_layout && mark_parents == kMarkContainerChain) {
+    MarkContainerChainForLayout();
+  }
 }
 
 inline void LayoutObject::SetNeedsPositionedMovementLayout() {
@@ -4571,6 +4491,7 @@ inline void LayoutObject::SetNeedsPositionedMovementLayout() {
     MarkContainerChainForLayout();
 }
 
+// TODO(1229581): Get rid of this.
 inline void LayoutObject::SetIsInLayoutNGInlineFormattingContext(
     bool new_value) {
   DCHECK(!GetDocument().InPostLifecycleSteps());
@@ -4612,7 +4533,6 @@ CORE_EXPORT bool IsListBox(const LayoutObject* object);
 #if DCHECK_IS_ON()
 // Outside the blink namespace for ease of invocation from gdb.
 CORE_EXPORT void ShowTree(const blink::LayoutObject*);
-CORE_EXPORT void ShowLineTree(const blink::LayoutObject*);
 CORE_EXPORT void ShowLayoutTree(const blink::LayoutObject* object1);
 // We don't make object2 an optional parameter so that showLayoutTree
 // can be called from gdb easily.

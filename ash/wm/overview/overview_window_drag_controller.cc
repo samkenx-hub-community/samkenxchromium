@@ -33,7 +33,6 @@
 #include "ash/wm/tablet_mode/tablet_mode_controller.h"
 #include "ash/wm/window_positioning_utils.h"
 #include "ash/wm/window_util.h"
-#include "base/cxx17_backports.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
 #include "base/metrics/histogram_functions.h"
@@ -121,8 +120,9 @@ gfx::SizeF GetItemSizeWhenOnDesksBar(OverviewGrid* overview_grid,
   const DesksBarView* desks_bar_view = overview_grid->desks_bar_view();
   DCHECK(desks_bar_view);
 
-  const int expanded_desks_bar_height =
-      DesksBarView::GetExpandedBarHeight(overview_grid->root_window());
+  const int expanded_desks_bar_height = DesksBarView::GetPreferredBarHeight(
+      overview_grid->root_window(), DesksBarView::Type::kOverview,
+      DesksBarView::State::kExpanded);
 
   // We should always use the expanded desks bar height here even if the desks
   // bar is actually in zero state to calculate `scale_factor`. Because if zero
@@ -348,10 +348,11 @@ void OverviewWindowDragController::StartNormalDragMode(
 
   // Expand desks bar when normal drag starts and desks bar is in zero state for
   // feature Jellyroll.
-  if (chromeos::features::IsJellyrollEnabled() &&
-      overview_grid->desks_bar_view()->IsZeroState()) {
-    overview_grid->desks_bar_view()->UpdateNewMiniViews(
-        /*initializing_bar_view=*/false, /*expanding_bar_view=*/true);
+  auto* desks_bar_view = overview_grid->desks_bar_view();
+  if (desks_bar_view && desks_bar_view->IsZeroState() &&
+      chromeos::features::IsJellyrollEnabled()) {
+    desks_bar_view->UpdateNewMiniViews(/*initializing_bar_view=*/false,
+                                       /*expanding_bar_view=*/true);
   }
 
   item_->UpdateShadowTypeForDrag(/*is_dragging=*/true);
@@ -399,8 +400,9 @@ void OverviewWindowDragController::StartNormalDragMode(
           GetItemSizeWhenOnDesksBar(grid.get(), window_original_size);
       grid_desks_bar_data.desks_bar_bounds = grid_desks_bar_data.shrink_bounds =
           gfx::RectF(grid->desks_bar_view()->GetBoundsInScreen());
-      const int expanded_height =
-          DesksBarView::GetExpandedBarHeight(grid->root_window());
+      const int expanded_height = DesksBarView::GetPreferredBarHeight(
+          grid->root_window(), DesksBarView::Type::kOverview,
+          DesksBarView::State::kExpanded);
       grid_desks_bar_data.desks_bar_bounds.set_height(expanded_height);
       grid_desks_bar_data.shrink_bounds.set_height(expanded_height);
       grid_desks_bar_data.shrink_bounds.Inset(gfx::InsetsF::VH(
@@ -479,7 +481,13 @@ void OverviewWindowDragController::ResetGesture() {
       item_->UpdateCannotSnapWarningVisibility(/*animate=*/true);
     }
   }
-  overview_session_->PositionWindows(/*animate=*/true);
+
+  // No need to position windows that are being destroyed.
+  base::flat_set<OverviewItem*> ignored_items;
+  if (item_->GetWindow()->is_destroying()) {
+    ignored_items.insert(item_);
+  }
+  overview_session_->PositionWindows(/*animate=*/true, ignored_items);
   overview_session_->float_container_stacker()->OnDragFinished(
       item_->GetWindow());
   // This function gets called after a long press release, which bypasses
@@ -535,7 +543,7 @@ void OverviewWindowDragController::ContinueDragToClose(
               kDragToCloseDistanceThresholdDp;
   overview_session_->GetGridWithRootWindow(item_->root_window())
       ->UpdateNudge(item_, val);
-  val = base::clamp(val, 0.f, 1.f);
+  val = std::clamp(val, 0.f, 1.f);
   float opacity = original_opacity_;
   if (opacity > kItemMinOpacity)
     opacity = original_opacity_ - val * (original_opacity_ - kItemMinOpacity);
@@ -636,7 +644,7 @@ void OverviewWindowDragController::ContinueNormalDrag(
                                       desks_bar_data.desks_bar_bounds) /
                 desks_bar_data.shrink_region_distance.x();
       }
-      value = base::clamp(value, 0.f, 1.f);
+      value = std::clamp(value, 0.f, 1.f);
       const gfx::SizeF size_value =
           gfx::Tween::SizeFValueBetween(1.f - value, original_scaled_size_,
                                         desks_bar_data.on_desks_bar_item_size);
@@ -670,8 +678,9 @@ void OverviewWindowDragController::ContinueNormalDrag(
   bounds.set_y(centerpoint.y() - bounds.height() / 2.f);
   item_->SetBounds(bounds, OVERVIEW_ANIMATION_NONE);
 
-  if (chromeos::features::IsJellyrollEnabled()) {
-    auto* new_desk_button = overview_grid->desks_bar_view()->new_desk_button();
+  auto* desks_bar_view = overview_grid->desks_bar_view();
+  if (desks_bar_view && chromeos::features::IsJellyrollEnabled()) {
+    auto* new_desk_button = desks_bar_view->new_desk_button();
 
     // When `Jellyroll` is enabled, the header of window is shown during
     // dragging. Overview item should be hovered on the new desk button with
@@ -771,6 +780,7 @@ OverviewWindowDragController::CompleteNormalDrag(
     }
   }
 
+  auto* desks_bar_view = current_grid->desks_bar_view();
   // Snap a window if appropriate.
   if (should_allow_split_view_ &&
       snap_position_ != SplitViewController::SnapPosition::kNone) {
@@ -781,8 +791,7 @@ OverviewWindowDragController::CompleteNormalDrag(
     // ended. Thus we need to check whether `overview_session_` is being
     // shutting down or not here before triggering `MaybeShrinkDesksBarView`.
     if (!overview_session_->is_shutting_down()) {
-      if (chromeos::features::IsJellyrollEnabled()) {
-        auto* desks_bar_view = current_grid->desks_bar_view();
+      if (desks_bar_view && chromeos::features::IsJellyrollEnabled()) {
         desks_bar_view->UpdateDeskIconButtonState(
             desks_bar_view->new_desk_button(),
             CrOSNextDeskIconButton::State::kExpanded);
@@ -828,8 +837,7 @@ OverviewWindowDragController::CompleteNormalDrag(
   } else {
     item_->set_should_restack_on_animation_end(true);
     overview_session_->PositionWindows(/*animate=*/true);
-    if (chromeos::features::IsJellyrollEnabled()) {
-      auto* desks_bar_view = current_grid->desks_bar_view();
+    if (desks_bar_view && chromeos::features::IsJellyrollEnabled()) {
       desks_bar_view->UpdateDeskIconButtonState(
           desks_bar_view->new_desk_button(),
           CrOSNextDeskIconButton::State::kExpanded);

@@ -24,6 +24,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import androidx.recyclerview.widget.RecyclerView.LayoutManager;
 
 import org.chromium.base.Callback;
+import org.chromium.base.FeatureList;
 import org.chromium.base.Log;
 import org.chromium.base.ObserverList;
 import org.chromium.base.ThreadUtils;
@@ -49,14 +50,15 @@ import org.chromium.chrome.browser.ui.messages.snackbar.Snackbar;
 import org.chromium.chrome.browser.ui.messages.snackbar.SnackbarManager;
 import org.chromium.chrome.browser.xsurface.FeedActionsHandler;
 import org.chromium.chrome.browser.xsurface.FeedLaunchReliabilityLogger;
-import org.chromium.chrome.browser.xsurface.FeedLaunchReliabilityLogger.StreamType;
+import org.chromium.chrome.browser.xsurface.FeedUserInteractionReliabilityLogger;
 import org.chromium.chrome.browser.xsurface.HybridListRenderer;
 import org.chromium.chrome.browser.xsurface.ListLayoutHelper;
 import org.chromium.chrome.browser.xsurface.LoggingParameters;
 import org.chromium.chrome.browser.xsurface.SurfaceActionsHandler;
 import org.chromium.chrome.browser.xsurface.SurfaceActionsHandler.OpenMode;
+import org.chromium.chrome.browser.xsurface.SurfaceActionsHandler.OpenWebFeedEntryPoint;
 import org.chromium.chrome.browser.xsurface.SurfaceScope;
-import org.chromium.chrome.tab_ui.R;
+import org.chromium.chrome.browser.xsurface.feed.StreamType;
 import org.chromium.components.browser_ui.bottomsheet.BottomSheetContent;
 import org.chromium.components.browser_ui.bottomsheet.BottomSheetController;
 import org.chromium.components.browser_ui.bottomsheet.BottomSheetController.StateChangeReason;
@@ -269,8 +271,26 @@ public class FeedStream implements Stream {
         }
 
         @Override
-        public void openWebFeed(String webFeedName) {
-            mActionDelegate.openWebFeed(webFeedName);
+        public void openWebFeed(String webFeedName, @OpenWebFeedEntryPoint int entryPoint) {
+            @SingleWebFeedEntryPoint
+            int singleWebFeedEntryPoint;
+
+            switch (entryPoint) {
+                case OpenWebFeedEntryPoint.ATTRIBUTION:
+                    singleWebFeedEntryPoint = SingleWebFeedEntryPoint.ATTRIBUTION;
+                    break;
+                case OpenWebFeedEntryPoint.RECOMMENDATION:
+                    singleWebFeedEntryPoint = SingleWebFeedEntryPoint.RECOMMENDATION;
+                    break;
+                case OpenWebFeedEntryPoint.GROUP_HEADER:
+                    singleWebFeedEntryPoint = SingleWebFeedEntryPoint.GROUP_HEADER;
+                    break;
+
+                default:
+                    singleWebFeedEntryPoint = SingleWebFeedEntryPoint.OTHER;
+            }
+
+            mActionDelegate.openWebFeed(webFeedName, singleWebFeedEntryPoint);
         }
 
         private void openSuggestionUrl(
@@ -376,7 +396,8 @@ public class FeedStream implements Stream {
     /**
      * Implementation of FeedActionsHandler methods.
      */
-    class FeedActionsHandlerImpl implements FeedActionsHandler {
+    class FeedActionsHandlerImpl
+            implements org.chromium.chrome.browser.xsurface.FeedActionsHandler {
         private static final int SNACKBAR_DURATION_MS_SHORT = 4000;
         private static final int SNACKBAR_DURATION_MS_LONG = 10000;
         // This is based on the menu animation time (218ms) from BottomSheet.java.
@@ -442,12 +463,37 @@ public class FeedStream implements Stream {
                     mNativeFeedStream, FeedStream.this, changeId);
         }
 
+        private @org.chromium.chrome.browser.xsurface.feed.FeedActionsHandler.SnackbarDuration
+        int convertDuration(SnackbarDuration duration) {
+            switch (duration) {
+                case SHORT:
+                    return org.chromium.chrome.browser.xsurface.feed.FeedActionsHandler
+                            .SnackbarDuration.SHORT;
+                case LONG:
+                    return org.chromium.chrome.browser.xsurface.feed.FeedActionsHandler
+                            .SnackbarDuration.LONG;
+            }
+            return org.chromium.chrome.browser.xsurface.feed.FeedActionsHandler.SnackbarDuration
+                    .SHORT;
+        }
+
         @Override
         public void showSnackbar(String text, String actionLabel, SnackbarDuration duration,
-                SnackbarController delegateController) {
+                SnackbarController controller) {
+            showSnackbar(text, actionLabel, convertDuration(duration), controller);
+        }
+
+        @Override
+        public void showSnackbar(String text, String actionLabel,
+                @org.chromium.chrome.browser.xsurface.feed.FeedActionsHandler.SnackbarDuration
+                int duration,
+                org.chromium.chrome.browser.xsurface.feed.FeedActionsHandler
+                        .SnackbarController delegateController) {
             assert ThreadUtils.runningOnUiThread();
             int durationMs = SNACKBAR_DURATION_MS_SHORT;
-            if (duration == FeedActionsHandler.SnackbarDuration.LONG) {
+            if (duration
+                    == org.chromium.chrome.browser.xsurface.feed.FeedActionsHandler.SnackbarDuration
+                               .LONG) {
                 durationMs = SNACKBAR_DURATION_MS_LONG;
             }
             SnackbarManager.SnackbarController controller =
@@ -597,6 +643,7 @@ public class FeedStream implements Stream {
     private RotationObserver mRotationObserver;
     private FeedReliabilityLoggingBridge mReliabilityLoggingBridge;
     private FeedLaunchReliabilityLogger mLaunchReliabilityLogger;
+    private FeedUserInteractionReliabilityLogger mFeedUserInteractionReliabilityLogger;
 
     // Things valid only when bound.
     private @Nullable RecyclerView mRecyclerView;
@@ -750,10 +797,20 @@ public class FeedStream implements Stream {
         launchReliabilityLogger.logFeedReloading(System.nanoTime());
         mReliabilityLoggingBridge.setLogger(launchReliabilityLogger);
 
+        if (FeatureList.isInitialized()
+                && ChromeFeatureList.isEnabled(
+                        ChromeFeatureList.FEED_USER_INTERACTION_RELIABILITY_REPORT)
+                && surfaceScope != null) {
+            mFeedUserInteractionReliabilityLogger =
+                    surfaceScope.getFeedUserInteractionReliabilityLogger();
+        }
+
         mScrollStateToRestore = savedInstanceState;
         manager.setHandlers(mHandlersMap);
         mSliceViewTracker = new FeedSliceViewTracker(rootView, mActivity, manager,
-                renderer.getListLayoutHelper(), new FeedStream.ViewTrackerObserver());
+                renderer.getListLayoutHelper(), /* watchForBarelyVisibleChange= */
+                (mFeedUserInteractionReliabilityLogger != null),
+                new FeedStream.ViewTrackerObserver());
         mSliceViewTracker.bind();
 
         rootView.addOnScrollListener(mMainScrollListener);
@@ -774,6 +831,10 @@ public class FeedStream implements Stream {
         }
 
         FeedStreamJni.get().surfaceOpened(mNativeFeedStream, FeedStream.this);
+
+        if (mFeedUserInteractionReliabilityLogger != null) {
+            mFeedUserInteractionReliabilityLogger.onStreamOpened(getStreamType());
+        }
     }
 
     @Override
@@ -1303,6 +1364,18 @@ public class FeedStream implements Stream {
         @Override
         public void feedContentVisible() {
             FeedStreamJni.get().reportFeedViewed(mNativeFeedStream, FeedStream.this);
+        }
+        @Override
+        public void reportViewFirstBarelyVisible(View view) {
+            if (mFeedUserInteractionReliabilityLogger != null) {
+                mFeedUserInteractionReliabilityLogger.onViewFirstVisible(view);
+            }
+        }
+        @Override
+        public void reportViewFirstRendered(View view) {
+            if (mFeedUserInteractionReliabilityLogger != null) {
+                mFeedUserInteractionReliabilityLogger.onViewFirstRendered(view);
+            }
         }
     }
 

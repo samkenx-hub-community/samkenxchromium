@@ -157,7 +157,8 @@ bool SwapGoogleUpdate(UpdaterScope scope,
         return uninstall_if_unused_command.GetCommandLineString();
       }(),
       true);
-
+  list->AddSetRegValueWorkItem(root, UPDATER_KEY, KEY_WOW64_32KEY,
+                               kRegValueVersion, kUpdaterVersionUtf16, true);
   return true;
 }
 
@@ -391,7 +392,12 @@ bool ComServerApp::SwapInNewVersion() {
 
   const base::ScopedClosureRunner reset_shutdown_event(
       SignalShutdownEvent(updater_scope()));
-  StopGoogleUpdateProcesses(updater_scope());
+
+  absl::optional<base::FilePath> target =
+      GetGoogleUpdateExePath(updater_scope());
+  if (target) {
+    StopProcessesUnderPath(target->DirName(), base::Seconds(45));
+  }
 
   const bool succeeded = list->Do();
   if (succeeded) {

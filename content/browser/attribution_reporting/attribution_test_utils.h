@@ -13,8 +13,8 @@
 
 #include "base/containers/enum_set.h"
 #include "base/containers/flat_set.h"
-#include "base/guid.h"
 #include "base/time/time.h"
+#include "base/uuid.h"
 #include "components/aggregation_service/aggregation_service.mojom.h"
 #include "components/attribution_reporting/aggregatable_values.h"
 #include "components/attribution_reporting/aggregation_keys.h"
@@ -57,7 +57,7 @@ constexpr auto kSourceTypes =
                   attribution_reporting::mojom::SourceType::kMinValue,
                   attribution_reporting::mojom::SourceType::kMaxValue>::All();
 
-base::GUID DefaultExternalReportID();
+base::Uuid DefaultExternalReportID();
 
 base::Time GetExpiryTimeForTesting(base::TimeDelta declared_expiry,
                                    base::Time source_time);
@@ -235,7 +235,6 @@ class TriggerBuilder {
 class AttributionInfoBuilder {
  public:
   explicit AttributionInfoBuilder(
-      StoredSource source,
       // For most tests, the context origin is irrelevant.
       attribution_reporting::SuitableOrigin context_origin =
           *attribution_reporting::SuitableOrigin::Deserialize(
@@ -249,7 +248,6 @@ class AttributionInfoBuilder {
   AttributionInfo Build() const;
 
  private:
-  StoredSource source_;
   base::Time time_;
   absl::optional<uint64_t> debug_key_;
   attribution_reporting::SuitableOrigin context_origin_;
@@ -259,7 +257,7 @@ class AttributionInfoBuilder {
 // data.
 class ReportBuilder {
  public:
-  explicit ReportBuilder(AttributionInfo attribution_info);
+  explicit ReportBuilder(AttributionInfo attribution_info, StoredSource);
   ~ReportBuilder();
 
   ReportBuilder& SetTriggerData(uint64_t trigger_data);
@@ -268,14 +266,11 @@ class ReportBuilder {
 
   ReportBuilder& SetPriority(int64_t priority);
 
-  ReportBuilder& SetExternalReportId(base::GUID external_report_id);
+  ReportBuilder& SetExternalReportId(base::Uuid external_report_id);
 
   ReportBuilder& SetRandomizedTriggerRate(double rate);
 
-  ReportBuilder& SetReportId(AttributionReport::EventLevelData::Id id);
-
-  ReportBuilder& SetReportId(
-      AttributionReport::AggregatableAttributionData::Id id);
+  ReportBuilder& SetReportId(AttributionReport::Id id);
 
   ReportBuilder& SetAggregatableHistogramContributions(
       std::vector<AggregatableHistogramContribution> contributions);
@@ -292,14 +287,13 @@ class ReportBuilder {
 
  private:
   AttributionInfo attribution_info_;
+  StoredSource source_;
   uint64_t trigger_data_ = 0;
   base::Time report_time_;
   int64_t priority_ = 0;
-  base::GUID external_report_id_;
+  base::Uuid external_report_id_;
   double randomized_trigger_rate_ = 0;
-  AttributionReport::EventLevelData::Id report_id_{0};
-  AttributionReport::AggregatableAttributionData::Id
-      aggregatable_attribution_report_id_{0};
+  AttributionReport::Id report_id_{0};
   std::vector<AggregatableHistogramContribution> contributions_;
   ::aggregation_service::mojom::AggregationCoordinator
       aggregation_coordinator_ =
@@ -460,8 +454,7 @@ MATCHER_P(TriggerDestinationOriginIs, matcher, "") {
 // Report matchers
 
 MATCHER_P(ReportSourceIs, matcher, "") {
-  return ExplainMatchResult(matcher, arg.attribution_info().source,
-                            result_listener);
+  return ExplainMatchResult(matcher, arg.GetStoredSource(), result_listener);
 }
 
 MATCHER_P(ReportTimeIs, matcher, "") {

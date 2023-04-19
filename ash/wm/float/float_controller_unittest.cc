@@ -785,6 +785,33 @@ TEST_F(WindowFloatTest, FloatWindowUpdatedOnOverview) {
   EXPECT_EQ(window.get(), overview_items[0]->GetWindow());
 }
 
+// Tests the floated window is hidden when there is a pinned window.
+TEST_F(WindowFloatTest, PinnedWindow) {
+  std::unique_ptr<aura::Window> floated_window = CreateFloatedWindow();
+
+  // Create and pin a window. The floated window should be hidden.
+  std::unique_ptr<aura::Window> pinned_window = CreateAppWindow();
+  wm::ActivateWindow(pinned_window.get());
+  window_util::PinWindow(pinned_window.get(), /*trusted=*/false);
+  EXPECT_FALSE(floated_window->IsVisible());
+
+  // Unpin the window.
+  Shell::Get()->accelerator_controller()->PerformActionIfEnabled(UNPIN, {});
+  EXPECT_TRUE(floated_window->IsVisible());
+
+  // Trusted pin the window.
+  window_util::PinWindow(pinned_window.get(), /*trusted=*/true);
+  EXPECT_FALSE(floated_window->IsVisible());
+
+  // Unpin the window by destroying it.
+  pinned_window.reset();
+  EXPECT_TRUE(floated_window->IsVisible());
+
+  // Try pinning the floated window. It should still be visible.
+  window_util::PinWindow(floated_window.get(), /*trusted=*/true);
+  EXPECT_TRUE(floated_window->IsVisible());
+}
+
 // A test class that uses a mock time test environment.
 class WindowFloatMetricsTest : public WindowFloatTest {
  public:
@@ -930,10 +957,8 @@ class TabletWindowFloatTest : public WindowFloatTest,
   // Drags `window` so that it magnetizes to `corner`.
   void MagnetizeWindow(aura::Window* window,
                        FloatController::MagnetismCorner corner) {
-    // Drag to a point outside of `kScreenEdgeInsetForSnap` from the edge of the
-    // screen to avoid snapping.
-    gfx::Rect area = WorkAreaInsets::ForWindow(window)->user_work_area_bounds();
-    area.Inset(kScreenEdgeInsetForSnap + 5);
+    const gfx::Rect area =
+        WorkAreaInsets::ForWindow(window)->user_work_area_bounds();
 
     gfx::Point end;
     switch (corner) {
@@ -1062,6 +1087,17 @@ TEST_F(TabletWindowFloatTest, TabletClamshellTransition) {
   // Test that on exiting tablet mode, we maintain float state.
   Shell::Get()->tablet_mode_controller()->SetEnabledForTest(false);
   EXPECT_TRUE(WindowState::Get(window2.get())->IsFloated());
+}
+
+TEST_F(TabletWindowFloatTest, ClamshellToTabletMagnetism) {
+  auto window = CreateFloatedWindow();
+  window->SetBounds(gfx::Rect(300, 300));
+
+  // Verify that on entering tablet mode, since our window's origin was 0,0, the
+  // window is magnetized to the top left.
+  Shell::Get()->tablet_mode_controller()->SetEnabledForTest(true);
+  EXPECT_TRUE(WindowState::Get(window.get())->IsFloated());
+  CheckMagnetized(window.get(), FloatController::MagnetismCorner::kTopLeft);
 }
 
 // Tests that the expected windows are animating duration a tablet <-> clamshell
@@ -1339,6 +1375,13 @@ TEST_F(TabletWindowFloatTest, MaximizeWhileDragging) {
   PressAndReleaseKey(ui::VKEY_OEM_PLUS, ui::EF_ALT_DOWN);
 
   EXPECT_TRUE(WindowState::Get(window.get())->IsMaximized());
+
+  // Press the accelerator to minimize before releasing touch.
+  event_generator->PressTouch(header_view->GetBoundsInScreen().CenterPoint());
+  event_generator->MoveTouch(gfx::Point(100, 100));
+  PressAndReleaseKey(ui::VKEY_OEM_MINUS, ui::EF_ALT_DOWN);
+
+  EXPECT_TRUE(WindowState::Get(window.get())->IsMinimized());
 }
 
 // Tests that on drag release, the window sticks to one of the four corners of
@@ -1379,41 +1422,6 @@ TEST_F(TabletWindowFloatTest, DraggingMagnetism) {
   UpdateDisplay("1000x1600");
   MagnetizeWindow(window.get(), FloatController::MagnetismCorner::kBottomLeft);
   CheckMagnetized(window.get(), FloatController::MagnetismCorner::kBottomLeft);
-}
-
-// Tests that if a floating window is dragged to the edges, it will snap.
-TEST_F(TabletWindowFloatTest, DraggingSnapping) {
-  // Use a set display size so we can drag to specific spots.
-  UpdateDisplay("1600x1000");
-
-  Shell::Get()->tablet_mode_controller()->SetEnabledForTest(true);
-
-  std::unique_ptr<aura::Window> window = CreateFloatedWindow();
-
-  auto* split_view_controller =
-      SplitViewController::Get(Shell::GetPrimaryRootWindow());
-  ASSERT_FALSE(split_view_controller->primary_window());
-  ASSERT_FALSE(split_view_controller->secondary_window());
-
-  // Move finger towards the right edge. Test that on release, it snaps right.
-  // Don't scroll too fast or we will tuck the window.
-  chromeos::HeaderView* header_view = GetHeaderView(window.get());
-  auto* event_generator = GetEventGenerator();
-  event_generator->GestureScrollSequence(
-      header_view->GetBoundsInScreen().CenterPoint(), gfx::Point(1580, 500),
-      base::Milliseconds(500), /*steps=*/50);
-  EXPECT_EQ(split_view_controller->secondary_window(), window.get());
-  ASSERT_TRUE(WindowState::Get(window.get())->IsSnapped());
-
-  // Float the window so we can drag it again.
-  PressAndReleaseKey(ui::VKEY_F, ui::EF_ALT_DOWN | ui::EF_COMMAND_DOWN);
-  ASSERT_TRUE(WindowState::Get(window.get())->IsFloated());
-
-  // Move finger towards the left edge. Test that on release, it snaps left.
-  event_generator->GestureScrollSequence(
-      header_view->GetBoundsInScreen().CenterPoint(), gfx::Point(20, 500),
-      base::Milliseconds(500), /*steps=*/50);
-  EXPECT_EQ(split_view_controller->primary_window(), window.get());
 }
 
 TEST_F(TabletWindowFloatTest, UntuckWindowOnExitTabletMode) {
@@ -1909,6 +1917,8 @@ TEST_F(TabletWindowFloatTest, EducationPreferences) {
 
   // Counter should not increment as nudge was not shown.
   EXPECT_EQ(3, nudge_counter.nudge_count());
+
+  TabletModeTuckEducation::SetOverrideClockForTesting(nullptr);
 }
 
 using TabletWindowFloatSplitviewTest = TabletWindowFloatTest;

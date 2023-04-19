@@ -11,6 +11,8 @@ namespace autofill {
 struct FormActivityParams;
 }  // namespace autofill
 
+class FaviconLoader;
+class PrefService;
 class WebStateList;
 
 @protocol PasswordSuggestionBottomSheetConsumer;
@@ -22,8 +24,13 @@ class WebStateList;
     : NSObject <PasswordSuggestionBottomSheetDelegate>
 
 - (instancetype)initWithWebStateList:(WebStateList*)webStateList
+                       faviconLoader:(FaviconLoader*)faviconLoader
+                         prefService:(PrefService*)prefService
                               params:
                                   (const autofill::FormActivityParams&)params;
+
+// Disconnects the mediator.
+- (void)disconnect;
 
 // The bottom sheet suggestions consumer.
 @property(nonatomic, strong) id<PasswordSuggestionBottomSheetConsumer> consumer;

@@ -49,7 +49,6 @@ BASE_DECLARE_FEATURE(kForceInitialSyncWhenDecryptionFails);
 BASE_DECLARE_FEATURE(kInferConfirmationPasswordField);
 #if BUILDFLAG(IS_IOS)
 BASE_DECLARE_FEATURE(kIOSPasswordUISplit);
-BASE_DECLARE_FEATURE(kIOSPasswordManagerCrossOriginIframeSupport);
 BASE_DECLARE_FEATURE(kIOSPasswordCheckup);
 BASE_DECLARE_FEATURE(kIOSShowPasswordStorageInSaveInfobar);
 BASE_DECLARE_FEATURE(kIOSPasswordBottomSheet);
@@ -58,19 +57,17 @@ BASE_DECLARE_FEATURE(kIOSPasswordBottomSheet);
 BASE_DECLARE_FEATURE(kMemoryMapWeaknessCheckDictionaries);
 #endif
 BASE_DECLARE_FEATURE(kNewRegexForOtpFields);
+BASE_DECLARE_FEATURE(kPasswordIssuesInSpecificsMetadata);
 BASE_DECLARE_FEATURE(kPasswordViewPageInSettings);
 BASE_DECLARE_FEATURE(kSendPasswords);
 BASE_DECLARE_FEATURE(kLeakDetectionUnauthenticated);
 BASE_DECLARE_FEATURE(kPasswordChangeWellKnown);
-BASE_DECLARE_FEATURE(kPasswordImport);
 #if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)  // Desktop
 BASE_DECLARE_FEATURE(kPasswordManagerRedesign);
 #endif
 BASE_DECLARE_FEATURE(kPasswordReuseDetectionEnabled);
 BASE_DECLARE_FEATURE(kPasswordsGrouping);
-#if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)  // Desktop
 BASE_DECLARE_FEATURE(kPasswordsImportM2);
-#endif
 BASE_DECLARE_FEATURE(kPasswordStrengthIndicator);
 BASE_DECLARE_FEATURE(kRecoverFromNeverSaveAndroid);
 #if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)  // Desktop
@@ -87,6 +84,7 @@ BASE_DECLARE_FEATURE(kShowUPMErrorNotification);
 BASE_DECLARE_FEATURE(kUnifiedCredentialManagerDryRun);
 BASE_DECLARE_FEATURE(kUnifiedPasswordManagerAndroid);
 BASE_DECLARE_FEATURE(kUnifiedPasswordManagerErrorMessages);
+BASE_DECLARE_FEATURE(kUnifiedPasswordManagerLocalPasswordsMigrationWarning);
 BASE_DECLARE_FEATURE(kUnifiedPasswordManagerSyncUsingAndroidBackendOnly);
 BASE_DECLARE_FEATURE(kUnifiedPasswordManagerReenrollment);
 BASE_DECLARE_FEATURE(kUnifiedPasswordManagerAndroidBranding);

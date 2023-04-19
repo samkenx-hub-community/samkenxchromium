@@ -9,6 +9,7 @@
 #import "base/ios/block_types.h"
 #import "base/notreached.h"
 #import "components/bookmarks/common/bookmark_features.h"
+#import "components/reading_list/features/reading_list_switches.h"
 #import "ios/chrome/browser/application_context/application_context.h"
 #import "ios/chrome/browser/browser_state/chrome_browser_state.h"
 #import "ios/chrome/browser/main/browser.h"
@@ -287,7 +288,7 @@ enum AuthenticationState {
 }
 
 - (void)continueSignin {
-  ChromeBrowserState* browserState = _browser->GetBrowserState();
+  ChromeBrowserState* browserState = [self originalBrowserState];
   if (self.handlingError) {
     // The flow should not continue while the error is being handled, e.g. while
     // the user is being informed of an issue.
@@ -423,7 +424,7 @@ enum AuthenticationState {
 // is not subject to parental controls and then continues sign-in.
 - (void)checkMergeCaseForUnsupervisedAccounts {
   if (([_performer shouldHandleMergeCaseForIdentity:_identityToSignIn
-                                  browserStatePrefs:_browser->GetBrowserState()
+                                  browserStatePrefs:[self originalBrowserState]
                                                         ->GetPrefs()])) {
     [_performer promptMergeCaseForIdentity:_identityToSignIn
                                    browser:_browser
@@ -439,7 +440,7 @@ enum AuthenticationState {
 - (void)checkSigninSteps {
   id<SystemIdentity> currentIdentity =
       AuthenticationServiceFactory::GetForBrowserState(
-          _browser->GetBrowserState())
+          [self originalBrowserState])
           ->GetPrimaryIdentity(signin::ConsentLevel::kSignin);
   if (currentIdentity && ![currentIdentity isEqual:_identityToSignIn]) {
     // If the identity to sign-in is different than the current identity,
@@ -451,7 +452,7 @@ enum AuthenticationState {
 }
 
 - (void)signInIdentity:(id<SystemIdentity>)identity {
-  ChromeBrowserState* browserState = _browser->GetBrowserState();
+  ChromeBrowserState* browserState = [self originalBrowserState];
   ChromeAccountManagerService* accountManagerService =
       ChromeAccountManagerServiceFactory::GetForBrowserState(browserState);
 
@@ -525,8 +526,18 @@ enum AuthenticationState {
 // Opts in the bookmark and reading list account storage and continues the
 // sign-in flow.
 - (void)optInBookmarkReadingListAccountStorage {
-  DCHECK(
-      base::FeatureList::IsEnabled(bookmarks::kEnableBookmarksAccountStorage));
+  bool bookmarksAccountStorageEnabled =
+      base::FeatureList::IsEnabled(bookmarks::kEnableBookmarksAccountStorage);
+  bool dualReadingListModelEnabled = base::FeatureList::IsEnabled(
+      reading_list::switches::kReadingListEnableDualReadingListModel);
+  bool readingListTransportUponSignInEnabled = base::FeatureList::IsEnabled(
+      reading_list::switches::kReadingListEnableSyncTransportModeUponSignIn);
+  CHECK(bookmarksAccountStorageEnabled ||
+        (dualReadingListModelEnabled && readingListTransportUponSignInEnabled))
+      << "bookmarksAccountStorageEnabled: " << bookmarksAccountStorageEnabled
+      << ", dualReadingListModelEnabled: " << dualReadingListModelEnabled
+      << ", readingListTransportUponSignInEnabled: "
+      << readingListTransportUponSignInEnabled;
   // TODO(crbug.com/1427044): Need to call the right APIs to opt in, as soon as
   // those APIs will be implemented.
   [self continueSignin];
@@ -628,6 +639,14 @@ enum AuthenticationState {
                                             completion();
                                           }
                                         }];
+}
+
+#pragma mark - Private methods
+
+// The original chrome browser state used for services that don't exist in
+// incognito mode.
+- (ChromeBrowserState*)originalBrowserState {
+  return _browser->GetBrowserState()->GetOriginalChromeBrowserState();
 }
 
 #pragma mark - Used for testing

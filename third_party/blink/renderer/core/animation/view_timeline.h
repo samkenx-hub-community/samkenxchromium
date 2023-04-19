@@ -30,7 +30,11 @@ class CORE_EXPORT ViewTimeline : public ScrollTimeline {
  public:
   static ViewTimeline* Create(Document&, ViewTimelineOptions*, ExceptionState&);
 
-  ViewTimeline(Document*, Element* subject, ScrollAxis axis, TimelineInset);
+  ViewTimeline(Document*,
+               TimelineAttachment attachment,
+               Element* subject,
+               ScrollAxis axis,
+               TimelineInset);
 
   bool IsViewTimeline() const override { return true; }
 
@@ -41,7 +45,14 @@ class CORE_EXPORT ViewTimeline : public ScrollTimeline {
       const Timing&) override;
 
   // IDL API implementation.
-  Element* subject() const { return ReferenceElement(); }
+  Element* subject() const;
+
+  bool Matches(TimelineAttachment,
+               Element* subject,
+               ScrollAxis,
+               const TimelineInset&) const;
+
+  const TimelineInset& GetInset() const;
 
   // Converts a delay that is expressed as a (phase,percentage) pair to
   // a fractional offset.
@@ -58,8 +69,6 @@ class CORE_EXPORT ViewTimeline : public ScrollTimeline {
   void Trace(Visitor*) const override;
 
  protected:
-  const TimelineInset& GetInset() const { return inset_; }
-
   absl::optional<ScrollOffsets> CalculateOffsets(
       PaintLayerScrollableArea* scrollable_area,
       ScrollOrientation physical_orientation) const override;
@@ -79,7 +88,6 @@ class CORE_EXPORT ViewTimeline : public ScrollTimeline {
   mutable double end_side_inset_;
   mutable double start_offset_ = 0;
   mutable double end_offset_ = 0;
-  TimelineInset inset_;
   // If either of the following elements are non-null, we need to update
   // |inset_| on a style change.
   Member<const CSSValue> style_dependant_start_inset_;

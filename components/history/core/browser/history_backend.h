@@ -580,6 +580,13 @@ class HistoryBackend : public base::RefCountedThreadSafe<HistoryBackend>,
 
   // Generic operations --------------------------------------------------------
 
+  // Sets the device information for all syncing devices.
+  void SetSyncDeviceInfo(SyncDeviceInfoMap sync_device_info);
+
+  // Sets the local device Originator Cache GUID.
+  void SetLocalDeviceOriginatorCacheGuid(
+      std::string local_device_originator_cache_guid);
+
   void ProcessDBTask(
       std::unique_ptr<HistoryDBTask> task,
       scoped_refptr<base::SequencedTaskRunner> origin_loop,
@@ -814,6 +821,7 @@ class HistoryBackend : public base::RefCountedThreadSafe<HistoryBackend>,
       VisitSource visit_source,
       bool should_increment_typed_count,
       VisitID opener_visit,
+      bool consider_for_ntp_most_visited,
       absl::optional<std::u16string> title = absl::nullopt,
       absl::optional<base::TimeDelta> visit_duration = absl::nullopt,
       absl::optional<std::string> originator_cache_guid = absl::nullopt,
@@ -1058,6 +1066,13 @@ class HistoryBackend : public base::RefCountedThreadSafe<HistoryBackend>,
   // HistoryBackend::Init() is called. Defined after `observers_` because
   // it unregisters itself as observer during destruction.
   std::unique_ptr<HistorySyncBridge> history_sync_bridge_;
+
+  // Contains device information for all syncing devices.
+  SyncDeviceInfoMap sync_device_info_;
+
+  // Contains the local device Originator Cache GUID, a unique, sync-specific
+  // identifier for the local device.
+  std::string local_device_originator_cache_guid_;
 };
 
 }  // namespace history

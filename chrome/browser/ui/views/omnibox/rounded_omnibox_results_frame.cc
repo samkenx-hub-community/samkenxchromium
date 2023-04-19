@@ -180,7 +180,8 @@ RoundedOmniboxResultsFrame::RoundedOmniboxResultsFrame(
   // Use rounded corners.
   bool cr23_expanded_shape =
       base::FeatureList::IsEnabled(omnibox::kExpandedStateShape) ||
-      base::FeatureList::IsEnabled(features::kChromeRefresh2023);
+      features::GetChromeRefresh2023Level() ==
+          features::ChromeRefresh2023Level::kLevel2;
   int corner_radius =
       cr23_expanded_shape
           ? views::LayoutProvider::Get()->GetCornerRadiusMetric(
@@ -240,7 +241,8 @@ gfx::Insets RoundedOmniboxResultsFrame::GetLocationBarAlignmentInsets() {
   if (ui::TouchUiController::Get()->touch_ui()) {
     return gfx::Insets::TLBR(6, 1, 5, 1);
   } else if (base::FeatureList::IsEnabled(omnibox::kExpandedStateHeight) ||
-             base::FeatureList::IsEnabled(features::kChromeRefresh2023)) {
+             features::GetChromeRefresh2023Level() ==
+                 features::ChromeRefresh2023Level::kLevel2) {
     return gfx::Insets::VH(5, 6);
   }
   return gfx::Insets::VH(4, 6);

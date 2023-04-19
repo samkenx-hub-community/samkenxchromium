@@ -408,8 +408,7 @@ class CommandBufferSetup {
         share_group_, surface_, std::move(shared_context),
         config_.workarounds.use_virtualized_gl_contexts, base::DoNothing(),
         gpu_preferences_.gr_context_type);
-    context_state_->InitializeGrContext(gpu_preferences_, config_.workarounds,
-                                        nullptr);
+    context_state_->InitializeSkia(gpu_preferences_, config_.workarounds);
     context_state_->InitializeGL(gpu_preferences_, feature_info);
 
     shared_image_manager_ = std::make_unique<SharedImageManager>();
@@ -437,7 +436,7 @@ class CommandBufferSetup {
       shared_image_factory_->CreateSharedImage(
           mailbox, si_format, gfx::Size(256, 256),
           gfx::ColorSpace::CreateSRGB(), kTopLeft_GrSurfaceOrigin,
-          kPremul_SkAlphaType, gfx::kNullAcceleratedWidget, usage);
+          kPremul_SkAlphaType, gfx::kNullAcceleratedWidget, usage, "TestLabel");
     }
 
 #if defined(GPU_FUZZER_USE_RASTER_DECODER)
