@@ -6,7 +6,6 @@
 
 #include <algorithm>
 #include <functional>
-#include <memory>
 #include <utility>
 
 #include "ash/accessibility/accessibility_controller_impl.h"
@@ -20,6 +19,7 @@
 #include "ash/screen_util.h"
 #include "ash/shell.h"
 #include "ash/strings/grit/ash_strings.h"
+#include "ash/style/ash_color_id.h"
 #include "ash/system/toast/toast_manager_impl.h"
 #include "ash/wallpaper/wallpaper_controller_impl.h"
 #include "ash/wm/desks/cros_next_default_desk_button.h"
@@ -27,18 +27,17 @@
 #include "ash/wm/desks/desk_bar_view_base.h"
 #include "ash/wm/desks/desk_mini_view.h"
 #include "ash/wm/desks/desk_name_view.h"
-#include "ash/wm/desks/desks_bar_view.h"
 #include "ash/wm/desks/desks_constants.h"
 #include "ash/wm/desks/desks_controller.h"
 #include "ash/wm/desks/desks_util.h"
 #include "ash/wm/desks/expanded_desks_bar_button.h"
+#include "ash/wm/desks/legacy_desk_bar_view.h"
 #include "ash/wm/desks/templates/saved_desk_animations.h"
 #include "ash/wm/desks/templates/saved_desk_grid_view.h"
 #include "ash/wm/desks/templates/saved_desk_library_view.h"
 #include "ash/wm/desks/templates/saved_desk_name_view.h"
 #include "ash/wm/desks/templates/saved_desk_presenter.h"
 #include "ash/wm/desks/templates/saved_desk_save_desk_button.h"
-#include "ash/wm/desks/templates/saved_desk_save_desk_button_container.h"
 #include "ash/wm/desks/templates/saved_desk_util.h"
 #include "ash/wm/desks/zero_state_button.h"
 #include "ash/wm/mru_window_tracker.h"
@@ -48,7 +47,6 @@
 #include "ash/wm/overview/overview_highlight_controller.h"
 #include "ash/wm/overview/overview_item.h"
 #include "ash/wm/overview/overview_item_view.h"
-#include "ash/wm/overview/overview_session.h"
 #include "ash/wm/overview/overview_types.h"
 #include "ash/wm/overview/overview_utils.h"
 #include "ash/wm/overview/overview_window_drag_controller.h"
@@ -71,12 +69,14 @@
 #include "components/app_restore/full_restore_utils.h"
 #include "ui/aura/client/aura_constants.h"
 #include "ui/base/l10n/l10n_util.h"
+#include "ui/chromeos/styles/cros_tokens_color_mappings.h"
 #include "ui/compositor/compositor_observer.h"
 #include "ui/compositor/layer.h"
 #include "ui/compositor/layer_animator.h"
 #include "ui/compositor/presentation_time_recorder.h"
 #include "ui/compositor/scoped_layer_animation_settings.h"
 #include "ui/compositor/throughput_tracker.h"
+#include "ui/gfx/canvas.h"
 #include "ui/gfx/geometry/transform_util.h"
 #include "ui/gfx/geometry/vector2d_f.h"
 #include "ui/views/animation/animation_builder.h"
@@ -97,7 +97,7 @@ constexpr int kNoItemsIndicatorVerticalPaddingDp = 8;
 
 // Distance from the bottom of the save desk as template button to the top of
 // the first overview item.
-constexpr int kSaveDeskAsTemplateOverviewItemSpacingDp = 40;
+constexpr int kSaveDeskAsTemplateOverviewItemSpacingDp = 45;
 
 // Windows are not allowed to get taller than this.
 constexpr int kMaxHeight = 512;
@@ -141,10 +141,6 @@ constexpr base::TimeDelta kZeroDesksBarSlideDuration = base::Milliseconds(250);
 constexpr char kMoveVisibleOnAllDesksWindowToastId[] =
     "ash.wm.overview.move_visible_on_all_desks_window_toast";
 
-constexpr SkColor kDropTargetBackgroundColor =
-    SkColorSetARGB(0x24, 0xFF, 0XFF, 0XFF);
-constexpr SkColor kDropTargetBorderColor =
-    SkColorSetARGB(0x4C, 0xE8, 0XEA, 0XED);
 constexpr int kDropTargetBorderThickness = 2;
 
 // Histogram names for overview enter/exit smoothness in clamshell,
@@ -271,7 +267,7 @@ class ShutdownAnimationMetricsTrackerObserver : public OverviewObserver,
   }
 
  private:
-  ui::Compositor* compositor_;
+  raw_ptr<ui::Compositor, ExperimentalAsh> compositor_;
   OverviewExitMetricsTracker metrics_tracker_;
 };
 
@@ -283,16 +279,15 @@ class DropTargetView : public views::View {
   METADATA_HEADER(DropTargetView);
   DropTargetView() {
     SetUseDefaultFillLayout(true);
-    const int corner_radius =
-        views::LayoutProvider::Get()->GetCornerRadiusMetric(
-            views::Emphasis::kLow);
+
+    int top_corner_radius = GetCornerRadius().first;
+    int bottom_corner_radius = GetCornerRadius().second;
 
     background_view_ = AddChildView(std::make_unique<views::View>());
-    background_view_->SetBackground(views::CreateRoundedRectBackground(
-        kDropTargetBackgroundColor, corner_radius));
-
-    SetBorder(views::CreateRoundedRectBorder(
-        kDropTargetBorderThickness, corner_radius, kDropTargetBorderColor));
+    // TODO(b/280330100): Replace the color token once the new color token is
+    // added.
+    background_view_->SetBackground(views::CreateThemedRoundedRectBackground(
+        kColorAshShieldAndBase20, top_corner_radius, bottom_corner_radius, 0));
   }
   DropTargetView(const DropTargetView&) = delete;
   DropTargetView& operator=(const DropTargetView&) = delete;
@@ -304,8 +299,47 @@ class DropTargetView : public views::View {
     background_view_->SetVisible(visible);
   }
 
+  // Paint the border for the drop target view. The reason we don't use the
+  // existing Border class here is the Border class only accepts one corner
+  // radius for all four corners, in our use case, the top corner radius could
+  // be different than the bottom corner radius.
+  void OnPaintBorder(gfx::Canvas* canvas) override {
+    gfx::Rect rect(GetLocalBounds());
+    rect.Inset(kDropTargetBorderThickness / 2);
+    float top_corner_radius = GetCornerRadius().first;
+    float bottom_corner_radius = GetCornerRadius().second;
+
+    SkScalar sk_radii[8] = {top_corner_radius,    top_corner_radius,
+                            top_corner_radius,    top_corner_radius,
+                            bottom_corner_radius, bottom_corner_radius,
+                            bottom_corner_radius, bottom_corner_radius};
+    SkPath path;
+    path.addRoundRect(gfx::RectToSkRect(rect), sk_radii);
+
+    cc::PaintFlags flags;
+    flags.setAntiAlias(true);
+    flags.setStrokeWidth(kDropTargetBorderThickness);
+    flags.setStyle(cc::PaintFlags::kStroke_Style);
+    // TODO(b/280330100): Replace the color token once the new color token is
+    // added.
+    flags.setColor(
+        GetColorProvider()->GetColor(cros_tokens::kCrosSysSystemBaseElevated));
+    canvas->DrawPath(path, flags);
+  }
+
  private:
-  views::View* background_view_ = nullptr;
+  std::pair<float, float> GetCornerRadius() const {
+    if (chromeos::features::IsJellyrollEnabled()) {
+      return {0.f, kOverviewItemCornerRadius};
+    }
+
+    const float corner_radius =
+        views::LayoutProvider::Get()->GetCornerRadiusMetric(
+            views::Emphasis::kLow);
+    return {corner_radius, corner_radius};
+  }
+
+  raw_ptr<views::View, ExperimentalAsh> background_view_ = nullptr;
 };
 
 BEGIN_METADATA(DropTargetView, views::View)
@@ -399,8 +433,8 @@ gfx::Insets GetGridInsetsImpl(const gfx::Rect& grid_bounds) {
       horizontal_inset +
       kOverviewVerticalInset * (grid_bounds.height() - 2 * horizontal_inset);
 
-  return gfx::Insets::VH(std::max(0, vertical_inset - kWindowMargin),
-                         std::max(0, horizontal_inset - kWindowMargin));
+  return gfx::Insets::VH(std::max(0, vertical_inset),
+                         std::max(0, horizontal_inset));
 }
 
 bool ShouldExcludeItemFromGridLayout(
@@ -1370,11 +1404,10 @@ void OverviewGrid::StartNudge(OverviewItem* item) {
   // respective source and destination bounds.
   nudge_data_.resize(affected_indexes.size());
   for (size_t i = 0; i < affected_indexes.size(); ++i) {
-    NudgeData data;
-    data.index = affected_indexes[i];
-    data.src = src_rects[data.index];
-    data.dst = dst_rects[data.index];
-    nudge_data_[i] = data;
+    const size_t new_index = static_cast<size_t>(affected_indexes[i]);
+    nudge_data_[i] = {.index = new_index,
+                      .src = src_rects[new_index],
+                      .dst = dst_rects[new_index]};
   }
 }
 
@@ -1457,7 +1490,7 @@ bool OverviewGrid::MaybeDropItemOnDeskMiniViewOrNewDeskButton(
   const bool dragged_window_is_visible_on_all_desks =
       dragged_window &&
       desks_util::IsWindowVisibleOnAllWorkspaces(dragged_window);
-  // End the drag for the DesksBarView.
+  // End the drag for the LegacyDeskBarView.
   if (!IntersectsWithDesksBar(screen_location,
                               /*update_desks_bar_drag_details=*/
                               !dragged_window_is_visible_on_all_desks,
@@ -1753,11 +1786,11 @@ void OverviewGrid::ShowSavedDeskLibrary() {
     // bar. `GetGridEffectiveBounds` will not be the correct bounds for the
     // library if we are currently in the zero state mode.
     gfx::Rect library_bounds = bounds_;
-    library_bounds.Inset(gfx::Insets::TLBR(
-        DesksBarView::GetPreferredBarHeight(root_window_,
-                                            DesksBarView::Type::kOverview,
-                                            DesksBarView::State::kExpanded),
-        0, 0, 0));
+    library_bounds.Inset(
+        gfx::Insets::TLBR(LegacyDeskBarView::GetPreferredBarHeight(
+                              root_window_, LegacyDeskBarView::Type::kOverview,
+                              LegacyDeskBarView::State::kExpanded),
+                          0, 0, 0));
 
     saved_desk_library_widget_->SetBounds(library_bounds);
   }
@@ -2032,8 +2065,7 @@ void OverviewGrid::UpdateSaveDeskButtons() {
   // changing, so its ok to use a bounds animation as opposed to a transform
   // animation. If the visibility has changed, skip the bounds animation and use
   // the fade animation from above. Align the widget so it is visually aligned
-  // with the first overview item, which has an invisible border of
-  // `kWindowMargin` thickness.
+  // with the first overview item.
   ScopedOverviewAnimationSettings settings(
       visibility_changed || in_desk_animation
           ? OVERVIEW_ANIMATION_NONE
@@ -2041,7 +2073,7 @@ void OverviewGrid::UpdateSaveDeskButtons() {
       save_desk_button_container_widget_->GetNativeWindow());
   gfx::Point available_origin =
       gfx::ToRoundedPoint(first_overview_item_bounds.origin()) +
-      gfx::Vector2d(kWindowMargin, -kSaveDeskAsTemplateOverviewItemSpacingDp);
+      gfx::Vector2d(0, -kSaveDeskAsTemplateOverviewItemSpacingDp);
   save_desk_button_container_widget_->SetBounds(gfx::Rect(
       available_origin, save_desk_button_container_widget_->GetContentsView()
                             ->GetPreferredSize()));
@@ -2195,11 +2227,11 @@ void OverviewGrid::MaybeInitDesksWidget() {
       root_window_, GetDesksWidgetBounds(), DeskBarViewBase::Type::kOverview);
 
   // The following order of function calls is significant: SetContentsView()
-  // must be called before DesksBarView:: Init(). This is needed because the
-  // desks mini views need to access the widget to get the root window in order
-  // to know how to layout themselves.
+  // must be called before LegacyDeskBarView:: Init(). This is needed because
+  // the desks mini views need to access the widget to get the root window in
+  // order to know how to layout themselves.
   desks_bar_view_ =
-      desks_widget_->SetContentsView(std::make_unique<DesksBarView>(this));
+      desks_widget_->SetContentsView(std::make_unique<LegacyDeskBarView>(this));
   desks_bar_view_->Init();
 
   desks_widget_->Show();
@@ -2239,7 +2271,7 @@ std::vector<gfx::RectF> OverviewGrid::GetWindowRects(
   // |high_height|. Once this optimal height is known, |height_fixed| is set to
   // true and the rows are balanced by repeatedly squeezing the widest row to
   // cause windows to overflow to the subsequent rows.
-  int low_height = 2 * kWindowMargin;
+  int low_height = kSpaceBetweenItemsDp;
   int high_height = std::max(low_height, total_bounds.height() + 1);
   int height = 0.5 * (low_height + high_height);
   bool height_fixed = false;
@@ -2378,7 +2410,7 @@ std::vector<gfx::RectF> OverviewGrid::GetWindowRectsForTabletModeLayout(
     const int x = right_edge_map.contains(y)
                       ? right_edge_map[y]
                       : total_bounds.x() + scroll_offset_;
-    right_edge_map[y] = x + width;
+    right_edge_map[y] = x + width + kSpaceBetweenItemsDp;
     DCHECK_LE(static_cast<int>(right_edge_map.size()), kTabletLayoutRow);
 
     const gfx::RectF bounds(x, y, width, height);
@@ -2418,35 +2450,33 @@ bool OverviewGrid::FitWindowRectsInBounds(
     if (ShouldExcludeItemFromGridLayout(window_list_[i].get(), ignored_items))
       continue;
 
-    int width = CalculateWidthAndMaybeSetUnclippedBounds(window_list_[i].get(),
-                                                         height) +
-                2 * kWindowMargin;
-    int height_with_margin = height + 2 * kWindowMargin;
+    int width =
+        CalculateWidthAndMaybeSetUnclippedBounds(window_list_[i].get(), height);
 
-    if (left + width > bounds.right()) {
+    if ((left + width + kSpaceBetweenItemsDp) > bounds.right()) {
       // Move to the next row if possible.
       if (*out_min_right > left)
         *out_min_right = left;
       if (*out_max_right < left)
         *out_max_right = left;
-      top += height_with_margin;
+      top += (height + kSpaceBetweenItemsDp);
 
       // Check if the new row reaches the bottom or if the first item in the new
       // row does not fit within the available width.
-      if (top + height_with_margin > bounds.bottom() ||
-          bounds.x() + width > bounds.right()) {
+      if ((top + height + kSpaceBetweenItemsDp) > bounds.bottom() ||
+          bounds.x() + width + kSpaceBetweenItemsDp > bounds.right()) {
         return false;
       }
       left = bounds.x();
     }
 
     // Position the current rect.
-    (*out_rects)[i] = gfx::RectF(left, top, width, height_with_margin);
+    (*out_rects)[i] = gfx::RectF(left, top, width, height);
 
-    // Increment horizontal position using sanitized positive |width|.
-    left += width;
+    // Increment horizontal position using sanitized positive `width`.
+    left += (width + kSpaceBetweenItemsDp);
 
-    *out_max_bottom = top + height_with_margin;
+    *out_max_bottom = top + height;
   }
 
   // Update the narrowest and widest row width for the last row.
@@ -2583,7 +2613,8 @@ void OverviewGrid::UpdateNumSavedDeskUnsupportedWindows(aura::Window* window,
   int addend = increment ? 1 : -1;
   if (!DeskTemplate::IsAppTypeSupported(window) || !has_restore_id) {
     num_unsupported_windows_ += addend;
-  } else if (Shell::Get()->saved_desk_delegate()->IsIncognitoWindow(window)) {
+  } else if (!Shell::Get()->saved_desk_delegate()->IsWindowPersistable(
+                 window)) {
     num_incognito_windows_ += addend;
   }
 
@@ -2592,12 +2623,12 @@ void OverviewGrid::UpdateNumSavedDeskUnsupportedWindows(aura::Window* window,
 }
 
 int OverviewGrid::GetDesksBarHeight() const {
-  DeskBarViewBase::State state =
-      desks_bar_view_
-          ? desks_bar_view_->state()
-          : DesksBarView::GetPerferredState(DesksBarView::Type::kOverview);
-  return DesksBarView::GetPreferredBarHeight(
-      root_window_, DesksBarView::Type::kOverview, state);
+  DeskBarViewBase::State state = desks_bar_view_
+                                     ? desks_bar_view_->state()
+                                     : LegacyDeskBarView::GetPerferredState(
+                                           LegacyDeskBarView::Type::kOverview);
+  return LegacyDeskBarView::GetPreferredBarHeight(
+      root_window_, LegacyDeskBarView::Type::kOverview, state);
 }
 
 }  // namespace ash

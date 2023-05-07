@@ -178,7 +178,7 @@ class QuotaManagerImpl::UsageAndQuotaInfoGatherer : public QuotaTask {
     // Gather info before computing an answer:
     // settings, host_usage, storage_key_quota and device_storage_capacity if
     // unlimited.
-    int callback_count = is_unlimited_ ? 4 : 3;
+    int callback_count = is_unlimited_ ? 3 : 2;
     base::RepeatingClosure barrier = base::BarrierClosure(
         callback_count,
         base::BindOnce(&UsageAndQuotaInfoGatherer::OnBarrierComplete,
@@ -202,11 +202,10 @@ class QuotaManagerImpl::UsageAndQuotaInfoGatherer : public QuotaTask {
 
     // Determine storage_key_quota differently depending on type.
     if (is_unlimited_) {
+      SetDesiredStorageKeyQuota(blink::mojom::QuotaStatusCode::kOk, kNoLimit);
       manager()->GetStorageCapacity(
           base::BindOnce(&UsageAndQuotaInfoGatherer::OnGotCapacity,
                          weak_factory_.GetWeakPtr(), barrier));
-      SetDesiredStorageKeyQuota(barrier, blink::mojom::QuotaStatusCode::kOk,
-                                kNoLimit);
     } else {
       // For limited storage,  OnGotSettings will set the host quota.
     }
@@ -277,13 +276,13 @@ class QuotaManagerImpl::UsageAndQuotaInfoGatherer : public QuotaTask {
     DCHECK(barrier_closure);
 
     settings_ = settings;
-    barrier_closure.Run();
     const int64_t quota =
         manager()->GetQuotaForStorageKey(storage_key_, type_, settings);
     if (quota != kNoLimit) {
-      SetDesiredStorageKeyQuota(std::move(barrier_closure),
-                                blink::mojom::QuotaStatusCode::kOk, quota);
+      SetDesiredStorageKeyQuota(blink::mojom::QuotaStatusCode::kOk, quota);
     }
+
+    barrier_closure.Run();
   }
 
   void OnGotCapacity(base::OnceClosure barrier_closure,
@@ -318,15 +317,12 @@ class QuotaManagerImpl::UsageAndQuotaInfoGatherer : public QuotaTask {
     std::move(barrier_closure).Run();
   }
 
-  void SetDesiredStorageKeyQuota(base::OnceClosure barrier_closure,
-                                 blink::mojom::QuotaStatusCode status,
+  void SetDesiredStorageKeyQuota(blink::mojom::QuotaStatusCode status,
                                  int64_t quota) {
     DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-    DCHECK(barrier_closure);
     DCHECK_GE(quota, 0);
 
     desired_storage_key_quota_ = quota;
-    std::move(barrier_closure).Run();
   }
 
   void OnBarrierComplete() { CallCompleted(); }
@@ -818,17 +814,14 @@ class QuotaManagerImpl::BucketSetDataDeleter {
  private:
   void DidGetBuckets(QuotaErrorOr<std::set<BucketInfo>> result) {
     DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-    if (!result.has_value()) {
-      Complete(/*success=*/false);
-      return;
+    if (result.has_value()) {
+      buckets_ = BucketInfosToBucketLocators(result.value());
+      if (!buckets_.empty()) {
+        ScheduleBucketsDeletion();
+        return;
+      }
     }
-
-    buckets_ = BucketInfosToBucketLocators(result.value());
-    if (!buckets_.empty()) {
-      ScheduleBucketsDeletion();
-      return;
-    }
-    Complete(/*success=*/true);
+    Complete(/*success=*/result.has_value());
   }
 
   void ScheduleBucketsDeletion() {
@@ -1354,6 +1347,59 @@ void QuotaManagerImpl::GetBucketUsageAndQuota(BucketId id,
   GetBucketById(
       id, base::BindOnce(&QuotaManagerImpl::DidGetBucketForUsageAndQuota,
                          weak_factory_.GetWeakPtr(), std::move(callback)));
+}
+
+void QuotaManagerImpl::GetBucketSpaceRemaining(
+    const BucketLocator& bucket,
+    base::OnceCallback<void(QuotaErrorOr<int64_t>)> callback) {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+
+  // This barrier is run once with each space restriction --- the StorageKey
+  // usage/quota and the bucket's usage/quota (if it exists). The final value is
+  // the more restrictive of the two.
+  auto barrier_aggregator = base::BindOnce(
+      [](base::OnceCallback<void(QuotaErrorOr<int64_t>)> final_space_remaining,
+         std::vector<int64_t> space_checks) {
+        int64_t space_left =
+            *std::min_element(space_checks.begin(), space_checks.end());
+        if (space_left == std::numeric_limits<int64_t>::min()) {
+          std::move(final_space_remaining)
+              .Run(base::unexpected(QuotaError::kUnknownError));
+        } else {
+          std::move(final_space_remaining).Run(space_left);
+        }
+      },
+      std::move(callback));
+  auto barrier = base::BarrierCallback<int64_t>(
+      /*num_callbacks=*/bucket.is_default ? 1 : 2,
+      std::move(barrier_aggregator));
+
+  // Translates a UsageAndQuota result into a single number for the barrier.
+  auto on_got_usage = base::BindRepeating(
+      [](base::RepeatingCallback<void(int64_t)> report_space_remaining,
+         blink::mojom::QuotaStatusCode code, int64_t usage, int64_t quota) {
+        // Report the amount of allocated space remaining, or min() for an
+        // error, or max() if there's no limit.
+        int64_t leftover_space = 0;
+        if (code != blink::mojom::QuotaStatusCode::kOk) {
+          leftover_space = std::numeric_limits<int64_t>::min();
+        } else if (quota == 0) {
+          leftover_space = kNoLimit;
+        } else {
+          leftover_space = quota - usage;
+        }
+        std::move(report_space_remaining).Run(leftover_space);
+      },
+      barrier);
+
+  // Check the usage for the whole StorageKey.
+  GetUsageAndQuota(bucket.storage_key, bucket.type, on_got_usage);
+
+  // If this is the default bucket, we're done. Otherwise, additionally check
+  // the usage of the specific bucket against its quota.
+  if (!bucket.is_default) {
+    GetBucketUsageAndQuota(bucket.id, on_got_usage);
+  }
 }
 
 void QuotaManagerImpl::OnClientWriteFailed(const StorageKey& storage_key) {
@@ -2138,7 +2184,8 @@ void QuotaManagerImpl::DidEvictBucketData(
     // an error and exclude it from future eviction if the error happens
     // consistently (> kThresholdOfErrorsToBeDenylisted).
     buckets_in_error_[eviction_context_.evicted_bucket.id]++;
-    std::move(eviction_context_.evict_bucket_data_callback).Run(entry.error());
+    std::move(eviction_context_.evict_bucket_data_callback)
+        .Run(entry.error().quota_error);
   }
 }
 
@@ -2580,12 +2627,9 @@ void QuotaManagerImpl::DidGetLruEvictableBucket(
   DidDatabaseWork(result.has_value() ||
                   result.error() != QuotaError::kDatabaseError);
 
-  if (result.has_value()) {
-    std::move(lru_bucket_callback_)
-        .Run(absl::make_optional(std::move(result.value())));
-  } else {
-    std::move(lru_bucket_callback_).Run(absl::nullopt);
-  }
+  std::move(lru_bucket_callback_)
+      .Run(result.has_value() ? absl::make_optional(std::move(result.value()))
+                              : absl::nullopt);
 }
 
 void QuotaManagerImpl::GetQuotaSettings(QuotaSettingsCallback callback) {
@@ -2930,11 +2974,7 @@ void QuotaManagerImpl::DidGetStorageKeys(
 
   DidDatabaseWork(result.has_value() ||
                   result.error() != QuotaError::kDatabaseError);
-  if (!result.has_value()) {
-    std::move(callback).Run(std::set<StorageKey>());
-    return;
-  }
-  std::move(callback).Run(std::move(result.value()));
+  std::move(callback).Run(result.value_or(std::set<StorageKey>()));
 }
 
 void QuotaManagerImpl::DidGetBuckets(
@@ -2999,11 +3039,7 @@ void QuotaManagerImpl::DidGetModifiedBetween(
 
   DidDatabaseWork(result.has_value() ||
                   result.error() != QuotaError::kDatabaseError);
-  if (!result.has_value()) {
-    std::move(callback).Run(std::set<BucketLocator>());
-    return;
-  }
-  std::move(callback).Run(result.value());
+  std::move(callback).Run(result.value_or(std::set<BucketLocator>()));
 }
 
 template <typename ValueType>

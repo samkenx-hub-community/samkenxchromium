@@ -8,6 +8,7 @@
 
 #include "ash/constants/ash_features.h"
 #include "base/functional/bind.h"
+#include "base/memory/raw_ptr.h"
 #include "base/test/scoped_feature_list.h"
 #include "chrome/browser/ash/borealis/borealis_app_launcher_impl.h"
 #include "chrome/browser/ash/borealis/borealis_context.h"
@@ -42,15 +43,15 @@ namespace {
 
 class BorealisInstallerMock : public borealis::BorealisInstaller {
  public:
-  MOCK_METHOD0(IsProcessing, bool());
-  MOCK_METHOD0(Start, void());
-  MOCK_METHOD0(Cancel, void());
+  MOCK_METHOD(bool, IsProcessing, (), (override));
+  MOCK_METHOD(void, Start, (), (override));
+  MOCK_METHOD(void, Cancel, (), (override));
   MOCK_METHOD(void,
               Uninstall,
               (base::OnceCallback<void(BorealisUninstallResult)>),
               ());
-  MOCK_METHOD1(AddObserver, void(Observer*));
-  MOCK_METHOD1(RemoveObserver, void(Observer*));
+  MOCK_METHOD(void, AddObserver, (Observer*), (override));
+  MOCK_METHOD(void, RemoveObserver, (Observer*), (override));
 };
 
 class BorealisInstallerViewBrowserTest : public DialogBrowserTest {
@@ -148,7 +149,7 @@ class BorealisInstallerViewBrowserTest : public DialogBrowserTest {
   ::testing::NiceMock<BorealisContextManagerMock> mock_context_manager_;
   std::unique_ptr<BorealisAppLauncher> app_launcher_;
   std::unique_ptr<BorealisFeatures> features_;
-  BorealisInstallerView* view_;
+  raw_ptr<BorealisInstallerView, ExperimentalAsh> view_;
 };
 
 // Test that the dialog can be launched.

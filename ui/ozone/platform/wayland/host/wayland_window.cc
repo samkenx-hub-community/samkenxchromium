@@ -150,6 +150,10 @@ void WaylandWindow::UpdateWindowScale(bool update_bounds) {
   }
 }
 
+WaylandZAuraSurface* WaylandWindow::GetZAuraSurface() {
+  return root_surface_ ? root_surface_->zaura_surface() : nullptr;
+}
+
 gfx::AcceleratedWidget WaylandWindow::GetWidget() const {
   return accelerated_widget_;
 }
@@ -329,15 +333,8 @@ void WaylandWindow::OnChannelDestroyed() {
                                      std::move(subsurfaces_to_overlays)));
 }
 
-void WaylandWindow::SetAuraSurface(zaura_surface* aura_surface) {
-  DCHECK(connection()->zaura_shell());
-  DCHECK_NE(aura_surface_.get(), aura_surface);
-  aura_surface_.reset(aura_surface);
-}
-
-bool WaylandWindow::IsSupportedOnAuraSurface(uint32_t version) const {
-  return aura_surface_ &&
-         zaura_surface_get_version(aura_surface_.get()) >= version;
+bool WaylandWindow::SupportsConfigureMinimizedState() const {
+  return false;
 }
 
 void WaylandWindow::Close() {
@@ -465,11 +462,11 @@ void WaylandWindow::ConfineCursorToBounds(const gfx::Rect& bounds) {
 }
 
 void WaylandWindow::SetRestoredBoundsInDIP(const gfx::Rect& bounds) {
-  restored_size_dip_ = bounds.size();
+  restored_bounds_dip_ = bounds;
 }
 
 gfx::Rect WaylandWindow::GetRestoredBoundsInDIP() const {
-  return gfx::Rect(restored_size_dip_);
+  return restored_bounds_dip_;
 }
 
 bool WaylandWindow::ShouldWindowContentsBeTransparent() const {
@@ -784,6 +781,10 @@ bool WaylandWindow::IsActive() const {
 }
 
 WaylandPopup* WaylandWindow::AsWaylandPopup() {
+  return nullptr;
+}
+
+WaylandToplevelWindow* WaylandWindow::AsWaylandToplevelWindow() {
   return nullptr;
 }
 

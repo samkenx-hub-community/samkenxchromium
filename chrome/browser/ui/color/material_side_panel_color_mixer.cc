@@ -16,6 +16,7 @@ void AddMaterialSidePanelColorMixer(ui::ColorProvider* provider,
   mixer[kColorSidePanelContentBackground] = {ui::kColorSysSurface4};
   mixer[kColorSidePanelScrollbarThumb] = {ui::kColorSysPrimary};
   mixer[kColorSidePanelCardBackground] = {ui::kColorSysSurface};
+  mixer[kColorSidePanelDivider] = {ui::kColorSysDivider};
 
   mixer[kColorSidePanelBadgeBackground] = {ui::kColorSysSurfaceVariant};
   mixer[kColorSidePanelBadgeBackgroundUpdated] = {
@@ -23,6 +24,8 @@ void AddMaterialSidePanelColorMixer(ui::ColorProvider* provider,
   mixer[kColorSidePanelBadgeForeground] = {ui::kColorSysOnSurfaceVariant};
   mixer[kColorSidePanelBadgeForegroundUpdated] = {
       ui::kColorSysOnTertiaryContainer};
+
+  mixer[kColorSidePanelEditFooterBorder] = {ui::kColorSysTonalOutline};
 
   mixer[kColorSidePanelFilterChipBorder] = {ui::kColorSysTonalOutline};
   mixer[kColorSidePanelFilterChipForeground] = {ui::kColorSysOnSurface};
@@ -36,5 +39,7 @@ void AddMaterialSidePanelColorMixer(ui::ColorProvider* provider,
   mixer[kColorSidePanelFilterChipBackgroundSelected] = {
       ui::kColorSysTonalContainer};
 
+  mixer[kColorSidePanelTextfieldBackgroundHover] = {
+      ui::kColorSysStateHoverOnSubtle};
   mixer[kColorSidePanelTextfieldBorder] = {ui::kColorSysNeutralOutline};
 }

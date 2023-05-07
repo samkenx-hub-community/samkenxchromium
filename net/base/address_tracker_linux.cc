@@ -8,13 +8,16 @@
 #include <linux/if.h>
 #include <stdint.h>
 #include <sys/ioctl.h>
+#include <vector>
 #include <utility>
 
 #include "base/check.h"
 #include "base/dcheck_is_on.h"
 #include "base/files/scoped_file.h"
+#include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
 #include "base/logging.h"
+#include "base/memory/page_size.h"
 #include "base/posix/eintr_wrapper.h"
 #include "base/sequence_checker.h"
 #include "base/task/current_thread.h"
@@ -164,14 +167,16 @@ AddressTrackerLinux::AddressTrackerLinux(
     const base::RepeatingClosure& address_callback,
     const base::RepeatingClosure& link_callback,
     const base::RepeatingClosure& tunnel_callback,
-    const std::unordered_set<std::string>& ignored_interfaces)
+    const std::unordered_set<std::string>& ignored_interfaces,
+    scoped_refptr<base::SequencedTaskRunner> blocking_thread_runner)
     : get_interface_name_(GetInterfaceName),
       address_callback_(address_callback),
       link_callback_(link_callback),
       tunnel_callback_(tunnel_callback),
       ignored_interfaces_(ignored_interfaces),
       connection_type_initialized_cv_(&connection_type_lock_),
-      tracking_(true) {
+      tracking_(true),
+      sequenced_task_runner_(std::move(blocking_thread_runner)) {
   DCHECK(!address_callback.is_null());
   DCHECK(!link_callback.is_null());
   DETACH_FROM_SEQUENCE(sequence_checker_);
@@ -252,6 +257,10 @@ std::unordered_set<int> AddressTrackerLinux::GetOnlineLinks() const {
   return online_links_;
 }
 
+AddressTrackerLinux* AddressTrackerLinux::GetAddressTrackerLinux() {
+  return this;
+}
+
 std::pair<AddressTrackerLinux::AddressMap, std::unordered_set<int>>
 AddressTrackerLinux::GetInitialDataAndStartRecordingDiffs() {
   DCHECK(tracking_);
@@ -263,8 +272,18 @@ AddressTrackerLinux::GetInitialDataAndStartRecordingDiffs() {
 }
 
 void AddressTrackerLinux::SetDiffCallback(DiffCallback diff_callback) {
-  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   DCHECK(tracking_);
+  DCHECK(sequenced_task_runner_);
+
+  if (!sequenced_task_runner_->RunsTasksInCurrentSequence()) {
+    sequenced_task_runner_->PostTask(
+        FROM_HERE, base::BindOnce(&AddressTrackerLinux::SetDiffCallback,
+                                  weak_ptr_factory_.GetWeakPtr(),
+                                  std::move(diff_callback)));
+    return;
+  }
+
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
 #if DCHECK_IS_ON()
   {
     // GetInitialDataAndStartRecordingDiffs() must be called before
@@ -358,6 +377,9 @@ void AddressTrackerLinux::DumpInitialAddressesAndWatch() {
   }
 
   if (tracking_) {
+    DCHECK(!sequenced_task_runner_ ||
+           sequenced_task_runner_->RunsTasksInCurrentSequence());
+
     watcher_ = base::FileDescriptorWatcher::WatchReadable(
         netlink_fd_.get(),
         base::BindRepeating(&AddressTrackerLinux::OnFileCanReadWithoutBlocking,
@@ -372,8 +394,30 @@ void AddressTrackerLinux::ReadMessages(bool* address_changed,
   *address_changed = false;
   *link_changed = false;
   *tunnel_changed = false;
-  char buffer[4096];
   bool first_loop = true;
+
+  // Varying sources have different opinions regarding the buffer size needed
+  // for netlink messages to avoid truncation:
+  // - The official documentation on netlink says messages are generally 8kb
+  //   or the system page size, whichever is *larger*:
+  //   https://www.kernel.org/doc/html/v6.2/userspace-api/netlink/intro.html#buffer-sizing
+  // - The kernel headers would imply that messages are generally the system
+  //   page size or 8kb, whichever is *smaller*:
+  //   https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/tree/include/linux/netlink.h?h=v6.2.2#n226
+  //   (libmnl follows this.)
+  // - The netlink(7) man page's example always uses a fixed size 8kb buffer:
+  //   https://man7.org/linux/man-pages/man7/netlink.7.html
+  // Here, we follow the guidelines in the documentation, for two primary
+  // reasons:
+  // - Erring on the side of a larger size is the safer way to go to avoid
+  //   MSG_TRUNC.
+  // - Since this is heap-allocated anyway, there's no risk to the stack by
+  //   using the larger size.
+
+  constexpr size_t kMinNetlinkBufferSize = 8 * 1024;
+  std::vector<char> buffer(
+      std::max(base::GetPageSize(), kMinNetlinkBufferSize));
+
   {
     absl::optional<base::ScopedBlockingCall> blocking_call;
     if (tracking_) {
@@ -383,9 +427,10 @@ void AddressTrackerLinux::ReadMessages(bool* address_changed,
     }
 
     for (;;) {
-      int rv = HANDLE_EINTR(recv(netlink_fd_.get(), buffer, sizeof(buffer),
-                                 // Block the first time through loop.
-                                 first_loop ? 0 : MSG_DONTWAIT));
+      int rv =
+          HANDLE_EINTR(recv(netlink_fd_.get(), buffer.data(), buffer.size(),
+                            // Block the first time through loop.
+                            first_loop ? 0 : MSG_DONTWAIT));
       first_loop = false;
       if (rv == 0) {
         LOG(ERROR) << "Unexpected shutdown of NETLINK socket.";
@@ -397,7 +442,8 @@ void AddressTrackerLinux::ReadMessages(bool* address_changed,
         PLOG(ERROR) << "Failed to recv from netlink socket";
         return;
       }
-      HandleMessage(buffer, rv, address_changed, link_changed, tunnel_changed);
+      HandleMessage(buffer.data(), rv, address_changed, link_changed,
+                    tunnel_changed);
     }
   }
   if (*link_changed || *address_changed)

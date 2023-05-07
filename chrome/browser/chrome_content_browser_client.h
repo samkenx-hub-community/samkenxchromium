@@ -121,6 +121,7 @@ class ChromeContentBrowserClient : public content::ContentBrowserClient {
   using PopupNavigationDelegateFactory =
       std::unique_ptr<blocked_content::PopupNavigationDelegate> (*)(
           NavigateParams);
+  using ClipboardPasteData = content::ClipboardPasteData;
 
   static PopupNavigationDelegateFactory&
   GetPopupNavigationDelegateFactoryForTesting();
@@ -773,7 +774,7 @@ class ChromeContentBrowserClient : public content::ContentBrowserClient {
       content::WebContents* web_contents,
       const GURL& url,
       const ui::ClipboardFormatType& data_type,
-      const std::string& data,
+      ClipboardPasteData clipboard_paste_data,
       IsClipboardPasteContentAllowedCallback callback) override;
 
   bool IsClipboardCopyAllowed(content::BrowserContext* browser_context,
@@ -877,6 +878,9 @@ class ChromeContentBrowserClient : public content::ContentBrowserClient {
       content::WebContents* web_contents) override;
 
   bool ShouldUseFirstPartyStorageKey(const url::Origin& origin) override;
+
+  std::unique_ptr<content::ResponsivenessCalculatorDelegate>
+  CreateResponsivenessCalculatorDelegate() override;
 
  protected:
   static bool HandleWebUI(GURL* url, content::BrowserContext* browser_context);
@@ -1002,9 +1006,7 @@ class ChromeContentBrowserClient : public content::ContentBrowserClient {
 #endif
 
 #if BUILDFLAG(IS_MAC)
-  base::FilePath GetChildProcessPath(
-      int child_flags,
-      const base::FilePath& helpers_path) override;
+  std::string GetChildProcessSuffix(int child_flags) override;
 #endif  // BUILDFLAG(IS_MAC)
 
   base::WeakPtrFactory<ChromeContentBrowserClient> weak_factory_{this};

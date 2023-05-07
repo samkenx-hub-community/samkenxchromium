@@ -19,9 +19,9 @@
 #include "ash/wm/cursor_manager_chromeos.h"
 #include "ash/wm/desks/desk.h"
 #include "ash/wm/desks/desk_mini_view.h"
-#include "ash/wm/desks/desks_bar_view.h"
 #include "ash/wm/desks/desks_test_api.h"
 #include "ash/wm/desks/desks_test_util.h"
+#include "ash/wm/desks/legacy_desk_bar_view.h"
 #include "ash/wm/float/scoped_window_tucker.h"
 #include "ash/wm/float/tablet_mode_float_window_resizer.h"
 #include "ash/wm/float/tablet_mode_tuck_education.h"
@@ -121,6 +121,43 @@ class WindowLayerRecreatedCounter : public aura::WindowObserver {
       window_observation_{this};
 };
 
+// A subclass of `NonClientFrameViewAsh` that allows us to set a custom minimum
+// size.
+class TestNonClientFrameView : public NonClientFrameViewAsh {
+ public:
+  explicit TestNonClientFrameView(views::Widget* widget)
+      : NonClientFrameViewAsh(widget) {}
+  TestNonClientFrameView(const TestNonClientFrameView&) = delete;
+  TestNonClientFrameView& operator=(const TestNonClientFrameView&) = delete;
+  ~TestNonClientFrameView() override = default;
+
+  void SetMinimumSize(const gfx::Size& size) {
+    minimum_size_ = size;
+    frame()->OnSizeConstraintsChanged();
+  }
+
+  // NonClientFrameViewAsh:
+  gfx::Size GetMinimumSize() const override { return minimum_size_; }
+
+ private:
+  gfx::Size minimum_size_;
+};
+
+// A test widget delegate that creates `TestNonClientFrameView` as its frame.
+class TestWidgetDelegate : public views::WidgetDelegate {
+ public:
+  TestWidgetDelegate() { SetHasWindowSizeControls(true); }
+  TestWidgetDelegate(const TestWidgetDelegate& other) = delete;
+  TestWidgetDelegate& operator=(const TestWidgetDelegate& other) = delete;
+  ~TestWidgetDelegate() override = default;
+
+  // views::WidgetDelegateView:
+  std::unique_ptr<views::NonClientFrameView> CreateNonClientFrameView(
+      views::Widget* widget) override {
+    return std::make_unique<TestNonClientFrameView>(widget);
+  }
+};
+
 }  // namespace
 
 class WindowFloatTest : public AshTestBase {
@@ -136,7 +173,7 @@ class WindowFloatTest : public AshTestBase {
   std::unique_ptr<aura::Window> CreateFloatedWindow() {
     std::unique_ptr<aura::Window> floated_window = CreateAppWindow();
     PressAndReleaseKey(ui::VKEY_F, ui::EF_ALT_DOWN | ui::EF_COMMAND_DOWN);
-    DCHECK(WindowState::Get(floated_window.get())->IsFloated());
+    CHECK(WindowState::Get(floated_window.get())->IsFloated());
     return floated_window;
   }
 
@@ -669,7 +706,7 @@ TEST_F(WindowFloatTest, FloatWindowWorkAreaConsiderations) {
 
 // Tests that if we unminimize a window that was floated and another window has
 // since been floated, unminimizing the window would not float it.
-TEST_F(WindowFloatTest, UnminimzeWithFloatedWindow) {
+TEST_F(WindowFloatTest, UnminimizeWithFloatedWindow) {
   // Create two windows and float the second one and then minimize it.
   auto window1 = CreateAppWindow();
   auto window2 = CreateFloatedWindow();
@@ -812,6 +849,17 @@ TEST_F(WindowFloatTest, PinnedWindow) {
   EXPECT_TRUE(floated_window->IsVisible());
 }
 
+// Tests that there is no crash when trying to float an always on top window.
+// Regression test for b/279366443.
+TEST_F(WindowFloatTest, AlwaysOnTopWindow) {
+  std::unique_ptr<aura::Window> always_on_top_window = CreateAppWindow();
+  always_on_top_window->SetProperty(aura::client::kZOrderingKey,
+                                    ui::ZOrderLevel::kFloatingWindow);
+
+  PressAndReleaseKey(ui::VKEY_F, ui::EF_ALT_DOWN | ui::EF_COMMAND_DOWN);
+  EXPECT_FALSE(WindowState::Get(always_on_top_window.get())->IsFloated());
+}
+
 // A test class that uses a mock time test environment.
 class WindowFloatMetricsTest : public WindowFloatTest {
  public:
@@ -935,6 +983,18 @@ TEST_F(WindowFloatMetricsTest, FloatWindowDuration) {
   // Closing a window should record the float duration.
   window.reset();
   histogram_tester_.ExpectBucketCount(kHistogramName, 3, 4);
+}
+
+// Test that the size of preferred bounds for unresizable windows is not
+// different from the size of the original window bounds.
+TEST_F(WindowFloatTest, PreferredBoundsForUnresizableWindow) {
+  std::unique_ptr<aura::Window> window = CreateAppWindow(gfx::Rect(600, 600));
+  window->SetProperty(aura::client::kResizeBehaviorKey,
+                      aura::client::kResizeBehaviorNone);
+  EXPECT_EQ(
+      FloatController::GetPreferredFloatWindowClamshellBounds(window.get())
+          .size(),
+      window->GetBoundsInScreen().size());
 }
 
 class TabletWindowFloatTest : public WindowFloatTest,
@@ -1156,11 +1216,14 @@ TEST_F(TabletWindowFloatTest, MinimumSizeChangeOnTablet) {
 
   // Create a window in clamshell mode without a minimum size, and larger than
   // its tablet minimum size.
-  aura::test::TestWindowDelegate window_delegate;
-  std::unique_ptr<aura::Window> window(CreateTestWindowInShellWithDelegate(
-      &window_delegate, /*id=*/-1, gfx::Rect(500, 500)));
-  window->SetProperty(aura::client::kAppType,
-                      static_cast<int>(AppType::BROWSER));
+  auto test_widget_delegate = std::make_unique<TestWidgetDelegate>();
+  auto window = CreateAppWindow(gfx::Rect(500, 500), AppType::SYSTEM_APP,
+                                kShellWindowId_DeskContainerA,
+                                test_widget_delegate.get());
+  auto* custom_frame = static_cast<TestNonClientFrameView*>(
+      views::Widget::GetWidgetForNativeWindow(window.get())
+          ->non_client_view()
+          ->frame_view());
   wm::ActivateWindow(window.get());
   PressAndReleaseKey(ui::VKEY_F, ui::EF_ALT_DOWN | ui::EF_COMMAND_DOWN);
   ASSERT_TRUE(WindowState::Get(window.get())->IsFloated());
@@ -1175,10 +1238,10 @@ TEST_F(TabletWindowFloatTest, MinimumSizeChangeOnTablet) {
       base::BindLambdaForTesting([&](display::TabletState state) {
         switch (state) {
           case display::TabletState::kInTabletMode:
-            window_delegate.set_minimum_size(tablet_minimum_size);
+            custom_frame->SetMinimumSize(tablet_minimum_size);
             return;
           case display::TabletState::kInClamshellMode:
-            window_delegate.set_minimum_size(gfx::Size());
+            custom_frame->SetMinimumSize(gfx::Size());
             return;
           case display::TabletState::kEnteringTabletMode:
           case display::TabletState::kExitingTabletMode:
@@ -1191,6 +1254,58 @@ TEST_F(TabletWindowFloatTest, MinimumSizeChangeOnTablet) {
   Shell::Get()->tablet_mode_controller()->SetEnabledForTest(true);
   ASSERT_TRUE(WindowState::Get(window.get())->IsFloated());
   EXPECT_EQ(tablet_minimum_size.width(), window->bounds().width());
+
+  // Alter the minimum size of the window. Tests that the window bounds adjust
+  // to match.
+  custom_frame->SetMinimumSize(gfx::Size(350, 350));
+  ASSERT_TRUE(WindowState::Get(window.get())->IsFloated());
+  EXPECT_EQ(350, window->bounds().width());
+}
+
+// Tests if a browser can float at several minimum sizes.
+TEST_F(TabletWindowFloatTest, CanBrowsersFloat) {
+  UpdateDisplay("800x600");
+
+  Shell::Get()->tablet_mode_controller()->SetEnabledForTest(true);
+
+  const int work_area_width =
+      display::Screen::GetScreen()->GetPrimaryDisplay().work_area().width();
+  const int maximum_float_width =
+      (work_area_width - chromeos::wm::kSplitviewDividerShortSideLength) / 2 -
+      chromeos::wm::kFloatedWindowPaddingDp * 2;
+
+  aura::test::TestWindowDelegate window_delegate;
+  std::unique_ptr<aura::Window> window(CreateTestWindowInShellWithDelegate(
+      &window_delegate, /*id=*/-1, gfx::Rect(500, 500)));
+  window->SetProperty(aura::client::kAppType,
+                      static_cast<int>(AppType::BROWSER));
+  wm::ActivateWindow(window.get());
+
+  // Browser windows whose minimum size is greater than the maximum allowed
+  // float width can never be floated.
+  window_delegate.set_minimum_size(gfx::Size(maximum_float_width + 5, 100));
+  PressAndReleaseKey(ui::VKEY_F, ui::EF_ALT_DOWN | ui::EF_COMMAND_DOWN);
+  ASSERT_FALSE(WindowState::Get(window.get())->IsFloated());
+
+  // Browser windows whose minimum size is slightly less than the maximum
+  // allowed, will be floated and have some extra padding, but their size should
+  // not exceed the maximum allowed.
+  window_delegate.set_minimum_size(gfx::Size(maximum_float_width - 20, 100));
+  PressAndReleaseKey(ui::VKEY_F, ui::EF_ALT_DOWN | ui::EF_COMMAND_DOWN);
+  ASSERT_TRUE(WindowState::Get(window.get())->IsFloated());
+  EXPECT_EQ(maximum_float_width, window->bounds().width());
+
+  // Unfloat the window for the next check.
+  PressAndReleaseKey(ui::VKEY_F, ui::EF_ALT_DOWN | ui::EF_COMMAND_DOWN);
+  ASSERT_FALSE(WindowState::Get(window.get())->IsFloated());
+
+  // Browser windows whose minimum size is smaller that the maximum allowed will
+  // have extra padding to make the omnibox tappable.
+  window_delegate.set_minimum_size(gfx::Size(250, 100));
+  PressAndReleaseKey(ui::VKEY_F, ui::EF_ALT_DOWN | ui::EF_COMMAND_DOWN);
+  ASSERT_TRUE(WindowState::Get(window.get())->IsFloated());
+  EXPECT_EQ(250 + chromeos::wm::kBrowserExtraPaddingDp,
+            window->bounds().width());
 }
 
 // Tests that a window can be floated in tablet mode, unless its minimum width
@@ -1284,16 +1399,19 @@ TEST_F(TabletWindowFloatTest, ImmersiveMode) {
   EXPECT_FALSE(immersive_controller->IsEnabled());
 }
 
-// Tests that if we minimize a floated window, it is floated upon unminimizing.
+// Tests that if we minimize a floated window, it is floated upon unminimizing,
+// and magnetized in the same corner as before.
 TEST_F(TabletWindowFloatTest, UnminimizeFloatWindow) {
   Shell::Get()->tablet_mode_controller()->SetEnabledForTest(true);
 
   std::unique_ptr<aura::Window> window = CreateFloatedWindow();
-  auto* window_state = WindowState::Get(window.get());
+  MagnetizeWindow(window.get(), FloatController::MagnetismCorner::kTopLeft);
 
+  auto* window_state = WindowState::Get(window.get());
   window_state->Minimize();
   window_state->Unminimize();
   EXPECT_TRUE(window_state->IsFloated());
+  CheckMagnetized(window.get(), FloatController::MagnetismCorner::kTopLeft);
 }
 
 TEST_F(TabletWindowFloatTest, Rotation) {
@@ -1535,8 +1653,7 @@ TEST_F(TabletWindowFloatTest, UntuckedWindowVisibility) {
   views::Widget* tuck_handle_widget =
       float_controller->GetTuckHandleWidget(window.get());
   ASSERT_TRUE(tuck_handle_widget);
-  GetEventGenerator()->GestureTapAt(
-      tuck_handle_widget->GetWindowBoundsInScreen().CenterPoint());
+  GestureTapOn(tuck_handle_widget->GetContentsView());
   ASSERT_TRUE(window->IsVisible());
   EXPECT_FALSE(float_controller->IsFloatedWindowTuckedForTablet(window.get()));
 }
@@ -1563,8 +1680,7 @@ TEST_F(TabletWindowFloatTest, WindowActivationAfterTuckingUntucking) {
   views::Widget* tuck_handle_widget =
       float_controller->GetTuckHandleWidget(float_window.get());
   ASSERT_TRUE(tuck_handle_widget);
-  GetEventGenerator()->GestureTapAt(
-      tuck_handle_widget->GetWindowBoundsInScreen().CenterPoint());
+  GestureTapOn(tuck_handle_widget->GetContentsView());
   ASSERT_FALSE(
       float_controller->IsFloatedWindowTuckedForTablet(float_window.get()));
   ASSERT_EQ(float_window.get(), window_util::GetActiveWindow());
@@ -1579,8 +1695,7 @@ TEST_F(TabletWindowFloatTest, WindowActivationAfterTuckingUntucking) {
   tuck_handle_widget =
       float_controller->GetTuckHandleWidget(float_window.get());
   ASSERT_TRUE(tuck_handle_widget);
-  GetEventGenerator()->GestureTapAt(
-      tuck_handle_widget->GetWindowBoundsInScreen().CenterPoint());
+  GestureTapOn(tuck_handle_widget->GetContentsView());
   ASSERT_FALSE(
       float_controller->IsFloatedWindowTuckedForTablet(float_window.get()));
   WindowState::Get(window2.get())->Minimize();
@@ -1930,11 +2045,11 @@ TEST_F(TabletWindowFloatSplitviewTest, BothSnappedToFloat) {
 
   // Create two windows and snap one on each side.
   auto left_window = CreateAppWindow();
-  const WMEvent snap_left(WM_EVENT_SNAP_PRIMARY);
+  const WindowSnapWMEvent snap_left(WM_EVENT_SNAP_PRIMARY);
   WindowState::Get(left_window.get())->OnWMEvent(&snap_left);
 
   auto right_window = CreateAppWindow();
-  const WMEvent snap_right(WM_EVENT_SNAP_SECONDARY);
+  const WindowSnapWMEvent snap_right(WM_EVENT_SNAP_SECONDARY);
   WindowState::Get(right_window.get())->OnWMEvent(&snap_right);
 
   auto* split_view_controller =
@@ -1961,7 +2076,7 @@ TEST_F(TabletWindowFloatSplitviewTest, FloatToSnapped) {
 
   // If there are no other windows, expect to enter overview. The hotseat will
   // extended and users can pick a second app from there.
-  const WMEvent snap_left(WM_EVENT_SNAP_PRIMARY);
+  const WindowSnapWMEvent snap_left(WM_EVENT_SNAP_PRIMARY);
   WindowState::Get(window.get())->OnWMEvent(&snap_left);
   ASSERT_TRUE(Shell::Get()->overview_controller()->InOverviewSession());
   ASSERT_TRUE(split_view_controller->InSplitViewMode());
@@ -2006,9 +2121,9 @@ TEST_F(TabletWindowFloatSplitviewTest, ResetFloatToMaximize) {
   auto* split_view_controller =
       SplitViewController::Get(Shell::GetPrimaryRootWindow());
 
-  const WMEvent snap_left(WM_EVENT_SNAP_PRIMARY);
+  const WindowSnapWMEvent snap_left(WM_EVENT_SNAP_PRIMARY);
   WindowState::Get(window_1.get())->OnWMEvent(&snap_left);
-  const WMEvent snap_right(WM_EVENT_SNAP_SECONDARY);
+  const WindowSnapWMEvent snap_right(WM_EVENT_SNAP_SECONDARY);
   WindowState::Get(window_2.get())->OnWMEvent(&snap_right);
   EXPECT_TRUE(split_view_controller->BothSnapped());
   EXPECT_EQ(split_view_controller->primary_window(), window_1.get());

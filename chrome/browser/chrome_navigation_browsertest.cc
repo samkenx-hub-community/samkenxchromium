@@ -218,18 +218,10 @@ class CtrlClickProcessTest : public ChromeNavigationBrowserTest {
     {
       // Double-check that main_contents has expected window.name set.
       // This is a sanity check of test setup; this is not a product test.
-      std::string name_of_main_contents_window;
-      EXPECT_TRUE(ExecuteScriptAndExtractString(
-          main_contents, "window.domAutomationController.send(window.name)",
-          &name_of_main_contents_window));
-      EXPECT_EQ("main_contents", name_of_main_contents_window);
+      EXPECT_EQ("main_contents", EvalJs(main_contents, "window.name"));
 
       // Verify that the new contents doesn't have a window.opener set.
-      bool window_opener_cast_to_bool = true;
-      EXPECT_TRUE(ExecuteScriptAndExtractBool(
-          new_contents, "window.domAutomationController.send(!!window.opener)",
-          &window_opener_cast_to_bool));
-      EXPECT_FALSE(window_opener_cast_to_bool);
+      EXPECT_EQ(false, EvalJs(new_contents, "!!window.opener"));
 
       VerifyBrowsingInstanceExpectations(main_contents, new_contents);
     }
@@ -270,13 +262,10 @@ class CtrlClickProcessTest : public ChromeNavigationBrowserTest {
     // Verify that the new contents cannot find the old contents via
     // window.open. (i.e. window.open should open a new window, rather than
     // returning a reference to main_contents / old window).
-    std::string location_of_opened_window;
-    EXPECT_TRUE(ExecuteScriptAndExtractString(
-        new_contents,
-        "w = window.open('', 'main_contents');"
-        "window.domAutomationController.send(w.location.href);",
-        &location_of_opened_window));
-    EXPECT_EQ(url::kAboutBlankURL, location_of_opened_window);
+    EXPECT_EQ(url::kAboutBlankURL,
+              EvalJs(new_contents,
+                     "w = window.open('', 'main_contents');"
+                     "w.location.href;"));
   }
 };
 
@@ -287,10 +276,15 @@ class CtrlClickShouldEndUpInNewProcessTest : public CtrlClickProcessTest {
  protected:
   void VerifyProcessExpectations(content::WebContents* main_contents,
                                  content::WebContents* new_contents) override {
-    // Verify that the two WebContents are in a different process, SiteInstance
-    // and BrowsingInstance from the old contents.
-    EXPECT_NE(main_contents->GetPrimaryMainFrame()->GetProcess(),
-              new_contents->GetPrimaryMainFrame()->GetProcess());
+    // The two WebContents should not share the same process unless process
+    // sharing is explicitly allowed by a process-per-site feature.
+    if (!base::FeatureList::IsEnabled(
+            features::kProcessPerSiteUpToMainFrameThreshold)) {
+      EXPECT_NE(main_contents->GetPrimaryMainFrame()->GetProcess(),
+                new_contents->GetPrimaryMainFrame()->GetProcess());
+    }
+    // The new WebContents should always have a different SiteInstance and
+    // BrowsingInstance from the old contents.
     EXPECT_NE(main_contents->GetPrimaryMainFrame()->GetSiteInstance(),
               new_contents->GetPrimaryMainFrame()->GetSiteInstance());
     EXPECT_FALSE(main_contents->GetSiteInstance()->IsRelatedSiteInstance(
@@ -545,17 +539,15 @@ IN_PROC_BROWSER_TEST_F(ChromeNavigationBrowserTest,
   content::RenderFrameHost* error_host =
       ChildFrameAt(web_contents->GetPrimaryMainFrame(), 0);
   std::string location;
-  EXPECT_TRUE(ExecuteScriptAndExtractString(
-      error_host,
-      "location='javascript:domAutomationController.send(location.href)';",
-      &location));
-  EXPECT_EQ(location, content::kUnreachableWebDataURL);
+  EXPECT_EQ(
+      EvalJs(
+          error_host,
+          "location='javascript:domAutomationController.send(location.href)';",
+          content::EXECUTE_SCRIPT_USE_MANUAL_REPLY),
+      content::kUnreachableWebDataURL);
 
   // The error page should have a unique origin.
-  std::string origin;
-  EXPECT_TRUE(ExecuteScriptAndExtractString(
-      error_host, "domAutomationController.send(self.origin);", &origin));
-  EXPECT_EQ("null", origin);
+  EXPECT_EQ("null", EvalJs(error_host, "self.origin;"));
 }
 
 // Test that web pages can't navigate to an error page URL, either directly or
@@ -629,12 +621,9 @@ IN_PROC_BROWSER_TEST_F(ChromeNavigationBrowserTest,
   // the error page content to be populated asynchronously by scripts after
   // DidFinishLoad.
   while (true) {
-    std::string content;
-    EXPECT_TRUE(ExecuteScriptAndExtractString(
-        web_contents,
-        "domAutomationController.send("
-        "    document.body ? document.body.innerText : '');",
-        &content));
+    std::string content =
+        EvalJs(web_contents, "document.body ? document.body.innerText : '';")
+            .ExtractString();
     if (content.find("HTTP ERROR 404") != std::string::npos)
       break;
     base::RunLoop run_loop;
@@ -1512,18 +1501,15 @@ IN_PROC_BROWSER_TEST_F(ChromeNavigationBrowserTest,
       browser(), embedded_test_server()->GetURL("a.com", "/title1.html")));
 
   // Open a popup.
-  bool opened = false;
   content::WebContents* opener =
       browser()->tab_strip_model()->GetActiveWebContents();
-  const char* kScriptFormat =
-      "window.domAutomationController.send(!!window.open('%s'));";
+  const char* kScriptFormat = "!!window.open('%s');";
   GURL popup_url = embedded_test_server()->GetURL("b.com", "/title1.html");
   content::TestNavigationObserver popup_waiter(nullptr, 1);
   popup_waiter.StartWatchingNewWebContents();
-  EXPECT_TRUE(content::ExecuteScriptAndExtractBool(
-      opener, base::StringPrintf(kScriptFormat, popup_url.spec().c_str()),
-      &opened));
-  EXPECT_TRUE(opened);
+  EXPECT_EQ(true, content::EvalJs(
+                      opener, base::StringPrintf(kScriptFormat,
+                                                 popup_url.spec().c_str())));
   popup_waiter.Wait();
   EXPECT_EQ(2, browser()->tab_strip_model()->count());
 
@@ -1563,18 +1549,15 @@ IN_PROC_BROWSER_TEST_F(ChromeNavigationBrowserTest,
       browser(), embedded_test_server()->GetURL("a.com", "/title1.html")));
 
   // Open a popup.
-  bool opened = false;
   content::WebContents* opener =
       browser()->tab_strip_model()->GetActiveWebContents();
-  const char* kScriptFormat =
-      "window.domAutomationController.send(!!window.open('%s'));";
+  const char* kScriptFormat = "!!window.open('%s');";
   GURL popup_url = embedded_test_server()->GetURL("a.com", "/title1.html");
   content::TestNavigationObserver popup_waiter(nullptr, 1);
   popup_waiter.StartWatchingNewWebContents();
-  EXPECT_TRUE(content::ExecuteScriptAndExtractBool(
-      opener, base::StringPrintf(kScriptFormat, popup_url.spec().c_str()),
-      &opened));
-  EXPECT_TRUE(opened);
+  EXPECT_EQ(true, content::EvalJs(
+                      opener, base::StringPrintf(kScriptFormat,
+                                                 popup_url.spec().c_str())));
   popup_waiter.Wait();
   EXPECT_EQ(2, browser()->tab_strip_model()->count());
 
@@ -1685,9 +1668,15 @@ IN_PROC_BROWSER_TEST_F(ChromeNavigationBrowserTest,
       std::make_unique<BackForwardMenuModel>(
           browser(), BackForwardMenuModel::ModelType::kBackward));
   back_model->set_test_web_contents(main_contents);
+  back_model->MenuWillShow();
+  back_model->MenuWillClose();
   back_model->ActivatedAt(0);
   histogram.ExpectBucketCount(
       "Navigation.BackForward.NavigatingToEntryMarkedToBeSkipped", true, 1);
+  histogram.ExpectTotalCount(
+      "Navigation.BackForward.TimeFromOpenBackNavigationMenuToActivateItem", 1);
+  histogram.ExpectTotalCount(
+      "Navigation.BackForward.TimeFromOpenBackNavigationMenuToCloseMenu", 1);
 }
 
 // Same as above except the navigation is cross-site.
@@ -1855,14 +1844,13 @@ IN_PROC_BROWSER_TEST_F(NavigationConsumingTest,
       browser()->tab_strip_model()->GetActiveWebContents();
 
   // Normally, fullscreen should work, as long as there is a user gesture.
-  bool is_fullscreen = false;
-  EXPECT_TRUE(content::ExecuteScriptAndExtractBool(
-      contents, "document.body.webkitRequestFullscreen();", &is_fullscreen));
-  EXPECT_TRUE(is_fullscreen);
+  EXPECT_EQ(true, content::EvalJs(contents,
+                                  "document.body.webkitRequestFullscreen();"
+                                  "resultQueue.pop();"));
 
-  EXPECT_TRUE(content::ExecuteScriptAndExtractBool(
-      contents, "document.webkitExitFullscreen();", &is_fullscreen));
-  EXPECT_FALSE(is_fullscreen);
+  EXPECT_EQ(false, content::EvalJs(contents,
+                                   "document.webkitExitFullscreen();"
+                                   "resultQueue.pop();"));
 
   // However, starting a navigation should consume the gesture. Fullscreen
   // should not work afterwards. Make sure the navigation is synchronously
@@ -1870,15 +1858,14 @@ IN_PROC_BROWSER_TEST_F(NavigationConsumingTest,
   std::string script = R"(
     document.getElementsByTagName('a')[0].click();
     document.body.webkitRequestFullscreen();
+    resultQueue.pop();
   )";
 
   // Use the TestNavigationManager to ensure the navigation is not finished
   // before fullscreen can occur.
   content::TestNavigationManager nav_manager(
       contents, embedded_test_server()->GetURL("/title1.html"));
-  EXPECT_TRUE(
-      content::ExecuteScriptAndExtractBool(contents, script, &is_fullscreen));
-  EXPECT_FALSE(is_fullscreen);
+  EXPECT_EQ(false, content::EvalJs(contents, script));
 }
 
 // Similar to the fullscreen test above, but checks that popups are successfully
@@ -1891,31 +1878,23 @@ IN_PROC_BROWSER_TEST_F(NavigationConsumingTest,
       browser()->tab_strip_model()->GetActiveWebContents();
 
   // Normally, a popup should open fine if it is associated with a user gesture.
-  bool did_open = false;
-  EXPECT_TRUE(content::ExecuteScriptAndExtractBool(
-      contents, "window.domAutomationController.send(!!window.open());",
-      &did_open));
-  EXPECT_TRUE(did_open);
+  EXPECT_EQ(true, content::EvalJs(contents, "!!window.open();"));
 
   // Starting a navigation should consume a gesture, but make sure that starting
   // a same-document navigation doesn't do the consuming.
   std::string same_document_script = R"(
     document.getElementById("ref").click();
-    window.domAutomationController.send(!!window.open());
+    !!window.open();
   )";
-  EXPECT_TRUE(content::ExecuteScriptAndExtractBool(
-      contents, same_document_script, &did_open));
-  EXPECT_TRUE(did_open);
+  EXPECT_EQ(true, content::EvalJs(contents, same_document_script));
 
   // If the navigation is to a different document, the gesture should be
   // successfully consumed.
   std::string different_document_script = R"(
     document.getElementById("title1").click();
-    window.domAutomationController.send(!!window.open());
+    !!window.open();
   )";
-  EXPECT_TRUE(content::ExecuteScriptAndExtractBool(
-      contents, different_document_script, &did_open));
-  EXPECT_FALSE(did_open);
+  EXPECT_EQ(false, content::EvalJs(contents, different_document_script));
 }
 
 // Regression test for https://crbug.com/856779, where a navigation to a

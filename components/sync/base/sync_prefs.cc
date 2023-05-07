@@ -17,6 +17,7 @@
 #include "build/chromeos_buildflags.h"
 #include "components/prefs/pref_registry_simple.h"
 #include "components/prefs/pref_service.h"
+#include "components/prefs/pref_value_map.h"
 #include "components/sync/base/pref_names.h"
 #include "components/sync/base/user_selectable_type.h"
 
@@ -36,10 +37,6 @@ SyncPrefs::SyncPrefs(PrefService* pref_service) : pref_service_(pref_service) {
       prefs::kSyncFirstSetupComplete, pref_service_,
       base::BindRepeating(&SyncPrefs::OnFirstSetupCompletePrefChange,
                           base::Unretained(this)));
-  pref_sync_requested_.Init(
-      prefs::kSyncRequested, pref_service_,
-      base::BindRepeating(&SyncPrefs::OnSyncRequestedPrefChange,
-                          base::Unretained(this)));
 
   // Cache the value of the kEnableLocalSyncBackend pref to avoid it flipping
   // during the lifetime of the service.
@@ -57,6 +54,8 @@ void SyncPrefs::RegisterProfilePrefs(PrefRegistrySimple* registry) {
   registry->RegisterBooleanPref(prefs::kSyncFirstSetupComplete, false);
   registry->RegisterBooleanPref(prefs::kSyncRequested, false);
   registry->RegisterBooleanPref(prefs::kSyncKeepEverythingSynced, true);
+  registry->RegisterBooleanPref(
+      prefs::kBookmarksAndReadingListAccountStorageOptIn, false);
   for (UserSelectableType type : UserSelectableTypeSet::All()) {
     RegisterTypeSelectedPref(registry, type);
   }
@@ -118,14 +117,12 @@ void SyncPrefs::SetSyncRequested(bool is_requested) {
   pref_service_->SetBoolean(prefs::kSyncRequested, is_requested);
 }
 
-void SyncPrefs::SetSyncRequestedIfNotSetExplicitly() {
+bool SyncPrefs::IsSyncRequestedSetExplicitly() const {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   // GetUserPrefValue() returns nullptr if there is no user-set value for this
   // pref (there might still be a non-default value, e.g. from a policy, but we
   // explicitly don't care about that here).
-  if (!pref_service_->GetUserPrefValue(prefs::kSyncRequested)) {
-    pref_service_->SetBoolean(prefs::kSyncRequested, true);
-  }
+  return pref_service_->GetUserPrefValue(prefs::kSyncRequested) != nullptr;
 }
 
 bool SyncPrefs::HasKeepEverythingSynced() const {
@@ -144,15 +141,20 @@ UserSelectableTypeSet SyncPrefs::GetSelectedTypes() const {
   for (UserSelectableType type : UserSelectableTypeSet::All()) {
     const char* pref_name = GetPrefNameForType(type);
     DCHECK(pref_name);
-    // If the preference is managed, |sync_all_types| is ignored for this
-    // preference.
+    // If the type is managed, |sync_all_types| is ignored for this type.
     if (pref_service_->GetBoolean(pref_name) ||
-        (sync_all_types && !pref_service_->IsManagedPreference(pref_name))) {
+        (sync_all_types && !IsTypeManagedByPolicy(type))) {
       selected_types.Put(type);
     }
   }
 
   return selected_types;
+}
+
+bool SyncPrefs::IsTypeManagedByPolicy(UserSelectableType type) const {
+  const char* pref_name = GetPrefNameForType(type);
+  CHECK(pref_name);
+  return pref_service_->IsManagedPreference(pref_name);
 }
 
 void SyncPrefs::SetSelectedTypes(bool keep_everything_synced,
@@ -173,6 +175,26 @@ void SyncPrefs::SetSelectedTypes(bool keep_everything_synced,
   }
 }
 
+#if BUILDFLAG(IS_IOS)
+void SyncPrefs::SetBookmarksAndReadingListAccountStorageOptIn(bool value) {
+  pref_service_->SetBoolean(prefs::kBookmarksAndReadingListAccountStorageOptIn,
+                            value);
+
+  for (SyncPrefObserver& observer : sync_pref_observers_) {
+    observer.OnPreferredDataTypesPrefChange();
+  }
+}
+
+bool SyncPrefs::IsOptedInForBookmarksAndReadingListAccountStorage() {
+  return pref_service_->GetBoolean(
+      prefs::kBookmarksAndReadingListAccountStorageOptIn);
+}
+
+void SyncPrefs::ClearBookmarksAndReadingListAccountStorageOptIn() {
+  pref_service_->ClearPref(prefs::kBookmarksAndReadingListAccountStorageOptIn);
+}
+#endif  // BUILDFLAG(IS_IOS)
+
 #if BUILDFLAG(IS_CHROMEOS_ASH)
 bool SyncPrefs::IsSyncAllOsTypesEnabled() const {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
@@ -186,14 +208,19 @@ UserSelectableOsTypeSet SyncPrefs::GetSelectedOsTypes() const {
   for (UserSelectableOsType type : UserSelectableOsTypeSet::All()) {
     const char* pref_name = GetPrefNameForOsType(type);
     DCHECK(pref_name);
-    // If the preference is managed, |sync_all_os_types| is ignored for this
-    // preference.
+    // If the type is managed, |sync_all_os_types| is ignored for this type.
     if (pref_service_->GetBoolean(pref_name) ||
-        (sync_all_os_types && !pref_service_->IsManagedPreference(pref_name))) {
+        (sync_all_os_types && !IsOsTypeManagedByPolicy(type))) {
       selected_types.Put(type);
     }
   }
   return selected_types;
+}
+
+bool SyncPrefs::IsOsTypeManagedByPolicy(UserSelectableOsType type) const {
+  const char* pref_name = GetPrefNameForOsType(type);
+  CHECK(pref_name);
+  return pref_service_->IsManagedPreference(pref_name);
 }
 
 void SyncPrefs::SetSelectedOsTypes(bool sync_all_os_types,
@@ -212,6 +239,12 @@ void SyncPrefs::SetSelectedOsTypes(bool sync_all_os_types,
 }
 
 // static
+const char* SyncPrefs::GetPrefNameForOsTypeForTesting(
+    UserSelectableOsType type) {
+  return GetPrefNameForOsType(type);
+}
+
+// static
 const char* SyncPrefs::GetPrefNameForOsType(UserSelectableOsType type) {
   switch (type) {
     case UserSelectableOsType::kOsApps:
@@ -223,6 +256,14 @@ const char* SyncPrefs::GetPrefNameForOsType(UserSelectableOsType type) {
   }
   NOTREACHED();
   return nullptr;
+}
+
+// static
+void SyncPrefs::SetOsTypeDisabledByPolicy(PrefValueMap* policy_prefs,
+                                          UserSelectableOsType type) {
+  const char* pref_name = syncer::SyncPrefs::GetPrefNameForOsType(type);
+  CHECK(pref_name);
+  policy_prefs->SetValue(pref_name, base::Value(false));
 }
 #endif  // BUILDFLAG(IS_CHROMEOS_ASH)
 
@@ -262,6 +303,11 @@ void SyncPrefs::ClearEncryptionBootstrapToken() {
 }
 
 // static
+const char* SyncPrefs::GetPrefNameForTypeForTesting(UserSelectableType type) {
+  return GetPrefNameForType(type);
+}
+
+// static
 const char* SyncPrefs::GetPrefNameForType(UserSelectableType type) {
   switch (type) {
     case UserSelectableType::kBookmarks:
@@ -295,6 +341,14 @@ const char* SyncPrefs::GetPrefNameForType(UserSelectableType type) {
   return nullptr;
 }
 
+// static
+void SyncPrefs::SetTypeDisabledByPolicy(PrefValueMap* policy_prefs,
+                                        UserSelectableType type) {
+  const char* pref_name = syncer::SyncPrefs::GetPrefNameForType(type);
+  CHECK(pref_name);
+  policy_prefs->SetValue(pref_name, base::Value(false));
+}
+
 void SyncPrefs::OnSyncManagedPrefChanged() {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   for (SyncPrefObserver& observer : sync_pref_observers_)
@@ -305,12 +359,6 @@ void SyncPrefs::OnFirstSetupCompletePrefChange() {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   for (SyncPrefObserver& observer : sync_pref_observers_)
     observer.OnFirstSetupCompletePrefChange(*pref_first_setup_complete_);
-}
-
-void SyncPrefs::OnSyncRequestedPrefChange() {
-  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-  for (SyncPrefObserver& observer : sync_pref_observers_)
-    observer.OnSyncRequestedPrefChange(*pref_sync_requested_);
 }
 
 // static
@@ -340,7 +388,8 @@ void SyncPrefs::ClearPassphrasePromptMutedProductVersion() {
 }
 
 #if BUILDFLAG(IS_ANDROID) || BUILDFLAG(IS_IOS)
-void MigrateSyncRequestedPrefPostMice(PrefService* pref_service) {
+// static
+void SyncPrefs::MigrateSyncRequestedPrefPostMice(PrefService* pref_service) {
   // Before MICe, there was a toggle in Sync settings that corresponded to the
   // SyncRequested bit. After MICe, there's no such toggle anymore, but some
   // users may still be in the legacy state where SyncRequested is false, for

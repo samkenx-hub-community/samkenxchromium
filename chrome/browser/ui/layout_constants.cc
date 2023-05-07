@@ -14,6 +14,10 @@
 #include "ui/base/ui_base_features.h"
 #include "ui/gfx/geometry/insets.h"
 
+#if BUILDFLAG(IS_CHROMEOS)
+#include "chromeos/constants/chromeos_features.h"
+#endif  // IS_CHROMEOS
+
 int GetLayoutConstant(LayoutConstant constant) {
   const bool touch_ui = ui::TouchUiController::Get()->touch_ui();
   switch (constant) {
@@ -42,7 +46,12 @@ int GetLayoutConstant(LayoutConstant constant) {
     case LOCATION_BAR_PAGE_INFO_ICON_VERTICAL_PADDING:
       return touch_ui ? 3 : 5;
     case LOCATION_BAR_LEADING_DECORATION_EDGE_PADDING:
-      return touch_ui ? 3 : 5;
+      // TODO(manukh): See comment in `LocationBarView::Layout()`. We have too
+      //   many feature permutations that would affect this and other layout
+      //   constants. So instead of spreading the permutation logic here and
+      //   elsewhere, its consolidated in `Layout()` and will be moved back here
+      //   once we decide on a permutation.
+      NOTREACHED_NORETURN();
     case LOCATION_BAR_TRAILING_DECORATION_EDGE_PADDING:
       return touch_ui ? 3 : 12;
     case LOCATION_BAR_HEIGHT:
@@ -68,6 +77,11 @@ int GetLayoutConstant(LayoutConstant constant) {
     case TAB_ALERT_INDICATOR_ICON_WIDTH:
       return touch_ui ? 12 : 16;
     case TAB_HEIGHT:
+#if BUILDFLAG(IS_CHROMEOS)
+      if (chromeos::features::IsJellyrollEnabled()) {
+        return 34 + GetLayoutConstant(TABSTRIP_TOOLBAR_OVERLAP);
+      }
+#endif  // IS_CHROMEOS
       return (touch_ui ? 41 : 34) + GetLayoutConstant(TABSTRIP_TOOLBAR_OVERLAP);
     case TAB_PRE_TITLE_PADDING:
       return 8;

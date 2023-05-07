@@ -809,8 +809,9 @@ bool LayoutObject::IsRenderedLegendInternal() const {
 }
 
 bool LayoutObject::IsListMarkerForSummary() const {
-  if (!IsListMarkerIncludingAll())
+  if (!IsListMarker()) {
     return false;
+  }
   if (const auto* summary =
           DynamicTo<HTMLSummaryElement>(Parent()->GetNode())) {
     if (!summary->IsMainSummary())
@@ -828,19 +829,7 @@ bool LayoutObject::IsListMarkerForSummary() const {
 bool LayoutObject::IsInListMarker() const {
   // List markers are either leaf nodes (legacy LayoutListMarker), or have
   // exactly one leaf child. So there's no need to traverse ancestors.
-  return Parent() && Parent()->IsListMarkerIncludingAll();
-}
-
-LayoutObject* LayoutObject::NonCulledParent() const {
-  LayoutObject* parent = Parent();
-  for (; parent; parent = parent->Parent()) {
-    if (const auto* parent_inline_box = DynamicTo<LayoutInline>(parent)) {
-      if (!parent_inline_box->AlwaysCreateLineBoxesForLayoutInline())
-        continue;
-    }
-    return parent;
-  }
-  return nullptr;
+  return Parent() && Parent()->IsListMarker();
 }
 
 LayoutObject* LayoutObject::NextInPreOrderAfterChildren() const {
@@ -1203,9 +1192,9 @@ LayoutBlockFlow* LayoutObject::FragmentItemsContainer() const {
 
 LayoutBox* LayoutObject::ContainingNGBox() const {
   NOT_DESTROYED();
-  if (RuntimeEnabledFeatures::LayoutMediaNGContainerEnabled() && Parent() &&
-      Parent()->IsMedia())
+  if (Parent() && Parent()->IsMedia()) {
     return To<LayoutBox>(Parent());
+  }
   LayoutBlock* containing_block = ContainingBlock();
   if (!containing_block)
     return nullptr;
@@ -1315,6 +1304,9 @@ static inline bool ObjectIsRelayoutBoundary(const LayoutObject* object) {
       // when `contain: strict` is explicitly set.
       if (fragment.HasAnchorQuery())
         return false;
+    } else if (RuntimeEnabledFeatures::LayoutNewSubtreeRootEnabled()) {
+      // We need a previous layout result to begin layout at a subtree root.
+      return false;
     }
 
     // A box which doesn't establish a new formating context can pass a whole
@@ -2787,12 +2779,15 @@ void LayoutObject::StyleWillChange(StyleDifference diff,
         (style_->UnresolvedFloating() != new_style.UnresolvedFloating())) {
       // For changes in float styles, we need to conceivably remove ourselves
       // from the floating objects list.
-      To<LayoutBox>(this)->RemoveFloatingOrPositionedChildFromBlockLists();
+      if (!RuntimeEnabledFeatures::
+              LayoutDisableBrokenFloatInvalidationEnabled()) {
+        To<LayoutBox>(this)->RemoveFloatingOrPositionedChildFromBlockLists();
+      }
     } else if (IsOutOfFlowPositioned() &&
                (style_->GetPosition() != new_style.GetPosition())) {
       // For changes in positioning styles, we need to conceivably remove
       // ourselves from the positioned objects list.
-      To<LayoutBox>(this)->RemoveFloatingOrPositionedChildFromBlockLists();
+      LayoutBlock::RemovePositionedObject(To<LayoutBox>(this));
     }
 
     affects_parent_block_ =
@@ -3375,13 +3370,19 @@ void LayoutObject::GetTransformFromContainer(
     const LayoutObject* container_object,
     const PhysicalOffset& offset_in_container,
     gfx::Transform& transform,
-    const PhysicalSize* size) const {
+    const PhysicalSize* size,
+    const gfx::Transform* fragment_transform) const {
   NOT_DESTROYED();
   transform.MakeIdentity();
-  PaintLayer* layer =
-      HasLayer() ? To<LayoutBoxModelObject>(this)->Layer() : nullptr;
-  if (layer && layer->Transform())
-    transform.PreConcat(layer->CurrentTransform());
+  if (fragment_transform) {
+    transform.PreConcat(*fragment_transform);
+  } else {
+    PaintLayer* layer =
+        HasLayer() ? To<LayoutBoxModelObject>(this)->Layer() : nullptr;
+    if (layer && layer->Transform()) {
+      transform.PreConcat(layer->CurrentTransform());
+    }
+  }
 
   transform.PostTranslate(offset_in_container.left.ToFloat(),
                           offset_in_container.top.ToFloat());
@@ -4685,6 +4686,14 @@ void LayoutObject::SetIsBackgroundAttachmentFixedObject(
     GetFrameView()->AddBackgroundAttachmentFixedObject(this);
   else
     GetFrameView()->RemoveBackgroundAttachmentFixedObject(this);
+}
+
+void LayoutObject::SetCanCompositeBackgroundAttachmentFixed(
+    bool can_fast_scroll) {
+  if (can_fast_scroll != bitfields_.CanCompositeBackgroundAttachmentFixed()) {
+    bitfields_.SetCanCompositeBackgroundAttachmentFixed(can_fast_scroll);
+    SetNeedsPaintPropertyUpdate();
+  }
 }
 
 PhysicalRect LayoutObject::DebugRect() const {

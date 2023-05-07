@@ -14,7 +14,6 @@
 #include "ash/accelerators/debug_commands.h"
 #include "ash/accessibility/accessibility_controller_impl.h"
 #include "ash/accessibility/ui/accessibility_confirmation_dialog.h"
-#include "ash/ambient/ambient_controller.h"
 #include "ash/app_list/app_list_metrics.h"
 #include "ash/constants/ash_features.h"
 #include "ash/constants/devicetype.h"
@@ -629,6 +628,7 @@ bool AcceleratorControllerImpl::CanPerformAction(
     case DEBUG_TOGGLE_DARK_MODE:
     case DEBUG_TOGGLE_DYNAMIC_COLOR:
     case DEBUG_TOGGLE_GLANCEABLES:
+    case DEBUG_TOGGLE_POWER_BUTTON_MENU:
     case DEBUG_TOGGLE_SHOW_DEBUG_BORDERS:
     case DEBUG_TOGGLE_SHOW_FPS_COUNTER:
     case DEBUG_TOGGLE_SHOW_PAINT_RECTS:
@@ -668,8 +668,6 @@ bool AcceleratorControllerImpl::CanPerformAction(
       return true;
     case SHOW_STYLUS_TOOLS:
       return accelerators::CanShowStylusTools();
-    case START_AMBIENT_MODE:
-      return accelerators::CanStartAmbientMode();
     case START_ASSISTANT:
       return true;
     case SWAP_PRIMARY_DISPLAY:
@@ -711,6 +709,8 @@ bool AcceleratorControllerImpl::CanPerformAction(
       return true;
     case TOGGLE_OVERVIEW:
       return accelerators::CanToggleOverview();
+    case TOGGLE_SNAP_GROUP_WINDOWS_MINIMIZE_AND_RESTORE:
+      return accelerators::CanMinimizeSnapGroupWindows();
     case TOGGLE_MULTITASK_MENU:
       return accelerators::CanToggleMultitaskMenu();
     case TOUCH_HUD_CLEAR:
@@ -896,6 +896,7 @@ void AcceleratorControllerImpl::PerformAction(
     case DEBUG_TOGGLE_DARK_MODE:
     case DEBUG_TOGGLE_DYNAMIC_COLOR:
     case DEBUG_TOGGLE_GLANCEABLES:
+    case DEBUG_TOGGLE_POWER_BUTTON_MENU:
     case DEBUG_TOGGLE_VIDEO_CONFERENCE_CAMERA_TRAY_ICON:
     case DEBUG_SYSTEM_UI_STYLE_VIEWER:
       debug::PerformDebugActionIfEnabled(action);
@@ -1163,9 +1164,6 @@ void AcceleratorControllerImpl::PerformAction(
       base::RecordAction(UserMetricsAction("Accel_Show_Task_Manager"));
       accelerators::ShowTaskManager();
       break;
-    case START_AMBIENT_MODE:
-      accelerators::ToggleAmbientMode();
-      break;
     case START_ASSISTANT:
       // TODO(longbowei): Move this to CanToggleAssistant().
       if (ShouldToggleAssistant(accelerator)) {
@@ -1281,6 +1279,11 @@ void AcceleratorControllerImpl::PerformAction(
     case TOGGLE_OVERVIEW:
       base::RecordAction(base::UserMetricsAction("Accel_Overview_F5"));
       accelerators::ToggleOverview();
+      break;
+    case TOGGLE_SNAP_GROUP_WINDOWS_MINIMIZE_AND_RESTORE:
+      base::RecordAction(base::UserMetricsAction(
+          "Accel_Toggle_Snap_Group_Windows_Minimize_Restore"));
+      accelerators::MinimizeWindowsInSnapGroup();
       break;
     case TOGGLE_RESIZE_LOCK_MENU:
       base::RecordAction(

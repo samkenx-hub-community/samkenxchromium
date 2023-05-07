@@ -379,11 +379,7 @@ int BrowsingDataRemoverBrowserTestBase::GetCookiesTreeModelCount(
   int count = 0;
   for (const auto& node : root->children()) {
     EXPECT_GE(node->children().size(), 1u);
-    count += base::ranges::count_if(node->children(), [](const auto& child) {
-      // TODO(crbug.com/1307796): Include quota nodes.
-      return child->GetDetailedInfo().node_type !=
-             CookieTreeNode::DetailedInfo::TYPE_QUOTA;
-    });
+    count += node->children().size();
   }
   return count;
 }
@@ -395,10 +391,8 @@ std::string BrowsingDataRemoverBrowserTestBase::GetCookiesTreeModelInfo(
   for (const auto& node : root->children()) {
     info << node->GetTitle() << std::endl;
     for (const auto& child : node->children()) {
-      // Quota nodes are not included in the UI due to crbug.com/642955.
       const auto node_type = child->GetDetailedInfo().node_type;
-      if (node_type != CookieTreeNode::DetailedInfo::TYPE_QUOTA)
-        info << "  " << child->GetTitle() << " " << node_type << std::endl;
+      info << "  " << child->GetTitle() << " " << node_type << std::endl;
     }
   }
   return info.str();

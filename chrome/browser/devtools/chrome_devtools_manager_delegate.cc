@@ -23,6 +23,7 @@
 #include "chrome/browser/extensions/extension_tab_util.h"
 #include "chrome/browser/lifetime/application_lifetime.h"
 #include "chrome/browser/policy/developer_tools_policy_handler.h"
+#include "chrome/browser/policy/profile_policy_connector.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/profiles/profile_manager.h"
 #include "chrome/browser/ui/browser_navigator.h"
@@ -50,7 +51,6 @@
 #include "extensions/browser/view_type_utils.h"
 #include "extensions/common/manifest.h"
 #include "extensions/common/mojom/view_type.mojom.h"
-#include "extensions/common/permissions/permissions_data.h"
 #include "ui/base/resource/resource_bundle.h"
 
 #if BUILDFLAG(IS_CHROMEOS_ASH)
@@ -91,8 +91,10 @@ bool GetExtensionInfo(content::WebContents* wc,
     *type = ChromeDevToolsManagerDelegate::kTypeApp;
     return true;
   }
-  if (extensions::GetViewType(wc) ==
-      extensions::mojom::ViewType::kExtensionPopup) {
+
+  auto view_type = extensions::GetViewType(wc);
+  if (view_type == extensions::mojom::ViewType::kExtensionPopup ||
+      view_type == extensions::mojom::ViewType::kExtensionSidePanel) {
     // Note that we are intentionally not setting name here, so that we can
     // construct a name based on the URL or page title in
     // RenderFrameDevToolsAgentHost::GetTitle()
@@ -247,16 +249,17 @@ bool ChromeDevToolsManagerDelegate::AllowInspection(
       return false;
     case Availability::kAllowed:
       return true;
-    case Availability::kDisallowedForSenstiveExtensions:
+    case Availability::kDisallowedForForceInstalledExtensions:
       if (!extension) {
         return true;
       }
       if (extensions::Manifest::IsPolicyLocation(extension->location())) {
         return false;
       }
+      // We also disallow inspecting component extensions, but only for managed
+      // profiles.
       if (extensions::Manifest::IsComponentLocation(extension->location()) &&
-          extension->permissions_data()->HasAPIPermission(
-              extensions::mojom::APIPermissionID::kManagement)) {
+          profile->GetProfilePolicyConnector()->IsManaged()) {
         return false;
       }
       return true;
@@ -278,7 +281,7 @@ bool ChromeDevToolsManagerDelegate::AllowInspection(
       return false;
     case Availability::kAllowed:
       return true;
-    case Availability::kDisallowedForSenstiveExtensions:
+    case Availability::kDisallowedForForceInstalledExtensions:
       return !web_app || !web_app->IsKioskInstalledApp();
     default:
       NOTREACHED() << "Unknown developer tools policy";

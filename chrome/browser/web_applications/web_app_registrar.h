@@ -186,6 +186,10 @@ class WebAppRegistrar : public ProfileManagerObserver {
   // Requires app registry to be in a ready state.
   int CountUserInstalledApps() const;
 
+  // Count a number of all apps which are installed by the user but not locally
+  // installed (aka installed via sync).
+  int CountUserInstalledNotLocallyInstalledApps() const;
+
   // All names are UTF8 encoded.
   std::string GetAppShortName(const AppId& app_id) const;
   std::string GetAppDescription(const AppId& app_id) const;
@@ -227,7 +231,7 @@ class WebAppRegistrar : public ProfileManagerObserver {
   // app are returned. Other entries are removed. See
   // https://github.com/WICG/manifest-incubations/blob/gh-pages/scope_extensions-explainer.md
   // for association requirements.
-  std::vector<ScopeExtensionInfo> GetValidatedScopeExtensions(
+  base::flat_set<ScopeExtensionInfo> GetValidatedScopeExtensions(
       const AppId& app_id) const;
 
   GURL GetAppManifestUrl(const AppId& app_id) const;

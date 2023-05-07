@@ -59,6 +59,18 @@ void AddMaterialTabStripColorMixer(ui::ColorProvider* provider,
       ui::SetAlpha(ui::kColorSysOnSurface, kWebUiTabStripTabSeparatorAlpha);
   mixer[kColorWebUiTabStripTabText] = {ui::kColorSysOnSurface};
 
+  // TabDivider colors.
   mixer[kColorTabDividerFrameActive] = {ui::kColorSysOnHeaderDivider};
   mixer[kColorTabDividerFrameInactive] = {ui::kColorSysOnHeaderDividerInactive};
+
+  // Tabstrip Button colors.
+  mixer[kColorNewTabButtonCRForegroundFrameActive] = {
+      ui::kColorSysOnSurfacePrimary};
+  mixer[kColorNewTabButtonCRForegroundFrameInactive] = {
+      ui::kColorSysOnSurfacePrimaryInactive};
+  mixer[kColorNewTabButtonCRBackgroundFrameActive] = {
+      ui::kColorSysHeaderContainer};
+  mixer[kColorNewTabButtonCRBackgroundFrameInactive] = {
+      ui::kColorSysHeaderContainerInactive};
+  // MISSING 2
 }

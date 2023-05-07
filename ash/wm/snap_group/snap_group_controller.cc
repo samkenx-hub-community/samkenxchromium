@@ -4,8 +4,6 @@
 
 #include "ash/wm/snap_group/snap_group_controller.h"
 
-#include <memory>
-
 #include "ash/shell.h"
 #include "ash/wm/snap_group/snap_group.h"
 #include "ash/wm/splitview/split_view_constants.h"
@@ -31,6 +29,14 @@ bool SnapGroupController::AreWindowsInSnapGroup(aura::Window* window1,
 
 bool SnapGroupController::AddSnapGroup(aura::Window* window1,
                                        aura::Window* window2) {
+  // We should only allow snap group to be created for windows that have the
+  // same parent.
+  // TODO(michelefan): Avoid showing the lock widget if given two windows are
+  // not allowed to create a snap group.
+  if (window1->parent() != window2->parent()) {
+    return false;
+  }
+
   if (window_to_snap_group_map_.find(window1) !=
           window_to_snap_group_map_.end() ||
       window_to_snap_group_map_.find(window2) !=

@@ -51,6 +51,7 @@ constexpr bool IsWallpaperTypeSyncable(WallpaperType type) {
     case WallpaperType::kThirdParty:
     case WallpaperType::kDevice:
     case WallpaperType::kOneShot:
+    case WallpaperType::kOobe:
     case WallpaperType::kCount:
       return false;
   }
@@ -274,7 +275,7 @@ class WallpaperProfileHelperImpl : public WallpaperProfileHelper {
   }
 
  private:
-  base::raw_ptr<WallpaperControllerClient> wallpaper_controller_client_ =
+  raw_ptr<WallpaperControllerClient> wallpaper_controller_client_ =
       nullptr;  // not owned
 };
 
@@ -525,6 +526,8 @@ class WallpaperPrefManagerImpl : public WallpaperPrefManager {
     if (!pref_service)
       return false;
 
+    DCHECK(IsWallpaperTypeSyncable(info.type));
+
     return SetWallpaperInfo(account_id, info, pref_service,
                             prefs::kSyncableWallpaperInfo);
   }
@@ -586,7 +589,7 @@ class WallpaperPrefManagerImpl : public WallpaperPrefManager {
     color_dict->Remove(old_info.location);
   }
 
-  PrefService* local_state_ = nullptr;
+  raw_ptr<PrefService, ExperimentalAsh> local_state_ = nullptr;
   std::unique_ptr<WallpaperProfileHelper> profile_helper_;
 
   // Cache of wallpapers for ephemeral users.

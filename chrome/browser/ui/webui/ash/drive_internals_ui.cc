@@ -997,7 +997,7 @@ class DriveInternalsWebUIHandler : public content::WebUIMessageHandler,
   }
 
   // DriveFS bulk-pinning manager.
-  base::raw_ptr<PinManager> pin_manager_ = nullptr;
+  raw_ptr<PinManager> pin_manager_ = nullptr;
 
   // The last event sent to the JavaScript side.
   int last_sent_event_id_ = -1;
@@ -1102,7 +1102,7 @@ class LogsZipper : public download::AllDownloadItemNotifier::Observer {
     base::SequencedTaskRunner::GetCurrentDefault()->DeleteSoon(FROM_HERE, this);
   }
 
-  Profile* const profile_;
+  const raw_ptr<Profile, ExperimentalAsh> profile_;
   const base::FilePath logs_directory_;
   const base::FilePath zip_path_;
 

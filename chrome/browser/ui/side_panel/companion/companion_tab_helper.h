@@ -33,6 +33,8 @@ class CompanionTabHelper
 
     // Shows the companion side panel.
     virtual void ShowCompanionSidePanel() = 0;
+    // Triggers an update of the 'open in new tab' button
+    virtual void UpdateNewTabButtonState() = 0;
   };
 
   CompanionTabHelper(const CompanionTabHelper&) = delete;
@@ -49,6 +51,7 @@ class CompanionTabHelper
       const std::string& additional_query_params_modified,
       const std::vector<uint8_t>& thumbnail_data,
       const gfx::Size& original_size,
+      const gfx::Size& downscaled_size,
       const std::string& image_extension,
       const std::string& content_type);
 
@@ -64,6 +67,13 @@ class CompanionTabHelper
   // Returns the latest image data saved to the helper and not passed to the
   // handler or an empty pointer if none.
   std::unique_ptr<side_panel::mojom::ImageQuery> GetImageQuery();
+
+  // Triggers an update for the 'open in new tab' button in the side panel
+  // header to make sure the visibility is correct.
+  void UpdateNewTabButtonState();
+  // Returns the latest set url to be used for the 'open in new tab' button in
+  // the side panel header.
+  GURL GetNewTabButtonUrl();
 
   base::WeakPtr<CompanionPageHandler> GetCompanionPageHandler();
   void SetCompanionPageHandler(

@@ -22,6 +22,9 @@ const float kContentHorizontalInset = 16.0f;
 // The top inset for the content within this container.
 const float kContentTopInset = 14.0f;
 
+// The bottom inset for the content within this container.
+const float kContentBottomInset = 10.0f;
+
 }  // namespace
 
 @implementation ActionListModule {
@@ -35,7 +38,7 @@ const float kContentTopInset = 14.0f;
     UILabel* title = [[UILabel alloc] init];
     title.text = [self titleString];
     title.font = [UIFont preferredFontForTextStyle:UIFontTextStyleFootnote];
-    title.textColor = [UIColor colorNamed:kTextSecondaryColor];
+    title.textColor = [UIColor colorNamed:kTextPrimaryColor];
     title.accessibilityTraits |= UIAccessibilityTraitHeader;
     title.accessibilityIdentifier = [self titleString];
 
@@ -55,9 +58,9 @@ const float kContentTopInset = 14.0f;
     [NSLayoutConstraint activateConstraints:@[ _contentViewWidthAnchor ]];
 
     [self addSubview:stackView];
-    NSDirectionalEdgeInsets contentInsets =
-        NSDirectionalEdgeInsetsMake(kContentTopInset, kContentHorizontalInset,
-                                    0.0, kContentHorizontalInset);
+    NSDirectionalEdgeInsets contentInsets = NSDirectionalEdgeInsetsMake(
+        kContentTopInset, kContentHorizontalInset, kContentBottomInset,
+        kContentHorizontalInset);
     AddSameConstraintsWithInsets(stackView, self, contentInsets);
   }
   return self;

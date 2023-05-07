@@ -33,7 +33,7 @@ class AmbientInfoViewTest : public AmbientAshTestBase {
 };
 
 TEST_F(AmbientInfoViewTest, ShowAmbientInfoView) {
-  ShowAmbientScreen();
+  SetAmbientShownAndWaitForWidgets();
   DisableJitter();
 
   WeatherInfo info;
@@ -41,9 +41,9 @@ TEST_F(AmbientInfoViewTest, ShowAmbientInfoView) {
   info.condition_icon_url = "https://fake-icon-url";
   info.temp_f = 70.0f;
   backend_controller()->SetWeatherInfo(info);
-  FastForwardToRefreshWeather();
+  FastForwardByWeatherRefreshInterval();
 
   EXPECT_TRUE(GetPixelDiffer()->CompareUiComponentsOnPrimaryScreen(
-      "ambient_info_view", /*revision_number=*/0, GetAmbientInfoView()));
+      "ambient_info_view", /*revision_number=*/1, GetAmbientInfoView()));
 }
 }  // namespace ash

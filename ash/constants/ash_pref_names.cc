@@ -126,6 +126,9 @@ const char kQuirksClientLastServerCheck[] = "quirks_client.last_server_check";
 const char kDeviceWiFiFastTransitionEnabled[] =
     "net.device_wifi_fast_transition_enabled";
 
+// A boolean pref indicating whether hotspot has been used before.
+const char kHasHotspotUsedBefore[] = "ash.hotspot.has_used_before";
+
 // A boolean pref that controls whether input noise cancellation is enabled.
 const char kInputNoiseCancellationEnabled[] =
     "ash.input_noise_cancellation_enabled";
@@ -155,6 +158,10 @@ const char kSamlPasswordExpirationTime[] = "saml.password_expiration_time";
 // A string pref - the URL where the user can update their password, according
 // to the SAML IdP.
 const char kSamlPasswordChangeUrl[] = "saml.password_change_url";
+
+// A dictionary pref that stores custom accelerators that overrides the default
+// system-provided accelerators.
+const char kShortcutCustomizationOverrides[] = "accelerator.overrides";
 
 // Boolean pref indicating whether the user has completed (or skipped) the
 // out-of-box experience (OOBE) sync consent screen. Before this pref is set
@@ -1030,6 +1037,11 @@ const char kTouchscreenEnabled[] = "events.touch_screen.enabled";
 // shown to the user during oobe.
 const char kShowTouchpadScrollScreenEnabled[] =
     "ash.touchpad_scroll_screen_oobe_enabled";
+
+// Boolean value indicating that the Display size screen should be
+// shown to the user during the first sign-in.
+const char kShowDisplaySizeScreenEnabled[] =
+    "ash.display_size_screen_oobe_enabled";
 
 // Integer prefs indicating the minimum and maximum lengths of the lock screen
 // pin.

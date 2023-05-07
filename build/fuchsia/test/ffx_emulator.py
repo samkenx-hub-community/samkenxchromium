@@ -13,7 +13,7 @@ import subprocess
 
 from contextlib import AbstractContextManager
 
-from common import check_ssh_config_file, find_image_in_sdk, get_system_info, \
+from common import find_image_in_sdk, get_system_info, \
                    run_ffx_command, SDK_ROOT
 from compatible_utils import get_host_arch, get_sdk_hash
 
@@ -55,7 +55,6 @@ class FfxEmulator(AbstractContextManager):
     def _start_emulator(self) -> None:
         """Start the emulator."""
         logging.info('Starting emulator %s', self._node_name)
-        check_ssh_config_file()
         emu_command = [
             'emu', 'start', self._product_bundle, '--name', self._node_name
         ]
@@ -108,16 +107,20 @@ class FfxEmulator(AbstractContextManager):
                 json.dump(ast.literal_eval(qemu_arm64_meta), f)
             emu_command.extend(['--engine', 'qemu'])
 
-        for _ in range(_EMU_COMMAND_RETRIES):
+        for i in range(_EMU_COMMAND_RETRIES):
 
             # If the ffx daemon fails to establish a connection with
             # the emulator after 85 seconds, that means the emulator
             # failed to be brought up and a retry is needed.
             # TODO(fxb/103540): Remove retry when start up issue is fixed.
             try:
-                run_ffx_command(emu_command,
-                                timeout=85,
-                                configs=['emu.start.timeout=90'])
+                # TODO(fxb/125872): Debug is added for examining flakiness.
+                configs = ['emu.start.timeout=90']
+                if i > 0:
+                    logging.warning(
+                        'Emulator failed to start. Turning on debug')
+                    configs.append('log.level=debug')
+                run_ffx_command(emu_command, timeout=85, configs=configs)
                 break
             except (subprocess.TimeoutExpired, subprocess.CalledProcessError):
                 run_ffx_command(('emu', 'stop'))

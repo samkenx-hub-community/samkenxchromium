@@ -107,6 +107,7 @@ class SyncServiceImpl : public SyncService,
   void Initialize();
 
   // SyncService implementation
+  void SetSyncFeatureRequested() override;
   SyncUserSettings* GetUserSettings() override;
   const SyncUserSettings* GetUserSettings() const override;
   DisableReasonSet GetDisableReasons() const override;
@@ -197,7 +198,6 @@ class SyncServiceImpl : public SyncService,
   // SyncPrefObserver implementation.
   void OnSyncManagedPrefChange(bool is_sync_managed) override;
   void OnFirstSetupCompletePrefChange(bool is_first_setup_complete) override;
-  void OnSyncRequestedPrefChange(bool is_sync_requested) override;
   void OnPreferredDataTypesPrefChange() override;
 
   // KeyedService implementation.  This must be called exactly
@@ -277,6 +277,8 @@ class SyncServiceImpl : public SyncService,
 
   bool UseTransportOnlyMode() const;
 
+  bool ShouldHonorBookmarksAndReadingListAccountStorageOptIn() const;
+
   // Returns the set of data types that are supported in principle, possibly
   // influenced by command-line options.
   ModelTypeSet GetRegisteredDataTypes() const;
@@ -334,6 +336,10 @@ class SyncServiceImpl : public SyncService,
 
   // Called when a SetupInProgressHandle issued by this instance is destroyed.
   void OnSetupInProgressHandleDestroyed();
+
+  // Records (or may record) histograms related to trusted vault passphrase
+  // type.
+  void MaybeRecordTrustedVaultHistograms();
 
   // This profile's SyncClient, which abstracts away non-Sync dependencies and
   // the Sync API component factory.
@@ -444,10 +450,6 @@ class SyncServiceImpl : public SyncService,
   // profiles types such as system and guest profiles, as well as sign-in and
   // lockscreen profiles on Ash.
   const bool is_regular_profile_for_uma_;
-
-  // Used in OnSyncRequestedPrefChange() to know whether the notification was
-  // caused by the service itself setting the pref.
-  bool is_setting_sync_requested_;
 
   // Used for UMA to determine whether TrustedVaultErrorShownOnStartup
   // histogram needs to recorded. Set to false iff histogram was already

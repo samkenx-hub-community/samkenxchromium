@@ -49,6 +49,7 @@ import org.robolectric.annotation.Implements;
 import org.robolectric.shadows.ShadowLog;
 import org.robolectric.shadows.ShadowLooper;
 
+import org.chromium.base.Callback;
 import org.chromium.base.ContextUtils;
 import org.chromium.base.supplier.Supplier;
 import org.chromium.chrome.R;
@@ -163,6 +164,8 @@ public class PartialCustomTabTestRule implements TestRule {
             FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT);
     FrameLayout.LayoutParams mCoordinatorLayoutParams = new FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT);
+    ViewGroup.LayoutParams mDragBarLayoutParams = new ViewGroup.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
 
     private void setUp() {
         ShadowLog.stream = System.out;
@@ -205,9 +208,11 @@ public class PartialCustomTabTestRule implements TestRule {
         when(mToolbarView.getLayoutParams()).thenReturn(mLayoutParams);
         when(mColorDrawable.getColor()).thenReturn(2);
         when(mDragBar.getBackground()).thenReturn(mDragBarBackground);
+        when(mDragBar.getLayoutParams()).thenReturn(mDragBarLayoutParams);
         when(mHandleStrategyFactory.create(anyInt(), any(Context.class), any(BooleanSupplier.class),
                      any(Supplier.class),
-                     any(PartialCustomTabHandleStrategy.DragEventCallback.class)))
+                     any(PartialCustomTabHandleStrategy.DragEventCallback.class),
+                     any(Callback.class)))
                 .thenReturn(null);
         mConfiguration.orientation = Configuration.ORIENTATION_PORTRAIT;
 

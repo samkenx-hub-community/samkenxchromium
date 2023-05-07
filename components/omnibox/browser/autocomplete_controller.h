@@ -299,16 +299,17 @@ class AutocompleteController : public AutocompleteProviderListener,
   void UpdateResult(bool regenerate_result,
                     bool force_notify_default_match_changed);
 
-  // Annotates the final set of suggestions (with open tab match, pedals,
-  // keyword info, etc.), and notifies the listeners that the result and
-  // potentially the default match has changed.
-  void AnnotateResultAndNotifyChanged(
+  // Calls `SortAndCull()`, then annotates the final set of suggestions (with
+  // open tab match, pedals, keyword info, etc.). Upon completion, notifies the
+  // listeners that the result and potentially the default match has changed.
+  void SortCullAndAnnotateResult(
       const absl::optional<AutocompleteMatch>& last_default_match,
       const std::u16string& last_default_associated_keyword,
-      bool force_notify_default_match_changed);
+      bool force_notify_default_match_changed,
+      absl::optional<AutocompleteMatch> default_match_to_preserve);
 
-  // Updates ML scoring signals of suggestions in the autocomplete result.
-  void UpdateScoringSignals();
+  // Attaches actions to matches: pedals, history clusters, tab switch, etc.
+  void AttachActions();
 
   // Updates `result` to populate each match's `associated_keyword` if that
   // match can show a keyword hint. `result` should be sorted by relevance
@@ -334,6 +335,10 @@ class AutocompleteController : public AutocompleteProviderListener,
   // Invokes `NotifyChanged()` through `notify_changed_debouncer_`.
   void DelayedNotifyChanged(bool notify_default_match);
 
+  // Cancels any pending `NotifyChanged()` invocation through
+  // `notify_changed_debouncer_`.
+  void CancelDelayedNotifyChanged();
+
   // Updates |done_| to be accurate with respect to current providers' statuses.
   void CheckIfDone();
 
@@ -346,11 +351,6 @@ class AutocompleteController : public AutocompleteProviderListener,
   // Helper function for Stop().  |due_to_user_inactivity| means this call was
   // triggered by a user's idleness, i.e., not an explicit user action.
   void StopHelper(bool clear_result, bool due_to_user_inactivity);
-
-  // Helper for UpdateKeywordDescriptions(). Returns whether curbing the keyword
-  // descriptions is enabled, and whether there is enough input to guarantee
-  // that the Omnibox is in keyword mode.
-  bool ShouldCurbKeywordDescriptions(const std::u16string& keyword);
 
   // MemoryDumpProvider:
   bool OnMemoryDump(
@@ -381,7 +381,6 @@ class AutocompleteController : public AutocompleteProviderListener,
   // highest output value, and vice versa), re-sorts and trims the matches, and
   // calls `completion_callback`.
   void OnUrlScoringModelDone(
-      AutocompleteInput input,
       const base::ElapsedTimer elapsed_timer,
       base::OnceClosure completion_callback,
       std::vector<std::tuple<absl::optional<float>, size_t, GURL>>

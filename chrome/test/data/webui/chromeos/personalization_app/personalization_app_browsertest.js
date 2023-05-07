@@ -10,7 +10,6 @@ GEN('#include "chrome/browser/ash/web_applications/personalization_app/personali
 
 GEN('#include "ash/constants/ash_features.h"');
 GEN('#include "ash/public/cpp/ambient/ambient_client.h"');
-GEN('#include "chromeos/constants/chromeos_features.h"');
 GEN('#include "content/public/test/browser_test.h"');
 
 const ROOT_PAGE = 'chrome://personalization/';
@@ -19,12 +18,19 @@ const DEFAULT_WALLPAPER_NAME = 'Default Wallpaper';
 /**
  * Wait until `func` returns a truthy value.
  * If `timeoutMs` milliseconds elapse, will reject with `message`.
- * Polls every `intervalMs` milliseconds.
+ * `message` may either be a string, or function. It will be called with the
+ * final value returned by `func`. Polls every `intervalMs` milliseconds.
  * Resolves with the final value of `func`.
  */
 async function waitUntil(func, message, intervalMs = 50, timeoutMs = 1001) {
+  const messageType = typeof message;
+  if (messageType !== 'string' && messageType !== 'function') {
+    throw new Error(
+        `message must be a string|function but received ${messageType}`);
+  }
   let rejectTimer = null;
   let pollTimer = null;
+  let value;
 
   function cleanup() {
     if (rejectTimer) {
@@ -38,11 +44,13 @@ async function waitUntil(func, message, intervalMs = 50, timeoutMs = 1001) {
   return new Promise((resolve, reject) => {
     rejectTimer = window.setTimeout(() => {
       cleanup();
-      reject(new Error(message));
+      const errorMessage =
+          messageType === 'function' ? message(value) : message;
+      reject(new Error(errorMessage));
     }, timeoutMs);
 
     pollTimer = window.setInterval(() => {
-      const value = func();
+      value = func();
       if (value) {
         cleanup();
         resolve(value);
@@ -53,6 +61,14 @@ async function waitUntil(func, message, intervalMs = 50, timeoutMs = 1001) {
 
 function getRouter() {
   return document.querySelector('personalization-router');
+}
+
+/** Returns an array of three numbers, representing the RGB values. */
+function getBodyColorChannels() {
+  return getComputedStyle(document.body)
+      .backgroundColor.match(/rgb\((\d+), (\d+), (\d+)\)/)
+      .slice(1, 4)
+      .map(x => parseInt(x, 10));
 }
 
 class PersonalizationAppBrowserTest extends testing.Test {
@@ -73,7 +89,6 @@ class PersonalizationAppBrowserTest extends testing.Test {
   get featureList() {
     return {
       enabled: [
-        'chromeos::features::kDarkLightMode',
         'ash::features::kWallpaperGooglePhotosSharedAlbums',
       ],
     };
@@ -120,15 +135,45 @@ TEST_F(PersonalizationAppBrowserTest.name, 'All', async () => {
       const theme = getRouter()
                         .shadowRoot.querySelector('personalization-main')
                         .shadowRoot.querySelector('personalization-theme');
-      await waitUntil(
+
+      const lightButton = await waitUntil(
           () => theme.shadowRoot.getElementById('lightMode'),
           'failed to find light button');
-      const lightButton = theme.shadowRoot.getElementById('lightMode');
-      assertTrue(!!lightButton);
-      assertEquals(lightButton.getAttribute('aria-pressed'), 'true');
+      assertEquals('false', lightButton.getAttribute('aria-pressed'));
       const darkButton = theme.shadowRoot.getElementById('darkMode');
       assertTrue(!!darkButton);
-      assertEquals(darkButton.getAttribute('aria-pressed'), 'false');
+      assertEquals('false', darkButton.getAttribute('aria-pressed'));
+      const autoButton = theme.shadowRoot.getElementById('autoMode');
+      assertTrue(!!autoButton);
+      assertEquals('true', autoButton.getAttribute('aria-pressed'));
+    });
+
+    test('selects dark mode', async () => {
+      const theme = getRouter()
+                        .shadowRoot.querySelector('personalization-main')
+                        .shadowRoot.querySelector('personalization-theme');
+      const darkButton = theme.shadowRoot.getElementById('darkMode');
+
+      darkButton.click();
+
+      assertEquals('true', darkButton.getAttribute('aria-pressed'));
+      await waitUntil(
+          () => getBodyColorChannels().every(channel => channel < 50),
+          'failed to switch to dark mode');
+    });
+
+    test('selects light mode', async () => {
+      const theme = getRouter()
+                        .shadowRoot.querySelector('personalization-main')
+                        .shadowRoot.querySelector('personalization-theme');
+      const lightButton = theme.shadowRoot.getElementById('lightMode');
+
+      lightButton.click();
+
+      assertEquals('true', lightButton.getAttribute('aria-pressed'));
+      await waitUntil(
+          () => getBodyColorChannels().every(channel => channel > 200),
+          'failed to switch to light mode');
     });
 
     test('shows user info', async () => {
@@ -136,11 +181,10 @@ TEST_F(PersonalizationAppBrowserTest.name, 'All', async () => {
                           .shadowRoot.querySelector('personalization-main')
                           .shadowRoot.querySelector('user-preview');
 
-      await waitUntil(
+      const email = await waitUntil(
           () => preview.shadowRoot.getElementById('email'),
           'failed to find user email');
-      assertEquals(
-          'fake-email', preview.shadowRoot.getElementById('email').innerText);
+      assertEquals('fake-email', email.innerText);
       assertEquals(
           'Fake Name', preview.shadowRoot.getElementById('name').innerText);
     });
@@ -347,11 +391,15 @@ TEST_F(PersonalizationAppWallpaperSubpageBrowserTest.name, 'All', async () => {
       assertFalse(gridItem.selected, 'wallpaper tile does not start selected');
       gridItem.click();
 
+      const expectedImageTitle =
+          'fake_attribution_fake_collection_id_2_asset_id_31_line_0';
       await waitUntil(
           () =>
               textContainer.querySelector('#imageTitle').textContent.trim() ===
-              'fake_attribution_fake_collection_id_2_asset_id_31_line_0',
-          'failed waiting for text to update after selecting wallpaper');
+              expectedImageTitle,
+          () => `failed waiting for expected image title ` +
+              `${expectedImageTitle} after selecting wallpaper. ` +
+              `html:\n${textContainer.outerHTML}`);
 
       assertEquals(
           'fake_attribution_fake_collection_id_2_asset_id_31_line_1',
@@ -458,7 +506,9 @@ TEST_F(PersonalizationAppWallpaperSubpageBrowserTest.name, 'All', async () => {
           /^Daily Refresh\: fake_google_photos_photo_id_\d$/;
       await waitUntil(
           () => dailyRefreshRegex.test(imageTitle.textContent.trim()),
-          'Daily refresh set to a google photos image');
+          () => `Expected Daily refresh text to match regex ` +
+              `${dailyRefreshRegex.source} but received:\n` +
+              `${imageTitle.outerHTML}`);
 
       assertEquals(
           null, getSharedAlbumDialog(),

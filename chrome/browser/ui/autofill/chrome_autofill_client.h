@@ -206,10 +206,6 @@ class ChromeAutofillClient : public ContentAutofillClient,
       AddressProfileSavePromptCallback callback) override;
   bool HasCreditCardScanFeature() override;
   void ScanCreditCard(CreditCardScanCallback callback) override;
-  bool IsFastCheckoutSupported(
-      const FormData& form,
-      const FormFieldData& field,
-      const AutofillManager& autofill_manager) override;
   bool IsTouchToFillCreditCardSupported() override;
   bool ShowTouchToFillCreditCard(
       base::WeakPtr<TouchToFillDelegate> delegate,
@@ -285,6 +281,11 @@ class ChromeAutofillClient : public ContentAutofillClient,
   void OnZoomChanged(
       const zoom::ZoomController::ZoomChangedEventData& data) override;
 #endif
+
+  AutofillProgressDialogControllerImpl*
+  AutofillProgressDialogControllerForTesting() {
+    return autofill_progress_dialog_controller_.get();
+  }
 
  protected:
   explicit ChromeAutofillClient(content::WebContents* web_contents);

@@ -34,11 +34,7 @@ namespace ash {
 // 5- Don't forget to update the keyboard_shortcut_viewer_metadata.cc and
 //    shortcut_viewer_strings.grdp.
 const AcceleratorData kDeprecatedAccelerators[] = {
-    {true, ui::VKEY_ESCAPE, ui::EF_SHIFT_DOWN, SHOW_TASK_MANAGER},
-
-    // Deprecated in M59.
-    {true, ui::VKEY_K, ui::EF_SHIFT_DOWN | ui::EF_ALT_DOWN,
-     TOGGLE_IME_MENU_BUBBLE}};
+    {true, ui::VKEY_ESCAPE, ui::EF_SHIFT_DOWN, SHOW_TASK_MANAGER}};
 
 const size_t kDeprecatedAcceleratorsLength = std::size(kDeprecatedAccelerators);
 
@@ -47,12 +43,7 @@ const DeprecatedAcceleratorData kDeprecatedAcceleratorsData[] = {
     // completely in M94.
     {SHOW_TASK_MANAGER, "Ash.Accelerators.Deprecated.ShowTaskManager",
      IDS_DEPRECATED_SHOW_TASK_MANAGER_MSG, IDS_SHORTCUT_TASK_MANAGER_OLD,
-     IDS_SHORTCUT_TASK_MANAGER_NEW, false},
-    // The action for the old shortcut was stopped in M92. Delete
-    // completely in M94.
-    {TOGGLE_IME_MENU_BUBBLE, "Ash.Accelerators.Deprecated.ShowImeMenuBubble",
-     IDS_DEPRECATED_SHOW_IME_BUBBLE_MSG, IDS_SHORTCUT_IME_BUBBLE_OLD,
-     IDS_SHORTCUT_IME_BUBBLE_NEW, false}};
+     IDS_SHORTCUT_TASK_MANAGER_NEW, false}};
 
 const size_t kDeprecatedAcceleratorsDataLength =
     std::size(kDeprecatedAcceleratorsData);
@@ -89,6 +80,7 @@ const AcceleratorData kDebugAcceleratorData[] = {
     {true, ui::VKEY_OEM_4, kDebugModifier, DEBUG_TUCK_FLOATED_WINDOW_LEFT},
     {true, ui::VKEY_OEM_6, kDebugModifier, DEBUG_TUCK_FLOATED_WINDOW_RIGHT},
     {true, ui::VKEY_Y, kDebugModifier, DEBUG_TOGGLE_DYNAMIC_COLOR},
+    {true, ui::VKEY_E, kDebugModifier, DEBUG_TOGGLE_POWER_BUTTON_MENU},
 };
 
 const size_t kDebugAcceleratorDataLength = std::size(kDebugAcceleratorData);
@@ -120,9 +112,6 @@ const AcceleratorData kDeveloperAcceleratorData[] = {
     {true, ui::VKEY_W, ui::EF_SHIFT_DOWN | ui::EF_ALT_DOWN, CYCLE_BACKWARD_MRU},
     {true, ui::VKEY_F, ui::EF_SHIFT_DOWN | ui::EF_CONTROL_DOWN,
      TOGGLE_FULLSCREEN},
-    // TODO(wutao): Get a shortcut for the Ambient mode.
-    {true, ui::VKEY_A, ui::EF_COMMAND_DOWN | ui::EF_CONTROL_DOWN,
-     START_AMBIENT_MODE},
     // For testing on Linux desktop where it's hard to rebind the caps lock key.
     {true, ui::VKEY_A, ui::EF_ALT_DOWN, DEV_TOGGLE_APP_LIST},
 };
@@ -179,7 +168,6 @@ const AcceleratorAction kActionsAllowedAtLoginOrLockScreen[] = {
     SCALE_UI_RESET,
     SCALE_UI_UP,
     TOGGLE_IME_MENU_BUBBLE,
-    START_AMBIENT_MODE,
     SWITCH_TO_LAST_USED_IME,
     SWITCH_TO_NEXT_IME,
     TAKE_SCREENSHOT,
@@ -257,7 +245,6 @@ const AcceleratorAction kActionsAllowedAtModalWindow[] = {
     SCALE_UI_UP,
     TOGGLE_IME_MENU_BUBBLE,
     SHOW_SHORTCUT_VIEWER,
-    START_AMBIENT_MODE,
     SUSPEND,
     SWAP_PRIMARY_DISPLAY,
     SWITCH_TO_LAST_USED_IME,
@@ -386,6 +373,7 @@ const AcceleratorAction kActionsNeedingWindow[] = {
     TOGGLE_FLOATING,
     TOGGLE_FULLSCREEN,
     TOGGLE_MAXIMIZED,
+    TOGGLE_SNAP_GROUP_WINDOWS_MINIMIZE_AND_RESTORE,
     WINDOW_CYCLE_SNAP_LEFT,
     WINDOW_CYCLE_SNAP_RIGHT,
     WINDOW_MINIMIZE,

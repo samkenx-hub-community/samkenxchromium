@@ -2625,7 +2625,6 @@ interface GPUSupportedLimits
     getter maxComputeWorkgroupsPerDimension
     getter maxDynamicStorageBuffersPerPipelineLayout
     getter maxDynamicUniformBuffersPerPipelineLayout
-    getter maxFragmentCombinedOutputResources
     getter maxInterStageShaderComponents
     getter maxInterStageShaderVariables
     getter maxSampledTexturesPerShaderStage
@@ -8904,6 +8903,9 @@ interface VirtualKeyboard : EventTarget
     setter ongeometrychange
     setter overlaysContent
 interface VirtualKeyboardGeometryChangeEvent : Event
+    attribute @@toStringTag
+    method constructor
+interface VisibilityStateEntry : PerformanceEntry
     attribute @@toStringTag
     method constructor
 interface VisualViewport : EventTarget

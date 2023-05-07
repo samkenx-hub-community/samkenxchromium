@@ -45,12 +45,6 @@ SavedTabGroupKeyedService::SavedTabGroupKeyedService(Profile* profile)
       listener_(model(), profile),
       bridge_(model(), GetStoreFactory(), CreateChangeProcessor()) {
   model()->AddObserver(this);
-
-  // Perform the necessary setup, if the model is already loaded before we start
-  // observing it. Otherwise, the model will notify us when it has loaded.
-  if (model()->is_loaded()) {
-    SavedTabGroupModelLoaded();
-  }
 }
 
 SavedTabGroupKeyedService::~SavedTabGroupKeyedService() {
@@ -64,16 +58,29 @@ syncer::OnceModelTypeStoreFactory SavedTabGroupKeyedService::GetStoreFactory() {
 }
 
 void SavedTabGroupKeyedService::StoreLocalToSavedId(
-    const base::GUID& saved_guid,
+    const base::Uuid& saved_guid,
     const tab_groups::TabGroupId local_group_id) {
-  CHECK(!model()->is_loaded());
-  saved_guid_to_local_group_id_mapping_.emplace_back(saved_guid,
-                                                     local_group_id);
+  // Avoid linking SavedTabGroups that are already open.
+  const SavedTabGroup* const group = model()->Get(saved_guid);
+  if (group && group->local_group_id().has_value()) {
+    return;
+  }
+
+  // The model could already be loaded when restoring groups from a previously
+  // crashed session / window. This means we will have to manually trigger the
+  // local to saved group linking.
+  if (model()->is_loaded()) {
+    model_.OnGroupOpenedInTabStrip(saved_guid, local_group_id);
+    ConnectLocalTabGroup(local_group_id, saved_guid);
+  } else {
+    saved_guid_to_local_group_id_mapping_.emplace_back(saved_guid,
+                                                       local_group_id);
+  }
 }
 
 void SavedTabGroupKeyedService::OpenSavedTabGroupInBrowser(
     Browser* browser,
-    const base::GUID& saved_group_guid) {
+    const base::Uuid& saved_group_guid) {
   const SavedTabGroup* saved_group = model_.Get(saved_group_guid);
 
   // In the case where this function is called after confirmation of an
@@ -110,7 +117,7 @@ void SavedTabGroupKeyedService::OpenSavedTabGroupInBrowser(
   TabStripModel* tab_strip_model_for_creation = browser->tab_strip_model();
 
   std::vector<content::WebContents*> opened_web_contents;
-  std::vector<std::pair<content::WebContents*, base::GUID>>
+  std::vector<std::pair<content::WebContents*, base::Uuid>>
       local_and_saved_tab_mapping;
   for (const SavedTabGroupTab& saved_tab : saved_group->saved_tabs()) {
     if (!saved_tab.url().is_valid()) {
@@ -189,7 +196,7 @@ void SavedTabGroupKeyedService::SaveGroup(
 
   // Build the SavedTabGroupTabs and add them to the SavedTabGroup.
   const gfx::Range tab_range = tab_group->ListTabs();
-  std::vector<std::pair<content::WebContents*, base::GUID>>
+  std::vector<std::pair<content::WebContents*, base::Uuid>>
       local_and_saved_tab_mapping;
   for (auto i = tab_range.start(); i < tab_range.end(); ++i) {
     content::WebContents* web_contents = tab_strip_model->GetWebContentsAt(i);
@@ -206,7 +213,7 @@ void SavedTabGroupKeyedService::SaveGroup(
                            /*update_tab_positions=*/true);
   }
 
-  const base::GUID saved_group_guid = saved_tab_group.saved_guid();
+  const base::Uuid saved_group_guid = saved_tab_group.saved_guid();
   model_.Add(std::move(saved_tab_group));
 
   // Link the local group to the saved group in the listener.
@@ -233,7 +240,7 @@ void SavedTabGroupKeyedService::PauseTrackingLocalTabGroup(
 }
 
 void SavedTabGroupKeyedService::ResumeTrackingLocalTabGroup(
-    const base::GUID& saved_group_guid,
+    const base::Uuid& saved_group_guid,
     const tab_groups::TabGroupId& group_id) {
   listener_.ResumeTrackingLocalTabGroup(group_id);
   model_.OnGroupOpenedInTabStrip(saved_group_guid, group_id);
@@ -250,7 +257,7 @@ void SavedTabGroupKeyedService::DisconnectLocalTabGroup(
 
 void SavedTabGroupKeyedService::ConnectLocalTabGroup(
     const tab_groups::TabGroupId& local_group_id,
-    const base::GUID& saved_guid) {
+    const base::Uuid& saved_guid) {
   const TabStripModel* tab_strip_model =
       GetTabStripModelWithTabGroupId(local_group_id);
   TabGroup* const tab_group =
@@ -262,7 +269,7 @@ void SavedTabGroupKeyedService::ConnectLocalTabGroup(
   CHECK(saved_group);
   CHECK(tab_range.length() == saved_group->saved_tabs().size());
 
-  std::vector<std::pair<content::WebContents*, base::GUID>>
+  std::vector<std::pair<content::WebContents*, base::Uuid>>
       web_contents_to_guid_mapping;
 
   for (size_t i = tab_range.start(); i < tab_range.end(); ++i) {
@@ -290,15 +297,12 @@ void SavedTabGroupKeyedService::SavedTabGroupModelLoaded() {
     ConnectLocalTabGroup(local_group_id, saved_guid);
   }
 
-  // Clear `saved_guid_to_local_group_id_mapping_` expecting that this observer
-  // function will only be called once on startup freeing unsued space.
+  // Clear `saved_guid_to_local_group_id_mapping_` to save space when finished.
   //
   // TODO(dljames): Investigate using a single use callback to connect local and
   // saved groups together. There are crashes that occur when restarting the
-  // browser before the browser process completely shuts down. This triggers the
-  // CHECK in StoreLocalToSavedId because the SavedTabGroupModel has already
-  // loaded. The callback will also remove the need of
-  // `saved_guid_to_local_group_id_mapping_`.
+  // browser before the browser process completely shuts down. The callback will
+  // also remove the need of `saved_guid_to_local_group_id_mapping_`.
   saved_guid_to_local_group_id_mapping_.clear();
   CHECK(saved_guid_to_local_group_id_mapping_.empty());
 }
@@ -314,16 +318,21 @@ void SavedTabGroupKeyedService::SavedTabGroupUpdatedFromSync(
     return;
   }
 
-  if (tab_guid.has_value()) {
-    // TODO(dljames): Update tabs in the tabstrip if the respective group is
-    // open with the updated tab metadata. Figure out if the tab should be
-    // added, removed, or updated based on the data in saved_group.
-    NOTIMPLEMENTED();
-  } else {
-    // Update the visual data of the saved group if it exists and is open in
-    // the tabstrip.
-    UpdateGroupVisualData(group_guid, saved_group->local_group_id().value());
+  // Update the local group's metadata to match the saved group's.
+  UpdateGroupVisualData(group_guid, saved_group->local_group_id().value());
+  // Update the local group's contents to match the saved group's.
+  listener_.UpdateLocalGroupFromSync(saved_group->local_group_id().value());
+}
+
+void SavedTabGroupKeyedService::SavedTabGroupRemovedFromSync(
+    const SavedTabGroup* removed_group) {
+  // Do nothing if `removed_group` is not open in the tabstrip.
+  if (!removed_group->local_group_id().has_value()) {
+    return;
   }
+
+  // Update the local group's contents to match the saved group's.
+  listener_.RemoveLocalGroupFromSync(removed_group->local_group_id().value());
 }
 
 const TabStripModel* SavedTabGroupKeyedService::GetTabStripModelWithTabGroupId(
@@ -335,7 +344,7 @@ const TabStripModel* SavedTabGroupKeyedService::GetTabStripModelWithTabGroupId(
 }
 
 void SavedTabGroupKeyedService::UpdateGroupVisualData(
-    const base::GUID saved_group_guid,
+    const base::Uuid saved_group_guid,
     const tab_groups::TabGroupId group_id) {
   TabGroup* const tab_group = SavedTabGroupUtils::GetTabGroupWithId(group_id);
   CHECK(tab_group);

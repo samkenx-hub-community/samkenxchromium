@@ -4,12 +4,12 @@
 
 #include "chrome/browser/ui/webui/ash/cloud_upload/cloud_upload_dialog.h"
 
-#include "ash/constants/ash_features.h"
 #include "base/files/file_path.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback.h"
 #include "base/logging.h"
 #include "base/metrics/histogram_macros.h"
+#include "base/notreached.h"
 #include "base/strings/escape.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/time/time.h"
@@ -17,26 +17,30 @@
 #include "chrome/browser/apps/app_service/app_service_proxy_factory.h"
 #include "chrome/browser/ash/arc/fileapi/arc_documents_provider_util.h"
 #include "chrome/browser/ash/file_manager/file_tasks.h"
+#include "chrome/browser/ash/file_manager/io_task.h"
 #include "chrome/browser/ash/file_manager/open_util.h"
 #include "chrome/browser/ash/file_manager/open_with_browser.h"
 #include "chrome/browser/ash/file_system_provider/mount_path_util.h"
 #include "chrome/browser/browser_process.h"
+#include "chrome/browser/policy/profile_policy_connector.h"
 #include "chrome/browser/ui/ash/system_web_apps/system_web_app_ui_utils.h"
+#include "chrome/browser/ui/browser_list.h"
 #include "chrome/browser/ui/browser_window.h"
 #include "chrome/browser/ui/webui/ash/cloud_upload/cloud_upload.mojom-forward.h"
 #include "chrome/browser/ui/webui/ash/cloud_upload/cloud_upload.mojom-shared.h"
 #include "chrome/browser/ui/webui/ash/cloud_upload/cloud_upload.mojom.h"
 #include "chrome/browser/ui/webui/ash/cloud_upload/cloud_upload_ui.h"
+#include "chrome/browser/ui/webui/ash/cloud_upload/cloud_upload_util.h"
 #include "chrome/browser/ui/webui/ash/cloud_upload/drive_upload_handler.h"
 #include "chrome/browser/ui/webui/ash/cloud_upload/one_drive_upload_handler.h"
 #include "chrome/browser/web_applications/web_app_id_constants.h"
 #include "chrome/common/webui_url_constants.h"
 #include "chromeos/ash/components/browser_context_helper/browser_context_helper.h"
+#include "chromeos/constants/chromeos_features.h"
 #include "components/services/app_service/public/cpp/types_util.h"
 #include "components/user_manager/user_manager.h"
 #include "extensions/browser/api/file_handlers/mime_util.h"
 #include "extensions/browser/entry_info.h"
-#include "google_apis/gaia/gaia_auth_util.h"
 #include "storage/browser/file_system/file_system_url.h"
 #include "ui/gfx/geometry/size.h"
 #include "ui/gfx/native_widget_types.h"
@@ -191,9 +195,9 @@ bool FileIsOnODFS(Profile* profile, const FileSystemURL& url) {
 }
 
 bool HasWordFile(const std::vector<storage::FileSystemURL>& file_urls) {
-  constexpr const char* kWordExtensions[] = {".doc", ".docx"};
   for (auto& url : file_urls) {
-    for (const char* extension : kWordExtensions) {
+    for (const std::string& extension :
+         file_manager::file_tasks::WordGroupExtensions()) {
       if (url.path().MatchesExtension(extension)) {
         return true;
       }
@@ -203,9 +207,9 @@ bool HasWordFile(const std::vector<storage::FileSystemURL>& file_urls) {
 }
 
 bool HasExcelFile(const std::vector<storage::FileSystemURL>& file_urls) {
-  constexpr const char* kExcelExtensions[] = {".xls", ".xlsx"};
   for (auto& url : file_urls) {
-    for (const char* extension : kExcelExtensions) {
+    for (const std::string& extension :
+         file_manager::file_tasks::ExcelGroupExtensions()) {
       if (url.path().MatchesExtension(extension)) {
         return true;
       }
@@ -215,9 +219,9 @@ bool HasExcelFile(const std::vector<storage::FileSystemURL>& file_urls) {
 }
 
 bool HasPowerPointFile(const std::vector<storage::FileSystemURL>& file_urls) {
-  constexpr const char* kPowerpointExtensions[] = {".ppt", ".pptx"};
   for (auto& url : file_urls) {
-    for (const char* extension : kPowerpointExtensions) {
+    for (const std::string& extension :
+         file_manager::file_tasks::PowerPointGroupExtensions()) {
       if (url.path().MatchesExtension(extension)) {
         return true;
       }
@@ -320,14 +324,15 @@ void CloudOpenTask::OpenODFSUrls() {
 
 void CloudOpenTask::ConfirmMoveOrStartUpload() {
   if (cloud_provider_ == CloudProvider::kGoogleDrive) {
-    if (file_manager::file_tasks::AlwaysMoveOfficeFilesToDrive(profile_)) {
+    if (file_manager::file_tasks::GetAlwaysMoveOfficeFilesToDrive(profile_)) {
       // No dialog required.
       StartUpload();
     } else {
       InitAndShowDialog(mojom::DialogPage::kMoveConfirmationGoogleDrive);
     }
   } else if (cloud_provider_ == CloudProvider::kOneDrive) {
-    if (file_manager::file_tasks::AlwaysMoveOfficeFilesToOneDrive(profile_)) {
+    if (file_manager::file_tasks::GetAlwaysMoveOfficeFilesToOneDrive(
+            profile_)) {
       // No dialog required.
       StartUpload();
     } else {
@@ -336,41 +341,18 @@ void CloudOpenTask::ConfirmMoveOrStartUpload() {
   }
 }
 
-bool IsEligibleAndEnabledUploadOfficeToCloud() {
-  user_manager::UserManager* user_manager = user_manager::UserManager::Get();
-  if (!user_manager) {
+bool IsEligibleAndEnabledUploadOfficeToCloud(Profile* profile) {
+  if (!chromeos::features::IsUploadOfficeToCloudEnabled()) {
     return false;
   }
-
-  user_manager::User* user = user_manager->GetActiveUser();
-  if (!user) {
-    return false;
-  }
-
-  // |profile_manager| can be null in unit tests, even though a user was
-  // created. If it is null, `GetBrowserContextByUser` call will cause crash.
-  auto* profile_manager = g_browser_process->profile_manager();
-  if (!profile_manager) {
-    return false;
-  }
-
-  Profile* profile = Profile::FromBrowserContext(
-      BrowserContextHelper::Get()->GetBrowserContextByUser(user));
   if (!profile) {
     return false;
   }
-
-  // Managed users, e.g. enterprise account, child account, are not eligible
-  // with the exception of Google employees. `GetUserCloudPolicyManagerAsh`
-  // returns non-nullptr if a profile is a managed account. This approach is
-  // taken in `UserTypeByDeviceTypeMetricsProvider::GetUserSegment`.
-  if (profile->GetUserCloudPolicyManagerAsh() &&
-      !gaia::IsGoogleInternalAccountEmail(
-          user->GetAccountId().GetUserEmail())) {
+  // Managed users, e.g. enterprise account, child account, are not eligible.
+  if (profile->GetProfilePolicyConnector()->IsManaged()) {
     return false;
   }
-
-  return features::IsUploadOfficeToCloudEnabled();
+  return true;
 }
 
 bool ShouldFixUpOffice(Profile* profile, const CloudProvider cloud_provider) {
@@ -601,13 +583,33 @@ mojom::DialogArgsPtr CloudOpenTask::CreateDialogArgs(
   args->dialog_page = dialog_page;
   args->first_time_setup =
       !file_manager::file_tasks::OfficeSetupComplete(profile_);
+  const file_manager::io_task::OperationType operation_type =
+      GetOperationTypeForUpload(profile_, file_urls_[0]);
+  switch (operation_type) {
+    case file_manager::io_task::OperationType::kMove:
+      args->operation_type = mojom::OperationType::kMove;
+      break;
+    case file_manager::io_task::OperationType::kCopy:
+      args->operation_type = mojom::OperationType::kCopy;
+      break;
+    case file_manager::io_task::OperationType::kDelete:
+    case file_manager::io_task::OperationType::kEmptyTrash:
+    case file_manager::io_task::OperationType::kExtract:
+    case file_manager::io_task::OperationType::kRestore:
+    case file_manager::io_task::OperationType::kRestoreToDestination:
+    case file_manager::io_task::OperationType::kTrash:
+    case file_manager::io_task::OperationType::kZip:
+      NOTREACHED() << "Unexpected upload operation type";
+      break;
+  }
   return args;
 }
 
 // Creates and shows a new dialog for the cloud upload workflow. If there are
 // local file tasks from `resulting_tasks`, include them in the dialog
 // arguments. These tasks are can be selected by the user to open the files
-// instead of using a cloud provider.
+// instead of using a cloud provider. If no modal_parent was provided, first
+// launches a new Files app window, which we listen for in OnBrowserAdded().
 void CloudOpenTask::ShowDialog(
     mojom::DialogArgsPtr args,
     const mojom::DialogPage dialog_page,
@@ -629,10 +631,14 @@ void CloudOpenTask::ShowDialog(
       dialog_page, office_move_confirmation_shown);
 
   if (!modal_parent_) {
-    // Create a files app window and use it as the modal parent.
-    file_manager::util::ShowItemInFolder(
-        profile_, file_urls_.at(0).path(),
-        base::BindOnce(&CloudOpenTask::FilesAppWindowCreated, this, dialog));
+    BrowserList::AddObserver(this);
+    DCHECK(!pending_dialog_);
+    pending_dialog_ = dialog;
+    // Create a files app window and use it as the modal parent. CloudOpenTask
+    // is kept alive by the callback passed to CloudUploadDialog above. We
+    // expect this to trigger OnBrowserAdded, which then shows the dialog.
+    file_manager::util::ShowItemInFolder(profile_, file_urls_.at(0).path(),
+                                         base::DoNothing());
   } else {
     dialog->ShowSystemDialog(modal_parent_);
   }
@@ -668,25 +674,21 @@ void CloudOpenTask::SetTaskArgs(
   }
 }
 
-void CloudOpenTask::FilesAppWindowCreated(
-    CloudUploadDialog* dialog,
-    platform_util::OpenOperationResult result) {
-  if (result != platform_util::OpenOperationResult::OPEN_SUCCEEDED) {
-    // We keep going even if we failed to launch files app. The dialog
-    // just won't be modal in this case.
-    dialog->set_modal_type(ui::MODAL_TYPE_NONE);
-    dialog->ShowSystemDialog();
+void CloudOpenTask::OnBrowserAdded(Browser* browser) {
+  // TODO(petermarshall): Add a timeout. If Files app never launches for some
+  // reason, then we will never show the dialog.
+  DCHECK(pending_dialog_);
+  if (!IsBrowserForSystemWebApp(browser, SystemWebAppType::FILE_MANAGER)) {
+    // Wait for Files app to launch.
+    LOG(WARNING) << "Browser did not match Files app";
     return;
   }
-  Browser* browser =
-      FindSystemWebAppBrowser(profile_, SystemWebAppType::FILE_MANAGER);
-  if (!browser) {
-    dialog->set_modal_type(ui::MODAL_TYPE_NONE);
-    dialog->ShowSystemDialog();
-    return;
-  }
+  BrowserList::RemoveObserver(this);
+
   modal_parent_ = browser->window()->GetNativeWindow();
-  dialog->ShowSystemDialog(modal_parent_);
+  pending_dialog_->ShowSystemDialog(modal_parent_);
+  // The dialog is deleted in `SystemWebDialogDelegate::OnDialogClosed`.
+  pending_dialog_ = nullptr;
 }
 
 // Receive user's dialog response and acts accordingly. `user_response` is
@@ -703,12 +705,24 @@ void CloudOpenTask::OnDialogComplete(const std::string& user_response) {
   // (and for StartUpload?).
   if (user_response == kUserActionConfirmOrUploadToGoogleDrive) {
     cloud_provider_ = CloudProvider::kGoogleDrive;
-    SetWordFileHandlerToFilesSWA(
-        profile_, file_manager::file_tasks::kActionIdWebDriveOfficeWord);
-    SetExcelFileHandlerToFilesSWA(
-        profile_, file_manager::file_tasks::kActionIdWebDriveOfficeExcel);
-    SetPowerPointFileHandlerToFilesSWA(
-        profile_, file_manager::file_tasks::kActionIdWebDriveOfficePowerPoint);
+
+    // Because we treat Docs/Sheets/Slides as three separate apps, only set
+    // the default handler for the types that we are dealing with.
+    // We don't currently check MIME types, which could mean we get into edge
+    // cases if the MIME type doesn't match the file extension.
+    if (HasWordFile(file_urls_)) {
+      SetWordFileHandlerToFilesSWA(
+          profile_, file_manager::file_tasks::kActionIdWebDriveOfficeWord);
+    }
+    if (HasExcelFile(file_urls_)) {
+      SetExcelFileHandlerToFilesSWA(
+          profile_, file_manager::file_tasks::kActionIdWebDriveOfficeExcel);
+    }
+    if (HasPowerPointFile(file_urls_)) {
+      SetPowerPointFileHandlerToFilesSWA(
+          profile_,
+          file_manager::file_tasks::kActionIdWebDriveOfficePowerPoint);
+    }
     SetOfficeSetupComplete(profile_);
     OpenOrMoveFiles();
   } else if (user_response == kUserActionConfirmOrUploadToOneDrive) {
@@ -881,7 +895,7 @@ CloudUploadDialog::CloudUploadDialog(mojom::DialogArgsPtr args,
 CloudUploadDialog::~CloudUploadDialog() = default;
 
 ui::ModalType CloudUploadDialog::GetDialogModalType() const {
-  return modal_type_;
+  return ui::MODAL_TYPE_WINDOW;
 }
 
 bool CloudUploadDialog::ShouldCloseDialogOnEscape() const {

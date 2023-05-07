@@ -30,11 +30,11 @@ import android.view.View;
 import android.view.ViewGroup;
 
 import androidx.annotation.Nullable;
-import androidx.test.InstrumentationRegistry;
 import androidx.test.espresso.UiController;
 import androidx.test.espresso.ViewAction;
 import androidx.test.espresso.contrib.RecyclerViewActions;
 import androidx.test.espresso.matcher.ViewMatchers;
+import androidx.test.platform.app.InstrumentationRegistry;
 import androidx.test.uiautomator.UiDevice;
 
 import org.hamcrest.Matcher;
@@ -44,6 +44,7 @@ import org.chromium.base.CommandLine;
 import org.chromium.base.NativeLibraryLoadedStatus;
 import org.chromium.base.StreamUtil;
 import org.chromium.base.library_loader.LibraryLoader;
+import org.chromium.base.test.params.ParameterProvider;
 import org.chromium.base.test.params.ParameterSet;
 import org.chromium.base.test.util.CallbackHelper;
 import org.chromium.base.test.util.CriteriaHelper;
@@ -105,11 +106,43 @@ public class StartSurfaceTestUtils {
             + "/open_ntp_instead_of_start/false/open_start_as_homepage/true";
     public static final String START_SURFACE_TEST_BASE_PARAMS =
             "force-fieldtrial-params=Study.Group:";
+
+    public static final String START_SURFACE_ON_TABLET_TEST_PARAMS =
+            "force-fieldtrial-params=Study.Group:"
+            + StartSurfaceConfiguration.START_SURFACE_RETURN_TIME_ON_TABLET_SECONDS_PARAM + "/0";
     public static List<ParameterSet> sClassParamsForStartSurfaceTest =
             Arrays.asList(new ParameterSet().value(false, false).name("NoInstant_NoReturn"),
                     new ParameterSet().value(true, false).name("Instant_NoReturn"),
                     new ParameterSet().value(false, true).name("NoInstant_Return"),
                     new ParameterSet().value(true, true).name("Instant_Return"));
+
+    /**
+     * {@link ParameterProvider} used for parameterized tests with/without "Start Surface refactor"
+     * flag enabled.
+     */
+    public static class RefactorTestParams implements ParameterProvider {
+        private static List<ParameterSet> sRefactorTestParams =
+                Arrays.asList(new ParameterSet().value(false).name("RefactorDisabled"),
+                        new ParameterSet().value(true).name("RefactorEnabled"));
+
+        @Override
+        public List<ParameterSet> getParameters() {
+            return sRefactorTestParams;
+        }
+    }
+
+    /**
+     * {@link ParameterProvider} used for tests with "Start Surface refactor" flag disabled.
+     */
+    public static class LegacyTestParams implements ParameterProvider {
+        private static List<ParameterSet> sLegacyTestParams =
+                Arrays.asList(new ParameterSet().value(false));
+
+        @Override
+        public List<ParameterSet> getParameters() {
+            return sLegacyTestParams;
+        }
+    }
 
     private static final long MAX_TIMEOUT_MS = 30000L;
 
@@ -135,7 +168,7 @@ public class StartSurfaceTestUtils {
         if (immediateReturn) {
             StartSurfaceConfiguration.START_SURFACE_RETURN_TIME_SECONDS.setForTesting(0);
             assertEquals(0, StartSurfaceConfiguration.START_SURFACE_RETURN_TIME_SECONDS.getValue());
-            assertTrue(ReturnToChromeUtil.shouldShowTabSwitcher(-1));
+            assertTrue(ReturnToChromeUtil.shouldShowTabSwitcher(-1, false));
 
             // Need to start main activity from launcher for immediate return to be effective.
             // However, need at least one tab for carousel to show, which starting main activity
@@ -146,7 +179,7 @@ public class StartSurfaceTestUtils {
             TabAttributeCache.setTitleForTesting(0, "tab title");
             startMainActivityFromLauncher(activityTestRule);
         } else {
-            assertFalse(ReturnToChromeUtil.shouldShowTabSwitcher(-1));
+            assertFalse(ReturnToChromeUtil.shouldShowTabSwitcher(-1, false));
             // Cannot use StartSurfaceTestUtils.startMainActivityFromLauncher().
             // Otherwise tab switcher could be shown immediately if single-pane is enabled.
             activityTestRule.startMainActivityOnBlankPage();
@@ -443,21 +476,6 @@ public class StartSurfaceTestUtils {
     public static void gestureNavigateBack(ChromeTabbedActivityTestRule activityTestRule) {
         GestureNavigationUtils navUtils = new GestureNavigationUtils(activityTestRule);
         navUtils.swipeFromLeftEdge();
-    }
-
-    /**
-     * Perform gesture navigate back action on the start surface to put Chrome background.
-     * @param activityTestRule The ChromeTabbedActivityTestRule under test.
-     */
-    public static void gestureNavigateBackToBringChromeBackground(
-            ChromeTabbedActivityTestRule activityTestRule) {
-        AsyncInitializationActivity.interceptMoveTaskToBackForTesting();
-        GestureNavigationUtils navUtils = new GestureNavigationUtils(activityTestRule);
-        navUtils.swipeFromLeftEdge();
-
-        // Back gesture on the start surface puts Chrome background.
-        CriteriaHelper.pollUiThread(
-                () -> AsyncInitializationActivity.wasMoveTaskToBackInterceptedForTesting());
     }
 
     /**

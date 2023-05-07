@@ -161,8 +161,20 @@ enum class PrefetchStatus {
   // prefetch.
   kPrefetchFailedIneligibleRedirect = 44,
 
+  // The prefetch was not made because prefetches exceeded the limit per
+  // page.
+  kPrefetchFailedPerPageLimitExceeded = 45,
+
+  // The prefetch needed to fetch a same-site cross-origin URL and required the
+  // use of the prefetch proxy. These prefetches are blocked since the default
+  // network context cannot be configured to use the prefetch proxy for a single
+  // prefetch request.
+  // TODO(https://crbug.com/1439986): Allow same-site cross-origin prefetches
+  // that require the prefetch proxy to be made.
+  kPrefetchNotEligibleSameSiteCrossOriginPrefetchRequiredProxy = 46,
+
   // The max value of the PrefetchStatus. Update this when new enums are added.
-  kMaxValue = kPrefetchFailedIneligibleRedirect,
+  kMaxValue = kPrefetchNotEligibleSameSiteCrossOriginPrefetchRequiredProxy,
 };
 
 }  // namespace content

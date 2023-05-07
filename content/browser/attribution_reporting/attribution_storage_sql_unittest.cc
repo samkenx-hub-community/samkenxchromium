@@ -20,6 +20,7 @@
 #include "base/functional/callback_helpers.h"
 #include "base/functional/overloaded.h"
 #include "base/memory/raw_ptr.h"
+#include "base/ranges/algorithm.h"
 #include "base/run_loop.h"
 #include "base/test/metrics/histogram_tester.h"
 #include "base/test/scoped_feature_list.h"
@@ -43,7 +44,7 @@
 #include "content/browser/attribution_reporting/test/configurable_storage_delegate.h"
 #include "net/base/schemeful_site.h"
 #include "services/network/public/cpp/features.h"
-#include "services/network/public/cpp/trigger_attestation.h"
+#include "services/network/public/cpp/trigger_verification.h"
 #include "sql/database.h"
 #include "sql/meta_table.h"
 #include "sql/statement.h"
@@ -96,6 +97,21 @@ struct AttributionAggregatableMetadataRecord {
       coordinator =
           ::aggregation_service::mojom::AggregationCoordinator::kAwsCloud;
   std::vector<Contribution> contributions;
+  absl::optional<
+      proto::AttributionCommonAggregatableMetadata_SourceRegistrationTimeConfig>
+      source_registration_time_config =
+          proto::AttributionCommonAggregatableMetadata::INCLUDE;
+};
+
+struct AttributionNullAggregatableMetadataRecord {
+  absl::optional<::aggregation_service::mojom::AggregationCoordinator>
+      coordinator =
+          ::aggregation_service::mojom::AggregationCoordinator::kAwsCloud;
+  absl::optional<int64_t> fake_source_time;
+  absl::optional<
+      proto::AttributionCommonAggregatableMetadata_SourceRegistrationTimeConfig>
+      source_registration_time_config =
+          proto::AttributionCommonAggregatableMetadata::INCLUDE;
 };
 
 std::string CreateSerializedFilterData(
@@ -138,8 +154,8 @@ std::string SerializeReportMetadata(
   proto::AttributionAggregatableMetadata msg;
 
   if (record.coordinator) {
-    msg.set_coordinator(
-        static_cast<proto::AttributionAggregatableMetadata_Coordinator>(
+    msg.mutable_common_data()->set_coordinator(
+        static_cast<proto::AttributionCommonAggregatableMetadata_Coordinator>(
             *record.coordinator));
   }
 
@@ -155,6 +171,36 @@ std::string SerializeReportMetadata(
     if (contribution.value) {
       contribution_msg->set_value(*contribution.value);
     }
+  }
+
+  if (record.source_registration_time_config) {
+    msg.mutable_common_data()->set_source_registration_time_config(
+        *record.source_registration_time_config);
+  }
+
+  std::string str;
+  bool success = msg.SerializeToString(&str);
+  CHECK(success);
+  return str;
+}
+
+std::string SerializeReportMetadata(
+    const AttributionNullAggregatableMetadataRecord& record) {
+  proto::AttributionNullAggregatableMetadata msg;
+
+  if (record.coordinator) {
+    msg.mutable_common_data()->set_coordinator(
+        static_cast<proto::AttributionCommonAggregatableMetadata_Coordinator>(
+            *record.coordinator));
+  }
+
+  if (record.fake_source_time) {
+    msg.set_fake_source_time(*record.fake_source_time);
+  }
+
+  if (record.source_registration_time_config) {
+    msg.mutable_common_data()->set_source_registration_time_config(
+        *record.source_registration_time_config);
   }
 
   std::string str;
@@ -305,11 +351,12 @@ TEST_F(AttributionStorageSqlTest,
     // [conversion_domain_idx], [impression_expiry_idx],
     // [impression_origin_idx], [sources_by_source_time],
     // [reports_by_report_time], [reports_by_source_id_report_type],
-    // [reports_by_trigger_time], [rate_limit_source_site_reporting_origin_idx],
+    // [reports_by_trigger_time], [reports_by_reporting_origin],
+    // [rate_limit_source_site_reporting_origin_idx],
     // [rate_limit_reporting_origin_idx], [rate_limit_time_idx],
     // [rate_limit_impression_id_idx], [sources_by_destination_site], and the
     // meta table index.
-    EXPECT_EQ(13u, sql::test::CountSQLIndices(&raw_db));
+    EXPECT_EQ(14u, sql::test::CountSQLIndices(&raw_db));
   }
 }
 
@@ -369,10 +416,10 @@ TEST_F(AttributionStorageSqlTest, VersionTooNew_RazesDB) {
 }
 
 TEST_F(AttributionStorageSqlTest,
-       StoreAndRetrieveReportWithAttestation_FeatureEnabled) {
+       StoreAndRetrieveReportWithVerification_FeatureEnabled) {
   base::test::ScopedFeatureList feature_list;
   feature_list.InitAndEnableFeature(
-      network::features::kAttributionReportingTriggerAttestation);
+      network::features::kAttributionReportingReportVerification);
   base::HistogramTester histograms;
 
   OpenDatabase();
@@ -383,11 +430,11 @@ TEST_F(AttributionStorageSqlTest,
                               .Build();
   storage()->StoreSource(source);
 
-  auto trigger_attestation = network::TriggerAttestation::Create(
-      /*token=*/"attestation-token", /*aggregatable_report_id=*/
+  auto trigger_verification = network::TriggerVerification::Create(
+      /*token=*/"verification-token", /*aggregatable_report_id=*/
       "55865da3-fb0e-4b71-965e-64fc4bf0a323");
   AttributionTrigger trigger = DefaultAggregatableTriggerBuilder()
-                                   .SetAttestation(trigger_attestation)
+                                   .SetVerification(trigger_verification)
                                    .Build();
   EXPECT_THAT(storage()->MaybeCreateAndStoreReport(trigger),
               AllOf(CreateReportEventLevelStatusIs(
@@ -395,30 +442,31 @@ TEST_F(AttributionStorageSqlTest,
                     CreateReportAggregatableStatusIs(
                         AttributionTrigger::AggregatableResult::kSuccess)));
   histograms.ExpectUniqueSample(
-      "Conversions.TriggerAttestation.ReportHasAttestation", true,
+      "Conversions.ReportVerification.ReportHasVerification", true,
       /*expected_bucket_count=*/1);
 
   AttributionReport aggregatable_report =
       storage()->GetAttributionReports(base::Time::Max()).at(1);
-  // Should create the report with the id from the trigger attestation.
+  // Should create the report with the id from the trigger verification.
   EXPECT_EQ(aggregatable_report.external_report_id(),
-            trigger_attestation->aggregatable_report_id());
+            trigger_verification->aggregatable_report_id());
 
-  // Should store the attestation token on the report.
+  // Should store the verification token on the report.
   const auto* data =
       absl::get_if<AttributionReport::AggregatableAttributionData>(
           &aggregatable_report.data());
-  EXPECT_EQ(data->attestation_token.value(), trigger_attestation->token());
+  EXPECT_EQ(data->common_data.verification_token.value(),
+            trigger_verification->token());
 
   CloseDatabase();
 }
 
 TEST_F(AttributionStorageSqlTest,
-       StoreAndRetrieveReportWithoutAttestation_FeatureEnabled) {
+       StoreAndRetrieveReportWithoutVerification_FeatureEnabled) {
   OpenDatabase();
   base::test::ScopedFeatureList feature_list;
   feature_list.InitAndEnableFeature(
-      network::features::kAttributionReportingTriggerAttestation);
+      network::features::kAttributionReportingReportVerification);
   base::HistogramTester histograms;
 
   StorableSource source = TestAggregatableSourceProvider()
@@ -433,7 +481,7 @@ TEST_F(AttributionStorageSqlTest,
                     CreateReportAggregatableStatusIs(
                         AttributionTrigger::AggregatableResult::kSuccess)));
   histograms.ExpectUniqueSample(
-      "Conversions.TriggerAttestation.ReportHasAttestation", false,
+      "Conversions.ReportVerification.ReportHasVerification", false,
       /*expected_bucket_count=*/1);
 
   AttributionReport aggregatable_report =
@@ -442,19 +490,19 @@ TEST_F(AttributionStorageSqlTest,
   const auto* data =
       absl::get_if<AttributionReport::AggregatableAttributionData>(
           &aggregatable_report.data());
-  EXPECT_FALSE(data->attestation_token.has_value());
+  EXPECT_FALSE(data->common_data.verification_token.has_value());
 
   CloseDatabase();
 }
 
 TEST_F(
     AttributionStorageSqlTest,
-    StoreAndRetrieveReportWithoutAttestation_FeatureDisabled_HasAttestationNotRecorded) {
+    StoreAndRetrieveReportWithoutVerification_FeatureDisabled_HasVerificationNotRecorded) {
   OpenDatabase();
 
   base::test::ScopedFeatureList feature_list;
   feature_list.InitAndDisableFeature(
-      network::features::kAttributionReportingTriggerAttestation);
+      network::features::kAttributionReportingReportVerification);
   base::HistogramTester histograms;
 
   StorableSource source = TestAggregatableSourceProvider()
@@ -469,7 +517,7 @@ TEST_F(
                     CreateReportAggregatableStatusIs(
                         AttributionTrigger::AggregatableResult::kSuccess)));
   histograms.ExpectUniqueSample(
-      "Conversions.TriggerAttestation.ReportHasAttestation", false,
+      "Conversions.ReportVerification.ReportHasVerification", false,
       /*expected_bucket_count=*/0);
 
   AttributionReport aggregatable_report =
@@ -478,8 +526,162 @@ TEST_F(
   const auto* data =
       absl::get_if<AttributionReport::AggregatableAttributionData>(
           &aggregatable_report.data());
-  EXPECT_FALSE(data->attestation_token.has_value());
+  EXPECT_FALSE(data->common_data.verification_token.has_value());
 
+  CloseDatabase();
+}
+
+TEST_F(AttributionStorageSqlTest, NullReportWithVerification_FeatureEnabled) {
+  OpenDatabase();
+
+  base::test::ScopedFeatureList feature_list;
+  feature_list.InitAndEnableFeature(
+      network::features::kAttributionReportingReportVerification);
+  base::HistogramTester histograms;
+
+  delegate()->set_null_aggregatable_reports({
+      AttributionStorageDelegate::NullAggregatableReport{
+          .fake_source_time = base::Time::Now(),
+      },
+      AttributionStorageDelegate::NullAggregatableReport{
+          .fake_source_time = base::Time::Now() - base::Days(1),
+      },
+  });
+  auto trigger_verification = network::TriggerVerification::Create(
+      /*token=*/"verification-token", /*aggregatable_report_id=*/
+      "55865da3-fb0e-4b71-965e-64fc4bf0a323");
+  AttributionTrigger trigger = DefaultAggregatableTriggerBuilder()
+                                   .SetVerification(trigger_verification)
+                                   .Build();
+  auto result = storage()->MaybeCreateAndStoreReport(trigger);
+  EXPECT_TRUE(result.min_null_aggregatable_report_time().has_value());
+
+  histograms.ExpectUniqueSample(
+      "Conversions.ReportVerification.ReportHasVerification", true,
+      /*expected_bucket_count=*/1);
+
+  auto reports = storage()->GetAttributionReports(base::Time::Max());
+  ASSERT_THAT(reports, SizeIs(2));
+  base::ranges::sort(reports, std::less<>(), &AttributionReport::id);
+
+  // Only the first report was created with the id from the trigger
+  // verification.
+  const AttributionReport& first_report = reports.front();
+  EXPECT_EQ(first_report.external_report_id(),
+            trigger_verification->aggregatable_report_id());
+  // Should store the verification token on the report.
+  const auto* data = absl::get_if<AttributionReport::NullAggregatableData>(
+      &first_report.data());
+  EXPECT_EQ(data->common_data.verification_token.value(),
+            trigger_verification->token());
+
+  // The second report was not created with the trigger verification.
+  const AttributionReport& second_report = reports.back();
+  EXPECT_EQ(second_report.external_report_id(), DefaultExternalReportID());
+  data = absl::get_if<AttributionReport::NullAggregatableData>(
+      &second_report.data());
+  EXPECT_FALSE(data->common_data.verification_token.has_value());
+  CloseDatabase();
+}
+
+TEST_F(AttributionStorageSqlTest,
+       BothRealAndNullReports_OnlyOneReportWithVerification) {
+  OpenDatabase();
+
+  StorableSource source = TestAggregatableSourceProvider().GetBuilder().Build();
+  storage()->StoreSource(source);
+
+  delegate()->set_null_aggregatable_reports({
+      AttributionStorageDelegate::NullAggregatableReport{
+          .fake_source_time = base::Time::Now(),
+      },
+  });
+  auto trigger_verification = network::TriggerVerification::Create(
+      /*token=*/"verification-token", /*aggregatable_report_id=*/
+      "55865da3-fb0e-4b71-965e-64fc4bf0a323");
+  AttributionTrigger trigger =
+      DefaultAggregatableTriggerBuilder()
+          .SetVerification(trigger_verification)
+          .Build(/*generate_event_trigger_data=*/false);
+  auto result = storage()->MaybeCreateAndStoreReport(trigger);
+
+  EXPECT_EQ(result.aggregatable_status(),
+            AttributionTrigger::AggregatableResult::kSuccess);
+  EXPECT_TRUE(result.min_null_aggregatable_report_time().has_value());
+
+  auto reports = storage()->GetAttributionReports(base::Time::Max());
+  ASSERT_THAT(reports, SizeIs(2));
+  base::ranges::sort(reports, std::less<>(), &AttributionReport::id);
+
+  // Only the first report was created with the id from the trigger
+  // verification.
+  const AttributionReport& first_report = reports.front();
+  EXPECT_EQ(first_report.external_report_id(),
+            trigger_verification->aggregatable_report_id());
+  // Should store the verification token on the report.
+  const auto* aggregatable_data =
+      absl::get_if<AttributionReport::AggregatableAttributionData>(
+          &first_report.data());
+  EXPECT_EQ(aggregatable_data->common_data.verification_token.value(),
+            trigger_verification->token());
+
+  // The second report was not created with the trigger verification.
+  const AttributionReport& second_report = reports.back();
+  EXPECT_EQ(second_report.external_report_id(), DefaultExternalReportID());
+  const auto* null_data = absl::get_if<AttributionReport::NullAggregatableData>(
+      &second_report.data());
+  EXPECT_FALSE(null_data->common_data.verification_token.has_value());
+  CloseDatabase();
+}
+
+TEST_F(AttributionStorageSqlTest,
+       BothRealAndNullReportsReverseShuffle_OnlyOneReportWithVerification) {
+  OpenDatabase();
+
+  StorableSource source = TestAggregatableSourceProvider().GetBuilder().Build();
+  storage()->StoreSource(source);
+
+  delegate()->set_null_aggregatable_reports({
+      AttributionStorageDelegate::NullAggregatableReport{
+          .fake_source_time = base::Time::Now(),
+      },
+  });
+  delegate()->set_reverse_reports_on_shuffle(true);
+  auto trigger_verification = network::TriggerVerification::Create(
+      /*token=*/"verification-token", /*aggregatable_report_id=*/
+      "55865da3-fb0e-4b71-965e-64fc4bf0a323");
+  AttributionTrigger trigger =
+      DefaultAggregatableTriggerBuilder()
+          .SetVerification(trigger_verification)
+          .Build(/*generate_event_trigger_data=*/false);
+  auto result = storage()->MaybeCreateAndStoreReport(trigger);
+
+  EXPECT_EQ(result.aggregatable_status(),
+            AttributionTrigger::AggregatableResult::kSuccess);
+  EXPECT_TRUE(result.min_null_aggregatable_report_time().has_value());
+
+  auto reports = storage()->GetAttributionReports(base::Time::Max());
+  ASSERT_THAT(reports, SizeIs(2));
+  base::ranges::sort(reports, std::less<>(), &AttributionReport::id);
+
+  // Only the first report was created with the id from the trigger
+  // verification.
+  const AttributionReport& first_report = reports.front();
+  EXPECT_EQ(first_report.external_report_id(),
+            trigger_verification->aggregatable_report_id());
+  // Should store the verification token on the report.
+  const auto* null_data = absl::get_if<AttributionReport::NullAggregatableData>(
+      &first_report.data());
+  EXPECT_EQ(null_data->common_data.verification_token.value(),
+            trigger_verification->token());
+
+  // The second report was not created with the trigger verification.
+  const AttributionReport& second_report = reports.back();
+  EXPECT_EQ(second_report.external_report_id(), DefaultExternalReportID());
+  const auto* aggregatable_data =
+      absl::get_if<AttributionReport::AggregatableAttributionData>(
+          &second_report.data());
+  EXPECT_FALSE(aggregatable_data->common_data.verification_token.has_value());
   CloseDatabase();
 }
 
@@ -730,12 +932,30 @@ TEST_F(AttributionStorageSqlTest, ClearData_KeepRateLimitData) {
 
 TEST_F(AttributionStorageSqlTest, DeleteAttributionDataByDataKey) {
   OpenDatabase();
-  storage()->StoreSource(SourceBuilder().Build());
+  storage()->StoreSource(
+      SourceBuilder()
+          .SetReportingOrigin(
+              *attribution_reporting::SuitableOrigin::Deserialize(
+                  "https://report1.test"))
+          .Build());
+
+  delegate()->set_null_aggregatable_reports(
+      {AttributionStorageDelegate::NullAggregatableReport{
+          .fake_source_time = base::Time::Now(),
+      }});
+  AttributionTrigger trigger =
+      DefaultAggregatableTriggerBuilder()
+          .SetReportingOrigin(
+              *attribution_reporting::SuitableOrigin::Deserialize(
+                  "https://report2.test"))
+          .Build();
+  storage()->MaybeCreateAndStoreReport(trigger);
 
   std::vector keys = storage()->GetAllDataKeys();
-  ASSERT_THAT(keys, SizeIs(1));
+  ASSERT_THAT(keys, SizeIs(2));
 
   storage()->DeleteByDataKey(keys[0]);
+  storage()->DeleteByDataKey(keys[1]);
 
   CloseDatabase();
 
@@ -807,7 +1027,7 @@ TEST_F(AttributionStorageSqlTest, CantOpenDb_FailsSilentlyInRelease) {
 
   // These calls should be no-ops.
   storage->StoreSource(SourceBuilder().Build());
-  EXPECT_EQ(AttributionTrigger::EventLevelResult::kNoMatchingImpressions,
+  EXPECT_EQ(AttributionTrigger::EventLevelResult::kInternalError,
             storage->MaybeCreateAndStoreReport(DefaultTrigger())
                 .event_level_status());
 }
@@ -1322,7 +1542,7 @@ TEST_F(AttributionStorageSqlTest, ReportTimes) {
     reg.aggregatable_report_window = test_case.aggregatable_report_window;
 
     storage()->StoreSource(
-        StorableSource(reporting_origin, std::move(reg), kSourceTime,
+        StorableSource(reporting_origin, std::move(reg),
                        *SuitableOrigin::Deserialize("https://source.test"),
                        attribution_reporting::mojom::SourceType::kNavigation,
                        /*is_within_fenced_frame=*/false));
@@ -1594,6 +1814,22 @@ TEST_F(AttributionStorageSqlTest,
               },
           .valid = false,
       },
+      {
+          .desc = "missing_source_registration_time_config",
+          .record =
+              AttributionAggregatableMetadataRecord{
+                  .contributions =
+                      {
+                          AttributionAggregatableMetadataRecord::Contribution{
+                              .high_bits = 1,
+                              .low_bits = 2,
+                              .value = 3,
+                          },
+                      },
+                  .source_registration_time_config = absl::nullopt,
+              },
+          .valid = false,
+      },
   };
 
   for (auto test_case : kTestCases) {
@@ -1625,6 +1861,89 @@ TEST_F(AttributionStorageSqlTest,
     if (test_case.max_budget) {
       delegate()->set_aggregatable_budget_per_source(*test_case.max_budget);
     }
+    EXPECT_THAT(
+        storage()->GetAttributionReports(/*max_report_time=*/base::Time::Max()),
+        SizeIs(test_case.valid))
+        << test_case.desc;
+    storage()->ClearData(base::Time::Min(), base::Time::Max(),
+                         base::NullCallback());
+    CloseDatabase();
+  }
+}
+
+TEST_F(AttributionStorageSqlTest,
+       InvalidNullAggregatableMetadata_FailsDeserialization) {
+  const struct {
+    const char* desc;
+    absl::variant<AttributionNullAggregatableMetadataRecord, std::string>
+        record;
+    bool valid;
+  } kTestCases[] = {
+      {
+          .desc = "invalid_proto",
+          .record = "!",
+          .valid = false,
+      },
+      {
+          .desc = "missing_fake_source_time",
+          .record = AttributionNullAggregatableMetadataRecord(),
+          .valid = false,
+      },
+      {
+          .desc = "missing_coordinator",
+          .record =
+              AttributionNullAggregatableMetadataRecord{
+                  .coordinator = absl::nullopt,
+                  .fake_source_time = 12345678900,
+              },
+          .valid = false,
+      },
+      {
+          .desc = "missing_source_registration_time_config",
+          .record =
+              AttributionNullAggregatableMetadataRecord{
+                  .fake_source_time = 12345678900,
+                  .source_registration_time_config = absl::nullopt,
+              },
+          .valid = false,
+      },
+      {
+          .desc = "valid",
+          .record =
+              AttributionNullAggregatableMetadataRecord{
+                  .fake_source_time = 12345678900,
+              },
+          .valid = true,
+      },
+  };
+
+  for (auto test_case : kTestCases) {
+    OpenDatabase();
+    // Create the tables.
+    storage()->StoreSource(SourceBuilder().Build());
+    auto sources = storage()->GetActiveSources();
+    ASSERT_THAT(sources, SizeIs(1));
+    CloseDatabase();
+
+    std::string metadata = absl::visit(
+        base::Overloaded{
+            [](const AttributionNullAggregatableMetadataRecord& record) {
+              return SerializeReportMetadata(record);
+            },
+            [](const std::string& str) { return str; },
+        },
+        test_case.record);
+
+    StoreAttributionReport(AttributionReportRecord{
+        .report_id = 1,
+        .source_id = -1,
+        .external_report_id = DefaultExternalReportID().AsLowercaseString(),
+        .report_type =
+            static_cast<int>(AttributionReport::Type::kNullAggregatable),
+        .metadata = metadata,
+    });
+
+    OpenDatabase();
     EXPECT_THAT(
         storage()->GetAttributionReports(/*max_report_time=*/base::Time::Max()),
         SizeIs(test_case.valid))

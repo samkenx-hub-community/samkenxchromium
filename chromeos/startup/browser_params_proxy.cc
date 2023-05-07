@@ -294,4 +294,12 @@ bool BrowserParamsProxy::OopVideoDecodingEnabled() const {
   return BrowserInitParams::Get()->oop_video_decoding_enabled;
 }
 
+bool BrowserParamsProxy::IsUploadOfficeToCloudEnabled() const {
+  return BrowserInitParams::Get()->is_upload_office_to_cloud_enabled;
+}
+
+bool BrowserParamsProxy::EnableClipboardHistoryRefresh() const {
+  return BrowserInitParams::Get()->enable_clipboard_history_refresh;
+}
+
 }  // namespace chromeos

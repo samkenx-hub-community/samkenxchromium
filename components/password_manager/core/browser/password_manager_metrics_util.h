@@ -496,7 +496,8 @@ enum class AddCredentialFromSettingsUserInteractions {
 };
 
 // Metrics: PasswordManager.MoveToAccountStoreTrigger.
-// This must be kept in sync with the enum in password_move_to_account_dialog.js
+// This must be kept in sync with the enum in
+// password_move_multiple_passwords_to_account_dialog.ts
 // (in chrome/browser/resources/settings/autofill_page).
 // These values are persisted to logs. Entries should not be renumbered and
 // numeric values should never be reused.
@@ -650,6 +651,18 @@ enum class PasswordManagementBubbleInteractions {
   kNoteDeleted = 11,
   kCredentialRowWithNoteClicked = 12,
   kMaxValue = kCredentialRowWithNoteClicked,
+};
+
+// These values are persisted to logs. Entries should not be renumbered and
+// numeric values should never be reused.
+enum class PasswordManagerShortcutMetric {
+  // User clicked "Add shortcut" from the UI.
+  kAddShortcutClicked = 0,
+  // Shortcut was successfully installed .
+  kShortcutInstalled = 1,
+  // User switched profile in the standalone password manager app.
+  kProfileSwitched = 2,
+  kMaxValue = kProfileSwitched,
 };
 
 std::string GetPasswordAccountStorageUsageLevelHistogramSuffix(

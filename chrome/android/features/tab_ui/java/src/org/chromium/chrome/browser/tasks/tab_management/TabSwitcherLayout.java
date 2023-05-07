@@ -4,6 +4,8 @@
 
 package org.chromium.chrome.browser.tasks.tab_management;
 
+import static org.chromium.chrome.browser.device.DeviceClassManager.GTS_ACCESSIBILITY_SUPPORT;
+
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.AnimatorSet;
@@ -106,7 +108,10 @@ public class TabSwitcherLayout extends Layout {
 
     private boolean mAndroidViewFinishedShowing;
 
-    interface PerfListener {
+    /**
+     * Notified when the animation is complete.
+     */
+    public interface PerfListener {
         void onAnimationDone(
                 int frameRendered, long elapsedMs, long maxFrameInterval, int dirtySpan);
     }
@@ -233,6 +238,15 @@ public class TabSwitcherLayout extends Layout {
 
             if (DeviceFormFactor.isNonMultiDisplayContextOnTablet(getContext())) {
                 showOverviewWithTranslateUp(shouldAnimate);
+            } else if (TabUiFeatureUtilities.isTabGroupsAndroidContinuationEnabled(getContext())
+                    && GTS_ACCESSIBILITY_SUPPORT.getValue()
+                    && ChromeAccessibilityUtil.get().isTouchExplorationEnabled()) {
+                // Intentionally disable the shrinking animation when touch exploration is enabled.
+                // During the shrinking animation, since the ComponsitorViewHolder is not focusable,
+                // Chrome is in a temporary no "valid" focus target state. This result in focus
+                // shifting to the omnibox and triggers visual jank and accessibility announcement
+                // of the URL. Disable the animation and run immediately to avoid this state.
+                showOverviewWithTabShrink(false, () -> null, true);
             } else {
                 mDeferredAnimationRunnable = () -> {
                     showOverviewWithTabShrink(shouldAnimate,
@@ -401,14 +415,6 @@ public class TabSwitcherLayout extends Layout {
         Log.d(TAG, "SkipSlowZooming = " + skipSlowZooming);
         if (skipSlowZooming) {
             showShrinkingAnimation &= quick;
-        }
-        if (TabUiFeatureUtilities.isTabGroupsAndroidContinuationEnabled(getContext())) {
-            // Intentionally disable the shrinking animation when accessibility is enabled.
-            // During the shrinking animation, since the ComponsitorViewHolder is not focusable,
-            // I think we are in a temporary no "valid" focus target state, so the focus shifts
-            // to the omnibox and triggers an accessibility announcement of the URL and a
-            // keyboard hiding event. Disable the animation to avoid this temporary state.
-            showShrinkingAnimation &= !ChromeAccessibilityUtil.get().isAccessibilityEnabled();
         }
 
         if (!showShrinkingAnimation || target.get() == null) {
@@ -631,7 +637,7 @@ public class TabSwitcherLayout extends Layout {
     }
 
     @VisibleForTesting
-    void setPerfListenerForTesting(PerfListener perfListener) {
+    public void setPerfListenerForTesting(PerfListener perfListener) {
         mPerfListenerForTesting = perfListener;
     }
 

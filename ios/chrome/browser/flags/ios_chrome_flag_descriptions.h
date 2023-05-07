@@ -13,11 +13,6 @@
 
 namespace flag_descriptions {
 
-// Title and description for the flag to enable kAdaptiveSuggestionsCount flag
-// on iOS.
-extern const char kAdaptiveSuggestionsCountName[];
-extern const char kAdaptiveSuggestionsCountDescription[];
-
 // Title and description for the flag to enable add to home screen button in
 // share menu.
 extern const char kAddToHomeScreenName[];
@@ -181,15 +176,6 @@ extern const char kEnablePopoutOmniboxIpadDescription[];
 extern const char kEnableUIButtonConfigurationName[];
 extern const char kEnableUIButtonConfigurationDescription[];
 
-// Title and description for the flag to enable long press surrounding text.
-extern const char kLongPressSurroundingTextName[];
-extern const char kLongPressSurroundingTextDescription[];
-
-// Title and description for the flag to enable experience kit maps location and
-// directions.
-extern const char kMapsExperienceKitName[];
-extern const char kMapsExperienceKitDescription[];
-
 // Title and description for the flag to enable the Credential
 // Provider Extension promo.
 extern const char kCredentialProviderExtensionPromoName[];
@@ -215,6 +201,10 @@ extern const char kDefaultBrowserIntentsShowSettingsDescription[];
 // promos to be added to the promo manager.
 extern const char kDefaultBrowserRefactoringPromoManagerName[];
 extern const char kDefaultBrowserRefactoringPromoManagerDescription[];
+
+// Title and description for the flag to enable the default browser video promo.
+extern const char kDefaultBrowserVideoPromoName[];
+extern const char kDefaultBrowserVideoPromoDescription[];
 
 // Title and description for the flag to control if a crash report is generated
 // on main thread freeze.
@@ -281,10 +271,6 @@ extern const char kEnableFollowIPHExpParamsDescription[];
 // reload when opening.
 extern const char kEnableFollowManagementInstantReloadName[];
 extern const char kEnableFollowManagementInstantReloadDescription[];
-
-// Title and description for the flag to enable DMToken deletion.
-extern const char kDmTokenDeletionName[];
-extern const char kDmTokenDeletionDescription[];
 
 // Title and description for the flag to enable kEditPasswordsInSettings flag on
 // iOS.
@@ -428,6 +414,10 @@ extern const char kFullscreenPromosManagerSkipInternalLimitsDescription[];
 extern const char kFullscreenSmoothScrollingName[];
 extern const char kFullscreenSmoothScrollingDescription[];
 
+// Title and description for the flag to enable history-sync opt-in.
+extern const char kHistorySyncOptInName[];
+extern const char kHistorySyncOptInDescription[];
+
 // Title and description for the flag to enable HTTPS-Only Mode setting.
 extern const char kHttpsOnlyModeName[];
 extern const char kHttpsOnlyModeDescription[];
@@ -463,6 +453,14 @@ extern const char kIOSCustomBrowserEditMenuDescription[];
 // Title and description for the flag to enable partial translate.
 extern const char kIOSEditMenuPartialTranslateName[];
 extern const char kIOSEditMenuPartialTranslateDescription[];
+
+// Title and description for the flag to enable Search With edit menu entry.
+extern const char kIOSEditMenuSearchWithName[];
+extern const char kIOSEditMenuSearchWithDescription[];
+
+// Title and description for the flag to hide Search Web edit menu entry.
+extern const char kIOSEditMenuHideSearchWebName[];
+extern const char kIOSEditMenuHideSearchWebDescription[];
 
 // Title and description for the flag to enable force translate when language
 // detection failed.
@@ -511,11 +509,6 @@ extern const char kIOSSharedHighlightingAmpDescription[];
 // the text fragments UI.
 extern const char kIOSSharedHighlightingV2Name[];
 extern const char kIOSSharedHighlightingV2Description[];
-
-// Title and description for the flag that modifies the save password infobar
-// to show whether the save happens to an account or only to the current device.
-extern const char kIOSShowPasswordStorageInSaveInfobarName[];
-extern const char kIOSShowPasswordStorageInSaveInfobarDescription[];
 
 // Title and description for the flag to lock the bottom toolbar into place.
 extern const char kLockBottomToolbarName[];
@@ -717,19 +710,10 @@ extern const char kDownloadServiceForegroundSessionDescription[];
 extern const char kOptimizationGuidePushNotificationClientName[];
 extern const char kOptimizationGuidePushNotificationClientDescription[];
 
-// Title and description for the flag to enable TFLite model downloading.
-extern const char kOptimizationGuideModelDownloadingName[];
-extern const char kOptimizationGuideModelDownloadingDescription[];
-
 // Title and description for the flag to enable one tap experience for maps
 // experience kit.
 extern const char kOneTapForMapsName[];
 extern const char kOneTapForMapsDescription[];
-
-// Title and description for the flag to enable the prediction of optimization
-// targets.
-extern const char kOptimizationTargetPredictionDescription[];
-extern const char kOptimizationTargetPredictionName[];
 
 // Title and description for the flag to enable adding notes to password in
 // settings.
@@ -809,11 +793,6 @@ extern const char kShowAutofillTypePredictionsDescription[];
 extern const char kShowInactiveTabsCountName[];
 extern const char kShowInactiveTabsCountDescription[];
 
-// Title and description for the flag to enable smart sorting the new overflow
-// menu.
-extern const char kSmartSortingNewOverflowMenuName[];
-extern const char kSmartSortingNewOverflowMenuDescription[];
-
 // Title and description for the flag to add the Price Tracking destination
 // (with Smart Sorting) to the new overflow menu.
 extern const char kSmartSortingPriceTrackingDestinationName[];
@@ -873,11 +852,6 @@ extern const char kTFLiteLanguageDetectionIgnoreDescription[];
 extern const char kToolbarContainerName[];
 extern const char kToolbarContainerDescription[];
 
-// Title and description for the flag to enable using Lens to search for an
-// image from the long press context menu.
-extern const char kUseLensToSearchForImageName[];
-extern const char kUseLensToSearchForImageDescription[];
-
 // Title and description for the flag to enable using Lens to search using
 // the device camera from the home screen widget.
 extern const char kEnableLensInHomeScreenWidgetName[];
@@ -915,6 +889,11 @@ extern const char kSFSymbolsFollowUpDescription[];
 // Title and description for the flag to sort the tab by recency in the TabGrid.
 extern const char kTabGridRecencySortName[];
 extern const char kTabGridRecencySortDescription[];
+
+// Title and description for the flag to enable the new transitions in the
+// TabGrid.
+extern const char kTabGridNewTransitionsName[];
+extern const char kTabGridNewTransitionsDescription[];
 
 // Title and description for the flag to determine tab inactivity in the
 // TabGrid.

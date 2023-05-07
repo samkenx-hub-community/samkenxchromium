@@ -261,9 +261,6 @@ ImmersiveModeController::~ImmersiveModeController() {
   if (@available(macOS 11.0, *)) {
     browser_window_.titlebarSeparatorStyle = NSTitlebarSeparatorStyleAutomatic;
   }
-
-  // Move sub-widgets back to the browser widget.
-  ReparentChildWindows(overlay_window_, browser_window_);
 }
 
 void ImmersiveModeController::Enable() {
@@ -288,10 +285,6 @@ void ImmersiveModeController::Enable() {
       constraintEqualToAnchor:overlay_content_view_.superview.centerYAnchor]
       .active = YES;
 
-  // Watch for child windows. When they are added the overlay view will be
-  // revealed as appropriate.
-  ObserveChildWindows(overlay_window_);
-
   thin_titlebar_view_controller_.get().hidden = YES;
   [browser_window_
       addTitlebarAccessoryViewController:thin_titlebar_view_controller_];
@@ -305,10 +298,19 @@ void ImmersiveModeController::FullscreenTransitionCompleted() {
   fullscreen_transition_complete_ = true;
   UpdateToolbarVisibility(last_used_style_);
 
-  // Move sub-widgets from the browser widget to the overlay widget so that
-  // they are rendered above the toolbar. Do this after the fullscreen
-  // transition is complete.
-  ReparentChildWindows(browser_window_, overlay_window_);
+  //  Establish reveal locks for windows that exist before entering fullscreen,
+  //  such as permission popups and the find bar. Do this after the fullscreen
+  //  transition has ended to avoid graphical flashes during the animation.
+  for (NSWindow* child in overlay_window_.childWindows) {
+    if (!ShouldObserveChildWindow(child)) {
+      continue;
+    }
+    OnChildWindowAdded(child);
+  }
+
+  // Watch for child windows. When they are added the overlay view will be
+  // revealed as appropriate.
+  ObserveChildWindows(overlay_window_);
 }
 
 void ImmersiveModeController::OnTopViewBoundsChanged(const gfx::Rect& bounds) {
@@ -419,6 +421,10 @@ void ImmersiveModeController::StopObservingChildWindows(NSWindow* window) {
   widget_window.childWindowRemovedHandler = nil;
 }
 
+bool ImmersiveModeController::ShouldObserveChildWindow(NSWindow* child) {
+  return true;
+}
+
 void ImmersiveModeController::OnChildWindowAdded(NSWindow* child) {
   // When windows are re-ordered they get removed and re-added triggering
   // OnChildWindowRemoved and OnChildWindowAdded calls.
@@ -435,20 +441,6 @@ void ImmersiveModeController::OnChildWindowRemoved(NSWindow* child) {
   if (base::Contains(window_lock_received_, child)) {
     window_lock_received_.erase(child);
     RevealUnlock();
-  }
-}
-
-void ImmersiveModeController::ReparentChildWindows(NSWindow* source,
-                                                   NSWindow* target) {
-  NativeWidgetNSWindowBridge* source_bridge =
-      NativeWidgetNSWindowBridge::GetFromNativeWindow(source);
-  NativeWidgetNSWindowBridge* target_bridge =
-      NativeWidgetNSWindowBridge::GetFromNativeWindow(target);
-
-  // TODO(kerenzhu): DCHECK(source_bridge && target_bridge)
-  // Only in unittests the associated bridges might not exist.
-  if (source_bridge && target_bridge) {
-    source_bridge->MoveChildrenTo(target_bridge, /*anchored_only=*/true);
   }
 }
 
@@ -485,11 +477,15 @@ void ImmersiveModeController::ImmersiveModeViewWillMoveToWindow(
     window.delegate = immersive_mode_mapper_.get();
 
     // Attach overlay_widget to NSToolbarFullScreen so that children are placed
-    // on top of the toolbar. When exitting fullscreeen, we don't re-parent the
+    // on top of the toolbar. When exiting fullscreen, we don't re-parent the
     // overlay window back to the browser window because it seems to trigger
-    // re-entrancy in AppKit and cause crash.  This is safe because sub-widgets
+    // re-entrancy in AppKit and cause crash. This is safe because sub-widgets
     // will be re-parented to the browser window and therefore the overlay
     // window won't have any observable effect.
+    // Also, explicitly remove the overlay window from the browser window.
+    // Leaving a dangling reference to the overlay window on the browser window
+    // causes odd behavior.
+    [browser_window_ removeChildWindow:overlay_window()];
     [window addChildWindow:overlay_window() ordered:NSWindowAbove];
 
     NSView* view = GetNSTitlebarContainerViewFromWindow(window);
@@ -504,35 +500,47 @@ void ImmersiveModeController::ImmersiveModeViewWillMoveToWindow(
 }
 
 void ImmersiveModeController::OnTitlebarFrameDidChange(NSRect frame) {
-  // Find the overlay view's point on screen (bottom left).
-  NSPoint point_in_window = [overlay_content_view_ convertPoint:NSZeroPoint
-                                                         toView:nil];
+  LayoutWindowWithAnchorView(overlay_window_, overlay_content_view_);
+}
+
+bool ImmersiveModeController::IsTabbed() {
+  return false;
+}
+
+void ImmersiveModeController::LayoutWindowWithAnchorView(NSWindow* window,
+                                                         NSView* anchor_view) {
+  // Find the anchor view's point on screen (bottom left).
+  NSPoint point_in_window = [anchor_view convertPoint:NSZeroPoint toView:nil];
   NSPoint point_on_screen =
-      [overlay_content_view_.window convertPointToScreen:point_in_window];
+      [anchor_view.window convertPointToScreen:point_in_window];
 
   // This branch is only useful on macOS 11 and greater. macOS 10.15 and
   // earlier move the window instead of clipping the view within the window.
   // This allows the overlay window to appropriately track the overlay view.
   if (@available(macOS 11.0, *)) {
-    // If the overlay view is clipped move the overlay window off screen. A
-    // clipped overlay view indicates the titlebar is hidden or is in
-    // transition AND the browser content view takes up the whole window
+    // If the anchor view is clipped move the window off screen. A clipped
+    // anchor view indicates the titlebar is hidden or is in transition AND the
+    // browser content view takes up the whole window
     // ("Always Show Toolbar in Full Screen" is disabled). When we are in this
-    // state we don't want the overlay window on screen, otherwise it may mask
-    // input to the browser view. In all other cases will not enter this
-    // branch and the overlay window will be placed at the same coordinates as
-    // the overlay view.
-    if (overlay_content_view_.visibleRect.size.height !=
-        overlay_content_view_.frame.size.height) {
-      point_on_screen.y = -overlay_content_view_.frame.size.height;
+    // state we don't want the window on screen, otherwise it may mask input to
+    // the browser view. In all other cases will not enter this branch and the
+    // window will be placed at the same coordinates as the anchor view.
+    // If the toolbar is hidden (mojom::ToolbarVisibilityStyle::kNone) also move
+    // the window offscreen.
+    if (anchor_view.visibleRect.size.height != anchor_view.frame.size.height ||
+        last_used_style_ == mojom::ToolbarVisibilityStyle::kNone) {
+      // Move the window off the top of the screen.
+      point_on_screen.y = browser_window_.screen.frame.size.height;
+
+      // Make sure to make it past the safe area insets, otherwise some portion
+      // of the window may still be displayed.
+      if (@available(macOS 12.0, *)) {
+        point_on_screen.y += browser_window_.screen.safeAreaInsets.top;
+      }
     }
   }
 
-  [overlay_window_ setFrameOrigin:point_on_screen];
-}
-
-bool ImmersiveModeController::IsTabbed() {
-  return false;
+  [window setFrameOrigin:point_on_screen];
 }
 
 }  // namespace remote_cocoa

@@ -53,6 +53,7 @@ NSString* const kSettingsHandoffCellId = @"kSettingsHandoffCellId";
 NSString* const kSettingsCookiesCellId = @"kSettingsCookiesCellId";
 NSString* const kSettingsDefaultSiteModeCellId =
     @"kSettingsDefaultSiteModeCellId";
+NSString* const kSettingsWebInspectorCellId = @"kSettingsWebInspectorCellId";
 NSString* const kDefaultBrowserSettingsTableViewId =
     @"kDefaultBrowserSettingsTableViewId";
 NSString* const kSettingsHttpsOnlyModeCellId = @"kSettingsHttpsOnlyModeCellId";
@@ -60,8 +61,7 @@ NSString* const kSettingsIncognitoInterstitialId =
     @"kSettingsIncognitoInterstitialId";
 NSString* const kSettingsIncognitoInterstitialDisabledId =
     @"kSettingsIncognitoInterstitialDisabledId";
-NSString* const kSettingsPriceNotificationsId =
-    @"kSettingsPriceNotificationsId";
+NSString* const kSettingsNotificationsId = @"kSettingsNotificationsId";
 NSString* const kSettingsTabsCellId = @"kSettingsTabsCellId";
 NSString* const kSettingsMoveInactiveTabsCellId =
     @"kSettingsMoveInactiveTabsCellId";

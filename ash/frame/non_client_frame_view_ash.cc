@@ -11,7 +11,6 @@
 #include "ash/public/cpp/tablet_mode_observer.h"
 #include "ash/public/cpp/window_properties.h"
 #include "ash/shell.h"
-#include "ash/shell_delegate.h"
 #include "ash/wm/overview/overview_controller.h"
 #include "ash/wm/splitview/split_view_controller.h"
 #include "ash/wm/tablet_mode/tablet_mode_controller.h"
@@ -19,15 +18,14 @@
 #include "ash/wm/window_state_observer.h"
 #include "ash/wm/window_util.h"
 #include "base/functional/bind.h"
+#include "base/memory/raw_ptr.h"
 #include "chromeos/ui/base/window_properties.h"
 #include "chromeos/ui/frame/caption_buttons/frame_caption_button_container_view.h"
-#include "chromeos/ui/frame/caption_buttons/frame_size_button.h"
 #include "chromeos/ui/frame/default_frame_header.h"
 #include "chromeos/ui/frame/frame_utils.h"
 #include "chromeos/ui/frame/header_view.h"
 #include "chromeos/ui/frame/immersive/immersive_fullscreen_controller.h"
 #include "chromeos/ui/frame/non_client_frame_view_base.h"
-#include "chromeos/ui/wm/features.h"
 #include "ui/aura/client/aura_constants.h"
 #include "ui/aura/window.h"
 #include "ui/aura/window_observer.h"
@@ -147,8 +145,8 @@ class NonClientFrameViewAshImmersiveHelper : public WindowStateObserver,
     }
   }
 
-  views::Widget* widget_;
-  WindowState* window_state_;
+  raw_ptr<views::Widget, ExperimentalAsh> widget_;
+  raw_ptr<WindowState, ExperimentalAsh> window_state_;
   std::unique_ptr<ImmersiveFullscreenController>
       immersive_fullscreen_controller_;
 };
@@ -179,13 +177,6 @@ NonClientFrameViewAsh::NonClientFrameViewAsh(views::Widget* frame)
 
   header_view_->set_context_menu_controller(
       frame_context_menu_controller_.get());
-
-  auto* size_button = header_view_->caption_button_container()->size_button();
-  if (chromeos::wm::features::IsWindowLayoutMenuEnabled() && size_button) {
-    size_button->SetFeedbackButtonCallback(
-        base::BindRepeating(&NonClientFrameViewAsh::ShowFeedbackPageForMenu,
-                            weak_factory_.GetWeakPtr()));
-  }
 }
 
 NonClientFrameViewAsh::~NonClientFrameViewAsh() = default;
@@ -322,12 +313,6 @@ void NonClientFrameViewAsh::UpdateDefaultFrameColors() {
 
   frame_window->SetProperty(kFrameActiveColorKey, dialog_title_bar_color);
   frame_window->SetProperty(kFrameInactiveColorKey, dialog_title_bar_color);
-}
-
-void NonClientFrameViewAsh::ShowFeedbackPageForMenu() {
-  Shell::Get()->shell_delegate()->OpenFeedbackDialog(
-      ShellDelegate::FeedbackSource::kWindowLayoutMenu,
-      /*description_template=*/"#WindowLayoutMenu");
 }
 
 BEGIN_METADATA(NonClientFrameViewAsh, views::NonClientFrameView)

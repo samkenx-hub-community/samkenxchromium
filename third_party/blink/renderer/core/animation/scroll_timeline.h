@@ -79,6 +79,16 @@ class CORE_EXPORT ScrollTimeline : public AnimationTimeline,
   AnimationTimeDelta CalculateIntrinsicIterationDuration(
       const Animation*,
       const Timing&) override;
+
+  // TODO(kevers): Support range start and end for scroll-timelines that are not
+  // view timelines.
+  AnimationTimeDelta CalculateIntrinsicIterationDuration(
+      const absl::optional<TimelineOffset>& rangeStart,
+      const absl::optional<TimelineOffset>& rangeEnd,
+      const Timing& timing) override {
+    return CalculateIntrinsicIterationDuration(nullptr, timing);
+  }
+
   AnimationTimeDelta ZeroTime() override { return AnimationTimeDelta(); }
 
   void ServiceAnimations(TimingUpdateReason) override;
@@ -101,6 +111,8 @@ class CORE_EXPORT ScrollTimeline : public AnimationTimeline,
   // Return the latest resolved scroll offsets. This will be empty when
   // timeline is inactive.
   absl::optional<ScrollOffsets> GetResolvedScrollOffsets() const;
+
+  float GetResolvedZoom() const { return timeline_state_snapshotted_.zoom; }
 
   bool Matches(TimelineAttachment,
                ReferenceType,
@@ -186,10 +198,12 @@ class CORE_EXPORT ScrollTimeline : public AnimationTimeline,
     TimelinePhase phase = TimelinePhase::kInactive;
     absl::optional<base::TimeDelta> current_time;
     absl::optional<ScrollOffsets> scroll_offsets;
+    // Zoom factor applied to the scroll offsets.
+    float zoom = 1.0f;
 
     bool operator==(const TimelineState& other) const {
       return phase == other.phase && current_time == other.current_time &&
-             scroll_offsets == other.scroll_offsets;
+             scroll_offsets == other.scroll_offsets && zoom == other.zoom;
     }
   };
 

@@ -51,7 +51,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Login.ArcContinueBootImpulseStatus"
-    enum="ArcContinueBootImpulseStatus" expires_after="2023-08-20">
+    enum="ArcContinueBootImpulseStatus" expires_after="2023-10-22">
   <owner>vsomani@google.com</owner>
   <owner>arc-core@google.com</owner>
   <summary>
@@ -123,7 +123,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Login.CryptohomeRecoveryResult"
-    enum="CryptohomeRecoveryResult" expires_after="2023-08-18">
+    enum="CryptohomeRecoveryResult" expires_after="2023-10-22">
   <owner>yunkez@google.com</owner>
   <owner>cros-lurs@google.com</owner>
   <summary>
@@ -143,6 +143,17 @@ chromium-metrics-reviews@google.com.
     sign in. Chrome needs to be restarted if the device owner set of flags is
     different from the user flags. Which means that there is a flag difference
     which led to this restart. This difference is reported by this metric.
+  </summary>
+</histogram>
+
+<histogram name="Login.DevicePolicyState" enum="DevicePoliciesState"
+    expires_after="2024-04-10">
+  <owner>igorcov@chromium.org</owner>
+  <owner>chromeos-commercial-remote-management@chromium.org</owner>
+  <summary>
+    Reports the device ownership, the state of the device policy and the state
+    of the owner key. Logged only for the devices that have ownership taken as
+    per install attributes. Is logged at every device policy load.
   </summary>
 </histogram>
 
@@ -176,7 +187,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Login.InvalidCombinationsOfAllowedUsersPolicies"
-    enum="AllowedUsersPoliciesInvalidState" expires_after="2023-04-17">
+    enum="AllowedUsersPoliciesInvalidState" expires_after="2023-10-17">
   <owner>emaamari@google.com</owner>
   <owner>src/chromeos/ash/components/policy/OWNERS</owner>
   <summary>
@@ -214,7 +225,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Login.NumberOfUsersOnLoginScreen" units="units"
-    expires_after="2023-08-20">
+    expires_after="2023-10-22">
   <owner>mslus@chromium.org</owner>
   <owner>chromeos-commercial-identity@google.com</owner>
   <summary>
@@ -225,7 +236,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Login.OfflineLoginWithHiddenUserPods"
-    enum="ChromeOSHiddenUserPodsOfflineLogin" expires_after="2023-08-19">
+    enum="ChromeOSHiddenUserPodsOfflineLogin" expires_after="2023-10-22">
   <owner>mslus@chromium.org</owner>
   <owner>chromeos-commercial-identity@google.com</owner>
   <summary>
@@ -242,16 +253,6 @@ chromium-metrics-reviews@google.com.
   <owner>cros-lurs@google.com</owner>
   <summary>
     On offline login success, records number of attempts, including success.
-  </summary>
-</histogram>
-
-<histogram name="Login.PageLoad.DetectionType" enum="LoginDetectionType"
-    expires_after="2022-11-30">
-  <owner>rajendrant@chromium.org</owner>
-  <owner>mcrouse@chromium.org</owner>
-  <summary>
-    Type of login detected for a page load based on different heuristics.
-    Recorded once per page load.
   </summary>
 </histogram>
 

@@ -9,6 +9,7 @@
 #include "chrome/browser/ui/browser_finder.h"
 #include "chrome/browser/ui/tabs/tab_strip_model_delegate.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
+#include "chrome/browser/ui/views/webid/fedcm_modal_dialog_view.h"
 #include "chrome/grit/generated_resources.h"
 #include "third_party/blink/public/mojom/webid/federated_auth_request.mojom.h"
 #include "ui/base/l10n/l10n_util.h"
@@ -33,7 +34,7 @@ int AccountSelectionView::GetBrandIconIdealSize() {
   // different screen densities, make the ideal size be the size which works
   // with a high density display (if the OS supports high density displays).
   float max_supported_scale = ui::GetScaleForResourceScaleFactor(
-      ui::GetSupportedResourceScaleFactors().back());
+      ui::GetMaxSupportedResourceScaleFactor());
   return round(GetBrandIconMinimumSize() * max_supported_scale);
 }
 
@@ -130,19 +131,25 @@ void FedCmAccountSelectionView::Show(
 
 void FedCmAccountSelectionView::ShowFailureDialog(
     const std::string& top_frame_etld_plus_one,
+    const absl::optional<std::string>& iframe_etld_plus_one,
     const std::string& idp_etld_plus_one,
-    const content::IdentityProviderMetadata& idp_metadata) {
+    const content::IdentityProviderMetadata& idp_metadata,
+    IdentityRegistryCallback identity_registry_callback) {
   state_ = State::IDP_SIGNIN_STATUS_MISMATCH;
+  absl::optional<std::u16string> iframe_etld_plus_one_u16 =
+      iframe_etld_plus_one ? absl::make_optional<std::u16string>(
+                                 base::UTF8ToUTF16(*iframe_etld_plus_one))
+                           : absl::nullopt;
 
   bool create_bubble = !bubble_widget_;
   if (create_bubble) {
-    bubble_widget_ = CreateBubbleWithAccessibleTitle(
-                         base::UTF8ToUTF16(top_frame_etld_plus_one),
-                         /*iframe_etld_plus_one=*/absl::nullopt,
-                         base::UTF8ToUTF16(idp_etld_plus_one),
-                         blink::mojom::RpContext::kSignIn,
-                         /*show_auto_reauthn_checkbox=*/false)
-                         ->GetWeakPtr();
+    bubble_widget_ =
+        CreateBubbleWithAccessibleTitle(
+            base::UTF8ToUTF16(top_frame_etld_plus_one),
+            iframe_etld_plus_one_u16, base::UTF8ToUTF16(idp_etld_plus_one),
+            blink::mojom::RpContext::kSignIn,
+            /*show_auto_reauthn_checkbox=*/false)
+            ->GetWeakPtr();
 
     // Initialize InputEventActivationProtector to handle potentially unintended
     // input events. Do not override `input_protector_` set by
@@ -153,9 +160,10 @@ void FedCmAccountSelectionView::ShowFailureDialog(
     }
   }
 
-  GetBubbleView()->ShowFailureDialog(base::UTF8ToUTF16(top_frame_etld_plus_one),
-                                     base::UTF8ToUTF16(idp_etld_plus_one),
-                                     idp_metadata);
+  GetBubbleView()->ShowFailureDialog(
+      base::UTF8ToUTF16(top_frame_etld_plus_one), iframe_etld_plus_one_u16,
+      base::UTF8ToUTF16(idp_etld_plus_one), idp_metadata,
+      std::move(identity_registry_callback));
 
   if (create_bubble) {
     bubble_widget_->Show();
@@ -344,6 +352,22 @@ void FedCmAccountSelectionView::OnCloseButtonClicked(const ui::Event& event) {
 
   bubble_widget_->CloseWithReason(
       views::Widget::ClosedReason::kCloseButtonClicked);
+}
+
+void FedCmAccountSelectionView::ShowModalDialog(const GURL& url) {
+  idp_signin_modal_dialog_ = FedCmModalDialogView::ShowFedCmModalDialog(
+      delegate_->GetWebContents(), url);
+  if (GetBubbleView()->HasIdentityRegistryCallback()) {
+    std::move(GetBubbleView()->GetIdentityRegistryCallback())
+        .Run(idp_signin_modal_dialog_->GetWebViewWebContents());
+  }
+}
+
+void FedCmAccountSelectionView::CloseModalDialog() {
+  if (idp_signin_modal_dialog_) {
+    idp_signin_modal_dialog_->CloseFedCmModalDialog();
+    idp_signin_modal_dialog_ = nullptr;
+  }
 }
 
 void FedCmAccountSelectionView::ShowVerifyingSheet(

@@ -49,7 +49,7 @@ bool ShouldBrowserBeClosedByAppSessionBrowserHander(AppSessionAsh* app_session);
 // |app_session|.
 Browser* OpenA11ySettingsBrowser(AppSessionAsh* app_session);
 
-// Base class for Kiosk browser tests.
+// Base class for Chrome App Kiosk browser tests.
 class KioskBaseTest : public OobeBaseTest {
  public:
   KioskBaseTest();
@@ -110,8 +110,6 @@ class KioskBaseTest : public OobeBaseTest {
                                    bool keep_app_open = false);
 
   void WaitForAppLaunchSuccess();
-
-  void WaitForAppLaunchNetworkTimeout();
 
   void RunAppLaunchNetworkDownTest();
 

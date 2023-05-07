@@ -72,6 +72,9 @@ class USER_MANAGER_EXPORT UserManager {
     // user sign in are changed.
     virtual void OnUsersSignInConstraintsChanged();
 
+    // Called when the user affiliation is updated.
+    virtual void OnUserAffiliationUpdated(const User& user);
+
     // Called just before a user of the device will be removed.
     virtual void OnUserToBeRemoved(const AccountId& account_id);
 
@@ -177,6 +180,12 @@ class USER_MANAGER_EXPORT UserManager {
   // Returns account Id of the owner user. Returns an empty Id if there is
   // no owner for the device.
   virtual const AccountId& GetOwnerAccountId() const = 0;
+
+  // Provides the caller with account Id of the Owner user once it is loaded.
+  // Would provide empty account id if there is no owner on the device (e.g.
+  // if device is enterprise-owned).
+  virtual void GetOwnerAccountIdAsync(
+      base::OnceCallback<void(const AccountId&)> callback) const = 0;
 
   // Returns account Id of the user that was active in the previous session.
   virtual const AccountId& GetLastSessionActiveAccountId() const = 0;
@@ -380,6 +389,7 @@ class USER_MANAGER_EXPORT UserManager {
       const User& user,
       const gfx::ImageSkia& profile_image) = 0;
   virtual void NotifyUsersSignInConstraintsChanged() = 0;
+  virtual void NotifyUserAffiliationUpdated(const User& user) = 0;
   virtual void NotifyUserToBeRemoved(const AccountId& account_id) = 0;
   virtual void NotifyUserRemoved(const AccountId& account_id,
                                  UserRemovalReason reason) = 0;

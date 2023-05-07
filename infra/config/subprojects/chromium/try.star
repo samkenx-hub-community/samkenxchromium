@@ -117,6 +117,12 @@ luci.cq_group(
         cq.run_mode(cq.MODE_QUICK_DRY_RUN, 1, "Quick-Run", 1),
     ],
     tree_status_host = "chromium-status.appspot.com" if settings.is_main else None,
+    tryjob_experiments = [
+        cq.tryjob_experiment(
+            name = "chromium_rts.dry_run_rts",
+            owner_group_allowlist = ["rts-on-dry-run"],
+        ),
+    ],
 )
 
 # Declare a CQ group that watches all branch heads, excluding the active
@@ -169,9 +175,9 @@ exec("./try/tryserver.chromium.chromiumos.star")
 exec("./try/tryserver.chromium.cft.star")
 exec("./try/tryserver.chromium.dawn.star")
 exec("./try/tryserver.chromium.fuchsia.star")
+exec("./try/tryserver.chromium.infra.star")
 exec("./try/tryserver.chromium.linux.star")
 exec("./try/tryserver.chromium.mac.star")
-exec("./try/tryserver.chromium.packager.star")
 exec("./try/tryserver.chromium.rust.star")
 exec("./try/tryserver.chromium.tricium.star")
 exec("./try/tryserver.chromium.updater.star")

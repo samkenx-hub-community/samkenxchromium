@@ -75,6 +75,7 @@ export interface SortOption {
 
 export interface PowerBookmarksListElement {
   $: {
+    bookmarks: HTMLElement,
     contextMenu: PowerBookmarksContextMenuElement,
     deletionToast: CrLazyRenderElement<CrToastElement>,
     powerBookmarksContainer: HTMLElement,
@@ -178,6 +179,13 @@ export class PowerBookmarksListElement extends PolymerElement {
         type: String,
         value: '',
       },
+
+      /* If container containing shown bookmarks has scrollbars. */
+      hasScrollbars_: {
+        type: Boolean,
+        value: false,
+        reflectToAttribute: true,
+      },
     };
   }
 
@@ -214,6 +222,7 @@ export class PowerBookmarksListElement extends PolymerElement {
   private renamingId_: string;
   private deletionDescription_: string;
   private shownBookmarksResizeObserver_?: ResizeObserver;
+  private hasScrollbars_: boolean;
   private contextMenuBookmark_: chrome.bookmarks.BookmarkTreeNode|undefined;
 
   constructor() {
@@ -250,9 +259,8 @@ export class PowerBookmarksListElement extends PolymerElement {
 
     if (document.documentElement.hasAttribute('chrome-refresh-2023')) {
       this.shownBookmarksResizeObserver_ =
-          new ResizeObserver(this.resizeShownBookmarks_.bind(this));
-      this.shownBookmarksResizeObserver_.observe(
-          this.shadowRoot!.querySelector('#bookmarks')!);
+          new ResizeObserver(this.onShownBookmarksResize_.bind(this));
+      this.shownBookmarksResizeObserver_.observe(this.$.bookmarks);
     }
 
     this.recordMetricsOnConnected_();
@@ -342,6 +350,12 @@ export class PowerBookmarksListElement extends PolymerElement {
       getAnnouncerInstance().announce(loadTimeData.getStringF(
           'bookmarkMoved', getBookmarkName(bookmark),
           getBookmarkName(newParent)));
+      // If the new parent folder is visible, notify to ensure its displayed
+      // child count is updated.
+      const visibleIndex = this.visibleIndex_(newParent.id);
+      if (visibleIndex > -1) {
+        this.notifyPath(`shownBookmarks_.${visibleIndex}.children`);
+      }
     }
   }
 
@@ -685,22 +699,7 @@ export class PowerBookmarksListElement extends PolymerElement {
   }
 
   private shouldHideHeader_(): boolean {
-    return this.hasActiveLabels_() || !!this.searchQuery_ ||
-        this.hasNoBookmarks_();
-  }
-
-  private hasNoBookmarks_(): boolean {
-    return this.hasNoBookmarksInActiveFolder_() && !this.getActiveFolder_();
-  }
-
-  private hasNoBookmarksInActiveFolder_(): boolean {
-    for (const bookmark of this.shownBookmarks_) {
-      if (bookmark.url || bookmark.parentId !== '0' ||
-          bookmark.children!.length) {
-        return false;
-      }
-    }
-    return true;
+    return this.hasActiveLabels_() || !!this.searchQuery_;
   }
 
   private getSelectedDescription_() {
@@ -820,23 +819,24 @@ export class PowerBookmarksListElement extends PolymerElement {
         });
   }
 
-  private onContextMenuEditClicked_(event: CustomEvent<{id: string}>) {
+  private onContextMenuEditClicked_(
+      event: CustomEvent<{bookmarks: chrome.bookmarks.BookmarkTreeNode[]}>) {
     event.preventDefault();
     event.stopPropagation();
-    const bookmark =
-        this.bookmarksService_.findBookmarkWithId(event.detail.id)!;
-    if (editingDisabledByPolicy([bookmark])) {
+    if (editingDisabledByPolicy(event.detail.bookmarks)) {
       this.showDisabledFeatureDialog_();
       return;
     }
-    this.showEditDialog_([bookmark], false);
+    this.showEditDialog_(
+        event.detail.bookmarks, event.detail.bookmarks.length > 1);
   }
 
-  private onContextMenuDeleteClicked_(event: MouseEvent) {
+  private onContextMenuDeleteClicked_(
+      event: CustomEvent<{bookmarks: chrome.bookmarks.BookmarkTreeNode[]}>) {
     event.preventDefault();
     event.stopPropagation();
-    // Context menu delete is expected to only be called on a single bookmark.
-    this.showDeletionToastWithCount_(1);
+    this.showDeletionToastWithCount_(event.detail.bookmarks.length);
+    this.selectedBookmarks_ = [];
     this.editing_ = false;
   }
 
@@ -1006,11 +1006,14 @@ export class PowerBookmarksListElement extends PolymerElement {
     }
   }
 
-  private resizeShownBookmarks_() {
+  private onShownBookmarksResize_() {
     // The iron-list of `shownBookmarks_` is in a dynamically sized card.
     // Any time the size changes, let iron-list know so that iron-list can
     // properly adjust to its possibly new height.
     this.$.shownBookmarksIronList.notifyResize();
+
+    this.hasScrollbars_ =
+        this.$.bookmarks.scrollHeight > this.$.bookmarks.offsetHeight;
   }
 }
 

@@ -10,12 +10,12 @@
 #include <mftransform.h>
 #include <objbase.h>
 
+#include <algorithm>
 #include <iterator>
 #include <memory>
 #include <utility>
 #include <vector>
 
-#include "base/cxx17_backports.h"
 #include "base/features.h"
 #include "base/memory/shared_memory_mapping.h"
 #include "base/memory/unsafe_shared_memory_region.h"
@@ -32,6 +32,7 @@
 #include "media/base/media_switches.h"
 #include "media/base/video_frame.h"
 #include "media/base/video_util.h"
+#include "media/base/win/color_space_util_win.h"
 #include "media/base/win/mf_helpers.h"
 #include "media/base/win/mf_initializer.h"
 #include "media/filters/win/media_foundation_utils.h"
@@ -812,7 +813,7 @@ void MediaFoundationVideoEncodeAccelerator::RequestEncodingParametersChange(
       bitrate_allocation.GetMode() == bitrate_allocation_.GetMode(),
       "Invalid bitrate mode", );
   framerate =
-      base::clamp(framerate, 1u, static_cast<uint32_t>(kMaxFrameRateNumerator));
+      std::clamp(framerate, 1u, static_cast<uint32_t>(kMaxFrameRateNumerator));
 
   if (framerate == frame_rate_ && bitrate_allocation == bitrate_allocation_) {
     return;
@@ -1182,6 +1183,7 @@ void MediaFoundationVideoEncodeAccelerator::FeedInputs() {
   // There's no point in trying to feed more than one input here,
   // because MF encoder never accepts more than one input in a row.
   auto& next_input = pending_input_queue_.front();
+
   HRESULT hr = ProcessInput(next_input);
   if (hr == MF_E_NOTACCEPTING) {
     return;
@@ -1208,13 +1210,19 @@ HRESULT MediaFoundationVideoEncodeAccelerator::ProcessInput(
       // we encode.
       LONGLONG sample_ts = 0;
       auto hr = input_sample_->GetSampleTime(&sample_ts);
-      DCHECK_EQ(hr, S_OK);
+      DCHECK_EQ(hr, S_OK) << PrintHr(hr);
       int64_t frame_ts = input.frame->timestamp().InMicroseconds() *
                          kOneMicrosecondInMFSampleTimeUnits;
       DCHECK_EQ(frame_ts, sample_ts)
           << "Prepared sample timestamp doesn't match frame timestamp.";
     }
   } else {
+    const auto frame_cs = input.frame->ColorSpace();
+    if (encoder_color_space_.value_or(gfx::ColorSpace()) != frame_cs) {
+      encoder_color_space_ = frame_cs;
+      SetEncoderColorSpace();
+    }
+
     // Prepare input sample if it hasn't been done yet.
     HRESULT hr = PopulateInputSampleBuffer(input);
     RETURN_ON_HR_FAILURE(hr, "Couldn't populate input sample buffer", hr);
@@ -1272,6 +1280,25 @@ HRESULT MediaFoundationVideoEncodeAccelerator::PopulateInputSampleBuffer(
     return MF_E_INVALID_STREAM_DATA;
   }
 
+  auto hr = input_sample_->SetSampleTime(frame->timestamp().InMicroseconds() *
+                                         kOneMicrosecondInMFSampleTimeUnits);
+  RETURN_ON_HR_FAILURE(hr, "SetSampleTime() failed", hr);
+
+  UINT64 sample_duration = 0;
+  hr = MFFrameRateToAverageTimePerFrame(frame_rate_, 1, &sample_duration);
+  RETURN_ON_HR_FAILURE(hr, "Couldn't calculate sample duration", hr);
+
+  hr = input_sample_->SetSampleDuration(sample_duration);
+  RETURN_ON_HR_FAILURE(hr, "SetSampleDuration() failed", hr);
+
+  if (input.options.key_frame) {
+    VARIANT var;
+    var.vt = VT_UI4;
+    var.ulVal = 1;
+    hr = codec_api_->SetValue(&CODECAPI_AVEncVideoForceKeyFrame, &var);
+    RETURN_ON_HR_FAILURE(hr, "Set CODECAPI_AVEncVideoForceKeyFrame failed", hr);
+  }
+
   if (frame->storage_type() ==
       VideoFrame::StorageType::STORAGE_GPU_MEMORY_BUFFER) {
     gfx::GpuMemoryBuffer* gmb = frame->GetGpuMemoryBuffer();
@@ -1303,25 +1330,6 @@ HRESULT MediaFoundationVideoEncodeAccelerator::PopulateInputSampleBuffer(
       LOG(ERROR) << "Failed to map shared memory GMB";
       return E_FAIL;
     }
-  }
-
-  auto hr = input_sample_->SetSampleTime(frame->timestamp().InMicroseconds() *
-                                         kOneMicrosecondInMFSampleTimeUnits);
-  RETURN_ON_HR_FAILURE(hr, "SetSampleTime() failed", hr);
-
-  UINT64 sample_duration = 0;
-  hr = MFFrameRateToAverageTimePerFrame(frame_rate_, 1, &sample_duration);
-  RETURN_ON_HR_FAILURE(hr, "Couldn't calculate sample duration", hr);
-
-  hr = input_sample_->SetSampleDuration(sample_duration);
-  RETURN_ON_HR_FAILURE(hr, "SetSampleDuration() failed", hr);
-
-  if (input.options.key_frame) {
-    VARIANT var;
-    var.vt = VT_UI4;
-    var.ulVal = 1;
-    hr = codec_api_->SetValue(&CODECAPI_AVEncVideoForceKeyFrame, &var);
-    RETURN_ON_HR_FAILURE(hr, "Set CODECAPI_AVEncVideoForceKeyFrame failed", hr);
   }
 
   const auto kTargetPixelFormat = PIXEL_FORMAT_NV12;
@@ -1657,31 +1665,42 @@ void MediaFoundationVideoEncodeAccelerator::ProcessOutput() {
         base::Microseconds(sample_time / kOneMicrosecondInMFSampleTimeUnits);
   }
 
-  // For HMFT that continuously reports valid QP, update encoder info so that
-  // WebRTC will not use bandwidth quality scaler for resolution adaptation.
-  uint64_t frame_qp = 0xfffful;
+  // If `frame_qp` is set here, it will be plumbed down to WebRTC.
+  // If not set, the QP may be parsed by WebRTC from the bitstream but only if
+  // the QP is trusted (`encoder_info_.reports_average_qp` is true, which it is
+  // by default).
+  absl::optional<int32_t> frame_qp;
   bool should_notify_encoder_info_change = false;
-  hr = output_data_buffer.pSample->GetUINT64(MFSampleExtension_VideoEncodeQP,
-                                             &frame_qp);
-  if (vendor_ == DriverVendor::kIntel) {
-    if (codec_ == VideoCodec::kH264) {
-      if ((FAILED(hr) || !IsValidQp(codec_, frame_qp)) &&
-          encoder_info_.reports_average_qp) {
-        should_notify_encoder_info_change = true;
-        encoder_info_.reports_average_qp = false;
+  // In the case of VP9, `frame_qp_from_sample` is always 0 here
+  // (https://crbug.com/1434633) so we prefer WebRTC to parse the bitstream for
+  // us by leaving `frame_qp` unset.
+  if (codec_ != VideoCodec::kVP9) {
+    // For HMFT that continuously reports valid QP, update encoder info so that
+    // WebRTC will not use bandwidth quality scaler for resolution adaptation.
+    uint64_t frame_qp_from_sample = 0xfffful;
+    hr = output_data_buffer.pSample->GetUINT64(MFSampleExtension_VideoEncodeQP,
+                                               &frame_qp_from_sample);
+    if (vendor_ == DriverVendor::kIntel) {
+      if (codec_ == VideoCodec::kH264) {
+        if ((FAILED(hr) || !IsValidQp(codec_, frame_qp_from_sample)) &&
+            encoder_info_.reports_average_qp) {
+          should_notify_encoder_info_change = true;
+          encoder_info_.reports_average_qp = false;
+        }
+      } else if (codec_ == VideoCodec::kAV1) {
+        if (!rate_ctrl_) {
+          encoder_info_.reports_average_qp = false;
+        }
       }
-    } else if (codec_ == VideoCodec::kVP9 || codec_ == VideoCodec::kAV1) {
-      if (!rate_ctrl_)
-        encoder_info_.reports_average_qp = false;
+    }
+    // Bits 0-15: Default QP.
+    if (SUCCEEDED(hr)) {
+      frame_qp = frame_qp_from_sample & 0xfffful;
     }
   }
   if (!encoder_info_sent_ || should_notify_encoder_info_change) {
     client_->NotifyEncoderInfoChange(encoder_info_);
     encoder_info_sent_ = true;
-  }
-  // Bits 0-15: Default QP.
-  if (SUCCEEDED(hr)) {
-    frame_qp = frame_qp & 0xfffful;
   }
 
   const bool keyframe = MFGetAttributeUINT32(
@@ -1717,8 +1736,8 @@ void MediaFoundationVideoEncodeAccelerator::ProcessOutput() {
     {
       MediaBufferScopedPointer scoped_buffer(output_buffer.Get());
       memcpy(encode_output->memory(), scoped_buffer.get(), size);
-      if (IsValidQp(codec_, frame_qp)) {
-        encode_output->SetQp(frame_qp);
+      if (frame_qp.has_value() && IsValidQp(codec_, *frame_qp)) {
+        encode_output->SetQp(*frame_qp);
       }
     }
     encoder_output_queue_.push_back(std::move(encode_output));
@@ -1745,8 +1764,8 @@ void MediaFoundationVideoEncodeAccelerator::ProcessOutput() {
   output_data_buffer.pSample = nullptr;
 
   BitstreamBufferMetadata md(size, keyframe, timestamp);
-  if (IsValidQp(codec_, frame_qp)) {
-    md.qp = static_cast<int32_t>(frame_qp);
+  if (frame_qp.has_value() && IsValidQp(codec_, *frame_qp)) {
+    md.qp = *frame_qp;
   }
 
   if (temporal_scalable_coding()) {
@@ -1755,6 +1774,10 @@ void MediaFoundationVideoEncodeAccelerator::ProcessOutput() {
     } else if (codec_ == VideoCodec::kHEVC) {
       md.h265.emplace().temporal_idx = temporal_id;
     }
+  }
+
+  if (encoder_color_space_) {
+    md.encoded_color_space = *encoder_color_space_;
   }
 
   client_->BitstreamBufferReady(buffer_ref->id, md);
@@ -2025,6 +2048,53 @@ HRESULT MediaFoundationVideoEncodeAccelerator::QueryInterface(REFIID riid,
   static const QITAB kQI[] = {
       QITABENT(MediaFoundationVideoEncodeAccelerator, IMFAsyncCallback), {0}};
   return QISearch(this, kQI, riid, ppv);
+}
+
+void MediaFoundationVideoEncodeAccelerator::SetEncoderColorSpace() {
+  DCHECK(encoder_color_space_);
+  if (!encoder_color_space_->IsValid()) {
+    return;
+  }
+
+  MFVideoPrimaries primary;
+  MFVideoTransferFunction transfer;
+  MFVideoTransferMatrix matrix;
+  MFNominalRange range;
+  GetMediaTypeColorValues(*encoder_color_space_, &primary, &transfer, &matrix,
+                          &range);
+
+  // Set appropriate color space keys. Note: This may do nothing depending on
+  // the hardware MFT. It's expected that if the MFT does not support color
+  // space info that it either won't write any color info in the bitstream or it
+  // will write the values for UNSPECIFIED (see VideoColorSpace).
+  auto set_color_space = [&](IMFMediaType* type) {
+    auto hr = type->SetUINT32(MF_MT_VIDEO_PRIMARIES, primary);
+    RETURN_ON_HR_FAILURE(hr, "Couldn't set primaries", hr);
+    hr = type->SetUINT32(MF_MT_TRANSFER_FUNCTION, transfer);
+    RETURN_ON_HR_FAILURE(hr, "Couldn't set transfer", hr);
+    hr = type->SetUINT32(MF_MT_YUV_MATRIX, matrix);
+    RETURN_ON_HR_FAILURE(hr, "Couldn't set matrix", hr);
+    hr = type->SetUINT32(MF_MT_VIDEO_NOMINAL_RANGE, range);
+    RETURN_ON_HR_FAILURE(hr, "Couldn't set range", hr);
+    return hr;
+  };
+
+  // Set input and output color spaces to the same value so we don't
+  // inadvertently enable any kind of color space conversion.
+  RETURN_ON_HR_FAILURE(set_color_space(imf_output_media_type_.Get()),
+                       "Couldn't set output color space", );
+  RETURN_ON_HR_FAILURE(encoder_->SetOutputType(output_stream_id_,
+                                               imf_output_media_type_.Get(), 0),
+                       "Couldn't change output media type", );
+
+  RETURN_ON_HR_FAILURE(set_color_space(imf_input_media_type_.Get()),
+                       "Couldn't set input color space", );
+  RETURN_ON_HR_FAILURE(
+      encoder_->SetInputType(input_stream_id_, imf_input_media_type_.Get(), 0),
+      "Couldn't change input media type", );
+
+  DVLOG(1) << "Set encoder color space to: "
+           << encoder_color_space_->ToString();
 }
 
 }  // namespace media

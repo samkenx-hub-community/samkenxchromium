@@ -30,6 +30,7 @@
 #include "components/autofill/core/common/autofill_features.h"
 #include "components/signin/public/identity_manager/account_info.h"
 #include "components/strings/grit/components_strings.h"
+#include "components/sync/base/user_selectable_type.h"
 #include "skia/ext/image_operations.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/models/image_model.h"
@@ -214,7 +215,7 @@ std::u16string SaveUpdateAddressProfileBubbleControllerImpl::GetBodyText()
         GetPrimaryAccountInfoFromBrowserContext(
             web_contents()->GetBrowserContext());
 
-    int string_id = pdm->IsSyncEnabledFor(syncer::ModelType::AUTOFILL_PROFILE)
+    int string_id = pdm->IsSyncEnabledFor(syncer::UserSelectableType::kAutofill)
                         ? IDS_AUTOFILL_SYNCABLE_PROFILE_MIGRATION_PROMPT_NOTICE
                         : IDS_AUTOFILL_LOCAL_PROFILE_MIGRATION_PROMPT_NOTICE;
 
@@ -299,7 +300,6 @@ std::u16string SaveUpdateAddressProfileBubbleControllerImpl::GetFooterMessage()
     absl::optional<AccountInfo> account =
         GetPrimaryAccountInfoFromBrowserContext(
             web_contents()->GetBrowserContext());
-    CHECK(account);
 
     int string_id =
         IsSaveBubble()
@@ -335,7 +335,7 @@ void SaveUpdateAddressProfileBubbleControllerImpl::OnEditButtonClicked() {
   EditAddressProfileDialogControllerImpl* controller =
       EditAddressProfileDialogControllerImpl::FromWebContents(web_contents());
   controller->OfferEdit(address_profile_, GetOriginalProfile(),
-                        GetFooterMessage(),
+                        GetEditorFooterMessage(),
                         std::move(address_profile_save_prompt_callback_),
                         is_migration_to_account_);
   HideBubble();
@@ -399,6 +399,20 @@ void SaveUpdateAddressProfileBubbleControllerImpl::DoShowBubble() {
                             web_contents(), this, shown_by_user_gesture_));
   }
   DCHECK(bubble_view());
+}
+
+std::u16string
+SaveUpdateAddressProfileBubbleControllerImpl::GetEditorFooterMessage() const {
+  if (is_migration_to_account_) {
+    absl::optional<AccountInfo> account =
+        GetPrimaryAccountInfoFromBrowserContext(
+            web_contents()->GetBrowserContext());
+    return l10n_util::GetStringFUTF16(
+        IDS_AUTOFILL_SAVE_IN_ACCOUNT_PROMPT_ADDRESS_SOURCE_NOTICE,
+        base::UTF8ToUTF16(account->email));
+  }
+
+  return GetFooterMessage();
 }
 
 WEB_CONTENTS_USER_DATA_KEY_IMPL(SaveUpdateAddressProfileBubbleControllerImpl);

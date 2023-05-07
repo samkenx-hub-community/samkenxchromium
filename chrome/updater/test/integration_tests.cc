@@ -5,6 +5,8 @@
 #include <cstdlib>
 #include <memory>
 #include <string>
+#include <utility>
+#include <vector>
 
 #include "base/files/file_enumerator.h"
 #include "base/files/file_path.h"
@@ -64,8 +66,8 @@ namespace {
 
 void ExpectNoUpdateSequence(ScopedServer* test_server,
                             const std::string& app_id) {
-  test_server->ExpectOnce({request::GetContentMatcher(base::StringPrintf(
-                              R"(.*"appid":"%s".*)", app_id.c_str()))},
+  test_server->ExpectOnce({request::GetContentMatcher({base::StringPrintf(
+                              R"(.*"appid":"%s".*)", app_id.c_str())})},
                           base::StringPrintf(")]}'\n"
                                              R"({"response":{)"
                                              R"(  "protocol":"3.1",)"
@@ -93,9 +95,6 @@ class IntegrationTest : public ::testing::Test {
 
  protected:
   void SetUp() override {
-#if BUILDFLAG(IS_WIN) && defined(ARCH_CPU_ARM64)
-    GTEST_SKIP() << "Integration tests disabled on Arm64 Win";
-#else
     ASSERT_NO_FATAL_FAILURE(CleanProcesses());
     ASSERT_TRUE(WaitForUpdaterExit());
     ASSERT_NO_FATAL_FAILURE(Clean());
@@ -105,7 +104,6 @@ class IntegrationTest : public ::testing::Test {
     ASSERT_NO_FATAL_FAILURE(EnterTestMode(GURL("http://localhost:1234"),
                                           GURL("http://localhost:1235"),
                                           GURL("http://localhost:1236")));
-#endif
 #if BUILDFLAG(IS_LINUX)
     // On LUCI the XDG_RUNTIME_DIR and DBUS_SESSION_BUS_ADDRESS environment
     // variables may not be set. These are required for systemctl to connect to
@@ -125,9 +123,6 @@ class IntegrationTest : public ::testing::Test {
   }
 
   void TearDown() override {
-#if BUILDFLAG(IS_WIN) && defined(ARCH_CPU_ARM64)
-    GTEST_SKIP() << "Integration tests disabled on Arm64 Win";
-#else
     ExitTestMode();
     if (!HasFailure()) {
       ExpectClean();
@@ -146,7 +141,6 @@ class IntegrationTest : public ::testing::Test {
     // Updater process must not be running for `Clean()` to succeed.
     ASSERT_TRUE(WaitForUpdaterExit());
     Clean();
-#endif
   }
 
   void ExpectNoCrashes() { test_commands_->ExpectNoCrashes(); }
@@ -428,6 +422,23 @@ class IntegrationTest : public ::testing::Test {
   ScopedIPCSupportWrapper ipc_support_;
 };
 
+// TODO(crbug.com/1424548): re-enable the tests once they are passing on
+// Windows ARM64.
+#if BUILDFLAG(IS_WIN) && defined(ARCH_CPU_ARM64)
+#define MAYBE_InstallLowerVersion DISABLED_InstallLowerVersion
+#define MAYBE_OverinstallBroken DISABLED_OverinstallBroken
+#define MAYBE_OverinstallWorking DISABLED_OverinstallWorking
+#define MAYBE_SelfUpdateFromOldReal DISABLED_SelfUpdateFromOldReal
+#define MAYBE_UninstallIfUnusedSelfAndOldReal \
+  DISABLED_UninstallIfUnusedSelfAndOldReal
+#else
+#define MAYBE_InstallLowerVersion InstallLowerVersion
+#define MAYBE_OverinstallBroken OverinstallBroken
+#define MAYBE_OverinstallWorking OverinstallWorking
+#define MAYBE_SelfUpdateFromOldReal SelfUpdateFromOldReal
+#define MAYBE_UninstallIfUnusedSelfAndOldReal UninstallIfUnusedSelfAndOldReal
+#endif
+
 // The project's position is that component builds are not portable outside of
 // the build directory. Therefore, installation of component builds is not
 // expected to work and these tests do not run on component builders.
@@ -451,10 +462,7 @@ TEST_F(IntegrationTest, Install) {
   ASSERT_NO_FATAL_FAILURE(Uninstall());
 }
 
-// TODO(crbug.com/1398845) Enable test once version-skewed updater is available
-// for unbranded Linux.
-#if !(BUILDFLAG(IS_LINUX) && BUILDFLAG(CHROMIUM_BRANDING))
-TEST_F(IntegrationTest, OverinstallWorking) {
+TEST_F(IntegrationTest, MAYBE_OverinstallWorking) {
   ASSERT_NO_FATAL_FAILURE(SetupRealUpdaterLowerVersion());
   ASSERT_TRUE(WaitForUpdaterExit());
   ASSERT_NO_FATAL_FAILURE(ExpectVersionNotActive(kUpdaterVersion));
@@ -468,7 +476,7 @@ TEST_F(IntegrationTest, OverinstallWorking) {
   ASSERT_NO_FATAL_FAILURE(Uninstall());
 }
 
-TEST_F(IntegrationTest, OverinstallBroken) {
+TEST_F(IntegrationTest, MAYBE_OverinstallBroken) {
   ASSERT_NO_FATAL_FAILURE(SetupRealUpdaterLowerVersion());
   ASSERT_TRUE(WaitForUpdaterExit());
   ASSERT_NO_FATAL_FAILURE(DeleteUpdaterDirectory());
@@ -488,7 +496,6 @@ TEST_F(IntegrationTest, OverinstallBroken) {
   ASSERT_TRUE(WaitForUpdaterExit());
   ASSERT_NO_FATAL_FAILURE(Uninstall());
 }
-#endif  // !(BUILDFLAG(IS_LINUX) && BUILDFLAG(CHROMIUM_BRANDING))
 
 TEST_F(IntegrationTest, SelfUninstallOutdatedUpdater) {
   ASSERT_NO_FATAL_FAILURE(Install());
@@ -534,9 +541,9 @@ TEST_F(IntegrationTest, QualifyUpdater) {
 
   // This instance is now qualified and should activate itself and check itself
   // for updates on the next check.
-  test_server.ExpectOnce(
-      {request::GetContentMatcher(base::StringPrintf(".*%s.*", kUpdaterAppId))},
-      ")]}'\n");
+  test_server.ExpectOnce({request::GetContentMatcher(
+                             {base::StringPrintf(".*%s.*", kUpdaterAppId)})},
+                         ")]}'\n");
   ASSERT_NO_FATAL_FAILURE(RunWake(0));
   ASSERT_TRUE(WaitForUpdaterExit());
   ASSERT_NO_FATAL_FAILURE(ExpectVersionActive(kUpdaterVersion));
@@ -602,7 +609,7 @@ TEST_F(IntegrationTest, ReportsActive) {
   ASSERT_NO_FATAL_FAILURE(ExpectNotActive("test2"));
   test_server.ExpectOnce(
       {request::GetContentMatcher(
-          R"(.*"appid":"test1","enabled":true,"ping":{"a":-2,.*)")},
+          {R"(.*"appid":"test1","enabled":true,"ping":{"a":-2,.*)"})},
       R"()]}')"
       "\n"
       R"({"response":{"protocol":"3.1","daystart":{"elapsed_)"
@@ -900,6 +907,10 @@ TEST_F(IntegrationTest, RotateLog) {
 // test need not run on Windows.
 #if BUILDFLAG(IS_MAC)
 TEST_F(IntegrationTest, UnregisterUnownedApp) {
+  if (GetTestScope() == UpdaterScope::kSystem) {
+    // TODO(crbug.com/1441082): Re-enable this test.
+    return;
+  }
   ASSERT_NO_FATAL_FAILURE(Install());
   ASSERT_NO_FATAL_FAILURE(ExpectInstalled());
   ASSERT_NO_FATAL_FAILURE(ExpectVersionActive(kUpdaterVersion));
@@ -915,6 +926,7 @@ TEST_F(IntegrationTest, UnregisterUnownedApp) {
   ASSERT_TRUE(WaitForUpdaterExit());
 
   ASSERT_NO_FATAL_FAILURE(ExpectNotRegistered("test1"));
+
   ASSERT_NO_FATAL_FAILURE(ExpectRegistered("test2"));
 
   ASSERT_NO_FATAL_FAILURE(Uninstall());
@@ -923,13 +935,10 @@ TEST_F(IntegrationTest, UnregisterUnownedApp) {
 
 #if BUILDFLAG(CHROMIUM_BRANDING) || BUILDFLAG(GOOGLE_CHROME_BRANDING)
 #if !defined(COMPONENT_BUILD)
-// TODO(crbug.com/1398845) Enable test once version-skewed updater is available
-// for unbranded Linux.
-#if !BUILDFLAG(IS_LINUX) || BUILDFLAG(GOOGLE_CHROME_BRANDING)
 // TODO(crbug.com/1097297) Enable these tests once the `Brand the updater and
 // qualification app ids` change is available on CIPD.
 #if BUILDFLAG(GOOGLE_CHROME_BRANDING)
-TEST_F(IntegrationTest, SelfUpdateFromOldReal) {
+TEST_F(IntegrationTest, MAYBE_SelfUpdateFromOldReal) {
   ScopedServer test_server(test_commands_);
 
   ASSERT_NO_FATAL_FAILURE(SetupRealUpdaterLowerVersion());
@@ -956,7 +965,7 @@ TEST_F(IntegrationTest, SelfUpdateFromOldReal) {
   ASSERT_NO_FATAL_FAILURE(Uninstall());
 }
 
-TEST_F(IntegrationTest, UninstallIfUnusedSelfAndOldReal) {
+TEST_F(IntegrationTest, MAYBE_UninstallIfUnusedSelfAndOldReal) {
   ScopedServer test_server(test_commands_);
 
   ASSERT_NO_FATAL_FAILURE(SetupRealUpdaterLowerVersion());
@@ -993,7 +1002,7 @@ TEST_F(IntegrationTest, UninstallIfUnusedSelfAndOldReal) {
 
 // Tests that installing and uninstalling an old version of the updater from
 // CIPD is possible.
-TEST_F(IntegrationTest, InstallLowerVersion) {
+TEST_F(IntegrationTest, MAYBE_InstallLowerVersion) {
   ASSERT_NO_FATAL_FAILURE(SetupRealUpdaterLowerVersion());
   ASSERT_NO_FATAL_FAILURE(ExpectVersionNotActive(kUpdaterVersion));
   ASSERT_NO_FATAL_FAILURE(Uninstall());
@@ -1010,7 +1019,6 @@ TEST_F(IntegrationTest, InstallLowerVersion) {
 #endif  // IS_WIN
 }
 
-#endif  // !BUILDFLAG(IS_LINUX) || BUILDFLAG(GOOGLE_CHROME_BRANDING)
 #endif
 #endif
 
@@ -1046,14 +1054,14 @@ TEST_F(IntegrationTest, SameVersionUpdate) {
       app_id.c_str());
   test_server.ExpectOnce(
       {request::GetContentMatcher(
-          R"(.*"updatecheck":{"sameversionupdate":true},"version":"0.1"}.*)")},
+          {R"("updatecheck":{"sameversionupdate":true},"version":"0.1"}.*)"})},
       response);
   ASSERT_NO_FATAL_FAILURE(CallServiceUpdate(
       app_id, "", UpdateService::PolicySameVersionUpdate::kAllowed));
 
-  test_server.ExpectOnce(
-      {request::GetContentMatcher(R"(.*"updatecheck":{},"version":"0.1"}.*)")},
-      response);
+  test_server.ExpectOnce({request::GetContentMatcher(
+                             {R"(.*"updatecheck":{},"version":"0.1"}.*)"})},
+                         response);
   ASSERT_NO_FATAL_FAILURE(CallServiceUpdate(
       app_id, "", UpdateService::PolicySameVersionUpdate::kNotAllowed));
   ASSERT_NO_FATAL_FAILURE(ExpectUninstallPing(&test_server));
@@ -1087,9 +1095,9 @@ TEST_F(IntegrationTest, InstallDataIndex) {
       app_id.c_str());
 
   test_server.ExpectOnce(
-      {request::GetContentMatcher(base::StringPrintf(
+      {request::GetContentMatcher({base::StringPrintf(
           R"(.*"data":\[{"index":"%s","name":"install"}],.*)",
-          install_data_index.c_str()))},
+          install_data_index.c_str())})},
       response);
 
   ASSERT_NO_FATAL_FAILURE(
@@ -1156,18 +1164,24 @@ TEST_F(IntegrationTest, CrashUsageStatsEnabled) {
   ASSERT_TRUE(WaitForUpdaterExit());
 
   const std::string response;
-
-  // TODO(crbug.com/1430233): Add a matcher to verify the crash report
-  // contents. This is blocked by crbug.com/1430878.
   test_server.ExpectOnce(
-      {request::GetPathMatcher(
-           base::StringPrintf(R"(%s\?product=%s&version=%s&guid=.*)",
-                              test_server.crash_report_path().c_str(),
-                              CRASH_PRODUCT_NAME, kUpdaterVersion)),
-       request::GetHeaderMatcher("User-Agent", R"(Crashpad/.*)"),
-       request::GetHeaderMatcher(
-           "Content-Type",
-           R"(multipart/form-data; boundary=---MultipartBoundary.*---)")},
+      {
+          request::GetPathMatcher(
+              base::StringPrintf(R"(%s\?product=%s&version=%s&guid=.*)",
+                                 test_server.crash_report_path().c_str(),
+                                 CRASH_PRODUCT_NAME, kUpdaterVersion)),
+          request::GetHeaderMatcher("User-Agent", R"(Crashpad/.*)"),
+          request::GetMultipartContentMatcher({
+              {"guid", std::vector<std::string>({})},  // Crash guid.
+              {"process_type", std::vector<std::string>({R"(updater)"})},
+              {"prod", std::vector<std::string>({CRASH_PRODUCT_NAME})},
+              {"ver", std::vector<std::string>({kUpdaterVersion})},
+              {"upload_file_minidump",  // Dump file name and its content.
+               std::vector<std::string>(
+                   {R"(filename=".*dmp")",
+                    R"(Content-Type: application/octet-stream)", R"(MDMP)"})},
+          }),
+      },
       response);
   ExpectUninstallPing(&test_server);
   RunCrashMe();

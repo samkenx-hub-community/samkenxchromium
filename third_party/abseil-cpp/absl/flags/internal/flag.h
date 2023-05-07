@@ -121,7 +121,7 @@ inline void* Clone(FlagOpFn op, const void* obj) {
   flags_internal::CopyConstruct(op, obj, res);
   return res;
 }
-// Returns true if parsing of input text is successfull.
+// Returns true if parsing of input text is successful.
 inline bool Parse(FlagOpFn op, absl::string_view text, void* dst,
                   std::string* error) {
   return op(FlagOp::kParse, &text, dst, error) != nullptr;
@@ -139,12 +139,12 @@ inline size_t Sizeof(FlagOpFn op) {
   return static_cast<size_t>(reinterpret_cast<intptr_t>(
       op(FlagOp::kSizeof, nullptr, nullptr, nullptr)));
 }
-// Returns fast type id coresponding to the value type.
+// Returns fast type id corresponding to the value type.
 inline FlagFastTypeId FastTypeId(FlagOpFn op) {
   return reinterpret_cast<FlagFastTypeId>(
       op(FlagOp::kFastTypeId, nullptr, nullptr, nullptr));
 }
-// Returns fast type id coresponding to the value type.
+// Returns fast type id corresponding to the value type.
 inline const std::type_info* RuntimeTypeId(FlagOpFn op) {
   return reinterpret_cast<const std::type_info*>(
       op(FlagOp::kRuntimeTypeId, nullptr, nullptr, nullptr));
@@ -308,19 +308,20 @@ constexpr int64_t UninitializedFlagValue() {
 }
 
 template <typename T>
-using FlagUseValueAndInitBitStorage = std::integral_constant<
-    bool, absl::type_traits_internal::is_trivially_copyable<T>::value &&
-              std::is_default_constructible<T>::value && (sizeof(T) < 8)>;
+using FlagUseValueAndInitBitStorage =
+    std::integral_constant<bool, std::is_trivially_copyable<T>::value &&
+                                     std::is_default_constructible<T>::value &&
+                                     (sizeof(T) < 8)>;
 
 template <typename T>
-using FlagUseOneWordStorage = std::integral_constant<
-    bool, absl::type_traits_internal::is_trivially_copyable<T>::value &&
-              (sizeof(T) <= 8)>;
+using FlagUseOneWordStorage =
+    std::integral_constant<bool, std::is_trivially_copyable<T>::value &&
+                                     (sizeof(T) <= 8)>;
 
 template <class T>
-using FlagUseSequenceLockStorage = std::integral_constant<
-    bool, absl::type_traits_internal::is_trivially_copyable<T>::value &&
-              (sizeof(T) > 8)>;
+using FlagUseSequenceLockStorage =
+    std::integral_constant<bool, std::is_trivially_copyable<T>::value &&
+                                     (sizeof(T) > 8)>;
 
 enum class FlagValueStorageKind : uint8_t {
   kValueAndInitBit = 0,

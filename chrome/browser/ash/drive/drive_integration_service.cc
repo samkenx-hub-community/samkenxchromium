@@ -21,6 +21,7 @@
 #include "base/functional/callback_helpers.h"
 #include "base/hash/md5.h"
 #include "base/logging.h"
+#include "base/memory/raw_ptr.h"
 #include "base/metrics/histogram_macros.h"
 #include "base/strings/stringprintf.h"
 #include "base/system/sys_info.h"
@@ -513,9 +514,10 @@ class DriveIntegrationService::PreferenceWatcher
     }
   }
 
-  PrefService* pref_service_;
+  raw_ptr<PrefService, ExperimentalAsh> pref_service_;
   PrefChangeRegistrar pref_change_registrar_;
-  DriveIntegrationService* integration_service_ = nullptr;
+  raw_ptr<DriveIntegrationService, ExperimentalAsh> integration_service_ =
+      nullptr;
   PortalState portal_state_ = PortalState::kUnknown;
 
   base::WeakPtrFactory<PreferenceWatcher> weak_ptr_factory_{this};
@@ -698,8 +700,9 @@ class DriveIntegrationService::DriveFsHolder
     profile_->GetPrefs()->SetString(prefs::kDriveFsMirrorSyncMachineRootId, id);
   }
 
-  Profile* const profile_;
-  drivefs::DriveFsHost::MountObserver* const mount_observer_;
+  const raw_ptr<Profile, ExperimentalAsh> profile_;
+  const raw_ptr<drivefs::DriveFsHost::MountObserver, ExperimentalAsh>
+      mount_observer_;
 
   const DriveFsMojoListenerFactory test_drivefs_mojo_listener_factory_;
 
@@ -1097,6 +1100,7 @@ void DriveIntegrationService::RemoveDriveMountPoint() {
 
   if (pin_manager_) {
     pin_manager_->Stop();
+    pin_manager_->RemoveObserver(this);
     if (bulk_pinning_pref_updater_) {
       pin_manager_->RemoveObserver(bulk_pinning_pref_updater_.get());
       bulk_pinning_pref_updater_.reset();
@@ -1186,6 +1190,7 @@ void DriveIntegrationService::OnMounted(const base::FilePath& mount_path) {
     DCHECK(!pin_manager_);
     pin_manager_ = std::make_unique<PinManager>(profile_->GetPath(),
                                                 GetDriveFsInterface());
+    pin_manager_->AddObserver(this);
     DCHECK(!bulk_pinning_pref_updater_);
     bulk_pinning_pref_updater_ =
         std::make_unique<BulkPinningPrefUpdater>(GetPrefs());
@@ -1221,6 +1226,13 @@ void DriveIntegrationService::OnMountFailed(
     // We don't record mount time until we mount successfully at least once.
   }
   MaybeRemountFileSystem(remount_delay, true);
+}
+
+void DriveIntegrationService::OnProgress(
+    const drivefs::pinning::Progress& progress) {
+  for (auto& observer : observers_) {
+    observer.OnBulkPinProgress(progress);
+  }
 }
 
 void DriveIntegrationService::Initialize() {
@@ -1337,6 +1349,17 @@ void DriveIntegrationService::GetTotalPinnedSize(
         std::move(callback).Run(total_size);
       },
       std::move(callback)));
+}
+
+void DriveIntegrationService::ClearOfflineFiles(
+    base::OnceCallback<void(drive::FileError)> callback) {
+  if (!ash::features::IsDriveFsBulkPinningEnabled() || !IsMounted() ||
+      !GetDriveFsInterface()) {
+    std::move(callback).Run(drive::FILE_ERROR_SERVICE_UNAVAILABLE);
+    return;
+  }
+
+  GetDriveFsInterface()->ClearOfflineFiles(std::move(callback));
 }
 
 void DriveIntegrationService::GetQuickAccessItems(

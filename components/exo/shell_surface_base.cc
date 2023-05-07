@@ -24,6 +24,7 @@
 #include "base/containers/contains.h"
 #include "base/containers/flat_set.h"
 #include "base/logging.h"
+#include "base/memory/raw_ptr.h"
 #include "base/strings/stringprintf.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/trace_event/trace_event.h"
@@ -67,6 +68,7 @@
 #include "ui/wm/core/shadow_controller.h"
 #include "ui/wm/core/shadow_types.h"
 #include "ui/wm/core/window_animations.h"
+#include "ui/wm/core/window_properties.h"
 #include "ui/wm/core/window_util.h"
 
 namespace exo {
@@ -187,7 +189,7 @@ class CustomFrameView : public ash::NonClientFrameViewAsh {
   }
 
  private:
-  ShellSurfaceBase* const shell_surface_;
+  const raw_ptr<ShellSurfaceBase, ExperimentalAsh> shell_surface_;
 };
 
 class CustomWindowTargeter : public aura::WindowTargeter {
@@ -264,8 +266,8 @@ class CustomWindowTargeter : public aura::WindowTargeter {
     return false;
   }
 
-  ShellSurfaceBase* shell_surface_;
-  views::Widget* const widget_;
+  raw_ptr<ShellSurfaceBase, ExperimentalAsh> shell_surface_;
+  const raw_ptr<views::Widget, ExperimentalAsh> widget_;
 };
 
 void CloseAllShellSurfaceTransientChildren(aura::Window* window) {
@@ -290,8 +292,10 @@ void ShowSnapPreview(aura::Window* window,
 void CommitSnap(aura::Window* window,
                 chromeos::SnapDirection snap_direction,
                 float snap_ratio) {
-  chromeos::SnapController::Get()->CommitSnap(window, snap_direction,
-                                              snap_ratio);
+  chromeos::SnapController::Get()->CommitSnap(
+      window, snap_direction, snap_ratio,
+      chromeos::SnapController::SnapRequestSource::
+          kFromLacrosSnapButtonOrWindowLayoutMenu);
 }
 
 }  // namespace
@@ -771,6 +775,13 @@ void ShellSurfaceBase::SetCanMinimize(bool can_minimize) {
 
   can_minimize_ = can_minimize;
   WidgetDelegate::SetCanMinimize(!parent_ && can_minimize_);
+}
+
+void ShellSurfaceBase::SetPersistable(bool persistable) {
+  // This should be called before the widget is created.
+  DCHECK(!widget_);
+
+  persistable_ = persistable;
 }
 
 void ShellSurfaceBase::SetMenu() {
@@ -1517,6 +1528,9 @@ void ShellSurfaceBase::CreateShellSurfaceWidget(
         app_restore::kAppIdKey, restore_window_id_source_.value());
   }
 
+  params.init_properties_container.SetProperty(wm::kPersistableKey,
+                                               persistable_);
+
   // Restore `params` to those of the saved `restore_window_id_`.
   app_restore::ModifyWidgetParams(params.init_properties_container.GetProperty(
                                       app_restore::kRestoreWindowIdKey),
@@ -1897,9 +1911,12 @@ void ShellSurfaceBase::CommitWidget() {
     widget_->GetNativeWindow()->ClearProperty(aura::client::kAspectRatio);
   }
 
+  // The calling order matters. The frame type has to be updated before
+  // calculating the bounds because the bounds computation depends on the frame
+  // type (e.g. caption height).
+  UpdateFrameType();
   UpdateWidgetBounds();
   SurfaceTreeHost::UpdateHostWindowBounds();
-  UpdateFrameType();
   gfx::Rect bounds = geometry_;
   if (!bounds.IsEmpty() && !widget_->GetNativeWindow()->GetProperty(
                                aura::client::kUseWindowBoundsForShadow)) {

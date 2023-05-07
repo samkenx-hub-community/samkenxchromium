@@ -101,10 +101,8 @@ IsolatedWebAppUrlInfo CreateRandomIsolatedWebAppUrlInfo() {
       web_package::SignedWebBundleId::CreateRandomForDevelopment();
   base::expected<IsolatedWebAppUrlInfo, std::string> url_info =
       IsolatedWebAppUrlInfo::CreateFromSignedWebBundleId(signed_web_bundle_id);
-  if (!url_info.has_value()) {
-    CHECK(false) << "Failed to create testing web app url info: "
-                 << url_info.error();
-  }
+  CHECK(url_info.has_value())
+      << "Failed to create testing web app url info: " << url_info.error();
   return url_info.value();
 }
 
@@ -115,10 +113,8 @@ IsolatedWebAppUrlInfo CreateEd25519IsolatedWebAppUrlInfo() {
               base::make_span(kTestPublicKey)));
   base::expected<IsolatedWebAppUrlInfo, std::string> url_info =
       IsolatedWebAppUrlInfo::CreateFromSignedWebBundleId(signed_web_bundle_id);
-  if (!url_info.has_value()) {
-    CHECK(false) << "Failed to create testing web app url info: "
-                 << url_info.error();
-  }
+  CHECK(url_info.has_value())
+      << "Failed to create testing web app url info: " << url_info.error();
   return url_info.value();
 }
 
@@ -315,7 +311,8 @@ class InstallIsolatedWebAppCommandTest : public ::testing::Test {
 
     return std::make_unique<InstallIsolatedWebAppCommand>(
         url_info, location.value(), std::move(web_contents),
-        std::move(url_loader), *profile(), std::move(callback),
+        std::move(url_loader), /*keep_alive=*/nullptr,
+        /*profile_keep_alive=*/nullptr, std::move(callback),
         std::make_unique<FakeResponseReaderFactory>(std::move(bundle_error)));
   }
 
@@ -379,16 +376,6 @@ MATCHER_P(IsUnexpectedValue, error_matcher, "") {
   return ExplainMatchResult(error_matcher, arg.error(), result_listener);
 }
 
-MATCHER(IsInstallationOk, "") {
-  bool result = ExplainMatchResult(IsExpectedValue(_), arg, result_listener);
-  if (!result) {
-    DCHECK(!arg.has_value());
-    *result_listener << ", error: " << arg.error();
-  }
-
-  return result;
-}
-
 MATCHER_P(IsInstallationError, message_matcher, "") {
   return ExplainMatchResult(
       IsUnexpectedValue(ResultOf(
@@ -419,12 +406,12 @@ TEST_F(InstallIsolatedWebAppCommandTest,
           CreateDefaultManifest(url_info.origin().GetURL()),
           CreateDefaultManifestURL(url_info.origin().GetURL())));
 
-  EXPECT_THAT(ExecuteCommand(
+  EXPECT_TRUE(ExecuteCommand(
                   Parameters{
                       .url_info = url_info,
                   },
-                  std::move(fake_data_retriever)),
-              IsInstallationOk());
+                  std::move(fake_data_retriever))
+                  .has_value());
 }
 
 TEST_F(InstallIsolatedWebAppCommandTest, PropagateErrorWhenURLLoaderFails) {
@@ -469,11 +456,11 @@ TEST_F(InstallIsolatedWebAppCommandTest,
           ".well-known/_generated_install_page.html"),
       WebAppUrlLoader::Result::kUrlLoaded);
 
-  EXPECT_THAT(ExecuteCommand(Parameters{
-                  .url_info = url_info,
-                  .url_loader = std::move(url_loader),
-              }),
-              IsInstallationOk());
+  EXPECT_TRUE(ExecuteCommand(Parameters{
+                                 .url_info = url_info,
+                                 .url_loader = std::move(url_loader),
+                             })
+                  .has_value());
 }
 
 TEST_F(InstallIsolatedWebAppCommandTest, URLLoaderIgnoresQueryParameters) {
@@ -492,11 +479,11 @@ TEST_F(InstallIsolatedWebAppCommandTest, URLLoaderIgnoresQueryParameters) {
         last_url_comparison = url_comparison;
       }));
 
-  EXPECT_THAT(ExecuteCommand(Parameters{
-                  .url_info = url_info,
-                  .url_loader = std::move(url_loader),
-              }),
-              IsInstallationOk());
+  EXPECT_TRUE(ExecuteCommand(Parameters{
+                                 .url_info = url_info,
+                                 .url_loader = std::move(url_loader),
+                             })
+                  .has_value());
 
   EXPECT_THAT(
       last_url_comparison,
@@ -507,10 +494,10 @@ TEST_F(InstallIsolatedWebAppCommandTest,
        InstallationSucceedesWhenFinalizerReturnSuccessNewInstall) {
   IsolatedWebAppUrlInfo url_info = CreateRandomIsolatedWebAppUrlInfo();
 
-  EXPECT_THAT(ExecuteCommand(Parameters{
-                  .url_info = url_info,
-              }),
-              IsInstallationOk());
+  EXPECT_TRUE(ExecuteCommand(Parameters{
+                                 .url_info = url_info,
+                             })
+                  .has_value());
 }
 
 TEST_F(InstallIsolatedWebAppCommandTest,
@@ -531,12 +518,12 @@ TEST_F(InstallIsolatedWebAppCommandTest,
   std::unique_ptr<MockDataRetriever> fake_data_retriever =
       CreateDefaultDataRetriever(url_info.origin().GetURL());
 
-  EXPECT_THAT(ExecuteCommand(
+  EXPECT_TRUE(ExecuteCommand(
                   Parameters{
                       .url_info = url_info,
                   },
-                  std::move(fake_data_retriever)),
-              IsInstallationOk());
+                  std::move(fake_data_retriever))
+                  .has_value());
 
   using InstallSource = webapps::WebappInstallSource;
 
@@ -611,13 +598,15 @@ TEST_F(InstallIsolatedWebAppCommandTest,
 TEST_F(InstallIsolatedWebAppCommandTest, LocationSentToFinalizer) {
   IsolatedWebAppUrlInfo url_info = CreateRandomIsolatedWebAppUrlInfo();
 
-  EXPECT_THAT(
-      ExecuteCommand(Parameters{
-          .url_info = url_info,
-          .location = DevModeProxy{.proxy_url = url::Origin::Create(GURL(
-                                       "http://some-testing-proxy-url.com/"))},
-      }),
-      IsInstallationOk());
+  EXPECT_TRUE(
+      ExecuteCommand(
+          Parameters{
+              .url_info = url_info,
+              .location =
+                  DevModeProxy{.proxy_url = url::Origin::Create(
+                                   GURL("http://some-testing-proxy-url.com/"))},
+          })
+          .has_value());
 
   EXPECT_THAT(web_app_registrar().GetAppById(url_info.app_id()),
               Pointee(AllOf(Property(
@@ -639,9 +628,9 @@ TEST_F(InstallIsolatedWebAppCommandTest,
           ".well-known/_generated_install_page.html"),
       WebAppUrlLoader::Result::kUrlLoaded);
 
-  EXPECT_THAT(ExecuteCommand(Parameters{.url_info = url_info,
-                                        .url_loader = std::move(url_loader)}),
-              IsInstallationOk());
+  EXPECT_TRUE(ExecuteCommand(Parameters{.url_info = url_info,
+                                        .url_loader = std::move(url_loader)})
+                  .has_value());
 
   EXPECT_THAT(profile()->GetStoragePartition(
                   url_info.storage_partition_config(profile()),
@@ -651,10 +640,10 @@ TEST_F(InstallIsolatedWebAppCommandTest,
 
 TEST_F(InstallIsolatedWebAppCommandTest, UsersCanDeleteIsolatedApp) {
   IsolatedWebAppUrlInfo url_info = CreateRandomIsolatedWebAppUrlInfo();
-  ASSERT_THAT(ExecuteCommand(Parameters{
-                  .url_info = url_info,
-              }),
-              IsInstallationOk());
+  ASSERT_TRUE(ExecuteCommand(Parameters{
+                                 .url_info = url_info,
+                             })
+                  .has_value());
 
   EXPECT_THAT(web_app_registrar().GetAppById(url_info.app_id()),
               Pointee(Property("CanUserUninstallWebApp",
@@ -684,11 +673,11 @@ TEST_F(InstallIsolatedWebAppCommandTest,
                   /*can_create=*/false),
               IsNull());
 
-  EXPECT_THAT(ExecuteCommand({
-                  .url_info = url_info,
-                  .url_loader = std::move(url_loader),
-              }),
-              IsInstallationOk());
+  EXPECT_TRUE(ExecuteCommand({
+                                 .url_info = url_info,
+                                 .url_loader = std::move(url_loader),
+                             })
+                  .has_value());
 
   EXPECT_THAT(storage_partition_during_url_loading, NotNull());
 }
@@ -705,7 +694,6 @@ TEST_F(InstallIsolatedWebAppCommandManifestTest,
 
   EXPECT_THAT(
       ExecuteCommandWithManifest(url_info, manifest.Clone()),
-
       IsInstallationError(HasSubstr(
           "Manifest `id` is not present. manifest_url: " +
           CreateDefaultManifestURL(url_info.origin().GetURL()).spec())));
@@ -733,8 +721,8 @@ TEST_F(InstallIsolatedWebAppCommandManifestTest,
       CreateDefaultManifest(url_info.origin().GetURL());
   manifest->id = u"";
 
-  EXPECT_THAT(ExecuteCommandWithManifest(url_info, manifest.Clone()),
-              IsInstallationOk());
+  EXPECT_TRUE(
+      ExecuteCommandWithManifest(url_info, manifest.Clone()).has_value());
 
   EXPECT_THAT(web_app_registrar().GetAppById(url_info.app_id()), NotNull());
 }
@@ -774,8 +762,8 @@ TEST_F(InstallIsolatedWebAppCommandManifestTest,
       CreateDefaultManifest(url_info.origin().GetURL());
   manifest->scope = url_info.origin().GetURL().Resolve("/");
 
-  EXPECT_THAT(ExecuteCommandWithManifest(url_info, manifest.Clone()),
-              IsInstallationOk());
+  EXPECT_TRUE(
+      ExecuteCommandWithManifest(url_info, manifest.Clone()).has_value());
 
   EXPECT_THAT(web_app_registrar().GetAppById(url_info.app_id()),
               Pointee(Property("scope", &WebApp::scope,
@@ -789,8 +777,8 @@ TEST_F(InstallIsolatedWebAppCommandManifestTest,
       CreateDefaultManifest(url_info.origin().GetURL());
   manifest->name = u"test application name";
 
-  EXPECT_THAT(ExecuteCommandWithManifest(url_info, manifest.Clone()),
-              IsInstallationOk());
+  EXPECT_TRUE(
+      ExecuteCommandWithManifest(url_info, manifest.Clone()).has_value());
 
   EXPECT_THAT(web_app_registrar().GetAppById(url_info.app_id()),
               Pointee(Property("untranslated_name", &WebApp::untranslated_name,
@@ -806,8 +794,8 @@ TEST_F(InstallIsolatedWebAppCommandManifestTest,
   manifest->name = absl::nullopt;
   manifest->short_name = u"test short name";
 
-  EXPECT_THAT(ExecuteCommandWithManifest(url_info, manifest.Clone()),
-              IsInstallationOk());
+  EXPECT_TRUE(
+      ExecuteCommandWithManifest(url_info, manifest.Clone()).has_value());
 
   EXPECT_THAT(web_app_registrar().GetAppById(url_info.app_id()),
               Pointee(Property("untranslated_name", &WebApp::untranslated_name,
@@ -822,8 +810,8 @@ TEST_F(InstallIsolatedWebAppCommandManifestTest,
   manifest->name = u"";
   manifest->short_name = u"other test short name";
 
-  EXPECT_THAT(ExecuteCommandWithManifest(url_info, manifest.Clone()),
-              IsInstallationOk());
+  EXPECT_TRUE(
+      ExecuteCommandWithManifest(url_info, manifest.Clone()).has_value());
 
   EXPECT_THAT(web_app_registrar().GetAppById(url_info.app_id()),
               Pointee(Property("untranslated_name", &WebApp::untranslated_name,
@@ -923,12 +911,12 @@ TEST_F(InstallIsolatedWebAppCommandManifestIconsTest,
       .WillOnce(RunOnceCallback<3>(IconsDownloadedResult::kCompleted,
                                    std::move(icons), http_result));
 
-  EXPECT_THAT(ExecuteCommand(
+  EXPECT_TRUE(ExecuteCommand(
                   Parameters{
                       .url_info = url_info,
                   },
-                  std::move(fake_data_retriever)),
-              IsInstallationOk());
+                  std::move(fake_data_retriever))
+                  .has_value());
 
   base::test::TestFuture<std::map<SquareSizePx, SkBitmap>> test_future;
   web_app_icon_manager().ReadIconAndResize(url_info.app_id(), IconPurpose::ANY,
@@ -1002,14 +990,16 @@ TEST_F(InstallIsolatedWebAppCommandTest, SetDevModeLocationBeforeUrlLoading) {
                 .location();
       }));
 
-  EXPECT_THAT(
-      ExecuteCommand(Parameters{
-          .url_info = url_info,
-          .url_loader = std::move(url_loader),
-          .location = DevModeProxy{.proxy_url = url::Origin::Create(GURL(
-                                       "http://some-testing-proxy-url.com/"))},
-      }),
-      IsInstallationOk());
+  EXPECT_TRUE(
+      ExecuteCommand(
+          Parameters{
+              .url_info = url_info,
+              .url_loader = std::move(url_loader),
+              .location =
+                  DevModeProxy{.proxy_url = url::Origin::Create(
+                                   GURL("http://some-testing-proxy-url.com/"))},
+          })
+          .has_value());
 
   EXPECT_THAT(location, Optional(VariantWith<DevModeProxy>(Field(
                             "proxy_url", &DevModeProxy::proxy_url,
@@ -1035,16 +1025,17 @@ TEST_F(InstallIsolatedWebAppCommandTest,
                 .location();
       }));
 
-  EXPECT_THAT(ExecuteCommand(Parameters{
-                  .url_info = url_info,
-                  .url_loader = std::move(url_loader),
-                  .location =
-                      InstalledBundle{
-                          .path = base::FilePath{FILE_PATH_LITERAL(
-                              "/testing/path/to/a/bundle")},
-                      },
-              }),
-              IsInstallationOk());
+  EXPECT_TRUE(
+      ExecuteCommand(Parameters{
+                         .url_info = url_info,
+                         .url_loader = std::move(url_loader),
+                         .location =
+                             InstalledBundle{
+                                 .path = base::FilePath{FILE_PATH_LITERAL(
+                                     "/testing/path/to/a/bundle")},
+                             },
+                     })
+          .has_value());
 
   EXPECT_THAT(location, Optional(VariantWith<InstalledBundle>(
                             Field("path", &InstalledBundle::path,
@@ -1061,10 +1052,10 @@ TEST_F(InstallIsolatedWebAppCommandMetricsTest,
 
   base::HistogramTester histogram_tester;
 
-  EXPECT_THAT(ExecuteCommand(Parameters{
-                  .url_info = url_info,
-              }),
-              IsInstallationOk());
+  EXPECT_TRUE(ExecuteCommand(Parameters{
+                                 .url_info = url_info,
+                             })
+                  .has_value());
 
   EXPECT_THAT(histogram_tester.GetAllSamples("WebApp.Install.Result"),
               BucketsAre(base::Bucket(true, 1)));
@@ -1179,12 +1170,12 @@ class InstallIsolatedWebAppCommandBundleTest
 
 TEST_P(InstallIsolatedWebAppCommandBundleTest, InstallsWhenThereIsNoError) {
   IsolatedWebAppUrlInfo url_info = CreateEd25519IsolatedWebAppUrlInfo();
-  EXPECT_THAT(ExecuteCommand(Parameters{
-                  .url_info = url_info,
-                  .location = location_,
-                  .bundle_error = absl::nullopt,
-              }),
-              IsInstallationOk());
+  EXPECT_TRUE(ExecuteCommand(Parameters{
+                                 .url_info = url_info,
+                                 .location = location_,
+                                 .bundle_error = absl::nullopt,
+                             })
+                  .has_value());
 }
 
 TEST_P(InstallIsolatedWebAppCommandBundleTest, ErrorsOnBundleError) {
@@ -1207,7 +1198,7 @@ TEST_P(InstallIsolatedWebAppCommandBundleTest,
                                 .location = location_,
                                 .bundle_error = absl::nullopt});
   if (GetParam()) {
-    EXPECT_THAT(installation_result, IsInstallationOk());
+    EXPECT_TRUE(installation_result.has_value());
   } else {
     EXPECT_THAT(installation_result,
                 IsInstallationError(HasSubstr(

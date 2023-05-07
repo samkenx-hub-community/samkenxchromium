@@ -133,20 +133,6 @@ reviewer.
   <summary>The accuracy status of a page. Recorded on each page load.</summary>
 </histogram>
 
-<histogram name="Privacy.ClearBrowsingData.Action"
-    enum="ClearBrowsingDataAction" expires_after="never">
-<!-- expires-never: tracked as an important privacy metric. -->
-
-  <owner>arabm@chromium.org</owner>
-  <owner>dullweber@chromium.org</owner>
-  <summary>
-    Horizontal metric to show CBD usage across various surfaces. Recorded when
-    the user deletes browsing data from one of these surfaces or when the
-    browser automatically deletes cookies because the user enabled
-    &quot;ClearOnExit&quot;.
-  </summary>
-</histogram>
-
 <histogram name="Privacy.ClearOnExitSyncEvent" enum="ClearOnExitSyncEvent"
     expires_after="M103">
   <owner>sauski@google.com</owner>
@@ -217,6 +203,20 @@ reviewer.
   <summary>
     Logging actions done by the user while interacting with the &quot;Cookies in
     use&quot; dialog.
+  </summary>
+</histogram>
+
+<histogram name="Privacy.DeleteBrowsingData.Action"
+    enum="DeleteBrowsingDataAction" expires_after="never">
+<!-- expires-never: tracked as an important privacy metric. -->
+
+  <owner>arabm@chromium.org</owner>
+  <owner>dullweber@chromium.org</owner>
+  <summary>
+    Horizontal metric to show CBD usage across various surfaces. Recorded when
+    the user deletes browsing data from one of these surfaces or when the
+    browser automatically deletes cookies because the user enabled
+    &quot;ClearOnExit&quot;.
   </summary>
 </histogram>
 
@@ -370,7 +370,7 @@ reviewer.
 </histogram>
 
 <histogram name="Privacy.DIPS.TimeFromNavigationCommitToClientBounce"
-    units="ms" expires_after="2023-08-20">
+    units="ms" expires_after="2023-10-22">
   <owner>jdh@chromium.org</owner>
   <owner>rtarpine@chromium.org</owner>
   <owner>src/chrome/browser/dips/OWNERS</owner>
@@ -435,7 +435,7 @@ reviewer.
 </histogram>
 
 <histogram name="Privacy.QuickDelete" enum="QuickDeleteAction"
-    expires_after="M116">
+    expires_after="2023-10-22">
   <owner>roagarwal@chromium.org</owner>
   <owner>eokoyomon@chromium.org</owner>
   <owner>fsenra@google.com</owner>

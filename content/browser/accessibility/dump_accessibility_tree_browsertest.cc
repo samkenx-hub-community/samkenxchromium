@@ -2059,8 +2059,9 @@ INSTANTIATE_TEST_SUITE_P(
     ::testing::ValuesIn(ui::AXInspectTestHelper::TreeTestPasses()),
     DumpAccessibilityTreeTestPassToString());
 
-// TODO(crbug.com/1428918): Re-enable this test.
-#if BUILDFLAG(IS_CHROMEOS)
+// TODO(crbug.com/1428918): Re-enable this test on ChromeOS.
+// TODO(crbug.com/1440049): Fix flaky timeouts on Windows ASAN.
+#if BUILDFLAG(IS_CHROMEOS) || (BUILDFLAG(IS_WIN) && defined(ADDRESS_SANITIZER))
 #define MAYBE_AccessibilityFencedFrameScrollable \
   DISABLED_AccessibilityFencedFrameScrollable
 #else
@@ -3415,6 +3416,12 @@ IN_PROC_BROWSER_TEST_P(DumpAccessibilityTreeTest,
                        ClearChildrenWhileComputingName) {
   RunRegressionTest(
       FILE_PATH_LITERAL("clear-children-while-computing-name.html"));
+}
+
+IN_PROC_BROWSER_TEST_P(DumpAccessibilityTreeTest,
+                       FrozenAncestorCannotChangeDescendants) {
+  RunRegressionTest(
+      FILE_PATH_LITERAL("frozen-ancestor-cannot-change-descendants.html"));
 }
 
 IN_PROC_BROWSER_TEST_P(DumpAccessibilityTreeTest, HiddenTable) {

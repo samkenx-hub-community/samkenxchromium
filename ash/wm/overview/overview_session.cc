@@ -27,9 +27,8 @@
 #include "ash/system/unified/unified_system_tray_bubble.h"
 #include "ash/utility/haptics_util.h"
 #include "ash/wm/desks/desk.h"
-#include "ash/wm/desks/desks_bar_view.h"
-#include "ash/wm/desks/desks_controller.h"
 #include "ash/wm/desks/desks_util.h"
+#include "ash/wm/desks/legacy_desk_bar_view.h"
 #include "ash/wm/desks/templates/saved_desk_dialog_controller.h"
 #include "ash/wm/desks/templates/saved_desk_grid_view.h"
 #include "ash/wm/desks/templates/saved_desk_item_view.h"
@@ -46,7 +45,6 @@
 #include "ash/wm/overview/overview_window_drag_controller.h"
 #include "ash/wm/overview/scoped_float_container_stacker.h"
 #include "ash/wm/overview/scoped_overview_animation_settings.h"
-#include "ash/wm/splitview/split_view_controller.h"
 #include "ash/wm/splitview/split_view_utils.h"
 #include "ash/wm/window_state.h"
 #include "ash/wm/window_util.h"
@@ -123,7 +121,7 @@ class AsyncWindowStateChangeObserver : public WindowStateObserver,
     window_->RemoveObserver(this);
   }
 
-  aura::Window* window_;
+  raw_ptr<aura::Window, ExperimentalAsh> window_;
 
   base::OnceCallback<void(WindowState*)> on_post_window_state_changed_;
 };
@@ -187,7 +185,7 @@ void OverviewSession::Init(const WindowList& windows,
   active_window_before_overview_ = window_util::GetActiveWindow();
   if (active_window_before_overview_) {
     active_window_before_overview_observation_.Observe(
-        active_window_before_overview_);
+        active_window_before_overview_.get());
   }
 
   // Create this before the desks bar widget.
@@ -330,7 +328,7 @@ void OverviewSession::Shutdown() {
       overview_grid->CalculateWindowListAnimationStates(
           selected_item_ &&
                   selected_item_->overview_grid() == overview_grid.get()
-              ? selected_item_
+              ? selected_item_.get()
               : nullptr,
           OverviewTransition::kExit, /*target_bounds=*/{});
     }

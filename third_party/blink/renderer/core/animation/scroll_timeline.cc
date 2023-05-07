@@ -211,11 +211,13 @@ ScrollTimeline::TimelineState ScrollTimeline::ComputeTimelineState() {
       CalculateOffsets(scrollable_area, physical_orientation);
   DCHECK(scroll_offsets);
 
+  float zoom = layout_box->StyleRef().EffectiveZoom();
+
   // Make the timeline inactive when the scroll offset range is zero.
   // github.com/w3c/csswg-drafts/issues/7401
   if (std::abs(scroll_offsets->end - scroll_offsets->start) < 1) {
     return {TimelinePhase::kInactive, /*current_time*/ absl::nullopt,
-            scroll_offsets};
+            scroll_offsets, zoom};
   }
 
   double progress = (current_offset - scroll_offsets->start) /
@@ -225,7 +227,8 @@ ScrollTimeline::TimelineState ScrollTimeline::ComputeTimelineState() {
   absl::optional<base::TimeDelta> calculated_current_time =
       base::Milliseconds(progress * duration.InMillisecondsF());
 
-  return {TimelinePhase::kActive, calculated_current_time, scroll_offsets};
+  return {TimelinePhase::kActive, calculated_current_time, scroll_offsets,
+          zoom};
 }
 
 absl::optional<ScrollOffsets> ScrollTimeline::CalculateOffsets(
@@ -252,8 +255,7 @@ AnimationTimeDelta ScrollTimeline::CalculateIntrinsicIterationDuration(
 
   // Only run calculation for progress based scroll timelines
   if (duration) {
-    // if iteration_duration == "auto" and iterations > 0
-    if (!timing.iteration_duration && timing.iteration_count > 0) {
+    if (timing.iteration_count > 0) {
       // duration represents 100% so we subtract percentage delays and divide it
       // by iteration count to calculate the iteration duration.
       double start_delay = timing.start_delay.relative_delay.value_or(0);

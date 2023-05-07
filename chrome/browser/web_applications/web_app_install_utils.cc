@@ -323,14 +323,17 @@ apps::UrlHandlers ToWebAppUrlHandlers(
   return apps_url_handlers;
 }
 
-std::vector<ScopeExtensionInfo> ToWebAppScopeExtensions(
+ScopeExtensions ToWebAppScopeExtensions(
     const std::vector<blink::mojom::ManifestScopeExtensionPtr>&
         scope_extensions) {
-  std::vector<ScopeExtensionInfo> apps_scope_extensions;
+  ScopeExtensions apps_scope_extensions;
   for (const auto& scope_extension : scope_extensions) {
     DCHECK(scope_extension);
-    apps_scope_extensions.emplace_back(scope_extension->origin,
-                                       scope_extension->has_origin_wildcard);
+    ScopeExtensionInfo new_scope_extension;
+    new_scope_extension.origin = scope_extension->origin;
+    new_scope_extension.has_origin_wildcard =
+        scope_extension->has_origin_wildcard;
+    apps_scope_extensions.insert(std::move(new_scope_extension));
   }
   return apps_scope_extensions;
 }
@@ -1228,6 +1231,11 @@ void SetWebAppManifestFields(const WebAppInstallInfo& web_app_info,
   web_app.SetLaunchHandler(web_app_info.launch_handler);
 
   web_app.SetTabStrip(web_app_info.tab_strip);
+
+  if (web_app_info.validated_scope_extensions.has_value()) {
+    web_app.SetValidatedScopeExtensions(
+        web_app_info.validated_scope_extensions.value());
+  }
 }
 
 void MaybeDisableOsIntegration(const WebAppRegistrar* app_registrar,

@@ -5,9 +5,18 @@
 #include "ash/capture_mode/capture_mode_behavior.h"
 
 #include <memory>
+#include <utility>
+#include <vector>
 
 #include "ash/capture_mode/capture_mode_metrics.h"
 #include "ash/capture_mode/capture_mode_types.h"
+#include "ash/constants/ash_features.h"
+#include "ash/projector/projector_controller_impl.h"
+#include "base/files/file_path.h"
+#include "base/functional/bind.h"
+#include "base/functional/callback_forward.h"
+#include "base/memory/weak_ptr.h"
+#include "base/notreached.h"
 
 namespace ash {
 
@@ -48,14 +57,75 @@ class ProjectorBehavior : public CaptureModeBehavior {
 
   // CaptureModeBehavior:
   bool ShouldImageCaptureTypeBeAllowed() const override { return false; }
-
   bool ShouldSaveToSettingsBeIncluded() const override { return false; }
-
   bool ShouldGifBeSupported() const override { return false; }
-
   bool ShouldShowPreviewNotification() const override { return false; }
-
+  bool SupportsAudioRecordingMode(AudioRecordingMode mode) const override {
+    switch (mode) {
+      case AudioRecordingMode::kOff:
+      case AudioRecordingMode::kSystem:
+        return false;
+      case AudioRecordingMode::kMicrophone:
+        return true;
+      case AudioRecordingMode::kSystemAndMicrophone:
+        return features::IsCaptureModeAudioMixingEnabled();
+    }
+  }
   bool ShouldCreateRecordingOverlayController() const override { return true; }
+  bool ShouldShowUserNudge() const override { return false; }
+  bool ShouldAutoSelectFirstCamera() const override { return true; }
+  bool RequiresCaptureFolderCreation() const override { return true; }
+  void CreateCaptureFolder(OnCaptureFolderCreatedCallback callback) override {
+    ProjectorControllerImpl::Get()->CreateScreencastContainerFolder(
+        base::BindOnce(&ProjectorBehavior::OnScreencastContainerFolderCreated,
+                       weak_ptr_factory_.GetWeakPtr(), std::move(callback)));
+  }
+  std::vector<RecordingType> GetSupportedRecordingTypes() const override {
+    return std::vector<RecordingType>{RecordingType::kWebM};
+  }
+
+ private:
+  // Called when the Projector controller creates the DriveFS folder that will
+  // host the video file along with the associated metadata file created by the
+  // Projector session.
+  void OnScreencastContainerFolderCreated(
+      OnCaptureFolderCreatedCallback callback,
+      const base::FilePath& capture_file_full_path) {
+    base::FilePath path;
+    // An empty path is sent to indicate an error.
+    if (!capture_file_full_path.empty()) {
+      path = capture_file_full_path.AddExtension("webm");
+    }
+    std::move(callback).Run(path);
+  }
+
+  base::WeakPtrFactory<ProjectorBehavior> weak_ptr_factory_{this};
+};
+
+// -----------------------------------------------------------------------------
+// GameDashboardBehavior:
+// Implements the `CaptureModeBehavior` interface with behaviors defined by the
+// game dashboard capture mode.
+class GameDashboardBehavior : public CaptureModeBehavior {
+ public:
+  GameDashboardBehavior()
+      : CaptureModeBehavior({CaptureModeType::kVideo,
+                             CaptureModeSource::kWindow, RecordingType::kWebM,
+                             /*audio_on=*/true,
+                             /*demo_tools_enabled=*/false}) {}
+
+  GameDashboardBehavior(const GameDashboardBehavior&) = delete;
+  GameDashboardBehavior operator=(const GameDashboardBehavior&) = delete;
+  ~GameDashboardBehavior() override = default;
+
+  // CaptureModeBehavior:
+  bool ShouldImageCaptureTypeBeAllowed() const override { return false; }
+  bool ShouldFulscreenCaptureSourceBeAllowed() const override { return false; }
+  bool ShouldRegionCaptureSourceBeAllowed() const override { return false; }
+  bool ShouldDemoToolsSettingsBeIncluded() const override { return false; }
+  bool ShouldGifBeSupported() const override { return false; }
+  bool ShouldShowUserNudge() const override { return false; }
+  bool ShouldAutoSelectFirstCamera() const override { return true; }
 };
 
 }  // namespace
@@ -73,6 +143,8 @@ std::unique_ptr<CaptureModeBehavior> CaptureModeBehavior::Create(
   switch (behavior_type) {
     case BehaviorType::kProjector:
       return std::make_unique<ProjectorBehavior>();
+    case BehaviorType::kGameDashboard:
+      return std::make_unique<GameDashboardBehavior>();
     case BehaviorType::kDefault:
       return std::make_unique<DefaultBehavior>();
   }
@@ -98,8 +170,16 @@ bool CaptureModeBehavior::ShouldWindowCaptureSourceBeAllowed() const {
   return true;
 }
 
-bool CaptureModeBehavior::ShouldAudioInputSettingsBeIncluded() const {
-  return true;
+bool CaptureModeBehavior::SupportsAudioRecordingMode(
+    AudioRecordingMode mode) const {
+  switch (mode) {
+    case AudioRecordingMode::kOff:
+    case AudioRecordingMode::kMicrophone:
+      return true;
+    case AudioRecordingMode::kSystem:
+    case AudioRecordingMode::kSystemAndMicrophone:
+      return features::IsCaptureModeAudioMixingEnabled();
+  }
 }
 
 bool CaptureModeBehavior::ShouldCameraSelectionSettingsBeIncluded() const {
@@ -128,6 +208,33 @@ bool CaptureModeBehavior::ShouldSkipVideoRecordingCountDown() const {
 
 bool CaptureModeBehavior::ShouldCreateRecordingOverlayController() const {
   return false;
+}
+
+bool CaptureModeBehavior::ShouldShowUserNudge() const {
+  return true;
+}
+
+bool CaptureModeBehavior::ShouldAutoSelectFirstCamera() const {
+  return false;
+}
+
+bool CaptureModeBehavior::RequiresCaptureFolderCreation() const {
+  return false;
+}
+
+void CaptureModeBehavior::CreateCaptureFolder(
+    OnCaptureFolderCreatedCallback callback) {
+  NOTREACHED();
+}
+
+std::vector<RecordingType> CaptureModeBehavior::GetSupportedRecordingTypes()
+    const {
+  std::vector<RecordingType> supported_recording_types;
+  supported_recording_types.push_back(RecordingType::kWebM);
+  if (features::IsGifRecordingEnabled()) {
+    supported_recording_types.push_back(RecordingType::kGif);
+  }
+  return supported_recording_types;
 }
 
 }  // namespace ash

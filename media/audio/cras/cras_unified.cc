@@ -243,6 +243,12 @@ void CrasUnifiedStream::Start(AudioSourceCallback* callback) {
     return;
   }
 
+  // Recreate `peak_detector_` everytime we create a new stream, to
+  // avoid ThreadChecker DCHECKs.
+  peak_detector_ = std::make_unique<AmplitudePeakDetector>(base::BindRepeating(
+      &AudioManager::TraceAmplitudePeak, base::Unretained(manager_),
+      /*trace_start=*/false));
+
   // Adding the stream will start the audio callbacks requesting data.
   if (libcras_client_add_pinned_stream(client_, pin_device_, &stream_id_,
                                        stream_params)) {
@@ -259,10 +265,6 @@ void CrasUnifiedStream::Start(AudioSourceCallback* callback) {
 
   // Done with config params.
   libcras_stream_params_destroy(stream_params);
-
-  peak_detector_ = std::make_unique<AmplitudePeakDetector>(base::BindRepeating(
-      &AudioManager::TraceAmplitudePeak, base::Unretained(manager_),
-      /*trace_start=*/false));
 
   is_playing_ = true;
 

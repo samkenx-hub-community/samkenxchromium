@@ -129,11 +129,19 @@
   E_CPONLY(kColorMediaRouterIconActive) \
   E_CPONLY(kColorMediaRouterIconWarning) \
   /* New tab button colors. */ \
+  E_CPONLY(kColorNewTabButtonForegroundFrameActive) \
+  E_CPONLY(kColorNewTabButtonForegroundFrameInactive) \
   E_CPONLY(kColorNewTabButtonBackgroundFrameActive) \
   E_CPONLY(kColorNewTabButtonBackgroundFrameInactive) \
   E_CPONLY(kColorNewTabButtonFocusRing) \
   E_CPONLY(kColorNewTabButtonInkDropFrameActive) \
   E_CPONLY(kColorNewTabButtonInkDropFrameInactive) \
+  /* New tab button colors for ChromeRefresh.*/ \
+  /* TODO (crbug.com/1399942) remove when theming works */ \
+  E_CPONLY(kColorNewTabButtonCRForegroundFrameActive) \
+  E_CPONLY(kColorNewTabButtonCRForegroundFrameInactive) \
+  E_CPONLY(kColorNewTabButtonCRBackgroundFrameActive) \
+  E_CPONLY(kColorNewTabButtonCRBackgroundFrameInactive) \
   /* New Tab Page colors. */ \
   E_CPONLY(kColorNewTabPageActionButtonBackground) \
   E_CPONLY(kColorNewTabPageActionButtonBorder) \
@@ -329,6 +337,8 @@
   E_CPONLY(kColorSidePanelCardBackground) \
   E_CPONLY(kColorSidePanelContentAreaSeparator) \
   E_CPONLY(kColorSidePanelContentBackground) \
+  E_CPONLY(kColorSidePanelDivider) \
+  E_CPONLY(kColorSidePanelEditFooterBorder) \
   E_CPONLY(kColorSidePanelFilterChipBorder) \
   E_CPONLY(kColorSidePanelFilterChipForeground) \
   E_CPONLY(kColorSidePanelFilterChipForegroundSelected) \
@@ -337,6 +347,7 @@
   E_CPONLY(kColorSidePanelFilterChipBackgroundHover) \
   E_CPONLY(kColorSidePanelFilterChipBackgroundSelected) \
   E_CPONLY(kColorSidePanelScrollbarThumb) \
+  E_CPONLY(kColorSidePanelTextfieldBackgroundHover) \
   E_CPONLY(kColorSidePanelTextfieldBorder) \
   /* Status bubble colors. */ \
   E_CPONLY(kColorStatusBubbleBackgroundFrameActive) \
@@ -536,6 +547,11 @@
   E_CPONLY(kColorReadAnythingDropdownSelectedDark) \
   E_CPONLY(kColorReadAnythingDropdownSelectedLight) \
   E_CPONLY(kColorReadAnythingDropdownSelectedYellow) \
+  E_CPONLY(kColorReadAnythingFocusRingBackground) \
+  E_CPONLY(kColorReadAnythingFocusRingBackgroundBlue) \
+  E_CPONLY(kColorReadAnythingFocusRingBackgroundDark) \
+  E_CPONLY(kColorReadAnythingFocusRingBackgroundLight) \
+  E_CPONLY(kColorReadAnythingFocusRingBackgroundYellow) \
 
 #if BUILDFLAG(IS_CHROMEOS)
 #define CHROME_PLATFORM_SPECIFIC_COLOR_IDS \

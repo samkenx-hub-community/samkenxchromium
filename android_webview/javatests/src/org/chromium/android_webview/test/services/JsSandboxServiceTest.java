@@ -4,6 +4,8 @@
 
 package org.chromium.android_webview.test.services;
 
+import static org.chromium.android_webview.test.OnlyRunIn.ProcessMode.SINGLE_PROCESS;
+
 import android.content.Context;
 import android.os.Build;
 
@@ -21,14 +23,16 @@ import androidx.test.filters.MediumTest;
 
 import com.google.common.util.concurrent.ListenableFuture;
 
-import org.chromium.android_webview.test.AwJUnit4ClassRunner;
-import org.chromium.base.ContextUtils;
-import org.chromium.base.test.util.DisabledTest;
-import org.chromium.base.test.util.MinAndroidSdkLevel;
 import org.junit.Assert;
 import org.junit.Assume;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+
+import org.chromium.android_webview.test.AwJUnit4ClassRunner;
+import org.chromium.android_webview.test.OnlyRunIn;
+import org.chromium.base.ContextUtils;
+import org.chromium.base.test.util.DisabledTest;
+import org.chromium.base.test.util.MinAndroidSdkLevel;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Vector;
@@ -41,6 +45,7 @@ import java.util.concurrent.TimeUnit;
 @RunWith(AwJUnit4ClassRunner.class)
 @MinAndroidSdkLevel(Build.VERSION_CODES.O)
 @RequiresApi(Build.VERSION_CODES.O)
+@OnlyRunIn(SINGLE_PROCESS)
 public class JsSandboxServiceTest {
     // This value is somewhat arbitrary. It might need bumping if V8 snapshots become significantly
     // larger in future. However, we don't want it too large as that will make the tests slower and
@@ -303,10 +308,11 @@ public class JsSandboxServiceTest {
         // The bytes of a minimal WebAssembly module, courtesy of v8/test/cctest/test-api-wasm.cc
         final byte[] bytes = {0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00};
         final String code = ""
-                + "android.consumeNamedDataAsArrayBuffer(\"id-1\").then((value) => {"
-                + " return WebAssembly.compile(value).then((module) => {"
+                + "android.consumeNamedDataAsArrayBuffer(\"id-1\").then((wasm) => {"
+                + " return WebAssembly.compile(wasm).then((module) => {"
+                + "  new WebAssembly.Instance(module);"
                 + "  return \"success\";"
-                + "  });"
+                + " });"
                 + "});";
         Context context = ContextUtils.getApplicationContext();
         ListenableFuture<JavaScriptSandbox> jsSandboxFuture =
@@ -411,7 +417,6 @@ public class JsSandboxServiceTest {
             jsIsolate.provideNamedData("id-3", bytes);
             jsIsolate.provideNamedData("id-4", bytes);
             jsIsolate.provideNamedData("id-5", bytes);
-            Thread.sleep(1000);
             ListenableFuture<String> resultFuture1 = jsIsolate.evaluateJavaScriptAsync(code);
             String result = resultFuture1.get(5, TimeUnit.SECONDS);
 

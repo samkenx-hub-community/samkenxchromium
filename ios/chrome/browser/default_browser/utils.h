@@ -93,14 +93,17 @@ bool IsBlueDotPromoEnabled();
 // manager.
 bool IsDefaultBrowserInPromoManagerEnabled();
 
+// Returns true if the default browser video promo is enabled.
+bool IsDefaultBrowserVideoPromoEnabled();
+
+// Returns true if the default browser video promo full screen enabled.
+bool IsDefaultBrowserVideoPromoFullscreenEnabled();
+
 // Returns true if the user is in the CTA experiment in the open links group.
 bool IsInCTAOpenLinksGroup();
 
 // Returns true if the user is in the CTA experiment in the switch group.
 bool IsInCTASwitchGroup();
-
-// Returns true if non modals default browser promos are enabled.
-bool NonModalPromosEnabled();
 
 // Returns true if the user has interacted with the Fullscreen Promo previously.
 // Returns false otherwise.

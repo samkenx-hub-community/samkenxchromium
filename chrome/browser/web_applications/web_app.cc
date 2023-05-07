@@ -16,7 +16,7 @@
 #include "base/strings/strcat.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_split.h"
-#include "base/strings/string_util.h"
+#include "base/strings/to_string.h"
 #include "base/values.h"
 #include "chrome/browser/web_applications/mojom/user_display_mode.mojom.h"
 #include "chrome/browser/web_applications/proto/web_app_os_integration_state.pb.h"
@@ -454,12 +454,12 @@ void WebApp::SetUrlHandlers(apps::UrlHandlers url_handlers) {
 }
 
 void WebApp::SetScopeExtensions(
-    std::vector<ScopeExtensionInfo> scope_extensions) {
+    base::flat_set<ScopeExtensionInfo> scope_extensions) {
   scope_extensions_ = std::move(scope_extensions);
 }
 
 void WebApp::SetValidatedScopeExtensions(
-    std::vector<ScopeExtensionInfo> validated_scope_extensions) {
+    base::flat_set<ScopeExtensionInfo> validated_scope_extensions) {
   validated_scope_extensions_ = std::move(validated_scope_extensions);
 }
 
@@ -637,7 +637,7 @@ base::Value WebApp::ClientData::AsDebugValue() const {
 #if BUILDFLAG(IS_CHROMEOS_ASH)
   root.Set("system_web_app_data", system_web_app_data
                                       ? system_web_app_data->AsDebugValue()
-                                      : base::Value());
+                                      : base::Value::Dict());
 #endif
   return base::Value(std::move(root));
 }
@@ -668,6 +668,13 @@ base::Value WebApp::SyncFallbackData::AsDebugValue() const {
 }
 
 WebApp::ExternalManagementConfig::ExternalManagementConfig() = default;
+WebApp::ExternalManagementConfig::ExternalManagementConfig(
+    bool is_placeholder,
+    const base::flat_set<GURL>& install_urls,
+    const base::flat_set<std::string>& additional_policy_ids)
+    : is_placeholder(is_placeholder),
+      install_urls(install_urls),
+      additional_policy_ids(additional_policy_ids) {}
 
 WebApp::ExternalManagementConfig::~ExternalManagementConfig() = default;
 
@@ -1116,6 +1123,12 @@ bool operator==(const WebApp::SyncFallbackData& sync_fallback_data1,
 bool operator!=(const WebApp::SyncFallbackData& sync_fallback_data1,
                 const WebApp::SyncFallbackData& sync_fallback_data2) {
   return !(sync_fallback_data1 == sync_fallback_data2);
+}
+
+std::ostream& operator<<(
+    std::ostream& out,
+    const WebApp::ExternalManagementConfig& management_config) {
+  return out << management_config.AsDebugValue().DebugString();
 }
 
 bool operator==(const WebApp::ExternalManagementConfig& management_config1,

@@ -18,6 +18,7 @@
 #include "ash/wm/desks/templates/restore_data_collector.h"
 #include "base/containers/flat_map.h"
 #include "base/containers/flat_set.h"
+#include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "base/observer_list.h"
 #include "base/time/time.h"
@@ -56,6 +57,7 @@ enum class DeskCloseType {
 
 class Desk;
 class DeskAnimationBase;
+class DeskBarController;
 class DeskTemplate;
 
 // Defines a controller for creating, destroying and managing virtual desks and
@@ -129,6 +131,10 @@ class ASH_EXPORT DesksController : public chromeos::DesksHelper,
   }
 
   DeskAnimationBase* animation() const { return animation_.get(); }
+
+  DeskBarController* desk_bar_controller() const {
+    return desk_bar_controller_.get();
+  }
 
   // Finds and returns the name of the desk that `desk` would be combined with
   // when the user clicks or presses the combine desks button or context menu
@@ -475,7 +481,7 @@ class ASH_EXPORT DesksController : public chromeos::DesksHelper,
 
   std::vector<std::unique_ptr<Desk>> desks_;
 
-  Desk* active_desk_ = nullptr;
+  raw_ptr<Desk, ExperimentalAsh> active_desk_ = nullptr;
 
   // Target desk if in middle of desk activation, `nullptr` otherwise.
   Desk* desk_to_activate_ = nullptr;
@@ -511,6 +517,9 @@ class ASH_EXPORT DesksController : public chromeos::DesksHelper,
   // Holds a desk when it has been removed but we are still waiting for the user
   // to confirm that they want the desk to be removed.
   std::unique_ptr<RemovedDeskData> temporary_removed_desk_;
+
+  // Dedicated controller for the desk bars.
+  std::unique_ptr<DeskBarController> desk_bar_controller_;
 
   base::ObserverList<Observer>::Unchecked observers_;
 

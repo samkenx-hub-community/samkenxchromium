@@ -1060,9 +1060,12 @@ gfx::Size BrowserView::GetWebAppFrameToolbarPreferredSize() const {
 
 #if BUILDFLAG(IS_MAC)
 bool BrowserView::UsesImmersiveFullscreenMode() const {
+  const bool is_pwa =
+      base::FeatureList::IsEnabled(features::kImmersiveFullscreenPWAs) &&
+      GetIsWebAppType();
+  const bool is_tabbed_window = GetSupportsTabStrip();
   return base::FeatureList::IsEnabled(features::kImmersiveFullscreen) &&
-         (!GetIsWebAppType() ||
-          base::FeatureList::IsEnabled(features::kImmersiveFullscreenPWAs));
+         (is_pwa || is_tabbed_window);
 }
 
 bool BrowserView::UsesImmersiveFullscreenTabbedMode() const {
@@ -2199,6 +2202,12 @@ void BrowserView::ToggleWindowControlsOverlayEnabled(base::OnceClosure done) {
 
 bool BrowserView::IsBorderlessModeEnabled() const {
   return borderless_mode_enabled_ && window_management_permission_granted_;
+}
+
+void BrowserView::ShowSidePanel(
+    absl::optional<SidePanelEntry::Id> entry_id,
+    absl::optional<SidePanelUtil::SidePanelOpenTrigger> open_trigger) {
+  side_panel_coordinator_->Show(entry_id, open_trigger);
 }
 
 bool BrowserView::AppUsesBorderlessMode() const {
@@ -3423,6 +3432,7 @@ views::View* BrowserView::CreateMacOverlayView() {
     params.type = views::Widget::InitParams::TYPE_POPUP;
     params.child = true;
     params.parent = parent->GetNativeView();
+    params.shadow_type = views::Widget::InitParams::ShadowType::kNone;
     OverlayWidget* overlay_widget = new OverlayWidget(GetWidget());
     overlay_widget->Init(std::move(params));
     overlay_widget->SetNativeWindowProperty(kBrowserViewKey, this);

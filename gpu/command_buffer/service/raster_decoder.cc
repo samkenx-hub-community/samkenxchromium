@@ -230,7 +230,7 @@ class SharedImageProviderImpl final : public cc::SharedImageProvider {
     }
 
     auto sk_image =
-        scoped_read_access->CreateSkImage(shared_context_state_->gr_context());
+        scoped_read_access->CreateSkImage(shared_context_state_.get());
     if (!sk_image) {
       ERRORSTATE_SET_GL_ERROR(error_state_, GL_INVALID_OPERATION,
                               "SharedImageProviderImpl::OpenSharedImageForRead",
@@ -713,12 +713,12 @@ class RasterDecoderImpl final : public RasterDecoder,
     static int flush_count = 0;
     const base::TimeTicks start = base::TimeTicks::Now();
     int num_planes = access->representation()->format().NumberOfPlanes();
-    auto end_state = access->TakeEndState();
     for (int plane_index = 0; plane_index < num_planes; plane_index++) {
       auto* surface = access->surface(plane_index);
       DCHECK(surface);
-      surface->flush({}, end_state.get());
+      surface->flush();
     }
+    access->ApplyBackendSurfaceEndState();
     if (flush_count < 100) {
       ++flush_count;
       base::UmaHistogramCustomMicrosecondsTimes(
@@ -2071,8 +2071,8 @@ void RasterDecoderImpl::DoWritePixelsINTERNAL(GLint x_offset,
                        "Failed to write pixels to SkCanvas");
   }
 
-  auto end_state = dest_scoped_access->TakeEndState();
-  surface->flush({}, end_state.get());
+  surface->flush();
+  dest_scoped_access->ApplyBackendSurfaceEndState();
   SubmitIfNecessary(std::move(end_semaphores));
 
   if (!dest_shared_image->IsCleared()) {
@@ -2112,11 +2112,7 @@ bool RasterDecoderImpl::DoWritePixelsINTERNALDirectTextureUpload(
       &pixmap,
       /*levels=*/1, dest_shared_image->surface_origin(), nullptr, nullptr);
 
-  if (auto end_state = dest_scoped_access->TakeEndState())
-    gr_context()->setBackendTextureState(
-        dest_scoped_access->promise_image_texture(plane_index)
-            ->backendTexture(),
-        *end_state);
+  dest_scoped_access->ApplyBackendSurfaceEndState();
 
   SubmitIfNecessary(std::move(end_semaphores));
   if (written && !dest_shared_image->IsCleared()) {
@@ -2342,7 +2338,7 @@ void RasterDecoderImpl::DoReadbackYUVImagePixelsINTERNAL(
   }
 
   auto sk_image =
-      source_scoped_access->CreateSkImage(shared_context_state_->gr_context());
+      source_scoped_access->CreateSkImage(shared_context_state_.get());
   if (!sk_image) {
     LOCAL_SET_GL_ERROR(GL_INVALID_OPERATION, "glReadbackImagePixels",
                        "Couldn't create SkImage for reading.");

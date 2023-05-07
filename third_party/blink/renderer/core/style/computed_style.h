@@ -44,6 +44,8 @@
 #include "third_party/blink/renderer/core/css/style_color.h"
 #include "third_party/blink/renderer/core/layout/geometry/box_sides.h"
 #include "third_party/blink/renderer/core/layout/geometry/logical_size.h"
+#include "third_party/blink/renderer/core/layout/geometry/physical_size.h"
+#include "third_party/blink/renderer/core/layout/ng/geometry/ng_box_strut.h"
 #include "third_party/blink/renderer/core/layout/ng/ng_outline_type.h"
 #include "third_party/blink/renderer/core/scroll/scroll_types.h"
 #include "third_party/blink/renderer/core/style/border_value.h"
@@ -57,7 +59,6 @@
 #include "third_party/blink/renderer/core/style/style_cached_data.h"
 #include "third_party/blink/renderer/core/style/style_highlight_data.h"
 #include "third_party/blink/renderer/core/style/transform_origin.h"
-#include "third_party/blink/renderer/platform/geometry/layout_rect_outsets.h"
 #include "third_party/blink/renderer/platform/geometry/length.h"
 #include "third_party/blink/renderer/platform/geometry/length_box.h"
 #include "third_party/blink/renderer/platform/geometry/length_point.h"
@@ -770,7 +771,7 @@ class ComputedStyle : public ComputedStyleBase,
   bool HasMaskBoxImageOutsets() const {
     return MaskBoxImageInternal().HasImage() && MaskBoxImageOutset().NonZero();
   }
-  LayoutRectOutsets MaskBoxImageOutsets() const {
+  NGPhysicalBoxStrut MaskBoxImageOutsets() const {
     return ImageOutsets(MaskBoxImageInternal());
   }
   const BorderImageLengthBox& MaskBoxImageOutset() const {
@@ -831,7 +832,6 @@ class ComputedStyle : public ComputedStyleBase,
   CORE_EXPORT const FontDescription& GetFontDescription() const {
     return GetFont().GetFontDescription();
   }
-  bool HasIdenticalAscentDescentAndLineGap(const ComputedStyle& other) const;
   bool HasFontRelativeUnits() const {
     return HasEmUnits() || HasRootFontRelativeUnits() ||
            HasGlyphRelativeUnits();
@@ -1008,7 +1008,7 @@ class ComputedStyle : public ComputedStyleBase,
   bool ColumnRuleIsTransparent() const {
     return !ColumnRuleColor()
                 .Resolve(GetCurrentColor(), UsedColorScheme())
-                .Alpha();
+                .AlphaAsInteger();
   }
   bool ColumnRuleEquivalent(const ComputedStyle& other_style) const;
   bool HasColumnRule() const {
@@ -1298,11 +1298,11 @@ class ComputedStyle : public ComputedStyleBase,
   }
 
   // Border utility functions
-  LayoutRectOutsets ImageOutsets(const NinePieceImage&) const;
+  NGPhysicalBoxStrut ImageOutsets(const NinePieceImage&) const;
   bool HasBorderImageOutsets() const {
     return BorderImage().HasImage() && BorderImage().Outset().NonZero();
   }
-  LayoutRectOutsets BorderImageOutsets() const {
+  NGPhysicalBoxStrut BorderImageOutsets() const {
     return ImageOutsets(BorderImage());
   }
   bool BorderImageSlicesFill() const { return BorderImage().Fill(); }
@@ -2138,7 +2138,7 @@ class ComputedStyle : public ComputedStyleBase,
   };
   void ApplyTransform(gfx::Transform&,
                       const LayoutBox* box,
-                      const LayoutSize& border_box_data_size,
+                      PhysicalSize border_box_data_size,
                       ApplyTransformOperations,
                       ApplyTransformOrigin,
                       ApplyMotionPath,
@@ -2388,7 +2388,7 @@ class ComputedStyle : public ComputedStyleBase,
            HasEffectiveAppearance() || BoxShadow();
   }
 
-  LayoutRectOutsets BoxDecorationOutsets() const;
+  NGPhysicalBoxStrut BoxDecorationOutsets() const;
 
   // Background utility functions.
   const FillLayer& BackgroundLayers() const { return BackgroundInternal(); }
@@ -2545,7 +2545,9 @@ class ComputedStyle : public ComputedStyleBase,
   static bool IsDisplayBlockContainer(EDisplay display) {
     return display == EDisplay::kBlock || display == EDisplay::kListItem ||
            display == EDisplay::kInlineBlock ||
-           display == EDisplay::kFlowRoot || display == EDisplay::kTableCell ||
+           display == EDisplay::kFlowRoot ||
+           display == EDisplay::kInlineFlowRootListItem ||
+           display == EDisplay::kTableCell ||
            display == EDisplay::kTableCaption;
   }
 
@@ -2572,6 +2574,7 @@ class ComputedStyle : public ComputedStyleBase,
 
   static bool IsDisplayReplacedType(EDisplay display) {
     return display == EDisplay::kInlineBlock ||
+           display == EDisplay::kInlineFlowRootListItem ||
            display == EDisplay::kWebkitInlineBox ||
            display == EDisplay::kInlineFlex ||
            display == EDisplay::kInlineTable ||
@@ -2638,6 +2641,9 @@ class ComputedStyle : public ComputedStyleBase,
                                 const LayoutBox* box,
                                 const gfx::RectF& bounding_box,
                                 gfx::Transform&) const;
+  PointAndTangent CalculatePointAndTangentOnBasicShape(
+      const LayoutBox* box,
+      const gfx::RectF& bounding_box) const;
   PointAndTangent CalculatePointAndTangentOnRay(
       const LayoutBox* box,
       const gfx::RectF& bounding_box) const;

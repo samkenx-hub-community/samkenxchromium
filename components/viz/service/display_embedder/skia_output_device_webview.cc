@@ -27,6 +27,7 @@ SkiaOutputDeviceWebView::SkiaOutputDeviceWebView(
     gpu::MemoryTracker* memory_tracker,
     DidSwapBufferCompleteCallback did_swap_buffer_complete_callback)
     : SkiaOutputDevice(context_state->gr_context(),
+                       context_state->graphite_context(),
                        memory_tracker,
                        std::move(did_swap_buffer_complete_callback)),
       context_state_(context_state),
@@ -50,14 +51,14 @@ SkiaOutputDeviceWebView::SkiaOutputDeviceWebView(
 
 SkiaOutputDeviceWebView::~SkiaOutputDeviceWebView() = default;
 
-bool SkiaOutputDeviceWebView::Reshape(
-    const SkSurfaceCharacterization& characterization,
-    const gfx::ColorSpace& color_space,
-    float device_scale_factor,
-    gfx::OverlayTransform transform) {
+bool SkiaOutputDeviceWebView::Reshape(const SkImageInfo& image_info,
+                                      const gfx::ColorSpace& color_space,
+                                      int sample_count,
+                                      float device_scale_factor,
+                                      gfx::OverlayTransform transform) {
   DCHECK_EQ(transform, gfx::OVERLAY_TRANSFORM_NONE);
 
-  gfx::Size size = gfx::SkISizeToSize(characterization.dimensions());
+  gfx::Size size = gfx::SkISizeToSize(image_info.dimensions());
   if (!gl_surface_->Resize(size, device_scale_factor, color_space,
                            /*has_alpha=*/true)) {
     DLOG(ERROR) << "Failed to resize.";
@@ -65,7 +66,7 @@ bool SkiaOutputDeviceWebView::Reshape(
   }
 
   size_ = size;
-  sk_color_space_ = characterization.refColorSpace();
+  sk_color_space_ = image_info.refColorSpace();
   InitSkiaSurface(gl_surface_->GetBackingFramebufferObject());
   return !!sk_surface_;
 }

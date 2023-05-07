@@ -26,7 +26,7 @@ class GoogleDriveTestBrowserProxy extends TestBrowserProxy implements
   observerRemote: GoogleDrivePageRemote;
 
   constructor() {
-    super(['calculateRequiredSpace']);
+    super(['calculateRequiredSpace', 'getTotalPinnedSize', 'clearPinnedFiles']);
     this.handler = TestMock.fromClass(GoogleDrivePageHandlerRemote);
     this.observer = new GoogleDrivePageCallbackRouter();
     this.observerRemote = this.observer.$.bindNewPipeAndPassRemote();
@@ -48,6 +48,8 @@ suite('<settings-google-drive-subpage>', function() {
   let connectDisconnectButton: CrButtonElement;
   let testBrowserProxy: GoogleDriveTestBrowserProxy;
   let bulkPinningToggle: SettingsToggleButtonElement;
+  let offlineStorageSubtitle: HTMLDivElement;
+  let clearOfflineStorageButton: CrButtonElement;
 
   /**
    * Helper to ensure a confirmation dialog is showing, retrieve a button in the
@@ -97,6 +99,12 @@ suite('<settings-google-drive-subpage>', function() {
     bulkPinningToggle =
         querySelectorShadow(page.shadowRoot!, ['#driveBulkPinning']) as
         SettingsToggleButtonElement;
+
+    offlineStorageSubtitle = page.shadowRoot!.querySelector<HTMLDivElement>(
+        '#drive-offline-storage-row .secondary')!;
+
+    clearOfflineStorageButton = page.shadowRoot!.querySelector<CrButtonElement>(
+        '#drive-offline-storage-row cr-button')!;
   });
 
   teardown(function() {
@@ -336,4 +344,66 @@ suite('<settings-google-drive-subpage>', function() {
         assertFalse(
             bulkPinningToggle.checked, 'Pinning toggle should not be toggled');
       });
+
+  test('free space shows the offline value returned', async function() {
+    // Send back a normal pinned size result.
+    testBrowserProxy.handler.setResultFor(
+        'getTotalPinnedSize', {size: '100 MB'});
+    page.onNavigated();
+    await assertAsync(() => offlineStorageSubtitle.innerText === '100 MB');
+
+    // Mock an empty pinned size (size is there but an empty string).
+    testBrowserProxy.handler.setResultFor('getTotalPinnedSize', {size: ''});
+    page.onNavigated();
+
+    await assertAsync(() => offlineStorageSubtitle.innerText === 'Unknown');
+  });
+
+  test(
+      'clear offline files disabled when bulk pinning enabled',
+      async function() {
+        page.setPrefValue('drivefs.bulk_pinning_enabled', false);
+        testBrowserProxy.observerRemote.onProgress({
+          remainingSpace: 'x',
+          requiredSpace: 'y',
+          stage: Stage.kStopped,
+          isError: false,
+        });
+        testBrowserProxy.observerRemote.$.flushForTesting();
+        await assertAsync(() => !clearOfflineStorageButton.disabled);
+
+        page.setPrefValue('drivefs.bulk_pinning_enabled', true);
+        testBrowserProxy.observerRemote.onProgress({
+          remainingSpace: 'x',
+          requiredSpace: 'y',
+          stage: Stage.kSyncing,
+          isError: false,
+        });
+        testBrowserProxy.observerRemote.$.flushForTesting();
+        await assertAsync(() => clearOfflineStorageButton.disabled);
+      });
+
+  test('when clear offline files clicked show dialog', async function() {
+    page.setPrefValue('drivefs.bulk_pinning_enabled', false);
+
+    clearOfflineStorageButton.click();
+    await assertAsync(
+        () =>
+            page.dialogType === ConfirmationDialogType.BULK_PINNING_CLEAR_FILES,
+        5000);
+    await clickConfirmationDialogButton('.cancel-button');
+    assertEquals(testBrowserProxy.handler.getCallCount('clearPinnedFiles'), 0);
+
+    testBrowserProxy.handler.setResultFor(
+        'getTotalPinnedSize', {size: '100 MB'});
+
+    clearOfflineStorageButton.click();
+    await assertAsync(
+        () =>
+            page.dialogType === ConfirmationDialogType.BULK_PINNING_CLEAR_FILES,
+        5000);
+    await clickConfirmationDialogButton('.action-button');
+    await assertAsync(
+        () => testBrowserProxy.handler.getCallCount('clearPinnedFiles') === 1);
+  });
 });

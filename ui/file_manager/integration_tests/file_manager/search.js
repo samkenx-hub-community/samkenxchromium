@@ -7,7 +7,7 @@ import {addEntries, ENTRIES, EntryType, getCaller, getDateWithDayDiff, pending, 
 import {testcase} from '../testcase.js';
 
 import {mountCrostini, navigateWithDirectoryTree, remoteCall, setupAndWaitUntilReady} from './background.js';
-import {BASIC_DRIVE_ENTRY_SET, BASIC_FAKE_ENTRY_SET, BASIC_LOCAL_ENTRY_SET, NESTED_ENTRY_SET} from './test_data.js';
+import {BASIC_ANDROID_ENTRY_SET, BASIC_DRIVE_ENTRY_SET, BASIC_FAKE_ENTRY_SET, BASIC_LOCAL_ENTRY_SET, NESTED_ENTRY_SET} from './test_data.js';
 
 /**
  * @param {string} appId The ID that identifies the files app.
@@ -392,6 +392,20 @@ testcase.searchWithRecencyOptions = async () => {
 };
 
 /**
+ * Checks that when searching Google Drive we correctly match on name, not on
+ * contents.
+ */
+testcase.matchDriveFilesByName = async () => {
+  const appId =
+      await setupAndWaitUntilReady(RootPath.DRIVE, BASIC_LOCAL_ENTRY_SET, [
+        ENTRIES.image2,
+      ]);
+  await remoteCall.typeSearchText(appId, 'image2');
+  await remoteCall.waitForFiles(
+      appId, TestEntryInfo.getExpectedRows([ENTRIES.image2]));
+};
+
+/**
  * Checks that changing recency options correctly filters search results on
  * drive.
  */
@@ -766,6 +780,11 @@ testcase.searchHierarchy = async () => {
     targetPath: 'drive-hello.txt',
     nameText: 'drive-hello.txt',
   });
+  // hello file stored in playfiles.
+  const playfilesHello = ENTRIES.hello.cloneWith({
+    targetPath: 'Documents/playfile-hello.txt',
+    nameText: 'playfile-hello.txt',
+  });
 
   // Set up the app. This creates entries in My files and Drive.
   const appId = await setupAndWaitUntilReady(
@@ -778,11 +797,13 @@ testcase.searchHierarchy = async () => {
   // Add Linux files.
   await mountCrostini(appId);
 
-  // Add custom hello files to Linux, and USB.
+  // Add custom hello files to Linux, USB, and PlayFiles.
+  await addEntries(['android_files'], BASIC_ANDROID_ENTRY_SET.concat([
+    ENTRIES.directoryDocuments,
+    playfilesHello,
+  ]));
   await addEntries(['usb'], [usbHello]);
   await addEntries(['crostini'], [linuxHello]);
-
-  // TODO(b:273843598): Add Play Files
 
   // Move to a nested directory under My files.
   await navigateWithDirectoryTree(appId, '/My files/Downloads/photos');
@@ -804,6 +825,7 @@ testcase.searchHierarchy = async () => {
         myFilesHello,
         photosHello,
         linuxHello,
+        playfilesHello,
       ]),
       {ignoreLastModifiedTime: true});
 
@@ -818,8 +840,33 @@ testcase.searchHierarchy = async () => {
         myFilesHello,
         photosHello,
         linuxHello,
+        playfilesHello,
         driveHello,
         usbHello,
       ]),
       {ignoreLastModifiedTime: true});
+};
+
+/**
+ * Checks that search is not visible when in the Trash volume.
+ */
+testcase.hideSearchInTrash = async () => {
+  const appId = await setupAndWaitUntilReady(RootPath.DOWNLOADS);
+  // Make sure that the search button is visible in Downloads.
+  await remoteCall.waitForElement(appId, '#search-button');
+  let searchButton = await remoteCall.waitForElementStyles(
+      appId, ['#search-button'], ['display']);
+  chrome.test.assertTrue(searchButton.styles['display'] !== 'none');
+
+  // Navigate to Trash and confirm that the search button is now hidden.
+  await navigateWithDirectoryTree(appId, '/Trash');
+  searchButton = await remoteCall.waitForElementStyles(
+      appId, ['#search-button'], ['display']);
+  chrome.test.assertTrue(searchButton.styles['display'] === 'none');
+
+  // Go back to Downloads and confirm that the search button is visible again.
+  await navigateWithDirectoryTree(appId, '/My files/Downloads');
+  searchButton = await remoteCall.waitForElementStyles(
+      appId, ['#search-button'], ['display']);
+  chrome.test.assertTrue(searchButton.styles['display'] !== 'none');
 };

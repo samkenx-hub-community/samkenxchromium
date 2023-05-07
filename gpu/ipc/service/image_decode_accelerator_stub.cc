@@ -17,6 +17,7 @@
 #include "base/functional/callback_helpers.h"
 #include "base/location.h"
 #include "base/logging.h"
+#include "base/memory/raw_ptr.h"
 #include "base/numerics/checked_math.h"
 #include "base/numerics/safe_conversions.h"
 #include "base/task/single_thread_task_runner.h"
@@ -68,7 +69,7 @@ namespace {
 
 struct CleanUpContext {
   scoped_refptr<base::SingleThreadTaskRunner> main_task_runner;
-  SharedContextState* shared_context_state = nullptr;
+  raw_ptr<SharedContextState, ExperimentalAsh> shared_context_state = nullptr;
   std::unique_ptr<SkiaImageRepresentation> skia_representation;
   std::unique_ptr<SkiaImageRepresentation::ScopedReadAccess> skia_scoped_access;
 };
@@ -299,7 +300,8 @@ void ImageDecodeAcceleratorStub::ProcessCompletedDecode(
             mailbox, std::move(plane_handle), plane_format,
             gfx::BufferPlane::DEFAULT, plane_size, gfx::ColorSpace(),
             kTopLeft_GrSurfaceOrigin, kOpaque_SkAlphaType,
-            SHARED_IMAGE_USAGE_RASTER | SHARED_IMAGE_USAGE_OOP_RASTERIZATION)) {
+            SHARED_IMAGE_USAGE_RASTER | SHARED_IMAGE_USAGE_OOP_RASTERIZATION,
+            "ImageDecodeAccelerator")) {
       DLOG(ERROR) << "Could not create SharedImage";
       return;
     }
@@ -349,7 +351,7 @@ void ImageDecodeAcceleratorStub::ProcessCompletedDecode(
     resource->skia_scoped_access = std::move(skia_scoped_access);
 
     plane_sk_images[plane] = resource->skia_scoped_access->CreateSkImage(
-        shared_context_state->gr_context(), CleanUpResource, resource);
+        shared_context_state.get(), CleanUpResource, resource);
     if (!plane_sk_images[plane]) {
       DLOG(ERROR) << "Could not create planar SkImage";
       return;

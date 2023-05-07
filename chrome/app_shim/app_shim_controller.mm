@@ -235,14 +235,14 @@ bool AppShimController::FindOrLaunchChrome() {
       chrome_bundle_path, browser_command_line, /*url_specs=*/{},
       {.create_new_instance = true},
       base::BindOnce(
-          [](AppShimController* shim_controller,
-             base::expected<NSRunningApplication*, NSError*> result) {
-            if (!result.has_value()) {
+          [](AppShimController* shim_controller, NSRunningApplication* app,
+             NSError* error) {
+            if (error) {
               LOG(FATAL) << "Failed to launch Chrome.";
             }
 
             shim_controller->chrome_launched_by_app_.reset(
-                result.value(), base::scoped_policy::RETAIN);
+                app, base::scoped_policy::RETAIN);
 
             // Start polling to see if Chrome is ready to connect.
             shim_controller->PollForChromeReady(kPollTimeoutSeconds);
@@ -509,17 +509,17 @@ void AppShimController::CreateRenderWidgetHostNSView(
     mojo::ScopedInterfaceEndpointHandle host_handle,
     mojo::ScopedInterfaceEndpointHandle view_request_handle) {
   remote_cocoa::RenderWidgetHostViewMacDelegateCallback
-      responder_delegate_creation_callback = base::BindOnce(
-          &AppShimController::CreateRenderWidgetHostViewDelegate, view_id);
+      responder_delegate_creation_callback =
+          base::BindOnce(&AppShimController::GetDelegateForHost, view_id);
   remote_cocoa::CreateRenderWidgetHostNSView(
       view_id, std::move(host_handle), std::move(view_request_handle),
       std::move(responder_delegate_creation_callback));
 }
 
 NSObject<RenderWidgetHostViewMacDelegate>*
-AppShimController::CreateRenderWidgetHostViewDelegate(uint64_t view_id) {
-  return [[AppShimRenderWidgetHostViewMacDelegate alloc]
-      initWithRenderWidgetHostNSViewID:view_id];
+AppShimController::GetDelegateForHost(uint64_t view_id) {
+  return [[[AppShimRenderWidgetHostViewMacDelegate alloc]
+      initWithRenderWidgetHostNSViewID:view_id] autorelease];
 }
 
 void AppShimController::CreateCommandDispatcherForWidget(uint64_t widget_id) {

@@ -39,7 +39,6 @@
 #import "components/pref_registry/pref_registry_syncable.h"
 #import "components/prefs/pref_service.h"
 #import "components/proxy_config/pref_proxy_config_tracker_impl.h"
-#import "components/reading_list/core/reading_list_pref_names.h"
 #import "components/safe_browsing/core/common/safe_browsing_prefs.h"
 #import "components/search_engines/template_url_prepopulate_data.h"
 #import "components/segmentation_platform/embedder/default_model/device_switcher_result_dispatcher.h"
@@ -59,14 +58,15 @@
 #import "components/variations/service/variations_service.h"
 #import "components/web_resource/web_resource_pref_names.h"
 #import "ios/chrome/app/variations_app_state_agent.h"
-#import "ios/chrome/browser/browser_state/browser_state_info_cache.h"
 #import "ios/chrome/browser/first_run/first_run.h"
 #import "ios/chrome/browser/memory/memory_debugger_manager.h"
 #import "ios/chrome/browser/metrics/ios_chrome_metrics_service_client.h"
+#import "ios/chrome/browser/ntp/set_up_list_prefs.h"
 #import "ios/chrome/browser/policy/policy_util.h"
 #import "ios/chrome/browser/prefs/pref_names.h"
 #import "ios/chrome/browser/prerender/prerender_pref.h"
 #import "ios/chrome/browser/push_notification/push_notification_service.h"
+#import "ios/chrome/browser/shared/model/browser_state/browser_state_info_cache.h"
 #import "ios/chrome/browser/shared/public/features/features.h"
 #import "ios/chrome/browser/ui/authentication/signin/signin_coordinator.h"
 #import "ios/chrome/browser/ui/authentication/signin_promo_view_mediator.h"
@@ -120,6 +120,10 @@ const char kPrefPromoObject[] = "ios.ntppromo";
 // Deprecated 11/2022.
 const char kLocalConsentsDictionary[] = "local_consents";
 
+// Deprecated 12/2022.
+const char kDeprecatedReadingListHasUnseenEntries[] =
+    "reading_list.has_unseen_entries";
+
 // Deprecated 01/2023.
 const char* kTrialGroupMICeAndDefaultBrowserVersionPrefName =
     "fre_refactoring_mice_and_default_browser.trial_version";
@@ -139,6 +143,7 @@ void RegisterLocalStatePrefs(PrefRegistrySimple* registry) {
   policy::PolicyStatisticsCollector::RegisterPrefs(registry);
   PrefProxyConfigTrackerImpl::RegisterPrefs(registry);
   sessions::SessionIdGenerator::RegisterPrefs(registry);
+  set_up_list_prefs::RegisterPrefs(registry);
   update_client::RegisterPrefs(registry);
   variations::VariationsService::RegisterPrefs(registry);
   new_tab_page_retention_field_trial::RegisterLocalStatePrefs(registry);
@@ -233,6 +238,9 @@ void RegisterLocalStatePrefs(PrefRegistrySimple* registry) {
   // Preferences related to tab grid.
   // Default to 0 which is the unassigned value.
   registry->RegisterIntegerPref(prefs::kInactiveTabsTimeThreshold, 0);
+
+  registry->RegisterIntegerPref(prefs::kIosSyncSegmentsNewTabPageDisplayCount,
+                                0);
 }
 
 void RegisterBrowserStatePrefs(user_prefs::PrefRegistrySyncable* registry) {
@@ -366,6 +374,9 @@ void RegisterBrowserStatePrefs(user_prefs::PrefRegistrySyncable* registry) {
 
   registry->RegisterDictionaryPref(kPrefPromoObject);
 
+  // Register pref storing whether Web Inspector support is enabled.
+  registry->RegisterBooleanPref(prefs::kWebInspectorEnabled, false);
+
   // Register prerender network prediction preferences.
   registry->RegisterIntegerPref(
       prefs::kNetworkPredictionSetting,
@@ -384,6 +395,8 @@ void RegisterBrowserStatePrefs(user_prefs::PrefRegistrySyncable* registry) {
   registry->RegisterBooleanPref(prefs::kBrowserLockdownModeEnabled, false);
 
   ntp_snippets::prefs::RegisterProfilePrefsForMigrationApril2023(registry);
+
+  registry->RegisterBooleanPref(kDeprecatedReadingListHasUnseenEntries, false);
 }
 
 // This method should be periodically pruned of year+ old migrations.
@@ -438,7 +451,7 @@ void MigrateObsoleteBrowserStatePrefs(PrefService* prefs) {
   prefs->ClearPref(kPrefPromoObject);
 
   // Added 06/2022.
-  syncer::MigrateSyncRequestedPrefPostMice(prefs);
+  syncer::SyncPrefs::MigrateSyncRequestedPrefPostMice(prefs);
 
   // Added 09/2022
   prefs->ClearPref(kDataSaverEnabled);
@@ -456,7 +469,7 @@ void MigrateObsoleteBrowserStatePrefs(PrefService* prefs) {
   }
 
   // Added 12/2022.
-  prefs->ClearPref(reading_list::prefs::kDeprecatedReadingListHasUnseenEntries);
+  prefs->ClearPref(kDeprecatedReadingListHasUnseenEntries);
 
   // Added 04/2023.
   ntp_snippets::prefs::MigrateObsoleteProfilePrefsApril2023(prefs);

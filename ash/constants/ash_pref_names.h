@@ -55,6 +55,8 @@ extern const char kQuirksClientLastServerCheck[];
 COMPONENT_EXPORT(ASH_CONSTANTS)
 extern const char kDeviceWiFiFastTransitionEnabled[];
 COMPONENT_EXPORT(ASH_CONSTANTS)
+extern const char kHasHotspotUsedBefore[];
+COMPONENT_EXPORT(ASH_CONSTANTS)
 extern const char kInputNoiseCancellationEnabled[];
 COMPONENT_EXPORT(ASH_CONSTANTS)
 extern const char kMultitaskMenuNudgeClamshellShownCount[];
@@ -70,6 +72,8 @@ COMPONENT_EXPORT(ASH_CONSTANTS)
 extern const char kSamlPasswordExpirationTime[];
 COMPONENT_EXPORT(ASH_CONSTANTS)
 extern const char kSamlPasswordChangeUrl[];
+COMPONENT_EXPORT(ASH_CONSTANTS)
+extern const char kShortcutCustomizationOverrides[];
 COMPONENT_EXPORT(ASH_CONSTANTS)
 extern const char kSyncOobeCompleted[];
 COMPONENT_EXPORT(ASH_CONSTANTS)
@@ -624,6 +628,9 @@ extern const char kPersonalizationKeyboardBacklightColorDisplayType[];
 
 COMPONENT_EXPORT(ASH_CONSTANTS)
 extern const char kShowTouchpadScrollScreenEnabled[];
+
+COMPONENT_EXPORT(ASH_CONSTANTS)
+extern const char kShowDisplaySizeScreenEnabled[];
 
 COMPONENT_EXPORT(ASH_CONSTANTS) extern const char kAutozoomState[];
 

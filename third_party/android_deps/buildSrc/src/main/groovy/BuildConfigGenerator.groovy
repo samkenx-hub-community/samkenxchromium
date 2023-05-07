@@ -61,6 +61,7 @@ class BuildConfigGenerator extends DefaultTask {
         com_almworks_sqlite4java_sqlite4java: '//third_party/sqlite4java:sqlite4java_java',
         com_jakewharton_android_repackaged_dalvik_dx: '//third_party/aosp_dalvik:aosp_dalvik_dx_java',
         junit_junit: '//third_party/junit:junit',
+        net_bytebuddy_byte_buddy_android: '//third_party/byte_buddy:byte_buddy_android_java',
         org_hamcrest_hamcrest_core: '//third_party/hamcrest:hamcrest_core_java',
         org_hamcrest_hamcrest_integration: '//third_party/hamcrest:hamcrest_integration_java',
         org_hamcrest_hamcrest_library: '//third_party/hamcrest:hamcrest_library_java',
@@ -638,7 +639,8 @@ class BuildConfigGenerator extends DefaultTask {
         switch (dependencyId) {
             case 'androidx_annotation_annotation_jvm':
                 sb.append('  # https://crbug.com/989505\n')
-                sb.append('  jar_excluded_patterns = ["META-INF/proguard/*"]\n')
+                sb.append('  jar_excluded_patterns = [ "META-INF/proguard/*" ]\n')
+                sb.append('  proguard_configs = [ "androidx_annotations.flags" ]\n')
                 break
             case 'androidx_benchmark_benchmark_macro':
                 // Manually add dep onto DISALLOWED_DEP androidx.profileinstaller.
@@ -833,6 +835,8 @@ class BuildConfigGenerator extends DefaultTask {
             case 'androidx_preference_preference':
                 sb.append('''\
                 |  bytecode_rewriter_target = "//build/android/bytecode:fragment_activity_replacer"
+                |
+                |  proguard_configs = [ "androidx_preferences.flags" ]
                 |'''.stripMargin())
                 // Replace broad library -keep rules with a more limited set in
                 // chrome/android/java/proguard.flags instead.
@@ -926,18 +930,28 @@ class BuildConfigGenerator extends DefaultTask {
                 sb.append('  # this for other purposes, change buildCompileNoDeps in build.gradle.\n')
                 sb.append('  visibility = [ "//build/android/unused_resources:*" ]\n')
                 break
-            case 'net_bytebuddy_byte_buddy_android':
             case 'net_bytebuddy_byte_buddy_agent':
             case 'net_bytebuddy_byte_buddy':
                 sb.append('  # Can\'t find com.sun.jna / dalvik.system classes.\n')
                 sb.append('  enable_bytecode_checks = false\n')
                 break
             case 'org_jetbrains_kotlinx_kotlinx_coroutines_android':
+            case 'org_jetbrains_kotlinx_kotlinx_coroutines_guava':
                 sb.append('requires_android = true')
+                break
+            case 'org_mockito_mockito_android':
+                sb.append('  # Depends on third_party/byte_buddy:byte_buddy_android_java\n')
+                sb.append('  requires_android = true\n')
                 break
             case 'org_mockito_mockito_core':
                 sb.append('  # Can\'t find org.opentest4j.AssertionFailedError classes.\n')
                 sb.append('  enable_bytecode_checks = false\n')
+                sb.append('  # Uses java.time which does not exist until API 26.\n')
+                sb.append('  # Modifications are added in third_party/mockito.\n')
+                sb.append('  jar_excluded_patterns = [\n')
+                sb.append('    "org/mockito/internal/junit/ExceptionFactory*",\n')
+                sb.append('    "org/mockito/internal/stubbing/defaultanswers/ReturnsEmptyValues*",\n')
+                sb.append('  ]')
                 break
         }
     }

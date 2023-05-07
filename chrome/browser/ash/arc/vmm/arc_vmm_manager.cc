@@ -7,11 +7,13 @@
 #include "ash/accelerators/accelerator_controller_impl.h"
 #include "ash/components/arc/arc_browser_context_keyed_service_factory_base.h"
 #include "ash/components/arc/arc_features.h"
+#include "ash/components/arc/arc_util.h"
 #include "ash/public/cpp/accelerators.h"
 #include "ash/shell.h"
 #include "base/feature_list.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
+#include "base/memory/raw_ptr.h"
 #include "base/task/thread_pool.h"
 #include "chrome/browser/ash/arc/vmm/arc_vmm_swap_scheduler.h"
 #include "chromeos/ash/components/dbus/concierge/concierge_client.h"
@@ -117,7 +119,7 @@ void ArcVmmManager::SendSwapRequest(
   }
 
   vm_tools::concierge::SwapVmRequest request;
-  request.set_name("arcvm");
+  request.set_name(kArcVmName);
   request.set_owner_id(user_id_hash_);
   request.set_operation(operation);
   client->SwapVm(
@@ -173,7 +175,7 @@ class ArcVmmManager::AcceleratorTarget : public ui::AcceleratorTarget {
   bool CanHandleAccelerators() const override { return true; }
 
   // The manager responsible for executing vmm commands.
-  ArcVmmManager* const manager_;
+  const raw_ptr<ArcVmmManager, ExperimentalAsh> manager_;
 
   // The accelerator to enable vmm swap for ARCVM.
   const ui::Accelerator vmm_swap_enabled_;

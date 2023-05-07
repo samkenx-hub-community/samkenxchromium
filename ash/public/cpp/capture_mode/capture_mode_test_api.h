@@ -9,6 +9,7 @@
 #include "ash/capture_mode/capture_mode_types.h"
 #include "base/files/file_path.h"
 #include "base/functional/callback_forward.h"
+#include "base/memory/raw_ptr.h"
 #include "base/memory/scoped_refptr.h"
 
 namespace aura {
@@ -106,13 +107,13 @@ class ASH_EXPORT CaptureModeTestApi {
   // finished.
   void SetOnVideoRecordCountdownFinishedCallback(base::OnceClosure callback);
 
-  // Sets whether or not audio will be recorded when capturing a video. Should
-  // only be called before recording starts, otherwise it has no effect.
-  void SetAudioRecordingEnabled(bool enabled);
+  // Sets the audio recording mode when capturing a video. Should only be called
+  // before recording starts, otherwise it has no effect.
+  void SetAudioRecordingMode(AudioRecordingMode mode);
 
-  // Returns the effective enabled state of audio recording which takes into
-  // account the `AudioCaptureAllowed` policy.
-  bool GetAudioRecordingEnabled() const;
+  // Returns the effective mode of audio recording which takes into account the
+  // `AudioCaptureAllowed` policy.
+  AudioRecordingMode GetEffectiveAudioRecordingMode() const;
 
   // Flushes the recording service pipe synchronously. Can only be called while
   // recording is in progress.
@@ -161,7 +162,7 @@ class ASH_EXPORT CaptureModeTestApi {
   // image capture otherwise.
   void SetType(bool for_video);
 
-  CaptureModeController* const controller_;
+  const raw_ptr<CaptureModeController, ExperimentalAsh> controller_;
 };
 
 }  // namespace ash

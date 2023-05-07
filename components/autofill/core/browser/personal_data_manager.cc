@@ -70,8 +70,10 @@
 #include "components/signin/public/base/consent_level.h"
 #include "components/signin/public/identity_manager/account_info.h"
 #include "components/signin/public/identity_manager/identity_manager.h"
+#include "components/sync/base/user_selectable_type.h"
 #include "components/sync/driver/sync_service.h"
 #include "components/sync/driver/sync_service_utils.h"
+#include "components/sync/driver/sync_user_settings.h"
 #include "components/version_info/version_info.h"
 #include "third_party/libaddressinput/src/cpp/include/libaddressinput/address_data.h"
 #include "third_party/libaddressinput/src/cpp/include/libaddressinput/address_formatter.h"
@@ -368,9 +370,13 @@ void PersonalDataManager::Init(
     return;
   }
 
-  database_helper_->GetLocalDatabase()->SetAutofillProfileChangedCallback(
-      base::BindRepeating(&PersonalDataManager::OnAutofillProfileChanged,
-                          weak_factory_.GetWeakPtr()));
+  // No profile change callbacks are expected in the Incognito mode, this check ensures
+  // that the origin profile (which is actually used) change callback is not overridden.
+  if (!is_off_the_record) {
+    database_helper_->GetLocalDatabase()->SetAutofillProfileChangedCallback(
+        base::BindRepeating(&PersonalDataManager::OnAutofillProfileChanged,
+                            weak_factory_.GetWeakPtr()));
+  }
 
   Refresh();
 
@@ -604,15 +610,12 @@ void PersonalDataManager::OnStateChanged(syncer::SyncService* sync_service) {
     observer.OnPersonalDataSyncStateChanged();
   }
 
-  if (base::FeatureList::IsEnabled(
-          features::kAutofillEnableAccountWalletStorage)) {
-    // Use the ephemeral account storage when the user didn't enable the sync
-    // feature explicitly. `sync_service` is nullptr-checked because this
-    // method can also be used (apart from the Sync service observer's calls) in
-    // SetSyncService() where setting a nullptr is possible.
-    database_helper_->SetUseAccountStorageForServerData(
-        sync_service && !sync_service->IsSyncFeatureEnabled());
-  }
+  // Use the ephemeral account storage when the user didn't enable the sync
+  // feature explicitly. `sync_service` is nullptr-checked because this
+  // method can also be used (apart from the Sync service observer's calls) in
+  // SetSyncService() where setting a nullptr is possible.
+  database_helper_->SetUseAccountStorageForServerData(
+      sync_service && !sync_service->IsSyncFeatureEnabled());
 }
 
 void PersonalDataManager::OnSyncShutdown(syncer::SyncService* sync_service) {
@@ -665,10 +668,8 @@ AutofillSyncSigninState PersonalDataManager::GetSyncSigninState() const {
     return AutofillSyncSigninState::kSignedInAndSyncFeatureEnabled;
   }
 
-  // Check if the feature is enabled and if Wallet data types are supported.
-  if (base::FeatureList::IsEnabled(
-          features::kAutofillEnableAccountWalletStorage) &&
-      sync_service_->GetActiveDataTypes().Has(syncer::AUTOFILL_WALLET_DATA)) {
+  // Check if Wallet data types are supported.
+  if (sync_service_->GetActiveDataTypes().Has(syncer::AUTOFILL_WALLET_DATA)) {
     return AutofillSyncSigninState::kSignedInAndWalletSyncTransportEnabled;
   }
 
@@ -1585,9 +1586,7 @@ bool PersonalDataManager::ShouldSuggestServerCards() const {
     return false;
 
   // Check if the user is in sync transport mode for wallet data.
-  if (!sync_service_->IsSyncFeatureEnabled() &&
-      base::FeatureList::IsEnabled(
-          features::kAutofillEnableAccountWalletStorage)) {
+  if (!sync_service_->IsSyncFeatureEnabled()) {
     // For SyncTransport, only show server cards if the user has opted in to
     // seeing them in the dropdown.
     if (!prefs::IsUserOptedInWalletSyncTransport(
@@ -1869,9 +1868,10 @@ void PersonalDataManager::RemoveStrikesToBlockProfileUpdate(
   GetProfileUpdateStrikeDatabase()->ClearStrikes(guid);
 }
 
-bool PersonalDataManager::IsSyncEnabledFor(syncer::ModelType model_type) const {
+bool PersonalDataManager::IsSyncEnabledFor(
+    syncer::UserSelectableType data_type) const {
   return sync_service_ != nullptr && sync_service_->CanSyncFeatureStart() &&
-         sync_service_->GetPreferredDataTypes().Has(model_type);
+         sync_service_->GetUserSettings()->GetSelectedTypes().Has(data_type);
 }
 
 bool PersonalDataManager::IsAutofillPaymentMethodsMandatoryReauthEnabled() {
@@ -2231,18 +2231,14 @@ std::string PersonalDataManager::MostCommonCountryCodeFromProfiles() const {
 
   // Count up country codes from existing profiles.
   std::map<std::string, int> votes;
-  // TODO(estade): can we make this GetProfiles() instead? It seems to cause
-  // errors in tests on mac trybots. See http://crbug.com/57221
   const std::vector<AutofillProfile*>& profiles = GetProfiles();
   const std::vector<std::string>& country_codes =
       CountryDataMap::GetInstance()->country_codes();
   for (auto* profile : profiles) {
     std::string country_code = base::ToUpperASCII(
         base::UTF16ToASCII(profile->GetRawInfo(ADDRESS_HOME_COUNTRY)));
-
     if (base::Contains(country_codes, country_code)) {
-      // Verified profiles count 100x more than unverified ones.
-      votes[country_code] += profile->IsVerified() ? 100 : 1;
+      votes[country_code]++;
     }
   }
 
@@ -2324,12 +2320,6 @@ bool PersonalDataManager::ShouldShowCardsFromAccountOption() const {
       GetServerCreditCards().empty()) {
     return false;
   }
-
-  // If we have not returned yet, it should mean that the user is in Sync
-  // Transport mode for Wallet data (Sync Feature disabled but has server
-  // cards). This should only happen if that feature is enabled.
-  DCHECK(base::FeatureList::IsEnabled(
-      features::kAutofillEnableAccountWalletStorage));
 
   bool is_opted_in = prefs::IsUserOptedInWalletSyncTransport(
       pref_service_, sync_service_->GetAccountInfo().account_id);

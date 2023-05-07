@@ -375,6 +375,12 @@ bool SidePanelCoordinator::IsSidePanelShowing() const {
 }
 
 bool SidePanelCoordinator::IsSidePanelEntryShowing(
+    const SidePanelEntry::Key& entry_key) const {
+  return IsSidePanelShowing() && current_entry_ &&
+         current_entry_->key() == entry_key;
+}
+
+bool SidePanelCoordinator::IsSidePanelEntryShowing(
     const SidePanelEntry* entry) const {
   return IsSidePanelShowing() && current_entry_ &&
          current_entry_.get() == entry;
@@ -539,12 +545,11 @@ void SidePanelCoordinator::PopulateSidePanel(
   } else {
     content->RequestFocus();
   }
-  header_open_in_new_tab_button_->SetVisible(
-      current_entry_->SupportsNewTabButton());
   UpdateNewTabButtonState();
   if (auto* side_panel_container =
           browser_view_->toolbar()->side_panel_container()) {
     UpdateHeaderPinButtonState();
+    side_panel_container->UpdateSidePanelContainerButtonsState();
   }
 }
 
@@ -935,8 +940,10 @@ void SidePanelCoordinator::OnTabStripModelChanged(
 
 void SidePanelCoordinator::UpdateNewTabButtonState() {
   if (header_open_in_new_tab_button_ && current_entry_) {
-    header_open_in_new_tab_button_->SetEnabled(
-        current_entry_->GetOpenInNewTabURL().is_valid());
+    bool has_open_in_new_tab_button =
+        current_entry_->SupportsNewTabButton() &&
+        current_entry_->GetOpenInNewTabURL().is_valid();
+    header_open_in_new_tab_button_->SetVisible(has_open_in_new_tab_button);
   }
 }
 

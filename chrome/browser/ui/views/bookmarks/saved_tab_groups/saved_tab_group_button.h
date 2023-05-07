@@ -72,12 +72,14 @@ class SavedTabGroupButton : public views::MenuButton,
     return tab_group_color_id_;
   }
 
-  const base::GUID guid() const { return guid_; }
+  const base::Uuid guid() const { return guid_; }
 
   DECLARE_CLASS_ELEMENT_IDENTIFIER_VALUE(kDeleteGroupMenuItem);
   DECLARE_CLASS_ELEMENT_IDENTIFIER_VALUE(kMoveGroupToNewWindowMenuItem);
 
  private:
+  std::u16string GetAccessibleNameForButton();
+  void SetTextProperties(const SavedTabGroup& group);
   void UpdateButtonLayout();
   void TabMenuItemPressed(const GURL& url, int event_flags);
   void MoveGroupToNewWindowPressed(int event_flags);
@@ -92,7 +94,7 @@ class SavedTabGroupButton : public views::MenuButton,
   tab_groups::TabGroupColorId tab_group_color_id_;
 
   // The guid used to identify the group this button represents.
-  base::GUID guid_;
+  base::Uuid guid_;
 
   // The local guid used to identify the group in the tabstrip if it is open.
   absl::optional<tab_groups::TabGroupId> local_group_id_;

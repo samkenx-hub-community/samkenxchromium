@@ -5,6 +5,8 @@
 #import "ios/chrome/browser/ui/settings/tabs/inactive_tabs/inactive_tabs_settings_table_view_controller.h"
 
 #import "base/i18n/message_formatter.h"
+#import "base/metrics/user_metrics.h"
+#import "base/metrics/user_metrics_action.h"
 #import "base/notreached.h"
 #import "base/strings/sys_string_conversions.h"
 #import "base/time/time.h"
@@ -65,7 +67,7 @@ int InactiveDaysThresholdWithItemType(ItemType item_type) {
 #pragma mark - Initialization
 
 - (instancetype)init {
-  DCHECK(IsInactiveTabsEnabled() || IsInactiveTabsExplictlyDisabledByUser());
+  CHECK(IsInactiveTabsAvailable());
   self = [super initWithStyle:ChromeTableViewStyle()];
   if (self) {
     self.title = l10n_util::GetNSString(IDS_IOS_OPTIONS_MOVE_INACTIVE_TABS);
@@ -176,13 +178,12 @@ int InactiveDaysThresholdWithItemType(ItemType item_type) {
 #pragma mark - SettingsControllerProtocol
 
 - (void)reportDismissalUserAction {
-  // TODO(crbug.com/1418021): Add metrics when the user go close Inactive Tabs
-  // Settings.
+  base::RecordAction(
+      base::UserMetricsAction("MobileInactiveTabsSettingsClose"));
 }
 
 - (void)reportBackUserAction {
-  // TODO(crbug.com/1418021): Add metrics when the user go back from Inactive
-  // Tabs Settings to Tabs Settings screen.
+  base::RecordAction(base::UserMetricsAction("MobileInactiveTabsSettingsBack"));
 }
 
 @end

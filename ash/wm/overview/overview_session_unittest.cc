@@ -32,13 +32,12 @@
 #include "ash/style/close_button.h"
 #include "ash/style/rounded_label_widget.h"
 #include "ash/test/ash_test_base.h"
-#include "ash/test/ash_test_util.h"
 #include "ash/test/test_window_builder.h"
 #include "ash/wm/desks/desk.h"
-#include "ash/wm/desks/desks_bar_view.h"
 #include "ash/wm/desks/desks_constants.h"
 #include "ash/wm/desks/desks_test_util.h"
 #include "ash/wm/desks/desks_util.h"
+#include "ash/wm/desks/legacy_desk_bar_view.h"
 #include "ash/wm/desks/templates/saved_desk_save_desk_button.h"
 #include "ash/wm/desks/templates/saved_desk_util.h"
 #include "ash/wm/desks/zero_state_button.h"
@@ -75,6 +74,7 @@
 #include "base/containers/contains.h"
 #include "base/containers/cxx20_erase.h"
 #include "base/memory/ptr_util.h"
+#include "base/memory/raw_ptr.h"
 #include "base/ranges/algorithm.h"
 #include "base/run_loop.h"
 #include "base/strings/stringprintf.h"
@@ -154,7 +154,7 @@ class TweenTester : public ui::LayerAnimationObserver {
 
  private:
   gfx::Tween::Type tween_type_ = gfx::Tween::LINEAR;
-  aura::Window* window_;
+  raw_ptr<aura::Window, ExperimentalAsh> window_;
   bool will_animate_ = false;
 };
 
@@ -237,7 +237,8 @@ TEST_P(OverviewSessionTest, CloseButtonDisabledOnDrag) {
 
   // Drag `window1` in overview to trigger drag animations.
   GetEventGenerator()->PressTouchId(
-      /*touch_id=*/0, item1->GetBoundsOfSelectedItem().CenterPoint());
+      /*touch_id=*/0,
+      gfx::ToRoundedPoint(item1->GetTransformedBounds().CenterPoint()));
   GetEventGenerator()->MoveTouchIdBy(/*touch_id=*/0, -100, 0);
 
   // Make sure the drag event triggered the fade animations.
@@ -297,7 +298,8 @@ TEST_P(OverviewSessionTest, CloseButtonEnabledOnSnap) {
   // Snap `window1` to the left side of the screen while in
   // overview.
   GetEventGenerator()->PressTouchId(
-      /*touch_id=*/0, item1->GetBoundsOfSelectedItem().CenterPoint());
+      /*touch_id=*/0,
+      gfx::ToRoundedPoint(item1->GetTransformedBounds().CenterPoint()));
 
   GetEventGenerator()->MoveTouchId(gfx::Point(0, 0), /*touch_id=*/0);
 
@@ -743,7 +745,7 @@ TEST_P(OverviewSessionTest, CloseAnimationShadow) {
   ASSERT_TRUE(InOverviewSession());
 
   // The shadow bounds are empty, which means its not visible.
-  EXPECT_EQ(gfx::Rect(), item->GetShadowBoundsForTesting());
+  EXPECT_EQ(gfx::Rect(), GetShadowBounds(item));
 }
 
 // Tests minimizing/unminimizing in overview mode.
@@ -793,11 +795,7 @@ TEST_P(OverviewSessionTest, CloseButtonOnMultipleDisplay) {
 }
 
 // Tests entering overview mode with two windows and selecting one.
-// TODO(crbug.com/1323145): Flaky.
-TEST_P(OverviewSessionTest, DISABLED_FullscreenWindow) {
-  ui::ScopedAnimationDurationScaleMode anmatin_scale(
-      ui::ScopedAnimationDurationScaleMode::NON_ZERO_DURATION);
-
+TEST_P(OverviewSessionTest, FullscreenWindow) {
   std::unique_ptr<aura::Window> window1(CreateTestWindow());
   std::unique_ptr<aura::Window> window2(CreateTestWindow());
   wm::ActivateWindow(window1.get());
@@ -808,34 +806,20 @@ TEST_P(OverviewSessionTest, DISABLED_FullscreenWindow) {
 
   // Enter overview and select the fullscreen window.
   ToggleOverview();
-  WaitForOverviewEnterAnimation();
-  CheckOverviewEnterExitHistogram("FullscreenWindowEnter1", {0, 1, 0, 0, 0},
-                                  {0, 0, 0, 0, 0});
   ClickWindow(window1.get());
-  WaitForOverviewExitAnimation();
+  ASSERT_FALSE(InOverviewSession());
   EXPECT_TRUE(WindowState::Get(window1.get())->IsFullscreen());
-  CheckOverviewEnterExitHistogram("FullscreenWindowExit1", {0, 1, 0, 0, 0},
-                                  {0, 1, 0, 0, 0});
 
   // Entering overview and selecting another window, the previous window remains
   // fullscreen.
   ToggleOverview();
-  WaitForOverviewEnterAnimation();
-  CheckOverviewEnterExitHistogram("FullscreenWindowEnter2", {0, 2, 0, 0, 0},
-                                  {0, 1, 0, 0, 0});
   ClickWindow(window2.get());
-  WaitForOverviewExitAnimation();
+  EXPECT_FALSE(InOverviewSession());
   EXPECT_TRUE(WindowState::Get(window1.get())->IsFullscreen());
-  CheckOverviewEnterExitHistogram("FullscreenWindowExit2", {0, 2, 0, 0, 0},
-                                  {1, 1, 0, 0, 0});
 }
 
 // Tests entering overview mode with maximized window.
-// TODO(crbug.com/1325386): Flaky.
-TEST_P(OverviewSessionTest, DISABLED_MaximizedWindow) {
-  ui::ScopedAnimationDurationScaleMode anmatin_scale(
-      ui::ScopedAnimationDurationScaleMode::NON_ZERO_DURATION);
-
+TEST_P(OverviewSessionTest, MaximizedWindow) {
   std::unique_ptr<aura::Window> window1(CreateTestWindow());
   std::unique_ptr<aura::Window> window2(CreateTestWindow());
   wm::ActivateWindow(window1.get());
@@ -844,26 +828,58 @@ TEST_P(OverviewSessionTest, DISABLED_MaximizedWindow) {
   WindowState::Get(window1.get())->OnWMEvent(&maximize_event);
   EXPECT_TRUE(WindowState::Get(window1.get())->IsMaximized());
 
-  // Enter overview and select the fullscreen window.
+  // Enter overview and select the maximized window.
+  ToggleOverview();
+  ClickWindow(window1.get());
+  ASSERT_FALSE(InOverviewSession());
+  EXPECT_TRUE(WindowState::Get(window1.get())->IsMaximized());
+
+  ToggleOverview();
+  ClickWindow(window2.get());
+  EXPECT_FALSE(InOverviewSession());
+  EXPECT_TRUE(WindowState::Get(window1.get())->IsMaximized());
+}
+
+// Tests the animation histograms when entering and exiting overview with a
+// maximized and fullscreen window.
+// TODO(b/252523767): Reenable this test.
+TEST_P(OverviewSessionTest, DISABLED_MaximizedFullscreenHistograms) {
+  std::unique_ptr<aura::Window> maximized_window(CreateTestWindow());
+  std::unique_ptr<aura::Window> fullscreen_window(CreateTestWindow());
+
+  const WMEvent maximize_event(WM_EVENT_MAXIMIZE);
+  WindowState::Get(maximized_window.get())->OnWMEvent(&maximize_event);
+  ASSERT_TRUE(WindowState::Get(maximized_window.get())->IsMaximized());
+
+  const WMEvent toggle_fullscreen_event(WM_EVENT_TOGGLE_FULLSCREEN);
+  WindowState::Get(fullscreen_window.get())
+      ->OnWMEvent(&toggle_fullscreen_event);
+  ASSERT_TRUE(WindowState::Get(fullscreen_window.get())->IsFullscreen());
+
+  ui::ScopedAnimationDurationScaleMode animation_scale(
+      ui::ScopedAnimationDurationScaleMode::NON_ZERO_DURATION);
+
+  // Enter and exit overview with the maximized window activated.
+  wm::ActivateWindow(maximized_window.get());
   ToggleOverview();
   WaitForOverviewEnterAnimation();
   CheckOverviewEnterExitHistogram("MaximizedWindowEnter1", {0, 1, 0, 0, 0},
                                   {0, 0, 0, 0, 0});
-  ClickWindow(window1.get());
+  ToggleOverview();
   WaitForOverviewExitAnimation();
-  EXPECT_TRUE(WindowState::Get(window1.get())->IsMaximized());
   CheckOverviewEnterExitHistogram("MaximizedWindowExit1", {0, 1, 0, 0, 0},
                                   {0, 1, 0, 0, 0});
 
+  // Enter and exit overview with the fullscreen window activated.
+  wm::ActivateWindow(fullscreen_window.get());
   ToggleOverview();
   WaitForOverviewEnterAnimation();
-  CheckOverviewEnterExitHistogram("MaximizedWindowEnter2", {0, 2, 0, 0, 0},
+  CheckOverviewEnterExitHistogram("FullscreenWindowEnter1", {0, 2, 0, 0, 0},
                                   {0, 1, 0, 0, 0});
-  ClickWindow(window2.get());
+  ToggleOverview();
   WaitForOverviewExitAnimation();
-  EXPECT_TRUE(WindowState::Get(window1.get())->IsMaximized());
-  CheckOverviewEnterExitHistogram("MaximizedWindowExit2", {0, 2, 0, 0, 0},
-                                  {1, 1, 0, 0, 0});
+  CheckOverviewEnterExitHistogram("FullscreenWindowExit1", {0, 2, 0, 0, 0},
+                                  {0, 2, 0, 0, 0});
 }
 
 TEST_P(OverviewSessionTest, TabletModeHistograms) {
@@ -2363,15 +2379,18 @@ TEST_P(OverviewSessionTest, OverviewWidgetStackingOrder) {
 
   // The original order of stacking is determined by the order the associated
   // window was activated.
-  EXPECT_TRUE(
-      IsStackedBelow(widget2->GetNativeWindow(), widget3->GetNativeWindow()));
-  EXPECT_TRUE(
-      IsStackedBelow(widget1->GetNativeWindow(), widget2->GetNativeWindow()));
+  EXPECT_TRUE(window_util::IsStackedBelow(widget2->GetNativeWindow(),
+                                          widget3->GetNativeWindow()));
+  EXPECT_TRUE(window_util::IsStackedBelow(widget1->GetNativeWindow(),
+                                          widget2->GetNativeWindow()));
 
   // Verify that the item widget is stacked below the window.
-  EXPECT_TRUE(IsStackedBelow(widget1->GetNativeWindow(), minimized.get()));
-  EXPECT_TRUE(IsStackedBelow(widget2->GetNativeWindow(), window.get()));
-  EXPECT_TRUE(IsStackedBelow(widget3->GetNativeWindow(), window3.get()));
+  EXPECT_TRUE(
+      window_util::IsStackedBelow(widget1->GetNativeWindow(), minimized.get()));
+  EXPECT_TRUE(
+      window_util::IsStackedBelow(widget2->GetNativeWindow(), window.get()));
+  EXPECT_TRUE(
+      window_util::IsStackedBelow(widget3->GetNativeWindow(), window3.get()));
 
   // Drag the first window. Verify that it's item widget is not stacked above
   // the other two.
@@ -2380,10 +2399,10 @@ TEST_P(OverviewSessionTest, OverviewWidgetStackingOrder) {
   ui::test::EventGenerator* generator = GetEventGenerator();
   generator->MoveMouseTo(start_drag);
   generator->PressLeftButton();
-  EXPECT_TRUE(
-      IsStackedBelow(widget2->GetNativeWindow(), widget1->GetNativeWindow()));
-  EXPECT_TRUE(
-      IsStackedBelow(widget3->GetNativeWindow(), widget1->GetNativeWindow()));
+  EXPECT_TRUE(window_util::IsStackedBelow(widget2->GetNativeWindow(),
+                                          widget1->GetNativeWindow()));
+  EXPECT_TRUE(window_util::IsStackedBelow(widget3->GetNativeWindow(),
+                                          widget1->GetNativeWindow()));
 
   histogram_tester.ExpectTotalCount(
       "Ash.Overview.WindowDrag.PresentationTime.TabletMode", 0);
@@ -2403,10 +2422,10 @@ TEST_P(OverviewSessionTest, OverviewWidgetStackingOrder) {
   generator->ReleaseLeftButton();
 
   // Verify the stacking order is same as before dragging started.
-  EXPECT_TRUE(
-      IsStackedBelow(widget2->GetNativeWindow(), widget3->GetNativeWindow()));
-  EXPECT_TRUE(
-      IsStackedBelow(widget1->GetNativeWindow(), widget2->GetNativeWindow()));
+  EXPECT_TRUE(window_util::IsStackedBelow(widget2->GetNativeWindow(),
+                                          widget3->GetNativeWindow()));
+  EXPECT_TRUE(window_util::IsStackedBelow(widget1->GetNativeWindow(),
+                                          widget2->GetNativeWindow()));
 
   histogram_tester.ExpectTotalCount(
       "Ash.Overview.WindowDrag.PresentationTime.TabletMode", 2);
@@ -2431,7 +2450,8 @@ TEST_P(OverviewSessionTest, DropTargetStackedAtBottomForOverviewItem) {
   generator->PressLeftButton();
   generator->MoveMouseBy(5, 0);
   ASSERT_TRUE(GetDropTarget(0));
-  EXPECT_TRUE(IsStackedBelow(GetDropTarget(0)->GetWindow(), window2.get()));
+  EXPECT_TRUE(window_util::IsStackedBelow(GetDropTarget(0)->GetWindow(),
+                                          window2.get()));
   generator->ReleaseLeftButton();
   EXPECT_FALSE(GetDropTarget(0));
 }
@@ -2555,8 +2575,8 @@ TEST_P(OverviewSessionTest, ShadowVisibilityDragging) {
   EXPECT_FALSE(window1->layer()->GetAnimator()->is_animating());
   EXPECT_FALSE(window2->layer()->GetAnimator()->is_animating());
 
-  EXPECT_TRUE(item1->GetShadowBoundsForTesting().IsEmpty());
-  EXPECT_FALSE(item2->GetShadowBoundsForTesting().IsEmpty());
+  EXPECT_TRUE(GetShadowBounds(item1).IsEmpty());
+  EXPECT_FALSE(GetShadowBounds(item2).IsEmpty());
 
   // Drag to horizontally and then back to the start to avoid activating the
   // window, drag to close or entering splitview. Verify that the shadow is
@@ -2566,43 +2586,42 @@ TEST_P(OverviewSessionTest, ShadowVisibilityDragging) {
   // The drop target window should be created with no shadow.
   OverviewItem* drop_target_item = GetDropTarget(0);
   ASSERT_TRUE(drop_target_item);
-  EXPECT_TRUE(drop_target_item->GetShadowBoundsForTesting().IsEmpty());
+  EXPECT_TRUE(GetShadowBounds(drop_target_item).IsEmpty());
 
   generator->MoveMouseTo(start_drag);
   generator->ReleaseLeftButton();
   EXPECT_TRUE(window1->layer()->GetAnimator()->is_animating());
   EXPECT_TRUE(window2->layer()->GetAnimator()->is_animating());
-  EXPECT_TRUE(item1->GetShadowBoundsForTesting().IsEmpty());
-  EXPECT_TRUE(item2->GetShadowBoundsForTesting().IsEmpty());
+  EXPECT_TRUE(GetShadowBounds(item1).IsEmpty());
+  EXPECT_TRUE(GetShadowBounds(item2).IsEmpty());
 
   // Verify that the shadow is visble again after animation is finished.
   window1->layer()->GetAnimator()->StopAnimating();
   window2->layer()->GetAnimator()->StopAnimating();
-  EXPECT_FALSE(item1->GetShadowBoundsForTesting().IsEmpty());
-  EXPECT_FALSE(item2->GetShadowBoundsForTesting().IsEmpty());
+  EXPECT_FALSE(GetShadowBounds(item1).IsEmpty());
+  EXPECT_FALSE(GetShadowBounds(item2).IsEmpty());
 }
 
 // Tests that the shadows in overview mode are placed correctly.
 TEST_P(OverviewSessionTest, ShadowBounds) {
   // Helper function to check if the bounds of a shadow owned by |shadow_parent|
   // is contained within the bounds of |widget|.
-  auto contains = [](views::Widget* widget, OverviewItem* shadow_parent) {
+  auto contains = [&](views::Widget* widget, OverviewItem* shadow_parent) {
     return gfx::Rect(widget->GetNativeWindow()->bounds().size())
-        .Contains(shadow_parent->GetShadowBoundsForTesting());
+        .Contains(GetShadowBounds(shadow_parent));
   };
 
   // Helper function which returns the ratio of the shadow owned by
   // |shadow_parent| width and height.
-  auto shadow_ratio = [](OverviewItem* shadow_parent) {
-    gfx::RectF boundsf = gfx::RectF(shadow_parent->GetShadowBoundsForTesting());
+  auto shadow_ratio = [&](OverviewItem* shadow_parent) {
+    gfx::RectF boundsf = gfx::RectF(GetShadowBounds(shadow_parent));
     return boundsf.width() / boundsf.height();
   };
 
   // Helper function which returns the ratio of the item width and height minus
   // the header and window margin.
   auto item_ratio = [](OverviewItem* item) {
-    gfx::RectF boundsf = item->target_bounds();
-    boundsf.Inset(gfx::InsetsF(kWindowMargin));
+    gfx::RectF boundsf = item->GetWindowTargetBoundsWithInsets();
     return boundsf.width() / boundsf.height();
   };
 
@@ -2645,7 +2664,7 @@ TEST_P(OverviewSessionTest, ShadowBounds) {
   // the header of window margin.
   EXPECT_NEAR(shadow_ratio(wide_item), item_ratio(wide_item), 0.01f);
   EXPECT_NEAR(shadow_ratio(tall_item), item_ratio(tall_item), 0.01f);
-  EXPECT_NEAR(shadow_ratio(normal_item), item_ratio(normal_item), 0.01f);
+  EXPECT_NEAR(shadow_ratio(normal_item), 1.f, 0.01f);
 
   // Verify all the shadows are within the bounds of their respective item
   // widgets when the overview windows are positioned with animations.
@@ -2658,7 +2677,7 @@ TEST_P(OverviewSessionTest, ShadowBounds) {
 
   EXPECT_NEAR(shadow_ratio(wide_item), item_ratio(wide_item), 0.01f);
   EXPECT_NEAR(shadow_ratio(tall_item), item_ratio(tall_item), 0.01f);
-  EXPECT_NEAR(shadow_ratio(normal_item), item_ratio(normal_item), 0.01f);
+  EXPECT_NEAR(shadow_ratio(normal_item), 1.f, 0.01f);
 
   // Test that leaving overview mode cleans up properly.
   ToggleOverview();
@@ -2793,8 +2812,8 @@ TEST_P(OverviewSessionTest, PositionWindows) {
 
   // Verify that items that are animating before closing are ignored by
   // PositionWindows.
-  item1->set_animating_to_close_for_testing(true);
-  item2->set_animating_to_close_for_testing(true);
+  SetAnimatingToClose(item1, true);
+  SetAnimatingToClose(item2, true);
   GetOverviewSession()->PositionWindows(/*animate=*/false);
   EXPECT_EQ(bounds1, item1->target_bounds());
   EXPECT_EQ(bounds2, item2->target_bounds());
@@ -3385,12 +3404,12 @@ class FloatOverviewSessionTest : public OverviewTestBase {
   // this is not true on any of the root windows.
   bool IsFloatContainerNormalStacked() const {
     for (aura::Window* root : Shell::GetAllRootWindows()) {
-      if (!IsStackedBelow(
+      if (!window_util::IsStackedBelow(
               root->GetChildById(kShellWindowId_AlwaysOnTopContainer),
               root->GetChildById(kShellWindowId_FloatContainer))) {
         return false;
       }
-      if (!IsStackedBelow(
+      if (!window_util::IsStackedBelow(
               root->GetChildById(kShellWindowId_FloatContainer),
               root->GetChildById(kShellWindowId_AppListContainer))) {
         return false;
@@ -3402,8 +3421,9 @@ class FloatOverviewSessionTest : public OverviewTestBase {
 
   bool IsFloatContainerBelowActiveDesk() const {
     for (aura::Window* root : Shell::GetAllRootWindows()) {
-      if (!IsStackedBelow(root->GetChildById(kShellWindowId_FloatContainer),
-                          root->GetChildById(kShellWindowId_DeskContainerA))) {
+      if (!window_util::IsStackedBelow(
+              root->GetChildById(kShellWindowId_FloatContainer),
+              root->GetChildById(kShellWindowId_DeskContainerA))) {
         return false;
       }
     }
@@ -3805,45 +3825,44 @@ TEST_F(TabletModeOverviewSessionTest, WindowDestroyWhileScrolling) {
 }
 
 // Tests the windows are stacked correctly when entering or exiting splitview
-// while the new overivew layout is enabled.
-TEST_F(TabletModeOverviewSessionTest, StackingOrderSplitviewWindow) {
+// while in tablet mode.
+TEST_F(TabletModeOverviewSessionTest, StackingOrderSplitViewWindow) {
   std::unique_ptr<aura::Window> window1 = CreateTestWindow();
   std::unique_ptr<aura::Window> window2 = CreateUnsnappableWindow();
   std::unique_ptr<aura::Window> window3 = CreateTestWindow();
 
-  ToggleOverview();
-  ASSERT_TRUE(InOverviewSession());
-
-  // Snap |window1| to the left and exit overview. |window3| should have higher
-  // z-order now, since it is the MRU window.
+  // Snap `window1` to the left and `window3` to the right. Activate `window3`
+  // so that it is stacked above `window1`.
   split_view_controller()->SnapWindow(
       window1.get(), SplitViewController::SnapPosition::kPrimary);
-  ToggleOverview();
-  ASSERT_EQ(SplitViewController::State::kBothSnapped,
-            split_view_controller()->state());
-  ASSERT_TRUE(IsStackedBelow(window1.get(), window3.get()));
+  split_view_controller()->SnapWindow(
+      window3.get(), SplitViewController::SnapPosition::kSecondary);
+  wm::ActivateWindow(window3.get());
+  ASSERT_TRUE(window_util::IsStackedBelow(window1.get(), window3.get()));
 
-  // Test that on entering overview, |window3| is of a lower z-order, so that
-  // when we scroll the grid, it will be seen under |window1|.
+  // Test that on entering overview, `window3` is stacked below `window1`, so
+  // that when we scroll the grid, it will be seen under `window1`.
   ToggleOverview();
-  EXPECT_TRUE(IsStackedBelow(window3.get(), window1.get()));
+  ASSERT_FALSE(GetOverviewItemForWindow(window1.get()));
+  ASSERT_TRUE(GetOverviewItemForWindow(window2.get()));
+  ASSERT_TRUE(GetOverviewItemForWindow(window3.get()));
+  EXPECT_TRUE(window_util::IsStackedBelow(window3.get(), window1.get()));
 
-  // Test that |window2| has a cannot snap widget indicating that it cannot be
-  // snapped, and that both |window2| and the widget are lower z-order than
-  // |window1|.
+  // Test that `window2` has a cannot snap widget indicating that it cannot be
+  // snapped, and that both `window2` and the widget are lower z-order than
+  // `window1`.
   views::Widget* cannot_snap_widget =
-      static_cast<views::Widget*>(GetOverviewItemForWindow(window2.get())
-                                      ->cannot_snap_widget_for_testing());
+      GetCannotSnapWidget(GetOverviewItemForWindow(window2.get()));
   ASSERT_TRUE(cannot_snap_widget);
   aura::Window* cannot_snap_window = cannot_snap_widget->GetNativeWindow();
   ASSERT_EQ(window1->parent(), cannot_snap_window->parent());
-  EXPECT_TRUE(IsStackedBelow(window2.get(), window1.get()));
-  EXPECT_TRUE(IsStackedBelow(cannot_snap_window, window1.get()));
+  EXPECT_TRUE(window_util::IsStackedBelow(window2.get(), window1.get()));
+  EXPECT_TRUE(window_util::IsStackedBelow(cannot_snap_window, window1.get()));
 
-  // Test that on exiting overview, |window3| becomes activated, so it returns
-  // to being higher on the z-order than |window1|.
+  // Test that on exiting overview, the relative stacking order between
+  // `window3` and `window1` remains unchanged.
   ToggleOverview();
-  EXPECT_TRUE(IsStackedBelow(window1.get(), window3.get()));
+  EXPECT_TRUE(window_util::IsStackedBelow(window1.get(), window3.get()));
 }
 
 // Tests the windows are remain stacked underneath the split view window after
@@ -3866,7 +3885,7 @@ TEST_F(TabletModeOverviewSessionTest, StackingOrderAfterGestureEvent) {
                                ui::EventTimeForNow(),
                                ui::GestureEventDetails(ui::ET_GESTURE_END));
   item->HandleGestureEvent(&gesture_end);
-  EXPECT_TRUE(IsStackedBelow(window2.get(), window1.get()));
+  EXPECT_TRUE(window_util::IsStackedBelow(window2.get(), window1.get()));
 
   // Tests that if we drag the window around, then release, the window also
   // stays stacked under the snapped window.
@@ -3875,7 +3894,7 @@ TEST_F(TabletModeOverviewSessionTest, StackingOrderAfterGestureEvent) {
   DispatchLongPress(item);
   GetOverviewSession()->Drag(item, item_center + delta);
   GetOverviewSession()->CompleteDrag(item, item_center + delta);
-  EXPECT_TRUE(IsStackedBelow(window2.get(), window1.get()));
+  EXPECT_TRUE(window_util::IsStackedBelow(window2.get(), window1.get()));
 }
 
 // Test that scrolling occurs if started on top of a window using the window's
@@ -5108,7 +5127,7 @@ TEST_F(SplitViewOverviewSessionTest, AltLeftSquareBracketOnMaximizedWindow) {
   EXPECT_EQ(SplitViewController::State::kNoSnap,
             split_view_controller()->state());
   EXPECT_FALSE(InOverviewSession());
-  const WMEvent alt_left_square_bracket(WM_EVENT_CYCLE_SNAP_PRIMARY);
+  const WindowSnapWMEvent alt_left_square_bracket(WM_EVENT_CYCLE_SNAP_PRIMARY);
   snapped_window_state->OnWMEvent(&alt_left_square_bracket);
   EXPECT_TRUE(wm::IsActiveWindow(snapped_window.get()));
   EXPECT_EQ(WindowStateType::kPrimarySnapped,
@@ -5129,7 +5148,8 @@ TEST_F(SplitViewOverviewSessionTest, AltRightSquareBracketOnMaximizedWindow) {
   EXPECT_EQ(SplitViewController::State::kNoSnap,
             split_view_controller()->state());
   EXPECT_FALSE(InOverviewSession());
-  const WMEvent alt_right_square_bracket(WM_EVENT_CYCLE_SNAP_SECONDARY);
+  const WindowSnapWMEvent alt_right_square_bracket(
+      WM_EVENT_CYCLE_SNAP_SECONDARY);
   snapped_window_state->OnWMEvent(&alt_right_square_bracket);
   EXPECT_TRUE(wm::IsActiveWindow(snapped_window.get()));
   EXPECT_EQ(WindowStateType::kSecondarySnapped,
@@ -5156,10 +5176,11 @@ TEST_F(SplitViewOverviewSessionTest, AltSquareBracketOnUnsnappableWindow) {
         EXPECT_FALSE(InOverviewSession());
       };
   expect_unsnappable_window_is_active_and_maximized();
-  const WMEvent alt_left_square_bracket(WM_EVENT_CYCLE_SNAP_PRIMARY);
+  const WindowSnapWMEvent alt_left_square_bracket(WM_EVENT_CYCLE_SNAP_PRIMARY);
   unsnappable_window_state->OnWMEvent(&alt_left_square_bracket);
   expect_unsnappable_window_is_active_and_maximized();
-  const WMEvent alt_right_square_bracket(WM_EVENT_CYCLE_SNAP_SECONDARY);
+  const WindowSnapWMEvent alt_right_square_bracket(
+      WM_EVENT_CYCLE_SNAP_SECONDARY);
   unsnappable_window_state->OnWMEvent(&alt_right_square_bracket);
   expect_unsnappable_window_is_active_and_maximized();
 }
@@ -5173,7 +5194,7 @@ TEST_F(SplitViewOverviewSessionTest, AltSquareBracketOnSameSideSnappedWindow) {
                                         &window1](WMEventType event_type) {
     wm::ActivateWindow(window1.get());
     WindowState* window1_state = WindowState::Get(window1.get());
-    const WMEvent event(event_type);
+    const WindowSnapWMEvent event(event_type);
     window1_state->OnWMEvent(&event);
     EXPECT_TRUE(wm::IsActiveWindow(window1.get()));
     EXPECT_EQ(WindowStateType::kMaximized, window1_state->GetStateType());
@@ -5229,7 +5250,8 @@ TEST_F(SplitViewOverviewSessionTest,
   const auto test_left_snapping_window1 = [this, &window1, &window2]() {
     wm::ActivateWindow(window1.get());
     WindowState* window1_state = WindowState::Get(window1.get());
-    const WMEvent alt_left_square_bracket(WM_EVENT_CYCLE_SNAP_PRIMARY);
+    const WindowSnapWMEvent alt_left_square_bracket(
+        WM_EVENT_CYCLE_SNAP_PRIMARY);
     window1_state->OnWMEvent(&alt_left_square_bracket);
     EXPECT_TRUE(wm::IsActiveWindow(window1.get()));
     EXPECT_EQ(WindowStateType::kPrimarySnapped, window1_state->GetStateType());
@@ -5242,7 +5264,8 @@ TEST_F(SplitViewOverviewSessionTest,
   const auto test_right_snapping_window1 = [this, &window1, &window2]() {
     wm::ActivateWindow(window1.get());
     WindowState* window1_state = WindowState::Get(window1.get());
-    const WMEvent alt_right_square_bracket(WM_EVENT_CYCLE_SNAP_SECONDARY);
+    const WindowSnapWMEvent alt_right_square_bracket(
+        WM_EVENT_CYCLE_SNAP_SECONDARY);
     window1_state->OnWMEvent(&alt_right_square_bracket);
     EXPECT_TRUE(wm::IsActiveWindow(window1.get()));
     EXPECT_EQ(WindowStateType::kSecondarySnapped,
@@ -5554,20 +5577,18 @@ TEST_F(SplitViewOverviewSessionTest, OverviewUnsnappableIndicatorVisibility) {
       GetOverviewItemForWindow(unsnappable_window.get());
 
   // Note: |cannot_snap_label_view_| and its parent will be created on demand.
-  EXPECT_FALSE(snappable_overview_item->cannot_snap_widget_for_testing());
-  ASSERT_FALSE(unsnappable_overview_item->cannot_snap_widget_for_testing());
+  EXPECT_FALSE(GetCannotSnapWidget(snappable_overview_item));
+  ASSERT_FALSE(GetCannotSnapWidget(unsnappable_overview_item));
 
   // Snap the extra snappable window to enter split view mode.
   split_view_controller()->SnapWindow(
       window1.get(), SplitViewController::SnapPosition::kPrimary);
   ASSERT_TRUE(split_view_controller()->InSplitViewMode());
-  EXPECT_FALSE(snappable_overview_item->cannot_snap_widget_for_testing());
-  ASSERT_TRUE(unsnappable_overview_item->cannot_snap_widget_for_testing());
-  ui::Layer* unsnappable_layer =
-      unsnappable_overview_item->cannot_snap_widget_for_testing()
-          ->GetNativeWindow()
-          ->layer();
-  EXPECT_EQ(1.f, unsnappable_layer->opacity());
+  EXPECT_FALSE(GetCannotSnapWidget(snappable_overview_item));
+  views::Widget* cannot_snap_widget =
+      GetCannotSnapWidget(unsnappable_overview_item);
+  ASSERT_TRUE(cannot_snap_widget);
+  EXPECT_EQ(1.f, cannot_snap_widget->GetLayer()->opacity());
 
   // Exiting the splitview will hide the unsnappable label.
   const gfx::Rect divider_bounds =
@@ -5578,7 +5599,7 @@ TEST_F(SplitViewOverviewSessionTest, OverviewUnsnappableIndicatorVisibility) {
   SkipDividerSnapAnimation();
 
   EXPECT_FALSE(split_view_controller()->InSplitViewMode());
-  EXPECT_EQ(0.f, unsnappable_layer->opacity());
+  EXPECT_EQ(0.f, cannot_snap_widget->GetLayer()->opacity());
 }
 
 // Verify that during "normal" dragging from overview (not drag-to-close), the
@@ -5600,11 +5621,10 @@ TEST_F(SplitViewOverviewSessionTest,
   ASSERT_TRUE(split_view_controller()->InSplitViewMode());
   OverviewItem* unsnappable_overview_item =
       GetOverviewItemForWindow(unsnappable_window.get());
-  ASSERT_TRUE(unsnappable_overview_item->cannot_snap_widget_for_testing());
-  ui::Layer* unsnappable_layer =
-      unsnappable_overview_item->cannot_snap_widget_for_testing()
-          ->GetNativeWindow()
-          ->layer();
+  views::Widget* cannot_snap_widget =
+      GetCannotSnapWidget(unsnappable_overview_item);
+  ASSERT_TRUE(cannot_snap_widget);
+  ui::Layer* unsnappable_layer = cannot_snap_widget->GetLayer();
   ASSERT_EQ(1.f, unsnappable_layer->opacity());
 
   // Test that the unsnappable label is temporarily suppressed during mouse
@@ -5703,7 +5723,7 @@ TEST_F(SplitViewOverviewSessionTest,
   ASSERT_TRUE(split_view_controller()->InSplitViewMode());
   OverviewItem* overview_item = GetOverviewItemForWindow(overview_window.get());
   // Note: |cannot_snap_label_view_| and its parent will be created on demand.
-  EXPECT_FALSE(overview_item->cannot_snap_widget_for_testing());
+  EXPECT_FALSE(GetCannotSnapWidget(overview_item));
 
   // Rotate to primary portrait orientation. The unsnappable indicator appears.
   display::test::DisplayManagerTestApi(Shell::Get()->display_manager())
@@ -5712,9 +5732,9 @@ TEST_F(SplitViewOverviewSessionTest,
       Shell::Get()->screen_orientation_controller());
   test_api.SetDisplayRotation(display::Display::ROTATE_270,
                               display::Display::RotationSource::ACTIVE);
-  ASSERT_TRUE(overview_item->cannot_snap_widget_for_testing());
-  ui::Layer* unsnappable_layer =
-      overview_item->cannot_snap_widget_for_testing()->GetLayer();
+  views::Widget* cannot_snap_widget = GetCannotSnapWidget(overview_item);
+  ASSERT_TRUE(cannot_snap_widget);
+  ui::Layer* unsnappable_layer = cannot_snap_widget->GetLayer();
   EXPECT_EQ(1.f, unsnappable_layer->opacity());
 
   // Rotate to primary landscape orientation. The unsnappable indicator hides.
@@ -6036,12 +6056,12 @@ TEST_F(
   aura::Window* parent = window1->parent();
   ASSERT_EQ(parent, window2->parent());
   ASSERT_EQ(parent, window3->parent());
-  EXPECT_TRUE(IsStackedBelow(
+  EXPECT_TRUE(window_util::IsStackedBelow(
       GetOverviewItemForWindow(window1.get())->item_widget()->GetNativeWindow(),
       GetOverviewItemForWindow(window2.get())
           ->item_widget()
           ->GetNativeWindow()));
-  EXPECT_TRUE(IsStackedBelow(
+  EXPECT_TRUE(window_util::IsStackedBelow(
       GetOverviewItemForWindow(window3.get())->item_widget()->GetNativeWindow(),
       GetOverviewItemForWindow(window1.get())
           ->item_widget()
@@ -6086,12 +6106,12 @@ TEST_F(
   aura::Window* parent = window1->parent();
   ASSERT_EQ(parent, window2->parent());
   ASSERT_EQ(parent, window4->parent());
-  EXPECT_TRUE(IsStackedBelow(
+  EXPECT_TRUE(window_util::IsStackedBelow(
       GetOverviewItemForWindow(window1.get())->item_widget()->GetNativeWindow(),
       GetOverviewItemForWindow(window2.get())
           ->item_widget()
           ->GetNativeWindow()));
-  EXPECT_TRUE(IsStackedBelow(
+  EXPECT_TRUE(window_util::IsStackedBelow(
       GetOverviewItemForWindow(window4.get())->item_widget()->GetNativeWindow(),
       GetOverviewItemForWindow(window1.get())
           ->item_widget()
@@ -7249,7 +7269,7 @@ TEST_F(SplitViewOverviewSessionInClamshellTest,
   ASSERT_TRUE(split_view_controller()->InSplitViewMode());
   OverviewItem* overview_item = GetOverviewItemForWindow(overview_window.get());
   // Note: |cannot_snap_label_view_| and its parent will be created on demand.
-  EXPECT_FALSE(overview_item->cannot_snap_widget_for_testing());
+  EXPECT_FALSE(GetCannotSnapWidget(overview_item));
 
   // Rotate to primary portrait orientation. The unsnappable indicator appears.
   display::DisplayManager* display_manager = Shell::Get()->display_manager();
@@ -7257,9 +7277,9 @@ TEST_F(SplitViewOverviewSessionInClamshellTest,
       display::Screen::GetScreen()->GetPrimaryDisplay().id();
   display_manager->SetDisplayRotation(display_id, display::Display::ROTATE_270,
                                       display::Display::RotationSource::ACTIVE);
-  ASSERT_TRUE(overview_item->cannot_snap_widget_for_testing());
-  ui::Layer* unsnappable_layer =
-      overview_item->cannot_snap_widget_for_testing()->GetLayer();
+  views::Widget* cannot_snap_widget = GetCannotSnapWidget(overview_item);
+  ASSERT_TRUE(cannot_snap_widget);
+  ui::Layer* unsnappable_layer = cannot_snap_widget->GetLayer();
   EXPECT_EQ(1.f, unsnappable_layer->opacity());
 
   // Rotate to primary landscape orientation. The unsnappable indicator hides.
@@ -7318,14 +7338,15 @@ TEST_F(SplitViewOverviewSessionInClamshellTest,
   EXPECT_FALSE(split_view_controller()->InSplitViewMode());
   EXPECT_FALSE(InOverviewSession());
   // Alt+[
-  const WMEvent alt_left_square_bracket(WM_EVENT_CYCLE_SNAP_PRIMARY);
+  const WindowSnapWMEvent alt_left_square_bracket(WM_EVENT_CYCLE_SNAP_PRIMARY);
   WindowState* window1_state = WindowState::Get(window1.get());
   window1_state->OnWMEvent(&alt_left_square_bracket);
   EXPECT_EQ(WindowStateType::kPrimarySnapped, window1_state->GetStateType());
   EXPECT_FALSE(split_view_controller()->InSplitViewMode());
   EXPECT_FALSE(InOverviewSession());
   // Alt+]
-  const WMEvent alt_right_square_bracket(WM_EVENT_CYCLE_SNAP_SECONDARY);
+  const WindowSnapWMEvent alt_right_square_bracket(
+      WM_EVENT_CYCLE_SNAP_SECONDARY);
   window1_state->OnWMEvent(&alt_right_square_bracket);
   EXPECT_EQ(WindowStateType::kSecondarySnapped, window1_state->GetStateType());
   EXPECT_FALSE(split_view_controller()->InSplitViewMode());
@@ -7345,7 +7366,7 @@ TEST_F(SplitViewOverviewSessionInClamshellTest,
             snapped_window_state->GetStateType());
   EXPECT_TRUE(split_view_controller()->InSplitViewMode());
   EXPECT_TRUE(InOverviewSession());
-  const WMEvent alt_left_square_bracket(WM_EVENT_CYCLE_SNAP_PRIMARY);
+  const WindowSnapWMEvent alt_left_square_bracket(WM_EVENT_CYCLE_SNAP_PRIMARY);
   snapped_window_state->OnWMEvent(&alt_left_square_bracket);
   EXPECT_EQ(WindowStateType::kNormal, snapped_window_state->GetStateType());
   EXPECT_FALSE(split_view_controller()->InSplitViewMode());
@@ -7365,7 +7386,8 @@ TEST_F(SplitViewOverviewSessionInClamshellTest,
             snapped_window_state->GetStateType());
   EXPECT_TRUE(split_view_controller()->InSplitViewMode());
   EXPECT_TRUE(InOverviewSession());
-  const WMEvent alt_right_square_bracket(WM_EVENT_CYCLE_SNAP_SECONDARY);
+  const WindowSnapWMEvent alt_right_square_bracket(
+      WM_EVENT_CYCLE_SNAP_SECONDARY);
   snapped_window_state->OnWMEvent(&alt_right_square_bracket);
   EXPECT_EQ(WindowStateType::kNormal, snapped_window_state->GetStateType());
   EXPECT_FALSE(split_view_controller()->InSplitViewMode());
@@ -7391,7 +7413,7 @@ TEST_F(SplitViewOverviewSessionInClamshellTest,
   EXPECT_EQ(snapped_window.get(), split_view_controller()->secondary_window());
   EXPECT_TRUE(InOverviewSession());
   // Test using Alt+[ to put |snapped_window| on the left.
-  const WMEvent alt_left_square_bracket(WM_EVENT_CYCLE_SNAP_PRIMARY);
+  const WindowSnapWMEvent alt_left_square_bracket(WM_EVENT_CYCLE_SNAP_PRIMARY);
   snapped_window_state->OnWMEvent(&alt_left_square_bracket);
   EXPECT_TRUE(wm::IsActiveWindow(snapped_window.get()));
   EXPECT_EQ(WindowStateType::kPrimarySnapped,
@@ -7401,7 +7423,8 @@ TEST_F(SplitViewOverviewSessionInClamshellTest,
   EXPECT_EQ(snapped_window.get(), split_view_controller()->primary_window());
   EXPECT_TRUE(InOverviewSession());
   // Test using Alt+] to put |snapped_window| on the right.
-  const WMEvent alt_right_square_bracket(WM_EVENT_CYCLE_SNAP_SECONDARY);
+  const WindowSnapWMEvent alt_right_square_bracket(
+      WM_EVENT_CYCLE_SNAP_SECONDARY);
   snapped_window_state->OnWMEvent(&alt_right_square_bracket);
   EXPECT_TRUE(wm::IsActiveWindow(snapped_window.get()));
   EXPECT_EQ(WindowStateType::kSecondarySnapped,
@@ -7772,7 +7795,6 @@ TEST_F(SplitViewOverviewSessionInClamshellTestMultiDisplayOnly,
   // Verify that |item| is letter boxed. The bounds of |item|, minus the margin
   // should have an aspect ratio of 2 : 1.
   gfx::RectF item_bounds = item->target_bounds();
-  item_bounds.Inset(gfx::InsetsF(kWindowMargin));
   EXPECT_EQ(OverviewGridWindowFillMode::kLetterBoxed,
             item->GetWindowDimensionsType());
   EXPECT_EQ(2.f, item_bounds.width() / item_bounds.height());
@@ -7791,7 +7813,6 @@ TEST_F(SplitViewOverviewSessionInClamshellTestMultiDisplayOnly,
   // targets (and that is okay). The bounds of |drop_target|, minus the margin
   // should have an aspect ratio of 1 : 2.
   gfx::RectF drop_target_bounds = drop_target->target_bounds();
-  drop_target_bounds.Inset(gfx::InsetsF(kWindowMargin));
   EXPECT_EQ(0.5f, drop_target_bounds.width() / drop_target_bounds.height());
 }
 
@@ -7914,16 +7935,17 @@ TEST_F(SplitViewOverviewSessionInClamshellTestMultiDisplayOnly,
   ASSERT_EQ(root_windows[0], item2->root_window());
   // Verify that |item1| is stacked above |item3| (because we created |window1|
   // after |window3|).
-  EXPECT_TRUE(IsStackedBelow(item3->item_widget()->GetNativeWindow(),
-                             item1->item_widget()->GetNativeWindow()));
+  EXPECT_TRUE(
+      window_util::IsStackedBelow(item3->item_widget()->GetNativeWindow(),
+                                  item1->item_widget()->GetNativeWindow()));
 
   // Verify that the item widget for each window is stacked below that window.
-  EXPECT_TRUE(
-      IsStackedBelow(item1->item_widget()->GetNativeWindow(), window1.get()));
-  EXPECT_TRUE(
-      IsStackedBelow(item2->item_widget()->GetNativeWindow(), window2.get()));
-  EXPECT_TRUE(
-      IsStackedBelow(item3->item_widget()->GetNativeWindow(), window3.get()));
+  EXPECT_TRUE(window_util::IsStackedBelow(
+      item1->item_widget()->GetNativeWindow(), window1.get()));
+  EXPECT_TRUE(window_util::IsStackedBelow(
+      item2->item_widget()->GetNativeWindow(), window2.get()));
+  EXPECT_TRUE(window_util::IsStackedBelow(
+      item3->item_widget()->GetNativeWindow(), window3.get()));
 
   // Drag |item2| from the left display and drop into the right display.
   ui::test::EventGenerator* generator = GetEventGenerator();
@@ -7944,13 +7966,15 @@ TEST_F(SplitViewOverviewSessionInClamshellTestMultiDisplayOnly,
   // With all three items on one grid, verify that their stacking order
   // corresponds to the MRU order of the windows. The new |item2| is sandwiched
   // between |item1| and |item3|.
-  EXPECT_TRUE(IsStackedBelow(item2->item_widget()->GetNativeWindow(),
-                             item1->item_widget()->GetNativeWindow()));
-  EXPECT_TRUE(IsStackedBelow(item3->item_widget()->GetNativeWindow(),
-                             item2->item_widget()->GetNativeWindow()));
-  // Verify that the item widget for the new |item2| is stacked below |window2|.
   EXPECT_TRUE(
-      IsStackedBelow(item2->item_widget()->GetNativeWindow(), window2.get()));
+      window_util::IsStackedBelow(item2->item_widget()->GetNativeWindow(),
+                                  item1->item_widget()->GetNativeWindow()));
+  EXPECT_TRUE(
+      window_util::IsStackedBelow(item3->item_widget()->GetNativeWindow(),
+                                  item2->item_widget()->GetNativeWindow()));
+  // Verify that the item widget for the new |item2| is stacked below |window2|.
+  EXPECT_TRUE(window_util::IsStackedBelow(
+      item2->item_widget()->GetNativeWindow(), window2.get()));
 
   // Verify that the right grid is in MRU order.
   const std::vector<aura::Window*> expected_order = {
@@ -8201,49 +8225,47 @@ TEST_F(SplitViewOverviewSessionInClamshellTestMultiDisplayOnly,
   // Note: |cannot_snap_label_view_| and its parent will be created on demand.
   ASSERT_FALSE(SplitViewController::Get(root_windows[0])->InSplitViewMode());
   ASSERT_FALSE(SplitViewController::Get(root_windows[1])->InSplitViewMode());
-  EXPECT_FALSE(item2->cannot_snap_widget_for_testing());
-  EXPECT_FALSE(item3->cannot_snap_widget_for_testing());
-  EXPECT_FALSE(item5->cannot_snap_widget_for_testing());
-  EXPECT_FALSE(item6->cannot_snap_widget_for_testing());
+  EXPECT_FALSE(GetCannotSnapWidget(item2));
+  EXPECT_FALSE(GetCannotSnapWidget(item3));
+  EXPECT_FALSE(GetCannotSnapWidget(item5));
+  EXPECT_FALSE(GetCannotSnapWidget(item6));
 
   SplitViewController::Get(root_windows[0])
       ->SnapWindow(window1.get(), SplitViewController::SnapPosition::kPrimary);
   ASSERT_TRUE(SplitViewController::Get(root_windows[0])->InSplitViewMode());
   ASSERT_FALSE(SplitViewController::Get(root_windows[1])->InSplitViewMode());
-  EXPECT_FALSE(item2->cannot_snap_widget_for_testing());
-  ASSERT_TRUE(item3->cannot_snap_widget_for_testing());
-  ui::Layer* item3_unsnappable_layer =
-      item3->cannot_snap_widget_for_testing()->GetNativeWindow()->layer();
+  EXPECT_FALSE(GetCannotSnapWidget(item2));
+  ASSERT_TRUE(GetCannotSnapWidget(item3));
+  ui::Layer* item3_unsnappable_layer = GetCannotSnapWidget(item3)->GetLayer();
   EXPECT_EQ(1.f, item3_unsnappable_layer->opacity());
-  EXPECT_FALSE(item5->cannot_snap_widget_for_testing());
-  EXPECT_FALSE(item6->cannot_snap_widget_for_testing());
+  EXPECT_FALSE(GetCannotSnapWidget(item5));
+  EXPECT_FALSE(GetCannotSnapWidget(item6));
 
   SplitViewController::Get(root_windows[1])
       ->SnapWindow(window4.get(), SplitViewController::SnapPosition::kPrimary);
   ASSERT_TRUE(SplitViewController::Get(root_windows[0])->InSplitViewMode());
   ASSERT_TRUE(SplitViewController::Get(root_windows[1])->InSplitViewMode());
-  EXPECT_FALSE(item2->cannot_snap_widget_for_testing());
+  EXPECT_FALSE(GetCannotSnapWidget(item2));
   EXPECT_EQ(1.f, item3_unsnappable_layer->opacity());
-  EXPECT_FALSE(item5->cannot_snap_widget_for_testing());
-  ASSERT_TRUE(item6->cannot_snap_widget_for_testing());
-  ui::Layer* item6_unsnappable_layer =
-      item6->cannot_snap_widget_for_testing()->GetNativeWindow()->layer();
+  EXPECT_FALSE(GetCannotSnapWidget(item5));
+  ASSERT_TRUE(GetCannotSnapWidget(item6));
+  ui::Layer* item6_unsnappable_layer = GetCannotSnapWidget(item6)->GetLayer();
   EXPECT_EQ(1.f, item6_unsnappable_layer->opacity());
 
   SplitViewController::Get(root_windows[0])->EndSplitView();
   ASSERT_FALSE(SplitViewController::Get(root_windows[0])->InSplitViewMode());
   ASSERT_TRUE(SplitViewController::Get(root_windows[1])->InSplitViewMode());
-  EXPECT_FALSE(item2->cannot_snap_widget_for_testing());
+  EXPECT_FALSE(GetCannotSnapWidget(item2));
   EXPECT_EQ(0.f, item3_unsnappable_layer->opacity());
-  EXPECT_FALSE(item5->cannot_snap_widget_for_testing());
+  EXPECT_FALSE(GetCannotSnapWidget(item5));
   EXPECT_EQ(1.f, item6_unsnappable_layer->opacity());
 
   SplitViewController::Get(root_windows[1])->EndSplitView();
   ASSERT_FALSE(SplitViewController::Get(root_windows[0])->InSplitViewMode());
   ASSERT_FALSE(SplitViewController::Get(root_windows[1])->InSplitViewMode());
-  EXPECT_FALSE(item2->cannot_snap_widget_for_testing());
+  EXPECT_FALSE(GetCannotSnapWidget(item2));
   EXPECT_EQ(0.f, item3_unsnappable_layer->opacity());
-  EXPECT_FALSE(item5->cannot_snap_widget_for_testing());
+  EXPECT_FALSE(GetCannotSnapWidget(item5));
   EXPECT_EQ(0.f, item6_unsnappable_layer->opacity());
 }
 

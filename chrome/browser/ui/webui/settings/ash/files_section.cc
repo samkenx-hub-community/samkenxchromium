@@ -90,7 +90,7 @@ FilesSection::FilesSection(Profile* profile,
     : OsSettingsSection(profile, search_tag_registry) {
   SearchTagRegistry::ScopedTagUpdater updater = registry()->StartUpdate();
   updater.AddSearchTags(GetFilesSearchConcepts());
-  if (cloud_upload::IsEligibleAndEnabledUploadOfficeToCloud()) {
+  if (cloud_upload::IsEligibleAndEnabledUploadOfficeToCloud(profile)) {
     updater.AddSearchTags(GetFilesOfficeSearchConcepts());
   }
   if (ash::features::IsDriveFsBulkPinningEnabled()) {
@@ -111,14 +111,20 @@ void FilesSection::AddLoadTimeData(content::WebUIDataSource* html_source) {
       {"googleDriveOfflineTitle", IDS_SETTINGS_GOOGLE_DRIVE_OFFLINE_TITLE},
       {"googleDriveOfflineSubtitle",
        IDS_SETTINGS_GOOGLE_DRIVE_OFFLINE_SUBTITLE},
-      {"googleDriveOfflineClearTitle",
-       IDS_SETTINGS_GOOGLE_DRIVE_OFFLINE_CLEAR_TITLE},
+      {"googleDriveOfflineStorageTitle",
+       IDS_SETTINGS_GOOGLE_DRIVE_OFFLINE_STORAGE_TITLE},
       {"googleDriveOfflineSpaceSubtitle",
        IDS_SETTINGS_GOOGLE_DRIVE_OFFLINE_STORAGE_REQUIRED_SUBTITLE},
-      {"googleDriveOfflineClearSubtitle",
-       IDS_SETTINGS_GOOGLE_DRIVE_OFFLINE_CLEAR_SUBTITLE},
+      {"googleDriveOfflineClearCalculatingSubtitle",
+       IDS_SETTINGS_GOOGLE_DRIVE_OFFLINE_CLEAR_CALCULATING_SUBTITLE},
+      {"googleDriveOfflineClearErrorSubtitle",
+       IDS_SETTINGS_GOOGLE_DRIVE_OFFLINE_CLEAR_ERROR_SUBTITLE},
       {"googleDriveOfflineClearAction",
        IDS_SETTINGS_GOOGLE_DRIVE_OFFLINE_CLEAR_ACTION},
+      {"googleDriveOfflineClearDialogTitle",
+       IDS_SETTINGS_GOOGLE_DRIVE_OFFLINE_CLEAR_DIALOG_TITLE},
+      {"googleDriveOfflineClearDialogBody",
+       IDS_SETTINGS_GOOGLE_DRIVE_OFFLINE_CLEAR_DIALOG_BODY},
       {"googleDriveTurnOffLabel",
        IDS_SETTINGS_GOOGLE_DRIVE_TURN_OFF_BUTTON_LABEL},
       {"googleDriveTurnOffTitle",
@@ -171,7 +177,7 @@ void FilesSection::AddLoadTimeData(content::WebUIDataSource* html_source) {
 
   html_source->AddBoolean(
       "showOfficeSettings",
-      cloud_upload::IsEligibleAndEnabledUploadOfficeToCloud());
+      cloud_upload::IsEligibleAndEnabledUploadOfficeToCloud(profile()));
 
   const user_manager::User* user =
       ProfileHelper::Get()->GetUserByProfile(profile());

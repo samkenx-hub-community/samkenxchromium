@@ -36,7 +36,7 @@ suite('NewTabPageModulesHistoryClustersModuleCartTileTest', () => {
           url: 'https://foo.com/image' + i,
         };
       }),
-      discountText: '',
+      discountText: '5% off',
       relativeDate: '6 mins ago',
     };
     const tileElement = await initializeModule(cart);
@@ -45,6 +45,11 @@ suite('NewTabPageModulesHistoryClustersModuleCartTileTest', () => {
     assertTrue(!!tileElement);
     assertEquals(
         $$(tileElement, '#content')!.getAttribute('href'), 'https://foo.com');
+    assertEquals(
+        $$(tileElement, '#content')!.getAttribute('aria-label'),
+        loadTimeData.getStringF(
+            'modulesJourneysCartTileLabelPlural', 5, '5% off', 'Foo', 'foo.com',
+            '6 mins ago'));
     assertEquals($$(tileElement, '#title')!.textContent, 'Foo');
     assertEquals(
         $$(tileElement, '#titleAnnotation')!.textContent!,
@@ -58,6 +63,8 @@ suite('NewTabPageModulesHistoryClustersModuleCartTileTest', () => {
     assertFalse(isVisible($$(tileElement, '#fallbackImage')!));
     assertEquals($$(tileElement, '#domain')!.textContent!, 'foo.com');
     assertEquals($$(tileElement, '#date')!.textContent!, '6 mins ago');
+    assertTrue(isVisible($$(tileElement, '#discountChip')!));
+    assertEquals($$(tileElement, '#discountChip')!.textContent!, '5% off');
   });
 
   test(
@@ -82,6 +89,11 @@ suite('NewTabPageModulesHistoryClustersModuleCartTileTest', () => {
         assertEquals(
             $$(tileElement, '#content')!.getAttribute('href'),
             'https://foo.com');
+        assertEquals(
+            $$(tileElement, '#content')!.getAttribute('aria-label'),
+            loadTimeData.getStringF(
+                'modulesJourneysCartTileLabelPlural', 2, '', 'Foo', 'foo.com',
+                '6 mins ago'));
         assertEquals($$(tileElement, '#title')!.textContent, 'Foo');
         assertTrue(isVisible($$(tileElement, '#titleAnnotation')!));
         assertEquals(
@@ -117,6 +129,11 @@ suite('NewTabPageModulesHistoryClustersModuleCartTileTest', () => {
     assertTrue(!!tileElement);
     assertEquals(
         $$(tileElement, '#content')!.getAttribute('href'), 'https://foo.com');
+    assertEquals(
+        $$(tileElement, '#content')!.getAttribute('aria-label'),
+        loadTimeData.getStringF(
+            'modulesJourneysCartTileLabelSingular', '', 'Foo', 'foo.com',
+            '6 mins ago'));
     assertEquals($$(tileElement, '#title')!.textContent, 'Foo');
     assertTrue(isVisible($$(tileElement, '#titleAnnotation')!));
     assertEquals(
@@ -148,6 +165,11 @@ suite('NewTabPageModulesHistoryClustersModuleCartTileTest', () => {
     assertTrue(!!tileElement);
     assertEquals(
         $$(tileElement, '#content')!.getAttribute('href'), 'https://foo.com');
+    assertEquals(
+        $$(tileElement, '#content')!.getAttribute('aria-label'),
+        loadTimeData.getStringF(
+            'modulesJourneysCartTileLabelDefault', '', 'Foo', 'foo.com',
+            '6 mins ago'));
     assertEquals($$(tileElement, '#title')!.textContent, 'Foo');
     assertTrue(isVisible($$(tileElement, '#titleAnnotation')!));
     assertEquals(
@@ -162,4 +184,23 @@ suite('NewTabPageModulesHistoryClustersModuleCartTileTest', () => {
     assertEquals($$(tileElement, '#domain')!.textContent!, 'foo.com');
     assertEquals($$(tileElement, '#date')!.textContent!, '6 mins ago');
   });
+
+  test(
+      'Tile does not render discount chip when discount is unavailable',
+      async () => {
+        // Arrange.
+        const cart = {
+          domain: 'foo.com',
+          merchant: 'Foo',
+          cartUrl: {url: 'https://foo.com'},
+          productImageUrls: [],
+          discountText: '',
+          relativeDate: '6 mins ago',
+        };
+        const tileElement = await initializeModule(cart);
+
+        // Assert.
+        assertTrue(!!tileElement);
+        assertTrue(!$$(tileElement, '#discountChip'));
+      });
 });

@@ -17,7 +17,7 @@ try_.defaults.set(
     cores = 8,
     os = os.LINUX_DEFAULT,
     compilator_cores = 16,
-    compilator_reclient_jobs = reclient.jobs.MID_JOBS_FOR_CQ,
+    compilator_reclient_jobs = reclient.jobs.HIGH_JOBS_FOR_CQ,
     execution_timeout = try_.DEFAULT_EXECUTION_TIMEOUT,
     orchestrator_cores = 2,
     reclient_instance = reclient.instance.DEFAULT_UNTRUSTED,
@@ -59,7 +59,7 @@ try_.orchestrator_builder(
     compilator = "chromeos-amd64-generic-rel-compilator",
     experiments = {
         # go/nplus1shardsproposal
-        "chromium.add_one_test_shard": 5,
+        "chromium.add_one_test_shard": 10,
     },
     main_list_view = "try",
     tryjob = try_.job(),
@@ -71,7 +71,7 @@ try_.orchestrator_builder(
 try_.compilator_builder(
     name = "chromeos-amd64-generic-rel-compilator",
     branch_selector = branches.selector.CROS_LTS_BRANCHES,
-    cores = 8,
+    cores = "8|16",
     main_list_view = "try",
 )
 
@@ -108,17 +108,6 @@ try_.builder(
     tryjob = try_.job(),
 )
 
-try_.orchestrator_builder(
-    name = "lacros-amd64-generic-rel-orchestrator",
-    branch_selector = branches.selector.CROS_BRANCHES,
-    mirrors = [
-        "ci/lacros-amd64-generic-rel",
-    ],
-    compilator = "lacros-amd64-generic-rel-compilator",
-    main_list_view = "try",
-    use_orchestrator_pool = True,
-)
-
 try_.builder(
     name = "lacros-amd64-generic-rel-skylab",
     branch_selector = branches.selector.CROS_BRANCHES,
@@ -150,16 +139,6 @@ try_.builder(
             gs_bucket = "chromium-try-skylab",
         ),
     ),
-)
-
-try_.compilator_builder(
-    name = "lacros-amd64-generic-rel-compilator",
-    branch_selector = branches.selector.CROS_BRANCHES,
-    cores = None,
-    # TODO (crbug.com/1287228): Set correct values once bots are set up
-    ssd = None,
-    goma_backend = goma.backend.RBE_PROD,
-    main_list_view = "try",
 )
 
 try_.builder(
@@ -271,7 +250,7 @@ try_.orchestrator_builder(
     coverage_test_types = ["unit", "overall"],
     experiments = {
         # go/nplus1shardsproposal
-        "chromium.add_one_test_shard": 5,
+        "chromium.add_one_test_shard": 10,
     },
     main_list_view = "try",
     tryjob = try_.job(),
@@ -352,4 +331,43 @@ try_.builder(
             "chrome/test/data/webui/chromeos/chromebox_for_meetings/.+",
         ],
     ),
+)
+
+try_.builder(
+    name = "chromeos-amd64-generic-rel-rts",
+    mirrors = builder_config.copy_from("try/chromeos-amd64-generic-rel"),
+    try_settings = builder_config.try_settings(
+        rts_config = builder_config.rts_config(
+            condition = builder_config.rts_condition.QUICK_RUN_ONLY,
+        ),
+    ),
+    experiments = {
+        "chromium_rts.inverted_rts": 100,
+    },
+)
+
+try_.builder(
+    name = "linux-chromeos-rel-rts",
+    mirrors = builder_config.copy_from("try/linux-chromeos-rel"),
+    try_settings = builder_config.try_settings(
+        rts_config = builder_config.rts_config(
+            condition = builder_config.rts_condition.QUICK_RUN_ONLY,
+        ),
+    ),
+    experiments = {
+        "chromium_rts.inverted_rts": 100,
+    },
+)
+
+try_.builder(
+    name = "linux-lacros-rel-rts",
+    mirrors = builder_config.copy_from("try/linux-lacros-rel"),
+    try_settings = builder_config.try_settings(
+        rts_config = builder_config.rts_config(
+            condition = builder_config.rts_condition.QUICK_RUN_ONLY,
+        ),
+    ),
+    experiments = {
+        "chromium_rts.inverted_rts": 100,
+    },
 )

@@ -3102,7 +3102,6 @@ interface GPUSupportedLimits
     getter maxComputeWorkgroupsPerDimension
     getter maxDynamicStorageBuffersPerPipelineLayout
     getter maxDynamicUniformBuffersPerPipelineLayout
-    getter maxFragmentCombinedOutputResources
     getter maxInterStageShaderComponents
     getter maxInterStageShaderVariables
     getter maxSampledTexturesPerShaderStage
@@ -5168,10 +5167,12 @@ interface IdentityCredential : Credential
     getter token
     method constructor
 interface IdentityProvider
+    static method close
     static method getUserInfo
     static method login
     static method logout
     static method register
+    static method resolve
     static method unregister
     attribute @@toStringTag
     method constructor
@@ -5524,6 +5525,7 @@ interface MLGraphBuilder
     method conv2d
     method convTranspose2d
     method div
+    method elu
     method gemm
     method hardSwish
     method input
@@ -11469,6 +11471,7 @@ interface XMLHttpRequest : XMLHttpRequestEventTarget
     method open
     method overrideMimeType
     method send
+    method setAttributionReporting
     method setPrivateToken
     method setRequestHeader
     setter onreadystatechange

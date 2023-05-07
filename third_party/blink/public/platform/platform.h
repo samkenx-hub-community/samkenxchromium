@@ -52,6 +52,7 @@
 #include "third_party/abseil-cpp/absl/types/optional.h"
 #include "third_party/blink/public/common/security/protocol_handler_security_level.h"
 #include "third_party/blink/public/common/user_agent/user_agent_metadata.h"
+#include "third_party/blink/public/mojom/service_worker/service_worker_fetch_handler_bypass_option.mojom-shared.h"
 #include "third_party/blink/public/platform/audio/web_audio_device_source_type.h"
 #include "third_party/blink/public/platform/cross_variant_mojo_util.h"
 #include "third_party/blink/public/platform/url_loader_throttle_provider.h"
@@ -670,6 +671,7 @@ class BLINK_PLATFORM_EXPORT Platform {
       CrossVariantMojoRemote<mojom::ServiceWorkerContainerHostInterfaceBase>
           service_worker_container_host,
       const WebString& client_id,
+      mojom::ServiceWorkerFetchHandlerBypassOption fetch_handler_bypass_option,
       std::unique_ptr<network::PendingSharedURLLoaderFactory> fallback_factory,
       mojo::PendingReceiver<network::mojom::URLLoaderFactory> receiver,
       scoped_refptr<base::SequencedTaskRunner> task_runner);
@@ -771,12 +773,11 @@ class BLINK_PLATFORM_EXPORT Platform {
 
   // Attribution Reporting API ------------------------------------
 
-  // Returns whether OS-level support is enabled for Attribution Reporting API.
+  // Returns whether web or OS-level Attribution Reporting is supported.
   // See
   // https://github.com/WICG/attribution-reporting-api/blob/main/app_to_web.md.
-  virtual network::mojom::AttributionOsSupport
-  GetOsSupportForAttributionReporting() {
-    return network::mojom::AttributionOsSupport::kDisabled;
+  virtual network::mojom::AttributionSupport GetAttributionReportingSupport() {
+    return network::mojom::AttributionSupport::kWeb;
   }
 
 #if BUILDFLAG(IS_ANDROID)
@@ -785,11 +786,9 @@ class BLINK_PLATFORM_EXPORT Platform {
       uint64_t private_memory_footprint_bytes) {}
 
   virtual bool IsUserLevelMemoryPressureSignalEnabled() { return false; }
-  virtual base::TimeDelta InertIntervalOfUserLevelMemoryPressureSignal() {
-    return base::TimeDelta();
-  }
-  virtual base::TimeDelta MinimumIntervalOfUserLevelMemoryPressureSignal() {
-    return base::TimeDelta();
+  virtual std::pair<base::TimeDelta, base::TimeDelta>
+  InertAndMinimumIntervalOfUserLevelMemoryPressureSignal() {
+    return std::make_pair(base::TimeDelta(), base::TimeDelta());
   }
 #endif
 

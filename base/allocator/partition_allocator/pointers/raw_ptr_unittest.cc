@@ -26,6 +26,7 @@
 #include "base/allocator/partition_allocator/pointers/raw_ref.h"
 #include "base/allocator/partition_allocator/tagging.h"
 #include "base/cpu.h"
+#include "base/cxx20_to_address.h"
 #include "base/logging.h"
 #include "base/memory/raw_ptr_asan_service.h"
 #include "base/task/thread_pool.h"
@@ -1475,6 +1476,59 @@ TEST_F(RawPtrTest, CrossKindAssignment) {
                   .wrap_raw_ptr_cnt = 0, .wrap_raw_ptr_for_dup_cnt = 2}),
               CountersMatch());
 }
+
+// Without the explicitly customized `raw_ptr::to_address()`,
+// `base::to_address()` will use the dereference operator. This is not
+// what we want; this test enforces extraction semantics for
+// `to_address()`.
+TEST_F(RawPtrTest, ToAddressDoesNotDereference) {
+  CountingRawPtr<int> ptr = nullptr;
+  int* raw = base::to_address(ptr);
+  std::ignore = raw;
+  EXPECT_THAT((CountingRawPtrExpectations<RawPtrCountingImpl>{
+                  .get_for_dereference_cnt = 0,
+                  .get_for_extraction_cnt = 1,
+                  .get_for_comparison_cnt = 0,
+                  .get_for_duplication_cnt = 0}),
+              CountersMatch());
+}
+
+TEST_F(RawPtrTest, ToAddressGivesBackRawAddress) {
+  int* raw = nullptr;
+  raw_ptr<int> miracle = raw;
+  EXPECT_EQ(base::to_address(raw), base::to_address(miracle));
+}
+
+// Verifies that `raw_ptr_experimental` is aliased appropriately.
+//
+// The `DisableDanglingPtrDetection` trait is arbitrarily chosen and is
+// just there to ensure that `raw_ptr_experimental` knows how to field
+// the traits template argument.
+#if BUILDFLAG(ENABLE_RAW_PTR_EXPERIMENTAL)
+static_assert(
+    std::is_same_v<raw_ptr_experimental<int, DisableDanglingPtrDetection>,
+                   raw_ptr<int, DisableDanglingPtrDetection>>);
+static_assert(
+    std::is_same_v<raw_ptr_experimental<const int, DisableDanglingPtrDetection>,
+                   raw_ptr<const int, DisableDanglingPtrDetection>>);
+static_assert(
+    std::is_same_v<
+        const raw_ptr_experimental<const int, DisableDanglingPtrDetection>,
+        const raw_ptr<const int, DisableDanglingPtrDetection>>);
+#else   // BUILDFLAG(ENABLE_RAW_PTR_EXPERIMENTAL)
+// `DisableDanglingPtrDetection` means nothing here and is silently
+// ignored.
+static_assert(
+    std::is_same_v<raw_ptr_experimental<int, DisableDanglingPtrDetection>,
+                   int*>);
+static_assert(
+    std::is_same_v<raw_ptr_experimental<const int, DisableDanglingPtrDetection>,
+                   const int*>);
+static_assert(
+    std::is_same_v<
+        const raw_ptr_experimental<const int, DisableDanglingPtrDetection>,
+        const int* const>);
+#endif  // BUILDFLAG(ENABLE_RAW_PTR_EXPERIMENTAL)
 
 }  // namespace
 

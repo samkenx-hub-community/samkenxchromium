@@ -28,12 +28,12 @@ constexpr char kTaskListsListRequestedFields[] =
 
 constexpr char kTasksListUrlTemplate[] = "tasks/v1/lists/$1/tasks";
 constexpr char kTasksListRequestedFields[] =
-    "kind,items(id,title,status,parent),nextPageToken";
+    "kind,items(id,title,status,parent,due),nextPageToken";
 
 constexpr char kTaskUrlTemplate[] = "tasks/v1/lists/$1/tasks/$2";
 
 GURL GetBaseUrl() {
-  return GaiaUrls::GetInstance()->google_apis_origin_url();
+  return GaiaUrls::GetInstance()->tasks_api_origin_url();
 }
 
 }  // namespace

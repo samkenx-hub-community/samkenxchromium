@@ -35,7 +35,7 @@ typedef NS_ENUM(NSInteger, SettingsItemType) {
   SettingsItemTypeAutofillProfile,
   SettingsItemTypeVoiceSearch,
   SettingsItemTypeBottomOmnibox,
-  SettingsItemTypePriceNotifications,
+  SettingsItemTypeNotifications,
   SettingsItemTypePrivacy,
   SettingsItemTypeLanguageSettings,
   SettingsItemTypeContentSettings,
@@ -149,6 +149,9 @@ extern NSString* const kSettingsCookiesCellId;
 // The accessibility identifier of the Default Site Mode cell.
 extern NSString* const kSettingsDefaultSiteModeCellId;
 
+// The accessibility identifier of the Web Inspector cell.
+extern NSString* const kSettingsWebInspectorCellId;
+
 // The accessibility identifier of the default browser settings TableView.
 extern NSString* const kDefaultBrowserSettingsTableViewId;
 
@@ -161,8 +164,8 @@ extern NSString* const kSettingsIncognitoInterstitialId;
 // when the setting is disabled because of Enterprise policy.
 extern NSString* const kSettingsIncognitoInterstitialDisabledId;
 
-// The accessibility identifier of the Price Notifications setting.
-extern NSString* const kSettingsPriceNotificationsId;
+// The accessibility identifier of the Notifications setting.
+extern NSString* const kSettingsNotificationsId;
 
 // The accessibility identifier of the tabs cell.
 extern NSString* const kSettingsTabsCellId;

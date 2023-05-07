@@ -113,6 +113,8 @@ void StartupUtils::RegisterPrefs(PrefRegistrySimple* registry) {
                                std::string());
   registry->RegisterBooleanPref(
       ash::quick_start::prefs::kShouldResumeQuickStartAfterReboot, false);
+  registry->RegisterDictionaryPref(
+      ash::quick_start::prefs::kResumeQuickStartAfterRebootInfo);
 }
 
 // static
@@ -140,6 +142,12 @@ void StartupUtils::RegisterOobeProfilePrefs(PrefRegistrySimple* registry) {
     registry->RegisterListPref(prefs::kChoobeSelectedScreens);
     registry->RegisterListPref(prefs::kChoobeCompletedScreens);
   }
+
+  if (features::IsOobeDrivePinningEnabled()) {
+    registry->RegisterBooleanPref(prefs::kOobeDrivePinningEnabledDeferred,
+                                  false);
+  }
+
   OnboardingUserActivityCounter::RegisterProfilePrefs(registry);
 }
 

@@ -374,15 +374,15 @@ mojom("mojom_attribution") {
     {
       types = [
         {
-          mojom = "network.mojom.TriggerAttestation"
-          cpp = "::network::TriggerAttestation"
+          mojom = "network.mojom.TriggerVerification"
+          cpp = "::network::TriggerVerification"
           move_only = true
         },
       ]
       traits_headers =
           [ "//services/network/public/cpp/attribution_mojom_traits.h" ]
       traits_deps =
-          [ "//services/network/public/cpp:trigger_attestation_traits" ]
+          [ "//services/network/public/cpp:trigger_verification_traits" ]
     },
   ]
 
@@ -876,6 +876,10 @@ mojom("mojom_network_param") {
         {
           mojom = "network.mojom.ProxyServer"
           cpp = "::net::ProxyServer"
+        },
+        {
+          mojom = "network.mojom.ProxyScheme"
+          cpp = "::net::ProxyServer::Scheme"
         },
         {
           mojom = "network.mojom.ResolveErrorInfo"
@@ -1375,6 +1379,12 @@ mojom("mojom") {
     if (enable_reporting) {
       enabled_features += [ "enable_reporting" ]
     }
+  }
+
+  if (is_linux) {
+    # TODO(crbug.com/1431866): Remove this once is_linux in the mojom IDL does
+    # not include lacros.
+    enabled_features += [ "use_network_interface_change_listener" ]
   }
 
   # Typemaps which apply to both Blink and non-Blink bindings.

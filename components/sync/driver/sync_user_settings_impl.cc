@@ -59,24 +59,19 @@ SyncUserSettingsImpl::SyncUserSettingsImpl(
     SyncServiceCrypto* crypto,
     SyncPrefs* prefs,
     const SyncTypePreferenceProvider* preference_provider,
-    ModelTypeSet registered_model_types)
+    ModelTypeSet registered_model_types,
+    base::RepeatingCallback<bool()> bookmarks_and_reading_list_opt_in_callback)
     : crypto_(crypto),
       prefs_(prefs),
       preference_provider_(preference_provider),
-      registered_model_types_(registered_model_types) {
+      registered_model_types_(registered_model_types),
+      bookmarks_and_reading_list_opt_in_callback_(
+          std::move(bookmarks_and_reading_list_opt_in_callback)) {
   DCHECK(crypto_);
   DCHECK(prefs_);
 }
 
 SyncUserSettingsImpl::~SyncUserSettingsImpl() = default;
-
-bool SyncUserSettingsImpl::IsSyncRequested() const {
-  return prefs_->IsSyncRequested();
-}
-
-void SyncUserSettingsImpl::SetSyncRequested() {
-  prefs_->SetSyncRequested(true);
-}
 
 bool SyncUserSettingsImpl::IsFirstSetupComplete() const {
   return prefs_->IsFirstSetupComplete();
@@ -98,6 +93,18 @@ UserSelectableTypeSet SyncUserSettingsImpl::GetSelectedTypes() const {
   UserSelectableTypeSet types = prefs_->GetSelectedTypes();
   types.RetainAll(GetRegisteredSelectableTypes());
 
+#if BUILDFLAG(IS_IOS)
+  // In transport-only mode, bookmarks and reading list require an additional
+  // opt-in.
+  // TODO(crbug.com/1440628): Cleanup the temporary behaviour of an additional
+  // opt in for Bookmarks and Reading Lists.
+  if (bookmarks_and_reading_list_opt_in_callback_.Run() &&
+      !prefs_->IsOptedInForBookmarksAndReadingListAccountStorage()) {
+    types.Remove(UserSelectableType::kBookmarks);
+    types.Remove(UserSelectableType::kReadingList);
+  }
+#endif  // BUILDFLAG(IS_IOS)
+
 #if BUILDFLAG(IS_CHROMEOS_LACROS)
   if (base::FeatureList::IsEnabled(kSyncChromeOSAppsToggleSharing) &&
       GetRegisteredSelectableTypes().Has(UserSelectableType::kApps)) {
@@ -113,6 +120,11 @@ UserSelectableTypeSet SyncUserSettingsImpl::GetSelectedTypes() const {
   return types;
 }
 
+bool SyncUserSettingsImpl::IsTypeManagedByPolicy(
+    UserSelectableType type) const {
+  return prefs_->IsTypeManagedByPolicy(type);
+}
+
 void SyncUserSettingsImpl::SetSelectedTypes(bool sync_everything,
                                             UserSelectableTypeSet types) {
   UserSelectableTypeSet registered_types = GetRegisteredSelectableTypes();
@@ -121,6 +133,13 @@ void SyncUserSettingsImpl::SetSelectedTypes(bool sync_everything,
       << "\n setting to: " << UserSelectableTypeSetToString(types);
   prefs_->SetSelectedTypes(sync_everything, registered_types, types);
 }
+
+#if BUILDFLAG(IS_IOS)
+void SyncUserSettingsImpl::SetBookmarksAndReadingListAccountStorageOptIn(
+    bool value) {
+  prefs_->SetBookmarksAndReadingListAccountStorageOptIn(value);
+}
+#endif  // BUILDFLAG(IS_IOS)
 
 UserSelectableTypeSet SyncUserSettingsImpl::GetRegisteredSelectableTypes()
     const {
@@ -144,6 +163,11 @@ UserSelectableOsTypeSet SyncUserSettingsImpl::GetSelectedOsTypes() const {
   UserSelectableOsTypeSet types = prefs_->GetSelectedOsTypes();
   types.RetainAll(GetRegisteredSelectableOsTypes());
   return types;
+}
+
+bool SyncUserSettingsImpl::IsOsTypeManagedByPolicy(
+    UserSelectableOsType type) const {
+  return prefs_->IsOsTypeManagedByPolicy(type);
 }
 
 void SyncUserSettingsImpl::SetSelectedOsTypes(bool sync_all_os_types,
@@ -254,14 +278,6 @@ void SyncUserSettingsImpl::SetDecryptionNigoriKey(
 
 std::unique_ptr<Nigori> SyncUserSettingsImpl::GetDecryptionNigoriKey() const {
   return crypto_->GetDecryptionNigoriKey();
-}
-
-void SyncUserSettingsImpl::ClearSyncRequested() {
-  prefs_->SetSyncRequested(false);
-}
-
-void SyncUserSettingsImpl::SetSyncRequestedIfNotSetExplicitly() {
-  prefs_->SetSyncRequestedIfNotSetExplicitly();
 }
 
 ModelTypeSet SyncUserSettingsImpl::GetPreferredDataTypes() const {

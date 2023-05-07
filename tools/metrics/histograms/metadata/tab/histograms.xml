@@ -152,20 +152,6 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
-<histogram name="Tab.AgeUponRestoreFromColdStart" units="minutes"
-    expires_after="M88">
-  <owner>dtrainor@chromium.org</owner>
-  <owner>yfriedman@chromium.org</owner>
-  <summary>
-    [Android] Age (time since the last display in previous sessions) of a tab
-    being restored due to the first tab switch after the browser cold start,
-    recorded upon such restore. When the browser is started from cold, this
-    metric is not recorded for the foreground, automatically restored tab, so
-    that the metric tracks only the restores triggered by direct user decision
-    to switch tabs.
-  </summary>
-</histogram>
-
 <histogram name="Tab.AndroidCrashUpload{AndroidCrashUploadTypes}"
     enum="BooleanSuccess" expires_after="M85">
   <owner>wnwen@chromium.org</owner>
@@ -267,7 +253,7 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
-<histogram name="Tab.NewTab" enum="NewTabType" expires_after="2023-08-20">
+<histogram name="Tab.NewTab" enum="NewTabType" expires_after="2023-10-22">
   <owner>tbergquist@chromium.org</owner>
   <owner>bsep@chromium.org</owner>
   <summary>
@@ -499,38 +485,6 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
-<histogram name="Tab.TabUnder.PopupToTabUnderTime" units="ms"
-    expires_after="M85">
-  <owner>csharrison@chromium.org</owner>
-  <summary>
-    Measures the time from when a tab opens a popup to when it performs a
-    tab-under (i.e. navigates cross origin, in the background without a user
-    gesture).
-  </summary>
-</histogram>
-
-<histogram name="Tab.TabUnder.VisibleTime" units="ms" expires_after="M77">
-  <owner>csharrison@chromium.org</owner>
-  <summary>
-    Measures the total time a tab is visible after it navigates itself
-    cross-origin in the background, without a user gesture. The tab must have
-    opened a popup since the last user gesture in the tab. Measured at
-    WebContents destruction. The total visible time for the tab is the sum of
-    this metric and Tab.TabUnder.VisibleTimeBefore.
-  </summary>
-</histogram>
-
-<histogram name="Tab.TabUnder.VisibleTimeBefore" units="ms" expires_after="M85">
-  <owner>csharrison@chromium.org</owner>
-  <summary>
-    Measures the total time a tab is visible before it navigates itself
-    cross-origin in the background, without a user gesture. The tab must have
-    opened a popup since the last user gesture in the tab. Measured at
-    WebContents destruction. The total visible time for the tab is the sum of
-    this metric and Tab.TabUnder.VisibleTime.
-  </summary>
-</histogram>
-
 <histogram name="Tab.TotalTabCount.BeforeLeavingApp" units="tabs"
     expires_after="M85">
   <owner>tedchoc@chromium.org</owner>
@@ -542,17 +496,8 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
-<histogram name="Tab.VisibleTime" units="ms" expires_after="M77">
-  <owner>csharrison@chromium.org</owner>
-  <summary>
-    Measures the total time a tab is visible. Measured at the WebContents layer
-    so this metric does not attempt to account for things like session restore.
-    Logged at WebContents destruction.
-  </summary>
-</histogram>
-
 <histogram name="TabGroups.CollapsedGroupCountPerLoad" units="groups"
-    expires_after="2023-08-20">
+    expires_after="2023-10-22">
   <owner>dpenning@chromium.org</owner>
   <owner>chrome-desktop-ui-sea@google.com</owner>
   <summary>
@@ -582,7 +527,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="TabGroups.SessionsPerGroup" units="sessions"
-    expires_after="2023-08-20">
+    expires_after="2023-10-22">
   <owner>yusufo@chromium.org</owner>
   <owner>wychen@chromium.org</owner>
   <summary>
@@ -634,7 +579,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="TabGroups.UserGroupCountPerLoad" units="groups"
-    expires_after="2023-08-20">
+    expires_after="2023-10-22">
   <owner>dpenning@chromium.org</owner>
   <owner>chrome-desktop-ui-sea@google.com</owner>
   <summary>
@@ -1100,33 +1045,6 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
-<histogram name="TabRestore.error_move_session_at_path_to_backup"
-    enum="FoundationFileSystemError" expires_after="M77">
-  <owner>sky@chromium.org</owner>
-  <summary>
-    Error code returned by [moveItemAtPath:toPath:error:] when moving previous
-    session file to backup file before restoring. 0 in case of success.
-  </summary>
-</histogram>
-
-<histogram name="TabRestore.error_remove_backup_at_path"
-    enum="FoundationFileSystemError" expires_after="M77">
-  <owner>sky@chromium.org</owner>
-  <summary>
-    Error code returned by [removeItemAtPath:error:] when removing previous
-    session backup file. 0 in case of success.
-  </summary>
-</histogram>
-
-<histogram name="TabRestore.error_remove_session_at_path"
-    enum="FoundationFileSystemError" expires_after="M77">
-  <owner>sky@chromium.org</owner>
-  <summary>
-    Error code returned by [removeItemAtPath:error:] when removing previous
-    session file. 0 in case of success.
-  </summary>
-</histogram>
-
 <histogram name="TabRestore.{RestoreType}.TimeBetweenClosedAndRestored"
     units="ms" expires_after="2023-07-10">
   <owner>sreejakshetty@chromium.org</owner>
@@ -1141,6 +1059,17 @@ chromium-metrics-reviews@google.com.
     <variant name="Tab" summary="tab"/>
     <variant name="Window" summary="window"/>
   </token>
+</histogram>
+
+<histogram name="Tabs.ActiveCountAtStartup" units="tabs"
+    expires_after="2023-10-01">
+  <owner>alionadangla@chromium.org</owner>
+  <owner>lpromero@chromium.org</owner>
+  <owner>chromeleon@google.com</owner>
+  <summary>
+    [iOS] Records the number of tabs that are considered active as per the
+    current tab inactivity threshold. This is recorded at cold launch.
+  </summary>
 </histogram>
 
 <histogram name="Tabs.CountAtResume" units="tabs" expires_after="2024-01-15">
@@ -1195,13 +1124,14 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
-<histogram name="Tabs.ForegroundTabAgeAtStartup" units="minutes"
-    expires_after="M88">
-  <owner>dtrainor@chromium.org</owner>
-  <owner>yusufo@chromium.org</owner>
+<histogram name="Tabs.InactiveCountAtStartup" units="tabs"
+    expires_after="2023-10-01">
+  <owner>alionadangla@chromium.org</owner>
+  <owner>lpromero@chromium.org</owner>
+  <owner>chromeleon@google.com</owner>
   <summary>
-    [Android] Age (time since the last display in previous sessions) of the
-    foreground tab being restored on the browser cold start.
+    [iOS] Records the number of tabs that are considered inactive as per the
+    current tab inactivity threshold. This is recorded at cold launch.
   </summary>
 </histogram>
 
@@ -1311,6 +1241,16 @@ chromium-metrics-reviews@google.com.
     logged on all desktop platforms.
   </summary>
   <token key="BatteryState" variants="BatteryState"/>
+</histogram>
+
+<histogram name="Tabs.OldCountAtStartup" units="tabs"
+    expires_after="2023-10-01">
+  <owner>alionadangla@chromium.org</owner>
+  <owner>lpromero@chromium.org</owner>
+  <owner>chromeleon@google.com</owner>
+  <summary>
+    [iOS] Number of tabs older than 21 days. Recorded at cold launch.
+  </summary>
 </histogram>
 
 <histogram name="Tabs.PersistedTabData.Critical.Map.Success"
@@ -1745,58 +1685,6 @@ chromium-metrics-reviews@google.com.
   </token>
 </histogram>
 
-<histogram name="Tabs.SwitchFromCloseLatency{Tabs_SwitchLatency}" units="ms"
-    expires_after="M88">
-  <owner>dtrainor@chromium.org</owner>
-  <owner>yusufo@chromium.org</owner>
-  <summary>
-    [Android] Time between the event that closes a tab and the start of
-    rendering. {Tabs_SwitchLatency}
-  </summary>
-  <token key="Tabs_SwitchLatency" variants="Tabs_SwitchLatency">
-    <variant name=""/>
-  </token>
-</histogram>
-
-<histogram name="Tabs.SwitchFromExitLatency{Tabs_SwitchLatency}" units="ms"
-    expires_after="M88">
-  <owner>dtrainor@chromium.org</owner>
-  <owner>yusufo@chromium.org</owner>
-  <summary>
-    [Android] Time between the event that exits an app and the start of
-    rendering. {Tabs_SwitchLatency}
-  </summary>
-  <token key="Tabs_SwitchLatency" variants="Tabs_SwitchLatency">
-    <variant name=""/>
-  </token>
-</histogram>
-
-<histogram name="Tabs.SwitchFromNewLatency{Tabs_SwitchLatency}" units="ms"
-    expires_after="M88">
-  <owner>dtrainor@chromium.org</owner>
-  <owner>yusufo@chromium.org</owner>
-  <summary>
-    [Android] Time between the event that creates a tab and the start of
-    rendering. {Tabs_SwitchLatency}
-  </summary>
-  <token key="Tabs_SwitchLatency" variants="Tabs_SwitchLatency">
-    <variant name=""/>
-  </token>
-</histogram>
-
-<histogram name="Tabs.SwitchFromUserLatency{Tabs_SwitchLatency}" units="ms"
-    expires_after="M88">
-  <owner>dtrainor@chromium.org</owner>
-  <owner>yusufo@chromium.org</owner>
-  <summary>
-    [Android] Time between the event that selects a tab and the start of
-    rendering. {Tabs_SwitchLatency}
-  </summary>
-  <token key="Tabs_SwitchLatency" variants="Tabs_SwitchLatency">
-    <variant name=""/>
-  </token>
-</histogram>
-
 <histogram name="Tabs.TabCountActiveWindow" units="tabs" expires_after="never">
 <!-- expires-never: usage drives tab optimization and analysis. -->
 
@@ -1853,9 +1741,6 @@ chromium-metrics-reviews@google.com.
     load completes.
 
     This is basically the average number of tabs over time.
-
-    See also MPArch.RPHCountPerLoad for the number of processes used by these
-    tabs.
   </summary>
 </histogram>
 
@@ -2516,7 +2401,7 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
-<histogram name="TabStrip.TimeToSwitch" units="ms" expires_after="2023-08-20">
+<histogram name="TabStrip.TimeToSwitch" units="ms" expires_after="2023-10-22">
   <owner>dpenning@chromium.org</owner>
   <owner>chrome-desktop-ui-sea@google.com</owner>
   <summary>

@@ -9,6 +9,7 @@
 #include "base/rand_util.h"
 #include "components/prefs/pref_service.h"
 #include "components/safe_browsing/core/browser/utils/backoff_operator.h"
+#include "components/safe_browsing/core/common/features.h"
 #include "components/safe_browsing/core/common/safe_browsing_prefs.h"
 #include "components/safe_browsing/core/common/utils.h"
 #include "net/base/net_errors.h"
@@ -100,6 +101,20 @@ constexpr net::NetworkTrafficAnnotationTag kOhttpKeyTrafficAnnotation =
       "default."
   )");
 
+bool IsEnabled(const PrefService& pref_service) {
+  safe_browsing::SafeBrowsingState state =
+      safe_browsing::GetSafeBrowsingState(pref_service);
+  return (state == safe_browsing::SafeBrowsingState::STANDARD_PROTECTION &&
+          !base::FeatureList::IsEnabled(
+              safe_browsing::kSafeBrowsingLookupMechanismExperiment)) ||
+         // The service is enabled when enhanced protection and lookup mechanism
+         // experiment are both enabled, because Chrome needs to send HPRT
+         // requests to conduct the experiment.
+         (state == safe_browsing::SafeBrowsingState::ENHANCED_PROTECTION &&
+          base::FeatureList::IsEnabled(
+              safe_browsing::kSafeBrowsingLookupMechanismExperiment));
+}
+
 }  // namespace
 
 namespace safe_browsing {
@@ -132,15 +147,13 @@ OhttpKeyService::OhttpKeyService(
       base::BindRepeating(&OhttpKeyService::OnSafeBrowsingStateChanged,
                           weak_factory_.GetWeakPtr()));
 
-  SetEnabled(GetSafeBrowsingState(*pref_service_) ==
-             SafeBrowsingState::STANDARD_PROTECTION);
+  SetEnabled(IsEnabled(*pref_service_));
 }
 
 OhttpKeyService::~OhttpKeyService() = default;
 
 void OhttpKeyService::OnSafeBrowsingStateChanged() {
-  SetEnabled(GetSafeBrowsingState(*pref_service_) ==
-             SafeBrowsingState::STANDARD_PROTECTION);
+  SetEnabled(IsEnabled(*pref_service_));
 }
 
 void OhttpKeyService::SetEnabled(bool enable) {
@@ -209,7 +222,8 @@ void OhttpKeyService::NotifyLookupResponse(
     return;
   }
 
-  if (response_code == net::HTTP_OK && headers->HasHeader(kKeyRotatedHeader)) {
+  if (response_code == net::HTTP_OK && headers &&
+      headers->HasHeader(kKeyRotatedHeader)) {
     server_triggered_fetch_scheduled_ = true;
     // The key is still valid, but it is close to expiration. It is a soft
     // failure, so do not clear the key immediately.

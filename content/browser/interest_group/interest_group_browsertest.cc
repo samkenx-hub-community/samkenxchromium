@@ -29,6 +29,7 @@
 #include "base/time/time.h"
 #include "base/values.h"
 #include "build/build_config.h"
+#include "build/chromeos_buildflags.h"
 #include "components/network_session_configurator/common/network_switches.h"
 #include "components/web_package/web_bundle_builder.h"
 #include "content/browser/fenced_frame/fenced_frame.h"
@@ -45,6 +46,7 @@
 #include "content/public/browser/browser_context.h"
 #include "content/public/common/content_client.h"
 #include "content/public/common/content_features.h"
+#include "content/public/test/back_forward_cache_util.h"
 #include "content/public/test/browser_test.h"
 #include "content/public/test/browser_test_utils.h"
 #include "content/public/test/content_browser_test.h"
@@ -65,7 +67,9 @@
 #include "net/test/embedded_test_server/embedded_test_server.h"
 #include "net/test/embedded_test_server/http_request.h"
 #include "net/test/embedded_test_server/http_response.h"
+#include "net/traffic_annotation/network_traffic_annotation_test_helper.h"
 #include "services/data_decoder/public/cpp/test_support/in_process_data_decoder.h"
+#include "services/network/public/cpp/features.h"
 #include "services/network/public/cpp/network_switches.h"
 #include "services/network/public/cpp/resource_request.h"
 #include "services/network/public/mojom/fetch_api.mojom.h"
@@ -132,6 +136,12 @@ base::Value::List MakeAdsValue(
     entry.Set("renderUrl", ad.render_url.spec());
     if (ad.size_group) {
       entry.Set("sizeGroup", std::move(ad.size_group.value()));
+    }
+    if (ad.buyer_reporting_id) {
+      entry.Set("buyerReportingId", *ad.buyer_reporting_id);
+    }
+    if (ad.buyer_and_seller_reporting_id) {
+      entry.Set("buyerAndSellerReportingId", *ad.buyer_and_seller_reporting_id);
     }
     if (ad.metadata)
       entry.Set("metadata", JsonToValue(*ad.metadata));
@@ -421,6 +431,12 @@ function generateBid(
                                 /*cookies=*/{},
                                 /*extra_headers=*/{std::string(kFledgeHeader)});
     controllable_response_.Done();
+  }
+
+  // Wait for and get the received request.
+  const net::test_server::HttpRequest* GetRequest() {
+    controllable_response_.WaitForRequest();
+    return controllable_response_.http_request();
   }
 
   bool HasReceivedRequest() {
@@ -1609,8 +1625,14 @@ class InterestGroupLocalNetworkBrowserTest : public InterestGroupBrowserTest {
  protected:
   InterestGroupLocalNetworkBrowserTest()
       : remote_test_server_(net::test_server::EmbeddedTestServer::TYPE_HTTPS) {
-    feature_list_.InitAndEnableFeature(
-        features::kPrivateNetworkAccessRespectPreflightResults);
+    feature_list_.InitWithFeatures(
+        /*`enabled_features`=*/
+        {features::kPrivateNetworkAccessRespectPreflightResults},
+        /*disabled_features=*/
+        // TODO(https://crbug.com/1427145): Enable same-origin exemption when
+        // the initiator is fixed.
+        {network::features::
+             kLocalNetworkAccessAllowPotentiallyTrustworthySameOrigin});
 
     remote_test_server_.SetSSLConfig(net::EmbeddedTestServer::CERT_TEST_NAMES);
     remote_test_server_.AddDefaultHandlers(GetTestDataFilePath());
@@ -2466,6 +2488,45 @@ navigator.joinAdInterestGroup(
 }
 
 IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
+                       JoinInterestGroupUnsupportedFields) {
+  GURL url = https_server_->GetURL("a.test", "/echo");
+  url::Origin test_origin = url::Origin::Create(url);
+  ASSERT_TRUE(NavigateToURL(shell(), url));
+  AttachInterestGroupObserver();
+
+  EXPECT_EQ("done", EvalJs(shell(), JsReplace(R"(
+(async function() {
+  try {
+    await navigator.joinAdInterestGroup(
+        {
+          name: 'cars',
+          owner: $1,
+          unsupportedField: 'In group',
+          ads: [{
+            renderUrl: $2,
+            unsupportedField: 'In ad',
+            }],
+          adComponents: [{
+            renderUrl: $2,
+            unsupportedField: 'In ad component',
+            }]
+        },
+        /*joinDurationSec=*/1);
+  } catch (e) {
+    return e.toString();
+  }
+  return 'done';
+})())",
+                                              test_origin.Serialize().c_str(),
+                                              url.spec().c_str())));
+  WaitForAccessObserved({
+      {TestInterestGroupObserver::kJoin, test_origin, "cars"},
+  });
+  auto storage_groups = GetInterestGroupsForOwner(test_origin);
+  ASSERT_EQ(storage_groups.size(), 1u);
+}
+
+IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
                        JoinInterestGroupInvalidOwner) {
   ASSERT_TRUE(NavigateToURL(shell(), https_server_->GetURL("a.test", "/echo")));
   AttachInterestGroupObserver();
@@ -2725,6 +2786,44 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
   EXPECT_EQ(group.size_groups->size(), 1u);
   ASSERT_EQ(group.size_groups->at("group_1").size(), 1u);
   ASSERT_EQ(group.size_groups->at("group_1").at(0), "size_1");
+}
+
+IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
+                       JoinInterestGroupValidReportingIds) {
+  GURL url = https_server_->GetURL("a.test", "/echo");
+  auto origin = url::Origin::Create(url);
+  std::string origin_string = origin.Serialize();
+  ASSERT_TRUE(NavigateToURL(shell(), url));
+
+  EXPECT_EQ(
+      kSuccess,
+      JoinInterestGroupAndVerify(
+          blink::TestInterestGroupBuilder(origin, "cars")
+              .SetAds(
+                  {{{GURL("https://example.com/render"),
+                     /*metadata=*/absl::nullopt, /*size_group=*/absl::nullopt,
+                     /*buyer_reporting_id=*/"brid1",
+                     /*buyer_and_seller_reporting_id=*/"sh1"},
+                    {GURL("https://example.com/render2"),
+                     /*metadata=*/absl::nullopt, /*size_group=*/absl::nullopt,
+                     /*buyer_reporting_id=*/absl::nullopt,
+                     /*buyer_and_seller_reporting_id=*/"sh2"}}})
+              .Build()));
+
+  std::vector<StorageInterestGroup> groups = GetInterestGroupsForOwner(origin);
+  ASSERT_EQ(groups.size(), 1u);
+  const blink::InterestGroup& group = groups[0].interest_group;
+  ASSERT_TRUE(group.ads.has_value());
+  ASSERT_EQ(group.ads->size(), 2u);
+  EXPECT_EQ(group.ads.value()[0].render_url,
+            GURL("https://example.com/render"));
+  EXPECT_EQ(group.ads.value()[0].buyer_reporting_id, "brid1");
+  EXPECT_EQ(group.ads.value()[0].buyer_and_seller_reporting_id, "sh1");
+
+  EXPECT_EQ(group.ads.value()[1].render_url,
+            GURL("https://example.com/render2"));
+  EXPECT_FALSE(group.ads.value()[1].buyer_reporting_id.has_value());
+  EXPECT_EQ(group.ads.value()[1].buyer_and_seller_reporting_id, "sh2");
 }
 
 IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
@@ -3437,7 +3536,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
         {
           name: 'cars',
           owner: $1,
-          adSizes: {"size_1": {"width": "300 px", "height": "150 px"}},
+          adSizes: {"size_1": {"width": "300px", "height": "150px"}},
           sizeGroups: {"": ["size_1"]},
         },
         /*joinDurationSec=*/1);
@@ -5012,6 +5111,48 @@ IN_PROC_BROWSER_TEST_F(
   WaitForAccessObserved({});
 }
 
+IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
+                       RunAdAuctionAuctionReportBuyersIncompleteDictionary) {
+  GURL test_url = https_server_->GetURL("a.test", "/echo");
+  ASSERT_TRUE(NavigateToURL(shell(), test_url));
+
+  EXPECT_EQ(
+      "TypeError: Failed to execute 'runAdAuction' on 'Navigator': Failed to "
+      "read the 'auctionReportBuyers' property from 'AuctionAdConfig': Failed "
+      "to read the 'scale' property from 'AuctionReportBuyersConfig': Required "
+      "member is undefined.",
+      RunAuctionAndWait(JsReplace(
+          R"({
+    seller: $1,
+    decisionLogicUrl: $2,
+    auctionReportBuyerKeys: [1n],
+    auctionReportBuyers: {
+      bidCount: { bucket: 0n },
+    }
+                         })",
+          url::Origin::Create(test_url),
+          https_server_->GetURL("a.test",
+                                "/interest_group/decision_logic.js"))));
+
+  EXPECT_EQ(
+      "TypeError: Failed to execute 'runAdAuction' on 'Navigator': Failed to "
+      "read the 'auctionReportBuyers' property from 'AuctionAdConfig': Failed "
+      "to read the 'bucket' property from 'AuctionReportBuyersConfig': "
+      "Required member is undefined.",
+      RunAuctionAndWait(JsReplace(
+          R"({
+    seller: $1,
+    decisionLogicUrl: $2,
+    auctionReportBuyerKeys: [1n],
+    auctionReportBuyers: {
+      bidCount: { scale: 1 },
+    }
+                         })",
+          url::Origin::Create(test_url),
+          https_server_->GetURL("a.test",
+                                "/interest_group/decision_logic.js"))));
+}
+
 IN_PROC_BROWSER_TEST_F(
     InterestGroupBrowserTest,
     RunAdAuctionAuctionInvalidRequiredSellerCapabilitiesIgnored) {
@@ -5717,12 +5858,13 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
               /*name=*/"cars")
               .SetBiddingUrl(https_server_->GetURL(
                   "a.test", "/interest_group/bidding_logic_with_size.js"))
-              .SetAds(/*ads=*/{
-                  {{ad_url, R"({"ad":"metadata","here":[1,2]})", "group_1"}}})
+              .SetAds(
+                  /*ads=*/{{{ad_url, /*metadata=*/absl::nullopt, "group_1"}}})
               .SetAdSizes(
                   {{{"size_1",
                      blink::AdSize(100, blink::AdSize::LengthUnit::kScreenWidth,
-                                   50, blink::AdSize::LengthUnit::kPixels)}}})
+                                   50,
+                                   blink::AdSize::LengthUnit::kScreenHeight)}}})
               .SetSizeGroups({{{"group_1", {"size_1"}}}})
               .Build()));
 
@@ -5748,46 +5890,42 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
   GURL ad_url = https_server_->GetURL(
       "c.test", "/echo?render_cars&size={%AD_WIDTH%}x{%AD_HEIGHT%}");
 
-  EXPECT_EQ(
-      kSuccess,
-      JoinInterestGroupAndVerify(
-          blink::TestInterestGroupBuilder(
-              /*owner=*/test_origin,
-              /*name=*/"cars")
-              .SetBiddingUrl(https_server_->GetURL(
-                  "a.test", "/interest_group/bidding_logic_with_size.js"))
-              .SetTrustedBiddingSignalsUrl(https_server_->GetURL(
-                  "a.test", "/interest_group/trusted_bidding_signals.json"))
-              .SetTrustedBiddingSignalsKeys({{"key1"}})
-              .SetAds(/*ads=*/{{{ad_url, /*metadata=*/absl::nullopt,
-                                 /*size_group=*/"group_1"}}})
-              .SetAdSizes(
-                  {{{"size_1",
-                     blink::AdSize(100, blink::AdSize::LengthUnit::kScreenWidth,
-                                   50, blink::AdSize::LengthUnit::kPixels)}}})
-              .SetSizeGroups({{{"group_1", {"size_1"}}}})
-              .Build()));
+  EXPECT_EQ(kSuccess,
+            JoinInterestGroupAndVerify(
+                blink::TestInterestGroupBuilder(
+                    /*owner=*/test_origin,
+                    /*name=*/"cars")
+                    .SetBiddingUrl(https_server_->GetURL(
+                        "a.test", "/interest_group/bidding_logic_with_size.js"))
+                    .SetAds(/*ads=*/{{{ad_url, /*metadata=*/absl::nullopt,
+                                       /*size_group=*/"group_1"}}})
+                    .SetAdSizes(
+                        {{{"size_1",
+                           blink::AdSize(
+                               100, blink::AdSize::LengthUnit::kScreenWidth, 50,
+                               blink::AdSize::LengthUnit::kScreenHeight)}}})
+                    .SetSizeGroups({{{"group_1", {"size_1"}}}})
+                    .Build()));
 
   std::string auction_config = JsReplace(
       R"({
-    seller: $1,
-    decisionLogicUrl: $2,
-    interestGroupBuyers: [$1],
-    auctionSignals: {x: 1},
-    sellerSignals: {yet: 'more', info: 1},
-    sellerTimeout: 200,
-    perBuyerSignals: {$1: {even: 'more', x: 4.5}},
-    perBuyerTimeouts: {$1: 100, '*': 150}
-                })",
+        seller: $1,
+        decisionLogicUrl: $2,
+        interestGroupBuyers: [$1]
+      })",
       test_origin,
       https_server_->GetURL("a.test", "/interest_group/decision_logic.js"));
   int screen_width = static_cast<int>(display::Screen::GetScreen()
                                           ->GetPrimaryDisplay()
                                           .GetSizeInPixel()
                                           .width());
+  int screen_height = static_cast<int>(0.5 * display::Screen::GetScreen()
+                                                 ->GetPrimaryDisplay()
+                                                 .GetSizeInPixel()
+                                                 .height());
   GURL expected_url = https_server_->GetURL(
-      "c.test",
-      base::StringPrintf("/echo?render_cars&size=%ix50", screen_width));
+      "c.test", base::StringPrintf("/echo?render_cars&size=%ix%i", screen_width,
+                                   screen_height));
   RunAuctionAndWaitForURLAndNavigateIframe(auction_config, expected_url);
 }
 
@@ -6435,22 +6573,22 @@ IN_PROC_BROWSER_TEST_F(InterestGroupFencedFrameBrowserTest,
   GURL ad_url = https_server_->GetURL(
       "c.test", "/set-header?Supports-Loading-Mode: fenced-frame");
 
-  EXPECT_EQ(
-      kSuccess,
-      JoinInterestGroupAndVerify(
-          blink::TestInterestGroupBuilder(
-              /*owner=*/test_origin,
-              /*name=*/"cars")
-              .SetBiddingUrl(https_server_->GetURL(
-                  "a.test", "/interest_group/bidding_logic_with_size.js"))
-              .SetAds(/*ads=*/{{{ad_url, /*metadata=*/absl::nullopt,
-                                 /*size_group=*/"group_1"}}})
-              .SetAdSizes(
-                  {{{"size_1",
-                     blink::AdSize(100, blink::AdSize::LengthUnit::kScreenWidth,
-                                   50, blink::AdSize::LengthUnit::kPixels)}}})
-              .SetSizeGroups({{{"group_1", {"size_1"}}}})
-              .Build()));
+  EXPECT_EQ(kSuccess,
+            JoinInterestGroupAndVerify(
+                blink::TestInterestGroupBuilder(
+                    /*owner=*/test_origin,
+                    /*name=*/"cars")
+                    .SetBiddingUrl(https_server_->GetURL(
+                        "a.test", "/interest_group/bidding_logic_with_size.js"))
+                    .SetAds(/*ads=*/{{{ad_url, /*metadata=*/absl::nullopt,
+                                       /*size_group=*/"group_1"}}})
+                    .SetAdSizes(
+                        {{{"size_1",
+                           blink::AdSize(
+                               100, blink::AdSize::LengthUnit::kScreenWidth, 50,
+                               blink::AdSize::LengthUnit::kScreenHeight)}}})
+                    .SetSizeGroups({{{"group_1", {"size_1"}}}})
+                    .Build()));
 
   std::string auction_config = JsReplace(
       R"({
@@ -6468,6 +6606,10 @@ IN_PROC_BROWSER_TEST_F(InterestGroupFencedFrameBrowserTest,
                                           ->GetPrimaryDisplay()
                                           .GetSizeInPixel()
                                           .width());
+  int screen_height = static_cast<int>(0.5 * display::Screen::GetScreen()
+                                                 ->GetPrimaryDisplay()
+                                                 .GetSizeInPixel()
+                                                 .height());
   RenderFrameHost* ad_frame = GetFencedFrameRenderFrameHost(shell());
   EXPECT_TRUE(WaitForLoadStop(web_contents()));
   // Wait for 2 requestAnimationFrame calls to make things deterministic.
@@ -6478,11 +6620,19 @@ IN_PROC_BROWSER_TEST_F(InterestGroupFencedFrameBrowserTest,
   EXPECT_TRUE(
       ExecJs(ad_frame, "getComputedStyle(document.documentElement).width;"));
   EXPECT_EQ(EvalJs(ad_frame, "innerWidth").ExtractInt(), screen_width);
-  EXPECT_EQ(EvalJs(ad_frame, "innerHeight").ExtractInt(), 50);
+  EXPECT_EQ(EvalJs(ad_frame, "innerHeight").ExtractInt(), screen_height);
 }
 
+// TODO(crbug.com/1439980): Fix flaky test.
+#if BUILDFLAG(IS_CHROMEOS_LACROS)
+#define MAYBE_RunAdAuctionWithAdComponentWithSize \
+  DISABLED_RunAdAuctionWithAdComponentWithSize
+#else
+#define MAYBE_RunAdAuctionWithAdComponentWithSize \
+  RunAdAuctionWithAdComponentWithSize
+#endif
 IN_PROC_BROWSER_TEST_F(InterestGroupFencedFrameBrowserTest,
-                       RunAdAuctionWithAdComponentWithSize) {
+                       MAYBE_RunAdAuctionWithAdComponentWithSize) {
   GURL test_url = https_server_->GetURL("a.test", "/fenced_frames/basic.html");
   ASSERT_TRUE(NavigateToURL(shell(), test_url));
   GURL ad_component_url = https_server_->GetURL(
@@ -6504,7 +6654,8 @@ IN_PROC_BROWSER_TEST_F(InterestGroupFencedFrameBrowserTest,
               .SetAdSizes(
                   {{{"size_1",
                      blink::AdSize(100, blink::AdSize::LengthUnit::kScreenWidth,
-                                   50, blink::AdSize::LengthUnit::kPixels)},
+                                   50,
+                                   blink::AdSize::LengthUnit::kScreenHeight)},
                     {"size_2",
                      blink::AdSize(50, blink::AdSize::LengthUnit::kPixels, 25,
                                    blink::AdSize::LengthUnit::kPixels)}}})
@@ -6530,6 +6681,10 @@ IN_PROC_BROWSER_TEST_F(InterestGroupFencedFrameBrowserTest,
                                           ->GetPrimaryDisplay()
                                           .GetSizeInPixel()
                                           .width());
+  int screen_height = static_cast<int>(0.5 * display::Screen::GetScreen()
+                                                 ->GetPrimaryDisplay()
+                                                 .GetSizeInPixel()
+                                                 .height());
   EXPECT_TRUE(WaitForLoadStop(web_contents()));
   // Wait for 2 requestAnimationFrame calls to make things deterministic.
   // Without this, the fenced frame may end up with its default size 300px *
@@ -6539,7 +6694,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupFencedFrameBrowserTest,
   EXPECT_TRUE(
       ExecJs(ad_frame, "getComputedStyle(document.documentElement).width;"));
   EXPECT_EQ(EvalJs(ad_frame, "innerWidth").ExtractInt(), screen_width);
-  EXPECT_EQ(EvalJs(ad_frame, "innerHeight").ExtractInt(), 50);
+  EXPECT_EQ(EvalJs(ad_frame, "innerHeight").ExtractInt(), screen_height);
 
   // Get the first component config from the fenced frame. Load it in the
   // nested fenced frame. The load should succeed.
@@ -8794,7 +8949,8 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest, ValidateWorkletParameters) {
     perBuyerTimeouts: {$4: 110, $5: 120, '*': 150},
     perBuyerCumulativeTimeouts: {$4: 13000, $5: 14000, '*': 16000},
     perBuyerPrioritySignals: {$4: {foo: 1}, '*': {BaR: -2}},
-    perBuyerCurrencies: {$4: 'USD', $5: 'CAD', '*': 'EUR'}
+    perBuyerCurrencies: {$4: 'USD', $5: 'CAD', '*': 'EUR'},
+    sellerCurrency: 'EUR'
   });
 })())",
                       seller_origin, seller_script_url,
@@ -8925,7 +9081,8 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
     perBuyerTimeouts: {$4: 110, $5: 120, '*': 150},
     perBuyerCumulativeTimeouts: {$4: 13000, $5: 14000, '*': 16000},
     perBuyerPrioritySignals: {$4: {foo: 1}, '*': {BaR: -2}},
-    perBuyerCurrencies: {$4: 'USD', $5: 'CAD', '*': 'EUR'}
+    perBuyerCurrencies: {$4: 'USD', $5: 'CAD', '*': 'EUR'},
+    sellerCurrency: 'EUR'
   });
 })())",
                       seller_origin, seller_script_url,
@@ -12197,26 +12354,44 @@ class InterestGroupFencedFrameAdComponentAutomaticBeaconBrowserTest
                                               "/report_event.html");
   }
 
-  void RunAdAuctionAndLoadAdComponent(GURL ad_component_url) {
-    // Run ad auction with ad components and register ad beacons.
-    ASSERT_NO_FATAL_FAILURE(RunBasicAuctionWithAdComponents(
-        ad_component_url, /*component_ad_urn=*/nullptr,
-        "bidding_logic_register_ad_beacon.js",
-        "decision_logic_register_ad_beacon.js"));
+  // Send a request that has the content "Basic request data" to the reporting
+  // destination. This function is used in negative test cases where a reporting
+  // beacon is expected not to be sent. For example:
+  // 1. A click without user gesture happened on ad component fenced frame, the
+  // reporting beacon should not be sent.
+  // 2. Call SendBasicRequest().
+  // 3. Verify the received request's content is from SendBasicRequest().
+  // This works because `ControllableHttpResponse` only handles one request.
+  void SendBasicRequest(GURL url) {
+    // Construct the resource request.
+    scoped_refptr<network::SharedURLLoaderFactory> url_loader_factory =
+        web_contents()
+            ->GetPrimaryMainFrame()
+            ->GetStoragePartition()
+            ->GetURLLoaderFactoryForBrowserProcess();
 
-    RenderFrameHostImpl* ad_frame = GetFencedFrameRenderFrameHost(shell());
+    auto request = std::make_unique<network::ResourceRequest>();
 
-    // Validate the ad components.
-    CheckAdComponents(
-        /*expected_ad_component_urls=*/std::vector<GURL>{ad_component_url},
-        ad_frame);
+    request->url = url;
+    request->credentials_mode = network::mojom::CredentialsMode::kOmit;
+    request->method = net::HttpRequestHeaders::kPostMethod;
+    request->trusted_params = network::ResourceRequest::TrustedParams();
+    request->trusted_params->isolation_info =
+        net::IsolationInfo::CreateTransient();
 
-    // Navigate the existing nested fenced frame to the ad component urn.
-    absl::optional<std::vector<GURL>> all_component_urls =
-        GetAdAuctionComponentsInJS(ad_frame, blink::kMaxAdAuctionAdComponents);
-    ASSERT_TRUE(all_component_urls);
-    NavigateFencedFrameAndWait((*all_component_urls)[0], ad_component_url,
-                               ad_frame);
+    std::unique_ptr<network::SimpleURLLoader> simple_url_loader =
+        network::SimpleURLLoader::Create(std::move(request),
+                                         TRAFFIC_ANNOTATION_FOR_TESTS);
+
+    simple_url_loader->AttachStringForUpload(
+        "Basic request data",
+        /*upload_content_type=*/"text/plain;charset=UTF-8");
+    network::SimpleURLLoader* simple_url_loader_ptr = simple_url_loader.get();
+
+    // Send out the beacon.
+    simple_url_loader_ptr->DownloadHeadersOnly(
+        url_loader_factory.get(),
+        base::DoNothingWithBoundArgs(std::move(simple_url_loader)));
   }
 };
 
@@ -12234,7 +12409,10 @@ IN_PROC_BROWSER_TEST_F(
   GURL ad_component_url = https_server_->GetURL(
       "a.test", "/set-header?Supports-Loading-Mode: fenced-frame");
 
-  ASSERT_NO_FATAL_FAILURE(RunAdAuctionAndLoadAdComponent(ad_component_url));
+  ASSERT_NO_FATAL_FAILURE(RunBasicAuctionWithAdComponents(
+      ad_component_url, /*component_ad_urn=*/nullptr,
+      "bidding_logic_register_ad_beacon.js",
+      "decision_logic_register_ad_beacon.js"));
 
   RenderFrameHostImpl* ad_frame = GetFencedFrameRenderFrameHost(shell());
   RenderFrameHostImpl* ad_component_frame =
@@ -12267,7 +12445,310 @@ IN_PROC_BROWSER_TEST_F(
             "This frame is an ad component. It is not allowed to call "
             "fence.reportEvent.");
 
-  EXPECT_FALSE(network_responder_->HasReceivedRequest());
+  // Send a basic request to the reporting destination.
+  GURL reporting_url = https_server_->GetURL("a.test", "/report_event.html");
+  SendBasicRequest(reporting_url);
+
+  // Verify the request received is the basic request, which implies the
+  // reportEvent beacon was not sent as expected.
+  EXPECT_EQ(network_responder_->GetRequest()->content, "Basic request data");
+  EXPECT_TRUE(network_responder_->HasReceivedRequest());
+}
+
+// Test `reserved.top_navigation` beacon from an ad component:
+// 1. Run an auction with an ad component.
+// 2. Load the ad in a fenced frame.
+// 3. Load the ad component in the nested fenced frame.
+// 4. Register the automatic beacon data.
+// 5. Navigate to a same-origin url.
+// 6. The automatic beacon from ad component is sent successfully.
+IN_PROC_BROWSER_TEST_F(
+    InterestGroupFencedFrameAdComponentAutomaticBeaconBrowserTest,
+    AdComponentFencedFrameSameOriginNavigation) {
+  GURL ad_component_url = https_server_->GetURL(
+      "a.test", "/set-header?Supports-Loading-Mode: fenced-frame");
+
+  ASSERT_NO_FATAL_FAILURE(RunBasicAuctionWithAdComponents(
+      ad_component_url, /*component_ad_urn=*/nullptr,
+      "bidding_logic_register_ad_beacon.js",
+      "decision_logic_register_ad_beacon.js"));
+
+  RenderFrameHostImpl* ad_frame = GetFencedFrameRenderFrameHost(shell());
+  RenderFrameHostImpl* ad_component_frame =
+      GetFencedFrameRenderFrameHost(ad_frame);
+
+  // Set automatic beacon data for ad component.
+  EXPECT_TRUE(ExecJs(ad_component_frame, (R"(
+                        window.fence.setReportEventDataForAutomaticBeacons(
+                          {
+                            eventType: 'reserved.top_navigation',
+                            eventData: 'should be igonred',
+                            destination: ['seller']
+                          }
+                        );
+                      )")));
+
+  // Perform a same-origin `_unfencedTop` navigation.
+  GURL navigation_url = https_server_->GetURL(
+      "a.test", "/set-header?Supports-Loading-Mode: fenced-frame");
+  EXPECT_TRUE(
+      ExecJs(ad_component_frame,
+             JsReplace("window.open($1, '_unfencedTop');", navigation_url)));
+
+  // Expect automatic beacon being sent successfully with empty event data.
+  EXPECT_TRUE(network_responder_->GetRequest()->content.empty());
+  EXPECT_TRUE(network_responder_->HasReceivedRequest());
+}
+
+// Test `reserved.top_navigation` beacon from an ad component:
+// 1. Run an auction with an ad component.
+// 2. Load the ad in a fenced frame.
+// 3. Load the ad component in the nested fenced frame.
+// 4. Register the automatic beacon data.
+// 5. Navigate to a cross-origin url.
+// 6. The automatic beacon from ad component is sent successfully.
+IN_PROC_BROWSER_TEST_F(
+    InterestGroupFencedFrameAdComponentAutomaticBeaconBrowserTest,
+    AdComponentFencedFrameCrossOriginNavigation) {
+  GURL ad_component_url = https_server_->GetURL(
+      "a.test", "/set-header?Supports-Loading-Mode: fenced-frame");
+
+  ASSERT_NO_FATAL_FAILURE(RunBasicAuctionWithAdComponents(
+      ad_component_url, /*component_ad_urn=*/nullptr,
+      "bidding_logic_register_ad_beacon.js",
+      "decision_logic_register_ad_beacon.js"));
+
+  RenderFrameHostImpl* ad_frame = GetFencedFrameRenderFrameHost(shell());
+  RenderFrameHostImpl* ad_component_frame =
+      GetFencedFrameRenderFrameHost(ad_frame);
+
+  // Set automatic beacon data for ad component.
+  EXPECT_TRUE(ExecJs(ad_component_frame, (R"(
+                        window.fence.setReportEventDataForAutomaticBeacons(
+                          {
+                            eventType: 'reserved.top_navigation',
+                            eventData: 'should be igonred',
+                            destination: ['seller']
+                          }
+                        );
+                      )")));
+
+  // Perform a cross-origin `_unfencedTop` navigation.
+  GURL navigation_url = https_server_->GetURL(
+      "b.test", "/set-header?Supports-Loading-Mode: fenced-frame");
+  EXPECT_TRUE(
+      ExecJs(ad_component_frame,
+             JsReplace("window.open($1, '_unfencedTop');", navigation_url)));
+
+  // Expect automatic beacon being sent successfully with empty event data.
+  EXPECT_TRUE(network_responder_->GetRequest()->content.empty());
+  EXPECT_TRUE(network_responder_->HasReceivedRequest());
+}
+
+// Just like `AdComponentFencedFrameCrossOriginNavigation`, but with
+// BackForwardCache disabled.
+IN_PROC_BROWSER_TEST_F(
+    InterestGroupFencedFrameAdComponentAutomaticBeaconBrowserTest,
+    AdComponentFencedFrameBFCacheDisabled) {
+  DisableBackForwardCacheForTesting(shell()->web_contents(),
+                                    BackForwardCache::TEST_REQUIRES_NO_CACHING);
+  GURL ad_component_url = https_server_->GetURL(
+      "a.test", "/set-header?Supports-Loading-Mode: fenced-frame");
+
+  ASSERT_NO_FATAL_FAILURE(RunBasicAuctionWithAdComponents(
+      ad_component_url, /*component_ad_urn=*/nullptr,
+      "bidding_logic_register_ad_beacon.js",
+      "decision_logic_register_ad_beacon.js"));
+
+  RenderFrameHostImpl* ad_frame = GetFencedFrameRenderFrameHost(shell());
+  RenderFrameHostImpl* ad_component_frame =
+      GetFencedFrameRenderFrameHost(ad_frame);
+
+  // Set automatic beacon data for ad component.
+  EXPECT_TRUE(ExecJs(ad_component_frame, (R"(
+                        window.fence.setReportEventDataForAutomaticBeacons(
+                          {
+                            eventType: 'reserved.top_navigation',
+                            eventData: 'should be igonred',
+                            destination: ['seller']
+                          }
+                        );
+                      )")));
+
+  // Perform a cross-origin `_unfencedTop` navigation.
+  GURL navigation_url = https_server_->GetURL(
+      "b.test", "/set-header?Supports-Loading-Mode: fenced-frame");
+  EXPECT_TRUE(
+      ExecJs(ad_component_frame,
+             JsReplace("window.open($1, '_unfencedTop');", navigation_url)));
+
+  // Expect automatic beacon being sent successfully with empty event data.
+  EXPECT_TRUE(network_responder_->GetRequest()->content.empty());
+  EXPECT_TRUE(network_responder_->HasReceivedRequest());
+}
+
+// No beacon is sent if `setReportEventDataForAutomaticBeacons` is not invoked
+// to register automatic beacon data in ad component.
+IN_PROC_BROWSER_TEST_F(
+    InterestGroupFencedFrameAdComponentAutomaticBeaconBrowserTest,
+    AdComponentFencedFrameNoBeaconDataRegistered) {
+  GURL ad_component_url = https_server_->GetURL(
+      "a.test", "/set-header?Supports-Loading-Mode: fenced-frame");
+
+  ASSERT_NO_FATAL_FAILURE(RunBasicAuctionWithAdComponents(
+      ad_component_url, /*component_ad_urn=*/nullptr,
+      "bidding_logic_register_ad_beacon.js",
+      "decision_logic_register_ad_beacon.js"));
+
+  RenderFrameHostImpl* ad_frame = GetFencedFrameRenderFrameHost(shell());
+  RenderFrameHostImpl* ad_component_frame =
+      GetFencedFrameRenderFrameHost(ad_frame);
+
+  // Perform a cross-origin `_unfencedTop` navigation, without registering any
+  // automatic beacon data.
+  GURL navigation_url = https_server_->GetURL(
+      "b.test", "/set-header?Supports-Loading-Mode: fenced-frame");
+  EXPECT_TRUE(
+      ExecJs(ad_component_frame,
+             JsReplace("window.open($1, '_unfencedTop');", navigation_url)));
+
+  // Send a basic request to the reporting destination.
+  GURL reporting_url = https_server_->GetURL("a.test", "/report_event.html");
+  SendBasicRequest(reporting_url);
+
+  // Verify the request received is the basic request, which implies the
+  // automatic beacon was not sent as expected.
+  EXPECT_EQ(network_responder_->GetRequest()->content, "Basic request data");
+  EXPECT_TRUE(network_responder_->HasReceivedRequest());
+}
+
+// Set the event data to an empty string. The beacon should be sent.
+IN_PROC_BROWSER_TEST_F(
+    InterestGroupFencedFrameAdComponentAutomaticBeaconBrowserTest,
+    AdComponentFencedFrameEmptyEventData) {
+  GURL ad_component_url = https_server_->GetURL(
+      "a.test", "/set-header?Supports-Loading-Mode: fenced-frame");
+
+  ASSERT_NO_FATAL_FAILURE(RunBasicAuctionWithAdComponents(
+      ad_component_url, /*component_ad_urn=*/nullptr,
+      "bidding_logic_register_ad_beacon.js",
+      "decision_logic_register_ad_beacon.js"));
+
+  RenderFrameHostImpl* ad_frame = GetFencedFrameRenderFrameHost(shell());
+  RenderFrameHostImpl* ad_component_frame =
+      GetFencedFrameRenderFrameHost(ad_frame);
+
+  // Set automatic beacon data for ad component, with the eventData field being
+  // an empty string.
+  // TODO(xiaochenzh): The web IDL for `FenceEvent` should be updated to make
+  // eventData field optional. This test should be updated when it is done.
+  EXPECT_TRUE(ExecJs(ad_component_frame, (R"(
+                        window.fence.setReportEventDataForAutomaticBeacons(
+                          {
+                            eventType: 'reserved.top_navigation',
+                            eventData: '',
+                            destination: ['seller']
+                          }
+                        );
+                      )")));
+
+  // Perform a cross-origin `_unfencedTop` navigation.
+  GURL navigation_url = https_server_->GetURL(
+      "b.test", "/set-header?Supports-Loading-Mode: fenced-frame");
+  EXPECT_TRUE(
+      ExecJs(ad_component_frame,
+             JsReplace("window.open($1, '_unfencedTop');", navigation_url)));
+
+  // Expect automatic beacon being sent successfully with empty event data.
+  EXPECT_TRUE(network_responder_->GetRequest()->content.empty());
+  EXPECT_TRUE(network_responder_->HasReceivedRequest());
+}
+
+// No beacon is sent if the navigation is without user activation.
+IN_PROC_BROWSER_TEST_F(
+    InterestGroupFencedFrameAdComponentAutomaticBeaconBrowserTest,
+    AdComponentFencedFrameNoUserActivation) {
+  GURL ad_component_url = https_server_->GetURL(
+      "a.test", "/set-header?Supports-Loading-Mode: fenced-frame");
+
+  ASSERT_NO_FATAL_FAILURE(RunBasicAuctionWithAdComponents(
+      ad_component_url, /*component_ad_urn=*/nullptr,
+      "bidding_logic_register_ad_beacon.js",
+      "decision_logic_register_ad_beacon.js"));
+
+  RenderFrameHostImpl* ad_frame = GetFencedFrameRenderFrameHost(shell());
+  RenderFrameHostImpl* ad_component_frame =
+      GetFencedFrameRenderFrameHost(ad_frame);
+
+  // Set automatic beacon data for ad component, this step must be done without
+  // user gesture. Otherwise later the '_unfencedTop' navigation will find there
+  // exists an user gesture.
+  EXPECT_TRUE(ExecJs(ad_component_frame, (R"(
+                        window.fence.setReportEventDataForAutomaticBeacons(
+                          {
+                            eventType: 'reserved.top_navigation',
+                            eventData: 'should be igonred',
+                            destination: ['seller']
+                          }
+                        );
+                      )"),
+                     EXECUTE_SCRIPT_NO_USER_GESTURE));
+
+  // Perform a cross-origin `_unfencedTop` navigation without user activation.
+  GURL navigation_url = https_server_->GetURL(
+      "b.test", "/set-header?Supports-Loading-Mode: fenced-frame");
+  EXPECT_TRUE(
+      ExecJs(ad_component_frame,
+             JsReplace("window.open($1, '_unfencedTop');", navigation_url),
+             EXECUTE_SCRIPT_NO_USER_GESTURE));
+
+  // Send a basic request to the reporting destination.
+  GURL reporting_url = https_server_->GetURL("a.test", "/report_event.html");
+  SendBasicRequest(reporting_url);
+
+  // Verify the request received is the basic request, which implies the
+  // automatic beacon was not sent as expected.
+  EXPECT_EQ(network_responder_->GetRequest()->content, "Basic request data");
+  EXPECT_TRUE(network_responder_->HasReceivedRequest());
+}
+
+// Call `setReportEventDataForAutomaticBeacons` without `eventData` field. The
+// beacon should be sent with empty event data.
+IN_PROC_BROWSER_TEST_F(
+    InterestGroupFencedFrameAdComponentAutomaticBeaconBrowserTest,
+    AdComponentFencedFrameNoEventData) {
+  GURL ad_component_url = https_server_->GetURL(
+      "a.test", "/set-header?Supports-Loading-Mode: fenced-frame");
+
+  ASSERT_NO_FATAL_FAILURE(RunBasicAuctionWithAdComponents(
+      ad_component_url, /*component_ad_urn=*/nullptr,
+      "bidding_logic_register_ad_beacon.js",
+      "decision_logic_register_ad_beacon.js"));
+
+  RenderFrameHostImpl* ad_frame = GetFencedFrameRenderFrameHost(shell());
+  RenderFrameHostImpl* ad_component_frame =
+      GetFencedFrameRenderFrameHost(ad_frame);
+
+  // Set automatic beacon data for ad component without the eventData field.
+  EXPECT_TRUE(ExecJs(ad_component_frame, (R"(
+                        window.fence.setReportEventDataForAutomaticBeacons(
+                          {
+                            eventType: 'reserved.top_navigation',
+                            destination: ['seller']
+                          }
+                        );
+                      )")));
+
+  // Perform a cross-origin `_unfencedTop` navigation.
+  GURL navigation_url = https_server_->GetURL(
+      "b.test", "/set-header?Supports-Loading-Mode: fenced-frame");
+  EXPECT_TRUE(
+      ExecJs(ad_component_frame,
+             JsReplace("window.open($1, '_unfencedTop');", navigation_url)));
+
+  // Expect automatic beacon being sent successfully with empty event data.
+  EXPECT_TRUE(network_responder_->GetRequest()->content.empty());
+  EXPECT_TRUE(network_responder_->HasReceivedRequest());
 }
 
 }  // namespace

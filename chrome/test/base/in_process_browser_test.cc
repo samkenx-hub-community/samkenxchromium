@@ -15,6 +15,7 @@
 #include "base/functional/bind.h"
 #include "base/lazy_instance.h"
 #include "base/location.h"
+#include "base/memory/weak_ptr.h"
 #include "base/no_destructor.h"
 #include "base/path_service.h"
 #include "base/sampling_heap_profiler/poisson_allocation_sampler.h"
@@ -143,8 +144,8 @@
 #include "base/base_switches.h"
 #include "base/environment.h"
 #include "base/files/file_path_watcher.h"
-#include "base/guid.h"
 #include "base/process/launch.h"
+#include "base/uuid.h"
 #include "chrome/browser/lacros/cert/cert_db_initializer_factory.h"
 #include "components/account_manager_core/chromeos/account_manager.h"
 #include "components/account_manager_core/chromeos/account_manager_facade_factory.h"  // nogncheck
@@ -783,9 +784,12 @@ void InProcessBrowserTest::PreRunTestOnMainThread() {
 
   SelectFirstBrowser();
   if (browser_) {
-    auto* tab = browser_->tab_strip_model()->GetActiveWebContents();
-    content::WaitForLoadStop(tab);
-    SetInitialWebContents(tab);
+    base::WeakPtr<content::WebContents> tab =
+        browser_->tab_strip_model()->GetActiveWebContents()->GetWeakPtr();
+    content::WaitForLoadStop(tab.get());
+    if (tab) {
+      SetInitialWebContents(tab.get());
+    }
   }
 
 #if !BUILDFLAG(IS_ANDROID)
@@ -896,7 +900,7 @@ void InProcessBrowserTest::StartUniqueAshChrome(
   base::Environment::Create()->SetVar(
       "WAYLAND_DISPLAY",
       base::JoinString({"unique_wayland",
-                        base::GUID::GenerateRandomV4().AsLowercaseString()},
+                        base::Uuid::GenerateRandomV4().AsLowercaseString()},
                        "_"));
 
   base::FilePath ash_chrome_path =

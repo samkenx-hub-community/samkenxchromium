@@ -8,6 +8,7 @@
 #include "ash/strings/grit/ash_strings.h"
 #include "ash/style/ash_color_id.h"
 #include "ash/style/dark_light_mode_controller_impl.h"
+#include "ash/style/typography.h"
 #include "ash/system/tray/tray_constants.h"
 #include "chromeos/constants/chromeos_features.h"
 #include "components/vector_icons/vector_icons.h"
@@ -115,6 +116,8 @@ void FeatureTile::CreateChildViews() {
 
   label_ = title_container->AddChildView(std::make_unique<views::Label>());
   label_->SetAutoColorReadabilityEnabled(false);
+  label_->SetFontList(ash::TypographyProvider::Get()->ResolveTypographyToken(
+      ash::TypographyToken::kCrosButton2));
 
   if (is_compact) {
     label_->SetPreferredSize(kCompactTitleLabelSize);
@@ -122,17 +125,26 @@ void FeatureTile::CreateChildViews() {
     // clipping and center aligned.
     label_->SetMultiLine(true);
     label_->SetLineHeight(kCompactTitleLineHeight);
-    // TODO(b/252873172): update FontList.
-    label_->SetFontList(views::Label::GetDefaultFontList().Derive(
-        -1, gfx::Font::FontStyle::NORMAL, gfx::Font::Weight::NORMAL));
+    label_->SetFontList(ash::TypographyProvider::Get()->ResolveTypographyToken(
+        ash::TypographyToken::kCrosAnnotation2));
   } else {
     sub_label_ =
         title_container->AddChildView(std::make_unique<views::Label>());
     sub_label_->SetAutoColorReadabilityEnabled(false);
-    // TODO(b/252873172): update FontList.
-    sub_label_->SetFontList(views::Label::GetDefaultFontList().Derive(
-        -1, gfx::Font::FontStyle::NORMAL, gfx::Font::Weight::NORMAL));
+    sub_label_->SetFontList(
+        ash::TypographyProvider::Get()->ResolveTypographyToken(
+            ash::TypographyToken::kCrosAnnotation1));
     sub_label_->SetLineHeight(kPrimarySubtitleLineHeight);
+    if (chromeos::features::IsJellyEnabled()) {
+      TypographyProvider::Get()->StyleLabel(TypographyToken::kCrosAnnotation1,
+                                            *sub_label_);
+    }
+  }
+  if (chromeos::features::IsJellyEnabled()) {
+    TypographyProvider::Get()->StyleLabel(
+        is_compact ? TypographyToken::kCrosAnnotation2
+                   : TypographyToken::kCrosButton2,
+        *label_);
   }
 }
 
@@ -158,7 +170,7 @@ void FeatureTile::UpdateColors() {
                                 : cros_tokens::kCrosSysOnSurface;
     foreground_optional_color =
         toggled_ ? cros_tokens::kCrosSysSystemOnPrimaryContainer
-                 : cros_tokens::kCrosSysSecondary;
+                 : cros_tokens::kCrosSysOnSurfaceVariant;
   } else {
     background_color = cros_tokens::kCrosSysDisabledContainer;
     foreground_color = cros_tokens::kCrosSysDisabled;

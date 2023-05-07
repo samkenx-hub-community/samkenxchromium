@@ -24,6 +24,7 @@
 #include "ash/display/screen_orientation_controller.h"
 #include "ash/display/screen_orientation_controller_test_api.h"
 #include "ash/frame/non_client_frame_view_ash.h"
+#include "ash/game_dashboard/test_game_dashboard_delegate.h"
 #include "ash/ime/ime_controller_impl.h"
 #include "ash/ime/test_ime_controller_client.h"
 #include "ash/media/media_controller_impl.h"
@@ -32,6 +33,7 @@
 #include "ash/public/cpp/ime_info.h"
 #include "ash/public/cpp/test/shell_test_api.h"
 #include "ash/public/cpp/test/test_new_window_delegate.h"
+#include "ash/public/cpp/window_properties.h"
 #include "ash/session/session_controller_impl.h"
 #include "ash/shell.h"
 #include "ash/system/brightness_control_delegate.h"
@@ -57,6 +59,7 @@
 #include "base/files/file_util.h"
 #include "base/files/scoped_temp_dir.h"
 #include "base/json/json_writer.h"
+#include "base/memory/raw_ptr.h"
 #include "base/run_loop.h"
 #include "base/system/sys_info.h"
 #include "base/test/bind.h"
@@ -429,9 +432,10 @@ class AcceleratorControllerTest : public AshTestBase {
     return true;
   }
 
-  AcceleratorControllerImpl* controller_ = nullptr;  // Not owned.
+  raw_ptr<AcceleratorControllerImpl, ExperimentalAsh> controller_ =
+      nullptr;  // Not owned.
   std::unique_ptr<AcceleratorControllerImpl::TestApi> test_api_;
-  MockNewWindowDelegate* new_window_delegate_;
+  raw_ptr<MockNewWindowDelegate, ExperimentalAsh> new_window_delegate_;
   std::unique_ptr<TestNewWindowDelegateProvider> delegate_provider_;
 };
 
@@ -1189,6 +1193,20 @@ TEST_F(AcceleratorControllerTest, DontToggleFullscreenWhenOverviewStarts) {
                   ->IsWindowInOverview(widget->GetNativeWindow()));
 }
 
+// Tests that window shortcuts don't work on a minimized, i.e. not visible,
+// window in overview.
+TEST_F(AcceleratorControllerTest, MinimizedWindowInOverview) {
+  std::unique_ptr<aura::Window> window(
+      CreateTestWindowInShellWithBounds(gfx::Rect(5, 5, 20, 20)));
+  WindowState* window_state = WindowState::Get(window.get());
+  window_state->Minimize();
+  EXPECT_TRUE(window_state->IsMinimized());
+  ToggleOverview();
+  GetEventGenerator()->PressKey(ui::VKEY_OEM_4, ui::EF_ALT_DOWN);
+  EXPECT_TRUE(Shell::Get()->overview_controller()->InOverviewSession());
+  EXPECT_TRUE(window_state->IsMinimized());
+}
+
 // TODO(oshima): Fix this test to use EventGenerator.
 TEST_F(AcceleratorControllerTest, ProcessOnce) {
   // The IME event filter interferes with the basic key event propagation we
@@ -1435,6 +1453,8 @@ TEST_F(AcceleratorControllerTest, ToggleMultitaskMenu) {
       {chromeos::wm::features::kWindowLayoutMenu,
        ::features::kShortcutCustomization},
       {});
+  // Simulate fake user login to ensure pref registration is done correctly.
+  SimulateUserLogin("fakeuser");
   // Enabling `kShortcutCustomization` will start letting
   // `AcceleratorControllerImpl` to observe changes to the accelerator list.
   // This includes accelerators added by enabling flags.
@@ -2314,19 +2334,22 @@ class AcceleratorControllerImprovedKeyboardShortcutsTest
     input_method::InputMethodManager::Initialize(input_method_manager_);
 
     AcceleratorControllerTest::SetUp();
-    EXPECT_TRUE(input_method_manager_->observers_.HasObserver(controller_));
+    EXPECT_TRUE(
+        input_method_manager_->observers_.HasObserver(controller_.get()));
   }
 
   void TearDown() override {
     AcceleratorControllerTest::TearDown();
-    EXPECT_FALSE(input_method_manager_->observers_.HasObserver(controller_));
+    EXPECT_FALSE(
+        input_method_manager_->observers_.HasObserver(controller_.get()));
 
     input_method::InputMethodManager::Shutdown();
     input_method_manager_ = nullptr;
   }
 
  protected:
-  TestInputMethodManager* input_method_manager_ = nullptr;  // Not owned.
+  raw_ptr<TestInputMethodManager, ExperimentalAsh> input_method_manager_ =
+      nullptr;  // Not owned.
 
  private:
   base::test::ScopedFeatureList scoped_feature_list_;
@@ -2379,7 +2402,8 @@ class AcceleratorControllerInputMethodTest : public AcceleratorControllerTest {
   }
 
  protected:
-  AcceleratorMockInputMethod* mock_input_ = nullptr;  // Not owned.
+  raw_ptr<AcceleratorMockInputMethod, ExperimentalAsh> mock_input_ =
+      nullptr;  // Not owned.
 
  private:
   base::test::ScopedFeatureList scoped_feature_list_;
@@ -2604,7 +2628,7 @@ class FakeMagnificationManager {
 
  private:
   std::unique_ptr<PrefChangeRegistrar> pref_change_registrar_;
-  PrefService* prefs_;
+  raw_ptr<PrefService, ExperimentalAsh> prefs_;
 };
 
 TEST_F(MagnifiersAcceleratorsTester, TestToggleFullscreenMagnifier) {
@@ -3256,24 +3280,22 @@ TEST_F(AcceleratorControllerGameDashboardTests,
   // No active window.
   EXPECT_FALSE(ProcessInController(accelerator));
 
-  // Create a new window.
-  std::unique_ptr<aura::Window> window(
-      CreateTestWindowInShellWithBounds(gfx::Rect(5, 5, 20, 20)));
-  wm::ActivateWindow(window.get());
-
   // Verify cannot toggle for unsupported app types.
   const AppType unsupported_window_types[] = {
       AppType::NON_APP,      AppType::BROWSER,    AppType::CHROME_APP,
       AppType::CROSTINI_APP, AppType::SYSTEM_APP, AppType::LACROS};
   for (AppType unsupported_window_type : unsupported_window_types) {
+    std::unique_ptr<aura::Window> window =
+        CreateAppWindow(gfx::Rect(5, 5, 20, 20), unsupported_window_type);
     window->SetProperty(aura::client::kAppType,
                         static_cast<int>(unsupported_window_type));
     EXPECT_FALSE(ProcessInController(accelerator));
   }
 
-  // Set the window's app type to ARC.
-  window->SetProperty(aura::client::kAppType,
-                      static_cast<int>(AppType::ARC_APP));
+  std::unique_ptr<aura::Window> window =
+      CreateAppWindow(gfx::Rect(5, 5, 20, 20), AppType::ARC_APP);
+  window->SetProperty(kAppIDKey,
+                      std::string(TestGameDashboardDelegate::kGameAppId));
   EXPECT_TRUE(ProcessInController(accelerator));
 }
 

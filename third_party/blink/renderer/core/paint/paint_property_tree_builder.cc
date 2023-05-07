@@ -69,7 +69,6 @@
 #include "third_party/blink/renderer/core/style/style_overflow_clip_margin.h"
 #include "third_party/blink/renderer/core/view_transition/view_transition.h"
 #include "third_party/blink/renderer/core/view_transition/view_transition_utils.h"
-#include "third_party/blink/renderer/platform/geometry/layout_rect_outsets.h"
 #include "third_party/blink/renderer/platform/geometry/layout_unit.h"
 #include "third_party/blink/renderer/platform/graphics/compositing/paint_artifact_compositor.h"
 #include "third_party/blink/renderer/platform/graphics/paint/effect_paint_property_node.h"
@@ -283,6 +282,7 @@ class FragmentPaintPropertyTreeBuilder {
   ALWAYS_INLINE void UpdateLocalBorderBoxContext();
   ALWAYS_INLINE bool NeedsOverflowControlsClip() const;
   ALWAYS_INLINE void UpdateOverflowControlsClip();
+  ALWAYS_INLINE void UpdateBackgroundClip();
   ALWAYS_INLINE void UpdateInnerBorderRadiusClip();
   ALWAYS_INLINE void UpdateOverflowClip();
   ALWAYS_INLINE void UpdatePerspective();
@@ -300,6 +300,18 @@ class FragmentPaintPropertyTreeBuilder {
   bool NeedsPaintPropertyUpdate() const {
     return object_.NeedsPaintPropertyUpdate() ||
            full_context_.force_subtree_update_reasons;
+  }
+
+  const NGPhysicalBoxFragment& BoxFragment() const {
+    DCHECK(object_.IsBox());
+    if (pre_paint_info_) {
+      return pre_paint_info_->box_fragment;
+    }
+    // We only get here if we're not inside block fragmentation, so there should
+    // only be one fragment.
+    const auto& box = To<LayoutBox>(object_);
+    DCHECK_EQ(box.PhysicalFragmentCount(), 1u);
+    return *box.GetPhysicalFragment(0);
   }
 
   bool IsInNGFragmentTraversal() const { return pre_paint_info_; }
@@ -1136,8 +1148,7 @@ void FragmentPaintPropertyTreeBuilder::UpdateIndividualTransform(
         auto& box = To<LayoutBox>(object_);
         // Each individual fragment should have its own transform origin, based
         // on the fragment size.
-        PhysicalSize size(pre_paint_info_ ? pre_paint_info_->box_fragment.Size()
-                                          : PhysicalSize(box.Size()));
+        PhysicalSize size(BoxFragment().Size());
         // If we are running transform animation on compositor, we should
         // disable 2d translation optimization to ensure that the compositor
         // gets the correct origin (which might be omitted by the optimization)
@@ -1276,8 +1287,7 @@ void FragmentPaintPropertyTreeBuilder::UpdateOffset() {
          gfx::Transform& matrix) {
         const ComputedStyle& style = box.StyleRef();
         style.ApplyTransform(
-            matrix, &box, size.ToLayoutSize(),
-            ComputedStyle::kExcludeTransformOperations,
+            matrix, &box, size, ComputedStyle::kExcludeTransformOperations,
             ComputedStyle::kExcludeTransformOrigin,
             ComputedStyle::kIncludeMotionPath,
             ComputedStyle::kExcludeIndependentTransformProperties);
@@ -1298,8 +1308,7 @@ void FragmentPaintPropertyTreeBuilder::UpdateTransform() {
          gfx::Transform& matrix) {
         const ComputedStyle& style = box.StyleRef();
         style.ApplyTransform(
-            matrix, &box, size.ToLayoutSize(),
-            ComputedStyle::kIncludeTransformOperations,
+            matrix, &box, size, ComputedStyle::kIncludeTransformOperations,
             ComputedStyle::kExcludeTransformOrigin,
             ComputedStyle::kExcludeMotionPath,
             ComputedStyle::kExcludeIndependentTransformProperties);
@@ -2063,6 +2072,42 @@ void FragmentPaintPropertyTreeBuilder::UpdateOverflowControlsClip() {
   // LayoutObjects under custom scrollbars don't support paint properties.
 }
 
+static bool NeedsBackgroundClip(const LayoutObject& object) {
+  return object.CanCompositeBackgroundAttachmentFixed();
+}
+
+void FragmentPaintPropertyTreeBuilder::UpdateBackgroundClip() {
+  DCHECK(properties_);
+
+  if (!NeedsPaintPropertyUpdate()) {
+    return;
+  }
+  if (NeedsBackgroundClip(object_)) {
+    DCHECK(!object_.StyleRef().BackgroundLayers().Next());
+    const auto& fragment = BoxFragment();
+    PhysicalRect clip_rect(context_.current.paint_offset, fragment.Size());
+    auto clip = object_.StyleRef().BackgroundLayers().Clip();
+    if (clip == EFillBox::kContent || clip == EFillBox::kPadding) {
+      NGPhysicalBoxStrut strut = fragment.Borders();
+      if (clip == EFillBox::kContent) {
+        strut += fragment.Padding();
+      }
+      strut.TruncateSides(fragment.SidesToInclude());
+      clip_rect.Contract(strut);
+    }
+    OnUpdateClip(properties_->UpdateBackgroundClip(
+        *context_.current.clip,
+        ClipPaintPropertyNode::State(context_.current.transform,
+                                     gfx::RectF(clip_rect),
+                                     ToSnappedClipRect(clip_rect))));
+  } else {
+    OnClearClip(properties_->ClearBackgroundClip());
+  }
+
+  // BackgroundClip doesn't have descendants, so it doesn't affect the
+  // context_.current.affect descendants.clip.
+}
+
 static void AdjustRoundedClipForOverflowClipMargin(
     const LayoutBox& box,
     gfx::RectF& layout_clip_rect,
@@ -2074,7 +2119,7 @@ static void AdjustRoundedClipForOverflowClipMargin(
 
   // The default rects map to the inner border-radius which is the padding-box.
   // First apply a margin for the reference-box.
-  LayoutRectOutsets outsets;
+  NGPhysicalBoxStrut outsets;
   switch (overflow_clip_margin->GetReferenceBox()) {
     case StyleOverflowClipMargin::ReferenceBox::kBorderBox:
       outsets = box.BorderBoxOutsets();
@@ -2086,7 +2131,7 @@ static void AdjustRoundedClipForOverflowClipMargin(
       break;
   }
 
-  outsets += overflow_clip_margin->GetMargin();
+  outsets.Inflate(overflow_clip_margin->GetMargin());
   layout_clip_rect.Outset(gfx::OutsetsF(outsets));
   paint_clip_rect.OutsetForMarginOrShadow(gfx::OutsetsF(outsets));
 }
@@ -2105,12 +2150,9 @@ void FragmentPaintPropertyTreeBuilder::UpdateInnerBorderRadiusClip() {
           RoundedBorderGeometry::PixelSnappedRoundedInnerBorder(box.StyleRef(),
                                                                 box_rect);
 
-      if (pre_paint_info_) {
-        gfx::Vector2dF offset(
-            -OffsetInStitchedFragments(pre_paint_info_->box_fragment));
-        layout_clip_rect.Offset(offset);
-        paint_clip_rect.Move(offset);
-      }
+      gfx::Vector2dF offset(-OffsetInStitchedFragments(BoxFragment()));
+      layout_clip_rect.Offset(offset);
+      paint_clip_rect.Move(offset);
 
       AdjustRoundedClipForOverflowClipMargin(box, layout_clip_rect,
                                              paint_clip_rect);
@@ -2152,7 +2194,7 @@ void FragmentPaintPropertyTreeBuilder::UpdateOverflowClip() {
         auto clip_rect =
             RoundedBorderGeometry::PixelSnappedRoundedBorderWithOutsets(
                 replaced.StyleRef(), content_rect,
-                LayoutRectOutsets(
+                NGPhysicalBoxStrut(
                     -(replaced.PaddingTop() + replaced.BorderTop()),
                     -(replaced.PaddingRight() + replaced.BorderRight()),
                     -(replaced.PaddingBottom() + replaced.BorderBottom()),
@@ -2169,15 +2211,10 @@ void FragmentPaintPropertyTreeBuilder::UpdateOverflowClip() {
         // the first parameter?
         state.SetClipRect(clip_rect.Rect(), clip_rect);
       } else if (object_.IsBox()) {
-        PhysicalRect clip_rect;
-        if (pre_paint_info_) {
-          clip_rect = pre_paint_info_->box_fragment.OverflowClipRect(
-              context_.current.paint_offset,
-              FindPreviousBreakToken(pre_paint_info_->box_fragment));
-        } else {
-          clip_rect = To<LayoutBox>(object_).OverflowClipRect(
-              context_.current.paint_offset);
-        }
+        const NGPhysicalBoxFragment& box_fragment = BoxFragment();
+        PhysicalRect clip_rect =
+            box_fragment.OverflowClipRect(context_.current.paint_offset,
+                                          FindPreviousBreakToken(box_fragment));
 
         if (object_.IsLayoutReplaced()) {
           // TODO(crbug.com/1248598): Should we use non-snapped clip rect for
@@ -2704,7 +2741,7 @@ void FragmentPaintPropertyTreeBuilder::UpdatePaintOffset() {
       // descendants need special treatment inside block fragmentation.
       context_.current.is_in_block_fragmentation =
           pre_paint_info_->fragmentainer_is_oof_containing_block &&
-          !pre_paint_info_->box_fragment.IsMonolithic();
+          !BoxFragment().IsMonolithic();
     } else {
       // TODO(pdr): Several calls in this function walk back up the tree to
       // calculate containers (e.g., physicalLocation,
@@ -2742,6 +2779,13 @@ void FragmentPaintPropertyTreeBuilder::SetNeedsPaintPropertyUpdateIfNeeded() {
             .SetOnlyThisNeedsPaintPropertyUpdate();
       }
     }
+  }
+
+  // We could check the change of border-box, padding-box or content-box
+  // according to background-clip, but checking layout change is much simpler
+  // and good enough for the rare cases of NeedsBackgroundClip().
+  if (NeedsBackgroundClip(box) && box.ShouldCheckLayoutForPaintInvalidation()) {
+    box.GetMutableForPainting().SetOnlyThisNeedsPaintPropertyUpdate();
   }
 
   // If we reach FragmentPaintPropertyTreeBuilder for an object needing a
@@ -2900,6 +2944,7 @@ void FragmentPaintPropertyTreeBuilder::UpdateForSelf() {
     UpdateCssClip();
     UpdateFilter();
     UpdateOverflowControlsClip();
+    UpdateBackgroundClip();
   } else if (!object_.IsAnonymous()) {
     // 3D rendering contexts follow the DOM ancestor chain, so
     // flattening should apply regardless of presence of transform.
@@ -3099,8 +3144,9 @@ void PaintPropertyTreeBuilder::UpdateFragments() {
        NeedsTransformForSVGChild(object_,
                                  context_.direct_compositing_reasons) ||
        NeedsFilter(object_, context_) || NeedsCssClip(object_) ||
-       NeedsInnerBorderRadiusClip(object_) || NeedsOverflowClip(object_) ||
-       NeedsPerspective(object_) || NeedsReplacedContentTransform(object_) ||
+       NeedsBackgroundClip(object_) || NeedsInnerBorderRadiusClip(object_) ||
+       NeedsOverflowClip(object_) || NeedsPerspective(object_) ||
+       NeedsReplacedContentTransform(object_) ||
        NeedsScrollOrScrollTranslation(object_,
                                       context_.direct_compositing_reasons));
 
@@ -3161,7 +3207,6 @@ void PaintPropertyTreeBuilder::UpdateForSelf() {
   context_.direct_compositing_reasons =
       CompositingReasonFinder::DirectReasonsForPaintPropertiesExceptScrolling(
           object_);
-  context_.was_main_thread_scrolling = false;
   if (const auto* box = DynamicTo<LayoutBox>(object_)) {
     if (auto* scrollable_area = box->GetScrollableArea()) {
       bool force_prefer_compositing =
@@ -3175,8 +3220,6 @@ void PaintPropertyTreeBuilder::UpdateForSelf() {
                 : CompositedScrollingPreference::kDefault);
       }
       scrollable_area->UpdateNeedsCompositedScrolling(force_prefer_compositing);
-      context_.was_main_thread_scrolling =
-          scrollable_area->ShouldScrollOnMainThread();
       context_.direct_compositing_reasons =
           CompositingReasonFinder::DirectReasonsForPaintProperties(
               object_, context_.direct_compositing_reasons);
@@ -3411,8 +3454,7 @@ void PaintPropertyTreeBuilder::DirectlyUpdateTransformMatrix(
          gfx::Transform& matrix) {
         const ComputedStyle& style = box.StyleRef();
         style.ApplyTransform(
-            matrix, &box, size.ToLayoutSize(),
-            ComputedStyle::kIncludeTransformOperations,
+            matrix, &box, size, ComputedStyle::kIncludeTransformOperations,
             ComputedStyle::kExcludeTransformOrigin,
             ComputedStyle::kExcludeMotionPath,
             ComputedStyle::kExcludeIndependentTransformProperties);
@@ -3493,11 +3535,15 @@ void PaintPropertyTreeBuilder::IssueInvalidationsAfterUpdate() {
     object_.GetFrameView()->SetPaintArtifactCompositorNeedsUpdate(reason);
   }
 
-  if (auto* box = DynamicTo<LayoutBox>(object_)) {
-    if (auto* scrollable_area = box->GetScrollableArea()) {
-      if (context_.was_main_thread_scrolling !=
-          scrollable_area->ShouldScrollOnMainThread())
-        scrollable_area->MainThreadScrollingDidChange();
+  if (!RuntimeEnabledFeatures::CompositeScrollAfterPaintEnabled()) {
+    if (auto* box = DynamicTo<LayoutBox>(object_)) {
+      if (auto* scrollable_area = box->GetScrollableArea()) {
+        const auto* properties = object_.FirstFragment().PaintProperties();
+        scrollable_area->SetShouldScrollOnMainThread(
+            !properties || !properties->Scroll() ||
+            properties->Scroll()->GetMainThreadScrollingReasons() ||
+            !properties->ScrollTranslation()->HasDirectCompositingReasons());
+      }
     }
   }
 

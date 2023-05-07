@@ -148,6 +148,7 @@
 #endif
 
 #if BUILDFLAG(IS_CHROMEOS_ASH)
+#include "ash/components/arc/arc_util.h"
 #include "ash/constants/ash_paths.h"
 #include "ash/constants/ash_switches.h"
 #include "base/system/sys_info.h"
@@ -912,6 +913,9 @@ void ChromeMainDelegate::CommonEarlyInitialization() {
   // it if not already overridden by command line, field trial etc.
   net::HttpCache::SplitCacheFeatureEnableByDefault();
 
+  // Similarly, enable network state partitioning by default.
+  net::NetworkAnonymizationKey::PartitionByDefault();
+
 #if BUILDFLAG(IS_CHROMEOS)
   // Threading features.
   base::PlatformThread::InitFeaturesPostFieldTrial();
@@ -923,7 +927,7 @@ void ChromeMainDelegate::CommonEarlyInitialization() {
 
   if (is_browser_process) {
 #if BUILDFLAG(IS_CHROMEOS_ASH)
-    ash::ConfigureSwap();
+    ash::ConfigureSwap(arc::IsArcAvailable());
     ash::InitializeKstaled();
 #endif
   }
@@ -1784,6 +1788,8 @@ void ChromeMainDelegate::InitializeMemorySystem() {
       .SetProfilingClientParameters(channel,
                                     GetProfileParamsProcess(*command_line))
       .SetDispatcherParameters(memory_system::DispatcherParameters::
-                                   PoissonAllocationSamplerInclusion::kEnforce)
+                                   PoissonAllocationSamplerInclusion::kEnforce,
+                               memory_system::DispatcherParameters::
+                                   AllocationTraceRecorderInclusion::kDynamic)
       .Initialize(memory_system_);
 }

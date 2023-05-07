@@ -11,16 +11,13 @@
 #include "base/base64.h"
 #include "base/command_line.h"
 #include "base/functional/bind.h"
-#include "base/guid.h"
 #include "base/location.h"
 #include "base/logging.h"
 #include "base/task/sequenced_task_runner.h"
 #include "base/task/single_thread_task_runner.h"
 #include "base/task/thread_pool.h"
 #include "base/time/time.h"
-#include "chrome/browser/ash/attestation/certificate_util.h"
 #include "chrome/browser/ash/ownership/owner_settings_service_ash.h"
-#include "chrome/browser/ash/policy/active_directory/active_directory_join_delegate.h"
 #include "chrome/browser/ash/policy/core/device_cloud_policy_store_ash.h"
 #include "chrome/browser/ash/policy/core/dm_token_storage.h"
 #include "chrome/browser/ash/policy/dev_mode/dev_mode_policy_util.h"
@@ -175,24 +172,6 @@ absl::optional<int64_t> GetPsmDeterminationTimestamp(
   return psm_determination_timestamp.ToJavaTime();
 }
 
-// Returns binary config which is encrypted by a password that the joining user
-// has to enter.
-std::string GetActiveDirectoryDomainJoinConfig(
-    const base::Value::Dict* config) {
-  if (!config)
-    return std::string();
-  const std::string* base64_value =
-      config->FindString("active_directory_domain_join_config");
-  if (!base64_value)
-    return std::string();
-  std::string result;
-  if (!base::Base64Decode(*base64_value, &result)) {
-    LOG(ERROR) << "Active Directory config is not base64";
-    return std::string();
-  }
-  return result;
-}
-
 }  // namespace
 
 EnrollmentHandler::EnrollmentHandler(
@@ -202,7 +181,6 @@ EnrollmentHandler::EnrollmentHandler(
     ash::attestation::AttestationFlow* attestation_flow,
     std::unique_ptr<CloudPolicyClient> client,
     scoped_refptr<base::SequencedTaskRunner> background_task_runner,
-    ActiveDirectoryJoinDelegate* ad_join_delegate,
     const EnrollmentConfig& enrollment_config,
     LicenseType license_type,
     DMAuth dm_auth,
@@ -218,7 +196,6 @@ EnrollmentHandler::EnrollmentHandler(
           std::make_unique<TpmEnrollmentKeySigningServiceProvider>()),
       client_(std::move(client)),
       background_task_runner_(background_task_runner),
-      ad_join_delegate_(ad_join_delegate),
       enrollment_config_(enrollment_config),
       client_id_(client_id),
       sub_organization_(sub_organization),
@@ -462,27 +439,22 @@ void EnrollmentHandler::StartRegistration() {
 
   SetStep(STEP_REGISTRATION);
   if (enrollment_config_.is_mode_attestation()) {
-    // First attempt to register with enrollment certificate. Do not force new
-    // key and fresh enrollment certificate.
-    StartAttestationBasedEnrollmentFlow(/*is_initial_attempt=*/true);
+    StartAttestationBasedEnrollmentFlow();
   } else {
     client_->Register(*register_params_, client_id_, dm_auth_.oauth_token());
   }
 }
 
-void EnrollmentHandler::StartAttestationBasedEnrollmentFlow(
-    bool is_initial_attempt) {
-  const bool force_new_key = !is_initial_attempt;
+void EnrollmentHandler::StartAttestationBasedEnrollmentFlow() {
   ash::attestation::AttestationFlow::CertificateCallback callback =
       base::BindOnce(&EnrollmentHandler::HandleRegistrationCertificateResult,
-                     weak_ptr_factory_.GetWeakPtr(), is_initial_attempt);
-  ash::attestation::AttestationFeatures::GetFeatures(base::BindOnce(
-      &EnrollmentHandler::OnGetFeaturesReady, weak_ptr_factory_.GetWeakPtr(),
-      force_new_key, std::move(callback)));
+                     weak_ptr_factory_.GetWeakPtr());
+  ash::attestation::AttestationFeatures::GetFeatures(
+      base::BindOnce(&EnrollmentHandler::OnGetFeaturesReady,
+                     weak_ptr_factory_.GetWeakPtr(), std::move(callback)));
 }
 
 void EnrollmentHandler::OnGetFeaturesReady(
-    bool force_new_key,
     ash::attestation::AttestationFlow::CertificateCallback callback,
     const ash::attestation::AttestationFeatures* features) {
   if (!features) {
@@ -511,11 +483,13 @@ void EnrollmentHandler::OnGetFeaturesReady(
     return;
   }
 
+  // Always force a new key to obtain a fresh certificate. See crbug.com/1292897
+  // for context.
   attestation_flow_->GetCertificate(
       /*certificate_profile=*/ash::attestation::
           PROFILE_ENTERPRISE_ENROLLMENT_CERTIFICATE,
       /*account_id=*/EmptyAccountId(), /*request_origin=*/std::string(),
-      /*force_new_key=*/force_new_key,
+      /*force_new_key=*/true,
       /*key_crypto_type=*/key_crypto_type,
       /*key_name=*/ash::attestation::kEnterpriseEnrollmentKey,
       /*profile_specific_data=*/absl::nullopt,
@@ -523,53 +497,12 @@ void EnrollmentHandler::OnGetFeaturesReady(
 }
 
 void EnrollmentHandler::HandleRegistrationCertificateResult(
-    bool is_initial_attempt,
     ash::attestation::AttestationStatus status,
     const std::string& pem_certificate_chain) {
   if (status != ash::attestation::ATTESTATION_SUCCESS) {
     ReportResult(EnrollmentStatus::ForStatus(
         EnrollmentStatus::REGISTRATION_CERT_FETCH_FAILED));
     return;
-  }
-
-  // Expiry threshold is 0 so no expiring soon certificates. The reason is that
-  // enrollment certificates expire in 1 day so there's no optimal threshold to
-  // catch expiring certificates.
-  const ash::attestation::CertificateExpiryStatus cert_status =
-      ash::attestation::CheckCertificateExpiry(
-          pem_certificate_chain,
-          /*expiry_threshold=*/base::TimeDelta());
-
-  switch (cert_status) {
-    case ash::attestation::CertificateExpiryStatus::kValid:
-      // Valid certificate, proceed with registration.
-      break;
-    case ash::attestation::CertificateExpiryStatus::kExpiringSoon:
-    case ash::attestation::CertificateExpiryStatus::kExpired:
-      if (is_initial_attempt) {
-        // The first certificate request resulted in expired enrollment
-        // certificate. Initiate second attempt with forced new key to fetch
-        // fresh enrollment certificate.
-        LOG(ERROR) << "Existing certificate has expired. Attempt to request "
-                      "fresh certificate.";
-        StartAttestationBasedEnrollmentFlow(/*is_initial_attempt=*/false);
-        return;
-      } else {
-        // Second attempt with forced new key resulted in expired certificate
-        // again. We cannot tell if any following attempt will result in a valid
-        // certificate. Proceed with registration with given certificate.
-        LOG(ERROR) << "Existing certificate has expired. Attempt to register.";
-        break;
-      }
-    case ash::attestation::CertificateExpiryStatus::kInvalidPemChain:
-    case ash::attestation::CertificateExpiryStatus::kInvalidX509:
-      // We cannot tell for sure what caused the certificate to be invalid,
-      // whether it can be accepted by the server, or will we get a valid
-      // certificate on the next attempt. Proceed with the registration to not
-      // to fall into potential infinite loop blocking fallback enrollment.
-      LOG(ERROR) << "Failed to parse certificate, cannot check expiry: "
-                 << CertificateExpiryStatusToString(cert_status);
-      break;
   }
 
   client_->RegisterWithCertificate(
@@ -614,25 +547,18 @@ void EnrollmentHandler::HandlePolicyValidationResult(
     return;
   }
 
-  if (device_mode_ == DEVICE_MODE_ENTERPRISE_AD) {
-    // Don't use robot account for the Active Directory managed devices.
-    skip_robot_auth_ = true;
-    SetStep(STEP_AD_DOMAIN_JOIN);
-    StartJoinAdDomain();
-  } else {
-    domain_ = gaia::ExtractDomainName(gaia::CanonicalizeEmail(username));
-    SetStep(STEP_ROBOT_AUTH_FETCH);
-    device_account_initializer_ =
-        std::make_unique<DeviceAccountInitializer>(client_.get(), this);
-    device_account_initializer_->FetchToken();
-  }
+  domain_ = gaia::ExtractDomainName(gaia::CanonicalizeEmail(username));
+  SetStep(STEP_ROBOT_AUTH_FETCH);
+  device_account_initializer_ =
+      std::make_unique<DeviceAccountInitializer>(client_.get(), this);
+  device_account_initializer_->FetchToken();
 }
 
 void EnrollmentHandler::OnDeviceAccountTokenFetched(bool empty_token) {
   CHECK_EQ(STEP_ROBOT_AUTH_FETCH, enrollment_step_);
   skip_robot_auth_ = empty_token;
-  SetStep(STEP_AD_DOMAIN_JOIN);
-  StartJoinAdDomain();
+  SetStep(STEP_SET_FWMP_DATA);
+  SetFirmwareManagementParametersData();
 }
 
 void EnrollmentHandler::OnDeviceAccountTokenFetchError(
@@ -710,29 +636,6 @@ void EnrollmentHandler::OnFirmwareManagementParametersDataSet(
 
   SetStep(STEP_LOCK_DEVICE);
   StartLockDevice();
-}
-
-void EnrollmentHandler::StartJoinAdDomain() {
-  DCHECK_EQ(STEP_AD_DOMAIN_JOIN, enrollment_step_);
-  if (device_mode_ != DEVICE_MODE_ENTERPRISE_AD) {
-    SetStep(STEP_SET_FWMP_DATA);
-    SetFirmwareManagementParametersData();
-    return;
-  }
-  DCHECK(ad_join_delegate_);
-  ad_join_delegate_->JoinDomain(
-      client_->dm_token(),
-      GetActiveDirectoryDomainJoinConfig(client_->configuration_seed()),
-      base::BindOnce(&EnrollmentHandler::OnAdDomainJoined,
-                     weak_ptr_factory_.GetWeakPtr()));
-}
-
-void EnrollmentHandler::OnAdDomainJoined(const std::string& realm) {
-  DCHECK_EQ(STEP_AD_DOMAIN_JOIN, enrollment_step_);
-  CHECK(!realm.empty());
-  realm_ = realm;
-  SetStep(STEP_SET_FWMP_DATA);
-  SetFirmwareManagementParametersData();
 }
 
 void EnrollmentHandler::StartLockDevice() {

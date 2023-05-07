@@ -6,6 +6,7 @@
 #define CHROME_BROWSER_UI_VIEWS_FRAME_BROWSER_FRAME_VIEW_WIN_H_
 
 #include "base/memory/raw_ptr.h"
+#include "base/memory/raw_ptr_exclusion.h"
 #include "base/win/scoped_gdi_object.h"
 #include "chrome/browser/ui/views/frame/browser_non_client_frame_view.h"
 #include "chrome/browser/ui/views/frame/windows_caption_button.h"
@@ -57,6 +58,7 @@ class BrowserFrameViewWin : public BrowserNonClientFrameView,
   void GetWindowMask(const gfx::Size& size, SkPath* window_mask) override {}
   void ResetWindowControls() override;
   void SizeConstraintsChanged() override {}
+  void OnThemeChanged() override;
 
   // TabIconViewModel:
   bool ShouldTabIconViewAnimate() const override;
@@ -126,9 +128,9 @@ class BrowserFrameViewWin : public BrowserNonClientFrameView,
   // the window to leave room for the visual border that Windows draws.
   int WindowTopY() const;
 
-  // Returns the distance from the leading edge of the window to the leading
-  // edge of the caption buttons.
-  int MinimizeButtonX() const;
+  // Returns the width of the caption buttons region, including visible
+  // system-drawn and custom-drawn caption buttons.
+  int CaptionButtonsRegionWidth() const;
 
   // Returns whether or not the window should display an icon of the specified
   // |type|.
@@ -137,6 +139,9 @@ class BrowserFrameViewWin : public BrowserNonClientFrameView,
   // Returns whether or not the window should display a title of the specified
   // |type|.
   bool ShouldShowWindowTitle(TitlebarType type) const;
+
+  // Sets DWM attributes for rendering the system-drawn titlebar.
+  void SetSystemTitlebarAttributes();
 
   // Paint various sub-components of this view.
   void PaintTitlebar(gfx::Canvas* canvas) const;
@@ -167,12 +172,12 @@ class BrowserFrameViewWin : public BrowserNonClientFrameView,
   base::win::ScopedHICON big_window_icon_;
 
   // Icon and title. Only used when custom-drawing the titlebar for popups.
-  TabIconView* window_icon_ = nullptr;
+  // This field is not a raw_ptr<> because it was filtered by the rewriter for:
+  // #addr-of
+  RAW_PTR_EXCLUSION TabIconView* window_icon_ = nullptr;
   raw_ptr<views::Label> window_title_ = nullptr;
 
   // The container holding the caption buttons (minimize, maximize, close, etc.)
-  // May be null if the caption button container is destroyed before the frame
-  // view. Always check for validity before using!
   raw_ptr<BrowserCaptionButtonContainer> caption_button_container_;
 
   // Whether or not the window throbber is currently animating.

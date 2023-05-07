@@ -184,7 +184,7 @@ TEST_F(SyncServiceImplStartupTest, StartFirstTime) {
   // This tells the SyncServiceImpl that setup is now in progress, which
   // causes it to try starting up the engine. We're not signed in yet though, so
   // that won't work.
-  sync_service()->GetUserSettings()->SetSyncRequested();
+  sync_service()->SetSyncFeatureRequested();
   std::unique_ptr<SyncSetupInProgressHandle> sync_blocker =
       sync_service()->GetSetupInProgressHandle();
   EXPECT_FALSE(sync_service()->IsEngineInitialized());
@@ -475,7 +475,7 @@ TEST_F(SyncServiceImplStartupTest, StartRecoverDatatypePrefs) {
   // Clear the datatype preference fields (simulating bug 154940).
   pref_service()->ClearPref(prefs::kSyncKeepEverythingSynced);
   for (UserSelectableType type : UserSelectableTypeSet::All()) {
-    pref_service()->ClearPref(SyncPrefs::GetPrefNameForType(type));
+    pref_service()->ClearPref(SyncPrefs::GetPrefNameForTypeForTesting(type));
   }
 
   sync_prefs()->SetFirstSetupComplete();
@@ -494,8 +494,8 @@ TEST_F(SyncServiceImplStartupTest, StartDontRecoverDatatypePrefs) {
   // enabled.
   sync_prefs()->SetSelectedTypes(
       /*keep_everything_synced=*/false,
-      /*choosable_types=*/UserSelectableTypeSet::All(),
-      /*chosen_types=*/{UserSelectableType::kBookmarks});
+      /*registered_types=*/UserSelectableTypeSet::All(),
+      /*selected_types=*/{UserSelectableType::kBookmarks});
 
   sync_prefs()->SetFirstSetupComplete();
   CreateSyncService(SyncServiceImpl::MANUAL_START);
@@ -647,7 +647,7 @@ TEST_F(SyncServiceImplStartupTest, FullStartupSequenceFirstTime) {
 
   // Initiate Sync (the feature) setup before the engine initializes itself in
   // transport mode.
-  sync_service()->GetUserSettings()->SetSyncRequested();
+  sync_service()->SetSyncFeatureRequested();
   std::unique_ptr<SyncSetupInProgressHandle> setup_in_progress_handle =
       sync_service()->GetSetupInProgressHandle();
 

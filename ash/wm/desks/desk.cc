@@ -236,8 +236,8 @@ class DeskContainerObserver : public aura::WindowObserver {
   }
 
  private:
-  Desk* const owner_;
-  aura::Window* const container_;
+  const raw_ptr<Desk, ExperimentalAsh> owner_;
+  const raw_ptr<aura::Window, ExperimentalAsh> container_;
 };
 
 // -----------------------------------------------------------------------------

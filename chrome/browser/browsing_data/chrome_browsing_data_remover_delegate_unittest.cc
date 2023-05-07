@@ -15,7 +15,6 @@
 #include "base/containers/flat_set.h"
 #include "base/files/file_util.h"
 #include "base/functional/bind.h"
-#include "base/guid.h"
 #include "base/json/values_util.h"
 #include "base/memory/ptr_util.h"
 #include "base/memory/raw_ptr.h"
@@ -34,6 +33,7 @@
 #include "base/test/simple_test_clock.h"
 #include "base/test/test_timeouts.h"
 #include "base/time/time.h"
+#include "base/uuid.h"
 #include "build/build_config.h"
 #include "build/chromeos_buildflags.h"
 #include "chrome/browser/autocomplete/zero_suggest_cache_service_factory.h"
@@ -244,6 +244,8 @@ using testing::WithArgs;
 namespace constants = chrome_browsing_data_remover;
 
 namespace {
+
+constexpr int kTopicsAPITestTaxonomyVersion = 1;
 
 const char kTestRegisterableDomain1[] = "host1.com";
 const char kTestRegisterableDomain3[] = "host3.com";
@@ -973,7 +975,7 @@ class RemoveAutofillTester {
   void AddProfilesAndCards() {
     std::vector<autofill::AutofillProfile> profiles;
     autofill::AutofillProfile profile;
-    profile.set_guid(base::GenerateGUID());
+    profile.set_guid(base::Uuid::GenerateRandomV4().AsLowercaseString());
     profile.set_origin(kWebOrigin);
     profile.SetRawInfo(autofill::NAME_FIRST, u"Bob");
     profile.SetRawInfo(autofill::NAME_LAST, u"Smith");
@@ -982,7 +984,7 @@ class RemoveAutofillTester {
     profile.SetRawInfo(autofill::COMPANY_NAME, u"Company X");
     profiles.push_back(profile);
 
-    profile.set_guid(base::GenerateGUID());
+    profile.set_guid(base::Uuid::GenerateRandomV4().AsLowercaseString());
     profile.set_origin(autofill::kSettingsOrigin);
     profiles.push_back(profile);
 
@@ -992,12 +994,12 @@ class RemoveAutofillTester {
 
     std::vector<autofill::CreditCard> cards;
     autofill::CreditCard card;
-    card.set_guid(base::GenerateGUID());
+    card.set_guid(base::Uuid::GenerateRandomV4().AsLowercaseString());
     card.set_origin(kWebOrigin);
     card.SetRawInfo(autofill::CREDIT_CARD_NUMBER, u"1234-5678-9012-3456");
     cards.push_back(card);
 
-    card.set_guid(base::GenerateGUID());
+    card.set_guid(base::Uuid::GenerateRandomV4().AsLowercaseString());
     card.set_origin(autofill::kSettingsOrigin);
     cards.push_back(card);
 
@@ -3001,12 +3003,10 @@ TEST_F(ChromeBrowsingDataRemoverDelegateTest, RemoveFledgeJoinSettings) {
 TEST_F(ChromeBrowsingDataRemoverDelegateTest, RemoveTopicSettings) {
   auto* privacy_sandbox_settings =
       PrivacySandboxSettingsFactory::GetForProfile(GetProfile());
-  privacy_sandbox::CanonicalTopic topic_one(
-      browsing_topics::Topic(1),
-      privacy_sandbox::CanonicalTopic::AVAILABLE_TAXONOMY);
-  privacy_sandbox::CanonicalTopic topic_two(
-      browsing_topics::Topic(2),
-      privacy_sandbox::CanonicalTopic::AVAILABLE_TAXONOMY);
+  privacy_sandbox::CanonicalTopic topic_one(browsing_topics::Topic(1),
+                                            kTopicsAPITestTaxonomyVersion);
+  privacy_sandbox::CanonicalTopic topic_two(browsing_topics::Topic(2),
+                                            kTopicsAPITestTaxonomyVersion);
   EXPECT_TRUE(privacy_sandbox_settings->IsTopicAllowed(topic_one));
   EXPECT_TRUE(privacy_sandbox_settings->IsTopicAllowed(topic_two));
 

@@ -206,17 +206,8 @@ IN_PROC_BROWSER_TEST_F(ChromeSitePerProcessTest,
   // Check that JS storage APIs can be accessed successfully.
   EXPECT_TRUE(
       content::ExecuteScript(frame_host, "localStorage['foo'] = 'bar'"));
-  std::string result;
-  EXPECT_TRUE(ExecuteScriptAndExtractString(
-      frame_host, "window.domAutomationController.send(localStorage['foo']);",
-      &result));
-  EXPECT_EQ(result, "bar");
-  bool is_object_created = false;
-  EXPECT_TRUE(ExecuteScriptAndExtractBool(
-      frame_host,
-      "window.domAutomationController.send(!!indexedDB.open('testdb', 2));",
-      &is_object_created));
-  EXPECT_TRUE(is_object_created);
+  EXPECT_EQ(content::EvalJs(frame_host, "localStorage['foo'];"), "bar");
+  EXPECT_EQ(true, EvalJs(frame_host, "!!indexedDB.open('testdb', 2);"));
   EXPECT_TRUE(ExecuteScript(frame_host,
                             "window.webkitRequestFileSystem("
                             "window.TEMPORARY, 1024, function() {});"));
@@ -587,10 +578,7 @@ IN_PROC_BROWSER_TEST_F(ChromeSitePerProcessTest, PrintIgnoredInUnloadHandler) {
       GURL(embedded_test_server()->GetURL("c.com", "/title1.html"))));
 
   // Check that b.com's process is still alive.
-  bool renderer_alive = false;
-  EXPECT_TRUE(ExecuteScriptAndExtractBool(
-      child_1, "window.domAutomationController.send(true);", &renderer_alive));
-  EXPECT_TRUE(renderer_alive);
+  EXPECT_EQ(true, EvalJs(child_1, "true;"));
 }
 
 // Ensure that when a window closes itself via window.close(), its process does

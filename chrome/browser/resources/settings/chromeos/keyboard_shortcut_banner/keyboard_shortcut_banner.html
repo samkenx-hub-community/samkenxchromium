@@ -1,4 +1,4 @@
-<style>
+<style include="cros-color-overrides">
   :host {
     align-items: center;
     border: 1px solid var(--cr-separator-color);
@@ -17,8 +17,6 @@
     background: center / cover no-repeat;
     background-image: url(chrome://os-settings/images/keyboard_shortcut.svg);
     flex-shrink: 0;
-    height: 48px;
-    width: 48px;
   }
 
   @media (prefers-color-scheme: dark) {
@@ -26,6 +24,20 @@
       background-image:
         url(chrome://os-settings/images/keyboard_shortcut_dark.svg);
     }
+  }
+
+  #icon,
+  #keyboardShortcutIcon {
+    height: 48px;
+    width: 48px;
+  }
+
+  :host-context(body.jelly-enabled) #icon {
+    display: none;
+  }
+
+  :host-context(body:not(.jelly-enabled)) #keyboardShortcutIcon {
+    display: none;
   }
 
   #text {
@@ -71,7 +83,7 @@
     color: var(--cros-text-color-prominent);
   }
 
-  cr-button {
+  :host-context(body:not(.jelly-enabled)) cr-button {
     --border-color: transparent;
     --hover-border-color: transparent;
     --disabled-border-color: transparent;
@@ -79,6 +91,9 @@
 </style>
 
 <div id="icon"></div>
+
+<iron-icon id="keyboardShortcutIcon" icon="os-settings:keyboard-shortcut">
+</iron-icon>
 
 <div id="text">
   <h2>[[header]]</h2>

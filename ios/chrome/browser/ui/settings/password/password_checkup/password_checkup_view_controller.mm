@@ -9,8 +9,9 @@
 #import "base/strings/string_number_conversions.h"
 #import "components/google/core/common/google_util.h"
 #import "components/strings/grit/components_strings.h"
-#import "ios/chrome/browser/application_context/application_context.h"
 #import "ios/chrome/browser/net/crurl.h"
+#import "ios/chrome/browser/passwords/password_checkup_utils.h"
+#import "ios/chrome/browser/shared/model/application_context/application_context.h"
 #import "ios/chrome/browser/shared/ui/table_view/cells/table_view_text_item.h"
 #import "ios/chrome/browser/shared/ui/util/uikit_ui_util.h"
 #import "ios/chrome/browser/ui/settings/cells/settings_check_cell.h"
@@ -18,7 +19,6 @@
 #import "ios/chrome/browser/ui/settings/password/password_checkup/password_checkup_commands.h"
 #import "ios/chrome/browser/ui/settings/password/password_checkup/password_checkup_constants.h"
 #import "ios/chrome/browser/ui/settings/password/password_checkup/password_checkup_consumer.h"
-#import "ios/chrome/browser/ui/settings/password/password_checkup/password_checkup_utils.h"
 #import "ios/chrome/browser/ui/settings/password/password_checkup/password_checkup_view_controller_delegate.h"
 #import "ios/chrome/common/ui/colors/semantic_color_names.h"
 #import "ios/chrome/grit/ios_strings.h"
@@ -188,8 +188,8 @@ void SetUpTrailingIconAndAccessoryType(
   self.title = l10n_util::GetNSString(IDS_IOS_PASSWORD_CHECKUP);
 
   _headerImageView = [self createHeaderImageView];
-  self.tableView.tableHeaderView = _headerImageView;
   [self updateHeaderImage];
+  [self updateTableViewHeaderView];
 
   [self loadModel];
 }
@@ -381,7 +381,7 @@ void SetUpTrailingIconAndAccessoryType(
   // If state is PasswordCheckupHomepageStateDisabled, it means that there is no
   // saved password to check, so we return to the Password Manager.
   if (state == PasswordCheckupHomepageStateDisabled) {
-    [self.handler dismissPasswordCheckupViewController];
+    [self.handler dismissAfterAllPasswordsGone];
   }
 
   _passwordCheckupState = state;

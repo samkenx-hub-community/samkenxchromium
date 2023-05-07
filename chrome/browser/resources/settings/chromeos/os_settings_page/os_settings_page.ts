@@ -13,6 +13,7 @@ import 'chrome://resources/cr_elements/icons.html.js';
 import 'chrome://resources/cr_elements/cr_shared_vars.css.js';
 import 'chrome://resources/polymer/v3_0/iron-icon/iron-icon.js';
 import './settings_idle_load.js';
+import '../os_a11y_page/os_a11y_page.js';
 import '../os_about_page/eol_offer_section.js';
 import '../os_apps_page/os_apps_page.js';
 import '../os_people_page/os_people_page.js';
@@ -38,7 +39,7 @@ import {castExists} from '../assert_extras.js';
 import {MainPageMixin} from '../main_page_mixin.js';
 import {AboutPageBrowserProxyImpl} from '../os_about_page/about_page_browser_proxy.js';
 import {AndroidAppsBrowserProxyImpl, AndroidAppsInfo} from '../os_apps_page/android_apps_browser_proxy.js';
-import {OsPageVisibility} from '../os_page_visibility.js';
+import {OsPageAvailability} from '../os_page_availability.js';
 import {routes} from '../os_settings_routes.js';
 import {Route, Router} from '../router.js';
 
@@ -95,9 +96,9 @@ export class OsSettingsPageElement extends OsSettingsPageElementBase {
       },
 
       /**
-       * Dictionary defining page visibility.
+       * Dictionary defining page availability.
        */
-      pageVisibility: {
+      pageAvailability: {
         type: Object,
         value() {
           return {};
@@ -154,7 +155,7 @@ export class OsSettingsPageElement extends OsSettingsPageElementBase {
   }
 
   androidAppsInfo?: AndroidAppsInfo;
-  pageVisibility: OsPageVisibility;
+  pageAvailability: OsPageAvailability;
   advancedToggleExpanded: boolean;
   showKerberosSection: boolean;
   private allowCrostini_: boolean;

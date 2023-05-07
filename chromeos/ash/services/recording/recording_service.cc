@@ -374,19 +374,14 @@ void RecordingService::OnFrameCaptured(
     return;
   }
 
-  if (!info->color_space) {
-    DLOG(ERROR) << "Missing mandatory color space info.";
-    return;
-  }
-
   DCHECK(current_video_capture_params_);
   const gfx::Rect& visible_rect =
       current_video_capture_params_->GetVideoFrameVisibleRect(
           info->visible_rect);
   scoped_refptr<media::VideoFrame> frame = media::VideoFrame::WrapExternalData(
       info->pixel_format, info->coded_size, visible_rect, visible_rect.size(),
-      reinterpret_cast<uint8_t*>(const_cast<void*>(mapping.memory())),
-      mapping.size(), info->timestamp);
+      reinterpret_cast<const uint8_t*>(mapping.memory()), mapping.size(),
+      info->timestamp);
   if (!frame) {
     DLOG(ERROR) << "Failed to create a VideoFrame.";
     return;
@@ -400,7 +395,7 @@ void RecordingService::OnFrameCaptured(
              callbacks) {},
       std::move(mapping), std::move(callbacks)));
   frame->set_metadata(info->metadata);
-  frame->set_color_space(info->color_space.value());
+  frame->set_color_space(info->color_space);
 
   if (video_thumbnail_.isNull())
     video_thumbnail_ = ExtractImageFromVideoFrame(*frame);

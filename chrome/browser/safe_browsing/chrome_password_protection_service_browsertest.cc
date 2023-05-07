@@ -30,6 +30,7 @@
 #include "components/password_manager/core/browser/password_manager_test_utils.h"
 #include "components/password_manager/core/browser/password_reuse_manager.h"
 #include "components/password_manager/core/browser/ui/password_check_referrer.h"
+#include "components/password_manager/core/common/password_manager_features.h"
 #include "components/password_manager/core/common/password_manager_pref_names.h"
 #include "components/prefs/pref_service.h"
 #include "components/prefs/scoped_user_pref_update.h"
@@ -77,8 +78,9 @@ PasswordForm CreatePasswordFormWithPhishedEntry(std::string signon_realm,
   form.in_store = PasswordForm::Store::kProfileStore;
   form.password_issues = {
       {password_manager::InsecureType::kPhished,
-       password_manager::InsecurityMetadata(base::Time::FromTimeT(1),
-                                            password_manager::IsMuted(false))}};
+       password_manager::InsecurityMetadata(
+           base::Time::FromTimeT(1), password_manager::IsMuted(false),
+           password_manager::TriggerBackendNotification(false))}};
 
   return form;
 }
@@ -323,6 +325,8 @@ IN_PROC_BROWSER_TEST_F(ChromePasswordProtectionServiceBrowserTest,
 class ChromePasswordProtectionServiceBrowserWithFakeBackendPasswordStoreTest
     : public ChromePasswordProtectionServiceBrowserTest {
   void SetUpInProcessBrowserTestFixture() override {
+    scoped_feature_list_.InitAndEnableFeature(
+        password_manager::features::kPasswordManagerRedesign);
     ChromePasswordProtectionServiceBrowserTest::
         SetUpInProcessBrowserTestFixture();
     create_services_subscription_ =
@@ -338,6 +342,7 @@ class ChromePasswordProtectionServiceBrowserWithFakeBackendPasswordStoreTest
   }
 
  private:
+  base::test::ScopedFeatureList scoped_feature_list_;
   base::CallbackListSubscription create_services_subscription_;
 };
 
@@ -388,7 +393,7 @@ IN_PROC_BROWSER_TEST_F(
   // foreground tab.
   ASSERT_EQ(2, browser()->tab_strip_model()->count());
   ASSERT_EQ(
-      chrome::GetSettingsUrl(chrome::kPasswordCheckSubPage),
+      GURL(chrome::kChromeUIPasswordManagerCheckupURL),
       browser()->tab_strip_model()->GetActiveWebContents()->GetVisibleURL());
   histograms.ExpectUniqueSample(
       password_manager::kPasswordCheckReferrerHistogram,

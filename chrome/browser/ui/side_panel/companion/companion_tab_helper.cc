@@ -4,6 +4,8 @@
 
 #include "chrome/browser/ui/side_panel/companion/companion_tab_helper.h"
 
+#include <string>
+
 #include "base/strings/strcat.h"
 #include "chrome/browser/companion/core/features.h"
 #include "chrome/browser/companion/core/mojom/companion.mojom.h"
@@ -43,6 +45,7 @@ void CompanionTabHelper::ShowCompanionSidePanelForImage(
     const std::string& additional_query_params_modified,
     const std::vector<uint8_t>& thumbnail_data,
     const gfx::Size& original_size,
+    const gfx::Size& downscaled_size,
     const std::string& image_extension,
     const std::string& content_type) {
   CHECK(delegate_);
@@ -61,7 +64,7 @@ void CompanionTabHelper::ShowCompanionSidePanelForImage(
   // Construct image query object for mojom.
   auto image_query = side_panel::mojom::ImageQuery(
       upload_url, src_url, content_type, thumbnail_data, original_size.height(),
-      original_size.width());
+      original_size.width(), downscaled_size.height(), downscaled_size.width());
 
   if (companion_page_handler_) {
     // Send request immediately if page handler already exists.
@@ -130,6 +133,15 @@ void CompanionTabHelper::SetTextQuery(const std::string& text_query) {
   if (companion_page_handler_) {
     companion_page_handler_->OnSearchTextQuery(GetTextQuery());
   }
+}
+
+void CompanionTabHelper::UpdateNewTabButtonState() {
+  delegate_->UpdateNewTabButtonState();
+}
+
+GURL CompanionTabHelper::GetNewTabButtonUrl() {
+  return companion_page_handler_ ? companion_page_handler_->GetNewTabButtonUrl()
+                                 : GURL();
 }
 
 std::string CompanionTabHelper::GetTextQueryFromSearchUrl(

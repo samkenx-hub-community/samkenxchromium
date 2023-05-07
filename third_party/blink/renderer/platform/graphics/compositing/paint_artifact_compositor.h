@@ -206,6 +206,8 @@ class PLATFORM_EXPORT PaintArtifactCompositor final
                                const gfx::PointF& scroll_offset);
 
   uint32_t GetMainThreadScrollingReasons(const ScrollPaintPropertyNode&) const;
+  // Returns true if the scroll node is currently composited in cc.
+  bool UsesCompositedScrolling(const ScrollPaintPropertyNode&) const;
 
   // The root layer of the tree managed by this object.
   cc::Layer* RootLayer() const { return root_layer_.get(); }
@@ -364,10 +366,10 @@ class PLATFORM_EXPORT PaintArtifactCompositor final
   class OldPendingLayerMatcher;
   PendingLayers pending_layers_;
 
-  // ScrollTranslationNodes of the PaintArtifact that are painted.
+  // Scroll translation nodes of the PaintArtifact that are painted.
   // This member variable is only used in PaintArtifactCompositor::Update.
   // The value indicates if the scroll should be composited.
-  HashMap<const TransformPaintPropertyNode*, bool> scroll_translation_nodes_;
+  HashMap<const TransformPaintPropertyNode*, bool> painted_scroll_translations_;
 
   friend class StubChromeClientForCAP;
   friend class PaintArtifactCompositorTest;

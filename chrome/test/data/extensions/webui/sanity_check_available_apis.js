@@ -20,9 +20,6 @@ var expected = [
   'loadTimes',
   'management',
   'metricsPrivate',
-  // chrome.readAnything is exposed to all WebUIs but meant to be used in
-  // chrome://read-anything-side-panel.top-chrome.
-  'readAnything',
   'runtime',
   'send',
   'test',
@@ -41,4 +38,4 @@ if (!isEqual) {
                 'Expected: ' + JSON.stringify(expected) + ', ' +
                 'Actual: ' + JSON.stringify(actual));
 }
-domAutomationController.send(isEqual);
+return isEqual;

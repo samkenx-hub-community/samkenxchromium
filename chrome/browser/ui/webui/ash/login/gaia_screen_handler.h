@@ -208,10 +208,8 @@ class GaiaScreenHandler
   // BaseScreenHandler implementation:
   void DeclareLocalizedValues(
       ::login::LocalizedValuesBuilder* builder) override;
+  void DeclareJSCallbacks() override;
   void InitAfterJavascriptAllowed() override;
-
-  // WebUIMessageHandler implementation:
-  void RegisterMessages() override;
 
   // WebUI message handlers.
   void HandleWebviewLoadAborted(int error_code);
@@ -443,7 +441,7 @@ class GaiaScreenHandler
   // Network state informer used to keep signin screen up.
   scoped_refptr<NetworkStateInformer> network_state_informer_;
 
-  const base::raw_ptr<ErrorScreen, DanglingUntriaged> error_screen_;
+  const raw_ptr<ErrorScreen, DanglingUntriaged> error_screen_;
 
   NetworkStateInformer::State last_network_state_ =
       NetworkStateInformer::UNKNOWN;

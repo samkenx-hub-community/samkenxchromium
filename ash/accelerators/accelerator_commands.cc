@@ -4,11 +4,10 @@
 
 #include "ash/accelerators/accelerator_commands.h"
 
-#include "accelerator_notifications.h"
+#include "ash/accelerators/accelerator_notifications.h"
 #include "ash/accessibility/accessibility_controller_impl.h"
 #include "ash/accessibility/magnifier/docked_magnifier_controller.h"
 #include "ash/accessibility/magnifier/fullscreen_magnifier_controller.h"
-#include "ash/ambient/ambient_controller.h"
 #include "ash/app_list/app_list_controller_impl.h"
 #include "ash/assistant/assistant_controller_impl.h"
 #include "ash/capture_mode/capture_mode_camera_controller.h"
@@ -26,7 +25,6 @@
 #include "ash/ime/ime_controller_impl.h"
 #include "ash/keyboard/keyboard_controller_impl.h"
 #include "ash/media/media_controller_impl.h"
-#include "ash/public/cpp/ambient/ambient_client.h"
 #include "ash/public/cpp/app_types_util.h"
 #include "ash/public/cpp/assistant/assistant_state.h"
 #include "ash/public/cpp/new_window_delegate.h"
@@ -63,6 +61,8 @@
 #include "ash/wm/overview/overview_controller.h"
 #include "ash/wm/overview/overview_session.h"
 #include "ash/wm/screen_pinning_controller.h"
+#include "ash/wm/snap_group/snap_group.h"
+#include "ash/wm/snap_group/snap_group_controller.h"
 #include "ash/wm/tablet_mode/tablet_mode_multitask_menu_event_handler.h"
 #include "ash/wm/tablet_mode/tablet_mode_window_manager.h"
 #include "ash/wm/window_cycle/window_cycle_controller.h"
@@ -400,12 +400,19 @@ chromeos::FrameSizeButton* GetFrameSizeButton(aura::Window* window) {
 }
 
 // Gets the target window for accelerator action. This can be the top visible
-// window, or active window if the accelerator is pressed during a window drag.
-// Returns nullptr if neither exist.
+// window not in overview, or active window if the accelerator is pressed during
+// a window drag. Returns nullptr if neither exist.
 aura::Window* GetTargetWindow() {
   aura::Window* window = window_util::GetTopWindow();
-  return window && window->IsVisible() ? window
-                                       : window_util::GetActiveWindow();
+  if (!window) {
+    return window_util::GetActiveWindow();
+  }
+  if (auto* overview_controller = Shell::Get()->overview_controller();
+      overview_controller->InOverviewSession() &&
+      overview_controller->overview_session()->IsWindowInOverview(window)) {
+    return nullptr;
+  }
+  return window->IsVisible() ? window : nullptr;
 }
 
 }  // namespace
@@ -467,6 +474,27 @@ bool CanLock() {
   return Shell::Get()->session_controller()->CanLockScreen();
 }
 
+bool CanMinimizeSnapGroupWindows() {
+  return Shell::Get()->snap_group_controller();
+}
+
+void MinimizeWindowsInSnapGroup() {
+  aura::Window* top_window = GetTargetWindow();
+  SnapGroupController* snap_group_controller =
+      Shell::Get()->snap_group_controller();
+  if (!top_window || !snap_group_controller) {
+    return;
+  }
+
+  SnapGroup* snap_group =
+      snap_group_controller->GetSnapGroupForGivenWindow(top_window);
+  if (!snap_group) {
+    return;
+  }
+
+  snap_group->MinimizeWindows();
+}
+
 bool CanMinimizeTopWindowOnBack() {
   return window_util::ShouldMinimizeTopWindowOnBack();
 }
@@ -490,10 +518,6 @@ bool CanShowStylusTools() {
   return GetPaletteTray()->ShouldShowPalette();
 }
 
-bool CanStartAmbientMode() {
-  return AmbientClient::Get() && AmbientClient::Get()->IsAmbientModeAllowed();
-}
-
 bool CanSwapPrimaryDisplay() {
   return display::Screen::GetScreen()->GetNumDisplays() > 1;
 }
@@ -514,7 +538,7 @@ bool CanToggleGameDashboard() {
     return false;
   }
   aura::Window* window = GetTargetWindow();
-  return window && GameDashboardController::Get()->IsSupported(window);
+  return window && chromeos::wm::IsGameWindow(window);
 }
 
 bool CanToggleMultitaskMenu() {
@@ -1080,10 +1104,6 @@ void TakeScreenshot(bool from_snapshot_key) {
   capture_mode_controller->CaptureScreenshotsOfAllDisplays();
 }
 
-void ToggleAmbientMode() {
-  Shell::Get()->ambient_controller()->ToggleInSessionUi();
-}
-
 void ToggleAssignToAllDesk() {
   auto* window = GetTargetWindow();
   if (!window) {
@@ -1426,6 +1446,11 @@ bool ToggleMinimized() {
   if (!window) {
     return false;
   }
+  if (auto* overview_controller = Shell::Get()->overview_controller();
+      overview_controller->InOverviewSession() &&
+      overview_controller->overview_session()->IsWindowInOverview(window)) {
+    return false;
+  }
   WindowState* window_state = WindowState::Get(window);
   if (window_state->IsMinimized()) {
     // Attempt to restore the top window, i.e. the window that would be cycled
@@ -1633,17 +1658,14 @@ void WindowSnap(AcceleratorAction action) {
           WindowSnapAcceleratorAction::kCycleRightSnapInClamshellNoOverview);
     }
   }
-
-  const WMEvent event(action == WINDOW_CYCLE_SNAP_LEFT
-                          ? WM_EVENT_CYCLE_SNAP_PRIMARY
-                          : WM_EVENT_CYCLE_SNAP_SECONDARY);
+  const WindowSnapWMEvent event(
+      action == WINDOW_CYCLE_SNAP_LEFT ? WM_EVENT_CYCLE_SNAP_PRIMARY
+                                       : WM_EVENT_CYCLE_SNAP_SECONDARY,
+      WindowSnapActionSource::kKeyboardShortcutToSnap);
   aura::Window* window = GetTargetWindow();
   DCHECK(window);
 
-  auto* window_state = WindowState::Get(window);
-  window_state->set_snap_action_source(
-      WindowSnapActionSource::kKeyboardShortcutToSnap);
-  window_state->OnWMEvent(&event);
+  WindowState::Get(window)->OnWMEvent(&event);
 }
 
 bool ZoomDisplay(bool up) {

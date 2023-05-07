@@ -739,6 +739,9 @@ void BrowserManager::InitializeAndStartIfNeeded() {
   }
   DCHECK_EQ(state_, State::NOT_INITIALIZED);
 
+  // Ensure this isn't run multiple times.
+  session_manager::SessionManager::Get()->RemoveObserver(this);
+
   PrepareLacrosPolicies();
 
   // Perform the UMA recording for the current Lacros mode of operation.
@@ -1377,9 +1380,6 @@ void BrowserManager::OnSessionStateChanged() {
     return;
   }
 
-  // Ensure this isn't run multiple times.
-  session_manager::SessionManager::Get()->RemoveObserver(this);
-
   if (launch_at_login_screen_ && postlogin_pipe_fd_.is_valid()) {
     // Resume Lacros launch after login, if it was pre-launched.
     ResumeLaunch();
@@ -1821,6 +1821,10 @@ BrowserManager::ScopedUnsetAllKeepAliveForTesting::
   manager_->keep_alive_features_ = std::move(previous_keep_alive_features_);
   manager_->UpdateKeepAliveInBrowserIfNecessary(
       !manager_->keep_alive_features_.empty());
+}
+
+void BrowserManager::KillLacrosForTesting() {
+  lacros_process_.Terminate(/*exit_code=*/1, /*wait=*/false);
 }
 
 }  // namespace crosapi

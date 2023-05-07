@@ -9,10 +9,7 @@
 #import "base/strings/sys_string_conversions.h"
 #import "base/test/ios/wait_util.h"
 #import "components/sessions/core/session_id.h"
-#import "ios/chrome/browser/browser_state/test_chrome_browser_state.h"
-#import "ios/chrome/browser/main/browser.h"
 #import "ios/chrome/browser/main/browser_web_state_list_delegate.h"
-#import "ios/chrome/browser/main/test_browser.h"
 #import "ios/chrome/browser/ntp/new_tab_page_tab_helper.h"
 #import "ios/chrome/browser/ntp/new_tab_page_tab_helper_delegate.h"
 #import "ios/chrome/browser/sessions/ios_chrome_session_tab_helper.h"
@@ -21,13 +18,16 @@
 #import "ios/chrome/browser/sessions/session_restoration_observer.h"
 #import "ios/chrome/browser/sessions/session_window_ios.h"
 #import "ios/chrome/browser/sessions/test_session_service.h"
+#import "ios/chrome/browser/shared/model/browser/browser.h"
+#import "ios/chrome/browser/shared/model/browser/test/test_browser.h"
+#import "ios/chrome/browser/shared/model/browser_state/test_chrome_browser_state.h"
+#import "ios/chrome/browser/shared/model/web_state_list/web_state_list.h"
+#import "ios/chrome/browser/shared/model/web_state_list/web_state_list_delegate.h"
+#import "ios/chrome/browser/shared/model/web_state_list/web_state_opener.h"
 #import "ios/chrome/browser/signin/authentication_service_factory.h"
 #import "ios/chrome/browser/signin/fake_authentication_service_delegate.h"
 #import "ios/chrome/browser/tabs/features.h"
 #import "ios/chrome/browser/url/chrome_url_constants.h"
-#import "ios/chrome/browser/web_state_list/web_state_list.h"
-#import "ios/chrome/browser/web_state_list/web_state_list_delegate.h"
-#import "ios/chrome/browser/web_state_list/web_state_opener.h"
 #import "ios/chrome/browser/web_state_list/web_usage_enabler/web_usage_enabler_browser_agent.h"
 #import "ios/chrome/test/ios_chrome_scoped_testing_local_state.h"
 #import "ios/web/public/navigation/navigation_manager.h"
@@ -48,13 +48,7 @@
 #error "This file requires ARC support."
 #endif
 
-using base::test::ios::kWaitForPageLoadTimeout;
-using base::test::ios::WaitUntilConditionOrTimeout;
-
 namespace {
-
-const char kURL1[] = "https://www.some.url.com";
-const char kURL2[] = "https://www.some.url2.com";
 
 // Information about a single tab that needs to be restored.
 struct TabInfo {
@@ -198,34 +192,23 @@ class SessionRestorationBrowserAgentTest : public PlatformTest {
   }
 
   // Creates a WebState with the given parameters.
-  std::unique_ptr<web::WebState> CreateWebState(const GURL& url) {
-    web::NavigationManager::WebLoadParams load_params(url);
-    load_params.transition_type = ui::PAGE_TRANSITION_TYPED;
-
+  std::unique_ptr<web::WebState> CreateWebState() {
     web::WebState::CreateParams create_params(chrome_browser_state_.get());
     create_params.created_with_opener = false;
 
     std::unique_ptr<web::WebState> web_state =
         web::WebState::Create(create_params);
-    web_state->GetView();
-    web_state->GetNavigationManager()->LoadURLWithParams(load_params);
-    web_state->GetPageWorldWebFramesManager();
-    web::WebState* web_state_ptr = web_state.get();
-    EXPECT_TRUE(WaitUntilConditionOrTimeout(kWaitForPageLoadTimeout, ^bool {
-      return !web_state_ptr->IsLoading();
-    }));
 
     return web_state;
   }
 
   // Creates a WebState with the given parameters and insert it in the
   // Browser's WebStateList.
-  web::WebState* InsertNewWebState(const GURL& url,
-                                   web::WebState* parent,
+  web::WebState* InsertNewWebState(web::WebState* parent,
                                    int index,
                                    bool pinned,
                                    bool background) {
-    std::unique_ptr<web::WebState> web_state = CreateWebState(url);
+    std::unique_ptr<web::WebState> web_state = CreateWebState();
 
     int insertion_flags = WebStateList::INSERT_FORCE_INDEX;
     if (!background) {
@@ -304,7 +287,7 @@ TEST_F(SessionRestorationBrowserAgentTest,
   CreateSessionRestorationBrowserAgent(true);
 
   web::WebState* web_state =
-      InsertNewWebState(GURL(kURL1), /*parent=*/nullptr, /*index=*/0,
+      InsertNewWebState(/*parent=*/nullptr, /*index=*/0,
                         /*pinned=*/false, /*background=*/false);
 
   SessionWindowIOS* window =
@@ -328,32 +311,30 @@ TEST_F(SessionRestorationBrowserAgentTest,
 
 // Tests that restoring a session with scope `kAll` works correctly on non
 // empty WebStatelist with pinned WebStates present.
-// TODO(crbug.com/1433670): The tests are flaky.
-TEST_F(SessionRestorationBrowserAgentTest,
-       DISABLED_RestoreAllWebStatesInSession) {
+TEST_F(SessionRestorationBrowserAgentTest, RestoreAllWebStatesInSession) {
   CreateSessionRestorationBrowserAgent(true);
 
   web::WebState* pinned_web_state_0 =
-      InsertNewWebState(GURL(kURL1), /*parent=*/nullptr, /*index=*/0,
+      InsertNewWebState(/*parent=*/nullptr, /*index=*/0,
                         /*pinned=*/true, /*background=*/false);
   web::WebState* pinned_web_state_1 =
-      InsertNewWebState(GURL(kURL1), /*parent=*/nullptr, /*index=*/1,
+      InsertNewWebState(/*parent=*/nullptr, /*index=*/1,
                         /*pinned=*/true, /*background=*/false);
   web::WebState* pinned_web_state_2 =
-      InsertNewWebState(GURL(kURL1), /*parent=*/nullptr, /*index=*/2,
+      InsertNewWebState(/*parent=*/nullptr, /*index=*/2,
                         /*pinned=*/true, /*background=*/false);
 
   web::WebState* regular_web_state_0 =
-      InsertNewWebState(GURL(kURL2), /*parent=*/nullptr, /*index=*/3,
+      InsertNewWebState(/*parent=*/nullptr, /*index=*/3,
                         /*pinned=*/false, /*background=*/false);
   web::WebState* regular_web_state_1 =
-      InsertNewWebState(GURL(kURL2), /*parent=*/nullptr, /*index=*/4,
+      InsertNewWebState(/*parent=*/nullptr, /*index=*/4,
                         /*pinned=*/false, /*background=*/false);
   web::WebState* regular_web_state_2 =
-      InsertNewWebState(GURL(kURL2), /*parent=*/nullptr, /*index=*/5,
+      InsertNewWebState(/*parent=*/nullptr, /*index=*/5,
                         /*pinned=*/false, /*background=*/false);
   web::WebState* regular_web_state_3 =
-      InsertNewWebState(GURL(kURL2), /*parent=*/nullptr, /*index=*/6,
+      InsertNewWebState(/*parent=*/nullptr, /*index=*/6,
                         /*pinned=*/false, /*background=*/false);
 
   SessionWindowIOS* window =
@@ -383,32 +364,31 @@ TEST_F(SessionRestorationBrowserAgentTest,
 
 // Tests that restoring a session with scope `kPinnedOnly` works correctly on
 // non empty WebStatelist with pinned WebStates present.
-// TODO(crbug.com/1433670): The tests are flaky.
 TEST_F(SessionRestorationBrowserAgentTest,
-       DISABLED_RestorePinnedWebStatesOnlyInSession) {
+       RestorePinnedWebStatesOnlyInSession) {
   CreateSessionRestorationBrowserAgent(true);
 
   web::WebState* pinned_web_state_0 =
-      InsertNewWebState(GURL(kURL1), /*parent=*/nullptr, /*index=*/0,
+      InsertNewWebState(/*parent=*/nullptr, /*index=*/0,
                         /*pinned=*/true, /*background=*/false);
   web::WebState* pinned_web_state_1 =
-      InsertNewWebState(GURL(kURL1), /*parent=*/nullptr, /*index=*/1,
+      InsertNewWebState(/*parent=*/nullptr, /*index=*/1,
                         /*pinned=*/true, /*background=*/false);
   web::WebState* pinned_web_state_2 =
-      InsertNewWebState(GURL(kURL1), /*parent=*/nullptr, /*index=*/2,
+      InsertNewWebState(/*parent=*/nullptr, /*index=*/2,
                         /*pinned=*/true, /*background=*/false);
 
   web::WebState* regular_web_state_0 =
-      InsertNewWebState(GURL(kURL2), /*parent=*/nullptr, /*index=*/3,
+      InsertNewWebState(/*parent=*/nullptr, /*index=*/3,
                         /*pinned=*/false, /*background=*/false);
   web::WebState* regular_web_state_1 =
-      InsertNewWebState(GURL(kURL2), /*parent=*/nullptr, /*index=*/4,
+      InsertNewWebState(/*parent=*/nullptr, /*index=*/4,
                         /*pinned=*/false, /*background=*/false);
   web::WebState* regular_web_state_2 =
-      InsertNewWebState(GURL(kURL2), /*parent=*/nullptr, /*index=*/5,
+      InsertNewWebState(/*parent=*/nullptr, /*index=*/5,
                         /*pinned=*/false, /*background=*/false);
   web::WebState* regular_web_state_3 =
-      InsertNewWebState(GURL(kURL2), /*parent=*/nullptr, /*index=*/6,
+      InsertNewWebState(/*parent=*/nullptr, /*index=*/6,
                         /*pinned=*/false, /*background=*/false);
 
   SessionWindowIOS* window =
@@ -438,32 +418,31 @@ TEST_F(SessionRestorationBrowserAgentTest,
 
 // Tests that restoring a session with scope `kRegularOnly` works correctly on
 // non empty WebStatelist with pinned WebStates present.
-// TODO(crbug.com/1433670): The tests are flaky.
 TEST_F(SessionRestorationBrowserAgentTest,
-       DISABLED_RestoreRegularWebStatesOnlyInSession) {
+       RestoreRegularWebStatesOnlyInSession) {
   CreateSessionRestorationBrowserAgent(true);
 
   web::WebState* pinned_web_state_0 =
-      InsertNewWebState(GURL(kURL1), /*parent=*/nullptr, /*index=*/0,
+      InsertNewWebState(/*parent=*/nullptr, /*index=*/0,
                         /*pinned=*/true, /*background=*/false);
   web::WebState* pinned_web_state_1 =
-      InsertNewWebState(GURL(kURL1), /*parent=*/nullptr, /*index=*/1,
+      InsertNewWebState(/*parent=*/nullptr, /*index=*/1,
                         /*pinned=*/true, /*background=*/false);
   web::WebState* pinned_web_state_2 =
-      InsertNewWebState(GURL(kURL1), /*parent=*/nullptr, /*index=*/2,
+      InsertNewWebState(/*parent=*/nullptr, /*index=*/2,
                         /*pinned=*/true, /*background=*/false);
 
   web::WebState* regular_web_state_0 =
-      InsertNewWebState(GURL(kURL2), /*parent=*/nullptr, /*index=*/3,
+      InsertNewWebState(/*parent=*/nullptr, /*index=*/3,
                         /*pinned=*/false, /*background=*/false);
   web::WebState* regular_web_state_1 =
-      InsertNewWebState(GURL(kURL2), /*parent=*/nullptr, /*index=*/4,
+      InsertNewWebState(/*parent=*/nullptr, /*index=*/4,
                         /*pinned=*/false, /*background=*/false);
   web::WebState* regular_web_state_2 =
-      InsertNewWebState(GURL(kURL2), /*parent=*/nullptr, /*index=*/5,
+      InsertNewWebState(/*parent=*/nullptr, /*index=*/5,
                         /*pinned=*/false, /*background=*/false);
   web::WebState* regular_web_state_3 =
-      InsertNewWebState(GURL(kURL2), /*parent=*/nullptr, /*index=*/6,
+      InsertNewWebState(/*parent=*/nullptr, /*index=*/6,
                         /*pinned=*/false, /*background=*/false);
 
   SessionWindowIOS* window =
@@ -493,32 +472,31 @@ TEST_F(SessionRestorationBrowserAgentTest,
 
 // Tests that restoring a session with scope `kAll` but disabled pinned tabs
 // works correctly on non empty WebStatelist with pinned WebStates present.
-// TODO(crbug.com/1433670): The tests are flaky.
 TEST_F(SessionRestorationBrowserAgentTest,
-       DISABLED_RestoreAllWebStatesInSessionWithPinnedTabsDisabled) {
+       RestoreAllWebStatesInSessionWithPinnedTabsDisabled) {
   CreateSessionRestorationBrowserAgent(false);
 
   web::WebState* pinned_web_state_0 =
-      InsertNewWebState(GURL(kURL1), /*parent=*/nullptr, /*index=*/0,
+      InsertNewWebState(/*parent=*/nullptr, /*index=*/0,
                         /*pinned=*/true, /*background=*/false);
   web::WebState* pinned_web_state_1 =
-      InsertNewWebState(GURL(kURL1), /*parent=*/nullptr, /*index=*/1,
+      InsertNewWebState(/*parent=*/nullptr, /*index=*/1,
                         /*pinned=*/true, /*background=*/false);
   web::WebState* pinned_web_state_2 =
-      InsertNewWebState(GURL(kURL1), /*parent=*/nullptr, /*index=*/2,
+      InsertNewWebState(/*parent=*/nullptr, /*index=*/2,
                         /*pinned=*/true, /*background=*/false);
 
   web::WebState* regular_web_state_0 =
-      InsertNewWebState(GURL(kURL2), /*parent=*/nullptr, /*index=*/3,
+      InsertNewWebState(/*parent=*/nullptr, /*index=*/3,
                         /*pinned=*/false, /*background=*/false);
   web::WebState* regular_web_state_1 =
-      InsertNewWebState(GURL(kURL2), /*parent=*/nullptr, /*index=*/4,
+      InsertNewWebState(/*parent=*/nullptr, /*index=*/4,
                         /*pinned=*/false, /*background=*/false);
   web::WebState* regular_web_state_2 =
-      InsertNewWebState(GURL(kURL2), /*parent=*/nullptr, /*index=*/5,
+      InsertNewWebState(/*parent=*/nullptr, /*index=*/5,
                         /*pinned=*/false, /*background=*/false);
   web::WebState* regular_web_state_3 =
-      InsertNewWebState(GURL(kURL2), /*parent=*/nullptr, /*index=*/6,
+      InsertNewWebState(/*parent=*/nullptr, /*index=*/6,
                         /*pinned=*/false, /*background=*/false);
 
   SessionWindowIOS* window =
@@ -549,32 +527,31 @@ TEST_F(SessionRestorationBrowserAgentTest,
 // Tests that restoring a session with scope `kPinnedOnly` but disabled pinned
 // tabs works correctly on non empty WebStatelist with pinned WebStates
 // present.
-// TODO(crbug.com/1433670): The tests are flaky.
 TEST_F(SessionRestorationBrowserAgentTest,
-       DISABLED_RestorePinnedWebStatesOnlyInSessionWithPinnedTabsDisabled) {
+       RestorePinnedWebStatesOnlyInSessionWithPinnedTabsDisabled) {
   CreateSessionRestorationBrowserAgent(false);
 
   web::WebState* pinned_web_state_0 =
-      InsertNewWebState(GURL(kURL1), /*parent=*/nullptr, /*index=*/0,
+      InsertNewWebState(/*parent=*/nullptr, /*index=*/0,
                         /*pinned=*/true, /*background=*/false);
   web::WebState* pinned_web_state_1 =
-      InsertNewWebState(GURL(kURL1), /*parent=*/nullptr, /*index=*/1,
+      InsertNewWebState(/*parent=*/nullptr, /*index=*/1,
                         /*pinned=*/true, /*background=*/false);
   web::WebState* pinned_web_state_2 =
-      InsertNewWebState(GURL(kURL1), /*parent=*/nullptr, /*index=*/2,
+      InsertNewWebState(/*parent=*/nullptr, /*index=*/2,
                         /*pinned=*/true, /*background=*/false);
 
   web::WebState* regular_web_state_0 =
-      InsertNewWebState(GURL(kURL2), /*parent=*/nullptr, /*index=*/3,
+      InsertNewWebState(/*parent=*/nullptr, /*index=*/3,
                         /*pinned=*/false, /*background=*/false);
   web::WebState* regular_web_state_1 =
-      InsertNewWebState(GURL(kURL2), /*parent=*/nullptr, /*index=*/4,
+      InsertNewWebState(/*parent=*/nullptr, /*index=*/4,
                         /*pinned=*/false, /*background=*/false);
   web::WebState* regular_web_state_2 =
-      InsertNewWebState(GURL(kURL2), /*parent=*/nullptr, /*index=*/5,
+      InsertNewWebState(/*parent=*/nullptr, /*index=*/5,
                         /*pinned=*/false, /*background=*/false);
   web::WebState* regular_web_state_3 =
-      InsertNewWebState(GURL(kURL2), /*parent=*/nullptr, /*index=*/6,
+      InsertNewWebState(/*parent=*/nullptr, /*index=*/6,
                         /*pinned=*/false, /*background=*/false);
 
   SessionWindowIOS* window =
@@ -605,32 +582,31 @@ TEST_F(SessionRestorationBrowserAgentTest,
 // Tests that restoring a session with scope `kRegularOnly` but disabled
 // pinned tabs works correctly on non empty WebStatelist with pinned WebStates
 // present.
-// TODO(crbug.com/1433670): The tests are flaky.
 TEST_F(SessionRestorationBrowserAgentTest,
-       DISABLED_RestoreRegularWebStatesOnlyInSessionWithPinnedTabsDisabled) {
+       RestoreRegularWebStatesOnlyInSessionWithPinnedTabsDisabled) {
   CreateSessionRestorationBrowserAgent(false);
 
   web::WebState* pinned_web_state_0 =
-      InsertNewWebState(GURL(kURL1), /*parent=*/nullptr, /*index=*/0,
+      InsertNewWebState(/*parent=*/nullptr, /*index=*/0,
                         /*pinned=*/true, /*background=*/false);
   web::WebState* pinned_web_state_1 =
-      InsertNewWebState(GURL(kURL1), /*parent=*/nullptr, /*index=*/1,
+      InsertNewWebState(/*parent=*/nullptr, /*index=*/1,
                         /*pinned=*/true, /*background=*/false);
   web::WebState* pinned_web_state_2 =
-      InsertNewWebState(GURL(kURL1), /*parent=*/nullptr, /*index=*/2,
+      InsertNewWebState(/*parent=*/nullptr, /*index=*/2,
                         /*pinned=*/true, /*background=*/false);
 
   web::WebState* regular_web_state_0 =
-      InsertNewWebState(GURL(kURL2), /*parent=*/nullptr, /*index=*/3,
+      InsertNewWebState(/*parent=*/nullptr, /*index=*/3,
                         /*pinned=*/false, /*background=*/false);
   web::WebState* regular_web_state_1 =
-      InsertNewWebState(GURL(kURL2), /*parent=*/nullptr, /*index=*/4,
+      InsertNewWebState(/*parent=*/nullptr, /*index=*/4,
                         /*pinned=*/false, /*background=*/false);
   web::WebState* regular_web_state_2 =
-      InsertNewWebState(GURL(kURL2), /*parent=*/nullptr, /*index=*/5,
+      InsertNewWebState(/*parent=*/nullptr, /*index=*/5,
                         /*pinned=*/false, /*background=*/false);
   web::WebState* regular_web_state_3 =
-      InsertNewWebState(GURL(kURL2), /*parent=*/nullptr, /*index=*/6,
+      InsertNewWebState(/*parent=*/nullptr, /*index=*/6,
                         /*pinned=*/false, /*background=*/false);
 
   SessionWindowIOS* window =
@@ -664,9 +640,8 @@ TEST_F(SessionRestorationBrowserAgentTest,
 TEST_F(SessionRestorationBrowserAgentTest, DISABLED_RestoreSessionOnNTPTest) {
   CreateSessionRestorationBrowserAgent(true);
 
-  web::WebState* web_state =
-      InsertNewWebState(GURL(kChromeUINewTabURL), /*parent=*/nullptr,
-                        /*index=*/0, /*pinned=*/false, /*background=*/false);
+  web::WebState* web_state = InsertNewWebState(
+      /*parent=*/nullptr, /*index=*/0, /*pinned=*/false, /*background=*/false);
 
   // Create NTPTabHelper to ensure VisibleURL is set to kChromeUINewTabURL.
   id delegate = OCMProtocolMock(@protocol(NewTabPageTabHelperDelegate));
@@ -697,7 +672,7 @@ TEST_F(SessionRestorationBrowserAgentTest, DISABLED_RestoreSessionOnNTPTest) {
 TEST_F(SessionRestorationBrowserAgentTest, SaveAndRestoreEmptySession) {
   CreateSessionRestorationBrowserAgent(true);
 
-  InsertNewWebState(GURL(kURL1), /*parent=*/nullptr, /*index=*/0,
+  InsertNewWebState(/*parent=*/nullptr, /*index=*/0,
                     /*pinned=*/false,
                     /*background=*/false);
 
@@ -731,11 +706,11 @@ TEST_F(SessionRestorationBrowserAgentTest, DISABLED_SaveAndRestoreSession) {
   CreateSessionRestorationBrowserAgent(true);
 
   web::WebState* web_state =
-      InsertNewWebState(GURL(kURL1), /*parent=*/nullptr, /*index=*/0,
+      InsertNewWebState(/*parent=*/nullptr, /*index=*/0,
                         /*pinned=*/false, /*background=*/false);
-  InsertNewWebState(GURL(kURL1), web_state, /*index=*/1, /*pinned=*/false,
+  InsertNewWebState(web_state, /*index=*/1, /*pinned=*/false,
                     /*background=*/false);
-  InsertNewWebState(GURL(kURL2), web_state, /*index=*/0, /*pinned=*/false,
+  InsertNewWebState(web_state, /*index=*/0, /*pinned=*/false,
                     /*background=*/false);
 
   ASSERT_EQ(3, browser_->GetWebStateList()->count());
@@ -812,7 +787,7 @@ TEST_F(SessionRestorationBrowserAgentTest, SaveInProgressAndRestoreSession) {
 TEST_F(SessionRestorationBrowserAgentTest, ObserverCalledWithRestore) {
   CreateSessionRestorationBrowserAgent(true);
 
-  InsertNewWebState(GURL(kURL1), /*parent=*/nullptr, /*index=*/0,
+  InsertNewWebState(/*parent=*/nullptr, /*index=*/0,
                     /*pinned=*/false,
                     /*background=*/false);
 
@@ -838,21 +813,20 @@ TEST_F(SessionRestorationBrowserAgentTest, ObserverCalledWithRestore) {
 
 // Tests that SessionRestorationAgent saves session when the active webState
 // changes.
-// TODO(crbug.com/1433670): The tests are flaky.
 TEST_F(SessionRestorationBrowserAgentTest,
-       DISABLED_SaveSessionWithActiveWebStateChange) {
+       SaveSessionWithActiveWebStateChange) {
   CreateSessionRestorationBrowserAgent(true);
 
-  InsertNewWebState(GURL(kURL1), /*parent=*/nullptr, /*index=*/0,
+  InsertNewWebState(/*parent=*/nullptr, /*index=*/0,
                     /*pinned=*/false,
                     /*background=*/true);
-  InsertNewWebState(GURL(kURL2), /*parent=*/nullptr, /*index=*/1,
+  InsertNewWebState(/*parent=*/nullptr, /*index=*/1,
                     /*pinned=*/false,
                     /*background=*/true);
   EXPECT_EQ(test_session_service_.saveSessionCallsCount, 0);
 
   // Inserting new active webState.
-  InsertNewWebState(GURL(kURL2), /*parent=*/nullptr, /*index=*/2,
+  InsertNewWebState(/*parent=*/nullptr, /*index=*/2,
                     /*pinned=*/false,
                     /*background=*/false);
   EXPECT_EQ(test_session_service_.saveSessionCallsCount, 1);
@@ -878,10 +852,10 @@ TEST_F(SessionRestorationBrowserAgentTest,
                                                WebStateList::CLOSE_USER_ACTION);
   EXPECT_EQ(test_session_service_.saveSessionCallsCount, 6);
 
-  InsertNewWebState(GURL(kURL1), /*parent=*/nullptr, /*index=*/0,
+  InsertNewWebState(/*parent=*/nullptr, /*index=*/0,
                     /*pinned=*/false,
                     /*background=*/true);
-  InsertNewWebState(GURL(kURL2), /*parent=*/nullptr, /*index=*/1,
+  InsertNewWebState(/*parent=*/nullptr, /*index=*/1,
                     /*pinned=*/false,
                     /*background=*/true);
   browser_->GetWebStateList()->CloseAllWebStates(WebStateList::CLOSE_NO_FLAGS);

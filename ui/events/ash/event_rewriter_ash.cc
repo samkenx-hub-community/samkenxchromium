@@ -28,6 +28,7 @@
 #include "ui/events/ash/mojom/modifier_key.mojom-shared.h"
 #include "ui/events/ash/pref_names.h"
 #include "ui/events/devices/device_data_manager.h"
+#include "ui/events/devices/keyboard_device.h"
 #include "ui/events/event.h"
 #include "ui/events/event_constants.h"
 #include "ui/events/event_rewriter.h"
@@ -275,9 +276,9 @@ const ModifierRemapping* GetRemappedKey(int device_id,
 const ModifierRemapping* GetSearchRemappedKey(
     EventRewriterAsh::Delegate* delegate,
     int device_id,
-    KeyboardCapability::DeviceType keyboard_type) {
+    const KeyboardCapability& keyboard_capability) {
   std::string pref_name;
-  switch (keyboard_type) {
+  switch (keyboard_capability.GetDeviceType(device_id)) {
     case KeyboardCapability::DeviceType::kDeviceExternalAppleKeyboard:
       pref_name = prefs::kLanguageRemapExternalCommandKeyTo;
       break;
@@ -690,7 +691,7 @@ void EventRewriterAsh::BuildRewrittenKeyEvent(
 
 // static
 bool EventRewriterAsh::HasAssistantKeyOnKeyboard(
-    const InputDevice& keyboard_device,
+    const KeyboardDevice& keyboard_device,
     bool* has_assistant_key) {
   std::unique_ptr<EventDeviceInfo> devinfo =
       KeyboardCapability::CreateEventDeviceInfoFromInputDevice(keyboard_device);
@@ -737,7 +738,7 @@ bool EventRewriterAsh::RewriteModifierKeys(const KeyEvent& key_event,
         } else {
           characteristic_flag = EF_ALTGR_DOWN;
           remapped_key = GetSearchRemappedKey(
-              delegate_, last_keyboard_device_id_, GetLastKeyboardType());
+              delegate_, last_keyboard_device_id_, *keyboard_capability_);
         }
       }
       if (remapped_key && remapped_key->result.key_code == VKEY_CAPITAL) {
@@ -790,7 +791,7 @@ bool EventRewriterAsh::RewriteModifierKeys(const KeyEvent& key_event,
     case DomCode::META_RIGHT:
       characteristic_flag = EF_COMMAND_DOWN;
       remapped_key = GetSearchRemappedKey(delegate_, last_keyboard_device_id_,
-                                          GetLastKeyboardType());
+                                          *keyboard_capability_);
       // Default behavior is Super key, hence don't remap the event if the pref
       // is unavailable.
       break;
@@ -916,23 +917,9 @@ void EventRewriterAsh::DeviceKeyPressedOrReleased(int device_id) {
   last_keyboard_device_id_ = device_id;
 }
 
-bool EventRewriterAsh::IsHotrodRemote() const {
-  return IsLastKeyboardOfType(
-      KeyboardCapability::DeviceType::kDeviceHotrodRemote);
-}
-
-bool EventRewriterAsh::IsLastKeyboardOfType(
-    KeyboardCapability::DeviceType device_type) const {
-  return GetLastKeyboardType() == device_type;
-}
-
-KeyboardCapability::DeviceType EventRewriterAsh::GetLastKeyboardType() const {
-  if ((last_keyboard_device_id_ == ED_UNKNOWN_DEVICE) ||
-      (last_keyboard_device_id_ == ED_REMOTE_INPUT_DEVICE)) {
-    return KeyboardCapability::DeviceType::kDeviceUnknown;
-  }
-
-  return keyboard_capability_->GetDeviceType(last_keyboard_device_id_);
+bool EventRewriterAsh::IsHotrodRemote(int device_id) const {
+  return keyboard_capability_->GetDeviceType(device_id) ==
+         KeyboardCapability::DeviceType::kDeviceHotrodRemote;
 }
 
 int EventRewriterAsh::GetRemappedModifierMasks(const Event& event,
@@ -948,7 +935,7 @@ int EventRewriterAsh::GetRemappedModifierMasks(const Event& event,
     switch (kModifierRemappings[i].flag) {
       case EF_COMMAND_DOWN:
         remapped_key = GetSearchRemappedKey(delegate_, last_keyboard_device_id_,
-                                            GetLastKeyboardType());
+                                            *keyboard_capability_);
         break;
       case EF_MOD3_DOWN:
         // If EF_MOD3_DOWN is used by the current input method, leave it alone;
@@ -1061,8 +1048,7 @@ void EventRewriterAsh::RecordModifierKeyPressedAfterRemapping(
     return;
   }
 
-  const auto device_type = GetLastKeyboardType();
-  switch (device_type) {
+  switch (keyboard_capability_->GetDeviceType(last_keyboard_device_id_)) {
     case KeyboardCapability::DeviceType::kDeviceInternalKeyboard:
       UMA_HISTOGRAM_ENUMERATION(
           "ChromeOS.Inputs.Keyboard.RemappedModifierPressed.Internal",
@@ -1105,8 +1091,7 @@ void EventRewriterAsh::RecordModifierKeyPressedBeforeRemapping(
     return;
   }
 
-  const auto device_type = GetLastKeyboardType();
-  switch (device_type) {
+  switch (keyboard_capability_->GetDeviceType(last_keyboard_device_id_)) {
     case KeyboardCapability::DeviceType::kDeviceInternalKeyboard:
       UMA_HISTOGRAM_ENUMERATION(
           "ChromeOS.Inputs.Keyboard.ModifierPressed.Internal",
@@ -1144,7 +1129,8 @@ EventRewriteStatus EventRewriterAsh::RewriteKeyEvent(
 
   // Drop repeated keys from Hotrod remote.
   if ((key_event.flags() & EF_IS_REPEAT) &&
-      (key_event.type() == ET_KEY_PRESSED) && IsHotrodRemote() &&
+      (key_event.type() == ET_KEY_PRESSED) &&
+      IsHotrodRemote(last_keyboard_device_id_) &&
       key_event.key_code() != VKEY_BACK) {
     return EVENT_REWRITE_DISCARD;
   }

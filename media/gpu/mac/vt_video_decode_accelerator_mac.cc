@@ -10,13 +10,13 @@
 #include <OpenGL/gl.h>
 #include <stddef.h>
 
+#include <algorithm>
 #include <iterator>
 #include <memory>
 
 #include "base/atomic_sequence_num.h"
 #include "base/containers/contains.h"
 #include "base/containers/span.h"
-#include "base/cxx17_backports.h"
 #include "base/functional/bind.h"
 #include "base/logging.h"
 #include "base/mac/mac_logging.h"
@@ -499,7 +499,7 @@ int32_t ComputeH264ReorderWindow(const H264SPS* sps) {
   int max_dpb_frames =
       max_dpb_mbs / ((sps->pic_width_in_mbs_minus1 + 1) *
                      (sps->pic_height_in_map_units_minus1 + 1));
-  max_dpb_frames = base::clamp(max_dpb_frames, 0, 16);
+  max_dpb_frames = std::clamp(max_dpb_frames, 0, 16);
 
   // See AVC spec section E.2.1 definition of |max_num_reorder_frames|.
   if (sps->vui_parameters_present_flag && sps->bitstream_restriction_flag) {
@@ -2290,15 +2290,17 @@ bool VTVideoDecodeAccelerator::SendFrame(const Frame& frame) {
 
       gpu::Mailbox mailbox = gpu::Mailbox::GenerateForSharedImage();
       bool success;
+      constexpr char kDebugLabel[] = "VTVideoDecodeAccelerator";
       if (IsMultiPlaneFormatForHardwareVideoEnabled()) {
         success = shared_image_stub->CreateSharedImage(
             mailbox, std::move(handle), si_format_, frame_size, color_space,
-            kTopLeft_GrSurfaceOrigin, kOpaque_SkAlphaType, shared_image_usage);
+            kTopLeft_GrSurfaceOrigin, kOpaque_SkAlphaType, shared_image_usage,
+            kDebugLabel);
       } else {
         success = shared_image_stub->CreateSharedImage(
             mailbox, std::move(handle), ToBufferFormat(si_format_),
             planes[plane], frame_size, color_space, kTopLeft_GrSurfaceOrigin,
-            kOpaque_SkAlphaType, shared_image_usage);
+            kOpaque_SkAlphaType, shared_image_usage, kDebugLabel);
       }
       if (!success) {
         DLOG(ERROR) << "Failed to create shared image";

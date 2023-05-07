@@ -269,9 +269,25 @@ public class BackPressManagerUnitTest {
                 manager.getCallback().isEnabled());
     }
 
-    // Test callback is always enabled to trigger fallbacks for groups without system back.
     @Test
-    public void testAlwaysEnabledCallback() {
+    public void testAlwaysEnabledCallback_TabbedActivity() {
+        MinimizeAppAndCloseTabBackPressHandler.SYSTEM_BACK.setForTesting(false);
+        BackPressManager manager = new BackPressManager();
+        manager.setHasSystemBackArm(true);
+        EmptyBackPressHandler h1 = new EmptyBackPressHandler();
+        EmptyBackPressHandler h2 = new EmptyBackPressHandler();
+        manager.addHandler(h1, 0);
+        manager.addHandler(h2, 1);
+        h1.getHandleBackPressChangedSupplier().set(true);
+        Assert.assertTrue("Callback should be enabled if any of handlers are enabled",
+                manager.getCallback().isEnabled());
+        h1.getHandleBackPressChangedSupplier().set(false);
+        Assert.assertFalse("No handler is enabled", manager.shouldInterceptBackPress());
+        Assert.assertTrue("Callback is always enabled", manager.getCallback().isEnabled());
+    }
+
+    @Test
+    public void testAlwaysEnabledCallback_NonTabbedActivity() {
         MinimizeAppAndCloseTabBackPressHandler.SYSTEM_BACK.setForTesting(false);
         BackPressManager manager = new BackPressManager();
         EmptyBackPressHandler h1 = new EmptyBackPressHandler();
@@ -283,7 +299,8 @@ public class BackPressManagerUnitTest {
                 manager.getCallback().isEnabled());
         h1.getHandleBackPressChangedSupplier().set(false);
         Assert.assertFalse("No handler is enabled", manager.shouldInterceptBackPress());
-        Assert.assertTrue("Callback is always enabled", manager.getCallback().isEnabled());
+        Assert.assertFalse("Callback should not be always enabled on non tabbed activity",
+                manager.getCallback().isEnabled());
     }
 
     private int getHandlerCount(BackPressManager manager) {

@@ -9,6 +9,7 @@
 
 #include "base/feature_list.h"
 #include "base/metrics/field_trial_params.h"
+#include "base/time/time.h"
 #include "build/build_config.h"
 #include "build/chromeos_buildflags.h"
 
@@ -26,10 +27,6 @@ BASE_FEATURE(kRunOnDedicatedThreadPoolThread,
 BASE_FEATURE(kBackgroundTabLoadingFromPerformanceManager,
              "BackgroundTabLoadingFromPerformanceManager",
              base::FEATURE_DISABLED_BY_DEFAULT);
-
-BASE_FEATURE(kBatterySaverModeAvailable,
-             "BatterySaverModeAvailable",
-             base::FEATURE_ENABLED_BY_DEFAULT);
 
 BASE_FEATURE(kPerformanceControlsPerformanceSurvey,
              "PerformanceControlsPerformanceSurvey",
@@ -52,19 +49,6 @@ const base::FeatureParam<base::TimeDelta>
         &kPerformanceControlsBatteryPerformanceSurvey, "battery_lookback",
         base::Days(8)};
 
-// On ChromeOS, the adjustment generally seems to be around 3%, sometimes 2%. We
-// choose 3% because it gets us close enough, or overestimates (which is better
-// than underestimating in this instance).
-const base::FeatureParam<int>
-    kBatterySaverModeThresholdAdjustmentForDisplayLevel {
-  &kBatterySaverModeAvailable, "low_battery_threshold_adjustment",
-#if BUILDFLAG(IS_CHROMEOS_ASH)
-      3,
-#else
-      0,
-#endif  // BUILDFLAG(IS_CHROMEOS_ASH)
-};
-
 BASE_FEATURE(kHeuristicMemorySaver,
              "HeuristicMemorySaver",
              base::FEATURE_DISABLED_BY_DEFAULT);
@@ -80,6 +64,12 @@ const base::FeatureParam<int>
     kHeuristicMemorySaverAvailableMemoryThresholdPercent{
         &kHeuristicMemorySaver, "threshold_percent", 5};
 
+const base::FeatureParam<int> kHeuristicMemorySaverAvailableMemoryThresholdMb{
+    &kHeuristicMemorySaver, "threshold_mb", 4096};
+
+const base::FeatureParam<int> kHeuristicMemorySaverPageCacheDiscountMac{
+    &kHeuristicMemorySaver, "mac_page_cache_available_percent", 50};
+
 const base::FeatureParam<int> kHeuristicMemorySaverMinimumMinutesInBackground{
     &kHeuristicMemorySaver, "minimum_minutes_in_background", 120};
 
@@ -94,6 +84,43 @@ BASE_FEATURE(kMemoryUsageInHovercards,
              base::FEATURE_DISABLED_BY_DEFAULT);
 BASE_FEATURE(kDiscardExceptionsImprovements,
              "DiscardExceptionsImprovements",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+BASE_FEATURE(kMemorySavingsReportingImprovements,
+             "MemorySavingsReportingImprovements",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+const base::FeatureParam<base::TimeDelta> kExpandedHighEfficiencyChipFrequency{
+    &kMemorySavingsReportingImprovements,
+    "expanded_high_efficiency_chip_frequency", base::Days(1)};
+
+const base::FeatureParam<int> kExpandedHighEfficiencyChipThresholdBytes{
+    &kMemorySavingsReportingImprovements,
+    "expanded_high_efficiency_chip_threshold_bytes", 200 * 1024 * 1024};
+
+const base::FeatureParam<base::TimeDelta>
+    kExpandedHighEfficiencyChipDiscardedDuration{
+        &kMemorySavingsReportingImprovements,
+        "expanded_high_efficiency_chip_discarded_duration", base::Hours(6)};
+
+const base::FeatureParam<int> kHighEfficiencyChartPmf25PercentileBytes{
+    &kMemorySavingsReportingImprovements,
+    "high_efficiency_chart_pmf_25_percentile_bytes", 62 * 1024 * 1024};
+const base::FeatureParam<int> kHighEfficiencyChartPmf50PercentileBytes{
+    &kMemorySavingsReportingImprovements,
+    "high_efficiency_chart_pmf_50_percentile_bytes", 112 * 1024 * 1024};
+const base::FeatureParam<int> kHighEfficiencyChartPmf75PercentileBytes{
+    &kMemorySavingsReportingImprovements,
+    "high_efficiency_chart_pmf_75_percentile_bytes", 197 * 1024 * 1024};
+
+const base::FeatureParam<double> kDiscardedTabTreatmentOpacity{
+    &kDiscardedTabTreatment, "discard_tab_treatment_opacity", 0.3};
+
+const base::FeatureParam<int> kDiscardedTabTreatmentOption{
+    &kDiscardedTabTreatment, "discard_tab_treatment_option",
+    static_cast<int>(DiscardTabTreatmentOptions::kFadeFullsizedFavicon)};
+
+BASE_FEATURE(kUseDeviceBatterySaverChromeOS,
+             "UseDeviceBatterySaverChromeOS",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 #endif

@@ -19,6 +19,7 @@
 #include "base/json/values_util.h"
 #include "base/logging.h"
 #include "base/memory/raw_ptr.h"
+#include "base/memory/raw_ref.h"
 #include "base/strings/string_piece.h"
 #include "base/strings/stringprintf.h"
 #include "base/strings/utf_string_conversions.h"
@@ -131,6 +132,9 @@
 #include "chrome/browser/hid/hid_chooser_context_factory.h"
 #include "chrome/browser/serial/serial_chooser_context.h"
 #include "chrome/browser/serial/serial_chooser_context_factory.h"
+#include "chrome/browser/ui/web_applications/test/isolated_web_app_test_utils.h"
+#include "chrome/browser/web_applications/test/web_app_install_test_utils.h"
+#include "chrome/browser/web_applications/web_app_id.h"
 #include "services/device/public/cpp/test/fake_hid_manager.h"
 #include "services/device/public/cpp/test/fake_serial_port_manager.h"
 #include "services/device/public/mojom/hid.mojom.h"
@@ -226,14 +230,11 @@ apps::AppPtr MakeApp(const std::string& app_id,
   return app;
 }
 
-void InstallWebApp(Profile* profile, const GURL& start_url) {
+void RegisterWebApp(Profile* profile, apps::AppPtr app) {
   apps::AppRegistryCache& cache =
       apps::AppServiceProxyFactory::GetForProfile(profile)->AppRegistryCache();
   std::vector<apps::AppPtr> deltas;
-  deltas.push_back(
-      MakeApp(web_app::GenerateAppId(/*manifest_id=*/absl::nullopt, start_url),
-              apps::AppType::kWeb, start_url.spec(), apps::Readiness::kReady,
-              apps::InstallReason::kSync));
+  deltas.push_back(std::move(app));
   cache.OnApps(std::move(deltas), apps::AppType::kWeb,
                /*should_notify_initialized=*/true);
 }
@@ -241,7 +242,7 @@ void InstallWebApp(Profile* profile, const GURL& start_url) {
 struct TestModels {
   scoped_refptr<browsing_data::MockCookieHelper> cookie_helper;
   scoped_refptr<browsing_data::MockLocalStorageHelper> local_storage_helper;
-  FakeBrowsingDataModel& browsing_data_model;
+  const raw_ref<FakeBrowsingDataModel, ExperimentalAsh> browsing_data_model;
 };
 
 }  // namespace
@@ -658,11 +659,13 @@ class SiteSettingsHandlerBaseTest : public testing::Test {
     auto mock_cookies_tree_model = std::make_unique<CookiesTreeModel>(
         std::move(container), profile()->GetExtensionSpecialStoragePolicy());
 
-    auto fake_browsing_data_model = std::make_unique<FakeBrowsingDataModel>();
+    auto fake_browsing_data_model = std::make_unique<FakeBrowsingDataModel>(
+        ChromeBrowsingDataModelDelegate::CreateForProfile(profile()));
 
-    std::move(setup).Run({mock_browsing_data_cookie_helper,
-                          mock_browsing_data_local_storage_helper,
-                          *fake_browsing_data_model});
+    std::move(setup).Run(
+        {mock_browsing_data_cookie_helper,
+         mock_browsing_data_local_storage_helper,
+         ToRawRef<ExperimentalAsh>(*fake_browsing_data_model)});
 
     mock_browsing_data_local_storage_helper->Notify();
     mock_browsing_data_cookie_helper->Notify();
@@ -716,7 +719,7 @@ class SiteSettingsHandlerBaseTest : public testing::Test {
       models.cookie_helper->AddCookieSamples(GURL("http://ungrouped.com"),
                                              "A=1");
 
-      models.browsing_data_model.AddBrowsingData(
+      models.browsing_data_model->AddBrowsingData(
           url::Origin::Create(GURL("https://www.google.com")),
           BrowsingDataModel::StorageType::kTrustTokens, 50000000000);
     }));
@@ -726,7 +729,7 @@ class SiteSettingsHandlerBaseTest : public testing::Test {
       const std::string& isolated_web_app_url,
       int64_t usage) {
     SetupModels(base::BindLambdaForTesting([&](const TestModels& models) {
-      models.browsing_data_model.AddBrowsingData(
+      models.browsing_data_model->AddBrowsingData(
           url::Origin::Create(GURL(isolated_web_app_url)),
           static_cast<BrowsingDataModel::StorageType>(
               ChromeBrowsingDataModelDelegate::StorageType::kIsolatedWebApp),
@@ -737,8 +740,7 @@ class SiteSettingsHandlerBaseTest : public testing::Test {
   base::Value::List GetOnStorageFetchedSentList() {
     handler()->ClearAllSitesMapForTesting();
 
-    base::Value::List get_all_sites_args;
-    get_all_sites_args.Append(kCallbackId);
+    auto get_all_sites_args = base::Value::List().Append(kCallbackId);
     handler()->HandleGetAllSites(get_all_sites_args);
     handler()->ServicePendingRequests();
 
@@ -796,11 +798,10 @@ class SiteSettingsHandlerBaseTest : public testing::Test {
   scoped_refptr<const extensions::Extension> LoadExtension(
       const std::string& extension_name) {
     auto extension = extensions::ExtensionBuilder()
-                         .SetManifest(extensions::DictionaryBuilder()
+                         .SetManifest(base::Value::Dict()
                                           .Set("name", kExtensionName)
                                           .Set("version", "1.0.0")
-                                          .Set("manifest_version", 3)
-                                          .Build())
+                                          .Set("manifest_version", 3))
                          .Build();
 
     extensions::TestExtensionSystem* extension_system =
@@ -1172,7 +1173,7 @@ TEST_F(SiteSettingsHandlerTest, Cookies) {
   // This corresponds to case 3 in InsertOriginIntoGroup.
   {
     SetupModels(base::BindLambdaForTesting([](const TestModels& models) {
-      models.browsing_data_model.AddBrowsingData(
+      models.browsing_data_model->AddBrowsingData(
           url::Origin::Create(GURL("https://w.c3.com")),
           BrowsingDataModel::StorageType::kTrustTokens, 50);
       models.cookie_helper->AddCookieSamples(GURL("http://w.c3.com"), "A=1");
@@ -1491,7 +1492,12 @@ TEST_F(SiteSettingsHandlerTest, OnStorageFetched) {
 }
 
 TEST_F(SiteSettingsHandlerTest, InstalledApps) {
-  InstallWebApp(profile(), GURL("http://abc.example.com/path"));
+  GURL start_url("http://abc.example.com/path");
+  RegisterWebApp(
+      profile(),
+      MakeApp(web_app::GenerateAppId(/*manifest_id=*/absl::nullopt, start_url),
+              apps::AppType::kWeb, start_url.spec(), apps::Readiness::kReady,
+              apps::InstallReason::kSync));
 
   SetupModels();
 
@@ -1538,6 +1544,52 @@ TEST_F(SiteSettingsHandlerTest, InstalledApps) {
     }
   }
 }
+
+#if !BUILDFLAG(IS_ANDROID)
+TEST_F(SiteSettingsHandlerTest, AllSitesDisplaysIsolatedWebAppName) {
+  std::string iwa_hostname =
+      "aerugqztij5biqquuk3mfwpsaibuegaqcitgfchwuosuofdjabzqaaic";
+  GURL iwa_url("isolated-app://" + iwa_hostname);
+  GURL https_url("https://" + iwa_hostname);
+
+  // Install an IWA at |iwa_url|.
+  web_app::test::AwaitStartWebAppProviderAndSubsystems(profile());
+  web_app::AppId app_id =
+      web_app::AddDummyIsolatedAppToRegistry(profile(), iwa_url, "IWA Name");
+  RegisterWebApp(profile(),
+                 MakeApp(app_id, apps::AppType::kWeb, iwa_url.spec(),
+                         apps::Readiness::kReady, apps::InstallReason::kUser));
+
+  SetupModelsWithIsolatedWebAppData(iwa_url.spec(), 50);
+  HostContentSettingsMap* map =
+      HostContentSettingsMapFactory::GetForProfile(profile());
+  map->SetContentSettingDefaultScope(iwa_url, iwa_url,
+                                     ContentSettingsType::NOTIFICATIONS,
+                                     CONTENT_SETTING_BLOCK);
+  map->SetContentSettingDefaultScope(https_url, https_url,
+                                     ContentSettingsType::NOTIFICATIONS,
+                                     CONTENT_SETTING_BLOCK);
+
+  base::Value::List site_groups = GetOnStorageFetchedSentList();
+
+  ASSERT_EQ(site_groups.size(), 2u);
+  const base::Value::Dict& group1 = site_groups[0].GetDict();
+  const base::Value::Dict& origin1 =
+      CHECK_DEREF(group1.FindList("origins"))[0].GetDict();
+  EXPECT_EQ(CHECK_DEREF(group1.FindString("etldPlus1")), iwa_url);
+  EXPECT_EQ(CHECK_DEREF(group1.FindString("displayName")), "IWA Name");
+  EXPECT_EQ(CHECK_DEREF(origin1.FindString("origin")), iwa_url);
+  EXPECT_EQ(origin1.FindDouble("usage").value(), 50.0);
+
+  const base::Value::Dict& group2 = site_groups[1].GetDict();
+  const base::Value::Dict& origin2 =
+      CHECK_DEREF(group2.FindList("origins"))[0].GetDict();
+  EXPECT_EQ(CHECK_DEREF(group2.FindString("etldPlus1")), iwa_hostname);
+  EXPECT_EQ(CHECK_DEREF(group2.FindString("displayName")), iwa_hostname);
+  EXPECT_EQ(CHECK_DEREF(origin2.FindString("origin")), https_url);
+  EXPECT_EQ(origin2.FindDouble("usage").value(), 0.0);
+}
+#endif  // !BUILDFLAG(IS_ANDROID)
 
 TEST_F(SiteSettingsHandlerTest, IncognitoExceptions) {
   constexpr char kOriginToBlock[] = "https://www.blocked.com:443";
@@ -1648,8 +1700,7 @@ TEST_F(SiteSettingsHandlerTest, ResetCategoryPermissionForEmbargoedOrigins) {
   {
     base::Value::List exceptions;
     site_settings::GetExceptionsForContentType(
-        kPermissionNotifications, profile(), /*extension_registry=*/nullptr,
-        web_ui(),
+        kPermissionNotifications, profile(), web_ui(),
         /*incognito=*/false, &exceptions);
 
     // The size should be 2, 1st is blocked origin, 2nd is embargoed origin.
@@ -1668,8 +1719,7 @@ TEST_F(SiteSettingsHandlerTest, ResetCategoryPermissionForEmbargoedOrigins) {
     // Check there is 1 blocked origin.
     base::Value::List exceptions;
     site_settings::GetExceptionsForContentType(
-        kPermissionNotifications, profile(), /*extension_registry=*/nullptr,
-        web_ui(),
+        kPermissionNotifications, profile(), web_ui(),
         /*incognito=*/false, &exceptions);
     ASSERT_EQ(1U, exceptions.size());
   }
@@ -1686,8 +1736,7 @@ TEST_F(SiteSettingsHandlerTest, ResetCategoryPermissionForEmbargoedOrigins) {
     // Check that there are no blocked or embargoed origins.
     base::Value::List exceptions;
     site_settings::GetExceptionsForContentType(
-        kPermissionNotifications, profile(), /*extension_registry=*/nullptr,
-        web_ui(),
+        kPermissionNotifications, profile(), web_ui(),
         /*incognito=*/false, &exceptions);
     ASSERT_TRUE(exceptions.empty());
   }
@@ -2015,11 +2064,10 @@ TEST_F(SiteSettingsHandlerTest, ExceptionHelpers) {
 
   scoped_refptr<const extensions::Extension> extension;
   extension = extensions::ExtensionBuilder()
-                  .SetManifest(extensions::DictionaryBuilder()
+                  .SetManifest(base::Value::Dict()
                                    .Set("name", kExtensionName)
                                    .Set("version", "1.0.0")
-                                   .Set("manifest_version", 2)
-                                   .Build())
+                                   .Set("manifest_version", 2))
                   .SetID("ahfgeienlihckogmohjhadlkjgocpleb")
                   .Build();
 
@@ -2041,8 +2089,7 @@ TEST_F(SiteSettingsHandlerTest, ExceptionHelpers) {
 }
 
 TEST_F(SiteSettingsHandlerTest, ExtensionDisplayName) {
-  // When the extension is loaded, the displayName is the extension's name, and
-  // there is extensionNameWithId field.
+  // When the extension is loaded, displayName is the extension's name and id.
   auto extension = LoadExtension(kExtensionName);
   auto extension_url = extension->url().spec();
   {
@@ -2055,28 +2102,14 @@ TEST_F(SiteSettingsHandlerTest, ExtensionDisplayName) {
       get_origin_permissions_args.Append(std::move(category_list));
     }
     handler()->HandleGetOriginPermissions(get_origin_permissions_args);
-    ValidateOrigin(extension_url, extension_url, kExtensionName,
+    std::string expected_display_name =
+        base::StringPrintf("Test Extension (ID: %s)", extension->id().c_str());
+    ValidateOrigin(extension_url, extension_url, expected_display_name,
                    CONTENT_SETTING_ASK,
                    site_settings::SiteSettingSource::kDefault, 1U);
-    // Validates the extensionNameWithId field.
-    {
-      const content::TestWebUI::CallData& data = *web_ui()->call_data().back();
-      EXPECT_EQ("cr.webUIResponse", data.function_name());
-      ASSERT_TRUE(data.arg3()->is_list());
-      EXPECT_EQ(1U, data.arg3()->GetList().size());
-      const base::Value& exception = data.arg3()->GetList()[0];
-      ASSERT_TRUE(exception.is_dict());
-      const std::string* extension_name_with_id =
-          exception.GetDict().FindString(site_settings::kExtensionNameWithId);
-      ASSERT_TRUE(extension_name_with_id);
-      ASSERT_EQ(base::StringPrintf("Test Extension (ID: %s)",
-                                   extension->id().c_str()),
-                *extension_name_with_id);
-    }
   }
 
-  // When the extension is unloaded, the displayName is the extension's origin,
-  // and there is no extensionNameWithId field.
+  // When the extension is unloaded, the displayName is the extension's origin.
   UnloadExtension(extension->id());
   {
     base::Value::List get_origin_permissions_args;
@@ -2092,17 +2125,6 @@ TEST_F(SiteSettingsHandlerTest, ExtensionDisplayName) {
         extension_url, extension_url,
         base::StringPrintf("chrome-extension://%s", extension->id().c_str()),
         CONTENT_SETTING_ASK, site_settings::SiteSettingSource::kDefault, 2U);
-    // Validates there is no extensionNameWithId field.
-    {
-      const content::TestWebUI::CallData& data = *web_ui()->call_data().back();
-      EXPECT_EQ("cr.webUIResponse", data.function_name());
-      ASSERT_TRUE(data.arg3()->is_list());
-      EXPECT_EQ(1U, data.arg3()->GetList().size());
-      const base::Value::Dict& exception = data.arg3()->GetList()[0].GetDict();
-      const std::string* extension_name_with_id =
-          exception.FindString(site_settings::kExtensionNameWithId);
-      ASSERT_FALSE(extension_name_with_id);
-    }
   }
 }
 
@@ -4052,12 +4074,14 @@ class SiteSettingsHandlerHidTest
 
   base::Value GetPersistentDeviceValueForOrigin(
       const url::Origin& origin) override {
-    return HidChooserContext::DeviceInfoToValue(*persistent_device_);
+    return base::Value(
+        HidChooserContext::DeviceInfoToValue(*persistent_device_));
   }
 
   base::Value GetUserGrantedDeviceValueForOrigin(
       const url::Origin& origin) override {
-    return HidChooserContext::DeviceInfoToValue(*user_granted_device_);
+    return base::Value(
+        HidChooserContext::DeviceInfoToValue(*user_granted_device_));
   }
 
   std::string GetAllDevicesDisplayName() override { return "Any HID device"; }
@@ -4296,12 +4320,14 @@ class SiteSettingsHandlerSerialTest
 
   base::Value GetPersistentDeviceValueForOrigin(
       const url::Origin& origin) override {
-    return SerialChooserContext::PortInfoToValue(*persistent_port_);
+    return base::Value(
+        SerialChooserContext::PortInfoToValue(*persistent_port_));
   }
 
   base::Value GetUserGrantedDeviceValueForOrigin(
       const url::Origin& origin) override {
-    return SerialChooserContext::PortInfoToValue(*user_granted_port_);
+    return base::Value(
+        SerialChooserContext::PortInfoToValue(*user_granted_port_));
   }
 
   std::string GetAllDevicesDisplayName() override { return "Any serial port"; }
@@ -4498,12 +4524,14 @@ class SiteSettingsHandlerUsbTest
 
   base::Value GetPersistentDeviceValueForOrigin(
       const url::Origin& origin) override {
-    return UsbChooserContext::DeviceInfoToValue(*persistent_device_);
+    return base::Value(
+        UsbChooserContext::DeviceInfoToValue(*persistent_device_));
   }
 
   base::Value GetUserGrantedDeviceValueForOrigin(
       const url::Origin& origin) override {
-    return UsbChooserContext::DeviceInfoToValue(*user_granted_device_);
+    return base::Value(
+        UsbChooserContext::DeviceInfoToValue(*user_granted_device_));
   }
 
   std::string GetAllDevicesDisplayName() override {
@@ -4728,8 +4756,7 @@ TEST_P(SiteSettingsHandlerTest, HandleClearUnpartitionedUsage) {
   // In the beginning, there should be nothing stored in the origin data.
   ASSERT_EQ(0u, user_prefs->GetDict(prefs::kMediaCdmOriginData).size());
 
-  base::Value::Dict entry_google;
-  entry_google.Set(
+  auto entry_google = base::Value::Dict().Set(
       "https://www.google.com/",
       base::UnguessableTokenToValue(base::UnguessableToken::Create()));
 

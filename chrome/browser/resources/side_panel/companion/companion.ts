@@ -22,6 +22,9 @@ enum ParamType {
   // Mandatory arguments.
   METHOD_TYPE = 'type',
 
+  // Arguments for MethodType.kOnCqCandidatesAvailable.
+  CQ_TEXT_DIRECTIVES = 'cqTextDirectives',
+
   // Optional arguments.
   // Arguments for MethodType.kOnExpsOptInStatusAvailable.
   IS_EXPS_OPTED_IN = 'isExpsOptedIn',
@@ -30,14 +33,26 @@ enum ParamType {
   PROMO_ACTION = 'promoAction',
   PROMO_TYPE = 'promoType',
 
-  // Arguments for MethodType.kOnPhAction.
-  PH_ACTION = 'phAction',
+  // Arguments for MethodType.kOnPhFeedback.
+  PH_FEEDBACK = 'phFeedback',
 
   // Arguments for MethodType.kOnOpenInNewTabButtonURLChanged.
   URL_FOR_OPEN_IN_NEW_TAB = 'urlForOpenInNewTab',
 
-  // Arguments for browser -> iframe communcation.
-  COMPANION_UPDATE_PARAMS = 'companion_update_params',
+  // Arguments for MethodType.kRecordUiSurfaceShown.
+  UI_SURFACE = 'uiSurface',
+
+  // Arguments for MethodType.kRecordUiSurfaceShown.
+  CHILD_ELEMENT_COUNT = 'childElementCount',
+
+  // Arguments for MethodType.kOnCqJamptagClicked.
+  CQ_JUMPTAG_TEXT = 'cqJumptagText',
+
+  // Arguments for browser -> iframe communication.
+  COMPANION_UPDATE_PARAMS = 'companionUpdateParams',
+
+  // Arguments for sending text find results from browser to iframe.
+  CQ_TEXT_FIND_RESULTS = 'cqTextFindResults',
 }
 
 const companionProxy: CompanionProxy = CompanionProxyImpl.getInstance();
@@ -63,8 +78,10 @@ function initialize() {
       (companionUpdateProto: string) => {
         const companionOrigin =
             new URL(loadTimeData.getString('companion_origin')).origin;
-        const message =
-            {[ParamType.COMPANION_UPDATE_PARAMS]: companionUpdateProto};
+        const message = {
+          [ParamType.METHOD_TYPE]: MethodType.kUpdateCompanionPage,
+          [ParamType.COMPANION_UPDATE_PARAMS]: companionUpdateProto,
+        };
 
         const frame = document.body.querySelector('iframe');
         assert(frame);
@@ -86,11 +103,15 @@ function initialize() {
             document.getElementById('image-width') as HTMLInputElement;
         const heightInput =
             document.getElementById('image-height') as HTMLInputElement;
+        const downscaledDimensionsInput =
+            document.getElementById('image-downscaled-dimensions') as
+            HTMLInputElement;
         assert(queryForm);
         assert(imageDataInput);
         assert(imageUrlInput);
         assert(widthInput);
         assert(heightInput);
+        assert(downscaledDimensionsInput);
         queryForm.setAttribute('action', imageQuery.uploadUrl.url);
         // The original Uint8Array that gets passed does not have an array
         // buffer due to how it is initialized. Thus, we have to create a
@@ -112,8 +133,27 @@ function initialize() {
         imageUrlInput.value = imageQuery.imageUrl.url;
         widthInput.value = String(imageQuery.width);
         heightInput.value = String(imageQuery.height);
+        downscaledDimensionsInput.value =
+            `${imageQuery.downscaledWidth},${imageQuery.downscaledHeight}`;
         queryForm.submit();
         queryForm.reset();
+      });
+
+  companionProxy.callbackRouter.onCqFindTextResultsAvailable.addListener(
+      (textDirectives: string[], results: boolean[]) => {
+        const companionOrigin =
+            new URL(loadTimeData.getString('companion_origin')).origin;
+        const message = {
+          [ParamType.METHOD_TYPE]: MethodType.kOnCqFindTextResultsAvailable,
+          [ParamType.CQ_TEXT_DIRECTIVES]: textDirectives,
+          [ParamType.CQ_TEXT_FIND_RESULTS]: results,
+        };
+
+        const frame = document.body.querySelector('iframe');
+        assert(frame);
+        if (frame.contentWindow) {
+          frame.contentWindow.postMessage(message, companionOrigin);
+        }
       });
 
   companionProxy.handler.showUI();
@@ -144,6 +184,22 @@ function onCompanionMessageEvent(event: MessageEvent) {
   } else if (methodType === MethodType.kOnExpsOptInStatusAvailable) {
     companionProxy.handler.onExpsOptInStatusAvailable(
         data[ParamType.IS_EXPS_OPTED_IN]);
+  } else if (methodType === MethodType.kOnOpenInNewTabButtonURLChanged) {
+    const openInNewTabUrl = new Url();
+    openInNewTabUrl.url = data[ParamType.URL_FOR_OPEN_IN_NEW_TAB];
+    companionProxy.handler.onOpenInNewTabButtonURLChanged(openInNewTabUrl);
+  } else if (methodType === MethodType.kRecordUiSurfaceShown) {
+    companionProxy.handler.recordUiSurfaceShown(
+        data[ParamType.UI_SURFACE], data[ParamType.CHILD_ELEMENT_COUNT]);
+  } else if (methodType === MethodType.kRecordUiSurfaceClicked) {
+    companionProxy.handler.recordUiSurfaceClicked(data[ParamType.UI_SURFACE]);
+  } else if (methodType === MethodType.kOnCqCandidatesAvailable) {
+    companionProxy.handler.onCqCandidatesAvailable(
+        data[ParamType.CQ_TEXT_DIRECTIVES]);
+  } else if (methodType === MethodType.kOnPhFeedback) {
+    companionProxy.handler.onPhFeedback(data[ParamType.PH_FEEDBACK]);
+  } else if (methodType === MethodType.kOnCqJumptagClicked) {
+    companionProxy.handler.onCqJumptagClicked(data[ParamType.CQ_JUMPTAG_TEXT]);
   }
 }
 

@@ -26,6 +26,7 @@ class HidSystemTrayIcon {
   // Stage |profile| to be shown in the system tray icon.
   virtual void StageProfile(Profile* profile);
 
+  // TODO(crbug.com/1353104): Remove support for non-immediate unstage request.
   // Unstage |profile| that is being shown in the system tray icon. The profile
   // will be removed immediately when |immediate| is true, otherwise it is
   // scheduled to be removed later.
@@ -50,12 +51,12 @@ class HidSystemTrayIcon {
   // Get the image for the status tray icon.
   static gfx::ImageSkia GetStatusTrayIcon();
 
-  // Get the label of the button for managing HID device permission on the HID
-  // system tray icon.
-  static std::u16string GetManageHidDeviceButtonLabel(Profile* profile);
+  // Get the label of the title of the HID system tray icon.
+  static std::u16string GetTitleLabel(size_t num_origins,
+                                      size_t num_connections);
 
-  // Get the label of the tooltip of the HID system tray icon.
-  static std::u16string GetTooltipLabel(size_t num_connections);
+  // Returns a label for HID settings button.
+  static std::u16string GetContentSettingsLabel();
 
   // This map stores profiles being tracked, along with their staging status.
   base::flat_map<Profile*, bool> profiles_;

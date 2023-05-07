@@ -7,18 +7,19 @@
 #include <limits>
 #include <tuple>
 
-#include "base/guid.h"
 #include "base/hash/hash.h"
 #include "base/rand_util.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/test/metrics/histogram_tester.h"
 #include "base/test/scoped_feature_list.h"
+#include "base/uuid.h"
 #include "build/build_config.h"
 #include "chrome/browser/sync/test/integration/encryption_helper.h"
 #include "chrome/browser/sync/test/integration/passwords_helper.h"
 #include "chrome/browser/sync/test/integration/sync_service_impl_harness.h"
 #include "chrome/browser/sync/test/integration/sync_test.h"
 #include "chrome/browser/sync/test/integration/updated_progress_marker_checker.h"
+#include "components/password_manager/core/browser/password_form.h"
 #include "components/password_manager/core/browser/password_store_interface.h"
 #include "components/password_manager/core/common/password_manager_features.h"
 #include "components/sync/base/features.h"
@@ -43,6 +44,7 @@ using password_manager::InsecureType;
 using password_manager::InsecurityMetadata;
 using password_manager::IsMuted;
 using password_manager::PasswordForm;
+using password_manager::TriggerBackendNotification;
 
 using testing::ElementsAre;
 using testing::Pointee;
@@ -266,10 +268,10 @@ IN_PROC_BROWSER_TEST_F(TwoClientPasswordsSyncTest, E2E_ONLY(DeleteTwo)) {
   ASSERT_TRUE(SetupSync()) << "SetupSync() failed.";
   ASSERT_TRUE(AllProfilesContainSamePasswordForms());
 
-  PasswordForm form0 =
-      CreateTestPasswordForm(base::FastHash(base::GenerateGUID()));
-  PasswordForm form1 =
-      CreateTestPasswordForm(base::FastHash(base::GenerateGUID()));
+  PasswordForm form0 = CreateTestPasswordForm(
+      base::FastHash(base::Uuid::GenerateRandomV4().AsLowercaseString()));
+  PasswordForm form1 = CreateTestPasswordForm(
+      base::FastHash(base::Uuid::GenerateRandomV4().AsLowercaseString()));
   GetProfilePasswordStoreInterface(0)->AddLogin(form0);
   GetProfilePasswordStoreInterface(0)->AddLogin(form1);
 
@@ -392,10 +394,12 @@ IN_PROC_BROWSER_TEST_F(TwoClientPasswordsSyncTest,
 
   form0.password_issues.insert(
       {InsecureType::kLeaked,
-       InsecurityMetadata(base::Time(), IsMuted(false))});
+       InsecurityMetadata(base::Time(), IsMuted(false),
+                          TriggerBackendNotification(false))});
   form1.password_issues.insert(
       {InsecureType::kPhished,
-       InsecurityMetadata(base::Time(), IsMuted(false))});
+       InsecurityMetadata(base::Time(), IsMuted(false),
+                          TriggerBackendNotification(false))});
 
   ASSERT_TRUE(SetupClients()) << "SetupClients() failed.";
 
@@ -428,10 +432,12 @@ IN_PROC_BROWSER_TEST_F(TwoClientPasswordsSyncTest,
   PasswordForm form = CreateTestPasswordForm(0);
   form.password_issues.insert(
       {InsecureType::kLeaked,
-       InsecurityMetadata(base::Time(), IsMuted(false))});
+       InsecurityMetadata(base::Time(), IsMuted(false),
+                          TriggerBackendNotification(false))});
   form.password_issues.insert(
       {InsecureType::kPhished,
-       InsecurityMetadata(base::Time(), IsMuted(false))});
+       InsecurityMetadata(base::Time(), IsMuted(false),
+                          TriggerBackendNotification(false))});
 
   // Add the form and security issues to Client 0.
   GetProfilePasswordStoreInterface(0)->AddLogin(form);
@@ -452,10 +458,12 @@ IN_PROC_BROWSER_TEST_F(TwoClientPasswordsSyncTest, RemoveInsecureCredentialss) {
 
   form0.password_issues.insert(
       {InsecureType::kLeaked,
-       InsecurityMetadata(base::Time(), IsMuted(false))});
+       InsecurityMetadata(base::Time(), IsMuted(false),
+                          TriggerBackendNotification(false))});
   form1.password_issues.insert(
       {InsecureType::kPhished,
-       InsecurityMetadata(base::Time(), IsMuted(false))});
+       InsecurityMetadata(base::Time(), IsMuted(false),
+                          TriggerBackendNotification(false))});
 
   // Add the form and security issues to Client 0.
   GetProfilePasswordStoreInterface(0)->AddLogin(form0);
@@ -485,7 +493,8 @@ IN_PROC_BROWSER_TEST_F(TwoClientPasswordsSyncTest,
   PasswordForm form = CreateTestPasswordForm(0);
   form.password_issues.insert(
       {InsecureType::kLeaked,
-       InsecurityMetadata(base::Time(), IsMuted(false))});
+       InsecurityMetadata(base::Time(), IsMuted(false),
+                          TriggerBackendNotification(false))});
 
   // Add the form and security issue to Client 0.
   GetProfilePasswordStoreInterface(0)->AddLogin(form);

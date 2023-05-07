@@ -36,7 +36,10 @@
 #include "components/translate/core/browser/language_state.h"
 #include "components/translate/core/common/translate_constants.h"
 #include "content/public/browser/navigation_controller.h"
+#include "content/public/browser/navigation_details.h"
 #include "content/public/browser/navigation_entry.h"
+#include "content/public/browser/navigation_handle.h"
+#include "content/public/browser/page_navigator.h"
 #include "content/public/browser/render_frame_host.h"
 #include "content/public/browser/render_process_host.h"
 #include "content/public/browser/render_view_host.h"
@@ -149,10 +152,26 @@ lens::mojom::ImageFormat CoreTabHelper::EncodeImageIntoSearchArgs(
   return image_format;
 }
 
+void CoreTabHelper::TriggerLensPingIfEnabled() {
+  if (lens::features::GetEnableLensPing()) {
+    lens_ping_start_time_ = base::TimeTicks::Now();
+    awaiting_lens_ping_response_ = lens::features::GetLensPingIsSequential();
+
+    // The Lens ping should return response code 204, so opening it in the
+    // current tab will be invisible to the user.
+    GURL lens_ping_url = GURL(lens::features::GetLensPingURL());
+    content::OpenURLParams lens_ping_url_params(
+        lens_ping_url, content::Referrer(), WindowOpenDisposition::CURRENT_TAB,
+        ui::PAGE_TRANSITION_AUTO_TOPLEVEL, false);
+    web_contents()->OpenURL(lens_ping_url_params);
+  }
+}
+
 void CoreTabHelper::SearchWithLens(content::RenderFrameHost* render_frame_host,
                                    const GURL& src_url,
                                    lens::EntryPoint entry_point,
                                    bool is_image_translate) {
+  TriggerLensPingIfEnabled();
   bool use_side_panel = lens::IsSidePanelEnabledForLens(web_contents());
   SearchByImageImpl(render_frame_host, src_url, kImageSearchThumbnailMinSize,
                     lens::features::GetMaxPixelsForImageSearch(),
@@ -178,6 +197,10 @@ void CoreTabHelper::RegionSearchWithLens(
     gfx::Image image,
     const gfx::Size& image_original_size,
     std::vector<lens::mojom::LatencyLogPtr> log_data) {
+  // TODO(crbug/1431377): After validating the efficacy of the Lens Ping, move
+  // the region search Ping to an earlier point in
+  // lens_region_search_controller.
+  TriggerLensPingIfEnabled();
   // Do not show the side panel on region searches and modify the entry point
   // if Lens fullscreen search features are enabled.
   bool is_full_screen_region_search_request =
@@ -268,11 +291,17 @@ void CoreTabHelper::SearchByImageImpl(
     companion_helper->ShowCompanionSidePanelForImage(
         /*src_url=*/GURL(), /*is_image_translate=*/false,
         additional_query_params_modified, encoded_image_bytes,
-        image_original_size,
+        image_original_size, image.Size(),
         /*image_extension=*/std::string(), content_type);
     return;
   }
 #endif
+
+  if (search::DefaultSearchProviderIsGoogle(template_url_service)) {
+    search_args.processed_image_dimensions =
+        base::NumberToString(image.Size().width()) + "," +
+        base::NumberToString(image.Size().height());
+  }
 
   search_args.image_original_size = image_original_size;
   search_args.additional_query_params = additional_query_params_modified;
@@ -475,6 +504,27 @@ void CoreTabHelper::OnWebContentsLostFocus(
 #endif  // BUILDFLAG(IS_ANDROID)
 }
 
+void CoreTabHelper::DidFinishNavigation(
+    content::NavigationHandle* navigation_handle) {
+  // A Lens ping should return code 204, so the navigation handle will not be
+  // committed and the URL will start with the Lens ping URL.
+  if (awaiting_lens_ping_response_ && !navigation_handle->HasCommitted() &&
+      navigation_handle->GetURL().spec().find(
+          lens::features::GetLensPingURL()) != std::string::npos) {
+    awaiting_lens_ping_response_ = false;
+
+    base::TimeDelta ping_elapsed_time =
+        base::TimeTicks::Now() - lens_ping_start_time_;
+    UMA_HISTOGRAM_TIMES("Search.Lens.PingDuration", ping_elapsed_time);
+
+    if (stored_lens_search_settings_) {
+      OpenOpenURLParams(stored_lens_search_settings_->url_params,
+                        stored_lens_search_settings_->use_side_panel);
+      stored_lens_search_settings_.reset();
+    }
+  }
+}
+
 // Handles the image thumbnail for the context node, composes a image search
 // request based on the received thumbnail and opens the request in a new tab.
 void CoreTabHelper::DoSearchByImage(
@@ -487,6 +537,7 @@ void CoreTabHelper::DoSearchByImage(
     const std::string& thumbnail_content_type,
     const std::vector<uint8_t>& thumbnail_data,
     const gfx::Size& original_size,
+    const gfx::Size& downscaled_size,
     const std::string& image_extension,
     const std::vector<lens::mojom::LatencyLogPtr> log_data) {
   if (thumbnail_data.empty())
@@ -510,13 +561,20 @@ void CoreTabHelper::DoSearchByImage(
   if (companion_helper && IsImageSearchSupportedForCompanion()) {
     companion_helper->ShowCompanionSidePanelForImage(
         src_url, is_image_translate, additional_query_params_modified,
-        thumbnail_data, original_size, image_extension, thumbnail_content_type);
+        thumbnail_data, original_size, downscaled_size, image_extension,
+        thumbnail_content_type);
     return;
   }
 #endif
 
   TemplateURLRef::SearchTermsArgs search_args =
       TemplateURLRef::SearchTermsArgs(std::u16string());
+  if (search::DefaultSearchProviderIsGoogle(template_url_service)) {
+    search_args.processed_image_dimensions =
+        base::NumberToString(downscaled_size.width()) + "," +
+        base::NumberToString(downscaled_size.height());
+  }
+
   search_args.image_thumbnail_content.assign(thumbnail_data.begin(),
                                              thumbnail_data.end());
   search_args.image_thumbnail_content_type = thumbnail_content_type;
@@ -590,6 +648,15 @@ void CoreTabHelper::PostContentToURL(TemplateURLRef::PostContent post_content,
         "%s: %s\r\n", net::HttpRequestHeaders::kContentType,
         content_type.c_str());
   }
+  if (awaiting_lens_ping_response_) {
+    stored_lens_search_settings_ = {use_side_panel, open_url_params};
+  } else {
+    OpenOpenURLParams(open_url_params, use_side_panel);
+  }
+}
+
+void CoreTabHelper::OpenOpenURLParams(content::OpenURLParams open_url_params,
+                                      bool use_side_panel) {
   if (use_side_panel) {
 #if BUILDFLAG(ENABLE_LENS_DESKTOP_GOOGLE_BRANDED_FEATURES)
     lens::OpenLensSidePanel(chrome::FindBrowserWithWebContents(web_contents()),

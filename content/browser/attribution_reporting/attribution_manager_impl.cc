@@ -29,7 +29,6 @@
 #include "base/task/thread_pool.h"
 #include "base/task/updateable_sequenced_task_runner.h"
 #include "base/threading/sequence_bound.h"
-#include "base/threading/thread_restrictions.h"
 #include "base/time/time.h"
 #include "build/build_config.h"
 #include "build/buildflag.h"
@@ -48,15 +47,18 @@
 #include "content/browser/attribution_reporting/attribution_features.h"
 #include "content/browser/attribution_reporting/attribution_info.h"
 #include "content/browser/attribution_reporting/attribution_observer.h"
+#include "content/browser/attribution_reporting/attribution_os_level_manager.h"
 #include "content/browser/attribution_reporting/attribution_report.h"
 #include "content/browser/attribution_reporting/attribution_report_network_sender.h"
 #include "content/browser/attribution_reporting/attribution_report_sender.h"
+#include "content/browser/attribution_reporting/attribution_reporting.mojom.h"
 #include "content/browser/attribution_reporting/attribution_storage.h"
 #include "content/browser/attribution_reporting/attribution_storage_delegate.h"
 #include "content/browser/attribution_reporting/attribution_storage_delegate_impl.h"
 #include "content/browser/attribution_reporting/attribution_storage_sql.h"
 #include "content/browser/attribution_reporting/attribution_trigger.h"
 #include "content/browser/attribution_reporting/create_report_result.h"
+#include "content/browser/attribution_reporting/os_registration.h"
 #include "content/browser/attribution_reporting/send_result.h"
 #include "content/browser/attribution_reporting/storable_source.h"
 #include "content/browser/attribution_reporting/store_source_result.h"
@@ -72,6 +74,8 @@
 #include "content/public/browser/storage_partition.h"
 #include "content/public/common/content_client.h"
 #include "content/public/common/content_switches.h"
+#include "net/base/schemeful_site.h"
+#include "services/network/public/cpp/attribution_utils.h"
 #include "services/network/public/cpp/features.h"
 #include "services/network/public/mojom/attribution.mojom.h"
 #include "services/network/public/mojom/network_change_manager.mojom-forward.h"
@@ -82,10 +86,7 @@
 #include "url/origin.h"
 
 #if BUILDFLAG(IS_ANDROID)
-#include "content/browser/attribution_reporting/attribution_os_level_manager.h"
 #include "content/browser/attribution_reporting/attribution_os_level_manager_android.h"
-#include "content/browser/attribution_reporting/attribution_reporting.mojom.h"
-#include "content/browser/attribution_reporting/os_registration.h"
 #endif
 
 namespace content {
@@ -95,10 +96,8 @@ namespace {
 using ScopedUseInMemoryStorageForTesting =
     ::content::AttributionManagerImpl::ScopedUseInMemoryStorageForTesting;
 
-#if BUILDFLAG(IS_ANDROID)
 using ::attribution_reporting::mojom::OsRegistrationResult;
 using ::attribution_reporting::mojom::OsRegistrationType;
-#endif
 
 // These values are persisted to logs. Entries should not be renumbered and
 // numeric values should never be reused.
@@ -236,6 +235,8 @@ void RecordNetworkConnectionTypeOnFailure(
           "Conversions.AggregatableReport.NetworkConnectionTypeOnFailure",
           connection_type);
       break;
+    case AttributionReport::Type::kNullAggregatable:
+      break;
   }
 }
 
@@ -288,6 +289,8 @@ void LogMetricsOnReportSend(const AttributionReport& report, base::Time now) {
           now - report.report_time(), base::Seconds(1), base::Days(1), 50);
       break;
     }
+    case AttributionReport::Type::kNullAggregatable:
+      break;
   }
 }
 
@@ -304,6 +307,8 @@ void LogMetricsOnReportCompleted(const AttributionReport& report,
       base::UmaHistogramEnumeration(
           "Conversions.AggregatableReport.ReportSendOutcome2",
           ConvertToConversionReportSendOutcome(status));
+      break;
+    case AttributionReport::Type::kNullAggregatable:
       break;
   }
 }
@@ -339,6 +344,8 @@ void LogMetricsOnReportSent(const AttributionReport& report) {
           time_since_original_report_time, base::Seconds(1), base::Days(24),
           /*bucket_count=*/50);
       break;
+    case AttributionReport::Type::kNullAggregatable:
+      break;
   }
 }
 
@@ -366,6 +373,16 @@ bool IsOperationAllowed(
   return GetContentClient()->browser()->IsAttributionReportingOperationAllowed(
       storage_partition->browser_context(), operation, rfh, source_origin,
       destination_origin, reporting_origin);
+}
+
+std::unique_ptr<AttributionOsLevelManager> CreateOsLevelManager() {
+#if BUILDFLAG(IS_ANDROID)
+  if (base::FeatureList::IsEnabled(
+          network::features::kAttributionReportingCrossAppWeb)) {
+    return std::make_unique<AttributionOsLevelManagerAndroid>();
+  }
+#endif
+  return std::make_unique<NoOpAttributionOsLevelManager>();
 }
 
 bool g_run_in_memory = false;
@@ -400,33 +417,27 @@ ScopedUseInMemoryStorageForTesting::~ScopedUseInMemoryStorageForTesting() {
   g_run_in_memory = previous_;
 }
 
-// static
-std::unique_ptr<AttributionManagerImpl>
-AttributionManagerImpl::CreateWithNewDbForTesting(
-    StoragePartitionImpl* storage_partition,
-    const base::FilePath& user_data_directory,
-    scoped_refptr<storage::SpecialStoragePolicy> special_storage_policy) {
-  {
-    base::ScopedAllowBlockingForTesting allow_blocking;
-    if (!AttributionStorageSql::DeleteStorageForTesting(user_data_directory)) {
-      return nullptr;
-    }
-  }
-
-  return std::make_unique<AttributionManagerImpl>(
-      storage_partition, user_data_directory,
-      std::move(special_storage_policy));
-}
-
 bool AttributionManagerImpl::IsReportAllowed(
     const AttributionReport& report) const {
-  const CommonSourceInfo& common_info = report.GetStoredSource().common_info();
+  const attribution_reporting::SuitableOrigin* source_origin = absl::visit(
+      base::Overloaded{
+          [](const AttributionReport::EventLevelData& data) {
+            return &data.source.common_info().source_origin();
+          },
+          [](const AttributionReport::AggregatableAttributionData& data) {
+            return &data.source.common_info().source_origin();
+          },
+          [&](const AttributionReport::NullAggregatableData&) {
+            return &report.attribution_info().context_origin;
+          },
+      },
+      report.data());
   return IsOperationAllowed(
       storage_partition_.get(),
       ContentBrowserClient::AttributionReportingOperation::kReport,
-      /*rfh=*/nullptr, &*common_info.source_origin(),
+      /*rfh=*/nullptr, &**source_origin,
       &*report.attribution_info().context_origin,
-      &*common_info.reporting_origin());
+      &*report.GetReportingOrigin());
 }
 
 // static
@@ -438,22 +449,14 @@ AttributionManagerImpl::CreateForTesting(
     std::unique_ptr<AttributionStorageDelegate> storage_delegate,
     std::unique_ptr<AttributionCookieChecker> cookie_checker,
     std::unique_ptr<AttributionReportSender> report_sender,
+    std::unique_ptr<AttributionOsLevelManager> os_level_manager,
     StoragePartitionImpl* storage_partition,
     scoped_refptr<base::UpdateableSequencedTaskRunner> storage_task_runner) {
   return base::WrapUnique(new AttributionManagerImpl(
       storage_partition, user_data_directory, max_pending_events,
       std::move(special_storage_policy), std::move(storage_delegate),
       std::move(cookie_checker), std::move(report_sender),
-      std::move(storage_task_runner)));
-}
-
-// static
-network::mojom::AttributionOsSupport AttributionManagerImpl::GetOsSupport() {
-#if BUILDFLAG(IS_ANDROID)
-  return AttributionOsLevelManagerAndroid::GetOsSupport();
-#else
-  return network::mojom::AttributionOsSupport::kDisabled;
-#endif
+      std::move(os_level_manager), std::move(storage_task_runner)));
 }
 
 AttributionManagerImpl::AttributionManagerImpl(
@@ -469,6 +472,7 @@ AttributionManagerImpl::AttributionManagerImpl(
           std::make_unique<AttributionCookieCheckerImpl>(storage_partition),
           std::make_unique<AttributionReportNetworkSender>(
               storage_partition->GetURLLoaderFactoryForBrowserProcess()),
+          CreateOsLevelManager(),
           // This uses BLOCK_SHUTDOWN as some data deletion operations may be
           // running when the browser is closed, and we want to ensure all data
           // is deleted correctly. Additionally, we use MUST_USE_FOREGROUND to
@@ -489,8 +493,10 @@ AttributionManagerImpl::AttributionManagerImpl(
     std::unique_ptr<AttributionStorageDelegate> storage_delegate,
     std::unique_ptr<AttributionCookieChecker> cookie_checker,
     std::unique_ptr<AttributionReportSender> report_sender,
+    std::unique_ptr<AttributionOsLevelManager> os_level_manager,
     scoped_refptr<base::UpdateableSequencedTaskRunner> storage_task_runner)
-    : storage_partition_(storage_partition),
+    : throttler_(DestinationThrottler::Policy()),
+      storage_partition_(storage_partition),
       max_pending_events_(max_pending_events),
       storage_task_runner_(std::move(storage_task_runner)),
       attribution_storage_(base::SequenceBound<AttributionStorageSql>(
@@ -508,20 +514,14 @@ AttributionManagerImpl::AttributionManagerImpl(
           std::make_unique<AttributionDataHostManagerImpl>(this)),
       special_storage_policy_(std::move(special_storage_policy)),
       cookie_checker_(std::move(cookie_checker)),
-      report_sender_(std::move(report_sender)) {
+      report_sender_(std::move(report_sender)),
+      os_level_manager_(std::move(os_level_manager)) {
   DCHECK(storage_partition_);
   DCHECK_GT(max_pending_events_, 0u);
   DCHECK(storage_task_runner_);
   DCHECK(cookie_checker_);
   DCHECK(report_sender_);
-
-#if BUILDFLAG(IS_ANDROID)
-  if (base::FeatureList::IsEnabled(
-          network::features::kAttributionReportingCrossAppWeb)) {
-    attribution_os_level_manager_ =
-        std::make_unique<AttributionOsLevelManagerAndroid>();
-  }
-#endif
+  DCHECK(os_level_manager_);
 }
 
 AttributionManagerImpl::~AttributionManagerImpl() {
@@ -576,6 +576,14 @@ void AttributionManagerImpl::HandleSource(
     return;
   }
 
+  // TODO(csharrison): Consider enforcing this limit after checking metrics.
+  bool allowed_by_destination_window = throttler_.UpdateAndGetAllowed(
+      source.registration().destination_set,
+      net::SchemefulSite(source.common_info().source_origin()),
+      net::SchemefulSite(source.common_info().reporting_origin()));
+  base::UmaHistogramBoolean("Conversions.SourceAllowedByDestinationWindowLimit",
+                            allowed_by_destination_window);
+
   MaybeEnqueueEvent(std::move(source));
 }
 
@@ -617,8 +625,9 @@ void AttributionManagerImpl::OnSourceStored(
     StoreSourceResult result) {
   RecordStoreSourceStatus(result);
 
+  base::Time now = base::Time::Now();
   for (auto& observer : observers_) {
-    observer.OnSourceHandled(source, cleared_debug_key, result.status);
+    observer.OnSourceHandled(source, now, cleared_debug_key, result.status);
   }
 
   scheduler_timer_.MaybeSet(result.min_fake_report_time);
@@ -787,7 +796,12 @@ void AttributionManagerImpl::OnReportStored(
     MaybeSendDebugReport(std::move(*report));
   }
 
+  min_new_report_time = AttributionReport::MinReportTime(
+      min_new_report_time, result.min_null_aggregatable_report_time());
+
   scheduler_timer_.MaybeSet(min_new_report_time);
+
+  bool notify_reports_changed = false;
 
   if (result.event_level_status() !=
           AttributionTrigger::EventLevelResult::kInternalError ||
@@ -797,6 +811,12 @@ void AttributionManagerImpl::OnReportStored(
     // aggregatable report can cause sources to reach event-level attribution
     // limit or become associated with a dedup key.
     NotifySourcesChanged();
+
+    notify_reports_changed = true;
+  }
+
+  if (notify_reports_changed ||
+      result.min_null_aggregatable_report_time().has_value()) {
     NotifyReportsChanged();
   }
 
@@ -809,7 +829,9 @@ void AttributionManagerImpl::OnReportStored(
 
 void AttributionManagerImpl::MaybeSendDebugReport(AttributionReport&& report) {
   const AttributionInfo& attribution_info = report.attribution_info();
-  if (!attribution_info.debug_key || !report.GetStoredSource().debug_key() ||
+  const StoredSource* source = report.GetStoredSource();
+  DCHECK(source);
+  if (!attribution_info.debug_key || !source->debug_key() ||
       !IsReportAllowed(report)) {
     return;
   }
@@ -854,30 +876,25 @@ void AttributionManagerImpl::ClearData(
     BrowsingDataFilterBuilder* filter_builder,
     bool delete_rate_limit_data,
     base::OnceClosure done) {
-#if BUILDFLAG(IS_ANDROID)
-  if (attribution_os_level_manager_) {
-    auto barrier = base::BarrierClosure(2, std::move(done));
-    done = barrier;
+  auto barrier = base::BarrierClosure(2, std::move(done));
+  done = barrier;
 
-    if (filter_builder) {
-      auto* filter_builder_impl =
-          static_cast<BrowsingDataFilterBuilderImpl*>(filter_builder);
-      attribution_os_level_manager_->ClearData(
-          delete_begin, delete_end, filter_builder_impl->GetOrigins(),
-          filter_builder_impl->GetRegisterableDomains(),
-          filter_builder->GetMode(), delete_rate_limit_data,
-          std::move(barrier));
-    } else {
-      // When there is not filter_builder, we clear all the data.
-      attribution_os_level_manager_->ClearData(
-          delete_begin, delete_end, /*origins=*/{}, /*domains=*/{},
-          // By preserving data only from an empty list, we are effectively
-          // clearing all the data.
-          BrowsingDataFilterBuilder::Mode::kPreserve, delete_rate_limit_data,
-          std::move(barrier));
-    }
+  if (filter_builder) {
+    auto* filter_builder_impl =
+        static_cast<BrowsingDataFilterBuilderImpl*>(filter_builder);
+    os_level_manager_->ClearData(
+        delete_begin, delete_end, filter_builder_impl->GetOrigins(),
+        filter_builder_impl->GetRegisterableDomains(),
+        filter_builder->GetMode(), delete_rate_limit_data, std::move(barrier));
+  } else {
+    // When there is not filter_builder, we clear all the data.
+    os_level_manager_->ClearData(delete_begin, delete_end, /*origins=*/{},
+                                 /*domains=*/{},
+                                 // By preserving data only from an empty list,
+                                 // we are effectively clearing all the data.
+                                 BrowsingDataFilterBuilder::Mode::kPreserve,
+                                 delete_rate_limit_data, std::move(barrier));
   }
-#endif
 
   // When a clear data task is queued or running, we use a higher priority.
   ++num_pending_clear_data_tasks_;
@@ -1014,6 +1031,7 @@ void AttributionManagerImpl::PrepareToSendReport(AttributionReport report,
                                  std::move(callback));
       break;
     case AttributionReport::Type::kAggregatableAttribution:
+    case AttributionReport::Type::kNullAggregatable:
       AssembleAggregatableReport(std::move(report), is_debug_report,
                                  std::move(callback));
       break;
@@ -1146,10 +1164,18 @@ void AttributionManagerImpl::OnAggregatableReportAssembled(
     return;
   }
 
-  auto* data = absl::get_if<AttributionReport::AggregatableAttributionData>(
-      &report.data());
-  DCHECK(data);
-  data->assembled_report = std::move(assembled_report);
+  absl::visit(
+      base::Overloaded{
+          [](const AttributionReport::EventLevelData&) { NOTREACHED(); },
+          [&](AttributionReport::AggregatableAttributionData& data) {
+            data.common_data.assembled_report = std::move(assembled_report);
+          },
+          [&](AttributionReport::NullAggregatableData& data) {
+            data.common_data.assembled_report = std::move(assembled_report);
+          },
+      },
+      report.data());
+
   RecordAssembleAggregatableReportStatus(
       AssembleAggregatableReportStatus::kSuccess);
 
@@ -1238,17 +1264,10 @@ void AttributionManagerImpl::MaybeSendVerboseDebugReport(
   }
 }
 
-#if BUILDFLAG(IS_ANDROID)
-
-void AttributionManagerImpl::OverrideOsLevelManagerForTesting(
-    std::unique_ptr<AttributionOsLevelManager> os_level_manager) {
-  attribution_os_level_manager_ = std::move(os_level_manager);
-}
-
 void AttributionManagerImpl::HandleOsRegistration(
     OsRegistration registration,
     GlobalRenderFrameHostId render_frame_id) {
-  if (!attribution_os_level_manager_) {
+  if (!network::HasAttributionOsSupport(GetSupport())) {
     NotifyOsRegistration(registration,
                          /*is_debug_key_allowed=*/false,
                          OsRegistrationResult::kUnsupported);
@@ -1325,12 +1344,11 @@ void AttributionManagerImpl::ProcessNextOsEvent() {
               return;
             }
 
-            DCHECK(manager->attribution_os_level_manager_);
             DCHECK(!manager->pending_os_events_.empty());
 
             {
               const auto& event = manager->pending_os_events_.front();
-              manager->attribution_os_level_manager_->Register(
+              manager->os_level_manager_->Register(
                   event, is_debug_key_allowed,
                   base::BindOnce(&AttributionManagerImpl::OnOsRegistration,
                                  manager, event, is_debug_key_allowed));
@@ -1358,11 +1376,12 @@ void AttributionManagerImpl::OnOsRegistration(
     const OsRegistration& registration,
     bool is_debug_key_allowed,
     bool success) {
+  base::UmaHistogramBoolean("Conversions.AttributionOsRegistrationResult",
+                            success);
+
   NotifyOsRegistration(registration, is_debug_key_allowed,
                        success ? OsRegistrationResult::kPassedToOs
                                : OsRegistrationResult::kRejectedByOs);
 }
-
-#endif  // BUILDFLAG(IS_ANDROID)
 
 }  // namespace content

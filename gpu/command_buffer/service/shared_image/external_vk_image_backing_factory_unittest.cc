@@ -84,10 +84,13 @@ class ExternalVkImageBackingFactoryDawnTest
     DawnProcTable procs = dawn::native::GetProcs();
     dawnProcSetProcs(&procs);
 
-    dawn::native::DawnDeviceDescriptor device_descriptor;
     // We need to request internal usage to be able to do operations with
     // internal methods that would need specific usages.
-    device_descriptor.requiredFeatures.push_back("dawn-internal-usages");
+    wgpu::FeatureName dawn_internal_usage =
+        wgpu::FeatureName::DawnInternalUsages;
+    wgpu::DeviceDescriptor device_descriptor;
+    device_descriptor.requiredFeaturesCount = 1;
+    device_descriptor.requiredFeatures = &dawn_internal_usage;
 
     dawn_device_ =
         wgpu::Device::Acquire(adapter_it->CreateDevice(&device_descriptor));
@@ -269,8 +272,8 @@ TEST_F(ExternalVkImageBackingFactoryDawnTest, SkiaVulkanWrite_DawnRead) {
     flush_info.fSignalSemaphores = end_semaphores.data();
     gpu::AddVulkanCleanupTaskForSkiaFlush(vulkan_context_provider_.get(),
                                           &flush_info);
-    auto end_state = skia_scoped_access->TakeEndState();
-    dest_surface->flush(flush_info, end_state.get());
+    dest_surface->flush(flush_info, nullptr);
+    skia_scoped_access->ApplyBackendSurfaceEndState();
     gr_context()->submit();
   }
 
@@ -411,15 +414,17 @@ TEST_P(ExternalVkImageBackingFactoryWithFormatTest, Basic) {
       EXPECT_EQ(plane_size.height(), surface->height());
     }
 
+    scoped_write_access->ApplyBackendSurfaceEndState();
     // Handle end state and semaphores.
-    auto end_state = scoped_write_access->TakeEndState();
-    if (!end_semaphores.empty() || end_state) {
+    if (!end_semaphores.empty()) {
       GrFlushInfo flush_info;
       if (!end_semaphores.empty()) {
         flush_info.fNumSemaphores = end_semaphores.size();
         flush_info.fSignalSemaphores = end_semaphores.data();
       }
-      scoped_write_access->surface()->flush(flush_info, end_state.get());
+      for (int plane = 0; plane < format.NumberOfPlanes(); ++plane) {
+        scoped_write_access->surface(plane)->flush(flush_info, nullptr);
+      }
       gr_context()->submit();
     }
   }

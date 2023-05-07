@@ -95,14 +95,6 @@ class MediaRouterIntegrationBrowserTest
   static void ExecuteJavaScriptAPI(content::WebContents* web_contents,
                                    const std::string& script);
 
-  static std::string ExecuteScriptAndExtractString(
-      const content::ToRenderFrameHost& adapter,
-      const std::string& script);
-
-  static bool ExecuteScriptAndExtractBool(
-      const content::ToRenderFrameHost& adapter,
-      const std::string& script);
-
   static void ExecuteScript(const content::ToRenderFrameHost& adapter,
                             const std::string& script);
 
@@ -179,12 +171,19 @@ class MediaRouterIntegrationBrowserTest
 
   void WaitUntilNoRoutes(content::WebContents* web_contents);
 
+  // Get the full path of the resource file.
+  // |relative_path|: The relative path to
+  //                  <chromium src>/out/<build config>/media_router/
+  //                  browser_test_resources/
+  base::FilePath GetResourceFile(
+      base::FilePath::StringPieceType relative_path) const;
+
   // Returns whether actual media route providers (as opposed to
   // TestMediaRouteProvider) should be loaded.
   virtual bool RequiresMediaRouteProviders() const;
 
   // Test API for manipulating the UI.
-  raw_ptr<MediaRouterUiForTestBase, DanglingUntriaged> test_ui_ = nullptr;
+  std::unique_ptr<MediaRouterUiForTestBase> test_ui_;
 
   // Enabled features.
   base::test::ScopedFeatureList scoped_feature_list_;
@@ -201,13 +200,6 @@ class MediaRouterIntegrationBrowserTest
   virtual Browser* browser();
 
  private:
-  // Get the full path of the resource file.
-  // |relative_path|: The relative path to
-  //                  <chromium src>/out/<build config>/media_router/
-  //                  browser_test_resources/
-  base::FilePath GetResourceFile(
-      base::FilePath::StringPieceType relative_path) const;
-
   std::unique_ptr<content::TestNavigationObserver> test_navigation_observer_;
   policy::MockConfigurationPolicyProvider provider_;
   base::test::ScopedFeatureList feature_list_;

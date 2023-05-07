@@ -13,9 +13,10 @@
 #define _NTDEF_  // Prevent redefition errors, must come after <winternl.h>
 #include <ntsecapi.h>  // For POLICY_ALL_ACCESS types
 
+#include <algorithm>
+
 #include "base/base64.h"
 #include "base/containers/span.h"
-#include "base/cxx17_backports.h"
 #include "base/json/json_reader.h"
 #include "base/json/json_writer.h"
 #include "base/strings/strcat.h"
@@ -110,14 +111,15 @@ bool PadSecret(const std::string& secret, std::string* out) {
   std::memcpy(&padded_secret[padded_length - secret.size()], secret.data(),
               secret.size());
 
-  base::Value pwd_padding_dict(base::Value::Type::DICT);
-  pwd_padding_dict.SetStringKey(kPaddedPassword, padded_secret);
-  pwd_padding_dict.SetIntKey(kPasswordLength, secret.size());
+  auto pwd_padding_dict =
+      base::Value::Dict()
+          .Set(kPaddedPassword, padded_secret)
+          .Set(kPasswordLength, static_cast<int>(secret.size()));
   SecurelyClearString(padded_secret);
 
   auto result = base::JSONWriter::Write(pwd_padding_dict, out);
   const std::string* password_value =
-      pwd_padding_dict.FindStringKey(kPaddedPassword);
+      pwd_padding_dict.FindString(kPaddedPassword);
   if (password_value)
     SecurelyClearString(*const_cast<std::string*>(password_value));
 
@@ -128,15 +130,16 @@ bool PadSecret(const std::string& secret, std::string* out) {
 // find padded secret. It then removes the padding and returns original secret.
 bool UnpadSecret(const std::string& serialized_padded_secret,
                  std::string* out) {
-  absl::optional<base::Value> pwd_padding_dict = base::JSONReader::Read(
+  absl::optional<base::Value> pwd_padding = base::JSONReader::Read(
       serialized_padded_secret, base::JSON_ALLOW_TRAILING_COMMAS);
-  if (!pwd_padding_dict.has_value() || !pwd_padding_dict->is_dict()) {
+  if (!pwd_padding.has_value() || !pwd_padding->is_dict()) {
     LOGFN(ERROR) << "Failed to deserialize given secret from json.";
     return false;
   }
 
-  auto* padded_secret = pwd_padding_dict->FindStringKey(kPaddedPassword);
-  auto pwd_length = pwd_padding_dict->FindIntKey(kPasswordLength);
+  const auto& pwd_padding_dict = pwd_padding->GetDict();
+  auto* padded_secret = pwd_padding_dict.FindString(kPaddedPassword);
+  auto pwd_length = pwd_padding_dict.FindInt(kPasswordLength);
 
   auto result = true;
   if (!padded_secret || !pwd_length.has_value()) {
@@ -145,7 +148,7 @@ bool UnpadSecret(const std::string& serialized_padded_secret,
     out->assign(&(*padded_secret)[padded_secret->size() - *pwd_length],
                 *pwd_length);
   }
-  SecurelyClearDictionaryValueWithKey(&pwd_padding_dict, kPaddedPassword);
+  SecurelyClearDictionaryValueWithKey(&pwd_padding, kPaddedPassword);
 
   return result;
 }

@@ -13,9 +13,9 @@
 #include <utility>
 #include <vector>
 
+#include "base/memory/raw_ptr.h"
 #include "ui/events/ash/keyboard_capability.h"
 #include "ui/events/ash/mojom/modifier_key.mojom-shared.h"
-#include "ui/events/devices/input_device.h"
 #include "ui/events/event.h"
 #include "ui/events/event_rewriter.h"
 #include "ui/events/keycodes/dom/dom_key.h"
@@ -29,6 +29,7 @@ class ImeKeyboard;
 namespace ui {
 
 enum class DomCode;
+struct KeyboardDevice;
 
 // EventRewriterAsh makes various changes to keyboard-related events,
 // including KeyEvents and some other events with keyboard modifier flags:
@@ -206,7 +207,7 @@ class EventRewriterAsh : public EventRewriter {
   // Given a keyboard device, returns true if we get back the Assistant key
   // property without getting an error. Property value is stored in
   // |has_assistant_key|.
-  static bool HasAssistantKeyOnKeyboard(const InputDevice& keyboard_device,
+  static bool HasAssistantKeyOnKeyboard(const KeyboardDevice& keyboard_device,
                                         bool* has_assistant_key);
 
   // Part of rewrite phases below. These methods are public only so that
@@ -225,12 +226,8 @@ class EventRewriterAsh : public EventRewriter {
   // request raw function keys for these keys.
   bool ForceTopRowAsFunctionKeys(int device_id) const;
 
-  // Returns true if |last_keyboard_device_id_| is Hotrod remote.
-  bool IsHotrodRemote() const;
-  // Returns true if |last_keyboard_device_id_| is of given |device_type|.
-  bool IsLastKeyboardOfType(KeyboardCapability::DeviceType device_type) const;
-  // Returns the device type of |last_keyboard_device_id_|.
-  KeyboardCapability::DeviceType GetLastKeyboardType() const;
+  // Returns true if |device_id| is Hotrod remote.
+  bool IsHotrodRemote(int device_id) const;
 
   // Given modifier flags |original_flags|, returns the remapped modifiers
   // according to user preferences and/or event properties.
@@ -327,7 +324,7 @@ class EventRewriterAsh : public EventRewriter {
   // used to interpret modifiers on pointer events.
   int last_keyboard_device_id_;
 
-  Delegate* const delegate_;
+  const raw_ptr<Delegate, ExperimentalAsh> delegate_;
 
   // For each pair, the first element is the rewritten key state and the second
   // one is the original key state. If no key event rewriting happens, the first
@@ -336,7 +333,7 @@ class EventRewriterAsh : public EventRewriter {
 
   // The sticky keys controller is not owned here;
   // at time of writing it is a singleton in ash::Shell.
-  EventRewriter* const sticky_keys_controller_;
+  const raw_ptr<EventRewriter, ExperimentalAsh> sticky_keys_controller_;
 
   // Some drallion devices have digital privacy screens and a corresponding
   // privacy screen toggle key in the top row.
@@ -370,8 +367,8 @@ class EventRewriterAsh : public EventRewriter {
   // latches. See b/216049965 for more details.
   base::flat_map<DomCode, ui::EventFlags> previous_non_modifier_latches_;
 
-  KeyboardCapability* const keyboard_capability_;
-  ash::input_method::ImeKeyboard* const ime_keyboard_;
+  const raw_ptr<KeyboardCapability, ExperimentalAsh> keyboard_capability_;
+  const raw_ptr<ash::input_method::ImeKeyboard, ExperimentalAsh> ime_keyboard_;
 
   // True if alt + key and mouse event remapping is allowed. In some scenario,
   // such as clicking a button in the Alt-Tab UI, this remapping undesirably

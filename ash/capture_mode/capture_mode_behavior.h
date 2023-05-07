@@ -5,14 +5,19 @@
 #ifndef ASH_CAPTURE_MODE_CAPTURE_MODE_BEHAVIOR_H_
 #define ASH_CAPTURE_MODE_CAPTURE_MODE_BEHAVIOR_H_
 
+#include <vector>
+
 #include "ash/capture_mode/capture_mode_metrics.h"
 #include "ash/capture_mode/capture_mode_types.h"
+#include "base/files/file_path.h"
+#include "base/functional/callback_forward.h"
+#include "base/functional/callback_helpers.h"
 
 namespace ash {
 
-// Contains the cached capture mode configurations that will be used
-// for configurations restoration when initiating the corresponding capture
-// mode session.
+// Contains the cached capture mode configurations that will be used for
+// configurations restoration when initiating the corresponding capture mode
+// session.
 struct CaptureModeSessionConfigs {
   CaptureModeType type;
   CaptureModeSource source;
@@ -43,7 +48,8 @@ class CaptureModeBehavior {
   virtual bool ShouldFulscreenCaptureSourceBeAllowed() const;
   virtual bool ShouldRegionCaptureSourceBeAllowed() const;
   virtual bool ShouldWindowCaptureSourceBeAllowed() const;
-  virtual bool ShouldAudioInputSettingsBeIncluded() const;
+  // Returns true if the given `mode` is supported by this behavior.
+  virtual bool SupportsAudioRecordingMode(AudioRecordingMode mode) const;
   virtual bool ShouldCameraSelectionSettingsBeIncluded() const;
   virtual bool ShouldDemoToolsSettingsBeIncluded() const;
   virtual bool ShouldSaveToSettingsBeIncluded() const;
@@ -51,6 +57,15 @@ class CaptureModeBehavior {
   virtual bool ShouldShowPreviewNotification() const;
   virtual bool ShouldSkipVideoRecordingCountDown() const;
   virtual bool ShouldCreateRecordingOverlayController() const;
+  virtual bool ShouldShowUserNudge() const;
+  virtual bool ShouldAutoSelectFirstCamera() const;
+  virtual bool RequiresCaptureFolderCreation() const;
+  // Returns the full path for the capture file. If the creation of the path
+  // failed, the path provided will be empty.
+  using OnCaptureFolderCreatedCallback =
+      base::OnceCallback<void(const base::FilePath& capture_file_full_path)>;
+  virtual void CreateCaptureFolder(OnCaptureFolderCreatedCallback callback);
+  virtual std::vector<RecordingType> GetSupportedRecordingTypes() const;
 
  protected:
   explicit CaptureModeBehavior(const CaptureModeSessionConfigs& configs);

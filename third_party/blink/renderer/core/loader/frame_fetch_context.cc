@@ -349,7 +349,6 @@ void FrameFetchContext::PrepareRequest(
   String user_agent =
       ua_full ? GetFullUserAgent()
               : (ua_reduced ? GetReducedUserAgent() : GetUserAgent());
-  base::UmaHistogramBoolean("Blink.Fetch.ReducedUserAgent", ua_reduced);
   request.SetHTTPUserAgent(AtomicString(user_agent));
 
   if (GetResourceFetcherProperties().IsDetached())
@@ -364,8 +363,8 @@ void FrameFetchContext::PrepareRequest(
 
   if (AttributionSrcLoader* attribution_src_loader =
           GetFrame()->GetAttributionSrcLoader()) {
-    request.SetAttributionReportingOsSupport(
-        attribution_src_loader->GetOsSupport());
+    request.SetAttributionReportingSupport(
+        attribution_src_loader->GetSupport());
   }
 
   GetLocalFrameClient()->DispatchWillSendRequest(request);

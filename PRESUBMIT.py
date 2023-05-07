@@ -970,6 +970,8 @@ _BANNED_CPP_FUNCTIONS : Sequence[BanRule] = (
       [
         # Needed to implement and test std::string_view interoperability.
         r'base/strings/string_piece.*',
+        # Needed to use re2::RE2 regular expression library.
+        r'third_party/blink/common/interest_group/ad_display_size_utils.cc',
         # Needed to use liburlpattern API.
         r'third_party/blink/renderer/core/url_pattern/.*',
         r'third_party/blink/renderer/modules/manifest/manifest_parser\.cc',
@@ -1174,7 +1176,12 @@ _BANNED_CPP_FUNCTIONS : Sequence[BanRule] = (
         ' char and std::string instead?',
       ),
       True,
-      [_THIRD_PARTY_EXCEPT_BLINK],  # Don't warn in third_party folders.
+      [
+        # The demangler does not use this type but needs to know about it.
+        'base/third_party/symbolize/demangle\.cc',
+        # Don't warn in third_party folders.
+        _THIRD_PARTY_EXCEPT_BLINK
+      ],
     ),
     BanRule(
       r'/(\b(co_await|co_return|co_yield)\b|#include <coroutine>)',
@@ -1591,6 +1598,16 @@ _BANNED_CPP_FUNCTIONS : Sequence[BanRule] = (
       True,
       []
     ),
+    BanRule(
+      r'/#include <filesystem>',
+      (
+        'libc++ <filesystem> is banned per the Google C++ styleguide.',
+      ),
+      True,
+      # This fuzzing framework is a standalone open source project and
+      # cannot rely on Chromium base.
+      (r'third_party/centipede'),
+    ),
 )
 
 _BANNED_MOJOM_PATTERNS : Sequence[BanRule] = (
@@ -1757,7 +1774,8 @@ _KNOWN_ROBOTS = set(
                     'lacros-version-skew-roller', 'skylab-test-cros-roller',
                     'infra-try-recipes-tester', 'lacros-tracking-roller',
                     'lacros-sdk-version-roller', 'chrome-automated-expectation',
-                    'chromium-automated-expectation', 'chrome-branch-day')
+                    'chromium-automated-expectation', 'chrome-branch-day',
+                    'chromium-autosharder')
   ) | set('%s@skia-public.iam.gserviceaccount.com' % s
           for s in ('chromium-autoroll', 'chromium-release-autoroll')
   ) | set('%s@skia-corp.google.com.iam.gserviceaccount.com' % s
@@ -4993,19 +5011,13 @@ def CheckForTooLargeFiles(input_api, output_api):
     # files seems to be 1-2 MB, with a handful around 5-8 MB, so
     # anything over 20 MB is exceptional.
     TOO_LARGE_FILE_SIZE_LIMIT = 20 * 1024 * 1024
-    # Special exemption for a file that is slightly over the limit.
-    SPECIAL_FILE_SIZE_LIMIT = 25 * 1024 * 1024
-    SPECIAL_FILE_NAME = 'transport_security_state_static.json'
 
     too_large_files = []
     for f in input_api.AffectedFiles():
         # Check both added and modified files (but not deleted files).
         if f.Action() in ('A', 'M'):
             size = input_api.os_path.getsize(f.AbsoluteLocalPath())
-            limit = (SPECIAL_FILE_SIZE_LIMIT if
-                f.AbsoluteLocalPath().endswith(SPECIAL_FILE_NAME) else
-                TOO_LARGE_FILE_SIZE_LIMIT)
-            if size > limit:
+            if size > TOO_LARGE_FILE_SIZE_LIMIT:
                 too_large_files.append("%s: %d bytes" % (f.LocalPath(), size))
 
     if too_large_files:
@@ -6840,7 +6852,7 @@ def CheckNoJsInIos(input_api, output_api):
         return input_api.FilterSourceFile(
             affected_file,
             files_to_skip=input_api.DEFAULT_FILES_TO_SKIP +
-                          (r'^ios/third_party/*', r'^third_party/*'),
+                (r'^ios/third_party/*', r'^ios/tools/*', r'^third_party/*'),
             files_to_check=[r'^ios/.*\.js$', r'.*/ios/.*\.js$'])
 
     deleted_files = []

@@ -11,28 +11,27 @@
 #include "ash/ambient/ambient_constants.h"
 #include "ash/ambient/ambient_managed_photo_controller.h"
 #include "ash/ambient/ambient_ui_settings.h"
+#include "ash/ambient/managed/screensaver_images_policy_handler.h"
+#include "ash/ambient/metrics/ambient_metrics.h"
 #include "ash/ambient/test/ambient_ash_test_base.h"
-#include "ash/ambient/test/ambient_ash_test_helper.h"
-#include "ash/ambient/test/test_ambient_managed_photo_source.h"
+#include "ash/ambient/test/test_ambient_client.h"
 #include "ash/ambient/ui/ambient_container_view.h"
 #include "ash/ambient/ui/ambient_view_ids.h"
 #include "ash/ambient/ui/photo_view.h"
 #include "ash/assistant/assistant_interaction_controller_impl.h"
-#include "ash/assistant/model/assistant_interaction_model.h"
 #include "ash/constants/ambient_theme.h"
 #include "ash/constants/ambient_video.h"
 #include "ash/constants/ash_features.h"
-#include "ash/public/cpp/ambient/ambient_metrics.h"
+#include "ash/login/login_screen_controller.h"
 #include "ash/public/cpp/ambient/ambient_prefs.h"
 #include "ash/public/cpp/ambient/ambient_ui_model.h"
-#include "ash/public/cpp/ambient/fake_ambient_backend_controller_impl.h"
 #include "ash/public/cpp/assistant/controller/assistant_interaction_controller.h"
 #include "ash/public/cpp/personalization_app/time_of_day_paths.h"
 #include "ash/public/cpp/test/in_process_image_decoder.h"
 #include "ash/root_window_controller.h"
 #include "ash/shell.h"
-#include "ash/system/power/power_status.h"
 #include "ash/test/test_ash_web_view.h"
+#include "ash/wallpaper/wallpaper_controller_impl.h"
 #include "ash/wm/tablet_mode/tablet_mode_controller.h"
 #include "base/files/scoped_temp_dir.h"
 #include "base/functional/callback.h"
@@ -40,7 +39,6 @@
 #include "base/ranges/algorithm.h"
 #include "base/run_loop.h"
 #include "base/scoped_observation.h"
-#include "base/strings/strcat.h"
 #include "base/task/sequenced_task_runner.h"
 #include "base/test/bind.h"
 #include "base/test/metrics/histogram_tester.h"
@@ -52,8 +50,6 @@
 #include "chromeos/ash/components/assistant/buildflags.h"
 #include "chromeos/ash/services/libassistant/public/cpp/assistant_interaction_metadata.h"
 #include "chromeos/dbus/power/fake_power_manager_client.h"
-#include "chromeos/dbus/power/power_manager_client.h"
-#include "chromeos/dbus/power_manager/power_supply_properties.pb.h"
 #include "chromeos/dbus/power_manager/suspend.pb.h"
 #include "net/base/url_util.h"
 #include "ui/events/event.h"
@@ -128,13 +124,6 @@ class AmbientControllerTest : public AmbientAshTestBase {
     return pref_change_registrar->IsObserved(pref_name);
   }
 
-  bool WidgetsVisible() {
-    const auto& views = GetContainerViews();
-    return !views.empty() && base::ranges::all_of(views, [](const auto* view) {
-      return view->GetWidget()->IsVisible();
-    });
-  }
-
   bool AreSessionSpecificObserversBound() {
     auto* ctrl = ambient_controller();
 
@@ -193,26 +182,29 @@ INSTANTIATE_TEST_SUITE_P(
                         ,
                     AmbientUiSettings(AmbientTheme::kFeelTheBreeze)
 #endif  // BUILDFLAG(HAS_ASH_AMBIENT_ANIMATION_RESOURCES)
-                        ));
+                        ),
+    [](const ::testing::TestParamInfo<AmbientUiSettings>& param_info) {
+      return std::string(ToString(param_info.param.theme()));
+    });
 
 TEST_P(AmbientControllerTestForAnyUiSettings, ShowAmbientScreenUponLock) {
   LockScreen();
   // Lockscreen will not immediately show Ambient mode.
-  EXPECT_FALSE(ambient_controller()->IsShown());
+  EXPECT_FALSE(ambient_controller()->ShouldShowAmbientUi());
 
   // Ambient mode will show after inacivity and successfully loading first
   // image.
-  FastForwardToLockScreenTimeout();
+  FastForwardByLockScreenInactivityTimeout();
   FastForwardTiny();
 
   EXPECT_FALSE(GetContainerViews().empty());
   EXPECT_EQ(AmbientUiModel::Get()->ui_visibility(),
-            AmbientUiVisibility::kShown);
-  EXPECT_TRUE(ambient_controller()->IsShown());
+            AmbientUiVisibility::kShouldShow);
+  EXPECT_TRUE(ambient_controller()->ShouldShowAmbientUi());
 
   // Clean up.
   UnlockScreen();
-  EXPECT_FALSE(ambient_controller()->IsShown());
+  EXPECT_FALSE(ambient_controller()->ShouldShowAmbientUi());
 }
 
 TEST_P(AmbientControllerTestForAnyUiSettings,
@@ -221,32 +213,32 @@ TEST_P(AmbientControllerTestForAnyUiSettings,
 
   LockScreen();
   // Lockscreen will not immediately show Ambient mode.
-  EXPECT_FALSE(ambient_controller()->IsShown());
+  EXPECT_FALSE(ambient_controller()->ShouldShowAmbientUi());
 
   // Ambient mode will not show after inacivity and successfully loading first
   // image.
-  FastForwardToLockScreenTimeout();
+  FastForwardByLockScreenInactivityTimeout();
   FastForwardTiny();
 
   EXPECT_TRUE(GetContainerViews().empty());
   EXPECT_EQ(AmbientUiModel::Get()->ui_visibility(),
             AmbientUiVisibility::kClosed);
-  EXPECT_FALSE(ambient_controller()->IsShown());
+  EXPECT_FALSE(ambient_controller()->ShouldShowAmbientUi());
 
   // Clean up.
   UnlockScreen();
-  EXPECT_FALSE(ambient_controller()->IsShown());
+  EXPECT_FALSE(ambient_controller()->ShouldShowAmbientUi());
 }
 
 TEST_P(AmbientControllerTestForAnyUiSettings, HideAmbientScreen) {
   LockScreen();
-  FastForwardToLockScreenTimeout();
+  FastForwardByLockScreenInactivityTimeout();
   FastForwardTiny();
 
   EXPECT_FALSE(GetContainerViews().empty());
   EXPECT_EQ(AmbientUiModel::Get()->ui_visibility(),
-            AmbientUiVisibility::kShown);
-  EXPECT_TRUE(ambient_controller()->IsShown());
+            AmbientUiVisibility::kShouldShow);
+  EXPECT_TRUE(ambient_controller()->ShouldShowAmbientUi());
 
   HideAmbientScreen();
 
@@ -257,24 +249,24 @@ TEST_P(AmbientControllerTestForAnyUiSettings, HideAmbientScreen) {
 
   // Clean up.
   UnlockScreen();
-  EXPECT_FALSE(ambient_controller()->IsShown());
+  EXPECT_FALSE(ambient_controller()->ShouldShowAmbientUi());
 }
 
 TEST_P(AmbientControllerTestForAnyUiSettings, CloseAmbientScreenUponUnlock) {
   LockScreen();
-  FastForwardToLockScreenTimeout();
+  FastForwardByLockScreenInactivityTimeout();
   FastForwardTiny();
 
   EXPECT_FALSE(GetContainerViews().empty());
   EXPECT_EQ(AmbientUiModel::Get()->ui_visibility(),
-            AmbientUiVisibility::kShown);
-  EXPECT_TRUE(ambient_controller()->IsShown());
+            AmbientUiVisibility::kShouldShow);
+  EXPECT_TRUE(ambient_controller()->ShouldShowAmbientUi());
 
   UnlockScreen();
 
   EXPECT_EQ(AmbientUiModel::Get()->ui_visibility(),
             AmbientUiVisibility::kClosed);
-  EXPECT_FALSE(ambient_controller()->IsShown());
+  EXPECT_FALSE(ambient_controller()->ShouldShowAmbientUi());
   // The view should be destroyed along the widget.
   FastForwardTiny();
   EXPECT_TRUE(GetContainerViews().empty());
@@ -288,27 +280,27 @@ TEST_P(AmbientControllerTestForAnyUiSettings,
   SetAmbientModeEnabled(true);
 
   LockScreen();
-  FastForwardToLockScreenTimeout();
+  FastForwardByLockScreenInactivityTimeout();
   FastForwardTiny();
 
   EXPECT_FALSE(GetContainerViews().empty());
   EXPECT_EQ(AmbientUiModel::Get()->ui_visibility(),
-            AmbientUiVisibility::kShown);
-  EXPECT_TRUE(ambient_controller()->IsShown());
+            AmbientUiVisibility::kShouldShow);
+  EXPECT_TRUE(ambient_controller()->ShouldShowAmbientUi());
 
   SimulateUserLogin(kUser2);
   EXPECT_EQ(AmbientUiModel::Get()->ui_visibility(),
             AmbientUiVisibility::kClosed);
-  EXPECT_FALSE(ambient_controller()->IsShown());
+  EXPECT_FALSE(ambient_controller()->ShouldShowAmbientUi());
   // The view should be destroyed along the widget.
   FastForwardTiny();
   EXPECT_TRUE(GetContainerViews().empty());
 
-  FastForwardToLockScreenTimeout();
+  FastForwardByLockScreenInactivityTimeout();
   FastForwardTiny();
   EXPECT_EQ(AmbientUiModel::Get()->ui_visibility(),
             AmbientUiVisibility::kClosed);
-  EXPECT_FALSE(ambient_controller()->IsShown());
+  EXPECT_FALSE(ambient_controller()->ShouldShowAmbientUi());
   // The view should be destroyed along the widget.
   FastForwardTiny();
   EXPECT_TRUE(GetContainerViews().empty());
@@ -318,17 +310,17 @@ TEST_F(AmbientControllerTest,
        CloseAmbientScreenUponPowerButtonClickInTabletMode) {
   Shell::Get()->tablet_mode_controller()->SetEnabledForTest(true);
   LockScreen();
-  FastForwardToLockScreenTimeout();
+  FastForwardByLockScreenInactivityTimeout();
   FastForwardTiny();
 
   EXPECT_FALSE(GetContainerViews().empty());
-  EXPECT_TRUE(ambient_controller()->IsShown());
+  EXPECT_TRUE(ambient_controller()->ShouldShowAmbientUi());
 
   SimulatePowerButtonClick();
 
   EXPECT_EQ(AmbientUiModel::Get()->ui_visibility(),
             AmbientUiVisibility::kClosed);
-  EXPECT_FALSE(ambient_controller()->IsShown());
+  EXPECT_FALSE(ambient_controller()->ShouldShowAmbientUi());
   // The view should be destroyed along the widget.
   EXPECT_TRUE(GetContainerViews().empty());
 }
@@ -340,13 +332,13 @@ TEST_F(AmbientControllerTest, NotShowAmbientWhenLockSecondaryUser) {
   SetAmbientModeEnabled(true);
 
   LockScreen();
-  FastForwardToLockScreenTimeout();
+  FastForwardByLockScreenInactivityTimeout();
   FastForwardTiny();
 
   EXPECT_FALSE(GetContainerViews().empty());
   EXPECT_EQ(AmbientUiModel::Get()->ui_visibility(),
-            AmbientUiVisibility::kShown);
-  EXPECT_TRUE(ambient_controller()->IsShown());
+            AmbientUiVisibility::kShouldShow);
+  EXPECT_TRUE(ambient_controller()->ShouldShowAmbientUi());
 
   SimulateUserLogin(kUser2);
   SetAmbientModeEnabled(true);
@@ -355,18 +347,18 @@ TEST_F(AmbientControllerTest, NotShowAmbientWhenLockSecondaryUser) {
   // turned on.
   EXPECT_EQ(AmbientUiModel::Get()->ui_visibility(),
             AmbientUiVisibility::kClosed);
-  EXPECT_FALSE(ambient_controller()->IsShown());
+  EXPECT_FALSE(ambient_controller()->ShouldShowAmbientUi());
   // The view should be destroyed along the widget.
   FastForwardTiny();
   EXPECT_TRUE(GetContainerViews().empty());
 
   LockScreen();
-  FastForwardToLockScreenTimeout();
+  FastForwardByLockScreenInactivityTimeout();
   FastForwardTiny();
 
   EXPECT_EQ(AmbientUiModel::Get()->ui_visibility(),
             AmbientUiVisibility::kClosed);
-  EXPECT_FALSE(ambient_controller()->IsShown());
+  EXPECT_FALSE(ambient_controller()->ShouldShowAmbientUi());
   // The view should be destroyed along the widget.
   EXPECT_TRUE(GetContainerViews().empty());
 }
@@ -422,6 +414,20 @@ TEST_P(AmbientControllerTestForAnyUiSettings, ShouldReturnCachedAccessToken) {
 
   // Clean up.
   CloseAmbientScreen();
+}
+
+// The test body intentionally does not have any actual test expectations. The
+// test just has to run without crashing on tear down.
+// http://crbug.com/1428481
+TEST_P(AmbientControllerTestForAnyUiSettings,
+       ShutsDownWithoutCrashingWhileAmbientSessionActive) {
+  LockScreen();
+  FastForwardByLockScreenInactivityTimeout();
+  FastForwardTiny();
+  ASSERT_TRUE(ambient_controller()->ShouldShowAmbientUi());
+  // Simulates what happens in a real shutdown scenario. The crash bug above
+  // cannot be reproduced without this.
+  ClearLogin();
 }
 
 TEST_F(AmbientControllerTest, ShouldReturnEmptyAccessToken) {
@@ -550,7 +556,7 @@ TEST_F(AmbientControllerTest,
   // Lock screen to start ambient mode, and flush the loop to ensure
   // the acquire wake lock request has reached the wake lock provider.
   LockScreen();
-  FastForwardToLockScreenTimeout();
+  FastForwardByLockScreenInactivityTimeout();
   FastForwardTiny();
 
   EXPECT_EQ(1, GetNumOfActiveWakeLocks(
@@ -563,7 +569,7 @@ TEST_F(AmbientControllerTest,
                    device::mojom::WakeLockType::kPreventDisplaySleep));
 
   // Ambient screen showup again after inactivity.
-  FastForwardToLockScreenTimeout();
+  FastForwardByLockScreenInactivityTimeout();
 
   EXPECT_EQ(1, GetNumOfActiveWakeLocks(
                    device::mojom::WakeLockType::kPreventDisplaySleep));
@@ -585,7 +591,7 @@ TEST_F(AmbientControllerTest,
   // Lock screen to start ambient mode, and flush the loop to ensure
   // the acquire wake lock request has reached the wake lock provider.
   LockScreen();
-  FastForwardToLockScreenTimeout();
+  FastForwardByLockScreenInactivityTimeout();
   FastForwardTiny();
 
   EXPECT_EQ(1, GetNumOfActiveWakeLocks(
@@ -598,7 +604,7 @@ TEST_F(AmbientControllerTest,
                    device::mojom::WakeLockType::kPreventDisplaySleep));
 
   // Ambient screen showup again after inactivity.
-  FastForwardToLockScreenTimeout();
+  FastForwardByLockScreenInactivityTimeout();
 
   EXPECT_EQ(1, GetNumOfActiveWakeLocks(
                    device::mojom::WakeLockType::kPreventDisplaySleep));
@@ -619,10 +625,10 @@ TEST_F(AmbientControllerTest,
 
   // Lock screen to start ambient mode.
   LockScreen();
-  FastForwardToLockScreenTimeout();
+  FastForwardByLockScreenInactivityTimeout();
   FastForwardTiny();
 
-  EXPECT_TRUE(ambient_controller()->IsShown());
+  EXPECT_TRUE(ambient_controller()->ShouldShowAmbientUi());
   // Should not acquire wake lock when device is not charging and with low
   // battery.
   EXPECT_EQ(0, GetNumOfActiveWakeLocks(
@@ -708,9 +714,9 @@ TEST_P(AmbientControllerTestForAnyUiSettings,
   events.emplace_back(nullptr);
 
   for (const auto& event : events) {
-    ShowAmbientScreen();
+    SetAmbientShownAndWaitForWidgets();
     FastForwardTiny();
-    EXPECT_TRUE(WidgetsVisible());
+    EXPECT_TRUE(ambient_controller()->IsShowing());
 
     if (!event) {
       ambient_controller()->OnUserActivity(nullptr);
@@ -732,106 +738,106 @@ TEST_P(AmbientControllerTestForAnyUiSettings,
 
 TEST_P(AmbientControllerTestForAnyUiSettings, ShouldDismissAndThenComesBack) {
   LockScreen();
-  FastForwardToLockScreenTimeout();
+  FastForwardByLockScreenInactivityTimeout();
   FastForwardTiny();
-  EXPECT_TRUE(WidgetsVisible());
+  EXPECT_TRUE(ambient_controller()->IsShowing());
 
   GetEventGenerator()->PressLeftButton();
   FastForwardTiny();
   EXPECT_TRUE(GetContainerViews().empty());
 
-  FastForwardToLockScreenTimeout();
+  FastForwardByLockScreenInactivityTimeout();
   FastForwardTiny();
-  EXPECT_TRUE(WidgetsVisible());
+  EXPECT_TRUE(ambient_controller()->IsShowing());
 }
 
 TEST_P(AmbientControllerTestForAnyUiSettings,
        ShouldDismissContainerViewOnKeyEvent) {
   // Without user interaction, should show ambient mode.
-  ShowAmbientScreen();
-  EXPECT_TRUE(WidgetsVisible());
+  SetAmbientShownAndWaitForWidgets();
+  EXPECT_TRUE(ambient_controller()->IsShowing());
   CloseAmbientScreen();
 
   // When ambient is shown, OnUserActivity() should ignore key event.
-  ambient_controller()->ShowUi();
-  EXPECT_TRUE(ambient_controller()->IsShown());
+  ambient_controller()->SetUiVisibilityShown();
+  EXPECT_TRUE(ambient_controller()->ShouldShowAmbientUi());
 
   // General key press will exit ambient mode.
   // Simulate key press to close the widget.
   PressAndReleaseKey(ui::VKEY_A);
-  EXPECT_FALSE(ambient_controller()->IsShown());
+  EXPECT_FALSE(ambient_controller()->ShouldShowAmbientUi());
 }
 
 TEST_F(AmbientControllerTest,
        ShouldDismissContainerViewOnKeyEventWhenLockScreenInBackground) {
   GetSessionControllerClient()->SetShouldLockScreenAutomatically(true);
   SetPowerStateCharging();
-  EXPECT_FALSE(ambient_controller()->IsShown());
+  EXPECT_FALSE(ambient_controller()->ShouldShowAmbientUi());
 
   // Should not lock the device and enter ambient mode when the screen is
   // dimmed.
   SetScreenIdleStateAndWait(/*dimmed=*/true, /*off=*/false);
   EXPECT_FALSE(IsLocked());
-  EXPECT_TRUE(ambient_controller()->IsShown());
+  EXPECT_TRUE(ambient_controller()->ShouldShowAmbientUi());
 
-  FastForwardToBackgroundLockScreenTimeout();
+  FastForwardByBackgroundLockScreenTimeout();
   EXPECT_TRUE(IsLocked());
   // Should not disrupt ongoing ambient mode.
-  EXPECT_TRUE(ambient_controller()->IsShown());
+  EXPECT_TRUE(ambient_controller()->ShouldShowAmbientUi());
 
   // General key press will exit ambient mode.
   // Simulate key press to close the widget.
   PressAndReleaseKey(ui::VKEY_A);
-  EXPECT_FALSE(ambient_controller()->IsShown());
+  EXPECT_FALSE(ambient_controller()->ShouldShowAmbientUi());
 }
 
 TEST_F(AmbientControllerTest,
        ShouldShowAmbientScreenWithLockscreenWhenScreenIsDimmed) {
   GetSessionControllerClient()->SetShouldLockScreenAutomatically(true);
   SetPowerStateCharging();
-  EXPECT_FALSE(ambient_controller()->IsShown());
+  EXPECT_FALSE(ambient_controller()->ShouldShowAmbientUi());
 
   // Should enter ambient mode when the screen is dimmed.
   SetScreenIdleStateAndWait(/*dimmed=*/true, /*off=*/false);
   EXPECT_FALSE(IsLocked());
-  EXPECT_TRUE(ambient_controller()->IsShown());
+  EXPECT_TRUE(ambient_controller()->ShouldShowAmbientUi());
 
-  FastForwardToBackgroundLockScreenTimeout();
+  FastForwardByBackgroundLockScreenTimeout();
   EXPECT_TRUE(IsLocked());
   // Should not disrupt ongoing ambient mode.
-  EXPECT_TRUE(ambient_controller()->IsShown());
+  EXPECT_TRUE(ambient_controller()->ShouldShowAmbientUi());
 
   // Closes ambient for clean-up.
   UnlockScreen();
-  EXPECT_FALSE(ambient_controller()->IsShown());
+  EXPECT_FALSE(ambient_controller()->ShouldShowAmbientUi());
 }
 
 TEST_F(AmbientControllerTest,
        ShouldShowAmbientScreenWithLockscreenWithNoisyPowerEvents) {
   GetSessionControllerClient()->SetShouldLockScreenAutomatically(true);
   SetPowerStateCharging();
-  EXPECT_FALSE(ambient_controller()->IsShown());
+  EXPECT_FALSE(ambient_controller()->ShouldShowAmbientUi());
 
   // Should enter ambient mode when the screen is dimmed.
   SetScreenIdleStateAndWait(/*dimmed=*/true, /*off=*/false);
   EXPECT_FALSE(IsLocked());
 
   FastForwardTiny();
-  EXPECT_TRUE(ambient_controller()->IsShown());
+  EXPECT_TRUE(ambient_controller()->ShouldShowAmbientUi());
 
-  FastForwardHalfLockScreenDelay();
+  FastForwardByBackgroundLockScreenTimeout(0.5001);
   SetPowerStateCharging();
 
-  FastForwardHalfLockScreenDelay();
+  FastForwardByBackgroundLockScreenTimeout(0.5001);
   SetPowerStateCharging();
 
   EXPECT_TRUE(IsLocked());
   // Should not disrupt ongoing ambient mode.
-  EXPECT_TRUE(ambient_controller()->IsShown());
+  EXPECT_TRUE(ambient_controller()->ShouldShowAmbientUi());
 
   // Closes ambient for clean-up.
   UnlockScreen();
-  EXPECT_FALSE(ambient_controller()->IsShown());
+  EXPECT_FALSE(ambient_controller()->ShouldShowAmbientUi());
 }
 
 TEST_F(AmbientControllerTest,
@@ -841,19 +847,19 @@ TEST_F(AmbientControllerTest,
   // mode since we do not prevent the device go to sleep which will natually
   // lock the device.
   SetPowerStateDischarging();
-  EXPECT_FALSE(ambient_controller()->IsShown());
+  EXPECT_FALSE(ambient_controller()->ShouldShowAmbientUi());
 
   // Should not lock the device but still enter ambient mode when the screen is
   // dimmed.
   SetScreenIdleStateAndWait(/*dimmed=*/true, /*off=*/false);
   EXPECT_FALSE(IsLocked());
-  EXPECT_TRUE(ambient_controller()->IsShown());
+  EXPECT_TRUE(ambient_controller()->ShouldShowAmbientUi());
 
-  FastForwardToLockScreenTimeout();
+  FastForwardByLockScreenInactivityTimeout();
   FastForwardTiny();
-  EXPECT_TRUE(ambient_controller()->IsShown());
+  EXPECT_TRUE(ambient_controller()->ShouldShowAmbientUi());
 
-  FastForwardToBackgroundLockScreenTimeout();
+  FastForwardByBackgroundLockScreenTimeout();
   EXPECT_FALSE(IsLocked());
 
   // Closes ambient for clean-up.
@@ -863,7 +869,7 @@ TEST_F(AmbientControllerTest,
 TEST_F(AmbientControllerTest, ShouldShowAmbientScreenWhenScreenIsDimmed) {
   GetSessionControllerClient()->SetShouldLockScreenAutomatically(false);
   SetPowerStateCharging();
-  EXPECT_FALSE(ambient_controller()->IsShown());
+  EXPECT_FALSE(ambient_controller()->ShouldShowAmbientUi());
 
   // Should not lock the device but enter ambient mode when the screen is
   // dimmed.
@@ -871,9 +877,9 @@ TEST_F(AmbientControllerTest, ShouldShowAmbientScreenWhenScreenIsDimmed) {
   EXPECT_FALSE(IsLocked());
 
   FastForwardTiny();
-  EXPECT_TRUE(ambient_controller()->IsShown());
+  EXPECT_TRUE(ambient_controller()->ShouldShowAmbientUi());
 
-  FastForwardToBackgroundLockScreenTimeout();
+  FastForwardByBackgroundLockScreenTimeout();
   EXPECT_FALSE(IsLocked());
 
   // Closes ambient for clean-up.
@@ -885,22 +891,22 @@ TEST_F(AmbientControllerTest, HandlesPreviousImageFailuresWithLockScreen) {
   // remember the old failure.
   SetDownloadPhotoData("");
   LockScreen();
-  FastForwardToLockScreenTimeout();
+  FastForwardByLockScreenInactivityTimeout();
   FastForwardTiny();
-  ASSERT_TRUE(ambient_controller()->IsShown());
+  ASSERT_TRUE(ambient_controller()->ShouldShowAmbientUi());
   AmbientUiVisibilityBarrier ambient_closed_barrier(
       AmbientUiVisibility::kClosed);
   ambient_closed_barrier.WaitWithTimeout(base::Seconds(15));
-  ASSERT_FALSE(ambient_controller()->IsShown());
+  ASSERT_FALSE(ambient_controller()->ShouldShowAmbientUi());
   UnlockScreen();
 
   // Now simulate FIFE downloads starting to work again. The device should be
   // able to enter ambient mode.
   ClearDownloadPhotoData();
   LockScreen();
-  FastForwardToLockScreenTimeout();
+  FastForwardByLockScreenInactivityTimeout();
   FastForwardTiny();
-  ASSERT_TRUE(ambient_controller()->IsShown());
+  ASSERT_TRUE(ambient_controller()->ShouldShowAmbientUi());
 }
 
 TEST_F(AmbientControllerTest, HandlesPreviousImageFailuresWithDimmedScreen) {
@@ -912,11 +918,11 @@ TEST_F(AmbientControllerTest, HandlesPreviousImageFailuresWithDimmedScreen) {
   SetDownloadPhotoData("");
   SetScreenIdleStateAndWait(/*is_screen_dimmed=*/true, /*is_off=*/false);
   FastForwardTiny();
-  ASSERT_TRUE(ambient_controller()->IsShown());
+  ASSERT_TRUE(ambient_controller()->ShouldShowAmbientUi());
   AmbientUiVisibilityBarrier ambient_closed_barrier(
       AmbientUiVisibility::kClosed);
   ambient_closed_barrier.WaitWithTimeout(base::Seconds(15));
-  ASSERT_FALSE(ambient_controller()->IsShown());
+  ASSERT_FALSE(ambient_controller()->ShouldShowAmbientUi());
 
   SetScreenIdleStateAndWait(/*is_screen_dimmed=*/false, /*is_off=*/false);
 
@@ -924,7 +930,7 @@ TEST_F(AmbientControllerTest, HandlesPreviousImageFailuresWithDimmedScreen) {
   // it shouldn't because of the previous image failures.
   SetScreenIdleStateAndWait(/*is_screen_dimmed=*/true, /*is_off=*/false);
   FastForwardTiny();
-  ASSERT_FALSE(ambient_controller()->IsShown());
+  ASSERT_FALSE(ambient_controller()->ShouldShowAmbientUi());
 
   SetScreenIdleStateAndWait(/*is_screen_dimmed=*/false, /*is_off=*/false);
 
@@ -933,7 +939,7 @@ TEST_F(AmbientControllerTest, HandlesPreviousImageFailuresWithDimmedScreen) {
   ClearDownloadPhotoData();
   SetScreenIdleStateAndWait(/*is_screen_dimmed=*/true, /*is_off=*/false);
   FastForwardTiny();
-  ASSERT_TRUE(ambient_controller()->IsShown());
+  ASSERT_TRUE(ambient_controller()->ShouldShowAmbientUi());
 
   // Closes ambient for clean-up.
   CloseAmbientScreen();
@@ -941,7 +947,7 @@ TEST_F(AmbientControllerTest, HandlesPreviousImageFailuresWithDimmedScreen) {
 
 TEST_F(AmbientControllerTest, ShouldHideAmbientScreenWhenDisplayIsOff) {
   GetSessionControllerClient()->SetShouldLockScreenAutomatically(false);
-  EXPECT_FALSE(ambient_controller()->IsShown());
+  EXPECT_FALSE(ambient_controller()->ShouldShowAmbientUi());
 
   // Should not lock the device and enter ambient mode when the screen is
   // dimmed.
@@ -949,58 +955,58 @@ TEST_F(AmbientControllerTest, ShouldHideAmbientScreenWhenDisplayIsOff) {
   EXPECT_FALSE(IsLocked());
 
   FastForwardTiny();
-  EXPECT_TRUE(ambient_controller()->IsShown());
+  EXPECT_TRUE(ambient_controller()->ShouldShowAmbientUi());
 
   // Should dismiss ambient mode screen.
   SetScreenIdleStateAndWait(/*dimmed=*/true, /*off=*/true);
   FastForwardTiny();
-  EXPECT_FALSE(ambient_controller()->IsShown());
+  EXPECT_FALSE(ambient_controller()->ShouldShowAmbientUi());
 
   // Screen back on again, should not have ambient screen.
   SetScreenIdleStateAndWait(/*dimmed=*/false, /*off=*/false);
   FastForwardTiny();
-  EXPECT_FALSE(ambient_controller()->IsShown());
+  EXPECT_FALSE(ambient_controller()->ShouldShowAmbientUi());
 }
 
 TEST_F(AmbientControllerTest,
        ShouldHideAmbientScreenWhenDisplayIsOffThenComesBackWithLockScreen) {
   GetSessionControllerClient()->SetShouldLockScreenAutomatically(true);
   SetPowerStateCharging();
-  EXPECT_FALSE(ambient_controller()->IsShown());
+  EXPECT_FALSE(ambient_controller()->ShouldShowAmbientUi());
 
   // Should not lock the device and enter ambient mode when the screen is
   // dimmed.
   SetScreenIdleStateAndWait(/*dimmed=*/true, /*off=*/false);
   EXPECT_FALSE(IsLocked());
 
-  FastForwardToLockScreenTimeout();
+  FastForwardByLockScreenInactivityTimeout();
   FastForwardTiny();
-  EXPECT_TRUE(ambient_controller()->IsShown());
+  EXPECT_TRUE(ambient_controller()->ShouldShowAmbientUi());
 
-  FastForwardToBackgroundLockScreenTimeout();
+  FastForwardByBackgroundLockScreenTimeout();
   EXPECT_TRUE(IsLocked());
 
   // Should dismiss ambient mode screen.
   SetScreenIdleStateAndWait(/*dimmed=*/true, /*off=*/true);
   FastForwardTiny();
-  EXPECT_FALSE(ambient_controller()->IsShown());
+  EXPECT_FALSE(ambient_controller()->ShouldShowAmbientUi());
 
   // Screen back on again, should not have ambient screen, but still has lock
   // screen.
   SetScreenIdleStateAndWait(/*dimmed=*/false, /*off=*/false);
   EXPECT_TRUE(IsLocked());
-  EXPECT_FALSE(ambient_controller()->IsShown());
+  EXPECT_FALSE(ambient_controller()->ShouldShowAmbientUi());
 
-  FastForwardToLockScreenTimeout();
+  FastForwardByLockScreenInactivityTimeout();
   FastForwardTiny();
-  EXPECT_TRUE(ambient_controller()->IsShown());
+  EXPECT_TRUE(ambient_controller()->ShouldShowAmbientUi());
 }
 
 TEST_F(AmbientControllerTest,
        ShouldHideAmbientScreenWhenDisplayIsOffAndNotStartWhenLockScreen) {
   GetSessionControllerClient()->SetShouldLockScreenAutomatically(true);
   SetPowerStateDischarging();
-  EXPECT_FALSE(ambient_controller()->IsShown());
+  EXPECT_FALSE(ambient_controller()->ShouldShowAmbientUi());
 
   // Should not lock the device and enter ambient mode when the screen is
   // dimmed.
@@ -1008,46 +1014,46 @@ TEST_F(AmbientControllerTest,
   EXPECT_FALSE(IsLocked());
 
   FastForwardTiny();
-  EXPECT_TRUE(ambient_controller()->IsShown());
+  EXPECT_TRUE(ambient_controller()->ShouldShowAmbientUi());
 
   // Should not lock the device because the device is not charging.
-  FastForwardToBackgroundLockScreenTimeout();
+  FastForwardByBackgroundLockScreenTimeout();
   EXPECT_FALSE(IsLocked());
 
   // Should dismiss ambient mode screen.
   SetScreenIdleStateAndWait(/*dimmed=*/true, /*off=*/true);
   FastForwardTiny();
-  EXPECT_FALSE(ambient_controller()->IsShown());
+  EXPECT_FALSE(ambient_controller()->ShouldShowAmbientUi());
 
   // Lock screen will not start ambient mode.
   LockScreen();
   EXPECT_TRUE(IsLocked());
 
-  FastForwardToLockScreenTimeout();
+  FastForwardByLockScreenInactivityTimeout();
   FastForwardTiny();
-  EXPECT_FALSE(ambient_controller()->IsShown());
+  EXPECT_FALSE(ambient_controller()->ShouldShowAmbientUi());
 
   // Screen back on again, should not have ambient screen, but still has lock
   // screen.
   SetScreenIdleStateAndWait(/*dimmed=*/false, /*off=*/false);
   EXPECT_TRUE(IsLocked());
-  EXPECT_FALSE(ambient_controller()->IsShown());
+  EXPECT_FALSE(ambient_controller()->ShouldShowAmbientUi());
 
-  FastForwardToLockScreenTimeout();
+  FastForwardByLockScreenInactivityTimeout();
   FastForwardTiny();
-  EXPECT_TRUE(ambient_controller()->IsShown());
+  EXPECT_TRUE(ambient_controller()->ShouldShowAmbientUi());
 }
 
 TEST_F(AmbientControllerTest, HandlesPhotoDownloadOutage) {
   SetDownloadPhotoData("");
 
   LockScreen();
-  FastForwardToLockScreenTimeout();
-  ASSERT_TRUE(ambient_controller()->IsShown());
+  FastForwardByLockScreenInactivityTimeout();
+  ASSERT_TRUE(ambient_controller()->ShouldShowAmbientUi());
   AmbientUiVisibilityBarrier ambient_closed_barrier(
       AmbientUiVisibility::kClosed);
   ambient_closed_barrier.WaitWithTimeout(base::Seconds(15));
-  EXPECT_FALSE(ambient_controller()->IsShown());
+  EXPECT_FALSE(ambient_controller()->ShouldShowAmbientUi());
 }
 
 TEST_P(AmbientControllerTestForAnyUiSettings, HideCursor) {
@@ -1057,25 +1063,25 @@ TEST_P(AmbientControllerTestForAnyUiSettings, HideCursor) {
   cursor_manager->ShowCursor();
   EXPECT_TRUE(cursor_manager->IsCursorVisible());
 
-  FastForwardToLockScreenTimeout();
+  FastForwardByLockScreenInactivityTimeout();
   FastForwardTiny();
 
   EXPECT_FALSE(GetContainerViews().empty());
   EXPECT_EQ(AmbientUiModel::Get()->ui_visibility(),
-            AmbientUiVisibility::kShown);
-  EXPECT_TRUE(ambient_controller()->IsShown());
+            AmbientUiVisibility::kShouldShow);
+  EXPECT_TRUE(ambient_controller()->ShouldShowAmbientUi());
   EXPECT_FALSE(cursor_manager->IsCursorVisible());
 
   // Clean up.
   UnlockScreen();
-  EXPECT_FALSE(ambient_controller()->IsShown());
+  EXPECT_FALSE(ambient_controller()->ShouldShowAmbientUi());
 }
 
 TEST_P(AmbientControllerTestForAnyUiSettings, ShowsOnMultipleDisplays) {
   UpdateDisplay("800x600,800x600");
   FastForwardTiny();
 
-  ShowAmbientScreen();
+  SetAmbientShownAndWaitForWidgets();
 
   auto* screen = display::Screen::GetScreen();
   EXPECT_EQ(screen->GetNumDisplays(), 2);
@@ -1112,7 +1118,7 @@ TEST_P(AmbientControllerTestForAnyUiSettings, RespondsToDisplayAdded) {
   ui::PlatformEventSource::SetIgnoreNativePlatformEvents(true);
 
   UpdateDisplay("800x600");
-  ShowAmbientScreen();
+  SetAmbientShownAndWaitForWidgets();
 
   auto* screen = display::Screen::GetScreen();
   EXPECT_EQ(screen->GetNumDisplays(), 1);
@@ -1121,7 +1127,7 @@ TEST_P(AmbientControllerTestForAnyUiSettings, RespondsToDisplayAdded) {
   UpdateDisplay("800x600,800x600");
   FastForwardTiny();
 
-  EXPECT_TRUE(WidgetsVisible());
+  EXPECT_TRUE(ambient_controller()->IsShowing());
   EXPECT_EQ(screen->GetNumDisplays(), 2);
   EXPECT_EQ(GetContainerViews().size(), 2u);
   for (auto* ctrl : RootWindowController::root_window_controllers())
@@ -1136,12 +1142,12 @@ TEST_P(AmbientControllerTestForAnyUiSettings, HandlesDisplayRemoved) {
   UpdateDisplay("800x600,800x600");
   FastForwardTiny();
 
-  ShowAmbientScreen();
+  SetAmbientShownAndWaitForWidgets();
 
   auto* screen = display::Screen::GetScreen();
   EXPECT_EQ(screen->GetNumDisplays(), 2);
   EXPECT_EQ(GetContainerViews().size(), 2u);
-  EXPECT_TRUE(WidgetsVisible());
+  EXPECT_TRUE(ambient_controller()->IsShowing());
 
   // Changing to one screen will destroy the widget on the non-primary screen.
   UpdateDisplay("800x600");
@@ -1149,44 +1155,44 @@ TEST_P(AmbientControllerTestForAnyUiSettings, HandlesDisplayRemoved) {
 
   EXPECT_EQ(screen->GetNumDisplays(), 1);
   EXPECT_EQ(GetContainerViews().size(), 1u);
-  EXPECT_TRUE(WidgetsVisible());
+  EXPECT_TRUE(ambient_controller()->IsShowing());
 }
 
 TEST_F(AmbientControllerTest, ClosesAmbientBeforeSuspend) {
   LockScreen();
-  FastForwardToLockScreenTimeout();
+  FastForwardByLockScreenInactivityTimeout();
 
-  EXPECT_TRUE(ambient_controller()->IsShown());
+  EXPECT_TRUE(ambient_controller()->ShouldShowAmbientUi());
   SimulateSystemSuspendAndWait(power_manager::SuspendImminent::Reason::
                                    SuspendImminent_Reason_LID_CLOSED);
 
-  EXPECT_FALSE(ambient_controller()->IsShown());
+  EXPECT_FALSE(ambient_controller()->ShouldShowAmbientUi());
 
-  FastForwardToLockScreenTimeout();
+  FastForwardByLockScreenInactivityTimeout();
   // Ambient mode should not resume until SuspendDone is received.
-  EXPECT_FALSE(ambient_controller()->IsShown());
+  EXPECT_FALSE(ambient_controller()->ShouldShowAmbientUi());
 }
 
 TEST_F(AmbientControllerTest, RestartsAmbientAfterSuspend) {
   LockScreen();
-  FastForwardToLockScreenTimeout();
+  FastForwardByLockScreenInactivityTimeout();
 
-  EXPECT_TRUE(ambient_controller()->IsShown());
+  EXPECT_TRUE(ambient_controller()->ShouldShowAmbientUi());
 
   SimulateSystemSuspendAndWait(
       power_manager::SuspendImminent::Reason::SuspendImminent_Reason_IDLE);
 
-  EXPECT_FALSE(ambient_controller()->IsShown());
+  EXPECT_FALSE(ambient_controller()->ShouldShowAmbientUi());
 
   // This call should be blocked by prior |SuspendImminent| until |SuspendDone|.
-  ambient_controller()->ShowUi();
-  EXPECT_FALSE(ambient_controller()->IsShown());
+  ambient_controller()->SetUiVisibilityShown();
+  EXPECT_FALSE(ambient_controller()->ShouldShowAmbientUi());
 
   SimulateSystemResumeAndWait();
 
-  FastForwardToLockScreenTimeout();
+  FastForwardByLockScreenInactivityTimeout();
 
-  EXPECT_TRUE(ambient_controller()->IsShown());
+  EXPECT_TRUE(ambient_controller()->ShouldShowAmbientUi());
 }
 
 TEST_F(AmbientControllerTest, ObservesPrefsWhenAmbientEnabled) {
@@ -1265,7 +1271,7 @@ TEST_F(AmbientControllerTest, BindsObserversWhenAmbientOn) {
   // Do not monitor power status yet.
   EXPECT_FALSE(ctrl->power_status_observer_.IsObserving());
 
-  FastForwardToLockScreenTimeout();
+  FastForwardByLockScreenInactivityTimeout();
 
   EXPECT_TRUE(ctrl->user_activity_observer_.IsObserving());
   EXPECT_TRUE(ctrl->power_status_observer_.IsObserving());
@@ -1279,8 +1285,8 @@ TEST_F(AmbientControllerTest, BindsObserversWhenAmbientOn) {
 TEST_P(AmbientControllerTestForAnyUiSettings,
        ShowDismissAmbientScreenUponAssistantQuery) {
   // Without user interaction, should show ambient mode.
-  ShowAmbientScreen();
-  EXPECT_TRUE(ambient_controller()->IsShown());
+  SetAmbientShownAndWaitForWidgets();
+  EXPECT_TRUE(ambient_controller()->ShouldShowAmbientUi());
 
   // Trigger Assistant interaction.
   static_cast<AssistantInteractionControllerImpl*>(
@@ -1290,7 +1296,7 @@ TEST_P(AmbientControllerTestForAnyUiSettings,
 
   // Ambient screen should dismiss.
   EXPECT_TRUE(GetContainerViews().empty());
-  EXPECT_FALSE(ambient_controller()->IsShown());
+  EXPECT_FALSE(ambient_controller()->ShouldShowAmbientUi());
 }
 
 // For all test cases that depend on ash ambient resources (lottie files, image
@@ -1306,7 +1312,7 @@ TEST_F(AmbientControllerTest,
   SetAmbientTheme(AmbientTheme::kFeelTheBreeze);
 
   LockScreen();
-  FastForwardToLockScreenTimeout();
+  FastForwardByLockScreenInactivityTimeout();
   FastForwardTiny();
 
   ASSERT_TRUE(GetContainerView());
@@ -1319,7 +1325,7 @@ TEST_F(AmbientControllerTest,
   SetAmbientTheme(AmbientTheme::kSlideshow);
 
   LockScreen();
-  FastForwardToLockScreenTimeout();
+  FastForwardByLockScreenInactivityTimeout();
   FastForwardTiny();
 
   ASSERT_TRUE(GetContainerView());
@@ -1332,7 +1338,7 @@ TEST_F(AmbientControllerTest,
   SetAmbientTheme(AmbientTheme::kFeelTheBreeze);
 
   LockScreen();
-  FastForwardToLockScreenTimeout();
+  FastForwardByLockScreenInactivityTimeout();
   FastForwardTiny();
 
   ASSERT_TRUE(GetContainerView());
@@ -1347,7 +1353,7 @@ TEST_F(AmbientControllerTest,
   SetAmbientTheme(AmbientTheme::kSlideshow);
 
   LockScreen();
-  FastForwardToLockScreenTimeout();
+  FastForwardByLockScreenInactivityTimeout();
   FastForwardTiny();
 
   ASSERT_TRUE(GetContainerView());
@@ -1361,92 +1367,10 @@ TEST_F(AmbientControllerTest,
   // UI shouldn't start with a photo cached during slideshow mode.
   SetDownloadPhotoData(/*data=*/"");
   LockScreen();
-  FastForwardToLockScreenTimeout();
+  FastForwardByLockScreenInactivityTimeout();
   FastForwardTiny();
   EXPECT_FALSE(GetContainerView());
   EXPECT_TRUE(GetCachedFiles().empty());
-}
-
-TEST_P(AmbientControllerTestForAnyUiSettings, MetricsEngagementTime) {
-  // TODO(esum): Find a better way of fast forwarding time for lottie animations
-  // in unit tests. Currently, the whole compositor stack is being used in this
-  // test harness and there is no good way to control the frame rate, so
-  // FastForwardBy() blocks for long periods of time. Do not make this value
-  // too high, or the test is at risk of timing out.
-  constexpr base::TimeDelta kExpectedEngagementTime = base::Milliseconds(100);
-
-  base::HistogramTester histogram_tester;
-  Shell::Get()->tablet_mode_controller()->SetEnabledForTest(false);
-  LockScreen();
-
-  // Unlike other tests, the exact amount of time we spend in ambient mode
-  // matters to write the correct test expectation. So fast forward by the
-  // exact amount needed to trigger ambient mode.
-  // (FastForwardToLockScreenTimeout() adds on a little buffer to the timeout)
-  task_environment()->FastForwardBy(ambient_controller()
-                                        ->ambient_ui_model()
-                                        ->lock_screen_inactivity_timeout());
-  ASSERT_TRUE(ambient_controller()->IsShown());
-
-  task_environment()->FastForwardBy(kExpectedEngagementTime);
-
-  UnlockScreen();
-  ASSERT_FALSE(ambient_controller()->IsShown());
-
-  histogram_tester.ExpectTimeBucketCount(
-      "Ash.AmbientMode.EngagementTime.ClamshellMode", kExpectedEngagementTime,
-      1);
-  histogram_tester.ExpectTimeBucketCount(
-      base::StrCat(
-          {"Ash.AmbientMode.EngagementTime.", ToString(GetParam().theme())}),
-      kExpectedEngagementTime, 1);
-
-  // Now do the same sequence in tablet mode.
-  Shell::Get()->tablet_mode_controller()->SetEnabledForTest(true);
-  LockScreen();
-
-  task_environment()->FastForwardBy(ambient_controller()
-                                        ->ambient_ui_model()
-                                        ->lock_screen_inactivity_timeout());
-  ASSERT_TRUE(ambient_controller()->IsShown());
-
-  task_environment()->FastForwardBy(kExpectedEngagementTime);
-
-  UnlockScreen();
-  ASSERT_FALSE(ambient_controller()->IsShown());
-
-  histogram_tester.ExpectTimeBucketCount(
-      "Ash.AmbientMode.EngagementTime.TabletMode", kExpectedEngagementTime, 1);
-  histogram_tester.ExpectTimeBucketCount(
-      base::StrCat(
-          {"Ash.AmbientMode.EngagementTime.", ToString(GetParam().theme())}),
-      kExpectedEngagementTime, 2);
-}
-
-TEST_P(AmbientControllerTestForAnyUiSettings, MetricsStartupTime) {
-  base::HistogramTester histogram_tester;
-  LockScreen();
-  FastForwardToLockScreenTimeout();
-  FastForwardTiny();
-  ASSERT_TRUE(ambient_controller()->IsShown());
-
-  histogram_tester.ExpectTotalCount(
-      base::StrCat(
-          {"Ash.AmbientMode.StartupTime.", ToString(GetParam().theme())}),
-      1);
-
-  UnlockScreen();
-  ASSERT_FALSE(ambient_controller()->IsShown());
-
-  LockScreen();
-  FastForwardToLockScreenTimeout();
-  FastForwardTiny();
-  ASSERT_TRUE(ambient_controller()->IsShown());
-
-  histogram_tester.ExpectTotalCount(
-      base::StrCat(
-          {"Ash.AmbientMode.StartupTime.", ToString(GetParam().theme())}),
-      2);
 }
 
 TEST_F(AmbientControllerTest,
@@ -1454,15 +1378,15 @@ TEST_F(AmbientControllerTest,
   SetAmbientTheme(AmbientTheme::kSlideshow);
   base::HistogramTester histogram_tester;
   LockScreen();
-  FastForwardToLockScreenTimeout();
+  FastForwardByLockScreenInactivityTimeout();
   task_environment()->FastForwardBy(ambient::kMetricsStartupTimeMax);
   FastForwardTiny();
-  ASSERT_TRUE(ambient_controller()->IsShown());
+  ASSERT_TRUE(ambient_controller()->ShouldShowAmbientUi());
 
   SimulateSystemSuspendAndWait(power_manager::SuspendImminent::Reason::
                                    SuspendImminent_Reason_LID_CLOSED);
 
-  ASSERT_FALSE(ambient_controller()->IsShown());
+  ASSERT_FALSE(ambient_controller()->ShouldShowAmbientUi());
   histogram_tester.ExpectTotalCount("Ash.AmbientMode.StartupTime.SlideShow", 1);
   UnlockScreen();
 }
@@ -1472,53 +1396,26 @@ TEST_F(AmbientControllerTest,
   SetAmbientTheme(AmbientTheme::kSlideshow);
   base::HistogramTester histogram_tester;
   LockScreen();
-  FastForwardToLockScreenTimeout();
+  FastForwardByLockScreenInactivityTimeout();
 
   task_environment()->FastForwardBy(ambient::kMetricsStartupTimeMax);
   FastForwardTiny();
-  ASSERT_TRUE(ambient_controller()->IsShown());
+  ASSERT_TRUE(ambient_controller()->ShouldShowAmbientUi());
 
   SetScreenIdleStateAndWait(/*dimmed=*/true, /*off=*/true);
 
-  ASSERT_FALSE(ambient_controller()->IsShown());
+  ASSERT_FALSE(ambient_controller()->ShouldShowAmbientUi());
   histogram_tester.ExpectTotalCount("Ash.AmbientMode.StartupTime.SlideShow", 1);
   UnlockScreen();
-}
-
-TEST_P(AmbientControllerTestForAnyUiSettings, MetricsStartupTimeFailedToStart) {
-  switch (GetParam().theme()) {
-    case AmbientTheme::kVideo:
-      // Video themes have no dependency on backend photos, so we cannot test
-      // failure to start ambient mode by simulating an IMAX outage. Video
-      // themes should always start unless there is a design oversight or bug.
-      GTEST_SKIP();
-    case AmbientTheme::kSlideshow:
-    case AmbientTheme::kFeelTheBreeze:
-    case AmbientTheme::kFloatOnBy:
-      break;
-  }
-  // Simulate IMAX outage that doesn't return any photos.
-  backend_controller()->SetFetchScreenUpdateInfoResponseSize(0);
-
-  base::HistogramTester histogram_tester;
-  LockScreen();
-  FastForwardToLockScreenTimeout();
-  task_environment()->FastForwardBy(base::Minutes(1));
-  ASSERT_TRUE(GetContainerViews().empty());
-
-  UnlockScreen();
-  histogram_tester.ExpectUniqueTimeSample(
-      base::StrCat({"Ash.AmbientMode.StartupTime.", GetParam().ToString()}),
-      base::Minutes(1), 1);
 }
 
 TEST_F(AmbientControllerTest, ShouldStartScreenSaverPreview) {
   ASSERT_EQ(0,
             user_action_tester_.GetActionCount(kScreenSaverPreviewUserAction));
-  ambient_controller()->StartScreenSaverPreview();
-  FastForwardToLockScreenTimeout();
+  ambient_controller()->SetUiVisibilityPreview();
+  FastForwardByLockScreenInactivityTimeout();
   FastForwardTiny();
-  EXPECT_TRUE(ambient_controller()->IsShown());
+  EXPECT_TRUE(ambient_controller()->ShouldShowAmbientUi());
   EXPECT_FALSE(IsLocked());
   EXPECT_EQ(1,
             user_action_tester_.GetActionCount(kScreenSaverPreviewUserAction));
@@ -1526,90 +1423,90 @@ TEST_F(AmbientControllerTest, ShouldStartScreenSaverPreview) {
 
 TEST_F(AmbientControllerTest,
        ShouldNotDismissScreenSaverPreviewOnUserActivity) {
-  ambient_controller()->StartScreenSaverPreview();
-  EXPECT_TRUE(ambient_controller()->IsShown());
+  ambient_controller()->SetUiVisibilityPreview();
+  EXPECT_TRUE(ambient_controller()->ShouldShowAmbientUi());
 
   ui::MouseEvent mouse_event(ui::ET_MOUSE_RELEASED, gfx::Point(), gfx::Point(),
                              base::TimeTicks(), ui::EF_NONE, ui::EF_NONE);
   ambient_controller()->OnUserActivity(&mouse_event);
   FastForwardTiny();
 
-  EXPECT_TRUE(ambient_controller()->IsShown());
+  EXPECT_TRUE(ambient_controller()->ShouldShowAmbientUi());
 }
 
 TEST_F(AmbientControllerTest, ShouldDismissScreenSaverPreviewOnKeyReleased) {
-  ambient_controller()->StartScreenSaverPreview();
-  EXPECT_TRUE(ambient_controller()->IsShown());
+  ambient_controller()->SetUiVisibilityPreview();
+  EXPECT_TRUE(ambient_controller()->ShouldShowAmbientUi());
 
   GetEventGenerator()->ReleaseKey(ui::VKEY_A, ui::EF_NONE);
-  EXPECT_TRUE(ambient_controller()->IsShown());
+  EXPECT_TRUE(ambient_controller()->ShouldShowAmbientUi());
 
   GetEventGenerator()->PressKey(ui::VKEY_A, ui::EF_NONE);
-  EXPECT_FALSE(ambient_controller()->IsShown());
+  EXPECT_FALSE(ambient_controller()->ShouldShowAmbientUi());
 }
 
 TEST_F(AmbientControllerTest,
        ShouldNotDismissScreenSaverPreviewOnSomeMouseEvents) {
-  ambient_controller()->StartScreenSaverPreview();
-  EXPECT_TRUE(ambient_controller()->IsShown());
+  ambient_controller()->SetUiVisibilityPreview();
+  EXPECT_TRUE(ambient_controller()->ShouldShowAmbientUi());
 
   GetEventGenerator()->MoveMouseWheel(10, 10);
-  EXPECT_TRUE(ambient_controller()->IsShown());
+  EXPECT_TRUE(ambient_controller()->ShouldShowAmbientUi());
 
   GetEventGenerator()->SendMouseEnter();
-  EXPECT_TRUE(ambient_controller()->IsShown());
+  EXPECT_TRUE(ambient_controller()->ShouldShowAmbientUi());
 
   GetEventGenerator()->SendMouseExit();
-  EXPECT_TRUE(ambient_controller()->IsShown());
+  EXPECT_TRUE(ambient_controller()->ShouldShowAmbientUi());
 }
 
 TEST_F(AmbientControllerTest, ShouldDismissScreenSaverPreviewOnMouseClick) {
-  ambient_controller()->StartScreenSaverPreview();
-  EXPECT_TRUE(ambient_controller()->IsShown());
+  ambient_controller()->SetUiVisibilityPreview();
+  EXPECT_TRUE(ambient_controller()->ShouldShowAmbientUi());
 
   GetEventGenerator()->ClickLeftButton();
-  EXPECT_FALSE(ambient_controller()->IsShown());
+  EXPECT_FALSE(ambient_controller()->ShouldShowAmbientUi());
 
-  ambient_controller()->StartScreenSaverPreview();
-  EXPECT_TRUE(ambient_controller()->IsShown());
+  ambient_controller()->SetUiVisibilityPreview();
+  EXPECT_TRUE(ambient_controller()->ShouldShowAmbientUi());
 
   GetEventGenerator()->ClickRightButton();
-  EXPECT_FALSE(ambient_controller()->IsShown());
+  EXPECT_FALSE(ambient_controller()->ShouldShowAmbientUi());
 }
 
 TEST_F(AmbientControllerTest, MaybeDismissUIOnMouseMove) {
-  ambient_controller()->StartScreenSaverPreview();
-  EXPECT_TRUE(ambient_controller()->IsShown());
+  ambient_controller()->SetUiVisibilityPreview();
+  EXPECT_TRUE(ambient_controller()->ShouldShowAmbientUi());
 
   GetEventGenerator()->MoveMouseTo(gfx::Point(5, 5), /*count=*/2);
-  EXPECT_TRUE(ambient_controller()->IsShown());
+  EXPECT_TRUE(ambient_controller()->ShouldShowAmbientUi());
 
   task_environment()->FastForwardBy(kDismissPreviewOnMouseMoveDelay);
   FastForwardTiny();
   GetEventGenerator()->MoveMouseTo(gfx::Point(5, 5), /*count=*/2);
-  EXPECT_FALSE(ambient_controller()->IsShown());
+  EXPECT_FALSE(ambient_controller()->ShouldShowAmbientUi());
 }
 
 TEST_F(AmbientControllerTest, ShouldDismissScreenSaverPreviewOnTouch) {
-  ambient_controller()->StartScreenSaverPreview();
-  EXPECT_TRUE(ambient_controller()->IsShown());
+  ambient_controller()->SetUiVisibilityPreview();
+  EXPECT_TRUE(ambient_controller()->ShouldShowAmbientUi());
 
   GetEventGenerator()->PressTouch();
-  EXPECT_FALSE(ambient_controller()->IsShown());
+  EXPECT_FALSE(ambient_controller()->ShouldShowAmbientUi());
 
-  ambient_controller()->StartScreenSaverPreview();
-  EXPECT_TRUE(ambient_controller()->IsShown());
+  ambient_controller()->SetUiVisibilityPreview();
+  EXPECT_TRUE(ambient_controller()->ShouldShowAmbientUi());
 
   GetEventGenerator()->ReleaseTouch();
-  EXPECT_FALSE(ambient_controller()->IsShown());
+  EXPECT_FALSE(ambient_controller()->ShouldShowAmbientUi());
 }
 
 TEST_F(AmbientControllerTest,
        ShouldResetInactivityTimerOnUserActivityWhileUiIsHidden) {
   LockScreen();
-  FastForwardToLockScreenTimeout();
+  FastForwardByLockScreenInactivityTimeout();
   FastForwardTiny();
-  EXPECT_TRUE(ambient_controller()->IsShown());
+  EXPECT_TRUE(ambient_controller()->ShouldShowAmbientUi());
 
   HideAmbientScreen();
   FastForwardTiny();
@@ -1625,15 +1522,15 @@ TEST_F(AmbientControllerTest,
       std::make_unique<ui::KeyEvent>(ui::ET_KEY_PRESSED, ui::VKEY_A,
                                      ui::EF_NONE)
           .get());
-  EXPECT_FALSE(ambient_controller()->IsShown());
+  EXPECT_FALSE(ambient_controller()->ShouldShowAmbientUi());
 
   task_environment()->FastForwardBy(inactivity_timeout * 0.8);
   EXPECT_TRUE(IsInactivityTimerRunning());
-  EXPECT_FALSE(ambient_controller()->IsShown());
+  EXPECT_FALSE(ambient_controller()->ShouldShowAmbientUi());
 
   task_environment()->FastForwardBy(inactivity_timeout * 0.3);
   EXPECT_FALSE(IsInactivityTimerRunning());
-  EXPECT_TRUE(ambient_controller()->IsShown());
+  EXPECT_TRUE(ambient_controller()->ShouldShowAmbientUi());
 }
 
 class AmbientControllerForManagedScreensaverTest : public AmbientAshTestBase {
@@ -1642,7 +1539,8 @@ class AmbientControllerForManagedScreensaverTest : public AmbientAshTestBase {
     scoped_feature_list_.InitAndEnableFeature(
         ash::features::kAmbientModeManagedScreensaver);
     AmbientAshTestBase::SetUp();
-    photo_source_ = std::make_unique<TestAmbientManagedPhotoSource>();
+    // Disable consumer ambient mode
+    SetAmbientModeEnabled(false);
     GetSessionControllerClient()->set_show_lock_screen_views(true);
     CreateTestData();
   }
@@ -1650,7 +1548,6 @@ class AmbientControllerForManagedScreensaverTest : public AmbientAshTestBase {
   void TearDown() override {
     ASSERT_TRUE(temp_dir_.Delete());
     image_file_paths_.clear();
-    photo_source_.reset();
     AmbientAshTestBase::TearDown();
   }
 
@@ -1671,19 +1568,13 @@ class AmbientControllerForManagedScreensaverTest : public AmbientAshTestBase {
 
   void SimulateScreensaverStart() {
     LockScreen();
-    FastForwardToLockScreenTimeout();
-    FastForwardTiny();
-    EXPECT_TRUE(ambient_controller()->IsShown());
-  }
-
-  TestAmbientManagedPhotoSource* ambient_managed_photo_source() {
-    return photo_source_.get();
+    FastForwardByLockScreenInactivityTimeout();
+    EXPECT_TRUE(ambient_controller()->ShouldShowAmbientUi());
   }
 
   base::test::ScopedFeatureList scoped_feature_list_;
   InProcessImageDecoder decoder_;
   std::vector<base::FilePath> image_file_paths_;
-  std::unique_ptr<TestAmbientManagedPhotoSource> photo_source_;
   base::ScopedTempDir temp_dir_;
 };
 
@@ -1691,7 +1582,7 @@ TEST_F(AmbientControllerForManagedScreensaverTest,
        ScreensaverIsShownWithEnoughImages) {
   SetAmbientModeManagedScreensaverEnabled(true);
 
-  ambient_managed_photo_source()->SetImagesForTesting(image_file_paths_);
+  managed_policy_handler()->SetImagesForTesting(image_file_paths_);
   SimulateScreensaverStart();
 
   ASSERT_TRUE(GetContainerView());
@@ -1703,11 +1594,11 @@ TEST_F(AmbientControllerForManagedScreensaverTest,
       << "Peripheral Ui should be hidden in managed mode";
 
   GetEventGenerator()->ClickLeftButton();
-  EXPECT_FALSE(ambient_controller()->IsShown());
-  FastForwardToLockScreenTimeout();
-  EXPECT_TRUE(ambient_controller()->IsShown());
+  EXPECT_FALSE(ambient_controller()->ShouldShowAmbientUi());
+  FastForwardByLockScreenInactivityTimeout();
+  EXPECT_TRUE(ambient_controller()->ShouldShowAmbientUi());
   UnlockScreen();
-  EXPECT_FALSE(ambient_controller()->IsShown());
+  EXPECT_FALSE(ambient_controller()->ShouldShowAmbientUi());
 
   ASSERT_FALSE(GetContainerView());
 }
@@ -1716,13 +1607,13 @@ TEST_F(AmbientControllerForManagedScreensaverTest,
        ScreensaverIsNotShownWithoutImages) {
   SetAmbientModeManagedScreensaverEnabled(true);
   LockScreen();
-  FastForwardToLockScreenTimeout();
+  FastForwardByLockScreenInactivityTimeout();
   FastForwardTiny();
 
-  EXPECT_TRUE(ambient_controller()->IsShown());
+  EXPECT_TRUE(ambient_controller()->ShouldShowAmbientUi());
   ASSERT_FALSE(GetContainerView());
   UnlockScreen();
-  EXPECT_FALSE(ambient_controller()->IsShown());
+  EXPECT_FALSE(ambient_controller()->ShouldShowAmbientUi());
 }
 
 TEST_F(AmbientControllerForManagedScreensaverTest,
@@ -1732,14 +1623,14 @@ TEST_F(AmbientControllerForManagedScreensaverTest,
 
   ASSERT_FALSE(ambient_controller()->ambient_ui_launcher());
 
-  EXPECT_FALSE(ambient_controller()->IsShown());
+  EXPECT_FALSE(ambient_controller()->ShouldShowAmbientUi());
 }
 
 TEST_F(AmbientControllerForManagedScreensaverTest,
        DisablingManagedAmbientModeFallsbackToUserAmbientModeIfEnabled) {
   SetAmbientModeEnabled(true);
   SetAmbientModeManagedScreensaverEnabled(true);
-  ambient_managed_photo_source()->SetImagesForTesting(image_file_paths_);
+  managed_policy_handler()->SetImagesForTesting(image_file_paths_);
   SimulateScreensaverStart();
   ASSERT_TRUE(GetContainerView());
   EXPECT_TRUE(
@@ -1749,15 +1640,15 @@ TEST_F(AmbientControllerForManagedScreensaverTest,
   UnlockScreen();
 
   LockScreen();
-  FastForwardToLockScreenTimeout();
+  FastForwardByLockScreenInactivityTimeout();
   FastForwardTiny();
-  EXPECT_TRUE(ambient_controller()->IsShown());
+  EXPECT_TRUE(ambient_controller()->ShouldShowAmbientUi());
   ASSERT_TRUE(GetContainerView());
   EXPECT_TRUE(
       GetContainerView()->GetViewByID(AmbientViewID::kAmbientPhotoView));
   EXPECT_TRUE(GetAmbientSlideshowPeripheralUi()->GetVisible());
   UnlockScreen();
-  EXPECT_FALSE(ambient_controller()->IsShown());
+  EXPECT_FALSE(ambient_controller()->ShouldShowAmbientUi());
 }
 
 TEST_F(AmbientControllerForManagedScreensaverTest,
@@ -1771,7 +1662,7 @@ TEST_F(AmbientControllerForManagedScreensaverTest,
 
   SimulateScreensaverStart();
   UnlockScreen();
-  EXPECT_FALSE(ambient_controller()->IsShown());
+  EXPECT_FALSE(ambient_controller()->ShouldShowAmbientUi());
 }
 
 TEST_F(AmbientControllerForManagedScreensaverTest,
@@ -1784,7 +1675,7 @@ TEST_F(AmbientControllerForManagedScreensaverTest,
 
   SimulateScreensaverStart();
   UnlockScreen();
-  EXPECT_FALSE(ambient_controller()->IsShown());
+  EXPECT_FALSE(ambient_controller()->ShouldShowAmbientUi());
 }
 
 TEST_F(AmbientControllerForManagedScreensaverTest, PrefObserverUpdatesUiModel) {
@@ -1812,7 +1703,7 @@ TEST_F(AmbientControllerForManagedScreensaverTest,
   SetAmbientModeManagedScreensaverEnabled(/*enabled=*/true);
 
   SimulateScreensaverStart();
-  ambient_managed_photo_source()->SetImagesForTesting(image_file_paths_);
+  managed_policy_handler()->SetImagesForTesting(image_file_paths_);
 
   // Forward the task environment a bit to make sure any pending tasks get
   // started.
@@ -1824,7 +1715,7 @@ TEST_F(AmbientControllerForManagedScreensaverTest,
   UnlockScreen();
 
   ASSERT_FALSE(GetContainerView());
-  EXPECT_FALSE(ambient_controller()->IsShown());
+  EXPECT_FALSE(ambient_controller()->ShouldShowAmbientUi());
 
   managed_photo_controller()->UpdateImageFilePaths(image_file_paths_);
   SimulateScreensaverStart();
@@ -1835,24 +1726,125 @@ TEST_F(AmbientControllerForManagedScreensaverTest,
 }
 
 TEST_F(AmbientControllerForManagedScreensaverTest,
-       AmbientManagedPhotoSourceErrorCase) {
+       ManagedAmbientModeGetsEnabledOnLockScreenAndStartsIt) {
+  LockScreen();
   SetAmbientModeManagedScreensaverEnabled(/*enabled=*/true);
-  photo_source_.reset();
-  SimulateScreensaverStart();
+  managed_policy_handler()->SetImagesForTesting(image_file_paths_);
+  FastForwardByLockScreenInactivityTimeout();
+  ASSERT_TRUE(GetContainerView());
+  EXPECT_TRUE(
+      GetContainerView()->GetViewByID(AmbientViewID::kAmbientPhotoView));
+}
 
-  // The view will not be created as an initialization callback will be called
-  // with success = false, so the container would be null.
+class AmbientControllerForManagedScreensaverLoginScreenTest
+    : public AmbientControllerForManagedScreensaverTest {
+ public:
+  void SetUp() override {
+    // For login screen tests we don't want to start a session rather we want to
+    // start on the login screen.
+    set_start_session(false);
+    AmbientControllerForManagedScreensaverTest::SetUp();
+    SetAmbientModeManagedScreensaverEnabled(/*enabled=*/true);
+    managed_policy_handler()->SetImagesForTesting(image_file_paths_);
+  }
+
+  void TriggerLoginScreen() {
+    GetSessionControllerClient()->RequestSignOut();
+    // The login screen can't be shown without a wallpaper.
+    Shell::Get()->wallpaper_controller()->ShowDefaultWallpaperForTesting();
+    Shell::Get()->login_screen_controller()->ShowLoginScreen();
+    GetSessionControllerClient()->FlushForTest();
+    FastForwardByLockScreenInactivityTimeout();
+  }
+};
+
+TEST_F(AmbientControllerForManagedScreensaverLoginScreenTest,
+       ShownOnLoginScreen) {
+  TriggerLoginScreen();
+
+  EXPECT_TRUE(ambient_controller()->ShouldShowAmbientUi());
+  ASSERT_TRUE(GetContainerView());
+  EXPECT_TRUE(
+      GetContainerView()->GetViewByID(AmbientViewID::kAmbientPhotoView));
+  GetEventGenerator()->ClickLeftButton();
+  EXPECT_FALSE(ambient_controller()->ShouldShowAmbientUi());
+  FastForwardByLockScreenInactivityTimeout();
+  EXPECT_TRUE(ambient_controller()->ShouldShowAmbientUi());
+}
+
+TEST_F(AmbientControllerForManagedScreensaverLoginScreenTest,
+       ShownOnLoginWhenPrefUpdatedLater) {
+  SetAmbientModeManagedScreensaverEnabled(/*enabled=*/false);
+  EXPECT_FALSE(ambient_controller()->ShouldShowAmbientUi());
+  // Login screen is shown when the managed mode is disabled
+  TriggerLoginScreen();
+  SetAmbientModeManagedScreensaverEnabled(/*enabled=*/true);
+  managed_policy_handler()->SetImagesForTesting(image_file_paths_);
+  FastForwardByLockScreenInactivityTimeout();
+  EXPECT_TRUE(ambient_controller()->ShouldShowAmbientUi());
+  ASSERT_TRUE(GetContainerView());
+}
+
+TEST_F(AmbientControllerForManagedScreensaverLoginScreenTest,
+       NotShownOnLoginScreenWhenDisabled) {
+  SetAmbientModeManagedScreensaverEnabled(/*enabled=*/false);
+  FastForwardByLockScreenInactivityTimeout();
+  EXPECT_FALSE(ambient_controller()->ShouldShowAmbientUi());
+}
+
+TEST_F(AmbientControllerForManagedScreensaverLoginScreenTest,
+       UserLogsInAmbientModeDisabledAndManagedAmbientModeEnabled) {
+  TriggerLoginScreen();
+  EXPECT_TRUE(ambient_controller()->ShouldShowAmbientUi());
+  ASSERT_TRUE(GetContainerView());
+
+  // Simulate user session start (e.g. user login)
+  CreateUserSessions(/*session_count=*/1);
+
+  // Confirm that ambient mode is not shown if disabled. (disabled by default)
+  FastForwardByLockScreenInactivityTimeout();
+  EXPECT_FALSE(ambient_controller()->ShouldShowAmbientUi());
   ASSERT_FALSE(GetContainerView());
-  EXPECT_TRUE(ambient_controller()->IsShown());
+  ASSERT_FALSE(ambient_controller()->ambient_ui_launcher());
+
+  // Enabling and locking screen starts the managed ambient mode
+  SetAmbientModeManagedScreensaverEnabled(/*enabled=*/true);
+  managed_policy_handler()->SetImagesForTesting(image_file_paths_);
+  LockScreen();
+  FastForwardByLockScreenInactivityTimeout();
+  FastForwardTiny();
+
+  EXPECT_TRUE(ambient_controller()->ShouldShowAmbientUi());
+  ASSERT_TRUE(GetContainerView());
+}
+
+TEST_F(AmbientControllerForManagedScreensaverLoginScreenTest,
+       UserLogsInAmbientModeEnabled) {
+  TriggerLoginScreen();
+  EXPECT_TRUE(ambient_controller()->ShouldShowAmbientUi());
+  ASSERT_TRUE(GetContainerView());
+
+  // Simulate user session start (e.g. consumer user login)
+  SimulateNewUserFirstLogin(kUser1);
+
+  // Enabling and locking screen starts the consumer ambient mode
+  SetAmbientModeEnabled(true);
+  DisableBackupCacheDownloads();
+  LockScreen();
+  FastForwardByLockScreenInactivityTimeout();
+  FastForwardTiny();
+
+  EXPECT_TRUE(ambient_controller()->ShouldShowAmbientUi());
+  ASSERT_TRUE(GetContainerView());
 }
 
 TEST_F(AmbientControllerForManagedScreensaverTest,
        ManagedScreensaverNotShownOnScreenDim) {
   SetAmbientModeManagedScreensaverEnabled(/*enabled=*/true);
-  ambient_managed_photo_source()->SetImagesForTesting(image_file_paths_);
+  managed_policy_handler()->SetImagesForTesting(image_file_paths_);
   SetScreenIdleStateAndWait(/*is_screen_dimmed=*/true, /*is_off=*/false);
   EXPECT_FALSE(IsLocked());
-  EXPECT_FALSE(ambient_controller()->IsShown());
+  EXPECT_FALSE(ambient_controller()->ShouldShowAmbientUi());
 }
 
 TEST_F(AmbientControllerTest, RendersCorrectViewForVideo) {
@@ -1860,7 +1852,7 @@ TEST_F(AmbientControllerTest, RendersCorrectViewForVideo) {
       AmbientUiSettings(AmbientTheme::kVideo, AmbientVideo::kNewMexico));
 
   LockScreen();
-  FastForwardToLockScreenTimeout();
+  FastForwardByLockScreenInactivityTimeout();
   FastForwardTiny();
 
   ASSERT_TRUE(GetContainerView());
@@ -1886,7 +1878,7 @@ TEST_F(AmbientControllerTest, RendersCorrectViewForVideo) {
   SetAmbientTheme(AmbientTheme::kSlideshow);
 
   LockScreen();
-  FastForwardToLockScreenTimeout();
+  FastForwardByLockScreenInactivityTimeout();
   FastForwardTiny();
 
   ASSERT_TRUE(GetContainerView());
@@ -1898,7 +1890,7 @@ TEST_F(AmbientControllerTest, RendersCorrectViewForVideo) {
       AmbientUiSettings(AmbientTheme::kVideo, AmbientVideo::kClouds));
 
   LockScreen();
-  FastForwardToLockScreenTimeout();
+  FastForwardByLockScreenInactivityTimeout();
   FastForwardTiny();
 
   ASSERT_TRUE(GetContainerView());
@@ -1918,6 +1910,117 @@ TEST_F(AmbientControllerTest, RendersCorrectViewForVideo) {
             personalization_app::GetTimeOfDayVideosDir()
                 .Append(personalization_app::kTimeOfDayCloudsVideo)
                 .value());
+}
+
+class AmbientControllerDurationTest : public AmbientAshTestBase {
+ public:
+  AmbientControllerDurationTest() = default;
+  ~AmbientControllerDurationTest() override = default;
+
+  void SetUp() override {
+    scoped_feature_list_.InitAndEnableFeature(features::kScreenSaverDuration);
+    AmbientAshTestBase::SetUp();
+    GetSessionControllerClient()->set_show_lock_screen_views(true);
+  }
+
+ protected:
+  base::test::ScopedFeatureList scoped_feature_list_;
+};
+
+TEST_F(AmbientControllerDurationTest, SetScreenSaverDuration) {
+  EXPECT_TRUE(ash::features::IsScreenSaverDurationEnabled());
+
+  // Set screen saver duration.
+  SetAmbientModeEnabled(true);
+  SetScreenSaverDuration(5);
+  EXPECT_EQ(5, GetScreenSaverDuration());
+
+  SetScreenSaverDuration(10);
+  EXPECT_EQ(10, GetScreenSaverDuration());
+
+  SetScreenSaverDuration(0);
+  EXPECT_EQ(0, GetScreenSaverDuration());
+}
+
+TEST_F(AmbientControllerDurationTest, AcquireWakeLockWithoutCharger) {
+  // Simulate User logged in.
+  ClearLogin();
+  SimulateUserLogin(kUser1);
+
+  // Set screen saver duration to forever.
+  SetAmbientModeEnabled(true);
+  SetScreenSaverDuration(0);
+  EXPECT_EQ(0, GetScreenSaverDuration());
+
+  // Lock screen to start ambient mode, and flush the loop to ensure
+  // the acquire wake lock request has reached the wake lock provider.
+  LockScreen();
+  FastForwardByLockScreenInactivityTimeout();
+  FastForwardTiny();
+
+  EXPECT_EQ(1, GetNumOfActiveWakeLocks(
+                   device::mojom::WakeLockType::kPreventDisplaySleep));
+
+  HideAmbientScreen();
+  base::RunLoop().RunUntilIdle();
+
+  EXPECT_EQ(0, GetNumOfActiveWakeLocks(
+                   device::mojom::WakeLockType::kPreventDisplaySleep));
+
+  // Ambient screen showup again after inactivity.
+  FastForwardByLockScreenInactivityTimeout();
+
+  EXPECT_EQ(1, GetNumOfActiveWakeLocks(
+                   device::mojom::WakeLockType::kPreventDisplaySleep));
+
+  // Unlock screen to exit ambient mode.
+  UnlockScreen();
+  base::RunLoop().RunUntilIdle();
+
+  EXPECT_EQ(0, GetNumOfActiveWakeLocks(
+                   device::mojom::WakeLockType::kPreventDisplaySleep));
+}
+
+TEST_F(AmbientControllerDurationTest, AcquireWakeLockWithCharger) {
+  // Simulate User logged in.
+  ClearLogin();
+  SimulateUserLogin(kUser1);
+
+  // Set screen saver duration to forever.
+  SetAmbientModeEnabled(true);
+  SetScreenSaverDuration(0);
+  EXPECT_EQ(0, GetScreenSaverDuration());
+
+  // Simulate a device being connected to a charger initially.
+  SetPowerStateCharging();
+
+  // Lock screen to start ambient mode, and flush the loop to ensure
+  // the acquire wake lock request has reached the wake lock provider.
+  LockScreen();
+  FastForwardByLockScreenInactivityTimeout();
+  FastForwardTiny();
+
+  EXPECT_EQ(1, GetNumOfActiveWakeLocks(
+                   device::mojom::WakeLockType::kPreventDisplaySleep));
+
+  HideAmbientScreen();
+  base::RunLoop().RunUntilIdle();
+
+  EXPECT_EQ(0, GetNumOfActiveWakeLocks(
+                   device::mojom::WakeLockType::kPreventDisplaySleep));
+
+  // Ambient screen showup again after inactivity.
+  FastForwardByLockScreenInactivityTimeout();
+
+  EXPECT_EQ(1, GetNumOfActiveWakeLocks(
+                   device::mojom::WakeLockType::kPreventDisplaySleep));
+
+  // Unlock screen to exit ambient mode.
+  UnlockScreen();
+  base::RunLoop().RunUntilIdle();
+
+  EXPECT_EQ(0, GetNumOfActiveWakeLocks(
+                   device::mojom::WakeLockType::kPreventDisplaySleep));
 }
 
 }  // namespace ash

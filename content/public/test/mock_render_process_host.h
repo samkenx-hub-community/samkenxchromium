@@ -287,10 +287,8 @@ class MockRenderProcessHost : public RenderProcessHost {
   std::string GetInfoForBrowserContextDestructionCrashReporting() override;
   void WriteIntoTrace(perfetto::TracedProto<TraceProto> proto) const override;
 
-#if BUILDFLAG(IS_ANDROID)
-  void SetOsSupportForAttributionReporting(
-      network::mojom::AttributionOsSupport os_support) override {}
-#endif
+  void SetAttributionReportingSupport(
+      network::mojom::AttributionSupport) override {}
 
 #if BUILDFLAG(IS_CHROMEOS_ASH)
   void ReinitializeLogging(uint32_t logging_dest,

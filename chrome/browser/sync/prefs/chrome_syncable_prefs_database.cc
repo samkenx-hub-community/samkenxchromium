@@ -28,13 +28,18 @@
 #if BUILDFLAG(ENABLE_EXTENSIONS)
 #include "extensions/browser/pref_names.h"
 #endif
+#if BUILDFLAG(ENABLE_EXTENSIONS) && BUILDFLAG(ENABLE_SUPERVISED_USERS)
+#include "components/supervised_user/core/common/pref_names.h"
+#endif
 
 namespace browser_sync {
 namespace {
 // Not an enum class to ease cast to int.
 namespace syncable_prefs_ids {
 // These values are persisted to logs. Entries should not be renumbered and
-// numeric values should never be reused.
+// numeric values should never be reused. When adding a new entry, append the
+// enumerator to the end. When removing an unused enumerator, comment it out,
+// making it clear the value was previously used.
 // Please also add new entries to `SyncablePref` enum in
 // tools/metrics/histograms/enums.xml.
 enum {

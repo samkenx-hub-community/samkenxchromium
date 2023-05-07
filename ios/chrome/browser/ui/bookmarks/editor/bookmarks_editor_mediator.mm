@@ -8,9 +8,11 @@
 #import "base/strings/sys_string_conversions.h"
 #import "components/bookmarks/browser/bookmark_model.h"
 #import "components/bookmarks/browser/bookmark_node.h"
+#import "components/bookmarks/common/bookmark_features.h"
 #import "components/prefs/pref_service.h"
 #import "components/url_formatter/url_fixer.h"
 #import "ios/chrome/browser/bookmarks/bookmark_model_bridge_observer.h"
+#import "ios/chrome/browser/bookmarks/bookmarks_utils.h"
 #import "ios/chrome/browser/prefs/pref_names.h"
 #import "ios/chrome/browser/sync/sync_observer_bridge.h"
 #import "ios/chrome/browser/sync/sync_setup_service.h"
@@ -37,22 +39,37 @@
 
 @end
 
-@implementation BookmarksEditorMediator
+@implementation BookmarksEditorMediator {
+  base::WeakPtr<bookmarks::BookmarkModel> _profileBookmarkModel;
+  base::WeakPtr<bookmarks::BookmarkModel> _accountBookmarkModel;
+}
 
-- (instancetype)initWithBookmarkModel:(bookmarks::BookmarkModel*)bookmarkModel
-                             bookmark:(const bookmarks::BookmarkNode*)bookmark
-                                prefs:(PrefService*)prefs
-                     syncSetupService:(SyncSetupService*)syncSetupService
-                          syncService:(syncer::SyncService*)syncService {
+- (instancetype)
+    initWithProfileBookmarkModel:(bookmarks::BookmarkModel*)profileBookmarkModel
+            accountBookmarkModel:(bookmarks::BookmarkModel*)accountBookmarkModel
+                    bookmarkNode:(const bookmarks::BookmarkNode*)bookmarkNode
+                           prefs:(PrefService*)prefs
+                syncSetupService:(SyncSetupService*)syncSetupService
+                     syncService:(syncer::SyncService*)syncService {
   self = [super init];
   if (self) {
-    DCHECK(bookmarkModel);
-    DCHECK(bookmark);
-    DCHECK(bookmark->is_url());
-    DCHECK(bookmarkModel->loaded());
-    _bookmarkModel = bookmarkModel;
-    _bookmark = bookmark;
-    _folder = bookmark->parent();
+    DCHECK(profileBookmarkModel);
+    DCHECK(profileBookmarkModel->loaded());
+    if (base::FeatureList::IsEnabled(
+            bookmarks::kEnableBookmarksAccountStorage)) {
+      DCHECK(accountBookmarkModel);
+      DCHECK(accountBookmarkModel->loaded());
+    } else {
+      DCHECK(!accountBookmarkModel);
+    }
+    DCHECK(bookmarkNode);
+    DCHECK(bookmarkNode->is_url()) << "Type: " << bookmarkNode->type();
+    _profileBookmarkModel = profileBookmarkModel->AsWeakPtr();
+    if (accountBookmarkModel) {
+      _accountBookmarkModel = accountBookmarkModel->AsWeakPtr();
+    }
+    _bookmark = bookmarkNode;
+    _folder = bookmarkNode->parent();
     _prefs = prefs;
     _bookmarkModelBridgeObserver.reset(
         new BookmarkModelBridge(self, self.bookmarkModel));
@@ -63,26 +80,46 @@
 }
 
 - (void)disconnect {
-  _bookmarkModel = nullptr;
+  _profileBookmarkModel = nullptr;
+  _accountBookmarkModel = nullptr;
   _bookmark = nullptr;
   _folder = nullptr;
-  _bookmarkModelBridgeObserver = nil;
-  _syncObserverModelBridge = nil;
+  _prefs = nullptr;
+  _bookmarkModelBridgeObserver = nullptr;
+  _syncObserverModelBridge = nullptr;
+}
+
+#pragma mark - Properties
+
+- (bookmarks::BookmarkModel*)bookmarkModel {
+  return bookmark_utils_ios::GetBookmarkModelForNode(
+      self.bookmark, _profileBookmarkModel.get(), _accountBookmarkModel.get());
 }
 
 #pragma mark - BookmarksEditorMutator
 
 - (BOOL)shouldDisplayCloudSlashSymbolForParentFolder {
-  return bookmark_utils_ios::ShouldDisplayCloudSlashIconForProfileModel(
-      _syncSetupService);
+  bookmarks::StorageType type = bookmark_utils_ios::GetBookmarkModelType(
+      self.bookmark, _profileBookmarkModel.get(), _accountBookmarkModel.get());
+  switch (type) {
+    case bookmarks::StorageType::kLocalOrSyncable:
+      return bookmark_utils_ios::ShouldDisplayCloudSlashIconForProfileModel(
+          _syncSetupService);
+    case bookmarks::StorageType::kAccount:
+      return NO;
+  }
+  NOTREACHED_NORETURN();
 }
 
 - (void)changeFolder:(const bookmarks::BookmarkNode*)folder {
   DCHECK(folder);
   DCHECK(folder->is_folder());
   [self setFolder:folder];
-  // TODO:(crbug.com/1411901): update kIosBookmarkFolderDefault on save only.
-  _prefs->SetInt64(prefs::kIosBookmarkFolderDefault, folder->id());
+  bookmarks::StorageType type = bookmark_utils_ios::GetBookmarkModelType(
+      folder, _profileBookmarkModel.get(), _accountBookmarkModel.get());
+  // TODO:(crbug.com/1411901): Update the last used default folder on save only.
+  SetLastUsedBookmarkFolder(_prefs, folder, type);
+
   [self.consumer updateFolderLabel];
 }
 
@@ -133,7 +170,7 @@
   }
 
   if (self.bookmark == node) {
-    self.bookmark = nil;
+    self.bookmark = nullptr;
     [self.delegate bookmarkEditorMediatorWantsDismissal:self];
   } else if (self.folder == node) {
     [self changeFolder:self.bookmarkModel->mobile_node()];
@@ -141,16 +178,9 @@
 }
 
 - (void)bookmarkModelRemovedAllNodes:(bookmarks::BookmarkModel*)model {
-  if (_ignoresBookmarkModelChanges) {
-    return;
-  }
-
-  self.bookmark = nil;
-  if (!self.bookmarkModel->is_permanent_node(self.folder)) {
-    // TODO(crbug.com/1404311) Do not edit the bookmark that has been deleted.
-    [self changeFolder:self.bookmarkModel->mobile_node()];
-  }
-
+  CHECK(!_ignoresBookmarkModelChanges);
+  self.bookmark = nullptr;
+  self.folder = nullptr;
   [self.delegate bookmarkEditorMediatorWantsDismissal:self];
 }
 

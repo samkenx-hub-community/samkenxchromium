@@ -190,10 +190,14 @@ bool ShouldResourceBeAddedToMemoryCache(const FetchParameters& params,
 
 bool ShouldResourceBeKeptStrongReferenceByType(Resource* resource) {
   // Image, fonts, stylesheets and scripts are the most commonly reused scripts.
-  return (resource->GetType() == ResourceType::kImage ||
-          resource->GetType() == ResourceType::kFont ||
-          resource->GetType() == ResourceType::kCSSStyleSheet ||
-          resource->GetType() == ResourceType::kScript);
+  return (resource->GetType() == ResourceType::kImage &&
+          !base::FeatureList::IsEnabled(
+              features::kMemoryCacheStrongReferenceFilterImages)) ||
+         (resource->GetType() == ResourceType::kScript &&
+          !base::FeatureList::IsEnabled(
+              features::kMemoryCacheStrongReferenceFilterScripts)) ||
+         resource->GetType() == ResourceType::kFont ||
+         resource->GetType() == ResourceType::kCSSStyleSheet;
 }
 
 bool ShouldResourceBeKeptStrongReference(Resource* resource) {
@@ -660,6 +664,7 @@ ResourceFetcher::ResourceFetcher(const ResourceFetcherInit& init)
               : nullptr),
       blob_registry_remote_(init.context_lifecycle_notifier),
       resource_cache_remote_(init.context_lifecycle_notifier),
+      context_lifecycle_notifier_(init.context_lifecycle_notifier),
       auto_load_images_(true),
       images_enabled_(true),
       allow_stale_resources_(false),
@@ -1503,8 +1508,18 @@ std::unique_ptr<URLLoader> ResourceFetcher::CreateURLLoader(
             frame_scheduler->GetAgentGroupScheduler()->DefaultTaskRunner();
       }
     }
+  } else if (request.GetRequestContext() ==
+                 mojom::blink::RequestContextType::IMAGE &&
+             base::FeatureList::IsEnabled(
+                 features::kMainThreadHighPriorityImageLoading)) {
+    if (auto* frame_or_worker_scheduler = GetFrameOrWorkerScheduler()) {
+      if (auto* frame_scheduler =
+              frame_or_worker_scheduler->ToFrameScheduler()) {
+        task_runner = frame_scheduler->GetTaskRunner(
+            TaskType::kNetworkingUnfreezableImageLoading);
+      }
+    }
   }
-
   return loader_factory_->CreateURLLoader(ResourceRequest(request), options,
                                           freezable_task_runner_, task_runner,
                                           back_forward_cache_loader_helper_);
@@ -2366,7 +2381,8 @@ bool ResourceFetcher::StartLoad(
     }
 
     loader = MakeGarbageCollected<ResourceLoader>(
-        this, scheduler_, resource, std::move(request_body), size);
+        this, scheduler_, resource, context_lifecycle_notifier_,
+        std::move(request_body), size);
     // Preload requests should not block the load event. IsLinkPreload()
     // actually continues to return true for Resources matched from the preload
     // cache that must block the load event, but that is OK because this method
@@ -2742,16 +2758,12 @@ void ResourceFetcher::CancelWebBundleSubresourceLoadersFor(
 void ResourceFetcher::MaybeSaveResourceToStrongReference(Resource* resource) {
   if (base::FeatureList::IsEnabled(features::kMemoryCacheStrongReference) &&
       ShouldResourceBeKeptStrongReference(resource)) {
-    if (resource->GetType() != ResourceType::kImage ||
-        !base::FeatureList::IsEnabled(
-            features::kMemoryCacheStrongReferenceFilterImages)) {
-      document_resource_strong_refs_.insert(resource);
-      freezable_task_runner_->PostDelayedTask(
-          FROM_HERE,
-          WTF::BindOnce(&ResourceFetcher::RemoveResourceStrongReference,
-                        WrapWeakPersistent(this), WrapWeakPersistent(resource)),
-          GetResourceStrongReferenceTimeout(resource));
-    }
+    document_resource_strong_refs_.insert(resource);
+    freezable_task_runner_->PostDelayedTask(
+        FROM_HERE,
+        WTF::BindOnce(&ResourceFetcher::RemoveResourceStrongReference,
+                      WrapWeakPersistent(this), WrapWeakPersistent(resource)),
+        GetResourceStrongReferenceTimeout(resource));
   }
 }
 
@@ -2830,6 +2842,7 @@ void ResourceFetcher::Trace(Visitor* visitor) const {
   visitor->Trace(subresource_web_bundles_);
   visitor->Trace(document_resource_strong_refs_);
   visitor->Trace(resource_cache_remote_);
+  visitor->Trace(context_lifecycle_notifier_);
   MemoryPressureListener::Trace(visitor);
 }
 

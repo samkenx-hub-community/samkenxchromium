@@ -351,12 +351,22 @@ chrome.fileManagerPrivate.SharesheetLaunchSource = {
 chrome.fileManagerPrivate.IOTaskState = {
   QUEUED: 'queued',
   SCANNING: 'scanning',
+  WARNING: 'warning',
   IN_PROGRESS: 'in_progress',
   PAUSED: 'paused',
   SUCCESS: 'success',
   ERROR: 'error',
   NEED_PASSWORD: 'need_password',
   CANCELLED: 'cancelled',
+};
+
+/**
+ * @enum {string}
+ */
+chrome.fileManagerPrivate.SecurityErrorType = {
+  DLP: 'dlp',
+  ENTERPRISE_CONNECTORS: 'enterprise_connectors',
+  DLP_WARNING_TIMEOUT: 'dlp_warning_timeout',
 };
 
 /**
@@ -514,7 +524,8 @@ chrome.fileManagerPrivate.ResultingTasks;
  *   isExternalMedia: (boolean|undefined),
  *   isArbitrarySyncFolder: (boolean|undefined),
  *   syncStatus: (!chrome.fileManagerPrivate.SyncStatus|undefined),
- *   progress: (number|undefined)
+ *   progress: (number|undefined),
+ *   shortcut: (boolean|undefined)
  * }}
  */
 chrome.fileManagerPrivate.EntryProperties;
@@ -1729,6 +1740,7 @@ chrome.fileManagerPrivate.openManageSyncSettings = function() {};
 chrome.fileManagerPrivate.parseTrashInfoFiles = function(entries, callback) {};
 
 /**
+ * Returns the current progress of the bulk pinning manager.
  * @param {function(!chrome.fileManagerPrivate.BulkPinProgress): void} callback
  */
 chrome.fileManagerPrivate.getBulkPinProgress = function(callback) {};
@@ -1809,3 +1821,8 @@ chrome.fileManagerPrivate.onIOTaskProgressStatus;
  * @type {!ChromeEvent}
  */
 chrome.fileManagerPrivate.onMountableGuestsChanged;
+
+/**
+ * @type {!ChromeEvent}
+ */
+chrome.fileManagerPrivate.onBulkPinProgress;

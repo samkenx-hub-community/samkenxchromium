@@ -8,7 +8,9 @@
 #include <memory>
 #include <vector>
 
+#include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
+#include "chrome/browser/ash/login/oobe_quick_start/connectivity/connection.h"
 #include "chrome/browser/ash/login/oobe_quick_start/connectivity/target_device_connection_broker.h"
 #include "chrome/browser/ash/login/oobe_quick_start/connectivity/target_device_connection_broker_factory.h"
 
@@ -17,7 +19,6 @@ class FakeNearbyConnection;
 namespace ash::quick_start {
 
 class FakeQuickStartDecoder;
-class RandomSessionId;
 
 class FakeTargetDeviceConnectionBroker : public TargetDeviceConnectionBroker {
  public:
@@ -43,8 +44,11 @@ class FakeTargetDeviceConnectionBroker : public TargetDeviceConnectionBroker {
     FeatureSupportStatus initial_feature_support_status_ =
         FeatureSupportStatus::kSupported;
 
+    // TargetDeviceConnectionBrokerFactory:
     std::unique_ptr<TargetDeviceConnectionBroker> CreateInstance(
-        RandomSessionId session_id) override;
+        base::WeakPtr<NearbyConnectionsManager> nearby_connections_manager,
+        mojo::SharedRemote<mojom::QuickStartDecoder> quick_start_decoder,
+        bool is_resume_after_update = false) override;
 
     std::vector<FakeTargetDeviceConnectionBroker*> instances_;
   };
@@ -61,6 +65,7 @@ class FakeTargetDeviceConnectionBroker : public TargetDeviceConnectionBroker {
                         bool use_pin_authentication,
                         ResultCallback on_start_advertising_callback) override;
   void StopAdvertising(base::OnceClosure on_stop_advertising_callback) override;
+  base::Value::Dict GetPrepareForUpdateInfo() override;
 
   void InitiateConnection(const std::string& source_device_id);
   void AuthenticateConnection(const std::string& source_device_id);
@@ -105,6 +110,8 @@ class FakeTargetDeviceConnectionBroker : public TargetDeviceConnectionBroker {
   base::OnceClosure on_stop_advertising_callback_;
   std::unique_ptr<FakeNearbyConnection> fake_nearby_connection_;
   std::unique_ptr<FakeQuickStartDecoder> fake_quick_start_decoder_;
+  std::unique_ptr<Connection::Factory> connection_factory_;
+  std::unique_ptr<Connection> connection_;
 
   base::WeakPtrFactory<FakeTargetDeviceConnectionBroker> weak_ptr_factory_{
       this};

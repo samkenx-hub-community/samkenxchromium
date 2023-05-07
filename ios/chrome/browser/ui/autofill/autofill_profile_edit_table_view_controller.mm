@@ -15,7 +15,6 @@
 #import "ios/chrome/browser/shared/ui/table_view/cells/table_view_link_header_footer_item.h"
 #import "ios/chrome/browser/shared/ui/table_view/cells/table_view_multi_detail_text_item.h"
 #import "ios/chrome/browser/shared/ui/table_view/cells/table_view_text_button_item.h"
-#import "ios/chrome/browser/shared/ui/table_view/cells/table_view_text_edit_item_delegate.h"
 #import "ios/chrome/browser/shared/ui/table_view/cells/table_view_text_item.h"
 #import "ios/chrome/browser/shared/ui/table_view/table_view_model.h"
 #import "ios/chrome/browser/shared/ui/table_view/table_view_utils.h"
@@ -65,8 +64,7 @@ const CGFloat kLineSpacingBetweenErrorAndFooter = 12.0f;
 
 }  // namespace
 
-@interface AutofillProfileEditTableViewController () <
-    TableViewTextEditItemDelegate>
+@interface AutofillProfileEditTableViewController ()
 
 // The AutofillProfileEditTableViewControllerDelegate for this ViewController.
 @property(nonatomic, weak) id<AutofillProfileEditTableViewControllerDelegate>
@@ -93,6 +91,7 @@ const CGFloat kLineSpacingBetweenErrorAndFooter = 12.0f;
 @property(nonatomic, assign) BOOL errorSectionPresented;
 
 // If YES, denote that the particular field requires a value.
+@property(nonatomic, assign) BOOL nameRequired;
 @property(nonatomic, assign) BOOL line1Required;
 @property(nonatomic, assign) BOOL cityRequired;
 @property(nonatomic, assign) BOOL stateRequired;
@@ -110,6 +109,12 @@ const CGFloat kLineSpacingBetweenErrorAndFooter = 12.0f;
 
 // If YES, denotes that the view is shown in the settings.
 @property(nonatomic, assign) BOOL settingsView;
+
+// Points to the save/update button in the modal view.
+@property(nonatomic, strong) TableViewTextButtonItem* modalSaveUpdateButton;
+
+// If YES, denotes that the view is laid out for the migration prompt.
+@property(nonatomic, assign) BOOL migrationPrompt;
 
 @end
 
@@ -147,37 +152,9 @@ const CGFloat kLineSpacingBetweenErrorAndFooter = 12.0f;
 }
 
 - (void)editButtonPressed {
+  DCHECK(self.settingsView);
   if (!self.controller.tableView.editing) {
-    TableViewModel* model = self.controller.tableViewModel;
-    NSInteger itemCount =
-        [model numberOfItemsInSection:
-                   [model sectionForSectionIdentifier:SectionIdentifierFields]];
-
-    // Reads the values from the fields and updates the local copy of the
-    // profile accordingly.
-    NSInteger section =
-        [model sectionForSectionIdentifier:SectionIdentifierFields];
-    for (NSInteger itemIndex = 0; itemIndex < itemCount; ++itemIndex) {
-      NSIndexPath* path = [NSIndexPath indexPathForItem:itemIndex
-                                              inSection:section];
-      NSInteger itemType =
-          [self.controller.tableViewModel itemTypeForIndexPath:path];
-
-      if (itemType == ItemTypeCountry &&
-          self.autofillAccountProfilesUnionViewEnabled) {
-        [self.delegate
-            updateProfileMetadataWithValue:self.homeAddressCountry
-                         forAutofillUIType:
-                             AutofillUITypeProfileHomeAddressCountry];
-        continue;
-      }
-
-      AutofillEditItem* item = base::mac::ObjCCastStrict<AutofillEditItem>(
-          [model itemAtIndexPath:path]);
-      [self.delegate updateProfileMetadataWithValue:item.textFieldValue
-                                  forAutofillUIType:item.autofillUIType];
-    }
-
+    [self updateProfileData];
     [self.delegate didEditAutofillProfile];
   }
 
@@ -221,6 +198,10 @@ const CGFloat kLineSpacingBetweenErrorAndFooter = 12.0f;
   NSInteger itemType =
       [self.controller.tableViewModel itemTypeForIndexPath:indexPath];
   if (itemType == ItemTypeFooter || itemType == ItemTypeError) {
+    if (!self.settingsView) {
+      cell.separatorInset = UIEdgeInsetsMake(
+          0, self.controller.tableView.bounds.size.width, 0, 0);
+    }
     return cell;
   }
 
@@ -284,6 +265,7 @@ const CGFloat kLineSpacingBetweenErrorAndFooter = 12.0f;
 }
 
 - (void)loadFooterForSettings {
+  CHECK(self.settingsView);
   TableViewModel* model = self.controller.tableViewModel;
 
   if (self.autofillAccountProfilesUnionViewEnabled && self.accountProfile &&
@@ -295,9 +277,9 @@ const CGFloat kLineSpacingBetweenErrorAndFooter = 12.0f;
 }
 
 - (void)loadMessageAndButtonForModalIfSaveOrUpdate:(BOOL)update {
-  DCHECK(!self.settingsView);
+  CHECK(!self.settingsView);
   TableViewModel* model = self.controller.tableViewModel;
-  if (self.accountProfile) {
+  if (self.accountProfile || self.migrationPrompt) {
     DCHECK([_userEmail length] > 0);
     [model addItem:[self footerItemForModalViewIfSaveOrUpdate:update]
         toSectionWithIdentifier:SectionIdentifierFields];
@@ -320,10 +302,14 @@ const CGFloat kLineSpacingBetweenErrorAndFooter = 12.0f;
 }
 
 - (void)tableViewItemDidChange:(TableViewTextEditItem*)tableViewItem {
-  if (self.autofillAccountProfilesUnionViewEnabled && self.accountProfile &&
-      self.settingsView) {
+  if (self.autofillAccountProfilesUnionViewEnabled &&
+      (self.accountProfile || self.migrationPrompt)) {
     [self computeErrorIfRequiredTextField:tableViewItem];
-    [self updateDoneButtonStatus];
+    if (self.settingsView) {
+      [self updateDoneButtonStatus];
+    } else {
+      [self updateSaveButtonStatus];
+    }
   }
   [self.controller reconfigureCellsForItems:@[ tableViewItem ]];
 }
@@ -335,7 +321,7 @@ const CGFloat kLineSpacingBetweenErrorAndFooter = 12.0f;
 #pragma mark - AutofillProfileEditConsumer
 
 - (void)didSelectCountry:(NSString*)country {
-  DCHECK(self.autofillAccountProfilesUnionViewEnabled);
+  CHECK(self.autofillAccountProfilesUnionViewEnabled);
   self.homeAddressCountry = country;
 
   [self.requiredFieldsWithEmptyValue removeAllObjects];
@@ -345,21 +331,30 @@ const CGFloat kLineSpacingBetweenErrorAndFooter = 12.0f;
       TableViewMultiDetailTextItem* multiDetailTextItem =
           base::mac::ObjCCastStrict<TableViewMultiDetailTextItem>(item);
       multiDetailTextItem.trailingDetailText = self.homeAddressCountry;
-    } else if (self.settingsView && [self isItemTypeTextEditCell:item.type]) {
-      TableViewTextEditItem* tableViewTextEditItem =
-          base::mac::ObjCCastStrict<TableViewTextEditItem>(item);
-      [self computeErrorIfRequiredTextField:tableViewTextEditItem];
+    } else if ([self isItemTypeTextEditCell:item.type]) {
+      // No requirement checks for local profiles.
+      if (self.accountProfile || self.migrationPrompt) {
+        TableViewTextEditItem* tableViewTextEditItem =
+            base::mac::ObjCCastStrict<TableViewTextEditItem>(item);
+        [self computeErrorIfRequiredTextField:tableViewTextEditItem];
+      }
     }
     [self.controller reconfigureCellsForItems:@[ item ]];
   }
 
-  [self updateDoneButtonStatus];
+  if (self.settingsView) {
+    [self updateDoneButtonStatus];
+  } else {
+    [self updateSaveButtonStatus];
+  }
 }
 
 #pragma mark - Actions
 
 - (void)didTapSaveButton {
-  // TODO(crbug.com/1407666): Implement Save functionality.
+  CHECK(!self.settingsView);
+  [self updateProfileData];
+  [self.delegate didSaveProfileFromModal];
 }
 
 #pragma mark - Conversion Helper Methods
@@ -368,6 +363,8 @@ const CGFloat kLineSpacingBetweenErrorAndFooter = 12.0f;
 - (autofill::ServerFieldType)serverFieldTypeCorrespondingToRequiredItemType:
     (ItemType)itemType {
   switch (itemType) {
+    case ItemTypeFullName:
+      return autofill::NAME_FULL;
     case ItemTypeLine1:
       return autofill::ADDRESS_HOME_LINE1;
     case ItemTypeCity:
@@ -378,7 +375,6 @@ const CGFloat kLineSpacingBetweenErrorAndFooter = 12.0f;
       return autofill::ADDRESS_HOME_ZIP;
     case ItemTypeHonorificPrefix:
     case ItemTypeCompanyName:
-    case ItemTypeFullName:
     case ItemTypeLine2:
     case ItemTypePhoneNumber:
     case ItemTypeEmailAddress:
@@ -395,6 +391,8 @@ const CGFloat kLineSpacingBetweenErrorAndFooter = 12.0f;
 // Returns the label corresponding to the item type for a required field.
 - (NSString*)labelCorrespondingToRequiredItemType:(ItemType)itemType {
   switch (itemType) {
+    case ItemTypeFullName:
+      return l10n_util::GetNSString(IDS_IOS_AUTOFILL_FULLNAME);
     case ItemTypeLine1:
       return l10n_util::GetNSString(IDS_IOS_AUTOFILL_ADDRESS1);
     case ItemTypeCity:
@@ -405,7 +403,6 @@ const CGFloat kLineSpacingBetweenErrorAndFooter = 12.0f;
       return l10n_util::GetNSString(IDS_IOS_AUTOFILL_ZIP);
     case ItemTypeHonorificPrefix:
     case ItemTypeCompanyName:
-    case ItemTypeFullName:
     case ItemTypeLine2:
     case ItemTypePhoneNumber:
     case ItemTypeEmailAddress:
@@ -487,6 +484,7 @@ const CGFloat kLineSpacingBetweenErrorAndFooter = 12.0f;
 
 // Creates and returns the `TableViewLinkHeaderFooterItem` footer item.
 - (TableViewLinkHeaderFooterItem*)footerItem {
+  CHECK(self.settingsView);
   TableViewLinkHeaderFooterItem* item =
       [[TableViewLinkHeaderFooterItem alloc] initWithType:ItemTypeFooter];
   item.text = [self footerMessage];
@@ -495,6 +493,7 @@ const CGFloat kLineSpacingBetweenErrorAndFooter = 12.0f;
 
 // Returns the error message item as a footer.
 - (TableViewAttributedStringHeaderFooterItem*)errorMessageItem {
+  CHECK(self.settingsView);
   TableViewAttributedStringHeaderFooterItem* item =
       [[TableViewAttributedStringHeaderFooterItem alloc]
           initWithType:ItemTypeError];
@@ -544,6 +543,7 @@ const CGFloat kLineSpacingBetweenErrorAndFooter = 12.0f;
 
 // Returns the footer element for the save/update prompts.
 - (TableViewTextItem*)footerItemForModalViewIfSaveOrUpdate:(BOOL)update {
+  CHECK(!self.settingsView);
   TableViewTextItem* item =
       [[TableViewTextItem alloc] initWithType:ItemTypeFooter];
   item.text = l10n_util::GetNSStringF(
@@ -557,14 +557,22 @@ const CGFloat kLineSpacingBetweenErrorAndFooter = 12.0f;
 
 // Returns the button element for the save/update prompts.
 - (TableViewTextButtonItem*)saveButtonIfSaveOrUpdate:(BOOL)update {
-  TableViewTextButtonItem* saveButton =
+  CHECK(!self.settingsView);
+  self.modalSaveUpdateButton =
       [[TableViewTextButtonItem alloc] initWithType:ItemTypeSaveButton];
-  saveButton.textAlignment = NSTextAlignmentNatural;
-  saveButton.buttonText = l10n_util::GetNSString(
-      update ? IDS_AUTOFILL_UPDATE_ADDRESS_PROMPT_OK_BUTTON_LABEL
-             : IDS_AUTOFILL_SAVE_ADDRESS_PROMPT_OK_BUTTON_LABEL);
-  saveButton.disableButtonIntrinsicWidth = YES;
-  return saveButton;
+  self.modalSaveUpdateButton.textAlignment = NSTextAlignmentNatural;
+  if (self.migrationPrompt) {
+    self.modalSaveUpdateButton.buttonText = l10n_util::GetNSString(
+        IDS_AUTOFILL_ADDRESS_MIGRATION_TO_ACCOUNT_PROMPT_OK_BUTTON_LABEL);
+  } else {
+    self.modalSaveUpdateButton.buttonText = l10n_util::GetNSString(
+        update ? IDS_AUTOFILL_UPDATE_ADDRESS_PROMPT_OK_BUTTON_LABEL
+               : IDS_AUTOFILL_SAVE_ADDRESS_PROMPT_OK_BUTTON_LABEL);
+  }
+
+  self.modalSaveUpdateButton.disableButtonIntrinsicWidth = YES;
+
+  return self.modalSaveUpdateButton;
 }
 
 #pragma mark - Private
@@ -572,6 +580,8 @@ const CGFloat kLineSpacingBetweenErrorAndFooter = 12.0f;
 // Returns true if the itemType belongs to a required field.
 - (BOOL)isItemTypeRequiredField:(ItemType)itemType {
   switch (itemType) {
+    case ItemTypeFullName:
+      return self.nameRequired;
     case ItemTypeLine1:
       return self.line1Required;
     case ItemTypeCity:
@@ -582,7 +592,6 @@ const CGFloat kLineSpacingBetweenErrorAndFooter = 12.0f;
       return self.zipRequired;
     case ItemTypeHonorificPrefix:
     case ItemTypeCompanyName:
-    case ItemTypeFullName:
     case ItemTypeLine2:
     case ItemTypePhoneNumber:
     case ItemTypeEmailAddress:
@@ -640,6 +649,7 @@ const CGFloat kLineSpacingBetweenErrorAndFooter = 12.0f;
 // Removes the given section if it exists.
 - (void)removeSectionWithIdentifier:(NSInteger)sectionIdentifier
                    withRowAnimation:(UITableViewRowAnimation)animation {
+  CHECK(self.settingsView);
   TableViewModel* model = self.controller.tableViewModel;
   if ([model hasSectionForSectionIdentifier:sectionIdentifier]) {
     NSInteger section = [model sectionForSectionIdentifier:sectionIdentifier];
@@ -653,6 +663,7 @@ const CGFloat kLineSpacingBetweenErrorAndFooter = 12.0f;
 // If the error status has changed, displays the footer accordingly.
 - (void)changeFooterStatusToRemoveSection:(SectionIdentifier)removeSection
                                addSection:(SectionIdentifier)addSection {
+  CHECK(self.settingsView);
   TableViewModel* model = self.controller.tableViewModel;
   [self.controller
       performBatchTableViewUpdates:^{
@@ -679,6 +690,7 @@ const CGFloat kLineSpacingBetweenErrorAndFooter = 12.0f;
 // Updates the Done button status based on `self.requiredFieldsWithEmptyValue`
 // and shows/removes the error footer if required.
 - (void)updateDoneButtonStatus {
+  CHECK(self.settingsView);
   BOOL shouldShowError = ([self.requiredFieldsWithEmptyValue count] > 0);
   self.controller.navigationItem.rightBarButtonItem.enabled = !shouldShowError;
   if (shouldShowError != self.errorSectionPresented) {
@@ -697,9 +709,19 @@ const CGFloat kLineSpacingBetweenErrorAndFooter = 12.0f;
   }
 }
 
+// Updates the Save/Update button status based on
+// `self.requiredFieldsWithEmptyValue`.
+- (void)updateSaveButtonStatus {
+  CHECK(!self.settingsView);
+  BOOL shouldShowError = ([self.requiredFieldsWithEmptyValue count] > 0);
+  self.modalSaveUpdateButton.enabled = !shouldShowError;
+  [self.controller reconfigureCellsForItems:@[ self.modalSaveUpdateButton ]];
+}
+
 // Returns YES, if the error message needs to be changed. This happens when
 // there are multiple required fields that become empty.
 - (BOOL)shouldChangeErrorMessage {
+  CHECK(self.settingsView);
   TableViewHeaderFooterItem* currentFooter = [self.controller.tableViewModel
       footerForSectionWithIdentifier:SectionIdentifierErrorFooter];
   TableViewAttributedStringHeaderFooterItem* attributedFooterItem =
@@ -724,7 +746,8 @@ const CGFloat kLineSpacingBetweenErrorAndFooter = 12.0f;
 
 // Returns the error message combined with footer.
 - (NSAttributedString*)errorAndFooterMessage {
-  DCHECK([self.requiredFieldsWithEmptyValue count] > 0);
+  CHECK([self.requiredFieldsWithEmptyValue count] > 0);
+  CHECK(self.settingsView);
   NSString* error = l10n_util::GetPluralNSStringF(
       IDS_IOS_SETTINGS_EDIT_AUTOFILL_ADDRESS_REQUIREMENT_ERROR,
       (int)[self.requiredFieldsWithEmptyValue count]);
@@ -776,6 +799,41 @@ const CGFloat kLineSpacingBetweenErrorAndFooter = 12.0f;
       break;
   }
   return NO;
+}
+
+- (void)updateProfileData {
+  TableViewModel* model = self.controller.tableViewModel;
+  NSInteger itemCount =
+      [model numberOfItemsInSection:
+                 [model sectionForSectionIdentifier:SectionIdentifierFields]];
+
+  // Reads the values from the fields and updates the local copy of the
+  // profile accordingly.
+  NSInteger section =
+      [model sectionForSectionIdentifier:SectionIdentifierFields];
+  for (NSInteger itemIndex = 0; itemIndex < itemCount; ++itemIndex) {
+    NSIndexPath* path = [NSIndexPath indexPathForItem:itemIndex
+                                            inSection:section];
+    NSInteger itemType =
+        [self.controller.tableViewModel itemTypeForIndexPath:path];
+
+    if (itemType == ItemTypeCountry) {
+      if (self.autofillAccountProfilesUnionViewEnabled) {
+        [self.delegate
+            updateProfileMetadataWithValue:self.homeAddressCountry
+                         forAutofillUIType:
+                             AutofillUITypeProfileHomeAddressCountry];
+        continue;
+      }
+    } else if (![self isItemTypeTextEditCell:itemType]) {
+      continue;
+    }
+
+    AutofillEditItem* item = base::mac::ObjCCastStrict<AutofillEditItem>(
+        [model itemAtIndexPath:path]);
+    [self.delegate updateProfileMetadataWithValue:item.textFieldValue
+                                forAutofillUIType:item.autofillUIType];
+  }
 }
 
 @end

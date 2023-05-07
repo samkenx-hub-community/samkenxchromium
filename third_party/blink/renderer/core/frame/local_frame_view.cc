@@ -324,7 +324,6 @@ void LocalFrameView::Trace(Visitor* visitor) const {
   visitor->Trace(frame_);
   visitor->Trace(update_plugins_timer_);
   visitor->Trace(layout_subtree_root_list_);
-  visitor->Trace(orthogonal_writing_mode_root_list_);
   visitor->Trace(fragment_anchor_);
   visitor->Trace(scroll_anchoring_scrollable_areas_);
   visitor->Trace(animating_scrollable_areas_);
@@ -489,7 +488,6 @@ void LocalFrameView::Dispose() {
   // tracking groups when they update style or are destroyed, but sometimes they
   // are missed. It would be good to understand how/why that happens, but in the
   // mean time, it's not safe to keep pointers around to defunct LayoutObjects.
-  orthogonal_writing_mode_root_list_.Clear();
   fixed_position_objects_.Clear();
   background_attachment_fixed_objects_.clear();
 
@@ -673,7 +671,6 @@ bool LocalFrameView::LayoutFromRootObject(LayoutObject& root) {
     return false;
   }
 
-  LayoutState layout_state(root);
   if (scroll_anchoring_scrollable_areas_) {
     for (auto& scrollable_area : *scroll_anchoring_scrollable_areas_) {
       if (scrollable_area->GetScrollAnchor() &&
@@ -682,7 +679,11 @@ bool LocalFrameView::LayoutFromRootObject(LayoutObject& root) {
     }
   }
 
-  To<LayoutBox>(root).LayoutSubtreeRoot();
+  if (RuntimeEnabledFeatures::LayoutNewSubtreeRootEnabled()) {
+    To<LayoutBox>(root).LayoutSubtreeRoot();
+  } else {
+    To<LayoutBox>(root).LayoutSubtreeRootOld();
+  }
   return true;
 }
 
@@ -727,14 +728,8 @@ void LocalFrameView::PerformLayout() {
   if (!in_subtree_layout) {
     ClearLayoutSubtreeRootsAndMarkContainingBlocks();
     Node* body = document->body();
-    if (body && body->GetLayoutObject()) {
-      if (IsA<HTMLFrameSetElement>(*body)) {
-        body->GetLayoutObject()->SetChildNeedsLayout();
-      } else if (IsA<HTMLBodyElement>(*body)) {
-        if (!first_layout_ && size_.Height() != GetLayoutSize().height() &&
-            body->GetLayoutObject()->EnclosingBox()->StretchesToViewport())
-          body->GetLayoutObject()->SetChildNeedsLayout();
-      }
+    if (IsA<HTMLFrameSetElement>(body) && body->GetLayoutObject()) {
+      body->GetLayoutObject()->SetChildNeedsLayout();
     }
 
     first_layout_ = false;
@@ -750,23 +745,7 @@ void LocalFrameView::PerformLayout() {
       }
     }
 
-    LayoutSize old_size = size_;
-
     size_ = LayoutSize(GetLayoutSize());
-
-    if (old_size != size_) {
-      LayoutBox* root_layout_object =
-          document->documentElement()
-              ? document->documentElement()->GetLayoutBox()
-              : nullptr;
-      LayoutBox* body_layout_object = root_layout_object && document->body()
-                                          ? document->body()->GetLayoutBox()
-                                          : nullptr;
-      if (body_layout_object && body_layout_object->StretchesToViewport())
-        body_layout_object->SetChildNeedsLayout();
-      else if (root_layout_object && root_layout_object->StretchesToViewport())
-        root_layout_object->SetChildNeedsLayout();
-    }
   }
 
   TRACE_EVENT_OBJECT_SNAPSHOT_WITH_ID(
@@ -782,16 +761,6 @@ void LocalFrameView::PerformLayout() {
   TRACE_EVENT_BEGIN1(
       PERFORM_LAYOUT_TRACE_CATEGORIES, "LocalFrameView::performLayout",
       "contentsHeightBeforeLayout", contents_height_before_layout);
-
-  if (in_subtree_layout && HasOrthogonalWritingModeRoots()) {
-    // If we're going to lay out from each subtree root, rather than once from
-    // LayoutView, we need to merge the depth-ordered orthogonal writing mode
-    // root list into the depth-ordered list of subtrees scheduled for
-    // layout. Otherwise, during layout of one such subtree, we'd risk skipping
-    // over a subtree of objects needing layout.
-    DCHECK(!layout_subtree_root_list_.IsEmpty());
-    ScheduleOrthogonalWritingModeRootsForLayout();
-  }
 
   DCHECK(!IsInPerformLayout());
   Lifecycle().AdvanceTo(DocumentLifecycle::kInPerformLayout);
@@ -850,9 +819,6 @@ void LocalFrameView::PerformLayout() {
 #endif
       fragment_tree_spines.clear();
     } else {
-      if (HasOrthogonalWritingModeRoots())
-        LayoutOrthogonalWritingModeRoots();
-
       GetLayoutView()->UpdateLayout();
     }
   }
@@ -1222,23 +1188,27 @@ void LocalFrameView::RemoveBackgroundAttachmentFixedObject(
   SetNeedsPaintPropertyUpdate();
 }
 
+static bool BackgroundAttachmentFixedNeedsRepaintOnScroll(
+    const LayoutObject& object) {
+  // We should not add such object in the background_attachment_fixed_objects_.
+  DCHECK(!To<LayoutBoxModelObject>(object).BackgroundTransfersToView());
+  // The background doesn't need repaint if it's the viewport background and it
+  // paints onto the border box space only.
+  if (IsA<LayoutView>(object) &&
+      object.GetBackgroundPaintLocation() == kBackgroundPaintInBorderBoxSpace) {
+    return false;
+  }
+  return !object.CanCompositeBackgroundAttachmentFixed();
+}
+
 bool LocalFrameView::RequiresMainThreadScrollingForBackgroundAttachmentFixed()
     const {
-  if (background_attachment_fixed_objects_.empty())
-    return false;
-  if (background_attachment_fixed_objects_.size() > 1)
-    return true;
-
-  const auto* object = To<LayoutBoxModelObject>(
-      background_attachment_fixed_objects_.begin()->Get());
-  // We should not add such object in the set.
-  DCHECK(!object->BackgroundTransfersToView());
-  // If the background is viewport background and it paints onto the border box
-  // space only, then it doesn't need main thread scrolling.
-  if (IsA<LayoutView>(object) &&
-      object->GetBackgroundPaintLocation() == kBackgroundPaintInBorderBoxSpace)
-    return false;
-  return true;
+  for (const auto& object : background_attachment_fixed_objects_) {
+    if (BackgroundAttachmentFixedNeedsRepaintOnScroll(*object)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 void LocalFrameView::AddFixedPositionObject(LayoutObject& object) {
@@ -1271,7 +1241,6 @@ void LocalFrameView::ViewportSizeChanged(bool width_changed,
     // TODO(bokan): IsOutermostMainFrame may need to be reevaluated for
     // portals.
     if (GetFrame().IsOutermostMainFrame()) {
-      layout_view->Layer()->UpdateSize();
       if (auto* scrollable_area = layout_view->GetScrollableArea())
         scrollable_area->ClampScrollOffsetAfterOverflowChange();
     }
@@ -1336,19 +1305,15 @@ bool LocalFrameView::ShouldSetCursor() const {
 }
 
 void LocalFrameView::InvalidateBackgroundAttachmentFixedDescendantsOnScroll(
-    const LayoutObject& scrolled_object) {
+    const LayoutBox& scroller) {
   for (const auto& layout_object : background_attachment_fixed_objects_) {
-    if (scrolled_object != GetLayoutView() &&
-        !layout_object->IsDescendantOf(&scrolled_object))
+    if (scroller != GetLayoutView() &&
+        !layout_object->IsDescendantOf(&scroller)) {
       continue;
-    // An object needs to repaint the background on scroll when it has
-    // background-attachment:fixed unless the object is the LayoutView and the
-    // background is not painted on the scrolling contents.
-    if (layout_object == GetLayoutView() &&
-        !(GetLayoutView()->GetBackgroundPaintLocation() &
-          kBackgroundPaintInContentsSpace))
-      continue;
-    layout_object->SetBackgroundNeedsFullPaintInvalidation();
+    }
+    if (BackgroundAttachmentFixedNeedsRepaintOnScroll(*layout_object)) {
+      layout_object->SetBackgroundNeedsFullPaintInvalidation();
+    }
   }
 }
 
@@ -1417,73 +1382,6 @@ void LocalFrameView::ClearLayoutSubtreeRoot(const LayoutObject& root) {
 
 void LocalFrameView::ClearLayoutSubtreeRootsAndMarkContainingBlocks() {
   layout_subtree_root_list_.ClearAndMarkContainingBlocksForLayout();
-}
-
-void LocalFrameView::AddOrthogonalWritingModeRoot(LayoutBox& root) {
-  DCHECK(!root.IsLayoutCustomScrollbarPart());
-  orthogonal_writing_mode_root_list_.Add(root);
-}
-
-void LocalFrameView::RemoveOrthogonalWritingModeRoot(LayoutBox& root) {
-  orthogonal_writing_mode_root_list_.Remove(root);
-}
-
-bool LocalFrameView::HasOrthogonalWritingModeRoots() const {
-  return !orthogonal_writing_mode_root_list_.IsEmpty();
-}
-
-static bool PrepareOrthogonalWritingModeRootForLayout(LayoutObject& root) {
-  DCHECK(To<LayoutBox>(root).IsOrthogonalWritingModeRoot());
-  if (!root.NeedsLayout() || root.IsOutOfFlowPositioned() ||
-      root.IsColumnSpanAll() || root.StyleRef().LogicalHeight().IsSpecified() ||
-      root.IsTablePart() || root.IsLayoutFlowThread()) {
-    return false;
-  }
-
-  // Do not pre-layout objects that are fully managed by LayoutNG; it is not
-  // necessary and may lead to double layouts. We do need to pre-layout objects
-  // whose containing block is a legacy object so that it can properly compute
-  // its intrinsic size.
-  if (IsManagedByLayoutNG(root)) {
-    return false;
-  }
-
-  // If the root is legacy but has |CachedLayoutResult|, its parent is NG, which
-  // called |RunLegacyLayout()|. This parent not only needs to run pre-layout,
-  // but also clearing |NeedsLayout()| without updating |CachedLayoutResult| is
-  // harmful.
-  if (const auto* box = DynamicTo<LayoutBox>(root)) {
-    if (box->GetSingleCachedLayoutResult()) {
-      return false;
-    }
-  }
-
-  return true;
-}
-
-void LocalFrameView::LayoutOrthogonalWritingModeRoots() {
-  for (auto& root : orthogonal_writing_mode_root_list_.Ordered()) {
-    if (PrepareOrthogonalWritingModeRootForLayout(*root))
-      LayoutFromRootObject(*root);
-  }
-}
-
-void LocalFrameView::ScheduleOrthogonalWritingModeRootsForLayout() {
-  for (auto& root : orthogonal_writing_mode_root_list_.Ordered()) {
-    if (PrepareOrthogonalWritingModeRootForLayout(*root))
-      layout_subtree_root_list_.Add(*root);
-  }
-}
-
-void LocalFrameView::MarkOrthogonalWritingModeRootsForLayout() {
-  for (auto& root : orthogonal_writing_mode_root_list_.Ordered()) {
-    // OOF-positioned objects don't depend on the ICB size.
-    if (root->NeedsLayout() || root->IsOutOfFlowPositioned())
-      continue;
-
-    root->SetNeedsLayoutAndIntrinsicWidthsRecalc(
-        layout_invalidation_reason::kSizeChanged);
-  }
 }
 
 bool LocalFrameView::CheckLayoutInvalidationIsAllowed() const {
@@ -2155,7 +2053,7 @@ bool LocalFrameView::NotifyResizeObservers() {
         !resize_controller->IsLoopLimitErrorDispatched()) {
       resize_controller->ClearObservations();
       ErrorEvent* error = ErrorEvent::Create(
-          "ResizeObserver loop limit exceeded",
+          "ResizeObserver loop completed with undelivered notifications.",
           CaptureSourceLocation(frame_->DomWindow()), nullptr);
       // We're using |SanitizeScriptErrors::kDoNotSanitize| as the error is made
       // by blink itself.
@@ -2764,8 +2662,21 @@ void LocalFrameView::RunPaintLifecyclePhase(PaintBenchmarkMode benchmark_mode) {
 
   size_t total_animations_count = 0;
   ForAllNonThrottledLocalFrameViews(
-      [this, &needed_update,
+      [this, needed_update,
        &total_animations_count](LocalFrameView& frame_view) {
+        if (RuntimeEnabledFeatures::CompositeScrollAfterPaintEnabled() &&
+            needed_update && paint_artifact_compositor_ &&
+            frame_view.UserScrollableAreas()) {
+          for (auto& scrollable_area : *frame_view.UserScrollableAreas()) {
+            const auto* properties = scrollable_area->GetLayoutBox()
+                                         ->FirstFragment()
+                                         .PaintProperties();
+            scrollable_area->SetShouldScrollOnMainThread(
+                !properties || !properties->Scroll() ||
+                paint_artifact_compositor_->GetMainThreadScrollingReasons(
+                    *properties->Scroll()));
+          }
+        }
         if (auto* scrollable_area = frame_view.GetScrollableArea())
           scrollable_area->UpdateCompositorScrollAnimations();
         if (const auto* animating_scrollable_areas =
@@ -4612,8 +4523,10 @@ String LocalFrameView::MainThreadScrollingReasonsAsText() {
   DCHECK_GE(Lifecycle().GetState(), DocumentLifecycle::kPaintClean);
   const auto* properties = GetLayoutView()->FirstFragment().PaintProperties();
   if (properties && properties->Scroll()) {
-    reasons = paint_artifact_compositor_->GetMainThreadScrollingReasons(
-        *properties->Scroll());
+    const auto* compositor =
+        GetFrame().LocalFrameRoot().View()->paint_artifact_compositor_.get();
+    CHECK(compositor);
+    reasons = compositor->GetMainThreadScrollingReasons(*properties->Scroll());
   }
   return String(cc::MainThreadScrollingReason::AsText(reasons).c_str());
 }

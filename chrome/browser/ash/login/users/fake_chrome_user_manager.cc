@@ -131,6 +131,9 @@ FakeChromeUserManager::AddUserWithAffiliationAndTypeAndProfile(
   if (profile) {
     ProfileHelper::Get()->SetUserToProfileMappingForTesting(user, profile);
   }
+
+  NotifyUserAffiliationUpdated(*user);
+
   return user;
 }
 
@@ -291,6 +294,10 @@ void FakeChromeUserManager::OnSessionStarted() {}
 
 void FakeChromeUserManager::RemoveUser(const AccountId& account_id,
                                        user_manager::UserRemovalReason reason) {
+  // TODO(b/278643115): Unify the implementation with the real one.
+  NotifyUserToBeRemoved(account_id);
+  RemoveUserFromList(account_id);
+  NotifyUserRemoved(account_id, reason);
 }
 
 void FakeChromeUserManager::RemoveUserFromList(const AccountId& account_id) {
@@ -367,13 +374,6 @@ bool FakeChromeUserManager::IsStubAccountId(const AccountId& account_id) const {
 
 bool FakeChromeUserManager::IsDeprecatedSupervisedAccountId(
     const AccountId& account_id) const {
-  const policy::BrowserPolicyConnectorAsh* connector =
-      g_browser_process->platform_part()->browser_policy_connector_ash();
-  // Supervised accounts are not allowed on the Active Directory devices. It
-  // also makes sure "locally-managed.localhost" would work properly and would
-  // not be detected as supervised users.
-  if (connector->IsActiveDirectoryManaged())
-    return false;
   return gaia::ExtractDomainName(account_id.GetUserEmail()) ==
          user_manager::kSupervisedUserDomain;
 }
@@ -711,13 +711,20 @@ void FakeChromeUserManager::PublicAccountUserLoggedIn(
   NOTREACHED();
 }
 
-void FakeChromeUserManager::OnUserRemoved(const AccountId& account_id) {
-  NOTREACHED();
-}
-
 void FakeChromeUserManager::SetUserAffiliation(
     const AccountId& account_id,
-    const AffiliationIDSet& user_affiliation_ids) {}
+    const base::flat_set<std::string>& user_affiliation_ids) {}
+
+void FakeChromeUserManager::SetUserAffiliationForTesting(
+    const AccountId& account_id,
+    bool is_affiliated) {
+  auto* user = FindUserAndModify(account_id);
+  if (!user) {
+    return;
+  }
+  user->SetAffiliation(is_affiliated);
+  NotifyUserAffiliationUpdated(*user);
+}
 
 bool FakeChromeUserManager::IsFullManagementDisclosureNeeded(
     policy::DeviceLocalAccountPolicyBroker* broker) const {

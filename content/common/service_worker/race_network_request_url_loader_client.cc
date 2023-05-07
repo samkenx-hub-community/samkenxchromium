@@ -6,6 +6,7 @@
 #include "content/common/service_worker/service_worker_resource_loader.h"
 #include "net/http/http_status_code.h"
 #include "services/network/public/cpp/record_ontransfersizeupdate_utils.h"
+#include "third_party/blink/public/mojom/loader/resource_load_info.mojom-shared.h"
 
 namespace content {
 ServiceWorkerRaceNetworkRequestURLLoaderClient::
@@ -58,7 +59,7 @@ void ServiceWorkerRaceNetworkRequestURLLoaderClient::OnReceiveResponse(
     return;
   }
 
-  owner_->set_fetch_response_from(
+  owner_->SetFetchResponseFrom(
       ServiceWorkerResourceLoader::FetchResponseFrom::kWithoutServiceWorker);
 
   head_ = std::move(head);
@@ -70,7 +71,19 @@ void ServiceWorkerRaceNetworkRequestURLLoaderClient::OnReceiveResponse(
 void ServiceWorkerRaceNetworkRequestURLLoaderClient::OnReceiveRedirect(
     const net::RedirectInfo& redirect_info,
     network::mojom::URLResponseHeadPtr head) {
-  // Do nothing. A redirect response will be handled by the fetch handler.
+  if (!owner_) {
+    return;
+  }
+  // If fetch_response_from() is FetchResponseFrom::kServiceWorker, that
+  // means the response was already received from the fetch handler. The
+  // response from RaceNetworkRequest is simply discarded in that case.
+  if (owner_->fetch_response_from() ==
+      ServiceWorkerResourceLoader::FetchResponseFrom::kServiceWorker) {
+    return;
+  }
+  owner_->SetFetchResponseFrom(
+      ServiceWorkerResourceLoader::FetchResponseFrom::kWithoutServiceWorker);
+  owner_->HandleRedirect(redirect_info, head);
 }
 
 void ServiceWorkerRaceNetworkRequestURLLoaderClient::OnComplete(

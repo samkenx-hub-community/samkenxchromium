@@ -158,7 +158,6 @@ SyncServiceImpl::SyncServiceImpl(InitParams init_params)
           base::BindRepeating(&CreateHttpBridgeFactory)),
       start_behavior_(init_params.start_behavior),
       is_regular_profile_for_uma_(init_params.is_regular_profile_for_uma),
-      is_setting_sync_requested_(false),
       should_record_trusted_vault_error_shown_on_startup_(true),
 #if BUILDFLAG(IS_ANDROID)
       sessions_invalidations_enabled_(false) {
@@ -206,9 +205,15 @@ void SyncServiceImpl::Initialize() {
   data_type_controllers_ =
       BuildDataTypeControllerMap(sync_client_->CreateDataTypeControllers(this));
 
+  // It's safe to pass a raw ptr, since SyncServiceImpl outlives
+  // SyncUserSettingsImpl.
   user_settings_ = std::make_unique<SyncUserSettingsImpl>(
       &crypto_, &sync_prefs_, sync_client_->GetPreferenceProvider(),
-      GetRegisteredDataTypes());
+      GetRegisteredDataTypes(),
+      base::BindRepeating(
+          &SyncServiceImpl::
+              ShouldHonorBookmarksAndReadingListAccountStorageOptIn,
+          base::Unretained(this)));
 
   sync_prefs_.AddSyncPrefObserver(this);
 
@@ -254,8 +259,9 @@ void SyncServiceImpl::Initialize() {
   // Local Sync bypasses the IsSyncRequested() check, so no need to set it in
   // that case.
   // TODO(crbug.com/920158): Get rid of AUTO_START and remove this workaround.
-  if (start_behavior_ == AUTO_START && !IsLocalSyncEnabled()) {
-    user_settings_->SetSyncRequestedIfNotSetExplicitly();
+  if (start_behavior_ == AUTO_START && !IsLocalSyncEnabled() &&
+      !sync_prefs_.IsSyncRequestedSetExplicitly()) {
+    SetSyncFeatureRequested();
   }
   bool force_immediate = (start_behavior_ == AUTO_START &&
                           !HasDisableReason(DISABLE_REASON_USER_CHOICE) &&
@@ -597,6 +603,23 @@ void SyncServiceImpl::ResetEngine(ShutdownReason shutdown_reason,
   }
 }
 
+void SyncServiceImpl::SetSyncFeatureRequested() {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  sync_prefs_.SetSyncRequested(true);
+
+  // If the Sync engine was already initialized (probably running in transport
+  // mode), just reconfigure.
+  if (engine_ && engine_->IsInitialized()) {
+    ReconfigureDatatypeManager(/*bypass_setup_in_progress_check=*/false);
+  } else {
+    // Otherwise try to start up. Note that there might still be other disable
+    // reasons remaining, in which case this will effectively do nothing.
+    startup_controller_->TryStart(/*force_immediate=*/true);
+  }
+
+  NotifyObservers();
+}
+
 SyncUserSettings* SyncServiceImpl::GetUserSettings() {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   return user_settings_.get();
@@ -623,7 +646,7 @@ SyncService::DisableReasonSet SyncServiceImpl::GetDisableReasons() const {
     if (!IsSignedIn()) {
       result.Put(DISABLE_REASON_NOT_SIGNED_IN);
     }
-    if (!user_settings_->IsSyncRequested()) {
+    if (!sync_prefs_.IsSyncRequested()) {
       result.Put(DISABLE_REASON_USER_CHOICE);
     }
   }
@@ -1034,7 +1057,10 @@ void SyncServiceImpl::CryptoStateChanged() {
 
 void SyncServiceImpl::CryptoRequiredUserActionChanged() {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  MaybeRecordTrustedVaultHistograms();
+}
 
+void SyncServiceImpl::MaybeRecordTrustedVaultHistograms() {
   if (should_record_trusted_vault_error_shown_on_startup_ &&
       crypto_.IsTrustedVaultKeyRequiredStateKnown() && IsSyncFeatureEnabled()) {
     DCHECK(engine_);
@@ -1051,7 +1077,7 @@ void SyncServiceImpl::CryptoRequiredUserActionChanged() {
         // A 'first time sync configure' is an indication that the account was
         // added to the browser recently (sign in).
         base::UmaHistogramBoolean(
-            "Sync.TrustedVaultErrorShownOnFirstTimeSync",
+            "Sync.TrustedVaultErrorShownOnFirstTimeSync2",
             user_settings_->IsTrustedVaultKeyRequiredForPreferredDataTypes());
       }
     }
@@ -1320,6 +1346,15 @@ bool SyncServiceImpl::UseTransportOnlyMode() const {
   return !IsSyncFeatureEnabled() && !IsLocalSyncEnabled();
 }
 
+bool SyncServiceImpl::ShouldHonorBookmarksAndReadingListAccountStorageOptIn()
+    const {
+  // The special bookmarks&readinglist account-storage opt-in should be honored
+  // only in transport mode (not in full-sync mode). As a special case, it
+  // should not be honored while the setup for Sync-the-feature is in progress,
+  // so that the user can properly select the types they want to sync.
+  return !IsSetupInProgress() && UseTransportOnlyMode();
+}
+
 ModelTypeSet SyncServiceImpl::GetRegisteredDataTypes() const {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   ModelTypeSet registered_types;
@@ -1542,34 +1577,9 @@ void SyncServiceImpl::OnFirstSetupCompletePrefChange(
     bool is_first_setup_complete) {
   if (engine_ && engine_->IsInitialized()) {
     ReconfigureDatatypeManager(/*bypass_setup_in_progress_check=*/false);
-  }
-}
-
-void SyncServiceImpl::OnSyncRequestedPrefChange(bool is_sync_requested) {
-  // Ignore the notification if the service itself set the pref.
-  if (is_setting_sync_requested_) {
-    is_setting_sync_requested_ = false;
-    return;
-  }
-
-  if (is_sync_requested) {
-    // If the Sync engine was already initialized (probably running in transport
-    // mode), just reconfigure.
-    if (engine_ && engine_->IsInitialized()) {
-      ReconfigureDatatypeManager(/*bypass_setup_in_progress_check=*/false);
-    } else {
-      // Otherwise try to start up. Note that there might still be other disable
-      // reasons remaining, in which case this will effectively do nothing.
-      startup_controller_->TryStart(/*force_immediate=*/true);
-    }
-
-    NotifyObservers();
-  } else {
-    // This will notify the observers.
-    // TODO(crbug.com/856179): Evaluate whether we can get away without a
-    // full restart in this case (i.e. just reconfigure).
-    ResetEngine(ShutdownReason::STOP_SYNC_AND_KEEP_DATA,
-                ResetEngineReason::kRequestedPrefChange);
+    // IsSyncFeatureEnabled() likely changed, it might be time to record
+    // histograms.
+    MaybeRecordTrustedVaultHistograms();
   }
 }
 
@@ -1791,18 +1801,11 @@ void SyncServiceImpl::StopAndClear() {
   // will need to reenter it if sync gets re-enabled.
   sync_prefs_.ClearEncryptionBootstrapToken();
 
-  // Clear the sync-requested bit, but avoid side effects in
-  // OnSyncRequestedPrefChange() by leveraging |is_setting_sync_requested_|.
-  //
-  // For a no-op, OnSyncRequestedPrefChange() wouldn't be called and
-  // |is_setting_sync_requested_| wouldn't get reset, so check.
-  if (user_settings_->IsSyncRequested()) {
-    CHECK(!is_setting_sync_requested_);
-    is_setting_sync_requested_ = true;
-    user_settings_->ClearSyncRequested();
-    // OnSyncRequestedPrefChange() should have cleared the flag.
-    CHECK(!is_setting_sync_requested_);
-  }
+#if BUILDFLAG(IS_IOS)
+  sync_prefs_.ClearBookmarksAndReadingListAccountStorageOptIn();
+#endif  // BUILDFLAG(IS_IOS)
+
+  sync_prefs_.SetSyncRequested(false);
 
   // Also let observers know that Sync-the-feature is now fully disabled
   // (before it possibly starts up again in transport-only mode).

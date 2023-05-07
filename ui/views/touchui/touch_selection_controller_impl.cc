@@ -234,7 +234,9 @@ class TouchSelectionControllerImpl::EditingHandleView : public View {
     event->SetHandled();
     switch (event->type()) {
       case ui::ET_GESTURE_TAP:
-        controller_->OnHandleTapped(this);
+        if (is_cursor_handle_) {
+          controller_->ToggleQuickMenu();
+        }
         break;
       case ui::ET_GESTURE_SCROLL_BEGIN: {
         widget_->SetCapture(this);
@@ -265,8 +267,9 @@ class TouchSelectionControllerImpl::EditingHandleView : public View {
   gfx::Size CalculatePreferredSize() const override {
     // This function will be called during widget initialization, i.e. before
     // SetBoundInScreen has been called. No-op in that case.
-    if (selection_bound_.type() == gfx::SelectionBound::EMPTY)
+    if (!selection_bound_.HasHandle()) {
       return gfx::Size();
+    }
     return GetSelectionWidgetBounds(selection_bound_).size();
   }
 
@@ -371,8 +374,7 @@ TouchSelectionControllerImpl::TouchSelectionControllerImpl(
                                    ui::ET_KEY_PRESSED, ui::ET_MOUSEWHEEL};
   env->AddEventObserver(this, env, types);
 
-  tap_cursor_to_toggle_menu_enabled_ =
-      ::features::IsTouchTextEditingRedesignEnabled();
+  toggle_menu_enabled_ = ::features::IsTouchTextEditingRedesignEnabled();
 }
 
 TouchSelectionControllerImpl::~TouchSelectionControllerImpl() {
@@ -453,7 +455,7 @@ void TouchSelectionControllerImpl::SelectionChanged() {
       selection_handle_2_->SetWidgetVisible(false);
       UpdateHandle(cursor_handle_, screen_bound_anchor_clipped,
                    should_show_anchor_handle);
-      quick_menu_requested_ = !tap_cursor_to_toggle_menu_enabled_;
+      quick_menu_requested_ = !toggle_menu_enabled_;
     } else {
       // Non-empty selection, show selection handles.
       cursor_handle_->SetWidgetVisible(false);
@@ -467,19 +469,17 @@ void TouchSelectionControllerImpl::SelectionChanged() {
   }
 }
 
+void TouchSelectionControllerImpl::ToggleQuickMenu() {
+  if (toggle_menu_enabled_) {
+    quick_menu_requested_ = !quick_menu_requested_;
+    UpdateQuickMenu();
+  }
+}
+
 void TouchSelectionControllerImpl::ShowQuickMenuImmediatelyForTesting() {
   if (quick_menu_timer_.IsRunning()) {
     quick_menu_timer_.Stop();
     QuickMenuTimerFired();
-  }
-}
-
-void TouchSelectionControllerImpl::OnHandleTapped(EditingHandleView* handle) {
-  if (tap_cursor_to_toggle_menu_enabled_) {
-    if (handle == cursor_handle_) {
-      quick_menu_requested_ = !quick_menu_requested_;
-    }
-    UpdateQuickMenu();
   }
 }
 

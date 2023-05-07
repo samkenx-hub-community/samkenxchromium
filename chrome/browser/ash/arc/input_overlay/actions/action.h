@@ -18,7 +18,6 @@
 #include "chrome/browser/ash/arc/input_overlay/actions/position.h"
 #include "chrome/browser/ash/arc/input_overlay/constants.h"
 #include "chrome/browser/ash/arc/input_overlay/db/proto/app_data.pb.h"
-#include "chrome/browser/ash/arc/input_overlay/display_overlay_controller.h"
 #include "chrome/browser/ash/arc/input_overlay/touch_injector.h"
 #include "chrome/browser/ash/arc/input_overlay/ui/action_label.h"
 #include "chrome/browser/ash/arc/input_overlay/ui/action_view.h"
@@ -46,7 +45,7 @@ void LogTouchEvents(const std::list<ui::TouchEvent>& events);
 //    "modifiers": [""] // optional: "ctrl", "shift", "alt".
 // }
 absl::optional<std::pair<ui::DomCode, int>> ParseKeyboardKey(
-    const base::Value& value,
+    const base::Value::Dict& value,
     const base::StringPiece key_name);
 
 // Return true if the |input_element| is bound.
@@ -64,7 +63,7 @@ class Action {
   Action& operator=(const Action&) = delete;
   virtual ~Action();
 
-  virtual bool ParseFromJson(const base::Value& value);
+  virtual bool ParseFromJson(const base::Value::Dict& value);
   // Used to create an action from UI.
   virtual bool InitFromEditor();
   bool ParseFromProto(const ActionProto& proto);
@@ -230,9 +229,6 @@ class Action {
   // Mainly for default action to mark if it is deleted.
   bool deleted_ = false;
 
-  // TODO(b/260937747): Update or remove when removing flags
-  // |kArcInputOverlayAlphaV2| or |kArcInputOverlayBeta|.
-  bool allow_reposition_;
   // Corresponds to |kArcInputOverlayBeta| flag to turn on/off the editor
   // feature of adding or removing actions.
   bool beta_;

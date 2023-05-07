@@ -19,7 +19,6 @@
 #include "components/cbor/reader.h"
 #include "components/cbor/values.h"
 #include "quick_start_conversions.h"
-#include "sandbox/policy/sandbox.h"
 
 namespace ash::quick_start {
 
@@ -57,6 +56,10 @@ constexpr char kWifiNetworkSecurityTypeKey[] = "wifi_security_type";
 
 // Key in wifi_network dictionary containing if the wifi network is hidden.
 constexpr char kWifiNetworkIsHiddenKey[] = "wifi_hidden_ssid";
+
+// Key in Notify Source of Update response containing bool acknowledging the
+// message.
+constexpr char kNotifySourceOfUpdateAckKey[] = "forced_update_acknowledged";
 
 std::pair<int, absl::optional<cbor::Value>> CborDecodeGetAssertionResponse(
     base::span<const uint8_t> response) {
@@ -143,8 +146,11 @@ mojom::GetAssertionResponsePtr BuildGetAssertionResponseError(
 }  // namespace
 
 QuickStartDecoder::QuickStartDecoder(
-    mojo::PendingReceiver<mojom::QuickStartDecoder> receiver)
-    : receiver_(this, std::move(receiver)) {}
+    mojo::PendingReceiver<mojom::QuickStartDecoder> receiver,
+    base::OnceClosure on_disconnect)
+    : receiver_(this, std::move(receiver)) {
+  receiver_.set_disconnect_handler(std::move(on_disconnect));
+}
 
 QuickStartDecoder::~QuickStartDecoder() = default;
 
@@ -219,14 +225,12 @@ QuickStartDecoder::DoDecodeBootstrapConfigurations(
 void QuickStartDecoder::DecodeBootstrapConfigurations(
     const std::vector<uint8_t>& data,
     DecodeBootstrapConfigurationsCallback callback) {
-  DCHECK(sandbox::policy::Sandbox::IsProcessSandboxed());
   std::move(callback).Run(DoDecodeBootstrapConfigurations(data));
 }
 
 void QuickStartDecoder::DecodeWifiCredentialsResponse(
     const std::vector<uint8_t>& data,
     DecodeWifiCredentialsResponseCallback callback) {
-  DCHECK(sandbox::policy::Sandbox::IsProcessSandboxed());
   std::move(callback).Run(DoDecodeWifiCredentialsResponse(data));
 }
 
@@ -308,7 +312,6 @@ QuickStartDecoder::DoDecodeWifiCredentialsResponse(
 void QuickStartDecoder::DecodeGetAssertionResponse(
     const std::vector<uint8_t>& data,
     DecodeGetAssertionResponseCallback callback) {
-  DCHECK(sandbox::policy::Sandbox::IsProcessSandboxed());
   std::move(callback).Run(DoDecodeGetAssertionResponse(data));
 }
 
@@ -338,6 +341,27 @@ QuickStartDecoder::ExtractFidoDataFromJsonResponse(
   }
 
   return base::Base64Decode(*fido_message);
+}
+
+void QuickStartDecoder::DecodeNotifySourceOfUpdateResponse(
+    const std::vector<uint8_t>& data,
+    DecodeNotifySourceOfUpdateResponseCallback callback) {
+  std::move(callback).Run(DoDecodeNotifySourceOfUpdateResponse(data));
+}
+
+absl::optional<bool> QuickStartDecoder::DoDecodeNotifySourceOfUpdateResponse(
+    const std::vector<uint8_t>& data) {
+  std::unique_ptr<ash::quick_start::QuickStartMessage> message =
+      QuickStartMessage::ReadMessage(data,
+                                     QuickStartMessageType::kQuickStartPayload);
+
+  if (!message) {
+    LOG(ERROR) << "Notify Source of Update message cannot be parsed as a JSON "
+                  "Dictionary.";
+    return absl::nullopt;
+  }
+
+  return message->GetPayload()->FindBool(kNotifySourceOfUpdateAckKey);
 }
 
 }  // namespace ash::quick_start

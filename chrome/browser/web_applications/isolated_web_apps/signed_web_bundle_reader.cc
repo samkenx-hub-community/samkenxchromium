@@ -15,7 +15,6 @@
 #include "base/metrics/histogram_functions.h"
 #include "base/notreached.h"
 #include "base/numerics/safe_conversions.h"
-#include "base/strings/stringprintf.h"
 #include "base/task/sequenced_task_runner.h"
 #include "base/task/task_traits.h"
 #include "base/task/thread_pool.h"
@@ -142,21 +141,24 @@ void SignedWebBundleReader::OnIntegrityBlockParsed(
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   CHECK_EQ(state_, State::kInitializing);
 
-  if (error) {
-    FulfillWithError(std::move(read_error_callback), std::move(error));
-    return;
-  }
-
-  auto integrity_block = web_package::SignedWebBundleIntegrityBlock::Create(
-      std::move(raw_integrity_block));
+  auto integrity_block = [&]()
+      -> base::expected<web_package::SignedWebBundleIntegrityBlock,
+                        web_package::mojom::BundleIntegrityBlockParseErrorPtr> {
+    if (error) {
+      return base::unexpected(std::move(error));
+    }
+    return web_package::SignedWebBundleIntegrityBlock::Create(
+               std::move(raw_integrity_block))
+        .transform_error([&](std::string error) {
+          return web_package::mojom::BundleIntegrityBlockParseError::New(
+              web_package::mojom::BundleParseErrorType::kFormatError,
+              "Error while parsing the Signed Web Bundle's integrity block: " +
+                  std::move(error));
+        });
+  }();
   if (!integrity_block.has_value()) {
-    FulfillWithError(
-        std::move(read_error_callback),
-        web_package::mojom::BundleIntegrityBlockParseError::New(
-            web_package::mojom::BundleParseErrorType::kFormatError,
-            base::StringPrintf("Error while parsing the Signed Web Bundle's "
-                               "integrity block: %s",
-                               integrity_block.error().c_str())));
+    FulfillWithError(std::move(read_error_callback),
+                     std::move(integrity_block.error()));
     return;
   }
 
@@ -338,12 +340,11 @@ void SignedWebBundleReader::ReadResponse(
   if (entry_it == entries_.end()) {
     base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
         FROM_HERE,
-        base::BindOnce(
-            std::move(callback),
-            base::unexpected(ReadResponseError::ForResponseNotFound(
-                base::StringPrintf("The Web Bundle does not contain a response "
-                                   "for the provided URL: %s",
-                                   url.spec().c_str())))));
+        base::BindOnce(std::move(callback),
+                       base::unexpected(ReadResponseError::ForResponseNotFound(
+                           "The Web Bundle does not contain a response for the "
+                           "provided URL: " +
+                           url.spec()))));
     return;
   }
 
@@ -481,9 +482,8 @@ void SignedWebBundleReader::DidReconnect(absl::optional<std::string> error) {
           FROM_HERE,
           base::BindOnce(
               std::move(response_callback),
-              base::unexpected(
-                  ReadResponseError::ForParserInternalError(base::StringPrintf(
-                      "Unable to open file: %s", error->c_str())))));
+              base::unexpected(ReadResponseError::ForParserInternalError(
+                  "Unable to open file: " + *error))));
     }
     return;
   }

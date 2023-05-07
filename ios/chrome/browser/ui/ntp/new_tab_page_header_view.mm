@@ -6,8 +6,9 @@
 
 #import <UIKit/UIKit.h>
 
+#import <algorithm>
+
 #import "base/check.h"
-#import "base/cxx17_backports.h"
 #import "base/feature_list.h"
 #import "components/strings/grit/components_strings.h"
 #import "ios/chrome/browser/shared/public/features/features.h"
@@ -171,10 +172,12 @@ CGFloat ToolbarHeight() {
 - (void)addViewsToSearchField:(UIView*)searchField {
   // Fake Toolbar.
   ToolbarButtonFactory* buttonFactory =
-      [[ToolbarButtonFactory alloc] initWithStyle:NORMAL];
+      [[ToolbarButtonFactory alloc] initWithStyle:ToolbarStyle::kNormal];
   self.fakeToolbar = [[UIView alloc] init];
   self.fakeToolbar.backgroundColor =
-      buttonFactory.toolbarConfiguration.backgroundColor;
+      IsMagicStackEnabled()
+          ? [UIColor clearColor]
+          : buttonFactory.toolbarConfiguration.backgroundColor;
   [searchField insertSubview:self.fakeToolbar atIndex:0];
   self.fakeToolbar.translatesAutoresizingMaskIntoConstraints = NO;
 
@@ -203,7 +206,7 @@ CGFloat ToolbarHeight() {
 
   // Cancel button, used in animation.
   ToolbarButtonFactory* factory =
-      [[ToolbarButtonFactory alloc] initWithStyle:NORMAL];
+      [[ToolbarButtonFactory alloc] initWithStyle:ToolbarStyle::kNormal];
   self.cancelButton = [factory cancelButton];
   [searchField addSubview:self.cancelButton];
   self.cancelButton.translatesAutoresizingMaskIntoConstraints = NO;
@@ -383,8 +386,17 @@ CGFloat ToolbarHeight() {
   CGFloat percent = 0;
   if (offset && offset > startScaleOffset) {
     CGFloat animatingOffset = offset - startScaleOffset;
-    percent = base::clamp<CGFloat>(
+    percent = std::clamp<CGFloat>(
         animatingOffset / ntp_header::kAnimationDistance, 0, 1);
+  }
+  if (IsMagicStackEnabled()) {
+    // Update background color of fake toolbar if stuck to top of NTP so that it
+    // has a non-clear background that matches the NTP background. Otherwise,
+    // return to clear background.
+    self.fakeToolbar.backgroundColor =
+        percent == 1.0f
+            ? [UIColor colorNamed:@"ntp_background_light_mode_only_color"]
+            : [UIColor clearColor];
   }
   return percent;
 }
@@ -557,7 +569,9 @@ CGFloat ToolbarHeight() {
     _fakeLocationBar.userInteractionEnabled = NO;
     _fakeLocationBar.clipsToBounds = YES;
     _fakeLocationBar.backgroundColor =
-        [UIColor colorNamed:kTextfieldBackgroundColor];
+        IsMagicStackEnabled()
+            ? [UIColor colorNamed:@"fake_omnibox_background_color"]
+            : [UIColor colorNamed:kTextfieldBackgroundColor];
     _fakeLocationBar.translatesAutoresizingMaskIntoConstraints = NO;
     _fakeLocationBarHighlightView = [[UIView alloc] init];
     _fakeLocationBarHighlightView.userInteractionEnabled = NO;

@@ -157,8 +157,8 @@ void NGInlineLayoutAlgorithm::PrepareBoxStates(
   // have ::first-line styles.
   const HeapVector<NGInlineItem>& items = line_info.ItemsData().items;
   if (!break_token->UseFirstLineStyle()) {
-    box_states_ =
-        context_->BoxStatesIfValidForItemIndex(items, break_token->ItemIndex());
+    box_states_ = context_->BoxStatesIfValidForItemIndex(
+        items, break_token->StartItemIndex());
     if (box_states_) {
 #if EXPENSIVE_DCHECKS_ARE_ON()
       is_box_states_from_context_ = true;
@@ -200,7 +200,8 @@ void NGInlineLayoutAlgorithm::RebuildBoxStates(
     NGInlineLayoutStateStack* box_states) const {
   // Compute which tags are not closed at the beginning of this line.
   NGInlineItemsData::OpenTagItems open_items;
-  line_info.ItemsData().GetOpenTagItems(break_token->ItemIndex(), &open_items);
+  line_info.ItemsData().GetOpenTagItems(break_token->StartItemIndex(),
+                                        &open_items);
 
   // Create box states for tags that are not closed yet.
   NGLogicalLineItems& line_box = context_->AcquireTempLogicalLineItems();
@@ -263,8 +264,9 @@ void NGInlineLayoutAlgorithm::CreateLine(
   // strut, for *every* line. This matches other browsers. The intention may
   // have been to make sure that there's always room for the list item marker,
   // but that doesn't explain why it's done for every line...
-  if (quirks_mode_ && line_style.Display() == EDisplay::kListItem)
+  if (quirks_mode_ && ComputedStyle::IsDisplayListItem(line_style.Display())) {
     box->ComputeTextMetrics(line_style, *box->font, baseline_type_);
+  }
 
   for (NGInlineItemResult& item_result : *line_items) {
     DCHECK(item_result.item);
@@ -279,6 +281,16 @@ void NGInlineLayoutAlgorithm::CreateLine(
       DCHECK(item.GetLayoutObject());
       DCHECK(item.GetLayoutObject()->IsText() ||
              item.GetLayoutObject()->IsLayoutNGListItem());
+
+      if (UNLIKELY(!item_result.Length())) {
+        // Empty or fully collapsed text isn't needed for layout, but needs
+        // `ClearNeedsLayout`. See `NGLineBreaker::HandleEmptyText`.
+        LayoutObject* layout_object = item.GetLayoutObject();
+        if (layout_object->NeedsLayout()) {
+          layout_object->ClearNeedsLayout();
+        }
+        continue;
+      }
       DCHECK(item_result.shape_result);
 
       if (UNLIKELY(quirks_mode_))
@@ -494,8 +506,9 @@ void NGInlineLayoutAlgorithm::CreateLine(
     // Test[1] has a float to be pushed down to next line.
     // [1]
     // https://wpt.live/css/css-inline/initial-letter/initial-letter-floats-005.html
-    PlaceFloatingObjects(*line_info, line_box_metrics, opportunity,
-                         line_info->ComputeBlockStartAdjustment(), line_box);
+    PlaceFloatingObjects(line_box_metrics, opportunity,
+                         line_info->ComputeBlockStartAdjustment(), line_info,
+                         line_box);
   }
 
   // Apply any relative positioned offsets to *items* which have relative
@@ -837,21 +850,21 @@ void NGInlineLayoutAlgorithm::PlaceOutOfFlowObjects(
 }
 
 void NGInlineLayoutAlgorithm::PlaceFloatingObjects(
-    const NGLineInfo& line_info,
     const FontHeight& line_box_metrics,
     const NGLineLayoutOpportunity& opportunity,
     LayoutUnit ruby_block_start_adjust,
+    NGLineInfo* line_info,
     NGLogicalLineItems* line_box) {
-  DCHECK(line_info.IsEmptyLine() || !line_box_metrics.IsEmpty())
+  DCHECK(line_info->IsEmptyLine() || !line_box_metrics.IsEmpty())
       << "Non-empty lines must have a valid set of linebox metrics.";
 
   // All children within the linebox are positioned relative to the baseline,
   // then shifted later using NGLineBoxFragmentBuilder::MoveInBlockDirection.
   LayoutUnit baseline_adjustment =
-      line_info.IsEmptyLine() ? LayoutUnit() : -line_box_metrics.ascent;
+      line_info->IsEmptyLine() ? LayoutUnit() : -line_box_metrics.ascent;
 
   LayoutUnit line_height =
-      line_info.IsEmptyLine() ? LayoutUnit() : line_box_metrics.LineHeight();
+      line_info->IsEmptyLine() ? LayoutUnit() : line_box_metrics.LineHeight();
 
   // Any unpositioned floats we encounter need to be placed on the "next" line.
   // This BFC block-offset represents the start of the "next" line.
@@ -860,9 +873,9 @@ void NGInlineLayoutAlgorithm::PlaceFloatingObjects(
 
   LayoutUnit bfc_line_offset = container_builder_.BfcLineOffset();
   LayoutUnit bfc_block_offset =
-      line_info.IsEmptyLine()
+      line_info->IsEmptyLine()
           ? ConstraintSpace().ExpectedBfcBlockOffset()
-          : line_info.BfcOffset().block_offset + ruby_block_start_adjust;
+          : line_info->BfcOffset().block_offset + ruby_block_start_adjust;
 
   for (NGLogicalLineItem& child : *line_box) {
     // We need to position any floats which should be on the "next" line now.
@@ -877,14 +890,16 @@ void NGInlineLayoutAlgorithm::PlaceFloatingObjects(
         NGBlockNode float_node(To<LayoutBox>(child.unpositioned_float.Get()));
         auto* break_before = NGBlockBreakToken::CreateBreakBefore(
             float_node, /* is_forced_break */ false);
-        context_->PropagateBreakToken(break_before);
+        line_info->PropagateBreakToken(break_before);
         continue;
       } else {
         // If the float broke inside, we need to propagate the break token to
         // the block container, so that we'll resume in the next fragmentainer.
         if (const NGBreakToken* token =
-                positioned_float.layout_result->PhysicalFragment().BreakToken())
-          context_->PropagateBreakToken(To<NGBlockBreakToken>(token));
+                positioned_float.layout_result->PhysicalFragment()
+                    .BreakToken()) {
+          line_info->PropagateBreakToken(To<NGBlockBreakToken>(token));
+        }
         child.layout_result = std::move(positioned_float.layout_result);
         child.bfc_offset = positioned_float.bfc_offset;
         child.unpositioned_float = nullptr;
@@ -1408,14 +1423,6 @@ const NGLayoutResult* NGInlineLayoutAlgorithm::Layout() {
       line_info.SetAvailableWidth(line_opportunity.AvailableInlineSize());
     }
 
-    // Propagate any break tokens for floats that we fragmented before or inside
-    // to the block container in 3 steps: 1) in `PositionLeadingFloats`, 2) from
-    // `NGLineInfo` here, 3) then `CreateLine` may propagate more.
-    for (const NGBlockBreakToken* float_break_token :
-         line_info.PropagatedBreakTokens()) {
-      context_->PropagateBreakToken(float_break_token);
-    }
-
     PrepareBoxStates(line_info, break_token);
 
     CreateLine(line_opportunity, &line_info, line_box);
@@ -1495,6 +1502,14 @@ const NGLayoutResult* NGInlineLayoutAlgorithm::Layout() {
     container_builder_.SetBreakToken(line_info.BreakToken());
     container_builder_.SetBaseDirection(line_info.BaseDirection());
 
+    // Propagate any break tokens for floats that we fragmented before or inside
+    // to the block container in 3 steps: 1) in `PositionLeadingFloats`, 2) from
+    // `NGLineInfo` here, 3) then `CreateLine` may propagate more.
+    for (const NGBlockBreakToken* float_break_token :
+         line_info.PropagatedBreakTokens()) {
+      context_->PropagateBreakToken(float_break_token);
+    }
+
     if (line_info.IsEmptyLine()) {
       DCHECK_EQ(container_builder_.BlockSize(), LayoutUnit());
       DCHECK(!container_builder_.BfcBlockOffset());
@@ -1551,7 +1566,7 @@ unsigned NGInlineLayoutAlgorithm::PositionLeadingFloats(
   const HeapVector<NGInlineItem>& items =
       Node().ItemsData(/* is_first_line */ false).items;
 
-  unsigned index = BreakToken() ? BreakToken()->ItemIndex() : 0;
+  unsigned index = BreakToken() ? BreakToken()->StartItemIndex() : 0;
   for (; index < items.size(); ++index) {
     const NGInlineItem& item = items[index];
 

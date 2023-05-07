@@ -566,6 +566,9 @@ Permissions you've already given to websites and apps may apply to this account.
         <message name="IDS_PASSWORDS_PAGE_EXPORT_AUTHENTICATION_PROMPT" desc="Text for the dialog box that prompts the user for their OS account password before exporting passwords to a file.">
           Chromium wants to export your passwords. Type your Windows password to allow this.
         </message>
+        <message name="IDS_PASSWORDS_PAGE_IMPORT_AUTHENTICATION_PROMPT" desc="Text for the dialog box that prompts the user for their OS account password before overriding passwords during Import.">
+          Chromium is trying to replace existing passwords. Type your Windows password to allow this.
+        </message>
         <message name="IDS_INSTALL_HIGHER_VERSION" desc="Error displayed when higher version already exists.">
           This computer already has a more recent version of Chromium. If the software is not working, please uninstall Chromium and try again.
         </message>
@@ -827,6 +830,10 @@ Permissions you've already given to websites and apps may apply to this account.
         </message>
       </if>
 
+      <message name="IDS_VIEW_PASSWORDS" desc="Item in the app menu which shows Password Manager page">
+        Password Manager
+      </message>
+
       <!-- Chrome sign-in page -->
       <message name="IDS_CHROME_SIGNIN_TITLE" desc="Title on the about:chrome-signin page">
         Chromium
@@ -1002,11 +1009,17 @@ Permissions you've already given to websites and apps may apply to this account.
 
       <if expr="not is_android">
         <!-- WebHID system tray icon -->
-        <message name="IDS_WEBHID_SYSTEM_TRAY_ICON_TOOLTIP" desc="Tooltip for the WebHID system tray icon when one or more HID devices are being accessed.">
+        <message name="IDS_WEBHID_SYSTEM_TRAY_ICON_TITLE_SINGLE_EXTENSION" desc="Title for the WebHID system tray icon when one or more HID devices are being accessed by an extension.">
             {NUM_DEVICES, plural,
-            =0 {Chromium was connected to a HID device}
-            =1 {Chromium is connected to a HID device}
-            other {Chromium is connected to HID devices}}
+            =0 {A Chromium extension was accessing HID devices}
+            =1 {A Chromium extension is accessing 1 HID device}
+            other {A Chromium extension is accessing # HID devices}}
+        </message>
+        <message name="IDS_WEBHID_SYSTEM_TRAY_ICON_TITLE_MULTIPLE_EXTENSIONS" desc="Title for the WebHID system tray icon when HID devices are being accessed by multiple extensions.">
+            {NUM_DEVICES, plural,
+            =0 {Chromium extensions were accessing HID devices}
+            =1 {Chromium extensions are accessing HID devices}
+            other {Chromium extensions are accessing # HID devices}}
         </message>
       </if>
 
@@ -1364,6 +1377,19 @@ Permissions you've already given to websites and apps may apply to this account.
       </if>
       <message name="IDS_DESKTOP_MEDIA_PICKER_TITLE_WEB_CONTENTS_ONLY" desc="Title for the window picker dialog shown when desktop capture of a tab is requested by an app.">
         Share a Chromium tab
+      </message>
+      <!-- Idle timeout bubble. -->
+      <message name="IDS_IDLE_BUBBLE_TITLE_CLOSE" desc="Title of a bubble that informs the user that Chrome closed automatically, because they were away from the computer for X minutes.">
+        Chromium was automatically closed
+      </message>
+      <message name="IDS_IDLE_BUBBLE_BODY_CLOSE_AND_CLEAR" desc="Body of a bubble that informs the user that Chromium closed + cleared data automatically, because they were away from the computer for X minutes.">
+        Your organization closes Chromium when it isn't used for <ph name="TIMEOUT_DURATION">$1<ex>30 minutes</ex></ph>. Browsing data was deleted. This could include history, autofill, and downloads.
+      </message>
+      <message name="IDS_IDLE_BUBBLE_BODY_CLEAR" desc="Body of a bubble that informs the user that Chromium cleared data automatically, because they were away from the computer for X minutes.">
+        Your organization deletes Chromium data when it isn't used for <ph name="TIMEOUT_DURATION">$1<ex>30 minutes</ex></ph>. This could include history, autofill, and downloads.
+      </message>
+      <message name="IDS_IDLE_BUBBLE_BODY_CLOSE" desc="Body of a bubble that informs the user that Chromium closed automatically, because they were away from the computer for X minutes.">
+        Your organization closes Chromium when it isn't used for <ph name="TIMEOUT_DURATION">$1<ex>30 minutes</ex></ph>.
       </message>
       <!-- Idle timeout dialog. -->
       <if expr="not is_android and not is_chromeos">

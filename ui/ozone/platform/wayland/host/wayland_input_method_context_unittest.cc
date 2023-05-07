@@ -27,6 +27,7 @@
 #include "ui/ozone/platform/wayland/test/mock_zwp_text_input.h"
 #include "ui/ozone/platform/wayland/test/test_util.h"
 #include "ui/ozone/platform/wayland/test/test_wayland_server_thread.h"
+#include "ui/ozone/platform/wayland/test/test_zcr_text_input_extension.h"
 #include "ui/ozone/platform/wayland/test/wayland_test.h"
 
 using ::testing::_;
@@ -285,14 +286,17 @@ using WaylandInputMethodContextTest = WaylandInputMethodContextTestBase;
 using WaylandInputMethodContextOldServerTest =
     WaylandInputMethodContextTestBase;
 
-INSTANTIATE_TEST_SUITE_P(TextInputExtensionLatestVersion,
-                         WaylandInputMethodContextTest,
-                         ::testing::Values(wl::ServerConfig{}));
+INSTANTIATE_TEST_SUITE_P(
+    TextInputExtensionLatestVersion,
+    WaylandInputMethodContextTest,
+    ::testing::Values(wl::ServerConfig{.use_ime_keep_selection_fix = true},
+                      wl::ServerConfig{.use_ime_keep_selection_fix = false}));
 INSTANTIATE_TEST_SUITE_P(
     TextInputExtensionV7,
     WaylandInputMethodContextOldServerTest,
     ::testing::Values(wl::ServerConfig{
-        .text_input_extension_version = wl::TextInputExtensionVersion::kV7}));
+        .text_input_extension_version =
+            wl::TestZcrTextInputExtensionV1::Version::kV7}));
 
 TEST_P(WaylandInputMethodContextOldServerTest, SetContentType) {
   PostToServerAndWait([](wl::TestWaylandServerThread* server) {
@@ -765,8 +769,7 @@ TEST_P(WaylandInputMethodContextTest,
 
   input_method_context_->SetSurroundingText(
       text, gfx::Range(0, 50), range, absl::nullopt,
-      LinuxInputMethodContext::AutocorrectInfo{gfx::Range(15, 18),
-                                               gfx::Rect(10, 20)});
+      AutocorrectInfo{gfx::Range(15, 18), gfx::Rect(10, 20)});
   EXPECT_EQ(
       input_method_context_->predicted_state_for_testing().surrounding_text,
       text);
@@ -1103,7 +1106,11 @@ TEST_P(WaylandInputMethodContextTest, MAYBE(OnConfirmCompositionText)) {
     auto* text_input = server->text_input_manager_v1()->text_input();
     Mock::VerifyAndClearExpectations(text_input);
 
-    zwp_text_input_v1_send_cursor_position(text_input->resource(), 7, 10);
+    const auto sent_range = GetParam().use_ime_keep_selection_fix
+                                ? gfx::Range(10, 7)
+                                : gfx::Range(7, 10);
+    zwp_text_input_v1_send_cursor_position(
+        text_input->resource(), sent_range.start(), sent_range.end());
     zwp_text_input_v1_send_commit_string(text_input->resource(), 0,
                                          "ab😀cあdef");
   });
@@ -1151,9 +1158,13 @@ TEST_P(WaylandInputMethodContextTest,
     auto* text_input = server->text_input_manager_v1()->text_input();
     Mock::VerifyAndClearExpectations(text_input);
 
+    const auto expected_sent_range =
+        GetParam().use_ime_keep_selection_fix
+            ? gfx::Range(kExpectedSentRange.end(), kExpectedSentRange.start())
+            : kExpectedSentRange;
     zwp_text_input_v1_send_cursor_position(text_input->resource(),
-                                           kExpectedSentRange.start(),
-                                           kExpectedSentRange.end());
+                                           expected_sent_range.start(),
+                                           expected_sent_range.end());
     zwp_text_input_v1_send_commit_string(text_input->resource(), 0,
                                          kExpectedSentText.c_str());
   });

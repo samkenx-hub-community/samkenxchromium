@@ -21,6 +21,7 @@
 #include "ash/session/session_controller_impl.h"
 #include "ash/shell.h"
 #include "ash/strings/grit/ash_strings.h"
+#include "ash/system/input_device_settings/input_device_settings_controller_impl.h"
 #include "ash/test/ash_test_base.h"
 #include "ash/webui/shortcut_customization_ui/backend/accelerator_layout_table.h"
 #include "ash/webui/shortcut_customization_ui/mojom/shortcut_customization.mojom-forward.h"
@@ -72,7 +73,7 @@ class FakeDeviceManager {
 
   // Add a fake keyboard to DeviceDataManagerTestApi and provide layout info to
   // fake udev.
-  void AddFakeKeyboard(const ui::InputDevice& fake_keyboard,
+  void AddFakeKeyboard(const ui::KeyboardDevice& fake_keyboard,
                        const std::string& layout) {
     fake_keyboard_devices_.push_back(fake_keyboard);
 
@@ -97,7 +98,7 @@ class FakeDeviceManager {
 
  private:
   testing::FakeUdevLoader fake_udev_;
-  std::vector<ui::InputDevice> fake_keyboard_devices_;
+  std::vector<ui::KeyboardDevice> fake_keyboard_devices_;
 };
 class FakeAcceleratorsUpdatedObserver
     : public shortcut_ui::AcceleratorConfigurationProvider::
@@ -177,8 +178,8 @@ bool CompareAccelerators(const ui::Accelerator& expected_accelerator,
   return AreAcceleratorsEqual(expected_accelerator, actual_info);
 }
 
-void CompareInputDevices(const ui::InputDevice& expected,
-                         const ui::InputDevice& actual) {
+void CompareInputDevices(const ui::KeyboardDevice& expected,
+                         const ui::KeyboardDevice& actual) {
   EXPECT_EQ(expected.type, actual.type);
   EXPECT_EQ(expected.id, actual.id);
   EXPECT_EQ(expected.name, actual.name);
@@ -337,7 +338,7 @@ class AcceleratorConfigurationProviderTest : public AshTestBase {
 
     fake_keyboard_manager_ = std::make_unique<FakeDeviceManager>();
     // Add a fake layout2 keyboard.
-    ui::InputDevice fake_keyboard(
+    ui::KeyboardDevice fake_keyboard(
         /*id=*/1, /*type=*/ui::InputDeviceType::INPUT_DEVICE_BLUETOOTH,
         /*name=*/"fake_Keyboard");
     fake_keyboard.sys_path = base::FilePath("path1");
@@ -362,7 +363,7 @@ class AcceleratorConfigurationProviderTest : public AshTestBase {
   }
 
  protected:
-  const std::vector<ui::InputDevice>& GetConnectedKeyboards() {
+  const std::vector<ui::KeyboardDevice>& GetConnectedKeyboards() {
     return provider_->connected_keyboards_;
   }
 
@@ -418,7 +419,7 @@ class AcceleratorConfigurationProviderTest : public AshTestBase {
   NonConfigurableActionsMap non_configurable_actions_map_;
   base::test::ScopedFeatureList scoped_feature_list_;
   // Test global singleton. Delete is handled by InputMethodManager::Shutdown().
-  base::raw_ptr<TestInputMethodManager> input_method_manager_;
+  raw_ptr<TestInputMethodManager> input_method_manager_;
   std::unique_ptr<FakeDeviceManager> fake_keyboard_manager_;
   FakeAcceleratorsUpdatedObserver observer_;
 };
@@ -521,18 +522,20 @@ TEST_F(AcceleratorConfigurationProviderTest, ConnectedKeyboardsUpdated) {
 
   EXPECT_EQ(0, mojo_observer.num_times_notified());
 
-  const std::vector<ui::InputDevice>& actual_devices = GetConnectedKeyboards();
+  const std::vector<ui::KeyboardDevice>& actual_devices =
+      GetConnectedKeyboards();
   EXPECT_EQ(0u, actual_devices.size());
 
-  ui::InputDevice expected_test_keyboard(
+  ui::KeyboardDevice expected_test_keyboard(
       1, ui::InputDeviceType::INPUT_DEVICE_INTERNAL, "Keyboard");
 
-  std::vector<ui::InputDevice> keyboard_devices;
+  std::vector<ui::KeyboardDevice> keyboard_devices;
   keyboard_devices.push_back(expected_test_keyboard);
 
   ui::DeviceDataManagerTestApi().SetKeyboardDevices(keyboard_devices);
 
-  const std::vector<ui::InputDevice>& actual_devices2 = GetConnectedKeyboards();
+  const std::vector<ui::KeyboardDevice>& actual_devices2 =
+      GetConnectedKeyboards();
   EXPECT_EQ(1u, actual_devices2.size());
   CompareInputDevices(expected_test_keyboard, actual_devices[0]);
 
@@ -605,18 +608,30 @@ TEST_F(AcceleratorConfigurationProviderTest, FilterOutHiddenAccelerators) {
 
 TEST_F(AcceleratorConfigurationProviderTest, TopRowKeyAcceleratorRemapped) {
   // Add a fake layout2 keyboard.
-  ui::InputDevice fake_keyboard(
+  ui::KeyboardDevice fake_keyboard(
       /*id=*/1, /*type=*/ui::InputDeviceType::INPUT_DEVICE_BLUETOOTH,
       /*name=*/"fake_Keyboard");
   fake_keyboard.sys_path = base::FilePath("path1");
   fake_keyboard_manager_->AddFakeKeyboard(fake_keyboard, kKbdTopRowLayout2Tag);
 
+  // Disable TopRowKeysAreFKeys.
+  if (!features::IsInputDeviceSettingsSplitEnabled()) {
+    Shell::Get()->session_controller()->GetActivePrefService()->SetBoolean(
+        prefs::kSendFunctionKeys, false);
+    EXPECT_FALSE(Shell::Get()->keyboard_capability()->TopRowKeysAreFKeys());
+  } else {
+    auto settings = Shell::Get()
+                        ->input_device_settings_controller()
+                        ->GetKeyboardSettings(fake_keyboard.id)
+                        ->Clone();
+    settings->top_row_are_fkeys = false;
+    Shell::Get()->input_device_settings_controller()->SetKeyboardSettings(
+        fake_keyboard.id, std::move(settings));
+  }
+
   FakeAcceleratorsUpdatedMojoObserver mojo_observer;
   SetUpObserver(&mojo_observer);
   EXPECT_EQ(0, mojo_observer.num_times_notified());
-
-  // Top row keys are not function keys by default.
-  EXPECT_FALSE(Shell::Get()->keyboard_capability()->TopRowKeysAreFKeys());
 
   const AcceleratorData test_data[] = {
       {/*trigger_on_press=*/true, ui::VKEY_TAB, ui::EF_ALT_DOWN,
@@ -643,18 +658,28 @@ TEST_F(AcceleratorConfigurationProviderTest, TopRowKeyAcceleratorRemapped) {
   Shell::Get()->ash_accelerator_configuration()->Initialize(test_data);
   base::RunLoop().RunUntilIdle();
 
-  // Notified once after instantiating the accelerators.
+  // Notified after instantiating the accelerators.
   EXPECT_EQ(1, mojo_observer.num_times_notified());
   // Verify observer received the correct accelerators.
   ExpectMojomAcceleratorsEqual(mojom::AcceleratorSource::kAsh, test_data,
                                mojo_observer.config());
 
   // Enable TopRowKeysAreFKeys.
-  Shell::Get()->session_controller()->GetActivePrefService()->SetBoolean(
-      prefs::kSendFunctionKeys, true);
+  if (!features::IsInputDeviceSettingsSplitEnabled()) {
+    Shell::Get()->session_controller()->GetActivePrefService()->SetBoolean(
+        prefs::kSendFunctionKeys, true);
+    EXPECT_TRUE(Shell::Get()->keyboard_capability()->TopRowKeysAreFKeys());
+  } else {
+    auto settings = Shell::Get()
+                        ->input_device_settings_controller()
+                        ->GetKeyboardSettings(fake_keyboard.id)
+                        ->Clone();
+    settings->top_row_are_fkeys = true;
+    Shell::Get()->input_device_settings_controller()->SetKeyboardSettings(
+        fake_keyboard.id, std::move(settings));
+  }
   base::RunLoop().RunUntilIdle();
 
-  EXPECT_TRUE(Shell::Get()->keyboard_capability()->TopRowKeysAreFKeys());
   EXPECT_EQ(2, mojo_observer.num_times_notified());
 
   // Initialize the same test_data again, but with
@@ -1327,6 +1352,43 @@ TEST_F(AcceleratorConfigurationProviderTest, AddAcceleratorBadAccelerator) {
       AcceleratorConfigurationProviderAsyncWaiter(provider_.get())
           .AddAccelerator(mojom::AcceleratorSource::kAsh, TOGGLE_MIRROR_MODE,
                           top_row_accelerator, &result);
+  EXPECT_EQ(mojom::AcceleratorConfigResult::kKeyNotAllowed, result->result);
+}
+
+TEST_F(AcceleratorConfigurationProviderTest, ReservedKeysNotAllowed) {
+  const AcceleratorData test_data[] = {
+      {/*trigger_on_press=*/true, ui::VKEY_SPACE, ui::EF_CONTROL_DOWN,
+       TOGGLE_MIRROR_MODE},
+  };
+
+  AshAcceleratorConfiguration* config =
+      Shell::Get()->ash_accelerator_configuration();
+  config->Initialize(test_data);
+  base::RunLoop().RunUntilIdle();
+
+  AcceleratorResultDataPtr result;
+  // Power key.
+  const ui::Accelerator power_accelerator(ui::VKEY_POWER, ui::EF_COMMAND_DOWN);
+  ash::shortcut_customization::mojom::
+      AcceleratorConfigurationProviderAsyncWaiter(provider_.get())
+          .AddAccelerator(mojom::AcceleratorSource::kAsh, TOGGLE_MIRROR_MODE,
+                          power_accelerator, &result);
+  EXPECT_EQ(mojom::AcceleratorConfigResult::kKeyNotAllowed, result->result);
+
+  // Sleep key.
+  const ui::Accelerator sleep_accelerator(ui::VKEY_SLEEP, ui::EF_COMMAND_DOWN);
+  ash::shortcut_customization::mojom::
+      AcceleratorConfigurationProviderAsyncWaiter(provider_.get())
+          .AddAccelerator(mojom::AcceleratorSource::kAsh, TOGGLE_MIRROR_MODE,
+                          sleep_accelerator, &result);
+  EXPECT_EQ(mojom::AcceleratorConfigResult::kKeyNotAllowed, result->result);
+
+  // Lock/f13 key.
+  const ui::Accelerator lock_accelerator(ui::VKEY_F13, ui::EF_COMMAND_DOWN);
+  ash::shortcut_customization::mojom::
+      AcceleratorConfigurationProviderAsyncWaiter(provider_.get())
+          .AddAccelerator(mojom::AcceleratorSource::kAsh, TOGGLE_MIRROR_MODE,
+                          lock_accelerator, &result);
   EXPECT_EQ(mojom::AcceleratorConfigResult::kKeyNotAllowed, result->result);
 }
 

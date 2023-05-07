@@ -461,7 +461,6 @@ public class FakeUrlRequestTest {
         callback.blockForDone();
     }
 
-    @DisabledTest(message = "crbug.com/994722")
     @Test
     @SmallTest
     public void testStatusIdleWhenWaitingForRedirect() {
@@ -476,6 +475,8 @@ public class FakeUrlRequestTest {
                         .build();
 
         request.start();
+        callback.waitForNextStep();
+        assertEquals(callback.mResponseStep, ResponseStep.ON_RECEIVED_REDIRECT);
         checkStatus(request, Status.IDLE);
         callback.setAutoAdvance(true);
         request.followRedirect();
@@ -1642,7 +1643,7 @@ public class FakeUrlRequestTest {
      * A Cronet callback that does nothing.
      */
 
-    private static class StubCallback extends UrlRequest.Callback {
+    static class StubCallback extends UrlRequest.Callback {
         @Override
         public void onRedirectReceived(org.chromium.net.UrlRequest urlRequest,
                 UrlResponseInfo urlResponseInfo, String s) {}

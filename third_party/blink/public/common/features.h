@@ -5,6 +5,8 @@
 #ifndef THIRD_PARTY_BLINK_PUBLIC_COMMON_FEATURES_H_
 #define THIRD_PARTY_BLINK_PUBLIC_COMMON_FEATURES_H_
 
+#include <string>
+
 #include "base/feature_list.h"
 #include "base/metrics/field_trial_params.h"
 #include "base/time/time.h"
@@ -159,9 +161,6 @@ BLINK_COMMON_EXPORT extern const base::FeatureParam<int>
 BLINK_COMMON_EXPORT extern const base::FeatureParam<int>
     kSharedStorageSelectURLBitBudgetPerOriginPerPageLoad;
 
-// Enables the multiple prerendering in a sequential way:
-// https://crbug.com/1355151
-BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kPrerender2SequentialPrerendering);
 // Enables the same-origin main frame navigation in a prerendered page.
 // See https://crbug.com/1239281.
 BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kPrerender2MainFrameNavigation);
@@ -320,6 +319,12 @@ BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kResamplingInputEvents);
 // blocking.
 BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kInputTargetClientHighPriority);
 
+// Enables passing of mailbox backed Accelerated bitmap images to be passed
+// cross-process as mailbox references instead of serialized bitmaps in
+// shared memory.
+BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(
+    kAcceleratedStaticBitmapImageSerialization);
+
 // Enables resampling GestureScroll events on compositor thread.
 // Uses the kPredictorName* values in ui_base_features.h as the 'predictor'
 // feature param.
@@ -383,6 +388,8 @@ BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kWebAppEnableScopeExtensions);
 BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kWebAppManifestLockScreen);
 
 BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kWebAppBorderless);
+
+BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kDesktopPWAsTabStripCustomizations);
 
 BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kLoadingTasksUnfreezable);
 
@@ -464,6 +471,8 @@ BLINK_COMMON_EXPORT extern const base::FeatureParam<int>
     kBrowsingTopicsConfigVersion;
 BLINK_COMMON_EXPORT extern const base::FeatureParam<int>
     kBrowsingTopicsTaxonomyVersion;
+BLINK_COMMON_EXPORT extern const base::FeatureParam<std::string>
+    kBrowsingTopicsDisabledTopicsList;
 BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(
     kBrowsingTopicsBypassIPIsPubliclyRoutableCheck);
 
@@ -802,6 +811,9 @@ BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kClipboardUnsanitizedContent);
 // Make RTCVideoEncoder::Encode() asynchronous.
 BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kWebRtcEncoderAsyncEncode);
 
+// Initialize VideoEncodeAccelerator on the first encode.
+BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kWebRtcInitializeEncoderOnFirstFrame);
+
 // If enabled, the WebRTC_* threads in peerconnection module will use
 // kResourceEfficient thread type.
 BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(
@@ -1067,10 +1079,15 @@ BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kMemoryCacheStrongReference);
 BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(
     kMemoryCacheStrongReferenceSingleUnload);
 
-// Save strong references only for fonts, stylesheets and scripts
+// Exclude images from the saved strong references for resources.
 // See https://crbug.com/1409349.
 BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(
     kMemoryCacheStrongReferenceFilterImages);
+
+// Exclude scripts from the saved strong references for resources.
+// See https://crbug.com/1409349.
+BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(
+    kMemoryCacheStrongReferenceFilterScripts);
 
 // If enabled, renderers look for cached resources from another renderer
 // that has the same process isolation policies. Note that renderers don't
@@ -1087,6 +1104,13 @@ BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kKeepAliveInBrowserMigration);
 // Switch to enabling rendering of gainmap-based HDR images.
 // Tracker: https://crbug.com/1404000
 BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kGainmapHdrImages);
+
+// If enabled, image loading tasks on visible pages have high priority.
+BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kMainThreadHighPriorityImageLoading);
+
+// Enables input IPC to directly target the renderer's compositor thread without
+// hopping through the IO thread first.
+BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kInputIpcDirect);
 
 }  // namespace features
 }  // namespace blink

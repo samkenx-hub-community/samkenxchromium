@@ -36,6 +36,7 @@
 #include "third_party/blink/public/common/service_worker/service_worker_type_converters.h"
 #include "third_party/blink/public/mojom/blob/blob.mojom.h"
 #include "third_party/blink/public/mojom/service_worker/dispatch_fetch_event_params.mojom.h"
+#include "third_party/blink/public/mojom/service_worker/service_worker_fetch_handler_bypass_option.mojom-shared.h"
 #include "third_party/blink/public/mojom/service_worker/service_worker_stream_handle.mojom.h"
 #include "third_party/blink/public/platform/web_http_body.h"
 #include "third_party/blink/public/platform/web_string.h"
@@ -192,13 +193,9 @@ class ServiceWorkerSubresourceLoader::StreamWaiter
 };
 
 bool ServiceWorkerSubresourceLoader::MaybeStartRaceNetworkRequest() {
-  if (!base::FeatureList::IsEnabled(
-          features::kServiceWorkerBypassFetchHandler)) {
-    return false;
-  }
-  if (features::kServiceWorkerBypassFetchHandlerTarget.Get() !=
-      features::ServiceWorkerBypassFetchHandlerTarget::
-          kAllWithRaceNetworkRequest) {
+  if (controller_connector_->fetch_handler_bypass_option() !=
+      blink::mojom::ServiceWorkerFetchHandlerBypassOption::
+          kRaceNetworkRequest) {
     return false;
   }
 
@@ -387,6 +384,7 @@ void ServiceWorkerSubresourceLoader::DispatchFetchEventForSubresource() {
   auto params = blink::mojom::DispatchFetchEventParams::New();
   params->request = blink::mojom::FetchAPIRequest::From(resource_request_);
   params->client_id = controller_connector_->client_id();
+  params->did_start_race_network_request = did_start_race_network_request_;
 
   // TODO(falken): Grant the controller service worker's process access to files
   // in the body, like ServiceWorkerFetchDispatcher::DispatchFetchEvent() does.
@@ -446,7 +444,7 @@ void ServiceWorkerSubresourceLoader::OnConnectionClosed() {
     if (fetch_response_from() == FetchResponseFrom::kWithoutServiceWorker) {
       return;
     }
-    set_fetch_response_from(FetchResponseFrom::kServiceWorker);
+    SetFetchResponseFrom(FetchResponseFrom::kServiceWorker);
     CommitCompleted(net::ERR_FAILED, "Disconnected before completed");
     return;
   }
@@ -576,7 +574,8 @@ void ServiceWorkerSubresourceLoader::StartResponse(
   if (fetch_response_from() == FetchResponseFrom::kWithoutServiceWorker) {
     return;
   }
-  set_fetch_response_from(FetchResponseFrom::kServiceWorker);
+  SetFetchResponseFrom(FetchResponseFrom::kServiceWorker);
+  race_network_request_loader_client_.reset();
 
   // A response with status code 0 is Blink telling us to respond with network
   // error.
@@ -599,17 +598,11 @@ void ServiceWorkerSubresourceLoader::StartResponse(
 
   // Handle a redirect response. ComputeRedirectInfo returns non-null redirect
   // info if the given response is a redirect.
-  redirect_info_ = blink::ServiceWorkerLoaderHelpers::ComputeRedirectInfo(
-      resource_request_, *response_head_);
-  if (redirect_info_) {
-    if (redirect_limit_-- == 0) {
-      CommitCompleted(net::ERR_TOO_MANY_REDIRECTS, "Too many redirects");
-      return;
-    }
-    response_head_->encoded_data_length = 0;
-    url_loader_client_->OnReceiveRedirect(*redirect_info_,
-                                          response_head_.Clone());
-    TransitionToStatus(Status::kSentRedirect);
+  absl::optional<net::RedirectInfo> redirect_info =
+      blink::ServiceWorkerLoaderHelpers::ComputeRedirectInfo(resource_request_,
+                                                             *response_head_);
+  if (redirect_info) {
+    HandleRedirect(*redirect_info, response_head_);
     return;
   }
 
@@ -747,6 +740,26 @@ void ServiceWorkerSubresourceLoader::CommitCompleted(int error_code,
   // Invalidate weak pointers to prevent callbacks after commit.  This can
   // occur if an error code is encountered which forces an early commit.
   weak_factory_.InvalidateWeakPtrs();
+}
+
+void ServiceWorkerSubresourceLoader::HandleRedirect(
+    const net::RedirectInfo& redirect_info,
+    const network::mojom::URLResponseHeadPtr& response_head) {
+  // If the fetch response is not from the fetch handler, call
+  // SettleFetchEventDispatch here explicitly because the loader is going to
+  // handle the response with RaceNetworkRequest, and the in-flight fetch event
+  // by the fetch handler may not be settled yet.
+  if (fetch_response_from() == FetchResponseFrom::kWithoutServiceWorker) {
+    SettleFetchEventDispatch(absl::nullopt);
+  }
+  redirect_info_ = std::move(redirect_info);
+  if (redirect_limit_-- == 0) {
+    CommitCompleted(net::ERR_TOO_MANY_REDIRECTS, "Too many redirects");
+    return;
+  }
+  response_head->encoded_data_length = 0;
+  url_loader_client_->OnReceiveRedirect(*redirect_info_, response_head.Clone());
+  TransitionToStatus(Status::kSentRedirect);
 }
 
 void ServiceWorkerSubresourceLoader::
@@ -962,6 +975,9 @@ void ServiceWorkerSubresourceLoader::FollowRedirect(
   redirect_info_.reset();
   response_callback_receiver_.reset();
   reset_fetch_response_from();
+  race_network_request_loader_client_.reset();
+  race_network_request_url_loader_.reset();
+  race_network_request_url_loader_factory_.reset();
   StartRequest(resource_request_);
 }
 
@@ -1031,6 +1047,10 @@ void ServiceWorkerSubresourceLoader::OnBodyReadingComplete(int net_error) {
   if (!side_data_reading_complete_ && net_error == net::OK)
     return;
   CommitCompleted(net_error, "Body reading completed");
+}
+
+bool ServiceWorkerSubresourceLoader::IsMainResourceLoader() {
+  return false;
 }
 
 // ServiceWorkerSubresourceLoaderFactory ------------------------------------

@@ -11,6 +11,7 @@
 #include "components/segmentation_platform/internal/database/storage_service.h"
 #include "components/segmentation_platform/internal/execution/default_model_manager.h"
 #include "components/segmentation_platform/internal/signals/histogram_signal_handler.h"
+#include "components/segmentation_platform/internal/signals/user_action_signal_handler.h"
 #include "components/segmentation_platform/public/input_context.h"
 #include "components/segmentation_platform/public/proto/model_metadata.pb.h"
 #include "components/segmentation_platform/public/proto/segmentation_platform.pb.h"
@@ -40,8 +41,9 @@ class TrainingDataCollector {
   static std::unique_ptr<TrainingDataCollector> Create(
       processing::FeatureListQueryProcessor* processor,
       HistogramSignalHandler* histogram_signal_handler,
+      UserActionSignalHandler* user_action_signal_handler,
       StorageService* storage_service,
-      std::vector<std::unique_ptr<Config>>* configs,
+      const std::vector<std::unique_ptr<Config>>* configs,
       PrefService* profile_prefs,
       base::Clock* clock);
 
@@ -70,10 +72,12 @@ class TrainingDataCollector {
   virtual void ReportCollectedContinuousTrainingData() = 0;
 
   // Called to collect and store training input data. The data will only be
-  // uploaded once |OnObservationTrigger| is triggered.
-  virtual void OnDecisionTime(proto::SegmentId id,
-                              scoped_refptr<InputContext> input_context,
-                              DecisionType type) = 0;
+  // uploaded once |OnObservationTrigger| is triggered. |TrainingRequestId| can
+  // be used to trigger observation for a specific set of training data.
+  virtual TrainingRequestId OnDecisionTime(
+      proto::SegmentId id,
+      scoped_refptr<InputContext> input_context,
+      DecisionType type) = 0;
 
   // Called when a relevant uma histogram is recorded or when a time delay
   // trigger is hit, retrieve input training data from storage, collect output

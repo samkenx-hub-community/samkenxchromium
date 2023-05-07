@@ -462,9 +462,26 @@ id<GREYMatcher> EditDoneButton() {
   return YES;
 }
 
+- (BOOL)notesEnabled {
+  return YES;
+}
+
+- (BOOL)passwordCheckupEnabled {
+  return YES;
+}
+
 - (GREYElementInteraction*)
     interactionForSinglePasswordEntryWithDomain:(NSString*)domain
                                        username:(NSString*)username {
+  // With notes enabled authentication is required before interacting with
+  // password details.
+  if ([self notesEnabled]) {
+    [PasswordSettingsAppInterface
+        setUpMockReauthenticationModuleForPasswordManager];
+    [PasswordSettingsAppInterface mockReauthenticationModuleExpectedResult:
+                                      ReauthenticationResult::kSuccess];
+  }
+
   // With grouping enabled, discard the username; it's only shown on the details
   // page.
   // ID, not label because the latter might contain an extra label for the
@@ -545,16 +562,18 @@ id<GREYMatcher> EditDoneButton() {
         password_manager::features::kEnablePasswordsAccountStorage);
   }
 
-  if ([self isRunningTest:@selector(testLayoutWithNotesDisabled)]) {
+  if ([self notesEnabled]) {
+    config.features_enabled.push_back(syncer::kPasswordNotesWithBackup);
+  } else {
     config.features_disabled.push_back(syncer::kPasswordNotesWithBackup);
   }
-  if ([self isRunningTest:@selector(testLayoutWithNotesEnabled)] ||
-      [self isRunningTest:@selector(testAddPasswordLayoutWithLongNotes)] ||
-      [self isRunningTest:@selector
-            (testAddPasswordSaveButtonStateOnFieldChanges)] ||
-      [self isRunningTest:@selector(testLayoutWithLongNotes)] ||
-      [self isRunningTest:@selector(testShowHidePasswordWithNotesEnabled)]) {
-    config.features_enabled.push_back(syncer::kPasswordNotesWithBackup);
+
+  if ([self passwordCheckupEnabled]) {
+    config.features_enabled.push_back(
+        password_manager::features::kIOSPasswordCheckup);
+  } else {
+    config.features_disabled.push_back(
+        password_manager::features::kIOSPasswordCheckup);
   }
 
   return config;
@@ -590,6 +609,11 @@ id<GREYMatcher> EditDoneButton() {
 // Checks that attempts to copy a password provide appropriate feedback,
 // both when reauthentication succeeds and when it fails.
 - (void)testCopyPasswordToast {
+  if ([self notesEnabled]) {
+    EARL_GREY_TEST_SKIPPED(
+        @"This test is not needed with notes for passwords enabled.");
+  }
+
   // Saving a form is needed for using the "password details" view.
   SaveExamplePasswordForm();
 
@@ -644,9 +668,11 @@ id<GREYMatcher> EditDoneButton() {
                                             username:@"concrete username"]
       performAction:grey_tap()];
 
-  [PasswordSettingsAppInterface setUpMockReauthenticationModule];
-  [PasswordSettingsAppInterface mockReauthenticationModuleExpectedResult:
-                                    ReauthenticationResult::kSuccess];
+  if (![self notesEnabled]) {
+    [PasswordSettingsAppInterface setUpMockReauthenticationModule];
+    [PasswordSettingsAppInterface mockReauthenticationModuleExpectedResult:
+                                      ReauthenticationResult::kSuccess];
+  }
 
   [GetInteractionForPasswordDetailItem(ShowPasswordButton())
       performAction:grey_tap()];
@@ -666,6 +692,11 @@ id<GREYMatcher> EditDoneButton() {
 // Checks that an attempt to show a password provides an appropriate feedback
 // when reauthentication fails.
 - (void)testShowPasswordToastAuthFailed {
+  if ([self notesEnabled]) {
+    EARL_GREY_TEST_SKIPPED(
+        @"This test is not needed with notes for passwords enabled.");
+  }
+
   // Saving a form is needed for using the "password details" view.
   SaveExamplePasswordForm();
 
@@ -766,9 +797,11 @@ id<GREYMatcher> EditDoneButton() {
                                             username:@"concrete username"]
       performAction:grey_tap()];
 
-  [PasswordSettingsAppInterface setUpMockReauthenticationModule];
-  [PasswordSettingsAppInterface mockReauthenticationModuleExpectedResult:
-                                    ReauthenticationResult::kSuccess];
+  if (![self notesEnabled]) {
+    [PasswordSettingsAppInterface setUpMockReauthenticationModule];
+    [PasswordSettingsAppInterface mockReauthenticationModuleExpectedResult:
+                                      ReauthenticationResult::kSuccess];
+  }
 
   [[EarlGrey selectElementWithMatcher:NavigationBarEditButton()]
       performAction:grey_tap()];
@@ -828,9 +861,11 @@ id<GREYMatcher> EditDoneButton() {
                                             username:@"concrete username"]
       performAction:grey_tap()];
 
-  [PasswordSettingsAppInterface setUpMockReauthenticationModule];
-  [PasswordSettingsAppInterface mockReauthenticationModuleExpectedResult:
-                                    ReauthenticationResult::kSuccess];
+  if (![self notesEnabled]) {
+    [PasswordSettingsAppInterface setUpMockReauthenticationModule];
+    [PasswordSettingsAppInterface mockReauthenticationModuleExpectedResult:
+                                      ReauthenticationResult::kSuccess];
+  }
 
   TapEdit();
 
@@ -900,9 +935,11 @@ id<GREYMatcher> EditDoneButton() {
                                             username:@"concrete username"]
       performAction:grey_tap()];
 
-  [PasswordSettingsAppInterface setUpMockReauthenticationModule];
-  [PasswordSettingsAppInterface mockReauthenticationModuleExpectedResult:
-                                    ReauthenticationResult::kSuccess];
+  if (![self notesEnabled]) {
+    [PasswordSettingsAppInterface setUpMockReauthenticationModule];
+    [PasswordSettingsAppInterface mockReauthenticationModuleExpectedResult:
+                                      ReauthenticationResult::kSuccess];
+  }
 
   [[EarlGrey selectElementWithMatcher:NavigationBarEditButton()]
       performAction:grey_tap()];
@@ -975,9 +1012,11 @@ id<GREYMatcher> EditDoneButton() {
                                             username:@"concrete username"]
       performAction:grey_tap()];
 
-  [PasswordSettingsAppInterface setUpMockReauthenticationModule];
-  [PasswordSettingsAppInterface mockReauthenticationModuleExpectedResult:
-                                    ReauthenticationResult::kSuccess];
+  if (![self notesEnabled]) {
+    [PasswordSettingsAppInterface setUpMockReauthenticationModule];
+    [PasswordSettingsAppInterface mockReauthenticationModuleExpectedResult:
+                                      ReauthenticationResult::kSuccess];
+  }
 
   [[EarlGrey selectElementWithMatcher:NavigationBarEditButton()]
       performAction:grey_tap()];
@@ -1137,9 +1176,11 @@ id<GREYMatcher> EditDoneButton() {
                                             username:@"concrete username"]
       performAction:grey_tap()];
 
-  [PasswordSettingsAppInterface setUpMockReauthenticationModule];
-  [PasswordSettingsAppInterface mockReauthenticationModuleExpectedResult:
-                                    ReauthenticationResult::kSuccess];
+  if (![self notesEnabled]) {
+    [PasswordSettingsAppInterface setUpMockReauthenticationModule];
+    [PasswordSettingsAppInterface mockReauthenticationModuleExpectedResult:
+                                      ReauthenticationResult::kSuccess];
+  }
 
   [[EarlGrey selectElementWithMatcher:NavigationBarEditButton()]
       performAction:grey_tap()];
@@ -1225,9 +1266,11 @@ id<GREYMatcher> EditDoneButton() {
   // Make sure to capture the reauthentication module in a variable until the
   // end of the test, otherwise it might get deleted too soon and break the
   // functionality of copying and viewing passwords.
-  [PasswordSettingsAppInterface setUpMockReauthenticationModule];
-  [PasswordSettingsAppInterface mockReauthenticationModuleExpectedResult:
-                                    ReauthenticationResult::kSuccess];
+  if (![self notesEnabled]) {
+    [PasswordSettingsAppInterface setUpMockReauthenticationModule];
+    [PasswordSettingsAppInterface mockReauthenticationModuleExpectedResult:
+                                      ReauthenticationResult::kSuccess];
+  }
 
   // Tap the context menu item for copying.
   [[EarlGrey
@@ -1283,9 +1326,12 @@ id<GREYMatcher> EditDoneButton() {
       assertWithMatcher:grey_nil()];
 
   // Check that editing doesn't require reauth.
-  [PasswordSettingsAppInterface setUpMockReauthenticationModule];
-  [PasswordSettingsAppInterface mockReauthenticationModuleExpectedResult:
-                                    ReauthenticationResult::kFailure];
+  if (![self notesEnabled]) {
+    [PasswordSettingsAppInterface setUpMockReauthenticationModule];
+    [PasswordSettingsAppInterface mockReauthenticationModuleExpectedResult:
+                                      ReauthenticationResult::kFailure];
+  }
+
   [[EarlGrey selectElementWithMatcher:NavigationBarEditButton()]
       performAction:grey_tap()];
   // Ensure delete button is present after entering editing mode.
@@ -1345,6 +1391,10 @@ id<GREYMatcher> EditDoneButton() {
 // Checks the order of the elements in the detail view layout for a
 // non-federated, non-blocked credential with notes feature disabled.
 - (void)testLayoutWithNotesDisabled {
+  if ([self notesEnabled]) {
+    EARL_GREY_TEST_SKIPPED(@"This test is obsolete with notes enabled.");
+  }
+
   SaveExamplePasswordForm();
 
   OpenPasswordManager();
@@ -1385,13 +1435,14 @@ id<GREYMatcher> EditDoneButton() {
 // Checks the order of the elements in the detail view layout for a
 // non-federated, non-blocked credential with notes feature enabled.
 - (void)testLayoutWithNotesEnabled {
+  if (![self notesEnabled]) {
+    EARL_GREY_TEST_SKIPPED(
+        @"This test is obsolete with notes for passwords disabled.");
+  }
+
   SaveExamplePasswordFormWithNote();
 
   OpenPasswordManager();
-  [PasswordSettingsAppInterface
-      setUpMockReauthenticationModuleForPasswordManager];
-  [PasswordSettingsAppInterface mockReauthenticationModuleExpectedResult:
-                                    ReauthenticationResult::kSuccess];
 
   [[self interactionForSinglePasswordEntryWithDomain:@"example.com"
                                             username:@"concrete username"]
@@ -1429,13 +1480,14 @@ id<GREYMatcher> EditDoneButton() {
 // Checks that entering too long note while editing a password blocks the save
 // button and displays a footer explanation.
 - (void)testLayoutWithLongNotes {
+  if (![self notesEnabled]) {
+    EARL_GREY_TEST_SKIPPED(
+        @"This test is obsolete with notes for passwords disabled.");
+  }
+
   SaveExamplePasswordFormWithNote();
 
   OpenPasswordManager();
-  [PasswordSettingsAppInterface
-      setUpMockReauthenticationModuleForPasswordManager];
-  [PasswordSettingsAppInterface mockReauthenticationModuleExpectedResult:
-                                    ReauthenticationResult::kSuccess];
 
   [[self interactionForSinglePasswordEntryWithDomain:@"example.com"
                                             username:@"concrete username"]
@@ -1675,6 +1727,11 @@ id<GREYMatcher> EditDoneButton() {
 // Checks that an attempt to copy a password provides appropriate feedback when
 // reauthentication cannot be attempted.
 - (void)testCopyPasswordToastNoReauth {
+  if ([self notesEnabled]) {
+    EARL_GREY_TEST_SKIPPED(
+        @"This test is not needed with notes for passwords enabled.");
+  }
+
   // Saving a form is needed for using the "password details" view.
   SaveExamplePasswordForm();
 
@@ -1706,6 +1763,11 @@ id<GREYMatcher> EditDoneButton() {
 // Checks that an attempt to view a password provides appropriate feedback when
 // reauthentication cannot be attempted.
 - (void)testShowPasswordToastNoReauth {
+  if ([self notesEnabled]) {
+    EARL_GREY_TEST_SKIPPED(
+        @"This test is not needed with notes for passwords enabled.");
+  }
+
   // Saving a form is needed for using the "password details" view.
   SaveExamplePasswordForm();
 
@@ -1754,7 +1816,8 @@ id<GREYMatcher> EditDoneButton() {
 // storing just about enough passwords to ensure filling more than one page on
 // any device. To limit the effect of (2), custom large scrolling steps are
 // added to the usual scrolling actions.
-- (void)testManyPasswords {
+// TODO(crbug.com/1442985): This test is flaky.
+- (void)FLAKY_testManyPasswords {
   if ([ChromeEarlGrey isIPadIdiom]) {
     // TODO(crbug.com/906551): Enable the test on iPad once the bug is fixed.
     EARL_GREY_TEST_DISABLED(@"Disabled for iPad.");
@@ -1773,6 +1836,13 @@ id<GREYMatcher> EditDoneButton() {
                   @"Unexpected PasswordStore results.");
 
   OpenPasswordManager();
+
+  if ([self notesEnabled]) {
+    [PasswordSettingsAppInterface
+        setUpMockReauthenticationModuleForPasswordManager];
+    [PasswordSettingsAppInterface mockReauthenticationModuleExpectedResult:
+                                      ReauthenticationResult::kSuccess];
+  }
 
   // Wait for the loading indicator to disappear, and the sections to be on
   // screen, before scrolling.
@@ -2119,9 +2189,11 @@ id<GREYMatcher> EditDoneButton() {
       performAction:grey_tap()];
 
   // Check the snackbar in case of successful reauthentication.
-  [PasswordSettingsAppInterface setUpMockReauthenticationModule];
-  [PasswordSettingsAppInterface mockReauthenticationModuleExpectedResult:
-                                    ReauthenticationResult::kSuccess];
+  if (![self notesEnabled]) {
+    [PasswordSettingsAppInterface setUpMockReauthenticationModule];
+    [PasswordSettingsAppInterface mockReauthenticationModuleExpectedResult:
+                                      ReauthenticationResult::kSuccess];
+  }
 
   TapEdit();
 
@@ -2171,9 +2243,11 @@ id<GREYMatcher> EditDoneButton() {
       performAction:grey_tap()];
 
   // Check the snackbar in case of successful reauthentication.
-  [PasswordSettingsAppInterface setUpMockReauthenticationModule];
-  [PasswordSettingsAppInterface mockReauthenticationModuleExpectedResult:
-                                    ReauthenticationResult::kSuccess];
+  if (![self notesEnabled]) {
+    [PasswordSettingsAppInterface setUpMockReauthenticationModule];
+    [PasswordSettingsAppInterface mockReauthenticationModuleExpectedResult:
+                                      ReauthenticationResult::kSuccess];
+  }
 
   TapEdit();
 
@@ -2187,9 +2261,6 @@ id<GREYMatcher> EditDoneButton() {
   [[EarlGrey selectElementWithMatcher:EditDoneButton()]
       performAction:grey_tap()];
 
-  [[EarlGrey selectElementWithMatcher:EditConfirmationButton()]
-      performAction:grey_tap()];
-
   [[EarlGrey selectElementWithMatcher:PasswordDetailUsername()]
       assertWithMatcher:grey_textFieldValue(@"")];
 
@@ -2199,9 +2270,6 @@ id<GREYMatcher> EditDoneButton() {
       performAction:grey_replaceText(@"new username")];
 
   [[EarlGrey selectElementWithMatcher:EditDoneButton()]
-      performAction:grey_tap()];
-
-  [[EarlGrey selectElementWithMatcher:EditConfirmationButton()]
       performAction:grey_tap()];
 
   [[EarlGrey selectElementWithMatcher:PasswordDetailUsername()]
@@ -2246,9 +2314,11 @@ id<GREYMatcher> EditDoneButton() {
       performAction:grey_tap()];
 
   // Check the snackbar in case of successful reauthentication.
-  [PasswordSettingsAppInterface setUpMockReauthenticationModule];
-  [PasswordSettingsAppInterface mockReauthenticationModuleExpectedResult:
-                                    ReauthenticationResult::kSuccess];
+  if (![self notesEnabled]) {
+    [PasswordSettingsAppInterface setUpMockReauthenticationModule];
+    [PasswordSettingsAppInterface mockReauthenticationModuleExpectedResult:
+                                      ReauthenticationResult::kSuccess];
+  }
 
   TapEdit();
 
@@ -2288,9 +2358,11 @@ id<GREYMatcher> EditDoneButton() {
       performAction:grey_tap()];
 
   // Check the snackbar in case of successful reauthentication.
-  [PasswordSettingsAppInterface setUpMockReauthenticationModule];
-  [PasswordSettingsAppInterface mockReauthenticationModuleExpectedResult:
-                                    ReauthenticationResult::kSuccess];
+  if (![self notesEnabled]) {
+    [PasswordSettingsAppInterface setUpMockReauthenticationModule];
+    [PasswordSettingsAppInterface mockReauthenticationModuleExpectedResult:
+                                      ReauthenticationResult::kSuccess];
+  }
 
   TapEdit();
 
@@ -2453,6 +2525,11 @@ id<GREYMatcher> EditDoneButton() {
 // Checks that entering too long note while adding passwords blocks the save
 // button and displays a footer explanation.
 - (void)testAddPasswordLayoutWithLongNotes {
+  if (![self notesEnabled]) {
+    EARL_GREY_TEST_SKIPPED(
+        @"This test is obsolote with notes for passwords disabled.");
+  }
+
   OpenPasswordManager();
 
   [[EarlGrey selectElementWithMatcher:AddPasswordToolbarButton()]
@@ -2610,6 +2687,11 @@ id<GREYMatcher> EditDoneButton() {
 // from invalid to valid input in any of the fields (website, password, note),
 // when there are still other fields with invalid input.
 - (void)testAddPasswordSaveButtonStateOnFieldChanges {
+  if (![self notesEnabled]) {
+    EARL_GREY_TEST_SKIPPED(
+        @"This test is obsolete with notes for passwords disabled.");
+  }
+
   OpenPasswordManager();
   [[EarlGrey selectElementWithMatcher:AddPasswordToolbarButton()]
       performAction:grey_tap()];
@@ -2724,9 +2806,11 @@ id<GREYMatcher> EditDoneButton() {
                                             username:@"new username"]
       performAction:grey_tap()];
 
-  [PasswordSettingsAppInterface setUpMockReauthenticationModule];
-  [PasswordSettingsAppInterface mockReauthenticationModuleExpectedResult:
-                                    ReauthenticationResult::kSuccess];
+  if (![self notesEnabled]) {
+    [PasswordSettingsAppInterface setUpMockReauthenticationModule];
+    [PasswordSettingsAppInterface mockReauthenticationModuleExpectedResult:
+                                      ReauthenticationResult::kSuccess];
+  }
 
   TapEdit();
 
@@ -2767,10 +2851,15 @@ id<GREYMatcher> EditDoneButton() {
 // Checks that deleting a compromised password from password issues goes back
 // to the list-of-issues which doesn't display that password anymore.
 - (void)testDeletePasswordIssue {
+  if ([self passwordCheckupEnabled]) {
+    EARL_GREY_TEST_SKIPPED(
+        @"This test isn't implemented for Password Checkup yet.");
+  }
+
   GREYAssert([PasswordSettingsAppInterface
-                 saveInsecurePassword:@"concrete password"
-                             userName:@"concrete username"
-                               origin:@"https://example.com"],
+                 saveCompromisedPassword:@"concrete password"
+                                userName:@"concrete username"
+                                  origin:@"https://example.com"],
              @"Stored form was not found in the PasswordStore results.");
 
   OpenPasswordManager();
@@ -2778,10 +2867,7 @@ id<GREYMatcher> EditDoneButton() {
   NSString* text = l10n_util::GetNSString(IDS_IOS_CHECK_PASSWORDS);
   NSString* detailText =
       base::SysUTF16ToNSString(l10n_util::GetPluralStringFUTF16(
-          password_manager::features::IsPasswordCheckupEnabled()
-              ? IDS_IOS_PASSWORD_CHECKUP_COMPROMISED_COUNT
-              : IDS_IOS_CHECK_PASSWORDS_COMPROMISED_COUNT,
-          1));
+          IDS_IOS_CHECK_PASSWORDS_COMPROMISED_COUNT, 1));
 
   [[EarlGrey selectElementWithMatcher:ButtonWithAccessibilityLabel([NSString
                                           stringWithFormat:@"%@, %@", text,
@@ -2828,6 +2914,11 @@ id<GREYMatcher> EditDoneButton() {
 }
 
 - (void)testShowHidePassword {
+  if ([self notesEnabled]) {
+    EARL_GREY_TEST_SKIPPED(
+        @"This test is obsolete with notes for passwords enabled.");
+  }
+
   SaveExamplePasswordForm();
 
   OpenPasswordManager();
@@ -2859,13 +2950,14 @@ id<GREYMatcher> EditDoneButton() {
 // enabled since the reauthentication happens before navigating to the details
 // view in this scenario.
 - (void)testShowHidePasswordWithNotesEnabled {
+  if (![self notesEnabled]) {
+    EARL_GREY_TEST_SKIPPED(
+        @"This test is obsolete with notes for passwords disabled.");
+  }
+
   SaveExamplePasswordForm();
 
   OpenPasswordManager();
-  [PasswordSettingsAppInterface
-      setUpMockReauthenticationModuleForPasswordManager];
-  [PasswordSettingsAppInterface mockReauthenticationModuleExpectedResult:
-                                    ReauthenticationResult::kSuccess];
 
   [[self interactionForSinglePasswordEntryWithDomain:@"example.com"
                                             username:@"concrete username"]
@@ -3075,14 +3167,23 @@ id<GREYMatcher> EditDoneButton() {
 
   OpenPasswordManager();
 
+  if ([self notesEnabled]) {
+    [PasswordSettingsAppInterface
+        setUpMockReauthenticationModuleForPasswordManager];
+    [PasswordSettingsAppInterface mockReauthenticationModuleExpectedResult:
+                                      ReauthenticationResult::kSuccess];
+  }
+
   [GetInteractionForPasswordEntry(@"example1.com, 2 accounts")
       assertWithMatcher:grey_notNil()];
   [GetInteractionForPasswordEntry(@"example1.com, 2 accounts")
       performAction:grey_tap()];
 
-  [PasswordSettingsAppInterface setUpMockReauthenticationModule];
-  [PasswordSettingsAppInterface mockReauthenticationModuleExpectedResult:
-                                    ReauthenticationResult::kSuccess];
+  if (![self notesEnabled]) {
+    [PasswordSettingsAppInterface setUpMockReauthenticationModule];
+    [PasswordSettingsAppInterface mockReauthenticationModuleExpectedResult:
+                                      ReauthenticationResult::kSuccess];
+  }
 
   [[EarlGrey selectElementWithMatcher:NavigationBarEditButton()]
       performAction:grey_tap()];
@@ -3236,6 +3337,13 @@ id<GREYMatcher> EditDoneButton() {
                                 enableSync:NO];
   OpenPasswordManager();
 
+  if ([self notesEnabled]) {
+    [PasswordSettingsAppInterface
+        setUpMockReauthenticationModuleForPasswordManager];
+    [PasswordSettingsAppInterface mockReauthenticationModuleExpectedResult:
+                                      ReauthenticationResult::kSuccess];
+  }
+
   // `passwordMatcher` includes grey_sufficientlyVisible() because there are
   // other invisible cells when password details is closed later.
   id<GREYMatcher> passwordMatcher =
@@ -3252,9 +3360,11 @@ id<GREYMatcher> EditDoneButton() {
   [[EarlGrey selectElementWithMatcher:passwordMatcher]
       performAction:grey_tap()];
 
-  [PasswordSettingsAppInterface setUpMockReauthenticationModule];
-  [PasswordSettingsAppInterface mockReauthenticationModuleExpectedResult:
-                                    ReauthenticationResult::kSuccess];
+  if (![self notesEnabled]) {
+    [PasswordSettingsAppInterface setUpMockReauthenticationModule];
+    [PasswordSettingsAppInterface mockReauthenticationModuleExpectedResult:
+                                      ReauthenticationResult::kSuccess];
+  }
 
   [[EarlGrey selectElementWithMatcher:grey_accessibilityID(
                                           kMovePasswordToAccountButtonId)]
@@ -3291,6 +3401,13 @@ id<GREYMatcher> EditDoneButton() {
 
   OpenPasswordManager();
 
+  if ([self notesEnabled]) {
+    [PasswordSettingsAppInterface
+        setUpMockReauthenticationModuleForPasswordManager];
+    [PasswordSettingsAppInterface mockReauthenticationModuleExpectedResult:
+                                      ReauthenticationResult::kSuccess];
+  }
+
   // `passwordMatcher` includes grey_sufficientlyVisible() because there are
   // other invisible cells when password details is closed later.
   id<GREYMatcher> passwordMatcher =
@@ -3307,9 +3424,11 @@ id<GREYMatcher> EditDoneButton() {
   [[EarlGrey selectElementWithMatcher:passwordMatcher]
       performAction:grey_tap()];
 
-  [PasswordSettingsAppInterface setUpMockReauthenticationModule];
-  [PasswordSettingsAppInterface mockReauthenticationModuleExpectedResult:
-                                    ReauthenticationResult::kSuccess];
+  if (![self notesEnabled]) {
+    [PasswordSettingsAppInterface setUpMockReauthenticationModule];
+    [PasswordSettingsAppInterface mockReauthenticationModuleExpectedResult:
+                                      ReauthenticationResult::kSuccess];
+  }
 
   [[EarlGrey selectElementWithMatcher:grey_accessibilityID(
                                           kMovePasswordToAccountButtonId)]
@@ -3348,6 +3467,15 @@ id<GREYMatcher> EditDoneButton() {
 - (GREYElementInteraction*)
     interactionForSinglePasswordEntryWithDomain:(NSString*)domain
                                        username:(NSString*)username {
+  // With notes enabled authentication is required before interacting with
+  // password details.
+  if ([self notesEnabled]) {
+    [PasswordSettingsAppInterface
+        setUpMockReauthenticationModuleForPasswordManager];
+    [PasswordSettingsAppInterface mockReauthenticationModuleExpectedResult:
+                                      ReauthenticationResult::kSuccess];
+  }
+
   NSString* label = [NSString stringWithFormat:@"%@, %@", domain, username];
   // ID, not label because the latter might contain an extra label for the
   // "local password icon" and most tests don't care about it.
@@ -3365,6 +3493,47 @@ id<GREYMatcher> EditDoneButton() {
     matcherForDeleteButtonInDetailsWithUsername:(NSString*)username
                                        password:(NSString*)password {
   return DeleteButton();
+}
+
+// This causes the test case to actually be detected as a test case. The actual
+// tests are all inherited from the parent class.
+- (void)testEmpty {
+}
+
+@end
+
+// Rerun all the tests in this file but with kPasswordNotesWithBackup disabled.
+// This will be removed once that feature launches fully, but ensures
+// regressions aren't introduced in the meantime.
+@interface PasswordManagerNotesDisabledTestCase : PasswordManagerTestCase
+
+@end
+
+@implementation PasswordManagerNotesDisabledTestCase
+
+- (BOOL)notesEnabled {
+  return NO;
+}
+
+// This causes the test case to actually be detected as a test case. The actual
+// tests are all inherited from the parent class.
+- (void)testEmpty {
+}
+
+@end
+
+// Rerun all the tests in this file but with kIOSPasswordCheckup disabled.
+// This will be removed once that feature launches fully, but ensures
+// regressions aren't introduced in the meantime.
+@interface PasswordManagerPasswordCheckupDisabledTestCase
+    : PasswordManagerTestCase
+
+@end
+
+@implementation PasswordManagerPasswordCheckupDisabledTestCase
+
+- (BOOL)passwordCheckupEnabled {
+  return NO;
 }
 
 // This causes the test case to actually be detected as a test case. The actual

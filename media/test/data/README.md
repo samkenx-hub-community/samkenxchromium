@@ -107,6 +107,28 @@ Fragmented audio-only 44.1kHz FLAC in MP4 file, created using:
 ffmpeg -i sfx.flac -map 0:0 -acodec copy -strict -2 -movflags frag_keyframe+empty_moov+default_base_moof sfx-flac_frag.mp4
 ```
 
+### VVC
+
+#### bear_180p.vvc
+Created using FFmpeg/vvencapp with the following commands:
+```
+ffmpeg -i bear.y4m -f rawvideo bear_180P.yuv
+vvencapp --preset medium -i bear_180P.yuv -s 320x180 -r 15 -b 1000000 -p 2 -o bear_180p.vvc
+```
+
+#### bbb_360p.vvc
+Created using FFmpeg/vvencapp with the following commands:
+```
+ffmpeg -i bbb-320x240-2video-2audio.mp4 bbb.y4m
+ffmpeg -i bbb.y4m -vf scale=480x360 bbb_480x360.yuv
+vvencapp --preset medium -i bbb_480x360.yuv -s 480x360 -r 15 -b 1000000 -p 2 -f 60 -o bbb_360p.vvc
+```
+
+#### basketball_2_layers.vvc
+2 spatial layer VVC video with layer 0 at 208x120 and layer 1 at 832x480.
+Used for vvc parser test. Once vvencapp supports multi-layer encoding, the
+creation command needs to be provided.
+
 ### AV1
 
 Unless noted otherwise, the codec string is `av01.0.04M.08` for 8-bit files,
@@ -1256,6 +1278,12 @@ Generated using following steps:
     ```
     ffmpeg -i bbb1.mp4 -i bbb2.mp4 -map 0:0 -map 0:1 -map 1:0 -map 1:1 -c:v copy -c:a copy -movflags frag_keyframe+omit_tfhd_offset+separate_moof bbb-320x240-2video-2audio.mp4
     ```
+
+#### multitrack-disabled.mp4
+H.264 video stream with the first track marked as disabled, generated with
+````
+ffmpeg -f lavfi -i "color=c=white:d=1" -f lavfi -i "testsrc2=d=1" -map 0 -disposition:v:0 0 -map 1 -disposition:v:1 default -c:v libx264 multitrack-disabled.mp4
+````
 
 ### Multi-track WebM file
 

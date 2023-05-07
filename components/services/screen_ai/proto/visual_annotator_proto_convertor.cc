@@ -16,11 +16,13 @@
 #include "base/numerics/safe_conversions.h"
 #include "base/ranges/ranges.h"
 #include "components/services/screen_ai/public/mojom/screen_ai_service.mojom.h"
+#include "components/strings/grit/components_strings.h"
 #include "ui/accessibility/accessibility_features.h"
 #include "ui/accessibility/ax_enums.mojom.h"
 #include "ui/accessibility/ax_node.h"
 #include "ui/accessibility/ax_node_data.h"
 #include "ui/accessibility/ax_role_properties.h"
+#include "ui/base/l10n/l10n_util.h"
 #include "ui/gfx/geometry/rect.h"
 #include "ui/gfx/geometry/rect_f.h"
 #include "ui/gfx/geometry/transform.h"
@@ -29,15 +31,22 @@ namespace ranges = base::ranges;
 
 namespace {
 
-ui::AXNodeID next_node_id{1};
+// A negative ID for ui::AXNodeID needs to start from -2 as using -1 for this
+// node id is still incorrectly treated as invalid.
+// TODO(crbug.com/1439285): fix code treating -1 as invalid for ui::AXNodeID.
+constexpr int kFirstValidNegativeId = -2;
+
+ui::AXNodeID next_negative_node_id{kFirstValidNegativeId};
 
 // TODO(crbug.com/1278249): Check if this max count will cover different cases.
 constexpr int kUmaMaxNodesCount = 500;
 
-// Returns the next valid ID that can be used for identifying `AXNode`s in the
-// accessibility tree.
-ui::AXNodeID GetNextNodeID() {
-  return next_node_id++;
+// Returns the next valid negative ID that can be used for identifying
+// `AXNode`s in the accessibility tree. Using negative IDs here enables
+// adding nodes built from OCR results to PDF accessibility tree in PDF
+// renderer without updating their IDs.
+ui::AXNodeID GetNextNegativeNodeID() {
+  return next_negative_node_id--;
 }
 
 bool HaveIdenticalFormattingStyle(const chrome_screen_ai::WordBox& word_1,
@@ -293,7 +302,7 @@ size_t SerializeWordBoxes(const google::protobuf::RepeatedPtrField<
   ui::AXNodeData& inline_text_box_node = node_data[node_index];
   DCHECK_EQ(inline_text_box_node.role, ax::mojom::Role::kUnknown);
   inline_text_box_node.role = ax::mojom::Role::kInlineTextBox;
-  inline_text_box_node.id = GetNextNodeID();
+  inline_text_box_node.id = GetNextNegativeNodeID();
   // The union of the bounding boxes in this formatting context is set as the
   // bounding box of `inline_text_box_node`.
   DCHECK(inline_text_box_node.relative_bounds.bounds.IsEmpty());
@@ -339,7 +348,7 @@ void SerializeUIComponent(const chrome_screen_ai::UIComponent& ui_component,
   ui::AXNodeData& current_node = node_data[index];
   if (!SerializePredictedType(ui_component.predicted_type(), current_node))
     return;
-  current_node.id = GetNextNodeID();
+  current_node.id = GetNextNegativeNodeID();
   SerializeBoundingBox(ui_component.bounding_box(), parent_node.id,
                        current_node);
   parent_node.child_ids.push_back(current_node.id);
@@ -359,7 +368,7 @@ size_t SerializeLineBox(const chrome_screen_ai::LineBox& line_box,
   DCHECK_EQ(line_box_node.role, ax::mojom::Role::kUnknown);
 
   SerializeContentType(line_box.content_type(), line_box_node);
-  line_box_node.id = GetNextNodeID();
+  line_box_node.id = GetNextNegativeNodeID();
   SerializeBoundingBox(line_box.bounding_box(), parent_node.id, line_box_node);
   // `ax::mojom::NameFrom` should be set to the correct value based on the
   // role.
@@ -385,7 +394,7 @@ size_t SerializeLineBox(const chrome_screen_ai::LineBox& line_box,
 namespace screen_ai {
 
 void ResetNodeIDForTesting() {
-  next_node_id = 1;
+  next_negative_node_id = kFirstValidNegativeId;
 }
 
 // TODO(nektar): Change return value to `std::vector<ui::AXNodeData>` as other
@@ -444,8 +453,11 @@ ui::AXTreeUpdate VisualAnnotationToAXTreeUpdate(
   size_t rootnodes_count = 0u;
   if (!visual_annotation.ui_component().empty())
     ++rootnodes_count;
-  if (!visual_annotation.lines().empty())
+  if (!visual_annotation.lines().empty()) {
     ++rootnodes_count;
+    // Need two more nodes that convey the disclaimer message.
+    formatting_context_count += 2;
+  }
 
   std::vector<ui::AXNodeData> nodes(
       rootnodes_count + visual_annotation.ui_component().size() +
@@ -456,7 +468,7 @@ ui::AXTreeUpdate VisualAnnotationToAXTreeUpdate(
   if (!visual_annotation.ui_component().empty()) {
     ui::AXNodeData& rootnode = nodes[index++];
     rootnode.role = ax::mojom::Role::kDialog;
-    rootnode.id = GetNextNodeID();
+    rootnode.id = GetNextNegativeNodeID();
     rootnode.relative_bounds.bounds = gfx::RectF(image_rect);
     for (const auto& ui_component : visual_annotation.ui_component())
       SerializeUIComponent(ui_component, index++, rootnode, nodes);
@@ -466,10 +478,23 @@ ui::AXTreeUpdate VisualAnnotationToAXTreeUpdate(
     // We assume that OCR is performed on a page-by-page basis.
     ui::AXNodeData& page_node = nodes[index++];
     page_node.role = ax::mojom::Role::kRegion;
-    page_node.id = GetNextNodeID();
+    page_node.id = GetNextNegativeNodeID();
+    update.root_id = page_node.id;
     page_node.AddBoolAttribute(ax::mojom::BoolAttribute::kIsPageBreakingObject,
                                true);
     page_node.relative_bounds.bounds = gfx::RectF(image_rect);
+    // Add a disclaimer node informing of the beginning of extracted text.
+    // TODO(crbug.com/1442928): Check if screen readers on windows, linux, and
+    // macOS treat the status node as live region. If so, update the role.
+    ui::AXNodeData& begin_node = nodes[index++];
+    begin_node.role = ax::mojom::Role::kStatus;
+    begin_node.id = GetNextNegativeNodeID();
+    begin_node.SetNameChecked(
+        l10n_util::GetStringUTF8(IDS_PDF_OCR_RESULT_BEGIN));
+    begin_node.relative_bounds.bounds =
+        gfx::RectF(image_rect.x(), image_rect.y(), 1, 1);
+    page_node.child_ids.push_back(begin_node.id);
+
     for (const auto& block_to_lines_pair : blocks_to_lines_map) {
       for (const auto& line_sequence_number_to_index_pair :
            block_to_lines_pair.second) {
@@ -482,6 +507,15 @@ ui::AXTreeUpdate VisualAnnotationToAXTreeUpdate(
         index += SerializeLineBox(line_box, index, page_node, nodes);
       }
     }
+
+    // Add a disclaimer node informing of the end of extracted text.
+    ui::AXNodeData& end_node = nodes[index++];
+    end_node.role = ax::mojom::Role::kStatus;
+    end_node.id = GetNextNegativeNodeID();
+    end_node.SetNameChecked(l10n_util::GetStringUTF8(IDS_PDF_OCR_RESULT_END));
+    end_node.relative_bounds.bounds =
+        gfx::RectF(image_rect.width(), image_rect.height(), 1, 1);
+    page_node.child_ids.push_back(end_node.id);
   }
 
   // Filter out invalid / unrecognized / unused nodes from the update.
@@ -497,6 +531,30 @@ ui::AXTreeUpdate VisualAnnotationToAXTreeUpdate(
       /*min=*/1, kUmaMaxNodesCount, /*buckets=*/100);
 
   return update;
+}
+
+mojom::VisualAnnotationPtr ConvertProtoToVisualAnnotation(
+    const chrome_screen_ai::VisualAnnotation& annotation_proto) {
+  auto annotation = screen_ai::mojom::VisualAnnotation::New();
+
+  for (const auto& line : annotation_proto.lines()) {
+    auto line_box = screen_ai::mojom::LineBox::New();
+    line_box->text_line = line.utf8_string();
+    line_box->block_id = line.block_id();
+    line_box->language = line.language();
+    line_box->order_within_block = line.order_within_block();
+
+    for (const auto& word : line.words()) {
+      auto word_box = screen_ai::mojom::WordBox::New();
+      word_box->word = word.utf8_string();
+      word_box->dictionary_word = word.dictionary_word();
+      word_box->language = word.language();
+      line_box->words.push_back(std::move(word_box));
+    }
+    annotation->lines.push_back(std::move(line_box));
+  }
+
+  return annotation;
 }
 
 }  // namespace screen_ai

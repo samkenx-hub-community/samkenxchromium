@@ -216,7 +216,7 @@ typedef NS_ENUM(NSInteger, ItemType) {
   return item;
 }
 
-// Creates the item acting as a buton for presenting dismissed compromised
+// Creates the item acting as a button for presenting dismissed compromised
 // credential warnings. Returns nil when `_dismissedWarningsButtonText` is nil.
 - (TableViewTextItem*)dismissedWarningsItem {
   // The button is not visible either because there aren't dismissed compromised
@@ -414,6 +414,13 @@ typedef NS_ENUM(NSInteger, ItemType) {
   _passwordGroups = passwordGroups;
   _dismissedWarningsButtonText = buttonText;
   [self reloadData];
+
+  // User removed/resolved all issues, dismiss the vc and go back to the
+  // previous screen.
+  if (IsPasswordCheckupEnabled() && passwordGroups.count == 0 &&
+      buttonText == nullptr) {
+    [self.presenter dismissAfterAllIssuesGone];
+  }
 }
 
 - (void)setNavigationBarTitle:(NSString*)title {

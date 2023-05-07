@@ -20,6 +20,9 @@ base::RepeatingClosure* GetVolumeAdjustmentCallback() {
 
 }  // namespace
 
+//  If you plan on adding a new accelerator and want it displayed in the
+//  Shortcuts app, please follow the instructions at:
+// `ash/webui/shortcut_customization_ui/backend/accelerator_layout_table.h`.
 const AcceleratorData kAcceleratorData[] = {
     {true, ui::VKEY_SPACE, ui::EF_CONTROL_DOWN, SWITCH_TO_LAST_USED_IME},
     {false, ui::VKEY_SPACE, ui::EF_CONTROL_DOWN, SWITCH_TO_LAST_USED_IME},
@@ -185,6 +188,8 @@ const AcceleratorData kAcceleratorData[] = {
     {true, ui::VKEY_BROWSER_BACK, ui::EF_SHIFT_DOWN | ui::EF_CONTROL_DOWN,
      FOCUS_NEXT_PANE},
     {true, ui::VKEY_BROWSER_BACK, ui::EF_NONE, MINIMIZE_TOP_WINDOW_ON_BACK},
+    {true, ui::VKEY_D, ui::EF_SHIFT_DOWN | ui::EF_COMMAND_DOWN,
+     TOGGLE_SNAP_GROUP_WINDOWS_MINIMIZE_AND_RESTORE},
 
     // Moving active window between displays shortcut.
     {true, ui::VKEY_M, ui::EF_COMMAND_DOWN | ui::EF_ALT_DOWN,

@@ -32,7 +32,6 @@
 #import "ios/components/security_interstitials/safe_browsing/safe_browsing_unsafe_resource_container.h"
 #include "ios/web/public/favicon/favicon_url.h"
 #include "ios/web/public/js_messaging/web_frame.h"
-#import "ios/web/public/js_messaging/web_frame_util.h"
 #import "ios/web/public/js_messaging/web_frames_manager.h"
 #import "ios/web/public/navigation/navigation_context.h"
 #import "ios/web/public/navigation/navigation_item.h"
@@ -376,7 +375,8 @@ BOOL gChromeContextMenuEnabled = NO;
 
 - (void)evaluateJavaScript:(NSString*)javaScriptString
                 completion:(void (^)(id, NSError*))completion {
-  web::WebFrame* mainFrame = web::GetMainFrame(_webState.get());
+  web::WebFrame* mainFrame =
+      _webState->GetPageWorldWebFramesManager()->GetMainWebFrame();
   if (!mainFrame) {
     if (completion) {
       completion(nil, [NSError errorWithDomain:@"org.chromium.chromewebview"
@@ -582,9 +582,9 @@ BOOL gChromeContextMenuEnabled = NO;
   return _javaScriptDialogPresenter.get();
 }
 
-- (BOOL)webState:(web::WebState*)webState
+- (void)webState:(web::WebState*)webState
     handlePermissions:(NSArray<NSNumber*>*)permissions
-      decisionHandler:(void (^)(BOOL allow))decisionHandler
+      decisionHandler:(web::WebStatePermissionDecisionHandler)decisionHandler
     API_AVAILABLE(ios(15.0)) {
   DCHECK(decisionHandler);
   CWVMediaCaptureType mediaCaptureType;
@@ -609,17 +609,22 @@ BOOL gChromeContextMenuEnabled = NO;
         requestMediaCapturePermissionForType:mediaCaptureType
                              decisionHandler:^(CWVPermissionDecision decision) {
                                switch (decision) {
+                                 case CWVPermissionDecisionPrompt:
+                                   decisionHandler(
+                                       web::
+                                           PermissionDecisionShowDefaultPrompt);
+                                   break;
                                  case CWVPermissionDecisionGrant:
-                                   decisionHandler(YES);
+                                   decisionHandler(
+                                       web::PermissionDecisionGrant);
                                    break;
                                  case CWVPermissionDecisionDeny:
-                                   decisionHandler(NO);
+                                   decisionHandler(web::PermissionDecisionDeny);
                                    break;
                                }
                              }];
-    return YES;
   } else {
-    return NO;
+    decisionHandler(web::PermissionDecisionShowDefaultPrompt);
   }
 }
 

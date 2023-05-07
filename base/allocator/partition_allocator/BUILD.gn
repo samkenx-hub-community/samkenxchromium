@@ -306,7 +306,6 @@ component("partition_alloc") {
     ":chromecast_buildflags",
     ":chromeos_buildflags",
     ":debugging_buildflags",
-    ":logging_buildflags",
     ":partition_alloc_buildflags",
   ]
 
@@ -427,6 +426,7 @@ buildflag_header("partition_alloc_buildflags") {
     "ENABLE_BACKUP_REF_PTR_SUPPORT=$enable_backup_ref_ptr_support",
     "ENABLE_BACKUP_REF_PTR_SLOW_CHECKS=$enable_backup_ref_ptr_slow_checks",
     "ENABLE_BACKUP_REF_PTR_FEATURE_FLAG=$enable_backup_ref_ptr_feature_flag",
+    "ENABLE_RAW_PTR_EXPERIMENTAL=$enable_raw_ptr_experimental",
     "ENABLE_DANGLING_RAW_PTR_CHECKS=$enable_dangling_raw_ptr_checks",
     "ENABLE_DANGLING_RAW_PTR_FEATURE_FLAG=$enable_dangling_raw_ptr_feature_flag",
     "ENABLE_DANGLING_RAW_PTR_PERF_EXPERIMENT=$enable_dangling_raw_ptr_perf_experiment",
@@ -475,12 +475,6 @@ buildflag_header("chromeos_buildflags") {
   flags = [ "PA_IS_CHROMEOS_ASH=$is_chromeos_ash" ]
 }
 
-buildflag_header("logging_buildflags") {
-  header = "logging_buildflags.h"
-
-  flags = [ "PA_ENABLE_LOG_ERROR_NOT_REACHED=$enable_log_error_not_reached" ]
-}
-
 buildflag_header("debugging_buildflags") {
   header = "debugging_buildflags.h"
   header_dir = rebase_path(".", "//") + "/partition_alloc_base/debug"
@@ -501,7 +495,6 @@ group("buildflags") {
     ":chromecast_buildflags",
     ":chromeos_buildflags",
     ":debugging_buildflags",
-    ":logging_buildflags",
     ":partition_alloc_buildflags",
   ]
 }

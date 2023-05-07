@@ -91,6 +91,7 @@ void PopulateLoadTimeData(content::WebUI* web_ui,
       base::FeatureList::IsEnabled(features::kEnableLocalSearchService));
   source->AddBoolean("isCloudGamingDevice",
                      chromeos::features::IsCloudGamingDeviceEnabled());
+  source->AddBoolean("jelly", chromeos::features::IsJellyEnabled());
 
   Profile* profile = Profile::FromWebUI(web_ui);
   PrefService* pref_service = profile->GetPrefs();
@@ -153,7 +154,8 @@ HelpAppUntrustedUIConfig::HelpAppUntrustedUIConfig()
 HelpAppUntrustedUIConfig::~HelpAppUntrustedUIConfig() = default;
 
 std::unique_ptr<content::WebUIController>
-HelpAppUntrustedUIConfig::CreateWebUIController(content::WebUI* web_ui) {
+HelpAppUntrustedUIConfig::CreateWebUIController(content::WebUI* web_ui,
+                                                const GURL& url) {
   base::RepeatingCallback<void(content::WebUIDataSource*)> callback =
       base::BindRepeating(&PopulateLoadTimeData, web_ui);
 

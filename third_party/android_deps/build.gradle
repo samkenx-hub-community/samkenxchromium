@@ -119,6 +119,7 @@ dependencies {
     // Note: These have version overrides set in ChromiumDepGraph.groovy.
     compile "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.6.4"
     compile "org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.6.4"
+    compile "org.jetbrains.kotlinx:kotlinx-coroutines-guava:1.6.4"
     compile "org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.20"
     compile "org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.20"
 
@@ -184,7 +185,7 @@ dependencies {
     // Version 1.2 is needed by espresso-web, but we'll newer 1.2.1.
     androidTestCompile 'org.ccil.cowan.tagsoup:tagsoup:1.2.1'
 
-    String mockitoVersion = '5.1.1'
+    String mockitoVersion = '5.3.1'
     androidTestCompile "org.mockito:mockito-android:${mockitoVersion}"
     androidTestCompile "org.mockito:mockito-core:${mockitoVersion}"
     androidTestCompile "org.mockito:mockito-subclass:${mockitoVersion}"

@@ -31,6 +31,9 @@
 // Yes, if the edit is done for updating the profile.
 @property(nonatomic, assign) BOOL isEditForUpdate;
 
+// Yes, if the edit is shown for the migration prompt.
+@property(nonatomic, assign) BOOL migrationPrompt;
+
 @end
 
 @implementation InfobarEditAddressProfileTableViewController
@@ -54,7 +57,8 @@
   self.styler.cellBackgroundColor = [UIColor colorNamed:kBackgroundColor];
   self.tableView.sectionHeaderHeight = 0;
   self.tableView.estimatedRowHeight = 56;
-  self.tableView.separatorStyle = UITableViewCellSeparatorStyleNone;
+  [self.tableView
+      setSeparatorInset:UIEdgeInsetsMake(0, kTableViewHorizontalSpacing, 0, 0)];
 
   // Configure the NavigationBar.
   UIBarButtonItem* cancelButton = [[UIBarButtonItem alloc]
@@ -64,9 +68,14 @@
 
   self.navigationItem.leftBarButtonItem = cancelButton;
   self.navigationController.navigationBar.prefersLargeTitles = NO;
-  self.navigationItem.title = l10n_util::GetNSString(
-      self.isEditForUpdate ? IDS_IOS_AUTOFILL_UPDATE_ADDRESS_PROMPT_TITLE
-                           : IDS_IOS_AUTOFILL_SAVE_ADDRESS_PROMPT_TITLE);
+  if (self.migrationPrompt) {
+    self.navigationItem.title = l10n_util::GetNSString(
+        IDS_IOS_AUTOFILL_ADDRESS_MIGRATION_TO_ACCOUNT_PROMPT_TITLE);
+  } else {
+    self.navigationItem.title = l10n_util::GetNSString(
+        self.isEditForUpdate ? IDS_IOS_AUTOFILL_UPDATE_ADDRESS_PROMPT_TITLE
+                             : IDS_IOS_AUTOFILL_SAVE_ADDRESS_PROMPT_TITLE);
+  }
 
   self.tableView.allowsSelectionDuringEditing = YES;
 
@@ -75,6 +84,7 @@
 
 - (void)loadModel {
   [super loadModel];
+  [self.handler setMigrationPrompt:self.migrationPrompt];
   [self.handler loadModel];
   [self.handler
       loadMessageAndButtonForModalIfSaveOrUpdate:self.isEditForUpdate];

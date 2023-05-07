@@ -32,21 +32,25 @@ using InsetValueSequence =
 
 namespace {
 
-double ComputeOffset(Element* source_element,
-                     LayoutBox* subject_layout,
+double ComputeOffset(LayoutBox* subject_layout,
                      LayoutBox* source_layout,
                      ScrollOrientation physical_orientation) {
+  DCHECK(source_layout);
   MapCoordinatesFlags flags = kIgnoreScrollOffset | kIgnoreTransforms;
   gfx::PointF point = gfx::PointF(subject_layout->LocalToAncestorPoint(
       PhysicalOffset(), source_layout, flags));
 
-  // We can not call the regular clientLeft/Top functions here, because we
-  // may reach this function during style resolution, and clientLeft/Top
-  // also attempt to update style/layout.
+  // We call LayoutObject::ClientLeft/Top directly and avoid
+  // Element::clientLeft/Top because:
+  //
+  // - We may reach this function during style resolution,
+  //   and clientLeft/Top also attempt to update style/layout.
+  // - Those functions return the unzoomed values, and we require the zoomed
+  //   values.
   if (physical_orientation == kHorizontalScroll)
-    return point.x() - source_element->ClientLeftNoLayout();
+    return point.x() - source_layout->ClientLeft().Round();
   else
-    return point.y() - source_element->ClientTopNoLayout();
+    return point.y() - source_layout->ClientTop().Round();
 }
 
 bool IsBlockDirection(ViewTimeline::ScrollAxis axis, WritingMode writing_mode) {
@@ -261,20 +265,23 @@ ViewTimeline::ViewTimeline(Document* document,
 AnimationTimeDelta ViewTimeline::CalculateIntrinsicIterationDuration(
     const Animation* animation,
     const Timing& timing) {
+  return CalculateIntrinsicIterationDuration(animation->GetRangeStartInternal(),
+                                             animation->GetRangeEndInternal(),
+                                             timing);
+}
+
+AnimationTimeDelta ViewTimeline::CalculateIntrinsicIterationDuration(
+    const absl::optional<TimelineOffset>& rangeStart,
+    const absl::optional<TimelineOffset>& rangeEnd,
+    const Timing& timing) {
   absl::optional<AnimationTimeDelta> duration = GetDuration();
 
   // Only run calculation for progress based scroll timelines
   if (duration && timing.iteration_count > 0) {
     double active_interval = 1;
 
-    double start =
-        animation->GetRangeStartInternal()
-            ? ToFractionalOffset(animation->GetRangeStartInternal().value())
-            : 0;
-    double end =
-        animation->GetRangeEndInternal()
-            ? ToFractionalOffset(animation->GetRangeEndInternal().value())
-            : 1;
+    double start = rangeStart ? ToFractionalOffset(rangeStart.value()) : 0;
+    double end = rangeEnd ? ToFractionalOffset(rangeEnd.value()) : 1;
 
     active_interval -= start;
     active_interval -= (1 - end);
@@ -316,7 +323,7 @@ absl::optional<ScrollTimeline::ScrollOffsets> ViewTimeline::CalculateOffsets(
   LayoutUnit viewport_size;
 
   target_offset_ =
-      ComputeOffset(source, layout_box, source_layout, physical_orientation);
+      ComputeOffset(layout_box, source_layout, physical_orientation);
 
   if (physical_orientation == kHorizontalScroll) {
     target_size_ = layout_box->Size().Width().ToDouble();
@@ -361,8 +368,9 @@ absl::optional<ScrollTimeline::ScrollOffsets> ViewTimeline::CalculateOffsets(
     start_offset_ = start_offset;
     end_offset_ = end_offset;
 
-    for (auto animation : GetAnimations())
+    for (auto animation : GetAnimations()) {
       animation->InvalidateNormalizedTiming();
+    }
   }
 
   return absl::make_optional<ScrollOffsets>(start_offset, end_offset);
@@ -556,7 +564,8 @@ CSSNumericValue* ViewTimeline::startOffset() const {
   if (!scroll_offsets)
     return nullptr;
 
-  return CSSUnitValues::px(scroll_offsets->start);
+  DCHECK(GetResolvedZoom());
+  return CSSUnitValues::px(scroll_offsets->start / GetResolvedZoom());
 }
 
 CSSNumericValue* ViewTimeline::endOffset() const {
@@ -564,7 +573,8 @@ CSSNumericValue* ViewTimeline::endOffset() const {
   if (!scroll_offsets)
     return nullptr;
 
-  return CSSUnitValues::px(scroll_offsets->end);
+  DCHECK(GetResolvedZoom());
+  return CSSUnitValues::px(scroll_offsets->end / GetResolvedZoom());
 }
 
 void ViewTimeline::UpdateSnapshot() {

@@ -11,6 +11,7 @@
 #include "base/containers/contains.h"
 #include "base/feature_list.h"
 #include "base/files/file_path.h"
+#include "base/memory/raw_ptr.h"
 #include "base/path_service.h"
 #include "base/run_loop.h"
 #include "base/strings/strcat.h"
@@ -371,12 +372,8 @@ IN_PROC_BROWSER_TEST_F(SupervisedUserNavigationThrottleTest,
   // Both iframes (from allowed host iframe1.com as well as from blocked host
   // iframe2.com) should be loaded normally, since we don't filter iframes
   // (yet) - see crbug.com/651115.
-  bool loaded1 = false;
-  ASSERT_TRUE(content::ExecuteScriptAndExtractBool(tab, "loaded1()", &loaded1));
-  EXPECT_TRUE(loaded1);
-  bool loaded2 = false;
-  ASSERT_TRUE(content::ExecuteScriptAndExtractBool(tab, "loaded2()", &loaded2));
-  EXPECT_TRUE(loaded2);
+  EXPECT_TRUE(content::EvalJs(tab, "loaded1()").ExtractBool());
+  EXPECT_TRUE(content::EvalJs(tab, "loaded2()").ExtractBool());
 }
 
 IN_PROC_BROWSER_TEST_F(SupervisedUserNavigationThrottleTest,
@@ -441,7 +438,7 @@ class SupervisedUserIframeFilterTest
                                         const std::string& command);
 
   std::unique_ptr<RenderFrameTracker> tracker_;
-  PermissionRequestCreatorMock* permission_creator_;
+  raw_ptr<PermissionRequestCreatorMock, ExperimentalAsh> permission_creator_;
   base::test::ScopedFeatureList scoped_feature_list_;
 };
 

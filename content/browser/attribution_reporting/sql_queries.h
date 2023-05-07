@@ -68,6 +68,13 @@ inline constexpr const char kDedupKeySql[] =
 inline constexpr const char kGetSourcesDataKeysSql[] =
     "SELECT DISTINCT reporting_origin FROM sources";
 
+static_assert(
+    static_cast<int>(
+        attribution_reporting::mojom::ReportType::kNullAggregatable) == 2,
+    "update `report_type=2` clause below");
+inline constexpr const char kGetNullReportsDataKeysSql[] =
+    "SELECT DISTINCT reporting_origin FROM reports WHERE report_type=2";
+
 inline constexpr const char kGetRateLimitDataKeysSql[] =
     "SELECT DISTINCT reporting_origin FROM rate_limits";
 
@@ -131,9 +138,9 @@ inline constexpr const char kGetActiveSourcesSql[] =
   ATTRIBUTION_SOURCE_COLUMNS_SQL("I.")                                        \
   ",R.report_id,R.trigger_time,R.report_time,R.initial_report_time,"          \
   "R.failed_send_attempts,R.external_report_id,R.debug_key,R.context_origin," \
-  "R.report_type,R.metadata "                                                 \
+  "R.reporting_origin,R.report_type,R.metadata "                              \
   "FROM reports R "                                                           \
-  "JOIN sources I ON R.source_id=I.source_id "
+  "LEFT JOIN sources I ON R.source_id=I.source_id "
 
 inline constexpr const char kGetReportsSql[] =
     ATTRIBUTION_SELECT_REPORT_AND_SOURCE_COLUMNS_SQL

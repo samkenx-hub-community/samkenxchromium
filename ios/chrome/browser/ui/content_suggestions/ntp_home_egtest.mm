@@ -12,6 +12,7 @@
 #import "ios/chrome/browser/flags/chrome_switches.h"
 #import "ios/chrome/browser/ntp/features.h"
 #import "ios/chrome/browser/prefs/pref_names.h"
+#import "ios/chrome/browser/search_engines/search_engines_app_interface.h"
 #import "ios/chrome/browser/shared/public/features/features.h"
 #import "ios/chrome/browser/signin/capabilities_types.h"
 #import "ios/chrome/browser/signin/fake_system_identity.h"
@@ -169,13 +170,13 @@ id<GREYMatcher> notPracticallyVisible() {
       setBoolValue:YES
        forUserPref:base::SysUTF8ToNSString(feed::prefs::kArticlesListVisible)];
 
-  self.defaultSearchEngine = [NewTabPageAppInterface defaultSearchEngine];
+  self.defaultSearchEngine = [SearchEnginesAppInterface defaultSearchEngine];
 }
 
 - (void)tearDown {
   [EarlGrey rotateDeviceToOrientation:UIDeviceOrientationPortrait
                                 error:nil];
-  [NewTabPageAppInterface resetSearchEngineTo:self.defaultSearchEngine];
+  [SearchEnginesAppInterface setSearchEngineTo:self.defaultSearchEngine];
 
   [super tearDown];
 }
@@ -1358,6 +1359,11 @@ id<GREYMatcher> notPracticallyVisible() {
 // Tests that content suggestions are hidden for supervised users on sign-in.
 // When the supervised user signs out the active policy should apply to the NTP.
 - (void)testFeedHiddenForSupervisedUser {
+  // TODO(crbug.com/1438444): Re-enable the test on iPad once the test is fixed.
+  if ([ChromeEarlGrey isIPadIdiom]) {
+    EARL_GREY_TEST_DISABLED(@"Disabled for iPad as the test fails.");
+  }
+
   // Disable trending queries experiment to ensure that the Discover feed is
   // visible when first opening the NTP.
   // TODO(crbug.com/1350826): Adapt the test with launch of trending queries.

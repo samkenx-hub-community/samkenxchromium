@@ -83,9 +83,17 @@ const char kDeviceSwitcherUmaName[] = "DeviceSwitcher";
 const char kTabletProductivityUserKey[] = "tablet_productivity_user";
 const char kTabletProductivityUserUmaName[] = "TabletProductivityUser";
 
+// The key is used to decide whether the user should receive a web app
+// installation promotion.
+const char kWebAppInstallationPromoKey[] = "web_app_installation_promo";
+const char kWebAppInstallationPromoUmaName[] = "WebAppInstallationPromo";
+
 // Key for segment that tells in which tier the device used by the user belongs.
 const char kDeviceTierKey[] = "device_tier";
 const char kDeviceTierUmaName[] = "DeviceTier";
+
+const char kTabResumptionClassifierKey[] = "tab_resupmtion_classifier";
+const char kTabResumptionClassifierUmaName[] = "TabResumptionClassifier";
 
 // The key provide a list of segment IDs, separated by commas, whose ML model
 // execution results are allowed to be uploaded through UKM.

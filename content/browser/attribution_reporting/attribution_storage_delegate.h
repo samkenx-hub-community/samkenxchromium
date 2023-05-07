@@ -22,6 +22,7 @@
 namespace content {
 
 class AttributionReport;
+class AttributionTrigger;
 class CommonSourceInfo;
 class StoredSource;
 
@@ -47,6 +48,10 @@ class CONTENT_EXPORT AttributionStorageDelegate {
   // empty vector -> `StoredSource::AttributionLogic::kNever`
   // non-empty vector -> `StoredSource::AttributionLogic::kFalsely`
   using RandomizedResponse = absl::optional<std::vector<FakeReport>>;
+
+  struct NullAggregatableReport {
+    base::Time fake_source_time;
+  };
 
   explicit AttributionStorageDelegate(const AttributionConfig& config);
 
@@ -119,17 +124,19 @@ class CONTENT_EXPORT AttributionStorageDelegate {
   virtual void ShuffleReports(std::vector<AttributionReport>& reports) = 0;
 
   // Returns the rate used to determine whether to randomize the response to a
-  // source with the given source type, as implemented by
+  // source with the given source type and expiry deadline, as implemented by
   // `GetRandomizedResponse()`. Must be in the range [0, 1] and remain constant
-  // for the lifetime of the delegate.
-  double GetRandomizedResponseRate(
-      attribution_reporting::mojom::SourceType) const;
+  // for the lifetime of the delegate for calls with identical inputs.
+  virtual double GetRandomizedResponseRate(
+      attribution_reporting::mojom::SourceType,
+      base::TimeDelta expiry_deadline) const = 0;
 
   // Returns a randomized response for the given source, consisting of zero or
   // more fake reports. Returns `absl::nullopt` to indicate that the response
   // should not be randomized.
   virtual RandomizedResponse GetRandomizedResponse(
       const CommonSourceInfo& source,
+      base::Time source_time,
       base::Time event_report_window_time) = 0;
 
   virtual base::Time GetExpiryTime(
@@ -148,6 +155,12 @@ class CONTENT_EXPORT AttributionStorageDelegate {
   // Sanitizes `trigger_data` according to the data limits for `source_type`.
   uint64_t SanitizeTriggerData(uint64_t trigger_data,
                                attribution_reporting::mojom::SourceType) const;
+
+  // Returns zero or more null aggregatable reports for the given trigger.
+  virtual std::vector<NullAggregatableReport> GetNullAggregatableReports(
+      const AttributionTrigger&,
+      base::Time trigger_time,
+      absl::optional<base::Time> attributed_source_time) const = 0;
 
  protected:
   uint64_t TriggerDataCardinality(

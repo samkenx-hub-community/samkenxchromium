@@ -684,7 +684,6 @@ public class NewTabPageLayout extends LinearLayout {
         if (!mHasShownView) {
             mHasShownView = true;
             onInitializationProgressChanged();
-            mNewTabPageUma.recordSearchAvailableLoadTime();
             TraceEvent.instant("NewTabPageSearchAvailable)");
         }
     }
@@ -865,7 +864,8 @@ public class NewTabPageLayout extends LinearLayout {
 
     private boolean isScrollableMvtEnabled() {
         return ChromeFeatureList.isEnabled(ChromeFeatureList.SHOW_SCROLLABLE_MVT_ON_NTP_ANDROID)
-                && !DeviceFormFactor.isNonMultiDisplayContextOnTablet(mContext);
+                && (ChromeFeatureList.sStartSurfaceOnTablet.isEnabled()
+                        || !DeviceFormFactor.isNonMultiDisplayContextOnTablet(mContext));
     }
 
     // TODO(crbug.com/1329288): Remove this method when the Feed position experiment is cleaned up.

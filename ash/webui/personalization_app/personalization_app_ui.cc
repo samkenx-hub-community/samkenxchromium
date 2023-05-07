@@ -12,6 +12,7 @@
 #include "ash/public/cpp/wallpaper/wallpaper_controller.h"
 #include "ash/rgb_keyboard/rgb_keyboard_manager.h"
 #include "ash/shell.h"
+#include "ash/wallpaper/wallpaper_constants.h"
 #include "ash/webui/grit/ash_personalization_app_resources.h"
 #include "ash/webui/grit/ash_personalization_app_resources_map.h"
 #include "ash/webui/personalization_app/personalization_app_ambient_provider.h"
@@ -293,6 +294,7 @@ void AddStrings(content::WebUIDataSource* source) {
       {"wallpaperColorDescription",
        IDS_PERSONALIZATION_APP_KEYBOARD_BACKLIGHT_WALLPAPER_COLOR_DESCRIPTION},
       {"zoneTitle", IDS_PERSONALIZATION_APP_KEYBOARD_BACKLIGHT_ZONE_TITLE},
+      {"keyboardZonesTitle", IDS_PERSONALIZATION_APP_KEYBOARD_ZONES_TITLE},
 
       // Google Photos strings
       // TODO(b/229149314): Finalize error and retry strings.
@@ -335,6 +337,9 @@ void AddStrings(content::WebUIDataSource* source) {
   source->AddLocalizedStrings(kLocalizedStrings);
 
   source->AddString("googlePhotosURL", GetGooglePhotosURL());
+
+  source->AddString("timeOfDayWallpaperCollectionId",
+                    wallpaper_constants::kTimeOfDayWallpaperCollectionId);
 
   source->AddString("timeOfDayBannerImageUrl",
                     GetAmbientBackendController()->GetPromoBannerUrl());
@@ -443,9 +448,6 @@ void PersonalizationAppUI::AddBooleans(content::WebUIDataSource* source) {
 
   source->AddBoolean("isGooglePhotosSharedAlbumsEnabled",
                      features::IsWallpaperGooglePhotosSharedAlbumsEnabled());
-
-  source->AddBoolean("isDarkLightModeEnabled",
-                     features::IsDarkLightModeEnabled());
 
   source->AddBoolean("isAmbientModeAllowed", IsAmbientModeAllowed());
 

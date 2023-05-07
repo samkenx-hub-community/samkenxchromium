@@ -25,6 +25,7 @@
 #include "ash/system/video_conference/video_conference_tray_controller.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
+#include "base/memory/raw_ptr.h"
 #include "base/metrics/histogram_functions.h"
 #include "components/session_manager/session_manager_types.h"
 #include "ui/base/l10n/l10n_util.h"
@@ -84,7 +85,7 @@ class ToggleBubbleButton : public IconButton {
 
  private:
   // Parent view of this button. Owned by the views hierarchy.
-  VideoConferenceTray* const tray_;
+  const raw_ptr<VideoConferenceTray, ExperimentalAsh> tray_;
 };
 
 }  // namespace
@@ -232,6 +233,7 @@ VideoConferenceTray::VideoConferenceTray(Shelf* shelf)
                                     weak_ptr_factory_.GetWeakPtr())));
 
   VideoConferenceTrayController::Get()->AddObserver(this);
+  VideoConferenceTrayController::Get()->effects_manager().AddObserver(this);
   Shell::Get()->session_controller()->AddObserver(this);
 
   // Update visibility of the tray and all child icons and indicators. If this
@@ -246,6 +248,7 @@ VideoConferenceTray::VideoConferenceTray(Shelf* shelf)
 
 VideoConferenceTray::~VideoConferenceTray() {
   Shell::Get()->session_controller()->RemoveObserver(this);
+  VideoConferenceTrayController::Get()->effects_manager().RemoveObserver(this);
   VideoConferenceTrayController::Get()->RemoveObserver(this);
 }
 
@@ -269,6 +272,12 @@ std::u16string VideoConferenceTray::GetAccessibleNameForTray() {
   // https://crrev.com/c/4109611 browsertests and still needs to be replaced
   // with the proper name.
   return u"Placeholder";
+}
+
+std::u16string VideoConferenceTray::GetAccessibleNameForBubble() {
+  // TODO(b/261640628): Replace this placeholder with the appropriate string,
+  // once it is decided.
+  return u"Placeholder2";
 }
 
 void VideoConferenceTray::HideBubbleWithView(
@@ -317,6 +326,15 @@ void VideoConferenceTray::OnCameraCapturingStateChange(bool is_capturing) {
 
 void VideoConferenceTray::OnMicrophoneCapturingStateChange(bool is_capturing) {
   audio_icon_->SetIsCapturing(is_capturing);
+}
+
+void VideoConferenceTray::OnEffectSupportStateChanged(VcEffectId effect_id,
+                                                      bool is_supported) {
+  // If the bubble is open, we close it so that when it is re-opened, the
+  // bubble is updated with the correct effect support state.
+  if (GetBubbleWidget()) {
+    CloseBubble();
+  }
 }
 
 SkScalar VideoConferenceTray::GetRotationValueForToggleBubbleButton() {

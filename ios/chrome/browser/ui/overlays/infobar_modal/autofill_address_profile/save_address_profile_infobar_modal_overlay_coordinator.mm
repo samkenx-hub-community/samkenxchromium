@@ -9,11 +9,11 @@
 #import "base/strings/sys_string_conversions.h"
 #import "components/autofill/core/common/autofill_features.h"
 #import "ios/chrome/browser/autofill/personal_data_manager_factory.h"
-#import "ios/chrome/browser/browser_state/chrome_browser_state.h"
-#import "ios/chrome/browser/main/browser.h"
 #import "ios/chrome/browser/overlays/public/infobar_modal/save_address_profile_infobar_modal_overlay_request_config.h"
 #import "ios/chrome/browser/overlays/public/overlay_callback_manager.h"
 #import "ios/chrome/browser/overlays/public/overlay_response.h"
+#import "ios/chrome/browser/shared/model/browser/browser.h"
+#import "ios/chrome/browser/shared/model/browser_state/chrome_browser_state.h"
 #import "ios/chrome/browser/ui/autofill/autofill_country_selection_table_view_controller.h"
 #import "ios/chrome/browser/ui/autofill/autofill_profile_edit_mediator.h"
 #import "ios/chrome/browser/ui/autofill/autofill_profile_edit_mediator_delegate.h"
@@ -41,8 +41,11 @@ using autofill_address_profile_infobar_overlays::
     SaveAddressProfileInfobarModalOverlayMediatorDelegate> {
   autofill::AutofillProfile _autofillProfile;
 }
+
 // Redefine ModalConfiguration properties as readwrite.
-@property(nonatomic, strong, readwrite) OverlayRequestMediator* modalMediator;
+@property(nonatomic, strong, readwrite)
+    SaveAddressProfileInfobarModalOverlayMediator* modalMediator;
+
 @property(nonatomic, strong, readwrite) UIViewController* modalViewController;
 
 // Mediator and view controller used to display the edit view.
@@ -103,7 +106,8 @@ using autofill_address_profile_infobar_overlays::
            initWithDelegate:self
         personalDataManager:personalDataManager
             autofillProfile:&_autofillProfile
-                countryCode:nil];
+                countryCode:nil
+          isMigrationPrompt:self.config->is_migration_to_account()];
 
     InfobarEditAddressProfileTableViewController* editModalViewController =
         [[InfobarEditAddressProfileTableViewController alloc]
@@ -147,11 +151,6 @@ using autofill_address_profile_infobar_overlays::
 - (void)willSelectCountryWithCurrentlySelectedCountry:(NSString*)country
                                           countryList:(NSArray<CountryItem*>*)
                                                           allCountries {
-  for (CountryItem* countryItem in allCountries) {
-    if ([country isEqualToString:countryItem.text]) {
-      countryItem.accessoryType = UITableViewCellAccessoryCheckmark;
-    }
-  }
   AutofillCountrySelectionTableViewController*
       autofillCountrySelectionTableViewController =
           [[AutofillCountrySelectionTableViewController alloc]
@@ -163,6 +162,10 @@ using autofill_address_profile_infobar_overlays::
   [self.modalViewController.navigationController
       pushViewController:autofillCountrySelectionTableViewController
                 animated:YES];
+}
+
+- (void)didSaveProfile {
+  [self.modalMediator saveEditedProfileWithProfileData:&_autofillProfile];
 }
 
 #pragma mark - AutofillCountrySelectionTableViewControllerDelegate

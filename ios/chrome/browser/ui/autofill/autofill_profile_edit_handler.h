@@ -46,6 +46,9 @@
 // Returns YES if the `cellPath` belongs to a text field.
 - (BOOL)isItemAtIndexPathTextEditCell:(NSIndexPath*)cellPath;
 
+// Setter called only for the migration prompt view.
+- (BOOL)setMigrationPrompt:(BOOL)migrationPrompt;
+
 @end
 
 #endif  // IOS_CHROME_BROWSER_UI_AUTOFILL_AUTOFILL_PROFILE_EDIT_HANDLER_H_

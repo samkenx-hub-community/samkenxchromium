@@ -18,7 +18,6 @@
 #include "base/command_line.h"
 #include "base/containers/contains.h"
 #include "base/debug/crash_logging.h"
-#include "base/debug/dump_without_crashing.h"
 #include "base/i18n/case_conversion.h"
 #include "base/logging.h"
 #include "base/numerics/safe_conversions.h"
@@ -1138,7 +1137,7 @@ std::unique_ptr<AutofillProfile> GetAutofillProfileFromContactInfoTable(
     return nullptr;
   }
   auto profile = std::make_unique<AutofillProfile>(
-      guid, /*origin=*/"", AutofillProfile::Source::kAccount);
+      guid, AutofillProfile::Source::kAccount);
   int index = 0;
   profile->set_use_count(s.ColumnInt64(index++));
   profile->set_use_date(base::Time::FromTimeT(s.ColumnInt64(index++)));
@@ -1199,10 +1198,6 @@ bool AutofillTable::CreateTablesIfNecessary() {
          InitOfferEligibleInstrumentTable() && InitOfferMerchantDomainTable() &&
          InitContactInfoTable() && InitContactInfoTypeTokensTable() &&
          InitVirtualCardUsageDataTable();
-}
-
-bool AutofillTable::IsSyncable() {
-  return true;
 }
 
 bool AutofillTable::MigrateToVersion(int version,
@@ -1746,8 +1741,8 @@ std::unique_ptr<AutofillProfile> AutofillTable::GetAutofillProfile(
   }
 
   auto profile = std::make_unique<AutofillProfile>(
-      guid, /*origin=*/s.ColumnString(0),
-      AutofillProfile::Source::kLocalOrSyncable);
+      guid, AutofillProfile::Source::kLocalOrSyncable);
+  profile->set_origin(s.ColumnString(0));
   DCHECK(base::Uuid::ParseCaseInsensitive(profile->guid()).is_valid());
 
   // Get associated name info using guid.
@@ -2655,31 +2650,19 @@ bool AutofillTable::GetAutofillOffers(
   return s.Succeeded();
 }
 
-bool AutofillTable::AddVirtualCardUsageData(
+bool AutofillTable::AddOrUpdateVirtualCardUsageData(
     const VirtualCardUsageData& virtual_card_usage_data) {
-  if (GetVirtualCardUsageData(*virtual_card_usage_data.usage_data_id())) {
-    return false;
-  }
-  sql::Statement s;
-  InsertBuilder(db_, s, kVirtualCardUsageDataTable,
-                {kId, kInstrumentId, kMerchantDomain, kLastFour});
-  BindVirtualCardUsageDataToStatement(virtual_card_usage_data, s);
-  return s.Run();
-}
-
-bool AutofillTable::UpdateVirtualCardUsageData(
-    const VirtualCardUsageData& virtual_card_usage_data) {
-  std::unique_ptr<VirtualCardUsageData> old_data =
+  std::unique_ptr<VirtualCardUsageData> existing_data =
       GetVirtualCardUsageData(*virtual_card_usage_data.usage_data_id());
-  if (!old_data) {
-    return false;
-  }
-
   sql::Statement s;
-  UpdateBuilder(db_, s, kVirtualCardUsageDataTable,
-                {kId, kInstrumentId, kMerchantDomain, kLastFour}, "id=?1");
+  if (!existing_data) {
+    InsertBuilder(db_, s, kVirtualCardUsageDataTable,
+                  {kId, kInstrumentId, kMerchantDomain, kLastFour});
+  } else {
+    UpdateBuilder(db_, s, kVirtualCardUsageDataTable,
+                  {kId, kInstrumentId, kMerchantDomain, kLastFour}, "id=?1");
+  }
   BindVirtualCardUsageDataToStatement(virtual_card_usage_data, s);
-
   return s.Run();
 }
 
@@ -3487,7 +3470,6 @@ bool AutofillTable::AddFormFieldValueTime(const FormFieldData& element,
                                           std::vector<AutofillChange>* changes,
                                           base::Time time) {
   if (!db_->is_open()) {
-    base::debug::DumpWithoutCrashing();
     return false;
   }
   // TODO(crbug.com/1424298): Remove once it is understood where the `false`

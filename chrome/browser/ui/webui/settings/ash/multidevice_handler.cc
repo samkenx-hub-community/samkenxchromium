@@ -6,6 +6,7 @@
 
 #include "ash/constants/ash_features.h"
 #include "ash/constants/ash_pref_names.h"
+#include "ash/public/cpp/new_window_delegate.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
 #include "base/logging.h"
@@ -189,6 +190,10 @@ void MultideviceHandler::RegisterMessages() {
           &MultideviceHandler::HandleCancelFeatureSetupConnection,
           base::Unretained(this)));
   web_ui()->RegisterMessageCallback(
+      "showBrowserSyncSettings",
+      base::BindRepeating(&MultideviceHandler::HandleShowBrowserSyncSettings,
+                          base::Unretained(this)));
+  web_ui()->RegisterMessageCallback(
       "logPhoneHubPermissionSetUpScreenAction",
       base::BindRepeating(
           &MultideviceHandler::LogPhoneHubPermissionSetUpScreenAction,
@@ -212,36 +217,37 @@ void MultideviceHandler::RegisterMessages() {
 
 void MultideviceHandler::OnJavascriptAllowed() {
   if (multidevice_setup_client_) {
-    multidevice_setup_observation_.Observe(multidevice_setup_client_);
+    multidevice_setup_observation_.Observe(multidevice_setup_client_.get());
   }
 
   if (multidevice_feature_access_manager_) {
     multidevice_feature_access_manager_observation_.Observe(
-        multidevice_feature_access_manager_);
+        multidevice_feature_access_manager_.get());
   }
 
   if (android_sms_pairing_state_tracker_) {
     android_sms_pairing_state_tracker_observation_.Observe(
-        android_sms_pairing_state_tracker_);
+        android_sms_pairing_state_tracker_.get());
   }
 
   if (android_sms_app_manager_) {
-    android_sms_app_manager_observation_.Observe(android_sms_app_manager_);
+    android_sms_app_manager_observation_.Observe(
+        android_sms_app_manager_.get());
   }
 
   if (apps_access_manager_) {
-    apps_access_manager_observation_.Observe(apps_access_manager_);
+    apps_access_manager_observation_.Observe(apps_access_manager_.get());
   }
 
   if (camera_roll_manager_) {
-    camera_roll_manager_observation_.Observe(camera_roll_manager_);
+    camera_roll_manager_observation_.Observe(camera_roll_manager_.get());
   }
 
   if (phonehub::BrowserTabsModelProviderImpl::
           IsLacrosSessionSyncFeatureEnabled() &&
       browser_tabs_model_provider_) {
     browser_tabs_model_provider_observation_.Observe(
-        browser_tabs_model_provider_);
+        browser_tabs_model_provider_.get());
   }
 
   pref_change_registrar_.Add(
@@ -273,40 +279,48 @@ void MultideviceHandler::OnJavascriptDisallowed() {
 
   if (multidevice_setup_client_) {
     DCHECK(multidevice_setup_observation_.IsObservingSource(
-        multidevice_setup_client_));
+        multidevice_setup_client_.get()));
     multidevice_setup_observation_.Reset();
   }
 
   if (multidevice_feature_access_manager_) {
     DCHECK(multidevice_feature_access_manager_observation_.IsObservingSource(
-        multidevice_feature_access_manager_));
+        multidevice_feature_access_manager_.get()));
     multidevice_feature_access_manager_observation_.Reset();
     notification_access_operation_.reset();
   }
 
   if (android_sms_pairing_state_tracker_) {
     DCHECK(android_sms_pairing_state_tracker_observation_.IsObservingSource(
-        android_sms_pairing_state_tracker_));
+        android_sms_pairing_state_tracker_.get()));
     android_sms_pairing_state_tracker_observation_.Reset();
   }
 
   if (android_sms_app_manager_) {
     DCHECK(android_sms_app_manager_observation_.IsObservingSource(
-        android_sms_app_manager_));
+        android_sms_app_manager_.get()));
     android_sms_app_manager_observation_.Reset();
   }
 
   if (apps_access_manager_) {
     DCHECK(apps_access_manager_observation_.IsObservingSource(
-        apps_access_manager_));
+        apps_access_manager_.get()));
     apps_access_manager_observation_.Reset();
     apps_access_operation_.reset();
   }
 
   if (camera_roll_manager_) {
     DCHECK(camera_roll_manager_observation_.IsObservingSource(
-        camera_roll_manager_));
+        camera_roll_manager_.get()));
     camera_roll_manager_observation_.Reset();
+  }
+
+  if (phonehub::BrowserTabsModelProviderImpl::
+          IsLacrosSessionSyncFeatureEnabled() &&
+      browser_tabs_model_provider_) {
+    DCHECK(browser_tabs_model_provider_observation_.IsObservingSource(
+        browser_tabs_model_provider_));
+    browser_tabs_model_provider_observation_.Reset();
   }
 
   // Ensure that pending callbacks do not complete and cause JS to be evaluated.
@@ -630,6 +644,14 @@ void MultideviceHandler::HandleCancelFeatureSetupConnection(
   DCHECK(feature_setup_connection_operation_);
 
   feature_setup_connection_operation_.reset();
+}
+
+void MultideviceHandler::HandleShowBrowserSyncSettings(
+    const base::Value::List& args) {
+  ash::NewWindowDelegate::GetPrimary()->OpenUrl(
+      GURL("chrome://settings/syncSetup/advanced"),
+      ash::NewWindowDelegate::OpenUrlFrom::kUserInteraction,
+      ash::NewWindowDelegate::Disposition::kSwitchToTab);
 }
 
 void MultideviceHandler::LogPhoneHubPermissionSetUpScreenAction(

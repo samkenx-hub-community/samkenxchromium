@@ -5,6 +5,7 @@
 #include <deque>
 
 #include "ash/constants/ash_features.h"
+#include "base/memory/raw_ptr.h"
 #include "base/run_loop.h"
 #include "base/test/scoped_feature_list.h"
 #include "base/test/task_environment.h"
@@ -219,7 +220,7 @@ class HermesEuiccClientTest : public HermesClientTestBase {
  protected:
   scoped_refptr<dbus::MockObjectProxy> proxy_;
 
-  HermesEuiccClient* client_;
+  raw_ptr<HermesEuiccClient, ExperimentalAsh> client_;
   TestHermesEuiccClientObserver test_observer_;
 };
 
@@ -348,8 +349,7 @@ TEST_F(HermesEuiccClientTest, TestRefreshInstalledProfiles) {
 
 TEST_F(HermesEuiccClientTest, TestRefreshSmdxProfiles) {
   base::test::ScopedFeatureList feature_list;
-  feature_list.InitWithFeatures(
-      {{ash::features::kSmdsSupport, ash::features::kSmdsDbusMigration}}, {{}});
+  feature_list.InitAndEnableFeature(ash::features::kSmdsDbusMigration);
 
   dbus::ObjectPath test_euicc_path(kTestEuiccPath);
   dbus::MethodCall method_call(hermes::kHermesEuiccInterface,

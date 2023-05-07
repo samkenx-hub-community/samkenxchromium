@@ -12,12 +12,13 @@
 #include <vector>
 
 #include "base/functional/callback_forward.h"
+#include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "base/scoped_observation.h"
 #include "base/synchronization/lock.h"
 #include "chrome/browser/ash/login/user_flow.h"
 #include "chrome/browser/ash/login/users/affiliation.h"
-#include "chrome/browser/ash/login/users/avatar/user_image_manager_impl.h"
+#include "chrome/browser/ash/login/users/avatar/user_image_manager_registry.h"
 #include "chrome/browser/ash/login/users/chrome_user_manager.h"
 #include "chrome/browser/ash/login/users/multi_profile_user_controller_delegate.h"
 #include "chrome/browser/ash/policy/core/device_local_account.h"
@@ -129,14 +130,11 @@ class ChromeUserManagerImpl
   void OnProfileAdded(Profile* profile) override;
   void OnProfileManagerDestroying() override;
 
-  // UserManagerBase:
-  void OnUserRemoved(const AccountId& account_id) override;
-
   // ChromeUserManager:
   bool IsEnterpriseManaged() const override;
   void SetUserAffiliation(
       const AccountId& account_id,
-      const AffiliationIDSet& user_affiliation_ids) override;
+      const base::flat_set<std::string>& user_affiliation_ids) override;
   bool IsFullManagementDisclosureNeeded(
       policy::DeviceLocalAccountPolicyBroker* broker) const override;
 
@@ -168,9 +166,6 @@ class ChromeUserManagerImpl
   friend class WallpaperManager;
   friend class WallpaperManagerTest;
   friend class MockRemoveUserManager;
-
-  using UserImageManagerMap =
-      std::map<AccountId, std::unique_ptr<UserImageManager>>;
 
   ChromeUserManagerImpl();
 
@@ -232,17 +227,18 @@ class ChromeUserManagerImpl
       const AccountId& account_id);
 
   // Interface to the signed settings store.
-  CrosSettings* cros_settings_;
+  raw_ptr<CrosSettings, ExperimentalAsh> cros_settings_;
 
   // Interface to device-local account definitions and associated policy.
-  policy::DeviceLocalAccountPolicyService* device_local_account_policy_service_;
+  raw_ptr<policy::DeviceLocalAccountPolicyService, ExperimentalAsh>
+      device_local_account_policy_service_;
 
   base::ScopedObservation<session_manager::SessionManager,
                           session_manager::SessionManagerObserver>
       session_observation_{this};
 
-  // User avatar managers.
-  UserImageManagerMap user_image_managers_;
+  // TODO(b/278643115): Move this out from ChromeUserManagerImpl.
+  UserImageManagerRegistry user_image_manager_registry_;
 
   // Supervised user manager.
   std::unique_ptr<SupervisedUserManagerImpl> supervised_user_manager_;

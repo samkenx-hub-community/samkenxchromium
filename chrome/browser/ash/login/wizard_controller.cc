@@ -65,6 +65,7 @@
 #include "chrome/browser/ash/login/screens/demo_setup_screen.h"
 #include "chrome/browser/ash/login/screens/device_disabled_screen.h"
 #include "chrome/browser/ash/login/screens/display_size_screen.h"
+#include "chrome/browser/ash/login/screens/drive_pinning_screen.h"
 #include "chrome/browser/ash/login/screens/edu_coexistence_login_screen.h"
 #include "chrome/browser/ash/login/screens/enable_adb_sideloading_screen.h"
 #include "chrome/browser/ash/login/screens/enable_debugging_screen.h"
@@ -145,6 +146,7 @@
 #include "chrome/browser/ui/webui/ash/login/demo_setup_screen_handler.h"
 #include "chrome/browser/ui/webui/ash/login/device_disabled_screen_handler.h"
 #include "chrome/browser/ui/webui/ash/login/display_size_screen_handler.h"
+#include "chrome/browser/ui/webui/ash/login/drive_pinning_screen_handler.h"
 #include "chrome/browser/ui/webui/ash/login/enable_adb_sideloading_screen_handler.h"
 #include "chrome/browser/ui/webui/ash/login/enable_debugging_screen_handler.h"
 #include "chrome/browser/ui/webui/ash/login/encryption_migration_screen_handler.h"
@@ -871,19 +873,26 @@ WizardController::CreateScreens() {
                             weak_factory_.GetWeakPtr())));
   }
 
-  if (features::IsOobeChoobeEnabled() &&
-      features::IsOobeTouchpadScrollEnabled()) {
+  if (features::IsOobeTouchpadScrollEnabled()) {
     append(std::make_unique<TouchpadScrollScreen>(
         oobe_ui->GetView<TouchpadScrollScreenHandler>()->AsWeakPtr(),
         base::BindRepeating(&WizardController::OnTouchpadScreenExit,
                             weak_factory_.GetWeakPtr())));
   }
-  if (features::IsOobeChoobeEnabled() && features::IsOobeDisplaySizeEnabled()) {
+  if (features::IsOobeDisplaySizeEnabled()) {
     append(std::make_unique<DisplaySizeScreen>(
         oobe_ui->GetView<DisplaySizeScreenHandler>()->AsWeakPtr(),
         base::BindRepeating(&WizardController::OnDisplaySizeScreenExit,
                             weak_factory_.GetWeakPtr())));
   }
+
+  if (features::IsOobeDrivePinningEnabled()) {
+    append(std::make_unique<DrivePinningScreen>(
+        oobe_ui->GetView<DrivePinningScreenHandler>()->AsWeakPtr(),
+        base::BindRepeating(&WizardController::OnDrivePinningScreenExit,
+                            weak_factory_.GetWeakPtr())));
+  }
+
   return result;
 }
 
@@ -979,6 +988,14 @@ void WizardController::ShowDemoModePreferencesScreen() {
 
 void WizardController::ShowDemoModeSetupScreen() {
   SetCurrentScreen(GetScreen(DemoSetupScreenView::kScreenId));
+}
+
+void WizardController::ShowDrivePinningScreen() {
+  if (features::IsOobeDrivePinningEnabled()) {
+    SetCurrentScreen(GetScreen(DrivePinningScreenView::kScreenId));
+  } else {
+    OnDrivePinningScreenExit(DrivePinningScreen::Result::NOT_APPLICABLE);
+  }
 }
 
 void WizardController::ShowResetScreen() {
@@ -1117,11 +1134,23 @@ void WizardController::ShowChoobeScreen() {
 }
 
 void WizardController::ShowTouchpadScrollScreen() {
-  SetCurrentScreen(GetScreen(TouchpadScrollScreenView::kScreenId));
+  // If the `OobeChoobe` or `OobeDisplaySize` feature is disabled, the
+  // DisplaySizeScreen object will not be created. In this case,
+  // `OnTouchpadScreenExit()` function is called with the exit result
+  // `kNotApplicable` to proceed to the next screen.
+  if (features::IsOobeTouchpadScrollEnabled()) {
+    SetCurrentScreen(GetScreen(TouchpadScrollScreenView::kScreenId));
+  } else {
+    OnTouchpadScreenExit(TouchpadScrollScreen::Result::kNotApplicable);
+  }
 }
 
 void WizardController::ShowDisplaySizeScreen() {
-  SetCurrentScreen(GetScreen(DisplaySizeScreenView::kScreenId));
+  if (features::IsOobeDisplaySizeEnabled()) {
+    SetCurrentScreen(GetScreen(DisplaySizeScreenView::kScreenId));
+  } else {
+    OnDisplaySizeScreenExit(DisplaySizeScreen::Result::kNotApplicable);
+  }
 }
 
 void WizardController::ShowCryptohomeRecoverySetupScreen() {
@@ -1321,6 +1350,11 @@ void WizardController::OnConsolidatedConsentScreenExit(
     ConsolidatedConsentScreen::Result result) {
   OnScreenExit(ConsolidatedConsentScreenView::kScreenId,
                ConsolidatedConsentScreen::GetResultString(result));
+
+  if (features::IsOobeDrivePinningEnabled()) {
+    GetScreen<DrivePinningScreen>()->CalculateRequiredSpace();
+  }
+
   if (wizard_context_->is_cloud_ready_update_flow) {
     AdvanceToScreen(HWDataCollectionView::kScreenId);
     return;
@@ -1447,18 +1481,16 @@ void WizardController::OnThemeSelectionScreenExit(
   OnScreenExit(ThemeSelectionScreenView::kScreenId,
                ThemeSelectionScreen::GetResultString(result));
 
-  // Since ThemeSelectionScreen is the last optional screen, either return to
-  // CHOOBE screen if return_to_choobe_screen is true, or reset
-  // choobe_flow_controller_.
-  if (features::IsOobeChoobeEnabled()) {
-    if (wizard_context_->return_to_choobe_screen) {
-      ShowChoobeScreen();
-      return;
-    }
-    choobe_flow_controller_.reset();
+  switch (result) {
+    case ThemeSelectionScreen::Result::kProceed:
+    case ThemeSelectionScreen::Result::kNotApplicable:
+      if (features::IsOobeChoobeEnabled()) {
+        ShowDisplaySizeScreen();
+      } else {
+        ShowMarketingOptInScreen();
+      }
+      break;
   }
-
-  ShowMarketingOptInScreen();
 }
 
 void WizardController::OnCryptohomeRecoveryScreenExit(
@@ -1507,20 +1539,30 @@ void WizardController::OnTouchpadScreenExit(
     TouchpadScrollScreen::Result result) {
   OnScreenExit(TouchpadScrollScreenView::kScreenId,
                TouchpadScrollScreen::GetResultString(result));
-  switch (result) {
-    case TouchpadScrollScreen::Result::kNotApplicable:
-    case TouchpadScrollScreen::Result::kNext:
-      ShowThemeSelectionScreen();
-      break;
-  }
+
+  ShowDrivePinningScreen();
+}
+
+void WizardController::OnDrivePinningScreenExit(
+    DrivePinningScreen::Result result) {
+  OnScreenExit(DrivePinningScreenView::kScreenId,
+               DrivePinningScreen::GetResultString(result));
+
+  ShowThemeSelectionScreen();
 }
 
 void WizardController::OnDisplaySizeScreenExit(
     DisplaySizeScreen::Result result) {
   OnScreenExit(DisplaySizeScreenView::kScreenId,
                DisplaySizeScreen::GetResultString(result));
-  // TODO(b/275556512): Include the screen In CHOOBE flow.
-  NOTIMPLEMENTED();
+
+  switch (result) {
+    case DisplaySizeScreen::Result::kNotApplicable:
+    case DisplaySizeScreen::Result::kNext:
+      choobe_flow_controller_.reset();
+      ShowMarketingOptInScreen();
+      break;
+  }
 }
 
 void WizardController::SkipToLoginForTesting() {
@@ -2726,7 +2768,7 @@ bool WizardController::MaybeSetToPreviousScreen() {
   if (!base::Contains(previous_screens_, current_screen_)) {
     return false;
   }
-  auto* old_current_screen = current_screen_;
+  auto* old_current_screen = current_screen_.get();
   SetCurrentScreen(previous_screens_[current_screen_]);
   return old_current_screen != current_screen_;
 }

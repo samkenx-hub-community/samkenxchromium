@@ -225,18 +225,17 @@ SK_API void SkDebugf_FileLine(const char* file,
 // Max. verb count for paths rendered by the edge-AA tessellating path renderer.
 #define GR_AA_TESSELLATOR_MAX_VERB_COUNT 100
 
-#if defined(SK_BUILD_FOR_WIN) || defined(SK_BUILD_FOR_MAC)
 #define SK_FORCE_AAA
-#endif
 
 #define SK_SUPPORT_LEGACY_DRAWLOOPER
 
 #define SK_USE_LEGACY_MIPMAP_BUILDER
 
-#define SK_USE_LEGACY_XFERMODE_SPRITE_BLITTERS
-#define SK_USE_LEGACY_XFERMODE_SHADER_BLITTERS
-
 #define SK_SUPPORT_LEGACY_CONIC_CHOP
+
+#define SK_ENABLE_SKSL_IN_RASTER_PIPELINE
+
+#define SK_USE_LEGACY_COLORFILTER_IMAGEFILTER
 
 // Use the original std::vector based serializer
 // Remove when new streaming support operations has been verified.

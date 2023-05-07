@@ -13,6 +13,7 @@
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
 #include "base/logging.h"
+#include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "base/task/single_thread_task_runner.h"
 #include "base/time/time.h"
@@ -122,7 +123,7 @@ class Buffer::Texture : public viz::ContextLostObserver {
   void ScheduleWaitForRelease(base::TimeDelta delay);
   void WaitForRelease();
 
-  gfx::GpuMemoryBuffer* const gpu_memory_buffer_;
+  const raw_ptr<gfx::GpuMemoryBuffer, ExperimentalAsh> gpu_memory_buffer_;
   const gfx::Size size_;
   scoped_refptr<viz::RasterContextProvider> context_provider_;
   const unsigned texture_target_;
@@ -155,7 +156,7 @@ Buffer::Texture::Texture(
 
   mailbox_ = sii->CreateSharedImage(viz::SinglePlaneFormat::kRGBA_8888, size,
                                     color_space, kTopLeft_GrSurfaceOrigin,
-                                    kPremul_SkAlphaType, usage,
+                                    kPremul_SkAlphaType, usage, "ExoTexture",
                                     gpu::kNullSurfaceHandle);
   DCHECK(!mailbox_.IsZero());
   gpu::raster::RasterInterface* ri = context_provider_->RasterInterface();
@@ -193,7 +194,7 @@ Buffer::Texture::Texture(
   }
   mailbox_ = sii->CreateSharedImage(
       gpu_memory_buffer_, gpu_memory_buffer_manager, color_space,
-      kTopLeft_GrSurfaceOrigin, kPremul_SkAlphaType, usage);
+      kTopLeft_GrSurfaceOrigin, kPremul_SkAlphaType, usage, "ExoTexture");
   DCHECK(!mailbox_.IsZero());
   gpu::raster::RasterInterface* ri = context_provider_->RasterInterface();
   sync_token_out = sii->GenUnverifiedSyncToken();
@@ -471,7 +472,6 @@ bool Buffer::ProduceTransferableResource(
 
   resource->id = resource_manager->AllocateResourceId();
   resource->format = viz::SinglePlaneFormat::kRGBA_8888;
-  resource->filter = GL_LINEAR;
   resource->size = gpu_memory_buffer_->GetSize();
 
   // Create a new image texture for |gpu_memory_buffer_| with |texture_target_|
@@ -533,8 +533,8 @@ bool Buffer::ProduceTransferableResource(
         contents_texture->mailbox(), resource->mailbox_holder.sync_token,
         texture_target_);
     resource->is_overlay_candidate = is_overlay_candidate_;
-    resource->format = viz::SharedImageFormat::SinglePlane(
-        viz::GetResourceFormat(gpu_memory_buffer_->GetFormat()));
+    resource->format =
+        viz::GetSharedImageFormat(gpu_memory_buffer_->GetFormat());
     if (context_provider->ContextCapabilities().chromium_gpu_fence &&
         request_release_fence) {
       resource->synchronization_type =

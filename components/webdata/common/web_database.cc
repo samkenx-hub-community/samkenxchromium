@@ -6,14 +6,19 @@
 
 #include <algorithm>
 
+#include "base/debug/crash_logging.h"
+#include "base/debug/dump_without_crashing.h"
+#include "base/feature_list.h"
+#include "base/location.h"
 #include "base/logging.h"
+#include "base/strings/stringprintf.h"
 #include "sql/transaction.h"
 
 // Current version number.  Note: when changing the current version number,
 // corresponding changes must happen in the unit tests, and new migration test
 // added.  See `WebDatabaseMigrationTest::kCurrentTestedVersionNumber`.
 // static
-const int WebDatabase::kCurrentVersionNumber = 111;
+const int WebDatabase::kCurrentVersionNumber = 112;
 
 const int WebDatabase::kDeprecatedVersionNumber = 82;
 
@@ -21,6 +26,34 @@ const base::FilePath::CharType WebDatabase::kInMemoryPath[] =
     FILE_PATH_LITERAL(":memory");
 
 namespace {
+
+BASE_FEATURE(kWebDatabaseDumpWithoutCrashingOnInitProblems,
+             "WebDatabaseDumpWithoutCrashingOnInitProblems",
+             base::FEATURE_ENABLED_BY_DEFAULT);
+
+std::string GetDiagnostics(const sql::Database& db,
+                           const base::Location& location) {
+  if (!db.is_open()) {
+    return "Database is not open";
+  }
+  return base::StringPrintf(
+      "ErrorCode: %d, LastErrorno: %d, Error: %s, location: %s",
+      db.GetErrorCode(), db.GetLastErrno(), db.GetErrorMessage(),
+      location.ToString().c_str());
+}
+
+// TODO(crbug.com/1430313): Remove when bug is fixed.
+NOINLINE void LogDiagnostics(
+    sql::Database& db,
+    const base::Location& location = base::Location::Current()) {
+  if (!base::FeatureList::IsEnabled(
+          kWebDatabaseDumpWithoutCrashingOnInitProblems)) {
+    return;
+  }
+  SCOPED_CRASH_KEY_STRING1024("db_init_error", "diagnostics",
+                              GetDiagnostics(db, location));
+  base::debug::DumpWithoutCrashing();
+}
 
 const int kCompatibleVersionNumber = 106;
 
@@ -40,7 +73,6 @@ const int kCompatibleVersionNumber = 106;
 sql::InitStatus FailedMigrationTo(int version_num) {
   LOG(WARNING) << "Unable to update web database to version " << version_num
                << ".";
-  NOTREACHED();
   return sql::INIT_FAILURE;
 }
 
@@ -87,29 +119,61 @@ sql::Database* WebDatabase::GetSQLConnection() {
 }
 
 sql::InitStatus WebDatabase::Init(const base::FilePath& db_name) {
+  // TODO(crbug.com/1430313): Remove when bug is fixed.
+  SCOPED_CRASH_KEY_STRING64("db_init_error", "path",
+                            db_name.BaseName().AsUTF8Unsafe());
   db_.set_histogram_tag("Web");
 
   if ((db_name.value() == kInMemoryPath) ? !db_.OpenInMemory()
                                          : !db_.Open(db_name)) {
+    LogDiagnostics(db_);
     return sql::INIT_FAILURE;
+  }
+
+  // Check whether we have write access at the earliest possible time.
+  // While failures can happen later as well, this gives us some clarity
+  // that we could at least use the database when we opened it.
+  // TODO(crbug.com/1430313): Remove when bug is fixed.
+  {
+    if (!db_.Execute("BEGIN EXCLUSIVE")) {
+      LogDiagnostics(db_);
+      return sql::INIT_FAILURE;
+    }
+    if (!db_.Execute("COMMIT")) {
+      LogDiagnostics(db_);
+      return sql::INIT_FAILURE;
+    }
   }
 
   // Clobber really old databases.
   static_assert(kDeprecatedVersionNumber < kCurrentVersionNumber,
                 "Deprecation version must be less than current");
-  sql::MetaTable::RazeIfIncompatible(
-      &db_, /*lowest_supported_version=*/kDeprecatedVersionNumber + 1,
-      kCurrentVersionNumber);
+  if (!sql::MetaTable::RazeIfIncompatible(
+          &db_, /*lowest_supported_version=*/kDeprecatedVersionNumber + 1,
+          kCurrentVersionNumber)) {
+    LogDiagnostics(db_);
+    return sql::INIT_FAILURE;
+  }
+
+  // TODO(crbug.com/1430313): Remove when bug is fixed.
+  if (!db_.is_open()) {
+    LogDiagnostics(db_);
+  }
 
   // Scope initialization in a transaction so we can't be partially
   // initialized.
   sql::Transaction transaction(&db_);
-  if (!transaction.Begin())
+  if (!transaction.Begin()) {
+    LogDiagnostics(db_);
     return sql::INIT_FAILURE;
+  }
 
   // Version check.
-  if (!meta_table_.Init(&db_, kCurrentVersionNumber, kCompatibleVersionNumber))
+  if (!meta_table_.Init(&db_, kCurrentVersionNumber,
+                        kCompatibleVersionNumber)) {
+    LogDiagnostics(db_);
     return sql::INIT_FAILURE;
+  }
   if (meta_table_.GetCompatibleVersionNumber() > kCurrentVersionNumber) {
     LOG(WARNING) << "Web database is too new.";
     return sql::INIT_TOO_NEW;
@@ -118,14 +182,20 @@ sql::InitStatus WebDatabase::Init(const base::FilePath& db_name) {
   // Initialize the tables.
   for (const auto& table : tables_) {
     table.second->Init(&db_, &meta_table_);
+    // TODO(crbug.com/1430313): Remove when bug is fixed.
+    if (!db_.is_open()) {
+      LogDiagnostics(db_);
+    }
   }
 
   // If the file on disk is an older database version, bring it up to date.
   // If the migration fails we return an error to caller and do not commit
   // the migration.
   sql::InitStatus migration_status = MigrateOldVersionsAsNeeded();
-  if (migration_status != sql::INIT_OK)
+  if (migration_status != sql::INIT_OK) {
+    LogDiagnostics(db_);
     return migration_status;
+  }
 
   // Create the desired SQL tables if they do not already exist.
   // It's important that this happen *after* the migration code runs.
@@ -133,12 +203,17 @@ sql::InitStatus WebDatabase::Init(const base::FilePath& db_name) {
   // tables created in the new format, and skip the migration in that case.
   for (const auto& table : tables_) {
     if (!table.second->CreateTablesIfNecessary()) {
+      LogDiagnostics(db_);
       LOG(WARNING) << "Unable to initialize the web database.";
       return sql::INIT_FAILURE;
     }
   }
 
-  return transaction.Commit() ? sql::INIT_OK : sql::INIT_FAILURE;
+  bool result = transaction.Commit();
+  if (!result) {
+    LogDiagnostics(db_);
+  }
+  return result ? sql::INIT_OK : sql::INIT_FAILURE;
 }
 
 sql::InitStatus WebDatabase::MigrateOldVersionsAsNeeded() {
@@ -149,6 +224,7 @@ sql::InitStatus WebDatabase::MigrateOldVersionsAsNeeded() {
                                  meta_table_.GetCompatibleVersionNumber());
   if (current_version > meta_table_.GetVersionNumber() &&
       !ChangeVersion(&meta_table_, current_version, false)) {
+    LogDiagnostics(db_);
     return FailedMigrationTo(current_version);
   }
 
@@ -160,6 +236,7 @@ sql::InitStatus WebDatabase::MigrateOldVersionsAsNeeded() {
     bool update_compatible_version = false;
     if (!MigrateToVersion(next_version, &update_compatible_version) ||
         !ChangeVersion(&meta_table_, next_version, update_compatible_version)) {
+      LogDiagnostics(db_);
       return FailedMigrationTo(next_version);
     }
 
@@ -171,6 +248,7 @@ sql::InitStatus WebDatabase::MigrateOldVersionsAsNeeded() {
                                           &update_compatible_version) ||
           !ChangeVersion(&meta_table_, next_version,
                          update_compatible_version)) {
+        LogDiagnostics(db_);
         return FailedMigrationTo(next_version);
       }
     }

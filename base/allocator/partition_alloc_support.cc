@@ -20,6 +20,7 @@
 #include "base/allocator/partition_allocator/partition_alloc_check.h"
 #include "base/allocator/partition_allocator/partition_alloc_config.h"
 #include "base/allocator/partition_allocator/partition_lock.h"
+#include "base/allocator/partition_allocator/pointers/raw_ptr.h"
 #include "base/allocator/partition_allocator/shim/allocator_shim.h"
 #include "base/allocator/partition_allocator/shim/allocator_shim_default_dispatch_to_partition_alloc.h"
 #include "base/allocator/partition_allocator/thread_cache.h"
@@ -39,6 +40,7 @@
 #include "base/strings/string_piece.h"
 #include "base/strings/string_split.h"
 #include "base/strings/stringprintf.h"
+#include "base/system/sys_info.h"
 #include "base/task/single_thread_task_runner.h"
 #include "base/thread_annotations.h"
 #include "base/threading/platform_thread.h"
@@ -858,6 +860,7 @@ PartitionAllocSupport::GetBrpConfiguration(const std::string& process_type) {
   CHECK(base::FeatureList::GetInstance());
 
   bool enable_brp = false;
+  bool enable_brp_for_ash = false;
   bool enable_brp_zapping = false;
   bool split_main_partition = false;
   bool use_dedicated_aligned_partition = false;
@@ -950,13 +953,19 @@ PartitionAllocSupport::GetBrpConfiguration(const std::string& process_type) {
 #endif  // BUILDFLAG(USE_PARTITION_ALLOC_AS_MALLOC) &&
         // BUILDFLAG(ENABLE_BACKUP_REF_PTR_SUPPORT)
 
-  return {enable_brp,
-          enable_brp_zapping,
-          enable_memory_reclaimer,
-          split_main_partition,
-          use_dedicated_aligned_partition,
-          add_dummy_ref_count,
-          process_affected_by_brp_flag};
+  // Enabling BRP for Ash makes sense only when BRP is enabled. If it wasn't,
+  // there would be no BRP pool, thus BRP would be equally inactive for Ash
+  // pointers.
+#if BUILDFLAG(ENABLE_BACKUP_REF_PTR_SUPPORT)
+  enable_brp_for_ash =
+      enable_brp && base::FeatureList::IsEnabled(
+                        base::features::kPartitionAllocBackupRefPtrForAsh);
+#endif
+
+  return {enable_brp,           enable_brp_for_ash,
+          enable_brp_zapping,   enable_memory_reclaimer,
+          split_main_partition, use_dedicated_aligned_partition,
+          add_dummy_ref_count,  process_affected_by_brp_flag};
 }
 
 void PartitionAllocSupport::ReconfigureEarlyish(
@@ -1059,6 +1068,12 @@ void PartitionAllocSupport::ReconfigureAfterFeatureListInit(
   [[maybe_unused]] BrpConfiguration brp_config =
       GetBrpConfiguration(process_type);
 
+  if (brp_config.enable_brp_for_ash) {
+    // This must be enabled before the BRP partition is created. See
+    // RawPtrBackupRefImpl::UseBrp().
+    base::RawPtrGlobalSettings::EnableExperimentalAsh();
+  }
+
 #if BUILDFLAG(USE_ASAN_BACKUP_REF_PTR)
   if (brp_config.process_affected_by_brp_flag) {
     base::RawPtrAsanService::GetInstance().Configure(
@@ -1077,6 +1092,13 @@ void PartitionAllocSupport::ReconfigureAfterFeatureListInit(
 #endif  // BUILDFLAG(USE_ASAN_BACKUP_REF_PTR)
 
 #if BUILDFLAG(USE_PARTITION_ALLOC_AS_MALLOC)
+  // No specified type means we are in the browser.
+  auto bucket_distribution =
+      process_type == ""
+          ? base::features::kPartitionAllocAlternateBucketDistributionParam
+                .Get()
+          : base::features::AlternateBucketDistributionMode::kDefault;
+
   allocator_shim::ConfigurePartitions(
       allocator_shim::EnableBrp(brp_config.enable_brp),
       allocator_shim::EnableBrpZapping(brp_config.enable_brp_zapping),
@@ -1086,9 +1108,7 @@ void PartitionAllocSupport::ReconfigureAfterFeatureListInit(
       allocator_shim::UseDedicatedAlignedPartition(
           brp_config.use_dedicated_aligned_partition),
       allocator_shim::AddDummyRefCount(brp_config.add_dummy_ref_count),
-      allocator_shim::AlternateBucketDistribution(
-          base::features::kPartitionAllocAlternateBucketDistributionParam
-              .Get()));
+      allocator_shim::AlternateBucketDistribution(bucket_distribution));
 #endif  // BUILDFLAG(USE_PARTITION_ALLOC_AS_MALLOC)
 
   // If BRP is not enabled, check if any of PCScan flags is enabled.
@@ -1194,7 +1214,7 @@ void PartitionAllocSupport::ReconfigureAfterTaskRunnerInit(
 
 #if BUILDFLAG(IS_ANDROID)
   // Lower thread cache limits to avoid stranding too much memory in the caches.
-  if (base::SysInfo::IsLowEndDevice()) {
+  if (base::SysInfo::IsLowEndDeviceOrPartialLowEndModeEnabled()) {
     ::partition_alloc::ThreadCacheRegistry::Instance().SetThreadCacheMultiplier(
         ::partition_alloc::ThreadCache::kDefaultMultiplier / 2.);
   }

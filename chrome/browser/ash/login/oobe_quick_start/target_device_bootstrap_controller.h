@@ -14,15 +14,14 @@
 #include "chrome/browser/ash/login/oobe_quick_start/connectivity/target_device_connection_broker.h"
 #include "third_party/abseil-cpp/absl/types/variant.h"
 
-class NearbyConnectionsManager;
-
 namespace ash::quick_start {
 
 class TargetDeviceBootstrapController
     : public TargetDeviceConnectionBroker::ConnectionLifecycleListener {
  public:
   explicit TargetDeviceBootstrapController(
-      base::WeakPtr<NearbyConnectionsManager> nearby_connections_manager);
+      std::unique_ptr<TargetDeviceConnectionBroker>
+          target_device_connection_broker);
   TargetDeviceBootstrapController(TargetDeviceBootstrapController&) = delete;
   TargetDeviceBootstrapController& operator=(TargetDeviceBootstrapController&) =
       delete;
@@ -109,6 +108,11 @@ class TargetDeviceBootstrapController
   bool prepare_for_update_on_connection_closed_ = false;
 
   Status status_;
+
+  base::WeakPtr<TargetDeviceConnectionBroker::AuthenticatedConnection>
+      authenticated_connection_;
+
+  int32_t session_id_;
 
   base::WeakPtrFactory<TargetDeviceBootstrapController>
       weak_ptr_factory_for_clients_{this};

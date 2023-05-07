@@ -165,7 +165,6 @@ direction
 display
 dominantBaseline
 emptyCells
-end
 fallback
 fill
 fillOpacity
@@ -347,6 +346,8 @@ placeContent
 placeItems
 placeSelf
 pointerEvents
+popoverHideDelay
+popoverShowDelay
 position
 positionFallback
 prefix
@@ -401,11 +402,9 @@ shapeOutside
 shapeRendering
 size
 sizeAdjust
-source
 speak
 speakAs
 src
-start
 stopColor
 stopOpacity
 stroke

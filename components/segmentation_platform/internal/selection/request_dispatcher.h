@@ -13,7 +13,7 @@
 #include "base/functional/callback_helpers.h"
 #include "base/memory/raw_ref.h"
 #include "base/memory/scoped_refptr.h"
-#include "components/segmentation_platform/internal/selection/cached_result_provider.h"
+#include "components/segmentation_platform/internal/database/cached_result_provider.h"
 #include "components/segmentation_platform/internal/selection/request_handler.h"
 #include "components/segmentation_platform/public/input_context.h"
 #include "components/segmentation_platform/public/result.h"
@@ -52,6 +52,11 @@ class RequestDispatcher {
                                scoped_refptr<InputContext> input_context,
                                ClassificationResultCallback callback);
 
+  void GetAnnotatedNumericResult(const std::string& segmentation_key,
+                                 const PredictionOptions& options,
+                                 scoped_refptr<InputContext> input_context,
+                                 AnnotatedNumericResultCallback callback);
+
   // For testing only.
   int get_pending_actions_size_for_testing() { return pending_actions_.size(); }
   void set_request_handler_for_testing(
@@ -61,6 +66,13 @@ class RequestDispatcher {
   }
 
  private:
+  template <typename ResultType, typename Request>
+  void GetModelResult(const std::string& segmentation_key,
+                      const PredictionOptions& options,
+                      scoped_refptr<InputContext> input_context,
+                      Request request,
+                      base::OnceCallback<void(const ResultType&)> callback);
+
   // Configs for all registered clients.
   const raw_ref<const std::vector<std::unique_ptr<Config>>> configs_;
 

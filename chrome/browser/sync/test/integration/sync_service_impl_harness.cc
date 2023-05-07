@@ -301,7 +301,7 @@ bool SyncServiceImplHarness::SetupSyncNoWaitForCompletion(
   }
 
   // Now that auth is completed, request that sync actually start.
-  service()->GetUserSettings()->SetSyncRequested();
+  service()->SetSyncFeatureRequested();
 
   if (!AwaitEngineInitialization()) {
     return false;
@@ -333,11 +333,11 @@ void SyncServiceImplHarness::StopSyncServiceAndClearData() {
   service()->StopAndClear();
 }
 
-bool SyncServiceImplHarness::StartSyncService() {
+bool SyncServiceImplHarness::EnableSyncFeature() {
   std::unique_ptr<syncer::SyncSetupInProgressHandle> blocker =
       service()->GetSetupInProgressHandle();
   DVLOG(1) << "Requesting start for service";
-  service()->GetUserSettings()->SetSyncRequested();
+  service()->SetSyncFeatureRequested();
 
   if (!AwaitEngineInitialization()) {
     LOG(ERROR) << "AwaitEngineInitialization failed.";

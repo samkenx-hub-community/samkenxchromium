@@ -13,7 +13,6 @@
 #include <utility>
 
 #include "base/containers/contains.h"
-#include "base/cxx17_backports.h"
 #include "base/debug/dump_without_crashing.h"
 #include "base/metrics/histogram_macros.h"
 #include "base/observer_list.h"
@@ -615,6 +614,9 @@ void DebugDrawFrame(const AggregatedFrame& frame) {
       continue;
     }
 
+    DBG_DRAW_RECT_OPT("frame.render_pass.damage", DBG_OPT_RED,
+                      render_pass->damage_rect);
+
     DBG_LOG_OPT("frame.render_pass.numquads", DBG_OPT_BLUE,
                 "Num render pass quads=%d",
                 static_cast<int>(render_pass->quad_list.size()));
@@ -636,8 +638,6 @@ void DebugDrawFrame(const AggregatedFrame& frame) {
           base::NumberToString(quad->resources.ids[0].GetUnsafeValue()));
 
       DBG_DRAW_RECT("frame.render_pass.quad", display_rect);
-      DBG_DRAW_RECT_OPT("frame.render_pass.damage", DBG_OPT_RED,
-                        render_pass->damage_rect);
     }
   }
 }
@@ -1183,7 +1183,7 @@ base::TimeDelta Display::GetEstimatedDisplayDrawTime(base::TimeDelta interval,
     // We do not want the deadline adjustmens to exceed a default of 1/3 VSync,
     // as we would not give other processes enough time to produce content. So
     // this would make high latency situations worse.
-    return base::clamp(
+    return std::clamp(
         draw_time_without_scheduling_waits_.Percentile(percentile),
         kMinEstimatedDisplayDrawTime, default_estimate);
   }

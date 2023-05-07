@@ -4,19 +4,22 @@
 
 package org.chromium.chrome.features.start_surface;
 
-import static org.chromium.chrome.features.start_surface.StartSurfaceTestUtils.INSTANT_START_TEST_BASE_PARAMS;
+import static org.chromium.chrome.features.start_surface.StartSurfaceTestUtils.START_SURFACE_ON_TABLET_TEST_PARAMS;
 
 import android.text.TextUtils;
+import android.view.ViewGroup;
 
 import androidx.test.filters.MediumTest;
 
+import org.hamcrest.Matchers;
 import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
 import org.chromium.base.test.util.CommandLineFlags;
-import org.chromium.base.test.util.DisabledTest;
+import org.chromium.base.test.util.Criteria;
+import org.chromium.base.test.util.CriteriaHelper;
 import org.chromium.base.test.util.DoNotBatch;
 import org.chromium.base.test.util.Feature;
 import org.chromium.base.test.util.Restriction;
@@ -24,6 +27,8 @@ import org.chromium.chrome.browser.ChromeTabbedActivity;
 import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.flags.ChromeSwitches;
 import org.chromium.chrome.browser.ntp.NewTabPage;
+import org.chromium.chrome.browser.suggestions.tile.MostVisitedTilesCarouselLayout;
+import org.chromium.chrome.browser.suggestions.tile.MostVisitedTilesGridLayout;
 import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.test.ChromeJUnit4ClassRunner;
 import org.chromium.chrome.test.ChromeTabbedActivityTestRule;
@@ -55,7 +60,7 @@ public class StartSurfaceOnTabletTest {
     @Test
     @MediumTest
     @Feature({"StartSurface"})
-    @CommandLineFlags.Add({INSTANT_START_TEST_BASE_PARAMS})
+    @CommandLineFlags.Add({START_SURFACE_ON_TABLET_TEST_PARAMS})
     @DisableFeatures({ChromeFeatureList.START_SURFACE_ON_TABLET})
     public void testStartSurfaceOnTabletDisabled() throws IOException {
         StartSurfaceTestUtils.prepareTabStateMetadataFile(new int[] {0}, new String[] {TAB_URL}, 0);
@@ -69,7 +74,7 @@ public class StartSurfaceOnTabletTest {
     @Test
     @MediumTest
     @Feature({"StartSurface"})
-    @CommandLineFlags.Add({INSTANT_START_TEST_BASE_PARAMS})
+    @CommandLineFlags.Add({START_SURFACE_ON_TABLET_TEST_PARAMS})
     public void testStartSurfaceOnTablet() throws IOException {
         StartSurfaceTestUtils.prepareTabStateMetadataFile(new int[] {0}, new String[] {TAB_URL}, 0);
         StartSurfaceTestUtils.startMainActivityFromLauncher(mActivityTestRule);
@@ -83,8 +88,7 @@ public class StartSurfaceOnTabletTest {
     @Test
     @MediumTest
     @Feature({"StartSurface"})
-    @CommandLineFlags.Add({INSTANT_START_TEST_BASE_PARAMS})
-    @DisabledTest(message = "https://crbug.com/1431467")
+    @CommandLineFlags.Add({START_SURFACE_ON_TABLET_TEST_PARAMS})
     public void testStartSurfaceOnTabletWithNtpExist() throws IOException {
         // The existing NTP isn't the last active Tab.
         String modifiedNtpUrl = UrlConstants.NTP_URL + "/1";
@@ -94,16 +98,15 @@ public class StartSurfaceOnTabletTest {
         StartSurfaceTestUtils.startMainActivityFromLauncher(mActivityTestRule);
         StartSurfaceTestUtils.waitForTabModel(mActivityTestRule.getActivity());
 
-        // Verifies that the existing non active NTP is skipped in Tab restoring, and a new NTP is
-        // created and set as the active Tab.
-        verifyTabCountAndActiveTabUrl(mActivityTestRule.getActivity(), 2, UrlConstants.NTP_URL,
+        // Verifies that a new NTP is created and set as the active Tab.
+        verifyTabCountAndActiveTabUrl(mActivityTestRule.getActivity(), 3, UrlConstants.NTP_URL,
                 true /* expectHomeSurfaceUiShown */);
     }
 
     @Test
     @MediumTest
     @Feature({"StartSurface"})
-    @CommandLineFlags.Add({INSTANT_START_TEST_BASE_PARAMS})
+    @CommandLineFlags.Add({START_SURFACE_ON_TABLET_TEST_PARAMS})
     public void testStartSurfaceOnTabletWithActiveNtpExist() throws IOException {
         // The existing NTP is set as the last active Tab.
         String modifiedNtpUrl = UrlConstants.NTP_URL + "/1";
@@ -119,6 +122,71 @@ public class StartSurfaceOnTabletTest {
                 false /* expectHomeSurfaceUiShown */);
     }
 
+    @Test
+    @MediumTest
+    @Feature({"StartSurface"})
+    @EnableFeatures({ChromeFeatureList.SHOW_SCROLLABLE_MVT_ON_NTP_ANDROID})
+    @CommandLineFlags.Add({START_SURFACE_ON_TABLET_TEST_PARAMS})
+    public void testScrollableMvTilesEnabledOnTablet() throws IOException {
+        StartSurfaceTestUtils.prepareTabStateMetadataFile(new int[] {0}, new String[] {TAB_URL}, 0);
+        StartSurfaceTestUtils.startMainActivityFromLauncher(mActivityTestRule);
+        ChromeTabbedActivity cta = mActivityTestRule.getActivity();
+        StartSurfaceTestUtils.waitForTabModel(cta);
+        // Verifies that a NTP is created and set as the current Tab.
+        verifyTabCountAndActiveTabUrl(
+                cta, 2, UrlConstants.NTP_URL, true /* expectHomeSurfaceUiShown */);
+
+        waitForNtpLoaded(cta.getActivityTab());
+        NewTabPage ntp = (NewTabPage) cta.getActivityTab().getNativePage();
+        ViewGroup mvTilesLayout =
+                ntp.getView().findViewById(org.chromium.chrome.test.R.id.mv_tiles_layout);
+        // Verifies that 1 row MV tiles are shown when "Start surface on tablet" flag is enabled.
+        Assert.assertTrue(mvTilesLayout instanceof MostVisitedTilesCarouselLayout);
+    }
+
+    @Test
+    @MediumTest
+    @Feature({"StartSurface"})
+    @EnableFeatures({ChromeFeatureList.SHOW_SCROLLABLE_MVT_ON_NTP_ANDROID})
+    @DisableFeatures({ChromeFeatureList.START_SURFACE_ON_TABLET})
+    public void testScrollableMvTilesDefaultDisabledOnTablet() {
+        mActivityTestRule.startMainActivityWithURL(UrlConstants.NTP_URL);
+        ChromeTabbedActivity cta = mActivityTestRule.getActivity();
+        StartSurfaceTestUtils.waitForTabModel(cta);
+        waitForNtpLoaded(cta.getActivityTab());
+
+        NewTabPage ntp = (NewTabPage) cta.getActivityTab().getNativePage();
+        ViewGroup mvTilesLayout =
+                ntp.getView().findViewById(org.chromium.chrome.test.R.id.mv_tiles_layout);
+        // Verifies that 2 row MV tiles are shown when "Start surface on tablet" flag is disabled.
+        Assert.assertTrue(mvTilesLayout instanceof MostVisitedTilesGridLayout);
+    }
+
+    @Test
+    @MediumTest
+    @Feature({"StartSurface"})
+    @CommandLineFlags.Add({START_SURFACE_ON_TABLET_TEST_PARAMS})
+    public void testSingleTabCardGoneAfterTabClosed() throws IOException {
+        StartSurfaceTestUtils.prepareTabStateMetadataFile(new int[] {0}, new String[] {TAB_URL}, 0);
+        StartSurfaceTestUtils.startMainActivityFromLauncher(mActivityTestRule);
+        ChromeTabbedActivity cta = mActivityTestRule.getActivity();
+        StartSurfaceTestUtils.waitForTabModel(cta);
+
+        // Verifies that a new NTP is created and set as the active Tab.
+        verifyTabCountAndActiveTabUrl(
+                cta, 2, UrlConstants.NTP_URL, true /* expectHomeSurfaceUiShown */);
+        waitForNtpLoaded(cta.getActivityTab());
+
+        NewTabPage ntp = (NewTabPage) cta.getActivityTab().getNativePage();
+        Assert.assertTrue(ntp.isSingleTabCardVisibleForTesting());
+
+        Tab lastActiveTab = cta.getCurrentTabModel().getTabAt(0);
+        TestThreadUtils.runOnUiThreadBlocking(
+                () -> { cta.getCurrentTabModel().closeTab(lastActiveTab); });
+        Assert.assertEquals(1, cta.getCurrentTabModel().getCount());
+        Assert.assertFalse(ntp.isSingleTabCardVisibleForTesting());
+    }
+
     private void verifyTabCountAndActiveTabUrl(
             ChromeTabbedActivity cta, int tabCount, String url, Boolean expectHomeSurfaceUiShown) {
         Assert.assertEquals(tabCount, cta.getCurrentTabModel().getCount());
@@ -129,5 +197,14 @@ public class StartSurfaceOnTabletTest {
             Assert.assertEquals(expectHomeSurfaceUiShown,
                     ((NewTabPage) tab.getNativePage()).isSingleTabCardVisibleForTesting());
         }
+    }
+
+    private static void waitForNtpLoaded(final Tab tab) {
+        assert !tab.isIncognito();
+        CriteriaHelper.pollUiThread(() -> {
+            Criteria.checkThat(tab.getNativePage(), Matchers.instanceOf(NewTabPage.class));
+            Criteria.checkThat(
+                    ((NewTabPage) tab.getNativePage()).isLoadedForTests(), Matchers.is(true));
+        });
     }
 }

@@ -21,7 +21,7 @@
     <link rel="stylesheet" href="/css/views/settings.css">
     <script type="module" src="/js/init.js"></script>
   </head>
-  <body class="sound mirror mic view-splash">
+  <body class="sound mirror view-splash">
     <div id="spoken_msg" class="centered-overlay" tabindex="-1"
          aria-live="polite"></div>
     <div id="view-camera">
@@ -97,11 +97,13 @@
         <div id="barcode-chip-url-container"
              class="invisible barcode-chip-container">
           <div class="barcode-chip-url">
+            <svg-wrapper name="barcode_url.svg"></svg-wrapper>
             <a href="#barcode-chip-url-container"></a>
           </div>
           <div class="circle">
             <button class="barcode-copy-button" tabindex="0"
-              i18n-label="barcode_copy_link_button"></button>
+              i18n-label="barcode_copy_link_button"
+              data-svg="barcode_copy.svg"></button>
           </div>
         </div>
         <div id="barcode-chip-text-container"
@@ -111,11 +113,17 @@
           <div class="barcode-chip-text">
             <div id="barcode-chip-text-content"></div>
             <button id="barcode-chip-text-expand"
-                    aria-expanded="false"></button>
+                    aria-expanded="false">
+              <svg-wrapper name="barcode_chevron_up.svg" class="up-icon">
+              </svg-wrapper>
+              <svg-wrapper name="barcode_chevron_down.svg" class="down-icon">
+              </svg-wrapper>
+            </button>
           </div>
           <div class="circle">
             <button class="barcode-copy-button" tabindex="0"
-              i18n-label="barcode_copy_text_button"></button>
+              i18n-label="barcode_copy_text_button"
+              data-svg="barcode_copy.svg"></button>
           </div>
         </div>
       </div>
@@ -129,18 +137,41 @@
                 i18n-label="back_button"></button>
       </div>
       <div class="top-stripe right-stripe circle buttons">
-        <input id="toggle-mic" type="checkbox" tabindex="0"
-               i18n-label="toggle_mic_button" data-state="mic"
-               i18n-aria="aria_mute_off" data-key="toggleMic" checked>
+        <button id="toggle-mic" role="checkbox" tabindex="0"
+               i18n-label="toggle_mic_button" i18n-aria="aria_mute_off">
+          <svg-wrapper name="camera_button_mic_off.svg"
+                       class="off-icon"></svg-wrapper>
+          <svg-wrapper name="camera_button_mic_on.svg"
+                       class="on-icon"></svg-wrapper>
+        </button>
       </div>
       <div id="options-group" class="left-stripe buttons circle">
+        <!--
+          TODO(pihsun): These should be icon-button when jellybean is ready.
+        -->
         <button id="open-mirror-panel" tabindex="0" aria-haspopup="true">
+          <svg-wrapper name="camera_button_mirror_off.svg"
+                       class="off-icon"></svg-wrapper>
+          <svg-wrapper name="camera_button_mirror_on.svg"
+                       class="on-icon"></svg-wrapper>
         </button>
-        <button id="open-grid-panel" tabindex="0" aria-haspopup="true"></button>
+        <button id="open-grid-panel" tabindex="0" aria-haspopup="true">
+          <svg-wrapper name="camera_button_grid_off.svg"
+                       class="off-icon"></svg-wrapper>
+          <svg-wrapper name="camera_button_grid_on.svg"
+                       class="on-icon"></svg-wrapper>
+        </button>
         <button id="open-timer-panel" tabindex="0" aria-haspopup="true">
-        <button id="open-ptz-panel" tabindex="0" aria-haspopup="true"
-                i18n-label="open_ptz_panel_button"></button>
+          <svg-wrapper name="camera_button_timer_off.svg"
+                       class="off-icon"></svg-wrapper>
+          <svg-wrapper name="camera_button_timer_on_3s.svg"
+                       class="on-3s-icon"></svg-wrapper>
+          <svg-wrapper name="camera_button_timer_on_10s.svg"
+                       class="on-10s-icon"></svg-wrapper>
         </button>
+        <button id="open-ptz-panel" tabindex="0" aria-haspopup="true"
+                i18n-label="open_ptz_panel_button"
+                data-svg="camera_button_ptz_panel.svg"></button>
       </div>
       <div id="scan-modes-group" class="mode-subgroup" role="radiogroup"
            i18n-aria="aria_scan_type_group">
@@ -184,11 +215,12 @@
         </div>
       </div>
       <div id="video-snapshot-holder" class="buttons right-stripe circle">
-        <button id="video-snapshot" tabindex="0"
-                i18n-label="take_video_snapshot_button"></button>
+        <button id="video-snapshot" class="inkdrop" tabindex="0"
+                i18n-label="take_video_snapshot_button"
+                data-svg="camera_shutter_video_snapshot.svg"></button>
       </div>
       <div id="shutters-group" class="buttons right-stripe circle">
-        <button id="recordvideo" class="shutter" tabindex="0"
+        <button id="recordvideo" class="shutter inkdrop" tabindex="0"
                 i18n-label="record_video_start_button">
           <div class="red-dot"></div>
           <div class="white-square"></div>
@@ -196,16 +228,17 @@
             <circle></circle>
           </svg>
         </button>
-        <button id="start-takephoto" class="shutter" tabindex="0"
-                i18n-label="take_photo_button"></button>
-        <button id="stop-takephoto" class="shutter" tabindex="0"
+        <button id="start-takephoto" class="shutter inkdrop" tabindex="0"
+                i18n-label="take_photo_button"
+                data-svg="camera_shutter_photo_start.svg"></button>
+        <button id="stop-takephoto" class="shutter inkdrop" tabindex="0"
                 i18n-label="take_photo_cancel_button"></button>
       </div>
       <div id="pause-recordvideo-holder" class="buttons right-stripe circle">
         <button id="pause-recordvideo" tabindex="0"
-                i18n-label="record_video_pause_button">
+                i18n-label="record_video_pause_button" class="inkdrop">
           <div class="red-dot"></div>
-          <div class="two-bars"></div>
+          <div class="two-bars" data-svg="camera_shutter_video_pause.svg"></div>
         </button>
       </div>
       <div class="bottom-stripe left-stripe buttons circle">
@@ -416,7 +449,6 @@
           <span i18n-text="expert_enable_expert_mode"></span>
         </label>
       </div>
-      <div class="spinner centered-overlay"></div>
     </div>
     <div id="view-option-panel">
       <div id="option-panel" class="panel">
@@ -428,23 +460,23 @@
       <div id="ptz-panel">
         <div id="reset-all-container" class="panel">
           <button id="ptz-reset-all" class="inkdrop" tabindex="0">
-            <div class="icon"></div>
+            <div class="icon" data-svg="ptz_reset_all.svg"></div>
             <div class="text" i18n-text="ptz_reset_all_button"></div>
           </button>
         </div>
         <div id="ptz-panel-container" class="panel">
           <button id="tilt-up" class="inkdrop" i18n-label="tilt_up_button"
-            tabindex="0"></button>
+            tabindex="0" data-svg="ptz_tilt_up.svg"></button>
           <button id="pan-left" class="inkdrop" i18n-label="pan_left_button"
-            tabindex="0"></button>
+            tabindex="0" data-svg="ptz_pan_left.svg"></button>
           <button id="zoom-out" class="inkdrop" i18n-label="zoom_out_button"
-            tabindex="0"></button>
+            tabindex="0" data-svg="ptz_zoom_out.svg"></button>
           <button id="zoom-in" class="inkdrop" i18n-label="zoom_in_button"
-            tabindex="0"></button>
+            tabindex="0" data-svg="ptz_zoom_in.svg"></button>
           <button id="pan-right" class="inkdrop" i18n-label="pan_right_button"
-            tabindex="0"></button>
+            tabindex="0" data-svg="ptz_pan_right.svg"></button>
           <button id="tilt-down" class="inkdrop" i18n-label="tilt_down_button"
-            tabindex="0"></button>
+            tabindex="0" data-svg="ptz_tilt_down.svg"></button>
           <div id="ptz-divider1" class="ptz-divider"></div>
           <div id="ptz-divider2" class="ptz-divider"></div>
           <div id="ptz-divider3" class="ptz-divider"></div>
@@ -491,17 +523,6 @@
     </div>
     <div id="view-warning">
       <div id="error-msg" aria-live="polite"></div>
-    </div>
-    <div id="view-message-dialog" class="dialog">
-      <div class="dialog-popup" role="dialog" aria-labelledby="dialog-msg">
-        <div class="dialog-msg dialog-msg-holder"></div>
-        <div class="dialog-buttons">
-          <button class="dialog-negative-button" tabindex="0"
-                  i18n-text="dialog_cancel_button"></button>
-          <button class="dialog-positive-button" tabindex="0"
-                  i18n-text="dialog_ok_button"></button>
-        </div>
-      </div>
     </div>
     <div id="view-splash"></div>
     <div id="toast" class="centered-overlay" tabindex="-1"

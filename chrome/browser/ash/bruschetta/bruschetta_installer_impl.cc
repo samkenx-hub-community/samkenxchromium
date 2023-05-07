@@ -19,6 +19,7 @@
 #include "chrome/browser/ash/bruschetta/bruschetta_util.h"
 #include "chrome/browser/ash/crostini/crostini_util.h"
 #include "chrome/browser/ash/guest_os/guest_id.h"
+#include "chrome/browser/ash/guest_os/guest_os_dlc_helper.h"
 #include "chrome/browser/ash/guest_os/guest_os_terminal.h"
 #include "chrome/browser/ash/profiles/profile_helper.h"
 #include "chrome/browser/download/background_download_service_factory.h"
@@ -145,25 +146,25 @@ void BruschettaInstallerImpl::InstallToolsDlc() {
   VLOG(2) << "Installing tools DLC";
   NotifyObserver(State::kToolsDlcInstall);
 
-  dlcservice::InstallRequest request;
-  request.set_id(kToolsDlc);
-  ash::DlcserviceClient::Get()->Install(
-      request,
+  in_progress_dlc_ = std::make_unique<guest_os::GuestOsDlcInstallation>(
+      kToolsDlc,
       base::BindOnce(&BruschettaInstallerImpl::OnToolsDlcInstalled,
                      weak_ptr_factory_.GetWeakPtr()),
       base::DoNothing());
 }
 
 void BruschettaInstallerImpl::OnToolsDlcInstalled(
-    const ash::DlcserviceClient::InstallResult& install_result) {
+    guest_os::GuestOsDlcInstallation::Result install_result) {
+  in_progress_dlc_.reset();
+
   if (MaybeClose()) {
     return;
   }
 
-  if (install_result.error != dlcservice::kErrorNone) {
+  if (!install_result.has_value()) {
     install_running_ = false;
     Error(BruschettaInstallResult::kToolsDlcInstallError);
-    LOG(ERROR) << "Failed to install tools dlc: " << install_result.error;
+    LOG(ERROR) << "Failed to install tools dlc: " << install_result.error();
     return;
   }
 
@@ -174,25 +175,23 @@ void BruschettaInstallerImpl::InstallFirmwareDlc() {
   VLOG(2) << "Installing firmware DLC";
   NotifyObserver(State::kFirmwareDlcInstall);
 
-  dlcservice::InstallRequest request;
-  request.set_id(kUefiDlc);
-  ash::DlcserviceClient::Get()->Install(
-      request,
+  in_progress_dlc_ = std::make_unique<guest_os::GuestOsDlcInstallation>(
+      kUefiDlc,
       base::BindOnce(&BruschettaInstallerImpl::OnFirmwareDlcInstalled,
                      weak_ptr_factory_.GetWeakPtr()),
       base::DoNothing());
 }
 
 void BruschettaInstallerImpl::OnFirmwareDlcInstalled(
-    const ash::DlcserviceClient::InstallResult& install_result) {
+    guest_os::GuestOsDlcInstallation::Result install_result) {
   if (MaybeClose()) {
     return;
   }
 
-  if (install_result.error != dlcservice::kErrorNone) {
+  if (!install_result.has_value()) {
     install_running_ = false;
     Error(BruschettaInstallResult::kFirmwareDlcInstallError);
-    LOG(ERROR) << "Failed to install firmware dlc: " << install_result.error;
+    LOG(ERROR) << "Failed to install firmware dlc: " << install_result.error();
     return;
   }
 
@@ -248,7 +247,7 @@ void BruschettaInstallerImpl::DownloadStarted(
 }
 
 void BruschettaInstallerImpl::DownloadFailed() {
-  download_guid_ = base::GUID();
+  download_guid_ = base::Uuid();
   download_callback_.Reset();
 
   if (MaybeClose()) {
@@ -261,15 +260,15 @@ void BruschettaInstallerImpl::DownloadFailed() {
 
 void BruschettaInstallerImpl::DownloadSucceeded(
     const download::CompletionInfo& completion_info) {
-  download_guid_ = base::GUID();
+  download_guid_ = base::Uuid();
   std::move(download_callback_).Run(completion_info);
 }
 
 void BruschettaInstallerImpl::DownloadBootDisk() {
   VLOG(2) << "Downloading boot disk";
-  // We need to generate the download GUID before notifying because the tests
+  // We need to generate the download UUID before notifying because the tests
   // need it to set the response.
-  download_guid_ = base::GUID::GenerateRandomV4();
+  download_guid_ = base::Uuid::GenerateRandomV4();
   NotifyObserver(State::kBootDiskDownload);
 
   const std::string* url = config_.FindDict(prefs::kPolicyImageKey)
@@ -304,9 +303,9 @@ void BruschettaInstallerImpl::OnBootDiskDownloaded(
 
 void BruschettaInstallerImpl::DownloadPflash() {
   VLOG(2) << "Downloading pflash";
-  // We need to generate the download GUID before notifying because the tests
+  // We need to generate the download UUID before notifying because the tests
   // need it to set the response.
-  download_guid_ = base::GUID::GenerateRandomV4();
+  download_guid_ = base::Uuid::GenerateRandomV4();
   NotifyObserver(State::kPflashDownload);
 
   const base::Value::Dict* pflash = config_.FindDict(prefs::kPolicyPflashKey);
@@ -617,7 +616,7 @@ void BruschettaInstallerImpl::Error(BruschettaInstallResult error) {
   }
 }
 
-const base::GUID& BruschettaInstallerImpl::GetDownloadGuid() const {
+const base::Uuid& BruschettaInstallerImpl::GetDownloadGuid() const {
   return download_guid_;
 }
 

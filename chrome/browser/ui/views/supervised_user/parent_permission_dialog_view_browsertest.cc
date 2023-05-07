@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include "base/memory/raw_ptr.h"
 #include "chrome/browser/ui/supervised_user/parent_permission_dialog.h"
 
 #include <memory>
@@ -156,6 +157,9 @@ class ParentPermissionDialogViewTest
     supervised_user_test_util::
         SetSupervisedUserExtensionsMayRequestPermissionsPref(
             browser()->profile(), true);
+    supervised_user_extensions_delegate_ =
+        std::make_unique<extensions::SupervisedUserExtensionsDelegateImpl>(
+            browser()->profile());
 
     if (browser()->profile()->IsChild())
       InitializeFamilyData();
@@ -165,6 +169,11 @@ class ParentPermissionDialogViewTest
     extension_service()->DisableExtension(
         test_extension_->id(),
         extensions::disable_reason::DISABLE_CUSTODIAN_APPROVAL_REQUIRED);
+  }
+
+  void TearDownOnMainThread() override {
+    supervised_user_extensions_delegate_.reset();
+    MixinBasedInProcessBrowserTest::TearDownOnMainThread();
   }
 
   void set_next_reauth_status(
@@ -247,8 +256,11 @@ class ParentPermissionDialogViewTest
         ->extension_service();
   }
 
+  std::unique_ptr<extensions::SupervisedUserExtensionsDelegate>
+      supervised_user_extensions_delegate_;
+
  private:
-  ParentPermissionDialogView* view_ = nullptr;
+  raw_ptr<ParentPermissionDialogView, ExperimentalAsh> view_ = nullptr;
   std::unique_ptr<ParentPermissionDialog> parent_permission_dialog_;
   ParentPermissionDialog::Result result_;
 
@@ -588,10 +600,6 @@ class ExtensionManagementApiTestSupervised
       EXPECT_FALSE(disabled_extension_id_.empty());
       EXPECT_FALSE(test_extension_id_.empty());
       // Approve the extension for running the test.
-      std::unique_ptr<extensions::SupervisedUserExtensionsDelegate>
-          supervised_user_extensions_delegate_ = std::make_unique<
-              extensions::SupervisedUserExtensionsDelegateImpl>(
-              browser()->profile());
       supervised_user_extensions_delegate_->AddExtensionApproval(
           *test_extension);
     }

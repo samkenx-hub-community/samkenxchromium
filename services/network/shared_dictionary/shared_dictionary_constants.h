@@ -8,16 +8,26 @@
 #include <stdint.h>
 
 #include "base/component_export.h"
+#include "base/time/time.h"
 
 namespace network::shared_dictionary {
 
 // The default value (1 year) of expiration time in "use-as-dictionary"
 // HTTP header.
-constexpr int64_t kDefaultExpiration = 31536000;
+constexpr base::TimeDelta kDefaultExpiration = base::Seconds(31536000);
 
 // The header name of "use-as-dictionary".
 COMPONENT_EXPORT(NETWORK_SERVICE)
 extern const char kUseAsDictionaryHeaderName[];
+
+// The dictionary option name of "match".
+COMPONENT_EXPORT(NETWORK_SERVICE) extern const char kOptionNameMatch[];
+
+// The dictionary option name of "expires".
+COMPONENT_EXPORT(NETWORK_SERVICE) extern const char kOptionNameExpires[];
+
+// The dictionary option name of "algorithms".
+COMPONENT_EXPORT(NETWORK_SERVICE) extern const char kOptionNameAlgorithms[];
 
 }  // namespace network::shared_dictionary
 

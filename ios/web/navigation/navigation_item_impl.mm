@@ -36,6 +36,8 @@ static int GetUniqueIDInConstructor() {
 
 namespace web {
 
+using HttpRequestHeaders = NavigationItem::HttpRequestHeaders;
+
 // Value 50 was picked experimentally by examining Chrome for iOS UI. Tab strip
 // on 12.9" iPad Pro trucates the title to less than 50 characters (title that
 // only consists of letters "i"). Tab strip has the biggest surface to fit
@@ -48,39 +50,14 @@ std::unique_ptr<NavigationItem> NavigationItem::Create() {
 }
 
 NavigationItemImpl::NavigationItemImpl()
-    : unique_id_(GetUniqueIDInConstructor()),
-      transition_type_(ui::PAGE_TRANSITION_LINK),
-      user_agent_type_(UserAgentType::NONE),
-      is_created_from_hash_change_(false),
-      should_skip_serialization_(false),
-      navigation_initiation_type_(web::NavigationInitiationType::NONE),
-      is_untrusted_(false),
-      https_upgrade_type_(HttpsUpgradeType::kNone) {}
+    : unique_id_(GetUniqueIDInConstructor()) {}
 
 NavigationItemImpl::~NavigationItemImpl() {
 }
 
-NavigationItemImpl::NavigationItemImpl(const NavigationItemImpl& item)
-    : unique_id_(item.unique_id_),
-      original_request_url_(item.original_request_url_),
-      url_(item.url_),
-      referrer_(item.referrer_),
-      virtual_url_(item.virtual_url_),
-      title_(item.title_),
-      transition_type_(item.transition_type_),
-      favicon_status_(item.favicon_status_),
-      ssl_(item.ssl_),
-      timestamp_(item.timestamp_),
-      user_agent_type_(item.user_agent_type_),
-      http_request_headers_([item.http_request_headers_ mutableCopy]),
-      serialized_state_object_([item.serialized_state_object_ copy]),
-      is_created_from_hash_change_(item.is_created_from_hash_change_),
-      should_skip_serialization_(item.should_skip_serialization_),
-      post_data_([item.post_data_ copy]),
-      navigation_initiation_type_(item.navigation_initiation_type_),
-      is_untrusted_(item.is_untrusted_),
-      cached_display_title_(item.cached_display_title_),
-      https_upgrade_type_(item.https_upgrade_type_) {}
+std::unique_ptr<NavigationItemImpl> NavigationItemImpl::Clone() {
+  return base::WrapUnique(new NavigationItemImpl(*this));
+}
 
 int NavigationItemImpl::GetUniqueID() const {
   return unique_id_;
@@ -187,10 +164,6 @@ base::Time NavigationItemImpl::GetTimestamp() const {
 
 void NavigationItemImpl::SetUserAgentType(UserAgentType type) {
   user_agent_type_ = type;
-  DCHECK(!wk_navigation_util::URLNeedsUserAgentType(GetURL()) ==
-         (user_agent_type_ == UserAgentType::NONE))
-      << "GetURL() " << GetURL() << " user_agent_type_ "
-      << static_cast<short>(user_agent_type_);
 }
 
 void NavigationItemImpl::SetUntrusted() {
@@ -209,12 +182,12 @@ bool NavigationItemImpl::HasPostData() const {
   return post_data_ != nil;
 }
 
-NSDictionary* NavigationItemImpl::GetHttpRequestHeaders() const {
+HttpRequestHeaders* NavigationItemImpl::GetHttpRequestHeaders() const {
   return [http_request_headers_ copy];
 }
 
 void NavigationItemImpl::AddHttpRequestHeaders(
-    NSDictionary* additional_headers) {
+    HttpRequestHeaders* additional_headers) {
   if (!additional_headers)
     return;
 
@@ -343,5 +316,29 @@ NSString* NavigationItemImpl::GetDescription() const {
           GetHttpsUpgradeTypeDescription(https_upgrade_type_).c_str()];
 }
 #endif
+
+NavigationItemImpl::NavigationItemImpl(const NavigationItemImpl& item)
+    : unique_id_(item.unique_id_),
+      original_request_url_(item.original_request_url_),
+      url_(item.url_),
+      referrer_(item.referrer_),
+      virtual_url_(item.virtual_url_),
+      title_(item.title_),
+      transition_type_(item.transition_type_),
+      favicon_status_(item.favicon_status_),
+      ssl_(item.ssl_),
+      timestamp_(item.timestamp_),
+      user_agent_type_(item.user_agent_type_),
+      http_request_headers_([item.http_request_headers_ mutableCopy]),
+      serialized_state_object_([item.serialized_state_object_ copy]),
+      is_created_from_hash_change_(item.is_created_from_hash_change_),
+      should_skip_serialization_(item.should_skip_serialization_),
+      post_data_([item.post_data_ copy]),
+      navigation_initiation_type_(item.navigation_initiation_type_),
+      is_untrusted_(item.is_untrusted_),
+      cached_display_title_(item.cached_display_title_),
+      https_upgrade_type_(item.https_upgrade_type_) {
+  CloneDataFrom(item);
+}
 
 }  // namespace web

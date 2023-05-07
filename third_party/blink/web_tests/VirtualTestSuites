@@ -54,15 +54,6 @@
     "expires": "Jul 1, 2023"
   },
   {
-    "prefix": "lna-allow-potentially-trustworthy-same-origin",
-    "platforms": ["Linux", "Mac", "Win"],
-    "bases": ["external/wpt/fetch/local-network-access"],
-    "args": [
-      "--enable-features=LocalNetworkAccessAllowPotentiallyTrustworthySameOrigin"
-    ],
-    "expires": "Jul 1, 2023"
-  },
-  {
     "prefix": "reduce-accept-language",
     "platforms": ["Linux", "Mac", "Win"],
     "bases": ["http/tests/navigation/language",
@@ -78,7 +69,8 @@
     "prefix": "gpu",
     "platforms": ["Linux", "Mac", "Win", "Fuchsia"],
     "bases": [ "fast/canvas",
-               "external/wpt/mediacapture-record/MediaRecorder-canvas-media-source.https.html" ],
+               "external/wpt/mediacapture-record/MediaRecorder-canvas-media-source.https.html",
+               "external/wpt/webmessaging/postMessage_cross_domain_image_transfer_2d.sub.htm" ],
     "args": ["--enable-accelerated-2d-canvas"],
     "expires": "Jul 1, 2023"
   },
@@ -134,18 +126,41 @@
   },
 
   {
-    "prefix": "composite-scroll-after-paint",
+    "prefix": "disable-composite-scroll-after-paint",
     "platforms": ["Linux"],
     "bases": ["compositing/overflow",
               "fast/scrolling",
               "paint/invalidation/overflow",
+              "paint/invalidation/scroll",
               "scrollbars",
               "external/wpt/css/css-scroll-snap",
               "external/wpt/scroll-animations",
               "external/wpt/css/css-overflow",
+              "scrollingcoordinator",
               "http/tests/devtools/layers"],
-    "args": ["--enable-features=CompositeScrollAfterPaint"],
+    "args": ["--disable-features=CompositeScrollAfterPaint"],
     "expires": "Sep 1, 2023"
+  },
+  {
+    "prefix": "composite-background-attachment-fixed",
+    "platforms": ["Linux"],
+    "bases": ["compositing/fixed-background-after-style-recalc.html",
+              "compositing/fixed-background-composited-html.html",
+              "compositing/fixed-background-negative-z-index-fixed.html",
+              "compositing/fixed-body-background-positioned.html",
+              "compositing/backgrounds",
+              "fast/backgrounds",
+              "paint/background",
+              "paint/invalidation/background",
+              "external/wpt/css/CSS2/backgrounds",
+              "external/wpt/css/css-backgrounds",
+              "external/wpt/css/css-break/background-image-000.html",
+              "external/wpt/css/css-break/background-image-001.html",
+              "external/wpt/css/css-break/background-image-002.html",
+              "external/wpt/css/css-break/background-attachment-fixed.html"],
+    "args": ["--enable-features=CompositeBackgroundAttachmentFixed",
+             "--enable-prefer-compositing-to-lcd-text"],
+    "expires": "Aug 1, 2023"
   },
   {
     "prefix": "attribution-reporting-debug-mode",
@@ -153,7 +168,7 @@
     "bases": ["wpt_internal/attribution-reporting"],
     "exclusive_tests": "ALL",
     "args": ["--attribution-reporting-debug-mode",
-             "--enable-features=AttributionReportingCrossAppWeb,AttributionReportingTriggerAttestation",
+             "--enable-features=AttributionReportingCrossAppWeb,AttributionReportingReportVerification",
              "--additional-private-state-token-key-commitments={\"https://web-platform.test:8444\":{\"PrivateStateTokenV3VOPRF\":{\"protocol_version\":\"PrivateStateTokenV3VOPRF\",\"id\":1,\"batchsize\":1,\"keys\":{\"0\":{\"Y\":\"AAAAAASqh8oivosFN46xxx7zIK10bh07Younm5hZ90HgglQqOFUC8l2/VSlsOlReOHJ2CrfJ6CG1adnTkKJhZ0BtbSPWBwviQtdl64MWJc7sSg9HPvWfTjDigX5ihbzihG8V8aA=\",\"expiry\":\"253402300799000000\"}}}}}"],
     "expires": "Jul 1, 2023"
   },
@@ -351,7 +366,8 @@
   {
     "prefix": "compute-pressure",
     "platforms": ["Linux", "Mac", "Win"],
-    "bases": ["external/wpt/compute-pressure"],
+    "bases": ["external/wpt/compute-pressure",
+              "wpt_internal/compute-pressure"],
     "exclusive_tests": "ALL",
     "args": ["--enable-features=ComputePressure"],
     "expires": "Jul 1, 2023"
@@ -1114,7 +1130,8 @@
     "prefix": "oopr-canvas2d",
     "platforms": ["Linux", "Mac", "Win"],
     "bases": [ "fast/canvas",
-               "external/wpt/mediacapture-record/MediaRecorder-canvas-media-source.https.html" ],
+               "external/wpt/mediacapture-record/MediaRecorder-canvas-media-source.https.html",
+               "external/wpt/webmessaging/postMessage_cross_domain_image_transfer_2d.sub.htm" ],
     "args": [ "--enable-features=CanvasOopRasterization",
               "--enable-accelerated-2d-canvas",
               "--enable-gpu-rasterization" ],
@@ -1456,11 +1473,13 @@
       "http/tests/fenced_frame",
       "wpt_internal/fenced_frame",
       "http/tests/inspector-protocol/fenced-frame",
-      "external/wpt/html/anonymous-iframe"
+      "external/wpt/html/anonymous-iframe",
+      "external/wpt/fenced-frame"
     ],
     "exclusive_tests": [
       "http/tests/fenced_frame",
       "wpt_internal/fenced_frame",
+      "external/wpt/fenced-frame",
       "http/tests/inspector-protocol/fenced-frame"
     ],
     "args": ["--enable-features=FencedFrames:implementation_type/mparch,PrivacySandboxAdsAPIsOverride,SharedStorageAPI,NoncedPartitionedCookies,Fledge,InterestGroupStorage,AdInterestGroupAPI,AllowURNsInIframes,BiddingAndScoringDebugReportingAPI,ComputePressure",
@@ -1658,7 +1677,7 @@
     ],
     "exclusive_tests": "ALL",
     "args": [
-      "--enable-blink-features=SpeculationRulesPrefetchProxy,SpeculationRulesFetchFromHeader,SpeculationRulesDocumentRules,NoVarySearchPrefetch,SpeculationRulesEagerness",
+      "--enable-blink-features=SpeculationRulesPrefetchProxy,SpeculationRulesFetchFromHeader,SpeculationRulesDocumentRules,NoVarySearchPrefetch,SpeculationRulesEagerness,SpeculationRulesDocumentRulesSelectorMatches",
       "--enable-features=SpeculationRulesPrefetchProxy,PrefetchUseContentRefactor",
       "--bypass-prefetch-proxy-for-host=not-web-platform.test"
     ],
@@ -1931,7 +1950,7 @@
       "http/tests/inspector-protocol/network/is-same-site.js",
       "http/tests/priority-hints/image-initial-load.html"
     ],
-    "args": ["--enable-features=BoostImagePriority"]
+    "args": ["--disable-features=BoostImagePriority"]
   },
   {
     "prefix": "html-pattern-regexp-unicodesets",
@@ -1947,6 +1966,24 @@
     "platforms": ["Linux"],
     "bases": ["external/wpt/fetch/api/response"],
     "args": ["--disable-features=ReadableStreamTeeCloneForBranch2"],
+    "expires": "Aug 1, 2023"
+  },
+  {
+    "prefix": "main-thread-high-priority-image-loading",
+    "platforms": ["Linux"],
+    "bases": [
+      "images/image-change-src.html"
+    ],
+    "args": [
+      "--enable-features=MainThreadHighPriorityImageLoading"
+    ],
+    "expires": "Dec 1, 2023"
+  },
+  {
+    "prefix": "longtask-from-loaf",
+    "platforms": ["Linux"],
+    "bases": ["external/wpt/longtask-timing"],
+    "args": ["--enable-blink-features=LongTaskFromLongAnimationFrame"],
     "expires": "Aug 1, 2023"
   }
 ]

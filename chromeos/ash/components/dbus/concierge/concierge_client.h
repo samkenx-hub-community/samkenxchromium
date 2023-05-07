@@ -40,15 +40,19 @@ class COMPONENT_EXPORT(CONCIERGE) ConciergeClient
    public:
     // OnVmStarted is signaled by Concierge when a VM starts.
     virtual void OnVmStarted(
-        const vm_tools::concierge::VmStartedSignal& signal) = 0;
+        const vm_tools::concierge::VmStartedSignal& signal) {}
 
     // OnVmStopped is signaled by Concierge when a VM stops.
     virtual void OnVmStopped(
-        const vm_tools::concierge::VmStoppedSignal& signal) = 0;
+        const vm_tools::concierge::VmStoppedSignal& signal) {}
 
     // OnVmStopping is signaled by Concierge when a VM is stopping.
     virtual void OnVmStopping(
         const vm_tools::concierge::VmStoppingSignal& signal) {}
+
+    // OnVmSwapping is signaled by Concierge when a VM is swapping.
+    virtual void OnVmSwapping(
+        const vm_tools::concierge::VmSwappingSignal& signal) {}
 
    protected:
     virtual ~VmObserver() = default;
@@ -232,14 +236,6 @@ class COMPONENT_EXPORT(CONCIERGE) ConciergeClient
   // becomes available.
   virtual void WaitForServiceToBeAvailable(
       dbus::ObjectProxy::WaitForServiceToBeAvailableCallback callback) = 0;
-
-  // Gets SSH server public key of container and trusted SSH client private key
-  // which can be used to connect to the container.
-  // |callback| is called after the method call finishes.
-  virtual void GetContainerSshKeys(
-      const vm_tools::concierge::ContainerSshKeysRequest& request,
-      chromeos::DBusMethodCallback<
-          vm_tools::concierge::ContainerSshKeysResponse> callback) = 0;
 
   // Attaches a USB device to a VM.
   // |callback| is called once the method call has finished.

@@ -241,8 +241,7 @@ class MHTMLGenerationManager::Job {
   // renderer that the MHTML generation for previous frame has finished).
   void SerializeAsMHTMLResponse(
       mojom::MhtmlSaveStatus save_status,
-      const std::vector<std::string>& digests_of_uris_of_serialized_resources,
-      base::TimeDelta renderer_main_thread_time);
+      const std::vector<std::string>& digests_of_uris_of_serialized_resources);
 
   // Records newly serialized resource digests into
   // |digests_of_already_serialized_uris_|.
@@ -280,18 +279,13 @@ class MHTMLGenerationManager::Job {
   // Renderer. This prevents the race/crash from https://crbug.com/612098.
   void MarkAsFinished();
 
-  void ReportRendererMainThreadTime(base::TimeDelta renderer_main_thread_time);
-
   // Close the MHTML file if it looks good, setting the size param.  Returns
   // false for failure.
   static bool CloseFileIfValid(base::File& file, int64_t* file_size);
 
   // Time tracking for performance metrics reporting.
-  const base::TimeTicks creation_time_;
   base::TimeTicks wait_on_renderer_start_time_;
   base::TimeDelta all_renderers_wait_time_;
-  base::TimeDelta all_renderers_main_thread_time_;
-  base::TimeDelta longest_renderer_main_thread_time_;
 
   // User-configurable parameters. Includes the file location, binary encoding
   // choices.
@@ -352,8 +346,7 @@ MHTMLGenerationManager::Job::Job(
     WebContents* web_contents,
     const MHTMLGenerationParams& params,
     MHTMLGenerationResult::GenerateMHTMLCallback callback)
-    : creation_time_(base::TimeTicks::Now()),
-      params_(params),
+    : params_(params),
       frame_tree_node_id_of_busy_frame_(FrameTreeNode::kFrameTreeNodeInvalidId),
       mhtml_boundary_marker_(net::GenerateMimeMultipartBoundary()),
       salt_(base::Uuid::GenerateRandomV4().AsLowercaseString()),
@@ -587,8 +580,6 @@ void MHTMLGenerationManager::Job::OnFinished(
   TRACE_EVENT_NESTABLE_ASYNC_END2("page-serialization", "SavingMhtmlJob", this,
                                   "job save status", save_status, "file size",
                                   file_size);
-  UMA_HISTOGRAM_TIMES("PageSerialization.MhtmlGeneration.FullPageSavingTime",
-                      base::TimeTicks::Now() - creation_time_);
   UMA_HISTOGRAM_ENUMERATION("PageSerialization.MhtmlGeneration.FinalSaveStatus",
                             save_status);
 
@@ -632,25 +623,6 @@ void MHTMLGenerationManager::Job::MarkAsFinished() {
         "FrameTree",
         all_renderers_wait_time_);
   }
-  if (!all_renderers_main_thread_time_.is_zero()) {
-    UMA_HISTOGRAM_TIMES(
-        "PageSerialization.MhtmlGeneration.RendererMainThreadTime.FrameTree",
-        all_renderers_main_thread_time_);
-  }
-  if (!longest_renderer_main_thread_time_.is_zero()) {
-    UMA_HISTOGRAM_TIMES(
-        "PageSerialization.MhtmlGeneration.RendererMainThreadTime.SlowestFrame",
-        longest_renderer_main_thread_time_);
-  }
-}
-
-void MHTMLGenerationManager::Job::ReportRendererMainThreadTime(
-    base::TimeDelta renderer_main_thread_time) {
-  DCHECK(renderer_main_thread_time.is_positive());
-  if (renderer_main_thread_time.is_positive())
-    all_renderers_main_thread_time_ += renderer_main_thread_time;
-  if (renderer_main_thread_time > longest_renderer_main_thread_time_)
-    longest_renderer_main_thread_time_ = renderer_main_thread_time;
 }
 
 void MHTMLGenerationManager::Job::CloseFile(
@@ -675,13 +647,11 @@ void MHTMLGenerationManager::Job::CloseFile(
 
 void MHTMLGenerationManager::Job::SerializeAsMHTMLResponse(
     mojom::MhtmlSaveStatus save_status,
-    const std::vector<std::string>& digests_of_uris_of_serialized_resources,
-    base::TimeDelta renderer_main_thread_time) {
+    const std::vector<std::string>& digests_of_uris_of_serialized_resources) {
   DCHECK_CURRENTLY_ON(BrowserThread::UI);
 
   TRACE_EVENT_NESTABLE_ASYNC_END0("page-serialization", "WaitingOnRenderer",
                                   this);
-  ReportRendererMainThreadTime(renderer_main_thread_time);
 
   frame_tree_node_id_of_busy_frame_ = FrameTreeNode::kFrameTreeNodeInvalidId;
 

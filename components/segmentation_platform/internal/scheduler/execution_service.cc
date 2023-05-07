@@ -46,7 +46,7 @@ void ExecutionService::Initialize(
     std::vector<ModelExecutionScheduler::Observer*>&& observers,
     const PlatformOptions& platform_options,
     std::unique_ptr<processing::InputDelegateHolder> input_delegate_holder,
-    std::vector<std::unique_ptr<Config>>* configs,
+    const std::vector<std::unique_ptr<Config>>* configs,
     PrefService* profile_prefs) {
   storage_service_ = storage_service;
 
@@ -57,8 +57,9 @@ void ExecutionService::Initialize(
 
   training_data_collector_ = TrainingDataCollector::Create(
       feature_list_query_processor_.get(),
-      signal_handler->deprecated_histogram_signal_handler(), storage_service,
-      configs, profile_prefs, clock);
+      signal_handler->deprecated_histogram_signal_handler(),
+      signal_handler->user_action_signal_handler(), storage_service, configs,
+      profile_prefs, clock);
 
   model_executor_ = std::make_unique<ModelExecutorImpl>(
       clock, feature_list_query_processor_.get());
